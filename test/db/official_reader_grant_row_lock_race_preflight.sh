@@ -55,7 +55,7 @@ set_status() {
       last_effective_at=clock_timestamp(),updated_at=clock_timestamp()
     where id='$1'::uuid and grant_source_type='purchase'
     returning status;")"
-  [[ "$result" == "$2" ]] || fail "fixture status mismatch: $1 $2 $result"
+  [[ "$(printf '%s\n' "$result" | sed -n '1p')" == "$2" ]] || fail "fixture status mismatch: $1 $2 $result"
 }
 wait_backend() {
   local result
