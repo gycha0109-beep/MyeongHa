@@ -223,6 +223,14 @@ previousEventDigest, eventDigest, externalAuditReceipt?
 - 재검증된 R01–R14 실제 증빙을 입력받는 Target Authority V2 (Runner와 연결 금지 상태부터 구현).
 - 기존 2인 승인·Collector/Reviewer 구분의 **출처·신원 모델**을 단일 인간 Owner + 다중 시스템 주체로 명시 변환. 기존 계약을 silent rewrite하여 잘못된 2인 독립 증빙을 생성하지 않는다.
 
+## 12A. SO-1 합성 Owner Intent / 기술 보안 신원 계약 (운영 비인증)
+
+- `apps/api/src/saju-held-staging-solo-owner-intent-v1.ts`: `P2_STAGING_READ_ONLY`와 `P3_STAGING_SINGLE_REHEARSAL` 두 가지 **주장된** Owner 의도만 정형화한다. P4 Root 변경·Production/Commerce 권한은 지원하지 않는다.
+- Intent는 단일 환경·Manifest/Plan digests·MyeongHa/Saju commit SHA·정확한 request digest·Permit ID(P3에서만 필수)·인증 이벤트 참조·정책 revision과 최대 60초 기한에 묶인다.
+- `authenticationEvent`, `expectedScope`, 여섯 개 기술 주체(`OWNER_PORTAL`, `ROOT_CUSTODY`, `OPERATOR_SIGNER`, `ATTESTOR_WORKER`, `CHALLENGE_CONSUMER`, `RUNNER`)를 각각 검사한다. 서로 다른 principal ID가 필요하며 Root/Owner/Attestor 도메인이 Runner와 분리되어야 한다. 여섯 주체의 `humanOwnerSubject`는 동일한 **한 사람**으로 명시한다.
+- **모든 필드는 호출자가 제출한 합성 주장**이다. 실제 패스키 서명, 인증 이벤트의 저장소 출처, workload IAM, Root KMS custody, 감사 원장 불변성, 안전한 서버 시간은 이 함수에서 증명하지 않는다. `CONSISTENT_UNVERIFIED_ORIGIN`은 형식 일치일 뿐 승인·실행권이 아니다. 소유권·신원 검증을 오인하지 않도록 `humanReviewersVerified=0`, `ownerAuthentication=NOT_VERIFIED`, `stagingAdmission=HOLD`, 실행/판매 플래그 모두 false를 반환한다.
+- 허용되지 않는 principal 결합, 잘못된 환경·Permit·SHA·digest, 만료/변조·P4 주입, 악의적 getter·prototype/secret injection은 `BLOCKED`. 기존 Registry/Permit V2·Evidence/Runner 코드와 **연결하지 않는다**. 테스트는 `test/saju-held-staging-solo-owner-intent-v1.test.ts`.
+
 ## 13. 단계별 마이그레이션 및 종료 게이트
 
 | 단계 | 내용 | 통과 조건 | 미통과 시 |
