@@ -86,7 +86,7 @@ insert into public.seyeon_ai_governor_model_policies_v1(
  cached_input_micro_usd_per_million,output_micro_usd_per_million,is_active
 ) values (
  'openai-responses','d4-offline-no-network-model-chat',
- 'd4-chat-policy-v1','d4-rate-v1',array['renderer']::text[],
+ 'd4-chat-policy-v1','d4-rate-v1',array['dialogue_render']::text[],
  2000,1200,800,20000,1000000,250000,4000000,true
 );
 update public.seyeon_ai_governor_daily_budgets_v1
@@ -115,7 +115,7 @@ begin;
 set local role myeongha_seyeon_governed_executor;
 select subject_id from public.begin_member_subject_context_v1('00000000-0000-0000-0000-00000000a002');
 select call_id,ceiling_micro_usd from public.cmd_governed_start_seyeon_ai_call_v1(
- '$sb','$tb','$ab','chat','$call','renderer',
+ '$sb','$tb','$ab','chat','$call','dialogue_render',
  'openai-responses','d4-offline-no-network-model-chat','d4-chat-policy-v1','d4-rate-v1',500,800,2500);
 SQL
   fi
@@ -197,10 +197,10 @@ denied b-subject 'seyeon_ai_governor_subject_exhausted' "$tmp/b2.sql"
 # Two authenticated member sessions cannot reserve the other's canonical
 # Subject, even with otherwise eligible turn/attempt values.
 sed -e "s/'$sa'/'$sb'/g" -e "s/'$ta'/'$tb'/g" -e "s/'$aa'/'$ab'/g" \
- -e "s/'post_turn'/'chat'/g" -e "s/'event_extraction'/'renderer'/g" \
+ -e "s/'post_turn'/'chat'/g" -e "s/'event_extraction'/'dialogue_render'/g" \
  "$tmp/a2.sql" >"$tmp/a-foreign.sql"
 sed -e "s/'$sb'/'$sa'/g" -e "s/'$tb'/'$ta'/g" -e "s/'$ab'/'$aa'/g" \
- -e "s/'chat'/'post_turn'/g" -e "s/'renderer'/'event_extraction'/g" \
+ -e "s/'chat'/'post_turn'/g" -e "s/'dialogue_render'/'event_extraction'/g" \
  "$tmp/b2.sql" >"$tmp/b-foreign.sql"
 for who in a b; do
  if db -f "$tmp/$who-foreign.sql" >"$tmp/$who-foreign.log" 2>&1; then
