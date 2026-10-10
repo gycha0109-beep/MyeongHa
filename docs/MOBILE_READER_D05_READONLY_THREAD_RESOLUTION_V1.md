@@ -142,3 +142,46 @@ the actual Product owner policy port (#1828); #1827 refund/revoke and final T2
 writer lock; public Reader CTA/Chat and Saju execution. This function is
 **not imported into any HTTP, mobile or chat send route**, and success
 does not authorize paid Reader interpretation or public result disclosure.
+
+## D-05-C outer admission scope parity review (2026-10-11)
+
+The *first* exact access metadata read happens before the opener and before
+`resolveOfficialReadingReaderThreadV1` performs its own double-read. The
+outer first-to-final comparison now includes **all** authoritative access
+identity/scope fields, specifically `topicKey`, `readingPeriod`, and
+`readingVariant`, in addition to Subject, Reading, Reader, Grant Bundle,
+product, versions, birth revision, engine and official source hash. The inner
+resolver already compared these three fields; its second/third reads alone
+cannot detect a first-to-second scope change that then remains stable.
+
+The six regression cases in
+`test/postgres-official-reading-reader-first-thread-v1.test.ts` simulate
+first-to-final drift of each field for both initial open and existing Thread
+reuse, and require `ACCESS_DENIED` plus transaction `ROLLBACK`. This is a
+synthetic PostgreSQL-port fault-injection test, **not** evidence that the real
+PostgreSQL writer can mutate immutable Reading facts in-place, and **not** a
+claim of current live privilege escalation.
+
+### Owner decision options, not approvals
+
+| Decision | Options and engineering trade-off | Recommendation while undecided |
+| --- | --- | --- |
+| D05-A Thread identity | Shared Member × Reader reuses existing Web/Chat history but needs *per-Reading* knowledge isolation and revoke-aware context; one Thread per Reading isolates context but conflicts with the existing single-character opener/locator and requires DB identity redesign | Preserve existing general Chat and the dormant shared candidate; hold paid behavior until DB/Product sign-off |
+| Bundle compatibility | Reject non-matching default-release Bundle (current atomic rollback; no new schema), or implement an approved pinned-Bundle writer (more precise, but requires DB migration/lock and content transition review) | Reject/rollback. No silent default-Bundle substitute |
+| #1828 eligibility | Separate versioned Standard product eligibility from specialist `can_initiate` only after Product/DB/Reader sign-off, or keep current capability gate | HOLD. No fabricated capability rows or 9-Reader promotion |
+| #1827 revoke/T2 | Shared existing-grant row locks alone miss *new* independent Grant/access INSERTs (DB-C4); a Birth Profile anchor may block the binder but naïve reversed lock order can deadlock (DB-C5); new Reader×Reading anchor adds schema/writer work | HOLD. Require one agreed predicate/row-lock order, **all** participating writers, fresh T2 evaluation and commit-to-send disclosure contract |
+
+Current DB preflights:
+`test/db/official_reader_new_grant_insert_phantom_preflight.sh`,
+`test/db/official_reader_provider_effect_revoke_race_preflight.sh`,
+`test/db/official_reader_birth_scope_lock_candidate_preflight.sh`.
+These are **bounded isolated PostgreSQL evidence**, not an approved final
+T2 release protocol. The existing D-05-C rollback fixture only invokes the
+real Member Chat open command and locator against a synthetic expected bundle;
+it does **not** combine the actual purchased Grant/Reader access query, Product
+approval and HTTP handler into a positive real-DB end-to-end test. Before
+public activation, require that independent full-scope fixture (including
+two active cross-Bundle purchases, simultaneous first entry, revoke races,
+retry/rollback and RLS/role checks) and Owner approvals. Product/Commerce
+policy factory, public Reader route, paid send, final reveal and live checkout
+remain disabled.
