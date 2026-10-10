@@ -161,7 +161,7 @@ export function createProductionSeyeonPostTurnWorkerRuntimeV1(
           pool: poolLease.pool,
           verifiedEvidence: runInput.verifiedEvidence,
         });
-      const resolvedSubject = await runner.resolveSubject();;
+      const resolvedSubject = await runner.resolveSubject();
       // The main Subject Runner remains responsible for Chat/Outbox writes.
       // Governed Start and Settle use a different DB LOGIN + role only.
       const costRunner = costPoolLease === null
