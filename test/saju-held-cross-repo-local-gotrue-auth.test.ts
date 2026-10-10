@@ -1,8 +1,12 @@
-import { randomBytes } from 'node:crypto';
+import { generateKeyPairSync, randomBytes, randomUUID, sign } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { Pool, type PoolConfig } from 'pg';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { bindAuthenticatedMemberSajuHeldProofV1 } from '../apps/api/src/saju-held-authenticated-member-proof-v1.js';
+import { createSajuHeldStagingPostgresAdmissionPortV2 } from '../apps/api/src/saju-held-staging-admission-postgres-v2.js';
+import { canonicalSajuHeldStagingPermitApprovalBytesV2 } from '../apps/api/src/saju-held-staging-admission-signature-v2.js';
+import { digestSajuHeldStagingTargetManifestV1 } from '../apps/api/src/saju-held-staging-target-manifest-v1.js';
+import { digestSajuHeldStagingConnectionPlanV1 } from '../apps/api/src/saju-held-staging-connection-plan-v1.js';
 import { createProductionRequestIdentityVerifierV1 } from '../apps/api/src/production-request-identity-verifier.js';
 import {
   MYEONGHA_PRODUCTION_SUPABASE_ORIGIN,
@@ -49,6 +53,7 @@ const pgConfig = {
 };
 const isolatedSubjectTls = enabled && process.env.MYEONGHA_LOCAL_TLS_SUBJECT_ENABLED === '1';
 const isolatedNonceTls = enabled && process.env.MYEONGHA_LOCAL_TLS_NONCE_ENABLED === '1';
+const isolatedAdmissionTls = enabled && process.env.MYEONGHA_LOCAL_TLS_ADMISSION_ENABLED === '1';
 const readCiCa = (file: string | undefined) => file ? readFileSync(file, 'utf8') : '';
 const subjectAdminConfig: PoolConfig = isolatedSubjectTls ? {
   host: 'subject.saju-bridge-ci.invalid', port: 5444,
@@ -322,6 +327,163 @@ describe.skipIf(!enabled)('real local GoTrue /user -> MyeongHa member verifier -
     expect(issued).not.toHaveBeenCalled();
     expect(result).not.toHaveProperty('binding');
   });
+
+
+  it.skipIf(!isolatedAdmissionTls)(
+    'binds one real GoTrue JWT to TLS Subject and TLS Nonce, then isolates signed Admission without Runner',
+    async () => {
+      if (!isolatedSubjectTls || !isolatedNonceTls
+        || !process.env.MYEONGHA_LOCAL_TLS_ADMISSION_PASSWORD
+        || !process.env.MYEONGHA_LOCAL_TLS_ADMISSION_ADMIN_PASSWORD
+        || !process.env.MYEONGHA_LOCAL_TLS_ADMISSION_CA_FILE
+        || !process.env.MYEONGHA_LOCAL_TLS_ADMISSION_CA_FINGERPRINT
+        || !process.env.MYEONGHA_LOCAL_TLS_SUBJECT_CA_FINGERPRINT
+        || !process.env.MYEONGHA_LOCAL_TLS_NONCE_CA_FINGERPRINT) {
+        throw new Error('Triple-DB proof requires synthetic TLS identities.');
+      }
+      // Existing trusted JWT verifier + Subject transaction + HMAC issuer + Nonce claim,
+      // not a mocked replacement or a new permission boundary.
+      const validated = await bindAuthenticatedMemberSajuHeldProofV1(
+        input(owner.accessToken),
+      );
+      expect(validated).toMatchObject({
+        state: 'held', reason: 'source_transport_integrity_verified_only',
+        canExecute: false, canPublish: false, canSell: false,
+        binding: { subjectId: SUBJECT_OWNER, birthRevisionId: REVISION_1 },
+      });
+      const admissionConfig: PoolConfig = {
+        host: 'admission.saju-bridge-ci.invalid', port: 5445,
+        database: 'myeongha_saju_admission_tls_verify',
+        user: 'myeongha_tls_admission_ci_login',
+        password: process.env.MYEONGHA_LOCAL_TLS_ADMISSION_PASSWORD,
+        ssl: { ca: readCiCa(process.env.MYEONGHA_LOCAL_TLS_ADMISSION_CA_FILE),
+          rejectUnauthorized: true },
+        max: 2, connectionTimeoutMillis: 5000,
+      };
+      const admission = new Pool(admissionConfig);
+      const admin = new Pool({
+        ...admissionConfig, user: 'postgres',
+        password: process.env.MYEONGHA_LOCAL_TLS_ADMISSION_ADMIN_PASSWORD,
+      });
+      try {
+        const probe = await admission.query<{
+          db: string; principal: string; ssl: boolean; has_subject: boolean; has_nonce: boolean;
+        }>(
+          "select current_database()::text as db, current_user::text as principal, ssl.ssl,"
+          + " exists(select 1 from pg_roles where rolname='myeongha_api_executor') as has_subject,"
+          + " exists(select 1 from pg_roles where rolname='myeongha_saju_proof_nonce_runtime') as has_nonce"
+          + " from pg_stat_ssl ssl where ssl.pid=pg_backend_pid()",
+        );
+        expect(probe.rows[0]).toMatchObject({
+          db: 'myeongha_saju_admission_tls_verify',
+          principal: 'myeongha_tls_admission_ci_login',
+          ssl: true, has_subject: false, has_nonce: false,
+        });
+        const [subject, nonce] = await Promise.all([
+          subjectRuntimePool!.query<{ db: string; ssl: boolean }>(
+            "select current_database()::text as db, ssl.ssl from pg_stat_ssl ssl where ssl.pid=pg_backend_pid()",
+          ),
+          noncePool!.query<{ db: string; ssl: boolean }>(
+            "select current_database()::text as db, ssl.ssl from pg_stat_ssl ssl where ssl.pid=pg_backend_pid()",
+          ),
+        ]);
+        expect(subject.rows[0]?.ssl).toBe(true);
+        expect(nonce.rows[0]?.ssl).toBe(true);
+        expect(new Set([
+          subject.rows[0]?.db, nonce.rows[0]?.db, probe.rows[0]?.db,
+        ]).size).toBe(3);
+
+        // The operator signs *synthetic* CI Permit data; the Admission database
+        // is deliberately NOT wired to the real staging rehearsal runner.
+        const keys = generateKeyPairSync('ed25519');
+        const now = Date.now();
+        const manifest = {
+          version: 'myeongha-saju-staging-target-v1',
+          environmentId: 'myeongha-staging-v2-atomic',
+          myeonghaCommitSha: 'a'.repeat(40), sajuCommitSha: 'b'.repeat(40),
+          authProjectRef: 'abcdefghijklmnopqrst',
+          authOrigin: 'https://abcdefghijklmnopqrst.supabase.co',
+          subjectDbTargetId: 'staging-db:subject', nonceDbTargetId: 'staging-db:nonce',
+          proofServiceOrigin: 'https://saju-proof.staging.example.com',
+          proofIssuer: 'saju-preview', proofAudience: 'myeongha-staging',
+          proofKeyId: 'hmac-key-v2', proofTtlMs: 60000,
+        };
+        const binding = (targetId: string, loginRole: string, runtimeRole: string,
+          tlsHostname: string, fingerprint: string) => ({
+          targetId, loginRole, runtimeRole, tlsHostname,
+          caFingerprint256: fingerprint, tlsMode: 'verify-full',
+        });
+        const plan = {
+          version: 'myeongha-saju-staging-connection-plan-v1',
+          manifestDigest: digestSajuHeldStagingTargetManifestV1(manifest),
+          environmentId: manifest.environmentId,
+          myeonghaCommitSha: manifest.myeonghaCommitSha,
+          sajuCommitSha: manifest.sajuCommitSha,
+          authProjectRef: manifest.authProjectRef, authOrigin: manifest.authOrigin,
+          proofServiceOrigin: manifest.proofServiceOrigin, proofIssuer: manifest.proofIssuer,
+          proofAudience: manifest.proofAudience, proofKeyId: manifest.proofKeyId,
+          subjectDb: binding('staging-db:subject', 'myeongha_runtime',
+            'myeongha_api_executor', 'subject.saju-bridge-ci.invalid',
+            process.env.MYEONGHA_LOCAL_TLS_SUBJECT_CA_FINGERPRINT),
+          nonceDb: binding('staging-db:nonce', 'myeongha_tls_nonce_ci_login',
+            'myeongha_saju_proof_nonce_runtime', 'nonce.saju-bridge-ci.invalid',
+            process.env.MYEONGHA_LOCAL_TLS_NONCE_CA_FINGERPRINT),
+          admissionDb: binding('staging-db:admission', 'myeongha_tls_admission_ci_login',
+            'myeongha_saju_staging_admission_runtime', 'admission.saju-bridge-ci.invalid',
+            process.env.MYEONGHA_LOCAL_TLS_ADMISSION_CA_FINGERPRINT),
+        };
+        const permit = {
+          version: 'myeongha-saju-staging-admission-contract-v2',
+          permitId: randomUUID(),
+          manifestDigest: digestSajuHeldStagingTargetManifestV1(manifest),
+          connectionPlanDigest: digestSajuHeldStagingConnectionPlanV1(plan),
+          environmentId: manifest.environmentId,
+          myeonghaCommitSha: manifest.myeonghaCommitSha,
+          sajuCommitSha: manifest.sajuCommitSha,
+          approvedOperatorId: 'approved-operator-v2',
+          issuedAtMs: now - 1000, expiresAtMs: now + 90000,
+          consumedAtMs: null, status: 'ISSUED',
+          approvalSignatureKeyId: 'ci-approved-v2-key',
+        };
+        await admin.query(
+          'insert into public.saju_staging_operator_admission_permits_v2 '
+          + '(permit_id,manifest_digest,connection_plan_digest,environment_id,'
+          + 'myeongha_commit_sha,saju_commit_sha,approved_operator_id,'
+          + 'approval_signature_key_id,issued_at_ms,expires_at_ms,consumed_at_ms,status) '
+          + 'values ($1::uuid,$2,$3,$4,$5,$6,$7,$8,$9::bigint,$10::bigint,null,$11)',
+          [
+            permit.permitId, permit.manifestDigest, permit.connectionPlanDigest,
+            permit.environmentId, permit.myeonghaCommitSha, permit.sajuCommitSha,
+            permit.approvedOperatorId, permit.approvalSignatureKeyId,
+            permit.issuedAtMs, permit.expiresAtMs, permit.status,
+          ],
+        );
+        const signedOptions = {
+          manifest, approvedManifest: structuredClone(manifest),
+          connectionPlan: plan, approvedConnectionPlan: structuredClone(plan),
+          permit, approvalPublicKey: keys.publicKey,
+          approvalSignature: sign(
+            null, canonicalSajuHeldStagingPermitApprovalBytesV2(permit), keys.privateKey,
+          ).toString('base64url'),
+          expectedOperatorId: 'approved-operator-v2',
+          expectedApprovalKeyId: 'ci-approved-v2-key',
+          nowMsFactory: () => Date.now(),
+          pool: poolPort(admission),
+        };
+        const admissionConsumer = createSajuHeldStagingPostgresAdmissionPortV2(signedOptions);
+        expect(await admissionConsumer.consumeAuthorizedAttemptOnce()).toBe(true);
+        expect(await createSajuHeldStagingPostgresAdmissionPortV2(signedOptions)
+          .consumeAuthorizedAttemptOnce()).toBe(false);
+        expect(validated).toMatchObject({
+          state: 'held', sourceAuthority: 'NOT_EVALUATED',
+          releaseAuthorization: 'NOT_EVALUATED',
+          canExecute: false, canPublish: false, canSell: false,
+        });
+      } finally {
+        await Promise.all([admission.end(), admin.end()]);
+      }
+    },
+  );
 
   it('rejects tampered GoTrue JWT and missing Auth before contacting Saju', async () => {
     const segments = owner.accessToken.split('.');

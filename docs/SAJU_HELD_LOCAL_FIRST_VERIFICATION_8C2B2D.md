@@ -202,7 +202,18 @@ node scripts/local/verify-saju-bridge-http.mjs ../Saju
 
 **초기 검증:** [Scope CI #38061098116](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38061098116) — 기존 31건 + 신규 Admission 7건 = **38건 PASS**. 첫 실행의 미대기 assertion 경고 1건은 `await expect(...).resolves`로 수정했으며, 최종 HEAD·필수 통합 CI·Squash Merge는 PR #1913에서 다시 검증·기록한다.
 
+**최종 병합 근거:** PR [#1913](https://github.com/gycha0109-beep/MyeongHa/pull/1913) — 변경 범위 [#38063739885](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38063739885), 일반 CI [#38063739997](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38063739997), 고정 HEAD 전체 통합 [#38064007261](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38064007261) 모두 SUCCESS; squash `537f95ca00b99fff5c2f4093b29d2cbfeaa45b72`를 병합 직후 `main` HEAD로 확인. 독립 운영 Root·권한 검증을 의미하지 않는다.
+
 **여전히 미검증:** 세 DB가 모두 CI 내에서 별도 TLS 클러스터라는 사실이 실제 운영 DB 자격증명·R06–R09 독립 증빙을 입증하지 않는다. 세 DB의 동일 요청 흐름에서의 통합 불변성·부분 장애는 **2J**의 책임이다. 3-04-02 Root/Key custody, 3-04-03B 독립 R01–R14, 3-04-04 Target Authority V2, 2D-4 Runner Rehearsal은 별도 운영 승인 전 HOLD.
+
+## 2J. 동일 검증 흐름에서 3개 독립 TLS DB 교차 시험 — 5단계 (범위 39 PASS)
+
+- **목적**: 기존 실행 경로를 바꾸지 않고 하나의 폐기형 GoTrue 사용자 JWT를 기존 Subject 제한 계정의 현재 Birth/Revision 조회 → 실제 로컬 Saju HTTP/HMAC → 별도 Nonce TLS 원자 소비 → 별도 Admission TLS의 합성 Ed25519 Permit V2 원자 소비까지 동일 테스트에서 검증한다.
+- **구현 범위**: `test/saju-held-cross-repo-local-gotrue-auth.test.ts`에 독립 DB 이름·제한 로그인·TLS 세션을 확인하고 합성 Connection Plan에 서로 다른 CA fingerprint/호스트/역할을 바인딩하는 테스트 1건을 추가한다. `scripts/local/verify-saju-bridge-http.mjs`에서 해당 테스트에 한해 기존 3개 DB CI 임시 환경값을 전달한다. 기존 2A–2I 포트/권한/워크플로를 재사용한다.
+- **통과 조건**: 실제 GoTrue JWT→현재 Birth→HTTP/HMAC→Nonce claim은 `held`; Admission 제한 로그인에서 올바른 V2 서명 Permit은 최초 consume만 `true`, 재소비는 `false`; 최종 응답은 `canExecute/canPublish/canSell=false` 유지. 별도 2I 시험의 CA·비밀번호·역할 교차 접속 차단, 만료/철회·경합·연결 장애 부정 검증도 반드시 회귀 통과해야 한다.
+- **범위 한계**: 실제 GoTrue JWT와 별도 **합성 Permit**은 하나의 테스트 실행 안에서 관찰하지만 승인 주체 간 암호학적 거래 ID·JWT-Permit 인과관계나 세 DB의 분산 원자성을 새로 증명하지 않는다. Admission 소비 성공을 실제 실행 허가로 연결하지 않으며 Rehearsal Runner·운영 Root/Key·R01–R14·실회원·Production/Commerce는 미접속.
+- **범위 검증 근거**: [PR #1918](https://github.com/gycha0109-beep/MyeongHa/pull/1918) 첫 코드 HEAD `4d3095f76cbf5ed447fabab601a07e294f46aba0`의 [범위 CI #38064807263](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38064807263) SUCCESS. 단계별 15+5+4+4+7+4 = **39건 PASS** (GoTrue 교차 4건 중 신규 1건). 일반 CI [#38064807353](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38064807353), 웹·거버넌스도 SUCCESS.
+- **종료 조건**: 최종 HEAD 고정 전체 통합 CI SUCCESS → PR #1918 squash → 정확한 `main` SHA 확인; PR의 검증 상태와 Issue #1871에서 최종 SHA를 독립 확인한다. CI 성공은 운영 증빙이 아니다.
 
 ## 3. 통과 기준 / 아직 증명하지 않은 것
 
