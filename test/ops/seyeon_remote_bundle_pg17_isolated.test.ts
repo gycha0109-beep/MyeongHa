@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
@@ -33,8 +33,13 @@ describe('Se-yeon exact remote historical bundle PostgreSQL 17 rehearsal', () =>
     try {
       const bad = join(dir, 'wrong.sql');
       const marker = join(dir, 'attempted-db-command');
+      const bin = join(dir, 'bin');
+      mkdirSync(bin);
+      const mockPsql = join(bin, 'psql');
+      writeFileSync(mockPsql, '#!/usr/bin/env bash\nprintf reached > "' + marker + '"\n');
+      chmodSync(mockPsql, 0o755);
       writeFileSync(bad, 'SELECT 1;\n');
-      // If the script reaches the database at all, the marker will be created.
+      // A database operation would invoke the mock psql and leave its marker.
       const env = {
         ...process.env,
         CI: 'true',
@@ -44,7 +49,7 @@ describe('Se-yeon exact remote historical bundle PostgreSQL 17 rehearsal', () =>
         SUPABASE_DB_PASSWORD: '',
         SUPABASE_PRODUCTION_SESSION_POOLER_HOST: '',
         SEYEON_REMOTE_BUNDLE_FILE: bad,
-        PSQL_TEST_SENTINEL: marker,
+        PATH: bin + ':' + (process.env.PATH ?? ''),
       };
       expect(() => execFileSync('bash', [script], { env, stdio: 'pipe' })).toThrow();
       expect(() => readFileSync(marker, 'utf8')).toThrow();
