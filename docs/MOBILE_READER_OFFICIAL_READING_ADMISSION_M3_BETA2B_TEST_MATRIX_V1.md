@@ -95,7 +95,7 @@ migration 1220/1270/1240의 기존 관계와 Reader 접근을 재사용할 때�
 - **DB-C3:** refund/revoke의 FOR UPDATE·revision CAS와 T2 접근 승인 잠금이 두 PostgreSQL connection에서 양 방향 순서로 직렬화되는지 검증. 만료 시점은 잠금 후 fresh DB clock 사용.
 - **DB-C4:** 새로운 Reader bundle/Grant가 끼어드는 phantom은 기존 Grant row lock만으로 막을 수 없으므로, 모든 writer가 준수하는 reader/reading scope anchor 프로토콜이 필요. Owner 승인 전 구현·PASS 없음.
 - **API-C1/C2:** Saju/provider await 시 DB connection 해제, T2의 fresh identity/Grant/source/policy/rollout 확인 후에만 응답 본문 전달. T1/A2 proof 자체는 현재 권한이 아님.
-- **DB-C1/C2 테스트 실행·병합 완료.** DB-C3/C4 및 final reveal RACE-01~16 실제 잠금 경합은 **아직 실행되지 않았다**. #1831·#1838·#1854 범위의 DB PASS를 운영 환불/최종 공개 승인으로 혼동 금지.
+- **#1857 두 PostgreSQL 연결 DB 잠금 사전 검증 PASS:** 기존 purchase Grant UPDATE 선점 → FOR SHARE가 기다린 후 회수 상태 DENY; 반대 순서에서는 UPDATE가 FOR SHARE를 기다린다. B2 행만 잠근 동안 B3 **기존 독립 Grant**가 활성화되는 한계 확인. **실제 T2/Provider refund RACE-01~16과 신규 Grant INSERT phantom 경합은 미구현·미실행**, Owner 승인 HOLD. #1831·#1838·#1854·#1857 범위의 DB PASS를 실서비스 공개 승인으로 혼동 금지.
 
 ## 3. 특히 중요한 경계 테스트
 
