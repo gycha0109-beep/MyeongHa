@@ -83,7 +83,7 @@ describe('Se-yeon server-owned zero-record attempt provenance', () => {
       context([{}]),
       {} as SourceContext,
       null as unknown as SourceContext,
-      { version: 'seyeon-production-context-v1', retrievedMemories: [] } as SourceContext,
+      { version: 'seyeon-production-context-v1', retrievedMemories: [] } as unknown as SourceContext,
       { version: 'unexpected', retrievedMemories: [], personalRecordAdmissions: [] } as unknown as SourceContext,
     ]) {
       expect(() => mint({ context: value })).toThrow(SeyeonAttemptZeroPersonalProofHoldV1);
