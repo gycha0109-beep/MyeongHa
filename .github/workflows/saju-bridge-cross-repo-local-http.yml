@@ -107,6 +107,7 @@ jobs:
           set -euo pipefail
           test "$(PGHOST=127.0.0.1 PGPORT=5433 PGDATABASE=myeongha_saju_gotrue_verify PGPASSWORD="$GOTRUE_AUTH_DB_PASSWORD" PGUSER=postgres psql -X -Atqc 'select current_database()')" = 'myeongha_saju_gotrue_verify'
           PGHOST=127.0.0.1 PGPORT=5433 PGDATABASE=myeongha_saju_gotrue_verify PGPASSWORD="$GOTRUE_AUTH_DB_PASSWORD" PGUSER=postgres psql -X -v ON_ERROR_STOP=1 -c 'CREATE SCHEMA IF NOT EXISTS auth'
+          PGHOST=127.0.0.1 PGPORT=5433 PGDATABASE=myeongha_saju_gotrue_verify PGPASSWORD="$GOTRUE_AUTH_DB_PASSWORD" PGUSER=postgres psql -X -v ON_ERROR_STOP=1 -c 'ALTER ROLE postgres IN DATABASE myeongha_saju_gotrue_verify SET search_path TO auth, public'
           jwt_secret="$(openssl rand -hex 32)"
           docker run -d --name myeongha-saju-gotrue-local --network host \
             -e GOTRUE_API_HOST=127.0.0.1 \
@@ -142,6 +143,9 @@ jobs:
         env:
           MYEONGHA_LOCAL_GOTRUE_ENABLED: '1'
         run: node scripts/local/verify-saju-bridge-http.mjs ../saju
+      - name: Collect disposable GoTrue Auth failure diagnostics
+        if: failure()
+        run: docker logs --tail 80 myeongha-saju-gotrue-local || true
       - name: Tear down disposable local GoTrue
         if: always()
         run: docker rm -f myeongha-saju-gotrue-local >/dev/null 2>&1 || true
