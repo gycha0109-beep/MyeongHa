@@ -11,6 +11,15 @@ describe('Se-yeon historical SQL PG17 isolated CI bridge', () => {
     expect(job).toContain("inputs.exact_remote_bundle_pg17 == true");
     expect(job).toContain("github.event_name == 'push'");
     expect(job).toContain('image: postgres:17.6');
+    expect(job).toContain('POSTGRES_USER: seyeon_cluster_admin');
+    expect(job).toContain('pg_isready -U seyeon_cluster_admin');
+    expect(job).toContain('Initialize isolated non-bootstrap postgres actor (never Production)');
+    expect(job).toContain('create role postgres login superuser createrole createdb');
+    expect(job).toContain("password :'actor_password'");
+    expect(job).toContain('DISPOSABLE_NONBOOTSTRAP_POSTGRES_CREATED');
+    expect(job).toContain('seyeon-actor-bootstrap.err');
+    expect(job).not.toContain('POSTGRES_USER: postgres');
+
     expect(workflow).toContain("'test/db/seyeon_remote_bundle_pg17_isolated.sh'");
     expect(job).toContain('persist-credentials: false');
     expect(workflow).not.toContain('supabase db push');
