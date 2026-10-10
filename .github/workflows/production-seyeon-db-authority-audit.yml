@@ -7,6 +7,12 @@ on:
     paths:
       - '.github/workflows/production-seyeon-db-authority-audit.yml'
   workflow_dispatch:
+    inputs:
+      exact_remote_bundle_pg17:
+        description: 'Run SHA-pinned historical SQL in disposable PostgreSQL 17 only'
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: read
@@ -78,3 +84,95 @@ jobs:
           order by expected.version;
           COMMIT;
           SQL
+
+
+  exact-recovery-pg17:
+    name: seyeon-exact-recovery-postgres17-isolated
+    if: ${{ github.event_name == 'push' || inputs.exact_remote_bundle_pg17 == true }}
+    runs-on: ubuntu-24.04
+    environment: production
+    timeout-minutes: 12
+    permissions:
+      contents: read
+    services:
+      postgres:
+        image: postgres:17.6
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ${{ github.run_id }}-${{ github.run_attempt }}
+          POSTGRES_DB: myeongha_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d myeongha_test"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+    steps:
+      - name: Check out exact source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install PostgreSQL client
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client >/dev/null
+          psql --version
+      - name: Fetch SHA-pinned SQL via Production read-only SELECT
+        shell: bash
+        env:
+          SUPABASE_PROJECT_ID: cnsfpcdiyofqvhpcegfc
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          SUPABASE_PRODUCTION_SESSION_POOLER_HOST: ${{ secrets.SUPABASE_PRODUCTION_SESSION_POOLER_HOST }}
+        run: |
+          set -euo pipefail
+          set +x
+          [[ "$SUPABASE_PROJECT_ID" == 'cnsfpcdiyofqvhpcegfc' ]]
+          test -n "$SUPABASE_DB_PASSWORD"
+          [[ "$SUPABASE_PRODUCTION_SESSION_POOLER_HOST" =~ ^[a-z0-9-]+([.][a-z0-9-]+)*[.]pooler[.]supabase[.]com$ ]]
+          umask 077
+          file="$RUNNER_TEMP/seyeon-20261008090417-exact.sql"
+          export PGHOST="$SUPABASE_PRODUCTION_SESSION_POOLER_HOST"
+          export PGPORT=5432 PGDATABASE=postgres PGUSER="postgres.$SUPABASE_PROJECT_ID"
+          export PGPASSWORD="$SUPABASE_DB_PASSWORD" PGSSLMODE=require
+          export PGOPTIONS='-c default_transaction_read_only=on -c statement_timeout=30000'
+          sql="select encode(convert_to(statements[1], 'UTF8'), 'hex')
+               from supabase_migrations.schema_migrations
+               where version='20261008090417'
+                 and name='seyeon_runtime_1460_1510_acl_before_owner_recovery'
+                 and cardinality(statements)=1
+                 and octet_length(convert_to(statements[1], 'UTF8'))=104021
+                 and encode(sha256(convert_to(statements[1], 'UTF8')), 'hex')
+                   ='4f38e4483061a84899f0fcaa4a8d6cfa9e09ce1553b1d31089d4de9154c4d894'"
+          # Never reveal SQL bytes, hex or remote error messages in logs.
+          psql -X -qAt -v ON_ERROR_STOP=1 -c "$sql" 2>"$RUNNER_TEMP/seyeon-remote-select.err" |
+            python3 -c 'import sys; from pathlib import Path; Path(sys.argv[1]).write_bytes(bytes.fromhex(sys.stdin.read().strip()))' "$file"
+          test "$(wc -c < "$file" | tr -d ' ')" = 104021
+          printf '%s  %s\n' \
+            '4f38e4483061a84899f0fcaa4a8d6cfa9e09ce1553b1d31089d4de9154c4d894' \
+            "$file" | sha256sum --check --status
+          echo 'REMOTE_BUNDLE_SHA256_PASS: 104021 bytes from read-only Production migration ledger'
+      - name: Reproduce exact SQL against disposable PostgreSQL 17 only
+        shell: bash
+        env:
+          CI: 'true'
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: ${{ github.run_id }}-${{ github.run_attempt }}
+          PGDATABASE: myeongha_test
+          SEYEON_REMOTE_BUNDLE_FILE: ${{ runner.temp }}/seyeon-20261008090417-exact.sql
+        run: |
+          set -euo pipefail
+          set +x
+          bash test/db/seyeon_remote_bundle_pg17_isolated.sh
+      - name: Destroy private SQL and diagnostics
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f -- "$RUNNER_TEMP/seyeon-20261008090417-exact.sql" \
+            "$RUNNER_TEMP/seyeon-remote-select.err"
+          echo 'TEMP_PRIVATE_SQL_REMOVED'
