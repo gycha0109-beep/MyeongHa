@@ -6,6 +6,7 @@
 \set ON_ERROR_STOP on
 
 begin read only;
+set local statement_timeout = '5s';
 
 select
   current_setting('server_version') as postgres_version,
@@ -54,8 +55,14 @@ select
 
 -- Skip relations entirely if Production has not applied the 1550+ migrations.
 -- Do not silently reinterpret missing schema as an empty or drained ledger.
-select (pg_catalog.to_regclass(
-    'public.seyeon_ai_call_cost_events') is not null
+select (
+    pg_catalog.to_regclass('public.seyeon_ai_call_cost_events') is not null
+    and (select count(*) from information_schema.columns
+       where table_schema='public'
+         and table_name='seyeon_ai_call_cost_events'
+         and column_name in (
+           'lifecycle_state','governor_bucket_utc_date',
+           'created_at','cost_status'))=4
   )::int as seyeon_cutover_ledger_exists \gset
 \if :seyeon_cutover_ledger_exists
 select
@@ -81,7 +88,7 @@ select
   null::bigint as historical_legacy_settled_calls,
   null::bigint as started_in_last_24h,
   null::bigint as settled_without_known_estimate,
-  'HOLD_LEDGER_SCHEMA_NOT_PRESENT'::text as evidence_status;
+  'HOLD_LEDGER_OR_REQUIRED_COLUMNS_NOT_PRESENT'::text as evidence_status;
 \endif
 
 select (pg_catalog.to_regclass(
