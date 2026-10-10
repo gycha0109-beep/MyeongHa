@@ -20,6 +20,48 @@ import {
 
 export const SEYEON_AI_COST_LEDGER_VERSION_V1 = 'seyeon-ai-cost-ledger-v1' as const;
 
+/** Only the cost adapter owns legacy function names, including ACL preflight. */
+export const GOVERNED_LOGIN_PREFLIGHT_SQL_V1 = `
+select
+ session_user::text as "sessionUser",
+ current_user::text as "currentUser",
+ r.rolcanlogin as "canLogin",
+ r.rolsuper as "isSuper",
+ r.rolbypassrls as "canBypassRls",
+ r.rolinherit as "canInherit",
+ r.rolcreatedb as "canCreateDb",
+ r.rolcreaterole as "canCreateRole",
+ pg_catalog.pg_has_role(session_user, $1::name, 'MEMBER') as "hasGovernedRoleMembership",
+ pg_catalog.pg_has_role(session_user, $2::name, 'MEMBER') as "isLegacyMember",
+ pg_catalog.pg_has_role(session_user, 'myeongha_seyeon_cost_meter_owner', 'MEMBER')
+    as "isCostOwnerMember",
+ (select count(*)::int
+  from pg_catalog.pg_auth_members m
+  join pg_catalog.pg_roles member_role on member_role.oid=m.member
+  join pg_catalog.pg_roles granted_role on granted_role.oid=m.roleid
+  where member_role.rolname=session_user
+    and granted_role.rolname<>$1::name) as "otherMemberships",
+ pg_catalog.has_function_privilege(session_user,
+   'public.cmd_start_seyeon_ai_call_v1(uuid,uuid,uuid,text,uuid,text,text,text)',
+   'EXECUTE') as "canLegacyStart",
+ pg_catalog.has_function_privilege(session_user,
+   'public.cmd_settle_seyeon_ai_call_v1(uuid,uuid,uuid,text,jsonb)',
+   'EXECUTE') as "canLegacySettle",
+ pg_catalog.has_function_privilege(session_user,
+   'public.cmd_record_seyeon_ai_call_cost_v1(uuid,uuid,uuid,text,jsonb)',
+   'EXECUTE') as "canLegacyRecord",
+ pg_catalog.has_table_privilege(session_user,
+   'public.seyeon_ai_call_cost_events', 'SELECT,INSERT,UPDATE,DELETE')
+   as "canDirectLedger",
+ pg_catalog.has_table_privilege(session_user,
+   'public.seyeon_ai_governor_daily_budgets_v1', 'SELECT,INSERT,UPDATE,DELETE')
+   as "canDirectBudget",
+ pg_catalog.has_table_privilege(session_user,
+   'public.seyeon_ai_governor_model_policies_v1', 'SELECT,INSERT,UPDATE,DELETE')
+   as "canDirectRateCard"
+from pg_catalog.pg_roles r where r.rolname=session_user
+`.trim();
+
 const INSERT_SQL = `
 select call_id::text as "callId", replayed
 from public.cmd_record_seyeon_ai_call_cost_v1($1::uuid,$2::uuid,$3::uuid,$4::text,$5::jsonb)
