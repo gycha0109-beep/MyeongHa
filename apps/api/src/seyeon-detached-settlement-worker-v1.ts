@@ -3,7 +3,7 @@ import type {
   NodePostgresDriverClientV1,
 } from './node-postgres-subject-pool.js';
 import type { SeyeonAiPriceV1, SeyeonAiCallOutcomeV1, SeyeonAiTokenUsageV1 } from './seyeon-ai-usage-cost-v1.js';
-import { createSeyeonAiCostEventV1 } from './seyeon-ai-usage-cost-v1';
+import { createSeyeonAiCostEventV1 } from './seyeon-ai-usage-cost-v1.js';
 
 /**
  * D4B-10A: offline-only detached settlement adapter.
