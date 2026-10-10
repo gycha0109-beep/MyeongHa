@@ -7,16 +7,8 @@
 DO $local_only$
 BEGIN
   IF current_database() <> 'myeongha_saju_local_verify'
-    OR current_user <> 'postgres'
-    OR inet_server_addr() IS DISTINCT FROM '172.17.0.1'::inet
-      AND inet_server_addr() IS DISTINCT FROM '127.0.0.1'::inet
-      AND inet_server_addr() IS NOT NULL THEN
-    -- Docker service connections may use the bridge gateway address, so
-    -- the exact disposable database name is the primary safety invariant.
-    IF current_database() <> 'myeongha_saju_local_verify'
-      OR current_user <> 'postgres' THEN
-      RAISE EXCEPTION 'Refusing live restricted-login fixture outside disposable test DB';
-    END IF;
+    OR current_user <> 'postgres' THEN
+    RAISE EXCEPTION 'Refusing live restricted-login fixture outside disposable test DB';
   END IF;
   IF NOT EXISTS (
     SELECT 1 FROM pg_roles
