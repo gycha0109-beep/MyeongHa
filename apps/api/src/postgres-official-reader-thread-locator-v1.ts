@@ -24,7 +24,9 @@ export function createPostgresOfficialReaderThreadLocatorAuthorityPortV1(
   client: PostgresTransactionQueryV1,
 ): OfficialReadingReaderThreadLocatorAuthorityPortV1 {
   return Object.freeze({
-    async readActiveMemberSingleCharacterThreads(input) {
+    async readActiveMemberSingleCharacterThreads(
+      input: Parameters<OfficialReadingReaderThreadLocatorAuthorityPortV1['readActiveMemberSingleCharacterThreads']>[0],
+    ) {
       const result = await client.query<ThreadLocatorRowV1>(
         LOCATE_EXISTING_MEMBER_READER_THREAD_SQL,
         [input.subjectId, input.readerCharacterId],
