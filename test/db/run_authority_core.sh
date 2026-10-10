@@ -60,6 +60,7 @@ bash test/db/subject_owned_data_graph_catalog_guard.sh
 bash test/db/transitive_subject_dependency_graph_catalog_guard.sh
 bash test/db/outbox_claim_concurrency.sh
 bash test/db/saju_source_proof_nonce_claim_concurrency.sh
+run_isolated_case myeongha_saju_custody_challenge_test bash test/db/saju_staging_custody_challenge_authority.sh
 bash test/db/chat_receive_concurrency.sh
 bash test/db/chat_attempt_commit_concurrency.sh
 psql -v ON_ERROR_STOP=1 -f test/db/seyeon_zero_personal_source_pre_model_pin_v1.sql

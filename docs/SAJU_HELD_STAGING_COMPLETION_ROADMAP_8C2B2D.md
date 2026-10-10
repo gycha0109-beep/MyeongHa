@@ -17,7 +17,7 @@ Watchtower-Track: saju-bridge
 |---|---|---|---|
 | 3-03 (완료) | 3-03A/B 계약 및 #1862 Permit-scoped challenge 보완 | 승인 범위의 CI·squash·main 확인 | `SIGNED_ASSERTIONS_UNANCHORED` / 운영 HOLD |
 | 3-04-01 (완료) | R01–R14 출처·철회·복구 런북 | 명세 및 기존 CI·병합 | 증빙 미수집 |
-| **3-04-02 (운영 보류)** | 별도 Root/key custody, durable registry revision floor, Permit-scoped one-use challenge의 설계·보안 검토 | 신뢰 입력 출처/권한/원자성/레이스/롤백/장애 테스트 계획이 독립 심사 가능; **운영 연결은 별도 승인** | root/key/durable store `NOT_VERIFIED` |
+| **3-04-02 (합성 검증·운영 보류)** | CI 폐기형 PG의 Registry revision 단조 floor·Permit-scoped Challenge 역할 분리/일회성 소비 | 동시 경합·재생/위조·TTL·철회·rollback 테스트, 기존 DB Core CI | 운영 Root/키/실환경 증빙 `NOT_VERIFIED`; Runner `HOLD` |
 | 3-04-03 | R01–R14 독립 실환경 증빙 및 attestor-signed Evidence | 03A: 무권한 참조 인덱스/부정 검증; 03B: 승인된 실제 출처·서명·감사/환경/SHA 검증 | 03A 계약만으로 운영 검증 승격 금지 / 03B 미실행 |
 | 3-04-04 | Target Authority V2와 기존 Runner 사이 좁은 실행 전 게이트 | 운영 증빙·승인·Permit·대상·시간·소비 상태를 신뢰 출처에서 재평가, 부정·장애 시 false; V1 boolean 포트 승격 금지 | 운영 승인 전 false |
 | 2D-4 | 폐기형 Member/Birth로 격리 스테이징 한 차례 실행 및 증빙 보존 | 원자 Permit 소비, Auth/Subject Revision, Saju Preview Proof/HMAC/nonce, 결과/차단/수동복구·폐기 확인 | 별도 명시 승인 전 미실행 |
@@ -55,6 +55,10 @@ Watchtower-Track: saju-bridge
 - 2H의 Subject/Nonce 별도 TLS와 실제 격리 GoTrue 연결은 PR #1911의 scoped CI에서 검증했다. 2I의 세 번째 Admission TLS 및 서명 Permit V2 원자 소비는 PR #1913에서 최신 HEAD 전용/전체 CI 성공 후 Squash 병합과 `main` HEAD를 확인했다. 다음은 **2J Subject·Nonce·Admission 동일 폐기형 검증 실행 교차 시험**이며, 하나의 검증 스크립트 성공과 운영 권한/JWT-Permit 연결은 동일하지 않다. 2H 테스트 성공은 PR 최종 통합 CI/병합이나 운영 검증을 대신하지 않는다. 기존 코드/동일 scoped CI 재사용 우선.
 - 로컬에서 생성한 GoTrue 계정·자체 CA·DB/암호·서명 Proof는 운영 Root/Attestor/회원 데이터 또는 R01–R14 독립 운영 증빙이 아니다. 실제 운영 Root/Key/증빙/연결/Runner는 그대로 미검증/HOLD.
 - 상세 수행 파일·성공/실패 테스트는 로컬 기록의 해당 절에 보존하며 이후 각 하위 단계의 PR, 병합 SHA, CI 링크 및 한계를 여기에 추가한다.
+
+## 2C. 3-04-02 검증 범위
+
+기존 DB Core CI에 독립 폐기형 PostgreSQL floor·Challenge 검증을 추가한다. 저장소 메커니즘의 무결성 시험일 뿐 실제 Root/KMS custody·운영 관리 평면·R01–R14·백업 복구, 다른 Admission DB와의 분산 원자성은 여전히 검증되지 않았다. [설계/한계](./SAJU_HELD_STAGING_INDEPENDENT_TRUST_CUSTODY_8C2B2D30402.md) 참조.
 
 ## 3. 코드·운영 병렬화와 범위 제한
 
