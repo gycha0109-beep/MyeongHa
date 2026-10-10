@@ -6,6 +6,7 @@ import {
   SAJU_GROUNDING_AXIS_KEYS_V1,
   admitCharacterPerspectiveProfileV1,
 } from './character-saju-perspective.js';
+import { resolveCharacterSajuCommonPerspectiveV1 } from './character-saju-common-perspective.js';
 import { SAJU_GROUNDING_AXIS_REGISTRY_VERSION_V1 } from './character-saju-grounding-admission.js';
 
 function makeSource(
@@ -212,5 +213,84 @@ describe('CharacterPerspectiveProfileV1 admission', () => {
         source: makeSource(),
       }),
     ).toThrow('selection total must be between 1 and 16 units');
+  });
+});
+
+/**
+ * Offline contract matrix for the four-profile extension seam.
+ * The source objects are synthetic *published-source-shaped* inputs:
+ * they are NOT actual released Bibles, approved Oaths, real Saju Claims,
+ * or grant/production authority. Character Owner must source all real bindings.
+ *
+ * Fixed acceptance:
+ * - 3 named profiles plus one test-only fourth without a character switch;
+ * - different explicit authored-axis -> Saju-grounding-axis bindings;
+ * - default common policy NEVER silently infers those mappings;
+ * - identity and source version remain exact;
+ * - mandate/Oath payload cannot masquerade as an extra Perspective schema field.
+ */
+describe('3+1 Reader perspective admission boundary (offline; no Canon publication)', () => {
+  const profiles = [
+    { characterId: 'seyeon', authoredAxis: 'fixture_first_action', groundingAxis: 'action_style' },
+    { characterId: 'rahyeon', authoredAxis: 'fixture_visible_structure', groundingAxis: 'structure' },
+    { characterId: 'yeoul', authoredAxis: 'fixture_choice_ownership', groundingAxis: 'decision_style' },
+    { characterId: 'fixture-fourth-not-canon', authoredAxis: 'fixture_responsibility', groundingAxis: 'responsibility' },
+  ] as const;
+
+  it('admits four source-bound profiles using the unchanged common Character contract', () => {
+    const admitted = profiles.map(({ characterId, authoredAxis, groundingAxis }) => {
+      const source = {
+        ...makeSource([authoredAxis]),
+        characterId,
+      };
+      const candidate = makeCandidate({
+        characterId,
+        attentionBindings: [{ authoredAttentionAxis: authoredAxis, groundingAxis }],
+        attentionOrder: [groundingAxis],
+      });
+
+      const common = resolveCharacterSajuCommonPerspectiveV1(source);
+      expect(common.characterId).toBe(characterId);
+      expect(common.attentionBindings).toEqual([]);
+      expect(common.attentionOrder).toEqual([]);
+
+      const reviewedShape = admitCharacterPerspectiveProfileV1({ source, candidate });
+      expect(reviewedShape.characterId).toBe(characterId);
+      expect(reviewedShape.sourceContentVersion).toBe(source.contentVersion);
+      expect(reviewedShape.sourceSajuProfileVersion).toBe(source.sajuProfile.profileVersion);
+      expect(reviewedShape.attentionBindings).toEqual([
+        { authoredAttentionAxis: authoredAxis, groundingAxis },
+      ]);
+      expect(reviewedShape.attentionOrder).toEqual([groundingAxis]);
+      return reviewedShape;
+    });
+
+    expect(admitted).toHaveLength(4);
+    expect(new Set(admitted.map(profile => profile.characterId)).size).toBe(4);
+    expect(new Set(admitted.map(profile => profile.attentionOrder[0])).size).toBe(4);
+  });
+
+  it('rejects another Reader identity and unknown oath/mandate authority fields', () => {
+    const source = { ...makeSource(['fixture_first_action']), characterId: 'seyeon' };
+    const validCandidate = makeCandidate({
+      characterId: 'seyeon',
+      attentionBindings: [{ authoredAttentionAxis: 'fixture_first_action', groundingAxis: 'action_style' }],
+      attentionOrder: ['action_style'],
+    });
+
+    expect(() => admitCharacterPerspectiveProfileV1({
+      source,
+      candidate: { ...validCandidate, characterId: 'rahyeon' },
+    })).toThrow('characterId does not match published Character content');
+
+    expect(() => admitCharacterPerspectiveProfileV1({
+      source,
+      candidate: { ...validCandidate, oath: { principle: 'synthetic-not-authorized' } },
+    })).toThrow('unexpected field: oath');
+
+    expect(() => admitCharacterPerspectiveProfileV1({
+      source,
+      candidate: { ...validCandidate, mandate: 'synthetic-not-authorized' },
+    })).toThrow('unexpected field: mandate');
   });
 });
