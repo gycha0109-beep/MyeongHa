@@ -114,6 +114,13 @@ Watchtower-Track: saju-bridge
 - 이 함수에 API/request/Evidence/Registry가 제출한 pin을 그대로 연결하지 않는다. 실제 운영 단계에는 별도 보안 관리자의 신뢰 가능한 read-only custody provider와 최신 revision 조회, 서명 검증→원자 high-water 갱신, clock/revocation 및 장애/불명확 COMMIT 감사 계약이 선행돼야 한다.
 - 기존 3-03 Registry 서명 검증기를 재사용하고, `test/saju-held-staging-root-pin-preflight-v1.test.ts`에서 합성·변조·출처 위장 반례를 검증한다. 새 워크플로/실환경 KMS·Secret/운영 DB/Runner/Commerce 접근은 없다.
 
+## 6C. 단일 Owner SO-2 서명 Registry → Floor 합성 결속
+
+- 합성 순수 정책/포트는 Root pin snapshot 및 시간값을 **요청 본문이 아닌 별도 제공자 인터페이스**에서 조회한다. 제공자의 실제 출처와 권한은 타입만으로 증명할 수 없다.
+- 기존 Registry Ed25519 서명·환경·Root ID·SPKI 지문·최소 revision을 모두 확인한 뒤에만 증분 요청을 발행한다. 별도 역할이 접수한 검증완료 Receipt는 원자 UPDATE에서 고정 scope·고수위·철회를 재확인하여 1회 소비한다.
+- 폐기형 CI DB의 `recovery_anchor`는 **동일 DB 내부의 보안 모델**이며 실제 오프사이트 감사·WORM·불변 원장이 아니다. 합성 통과는 운영 검증·Root 출처 신뢰·서명자 독립 권한 또는 고가용성을 입증하지 못한다.
+- 자세한 계약/부정 시험: [SO-2 독립 신뢰 저장소 합성 검증](./SAJU_SOLO_OWNER_SO2_REGISTRY_FLOOR_SYNTHETIC.md). 정책 단계는 SO-2 코드/합성 종료이고 운영 R01–R14·Runner/Commerce는 여전히 HOLD.
+
 ## 7. 3-04-02 단계 종료 판정
 
 - **A — 설계:** 신뢰 입력·주체·스토리지 계약·접근 권한·레이스/사고 정책·테스트 매트릭스 문서화.
