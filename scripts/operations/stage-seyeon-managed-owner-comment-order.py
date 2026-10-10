@@ -65,8 +65,8 @@ def main():
         # remain in the ORIGINAL order. Only metadata COMMENT moves to a point
         # where current_user is still creator and owner of the new function.
         patched = (
-            prefix.rstrip() + "\\n\\n" + trailing_comments.strip() + "\\n\\n" +
-            grant_marker + owned_operations + MARKER + "\\n"
+            prefix.rstrip() + "\n\n" + trailing_comments.strip() + "\n\n" +
+            grant_marker + owned_operations + MARKER + "\n"
         )
         if patched.count(MARKER) != 1 or patched.count(grant_marker) != 1:
             raise ValueError("staged SQL changed owner membership statement multiplicity")
