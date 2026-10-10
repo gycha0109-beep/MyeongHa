@@ -1,5 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { readFile, readdir } from 'node:fs/promises';
+import { assertUniqueSupabaseMigrationVersions } from './verify-supabase-migration-versions.mjs';
 
 const expectedProjectRef = 'cnsfpcdiyofqvhpcegfc';
 const workflowPath = '.github/workflows/supabase-production.yml';
@@ -183,5 +184,7 @@ if (!config.includes('project_id = "myeongha"')) {
 if (!migrationFiles.includes('0010_auth_owner.sql')) {
   throw new Error('Expected baseline migration 0010_auth_owner.sql is missing.');
 }
+
+assertUniqueSupabaseMigrationVersions(migrationFiles);
 
 console.log(`MyeongHa Supabase deployment configuration + auditable main-push gate + explicit Session Pooler-only post-deploy verification passed for ${migrationFiles.length} migration files.`);
