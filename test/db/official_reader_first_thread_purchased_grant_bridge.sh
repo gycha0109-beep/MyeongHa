@@ -38,6 +38,31 @@ purchase_state() {
       and a.purchase_intent_id='$1'::uuid;" >/dev/null
 }
 
+# The verified receipt/Reader fixture starts as a Guest. D-05-C is Member
+# only: perform the EXISTING DB-authorized same-subject Guest promotion in
+# this disposable DB. No ownership rewrite, production user or live payment.
+p <<SQL >/dev/null
+insert into auth.users(id)
+values ('c1990000-0000-0000-0000-000000000001'::uuid);
+insert into public.guest_sessions(
+  id,subject_id,token_hash,expires_at,consumed_at,
+  claimed_by_subject_id,created_at
+) values (
+  'c3990000-0000-0000-0000-000000000001'::uuid,
+  '$subject'::uuid, 'd05-fixture-promotion-token',
+  clock_timestamp()+interval '1 day',null,null,clock_timestamp()
+);
+select subject_id,subject_kind,subject_status
+from public.cmd_promote_guest_v1(
+  '$subject'::uuid,
+  'c3990000-0000-0000-0000-000000000001'::uuid,
+  'c1990000-0000-0000-0000-000000000001'::uuid
+);
+SQL
+[[ "$(p -c "select kind||'|'||status from public.subjects where id='$subject'::uuid;")" == 'member|active' ]] ||
+  fail "canonical purchased-Reading owner not promoted to active Member"
+echo 'PASS D-05-C synthetic Guest purchase retained after DB-authorized Member promotion'
+
 # The preceding general Chat fixture may already have a default Release.
 # Clear its default flag only inside the same disposable PostgreSQL database.
 p -c "update public.content_releases set is_default=false where is_default;" >/dev/null
