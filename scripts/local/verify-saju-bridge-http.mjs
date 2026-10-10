@@ -44,6 +44,14 @@ async function run() {
   const nonceDbEnabled = process.env.MYEONGHA_LOCAL_NONCE_PG_ENABLED === '1';
   const realGoTrueEnabled = process.env.MYEONGHA_LOCAL_GOTRUE_ENABLED === '1';
   const restrictedLoginEnabled = process.env.MYEONGHA_LOCAL_RESTRICTED_LOGINS_ENABLED === '1';
+  const tlsNonceEnabled = process.env.MYEONGHA_LOCAL_TLS_NONCE_ENABLED === '1';
+  if (tlsNonceEnabled && (!restrictedLoginEnabled
+    || !process.env.MYEONGHA_LOCAL_TLS_NONCE_PASSWORD
+    || !process.env.MYEONGHA_LOCAL_TLS_NONCE_CA_FILE
+    || !process.env.MYEONGHA_LOCAL_TLS_NONCE_WRONG_CA_FILE
+    || !process.env.MYEONGHA_LOCAL_TLS_NONCE_CA_FINGERPRINT)) {
+    throw new Error('Independent TLS nonce suite requires the disposable restricted Subject login and CA.');
+  }
   if (restrictedLoginEnabled && (!nonceDbEnabled
     || !process.env.MYEONGHA_LOCAL_SUBJECT_DB_PASSWORD
     || !process.env.MYEONGHA_LOCAL_NONCE_DB_PASSWORD
@@ -161,6 +169,31 @@ async function run() {
       });
       if (limitedCode !== 0) throw new Error('Actual least-privilege Subject/Nonce login verification failed.');
       console.log('[saju-bridge] Real limited PostgreSQL network logins passed (NOT operational authority).');
+    }
+    if (tlsNonceEnabled) {
+      // A physically separate PostgreSQL 15 instance with its own restricted
+      // LOGIN, pinned CA and actual hostname check. Subject remains on the
+      // first disposable DB; no Production TLS/certificate is involved.
+      const tlsNonce = spawn(process.execPath, [
+        vitest, 'run', 'test/saju-held-cross-repo-local-tls-nonce.test.ts',
+      ], {
+        cwd: root,
+        env: {
+          ...testEnv,
+          MYEONGHA_LOCAL_TLS_NONCE_ENABLED: '1',
+          MYEONGHA_LOCAL_TLS_NONCE_PASSWORD: process.env.MYEONGHA_LOCAL_TLS_NONCE_PASSWORD,
+          MYEONGHA_LOCAL_TLS_NONCE_CA_FILE: process.env.MYEONGHA_LOCAL_TLS_NONCE_CA_FILE,
+          MYEONGHA_LOCAL_TLS_NONCE_WRONG_CA_FILE: process.env.MYEONGHA_LOCAL_TLS_NONCE_WRONG_CA_FILE,
+          MYEONGHA_LOCAL_TLS_NONCE_CA_FINGERPRINT: process.env.MYEONGHA_LOCAL_TLS_NONCE_CA_FINGERPRINT,
+        },
+        stdio: 'inherit',
+      });
+      const tlsCode = await new Promise((ok, bad) => {
+        tlsNonce.once('error', bad);
+        tlsNonce.once('exit', (exitCode, signal) => ok(exitCode ?? (signal ? 1 : 1)));
+      });
+      if (tlsCode !== 0) throw new Error('Actual separate PostgreSQL TLS peer/nonce verification failed.');
+      console.log('[saju-bridge] Physically separate nonce PG with verified TLS and restricted login: PASS (not staging).');
     }
     if (realGoTrueEnabled) {
       // A distinct Vitest process prevents the GoTrue→Subject fixture remapping

@@ -164,6 +164,18 @@ node scripts/local/verify-saju-bridge-http.mjs ../Saju
 
 **한계:** 동일한 disposable PostgreSQL 클러스터 내에서 두 로그인 권한을 물리적으로 구분한 것으로, 독립된 Subject/Nonce/Admission **클러스터**나 원격 Staging 로그인은 아직 검증하지 않았다. 또한 이 단계의 PostgreSQL 연결은 TLS가 아니다. 엄격한 hostname/CA `verify-full` **실소켓 검증** 및 3 DB 물리 분리는 다음 단계를 통해 별도로 입증한다. 이 결과를 R06–R09 운영 신뢰 증빙 또는 `stagingAdmission=HOLD` 해제로 처리하지 않는다.
 
+## 2G. 실제 TLS 연결·서버 호스트 검증과 Nonce DB 물리 분리 — 2단계
+
+2F의 실제 TCP 제한 로그인 이후 별도의 임시 `postgres:15` 컨테이너를 **Nonce 전용 PostgreSQL 클러스터**로 생성한다. 기존 Subject DB(5432)는 유지하고 독립 Nonce DB(로컬 포트 5443)에만 기존 `1540_saju_source_proof_nonce_claim_authority_v1.sql`을 적용한다.
+
+- [CI 전용 설정 스크립트](../scripts/local/setup-saju-bridge-tls-nonce-ci.sh)는 CI 한정 가드, 포트 5443, `myeongha_saju_nonce_tls_verify` 데이터베이스 이름을 강제한다. 실행마다 새로운 CA·별도 오답 CA·서버 인증서를 생성하고 인증서의 SAN을 `nonce.saju-bridge-ci.invalid`로 고정한다. 자체 CA 개인키와 서버 개인키는 CI 종료 시 폐기한다.
+- Postgres TLS 1.2 이상과 인증서/개인키 파일 권한을 적용하고, `hostnossl ... reject` HBA 규칙으로 평문 TCP 접속을 서버에서도 거부한다. 실제 `psql sslmode=verify-full`/일회성 CA로 인증된 별도 `myeongha_tls_nonce_ci_login` 계정의 TCP 로그인을 먼저 확인한다.
+- [추가 검증](../test/saju-held-cross-repo-local-tls-nonce.test.ts)은 node-postgres의 `ssl: {ca, rejectUnauthorized:true}` 및 기본 호스트명 검증으로 실제 서버와 연결하고, `pg_stat_ssl`의 현재 세션 TLS 버전과 `session_user`, 실제 DB 이름을 확인한다. 잘못된 CA/호스트명·SSL 미사용·Subject 로그인 재사용 및 테이블 직접 접근은 실패해야 한다.
+- 제한 로그인 Subject DB의 현재 Birth 조회 → 실제 Saju 서버 HTTP 서명 Proof → **물리적으로 분리된 TLS Nonce 클러스터**에서 원자 claim → 동일 Birth Revision 재확인까지 기존 함수를 변경하지 않고 실행한다. 독립 TLS 연결 2개 사이에서 같은 Proof는 한 번만 소비한다.
+- 기존 베이스라인·2F·실제 GoTrue 테스트는 보존하고 동일 scoped Workflow에서 순차적으로 실행한다. TLS DB에는 Birth/회원 정보나 로그인 주체가 없으며, Subject·GoTrue CI DB를 TLS 서버 DB로 복제하지 않는다.
+
+**한계:** 이 테스트의 CA는 CI가 생성한 일회용 자체 CA이다. `saju-held-staging-db-tls-target-v1.ts`의 독립 운영 승인 Plan을 실제로 수령하거나 운영 Root fingerprint를 검증하지 않는다. Subject DB는 이 단계에서도 **평문 로컬 연결**이며, Admission DB의 독립 TLS 실소켓 경계 역시 미검증이다. 운영 Auth/Root/Attestor/Runner/Permit custody, 실제 TLS 대상·DNS·R01–R14 운영 신뢰 증빙은 계속 `NOT_VERIFIED`/`HOLD` 상태로 유지한다.
+
 ## 3. 통과 기준 / 아직 증명하지 않은 것
 
 | 시험 | 로컬/기존 CI에서 검사 가능 | 남는 실제 환경 확인 |
