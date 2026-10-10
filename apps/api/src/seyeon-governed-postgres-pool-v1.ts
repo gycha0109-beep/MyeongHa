@@ -113,7 +113,7 @@ export function parseSeyeonGovernedDbConfigV1(input: {
  * The new role has SET permission only from a separately provisioned login.
  */
 const LEGACY_OR_DIRECT_FLAGS = [
-  'isLegacyMember','canSetLegacyRole','isCostOwnerMember',
+  'isLegacyMember','isCostOwnerMember',
   'canLegacyStart','canLegacySettle','canLegacyRecord',
   'canDirectLedger','canDirectBudget','canDirectRateCard',
 ] as const;
@@ -137,7 +137,7 @@ export function verifySeyeonGovernedLoginPreflightV1(
       row.otherMemberships !== 0) {
     return fail('LOGIN_ROLE_UNSAFE', 'Governed login has elevated flags or unrelated role memberships.');
   }
-  if (row.canSetGovernedRole !== true) {
+  if (row.hasGovernedRoleMembership !== true) {
     return fail('GOVERNED_ROLE_UNAVAILABLE', 'Governed login cannot enter its dedicated execution role.');
   }
   for (const key of LEGACY_OR_DIRECT_FLAGS) {
@@ -179,12 +179,40 @@ export class SeyeonGovernedNodePostgresPoolV1
   ) {}
   async connect(): Promise<PostgresSubjectConnectionV1> {
     const client = await this.driverPool.connect();
+    let roleProbeStarted = false;
     try {
       const result = await client.query(GOVERNED_LOGIN_PREFLIGHT_SQL_V1,
         [SEYEON_GOVERNED_DB_ROLE_V1, MYEONGHA_API_EXECUTION_ROLE]);
       verifySeyeonGovernedLoginPreflightV1(result.rows,this.expectedPrincipal);
+      // PG role privilege catalogs do not expose portable SET permission
+      // semantics across supported versions. Prove actual SET LOCAL ROLE
+      // with an isolated dry-run transaction BEFORE handing the connection
+      // to the Subject runner.
+      await client.query('BEGIN');
+      roleProbeStarted = true;
+      await client.query('SET LOCAL ROLE myeongha_seyeon_governed_executor');
+      const proof = await client.query(
+        'select current_user::text as "currentUser"',
+      );
+      if (proof.rows.length !== 1 ||
+          proof.rows[0]?.currentUser !== SEYEON_GOVERNED_DB_ROLE_V1) {
+        return fail('GOVERNED_ROLE_UNAVAILABLE',
+          'Governed login failed the actual PostgreSQL role-switch proof.');
+      }
+      await client.query('ROLLBACK');
+      roleProbeStarted = false;
       return new GovernedSubjectConnectionV1(client);
     } catch (error) {
+      if (roleProbeStarted) {
+        try { await client.query('ROLLBACK'); }
+        catch (rollbackError) {
+          client.release(rollbackError instanceof Error ? rollbackError :
+            new Error('Governed preflight rollback failure.'));
+          throw new AggregateError(
+            [error,rollbackError],'Governed role preflight and rollback failed.',
+          );
+        }
+      }
       client.release(error instanceof Error ? error :
         new Error('Governed login authority preflight rejected.'));
       throw error;
