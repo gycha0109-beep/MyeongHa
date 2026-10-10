@@ -108,6 +108,7 @@ async function run() {
       MYEONGHA_LOCAL_SAJU_KEY_ID: keyId,
       ...(nonceDbEnabled ? {
         MYEONGHA_LOCAL_SAJU_NONCE_DB: '1',
+        MYEONGHA_LOCAL_SAJU_BIRTH_DB: '1',
         PGHOST: '127.0.0.1',
         PGPORT: '5432',
         PGDATABASE: 'myeongha_saju_local_verify',
@@ -117,6 +118,7 @@ async function run() {
     };
     const tests = ['test/saju-held-cross-repo-local-http.test.ts'];
     if (nonceDbEnabled) tests.push('test/saju-held-cross-repo-local-postgres-nonce.test.ts');
+    if (nonceDbEnabled) tests.push('test/saju-held-cross-repo-local-postgres-current-birth.test.ts');
     const test = spawn(process.execPath, [vitest, 'run', ...tests], {
       cwd: root, env: testEnv, stdio: 'inherit',
     });
