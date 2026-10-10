@@ -160,35 +160,37 @@ python3 scripts/operations/stage-seyeon-managed-owner-comment-order.py \
   --source-dir "$root/supabase/migrations" \
   --output-dir "$tempdir/managed-owner-migrations" >/dev/null ||
   hold 'Managed-owner SQL staging failed against exact approved source.'
-# Match the Production managed-owner membership *options* (admin true,
-# INHERIT false, SET false) before dropping the disposable service superuser.
-# The fixture's grantor may differ from Supabase's "supabase_admin"; both the
-# pre/post Production and isolated tests still require exact membership
-# fingerprint preservation across the six scoped migrations.
-psql -X -q -v ON_ERROR_STOP=1 \
-  -c 'grant myeongha_relationship_apply_owner to postgres with admin true, inherit false, set false;' \
-  >/dev/null 2>"$tempdir/membership-fixture.err" ||
-  hold 'Unable to install restricted managed-owner membership fixture.'
-membership="$(psql -X -qAt -v ON_ERROR_STOP=1 -c "
+# A stock postgres:17.6 role is the bootstrap superuser (OID 10).
+# PostgreSQL 17 expressly forbids changing the bootstrap role's SUPERUSER
+# property, even through SET ROLE to a second superuser. Never claim that a
+# successful stock-postgres CI replay proves Production non-superuser behavior.
+# Use a dedicated disposable executor with matching Production role attributes
+# (NOSUPERUSER, CREATEROLE, CREATEDB, BYPASSRLS, INHERIT) for the guarded SQL.
+# This fixture grants ONLY the test executor requisite schema/table access;
+# Production actor ownership parity still needs separate authority review.
+psql -X -q -v ON_ERROR_STOP=1 >/dev/null 2>"$tempdir/executor-fixture.err" <<'SQL'
+create role seyeon_pg17_executor nosuperuser createrole createdb bypassrls inherit nologin;
+grant usage, create on schema public to seyeon_pg17_executor;
+grant usage on schema supabase_migrations to seyeon_pg17_executor;
+grant select, insert on supabase_migrations.schema_migrations to seyeon_pg17_executor;
+grant select, insert, update, delete on all tables in schema public to seyeon_pg17_executor;
+grant usage, select on all sequences in schema public to seyeon_pg17_executor;
+grant myeongha_relationship_apply_owner to seyeon_pg17_executor
+  with admin true, inherit false, set false;
+SQL
+[[ "$(psql -X -qAt -v ON_ERROR_STOP=1 -c "
   select count(*) from pg_auth_members m
     join pg_roles owner on owner.oid=m.roleid
     join pg_roles member on member.oid=m.member
   where owner.rolname='myeongha_relationship_apply_owner'
-    and member.rolname='postgres'
-    and m.admin_option=true and m.inherit_option=false and m.set_option=false")" ||
-  hold 'Unable to inspect non-superuser owner membership fixture.'
-[[ "$membership" == 1 ]] ||
-  hold 'Expected one restricted direct managed-owner grant.'
-
-# Supabase Production's postgres role is non-superuser. The earlier rehearsal
-# was a false positive because stock postgres:17.6 ships a superuser postgres.
-# Demote ONLY this disposable test service after the historical bundle is
-# installed. This intentionally exposes COMMENT/OWNER membership mistakes.
-psql -X -q -v ON_ERROR_STOP=1 -c 'alter role postgres nosuperuser createrole createdb;' \
-  >/dev/null 2>"$tempdir/demote.err" ||
-  hold 'Unable to reproduce Production non-superuser postgres role.'
-[[ "$(psql -X -qAt -v ON_ERROR_STOP=1 -c "select rolsuper from pg_roles where rolname='postgres'")" == f ]] ||
-  hold 'Disposable PG17 executor is unexpectedly superuser.'
+    and member.rolname='seyeon_pg17_executor'
+    and m.admin_option=true and m.inherit_option=false and m.set_option=false")" == 1 ]] ||
+  hold 'Expected exact restricted non-superuser owner membership fixture.'
+[[ "$(psql -X -qAt -v ON_ERROR_STOP=1 -c "
+  select count(*) from pg_roles
+  where rolname='seyeon_pg17_executor' and not rolsuper and rolcreaterole
+    and rolcreatedb and rolbypassrls and rolinherit")" == 1 ]] ||
+  hold 'Production-like fixture role attributes diverged.'
 
 set --
 for n in 1400 1410 1420 1430 1440 1450; do
@@ -202,7 +204,11 @@ for n in 1400 1410 1420 1430 1440 1450; do
 done
 # Exercise the exact guarded Production transaction pre/post assertions in
 # the isolated PG17 test, so its SQL is never only statically checked.
-set -- -f scripts/operations/seyeon-relationship-backfill-transaction-pre.sql "$@" \
+set -- -c 'set role seyeon_pg17_executor' \
+  -c "select 1 / case when current_user='seyeon_pg17_executor'
+    and not (select rolsuper from pg_roles where rolname=current_user)
+    then 1 else 0 end" \
+  -f scripts/operations/seyeon-relationship-backfill-transaction-pre.sql "$@" \
   -f scripts/operations/seyeon-relationship-backfill-transaction-post.sql
 psql -X -q -1 -v ON_ERROR_STOP=1 "$@" >/dev/null 2>"$tempdir/early.err" ||
   hold 'Transactional backfill failed in isolated PostgreSQL 17.'
