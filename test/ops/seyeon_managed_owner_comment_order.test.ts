@@ -30,11 +30,16 @@ describe('non-superuser managed function owner COMMENT staging', () => {
       const marker = 'revoke myeongha_relationship_apply_owner from current_user;';
       expect(original.indexOf(marker)).toBeGreaterThan(-1);
       expect(original.lastIndexOf('comment on function public.')).toBeGreaterThan(original.indexOf(marker));
+      const grant = 'grant myeongha_relationship_apply_owner to current_user;';
+      const grantAt = original.indexOf(grant);
+      const revokeAt = original.indexOf(marker);
       expect(staged.indexOf(marker)).toBe(staged.lastIndexOf(marker));
-      expect(staged.indexOf(marker)).toBeGreaterThan(staged.lastIndexOf('comment on function public.'));
-      expect(staged.slice(0, staged.indexOf('revoke create on schema public'))).toBe(
-        original.slice(0, original.indexOf('revoke create on schema public')),
-      );
+      expect(grantAt).toBeGreaterThan(0);
+      expect(staged).toContain(original.slice(0, grantAt).trimEnd());
+      expect(staged).toContain(original.slice(grantAt, revokeAt + marker.length));
+      expect(staged).toContain(original.slice(revokeAt + marker.length).trim());
+      expect(staged.lastIndexOf('comment on function public.')).toBeLessThan(staged.indexOf(grant));
+      expect(staged.indexOf(marker)).toBeGreaterThan(staged.indexOf(grant));
       expect(readFileSync(join(sourceDir, name), 'utf8')).toBe(original);
     }
   });
