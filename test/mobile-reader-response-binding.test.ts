@@ -88,7 +88,7 @@ describe('mobile M3-beta-1 Reader response authority matching', () => {
       domain: 'general',
     });
     expect(fetchImpl).toHaveBeenCalledTimes(2);
-    expect(bearerCalls()).toBe(1);
+    expect(bearerCalls()).toBe(3); // initial admission, post-Thread and post-Reader session checks
     const preflight = fetchImpl.mock.calls[0];
     expect(new URL(String(preflight?.[0])).pathname).toBe('/api/chat/' + threadId);
     expect(new Headers(preflight?.[1]?.headers).get('Authorization')).toBe(
