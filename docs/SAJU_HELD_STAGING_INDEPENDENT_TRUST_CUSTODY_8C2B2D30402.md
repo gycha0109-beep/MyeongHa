@@ -103,6 +103,15 @@ Watchtower-Track: saju-bridge
 - 기존 `test/db/run_authority_core.sh`의 격리 DB 경로를 재사용하며 별도 워크플로, 운영 GRANT/로그인, 외부 DB/KMS·Runner/Commerce 자원은 생성하지 않는다.
 - **미증명:** 실제 Root 및 서명키의 독립 custody, 서명 검증과 floor 갱신의 신뢰된 선행 결속, 재해복구 시 durable floor, 운영 R01–R14, Permit/Challenge 별도 DB 간 원자성, 불명확 COMMIT의 독립 감사. 현재 상태는 `NOT_VERIFIED/HOLD`; 실행·발행·판매 권한은 모두 false.
 
+## 6B. 독립 Root pin·Registry 서명 연결 예비 검증 (합성·무권한)
+
+- 새 순수 검증 함수: `apps/api/src/saju-held-staging-root-pin-preflight-v1.ts`의 `assessSajuHeldStagingRootPinPreflightV1`.
+- **후보 신뢰 기록**은 `environmentId`, `rootKeyId`, `rootSpkiSha256`, `minimumRegistryRevision`의 정확한 필드만 수용한다. 이 기록이 실제 독립 보관소에서 왔는지, 최신 상태인지, 승인자가 관리하는지는 **확인하지 않는다.**
+- 전달된 Ed25519 공개키의 canonical SPKI/ SHA-256 fingerprint가 후보 기록에 일치하고 Registry의 detached signature, Root ID, environment, revision floor, 유효 시간이 함께 만족할 때에만 `PINNED_SIGNED_CLAIM_UNVERIFIED_CUSTODY`를 보고한다.
+- 다른 Root 공개키·fingerprint, Root ID/환경, revision 롤백, 위조 서명·변경된 Registry, 기한 만료, 악성 getter/Secret 필드를 거부한다. **자기 소유 Root가 만든 자기 소유 pin + 서명**이 전부 일치하더라도 결과는 *비운영 검증 주장*이며 `rootAuthority=NOT_VERIFIED`, `stagingAdmission=HOLD`, 모든 실행 boolean은 `false`.
+- 이 함수에 API/request/Evidence/Registry가 제출한 pin을 그대로 연결하지 않는다. 실제 운영 단계에는 별도 보안 관리자의 신뢰 가능한 read-only custody provider와 최신 revision 조회, 서명 검증→원자 high-water 갱신, clock/revocation 및 장애/불명확 COMMIT 감사 계약이 선행돼야 한다.
+- 기존 3-03 Registry 서명 검증기를 재사용하고, `test/saju-held-staging-root-pin-preflight-v1.test.ts`에서 합성·변조·출처 위장 반례를 검증한다. 새 워크플로/실환경 KMS·Secret/운영 DB/Runner/Commerce 접근은 없다.
+
 ## 7. 3-04-02 단계 종료 판정
 
 - **A — 설계:** 신뢰 입력·주체·스토리지 계약·접근 권한·레이스/사고 정책·테스트 매트릭스 문서화.

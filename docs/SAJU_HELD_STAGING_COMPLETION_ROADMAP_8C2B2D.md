@@ -17,7 +17,7 @@ Watchtower-Track: saju-bridge
 |---|---|---|---|
 | 3-03 (완료) | 3-03A/B 계약 및 #1862 Permit-scoped challenge 보완 | 승인 범위의 CI·squash·main 확인 | `SIGNED_ASSERTIONS_UNANCHORED` / 운영 HOLD |
 | 3-04-01 (완료) | R01–R14 출처·철회·복구 런북 | 명세 및 기존 CI·병합 | 증빙 미수집 |
-| **3-04-02 (합성 검증·운영 보류)** | CI 폐기형 PG의 Registry revision 단조 floor·Permit-scoped Challenge 역할 분리/일회성 소비 | 동시 경합·재생/위조·TTL·철회·rollback 테스트, 기존 DB Core CI | 운영 Root/키/실환경 증빙 `NOT_VERIFIED`; Runner `HOLD` |
+| **3-04-02 (합성 검증·운영 보류)** | CI 폐기형 PG의 Registry revision floor·일회성 Challenge + Root SPKI pin/Registry 서명 예비 대조 | DB 동시 경합·재생·철회/rollback 및 합성 Ed25519 pin/서명/환경/수정·자기소유 Root 부정 테스트 | 운영 Root/키·실환경 출처·지속성 `NOT_VERIFIED`; Runner `HOLD` |
 | 3-04-03 | R01–R14 독립 실환경 증빙 및 attestor-signed Evidence | 03A: 무권한 참조 인덱스/부정 검증; 03B: 승인된 실제 출처·서명·감사/환경/SHA 검증 | 03A 계약만으로 운영 검증 승격 금지 / 03B 미실행 |
 | 3-04-04 | Target Authority V2와 기존 Runner 사이 좁은 실행 전 게이트 | 운영 증빙·승인·Permit·대상·시간·소비 상태를 신뢰 출처에서 재평가, 부정·장애 시 false; V1 boolean 포트 승격 금지 | 운영 승인 전 false |
 | 2D-4 | 폐기형 Member/Birth로 격리 스테이징 한 차례 실행 및 증빙 보존 | 원자 Permit 소비, Auth/Subject Revision, Saju Preview Proof/HMAC/nonce, 결과/차단/수동복구·폐기 확인 | 별도 명시 승인 전 미실행 |
@@ -48,17 +48,21 @@ Watchtower-Track: saju-bridge
 | 2G | 별도 PostgreSQL Nonce 클러스터 TLS 1.2+/CA/DNS SAN·제한 로그인 | #1905 · `c187ba6c64dd` | Subject/Admission 독립 TLS |
 | 2H | Subject 별도 PostgreSQL TLS/CA/SAN·제한 로그인·Member RLS·실제 GoTrue JWT → Saju HTTP → Nonce TLS | #1911 · [CI #38060001813](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38060001813), 31 PASS | Admission 독립 DB/TLS·운영 R01–R14 |
 | 2I | 3번째 독립 Admission TLS·제한 LOGIN, 서명 Permit V2 원자 소비·경합·실패 차단 | **병합 #1913 · `537f95ca00b99fff5c2f4093b29d2cbfeaa45b72`** · [범위 CI #38063739885](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38063739885) · [고정 통합 CI #38064007261](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38064007261) 성공; **38건** | 세 DB 한 흐름 교차 검증·운영 R01–R14 |
-| 2J | **동일 폐기형 검증 실행**: GoTrue JWT→Subject TLS/Birth→Saju HTTP/HMAC→Nonce TLS→Admission TLS 합성 Permit V2 정확히 한 번 소비·HELD 유지 | PR [#1918](https://github.com/gycha0109-beep/MyeongHa/pull/1918) · [범위 CI #38064807263](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38064807263): **39 PASS**; 최신 고정 통합 CI·병합은 PR에서 별도 확인 | 운영 인가, 단일 분산 트랜잭션, JWT-승인 Permit 암호학적 결속·Runner 실행은 입증하지 않음 |
+| 2J | **동일 폐기형 검증 실행**: GoTrue JWT→Subject TLS/Birth→Saju HTTP/HMAC→Nonce TLS→Admission TLS 합성 Permit V2 정확히 한 번 소비·HELD 유지 | **병합 #1918** · `369deb33425e96d0756d3f45653115bae8c4b941` · [전체 CI #38065901520](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38065901520) 성공, **39 PASS** | 운영 인가, 단일 분산 트랜잭션, JWT-승인 Permit 암호학적 결속·Runner 실행은 입증하지 않음 |
 
 - #1904 범위 검증: 실제 제한 로그인 포함 23건 PASS, 병합 및 main 기록 확인.
 - #1905 범위 검증: 기존 23건과 독립 TLS Nonce 4건을 포함한 27건 PASS. [범위 CI #38057794070](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38057794070)와 [고정 HEAD 통합 CI #38058002001](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38058002001)는 `d740773e863eb6d4071edae58cbbda6faebe7aa5`에서 SUCCESS.
-- 2H의 Subject/Nonce 별도 TLS와 실제 격리 GoTrue 연결은 PR #1911의 scoped CI에서 검증했다. 2I의 세 번째 Admission TLS 및 서명 Permit V2 원자 소비는 PR #1913에서 최신 HEAD 전용/전체 CI 성공 후 Squash 병합과 `main` HEAD를 확인했다. 다음은 **2J Subject·Nonce·Admission 동일 폐기형 검증 실행 교차 시험**이며, 하나의 검증 스크립트 성공과 운영 권한/JWT-Permit 연결은 동일하지 않다. 2H 테스트 성공은 PR 최종 통합 CI/병합이나 운영 검증을 대신하지 않는다. 기존 코드/동일 scoped CI 재사용 우선.
+- 2H의 Subject/Nonce 별도 TLS와 실제 격리 GoTrue 연결은 PR #1911의 scoped CI에서 검증했다. 2I의 세 번째 Admission TLS 및 서명 Permit V2 원자 소비는 PR #1913에서 최신 HEAD 전용/전체 CI 성공 후 Squash 병합과 `main` HEAD를 확인했다. 2J는 PR #1918 병합 완료했다. 다음은 **3-04-02 독립 Root/Key의 보관 출처·신뢰 상향 전 검증**이며, 하나의 검증 스크립트 성공과 운영 권한/JWT-Permit 연결은 동일하지 않다. 2H 테스트 성공은 PR 최종 통합 CI/병합이나 운영 검증을 대신하지 않는다. 기존 코드/동일 scoped CI 재사용 우선.
 - 로컬에서 생성한 GoTrue 계정·자체 CA·DB/암호·서명 Proof는 운영 Root/Attestor/회원 데이터 또는 R01–R14 독립 운영 증빙이 아니다. 실제 운영 Root/Key/증빙/연결/Runner는 그대로 미검증/HOLD.
 - 상세 수행 파일·성공/실패 테스트는 로컬 기록의 해당 절에 보존하며 이후 각 하위 단계의 PR, 병합 SHA, CI 링크 및 한계를 여기에 추가한다.
 
 ## 2C. 3-04-02 검증 범위
 
 기존 DB Core CI에 독립 폐기형 PostgreSQL floor·Challenge 검증을 추가한다. 저장소 메커니즘의 무결성 시험일 뿐 실제 Root/KMS custody·운영 관리 평면·R01–R14·백업 복구, 다른 Admission DB와의 분산 원자성은 여전히 검증되지 않았다. [설계/한계](./SAJU_HELD_STAGING_INDEPENDENT_TRUST_CUSTODY_8C2B2D30402.md) 참조.
+
+## 2D. Root pin·Registry 연결의 무권한 보안 검증
+
+3-04-02 후보 신뢰 스냅샷의 Ed25519 SPKI SHA-256 pin, Root ID, Registry detached signature, 최소 revision 및 환경 ID를 한 경로에서 검사한다. 이 결과는 **`PINNED_SIGNED_CLAIM_UNVERIFIED_CUSTODY`** 또는 BLOCKED이며 실제 독립 관리자/보관소의 출처 증명, 서명 검증과 DB high-water의 트랜잭션 결속, R01–R14 실환경 증빙·운영 키 발급·실행 인가를 대체하지 않는다. 자세한 계약과 미검증 항목은 [3-04-02 설계 6B](./SAJU_HELD_STAGING_INDEPENDENT_TRUST_CUSTODY_8C2B2D30402.md)를 따른다.
 
 ## 3. 코드·운영 병렬화와 범위 제한
 
@@ -75,8 +79,8 @@ Watchtower-Track: saju-bridge
 | 서명/정적 신뢰 평가 | #1850 #1851 #1862 | 코드 완료 / 운영 비인증 |
 | 운영 증빙 목록 및 중단 절차 | #1856, R01–R14 | 문서 완료 / 운영 미검증 |
 | 개별 부정 시험 T01–T40 | 기존 합성 테스트 분산 | **개별 대응표 미완료** |
-| 독립 Root 및 durable revision/challenge | 3-04-02 | 설계/운영 미완료 |
-| 실환경 Auth·DB 3종·Saju Proof | 로컬 2A–2I 합성/실소켓 검증, Admission 38 PASS·병합 #1913; 3-04-03A 인덱스 계약 / 03B 실제 probe | 3 DB 동일 검증 흐름(2J)·R05–R14 독립 운영 관찰 미완료 |
+| 독립 Root 및 durable revision/challenge | 3-04-02 | 합성 저장소 검증 #1925 병합 / 운영 미검증 |
+| 실환경 Auth·DB 3종·Saju Proof | 로컬 2A–2I 합성/실소켓 검증, Admission 38 PASS·병합 #1913; 3-04-03A 인덱스 계약 / 03B 실제 probe | 3 DB 동일 검증 흐름(2J) 합성 완료, R05–R14 독립 운영 관찰 미완료 |
 | Target Authority V2 + Runner | 3-04-04 | 미연결 |
 | 실제 격리 스테이징 1회 | 2D-4 | 미실행 |
 | Production/Commerce | 별도 authority | 미승인 |
