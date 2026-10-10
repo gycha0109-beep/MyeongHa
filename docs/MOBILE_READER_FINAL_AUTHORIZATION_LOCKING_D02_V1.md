@@ -107,13 +107,19 @@
 | DB-C0 | revoked bind replay는 현재 권한 아님, Reader A DENY/Reader B 허용 | #1831 / db-authority-core | 범위 한정 PASS |
 | DB-C1 | 같은 Reader/Reading/bundle의 독립 active Grants 둘, B1 revoke 후 B2 유지, 전부 revoke 시 deny | #1854 / db-authority-core | **실제 Postgres PASS / merged b18e6c15** |
 | DB-C2 | 서로 다른 active bundle 둘은 DB 메타데이터 2행으로 유지, 한 bundle revoke 뒤 단일 행 복구 | #1854 / db-authority-core | **DB SQL 2행 PASS**. 애플리케이션 exact-one reject의 새 E2E는 별도 |
-| DB-C3 | T2보다 revoke commit 우선, revoke lock 우선, T2 잠금 우선 양방향 경합 | 승인 R1/R2 server-only function + 두 PostgreSQL connection | 정책·구현 HOLD |
-| DB-C4 | 신규 bundle insert와 T2 공개 판단의 phantom 경합 | DB Owner 승인 shared scope anchor 및 모든 mutation writer 수정 | 정책·구현 HOLD |
+| DB-C3 | 기존 구매 Grant UPDATE vs 가상 최종 조회 FOR SHARE의 양방향 잠금 대기 | #1857 / isolated PostgreSQL 두 연결 | **기초 행 잠금 사전 검증 PASS**. 실제 T2 권한 함수·환불 Provider effect/최종 공개는 HOLD |
+| DB-C4 | B2 행 잠금 중 다른 bundle B3의 **기존 독립 Grant** 활성화 | #1857 / preflight | **단일 행 잠금의 한계 재현 PASS**. 신규 Grant INSERT/공통 scope anchor·실제 T2 경합은 HOLD |
 | API-C1 | T1→원격 fake Saju wait→T2, provider await 중 DB pool lease 0 | Reader/API Runtime 별도 PR | 구현 HOLD |
 | API-C2 | Fresh clock/Subject/Source/policy/release 검증 및 client stale response 폐기 | Reader/API + 모바일 계약 검증 | 구현 HOLD |
 | RELEASE | Web checkout→receipt→Grant→Reader result→refund→re-read, kill switch | Product/Commerce/Saju/QA | 운영 HOLD |
 
 DB-C1/C2는 #1854로 격리 PostgreSQL 범위에서 검증·병합 완료. 별도 synthetic verified receipt+독립 purchase Grants가 유지되며 Source Truth/과거 바인딩 불변. **DB-C2의 2행은 DB에서 모호성을 드러내는 결과이지 DB 단독 DENY가 아니다**. 실제 A2 exact-one 선택은 서버에서 거부하도록 기존 로직이 구현돼 있지만, #1854는 해당 서버 통합 E2E까지 새로 검증하지 않았다. DB-C3/C4는 Owner가 선형화 정책과 모든 writer 잠금/ACL 계약에 서명하기 전 SQL 마이그레이션을 시작하지 않는다.
+
+## 6.1 PR #1857 병합 후 증거 범위
+
+- DB-C3 사전 검증은 기존 purchase-backed Grant에서 **UPDATE 선점 → FOR SHARE 대기·DENY**, **FOR SHARE 선점 → UPDATE 대기 후 회수** 순서를 서로 다른 PostgreSQL 연결 두 개와 `pg_stat_activity.wait_event_type` 관측으로 증명했다. 이것은 승인된 T2 final reveal 트랜잭션이나 Commerce Provider refund/effect 전체 경로가 아니다.
+- DB-C4 사전 검증은 **기존 다른 번들 B3 Grant의 상태 활성화**가 B2 행 `FOR SHARE`만으로 차단되지 않는다는 음성 증거다. **새 Purchase Intent/binding/Grant INSERT phantom은 시험하지 않았다.**
+- #1857 병합 `510945f0b0d9e7c969dd2c60d520922c3ef8b01f`, scoped DB 및 full integration PASS. 기능 정책/SQL migration/공개 설정 변경 없음. L1·R2 잠금 protocol은 DB/Commerce/Reader owner HOLD 유지.
 
 ## 7. 부정 테스트·출시 금지
 
@@ -126,7 +132,7 @@ DB-C1/C2는 #1854로 격리 PostgreSQL 범위에서 검증·병합 완료. 별�
 ## 8. A/B/C 종료
 
 A. 실행 가능한 lock/linearization 후보·DB-C1~C4 테스트 설계 작성: **SELF REVIEW PASS**. DB/Commerce/Reader/API/Legal 합의: **HOLD**.
-B. #1831·#1838·**#1854(DB-C1/C2)** 범위 한정 DB 회귀 PASS. DB-C3/C4, short T1-T2/Final reveal 구현·실경합은 **HOLD**.
+B. #1831·#1838·#1854(DB-C1/C2), #1857(기존 Grant 행 잠금 **사전 검증만**) 실제 PostgreSQL PASS. 승인된 DB-C3/C4 완결, 짧은 T1-T2/Final reveal 운영 구현·환불 interleaving은 **HOLD**.
 C. 실판매·환불/권한회수·Saju Production·Reader 공개/rollback 실제 E2E: **HOLD**.
 
 본 문서는 코드가 아니라 owner 검토용 설계이며, 어떤 실제 동시성 테스트 실행도 주장하지 않는다.
