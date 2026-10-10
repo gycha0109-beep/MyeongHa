@@ -56,6 +56,18 @@ describe('mobile M3-alpha Official Reading Reader entry', () => {
     })).toThrow('matching Reader identity');
   });
 
+  it('keeps informational Reader selection separate from purchase/Thread authority', () => {
+    for (const reader of MOBILE_READER_PRESENTATIONS_V1) {
+      expect(reader.tone.length).toBeGreaterThan(0);
+      const entry = projectMobileOfficialReadingReaderEntryV1(official, reader.key);
+      expect(entry.readerId).toBe(reader.key);
+      expect(entry.status).toBe('public_route_off');
+      expect(entry.canStartInterpretation).toBe(false);
+      expect(entry).not.toHaveProperty('threadId');
+      expect(entry).not.toHaveProperty('purchaseAccess');
+    }
+  });
+
   it('uses the validated archive and offers no Reader admission or Thread action', async () => {
     const read = (path: string) => readFile(new URL('../' + path, import.meta.url), 'utf8');
     const [screen, view, native] = await Promise.all([
@@ -68,8 +80,18 @@ describe('mobile M3-alpha Official Reading Reader entry', () => {
     expect(screen).toContain('state.record.display.steps.map');
     expect(view).toContain('MOBILE_READER_PRESENTATIONS_V1.map');
     expect(view).toContain('해설 서비스 준비 중');
-    expect(view).not.toContain('onPress=');
+    // All nine Reader introductions are now explorable without a network call,
+    // purchasing a Reader, creating a Thread or lifting the public OFF gate.
+    expect(view).toContain('useState<MobileReaderPresentationIdV1>');
+    expect(view).toContain('onPress={() => setSelectedReaderId(reader.key)}');
+    expect(view).toContain('accessibilityState={{ selected: selectedReaderId === reader.key }}');
+    expect(view).toContain('findMobileReaderPresentationV1(selectedReaderId)');
+    expect(view).toContain('projectMobileOfficialReadingReaderEntryV1(record, selectedReaderId)');
+    expect(view).toContain('{selectedReader.tone}');
+    expect(view).toContain('해설 서비스 준비 중');
     expect(view).not.toContain('fetch(');
+    expect(view).not.toContain('router.push(');
+    expect(view).not.toContain('router.navigate(');
     expect(view).not.toContain('threadId');
     expect(view).not.toContain('mobileReaderInterpretationServiceV1');
     expect(native).not.toContain('publicRouteActivated: true');
