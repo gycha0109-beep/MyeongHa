@@ -80,7 +80,7 @@ export function useMobileRecordsV1() {
         .filter((key) => snapshots[key].status === 'error')
         .map((key) => run(() => mobileRecordsControllerV1.loadInitial(key, { force: true }))),
     );
-    if (focused.current) setSnapshots(sync());
+    // Each run publishes only to the focus epoch that started it.
   }, [run, snapshots]);
 
   const loadMore = useCallback(async (tab: RecordsTabV1) => {
