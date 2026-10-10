@@ -34,6 +34,16 @@ begin
   if v_before is null or v_before is distinct from v_after then
     raise exception 'HOLD_SEYEON_BACKFILL: later runtime definition/Owner/ACL fingerprint changed';
   end if;
+  if (select sha from pg_temp.seyeon_before_owner_membership) is distinct from
+     (select md5(coalesce(string_agg(
+       m.roleid::text || ':' || m.member::text || ':' || m.grantor::text || ':' ||
+       m.admin_option::text || ':' || m.inherit_option::text || ':' ||
+       m.set_option::text, E'\\n' order by m.member::text, m.roleid::text
+     ), ''))
+       from pg_auth_members m join pg_roles r on r.oid=m.roleid
+       where r.rolname = 'myeongha_relationship_apply_owner') then
+    raise exception 'HOLD_SEYEON_BACKFILL: owner role memberships changed';
+  end if;
   if (select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace
       where n.nspname='public' and p.proname in ('relationship_event_json_v1',
         'cmd_lock_relationship_apply_context_v1',
