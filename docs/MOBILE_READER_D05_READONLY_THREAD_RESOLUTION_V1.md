@@ -65,3 +65,39 @@ The web runtime invokes `ensureRoomReady()` on entering `chat.html?character=...
 Mobile general Chat follows the same lifecycle: tapping a Character calls existing Member-only Chat open/reuse, navigates to the returned server Thread, reads the authoritative history, then renders the matching canonical introduction only for verified empty history; the existing composer enables actual send for Se-yeon only. No default introduction on read failures, loading states or histories with messages.
 
 This is **not** authorization to call the ordinary Chat open route as the fallback to D-05 Official Reading×Reader purchase admission. D-05's missing Thread case still returns unavailable until D05-C's pinned Bundle / exact Grant first-create contract and public release are separately accepted. Ordinary Chat, Reader-paid interpretation, Records and Chat Thread identities remain separate.
+
+## D-05 server-only authenticated PostgreSQL orchestration
+
+`apps/api/src/postgres-official-reading-reader-thread-resolution-v1.ts` now
+composes the existing read-only authority ports **within one**
+`executePostgresSubjectTransactionV1` call. It accepts verified authentication
+evidence and Reading/Reader selectors, never a client or UI-provided Subject,
+Thread, Product approval, Grant, content Bundle, or effective timestamp.
+
+The entrypoint:
+
+1. Rejects Guest and malformed selectors before borrowing the DB connection.
+2. Resolves and transaction-binds canonical Member, with `SET LOCAL ROLE myeongha_api_executor`.
+3. Obtains `transaction_timestamp()` from PostgreSQL, not the client's clock.
+4. Receives the **Product/Commerce-approved eligibility authority-port factory**
+   from trusted server code and binds it to that same transaction connection.
+   No guessed approved Product rule is provided here; without this owner-owned
+   implementation, an authorized positive resolution cannot be activated.
+5. Calls the existing exact Reading×Reader Grant/source metadata, Product
+   eligibility, bounded existing-thread locator and known-thread binding
+   with replay checks; commits a read-only result or rolls back on mismatch.
+
+This is an internal module, **not wired to a public API or mobile Reader CTA**.
+The returned result is a short-lived internal lookup, not a reusable capability
+or permission to issue an Official Reading Reader Chat turn. If a Member has
+never created a general Reader Chat Thread, D-05 still fails closed. Do not
+substitute the ordinary Member Chat open/create command, even though general
+Web/Mobile Chat already uses it to display the default greeting.
+
+Test evidence: `test/postgres-official-reading-reader-thread-resolution-v1.test.ts`
+checks same connection and timestamp, Guest/bad inputs, revoked/missing Grant,
+Product HOLD, zero/ambiguous Thread, bundle mismatch, and rollback/no-write.
+The previous real PostgreSQL locator test proves row-level discovery behavior;
+this new test uses injected PostgreSQL/Commerce ports and **does not** resolve
+D05-A/C/D, #1827 refund/reveal linearization, #1828 Product policy mapping or
+production deployment.
