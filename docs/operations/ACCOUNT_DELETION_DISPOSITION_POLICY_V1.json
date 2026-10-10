@@ -6,10 +6,10 @@
   "executionAuthorized": true,
   "graphRef": {
     "schema": "myeongha-transitive-subject-dependency-graph-v1",
-    "edgeCount": 140,
-    "distinctReachableTableCount": 59,
+    "edgeCount": 146,
+    "distinctReachableTableCount": 60,
     "maxDepth": 4,
-    "fingerprintSha256": "c745bacb0e9b2d13013c1048fc4273203af68b9c4816eef7b6c9fe37e4db167b"
+    "fingerprintSha256": "c8027aeaf8c137d7d1629c200ed86960537ca99ddb9202a6025e3a7b9fd2fb2f"
   },
   "tableDispositions": [
     {
@@ -41,14 +41,14 @@
       "retentionPeriod": null
     },
     {
-      "table": "character_unlocks",
+      "table": "character_reading_artifacts",
       "disposition": "DELETE",
       "authorityReference": "https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582",
       "retentionDurationDays": null,
       "retentionPeriod": null
     },
     {
-      "table": "character_reading_artifacts",
+      "table": "character_unlocks",
       "disposition": "DELETE",
       "authorityReference": "https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582",
       "retentionDurationDays": null,
@@ -224,6 +224,13 @@
     },
     {
       "table": "notifications",
+      "disposition": "DELETE",
+      "authorityReference": "https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582",
+      "retentionDurationDays": null,
+      "retentionPeriod": null
+    },
+    {
+      "table": "official_reader_assistant_saju_provenance",
       "disposition": "DELETE",
       "authorityReference": "https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582",
       "retentionDurationDays": null,
