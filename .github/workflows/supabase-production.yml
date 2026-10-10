@@ -62,7 +62,7 @@ jobs:
           requires_deploy=false
           reason='no governed Production DB deployment-surface change detected'
 
-          if [[ "$EVENT_NAME" == 'workflow_dispatch' && "$SCOPED_BACKFILL" == 'true' ]]; then
+          if [[ "$EVENT_NAME" == 'workflow_dispatch' && "${SCOPED_BACKFILL:-}" == 'true' ]]; then
             requires_deploy=false
             reason='manual scoped Se-yeon backfill must never invoke ordinary db push'
           elif [[ "$EVENT_NAME" == 'workflow_dispatch' ]]; then
