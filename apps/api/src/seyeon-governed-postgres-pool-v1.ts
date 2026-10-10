@@ -91,8 +91,7 @@ export function parseSeyeonGovernedDbConfigV1(input: {
     return fail('INVALID_CONFIG', 'Governed database URL principal does not match the dedicated login.');
   }
   if (governed.href === ordinary.href ||
-      (governed.username === ordinary.username &&
-        governed.password === ordinary.password) ||
+      governed.password === ordinary.password ||
       governed.hostname.toLowerCase() !== ordinary.hostname.toLowerCase() ||
       governed.port !== ordinary.port ||
       governed.pathname !== ordinary.pathname) {
