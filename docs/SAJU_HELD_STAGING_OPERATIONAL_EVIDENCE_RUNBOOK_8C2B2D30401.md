@@ -2,6 +2,9 @@
 
 Watchtower-Track: saju-bridge
 
+**최종 완료 기준·단계별 상태:** [8C-2B-2D 완료 로드맵](./SAJU_HELD_STAGING_COMPLETION_ROADMAP_8C2B2D.md). **3-04-02 신뢰 입력·영속 상태 설계:** [독립 Root/Revision/Challenge Authority](./SAJU_HELD_STAGING_INDEPENDENT_TRUST_CUSTODY_8C2B2D30402.md).
+
+
 > 단계: **실행·권한 부여 이전의 운영 설계/증빙 준비**. 본 문서 자체는 승인, 검증된 운영 증빙 또는 실행 허가가 아니다. 검증된 운영 증빙을 실제로 생성한 적 없으며, 이 변경으로 키/GRANT/네트워크/배포/Runner를 활성화하지 않는다.
 
 ## 1. 현재 코드와 실환경 증빙 구분
