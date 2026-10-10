@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { SAJU_DOMAINS, type SajuDomain } from '../packages/contracts/src/index.js';
 import type { CharacterRuntimeContextV1 } from '../packages/domain/src/character-runtime-context.js';
+import { guardCharacterRendererOutput } from '../packages/domain/src/character-output-guard.js';
 import type { CharacterPerspectiveProfileV1 } from '../packages/domain/src/character-saju-perspective.js';
 import type { CharacterRuntimeContextWithGroundingV1 } from '../packages/domain/src/character-saju-grounding-admission.js';
 import {
@@ -102,6 +103,7 @@ function fixture(reader: string, domain: SajuDomain) {
     schemaVersion: 'v1', characterId: reader, contentBundleId: BUNDLE,
     contentVersion: 'fixture-content-v1', speech, persona: { communication },
     sajuProfile: { profileVersion: 'fixture-saju-profile-v1' },
+    rendererPolicy: { allowedEmotionIds: ['neutral'], allowedAnimationCueIds: [] },
     saju: null, lifeFacts: [], memories: [], recentMessages: [],
   } as unknown as CharacterRuntimeContextV1;
   const perspective = {
@@ -190,6 +192,76 @@ describe('A3-beta: verified official standard Saju runtime, no fake Capability',
       expect(Object.isFrozen(admitted)).toBe(true);
     },
   );
+
+  it('applies existing Character Output Guard to authentic official Reader V2 without a fake Capability', async () => {
+    const a = await authorize('baekheon', 'career');
+    const grounding = bundle('career');
+    const admitted = admitCharacterRuntimeSajuGroundingV2({
+      context: a.context, groundingRef: refOf(grounding),
+    });
+    const draft = {
+      schemaVersion: 'v1',
+      emotion: 'neutral',
+      memoryProposals: [],
+      relationshipEventProposals: [],
+      suggestedActions: [],
+    };
+    const envelope = guardCharacterRendererOutput({
+      context: admitted, rawOutput: draft, allowedSuggestedActionKeys: [],
+    });
+    expect(envelope.protectedSajuSegments.map(v => v.text))
+      .toEqual(['근거를 바탕으로 설명합니다.']);
+    expect(envelope.protectedSajuDisclosures.map(v => v.text))
+      .toEqual(['불확실성을 고려해야 합니다.']);
+    expect(envelope.memoryProposals).toEqual([]);
+    expect(envelope.relationshipEventProposals).toEqual([]);
+    expect(envelope.suggestedActions).toEqual([]);
+    expect(Object.isFrozen(envelope)).toBe(true);
+  });
+
+  it('blocks forged and ungrounded V2 runtime at the Output Guard boundary', async () => {
+    const a = await authorize('seyeon', 'general');
+    const grounding = bundle('general');
+    const admitted = admitCharacterRuntimeSajuGroundingV2({
+      context: a.context, groundingRef: refOf(grounding),
+    });
+    const draft = {
+      schemaVersion: 'v1',
+      emotion: 'neutral',
+      memoryProposals: [], relationshipEventProposals: [], suggestedActions: [],
+    };
+    const guard = (context: typeof admitted) => guardCharacterRendererOutput({
+      context, rawOutput: draft, allowedSuggestedActionKeys: [],
+    });
+    expect(() => guard({ ...admitted })).toThrow(CharacterSajuRuntimeAdmissionErrorV2);
+    expect(() => guard({
+      ...admitted, saju: { ...admitted.saju, readingRef: 'other-reading' },
+    })).toThrow(CharacterSajuRuntimeAdmissionErrorV2);
+    expect(() => guard(a.context as typeof admitted))
+      .toThrow(CharacterSajuRuntimeAdmissionErrorV2);
+  });
+
+  it('rejects invented renderer text, protected Saju echoes and unauthorized actions on V2', async () => {
+    const a = await authorize('yeoul', 'general');
+    const admitted = admitCharacterRuntimeSajuGroundingV2({
+      context: a.context, groundingRef: refOf(bundle('general')),
+    });
+    const base = {
+      schemaVersion: 'v1',
+      emotion: 'neutral',
+      memoryProposals: [], relationshipEventProposals: [], suggestedActions: [],
+    };
+    for (const draft of [
+      { ...base, madeUpClaim: '사주의 새로운 결론' },
+      { ...base, framingBefore: '근거를 바탕으로 설명합니다.' },
+      { ...base, suggestedActions: [{ actionKey: 'not_authorized' }] },
+      { ...base, emotion: 'unpublished_emotion' },
+    ]) {
+      expect(() => guardCharacterRendererOutput({
+        context: admitted, rawOutput: draft, allowedSuggestedActionKeys: [],
+      })).toThrow();
+    }
+  });
 
   it('blocks forged, cloned, reused and scope-swapped proofs', async () => {
     const a = await authorize('seyeon', 'general');
