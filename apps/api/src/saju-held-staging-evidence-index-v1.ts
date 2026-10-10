@@ -130,7 +130,8 @@ export function assessSajuHeldStagingEvidenceIndexV1(
           || !digest(raw.artifactDigest) || !ref(raw.auditRecordId)
           || !ref(raw.collectorId) || !ref(raw.reviewerId)
           || raw.collectorId === raw.reviewerId
-          || !clock(raw.claimedObservedAtMs) || raw.claimedObservedAtMs > input.nowMs
+          || !clock(raw.claimedObservedAtMs) || !clock(input.nowMs)
+          || raw.claimedObservedAtMs > input.nowMs
           || typeof raw.myeonghaCommitSha !== 'string' || !SHA40.test(raw.myeonghaCommitSha)
           || typeof raw.sajuCommitSha !== 'string' || !SHA40.test(raw.sajuCommitSha)) {
           blocked.add(evidenceId);
