@@ -175,6 +175,57 @@ describe('Character Saju grounding bundle view admission', () => {
     ).toThrow('bundle hash does not match bundle content');
   });
 
+  it.each([
+    'general', 'family', 'relationship', 'compatibility', 'career',
+    'business', 'wealth', 'life_stage', 'question_specific',
+  ] as const)('RR-02 checks the V1 shape for %s without claiming Product readiness', (domain) => {
+    const original = makeBundle([makeUnit('1')]);
+    const { groundingHash: _previous, ...source } = original;
+    const material = {
+      ...source,
+      readingDomain: domain,
+      units: source.units.map(unit => ({ ...unit, domain })),
+    };
+    const bundle = {
+      ...material,
+      groundingHash: hashCharacterSajuGroundingBundleMaterialV1(material),
+    };
+    const expectedRef = { ...makeContext(original).saju!.groundingRef!, readingDomain: domain,
+      groundingHash: bundle.groundingHash };
+    const admitted = admitCharacterSajuGroundingBundleViewV1({ candidate: bundle, expectedRef });
+    expect(admitted.readingDomain).toBe(domain);
+    expect(admitted.units.every(unit => unit.domain === domain)).toBe(true);
+  });
+
+  it('RR-02 rejects a recomputed-hash V1 bundle with zero source block provenance', () => {
+    const original = makeBundle([makeUnit('1')]);
+    const { groundingHash: _previous, ...source } = original;
+    const material = { ...source, units: [{ ...source.units[0]!, sourceBlockRefs: [] }] };
+    const tampered = {
+      ...material,
+      groundingHash: hashCharacterSajuGroundingBundleMaterialV1(material),
+    };
+    expect(() => admitCharacterSajuGroundingBundleViewV1({
+      candidate: tampered,
+      expectedRef: { ...makeContext(original).saju!.groundingRef!,
+        groundingHash: tampered.groundingHash },
+    })).toThrow(/sourceBlockRefs must not be empty/u);
+  });
+
+  it('RR-02 refuses Saju V2 source contract without silently treating it as V1', () => {
+    const original = makeBundle([makeUnit('1')]);
+    const candidate = {
+      ...original,
+      schemaVersion: 'myeonghwa-character-grounding-v2',
+      projectionVersion: 'myeonghwa-character-grounding-projection-v3',
+      units: [{ ...original.units[0]!, unitId: 'grounding_unit_v2_' + '0'.repeat(24) }],
+    };
+    expect(() => admitCharacterSajuGroundingBundleViewV1({
+      candidate,
+      expectedRef: makeContext(original).saju!.groundingRef!,
+    })).toThrow();
+  });
+
   it('rejects raw Product/ClaimGraph material at the bundle boundary', () => {
     const bundle = makeBundle([makeUnit('1')]);
     const context = makeContext(bundle);
