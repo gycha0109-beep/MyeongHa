@@ -130,3 +130,14 @@ create temporary table pg_temp.seyeon_before_backfill_fingerprint
     'cmd_checkpoint_seyeon_post_turn_analysis_v1',
     'cmd_complete_seyeon_post_turn_analysis_v1',
     'qry_content_bundle_manifest_v1');
+
+create temporary table pg_temp.seyeon_before_owner_membership
+  on commit drop
+  as select md5(coalesce(string_agg(
+    m.roleid::text || ':' || m.member::text || ':' || m.grantor::text || ':' ||
+    m.admin_option::text || ':' || m.inherit_option::text || ':' ||
+    m.set_option::text, E'\\n' order by m.member::text, m.roleid::text
+  ), '')) as sha
+  from pg_auth_members m
+  join pg_roles r on r.oid=m.roleid
+  where r.rolname = 'myeongha_relationship_apply_owner';
