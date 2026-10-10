@@ -31,9 +31,8 @@ select
  r.rolinherit as "canInherit",
  r.rolcreatedb as "canCreateDb",
  r.rolcreaterole as "canCreateRole",
- pg_catalog.pg_has_role(session_user, $1::name, 'SET') as "canSetGovernedRole",
+ pg_catalog.pg_has_role(session_user, $1::name, 'MEMBER') as "hasGovernedRoleMembership",
  pg_catalog.pg_has_role(session_user, $2::name, 'MEMBER') as "isLegacyMember",
- pg_catalog.pg_has_role(session_user, $2::name, 'SET') as "canSetLegacyRole",
  pg_catalog.pg_has_role(session_user, 'myeongha_seyeon_cost_meter_owner', 'MEMBER')
     as "isCostOwnerMember",
  (select count(*)::int
