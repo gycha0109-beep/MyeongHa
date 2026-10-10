@@ -235,7 +235,7 @@ export class SeyeonGovernedNodePostgresPoolV1
 }
 
 class NativeGovernedDriverPoolV1 implements NodePostgresDriverPoolV1 {
-  private pool?: Pool;
+  private pool: Pool | undefined;
   constructor(
     private readonly config: SeyeonGovernedDbConfigV1,
     private readonly options: NodePostgresSubjectPoolOptionsV1,
