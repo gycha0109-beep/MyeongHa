@@ -89,6 +89,7 @@ function fixtures(options: {
   accessRows?: CharacterStandardReadingAccessAuthorityRowV1[];
   artifactRows?: CharacterStandardReadingArtifactAuthorityRowV1[];
   policy?: ProductReaderRuleLookupV1;
+  policyAfterArtifact?: ProductReaderRuleLookupV1 | 'throw';
   pinnedBundle?: string;
   failPolicy?: boolean;
   changeThreadOnRecheck?: boolean;
@@ -97,6 +98,7 @@ function fixtures(options: {
   const reader = options.threadReader ?? 'seyeon';
   const events: string[] = [];
   let threadReadCount = 0;
+  let policyReadCount = 0;
   const readRuntimeBinding = vi.fn(async (_input: { subjectId: string; threadId: string }) => {
     events.push('thread');
     threadReadCount += 1;
@@ -120,8 +122,14 @@ function fixtures(options: {
     ProductReaderEligibilityAuthorityPortV1['readApprovedRule']
   >[0]) => {
     events.push('policy');
-    if (options.failPolicy) throw new Error('policy unavailable');
-    return options.policy ?? approved();
+    policyReadCount += 1;
+    if (options.failPolicy ||
+        (policyReadCount > 1 && options.policyAfterArtifact === 'throw')) {
+      throw new Error('policy unavailable');
+    }
+    return policyReadCount > 1 && options.policyAfterArtifact !== undefined
+      ? options.policyAfterArtifact
+      : options.policy ?? approved();
   });
   const readArtifactSource = vi.fn(async (_input: {
     subjectId: string; readingId: string; readerCharacterId: string;
@@ -157,10 +165,11 @@ function fixtures(options: {
 }
 
 describe('A2-beta server-only Reading × Reader admission', () => {
-  it('enforces thread -> exact Reader access -> Product policy -> artifact -> thread recheck', async () => {
+  it('enforces thread -> Reader Grant -> policy -> artifact -> thread + unchanged policy recheck', async () => {
     const f = fixtures();
     const result = await prepareOfficialReadingReaderAdmissionV1(f.input);
-    expect(f.events).toEqual(['thread', 'access', 'policy', 'artifact', 'thread']);
+    expect(f.events).toEqual(['thread', 'access', 'policy', 'artifact', 'thread', 'policy']);
+    expect(f.readApprovedRule).toHaveBeenCalledTimes(2);
     expect(f.readAccessibleReadings).toHaveBeenCalledWith({
       subjectId: SUBJECT, readerCharacterId: 'seyeon', effectiveAt: TIME,
     });
@@ -245,6 +254,35 @@ describe('A2-beta server-only Reading × Reader admission', () => {
     await expect(prepareOfficialReadingReaderAdmissionV1(denied.input))
       .rejects.toMatchObject({ code: 'POLICY_HOLD' });
     expect(denied.readArtifactSource).not.toHaveBeenCalled();
+  });
+
+
+  it.each([
+    { label: 'withdrawn', after: { status: 'withheld', reason: 'disabled' } as ProductReaderRuleLookupV1 },
+    { label: 'premium now excludes Reader', after: approved(['baekheon']) },
+    { label: 'new approved policy revision', after: {
+      ...approved(),
+      rule: {
+        ...(approved() as Extract<ProductReaderRuleLookupV1, { status: 'approved' }>).rule,
+        approvedPolicyRevision: 'synthetic-next-policy-revision',
+      },
+    } as ProductReaderRuleLookupV1 },
+    { label: 'policy service fails on recheck', after: 'throw' as const },
+  ])('does not mint an A2 proof when $label after private artifact resolution', async ({ after }) => {
+    const f = fixtures({ policyAfterArtifact: after });
+    await expect(prepareOfficialReadingReaderAdmissionV1(f.input))
+      .rejects.toMatchObject({ code: 'POLICY_HOLD' });
+    expect(f.events).toEqual(['thread', 'access', 'policy', 'artifact', 'thread', 'policy']);
+    expect(f.readApprovedRule).toHaveBeenCalledTimes(2);
+    expect(f.readArtifactSource).toHaveBeenCalledTimes(1);
+  });
+
+  it('rechecks an unchanged approved premium policy without broadening its Reader list', async () => {
+    const f = fixtures({ policy: approved(['seyeon']) });
+    const result = await prepareOfficialReadingReaderAdmissionV1(f.input);
+    expect(result.scope.productRuleVersion).toBe('synthetic-premium-rule');
+    expect(f.readApprovedRule).toHaveBeenCalledTimes(2);
+    expect(f.events).toEqual(['thread', 'access', 'policy', 'artifact', 'thread', 'policy']);
   });
 
   it.each([
