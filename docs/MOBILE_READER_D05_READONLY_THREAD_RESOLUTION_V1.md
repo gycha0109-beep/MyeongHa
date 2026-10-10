@@ -56,3 +56,12 @@ Server orchestration tests establish only internal composition. In addition, `te
 ## Follow-on slice after owner decision
 
 After DB/API Owner acceptance of the existing read-only locator and D05-A shared-Thread choice, wire the adapter **only** to an approved server internal entrypoint inside `executePostgresSubjectTransactionV1`. Then address D05-C first-Thread creation and bundle mismatch separately. Re-run exact-grant checks at admission and at the authorized T2 final send boundary.
+
+## Web/mobile no-history Chat parity (non-Reader activation)
+
+Owner direction: follow the existing web Character Room **empty history** behavior.
+The web runtime invokes `ensureRoomReady()` on entering `chat.html?character=...`; the ordinary server-owned Member×Character Chat open command creates or reuses the Thread before the room history is read. **Only when that authoritative read returns zero messages** does the web room show its ephemeral introduction. The greeting is UI content, not a persisted Character turn.
+
+Mobile general Chat follows the same lifecycle: tapping a Character calls existing Member-only Chat open/reuse, navigates to the returned server Thread, reads the authoritative history, then renders the matching canonical introduction only for verified empty history; the existing composer enables actual send for Se-yeon only. No default introduction on read failures, loading states or histories with messages.
+
+This is **not** authorization to call the ordinary Chat open route as the fallback to D-05 Official Reading×Reader purchase admission. D-05's missing Thread case still returns unavailable until D05-C's pinned Bundle / exact Grant first-create contract and public release are separately accepted. Ordinary Chat, Reader-paid interpretation, Records and Chat Thread identities remain separate.
