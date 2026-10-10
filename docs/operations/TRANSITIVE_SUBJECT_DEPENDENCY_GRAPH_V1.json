@@ -5,14 +5,14 @@
   "graphAuthority": "SCHEMA_DISCOVERED_POLICY_NEUTRAL",
   "executionAuthorized": false,
   "discovery": {
-    "edgeCount": 140,
-    "distinctReachableTableCount": 59,
+    "edgeCount": 146,
+    "distinctReachableTableCount": 60,
     "maxDepth": 4,
     "depthCounts": {
       "1": 30,
-      "2": 47,
-      "3": 59,
-      "4": 4
+      "2": 48,
+      "3": 63,
+      "4": 5
     },
     "directDepthOneEdgeCount": 30
   },
@@ -674,6 +674,21 @@
     },
     {
       "minDepth": 2,
+      "parentTable": "conversation_threads",
+      "childTable": "official_reader_assistant_saju_provenance",
+      "constraintName": "official_reader_provenance_thread_subject_fk",
+      "childColumns": [
+        "thread_id",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id",
+        "subject_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 2,
       "parentTable": "device_installations",
       "childTable": "notification_deliveries",
       "constraintName": "notification_deliveries_installation_subject_fk",
@@ -1217,11 +1232,45 @@
     {
       "minDepth": 3,
       "parentTable": "chat_turn_attempts",
+      "childTable": "character_reading_artifacts",
+      "constraintName": "character_reading_artifacts_attempt_turn_subject_fk",
+      "childColumns": [
+        "attempt_id",
+        "turn_id",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id",
+        "turn_id",
+        "subject_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 3,
+      "parentTable": "chat_turn_attempts",
       "childTable": "chat_turns",
       "constraintName": "chat_turns_committed_attempt_fk",
       "childColumns": [
         "committed_attempt_id",
         "id",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id",
+        "turn_id",
+        "subject_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 3,
+      "parentTable": "chat_turn_attempts",
+      "childTable": "official_reader_assistant_saju_provenance",
+      "constraintName": "official_reader_provenance_attempt_turn_subject_fk",
+      "childColumns": [
+        "attempt_id",
+        "turn_id",
         "subject_id"
       ],
       "parentColumns": [
@@ -1394,6 +1443,23 @@
       ],
       "parentColumns": [
         "id",
+        "subject_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 3,
+      "parentTable": "chat_turns",
+      "childTable": "official_reader_assistant_saju_provenance",
+      "constraintName": "official_reader_provenance_turn_thread_subject_fk",
+      "childColumns": [
+        "turn_id",
+        "thread_id",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id",
+        "thread_id",
         "subject_id"
       ],
       "disposition": "UNDECIDED"
@@ -1590,6 +1656,23 @@
       "childColumns": [
         "source_message_id",
         "source_turn_id",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id",
+        "turn_id",
+        "subject_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 3,
+      "parentTable": "conversation_messages",
+      "childTable": "official_reader_assistant_saju_provenance",
+      "constraintName": "official_reader_provenance_message_turn_subject_fk",
+      "childColumns": [
+        "assistant_message_id",
+        "turn_id",
         "subject_id"
       ],
       "parentColumns": [
@@ -1924,6 +2007,21 @@
     {
       "minDepth": 3,
       "parentTable": "standard_reading_official_bindings",
+      "childTable": "official_reader_assistant_saju_provenance",
+      "constraintName": "official_reader_provenance_reading_subject_fk",
+      "childColumns": [
+        "reading_ref",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "reading_id",
+        "subject_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 3,
+      "parentTable": "standard_reading_official_bindings",
       "childTable": "standard_reading_reader_access_grants",
       "constraintName": "standard_reading_reader_access_official_subject_fk",
       "childColumns": [
@@ -2017,23 +2115,6 @@
       "disposition": "UNDECIDED"
     },
     {
-      "minDepth": 3,
-      "parentTable": "chat_turn_attempts",
-      "childTable": "character_reading_artifacts",
-      "constraintName": "character_reading_artifacts_attempt_turn_subject_fk",
-      "childColumns": [
-        "attempt_id",
-        "turn_id",
-        "subject_id"
-      ],
-      "parentColumns": [
-        "id",
-        "turn_id",
-        "subject_id"
-      ],
-      "disposition": "UNDECIDED"
-    },
-    {
       "minDepth": 4,
       "parentTable": "reading_execution_attempts",
       "childTable": "reading_refs",
@@ -2079,6 +2160,21 @@
       "parentColumns": [
         "id",
         "subject_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 4,
+      "parentTable": "standard_reading_reader_interpretations",
+      "childTable": "official_reader_assistant_saju_provenance",
+      "constraintName": "official_reader_provenance_interpretation_fk",
+      "childColumns": [
+        "reading_ref",
+        "reader_character_id"
+      ],
+      "parentColumns": [
+        "official_reading_id",
+        "reader_character_id"
       ],
       "disposition": "UNDECIDED"
     },
