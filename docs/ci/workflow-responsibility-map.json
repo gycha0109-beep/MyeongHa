@@ -367,6 +367,12 @@
       "prMode": "none",
       "mainMode": "one-shot-trigger",
       "workTrackAttribution": "commit-metadata"
+    },
+    "saju-bridge-cross-repo-local-http.yml": {
+      "responsibility": "saju-bridge-local-transport-verification",
+      "prMode": "narrow",
+      "mainMode": "manual-only",
+      "workTrackAttribution": "pr-metadata"
     }
   }
 }
