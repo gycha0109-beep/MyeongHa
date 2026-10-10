@@ -5,16 +5,16 @@ set -euo pipefail
 # Watchtower-Track: ops
 hold() { echo "HOLD_SEYEON_PG17: $1" >&2; exit 1; }
 root="$(cd "$(dirname "$0")/../.." && pwd)"
-[[ "$CI" == true && "$PGHOST" == localhost &&
-   "$PGUSER" == postgres && "$PGDATABASE" == myeongha_test ]] ||
+[[ "${CI:-}" == true && "${PGHOST:-}" == localhost &&
+   "${PGUSER:-}" == postgres && "${PGDATABASE:-}" == myeongha_test ]] ||
   hold 'Disposable CI PostgreSQL required.'
-[[ -z "$SUPABASE_DB_PASSWORD" && -z "$SUPABASE_PRODUCTION_SESSION_POOLER_HOST" ]] ||
+[[ -z "${SUPABASE_DB_PASSWORD:-}" && -z "${SUPABASE_PRODUCTION_SESSION_POOLER_HOST:-}" ]] ||
   hold 'Production connection settings forbidden.'
-[[ -n "$SEYEON_REMOTE_BUNDLE_FILE" ]] || hold 'Approved offline SQL required.'
+[[ -n "${SEYEON_REMOTE_BUNDLE_FILE:-}" ]] || hold 'Approved offline SQL required.'
 for binary in psql createdb dropdb realpath sha256sum; do
   command -v "$binary" >/dev/null || hold 'Missing local dependency.'
 done
-bundle="$(realpath -e -- "$SEYEON_REMOTE_BUNDLE_FILE")" || hold 'SQL not available.'
+bundle="$(realpath -e -- "${SEYEON_REMOTE_BUNDLE_FILE:-}")" || hold 'SQL not available.'
 [[ -f "$bundle" && "$bundle" != "$root/"* ]] || hold 'Input must be outside Git tree.'
 [[ "$(wc -c < "$bundle" | tr -d ' ')" == 104021 ]] || hold 'Length mismatch.'
 printf '%s  %s\n' '4f38e4483061a84899f0fcaa4a8d6cfa9e09ce1553b1d31089d4de9154c4d894' "$bundle" |
@@ -23,7 +23,7 @@ version="$(psql -X -qAt -v ON_ERROR_STOP=1 -c 'show server_version_num')" ||
   hold 'Local PostgreSQL unavailable.'
 [[ "$version" =~ ^17[0-9]{4}$ ]] || hold 'PostgreSQL 17 required.'
 
-origin="$PGDATABASE"
+origin="${PGDATABASE:-}"
 shadow=myeongha_seyeon_remote_pg17_scratch_ci
 tempdir="$(mktemp -d)"
 chmod 700 "$tempdir"
