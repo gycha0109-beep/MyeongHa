@@ -12,6 +12,10 @@ import {
   type ProtectedSajuSegmentV1,
   type ProtectedSajuTextRefV1,
 } from './character-runtime-context.js';
+import {
+  assertCharacterRuntimeSajuGroundingV2,
+  type CharacterRuntimeContextWithGroundingV2,
+} from './character-saju-runtime-v2.js';
 
 export const CHARACTER_OUTPUT_GUARD_VERSION_V1 = 'myeongha-character-output-guard-v1' as const;
 
@@ -238,11 +242,25 @@ function assertReadingPublicTrustLanguage(
   }
 }
 
+/**
+ * The same bounded Character cosmetic-output policy applies to official Reader
+ * V2, but only with a server-minted, source-attested Grounding V2 context.
+ *
+ * This envelope alone is NOT the RR-06 complete Saju utterance Output Guard:
+ * the Semantic Guard, exact focus closure, final DB provenance Commit and
+ * public Reveal remain independent and mandatory.
+ */
 export function guardCharacterRendererOutput(input: {
   readonly rawOutput: unknown;
-  readonly context: CharacterRuntimeContextV1;
+  readonly context: CharacterRuntimeContextV1 | CharacterRuntimeContextWithGroundingV2;
   readonly allowedSuggestedActionKeys: readonly string[];
 }): CharacterDialogueEnvelopeV1 {
+  if (input.context.schemaVersion === 'v2') {
+    assertCharacterRuntimeSajuGroundingV2({
+      context: input.context,
+      requestedDomain: input.context.saju.domain,
+    });
+  }
   if (!isRecord(input.rawOutput)) {
     throw new CharacterOutputGuardError('Character renderer output must be an object.');
   }
