@@ -49,6 +49,8 @@ export interface SajuHeldStagingTargetTrustInputV1 {
   readonly evidenceSignature: unknown;
   /** Must be one-time and generated independently of the evidence submitter. */
   readonly expectedChallengeDigest: unknown;
+  /** Permit identity recorded by an independently issued challenge authority. */
+  readonly expectedChallengePermitId: unknown;
   readonly nowMs: unknown;
 }
 type Check = 'PASS' | 'BLOCKED';
@@ -229,6 +231,10 @@ export function assessSajuHeldStagingTargetTrustV1(
     challengeOK = typeof input.expectedChallengeDigest === 'string'
       && HEX64.test(input.expectedChallengeDigest)
       && input.expectedChallengeDigest === evidence.challengeDigest
+      // Challenge expectation belongs to this exact Permit, not merely its target.
+      // Caller provenance and durable one-use consumption remain unverified here.
+      && typeof input.expectedChallengePermitId === 'string'
+      && input.expectedChallengePermitId === permit.permitId
       && evidence.observedAtMs <= nowMs && nowMs < evidence.expiresAtMs;
     if (!challengeOK) throw new TypeError();
 

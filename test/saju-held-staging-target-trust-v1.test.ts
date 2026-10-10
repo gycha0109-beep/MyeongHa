@@ -4,6 +4,8 @@ import { assessSajuHeldStagingTargetTrustV1 } from
   '../apps/api/src/saju-held-staging-target-trust-v1.js';
 import { canonicalSajuHeldStagingAuthorityRegistryBytesV1 } from
   '../apps/api/src/saju-held-staging-authority-registry-v1.js';
+import { canonicalSajuHeldStagingPermitApprovalBytesV2 } from
+  '../apps/api/src/saju-held-staging-admission-signature-v2.js';
 import { canonicalSajuHeldStagingTargetEvidenceBytesV1,
   digestSajuHeldStagingObservationsV1 } from
   '../apps/api/src/saju-held-staging-target-evidence-v1.js';
@@ -17,7 +19,8 @@ function verifyInput(f=stagingTrustFixture()) {
     registrySignature:f.registrySignature,suppliedRootPublicKey:f.rootPublicKey,
     expectedRootKeyId:f.expectedRootKeyId,minimumRegistryRevision:f.minimumRevision,
     evidence:f.evidence,evidenceSignature:f.evidenceSignature,
-    expectedChallengeDigest:f.expectedChallengeDigest,nowMs:f.nowMs,
+    expectedChallengeDigest:f.expectedChallengeDigest,
+    expectedChallengePermitId:f.permit.permitId,nowMs:f.nowMs,
   };
 }
 function resignRegistry(f:ReturnType<typeof stagingTrustFixture>,registry:unknown) {
@@ -140,6 +143,30 @@ describe('8C-2B-2D-3-03 Target Trust Authority evaluator: zero I/O', () => {
     });
     expect(report.checks.registry_signature).toBe('PASS');
     expect(report.checks.operator_key_purpose_and_validity).toBe('BLOCKED');
+    expect(report.contract).toBe('BLOCKED');
+  });
+
+  it('rejects valid Permit B reusing Permit A evidence and challenge expectation',()=>{
+    const f=stagingTrustFixture();
+    const permitB={...f.permit,permitId:'123e4567-e89b-42d3-a456-426614174001'};
+    const permitSignatureB=sign(null,canonicalSajuHeldStagingPermitApprovalBytesV2(permitB),
+      f.operatorPrivateKey).toString('base64url');
+    const report=assessSajuHeldStagingTargetTrustV1({
+      ...verifyInput(f),permit:permitB,permitSignature:permitSignatureB,
+    });
+    // Both key approvals and both detached signatures remain legitimate.
+    expect(report.checks.permit_v2_signature).toBe('PASS');
+    expect(report.checks.evidence_signature).toBe('PASS');
+    expect(report.checks.challenge_and_freshness).toBe('BLOCKED');
+    expect(report.contract).toBe('BLOCKED');
+    expect(report.canRunOnce).toBe(false);
+  });
+
+  it('rejects missing externally supplied Permit-scoped challenge identity',()=>{
+    const report=assessSajuHeldStagingTargetTrustV1({
+      ...verifyInput(),expectedChallengePermitId:undefined,
+    });
+    expect(report.checks.challenge_and_freshness).toBe('BLOCKED');
     expect(report.contract).toBe('BLOCKED');
   });
 
