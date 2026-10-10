@@ -16,6 +16,7 @@ import {
   assertServerGuardedReaderInterpretationSceneV2,
 } from './reader-interpretation-preview-runtime-v2.js';
 import type { ReaderInterpretationPreviewEnvelopeV1 } from './reader-interpretation-preview-runtime-v1.js';
+import { closeCharacterStandardReaderSourceFocusV1 } from './character-standard-reading-chat-source-closure-v1.js';
 
 export const STANDARD_READER_SCENE_SOURCE_HANDOFF_VERSION_V1 =
   'myeongha-standard-reader-scene-source-handoff-v1' as const;
@@ -173,37 +174,15 @@ export async function prepareCharacterStandardReaderSceneSourceHandoffV1(input: 
     deny('SOURCE_MISMATCH');
   }
 
-  const selected = new Set<string>();
-  const visit = (id: string): void => {
-    if (selected.has(id)) return;
-    const unit = byId.get(id);
-    if (!unit) deny('SOURCE_MISMATCH');
-    selected.add(id);
-    for (const companion of unit.requiredCompanionUnitRefs) visit(companion);
-  };
-  visit(rootUnitId);
+  const closure = closeCharacterStandardReaderSourceFocusV1({
+    grounded: input.grounded,
+    rootUnitId,
+  });
+  if (closure.mode === 'hold') return hold('ambiguous_segment');
 
-  const chosen = units.filter(unit => selected.has(unit.unitId));
-  if (chosen.length === 0 || chosen.length > 12) return hold('ambiguous_segment');
-  const requiredDisclosureRefs = Object.freeze([...new Set(
-    chosen.flatMap(unit => [...unit.requiredDisclosureRefs]),
-  )]);
-  const requiredAmbiguityRefs = Object.freeze([...new Set(
-    chosen.flatMap(unit => unit.ambiguityRef === undefined ? [] : [unit.ambiguityRef]),
-  )]);
-  const disclosures = new Set(input.grounded.grounding.disclosures.map(d => d.disclosureRef));
-  const ambiguities = new Set(input.grounded.grounding.ambiguities.map(a => a.ambiguityRef));
-  if (requiredDisclosureRefs.some(ref => !disclosures.has(ref)) ||
-      requiredAmbiguityRefs.some(ref => !ambiguities.has(ref))) deny('SOURCE_MISMATCH');
-
-  const protectedOnly = chosen.some(unit =>
-    unit.realizationPolicyRef === 'protected_only_v1' ||
-    (unit.qualifiers?.length ?? 0) > 0 ||
-    unit.ambiguityRef !== undefined,
-  );
   const withoutHash = {
     schemaVersion: STANDARD_READER_SCENE_SOURCE_HANDOFF_VERSION_V1,
-    mode: protectedOnly ? 'protected_only_candidate' as const
+    mode: closure.protectedOnly ? 'protected_only_candidate' as const
       : 'source_segment_candidate' as const,
     source: 'semantic_guarded_official_reader_scene' as const,
     subjectId: scope.subjectId,
@@ -216,9 +195,9 @@ export async function prepareCharacterStandardReaderSceneSourceHandoffV1(input: 
     sceneInterpretationHash: scene.interpretationHash,
     sceneSegmentIndex: input.selectedSceneSegmentIndex,
     rootUnitId,
-    selectedUnitIds: Object.freeze(chosen.map(unit => unit.unitId)),
-    requiredDisclosureRefs,
-    requiredAmbiguityRefs,
+    selectedUnitIds: closure.selectedUnitIds,
+    requiredDisclosureRefs: closure.requiredDisclosureRefs,
+    requiredAmbiguityRefs: closure.requiredAmbiguityRefs,
   };
   const result = Object.freeze({
     ...withoutHash,

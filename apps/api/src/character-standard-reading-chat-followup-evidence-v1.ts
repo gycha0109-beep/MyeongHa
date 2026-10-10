@@ -1,7 +1,6 @@
 import { createHash } from 'node:crypto';
 import {
   canonicalJson,
-  type CharacterGroundingUnitViewV1,
 } from '../../../packages/domain/src/index.js';
 import {
   assertServerPreparedStandardChatPreflightV2,
@@ -11,6 +10,7 @@ import {
   assertServerPreparedStandardChatGroundingV2,
   type CharacterStandardChatGroundingV2,
 } from './character-standard-reading-chat-grounding-v2.js';
+import { closeCharacterStandardReaderSourceFocusV1 } from './character-standard-reading-chat-source-closure-v1.js';
 
 export const STANDARD_FOLLOWUP_EVIDENCE_VERSION_V1 =
   'myeongha-standard-followup-evidence-v1' as const;
@@ -90,24 +90,6 @@ function sameScope(
 function validId(v: unknown): v is string {
   return typeof v === 'string' && v.length > 0 && v.length <= 256 && v.trim() === v;
 }
-function closure(
-  root: string,
-  byId: ReadonlyMap<string, CharacterGroundingUnitViewV1>,
-): readonly CharacterGroundingUnitViewV1[] {
-  const selected = new Set<string>();
-  const visit = (id: string): void => {
-    if (selected.has(id)) return;
-    const unit = byId.get(id);
-    if (!unit) deny('SOURCE_MISMATCH');
-    selected.add(id);
-    for (const companion of unit.requiredCompanionUnitRefs) visit(companion);
-  };
-  visit(root);
-  return Object.freeze([...byId.values()].filter(unit => selected.has(unit.unitId)));
-}
-function uniqueInOrder(refs: readonly string[]): readonly string[] {
-  return Object.freeze([...new Set(refs)]);
-}
 function hold(
   reason: 'clarification_required' | 'insufficient_evidence',
 ): CharacterStandardFollowupEvidenceDecisionV1 {
@@ -184,29 +166,17 @@ export async function selectCharacterStandardFollowupEvidenceV1(input: Readonly<
   if (focus === null) return hold('clarification_required');
   if (!anchor.sourceUnitRefs.includes(focus)) deny('SOURCE_MISMATCH');
 
-  const selectedUnits = closure(focus, byId);
-  const selectedUnitIds = Object.freeze(selectedUnits.map(unit => unit.unitId));
-  const requiredDisclosureRefs = uniqueInOrder(
-    selectedUnits.flatMap(unit => [...unit.requiredDisclosureRefs]),
-  );
-  const requiredAmbiguityRefs = uniqueInOrder(
-    selectedUnits.flatMap(unit => unit.ambiguityRef === undefined ? [] : [unit.ambiguityRef]),
-  );
-  const availableDisclosures = new Set(input.grounded.grounding.disclosures.map(d => d.disclosureRef));
-  const availableAmbiguities = new Set(input.grounded.grounding.ambiguities.map(a => a.ambiguityRef));
-  if (requiredDisclosureRefs.some(ref => !availableDisclosures.has(ref)) ||
-      requiredAmbiguityRefs.some(ref => !availableAmbiguities.has(ref))) deny('SOURCE_MISMATCH');
+  // RR-02: preserve Saju-owned global disclosures/calculation ambiguity,
+  // including those not linked to a specific assistant focus Unit.
+  const source = closeCharacterStandardReaderSourceFocusV1({
+    grounded: input.grounded,
+    rootUnitId: focus,
+  });
+  if (source.mode === 'hold') return hold('insufficient_evidence');
 
-  // Current exact-core renderer cannot safely realize these cases as a new
-  // answer; preserve source units and require protected-only handling in PR 3.
-  const protectedOnly = selectedUnits.some(unit =>
-    unit.realizationPolicyRef === 'protected_only_v1' ||
-    (unit.qualifiers?.length ?? 0) > 0 ||
-    unit.ambiguityRef !== undefined
-  );
   const withoutHash = {
     schemaVersion: STANDARD_FOLLOWUP_EVIDENCE_VERSION_V1,
-    mode: protectedOnly ? 'protected_only' as const : 'grounded_selection' as const,
+    mode: source.protectedOnly ? 'protected_only' as const : 'grounded_selection' as const,
     subjectId: scope.subjectId,
     threadId: scope.threadId,
     readerCharacterId: scope.readerCharacterId,
@@ -216,9 +186,9 @@ export async function selectCharacterStandardFollowupEvidenceV1(input: Readonly<
     groundingHash: input.grounded.grounding.groundingHash,
     assistantMessageId: anchor.assistantMessageId,
     focusedUnitRef: focus,
-    selectedUnitIds,
-    requiredDisclosureRefs,
-    requiredAmbiguityRefs,
+    selectedUnitIds: source.selectedUnitIds,
+    requiredDisclosureRefs: source.requiredDisclosureRefs,
+    requiredAmbiguityRefs: source.requiredAmbiguityRefs,
   };
   return Object.freeze({
     ...withoutHash,
