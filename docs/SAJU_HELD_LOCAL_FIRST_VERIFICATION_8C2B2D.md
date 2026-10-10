@@ -44,6 +44,33 @@ npx vitest run test/saju-held-current-birth-server-rehearsal-v1.test.ts test/saj
 
 Saju는 별도 저장소에서 확인한다. 동일한 비밀값을 공유하지 않고 해당 저장소의 `npm ci --ignore-scripts`, `npm test`를 독립 실행한다. 이것은 양쪽의 계약·시뮬레이션 테스트이며 두 서버를 실제 네트워크로 연결했다는 증빙이 아니다.
 
+## 2A. 명하 ↔ 사주 **실제 로컬 HTTP** 교차 저장소 검증
+
+명하와 사주 저장소의 기존 코드를 **같은 머신에 별도 체크아웃**한 후 실행한다. 별도 유료 프로젝트, Supabase 접근, 실제 회원/출생정보 또는 클라우드 Secret 없이 Saju의 `source-reading-proof-server`가 `127.0.0.1`에 실제 Node HTTP listener를 열고, MyeongHa의 기존 `saju-held-source-proof-http-client-v1`이 고정 Preview Proof 경로를 호출한다.
+
+```powershell
+# MyeongHa 및 Saju 각각에서 최초 1회
+npm ci --ignore-scripts --no-audit --no-fund
+
+# Saju 디렉터리에서
+npm run build
+
+# MyeongHa 디렉터리에서 (Saju가 ../Saju 에 있을 경우)
+node scripts/local/verify-saju-bridge-http.mjs ../Saju
+```
+
+이 명령은 다음을 검증한다.
+
+- 실제 Saju Preview 엔진 기동 및 `POST /api/internal/preview/source-readings` 이외 라우트의 차단
+- 전용 Bearer 부정 인증 및 입력 형식 거부, 올바른 요청·no-store 전송
+- **발급 성공(HTTP 200) 시에만** Saju가 생성한 HMAC 서명 Proof를 명하 검증기가 요청 본문·Nonce·발급자·Audience와 결속 검증하고, 동일 Proof 재사용을 거부하는지 확인
+- 실제 Saju 프리뷰가 `409 SOURCE_PROOF_NOT_READY`만 반환할 경우 CI는 해당 교차 저장소 proof 테스트를 **실패**로 판정하며, 정상 연결 자체와 발급 가능성을 혼동하지 않음
+- 모든 권한 `canExecute/canPublish/canSell=false`, 운영 승인 `NOT_VERIFIED/HOLD` 유지
+
+**TLS 유의:** 현행 명하 운영 HTTP 클라이언트는 HTTPS URL만 허용한다. 위 Vitest 전용 `fetchImpl`만 정확히 고정된 보호 라우트에서 `http://127.0.0.1`로 요청을 전달하며, 운영 URL 정책을 바꾸지 않는다. 테스트용 인증·HMAC 키는 실행마다 난수로 생성해 자식 프로세스에만 전달한다. Nonce 재사용 검사는 이 단계에서 **테스트 프로세스 내 Set**을 사용하므로 실환경 PostgreSQL 원자적 claim 결과를 대체하지 않는다. 독립 DB 원자 검증은 앞 절의 PG15/17 테스트에서 별도로 수행한다.
+
+GitHub의 범위 제한된 [교차 저장소 루프백 CI](../.github/workflows/saju-bridge-cross-repo-local-http.yml)는 Saju 소스의 정확한 SHA를 고정하고, 실제 HTTP 경로를 **서버/클라이언트 양쪽의 현재 구현으로** 실행한다. Saju 코드가 변경되면 고정 SHA를 다시 선택하고 계약 테스트를 재실행한다.
+
 ## 3. 통과 기준 / 아직 증명하지 않은 것
 
 | 시험 | 로컬/기존 CI에서 검사 가능 | 남는 실제 환경 확인 |
