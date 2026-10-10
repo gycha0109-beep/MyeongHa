@@ -152,6 +152,18 @@ node scripts/local/verify-saju-bridge-http.mjs ../Saju
 
 **한계:** GoTrue 자체의 실제 회원 발급·검증 코드를 로컬에서 실행해도, *운영 Supabase Cloud Auth 세션, 서로 독립된 운영 자격증명/원본 증빙, Auth–MyeongHa API의 실서비스 TLS peer, Token revocation의 운영 정책, 독립 Root/Attestor R01–R14*는 확인되지 않는다. 특히 GoTrue의 로그아웃은 Refresh Token 폐기와 Access JWT 즉시 무효화를 동일하게 보장하지 않는다. 테스트 결과를 `stagingConnection=VERIFIED`나 `canExecute/canPublish/canSell=true`로 승격하지 않는다.
 
+## 2F. 실제 제한된 PostgreSQL 로그인 계정 검증 — 최소 권한 1단계
+
+2E의 실제 GoTrue → Subject/Birth → Saju Proof 연결에 앞서, 기존 CI의 superuser 테스트와 **독립적으로** 실제 TCP PostgreSQL 사용자명을 사용한 DB 검증을 추가한다.
+
+- 기존 `0800_production_api_login_principal.sql`이 생성하는 `myeongha_runtime` 계정에는 테스트 시점에만 암호를 부여한다. `myeongha_saju_nonce_ci_login`은 disposable DB에서 새로 생성하며 오직 `myeongha_saju_proof_nonce_runtime` 역할만 멤버십으로 부여한다. 두 계정 모두 `NOSUPERUSER/NOINHERIT/NOBYPASSRLS`이다.
+- `test/db/fixtures/saju_local_restricted_logins.sql`의 실행 조건은 **정확한 폐기 DB 이름과 postgres 관리 세션**으로 제한한다. SQL은 Production migration이 아니다. 암호는 CI에서 매 실행 별도 난수로 생성하여 로그에 출력하지 않으며, 세션 종료 후 컨테이너와 함께 폐기한다.
+- `test/saju-held-cross-repo-local-restricted-login.test.ts`는 `session_user`/`current_user` 및 멤버십을 실제 TCP로 확인한다. `SET ROLE`을 할 수 없는 타 전용 역할, 직접 테이블 조회 거부, 회원 간 Birth 격리, 기존 `NodePostgresSubjectPoolV1` 사전 로그인 계정 확인을 검사한다.
+- 올바른 제한 Subject 로그인으로 현재 Birth를 조회 → 실제 Saju HTTP Proof 발급 → **별도 제한 Nonce 로그인**으로 한 번만 claim → Revision 재조회. 다른 연결에서 동일 Proof를 소비하면 정확히 한 건만 성공해야 한다.
+- 기존 baseline 15건을 먼저 수행하고, **GoTrue가 CI Subject 소유자 매핑을 바꾸기 전에** 제한 로그인 테스트를 별도 Vitest 프로세스로 수행한다. 이후 GoTrue 실제 엔진의 기존 3건을 검증한다.
+
+**한계:** 동일한 disposable PostgreSQL 클러스터 내에서 두 로그인 권한을 물리적으로 구분한 것으로, 독립된 Subject/Nonce/Admission **클러스터**나 원격 Staging 로그인은 아직 검증하지 않았다. 또한 이 단계의 PostgreSQL 연결은 TLS가 아니다. 엄격한 hostname/CA `verify-full` **실소켓 검증** 및 3 DB 물리 분리는 다음 단계를 통해 별도로 입증한다. 이 결과를 R06–R09 운영 신뢰 증빙 또는 `stagingAdmission=HOLD` 해제로 처리하지 않는다.
+
 ## 3. 통과 기준 / 아직 증명하지 않은 것
 
 | 시험 | 로컬/기존 CI에서 검사 가능 | 남는 실제 환경 확인 |
