@@ -80,3 +80,80 @@ set -e
 [[ "$(p -c "select count(*) from public.conversation_thread_characters where id='$participant'::uuid;")" == 0 ]] ||
   fail "mismatched participant survived rollback"
 echo 'PASS D-05-C real purchased B3 access -> wrong default Bundle rollback'
+
+# Two separately purchased active bundles for the same Reading/Reader
+# are ambiguous; the opener MUST NOT be invoked.
+purchase_state 12192300-0000-0000-0000-000000000002 active
+distinct_bundles="$(run_member "select count(distinct reader_content_bundle_id)
+  from public.qry_character_standard_reading_access_runtime_v2(
+    '$subject'::uuid,'$reader',transaction_timestamp()
+  ) where reading_id='$reading'::uuid;")"
+[[ "$distinct_bundles" == 2 ]] || fail "expected two distinct active purchase bundles"
+set +e
+ambiguous="$(run_member "
+DO \$guard\$
+declare candidate_count integer;
+begin
+  select count(*) into candidate_count
+  from public.qry_character_standard_reading_access_runtime_v2(
+    '$subject'::uuid,'$reader',transaction_timestamp()
+  ) where reading_id='$reading'::uuid;
+  if candidate_count <> 1 then
+    raise exception 'D05_PURCHASED_GRANT_AMBIGUOUS';
+  end if;
+  perform 1 from public.cmd_open_member_single_character_thread_v1(
+    '$subject'::uuid,'$reader','$thread'::uuid,'$participant'::uuid
+  );
+end \$guard\$;" 2>&1)"
+rc=$?
+set -e
+[[ "$rc" != 0 && "$ambiguous" == *D05_PURCHASED_GRANT_AMBIGUOUS* ]] ||
+  { echo "$ambiguous" >&2; fail "cross-bundle Grant ambiguity must reject"; }
+[[ "$(p -c "select count(*) from public.conversation_threads where id='$thread'::uuid;")" == 0 ]] ||
+  fail "ambiguous access unexpectedly created Thread"
+echo 'PASS D-05-C real independent cross-bundle purchases deny first open'
+
+# Remove B3; B2's pinned Bundle matches the current default.
+purchase_state 12192300-0000-0000-0000-000000000003 revoked
+first="$(run_member "
+DO \$guard\$
+declare active_count integer; purchased uuid;
+begin
+  select count(*), min(reader_content_bundle_id)
+  into active_count, purchased
+  from public.qry_character_standard_reading_access_runtime_v2(
+    '$subject'::uuid,'$reader',transaction_timestamp()
+  ) where reading_id='$reading'::uuid;
+  if active_count <> 1 or purchased is distinct from '$bundle_a'::uuid then
+    raise exception 'D05_PURCHASED_GRANT_NOT_EXACT';
+  end if;
+end \$guard\$;
+select thread_id::text,created,active_content_bundle_id::text
+from public.cmd_open_member_single_character_thread_v1(
+  '$subject'::uuid,'$reader','$thread'::uuid,'$participant'::uuid
+);")"
+[[ "$first" == "$thread|t|$bundle_a" ]] || fail "exact matching Grant first open: $first"
+reused="$(run_member "select thread_id::text,created,active_content_bundle_id::text
+  from public.cmd_open_member_single_character_thread_v1(
+    '$subject'::uuid,'$reader',
+    'b5500000-0000-0000-0000-000000000002'::uuid,
+    'b6600000-0000-0000-0000-000000000002'::uuid
+  );")"
+[[ "$reused" == "$thread|f|$bundle_a" ]] || fail "idempotent Reader Thread reuse: $reused"
+[[ "$(run_member "select thread_id::text
+  from public.qry_member_single_character_thread_locator_v1(
+    '$subject'::uuid,'$reader'
+  );")" == "$thread" ]] || fail "actual Member locator disagrees"
+echo 'PASS D-05-C real purchased B2 access -> first create and re-entry'
+
+# A previously created general Chat Thread is not a paid Reading right.
+purchase_state 12192300-0000-0000-0000-000000000002 revoked
+[[ "$(run_member "select count(*)
+  from public.qry_character_standard_reading_access_runtime_v2(
+    '$subject'::uuid,'$reader',transaction_timestamp()
+  ) where reading_id='$reading'::uuid;")" == 0 ]] ||
+  fail "last purchase Grant revoke must remove paid Reader access"
+[[ "$(p -c "select count(*) from public.conversation_threads where id='$thread'::uuid;")" == 1 ]] ||
+  fail "revocation should preserve independent general Chat Thread"
+echo 'PASS D-05-C revoke denies paid Reading while general Chat remains'
+echo 'PASS D-05-C actual PostgreSQL purchase Grant + Chat opener bridge (PUBLIC OFF)'
