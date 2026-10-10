@@ -184,12 +184,14 @@ describe.skipIf(!enabled)('real restricted PostgreSQL network logins in Saju hel
     });
     expect(owner.resolvedSubject.subjectId).toBe(subjectOwner);
     expect(owner.profile?.currentRevision.revisionId).toBe(revision);
-    const other = await readBoundCurrentBirthContextV1({
+    // The existing Current Birth locator intentionally throws NOT_FOUND
+    // instead of returning a nullable Profile for a member without self Birth.
+    await expect(readBoundCurrentBirthContextV1({
       pool: subject!,
       verifiedEvidence: { kind: 'member', verifiedAuthUserId: authOther },
+    })).rejects.toMatchObject({
+      name: 'ApiCommandError', code: 'NOT_FOUND',
     });
-    expect(other.resolvedSubject.subjectId).not.toBe(subjectOwner);
-    expect(other.profile).toBeNull();
   });
 
   it('real restricted Subject read -> real Saju HTTP -> restricted Nonce claim remains HELD', async () => {
