@@ -5,6 +5,24 @@ on:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      relationship_backfill_1400_1450:
+        description: 'Only 1400-1450, with matching fresh backup and restored artifact proof'
+        required: false
+        type: boolean
+        default: false
+      backup_run_id:
+        description: 'Successful governed Production backup workflow run ID'
+        required: false
+        type: string
+      restore_run_id:
+        description: 'Successful isolated restore of that same backup workflow run ID'
+        required: false
+        type: string
+      scoped_confirmation:
+        description: 'Must be APPLY_RELATIONSHIP_1400_1450_ONLY'
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -37,13 +55,17 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
           BEFORE_SHA: ${{ github.event.before }}
           CURRENT_SHA: ${{ github.sha }}
+          SCOPED_BACKFILL: ${{ inputs.relationship_backfill_1400_1450 }}
         run: |
           set -euo pipefail
 
           requires_deploy=false
           reason='no governed Production DB deployment-surface change detected'
 
-          if [[ "$EVENT_NAME" == 'workflow_dispatch' ]]; then
+          if [[ "$EVENT_NAME" == 'workflow_dispatch' && "$SCOPED_BACKFILL" == 'true' ]]; then
+            requires_deploy=false
+            reason='manual scoped Se-yeon backfill must never invoke ordinary db push'
+          elif [[ "$EVENT_NAME" == 'workflow_dispatch' ]]; then
             requires_deploy=true
             reason='workflow_dispatch forces governed Production verification'
           elif [[ -z "${BEFORE_SHA:-}" || "$BEFORE_SHA" =~ ^0+$ ]]; then
@@ -135,3 +157,37 @@ jobs:
           path: ${{ runner.temp }}/myeongha-platform-integrity-catalog
           if-no-files-found: warn
           retention-days: 14
+
+
+  relationship-backfill-1400-1450:
+    name: governed-seyeon-relationship-backfill-1400-1450
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.relationship_backfill_1400_1450 == true }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    environment: production
+    permissions:
+      contents: read
+      actions: read
+    env:
+      CI: 'true'
+      GH_TOKEN: ${{ github.token }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PRODUCTION_SESSION_POOLER_HOST: ${{ secrets.SUPABASE_PRODUCTION_SESSION_POOLER_HOST }}
+      SUPABASE_PRODUCTION_SERVER_ROOT_CERT_PEM: ${{ secrets.SUPABASE_PRODUCTION_SERVER_ROOT_CERT_PEM }}
+      SEYEON_BACKUP_RUN_ID: ${{ inputs.backup_run_id }}
+      SEYEON_RESTORE_RUN_ID: ${{ inputs.restore_run_id }}
+      SEYEON_SCOPE_CONFIRMATION: ${{ inputs.scoped_confirmation }}
+    steps:
+      - name: Checkout immutable main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install PostgreSQL client and jq
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client jq >/dev/null
+      - name: Require fresh backup and matching restore before scoped atomic SQL
+        shell: bash
+        run: bash scripts/operations/seyeon-production-relationship-backfill-guarded.sh
