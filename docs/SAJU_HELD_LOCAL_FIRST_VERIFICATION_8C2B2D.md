@@ -138,6 +138,20 @@ node scripts/local/verify-saju-bridge-http.mjs ../Saju
 
 **중요:** 위 로컬 인증 서버는 **Supabase Auth 에뮬레이터**이며 실제 Supabase가 검증한 JWT·운영 세션·폐기/로그아웃 정책을 증명하지 않는다. 합성 JWT의 폐기 `jti` 저장소는 테스트용 메모리이고 Supabase의 실제 세션 저장소가 아니다. 기존 운영 인프라의 실제 Auth와 DB 자격증명, TLS, R01–R14 독립 운영 증빙, 일회용 Runner는 계속 `NOT_VERIFIED`/`HOLD`. 운영 DB에 접속하거나 Prod 인증 API를 호출하지 않는다.
 
+## 2E. 실제 Supabase GoTrue 로컬 엔진 ↔ 출생정보 ↔ 사주 Proof (무료 격리 CI)
+
+2D의 자체 구현 합성 Auth 서버를 추가로 재현하는 대신, **실제 Supabase Auth에서 사용하는 GoTrue v2.196.0**을 별도 컨테이너에 띄운다. CI는 독립된 Auth 전용 `postgres:15` DB(호스트 5433)와 기존 명하 테스트 DB(호스트 5432)를 사용한다. Auth 서버는 `127.0.0.1:9999`에만 바인딩되고 테스트 종료 시 파기된다.
+
+1. 테스트마다 GoTrue에 이메일·비밀번호로 **임시 사용자 2명을 실제로 등록**하고, GoTrue가 발급한 JWT를 `GET /user`로 다시 인증한다. 실제 회원 가입 이메일 전송은 사용하지 않는다(`GOTRUE_MAILER_AUTOCONFIRM=true`).
+2. 테스트용 DB 운영자가 GoTrue에서 얻은 사용자 UUID를 폐기할 **명하 테스트 DB에만** 매핑한다. 이는 CI fixture 운영 작업이며 실제 회원 계정 연동/운영 회원 인증·프로비저닝이 아니다.
+3. `createProductionRequestIdentityVerifierV1` / `SupabaseMemberIdentityEvidenceVerifierV1`의 운영 Auth URL 정책과 구현은 수정하지 않는다. 테스트에서 정확히 `/auth/v1/user`로 가는 `memberFetchImpl` 호출만 로컬 GoTrue의 실제 `/user`로 전달한다.
+4. 기존 명하 Postgres RLS 조회 → 본인 현재 Birth Revision → 실제 사주 HTTP 발급·HMAC 검증·DB nonce 소비 및 Revision 재확인을 수행한다.
+5. 다른 GoTrue 회원의 유효 JWT로 타 회원 출생정보에 접근하거나, JWT 서명을 변조하거나, 사용자 요청의 Subject/Birth 필드·수정 가능한 `user_metadata`로 소유자를 가장하면 차단되는지 확인한다.
+
+검증 파일은 `test/saju-held-cross-repo-local-gotrue-auth.test.ts`이며 **기존 2A–2D 테스트 실행이 끝난 뒤 별도 Vitest 프로세스**에서 실행한다. 별도 GoTrue DB에서 발급되는 동적 사용자 UUID를 테스트용 Birth DB에 매핑하므로, 앞선 정적 테스트들과 병렬 실행하면 안 된다. 새로운 CI 워크플로나 대형 통합 트랙을 추가하지 않고 기존 [한정 교차 저장소 CI](../.github/workflows/saju-bridge-cross-repo-local-http.yml)만 확장한다.
+
+**한계:** GoTrue 자체의 실제 회원 발급·검증 코드를 로컬에서 실행해도, *운영 Supabase Cloud Auth 세션, 서로 독립된 운영 자격증명/원본 증빙, Auth–MyeongHa API의 실서비스 TLS peer, Token revocation의 운영 정책, 독립 Root/Attestor R01–R14*는 확인되지 않는다. 특히 GoTrue의 로그아웃은 Refresh Token 폐기와 Access JWT 즉시 무효화를 동일하게 보장하지 않는다. 테스트 결과를 `stagingConnection=VERIFIED`나 `canExecute/canPublish/canSell=true`로 승격하지 않는다.
+
 ## 3. 통과 기준 / 아직 증명하지 않은 것
 
 | 시험 | 로컬/기존 CI에서 검사 가능 | 남는 실제 환경 확인 |
