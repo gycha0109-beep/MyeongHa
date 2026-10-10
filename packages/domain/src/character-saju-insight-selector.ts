@@ -366,7 +366,15 @@ function admitUnit(raw: unknown, index: number): CharacterGroundingUnitViewV1 {
     ),
     semanticKey: requireString(raw.semanticKey, `${path}.semanticKey`),
     canonicalMeaning: requireString(raw.canonicalMeaning, `${path}.canonicalMeaning`),
-    sourceBlockRefs: readUniqueStringArray(raw.sourceBlockRefs, `${path}.sourceBlockRefs`),
+    sourceBlockRefs: (() => {
+      const refs = readUniqueStringArray(raw.sourceBlockRefs, `${path}.sourceBlockRefs`);
+      if (refs.length === 0) {
+        throw new CharacterInsightSelectionErrorV1(
+          `${path}.sourceBlockRefs must not be empty.`,
+        );
+      }
+      return refs;
+    })(),
     ...(raw.qualifiers === undefined
       ? {}
       : { qualifiers: readUniqueStringArray(raw.qualifiers, `${path}.qualifiers`) }),
