@@ -12,14 +12,14 @@ Watchtower-Track: saju-bridge
 
 1. 별도 입력으로 공급받은 루트 공개키를 사용해 도메인 분리 Registry 서명 확인. Registry revision 하한·유효기간·environmentId·키 fingerprint/용도/철회 정책 확인.
 2. Registry에서 용도 `OPERATOR_APPROVAL`인 키만 Permit V2 Ed25519 검증에 사용. Principal ID, Key ID, Permit issuance TTL, Manifest Digest, Connection Plan Digest, MyeongHa/Saju commit SHA 일치.
-3. 별도 `TARGET_ATTESTATION` 키로 evidence 서명 확인. Evidence attestor ID, challengeDigest, freshness(최대 60초), 독립 등록된 키 범위·철회상태 일치.
+3. 별도 `TARGET_ATTESTATION` 키로 evidence 서명 확인. Evidence attestor ID, challengeDigest, freshness(최대 60초), 독립 등록된 키 범위·철회상태 일치. `expectedChallengePermitId`도 **별도 발급된 Challenge의 Permit ID**와 일치시켜 동일 Manifest/Plan을 공유하는 다른 Permit의 Evidence 재사용을 정적 계약 수준에서 차단한다. 이 입력의 신뢰 출처는 3-03에서 증명하지 않는다.
 4. Evidence의 관찰 주장에 포함된 Auth project ref/Origin/member-only/Production 분리, Subject/nonce/Admission DB의 서로 다른 클러스터 식별 Digest/실행 Role/로그인/TLS hostname/CA fingerprint/RLS/교차 접근 금지, Saju HTTPS/Bearer/HMAC 독립 주장과 Manifest·Plan을 비교.
 5. 잘못된 서명, 만료·키 철회·롤백·SHA/Plan drift, 위조된 Target 관찰 주장, 재사용한 challenge에 대한 잘못된 기대치, 역할·클러스터 혼용은 `BLOCKED`로 처리. 민감한 원본 값이나 signature는 결과에 출력하지 않는다.
 
 ## 중요한 미검증 및 보안 경계
 
 - **서명된 관찰 자료의 진위가 증명되어도 관찰 내용이 사실이라고 증명되지는 않는다.** Attestor의 독립 실제 프로브 경로와 관찰 증거는 실환경 3-04에서 입증할 책임이다.
-- 루트 공개키·서명 정책·최소 리비전·Challenge expected value·trusted time을 일반 API 입력이나 동일한 evidence bundle에서 공급한다면 독립성이 없다. 별도 고정·관리된 신뢰 Anchor와 anti-rollback durable source, 일회성 challenge 소비 저장소가 필요하다.
+- 루트 공개키·서명 정책·최소 리비전·Challenge expected value/Permit ID·trusted time을 일반 API 입력이나 동일한 evidence bundle에서 공급한다면 독립성이 없다. 별도 고정·관리된 신뢰 Anchor와 anti-rollback durable source, 일회성 challenge 소비 저장소가 필요하다.
 - Connection Plan V1의 서로 다른 DB target ID/role 이름은 물리적 격리 증빙이 아니다. 3-03은 3개의 서로 다른 clusterIdentityDigest에 대한 **서명된 주장**만 일치 검사한다. DB에 직접 연결하지 않는다.
 - 기존 `StagingTargetAuthorityPortV1.assertIsolatedStagingTarget({sourceProofOrigin})`은 원본 Manifest/Plan/SHA까지 바인딩하지 않는다. 이 모듈은 그 boolean port로 연결/변환하지 않는다. 향후 별도 Target Authority V2 인터페이스와 승인 운영 게이트 필수.
 - Saju Proof 서버는 현재 loopback 전용. 공개 바인딩/배포/프록시 Secret 발급을 하지 않는다.
