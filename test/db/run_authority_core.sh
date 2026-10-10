@@ -60,6 +60,7 @@ psql -v ON_ERROR_STOP=1 -f test/db/seyeon_ai_governor_atomic_admission_v1.sql
 psql -v ON_ERROR_STOP=1 -f test/db/seyeon_ai_governor_atomic_settlement_v1.sql
 psql -v ON_ERROR_STOP=1 -f test/db/seyeon_ai_governor_legacy_settlement_guard_v1.sql
 psql -v ON_ERROR_STOP=1 -f test/db/seyeon_ai_governor_internal_start_v1.sql
+psql -v ON_ERROR_STOP=1 -f test/db/seyeon_ai_governor_role_cutover_preflight_v1.sql
 bash test/db/character_face_governed_artifact_commit.sh
 bash test/db/chat_retry_abandon_concurrency.sh
 bash test/db/birth_profile_create_concurrency.sh
