@@ -42,13 +42,13 @@ begin
     )
   loop
     if pg_catalog.has_table_privilege(
-      v_role, v_table, 'SELECT'
+      v_role::name, v_table, 'SELECT'
     ) or pg_catalog.has_table_privilege(
-      v_role, v_table, 'INSERT'
+      v_role::name, v_table, 'INSERT'
     ) or pg_catalog.has_table_privilege(
-      v_role, v_table, 'UPDATE'
+      v_role::name, v_table, 'UPDATE'
     ) or pg_catalog.has_table_privilege(
-      v_role, v_table, 'DELETE'
+      v_role::name, v_table, 'DELETE'
     ) then
       raise exception 'Unauthorized role % has Reader provenance table access', v_role;
     end if;
