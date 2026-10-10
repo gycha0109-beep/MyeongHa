@@ -2,7 +2,7 @@
 set -euo pipefail
 # D4B-3: two independent Member Subjects compete for one UTC budget row.
 # Synthetic model; disposable DB ONLY. Watchtower-Track: character-memory
-[[ "\${PGDATABASE:-}" == 'myeongha_seyeon_d4b3_test' ]] || {
+[[ "${PGDATABASE:-}" == 'myeongha_seyeon_d4b3_test' ]] || {
   echo 'D4B-3 requires the exact disposable DB' >&2; exit 2;
 }
 db() { psql -X -qAt -F '|' -v ON_ERROR_STOP=1 --set=VERBOSITY=verbose "$@"; }
