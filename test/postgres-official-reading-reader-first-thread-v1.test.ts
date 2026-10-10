@@ -27,6 +27,7 @@ type Options = Readonly<{
   missingAfterOpen?: boolean;
   product?: ProductReaderRuleLookupV1;
   policyDrift?: boolean;
+  accessChangeAfterFirst?: 'topicKey' | 'readingPeriod' | 'readingVariant';
   openerBundle?: string;
   boundBundle?: string;
   openerCreated?: boolean;
@@ -58,13 +59,18 @@ class Connection implements PostgresSubjectConnectionV1 {
     } else if (sql.includes('qry_character_standard_reading_access_runtime_v2')) {
       this.accessReads += 1;
       if (!this.opts.revoked && !(this.opts.revokeAfterOpen && this.opened)) {
+        // Reproduce a metadata change after first admission read, while the
+        // internal resolver's own pair of repeated reads stays consistent.
+        const drift = this.accessReads > 1 ? this.opts.accessChangeAfterFirst : undefined;
         rows = [{
           subjectId: SUBJECT, readingId: READING,
           readingSessionId: '97000000-0000-4000-8000-000000000001',
           productId: PRODUCT, readerCharacterId: 'seyeon',
-          readerContentBundleId: BUNDLE, topicKey: 'general',
-          sajuDomain: 'general', readingPeriod: 'original',
-          readingVariant: 'standard',
+          readerContentBundleId: BUNDLE,
+          topicKey: drift === 'topicKey' ? 'career' : 'general',
+          sajuDomain: 'general',
+          readingPeriod: drift === 'readingPeriod' ? 'annual' : 'original',
+          readingVariant: drift === 'readingVariant' ? 'premium' : 'standard',
           sourceBirthRevisionId: '98000000-0000-4000-8000-000000000001',
           productSpecVersion: 'standard-reading-v1',
           domainCapabilityVersion: 'general-v1',
@@ -256,6 +262,19 @@ describe('D-05-C dormant first Thread open/reuse, no public activation', () => {
       await denied(openPostgresOfficialReadingReaderFirstThreadV1(f.input), code);
       expect(f.db.commandCalls).toBe(1);
       expect(steps(f.db).at(-1)).toBe('ROLLBACK');
+    }
+  });
+
+  it('rejects changed topic/period/variant between first access and final verification, even if inner reads agree', async () => {
+    for (const changed of ['topicKey', 'readingPeriod', 'readingVariant'] as const) {
+      for (const existing of [false, true]) {
+        const f = fixture({ accessChangeAfterFirst: changed, existing });
+        await denied(openPostgresOfficialReadingReaderFirstThreadV1(f.input), 'ACCESS_DENIED');
+        expect(f.db.accessReads).toBe(4);
+        expect(f.db.commandCalls).toBe(existing ? 0 : 1);
+        expect(steps(f.db).at(-1)).toBe('ROLLBACK');
+        expect(steps(f.db)).not.toContain('COMMIT');
+      }
     }
   });
 
