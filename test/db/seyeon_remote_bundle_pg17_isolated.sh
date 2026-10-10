@@ -3,6 +3,9 @@ set -euo pipefail
 # Exact recovery SQL is provided by an approved temporary file, never committed.
 # Runs against a disposable localhost PostgreSQL 17 database; no Production access.
 # Watchtower-Track: ops
+# GitHub Actions may print postgres service logs after a failed transaction.
+# Ensure private historical SQL text cannot appear in local PostgreSQL logs.
+export PGOPTIONS='-c log_min_messages=panic -c log_min_error_statement=panic -c log_statement=none'
 hold() { echo "HOLD_SEYEON_PG17: $1" >&2; exit 1; }
 root="$(cd "$(dirname "$0")/../.." && pwd)"
 [[ "${CI:-}" == true && "${PGHOST:-}" == localhost &&
@@ -22,6 +25,12 @@ printf '%s  %s\n' '4f38e4483061a84899f0fcaa4a8d6cfa9e09ce1553b1d31089d4de9154c4d
 version="$(psql -X -qAt -v ON_ERROR_STOP=1 -c 'show server_version_num')" ||
   hold 'Local PostgreSQL unavailable.'
 [[ "$version" =~ ^17[0-9]{4}$ ]] || hold 'PostgreSQL 17 required.'
+logging="$(psql -X -qAt -v ON_ERROR_STOP=1 -c "select current_setting('log_min_messages') || '|' ||
+current_setting('log_min_error_statement') || '|' || current_setting('log_statement')")" ||
+  hold 'Unable to inspect local statement logging.'
+[[ "$logging" == 'panic|panic|none' ]] ||
+  hold 'Local postgres confidential SQL logging must be disabled.'
+
 
 origin="${PGDATABASE:-}"
 shadow=myeongha_seyeon_remote_pg17_scratch_ci
@@ -81,7 +90,7 @@ psql -X -q -1 -v ON_ERROR_STOP=1 -f "$bundle" \
 history="$(psql -X -qAt -v ON_ERROR_STOP=1 -c "
   select count(*) from supabase_migrations.schema_migrations
   where version in ('1460','1470','1480','1490','1500','1510')
-    and cardinality(statements)=0")"
+    and coalesce(cardinality(statements),0)=0")"
 [[ "$history" == 6 ]] || hold 'Recovery failed to install its six marker rows.'
 acl() {
   psql -X -qAt -v ON_ERROR_STOP=1 \
