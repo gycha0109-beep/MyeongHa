@@ -88,6 +88,32 @@ const REFERENCES_TO_PRIOR_ANSWER = Object.freeze([
 const EXACT_READING_REFERENCE =
   /^방금 본 (.+) 해석을 (?:조금 )?더 (?:쉽게 )?설명해 ?주세요[.!?]?$/u;
 
+/**
+ * Lexical check only. Does not select a Unit or prove an Official Reading grant.
+ * Unlike follow-up pronouns, initial entry must refer explicitly to the
+ * already purchased Reading's admitted domain.
+ */
+export function classifyExactOfficialReadingReferenceV1(
+  text: unknown,
+  admittedDomain: string,
+): 'admitted' | 'unsupported_question' | 'new_authority_required' {
+  if (typeof text !== 'string' || text.length > 240 ||
+      /[\u0000-\u001f\u007f\u200b-\u200f\u202a-\u202e\u2060-\u206f]/u.test(text)) {
+    return 'unsupported_question';
+  }
+  const normalized = text.normalize('NFKC').trim().replace(/ +/gu, ' ');
+  if (normalized.length === 0 || normalized.length > 160) return 'unsupported_question';
+  const reference = EXACT_READING_REFERENCE.exec(normalized);
+  if (reference !== null) {
+    return DOMAIN_NAMES[admittedDomain]?.includes(reference[1] ?? '') === true
+      ? 'admitted'
+      : 'new_authority_required';
+  }
+  return SOURCE_CHANGE_REQUEST.test(normalized)
+    ? 'new_authority_required'
+    : 'unsupported_question';
+}
+
 const SOURCE_CHANGE_REQUEST =
   /(?:[0-9]{4}\s*년|내년|내후년|작년|올해|이번\s*달|다음\s*달|다음\s*해|언제|몇\s*월|월운|세운|대운|새로\s*계산|다시\s*계산|다른\s*사람|새로운\s*사주|궁합\s*봐|실시간|미래\s*예측)/u;
 
@@ -103,16 +129,7 @@ function classify(text: unknown, admittedDomain: string):
   if (REFERENCES_TO_PRIOR_ANSWER.some(pattern => pattern.test(normalized))) {
     return 'admitted';
   }
-  const readingReference = EXACT_READING_REFERENCE.exec(normalized);
-  if (readingReference !== null) {
-    const requestedDomain = readingReference[1];
-    return DOMAIN_NAMES[admittedDomain]?.includes(requestedDomain ?? '') === true
-      ? 'admitted'
-      : 'new_authority_required';
-  }
-  return SOURCE_CHANGE_REQUEST.test(normalized)
-    ? 'new_authority_required'
-    : 'unsupported_question';
+  return classifyExactOfficialReadingReferenceV1(text, admittedDomain);
 }
 
 /**
