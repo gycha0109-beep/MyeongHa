@@ -36,6 +36,11 @@ describe('Se-yeon historical SQL PG17 isolated CI bridge', () => {
     expect(isolate).toContain('PGHOST: localhost');
     expect(isolate).toContain('PGDATABASE: myeongha_test');
     expect(isolate).toContain('test/db/seyeon_remote_bundle_pg17_isolated.sh');
+    const isolated = readFileSync('test/db/seyeon_remote_bundle_pg17_isolated.sh', 'utf8');
+    expect(isolated).toContain('log_min_error_statement=panic');
+    expect(isolated).toContain('log_min_messages=panic');
+    expect(isolated).toContain('log_statement=none');
+    expect(isolated).toContain("[[ \"$logging\" == 'panic|panic|none' ]]");
     expect(isolate).not.toContain('secrets.');
     expect(isolate).not.toContain('SUPABASE_DB_PASSWORD');
     expect(isolate).not.toContain('SUPABASE_PRODUCTION_SESSION_POOLER_HOST');
