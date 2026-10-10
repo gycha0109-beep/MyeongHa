@@ -101,3 +101,44 @@ The previous real PostgreSQL locator test proves row-level discovery behavior;
 this new test uses injected PostgreSQL/Commerce ports and **does not** resolve
 D05-A/C/D, #1827 refund/reveal linearization, #1828 Product policy mapping or
 production deployment.
+
+## D-05-C dormant first-Thread open/reuse candidate (not activated)
+
+`apps/api/src/postgres-official-reading-reader-first-thread-v1.ts` adds an
+**INTERNAL, unmounted** exact-Grant guarded creation/reuse candidate. The
+existing `cmd_open_member_single_character_thread_v1` remains the *only*
+Thread writer; no SQL migration or independent Thread identity is created.
+
+- Verified **Member**, exact Official Reading × Reader access, approved
+  Product/Commerce-owned policy and 0/1/2 bounded Thread discovery all run
+  inside one canonical Subject PostgreSQL transaction.
+- **One existing Thread**: only read and reverify; never call the opener.
+- **No existing Thread**: call the existing serialized Member Chat open command
+  with two server-generated UUIDs. Its Content Release always comes from the
+  active *default*; compare the returned Bundle against the exact purchased
+  Reader content Bundle. If different, throw and **ROLL BACK the provisional
+  Thread and Character participant**. No silent release switch or grant remap.
+- **Concurrent first opens**: trust only the server command's created flag,
+  exact Reader/bundle, authoritative locator and binding; a server-returned
+  `created:false` still requires full revalidation.
+- After any command, re-read exact Grant/source metadata, approved Product
+  version/policy and Thread binding **before COMMIT**. A mismatch rolls back.
+  This improves transaction-local safety but is *not* a refund/reveal
+  linearization guarantee across concurrent transactions.
+
+Verification:
+`test/postgres-official-reading-reader-first-thread-v1.test.ts` covers
+Guest/forged selectors, missing/revoked/excluded Grant/Reader, wrong Bundle,
+duplicate/missing candidate, rollback on stale Product, and replay; this uses
+injected DB ports (not production fulfillment E2E).
+`test/db/official_reader_first_thread_bundle_rollback.sh` independently
+executes real PostgreSQL Member Chat command+locator and proves that an
+old-Grant-bundle/new-default mismatch leaves zero newly created Thread and
+participant, while a matching Bundle supports create and idempotent reuse.
+
+**Remaining hard HOLD:** D05-A approval of shared Member × Reader identity;
+D05-C authorization to use default-release creation for a paid Reader and
+the actual Product owner policy port (#1828); #1827 refund/revoke and final T2
+writer lock; public Reader CTA/Chat and Saju execution. This function is
+**not imported into any HTTP, mobile or chat send route**, and success
+does not authorize paid Reader interpretation or public result disclosure.
