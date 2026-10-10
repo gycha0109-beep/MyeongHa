@@ -10,6 +10,7 @@ Watchtower-Track: character-memory
 - `seyeon-governed-cost-transaction-v1.ts`에 고정 역할 `SET LOCAL ROLE myeongha_seyeon_governed_executor`, 기존 Subject Member/Guest Resolver, canonical Subject 결속/ASSERT, 트랜잭션 ROLLBACK/connection release 포함한 전용 Runner 추가.
 - 일반 Subject Runner의 `SET LOCAL ROLE myeongha_api_executor`는 변경 없음. 외부 Role parameter injection 불가.
 - 단위·시뮬레이션 테스트에서 잘못된 DB 자격, 역할 승격, 레거시 EXECUTE, 원장 직접 접근, Subject 불일치, 트랜잭션 실패 시 operation 0회와 ROLLBACK 확인.
+- `test/db/seyeon_governed_login_boundary_v1.sh`에서 테스트 전용 LOGIN 역할을 임시 생성하고 **서로 다른 psql 백엔드 연결 2개**에서 세션 권한 전환·실제 `SET ROLE` 거부·OFF 보존을 검증. 검증 후 DROP ROLE, 운영 계정/비밀번호 발급 없음.
 
 ## 시크릿 계약 (운영 적용 HOLD)
 - `MYEONGHA_SEYEON_GOVERNED_DATABASE_URL`: 별도의 `myeongha_seyeon_governed_login` PostgreSQL 자격. 현재 **발급되지 않은 별도 자격**.
