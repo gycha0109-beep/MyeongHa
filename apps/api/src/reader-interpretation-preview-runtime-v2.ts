@@ -37,6 +37,21 @@ import {
   type RunThreadBoundReaderInterpretationPreviewInputV1,
 } from './reader-interpretation-preview-runtime-v1.js';
 
+/** Only a V2 server-rendered, semantic-guard-passed Scene may nominate Chat source Units. */
+const mintedGuardedReaderSceneV2 = new WeakSet<object>();
+
+export function assertServerGuardedReaderInterpretationSceneV2(
+  value: unknown,
+): asserts value is Extract<ReaderInterpretationPreviewEnvelopeV1, { mode: 'reader_interpretation' }> {
+  if (value === null || typeof value !== 'object' ||
+      !mintedGuardedReaderSceneV2.has(value)) {
+    throw new ReaderInterpretationPreviewRuntimeErrorV1(
+      'ACCESS_DENIED',
+      'Server guarded Reader Scene is required for source handoff.',
+    );
+  }
+}
+
 function deny(code: ReaderInterpretationPreviewRuntimeErrorV1['code']): never {
   throw new ReaderInterpretationPreviewRuntimeErrorV1(
     code, 'Official standard Reader V2 admission or source verification failed.',
@@ -242,5 +257,7 @@ export async function runThreadBoundReaderInterpretationPreviewV2(
   }
   const envelope = { ...common, mode: 'reader_interpretation' as const,
     utterance: guarded.utterance };
-  return Object.freeze({ ...envelope, interpretationHash: hashEnvelope(envelope) });
+  const scene = Object.freeze({ ...envelope, interpretationHash: hashEnvelope(envelope) });
+  mintedGuardedReaderSceneV2.add(scene);
+  return scene;
 }
