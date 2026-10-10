@@ -42,6 +42,10 @@ async function freeLoopbackPort() {
 async function run() {
   validWorkspace();
   const nonceDbEnabled = process.env.MYEONGHA_LOCAL_NONCE_PG_ENABLED === '1';
+  const realGoTrueEnabled = process.env.MYEONGHA_LOCAL_GOTRUE_ENABLED === '1';
+  if (realGoTrueEnabled && !nonceDbEnabled) {
+    throw new Error('Real local GoTrue integration requires the disposable Birth/Nonce PostgreSQL DB.');
+  }
   // The extra PostgreSQL integration suite is an explicit opt-in and never
   // accepts a remote DB, arbitrary port, or Production runtime configuration.
   if (nonceDbEnabled && (process.env.PGHOST !== '127.0.0.1'
@@ -129,6 +133,23 @@ async function run() {
       test.once('exit', (exitCode, signal) => ok(exitCode ?? (signal ? 1 : 1)));
     });
     if (code !== 0) throw new Error('Cross-repository loopback HTTP verification failed.');
+    if (realGoTrueEnabled) {
+      // A distinct Vitest process prevents the GoTrue→Subject fixture remapping
+      // from racing with baseline Birth owner/revision tests.
+      const gotrueTest = spawn(process.execPath, [
+        vitest, 'run', 'test/saju-held-cross-repo-local-gotrue-auth.test.ts',
+      ], {
+        cwd: root,
+        env: { ...testEnv, MYEONGHA_LOCAL_GOTRUE_AUTH_DB: '1' },
+        stdio: 'inherit',
+      });
+      const gotrueCode = await new Promise((ok, bad) => {
+        gotrueTest.once('error', bad);
+        gotrueTest.once('exit', (exitCode, signal) => ok(exitCode ?? (signal ? 1 : 1)));
+      });
+      if (gotrueCode !== 0) throw new Error('Real local GoTrue Auth integration failed.');
+      console.log('[saju-bridge] Real isolated GoTrue signup/user JWT + Birth + Saju Proof: PASS (not Production).');
+    }
     console.log(nonceDbEnabled
       ? '[saju-bridge] Live local HTTP + PostgreSQL nonce claim PASS (NOT staging admission).'
       : '[saju-bridge] Local-only cross-repository HTTP check PASS (not staging admission).');

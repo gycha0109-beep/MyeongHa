@@ -9,6 +9,7 @@ on:
       - test/saju-held-cross-repo-local-postgres-nonce.test.ts
       - test/saju-held-cross-repo-local-postgres-current-birth.test.ts
       - test/saju-held-cross-repo-local-auth-user.test.ts
+      - test/saju-held-cross-repo-local-gotrue-auth.test.ts
       - apps/api/src/saju-held-authenticated-member-proof-v1.ts
       - test/db/fixtures/saju_local_subject_birth_proof_e2e.sql
       - apps/api/src/saju-held-source-proof-revision-binding-v1.ts
@@ -25,7 +26,7 @@ concurrency:
 jobs:
   real-local-http:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 12
     services:
       postgres:
         image: postgres:15
@@ -37,6 +38,19 @@ jobs:
           - 5432:5432
         options: >-
           --health-cmd="pg_isready -U postgres -d myeongha_saju_local_verify"
+          --health-interval=3s
+          --health-timeout=3s
+          --health-retries=15
+      gotrue-db:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ${{ github.run_id }}-${{ github.run_attempt }}-auth
+          POSTGRES_DB: myeongha_saju_gotrue_verify
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d myeongha_saju_gotrue_verify"
           --health-interval=3s
           --health-timeout=3s
           --health-retries=15
@@ -85,6 +99,53 @@ jobs:
             psql -X -v ON_ERROR_STOP=1 -f "$migration" >/dev/null
           done
           psql -X -v ON_ERROR_STOP=1 -f test/db/fixtures/saju_local_subject_birth_proof_e2e.sql
-      - name: Verify real HTTP, HMAC, PostgreSQL nonce and current Birth revision binding
+      - name: Start disposable real Supabase GoTrue with independent Auth database
+        shell: bash
+        env:
+          GOTRUE_AUTH_DB_PASSWORD: ${{ github.run_id }}-${{ github.run_attempt }}-auth
+        run: |
+          set -euo pipefail
+          test "$(PGHOST=127.0.0.1 PGPORT=5433 PGDATABASE=myeongha_saju_gotrue_verify PGPASSWORD="$GOTRUE_AUTH_DB_PASSWORD" PGUSER=postgres psql -X -Atqc 'select current_database()')" = 'myeongha_saju_gotrue_verify'
+          PGHOST=127.0.0.1 PGPORT=5433 PGDATABASE=myeongha_saju_gotrue_verify PGPASSWORD="$GOTRUE_AUTH_DB_PASSWORD" PGUSER=postgres psql -X -v ON_ERROR_STOP=1 -c 'CREATE SCHEMA IF NOT EXISTS auth'
+          PGHOST=127.0.0.1 PGPORT=5433 PGDATABASE=myeongha_saju_gotrue_verify PGPASSWORD="$GOTRUE_AUTH_DB_PASSWORD" PGUSER=postgres psql -X -v ON_ERROR_STOP=1 -c 'ALTER ROLE postgres IN DATABASE myeongha_saju_gotrue_verify SET search_path TO auth, public'
+          jwt_secret="$(openssl rand -hex 32)"
+          docker run -d --name myeongha-saju-gotrue-local --network host \
+            -e GOTRUE_API_HOST=127.0.0.1 \
+            -e GOTRUE_API_PORT=9999 \
+            -e API_EXTERNAL_URL=http://127.0.0.1:9999 \
+            -e GOTRUE_SITE_URL=http://127.0.0.1:3000 \
+            -e GOTRUE_DB_DRIVER=postgres \
+            -e GOTRUE_DB_DATABASE_URL="postgres://postgres:$GOTRUE_AUTH_DB_PASSWORD@127.0.0.1:5433/myeongha_saju_gotrue_verify?sslmode=disable" \
+            -e GOTRUE_JWT_SECRET="$jwt_secret" \
+            -e GOTRUE_JWT_AUD=authenticated \
+            -e GOTRUE_JWT_DEFAULT_GROUP_NAME=authenticated \
+            -e GOTRUE_JWT_EXP=300 \
+            -e GOTRUE_EXTERNAL_EMAIL_ENABLED=true \
+            -e GOTRUE_MAILER_AUTOCONFIRM=true \
+            -e GOTRUE_DISABLE_SIGNUP=false \
+            -e GOTRUE_EXTERNAL_PHONE_ENABLED=false \
+            supabase/gotrue:v2.196.0
+          ready=0
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent --show-error --max-time 2 http://127.0.0.1:9999/health >/dev/null 2>&1; then
+              ready=1
+              break
+            fi
+            sleep 2
+          done
+          if [ "$ready" -ne 1 ]; then
+            echo "Disposable GoTrue was not healthy; withholding integration admission"
+            docker logs --tail 80 myeongha-saju-gotrue-local || true
+            exit 1
+          fi
+      - name: Verify real GoTrue Auth, Birth, and Saju Proof in one local execution
         working-directory: myeongha
+        env:
+          MYEONGHA_LOCAL_GOTRUE_ENABLED: '1'
         run: node scripts/local/verify-saju-bridge-http.mjs ../saju
+      - name: Collect disposable GoTrue Auth failure diagnostics
+        if: failure()
+        run: docker logs --tail 80 myeongha-saju-gotrue-local || true
+      - name: Tear down disposable local GoTrue
+        if: always()
+        run: docker rm -f myeongha-saju-gotrue-local >/dev/null 2>&1 || true
