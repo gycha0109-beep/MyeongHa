@@ -1,10 +1,10 @@
 -- Disposable CI-only synthetic Subject + Birth revisions for real HTTP/DB E2E.
 -- Watchtower-Track: saju-bridge
--- Must run ONLY in the fresh GitHub service database after the complete
+-- Must run ONLY in named disposable GitHub PostgreSQL test databases after the complete
 -- checked-in migrations. This file must never be applied to Production.
 DO $$
 BEGIN
-  IF current_database() <> 'myeongha_saju_local_verify' THEN
+  IF current_database() NOT IN ('myeongha_saju_local_verify', 'myeongha_saju_subject_tls_verify') THEN
     RAISE EXCEPTION 'Refusing to seed a non-disposable Saju bridge database';
   END IF;
 END
