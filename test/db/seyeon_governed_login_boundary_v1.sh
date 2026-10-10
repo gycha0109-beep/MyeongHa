@@ -41,17 +41,19 @@ grant myeongha_api_executor
 SQL
 
 # Each psql process gets a fresh connection and a different session_user.
+# On older PG versions, pg_has_role supports MEMBER, not SET; the actual
+# SET ROLE success/denial tests below are the authoritative privilege proof.
 governed_result="$(psql -X -qAt -v ON_ERROR_STOP=1 <<'SQL'
 set session authorization myeongha_seyeon_governed_login_ci;
 select case when
   session_user='myeongha_seyeon_governed_login_ci'
   and current_user=session_user
   and pg_catalog.pg_has_role(session_user,
-    'myeongha_seyeon_governed_executor','SET')
+    'myeongha_seyeon_governed_executor','MEMBER')
   and not pg_catalog.pg_has_role(session_user,
     'myeongha_api_executor','MEMBER')
   and not pg_catalog.pg_has_role(session_user,
-    'myeongha_api_executor','SET')
+    'myeongha_api_executor','MEMBER')
   and not pg_catalog.has_function_privilege(session_user,
     'public.cmd_start_seyeon_ai_call_v1(uuid,uuid,uuid,text,uuid,text,text,text)',
     'EXECUTE')
@@ -93,9 +95,9 @@ ordinary_result="$(psql -X -qAt -v ON_ERROR_STOP=1 <<'SQL'
 set session authorization myeongha_seyeon_ordinary_login_ci;
 select case when
   session_user='myeongha_seyeon_ordinary_login_ci'
-  and pg_catalog.pg_has_role(session_user,'myeongha_api_executor','SET')
+  and pg_catalog.pg_has_role(session_user,'myeongha_api_executor','MEMBER')
   and not pg_catalog.pg_has_role(session_user,
-    'myeongha_seyeon_governed_executor','SET')
+    'myeongha_seyeon_governed_executor','MEMBER')
 then 'PASS' else 'FAIL' end;
 begin;
 set local role myeongha_api_executor;
