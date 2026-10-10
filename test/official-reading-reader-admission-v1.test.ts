@@ -127,9 +127,11 @@ function fixtures(options: {
         (policyReadCount > 1 && options.policyAfterArtifact === 'throw')) {
       throw new Error('policy unavailable');
     }
-    return policyReadCount > 1 && options.policyAfterArtifact !== undefined
-      ? options.policyAfterArtifact
-      : options.policy ?? approved();
+    if (policyReadCount > 1 && options.policyAfterArtifact !== undefined &&
+        options.policyAfterArtifact !== 'throw') {
+      return options.policyAfterArtifact;
+    }
+    return options.policy ?? approved();
   });
   const readArtifactSource = vi.fn(async (_input: {
     subjectId: string; readingId: string; readerCharacterId: string;
