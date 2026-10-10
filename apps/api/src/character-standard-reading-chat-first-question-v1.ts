@@ -15,6 +15,7 @@ import {
 import {
   classifyExactOfficialReadingReferenceV1,
 } from './character-standard-reading-chat-question-scope-v1.js';
+import { closeCharacterStandardReaderSourceFocusV1 } from './character-standard-reading-chat-source-closure-v1.js';
 
 export const STANDARD_FIRST_QUESTION_SOURCE_ENTRY_VERSION_V1 =
   'myeongha-standard-first-question-source-entry-v1' as const;
@@ -131,43 +132,21 @@ export async function selectCharacterStandardFirstQuestionSourceEntryV1(input: R
   );
   if (roots.length !== 1) return hold('clarification_required');
 
-  const selected = new Set<string>();
-  const visit = (unitId: string): void => {
-    if (selected.has(unitId)) return;
-    const unit = byId.get(unitId);
-    if (!unit) throw new Error('Official source companion Unit is unavailable.');
-    selected.add(unitId);
-    for (const companion of unit.requiredCompanionUnitRefs) visit(companion);
-  };
-  visit(roots[0]!.unitId);
-
-  // A source-only first answer must not discard any other independent
-  // official Reading Unit. Multi-focus official Readings are clarification.
-  if (selected.size !== units.length) return hold('clarification_required');
-
-  const chosen = units.filter(unit => selected.has(unit.unitId));
-  const disclosures = Object.freeze([...new Set(
-    chosen.flatMap(unit => [...unit.requiredDisclosureRefs]),
-  )]);
-  const ambiguities = Object.freeze([...new Set(
-    chosen.flatMap(unit => unit.ambiguityRef === undefined ? [] : [unit.ambiguityRef]),
-  )]);
-  const disclosureSet = new Set(input.grounded.grounding.disclosures.map(d => d.disclosureRef));
-  const ambiguitySet = new Set(input.grounded.grounding.ambiguities.map(a => a.ambiguityRef));
-  if (disclosures.some(ref => !disclosureSet.has(ref)) ||
-      ambiguities.some(ref => !ambiguitySet.has(ref))) {
-    throw new Error('Official source disclosure or ambiguity is missing.');
+  // RR-02: Saju V1 source-level ambiguity and disclosure obligations cannot
+  // disappear when a multi-Unit official source is narrowed to the first focus.
+  const closure = closeCharacterStandardReaderSourceFocusV1({
+    grounded: input.grounded,
+    rootUnitId: roots[0]!.unitId,
+  });
+  if (closure.mode === 'hold' ||
+      closure.selectedUnitIds.length !== units.length) {
+    return hold('clarification_required');
   }
 
-  const protectedOnly = chosen.some(unit =>
-    unit.realizationPolicyRef === 'protected_only_v1' ||
-    (unit.qualifiers?.length ?? 0) > 0 ||
-    unit.ambiguityRef !== undefined,
-  );
   const scope = input.grounded.scope;
   const withoutHash = {
     schemaVersion: STANDARD_FIRST_QUESTION_SOURCE_ENTRY_VERSION_V1,
-    mode: protectedOnly ? 'protected_only_candidate' as const
+    mode: closure.protectedOnly ? 'protected_only_candidate' as const
       : 'grounded_source_candidate' as const,
     source: 'official_reading_without_prior_guarded_answer' as const,
     subjectId: scope.subjectId,
@@ -179,9 +158,9 @@ export async function selectCharacterStandardFirstQuestionSourceEntryV1(input: R
     groundingHash: input.grounded.grounding.groundingHash,
     questionHash: `sha256:v1:${createHash('sha256').update(question as string).digest('hex')}`,
     rootUnitId: roots[0]!.unitId,
-    selectedUnitIds: Object.freeze(chosen.map(unit => unit.unitId)),
-    requiredDisclosureRefs: disclosures,
-    requiredAmbiguityRefs: ambiguities,
+    selectedUnitIds: closure.selectedUnitIds,
+    requiredDisclosureRefs: closure.requiredDisclosureRefs,
+    requiredAmbiguityRefs: closure.requiredAmbiguityRefs,
   };
   const result = Object.freeze({
     ...withoutHash,
