@@ -214,7 +214,7 @@ describe('Se-yeon D3B2B-3B2 isolated governed credential boundary',()=>{
       count++;return true;
     })).rejects.toThrow('database command rejected');
     expect(count).toBe(0);
-    expect(d.calls.map(c=>c.text).filter(t=>t==='ROLLBACK')).toHaveLength(1);
+    expect(d.calls.map(c=>c.text).filter(t=>t==='ROLLBACK')).toHaveLength(2); // preflight proof + failed operation
     expect(d.released).toEqual([undefined]);
   });
 
