@@ -36,7 +36,8 @@ function goodPreflight(){
     canCreateDb:false,canCreateRole:false,
     hasWorkerRole:true,otherMemberships:0,
     isApiMember:false,isGovernedMember:false,isCostOwnerMember:false,
-    canSettle:true,canStart:false,canReadLedger:false,canReadBudget:false,
+    workerCanSettle:true,canDirectSettle:false,
+    canStart:false,canReadLedger:false,canReadBudget:false,
   };
 }
 function fixture(options:{
@@ -96,7 +97,8 @@ describe('D4B-10A detached server-only binding (synthetic, no Production source)
       ['canBypassRls',true],['canCreateDb',true],['canCreateRole',true],
       ['hasWorkerRole',false],['otherMemberships',1],['isApiMember',true],
       ['isGovernedMember',true],['isCostOwnerMember',true],
-      ['canSettle',false],['canStart',true],['canReadLedger',true],
+      ['workerCanSettle',false],['canDirectSettle',true],
+      ['canStart',true],['canReadLedger',true],
       ['canReadBudget',true],
     ] as const){
       expect(()=>verifySeyeonDetachedWorkerLoginV1([
