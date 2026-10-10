@@ -756,6 +756,14 @@ export {
 } from './character-standard-reading-chat-first-question-v1.js';
 
 export {
+  STANDARD_READER_SCENE_SOURCE_HANDOFF_VERSION_V1,
+  CharacterStandardReaderSceneHandoffErrorV1,
+  prepareCharacterStandardReaderSceneSourceHandoffV1,
+  assertServerPreparedStandardReaderSceneSourceHandoffV1,
+  type CharacterStandardReaderSceneSourceHandoffDecisionV1,
+} from './character-standard-reading-chat-scene-handoff-v1.js';
+
+export {
   POSTGRES_STANDARD_FOLLOWUP_ANCHOR_BINDING_V1,
   PostgresStandardFollowupAnchorErrorV1,
   createPostgresStandardFollowupAnchorAuthorityPortV1,
