@@ -15,6 +15,7 @@ PR #1921은 저장소 SQL의 역순 적용 가능성을 PostgreSQL 15 합성 환
 - SQL 원문은 `runner.temp`에 0600 권한으로 보관합니다. Actions 출력/Artifact/GitHub Issue/커밋에 원문·HEX·SQL 오류를 남기지 않습니다.
 - **다음 실행 단계**에는 Production 비밀번호/호스트 환경변수가 제공되지 않습니다. 연결은 localhost:5432, `postgres:17.6` 서비스 DB로만 고정하고 테스트는 실패 시 즉시 중단합니다.
 - 정확한 원격 SQL을 로컬 임시 DB에 재현한 뒤, 1400~1450을 단일 트랜잭션으로 후행 적용합니다. 선행 함수 11개, 1460~1510 RPC 지문/Owner/ACL 불변, 관계 테이블의 테스트 데이터 0건을 검사합니다.
+- 로컬 PostgreSQL 컨테이너에서 실패 SQL 본문이 서비스 로그로 유출되지 않도록 각 연결에 `log_min_error_statement=panic`, `log_min_messages=panic`, `log_statement=none`을 강제하고 읽어서 검증합니다. 원격 Production의 로깅 설정은 변경하지 않습니다.
 - 테스트 후 원본 SQL 임시 파일과 로컬 오류 진단을 삭제합니다. 실제 운영 테이블/원격 migration marker에는 DDL·DML을 실행하지 않습니다.
 - 자동 실행은 이 워크플로 파일 변경의 `main` push에서만 발생합니다. 그 외에는 **명시적인 수동 입력 `exact_remote_bundle_pg17=true`**가 있어야 실행됩니다. 일반 점검 수동 실행에서는 새 작업이 건너뛰어집니다.
 - `supabase-production.yml` 및 `run-supabase-production-migrations.sh`와 연결하지 않으며 기존 1400~1450 배포 차단을 완화하지 않습니다.
