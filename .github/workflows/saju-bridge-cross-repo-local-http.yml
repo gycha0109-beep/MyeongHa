@@ -13,6 +13,9 @@ on:
       - test/saju-held-cross-repo-local-restricted-login.test.ts
       - test/saju-held-cross-repo-local-tls-nonce.test.ts
       - test/saju-held-cross-repo-local-tls-subject.test.ts
+      - test/saju-held-cross-repo-local-tls-admission.test.ts
+      - test/db/fixtures/saju_local_tls_admission_login.sql
+      - scripts/local/setup-saju-bridge-tls-admission-ci.sh
       - test/db/fixtures/saju_local_tls_subject_login.sql
       - scripts/local/setup-saju-bridge-tls-subject-ci.sh
       - test/db/fixtures/saju_local_tls_nonce_login.sql
@@ -135,6 +138,10 @@ jobs:
         working-directory: myeongha
         shell: bash
         run: bash scripts/local/setup-saju-bridge-tls-subject-ci.sh
+      - name: Start independent disposable Admission PostgreSQL with verified TLS and Permit V2 role
+        working-directory: myeongha
+        shell: bash
+        run: bash scripts/local/setup-saju-bridge-tls-admission-ci.sh
       - name: Start disposable real Supabase GoTrue with independent Auth database
         shell: bash
         env:
@@ -181,6 +188,7 @@ jobs:
           MYEONGHA_LOCAL_RESTRICTED_LOGINS_ENABLED: '1'
           MYEONGHA_LOCAL_TLS_NONCE_ENABLED: '1'
           MYEONGHA_LOCAL_TLS_SUBJECT_ENABLED: '1'
+          MYEONGHA_LOCAL_TLS_ADMISSION_ENABLED: '1'
         run: node scripts/local/verify-saju-bridge-http.mjs ../saju
       - name: Collect disposable GoTrue Auth failure diagnostics
         if: failure()
@@ -200,3 +208,9 @@ jobs:
         run: |
           docker rm -f myeongha-saju-tls-subject-ci >/dev/null 2>&1 || true
           rm -rf "$RUNNER_TEMP/saju-bridge-subject-tls"
+      - name: Tear down isolated TLS Admission cluster and ephemeral CA material
+        if: always()
+        shell: bash
+        run: |
+          docker rm -f myeongha-saju-tls-admission-ci >/dev/null 2>&1 || true
+          rm -rf "$RUNNER_TEMP/saju-bridge-admission-tls"
