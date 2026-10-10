@@ -116,11 +116,19 @@ for i in $(seq 1 100); do
   sleep 0.05
 done
 if [[ "$ready" != true ]]; then cat "$tmp/crash.log" >&2; exit 15; fi
-terminated="$(db -c "select count(*) from pg_catalog.pg_stat_activity
-  where application_name='seyeon_d4a_crash_ci' and pid<>pg_backend_pid()
-    and pg_catalog.pg_terminate_backend(pid)")"
-[[ "$terminated" == '1' ]] || {
-  echo "FAIL did not terminate exactly one uncommitted backend: $terminated" >&2
+# Never evaluate pg_terminate_backend() in a WHERE predicate:
+# SQL boolean evaluation order is not a termination-authority boundary.
+# First determine the exact backend pid without side effects, then terminate
+# that one pid from a distinct superuser test connection.
+target_pid="$(db -c "select pid::text from pg_catalog.pg_stat_activity
+  where application_name='seyeon_d4a_crash_ci' and pid<>pg_backend_pid()")"
+[[ "$target_pid" =~ ^[0-9]+$ ]] || {
+  echo "FAIL expected exactly one crash fixture backend PID: $target_pid" >&2
+  exit 16
+}
+terminated="$(db -c "select pg_catalog.pg_terminate_backend($target_pid)")"
+[[ "$terminated" == 't' ]] || {
+  echo "FAIL failed to terminate intended backend: $target_pid" >&2
   exit 16
 }
 if wait "$pid" 2>/dev/null; then
