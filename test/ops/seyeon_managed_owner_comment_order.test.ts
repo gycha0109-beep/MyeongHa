@@ -59,13 +59,16 @@ describe('non-superuser managed function owner COMMENT staging', () => {
     const shadow = readFileSync('test/db/seyeon_remote_bundle_pg17_isolated.sh', 'utf8');
     expect(prod).toContain('stage-seyeon-managed-owner-comment-order.py');
     expect(shadow).toContain('stage-seyeon-managed-owner-comment-order.py');
-    expect(shadow).toContain('create role seyeon_pg17_executor nosuperuser createrole createdb bypassrls inherit nologin');
+    expect(shadow).toContain('create role postgres nosuperuser createrole createdb bypassrls inherit nologin');
     expect(shadow).toContain('with admin true, inherit false, set false');
-    expect(shadow).toContain("member.rolname='seyeon_pg17_executor'");
-    expect(shadow).toContain("rolname='seyeon_pg17_executor' and not rolsuper");
-    expect(shadow).toContain("-c 'set role seyeon_pg17_executor'");
-    expect(shadow).toContain("current_user='seyeon_pg17_executor'");
+    expect(shadow).toContain("member.rolname='postgres'");
+    expect(shadow).toContain("rolname='postgres' and oid <> 10 and not rolsuper");
+    expect(shadow).toContain("-c 'set role postgres'");
+    expect(shadow).toContain("current_user='postgres'");
     expect(shadow).not.toContain('alter role postgres nosuperuser');
+    const workflow = readFileSync('.github/workflows/production-seyeon-db-authority-audit.yml', 'utf8');
+    expect(workflow).toContain('POSTGRES_USER: seyeon_pg17_bootstrap');
+    expect(workflow).toContain('PGUSER: seyeon_pg17_bootstrap');
     for (const name of names) {
       expect(prod).toContain('managed-owner-migrations/' + name);
       expect(shadow).toContain('managed-owner-migrations/');
