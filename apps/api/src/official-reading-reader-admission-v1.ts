@@ -197,6 +197,28 @@ export async function prepareOfficialReadingReaderAdmissionV1(
     return deny('ACCESS_DENIED');
   }
 
+  // Artifact retrieval is fallible and may outlive a Product policy revision
+  // or reader restriction. The initial eligible judgment must still be current
+  // at issuance; rechecking it does not replace the final DB/Grant transaction
+  // required before any public disclosure.
+  const latestEligibility = await resolveProductReaderEligibilityV1({
+    source: Object.freeze({
+      productId: access.productId,
+      productSpecVersion: access.productSpecVersion,
+      sajuDomain: access.sajuDomain,
+    }),
+    serverReaderId: readerCharacterId,
+    effectiveAt: access.effectiveAt,
+    authorityPort: input.productReaderEligibilityAuthorityPort,
+  });
+  if (latestEligibility.status !== 'eligible' ||
+      latestEligibility.readerCharacterId !== eligibility.readerCharacterId ||
+      latestEligibility.productId !== eligibility.productId ||
+      latestEligibility.ruleVersion !== eligibility.ruleVersion ||
+      latestEligibility.approvedPolicyRevision !== eligibility.approvedPolicyRevision) {
+    return deny('POLICY_HOLD');
+  }
+
   const scope = Object.freeze({
     subjectId: access.subjectId,
     threadId: thread.threadId,
