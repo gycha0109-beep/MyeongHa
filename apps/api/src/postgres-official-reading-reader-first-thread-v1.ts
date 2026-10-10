@@ -82,7 +82,10 @@ function sameAccess(a: CharacterStandardReadingAccessMetadataV1, b: CharacterSta
     a.readingSessionId === b.readingSessionId &&
     a.productId === b.productId &&
     a.productSpecVersion === b.productSpecVersion &&
+    a.topicKey === b.topicKey &&
     a.sajuDomain === b.sajuDomain &&
+    a.readingPeriod === b.readingPeriod &&
+    a.readingVariant === b.readingVariant &&
     a.readingContractVersion === b.readingContractVersion &&
     a.sourceBirthRevisionId === b.sourceBirthRevisionId &&
     a.responseHash === b.responseHash &&
