@@ -59,6 +59,8 @@ describe('non-superuser managed function owner COMMENT staging', () => {
     const shadow = readFileSync('test/db/seyeon_remote_bundle_pg17_isolated.sh', 'utf8');
     expect(prod).toContain('stage-seyeon-managed-owner-comment-order.py');
     expect(shadow).toContain('stage-seyeon-managed-owner-comment-order.py');
+    expect(shadow).toContain('grant myeongha_relationship_apply_owner to postgres with admin true, inherit false, set false;');
+    expect(shadow).toContain('Expected one restricted direct managed-owner grant.');
     expect(shadow).toContain('alter role postgres nosuperuser createrole createdb');
     expect(shadow).toContain('Disposable PG17 executor is unexpectedly superuser.');
     for (const name of names) {
