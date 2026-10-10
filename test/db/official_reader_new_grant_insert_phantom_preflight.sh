@@ -138,6 +138,8 @@ wait_holder
 p >"$tmpdir/b4-new-insert.out" 2>&1 <<SQL || { cat "$tmpdir/b4-new-insert.out" >&2; fail "new B4 receipt Grant + Reader access INSERT did not complete during B2 SHARE lock"; }
 set statement_timeout='7s';
 begin;
+-- Match the fixture's canonical Subject authority; never infer from a receipt.
+select pg_catalog.set_config('myeongha.subject_id', '$subject', true);
 select * from public.internal_apply_verified_receipt_capability_effects_v1(
   '$b4_receipt'::uuid,
   array['test-reader-unit'], array[transaction_timestamp()],
