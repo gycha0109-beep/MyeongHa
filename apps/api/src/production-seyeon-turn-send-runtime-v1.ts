@@ -12,6 +12,10 @@ import type {
 } from './openai-seyeon-structured-provider-v1.js';
 import type { SeyeonAiGovernorAdmissionV1 } from './postgres-seyeon-ai-cost-ledger-v1.js';
 import type { SeyeonProductionGovernorModeV1 } from './seyeon-production-governor-boundary-v1.js';
+import {
+  createSeyeonProductionChatGovernorsV1,
+  type SeyeonProductionChatGovernorApprovalV1,
+} from './seyeon-production-governor-factory-v1.js';
 import type { PostgresSubjectPoolV1 } from './postgres-subject-execution.js';
 import {
   createProductionRequestIdentityVerifierV1,
@@ -172,10 +176,13 @@ export interface CreateProductionSeyeonTurnSendRuntimeInputV1 {
   readonly oidcTokenProvider?: ProductionSeyeonOidcTokenProviderV1;
   /** Server-only explicit mode; default OFF. D5 owns activation approval. */
   readonly governorMode?: SeyeonProductionGovernorModeV1;
+  /** OFF-only compatibility seam; forbidden as an ENFORCE authority. */
   readonly costGovernorForRole?: (
     role: keyof SeyeonProductionRoleProviderConfigsV1,
     config: OpenAiSeyeonStructuredProviderConfigV1,
   ) => SeyeonAiGovernorAdmissionV1;
+  /** Trusted server-only versioned policies; never read from user payload. */
+  readonly governorApproval?: SeyeonProductionChatGovernorApprovalV1;
 }
 
 /**
@@ -210,14 +217,33 @@ export function createProductionSeyeonTurnSendRuntimeV1(
             const roleProviderConfigs = input.providerConfig === undefined
               ? resolveProductionSeyeonRoleProviderConfigsV1(input.env, providerConfig)
               : undefined;
+            if (input.governorMode === 'ENFORCE' &&
+                input.costGovernorForRole !== undefined) {
+              throw new Error('ENFORCE cannot use a caller-provided Governor callback.');
+            }
+            if (input.governorMode !== 'ENFORCE' &&
+                input.governorApproval !== undefined) {
+              throw new Error('Governor approval requires explicit ENFORCE mode.');
+            }
+            const enforce = input.governorMode === 'ENFORCE'
+              ? createSeyeonProductionChatGovernorsV1({
+                  baseProviderConfig: providerConfig,
+                  ...(roleProviderConfigs === undefined ? {} : { roleProviderConfigs }),
+                  approval: input.governorApproval!,
+                })
+              : null;
             const runtime = createProductionSeyeonChatRuntimeV1({
               databaseConfig: config,
               providerConfig,
               ...(input.governorMode === undefined ? {} : { governorMode: input.governorMode }),
-              ...(input.costGovernorForRole === undefined ? {} : {
-                costGovernorForRole: input.costGovernorForRole,
-              }),
-              ...(roleProviderConfigs === undefined ? {} : { roleProviderConfigs }),
+              ...(enforce === null
+                ? (input.costGovernorForRole === undefined ? {} : {
+                    costGovernorForRole: input.costGovernorForRole,
+                  })
+                : { costGovernorForRole: enforce.costGovernorForRole }),
+              ...(enforce === null
+                ? (roleProviderConfigs === undefined ? {} : { roleProviderConfigs })
+                : { roleProviderConfigs: enforce.roleProviderConfigs }),
               clientCompatibilityProfile:
                 input.clientCompatibilityProfile ??
                 SEYEON_PRODUCTION_WEB_COMPATIBILITY_PROFILE_V1,
