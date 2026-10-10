@@ -120,6 +120,24 @@ node scripts/local/verify-saju-bridge-http.mjs ../Saju
 
 **남는 검증:** 실제 클라우드 Auth identity verifier, 독립 권한으로 로그인한 DB Pool, 독립 출처의 Root/Challenge/Attestor, TLS peer, 운영 Subject/Birth/Revision, R01–R14 및 2D-4 Runner는 여전히 `NOT_VERIFIED`/`HOLD`. 테스트의 가짜 회원을 운영 인증 증빙으로 승격하지 않는다.
 
+## 2D. 테스트 전용 서명 인증 서버 → 기존 Supabase Member 검증기 → 현재 Birth → Saju Proof
+
+실제 회원의 인증 토큰이나 운영 Supabase 프로젝트 없이, 테스트 프로세스 내부에서 **매 실행마다 별도 비밀키로 HS256 서명한 합성 JWT**를 만들고 `127.0.0.1`에 테스트용 `GET /auth/v1/user` HTTP 서버를 띄운다. 서버는 서명·발급자·Audience·만료·폐기 목록을 확인한 뒤에만 테스트용 Auth 사용자 ID를 반환한다.
+
+테스트는 `createProductionRequestIdentityVerifierV1` 및 `SupabaseMemberIdentityEvidenceVerifierV1`의 **기존 검증 로직을 그대로 사용한다.** 이들의 HTTPS-only 허용 원칙과 Production Supabase 고정 Origin 검사는 바꾸지 않는다. 테스트의 `memberFetchImpl`만 **정확한 Auth user 경로 하나**에서 로컬 인증 서버로 전달하며, 다른 주소로는 전송하지 않는다.
+
+신규 `bindAuthenticatedMemberSajuHeldProofV1`는 서버 내부 전용 조합 함수이며, **공개 라우트나 Runner를 등록하지 않는다**. 클라이언트가 Subject ID·Birth 데이터·사주 읽기 유형·Proof Nonce·서버 Origin을 지정할 수 없고, 검증된 Member 증빙을 받아야만 기존 `bindCurrentSubjectSajuHeldProofV1`로 전달한다. Guest, 인증 누락/거부/장애, POST 외 메서드, 요청 본문이 있을 경우 Fail-Closed 한다.
+
+통합 테스트 `test/saju-held-cross-repo-local-auth-user.test.ts`는 기존 2C 테스트와 동일한 임시 회원/Birth DB 및 실제 Saju HTTP 서버를 사용한다. 정상 서명 토큰→로컬 인증 서버 200→명하 기존 Member 검증기→DB 현재 Birth→실제 사주 Proof→Postgres Nonce→Revision 재조회를 확인하고 다음 거부 사례를 함께 검사한다.
+
+- 다른 비밀키 서명, 만료·잘못된 Issuer/Audience, 폐기된 토큰, 형식 오류
+- 토큰을 정상 검증받은 다른 회원의 소유 Birth 부재
+- Guest 자격증명, 인증 누락, 본문으로 출생정보를 덮으려는 시도, 비-POST 요청
+- 인증 서버 중단 시 우회 없이 차단
+- `user_metadata` 및 `X-Client-Subject-Id`의 임의 소유자 값 무시
+
+**중요:** 위 로컬 인증 서버는 **Supabase Auth 에뮬레이터**이며 실제 Supabase가 검증한 JWT·운영 세션·폐기/로그아웃 정책을 증명하지 않는다. 합성 JWT의 폐기 `jti` 저장소는 테스트용 메모리이고 Supabase의 실제 세션 저장소가 아니다. 기존 운영 인프라의 실제 Auth와 DB 자격증명, TLS, R01–R14 독립 운영 증빙, 일회용 Runner는 계속 `NOT_VERIFIED`/`HOLD`. 운영 DB에 접속하거나 Prod 인증 API를 호출하지 않는다.
+
 ## 3. 통과 기준 / 아직 증명하지 않은 것
 
 | 시험 | 로컬/기존 CI에서 검사 가능 | 남는 실제 환경 확인 |
