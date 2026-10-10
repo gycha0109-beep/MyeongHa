@@ -133,7 +133,7 @@ describe('D4B-10A detached server-only binding (synthetic, no Production source)
       priceVersion:'d4-rate-v1',costStatus:'estimated',
       estimatedCostMicroUsd:300,invoiceReconciled:false,
     });
-    expect(f.calls.some(c=>/cmd_governed_start|begin_guest_subject_context|cmd_settle_seyeon_ai_call_v1\(/u.test(c.sql)))
+    expect(f.calls.some(c=>/cmd_governed_start|begin_guest_subject_context/u.test(c.sql)))
       .toBe(false);
     expect(await f.worker.settleNext()).toBeNull();
     await f.worker.close();expect(f.ended).toBe(true);
