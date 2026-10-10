@@ -160,6 +160,10 @@ python3 scripts/operations/stage-seyeon-managed-owner-comment-order.py \
   --source-dir "$root/supabase/migrations" \
   --output-dir "$tempdir/managed-owner-migrations" >/dev/null ||
   hold 'Managed-owner SQL staging failed against exact approved source.'
+# A stock postgres:17.6 role is the bootstrap superuser (OID 10).
+# PostgreSQL 17 expressly forbids changing the bootstrap role's SUPERUSER
+# property, even through SET ROLE to a second superuser. Never claim that a
+# successful stock-postgres CI replay proves Production non-superuser behavior.
 # Match the Production managed-owner membership *options* (admin true,
 # INHERIT false, SET false) before dropping the disposable service superuser.
 # The fixture's grantor may differ from Supabase's "supabase_admin"; both the
@@ -184,11 +188,24 @@ membership="$(psql -X -qAt -v ON_ERROR_STOP=1 -c "
 # was a false positive because stock postgres:17.6 ships a superuser postgres.
 # Demote ONLY this disposable test service after the historical bundle is
 # installed. This intentionally exposes COMMENT/OWNER membership mistakes.
-psql -X -q -v ON_ERROR_STOP=1 -c 'alter role postgres nosuperuser createrole createdb;' \
+# A superuser cannot safely revoke its own privilege while it is the
+# active current_user. Bootstrap a disposable secondary SUPERUSER role in
+# this isolated PostgreSQL service, switch only within this psql session,
+# then demote postgres. No Production connection/role mutation is involved.
+psql -X -q -v ON_ERROR_STOP=1 -c \
+  'create role seyeon_fixture_demoter superuser noinherit nologin;' \
+  >/dev/null 2>"$tempdir/demote-bootstrap.err" ||
+  hold 'Unable to create disposable isolated role demotion operator.'
+psql -X -q -v ON_ERROR_STOP=1 -c \
+  'set role seyeon_fixture_demoter; alter role postgres nosuperuser createrole createdb;' \
   >/dev/null 2>"$tempdir/demote.err" ||
   hold 'Unable to reproduce Production non-superuser postgres role.'
 [[ "$(psql -X -qAt -v ON_ERROR_STOP=1 -c "select rolsuper from pg_roles where rolname='postgres'")" == f ]] ||
   hold 'Disposable PG17 executor is unexpectedly superuser.'
+[[ "$(psql -X -qAt -v ON_ERROR_STOP=1 -c "select rolsuper from pg_roles where rolname=current_user")" == f ]] ||
+  hold 'Disposable connected PG17 executor retained superuser privileges.'
+[[ "$(psql -X -qAt -v ON_ERROR_STOP=1 -c "select current_user")" == postgres ]] ||
+  hold 'Disposable connected PG17 actor identity differs from Production.'
 
 set --
 for n in 1400 1410 1420 1430 1440 1450; do

@@ -62,6 +62,9 @@ describe('non-superuser managed function owner COMMENT staging', () => {
     expect(shadow).toContain('grant myeongha_relationship_apply_owner to postgres with admin true, inherit false, set false;');
     expect(shadow).toContain('Expected one restricted direct managed-owner grant.');
     expect(shadow).toContain('alter role postgres nosuperuser createrole createdb');
+    expect(shadow).toContain('create role seyeon_fixture_demoter superuser noinherit nologin');
+    expect(shadow).toContain('set role seyeon_fixture_demoter; alter role postgres nosuperuser createrole createdb');
+    expect(shadow).toContain('Disposable connected PG17 executor retained superuser privileges.');
     expect(shadow).toContain('Disposable PG17 executor is unexpectedly superuser.');
     for (const name of names) {
       expect(prod).toContain('managed-owner-migrations/' + name);
