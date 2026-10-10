@@ -128,7 +128,7 @@ export function parseSajuSoloOwnerIntentClaimV1(
     return Object.freeze({
       version:x.version,intentId:x.intentId,ownerSubject:x.ownerSubject,
       actionClass:x.actionClass,environmentId:x.environmentId,
-      permitId:x.permitId,manifestDigest:x.manifestDigest,
+      permitId:x.permitId as string | null,manifestDigest:x.manifestDigest,
       connectionPlanDigest:x.connectionPlanDigest,
       myeonghaCommitSha:x.myeonghaCommitSha,sajuCommitSha:x.sajuCommitSha,
       requestDigest:x.requestDigest,issuedAtMs:x.issuedAtMs,
