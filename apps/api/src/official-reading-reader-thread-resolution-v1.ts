@@ -88,6 +88,9 @@ function sameAccess(
     before.readerContentBundleId === after.readerContentBundleId &&
     before.readingSessionId === after.readingSessionId &&
     before.productId === after.productId &&
+    before.topicKey === after.topicKey &&
+    before.readingPeriod === after.readingPeriod &&
+    before.readingVariant === after.readingVariant &&
     before.productSpecVersion === after.productSpecVersion &&
     before.sajuDomain === after.sajuDomain &&
     before.readingContractVersion === after.readingContractVersion &&
