@@ -5,6 +5,7 @@ import {
 } from '@myeongha/api-client';
 
 import type { SecureKeyValueStoreV1 } from '@/core/auth/guest-credential-store';
+import { emitMobileSubjectCredentialChangedV1 } from '@/core/session/mobile-subject-credential-changes';
 
 export const MOBILE_MEMBER_SESSION_KEY_V1 =
   'myeongha.mobile.memberSession.v1' as const;
@@ -83,7 +84,9 @@ export function createMobileMemberSessionStoreV1(
       );
     }
 
-    return parseStoredMemberSessionV1(observed);
+    const persisted = parseStoredMemberSessionV1(observed);
+    emitMobileSubjectCredentialChangedV1();
+    return persisted;
   }
 
   async function clear(expectedAccessToken?: string): Promise<boolean> {
@@ -106,7 +109,9 @@ export function createMobileMemberSessionStoreV1(
       );
     }
 
-    return (await readRaw()) === null;
+    const cleared = (await readRaw()) === null;
+    if (cleared) emitMobileSubjectCredentialChangedV1();
+    return cleared;
   }
 
   return Object.freeze({ read, write, clear });
