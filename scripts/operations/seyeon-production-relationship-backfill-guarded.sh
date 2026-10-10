@@ -108,6 +108,12 @@ verdict="$(PGOPTIONS='-c default_transaction_read_only=on' \
   hold 'Production read-only admission failed.'
 [[ "$verdict" == 'HOLD_OUT_OF_ORDER_RELATIONSHIP_HISTORY' ]] ||
   hold "Unexpected Production gap admission verdict: $verdict"
+acl="$(PGOPTIONS='-c default_transaction_read_only=on' \
+  psql -X -qAt -v ON_ERROR_STOP=1 \
+  -f scripts/operations/seyeon-production-acl-recovery-readonly.sql | tail -n1)" ||
+  hold 'Pre-backfill late runtime ACL audit unavailable.'
+[[ "$acl" == *'ACL_PARITY_PASS_RECONCILIATION_STILL_HOLD' ]] ||
+  hold 'Pre-backfill Production late RPC ACL parity failed.'
 for n in 1400 1410 1420 1430 1440 1450; do
   files=(supabase/migrations/"$n"_*.sql)
   [[ "${#files[@]}" -eq 1 && -f "${files[0]}" ]] ||
@@ -147,5 +153,11 @@ after="$(PGOPTIONS='-c default_transaction_read_only=on' \
   hold 'Read-only post-commit catalog verification unavailable.'
 [[ "$after" == '6:11' ]] ||
   hold "Unexpected post-commit catalog result; investigation required."
+acl_after="$(PGOPTIONS='-c default_transaction_read_only=on' \
+  psql -X -qAt -v ON_ERROR_STOP=1 \
+  -f scripts/operations/seyeon-production-acl-recovery-readonly.sql | tail -n1)" ||
+  hold 'Post-commit late ACL audit unavailable; investigate.'
+[[ "$acl_after" == *'ACL_PARITY_PASS_RECONCILIATION_STILL_HOLD' ]] ||
+  hold 'Post-commit late RPC ACL parity failed; investigate.'
 echo 'PASS_SCOPED_PRODUCTION_1400_1450: exact six history rows and 11 functions'
 echo 'HOLD_OTHER_SCOPES: remote-only 20261008090417 history, 1520..1640 and G0..G6 remain restricted'
