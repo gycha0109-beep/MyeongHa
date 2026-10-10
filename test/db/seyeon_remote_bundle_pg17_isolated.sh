@@ -105,6 +105,20 @@ history="$(psql -X -qAt -v ON_ERROR_STOP=1 -c "
   where version in ('1460','1470','1480','1490','1500','1510')
     and coalesce(cardinality(statements),0)=0")"
 [[ "$history" == 6 ]] || hold 'Recovery failed to install its six marker rows.'
+
+# Recreate the exact remote-only history row IN DISPOSABLE TEST DB, not in
+# Production. Pipe hex to local psql without ever logging confidential SQL.
+python3 -c 'import sys
+from pathlib import Path
+raw=Path(sys.argv[1]).read_bytes()
+v=raw.hex()
+sys.stdout.write("insert into supabase_migrations.schema_migrations(version,name,statements) values ("+
+ "\x2720261008090417\x27,\x27seyeon_runtime_1460_1510_acl_before_owner_recovery\x27,"+
+ "array[convert_from(decode(\x27"+v+"\x27,\x27hex\x27),\x27UTF8\x27)]);")
+' "$bundle" |
+  psql -X -q -v ON_ERROR_STOP=1 >/dev/null 2>"$tempdir/marker.err" ||
+  hold 'Local-only exact incident ledger fixture failed.'
+
 acl() {
   psql -X -qAt -v ON_ERROR_STOP=1 \
     -f scripts/operations/seyeon-production-acl-recovery-readonly.sql | tail -n1
@@ -149,6 +163,10 @@ for n in 1400 1410 1420 1430 1440 1450; do
   done
   [[ "$count" == 1 ]] || hold 'Ambiguous early migration.'
 done
+# Exercise the exact guarded Production transaction pre/post assertions in
+# the isolated PG17 test, so its SQL is never only statically checked.
+set -- -f scripts/operations/seyeon-relationship-backfill-transaction-pre.sql "$@" \
+  -f scripts/operations/seyeon-relationship-backfill-transaction-post.sql
 psql -X -q -1 -v ON_ERROR_STOP=1 "$@" >/dev/null 2>"$tempdir/early.err" ||
   hold 'Transactional backfill failed in isolated PostgreSQL 17.'
 [[ "$(early_count)" == 11 ]] || hold 'Eleven early functions not installed.'
