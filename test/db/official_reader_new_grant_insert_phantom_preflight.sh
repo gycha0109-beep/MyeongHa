@@ -135,10 +135,7 @@ wait_holder() {
 }
 wait_holder
 
-p >"$tmpdir/b4-new-insert.out" 2>&1 <<SQL || {
-  cat "$tmpdir/b4-new-insert.out" >&2
-  fail "new B4 receipt Grant + Reader access INSERT did not complete during B2 SHARE lock"
-}
+p >"$tmpdir/b4-new-insert.out" 2>&1 <<SQL || { cat "$tmpdir/b4-new-insert.out" >&2; fail "new B4 receipt Grant + Reader access INSERT did not complete during B2 SHARE lock"; }
 set statement_timeout='7s';
 begin;
 select * from public.internal_apply_verified_receipt_capability_effects_v1(
