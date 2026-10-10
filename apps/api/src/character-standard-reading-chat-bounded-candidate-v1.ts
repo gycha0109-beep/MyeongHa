@@ -18,6 +18,16 @@ import {
   type CharacterStandardFollowupQuestionScopeDecisionV1,
 } from './character-standard-reading-chat-question-scope-v1.js';
 import { closeCharacterStandardReaderSourceFocusV1 } from './character-standard-reading-chat-source-closure-v1.js';
+import {
+  prepareOfficialReadingReaderAdmissionV1,
+  type OfficialReadingReaderAdmissionScopeV1,
+  type PrepareOfficialReadingReaderAdmissionInputV1,
+} from './official-reading-reader-admission-v1.js';
+import {
+  assertServerPreparedStandardChatPreflightV2,
+  type CharacterStandardReadingChatTurnPreflightV2,
+} from './character-standard-reading-chat-turn-preflight-v2.js';
+import { getServerPreparedChatReceiveContentEntryV1 } from './chat-receive.js';
 
 export const STANDARD_READER_BOUNDED_CANDIDATE_VERSION_V1 =
   'myeongha-standard-reader-bounded-candidate-v1' as const;
@@ -204,6 +214,8 @@ export type CharacterStandardReaderOutputHoldV1 = Readonly<{
   readonly productSpecVersion: string;
   readonly productRuleVersion: string;
   readonly approvedPolicyRevision: string;
+  readonly sajuDomain: OfficialReadingReaderAdmissionScopeV1['sajuDomain'];
+  readonly readingContractVersion: string;
   readonly officialArtifactResponseHash: string;
   readonly groundingHash: string;
   readonly focusedUnitRef: string;
@@ -324,6 +336,8 @@ export function guardCharacterStandardReaderFinalOutputV1(input: Readonly<{
     productSpecVersion: scope.productSpecVersion,
     productRuleVersion: scope.productRuleVersion,
     approvedPolicyRevision: scope.approvedPolicyRevision,
+    sajuDomain: scope.sajuDomain,
+    readingContractVersion: scope.readingContractVersion,
     officialArtifactResponseHash: scope.officialArtifactResponseHash,
     groundingHash: grounding.groundingHash,
     focusedUnitRef: evidence.focusedUnitRef,
@@ -350,4 +364,124 @@ export function guardCharacterStandardReaderFinalOutputV1(input: Readonly<{
   });
   mintedOutputHolds.add(output);
   return output;
+}
+
+
+/**
+ * RR-09 preparation only. An approved database-side provenance writer and
+ * final disclosure transaction DO NOT exist yet. Even a successful fresh
+ * eligibility check here must never authorize a persisted answer or reveal.
+ */
+export type CharacterStandardReaderFreshRecheckHoldV1 = Readonly<{
+  readonly mode: 'fresh_revalidated_hold';
+  readonly publicDisclosureAuthorized: false;
+  readonly atomicCommitAuthorized: false;
+  readonly reason: 'DB_ATOMIC_PROVENANCE_AND_DISCLOSURE_PENDING';
+  readonly sourceIdentityHash: string;
+  readonly utteranceHash: string;
+  readonly recheckedAt: string;
+}>;
+
+export class CharacterStandardReaderFreshRecheckErrorV1 extends Error {
+  constructor(readonly code: 'ACCESS_DENIED' | 'SOURCE_MISMATCH') {
+    super('Official Reader final fresh authority recheck is unavailable.');
+    this.name = 'CharacterStandardReaderFreshRecheckErrorV1';
+  }
+}
+
+function denyFresh(
+  code: CharacterStandardReaderFreshRecheckErrorV1['code'],
+): never {
+  throw new CharacterStandardReaderFreshRecheckErrorV1(code);
+}
+
+/**
+ * Reuse the original server-approved A2 access/official source/Product
+ * admission AFTER RR-06 output validation. The effective time is generated
+ * inside this server function, never accepted from an HTTP/client payload.
+ *
+ * Exact-current DB atomic Grant locking, Assistant provenance writer, stored
+ * Semantic/Output proof and final response disclosure remain separate BLOCKERS.
+ * This function returns metadata-only HOLD, never an admission ticket.
+ */
+export async function recheckCharacterStandardReaderFinalHoldV1(input: Readonly<{
+  preflight: CharacterStandardReadingChatTurnPreflightV2;
+  outputHold: CharacterStandardReaderOutputHoldV1;
+  threadBindingAuthorityPort: PrepareOfficialReadingReaderAdmissionInputV1['threadBindingAuthorityPort'];
+  accessAuthorityPort: PrepareOfficialReadingReaderAdmissionInputV1['accessAuthorityPort'];
+  artifactAuthorityPort: PrepareOfficialReadingReaderAdmissionInputV1['artifactAuthorityPort'];
+  productReaderEligibilityAuthorityPort: PrepareOfficialReadingReaderAdmissionInputV1['productReaderEligibilityAuthorityPort'];
+}>): Promise<CharacterStandardReaderFreshRecheckHoldV1> {
+  // No SQL/source/policy reads before checking both genuine server-minted
+  // artifacts and their exact original source. A forged structural clone
+  // is never revalidated.
+  assertServerPreparedStandardChatPreflightV2(input.preflight);
+  assertServerGuardedStandardReaderOutputHoldV1(input.outputHold);
+  const pinned = input.preflight.scope;
+  const hold = input.outputHold;
+  if (hold.publicDisclosureAuthorized !== false ||
+      hold.subjectId !== pinned.subjectId ||
+      hold.threadId !== pinned.threadId ||
+      hold.readingRef !== pinned.readingId ||
+      hold.readerCharacterId !== pinned.readerCharacterId ||
+      hold.contentRevision !== pinned.contentRevision ||
+      hold.contentReleaseId !== pinned.contentReleaseId ||
+      hold.readerContentBundleId !== pinned.readerContentBundleId ||
+      hold.effectiveAt !== pinned.effectiveAt ||
+      hold.productId !== pinned.productId ||
+      hold.productSpecVersion !== pinned.productSpecVersion ||
+      hold.productRuleVersion !== pinned.productRuleVersion ||
+      hold.approvedPolicyRevision !== pinned.approvedPolicyRevision ||
+      hold.sajuDomain !== pinned.sajuDomain ||
+      hold.readingContractVersion !== pinned.readingContractVersion ||
+      hold.officialArtifactResponseHash !== pinned.officialArtifactResponseHash) {
+    return denyFresh('SOURCE_MISMATCH');
+  }
+
+  const recheckedAt = new Date().toISOString();
+  const priorAt = Date.parse(pinned.effectiveAt);
+  if (!Number.isFinite(priorAt) || priorAt >= Date.parse(recheckedAt)) {
+    return denyFresh('ACCESS_DENIED');
+  }
+
+  let current: Awaited<ReturnType<typeof prepareOfficialReadingReaderAdmissionV1>>;
+  try {
+    current = await prepareOfficialReadingReaderAdmissionV1({
+      resolvedSubjectId: pinned.subjectId,
+      threadId: pinned.threadId,
+      readingId: pinned.readingId,
+      effectiveAt: recheckedAt,
+      contentEntry: getServerPreparedChatReceiveContentEntryV1(input.preflight.receivePlan),
+      threadBindingAuthorityPort: input.threadBindingAuthorityPort,
+      accessAuthorityPort: input.accessAuthorityPort,
+      artifactAuthorityPort: input.artifactAuthorityPort,
+      productReaderEligibilityAuthorityPort: input.productReaderEligibilityAuthorityPort,
+    });
+  } catch {
+    return denyFresh('ACCESS_DENIED');
+  }
+
+  const fresh = current.scope;
+  const scopeKeys = [
+    'subjectId', 'threadId', 'contentRevision', 'readingId',
+    'readerCharacterId', 'readerContentBundleId', 'contentReleaseId',
+    'productId', 'productSpecVersion', 'sajuDomain',
+    'readingContractVersion', 'officialArtifactResponseHash',
+    'productRuleVersion', 'approvedPolicyRevision',
+  ] as const satisfies readonly (keyof OfficialReadingReaderAdmissionScopeV1)[];
+  if (scopeKeys.some(key => fresh[key] !== pinned[key]) ||
+      fresh.effectiveAt !== recheckedAt ||
+      current.source.responseHash !== pinned.officialArtifactResponseHash) {
+    return denyFresh('SOURCE_MISMATCH');
+  }
+
+  return Object.freeze({
+    mode: 'fresh_revalidated_hold' as const,
+    publicDisclosureAuthorized: false as const,
+    atomicCommitAuthorized: false as const,
+    reason: 'DB_ATOMIC_PROVENANCE_AND_DISCLOSURE_PENDING' as const,
+    sourceIdentityHash: hold.sourceIdentityHash,
+    utteranceHash: hold.utteranceHash,
+    recheckedAt,
+  });
 }
