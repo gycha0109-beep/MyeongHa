@@ -1916,7 +1916,7 @@ describe('A3-eta server-anchored follow-up evidence selection (public OFF)', () 
     f.authority.productReaderEligibilityAuthorityPort.readApprovedRule.mockResolvedValue({
       status: 'approved',
       rule: {
-        kind: 'premium_restricted', allowedReaderIds: ['baekheon'],
+        kind: 'premium_restricted', allowedReaderIds: ['seyeon'],
         productId: PRODUCT_ID, productSpecVersion: 'standard-reading-v1',
         sajuDomain: 'career', ruleVersion: 'synthetic-test-reader-policy-v1',
         approvedPolicyRevision: 'synthetic-test-revision-v1',
