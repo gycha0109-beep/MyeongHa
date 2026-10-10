@@ -50,7 +50,7 @@ describe('non-superuser managed function owner COMMENT staging', () => {
     mkdirSync(source);
     mkdirSync(dest);
     for (const name of names) cpSync(join(sourceDir, name), join(source, name));
-    const p = join(source, names[0]);
+    const p = join(source, names[0]!);
     writeFileSync(p, readFileSync(p, 'utf8') + '\n');
     expect(() => execFileSync('python3', [script, '--source-dir', source, '--output-dir', dest], { stdio: 'pipe' })).toThrow();
   });
