@@ -457,3 +457,14 @@ The #389 backup/restore, privacy reconciliation, and objective-comparison closur
 DR Ready = FALSE / NOT EVIDENCED
 reason   = provider-managed Auth/Storage full-restore equivalence remains unproven
 ```
+
+
+## 2026-10-11 — 세연 incident frontier 단일 백업 격리 복원 증거 보정
+
+- 기본 격리 복원은 **manual-only** 운영 원칙을 유지합니다. 단, CI 도구가 기존 `workflow_dispatch` 호출을 지원하지 않는 현재 상황에서, 보호된 main에 **명시적으로 검토·병합된 한 번의 marker push**만 일회성으로 허용합니다.
+- 고정 백업: [run #38088591661](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38088591661), 암호화 아티팩트 `11682862555`, 복구 원본 이력 기준 `20261008090417`, source SHA `4ab87b94270d58a6ecc9d3c09d729f9f024331e0`.
+- 트리거 파일은 `.github/ops/postgres-restore-seyeon-20261008090417.once`, 정확한 내용은 `POSTGRES-RESTORE-SEYEON-20261008090417-V1`. 보호된 main의 승인된 병합 제목 `ops(dr): one-shot restore backup 38088591661 (#1947)`로 시작하는 변경이 아니면 실행하지 않습니다.
+- 백업 기준 시각 `2026-10-10T21:44:36Z`로부터 4시간 이내만 실행하고, 이 창 밖에서는 fail-closed 처리합니다. 이 기준 시각은 실제 저장된 백업과 별도로 `resolve-postgres-restore-source.sh`의 소스 권위 및 증거 파일 생성 시각 검증을 통과해야 합니다.
+- 작업은 `github-actions-loopback-supabase-postgres`에만 복원하고 기존 `production` 환경에서는 암호화 백업 해제 비밀만 제공합니다. 실제 운영 DB 비밀번호·Pooler 주소는 전달하지 않습니다. 개인정보 기록·복구 원문은 공개하지 않습니다.
+- 이 예외로 `dr_ready`가 자동 승인되는 것은 아닙니다. **운영 DB의 1400~1450 적용은 별개이며, 최신 백업 + 동일 백업의 격리 복원 증거 + 원자적 수동 실행 게이트가 모두 충족되어야 합니다.**
+- 현 PR의 병합과 복원 테스트가 실제 성공하기 전까지 복원 결과를 PASS로 기재하지 않습니다. 실패했을 경우 재실행을 위한 일반 push trigger 확대를 금지합니다.
