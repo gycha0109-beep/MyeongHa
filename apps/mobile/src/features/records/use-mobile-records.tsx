@@ -4,7 +4,7 @@ import type {
   ReadingHistoryItemV1,
 } from '@myeongha/api-client';
 import { useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 
 import {
   mobileRecordsControllerV1,
@@ -15,33 +15,58 @@ import type {
 } from '@/features/records/mobile-records-controller';
 import type { RecordsTabV1 } from '@/features/records/records-view-model';
 
+const EMPTY_SECTION = Object.freeze({
+  status: 'idle' as const,
+  items: Object.freeze([]),
+  hasMore: true,
+  nextCursor: null,
+  errorCode: null,
+});
+const EMPTY_RECORDS: MobileRecordsSnapshotsV1 = Object.freeze({
+  life: EMPTY_SECTION,
+  readings: EMPTY_SECTION,
+  memories: EMPTY_SECTION,
+});
+
 function sync() {
   return mobileRecordsControllerV1.getSnapshots();
 }
 
 export function useMobileRecordsV1() {
-  const [snapshots, setSnapshots] = useState<MobileRecordsSnapshotsV1>(() => sync());
+  // A module-global controller may retain a previous Subject's history.
+  // Never paint its initial snapshot before the current focus revalidates it.
+  const [snapshots, setSnapshots] = useState<MobileRecordsSnapshotsV1>(() => EMPTY_RECORDS);
+  const focused = useRef(false);
+  const focusEpoch = useRef(0);
 
   const run = useCallback(async (
     operation: () => Promise<MobileRecordsSnapshotsV1>,
   ) => {
+    const epoch = focusEpoch.current;
+    if (!focused.current) return sync();
     const pending = operation();
-    setSnapshots(sync());
+    if (focused.current && epoch === focusEpoch.current) setSnapshots(sync());
     const result = await pending;
-    setSnapshots(result);
+    if (focused.current && epoch === focusEpoch.current) setSnapshots(result);
     return result;
   }, []);
 
   useFocusEffect(
     useCallback(() => {
-      let active = true;
-      const pending = mobileRecordsControllerV1.loadInitialAll();
+      focused.current = true;
+      const epoch = ++focusEpoch.current;
+      // Re-entry after login/logout must not reuse an unscoped 60s cache.
+      setSnapshots(mobileRecordsControllerV1.reset());
+      const pending = mobileRecordsControllerV1.loadInitialAll({ force: true });
       setSnapshots(sync());
       void pending.then((result) => {
-        if (active) setSnapshots(result);
+        if (focused.current && epoch === focusEpoch.current) setSnapshots(result);
       });
       return () => {
-        active = false;
+        focused.current = false;
+        focusEpoch.current += 1;
+        // Suppress both cached rows and in-flight pages after tab blur.
+        setSnapshots(mobileRecordsControllerV1.reset());
       };
     }, []),
   );
@@ -55,7 +80,7 @@ export function useMobileRecordsV1() {
         .filter((key) => snapshots[key].status === 'error')
         .map((key) => run(() => mobileRecordsControllerV1.loadInitial(key, { force: true }))),
     );
-    setSnapshots(sync());
+    if (focused.current) setSnapshots(sync());
   }, [run, snapshots]);
 
   const loadMore = useCallback(async (tab: RecordsTabV1) => {
