@@ -19,7 +19,7 @@ export interface SeyeonProductionCostPoolLeaseV1 {
  * separately credentialed pool before any paid Provider can be created.
  */
 export function createSeyeonProductionCostPoolLeaseV1(input: {
-  readonly mode?: SeyeonProductionGovernorModeV1;
+  readonly mode?: SeyeonProductionGovernorModeV1 | undefined;
   readonly governedDbConfig?: SeyeonGovernedDbConfigV1;
   /** Trusted server test seam; not exposed on any HTTP/request body. */
   readonly governedPool?: SeyeonGovernedPostgresSubjectPoolV1;
