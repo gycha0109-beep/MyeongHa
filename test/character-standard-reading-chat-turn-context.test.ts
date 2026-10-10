@@ -14,6 +14,11 @@ import {
   assertServerPreparedStandardFollowupQuestionScopeV1,
 } from '../apps/api/src/character-standard-reading-chat-question-scope-v1.js';
 import { runThreadBoundReaderInterpretationPreviewV2 } from '../apps/api/src/reader-interpretation-preview-runtime-v2.js';
+import { assertServerGuardedReaderInterpretationSceneV2 } from '../apps/api/src/reader-interpretation-preview-runtime-v2.js';
+import {
+  prepareCharacterStandardReaderSceneSourceHandoffV1,
+  assertServerPreparedStandardReaderSceneSourceHandoffV1,
+} from '../apps/api/src/character-standard-reading-chat-scene-handoff-v1.js';
 import type { CharacterContentDefinition } from '../packages/character-content/src/index.js';
 import {
   SAJU_CHARACTER_GROUNDING_PROJECTION_VERSION_V1,
@@ -1226,6 +1231,143 @@ describe('A3-gamma server-only Thread-bound official standard V2 Preview (public
     })).rejects.toMatchObject({ code: 'SOURCE_MISMATCH' });
     expect(projectGrounding).not.toHaveBeenCalled();
   });
+
+  async function prepareSceneHandoffFixture() {
+    const authority = authorities();
+    const base = nonspecialistReleaseRuntime();
+    const entry = base.resolvePinned(RELEASE_ID);
+    const character = authoredCharacter('baekheon');
+    const authored = {
+      ...character,
+      capabilities: [],
+      sajuProfile: {
+        ...character.sajuProfile,
+        safeFraming: {
+          schemaVersion: 'v1' as const,
+          catalogVersion: 'reader-scene-handoff-test-v1',
+          before: [
+            { key: 'before_record', purpose: 'record_transition' as const, text: '기록된 흐름을 다시 살펴보겠습니다.' },
+            { key: 'before_question', purpose: 'current_life_question' as const, text: '지금 고민하는 선택과 함께 보겠습니다.' },
+          ],
+          after: [
+            { key: 'after_uncertainty', purpose: 'uncertainty_transition' as const, text: '시기를 단정하지 않겠습니다.' },
+            { key: 'after_relationship', purpose: 'relationship_transition' as const, text: '함께 정리해 보겠습니다.' },
+          ],
+        },
+      },
+    };
+    const runtime = {
+      ...base,
+      resolvePinned: vi.fn(() => ({
+        ...entry,
+        characters: {
+          ...entry.characters,
+          characters: [authored],
+        },
+      })),
+    } as unknown as ContentReleaseRuntime;
+    const bundle = previewGrounding();
+    const guardedScene = await runThreadBoundReaderInterpretationPreviewV2({
+      resolvedSubjectId: SUBJECT_ID, threadId: THREAD_ID,
+      officialReadingId: READING_ID,
+      effectiveAt: '2026-09-21T00:02:00.000Z',
+      ...authority, contentReleaseRuntime: runtime,
+      contextInput: serverContextInput(),
+      groundingProjectionPort: { projectGrounding: vi.fn(async () => bundle) },
+    });
+    const preflight = await prepareCharacterStandardReadingChatTurnPreflightV2({
+      resolvedSubjectId: SUBJECT_ID,
+      receivePlan: existingThreadReceivePlan(),
+      readingId: READING_ID,
+      effectiveAt: '2026-09-21T00:02:00.000Z',
+      ...authority, contextInput: serverContextInput(),
+    });
+    const grounded = await prepareCharacterStandardChatGroundingV2({
+      preflight,
+      threadBindingAuthorityPort: authority.threadBindingAuthorityPort,
+      accessAuthorityPort: authority.accessAuthorityPort,
+      artifactAuthorityPort: authority.artifactAuthorityPort,
+      productReaderEligibilityAuthorityPort: authority.productReaderEligibilityAuthorityPort,
+      groundingProjectionPort: { projectGrounding: vi.fn(async () => bundle) },
+    });
+    const readLatestValidatedAnchor = vi.fn(async () => null as
+      import('../apps/api/src/character-standard-reading-chat-followup-evidence-v1.js')
+      .ValidatedStandardFollowupAnchorV1 | null);
+    return {
+      guardedScene, grounded, preflight, readLatestValidatedAnchor,
+      input: {
+        preflight, grounded, guardedScene,
+        expectedSceneInterpretationHash: guardedScene.interpretationHash,
+        selectedSceneSegmentIndex: guardedScene.mode === 'reader_interpretation'
+          ? guardedScene.utterance.segments.findIndex(x => x.kind === 'semantic_realization') : 0,
+        anchorAuthorityPort: { readLatestValidatedAnchor },
+      },
+    };
+  }
+
+  it('RR-01 binds an actual server-guarded Reader Scene semantic segment to the same Official Reading and Saju Unit', async () => {
+    const f = await prepareSceneHandoffFixture();
+    expect(f.guardedScene.mode).toBe('reader_interpretation');
+    expect(() => assertServerGuardedReaderInterpretationSceneV2(f.guardedScene)).not.toThrow();
+    const result = await prepareCharacterStandardReaderSceneSourceHandoffV1(f.input);
+    expect(['source_segment_candidate', 'protected_only_candidate']).toContain(result.mode);
+    if (result.mode === 'hold') throw Error('guarded Scene did not admit its own source');
+    expect(result.source).toBe('semantic_guarded_official_reader_scene');
+    expect(result.subjectId).toBe(SUBJECT_ID);
+    expect(result.readingRef).toBe(READING_ID);
+    expect(result.rootUnitId).toMatch(/^grounding_unit_[a-f0-9]{24}$/u);
+    expect(result.selectedUnitIds).toContain(result.rootUnitId);
+    expect(result.selectionHash).toMatch(/^sha256:v1:[0-9a-f]{64}$/u);
+    expect(f.readLatestValidatedAnchor).toHaveBeenCalledTimes(1);
+    expect(() => assertServerPreparedStandardReaderSceneSourceHandoffV1(result)).not.toThrow();
+    expect(() => assertServerPreparedStandardReaderSceneSourceHandoffV1({ ...result }))
+      .toThrow(/unavailable/u);
+  });
+
+  it('RR-01 does not trust a browser Scene clone, stale hash, or forged A3 Grounding', async () => {
+    const f = await prepareSceneHandoffFixture();
+    if (f.guardedScene.mode !== 'reader_interpretation') throw Error('scene expected');
+    await expect(prepareCharacterStandardReaderSceneSourceHandoffV1({
+      ...f.input, guardedScene: { ...f.guardedScene },
+    })).rejects.toMatchObject({ code: 'ACCESS_DENIED' });
+    await expect(prepareCharacterStandardReaderSceneSourceHandoffV1({
+      ...f.input, grounded: { ...f.grounded },
+    })).rejects.toMatchObject({ code: 'ACCESS_DENIED' });
+    await expect(prepareCharacterStandardReaderSceneSourceHandoffV1({
+      ...f.input, expectedSceneInterpretationHash: 'sha256:v1:' + '0'.repeat(64),
+    })).resolves.toMatchObject({ mode: 'hold', reason: 'scene_stale' });
+    expect(f.readLatestValidatedAnchor).not.toHaveBeenCalled();
+  });
+
+  it('RR-01 does not let user pick a reaction as Saju Unit evidence', async () => {
+    const f = await prepareSceneHandoffFixture();
+    if (f.guardedScene.mode !== 'reader_interpretation') throw Error('scene expected');
+    const index = f.guardedScene.utterance.segments.findIndex(s => s.kind !== 'semantic_realization');
+    if (index === -1) throw Error('fixture needs a nonsemantic Scene segment');
+    await expect(prepareCharacterStandardReaderSceneSourceHandoffV1({
+      ...f.input, selectedSceneSegmentIndex: index,
+    })).resolves.toMatchObject({ mode: 'hold', reason: 'segment_not_semantic' });
+    expect(f.readLatestValidatedAnchor).not.toHaveBeenCalled();
+  });
+
+  it('RR-01 refuses missing PostgreSQL source and prior committed answer instead of downgrading', async () => {
+    const f = await prepareSceneHandoffFixture();
+    f.readLatestValidatedAnchor.mockRejectedValueOnce(new Error('missing production SQL function'));
+    await expect(prepareCharacterStandardReaderSceneSourceHandoffV1(f.input))
+      .rejects.toMatchObject({ code: 'ACCESS_DENIED' });
+    f.readLatestValidatedAnchor.mockResolvedValueOnce({
+      status: 'committed_semantic_guard_pass',
+      subjectId: SUBJECT_ID, threadId: THREAD_ID,
+      readerCharacterId: 'baekheon', readingRef: READING_ID,
+      officialArtifactResponseHash: f.grounded.scope.officialArtifactResponseHash,
+      groundingHash: f.grounded.grounding.groundingHash,
+      assistantMessageId: '12345678-1234-4234-8234-123456789012',
+      sourceUnitRefs: [f.grounded.grounding.units[0]!.unitId],
+    });
+    await expect(prepareCharacterStandardReaderSceneSourceHandoffV1(f.input))
+      .resolves.toMatchObject({ mode: 'hold', reason: 'prior_answer_exists' });
+  });
+
 });
 
 
