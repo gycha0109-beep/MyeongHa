@@ -122,7 +122,7 @@ first="$(run_member "
 DO \$guard\$
 declare active_count integer; purchased uuid;
 begin
-  select count(*), min(reader_content_bundle_id)
+  select count(*), min(reader_content_bundle_id::text)::uuid
   into active_count, purchased
   from public.qry_character_standard_reading_access_runtime_v2(
     '$subject'::uuid,'$reader',transaction_timestamp()
