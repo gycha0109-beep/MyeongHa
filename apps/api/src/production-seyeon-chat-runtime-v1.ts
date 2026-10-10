@@ -299,7 +299,7 @@ export function createProductionSeyeonChatRuntimeV1(
       const resolvedSubject = await runSeyeonTurnRuntimePhaseV1(
         'subject_resolution',
         () => runner.resolveSubject(),
-      );;
+      );
       // The main Subject Runner remains responsible for Chat/Outbox writes.
       // Governed Start and Settle use a different DB LOGIN + role only.
       const costRunner = costPoolLease === null
