@@ -13,14 +13,14 @@ const sqlText = readFileSync(sqlPath, 'utf8');
 
 describe('Production Se-yeon out-of-order migration admission', () => {
   it('places read-only admission before any general migration-history repair or push', () => {
-    const guard = runnerText.indexOf('history_admission="$( \\');
+    const guard = runnerText.indexOf('history_admission=');
     const firstHistoricalRepair = runnerText.indexOf("if [[ \"$legacy_repair\" == 'true' ]]");
     const generalList = runnerText.indexOf('state_file="$(mktemp)"');
     expect(guard).toBeGreaterThan(0);
     expect(guard).toBeLessThan(generalList);
     expect(guard).toBeLessThan(firstHistoricalRepair);
     expect(runnerText).toContain('PGOPTIONS=\'-c default_transaction_read_only=on\'');
-    expect(runnerText).toContain("history_admission" != 'ALLOW_PRELIMINARY_HISTORY_CHECK'");
+    expect(runnerText).toContain("if [[ \"$history_admission\" != 'ALLOW_PRELIMINARY_HISTORY_CHECK' ]]");
     expect(runnerText).toContain('exit 1');
     // Existing incident-scoped repair modes retain their explicit boundaries.
     expect(runnerText.indexOf("if [[ \"${SUPABASE_SEYEON_MANIFEST_ACL_REPAIR_ONLY:-false}\" == 'true' ]]")).toBeLessThan(guard);
