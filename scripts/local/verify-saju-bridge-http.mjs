@@ -43,6 +43,13 @@ async function run() {
   validWorkspace();
   const nonceDbEnabled = process.env.MYEONGHA_LOCAL_NONCE_PG_ENABLED === '1';
   const realGoTrueEnabled = process.env.MYEONGHA_LOCAL_GOTRUE_ENABLED === '1';
+  const restrictedLoginEnabled = process.env.MYEONGHA_LOCAL_RESTRICTED_LOGINS_ENABLED === '1';
+  if (restrictedLoginEnabled && (!nonceDbEnabled
+    || !process.env.MYEONGHA_LOCAL_SUBJECT_DB_PASSWORD
+    || !process.env.MYEONGHA_LOCAL_NONCE_DB_PASSWORD
+    || process.env.MYEONGHA_LOCAL_SUBJECT_DB_PASSWORD === process.env.MYEONGHA_LOCAL_NONCE_DB_PASSWORD)) {
+    throw new Error('Restricted Subject and Nonce suites require independent ephemeral PostgreSQL logins.');
+  }
   if (realGoTrueEnabled && !nonceDbEnabled) {
     throw new Error('Real local GoTrue integration requires the disposable Birth/Nonce PostgreSQL DB.');
   }
@@ -119,6 +126,10 @@ async function run() {
         PGDATABASE: 'myeongha_saju_local_verify',
         PGUSER: 'postgres',
         PGPASSWORD: process.env.PGPASSWORD,
+        ...(restrictedLoginEnabled ? {
+          MYEONGHA_LOCAL_SUBJECT_DB_PASSWORD: process.env.MYEONGHA_LOCAL_SUBJECT_DB_PASSWORD,
+          MYEONGHA_LOCAL_NONCE_DB_PASSWORD: process.env.MYEONGHA_LOCAL_NONCE_DB_PASSWORD,
+        } : {}),
       } : {}),
     };
     const tests = ['test/saju-held-cross-repo-local-http.test.ts'];
@@ -133,6 +144,24 @@ async function run() {
       test.once('exit', (exitCode, signal) => ok(exitCode ?? (signal ? 1 : 1)));
     });
     if (code !== 0) throw new Error('Cross-repository loopback HTTP verification failed.');
+    if (restrictedLoginEnabled) {
+      // Run after the baseline tests but before GoTrue updates the synthetic
+      // owner IDs in the disposable Subject DB. Real TCP auth, never SET ROLE
+      // through a superuser login.
+      const limited = spawn(process.execPath, [
+        vitest, 'run', 'test/saju-held-cross-repo-local-restricted-login.test.ts',
+      ], {
+        cwd: root,
+        env: { ...testEnv, MYEONGHA_LOCAL_RESTRICTED_DB: '1' },
+        stdio: 'inherit',
+      });
+      const limitedCode = await new Promise((ok, bad) => {
+        limited.once('error', bad);
+        limited.once('exit', (exitCode, signal) => ok(exitCode ?? (signal ? 1 : 1)));
+      });
+      if (limitedCode !== 0) throw new Error('Actual least-privilege Subject/Nonce login verification failed.');
+      console.log('[saju-bridge] Real limited PostgreSQL network logins passed (NOT operational authority).');
+    }
     if (realGoTrueEnabled) {
       // A distinct Vitest process prevents the GoTrue→Subject fixture remapping
       // from racing with baseline Birth owner/revision tests.
