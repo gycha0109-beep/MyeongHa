@@ -41,6 +41,16 @@ async function freeLoopbackPort() {
 
 async function run() {
   validWorkspace();
+  const nonceDbEnabled = process.env.MYEONGHA_LOCAL_NONCE_PG_ENABLED === '1';
+  // The extra PostgreSQL integration suite is an explicit opt-in and never
+  // accepts a remote DB, arbitrary port, or Production runtime configuration.
+  if (nonceDbEnabled && (process.env.PGHOST !== '127.0.0.1'
+    || process.env.PGPORT !== '5432'
+    || process.env.PGDATABASE !== 'myeongha_saju_local_verify'
+    || process.env.PGUSER !== 'postgres'
+    || !process.env.PGPASSWORD)) {
+    throw new Error('Refusing a nonlocal or uninitialized ephemeral PostgreSQL target.');
+  }
   const port = await freeLoopbackPort();
   const bearer = randomBytes(32).toString('base64url');
   const hmacKey = randomBytes(48).toString('base64');
@@ -96,8 +106,18 @@ async function run() {
       MYEONGHA_LOCAL_SAJU_ISSUER: issuer,
       MYEONGHA_LOCAL_SAJU_AUDIENCE: audience,
       MYEONGHA_LOCAL_SAJU_KEY_ID: keyId,
+      ...(nonceDbEnabled ? {
+        MYEONGHA_LOCAL_SAJU_NONCE_DB: '1',
+        PGHOST: '127.0.0.1',
+        PGPORT: '5432',
+        PGDATABASE: 'myeongha_saju_local_verify',
+        PGUSER: 'postgres',
+        PGPASSWORD: process.env.PGPASSWORD,
+      } : {}),
     };
-    const test = spawn(process.execPath, [vitest, 'run', 'test/saju-held-cross-repo-local-http.test.ts'], {
+    const tests = ['test/saju-held-cross-repo-local-http.test.ts'];
+    if (nonceDbEnabled) tests.push('test/saju-held-cross-repo-local-postgres-nonce.test.ts');
+    const test = spawn(process.execPath, [vitest, 'run', ...tests], {
       cwd: root, env: testEnv, stdio: 'inherit',
     });
     const code = await new Promise((ok, bad) => {
@@ -105,7 +125,9 @@ async function run() {
       test.once('exit', (exitCode, signal) => ok(exitCode ?? (signal ? 1 : 1)));
     });
     if (code !== 0) throw new Error('Cross-repository loopback HTTP verification failed.');
-    console.log('[saju-bridge] Local-only cross-repository HTTP check PASS (not staging admission).');
+    console.log(nonceDbEnabled
+      ? '[saju-bridge] Live local HTTP + PostgreSQL nonce claim PASS (NOT staging admission).'
+      : '[saju-bridge] Local-only cross-repository HTTP check PASS (not staging admission).');
   } finally {
     if (!childExit) child.kill('SIGTERM');
     await Promise.race([
