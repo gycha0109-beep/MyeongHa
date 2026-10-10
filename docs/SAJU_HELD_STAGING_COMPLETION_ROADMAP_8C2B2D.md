@@ -2,6 +2,8 @@
 
 Watchtower-Track: saju-bridge
 
+> **1인 운영 전환 설계:** [1인 Owner·분리된 보안 권한 설계 v0.1](./MYEONGHA_SOLO_OWNER_SEGREGATED_AUTHORITY_ARCHITECTURE_V0_1.md). 기존 본문의 사람 2명 승인·이중 확인은 **기존 구상**이며 단일 Owner·행위별 재인증·보안 계정/키/서비스 신원 분리 설계로 교체한다. 실제 관리 평면의 강제 정책·복구·증빙이 검증되기 전 운영 허가는 그대로 HOLD. 서비스 ID가 2개라도 인간 2인 검토로 주장하지 않는다.
+
 > 기준: MyeongHa `main @ a58523b75c0cdebe9203e8f2db686781d4106d7f` 확인, 3-03 구현 PR #1850/#1851/#1862 및 3-04-01 운영 런북 PR #1856 병합 확인.
 > 이 문서는 운영 승인이나 Production 공개 허가가 아니다. 실제 Secret, DB GRANT, Supabase provisioning, Runner 실행, Commerce 활성화는 미실행/HOLD다.
 
@@ -63,6 +65,12 @@ Watchtower-Track: saju-bridge
 ## 2D. Root pin·Registry 연결의 무권한 보안 검증
 
 3-04-02 후보 신뢰 스냅샷의 Ed25519 SPKI SHA-256 pin, Root ID, Registry detached signature, 최소 revision 및 환경 ID를 한 경로에서 검사한다. 이 결과는 **`PINNED_SIGNED_CLAIM_UNVERIFIED_CUSTODY`** 또는 BLOCKED이며 실제 독립 관리자/보관소의 출처 증명, 서명 검증과 DB high-water의 트랜잭션 결속, R01–R14 실환경 증빙·운영 키 발급·실행 인가를 대체하지 않는다. 자세한 계약과 미검증 항목은 [3-04-02 설계 6B](./SAJU_HELD_STAGING_INDEPENDENT_TRUST_CUSTODY_8C2B2D30402.md)를 따른다.
+
+## 2E. 단일 Owner·권한 분리 정책 설계
+
+- 상세 설계: [1인 Owner·분리된 보안 권한 설계 v0.1](./MYEONGHA_SOLO_OWNER_SEGREGATED_AUTHORITY_ARCHITECTURE_V0_1.md). 단일 Owner가 최종 책임을 지되, Root/Operator/Attestor/Verifier/Runner의 키·권한·계정 분리, 강인증·감사·비가역 HOLD를 요구한다.
+- 사람 2명을 전제로 한 과거 운영 요구는 1인 운영 정책으로 재설계하되, 기술적 독립이 사람 2명의 심사와 같다는 증빙을 만들지 않는다.
+- SO-0 설계와 합성 CI만 완료해도 운영 Root·실환경 R01–R14·2D-4는 NOT_VERIFIED/HOLD이며 실제 KMS/계정 생성·비용·Runner는 별도 승인 전 금지.
 
 ## 3. 코드·운영 병렬화와 범위 제한
 

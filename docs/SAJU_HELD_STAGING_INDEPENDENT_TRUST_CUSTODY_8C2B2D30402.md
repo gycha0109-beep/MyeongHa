@@ -2,6 +2,8 @@
 
 Watchtower-Track: saju-bridge
 
+> **1인 운영 전환 설계:** [1인 Owner·분리된 보안 권한 설계 v0.1](./MYEONGHA_SOLO_OWNER_SEGREGATED_AUTHORITY_ARCHITECTURE_V0_1.md). 기존 본문의 사람 2명 승인·이중 확인은 **기존 구상**이며 단일 Owner·행위별 재인증·보안 계정/키/서비스 신원 분리 설계로 교체한다. 실제 관리 평면의 강제 정책·복구·증빙이 검증되기 전 운영 허가는 그대로 HOLD. 서비스 ID가 2개라도 인간 2인 검토로 주장하지 않는다.
+
 > **단계:** 실제 운영 전 보안 설계 검토. 운영 Root/KMS/DB 준비, Secret 발급, GRANT, 서버 연결, Runner 실행은 **별도 승인 전 금지**. 이 문서 병합은 3-04-02의 **설계 정리**이지 실환경 완료 또는 실행 인가가 아니다.
 >
 > 선행: [3-03 정적 Target Trust](./SAJU_HELD_STAGING_TARGET_TRUST_8C2B2D303.md), [3-04-01 운영 증빙 R01–R14](./SAJU_HELD_STAGING_OPERATIONAL_EVIDENCE_RUNBOOK_8C2B2D30401.md), [브릿지 완료 로드맵](./SAJU_HELD_STAGING_COMPLETION_ROADMAP_8C2B2D.md).
@@ -23,21 +25,21 @@ Watchtower-Track: saju-bridge
 
 | 영역 | 소유자·권한 | 명시적 금지 |
 |---|---|---|
-| 신뢰 Anchor/Root | 검증 대상 애플리케이션과 독립된 운영 보안 관리자, 이중 승인 | API request/body, PR, Evidence, 대상 애플리케이션 설정만으로 Root를 교체 |
+| 신뢰 Anchor/Root | 검증 대상 애플리케이션과 독립된 보안 계정; 최종 책임은 인간 Owner 1인, 강인증/감사 필요 | API request/body, PR, Evidence, 대상 애플리케이션 설정만으로 Root를 교체 |
 | Operator signing | 승인 권한자 전용 키·purpose, 키 사용 감사 | attestor key 사용, private key를 API 런타임에 전달 |
 | Target attestation | 독립 probe 운영자/Attestor key·purpose | 대상 서비스가 직접 자기 관찰을 서명해 독립 증빙으로 주장 |
 | Registry revision floor | 변경 불가/감사 가능한 별도 저장소를 관리하는 보안 운영 역할 | 검증 대상이 floor 감소/삭제/초기화, 노드 로컬 캐시만 신뢰 |
 | Challenge ledger | 독립 발급/소비 역할, 강한 난수, 트랜잭션 격리 | 요청자가 임의 Challenge 선택, 대상이 발급·소비, 재사용/자동 재시도 |
 | Runtime Runner | 대상·Permit이 일치하는 좁은 실행 권한 | 자체 승인·자체 증빙·자체 실행 또는 V1 boolean 우회 |
 
-운영 승인은 런북에 따른 **2인 이상 분리된 검토 주체**가 담당하며, 역할 분리/승인 기록이 실제로 입증되지 않으면 HOLD다. 임시 예외는 별도 break-glass 절차로 기록하고 자동 승인하지 않는다.
+1인 운영 설계에서는 단일 인간 Owner가 책임지고, 행위별 강인증·독립 기술 주체/키·분리된 보안 계정·보호된 감사 원장으로 권한을 분리한다. 이는 인간 2인의 독립 심사가 아니다. 실환경에서 통제가 입증되고 별도 명시적 승인될 때까지 HOLD. break-glass는 실행 허가 우회가 아닌 중지·복구 전용이다.
 
 ## 3. Root/Registry 운영 Anchor
 
 - environment별 독립 pin: 환경 ID, Root Key ID, SPKI SHA-256 fingerprint, 공개키 신뢰 경로, 핀 버전 및 승인 이력.
 - 공급 주체가 다른 자료: Registry 서명 문서, 환경 Manifest, 승인 Permit, Attestor Evidence와 **별도의 저장/읽기 경로**를 적용한다.
 - 운영 키 custody: 개인키 비노출, Key ID와 purpose 경계, 생성/활성/회전/폐기 승인, 접근 로그, 긴급 정지 절차.
-- Registry의 `revision`은 환경 단위 **독립 durable high-water floor**를 통해 하향 전환 금지. Root 회전 시에도 floor를 재설정하지 않는다. 초기 pin 변경과 복구는 일반 요청/배포 CI가 아니라 별도 이중 승인 변경으로만 허용.
+- Registry의 `revision`은 환경 단위 **독립 durable high-water floor**를 통해 하향 전환 금지. Root 회전 시에도 floor를 재설정하지 않는다. 초기 pin 변경과 복구는 일반 요청/배포 CI가 아니라 단일 Owner의 위험도별 강인증·독립 보안 경계·감사·복구 게이트를 거치는 변경으로만 허용(실환경 미적용).
 - 공격자 제공 Root와 임의 Registry가 서로 서명 검증에 성공하는 경우도 운영 신뢰 `PASS`로 승격해서는 안 된다.
 - 요청 시각 `nowMs`도 검증 대상이 지정하는 원시값을 신뢰하지 않는다. 승인된 서버 시각 소스 및 clock skew/expiry 거부 기준을 정하고 실환경 시험한다.
 

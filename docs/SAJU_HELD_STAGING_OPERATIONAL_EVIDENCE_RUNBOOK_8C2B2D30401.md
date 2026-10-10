@@ -2,6 +2,8 @@
 
 Watchtower-Track: saju-bridge
 
+> **1인 운영 전환 설계:** [1인 Owner·분리된 보안 권한 설계 v0.1](./MYEONGHA_SOLO_OWNER_SEGREGATED_AUTHORITY_ARCHITECTURE_V0_1.md). 기존 본문의 사람 2명 승인·이중 확인은 **기존 구상**이며 단일 Owner·행위별 재인증·보안 계정/키/서비스 신원 분리 설계로 교체한다. 실제 관리 평면의 강제 정책·복구·증빙이 검증되기 전 운영 허가는 그대로 HOLD. 서비스 ID가 2개라도 인간 2인 검토로 주장하지 않는다.
+
 **최종 완료 기준·단계별 상태:** [8C-2B-2D 완료 로드맵](./SAJU_HELD_STAGING_COMPLETION_ROADMAP_8C2B2D.md). **3-04-02 신뢰 입력·영속 상태 설계:** [독립 Root/Revision/Challenge Authority](./SAJU_HELD_STAGING_INDEPENDENT_TRUST_CUSTODY_8C2B2D30402.md).
 
 
@@ -22,13 +24,13 @@ Watchtower-Track: saju-bridge
 
 ## 2. 실환경 준비 사전 의존성 (증빙 수집 실행 전에도 별도 승인이 필요)
 
-1. 관리 주체 2인 이상이 격리 Staging의 목적·범위·운영 책임자·중단/롤백 권한 및 예산을 기록해 승인한다.
+1. 단일 Owner가 격리 Staging의 목적·범위·중단/롤백 권한 및 예산을 결정하되, 중요 작업은 별도 사용자 행위 인증·분리된 보안 신원과 키·불변 감사 경로가 실증되어야 한다. 사람 2명의 심사와 동일시하지 않으며, 실증 전 운영 승인은 HOLD다.
 2. Production Supabase Project/DB/Calculation 서비스와 **자격증명 및 권한이 중복되지 않는** 별도 Staging 자원을 실제로 준비한다. 단순한 이름 차이는 격리 증거가 아니다.
-3. 루트 공개키의 진짜 신뢰 기준은 Evidence 파일이나 애플리케이션 입력이 아닌 독립 관리 경로에서 확보한다. 키 ID·SPKI fingerprint·발급/폐기 승인 기록·관리자 이중 확인·변조 방지 보관을 요구한다.
+3. 루트 공개키의 진짜 신뢰 기준은 Evidence 파일이나 애플리케이션 입력이 아닌 독립 관리 경로에서 확보한다. 키 ID·SPKI fingerprint·발급/폐기 승인 기록·Owner 강인증·보안 신원/계정 분리·변조 방지 보관을 요구한다.
 4. 별도 durable 저장소에 Registry 최소 revision/금지된 키 ID를 보관해 롤백을 차단한다. 재시작·노드 간 경쟁·장애 복구 상황에서도 과거 revision으로 돌아가지 않아야 한다.
 5. 일회성 Challenge 생성자와 저장소를 분리한다. 난수 자체는 256비트 이상, `challengeDigest`는 Challenge·명시적 도메인·대상환경·스냅샷 식별자에 결속한다. 보관 및 원자적 사용/만료/폐기 규칙을 명세하고 replay·동시성 시험을 수행한다. **3-03의 단순 문자열 비교는 nonce 소비/신뢰 출처 증빙이 아니다.**
 6. Attestor가 신뢰할 수 있는 배포/인프라 관리 평면으로 관찰할 최소 읽기 권한과 로그 출처를 규정한다. 검사 응답을 애플리케이션 또는 테스트 피대상자가 임의로 작성할 수 있으면 독립 증빙으로 인정하지 않는다.
-7. 단일 작업이 자체 승인·자체 증빙·자체 실행을 모두 수행하지 못하도록 권한 분리 및 break-glass 승인 절차를 마련한다.
+7. 하나의 API/CI/AI/workload 신원이 자체 승인·자체 증빙·자체 실행을 모두 수행하지 못하도록 권한을 분리한다. break-glass는 실행 승인이 아닌 중지·복구 전용이다.
 8. 증빙 확보 전까지 `StagingTargetAuthorityPortV1`의 Proof Origin → Boolean 계약을 실제 Target Authority로 재사용하지 않는다.
 
 ## 3. 필수 Evidence 항목과 신뢰 가능한 출처
@@ -48,7 +50,7 @@ Watchtower-Track: saju-bridge
 | R11 | Saju Bearer/HMAC 분리, Key ID/issuer/audience/TTL/rotation | 별도 Secret 관리 평면·무권한/부정 호출 | HOLD |
 | R12 | MyeongHa/Saju 배포 SHA와 Manifest/Plan Digest | 서명된 배포·릴리스 증빙 및 재검증 | HOLD |
 | R13 | 승인된 폐기형 테스트 Member만 접근, Birth/Subject 격리 | Auth/Subject DB 실험, 비식별화 로그 | HOLD |
-| R14 | 사고 중단·키 회전·승인 폐기·시스템 복구 | 독립 운영자 승인과 리허설 증빙 | HOLD |
+| R14 | 사고 중단·키 회전·승인 폐기·시스템 복구 | 단일 Owner의 별도 복구 강인증·분리된 시스템 감사와 리허설 증빙 | HOLD |
 
 - 관찰 내용은 `apps/api/src/saju-held-staging-target-evidence-v1.ts`의 정확한 버전 계약에 정규화해 Attestor가 서명한다. 원본 증빙은 변조 방지·접근 제한된 감사 저장소에 보관한다.
 - Evidence에는 `environmentId`, 두 digest, 두 SHA, 독립 Attestor ID/Key ID, Challenge Digest, 발급·만료 시각(최대 60초)을 결속한다.
@@ -61,7 +63,7 @@ Watchtower-Track: saju-bridge
 
 1. 별도 운영 변경 요청을 발행하고 **대상 환경, 소유자, 심사자, 범위, 비용, 폐기 시각**을 고정.
 2. 독립 Root/Registry 운영자 서명 검증 및 rollback floor 조회. 신뢰 실패·운영자가 동일한 주체로 서명을 위조할 수 있으면 중단.
-3. 이중 승인으로 approved Manifest/Connection Plan/배포 SHA를 동결. 승인 후 값이 하나라도 변경되면 기존 Permit·Evidence 폐기 후 신규 검토.
+3. Owner 행위별 재인증과 분리된 서명 서비스의 감사 기록을 전제로 approved Manifest/Connection Plan/배포 SHA를 동결한다(실환경 통제 적용 전 HOLD). 승인 후 값이 하나라도 변경되면 기존 Permit·Evidence 폐기 후 신규 검토.
 4. 별도 검증자 권한으로 R05~R13을 실제 테스트. DB 세션/CA/클러스터 격리, Production 재사용, Member-only, Saju Proof Bearer/HMAC을 포함.
 5. 외부 Challenge를 생성하고 Attestor가 해당 Challenge와 대상에 대해 관찰 결과를 서명. 로그와 독립 증빙원장을 동결.
 6. `3-03B Trust Evaluator`로 정적 계약/서명을 재검증하되 `SIGNED_ASSERTIONS_UNANCHORED`를 운영 PASS로 간주하지 않음.
