@@ -749,6 +749,13 @@ export {
 } from './character-standard-reading-chat-question-scope-v1.js';
 
 export {
+  STANDARD_FIRST_QUESTION_SOURCE_ENTRY_VERSION_V1,
+  selectCharacterStandardFirstQuestionSourceEntryV1,
+  assertServerPreparedStandardFirstQuestionSourceEntryV1,
+  type CharacterStandardFirstQuestionSourceEntryDecisionV1,
+} from './character-standard-reading-chat-first-question-v1.js';
+
+export {
   POSTGRES_STANDARD_FOLLOWUP_ANCHOR_BINDING_V1,
   PostgresStandardFollowupAnchorErrorV1,
   createPostgresStandardFollowupAnchorAuthorityPortV1,
