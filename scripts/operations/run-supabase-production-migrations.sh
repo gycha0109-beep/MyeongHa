@@ -69,6 +69,25 @@ if [[ "${SUPABASE_PROMOTION_REPAIR_ONLY:-false}" != 'false' ]]; then
   exit 1
 fi
 
+# A historical recovery has already installed 1460-1510 while 1400-1450
+# relationship Event/Correction/Snapshot functions are absent in Production.
+# Fail CLOSED before legacy migration repair OR db push; ordinary --include-all
+# is NOT allowed to backfill those missing dependencies without DB Owner review.
+# Scoped, previously reviewed function-only repair branches exit above.
+history_admission_file="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/scripts/operations/seyeon-production-history-admission-readonly.sql"
+[[ -f "$history_admission_file" ]]
+history_admission="$( \
+  PGHOST="$host" PGPORT='5432' PGDATABASE='postgres' \
+  PGUSER="postgres.$SUPABASE_PROJECT_ID" PGPASSWORD="$SUPABASE_DB_PASSWORD" \
+  PGSSLMODE='require' PGOPTIONS='-c default_transaction_read_only=on' \
+  psql -X -qAt -v ON_ERROR_STOP=1 -f "$history_admission_file"
+)"
+if [[ "$history_admission" != 'ALLOW_PRELIMINARY_HISTORY_CHECK' ]]; then
+  echo "HOLD: Production migration-history admission blocked: $history_admission" >&2
+  echo 'No migration repair / dry-run / db push has been executed by this invocation.' >&2
+  exit 1
+fi
+
 state_file="$(mktemp)"
 trap 'rm -f "$state_file"' EXIT
 
