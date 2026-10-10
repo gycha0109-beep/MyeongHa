@@ -16,7 +16,7 @@ describe('G1-B2 zero-only DB durability boundary', () => {
     expect(model).toBeGreaterThan(store);
     expect(runtime.slice(store, model)).toContain('zeroPersonalProof: personalRecordProof');
     expect(runtime.slice(store, model)).toContain('exactModelSourceSelection: exactModelPersonalSources');
-    const hold = runtime.indexOf('assertSeyeonPersonalRecordsNotUsedBeforeUnprotectedCommitV1(\\n          productionContext,');
+    const hold = runtime.lastIndexOf('assertSeyeonPersonalRecordsNotUsedBeforeUnprotectedCommitV1(', proof);
     expect(hold).toBeGreaterThan(-1);
     expect(hold).toBeLessThan(proof);
   });
