@@ -11,6 +11,7 @@ import type {
   OpenAiSeyeonStructuredProviderConfigV1,
 } from './openai-seyeon-structured-provider-v1.js';
 import type { SeyeonAiGovernorAdmissionV1 } from './postgres-seyeon-ai-cost-ledger-v1.js';
+import { parseSeyeonGovernedDbConfigV1 } from './seyeon-governed-postgres-pool-v1.js';
 import type { SeyeonProductionGovernorModeV1 } from './seyeon-production-governor-boundary-v1.js';
 import {
   createSeyeonProductionChatGovernorsV1,
@@ -232,8 +233,20 @@ export function createProductionSeyeonTurnSendRuntimeV1(
                   approval: input.governorApproval!,
                 })
               : null;
+            // No secret is read by a default OFF request. An explicit ENFORCE
+            // request must have a distinct governed login before runtime
+            // composition, or paid inference is rejected.
+            const governedDbConfig = input.governorMode === 'ENFORCE'
+              ? parseSeyeonGovernedDbConfigV1({
+                  env: input.env,
+                  ordinaryDatabaseUrl: config.databaseUrl,
+                  ordinaryDatabasePrincipal: config.databasePrincipal,
+                  rootCertificatePem: config.databaseSslRootCertificatePem ?? '',
+                })
+              : null;
             const runtime = createProductionSeyeonChatRuntimeV1({
               databaseConfig: config,
+              ...(governedDbConfig === null ? {} : { governedDbConfig }),
               providerConfig,
               ...(input.governorMode === undefined ? {} : { governorMode: input.governorMode }),
               ...(enforce === null
