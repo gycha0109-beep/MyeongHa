@@ -79,9 +79,16 @@ select * from public.cmd_receive_chat_turn_v1(
 );
 select * from public.cmd_allocate_chat_turn_attempt_v1('$sb','$tb','$ab','planner-v1');
 select public.cmd_mark_chat_turn_context_ready_v1('$sb','$tb','$ab');
-update public.seyeon_ai_governor_model_policies_v1
-set allowed_purposes=array['event_extraction','renderer']::text[]
-where model_key='d4-offline-no-network-model' and policy_version='d4-policy-v1';
+insert into public.seyeon_ai_governor_model_policies_v1(
+ provider_key,model_key,policy_version,price_version,allowed_purposes,
+ context_window_tokens,maximum_input_tokens,maximum_output_tokens,
+ maximum_serialized_request_bytes,input_micro_usd_per_million,
+ cached_input_micro_usd_per_million,output_micro_usd_per_million,is_active
+) values (
+ 'openai-responses','d4-offline-no-network-model-chat',
+ 'd4-chat-policy-v1','d4-rate-v1',array['renderer']::text[],
+ 2000,1200,800,20000,1000000,250000,4000000,true
+);
 update public.seyeon_ai_governor_daily_budgets_v1
 set global_limit_micro_usd=7000,subject_limit_micro_usd=5000
 where bucket_utc_date='$day';
@@ -109,7 +116,7 @@ set local role myeongha_seyeon_governed_executor;
 select subject_id from public.begin_member_subject_context_v1('00000000-0000-0000-0000-00000000a002');
 select call_id,ceiling_micro_usd from public.cmd_governed_start_seyeon_ai_call_v1(
  '$sb','$tb','$ab','chat','$call','renderer',
- 'openai-responses','d4-offline-no-network-model','d4-policy-v1','d4-rate-v1',500,800,2500);
+ 'openai-responses','d4-offline-no-network-model-chat','d4-chat-policy-v1','d4-rate-v1',500,800,2500);
 SQL
   fi
 }
