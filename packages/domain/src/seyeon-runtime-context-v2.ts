@@ -612,6 +612,32 @@ export function resolveSeyeonRuntimeBehaviorPolicyV2(input: {
   });
 }
 
+/**
+ * Shared pre-Provider selection boundary. The Production authority adapter
+ * and final Context assembler MUST use the exact same normalization,
+ * relevance/salience sorting and bounded limit. This is selection only,
+ * NOT durable Grant authority or permission to reveal.
+ */
+export function selectSeyeonRuntimeRetrievedMemoriesV2(input: Readonly<{
+  readonly retrievedMemories: readonly SeyeonRetrievedMemoryV2[];
+  readonly maxRetrievedMemories?: number;
+}>): readonly SeyeonRetrievedMemoryV2[] {
+  const maxRetrievedMemories = assertPositiveBoundedInteger(
+    input.maxRetrievedMemories, 8, 16, 'maxRetrievedMemories',
+  );
+  return Object.freeze(
+    input.retrievedMemories
+      .map(validateRetrievedMemory)
+      .sort(
+        (left, right) =>
+          right.relevance - left.relevance ||
+          right.salience - left.salience ||
+          left.memoryId.localeCompare(right.memoryId),
+      )
+      .slice(0, maxRetrievedMemories),
+  );
+}
+
 export function assembleSeyeonRuntimeContextV2(
   input: AssembleSeyeonRuntimeContextV2Input,
 ): SeyeonRuntimeContextV2 {
@@ -621,13 +647,6 @@ export function assembleSeyeonRuntimeContextV2(
     24,
     'maxRecentMessages',
   );
-  const maxRetrievedMemories = assertPositiveBoundedInteger(
-    input.maxRetrievedMemories,
-    8,
-    16,
-    'maxRetrievedMemories',
-  );
-
   const relationship = validateRelationship(input.relationship);
   const relationshipSemantics = validateRelationshipSemanticsOverlay(
     input.relationshipSemantics,
@@ -640,17 +659,12 @@ export function assembleSeyeonRuntimeContextV2(
       .map(validateRecentMessage),
   );
 
-  const retrievedMemories = Object.freeze(
-    input.retrievedMemories
-      .map(validateRetrievedMemory)
-      .sort(
-        (left, right) =>
-          right.relevance - left.relevance ||
-          right.salience - left.salience ||
-          left.memoryId.localeCompare(right.memoryId),
-      )
-      .slice(0, maxRetrievedMemories),
-  );
+  const retrievedMemories = selectSeyeonRuntimeRetrievedMemoriesV2({
+    retrievedMemories: input.retrievedMemories,
+    ...(input.maxRetrievedMemories === undefined
+      ? {}
+      : { maxRetrievedMemories: input.maxRetrievedMemories }),
+  });
 
   if (
     input.disclosure.decision !== null &&
