@@ -7,6 +7,8 @@
 -- Only the private cost-meter owner may invoke this narrow elevated read-lock
 -- helper. A SELECT FOR SHARE conflicts with the UPDATE lock used by deletion
 -- start/finalizer. The lock is transaction-scoped and is held until COMMIT.
+begin;
+
 create function public.seyeon_ai_lock_active_subject_for_cost_v1(p_subject_id uuid)
 returns void
 language plpgsql security definer
@@ -174,3 +176,5 @@ begin
   return query select p_call_id,v_ceiling::bigint,v_day;
 end
 $admit$;
+
+commit;
