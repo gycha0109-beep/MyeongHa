@@ -2,6 +2,8 @@
 
 Watchtower-Track: saju-bridge
 
+> **1인 운영 전환 설계:** [1인 Owner·분리된 보안 권한 설계 v0.1](./MYEONGHA_SOLO_OWNER_SEGREGATED_AUTHORITY_ARCHITECTURE_V0_1.md). 기존 본문의 사람 2명 승인·이중 확인은 **기존 구상**이며 단일 Owner·행위별 재인증·보안 계정/키/서비스 신원 분리 설계로 교체한다. 실제 관리 평면의 강제 정책·복구·증빙이 검증되기 전 운영 허가는 그대로 HOLD. 서비스 ID가 2개라도 인간 2인 검토로 주장하지 않는다.
+
 > **범위:** 오직 합성·비밀 아닌 참조 메타데이터의 완전성 검사. 실제 Staging 네트워크 접근, Auth/DB/Saju probe, 키 또는 Secret 발급, Operator/Attestor 승인, 서명 생성, Runner 실행, DB Migration/GRANT, Production/Commerce 변경 **없음**. 문서/코드/CI 성공은 R01–R14 사실 증명이나 권한 부여가 아니다.
 
 ## 1. 목적
@@ -13,7 +15,7 @@ Watchtower-Track: saju-bridge
 - 14개의 정확한 ID(R01~R14)와 런북 단계별 `sourceKind`를 요구.
 - 환경 ID, Manifest/Plan digest, MyeongHa/Saju 두 SHA를 검증된 비밀 아닌 목표 계약과 일치 비교.
 - 증빙 원본 대신 SHA-256 참조값, 감사 식별자, 수집자·심사자 ID, 주장된 수집 시각만 접수. 원문 Secret/URL/토큰/개인정보를 결과로 절대 반환하지 않음.
-- 수집자와 심사자가 같거나, 원본/감사 참조가 중복되거나, 미래 시각/모르는 필드/비정상 객체이면 거부.
+- 수집자 ID와 심사자 ID가 같거나, 원본/감사 참조가 중복되거나, 미래 시각/모르는 필드/비정상 객체이면 거부. **ID가 다르다고 인간 2명 또는 독립 관찰이 입증되는 것은 아니다.** 인간 Owner가 1명인 경우 분리된 시스템 principal/키·증빙 출처를 별도 실증해야 한다.
 - 14개가 모두 일치해도 결과는 **`INDEXED_UNVERIFIED`**, `evidenceProvenance=NOT_VERIFIED`, `operationalEvidence=NOT_VERIFIED`, `stagingAdmission=HOLD`, 모든 실행·발행·판매 boolean은 false.
 - 이는 정적 참조 인덱스이며 **증빙 내용·진실성·서명·독립 관찰·실제 존재/보관·관리자 권한·trusted clock을 검증하지 않음**. 검사 결과를 Target Authority V1/V2 Runner에 전달하지 않음.
 
