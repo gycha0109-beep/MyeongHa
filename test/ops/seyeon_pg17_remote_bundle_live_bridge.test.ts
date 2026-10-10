@@ -40,6 +40,7 @@ describe('Se-yeon historical SQL PG17 isolated CI bridge', () => {
     expect(isolated).toContain('log_min_error_statement=panic');
     expect(isolated).toContain('log_min_messages=panic');
     expect(isolated).toContain('log_statement=none');
+    expect(isolated).toContain('coalesce(cardinality(statements),0)=0');
     expect(isolated).toContain("[[ \"$logging\" == 'panic|panic|none' ]]");
     expect(isolate).not.toContain('secrets.');
     expect(isolate).not.toContain('SUPABASE_DB_PASSWORD');
