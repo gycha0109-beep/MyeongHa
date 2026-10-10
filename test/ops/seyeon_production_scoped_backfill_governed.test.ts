@@ -39,7 +39,7 @@ describe('Se-yeon scoped Production relationship migration restore', () => {
     expect(workflow).toContain("reason='manual scoped Se-yeon backfill must never invoke ordinary db push'");
     expect(workflow).toContain('requires_deploy=false');
     expect(workflow).toContain('concurrency:\n  group: supabase-production-migrations');
-    expect(code).not.toMatch(/^\\s*supabase (?:db push|migration repair)/m);
+    expect(code).not.toMatch(/^[ \t]*supabase (?:db push|migration repair)/m);
     expect(code).toContain('psql -X -q --single-transaction -v ON_ERROR_STOP=1');
   });
   it('enforces exactly six historical versions and fingerprints later 18 RPCs in the same transaction', () => {
