@@ -47,14 +47,27 @@ PGDATABASE="$origin" createdb "$shadow" || hold 'Local shadow creation failure.'
 export PGDATABASE="$shadow"
 cd "$root"
 apply() {
+  local filename
+  filename="$(basename "$1")"
+  # These are repository-owned fixtures, not the private incident SQL.
+  # Log the exact filename only; preserve the SQL error in deleted private tmp.
+  echo "PG17_BASELINE_APPLY: $filename"
   psql -X -q -v ON_ERROR_STOP=1 -f "$1" >/dev/null 2>"$tempdir/apply.err" ||
-    hold 'Predecessor migration failed; SQL output hidden.'
+    hold "Predecessor migration $filename failed; SQL error output hidden."
 }
 apply test/db/bootstrap_supabase_auth_stub.sql
 installed=0
 for file in supabase/migrations/*.sql; do
   n="$(basename "$file" | cut -d_ -f1)"
   if (( 10#$n < 1400 )); then
+    # Repository PG17 test/db/run_ci_case.sh already skips migration 0860
+    # unless its special managed-owner/principal fixture is prepared.
+    # Preserve the established PG17 compatibility contract; this means
+    # the isolated baseline is NOT a byte-exact Supabase Production clone.
+    if [[ "$file" == 'supabase/migrations/0860_birth_profile_create_runtime_authority.sql' ]]; then
+      echo 'PG17_FIXTURE_SKIP_0860: dedicated managed-principal authority case owns this migration'
+      continue
+    fi
     apply "$file"
     installed=$((installed+1))
   fi

@@ -33,3 +33,14 @@ PR #1921은 저장소 SQL의 역순 적용 가능성을 PostgreSQL 15 합성 환
 - 본 파일의 신규 연결에 대한 CI/격리 실행 PASS는 **새 실행 로그가 확인된 후에만** 인정합니다.
 - Production 자격증명이 있는 단계와 격리 실행 단계가 같은 작업용 Runner 파일시스템을 일시 공유하므로, Production Secret은 GitHub Environment 통제 및 보호된 main의 변경 검증을 거쳐서만 사용합니다.
 - 한 번의 synthetic 재현으로 실제 Production 사용자 데이터/복원 가능성이나 G6를 증명하지 않습니다.
+
+## 첫 Production 읽기 전용 → 격리 실행 결과 및 보정 (2026-10-11)
+
+- 실제 실행: https://github.com/gycha0109-beep/MyeongHa/actions/runs/38071154800
+- `REMOTE_BUNDLE_SHA256_PASS`: 원격 이력 SQL의 정확한 해시와 104,021바이트 검증 성공.
+- `HOLD_SEYEON_PG17: Predecessor migration failed`: 임시 PostgreSQL 17 DB의 0010~1390 준비 단계에서 실패. **정확본 104KB SQL 실행과 1400~1450 역순 적용은 시작되지 않았습니다.**
+- `TEMP_PRIVATE_SQL_REMOVED`: SQL 비공개 임시 파일 정리 성공.
+- 기존 PostgreSQL 17 검증기 `test/db/run_ci_case.sh`는 `0860_birth_profile_create_runtime_authority.sql`을 managed-principal 전용 검사로 분리합니다. 본 격리 재현도 그 계약을 따르도록 수정했습니다. **최초 실패가 반드시 0860 때문이라고 확정한 것은 아닙니다.** 각 파일의 이름만 로그로 출력하여 다른 실패 시 정확한 위치를 특정합니다.
+- 따라서 이 PG17 격리본은 **완전한 운영 스키마 복원본이 아니며**, 0860 관련 계정 소유권 및 구체적인 runtime 영향은 기존 전용 검증과 함께 별도 확인해야 합니다.
+- `production-seyeon-db-authority-audit.yml`에서 격리 실행 스크립트 변경의 main push도 읽기 전용 재실행을 트리거합니다.
+- 오류 SQL 본문/원격 복구 SQL 본문 공개 금지는 계속 유지됩니다.
