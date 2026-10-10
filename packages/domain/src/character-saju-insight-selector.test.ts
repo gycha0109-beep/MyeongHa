@@ -348,3 +348,97 @@ describe('deterministic Character Insight Selector', () => {
     expect(select(bundle, perspective)).toEqual(select(bundle, perspective));
   });
 });
+
+/**
+ * Pre-registered contract smoke, NOT the 20-real-Official-Reading evaluation.
+ * These profiles and unit texts are synthetic fixtures, NOT approved Bibles,
+ * canon, purchase grants, official Saju claims, or a Production rollout.
+ *
+ * Fixed acceptance before executing this suite:
+ * - one immutable V1 Grounding material/hash for all Readers;
+ * - three distinct selected source Unit IDs for the three named test profiles;
+ * - fourth profile uses exactly the same selector, no core-code change;
+ * - no Unit outside the admitted bundle and no invented semantic content;
+ * - absent attention-axis match falls back to source order, not fake relevance;
+ * - foreign-profile identity mismatch fails closed.
+ */
+describe('Representative perspective generalization contract (synthetic / public OFF)', () => {
+  const units = [
+    makeUnit('1', { axis: 'action_style', narrativeRole: 'primary' }),
+    makeUnit('2', { axis: 'structure', narrativeRole: 'primary' }),
+    makeUnit('3', { axis: 'decision_style', narrativeRole: 'primary' }),
+    makeUnit('4', { axis: 'responsibility', narrativeRole: 'primary' }),
+  ] as const;
+  const namesAndAxes = [
+    ['seyeon', 'action_style', units[0].unitId],
+    ['rahyeon', 'structure', units[1].unitId],
+    ['yeoul', 'decision_style', units[2].unitId],
+    ['fourth-fixture-not-canon', 'responsibility', units[3].unitId],
+  ] as const;
+
+  it('reorders the same admitted source for three named profiles and one anonymous fourth', () => {
+    const bundle = makeBundle(units);
+    const originalUnits = JSON.stringify(bundle.units);
+    const originalHash = bundle.groundingHash;
+
+    const selections = namesAndAxes.map(([characterId, axis, expectedUnitId]) => {
+      const perspective = {
+        ...makePerspective({
+          attentionOrder: [axis],
+          maxPrimaryUnits: 1,
+          maxSupportingUnits: 0,
+          maxTensionUnits: 0,
+          maxLimitationUnits: 0,
+        }),
+        characterId,
+      };
+      const context = {
+        ...makeContext(bundle), characterId,
+      } as CharacterRuntimeContextWithGroundingV1;
+      const result = selectCharacterInsightsV1({
+        context, grounding: bundle, perspective, requestedDomain: 'general',
+      });
+
+      expect(result.characterId).toBe(characterId);
+      expect(result.readingRef).toBe(bundle.readingRef);
+      expect(result.selectedUnitIds).toEqual([expectedUnitId]);
+      expect(result.orderedUnitIds).toEqual([expectedUnitId]);
+      expect(bundle.units.find(unit => unit.unitId === expectedUnitId)?.canonicalMeaning)
+        .toBe(`canonical meaning ${expectedUnitId.slice(-1)}`);
+      return result.selectedUnitIds[0];
+    });
+
+    expect(new Set(selections).size).toBe(namesAndAxes.length);
+    expect(selections.every(ref => bundle.units.some(unit => unit.unitId === ref))).toBe(true);
+    expect(bundle.groundingHash).toBe(originalHash);
+    expect(JSON.stringify(bundle.units)).toBe(originalUnits);
+  });
+
+  it('does not invent a matching claim if a test profile requests an absent attention axis', () => {
+    const bundle = makeBundle(units);
+    const result = select(bundle, makePerspective({
+      attentionOrder: ['learning'],
+      maxPrimaryUnits: 1,
+      maxSupportingUnits: 0,
+      maxTensionUnits: 0,
+      maxLimitationUnits: 0,
+    }));
+    expect(result.selectedUnitIds).toEqual([units[0].unitId]);
+    expect(result.selectionReasons.find(item => item.unitId === units[0].unitId)?.codes)
+      .not.toContain('attention_axis_preferred');
+  });
+
+  it('cannot substitute one Reader perspective for another active Character identity', () => {
+    const bundle = makeBundle(units);
+    const perspective = {
+      ...makePerspective({ attentionOrder: ['structure'] }),
+      characterId: 'rahyeon',
+    };
+    expect(() => selectCharacterInsightsV1({
+      context: { ...makeContext(bundle), characterId: 'seyeon' },
+      grounding: bundle,
+      perspective,
+      requestedDomain: 'general',
+    })).toThrow(/does not belong|active Character/u);
+  });
+});
