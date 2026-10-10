@@ -6,13 +6,13 @@ set -euo pipefail
 [[ "$PGDATABASE" == 'myeongha_seyeon_d4b6_test' ]] || exit 2
 db() { psql -X -qAt -F '|' -v ON_ERROR_STOP=1 --set=VERBOSITY=verbose "$@"; }
 tmp="$(mktemp -d)"
-holder='' waiter=''
+holder='' waiter='' promoter=''
 cleanup() {
   if [[ -p "$tmp/release" ]]; then
     (printf 'release\n' >"$tmp/release") >/dev/null 2>&1 &
     local x=$!; sleep 0.05; kill "$x" 2>/dev/null || true
   fi
-  for x in "$holder" "$waiter"; do
+  for x in "$holder" "$waiter" "$promoter"; do
     if [[ -n "$x" ]]; then kill "$x" 2>/dev/null || true; wait "$x" 2>/dev/null || true; fi
   done
   db -c 'drop role if exists myeongha_seyeon_d4_login_ci' >/dev/null 2>&1 || true
@@ -46,7 +46,7 @@ guest_start() {
 set session authorization myeongha_seyeon_d4_login_ci;
 begin;
 set local role myeongha_seyeon_governed_executor;
-select subject_id,subject_kind from public.begin_guest_subject_context_v1('$hash');
+select subject_id,subject_kind from public.begin_seyeon_governed_guest_subject_context_v1('$hash');
 select call_id,ceiling_micro_usd from public.cmd_governed_start_seyeon_ai_call_v1(
  '$subject','a4000000-0000-0000-0000-000000000006',
  'a6000000-0000-0000-0000-000000000006','post_turn','$id',
@@ -105,50 +105,86 @@ select subject_id,subject_kind,subject_status,replayed
   from public.cmd_promote_guest_runtime_v1('$subject','$guest','$auth');
 commit;
 SQL
-db -f "$tmp/promote.sql" >"$tmp/promote.log" 2>&1 || {
+# A validated Guest cost call already owns the canonical Subject SHARE lock.
+# Promotion must now WAIT (not commit early), despite a concurrent budget lock.
+{
+  echo "set application_name='seyeon_d4b6_promotion_wait';"
+  echo "set statement_timeout='15s';"
+  cat "$tmp/promote.sql"
+} >"$tmp/promote-wait.sql"
+db -f "$tmp/promote-wait.sql" >"$tmp/promote.log" 2>&1 &
+promoter=$!
+promoting=false
+for i in $(seq 1 120); do
+  n="$(db -c "select count(*) from pg_catalog.pg_stat_activity
+    where application_name='seyeon_d4b6_promotion_wait'
+      and wait_event_type='Lock'")"
+  if [[ "$n" == 1 ]]; then promoting=true; break; fi
+  if ! kill -0 "$promoter" 2>/dev/null; then break; fi
+  sleep 0.05
+done
+[[ "$promoting" == true ]] || {
+  echo 'FAIL Member promotion did not wait for prior governed Guest proof' >&2
   cat "$tmp/promote.log" >&2; exit 8;
 }
-grep -Fq "$subject|member|active|f" "$tmp/promote.log" || {
-  cat "$tmp/promote.log" >&2; exit 9;
+[[ "$(db -c "select kind from public.subjects where id='$subject'")" == 'guest' ]] || {
+  echo 'FAIL promotion became visible before original Guest cost finished' >&2
+  exit 9;
 }
+# Release the global budget: the already-authorized Guest admission commits
+# BEFORE membership changes; this is serial order, not stale authorization.
 printf 'release\n' >"$tmp/release"
 wait "$holder" || { cat "$tmp/holder.log" >&2; exit 10; }
 holder=''
-if wait "$waiter"; then
-  echo 'BLOCKER: pre-resolved Guest started a NEW paid call after Member promotion' >&2
-  cat "$tmp/stale.log" >&2
-  echo "Cost state: $(db -c "select count(*),sum(governor_effective_micro_usd) from public.seyeon_ai_call_cost_events where call_id in ('$pre','$stale')")" >&2
-  exit 11
+if ! wait "$waiter"; then
+  echo 'FAIL valid Guest request denied before Member promotion could commit' >&2
+  cat "$tmp/stale.log" >&2; exit 11;
 fi
 waiter=''
-grep -Eq '23514|28000|42501' "$tmp/stale.log" || {
+grep -Fq "$stale|3700" "$tmp/stale.log" || {
   cat "$tmp/stale.log" >&2; exit 12;
+}
+if ! wait "$promoter"; then
+  echo 'FAIL promotion could not finish after Guest reservation COMMIT' >&2
+  cat "$tmp/promote.log" >&2; exit 13;
+fi
+promoter=''
+grep -Fq "$subject|member|active|f" "$tmp/promote.log" || {
+  cat "$tmp/promote.log" >&2; exit 14;
 }
 cat >"$tmp/expired.sql" <<SQL
 set session authorization myeongha_seyeon_d4_login_ci;
 begin;
 set local role myeongha_seyeon_governed_executor;
-select subject_id from public.begin_guest_subject_context_v1('$hash');
+select subject_id from public.begin_seyeon_governed_guest_subject_context_v1('$hash');
 rollback;
 SQL
 if db -f "$tmp/expired.sql" >"$tmp/expired.log" 2>&1; then
-  echo 'FAIL consumed Guest credential still resolves' >&2; exit 13;
+  echo 'FAIL consumed Guest credential still resolves' >&2; exit 15;
 fi
 grep -Fq '28000' "$tmp/expired.log" || {
-  cat "$tmp/expired.log" >&2; exit 14;
+  cat "$tmp/expired.log" >&2; exit 16;
 }
 member="$(db -c "set session authorization myeongha_seyeon_d4_login_ci;
 begin; set local role myeongha_seyeon_governed_executor;
 select subject_id from public.begin_member_subject_context_v1('$auth');
 commit;")"
 [[ "$member" == "$subject" ]] || {
-  echo 'FAIL canonical Subject changed during promotion' >&2; exit 15;
+  echo 'FAIL canonical Subject changed during promotion' >&2; exit 17;
 }
 state="$(db -c "select count(*),sum(governor_effective_micro_usd),
  (select occupied_micro_usd from public.seyeon_ai_governor_daily_budgets_v1
   where bucket_utc_date='$day')
  from public.seyeon_ai_call_cost_events where call_id in ('$pre','$stale')")"
-[[ "$state" == '1|3700|3700' ]] || {
-  echo "FAIL Guest->Member changed charge ledger: $state" >&2; exit 16;
+[[ "$state" == '2|7400|7400' ]] || {
+  echo "FAIL Guest->Member changed charge ledger: $state" >&2; exit 18;
 }
-echo 'D4B-6 post-promotion Guest authority rejected, canonical Member cost preserved PASS'
+if db -c "set session authorization myeongha_seyeon_d4_login_ci;
+  set role myeongha_seyeon_governed_executor;
+  select * from public.begin_guest_subject_context_v1('$hash');" >"$tmp/old-role.log" 2>&1; then
+  echo 'FAIL old unlocked Guest resolver still callable by governed role' >&2; exit 19;
+fi
+grep -Fq '42501' "$tmp/old-role.log" || {
+  cat "$tmp/old-role.log" >&2; exit 20;
+}
+echo 'D4B-6 Guest-before-Member serialization, stale proof denial and exact ledger PASS'
