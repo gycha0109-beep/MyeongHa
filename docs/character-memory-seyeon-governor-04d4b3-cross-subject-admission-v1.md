@@ -6,7 +6,7 @@ Watchtower-Track: character-memory
 
 - D4B-2 병합 커밋 `2d07503be8ed9d3de7ee9e306c4b923fbe81d6bf` 기반. D4A/D4B-1/D4B-2 기존 테스트 유지.
 - 오직 disposable PostgreSQL `myeongha_seyeon_d4b3_test`에 합성 데이터와 오프라인 모델 가격만 설정.
-- Member A는 이미 COMMITTED인 post_turn Attempt, Member B는 독립 Subject/thread의 RUNNING chat Attempt를 사용. 각각 `begin_member_subject_context_v1`로 다시 Subject를 확인.
+- Member A는 이미 COMMITTED인 post_turn Attempt, Member B는 독립 Subject/thread의 RUNNING chat Attempt를 사용. 각각 `begin_member_subject_context_v1`로 다시 Subject를 확인. post_turn과 chat에는 서로 다른 불변 오프라인 정책 행을 신규 INSERT해 사용하며, 두 정책의 단가·견적만 동일하게 맞춤.
 - 두 예약 견적은 각각 3,700 microUSD, 글로벌 초기 예산은 7,000, Subject별 예산은 5,000.
 
 ## 독립 DB 세션 검증
