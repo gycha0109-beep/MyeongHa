@@ -19,7 +19,7 @@
 
 The function returns identity/scope metadata only. It does not return an A2 admission ticket, raw Official Reading artifact, generated Reader output, payment/Grant data, or any public route.
 
-No production DB implementation exists for the injected locator port: **D-05 discovery is not yet live**. A production locator must be separately authorized by the DB/API owners, be read-only and subject-scoped, and reject 0/2+ candidates. Client-provided `threadId`, Records attribution and ordinary `POST /api/chat` must not be substituted for this port.
+**D-05 DB read-only locator candidate now exists** in migration `1660_member_reader_existing_thread_locator_v1.sql` and the transaction-scoped adapter `postgres-official-reader-thread-locator-v1.ts`. The SQL is SECURITY INVOKER, API-executor-only, verifies bound canonical Member and returns 0/1/at most 2 matching active single-Character Threads. A return of 2 is an ambiguity signal for the server resolver. This remains a **dormant internal capability**: it is not wired into any public/API Reader route, never grants paid access, and requires DB/API Owner review before live activation. Client-provided `threadId`, Records attribution and ordinary `POST /api/chat` must not be substituted for this port.
 
 ## Authority and failure behavior
 
@@ -39,7 +39,7 @@ Same Reader may have multiple Official Readings; a single Member×Character Thre
 ## Not implemented / owner approval required
 
 - **D05-A**: Owner-approved shared Member×Reader Thread vs dedicated Reading×Reader Thread policy.
-- **D05-B**: Real read-only SQL runtime locator (minimal least-privilege RLS, canonical Subject scope, exact bundle handling) and actual PostgreSQL integration tests.
+- **D05-B**: SQL locator and adapter implemented as a reviewable read-only candidate, with isolated PostgreSQL integration tests; **DB/API Owner approval, actual production entrypoint wiring and Reader Grant/Bundle full E2E still pending**. SQL intentionally does not choose a Bundle: the existing Thread binding and Grant checks must agree at the server composition boundary.
 - **D05-C**: Thread creation path and default Content Release vs grant-pinned Bundle conflict resolution.
 - **D05-D**: Guest/member promotion and re-entry, public DTO, mobile navigation, Reader paid interpretation persistence and Chat V2.
 - **D02/#1827**: Final T2 reveal shared writer lock and refund/revoke linearization.
@@ -51,8 +51,8 @@ Same Reader may have multiple Official Readings; a single Member×Character Thre
 
 `test/official-reading-reader-thread-resolution-v1.test.ts` includes synthetic authority-port tests for canonical Member boundary, early denial, exact access and Product policy, locator 0/2+ handling, no creation, participant/bundle mismatch, revoked access and drift, and repeated read-only invocation.
 
-These tests establish internal orchestration only, not DB authority/RLS/lock correctness or integrated paid Reader E2E.
+Server orchestration tests establish only internal composition. In addition, `test/postgres-official-reader-thread-locator-v1.test.ts` verifies the SQL adapter's bounded DTO; `test/db/official_reader_thread_locator_query.sh` executes an actual isolated PostgreSQL migration/role/RLS fixture and checks existing/empty/duplicate/cross-Subject/Guest cases. These tests **do not** prove integrated paid Reader E2E, revocation linearization or final public disclosure.
 
 ## Follow-on slice after owner decision
 
-Create a DB-owned read-only Thread discovery function/adapter with real isolated PostgreSQL tests, then wire it **only** to a separately approved server internal entrypoint. Re-run exact-grant checks at admission and at the authorized T2 final send boundary.
+After DB/API Owner acceptance of the existing read-only locator and D05-A shared-Thread choice, wire the adapter **only** to an approved server internal entrypoint inside `executePostgresSubjectTransactionV1`. Then address D05-C first-Thread creation and bundle mismatch separately. Re-run exact-grant checks at admission and at the authorized T2 final send boundary.
