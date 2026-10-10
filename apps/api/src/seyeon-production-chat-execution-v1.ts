@@ -37,6 +37,9 @@ import {
 import {
   createSeyeonAttemptZeroPersonalProofV1,
 } from './seyeon-attempt-zero-personal-proof-v1.js';
+import {
+  selectSeyeonExactModelPersonalSourcesV1,
+} from './seyeon-exact-model-personal-source-selection-v1.js';
 import type {
   SeyeonProductionRelationshipSyncOutboxPortV1,
 } from './seyeon-production-relationship-outbox-v1.js';
@@ -705,6 +708,23 @@ export async function runSeyeonProductionChatExecutionV1(
           userMessageId: receivedTurn.userMessageId,
           userText: receivedTurn.userText,
         });
+
+        // Exact final selection shares the runtime normalizer/sorter/cap.
+        // G1-B DB owner still must persist this set BEFORE Provider use.
+        // No personal record is authorized here: the earlier HOLD remains.
+        const exactModelPersonalSources = selectSeyeonExactModelPersonalSourcesV1({
+          retrievedMemories: contextInput.retrievedMemories,
+          ...(contextInput.maxRetrievedMemories === undefined ? {} : {
+            maxRetrievedMemories: contextInput.maxRetrievedMemories,
+          }),
+          sourceCandidates: productionContext.personalRecordProjectionCandidates ?? [],
+        });
+        if (exactModelPersonalSources.selectedPersonalRecordCount !== 0 ||
+            exactModelPersonalSources.permitsAtomicCommit !== false) {
+          throw new SeyeonProductionChatExecutionErrorV1(
+            'Se-yeon positive personal records require durable DB Pin and atomic Commit.',
+          );
+        }
 
         const governance = await resolveTurnGovernance({
           execution: input,

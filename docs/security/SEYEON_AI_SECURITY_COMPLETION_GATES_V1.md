@@ -71,6 +71,19 @@ AI 경량 보안 정책 평가: [#1816](https://github.com/gycha0109-beep/Myeong
 - Governor direct Provider/legacy RPC, 재시도, 동시 예산 경쟁 및 중복 정산.
 - 모든 핵심 비인가 공개/무단 상태변경/예산 우회 = **0회**. Mock-only/Static-only/Shadow-only = 증거 보조일 뿐 최종 PASS 아님.
 
+## G1-B1 — 최종 모델 입력 선택 집합 결속 (부분 구현)
+
+- `packages/domain/src/seyeon-runtime-context-v2.ts`의 `selectSeyeonRuntimeRetrievedMemoriesV2`를 Context 최종 조립과 보안 출처 검증이 공용으로 사용하도록 분리했습니다. 동일한 normalize/relevance/salience/memoryId 정렬/상한을 사용합니다.
+- `apps/api/src/seyeon-exact-model-personal-source-selection-v1.ts`는 G1-A 서버 소유 후보와 **최종 선택된 Memory/Life Fact**의 정확한 projection digest 및 exact Grant/Record를 대응시킵니다. 누락·위조·중복·사용 시점 불일치는 모두 HOLD. 선택되지 않은 후보는 정확한 모델 입력 증명의 Record 목록에서 제외됩니다.
+- 실제 `runSeyeonProductionChatExecutionV1`의 Provider 실행 이전에 검증을 호출합니다. #1852 positive 개인기록 입력 HOLD는 유지하며 `persistedBeforeModel:false`, `permitsAtomicCommit:false`, `permitsHttpReveal:false`입니다.
+- **G1-B1은 G1 완료가 아닙니다.** 실제 Attempt의 DB 선행 영속 Pin은 미구현이고, 이전 채팅·Disclosure 등 간접 개인기록은 아직 모델 입력 출처가 귀속되지 않았습니다. Source candidate는 서버 내부 앱 스냅샷으로만 존재하며, digest는 무키 SHA-256으로 권한 서명이 아닙니다. DB Owner가 허용하지 않은 긍정 Projector/Route는 계속 비활성화합니다.
+
+## G1-B2 — 다음 필요 작업
+
+1. 서버가 모델에 실제 투입한 최종 Context의 **전체 출처**와 모델 Preflight 전 시점 결속 규칙을 Character/DB/Security가 공동 승인합니다. 현재 정확한 선택은 retrievedMemories에 한정되며 Preflight 공개 검색과 과거 텍스트를 별도 검토해야 합니다.
+2. forward-only DB Authority migration을 통해 `subjectId/threadId/turnId/attemptId`에 정확한 `recordId/grantId/type/schema/rawDigest/projectionDigest` + 빈 집합의 별도 상태를 모델 호출 전에 불변 저장합니다. 서버 호출 실패·DB 오류 시 Provider 호출 0회.
+3. 저장된 원본 Pin을 DB Owner 보호 하에 Commit/Reveal 함수가 읽도록 연결하고 실제 PostgreSQL 경합으로 검증합니다. 클라이언트/모델 전달 증명을 DB 권한으로 간주 금지.
+
 ## 운영 불변
 
 - `SEYEON_PRODUCTION_PERSONAL_RECORD_PROJECTORS_V1 = []`, `routeMounted:false`, 기본 `WRITE_DARK`.
