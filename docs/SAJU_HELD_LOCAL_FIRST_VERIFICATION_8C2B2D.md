@@ -91,12 +91,34 @@ GitHub의 범위 제한된 [교차 저장소 루프백 CI](../.github/workflows/
 # 데이터베이스는 실 운영과 무관한 폐기용 로컬 인스턴스만 허용됩니다.
 
 psql -v ON_ERROR_STOP=1 -f test/db/bootstrap_supabase_auth_stub.sql
-psql -v ON_ERROR_STOP=1 -f supabase/migrations/1540_saju_source_proof_nonce_claim_authority_v1.sql
+# 아래 전체 마이그레이션은 오직 새로 만든 폐기용 로컬 DB에서만 실행
+Get-ChildItem supabase/migrations/*.sql | Sort-Object Name | ForEach-Object {
+  psql -v ON_ERROR_STOP=1 -f $_.FullName
+  if ($LASTEXITCODE -ne 0) { throw 'Local disposable DB migration failed' }
+}
+psql -v ON_ERROR_STOP=1 -f test/db/fixtures/saju_local_subject_birth_proof_e2e.sql
 $env:MYEONGHA_LOCAL_NONCE_PG_ENABLED = '1'
 node scripts/local/verify-saju-bridge-http.mjs ../Saju
 ```
 
 **증명 범위 제한:** GitHub 테스트 DB는 임시 컨테이너의 superuser로 `SET LOCAL ROLE`을 실행합니다. 로컬 PostgreSQL의 실제 유니크 인덱스·RLS/ACL·원자성은 확인하지만, 독립 운영 로그인·접근 제어자·서버 간 DB 물리 분리/커스텀 TLS/실제 Supabase 회원 인증을 증명하지 않습니다. Saju Preview HMAC 결과는 여전히 `sourceAuthority=NOT_EVALUATED`, `stagingAdmission=HOLD` 및 제품 권한 모두 `false`입니다.
+
+## 2C. 실제 PostgreSQL 소유자·Current Birth Revision ↔ 실제 Saju Proof 종단 간 검증
+
+2B의 Nonce 검증에 이어, **명하에 이미 구현된 `bindCurrentSubjectSajuHeldProofV1` 함수를 수정하지 않고** 임시 DB의 실제 회원·Subject·Birth Profile·불변 Revision을 주입한 다음 **실제 사주 서버 HTTP → HMAC 검증 → PostgreSQL nonce claim → 동일 회원의 Current Birth 재조회**를 수행한다.
+
+- 테스트 전용 `auth.users`에 2명의 임시 계정을 생성한다. 여기서 전달되는 `VerifiedSubjectIdentityEvidenceV1`는 **테스트 어셈블리에서 주입한 합성 검증 결과**이며, 실제 Supabase JWT/세션 인증이 아니다.
+- 첫 번째 회원만 `self` Birth Profile과 같은 출생값을 가진 2개의 불변 Revision을 보유한다. 권한 검증은 원래 `myeongha_api_executor`의 `SET LOCAL ROLE`, Subject RLS, Birth RLS 및 `qry_*_v1` 조회 함수를 사용한다.
+- 실제 PostgreSQL 조회의 현재 Revision #1을 기반으로 Saju 프로세스가 서명한 Proof를 받고 명하 검증기로 검증한다. 결과는 **HELD, 운송 무결성만 검증**, 배포·판매 권한은 모두 false다.
+- 타 회원에게 Current Birth가 없으면 보호된 Saju 요청을 보내기 전에 거절한다.
+- 사주 Proof 발급과 후행 DB 재조회 사이에 현재 Revision이 #2로 바뀌면, **출생일·시간·성별이 같아도** `current_birth_revision_changed`로 차단하며 `binding`을 노출하지 않는다.
+- 실제 HTTP Proof 사용 및 동시성/재사용 방지는 2B의 기존 PostgreSQL nonce 검증을 그대로 사용한다. 새 제품/HTTP 라우트를 만들지 않는다.
+
+[교차 저장소 CI](../.github/workflows/saju-bridge-cross-repo-local-http.yml)는 이전과 동일한 단일 한정 워크플로에서 **격리 PostgreSQL 15에 기존 전체 명하 마이그레이션을 적용**하고 [합성 출생정보 fixture](../test/db/fixtures/saju_local_subject_birth_proof_e2e.sql)를 삽입한 뒤, 총 세 가지 범위(기존 HTTP / DB nonce / DB Current Birth)를 함께 실행한다. 기존 운영 DB에는 이 fixture를 절대 적용하지 않는다.
+
+명하·사주 체크아웃의 로컬 실행은 이전 절과 동일하되, **기존 2B의 단독 `1540` SQL 실행만으로는 2C를 시작할 수 없다.** 오직 처음 생성한 일회용 `myeongha_saju_local_verify` 데이터베이스에서 테스트용 Auth stub을 적용하고 `supabase/migrations/*.sql` 전체를 순서대로 적용한 후 `test/db/fixtures/saju_local_subject_birth_proof_e2e.sql`을 넣어야 한다. 실행 완료 후 해당 DB는 폐기한다.
+
+**남는 검증:** 실제 클라우드 Auth identity verifier, 독립 권한으로 로그인한 DB Pool, 독립 출처의 Root/Challenge/Attestor, TLS peer, 운영 Subject/Birth/Revision, R01–R14 및 2D-4 Runner는 여전히 `NOT_VERIFIED`/`HOLD`. 테스트의 가짜 회원을 운영 인증 증빙으로 승격하지 않는다.
 
 ## 3. 통과 기준 / 아직 증명하지 않은 것
 
