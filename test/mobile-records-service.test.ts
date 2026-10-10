@@ -43,7 +43,7 @@ describe('mobile Records service', () => {
     await service.readReadingPage();
     await service.readMemoryPage();
 
-    expect(sessionCalls).toBe(3);
+    expect(sessionCalls).toBe(6) // one active bearer for fetch, another for stale-Subject rejection;
     expect(requests).toEqual(['/api/life-record', '/api/readings', '/api/memories']);
   });
 });
@@ -102,7 +102,7 @@ it('routes Official Reading reread through the active subject bearer', async () 
     readingId,
     display: { kind: 'delivered' },
   });
-  expect(sessionCalls).toBe(1);
+  expect(sessionCalls).toBe(2) // post-reread active Subject freshness check;
   expect(authorization).toBe('Bearer active-owner-token');
   expect(requested).toBe(`/api/readings?readingId=${readingId}`);
 });
