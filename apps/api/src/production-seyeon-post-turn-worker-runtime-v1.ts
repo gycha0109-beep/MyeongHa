@@ -23,6 +23,7 @@ import {
 } from './production-postgres-subject-pool-lease.js';
 import type {
   ProductionUserDataRuntimeConfigV1,
+  ProductionUserDataRuntimeEnvV1,
 } from './production-user-data-runtime-config.js';
 import {
   processSeyeonPostTurnAnalysisV1,
@@ -34,6 +35,7 @@ import {
 import {
   createSeyeonGovernedCostTransactionRunnerV1,
 } from './seyeon-governed-cost-transaction-v1.js';
+import { parseSeyeonGovernedDbConfigV1 } from './seyeon-governed-postgres-pool-v1.js';
 import type {
   SeyeonGovernedDbConfigV1,
   SeyeonGovernedPostgresSubjectPoolV1,
@@ -92,6 +94,8 @@ export interface CreateProductionSeyeonPostTurnWorkerRuntimeInputV1 {
   readonly pool?: PostgresSubjectPoolV1;
   /** ENFORCE-only segregated DB credentials, never the ordinary Subject Pool. */
   readonly governedDbConfig?: SeyeonGovernedDbConfigV1;
+  /** Worker-only trusted server environment; never part of the outbox payload. */
+  readonly governedDbEnv?: ProductionUserDataRuntimeEnvV1;
   /** Server-owned test seam; not accepted from HTTP request input. */
   readonly governedCostPool?: SeyeonGovernedPostgresSubjectPoolV1;
 }
@@ -141,9 +145,21 @@ export function createProductionSeyeonPostTurnWorkerRuntimeV1(
     providerConfig: nativeConfig,
     governorConfigured: governor !== undefined,
   });
+  if (input.governedDbConfig !== undefined && input.governedDbEnv !== undefined) {
+    throw new Error('Post-turn ENFORCE refuses ambiguous governed DB configuration sources.');
+  }
+  const governedDbConfig = input.governorMode === 'ENFORCE' &&
+    input.governedDbEnv !== undefined
+    ? parseSeyeonGovernedDbConfigV1({
+        env: input.governedDbEnv,
+        ordinaryDatabaseUrl: input.databaseConfig.databaseUrl,
+        ordinaryDatabasePrincipal: input.databaseConfig.databasePrincipal,
+        rootCertificatePem: input.databaseConfig.databaseSslRootCertificatePem ?? '',
+      })
+    : input.governedDbConfig;
   const costPoolLease = createSeyeonProductionCostPoolLeaseV1({
     mode: input.governorMode,
-    ...(input.governedDbConfig === undefined ? {} : { governedDbConfig: input.governedDbConfig }),
+    ...(governedDbConfig === undefined ? {} : { governedDbConfig }),
     ...(input.governedCostPool === undefined ? {} : { governedPool: input.governedCostPool }),
   });
   const poolLease = createProductionPostgresSubjectPoolLeaseV1({
