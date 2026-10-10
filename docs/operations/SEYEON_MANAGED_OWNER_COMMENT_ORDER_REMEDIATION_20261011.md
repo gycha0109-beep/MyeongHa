@@ -13,8 +13,8 @@ Watchtower-Track: ops
 ## 수정
 
 - 기존 `supabase/migrations/1400..1450_*.sql` 6개 파일은 전혀 변경하지 않습니다.
-- 새 staging 실행기는 Git blob ID 여섯 개와 원문 SQL 구문을 정확히 검사하고, **각 파일 마지막의 `REVOKE myeongha_relationship_apply_owner FROM current_user` 문장만 기존 마지막 `COMMENT ON FUNCTION` 뒤로 이동**한 비공개 임시 사본 6개를 생성합니다. 주석 본문/함수 정의/ACL/Owner/SQL 내용은 변경하지 않고 문장의 순서만 바뀝니다.
-- staging 내용에는 원래 위치 이후 `COMMENT ON FUNCTION`만 존재해야 하며 그 외 DDL/DML이 하나라도 있으면 즉시 HOLD. 원문 SHA 불일치도 즉시 HOLD.
+- 새 staging 실행기는 Git blob ID 여섯 개와 원문 SQL 구문을 정확히 검사하고, **각 파일 마지막의 `COMMENT ON FUNCTION` 블록만 해당 파일의 `GRANT myeongha_relationship_apply_owner TO current_user` 및 `ALTER FUNCTION OWNER` 앞에 이동**한 비공개 임시 사본 6개를 생성합니다. 이로써 실제 `postgres`가 소유권을 이전하기 전 함수 생성자 자격으로 주석을 설정합니다. `GRANT`/`REVOKE` 역할 membership DDL·함수 정의·ACL/Owner 구문은 원본 그대로 보존합니다.
+- staging은 원래 마지막 `REVOKE ROLE` 뒤에 `COMMENT ON FUNCTION`만 존재할 때만 성공하며, 그 외 DDL/DML이 하나라도 있으면 즉시 HOLD. 원문 SHA 불일치도 즉시 HOLD.
 - Production에서 기존의 **단일 트랜잭션/정확한 여섯 개 파일/마이그레이션 이력 6건/Owner·ACL 및 역할 membership 불변/브라우저 실행 권한 0/관계 레코드 0/rollback** 검사는 완전히 유지합니다.
 - `test/db/seyeon_remote_bundle_pg17_isolated.sh`는 실제 remote-only 정확본 104KB를 로컬 PG17에 적용한 뒤 **postgres 역할을 NOSUPERUSER로 강등**하고 Production과 같은 staged 6개 SQL 및 동일한 pre/post 검증을 수행합니다.
 - 별도의 부정 테스트는 원문 공백 1자 변경만으로도 staging이 거부되는 것을 확인합니다. staging SQL 원문은 로그·artifact에 저장하지 않고 임시 디렉터리 종료 시 자동 삭제합니다.
@@ -27,3 +27,5 @@ Watchtower-Track: ops
 4. Supabase 연결 확인에 추가 결함이 나오면 데이터에 접근하거나 보호를 우회하지 않고 HOLD.
 
 G0~G6/G6, 세연 공개 경로, 유료 AI, 개인 Projector는 기존대로 HOLD.
+
+**추가 운영 권한 확인:** Production `postgres`는 `rolsuper=false`, `rolcreaterole=true`이고 `myeongha_relationship_apply_owner` 직접 membership은 `admin=true`, `inherit=false`, `set=false`, 기존 grantor는 `supabase_admin`입니다. 따라서 단순히 `REVOKE` 앞에 주석을 두는 방식도 유효하지 않을 수 있습니다. 주석을 `GRANT`/소유권 이전 **이전**으로 이동해야 하며, 사후 역할 membership의 정확한 원장 fingerprint는 계속 불변 검사합니다. 소유권 양도 자체나 membership 변화가 비슈퍼유저 검증에서 실패하면 Production 재시도는 하지 않습니다.
