@@ -14,7 +14,7 @@ root="$(cd "$(dirname "$0")/../.." && pwd)"
 [[ -z "${SUPABASE_DB_PASSWORD:-}" && -z "${SUPABASE_PRODUCTION_SESSION_POOLER_HOST:-}" ]] ||
   hold 'Production connection settings forbidden.'
 [[ -n "${SEYEON_REMOTE_BUNDLE_FILE:-}" ]] || hold 'Approved offline SQL required.'
-for binary in psql createdb dropdb realpath sha256sum; do
+for binary in psql createdb dropdb realpath sha256sum git python3; do
   command -v "$binary" >/dev/null || hold 'Missing local dependency.'
 done
 bundle="$(realpath -e -- "${SEYEON_REMOTE_BUNDLE_FILE:-}")" || hold 'SQL not available.'
@@ -153,10 +153,47 @@ fingerprint() {
 }
 before="$(fingerprint)"
 [[ -n "$before" ]] || hold 'Missing later runtime function fingerprint.'
+# Same runtime SQL plan as Production: immutable source blobs -> private approved
+# COMMENT-before-REVOKE staging. No SQL body escapes runner tmp storage.
+mkdir -m 700 "$tempdir/managed-owner-migrations"
+python3 scripts/operations/stage-seyeon-managed-owner-comment-order.py \
+  --source-dir "$root/supabase/migrations" \
+  --output-dir "$tempdir/managed-owner-migrations" >/dev/null ||
+  hold 'Managed-owner SQL staging failed against exact approved source.'
+# Match the Production managed-owner membership *options* (admin true,
+# INHERIT false, SET false) before dropping the disposable service superuser.
+# The fixture's grantor may differ from Supabase's "supabase_admin"; both the
+# pre/post Production and isolated tests still require exact membership
+# fingerprint preservation across the six scoped migrations.
+psql -X -q -v ON_ERROR_STOP=1 \
+  -c 'grant myeongha_relationship_apply_owner to postgres with admin true, inherit false, set false;' \
+  >/dev/null 2>"$tempdir/membership-fixture.err" ||
+  hold 'Unable to install restricted managed-owner membership fixture.'
+membership="$(psql -X -qAt -v ON_ERROR_STOP=1 -c "
+  select count(*) from pg_auth_members m
+    join pg_roles owner on owner.oid=m.roleid
+    join pg_roles member on member.oid=m.member
+  where owner.rolname='myeongha_relationship_apply_owner'
+    and member.rolname='postgres'
+    and m.admin_option=true and m.inherit_option=false and m.set_option=false")" ||
+  hold 'Unable to inspect non-superuser owner membership fixture.'
+[[ "$membership" == 1 ]] ||
+  hold 'Expected one restricted direct managed-owner grant.'
+
+# Supabase Production's postgres role is non-superuser. The earlier rehearsal
+# was a false positive because stock postgres:17.6 ships a superuser postgres.
+# Demote ONLY this disposable test service after the historical bundle is
+# installed. This intentionally exposes COMMENT/OWNER membership mistakes.
+psql -X -q -v ON_ERROR_STOP=1 -c 'alter role postgres nosuperuser createrole createdb;' \
+  >/dev/null 2>"$tempdir/demote.err" ||
+  hold 'Unable to reproduce Production non-superuser postgres role.'
+[[ "$(psql -X -qAt -v ON_ERROR_STOP=1 -c "select rolsuper from pg_roles where rolname='postgres'")" == f ]] ||
+  hold 'Disposable PG17 executor is unexpectedly superuser.'
+
 set --
 for n in 1400 1410 1420 1430 1440 1450; do
   count=0
-  for file in supabase/migrations/"$n"_*.sql; do
+  for file in "$tempdir/managed-owner-migrations/${n}_"*.sql; do
     [[ -f "$file" ]] || hold 'Missing early migration.'
     set -- "$@" -f "$file"
     count=$((count+1))
@@ -178,5 +215,5 @@ rows="$(psql -X -qAt -v ON_ERROR_STOP=1 -c "
   select (select count(*) from public.relationship_event_records) +
          (select count(*) from public.relationship_state_snapshots)")"
 [[ "$rows" == 0 ]] || hold 'Relationship records unexpectedly created.'
-echo 'PASS_PG17_EXACT_BUNDLE: incident SQL replay + retroactive 1400..1450; 11 functions, preserved late ACL/fingerprint, zero records'
+echo 'PASS_PG17_EXACT_BUNDLE: remote incident SQL + managed non-superuser retroactive 1400..1450; 11 functions, preserved ACL/fingerprint, zero records'
 echo 'HOLD_PRODUCTION: actual data, restore, 1520..1640, attack coverage and owner approval outstanding'

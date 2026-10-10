@@ -25,7 +25,7 @@ cd "$root"
 [[ "${SEYEON_BACKUP_RUN_ID:-}" =~ ^[1-9][0-9]+$ &&
    "${SEYEON_RESTORE_RUN_ID:-}" =~ ^[1-9][0-9]+$ ]] ||
   hold 'Paired governed backup and isolated restore run IDs required.'
-for binary in gh git jq psql date mktemp; do
+for binary in gh git jq psql date mktemp python3; do
   command -v "$binary" >/dev/null || hold "Missing execution dependency: $binary"
 done
 [[ "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ &&
@@ -123,15 +123,24 @@ done
 # No historical remote-only 104KB SQL is ever re-executed.
 # psql -1 wraps preflight + exactly six files + history + verification in
 # ONE transaction. Any SQL/ACL/schema failure rolls back even history rows.
-echo 'SCOPED_BACKFILL_START: Production 1400..1450, verified backup+restore'
+# Supabase-managed postgres is not PostgreSQL superuser. The immutable 1400..1450
+# SQL revokes owner-role membership before COMMENT ON FUNCTION, which PostgreSQL
+# rejects. Stage hash-pinned, audited copies where the closing REVOKE ROLE comes
+# AFTER existing COMMENT blocks. Original migration files remain unchanged.
+mkdir -m 700 "$temp/managed-owner-migrations"
+python3 scripts/operations/stage-seyeon-managed-owner-comment-order.py \
+  --source-dir "$root/supabase/migrations" \
+  --output-dir "$temp/managed-owner-migrations" ||
+  hold 'Immutable historical SQL staging rejected the approved source.'
+echo 'SCOPED_BACKFILL_START: Production 1400..1450, verified backup+restore + managed-owner comment order'
 psql -X -q --single-transaction -v ON_ERROR_STOP=1 \
   -f scripts/operations/seyeon-relationship-backfill-transaction-pre.sql \
-  -f supabase/migrations/1400_relationship_apply_context_v1.sql \
-  -f supabase/migrations/1410_relationship_event_apply_command_v1.sql \
-  -f supabase/migrations/1420_relationship_reliability_context_v1.sql \
-  -f supabase/migrations/1430_relationship_adjustment_commands_v1.sql \
-  -f supabase/migrations/1440_relationship_projection_rebuild_v1.sql \
-  -f supabase/migrations/1450_relationship_snapshot_runtime_v1.sql \
+  -f "$temp/managed-owner-migrations/1400_relationship_apply_context_v1.sql" \
+  -f "$temp/managed-owner-migrations/1410_relationship_event_apply_command_v1.sql" \
+  -f "$temp/managed-owner-migrations/1420_relationship_reliability_context_v1.sql" \
+  -f "$temp/managed-owner-migrations/1430_relationship_adjustment_commands_v1.sql" \
+  -f "$temp/managed-owner-migrations/1440_relationship_projection_rebuild_v1.sql" \
+  -f "$temp/managed-owner-migrations/1450_relationship_snapshot_runtime_v1.sql" \
   -f scripts/operations/seyeon-relationship-backfill-transaction-post.sql ||
   hold 'Atomic scoped Production SQL failed; transaction rolled back.'
 

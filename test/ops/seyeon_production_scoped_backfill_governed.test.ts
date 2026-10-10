@@ -75,7 +75,9 @@ describe('Se-yeon scoped Production relationship migration restore', () => {
     expect(pre).toContain('later history marker names have changed');
     for (const version of ['1400','1410','1420','1430','1440','1450']) {
       expect(post).toContain("'" + version + "'");
-      expect(code).toContain('supabase/migrations/' + version + '_');
+      expect(code).toContain('managed-owner-migrations/' + version + '_');
+      expect(readFileSync('scripts/operations/stage-seyeon-managed-owner-comment-order.py', 'utf8'))
+        .toContain('"' + version + '_');
     }
     expect(post).toContain('later runtime definition/Owner/ACL fingerprint changed');
     expect(post).toContain('unexpectedly exposed to public roles');
