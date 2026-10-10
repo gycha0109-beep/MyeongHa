@@ -84,6 +84,16 @@ AI 경량 보안 정책 평가: [#1816](https://github.com/gycha0109-beep/Myeong
 2. forward-only DB Authority migration을 통해 `subjectId/threadId/turnId/attemptId`에 정확한 `recordId/grantId/type/schema/rawDigest/projectionDigest` + 빈 집합의 별도 상태를 모델 호출 전에 불변 저장합니다. 서버 호출 실패·DB 오류 시 Provider 호출 0회.
 3. 저장된 원본 Pin을 DB Owner 보호 하에 Commit/Reveal 함수가 읽도록 연결하고 실제 PostgreSQL 경합으로 검증합니다. 클라이언트/모델 전달 증명을 DB 권한으로 간주 금지.
 
+## G1-B2 / 0건 경로 선행 DB Pin (구현, 양수 HOLD)
+
+- `supabase/migrations/1630_seyeon_zero_personal_source_pre_model_pin_v1.sql`은 `chat_turn_attempts`에 `seyeon_personal_source_pin_jsonb` 및 저장시각을 추가하며, 사후 불변 Trigger 및 세연 검증 결과의 원본 Pin 일치 Commit Trigger를 둡니다.
+- `cmd_mark_seyeon_chat_context_ready_pinned_v1(subject,turn,attempt,sourceProof)`가 **서버 생성 0건 Proof**와 **최종 선택된 Memory/Life Fact가 0건임을 보여주는 Selection**을 엄격히 검증한 뒤, 하나의 DB 트랜잭션에서 Pin 영속 저장과 `context_ready`로 전이합니다.
+- 이전 3인자 `cmd_mark_seyeon_chat_context_ready_runtime_v1`에서 `myeongha_api_executor`의 EXECUTE를 회수했습니다. 신규 함수는 NOLOGIN runtime owner가 실행하고 공개 DB 역할은 호출할 수 없습니다. 새 함수의 API 직접 DML 권한 부여는 없습니다.
+- 실행 경로에서 positive 개인기록 사전 HOLD + 정확한 final 모델 선택 검증 후 **선행 Pin 저장 성공**이 확인돼야 `resolveTurnGovernance` 및 유료 Provider 경로로 진입할 수 있습니다. 실패 시 모델/AI 호출 이전 종료.
+- 출력 검증의 `personalRecordProvenance`와 DB Pin 원본이 Commit 시점에 같아야 하며, 이미 존재하는 과거 Attempt/타 Product는 소급 Pin하지 않습니다.
+- **G1 완료 판정 금지:** 이 Pin은 **0건 제한**입니다. DB가 무키 해시를 서명/승인으로 인정하지 않으며 실제 모델의 과거 메시지·Relationship·공개 검색·Preflight에서 파생 개인정보까지 포함하는 전체 출처 증명이 아닙니다. 별도 exact Grant/record 양수 Pin, same-transaction Grant Commit, HTTP Reveal/replay는 G1 후속 및 G2/G3에서 HOLD입니다.
+- 검증은 실제 PostgreSQL `test/db/seyeon_zero_personal_source_pre_model_pin_v1.sql`을 사용해 scope/ACL/Replay/immutability를 확인합니다. 클라우드 과금 모델 실행 없음.
+
 ## 운영 불변
 
 - `SEYEON_PRODUCTION_PERSONAL_RECORD_PROJECTORS_V1 = []`, `routeMounted:false`, 기본 `WRITE_DARK`.
