@@ -61,6 +61,32 @@ begin
 end
 $start$;
 
+-- Establish the private ACL before exposing any wrappers to it.
+-- The governed and OFF wrappers already belong to this same NOLOGIN owner.
+-- CREATE OR REPLACE preserves their previously hardened EXECUTE ACLs.
+grant myeongha_seyeon_cost_meter_owner to current_user;
+grant create on schema public to myeongha_seyeon_cost_meter_owner;
+alter function public.seyeon_ai_start_internal_v1(
+  uuid,uuid,uuid,text,uuid,text,text,text
+) owner to myeongha_seyeon_cost_meter_owner;
+revoke all on function public.seyeon_ai_start_internal_v1(
+  uuid,uuid,uuid,text,uuid,text,text,text
+) from public, myeongha_api_executor;
+do $private_acl$
+declare v_role text;
+begin
+  for v_role in
+    select rolname from pg_catalog.pg_roles
+    where rolname in ('anon','authenticated','service_role')
+  loop
+    execute format(
+      'revoke all on function public.seyeon_ai_start_internal_v1(uuid,uuid,uuid,text,uuid,text,text,text) from %I',
+      v_role
+    );
+  end loop;
+end $private_acl$;
+
+
 -- Preserve the existing OFF-era public RPC's ABI and behavior.
 create or replace function public.cmd_start_seyeon_ai_call_v1(
   p_subject_id uuid, p_turn_id uuid, p_attempt_id uuid, p_phase text,
@@ -217,30 +243,6 @@ begin
   return query select p_call_id,v_ceiling::bigint,v_day;
 end
 $admit$;
-
--- The governed and OFF wrappers already belong to this same NOLOGIN owner.
--- CREATE OR REPLACE preserves their previously hardened EXECUTE ACLs.
-grant myeongha_seyeon_cost_meter_owner to current_user;
-grant create on schema public to myeongha_seyeon_cost_meter_owner;
-alter function public.seyeon_ai_start_internal_v1(
-  uuid,uuid,uuid,text,uuid,text,text,text
-) owner to myeongha_seyeon_cost_meter_owner;
-revoke all on function public.seyeon_ai_start_internal_v1(
-  uuid,uuid,uuid,text,uuid,text,text,text
-) from public, myeongha_api_executor;
-do $private_acl$
-declare v_role text;
-begin
-  for v_role in
-    select rolname from pg_catalog.pg_roles
-    where rolname in ('anon','authenticated','service_role')
-  loop
-    execute format(
-      'revoke all on function public.seyeon_ai_start_internal_v1(uuid,uuid,uuid,text,uuid,text,text,text) from %I',
-      v_role
-    );
-  end loop;
-end $private_acl$;
 
 revoke create on schema public from myeongha_seyeon_cost_meter_owner;
 revoke myeongha_seyeon_cost_meter_owner from current_user;
