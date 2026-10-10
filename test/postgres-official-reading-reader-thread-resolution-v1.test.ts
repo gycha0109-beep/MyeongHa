@@ -152,7 +152,7 @@ async function denied(promise: Promise<unknown>, code: string) {
   await expect(promise).rejects.toMatchObject({
     code,
     name: 'OfficialReadingReaderThreadResolutionErrorV1',
-  } satisfies Partial<OfficialReadingReaderThreadResolutionErrorV1>);
+  });
 }
 
 describe('D-05 read-only transaction-scoped Reader Thread entry', () => {
