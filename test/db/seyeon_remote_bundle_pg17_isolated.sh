@@ -90,7 +90,7 @@ psql -X -q -1 -v ON_ERROR_STOP=1 -f "$bundle" \
 history="$(psql -X -qAt -v ON_ERROR_STOP=1 -c "
   select count(*) from supabase_migrations.schema_migrations
   where version in ('1460','1470','1480','1490','1500','1510')
-    and cardinality(statements)=0")"
+    and coalesce(cardinality(statements),0)=0")"
 [[ "$history" == 6 ]] || hold 'Recovery failed to install its six marker rows.'
 acl() {
   psql -X -qAt -v ON_ERROR_STOP=1 \
