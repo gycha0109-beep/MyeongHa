@@ -243,6 +243,8 @@ begin
   select q.* into v_row from public.seyeon_ai_provider_receipt_queue_v1 q
   where q.call_id=p_call_id for update;
   if not found or v_row.acked_at is not null
+    or p_claim_token is null or v_row.claim_token is null
+    or v_row.claimed_until is null
     or v_row.claim_token is distinct from p_claim_token
     or v_row.claimed_until <= clock_timestamp()
   then
