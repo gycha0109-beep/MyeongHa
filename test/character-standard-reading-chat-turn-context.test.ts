@@ -1765,6 +1765,36 @@ describe('A3-eta server-anchored follow-up evidence selection (public OFF)', () 
     });
   });
 
+  it('RR-02 preserves bundle-global calculation ambiguity and disclosure even without Unit-local refs', async () => {
+    const original = previewGrounding();
+    const { groundingHash: _old, ...material } = original;
+    const source = {
+      ...material,
+      disclosures: [{
+        disclosureRef: 'grounding_disclosure_global',
+        type: 'scope_limitation' as const,
+        text: '구매한 공식 해석 범위 밖으로 확대할 수 없습니다.',
+        sourceDisclosureIndex: 0,
+      }],
+      ambiguities: [{
+        ambiguityRef: 'grounding_ambiguity_global',
+        kind: 'calculation' as const,
+        sourceRef: 'calculationSummary.ambiguity.0',
+        summary: '출생시각의 불확실성이 남아 있습니다.',
+      }],
+    };
+    const f = await setup({
+      ...source,
+      groundingHash: hashCharacterSajuGroundingBundleMaterialV1(source),
+    });
+    const result = await selectCharacterStandardFollowupEvidenceV1(f.input);
+    expect(result.mode).toBe('protected_only');
+    if (result.mode !== 'protected_only') throw Error('global ambiguity lost');
+    expect(result.selectedUnitIds).toEqual([f.ids[0]]);
+    expect(result.requiredDisclosureRefs).toEqual(['grounding_disclosure_global']);
+    expect(result.requiredAmbiguityRefs).toEqual(['grounding_ambiguity_global']);
+  });
+
   it('requires clarification when no validated prior answer is present', async () => {
     const f = await setup();
     f.readLatestValidatedAnchor.mockResolvedValueOnce(null as never);
@@ -2057,6 +2087,30 @@ describe('A3-kappa first Official Reading question source entry (public OFF)', (
     expect(result.selectedUnitIds).toEqual([primary!.unitId, companion!.unitId]);
     expect(result.requiredDisclosureRefs).toEqual([disclosures[0]!.disclosureRef]);
     expect(result.requiredAmbiguityRefs).toEqual([ambiguities[0]!.ambiguityRef]);
+  });
+
+  it('RR-02 keeps source-global restrictions in the first answer, not just Unit-linked refs', async () => {
+    const primary = previewGrounding().units[0]!;
+    const f = await setup(sourceWithUnits([primary], {
+      disclosures: [{
+        disclosureRef: 'grounding_disclosure_global',
+        type: 'scope_limitation',
+        text: '공식 해석의 범위가 제한되어 있습니다.',
+        sourceDisclosureIndex: 0,
+      }],
+      ambiguities: [{
+        ambiguityRef: 'grounding_ambiguity_global',
+        kind: 'calculation',
+        sourceRef: 'calculationSummary.ambiguity.0',
+        summary: '시간 입력이 불확실합니다.',
+      }],
+    }));
+    const result = await selectCharacterStandardFirstQuestionSourceEntryV1(f.input);
+    expect(result.mode).toBe('protected_only_candidate');
+    if (result.mode !== 'protected_only_candidate') throw Error('global ambiguity lost');
+    expect(result.selectedUnitIds).toEqual([primary.unitId]);
+    expect(result.requiredDisclosureRefs).toEqual(['grounding_disclosure_global']);
+    expect(result.requiredAmbiguityRefs).toEqual(['grounding_ambiguity_global']);
   });
 
   it('rejects a single primary Unit with an unselected independent official Unit', async () => {
