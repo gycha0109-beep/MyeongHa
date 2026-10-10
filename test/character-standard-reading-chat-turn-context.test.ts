@@ -1825,8 +1825,21 @@ describe('A3-eta server-anchored follow-up evidence selection (public OFF)', () 
       publicDisclosureAuthorized: false,
       reason: 'DB_PROVENANCE_AND_FINAL_DISCLOSURE_PENDING',
       assistantAnchorMessageId: f.anchor.assistantMessageId,
+      subjectId: f.input.grounded.scope.subjectId,
+      threadId: f.input.grounded.scope.threadId,
       readingRef: READING_ID,
       readerCharacterId: 'baekheon',
+      contentRevision: f.input.grounded.scope.contentRevision,
+      contentReleaseId: f.input.grounded.scope.contentReleaseId,
+      readerContentBundleId: f.input.grounded.scope.readerContentBundleId,
+      effectiveAt: f.input.grounded.scope.effectiveAt,
+      productId: f.input.grounded.scope.productId,
+      productSpecVersion: f.input.grounded.scope.productSpecVersion,
+      productRuleVersion: f.input.grounded.scope.productRuleVersion,
+      approvedPolicyRevision: f.input.grounded.scope.approvedPolicyRevision,
+      focusedUnitRef: f.ids[0],
+      requiredDisclosureRefs: questionScope.evidence.requiredDisclosureRefs,
+      requiredAmbiguityRefs: [],
       scopeHash: questionScope.scopeHash,
       sourceUnitRefs: [f.ids[0]],
       officialArtifactResponseHash: f.input.grounded.scope.officialArtifactResponseHash,
@@ -1834,9 +1847,12 @@ describe('A3-eta server-anchored follow-up evidence selection (public OFF)', () 
       utteranceId: candidate.utterance.utteranceId,
     });
     expect(guarded.utteranceHash).toMatch(/^sha256:v1:[0-9a-f]{64}$/u);
+    expect(guarded.sourceIdentityHash).toMatch(/^sha256:v1:[0-9a-f]{64}$/u);
     expect(guarded.selectionHash).toBe(questionScope.evidence.selectionHash);
     expect(Object.isFrozen(guarded)).toBe(true);
     expect(Object.isFrozen(guarded.sourceUnitRefs)).toBe(true);
+    expect(Object.isFrozen(guarded.requiredDisclosureRefs)).toBe(true);
+    expect(Object.isFrozen(guarded.requiredAmbiguityRefs)).toBe(true);
     expect(() => assertServerGuardedStandardReaderOutputHoldV1(guarded)).not.toThrow();
     expect(() => assertServerGuardedStandardReaderOutputHoldV1({ ...guarded }))
       .toThrow(/unavailable/u);
@@ -1844,6 +1860,8 @@ describe('A3-eta server-anchored follow-up evidence selection (public OFF)', () 
     expect(guarded).not.toHaveProperty('envelope');
     expect(guarded).not.toHaveProperty('committedMessageId');
     expect(guarded).not.toHaveProperty('publicReply');
+    expect(guarded).not.toHaveProperty('entitlementGrantId');
+    expect(guarded).not.toHaveProperty('canCommit');
   });
 
   it('RR-06 Output Guard rejects unminted candidate, cloned source, and a different question focus', async () => {
@@ -1861,6 +1879,24 @@ describe('A3-eta server-anchored follow-up evidence selection (public OFF)', () 
     expect(() => make({ questionScope: { ...questionScope } })).toThrow(/unavailable/u);
     const other = await setup();
     expect(() => make({ grounded: other.input.grounded })).toThrow();
+  });
+
+  it('RR-06 hold source identity is deterministic and cannot be reused across separately minted source snapshots', async () => {
+    const first = await oneUnitSemanticCandidate();
+    const second = await oneUnitSemanticCandidate();
+    const emit = (v: typeof first) => guardCharacterStandardReaderFinalOutputV1({
+      grounded: v.f.input.grounded, questionScope: v.questionScope,
+      candidate: v.candidate, rendererDraft: cosmetics(),
+    });
+    const a = emit(first);
+    const b = emit(second);
+    expect(a.sourceIdentityHash).toBe(b.sourceIdentityHash);
+    expect(a.sourceUnitRefs).toEqual(b.sourceUnitRefs);
+    expect(a.publicDisclosureAuthorized).toBe(false);
+    expect(b.publicDisclosureAuthorized).toBe(false);
+    expect(() => assertServerGuardedStandardReaderOutputHoldV1({
+      ...a, sourceIdentityHash: b.sourceIdentityHash,
+    })).toThrow(/unavailable/u);
   });
 
   it('RR-06 Output Guard refuses free-form claims, protected echoes, and unapproved side effects', async () => {

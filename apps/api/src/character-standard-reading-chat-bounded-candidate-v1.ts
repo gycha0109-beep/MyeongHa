@@ -192,14 +192,27 @@ export type CharacterStandardReaderOutputHoldV1 = Readonly<{
   readonly scopeHash: string;
   readonly selectionHash: string;
   readonly assistantAnchorMessageId: string;
+  readonly subjectId: string;
+  readonly threadId: string;
   readonly readingRef: string;
   readonly readerCharacterId: string;
+  readonly contentRevision: number;
+  readonly contentReleaseId: string;
+  readonly readerContentBundleId: string;
+  readonly effectiveAt: string;
+  readonly productId: string;
+  readonly productSpecVersion: string;
+  readonly productRuleVersion: string;
+  readonly approvedPolicyRevision: string;
   readonly officialArtifactResponseHash: string;
   readonly groundingHash: string;
+  readonly focusedUnitRef: string;
   readonly utteranceId: string;
   readonly utteranceHash: string;
+  readonly sourceIdentityHash: string;
   readonly sourceUnitRefs: readonly string[];
   readonly requiredDisclosureRefs: readonly string[];
+  readonly requiredAmbiguityRefs: readonly string[];
 }>;
 
 const mintedOutputHolds = new WeakSet<object>();
@@ -249,6 +262,9 @@ export function guardCharacterStandardReaderFinalOutputV1(input: Readonly<{
       candidate.utterance.requestedDomain !== scope.sajuDomain ||
       evidence.readingRef !== scope.readingId ||
       evidence.readerCharacterId !== scope.readerCharacterId ||
+      evidence.requestedDomain !== scope.sajuDomain ||
+      !candidate.sourceUnitRefs.includes(evidence.focusedUnitRef) ||
+      evidence.requiredAmbiguityRefs.length !== 0 ||
       evidence.subjectId !== scope.subjectId ||
       evidence.threadId !== scope.threadId ||
       evidence.officialArtifactResponseHash !== scope.officialArtifactResponseHash ||
@@ -292,6 +308,30 @@ export function guardCharacterStandardReaderFinalOutputV1(input: Readonly<{
       envelope.relationshipEventProposals.length !== 0 ||
       envelope.suggestedActions.length !== 0) failOutputHold();
 
+  // Persisting a follow-up later requires *all* source and policy pins, not
+  // just Unit refs. This digest is an inert T1 snapshot, NOT a DB trust proof:
+  // the final DB transaction must independently validate every current source.
+  const sourcePins = Object.freeze({
+    subjectId: scope.subjectId,
+    threadId: scope.threadId,
+    readingRef: scope.readingId,
+    readerCharacterId: scope.readerCharacterId,
+    contentRevision: scope.contentRevision,
+    contentReleaseId: scope.contentReleaseId,
+    readerContentBundleId: scope.readerContentBundleId,
+    effectiveAt: scope.effectiveAt,
+    productId: scope.productId,
+    productSpecVersion: scope.productSpecVersion,
+    productRuleVersion: scope.productRuleVersion,
+    approvedPolicyRevision: scope.approvedPolicyRevision,
+    officialArtifactResponseHash: scope.officialArtifactResponseHash,
+    groundingHash: grounding.groundingHash,
+    focusedUnitRef: evidence.focusedUnitRef,
+    sourceUnitRefs: Object.freeze([...candidate.sourceUnitRefs]),
+    requiredDisclosureRefs: Object.freeze([...candidate.requiredDisclosureRefs]),
+    requiredAmbiguityRefs: Object.freeze([...evidence.requiredAmbiguityRefs]),
+  });
+
   const output: CharacterStandardReaderOutputHoldV1 = Object.freeze({
     mode: 'output_guarded_hold' as const,
     schemaVersion: STANDARD_READER_OUTPUT_HOLD_VERSION_V1,
@@ -301,15 +341,12 @@ export function guardCharacterStandardReaderFinalOutputV1(input: Readonly<{
     scopeHash: input.questionScope.scopeHash,
     selectionHash: evidence.selectionHash,
     assistantAnchorMessageId: evidence.assistantMessageId,
-    readingRef: scope.readingId,
-    readerCharacterId: scope.readerCharacterId,
-    officialArtifactResponseHash: scope.officialArtifactResponseHash,
-    groundingHash: grounding.groundingHash,
+    ...sourcePins,
+    sourceIdentityHash: 'sha256:v1:' + createHash('sha256')
+      .update(canonicalJson(sourcePins)).digest('hex'),
     utteranceId: candidate.utterance.utteranceId,
     utteranceHash: 'sha256:v1:' + createHash('sha256')
       .update(canonicalJson(candidate.utterance)).digest('hex'),
-    sourceUnitRefs: Object.freeze([...candidate.sourceUnitRefs]),
-    requiredDisclosureRefs: Object.freeze([...candidate.requiredDisclosureRefs]),
   });
   mintedOutputHolds.add(output);
   return output;
