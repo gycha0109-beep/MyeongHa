@@ -34,9 +34,13 @@ select
   pg_catalog.pg_has_role(session_user, 'myeongha_api_executor', 'MEMBER') as "isApiMember",
   pg_catalog.pg_has_role(session_user, 'myeongha_seyeon_governed_executor', 'MEMBER') as "isGovernedMember",
   pg_catalog.pg_has_role(session_user, 'myeongha_seyeon_cost_meter_owner', 'MEMBER') as "isCostOwnerMember",
+  pg_catalog.has_function_privilege(
+    'myeongha_seyeon_settlement_worker',
+    'public.cmd_settle_seyeon_ai_call_detached_v1(uuid,uuid,uuid,text,jsonb)',
+    'EXECUTE') as "workerCanSettle",
   pg_catalog.has_function_privilege(session_user,
     'public.cmd_settle_seyeon_ai_call_detached_v1(uuid,uuid,uuid,text,jsonb)',
-    'EXECUTE') as "canSettle",
+    'EXECUTE') as "canDirectSettle",
   pg_catalog.has_function_privilege(session_user,
     'public.cmd_governed_start_seyeon_ai_call_v1(uuid,uuid,uuid,text,uuid,text,text,text,text,text,bigint,bigint,bigint)',
     'EXECUTE') as "canStart",
@@ -117,7 +121,8 @@ export function verifySeyeonDetachedWorkerLoginV1(
       row.hasWorkerRole !== true || row.otherMemberships !== 0 ||
       row.isApiMember !== false || row.isGovernedMember !== false ||
       row.isCostOwnerMember !== false ||
-      row.canSettle !== true || row.canStart !== false ||
+      row.workerCanSettle !== true || row.canDirectSettle !== false ||
+      row.canStart !== false ||
       row.canReadLedger !== false || row.canReadBudget !== false) {
     fail();
   }
