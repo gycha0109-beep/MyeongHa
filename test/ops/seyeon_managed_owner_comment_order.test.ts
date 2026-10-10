@@ -59,13 +59,13 @@ describe('non-superuser managed function owner COMMENT staging', () => {
     const shadow = readFileSync('test/db/seyeon_remote_bundle_pg17_isolated.sh', 'utf8');
     expect(prod).toContain('stage-seyeon-managed-owner-comment-order.py');
     expect(shadow).toContain('stage-seyeon-managed-owner-comment-order.py');
-    expect(shadow).toContain('grant myeongha_relationship_apply_owner to postgres with admin true, inherit false, set false;');
-    expect(shadow).toContain('Expected one restricted direct managed-owner grant.');
-    expect(shadow).toContain('alter role postgres nosuperuser createrole createdb');
-    expect(shadow).toContain('create role seyeon_fixture_demoter superuser noinherit nologin');
-    expect(shadow).toContain('set role seyeon_fixture_demoter; alter role postgres nosuperuser createrole createdb');
-    expect(shadow).toContain('Disposable connected PG17 executor retained superuser privileges.');
-    expect(shadow).toContain('Disposable PG17 executor is unexpectedly superuser.');
+    expect(shadow).toContain('create role seyeon_pg17_executor nosuperuser createrole createdb bypassrls inherit nologin');
+    expect(shadow).toContain('with admin true, inherit false, set false');
+    expect(shadow).toContain("member.rolname='seyeon_pg17_executor'");
+    expect(shadow).toContain("rolname='seyeon_pg17_executor' and not rolsuper");
+    expect(shadow).toContain("-c 'set role seyeon_pg17_executor'");
+    expect(shadow).toContain("current_user='seyeon_pg17_executor'");
+    expect(shadow).not.toContain('alter role postgres nosuperuser');
     for (const name of names) {
       expect(prod).toContain('managed-owner-migrations/' + name);
       expect(shadow).toContain('managed-owner-migrations/');
