@@ -30,6 +30,7 @@ describe('Se-yeon scoped Production relationship migration restore', () => {
     expect(code).toContain('source_encrypted_sha256');
     expect(code).toContain('SUPABASE_PRODUCTION_SERVER_ROOT_CERT_PEM');
     expect(code).toContain('PGSSLMODE=verify-full');
+    expect(code).toContain('seyeon-production-acl-recovery-readonly.sql');
     expect(code).toContain('current protected main HEAD');
   });
   it('isolates manual backfill from ordinary Production migration deployment', () => {
@@ -48,6 +49,8 @@ describe('Se-yeon scoped Production relationship migration restore', () => {
     expect(pre).toContain('relationship_state_snapshots');
     expect(pre).toContain('4f38e4483061a84899f0fcaa4a8d6cfa9e09ce1553b1d31089d4de9154c4d894');
     expect(pre).toContain('seyeon_before_backfill_fingerprint');
+    expect(pre).toContain('seyeon_before_owner_membership');
+    expect(post).toContain('owner role memberships changed');
     expect(pre).toContain('later dependent migrations already present');
     expect(pre).toContain('later history marker names have changed');
     for (const version of ['1400','1410','1420','1430','1440','1450']) {
