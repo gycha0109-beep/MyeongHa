@@ -47,6 +47,26 @@ describe('Se-yeon scoped Production relationship migration restore', () => {
     expect(pre).toContain('pg_try_advisory_xact_lock(14001450)');
     expect(pre).toContain('relationship_event_records');
     expect(pre).toContain('relationship_state_snapshots');
+    // Historical rows, legacy ledger and even a current-state row require a
+    // dedicated data review: the zero-row restoration cannot silently expand.
+    const guardedRelations = [
+      'relationship_history_entries', 'relationship_event_records',
+      'relationship_event_adjustments', 'relationship_event_links',
+      'relationship_event_provenance_refs', 'relationship_state_snapshots',
+      'relationship_events', 'user_character_states',
+    ];
+    for (const table of guardedRelations) {
+      expect(pre).toContain(table);
+      expect(post).toContain(table);
+    }
+    expect(pre).toContain("relationship RLS or browser table privileges drifted");
+    expect(post).toContain("relationship RLS or browser table privileges changed");
+    for (const role of ["anon", "authenticated"]) {
+      expect(pre).toContain("has_table_privilege('" + role + "'");
+      expect(post).toContain("has_table_privilege('" + role + "'");
+    }
+    expect(pre).toContain("related history/legacy/current-state records exist");
+    expect(post).toContain("related history/legacy/current-state records changed");
     expect(pre).toContain('4f38e4483061a84899f0fcaa4a8d6cfa9e09ce1553b1d31089d4de9154c4d894');
     expect(pre).toContain('seyeon_before_backfill_fingerprint');
     expect(pre).toContain('seyeon_before_owner_membership');

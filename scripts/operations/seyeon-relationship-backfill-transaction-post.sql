@@ -78,6 +78,31 @@ begin
      or (select count(*) from public.relationship_state_snapshots) <> 0 then
     raise exception 'HOLD_SEYEON_BACKFILL: unexpected relationship row creation';
   end if;
+  if (select count(*) from pg_catalog.pg_class c
+      join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+      where n.nspname = 'public'
+        and c.relname in (
+          'relationship_history_entries',
+          'relationship_event_records',
+          'relationship_event_adjustments',
+          'relationship_event_links',
+          'relationship_event_provenance_refs',
+          'relationship_state_snapshots')
+        and c.relkind = 'r'
+        and c.relrowsecurity
+        and not pg_catalog.has_table_privilege('anon', c.oid, 'SELECT,INSERT,UPDATE,DELETE')
+        and not pg_catalog.has_table_privilege('authenticated', c.oid, 'SELECT,INSERT,UPDATE,DELETE')
+  ) <> 6 then
+    raise exception 'HOLD_SEYEON_BACKFILL: relationship RLS or browser table privileges changed';
+  end if;
+  if exists (select 1 from public.relationship_history_entries)
+     or exists (select 1 from public.relationship_event_adjustments)
+     or exists (select 1 from public.relationship_event_links)
+     or exists (select 1 from public.relationship_event_provenance_refs)
+     or exists (select 1 from public.relationship_events)
+     or exists (select 1 from public.user_character_states) then
+    raise exception 'HOLD_SEYEON_BACKFILL: related history/legacy/current-state records changed';
+  end if;
 end $seyeon_assert_before_markers$;
 
 insert into supabase_migrations.schema_migrations(version,name)

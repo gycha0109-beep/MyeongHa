@@ -49,3 +49,10 @@ GitHub에서 보호된 `main` SHA와 일치하는 배포 실행에만 입장합�
 - **복구 성공:** 정확한 scope의 실DB 카탈로그와 이력 조회, 권한 불변, 복구 아티팩트/실행 로그까지 합격해야 인정.
 
 상세 작업 근거: #1887. 보안 최종 판정: #1866 (G6 별도).
+
+## 2026-10-11 후속: 관계 전체 0건 및 RLS/브라우저 ACL 경계 강화
+
+- 읽기 전용 Production 카탈로그/집계 확인: `relationship_history_entries`, `relationship_event_records`, `relationship_event_adjustments`, `relationship_event_links`, `relationship_event_provenance_refs`, `relationship_state_snapshots`, legacy `relationship_events`, `user_character_states` **각각 0건**. `chat_turn_attempts`는 **7건**으로 무관한 사용자 레코드 원문을 조회하지 않았습니다.
+- 관계 history 6개 테이블은 **RLS 6/6 활성**, `anon`/`authenticated` 직접 SELECT 권한 없음, `myeongha_api_executor` 직접 INSERT 없음, 테이블 Owner는 `postgres`. 이 감사는 운영 Role/RLS 전체 무결성 검증을 대체하지 않습니다.
+- 운영 전용 원자적 백필의 pre/post SQL은 관계 8개 테이블(레거시·현재 projection 포함)에 한 건이라도 존재하면 **HOLD**하고, 관계 6개 테이블 RLS 및 익명/인증된 웹 역할의 직접 DML 권한이 달라지면 **HOLD**합니다. 사전/사후 둘 다 검사하고, 오류 시 전체 트랜잭션이 롤백됩니다.
+- 이 확장은 **유효한 관계 데이터가 있는 운영 환경을 복구 가능하다고 입증하지 않습니다.** 데이터가 발생하면 별도 복구 설계·다중 Subject 및 FK/Deferred/Trigger 검증·Owner 승인이 필요합니다. 기존 백업/실복원·프로덕션 승인 필수, G6 및 공개/개인 기록 모델 입력 계속 HOLD.
