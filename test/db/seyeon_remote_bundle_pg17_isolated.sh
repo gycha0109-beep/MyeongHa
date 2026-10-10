@@ -9,7 +9,7 @@ export PGOPTIONS='-c log_min_messages=panic -c log_min_error_statement=panic -c 
 hold() { echo "HOLD_SEYEON_PG17: $1" >&2; exit 1; }
 root="$(cd "$(dirname "$0")/../.." && pwd)"
 [[ "${CI:-}" == true && "${PGHOST:-}" == localhost &&
-   "${PGUSER:-}" == postgres && "${PGDATABASE:-}" == myeongha_test ]] ||
+   "${PGUSER:-}" == seyeon_pg17_bootstrap && "${PGDATABASE:-}" == myeongha_test ]] ||
   hold 'Disposable CI PostgreSQL required.'
 [[ -z "${SUPABASE_DB_PASSWORD:-}" && -z "${SUPABASE_PRODUCTION_SESSION_POOLER_HOST:-}" ]] ||
   hold 'Production connection settings forbidden.'
@@ -46,6 +46,13 @@ PGDATABASE="$origin" dropdb --if-exists "$shadow" >/dev/null 2>&1 ||
 PGDATABASE="$origin" createdb "$shadow" || hold 'Local shadow creation failure.'
 export PGDATABASE="$shadow"
 cd "$root"
+# Discardable fixture: retain the stock bootstrap privilege under a separate
+# role identity. The real Production executor must be named 'postgres' but is
+# NOT the bootstrap superuser. Avoid attempting to demote bootstrap OID 10.
+psql -X -q -v ON_ERROR_STOP=1 \
+  -c 'create role postgres nosuperuser createrole createdb bypassrls inherit nologin;' \
+  >/dev/null 2>"$tempdir/prod-actor-fixture.err" ||
+  hold 'Unable to prepare isolated nonbootstrap postgres executor role.'
 apply() {
   local filename
   filename="$(basename "$1")"
@@ -160,22 +167,17 @@ python3 scripts/operations/stage-seyeon-managed-owner-comment-order.py \
   --source-dir "$root/supabase/migrations" \
   --output-dir "$tempdir/managed-owner-migrations" >/dev/null ||
   hold 'Managed-owner SQL staging failed against exact approved source.'
-# A stock postgres:17.6 role is the bootstrap superuser (OID 10).
-# PostgreSQL 17 expressly forbids changing the bootstrap role's SUPERUSER
-# property, even through SET ROLE to a second superuser. Never claim that a
-# successful stock-postgres CI replay proves Production non-superuser behavior.
-# Use a dedicated disposable executor with matching Production role attributes
-# (NOSUPERUSER, CREATEROLE, CREATEDB, BYPASSRLS, INHERIT) for the guarded SQL.
-# This fixture grants ONLY the test executor requisite schema/table access;
-# Production actor ownership parity still needs separate authority review.
+# Existing scoped Production pre/post SQL require exact current_user='postgres'.
+# Here 'postgres' is an independent disposable NON-superuser while
+# seyeon_pg17_bootstrap stays superuser only for historical fixture setup.
+# This avoids both falsely passing as root and weakening immutable authority.
 psql -X -q -v ON_ERROR_STOP=1 >/dev/null 2>"$tempdir/executor-fixture.err" <<'SQL'
-create role seyeon_pg17_executor nosuperuser createrole createdb bypassrls inherit nologin;
-grant usage, create on schema public to seyeon_pg17_executor;
-grant usage on schema supabase_migrations to seyeon_pg17_executor;
-grant select, insert on supabase_migrations.schema_migrations to seyeon_pg17_executor;
-grant select, insert, update, delete on all tables in schema public to seyeon_pg17_executor;
-grant usage, select on all sequences in schema public to seyeon_pg17_executor;
-grant myeongha_relationship_apply_owner to seyeon_pg17_executor
+grant usage, create on schema public to postgres;
+grant usage on schema supabase_migrations to postgres;
+grant select, insert on supabase_migrations.schema_migrations to postgres;
+grant select, insert, update, delete on all tables in schema public to postgres;
+grant usage, select on all sequences in schema public to postgres;
+grant myeongha_relationship_apply_owner to postgres
   with admin true, inherit false, set false;
 SQL
 [[ "$(psql -X -qAt -v ON_ERROR_STOP=1 -c "
@@ -183,14 +185,14 @@ SQL
     join pg_roles owner on owner.oid=m.roleid
     join pg_roles member on member.oid=m.member
   where owner.rolname='myeongha_relationship_apply_owner'
-    and member.rolname='seyeon_pg17_executor'
+    and member.rolname='postgres'
     and m.admin_option=true and m.inherit_option=false and m.set_option=false")" == 1 ]] ||
-  hold 'Expected exact restricted non-superuser owner membership fixture.'
+  hold 'Expected exact restricted Production-named owner membership fixture.'
 [[ "$(psql -X -qAt -v ON_ERROR_STOP=1 -c "
   select count(*) from pg_roles
-  where rolname='seyeon_pg17_executor' and not rolsuper and rolcreaterole
+  where rolname='postgres' and oid <> 10 and not rolsuper and rolcreaterole
     and rolcreatedb and rolbypassrls and rolinherit")" == 1 ]] ||
-  hold 'Production-like fixture role attributes diverged.'
+  hold 'Production-named fixture actor is bootstrap or superuser.'
 
 set --
 for n in 1400 1410 1420 1430 1440 1450; do
@@ -204,8 +206,8 @@ for n in 1400 1410 1420 1430 1440 1450; do
 done
 # Exercise the exact guarded Production transaction pre/post assertions in
 # the isolated PG17 test, so its SQL is never only statically checked.
-set -- -c 'set role seyeon_pg17_executor' \
-  -c "select 1 / case when current_user='seyeon_pg17_executor'
+set -- -c 'set role postgres' \
+  -c "select 1 / case when current_user='postgres'
     and not (select rolsuper from pg_roles where rolname=current_user)
     then 1 else 0 end" \
   -f scripts/operations/seyeon-relationship-backfill-transaction-pre.sql "$@" \
