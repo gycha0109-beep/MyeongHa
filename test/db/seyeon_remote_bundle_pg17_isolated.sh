@@ -193,7 +193,7 @@ psql -X -q -v ON_ERROR_STOP=1 -c 'alter role postgres nosuperuser createrole cre
 set --
 for n in 1400 1410 1420 1430 1440 1450; do
   count=0
-  for file in "$tempdir/managed-owner-migrations/"$n"_*.sql; do
+  for file in "$tempdir/managed-owner-migrations/${n}_"*.sql; do
     [[ -f "$file" ]] || hold 'Missing early migration.'
     set -- "$@" -f "$file"
     count=$((count+1))
