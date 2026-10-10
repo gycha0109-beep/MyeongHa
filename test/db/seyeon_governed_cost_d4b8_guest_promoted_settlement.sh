@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 # Watchtower-Track: character-memory
-[[ "$PGDATABASE" == 'myeongha_seyeon_d4b8_test' ]] || exit 2
+[[ "$PGDATABASE" == 'myeongha_seyeon_d4b8a_test' ]] || exit 2
 db() { psql -X -qAt -F '|' -v ON_ERROR_STOP=1 --set=VERBOSITY=verbose "$@"; }
 tmp="$(mktemp -d)"
 trap 'db -c "drop role if exists myeongha_seyeon_d4_login_ci" >/dev/null 2>&1 || true; rm -rf "$tmp"' EXIT
