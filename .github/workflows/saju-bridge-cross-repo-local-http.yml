@@ -7,6 +7,10 @@ on:
       - scripts/local/verify-saju-bridge-http.mjs
       - test/saju-held-cross-repo-local-http.test.ts
       - test/saju-held-cross-repo-local-postgres-nonce.test.ts
+      - test/saju-held-cross-repo-local-postgres-current-birth.test.ts
+      - test/db/fixtures/saju_local_subject_birth_proof_e2e.sql
+      - apps/api/src/saju-held-source-proof-revision-binding-v1.ts
+      - apps/api/src/current-subject-saju-calculation-http.ts
   workflow_dispatch:
 
 permissions:
@@ -67,11 +71,18 @@ jobs:
       - name: Build actual Saju proof issuer
         working-directory: saju
         run: npm run build
-      - name: Bootstrap one-use local-only nonce registry and client-denial roles
+      - name: Bootstrap complete disposable Subject, Birth, and nonce authority
         working-directory: myeongha
+        shell: bash
         run: |
+          set -euo pipefail
+          test "$(psql -X -Atqc 'select current_database()')" = 'myeongha_saju_local_verify'
           psql -X -v ON_ERROR_STOP=1 -f test/db/bootstrap_supabase_auth_stub.sql
-          psql -X -v ON_ERROR_STOP=1 -f supabase/migrations/1540_saju_source_proof_nonce_claim_authority_v1.sql
-      - name: Verify real HTTP loopback, signature, and PostgreSQL atomic claims
+          for migration in supabase/migrations/*.sql; do
+            echo "Applying $(basename "$migration") to disposable CI DB"
+            psql -X -v ON_ERROR_STOP=1 -f "$migration" >/dev/null
+          done
+          psql -X -v ON_ERROR_STOP=1 -f test/db/fixtures/saju_local_subject_birth_proof_e2e.sql
+      - name: Verify real HTTP, HMAC, PostgreSQL nonce and current Birth revision binding
         working-directory: myeongha
         run: node scripts/local/verify-saju-bridge-http.mjs ../saju
