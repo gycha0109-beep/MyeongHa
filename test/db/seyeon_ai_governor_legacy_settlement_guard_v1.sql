@@ -30,9 +30,6 @@ begin
     'anon',
     'public.seyeon_ai_settle_internal_v1(uuid,uuid,uuid,text,jsonb)',
     'EXECUTE'
-  ) or pg_catalog.has_function_privilege(
-    'public.seyeon_ai_settle_internal_v1(uuid,uuid,uuid,text,jsonb)',
-    'EXECUTE'
   ) then
     raise exception 'Internal settlement helper was executable by public or API roles';
   end if;
