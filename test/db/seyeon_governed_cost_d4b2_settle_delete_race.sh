@@ -121,7 +121,8 @@ db -c "select deletion_job_id from public.cmd_start_account_deletion_v1(
 # Mark those synthetic events processed so that the approved finalizer's
 # existing preflight can evaluate the exact deletion outbox lease.
 db -c "update public.outbox_events
-  set status='processed',locked_at=null,lock_owner=null,lease_expires_at=null
+  set status='processed',processed_at=clock_timestamp(),
+      locked_at=null,lock_owner=null,lease_expires_at=null
   where aggregate_type<>'data_deletion_job'
     and (payload_jsonb->>'subjectId'='$subject'
       or (aggregate_type='chat_turn' and aggregate_id in
