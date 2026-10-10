@@ -27,7 +27,7 @@ export interface OfficialReadingReaderThreadLocatorAuthorityPortV1 {
 
 export interface ResolveOfficialReadingReaderThreadInputV1 {
   /** The authenticated canonical Subject from the existing DB transaction. */
-  readonly resolvedSubjectId?: string;
+  readonly resolvedSubjectId?: string | undefined;
   /** Must be derived from that same server-side Subject resolution. */
   readonly resolvedSubjectKind: 'member' | 'guest';
   /** Selectors only; neither is an authorization credential. */
