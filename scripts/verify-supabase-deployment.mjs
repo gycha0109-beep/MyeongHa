@@ -184,4 +184,18 @@ if (!migrationFiles.includes('0010_auth_owner.sql')) {
   throw new Error('Expected baseline migration 0010_auth_owner.sql is missing.');
 }
 
+const migrationVersionOwner = new Map();
+for (const name of migrationFiles.filter((file) => file.endsWith('.sql'))) {
+  const match = /^(\\d+)_[^/]+\\.sql$/.exec(name);
+  if (!match) throw new Error(`Invalid Supabase migration filename: ${name}`);
+  const version = match[1];
+  const existing = migrationVersionOwner.get(version);
+  if (existing !== undefined) {
+    throw new Error(
+      `Duplicate Supabase migration version ${version}: ${existing} and ${name}`,
+    );
+  }
+  migrationVersionOwner.set(version, name);
+}
+
 console.log(`MyeongHa Supabase deployment configuration + auditable main-push gate + explicit Session Pooler-only post-deploy verification passed for ${migrationFiles.length} migration files.`);
