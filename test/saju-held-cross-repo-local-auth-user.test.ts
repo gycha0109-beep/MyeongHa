@@ -225,7 +225,7 @@ describe.skipIf(!enabled)('synthetic signed Auth user -> production verifier -> 
       authServer!.once('error', reject);
       authServer!.listen(0, '127.0.0.1', resolve);
     });
-    const bound = authServer.address();
+    const bound = authServer!.address();
     if (!bound || typeof bound === 'string') throw new Error('Synthetic Auth loopback failed.');
     authPort = bound.port;
     const db = await subjectPool!.query<{ name: string }>(
