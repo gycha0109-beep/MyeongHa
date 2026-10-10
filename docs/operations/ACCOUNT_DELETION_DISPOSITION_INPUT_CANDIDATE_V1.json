@@ -6,8 +6,8 @@
   "executionAuthorized": false,
   "graphRef": {
     "schema": "myeongha-transitive-subject-dependency-graph-v1",
-    "edgeCount": 140,
-    "distinctReachableTableCount": 59,
+    "edgeCount": 146,
+    "distinctReachableTableCount": 60,
     "maxDepth": 4
   },
   "tableDispositions": [
@@ -36,13 +36,13 @@
       "retentionDurationDays": null
     },
     {
-      "table": "character_unlocks",
+      "table": "character_reading_artifacts",
       "disposition": "UNDECIDED",
       "authorityReference": null,
       "retentionDurationDays": null
     },
     {
-      "table": "character_reading_artifacts",
+      "table": "character_unlocks",
       "disposition": "UNDECIDED",
       "authorityReference": null,
       "retentionDurationDays": null
@@ -193,6 +193,12 @@
     },
     {
       "table": "notifications",
+      "disposition": "UNDECIDED",
+      "authorityReference": null,
+      "retentionDurationDays": null
+    },
+    {
+      "table": "official_reader_assistant_saju_provenance",
       "disposition": "UNDECIDED",
       "authorityReference": null,
       "retentionDurationDays": null
