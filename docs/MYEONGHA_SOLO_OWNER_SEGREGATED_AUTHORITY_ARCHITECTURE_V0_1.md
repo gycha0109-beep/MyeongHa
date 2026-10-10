@@ -231,6 +231,15 @@ previousEventDigest, eventDigest, externalAuditReceipt?
 - **모든 필드는 호출자가 제출한 합성 주장**이다. 실제 패스키 서명, 인증 이벤트의 저장소 출처, workload IAM, Root KMS custody, 감사 원장 불변성, 안전한 서버 시간은 이 함수에서 증명하지 않는다. `CONSISTENT_UNVERIFIED_ORIGIN`은 형식 일치일 뿐 승인·실행권이 아니다. 소유권·신원 검증을 오인하지 않도록 `humanReviewersVerified=0`, `ownerAuthentication=NOT_VERIFIED`, `stagingAdmission=HOLD`, 실행/판매 플래그 모두 false를 반환한다.
 - 허용되지 않는 principal 결합, 잘못된 환경·Permit·SHA·digest, 만료/변조·P4 주입, 악의적 getter·prototype/secret injection은 `BLOCKED`. 기존 Registry/Permit V2·Evidence/Runner 코드와 **연결하지 않는다**. 테스트는 `test/saju-held-staging-solo-owner-intent-v1.test.ts`.
 
+## 12B. SO-2 합성 서명 Registry → 단조 증가 저장소 결속
+
+- 구현: `apps/api/src/saju-held-staging-registry-floor-v1.ts`의 `assessSajuSoloOwnerRegistryFloorV1`. 별도 port의 Root SPKI pin/revision floor/시간 조회 후 기존 Ed25519 Registry canonical signature 검증을 수행한다.
+- 서명 검증에 성공한 경우에만 exact environment/Root ID/SPKI SHA-256, expected floor, Registry revision, Registry bytes SHA-256을 고정된 **쓰기 요청**으로 전달한다. 포트의 최종 비교·원자적 증가·revocation 확인 및 확실한 ACK가 아니면 HOLD.
+- 실패/만료/가짜 서명/다른 Root/환경/버전 rollback/지문 오류/저장소 장애/응답 미확인에 자동 재시도는 없다. 결과가 긍정적이어도 `SIGNED_CLAIM_WRITE_ACK_UNVERIFIED_CUSTODY`, 운영 관련 상태는 전부 `NOT_VERIFIED/HOLD`, 실행/배포/판매 false다.
+- `test/db/fixtures/saju_so2_registry_floor_ci.sql` 및 `test/db/saju_so2_registry_floor_authority.sh`는 **폐기형 PostgreSQL**에서 등록자·소비자·철회자 역할 ACL 분리, 서명 검증 완료를 **주장하는** 별도 Receipt, 조건부 원자 floor + 모델 high-water 갱신, 동시 재사용/전원 재시도, backup rewind/rollback/revoke 차단을 시험한다. PostgreSQL은 **Ed25519 검증 자체를 수행하지 않으며**, 등록자가 거짓 Receipt를 만들 수 있고 모델 anchor도 같은 DB 내에 있다는 한계를 명시한다.
+- 운용 시 별도 읽기 전용 custody provider의 실제 신원/IAM 및 외부 immutable high-water anchor 출처, 원자적 버전 보관·철회, 백업 복원 검증, 감사/권한 분리의 독립 실측이 별도로 필요하다. 인프라·운영 DB·KMS 생성/GRANT·실행 연결 없음.
+- 상세 보안 결함과 수용 범위: [SO-2 검증 경계](./SAJU_SOLO_OWNER_SO2_REGISTRY_FLOOR_SYNTHETIC.md).
+
 ## 13. 단계별 마이그레이션 및 종료 게이트
 
 | 단계 | 내용 | 통과 조건 | 미통과 시 |

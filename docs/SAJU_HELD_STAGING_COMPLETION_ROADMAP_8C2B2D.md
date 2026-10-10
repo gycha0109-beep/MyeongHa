@@ -72,6 +72,10 @@ Watchtower-Track: saju-bridge
 - 사람 2명을 전제로 한 과거 운영 요구는 1인 운영 정책으로 재설계하되, 기술적 독립이 사람 2명의 심사와 같다는 증빙을 만들지 않는다.
 - SO-0 설계와 합성 CI만 완료해도 운영 Root·실환경 R01–R14·2D-4는 NOT_VERIFIED/HOLD이며 실제 KMS/계정 생성·비용·Runner는 별도 승인 전 금지.
 
+## 2F. SO-2 Registry 서명과 단조 Floor의 합성 결속
+
+1인 Owner 운영 정책 SO-2의 폐기형 검증을 `apps/api/src/saju-held-staging-registry-floor-v1.ts` 및 PostgreSQL 격리 CI에 추가한다. 서명/Root pin과 floor 변경 결속·role ACL·원자적 고수위·복원 역행·revocation/동시성 테스트가 목표다. **검증된 별도 운영 Root custody/KMS·관리 평면·외부 high-water anchor·실환경 R01–R14를 입증하지 않는다.** 자세한 보안 한계는 [SO-2 검증 경계](./SAJU_SOLO_OWNER_SO2_REGISTRY_FLOOR_SYNTHETIC.md) 참고. `NOT_VERIFIED/HOLD` 및 실행/판매 false 유지.
+
 ## 3. 코드·운영 병렬화와 범위 제한
 
 - 3-04-02의 **명세/테스트 포트**는 실환경 운영 권한 없이 미리 검토 가능하다. Root/KMS/저장소 생성·권한 부여는 별도 운영 결정 후 진행.
