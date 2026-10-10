@@ -8,6 +8,8 @@ import { selectCharacterStandardFollowupEvidenceV1 } from '../apps/api/src/chara
 import {
   prepareCharacterStandardReaderBoundedCandidateV1,
   assertServerGuardedStandardReaderBoundedCandidateV1,
+  guardCharacterStandardReaderFinalOutputV1,
+  assertServerGuardedStandardReaderOutputHoldV1,
 } from '../apps/api/src/character-standard-reading-chat-bounded-candidate-v1.js';
 import {
   selectCharacterStandardFirstQuestionSourceEntryV1,
@@ -1779,6 +1781,104 @@ describe('A3-eta server-anchored follow-up evidence selection (public OFF)', () 
       .toThrow(/unavailable/u);
     expect(candidate).not.toHaveProperty('committedMessageId');
     expect(candidate).not.toHaveProperty('outputGuardEvidence');
+  });
+
+
+  async function oneUnitSemanticCandidate() {
+    const base = previewGrounding();
+    const { groundingHash: _old, ...material } = base;
+    const source = { ...material, units: [material.units[0]!] };
+    const f = await setup({
+      ...source, groundingHash: hashCharacterSajuGroundingBundleMaterialV1(source),
+    });
+    const questionScope = await classifyCharacterStandardFollowupQuestionScopeV1(f.input);
+    const candidate = prepareCharacterStandardReaderBoundedCandidateV1({
+      grounded: f.input.grounded, questionScope,
+    });
+    if (candidate.mode !== 'semantic_guarded_candidate' ||
+        questionScope.mode === 'hold') {
+      throw new Error('synthetic bounded RR-06 source setup unavailable');
+    }
+    return { f, questionScope, candidate };
+  }
+
+  function cosmetics() {
+    return {
+      schemaVersion: 'v1',
+      emotion: 'neutral',
+      memoryProposals: [],
+      relationshipEventProposals: [],
+      suggestedActions: [],
+    };
+  }
+
+  it('RR-06 Output Guard seals the exact prior Assistant anchor and Unit/Reading hashes only as HOLD', async () => {
+    const { f, questionScope, candidate } = await oneUnitSemanticCandidate();
+    const guarded = guardCharacterStandardReaderFinalOutputV1({
+      grounded: f.input.grounded,
+      questionScope,
+      candidate,
+      rendererDraft: cosmetics(),
+    });
+    expect(guarded).toMatchObject({
+      mode: 'output_guarded_hold',
+      publicDisclosureAuthorized: false,
+      reason: 'DB_PROVENANCE_AND_FINAL_DISCLOSURE_PENDING',
+      assistantAnchorMessageId: f.anchor.assistantMessageId,
+      readingRef: READING_ID,
+      readerCharacterId: 'baekheon',
+      scopeHash: questionScope.scopeHash,
+      sourceUnitRefs: [f.ids[0]],
+      officialArtifactResponseHash: f.input.grounded.scope.officialArtifactResponseHash,
+      groundingHash: f.input.grounded.grounding.groundingHash,
+      utteranceId: candidate.utterance.utteranceId,
+    });
+    expect(guarded.utteranceHash).toMatch(/^sha256:v1:[0-9a-f]{64}$/u);
+    expect(guarded.selectionHash).toBe(questionScope.evidence.selectionHash);
+    expect(Object.isFrozen(guarded)).toBe(true);
+    expect(Object.isFrozen(guarded.sourceUnitRefs)).toBe(true);
+    expect(() => assertServerGuardedStandardReaderOutputHoldV1(guarded)).not.toThrow();
+    expect(() => assertServerGuardedStandardReaderOutputHoldV1({ ...guarded }))
+      .toThrow(/unavailable/u);
+    expect(guarded).not.toHaveProperty('utterance');
+    expect(guarded).not.toHaveProperty('envelope');
+    expect(guarded).not.toHaveProperty('committedMessageId');
+    expect(guarded).not.toHaveProperty('publicReply');
+  });
+
+  it('RR-06 Output Guard rejects unminted candidate, cloned source, and a different question focus', async () => {
+    const { f, questionScope, candidate } = await oneUnitSemanticCandidate();
+    const make = (overrides: Record<string, unknown> = {}) =>
+      guardCharacterStandardReaderFinalOutputV1({
+        grounded: f.input.grounded,
+        questionScope,
+        candidate,
+        rendererDraft: cosmetics(),
+        ...overrides,
+      });
+    expect(() => make({ candidate: { ...candidate } })).toThrow(/unavailable/u);
+    expect(() => make({ grounded: { ...f.input.grounded } })).toThrow();
+    expect(() => make({ questionScope: { ...questionScope } })).toThrow(/unavailable/u);
+    const other = await setup();
+    expect(() => make({ grounded: other.input.grounded })).toThrow();
+  });
+
+  it('RR-06 Output Guard refuses free-form claims, protected echoes, and unapproved side effects', async () => {
+    const { f, questionScope, candidate } = await oneUnitSemanticCandidate();
+    const reject = (rendererDraft: unknown) => expect(() =>
+      guardCharacterStandardReaderFinalOutputV1({
+        grounded: f.input.grounded, questionScope, candidate, rendererDraft,
+      })).toThrow(/unavailable/u);
+    reject({ ...cosmetics(), generatedSajuClaim: '조작한 사주 결론' });
+    reject({ ...cosmetics(), framingBefore: '근거 없이 새로운 결론을 내립니다.' });
+    reject({ ...cosmetics(), framingAfter: '독립적인 예언입니다.' });
+    reject({ ...cosmetics(), memoryProposals: [{
+      proposalKind: 'memory', recordType: 'observation', schemaVersion: 'v1',
+      proposedValue: 'sensitive', proposalDedupeKey: 'synthetic',
+    }] });
+    reject({ ...cosmetics(), relationshipEventProposals: ['trust_gain'] });
+    reject({ ...cosmetics(), suggestedActions: [{ actionKey: 'not_approved' }] });
+    reject({ ...cosmetics(), emotion: 'unpublished_emotion' });
   });
 
   it('RR-06 rejects extra narrator-selected Units instead of widening the verified DB focus', async () => {

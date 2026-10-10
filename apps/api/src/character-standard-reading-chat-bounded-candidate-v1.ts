@@ -1,4 +1,9 @@
+import { createHash } from 'node:crypto';
+import { findReadingPublicTrustLanguageViolationV1 } from '../../../packages/character-content/src/index.js';
 import {
+  CHARACTER_OUTPUT_GUARD_VERSION_V1,
+  canonicalJson,
+  guardCharacterRendererOutput,
   guardCharacterSajuSemanticPreservationV2,
   renderCharacterSajuBoundedExactCoreV2,
   resolveCharacterSajuCommonPerspectiveV1,
@@ -163,4 +168,149 @@ export function prepareCharacterStandardReaderBoundedCandidateV1(input: Readonly
   });
   mintedSemanticCandidates.add(result);
   return result;
+}
+
+
+/**
+ * RR-06 non-disclosing last gate. This is a privately verified, source-pinned
+ * HOLD record: not a completed Assistant message, DB provenance row, credential,
+ * public response, or authority to send. DB Owner RR-03/04 and final RR-09
+ * transactional checks must still accept the exact source identities.
+ *
+ * No free-form generated Saju explanation or memory/action side effect enters
+ * this gate. Provider cosmetics are restricted to pinned emotion/animation.
+ */
+export const STANDARD_READER_OUTPUT_HOLD_VERSION_V1 =
+  'myeongha-standard-reader-output-guarded-hold-v1' as const;
+
+export type CharacterStandardReaderOutputHoldV1 = Readonly<{
+  readonly mode: 'output_guarded_hold';
+  readonly schemaVersion: typeof STANDARD_READER_OUTPUT_HOLD_VERSION_V1;
+  readonly guardVersion: typeof CHARACTER_OUTPUT_GUARD_VERSION_V1;
+  readonly publicDisclosureAuthorized: false;
+  readonly reason: 'DB_PROVENANCE_AND_FINAL_DISCLOSURE_PENDING';
+  readonly scopeHash: string;
+  readonly selectionHash: string;
+  readonly assistantAnchorMessageId: string;
+  readonly readingRef: string;
+  readonly readerCharacterId: string;
+  readonly officialArtifactResponseHash: string;
+  readonly groundingHash: string;
+  readonly utteranceId: string;
+  readonly utteranceHash: string;
+  readonly sourceUnitRefs: readonly string[];
+  readonly requiredDisclosureRefs: readonly string[];
+}>;
+
+const mintedOutputHolds = new WeakSet<object>();
+
+export function assertServerGuardedStandardReaderOutputHoldV1(
+  value: unknown,
+): asserts value is CharacterStandardReaderOutputHoldV1 {
+  if (typeof value !== 'object' || value === null ||
+      !mintedOutputHolds.has(value)) {
+    throw new Error('Official Reader output hold is unavailable.');
+  }
+}
+
+function failOutputHold(): never {
+  throw new Error('Official Reader final output validation is unavailable.');
+}
+
+function orderedEqual(left: readonly string[], right: readonly string[]): boolean {
+  return left.length === right.length &&
+    left.every((ref, index) => ref === right[index]);
+}
+
+/**
+ * Applies the existing Character Output Guard to a genuine RR-06 semantic
+ * candidate, preserving the already verified Saju utterance byte-for-byte.
+ * Only source IDs and hashes leave this guard: never a draft answer/envelope.
+ * The result is explicitly held; no caller may treat it as a DB write/reveal.
+ */
+export function guardCharacterStandardReaderFinalOutputV1(input: Readonly<{
+  grounded: CharacterStandardChatGroundingV2;
+  questionScope: CharacterStandardFollowupQuestionScopeDecisionV1;
+  candidate: CharacterStandardReaderBoundedCandidateV1;
+  rendererDraft: unknown;
+}>): CharacterStandardReaderOutputHoldV1 {
+  assertServerPreparedStandardChatGroundingV2(input.grounded);
+  assertServerPreparedStandardFollowupQuestionScopeV1(input.questionScope);
+  assertServerGuardedStandardReaderBoundedCandidateV1(input.candidate);
+
+  const { scope, grounding, context } = input.grounded;
+  const evidence = input.questionScope.evidence;
+  const candidate = input.candidate;
+  if (candidate.scopeHash !== input.questionScope.scopeHash ||
+      candidate.readerCharacterId !== scope.readerCharacterId ||
+      candidate.readingRef !== scope.readingId ||
+      candidate.utterance.readingRef !== scope.readingId ||
+      candidate.utterance.characterId !== scope.readerCharacterId ||
+      candidate.utterance.requestedDomain !== scope.sajuDomain ||
+      evidence.readingRef !== scope.readingId ||
+      evidence.readerCharacterId !== scope.readerCharacterId ||
+      evidence.subjectId !== scope.subjectId ||
+      evidence.threadId !== scope.threadId ||
+      evidence.officialArtifactResponseHash !== scope.officialArtifactResponseHash ||
+      evidence.groundingHash !== grounding.groundingHash ||
+      context.saju.groundingRef.groundingHash !== grounding.groundingHash ||
+      !orderedEqual(candidate.sourceUnitRefs, evidence.selectedUnitIds) ||
+      !orderedEqual(candidate.requiredDisclosureRefs, evidence.requiredDisclosureRefs) ||
+      !orderedEqual(candidate.utterance.renderedUnitIds, evidence.selectedUnitIds) ||
+      input.questionScope.mode !== 'bounded_explanation_candidate' ||
+      !Array.isArray(candidate.utterance.segments) ||
+      candidate.utterance.segments.length === 0 ||
+      candidate.utterance.segments.length > 64) failOutputHold();
+
+  // The semantic guard already reconstructed the deterministic Saju utterance.
+  // Recheck all exact segment surfaces for public-trust language violations;
+  // never accept separate model-authored explanation prose here.
+  for (const segment of candidate.utterance.segments) {
+    if (typeof segment.text !== 'string' || segment.text.trim().length === 0 ||
+        segment.text.length > 4000 ||
+        findReadingPublicTrustLanguageViolationV1(segment.text) !== null) {
+      failOutputHold();
+    }
+  }
+
+  // The existing guard admits only published Character emotion/animation
+  // and injects protected Saju text from server-owned V2 context.
+  // Free-form framing, memory, relationship and suggested actions have no
+  // RR-07/09 approval yet: they must remain absent, not merely well-formed.
+  let envelope;
+  try {
+    envelope = guardCharacterRendererOutput({
+      rawOutput: input.rendererDraft,
+      context,
+      allowedSuggestedActionKeys: [],
+    });
+  } catch {
+    return failOutputHold();
+  }
+  if (envelope.framingBefore !== null || envelope.framingAfter !== null ||
+      envelope.memoryProposals.length !== 0 ||
+      envelope.relationshipEventProposals.length !== 0 ||
+      envelope.suggestedActions.length !== 0) failOutputHold();
+
+  const output: CharacterStandardReaderOutputHoldV1 = Object.freeze({
+    mode: 'output_guarded_hold' as const,
+    schemaVersion: STANDARD_READER_OUTPUT_HOLD_VERSION_V1,
+    guardVersion: CHARACTER_OUTPUT_GUARD_VERSION_V1,
+    publicDisclosureAuthorized: false as const,
+    reason: 'DB_PROVENANCE_AND_FINAL_DISCLOSURE_PENDING' as const,
+    scopeHash: input.questionScope.scopeHash,
+    selectionHash: evidence.selectionHash,
+    assistantAnchorMessageId: evidence.assistantMessageId,
+    readingRef: scope.readingId,
+    readerCharacterId: scope.readerCharacterId,
+    officialArtifactResponseHash: scope.officialArtifactResponseHash,
+    groundingHash: grounding.groundingHash,
+    utteranceId: candidate.utterance.utteranceId,
+    utteranceHash: 'sha256:v1:' + createHash('sha256')
+      .update(canonicalJson(candidate.utterance)).digest('hex'),
+    sourceUnitRefs: Object.freeze([...candidate.sourceUnitRefs]),
+    requiredDisclosureRefs: Object.freeze([...candidate.requiredDisclosureRefs]),
+  });
+  mintedOutputHolds.add(output);
+  return output;
 }
