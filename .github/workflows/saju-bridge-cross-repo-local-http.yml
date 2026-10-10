@@ -105,8 +105,10 @@ jobs:
           GOTRUE_AUTH_DB_PASSWORD: ${{ github.run_id }}-${{ github.run_attempt }}-auth
         run: |
           set -euo pipefail
+          test "$(PGHOST=127.0.0.1 PGPORT=5433 PGDATABASE=myeongha_saju_gotrue_verify PGPASSWORD="$GOTRUE_AUTH_DB_PASSWORD" PGUSER=postgres psql -X -Atqc 'select current_database()')" = 'myeongha_saju_gotrue_verify'
+          PGHOST=127.0.0.1 PGPORT=5433 PGDATABASE=myeongha_saju_gotrue_verify PGPASSWORD="$GOTRUE_AUTH_DB_PASSWORD" PGUSER=postgres psql -X -v ON_ERROR_STOP=1 -c 'CREATE SCHEMA IF NOT EXISTS auth'
           jwt_secret="$(openssl rand -hex 32)"
-          docker run --rm -d --name myeongha-saju-gotrue-local --network host \
+          docker run -d --name myeongha-saju-gotrue-local --network host \
             -e GOTRUE_API_HOST=127.0.0.1 \
             -e GOTRUE_API_PORT=9999 \
             -e API_EXTERNAL_URL=http://127.0.0.1:9999 \
@@ -132,7 +134,7 @@ jobs:
           done
           if [ "$ready" -ne 1 ]; then
             echo "Disposable GoTrue was not healthy; withholding integration admission"
-            docker logs --tail 40 myeongha-saju-gotrue-local || true
+            docker logs --tail 80 myeongha-saju-gotrue-local || true
             exit 1
           fi
       - name: Verify real GoTrue Auth, Birth, and Saju Proof in one local execution
