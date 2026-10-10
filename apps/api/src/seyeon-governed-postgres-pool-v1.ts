@@ -1,4 +1,5 @@
 import { Pool, type PoolClient } from 'pg';
+import { GOVERNED_LOGIN_PREFLIGHT_SQL_V1 } from './postgres-seyeon-ai-cost-ledger-v1.js';
 import {
   buildProductionNodePostgresPoolConfigV1,
   type NodePostgresDriverPoolV1,
@@ -111,48 +112,6 @@ export function parseSeyeonGovernedDbConfigV1(input: {
  * ANY transaction context or Subject resolver runs.
  * The new role has SET permission only from a separately provisioned login.
  */
-export const GOVERNED_LOGIN_PREFLIGHT_SQL_V1 = `
-select
- session_user::text as "sessionUser",
- current_user::text as "currentUser",
- r.rolcanlogin as "canLogin",
- r.rolsuper as "isSuper",
- r.rolbypassrls as "canBypassRls",
- r.rolinherit as "canInherit",
- r.rolcreatedb as "canCreateDb",
- r.rolcreaterole as "canCreateRole",
- pg_catalog.pg_has_role(session_user, $1::name, 'SET') as "canSetGovernedRole",
- pg_catalog.pg_has_role(session_user, $2::name, 'MEMBER') as "isLegacyMember",
- pg_catalog.pg_has_role(session_user, $2::name, 'SET') as "canSetLegacyRole",
- pg_catalog.pg_has_role(session_user, 'myeongha_seyeon_cost_meter_owner', 'MEMBER')
-    as "isCostOwnerMember",
- (select count(*)::int
-  from pg_catalog.pg_auth_members m
-  join pg_catalog.pg_roles member_role on member_role.oid=m.member
-  join pg_catalog.pg_roles granted_role on granted_role.oid=m.roleid
-  where member_role.rolname=session_user
-    and granted_role.rolname<>$1::name) as "otherMemberships",
- pg_catalog.has_function_privilege(session_user,
-   'public.cmd_start_seyeon_ai_call_v1(uuid,uuid,uuid,text,uuid,text,text,text)',
-   'EXECUTE') as "canLegacyStart",
- pg_catalog.has_function_privilege(session_user,
-   'public.cmd_settle_seyeon_ai_call_v1(uuid,uuid,uuid,text,jsonb)',
-   'EXECUTE') as "canLegacySettle",
- pg_catalog.has_function_privilege(session_user,
-   'public.cmd_record_seyeon_ai_call_cost_v1(uuid,uuid,uuid,text,jsonb)',
-   'EXECUTE') as "canLegacyRecord",
- pg_catalog.has_table_privilege(session_user,
-   'public.seyeon_ai_call_cost_events', 'SELECT,INSERT,UPDATE,DELETE')
-   as "canDirectLedger",
- pg_catalog.has_table_privilege(session_user,
-   'public.seyeon_ai_governor_daily_budgets_v1', 'SELECT,INSERT,UPDATE,DELETE')
-   as "canDirectBudget",
- pg_catalog.has_table_privilege(session_user,
-   'public.seyeon_ai_governor_model_policies_v1', 'SELECT,INSERT,UPDATE,DELETE')
-   as "canDirectRateCard"
-from pg_catalog.pg_roles r where r.rolname=session_user
-`.trim();
-
 const LEGACY_OR_DIRECT_FLAGS = [
   'isLegacyMember','canSetLegacyRole','isCostOwnerMember',
   'canLegacyStart','canLegacySettle','canLegacyRecord',
