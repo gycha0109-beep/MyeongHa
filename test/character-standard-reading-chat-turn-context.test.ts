@@ -6,6 +6,10 @@ import {
 } from '../apps/api/src/character-standard-reading-chat-grounding-v2.js';
 import { selectCharacterStandardFollowupEvidenceV1 } from '../apps/api/src/character-standard-reading-chat-followup-evidence-v1.js';
 import {
+  prepareCharacterStandardReaderBoundedCandidateV1,
+  assertServerGuardedStandardReaderBoundedCandidateV1,
+} from '../apps/api/src/character-standard-reading-chat-bounded-candidate-v1.js';
+import {
   selectCharacterStandardFirstQuestionSourceEntryV1,
   assertServerPreparedStandardFirstQuestionSourceEntryV1,
 } from '../apps/api/src/character-standard-reading-chat-first-question-v1.js';
@@ -1751,6 +1755,70 @@ describe('A3-eta server-anchored follow-up evidence selection (public OFF)', () 
       preflight, grounded, anchorAuthorityPort: { readLatestValidatedAnchor },
     } };
   }
+
+  it('RR-06 accepts a single exact grounded Unit only as an internal semantic candidate', async () => {
+    const base = previewGrounding();
+    const { groundingHash: _old, ...material } = base;
+    const source = { ...material, units: [material.units[0]!] };
+    const f = await setup({
+      ...source, groundingHash: hashCharacterSajuGroundingBundleMaterialV1(source),
+    });
+    const classified = await classifyCharacterStandardFollowupQuestionScopeV1(f.input);
+    expect(classified.mode).toBe('bounded_explanation_candidate');
+    const candidate = prepareCharacterStandardReaderBoundedCandidateV1({
+      grounded: f.input.grounded, questionScope: classified,
+    });
+    expect(candidate.mode).toBe('semantic_guarded_candidate');
+    if (candidate.mode !== 'semantic_guarded_candidate') return;
+    expect(candidate.sourceUnitRefs).toEqual([f.ids[0]]);
+    expect(candidate.utterance.renderedUnitIds).toEqual([f.ids[0]]);
+    expect(candidate.utterance.readingRef).toBe(READING_ID);
+    expect(() => assertServerGuardedStandardReaderBoundedCandidateV1(candidate))
+      .not.toThrow();
+    expect(() => assertServerGuardedStandardReaderBoundedCandidateV1({ ...candidate }))
+      .toThrow(/unavailable/u);
+    expect(candidate).not.toHaveProperty('committedMessageId');
+    expect(candidate).not.toHaveProperty('outputGuardEvidence');
+  });
+
+  it('RR-06 rejects extra narrator-selected Units instead of widening the verified DB focus', async () => {
+    const f = await setup();
+    const classified = await classifyCharacterStandardFollowupQuestionScopeV1(f.input);
+    const candidate = prepareCharacterStandardReaderBoundedCandidateV1({
+      grounded: f.input.grounded, questionScope: classified,
+    });
+    expect(candidate.mode).toBe('hold');
+    if (candidate.mode === 'hold') {
+      expect(['selection_mismatch', 'renderer_unavailable']).toContain(candidate.reason);
+    }
+  });
+
+  it('RR-06 refuses protected Saju interpretations before bounded paraphrasing', async () => {
+    const base = previewGrounding();
+    const { groundingHash: _old, ...material } = base;
+    const source = { ...material, units: [{
+      ...material.units[0]!, realizationPolicyRef: 'protected_only_v1' as const,
+    }] };
+    const f = await setup({
+      ...source, groundingHash: hashCharacterSajuGroundingBundleMaterialV1(source),
+    });
+    const classified = await classifyCharacterStandardFollowupQuestionScopeV1(f.input);
+    expect(classified.mode).toBe('protected_only_candidate');
+    expect(prepareCharacterStandardReaderBoundedCandidateV1({
+      grounded: f.input.grounded, questionScope: classified,
+    })).toMatchObject({ mode: 'hold', reason: 'protected_source' });
+  });
+
+  it('RR-06 refuses forged server-issued question scope and grounding', async () => {
+    const f = await setup();
+    const classified = await classifyCharacterStandardFollowupQuestionScopeV1(f.input);
+    expect(() => prepareCharacterStandardReaderBoundedCandidateV1({
+      grounded: f.input.grounded, questionScope: { ...classified },
+    })).toThrow(/unavailable/u);
+    expect(() => prepareCharacterStandardReaderBoundedCandidateV1({
+      grounded: { ...f.input.grounded }, questionScope: classified,
+    })).toThrow();
+  });
 
   it('uses exactly a persisted validated Unit, never arbitrary user text or all Reading units', async () => {
     const f = await setup();

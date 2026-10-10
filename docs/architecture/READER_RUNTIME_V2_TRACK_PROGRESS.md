@@ -37,3 +37,29 @@
 - P0-AI-01, P0-CM-03, P0-AGE-01 최신 결정은 `OPEN-P0`. RR-07 생성형/상업 공개 및 RR-13 판매 E2E는 HOLD.
 - RR-09~15 원자 Commit, HTTP, UX, 운영 공개·롤백, 인수인계·종료 감사를 아직 증명하지 못함.
 - 세연 Production Chat V1 무변경 / Official Reader Chat PUBLIC OFF / 전체 트랙 상태: **CONTINUE, NOT TRACK CLOSED**.
+
+## 2026-10-10 — RR-05 병합 / RR-06 안전한 내부 렌더링 후보
+
+### RR-05 병합 증거
+
+- PR #1883 squash 병합 SHA `ee8a877754c994e8456db27696a7ea48e2cae7f7`.
+- exact-head 기본 CI/Governance/Web PR Domain Gates 통과, 전체 Integration run `38048998306` 11개 Job 모두 SUCCESS.
+- 해당 commit의 Vercel Production deployment `dpl_74wiU4LqLDVeMAVqZKhkhtEGzsF8` READY (코드가 배포됐다는 사실만 증명).
+- postmerge exact-SHA main CI는 이후 push와 겹쳐 `cancelled`; 성공으로 재해석 금지. 추후 main의 별도 CI 관측이 필요함.
+- RR-05의 모든 자유 질문 이해·미지원 영역 처리는 여전히 제한적. Question Scope의 확장은 승인이나 답변 생성 권한을 주지 않음.
+
+### RR-06 최소 범위
+
+- `character-standard-reading-chat-bounded-candidate-v1.ts`: 기존 `renderCharacterSajuBoundedExactCoreV2` + `guardCharacterSajuSemanticPreservationV2` 재사용. 별도 해석 엔진 신설 없음.
+- DB에 의해 검증된 후속 Answer Anchor의 Source Unit closure와 Renderer 선정 Unit 집합이 **정확히 동일할 때만** 내부 Semantic Guard 후보 생성. 선택 Unit 범위를 확대하면 HOLD.
+- 전역 Disclosure/Calculation Ambiguity 및 Qualifier 보호 여부를 RR-02 Source Closure와 대조. 보호된 내용은 독자 paraphrase를 허용하지 않음.
+- 후보는 내부 전용이며 Output Guard, Writer/Commit/Reveal, HTTP/public Chat 권한이 없음. 아직 RR-06 최종 PASS나 RR-09 최종 답변 무결성을 선언하지 않음.
+- 부정 테스트: 범위 초과 Unit, protected-only, 서버 Mint 증명 객체 위조, source mismatch.
+- 이 코드가 포함된 PR의 기본 CI/전체 Integration, 병합 SHA, exact Production 검증 결과는 별도 확인 필요.
+
+### 정책 및 통합 차단
+
+- RR-03/04 DB Owner 인계 Issue #1884. Writer/Query 실DB E2E 완료 전 재사용 가능한 공식 Assistant 근거가 없음.
+- Saju `docs/product/22-production-interpretation-authority-audit.md`는 실제 Product Interpretation Production Registry를 아직 BLOCKED로 기록. Saju 원본 semantic authority 승인 없는 유료 도메인 출시 금지.
+- `P0-AI-01`, `P0-CM-03`, `P0-AGE-01` OPEN-P0. 본 내부 PR은 해당 정책을 대신 결정하지 않음.
+- 모든 단계에서 **PUBLIC OFF / TRACK NOT CLOSED** 유지.
