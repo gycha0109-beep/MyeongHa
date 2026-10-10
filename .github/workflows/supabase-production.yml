@@ -62,7 +62,21 @@ jobs:
           requires_deploy=false
           reason='no governed Production DB deployment-surface change detected'
 
-          if [[ "$EVENT_NAME" == 'workflow_dispatch' && "${SCOPED_BACKFILL:-}" == 'true' ]]; then
+          if [[ "$EVENT_NAME" == 'push' && "$(git show -s --format=%s "$CURRENT_SHA")" == 'ops(seyeon): apply one-shot 1400-1450 38088591661 38090483306' ]]; then
+            [[ "$BEFORE_SHA" =~ ^[0-9a-f]{40}$ ]] && git cat-file -e "${BEFORE_SHA}^{commit}" ||
+              { echo 'HOLD_ONE_SHOT_BACKFILL: missing reviewed predecessor'; exit 1; }
+            changed_files="$(git diff --name-only "$BEFORE_SHA" "$CURRENT_SHA")"
+            grep -Fxq '.github/ops/seyeon-relationship-1400-1450-restore-38090483306.once' <<<"$changed_files" ||
+              { echo 'HOLD_ONE_SHOT_BACKFILL: one-shot marker not in reviewed merge'; exit 1; }
+            if grep -Eq '^supabase/migrations/' <<<"$changed_files"; then
+              echo 'HOLD_ONE_SHOT_BACKFILL: migration SQL modified with one-shot'
+              exit 1
+            fi
+            [[ "$(cat '.github/ops/seyeon-relationship-1400-1450-restore-38090483306.once')" == 'SEYEON-SCOPED-BACKFILL-1400-1450-38088591661-38090483306-V1' ]] ||
+              { echo 'HOLD_ONE_SHOT_BACKFILL: unexpected marker'; exit 1; }
+            requires_deploy=false
+            reason='protected exact-head one-shot backfill must never invoke ordinary db push'
+          elif [[ "$EVENT_NAME" == 'workflow_dispatch' && "${SCOPED_BACKFILL:-}" == 'true' ]]; then
             requires_deploy=false
             reason='manual scoped Se-yeon backfill must never invoke ordinary db push'
           elif [[ "$EVENT_NAME" == 'workflow_dispatch' ]]; then
@@ -161,7 +175,8 @@ jobs:
 
   relationship-backfill-1400-1450:
     name: governed-seyeon-relationship-backfill-1400-1450
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.relationship_backfill_1400_1450 == true }}
+    if: "${{ (github.event_name == 'workflow_dispatch' && inputs.relationship_backfill_1400_1450 == true) || (github.event_name == 'push' && startsWith(github.event.head_commit.message, 'ops(seyeon): apply one-shot 1400-1450 38088591661 38090483306')) }}"
+    needs: change-gate
     runs-on: ubuntu-24.04
     timeout-minutes: 18
     environment: production
@@ -174,14 +189,24 @@ jobs:
       SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
       SUPABASE_PRODUCTION_SESSION_POOLER_HOST: ${{ secrets.SUPABASE_PRODUCTION_SESSION_POOLER_HOST }}
       SUPABASE_PRODUCTION_SERVER_ROOT_CERT_PEM: ${{ secrets.SUPABASE_PRODUCTION_SERVER_ROOT_CERT_PEM }}
-      SEYEON_BACKUP_RUN_ID: ${{ inputs.backup_run_id }}
-      SEYEON_RESTORE_RUN_ID: ${{ inputs.restore_run_id }}
-      SEYEON_SCOPE_CONFIRMATION: ${{ inputs.scoped_confirmation }}
+      SEYEON_BACKUP_RUN_ID: ${{ github.event_name == 'push' && '38088591661' || inputs.backup_run_id }}
+      SEYEON_RESTORE_RUN_ID: ${{ github.event_name == 'push' && '38090483306' || inputs.restore_run_id }}
+      SEYEON_SCOPE_CONFIRMATION: ${{ github.event_name == 'push' && 'APPLY_RELATIONSHIP_1400_1450_ONLY' || inputs.scoped_confirmation }}
     steps:
       - name: Checkout immutable main
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Verify reviewed one-shot Production backfill authorization
+        if: ${{ github.event_name == 'push' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_REF" == 'refs/heads/main' ]]
+          [[ "$(git rev-parse HEAD)" == "$GITHUB_SHA" ]]
+          [[ "$(git show -s --format=%s HEAD)" == 'ops(seyeon): apply one-shot 1400-1450 38088591661 38090483306' ]]
+          [[ "$(cat '.github/ops/seyeon-relationship-1400-1450-restore-38090483306.once')" == 'SEYEON-SCOPED-BACKFILL-1400-1450-38088591661-38090483306-V1' ]]
+          echo 'SCOPED_ONE_SHOT_ADMISSION_PASS: review, fixed backup and restore; no unrestricted db push'
       - name: Install PostgreSQL client and jq
         shell: bash
         run: |
