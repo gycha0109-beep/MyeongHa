@@ -45,7 +45,7 @@ concurrency:
 jobs:
   restore-drill:
     name: isolated-supabase-postgres-17-restore
-    if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && startsWith(github.event.head_commit.message, 'ops(dr): one-shot restore backup 38088591661')) }}
+    if: "${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && startsWith(github.event.head_commit.message, 'ops(dr): one-shot restore backup 38088591661')) }}"
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     environment: production
