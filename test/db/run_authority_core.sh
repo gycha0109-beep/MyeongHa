@@ -40,6 +40,13 @@ run_isolated_case() {
 }
 
 bash test/db/verify_no_schema_cardinality_hardcoding.sh
+# Exercise the actual 1460..1510 -> 1400..1450 inversion only on a
+# disposable local PostgreSQL database in CI. Never use Production credentials.
+if [[ "${CI:-}" == 'true' && "${PGHOST:-}" == 'localhost' &&
+      "${PGDATABASE:-}" == 'myeongha_test' ]]; then
+  bash test/db/relationship_gap_retroactive_backfill_synthetic.sh
+fi
+
 
 psql -v ON_ERROR_STOP=1 -f test/db/authority_core_negative.sql
 psql -1 -v ON_ERROR_STOP=1 -f test/db/record_world_negative.sql
