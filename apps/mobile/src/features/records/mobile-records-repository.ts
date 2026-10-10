@@ -34,6 +34,7 @@ export class MobileRecordsRepositoryErrorV1 extends Error {
 
 export interface MobileRecordsCollectionRepositoryV1<T> {
   getSnapshot(): MobileRecordsCollectionSnapshotV1<T>;
+  reset(): MobileRecordsCollectionSnapshotV1<T>;
   loadInitial(): Promise<MobileRecordsCollectionSnapshotV1<T>>;
   loadMore(): Promise<MobileRecordsCollectionSnapshotV1<T>>;
 }
@@ -57,6 +58,7 @@ function createCollectionRepositoryV1<T>(input: {
   });
   let inFlight: Promise<MobileRecordsCollectionSnapshotV1<T>> | null = null;
   const usedCursors = new Set<string>();
+  let generation = 0;
 
   function publish(next: MobileRecordsCollectionSnapshotV1<T>) {
     snapshot = Object.freeze({
@@ -64,6 +66,30 @@ function createCollectionRepositoryV1<T>(input: {
       items: Object.freeze([...next.items]),
     });
     return snapshot;
+  }
+
+  function reset(): MobileRecordsCollectionSnapshotV1<T> {
+    // Old HTTP completions can still arrive, but they cannot repopulate
+    // another Subject's shared mobile Records cache after blur/re-entry.
+    generation += 1;
+    inFlight = null;
+    usedCursors.clear();
+    return publish({
+      status: 'idle',
+      items: Object.freeze([]),
+      hasMore: true,
+      nextCursor: null,
+      errorCode: null,
+    });
+  }
+
+  function sessionChanged(error: unknown): boolean {
+    return (
+      typeof error === 'object' &&
+      error !== null &&
+      'code' in error &&
+      error.code === 'CLIENT_RECORDS_SESSION_CHANGED'
+    );
   }
 
   function protocolError(message: string): never {
@@ -109,6 +135,7 @@ function createCollectionRepositoryV1<T>(input: {
 
   async function loadInitial() {
     if (inFlight !== null) return inFlight;
+    const requestGeneration = generation;
     usedCursors.clear();
     publish({
       status: 'loading_initial',
@@ -121,14 +148,17 @@ function createCollectionRepositoryV1<T>(input: {
     inFlight = (async () => {
       try {
         const page = await input.readPage({ pageSize: input.pageSize });
+        if (requestGeneration !== generation) return snapshot;
         const next = appendPage(Object.freeze([]), page, null);
         return publish(next);
       } catch (error) {
+        if (requestGeneration !== generation) return snapshot;
         publish({
           status: 'error',
-          items: snapshot.items,
-          hasMore: snapshot.hasMore,
-          nextCursor: snapshot.nextCursor,
+          // A changed Subject must never preserve the old archive.
+          items: sessionChanged(error) ? Object.freeze([]) : snapshot.items,
+          hasMore: sessionChanged(error) ? false : snapshot.hasMore,
+          nextCursor: sessionChanged(error) ? null : snapshot.nextCursor,
           errorCode:
             error instanceof MobileRecordsRepositoryErrorV1
               ? error.code
@@ -136,7 +166,7 @@ function createCollectionRepositoryV1<T>(input: {
         });
         throw error;
       } finally {
-        inFlight = null;
+        if (requestGeneration === generation) inFlight = null;
       }
     })();
     return inFlight;
@@ -160,6 +190,7 @@ function createCollectionRepositoryV1<T>(input: {
     }
 
     const cursor = snapshot.nextCursor;
+    const requestGeneration = generation;
     publish({
       ...snapshot,
       status: 'loading_more',
@@ -171,11 +202,16 @@ function createCollectionRepositoryV1<T>(input: {
           pageSize: input.pageSize,
           cursor,
         });
+        if (requestGeneration !== generation) return snapshot;
         return publish(appendPage(snapshot.items, page, cursor));
       } catch (error) {
+        if (requestGeneration !== generation) return snapshot;
         publish({
           ...snapshot,
           status: 'error',
+          ...(sessionChanged(error)
+            ? { items: Object.freeze([]) as readonly T[], hasMore: false, nextCursor: null }
+            : {}),
           errorCode:
             error instanceof MobileRecordsRepositoryErrorV1
               ? error.code
@@ -183,7 +219,7 @@ function createCollectionRepositoryV1<T>(input: {
         });
         throw error;
       } finally {
-        inFlight = null;
+        if (requestGeneration === generation) inFlight = null;
       }
     })();
     return inFlight;
@@ -191,6 +227,7 @@ function createCollectionRepositoryV1<T>(input: {
 
   return Object.freeze({
     getSnapshot: () => snapshot,
+    reset,
     loadInitial,
     loadMore,
   });
