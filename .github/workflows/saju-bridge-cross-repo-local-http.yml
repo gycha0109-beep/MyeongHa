@@ -11,6 +11,9 @@ on:
       - test/saju-held-cross-repo-local-auth-user.test.ts
       - test/saju-held-cross-repo-local-gotrue-auth.test.ts
       - test/saju-held-cross-repo-local-restricted-login.test.ts
+      - test/saju-held-cross-repo-local-tls-nonce.test.ts
+      - test/db/fixtures/saju_local_tls_nonce_login.sql
+      - scripts/local/setup-saju-bridge-tls-nonce-ci.sh
       - test/db/fixtures/saju_local_restricted_logins.sql
       - apps/api/src/node-postgres-subject-pool.ts
       - apps/api/src/saju-held-authenticated-member-proof-v1.ts
@@ -121,6 +124,10 @@ jobs:
           # Confirm TCP network authentication as each role, NOT sudo/SET ROLE.
           PGUSER=myeongha_runtime PGPASSWORD="$subject_password" psql -X -Atqc "select session_user::text" | grep -Fx myeongha_runtime
           PGUSER=myeongha_saju_nonce_ci_login PGPASSWORD="$nonce_password" psql -X -Atqc "select session_user::text" | grep -Fx myeongha_saju_nonce_ci_login
+      - name: Start independent disposable nonce PostgreSQL with CA-verified TLS
+        working-directory: myeongha
+        shell: bash
+        run: bash scripts/local/setup-saju-bridge-tls-nonce-ci.sh
       - name: Start disposable real Supabase GoTrue with independent Auth database
         shell: bash
         env:
@@ -165,6 +172,7 @@ jobs:
         env:
           MYEONGHA_LOCAL_GOTRUE_ENABLED: '1'
           MYEONGHA_LOCAL_RESTRICTED_LOGINS_ENABLED: '1'
+          MYEONGHA_LOCAL_TLS_NONCE_ENABLED: '1'
         run: node scripts/local/verify-saju-bridge-http.mjs ../saju
       - name: Collect disposable GoTrue Auth failure diagnostics
         if: failure()
@@ -172,3 +180,9 @@ jobs:
       - name: Tear down disposable local GoTrue
         if: always()
         run: docker rm -f myeongha-saju-gotrue-local >/dev/null 2>&1 || true
+      - name: Tear down isolated TLS nonce cluster and ephemeral CA material
+        if: always()
+        shell: bash
+        run: |
+          docker rm -f myeongha-saju-tls-nonce-ci >/dev/null 2>&1 || true
+          rm -rf "$RUNNER_TEMP/saju-bridge-nonce-tls"
