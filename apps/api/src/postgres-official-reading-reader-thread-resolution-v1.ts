@@ -105,7 +105,7 @@ export async function resolvePostgresOfficialReadingReaderThreadV1(
         readingId: input.readingId,
         readerCharacterId: input.readerCharacterId,
         effectiveAt,
-        accessAuthorityPort: createPostgresCharacterStandardReadingKnowledgePortsV1(client),
+        accessAuthorityPort: createPostgresCharacterStandardReadingKnowledgePortsV1(client).accessAuthorityPort,
         productReaderEligibilityAuthorityPort: policyPort,
         threadLocatorAuthorityPort: createPostgresOfficialReaderThreadLocatorAuthorityPortV1(client),
         threadBindingAuthorityPort: createPostgresChatThreadRuntimeBindingAuthorityPortV1(client),
