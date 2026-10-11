@@ -114,3 +114,32 @@ begin
   raise notice 'PASS RR-03 source Unit syntax excludes legacy AI UUID and duplicates';
 end
 $verify_refs$;
+
+-- P0-PR-01 delete finalizer removes Reader interpretations before Chat messages.
+-- Every Subject-reachable Reader provenance FK must cascade, including the
+-- interpretation FK, or an approved account deletion deadlocks/fails.
+do $rr03_cascade_contract$
+declare
+  v_expected text[] := array[
+    'official_reader_provenance_thread_subject_fk',
+    'official_reader_provenance_attempt_turn_subject_fk',
+    'official_reader_provenance_turn_thread_subject_fk',
+    'official_reader_provenance_message_turn_subject_fk',
+    'official_reader_provenance_reading_subject_fk',
+    'official_reader_provenance_interpretation_fk'
+  ];
+  v_actual text[];
+begin
+  select array_agg(con.conname order by con.conname) into v_actual
+  from pg_catalog.pg_constraint con
+  where con.conrelid = 'public.official_reader_assistant_saju_provenance'::regclass
+    and con.contype = 'f'
+    and con.conname = any(v_expected)
+    and con.confdeltype = 'c';
+  if v_actual is distinct from (
+    select array_agg(name order by name) from unnest(v_expected) as e(name)
+  ) then
+    raise exception 'RR-03 approved DELETE graph must have all six FK cascades; actual=%', v_actual;
+  end if;
+  raise notice 'PASS RR-03 six subject-reachable FKs cascade on account deletion';
+end $rr03_cascade_contract$;
