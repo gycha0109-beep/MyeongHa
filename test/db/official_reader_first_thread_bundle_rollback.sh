@@ -63,3 +63,8 @@ found=$(runtime_query "$subject" "select thread_id::text from public.qry_member_
 pass "D-05-C repeated entry reuses one canonical Member x Reader Thread"
 
 echo 'PASS D-05-C first-thread Bundle rollback / idempotent reuse PostgreSQL fixture'
+
+# Same disposable PostgreSQL DB: extend the generic Chat rollback fixture with
+# real synthetic verified purchase Grant + exact Reader-access DB evidence.
+# No public Reader route, checkout, entitlement grant issuance or T2 reveal.
+bash test/db/official_reader_first_thread_purchased_grant_bridge.sh
