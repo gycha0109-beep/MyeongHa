@@ -15,7 +15,7 @@
 
 Migration `1720_official_reader_assistant_provenance_storage_v1.sql` (not colliding `1660`) creates a dormant FORCE-RLS, no-runtime-policy table with six subject-reachable FKs, immutable protected data, bounded Saju units/disclosures/ambiguity, and no API role table privilege. Null focus is allowed for safe follow-up clarification. No LLM UUID or user-provided metadata is a verified official source.
 
-The existing approved account-deletion finalizer deletes `conversation_messages`; the sidecar is FK `ON DELETE CASCADE` bound to the same message/turn/subject. **Populated-row finalizer, authenticated restoration/replay and live PG role checks still require passing isolated integration evidence**; a catalog-only result cannot assert privacy restoration works.
+The existing approved account-deletion finalizer deletes `standard_reading_reader_interpretations` **before** `conversation_messages`; the sidecar has `ON DELETE CASCADE` on both interpretation and message/turn/subject FKs, so either authoritative deletion order removes the private provenance. **Populated-row finalizer, authenticated restoration/replay and live PG role checks still require passing isolated integration evidence**; a catalog-only result cannot assert privacy restoration works.
 
 ## Unshipped commitments
 
