@@ -140,6 +140,12 @@ jobs:
             >/dev/null 2>"$RUNNER_TEMP/seyeon-actor-bootstrap.err" <<'SQL'
           create role postgres login superuser createrole createdb
             password :'actor_password';
+          -- Settings are installed by the disposable cluster bootstrap
+          -- superuser BEFORE the isolated actor connects. The future
+          -- NOSUPERUSER actor cannot set these SUSET GUCs via PGOPTIONS.
+          alter role postgres set log_min_messages = 'panic';
+          alter role postgres set log_min_error_statement = 'panic';
+          alter role postgres set log_statement = 'none';
           SQL
           test "$(psql -X -qAt -v ON_ERROR_STOP=1 -c \
             "select count(*) from pg_roles where rolname='postgres' and rolsuper and rolcanlogin")" = 1

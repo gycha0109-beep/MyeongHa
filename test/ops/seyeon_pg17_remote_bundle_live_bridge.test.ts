@@ -47,9 +47,11 @@ describe('Se-yeon historical SQL PG17 isolated CI bridge', () => {
     expect(isolate).toContain('PGDATABASE: myeongha_test');
     expect(isolate).toContain('test/db/seyeon_remote_bundle_pg17_isolated.sh');
     const isolated = readFileSync('test/db/seyeon_remote_bundle_pg17_isolated.sh', 'utf8');
-    expect(isolated).toContain('log_min_error_statement=panic');
-    expect(isolated).toContain('log_min_messages=panic');
-    expect(isolated).toContain('log_statement=none');
+    expect(isolated).toContain('unset PGOPTIONS');
+    expect(isolated).not.toContain("export PGOPTIONS='-c log_min_messages=panic");
+    expect(workflow).toContain("alter role postgres set log_min_messages = 'panic';");
+    expect(workflow).toContain("alter role postgres set log_min_error_statement = 'panic';");
+    expect(workflow).toContain("alter role postgres set log_statement = 'none';");
     expect(isolated).toContain('coalesce(cardinality(statements),0)=0');
     expect(isolated).toContain('PG17_FIXTURE_SKIP_0860');
     expect(isolated).toContain('PG17_BASELINE_APPLY: $filename');
