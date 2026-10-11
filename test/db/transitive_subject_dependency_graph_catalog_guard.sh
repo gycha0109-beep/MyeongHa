@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-inventory_path="docs/operations/TRANSITIVE_SUBJECT_DEPENDENCY_GRAPH_V1.json"
+inventory_path="docs/operations/TRANSITIVE_SUBJECT_DEPENDENCY_GRAPH_RR03_V2.json"
 
 expected="$(
   node --input-type=module - "$inventory_path" <<'NODE'
@@ -129,8 +129,8 @@ edge_count="$(printf '%s\n' "$actual" | sed '/^$/d' | wc -l | tr -d ' ')"
 direct_count="$(printf '%s\n' "$actual" | awk -F '|' '$1 == "1" { count += 1 } END { print count + 0 }')"
 max_depth="$(printf '%s\n' "$actual" | awk -F '|' 'BEGIN { max = 0 } $1 + 0 > max { max = $1 + 0 } END { print max }')"
 
-[[ "$edge_count" == "140" ]] || {
-  echo "Expected exactly 140 current reachable FK edges, found $edge_count." >&2
+[[ "$edge_count" == "146" ]] || {
+  echo "Expected exactly 146 current reachable FK edges, found $edge_count." >&2
   exit 1
 }
 
