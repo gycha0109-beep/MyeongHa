@@ -46,6 +46,15 @@ PGDATABASE="$origin" dropdb --if-exists "$shadow" >/dev/null 2>&1 ||
 PGDATABASE="$origin" createdb "$shadow" || hold 'Local shadow creation failure.'
 export PGDATABASE="$shadow"
 cd "$root"
+# Install logging protections as database defaults WHILE postgres is still
+# privileged. After demotion a non-superuser cannot supply these protected
+# GUCs via PGOPTIONS at connection startup.
+psql -X -q -v ON_ERROR_STOP=1 >/dev/null 2>"$tempdir/local-db-logging.err" <<'SQL' ||
+  hold 'Unable to pin confidential SQL logging policy on disposable DB.'
+alter database myeongha_seyeon_remote_pg17_scratch_ci set log_min_messages = 'panic';
+alter database myeongha_seyeon_remote_pg17_scratch_ci set log_min_error_statement = 'panic';
+alter database myeongha_seyeon_remote_pg17_scratch_ci set log_statement = 'none';
+SQL
 apply() {
   local filename
   filename="$(basename "$1")"
@@ -200,6 +209,16 @@ psql -X -q -v ON_ERROR_STOP=1 -c \
   'set role seyeon_fixture_demoter; alter role postgres nosuperuser createrole createdb;' \
   >/dev/null 2>"$tempdir/demote.err" ||
   hold 'Unable to reproduce Production non-superuser postgres role.'
+# Local database GUCs were set as admin above; do not pass protected GUCs
+# via startup PGOPTIONS to the now non-superuser Production-like actor.
+unset PGOPTIONS
+logging="$(psql -X -qAt -v ON_ERROR_STOP=1 -c "select
+  current_setting('log_min_messages') || '|' ||
+  current_setting('log_min_error_statement') || '|' ||
+  current_setting('log_statement')")" ||
+  hold 'Non-superuser cannot inspect confidential SQL logging defaults.'
+[[ "$logging" == 'panic|panic|none' ]] ||
+  hold 'Non-superuser inherited unsafe SQL logging configuration.'
 [[ "$(psql -X -qAt -v ON_ERROR_STOP=1 -c "select rolsuper from pg_roles where rolname='postgres'")" == f ]] ||
   hold 'Disposable PG17 executor is unexpectedly superuser.'
 [[ "$(psql -X -qAt -v ON_ERROR_STOP=1 -c "select rolsuper from pg_roles where rolname=current_user")" == f ]] ||
