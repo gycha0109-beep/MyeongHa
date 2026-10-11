@@ -75,7 +75,7 @@
     {
       "table": "official_reader_assistant_saju_provenance",
       "retentionPeriod": null,
-      "deleteMechanism": "FK_CASCADE_WITH_CONVERSATION_MESSAGE",
+      "deleteMechanism": "FK_CASCADE_WITH_INTERPRETATION_OR_CONVERSATION_MESSAGE",
       "authorityReference": "https://github.com/gycha0109-beep/MyeongHa/issues/1884#issuecomment-6103479019"
     }
   ]
