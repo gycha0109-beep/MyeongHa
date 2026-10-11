@@ -98,7 +98,7 @@ create table public.official_reader_assistant_saju_provenance (
     foreign key (reading_ref, reader_character_id)
     references public.standard_reading_reader_interpretations(
       official_reading_id, reader_character_id
-    ),
+    ) on delete cascade,
   constraint official_reader_provenance_content_bundle_fk
     foreign key (reader_character_id, reader_content_bundle_id)
     references public.character_runtime_catalog(character_id, content_bundle_id),
