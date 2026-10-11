@@ -5,7 +5,10 @@ set -euo pipefail
 # Watchtower-Track: ops
 # GitHub Actions may print postgres service logs after a failed transaction.
 # Ensure private historical SQL text cannot appear in local PostgreSQL logs.
-export PGOPTIONS='-c log_min_messages=panic -c log_min_error_statement=panic -c log_statement=none'
+# Already installed as ALTER ROLE postgres SET by isolated bootstrap
+# before actor login; sending SUSET values via PGOPTIONS causes FATAL when
+# that actor is NOSUPERUSER. Verify the effective values below instead.
+unset PGOPTIONS
 hold() { echo "HOLD_SEYEON_PG17: $1" >&2; exit 1; }
 root="$(cd "$(dirname "$0")/../.." && pwd)"
 [[ "${CI:-}" == true && "${PGHOST:-}" == localhost &&
