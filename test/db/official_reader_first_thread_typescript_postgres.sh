@@ -16,11 +16,13 @@ trap 'rm -rf "$tmp"' EXIT
 sed -e 's/test-standard-reader/seyeon/g' \
     -e "s/('test-coming-soon-reader', now());/('test-coming-soon-reader', now()) on conflict do nothing;/" \
     test/db/standard_love_relationship_reader_authority.sql | \
-  sed -E 's/([[:xdigit:]]{8}-[[:xdigit:]]{4})-0000-0000-([[:xdigit:]]{12})/\1-4000-8000-\2/g' >"$tmp/standard.sql"
+  sed -e 's/12103100-0000-0000-0000-000000000001/12103100-0000-4000-8000-000000000001/g' \
+      -e 's/11391000-0000-0000-0000-000000000001/11391000-0000-4000-8000-000000000001/g' >"$tmp/standard.sql"
 sed -e "s@\\\\i test/db/standard_love_relationship_reader_authority.sql@\\\\i $tmp/standard.sql@" \
     -e 's/test-standard-reader/seyeon/g' \
     test/db/official_standard_reading_reader_interpretation.sql | \
-  sed -E 's/([[:xdigit:]]{8}-[[:xdigit:]]{4})-0000-0000-([[:xdigit:]]{12})/\1-4000-8000-\2/g' >"$tmp/official.sql"
+  sed -e 's/12103100-0000-0000-0000-000000000001/12103100-0000-4000-8000-000000000001/g' \
+      -e 's/11391000-0000-0000-0000-000000000001/11391000-0000-4000-8000-000000000001/g' >"$tmp/official.sql"
 psql -X -v ON_ERROR_STOP=1 -f "$tmp/official.sql" >"$tmp/fixture.stdout" 2>"$tmp/fixture.stderr" || {
   tail -65 "$tmp/fixture.stderr" >&2
   echo 'FAIL: purchase-backed Reader fixture' >&2
@@ -38,12 +40,12 @@ insert into public.guest_sessions(
   claimed_by_subject_id,created_at
 ) values (
   'c3990000-0000-4000-8000-000000000009'::uuid,
-  '11390000-0000-4000-8000-000000000001'::uuid,
+  '11390000-0000-0000-0000-000000000001'::uuid,
   'd05-real-ts-app-promotion-fixture',
   clock_timestamp()+interval '1 day',null,null,clock_timestamp()
 );
 select subject_id,subject_kind from public.cmd_promote_guest_v1(
-  '11390000-0000-4000-8000-000000000001'::uuid,
+  '11390000-0000-0000-0000-000000000001'::uuid,
   'c3990000-0000-4000-8000-000000000009'::uuid,
   'c1990000-0000-4000-8000-000000000009'::uuid
 );
@@ -52,7 +54,7 @@ set status='active',revision=revision+1,
     last_effective_at=clock_timestamp(),updated_at=clock_timestamp()
 from public.standard_reading_reader_access_grants a
 where g.id=a.entitlement_grant_id
-  and a.purchase_intent_id='11392300-0000-4000-8000-000000000001'::uuid;
+  and a.purchase_intent_id='11392300-0000-0000-0000-000000000001'::uuid;
 
 -- Reader published as available in default C, whereas the verified
 -- purchase remains pinned to A. Real TypeScript must reject and roll back.
