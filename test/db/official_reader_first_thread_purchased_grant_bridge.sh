@@ -14,7 +14,8 @@ p -f test/db/official_standard_reading_reader_interpretation.sql >"$tmp/fixture.
 
 subject=11390000-0000-0000-0000-000000000001
 reading=12103100-0000-0000-0000-000000000001
-reader=test-unlockable-reader
+reader=test-standard-reader
+bundle_c=b3500000-0000-0000-0000-000000000001
 bundle_a=11391000-0000-0000-0000-000000000001
 bundle_b=12191000-0000-0000-0000-000000000002
 thread=b5500000-0000-0000-0000-000000000001
@@ -66,22 +67,40 @@ echo 'PASS D-05-C synthetic Guest purchase retained after DB-authorized Member p
 # The preceding general Chat fixture may already have a default Release.
 # Clear its default flag only inside the same disposable PostgreSQL database.
 p -c "update public.content_releases set is_default=false where is_default;" >/dev/null
-# Publish a disposable default A in this isolated test DB only.
+# Publish a separate disposable default C where the SAME Reader is marked
+# available. The purchased official Reader grant stays pinned to A.
 p <<SQL >/dev/null
+insert into public.content_bundles(
+  id,content_version,content_hash,artifact_ref,artifact_schema_version,
+  min_client_capability,asset_manifest_hash,cue_schema_version,
+  manifest_jsonb,published_at
+) values (
+  '$bundle_c'::uuid,'d05-default-c','sha256:d05-default-c','test://d05-c',
+  'test-v1','test-client-v1','sha256:d05-assets','test-cue-v1','{}'::jsonb,
+  clock_timestamp()-interval '1 day'
+);
+insert into public.character_runtime_catalog(
+  character_id,content_bundle_id,availability,enabled,
+  release_at,retire_at,published_at
+) values (
+  '$reader','$bundle_c'::uuid,'available',true,
+  clock_timestamp()-interval '1 day',null,clock_timestamp()-interval '1 day'
+);
 insert into public.content_releases(
   id,release_key,content_bundle_id,status,is_default,rollout_jsonb,
   rollout_policy_version,rollout_seed,activated_at,retired_at,created_at
 ) values (
   'b4400000-0000-0000-0000-000000000001',
-  'd05-purchased-grant-fixture','$bundle_a'::uuid,'active',true,null,
+  'd05-purchased-grant-fixture-c','$bundle_c'::uuid,'active',true,null,
   'uniform-default-v1','uniform',clock_timestamp(),null,clock_timestamp()
 );
 SQL
 
-# B3: exact purchased Grant is pinned to B, unlike default A.
-purchase_state 12192300-0000-0000-0000-000000000003 active
+# Reader A is published/available in default C, but its verified initial
+# purchase Grant points at A. The actual Chat opener can insert then roll back.
+purchase_state 11392300-0000-0000-0000-000000000001 active
 read_count="$(run_member "select count(*) from public.qry_character_standard_reading_access_runtime_v2('$subject'::uuid,'$reader',transaction_timestamp()) where reading_id='$reading'::uuid;")"
-[[ "$read_count" == 1 ]] || fail "real B3 purchase access must resolve exactly once"
+[[ "$read_count" == 1 ]] || fail "real Reader A purchase access must resolve exactly once"
 set +e
 mismatch="$(run_member "
 DO \$guard\$
@@ -107,10 +126,12 @@ set -e
   fail "mismatched Thread survived rollback"
 [[ "$(p -c "select count(*) from public.conversation_thread_characters where id='$participant'::uuid;")" == 0 ]] ||
   fail "mismatched participant survived rollback"
-echo 'PASS D-05-C real purchased B3 access -> wrong default Bundle rollback'
+echo 'PASS D-05-C real purchased Reader A access -> wrong default Bundle rollback'
 
-# Two separately purchased active bundles for the same Reading/Reader
-# are ambiguous; the opener MUST NOT be invoked.
+# Two separately purchased active bundles for Reader B are ambiguous.
+# Its unlockable publication is not treated as general-Chat availability.
+reader=test-unlockable-reader
+purchase_state 12192300-0000-0000-0000-000000000003 active
 purchase_state 12192300-0000-0000-0000-000000000002 active
 distinct_bundles="$(run_member "select count(distinct reader_content_bundle_id)
   from public.qry_character_standard_reading_access_runtime_v2(
