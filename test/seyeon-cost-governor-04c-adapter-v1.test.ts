@@ -85,6 +85,15 @@ describe('Se-yeon 04C governed provider adapter (fake HTTP and fake DB)', () => 
           callId:admittedId,ceilingMicroUsd:'3700',bucketUtcDate:'2026-10-10',
         }]};
       }
+      if (sql.includes('cmd_store_seyeon_provider_receipt_v1')) {
+        order.push('store');
+        const event = JSON.parse(String(values[4]));
+        expect(event).toMatchObject({
+          callId:admittedId,priceVersion:'offline-rate-v1',
+          outcome:'response_received',costStatus:'estimated',
+        });
+        return {rows:[{callId:admittedId,replayed:false}]};
+      }
       if (sql.includes('cmd_governed_settle_seyeon_ai_call_v1')) {
         order.push('settle');
         const event = JSON.parse(String(values[4]));
@@ -120,8 +129,8 @@ describe('Se-yeon 04C governed provider adapter (fake HTTP and fake DB)', () => 
     const info = vi.spyOn(console,'info').mockImplementation(()=>undefined);
     try {
       await expect(provider.generate(request)).resolves.toEqual({ok:true});
-      expect(order).toEqual(['certify','admit','fetch','settle']);
-      expect(query).toHaveBeenCalledTimes(2);
+      expect(order).toEqual(['certify','admit','fetch','store','settle']);
+      expect(query).toHaveBeenCalledTimes(3);
       expect(JSON.stringify(query.mock.calls)).not.toContain('Synthetic 한글 text');
       expect(JSON.stringify(query.mock.calls)).not.toContain('synthetic-test-placeholder');
     } finally { info.mockRestore(); }
@@ -184,5 +193,91 @@ describe('Se-yeon 04C governed provider adapter (fake HTTP and fake DB)', () => 
           inputCeilingTokens:500,outputCeilingTokens:800,ceilingMicroUsd:3700},
       },
     )).rejects.toThrow('DB receipt');
+  });
+
+  it('holds the full reservation when the Provider result cannot commit, with no second inference', async () => {
+    const order:string[]=[];
+    let admittedId='';
+    const query=vi.fn(async (sql:string,values:unknown[])=>{
+      if(sql.includes('cmd_governed_start_seyeon_ai_call_v1')) {
+        admittedId=String(values[4]);
+        order.push('admit');
+        return {rows:[{callId:admittedId,ceilingMicroUsd:'3700',bucketUtcDate:'2026-10-10'}]};
+      }
+      if(sql.includes('cmd_store_seyeon_provider_receipt_v1')) {
+        order.push('store-failed');
+        expect(JSON.parse(String(values[4]))).toMatchObject({
+          callId:admittedId, outcome:'response_received', costStatus:'estimated',
+        });
+        throw new Error('secret-db-error-no-leak');
+      }
+      throw new Error('Settlement is forbidden without committed Provider evidence.');
+    });
+    const fetchImpl=vi.fn(async()=>{
+      order.push('fetch');
+      return response();
+    });
+    const errors=vi.spyOn(console,'error').mockImplementation(()=>undefined);
+    const info=vi.spyOn(console,'info').mockImplementation(()=>undefined);
+    try {
+      const provider=createPersistingSeyeonAiProviderV1({
+        config:{...config,fetchImpl},runner:runner(query),getBinding:()=>binding,
+        governor:{policy,certifiedInputTokenUpperBound:()=>500},
+      });
+      await expect(provider.generate(request)).resolves.toEqual({ok:true});
+      expect(order).toEqual(['admit','fetch','store-failed']);
+      expect(query).toHaveBeenCalledTimes(2);
+      expect(fetchImpl).toHaveBeenCalledOnce();
+      expect(errors.mock.calls.map(x=>x[0])).toContain('MYEONGHA_SEYEON_PROVIDER_RECEIPT_UNPERSISTED');
+      expect(JSON.stringify(errors.mock.calls)).not.toContain('secret-db-error-no-leak');
+    } finally {
+      errors.mockRestore();
+      info.mockRestore();
+    }
+  });
+
+  it('stores an unknown-usage timeout before settling conservatively', async () => {
+    const order:string[]=[];
+    let admittedId='';
+    const query=vi.fn(async (sql:string,values:unknown[])=>{
+      if(sql.includes('cmd_governed_start_seyeon_ai_call_v1')) {
+        admittedId=String(values[4]);order.push('admit');
+        return {rows:[{callId:admittedId,ceilingMicroUsd:'3700',bucketUtcDate:'2026-10-10'}]};
+      }
+      if(sql.includes('cmd_store_seyeon_provider_receipt_v1')) {
+        const event=JSON.parse(String(values[4]));
+        expect(event).toMatchObject({
+          callId:admittedId,outcome:'timeout',costStatus:'usage_unknown',
+          estimatedCostMicroUsd:null,
+        });
+        order.push('store');
+        return {rows:[{callId:admittedId,replayed:false}]};
+      }
+      if(sql.includes('cmd_governed_settle_seyeon_ai_call_v1')) {
+        order.push('settle');
+        return {rows:[{callId:admittedId,replayed:false,
+          occupiedMicroUsd:'3700',overCeiling:false}]};
+      }
+      throw new Error('Unexpected database operation');
+    });
+    const fetchImpl=vi.fn(async(_url:string,init:RequestInit)=>{
+      order.push('fetch');
+      // Trigger the local AbortController only; no real external request.
+      return await new Promise<Response>((_resolve,reject)=>{
+        init.signal?.addEventListener('abort',()=>reject(new Error('timeout fixture')),{once:true});
+      });
+    });
+    const errors=vi.spyOn(console,'error').mockImplementation(()=>undefined);
+    const info=vi.spyOn(console,'info').mockImplementation(()=>undefined);
+    try {
+      const provider=createPersistingSeyeonAiProviderV1({
+        config:{...config,fetchImpl,timeoutMs:5},runner:runner(query),getBinding:()=>binding,
+        governor:{policy,certifiedInputTokenUpperBound:()=>500},
+      });
+      await expect(provider.generate(request)).rejects.toMatchObject({code:'TIMEOUT'});
+      expect(order).toEqual(['admit','fetch','store','settle']);
+      expect(fetchImpl).toHaveBeenCalledOnce();
+      expect(query).toHaveBeenCalledTimes(3);
+    } finally { errors.mockRestore(); info.mockRestore(); }
   });
 });

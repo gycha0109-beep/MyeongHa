@@ -45,6 +45,8 @@ export interface OpenAiSeyeonStructuredProviderConfigV1 {
   readonly fetchImpl?: OpenAiSeyeonStructuredProviderFetchV1;
   readonly priceQuote?: SeyeonAiPriceV1;
   readonly observeMetric?: (event: SeyeonAiCostEventV1) => void;
+  /** Server-private, awaited durable outcome persistence. No browser-owned inputs. */
+  readonly meteredAfterOutcome?: (event: SeyeonAiCostEventV1) => Promise<void>;
   /** Server-owned admission hook; must finish before network dispatch. */
   readonly beforeDispatch?: (call: Readonly<{
     callId: string;
@@ -309,7 +311,7 @@ function emitSeyeonProviderMetricV1(input: {
   readonly payload?: unknown;
   readonly priceQuote?: SeyeonAiPriceV1;
   readonly observeMetric?: (event: SeyeonAiCostEventV1) => void;
-}): void {
+}): SeyeonAiCostEventV1 {
   const usage = isRecord(input.payload) && isRecord(input.payload.usage)
     ? input.payload.usage : {};
   const tokens = (value: unknown): number | null =>
@@ -346,6 +348,7 @@ function emitSeyeonProviderMetricV1(input: {
   } catch {
     console.error('MYEONGHA_SEYEON_PROVIDER_METRIC_OBSERVER_FAILED');
   }
+  return event;
 }
 
 export function createOpenAiSeyeonStructuredProviderV1(
@@ -424,21 +427,22 @@ export function createOpenAiSeyeonStructuredProviderV1(
           );
         }
       }
-      const meter = (
+      const meter = async (
         outcome: SeyeonAiCallOutcomeV1,
         httpStatus: number | null,
         payload?: unknown,
       ) => {
         try {
-          emitSeyeonProviderMetricV1({
+          const event = emitSeyeonProviderMetricV1({
             callId, purpose: request.purpose, model, startedAt,
             outcome, httpStatus, payload,
             ...(config.priceQuote === undefined ? {} : { priceQuote: config.priceQuote }),
             ...(config.observeMetric === undefined ? {} : { observeMetric: config.observeMetric }),
           });
+          await config.meteredAfterOutcome?.(event);
         } catch {
           // Malformed provider usage must not change an otherwise valid answer.
-          console.error('MYEONGHA_SEYEON_PROVIDER_METRIC_CAPTURE_FAILED');
+          console.error('MYEONGHA_SEYEON_PROVIDER_METRIC_OR_PERSIST_FAILED');
         }
       };
       const controller = new AbortController();
@@ -464,7 +468,7 @@ export function createOpenAiSeyeonStructuredProviderV1(
         });
       } catch {
         clearTimeout(timer);
-        meter(timedOut ? 'timeout' : 'network_failure', null);
+        await meter(timedOut ? 'timeout' : 'network_failure', null);
         if (timedOut) {
           throw new OpenAiSeyeonStructuredProviderErrorV1(
             'TIMEOUT',
@@ -480,7 +484,7 @@ export function createOpenAiSeyeonStructuredProviderV1(
       try {
         if (!response.ok) {
           const diagnostic = await readSeyeonProviderFailureDiagnosticV1(response);
-          meter('http_failure', response.status);
+          await meter('http_failure', response.status);
           throw new OpenAiSeyeonStructuredProviderErrorV1(
             'HTTP_FAILURE',
             'OpenAI structured request returned a non-success status.',
@@ -494,7 +498,7 @@ export function createOpenAiSeyeonStructuredProviderV1(
           contentType === null ||
           !/^application\/json(?:\s*;|$)/iu.test(contentType.trim())
         ) {
-          meter('invalid_content_type', response.status);
+          await meter('invalid_content_type', response.status);
           try {
             void response.body?.cancel();
           } catch {
@@ -516,14 +520,14 @@ export function createOpenAiSeyeonStructuredProviderV1(
           raw = JSON.parse(boundedText) as unknown;
         } catch {
           if (timedOut || controller.signal.aborted) {
-            meter('timeout', response.status);
+            await meter('timeout', response.status);
             throw new OpenAiSeyeonStructuredProviderErrorV1(
               'TIMEOUT',
               'OpenAI structured response body exceeded the request deadline.',
               response.status,
             );
           }
-          meter('invalid_response', response.status);
+          await meter('invalid_response', response.status);
           throw new OpenAiSeyeonStructuredProviderErrorV1(
             'INVALID_RESPONSE',
             'OpenAI structured response body failed bounded JSON admission.',
@@ -531,7 +535,7 @@ export function createOpenAiSeyeonStructuredProviderV1(
           );
         }
 
-        meter('response_received', response.status, raw);
+        await meter('response_received', response.status, raw);
         const text = extractStructuredText(raw);
         try {
           return JSON.parse(text) as unknown;

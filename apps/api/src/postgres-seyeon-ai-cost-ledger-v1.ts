@@ -92,6 +92,13 @@ from public.cmd_governed_start_seyeon_ai_call_v1(
 )
 `.trim();
 
+const STORE_PROVIDER_RECEIPT_SQL = `
+select call_id::text as "callId", replayed
+from public.cmd_store_seyeon_provider_receipt_v1(
+  $1::uuid,$2::uuid,$3::uuid,$4::text,$5::jsonb
+)
+`.trim();
+
 const GOVERNED_SETTLE_SQL = `
 select call_id::text as "callId", replayed,
        occupied_micro_usd::text as "occupiedMicroUsd",
@@ -256,6 +263,32 @@ export async function settleSeyeonAiCallV1(
   return Object.freeze({callId,replayed:row.replayed});
 }
 
+/** Persist the actual server-observed Provider usage before any governed settlement. */
+export async function storeGovernedSeyeonProviderReceiptV1(
+  client: PostgresTransactionQueryV1,
+  binding: SeyeonAiCostLedgerBindingV1,
+  event: SeyeonAiCostEventV1,
+): Promise<Readonly<{ callId: string; replayed: boolean }>> {
+  const args=bindingParams(binding);
+  const callId=uuid(event.callId,'callId');
+  if (event.schemaVersion!=='seyeon-ai-cost-v1' ||
+      event.invoiceReconciled!==false ||
+      event.costStatus==='price_unknown') {
+    throw new Error('Seyeon Provider receipt must use a governed reservation price.');
+  }
+  const response=await client.query<{ callId: string; replayed: boolean }>(
+    STORE_PROVIDER_RECEIPT_SQL,[...args,JSON.stringify(event)],
+  );
+  const row=response.rows[0];
+  if (response.rows.length!==1 || row===undefined ||
+      typeof row.callId!=='string' ||
+      uuid(row.callId,'receipt callId')!==callId ||
+      typeof row.replayed!=='boolean') {
+    throw new Error('Se-yeon Provider receipt DB acknowledgment is invalid.');
+  }
+  return Object.freeze({callId,replayed:row.replayed});
+}
+
 /** The governed reservation and global budget are settled atomically in DB. */
 export async function settleGovernedSeyeonAiCallV1(
   client: PostgresTransactionQueryV1,
@@ -391,6 +424,7 @@ export function createPersistingSeyeonAiProviderV1(input: {
     modelKey: descriptor.modelKey,
     async generate(request: Parameters<SeyeonStructuredProviderPortV2['generate']>[0]) {
       const events: SeyeonAiCostEventV1[] = [];
+      const durableProviderReceipts = new Set<string>();
       const observer = input.config.observeMetric;
       const state: { binding: SeyeonAiCostLedgerBindingV1 | null; callId: string | null } = {
         binding: null, callId: null,
@@ -438,6 +472,17 @@ export function createPersistingSeyeonAiProviderV1(input: {
           state.binding = binding;
           state.callId = call.callId;
         },
+        async meteredAfterOutcome(event) {
+          if (input.governor===undefined) return;
+          const binding=state.binding;
+          if (binding===null || state.callId!==event.callId) {
+            throw new Error('Governed Provider receipt is missing reserved call context.');
+          }
+          await input.runner.run(binding.subjectId, client =>
+            storeGovernedSeyeonProviderReceiptV1(client,binding,event),
+          );
+          durableProviderReceipts.add(event.callId);
+        },
         observeMetric(event) {
           if (event.callId !== state.callId) {
             console.error('MYEONGHA_SEYEON_COST_CALL_ID_MISMATCH');
@@ -457,6 +502,13 @@ export function createPersistingSeyeonAiProviderV1(input: {
         for (const event of events) {
           if (state.binding === null || state.callId !== event.callId) {
             console.error('MYEONGHA_SEYEON_COST_BINDING_MISSING');
+            continue;
+          }
+          if (input.governor!==undefined &&
+              !durableProviderReceipts.has(event.callId)) {
+            // Provider completed but outcome was not committed: do not
+            // fabricate evidence, settle, or retry a potentially paid call.
+            console.error('MYEONGHA_SEYEON_PROVIDER_RECEIPT_UNPERSISTED');
             continue;
           }
           try {
