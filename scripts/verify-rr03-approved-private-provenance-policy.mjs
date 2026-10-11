@@ -79,7 +79,7 @@ assert(JSON.stringify(final.destructiveFinalization) === JSON.stringify(baseFina
   final.backupRetentionPeriod === 'P30D', 'old retention/backup semantics must remain intact');
 assert(final.additionalPrivacyDeletes?.length === 1 &&
   final.additionalPrivacyDeletes[0].table === table &&
-  final.additionalPrivacyDeletes[0].deleteMechanism === 'FK_CASCADE_WITH_CONVERSATION_MESSAGE', 'deletion path not defined');
+  final.additionalPrivacyDeletes[0].deleteMechanism === 'FK_CASCADE_WITH_INTERPRETATION_OR_CONVERSATION_MESSAGE', 'deletion path not defined');
 
 for (const fragment of [
   'on delete cascade',
