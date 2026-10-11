@@ -162,8 +162,23 @@ set -e
   fail "ambiguous access unexpectedly created Thread"
 echo 'PASS D-05-C real independent cross-bundle purchases deny first open'
 
-# Remove B3; B2's pinned Bundle matches the current default.
+# Revoke both Reader B grants, then restore active default A for
+# the independently purchased and published AVAILABLE Reader A.
 purchase_state 12192300-0000-0000-0000-000000000003 revoked
+purchase_state 12192300-0000-0000-0000-000000000002 revoked
+reader=test-standard-reader
+p <<SQL >/dev/null
+update public.content_releases set is_default=false
+where id='b4400000-0000-0000-0000-000000000001'::uuid;
+insert into public.content_releases(
+  id,release_key,content_bundle_id,status,is_default,rollout_jsonb,
+  rollout_policy_version,rollout_seed,activated_at,retired_at,created_at
+) values (
+  'b4400000-0000-0000-0000-000000000002'::uuid,
+  'd05-purchased-grant-fixture-a','$bundle_a'::uuid,'active',true,null,
+  'uniform-default-v1','uniform',clock_timestamp(),null,clock_timestamp()
+);
+SQL
 first="$(run_member "
 DO \$guard\$
 declare active_count integer; purchased uuid;
@@ -193,10 +208,10 @@ reused="$(run_member "select thread_id::text,created,active_content_bundle_id::t
   from public.qry_member_single_character_thread_locator_v1(
     '$subject'::uuid,'$reader'
   );")" == "$thread" ]] || fail "actual Member locator disagrees"
-echo 'PASS D-05-C real purchased B2 access -> first create and re-entry'
+echo 'PASS D-05-C real purchased Reader A access -> first create and re-entry'
 
 # A previously created general Chat Thread is not a paid Reading right.
-purchase_state 12192300-0000-0000-0000-000000000002 revoked
+purchase_state 11392300-0000-0000-0000-000000000001 revoked
 [[ "$(run_member "select count(*)
   from public.qry_character_standard_reading_access_runtime_v2(
     '$subject'::uuid,'$reader',transaction_timestamp()
