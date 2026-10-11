@@ -37,3 +37,10 @@ G0~G6/G6, 세연 공개 경로, 유료 AI, 개인 Projector는 기존대로 HOLD
 - **수정 방향:** 격리 서비스의 최초 관리자는 `seyeon_cluster_admin`, 테스트 대상 `postgres`는 두 번째 `LOGIN SUPERUSER`로 별도 생성합니다. 기존 migration bootstrap·정확한 104KB 번들·관리 owner 역할 설치까지 `postgres`로 진행한 다음, 격리 보조 관리자 `seyeon_fixture_demoter`로 `postgres`를 `NOSUPERUSER`로 전환하고 `current_user=postgres`, `rolsuper=false`를 확인합니다.
 - 별도 관리 계정/자격증명은 동일한 GitHub Actions 일회성 로컬 컨테이너에만 있습니다. Production SQL/자격증명·배포 작업·원격 migration ledger는 수정하지 않습니다. 해당 컨테이너는 GitHub Actions 종료 시 폐기됩니다.
 - 변경 검증은 전체 CI/Integration → 병합 후 `REMOTE_BUNDLE_SHA256_PASS`, 실제 비슈퍼유저 역순 재현 `PASS_PG17_EXACT_BUNDLE`, `TEMP_PRIVATE_SQL_REMOVED`로 단계별 판정합니다. 이 결과가 확인되지 않으면 재적용 HOLD입니다.
+
+## 2026-10-11 — 비슈퍼유저 로깅 옵션 수정
+
+- [격리 테스트 #38097196211](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38097196211): `DISPOSABLE_NONBOOTSTRAP_POSTGRES_CREATED` 성공, 원격 원문 104021 bytes/SHA 확인 PASS. 역할 비슈퍼유저 전환 SQL 이후 PostgreSQL 새 연결에서 `FATAL: permission denied to set parameter "log_min_messages"`가 발생했습니다. 테스트가 이를 `Disposable PG17 executor is unexpectedly superuser`로 잘못 진단했습니다.
+- 원인은 로그인 단계 `PGOPTIONS`가 슈퍼유저 전용 로깅 GUC를 강제했던 것입니다. 비슈퍼유저 DB 역할에는 해당 변수를 세션에서 설정할 권한이 없습니다. 원격 SQL·스키마·권한 적용 이전에 남겨 둔 자체 보안 설정 충돌입니다.
+- 격리 PG17 관리자 권한이 유효할 때, disposable shadow 데이터베이스 자체에 `ALTER DATABASE ... SET log_min_messages=panic, log_min_error_statement=panic, log_statement=none`을 각각 지정합니다. **비슈퍼유저 전환 직후에만** `PGOPTIONS`를 제거해 새 연결이 데이터베이스 수준 안전 로깅 정책을 물려받도록 하고, SQL로 세 값을 재검증합니다.
+- 안전한 로깅 기본값을 확인하지 못하면 원격 SQL 재현 없이 즉시 HOLD. 원격 운영 DB의 로깅 설정/Role/마이그레이션은 변경하지 않고, GitHub Actions disposable DB만 조정합니다.
