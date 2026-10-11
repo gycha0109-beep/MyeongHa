@@ -85,6 +85,15 @@ describe('Se-yeon 04C governed provider adapter (fake HTTP and fake DB)', () => 
           callId:admittedId,ceilingMicroUsd:'3700',bucketUtcDate:'2026-10-10',
         }]};
       }
+      if (sql.includes('cmd_store_seyeon_provider_receipt_v1')) {
+        order.push('store');
+        const event = JSON.parse(String(values[4]));
+        expect(event).toMatchObject({
+          callId:admittedId,priceVersion:'offline-rate-v1',
+          outcome:'response_received',costStatus:'estimated',
+        });
+        return {rows:[{callId:admittedId,replayed:false}]};
+      }
       if (sql.includes('cmd_governed_settle_seyeon_ai_call_v1')) {
         order.push('settle');
         const event = JSON.parse(String(values[4]));
@@ -120,8 +129,8 @@ describe('Se-yeon 04C governed provider adapter (fake HTTP and fake DB)', () => 
     const info = vi.spyOn(console,'info').mockImplementation(()=>undefined);
     try {
       await expect(provider.generate(request)).resolves.toEqual({ok:true});
-      expect(order).toEqual(['certify','admit','fetch','settle']);
-      expect(query).toHaveBeenCalledTimes(2);
+      expect(order).toEqual(['certify','admit','fetch','store','settle']);
+      expect(query).toHaveBeenCalledTimes(3);
       expect(JSON.stringify(query.mock.calls)).not.toContain('Synthetic 한글 text');
       expect(JSON.stringify(query.mock.calls)).not.toContain('synthetic-test-placeholder');
     } finally { info.mockRestore(); }
