@@ -224,4 +224,4 @@ end
 $acl$;
 
 comment on table public.official_reader_assistant_saju_provenance is
-'RR-03 dormant source-provenance sidecar. DB Writer not yet authorized; no role can insert/select through API. The future source-verified Assistant Commit must write the exact committed message and this provenance within one transaction. This table alone does not validate Saju semantics or authorize any Reader Chat reveal. P0-PR-01 RR-03 additive classification DELETE; approved 2026-10-11; migration 1710.';
+'RR-03 dormant source-provenance sidecar. DB Writer not yet authorized; no role can insert/select through API. The future source-verified Assistant Commit must write the exact committed message and this provenance within one transaction. This table alone does not validate Saju semantics or authorize any Reader Chat reveal. P0-PR-01 RR-03 additive classification DELETE; approved 2026-10-11; migration 1720.';
