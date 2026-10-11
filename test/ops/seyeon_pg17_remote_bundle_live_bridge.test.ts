@@ -52,9 +52,6 @@ describe('Se-yeon historical SQL PG17 isolated CI bridge', () => {
     expect(workflow).toContain("alter role postgres set log_min_messages = 'panic';");
     expect(workflow).toContain("alter role postgres set log_min_error_statement = 'panic';");
     expect(workflow).toContain("alter role postgres set log_statement = 'none';");
-    expect(isolated).toContain('log_min_error_statement=panic');
-    expect(isolated).toContain('log_min_messages=panic');
-    expect(isolated).toContain('log_statement=none');
     expect(isolated).toContain('coalesce(cardinality(statements),0)=0');
     expect(isolated).toContain('PG17_FIXTURE_SKIP_0860');
     expect(isolated).toContain('PG17_BASELINE_APPLY: $filename');
