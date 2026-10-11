@@ -134,12 +134,15 @@ describe.runIf(enabled)('D-05-C actual TypeScript and disposable PostgreSQL purc
     await expect(openPostgresOfficialReadingReaderFirstThreadV1(input()))
       .rejects.toMatchObject({ code: 'ACCESS_DENIED' });
     expect(await threadCount()).toBe(1);
-    const lastAccess = await pg.query<{ count: string }>(
+    // The DB query is additionally protected by a trusted subject context:
+    // an unauthenticated/raw connection must NOT read paid Reader metadata.
+    await expect(pg.query(
       'select count(*)::text as count ' +
       'from public.qry_character_standard_reading_access_runtime_v2($1::uuid,$2,clock_timestamp()) ' +
       'where reading_id=$3::uuid',
       [SUBJECT, READER, READING],
-    );
-    expect(Number(lastAccess.rows[0]?.count)).toBe(0);
+    )).rejects.toMatchObject({
+      code: '28000', constraint: 'myeongha_subject_context_required',
+    });
   });
 });
