@@ -128,7 +128,8 @@ describe('D4B-10C3 private durable receipt source (synthetic PostgreSQL)',()=>{
       .toHaveLength(3);
     expect(f.calls.filter(c=>c.sql==='SET LOCAL ROLE myeongha_seyeon_settlement_worker'))
       .toHaveLength(3);
-    expect(f.calls.some(c=>/cmd_governed_start|begin_guest_subject_context/u.test(c.sql)))
+    expect(f.calls.some(c=>c.sql!==DETACHED_WORKER_LOGIN_PREFLIGHT_SQL_V1 &&
+      /cmd_governed_start|begin_guest_subject_context/u.test(c.sql)))
       .toBe(false);
     expect(f.releases).toEqual([undefined,undefined,undefined]);
     expect(await worker.settleNext()).toBeNull();
@@ -142,7 +143,8 @@ describe('D4B-10C3 private durable receipt source (synthetic PostgreSQL)',()=>{
       driverPool:f.pool,source:createSeyeonPostgresProviderReceiptSourceV1(f.pool),
     });
     expect(await worker.settleNext()).toMatchObject({occupiedMicroUsd:3700n});
-    const settled=f.calls.find(c=>c.sql.includes('cmd_settle_seyeon_ai_call_detached_v1'));
+    const settled=f.calls.find(c=>c.params?.length===5 &&
+      c.sql.includes('cmd_settle_seyeon_ai_call_detached_v1'));
     const event=JSON.parse(String(settled?.params?.[4]));
     expect(event).toMatchObject({
       costStatus:'usage_unknown',estimatedCostMicroUsd:null,
