@@ -99,13 +99,13 @@ jobs:
       postgres:
         image: postgres:17.6
         env:
-          POSTGRES_USER: postgres
+          POSTGRES_USER: seyeon_cluster_admin
           POSTGRES_PASSWORD: ${{ github.run_id }}-${{ github.run_attempt }}
           POSTGRES_DB: myeongha_test
         ports:
           - 5432:5432
         options: >-
-          --health-cmd="pg_isready -U postgres -d myeongha_test"
+          --health-cmd="pg_isready -U seyeon_cluster_admin -d myeongha_test"
           --health-interval=5s
           --health-timeout=5s
           --health-retries=10
@@ -121,6 +121,30 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y -qq postgresql-client >/dev/null
           psql --version
+      - name: Initialize isolated non-bootstrap postgres actor (never Production)
+        shell: bash
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: seyeon_cluster_admin
+          PGPASSWORD: ${{ github.run_id }}-${{ github.run_attempt }}
+          PGDATABASE: myeongha_test
+        run: |
+          set -euo pipefail
+          set +x
+          export PGOPTIONS='-c log_min_messages=panic -c log_min_error_statement=panic -c log_statement=none'
+          # PostgreSQL 17 disallows removing SUPERUSER from the CLUSTER
+          # bootstrap role. Use a distinct cluster boot role and create
+          # application postgres separately, so isolated demotion is valid.
+          psql -X -q -v ON_ERROR_STOP=1 -v "actor_password=$PGPASSWORD" \
+            >/dev/null 2>"$RUNNER_TEMP/seyeon-actor-bootstrap.err" <<'SQL'
+          create role postgres login superuser createrole createdb
+            password :'actor_password';
+          SQL
+          test "$(psql -X -qAt -v ON_ERROR_STOP=1 -c \
+            "select count(*) from pg_roles where rolname='postgres' and rolsuper and rolcanlogin")" = 1
+          echo 'DISPOSABLE_NONBOOTSTRAP_POSTGRES_CREATED'
+
       - name: Fetch SHA-pinned SQL via Production read-only SELECT
         shell: bash
         env:
@@ -175,5 +199,6 @@ jobs:
         run: |
           set -euo pipefail
           rm -f -- "$RUNNER_TEMP/seyeon-20261008090417-exact.sql" \
-            "$RUNNER_TEMP/seyeon-remote-select.err"
+            "$RUNNER_TEMP/seyeon-remote-select.err" \
+            "$RUNNER_TEMP/seyeon-actor-bootstrap.err"
           echo 'TEMP_PRIVATE_SQL_REMOVED'

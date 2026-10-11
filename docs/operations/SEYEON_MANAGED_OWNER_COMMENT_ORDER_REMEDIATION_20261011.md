@@ -29,3 +29,11 @@ Watchtower-Track: ops
 G0~G6/G6, 세연 공개 경로, 유료 AI, 개인 Projector는 기존대로 HOLD.
 
 **추가 운영 권한 확인:** Production `postgres`는 `rolsuper=false`, `rolcreaterole=true`이고 `myeongha_relationship_apply_owner` 직접 membership은 `admin=true`, `inherit=false`, `set=false`, 기존 grantor는 `supabase_admin`입니다. 따라서 단순히 `REVOKE` 앞에 주석을 두는 방식도 유효하지 않을 수 있습니다. 주석을 `GRANT`/소유권 이전 **이전**으로 이동해야 하며, 사후 역할 membership의 정확한 원장 fingerprint는 계속 불변 검사합니다. 소유권 양도 자체나 membership 변화가 비슈퍼유저 검증에서 실패하면 Production 재시도는 하지 않습니다.
+
+## 2026-10-11 — PG17 bootstrap superuser 별도 생성 (격리 테스트 전용)
+
+- PR #1953 병합본의 exact-main [read-only + isolated run #38096222680](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38096222680)에서 원격 원본 SQL 104021바이트/SHA 확인은 PASS했으나 `HOLD_SEYEON_PG17: Unable to reproduce Production non-superuser postgres role`로 격리 트랜잭션이 중단됐습니다. 임시 SQL은 삭제됐고 Production DB 변경은 없습니다.
+- **원인:** 표준 `postgres:17.6` 컨테이너는 `POSTGRES_USER=postgres`를 PostgreSQL 클러스터의 **bootstrap superuser**로 생성합니다. PostgreSQL 17은 이 최초 슈퍼유저의 `SUPERUSER` 특성 변경을 금지하므로, 격리 역할 전환이 원천적으로 거부됩니다. 이 제약을 해제하지 않습니다.
+- **수정 방향:** 격리 서비스의 최초 관리자는 `seyeon_cluster_admin`, 테스트 대상 `postgres`는 두 번째 `LOGIN SUPERUSER`로 별도 생성합니다. 기존 migration bootstrap·정확한 104KB 번들·관리 owner 역할 설치까지 `postgres`로 진행한 다음, 격리 보조 관리자 `seyeon_fixture_demoter`로 `postgres`를 `NOSUPERUSER`로 전환하고 `current_user=postgres`, `rolsuper=false`를 확인합니다.
+- 별도 관리 계정/자격증명은 동일한 GitHub Actions 일회성 로컬 컨테이너에만 있습니다. Production SQL/자격증명·배포 작업·원격 migration ledger는 수정하지 않습니다. 해당 컨테이너는 GitHub Actions 종료 시 폐기됩니다.
+- 변경 검증은 전체 CI/Integration → 병합 후 `REMOTE_BUNDLE_SHA256_PASS`, 실제 비슈퍼유저 역순 재현 `PASS_PG17_EXACT_BUNDLE`, `TEMP_PRIVATE_SQL_REMOVED`로 단계별 판정합니다. 이 결과가 확인되지 않으면 재적용 HOLD입니다.
