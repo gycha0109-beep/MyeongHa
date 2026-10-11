@@ -5,12 +5,12 @@ import type { PostgresSubjectPoolV1 } from '../apps/api/src/postgres-subject-exe
 import type { ProductReaderEligibilitySourceV1 } from '../apps/api/src/product-reader-eligibility-policy-v1.js';
 
 const enabled = process.env.MYEONGHA_D05_REAL_PG === '1';
-const SUBJECT = '11390000-0000-0000-0000-000000000001';
-const AUTH = 'c1990000-0000-0000-0000-000000000009';
-const READING = '12103100-0000-0000-0000-000000000001';
-const BUNDLE_A = '11391000-0000-0000-0000-000000000001';
+const SUBJECT = '11390000-0000-4000-8000-000000000001';
+const AUTH = 'c1990000-0000-4000-8000-000000000009';
+const READING = '12103100-0000-4000-8000-000000000001';
+const BUNDLE_A = '11391000-0000-4000-8000-000000000001';
 const READER = 'seyeon';
-const initialIntent = '11392300-0000-0000-0000-000000000001';
+const initialIntent = '11392300-0000-4000-8000-000000000001';
 
 describe.runIf(enabled)('D-05-C actual TypeScript and disposable PostgreSQL purchased Reader', () => {
   const pg = new Pool({
@@ -104,7 +104,7 @@ describe.runIf(enabled)('D-05-C actual TypeScript and disposable PostgreSQL purc
         'id,release_key,content_bundle_id,status,is_default,rollout_jsonb,' +
         'rollout_policy_version,rollout_seed,activated_at,retired_at,created_at' +
       ') values (' +
-        "'b4400000-0000-0000-0000-000000000010'::uuid," +
+        "'b4400000-0000-4000-8000-000000000010'::uuid," +
         "'d05-app-default-a',$1::uuid,'active',true,null," +
         "'uniform-default-v1','uniform',clock_timestamp(),null,clock_timestamp())",
       [BUNDLE_A],
