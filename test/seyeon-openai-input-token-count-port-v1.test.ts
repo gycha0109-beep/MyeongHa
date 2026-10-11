@@ -98,6 +98,14 @@ describe('PR-04D2 OpenAI exact input-token counter (offline, no API calls)',()=>
         expect(Number(values[12])).toBeGreaterThan(100);
         return {rows:[{callId,ceilingMicroUsd:'3864',bucketUtcDate:'2026-10-10'}]};
       }
+      if(sql.includes('cmd_store_seyeon_provider_receipt_v1')){
+        steps.push('store');
+        expect(JSON.parse(String(values[4]))).toMatchObject({
+          callId,outcome:'response_received',costStatus:'estimated',
+          priceVersion:'offline-rate-v1',
+        });
+        return {rows:[{callId,replayed:false}]};
+      }
       if(sql.includes('cmd_governed_settle_seyeon_ai_call_v1')){
         steps.push('settle');
         return {rows:[{callId,replayed:false,occupiedMicroUsd:'130',overCeiling:false}]};
@@ -120,7 +128,7 @@ describe('PR-04D2 OpenAI exact input-token counter (offline, no API calls)',()=>
     const logger=vi.spyOn(console,'info').mockImplementation(()=>undefined);
     try{
       await expect(provider.generate(request)).resolves.toEqual({ok:true});
-      expect(steps).toEqual(['count','admit','generate','settle']);
+      expect(steps).toEqual(['count','admit','generate','store','settle']);
       expect(metadataHook).toHaveBeenCalledOnce();
       expect(metadataHook.mock.calls[0]).toHaveLength(1);
       expect(JSON.stringify(query.mock.calls)).not.toContain('Synthetic 한글');
