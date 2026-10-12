@@ -127,11 +127,11 @@ begin
       pg_catalog.unnest(p_reading_refs),
       pg_catalog.unnest(p_reader_character_ids)
     ) as input(reading_ref, reader_id)
-    where reading_ref is null or reader_id is null
-       or reader_id <> pg_catalog.btrim(reader_id)
-       or pg_catalog.btrim(reader_id) = ''
-       or pg_catalog.length(reader_id) > 256
-       or reader_id ~ '[[:cntrl:]]'
+    where input.reading_ref is null or input.reader_id is null
+       or input.reader_id <> pg_catalog.btrim(input.reader_id)
+       or pg_catalog.btrim(input.reader_id) = ''
+       or pg_catalog.length(input.reader_id) > 256
+       or input.reader_id ~ '[[:cntrl:]]'
   ) then
     raise exception using errcode='23514',
       constraint='reader_multi_reading_lockset_invalid',
