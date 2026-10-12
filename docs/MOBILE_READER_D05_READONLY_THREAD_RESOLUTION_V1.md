@@ -1,6 +1,6 @@
 # D-05 — Official Reading × Reader × Existing Thread read-only resolver v1
 
-> Status: **INTERNAL COMPOSITION ONLY / OWNER DECISION HOLD / PUBLIC OFF**
+> Status: **PRODUCT D05-A DIRECTION APPROVED 2026-10-12 / DB·API IMPLEMENTATION APPROVAL HOLD / PUBLIC OFF**
 >
 > Watchtower-Track: frontend-integration
 >
@@ -161,6 +161,17 @@ reuse, and require `ACCESS_DENIED` plus transaction `ROLLBACK`. This is a
 synthetic PostgreSQL-port fault-injection test, **not** evidence that the real
 PostgreSQL writer can mutate immutable Reading facts in-place, and **not** a
 claim of current live privilege escalation.
+
+
+## 2026-10-12 제품 소유자 승인에 따른 우선 적용 규칙
+
+제품 소유자는 **회원 × 캐릭터당 일반 Chat Thread 1개**, **Reading×Reader별 구매권·해설·지식의 강한 격리**, **bundle 불일치 rollback/DENY**, **최종 권한 승인 DB COMMIT 이후 비스트리밍 공개**, **일반 Standard 자격과 전문 `can_initiate` 분리**의 제품 방향을 승인했다. 단건 디지털 해설의 실제 제공 개시 후 단순 변심 청약철회 제한은 법정 고지·시험 제공 및 예외를 전제로 한 방향만 승인했다.
+
+상세 결정:
+- `docs/MOBILE_READER_PRODUCT_OWNER_DECISION_20261012_V1.md`
+- `docs/COMMERCE_DIGITAL_READING_REFUND_DISCLOSURE_POLICY_V1.md`
+
+따라서 아래 **"Owner decision options, not approvals" 표는 2026-10-11의 과거 미결정 검토 기록**으로 남긴다. D05-A 제품 방향과 bundle 충돌 처리 기준은 위 최신 문서가 우선한다. DB 공동 writer/잠금 순서(전용 Reader×Reading scope anchor는 선호 후보), #1827 환불·T2 선형화 구현, #1828 Product 규칙의 실제 DB 반영, 법무·운영 및 Release 서명은 여전히 차단 상태다. 기존 D-05 내부 후보 또는 PR #1969의 실제 PostgreSQL 합성 검증은 공개 승인·운영 환불 경합 검증으로 승격되지 않는다.
 
 ### Owner decision options, not approvals
 
