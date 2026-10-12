@@ -237,6 +237,9 @@ for (const fragment of [
   'ALTER DEFAULT PRIVILEGES REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC',
   'ALTER DEFAULT PRIVILEGES IN SCHEMA public',
   'REVOKE EXECUTE ON FUNCTIONS FROM anon, authenticated',
+  'ALTER DEFAULT PRIVILEGES REVOKE ALL PRIVILEGES ON TABLES FROM PUBLIC',
+  'REVOKE ALL PRIVILEGES ON TABLES FROM anon, authenticated',
+  'HOLD_SEYEON_RESTORE: creator retains PUBLIC/anon/authenticated default table privileges',
   'HOLD_SEYEON_RESTORE: creator retains PUBLIC/anon/authenticated default function EXECUTE',
   'PASS_SEYEON_ISOLATED_CREATOR_FUNCTION_DEFAULT_ACL',
 ]) {
@@ -246,6 +249,7 @@ for (const forbidden of [
   'REVOKE ALL ON FUNCTION',
   'GRANT EXECUTE ON FUNCTION',
   'ALTER FUNCTION',
+  'REVOKE ALL PRIVILEGES ON TABLE public.relationship_history_entries',
   'supabase_migrations.schema_migrations',
 ]) {
   forbidFragment(creatorDefaultAcl, forbidden, creatorDefaultAclPath);
@@ -253,6 +257,16 @@ for (const forbidden of [
 if (!(harness.indexOf('prepare-postgres-isolated-restore-function-defaults.sql')
   < harness.indexOf('--file "$work_dir/schema.sql"'))) {
   throw new Error('Creator default ACL must be guarded before schema replay.');
+}
+for (const fragment of [
+  "has_table_privilege('anon',c.oid,'SELECT,INSERT,UPDATE,DELETE')",
+  "has_table_privilege('authenticated',c.oid,'SELECT,INSERT,UPDATE,DELETE')",
+  'c.relrowsecurity AS rls_enabled',
+]) {
+  requireFragment(harness, fragment, harnessPath);
+}
+/* existing ordering contract follows */
+if (false) {
 }
 
 // The scoped proof must query the actual restored pg_proc/RLS catalog, not
