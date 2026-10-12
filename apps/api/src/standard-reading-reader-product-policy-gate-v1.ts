@@ -61,7 +61,9 @@ export function createPolicyGuardedStandardReaderSelectionPortV1(input: Readonly
   readonly approvedRulePort: ProductReaderEligibilityAuthorityPortV1;
 }>): StandardReadingReaderSelectionPortV4 {
   return Object.freeze({
-    async resolveEligibleReaderSelection(request) {
+    async resolveEligibleReaderSelection(
+      request: Parameters<StandardReadingReaderSelectionPortV4['resolveEligibleReaderSelection']>[0],
+    ) {
       try {
         const selected =
           await input.catalogAndUnlockPort.resolveEligibleReaderSelection(request);
