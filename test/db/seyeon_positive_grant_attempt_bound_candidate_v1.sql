@@ -308,33 +308,29 @@ declare
   s uuid := 'd2000000-0000-4000-8000-000000000001';
   t uuid := 'd4000000-0000-4000-8000-000000000001';
   turn_id uuid := 'd7000000-0000-4000-8000-000000000001';
-  attempt_id uuid := 'd7200000-0000-4000-8000-000000000001';
+  v_attempt_id uuid := 'd7200000-0000-4000-8000-000000000001';
   m uuid := 'd5000000-0000-4000-8000-000000000001';
   g uuid := 'd6000000-0000-4000-8000-000000000001';
   v_bool boolean;
 begin
   v_bool:=seyeon_positive_candidate.pin_before_model_v1(
-    s,t,turn_id,attempt_id,m,g);
+    s,t,turn_id,v_attempt_id,m,g);
   if v_bool is distinct from true then
     raise exception 'positive exact Grant failed to pin on REAL running Attempt'; end if;
   if not exists (
     select 1 from seyeon_positive_candidate.attempt_source_pins
-    where attempt_id=attempt_id and original_grant_id=g
-    and original_record_kind='memory'
-    and original_raw_digest ~ '^sha256:pg-jsonb:v1:[a-f0-9]{64}$'
-  ) then raise exception 'server DB exact source provenance not persisted'; end if;
 
   begin
     update seyeon_positive_candidate.attempt_source_pins
     set original_grant_id='d6000000-0000-4000-8000-000000000002'
-    where attempt_id=attempt_id;
+    where attempt_id=v_attempt_id;
     raise exception 'API executor directly changed immutable Pin';
   exception when insufficient_privilege then null;
   end;
 
   begin
     perform seyeon_positive_candidate.pin_before_model_v1(
-      s,t,turn_id,attempt_id,m,
+      s,t,turn_id,v_attempt_id,m,
       'd6000000-0000-4000-8000-000000000002');
     raise exception 'candidate admitted a second Pin on same Attempt';
   exception when unique_violation then null;
@@ -345,13 +341,68 @@ begin
 
   -- A synthetic-only Commit and Reveal succeed with the original Grant.
   if not seyeon_positive_candidate.commit_test_v1(
-    s,attempt_id,'SYNTHETIC_APPROVED_REPLY') then
+    s,v_attempt_id,'SYNTHETIC_APPROVED_REPLY') then
     raise exception 'original Grant Commit was denied'; end if;
-  if seyeon_positive_candidate.reveal_test_v1(s,attempt_id)
+  if seyeon_positive_candidate.reveal_test_v1(s,v_attempt_id)
        is distinct from 'SYNTHETIC_APPROVED_REPLY' then
     raise exception 'authorized candidate Reveal failed'; end if;
 end $test$;
 reset role;
+
+do $pin_receipt$
+begin
+  if not exists (
+    select 1 from seyeon_positive_candidate.attempt_source_pins
+    where attempt_id='d7200000-0000-4000-8000-000000000001'
+      and original_grant_id='d6000000-0000-4000-8000-000000000001'
+      and original_record_kind='memory'
+      and original_raw_digest ~ '^sha256:pg-jsonb:v1:[a-f0-9]{64} never retroactively authorizes
+-- the pinned Attempt. Revoke happens in the same disposable transaction here;
+-- independent PostgreSQL session races are covered by the separate race test.
+update public.record_access_grants
+set revoked_at=clock_timestamp()
+where id='d6000000-0000-4000-8000-000000000001';
+insert into public.record_access_grants(
+  id,subject_id,life_fact_id,memory_item_id,grantee_character_id,
+  grant_reason,granted_at,revoked_at
+) values (
+  'd6000000-0000-4000-8000-000000000003',
+  'd2000000-0000-4000-8000-000000000001',null,
+  'd5000000-0000-4000-8000-000000000001','seyeon',
+  'user_choice',clock_timestamp(),null
+);
+set local role myeongha_api_executor;
+set local myeongha.subject_id='d2000000-0000-4000-8000-000000000001';
+do $revoke$
+begin
+  if seyeon_positive_candidate.reveal_test_v1(
+    'd2000000-0000-4000-8000-000000000001',
+    'd7200000-0000-4000-8000-000000000001') is not null then
+    raise exception 'replacement Grant revived original disclosure'; end if;
+end $revoke$;
+reset role;
+-- A changed Memory payload (or schema) is also not retroactive authority.
+update public.record_access_grants set revoked_at=clock_timestamp()
+where id='d6000000-0000-4000-8000-000000000003';
+update public.record_access_grants set revoked_at=null
+where id='d6000000-0000-4000-8000-000000000001';
+update public.memory_items set content_jsonb='{"v":"changed"}'::jsonb
+where id='d5000000-0000-4000-8000-000000000001';
+set local role myeongha_api_executor;
+set local myeongha.subject_id='d2000000-0000-4000-8000-000000000001';
+do $changed$
+begin
+  if seyeon_positive_candidate.reveal_test_v1(
+    'd2000000-0000-4000-8000-000000000001',
+    'd7200000-0000-4000-8000-000000000001') is not null then
+    raise exception 'changed original Memory revived disclosure'; end if;
+end $changed$;
+reset role;
+rollback;
+\echo 'PASS offline-positive exact original Grant provenance Pin tied to REAL Chat Attempt; Commit/Reveal owner candidate, immutable ACL and regrant/content-change HOLD (all rolled back)'
+
+  ) then raise exception 'DB exact original source was not durably pinned'; end if;
+end $pin_receipt$;
 
 -- An independently minted replacement Grant never retroactively authorizes
 -- the pinned Attempt. Revoke happens in the same disposable transaction here;
