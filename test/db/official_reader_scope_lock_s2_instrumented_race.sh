@@ -160,6 +160,27 @@ runtime_exec_count="$(p -c "
 [[ "$runtime_exec_count" == "0" ]] ||
   fail "post-lock bundle query exposes unauthorized EXECUTE privilege"
 
+# A transaction's old snapshot is NOT refreshed by waiting on an advisory lock.
+# Prevent REPEATABLE READ and SERIALIZABLE from issuing a seemingly current
+# paid Reader bundle decision until a separate freshness protocol is proven.
+for isolation in "repeatable read" "serializable"; do
+  if p >"$tmpdir/rejected-isolation.out" 2>&1 <<SQL
+begin isolation level $isolation;
+select pg_catalog.set_config('myeongha.subject_id', '$subject', true);
+select * from public.internal_qry_official_reader_locked_bundle_scope_v1(
+  '$subject'::uuid, '$reading'::uuid, '$reader'
+);
+commit;
+SQL
+  then
+    fail "stale-snapshot transaction isolation was accepted: $isolation"
+  fi
+  grep -q 'Official Reader scope current access requires READ COMMITTED' \
+    "$tmpdir/rejected-isolation.out" ||
+    fail "wrong isolation denied without expected boundary: $isolation"
+done
+pass "stale-snapshot transaction isolation modes are denied"
+
 # Case 1: T2-like exact scope reading arrives BEFORE an independently minted
 # purchase Grant / Reader bind. The proposed Commerce writer MUST wait.
 # The holder sees only the original B2 bundle, then releases the scope.

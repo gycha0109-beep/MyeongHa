@@ -33,6 +33,16 @@ as $reader_locked_scope$
 declare
   v_effective_at timestamptz;
 begin
+  -- A pre-existing REPEATABLE READ / SERIALIZABLE snapshot can remain stale
+  -- even after waiting for a cooperative writer's advisory transaction lock.
+  -- Until a separate fresh-snapshot protocol is proven, refuse these modes.
+  if pg_catalog.current_setting('transaction_isolation') <> 'read committed' then
+    raise exception using
+      errcode = '25001',
+      constraint = 'official_reader_scope_requires_read_committed',
+      message = 'Official Reader scope current access requires READ COMMITTED';
+  end if;
+
   -- Also asserts the canonical transaction Subject and rejects invalid input.
   perform public.internal_acquire_official_reader_scope_lock_v1(
     p_subject_id, p_reading_ref, p_reader_character_id
