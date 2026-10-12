@@ -88,7 +88,7 @@ describe('parallel Character runtime authority lanes v1', () => {
     expect(lane?.authorityVersion).toMatch(/^sha256:v1:[0-9a-f]{64}$/u);
     expect(JSON.stringify(typed)).not.toContain('밝고 빠른 사회적 촉진자');
     expect(typed?.relationshipBehavior.rules.some((r) =>
-      'recentEventKeys' in r.when && r.when.recentEventKeys?.includes('RECONCILIATION_EVENT'))).toBe(true);
+      r.ruleKey === 'rahyeon_repair_does_not_repeat_test')).toBe(true);
   });
 
 });
