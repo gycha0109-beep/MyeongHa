@@ -489,6 +489,14 @@ Restore는 arbitrary admin grant 생성 기능이 아니다. Existing provider-i
 
 Refund 후 이미 생성된 Reading/content artifact의 열람/삭제는 Product/UX OPEN DECISION이다.
 
+**2026-10-12 이후 보충 제품 결정(기존 구현/운영 승인 아님):** 공식 Reading×Reader 유료 해설의 새로운 서버 열람·추가 유료 실행은 현재 exact Grant가 revoke/refund 상태면 차단한다. 일반 Chat Thread 자체와 다른 유효 구매권은 유지한다. 이미 소비자에게 제공한 콘텐츠의 철회 불가능성과 법정 적법 기록 보관·분쟁 제공 의무는 구분한다. 실제 디지털 콘텐츠 제공 시작 이후 **법정 사전 고지·시험 사용 등의 요건을 모두 충족하고 법정 예외가 없는 단순 변심만** 환불 제한 검토 대상이다. 법정 환불 신청을 어렵게 하거나 일괄 자동 거부하지 않는다.
+
+공식 최신 판단 기준:
+- `docs/MOBILE_READER_PRODUCT_OWNER_DECISION_20261012_V1.md` (회원×Reader 공유 Thread 및 Reader×Reading 구매권 격리)
+- `docs/COMMERCE_DIGITAL_READING_REFUND_DISCLOSURE_POLICY_V1.md` (제17조·시행령 §21-2·법정 예외·고지/인도 증빙; LEGAL/Commerce 출시 승인 대기)
+
+위 제품 방향 결정은 Provider refund/reversal/dispute runtime, 적법한 제공 개시 증빙, 환불 원가 정책, 새 공통 잠금, 실판매 권한 또는 P0-CM-03 완료가 아니다.
+
 ---
 
 ## 11. Guest / Member
