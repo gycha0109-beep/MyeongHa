@@ -3,6 +3,7 @@
 Watchtower-Track: security
 상위 종료 원장: [#1866](https://github.com/gycha0109-beep/MyeongHa/issues/1866)
 P0 Memory Grant/Commit/Reveal: [#1843](https://github.com/gycha0109-beep/MyeongHa/issues/1843)
+G0 Owner 검토 중인 **제안서(승인 아님)**: [세연 개인기록 출처·파생정보·공개 선형화 계약 v1](./SEYEON_G0_PERSONAL_SOURCE_AND_DERIVED_DISCLOSURE_CONTRACT_V1_PROPOSAL.md)
 Reader 구매 기반 권한: [#1827](https://github.com/gycha0109-beep/MyeongHa/issues/1827)
 AI 경량 보안 정책 평가: [#1816](https://github.com/gycha0109-beep/MyeongHa/issues/1816)
 플랫폼 전반 감사: [#1529](https://github.com/gycha0109-beep/MyeongHa/issues/1529)
@@ -25,6 +26,12 @@ AI 경량 보안 정책 평가: [#1816](https://github.com/gycha0109-beep/Myeong
 | G4 AI Governor | 서버 승인 비용/모델/역할 계약, 레거시 DB EXECUTE·Provider 우회 제거 | 독립 DB 세션 예산 경합, 중복 정산·크래시·direct RPC 차단·운영 정책 | Character + DB + Security | **IN PROGRESS / HOLD** |
 | G5 통합 검증 | 실제 DB·HTTP·AI 제어 경로, 정확한 HEAD CI·Governance·전체 Integration | 권한/유출/무단 유료 호출 핵심 0, PostgreSQL 2세션 race 모두 PASS | Security + QA | **HOLD** |
 | G6 운영 승인 | 제한적 synthetic + 내부 smoke, privacy-safe 관측·경보·복구·권한/배포 승인 | 승인자·범위·증거 URL·본번 main sha·rollback 기준·잔여 위험 명시 | Integration Owner | **HOLD** |
+
+## G0 설계 착수 판정 (2026-10-12, Owner 승인 전)
+
+- Draft PR #1985에서 운영 연결 이전 필요한 Owner의 **D-01~D-10 결정 원장**, source-class/파생 closure, raw/projected/context digest 분리, exact Grant revoke/Reveal 선형화, History/Reader/Relationship 무출처 HOLD, 제한적 S0 scope 및 G1~G6 테스트 요건을 버전 있는 G0 제안서로 기록.
+- **G0=PROPOSAL PREPARED, APPROVED 아님**. 이 문서의 개별 제안이 `SRC-25` type registry나 `SRC-22` 관계 정책, #1827 구매 entitlement 및 Production migration #1887을 확정하지 않음.
+- Security + DB + Character 외 Source Authority/Reader/Product/Ops가 각각 자기가 담당하는 D-ID를 명시 승인하거나 서명한 `OUT_OF_SCOPE + FAIL_CLOSED`를 남겨야 다음 운영 positive 단계 진행 가능. AI 작성·PR CI·테스트 PASS는 승인 대체 불가.
 
 ## G0 결정이 필요한 구체적 권한 계약
 
