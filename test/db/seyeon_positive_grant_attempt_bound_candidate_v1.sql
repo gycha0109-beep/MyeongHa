@@ -317,9 +317,6 @@ begin
     s,t,turn_id,v_attempt_id,m,g);
   if v_bool is distinct from true then
     raise exception 'positive exact Grant failed to pin on REAL running Attempt'; end if;
-  if not exists (
-    select 1 from seyeon_positive_candidate.attempt_source_pins
-
   begin
     update seyeon_positive_candidate.attempt_source_pins
     set original_grant_id='d6000000-0000-4000-8000-000000000002'
@@ -356,7 +353,11 @@ begin
     where attempt_id='d7200000-0000-4000-8000-000000000001'
       and original_grant_id='d6000000-0000-4000-8000-000000000001'
       and original_record_kind='memory'
-      and original_raw_digest ~ '^sha256:pg-jsonb:v1:[a-f0-9]{64} never retroactively authorizes
+      and original_raw_digest ~ '^sha256:pg-jsonb:v1:[a-f0-9]{64}$'
+  ) then raise exception 'DB exact original source was not durably pinned'; end if;
+end $pin_receipt$;
+
+-- An independently minted replacement Grant never retroactively authorizes
 -- the pinned Attempt. Revoke happens in the same disposable transaction here;
 -- independent PostgreSQL session races are covered by the separate race test.
 update public.record_access_grants
