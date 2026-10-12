@@ -31,6 +31,11 @@ export interface HandleChatReadRequestInputV1 {
   readonly serverTime: string;
   readonly identityEvidenceVerifier: IdentityEvidenceVerificationPortV1;
   readonly pool: PostgresSubjectPoolV1;
+  /**
+   * Server-only DB authority. Optional until an approved owner adapter exists:
+   * its absence MUST block Se-yeon history before the generic stream query.
+   */
+  readonly seyeonHistoryDisclosurePort?: SeyeonChatHistoryDisclosurePortV1;
 }
 
 type ParsedChatReadRequestV1 = Readonly<{
@@ -60,6 +65,29 @@ type StreamRow = Readonly<{
   redacted: unknown;
   redactedAt: unknown;
 }>;
+
+/**
+ * Not an authorization primitive by itself. The DB Owner implementation must
+ * load original Attempt/Grant Pin + current rights and return ONLY records
+ * whose full provenance is authorized within this SAME owner-scoped
+ * PostgreSQL transaction. Never forward raw qry_chat_thread_stream_v2 rows.
+ */
+export interface SeyeonChatHistoryDisclosurePortV1 {
+  readAuthorizedPage(input: Readonly<{
+    client: PostgresTransactionQueryV1;
+    subjectId: string;
+    threadId: string;
+    afterSequenceNo: number;
+    pageSize: number;
+    characterId: 'seyeon';
+  }>): Promise<readonly StreamRow[]>;
+}
+
+class SeyeonChatHistoryDisclosureUnavailableV1 extends Error {
+  constructor() {
+    super('Se-yeon history requires an approved current-rights DB disclosure authority.');
+  }
+}
 
 type RelationshipRow = Readonly<{
   stateId: unknown;
@@ -312,6 +340,7 @@ async function readChatState(
   client: PostgresTransactionQueryV1,
   subjectId: string,
   parsed: ParsedChatReadRequestV1,
+  seyeonHistoryDisclosurePort?: SeyeonChatHistoryDisclosurePortV1,
 ) {
   const bindingResult = await client.query<ThreadBindingRow>(READ_THREAD_BINDING_SQL, [
     subjectId,
@@ -322,19 +351,53 @@ async function readChatState(
   }
   const binding = mapThreadBinding(bindingResult.rows[0], parsed.threadId);
 
-  const streamResult = await client.query<StreamRow>(READ_STREAM_SQL, [
-    subjectId,
-    parsed.threadId,
-    parsed.afterSequenceNo,
-    parsed.pageSize,
-  ]);
-  const relationshipResult = await client.query<RelationshipRow>(READ_RELATIONSHIP_SQL, [
-    subjectId,
-    binding.primaryCharacterId,
-  ]);
+  // Se-yeon history may indirectly contain revoked Memory/Life Fact content.
+  // Generic stream SQL and relationship projection have no per-Attempt
+  // original-Grant current-rights proof. Do not query either for Se-yeon.
+  const isSeyeonThread = binding.participantCharacterIds.includes('seyeon');
+  let streamRows: readonly StreamRow[];
+  let relationshipResult: { readonly rows: readonly RelationshipRow[] };
+  if (isSeyeonThread) {
+    if (binding.participantCharacterIds.length !== 1 ||
+        binding.primaryCharacterId !== 'seyeon' ||
+        typeof seyeonHistoryDisclosurePort?.readAuthorizedPage !== 'function') {
+      throw new SeyeonChatHistoryDisclosureUnavailableV1();
+    }
+    try {
+      streamRows = await seyeonHistoryDisclosurePort.readAuthorizedPage({
+        client,
+        subjectId,
+        threadId: parsed.threadId,
+        afterSequenceNo: parsed.afterSequenceNo,
+        pageSize: parsed.pageSize,
+        characterId: 'seyeon',
+      });
+    } catch {
+      throw new SeyeonChatHistoryDisclosureUnavailableV1();
+    }
+    if (!Array.isArray(streamRows) ||
+        streamRows.length > parsed.pageSize + 1) {
+      throw new SeyeonChatHistoryDisclosureUnavailableV1();
+    }
+    // Relationship rows can themselves carry derived personal provenance.
+    // No historical current-rights owner contract exists for that projection.
+    relationshipResult = { rows: [] };
+  } else {
+    const streamResult = await client.query<StreamRow>(READ_STREAM_SQL, [
+      subjectId,
+      parsed.threadId,
+      parsed.afterSequenceNo,
+      parsed.pageSize,
+    ]);
+    streamRows = streamResult.rows;
+    relationshipResult = await client.query<RelationshipRow>(READ_RELATIONSHIP_SQL, [
+      subjectId,
+      binding.primaryCharacterId,
+    ]);
+  }
 
-  const hasMore = streamResult.rows.length > parsed.pageSize;
-  const pageRows = hasMore ? streamResult.rows.slice(0, parsed.pageSize) : streamResult.rows;
+  const hasMore = streamRows.length > parsed.pageSize;
+  const pageRows = hasMore ? streamRows.slice(0, parsed.pageSize) : streamRows;
   const messages = Object.freeze(pageRows.map(mapStreamRow));
   const latestCharacterMessage = [...messages].reverse().find((message) =>
     !message.redacted &&
@@ -393,7 +456,10 @@ export async function handleChatReadRequestV1(
       pool: input.pool,
       verifiedEvidence,
       execute: ({ resolvedSubject, client }) =>
-        readChatState(client, resolvedSubject.subjectId, parsed),
+        readChatState(
+          client, resolvedSubject.subjectId, parsed,
+          input.seyeonHistoryDisclosurePort,
+        ),
     });
     return success(
       data,
@@ -401,6 +467,12 @@ export async function handleChatReadRequestV1(
       stringValue('server time', input.serverTime),
     );
   } catch (error) {
+    if (error instanceof SeyeonChatHistoryDisclosureUnavailableV1) {
+      return jsonError(
+        503, 'CHAT_DISCLOSURE_UNAVAILABLE',
+        'chat.disclosure_unavailable', input.requestId,
+      );
+    }
     const constraint = postgresConstraint(error);
     if (constraint !== null && (
       constraint.includes('subject_ineligible') ||
