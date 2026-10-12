@@ -150,3 +150,35 @@ select pg_temp.assert_v2_fails(
   $sql$,
   'standard_b2_historical_replay_current_rights_unproven'
 );
+
+select pg_temp.assert_v2_true(
+  'S4 first Reader Binder and verified Receipt issuer are private only',
+  not pg_catalog.has_function_privilege(
+    'public',
+    'public.internal_cmd_bind_standard_reader_initial_policy_locked_v1(uuid,uuid,uuid,uuid,text,text,jsonb)',
+    'EXECUTE'
+  )
+  and not pg_catalog.has_function_privilege(
+    'public',
+    'public.internal_apply_initial_official_reader_receipt_locked_v1(uuid,text[],timestamptz[],timestamptz[],timestamptz[],text[])',
+    'EXECUTE'
+  )
+  and not exists (
+    select 1 from pg_catalog.pg_roles r
+    where r.rolname in (
+      'anon','authenticated','service_role',
+      'myeongha_api_executor','myeongha_commerce_internal_executor',
+      'myeongha_seyeon_chat_runtime_owner'
+    ) and (
+      pg_catalog.has_function_privilege(
+        r.rolname,
+        'public.internal_cmd_bind_standard_reader_initial_policy_locked_v1(uuid,uuid,uuid,uuid,text,text,jsonb)',
+        'EXECUTE'
+      ) or pg_catalog.has_function_privilege(
+        r.rolname,
+        'public.internal_apply_initial_official_reader_receipt_locked_v1(uuid,text[],timestamptz[],timestamptz[],timestamptz[],text[])',
+        'EXECUTE'
+      )
+    )
+  )
+);
