@@ -103,6 +103,12 @@ describe('Se-yeon post-recovery governed backup to real PG17 catalog proof', () 
   it('normalizes isolated creator defaults before DDL without changing existing RPC privileges', () => {
     expect(creatorDefaultAcl).toContain('ALTER DEFAULT PRIVILEGES REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC;');
     expect(creatorDefaultAcl).toContain('REVOKE EXECUTE ON FUNCTIONS FROM anon, authenticated;');
+    expect(creatorDefaultAcl).toContain('ALTER DEFAULT PRIVILEGES REVOKE ALL PRIVILEGES ON TABLES FROM PUBLIC;');
+    expect(creatorDefaultAcl).toContain('REVOKE ALL PRIVILEGES ON TABLES FROM anon, authenticated;');
+    expect(creatorDefaultAcl).toContain('HOLD_SEYEON_RESTORE: creator retains PUBLIC/anon/authenticated default table privileges');
+    expect(restore).toContain("has_table_privilege('anon',c.oid,'SELECT,INSERT,UPDATE,DELETE')");
+    expect(restore).toContain("has_table_privilege('authenticated',c.oid,'SELECT,INSERT,UPDATE,DELETE')");
+
     expect(creatorDefaultAcl).toContain('HOLD_SEYEON_RESTORE: creator retains PUBLIC/anon/authenticated default function EXECUTE');
     expect(creatorDefaultAcl).toContain("current_database() = 'postgres' AND current_user = 'supabase_admin'");
     expect(creatorDefaultAcl).toContain("current_database() ~ '^myeongha_ci_case_[0-9]+$'");
@@ -110,6 +116,9 @@ describe('Se-yeon post-recovery governed backup to real PG17 catalog proof', () 
     expect(creatorDefaultAcl).not.toContain('inet_server_addr()');
     expect(creatorDefaultAcl).not.toMatch(/\\b(?:REVOKE|GRANT)\\s+.*\\bON\\s+FUNCTION\\b/iu);
     expect(creatorDefaultAcl).not.toContain('supabase_migrations.schema_migrations');
+    expect(creatorDefaultAcl).not.toContain('GRANT SELECT ON TABLE public.relationship_history_entries');
+    expect(creatorDefaultAcl).not.toContain('ALTER TABLE public.relationship_history_entries DISABLE ROW LEVEL SECURITY');
+
     const aclPosition = restore.indexOf('prepare-postgres-isolated-restore-function-defaults.sql');
     const schemaPosition = restore.indexOf('--file "$work_dir/schema.sql"');
     const exactProofPosition = restore.indexOf('seyeon-relationship-isolated-restore-proof.sql');
