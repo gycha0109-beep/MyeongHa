@@ -19,7 +19,7 @@ const approvedRow = Object.freeze({
 });
 
 function testPort(rows: unknown[]) {
-  const query = vi.fn(async () => ({ rows }));
+  const query = vi.fn(async (_sql: string, _args: readonly unknown[] = []) => ({ rows }));
   return {
     port: createPostgresApprovedStandardReaderRuleAuthorityPortV1({
       query: query as never,
