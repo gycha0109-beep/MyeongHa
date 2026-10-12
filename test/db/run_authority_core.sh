@@ -70,7 +70,7 @@ psql -v ON_ERROR_STOP=1 -f test/db/seyeon_zero_personal_source_pre_model_pin_v1.
 run_isolated_case myeongha_seyeon_positive_grant_race_test bash test/db/seyeon_offline_positive_grant_exact_revoke_race.sh
 # G1/G2 positive source candidate is bound to an ACTUAL Chat Attempt, but
 # only installed for this disposable DB. Production zero-only RPC remains OFF.
-run_isolated_case myeongha_seyeon_positive_pin_candidate_test psql -X -v ON_ERROR_STOP=1 -f test/db/seyeon_positive_grant_attempt_bound_candidate_v1.sql
+run_isolated_case myeongha_seyeon_positive_pin_candidate_test bash test/db/seyeon_positive_grant_candidate_real_http.sh
 psql -v ON_ERROR_STOP=1 -f test/db/seyeon_ai_call_lifecycle_v1.sql
 psql -v ON_ERROR_STOP=1 -f test/db/seyeon_ai_governor_atomic_admission_v1.sql
 psql -v ON_ERROR_STOP=1 -f test/db/seyeon_ai_governor_atomic_settlement_v1.sql
