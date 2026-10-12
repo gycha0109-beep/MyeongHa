@@ -708,30 +708,29 @@ select pg_temp.assert_true(
   )
 );
 
--- #1828: A dormant source bridge returns authoritative Product spec and
--- DB time only. It never creates or approves Product Reader policy/Grant.
+-- #1828: Dormant Product source is a read-only identity/domain/DB-time query.
 select pg_temp.assert_true(
-  'Server-only active Standard Product source matches exact approved-target metadata',
+  'Server-only active Standard Product source matches exact metadata',
   (select count(*) from public.qry_standard_reading_product_scope_v1(
     '11392000-0000-0000-0000-000000000001'::uuid, 'v1'
   )) = 1
 );
 
 select pg_temp.assert_true(
-  'Active Standard source uses only DB time and correct Product/domain',
+  'Active Product source provides DB UTC time and correct domain',
   exists (
     select 1 from public.qry_standard_reading_product_scope_v1(
       '11392000-0000-0000-0000-000000000001'::uuid, 'v1'
     ) s
-    where s.product_id='11392000-0000-0000-0000-000000000001'::uuid
-      and s.product_spec_version='v1'
-      and s.saju_domain='relationship'
+    where s.product_id = '11392000-0000-0000-0000-000000000001'::uuid
+      and s.product_spec_version = 'v1'
+      and s.saju_domain = 'relationship'
       and s.effective_at ~ '^20[0-9]{2}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{3}Z$'
   )
 );
 
 select pg_temp.assert_true(
-  'No Product source for disabled launch SKU, stale version, or unknown Product',
+  'Disabled Product, stale Spec and unknown Product yield zero source rows',
   not exists (
     select 1 from public.qry_standard_reading_product_scope_v1(
       '11300000-0000-0000-0000-000000000001'::uuid, 'v1'
@@ -750,50 +749,7 @@ select pg_temp.assert_true(
 );
 
 select pg_temp.assert_true(
-  'Scope reader is executor-only and not public or saleable grant',
-  pg_catalog.has_function_privilege(
-    'myeongha_api_executor',
-    'public.qry_standard_reading_product_scope_v1(uuid,text)'::regprocedure,
-    'EXECUTE'
-  )
-  and not pg_catalog.has_function_privilege(
-    'public',
-    'public.qry_standard_reading_product_scope_v1(uuid,text)'::regprocedure,
-    'EXECUTE'
-  )
-  and not pg_catalog.has_function_privilege(
-    'myeongha_api_executor',
-    'public.cmd_create_standard_reading_purchase_intent_v4(uuid,uuid,uuid,uuid,text,text,jsonb,text,jsonb,text,uuid,text,uuid,text,jsonb,text)'::regprocedure,
-    'EXECUTE'
-  )
-);
-
-select 'Standard Love/Relationship × Reader authority passed' as result;
-
-  )
-);
-
-select pg_temp.assert_true(
-  'No Product source for disabled launch SKU, stale version, or unknown Product',
-  not exists (
-    select 1 from public.qry_standard_reading_product_scope_v1(
-      '11300000-0000-0000-0000-000000000001'::uuid, 'v1'
-    )
-  )
-  and not exists (
-    select 1 from public.qry_standard_reading_product_scope_v1(
-      '11392000-0000-0000-0000-000000000001'::uuid, 'old-v0'
-    )
-  )
-  and not exists (
-    select 1 from public.qry_standard_reading_product_scope_v1(
-      '11392000-0000-0000-0000-000000000099'::uuid, 'v1'
-    )
-  )
-);
-
-select pg_temp.assert_true(
-  'Scope reader is executor-only and not public or saleable grant',
+  'Product source is executor-only and purchase command remains disabled',
   pg_catalog.has_function_privilege(
     'myeongha_api_executor',
     'public.qry_standard_reading_product_scope_v1(uuid,text)'::regprocedure,
