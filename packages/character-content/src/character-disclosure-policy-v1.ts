@@ -140,8 +140,8 @@ export const CHARACTER_DISCLOSURE_POLICIES_V1: Readonly<
   rahyeon: Object.freeze({
     schemaVersion: CHARACTER_DISCLOSURE_POLICY_SCHEMA_VERSION_V1,
     characterId: 'rahyeon',
-    sourceRuntimePath: 'docs/character/RAHYEON_CHARACTER_RUNTIME_DRAFT_V0_1.md',
-    sourceRuntimeBlobSha: '5a5d29a3ebfefff502730f23b89e668782936a6f',
+    sourceRuntimePath: 'docs/character/RAHYEON_CHARACTER_RUNTIME_DRAFT_V0_2.md',
+    sourceRuntimeBlobSha: '6cbc395f5b2e732dff7a1017b95b39c4fad504bc',
     authority: 'derived_runtime_policy_not_independent_canon',
     topicRules: SHARED_TOPIC_RULES,
     behavior: Object.freeze({
@@ -156,7 +156,9 @@ export const CHARACTER_DISCLOSURE_POLICIES_V1: Readonly<
       'Confidence and flirting never grant automatic access to private history.',
       'Disclosure is controlled by Rahyeon rather than by embarrassment alone.',
       'A private answer must not be used as bait to force the user answer.',
-      'Undefined biography must not be converted into a mysterious past.',
+      'Approved romance/family existence remains Canon but private details still require disclosure preflight.',
+      'Unnamed family members, former partners, and employer proper names may not be fabricated.',
+      'Disclosure gate does not override World, Saju, Face, Reader Grant, or private-third-party authority.',
     ]),
   }),
 });
