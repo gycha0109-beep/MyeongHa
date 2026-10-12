@@ -265,9 +265,6 @@ for (const fragment of [
 ]) {
   requireFragment(harness, fragment, harnessPath);
 }
-/* existing ordering contract follows */
-if (false) {
-}
 
 // The scoped proof must query the actual restored pg_proc/RLS catalog, not
 // invent a full provider-managed migration ledger from the source frontier.
