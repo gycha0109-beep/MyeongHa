@@ -210,6 +210,8 @@ jobs:
         run: |
           set -euo pipefail
           jq -er '"backup_migration_frontier=\(.backup_migration_frontier)"' "$RESTORE_EVIDENCE_PATH"
+          jq -er '"seyeon_early_history_restore_proof=\(.seyeon_early_history_restore_proof)"' "$RESTORE_EVIDENCE_PATH"
+          jq -er '"seyeon_early_functions_restore_proof=\(.seyeon_early_functions_restore_proof)"' "$RESTORE_EVIDENCE_PATH"
           jq -er '"member_auth_rate_limit_schema_restore=\(.member_auth_rate_limit_schema_restore)"' "$RESTORE_EVIDENCE_PATH"
           jq -er '"member_auth_rate_limit_unlogged=\(.member_auth_rate_limit_unlogged)"' "$RESTORE_EVIDENCE_PATH"
           jq -er '"member_auth_rate_limit_ephemeral_data_restore=\(.member_auth_rate_limit_ephemeral_data_restore)"' "$RESTORE_EVIDENCE_PATH"
