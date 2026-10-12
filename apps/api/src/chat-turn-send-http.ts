@@ -13,6 +13,7 @@ import {
 } from './openai-seyeon-structured-provider-v1.js';
 import type {
   ProductionSeyeonChatRuntimeV1,
+  RunProductionSeyeonChatInputV1,
   RunProductionSeyeonChatResultV1,
 } from './production-seyeon-chat-runtime-v1.js';
 import {
@@ -35,12 +36,36 @@ export const SEYEON_CHAT_TURN_SEND_HTTP_BINDING_V1 = Object.freeze({
   apiContractVersion: API_CONTRACT_VERSION,
 } as const);
 
+/**
+ * Server-owned, database-authoritative disclosure boundary. Implementations
+ * must read the ORIGINAL durable Attempt pin and recheck CURRENT Grant rights
+ * at an owner-approved Reveal linearization point. Never grant authority from
+ * the runtime's response text or request body. Until G0/G1/G2/G3 are approved
+ * this port has no Production adapter; the public Se-yeon route remains OFF.
+ */
+export interface SeyeonChatTurnControlledDisclosurePortV1 {
+  reveal(input: Readonly<{
+    verifiedEvidence: RunProductionSeyeonChatInputV1['verifiedEvidence'];
+    subjectId: string;
+    threadId: string;
+    turnId: string;
+    attemptId: string;
+    assistantMessageId: string;
+    disposition: 'executed' | 'committed_replay';
+  }>): Promise<
+    | Readonly<{ state: 'authorized'; assistantText: string }>
+    | Readonly<{ state: 'held' }>
+  >;
+}
+
 export interface HandleSeyeonChatTurnSendRequestInputV1 {
   readonly request: Request;
   readonly requestId: string;
   readonly serverTime: string;
   readonly identityEvidenceVerifier: IdentityEvidenceVerificationPortV1;
   readonly runtime: Pick<ProductionSeyeonChatRuntimeV1, 'run'>;
+  /** Required before ANY model call, including idempotent committed replays. */
+  readonly controlledDisclosurePort: SeyeonChatTurnControlledDisclosurePortV1;
 }
 
 type ParsedRouteV1 = Readonly<{ threadId: string }>;
@@ -115,15 +140,60 @@ function methodNotAllowed(): Response {
   });
 }
 
-function projectResult(result: RunProductionSeyeonChatResultV1) {
+function validServerText(value: unknown, max: number): value is string {
+  return typeof value === 'string' &&
+    value.length > 0 && value.length <= max && value.trim() === value;
+}
+
+function disclosureUnavailable(requestId: string): Response {
+  // Identical client response for absent, revoked, mismatched, and failing
+  // authority. Do not expose grant identifiers, generated text, or DB errors.
+  return jsonError({
+    status: 503,
+    code: 'CHAT_DISCLOSURE_UNAVAILABLE',
+    messageKey: 'chat.disclosure_unavailable',
+    retryable: false,
+    requestId,
+  });
+}
+
+function authorizeDisclosureRequest(
+  result: RunProductionSeyeonChatResultV1,
+  threadId: string,
+  verifiedEvidence: RunProductionSeyeonChatInputV1['verifiedEvidence'],
+): Parameters<SeyeonChatTurnControlledDisclosurePortV1['reveal']>[0] | null {
+  if (result === null || typeof result !== 'object' ||
+      !validServerText(result.subjectId, 256) ||
+      result.threadBinding?.threadId !== threadId ||
+      result.threadBinding.participantCharacterIds?.length !== 1 ||
+      result.threadBinding.participantCharacterIds[0] !== 'seyeon') return null;
   const execution = result.execution;
-  const assistantText = execution.disposition === 'committed_replay'
-    ? execution.assistantText
-    : execution.runtimeResult.envelope.utterance;
+  if (execution?.disposition !== 'executed' &&
+      execution?.disposition !== 'committed_replay') return null;
+  const committed = execution.committedTurn;
+  if (!committed || !validServerText(committed.turnId, 256) ||
+      !validServerText(committed.attemptId, 256) ||
+      !validServerText(committed.assistantMessageId, 256)) return null;
+  return Object.freeze({
+    verifiedEvidence,
+    subjectId: result.subjectId,
+    threadId,
+    turnId: committed.turnId,
+    attemptId: committed.attemptId,
+    assistantMessageId: committed.assistantMessageId,
+    disposition: execution.disposition,
+  });
+}
+
+function projectResult(
+  result: RunProductionSeyeonChatResultV1,
+  authorizedText: string,
+) {
+  const execution = result.execution;
   return Object.freeze({
     turnId: execution.committedTurn.turnId,
     assistantMessageId: execution.committedTurn.assistantMessageId,
-    assistantText,
+    assistantText: authorizedText,
     sequenceNo: execution.committedTurn.sequenceNo,
     replayed:
       execution.disposition === 'committed_replay' ||
@@ -277,6 +347,12 @@ export async function handleSeyeonChatTurnSendRequestV1(
     return jsonError({ status: 400, code: 'INVALID_REQUEST', messageKey: 'request.invalid', retryable: false, requestId: input.requestId });
   }
 
+  // Fail BEFORE provider admission; never pay for a response when the
+  // required server-owned disclosure authority is absent or malformed.
+  if (typeof input.controlledDisclosurePort?.reveal !== 'function') {
+    return disclosureUnavailable(input.requestId);
+  }
+
   try {
     const result = await input.runtime.run({
       verifiedEvidence,
@@ -284,7 +360,22 @@ export async function handleSeyeonChatTurnSendRequestV1(
       clientTurnId: body.clientTurnId,
       text: body.text,
     });
-    return success(projectResult(result), input.requestId, input.serverTime);
+    const request = authorizeDisclosureRequest(result, parsedRoute.threadId, verifiedEvidence);
+    if (request === null) return disclosureUnavailable(input.requestId);
+
+    // Both first execution and committed_replay enter the SAME authority.
+    // Never return runtimeResult.envelope.utterance or replay.assistantText.
+    let disclosure: Awaited<ReturnType<SeyeonChatTurnControlledDisclosurePortV1['reveal']>>;
+    try {
+      disclosure = await input.controlledDisclosurePort.reveal(request);
+    } catch {
+      return disclosureUnavailable(input.requestId);
+    }
+    if (disclosure?.state !== 'authorized' ||
+        !validServerText(disclosure.assistantText, 8000)) {
+      return disclosureUnavailable(input.requestId);
+    }
+    return success(projectResult(result, disclosure.assistantText), input.requestId, input.serverTime);
   } catch (error) {
     const mapped = mapExecutionError(error, input.requestId);
     if (mapped !== null) return mapped;
