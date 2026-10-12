@@ -124,3 +124,11 @@ S1에서 공통 잠금 함수 자체가 성공하더라도 **S2 전체 경로가
 - 잠금 이후 현재 유효 묶음 판정: [#1987](https://github.com/gycha0109-beep/MyeongHa/pull/1987). **0개 / 1개 / 여러 묶음 충돌**만 구분하는 비공개 함수. 기존 검증 [38202209130](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38202209130) 성공. 새 본선에서는 변경된 DB 스키마 기준값과 재검증을 요구한다.
 - **선행 충돌:** RR-03 [#1960](https://github.com/gycha0109-beep/MyeongHa/pull/1960)의 `1720_official_reader_assistant_provenance_storage_v1.sql`과 현재 본선 Product `1720_standard_reader_product_scope_read_v1.sql`이 같은 1720 번호를 사용한다. 기존 RR-03/04의 근거 저장 내용을 삭제하거나 Product 기능으로 대체하지 않으며, 독립 번호 재배치·카탈로그·Privacy 삭제/복원 재검증 없이 병합/배포하지 않는다.
 - **미완료:** 실제 Commerce 발급·환불·회수 Writer의 공동 잠금 적용, RR-03 신뢰 출처 원자 저장, 유료 원문 보호 격리와 Reader 정식 조회, 운영 1400~1450 복구. 세 작업 가지의 검증 성공도 유료 답변 공개 승인으로 해석하지 않는다.
+
+## 10. S2 추가 구현: 잠금 이후 오래된 조회 시점 차단 (2026-10-12)
+
+- 출발 문제: PostgreSQL의 거래 단위 공동 잠금은 쓰기 순서를 정렬하지만, `REPEATABLE READ` 또는 `SERIALIZABLE` 거래가 이미 확보한 과거 조회 시점을 자동으로 최신화하지 않는다. 잠금이 풀린 후 과거 구매권 상태를 현재 상태로 잘못 해석해서는 안 된다.
+- 비공개 구현: `1750_official_reader_scope_current_bundle_private_v1.sql`의 `internal_qry_official_reader_locked_bundle_scope_v1`는 `READ COMMITTED`가 아니면 현재 구매권 판정을 즉시 거부한다. 다른 격리 수준의 안전한 새 조회 방식이 증명되기 전까지 예외 없이 차단한다.
+- 실제 검증: 기존 `official_reader_scope_lock_s2_instrumented_race.sh`에 `REPEATABLE READ`와 `SERIALIZABLE` 거절을 추가했다. 일반 `READ COMMITTED` 경합은 이전과 같이 검증한다.
+- 작업 분리: #1983(S1) → #1984(양방향 경합) → #1987(현재 묶음 판정) → **이번 격리 수준 차단 변경 요청** 순서로 의존한다. 각 부모가 아직 검토 중이므로 전체 본선 완료·출시로 선언하지 않는다.
+- **남은 근본 차단:** Commerce의 실제 구매권 발급·회수·환불, Reader 결속, 최종 유료 답변 저장이 모두 같은 잠금을 **실제 구현 경로에서 먼저** 취득해야 한다. 이번 차단은 공동 잠금 미참여를 해결하지 않는다. 보호 본문·실제 사주 출처 증명·원자 저장·정식 조회도 미구현이다.
