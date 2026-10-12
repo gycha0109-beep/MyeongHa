@@ -22,8 +22,6 @@ BEGIN
        OR (current_database() ~ '^myeongha_ci_case_[0-9]+$'
            AND current_user = 'postgres')
      )
-     OR (pg_catalog.inet_server_addr() IS DISTINCT FROM '127.0.0.1'::inet
-         AND pg_catalog.inet_server_addr() IS DISTINCT FROM '::1'::inet)
      OR current_setting('server_version_num')::integer < 170000
      OR current_setting('server_version_num')::integer >= 180000 THEN
     RAISE EXCEPTION 'HOLD_SEYEON_RESTORE: isolated default ACL principal/database/version mismatch';
