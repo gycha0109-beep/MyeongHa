@@ -69,13 +69,13 @@
 
 ## 6. R3 — DB G1 Positive immutable Pin (Owner 승인 후)
 
-**입구:** R0의 활성화 Scope 관련 D-01/D-02/D-03/D-06/D-07, O0, R1/R2.
+**입구:** R0의 활성화 Scope와 연관된 **D-01~D-10 전 항목 APPROVE 또는 Owner가 서명한 OUT_OF_SCOPE+FAIL_CLOSED**, O0, R1/R2. 특히 D-04/D-05/D-08/D-09/D-10을 명시 처리하지 않았으면 DB schema PR은 리뷰 후보일 뿐 운영 적용·positive Provider 연동 불가.
 
 **제안 파일:** supabase/migrations/<owner-approved-new-id>_seyeon_positive_source_set_pin_v1.sql (신규 forward-only), test/db/<owner-approved>_seyeon_positive_pin_v1.sql, 앱 postgres-seyeon-production-chat-execution-v1.ts 연결.
 
 **동작:** 기존 1640 0건 Pin 필드 그대로 유지. 별도 Versioned Attempt SourceSet parent + source edges로 Original Grant ID/Record/Subject/Thread/Turn/Attempt/Type/Schema/DB-computed raw payload digest/Node projection digest를 보관. 새 cmd_mark_seyeon_chat_context_ready_positive_pinned_v1 후보가 **같은 PG Transaction** 안에서 active exact Grant와 Record/Attempt를 읽고 락/검사→immutable 삽입→context_ready 처리. Provider 호출 전에 DB transaction 성공 필수.
 
-**검증:** 기존 zero Pin regression, 정확한 Memory 1건, missing source/policy/schema/Attempt, old Grant revoke/regrant, dual zero-positive Pin, duplicate/partial parent-edge, concurrent retries, executor direct DML 0 및 browser EXECUTE 0.
+**검증:** 기존 zero Pin regression, 정확한 Memory 1건, missing source/policy/schema/Attempt, old Grant revoke/regrant, dual zero-positive Pin, duplicate/partial parent-edge, concurrent retries(**Pin 성공 후 Grant revoke→같은 Attempt 재호출시 Provider 재실행 0**), executor direct DML 0 및 browser EXECUTE 0.
 
 **출구:** 실 Owner SQL/G1 durable Pin 증거. 아직 모델/route OFF. **상태: HOLD.**
 
