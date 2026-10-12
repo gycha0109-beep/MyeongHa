@@ -37,7 +37,7 @@ function romanceDecision(gate: 'PUBLIC' | 'FAMILIAR') {
       allowedDepth: 'surface',
       previouslyDisclosedDepth: 'none',
     },
-    factAuthority: romance,
+    factAuthority: romance!,
     relationship: {
       gate,
       trustBand: gate === 'PUBLIC' ? 'low' : 'medium',
