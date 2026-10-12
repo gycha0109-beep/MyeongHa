@@ -110,17 +110,36 @@ describe.runIf(enabled)('D-05-C actual TypeScript and disposable PostgreSQL purc
       [BUNDLE_A],
     );
 
-    const created = await openPostgresOfficialReadingReaderFirstThreadV1(input());
-    expect(created.created).toBe(true);
-    expect(created.resolved).toMatchObject({
-      subjectId: SUBJECT, readingId: READING,
-      readerCharacterId: READER, activeContentBundleId: BUNDLE_A,
-    });
+    // Actual TypeScript entrypoint, four simultaneous PostgreSQL sessions.
+    // Each caller proposes fresh server-owned UUIDs; all must converge on the
+    // same persisted single-Reader Thread without granting extra paid access.
+    const concurrent = await Promise.all(
+      Array.from({ length: 4 }, () =>
+        openPostgresOfficialReadingReaderFirstThreadV1(input())),
+    );
+    expect(concurrent.filter((item) => item.created)).toHaveLength(1);
+    const created = concurrent.find((item) => item.created);
+    expect(created).toBeDefined();
+    const canonicalThreadId = created!.resolved.threadId;
+    for (const result of concurrent) {
+      expect(result.resolved).toMatchObject({
+        subjectId: SUBJECT, readingId: READING,
+        readerCharacterId: READER, activeContentBundleId: BUNDLE_A,
+        threadId: canonicalThreadId,
+      });
+    }
     expect(await threadCount()).toBe(1);
+    const participantCount = await pg.query<{ count: string }>(
+      'select count(*)::text as count ' +
+      'from public.conversation_thread_characters ' +
+      'where thread_id=$1::uuid and character_id=$2 and left_at is null',
+      [canonicalThreadId, READER],
+    );
+    expect(Number(participantCount.rows[0]?.count)).toBe(1);
 
     const repeated = await openPostgresOfficialReadingReaderFirstThreadV1(input());
     expect(repeated.created).toBe(false);
-    expect(repeated.resolved.threadId).toBe(created.resolved.threadId);
+    expect(repeated.resolved.threadId).toBe(canonicalThreadId);
     expect(await threadCount()).toBe(1);
 
     await pg.query(
