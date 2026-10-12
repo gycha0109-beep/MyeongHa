@@ -320,10 +320,6 @@ begin
         v_subject,v_thread,v_turn,v_attempt,v_one,v_marker) then
       raise exception 'R1 valid single-Record source set was rejected';
     end if;
-    if (select source_count from seyeon_positive_candidate.source_sets_r1
-        where attempt_id=v_attempt) <> 1 then
-      raise exception 'R1 one-source child count mismatch';
-    end if;
     raise exception using errcode='ZX101',message='rollback one-source R1 probe';
   exception when sqlstate 'ZX101' then null;
   end;
@@ -349,13 +345,6 @@ begin
     raise exception 'R1 same Attempt accepted changed vector/order/digest';
   end if;
 
-  select count(*) into v_count
-  from seyeon_positive_candidate.source_edges_r1
-  where attempt_id=v_attempt;
-  if v_count <> 2 then
-    raise exception 'R1 immutable source edge cardinality differs from parent';
-  end if;
-
   begin
     update seyeon_positive_candidate.source_edges_r1
     set original_grant_id=v_g2
@@ -370,6 +359,20 @@ begin
   end;
 end $tests$;
 reset role;
+
+-- Test-runner Owner can inspect fixture parent/children. The API executor
+-- above deliberately cannot SELECT either source table (least privilege).
+do $owner_verify$
+begin
+  if (select source_count
+      from seyeon_positive_candidate.source_sets_r1
+      where attempt_id='d7200000-0000-4000-8000-000000000001') <> 2
+    or (select count(*)
+        from seyeon_positive_candidate.source_edges_r1
+        where attempt_id='d7200000-0000-4000-8000-000000000001') <> 2 then
+    raise exception 'R1 immutable SourceSet parent/edge cardinality mismatch';
+  end if;
+end $owner_verify$;
 
 -- Single-disposable-transaction negative fixture: Owner revokes original
 -- Grant, reissues a *different ID*, then rolls the experiment back.
