@@ -398,7 +398,31 @@ async function readChatState(
 
   const hasMore = streamRows.length > parsed.pageSize;
   const pageRows = hasMore ? streamRows.slice(0, parsed.pageSize) : streamRows;
-  const messages = Object.freeze(pageRows.map(mapStreamRow));
+  let messages: readonly ReturnType<typeof mapStreamRow>[];
+  if (isSeyeonThread) {
+    try {
+      // The candidate owner port returns a complete page. Even the lookahead
+      // row must be well-formed to prevent pagination from laundering messages.
+      const validated = streamRows.map(mapStreamRow);
+      let previousSequence = parsed.afterSequenceNo;
+      const seenIds = new Set<string>();
+      for (const message of validated) {
+        if (message.sequenceNo <= previousSequence ||
+            seenIds.has(message.messageId) ||
+            (message.senderType === 'character' &&
+              message.characterId !== 'seyeon')) {
+          throw new Error('Untrusted Se-yeon history page.');
+        }
+        previousSequence = message.sequenceNo;
+        seenIds.add(message.messageId);
+      }
+      messages = Object.freeze(validated.slice(0, parsed.pageSize));
+    } catch {
+      throw new SeyeonChatHistoryDisclosureUnavailableV1();
+    }
+  } else {
+    messages = Object.freeze(pageRows.map(mapStreamRow));
+  }
   const latestCharacterMessage = [...messages].reverse().find((message) =>
     !message.redacted &&
     message.senderType === 'character' &&
