@@ -134,6 +134,8 @@ export interface SeyeonDetachedSettlementReceiptSourceV1 {
     callId: string,
     result: Readonly<{ replayed: boolean; occupiedMicroUsd: bigint; overCeiling: boolean }>,
   ): Promise<void>;
+  /** Drop a failed attempt's in-process claim only; never alter DB lease. */
+  abandonUnsettledClaim?(callId: string): void | Promise<void>;
 }
 
 export function verifySeyeonDetachedWorkerLoginV1(
@@ -231,36 +233,47 @@ export function createSeyeonDetachedSettlementWorkerFromDriverV1(input: {
     async settleNext() {
       const receipt=await input.source.loadNextStoredReceipt();
       if (receipt===null) return null;
-      const {callId,parameters}=buildArguments(receipt);
-      const client: NodePostgresDriverClientV1=await input.driverPool.connect();
-      let begun=false;
-      let discard: Error | undefined;
       try {
-        const preflight=await client.query(DETACHED_WORKER_LOGIN_PREFLIGHT_SQL_V1);
-        verifySeyeonDetachedWorkerLoginV1(preflight.rows);
-        await client.query('BEGIN');
-        begun=true;
-        await client.query(ENTER_ROLE_SQL_V1);
-        const proof=await client.query(VERIFY_ROLE_SQL_V1);
-        if (proof.rows.length!==1 ||
-            proof.rows[0]?.currentUser!==SEYEON_DETACHED_WORKER_ROLE_V1) fail();
-        const result=checkedResult(
-          (await client.query(SETTLE_SQL_V1, parameters)).rows, callId,
-        );
-        // A lost COMMIT reply is UNKNOWN, never silently acknowledged.
-        await client.query('COMMIT');
-        begun=false;
-        await input.source.acknowledgeSettled(callId,result);
-        return result;
+        const {callId,parameters}=buildArguments(receipt);
+        const client: NodePostgresDriverClientV1=await input.driverPool.connect();
+        let begun=false;
+        let discard: Error | undefined;
+        try {
+          const preflight=await client.query(DETACHED_WORKER_LOGIN_PREFLIGHT_SQL_V1);
+          verifySeyeonDetachedWorkerLoginV1(preflight.rows);
+          await client.query('BEGIN');
+          begun=true;
+          await client.query(ENTER_ROLE_SQL_V1);
+          const proof=await client.query(VERIFY_ROLE_SQL_V1);
+          if (proof.rows.length!==1 ||
+              proof.rows[0]?.currentUser!==SEYEON_DETACHED_WORKER_ROLE_V1) fail();
+          const result=checkedResult(
+            (await client.query(SETTLE_SQL_V1, parameters)).rows, callId,
+          );
+          // Lost COMMIT reply is UNKNOWN: never acknowledge.
+          await client.query('COMMIT');
+          begun=false;
+          await input.source.acknowledgeSettled(callId,result);
+          return result;
+        } catch (error) {
+          discard=new Error('Detached settlement DB outcome requires safe replay.');
+          if (begun) {
+            try { await client.query('ROLLBACK'); }
+            catch { /* connection is discarded regardless */ }
+          }
+          throw error;
+        } finally {
+          client.release(discard);
+        }
       } catch (error) {
-        discard=new Error('Detached settlement DB outcome requires safe replay.');
-        if (begun) {
-          try { await client.query('ROLLBACK'); }
-          catch { /* connection is discarded regardless */ }
+        // Settlement/preflight failure cannot permanently pin local receipt
+        // state. The original DB lease remains fenced until its expiry.
+        try {
+          await input.source.abandonUnsettledClaim?.(receipt.callId);
+        } catch {
+          console.error('MYEONGHA_SEYEON_LOCAL_RECEIPT_ABANDON_FAILED');
         }
         throw error;
-      } finally {
-        client.release(discard);
       }
     },
     close() { return input.driverPool.end(); },
