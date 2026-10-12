@@ -27,5 +27,37 @@ insert into public.content_releases(
 );
 SQL
 
+# The approved Product-rule layer requires an ID from the official nine Readers.
+# Provision ONLY disposable test catalog rows, not a production publication.
+psql -X -v ON_ERROR_STOP=1 <<'SQL' >/dev/null
+insert into public.characters(character_id,created_at)
+values ('seyeon',clock_timestamp()),
+       ('baekheon',clock_timestamp()),
+       ('yeoul',clock_timestamp())
+on conflict (character_id) do nothing;
+
+insert into public.character_runtime_catalog(
+  character_id,content_bundle_id,availability,enabled,
+  release_at,retire_at,published_at
+) values
+  ('seyeon','11391000-0000-0000-0000-000000000001'::uuid,
+   'available',true,clock_timestamp()-interval '1 day',null,clock_timestamp()-interval '1 day'),
+  ('baekheon','11391000-0000-0000-0000-000000000001'::uuid,
+   'unlockable',true,clock_timestamp()-interval '1 day',null,clock_timestamp()-interval '1 day'),
+  ('yeoul','11391000-0000-0000-0000-000000000001'::uuid,
+   'coming_soon',true,clock_timestamp()+interval '1 day',null,clock_timestamp()-interval '1 day')
+on conflict (character_id, content_bundle_id) do nothing;
+
+insert into public.character_unlocks(
+  id,subject_id,character_id,status,revision,source_world_event_id,
+  unlocked_at,created_at,updated_at
+) values (
+  'd1852000-0000-4000-8000-000000000001'::uuid,
+  '11390000-0000-0000-0000-000000000001'::uuid,
+  'baekheon','unlocked',1,null,clock_timestamp(),
+  clock_timestamp(),clock_timestamp()
+);
+SQL
+
 MYEONGHA_D01_REAL_PG=1 ./node_modules/.bin/vitest run \
   test/postgres-standard-reader-approved-policy-real-db.test.ts
