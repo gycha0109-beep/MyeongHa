@@ -94,12 +94,12 @@ describe.runIf(enabled)('D-01 actual TypeScript + disposable PostgreSQL Product 
       );
       return port.resolveEligibleReaderSelection({
         subjectId: SUBJECT, productId: PRODUCT,
-        readerCharacterId: 'test-standard-reader',
+        readerCharacterId: 'seyeon',
       });
     });
     expect(found).toEqual({
       productId: PRODUCT, topicKey: 'test_reader_topic',
-      specVersion: 'v1', readerCharacterId: 'test-standard-reader',
+      specVersion: 'v1', readerCharacterId: 'seyeon',
       readerContentBundleId: BUNDLE,
     });
     expect(Object.isFrozen(found)).toBe(true);
@@ -110,17 +110,17 @@ describe.runIf(enabled)('D-01 actual TypeScript + disposable PostgreSQL Product 
       createPostgresPolicyGuardedStandardReaderSelectionPortV1(client, approved())
         .resolveEligibleReaderSelection({
           subjectId: SUBJECT, productId: PRODUCT,
-          readerCharacterId: 'test-unlockable-reader',
+          readerCharacterId: 'baekheon',
         }));
     expect(selection).toMatchObject({
-      readerCharacterId: 'test-unlockable-reader',
+      readerCharacterId: 'baekheon',
       readerContentBundleId: BUNDLE,
     });
     const forgedSubject = await withExecutor(client =>
       createPostgresPolicyGuardedStandardReaderSelectionPortV1(client, approved())
         .resolveEligibleReaderSelection({
           subjectId: '11390000-0000-0000-0000-000000000099',
-          productId: PRODUCT, readerCharacterId: 'test-unlockable-reader',
+          productId: PRODUCT, readerCharacterId: 'baekheon',
         }));
     expect(forgedSubject).toBeNull();
   });
@@ -135,7 +135,7 @@ describe.runIf(enabled)('D-01 actual TypeScript + disposable PostgreSQL Product 
         },
       }).resolveEligibleReaderSelection({
         subjectId: SUBJECT, productId: PRODUCT,
-        readerCharacterId: 'test-standard-reader',
+        readerCharacterId: 'seyeon',
       }));
     expect(result).toBeNull();
     expect(readRuleCount).toBe(1);
@@ -153,14 +153,14 @@ describe.runIf(enabled)('D-01 actual TypeScript + disposable PostgreSQL Product 
       createPostgresPolicyGuardedStandardReaderSelectionPortV1(client, guard)
         .resolveEligibleReaderSelection({
           subjectId: SUBJECT, productId: DISABLED_PRODUCT,
-          readerCharacterId: 'test-standard-reader',
+          readerCharacterId: 'seyeon',
         }));
     expect(disabled).toBeNull();
     const comingSoon = await withExecutor(client =>
       createPostgresPolicyGuardedStandardReaderSelectionPortV1(client, guard)
         .resolveEligibleReaderSelection({
           subjectId: SUBJECT, productId: PRODUCT,
-          readerCharacterId: 'test-coming-soon-reader',
+          readerCharacterId: 'yeoul',
         }));
     expect(comingSoon).toBeNull();
     expect(called).toBe(0);
