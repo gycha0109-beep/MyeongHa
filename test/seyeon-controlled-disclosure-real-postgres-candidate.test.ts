@@ -33,9 +33,12 @@ const subjectPool: PostgresSubjectPoolV1 = {
     if (!pool) throw new Error('Refuse unisolated PostgreSQL test execution.');
     const driver = await pool.connect();
     return {
-      async query(sql, values) {
-        const result = await driver.query(sql, values as unknown[] | undefined);
-        return { rows: result.rows as readonly Record<string, unknown>[] };
+      async query<Row = Record<string, unknown>>(
+        sql: string,
+        values: readonly unknown[] = [],
+      ): Promise<{ readonly rows: readonly Row[] }> {
+        const result = await driver.query(sql, values as unknown[]);
+        return { rows: result.rows as readonly Row[] };
       },
       release(error) {
         driver.release(Boolean(error));
