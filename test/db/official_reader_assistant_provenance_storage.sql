@@ -171,7 +171,14 @@ begin
       raise exception 'RR-04 unapproved role % can execute private candidate', v_role;
     end if;
   end loop;
-  if pg_catalog.has_function_privilege('public', v_function, 'EXECUTE') then
+  if exists (
+    select 1 from pg_catalog.pg_proc p
+    where p.oid = v_function
+      and exists (
+        select 1 from pg_catalog.aclexplode(p.proacl) ac
+        where ac.grantee = 0 and ac.privilege_type = 'EXECUTE'
+      )
+  ) then
     raise exception 'RR-04 PRIVATE candidate inherited PUBLIC EXECUTE';
   end if;
   if pg_catalog.to_regprocedure(
