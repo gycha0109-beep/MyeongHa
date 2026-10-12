@@ -189,3 +189,15 @@ Governor 04d4B 계열은 실제 격리 PostgreSQL 기반 영수증 임대·정�
 - `R1 DONE`: 복구 뒤 **새** 백업과 실제 격리 복원 매칭 및 해당 snapshot 내 6/6·11/11 기능 복원 증거(현재 Drill에 없으면 추가 테스트 작업) 검증.
 - `R2...R9`: PR/테스트/Owner 승인이 실재하기 전에는 `TODO/HOLD` 유지.
 - 전체 `SEYEON_AI_SECURITY_COMPLETE`: [#1866](https://github.com/gycha0109-beep/MyeongHa/issues/1866)의 A 구현 + B 실DB/공격 검증 + C 운영 승인 모두 PASS일 때만 선언.
+
+## 11. 2026-10-12 R1 보완 — 초기 관계 이력과 함수 복원에 대한 정확한 증거
+
+- **사후 암호화 백업** [#38201070158](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38201070158) (2026-10-12T03:49:41Z) 및 **대응 격리 복원** [#38201607863](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38201607863) (2026-10-12T03:55:27Z) SUCCESS. 증거 아티팩트는 각각 `11725302644`, `11725311998`. 이 복원은 앱 데이터·정형 개인정보 합성 복구가 성공했다는 뜻이다.
+- **미해결 근거:** 현재 `pg_dump`는 `supabase_migrations` 관리 스키마를 설계상 제외한다. 따라서 이전 백업의 단일 숫자 `backup_migration_frontier=20261008090417`만으로 초기 `1400..1450` 이력 **6개**의 백업/복원을 입증할 수 없다. 함수 11개에 대한 restored target 실제 `pg_proc` 검사도 당시 실행에는 없었다.
+- **보완 구현:** 신규 백업에서 read-only로 `1400..1450`의 정확한 `version/name` 6개만 전후 두 번 조회하고 동일성을 강제한다. 과거 DDL의 `statements`, 개인정보, 복구용 비밀번호는 캡처하지 않는다. 여섯 항목은 **암호화 내부 manifest**에만 보존, 공개 manifest에는 해당 목록의 SHA-256만 기록.
+- **신규 격리 복원:** 암호화·다이제스트 검증 후 여섯 행의 version/name을 해당 드릴의 PostgreSQL **임시 테이블에만 재구성**하고 읽기 검증한다. 같은 세션의 실제 **복원된** `pg_proc` 함수 11개 및 6개 관계 테이블 RLS와 브라우저 직접 권한 부재를 SQL로 확인한다. SQL은 ROLLBACK으로 임시 데이터까지 폐기한다. 빈 항목, 이름 바꿔치기, 중복/과부하 함수, ACL 우회 시 HOLD.
+- **정확한 보장 한계:** `supabase_migrations.schema_migrations` 전체 시스템 원장 데이터는 **계속 복원하지 않는다**. 임시 6개 증거 행 = source snapshot rehydration만 입증하며, 전체 Supabase 관리 마이그레이션 이력의 복구를 뜻하지 않는다. `supabase_managed_migration_ledger_fully_restored=false`와 `dr_ready=false` 필수.
+- **구형 백업 처리:** 기존 #38201070158에는 여섯 항목이 암호화 캡처되어 있지 않아 새 기능을 사용하더라도 `not_captured_in_source_backup` / `not_evidenced`로 남는다. 성공 처리로 자동 승격하지 않는다.
+- **R1 완료를 위한 실제 후속 절차:** 변경사항 코드·실DB 부정 테스트·CI 통합 PASS 및 `main` 반영 이후, **새로운** 암호화 백업을 수동 생성 → 그 백업 ID로 독립 격리 복원 → 신규 evidence envelope의 `seyeon_early_history_restore_proof=restored_scoped_version_name_snapshot_6_pass` 및 `seyeon_early_functions_restore_proof=restored_public_function_catalog_11_and_rls_6_pass` 확인. 이 두 필드와 작업 SHA/Run/Artifact 출처가 일치하기 전에는 R1 `HOLD_EXACT_RELATIONSHIP_RESTORE` 유지.
+
+본 개선은 민감 원본·Production DDL/DML, 새 CI 워크플로, 유료 AI, 캐릭터 공개, 1520..1710 배포를 포함하지 않는다. `#1887` 및 보안 `#1866`은 별도 Owner 승인까지 HOLD.

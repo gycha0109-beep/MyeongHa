@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+set -euo pipefail
+# Synthetic PostgreSQL 17 regression for the actual SQL used by the protected
+# isolated restore job. Runs only against CI disposable databases.
+# Watchtower-Track: ops
+[[ "${CI:-}" == 'true' && "${PGHOST:-}" == 'localhost' &&
+   "${PGDATABASE:-}" == myeongha_ci_case_* ]] || {
+  echo 'HOLD_SEYEON_RESTORE_TEST: disposable CI PostgreSQL required' >&2
+  exit 1
+}
+version_num="$(psql -X -qAt -v ON_ERROR_STOP=1 -c 'show server_version_num')"
+(( version_num >= 170000 && version_num < 180000 ))
+
+sql='scripts/operations/seyeon-relationship-isolated-restore-proof.sql'
+history='[
+  {"version":"1400","name":"relationship_apply_context_v1"},
+  {"version":"1410","name":"relationship_event_apply_command_v1"},
+  {"version":"1420","name":"relationship_reliability_context_v1"},
+  {"version":"1430","name":"relationship_adjustment_commands_v1"},
+  {"version":"1440","name":"relationship_projection_rebuild_v1"},
+  {"version":"1450","name":"relationship_snapshot_runtime_v1"}
+]'
+run_proof() {
+  psql -X -qAt --set ON_ERROR_STOP=1 -v "seyeon_history_json=$1" -f "$sql"
+}
+result="$(run_proof "$history")"
+[[ "$result" == 'PASS_SEYEON_RESTORED_EARLY_HISTORY_SNAPSHOT_6_FUNCTIONS_11_RLS_6' ]]
+
+expect_rejection() {
+  local label="$1" snapshot="$2" expected="$3" output
+  if output="$(run_proof "$snapshot" 2>&1)"; then
+    echo "FAIL $label unexpectedly accepted" >&2
+    exit 1
+  fi
+  [[ "$output" == *"$expected"* ]] || {
+    echo "FAIL $label wrong rejection cause" >&2
+    exit 1
+  }
+  echo "PASS $label: rejected"
+}
+
+missing="$(jq -c 'map(select(.version != "1430"))' <<<"$history")"
+expect_rejection 'missing version 1430' "$missing" 'backup migration history subset mismatch'
+wrong_name="$(jq -c 'map(if .version == "1440" then .name = "unreviewed_rewrite" else . end)' <<<"$history")"
+expect_rejection 'wrong version-name binding' "$wrong_name" 'backup migration history subset mismatch'
+
+# Deliberate overload in a disposable test database: exactly 11 real functions
+# must exist, not merely a set of 11 names with additional matching signatures.
+psql -X -q --set ON_ERROR_STOP=1 -c \
+  'CREATE FUNCTION public.relationship_event_json_v1(text) RETURNS text LANGUAGE sql AS $$ SELECT $1 $$;' >/dev/null
+expect_rejection 'unexpected overloaded early RPC' "$history" 'restored function catalog missing or overloaded'
+psql -X -q --set ON_ERROR_STOP=1 -c \
+  'DROP FUNCTION public.relationship_event_json_v1(text);' >/dev/null
+
+[[ "$(run_proof "$history")" == 'PASS_SEYEON_RESTORED_EARLY_HISTORY_SNAPSHOT_6_FUNCTIONS_11_RLS_6' ]]
+echo 'PASS_SEYEON_RESTORE_PG17_REAL_CATALOG_NEGATIVES'

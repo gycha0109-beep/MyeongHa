@@ -10,6 +10,7 @@ const authoritativePrivacyRunnerPath =
   'scripts/operations/run-restored-postgres-authoritative-privacy-replay.sh';
 const evidenceRunnerPath = 'scripts/operations/build-postgres-restore-evidence.sh';
 const harnessPath = 'scripts/run-postgres-isolated-restore-drill.sh';
+const relationshipProofPath = 'scripts/operations/seyeon-relationship-isolated-restore-proof.sql';
 const portableReplayPath = 'scripts/build-postgres-portable-data-replay.mjs';
 const privacySyntheticPath = 'scripts/run-postgres-privacy-reconciliation-synthetic-drill.sh';
 const runbookPath = 'docs/operations/POSTGRES_BACKUP_RESTORE_RUNBOOK_V1.md';
@@ -37,6 +38,7 @@ const [
   portableReplay,
   privacySynthetic,
   runbook,
+  relationshipProof,
 ] = await Promise.all([
   readFile(workflowPath, 'utf8'),
   readFile(sourceResolverPath, 'utf8'),
@@ -48,6 +50,7 @@ const [
   readFile(portableReplayPath, 'utf8'),
   readFile(privacySyntheticPath, 'utf8'),
   readFile(runbookPath, 'utf8'),
+  readFile(relationshipProofPath, 'utf8'),
 ]);
 
 function requireFragment(text, fragment, source) {
@@ -97,6 +100,8 @@ for (const fragment of [
   'artifact-ids: ${{ steps.privacy-source.outputs.ledger_artifact_id }}',
   'artifact-ids: ${{ steps.privacy-source.outputs.canary_artifact_id }}',
   'run: bash scripts/operations/run-restored-postgres-authoritative-privacy-replay.sh',
+  'seyeon_early_history_restore_proof=\\(.seyeon_early_history_restore_proof)',
+  'seyeon_early_functions_restore_proof=\\(.seyeon_early_functions_restore_proof)',
   '${{ runner.temp }}/restore-evidence/*.json',
   'retention-days: 30',
   "echo 'authoritative_privacy_reconciliation=production_nonzero_captured_window_replay_proven'",
@@ -206,12 +211,36 @@ for (const fragment of [
   'target-copy-catalog.json',
   'node scripts/build-postgres-portable-data-replay.mjs',
   'auth.users',
+  'seyeon-relationship-isolated-restore-proof.sql',
+  'seyeon_early_history_restore_proof: $seyeon_early_history_restore_proof',
+  'seyeon_early_functions_restore_proof: $seyeon_early_functions_restore_proof',
+  'supabase_managed_migration_ledger_fully_restored: false',
+  'not_captured_in_source_backup',
+  'restored_scoped_version_name_snapshot_6_pass',
+  'restored_public_function_catalog_11_and_rls_6_pass',
   'subject_auth_user_referential_integrity: "pass"',
   'restore_target: "github-actions-loopback-supabase-postgres"',
   'dr_ready: false',
 ]) {
   requireFragment(harness, fragment, harnessPath);
 }
+
+// The scoped proof must query the actual restored pg_proc/RLS catalog, not
+// invent a full provider-managed migration ledger from the source frontier.
+for (const fragment of [
+  "CREATE TEMP TABLE seyeon_restored_early_history",
+  "jsonb_to_recordset(:'seyeon_history_json'::jsonb)",
+  "pg_catalog.pg_proc",
+  "pg_catalog.pg_class",
+  "HOLD_SEYEON_RESTORE: restored function catalog missing or overloaded",
+  "HOLD_SEYEON_RESTORE: relationship RLS or browser table ACL mismatch",
+  "PASS_SEYEON_RESTORED_EARLY_HISTORY_SNAPSHOT_6_FUNCTIONS_11_RLS_6",
+  "ROLLBACK;",
+]) {
+  requireFragment(relationshipProof, fragment, relationshipProofPath);
+}
+forbidFragment(relationshipProof, 'INSERT INTO supabase_migrations.schema_migrations', relationshipProofPath);
+forbidFragment(relationshipProof, 'ALTER ROLE', relationshipProofPath);
 
 for (const fragment of [
   'myeongha-postgres-portable-data-replay-v2',

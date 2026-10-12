@@ -116,6 +116,39 @@ internal_backup_migration_frontier="$(jq -r '.migration_frontier // empty' "$wor
 [[ "$internal_backup_migration_frontier" == "$backup_migration_frontier" ]]
 [[ "$(jq -c '.ephemeral_data_exclusions // []' "$work_dir/manifest.json")" == "$backup_ephemeral_data_exclusions_json" ]]
 
+# The portable dump deliberately excludes provider-managed supabase_migrations.
+# A new-format backup captures only six immutable, non-sensitive version/name
+# pairs. Older encrypted archives stay restorable but cannot earn this proof.
+seyeon_history_proof='not_captured_in_source_backup'
+seyeon_functions_proof='not_evidenced'
+source_history_sha="$(jq -r '.seyeon_early_relationship_migration_history_sha256 // empty' "$work_dir/manifest.json")"
+public_history_sha="$(jq -r '.seyeon_early_relationship_migration_history_sha256 // empty' "$manifest")"
+history_json=''
+if [[ -n "$source_history_sha" || -n "$public_history_sha" ]]; then
+  [[ "$source_history_sha" =~ ^[0-9a-f]{64}$ && "$source_history_sha" == "$public_history_sha" ]] || {
+    echo 'HOLD_SEYEON_RESTORE: source/public scoped history digest mismatch.' >&2
+    exit 1
+  }
+  history_json="$(jq -ce '.seyeon_early_relationship_migration_history' "$work_dir/manifest.json")"
+  jq -e '
+    . == [
+      {"version":"1400","name":"relationship_apply_context_v1"},
+      {"version":"1410","name":"relationship_event_apply_command_v1"},
+      {"version":"1420","name":"relationship_reliability_context_v1"},
+      {"version":"1430","name":"relationship_adjustment_commands_v1"},
+      {"version":"1440","name":"relationship_projection_rebuild_v1"},
+      {"version":"1450","name":"relationship_snapshot_runtime_v1"}
+    ]
+  ' <<<"$history_json" >/dev/null || {
+    echo 'HOLD_SEYEON_RESTORE: source scoped history version/name contract mismatch.' >&2
+    exit 1
+  }
+  [[ "$(printf '%s' "$history_json" | sha256sum | awk '{print $1}')" == "$source_history_sha" ]] || {
+    echo 'HOLD_SEYEON_RESTORE: encrypted migration-history snapshot digest invalid.' >&2
+    exit 1
+  }
+fi
+
 restore_started_at="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
 restore_started_epoch="$(date -u +%s)"
 
@@ -301,6 +334,28 @@ done
 [[ "$(psql "$RESTORE_DATABASE_URL" -At --set ON_ERROR_STOP=1 -c \
   "select count(*) from public.subjects s left join auth.users u on u.id = s.auth_user_id where s.auth_user_id is not null and u.id is null;")" == '0' ]]
 
+# Exactly after schema+data replay, query the *isolated target's* real
+# pg_proc and RLS/ACL catalogs. Version/name history is restored only as a
+# transaction-local six-row source snapshot (the full provider ledger is NOT
+# restored). The SQL fails closed on missing/overloaded functions or ACL drift.
+if [[ -n "$history_json" ]]; then
+  proof_output="$(psql "$RESTORE_DATABASE_URL" -X -qAt --set ON_ERROR_STOP=1 \
+    -v seyeon_history_json="$history_json" \
+    -f scripts/operations/seyeon-relationship-isolated-restore-proof.sql)" || {
+    echo 'HOLD_SEYEON_RESTORE: exact scoped relationship restore proof failed.' >&2
+    exit 1
+  }
+  [[ "$proof_output" == 'PASS_SEYEON_RESTORED_EARLY_HISTORY_SNAPSHOT_6_FUNCTIONS_11_RLS_6' ]] || {
+    echo 'HOLD_SEYEON_RESTORE: unexpected scoped relationship proof verdict.' >&2
+    exit 1
+  }
+  seyeon_history_proof='restored_scoped_version_name_snapshot_6_pass'
+  seyeon_functions_proof='restored_public_function_catalog_11_and_rls_6_pass'
+  echo 'PASS_SEYEON_RESTORE: snapshot 6/6, real restored pg_proc 11/11, RLS/ACL 6/6'
+else
+  echo 'HOLD_SEYEON_RESTORE_PROOF: legacy backup excludes scoped migration-history snapshot'
+fi
+
 member_auth_rate_limit_schema_restore='not_applicable'
 member_auth_rate_limit_unlogged='not_applicable'
 member_auth_rate_limit_ephemeral_data_restore='not_applicable'
@@ -379,6 +434,8 @@ jq -n \
   --argjson provider_managed_data_full_restore "$provider_managed_data_full_restore" \
   --argjson backup_migration_frontier "$backup_migration_frontier_json" \
   --argjson backup_ephemeral_data_exclusions "$backup_ephemeral_data_exclusions_json" \
+  --arg seyeon_early_history_restore_proof "$seyeon_history_proof" \
+  --arg seyeon_early_functions_restore_proof "$seyeon_functions_proof" \
   --arg member_auth_rate_limit_schema_restore "$member_auth_rate_limit_schema_restore" \
   --arg member_auth_rate_limit_unlogged "$member_auth_rate_limit_unlogged" \
   --arg member_auth_rate_limit_ephemeral_data_restore "$member_auth_rate_limit_ephemeral_data_restore" \
@@ -412,6 +469,9 @@ jq -n \
     provider_managed_data_skips: $provider_managed_data_skips,
     provider_managed_data_full_restore: $provider_managed_data_full_restore,
     backup_migration_frontier: $backup_migration_frontier,
+    seyeon_early_history_restore_proof: $seyeon_early_history_restore_proof,
+    seyeon_early_functions_restore_proof: $seyeon_early_functions_restore_proof,
+    supabase_managed_migration_ledger_fully_restored: false,
     backup_ephemeral_data_exclusions: $backup_ephemeral_data_exclusions,
     member_auth_rate_limit_schema_restore: $member_auth_rate_limit_schema_restore,
     member_auth_rate_limit_unlogged: $member_auth_rate_limit_unlogged,

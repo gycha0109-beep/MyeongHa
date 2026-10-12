@@ -293,4 +293,11 @@ owner_flags=$("${psql_base[@]}" -c "select rolcanlogin::int||'|'||rolsuper::int|
 [[ "$owner_flags" == '0|0|0' ]] || fail "thread open owner role escaped NOLOGIN/NOSUPERUSER/NOBYPASSRLS contract: $owner_flags"
 pass "thread open wrapper preserves command-only least-privilege runtime authority"
 
+# Reuse only the existing disposable PG17 full-migration case. This shared
+# script also runs in the PG15 authority-core suite; that suite must not
+# execute a PG17-specific restore-catalog proof or infer a false PASS.
+if [[ "${CI:-}" == 'true' && "${PGDATABASE:-}" == myeongha_ci_case_* ]] &&
+   (( $(psql -X -qAt -v ON_ERROR_STOP=1 -c 'show server_version_num') >= 170000 )); then
+  bash test/db/seyeon_relationship_isolated_restore_proof.sh
+fi
 echo "Member Character thread open persistence/concurrency tests passed"
