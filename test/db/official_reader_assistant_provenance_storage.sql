@@ -145,6 +145,50 @@ begin
 end $rr03_cascade_contract$;
 
 
+-- RR-04 private candidate must be present but inaccessible to every exposed
+-- runtime role. It is NOT the eventual public qry_* contract.
+do $rr04_private_catalog$
+declare
+  v_function oid := pg_catalog.to_regprocedure(
+    'public.internal_qry_official_reader_followup_candidate_v1(uuid,uuid,text,uuid)'
+  );
+  v_role text;
+begin
+  if v_function is null then
+    raise exception 'RR-04 private candidate function missing';
+  end if;
+  if exists (select 1 from pg_catalog.pg_proc where oid=v_function and prosecdef) then
+    raise exception 'RR-04 candidate must not bypass RLS as SECURITY DEFINER';
+  end if;
+  for v_role in
+    select rolname from pg_catalog.pg_roles
+    where rolname in ('anon','authenticated','service_role',
+                      'myeongha_api_executor','myeongha_seyeon_chat_runtime_owner')
+  loop
+    if pg_catalog.has_function_privilege(
+      v_role, v_function, 'EXECUTE'
+    ) then
+      raise exception 'RR-04 unapproved role % can execute private candidate', v_role;
+    end if;
+  end loop;
+  if exists (
+    select 1 from pg_catalog.pg_proc p
+    where p.oid = v_function
+      and exists (
+        select 1 from pg_catalog.aclexplode(p.proacl) ac
+        where ac.grantee = 0 and ac.privilege_type = 'EXECUTE'
+      )
+  ) then
+    raise exception 'RR-04 PRIVATE candidate inherited PUBLIC EXECUTE';
+  end if;
+  if pg_catalog.to_regprocedure(
+    'public.qry_official_reader_followup_anchor_runtime_v1(uuid,uuid,text,uuid)'
+  ) is not null then
+    raise exception 'RR-04 public adapter function must remain absent';
+  end if;
+  raise notice 'PASS RR-04 PRIVATE candidate is invoker and ungranted';
+end $rr04_private_catalog$;
+
 -- Private synthetic row smoke (isolated PostgreSQL only; NOT an authorized
 -- semantic proof/Writer). Exercises real parent-message FK cascade and guarded
 -- immutable child deletion before any Production Reader Chat activation.
@@ -242,6 +286,36 @@ begin
       where assistant_message_id = v_assistant) <> 1 then
     raise exception 'RR-03 synthetic proof row not persisted';
   end if;
+
+  -- The candidate refuses a syntactically valid but UNCOMMITTED Assistant
+  -- fixture: false positive must not become a Reader follow-up anchor.
+  perform pg_catalog.set_config('myeongha.subject_id', v_subject::text, true);
+  if exists (
+    select 1
+    from public.internal_qry_official_reader_followup_candidate_v1(
+      v_subject,v_thread,'test-standard-reader',v_reading
+    )
+  ) then
+    raise exception 'RR-04 promoted uncommitted synthetic provenance to an anchor';
+  end if;
+  -- Canonical execution Subject is required even for private/test invocations.
+  begin
+    perform 1 from public.internal_qry_official_reader_followup_candidate_v1(
+      '11390000-0000-0000-0000-000000000099',v_thread,
+      'test-standard-reader',v_reading
+    );
+    raise exception 'RR-04 accepted mismatched Subject context';
+  exception when insufficient_privilege then
+    null; -- expected SQLSTATE 42501 from assert_myeongha_subject_context_v1
+  end;
+  if exists (
+    select 1 from public.internal_qry_official_reader_followup_candidate_v1(
+      v_subject,v_thread,'wrong-reader',v_reading
+    )
+  ) then
+    raise exception 'RR-04 accepted a wrong Reader candidate';
+  end if;
+  raise notice 'PASS RR-04 private candidate denies uncommitted and cross-Subject/Reader proofs';
 
   -- Ordinary update is never allowed, even for a session with direct table
   -- privileges. A rolled-back mutation must leave the proof intact.
