@@ -11,6 +11,7 @@ const authoritativePrivacyRunnerPath =
 const evidenceRunnerPath = 'scripts/operations/build-postgres-restore-evidence.sh';
 const harnessPath = 'scripts/run-postgres-isolated-restore-drill.sh';
 const relationshipProofPath = 'scripts/operations/seyeon-relationship-isolated-restore-proof.sql';
+const creatorDefaultAclPath = 'scripts/operations/prepare-postgres-isolated-restore-function-defaults.sql';
 const portableReplayPath = 'scripts/build-postgres-portable-data-replay.mjs';
 const privacySyntheticPath = 'scripts/run-postgres-privacy-reconciliation-synthetic-drill.sh';
 const runbookPath = 'docs/operations/POSTGRES_BACKUP_RESTORE_RUNBOOK_V1.md';
@@ -39,6 +40,7 @@ const [
   privacySynthetic,
   runbook,
   relationshipProof,
+  creatorDefaultAcl,
 ] = await Promise.all([
   readFile(workflowPath, 'utf8'),
   readFile(sourceResolverPath, 'utf8'),
@@ -51,6 +53,7 @@ const [
   readFile(privacySyntheticPath, 'utf8'),
   readFile(runbookPath, 'utf8'),
   readFile(relationshipProofPath, 'utf8'),
+  readFile(creatorDefaultAclPath, 'utf8'),
 ]);
 
 function requireFragment(text, fragment, source) {
@@ -211,6 +214,9 @@ for (const fragment of [
   'target-copy-catalog.json',
   'node scripts/build-postgres-portable-data-replay.mjs',
   'auth.users',
+  'prepare-postgres-isolated-restore-function-defaults.sql',
+  'PASS_SEYEON_ISOLATED_CREATOR_FUNCTION_DEFAULT_ACL',
+  'HOLD_SEYEON_RESTORE: exact scoped relationship restore proof failed.',
   'seyeon-relationship-isolated-restore-proof.sql',
   'seyeon_early_history_restore_proof: $seyeon_early_history_restore_proof',
   'seyeon_early_functions_restore_proof: $seyeon_early_functions_restore_proof',
@@ -223,6 +229,30 @@ for (const fragment of [
   'dr_ready: false',
 ]) {
   requireFragment(harness, fragment, harnessPath);
+}
+
+// The isolated principal's function ACL defaults must be normalized *before*
+// schema creation; neither Production nor already-created RPC ACL is touched.
+for (const fragment of [
+  'ALTER DEFAULT PRIVILEGES REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC',
+  'ALTER DEFAULT PRIVILEGES IN SCHEMA public',
+  'REVOKE EXECUTE ON FUNCTIONS FROM anon, authenticated',
+  'HOLD_SEYEON_RESTORE: creator retains PUBLIC/anon/authenticated default function EXECUTE',
+  'PASS_SEYEON_ISOLATED_CREATOR_FUNCTION_DEFAULT_ACL',
+]) {
+  requireFragment(creatorDefaultAcl, fragment, creatorDefaultAclPath);
+}
+for (const forbidden of [
+  'REVOKE ALL ON FUNCTION',
+  'GRANT EXECUTE ON FUNCTION',
+  'ALTER FUNCTION',
+  'supabase_migrations.schema_migrations',
+]) {
+  forbidFragment(creatorDefaultAcl, forbidden, creatorDefaultAclPath);
+}
+if (!(harness.indexOf('prepare-postgres-isolated-restore-function-defaults.sql')
+  < harness.indexOf('--file "$work_dir/schema.sql"'))) {
+  throw new Error('Creator default ACL must be guarded before schema replay.');
 }
 
 // The scoped proof must query the actual restored pg_proc/RLS catalog, not
