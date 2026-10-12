@@ -22,7 +22,7 @@ const RULE_SQL = [
   '       rule_version as "ruleVersion",',
   '       approved_policy_revision as "approvedPolicyRevision",',
   '       policy_kind as "kind",',
-  '       allowed_reader_ids as "allowedReaderIds"',
+  '       target_reader_id as "targetReaderId"',
   'from public.qry_standard_reader_approved_rule_v1($1::uuid,$2::text,$3::text,$4::timestamptz)',
 ].join('\n');
 
@@ -79,26 +79,21 @@ export function createPostgresApprovedStandardReaderRuleAuthorityPortV1(
         ruleVersion: row.ruleVersion,
         approvedPolicyRevision: row.approvedPolicyRevision,
       };
-      if (row.kind === 'standard_all_readers' && row.allowedReaderIds === null) {
+      if (row.kind === 'standard_all_readers' && row.targetReaderId === null) {
         return Object.freeze({
           status: 'approved',
           rule: Object.freeze({ kind: 'standard_all_readers', ...common }),
         });
       }
-      if (row.kind === 'premium_restricted' && Array.isArray(row.allowedReaderIds)) {
-        const readerIds: readonly unknown[] = row.allowedReaderIds;
-        if (readerIds.length === 0 ||
-            readerIds.length > OFFICIAL_READER_RUNTIME_IDS_V1.length ||
-            !readerIds.every((id) => typeof id === 'string' && officialReaders.has(id)) ||
-            new Set(readerIds).size !== readerIds.length) {
-          return unavailable('invalid_policy');
-        }
+      if (row.kind === 'premium_character_bound' &&
+          typeof row.targetReaderId === 'string' &&
+          officialReaders.has(row.targetReaderId)) {
         return Object.freeze({
           status: 'approved',
           rule: Object.freeze({
-            kind: 'premium_restricted',
+            kind: 'premium_character_bound',
             ...common,
-            allowedReaderIds: Object.freeze([...readerIds]) as readonly OfficialReaderRuntimeIdV1[],
+            targetReaderId: row.targetReaderId as OfficialReaderRuntimeIdV1,
           }),
         });
       }
