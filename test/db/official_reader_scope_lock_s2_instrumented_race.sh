@@ -127,10 +127,10 @@ read_locked_scope_state() {
       '$subject'::uuid, '$reading'::uuid, '$reader'
     );
     commit;
-  " | grep -E '^(no_active_grant|one_current_bundle|ambiguous_bundles)\\|'
+  " | grep -E '^(no_active_grant|one_current_bundle|ambiguous_bundles)\|'
 }
 initial_scope="$(read_locked_scope_state)"
-[[ "$initial_scope" =~ ^one_current_bundle\\|1\\|[0-9a-f-]{36}$ ]] ||
+[[ "$initial_scope" =~ ^one_current_bundle\|1\|[0-9a-f-]{36}$ ]] ||
   fail "private post-lock scope query missed initial single bundle"
 
 # Case 1: T2-like exact scope reading arrives BEFORE an independently minted
@@ -259,7 +259,7 @@ active_only_b2="$(p -c "select count(distinct a.reader_content_bundle_id)
     and a.reader_character_id='$reader' and g.status='active';")"
 [[ "$active_only_b2" == "1" ]] || fail "B2 must be the sole remaining bundle"
 after_b4_revoke_scope="$(read_locked_scope_state)"
-[[ "$after_b4_revoke_scope" =~ ^one_current_bundle\\|1\\|[0-9a-f-]{36}$ ]] ||
+[[ "$after_b4_revoke_scope" =~ ^one_current_bundle\|1\|[0-9a-f-]{36}$ ]] ||
   fail "private post-lock scope query missed surviving B2"
 
 
