@@ -152,6 +152,8 @@ run_isolated_case myeongha_reader_provider_effect_revoke_race_preflight_test bas
 run_isolated_case myeongha_reader_birth_scope_lock_candidate_preflight_test bash test/db/official_reader_birth_scope_lock_candidate_preflight.sh
 # S1: private Official Reader scope advisory lock; not a paid T2 protocol.
 run_isolated_case myeongha_reader_scope_lock_private_preflight_test bash test/db/official_reader_scope_lock_private_preflight.sh
+# S2 preflight: instrumented synthetic new Grant/Bind and revoke both acquire same scope lock.
+run_isolated_case myeongha_reader_scope_lock_s2_instrumented_race_test bash test/db/official_reader_scope_lock_s2_instrumented_race.sh
 bash test/db/entitlements_current_query.sh
 bash test/db/data_deletion_job_query.sh
 bash test/db/notification_preferences_query.sh
