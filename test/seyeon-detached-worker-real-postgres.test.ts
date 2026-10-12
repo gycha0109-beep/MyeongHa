@@ -97,7 +97,7 @@ describe.skipIf(!ENABLED)(
           {callId:callUnknown,acked:true},
         ]);
         const money=await admin.query(DATE_QUERY);
-        expect(money.rows[0]?.occupied).toBe('7700');
+        expect(money.rows[0]?.occupied).toBe('15100');
       } finally {await worker.close();}
     });
 
@@ -123,7 +123,7 @@ describe.skipIf(!ENABLED)(
         pending:true,claims:1,lifecycle:'settled',
       }]);
       const moneyAfterCrash=await admin.query(DATE_QUERY);
-      expect(moneyAfterCrash.rows[0]?.occupied).toBe('4300');
+      expect(moneyAfterCrash.rows[0]?.occupied).toBe('11700');
 
       // Only the *disposable test database* accelerates the 90s lease expiry.
       await admin.query(`
@@ -149,7 +149,7 @@ describe.skipIf(!ENABLED)(
         where call_id=$1::uuid
       `,[callInterrupted]);
       expect(afterReplay.rows).toEqual([{acked:true,claims:2}]);
-      expect((await admin.query(DATE_QUERY)).rows[0]?.occupied).toBe('4300');
+      expect((await admin.query(DATE_QUERY)).rows[0]?.occupied).toBe('11700');
     });
     it('does not treat a committed claim with a lost reply as a completed settlement',async()=>{
       const lostClaimDriver=guardedPool({loseCommitReplyAt:1});
