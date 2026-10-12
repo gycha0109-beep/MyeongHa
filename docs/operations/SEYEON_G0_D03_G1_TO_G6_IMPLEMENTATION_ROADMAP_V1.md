@@ -48,11 +48,19 @@
 - **상세 근거/입력 차이:** [R1 DB Parent/Edge · R2 native Provider ingress 인벤토리](../security/SEYEON_R1_R2_SOURCE_SET_AND_MODEL_INGRESS_PROOF_V1.md) 참고. 단순 구조화 필드 감사는 임의 자연어 속 hidden source/Reader entitlement·signed Bible·full Context closure의 증명이 아님.
 - **검증 판정:** 정확한 최종 HEAD CI 성공이 확인되기 전 R1/R2 PASS 선언 금지. G0 Owner 정책 D-01~D-10 OPEN, 운영 G1/G2/G3/HISTORY/유료 AI/공개 ON 아님.
 
+### R1/R2 추가 보완 — 양방향 Pin XOR 후보와 5단계 요청 지문
+
+- **R1 시행:** `test/db/seyeon_positive_source_set_parent_edge_candidate_v1.sql`에서 기존 1640 트리거가 Positive Parent를 인식하지 못하는 **역방향 취약 사례를 먼저 rollback으로 재현**한 뒤, 동일 **시험용 Schema에서만** `reject_zero_after_positive_r1` Guard를 설치합니다. Positive Parent 생성 함수는 Attempt 행을 `FOR UPDATE`로 점유하여 기존 Zero Pin UPDATE와 서로 직렬화합니다. Positive→Zero 변경이 SQLSTATE 23514로 거부되는지, 기존 Zero→Positive도 여전히 HOLD인지 검증합니다.
+- **R1 미검증/Owner 의존:** 위 Trigger는 `test/db` 파일에서만 생성되며 운영 1640/실 Commit 함수에 설치되지 않았습니다. **독립 PG 두 세션의 동시 역행 경합 및 운영 동등 Lock Graph·동일 Tx G2 Commit은 별도 증거 필요**. 승인된 Forward-only DB 변경과 legacy EXECUTE 봉쇄도 여전히 HOLD.
+- **R2 시행:** `apps/api/src/seyeon-offline-r2-sealed-provider-chain-v1.ts`가 native 분류 2개(순서 무관)→Interpreter→Renderer→Semantic Reviewer의 5개 `Provider Request` 객체를 **instructions/responseSchema/input 포함 전체 직렬화 지문**으로 결속합니다. 진짜 구조화 request 변경·중복/실패 stage·순서 역전은 합성 delegate를 호출하기 전에 HOLD. `test/seyeon-offline-r2-provider-ingress-audit-v1.test.ts`에 정상/공격/실패 회귀 추가.
+- **R2 한계:** 이 full-request 지문은 **테스트 harness가 사전에 승인했다고 주장한 synthetic expectedRequests**만 동일한지 확인합니다. DB-signed immutable SourceSet, Provider가 실제 전송한 네트워크 바이트, 유료 모델·Reader/Saju·Worker 파생/기억 재사용에 대한 권한/출처 증명은 아닙니다. Production 경로에 설치/활성화하지 않습니다.
+- **검증 로그:** PR #1985의 **최종 정확한 HEAD** CI + PostgreSQL authority + Governance/Web을 확인한 이후만 PASS 판정. 상세 증거 [R1/R2 검증 원장](../security/SEYEON_R1_R2_SOURCE_SET_AND_MODEL_INGRESS_PROOF_V1.md).
+
 ## 3. R1 — D-03 및 실제 SourceSet 구조의 격리 검증
 
 **기존 증거:** test/db/seyeon_positive_grant_attempt_bound_candidate_v1.sql, test/seyeon-source-digest-node-postgres-golden-v1.test.ts, 기존 Node/PG real HTTP 4건, 세연 S0 합성 17건. 2026-10-12 정확한 SHA에서 기존 PG/Node Golden 7건 PASS.
 
-**추가 구현 파일(제안):** 신규 test/db/seyeon_positive_source_set_parent_edge_candidate_v1.sql, test/db/seyeon_positive_source_set_parent_edge_candidate_v1.sh 및 D-03 Golden 테스트 확장. 전부 기존 db-authority-core 폐기 DB에 포함; supabase/migrations에 배포 금지.
+**현재 test-only 파일:** `test/db/seyeon_positive_source_set_parent_edge_candidate_v1.sql` 및 실행 진입점 `test/db/seyeon_positive_grant_candidate_real_http.sh`를 기존 db-authority-core 폐기 DB에 포함. 별도 신규 workflow 없음, `supabase/migrations` 변경 0. PG15↔PG17 독립 환경 호환성 실증은 Owner 결재 전 미완료.
 
 **검증:** DB payload hash / Node canonical envelope / projection/selected hash **각각 따로 검증**; 같은 레코드 다른 Grant ID, 다른 Type/Schema, raw content tamper, duplicate source, 0/1/N, cross Subject, invalid parent-edge count, zero-plus-positive 이중 mode 거부, Commit/Reveal revoke race. PostgreSQL 15/17이 다를 수 있으므로 실제 두 버전 golden corpus 및 upgrade strategy는 Owner 별도 확정. 무키 SHA는 권한 아님.
 
