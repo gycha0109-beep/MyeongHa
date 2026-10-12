@@ -19,9 +19,9 @@
 | 최소권한 | API executor의 parent/edge 직접 DML·SELECT 거부 | pin 함수 EXECUTE만; public/anon/authenticated/service_role 권한 없음 |
 | 경합 | 기존 별도 실제 PG 2-session revoke/commit_race 증거 | 본 R1 Parent/Edge는 임의 가정으로 실제 v2 Commit을 호출하지 않음 |
 
-**부정/긍정 사례:** empty array 거부, 정상 한 Record/두 Record, 같은 Attempt의 다른 SourceSet·Ordinal·선택 digest 거부, 다른 Grant/Turn/Attempt 거부, duplicate ID 거부, API 직접 DML 거부, 원본 Grant revoke+새 Grant 발급 이후 재사용 거부, Memory payload 변경 감지, **기존 Zero가 먼저 존재할 때 Positive Pin 거부**. 반대 방향(Positive가 먼저 존재하면 기존 1640 zero-only Attempt 필드가 추가되는 경우)은 현재 1640 트리거가 Test-only Parent를 모르기 때문에 통과할 수 있음을 격리 DB의 rollback probe로 명시적으로 재현. **양방향 XOR는 미구현이며 G1/G2 Owner 신규 트리거·ACL 선행**. 직접 table 조회는 test-runner owner로만 하며 API executor의 직접 SELECT를 추가하지 않습니다. 시험 준비 중 검증 SQL이 잘못된 역할로 읽는 문제를 확인하여 **ACL은 그대로 유지하고 테스트 검증 위치만 수정**했습니다.
+**부정/긍정 사례:** empty array 거부, 정상 한 Record/두 Record, 같은 Attempt의 다른 SourceSet·Ordinal·선택 digest 거부, 다른 Grant/Turn/Attempt 거부, duplicate ID 거부, API 직접 DML 거부, 원본 Grant revoke+새 Grant 발급 이후 재사용 거부, Memory payload 변경 감지, **기존 Zero가 먼저 존재할 때 Positive Pin 거부**. 반대 방향(Positive가 먼저 존재하면 기존 1640 zero-only Attempt 필드가 추가되는 경우)은 현재 1640 트리거가 Test-only Parent를 모르기 때문에 통과할 수 있음을 격리 DB의 rollback probe로 명시적으로 재현. **기존 1640 트리거만으로는 양방향 XOR 미구현**입니다. 이 갭을 그대로 재현한 후, 같은 *격리 DB* 안에 `reject_zero_after_positive_r1()` 신규 테스트 전용 `BEFORE UPDATE OF seyeon_personal_source_pin_jsonb` 트리거를 설치하고 역방향 `23514 / seyeon_offline_r1_zero_positive_xor`를 확인합니다. Positive Pin 함수는 대상 Attempt를 `FOR UPDATE`로 획득하도록 강화해 Zero 경로의 Attempt UPDATE와 상호 배타적입니다. **단, 운영 1640 migration/Trigger는 한 줄도 수정하지 않았고 Owner 신규 forward-only Trigger·ACL·진짜 두 세션 동시 경합은 여전히 선행**입니다. 직접 table 조회는 test-runner owner로만 하며 API executor의 직접 SELECT를 추가하지 않습니다. 시험 준비 중 검증 SQL이 잘못된 역할로 읽는 문제를 확인하여 **ACL은 그대로 유지하고 테스트 검증 위치만 수정**했습니다.
 
-**경계:** ① post-Pin Provider 문맥 전체의 전달 바이트는 아직 불변 보호하지 않습니다. ② Parent/Edge 구조는 real Chat Commit/Outbox를 발행하지 않습니다. ③ src25 실제 schema allowlist 미승인; 테스트 fixture shared_detail/memory-v1은 서비스 허가 아님. ④ N>2 혼합 Memory+Life Fact 및 실제 PG15↔17 Upgrade Golden은 아직 포함되지 않습니다. ⑤ XOR test는 기존 1640 zero field 충돌 거부만 확인하며 생산 트리거의 positive Commit 분기는 여전히 없음.
+**경계:** ① post-Pin Provider 문맥 전체의 전달 바이트는 아직 불변 보호하지 않습니다. ② Parent/Edge 구조는 real Chat Commit/Outbox를 발행하지 않습니다. ③ src25 실제 schema allowlist 미승인; 테스트 fixture shared_detail/memory-v1은 서비스 허가 아님. ④ N>2 혼합 Memory+Life Fact 및 실제 PG15↔17 Upgrade Golden은 아직 포함되지 않습니다. ⑤ 기존 1640의 Zero-after-Positive gap과 시험용 Guard 보완 전후를 모두 재현하나, **생산 트리거의 positive Commit 분기는 여전히 없음**. ⑥ SourceSet `FOR UPDATE` 와 Zero RPC 간 동시 실행의 **실제 독립 두 세션 검증은 향후 실험**이며 현재 시나리오는 동일 격리 DB 내 순차 실행/원자 롤백에 한정됩니다.
 
 ## R2 — 현재 native model/request 경로 실제 코드 점검
 
@@ -49,6 +49,14 @@
 - **반환:** observed_synthetic_only / permitsProductionProvider=false / permitsProductionReveal=false. 실제 요청 JSON fingerprint는 로그 원문이 아니라 테스트 비교용 비밀키 없는 sha256이며 **DB 승인/서명/실행 허가가 아닙니다**. 
 - **증명 불가:** 임의 문자열(역사 사실의 자연어 패러프레이즈) 속 출처 자동 증명, 공개 Bible bundle 서명/버전, Word-piece 내부 지식, dynamic external tool, Reader/Saju 엔타이틀먼트, post-turn worker 저장/전파 권한, 데이터 보존/삭제, 실제 HTTP Reveal의 Revoke 시점. 이 검증기는 Runtime Composition에 설치되어 있지 않습니다.
 
+### R2 전체 구조화 요청 지문 결속 — 추가 테스트 전용 구현
+
+- **코드:** `apps/api/src/seyeon-offline-r2-sealed-provider-chain-v1.ts`은 **실제 native 빌더가 만든 요청의 `instructions`·`responseSchema`·`input` 전체**와 Attempt/Subject/모델 식별자를 `canonicalJson` 해시로 결속합니다. SourceRef 배열만 비교하는 이전 감사기를 첫 단계로 통과한 요청에만 적용합니다.
+- **단계 순서:** `integrity_classification`, `disclosure_classification`은 병렬/순서 무관하나 **둘 다 성공해야** `turn_interpretation`을 시작합니다. 이후 `dialogue_render → semantic_review` 순서. 한 stage 중복/실패/새 purpose는 합성 Delegate 호출 이전에 차단하며 실패 후 무단 자동 재호출하지 않습니다.
+- **검증:** `test/seyeon-offline-r2-provider-ingress-audit-v1.test.ts`의 동일 native fixture에서 정상 5단계, stage 역행, 요청 `instructions` 변조, Context `behaviorPolicy` 보강, Renderer Packet 필드 변조, Reviewer 원문 변조, 중복/누락 stage, 합성 provider error/retry 경로를 실험합니다.
+- **권한의 정확한 한계:** `expectedRequests`는 **테스트 harness가 작성한 모델 객체**로, 원본 개인 기록·공개 Bible의 실제 DB/Author 승인이나 Provider Adapter가 전송한 wire bytes를 검증하는 DB 서명이 아닙니다. 합성 기대 요청 자체에 유출 내용이 있으면 해당 지문도 이를 허용할 수 있습니다. 결과 `permitsProductionProvider:false`, `permitsProductionReveal:false`; Production 또는 유료 Provider 미연결.
+- **G0 전환 의존:** Server-owned immutable sealed Context와 SourceSet/Edged Grant를 DB Owner가 공유하고, Preflight/Reader/Relationship/derived Worker의 **transitive source graph**와 실제 Provider wire request의 버전·해시를 각 단계에 결속해야 합니다. 실제 모델 송신 전 Grant Pin이 선행되며, 새 Source/뒤늦은 문맥은 HOLD 또는 승인된 별도 재 Pin 정책으로 처리.
+
 ## 자체 재검토·남은 리스크
 
 1. **R1 ACL:** Direct table SELECT가 필요한 내부 시험을 API executor로 실행하면 설계상 당연히 거부합니다. Test runner Owner 검증으로만 시행하며 executor 권한을 늘리지 않습니다.
@@ -60,7 +68,7 @@
 ### 단계 판정 기준
 
 - **R1 test-only PASS:** 정확한 HEAD의 기존 db-authority-core CI에서 격리 Parent/Edge SQL과 기존 real PG/Node 검사 성공 시만 표기.
-- **R2 structured audit PASS:** 정확한 HEAD에서 세연 담당 typecheck + 새 테스트 + affected tests 성공 시만 표기.
+- **R2 structured audit + full-request synthetic seal PASS:** 정확한 HEAD에서 세연 담당 typecheck + native builder 5-stage chain 테스트 + affected tests 성공 시만 표기. **실제 Provider wire bytes/DB Owner Source closure는 별도 게이트**.
 - **R2 Full Closure / 운영 G1:** **NOT COMPLETE / G0 Owner HOLD**. Input 요청 텍스트 출처·Reader/Saju·Worker·전문 request sealing·D03 Codec 승인은 여전히 외부 결정/추가 구현 필요.
 
 종료 판정: R1/R2의 제한된 격리·구조 관측까지만 B. G0/G1 positive·G2·G3의 운영 전환은 C(Owner 계약/실제 원자 RPC/외부 운영 lineage 필요).
