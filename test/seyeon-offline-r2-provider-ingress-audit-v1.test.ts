@@ -88,6 +88,7 @@ function fixture(){
     disclosure:context.disclosure,
     interpretation:{
       chosenAction:{key:'approach'},
+      expressionState:'baseline',
       notice:{evidenceRefs:[]},
       memoryRefsUsed:[],
       reveal:{level:'public',supportingHistoryRefs:[],triggerRef:null},
