@@ -9,5 +9,5 @@ if [[ "${CI:-}" != true || "${PGHOST:-}" != localhost ||
   exit 2
 fi
 psql -X -v ON_ERROR_STOP=1   -f test/db/seyeon_positive_grant_attempt_bound_candidate_v1.sql
-SEYEON_POSITIVE_GRANT_REAL_PG=1   ./node_modules/.bin/vitest run     test/seyeon-controlled-disclosure-real-postgres-candidate.test.ts --maxWorkers=1
-echo 'PASS: positive source Pin -> test Commit -> current-Grant HTTP authorized/held via real PostgreSQL on disposable CI DB'
+SEYEON_POSITIVE_GRANT_REAL_PG=1   ./node_modules/.bin/vitest run     test/seyeon-controlled-disclosure-real-postgres-candidate.test.ts test/seyeon-source-digest-node-postgres-golden-v1.test.ts --maxWorkers=1
+echo 'PASS: positive Pin -> test Commit -> real PG HTTP grant reveal and Node/Postgres D-03 dual-serializer golden vectors in disposable CI DB'
