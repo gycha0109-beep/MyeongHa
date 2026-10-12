@@ -293,4 +293,7 @@ owner_flags=$("${psql_base[@]}" -c "select rolcanlogin::int||'|'||rolsuper::int|
 [[ "$owner_flags" == '0|0|0' ]] || fail "thread open owner role escaped NOLOGIN/NOSUPERUSER/NOBYPASSRLS contract: $owner_flags"
 pass "thread open wrapper preserves command-only least-privilege runtime authority"
 
+# Reuse this existing disposable PG17 full-migration fixture for the scoped
+# restore proof's real catalog and fail-closed negative scenarios. No new CI job.
+bash test/db/seyeon_relationship_isolated_restore_proof.sh
 echo "Member Character thread open persistence/concurrency tests passed"
