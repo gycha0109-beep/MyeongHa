@@ -64,13 +64,13 @@ describe('D-01 / CAP-B Standard Reader v2 binder policy preflight', () => {
     }
   });
 
-  it('keeps premium explicitly HOLD even for allowlisted real specialist Reader', () => {
+  it('keeps Premium HOLD for the single owning Reader while withholding others', () => {
     const premium = {
       status: 'approved' as const,
       rule: {
         ...approvedStandard.rule,
-        kind: 'premium_restricted' as const,
-        allowedReaderIds: ['baekheon' as const],
+        kind: 'premium_character_bound' as const,
+        targetReaderId: 'baekheon' as const,
       },
     };
     expect(assessStandardReaderV2BinderPolicyCandidateV1({
@@ -79,7 +79,7 @@ describe('D-01 / CAP-B Standard Reader v2 binder policy preflight', () => {
 
     expect(assessStandardReaderV2BinderPolicyCandidateV1({
       ...input,
-      lookup: { ...premium, rule: { ...premium.rule, allowedReaderIds: ['seyeon' as const] } },
+      lookup: { ...premium, rule: { ...premium.rule, targetReaderId: 'seyeon' as const } },
     })).toEqual({ status: 'withheld', reason: 'policy_unavailable' });
   });
 

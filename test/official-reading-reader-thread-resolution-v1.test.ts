@@ -187,10 +187,10 @@ describe('D-05 dormant server-owned existing Member Reader thread lookup', () =>
   it.each([
     ['withheld', { status: 'withheld', reason: 'disabled' } as const],
     ['excluded', { status: 'approved', rule: {
-      kind: 'premium_restricted', productId: PRODUCT,
+      kind: 'premium_character_bound', productId: PRODUCT,
       productSpecVersion: 'standard-reading-v1', sajuDomain: 'general',
       ruleVersion: 'synthetic-restricted', approvedPolicyRevision: 'synthetic-policy',
-      allowedReaderIds: ['baekheon'],
+      targetReaderId: 'baekheon',
     }} as const],
   ])('%s policy prevents even finding a thread', async (_label, policy) => {
     const f = fixture({ policy });

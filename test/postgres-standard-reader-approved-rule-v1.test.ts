@@ -15,7 +15,7 @@ const approvedRow = Object.freeze({
   sajuDomain: SOURCE.sajuDomain,
   ruleVersion: 'synthetic-only-v1',
   approvedPolicyRevision: 'synthetic-only-revision',
-  kind: 'standard_all_readers', allowedReaderIds: null,
+  kind: 'standard_all_readers', targetReaderId: null,
 });
 
 function testPort(rows: unknown[]) {
@@ -61,7 +61,7 @@ describe('D-01 private PostgreSQL-approved Reader rule source', () => {
       [{ ...approvedRow, productSpecVersion: 'old' }],
       [{ ...approvedRow, sajuDomain: 'wealth' }],
       [{ ...approvedRow, approvedPolicyRevision: '' }],
-      [{ ...approvedRow, allowedReaderIds: ['seyeon'] }],
+      [{ ...approvedRow, targetReaderId: ['seyeon'] }],
       [{ ...approvedRow, kind: 'arbitrary' }],
     ];
     for (const rows of failures) {
@@ -71,13 +71,10 @@ describe('D-01 private PostgreSQL-approved Reader rule source', () => {
     }
   });
 
-  it('rejects invalid or duplicate premium Reader IDs at the PostgreSQL adapter itself', async () => {
-    for (const allowedReaderIds of [
-      [], ['seyeon', 'seyeon'], ['attacker'], ['seyeon', 'attacker'],
-      [' SEYEON'], ['seyeon', null],
-    ]) {
+  it('rejects invalid single-character Premium connections', async () => {
+    for (const targetReaderId of ['', ['seyeon'], 'not-official', ' SEYEON', null]) {
       const { port } = testPort([{
-        ...approvedRow, kind: 'premium_restricted', allowedReaderIds,
+        ...approvedRow, kind: 'premium_character_bound', targetReaderId,
       }]);
       expect(await port.readApprovedRule(SOURCE)).toEqual({
         status: 'withheld', reason: 'invalid_policy',
@@ -85,19 +82,14 @@ describe('D-01 private PostgreSQL-approved Reader rule source', () => {
     }
   });
 
-  it('accepts only a bounded canonical premium allowlist as policy data, not specialist permission', async () => {
+  it('reads only one Premium target Reader, not multi-Reader permission', async () => {
     const { port } = testPort([{
-      ...approvedRow, kind: 'premium_restricted', allowedReaderIds: ['seyeon', 'taegyeom'],
+      ...approvedRow, kind: 'premium_character_bound', targetReaderId: 'seyeon',
     }]);
-    expect(await port.readApprovedRule(SOURCE)).toEqual({
+    const lookup = await port.readApprovedRule(SOURCE);
+    expect(lookup).toMatchObject({
       status: 'approved',
-      rule: {
-        productId: SOURCE.productId, productSpecVersion: SOURCE.productSpecVersion,
-        sajuDomain: SOURCE.sajuDomain,
-        ruleVersion: approvedRow.ruleVersion,
-        approvedPolicyRevision: approvedRow.approvedPolicyRevision,
-        kind: 'premium_restricted', allowedReaderIds: ['seyeon', 'taegyeom'],
-      },
+      rule: { kind: 'premium_character_bound', targetReaderId: 'seyeon' },
     });
     expect(await resolveProductReaderEligibilityV1({
       source: {

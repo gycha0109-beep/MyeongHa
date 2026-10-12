@@ -63,7 +63,7 @@ const withheld = (reason: Extract<
  * flag. No specialist Capability object is read, written or synthesized.
  *
  * Premium is ALWAYS withheld pending separately approved Product/DB/Reader
- * binder semantics, even if that Reader appears in a premium allowlist.
+ * binder semantics, including when targetReaderId exactly matches this Reader.
  *
  * This does not verify Purchase Intent, verified receipt, exact live Grant,
  * new Reading locks, current Birth/Source, or T2/reveal authority.
@@ -98,8 +98,8 @@ export function assessStandardReaderV2BinderPolicyCandidateV1(input: Readonly<{
     source, serverReaderId: selected.readerCharacterId, lookup,
   });
   if (judgment.status !== 'eligible') return withheld('policy_unavailable');
-  // Do not let a premium allowlist or specialist can_initiate create a Standard
-  // eligibility bypass. Premium still needs an independently approved binder.
+  // A Premium Product is attached to one owning Reader, never a list of
+  // blocked Readers. Even that match is not permission to bind/reveal Premium.
   if (lookup.status !== 'approved' || lookup.rule.kind !== 'standard_all_readers') {
     return withheld('premium_hold');
   }

@@ -1,4 +1,7 @@
 -- D-01 private Product rule source candidate. No approvals are seeded.
+-- Standard: universal product-level eligibility across 9 canonical Readers.
+-- Premium: a single Product -> target Reader association; no multi-Reader allowlist.
+-- Paid access always needs exact current Grant, Release, Subject and bind checks.
 -- NOT a purchase, Offer, binder, Grant, release, or public authorization.
 -- Existing 1130/1150/1220/1270 and 1720 migrations stay unchanged.
 create table public.standard_reader_product_approved_rules_v1 (
@@ -8,7 +11,7 @@ create table public.standard_reader_product_approved_rules_v1 (
   approved_policy_revision text not null,
   rule_version text not null,
   policy_kind text not null,
-  allowed_reader_ids text[] null,
+  target_reader_id text null,
   approval_record_ref text not null,
   approved_at timestamptz not null,
   effective_from timestamptz not null,
@@ -26,11 +29,13 @@ create table public.standard_reader_product_approved_rules_v1 (
     and approval_record_ref <> '' and length(approval_record_ref) <= 256
   ),
   constraint std_reader_policy_kind check (
-    (policy_kind = 'standard_all_readers' and allowed_reader_ids is null)
+    (policy_kind = 'standard_all_readers' and target_reader_id is null)
     or
-    (policy_kind = 'premium_restricted' and allowed_reader_ids is not null
-      and cardinality(allowed_reader_ids) between 1 and 9
-      and array_position(allowed_reader_ids, null) is null)
+    (policy_kind = 'premium_character_bound'
+      and target_reader_id in (
+        'seyeon', 'baekheon', 'yeoul', 'seorin', 'rahyeon',
+        'mira', 'taegyeom', 'yunho', 'doyun'
+      ))
   ),
   constraint std_reader_policy_window check (
     approved_at <= effective_from
@@ -91,7 +96,7 @@ returns table (
   rule_version text,
   approved_policy_revision text,
   policy_kind text,
-  allowed_reader_ids text[]
+  target_reader_id text
 )
 language sql volatile security definer
 set search_path = pg_catalog, public
@@ -99,7 +104,7 @@ as $$
   with candidates as (
     select r.product_id, r.product_spec_version, r.saju_domain,
            r.rule_version, r.approved_policy_revision,
-           r.policy_kind, r.allowed_reader_ids
+           r.policy_kind, r.target_reader_id
     from public.standard_reader_product_approved_rules_v1 r
     join public.standard_reading_product_specs spec
       on spec.product_id = r.product_id
@@ -132,7 +137,7 @@ as $$
   )
   select c.product_id, c.product_spec_version, c.saju_domain,
          c.rule_version, c.approved_policy_revision,
-         c.policy_kind, c.allowed_reader_ids
+         c.policy_kind, c.target_reader_id
   from counted c
   where c.matched_rules = 1;
 $$;

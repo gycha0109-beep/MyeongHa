@@ -26,7 +26,7 @@ begin;
 
 insert into public.standard_reader_product_approved_rules_v1 (
  product_id,product_spec_version,saju_domain,approved_policy_revision,
- rule_version,policy_kind,allowed_reader_ids,approval_record_ref,
+ rule_version,policy_kind,target_reader_id,approval_record_ref,
  approved_at,effective_from
 ) values (
  '11392000-0000-0000-0000-000000000001', 'v1','relationship',
@@ -63,12 +63,12 @@ $$;
 
 insert into public.standard_reader_product_approved_rules_v1 (
  product_id,product_spec_version,saju_domain,approved_policy_revision,
- rule_version,policy_kind,allowed_reader_ids,approval_record_ref,
+ rule_version,policy_kind,target_reader_id,approval_record_ref,
  approved_at,effective_from
 ) values (
  '11392000-0000-0000-0000-000000000001','v1','relationship',
- 'synthetic-temporary-revision-B','test-only-v2','premium_restricted',
- array['seyeon'],'test-only:never-production',
+ 'synthetic-temporary-revision-B','test-only-v2','premium_character_bound',
+ 'seyeon','test-only:never-production',
  clock_timestamp()-interval '2 days',clock_timestamp()-interval '1 day'
 );
 
@@ -77,6 +77,37 @@ begin
   if (select count(*) from public.qry_standard_reader_approved_rule_v1(
       '11392000-0000-0000-0000-000000000001','v1','relationship',clock_timestamp())) <> 0 then
     raise exception 'D-01 overlapping active policies must be ambiguous and denied';
+  end if;
+end
+$$;
+
+-- Premium is ONE canonical owning Reader, not an allowlist. Rejected
+-- shapes cannot be materialized as a Product approval even in a private DB.
+do $$
+begin
+  begin
+    insert into public.standard_reader_product_approved_rules_v1(
+      product_id,product_spec_version,saju_domain,approved_policy_revision,
+      rule_version,policy_kind,target_reader_id,approval_record_ref,
+      approved_at,effective_from
+    ) values (
+      '11392000-0000-0000-0000-000000000001','v1','relationship',
+      'synthetic-invalid-target','test-only-v3','premium_character_bound',
+      'not-an-official-reader','test-only:never-production',
+      clock_timestamp()-interval '2 days',clock_timestamp()-interval '1 day'
+    );
+    raise exception 'D-01 invalid Premium target was accepted';
+  exception when check_violation then
+    if SQLERRM not like '%std_reader_policy_kind%' then raise; end if;
+  end;
+end
+$$;
+
+do $$
+begin
+  if (select count(*) from public.qry_standard_reader_approved_rule_v1(
+      '11392000-0000-0000-0000-000000000001','v1','relationship',clock_timestamp())) <> 0 then
+    raise exception 'D-01 Standard and Premium overlap must deny';
   end if;
 end
 $$;
@@ -118,7 +149,7 @@ rollback;
 -- actual TypeScript + PostgreSQL readback. Never delivered as Product approval.
 insert into public.standard_reader_product_approved_rules_v1 (
  product_id,product_spec_version,saju_domain,approved_policy_revision,
- rule_version,policy_kind,allowed_reader_ids,approval_record_ref,
+ rule_version,policy_kind,target_reader_id,approval_record_ref,
  approved_at,effective_from
 ) values (
  '11392000-0000-0000-0000-000000000001','v1','relationship',

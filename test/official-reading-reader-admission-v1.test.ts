@@ -66,15 +66,15 @@ function artifactRow(reader = 'seyeon') {
     completedAt: '2026-10-09T07:30:00.000Z',
   };
 }
-function approved(readerIds?: readonly ('seyeon' | 'baekheon')[]): ProductReaderRuleLookupV1 {
+function approved(targetReaderId?: 'seyeon' | 'baekheon'): ProductReaderRuleLookupV1 {
   return {
     status: 'approved',
-    rule: readerIds ? {
-      kind: 'premium_restricted', productId: PRODUCT,
+    rule: targetReaderId ? {
+      kind: 'premium_character_bound', productId: PRODUCT,
       productSpecVersion: 'standard-reading-v1',
       sajuDomain: 'general', ruleVersion: 'synthetic-premium-rule',
       approvedPolicyRevision: 'synthetic-policy-revision',
-      allowedReaderIds: readerIds,
+      targetReaderId,
     } : {
       kind: 'standard_all_readers', productId: PRODUCT,
       productSpecVersion: 'standard-reading-v1',
@@ -230,7 +230,7 @@ describe('A2-beta server-only Reading × Reader admission', () => {
         productSpecVersion: 'forged-spec',
       },
     } as ProductReaderRuleLookupV1 },
-    { label: 'premium excludes Reader', policy: approved(['baekheon']) },
+    { label: 'premium excludes Reader', policy: approved('baekheon') },
   ])('holds $label Product policy before raw artifact', async ({ policy }) => {
     const f = fixtures({ policy });
     await expect(prepareOfficialReadingReaderAdmissionV1(f.input)).rejects.toMatchObject({
@@ -248,11 +248,11 @@ describe('A2-beta server-only Reading × Reader admission', () => {
     expect(f.events).toEqual(['thread', 'access', 'policy']);
   });
 
-  it('future approved Premium allowlist can support one Reader without granting the others', async () => {
-    const allowed = fixtures({ policy: approved(['seyeon']) });
+  it('future Premium Product targets one Reader without granting the others', async () => {
+    const allowed = fixtures({ policy: approved('seyeon') });
     const success = await prepareOfficialReadingReaderAdmissionV1(allowed.input);
     expect(success.scope.readerCharacterId).toBe('seyeon');
-    const denied = fixtures({ threadReader: 'baekheon', policy: approved(['seyeon']) });
+    const denied = fixtures({ threadReader: 'baekheon', policy: approved('seyeon') });
     await expect(prepareOfficialReadingReaderAdmissionV1(denied.input))
       .rejects.toMatchObject({ code: 'POLICY_HOLD' });
     expect(denied.readArtifactSource).not.toHaveBeenCalled();
@@ -261,7 +261,7 @@ describe('A2-beta server-only Reading × Reader admission', () => {
 
   it.each([
     { label: 'withdrawn', after: { status: 'withheld', reason: 'disabled' } as ProductReaderRuleLookupV1 },
-    { label: 'premium now excludes Reader', after: approved(['baekheon']) },
+    { label: 'premium now excludes Reader', after: approved('baekheon') },
     { label: 'new approved policy revision', after: {
       ...approved(),
       rule: {
@@ -279,8 +279,8 @@ describe('A2-beta server-only Reading × Reader admission', () => {
     expect(f.readArtifactSource).toHaveBeenCalledTimes(1);
   });
 
-  it('rechecks an unchanged approved premium policy without broadening its Reader list', async () => {
-    const f = fixtures({ policy: approved(['seyeon']) });
+  it('rechecks an unchanged Premium character binding without broadening Reader identity', async () => {
+    const f = fixtures({ policy: approved('seyeon') });
     const result = await prepareOfficialReadingReaderAdmissionV1(f.input);
     expect(result.scope.productRuleVersion).toBe('synthetic-premium-rule');
     expect(f.readApprovedRule).toHaveBeenCalledTimes(2);
