@@ -162,6 +162,8 @@ run_isolated_case myeongha_reader_verified_provider_revoke_bridge_private_test b
 run_isolated_case myeongha_reader_initial_product_scope_lock_private_test bash test/db/official_reader_initial_product_scope_lock_private.sh
 # D1: source-owned verified initial/additional purchase L0→L1 scope and real two-session Product-first lock.
 run_isolated_case myeongha_reader_unified_scope_entry_private_test bash test/db/official_reader_unified_scope_entry_private.sh
+# D1: sorted multi-Product L0 then multi-Reader L1; three independent PostgreSQL sessions in reversed order.
+run_isolated_case myeongha_reader_multi_scope_lockset_three_session_test bash test/db/official_reader_multi_scope_lockset_three_session.sh
 bash test/db/entitlements_current_query.sh
 bash test/db/data_deletion_job_query.sh
 bash test/db/notification_preferences_query.sh

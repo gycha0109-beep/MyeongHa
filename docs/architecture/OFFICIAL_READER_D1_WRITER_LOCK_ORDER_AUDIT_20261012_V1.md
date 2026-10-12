@@ -54,3 +54,26 @@
 **완료:** 원본 1090/1080/1220/0220과 비공개 1740~1790의 잠금 진입·행 잠금 순서를 확인해 P0 잠금 공백을 기록했고, D1 **읽기 전용 공통 원시 함수 + 경쟁 시험**을 신설했다.
 
 **미완료/금지:** 다중 영향 Product 정렬, 운영 모든 Writer의 통일 Cutover, 환불 미결속·복구, RR-03 source manifest 및 보호 원문, RR-04 follow-up, Commerce/Legal/Privacy/DB Owner 승인, 운영 #1941 복원. 모든 비공개 후보 및 본 문서는 병합·운영 공개 HOLD.
+
+## 4. D1 확장 — 다중 Product / Reading×Reader Lockset (2026-10-12)
+
+**추가 구현:** `1810_official_reader_ordered_multi_scope_lockset_private_v1.sql`
+
+- `internal_acquire_official_reader_product_lockset_v1(subject, products[])`: 중복 UUID 제거·최대 64개·실존 `standard_reading_product_specs` 확인 후 **UUID 순서대로 L0를 전부** 잠근다. 거래는 `READ COMMITTED`·canonical Subject 필수. 입력 Product 자체가 실제 구매·판매 가능·권한을 증명하는 것은 아니다. 이 함수는 **잠금만 위한 원시 함수**이다.
+- `internal_acquire_official_reader_reading_lockset_v1(subject, readings[], readers[])`: 길이가 같은 Reading/Reader 쌍들을 중복 제거하고 모든 `standard_reading_official_bindings`의 **정본 Product**를 도출한다. **모든 Product L0를 먼저 오름차순 확보**, 대기 후 전체 source scope 변동을 재확인한 다음 **모든 Reading UUID×Reader text L1을 정렬해서 확보**한다. 이후 전체 mapping 재확인. 입력 Reader는 *잠금 목표*이지 현재 Grant나 Reader 상품 접근 자격이 아니다.
+- Product 잠금 인자가 임의 ID여도 Product Spec 존재만 확인한다. 이를 공식 Reading 권한 결정에 사용하지 않고, 공식 Reading 경로에서는 **정본 매핑에서 유도된 Product 배열만** 사용하는 것이 핵심 경계이다.
+- **최대 64개** Product / Reader pair를 지원하는 내부 상한을 둔다. 더 큰 회수 이벤트는 임의 분할로 부분 적용하지 말고 영향 집합을 범위별로 재설계하거나 DENY한다.
+- 두 함수 모두 `SECURITY INVOKER`, `PUBLIC/anon/authenticated/service_role/API/Commerce/Chat Runtime` 직접 EXECUTE 없음. 구매권 발급·회수·T2·진짜 상담 답변 저장에 연결하지 않았다.
+
+### 독립 PostgreSQL 경합 실증
+
+`test/db/official_reader_multi_scope_lockset_three_session.sh`를 `run_authority_core.sh`에 등록한다.
+
+1. 동일 Subject에 실존하는 Standard Product 2개를 사용하는 **세 연결 A/B/C**: A는 `[높은 Product, 낮은 Product]` 역순 요청으로 두 L0를 보유; B는 정순, C는 역순 요청. B/C가 실제 `pg_stat_activity + pg_locks`에서 advisory lock 대기하며 A COMMIT 이후 각각 완료하는지 검사.
+2. 동일 공식 Reading에 두 Reader의 L1을 거꾸로 요청하는 또 다른 세 연결: A/B/C가 모두 기존 정본 Product L0를 선행하고, 쌍 중복을 제거해 정렬한 L1을 보유하는지 검사.
+3. 유효하지 않은 UUID·NULL Product·배열 길이 불일치·존재하지 않는 Reading·공백 Reader·다른 Subject·오래된 Snapshot·런타임 role EXECUTE는 거부.
+4. 앞선 검사 통과는 **검사 범위 내 동시 실행에서 교착 없었음**을 뜻한다. Postgres 자체의 교착 가능성이 전역적으로 0이라는 수학적 주장이나 이미 운영 중인 직접 Writer의 안전성을 뜻하지 않는다.
+
+### 남은 Cutover 항목
+
+기존 `1080/1090/1220/0220` 및 `1750/1760/1770/1780/1790`은 아직 이 1810 진입점을 호출하지 않는다. Verified Provider 이벤트에 의해 실제 영향을 받는 모든 Product/Reader/Reading 집합을 추출하는 **read-only resolver**, 그리고 L0/L1 잠금 후 **이 집합이 변화하지 않았는지 보장하는 전체 Commerce 연결**이 필요하다. 신규 Grant Insert phantom/미결속 최초 회수와 T2 원자 저장은 별도 D2/D3/D5 검증·승인 범위이다.
