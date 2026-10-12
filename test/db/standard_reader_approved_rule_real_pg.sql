@@ -83,7 +83,7 @@ $$;
 
 -- Premium is ONE canonical owning Reader, not an allowlist. Rejected
 -- shapes cannot be materialized as a Product approval even in a private DB.
-do $
+do $$
 begin
   begin
     insert into public.standard_reader_product_approved_rules_v1(
@@ -101,16 +101,16 @@ begin
     if SQLERRM not like '%std_reader_policy_kind%' then raise; end if;
   end;
 end
-$;
+$$;
 
-do $
+do $$
 begin
   if (select count(*) from public.qry_standard_reader_approved_rule_v1(
       '11392000-0000-0000-0000-000000000001','v1','relationship',clock_timestamp())) <> 0 then
     raise exception 'D-01 Standard and Premium overlap must deny';
   end if;
 end
-$;
+$$;
 
 insert into public.standard_reader_product_rule_withdrawals_v1(
  product_id,approved_policy_revision,withdrawn_at,withdrawal_record_ref
