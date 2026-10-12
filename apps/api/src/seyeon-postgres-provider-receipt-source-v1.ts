@@ -226,8 +226,9 @@ export function createSeyeonPostgresProviderReceiptSourceV1(
     abandonUnsettledClaim(callId:string){
       // Only the local pointer is discarded. The DB lease is not shortened,
       // avoiding a forged early re-claim or a second paid request.
-      if (claimInFlight || ackInFlight || pending===null ||
-          exactId(callId)!==pending.callId) return fail();
+      if (claimInFlight || ackInFlight) return fail();
+      if (pending===null) return;
+      if (exactId(callId)!==pending.callId) return fail();
       pending=null;
     },
   });
