@@ -8,6 +8,8 @@
 >
 > 상위 원장: [#1866](https://github.com/gycha0109-beep/MyeongHa/issues/1866) · P0 권한 [#1843](https://github.com/gycha0109-beep/MyeongHa/issues/1843) · 구매 기반 Reader [#1827](https://github.com/gycha0109-beep/MyeongHa/issues/1827) · 운영 계보 [#1887](https://github.com/gycha0109-beep/MyeongHa/issues/1887)
 
+**G0 상세 설계 인수:** [D-03 Codec/Positive SourceSet/1640 Trigger/G2 v2 Commit 구현 명세](./SEYEON_G0_D03_G1_POSITIVE_PIN_DB_BLUEPRINT_V1_PROPOSED.md) 및 [Owner-gated R0~R8 실행 로드맵](../operations/SEYEON_G0_D03_G1_TO_G6_IMPLEMENTATION_ROADMAP_V1.md)을 추가하였습니다. 둘 모두 **PROPOSED / 미승인**이며, 구현 범위·역할·테스트·Owner 결정을 분리합니다.
+
 ## 0. 결론과 적용 제한
 
 기존 `docs/security/SEYEON_AI_SECURITY_COMPLETION_GATES_V1.md`, `docs/SEYEON_ATOMIC_COMMIT_OWNER_INTEGRATION_CANDIDATE_V1.md`, `docs/RELATIONSHIP_MEMORY_POLICY_SPEC.md`와 Draft #1985는 **방향과 시험 가능한 Port**를 정의했지만, DB/Character/Security 3자 승인까지 받은 **G0 세부 실행 계약은 없다**.
