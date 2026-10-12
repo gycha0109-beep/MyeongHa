@@ -514,7 +514,7 @@ describe('mock Character Chat Turn orchestration', () => {
       })),
     };
     let observed: unknown = null;
-    const renderer = new StaticMockCharacterRendererProviderV1((input) => {
+    const renderer = new StaticMockCharacterRendererProviderV1((input: { readonly rahyeonRuntime: unknown }) => {
       observed = input.rahyeonRuntime;
       return validDraft();
     });
