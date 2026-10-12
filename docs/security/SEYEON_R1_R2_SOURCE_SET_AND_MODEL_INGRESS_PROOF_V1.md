@@ -19,7 +19,7 @@
 | 최소권한 | API executor의 parent/edge 직접 DML·SELECT 거부 | pin 함수 EXECUTE만; public/anon/authenticated/service_role 권한 없음 |
 | 경합 | 기존 별도 실제 PG 2-session revoke/commit_race 증거 | 본 R1 Parent/Edge는 임의 가정으로 실제 v2 Commit을 호출하지 않음 |
 
-**부정/긍정 사례:** empty array 거부, 정상 한 Record/두 Record, 같은 Attempt의 다른 SourceSet·Ordinal·선택 digest 거부, 다른 Grant/Turn/Attempt 거부, duplicate ID 거부, API 직접 DML 거부, 원본 Grant revoke+새 Grant 발급 이후 재사용 거부, Memory payload 변경 감지, test-only zero+positive XOR 거부. 직접 table 조회는 test-runner owner로만 하며 API executor의 직접 SELECT를 추가하지 않습니다. 시험 준비 중 검증 SQL이 잘못된 역할로 읽는 문제를 확인하여 **ACL은 그대로 유지하고 테스트 검증 위치만 수정**했습니다.
+**부정/긍정 사례:** empty array 거부, 정상 한 Record/두 Record, 같은 Attempt의 다른 SourceSet·Ordinal·선택 digest 거부, 다른 Grant/Turn/Attempt 거부, duplicate ID 거부, API 직접 DML 거부, 원본 Grant revoke+새 Grant 발급 이후 재사용 거부, Memory payload 변경 감지, **기존 Zero가 먼저 존재할 때 Positive Pin 거부**. 반대 방향(Positive가 먼저 존재하면 기존 1640 zero-only Attempt 필드가 추가되는 경우)은 현재 1640 트리거가 Test-only Parent를 모르기 때문에 통과할 수 있음을 격리 DB의 rollback probe로 명시적으로 재현. **양방향 XOR는 미구현이며 G1/G2 Owner 신규 트리거·ACL 선행**. 직접 table 조회는 test-runner owner로만 하며 API executor의 직접 SELECT를 추가하지 않습니다. 시험 준비 중 검증 SQL이 잘못된 역할로 읽는 문제를 확인하여 **ACL은 그대로 유지하고 테스트 검증 위치만 수정**했습니다.
 
 **경계:** ① post-Pin Provider 문맥 전체의 전달 바이트는 아직 불변 보호하지 않습니다. ② Parent/Edge 구조는 real Chat Commit/Outbox를 발행하지 않습니다. ③ src25 실제 schema allowlist 미승인; 테스트 fixture shared_detail/memory-v1은 서비스 허가 아님. ④ N>2 혼합 Memory+Life Fact 및 실제 PG15↔17 Upgrade Golden은 아직 포함되지 않습니다. ⑤ XOR test는 기존 1640 zero field 충돌 거부만 확인하며 생산 트리거의 positive Commit 분기는 여전히 없음.
 
