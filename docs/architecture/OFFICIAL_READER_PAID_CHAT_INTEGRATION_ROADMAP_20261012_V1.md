@@ -180,3 +180,30 @@ S1에서 공통 잠금 함수 자체가 성공하더라도 **S2 전체 경로가
 **실제 DB 검증:** `official_reader_verified_provider_revoke_bridge_private.sh`는 회원 문맥 없이 실행한 verified Provider 취소를 통해 양방향 잠금 경합, 실행 이후 회원 문맥 복구, 기존 독립 구매권 회수 및 조회 차단, 미인증 실행 역할·서로 다른 회원 문맥 거부를 검증한다. `run_authority_core.sh`에서 독립 PostgreSQL 시험으로 실행한다.
 
 **남은 차단:** 안전한 Refund ingress 및 Provider Event 검증/정규화/순서의 소유 계약, Commerce 전용 최소 권한 호출자와 실제 엔드투엔드 회수(실결제 이벤트 사용) 검증, 최초 공식 Reading 구매를 위한 별도 잠금 정렬, RR-03 근거 증명/유료 보호 본문/원자 저장, RR-04 후속 조회, 운영 1400~1450 복원 증거. 비공개 SQL 후보의 검사 성공만으로 실거래 연동이나 법적 환불 결정을 선언하지 않는다.
+
+## 15. 최초 공식 Reading UUID 생성 전 공통 잠금 기반 (S2 INITIAL, 2026-10-12)
+
+### 왜 기존 잠금으로는 안 되는가
+
+추가 Reader·현재 유료 사주 T2의 잠금 키는 `회원×공식 Reading UUID×캐릭터`다. **최초 공식 사주 구매권을 발급할 때는 아직 공식 Reading UUID가 생성되지 않았다.** 사용자나 클라이언트가 제안한 임시 UUID를 대신 잠그면 같은 구매권이 다른 잠금 키를 선택할 수 있다. 이 문제를 해결하기 위해 **공식 구매 기록에서 확정되는 `회원×상품`**을 첫 바깥 잠금 범위로 설계한다.
+
+### 구현: `1790_official_reader_initial_product_scope_private_v1.sql`
+
+- `internal_acquire_official_reader_product_scope_lock_v1(subject,product)`: 트랜잭션 범위의 비공개 `pg_advisory_xact_lock`. 기존 Reading scope와 다른 고정 네임스페이스, 길고 지속적인 잠금 대신 COMMIT 시 자동 해제.
+- `internal_qry_official_reader_initial_product_candidate_v1`: 검증된 최초 구매 `Purchase Intent`와 서버 소유 Offer, `initial_reading` 역할, 선택 Reader, 활성 Product Spec, 공식 Reading 정책이 모두 **정확히 하나**일 때에만 Product UUID를 반환. 후보 조회만으로 권한을 부여하지 않는다.
+- `internal_apply_initial_official_reader_receipt_locked_v1`: 검증된 실제 production Receipt→Purchase Intent에서 Product 확인 → **행 잠금 전 Product 공통 잠금** → 기존 1090 영수증 권한 발급 명령 → Product 재검증. 구매권/이벤트/권한 재계산은 기존 Commerce 명령이 소유한다.
+- `internal_cmd_bind_initial_official_reader_locked_v1`: 구매 기록에서 Product 확인 → Product 공통 잠금 → 기존 `cmd_bind_standard_reading_access_v2` 수행. 기존 함수가 `initial_reader`를 반환하고 실제 첫 공식 Reading을 생성한 경우만 성공하며, 동일 요청의 공식 Binding 재생은 원본 v2의 불변 이력에 따라 허용한다.
+- 구매 정보 미확정·다른 상품/회원·추가 Reader 구매·기존 권한과 다른 결과·오래된 거래 조회는 모두 실패. `Commerce internal executor`, `service_role`, `API executor`, 브라우저 역할에는 **실행 권한을 주지 않는다**.
+
+### 검증
+
+- `test/db/official_reader_initial_product_scope_lock_private.sh`: 기존 공식 사주 테스트의 **첫 영수증 권한 발급/첫 Reading 생성 두 명령만** 1790의 비공개 함수로 대체하여 원본 전체 계약을 실행. 동일 계약 재생, 추가 Reader·미확정 구매·다른 회원/오래된 격리 수준 차단, 동일 회원×상품 두 연결 간 실제 Lock 대기와 다른 상품의 독립 진행 검증.
+- 기존 `run_authority_core.sh` 독립 DB 시험 추가. PostgreSQL 15·17 및 전체 CI 통과 전에는 단계 완료가 아니다.
+
+### 전체 경로 공유 잠금 순서 및 차단
+
+**목표 전역 순서:** `회원×Product`(최초 구매 전/후 동일 외부 잠금) → `회원×Reading×Reader`(Reading 존재 시 추가 잠금) → Commerce Provider/Receipt/Grant → Birth/읽기·응답 최종 확정. 실제 각 Writer의 선행 잠금은 모두 동일 순서를 사용하는지 먼저 검증해야 한다.
+
+- 이번 변경은 **첫 구매**에 대해서만 바깥 Product 잠금을 구현하며 **기존 추가 Reader 권한 발급·회수·T2 조회는 여전히 직접 Product 잠금을 취득하지 않는다.** 모든 Writer의 바깥 잠금 적용과 교착·환불/조회/재시도 경합을 확인하기 전까지 전체 잠금 통일 선언 금지.
+- 검증된 Provider 취소 이벤트의 안전한 호출자, RR-03 공식 Saju 근거 출처 실검증, 일반 채팅에서 보호하는 유료 본문, RR-04 정식 후속 질문 및 운영 DB 복원 #1941은 모두 미완료.
+- 어느 단계의 비공개 SQL 결과도 실제 상품의 공개 결제·Reader Chat 서비스 활성화·Privacy 보관 승인·Legal 환불 판정이 아니다. 초기 권한 발급과 원본 공식 Reading의 지속적 동일성은 후속 통합 계약에서 함께 검증한다.
