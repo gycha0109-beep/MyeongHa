@@ -19,6 +19,18 @@ Watchtower-Track: character-memory
 
 **현재 Production Chat에는 연결하지 않습니다.** 기존 `SEYEON_PRODUCTION_PERSONAL_RECORD_PROJECTORS_V1=[]`와 positive precommit HOLD, `routeMounted:false`, 운영 DB의 zero-only 선행 Pin은 그대로입니다. 코드상의 Pin/Commit/Reveal 인터페이스는 **DB 인증·최소권한·원자성 증거가 아닙니다**. 클라이언트가 원본 Pin 또는 Grant ID를 직접 제출하는 공개 인터페이스도 없습니다.
 
+## G3-A — 실제 HTTP 전송 경계의 Fail-Closed 연결 (운영 권한 미완료)
+
+`apps/api/src/chat-turn-send-http.ts`의 `handleSeyeonChatTurnSendRequestV1`에
+**필수** `controlledDisclosurePort` 인자를 추가합니다.
+
+- Member 인증 및 엄격한 요청 본문 검사 뒤 **공개권한 Port의 존재부터 검증**하므로 Port가 없는 환경에서는 모델/기존 대화 조회 실행이 시작되지 않습니다.
+- `executed`와 `committed_replay` **둘 다 동일한 Reveal Port**를 거칩니다. Port 입력은 서버 검증 Member Evidence, Runtime이 확인한 Subject, 원본 Thread, Turn, Attempt, Assistant Message ID뿐이며, 모델 원문과 저장 원문은 전달하지 않습니다.
+- 응답의 `assistantText`는 Runtime 모델/Replay 응답이 아니라 **해당 Port가 승인 후 반환한 본문만** 사용합니다. Port 거부·장애·누락·스코프 불일치는 동일한 본문 없는 `503 CHAT_DISCLOSURE_UNAVAILABLE`로 종료합니다. 자동 재시도 허가는 거부합니다.
+- 서버 응답 Thread의 일치 및 단일 세연 참가자 여부를 검사합니다. 브라우저 요청에 Grant/Owner/Disclosure 권한을 추가할 수 없습니다.
+- **중요:** 현재 통합 가능한 실제 DB Owner Reveal Port 구현은 존재하지 않습니다. 위 조건은 HTTP 전송 지점의 강제 의존성이지 DB 사용 권한 승인이 아닙니다. 이 코드만으로 세연 Chat 공개 Route를 마운트하면 안 됩니다. G0 선형화/과거 Context 및 G1/G2/G3 실 DB 권한 계약이 필요합니다.
+- 합성 HTTP 테스트는 서버가 허용한 본문과 Runtime에 남은 위험 텍스트를 분리해, 성공·거부·예외·Replay·다른 Thread·Port 누락을 검증합니다. 이는 실제 DB 권한 검증의 대체물이 아닙니다.
+
 ## 실제 연결 전 필수 미완료 사항
 
 1. **G0:** Security/DB/Character 소유자가 기록 종류·출처 스키마·과거 대화/관계 이벤트에서 파생된 개인정보 권한 상속·취소 효력·Reveal 선형화 시점을 확정. 사용자 승인으로 기본 개발 방향은 결정됐지만 이 세부 계약을 임의 확정하지 않음.
