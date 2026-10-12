@@ -223,6 +223,26 @@ grep -q 'One server-owned additional Reader' "$tmpdir/initial-or-missing.out" ||
   fail "unresolved scope failed for unexpected reason"
 pass "unresolved purchase cannot enter additional Reader bind scope"
 
+# The candidate verified Receipt issuance must lock scope on its own, BEFORE
+# the original 1090 Grant row locks. No test-supplied scope lock in the writer.
+receipt_fn="$(p -c "select count(*) from pg_catalog.pg_proc f
+  join pg_catalog.pg_namespace n on n.oid=f.pronamespace
+  where n.nspname='public'
+    and f.proname='internal_apply_additional_official_reader_receipt_locked_v1'
+    and f.prosecdef=false and f.provolatile='v';")"
+[[ "$receipt_fn" == "1" ]] ||
+  fail "locked additional Reader receipt issuance wrapper is missing"
+for sig in \
+ 'public.internal_apply_additional_official_reader_receipt_locked_v1(uuid,text[],timestamptz[],timestamptz[],timestamptz[],text[])' \
+ 'public.internal_qry_official_reader_additional_scope_candidate_v1(uuid,uuid)'; do
+  direct="$(p -c "select count(*) from pg_catalog.pg_roles r
+    where r.rolname in ('anon','authenticated','service_role',
+      'myeongha_api_executor','myeongha_seyeon_chat_runtime_owner')
+      and pg_catalog.has_function_privilege(r.rolname, '$sig', 'EXECUTE');")"
+  [[ "$direct" == "0" ]] || fail "unapproved runtime can execute: $sig"
+done
+pass "locked issuance candidate and scope resolver are private"
+
 # Case 1: T2-like exact scope reading arrives BEFORE an independently minted
 # purchase Grant / Reader bind. The proposed Commerce writer MUST wait.
 # The holder sees only the original B2 bundle, then releases the scope.
@@ -267,10 +287,7 @@ set application_name='rr_s2_new_grant_writer';
 set statement_timeout='20s';
 begin;
 select pg_catalog.set_config('myeongha.subject_id', '$subject', true);
-select public.internal_acquire_official_reader_scope_lock_v1(
-  '$subject'::uuid, '$reading'::uuid, '$reader'
-);
-select * from public.internal_apply_verified_receipt_capability_effects_v1(
+select * from public.internal_apply_additional_official_reader_receipt_locked_v1(
   '$b4_receipt'::uuid,
   array['test-reader-unit'], array[transaction_timestamp()],
   array[transaction_timestamp()], array[null]::timestamptz[],
