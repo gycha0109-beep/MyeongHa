@@ -11,16 +11,16 @@ set -euo pipefail
 version_num="$(psql -X -qAt -v ON_ERROR_STOP=1 -c 'show server_version_num')"
 (( version_num >= 170000 && version_num < 180000 ))
 
-# The disposable PostgreSQL 17 cluster also has an isolated 'postgres'
-# database. Simulate the Supabase image's unsafe function-creation defaults:
+# Simulate the Supabase image's unsafe function-creation defaults ONLY in
+# this disposable per-case PostgreSQL 17 database (never another DB):
 # global PUBLIC plus public-schema grants to anon/authenticated. Then execute
 # the exact guarded creator ACL adapter used before schema replay. Never
-# touch the CI test case's existing application default privileges.
-seeded_defaults="$(PGDATABASE=postgres psql -X -qAt --set ON_ERROR_STOP=1 <<'SQL'
+# touch any other database or role-scoped ACL outside this case.
+seeded_defaults="$(psql -X -qAt --set ON_ERROR_STOP=1 <<'SQL'
 ALTER DEFAULT PRIVILEGES GRANT EXECUTE ON FUNCTIONS TO PUBLIC;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT EXECUTE ON FUNCTIONS TO anon, authenticated;
 CREATE FUNCTION public.seyeon_restore_default_acl_probe() RETURNS integer
-  LANGUAGE sql AS $ SELECT 1 $;
+  LANGUAGE sql AS 'SELECT 1';
 SELECT has_function_privilege(
   'anon', 'public.seyeon_restore_default_acl_probe()'::regprocedure, 'EXECUTE');
 DROP FUNCTION public.seyeon_restore_default_acl_probe();
@@ -31,13 +31,13 @@ SQL
   exit 1
 }
 
-creator_acl_proof="$(PGDATABASE=postgres psql -X -qAt --set ON_ERROR_STOP=1 \
+creator_acl_proof="$(psql -X -qAt --set ON_ERROR_STOP=1 \
   -f scripts/operations/prepare-postgres-isolated-restore-function-defaults.sql)"
 [[ "$creator_acl_proof" == 'PASS_SEYEON_ISOLATED_CREATOR_FUNCTION_DEFAULT_ACL' ]]
 
-restricted_default_probe="$(PGDATABASE=postgres psql -X -qAt --set ON_ERROR_STOP=1 <<'SQL'
+restricted_default_probe="$(psql -X -qAt --set ON_ERROR_STOP=1 <<'SQL'
 CREATE FUNCTION public.seyeon_restore_default_acl_probe() RETURNS integer
-  LANGUAGE sql AS $ SELECT 1 $;
+  LANGUAGE sql AS 'SELECT 1';
 SELECT NOT has_function_privilege(
   'anon', 'public.seyeon_restore_default_acl_probe()'::regprocedure, 'EXECUTE')
   AND NOT has_function_privilege(
