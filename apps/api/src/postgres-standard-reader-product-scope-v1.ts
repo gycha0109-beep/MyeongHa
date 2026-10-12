@@ -48,7 +48,8 @@ function requireScope(
       typeof row.sajuDomain !== 'string' || !domains.has(row.sajuDomain) ||
       typeof row.effectiveAt !== 'string' ||
       !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(row.effectiveAt) ||
-      !Number.isFinite(Date.parse(row.effectiveAt))) {
+      !Number.isFinite(Date.parse(row.effectiveAt)) ||
+      new Date(row.effectiveAt).toISOString() !== row.effectiveAt) {
     throw new Error('Standard Reader Product PostgreSQL scope is inconsistent.');
   }
   return Object.freeze({
