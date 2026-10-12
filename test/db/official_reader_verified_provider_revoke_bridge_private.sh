@@ -167,7 +167,7 @@ SQL
   then
     fail "stale-snapshot Provider Reader revoke was accepted: $isolation"
   fi
-  grep -q 'Official Reader provider revocation requires READ COMMITTED' \
+  grep -q 'Verified Provider Reader revocation requires READ COMMITTED' \
     "$tmpdir/isolation.out" ||
     fail "incorrect stale-snapshot Provider failure: $isolation"
 done
