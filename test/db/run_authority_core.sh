@@ -158,6 +158,8 @@ run_isolated_case myeongha_reader_scope_lock_s2_instrumented_race_test bash test
 run_isolated_case myeongha_reader_provider_revoke_scope_lock_private_test bash test/db/official_reader_provider_revoke_scope_lock_private.sh
 # S2 bridge: verified Provider cancellation resolves Subject from DB lineage; no runtime execution grant.
 run_isolated_case myeongha_reader_verified_provider_revoke_bridge_private_test bash test/db/official_reader_verified_provider_revoke_bridge_private.sh
+# S2: initial Reading has no UUID; lock the server-derived Subject×Product before Grant/Reading creation.
+run_isolated_case myeongha_reader_initial_product_scope_lock_private_test bash test/db/official_reader_initial_product_scope_lock_private.sh
 bash test/db/entitlements_current_query.sh
 bash test/db/data_deletion_job_query.sh
 bash test/db/notification_preferences_query.sh
