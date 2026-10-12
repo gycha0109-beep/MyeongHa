@@ -152,3 +152,15 @@ S1에서 공통 잠금 함수 자체가 성공하더라도 **S2 전체 경로가
 - PostgreSQL 2연결 실제 시험에서 새 구매권 발급+Reader 결속 호출자의 **수동 잠금 선행 코드를 제거**했다. 대신 위 두 명령이 스스로 같은 범위를 잠그는지, T2 유사 조회가 먼저면 발급이 대기하는지 확인한다.
 - 이 두 후보는 아직 외부 실행권한이 없고 기존 운영 호출 경로로 배선되지 않았다. 초기 공식 Reading의 사주 식별자 확정 문제 및 Provider 회수·환불 Writer 경로는 여전히 별도 경계다.
 - 공통 잠금 범위가 미확정인 신규 구매나 과거 결속 재생은 유료 접근 증명으로 전환할 수 없으며, 실제 제품에 유료 공개를 켜지 않는다.
+
+## 13. 기존 결제사 이벤트의 구매권 회수에 공통 잠금 적용 후보 (S2 추가, 2026-10-12)
+
+- 신규 `1770_official_reader_provider_revoke_scope_lock_private_v1.sql`: `internal_apply_official_reader_provider_revoke_locked_v1`는 **이미 사주와 Reader에 결속된 독립 구매권**의 취소(`revoked`)·만료(`expired`)에만 동작하는 비공개 후보 함수다.
+- 외부 입력으로 사주/Reader를 선택하지 않는다. 결제사 이벤트 → 실제 영수증 → 독립 `entitlement_grants` 원본을 검증하고, 해당 구매권이 연결된 **모든** `standard_reading_reader_access_grants`에서 사주·Reader 범위를 도출한다.
+- 사주 ID/Reader ID를 정렬해 S1 공통 잠금을 전부 **기존 결제사 이벤트/Grant 행 잠금 전에** 확보한다. 잠금 대기 후 범위·영수증 계보를 다시 읽는다. 범위 유실·추가·원본 계보 변경은 거절한다.
+- 기존 `internal_apply_entitlement_effect_v1`의 검증된 결제사 순서, 영수증 원본, 구매권 수정 이력, 권한 재계산·알림 내보내기·중복 처리 의미를 그대로 재사용한다. 이 함수는 구매권 상태를 직접 수정하지 않는다.
+- `READ COMMITTED`가 아니거나, 영수증/구매권 출처를 확인할 수 없거나, 연결된 공식 사주가 없거나, 취소·만료 외 이벤트라면 차단한다. 서비스·브라우저 실행 권한 없음.
+- 실제 PostgreSQL 양방향 경합: **권한 회수 먼저 → 유료 조회 대기 및 차단**, **권한 확인 먼저 → 회수 대기 및 거래 완료 후 차단**. 원래의 별도 Provider-event 경합 시험은 보존한다.
+- 새 파일과 독립 실 DB 시험: `test/db/official_reader_provider_revoke_scope_lock_private.sh`. `test/db/run_authority_core.sh`의 격리 시험으로 등록한다.
+
+**개발·운영 차단:** 실제 PortOne/기타 결제사 콜백 호출자가 이 함수를 사용하지 않는다. 기존 `internal_apply_entitlement_effect_v1`의 직접 호출과 등록된 운영 Writer는 여전히 잠금 우회가 가능하다. 최초 Reading 발급, 미결속 구매권, 한 효과가 미확인 범위까지 영향을 주는 경우는 지원하지 않는다. 따라서 S2 전체 잠금 통일 및 유료 T2 공개 권한은 **미완료**. RR-03/04 사주 출처 원자 저장·보호 원문·후속 조회도 계속 차단한다.
