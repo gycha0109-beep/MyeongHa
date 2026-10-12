@@ -222,3 +222,13 @@ S1에서 공통 잠금 함수 자체가 성공하더라도 **S2 전체 경로가
 **다음 순서:** D0 설계 승인(Owner 결정 Q1~Q3 및 락 역전 감사) → D1 전역 잠금 범위 resolver → D2 초기/추가 구매권 발급·결속 공동 진입점 → D3 provider 취소·미결속 revoke/restore → D4 Saju 증거 → D5 보호 유료 본문/원자 T2 → D6 RR-04 및 제공 E2E.
 
 **이번 변경은 docs-only 설계 작업**이다. SQL·TypeScript·DB 권한·운영 경로·CI 코드 변경 없음. 비공개 후보들의 기존 검사 성공은 유지하되 운영 결제/유료 사주 채팅 공개·마이그레이션 적용은 계속 HOLD.
+
+## 17. D1 전역 잠금 진입점 / 기존 Writer Lock Order 감사 (2026-10-12)
+
+- 신규 감사: [OFFICIAL_READER_D1_WRITER_LOCK_ORDER_AUDIT_20261012_V1.md](./OFFICIAL_READER_D1_WRITER_LOCK_ORDER_AUDIT_20261012_V1.md).
+- **이번 코드:** `1800_official_reader_unified_scope_entry_private_v1.sql`. 기존 공식 Reading/Reader는 source-owned Product를 도출하여 **L0 Product→L1 Reading/Reader** 잠금 후 재확인. verified 최초 구매는 L0만, verified 추가 Reader 구매는 L0→L1을 획득하는 비공개 진입점을 분리한다.
+- **시험:** `official_reader_unified_scope_entry_private.sh`는 기존 합성 구매·Reading fixture를 사용하고, 동일 Product의 다른 Reader에 대해 실제 PostgreSQL advisory lock 대기, 다른 Product 독립, 두 잠금 보유, 잘못된 Subject/Reading/Isolation/Role을 부정한다. `run_authority_core.sh` 격리 CI에 등록했다.
+- **Writer 감사 결과:** 기존 `1090/1080/1220/0220`는 권한·Chat 행을 잠그지만 L0→L1을 강제하지 않는다. 기존 `1760/1770/1750`는 L1만, `1790`은 초기 경로의 L0만 취득한다. `1780` 실제 결제사 운영 호출자 권한은 열지 않았다.
+- **엄격한 현황:** 공통 진입점 **함수 구현 및 좁은 경합 증명**이지 기존 운영 Writer Cutover, 다중 Product 전체 정렬, 현재 유료 T2 보증은 아니다. 기존 Reader/Commerce 경로의 L1 선행을 전역적으로 제거하기 전까지 충돌과 경쟁 안전성 완료라고 선언하지 않는다.
+- **다음:** 다중 Product/Reader lockset 정렬과 전역 경합 검증(D1 확장) → 최초/추가 Receipt·Binder의 공통 진입점 연결(D2) → Provider cancel/revoke/restore 및 미결속 Grant(D3) → Saju-owned 출처(D4) → 유료 본문·원자 T2(D5) → 후속 조회(D6).
+- **차단 유지:** 공개 유료 채팅·실제 환불·운영 DB migration·결제 개시 OFF; RR-03/04 충돌, 개인정보/법무/Commerce 승인과 #1941 복구 증거 미완료.
