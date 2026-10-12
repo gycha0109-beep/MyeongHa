@@ -41,6 +41,34 @@ select
   pg_catalog.has_function_privilege(session_user,
     'public.cmd_settle_seyeon_ai_call_detached_v1(uuid,uuid,uuid,text,jsonb)',
     'EXECUTE') as "canDirectSettle",
+  pg_catalog.has_function_privilege(
+    'myeongha_seyeon_settlement_worker',
+    'public.cmd_claim_seyeon_provider_receipt_v1()',
+    'EXECUTE') as "workerCanClaim",
+  pg_catalog.has_function_privilege(
+    'myeongha_seyeon_settlement_worker',
+    'public.cmd_ack_seyeon_provider_receipt_v1(uuid,uuid)',
+    'EXECUTE') as "workerCanAck",
+  pg_catalog.has_function_privilege(
+    'myeongha_seyeon_settlement_worker',
+    'public.cmd_store_seyeon_provider_receipt_v1(uuid,uuid,uuid,text,jsonb)',
+    'EXECUTE') as "workerCanStore",
+  pg_catalog.has_function_privilege(session_user,
+    'public.cmd_claim_seyeon_provider_receipt_v1()',
+    'EXECUTE') as "canDirectClaim",
+  pg_catalog.has_function_privilege(session_user,
+    'public.cmd_ack_seyeon_provider_receipt_v1(uuid,uuid)',
+    'EXECUTE') as "canDirectAck",
+  pg_catalog.has_function_privilege(session_user,
+    'public.cmd_store_seyeon_provider_receipt_v1(uuid,uuid,uuid,text,jsonb)',
+    'EXECUTE') as "canDirectStore",
+  pg_catalog.has_table_privilege(session_user,
+    'public.seyeon_ai_provider_receipt_queue_v1', 'SELECT,INSERT,UPDATE,DELETE')
+    as "canDirectReceiptQueue",
+  pg_catalog.has_table_privilege(
+    'myeongha_seyeon_settlement_worker',
+    'public.seyeon_ai_provider_receipt_queue_v1', 'SELECT,INSERT,UPDATE,DELETE')
+    as "workerCanDirectReceiptQueue",
   pg_catalog.has_function_privilege(session_user,
     'public.cmd_governed_start_seyeon_ai_call_v1(uuid,uuid,uuid,text,uuid,text,text,text,text,text,bigint,bigint,bigint)',
     'EXECUTE') as "canStart",
@@ -122,6 +150,12 @@ export function verifySeyeonDetachedWorkerLoginV1(
       row.isApiMember !== false || row.isGovernedMember !== false ||
       row.isCostOwnerMember !== false ||
       row.workerCanSettle !== true || row.canDirectSettle !== false ||
+      row.workerCanClaim !== true || row.workerCanAck !== true ||
+      row.workerCanStore !== false ||
+      row.canDirectClaim !== false || row.canDirectAck !== false ||
+      row.canDirectStore !== false ||
+      row.canDirectReceiptQueue !== false ||
+      row.workerCanDirectReceiptQueue !== false ||
       row.canStart !== false ||
       row.canReadLedger !== false || row.canReadBudget !== false) {
     fail();
