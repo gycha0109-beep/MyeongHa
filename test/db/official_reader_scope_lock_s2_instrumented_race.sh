@@ -236,10 +236,7 @@ after_new_scope="$(read_locked_scope_state)"
 pass "same scoped new receipt Grant/Bind waits for T2; fresh access becomes ambiguous afterwards"
 
 # Revoke B4 under the same proposed lock (only a disposable synthetic row).
-p >"$tmpdir/revoke-b4.out" 2>&1 <<SQL || {
-  cat "$tmpdir/revoke-b4.out" >&2
-  fail "guarded B4 cleanup failed"
-}
+if ! p >"$tmpdir/revoke-b4.out" 2>&1 <<SQL
 begin;
 select pg_catalog.set_config('myeongha.subject_id', '$subject', true);
 select public.internal_acquire_official_reader_scope_lock_v1(
@@ -251,6 +248,10 @@ set status='revoked', revision=revision+1,
 where source_receipt_id='$b4_receipt'::uuid;
 commit;
 SQL
+then
+  cat "$tmpdir/revoke-b4.out" >&2
+  fail "guarded B4 cleanup failed"
+fi
 
 active_only_b2="$(p -c "select count(distinct a.reader_content_bundle_id)
   from public.standard_reading_reader_access_grants a
