@@ -38,17 +38,17 @@ function approvedStandard(source: ProductReaderEligibilitySourceV1 = SOURCE):
 }
 
 function approvedPremium(
-  ids: readonly (typeof OFFICIAL_READER_RUNTIME_IDS_V1)[number][],
+  targetReaderId: (typeof OFFICIAL_READER_RUNTIME_IDS_V1)[number],
   source: ProductReaderEligibilitySourceV1 = SOURCE,
 ): ProductReaderRuleLookupV1 {
   return {
     status: 'approved',
     rule: {
-      kind: 'premium_restricted',
+      kind: 'premium_character_bound',
       ...source,
       ruleVersion: 'synthetic-premium-policy-v1',
       approvedPolicyRevision: 'synthetic-review-only-v1',
-      allowedReaderIds: ids,
+      targetReaderId,
     },
   };
 }
@@ -122,30 +122,44 @@ describe('A1 Product × Reader eligibility (no grants, checkout or public activa
     })).toEqual({ status: 'withheld', reason: 'unclassified' });
   });
 
-  it('grants product eligibility only for explicit synthetic premium Reader IDs', () => {
-    expect(assessProductReaderEligibilityV1({
-      source: SOURCE, serverReaderId: 'seyeon',
-      lookup: approvedPremium(['seyeon', 'taegyeom']),
-    }).status).toBe('eligible');
-    expect(assessProductReaderEligibilityV1({
-      source: SOURCE, serverReaderId: 'baekheon',
-      lookup: approvedPremium(['seyeon', 'taegyeom']),
-    })).toEqual({ status: 'withheld', reason: 'reader_excluded' });
+  it('connects each Premium Product to exactly one canonical Reader', () => {
+    for (const target of OFFICIAL_READER_RUNTIME_IDS_V1) {
+      expect(assessProductReaderEligibilityV1({
+        source: SOURCE, serverReaderId: target, lookup: approvedPremium(target),
+      }).status).toBe('eligible');
+      for (const other of OFFICIAL_READER_RUNTIME_IDS_V1.filter((id) => id !== target)) {
+        expect(assessProductReaderEligibilityV1({
+          source: SOURCE, serverReaderId: other, lookup: approvedPremium(target),
+        })).toEqual({ status: 'withheld', reason: 'reader_excluded' });
+      }
+    }
   });
 
   it.each([
-    { allowedReaderIds: [] },
-    { allowedReaderIds: ['seyeon', 'seyeon'] },
-    { allowedReaderIds: ['unknown'] },
-    { allowedReaderIds: ['seyeon', 'unknown'] },
-  ])('denies malformed premium allowlists $allowedReaderIds', ({ allowedReaderIds }) => {
+    { targetReaderId: '' },
+    { targetReaderId: ' SEYEON' },
+    { targetReaderId: 'unknown' },
+    { targetReaderId: ['seyeon'] },
+    { targetReaderId: null },
+  ])('rejects malformed Premium targetReaderId $targetReaderId', ({ targetReaderId }) => {
     const rule = {
-      ...((approvedPremium(['seyeon']) as Extract<ProductReaderRuleLookupV1, { status: 'approved' }>).rule),
-      allowedReaderIds,
+      ...((approvedPremium('seyeon') as Extract<ProductReaderRuleLookupV1, { status: 'approved' }>).rule),
+      targetReaderId,
     };
     expect(assessProductReaderEligibilityV1({
       source: SOURCE, serverReaderId: 'seyeon',
       lookup: { status: 'approved', rule },
+    })).toEqual({ status: 'withheld', reason: 'invalid_policy' });
+  });
+
+  it('rejects the old allowlist format even for a single Premium Reader', () => {
+    const legacy = {
+      ...((approvedPremium('seyeon') as Extract<ProductReaderRuleLookupV1, { status: 'approved' }>).rule),
+      kind: 'premium_restricted',
+      allowedReaderIds: ['seyeon'],
+    };
+    expect(assessProductReaderEligibilityV1({
+      source: SOURCE, serverReaderId: 'seyeon', lookup: { status: 'approved', rule: legacy },
     })).toEqual({ status: 'withheld', reason: 'invalid_policy' });
   });
 
@@ -159,7 +173,7 @@ describe('A1 Product × Reader eligibility (no grants, checkout or public activa
       { ...approved, rule: { ...approved.rule, approvedPolicyRevision: '' } },
       { ...approved, rule: { ...approved.rule, ruleVersion: '  ' } },
       { ...approved, rule: { ...approved.rule, allowedReaderIds: ['seyeon'] } },
-      { ...approved, rule: { ...approved.rule, kind: 'premium_restricted' } },
+      { ...approved, rule: { ...approved.rule, kind: 'premium_character_bound' } },
       { ...approved, rule: { ...approved.rule, kind: 'standard_all_readers', approval: false } },
       { status: 'approved', rule: { ...approved.rule, sajuDomain: 'not-a-domain' } },
       { status: 'approved', rule: { ...approved.rule, productId: ' ' } },
