@@ -143,3 +143,12 @@ S1에서 공통 잠금 함수 자체가 성공하더라도 **S2 전체 경로가
 - 독립 PostgreSQL 경합 시험 `official_reader_scope_lock_s2_instrumented_race.sh`의 실제 **새 구매권+추가 Reader 결속** 호출을 이 비공개 명령으로 변경하여, 테스트에서만 선행 잠금하는 수준보다 한 단계 더 나아간 실제 호출 후보를 검증한다.
 
 **잔여 차단:** 영수증을 통한 신규 구매권 발급 자체와 환불·회수 Provider 이벤트의 원본 함수를 아직 바꾸지 않았다. 이 명령은 기존 Reader 결속 경로에 자동 적용된 것이 아니며, 외부 실행권한이 없다. 기존 결속 명령이 별도로 호출될 수 있는 한 전체 직렬화는 미완료다. 실제 Commerce 경로 및 최초 공식 Reading 처리 계약을 합의하기 전에는 공개·운영 적용이 불가능하다.
+
+## 12. 추가 Reader 영수증 발급과 결속을 모두 실제 명령 안에서 선행 잠금 (S2 확대)
+
+- 새 비공개 범위 결정기 `internal_qry_official_reader_additional_scope_candidate_v1(subject_id,purchase_intent_id)`: 확인된 추가 Reader Purchase Intent, 공식 Reading 정본, Product Spec, 현재 Birth revision으로 정확히 하나의 범위를 유도한다. 이 조회만으로는 잠금·구매권을 부여하지 않는다.
+- 새 비공개 발급 명령 `internal_apply_additional_official_reader_receipt_locked_v1`: 신뢰된 Receipt→Purchase 계보에서 범위를 도출, **Receipt·Grant 행을 잠그기 전에 공통 잠금을 선행 취득**하고 기존 `internal_apply_verified_receipt_capability_effects_v1`를 그대로 호출한다. 잠금 전후 범위가 바뀌면 전체 호출 취소.
+- 새 비공개 결속 명령 `internal_cmd_bind_official_reader_additional_locked_v1`: 같은 결정기를 사용해 잠금을 먼저 확보한 후 기존 `cmd_bind_standard_reading_access_v2`의 검증 및 기록을 재사용한다.
+- PostgreSQL 2연결 실제 시험에서 새 구매권 발급+Reader 결속 호출자의 **수동 잠금 선행 코드를 제거**했다. 대신 위 두 명령이 스스로 같은 범위를 잠그는지, T2 유사 조회가 먼저면 발급이 대기하는지 확인한다.
+- 이 두 후보는 아직 외부 실행권한이 없고 기존 운영 호출 경로로 배선되지 않았다. 초기 공식 Reading의 사주 식별자 확정 문제 및 Provider 회수·환불 Writer 경로는 여전히 별도 경계다.
+- 공통 잠금 범위가 미확정인 신규 구매나 과거 결속 재생은 유료 접근 증명으로 전환할 수 없으며, 실제 제품에 유료 공개를 켜지 않는다.
