@@ -62,6 +62,24 @@ function assertLocalEngine() {
     throw new Error('Docker context is not a local Unix socket or Windows named pipe.');
   }
   docker(['compose', 'version'], { capture: true, timeout: 15_000 });
+  // Context inspection and Compose version work even with a stopped daemon.
+  // Validate the actual Engine BEFORE entering the Compose/cleanup lifecycle.
+  let engineType;
+  try {
+    engineType = docker(['info', '--format', '{{.OSType}}'],
+      { capture: true, timeout: 15_000 });
+  } catch {
+    throw new Error(
+      'Docker Engine is unreachable. Start Docker Desktop in Linux containers mode '
+      + 'and check "docker info". No test resources were created; cleanup is not required.',
+    );
+  }
+  if (engineType !== 'linux') {
+    throw new Error(
+      'A local Linux Docker Engine is required. Switch Docker Desktop to Linux containers mode. '
+      + 'No test resources were created.',
+    );
+  }
 }
 
 const base = ['compose', '--project-name', project, '-f', compose];
