@@ -6,6 +6,7 @@ import type {
 import type { IdentityEvidenceVerificationPortV1 } from './current-subject-profile-http.js';
 import {
   handleSeyeonChatTurnSendRequestV1,
+  type SeyeonChatTurnControlledDisclosurePortV1,
 } from './chat-turn-send-http.js';
 import type {
   OpenAiSeyeonStructuredProviderConfigV1,
@@ -172,6 +173,11 @@ export interface CreateProductionSeyeonTurnSendRuntimeInputV1 {
   readonly pool?: PostgresSubjectPoolV1;
   readonly memberFetchImpl?: SupabaseMemberVerifierFetchV1;
   readonly identityEvidenceVerifier?: IdentityEvidenceVerificationPortV1;
+  /**
+   * Server-owned ONLY. No production DB owner adapter is installed yet;
+   * missing authority must prevent provider dispatch and HTTP disclosure.
+   */
+  readonly controlledDisclosurePort?: SeyeonChatTurnControlledDisclosurePortV1;
   readonly createUuid?: () => string;
   /** Test seam for request-context OIDC only. */
   readonly oidcTokenProvider?: ProductionSeyeonOidcTokenProviderV1;
@@ -207,6 +213,9 @@ export function createProductionSeyeonTurnSendRuntimeV1(
         requestId: requestInput.requestId,
         serverTime: requestInput.serverTime,
         identityEvidenceVerifier,
+        ...(input.controlledDisclosurePort === undefined
+          ? {}
+          : { controlledDisclosurePort: input.controlledDisclosurePort }),
         runtime: Object.freeze({
           run: async (runInput) => {
             const providerConfig =
