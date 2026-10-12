@@ -76,6 +76,8 @@ declare
   v_scope_reading uuid;
   v_scope_reader text;
   v_approved_count integer;
+  v_policy_product_id uuid;
+  v_policy_revision text;
   v_catalog_count integer;
   v_live_grant_count integer;
 
@@ -114,6 +116,21 @@ begin
   perform public.internal_acquire_official_reader_scope_lock_v1(
     p_subject_id, v_scope_reading, v_scope_reader
   );
+
+  -- DB derives the Product from Purchase Intent/Offer, never caller input.
+  -- Take Product-wide policy lock BEFORE original Purchase/Grant/Birth rows.
+  -- Every approval and withdrawal INSERT uses the same advisory lock via
+  -- BEFORE INSERT triggers from migration 1810.
+  select po.product_id into strict v_policy_product_id
+  from public.purchase_intents pi
+  join public.product_offers po on po.id = pi.product_offer_id
+  where pi.id = p_purchase_intent_id
+    and pi.subject_id = p_subject_id
+    and pi.status = 'verified';
+  perform public.internal_acquire_standard_reader_product_policy_lock_v1(
+    v_policy_product_id
+  );
+
   -- Starts AFTER any wait for a previous issue/revoke/bind/T2 Writer.
   v_now := pg_catalog.clock_timestamp();
 
@@ -275,7 +292,8 @@ begin
      or v_reader_selection_mode is distinct from 'required'
      or v_policy_version is null
      or v_purchase_role is distinct from 'additional_reader_interpretation'
-     or v_reader_character_id is distinct from v_scope_reader then
+     or v_reader_character_id is distinct from v_scope_reader
+     or v_product_id is distinct from v_policy_product_id then
     raise exception using
       errcode = 'P0001',
       constraint = 'cmd_standard_reading_access_v2_reader_provenance_unavailable',
@@ -469,13 +487,14 @@ begin
 
   -- Product-owned exact Standard policy, not specialist can_initiate.
   -- A Premium character association is intentionally NOT Standard authority.
-  select count(*)::integer into v_approved_count
+  select count(*)::integer, (array_agg(rule.approved_policy_revision))[1]
+    into v_approved_count, v_policy_revision
   from public.qry_standard_reader_approved_rule_v1(
     v_product_id, v_spec_version, v_saju_domain, pg_catalog.clock_timestamp()
   ) rule
   where rule.policy_kind = 'standard_all_readers'
     and rule.target_reader_id is null;
-  if v_approved_count <> 1 then
+  if v_approved_count <> 1 or v_policy_revision is null then
     raise exception using errcode = 'P0001',
       constraint = 'standard_b2_approved_standard_policy_required',
       message = 'One current approved Standard Reader Product rule is required';
@@ -690,6 +709,22 @@ begin
     raise exception using errcode = '40001',
       constraint = 'standard_b2_official_reader_scope_drift',
       message = 'Official Reading/Reader scope changed while binding';
+  end if;
+
+  -- Recheck the SAME Product rule revision with current DB wall clock.
+  -- The Product lock keeps approval and withdrawal INSERTs serialized.
+  -- Future expiration and independently retired Product are also fail-closed.
+  select count(*)::integer into v_approved_count
+  from public.qry_standard_reader_approved_rule_v1(
+    v_product_id, v_spec_version, v_saju_domain, pg_catalog.clock_timestamp()
+  ) rule
+  where rule.policy_kind = 'standard_all_readers'
+    and rule.target_reader_id is null
+    and rule.approved_policy_revision = v_policy_revision;
+  if v_approved_count <> 1 then
+    raise exception using errcode='P0001',
+      constraint='standard_b2_policy_revision_changed_before_commit',
+      message='Current approved Standard policy revision changed before binding';
   end if;
 
   -- Fresh post-validation check immediately before any returned successful
