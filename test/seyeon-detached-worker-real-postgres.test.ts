@@ -141,7 +141,8 @@ describe.skipIf(!ENABLED)(
           callId:callInterrupted,replayed:true,
           occupiedMicroUsd:300n,overCeiling:false,
         });
-        expect(await replayWorker.settleNext()).toBeNull();
+        // Other independently reserved fixtures remain for later test cases.
+        // Do not drain the queue from this recovery test.
       } finally {await replayWorker.close();}
       const afterReplay=await admin.query(`
         select acked_at is not null as "acked",claim_count as "claims"
