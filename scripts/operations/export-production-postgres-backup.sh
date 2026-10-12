@@ -74,6 +74,36 @@ member_auth_rate_limit_preflight="$(psql -At --set ON_ERROR_STOP=1 -F '|' -c "
 ")"
 [[ "$member_auth_rate_limit_preflight" == 'u|myeongha_member_auth_rate_limit_owner|myeongha_member_auth_rate_limit_owner|t|f' ]]
 
+# Supabase-managed migration history is intentionally excluded from the portable
+# pg_dump. Capture ONLY the six reviewed version/name pairs, as a bounded
+# source snapshot inside the encrypted backup, never the historical SQL body.
+# Source queries are read-only and run with the protected strict TLS connection.
+capture_seyeon_early_history() {
+  PGOPTIONS='-c default_transaction_read_only=on' psql -X -At --set ON_ERROR_STOP=1 -c "
+    select coalesce(jsonb_agg(
+      jsonb_build_object('version',version,'name',name) order by version
+    ), '[]'::jsonb)::text
+    from supabase_migrations.schema_migrations
+    where version in ('1400','1410','1420','1430','1440','1450');
+  "
+}
+seyeon_early_history_before="$(capture_seyeon_early_history)"
+jq -e '
+  . == [
+    {"version":"1400","name":"relationship_apply_context_v1"},
+    {"version":"1410","name":"relationship_event_apply_command_v1"},
+    {"version":"1420","name":"relationship_reliability_context_v1"},
+    {"version":"1430","name":"relationship_adjustment_commands_v1"},
+    {"version":"1440","name":"relationship_projection_rebuild_v1"},
+    {"version":"1450","name":"relationship_snapshot_runtime_v1"}
+  ]
+' <<<"$seyeon_early_history_before" >/dev/null || {
+  echo 'HOLD_SEYEON_BACKUP: scoped 1400..1450 migration history incomplete.' >&2
+  exit 1
+}
+seyeon_early_history_canonical="$(jq -c . <<<"$seyeon_early_history_before")"
+seyeon_early_history_sha256="$(printf '%s' "$seyeon_early_history_canonical" | sha256sum | awk '{print $1}')"
+
 bash scripts/operations/run-production-postgres-strict-dump.sh roles "$backup_dir/roles.sql"
 bash scripts/operations/run-production-postgres-strict-dump.sh schema "$backup_dir/schema.sql"
 bash scripts/operations/run-production-postgres-strict-dump.sh data "$backup_dir/data.sql"
@@ -81,6 +111,12 @@ bash scripts/operations/run-production-postgres-strict-dump.sh data "$backup_dir
 test -s "$backup_dir/roles.sql"
 test -s "$backup_dir/schema.sql"
 test -s "$backup_dir/data.sql"
+
+seyeon_early_history_after="$(capture_seyeon_early_history)"
+if [[ "$(jq -c . <<<"$seyeon_early_history_after")" != "$seyeon_early_history_canonical" ]]; then
+  echo 'HOLD_SEYEON_BACKUP: relationship history changed during governed dump.' >&2
+  exit 1
+fi
 
 grep -Fq 'member_auth_rate_limit_buckets' "$backup_dir/schema.sql"
 if grep -Eq 'COPY[[:space:]]+public[.]member_auth_rate_limit_buckets|INSERT[[:space:]]+INTO[[:space:]]+public[.]member_auth_rate_limit_buckets' "$backup_dir/data.sql"; then
@@ -101,6 +137,8 @@ jq -n \
   --arg cli_version "$SUPABASE_CLI_VERSION" \
   --arg started_at "$started_at" \
   --arg completed_at "$completed_at" \
+  --arg seyeon_early_history_sha256 "$seyeon_early_history_sha256" \
+  --argjson seyeon_early_history "$seyeon_early_history_canonical" \
   --argjson migration_frontier "$migration_frontier" \
   '{
     schema_version: $schema_version,
@@ -110,6 +148,8 @@ jq -n \
     started_at_utc: $started_at,
     completed_at_utc: $completed_at,
     migration_frontier: $migration_frontier,
+    seyeon_early_relationship_migration_history: $seyeon_early_history,
+    seyeon_early_relationship_migration_history_sha256: $seyeon_early_history_sha256,
     ephemeral_data_exclusions: [
       "public.member_auth_rate_limit_buckets"
     ]
@@ -138,6 +178,7 @@ jq -n \
   --arg created_at "$completed_at" \
   --arg encrypted_sha256 "$encrypted_sha256" \
   --arg archive_name "$(basename "$encrypted_archive")" \
+  --arg seyeon_early_history_sha256 "$seyeon_early_history_sha256" \
   --argjson migration_frontier "$migration_frontier" \
   '{
     schema_version: $schema_version,
@@ -147,6 +188,7 @@ jq -n \
     encrypted_sha256: $encrypted_sha256,
     archive_name: $archive_name,
     migration_frontier: $migration_frontier,
+    seyeon_early_relationship_migration_history_sha256: $seyeon_early_history_sha256,
     ephemeral_data_exclusions: [
       "public.member_auth_rate_limit_buckets"
     ]
