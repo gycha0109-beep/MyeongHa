@@ -8,13 +8,13 @@
 
 - `apps/api/src/postgres-standard-reader-v2-bind-policy-preflight-v1.ts`: 동일 transaction-scoped PostgreSQL query client로 Catalog/Unlock → enabled Product/Spec/Domain/effectiveAt → approved Product policy 조회.
 - 정확한 `standard_all_readers` 개정만 `standard_candidate`로 분류. `character_capabilities.can_initiate` 행이 없는 정식 Reader도 일반 상품 정책 관점에서 후보를 얻을 수 있으며 Character Capability 행 자체는 변형하지 않는다.
-- `premium_restricted`는 allowlist Reader도 **항상 `premium_hold`**. 승인 정책 누락/중복/비활성/출판·Unlock 결핍/위조 Subject/타 Reader/DB 오류는 **withheld**.
+- `premium_character_bound`는 **단일 `targetReaderId`가 일치하는 Reader도 `premium_hold`**. 승인 정책 누락/중복/비활성/출판·Unlock 결핍/위조 Subject/타 Reader/DB 오류는 **withheld**.
 - 결과에는 Product/spec/domain, Reader, content bundle, policy revision만 포함한다. Purchase Intent·Receipt·Entitlement Grant·Reading ID·전문 Capability·판매/공개 권한을 만들지 않는다.
 - 격리 PostgreSQL에서 공식 Reader `baekheon`의 합성 Bundle에 실제 `character_capabilities` 행이 없는 경우에도, 합성 Standard Rule과 실제 Unlock/Release 조건을 만족하면 *상품 적격성 후보만* 반환하는지 검증한다.
 
 ## 명시적으로 미구현
 
-- `cmd_bind_standard_reading_access_v2`는 **여전히 기존 `character_capabilities.can_initiate=true` 검사**를 수행한다. 이번 변경이 실제 Reader 구매 결속을 통과시키지는 않는다.
+- `cmd_bind_standard_reading_access_v2`는 **여전히 기존 `character_capabilities.can_initiate=true` 검사**를 수행한다. 이번 변경이 실제 Reader 구매 결속을 통과시키지는 않는다. 프리미엄 전용 관계는 다른 Reader의 일반 Standard 적격성에 영향을 주지 않는다.
 - Verified production Receipt, current exact Entitlement Grant, 최초 Reading 생성, locked additional Reader mutation, 환불/회수 선행 잠금, idempotent replay authorization, 읽기/쓰기에 걸친 policy revocation 직렬화는 이 Preflight가 보증하지 않는다.
 - Policy revision·Release·Grant는 SELECT 사이에 철회될 수 있다. 반환값은 캐시·bearer token·T2 지급 승인으로 사용할 수 없다. DB-owner의 공통 범위 잠금 내에서 다시 읽고 current 유효성을 검증해야 한다.
 - `#1999`의 `1770_standard_reader_product_approved_rule_private_v1.sql`과 `#2001`의 `1770_official_reader_provider_revoke_scope_lock_private_v1.sql` 번호 충돌은 각 Owner 합의로 해소해야 한다. 이 PR은 **신규 DB migration이 없다**.
