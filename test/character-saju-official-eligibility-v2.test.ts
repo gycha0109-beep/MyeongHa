@@ -138,8 +138,8 @@ describe('A3-alpha — official standard Character Saju eligibility V2', () => {
     f.readApprovedRule.mockImplementationOnce(async () => ({
       status: 'approved', rule: {
         ...((standardPolicy() as Extract<ProductReaderRuleLookupV1, {status:'approved'}>).rule),
-        kind: 'premium_restricted',
-        allowedReaderIds: ['seyeon'],
+        kind: 'premium_character_bound',
+        targetReaderId: 'seyeon',
       },
     }));
     await expect(issueCharacterSajuOfficialStandardEligibilityV2({
