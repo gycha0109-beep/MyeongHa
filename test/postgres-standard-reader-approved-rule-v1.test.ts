@@ -71,6 +71,45 @@ describe('D-01 private PostgreSQL-approved Reader rule source', () => {
     }
   });
 
+  it('rejects invalid or duplicate premium Reader IDs at the PostgreSQL adapter itself', async () => {
+    for (const allowedReaderIds of [
+      [], ['seyeon', 'seyeon'], ['attacker'], ['seyeon', 'attacker'],
+      [' SEYEON'], ['seyeon', null],
+    ]) {
+      const { port } = testPort([{
+        ...approvedRow, kind: 'premium_restricted', allowedReaderIds,
+      }]);
+      expect(await port.readApprovedRule(SOURCE)).toEqual({
+        status: 'withheld', reason: 'invalid_policy',
+      });
+    }
+  });
+
+  it('accepts only a bounded canonical premium allowlist as policy data, not specialist permission', async () => {
+    const { port } = testPort([{
+      ...approvedRow, kind: 'premium_restricted', allowedReaderIds: ['seyeon', 'taegyeom'],
+    }]);
+    expect(await port.readApprovedRule(SOURCE)).toEqual({
+      status: 'approved',
+      rule: {
+        productId: SOURCE.productId, productSpecVersion: SOURCE.productSpecVersion,
+        sajuDomain: SOURCE.sajuDomain,
+        ruleVersion: approvedRow.ruleVersion,
+        approvedPolicyRevision: approvedRow.approvedPolicyRevision,
+        kind: 'premium_restricted', allowedReaderIds: ['seyeon', 'taegyeom'],
+      },
+    });
+    expect(await resolveProductReaderEligibilityV1({
+      source: {
+        productId: SOURCE.productId, productSpecVersion: SOURCE.productSpecVersion,
+        sajuDomain: SOURCE.sajuDomain,
+      },
+      serverReaderId: 'baekheon',
+      effectiveAt: SOURCE.effectiveAt,
+      authorityPort: port,
+    })).toEqual({ status: 'withheld', reason: 'reader_excluded' });
+  });
+
   it('rejects malformed sources before any database call', async () => {
     const { port, query } = testPort([approvedRow]);
     for (const invalid of [
