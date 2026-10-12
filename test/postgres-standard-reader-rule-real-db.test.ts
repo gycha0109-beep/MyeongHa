@@ -63,18 +63,18 @@ describe.runIf(enabled)('D-01 Product-approved rule source / disposable PostgreS
   it('denies disabled Product, unpublished Reader and forged Subject', async () => {
     const results = await executor(async (client) => {
       const catalog = createPostgresDbApprovedStandardReaderSelectionPortV1(client);
-      return Promise.all([
-        catalog.resolveEligibleReaderSelection({
+      return [
+        await catalog.resolveEligibleReaderSelection({
           subjectId: SUBJECT, productId: DISABLED, readerCharacterId: 'seyeon',
         }),
-        catalog.resolveEligibleReaderSelection({
+        await catalog.resolveEligibleReaderSelection({
           subjectId: SUBJECT, productId: PRODUCT, readerCharacterId: 'yeoul',
         }),
-        catalog.resolveEligibleReaderSelection({
+        await catalog.resolveEligibleReaderSelection({
           subjectId: '11390000-0000-0000-0000-000000000099',
           productId: PRODUCT, readerCharacterId: 'baekheon',
         }),
-      ]);
+      ];
     });
     expect(results).toEqual([null, null, null]);
   });
@@ -108,21 +108,21 @@ describe.runIf(enabled)('D-01 Product-approved rule source / disposable PostgreS
   it('withholds disabled Product, unpublished Reader, forged Subject and unknown IDs', async () => {
     const decisions = await executor(async (client) => {
       const port = createPostgresStandardReaderV2PolicyPreflightV1(client);
-      return Promise.all([
-        port.assess({
+      return [
+        await port.assess({
           resolvedSubjectId: SUBJECT, productId: DISABLED, readerCharacterId: 'seyeon',
         }),
-        port.assess({
+        await port.assess({
           resolvedSubjectId: SUBJECT, productId: PRODUCT, readerCharacterId: 'yeoul',
         }),
-        port.assess({
+        await port.assess({
           resolvedSubjectId: '11390000-0000-0000-0000-000000000099',
           productId: PRODUCT, readerCharacterId: 'baekheon',
         }),
-        port.assess({
+        await port.assess({
           resolvedSubjectId: SUBJECT, productId: PRODUCT, readerCharacterId: 'unregistered',
         }),
-      ]);
+      ];
     });
     expect(decisions.every((decision) => decision.status === 'withheld')).toBe(true);
   });
