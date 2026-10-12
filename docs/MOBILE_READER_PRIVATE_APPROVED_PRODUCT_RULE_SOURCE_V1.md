@@ -5,12 +5,12 @@
 
 ## 이 변경에서 수행한 작업
 
-- Forward-only migration 1770: Product ID, spec 버전, saju domain, 승인 revision, 적용 시각, 철회 이력을 각각 고정합니다.
+- 미병합 Forward-only migration 1770: Product ID, spec 버전, saju domain, 승인 revision, 적용 시각, 철회 이력을 각각 고정합니다.
 - PostgreSQL private read: 현재 Product/spec가 활성이고 적용 기간 내 미철회 승인 revision이 정확히 하나일 때만 단일 규칙을 반환합니다. 0개 또는 중복이면 거절합니다.
 - append-only 승인/철회 이력. Ordinary API executor, anon, authenticated, service_role은 테이블을 직접 읽거나 변경할 수 없습니다. 서버 executor에 비공개 함수 실행 권한만 허용합니다.
 - 승인된 운영 정책 행은 하나도 추가하지 않았습니다. 테스트의 synthetic approval은 격리 PostgreSQL에만 존재합니다.
 - 기존 Catalog/Unlock/Product scope와 동일 PostgreSQL 클라이언트로 호출하는 TypeScript read-only Port 추가. `createPostgresDbApprovedStandardReaderSelectionPortV1`는 외부 합성 승인 정책 주입 없이 동일 클라이언트의 실제 DB Product 규칙을 읽는 비공개 선택 어댑터입니다. 실결제, Purchase Intent, v2 Binder, Grant, Reader public route 연결은 추가하지 않았습니다.
-- Premium Reader 목록은 서버가 소유한 공식 Reader ID 목록과 중복 여부까지 확인해 부정확한 DB 행이 승인 정책 포트에서 나가지 못하게 합니다. 이는 전문 Capability 권한을 발급한다는 뜻이 아닙니다.
+- Premium은 복수 Reader 허용 목록 대신 `premium_character_bound`의 **단일 `targetReaderId`**로 Product와 캐릭터를 연결합니다. PostgreSQL CHECK와 TypeScript 어댑터에서 공식 9명 ID만 허용합니다. 이 관계는 다른 캐릭터의 일반 사주 접근을 전역 차단하지 않으며, 전문 Capability·구매권을 발급하지 않습니다.
 
 ## 실제로 해결되지 않은 경계
 
