@@ -173,17 +173,21 @@ grep -qx SAME_INITIAL_PRODUCT_WAITED "$tmpdir/waiter.out" ||
   fail "waiter never acquired initial Product lock after COMMIT"
 pass "same Subject×Product serializes, distinct Products independent"
 
-replay="$(p -c "begin;
-  select pg_catalog.set_config('myeongha.subject_id','$subject',true);
-  select concat_ws('|',access_role,official_reading_created,replayed)
-  from public.internal_cmd_bind_initial_official_reader_locked_v1(
+replay="$(p <<SQL
+begin;
+select pg_catalog.set_config('myeongha.subject_id','$subject',true);
+select concat_ws('|',access_role,official_reading_created,replayed)
+from public.internal_cmd_bind_initial_official_reader_locked_v1(
   '$subject'::uuid,'$initial'::uuid,
   '12103000-0000-0000-0000-000000000001'::uuid,
   '12103100-0000-0000-0000-000000000001'::uuid,
   'sha256:v1:1111111111111111111111111111111111111111111111111111111111111111',
   'standard-reading-access-bind-v2',
   '{"schemaVersion":"standard-reading-access-bind-v2","purchaseIntentId":"11392300-0000-0000-0000-000000000001"}'::jsonb
-  ); commit;")"
+);
+commit;
+SQL
+)"
 printf '%s\n' "$replay" | grep -qx 'initial_reader|false|true' ||
   fail "original initial Reader replay contract changed"
 pass "existing initial Reading binding replay is preserved without new Reading"
