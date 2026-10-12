@@ -1,8 +1,7 @@
 import { afterAll, describe, expect, it } from 'vitest';
 import { Pool, type PoolClient } from 'pg';
 import type { PostgresTransactionQueryV1 } from '../apps/api/src/postgres-subject-execution.js';
-import { createPostgresApprovedStandardReaderRuleAuthorityPortV1 } from '../apps/api/src/postgres-standard-reader-approved-rule-v1.js';
-import { createPostgresPolicyGuardedStandardReaderSelectionPortV1 } from '../apps/api/src/postgres-standard-reader-product-scope-v1.js';
+import { createPostgresDbApprovedStandardReaderSelectionPortV1 } from '../apps/api/src/postgres-standard-reader-approved-rule-v1.js';
 
 const enabled = process.env.MYEONGHA_D01_REAL_PG === '1';
 const PRODUCT = '11392000-0000-0000-0000-000000000001';
@@ -48,8 +47,7 @@ describe.runIf(enabled)('D-01 Product-approved rule source / disposable PostgreS
 
   it('reads an exact synthetic revision with actual PostgreSQL authority', async () => {
     const result = await executor(async (client) => {
-      const source = createPostgresApprovedStandardReaderRuleAuthorityPortV1(client);
-      const catalog = createPostgresPolicyGuardedStandardReaderSelectionPortV1(client, source);
+      const catalog = createPostgresDbApprovedStandardReaderSelectionPortV1(client);
       return catalog.resolveEligibleReaderSelection({
         subjectId: SUBJECT, productId: PRODUCT, readerCharacterId: 'seyeon',
       });
@@ -63,8 +61,7 @@ describe.runIf(enabled)('D-01 Product-approved rule source / disposable PostgreS
 
   it('denies disabled Product, unpublished Reader and forged Subject', async () => {
     const results = await executor(async (client) => {
-      const ruleSource = createPostgresApprovedStandardReaderRuleAuthorityPortV1(client);
-      const catalog = createPostgresPolicyGuardedStandardReaderSelectionPortV1(client, ruleSource);
+      const catalog = createPostgresDbApprovedStandardReaderSelectionPortV1(client);
       return Promise.all([
         catalog.resolveEligibleReaderSelection({
           subjectId: SUBJECT, productId: DISABLED, readerCharacterId: 'seyeon',
