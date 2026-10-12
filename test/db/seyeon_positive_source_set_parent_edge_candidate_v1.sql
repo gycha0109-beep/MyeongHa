@@ -474,5 +474,38 @@ begin
   end;
 end $xor$;
 
+-- Reverse direction (positive first, then old zero-only Attempt field):
+-- the EXISTING 1640 trigger knows NOTHING about this test-only positive table.
+-- Demonstrate the gap; rollback all temporary changes. A future Owner migration
+-- must enforce exclusive mode on BOTH write paths, not just new positive Pin.
+do $reverse_xor_gap$
+declare
+  v_attempt uuid := 'd7200000-0000-4000-8000-000000000001';
+begin
+  begin
+    update public.chat_turn_attempts
+    set seyeon_personal_source_pin_jsonb='{"fixture":"reverse-XOR-gap-only"}'::jsonb,
+        seyeon_personal_source_pinned_at=clock_timestamp()
+    where id=v_attempt;
+    if not found or not exists (
+      select 1 from seyeon_positive_candidate.source_sets_r1
+      where attempt_id=v_attempt
+    ) then
+      raise exception 'R1 reverse XOR gap probe did not run on existing Parent';
+    end if;
+    -- Successful update is *expected*: test-only Owner sidecar is unknown to
+    -- the unchanged 1640 trigger. NEVER claim bidirectional XOR PASS.
+    raise exception using errcode='ZX105',
+      message='rollback demonstrated reverse XOR gap';
+  exception when sqlstate 'ZX105' then null;
+  end;
+  if exists (
+    select 1 from public.chat_turn_attempts
+    where id=v_attempt and seyeon_personal_source_pin_jsonb is not null
+  ) then
+    raise exception 'R1 reverse XOR probe failed to roll back';
+  end if;
+end $reverse_xor_gap$;
+
 commit;
-\echo 'PASS R1 isolated owner-candidate SourceSet/Edges 0/1/N, exact original Grants, immutable ACL, regrant/content tamper and 1640 zero XOR; no Production authorizations'
+\echo 'PASS R1 isolated SourceSet/Edges 0/1/N exact Grant, immutable ACL, regrant/tamper and positive-after-zero HOLD; reverse zero-after-positive 1640 migration gap DEMONSTRATED (no production change)'
