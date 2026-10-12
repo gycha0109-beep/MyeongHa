@@ -181,6 +181,48 @@ SQL
 done
 pass "stale-snapshot transaction isolation modes are denied"
 
+# The only binding cutover in this candidate must be an internal command
+# with no runtime EXECUTE. It derives the additional purchase scope from DB.
+additional_fn="$(p -c "select count(*) from pg_catalog.pg_proc f
+  join pg_catalog.pg_namespace n on n.oid=f.pronamespace
+  where n.nspname='public' and
+    f.proname='internal_cmd_bind_official_reader_additional_locked_v1'
+    and not f.prosecdef and f.provolatile='v';")"
+[[ "$additional_fn" == "1" ]] ||
+  fail "locked additional Reader binding function is missing/privileged"
+additional_exec="$(p -c "select count(*) from pg_catalog.pg_roles r
+  where r.rolname in ('anon','authenticated','service_role',
+    'myeongha_api_executor','myeongha_seyeon_chat_runtime_owner')
+    and pg_catalog.has_function_privilege(r.rolname,
+      'public.internal_cmd_bind_official_reader_additional_locked_v1(uuid,uuid,uuid,uuid,text,text,jsonb)',
+      'EXECUTE');")"
+[[ "$additional_exec" == "0" ]] ||
+  fail "locked additional Reader binding was exposed to runtime roles"
+
+# Initial purchase has no existing Official Reading scope to lock and must
+# never be promoted through this additional-only command. Using nonexistent
+# purchase checks deny before the legacy bind mutation.
+if p >"$tmpdir/initial-or-missing.out" 2>&1 <<SQL
+begin;
+select pg_catalog.set_config('myeongha.subject_id', '$subject', true);
+select * from public.internal_cmd_bind_official_reader_additional_locked_v1(
+ '$subject'::uuid,
+ 'ffffffff-ffff-ffff-ffff-ffffffffffff'::uuid,
+ '12193000-0000-0000-0000-000000000099'::uuid,
+ '12193100-0000-0000-0000-000000000099'::uuid,
+ 'sha256:v1:7777777777777777777777777777777777777777777777777777777777',
+ 'standard-reading-access-bind-v2',
+ '{"schemaVersion":"standard-reading-access-bind-v2","purchaseIntentId":"ffffffff-ffff-ffff-ffff-ffffffffffff"}'::jsonb
+);
+commit;
+SQL
+then
+  fail "unresolved additional Reader scope was unexpectedly accepted"
+fi
+grep -q 'One server-owned additional Reader' "$tmpdir/initial-or-missing.out" ||
+  fail "unresolved scope failed for unexpected reason"
+pass "unresolved purchase cannot enter additional Reader bind scope"
+
 # Case 1: T2-like exact scope reading arrives BEFORE an independently minted
 # purchase Grant / Reader bind. The proposed Commerce writer MUST wait.
 # The holder sees only the original B2 bundle, then releases the scope.
@@ -235,7 +277,7 @@ select * from public.internal_apply_verified_receipt_capability_effects_v1(
   array[null]::text[]
 );
 select reading_id,reader_character_id,reader_content_bundle_id
-from public.cmd_bind_standard_reading_access_v2(
+from public.internal_cmd_bind_official_reader_additional_locked_v1(
   '$subject'::uuid, '$b4_intent'::uuid,
   '12193000-0000-0000-0000-000000000004'::uuid,
   '12193100-0000-0000-0000-000000000004'::uuid,
