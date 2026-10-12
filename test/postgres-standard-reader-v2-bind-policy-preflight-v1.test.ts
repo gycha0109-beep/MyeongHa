@@ -68,8 +68,8 @@ describe('D-01 / CAP-B Standard Reader v2 binder policy preflight', () => {
     const premium = {
       status: 'approved' as const,
       rule: {
-        kind: 'premium_restricted' as const,
         ...approvedStandard.rule,
+        kind: 'premium_restricted' as const,
         allowedReaderIds: ['baekheon' as const],
       },
     };
