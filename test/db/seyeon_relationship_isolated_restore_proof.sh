@@ -11,6 +11,46 @@ set -euo pipefail
 version_num="$(psql -X -qAt -v ON_ERROR_STOP=1 -c 'show server_version_num')"
 (( version_num >= 170000 && version_num < 180000 ))
 
+# The disposable PostgreSQL 17 cluster also has an isolated 'postgres'
+# database. Simulate the Supabase image's unsafe function-creation defaults:
+# global PUBLIC plus public-schema grants to anon/authenticated. Then execute
+# the exact guarded creator ACL adapter used before schema replay. Never
+# touch the CI test case's existing application default privileges.
+seeded_defaults="$(PGDATABASE=postgres psql -X -qAt --set ON_ERROR_STOP=1 <<'SQL'
+ALTER DEFAULT PRIVILEGES GRANT EXECUTE ON FUNCTIONS TO PUBLIC;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT EXECUTE ON FUNCTIONS TO anon, authenticated;
+CREATE FUNCTION public.seyeon_restore_default_acl_probe() RETURNS integer
+  LANGUAGE sql AS $ SELECT 1 $;
+SELECT has_function_privilege(
+  'anon', 'public.seyeon_restore_default_acl_probe()'::regprocedure, 'EXECUTE');
+DROP FUNCTION public.seyeon_restore_default_acl_probe();
+SQL
+)"
+[[ "$seeded_defaults" == 't' ]] || {
+  echo 'FAIL default-ACL regression fixture did not recreate browser exposure' >&2
+  exit 1
+}
+
+creator_acl_proof="$(PGDATABASE=postgres psql -X -qAt --set ON_ERROR_STOP=1 \
+  -f scripts/operations/prepare-postgres-isolated-restore-function-defaults.sql)"
+[[ "$creator_acl_proof" == 'PASS_SEYEON_ISOLATED_CREATOR_FUNCTION_DEFAULT_ACL' ]]
+
+restricted_default_probe="$(PGDATABASE=postgres psql -X -qAt --set ON_ERROR_STOP=1 <<'SQL'
+CREATE FUNCTION public.seyeon_restore_default_acl_probe() RETURNS integer
+  LANGUAGE sql AS $ SELECT 1 $;
+SELECT NOT has_function_privilege(
+  'anon', 'public.seyeon_restore_default_acl_probe()'::regprocedure, 'EXECUTE')
+  AND NOT has_function_privilege(
+  'authenticated', 'public.seyeon_restore_default_acl_probe()'::regprocedure, 'EXECUTE');
+DROP FUNCTION public.seyeon_restore_default_acl_probe();
+SQL
+)"
+[[ "$restricted_default_probe" == 't' ]] || {
+  echo 'FAIL isolated restore creator default still exposed browser function EXECUTE' >&2
+  exit 1
+}
+echo 'PASS_SEYEON_RESTORE_PG17_CREATOR_DEFAULT_ACL_NORMALIZATION'
+
 sql='scripts/operations/seyeon-relationship-isolated-restore-proof.sql'
 history='[
   {"version":"1400","name":"relationship_apply_context_v1"},
@@ -51,6 +91,15 @@ psql -X -q --set ON_ERROR_STOP=1 -c \
 expect_rejection 'unexpected overloaded early RPC' "$history" 'restored function catalog missing or overloaded'
 psql -X -q --set ON_ERROR_STOP=1 -c \
   'DROP FUNCTION public.relationship_event_json_v1(text);' >/dev/null
+
+# A later explicit GRANT remains a hard failure. Correcting creator
+# defaults must NOT launder unsafe explicit RPC access into a fake PASS.
+psql -X -q --set ON_ERROR_STOP=1 -c \
+  'GRANT EXECUTE ON FUNCTION public.relationship_event_json_v1(uuid) TO anon;' >/dev/null
+expect_rejection 'explicit anon function GRANT is never normalized away' \
+  "$history" 'restored early function publicly executable'
+psql -X -q --set ON_ERROR_STOP=1 -c \
+  'REVOKE EXECUTE ON FUNCTION public.relationship_event_json_v1(uuid) FROM anon;' >/dev/null
 
 [[ "$(run_proof "$history")" == 'PASS_SEYEON_RESTORED_EARLY_HISTORY_SNAPSHOT_6_FUNCTIONS_11_RLS_6' ]]
 echo 'PASS_SEYEON_RESTORE_PG17_REAL_CATALOG_NEGATIVES'
