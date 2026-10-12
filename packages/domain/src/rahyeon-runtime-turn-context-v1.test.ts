@@ -66,6 +66,24 @@ describe('Rahyeon typed Runtime v0.2 governed context bridge', () => {
     expect(result.privateDisclosure.retrievedSources).toEqual([]);
   });
 
+  it('answers explicit basic profile and family facts without opening past romances', () => {
+    const biography = composeRahyeonTurnContextV1(context(), {
+      kind: 'biography',
+      requestedFactKeys: ['identity.mbti_self_report', 'life.current_living_base', 'family.structure'],
+    });
+    expect(biography.authorizedPublicFacts.map((fact) => fact.factKey)).toEqual([
+      'identity.mbti_self_report', 'life.current_living_base',
+    ]);
+    const family = composeRahyeonTurnContextV1(context(), {
+      kind: 'family',
+      requestedFactKeys: ['family.structure', 'past_romance.existence'],
+    });
+    expect(family.authorizedPublicFacts).toEqual([
+      { factKey: 'family.structure', value: '부모님과 세 살 위 언니가 있다' },
+    ]);
+    expect(family.privateDisclosure.retrievedSources).toEqual([]);
+  });
+
   it('keeps private romance unavailable at PUBLIC trust even when the fact is Canon', () => {
     const decision = romanceDecision('PUBLIC');
     expect(decision.retrievalScope.depth).toBe('none');
