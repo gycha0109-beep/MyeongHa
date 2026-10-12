@@ -64,4 +64,5 @@ psql -X -v ON_ERROR_STOP=1   -f test/db/standard_reader_approved_rule_real_pg.sq
 
 MYEONGHA_D01_REAL_PG=1 ./node_modules/.bin/vitest run \
   test/postgres-standard-reader-approved-policy-real-db.test.ts \
-  test/postgres-standard-reader-rule-real-db.test.ts
+  test/postgres-standard-reader-rule-real-db.test.ts \
+  test/postgres-standard-reader-v2-bind-policy-preflight-v1.test.ts
