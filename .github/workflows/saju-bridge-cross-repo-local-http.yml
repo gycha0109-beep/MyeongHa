@@ -7,6 +7,10 @@ on:
       - .github/workflows/saju-bridge-cross-repo-local-http.yml
       - scripts/local/verify-saju-bridge-http.mjs
       - scripts/local/verify-saju-bridge-full.mjs
+      - scripts/local/verify-saju-bridge-docker-local.mjs
+      - scripts/local/saju-bridge-full.compose.yml
+      - scripts/local/saju-bridge-local-auth-smoke.mjs
+      - scripts/local/saju-bridge-auth-init.sql
       - test/saju-held-cross-repo-local-http.test.ts
       - test/saju-held-cross-repo-local-postgres-nonce.test.ts
       - test/saju-held-cross-repo-local-postgres-current-birth.test.ts
@@ -108,6 +112,9 @@ jobs:
         run: |
           npm ci --ignore-scripts --no-audit --no-fund --prefix myeongha
           npm ci --ignore-scripts --no-audit --no-fund --prefix saju
+      - name: Verify disposable Windows-compatible Docker Compose foundation
+        working-directory: myeongha
+        run: node scripts/local/verify-saju-bridge-docker-local.mjs
       - name: Build actual Saju proof issuer
         working-directory: saju
         run: npm run build
