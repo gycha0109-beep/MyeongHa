@@ -1,10 +1,12 @@
 name: Saju Bridge Cross-Repo Loopback
+run-name: ${{ github.event_name == 'workflow_dispatch' && format('Saju Bridge {0}', inputs.request_id) || 'Saju Bridge Pull Request' }}
 
 on:
   pull_request:
     paths:
       - .github/workflows/saju-bridge-cross-repo-local-http.yml
       - scripts/local/verify-saju-bridge-http.mjs
+      - scripts/local/verify-saju-bridge-full.mjs
       - test/saju-held-cross-repo-local-http.test.ts
       - test/saju-held-cross-repo-local-postgres-nonce.test.ts
       - test/saju-held-cross-repo-local-postgres-current-birth.test.ts
@@ -27,6 +29,16 @@ on:
       - apps/api/src/saju-held-source-proof-revision-binding-v1.ts
       - apps/api/src/current-subject-saju-calculation-http.ts
   workflow_dispatch:
+    inputs:
+      request_id:
+        description: 'Unique identifier for a one-command disposable check'
+        required: false
+        type: string
+      watchtower_track:
+        description: 'CI Watchtower track'
+        required: false
+        default: saju-bridge
+        type: string
 
 permissions:
   contents: read
@@ -193,24 +205,25 @@ jobs:
       - name: Collect disposable GoTrue Auth failure diagnostics
         if: failure()
         run: docker logs --tail 80 myeongha-saju-gotrue-local || true
-      - name: Tear down disposable local GoTrue
-        if: always()
-        run: docker rm -f myeongha-saju-gotrue-local >/dev/null 2>&1 || true
-      - name: Tear down isolated TLS nonce cluster and ephemeral CA material
+      - name: Remove and verify all disposable Docker resources
         if: always()
         shell: bash
         run: |
-          docker rm -f myeongha-saju-tls-nonce-ci >/dev/null 2>&1 || true
-          rm -rf "$RUNNER_TEMP/saju-bridge-nonce-tls"
-      - name: Tear down isolated TLS Subject cluster and ephemeral CA material
-        if: always()
-        shell: bash
-        run: |
-          docker rm -f myeongha-saju-tls-subject-ci >/dev/null 2>&1 || true
-          rm -rf "$RUNNER_TEMP/saju-bridge-subject-tls"
-      - name: Tear down isolated TLS Admission cluster and ephemeral CA material
-        if: always()
-        shell: bash
-        run: |
-          docker rm -f myeongha-saju-tls-admission-ci >/dev/null 2>&1 || true
-          rm -rf "$RUNNER_TEMP/saju-bridge-admission-tls"
+          failed=0
+          for name in myeongha-saju-gotrue-local myeongha-saju-tls-nonce-ci myeongha-saju-tls-subject-ci myeongha-saju-tls-admission-ci; do
+            if docker container inspect "$name" >/dev/null 2>&1; then
+              docker rm -f "$name" >/dev/null || failed=1
+            fi
+            if docker container inspect "$name" >/dev/null 2>&1; then
+              echo "::error::Disposable container remains: $name"
+              failed=1
+            fi
+          done
+          for directory in saju-bridge-nonce-tls saju-bridge-subject-tls saju-bridge-admission-tls; do
+            rm -rf -- "$RUNNER_TEMP/$directory" || failed=1
+            if test -e "$RUNNER_TEMP/$directory"; then
+              echo "::error::Disposable certificate material remains: $directory"
+              failed=1
+            fi
+          done
+          test "$failed" -eq 0
