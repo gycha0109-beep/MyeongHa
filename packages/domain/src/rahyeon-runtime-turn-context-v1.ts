@@ -113,6 +113,16 @@ export function composeRahyeonTurnContextV1(
   } else if (decision.characterId !== 'rahyeon' ||
              !selection.requestedFactKeys.includes(decision.factKey)) {
     throw new TypeError('Disclosure decision must match the requested Rahyeon fact.');
+  } else {
+    const sourceAuthority = resolveCharacterFactAuthorityEntryV1(
+      RAHYEON_FACT_AUTHORITY_REGISTRY_V1, decision.factKey,
+    );
+    if (sourceAuthority === null ||
+        sourceAuthority.sourceAuthority !== decision.authority.sourceAuthority ||
+        sourceAuthority.characterKnowledge !== decision.authority.characterKnowledge ||
+        sourceAuthority.disclosureDefault !== decision.authority.disclosureDefault) {
+      throw new TypeError('Disclosure decision fact authority is not pinned to Rahyeon Canon.');
+    }
   }
   const guardedPrivateSources = decision === undefined
     ? Object.freeze([] as CharacterDisclosureRetrievedSourceV2[])
