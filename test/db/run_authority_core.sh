@@ -177,4 +177,10 @@ bash test/db/bounded_collection_read_runtime_authority.sh
 bash test/db/subject_merge_job_query.sh
 bash test/db/direct_merged_guest_lineage_query.sh
 bash test/db/life_fact_supersede_concurrency.sh
+# CAP-B2 integration candidate remains ungranted and isolated.
+psql -X -v ON_ERROR_STOP=1 -f test/db/standard_reader_additional_policy_locked_private_v1.sql
+if [[ "${CI:-}" == "true" && "${PGHOST:-}" == "localhost" ]]; then
+  run_isolated_case myeongha_reader_product_scope_app_test \
+    bash test/db/standard_reader_product_policy_real_postgres.sh
+fi
 bash test/db/catalog_snapshot.sh
