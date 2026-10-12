@@ -243,6 +243,35 @@ for sig in \
 done
 pass "locked issuance candidate and scope resolver are private"
 
+# The issuance wrapper must not grant in an isolation level with an
+# inherited stale MVCC snapshot. It must fail before the old receipt writer.
+for isolation in "repeatable read" "serializable"; do
+  if p >"$tmpdir/receipt-stale-isolation.out" 2>&1 <<SQL
+begin isolation level $isolation;
+select pg_catalog.set_config('myeongha.subject_id', '$subject', true);
+select * from public.internal_apply_additional_official_reader_receipt_locked_v1(
+  '$b4_receipt'::uuid,
+  array['test-reader-unit'], array[transaction_timestamp()],
+  array[transaction_timestamp()], array[null]::timestamptz[],
+  array[null]::text[]
+);
+commit;
+SQL
+  then
+    fail "stale-snapshot Receipt grant issuance was permitted: $isolation"
+  fi
+  grep -q 'Official Reader additional binding requires READ COMMITTED' \
+    "$tmpdir/receipt-stale-isolation.out" ||
+    fail "receipt isolation rejection was not explicit: $isolation"
+done
+still_no_b4="$(p -c "select count(*) from public.standard_reading_reader_access_grants
+  where purchase_intent_id='$b4_intent'::uuid;")"
+still_no_receipt_grant="$(p -c "select count(*) from public.entitlement_grants
+  where source_receipt_id='$b4_receipt'::uuid;")"
+[[ "$still_no_b4" == "0" && "$still_no_receipt_grant" == "0" ]] ||
+  fail "rejected issuance left a partial new Grant or Reader access"
+pass "stale isolation denies additional Reader receipt before any issuance"
+
 # Case 1: T2-like exact scope reading arrives BEFORE an independently minted
 # purchase Grant / Reader bind. The proposed Commerce writer MUST wait.
 # The holder sees only the original B2 bundle, then releases the scope.
