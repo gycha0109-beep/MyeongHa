@@ -101,6 +101,15 @@ type ModelInputSourceSetV1 = {
 
 **미결 기술 결정 D-03:** 현재 앱 `sha256:v1`는 `canonicalJson` 결과, 시험 DB `sha256:pg-jsonb:v1`는 PG `jsonb::text` UTF-8의 SHA-256이다. **동등하지 않다.** DB 재검증에 사용하는 버전은 DB 내부 일관성/원본 컬럼을 기준으로 하고, Node projection/context digest는 별도 체크한다. 운영 이전에 양쪽의 정규화 규칙(숫자/유니코드/키 순서/널/타입), PG15↔PG17 전환, domain separation, 재계산 비용, tamper 불가 저장과 교차언어 golden vector를 Owner가 확정해야 한다. 제3자가 제출한 `sha256` 문자열만으로 사용 허가 불가.
 
+## 2.4 단계별 승인 Scope — 과도한 일괄 구현 방지
+
+**최초 운영 활성화 후보 S0(아직 미승인):** 기존 과거사 재투입 및 Reader/Relationship 파생 권한을 한꺼번에 구현하지 않는다. 모델 입력은 `current_user_turn` + 고정된 승인 Character bundle + **단일 승인 schema/type에 속하는 직접 Memory 한 건 이하**로 한정하는 소규모 내부 Cohort부터 출발한다. Life Fact·여러 개 Memory·과거 Assistant/User 문맥·Relationship 이벤트·Reader/Saju/외부 검색·다른 캐릭터 원문은 데이터가 없다는 뜻이 아니라 **이 Scope에서는 제외하고 재조회/모델 추가를 차단**한다.
+
+- 이 제한이 실제 `runSeyeonProductionChatExecutionV1`의 기존 Context/Preflight/History 기능을 바꿀 수 있으므로 **Character + Product 기능 축소 승인**이 먼저 필요하다. 범위 밖 데이터를 silent filter 후 기존 답변처럼 재생성하거나 `explicit_zero`로 세탁해서는 안 된다.
+- S0 승인 후 G1 단일 Record/Grant → G2 동일 트랜잭션 실제 Commit → G3 최초 공개/Replay/History의 그 단일 Original Grant 재검사로 끝까지 관통한 뒤 N건/혼합·파생 정보 Scope를 **별도 버전**으로 확장한다. 새 Source Class 추가 시 최초 S0의 Pin 형식을 재사용하더라도 별도 데이터/권한 정책 승인 필요.
+- D-08(Reader), Saju/Face/peer가 S0에 등장하지 않으면 해당 Owner가 `OUT_OF_SCOPE + Fail-Closed`로 **명시 서명**할 수 있다. 서명 없는 `OPEN`은 임의 범위 제외로 인정되지 않는다.
+- 위 S0는 **업무 우선순위 제안**이며 정식 승인/활성화가 아니다. 기존 프로젝트의 전체 세연 대화 UX를 무단 축소하지 않는다.
+
 ## 3. 실제 실행 경로 — G1/G2/G3 후보
 
 ```text
@@ -169,7 +178,7 @@ Separate worker/next turn:
 | D-09 | History page/relationship/current context 변경 UX 및 오류 | full page HOLD/503/no-store, 유료 재생성 금지 | Product + API + Security | **OPEN** |
 | D-10 | Owner Role/ACL/RLS + production migration lineage/DR 선행 | API direct DML 0, test-only schema 운영 설치 금지 | DB + Ops + Security | **OPEN** |
 
-**서명 기록**: 각 D-ID마다 `{decision, policy_version, owner_team, approving_actor, recorded_at, PR_or_issue_url, exact_commit_sha, negative_test_urls, status}`를 남긴다. AI가 문서를 작성했다는 사실은 어떠한 Owner 승인도 아니다. **한 ID라도 OPEN이면 positive Projector/Route 활성화를 계속 거부한다.**
+**서명 기록**: 각 D-ID마다 `{decision, policy_version, owner_team, approving_actor, recorded_at, PR_or_issue_url, exact_commit_sha, negative_test_urls, status}`를 남긴다. AI가 문서를 작성했다는 사실은 어떠한 Owner 승인도 아니다. **해당 활성화 Scope에 관한 ID가 하나라도 OPEN이면 positive Projector/Route 활성화를 계속 거부한다.** 범위에서 제외되는 D-ID는 담당 Owner가 `OUT_OF_SCOPE + FAIL_CLOSED`로 명시 승인·검증해야 하며, 누락되었다고 자동 면제되지 않는다.
 
 ## 7. 검증 매트릭스와 G1→G6 완료 요건
 
