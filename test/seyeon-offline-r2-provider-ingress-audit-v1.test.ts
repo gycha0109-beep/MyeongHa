@@ -11,6 +11,7 @@ import {
   buildSeyeonTurnInterpreterRequestV2,
   type SeyeonStructuredProviderRequestV2,
 } from '../apps/api/src/seyeon-character-runtime-v2.js';
+import { createSeyeonOfflineR2SealedProviderChainV1 } from '../apps/api/src/seyeon-offline-r2-sealed-provider-chain-v1.js';
 import { selectSeyeonExactModelPersonalSourcesV1 } from '../apps/api/src/seyeon-exact-model-personal-source-selection-v1.js';
 import type { SeyeonOfflineS0ContextCandidateV1 } from '../apps/api/src/seyeon-offline-s0-context-admission-v1.js';
 import {
@@ -252,5 +253,173 @@ describe('R2 offline full native Provider request source observations (NO AUTHOR
     await expect(Promise.resolve().then(()=>provider.generate(bad)))
       .rejects.toThrow('offline R2 Provider ingress source closure held');
     expect(calls).toHaveBeenCalledTimes(1);
+  });
+});
+
+
+function sealedFiveRequests(){
+  const {candidate,context,packet}=fixture();
+  const requests=[
+    providerRequest('integrity_classification'),
+    providerRequest('disclosure_classification'),
+    buildSeyeonTurnInterpreterRequestV2(context),
+    buildSeyeonRendererRequestV2(packet),
+    buildSeyeonSemanticReviewRequestV2({
+      packet,
+      rendererDraft:{
+        utterance:'synthetic-only',
+        privateSourceRefsMentioned:[],
+        memoryRefsMentioned:[],
+        disclosureSliceIds:[],
+      },
+      utteranceHash:'sha256:v1:'+'a'.repeat(64),
+    }),
+  ] as const;
+  return {candidate,requests};
+}
+
+describe('R2 OFFLINE full native five-stage request sealing (NOT DB authorization)',()=>{
+  it('requires both classification stages first, then interpretation, render and review',async()=>{
+    const {candidate,requests}=sealedFiveRequests();
+    const delegate=vi.fn(async (request:SeyeonStructuredProviderRequestV2)=>({
+      purpose:request.purpose,synthetic:true,
+    }));
+    const chain=createSeyeonOfflineR2SealedProviderChainV1({
+      candidate,expectedRequests:requests,
+      delegate:{providerKey:'offline-synthetic',modelKey:'no-paid-provider',
+        generate:delegate},
+    });
+    expect(chain.snapshot()).toMatchObject({
+      permitsProductionProvider:false,permitsProductionReveal:false,
+    });
+    expect(chain.snapshot().sealedRequestDigests).toHaveLength(5);
+    expect(chain.snapshot().completedPurposes).toEqual([]);
+    // Preflight classifiers may be scheduled in either order in production.
+    for(const index of [1,0,2,3,4]){
+      await expect(chain.provider.generate(requests[index]!)).resolves.toEqual({
+        purpose:requests[index]!.purpose,synthetic:true,
+      });
+    }
+    expect(delegate).toHaveBeenCalledTimes(5);
+    expect(chain.snapshot().completedPurposes).toEqual([
+      'integrity_classification','disclosure_classification',
+      'turn_interpretation','dialogue_render','semantic_review',
+    ]);
+    await expect(chain.provider.generate(requests[4]!))
+      .rejects.toThrow('held before dispatch');
+    expect(delegate).toHaveBeenCalledTimes(5);
+  });
+
+  it('blocks attempted Interpreter dispatch before both native Preflight classifications',async()=>{
+    const {candidate,requests}=sealedFiveRequests();
+    const delegate=vi.fn(async()=>({synthetic:true}));
+    const chain=createSeyeonOfflineR2SealedProviderChainV1({
+      candidate,expectedRequests:requests,
+      delegate:{providerKey:'offline-synthetic',modelKey:'none',generate:delegate},
+    });
+    await expect(chain.provider.generate(requests[2]!))
+      .rejects.toThrow('held before dispatch');
+    await chain.provider.generate(requests[0]!);
+    await expect(chain.provider.generate(requests[2]!))
+      .rejects.toThrow('held before dispatch');
+    expect(delegate).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    'instruction change',
+    'allowed Bible metadata change',
+    'renderer interpretation change',
+    'reviewer draft change',
+  ] as const)(
+    'holds on unsealed %s despite structurally valid source references',
+    async(change)=>{
+      const {candidate,requests}=sealedFiveRequests();
+      const delegate=vi.fn(async()=>({synthetic:true}));
+      const chain=createSeyeonOfflineR2SealedProviderChainV1({
+        candidate,expectedRequests:requests,
+        delegate:{providerKey:'offline-synthetic',modelKey:'none',generate:delegate},
+      });
+      await chain.provider.generate(requests[0]!);
+      await chain.provider.generate(requests[1]!);
+      let stageIndex:number=2;
+      let altered:SeyeonStructuredProviderRequestV2=requests[2]!;
+      if(change==='instruction change'){
+        altered={...requests[2]!,instructions:requests[2]!.instructions+' changed'};
+      }else if(change==='allowed Bible metadata change'){
+        const original=requests[2]!.input as Record<string,unknown>;
+        const origContext=original.context as Record<string,unknown>;
+        altered={...requests[2]!,input:{
+          ...original,context:{
+            ...origContext,behaviorPolicy:{
+              ...(origContext.behaviorPolicy as Record<string,unknown>),
+              injectedClaim:'NEW_UNATTRIBUTED_POLICY',
+            },
+          },
+        }};
+      }else{
+        await chain.provider.generate(requests[2]!);
+        stageIndex=change==='renderer interpretation change'?3:4;
+        if(stageIndex===4)await chain.provider.generate(requests[3]!);
+        const origInput=requests[stageIndex]!.input as Record<string,unknown>;
+        altered={
+          ...requests[stageIndex]!,input:{
+            ...origInput,
+            ...(stageIndex===3?{
+              packet:{
+                ...(origInput.packet as Record<string,unknown>),
+                outputPolicy:{
+                  ...((origInput.packet as Record<string,unknown>)
+                    .outputPolicy as Record<string,unknown>),
+                  attackerExtra:'not original',
+                },
+              },
+            }:{
+              rendererDraft:{
+                ...(origInput.rendererDraft as Record<string,unknown>),
+                utterance:'altered after original expectation',
+              },
+            }),
+          },
+        };
+      }
+      await expect(chain.provider.generate(altered))
+        .rejects.toThrow('R2 offline Provider full-request fingerprint mismatch');
+      expect(delegate).toHaveBeenCalledTimes(stageIndex);
+    },
+  );
+
+  it('rejects incomplete/duplicate stages before constructing a synthetic provider',()=>{
+    const {candidate,requests}=sealedFiveRequests();
+    const delegate={providerKey:'synthetic',modelKey:'not-paid',
+      generate:vi.fn(async()=>null)};
+    expect(()=>createSeyeonOfflineR2SealedProviderChainV1({
+      candidate,delegate,expectedRequests:requests.slice(0,4),
+    })).toThrow('all five');
+    expect(()=>createSeyeonOfflineR2SealedProviderChainV1({
+      candidate,delegate,expectedRequests:[...requests.slice(0,4),requests[0]!],
+    })).toThrow('duplicate');
+    expect(delegate.generate).not.toHaveBeenCalled();
+  });
+
+  it('does not retry a failed synthetic stage or permit subsequent paid stages',async()=>{
+    const {candidate,requests}=sealedFiveRequests();
+    const delegate=vi.fn(async (request:SeyeonStructuredProviderRequestV2)=>{
+      if(request.purpose==='integrity_classification'){
+        throw new Error('synthetic classified failure');
+      }
+      return {synthetic:true};
+    });
+    const chain=createSeyeonOfflineR2SealedProviderChainV1({
+      candidate,expectedRequests:requests,
+      delegate:{providerKey:'synthetic',modelKey:'not-paid',generate:delegate},
+    });
+    await expect(chain.provider.generate(requests[0]!))
+      .rejects.toThrow('synthetic classified failure');
+    await expect(chain.provider.generate(requests[0]!))
+      .rejects.toThrow('held before dispatch');
+    await expect(chain.provider.generate(requests[2]!))
+      .rejects.toThrow('held before dispatch');
+    expect(delegate).toHaveBeenCalledTimes(1);
+    expect(chain.snapshot().completedPurposes).toEqual([]);
   });
 });
