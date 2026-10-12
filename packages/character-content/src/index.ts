@@ -18,3 +18,4 @@ export * from './character-disclosure-policy-v1.js';
 export * from './character-fact-authority-v1.js';
 export * from './seyeon-authored-projection-v2.js';
 export * from './seyeon-fact-authority-v1.js';
+export * from './rahyeon-fact-authority-v1.js';
