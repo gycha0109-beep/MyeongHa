@@ -132,3 +132,14 @@ S1에서 공통 잠금 함수 자체가 성공하더라도 **S2 전체 경로가
 - 실제 검증: 기존 `official_reader_scope_lock_s2_instrumented_race.sh`에 `REPEATABLE READ`와 `SERIALIZABLE` 거절을 추가했다. 일반 `READ COMMITTED` 경합은 이전과 같이 검증한다.
 - 작업 분리: #1983(S1) → #1984(양방향 경합) → #1987(현재 묶음 판정) → **이번 격리 수준 차단 변경 요청** 순서로 의존한다. 각 부모가 아직 검토 중이므로 전체 본선 완료·출시로 선언하지 않는다.
 - **남은 근본 차단:** Commerce의 실제 구매권 발급·회수·환불, Reader 결속, 최종 유료 답변 저장이 모두 같은 잠금을 **실제 구현 경로에서 먼저** 취득해야 한다. 이번 차단은 공동 잠금 미참여를 해결하지 않는다. 보호 본문·실제 사주 출처 증명·원자 저장·정식 조회도 미구현이다.
+
+## 11. 실제 추가 Reader 결속의 잠금 선점 내부 명령 (S2 제한적 진척)
+
+- 기존 `cmd_bind_standard_reading_access_v2`는 Purchase Intent → Grant → Birth 행 잠금을 내부에서 획득한다. 범위를 모르고 이 함수 이후 공통 잠금을 추가하면 획득 순서가 반대여서 교착 위험이 있다.
+- 새로운 비공개 `1760_official_reader_additional_bind_locked_private_v1.sql`은 **기존 검증된 추가 Reader 구매**에 대해서만, 현재 Purchase Intent·Reader 선택·상품 명세·Birth revision·이미 존재하는 공식 Reading 정본에서 **정확히 한 개의 회원×공식 Reading×Reader 잠금 범위**를 계산한다.
+- 그 범위를 선행 잠금한 뒤 기존 v2 결속 명령을 호출한다. 기존 명령이 되돌린 공식 Reading·Reader가 잠금 범위와 조금이라도 다르거나 새 공식 Reading을 생성하면 전체 SQL 문장을 오류로 취소한다.
+- 동일 거래의 고정된 낡은 조회 시점이 발생하지 않도록 `READ COMMITTED`에서만 실행하며 `REPEATABLE READ`·`SERIALIZABLE`은 거부한다. 외부 사용자/API 역할은 이 명령을 직접 실행할 수 없다.
+- 최초 공식 사주 구매·아직 확정되지 않은 공식 Reading·복수 후보·확정되지 않은 이력은 허용하지 않는다. `replayed=true`는 과거 결속 기록일 뿐 현재 구매권으로 승격하지 않는다.
+- 독립 PostgreSQL 경합 시험 `official_reader_scope_lock_s2_instrumented_race.sh`의 실제 **새 구매권+추가 Reader 결속** 호출을 이 비공개 명령으로 변경하여, 테스트에서만 선행 잠금하는 수준보다 한 단계 더 나아간 실제 호출 후보를 검증한다.
+
+**잔여 차단:** 영수증을 통한 신규 구매권 발급 자체와 환불·회수 Provider 이벤트의 원본 함수를 아직 바꾸지 않았다. 이 명령은 기존 Reader 결속 경로에 자동 적용된 것이 아니며, 외부 실행권한이 없다. 기존 결속 명령이 별도로 호출될 수 있는 한 전체 직렬화는 미완료다. 실제 Commerce 경로 및 최초 공식 Reading 처리 계약을 합의하기 전에는 공개·운영 적용이 불가능하다.
