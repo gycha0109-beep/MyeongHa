@@ -23,6 +23,8 @@
 - A relationship score alone does not declare love; flirting does not grant private source access.
 - No new NPCs, actual daily meetings, locations, legal authority, or relationship milestone is inferred.
 
+- Face named authoring admission remains explicitly Seyeon-only; shared Character runtime registration cannot silently activate Face publication.
+
 ## Acceptance
 
 - TypeScript and unit/regression tests on authoring, authority lane, fact registry, context composer and preflight.
