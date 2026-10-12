@@ -91,7 +91,7 @@ S0는 **부모 1행 + 간선 1행 + Type/Schema Allowlist 1쌍**의 exact match�
 ### 3.3 불변성·복구·동일성
 
 - DB Owner SECURITY DEFINER 함수를 제외한 sidecar INSERT/UPDATE/DELETE 금지; api_executor와 browser anon/authenticated/service_role은 **직접 TABLE DML 0**.
-- 최초 Pin 후 identity/SourceSet/edge/digest 불변. Retry는 **새 attempt_id** 및 새 source set 생성; 기존 Pin 변경 금지. 동일 attempt 반복 호출은 필드·스키마·source digest가 **완전히 같을 때만** idempotent success, 다르면 23505/23514 명시 HOLD.
+- 최초 Pin 후 identity/SourceSet/edge/digest 불변. Retry는 **새 attempt_id** 및 새 source set 생성; 기존 Pin 변경 금지. 동일 attempt 반복 호출은 필드·스키마·source digest가 **완전히 같을 때만** idempotent success **후보**이고, 이때도 **원래 exact Grant/Record의 현재 유효성, running/context_ready 상태, 이미 Provider가 시작됐는지**를 Owner가 다시 검사해야 합니다. 최초 Pin 후 Grant가 취소되었거나 Attempt 단계가 이미 진행된 경우 Pin replay를 모델 재실행 허가로 해석하지 않고 **HOLD**. 다른 필드면 23505/23514 명시 HOLD.
 - source_count와 Child 존재를 **동일 트랜잭션**에서 검증. 부모만 저장/간선 일부 저장/중복 ordinal/섞인 Subject/Record를 성공으로 취급하지 않음.
 - positive Pin만 만들고 zero pin도 존재하는 **이중-mode**를 트리거/Commit에서 금지. 기존 1640 zeroProof Pin은 이전 버전 그대로 보존하고 덮어쓰지 않음.
 - sidecar PK만으로 Subject/Thread/Turn FK join을 대신하지 않습니다. 필요한 composite FK가 기존 UNIQUE와 불일치하면 생성이 불가능하므로 실제 카탈로그에서 composite index를 확인한 뒤 Owner migration 형태 선택.
@@ -102,7 +102,7 @@ S0는 **부모 1행 + 간선 1행 + Type/Schema Allowlist 1쌍**의 exact match�
 ### G1 cmd_mark_seyeon_chat_context_ready_positive_pinned_v1
 입력 후보: (p_subject_id uuid, p_turn_id uuid, p_attempt_id uuid, p_source_selection_jsonb jsonb, p_provider_context_digest text, p_policy_version text).
 **거부:** 주체/Thread/Attempt 불일치, planner version 부적합, 기존 zero Pin 존재, 이미 generated/validated/committed, SRC-25 schema 미허가, 선택 출처 0개/2개 이상(S0), reissued Grant, 다른 Character, 과거/파생 ingress, digest/필드 미상.
-**DB 작업:** ① 동일 DB 호출/Transaction 내 canonical Subject+Thread/Turn/Attempt 확인 ② 정확한 Original Grant ID·Record Type/Schema/Content를 DB에서 확인, Row 잠금 ③ raw payload digest를 DB가 계산 ④ SourceSet+Edge 한 번에 삽입(immutable) ⑤ 같은 transaction에서 기존 cmd_mark_chat_turn_context_ready_v1 호출 ⑥ Provider 시작보다 먼저 결과 COMMIT이 확정되어야 함.
+**DB 작업:** ① 동일 DB 호출/Transaction 내 canonical Subject+Thread/Turn/Attempt 확인 ② 정확한 Original Grant ID·Record Type/Schema/Content를 DB에서 확인, Row 잠금 ③ raw payload digest를 DB가 계산 ④ SourceSet+Edge 한 번에 삽입(immutable) ⑤ 같은 transaction에서 기존 cmd_mark_chat_turn_context_ready_v1 호출 ⑥ Provider 시작보다 먼저 결과 COMMIT이 확정되어야 함. 재호출은 원래 exact Grant/Record가 아직 유효한지 재검사하고 **중복 Provider 발행 여부를 DB Attempt/Governor 상태와 교차 확인**하여 반환. 최초 성공 Pin receipt를 일반-purpose 재실행 토큰으로 인정하지 않음.
 *현재 1640 zero-only 함수는 그대로 유지*, 새 함수의 API runtime 사용은 **승인된 positive path에서만** 명시적으로 선택하고 old zero 함수로 positive fallback 금지.
 
 ### G2 cmd_commit_seyeon_chat_turn_with_positive_sources_v1 또는 승인된 v3
