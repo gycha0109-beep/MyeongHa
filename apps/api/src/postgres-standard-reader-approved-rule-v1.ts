@@ -5,6 +5,12 @@ import {
   type ProductReaderRuleLookupV1,
 } from './product-reader-eligibility-policy-v1.js';
 import { SAJU_DOMAINS } from '../../../packages/contracts/src/index.js';
+import {
+  OFFICIAL_READER_RUNTIME_IDS_V1,
+  type OfficialReaderRuntimeIdV1,
+} from './reader-production-rollout-policy-v1.js';
+import type { StandardReadingReaderSelectionPortV4 } from './standard-reading-purchase-intent-create-command-v4.js';
+import { createPostgresPolicyGuardedStandardReaderSelectionPortV1 } from './postgres-standard-reader-product-scope-v1.js';
 
 export const POSTGRES_APPROVED_STANDARD_READER_RULE_V1 =
   'public.qry_standard_reader_approved_rule_v1' as const;
@@ -21,6 +27,7 @@ const RULE_SQL = [
 ].join('\n');
 
 const domains: ReadonlySet<string> = new Set(SAJU_DOMAINS);
+const officialReaders: ReadonlySet<string> = new Set(OFFICIAL_READER_RUNTIME_IDS_V1);
 
 function text(value: unknown): value is string {
   return typeof value === 'string' && value.length >= 1 &&
@@ -78,21 +85,39 @@ export function createPostgresApprovedStandardReaderRuleAuthorityPortV1(
           rule: Object.freeze({ kind: 'standard_all_readers', ...common }),
         });
       }
-      if (row.kind === 'premium_restricted' &&
-          Array.isArray(row.allowedReaderIds) &&
-          row.allowedReaderIds.length >= 1 &&
-          row.allowedReaderIds.length <= 9 &&
-          row.allowedReaderIds.every((id) => typeof id === 'string')) {
+      if (row.kind === 'premium_restricted' && Array.isArray(row.allowedReaderIds)) {
+        const readerIds: readonly unknown[] = row.allowedReaderIds;
+        if (readerIds.length === 0 ||
+            readerIds.length > OFFICIAL_READER_RUNTIME_IDS_V1.length ||
+            !readerIds.every((id) => typeof id === 'string' && officialReaders.has(id)) ||
+            new Set(readerIds).size !== readerIds.length) {
+          return unavailable('invalid_policy');
+        }
         return Object.freeze({
           status: 'approved',
           rule: Object.freeze({
             kind: 'premium_restricted',
             ...common,
-            allowedReaderIds: Object.freeze([...row.allowedReaderIds]),
+            allowedReaderIds: Object.freeze([...readerIds]) as readonly OfficialReaderRuntimeIdV1[],
           }),
-        }) as ProductReaderRuleLookupV1;
+        });
       }
       return unavailable('invalid_policy');
     },
   });
+}
+
+/**
+ * Dormant exact-DB composition: Catalog/Unlock, Product scope and Product
+ * approval rule use ONE transaction-scoped PostgreSQL client. Unlike the
+ * generic test seam, no synthetic/external approval port can be supplied here.
+ * This remains selection-only: no binder, Grant, checkout, or public route.
+ */
+export function createPostgresDbApprovedStandardReaderSelectionPortV1(
+  client: PostgresTransactionQueryV1,
+): StandardReadingReaderSelectionPortV4 {
+  return createPostgresPolicyGuardedStandardReaderSelectionPortV1(
+    client,
+    createPostgresApprovedStandardReaderRuleAuthorityPortV1(client),
+  );
 }
