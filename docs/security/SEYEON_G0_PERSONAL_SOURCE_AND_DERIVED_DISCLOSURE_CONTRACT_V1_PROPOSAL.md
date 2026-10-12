@@ -110,6 +110,14 @@ type ModelInputSourceSetV1 = {
 - D-08(Reader), Saju/Face/peer가 S0에 등장하지 않으면 해당 Owner가 `OUT_OF_SCOPE + Fail-Closed`로 **명시 서명**할 수 있다. 서명 없는 `OPEN`은 임의 범위 제외로 인정되지 않는다.
 - 위 S0는 **업무 우선순위 제안**이며 정식 승인/활성화가 아니다. 기존 프로젝트의 전체 세연 대화 UX를 무단 축소하지 않는다.
 
+### S0 오프라인 코드 검증 (Owner 미승인, Provider 사용 허가 아님)
+
+- `apps/api/src/seyeon-offline-s0-context-admission-v1.ts`는 **오프라인 후보**로 S0 source-closure 범위를 실행 가능한 조건으로 검사합니다. `productionContext`와 현재 발화가 결속된 `finalContext`가 함께 제공되고, **단일 Memory source**의 Original Grant·원본 스키마·Projector 결과·최종 선택 digest가 기존 `selectSeyeonExactModelPersonalSourcesV1`과 정확히 같아야 합니다.
+- 과거 user/assistant 메시지 또는 Relationship history/event/state/revision, 추가 Memory/Life Fact, Reader/Disclosure/Peer/Preflight/External 출처, 누락된 출처 부류·Schema 불일치·Grant 변경·최종 Selection 변경이 발견되면 **Pin 호출·합성 Provider 호출 전에 HOLD**입니다. 과거 데이터를 스스로 필터링해서 `0건` 증명으로 바꾸지 않습니다.
+- `runSeyeonOfflineS0ScopedTurnV1`은 이 후보 검증을 기존 **off-line synthetic** `pinBeforeModel → generateSyntheticText → commitWithGrantRecheck → revealCommitted` 순서 앞에 놓습니다. 후보의 반환은 `eligible_offline_synthetic_only`·`permitsProductionProvider:false`·`permitsProductionReveal:false`이며 어느 시점에도 Production 허용 토큰이 아닙니다.
+- `test/seyeon-offline-s0-context-admission-v1.test.ts`는 오프라인 긍정/과거 메시지/관계/Reader/타 ingress/Grant tamper/Pre-Pin 중단을 검증합니다. `test/seyeon-offline-s0-real-context-shape-v1.test.ts`는 **실제 `composeSeyeonProductionContextV1`와 `bindSeyeonProductionCurrentUserTurnV1`** 출력을 사용해 Grant 값이 Memory 본문 안의 위조 ID가 아니라 서버 행에서 오는지, 원래의 history가 있으면 후보 거부되는지 증명합니다.
+- **증거 한계**: 소스가 별도로 추가되는 실제 `resolveTurnGovernance`, `runSeyeonCharacterTurnV2`의 disclosure/integrity 결정, post-turn worker 및 앞으로의 Reader/Saju Preflight는 합성 빈 ingress 선언만으로 커버되었다고 주장할 수 없습니다. 서버 소유 *완전한* source-closure 추적 포트와 Owner 정책이 승인되기 전에는 이 검사를 Production 실행 경로에 연결하지 않습니다. 시험용 `syntheticApprovedSchema` 역시 SRC-25 허가가 아닙니다.
+
 ## 3. 실제 실행 경로 — G1/G2/G3 후보
 
 ```text
