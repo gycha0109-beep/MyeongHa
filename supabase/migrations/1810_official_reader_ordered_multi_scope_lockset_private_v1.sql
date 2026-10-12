@@ -123,8 +123,10 @@ begin
   end if;
 
   if exists (
-    select 1 from pg_catalog.unnest(p_reading_refs,p_reader_character_ids)
-      as input(reading_ref, reader_id)
+    select 1 from ROWS FROM (
+      pg_catalog.unnest(p_reading_refs),
+      pg_catalog.unnest(p_reader_character_ids)
+    ) as input(reading_ref, reader_id)
     where reading_ref is null or reader_id is null
        or reader_id <> pg_catalog.btrim(reader_id)
        or pg_catalog.btrim(reader_id) = ''
@@ -140,8 +142,10 @@ begin
   -- Caller-selected Readers are LOCK TARGETS only; no permission is granted.
   with requested as (
     select distinct input.reading_ref, input.reader_id
-    from pg_catalog.unnest(p_reading_refs,p_reader_character_ids)
-      as input(reading_ref,reader_id)
+    from ROWS FROM (
+      pg_catalog.unnest(p_reading_refs),
+      pg_catalog.unnest(p_reader_character_ids)
+    ) as input(reading_ref, reader_id)
   )
   select count(*)::integer,
          count(o.product_id)::integer,
@@ -170,8 +174,10 @@ begin
 
   with requested as (
     select distinct input.reading_ref,input.reader_id
-    from pg_catalog.unnest(p_reading_refs,p_reader_character_ids)
-      as input(reading_ref,reader_id)
+    from ROWS FROM (
+      pg_catalog.unnest(p_reading_refs),
+      pg_catalog.unnest(p_reader_character_ids)
+    ) as input(reading_ref, reader_id)
   )
   select pg_catalog.jsonb_agg(
     pg_catalog.jsonb_build_array(
@@ -191,8 +197,10 @@ begin
   -- L1 is globally sorted; NEVER acquire a new Product lock after this point.
   for v_scope in
     select distinct input.reading_ref,input.reader_id
-    from pg_catalog.unnest(p_reading_refs,p_reader_character_ids)
-      as input(reading_ref,reader_id)
+    from ROWS FROM (
+      pg_catalog.unnest(p_reading_refs),
+      pg_catalog.unnest(p_reader_character_ids)
+    ) as input(reading_ref, reader_id)
     order by input.reading_ref,input.reader_id
   loop
     perform public.internal_acquire_official_reader_scope_lock_v1(
@@ -202,8 +210,10 @@ begin
 
   with requested as (
     select distinct input.reading_ref,input.reader_id
-    from pg_catalog.unnest(p_reading_refs,p_reader_character_ids)
-      as input(reading_ref,reader_id)
+    from ROWS FROM (
+      pg_catalog.unnest(p_reading_refs),
+      pg_catalog.unnest(p_reader_character_ids)
+    ) as input(reading_ref, reader_id)
   )
   select pg_catalog.jsonb_agg(
     pg_catalog.jsonb_build_array(
@@ -222,8 +232,10 @@ begin
 
   return query
   select distinct o.product_id,req.reading_ref,req.reader_id
-  from pg_catalog.unnest(p_reading_refs,p_reader_character_ids)
-    as req(reading_ref,reader_id)
+  from ROWS FROM (
+      pg_catalog.unnest(p_reading_refs),
+      pg_catalog.unnest(p_reader_character_ids)
+    ) as req(reading_ref, reader_id)
   join public.standard_reading_official_bindings o
     on o.reading_id=req.reading_ref and o.subject_id=p_subject_id
   order by req.reading_ref,req.reader_id;
