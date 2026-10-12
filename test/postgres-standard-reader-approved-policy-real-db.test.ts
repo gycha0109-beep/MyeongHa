@@ -26,7 +26,7 @@ describe.runIf(enabled)('D-01 actual TypeScript + disposable PostgreSQL Product 
   afterAll(() => pg.end());
 
   async function withExecutor<T>(
-    test: (client: PostgresTransactionQueryV1) => Promise<T>,
+    test: (client: PostgresTransactionQueryV1) => T | Promise<T>,
     subjectId: string | null = SUBJECT,
   ): Promise<T> {
     const connection: PoolClient = await pg.connect();
