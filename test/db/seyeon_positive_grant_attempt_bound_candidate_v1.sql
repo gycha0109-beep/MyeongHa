@@ -403,5 +403,10 @@ begin
     raise exception 'changed original Memory revived disclosure'; end if;
 end $changed$;
 reset role;
-rollback;
-\echo 'PASS offline-positive exact original Grant provenance Pin tied to REAL Chat Attempt; Commit/Reveal owner candidate, immutable ACL and regrant/content-change HOLD (all rolled back)'
+-- Leave an authorized synthetic committed candidate for the next separate
+-- real Node/PostgreSQL HTTP round-trip. Only this disposable DB survives.
+update public.memory_items
+set content_jsonb='{"v":"synthetic-consented-memory"}'::jsonb
+where id='d5000000-0000-4000-8000-000000000001';
+commit;
+\echo 'PASS offline-positive exact original Grant Pin on real Attempt, synthetic Commit/Reveal, ACL, regrant and content-change HOLD; fixture committed ONLY in disposable DB for HTTP driver test'
