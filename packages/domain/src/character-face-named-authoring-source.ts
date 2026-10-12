@@ -13,6 +13,13 @@ export const CHARACTER_FACE_NAMED_AUTHORING_SOURCE_SCHEMA_VERSION_V1 =
 export const CHARACTER_FACE_NAMED_AUTHORING_AUTHORITY_SOURCE_V1 =
   'character_runtime_authority_lane_v1' as const;
 
+/**
+ * Face-specific admission, intentionally narrower than the shared Character
+ * runtime registry. Runtime authoring alone cannot publish a new Face voice.
+ */
+export const CHARACTER_FACE_NAMED_AUTHORING_ADMITTED_IDS_V1 =
+  Object.freeze(['seyeon'] as const);
+
 export interface CharacterFaceNamedAuthoringSourceV1 {
   readonly schemaVersion:
     typeof CHARACTER_FACE_NAMED_AUTHORING_SOURCE_SCHEMA_VERSION_V1;
@@ -42,6 +49,10 @@ export interface CharacterFaceNamedAuthoringSourceV1 {
 export function resolveCharacterFaceNamedAuthoringSourceV1(
   characterId: string,
 ): CharacterFaceNamedAuthoringSourceV1 | null {
+  if (!CHARACTER_FACE_NAMED_AUTHORING_ADMITTED_IDS_V1.some(
+    (id) => id === characterId,
+  )) return null;
+
   const lane =
     resolveCharacterRuntimeAuthorityLaneV1(characterId);
   if (lane === null) return null;

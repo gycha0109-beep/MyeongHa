@@ -56,7 +56,8 @@ describe('named Character Face authoring source v1', () => {
     ]);
   });
 
-  it('fails closed for Characters without an admitted runtime-authority lane', () => {
+  it('requires distinct Face admission even if the Character runtime lane exists', () => {
+    expect(resolveCharacterRuntimeAuthorityLaneV1('rahyeon')).not.toBeNull();
     expect(
       resolveCharacterFaceNamedAuthoringSourceV1('yeoul'),
     ).toBeNull();

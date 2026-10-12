@@ -9,12 +9,12 @@ import {
 } from './runtime-authority-lane-v1.js';
 
 describe('parallel Character runtime authority lanes v1', () => {
-  it('registers Seyeon as the first independent lane only', () => {
+  it('registers reviewed Seyeon and Rahyeon lanes without silently publishing other characters', () => {
     expect(CHARACTER_RUNTIME_AUTHORITY_LANE_CHARACTER_IDS_V1).toEqual([
-      'seyeon',
+      'seyeon', 'rahyeon',
     ]);
     expect(resolveCharacterRuntimeAuthorityLaneV1('yeoul')).toBeNull();
-    expect(resolveCharacterRuntimeAuthorityLaneV1('rahyeon')).toBeNull();
+    expect(resolveCharacterRuntimeAuthorityLaneV1('rahyeon')).not.toBeNull();
   });
 
   it('uses the reviewed action-oriented Seyeon runtime instead of the stale calm-reviewer projection', () => {
@@ -73,4 +73,22 @@ describe('parallel Character runtime authority lanes v1', () => {
       'fcaa41f08a04ac66942609a5023fa6f69e9896a0',
     );
   });
+  it('pins Rahyeon to her approved Bible and Runtime v0.2, not the obsolete social catalyst', () => {
+    const lane = resolveCharacterRuntimeAuthorityLaneV1('rahyeon');
+    const typed = CHARACTER_RUNTIME_AUTHORING_V1.find((entry) => entry.characterId === 'rahyeon');
+    expect(lane).not.toBeNull();
+    expect(lane?.runtime).toBe(typed);
+    expect(lane?.speech.register).toBe('여유롭고 직접적인 성숙한 존댓말');
+    expect(lane?.communication.register).toBe('여유롭고 직접적인 성숙한 존댓말');
+    expect(lane?.provenance.runtime.path).toBe(
+      'docs/character/RAHYEON_CHARACTER_RUNTIME_DRAFT_V0_2.md',
+    );
+    expect(lane?.provenance.bible.blobSha).toBe('efba51048247704add8bbc19032afdd5a333aa06');
+    expect(lane?.provenance.runtime.blobSha).toBe('6cbc395f5b2e732dff7a1017b95b39c4fad504bc');
+    expect(lane?.authorityVersion).toMatch(/^sha256:v1:[0-9a-f]{64}$/u);
+    expect(JSON.stringify(typed)).not.toContain('밝고 빠른 사회적 촉진자');
+    expect(typed?.relationshipBehavior.rules.some((r) =>
+      r.ruleKey === 'rahyeon_repair_does_not_repeat_test')).toBe(true);
+  });
+
 });

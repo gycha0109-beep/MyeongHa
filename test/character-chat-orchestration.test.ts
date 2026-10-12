@@ -504,4 +504,58 @@ describe('mock Character Chat Turn orchestration', () => {
     expect(renderer.callCount).toBe(1);
     expect(commitPort.committedCount).toBe(0);
   });
+  it('passes a governed Rahyeon slice to the renderer without altering the Saju payload', () => {
+    const original = contextInput();
+    const rahyeonContext: CharacterRuntimeContextAssemblyInputV1 = {
+      ...original,
+      character: { ...original.character, characterId: 'rahyeon' },
+      grantedLifeFacts: original.grantedLifeFacts.map((fact) => ({
+        ...fact, granteeCharacterId: 'rahyeon',
+      })),
+    };
+    let observed: unknown = null;
+    const renderer = new StaticMockCharacterRendererProviderV1((input: { readonly rahyeonRuntime: unknown }) => {
+      observed = input.rahyeonRuntime;
+      return validDraft();
+    });
+    const result = runMockCharacterChatTurn({
+      turnId: 'rahyeon-typed-bridge-1',
+      attemptId: 'attempt-1',
+      capability: allowedCapability,
+      contextInput: rahyeonContext,
+      rahyeonTurn: {
+        kind: 'saju',
+        requestedFactKeys: ['identity.exact_age', 'past_romance.existence'],
+      },
+      allowedSuggestedActionKeys: ['open_records'],
+      renderer,
+      commitPort: new InMemoryCharacterChatCommitPortV1(),
+    });
+    expect(result.status).toBe('delivered');
+    expect(observed).toMatchObject({
+      characterId: 'rahyeon',
+      actionHint: 'source_grounded_reading',
+      authorizedPublicFacts: [{ factKey: 'identity.exact_age', value: '31세' }],
+      privateDisclosure: { result: 'NOT_REQUESTED', retrievedSources: [] },
+    });
+    if (result.status === 'delivered') {
+      expect(result.envelope.protectedSajuSegments[0]?.text).toBe('검증된 사주 블록입니다.');
+    }
+  });
+
+  it('blocks Rahyeon-only metadata from being attached to another Character', () => {
+    const renderer = new StaticMockCharacterRendererProviderV1(validDraft());
+    expect(() => runMockCharacterChatTurn({
+      turnId: 'cross-character-injection-1',
+      attemptId: 'attempt-1',
+      capability: allowedCapability,
+      contextInput: contextInput(),
+      rahyeonTurn: { kind: 'romance', requestedFactKeys: [] },
+      allowedSuggestedActionKeys: ['open_records'],
+      renderer,
+      commitPort: new InMemoryCharacterChatCommitPortV1(),
+    })).toThrow(/Rahyeon-specific context cannot attach/);
+    expect(renderer.callCount).toBe(0);
+  });
+
 });
