@@ -69,7 +69,10 @@ export function createPostgresStandardReaderProductScopeAuthorityPortV1(
   client: PostgresTransactionQueryV1,
 ): StandardReaderProductScopeAuthorityPortV1 {
   return Object.freeze({
-    async readCurrentScope({ productId, productSpecVersion }) {
+    async readCurrentScope(
+      { productId, productSpecVersion }:
+        Parameters<StandardReaderProductScopeAuthorityPortV1['readCurrentScope']>[0],
+    ) {
       if (!checkText(productId) || !checkText(productSpecVersion)) return null;
       const result = await client.query<ScopeRowV1>(READ_SCOPE_SQL, [
         productId, productSpecVersion,
