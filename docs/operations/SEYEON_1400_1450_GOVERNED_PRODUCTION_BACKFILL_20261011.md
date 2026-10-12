@@ -56,3 +56,14 @@ GitHub에서 보호된 `main` SHA와 일치하는 배포 실행에만 입장합�
 - 관계 history 6개 테이블은 **RLS 6/6 활성**, `anon`/`authenticated` 직접 SELECT 권한 없음, `myeongha_api_executor` 직접 INSERT 없음, 테이블 Owner는 `postgres`. 이 감사는 운영 Role/RLS 전체 무결성 검증을 대체하지 않습니다.
 - 운영 전용 원자적 백필의 pre/post SQL은 관계 8개 테이블(레거시·현재 projection 포함)에 한 건이라도 존재하면 **HOLD**하고, 관계 6개 테이블 RLS 및 익명/인증된 웹 역할의 직접 DML 권한이 달라지면 **HOLD**합니다. 사전/사후 둘 다 검사하고, 오류 시 전체 트랜잭션이 롤백됩니다.
 - 이 확장은 **유효한 관계 데이터가 있는 운영 환경을 복구 가능하다고 입증하지 않습니다.** 데이터가 발생하면 별도 복구 설계·다중 Subject 및 FK/Deferred/Trigger 검증·Owner 승인이 필요합니다. 기존 백업/실복원·프로덕션 승인 필수, G6 및 공개/개인 기록 모델 입력 계속 HOLD.
+
+## 2026-10-12 실제 운영 복구 완료 — 앞의 사전 사고 관측을 대체
+
+- 사용자 승인된 정확한 `1400..1450` 운영 복구: [Supabase Production #38198526367](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38198526367), `workflow_dispatch`, 완료 `2026-10-12T03:08:36Z`, Run SHA `bb47bce5acf9fa40b7f1d575f359dfc56dea07e6`.
+- `governed-seyeon-relationship-backfill-1400-1450` **SUCCESS**; 일반 `deploy-migrations` **SKIPPED**. 보호된 전용 SQL 로그: `PASS_SCOPED_PRODUCTION_1400_1450: exact six history rows and 11 functions`.
+- 독립 읽기 전용 Production 사후 감사(`2026-10-12T03:10:19Z`): 초기 migration **6/6**, 함수 **11/11**, 기존 `1460..1510` **6/6**, 원격 전용 `20261008090417` **유지**, 관계 8개 테이블 레코드 **0**, RLS **6/6**, 브라우저 직접 테이블 권한 **0**.
+- `2026-10-12T03:30:48Z` read-only 조회에서 초기 6개 이력 지속, `1520..1710` 후속 20개 이력 **0/20**. 앞 절의 "초기 0/6·함수 0/11" 문구는 **2026-10-11 당시 사전 복구 기록**이므로 현재 운영 상태로 해석하지 않는다.
+- [백업 #38196319511](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38196319511) → [격리 복원 #38196610263](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38196610263)은 **적용 이전 snapshot의 사전 복구 보호 증거**. 복구 이후 새 백업과 그 백업의 격리 복원, 전체 DR 판정은 아직 별도로 필요하다.
+- **다음 절차 및 트랙별 의존성:** [세연 복구 이후 통합 실행 로드맵](./SEYEON_POST_RECOVERY_EXECUTION_ROADMAP_20261012.md). 원격-only 이력/일반 push, 1520..1710, AI G0~G6, 양수 개인기록, 유료 AI, public route는 별도 승인 전 계속 HOLD.
+
+Watchtower-Track: ops
