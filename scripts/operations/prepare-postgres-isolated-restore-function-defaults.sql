@@ -1,5 +1,6 @@
 -- Portable Supabase dump restore: mirror Production's function creation default
 -- ACL on the disposable target's *creating* principal, before schema.sql.
+-- Applies to both function EXECUTE and table DML/default grants.
 --
 -- Production's postgres role has no global PUBLIC function EXECUTE and no
 -- per-public-schema anon/authenticated default function EXECUTE. However the
@@ -44,6 +45,16 @@ ALTER DEFAULT PRIVILEGES REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public
   REVOKE EXECUTE ON FUNCTIONS FROM anon, authenticated;
 
+-- Production postgres has no default PUBLIC/anon/authenticated table grants
+-- for app relationship tables. The isolated supabase_admin image grants
+-- browser table DML when a new public table is created. Restrict only the
+-- isolated creator's FUTURE table privileges before schema.sql replays.
+-- Do not REVOKE from existing restored tables; an explicit unsafe GRANT must
+-- still fail the downstream actual RLS/ACL assertion.
+ALTER DEFAULT PRIVILEGES REVOKE ALL PRIVILEGES ON TABLES FROM PUBLIC;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  REVOKE ALL PRIVILEGES ON TABLES FROM anon, authenticated;
+
 DO $seyeon_isolated_acl_assert$
 BEGIN
   IF EXISTS (
@@ -62,6 +73,26 @@ BEGIN
   ) THEN
     RAISE EXCEPTION 'HOLD_SEYEON_RESTORE: creator retains PUBLIC/anon/authenticated default function EXECUTE';
   END IF;
+
+  -- Fail closed on any table privilege in either the global creator
+  -- default ACL or the public-schema delta. RLS is checked separately
+  -- against the six real restored tables after the dump is replayed.
+  IF EXISTS (
+    SELECT 1
+    FROM pg_catalog.pg_default_acl d
+    JOIN pg_catalog.pg_roles r ON r.oid = d.defaclrole
+    JOIN LATERAL pg_catalog.aclexplode(d.defaclacl) a ON true
+    WHERE r.rolname = current_user
+      AND d.defaclobjtype = 'r'
+      AND d.defaclnamespace IN (0, 'public'::regnamespace::oid)
+      AND (
+        a.grantee = 0
+        OR a.grantee IN ('anon'::regrole::oid, 'authenticated'::regrole::oid)
+      )
+  ) THEN
+    RAISE EXCEPTION 'HOLD_SEYEON_RESTORE: creator retains PUBLIC/anon/authenticated default table privileges';
+  END IF;
+
   IF NOT EXISTS (
     SELECT 1 FROM pg_catalog.pg_default_acl d
     JOIN pg_catalog.pg_roles r ON r.oid = d.defaclrole

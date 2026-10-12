@@ -381,6 +381,25 @@ if [[ -n "$history_json" ]]; then
         'qry_latest_valid_relationship_snapshot_v1'
       ) ORDER BY p.proname;
     " >&2 || true
+    # Relationship table catalog only: no record contents, grants untouched.
+    # On fail-closed RLS/ACL drift, identify the exact restored object.
+    psql "$RESTORE_DATABASE_URL" -X -qAt --set ON_ERROR_STOP=1 -c "
+      SELECT c.relname,
+             pg_get_userbyid(c.relowner) AS owner,
+             c.relrowsecurity AS rls_enabled,
+             coalesce(c.relacl::text, '<default>') AS acl,
+             has_table_privilege('anon',c.oid,'SELECT,INSERT,UPDATE,DELETE') AS anon_dml,
+             has_table_privilege('authenticated',c.oid,'SELECT,INSERT,UPDATE,DELETE') AS auth_dml
+      FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+      WHERE n.nspname='public' AND c.relname IN (
+        'relationship_history_entries',
+        'relationship_event_records',
+        'relationship_event_adjustments',
+        'relationship_event_links',
+        'relationship_event_provenance_refs',
+        'relationship_state_snapshots'
+      ) ORDER BY c.relname;
+    " >&2 || true
     echo 'HOLD_SEYEON_RESTORE: exact scoped relationship restore proof failed.' >&2
     exit 1
   }

@@ -31,6 +31,24 @@ SQL
   exit 1
 }
 
+# Reproduce the *table* privilege drift of the isolated Supabase image.
+# Both dangerous defaults and all probes remain within this disposable CI DB.
+seeded_table_defaults="$(psql -X -qAt --set ON_ERROR_STOP=1 <<'SQL'
+ALTER DEFAULT PRIVILEGES GRANT SELECT ON TABLES TO PUBLIC;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO anon, authenticated;
+CREATE TABLE public.seyeon_restore_default_acl_table_probe(id integer);
+SELECT has_table_privilege(
+  'anon', 'public.seyeon_restore_default_acl_table_probe'::regclass,
+  'SELECT,INSERT,UPDATE,DELETE');
+DROP TABLE public.seyeon_restore_default_acl_table_probe;
+SQL
+)"
+[[ "$seeded_table_defaults" == 't' ]] || {
+  echo 'FAIL default-table-ACL fixture did not recreate browser exposure' >&2
+  exit 1
+}
+
 creator_acl_proof="$(psql -X -qAt --set ON_ERROR_STOP=1 \
   -f scripts/operations/prepare-postgres-isolated-restore-function-defaults.sql)"
 [[ "$creator_acl_proof" == 'PASS_SEYEON_ISOLATED_CREATOR_FUNCTION_DEFAULT_ACL' ]]
@@ -50,6 +68,23 @@ SQL
   exit 1
 }
 echo 'PASS_SEYEON_RESTORE_PG17_CREATOR_DEFAULT_ACL_NORMALIZATION'
+restricted_table_defaults="$(psql -X -qAt --set ON_ERROR_STOP=1 <<'SQL'
+CREATE TABLE public.seyeon_restore_default_acl_table_probe(id integer);
+SELECT NOT has_table_privilege(
+  'anon', 'public.seyeon_restore_default_acl_table_probe'::regclass,
+  'SELECT,INSERT,UPDATE,DELETE')
+AND NOT has_table_privilege(
+  'authenticated', 'public.seyeon_restore_default_acl_table_probe'::regclass,
+  'SELECT,INSERT,UPDATE,DELETE');
+DROP TABLE public.seyeon_restore_default_acl_table_probe;
+SQL
+)"
+[[ "$restricted_table_defaults" == 't' ]] || {
+  echo 'FAIL isolated restore creator default still exposes browser table DML' >&2
+  exit 1
+}
+echo 'PASS_SEYEON_RESTORE_PG17_CREATOR_TABLE_DEFAULT_ACL_NORMALIZATION'
+
 
 sql='scripts/operations/seyeon-relationship-isolated-restore-proof.sql'
 history='[
@@ -100,6 +135,22 @@ expect_rejection 'explicit anon function GRANT is never normalized away' \
   "$history" 'restored early function publicly executable'
 psql -X -q --set ON_ERROR_STOP=1 -c \
   'REVOKE EXECUTE ON FUNCTION public.relationship_event_json_v1(uuid) FROM anon;' >/dev/null
+
+# Default privilege hardening must NOT hide explicit unsafe table grants
+# or silently repair disabled row-level security on any real restored table.
+psql -X -q --set ON_ERROR_STOP=1 -c \
+  'GRANT SELECT ON TABLE public.relationship_history_entries TO anon;' >/dev/null
+expect_rejection 'explicit anon relationship table SELECT' "$history" \
+  'relationship RLS or browser table ACL mismatch'
+psql -X -q --set ON_ERROR_STOP=1 -c \
+  'REVOKE SELECT ON TABLE public.relationship_history_entries FROM anon;' >/dev/null
+
+psql -X -q --set ON_ERROR_STOP=1 -c \
+  'ALTER TABLE public.relationship_history_entries DISABLE ROW LEVEL SECURITY;' >/dev/null
+expect_rejection 'disabled relationship table RLS' "$history" \
+  'relationship RLS or browser table ACL mismatch'
+psql -X -q --set ON_ERROR_STOP=1 -c \
+  'ALTER TABLE public.relationship_history_entries ENABLE ROW LEVEL SECURITY;' >/dev/null
 
 [[ "$(run_proof "$history")" == 'PASS_SEYEON_RESTORED_EARLY_HISTORY_SNAPSHOT_6_FUNCTIONS_11_RLS_6' ]]
 echo 'PASS_SEYEON_RESTORE_PG17_REAL_CATALOG_NEGATIVES'
