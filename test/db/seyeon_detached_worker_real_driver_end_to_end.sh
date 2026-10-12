@@ -73,22 +73,24 @@ SQL
 }
 for item in "d4f00000-0000-4000-8000-000000000011 estimated" \
             "d4f00000-0000-4000-8000-000000000012 unknown" \
-            "d4f00000-0000-4000-8000-000000000013 estimated"; do
+            "d4f00000-0000-4000-8000-000000000013 estimated" \
+            "d4f00000-0000-4000-8000-000000000014 estimated" \
+            "d4f00000-0000-4000-8000-000000000015 estimated"; do
   read -r call kind <<< "$item"
   admit_and_store "$call" "$kind" >"$tmp/$kind-$call.sql"
   db -f "$tmp/$kind-$call.sql" >"$tmp/$kind-$call.log" 2>&1 || {
     cat "$tmp/$kind-$call.log" >&2; exit 4;
   }
 done
-[[ "$(db -c "select count(*) from public.seyeon_ai_provider_receipt_queue_v1")" == 3 ]] || exit 5
-[[ "$(db -c "select occupied_micro_usd from public.seyeon_ai_governor_daily_budgets_v1 where bucket_utc_date='$day'")" == 11100 ]] || exit 6
+[[ "$(db -c "select count(*) from public.seyeon_ai_provider_receipt_queue_v1")" == 5 ]] || exit 5
+[[ "$(db -c "select occupied_micro_usd from public.seyeon_ai_governor_daily_budgets_v1 where bucket_utc_date='$day'")" == 18500 ]] || exit 6
 
 SEYEON_DETACHED_REAL_DB_TEST=1 \
   ./node_modules/.bin/vitest run test/seyeon-detached-worker-real-postgres.test.ts --maxWorkers=1
 
-[[ "$(db -c "select count(*) from public.seyeon_ai_provider_receipt_queue_v1 where acked_at is not null")" == 3 ]] || exit 7
+[[ "$(db -c "select count(*) from public.seyeon_ai_provider_receipt_queue_v1 where acked_at is not null")" == 5 ]] || exit 7
 [[ "$(db -c "select count(*) from public.seyeon_ai_call_cost_events
-  where call_id::text like 'd4f00000-%' and lifecycle_state='settled'")" == 3 ]] || exit 8
+  where call_id::text like 'd4f00000-%' and lifecycle_state='settled'")" == 5 ]] || exit 8
 [[ "$(db -c "select occupied_micro_usd from public.seyeon_ai_governor_daily_budgets_v1
-  where bucket_utc_date='$day'")" == 4300 ]] || exit 9
-echo 'D4B-10G real TypeScript PostgreSQL driver, exact receipt, lost COMMIT, replay and ACK PASS'
+  where bucket_utc_date='$day'")" == 4900 ]] || exit 9
+echo 'D4B-10H real PostgreSQL claim/settlement/ack lost COMMIT replies, replay, budget PASS'
