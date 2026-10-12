@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { describe, expect, it } from 'vitest';
+// @ts-expect-error JS-only operational script has no ambient .mjs declarations
 import { buildRestoreEvidenceEnvelope } from '../../scripts/build-postgres-restore-evidence-envelope.mjs';
 
 const exporter = readFileSync('scripts/operations/export-production-postgres-backup.sh', 'utf8');
