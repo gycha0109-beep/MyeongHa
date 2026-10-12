@@ -2,6 +2,7 @@ import { afterAll, describe, expect, it } from 'vitest';
 import { Pool, type PoolClient } from 'pg';
 import type { PostgresTransactionQueryV1 } from '../apps/api/src/postgres-subject-execution.js';
 import { createPostgresDbApprovedStandardReaderSelectionPortV1 } from '../apps/api/src/postgres-standard-reader-approved-rule-v1.js';
+import { createPostgresStandardReaderV2PolicyPreflightV1 } from '../apps/api/src/postgres-standard-reader-v2-bind-policy-preflight-v1.js';
 
 const enabled = process.env.MYEONGHA_D01_REAL_PG === '1';
 const PRODUCT = '11392000-0000-0000-0000-000000000001';
@@ -62,20 +63,68 @@ describe.runIf(enabled)('D-01 Product-approved rule source / disposable PostgreS
   it('denies disabled Product, unpublished Reader and forged Subject', async () => {
     const results = await executor(async (client) => {
       const catalog = createPostgresDbApprovedStandardReaderSelectionPortV1(client);
-      return Promise.all([
-        catalog.resolveEligibleReaderSelection({
+      return [
+        await catalog.resolveEligibleReaderSelection({
           subjectId: SUBJECT, productId: DISABLED, readerCharacterId: 'seyeon',
         }),
-        catalog.resolveEligibleReaderSelection({
+        await catalog.resolveEligibleReaderSelection({
           subjectId: SUBJECT, productId: PRODUCT, readerCharacterId: 'yeoul',
         }),
-        catalog.resolveEligibleReaderSelection({
+        await catalog.resolveEligibleReaderSelection({
           subjectId: '11390000-0000-0000-0000-000000000099',
           productId: PRODUCT, readerCharacterId: 'baekheon',
         }),
-      ]);
+      ];
     });
     expect(results).toEqual([null, null, null]);
+  });
+
+  it('classifies an unlocked Standard Reader without specialist can_initiate', async () => {
+    const specialist = await pg.query(
+      "select count(*)::integer as n from public.character_capabilities " +
+      "where character_id = 'baekheon' " +
+      "and content_bundle_id = '11391000-0000-0000-0000-000000000001'::uuid " +
+      "and saju_domain = 'relationship'",
+    );
+    expect(specialist.rows[0]?.n).toBe(0);
+
+    const decision = await executor((client) =>
+      createPostgresStandardReaderV2PolicyPreflightV1(client).assess({
+        resolvedSubjectId: SUBJECT,
+        productId: PRODUCT,
+        readerCharacterId: 'baekheon',
+      }));
+    expect(decision).toMatchObject({
+      status: 'standard_candidate',
+      productId: PRODUCT,
+      readerCharacterId: 'baekheon',
+      approvedPolicyRevision: 'synthetic-d01-real-db-test-only',
+    });
+    expect(decision).not.toHaveProperty('entitlementGrantId');
+    expect(decision).not.toHaveProperty('readingId');
+    expect(decision).not.toHaveProperty('canInitiate');
+  });
+
+  it('withholds disabled Product, unpublished Reader, forged Subject and unknown IDs', async () => {
+    const decisions = await executor(async (client) => {
+      const port = createPostgresStandardReaderV2PolicyPreflightV1(client);
+      return [
+        await port.assess({
+          resolvedSubjectId: SUBJECT, productId: DISABLED, readerCharacterId: 'seyeon',
+        }),
+        await port.assess({
+          resolvedSubjectId: SUBJECT, productId: PRODUCT, readerCharacterId: 'yeoul',
+        }),
+        await port.assess({
+          resolvedSubjectId: '11390000-0000-0000-0000-000000000099',
+          productId: PRODUCT, readerCharacterId: 'baekheon',
+        }),
+        await port.assess({
+          resolvedSubjectId: SUBJECT, productId: PRODUCT, readerCharacterId: 'unregistered',
+        }),
+      ];
+    });
+    expect(decisions.every((decision) => decision.status === 'withheld')).toBe(true);
   });
 
   it('never creates any receipt, Reader Grant or paid output', async () => {
