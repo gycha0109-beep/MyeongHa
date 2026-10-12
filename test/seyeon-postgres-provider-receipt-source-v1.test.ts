@@ -44,7 +44,10 @@ function preflight(){
     canLogin:true,canInherit:false,isSuper:false,canBypassRls:false,
     canCreateDb:false,canCreateRole:false,hasWorkerRole:true,otherMemberships:0,
     isApiMember:false,isGovernedMember:false,isCostOwnerMember:false,
-    workerCanSettle:true,canDirectSettle:false,canStart:false,
+    workerCanSettle:true,canDirectSettle:false,
+    workerCanClaim:true,workerCanAck:true,workerCanStore:false,
+    canDirectClaim:false,canDirectAck:false,canDirectStore:false,
+    canDirectReceiptQueue:false,workerCanDirectReceiptQueue:false,canStart:false,
     canReadLedger:false,canReadBudget:false,
   };
 }
