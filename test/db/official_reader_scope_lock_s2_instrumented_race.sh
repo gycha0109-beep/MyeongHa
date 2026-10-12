@@ -116,6 +116,23 @@ baseline="$(p -c "select count(distinct a.reader_content_bundle_id)
 [[ "$baseline" == 1 ]] || fail "expected exactly one active Reader B bundle at baseline"
 
 
+# Read after taking the same scope lock, inside one trusted transaction.
+read_locked_scope_state() {
+  p -c "
+    begin;
+    select pg_catalog.set_config('myeongha.subject_id', '$subject', true);
+    select scope_state || '|' || active_bundle_count::text || '|' ||
+           coalesce(current_bundle_id::text, '')
+    from public.internal_qry_official_reader_locked_bundle_scope_v1(
+      '$subject'::uuid, '$reading'::uuid, '$reader'
+    );
+    commit;
+  " | grep -E '^(no_active_grant|one_current_bundle|ambiguous_bundles)\\|'
+}
+initial_scope="$(read_locked_scope_state)"
+[[ "$initial_scope" =~ ^one_current_bundle\\|1\\|[0-9a-f-]{36}$ ]] ||
+  fail "private post-lock scope query missed initial single bundle"
+
 # Case 1: T2-like exact scope reading arrives BEFORE an independently minted
 # purchase Grant / Reader bind. The proposed Commerce writer MUST wait.
 # The holder sees only the original B2 bundle, then releases the scope.
@@ -213,6 +230,9 @@ active_bundles="$(p -c "select count(distinct a.reader_content_bundle_id)
     and (g.valid_until is null or g.valid_until>clock_timestamp());")"
 [[ "$new_access" == "1" && "$active_bundles" == "2" ]] ||
   fail "new Grant must commit only after T2 and then create two-bundle ambiguity"
+after_new_scope="$(read_locked_scope_state)"
+[[ "$after_new_scope" == 'ambiguous_bundles|2|' ]] ||
+  fail "private post-lock scope query selected a bundle under two-bundle ambiguity"
 pass "same scoped new receipt Grant/Bind waits for T2; fresh access becomes ambiguous afterwards"
 
 # Revoke B4 under the same proposed lock (only a disposable synthetic row).
@@ -238,6 +258,10 @@ active_only_b2="$(p -c "select count(distinct a.reader_content_bundle_id)
   where a.subject_id='$subject'::uuid and a.official_reading_id='$reading'::uuid
     and a.reader_character_id='$reader' and g.status='active';")"
 [[ "$active_only_b2" == "1" ]] || fail "B2 must be the sole remaining bundle"
+after_b4_revoke_scope="$(read_locked_scope_state)"
+[[ "$after_b4_revoke_scope" =~ ^one_current_bundle\\|1\\|[0-9a-f-]{36}$ ]] ||
+  fail "private post-lock scope query missed surviving B2"
+
 
 # Case 2: Revoke of the last active Grant arrives FIRST. T2 must wait and
 # re-read after the revocation commits (must observe zero active bundles).
@@ -292,6 +316,9 @@ if ! wait "$reader_pid"; then cat "$tmpdir/t2-after-revoke.out" >&2; fail "T2 af
 reader_pid=""
 grep -qx 'T2_POST_REVOKE_BUNDLES=0' "$tmpdir/t2-after-revoke.out" ||
   fail "T2 did not see zero active purchase rights after first revoke"
+after_all_revoke_scope="$(read_locked_scope_state)"
+[[ "$after_all_revoke_scope" == 'no_active_grant|0|' ]] ||
+  fail "private post-lock scope query returned paid access after all Grants revoked"
 pass "revoke-first scope lock blocks T2 and its fresh read sees no active Grant"
 
 # This validates the proposed all-participants protocol only. Unmodified
