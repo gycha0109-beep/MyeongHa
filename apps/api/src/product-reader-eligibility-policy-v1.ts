@@ -11,6 +11,10 @@ import {
  * A1 — Product eligibility ONLY. Never a Reader Grant, Reading-access proof,
  * content-release approval, payment authority, or public-runtime activation.
  * The rule must come from a Product/Commerce-owned server authority port.
+ * Standard: all canonical Readers can be selected for separately purchased access.
+ * Premium: this Product has exactly ONE owning Reader; targetReaderId is a
+ * relation, not a list of other Readers to prohibit. No Reader gets paid
+ * content access merely by matching this identity.
  */
 export interface ProductReaderEligibilitySourceV1 {
   readonly productId: string;
@@ -28,8 +32,8 @@ export type ProductReaderRuleV1 =
       readonly kind: 'standard_all_readers';
     }>
   | Readonly<ProductReaderRuleBaseV1 & {
-      readonly kind: 'premium_restricted';
-      readonly allowedReaderIds: readonly OfficialReaderRuntimeIdV1[];
+      readonly kind: 'premium_character_bound';
+      readonly targetReaderId: OfficialReaderRuntimeIdV1;
     }>;
 
 export type ProductReaderRuleLookupV1 =
@@ -109,16 +113,10 @@ function validRule(value: unknown): value is ProductReaderRuleV1 {
     return false;
   }
   if (value.kind === 'standard_all_readers') return exactKeys(value, base);
-  if (value.kind !== 'premium_restricted' ||
-      !exactKeys(value, [...base, 'allowedReaderIds']) ||
-      !Array.isArray(value.allowedReaderIds) ||
-      value.allowedReaderIds.length < 1 ||
-      value.allowedReaderIds.length > OFFICIAL_READER_RUNTIME_IDS_V1.length) {
-    return false;
-  }
-  const ids: readonly unknown[] = value.allowedReaderIds;
-  return ids.every((id) => typeof id === 'string' && officialReaderIds.has(id)) &&
-    new Set(ids).size === ids.length;
+  return value.kind === 'premium_character_bound' &&
+    exactKeys(value, [...base, 'targetReaderId']) &&
+    typeof value.targetReaderId === 'string' &&
+    officialReaderIds.has(value.targetReaderId);
 }
 
 function withheld(reason: ProductReaderEligibilityWithheldReasonV1):
@@ -162,10 +160,8 @@ export function assessProductReaderEligibilityV1(input: Readonly<{
       rule.sajuDomain !== input.source.sajuDomain) {
     return withheld('policy_source_mismatch');
   }
-  if (rule.kind === 'premium_restricted' &&
-      !rule.allowedReaderIds.includes(
-        input.serverReaderId as OfficialReaderRuntimeIdV1,
-      )) {
+  if (rule.kind === 'premium_character_bound' &&
+      rule.targetReaderId !== input.serverReaderId) {
     return withheld('reader_excluded');
   }
   return Object.freeze({

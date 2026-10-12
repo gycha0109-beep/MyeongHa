@@ -1143,11 +1143,11 @@ describe('A3-gamma server-only Thread-bound official standard V2 Preview (public
     authority.productReaderEligibilityAuthorityPort.readApprovedRule.mockResolvedValue({
       status: 'approved',
       rule: {
-        kind: 'premium_restricted',
+        kind: 'premium_character_bound',
         productId: PRODUCT_ID,
         productSpecVersion: 'standard-reading-v1',
         sajuDomain: 'career',
-        allowedReaderIds: ['baekheon'],
+        targetReaderId: 'baekheon',
         ruleVersion: 'synthetic-premium-policy-v1',
         approvedPolicyRevision: 'synthetic-premium-revision-v1',
       },
@@ -1517,13 +1517,13 @@ describe('A3-epsilon server-only Official Standard Reader Chat V2 preflight (pub
       return {
         status: 'approved' as const,
         rule: {
-          kind: reads < 3 ? 'standard_all_readers' as const : 'premium_restricted' as const,
+          kind: reads < 3 ? 'standard_all_readers' as const : 'premium_character_bound' as const,
           productId: PRODUCT_ID,
           productSpecVersion: 'standard-reading-v1',
           sajuDomain: 'career' as const,
           ruleVersion: 'synthetic-test-reader-policy-v1',
           approvedPolicyRevision: 'synthetic-test-revision-v1',
-          ...(reads < 3 ? {} : { allowedReaderIds: ['baekheon'] }),
+          ...(reads < 3 ? {} : { targetReaderId: 'baekheon' }),
         },
       };
     }) as never;
@@ -1644,8 +1644,8 @@ describe('A3-zeta / PR 2-A server-only Chat Grounding V2 admission (public OFF)'
     f.authority.productReaderEligibilityAuthorityPort.readApprovedRule.mockResolvedValue({
       status: 'approved',
       rule: {
-        kind: 'premium_restricted',
-        allowedReaderIds: ['baekheon'],
+        kind: 'premium_character_bound',
+        targetReaderId: 'baekheon',
         productId: PRODUCT_ID,
         productSpecVersion: 'standard-reading-v1',
         sajuDomain: 'career',
@@ -1664,8 +1664,8 @@ describe('A3-zeta / PR 2-A server-only Chat Grounding V2 admission (public OFF)'
       f.authority.productReaderEligibilityAuthorityPort.readApprovedRule.mockResolvedValue({
         status: 'approved',
         rule: {
-          kind: 'premium_restricted',
-          allowedReaderIds: ['baekheon'],
+          kind: 'premium_character_bound',
+          targetReaderId: 'baekheon',
           productId: PRODUCT_ID,
           productSpecVersion: 'standard-reading-v1',
           sajuDomain: 'career',
@@ -1916,7 +1916,7 @@ describe('A3-eta server-anchored follow-up evidence selection (public OFF)', () 
     f.authority.productReaderEligibilityAuthorityPort.readApprovedRule.mockResolvedValue({
       status: 'approved',
       rule: {
-        kind: 'premium_restricted', allowedReaderIds: ['seyeon'],
+        kind: 'premium_character_bound', targetReaderId: 'seyeon',
         productId: PRODUCT_ID, productSpecVersion: 'standard-reading-v1',
         sajuDomain: 'career', ruleVersion: 'synthetic-test-reader-policy-v1',
         approvedPolicyRevision: 'synthetic-test-revision-v1',

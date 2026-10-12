@@ -151,19 +151,19 @@ describe('D-01 inactive Product policy guard for existing Catalog + Unlock Reade
     expect(await f.port.resolveEligibleReaderSelection(INPUT)).toBeNull();
   });
 
-  it('cannot bypass premium allowlist through general Standard Reader scope', async () => {
+  it('links a Premium Product only to its target Reader without globally restricting other Products', async () => {
     const rule = {
       status: 'approved', rule: {
-        kind: 'premium_restricted',
+        kind: 'premium_character_bound',
         productId: PRODUCT, productSpecVersion: SPEC,
         sajuDomain: 'general',
         ruleVersion: 'synthetic-premium-rule',
         approvedPolicyRevision: 'synthetic-approved-premium',
-        allowedReaderIds: ['taegyeom'],
+        targetReaderId: 'taegyeom',
       },
     };
     expect(await fixture({ rule }).port.resolveEligibleReaderSelection(INPUT)).toBeNull();
-    // Product allowlisting still does not prove specialist DB capability.
+    // An owning Reader connection still does not prove specialist capability or a paid Grant.
     const allowed = fixture({
       selection: { ...SELECTION, readerCharacterId: 'taegyeom' },
       rule,
