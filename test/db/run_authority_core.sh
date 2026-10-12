@@ -57,6 +57,7 @@ psql -1 -v ON_ERROR_STOP=1 -f test/db/commerce_negative.sql
 
 bash test/db/account_deletion_policy_catalog_guard.sh
 bash test/db/subject_owned_data_graph_catalog_guard.sh
+node scripts/verify-rr03-approved-private-provenance-policy.mjs
 bash test/db/transitive_subject_dependency_graph_catalog_guard.sh
 bash test/db/outbox_claim_concurrency.sh
 bash test/db/saju_source_proof_nonce_claim_concurrency.sh
