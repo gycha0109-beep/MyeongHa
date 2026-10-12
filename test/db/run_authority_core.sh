@@ -160,6 +160,8 @@ run_isolated_case myeongha_reader_provider_revoke_scope_lock_private_test bash t
 run_isolated_case myeongha_reader_verified_provider_revoke_bridge_private_test bash test/db/official_reader_verified_provider_revoke_bridge_private.sh
 # S2: initial Reading has no UUID; lock the server-derived Subject×Product before Grant/Reading creation.
 run_isolated_case myeongha_reader_initial_product_scope_lock_private_test bash test/db/official_reader_initial_product_scope_lock_private.sh
+# D1: source-owned verified initial/additional purchase L0→L1 scope and real two-session Product-first lock.
+run_isolated_case myeongha_reader_unified_scope_entry_private_test bash test/db/official_reader_unified_scope_entry_private.sh
 bash test/db/entitlements_current_query.sh
 bash test/db/data_deletion_job_query.sh
 bash test/db/notification_preferences_query.sh
