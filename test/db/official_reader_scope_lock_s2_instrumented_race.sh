@@ -133,6 +133,33 @@ initial_scope="$(read_locked_scope_state)"
 [[ "$initial_scope" =~ ^one_current_bundle\|1\|[0-9a-f-]{36}$ ]] ||
   fail "private post-lock scope query missed initial single bundle"
 
+# No public, session, or privileged API runtime role may call this
+# pre-authority helper; successful owner-side SQL tests do not grant EXECUTE.
+private_function_count="$(p -c "
+  select count(*)
+  from pg_catalog.pg_proc p
+  join pg_catalog.pg_namespace n on n.oid=p.pronamespace
+  where n.nspname='public'
+    and p.proname='internal_qry_official_reader_locked_bundle_scope_v1'
+    and p.prosecdef=false and p.provolatile='v';
+")"
+[[ "$private_function_count" == "1" ]] ||
+  fail "post-lock current bundle query must be volatile SECURITY INVOKER"
+runtime_exec_count="$(p -c "
+  select count(*)
+  from pg_catalog.pg_roles r
+  where r.rolname in (
+    'anon','authenticated','service_role','myeongha_api_executor',
+    'myeongha_seyeon_chat_runtime_owner'
+  ) and pg_catalog.has_function_privilege(
+    r.rolname,
+    'public.internal_qry_official_reader_locked_bundle_scope_v1(uuid,uuid,text)',
+    'EXECUTE'
+  );
+")"
+[[ "$runtime_exec_count" == "0" ]] ||
+  fail "post-lock bundle query exposes unauthorized EXECUTE privilege"
+
 # Case 1: T2-like exact scope reading arrives BEFORE an independently minted
 # purchase Grant / Reader bind. The proposed Commerce writer MUST wait.
 # The holder sees only the original B2 bundle, then releases the scope.
