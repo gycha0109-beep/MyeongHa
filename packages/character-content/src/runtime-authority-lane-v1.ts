@@ -67,6 +67,26 @@ const SEYEON_RUNTIME_AUTHORITY_PROVENANCE_V1 =
     }),
   }) satisfies CharacterRuntimeAuthorityProvenanceV1;
 
+const RAHYEON_RUNTIME_AUTHORITY_PROVENANCE_V1 =
+  Object.freeze({
+    decisionDocument:
+      'docs/source-authority-decisions/RAHYEON_BIBLE_RUNTIME_V0_5_V0_2_TYPED_APPROVAL.md',
+    // Reviewed source document merge, not a claim of production publication.
+    reviewedCommit: 'af5400cb1cf1a04eb3c4ff3c20e2dcb321f26ac9',
+    bible: Object.freeze({
+      path: 'docs/character/RAHYEON_CHARACTER_BIBLE_DRAFT_V0_5.md',
+      blobSha: 'efba51048247704add8bbc19032afdd5a333aa06',
+    }),
+    runtime: Object.freeze({
+      path: 'docs/character/RAHYEON_CHARACTER_RUNTIME_DRAFT_V0_2.md',
+      blobSha: '6cbc395f5b2e732dff7a1017b95b39c4fad504bc',
+    }),
+    typedProjection: Object.freeze({
+      path: 'packages/character-content/src/runtime-authoring-v1.ts',
+      blobSha: '333f62f2055838d6072265de976f68bcd1c222d5',
+    }),
+  }) satisfies CharacterRuntimeAuthorityProvenanceV1;
+
 function stableJson(value: unknown): string {
   if (Array.isArray(value)) {
     return `[${value.map(stableJson).join(',')}]`;
@@ -165,6 +185,10 @@ const CHARACTER_RUNTIME_AUTHORITY_LANES_V1 =
     buildCharacterRuntimeAuthorityLaneV1(
       'seyeon',
       SEYEON_RUNTIME_AUTHORITY_PROVENANCE_V1,
+    ),
+    buildCharacterRuntimeAuthorityLaneV1(
+      'rahyeon',
+      RAHYEON_RUNTIME_AUTHORITY_PROVENANCE_V1,
     ),
   ] as const);
 
