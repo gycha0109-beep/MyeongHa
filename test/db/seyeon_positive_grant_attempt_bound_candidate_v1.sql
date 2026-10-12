@@ -325,11 +325,15 @@ begin
   exception when insufficient_privilege then null;
   end;
 
+  v_bool:=seyeon_positive_candidate.pin_before_model_v1(
+    s,t,turn_id,v_attempt_id,m,
+    'd6000000-0000-4000-8000-000000000002');
+  if v_bool then
+    raise exception 'wrong original Grant matched different Memory'; end if;
   begin
     perform seyeon_positive_candidate.pin_before_model_v1(
-      s,t,turn_id,v_attempt_id,m,
-      'd6000000-0000-4000-8000-000000000002');
-    raise exception 'candidate admitted a second Pin on same Attempt';
+      s,t,turn_id,v_attempt_id,m,g);
+    raise exception 'candidate admitted a duplicate Pin on same Attempt';
   exception when unique_violation then null;
   end;
   if seyeon_positive_candidate.commit_test_v1(
