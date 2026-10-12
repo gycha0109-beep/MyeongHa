@@ -180,23 +180,34 @@ export function createSeyeonPostgresProviderReceiptSourceV1(
   pool:NodePostgresDriverPoolV1,
 ):SeyeonDetachedSettlementReceiptSourceV1 {
   let pending:{callId:string;token:string}|null=null;
+  let claimInFlight=false;
+  let ackInFlight=false;
   return Object.freeze({
     async loadNextStoredReceipt(){
-      if (pending!==null) return fail();
-      const claim=await withRole(pool,async client=>{
-        const rows=(await client.query(CLAIM_SEYEON_PROVIDER_RECEIPT_SQL_V1)).rows;
-        if (rows.length>1) return fail();
-        return rows.length===0 ? null : receiptFromClaim(rows[0]!);
-      });
-      if (claim===null) return null;
-      pending={callId:claim.receipt.callId,token:claim.claimToken};
-      return claim.receipt;
+      // Acquire the in-process fence BEFORE the first database await.
+      // Concurrent settleNext calls cannot overwrite each other's lease.
+      if (pending!==null || claimInFlight || ackInFlight) return fail();
+      claimInFlight=true;
+      try {
+        const claim=await withRole(pool,async client=>{
+          const rows=(await client.query(CLAIM_SEYEON_PROVIDER_RECEIPT_SQL_V1)).rows;
+          if (rows.length>1) return fail();
+          return rows.length===0 ? null : receiptFromClaim(rows[0]!);
+        });
+        if (claim===null) return null;
+        pending={callId:claim.receipt.callId,token:claim.claimToken};
+        return claim.receipt;
+      } finally {
+        claimInFlight=false;
+      }
     },
     async acknowledgeSettled(callId:string,_result:Readonly<{
       replayed:boolean;occupiedMicroUsd:bigint;overCeiling:boolean;
     }>){
       const owned=pending;
-      if (owned===null||exactId(callId)!==owned.callId) return fail();
+      if (owned===null || ackInFlight || claimInFlight ||
+          exactId(callId)!==owned.callId) return fail();
+      ackInFlight=true;
       try {
         await withRole(pool,async client=>{
           const result=await client.query(ACK_SEYEON_PROVIDER_RECEIPT_SQL_V1,[
@@ -206,10 +217,18 @@ export function createSeyeonPostgresProviderReceiptSourceV1(
               result.rows[0]?.acknowledged!==true) return fail();
         });
       } finally {
-        // After a lost ACK reply, release only the in-process claim. Database
-        // fencing survives; the same event becomes claimable after lease expiry.
+        // A failed/lost ACK leaves the database lease fenced. Never report it
+        // as acknowledged; only forget in-process state for later safe replay.
         pending=null;
+        ackInFlight=false;
       }
+    },
+    abandonUnsettledClaim(callId:string){
+      // Only the local pointer is discarded. The DB lease is not shortened,
+      // avoiding a forged early re-claim or a second paid request.
+      if (claimInFlight || ackInFlight || pending===null ||
+          exactId(callId)!==pending.callId) return fail();
+      pending=null;
     },
   });
 }
