@@ -45,6 +45,7 @@ class FakeConnection implements PostgresSubjectConnectionV1 {
   readonly calls: QueryCall[] = [];
   readonly releases: unknown[] = [];
   bindingError: unknown;
+  participants: readonly string[] = [PRIMARY_CHARACTER_ID, OTHER_CHARACTER_ID];
   streamRows: readonly Record<string, unknown>[] | undefined;
 
   async query<Row = Record<string, unknown>>(
@@ -67,7 +68,7 @@ class FakeConnection implements PostgresSubjectConnectionV1 {
           activeContentReleaseId: RELEASE_ID,
           activeContentBundleId: BUNDLE_ID,
           contentRevision: 7,
-          participantCharacterIds: [PRIMARY_CHARACTER_ID, OTHER_CHARACTER_ID],
+          participantCharacterIds: this.participants,
         }] as unknown as readonly Row[],
       };
     }
@@ -365,6 +366,134 @@ describe('owner Chat read HTTP boundary', () => {
     expect(response.status).toBe(405);
     expect(response.headers.get('allow')).toBe('GET');
     expect(response.headers.get('cache-control')).toBe('no-store');
+    expect(f.verifier.calls).toHaveLength(0);
+    expect(f.pool.connectCalls).toBe(0);
+  });
+});
+
+
+describe('Se-yeon historical current-rights disclosure gate (no Production adapter)', () => {
+  function seyeonFixture() {
+    const f = fixture();
+    f.connection.participants = ['seyeon'];
+    return f;
+  }
+
+  function authorizedRow(sequenceNo = 4) {
+    return {
+      messageId: '96000000-0000-4000-8000-000000000001',
+      sequenceNo,
+      senderType: 'character',
+      characterId: 'seyeon',
+      bodyText: 'CURRENT_GRANT_APPROVED_SYNTHETIC',
+      messagePayloadJsonb: { authority: 'synthetic-test-only' },
+      messageSchemaVersion: 'v1',
+      createdAt: new Date('2026-09-05T15:00:00.000Z'),
+      redacted: false,
+      redactedAt: null,
+    };
+  }
+
+  it('fails closed without an approved owner, before generic history/relationship queries', async () => {
+    const f = seyeonFixture();
+    f.connection.streamRows = [{ ...authorizedRow(), bodyText: 'UNAUTHORIZED_RAW_HISTORY' }];
+    const response = await handleChatReadRequestV1(f.input);
+    expect(response.status).toBe(503);
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    const payload = await response.text();
+    expect(payload).toContain('CHAT_DISCLOSURE_UNAVAILABLE');
+    expect(payload).not.toContain('UNAUTHORIZED_RAW_HISTORY');
+    expect(callTexts(f.connection).some((s) => s.includes('qry_chat_thread_stream_v2'))).toBe(false);
+    expect(callTexts(f.connection).some((s) => s.includes('qry_character_relationship_v1'))).toBe(false);
+    expect(callTexts(f.connection).at(-1)).toBe('ROLLBACK');
+  });
+
+  it('uses only the owner-authorized page, never the generic stream or derived relationship', async () => {
+    const f = seyeonFixture();
+    const portRequests: unknown[] = [];
+    f.connection.streamRows = [{ ...authorizedRow(), bodyText: 'UNAUTHORIZED_RAW_HISTORY' }];
+    const response = await handleChatReadRequestV1({
+      ...f.input,
+      seyeonHistoryDisclosurePort: {
+        readAuthorizedPage: async (arg) => {
+          portRequests.push(arg);
+          return [authorizedRow()];
+        },
+      },
+    });
+    expect(response.status).toBe(200);
+    const payload = await response.json();
+    expect(payload.data.messages).toHaveLength(1);
+    expect(payload.data.messages[0].bodyText).toBe('CURRENT_GRANT_APPROVED_SYNTHETIC');
+    expect(payload.data.latestCharacterMessage.bodyText).toBe('CURRENT_GRANT_APPROVED_SYNTHETIC');
+    expect(payload.data.relationship).toBeNull();
+    expect(JSON.stringify(payload)).not.toContain('UNAUTHORIZED_RAW_HISTORY');
+    expect(portRequests).toMatchObject([{
+      subjectId: SUBJECT_ID, threadId: THREAD_ID, characterId: 'seyeon',
+      afterSequenceNo: 0, pageSize: 50,
+    }]);
+    expect((portRequests[0] as { client: unknown }).client).toBe(f.connection);
+    expect(callTexts(f.connection).some((s) => s.includes('qry_chat_thread_stream_v2'))).toBe(false);
+    expect(callTexts(f.connection).some((s) => s.includes('qry_character_relationship_v1'))).toBe(false);
+    expect(callTexts(f.connection).at(-1)).toBe('COMMIT');
+  });
+
+  it('holds entire page if owner reports revoked Grant or throws DB error', async () => {
+    for (const readAuthorizedPage of [
+      async () => { throw new Error('SENSITIVE_DB_ERROR'); },
+      async () => null as never,
+      async () => [authorizedRow(), authorizedRow(5)],
+    ]) {
+      const f = seyeonFixture();
+      const response = await handleChatReadRequestV1({
+        ...f.input,
+        seyeonHistoryDisclosurePort: { readAuthorizedPage },
+      });
+      expect(response.status).toBe(503);
+      const text = await response.text();
+      expect(text).not.toContain('SENSITIVE_DB_ERROR');
+      expect(text).not.toContain('CURRENT_GRANT_APPROVED_SYNTHETIC');
+      expect(callTexts(f.connection).some((s) => s.includes('qry_chat_thread_stream_v2'))).toBe(false);
+      expect(callTexts(f.connection).at(-1)).toBe('ROLLBACK');
+    }
+  });
+
+  it('rejects cross-character history, bad cursors and mixed Se-yeon participant threads', async () => {
+    for (const row of [
+      { ...authorizedRow(), characterId: 'other-character' },
+      { ...authorizedRow(), sequenceNo: 0 },
+      { ...authorizedRow(), senderType: 'user', characterId: 'seyeon' },
+    ]) {
+      const f = seyeonFixture();
+      const response = await handleChatReadRequestV1({
+        ...f.input,
+        seyeonHistoryDisclosurePort: { readAuthorizedPage: async () => [row] },
+      });
+      expect(response.status).toBe(503);
+    }
+    const mixed = seyeonFixture();
+    mixed.connection.participants = ['seyeon', 'other-character'];
+    let called = false;
+    const response = await handleChatReadRequestV1({
+      ...mixed.input,
+      seyeonHistoryDisclosurePort: {
+        readAuthorizedPage: async () => {
+          called = true;
+          return [authorizedRow()];
+        },
+      },
+    });
+    expect(response.status).toBe(503);
+    expect(called).toBe(false);
+  });
+
+  it('rejects browser query parameters masquerading as original Grant or disclosure authority', async () => {
+    const f = fixture(
+      `https://myeongha.test/api/chat/${THREAD_ID}?afterSequenceNo=0&grantId=forged`,
+    );
+    f.connection.participants = ['seyeon'];
+    const response = await handleChatReadRequestV1(f.input);
+    expect(response.status).toBe(400);
     expect(f.verifier.calls).toHaveLength(0);
     expect(f.pool.connectCalls).toBe(0);
   });
