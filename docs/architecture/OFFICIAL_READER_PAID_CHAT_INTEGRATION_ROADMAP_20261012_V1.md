@@ -115,3 +115,12 @@ S1에서 공통 잠금 함수 자체가 성공하더라도 **S2 전체 경로가
 | S8 통합·출시 | **차단 유지** | 운영 1400~1450 이력 복구 증명, 출시 승인, 개인정보 삭제·복원 검증 필요 |
 
 **점검 구분:** S1 시험의 녹색 결과는 공통 잠금의 동일 범위 직렬화가 성공했음을 뜻하며, Commerce 실제 Writer·환불과 공개 결과의 선형화가 완료됐음을 뜻하지 않는다. 새 단계는 독립 변경 요청으로 검증한다.
+
+
+## 9. 본선 변화 및 분리된 검증 작업 (2026-10-12 추가)
+
+- 최신 본선에는 `1720_standard_reader_product_scope_read_v1.sql`이 합류했다. S1 `1740_official_reader_scope_lock_private_v1.sql`과는 독립이며 두 기능 모두 보존한다. PostgreSQL 15 카탈로그 스냅샷은 **두 migration이 함께 적용된 실제 합성 DB**에서 재계산한다.
+- S2 격리 경합 시험: [#1984](https://github.com/gycha0109-beep/MyeongHa/pull/1984). 제품/Commerce 실제 Writer 변경 없이 시험 호출자만 공통 잠금에 참여시켜, 새 영수증 발급 먼저/권한 회수 먼저의 순서 충돌을 실제 PostgreSQL 15에서 검증했다. 초기 확인한 [검사 38201976136](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38201976136)은 구 본선에서 성공했고, 신규 본선 재검증은 별도 진행한다.
+- 잠금 이후 현재 유효 묶음 판정: [#1987](https://github.com/gycha0109-beep/MyeongHa/pull/1987). **0개 / 1개 / 여러 묶음 충돌**만 구분하는 비공개 함수. 기존 검증 [38202209130](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38202209130) 성공. 새 본선에서는 변경된 DB 스키마 기준값과 재검증을 요구한다.
+- **선행 충돌:** RR-03 [#1960](https://github.com/gycha0109-beep/MyeongHa/pull/1960)의 `1720_official_reader_assistant_provenance_storage_v1.sql`과 현재 본선 Product `1720_standard_reader_product_scope_read_v1.sql`이 같은 1720 번호를 사용한다. 기존 RR-03/04의 근거 저장 내용을 삭제하거나 Product 기능으로 대체하지 않으며, 독립 번호 재배치·카탈로그·Privacy 삭제/복원 재검증 없이 병합/배포하지 않는다.
+- **미완료:** 실제 Commerce 발급·환불·회수 Writer의 공동 잠금 적용, RR-03 신뢰 출처 원자 저장, 유료 원문 보호 격리와 Reader 정식 조회, 운영 1400~1450 복구. 세 작업 가지의 검증 성공도 유료 답변 공개 승인으로 해석하지 않는다.
