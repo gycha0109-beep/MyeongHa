@@ -164,3 +164,19 @@ S1에서 공통 잠금 함수 자체가 성공하더라도 **S2 전체 경로가
 - 새 파일과 독립 실 DB 시험: `test/db/official_reader_provider_revoke_scope_lock_private.sh`. `test/db/run_authority_core.sh`의 격리 시험으로 등록한다.
 
 **개발·운영 차단:** 실제 PortOne/기타 결제사 콜백 호출자가 이 함수를 사용하지 않는다. 기존 `internal_apply_entitlement_effect_v1`의 직접 호출과 등록된 운영 Writer는 여전히 잠금 우회가 가능하다. 최초 Reading 발급, 미결속 구매권, 한 효과가 미확인 범위까지 영향을 주는 경우는 지원하지 않는다. 따라서 S2 전체 잠금 통일 및 유료 T2 공개 권한은 **미완료**. RR-03/04 사주 출처 원자 저장·보호 원문·후속 조회도 계속 차단한다.
+
+## 14. 검증된 결제사 환불 이벤트 → 공통 잠금 연결을 위한 비공개 실행 계약 (2026-10-12)
+
+**확인한 실제 현황:** `apps/api/src/commerce-provider-payment-completion-orchestration.ts`는 **결제 완료 확인**에 한정되며, 검증된 결제사 환불 이벤트를 Entitlement Effect 회수로 보내는 정식 HTTP/Worker 경로는 현재 저장소에 없다. `executePostgresCommerceInternalTransactionV1`은 유저 로그인 문맥과 분리된 `myeongha_commerce_internal_executor` 역할로 실행한다. 이를 일반 회원 컨텍스트로 가정하거나 클라이언트가 제공한 회원 ID를 신뢰해선 안 된다.
+
+**이번 구현(1780):** `internal_execute_official_reader_verified_provider_revoke_v1`는 비공개·`SECURITY DEFINER` 내부 연결 후보이다.
+
+1. 사전에 저장된 `commerce_provider_events` 중 **production 검증 완료 `payment.cancelled` 이벤트**로부터 production Receipt와 정확한 독립 구매권의 동일 회원을 유도한다. 사용자·사주·캐릭터 식별자를 함수 입력으로 받지 않는다.
+2. 이미 거래에 묶인 회원 문맥이 다른 경우 거부하고, 검증된 회원 ID만 거래 한정 내부 문맥으로 설정한다. 일반 사용자 역할의 회원 신원 확인 함수를 환불 이벤트에 오용하지 않는다.
+3. 앞 단계의 `internal_apply_official_reader_provider_revoke_locked_v1`를 호출해 모든 결속된 공식 Reading×Reader에 대한 잠금을 먼저 획득하게 한 뒤, 검증된 Commerce 원본 효과를 적용한다.
+4. 성공·실패 시 회원 문맥을 복원한다. 사전에 영수증/Grant의 변경 잠금을 먼저 잡지 않는다. `READ COMMITTED`가 아닌 거래는 차단한다.
+5. **함수 직접 실행권은 Commerce 내부 역할을 포함하여 전부 회수**하고, 단독 사용자·외부 서버·결제사 콜백·API 경로에 연결하지 않는다. 검증된 이벤트 입력의 취소 사유/타임스탬프 정규화와 운영 실행자 승인 전까지 활성화할 수 없다.
+
+**실제 DB 검증:** `official_reader_verified_provider_revoke_bridge_private.sh`는 회원 문맥 없이 실행한 verified Provider 취소를 통해 양방향 잠금 경합, 실행 이후 회원 문맥 복구, 기존 독립 구매권 회수 및 조회 차단, 미인증 실행 역할·서로 다른 회원 문맥 거부를 검증한다. `run_authority_core.sh`에서 독립 PostgreSQL 시험으로 실행한다.
+
+**남은 차단:** 안전한 Refund ingress 및 Provider Event 검증/정규화/순서의 소유 계약, Commerce 전용 최소 권한 호출자와 실제 엔드투엔드 회수(실결제 이벤트 사용) 검증, 최초 공식 Reading 구매를 위한 별도 잠금 정렬, RR-03 근거 증명/유료 보호 본문/원자 저장, RR-04 후속 조회, 운영 1400~1450 복원 증거. 비공개 SQL 후보의 검사 성공만으로 실거래 연동이나 법적 환불 결정을 선언하지 않는다.
