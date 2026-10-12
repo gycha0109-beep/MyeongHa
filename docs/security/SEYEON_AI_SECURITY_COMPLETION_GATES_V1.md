@@ -8,6 +8,12 @@ Reader 구매 기반 권한: [#1827](https://github.com/gycha0109-beep/MyeongHa/
 AI 경량 보안 정책 평가: [#1816](https://github.com/gycha0109-beep/MyeongHa/issues/1816)
 플랫폼 전반 감사: [#1529](https://github.com/gycha0109-beep/MyeongHa/issues/1529)
 
+G0 **상세 기술설계(Owner 미승인)**: [Positive Attempt SourceSet·D-03 Codec·1640 Zero Trigger·G2 Commit Blueprint](./SEYEON_G0_D03_G1_POSITIVE_PIN_DB_BLUEPRINT_V1_PROPOSED.md)
+
+G0→G6 **단계별 실행 로드맵(Owner 미승인)**: [R0~R8 Gate/검증/이관](../operations/SEYEON_G0_D03_G1_TO_G6_IMPLEMENTATION_ROADMAP_V1.md)
+
+> 2026-10-12: 기존 Gate 표의 HOLD는 그대로입니다. 계획/설계서 작성, PR CI 통과 또는 AI가 작성한 decision table은 Owner 승인·Production 적용 증거가 아닙니다.
+
 ## 판정 정의
 
 - **A / 구현 완료**: 실제 Production Code + PostgreSQL owner 함수 + HTTP/Replay 경로까지 보호가 연결되어, 더는 Shadow/Candidate-only가 아니다. G0/G1/G2/G3/G4 구현 필수.
