@@ -44,7 +44,10 @@ function preflight(){
     canLogin:true,canInherit:false,isSuper:false,canBypassRls:false,
     canCreateDb:false,canCreateRole:false,hasWorkerRole:true,otherMemberships:0,
     isApiMember:false,isGovernedMember:false,isCostOwnerMember:false,
-    workerCanSettle:true,canDirectSettle:false,canStart:false,
+    workerCanSettle:true,canDirectSettle:false,
+    workerCanClaim:true,workerCanAck:true,workerCanStore:false,
+    canDirectClaim:false,canDirectAck:false,canDirectStore:false,
+    canDirectReceiptQueue:false,workerCanDirectReceiptQueue:false,canStart:false,
     canReadLedger:false,canReadBudget:false,
   };
 }
@@ -63,9 +66,16 @@ function mockPool(input:{
   badPreflight?:boolean;
   wrongRole?:boolean;
   errorOn?:string;
+  holdClaim?:boolean;
+  holdAck?:boolean;
+  failSettlement?:boolean;
 }={}){
   const calls:Array<{sql:string;params?:readonly unknown[]}>=[], releases:Array<Error|undefined>=[];
   let claims=0,acks=0,ends=0,settlements=0,commits=0;
+  let releaseClaimGate:()=>void=()=>undefined;
+  let releaseAckGate:()=>void=()=>undefined;
+  const claimGate=new Promise<void>(resolve=>{releaseClaimGate=resolve;});
+  const ackGate=new Promise<void>(resolve=>{releaseAckGate=resolve;});
   const pool:NodePostgresDriverPoolV1={
     async connect(){
       return {
@@ -84,10 +94,13 @@ function mockPool(input:{
             return {rows:[{currentUser:input.wrongRole?'myeongha_api_executor':SEYEON_DETACHED_WORKER_ROLE_V1}]};
           if (sql===CLAIM_SEYEON_PROVIDER_RECEIPT_SQL_V1) {
             claims++;
+            if (input.holdClaim && claims===1) await claimGate;
             return {rows:claims===1&&input.row!==null?[input.row??queued()]:[]};
           }
-          if (sql.includes('cmd_settle_seyeon_ai_call_detached_v1')) {
+          if (sql.includes('cmd_settle_seyeon_ai_call_detached_v1') &&
+              params?.length===5) {
             settlements++;
+            if (input.failSettlement) throw new Error('synthetic settlement failure');
             const event=JSON.parse(String(params?.[4])) as Record<string,unknown>;
             expect(event).toEqual(input.row?.providerEvent??queued().providerEvent);
             return {rows:[{callId,replayed:false,
@@ -96,6 +109,7 @@ function mockPool(input:{
           }
           if (sql===ACK_SEYEON_PROVIDER_RECEIPT_SQL_V1) {
             acks++;
+            if (input.holdAck) await ackGate;
             expect(params).toEqual([callId,token]);
             return {rows:[{acknowledged:true}]};
           }
@@ -106,7 +120,7 @@ function mockPool(input:{
     },
     async end(){ends++;},
   };
-  return {pool,calls,releases,
+  return {pool,calls,releases,releaseClaimGate,releaseAckGate,
     get claims(){return claims;},get acks(){return acks;},
     get settlements(){return settlements;},get ends(){return ends;}};
 }
@@ -217,5 +231,45 @@ describe('D4B-10C3 private durable receipt source (synthetic PostgreSQL)',()=>{
     )).rejects.toThrow();
     expect(f.acks).toBe(0);
     await expect(source.loadNextStoredReceipt()).rejects.toThrow();
+  });
+
+  it('rejects overlapping claims before either has completed its database transaction',async()=>{
+    const f=mockPool({holdClaim:true});
+    const source=createSeyeonPostgresProviderReceiptSourceV1(f.pool);
+    const first=source.loadNextStoredReceipt();
+    await expect(source.loadNextStoredReceipt()).rejects.toThrow();
+    expect(f.claims).toBe(1);
+    f.releaseClaimGate();
+    expect((await first)?.callId).toBe(callId);
+    source.abandonUnsettledClaim?.(callId);
+    expect(await source.loadNextStoredReceipt()).toBeNull();
+    expect(f.acks).toBe(0);
+  });
+
+  it('rejects overlapping acknowledgements of the same lease',async()=>{
+    const f=mockPool({holdAck:true});
+    const source=createSeyeonPostgresProviderReceiptSourceV1(f.pool);
+    expect((await source.loadNextStoredReceipt())?.callId).toBe(callId);
+    const result={replayed:false,occupiedMicroUsd:300n,overCeiling:false};
+    const first=source.acknowledgeSettled(callId,result);
+    await expect(source.acknowledgeSettled(callId,result)).rejects.toThrow();
+    f.releaseAckGate();
+    await first;
+    expect(f.acks).toBe(1);
+    expect(await source.loadNextStoredReceipt()).toBeNull();
+  });
+
+  it('does not pin a local receipt forever when detached settlement aborts',async()=>{
+    const f=mockPool({failSettlement:true});
+    const source=createSeyeonPostgresProviderReceiptSourceV1(f.pool);
+    const worker=createSeyeonDetachedSettlementWorkerFromDriverV1({
+      driverPool:f.pool,source,
+    });
+    await expect(worker.settleNext()).rejects.toThrow('synthetic settlement failure');
+    expect(f.settlements).toBe(1);
+    expect(f.acks).toBe(0);
+    expect(f.calls.map(x=>x.sql)).toContain('ROLLBACK');
+    expect(await worker.settleNext()).toBeNull();
+    expect(f.claims).toBe(2);
   });
 });

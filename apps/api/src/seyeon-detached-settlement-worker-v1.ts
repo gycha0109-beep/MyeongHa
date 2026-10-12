@@ -41,6 +41,34 @@ select
   pg_catalog.has_function_privilege(session_user,
     'public.cmd_settle_seyeon_ai_call_detached_v1(uuid,uuid,uuid,text,jsonb)',
     'EXECUTE') as "canDirectSettle",
+  pg_catalog.has_function_privilege(
+    'myeongha_seyeon_settlement_worker',
+    'public.cmd_claim_seyeon_provider_receipt_v1()',
+    'EXECUTE') as "workerCanClaim",
+  pg_catalog.has_function_privilege(
+    'myeongha_seyeon_settlement_worker',
+    'public.cmd_ack_seyeon_provider_receipt_v1(uuid,uuid)',
+    'EXECUTE') as "workerCanAck",
+  pg_catalog.has_function_privilege(
+    'myeongha_seyeon_settlement_worker',
+    'public.cmd_store_seyeon_provider_receipt_v1(uuid,uuid,uuid,text,jsonb)',
+    'EXECUTE') as "workerCanStore",
+  pg_catalog.has_function_privilege(session_user,
+    'public.cmd_claim_seyeon_provider_receipt_v1()',
+    'EXECUTE') as "canDirectClaim",
+  pg_catalog.has_function_privilege(session_user,
+    'public.cmd_ack_seyeon_provider_receipt_v1(uuid,uuid)',
+    'EXECUTE') as "canDirectAck",
+  pg_catalog.has_function_privilege(session_user,
+    'public.cmd_store_seyeon_provider_receipt_v1(uuid,uuid,uuid,text,jsonb)',
+    'EXECUTE') as "canDirectStore",
+  pg_catalog.has_table_privilege(session_user,
+    'public.seyeon_ai_provider_receipt_queue_v1', 'SELECT,INSERT,UPDATE,DELETE')
+    as "canDirectReceiptQueue",
+  pg_catalog.has_table_privilege(
+    'myeongha_seyeon_settlement_worker',
+    'public.seyeon_ai_provider_receipt_queue_v1', 'SELECT,INSERT,UPDATE,DELETE')
+    as "workerCanDirectReceiptQueue",
   pg_catalog.has_function_privilege(session_user,
     'public.cmd_governed_start_seyeon_ai_call_v1(uuid,uuid,uuid,text,uuid,text,text,text,text,text,bigint,bigint,bigint)',
     'EXECUTE') as "canStart",
@@ -106,6 +134,8 @@ export interface SeyeonDetachedSettlementReceiptSourceV1 {
     callId: string,
     result: Readonly<{ replayed: boolean; occupiedMicroUsd: bigint; overCeiling: boolean }>,
   ): Promise<void>;
+  /** Drop a failed attempt's in-process claim only; never alter DB lease. */
+  abandonUnsettledClaim?(callId: string): void | Promise<void>;
 }
 
 export function verifySeyeonDetachedWorkerLoginV1(
@@ -122,6 +152,12 @@ export function verifySeyeonDetachedWorkerLoginV1(
       row.isApiMember !== false || row.isGovernedMember !== false ||
       row.isCostOwnerMember !== false ||
       row.workerCanSettle !== true || row.canDirectSettle !== false ||
+      row.workerCanClaim !== true || row.workerCanAck !== true ||
+      row.workerCanStore !== false ||
+      row.canDirectClaim !== false || row.canDirectAck !== false ||
+      row.canDirectStore !== false ||
+      row.canDirectReceiptQueue !== false ||
+      row.workerCanDirectReceiptQueue !== false ||
       row.canStart !== false ||
       row.canReadLedger !== false || row.canReadBudget !== false) {
     fail();
@@ -197,36 +233,47 @@ export function createSeyeonDetachedSettlementWorkerFromDriverV1(input: {
     async settleNext() {
       const receipt=await input.source.loadNextStoredReceipt();
       if (receipt===null) return null;
-      const {callId,parameters}=buildArguments(receipt);
-      const client: NodePostgresDriverClientV1=await input.driverPool.connect();
-      let begun=false;
-      let discard: Error | undefined;
       try {
-        const preflight=await client.query(DETACHED_WORKER_LOGIN_PREFLIGHT_SQL_V1);
-        verifySeyeonDetachedWorkerLoginV1(preflight.rows);
-        await client.query('BEGIN');
-        begun=true;
-        await client.query(ENTER_ROLE_SQL_V1);
-        const proof=await client.query(VERIFY_ROLE_SQL_V1);
-        if (proof.rows.length!==1 ||
-            proof.rows[0]?.currentUser!==SEYEON_DETACHED_WORKER_ROLE_V1) fail();
-        const result=checkedResult(
-          (await client.query(SETTLE_SQL_V1, parameters)).rows, callId,
-        );
-        // A lost COMMIT reply is UNKNOWN, never silently acknowledged.
-        await client.query('COMMIT');
-        begun=false;
-        await input.source.acknowledgeSettled(callId,result);
-        return result;
+        const {callId,parameters}=buildArguments(receipt);
+        const client: NodePostgresDriverClientV1=await input.driverPool.connect();
+        let begun=false;
+        let discard: Error | undefined;
+        try {
+          const preflight=await client.query(DETACHED_WORKER_LOGIN_PREFLIGHT_SQL_V1);
+          verifySeyeonDetachedWorkerLoginV1(preflight.rows);
+          await client.query('BEGIN');
+          begun=true;
+          await client.query(ENTER_ROLE_SQL_V1);
+          const proof=await client.query(VERIFY_ROLE_SQL_V1);
+          if (proof.rows.length!==1 ||
+              proof.rows[0]?.currentUser!==SEYEON_DETACHED_WORKER_ROLE_V1) fail();
+          const result=checkedResult(
+            (await client.query(SETTLE_SQL_V1, parameters)).rows, callId,
+          );
+          // Lost COMMIT reply is UNKNOWN: never acknowledge.
+          await client.query('COMMIT');
+          begun=false;
+          await input.source.acknowledgeSettled(callId,result);
+          return result;
+        } catch (error) {
+          discard=new Error('Detached settlement DB outcome requires safe replay.');
+          if (begun) {
+            try { await client.query('ROLLBACK'); }
+            catch { /* connection is discarded regardless */ }
+          }
+          throw error;
+        } finally {
+          client.release(discard);
+        }
       } catch (error) {
-        discard=new Error('Detached settlement DB outcome requires safe replay.');
-        if (begun) {
-          try { await client.query('ROLLBACK'); }
-          catch { /* connection is discarded regardless */ }
+        // Settlement/preflight failure cannot permanently pin local receipt
+        // state. The original DB lease remains fenced until its expiry.
+        try {
+          await input.source.abandonUnsettledClaim?.(receipt.callId);
+        } catch {
+          console.error('MYEONGHA_SEYEON_LOCAL_RECEIPT_ABANDON_FAILED');
         }
         throw error;
-      } finally {
-        client.release(discard);
       }
     },
     close() { return input.driverPool.end(); },
