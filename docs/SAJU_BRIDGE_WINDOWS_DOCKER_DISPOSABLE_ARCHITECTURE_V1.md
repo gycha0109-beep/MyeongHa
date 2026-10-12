@@ -50,6 +50,22 @@ CI와의 관계: 기존 `saju-bridge-cross-repo-local-http.yml` 하나에 **Comp
 
 강제종료/전원 꺼짐 등으로 finally가 실행되지 않은 경우 남을 수 있다. 로그에 출력된 고유 프로젝트 이름으로 소유 자원을 확인한 뒤 **그 프로젝트만** 정리한다. `docker system prune`, 다른 프로젝트 전체 제거 금지.
 
+### Docker Desktop 엔진 연결 실패 대응 (Windows)
+
+`docker compose version`과 `docker context inspect`는 Docker Engine이 꺼져 있어도 성공할 수 있다. 실행기는 Docker 자원을 만들기 전에 **실제 `docker info --format '{{.OSType}}'` 응답이 `linux`인지** 확인한다.
+
+```powershell
+docker context ls
+docker info
+docker compose version
+```
+
+- `open //./pipe/docker_engine: The system cannot find the file specified`는 Docker CLI에서 로컬 Windows named pipe의 Engine에 연결하지 못했다는 의미이다. Docker Desktop을 실행하고 Linux containers 모드로 전환한 뒤 `docker info`의 Server 항목을 확인한다.
+- 이 **사전 연결 검사**에서 실패한 경우에는 생성 시도 자체를 시작하지 않았으므로 `CLEANUP BLOCKED`를 출력하지 않는다. 이전 실행기가 `docker compose config`에서 실패하면서 정리 명령도 실패했다면, 로그만으로 컨테이너가 실제 남았다고 단정하지 않는다.
+- 이전 실행의 특정 프로젝트 잔여 자원을 조사할 경우 다른 프로젝트를 건드리지 않고 정확한 라벨로만 확인한다. 예: `docker ps -a --filter "label=com.docker.compose.project=myeongha-saju-full-47f68ba34a0d"`; 같은 필터를 `docker volume ls` 및 `docker network ls`에도 적용한다.
+- 이미지 다운로드나 컨테이너 생성 **이후** 엔진이 중단된다면 정리를 완수할 수 없을 수 있으므로 원래 프로젝트 ID에 한정해 사용자가 재확인해야 한다. Docker Engine 연결 오류를 검증 실패나 자원 정리 완료로 표시하지 않는다.
+- Windows Docker Desktop 직접 실행의 확인 기록은 사용자의 실제 기기 출력으로만 인정하며 GitHub Ubuntu CI로 대신하지 않는다.
+
 ## 4. 단계별 로드맵 · 종료 게이트
 
 | 단계 | 구현 | 게이트 | 범위 상태 |

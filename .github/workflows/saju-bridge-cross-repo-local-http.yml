@@ -8,6 +8,7 @@ on:
       - scripts/local/verify-saju-bridge-http.mjs
       - scripts/local/verify-saju-bridge-full.mjs
       - scripts/local/verify-saju-bridge-docker-local.mjs
+      - scripts/local/verify-saju-bridge-docker-local-preflight.test.mjs
       - scripts/local/saju-bridge-full.compose.yml
       - scripts/local/saju-bridge-local-auth-smoke.mjs
       - scripts/local/saju-bridge-auth-init.sql
@@ -112,6 +113,9 @@ jobs:
         run: |
           npm ci --ignore-scripts --no-audit --no-fund --prefix myeongha
           npm ci --ignore-scripts --no-audit --no-fund --prefix saju
+      - name: Reject stopped/non-Linux Docker Engine before allocating resources
+        working-directory: myeongha
+        run: node scripts/local/verify-saju-bridge-docker-local-preflight.test.mjs
       - name: Verify disposable Windows-compatible Docker Compose foundation
         working-directory: myeongha
         run: node scripts/local/verify-saju-bridge-docker-local.mjs
