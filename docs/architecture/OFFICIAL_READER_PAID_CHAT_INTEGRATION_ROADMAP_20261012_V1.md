@@ -207,3 +207,18 @@ S1에서 공통 잠금 함수 자체가 성공하더라도 **S2 전체 경로가
 - 이번 변경은 **첫 구매**에 대해서만 바깥 Product 잠금을 구현하며 **기존 추가 Reader 권한 발급·회수·T2 조회는 여전히 직접 Product 잠금을 취득하지 않는다.** 모든 Writer의 바깥 잠금 적용과 교착·환불/조회/재시도 경합을 확인하기 전까지 전체 잠금 통일 선언 금지.
 - 검증된 Provider 취소 이벤트의 안전한 호출자, RR-03 공식 Saju 근거 출처 실검증, 일반 채팅에서 보호하는 유료 본문, RR-04 정식 후속 질문 및 운영 DB 복원 #1941은 모두 미완료.
 - 어느 단계의 비공개 SQL 결과도 실제 상품의 공개 결제·Reader Chat 서비스 활성화·Privacy 보관 승인·Legal 환불 판정이 아니다. 초기 권한 발급과 원본 공식 Reading의 지속적 동일성은 후속 통합 계약에서 함께 검증한다.
+
+
+## 16. S2→S6 전역 잠금·유료 T2 상세 설계 (2026-10-12)
+
+- 상세 설계 원문: [OFFICIAL_READER_UNIFIED_AUTHORITY_T2_DETAILED_DESIGN_20261012_V1.md](./OFFICIAL_READER_UNIFIED_AUTHORITY_T2_DETAILED_DESIGN_20261012_V1.md).
+- **검토 기준:** #2006 최신 검증 HEAD `5127e8f`; 기존 migration 1740~1790, 1080/1220/1270/0220, RR-03 #1960, RR-04 #1974, Product/Commerce 정책.
+- **가장 중요한 변경 제안:** 첫 구매만의 `회원×Product` L0와 추가 구매/회수/현재 조회의 `회원×Reading×Reader` L1을 **전역 단일 선행 순서 L0→L1→원본 행 잠금**으로 통일한다. 현재 후보 구현은 경로별 한 단계만 처리하며, 본 문서는 이를 구현 완료로 판정하지 않는다.
+- **새로 확인한 P0 구멍:** 미결속 최초 Grant는 `1770`이 거부하므로 환불이 bind보다 앞서면 Product L0만으로 처리할 별도 경로 필요; `1780`은 실제 callback/Commerce worker에 연결되지 않음; 현행 PortOne webhook은 `Transaction.Paid` 외 이벤트를 ignored 처리하므로 검증된 취소 ingest 자체가 필요하다.
+- **Reader T2 위험:** `0220`은 일반 메시지 원문·세계/관계/기억·Outbox를 확정한다. 원문 분리만으로 충분하지 않다. RR-03 원자 finalizer는 전용 유료 저장 경계를 가져야 하며 RR-04의 기존 `conversation_messages.content_hash=provenance.utterance_hash` 전제도 재설계 필요.
+- **Saju 진실성:** RR-03 `grounding_unit_*` 형식 검사는 실제 Unit 소유/closure 증명이 아니다. Saju source-owned manifest + Semantic/Output proof를 필수로 설계. preview-held 전송 증명은 생산용 승인으로 사용할 수 없다.
+- **Migration 충돌:** RR-03 Draft의 `1720`과 본선 Product `1720` 번호 중복은 독립 재번호/전체 DB catalog 검증 전 병합 불가.
+
+**다음 순서:** D0 설계 승인(Owner 결정 Q1~Q3 및 락 역전 감사) → D1 전역 잠금 범위 resolver → D2 초기/추가 구매권 발급·결속 공동 진입점 → D3 provider 취소·미결속 revoke/restore → D4 Saju 증거 → D5 보호 유료 본문/원자 T2 → D6 RR-04 및 제공 E2E.
+
+**이번 변경은 docs-only 설계 작업**이다. SQL·TypeScript·DB 권한·운영 경로·CI 코드 변경 없음. 비공개 후보들의 기존 검사 성공은 유지하되 운영 결제/유료 사주 채팅 공개·마이그레이션 적용은 계속 HOLD.
