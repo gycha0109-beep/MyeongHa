@@ -1,0 +1,56 @@
+# D1 — 공식 Reader 전역 잠금 진입점과 Writer 잠금 순서 감사 v1
+
+> 기준: #2008 상세 설계, #2006 HEAD `5127e8f` 위 문서 가지 `9e33cee`.  
+> 분류: `db-authority-core`. 소유 책임: DB/Commerce/Chat/Reader/Saju.  
+> **D1 PRIVATE CANDIDATE / NOT A WRITER CUTOVER / NO PAID T2 / NO PRODUCTION MIGRATION.**
+
+## 1. 감사 결과 및 결론
+
+**P0:** 현재 함수 집합이 서로 다른 진입점으로 동작하고 있으며 Product L0→Reading-Reader L1→원본 행 잠금이라는 통일된 순서가 강제되지 않는다. **S1/S2 synthetic race PASS는 모든 Commerce/Chat Writer가 계약을 따르는 증거가 아니다.**
+
+이번 D1에서는 `1800_official_reader_unified_scope_entry_private_v1.sql`에 source-bound lock entry 두 개만 추가한다. **기존 Writer를 변경하지 않으며**, 실제 Product/Reading/Reader 범위의 권한을 발급하지 않는다.
+
+- `internal_acquire_official_reader_existing_scope_v2(subject, reading, reader)`: authoritative `standard_reading_official_bindings`의 읽기만으로 Product를 유도; `Subject×Product` L0를 확보한 다음 Source/product 변경을 확인하고 `Subject×Reading×Reader` L1 잠금; 다시 Product 일치 검증. 읽기만, COMMIT 시 두 잠금 자동 해제.
+- `internal_acquire_official_reader_purchase_scope_v2(subject, purchase_intent)`: verified Purchase Intent/Offer/Role에서 최초 구매냐 추가 Reader냐 정확히 분류한다. 초기이면 기존 1790의 권위 Product 후보 확인 후 L0만 확보. 추가이면 1760의 정확한 Reading/Reader 후보와 `standard_reading_official_bindings` Product 일치를 확인한 후 **L0→L1**. 잠금 대기 후 Role/Product/Reading/Reader 재확인; drift면 전체 오류.
+- 두 함수는 `READ COMMITTED` + canonical Subject context 필수, `SECURITY INVOKER`, PUBLIC·API·Commerce runtime 직접 `EXECUTE` 금지. 잠금·동일성만 다루며 **현재 Grant·Product 판매 가능 상태·T2/LLM/HTTP 공개 권한은 판단하지 않는다**.
+
+### 실제 Writer/Reader 잠금 순서 지도
+
+| 경로와 근거 파일 | 현행 원본 함수의 행 잠금/적용 순서 | 기존 후보의 L0/L1 | 결론 및 D2/D3 조치 |
+| --- | --- | --- | --- |
+| 원본 Receipt issuance, `1090_verified_receipt_capability_fulfillment_batch_v1.sql` | `commerce_receipts FOR UPDATE` → capability aggregate 검증 → `1080` effect | 자체 L0/L1 없음 | Verified Receipt/Offer/Intent 분기 후 공통 진입점으로 라우팅. **원본 영수증 행 잠금 전** L0/L1 |
+| 원본 Entitlement Effect, `1080_entitlement_effect_apply_v1.sql` | Receipt/Grant/Provider Event의 다중 `FOR UPDATE` 및 revision/order/CAS, ledger/projection/outbox | 자체 L0/L1 없음 | Source event별 영향을 받는 모든 Product/Reading/Reader 추출. **원본 event/Grant 행 잠금 전** 정렬 |
+| 공식 Reading bind, `1220_official_standard_reading_reader_interpretation_authority.sql` | Purchase Intent `FOR UPDATE` → Grant `FOR UPDATE` → Birth Profile `FOR UPDATE` → first Reading 또는 additional Reader 결속 | 자체 L0/L1 없음 | L0→(L1 필요 시) 후 원본 v2 호출. 원본 Binder 안에서 뒤늦은 잠금 취득 금지 |
+| 추가 Reader receipt·bind, `1760` | candidate Reading/Reader → **L1만** → 기존 `1090` 또는 `1220` | **L0 누락** | D1 source-bound Purchase entry에서 L0→L1으로 단일화; 구 함수 직접 호출 축소 및 회귀 검증 |
+| 기결속 Provider revoke, `1770` | 영수증/Grant lineage preflight → **모든 영향 L1 정렬** → 원본 `1080` | **L0 누락** | 영향 Product 전체 L0 먼저 정렬 후 L1. preflight 범위 drift 및 phantom 확인 |
+| verified Provider cancellation bridge, `1780` | 사전 verified event/receipt/Grant → 1770 호출 → 원본 1080. Provider Worker role EXECUTE 없음 | 1770과 같은 L0 누락 | 현재 PortOne callback 실제 wiring 없음. `payment.cancelled` 정규화/부분 취소·중복·역순 정책 + 최소 권한 worker 별도 검토 |
+| 최초 Receipt·bind, `1790` | verified Initial Intent→**L0만**→원본 `1090/1220` | Reading UUID 없음; L0만 존재 | 첫 구매에 적합한 잠금 후보. 이후 기존 Reading 생성·Grant 결속과 동일 Product의 추가 Reader 범위를 묶을 D2 필요 |
+| 현재 Reader Bundle read, `1750` | **L1만** → `1270` current Grant active time check | **L0 누락** | D5/D6 T2·protected read 모두 L0→L1, Product/Release/Source도 재검증 |
+| 일반 Chat commit, `0220_chat_attempt_commit_commands.sql` | Thread `FOR UPDATE` → Turn `FOR UPDATE` → Attempt `FOR UPDATE` → 일반 Message/Memory/Outbox | Product/Reading 잠금 없음 | 유료 전용 writer에서 먼저 L0→L1을 확보. 일반 Chat 원문 body 및 side effects를 유료 경로에 재사용 금지 |
+| RR-03 #1960 / RR-04 #1974 Draft | private provenance skeleton / private candidate query | 실 T2 및 source manifest 미구현 | 양쪽 모두 Draft·공개 사용 불가. 1720 migration 번호 충돌 분리 필수 |
+
+**잠금 순서 결과:** (1) L0 Product 전체를 UUID 오름차순 확보 → (2) L1 Reading/Reader 전체를 UUID/text 오름차순 확보 → (3) 원본 Commerce/Grant/Birth/Chat 행 잠금 → (4) 원자 결과 반영/COMMIT. **한 거래가 L1 또는 행 잠금을 먼저 취득했다면 L0를 뒤에 추가로 얻지 않는다.** 역전 감지 시 새 트랜잭션으로 재시작하는 설계가 필요하다.
+
+## 2. 이번 D1 PostgreSQL 증거
+
+`test/db/official_reader_unified_scope_entry_private.sh` (격리 PostgreSQL15, 17 종속 CI)의 검증 범위:
+
+- 원본 합성 공식 Reading 권한 fixture를 적용하고, 최초 Intent에서 L0-only, 추가 Intent에서 정확한 동일 Product+Reading/Reader, 기존 Reading에서 source-bound L0+L1 잠금을 입증.
+- 동일 Subject/Product의 L0를 접속 A가 보유한 사이 접속 B의 기존 Reading scope 접근이 **Product 잠금에서 실제 대기**하는지 `pg_stat_activity`와 `pg_locks`로 확인. 같은 Product에서 다른 Reader가 L0를 우회할 수 없는지와 다른 Product L0는 독립적인지 확인.
+- 격리 수준 `REPEATABLE READ`·`SERIALIZABLE`, 읽기 없는 Reading, 다른 Subject context, 과잉 runtime SQL role 권한 모두 부정.
+- 함수는 실제 Grant 생성·회수, Product 정책 승인, 출처 신뢰 증명, 유료 T2 Commit/Reveal, HTTP 계약을 구현하지 않는다.
+
+## 3. 남은 불변식 증명과 절차
+
+- **D1 추가 범위:** 다중 Product/Reading/Reader의 정렬된 전체 집합 선점, 범위가 잠금 대기 중 변하는 경우 rollback/retry. 이번 구현의 한 Purchase Intent 또는 한 기존 Reading 경로만으로 다중 이벤트 안전성을 주장하지 않는다.
+- **D2:** 1760 추가 구매 발급·bind, 1790 최초 발급·bind를 1800 공통 API로 모두 라우팅하되 기존 `1090/1220` 원본 CAS와 멱등성 보존. 미결속 초기 Grant revoke-before-bind 시험.
+- **D3:** Provider event/restore와 다중 Product 영향 범위에 L0 전체 선행 잠금, 그 다음 L1 전체. 기존 `1080` 직접 호출 및 관리자/보정 작업의 우회 실행 경로 차단. 실제 verified cancellation ingress/Commerce actor 권한 계약.
+- **D4:** Saju-owned source manifest/provenance Unit membership/closure + Output/Semantic guard. RR-03 형식만 맞는 source Unit은 거부.
+- **D5:** T2의 L0→L1→fresh Grant/Bundle/Source/Release→원자 paid content/provenance/placeholder. `0220` 일반 generated_body, memory/outbox에는 유료 원문 불허.
+- **D6:** RR-04의 일반 placeholder content_hash==paid-body hash 가정 제거, 보호 본문 최신 유효 후보/current rights 재열람 보안 검증.
+
+### 감사 종결 조건
+
+**완료:** 원본 1090/1080/1220/0220과 비공개 1740~1790의 잠금 진입·행 잠금 순서를 확인해 P0 잠금 공백을 기록했고, D1 **읽기 전용 공통 원시 함수 + 경쟁 시험**을 신설했다.
+
+**미완료/금지:** 다중 영향 Product 정렬, 운영 모든 Writer의 통일 Cutover, 환불 미결속·복구, RR-03 source manifest 및 보호 원문, RR-04 follow-up, Commerce/Legal/Privacy/DB Owner 승인, 운영 #1941 복원. 모든 비공개 후보 및 본 문서는 병합·운영 공개 HOLD.
