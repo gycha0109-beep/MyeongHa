@@ -64,8 +64,11 @@ export interface HandleSeyeonChatTurnSendRequestInputV1 {
   readonly serverTime: string;
   readonly identityEvidenceVerifier: IdentityEvidenceVerificationPortV1;
   readonly runtime: Pick<ProductionSeyeonChatRuntimeV1, 'run'>;
-  /** Required before ANY model call, including idempotent committed replays. */
-  readonly controlledDisclosurePort: SeyeonChatTurnControlledDisclosurePortV1;
+  /**
+   * Server-owned injection. Optional ONLY so an unconfigured deployment can
+   * return a controlled 503 before runtime/model dispatch; never defaults ALLOW.
+   */
+  readonly controlledDisclosurePort?: SeyeonChatTurnControlledDisclosurePortV1;
 }
 
 type ParsedRouteV1 = Readonly<{ threadId: string }>;
