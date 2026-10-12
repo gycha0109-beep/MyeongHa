@@ -1,5 +1,6 @@
 import {
   RAHYEON_FACT_AUTHORITY_REGISTRY_V1,
+  RAHYEON_CONTEXTUAL_SURFACE_FACTS_V1,
   RAHYEON_PUBLIC_FACT_VALUES_V1,
   resolveCharacterFactAuthorityEntryV1,
   resolveCharacterRuntimeAuthorityLaneV1,
@@ -94,13 +95,22 @@ export function composeRahyeonTurnContextV1(
     if (authority.sourceAuthority !== 'CANON' || authority.characterKnowledge !== 'KNOWN') {
       continue;
     }
-    // Strict allowlist: CONTEXTUAL and private facts never enter the base context.
-    if (authority.disclosureDefault !== 'PUBLIC') continue;
-    if (Object.prototype.hasOwnProperty.call(RAHYEON_PUBLIC_FACT_VALUES_V1, key)) {
+    if (authority.disclosureDefault === 'PUBLIC' &&
+        Object.prototype.hasOwnProperty.call(RAHYEON_PUBLIC_FACT_VALUES_V1, key)) {
       const value = RAHYEON_PUBLIC_FACT_VALUES_V1[
         key as keyof typeof RAHYEON_PUBLIC_FACT_VALUES_V1
       ];
       publicFacts.push(Object.freeze({ factKey: key, value }));
+    } else if (authority.disclosureDefault === 'CONTEXTUAL' &&
+        Object.prototype.hasOwnProperty.call(RAHYEON_CONTEXTUAL_SURFACE_FACTS_V1, key)) {
+      // A bounded direct-answer exception for low-impact known facts only.
+      // Neither past romance nor private emotional history is in this map.
+      const surface = RAHYEON_CONTEXTUAL_SURFACE_FACTS_V1[
+        key as keyof typeof RAHYEON_CONTEXTUAL_SURFACE_FACTS_V1
+      ];
+      if (surface.kind === selection.kind) {
+        publicFacts.push(Object.freeze({ factKey: key, value: surface.value }));
+      }
     }
   }
 
