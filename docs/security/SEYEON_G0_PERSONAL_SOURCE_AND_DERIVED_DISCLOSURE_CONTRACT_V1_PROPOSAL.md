@@ -118,6 +118,10 @@ type ModelInputSourceSetV1 = {
 - `test/seyeon-offline-s0-context-admission-v1.test.ts`는 오프라인 긍정/과거 메시지/관계/Reader/타 ingress/Grant tamper/Pre-Pin 중단을 검증합니다. `test/seyeon-offline-s0-real-context-shape-v1.test.ts`는 **실제 `composeSeyeonProductionContextV1`와 `bindSeyeonProductionCurrentUserTurnV1`** 출력을 사용해 Grant 값이 Memory 본문 안의 위조 ID가 아니라 서버 행에서 오는지, 원래의 history가 있으면 후보 거부되는지 증명합니다.
 - **증거 한계**: 소스가 별도로 추가되는 실제 `resolveTurnGovernance`, `runSeyeonCharacterTurnV2`의 disclosure/integrity 결정, post-turn worker 및 앞으로의 Reader/Saju Preflight는 합성 빈 ingress 선언만으로 커버되었다고 주장할 수 없습니다. 서버 소유 *완전한* source-closure 추적 포트와 Owner 정책이 승인되기 전에는 이 검사를 Production 실행 경로에 연결하지 않습니다. 시험용 `syntheticApprovedSchema` 역시 SRC-25 허가가 아닙니다.
 
+### G0 D-03 데이터 무결성 교차 런타임 검증 인수
+
+별도 문서 [G0 D-03 Node/PostgreSQL 직렬화 차이와 실제 Pin 검증](./SEYEON_G0_D03_CROSS_RUNTIME_DIGEST_PROOF_V1.md)은 기존 Node `canonicalJson` 기반 raw *envelope* candidate와 PostgreSQL `jsonb::text` 기반 원본 payload Pin이 **의미·바이트 표현·codec tag 모두 다르다**는 사실을 코드에 근거해 분리합니다. `test/seyeon-source-digest-node-postgres-golden-v1.test.ts`를 현재 disposable PostgreSQL 권한 CI에 포함해 실제 Attempt Pin의 DB digest를 다시 읽어 확인합니다. **테스트 성공이 교차 codec의 호환성이나 G0 승인으로 변하지 않으며**, D-03-A~D의 DB·Security·Character Owner 결정은 OPEN입니다.
+
 ## 3. 실제 실행 경로 — G1/G2/G3 후보
 
 ```text
