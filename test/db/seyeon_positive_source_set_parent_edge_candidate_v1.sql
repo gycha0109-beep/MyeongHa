@@ -116,7 +116,12 @@ begin
   where a.id = p_attempt and t.id = p_turn
     and t.thread_id = p_thread and t.subject_id = p_subject
     and th.status = 'active'
-  for share of t,a,th;
+  -- Serialize positive Parent insertion with the existing 1640 zero-pin
+  -- UPDATE on the *same Attempt*. Shared Attempt locks permit write skew:
+  -- two separate writers could each observe no competing mode.
+  -- Keep Subject-before-Turn-before-Attempt ordering for revoke/zero RPC.
+  for share of t,th
+  for update of a;
   if not found or v_attempt.attempt_state is distinct from 'running'
     or v_attempt.turn_state is distinct from 'planned'
     or v_attempt.planner_version is distinct from 'seyeon-production-chat-planner-v1'
@@ -507,5 +512,106 @@ begin
   end if;
 end $reverse_xor_gap$;
 
+-- R1 PROPOSED FIX: test-only second-line attempt guard for zero-after-positive.
+-- Production 1640 function/migration remain untouched. The existing zero
+-- evidence/immutability trigger continues to run alongside this candidate.
+-- In Production this requires a separately approved forward-only migration,
+-- Owner trigger order/call graph/ACL and real two-session lock tests.
+create function seyeon_positive_candidate.reject_zero_after_positive_r1()
+returns trigger language plpgsql
+set search_path = pg_catalog,public,seyeon_positive_candidate
+as $r1_xor_guard$
+begin
+  if old.seyeon_personal_source_pin_jsonb is null
+    and new.seyeon_personal_source_pin_jsonb is not null
+    and new.planner_version='seyeon-production-chat-planner-v1'
+    and exists (
+      select 1
+      from seyeon_positive_candidate.source_sets_r1
+      where attempt_id=new.id
+    ) then
+    raise exception using
+      errcode='23514',
+      constraint='seyeon_offline_r1_zero_positive_xor',
+      message='R1 offline attempt already has positive original-source Pin';
+  end if;
+  return new;
+end $r1_xor_guard$;
+
+create trigger tr_seyeon_r1_zero_after_positive_v1
+before update of seyeon_personal_source_pin_jsonb
+on public.chat_turn_attempts
+for each row
+execute function seyeon_positive_candidate.reject_zero_after_positive_r1();
+
+do $bidirectional_xor$
+declare
+  v_attempt uuid := 'd7200000-0000-4000-8000-000000000001';
+  v_subject uuid := 'd2000000-0000-4000-8000-000000000001';
+  v_thread uuid := 'd4000000-0000-4000-8000-000000000001';
+  v_turn uuid := 'd7000000-0000-4000-8000-000000000001';
+  v_two jsonb := jsonb_build_array(
+    jsonb_build_object('recordId','d5000000-0000-4000-8000-000000000001',
+      'grantId','d6000000-0000-4000-8000-000000000001'),
+    jsonb_build_object('recordId','d5000000-0000-4000-8000-000000000002',
+      'grantId','d6000000-0000-4000-8000-000000000002'));
+  v_denied boolean := false;
+  v_constraint text;
+begin
+  -- After an actual R1 positive Parent/Edge insert, the previously accepted
+  -- reverse write MUST now fail. A different SQLSTATE is not a passing test.
+  begin
+    update public.chat_turn_attempts
+    set seyeon_personal_source_pin_jsonb='{"fixture":"must-reject"}'::jsonb,
+        seyeon_personal_source_pinned_at=clock_timestamp()
+    where id=v_attempt;
+  exception when check_violation then
+    get stacked diagnostics v_constraint = CONSTRAINT_NAME;
+    if v_constraint <> 'seyeon_offline_r1_zero_positive_xor' then
+      raise;
+    end if;
+    v_denied := true;
+  end;
+  if not v_denied then
+    raise exception 'R1 guard did NOT reject zero-after-positive write';
+  end if;
+  if (select seyeon_personal_source_pin_jsonb
+      from public.chat_turn_attempts where id=v_attempt) is not null then
+    raise exception 'R1 guard changed 1640 zero Pin after rejection';
+  end if;
+  if (select count(*)
+      from seyeon_positive_candidate.source_edges_r1
+      where attempt_id=v_attempt) <> 2 then
+    raise exception 'R1 guard unexpectedly modified original positive edges';
+  end if;
+
+  -- To verify the other direction AFTER installing the new trigger, simulate
+  -- a zero-first write inside a subtransaction. Positive RPC must still HOLD.
+  begin
+    update public.chat_turn_attempts
+    set seyeon_personal_source_pin_jsonb='{"fixture":"zero-first"}'::jsonb,
+        seyeon_personal_source_pinned_at=clock_timestamp()
+    where id=v_attempt;
+    -- The just-installed trigger *must* reject it while Positive is present.
+    raise exception 'R1 guard permitted zero-first write on positive Attempt';
+  exception when check_violation then
+    get stacked diagnostics v_constraint = CONSTRAINT_NAME;
+    if v_constraint <> 'seyeon_offline_r1_zero_positive_xor' then
+      raise;
+    end if;
+  end;
+
+  -- Existing negative probe (before this trigger) already checked that an
+  -- unguarded zero-only Attempt is not upgraded by pin_source_set_r1.
+  -- No extra privilege is given to API executor for either source table.
+  if has_table_privilege('myeongha_api_executor',
+      'seyeon_positive_candidate.source_sets_r1','SELECT') or
+     has_table_privilege('myeongha_api_executor',
+      'seyeon_positive_candidate.source_edges_r1','INSERT') then
+    raise exception 'R1 second guard accidentally expanded table ACL';
+  end if;
+end $bidirectional_xor$;
+
 commit;
-\echo 'PASS R1 isolated SourceSet/Edges 0/1/N exact Grant, immutable ACL, regrant/tamper and positive-after-zero HOLD; reverse zero-after-positive 1640 migration gap DEMONSTRATED (no production change)'
+\echo 'PASS R1 offline proposed bidirectional XOR (zero→positive HOLD, positive→zero HOLD), immutable Parent+Edges, original Grant/regrant/tamper, no Production migration/authorizations'
+
