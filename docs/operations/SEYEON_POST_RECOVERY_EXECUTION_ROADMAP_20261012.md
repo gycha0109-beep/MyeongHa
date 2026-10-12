@@ -201,3 +201,12 @@ Governor 04d4B 계열은 실제 격리 PostgreSQL 기반 영수증 임대·정�
 - **R1 완료를 위한 실제 후속 절차:** 변경사항 코드·실DB 부정 테스트·CI 통합 PASS 및 `main` 반영 이후, **새로운** 암호화 백업을 수동 생성 → 그 백업 ID로 독립 격리 복원 → 신규 evidence envelope의 `seyeon_early_history_restore_proof=restored_scoped_version_name_snapshot_6_pass` 및 `seyeon_early_functions_restore_proof=restored_public_function_catalog_11_and_rls_6_pass` 확인. 이 두 필드와 작업 SHA/Run/Artifact 출처가 일치하기 전에는 R1 `HOLD_EXACT_RELATIONSHIP_RESTORE` 유지.
 
 본 개선은 민감 원본·Production DDL/DML, 새 CI 워크플로, 유료 AI, 캐릭터 공개, 1520..1710 배포를 포함하지 않는다. `#1887` 및 보안 `#1866`은 별도 Owner 승인까지 HOLD.
+
+## 12. 2026-10-12 격리 복원 #38205504194 장애 분석 및 한정 복구 절차
+
+- [격리 복원 #38205504194](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38205504194)는 신규 암호화 백업 [#38204929259](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38204929259)의 정확한 아티팩트를 검증·다운로드했고 스키마/데이터 replay 이후 신규 관계 검증의 `HOLD_SEYEON_RESTORE: restored early function publicly executable`에서 중단했다. EXIT 1은 **안전한 fail-closed**다. 후속 개인정보 합성 재생 및 evidence envelope는 실행되지 않았다.
+- **실제 운영 DB 조회:** 11개 대상 함수에서 `anon/authenticated EXECUTE=0`, 소유자는 `myeongha_relationship_apply_owner`, Production `postgres` 전역 함수 default ACL은 `{postgres=X/postgres}`, `public` 스키마 함수 default ACL은 `{postgres=X/postgres,service_role=X/postgres}`. Production Role 그래프에서 브라우저 역할의 `myeongha_*` 직접 멤버십은 0. 따라서 현재 확인된 실패는 **격리 복원 후 ACL 불일치**이고 Production 직접 권한 노출로 판단할 근거는 없다.
+- **원인/정정 범위:** 원본 함수의 생성 기준 역할 `postgres`와 격리 복원 생성 기준 역할 `supabase_admin`은 PostgreSQL의 전역 및 `public` 스키마 함수 기본권한이 다를 수 있다. `pg_dump`의 ACL replay가 생성 시 기본권한 전제까지 동일하게 만들지는 않으므로, 격리 DB의 복원 역할에서만 스키마 복원 **전** `ALTER DEFAULT PRIVILEGES REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC` 및 `IN SCHEMA public REVOKE ... FROM anon,authenticated`를 적용하고 카탈로그로 검증한다. 기존 함수에 `REVOKE`를 일괄 적용하지 않고, 실패한 11개 함수의 `has_function_privilege` 검증은 그대로 유지한다.
+- **부정 테스트:** PostgreSQL 17 disposable DB에서 위험한 global PUBLIC + public-schema anon/auth 기본권한을 **의도적으로 먼저 생성**, 복원 역할 기본권한 정렬 이후 새 함수의 브라우저 실행을 거부하는지 검증한다. 이미 존재하는 관계 함수에 `GRANT EXECUTE ... TO anon`을 주입하면 별도 원본 함수 검증이 계속 HOLD해야 한다.
+- **가용 백업:** 기존 #38204929259를 **재사용 가능**(새 SQL은 복원 임시 인프라의 스키마 replay 순서만 바꾼다). 변경 PR CI·Full Integration·exact-main 검증 PASS 후 같은 백업 ID로 새 격리 복원 실행. `incident_reference_utc=2026-10-12T04:46:04Z`, `watchtower_track=ops`. 새 Run이 실제 `6/6` history metadata, `11/11` restored functions, `6/6` RLS/ACL, auth/privacy synthetic, evidence artifact PASS가 될 때까지 R1 미완료다.
+- **불변 HOLD:** Production DDL/DML, provider migration ledger full restore, remote-only 계보 수정, 유료 AI/공개, `dr_ready=false`, G0~G6 유지.

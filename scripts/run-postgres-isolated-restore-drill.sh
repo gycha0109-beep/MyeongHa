@@ -258,6 +258,21 @@ if [[ ${#provider_managed_roles_absent[@]} -gt 0 ]]; then
   printf 'Provider-managed roles absent from isolated target and not fabricated: %s\n' "${provider_managed_roles_absent[*]}"
 fi
 
+# The dump was authored under Production postgres defaults (no browser
+# function EXECUTE). The isolated Supabase image restores the DDL as
+# supabase_admin, whose global/public defaults can otherwise introduce an
+# unintended browser grant at function creation. Align only the disposable
+# restoring principal *before* DDL replay; retain the subsequent 11-function
+# explicit EXECUTE fail-closed test.
+isolated_function_acl_defaults="$(psql "$RESTORE_ADMIN_DATABASE_URL" -X -qAt \
+  --set ON_ERROR_STOP=1 \
+  -f scripts/operations/prepare-postgres-isolated-restore-function-defaults.sql)"
+[[ "$isolated_function_acl_defaults" == 'PASS_SEYEON_ISOLATED_CREATOR_FUNCTION_DEFAULT_ACL' ]] || {
+  echo 'HOLD_SEYEON_RESTORE: creator function default ACL preflight invalid.' >&2
+  exit 1
+}
+echo 'PASS_SEYEON_RESTORE: isolated creator default ACL is browser-restricted'
+
 psql "$RESTORE_ADMIN_DATABASE_URL" --single-transaction --set ON_ERROR_STOP=1 --file "$work_dir/schema.sql"
 
 target_copy_catalog="$work_dir/target-copy-catalog.json"
@@ -342,6 +357,30 @@ if [[ -n "$history_json" ]]; then
   proof_output="$(psql "$RESTORE_DATABASE_URL" -X -qAt --set ON_ERROR_STOP=1 \
     -v seyeon_history_json="$history_json" \
     -f scripts/operations/seyeon-relationship-isolated-restore-proof.sql)" || {
+    # Diagnose the exact untrusted ACL, but do not mutate any restored
+    # function to turn this HOLD into a false PASS. Only fixed function names
+    # and PostgreSQL catalog ACLs are emitted, never user rows or SQL bodies.
+    psql "$RESTORE_DATABASE_URL" -X -qAt --set ON_ERROR_STOP=1 -c "
+      SELECT p.proname,
+             pg_get_userbyid(p.proowner) AS owner,
+             coalesce(p.proacl::text, '<default>') AS acl,
+             has_function_privilege('anon',p.oid,'EXECUTE') AS anon_exec,
+             has_function_privilege('authenticated',p.oid,'EXECUTE') AS auth_exec
+      FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+      WHERE n.nspname='public' AND p.proname IN (
+        'relationship_event_json_v1',
+        'cmd_lock_relationship_apply_context_v1',
+        'cmd_apply_relationship_event_runtime_v1',
+        'cmd_lock_relationship_history_context_v1',
+        'relationship_assert_adjustment_slot_v1',
+        'cmd_append_relationship_retraction_runtime_v1',
+        'cmd_append_relationship_correction_runtime_v1',
+        'cmd_commit_relationship_replay_projection_v1',
+        'cmd_rebuild_relationship_projection_runtime_v1',
+        'cmd_write_relationship_snapshot_runtime_v1',
+        'qry_latest_valid_relationship_snapshot_v1'
+      ) ORDER BY p.proname;
+    " >&2 || true
     echo 'HOLD_SEYEON_RESTORE: exact scoped relationship restore proof failed.' >&2
     exit 1
   }

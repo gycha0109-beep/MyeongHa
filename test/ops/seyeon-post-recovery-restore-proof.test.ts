@@ -7,6 +7,7 @@ import { buildRestoreEvidenceEnvelope } from '../../scripts/build-postgres-resto
 const exporter = readFileSync('scripts/operations/export-production-postgres-backup.sh', 'utf8');
 const restore = readFileSync('scripts/run-postgres-isolated-restore-drill.sh', 'utf8');
 const sql = readFileSync('scripts/operations/seyeon-relationship-isolated-restore-proof.sql', 'utf8');
+const creatorDefaultAcl = readFileSync('scripts/operations/prepare-postgres-isolated-restore-function-defaults.sql', 'utf8');
 const sourceSha = 'a'.repeat(40);
 const proofHash = 'b'.repeat(64);
 
@@ -97,6 +98,25 @@ describe('Se-yeon post-recovery governed backup to real PG17 catalog proof', () 
     expect(restore).toContain('seyeon-relationship-isolated-restore-proof.sql');
     expect(restore).toContain('HOLD_SEYEON_RESTORE_PROOF: legacy backup excludes scoped migration-history snapshot');
     expect(restore).toContain('supabase_managed_migration_ledger_fully_restored: false');
+  });
+
+  it('normalizes isolated creator defaults before DDL without changing existing RPC privileges', () => {
+    expect(creatorDefaultAcl).toContain('ALTER DEFAULT PRIVILEGES REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC;');
+    expect(creatorDefaultAcl).toContain('REVOKE EXECUTE ON FUNCTIONS FROM anon, authenticated;');
+    expect(creatorDefaultAcl).toContain('HOLD_SEYEON_RESTORE: creator retains PUBLIC/anon/authenticated default function EXECUTE');
+    expect(creatorDefaultAcl).toContain("current_database() = 'postgres' AND current_user = 'supabase_admin'");
+    expect(creatorDefaultAcl).toContain("current_database() ~ '^myeongha_ci_case_[0-9]+$'");
+    expect(restore).toContain("readonly RESTORE_ADMIN_DATABASE_URL='postgresql://supabase_admin:restore-drill@127.0.0.1:5432/postgres'");
+    expect(creatorDefaultAcl).not.toContain('inet_server_addr()');
+    expect(creatorDefaultAcl).not.toMatch(/\\b(?:REVOKE|GRANT)\\s+.*\\bON\\s+FUNCTION\\b/iu);
+    expect(creatorDefaultAcl).not.toContain('supabase_migrations.schema_migrations');
+    const aclPosition = restore.indexOf('prepare-postgres-isolated-restore-function-defaults.sql');
+    const schemaPosition = restore.indexOf('--file "$work_dir/schema.sql"');
+    const exactProofPosition = restore.indexOf('seyeon-relationship-isolated-restore-proof.sql');
+    expect(aclPosition).toBeGreaterThanOrEqual(0);
+    expect(aclPosition).toBeLessThan(schemaPosition);
+    expect(schemaPosition).toBeLessThan(exactProofPosition);
+    expect(restore).toContain('HOLD_SEYEON_RESTORE: exact scoped relationship restore proof failed.');
   });
 
   it('admits a new scoped backup only after SQL execution returns both pass verdicts', () => {
