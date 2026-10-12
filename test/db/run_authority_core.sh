@@ -186,5 +186,7 @@ if [[ "${CI:-}" == "true" && "${PGHOST:-}" == "localhost" ]]; then
     bash test/db/standard_reader_additional_policy_locked_real_pg.sh
   run_isolated_case myeongha_standard_initial_policy_lock_test \
     bash test/db/standard_reader_initial_policy_scope_lock_race.sh
+  run_isolated_case myeongha_standard_b2_initial_bind_test \
+    bash test/db/standard_reader_initial_policy_locked_real_pg.sh
 fi
 bash test/db/catalog_snapshot.sh
