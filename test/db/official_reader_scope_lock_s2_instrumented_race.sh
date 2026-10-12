@@ -181,6 +181,97 @@ SQL
 done
 pass "stale-snapshot transaction isolation modes are denied"
 
+# The only binding cutover in this candidate must be an internal command
+# with no runtime EXECUTE. It derives the additional purchase scope from DB.
+additional_fn="$(p -c "select count(*) from pg_catalog.pg_proc f
+  join pg_catalog.pg_namespace n on n.oid=f.pronamespace
+  where n.nspname='public' and
+    f.proname='internal_cmd_bind_official_reader_additional_locked_v1'
+    and not f.prosecdef and f.provolatile='v';")"
+[[ "$additional_fn" == "1" ]] ||
+  fail "locked additional Reader binding function is missing/privileged"
+additional_exec="$(p -c "select count(*) from pg_catalog.pg_roles r
+  where r.rolname in ('anon','authenticated','service_role',
+    'myeongha_api_executor','myeongha_seyeon_chat_runtime_owner')
+    and pg_catalog.has_function_privilege(r.rolname,
+      'public.internal_cmd_bind_official_reader_additional_locked_v1(uuid,uuid,uuid,uuid,text,text,jsonb)',
+      'EXECUTE');")"
+[[ "$additional_exec" == "0" ]] ||
+  fail "locked additional Reader binding was exposed to runtime roles"
+
+# Initial purchase has no existing Official Reading scope to lock and must
+# never be promoted through this additional-only command. Using nonexistent
+# purchase checks deny before the legacy bind mutation.
+if p >"$tmpdir/initial-or-missing.out" 2>&1 <<SQL
+begin;
+select pg_catalog.set_config('myeongha.subject_id', '$subject', true);
+select * from public.internal_cmd_bind_official_reader_additional_locked_v1(
+ '$subject'::uuid,
+ 'ffffffff-ffff-ffff-ffff-ffffffffffff'::uuid,
+ '12193000-0000-0000-0000-000000000099'::uuid,
+ '12193100-0000-0000-0000-000000000099'::uuid,
+ 'sha256:v1:7777777777777777777777777777777777777777777777777777777777',
+ 'standard-reading-access-bind-v2',
+ '{"schemaVersion":"standard-reading-access-bind-v2","purchaseIntentId":"ffffffff-ffff-ffff-ffff-ffffffffffff"}'::jsonb
+);
+commit;
+SQL
+then
+  fail "unresolved additional Reader scope was unexpectedly accepted"
+fi
+grep -q 'One server-owned additional Reader' "$tmpdir/initial-or-missing.out" ||
+  fail "unresolved scope failed for unexpected reason"
+pass "unresolved purchase cannot enter additional Reader bind scope"
+
+# The candidate verified Receipt issuance must lock scope on its own, BEFORE
+# the original 1090 Grant row locks. No test-supplied scope lock in the writer.
+receipt_fn="$(p -c "select count(*) from pg_catalog.pg_proc f
+  join pg_catalog.pg_namespace n on n.oid=f.pronamespace
+  where n.nspname='public'
+    and f.proname='internal_apply_additional_official_reader_receipt_locked_v1'
+    and f.prosecdef=false and f.provolatile='v';")"
+[[ "$receipt_fn" == "1" ]] ||
+  fail "locked additional Reader receipt issuance wrapper is missing"
+for sig in \
+ 'public.internal_apply_additional_official_reader_receipt_locked_v1(uuid,text[],timestamptz[],timestamptz[],timestamptz[],text[])' \
+ 'public.internal_qry_official_reader_additional_scope_candidate_v1(uuid,uuid)'; do
+  direct="$(p -c "select count(*) from pg_catalog.pg_roles r
+    where r.rolname in ('anon','authenticated','service_role',
+      'myeongha_api_executor','myeongha_seyeon_chat_runtime_owner')
+      and pg_catalog.has_function_privilege(r.rolname, '$sig', 'EXECUTE');")"
+  [[ "$direct" == "0" ]] || fail "unapproved runtime can execute: $sig"
+done
+pass "locked issuance candidate and scope resolver are private"
+
+# The issuance wrapper must not grant in an isolation level with an
+# inherited stale MVCC snapshot. It must fail before the old receipt writer.
+for isolation in "repeatable read" "serializable"; do
+  if p >"$tmpdir/receipt-stale-isolation.out" 2>&1 <<SQL
+begin isolation level $isolation;
+select pg_catalog.set_config('myeongha.subject_id', '$subject', true);
+select * from public.internal_apply_additional_official_reader_receipt_locked_v1(
+  '$b4_receipt'::uuid,
+  array['test-reader-unit'], array[transaction_timestamp()],
+  array[transaction_timestamp()], array[null]::timestamptz[],
+  array[null]::text[]
+);
+commit;
+SQL
+  then
+    fail "stale-snapshot Receipt grant issuance was permitted: $isolation"
+  fi
+  grep -q 'Official Reader additional binding requires READ COMMITTED' \
+    "$tmpdir/receipt-stale-isolation.out" ||
+    fail "receipt isolation rejection was not explicit: $isolation"
+done
+still_no_b4="$(p -c "select count(*) from public.standard_reading_reader_access_grants
+  where purchase_intent_id='$b4_intent'::uuid;")"
+still_no_receipt_grant="$(p -c "select count(*) from public.entitlement_grants
+  where source_receipt_id='$b4_receipt'::uuid;")"
+[[ "$still_no_b4" == "0" && "$still_no_receipt_grant" == "0" ]] ||
+  fail "rejected issuance left a partial new Grant or Reader access"
+pass "stale isolation denies additional Reader receipt before any issuance"
+
 # Case 1: T2-like exact scope reading arrives BEFORE an independently minted
 # purchase Grant / Reader bind. The proposed Commerce writer MUST wait.
 # The holder sees only the original B2 bundle, then releases the scope.
@@ -225,17 +316,14 @@ set application_name='rr_s2_new_grant_writer';
 set statement_timeout='20s';
 begin;
 select pg_catalog.set_config('myeongha.subject_id', '$subject', true);
-select public.internal_acquire_official_reader_scope_lock_v1(
-  '$subject'::uuid, '$reading'::uuid, '$reader'
-);
-select * from public.internal_apply_verified_receipt_capability_effects_v1(
+select * from public.internal_apply_additional_official_reader_receipt_locked_v1(
   '$b4_receipt'::uuid,
   array['test-reader-unit'], array[transaction_timestamp()],
   array[transaction_timestamp()], array[null]::timestamptz[],
   array[null]::text[]
 );
 select reading_id,reader_character_id,reader_content_bundle_id
-from public.cmd_bind_standard_reading_access_v2(
+from public.internal_cmd_bind_official_reader_additional_locked_v1(
   '$subject'::uuid, '$b4_intent'::uuid,
   '12193000-0000-0000-0000-000000000004'::uuid,
   '12193100-0000-0000-0000-000000000004'::uuid,
