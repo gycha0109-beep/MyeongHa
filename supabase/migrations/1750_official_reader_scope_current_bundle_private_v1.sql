@@ -50,8 +50,8 @@ begin
       where a.reading_id = p_reading_ref
     ),
     counts as (
-      select count(*) as bundle_count, min(b.bundle_id) as singleton_bundle_id
-      from active_bundles b
+      select count(*) as bundle_count
+      from active_bundles
     )
     select
       case
@@ -61,7 +61,7 @@ begin
       end as scope_state,
       counts.bundle_count as active_bundle_count,
       case when counts.bundle_count = 1
-        then counts.singleton_bundle_id else null::uuid
+        then (select b.bundle_id from active_bundles b limit 1) else null::uuid
       end as current_bundle_id
     from counts;
 end
