@@ -43,7 +43,7 @@ function fixture(input: {
   } : input.rule;
   const select = vi.fn(async () => selected);
   const readCurrentScope = vi.fn(async () => scope);
-  const readApprovedRule = vi.fn(async () => rule);
+  const readApprovedRule = vi.fn(async (_input: unknown) => rule);
   const port = createPolicyGuardedStandardReaderSelectionPortV1({
     catalogAndUnlockPort: {
       resolveEligibleReaderSelection: select as never,
