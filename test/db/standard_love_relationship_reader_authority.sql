@@ -728,6 +728,46 @@ select pg_temp.assert_true(
       and s.saju_domain='relationship'
       and s.effective_at ~ '^20[0-9]{2}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{3}Z
 
+select pg_temp.assert_true(
+  'No Product source for disabled launch SKU, stale version, or unknown Product',
+  not exists (
+    select 1 from public.qry_standard_reading_product_scope_v1(
+      '11300000-0000-0000-0000-000000000001'::uuid, 'v1'
+    )
+  )
+  and not exists (
+    select 1 from public.qry_standard_reading_product_scope_v1(
+      '11392000-0000-0000-0000-000000000001'::uuid, 'old-v0'
+    )
+  )
+  and not exists (
+    select 1 from public.qry_standard_reading_product_scope_v1(
+      '11392000-0000-0000-0000-000000000099'::uuid, 'v1'
+    )
+  )
+);
+
+select pg_temp.assert_true(
+  'Scope reader is executor-only and not public or saleable grant',
+  pg_catalog.has_function_privilege(
+    'myeongha_api_executor',
+    'public.qry_standard_reading_product_scope_v1(uuid,text)'::regprocedure,
+    'EXECUTE'
+  )
+  and not pg_catalog.has_function_privilege(
+    'public',
+    'public.qry_standard_reading_product_scope_v1(uuid,text)'::regprocedure,
+    'EXECUTE'
+  )
+  and not pg_catalog.has_function_privilege(
+    'myeongha_api_executor',
+    'public.cmd_create_standard_reading_purchase_intent_v4(uuid,uuid,uuid,uuid,text,text,jsonb,text,jsonb,text,uuid,text,uuid,text,jsonb,text)'::regprocedure,
+    'EXECUTE'
+  )
+);
+
+select 'Standard Love/Relationship × Reader authority passed' as result;
+
   )
 );
 
