@@ -182,5 +182,7 @@ psql -X -v ON_ERROR_STOP=1 -f test/db/standard_reader_additional_policy_locked_p
 if [[ "${CI:-}" == "true" && "${PGHOST:-}" == "localhost" ]]; then
   run_isolated_case myeongha_reader_product_scope_app_test \
     bash test/db/standard_reader_product_policy_real_postgres.sh
+  run_isolated_case myeongha_standard_b2_real_bind_test \
+    bash test/db/standard_reader_additional_policy_locked_real_pg.sh
 fi
 bash test/db/catalog_snapshot.sh
