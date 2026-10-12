@@ -187,10 +187,17 @@ Current DB preflights:
 `test/db/official_reader_provider_effect_revoke_race_preflight.sh`,
 `test/db/official_reader_birth_scope_lock_candidate_preflight.sh`.
 These are **bounded isolated PostgreSQL evidence**, not an approved final
-T2 release protocol. The existing D-05-C rollback fixture only invokes the
-real Member Chat open command and locator against a synthetic expected bundle;
-it does **not** combine the actual purchased Grant/Reader access query, Product
-approval and HTTP handler into a positive real-DB end-to-end test. Before
+T2 release protocol. The historical D-05-C raw SQL rollback fixture invoked
+only the Member Chat open command and locator against a synthetic bundle.
+Subsequent #1969 added the **real dormant TypeScript → PostgreSQL entrypoint**
+in an isolated disposable database, including exact purchased Reader metadata,
+injected **synthetic-only** Product rule, mismatched bundle rollback,
+first-create/reuse, revoked Grant deny, and subject-context ACL rejection.
+The follow-on concurrent-first-open test runs four simultaneous actual
+TypeScript requests on separate pooled PostgreSQL sessions and verifies
+one created Thread, one live Reader participant and one shared Thread ID.
+This does **not** install an approved Product policy or combine a paid HTTP
+handler, live refund Provider effect and approved T2 writer lock into public E2E. Before
 public activation, require that independent full-scope fixture (including
 two active cross-Bundle purchases, simultaneous first entry, revoke races,
 retry/rollback and RLS/role checks) and Owner approvals. Product/Commerce
