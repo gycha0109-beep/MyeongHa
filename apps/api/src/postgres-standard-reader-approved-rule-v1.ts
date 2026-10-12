@@ -1,6 +1,7 @@
 import type { PostgresTransactionQueryV1 } from './postgres-subject-execution.js';
 import {
   type ProductReaderEligibilityAuthorityPortV1,
+  type ProductReaderEligibilitySourceV1,
   type ProductReaderRuleLookupV1,
 } from './product-reader-eligibility-policy-v1.js';
 import { SAJU_DOMAINS } from '../../../packages/contracts/src/index.js';
@@ -45,7 +46,7 @@ export function createPostgresApprovedStandardReaderRuleAuthorityPortV1(
   client: PostgresTransactionQueryV1,
 ): ProductReaderEligibilityAuthorityPortV1 {
   return Object.freeze({
-    async readApprovedRule(source) {
+    async readApprovedRule(source: Readonly<ProductReaderEligibilitySourceV1 & { effectiveAt: string }>) {
       if (!text(source.productId) || !text(source.productSpecVersion) ||
           typeof source.sajuDomain !== 'string' || !domains.has(source.sajuDomain) ||
           !dbUtc(source.effectiveAt)) return unavailable('invalid_policy');
