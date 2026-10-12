@@ -105,7 +105,7 @@ function id(value: unknown): value is string {
 function sameItem(
   value: unknown,
   purchase: VerifiedDigitalReadingPurchaseV1,
-): value is ItemScope {
+): value is ItemScope & Record<string, unknown> {
   return obj(value) &&
     value.purchaseIntentId === purchase.purchaseIntentId &&
     value.unitId === purchase.unitId &&
