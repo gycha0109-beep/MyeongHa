@@ -39,6 +39,15 @@
 
 **종료:** 모든 activated source class/derived source 처리 정책이 승인되고 버전/최종 경계가 고정됨. **상태: OPEN, Owner 승인 없음.**
 
+## 2.5 R1/R2 실제 구현·자체 재검토 기록 (2026-10-12)
+
+- **R1 목적/변경:** test/db/seyeon_positive_source_set_parent_edge_candidate_v1.sql 작성 및 test/db/seyeon_positive_grant_candidate_real_http.sh에 포함. 기존 실 Attempt+실 Memory/Grant fixture의 0/1/2개 SourceSet, immutable Parent+Edge, original Grant, content digest, revoke/regrant, API 직접 테이블 ACL, 1640 zero Pin XOR를 실 PostgreSQL **격리 DB에서만** 검증. 기존 G2 v2 Commit은 건드리지 않음.
+- **R1 자체 보완:** 첫 CI에서 API executor가 금지된 Parent 직접 SELECT를 수행해 권한 오류. 보안 ACL은 그대로 유지하며 fixture 조회를 Owner 테스트 절차로 분리. 수정 커밋 반영.
+- **R2 목적/변경:** apps/api/src/seyeon-offline-r2-provider-ingress-audit-v1.ts 및 test/seyeon-offline-r2-provider-ingress-audit-v1.test.ts. Native 분류/Interpreter/Renderer/Reviewer의 실제 request builder를 사용해 구조화된 History/Disclosure/Relationship/Grant 참조의 **Pin 이후 혼입**을 오프라인 합성 Provider 앞에서 차단.
+- **R2 자체 보완:** Renderer synthetic fixture에는 실제 responseSchema에 필요한 expressionState가 필수여서 baseline 값을 명시. Provider payload 직렬화에 undefined가 있으면 audit가 HOLD하는 기본값은 변경하지 않음.
+- **상세 근거/입력 차이:** [R1 DB Parent/Edge · R2 native Provider ingress 인벤토리](../security/SEYEON_R1_R2_SOURCE_SET_AND_MODEL_INGRESS_PROOF_V1.md) 참고. 단순 구조화 필드 감사는 임의 자연어 속 hidden source/Reader entitlement·signed Bible·full Context closure의 증명이 아님.
+- **검증 판정:** 정확한 최종 HEAD CI 성공이 확인되기 전 R1/R2 PASS 선언 금지. G0 Owner 정책 D-01~D-10 OPEN, 운영 G1/G2/G3/HISTORY/유료 AI/공개 ON 아님.
+
 ## 3. R1 — D-03 및 실제 SourceSet 구조의 격리 검증
 
 **기존 증거:** test/db/seyeon_positive_grant_attempt_bound_candidate_v1.sql, test/seyeon-source-digest-node-postgres-golden-v1.test.ts, 기존 Node/PG real HTTP 4건, 세연 S0 합성 17건. 2026-10-12 정확한 SHA에서 기존 PG/Node Golden 7건 PASS.
