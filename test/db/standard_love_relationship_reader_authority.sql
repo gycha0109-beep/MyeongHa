@@ -726,7 +726,9 @@ select pg_temp.assert_true(
     where s.product_id='11392000-0000-0000-0000-000000000001'::uuid
       and s.product_spec_version='v1'
       and s.saju_domain='relationship'
-      and s.effective_at ~ '^20[0-9]{2}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{3}Z
+      and s.effective_at ~ '^20[0-9]{2}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{3}Z$'
+  )
+);
 
 select pg_temp.assert_true(
   'No Product source for disabled launch SKU, stale version, or unknown Product',
