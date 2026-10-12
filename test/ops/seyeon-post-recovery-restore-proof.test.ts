@@ -106,7 +106,8 @@ describe('Se-yeon post-recovery governed backup to real PG17 catalog proof', () 
     expect(creatorDefaultAcl).toContain('HOLD_SEYEON_RESTORE: creator retains PUBLIC/anon/authenticated default function EXECUTE');
     expect(creatorDefaultAcl).toContain("current_database() = 'postgres' AND current_user = 'supabase_admin'");
     expect(creatorDefaultAcl).toContain("current_database() ~ '^myeongha_ci_case_[0-9]+$'");
-    expect(creatorDefaultAcl).toContain("pg_catalog.inet_server_addr() IS DISTINCT FROM '127.0.0.1'::inet");
+    expect(restore).toContain("readonly RESTORE_ADMIN_DATABASE_URL='postgresql://supabase_admin:restore-drill@127.0.0.1:5432/postgres'");
+    expect(creatorDefaultAcl).not.toContain('inet_server_addr()');
     expect(creatorDefaultAcl).not.toMatch(/\\b(?:REVOKE|GRANT)\\s+.*\\bON\\s+FUNCTION\\b/iu);
     expect(creatorDefaultAcl).not.toContain('supabase_migrations.schema_migrations');
     const aclPosition = restore.indexOf('prepare-postgres-isolated-restore-function-defaults.sql');
