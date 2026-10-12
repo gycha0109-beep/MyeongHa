@@ -37,6 +37,9 @@ function goodPreflight(){
     hasWorkerRole:true,otherMemberships:0,
     isApiMember:false,isGovernedMember:false,isCostOwnerMember:false,
     workerCanSettle:true,canDirectSettle:false,
+    workerCanClaim:true,workerCanAck:true,workerCanStore:false,
+    canDirectClaim:false,canDirectAck:false,canDirectStore:false,
+    canDirectReceiptQueue:false,workerCanDirectReceiptQueue:false,
     canStart:false,canReadLedger:false,canReadBudget:false,
   };
 }
@@ -98,6 +101,9 @@ describe('D4B-10A detached server-only binding (synthetic, no Production source)
       ['hasWorkerRole',false],['otherMemberships',1],['isApiMember',true],
       ['isGovernedMember',true],['isCostOwnerMember',true],
       ['workerCanSettle',false],['canDirectSettle',true],
+      ['workerCanClaim',false],['workerCanAck',false],['workerCanStore',true],
+      ['canDirectClaim',true],['canDirectAck',true],['canDirectStore',true],
+      ['canDirectReceiptQueue',true],['workerCanDirectReceiptQueue',true],
       ['canStart',true],['canReadLedger',true],
       ['canReadBudget',true],
     ] as const){
