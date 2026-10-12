@@ -191,8 +191,8 @@ grep -q 'Verified Provider receipt and purchase Grant lineage is unavailable' "$
   fail "unqualified Grant denied for unexpected reason"
 pass "wrong Grant, runtime role and stale transaction isolation all denied"
 
-# CASE 1: Commerce effect owns the Grant row before Reader reads.
-# Reader must actually wait on PostgreSQL Lock and subsequently see DENY.
+# CASE 1: Provider effect holds the shared advisory scope lock first.
+# Reader must wait on PostgreSQL Lock and then deny after COMMIT.
 activate_b2
 {
   echo "set application_name='m3b2b_effect_writer_first';"
@@ -222,11 +222,11 @@ finish "$reader_pid" "$tmpdir/reader-after.out"; reader_pid=""
 grep -qx no_active_grant "$tmpdir/reader-after.out" ||
   { cat "$tmpdir/reader-after.out" >&2; fail "post-effect locked current Reader scope must DENY"; }
 assert_committed_revoke '12196000-0000-0000-0000-000000000001'
-pass "DB-C3 Commerce Writer-first: provider-event Grant FOR UPDATE blocks Reader FOR SHARE, then DENY"
+pass "S2 Provider-first: scope lock blocks Reader current-rights query, then DENY"
 
-# CASE 2: Reader FOR SHARE owns the row first. The real Entitlement Effect
-# writer waits, then commits the independent second synthetic revoke event.
-# ALLOW here is a row-lock observation, NEVER an HTTP reveal authorization.
+# CASE 2: Reader holds the shared advisory scope first. Provider effect
+# writer waits, then commits an independent second synthetic revoke event.
+# Pre-commit one_current_bundle is not an HTTP reveal authorization.
 activate_b2
 p >"$tmpdir/reader-first.out" 2>&1 <<SQL &
 set application_name='m3b2b_effect_reader_first';
@@ -245,6 +245,7 @@ wait_backend m3b2b_effect_reader_first Timeout
   echo "set application_name='m3b2b_effect_writer_after';"
   echo "set statement_timeout='12s';"
   echo "begin;"
+  echo "select pg_catalog.set_config('myeongha.subject_id', '$subject', true);"
   apply_effect_sql '12196000-0000-0000-0000-000000000002'
   echo "commit;"
 } | p >"$tmpdir/writer-after.out" 2>&1 &
@@ -255,6 +256,6 @@ finish "$writer_pid" "$tmpdir/writer-after.out"; writer_pid=""
 grep -qx one_current_bundle "$tmpdir/reader-first.out" ||
   { cat "$tmpdir/reader-first.out" >&2; fail "scope locked Reader-first synthetic current-rights read changed"; }
 assert_committed_revoke '12196000-0000-0000-0000-000000000002'
-pass "DB-C3 Reader-first: FOR SHARE forces provider-event Entitlement Effect writer to wait"
+pass "S2 Reader-first: shared scope lock forces provider-event effect writer to wait"
 
 echo "PASS: private Provider revoke scope-lock in both orders; no live refund or public T2"
