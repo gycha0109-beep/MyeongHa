@@ -5,7 +5,7 @@
 
 ## 이 변경에서 수행한 작업
 
-- Forward-only migration 1730: Product ID, spec 버전, saju domain, 승인 revision, 적용 시각, 철회 이력을 각각 고정합니다.
+- Forward-only migration 1770: Product ID, spec 버전, saju domain, 승인 revision, 적용 시각, 철회 이력을 각각 고정합니다.
 - PostgreSQL private read: 현재 Product/spec가 활성이고 적용 기간 내 미철회 승인 revision이 정확히 하나일 때만 단일 규칙을 반환합니다. 0개 또는 중복이면 거절합니다.
 - append-only 승인/철회 이력. Ordinary API executor, anon, authenticated, service_role은 테이블을 직접 읽거나 변경할 수 없습니다. 서버 executor에 비공개 함수 실행 권한만 허용합니다.
 - 승인된 운영 정책 행은 하나도 추가하지 않았습니다. 테스트의 synthetic approval은 격리 PostgreSQL에만 존재합니다.
