@@ -26,3 +26,12 @@
 1. Product/DB가 버전 고정된 실제 approved Reader rule source(활성/폐기/시간·동일 revision transaction) 스키마 및 ACL 결정.
 2. Product rule을 1220 v2 구매 바인딩의 **DB 원자적 권한 판정과 정합**시킬 forward-only migration 작성, 전문 `can_initiate`와 일반 해설의 정책 분리. 기존 1220 원본 수정 금지.
 3. Purchase Intent/Receipt/Grant 동일 transaction PostgreSQL 실제 성립과 분리된 premium DENY, refund/revoke Race 검증 뒤에만 유료 Reader 출시 여부 검토.
+
+
+## 2026-10-12 후속 실제 TypeScript × PostgreSQL 검증
+
+- 격리된 PostgreSQL 복제본(운영 연결 차단)에서 `standard_love_relationship_reader_authority.sql` 합성 상품·Reader·Unlock 데이터를 적재하고 합성 기본 콘텐츠 릴리스를 구성한다.
+- 실제 `myeongha_api_executor` SQL 역할로 **동일 PostgreSQL 거래** 안에서 Catalog→Product scope→서버 주입 합성 승인 규칙을 TypeScript로 호출한다.
+- 유효한 선택 및 저장된 Unlock 사례, Product 미활성 실제 판매 후보, 정책 철회, 공개 전 캐릭터, 다른 Subject의 Unlock 조회 불가 및 읽기 전용 부작용 0을 검사한다.
+- 이 검증에서 승인 규칙은 **테스트에서만 만든 합성 규칙**이며 운영 Product Rule 도입·실제 구매 바인딩·유료 해설 공개 증거로 승격하지 않는다.
+- 실행: `run_authority_core.sh`의 분리 DB `myeongha_reader_product_scope_app_test`; 파일 `test/db/standard_reader_product_policy_real_postgres.sh` / `test/postgres-standard-reader-approved-policy-real-db.test.ts`.
