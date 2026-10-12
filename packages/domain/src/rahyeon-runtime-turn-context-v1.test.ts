@@ -43,7 +43,7 @@ function romanceDecision(gate: 'PUBLIC' | 'FAMILIAR') {
       trustBand: gate === 'PUBLIC' ? 'low' : 'medium',
       relevantSharedHistoryRefs: gate === 'PUBLIC' ? [] : ['turn-confirmed-relationship'],
     },
-    questionContext: 'direct',
+    questionContext: gate === 'PUBLIC' ? 'casual_curiosity' : 'relationship_relevant',
   });
 }
 
