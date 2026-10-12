@@ -93,8 +93,8 @@ insert into public.commerce_receipts(
 
 select * from public.internal_apply_verified_receipt_capability_effects_v1(
   'b2030000-0000-4000-8000-000000000001',
-  array['test-reader-unit'],array[clock_timestamp()],
-  array[clock_timestamp()],array[null]::timestamptz[],array[null]::text[]
+  array['test-reader-unit'],array[transaction_timestamp()],
+  array[transaction_timestamp()],array[null]::timestamptz[],array[null]::text[]
 );
 
 select pg_temp.assert_v2_true(
