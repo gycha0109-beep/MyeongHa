@@ -232,3 +232,12 @@ S1에서 공통 잠금 함수 자체가 성공하더라도 **S2 전체 경로가
 - **엄격한 현황:** 공통 진입점 **함수 구현 및 좁은 경합 증명**이지 기존 운영 Writer Cutover, 다중 Product 전체 정렬, 현재 유료 T2 보증은 아니다. 기존 Reader/Commerce 경로의 L1 선행을 전역적으로 제거하기 전까지 충돌과 경쟁 안전성 완료라고 선언하지 않는다.
 - **다음:** 다중 Product/Reader lockset 정렬과 전역 경합 검증(D1 확장) → 최초/추가 Receipt·Binder의 공통 진입점 연결(D2) → Provider cancel/revoke/restore 및 미결속 Grant(D3) → Saju-owned 출처(D4) → 유료 본문·원자 T2(D5) → 후속 조회(D6).
 - **차단 유지:** 공개 유료 채팅·실제 환불·운영 DB migration·결제 개시 OFF; RR-03/04 충돌, 개인정보/법무/Commerce 승인과 #1941 복구 증거 미완료.
+
+## 18. D1 다중 범위 정렬 잠금 + PostgreSQL 3-세션 경합 (2026-10-12)
+
+- `1810_official_reader_ordered_multi_scope_lockset_private_v1.sql` 추가: 실존 Product Lockset L0 **전체를 먼저 오름차순** 확보하고, 정본 공식 Reading에 연결된 L1 Reading×Reader 쌍 **전체를 다음에 정렬하여** 잠그는 비공개 원시 함수를 분리했다.
+- Reading Lockset의 Product는 호출자가 권한으로 제시하는 값이 아니라 `standard_reading_official_bindings`에서 매번 도출하며, 잠금 전·L0 후·L1 후 동일성을 재검증한다. 현재 Grant·환불 가능·Reader 공개 허가와는 관계없다.
+- 최대 입력 64개·중복/NULL/배열 불일치·회원 실행 문맥·`READ COMMITTED`·실존 Product/Reading 검증, 런타임 SQL 실행권 거부.
+- `test/db/official_reader_multi_scope_lockset_three_session.sh`: PostgreSQL 실제 A/B/C 연결에서 **정순/역순 2 Product Lockset 경쟁**과 **역순 2 Reader Lockset 경쟁**을 각각 확인한다. 독립 격리 시험으로 DB authority core에 등록.
+- 상세 감사 문서 [OFFICIAL_READER_D1_WRITER_LOCK_ORDER_AUDIT_20261012_V1.md](./OFFICIAL_READER_D1_WRITER_LOCK_ORDER_AUDIT_20261012_V1.md) 4절에 입력의 권위·교착 범위·남은 우회 경로를 갱신한다.
+- **미완료:** 모든 Commerce/Reader Writer가 이 순서를 사용하도록 전환, Verified Provider event 영향 범위 서버 resolver, 미결속 취소, 3-세션의 현실적 Grant Writer vs refund vs T2 통합 경쟁, Saju 근거·유료 본문 원자 T2·RR-04. 운영 DB migration·결제/유료 채팅 공개 계속 OFF.
