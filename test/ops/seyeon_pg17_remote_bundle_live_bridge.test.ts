@@ -50,6 +50,12 @@ describe('Se-yeon historical SQL PG17 isolated CI bridge', () => {
     expect(isolated).toContain('log_min_error_statement=panic');
     expect(isolated).toContain('log_min_messages=panic');
     expect(isolated).toContain('log_statement=none');
+    expect(isolated).toContain("alter database myeongha_seyeon_remote_pg17_scratch_ci set log_min_messages = 'panic'");
+    expect(isolated).toContain("alter database myeongha_seyeon_remote_pg17_scratch_ci set log_min_error_statement = 'panic'");
+    expect(isolated).toContain("alter database myeongha_seyeon_remote_pg17_scratch_ci set log_statement = 'none'");
+    expect(isolated).toContain('env -u PGOPTIONS psql');
+    expect(isolated).toContain('unset PGOPTIONS');
+    expect(isolated).toContain('Non-superuser database session cannot preserve private SQL logging.');
     expect(isolated).toContain('coalesce(cardinality(statements),0)=0');
     expect(isolated).toContain('PG17_FIXTURE_SKIP_0860');
     expect(isolated).toContain('PG17_BASELINE_APPLY: $filename');

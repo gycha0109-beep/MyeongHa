@@ -46,6 +46,22 @@ PGDATABASE="$origin" dropdb --if-exists "$shadow" >/dev/null 2>&1 ||
 PGDATABASE="$origin" createdb "$shadow" || hold 'Local shadow creation failure.'
 export PGDATABASE="$shadow"
 cd "$root"
+# Protect private historical SQL even AFTER actor postgres becomes NOSUPERUSER.
+# A non-superuser cannot request superuser-only log settings through PGOPTIONS;
+# use trusted database-level defaults established while this throwaway actor
+# still has bootstrap-approved SUPERUSER, and verify defaults independently.
+psql -X -q -v ON_ERROR_STOP=1 >/dev/null 2>"$tempdir/logging-setup.err" <<'SQL'
+alter database myeongha_seyeon_remote_pg17_scratch_ci set log_min_messages = 'panic';
+alter database myeongha_seyeon_remote_pg17_scratch_ci set log_min_error_statement = 'panic';
+alter database myeongha_seyeon_remote_pg17_scratch_ci set log_statement = 'none';
+SQL
+private_logging="$(env -u PGOPTIONS psql -X -qAt -v ON_ERROR_STOP=1 -c "
+  select current_setting('log_min_messages') || '|' ||
+    current_setting('log_min_error_statement') || '|' ||
+    current_setting('log_statement')" 2>"$tempdir/logging-verify.err")" ||
+  hold 'Cannot establish private database-level SQL logging defaults.'
+[[ "$private_logging" == 'panic|panic|none' ]] ||
+  hold 'Isolated PostgreSQL 17 SQL logging defaults expose private incident SQL.'
 apply() {
   local filename
   filename="$(basename "$1")"
@@ -200,6 +216,14 @@ psql -X -q -v ON_ERROR_STOP=1 -c \
   'set role seyeon_fixture_demoter; alter role postgres nosuperuser createrole createdb;' \
   >/dev/null 2>"$tempdir/demote.err" ||
   hold 'Unable to reproduce Production non-superuser postgres role.'
+# Database-level PANIC logging was verified without PGOPTIONS above. Drop the
+# privileged startup overrides before ANY new non-superuser connection.
+unset PGOPTIONS
+[[ "$(psql -X -qAt -v ON_ERROR_STOP=1 -c "
+  select current_setting('log_min_messages') || '|' ||
+    current_setting('log_min_error_statement') || '|' ||
+    current_setting('log_statement')" 2>"$tempdir/non-superuser-logging.err")" == 'panic|panic|none' ]] ||
+  hold 'Non-superuser database session cannot preserve private SQL logging.'
 [[ "$(psql -X -qAt -v ON_ERROR_STOP=1 -c "select rolsuper from pg_roles where rolname='postgres'")" == f ]] ||
   hold 'Disposable PG17 executor is unexpectedly superuser.'
 [[ "$(psql -X -qAt -v ON_ERROR_STOP=1 -c "select rolsuper from pg_roles where rolname=current_user")" == f ]] ||
