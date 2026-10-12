@@ -100,59 +100,12 @@ describe('Se-yeon post-recovery governed backup to real PG17 catalog proof', () 
     expect(restore).toContain('supabase_managed_migration_ledger_fully_restored: false');
   });
 
-  it('normalizes only isolated creator default privileges before DDL, without changing any existing RPC ACL', () => {
+  it('normalizes isolated creator defaults before DDL without changing existing RPC privileges', () => {
     expect(creatorDefaultAcl).toContain('ALTER DEFAULT PRIVILEGES REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC;');
     expect(creatorDefaultAcl).toContain('REVOKE EXECUTE ON FUNCTIONS FROM anon, authenticated;');
     expect(creatorDefaultAcl).toContain('HOLD_SEYEON_RESTORE: creator retains PUBLIC/anon/authenticated default function EXECUTE');
     expect(creatorDefaultAcl).toContain("current_database() = 'postgres' AND current_user = 'supabase_admin'");
-    expect(creatorDefaultAcl).toContain("current_database() ~ '^myeongha_ci_case_[0-9]+
-    expect(creatorDefaultAcl).not.toMatch(/\\b(?:REVOKE|GRANT)\\s+.*\\bON\\s+FUNCTION\\b/iu);
-    expect(creatorDefaultAcl).not.toContain('supabase_migrations.schema_migrations');
-    const aclPosition = restore.indexOf('prepare-postgres-isolated-restore-function-defaults.sql');
-    const schemaPosition = restore.indexOf('--file "$work_dir/schema.sql"');
-    const exactProofPosition = restore.indexOf('seyeon-relationship-isolated-restore-proof.sql');
-    expect(aclPosition).toBeGreaterThanOrEqual(0);
-    expect(aclPosition).toBeLessThan(schemaPosition);
-    expect(schemaPosition).toBeLessThan(exactProofPosition);
-    expect(restore).toContain('HOLD_SEYEON_RESTORE: exact scoped relationship restore proof failed.');
-  });
-
-  it('admits a new scoped backup only after SQL execution returns both pass verdicts', () => {
-    const envelope = buildRestoreEvidenceEnvelope(fixture());
-    expect(envelope.seyeon_early_history_restore_proof).toBe('restored_scoped_version_name_snapshot_6_pass');
-    expect(envelope.seyeon_early_functions_restore_proof).toBe('restored_public_function_catalog_11_and_rls_6_pass');
-    expect(envelope.source_seyeon_early_history_sha256).toBe(proofHash);
-    expect(envelope.supabase_managed_migration_ledger_fully_restored).toBe(false);
-    expect(envelope.dr_ready).toBe(false);
-  });
-
-  it('rejects an absent, fake or improperly scoped relationship proof', () => {
-    const noProof = fixture();
-    noProof.restoreEvidence.seyeon_early_functions_restore_proof = 'not_evidenced';
-    expect(() => buildRestoreEvidenceEnvelope(noProof)).toThrow(/restoreEvidence.seyeon_early_functions_restore_proof/);
-
-    const missingDigest = fixture();
-    delete missingDigest.backupManifest.seyeon_early_relationship_migration_history_sha256;
-    expect(() => buildRestoreEvidenceEnvelope(missingDigest)).toThrow(/restoreEvidence.seyeon_early_history_restore_proof/);
-
-    const falseLedger = fixture();
-    falseLedger.restoreEvidence.supabase_managed_migration_ledger_fully_restored = true;
-    expect(() => buildRestoreEvidenceEnvelope(falseLedger)).toThrow(/supabase_managed_migration_ledger_fully_restored/);
-
-    const corruptDigest = fixture();
-    corruptDigest.backupManifest.seyeon_early_relationship_migration_history_sha256 = 'x';
-    expect(() => buildRestoreEvidenceEnvelope(corruptDigest)).toThrow(/must be SHA-256/);
-  });
-
-  it('accepts historical archives as unproven, never silently upgrades legacy evidence to PASS', () => {
-    const envelope = buildRestoreEvidenceEnvelope(fixture(false));
-    expect(envelope.source_seyeon_early_history_sha256).toBe(null);
-    expect(envelope.seyeon_early_history_restore_proof).toBe('not_captured_in_source_backup');
-    expect(envelope.seyeon_early_functions_restore_proof).toBe('not_evidenced');
-    expect(envelope.dr_ready).toBe(false);
-  });
-});
-");
+    expect(creatorDefaultAcl).toContain("current_database() ~ '^myeongha_ci_case_[0-9]+$'");
     expect(creatorDefaultAcl).toContain("pg_catalog.inet_server_addr() IS DISTINCT FROM '127.0.0.1'::inet");
     expect(creatorDefaultAcl).not.toMatch(/\\b(?:REVOKE|GRANT)\\s+.*\\bON\\s+FUNCTION\\b/iu);
     expect(creatorDefaultAcl).not.toContain('supabase_migrations.schema_migrations');
