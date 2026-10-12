@@ -8,6 +8,8 @@
 >
 > 적용 범위: isolated PG `myeongha_seyeon_positive_pin_candidate_test`. **운영 마이그레이션·positive Projector·권한 서명 아님.**
 
+**다음 설계 단계:** [G0 D-03 → G1 DB Blueprint](./SEYEON_G0_D03_G1_POSITIVE_PIN_DB_BLUEPRINT_V1_PROPOSED.md)에서 Node raw envelope와 PostgreSQL raw payload의 Codec 분리, Versioned Attempt SourceSet+Edges, Zero/Positive XOR, 실제 Commit·ACL·Lock Graph를 명시합니다. [실행 로드맵](../operations/SEYEON_G0_D03_G1_TO_G6_IMPLEMENTATION_ROADMAP_V1.md)의 R0/R1 이후 Owner sign-off 전 Production 변경 금지.
+
 ## 1. 이미 코드에서 확인된 사실
 
 1. `packages/domain/src/registry.ts`의 `canonicalJson`은 JSON 객체의 키를 정렬한 뒤 `JSON.stringify`로 직렬화한다. 비 JSON 값은 거부한다. 문자열 내용/기본 형식이 같아도 PostgreSQL `jsonb::text`와 일치하는 바이트 표현이라는 보장은 없다.
