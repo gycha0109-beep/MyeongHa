@@ -77,7 +77,7 @@ export function assessSajuSo4SupabaseStagingIsolationClaimV1(input:unknown):Saju
       if (inventoryValid
         && projects.get(MYEONGHA_PRODUCTION_SUPABASE_PROJECT_REF)==='PRODUCTION'
         && [...projects.entries()].filter(([,role])=>role==='PRODUCTION').length===1) {
-        const proposed=PLAN.map(k=>input.proposal[k]);
+        const proposed=PLAN.map(k=>(input.proposal as Record<string,unknown>)[k]);
         if (proposed.every(x=>x===null)) {
           result='NO_STAGING_RESOURCES';
         } else if (proposed.every(projectRef)) {
