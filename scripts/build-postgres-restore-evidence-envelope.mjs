@@ -106,6 +106,48 @@ export function buildRestoreEvidenceEnvelope(input) {
     }
   }
 
+  // The provider migration ledger itself is excluded by the portable backup.
+  // When a new governed backup carries the bounded six-version snapshot, the
+  // isolated runner must prove its exact temp-table replay and the restored
+  // PostgreSQL function/RLS catalogs. Legacy backups remain explicitly unproven.
+  const seyeonHistoryDigest = backupManifest.seyeon_early_relationship_migration_history_sha256;
+  if (seyeonHistoryDigest !== undefined) {
+    if (typeof seyeonHistoryDigest !== 'string' || !SHA256_RE.test(seyeonHistoryDigest)) {
+      fail('backupManifest.seyeon_early_relationship_migration_history_sha256 must be SHA-256');
+    }
+    requireExact(
+      restoreEvidence.seyeon_early_history_restore_proof,
+      'restored_scoped_version_name_snapshot_6_pass',
+      'restoreEvidence.seyeon_early_history_restore_proof',
+    );
+    requireExact(
+      restoreEvidence.seyeon_early_functions_restore_proof,
+      'restored_public_function_catalog_11_and_rls_6_pass',
+      'restoreEvidence.seyeon_early_functions_restore_proof',
+    );
+    requireExact(
+      restoreEvidence.supabase_managed_migration_ledger_fully_restored,
+      false,
+      'restoreEvidence.supabase_managed_migration_ledger_fully_restored',
+    );
+  } else {
+    if (
+      restoreEvidence.seyeon_early_history_restore_proof !== undefined ||
+      restoreEvidence.seyeon_early_functions_restore_proof !== undefined
+    ) {
+      requireExact(
+        restoreEvidence.seyeon_early_history_restore_proof,
+        'not_captured_in_source_backup',
+        'restoreEvidence.seyeon_early_history_restore_proof',
+      );
+      requireExact(
+        restoreEvidence.seyeon_early_functions_restore_proof,
+        'not_evidenced',
+        'restoreEvidence.seyeon_early_functions_restore_proof',
+      );
+    }
+  }
+
   const restoreStarted = requireUtc(
     restoreEvidence.restore_started_at_utc,
     'restoreEvidence.restore_started_at_utc',
@@ -189,6 +231,7 @@ export function buildRestoreEvidenceEnvelope(input) {
     source_artifact_expires_at: sourceArtifactExpiresAt.text,
     source_archive_name: archiveName,
     source_encrypted_sha256: encryptedSha256,
+    source_seyeon_early_history_sha256: seyeonHistoryDigest ?? null,
   });
 }
 
