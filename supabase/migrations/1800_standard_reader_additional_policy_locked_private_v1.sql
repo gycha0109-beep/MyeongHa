@@ -457,6 +457,16 @@ begin
       message = 'Standard Reading Saju domain is unavailable';
   end if;
 
+  -- A canonical Reader check belongs at DB execution time, not only in TS.
+  if v_reader_character_id not in (
+    'seyeon', 'baekheon', 'yeoul', 'seorin', 'rahyeon',
+    'mira', 'taegyeom', 'yunho', 'doyun'
+  ) then
+    raise exception using errcode = 'P0001',
+      constraint = 'standard_b2_official_reader_identity_required',
+      message = 'One official Reader identity is required for Standard purchase binding';
+  end if;
+
   -- Product-owned exact Standard policy, not specialist can_initiate.
   -- A Premium character association is intentionally NOT Standard authority.
   select count(*)::integer into v_approved_count
