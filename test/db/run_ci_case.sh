@@ -249,6 +249,16 @@ SQL
     apply_pg17_migrations_without_birth_authority
     bash test/db/content_release_lifecycle_authority.sh
     ;;
+  seyeon-r2-rpc-catalog)
+    verify_pg17
+    apply_pg17_migrations_without_birth_authority
+    snapshot="$(mktemp)"
+    trap 'rm -f -- "$snapshot"' EXIT
+    psql -X -qAt -v ON_ERROR_STOP=1 \
+      -f scripts/operations/seyeon-r2-rpc-catalog-readonly.sql > "$snapshot"
+    node scripts/operations/verify-seyeon-r2-rpc-catalog.mjs "$snapshot"
+    node scripts/operations/verify-seyeon-r2-rpc-catalog.mjs "$snapshot" "$snapshot"
+    ;;
   member-character-thread-open)
     verify_pg17
     apply_pg17_migrations_without_birth_authority

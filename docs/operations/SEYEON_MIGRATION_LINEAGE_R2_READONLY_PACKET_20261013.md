@@ -90,3 +90,20 @@ Watchtower-Track: ops
 
 - 원격 104KB bundle의 Private original audit/source, 전체 SQL/Object/Owner/ACL fingerprint parity, **1520~1720 21건**의 Owner별 의존·회귀·rollback 및 forward-only 결정 전에는 Production 적용 금지.
 - [DR Readiness #38226729128](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38226729128)은 역사적 `1310` 증거와 repository frontier `20261008043000` 불일치로 FAIL. 단순 숫자 변경·게이트 우회로 GREEN 처리하지 않는다. G0~G6, 유료 AI, 공개 경로는 별도 HOLD.
+
+
+## 7. R2 후속 — 1460~1510 함수 카탈로그 지문 검증 (승인 아님)
+
+- 실행 SQL: `scripts/operations/seyeon-r2-rpc-catalog-readonly.sql` — 1460~1500이 정의한 19종 함수의 검색경로 독립 시그니처, Owner, SECURITY DEFINER, volatility, ACL·DDL SHA-256, 익명/인증 실행 가능 여부만 출력. 함수 본문/실제 기록/비밀값 출력 없음.
+- 검증기: `scripts/operations/verify-seyeon-r2-rpc-catalog.mjs` — 19개 정해진 이름 및 소유자, overload/유실, 사용자 실행권한, SHA-256 형식을 fail-closed 검사하며 동일 PostgreSQL major(17) 두 스냅샷의 exact equality를 비교. 부정 테스트 `tests/seyeon-r2-rpc-catalog.test.mjs`.
+- Production 2026-10-13 읽기 전용 기초 확인에서 이름 19개가 관측되었고 browser EXECUTE는 모두 false. 다만 이 사실은 전체 exact-signature/DDL 동등성 또는 104KB SQL 계보 승인의 대체 증거가 아니다.
+- 실행 예시 (권한이 승인된 각 환경에서 별도 수행): `psql -X -qAt -v ON_ERROR_STOP=1 -f scripts/operations/seyeon-r2-rpc-catalog-readonly.sql > protected-snapshot.json` 후 `node scripts/operations/verify-seyeon-r2-rpc-catalog.mjs isolated.json production.json`. 결과 스냅샷은 운영 전용 보관소에만 보관하고, 일반 PR/CI에는 검증 결과·건수·Run ID만 기록. Supabase 관리형 역할/객체, PG 설정 및 migration history 차이는 별도 조사.
+- **R2 전체 HOLD:** 원격 단일 SQL 원본의 작성/적용 출처, 1460~1510 본문 차이와 timestamped DDL 중복/순서, 1520~1720 전체 21개의 종속성, forward-only Owner 방침/승인 미완료. Production 수정/복구/원장 repair 금지.
+
+
+## 8. 2026-10-13 R1 최신 실행 증거 — R2 계보 정합성은 별도 HOLD
+
+- 새로운 격리 복원 [#38337822738](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38337822738)가 `main@7af352c59738a0d36abd4d4fd78ba1789e57c121`에서 `backup_run_id=38328139495` 암호화 아티팩트를 실제 복원하여 **SUCCESS**. 이는 기존 2·6절 "실복원 미확보"보다 늦은 결과다.
+- 실제 PostgreSQL 17 복원 결과 `1400~1450` 이력 스냅샷 **6/6**, 복원 관계 함수 `pg_proc` **11/11**, 관계 RLS/ACL **6/6**, 브라우저 직접 권한 차단, Synthetic Privacy Recovery **PASS**. 정확한 encrypted backup source/envelope 검증 단계 통과. Evidence artifact ID `11785825091`, SHA-256 `b98e443f0c50b8af05b0d890971ae78b6284ed70d98940f04fefaeee9252c82a`.
+- **R1 scoped DONE**. 그러나 `dr_ready=false`, full `supabase_migrations` ledger 복원 false, hosted Supabase Auth/Storage 및 운영 개인정보 Privacy Ledger 실제 replay 미입증.
+- **R2 계속 HOLD:** remote-only 104KB SQL의 출처·객체/DDL 동등성·Owner 승인, 저장소 1520~1720 21개 의존성 및 forward-only 배포정책 미해결. [#2030](https://github.com/gycha0109-beep/MyeongHa/pull/2030)의 read-only 19 RPC catalog parity 도구는 R2 비교 증거를 위한 것이며, R1 성공 또는 CI Green이 Production history 수정 승인으로 바뀌지 않는다.

@@ -34,6 +34,9 @@ const commerceEntitlementPatterns = [
 ];
 
 const postgres17Patterns = [
+  /^scripts\/operations\/seyeon-r2-rpc-catalog-readonly\.sql$/u,
+  /^scripts\/operations\/verify-seyeon-r2-rpc-catalog\.mjs$/u,
+  /^tests\/seyeon-r2-rpc-catalog\.test\.mjs$/u,
   /^test\/db\/(?:saju_staging_operator_admission_v2_authority\.sh|fixtures\/saju_staging_operator_admission_schema_8c2b2d302\.sql)$/u,
   /^test\/db\/(?:birth_profile_create_runtime_authority|content_release_lifecycle_authority|member_character_thread_open_concurrency)\.sh$/u,
   /^docs\/CHARACTER_GATE_B_PUBLICATION_BLOCKER_EVIDENCE\.md$/u,
