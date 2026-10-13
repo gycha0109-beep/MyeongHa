@@ -1,0 +1,26 @@
+{
+  "observation": "production-readonly-2026-10-13",
+  "scope": "seyeon-r2-rpc-19",
+  "source": "Supabase Production pg_catalog SELECT ONLY",
+  "mainAtObservation": "5a969f62c1789b8d4fd1ea13571295cddd7c0f7a",
+  "readOnly": true,
+  "authorizesProduction": false,
+  "containsFunctionBodies": false,
+  "containsPII": false,
+  "aggregate": {
+    "schemaVersion": "seyeon-r2-rpc-set-fingerprint-v1",
+    "postgresMajor": 17,
+    "expectedNames": 19,
+    "rows": 19,
+    "resolvedFunctions": 19,
+    "uniqueResolvedNames": 19,
+    "missingFunctions": 0,
+    "browserExecuteCount": 0,
+    "namesSha256": "aac8208ad50b51b9df2fd745d358a8a7f20b9a888631c403a71bd3e3999ec60c",
+    "signatureSetSha256": "03939c8755b2ddc96685d9fed0d583c84f3761a1df63b2ab05531eb3c4dbeb55",
+    "ownerSetSha256": "e98325292283a4b233fb0a0a88247087f7a86bd17f4f9abafe15174ee35b0a5f",
+    "aclSetSha256": "e0576c2bcd9c0826cf2799017f1a2396a7d14a11aaf094209ea40547bb1f9e88",
+    "ddlSetSha256": "1d84ffa5cb1b248c4f356b4b7ed399ff9a718b3eff9b5b62db4afbfb5d69eec9",
+    "flagsSetSha256": "dbb0cbf1837820efc2f01c870d8d4b216d09600eb1d86b6bcc73c70b86e00c93"
+  }
+}
