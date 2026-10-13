@@ -38,7 +38,11 @@ begin
  loop
   select pg_get_functiondef(p.oid) into s from pg_proc p
   join pg_namespace ns on ns.oid=p.pronamespace
-  where ns.nspname='public' and p.proname=n;
+  where ns.nspname='public' and p.proname=left(n,63);
+  -- PostgreSQL NAMEDATALEN=64 truncates identifiers to 63 bytes. The R2
+  -- verified cancel function source identifier is 64 ASCII characters;
+  -- resolve its installed catalog spelling, not the untruncated source.
+  -- Future staged migrations should use explicit <=63-byte names.
   if s is null then raise exception 'missing R3 writer %',n; end if;
   if n in ('internal_cmd_bind_standard_reader_initial_policy_locked_v1',
            'internal_apply_initial_official_reader_receipt_locked_v1') and
