@@ -74,6 +74,7 @@ export function createSeyeonOfflineR2DerivedOutputLineageV1(input: Readonly<{
   let state: State = 'turn_interpretation';
   let inFlight = false;
   let expectedRequest = buildSeyeonTurnInterpreterRequestV2(input.actualContext);
+  let expectedRequestDigest = fingerprint(expectedRequest);
   let packet: SeyeonRendererPacketV2 | null = null;
   let packetDigest: string | null = null;
   let rendererDraft: unknown = null;
@@ -114,6 +115,8 @@ export function createSeyeonOfflineR2DerivedOutputLineageV1(input: Readonly<{
             current.contextDigest !== original.contextDigest ||
             current.interpreterRequestDigest !== original.interpreterRequestDigest ||
             !same(request, expectedRequest) ||
+            fingerprint(expectedRequest) !== expectedRequestDigest ||
+            fingerprint(request) !== expectedRequestDigest ||
             request.purpose !== stage ||
             auditSeyeonOfflineR2ProviderRequestV1({
               candidate: input.candidate, request,
@@ -134,7 +137,11 @@ export function createSeyeonOfflineR2DerivedOutputLineageV1(input: Readonly<{
         if (after.state !== 'post_preflight_context_observed_synthetic_only' ||
             after.contextDigest !== original.contextDigest ||
             after.interpreterRequestDigest !== original.interpreterRequestDigest ||
-            !same(request, expectedRequest)) {
+            !same(request, expectedRequest) ||
+            fingerprint(request) !== expectedRequestDigest ||
+            fingerprint(expectedRequest) !== expectedRequestDigest ||
+            (packet !== null && packetDigest !== fingerprint(packet)) ||
+            (rendererDraft !== null && rendererDraftDigest !== fingerprint(rendererDraft))) {
           throw new Error('R2 derived-output closure changed during generation');
         }
 
@@ -150,6 +157,7 @@ export function createSeyeonOfflineR2DerivedOutputLineageV1(input: Readonly<{
           });
           packetDigest = fingerprint(packet);
           expectedRequest = buildSeyeonRendererRequestV2(packet);
+          expectedRequestDigest = fingerprint(expectedRequest);
           appendReceipt(stage, request, {interpretation,riskCausality,packet});
           state = 'dialogue_render';
         } else if (stage === 'dialogue_render') {
@@ -164,6 +172,7 @@ export function createSeyeonOfflineR2DerivedOutputLineageV1(input: Readonly<{
           expectedRequest = buildSeyeonSemanticReviewRequestV2({
             packet, rendererDraft, utteranceHash,
           });
+          expectedRequestDigest = fingerprint(expectedRequest);
           appendReceipt(stage, request, {rendererDraft,utteranceHash});
           state = 'semantic_review';
         } else {
@@ -193,6 +202,11 @@ export function createSeyeonOfflineR2DerivedOutputLineageV1(input: Readonly<{
      * Offline unkeyed fingerprints, not an authenticated Grant, StageReceipt,
      * HTTP disclosure decision, or proof of serialized Provider wire bytes.
      */
+    /** Test-only view, copied so callers cannot change the sealed request. */
+    nextRequestForOfflineTest(): SeyeonStructuredProviderRequestV2 | null {
+      if (state === 'complete' || state === 'held' || inFlight) return null;
+      return structuredClone(expectedRequest);
+    },
     snapshot() {
       return Object.freeze({
         schemaVersion: SEYEON_OFFLINE_R2_DERIVED_OUTPUT_LINEAGE_V1,
