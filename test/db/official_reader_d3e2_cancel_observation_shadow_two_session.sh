@@ -114,8 +114,8 @@ done
 [[ "$waiting" == 1 ]] || { cat "$tmp/a.out" "$tmp/b.out" >&2; fail "same-transaction advisory lock wait missing"; }
 for pid in $pids; do wait "$pid" || { cat "$tmp/a.out" "$tmp/b.out" >&2; fail "two PG sessions failed"; }; done
 pids=""
-grep -q 'observed|f' "$tmp/a.out" || fail "session A not persisted"
-grep -q 'observed|f' "$tmp/b.out" || fail "session B not persisted"
+grep -q 'observed:false' "$tmp/a.out" || fail "session A not persisted"
+grep -q 'observed:false' "$tmp/b.out" || fail "session B not persisted"
 [[ "$(p -c 'select count(*) from public.official_reader_portone_cancel_observation_shadow_v1')" == 5 ]] ||
  fail "concurrent events not committed"
 echo "PASS D3e2: two actual PG sessions serialize provider observation stream, zero entitlement effects"
