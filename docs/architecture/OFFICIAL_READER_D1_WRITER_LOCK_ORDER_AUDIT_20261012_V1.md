@@ -130,3 +130,7 @@ PR #2031 code SHA `352791b5c176f3144a13a63e426c2f5300dec01b`, CI run `3833787599
 ### D3c 1080 다중 Grant 원자효과 최종 증거 (2026-10-13)
 
 PR #2034 SHA `99fa0bda9c0759fcccaf309fbc6cd3704190bc62` CI run `38339438218`: PostgreSQL15 Core·PG17·Content·Work Track·CI Verify·Governance·Web Gate PASS. DB 로그에서 **두 번째 정렬 Grant의 CAS 실패→첫 번째 상태·revision·불변 이벤트 완전 롤백**, 정상 배치 Grant 2개 회수→Event 2개 COMMIT, terminal replay DENY, runtime/Commerce EXECUTE DENY를 확인. 본 결과는 1850 PRIVATE 신규 경로만 증명하며 1080/1090/1220/1760/1770/1780/1790 직접 호출자 및 current PortOne `Transaction.Paid` 외 `ignored` 콜백의 L0→L1 참여 또는 운영 취소 진실성을 증명하지 않는다.
+
+## 9. D3e2 PortOne Cancellation Shadow와 Writer 안전 경계 (2026-10-13)
+
+새 `1860` 원장은 구매권 또는 환불 Writer가 아니라 verified PortOne candidate 정보를 위한 **별도 비공개 observation ledger**다. 동일 거래별 advisory lock 획득 후 immutable append, webhook identity replay/collision 및 event timestamp 역행 기록을 수행하며 1080 Entitlement Grant/Event/Projection/Outbox, D3b L0→L1, D3c 1850 호출에는 영향을 주지 않는다. 신규 테이블 public RLS=true + anon/authenticated/service_role/API/Commerce/Chat SELECT 및 함수 EXECUTE REVOKE. 운영 webhook path·사후 Settlement·Legal 승인·권한 있는 최소 actor를 추가하고 검증하기 전에는 shadow만으로 `full cancellation` 승인이나 사용자 Reader T2 공개 차단을 수행하지 않는다.
