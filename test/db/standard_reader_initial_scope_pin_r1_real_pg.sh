@@ -76,14 +76,15 @@ awk '/^create temp table _s4_initial_result as/{on=1} on{print}' \
 cat >> "$tmp/case.sql" <<SQL
 -- Birth revision advances AFTER the verified purchase and private binding.
 -- Existing 1810 live candidate will drift, but historical R1 pin must not.
-select * from public.cmd_append_birth_profile_revision_v1(
+select result.*
+from public.birth_profiles bp
+join public.birth_profile_revisions br on br.id=bp.current_revision_id
+cross join lateral public.cmd_append_birth_profile_revision_v1(
  bp.subject_id,bp.id,bp.current_revision_id,
  'b4260000-0000-4000-8000-000000000001'::uuid,
  br.calendar_type,br.birth_date,br.birth_time,br.time_known,br.is_leap_month,
  br.sex,'sha256:v1:7777777777777777777777777777777777777777777777777777777777777777'
-)
-from public.birth_profiles bp
-join public.birth_profile_revisions br on br.id=bp.current_revision_id
+) result
 where bp.subject_id='$subject'::uuid and bp.profile_kind='self' and bp.archived_at is null;
 update public.product_offers
 set enabled=false,retired_at=clock_timestamp()
