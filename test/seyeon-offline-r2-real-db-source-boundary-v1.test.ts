@@ -1,5 +1,9 @@
 import { createHash } from 'node:crypto';
-import { afterAll, describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it, vi } from 'vitest';
+import { createOpenAiSeyeonStructuredProviderV1 } from '../apps/api/src/openai-seyeon-structured-provider-v1.js';
+import { runCharacterGovernedPreflightV1 } from '../apps/api/src/character-governed-preflight-v1.js';
+import { observeSeyeonOfflineR2PostPreflightClosureV1 } from '../apps/api/src/seyeon-offline-r2-post-preflight-closure-v1.js';
+import { observeSeyeonOfflineR2DbWireBindingV1 } from '../apps/api/src/seyeon-offline-r2-db-wire-binding-v1.js';
 import { Pool } from 'pg';
 import {
   assembleSeyeonRuntimeContextV2,
@@ -248,6 +252,85 @@ describe.skipIf(!ENABLED)(
         const request = buildSeyeonTurnInterpreterRequestV2(runtimeContext);
         expect(auditSeyeonOfflineR2ProviderRequestV1({candidate,request}).state)
           .toBe('observed_synthetic_only');
+
+        // REAL disposable PostgreSQL observation -> REAL OpenAI Responses
+        // serializer + internal admission hook -> FAKE network fetch. The
+        // disposable DB transaction remains uncommitted and always rolls back.
+        const preflight = await runCharacterGovernedPreflightV1({
+          characterId:'seyeon',userMessageRef:USER_MESSAGE,userText,
+          relationship:{gate:'PUBLIC',trustBand:'low',
+            relevantSharedHistoryRefs:[]},
+          integrity:{
+            classifier:{classify:async()=>({claims:[]})},
+            authorityResolver:{resolve:async()=>({
+              state:'MISSING' as const,authorityRefs:[],
+              provenanceRefs:['offline-test-only'],
+            })},
+          },
+          disclosure:{
+            classifier:{classify:async()=>({
+              topicKey:null,questionContext:'casual_curiosity',
+            })},
+            sourceDescriptor:{readDescriptor:async()=>{
+              throw new Error('No private source permitted');
+            }},
+            factAuthorityResolver:{resolve:async()=>null},
+            retriever:{retrieve:async()=>[]},
+          },
+        });
+        expect(observeSeyeonOfflineR2PostPreflightClosureV1({
+          candidate,preflight,actualContext:runtimeContext,
+        }).state).toBe('post_preflight_context_observed_synthetic_only');
+
+        let admittedWire: {body:string;digest:string;length:number} | null=null;
+        const fetchImpl=vi.fn(async (_url:string,init:RequestInit)=>{
+          const actual=String(init.body);
+          const bytes=new TextEncoder().encode(actual);
+          const observed=admittedWire;
+          if(observed===null ||
+             observed.body!==actual ||
+             observed.length!==bytes.byteLength ||
+             observed.digest!=='sha256:utf8:v1:'+
+               createHash('sha256').update(bytes).digest('hex')) {
+            throw new Error('Offline wire drift after DB-bound admission');
+          }
+          return Response.json({status:'completed',output:[{
+            type:'message',content:[{type:'output_text',
+              text:JSON.stringify({accepted:true})}],
+          }]});
+        });
+        const native=createOpenAiSeyeonStructuredProviderV1({
+          apiKey:'sk-offline-no-real-provider-call-1234567890',
+          model:'offline-model',fetchImpl,
+          meteredBeforeDispatch:async(metadata,rawBody)=>{
+            // Query the ORIGINAL Grant+Record again for EVERY dispatch; a
+            // caller-cached prior row must never re-authorize a stale Attempt.
+            const fresh=await client.query<typeof observation>(evidenceSql,[ATTEMPT]);
+            if(fresh.rows.length!==1) throw new Error('Missing original Grant');
+            const dbRow=fresh.rows[0]!;
+            const exactObservation={
+              ...dbRow,
+              originalGrantedAt:dbRow.originalGrantedAt instanceof Date
+                ? dbRow.originalGrantedAt.toISOString()
+                : String(dbRow.originalGrantedAt),
+            };
+            const proof=observeSeyeonOfflineR2DbWireBindingV1({
+              candidate,observation:exactObservation,request,
+              serializedRequestBody:rawBody,expectedModel:metadata.modelKey,
+              preflight,actualContext:runtimeContext,
+            });
+            if(proof.state!=='db_original_grant_to_wire_observed_offline_only' ||
+               proof.wireByteLength!==metadata.requestBodyBytes) {
+              throw new Error('Original DB Grant to actual wire held');
+            }
+            admittedWire={
+              body:rawBody,digest:proof.wireDigest,length:proof.wireByteLength,
+            };
+          },
+        });
+        await expect(native.generate(request)).resolves.toEqual({accepted:true});
+        expect(fetchImpl).toHaveBeenCalledTimes(1);
+
         for (const altered of [
           { ...observation,originalGrantId:'d6000000-0000-4000-8000-000000000099' },
           { ...observation,sourceCount:2 },
@@ -273,6 +356,8 @@ describe.skipIf(!ENABLED)(
             ...observation, exactOriginalGrantActive:false,
           },
         }).state).toBe('held');
+        await expect(native.generate(request)).rejects.toMatchObject({code:'PRE_DISPATCH_REJECTED'});
+        expect(fetchImpl).toHaveBeenCalledTimes(1);
         await client.query('ROLLBACK TO SAVEPOINT revoke_original');
 
         await client.query('SAVEPOINT tamper_original');
@@ -289,6 +374,8 @@ describe.skipIf(!ENABLED)(
             currentPayloadDigest:alteredPayload.rows[0]!.currentPayloadDigest,
           },
         }).state).toBe('held');
+        await expect(native.generate(request)).rejects.toMatchObject({code:'PRE_DISPATCH_REJECTED'});
+        expect(fetchImpl).toHaveBeenCalledTimes(1);
         await client.query('ROLLBACK TO SAVEPOINT tamper_original');
       } finally {
         await client.query('ROLLBACK');
