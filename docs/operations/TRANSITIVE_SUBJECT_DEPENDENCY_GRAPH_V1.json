@@ -5,12 +5,12 @@
   "graphAuthority": "SCHEMA_DISCOVERED_POLICY_NEUTRAL",
   "executionAuthorized": false,
   "discovery": {
-    "edgeCount": 140,
-    "distinctReachableTableCount": 59,
+    "edgeCount": 142,
+    "distinctReachableTableCount": 60,
     "maxDepth": 4,
     "depthCounts": {
       "1": 30,
-      "2": 47,
+      "2": 49,
       "3": 59,
       "4": 4
     },
@@ -616,6 +616,19 @@
     },
     {
       "minDepth": 2,
+      "parentTable": "commerce_receipts",
+      "childTable": "standard_reader_initial_purchase_scope_pins_v1",
+      "constraintName": "standard_reader_initial_purchase_scope_p_source_receipt_id_fkey",
+      "childColumns": [
+        "source_receipt_id"
+      ],
+      "parentColumns": [
+        "id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 2,
       "parentTable": "conversation_threads",
       "childTable": "chat_turns",
       "constraintName": "chat_turns_thread_subject_fk",
@@ -885,6 +898,19 @@
       "parentTable": "purchase_intents",
       "childTable": "purchase_intent_reader_selections",
       "constraintName": "purchase_intent_reader_selections_intent_fk",
+      "childColumns": [
+        "purchase_intent_id"
+      ],
+      "parentColumns": [
+        "id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 2,
+      "parentTable": "purchase_intents",
+      "childTable": "standard_reader_initial_purchase_scope_pins_v1",
+      "constraintName": "standard_reader_initial_purchase_scope__purchase_intent_id_fkey",
       "childColumns": [
         "purchase_intent_id"
       ],
@@ -1204,6 +1230,23 @@
       "constraintName": "ai_execution_logs_turn_attempt_fk",
       "childColumns": [
         "turn_attempt_id",
+        "turn_id",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id",
+        "turn_id",
+        "subject_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 3,
+      "parentTable": "chat_turn_attempts",
+      "childTable": "character_reading_artifacts",
+      "constraintName": "character_reading_artifacts_attempt_turn_subject_fk",
+      "childColumns": [
+        "attempt_id",
         "turn_id",
         "subject_id"
       ],
@@ -2013,23 +2056,6 @@
       ],
       "parentColumns": [
         "id"
-      ],
-      "disposition": "UNDECIDED"
-    },
-    {
-      "minDepth": 3,
-      "parentTable": "chat_turn_attempts",
-      "childTable": "character_reading_artifacts",
-      "constraintName": "character_reading_artifacts_attempt_turn_subject_fk",
-      "childColumns": [
-        "attempt_id",
-        "turn_id",
-        "subject_id"
-      ],
-      "parentColumns": [
-        "id",
-        "turn_id",
-        "subject_id"
       ],
       "disposition": "UNDECIDED"
     },
