@@ -219,3 +219,12 @@ Governor 04d4B 계열은 실제 격리 PostgreSQL 기반 영수증 임대·정�
 - **증명 계약:** 일회용 PG17 CI에서 의도적으로 GLOBAL PUBLIC + public-schema anon/auth 테이블 기본 GRANT를 재현 → 이전 객체는 그대로 두고 앞으로 생성되는 테이블의 브라우저 DML이 없음을 검증. 기존 관계 테이블에 명시적 `GRANT SELECT TO anon` 또는 `DISABLE ROW LEVEL SECURITY` 시 **반드시 실패**. 실패 시 로그에는 정확한 6개 객체의 이름/owner/RLS/ACL만 남기고 실제 행 또는 고객정보를 출력하지 않는다.
 - **다음 실제 실행:** 이 보수 PR의 exact HEAD/PG17/Full Integration PASS 및 merge 후 새 [PostgreSQL Isolated Restore Drill](https://github.com/gycha0109-beep/MyeongHa/actions/workflows/postgres-isolated-restore-drill.yml) 수동 실행. 백업 `38204929259` 재사용, `incident_reference_utc=2026-10-12T04:46:04Z`, `watchtower_track=ops`, optional privacy fields blank. 6 history snapshot, 11 functions, 6 RLS/ACL 및 전체 synthetic/evidence SUCCESS 확인 전에는 `HOLD_EXACT_RELATIONSHIP_RESTORE`.
 - **고정 안전 경계:** `supabase_migrations` full ledger 복원하지 않음, `dr_ready=false`, Production SQL/Role/ACL/DML 변화 없음, 원격-only lineage `20261008090417` 복구·AI G0~G6·paid/public activation 별도 HOLD. 기존 백업 및 운영 장애 증거를 덮어쓰지 않는다.
+
+## 14. 2026-10-13 현재 상태 고정 — R1 새 백업 / R2 pending 1720까지 확대
+
+2026-10-12의 과거 실행 상태는 감사 기록으로 보존한다. **최신 실행 결론**과 근거는 [SEYEON_R1_R2_READONLY_BASELINE_20261013.md](SEYEON_R1_R2_READONLY_BASELINE_20261013.md)를 우선한다.
+
+- PR [#2011](https://github.com/gycha0109-beep/MyeongHa/pull/2011) main 병합, exact-main CI [#38226729382](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38226729382) SUCCESS. [Supabase Production #38226729166](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38226729166)의 일반 migration 및 backfill **둘 다 SKIPPED**.
+- 병합 이후 정기 암호화 백업 [#38328139495](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38328139495) SUCCESS. Source SHA `9b7c10cb694afee5c1cb1d89050668eaa3d9f558`, 완료 `2026-10-13T00:40:24Z`. 2026-10-13T01:00Z 조회 시 새 대응 격리 복원 성공 기록은 없음. **R1 HOLD**, 복원은 GitHub Actions UI의 `workflow_dispatch`가 필요하다.
+- Production SELECT 기준 초기 이력 `1400~1510=12/12`, 후속 **`1520~1720=0/21`**. 기존 문서의 `1520~1710=0/20`은 작성 당시 인벤토리로 남기고, **현재 추가된 `1720`은 Reader/Product Authority 연계 검토 범위**로 포함한다. 원격-only `20261008090417` 104,021-byte SQL SHA-256도 이전 증거와 일치한다. 아직 해당 원본의 전체 DDL fingerprint parity나 Owner 승인 증거는 없다.
+- DR Readiness [#38226729128](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38226729128) FAIL: 역사적 `1310` 문서 증거와 저장소 frontier `20261008043000` 차이. 임의로 고쳐 GREEN 처리하지 않음. `dr_ready=false`, remote lineage/후속 migration/AI 공개 HOLD는 유지.
