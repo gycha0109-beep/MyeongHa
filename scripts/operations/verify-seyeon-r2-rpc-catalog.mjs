@@ -85,10 +85,10 @@ export function compareR2RpcSnapshots(isolated, production) {
 }
 
 if (process.argv[1]?.endsWith('/verify-seyeon-r2-rpc-catalog.mjs')
-    && process.argv.length >= 4) {
+    && process.argv.length >= 3) {
   try {
     const load = (path) => JSON.parse(readFileSync(path, 'utf8'));
-    const result = process.argv.length >= 5
+    const result = process.argv.length >= 4
       ? compareR2RpcSnapshots(load(process.argv[2]), load(process.argv[3]))
       : { status: 'R2_RPC_CATALOG_SHAPE_PASS_NOT_LINEAGE_APPROVAL',
           count: validateR2RpcSnapshot(load(process.argv[2])).size };
