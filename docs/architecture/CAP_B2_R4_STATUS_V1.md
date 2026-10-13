@@ -27,3 +27,15 @@ BIND-15 additional Reader exact purchase: S4 predecessor PG PASS.
 BIND-16 missing additional source / drift: integration incomplete.
 BIND-17 historical replay after revoked Grant: R2 PG partial PASS.
 BIND-18 request hash/bundle conflicts: existing tests partial.
+
+BIND-19 one Grant revoked, another independent bundle Grant preserved: integration incomplete.
+BIND-20 cross-Subject/Reading/Reader, Guest-to-Member lineage: full test incomplete.
+BIND-21 legacy 1170 vs v2 history: no auto-entitlement upgrade; unproven across all paths.
+BIND-22 T2 scope lock before issuer: operational T2 Writer HOLD.
+BIND-23 revoke before Binder: R2 actual PG PASS; T2 reveal HOLD.
+BIND-24 Product withdrawal vs initial Binder: R3 actual PG 2/2 PASS.
+BIND-25 Grant expiry after lock wait: elapsed-clock PG case missing.
+BIND-26 stale REPEATABLE READ/SERIALIZABLE snapshot: existing guard, new R4 PG subset.
+BIND-27 multi Reader scope sorting: R3 actual PG PASS; global multi-scope proof incomplete.
+BIND-28 old 1220/API/Commerce bypass: R3 runtime HOLD inventory passed; real ingress integration missing.
+BIND-29 Product withdraw + Content retire/Unlock/T2 race: integration HOLD.
