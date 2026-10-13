@@ -129,18 +129,29 @@ export function createSeyeonOfflineR2PostPreflightSyntheticProviderV1(input: Rea
   actualContext: SeyeonRuntimeContextV2;
   delegate: SeyeonStructuredProviderPortV2;
 }>): SeyeonStructuredProviderPortV2 {
-  const verdict = observeSeyeonOfflineR2PostPreflightClosureV1(input);
+  const initial = observeSeyeonOfflineR2PostPreflightClosureV1(input);
+  let dispatched = false;
   return Object.freeze({
     providerKey: input.delegate.providerKey,
     modelKey: input.delegate.modelKey,
     generate(request) {
-      if (verdict.state !== 'post_preflight_context_observed_synthetic_only' ||
+      // Preflight/context objects may still be mutable and the synthetic
+      // callback may be invoked later: re-evaluate immediately before any
+      // delegate call, not just when the wrapper is constructed.
+      const current = observeSeyeonOfflineR2PostPreflightClosureV1(input);
+      if (dispatched ||
+          initial.state !== 'post_preflight_context_observed_synthetic_only' ||
+          current.state !== 'post_preflight_context_observed_synthetic_only' ||
+          current.contextDigest !== initial.contextDigest ||
+          current.interpreterRequestDigest !== initial.interpreterRequestDigest ||
           !same(request, buildSeyeonTurnInterpreterRequestV2(input.actualContext)) ||
           auditSeyeonOfflineR2ProviderRequestV1({
             candidate: input.candidate, request,
           }).state !== 'observed_synthetic_only') {
         throw new Error('Seyeon offline R2 post-Preflight source closure held');
       }
+      // Failures are terminal for this single synthetic attempt.
+      dispatched = true;
       return input.delegate.generate(request);
     },
   });
