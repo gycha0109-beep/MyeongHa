@@ -3,7 +3,7 @@
 // Phase 2 runs the real pinned Saju HTTP/HMAC loopback verifier inside Docker.
 // Keep the existing verify-saju-bridge-full.mjs GitHub workflow launcher unchanged.
 import { spawnSync } from 'node:child_process';
-import { randomBytes } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { readFileSync, realpathSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -12,6 +12,7 @@ const compose = fileURLToPath(new URL('./saju-bridge-full.compose.yml', import.m
 const httpCompose = fileURLToPath(new URL('./saju-bridge-http.compose.yml', import.meta.url));
 const tlsCompose = fileURLToPath(new URL('./saju-bridge-tls.compose.yml', import.meta.url));
 const permitCompose = fileURLToPath(new URL('./saju-bridge-permit.compose.yml', import.meta.url));
+const recoveryCompose = fileURLToPath(new URL('./saju-bridge-recovery.compose.yml', import.meta.url));
 const root = realpathSync(fileURLToPath(new URL('../../', import.meta.url)));
 const pinnedSajuSha = 'cd0acf9abd447826ccaefba56112d046e560ee04';
 const packagePath = fileURLToPath(new URL('../../package.json', import.meta.url));
@@ -63,8 +64,8 @@ function docker(args, { capture = false, timeout = 240_000 } = {}) {
 
 function localSajuCheckout() {
   if (process.argv.length === 2) return null;
-  if (process.argv.length !== 4 || !['--http', '--binding', '--tls', '--permit'].includes(process.argv[2]) || !process.argv[3]) {
-    throw new Error('Usage: node scripts/local/verify-saju-bridge-docker-local.mjs [--http ../Saju | --binding ../Saju | --tls ../Saju | --permit ../Saju]');
+  if (process.argv.length !== 4 || !['--http', '--binding', '--tls', '--permit', '--recovery'].includes(process.argv[2]) || !process.argv[3]) {
+    throw new Error('Usage: node scripts/local/verify-saju-bridge-docker-local.mjs [--http ../Saju | --binding ../Saju | --tls ../Saju | --permit ../Saju | --recovery ../Saju]');
   }
   const saju = realpathSync(resolve(process.argv[3]));
   if (saju === root) throw new Error('A separate pinned Saju checkout is required.');
@@ -121,13 +122,25 @@ function remaining(kind) {
 }
 
 function main() {
-  const permit = process.argv[2] === '--permit';
+  const recovery = process.argv[2] === '--recovery';
+  const permit = process.argv[2] === '--permit' || recovery;
   const tls = process.argv[2] === '--tls' || permit;
   const binding = process.argv[2] === '--binding' || tls;
   const saju = localSajuCheckout();
   if (saju) base = [...base, '-f', httpCompose];
   if (tls) base = [...base, '-f', tlsCompose];
   if (permit) base = [...base, '-f', permitCompose];
+  if (recovery) {
+    base = [...base, '-f', recoveryCompose];
+    sandboxEnv.SAJU_BRIDGE_LOCAL_RECOVERY_STAGE = 'seed';
+    sandboxEnv.SAJU_BRIDGE_LOCAL_RECOVERY_PERMIT_ID = randomUUID();
+    sandboxEnv.SAJU_BRIDGE_LOCAL_RECOVERY_NONCE_KEY = randomBytes(32).toString('base64url');
+    // Compose config preflight demands strings; fresh timestamps are set only
+    // after the slow dependency/build/bootstrap portion of the Docker run.
+    sandboxEnv.SAJU_BRIDGE_LOCAL_RECOVERY_PERMIT_ISSUED_MS = '1';
+    sandboxEnv.SAJU_BRIDGE_LOCAL_RECOVERY_PERMIT_EXPIRES_MS = '2';
+    sandboxEnv.SAJU_BRIDGE_LOCAL_RECOVERY_NONCE_EXPIRES_MS = '2';
+  }
   if (JSON.parse(readFileSync(packagePath, 'utf8')).name !== 'myeongha') {
     throw new Error('Expected MyeongHa repository checkout.');
   }
@@ -171,6 +184,33 @@ function main() {
         }
         console.log('[saju-bridge] Verifying GoTrue JWT → Subject/Birth → Saju HMAC → isolated Nonce.');
         composed('run', '--rm', '--no-deps', 'saju-binding-verifier');
+        if (recovery) {
+          // Fault probes keep the SAME DB data volumes and CA volumes. Do not
+          // call 'down --volumes' until all restart/outage assertions finish.
+          const now = Date.now();
+          sandboxEnv.SAJU_BRIDGE_LOCAL_RECOVERY_PERMIT_ISSUED_MS = String(now - 2000);
+          sandboxEnv.SAJU_BRIDGE_LOCAL_RECOVERY_PERMIT_EXPIRES_MS = String(now + 8 * 60_000);
+          sandboxEnv.SAJU_BRIDGE_LOCAL_RECOVERY_NONCE_EXPIRES_MS = String(now + 125_000);
+          sandboxEnv.SAJU_BRIDGE_LOCAL_RECOVERY_STAGE = 'seed';
+          console.log('[saju-bridge] Phase 4A: inject synthetic COMMIT acknowledgement loss against real TLS databases.');
+          composed('run', '--rm', '--no-deps', 'saju-recovery-verifier');
+          console.log('[saju-bridge] Phase 4A: restart three actual DB containers, preserving their named data volumes.');
+          composed('restart', 'subject-db', 'nonce-db', 'admission-db');
+          composed('up', '--detach', '--wait', '--wait-timeout', '120', 'subject-db', 'nonce-db', 'admission-db');
+          for (const service of ['nonce-db', 'subject-db', 'admission-db']) {
+            composed('stop', service);
+            try {
+              sandboxEnv.SAJU_BRIDGE_LOCAL_RECOVERY_STAGE = 'outage-' + service.slice(0, -3);
+              console.log('[saju-bridge] Phase 4A: verify refusal with ' + service + ' actually stopped.');
+              composed('run', '--rm', '--no-deps', 'saju-recovery-verifier');
+            } finally {
+              composed('up', '--detach', '--wait', '--wait-timeout', '120', service);
+            }
+          }
+          sandboxEnv.SAJU_BRIDGE_LOCAL_RECOVERY_STAGE = 'verify';
+          console.log('[saju-bridge] Phase 4A: verify durable Nonce/Permit consumption and Subject fixture after recovery.');
+          composed('run', '--rm', '--no-deps', 'saju-recovery-verifier');
+        }
       }
     }
   } catch (error) {
@@ -205,7 +245,12 @@ function main() {
           console.log('[saju-bridge] Phase 3A PASS: independent verify-full Subject/Nonce/Admission TLS (Permit not exercised).');
           if (permit) {
             console.log('[saju-bridge] Phase 3B PASS: signed synthetic Permit V2 consumed once in isolated Admission TLS DB (no Runner).');
-            console.log('[saju-bridge] Recovery and all operational approvals remain HOLD.');
+            if (recovery) {
+              console.log('[saju-bridge] Phase 4A PASS: real DB stop/restart durability and synthetic COMMIT-ACK uncertainty (not physical mid-COMMIT loss).');
+              console.log('[saju-bridge] Physical mid-COMMIT partition, distributed recovery, Runner and operational approval remain HOLD.');
+            } else {
+              console.log('[saju-bridge] Recovery and all operational approvals remain HOLD.');
+            }
           } else {
             console.log('[saju-bridge] Permit V2/recovery and operational approval remain HOLD.');
           }
