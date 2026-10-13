@@ -98,7 +98,7 @@ echo "PASS purchase match: provider payment ID, attempt, full receipt, verified 
  die "wrong Grant was accepted"
 [[ "$(check "$observation" 'ffffffff-ffff-ffff-ffff-ffffffffffff' "$grant")" == 'hold:false' ]] ||
  die "unverified event accepted"
-[[ "$(check" 'ffffffff-ffff-ffff-ffff-ffffffffffff' "$event" "$grant")" == 'hold:false' ]] ||
+[[ "$(check 'ffffffff-ffff-ffff-ffff-ffffffffffff' "$event" "$grant")" == 'hold:false' ]] ||
  die "unknown observation accepted"
 p -c "update public.official_reader_portone_cancel_observation_shadow_v1
  set payment_id='unrelated-payment' where id='$observation'::uuid" >/dev/null
