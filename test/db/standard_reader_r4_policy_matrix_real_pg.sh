@@ -1,7 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
-[[ "${CI:-}" == true && "${PGHOST:-}" == localhost &&
+# Exact GitHub test-only contexts. PG17 uses the per-case ephemeral suite DB.
+if [[ "${MYEONGHA_R4_PG17_CI:-}" == 1 ]]; then
+ [[ "${CI:-}" == true && "${PGHOST:-}" == localhost &&
+    "${PGDATABASE:-}" =~ ^myeongha_ci_case_[0-9]+$ ]] || exit 1
+ version="$(psql -X -Atqc 'show server_version_num')"
+ [[ "$version" -ge 170000 && "$version" -lt 180000 ]] || exit 1
+else
+ [[ "${CI:-}" == true && "${PGHOST:-}" == localhost &&
    "${PGDATABASE:-}" == myeongha_b2_r4_private_matrix ]] || exit 1
+fi
 p(){ psql -X -v ON_ERROR_STOP=1 -At "$@"; }
 fail(){ echo "FAIL R4: $*" >&2; exit 1; }
 tmp="$(mktemp -d)"
