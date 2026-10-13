@@ -44,7 +44,7 @@ for each row execute function seyeon_positive_candidate.reject_r1_source_rewrite
 -- from the SAME transaction, immutable pinned source ancestry, and a matching
 -- validation proof; direct v1/v2 API EXECUTE will also be removed.
 create or replace function public.tr_seyeon_zero_source_pin_immutable_v1()
-returns trigger language plpgsql
+returns trigger language plpgsql security definer
 set search_path = pg_catalog,public,seyeon_positive_candidate
 as $r3_trigger$
 declare
