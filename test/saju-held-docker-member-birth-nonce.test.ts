@@ -1,4 +1,5 @@
 import { randomBytes } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { Pool } from 'pg';
 import { beforeAll, afterAll, describe, expect, it, vi } from 'vitest';
 import { bindAuthenticatedMemberSajuHeldProofV1 } from '../apps/api/src/saju-held-authenticated-member-proof-v1.js';
@@ -21,6 +22,15 @@ import type { SupabaseMemberVerifierFetchV1 } from '../apps/api/src/supabase-mem
 import type { PostgresQueryResultV1, PostgresSubjectPoolV1 } from '../apps/api/src/postgres-subject-execution.js';
 
 const enabled = process.env.MYEONGHA_DOCKER_SAJU_BINDING === '1';
+const tls = enabled && process.env.MYEONGHA_DOCKER_SAJU_TLS === '1';
+const ca = tls ? {
+  subject: readFileSync('/certs/subject/ca.crt', 'utf8'),
+  nonce: readFileSync('/certs/nonce/ca.crt', 'utf8'),
+  admission: readFileSync('/certs/admission/ca.crt', 'utf8'),
+} : undefined;
+const subjectSsl = ca ? { ssl: { ca: ca.subject, rejectUnauthorized: true } } : {};
+const nonceSsl = ca ? { ssl: { ca: ca.nonce, rejectUnauthorized: true } } : {};
+const admissionSsl = ca ? { ssl: { ca: ca.admission, rejectUnauthorized: true } } : {};
 const AUTH = 'http://gotrue:9999';
 const SAJU_ORIGIN = 'https://saju-proof-local-test.invalid';
 const SUBJECT_OWNER = '8c320001-0000-4000-8000-000000000001';
@@ -40,6 +50,7 @@ const subjectAdmin = enabled ? new Pool({
   host: 'subject-db', port: 5432,
   database: 'myeongha_saju_subject_local_verify',
   user: 'postgres', password: process.env.SAJU_BRIDGE_LOCAL_SUBJECT_DB_PASSWORD,
+  ...subjectSsl,
   max: 2, connectionTimeoutMillis: 5000,
 }) : undefined;
 const subjectRuntime = enabled ? new Pool({
@@ -47,6 +58,7 @@ const subjectRuntime = enabled ? new Pool({
   database: 'myeongha_saju_subject_local_verify',
   user: 'myeongha_runtime',
   password: process.env.SAJU_BRIDGE_LOCAL_SUBJECT_LOGIN_PASSWORD,
+  ...subjectSsl,
   max: 2, connectionTimeoutMillis: 5000,
 }) : undefined;
 const nonceConfig = {
@@ -54,10 +66,19 @@ const nonceConfig = {
   database: 'myeongha_saju_nonce_local_verify',
   user: 'myeongha_docker_nonce_login',
   password: process.env.SAJU_BRIDGE_LOCAL_NONCE_LOGIN_PASSWORD,
+  ...nonceSsl,
   max: 2, connectionTimeoutMillis: 5000,
 };
 const nonceA = enabled ? new Pool(nonceConfig) : undefined;
 const nonceB = enabled ? new Pool(nonceConfig) : undefined;
+const admission = tls ? new Pool({
+  host: 'admission-db', port: 5432,
+  database: 'myeongha_saju_admission_local_verify',
+  user: 'myeongha_docker_admission_tls_probe',
+  password: process.env.SAJU_BRIDGE_LOCAL_ADMISSION_LOGIN_PASSWORD,
+  ...admissionSsl,
+  max: 1, connectionTimeoutMillis: 5000,
+}) : undefined;
 interface Member { readonly id: string; readonly token: string }
 let owner: Member;
 let other: Member;
@@ -226,7 +247,52 @@ describe.skipIf(!enabled)('Windows-compatible isolated Docker GoTrue→Subject/B
   }, 60_000);
   afterAll(async () => {
     await Promise.all([subjectAdmin?.end(), subjectRuntime?.end(),
-      nonceA?.end(), nonceB?.end()]);
+      nonceA?.end(), nonceB?.end(), admission?.end()]);
+  });
+  it.skipIf(!tls)('uses three independent verify-full TLS CAs and rejects foreign CA and plaintext', async () => {
+    expect(ca).toBeDefined();
+    expect(new Set([ca!.subject, ca!.nonce, ca!.admission]).size).toBe(3);
+    const dbPools = [subjectRuntime!, nonceA!, admission!];
+    for (const pool of dbPools) {
+      const result = await pool.query<{ ssl: boolean; version: string; db: string }>(
+        "select ssl.ssl, ssl.version, current_database()::text as db from pg_stat_ssl ssl where ssl.pid=pg_backend_pid()",
+      );
+      expect(result.rows[0]?.ssl).toBe(true);
+      expect(result.rows[0]?.version).toMatch(/^TLSv1\.[23]$/u);
+    }
+    expect((await admission!.query("select session_user::text as login")).rows[0])
+      .toMatchObject({ login: 'myeongha_docker_admission_tls_probe' });
+    await expect(admission!.query('select * from public.saju_source_proof_nonce_claims'))
+      .rejects.toThrow();
+    for (const [badHost, badDb, badLogin, credential, foreignCa] of [
+      ['subject-db', 'myeongha_saju_subject_local_verify', 'myeongha_runtime',
+        process.env.SAJU_BRIDGE_LOCAL_SUBJECT_LOGIN_PASSWORD!, ca!.nonce],
+      ['nonce-db', 'myeongha_saju_nonce_local_verify', 'myeongha_docker_nonce_login',
+        process.env.SAJU_BRIDGE_LOCAL_NONCE_LOGIN_PASSWORD!, ca!.admission],
+      ['admission-db', 'myeongha_saju_admission_local_verify', 'myeongha_docker_admission_tls_probe',
+        process.env.SAJU_BRIDGE_LOCAL_ADMISSION_LOGIN_PASSWORD!, ca!.subject],
+    ] as const) {
+      const foreign = new Pool({
+        host: badHost, database: badDb, user: badLogin,
+        password: credential, port: 5432, connectionTimeoutMillis: 4000,
+        ssl: { ca: foreignCa, rejectUnauthorized: true },
+      });
+      try {
+        await expect(foreign.query('select 1')).rejects.toThrow();
+      } finally {
+        await foreign.end();
+      }
+      const plaintext = new Pool({
+        host: badHost, database: badDb, user: badLogin,
+        password: credential, port: 5432, connectionTimeoutMillis: 4000,
+        ssl: false,
+      });
+      try {
+        await expect(plaintext.query('select 1')).rejects.toThrow();
+      } finally {
+        await plaintext.end();
+      }
+    }
   });
   it('binds real JWT to owned current Birth, real signed Saju HTTP, and separate nonce atomic claim', async () => {
     const input = operation(owner.token);
