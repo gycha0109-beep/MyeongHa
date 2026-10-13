@@ -14,7 +14,10 @@
 ## 검증
 
 - `test/db/standard_reader_initial_provider_revoke_pinned_real_pg.sh`: **bound** / **unbound** 별도 격리 PostgreSQL 15, S4 verified synthetic Receipt/Grant 연결로 실제 Commerce revoke 및 비공개 ACL/불변 pin/Reader 현재권한 거절을 확인.
-- S3 초기 잠금과 동일한 키를 사용하는지, Issuer/Provider effect의 별도 세션 경합과 Refund/T2 lock order는 다음 S5 concurrency gate에서 확대하여 검증.
+- `test/db/standard_reader_initial_refund_bind_race_s5.sh`: 별도 두 연결에서 **refund-first** 및 **bind-first** 양방향. 한 transaction이 private Writer + 최초 scope lock을 보유할 때 상대가 lock_timeout으로 차단되고, 해제 후 원본 Commerce revoke 또는 현재 Grant 거절 확인.
+- `1860_standard_reader_initial_pinned_grant_admission_private_v1.sql`: 초기 Binder가 S5 immutable pin의 **정확한 Receipt와 현재 Grant 동일성**을 별도로 입증해야만 official Reading을 INSERT. 다른 unpinned/private issuance 경로가 초기 Reader 권한을 우회하지 못함.
+- **개인정보 삭제:** pin은 Birth Profile 수정·삭제 이후에도 환불 감사 증거가 필요하므로 deletable Birth Revision이나 Subject를 직접 FK로 묶지 않는다. 그러나 여전히 간접 Subject 이력이며 retention/삭제/익명화 **정책 미결정**, Privacy Owner 검토 전 운영 불가.
+- S3 초기 잠금과 동일한 키의 양방향 별도 세션 경합을 신규 테스트로 확인. Refund/T2 운영 범위 전체 및 실제 Provider ingress worker는 별도 Owner 검토.
 - 현 테스트 결과/CI는 PR exact HEAD 확인 후만 기록. 운영 Provider ingress, 환불 처리 정책/자동 거부, Content release/T2 공개, 실상품 승인/마이그레이션 적용을 활성화하지 않음.
 
 ## 출시 차단
