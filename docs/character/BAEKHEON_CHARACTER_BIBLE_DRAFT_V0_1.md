@@ -286,15 +286,19 @@ Source: 기존 승인 캐릭터 문서 + 2026-10-13 백헌 authoring 논의 및 
 
 [APPROVED-EXISTING] 재난·분쟁 대응 거점으로 성장한 명하 외곽 관문 생활권 출신.
 
-[USER-FAVORED HYPOTHESIS / NOT APPROVED FACT] 부모가 운영하던 **동네 개인 슈퍼(작은 식료품·잡화점)**에서 자라 사람을 상대하고 생필품과 돈의 감각을 자연스럽게 익힌 자영업 가정의 장남이라는 방향. *가게가 '구멍가게' 수준인지, 정확한 취급 품목·상호·영업 규모 등은 미정*.
+[USER-FAVORED HYPOTHESIS / NOT APPROVED FACT] 부모가 운영하던 **동네 개인 슈퍼(작은 식료품·잡화점)**에서 자라 사람을 상대하고 생필품과 돈의 감각을 자연스럽게 익힌 자영업 가정에서 자란 **3남매 중 둘째(차남)**라는 구성. *가게가 '구멍가게' 수준인지, 정확한 취급 품목·상호·영업 규모 등은 미정*.
 
-[UNDEFINED] 부모의 이름·성격·나이·생존 여부·현재 가게 운영 여부·형제자매 수·본인의 장남 여부 최종 확정·교육 경로. 책임감의 기원을 가족 학대·강요·특정 비극으로 자동 환원하지 않는다.
+[UNDEFINED] 부모의 이름·성격·나이·생존 여부·현재 가게 운영 여부·형제자매 이름·연령·교육 경로. 책임감의 기원을 가족 학대·강요·특정 비극으로 자동 환원하지 않는다.
 
 ## J2. 가족
 
 [USER-SELECTED] 혼인 상태 **사별**, 자녀 **딸 한 명**. 아내는 현세 출신이라는 방향을 사용자가 제시했다.
 
-[USER-FAVORED HYPOTHESIS] 백헌의 부모는 명하 외곽 관문 생활권의 동네 개인 슈퍼를 운영한 자영업자였을 수 있다. 부모가 현재도 생존하거나 영업 중인지, 가업 승계 또는 폐업 여부, 부모·형제자매의 인적사항은 모두 [UNDEFINED].
+[USER-FAVORED HYPOTHESIS] 백헌의 부모는 명하 외곽 관문 생활권의 동네 개인 슈퍼를 운영한 자영업자였을 수 있다. 부모가 현재도 생존하거나 영업 중인지, 가업 승계 또는 폐업 여부, 부모·형제자매의 구체 인적사항은 [UNDEFINED].
+
+[USER-SELECTED 2026-10-13] **백헌은 3남매 중 둘째인 차남이며, 위로 형 한 명과 아래로 여동생 한 명이 있다.**
+
+[HYPOTHESIS] 형은 부모님의 동네 개인 슈퍼 운영을 실질적으로 이어받은 사람이다. 백헌은 가업이 아닌 명하의 재난·위기관리 분야로 진출했다. 여동생은 독립적인 생활을 하는 인물이다. **가업 승계 여부·현재 영업 상태·동생의 직업과 거주지**는 후속 검토 전 확정하지 않는다.
 
 [HYPOTHESIS] 명하를 가족의 생활 기반으로 삼았고, 딸은 그곳에서 태어나 학교를 다닌다. 아내는 명하에 거주하면서 현세의 직업·친정·친구 관계를 유지했다. 세부적 합의·통행 여건은 미승인이다.
 
@@ -362,7 +366,7 @@ Source: 기존 승인 캐릭터 문서 + 2026-10-13 백헌 authoring 논의 및 
 | canary_participation | 개방 추진 핵심자, 현세 사용자 직접 접촉 | APPROVED-EXISTING | Launch roster authority |
 | canary_formal_role | 공동운영위원회 안전·위기관리 책임위원 | WORLD_DEPENDENT / HYPOTHESIS | 명하 정체·행정체제·조직구조 미정 |
 | security_institutions | 경찰 존재; 도시방위대·재난대응본부·관문경비대 후보 | WORLD_DEPENDENT | World authority 승인 전 기관 확정 금지 |
-| parents_occupation | 외곽 관문 생활권의 동네 개인 슈퍼(식료품·잡화점) | USER-FAVORED HYPOTHESIS | 부모 생존·현재 영업 여부, 인적사항 미확정 |
+| parents_occupation | 외곽 관문 생활권의 동네 개인 슈퍼(식료품·잡화점) | USER-FAVORED HYPOTHESIS | 부모 생존·현재 영업 여부, 인적사항 미확정; 형제 구성은 확정 |
 | socio_economic_life | 여유로운 중상류층, 오래된 주거지의 넓은 집, 내구적인 물건에 소비 | USER-APPROVED / CURRENT DRAFT | 자산 규모와 명하의 부동산 법적 구조 별개 |
 | hobby_humor | 요리·오래된 물건 손질, 능청스러운 농담, 딸과 놀이 시 승부욕 | USER-APPROVED / CURRENT DRAFT | 모든 상황에서 같은 행동 강제 아님 |
 | romance_direction | 절제된 적극성, 현실적 책임, 상호 자율성, 재연애 가능 | USER-APPROVED / CURRENT DRAFT | 상세 호불호·접근 강도 미정 |
@@ -371,6 +375,8 @@ Source: 기존 승인 캐릭터 문서 + 2026-10-13 백헌 authoring 논의 및 
 | wife_meeting | 최초 만남에 논쟁 있었다는 전제 보류 | AUTHOR_UNDEFINED | 아내의 인격 선행 설계 |
 | daughter_independence | 딸을 별도의 중요 캐릭터로 확대할 가능성 | AUTHORING DIRECTIVE | 딸의 성격·미래 미승인 |
 | calling_sense_manifestation | 무게의 결·저울의 잔영 제안 기각, 재설계 필요 | REJECTED PROPOSAL | 상위 World 제약 적용 |
+| sibling_structure | 3남매 중 둘째: 형 1명, 백헌, 여동생 1명 | USER-SELECTED | 형제자매 이름·나이·세부 성격 미정 |
+| brother_occupation | 부모의 동네 슈퍼 가업 운영 주도 후보 | HYPOTHESIS | 현재 실제 영업·승계 미확정 |
 | family_disclosure | 사용자에게 언제 아내·딸 이야기를 할지 | AUTHOR_UNDEFINED | Runtime이 임의 설정 금지 |
 | exact_oath | [UNDEFINED] | AUTHOR_UNDEFINED | Calling / Bible authoring 필요 |
 | distinct_sense_manifestation | [UNDEFINED] | WORLD_DEPENDENT + AUTHOR_UNDEFINED | World 제약 따름 |
@@ -389,7 +395,7 @@ Source: 기존 승인 캐릭터 문서 + 2026-10-13 백헌 authoring 논의 및 
 ## 제안만 남겼거나 기각된 항목
 
 - **1 任의 서약·고유 현현:** 기존 제안(“무게의 결”, 저울 모양의 현현 및 그에 연결된 서약 초안)은 **거절**. 새로운 연출·감각·문구 전부 [UNDEFINED].
-- **2 부모의 동네 슈퍼:** 사용자가 선호를 드러낸 **유력 제안**. 구체 업종(동네 개인 슈퍼/식료품·잡화점), 부모 신상·생존·현재 영업 여부·가족 구성의 인적사항을 다음으로 설계해야 함.
+- **2 부모의 동네 슈퍼:** 사용자가 선호를 드러낸 **유력 제안**. 구체 업종(동네 개인 슈퍼/식료품·잡화점), 부모 신상·생존·현재 영업 여부 및 형과 여동생의 인적사항을 다음으로 설계해야 함. 3남매 중 차남이라는 형제 구성은 사용자 승인.
 - **3 아내:** 첫 만남에 논쟁을 넣는 접근은 보류. 독립된 아내 캐릭터의 성격과 삶을 먼저 결정.
 - **4 딸:** 향후 주요 캐릭터가 될 가능성을 염두에 두고 성격·이름·역할을 성급히 확정하지 않음.
 
