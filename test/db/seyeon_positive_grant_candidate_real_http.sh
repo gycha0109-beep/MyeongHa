@@ -18,5 +18,5 @@ bash test/db/seyeon_positive_source_set_exact_attempt_race_v1.sh
 # Two actual independent PostgreSQL backends must block on the same Attempt
 # before observing opposite Zero/Positive Pin outcomes.
 bash test/db/seyeon_positive_source_set_exact_attempt_race_v1.sh
-SEYEON_POSITIVE_GRANT_REAL_PG=1   ./node_modules/.bin/vitest run     test/seyeon-controlled-disclosure-real-postgres-candidate.test.ts test/seyeon-source-digest-node-postgres-golden-v1.test.ts --maxWorkers=1
+SEYEON_POSITIVE_GRANT_REAL_PG=1   ./node_modules/.bin/vitest run     test/seyeon-controlled-disclosure-real-postgres-candidate.test.ts test/seyeon-source-digest-node-postgres-golden-v1.test.ts test/seyeon-offline-r2-real-db-source-boundary-v1.test.ts --maxWorkers=1
 echo 'PASS: positive Pin -> test Commit -> real PG HTTP grant reveal and Node/Postgres D-03 dual-serializer golden vectors in disposable CI DB'
