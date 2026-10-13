@@ -60,7 +60,8 @@ services:
       - type: volume
         source: myeongha-workspace
         target: /myeongha
-        read_only: true
+        # Vitest writes .vite-temp under node_modules; only the disposable
+        # snapshot is writable, never the host source bind mount.
       - type: volume
         source: saju-workspace
         target: /saju
