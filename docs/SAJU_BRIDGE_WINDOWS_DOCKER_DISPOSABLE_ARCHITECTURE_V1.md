@@ -46,9 +46,32 @@ node scripts/local/verify-saju-bridge-docker-local.mjs
 
 검증 순서: Docker context 로컬 확인 → 실행 ID·4종 암호·JWT secret 생성 → Compose 구성 검증 → DB 4종 기동·health → GoTrue 기동 → DB별 이름/SELECT 1 확인 → 합성 가입과 인증된 GET /user 확인 → 실패/성공 관계없이 정리 → Docker의 프로젝트 라벨로 컨테이너·볼륨·네트워크 잔여 0개 확인. 스모크 응답에 비밀키나 사용자 토큰을 출력하지 않는다.
 
-CI와의 관계: 기존 `saju-bridge-cross-repo-local-http.yml` 하나에 **Compose 기반 스모크 단계만 연결**한다. 전체 기능 테스트 및 GitHub one-command 기존 흐름은 유지하고 새로운 대형 CI 워크플로를 만들지 않는다.
+CI와의 관계: 기존 `saju-bridge-cross-repo-local-http.yml` 하나에 **Compose 기반 스모크 및 2단계 HTTP/HMAC 검증**을 연결한다. 전체 기능 테스트 및 GitHub one-command 기존 흐름은 유지하고 새로운 대형 CI 워크플로를 만들지 않는다.
 
 강제종료/전원 꺼짐 등으로 finally가 실행되지 않은 경우 남을 수 있다. 로그에 출력된 고유 프로젝트 이름으로 소유 자원을 확인한 뒤 **그 프로젝트만** 정리한다. `docker system prune`, 다른 프로젝트 전체 제거 금지.
+
+### 3A. 2단계 중간 구현 — 실제 Saju HTTP/HMAC 루프백 (2026-10-13)
+
+**Phase 1 명령은 그대로 유지**한다. 별도의 고정 Saju 소스 체크아웃을 보유한 경우에만 명시적으로 2단계 HTTP 검증을 실행한다.
+
+```powershell
+# Saju 저장소를 MyeongHa 옆에 체크아웃하고 아래 SHA로 고정
+git -C ..\Saju checkout cd0acf9abd447826ccaefba56112d046e560ee04
+
+# MyeongHa 저장소 루트에서 실행
+node scripts/local/verify-saju-bridge-docker-local.mjs --http ../Saju
+```
+
+- `--http` 모드는 Saju의 **정확한 고정 커밋**과 clean worktree를 요구하며, 임의 URL/원격 Saju 서버를 받지 않는다. Saju가 없거나 다른 SHA이면 성공 처리하지 않는다.
+- [2단계 Compose 오버레이](../scripts/local/saju-bridge-http.compose.yml)를 추가한다. `node:24-bookworm-slim`의 의존성 준비 컨테이너가 저장소를 **읽기 전용**으로 마운트하고, `.git`/`node_modules`/`.env*` 등을 제외한 소스 스냅샷을 **실행별 writable named volume**에 복사한다. 이 스냅샷 안에서 `npm ci --ignore-scripts`와 Saju `npm run build`를 실행하므로 Windows 호스트의 `node_modules`를 수정하거나 Linux 의존성으로 오염시키지 않는다. 실제 HTTP/HMAC 검증기는 Saju 스냅샷은 읽기 전용으로, 명하 스냅샷은 Vitest의 임시 `.vite-temp` 캐시 생성 때문에 쓰기 가능으로 마운트한다. **두 스냅샷 모두 일회용 볼륨이며 호스트 체크아웃은 끝까지 읽기 전용**이다.
+- 의존성 설치 단계만 일반 `npm-egress` 네트워크를 사용하여 npm 패키지를 내려받는다. 이 단계에 Auth/DB/HMAC 비밀값을 전달하지 않는다. 실제 HTTP/HMAC 검증기는 **Compose `internal: true` 네트워크**에서만 실행하며 호스트 포트를 열지 않는다. npm registry 다운로드에는 네트워크 연결이 필요할 수 있다.
+- 검증기는 기존 `verify-saju-bridge-http.mjs`와 `test/saju-held-cross-repo-local-http.test.ts`를 변경 없이 재사용한다. 동일 컨테이너 내에서 실제 Saju Node HTTP listener를 루프백에 띄우고, MyeongHa의 Bearer/HMAC·발급 Proof/위변조·경로 차단 검사를 실행한다. Saju HTTP 응답이 200 Proof가 아니면 테스트 실패이다.
+- 기존 1단계의 GoTrue·4개 DB SQL 스모크를 먼저 실행하며, HTTP 검증과 DB 바인딩은 **아직 서로 연결되지 않는다**. 이 단계에서 인증된 회원의 Current Birth 조회, PostgreSQL Nonce 원자 소비, Admission Permit을 통과했다고 주장하지 않는다.
+- 기존 단일 GitHub CI의 Compose 검증 단계에 `--http ../saju`를 연결한다. 다른 대형 CI 워크플로를 추가하지 않는다.
+- `--http` 모드는 저장소 루트의 실제 `.env`, `.env.local`, `.env.production`, `.env.development` 존재 시 소스 마운트를 거부한다. 루트 이외의 모든 사용자 파일을 자동으로 검사하는 것은 아니므로 **비밀 파일이 포함된 체크아웃을 제공하지 않는다.** 테스트용 키만 실행 시 생성하고, 종료 시 컨테이너·네트워크·의존성 볼륨·빌드 볼륨을 모두 제거한다.
+- Windows 실기기에서 2단계 `--http` 실행 증빙은 별도로 기록한다. GitHub Ubuntu CI 성공만으로 Windows 통과로 표기하지 않는다.
+
+**2단계 남은 작업:** GoTrue 발급 회원 UUID→Subject/Birth fixture→실제 Saju HTTP/HMAC→Nonce PostgreSQL 원자 claim까지 동일 Docker 실행에서 연결한다. 기존 테스트가 `127.0.0.1`과 별도 CI TLS hostname을 가정하므로, 운영 정책을 완화하지 않고 테스트 전용 DNS/네트워크 어댑터를 추가해야 한다.
 
 ## 4. 단계별 로드맵 · 종료 게이트
 
@@ -56,7 +79,7 @@ CI와의 관계: 기존 `saju-bridge-cross-repo-local-http.yml` 하나에 **Comp
 |---|---|---|---|
 | 0 | 기존 GitHub 2J + 독립 TLS/두 DB 중단 처리 재사용, #1986 | exact-head 범위/최종 CI 성공·병합 | 완료: **합성 CI만** |
 | 1 | Windows Docker 기초 4DB + GoTrue + 폐기 실행기 | 단일 명령, 실 GoTrue JWT 검증, DB 네 곳 실 SQL, 자원 잔존 0, 기존 CI 최소 스모크 통과 | 이번 구현 |
-| 2 | 고정 Saju SHA의 실 HTTP/HMAC, Subject schema/fixture 및 기존 테스트 재사용 | 실제 Saju HTTP 200 proof, Auth JWT→Subject Current Birth→Nonce 원자 claim, 병렬 중복 차단 | 미구현 |
+| 2 | 고정 Saju SHA의 실 HTTP/HMAC, Subject schema/fixture 및 기존 테스트 재사용 | 실제 Saju HTTP 200 proof, Auth JWT→Subject Current Birth→Nonce 원자 claim, 병렬 중복 차단 | **부분 구현:** Docker HTTP/HMAC, DB 바인딩 미구현 |
 | 3 | 별도 Subject/Nonce/Admission TLS, 서로 다른 CA·SAN·제한 로그인, Permit V2 | TLS verify-full/틀린 CA/비TLS 차단, 한 번만 Permit 소비, RLS·ACL 거부 | 미구현 |
 | 4 | 실제 네트워크 중단·커밋 후 연결 단절·DB 재시작·볼륨 보존·복구 | 중복 허용 0, 불확실한 커밋 자동 재시도 0, 잘못된 승격 0, 재시작 후 사용 상태 유지 | 미구현 |
 | 5 | Windows Docker Desktop 실제 기기 및 Linux CI 공통 재현성 | 동일 테스트 매트릭스·정리·SHA/버전 기록, scoped + final CI PASS, 병합/issue 업데이트 | 미구현 |

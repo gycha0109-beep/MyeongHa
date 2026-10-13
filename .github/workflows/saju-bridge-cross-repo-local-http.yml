@@ -9,6 +9,7 @@ on:
       - scripts/local/verify-saju-bridge-full.mjs
       - scripts/local/verify-saju-bridge-docker-local.mjs
       - scripts/local/saju-bridge-full.compose.yml
+      - scripts/local/saju-bridge-http.compose.yml
       - scripts/local/saju-bridge-local-auth-smoke.mjs
       - scripts/local/saju-bridge-auth-init.sql
       - test/saju-held-cross-repo-local-http.test.ts
@@ -112,12 +113,12 @@ jobs:
         run: |
           npm ci --ignore-scripts --no-audit --no-fund --prefix myeongha
           npm ci --ignore-scripts --no-audit --no-fund --prefix saju
-      - name: Verify disposable Windows-compatible Docker Compose foundation
-        working-directory: myeongha
-        run: node scripts/local/verify-saju-bridge-docker-local.mjs
       - name: Build actual Saju proof issuer
         working-directory: saju
         run: npm run build
+      - name: Verify disposable Docker GoTrue DB and pinned Saju HTTP HMAC
+        working-directory: myeongha
+        run: node scripts/local/verify-saju-bridge-docker-local.mjs --http ../saju
       - name: Bootstrap complete disposable Subject, Birth, and nonce authority
         working-directory: myeongha
         shell: bash

@@ -1,12 +1,17 @@
 #!/usr/bin/env node
-// Disposable Windows Docker Desktop / Linux local Phase 1. No operational authority.
+// Disposable Windows Docker Desktop / Linux local Phase 1 and opt-in Phase 2.
+// Phase 2 runs the real pinned Saju HTTP/HMAC loopback verifier inside Docker.
 // Keep the existing verify-saju-bridge-full.mjs GitHub workflow launcher unchanged.
 import { spawnSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { readFileSync, realpathSync, existsSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const compose = fileURLToPath(new URL('./saju-bridge-full.compose.yml', import.meta.url));
+const httpCompose = fileURLToPath(new URL('./saju-bridge-http.compose.yml', import.meta.url));
+const root = realpathSync(fileURLToPath(new URL('../../', import.meta.url)));
+const pinnedSajuSha = 'cd0acf9abd447826ccaefba56112d046e560ee04';
 const packagePath = fileURLToPath(new URL('../../package.json', import.meta.url));
 const project = 'myeongha-saju-full-' + randomBytes(6).toString('hex');
 const services = Object.freeze([
@@ -51,6 +56,41 @@ function docker(args, { capture = false, timeout = 240_000 } = {}) {
   return result.stdout?.trim() ?? '';
 }
 
+function localSajuCheckout() {
+  if (process.argv.length === 2) return null;
+  if (process.argv.length !== 4 || process.argv[2] !== '--http' || !process.argv[3]) {
+    throw new Error('Usage: node scripts/local/verify-saju-bridge-docker-local.mjs [--http ../Saju]');
+  }
+  const saju = realpathSync(resolve(process.argv[3]));
+  if (saju === root) throw new Error('A separate pinned Saju checkout is required.');
+  const remote = JSON.parse(readFileSync(resolve(saju, 'package.json'), 'utf8'));
+  if (remote.name !== 'myeonghwa-saju-engine') {
+    throw new Error('Expected a local Saju engine checkout.');
+  }
+  const rev = spawnSync('git', ['-C', saju, 'rev-parse', 'HEAD'], {
+    encoding: 'utf8', shell: false, windowsHide: true, timeout: 15_000,
+  });
+  if (rev.error || rev.status !== 0 || rev.stdout.trim() !== pinnedSajuSha) {
+    throw new Error('Saju checkout is not the pinned source revision ' + pinnedSajuSha);
+  }
+  const dirty = spawnSync('git', ['-C', saju, 'status', '--porcelain', '--untracked-files=normal'], {
+    encoding: 'utf8', shell: false, windowsHide: true, timeout: 15_000,
+  });
+  if (dirty.error || dirty.status !== 0 || dirty.stdout.trim()) {
+    throw new Error('Saju pinned checkout has local changes or untracked files; refusing ambiguous proof.');
+  }
+  for (const directory of [root, saju]) {
+    for (const filename of ['.env', '.env.local', '.env.production', '.env.development']) {
+      if (existsSync(resolve(directory, filename))) {
+        throw new Error('Refusing to mount a repository containing local environment secrets.');
+      }
+    }
+  }
+  sandboxEnv.SAJU_BRIDGE_LOCAL_MYEONGHA_DIR = root;
+  sandboxEnv.SAJU_BRIDGE_LOCAL_SAJU_DIR = saju;
+  return saju;
+}
+
 function assertLocalEngine() {
   const host = process.env.DOCKER_HOST;
   if (host && !host.startsWith('unix://') && !host.startsWith('npipe://')) {
@@ -64,7 +104,7 @@ function assertLocalEngine() {
   docker(['compose', 'version'], { capture: true, timeout: 15_000 });
 }
 
-const base = ['compose', '--project-name', project, '-f', compose];
+let base = ['compose', '--project-name', project, '-f', compose];
 function composed(...args) { return docker([...base, ...args]); }
 
 function remaining(kind) {
@@ -76,7 +116,8 @@ function remaining(kind) {
 }
 
 function main() {
-  if (process.argv.length !== 2) throw new Error('No URL, user data, or CLI arguments are accepted.');
+  const saju = localSajuCheckout();
+  if (saju) base = [...base, '-f', httpCompose];
   if (JSON.parse(readFileSync(packagePath, 'utf8')).name !== 'myeongha') {
     throw new Error('Expected MyeongHa repository checkout.');
   }
@@ -98,6 +139,14 @@ function main() {
     }
     composed('up', '--detach', 'gotrue');
     composed('run', '--rm', '--no-deps', 'auth-verifier');
+    if (saju) {
+      console.log('[saju-bridge] Installing isolated Node 24 dependencies (temporary volumes).');
+      composed('run', '--rm', '--no-deps', 'saju-deps-myeongha');
+      composed('run', '--rm', '--no-deps', 'saju-deps-engine');
+      console.log('[saju-bridge] Running pinned Saju HTTP/HMAC in isolated Docker network.');
+      composed('run', '--rm', '--no-deps', 'saju-http-verifier');
+      console.log('[saju-bridge] Phase 2 actual Saju HTTP/HMAC: PASS (no DB binding yet).');
+    }
   } catch (error) {
     failure = error;
     console.error('[saju-bridge] Verification BLOCKED: '
@@ -121,8 +170,13 @@ function main() {
   }
   if (failure) process.exitCode = 1;
   else {
-    console.log('[saju-bridge] Phase 1 PASS: disposable GoTrue and 4 DBs only.');
-    console.log('[saju-bridge] Saju HTTP/TLS/Permit/recovery and operational approval remain HOLD.');
+    console.log('[saju-bridge] Phase 1 PASS: disposable GoTrue and 4 DBs.');
+    if (saju) {
+      console.log('[saju-bridge] Phase 2 PASS: real pinned Saju HTTP/HMAC loopback.');
+      console.log('[saju-bridge] Docker Auth/Birth/Nonce binding, TLS/Permit/recovery and operational approval remain HOLD.');
+    } else {
+      console.log('[saju-bridge] Saju HTTP/TLS/Permit/recovery and operational approval remain HOLD.');
+    }
   }
 }
 
