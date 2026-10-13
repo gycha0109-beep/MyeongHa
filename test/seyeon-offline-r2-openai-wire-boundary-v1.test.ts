@@ -126,6 +126,7 @@ type Hook=(purpose:WireStage)=>void | Promise<void>;
 
 function createOfflineWireProbe(options?:Readonly<{
   mutateBeforeSerializeAudit?:Hook;
+  assertCurrentSourceClosure?:Hook;
   invalidateExpectedDigest?:boolean;
 }>) {
   // The request snapshots are independently recorded by the native caller.
@@ -200,6 +201,9 @@ function createOfflineWireProbe(options?:Readonly<{
       await options?.mutateBeforeSerializeAudit?.(metadata.purpose);
     },
     meteredBeforeDispatch:async (metadata,rawBody)=>{
+      // This is the last awaited Adapter hook before fake fetch. Re-read
+      // source authority rather than trusting only an earlier request hash.
+      await options?.assertCurrentSourceClosure?.(metadata.purpose);
       const admitted=pending.get(metadata.purpose);
       if(!admitted ||
          canonicalJson(admitted.request)!==admitted.requestDigest) {
@@ -289,8 +293,19 @@ async function governedPreflight(
 describe('R2 actual OpenAI Responses UTF-8 wire boundary (fake fetch; offline)',()=>{
   it('seals the real 2-classifier + 3 generated native stages at pre-dispatch AND fetch bytes',async()=>{
     const {candidate,actualContext}=fixture();
-    const probe=createOfflineWireProbe();
+    let activePreflight:Awaited<ReturnType<typeof governedPreflight>>|null=null;
+    const probe=createOfflineWireProbe({assertCurrentSourceClosure(purpose){
+      if(purpose==='turn_interpretation' || purpose==='dialogue_render' ||
+         purpose==='semantic_review') {
+        if(!activePreflight || observeSeyeonOfflineR2PostPreflightClosureV1({
+          candidate,preflight:activePreflight,actualContext,
+        }).state!=='post_preflight_context_observed_synthetic_only') {
+          throw new Error('S0 source closure changed before actual wire dispatch');
+        }
+      }
+    }});
     const preflight=await governedPreflight(probe.provider);
+    activePreflight=preflight;
     expect(observeSeyeonOfflineR2PostPreflightClosureV1({
       candidate,preflight,actualContext,
     }).state).toBe('post_preflight_context_observed_synthetic_only');
@@ -320,14 +335,24 @@ describe('R2 actual OpenAI Responses UTF-8 wire boundary (fake fetch; offline)',
 
   it('rejects changed source closure inside the real Adapter hook BEFORE fetch',async()=>{
     const {candidate,actualContext}=fixture();
+    let activePreflight:Awaited<ReturnType<typeof governedPreflight>>|null=null;
     const probe=createOfflineWireProbe({
       mutateBeforeSerializeAudit(purpose){
         if(purpose==='turn_interpretation') {
           (candidate.currentUserMessage as {text:string}).text='변조된 현재 발화';
         }
       },
+      assertCurrentSourceClosure(purpose){
+        if(purpose==='turn_interpretation' &&
+           (!activePreflight || observeSeyeonOfflineR2PostPreflightClosureV1({
+             candidate,preflight:activePreflight,actualContext,
+           }).state!=='post_preflight_context_observed_synthetic_only')) {
+          throw new Error('Source changed before Provider fetch');
+        }
+      },
     });
     const preflight=await governedPreflight(probe.provider);
+    activePreflight=preflight;
     const chain=createSeyeonOfflineR2DerivedOutputLineageV1({
       candidate,preflight,actualContext,delegate:probe.provider,
     });
