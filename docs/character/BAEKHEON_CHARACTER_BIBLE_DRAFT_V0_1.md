@@ -1,6 +1,6 @@
 # 백헌 Character Bible Draft v0.1
 
-Status: **AUTHORING DRAFT v0.2 / NOT PRODUCTION APPROVED**  
+Status: **AUTHORING DRAFT v0.1 (2026-10-13 feedback revision) / NOT PRODUCTION APPROVED**  
 Document Type: CHARACTER BIBLE INSTANCE  
 Character: 백헌 (`baekheon`)  
 Bible Standard: Character Bible Standard v1  
@@ -400,4 +400,4 @@ Source: 기존 승인 캐릭터 문서 + 2026-10-13 백헌 authoring 논의 및 
 - Biography: 아내·딸·부모 이름, 출생연도, 학교, 결혼 시점, 사별 사고 세부.
 - Runtime: 위에서 확정된 인물성과 별개로 관계 노출·행동 정책은 후속 트랙에서 정함.
 
-> Draft v0.2의 USER-APPROVED 항목은 **이 Bible 초안 내에서 사용자가 방향을 승인한 설정**이다. Production 승격, 연령·제도·인물 이름의 최종 판정이 아니다.
+> 이번 Draft의 USER-APPROVED 항목은 **이 Bible 초안 내에서 사용자가 방향을 승인한 설정**이다. Production 승격, 연령·제도·인물 이름의 최종 판정이 아니다.
