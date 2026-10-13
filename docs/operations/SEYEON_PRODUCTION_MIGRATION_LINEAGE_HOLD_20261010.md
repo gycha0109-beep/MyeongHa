@@ -1,5 +1,7 @@
 # 세연 Production DB 마이그레이션 이력 정합성 — 읽기 전용 조사 / 운영 HOLD
 
+> **2026-10-13 재검증:** 이 문서의 2026-10-10 관측은 역사적 기준이며, 최신 Production read-only 1400~1510 **12/12**, 1520~1710 **0/20**, 핵심 관계 함수 11/11·RLS 6/6 및 DR 격리복원 진행 현황은 [R2 계보 판단 패킷](SEYEON_MIGRATION_LINEAGE_R2_READONLY_PACKET_20261013.md)을 우선 확인한다. 원격-only `20261008090417` 및 후속 Production 배포·DR 승인 HOLD는 계속된다.
+
 Watchtower-Track: ops
 판정 기준일: 2026-10-10
 Owner 이슈: [#1887](https://github.com/gycha0109-beep/MyeongHa/issues/1887)
