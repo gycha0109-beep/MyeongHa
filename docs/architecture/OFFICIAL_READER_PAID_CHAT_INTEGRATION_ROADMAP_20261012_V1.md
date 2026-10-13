@@ -252,3 +252,12 @@ S1에서 공통 잠금 함수 자체가 성공하더라도 **S2 전체 경로가
 - PostgreSQL 격리 fixture에서 positive 최초 Receipt와 최초/추가 bind를 D2 함수로 대체하고, 동일 Product에 대한 3개 실제 연결의 L0 대기 및 독립 Reader bind 멱등 재생·상태 보존·wrong subject/ACL/isolation 거절을 검증한다. 원본 test가 먼저 합격하더라도 신규 테스트 및 PostgreSQL 15/17 CI의 최종 결과 확인 전 **D2 완료 선언 금지**.
 
 **잔여 필수 검증/차단:** 신규 추가 Receipt가 공식 Reading commit보다 앞서는 경우 D1 source-bound resolver가 FAIL-CLOSED하며, 구 Commerce 호출자가 원본 1090/1080을 직접 사용하는 팬텀은 아직 막을 수 없다. 전체 1080 refund writer와 D3 trusted provider cancel/restore가 공통 L0→L1을 채택하고, 추가 신규 Grant INSERT·Birth 변경·Bundle ambiguity·부분 실패 경합 시험이 통과해야 D2→D3 통합 안전성을 주장할 수 있다. #1941 복원, Product/Commerce/Reader/Privacy/Legal 검토 및 병합/운영 승인은 계속 차단한다.
+
+
+### D2 최종 검증 (2026-10-13)
+
+- Draft PR #2024, exact code SHA `ea2503e502faac8e659785d22878ab7497975237`.
+- CI https://github.com/gycha0109-beep/MyeongHa/actions/runs/38333789245: PostgreSQL15 DB authority-core, PostgreSQL17 dependency, Content dependency, Work Track, CI Verify 모두 PASS. 같은 SHA의 Governance와 Web PR Domain Gates도 PASS.
+- 범위: `1820` 비공개 1090/1220 wrapper와 PostgreSQL 실제 다중 연결 Receipt 신규 Grant INSERT/Reader bind 경쟁. 기존 Writer 원본에는 외부 cutover 및 ACL 변경이 없다.
+- 최초 Catalog hash mismatch 교정 후 최종 검증 PASS. 예상 해시: `645387bbf029d85e5413ba61fa696106d8522056407c13f98e21c60ffe478bf7`.
+- D2 PRIVATE 검증 완료. 하지만 direct 1080/1090/1220/1760/1790, Provider 환불, 미결속 Grant, D5 T2, 운영 #1941 복원 및 Product/Commerce/Privacy/Legal 승인 미완료. 병합/운영 공개 HOLD.
