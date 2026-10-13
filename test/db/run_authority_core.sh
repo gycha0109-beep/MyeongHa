@@ -213,5 +213,14 @@ if [[ "${CI:-}" == "true" && "${PGHOST:-}" == "localhost" ]]; then
   run_isolated_case myeongha_b2_r4_rule_future bash test/db/standard_reader_r4_policy_release_denials_real_pg.sh rule_future
   run_isolated_case myeongha_b2_r4_rule_ambiguous bash test/db/standard_reader_r4_policy_release_denials_real_pg.sh rule_ambiguous
   run_isolated_case myeongha_b2_r4_rule_withdrawn bash test/db/standard_reader_r4_policy_release_denials_real_pg.sh rule_withdrawn
+  run_isolated_case myeongha_b2_r4_domain_seyeon bash test/db/standard_reader_r4_nine_reader_domain_real_pg.sh seyeon
+  run_isolated_case myeongha_b2_r4_domain_baekheon bash test/db/standard_reader_r4_nine_reader_domain_real_pg.sh baekheon
+  run_isolated_case myeongha_b2_r4_domain_yeoul bash test/db/standard_reader_r4_nine_reader_domain_real_pg.sh yeoul
+  run_isolated_case myeongha_b2_r4_domain_seorin bash test/db/standard_reader_r4_nine_reader_domain_real_pg.sh seorin
+  run_isolated_case myeongha_b2_r4_domain_rahyeon bash test/db/standard_reader_r4_nine_reader_domain_real_pg.sh rahyeon
+  run_isolated_case myeongha_b2_r4_domain_mira bash test/db/standard_reader_r4_nine_reader_domain_real_pg.sh mira
+  run_isolated_case myeongha_b2_r4_domain_taegyeom bash test/db/standard_reader_r4_nine_reader_domain_real_pg.sh taegyeom
+  run_isolated_case myeongha_b2_r4_domain_yunho bash test/db/standard_reader_r4_nine_reader_domain_real_pg.sh yunho
+  run_isolated_case myeongha_b2_r4_domain_doyun bash test/db/standard_reader_r4_nine_reader_domain_real_pg.sh doyun
 fi
 bash test/db/catalog_snapshot.sh
