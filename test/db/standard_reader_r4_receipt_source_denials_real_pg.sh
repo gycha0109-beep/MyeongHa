@@ -35,7 +35,7 @@ if [[ "$mode" == sandbox || "$mode" == unverified ]]; then
   array[transaction_timestamp()],array[null]::timestamptz[],array[null]::text[])" >"$tmp/issue.out" 2>"$tmp/issue.err"; then
   fail 'Commerce issuer accepted untrusted Receipt'
  fi
- grep -Fq 'One verified initial Standard Reader receipt is required' "$tmp/issue.err" ||
+ grep -Fq 'Verified initial Reader purchase Receipt is unavailable' "$tmp/issue.err" ||
  { cat "$tmp/issue.err" >&2; fail 'issuer denied for unrelated cause'; }
 else
  p -c "select * from public.internal_apply_initial_official_reader_receipt_locked_v1(
