@@ -5,16 +5,16 @@
 -- This is NOT a new user-facing Reading/Grant/public role.
 
 create table if not exists public.standard_reader_initial_purchase_scope_pins_v1 (
-  purchase_intent_id uuid primary key
-    references public.purchase_intents(id),
+  -- Verified receipt/purchase association is validated by private issuer,
+  -- Binder and Provider-effect SQL under the same pinned advisory scope.
+  -- Privacy retention policy has NOT approved a new FK-graph edge.
+  purchase_intent_id uuid primary key,
   -- Historical purchase ownership is validated against Receipt/Intent by
   -- the private issuer/provider Writer. No direct Subject FK: the account
   -- deletion FK graph is owned by Privacy and must remain unchanged.
   subject_id uuid not null,
-  source_receipt_id uuid not null unique
-    references public.commerce_receipts(id),
-  product_id uuid not null
-    references public.products(id),
+  source_receipt_id uuid not null unique,
+  product_id uuid not null,
   -- Historical revision UUID is a provenance token, not an active FK to
   -- birth_profile_revisions (which account deletion must be able to DELETE).
   source_birth_revision_id uuid not null,
