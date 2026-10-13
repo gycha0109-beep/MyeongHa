@@ -106,3 +106,13 @@ PR #2024의 코드 SHA `ea2503e502faac8e659785d22878ab7497975237`, CI run `38333
 ### D3a 검증 종료 — 비공개 구현만 (2026-10-13)
 
 PR #2028 HEAD 코드 `0146a2de2db2a6437cf2b61f93dc8dcbeab20533`, CI `38336400038`: PostgreSQL 15 Core/17/Content/Work Track/CI Verify, Governance, Web PR Domain Gates PASS. 경합 로그에서 기결속 Provider-first/Reader-first 양방향 대기 및 revoked 접근 차단, 최초 Reading 결속 전 환불의 Product L0 실제 대기와 원본 Grant/Event atomic COMMIT, 이후 bind deny를 확인했다. **기존 1080/1770/1780 직접 caller 전환 또는 PortOne cancellation ingress 연결 증거는 아니다.**
+
+## 7. D3b 여러 Receipt/Grant를 아우르는 verified 영향 lockset (2026-10-13)
+
+`1840`의 read-only impact resolver가 서버 검증된 Provider Event/production Receipt/Intent/Offer/Grant에서 정렬된 전체 영향 Product, Reading/Reader를 계산한다. 누락 Grant, 중복·위조 Pair, 다른 Product official Reading 결속, 다른 Subject, READ COMMITTED 위반은 거부한다. Lockset entry는 원본 Commerce event/Grant 행 잠금 **전에** 모든 Product L0를 정렬 취득하고, D1의 정본 Product 재확인을 경유하여 모든 L1을 정렬 취득한다. 대기 후 authority snapshot 불일치 시 오류/rollback. 전역 잠금 계약의 좁은 비공개 원시 기능이며 운영 인입/권한 변이/partial cancellation/restore가 아니다.
+
+**반드시 구분:** 기존 `1830`은 정확한 단일 verified Event↔Grant cancel effect만 수행하며 신규 `1840`은 영향 집합 및 잠금만 수행한다. 외부 webhook/callback·admin·repair·reconciliation·legacy 1080 직접 Writer는 이 lockset에 자동으로 참여하지 않는다. D3b CI 결과는 exact SHA로 확인 후 기록한다.
+
+### D3b PG15/17 검증 증거 (2026-10-13)
+
+PR #2031 code SHA `352791b5c176f3144a13a63e426c2f5300dec01b`, CI run `38337875997` 전체 PASS. PostgreSQL15 로그: verified Event 2건→Receipt→독립 Grant 2개를 완전한 source-owned scope로 도출, cross-source/중복/비인가/오래된 격리 거부, 3개 실제 연결에서 순서가 뒤집힌 event/grant 쌍의 **Product L0 advisory lock wait** 관측 및 terminal Grant 상태 불변. D3b의 1840은 **원본 1080을 실행하지 않는다**. Cross-Product Commerce effect/partial cancel/restore 및 현재 PortOne 서버의 authenticated non-Paid `ignored` 경로는 계속 P0 통합 차단이다.
