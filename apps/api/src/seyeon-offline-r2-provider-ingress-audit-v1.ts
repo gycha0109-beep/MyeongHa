@@ -66,10 +66,20 @@ function matchesSourceBearingContext(
   packet: boolean,
 ): boolean {
   if (!isObj(actual)) return false;
-  const messages = packet ? actual.recentConversation : actual.recentConversation;
+  const messages = actual.recentConversation;
   const memories = packet ? actual.memoryEvidence : actual.retrievedMemories;
+  // Native buildSeyeonRendererPacketV2 intentionally includes ONLY memories
+  // actually cited by the guarded interpretation. Unused granted Memory is
+  // not evidence of an additional source and must not be force-mentioned.
+  const interpretation = packet && isObj(actual.interpretation)
+    ? actual.interpretation : null;
+  const selectedMemories = packet && interpretation &&
+      Array.isArray(interpretation.memoryRefsUsed)
+    ? current.finalContext.retrievedMemories.filter(
+        m => (interpretation.memoryRefsUsed as unknown[]).includes(m.memoryId))
+    : current.finalContext.retrievedMemories;
   if (!eq(messages, current.finalContext.recentMessages) ||
-      !eq(memories, current.finalContext.retrievedMemories) ||
+      !eq(memories, selectedMemories) ||
       actual.relationship !== null ||
       actual.relationshipSemantics !== null) {
     return false;
