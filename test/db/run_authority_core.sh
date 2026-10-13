@@ -203,5 +203,6 @@ if [[ "${CI:-}" == "true" && "${PGHOST:-}" == "localhost" ]]; then
     bash test/db/standard_reader_policy_withdrawal_initial_bind_r3_real_pg.sh bind_first
   run_isolated_case myeongha_b2_r3_multiscope_sorted \
     bash test/db/standard_reader_multiscope_lock_order_r3_real_pg.sh
+  run_isolated_case myeongha_b2_r4_private_matrix bash test/db/standard_reader_r4_policy_matrix_real_pg.sh
 fi
 bash test/db/catalog_snapshot.sh
