@@ -295,3 +295,23 @@ S1에서 공통 잠금 함수 자체가 성공하더라도 **S2 전체 경로가
 - 최종 schema catalog `8852d1a7ee13d219383798b754fa8f8241ecfd72302f672199e844ffdc8130db`, 86 public tables, PASS.
 - 1차 자체 검토에서 fixture의 B2/B3가 **이미 revoked**인 사실을 재확인하여 lock-only 시험이 권한을 재활성화하지 않도록 테스트 기대값을 수정. 신규 1840 함수 2개에 따른 Catalog hash 변동도 실제 PostgreSQL15 값으로 교정.
 - **D3b PRIVATE 범위 검증 완료.** 이 구현은 2개 이벤트/독립 Grant가 *같은 Product*에 귀속되는 fixture에서 검증한 **read-only impact inventory 및 source-owned L0→L1 잠금**이다. 다른 Product를 가로지르는 실제 다중 환불 원자 효과, 신뢰된 PortOne cancellation ingest, 부분 취소·restore, 구 Commerce Writer cutover는 미완료. 이 PR도 Draft/운영 HOLD.
+
+## 22. D3c 비공개 원자 Full-Revoke 배치 + 기존 Writer 우회 감사 (2026-10-13)
+
+**현황: 구현 후보 / exact SHA PostgreSQL CI 확인 전 PASS 아님 / 운영 금지.**
+
+신규 `1850_official_reader_verified_cancel_atomic_batch_private_v1.sql`는 verified cancellation Event→Receipt→Grant *전체* 집합에 D3b의 source-owned 전 영향 Product L0 → Official Reading×Reader L1 잠금을 먼저 확보하고, 그 후 기존 `1080 internal_apply_entitlement_effect_v1`을 Grant ID 오름차순으로 호출한다. `1080`의 expected revision/provider ordering CAS·ledger·projection·outbox는 재구현하지 않는다. Batch는 한 PostgreSQL 함수 Statement에서 전부 `revoked` + 신규 Ledger Event가 성립할 때만 성공. 이벤트 누락·다른 회원·불완전 Receipt Grant set·stale CAS·부분 실패 시 RAISE하여 앞선 Grant mutation도 statement-atomic rollback. Replay는 이 **좁은 활성 Grant 전용 batch**에서 재적용하지 않으며 각 이벤트 원본 replay contract는 원본 1080이 소유한다.
+
+`test/db/official_reader_d3c_verified_cancel_atomic_batch.sh`는 D3b 3-세션 real wait fixture를 재사용한 뒤 독립 검증된 Provider 이벤트 2건·Receipt 2건·Grant 2건의 synthetic Full revoke를 수행한다. **정렬상 두 번째 Grant만 revision이 틀린 경우**, 첫 번째 Grant 변경과 entitlement_events가 전부 rollback되는지 확인하고, 올바른 batch는 2건 COMMIT/정확한 Ledger 2건으로 검증한다. Replayed terminal batch, API/Commerce/Runtime 직접 EXECUTE 권한은 거부한다.
+
+**Provider 진실성 경계:** `commerce_provider_events.event_type='payment.cancelled'`와 `status='verified'`는 환불 금액·부분 환불·잔액·Legal 제공 상태를 자동으로 증명하지 않는다. 서버 소유 'provider API 재조회 → full/partial 여부 및 동일 거래 검증 → 승인된 Full-Cancel policy'가 구현/검증되기 전 `1850`을 외부 호출자에 연결하면 안 된다. 즉 *DB full-revoke 원자 처리* 후보와 *실제 환불 권한*은 별개다. 여러 실제 Product를 묶는 provider 취소, stale Provider ordering 판정, 보정·복구·사후 환불 및 복수 세션 T2 역전 검증은 미완료.
+
+**기존 Writer 우회 감사:** `1080` 원본은 Provider Event `FOR UPDATE`→Grant `FOR UPDATE` 후 CAS 및 Entitlement Event/Projection/Outbox를 쓴다. 직접 호출에는 L0→L1 강제가 없다. `1090` 원본 Receipt 발급도 별도 L0를 강제하지 않고, `1220` 공식 Binder는 Purchase Intent/Grant/Birth 행 잠금 후 변경한다. `1760` 추가 Reader 및 `1770/1780` 회수 legacy private 함수는 L1-only이고 `1790` 최초는 L0-only다. 현행 Production TypeScript `apps/api/src/postgres-commerce-internal-execution.ts`는 Commerce 내부 Role로 별도 트랜잭션을 수행하지만, `commerce-provider-payment-completion-orchestration.ts`는 활성 Payment evidence persistence만 연결한다. `portone-v2-webhook-payment-completion.ts`는 인증된 `Transaction.Paid` 외 type에 `kind:'ignored'`를 반환하므로 Verified cancellation → 1850 호출이 없다.
+
+**강한 HOLD:** 직접 1080/1090/1220/1760/1770/1780/1790 통합 라우팅/최소 권한 차단, 승인된 Provider full/partial normalization과 restore, 독립 Provider ordering 정책, 공식 Reader 유료 T2 원자 공개 및 #1941 복원·Product/Commerce/Privacy/Legal/DB Owner 승인 전 Draft/배포·운영 결제/환불 공개 금지.
+
+### D3c exact-SHA PostgreSQL 원자성 최종 검증 (2026-10-13)
+
+- Draft PR #2034의 코드·테스트 SHA `99fa0bda9c0759fcccaf309fbc6cd3704190bc62`, GitHub Actions [38339438218](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38339438218)에서 PostgreSQL 15 DB Authority Core, PostgreSQL 17 dependency, Content dependency, Work Track, CI Verify 모두 PASS. Governance 및 Web PR Domain Gates PASS.
+- PostgreSQL15 실행 로그: `PASS D3c: second sorted Grant CAS failure rolled back first Grant revision and event`; `PASS D3c: two independent verified full cancellations atomically COMMIT with two immutable events`; `PASS D3c: replay denied, ledger unchanged, no runtime/Commerce EXECUTE`. Schema catalog `5d646e31f149eb3745646fe44705494b1cf09364f7bc7efb409490b3018e77a4` (86 tables) PASS.
+- **D3c PRIVATE 후보의 코드·테스트 검증 완료.** 시험은 동일 Product에 속한 두 별도 verified Provider Event/Receipt/Grant의 실험적 full cancellation이며, 실제 여러 Product 일괄 효과, 취소 금액/부분 환불/정상·역순 ordering의 독립 Provider 조회, Commerce worker 정식 등록, 원본 Writer direct bypass 제거, 복구·사후 정산·법무 정책은 미완료. Draft/병합·운영 서비스/유료 공개 HOLD.
