@@ -126,3 +126,7 @@ PR #2031 code SHA `352791b5c176f3144a13a63e426c2f5300dec01b`, CI run `3833787599
 - **현재 PortOne/Webhook 런타임** `apps/api/src/portone-v2-webhook-payment-completion.ts`: 서명 검증→비 Paid 타입 ignored, `portone-v2-webhook-runtime.ts`는 Paid-only path. `commerce-provider-payment-completion-orchestration.ts`: API 조회→Verified payment evidence persistence. `postgres-commerce-internal-execution.ts`: `SET LOCAL ROLE myeongha_commerce_internal_executor`로 BEGIN/COMMIT하나 신규 1850 호출/EXECUTE 권한 없음.
 - **최소 권한/정책:** D3c 새 함수는 PUBLIC, anon, authenticated, service_role, API/Commerce/Chat executor 실행권을 거부. 고위 DB Owner 후보 검증 외 구 Writer를 변경하지 않았다. 부분 환불 판단/Provider status ordering/환불 완료 시각/승인 주체·Legal 제공 판단은 본 코드가 단독 결정하지 못한다. Live ingress를 연결하거나 legacy 직접 Writer를 유지하면서 전역 lock 통일 완료로 판정하지 않는다.
 - **실행 및 비교 기준:** `test/db/official_reader_d3c_verified_cancel_atomic_batch.sh` isolated 2-Grant second-CAS failure rollback→성공 2-event atomic commit→terminal retry deny를 PostgreSQL15와 PG17/Content CI에서 검증할 것. 미완료면 HOLD.
+
+### D3c 1080 다중 Grant 원자효과 최종 증거 (2026-10-13)
+
+PR #2034 SHA `99fa0bda9c0759fcccaf309fbc6cd3704190bc62` CI run `38339438218`: PostgreSQL15 Core·PG17·Content·Work Track·CI Verify·Governance·Web Gate PASS. DB 로그에서 **두 번째 정렬 Grant의 CAS 실패→첫 번째 상태·revision·불변 이벤트 완전 롤백**, 정상 배치 Grant 2개 회수→Event 2개 COMMIT, terminal replay DENY, runtime/Commerce EXECUTE DENY를 확인. 본 결과는 1850 PRIVATE 신규 경로만 증명하며 1080/1090/1220/1760/1770/1780/1790 직접 호출자 및 current PortOne `Transaction.Paid` 외 `ignored` 콜백의 L0→L1 참여 또는 운영 취소 진실성을 증명하지 않는다.
