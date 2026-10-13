@@ -50,10 +50,23 @@ export function validateR2ProductionEnvelope(v) {
     || v.source !== 'Supabase Production pg_catalog SELECT ONLY'
     || v.readOnly !== true || v.authorizesProduction !== false
     || v.containsPII !== false || v.containsFunctionBodies !== false
+    || JSON.stringify(v.expectedMismatchFields) !== JSON.stringify(['aclSetSha256'])
     || !/^[a-f0-9]{40}$/u.test(v.mainAtObservation)) {
     throw new Error('HOLD_R2_PRODUCTION_PROVENANCE_INVALID');
   }
   return validateR2Aggregate(v.aggregate);
+}
+
+export function requireR2ExpectedDiagnostic(result, envelope) {
+  if (!result || !envelope
+    || JSON.stringify(envelope.expectedMismatchFields) !== JSON.stringify(['aclSetSha256'])
+    || result.match !== false
+    || JSON.stringify(result.mismatchFields) !== JSON.stringify(envelope.expectedMismatchFields)
+    || result.status !== 'HOLD_R2_RPC_CATALOG_NOT_EQUIVALENT'
+    || result.authorizedForProduction !== false || result.drReady !== false) {
+    throw new Error('HOLD_R2_UNEXPECTED_PARITY_DRIFT_REQUIRES_REVIEW');
+  }
+  return result;
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
@@ -61,7 +74,9 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     if (process.argv.length !== 4) throw new Error('HOLD_R2_USAGE');
     const isolated = JSON.parse(readFileSync(process.argv[2],'utf8'));
     const productionEnvelope = JSON.parse(readFileSync(process.argv[3],'utf8'));
-    const result = compareR2Aggregate(isolated,validateR2ProductionEnvelope(productionEnvelope));
+    const result = requireR2ExpectedDiagnostic(
+      compareR2Aggregate(isolated,validateR2ProductionEnvelope(productionEnvelope)),
+      productionEnvelope);
     console.log(JSON.stringify(result));
     // Audit observation succeeded, but status itself remains HOLD on mismatch.
     // This task may not be used as a deployment approval gate.
