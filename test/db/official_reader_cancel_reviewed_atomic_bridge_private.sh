@@ -23,12 +23,14 @@ obs="$(p -c "select id from public.official_reader_portone_cancel_observation_sh
  where webhook_id='wh-reader-b2'")"
 [[ "$grant" =~ ^[0-9a-f-]{36}$ && "$obs" =~ ^[0-9a-f-]{36}$ ]] ||
  die "verified source IDs missing"
+scope_digest="sha256:v1:$(printf 'reviewed-reader-cancel:v1:%s:%s:%s:%s' \
+  "$obs" "$event" "$receipt" "$grant" | sha256sum | cut -d' ' -f1)"
 call() {
 cat <<SQL
 select result_grant_id::text||':'||
  result_entitlement_event_id::text||':'||result_replayed::text
 from public.internal_apply_reviewed_official_reader_full_cancel_private_v1(
- '$approval'::uuid);
+ '$approval'::uuid,'$obs'::uuid,'$event'::uuid,'$receipt'::uuid,'$grant'::uuid);
 SQL
 }
 if p >"$tmp/no-review.out" 2>&1 <<SQL
@@ -45,13 +47,13 @@ grep -q 'No independent Commerce/Legal review' "$tmp/no-review.out" ||
 
 p <<SQL >/dev/null
 insert into public.official_reader_cancel_review_approvals_private_v1(
-  id,source_observation_id,verified_provider_event_id,verified_receipt_id,
-  approved_grant_id,source_fingerprint,
+  id,scope_digest,
+  source_fingerprint,
   provider_rechecked_at,commerce_reviewer_id,commerce_approved_at,
   legal_reviewer_id,legal_approved_at,approval_status
 )
-select '$approval'::uuid,'$obs'::uuid,'$event'::uuid,'$receipt'::uuid,
- '$grant'::uuid,s.source_evidence_fingerprint,
+select '$approval'::uuid,'$scope_digest',
+ s.source_evidence_fingerprint,
  s.provider_status_changed_at,
  '18800000-0000-0000-0000-000000000002'::uuid,pg_catalog.clock_timestamp(),
  '18800000-0000-0000-0000-000000000003'::uuid,pg_catalog.clock_timestamp(),
@@ -122,10 +124,10 @@ echo "PASS reviewed bridge: exact one-Grant atomic COMMIT + replay denied"
 
 if p >"$tmp/rewrite.out" 2>&1 <<SQL
 update public.official_reader_cancel_review_approvals_private_v1
-set approved_grant_id='ffffffff-ffff-ffff-ffff-ffffffffffff'::uuid where id='$approval';
+set scope_digest='sha256:v1:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff' where id='$approval';
 SQL
 then die "an immutable independent approval was changed"; fi
-sig='public.internal_apply_reviewed_official_reader_full_cancel_private_v1(uuid)'
+sig='public.internal_apply_reviewed_official_reader_full_cancel_private_v1(uuid,uuid,uuid,uuid,uuid)'
 [[ "$(p -c "select count(*) from pg_catalog.pg_proc
  where oid='$sig'::regprocedure and not prosecdef and provolatile='v'")" == 1 ]] ||
  die "reviewed revoke must be invoker/volatile"
