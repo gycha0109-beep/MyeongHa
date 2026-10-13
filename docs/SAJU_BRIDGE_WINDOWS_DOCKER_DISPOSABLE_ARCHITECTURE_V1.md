@@ -103,7 +103,22 @@ node scripts/local/verify-saju-bridge-docker-local.mjs --tls ../Saju-bridge-veri
 - 세 DB 각각에서 `pg_stat_ssl`의 암호화 연결, 독립 CA 식별, **다른 DB의 CA를 이용한 접속 실패**, **일반 텍스트 접속 실패**, 다른 DB의 테이블 및 역할 부재를 검사한다.
 - GoTrue의 내부 Auth DB 연결은 Phase 1/2B의 별도 상태를 유지한다. Phase 3A 성공은 GoTrue 내부 DB 자체의 TLS 보증을 의미하지 않는다.
 - Scope CI는 같은 GitHub Actions 흐름에서 `--tls` 모드를 실행한다. 별도 워크플로, 운영 URL, 퍼블릭 호스트 포트, 인증서 영속 저장, 새로운 유료 자원을 만들지 않는다.
-- **Phase 3A는 Permit V2 소비 및 양 DB 커밋 분리/복구의 합격을 뜻하지 않는다.** 운영 Root/Attestor, R01–R14, 2D-4, 스테이징 입장·상품/판매 권한은 기존대로 HOLD다. Windows의 `--tls` 실측은 사용자가 직접 성공 로그를 제출하기 전 NOT_VERIFIED이다.
+- **Phase 3A는 Permit V2 소비 및 양 DB 커밋 분리/복구의 합격을 뜻하지 않는다.** 운영 Root/Attestor, R01–R14, 2D-4, 스테이징 입장·상품/판매 권한은 기존대로 HOLD다. Windows의 `--tls` Phase 3A 실측은 2026-10-13 사용자 제출 로그로 **PASS** 확인하였다.
+
+### 3D. Phase 3B — 합성 서명 Permit V2의 독립 Admission TLS 원자 소비 (2026-10-13)
+
+`--permit`은 Phase 1·2·2B·3A를 **전부 같은 일회용 Docker 프로젝트**에서 실행한 뒤, 분리된 Admission DB에서 추가 테스트를 수행한다.
+
+```powershell
+node scripts/local/verify-saju-bridge-docker-local.mjs --permit ../Saju-bridge-verify
+```
+
+- 기존 `test/db/fixtures/saju_staging_operator_admission_schema_8c2b2d302.sql`을 **이름이 고정된 폐기 Admission DB**에만 로드한다. 이것은 **운영 마이그레이션이 아니라 기존 CI용 합성 RLS/ACL fixture**다.
+- 기존 Phase 3A TLS-only 제한 로그인에 `myeongha_saju_staging_admission_runtime` 멤버십만 별도로 부여한다. 합성 `issuer`/`revoker` 역할은 부여하지 않으며, Subject·Nonce의 실제 DB/롤과 격리한다. DB에는 서버가 생성한 새 Ed25519 테스트 키로 서명한 합성 Permit V2 레코드를 테스트 전용 관리자 연결로 삽입한다.
+- 구현 재사용: `canonicalSajuHeldStagingPermitApprovalBytesV2`, `createSajuHeldStagingPostgresAdmissionPortV2`, 기존 Manifest/ConnectionPlan digest를 그대로 호출한다. 서로 다른 독립 PostgreSQL 세션이 같은 Permit을 동시에 소비할 때 **한 건만 성공**, 이후 재시도 불허, 서명·승인 키·계획·CA 지문 변조/취소/만료/연결 실패는 fail closed여야 한다.
+- Subject/Nonce/Admission TLS CA 값은 실제 일회용 컨테이너의 CA 인증서에서 계산한다. 단, 서명된 Manifest/ConnectionPlan의 도메인 이름은 **CI 합성 메타데이터**이며 실제 운영 DNS나 인프라의 승인 근거가 아니다.
+- `--permit`은 오직 `saju-bridge-permit.compose.yml`과 테스트 스크립트에서만 Admission Permit 테이블/권한을 추가한다. 평상시 `--tls` 및 `--binding`에는 전혀 새 Permits를 생성하지 않는다. 모든 테스트 종료 시 컨테이너·CA 볼륨·DB 볼륨을 삭제 확인한다.
+- **중요:** 합성 키/서명 검증 + 원자 소비는 실제 운영자 승인이나 stagingAdmission 성공을 의미하지 않는다. Runner는 **절대 호출하지 않는다**. COMMIT 불확실성, 네트워크 분할, Subject와 Nonce의 서로 다른 결과·복구는 별도 Phase 4로 HOLD한다. `canExecute`, `canPublish`, `canSell`은 계속 false다. Linux CI 통과와 Windows 실기기 `--permit` 검증은 별개이다.
 
 ## 4. 단계별 로드맵 · 종료 게이트
 
