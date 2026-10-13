@@ -90,3 +90,7 @@
 **검증 게이트:** `test/db/official_reader_d2_unified_issue_bind_three_session.sh`는 최초 긍정 issuance/bind, 추가 bind, source-owned scope, 3세션 Product L0 wait와 Reader replay, final row-state 보존을 검사한다. *최신 CI 결과는 각 PR exact SHA로 확인하고 이 문서의 설계 기록과 구분해야 한다.*
 
 **여전히 P0:** Commerce `1080` 및 기존 `1090/1220/1760/1790` 외부 직접 Writer의 전환 미완료. 따라서 concurrent new-Grant INSERT phantom과 verified refund ↔ issue/bind 전역 linearization은 아직 승인할 수 없다. D3에서 전 영향 Product 정렬 L0→L1, 미결속 Grant revoke-before-bind, Provider normalized cancellation/restore를 구현·검증할 것. RR-03 source-owned proof, D5 보호 원문 원자 T2, #1941 복구·상품/결제/보안·법무 승인은 별도.
+
+### D2 최종 CI 확정 (2026-10-13)
+
+PR #2024의 코드 SHA `ea2503e502faac8e659785d22878ab7497975237`, CI run `38333789245`: PostgreSQL15 DB Authority Core / PostgreSQL17 / Content / Work Track / CI Verify PASS. Governance 및 Web PR Domain Gates PASS. 1820 PRIVATE 발급·결속 Wrapper의 신규 독립 Grant INSERT 및 Reader replay의 동일 Product 경합을 별도 PostgreSQL 연결로 검사. **1080/1090/1220 직접 Writer 통합 전환 및 D3 Provider 취소 처리 완료를 의미하지 않음.**
