@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
-[[ "\${CI:-}" == true && "\${PGHOST:-}" == localhost &&
-   "\${PGDATABASE:-}" == myeongha_b2_r4_b25_expiry ]] || exit 1
+[[ "${CI:-}" == true && "${PGHOST:-}" == localhost &&
+   "${PGDATABASE:-}" == myeongha_b2_r4_b25_expiry ]] || exit 1
 p(){ psql -X -v ON_ERROR_STOP=1 -At "$@"; }
 fail(){ echo "FAIL R4/BIND-25 $*" >&2; exit 1; }
 tmp="$(mktemp -d)"; holder=''; waiter=''
