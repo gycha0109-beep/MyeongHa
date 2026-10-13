@@ -18,5 +18,7 @@ bash test/db/seyeon_positive_source_set_exact_attempt_race_v1.sh
 # G1 Owner-style stage receipts exist ONLY in this isolated, resettable DB.
 psql -X -v ON_ERROR_STOP=1 \
   -f test/db/seyeon_positive_g1_owner_dispatch_receipt_candidate_v1.sql
-SEYEON_POSITIVE_GRANT_REAL_PG=1   ./node_modules/.bin/vitest run     test/seyeon-controlled-disclosure-real-postgres-candidate.test.ts test/seyeon-source-digest-node-postgres-golden-v1.test.ts test/seyeon-offline-r2-real-db-source-boundary-v1.test.ts --maxWorkers=1
+psql -X -v ON_ERROR_STOP=1 \
+  -f test/db/seyeon_positive_g2_atomic_revoke_candidate_v1.sql
+SEYEON_POSITIVE_GRANT_REAL_PG=1   ./node_modules/.bin/vitest run     test/seyeon-controlled-disclosure-real-postgres-candidate.test.ts test/seyeon-source-digest-node-postgres-golden-v1.test.ts test/seyeon-offline-r2-real-db-source-boundary-v1.test.ts test/seyeon-g1-g2-disposable-db-claims.test.ts --maxWorkers=1
 echo 'PASS: positive Pin -> test Commit -> real PG HTTP grant reveal and Node/Postgres D-03 dual-serializer golden vectors in disposable CI DB'
