@@ -303,6 +303,8 @@ SQL
       -f scripts/operations/seyeon-r2-acl-grants-canonical-readonly.sql > "$local_acl"
     node scripts/operations/verify-seyeon-r2-acl-grants.mjs "$local_acl" \
       scripts/operations/seyeon-r2-production-acl-grants-20261013.json
+    psql -X -qAt -v ON_ERROR_STOP=1 \
+      -f scripts/operations/seyeon-r2-assert-helper-acl-readonly.sql
     ;;
   seyeon-r2-rpc-catalog)
     verify_pg17
