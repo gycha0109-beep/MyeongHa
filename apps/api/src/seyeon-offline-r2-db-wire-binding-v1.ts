@@ -134,6 +134,7 @@ export function observeSeyeonOfflineR2DbWireBindingV1(input: Input):
         !Array.isArray(turn.content) || turn.content.length !== 1 ||
         !exactly(turn.content[0],['type','text']) ||
         turn.content[0].type !== 'input_text' ||
+        typeof turn.content[0].text !== 'string' ||
         turn.content[0].text !== JSON.stringify(input.request.input) ||
         !eq(JSON.parse(turn.content[0].text),input.request.input)) return HELD;
     if (!exactly(body.text,['format']) ||
