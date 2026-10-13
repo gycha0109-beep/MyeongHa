@@ -319,7 +319,7 @@ function fiveStageRequests(context: SeyeonRuntimeContextV2):
     ...context,
     schemaVersion: 'seyeon-renderer-packet-v2',
     recentConversation: context.recentConversation,
-    memoryEvidence: context.retrievedMemories,
+    memoryEvidence: [],
     interpretation: {
       chosenAction: {key: 'approach'},
       expressionState: 'baseline',
