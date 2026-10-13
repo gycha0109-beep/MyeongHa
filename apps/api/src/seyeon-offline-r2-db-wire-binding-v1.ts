@@ -50,7 +50,7 @@ type Input = Readonly<{
 const isObject = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === 'object' && !Array.isArray(value);
 
-function exactly(value: unknown, fields: readonly string[]): boolean {
+function exactly(value: unknown, fields: readonly string[]): value is Record<string, unknown> {
   return isObject(value) &&
     Object.keys(value).length === fields.length &&
     fields.every(field => Object.prototype.hasOwnProperty.call(value, field));
