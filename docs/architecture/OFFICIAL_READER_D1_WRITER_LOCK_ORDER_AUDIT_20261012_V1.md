@@ -102,3 +102,7 @@ PR #2024의 코드 SHA `ea2503e502faac8e659785d22878ab7497975237`, CI run `38333
 신규 `1830`의 `internal_apply_official_reader_verified_cancel_scope_v2`는 verified provider+production receipt+purchase Grant→정본 Product를 선조회하고 *행 잠금 없이* bound scope 전체를 조사하여, 하나의 Product에 모두 속함을 증명하면 Product L0 **먼저** 취득한다. 실제 bound Reader가 존재하면 그 다음 정렬된 Reading×Reader L1 전체를 잠근다. 최초 Grant 미결속이면 L1을 임의 생성하지 않고 L0만 사용한다. L0/L1 대기 후 연결 범위를 재검증하고 원본 `1080` effect를 호출한다. Unbound 단계에서는 환불 이후 `1220` 신규 공식 사주 생성이 active Grant를 찾지 못해야 한다.
 
 신규 dormant bridge `internal_execute_official_reader_verified_cancel_v2`는 DB-owned verified cancellation에 한정하고 Subject context를 복원한다. **변경되지 않은 구 함수 직접 호출, 미검증 PortOne payload, 복구·부분 취소·다중 Product 영향 집합, D5 T2·Source Proof**는 여전히 P0 차단이며 외부 cutover 미실시. 테스트/CI의 exact SHA를 확인한 이후 결과를 기록해야 한다.
+
+### D3a 검증 종료 — 비공개 구현만 (2026-10-13)
+
+PR #2028 HEAD 코드 `0146a2de2db2a6437cf2b61f93dc8dcbeab20533`, CI `38336400038`: PostgreSQL 15 Core/17/Content/Work Track/CI Verify, Governance, Web PR Domain Gates PASS. 경합 로그에서 기결속 Provider-first/Reader-first 양방향 대기 및 revoked 접근 차단, 최초 Reading 결속 전 환불의 Product L0 실제 대기와 원본 Grant/Event atomic COMMIT, 이후 bind deny를 확인했다. **기존 1080/1770/1780 직접 caller 전환 또는 PortOne cancellation ingress 연결 증거는 아니다.**
