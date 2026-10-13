@@ -135,3 +135,20 @@ Watchtower-Track: ops. R1 정확한 격리 복원 증거는 8절을 따른다. �
 4. DB/Security/Character/Reader/Saju/Ops 각 Owner가 단위별 무효화·실패 복구 경로를 승인한 뒤 forward-only 대응을 결정. 기존 `20261008090417` 이력을 임의 수리·삭제·대체하지 않음.
 
 **현 판정: R2 forensic metadata + 불변 의존성 스캐폴드 구축 중; Production 1520~1720 0/21, remote-only 1, 전체 DR readiness HOLD.** CI/PR 성공이나 R1 성공은 마이그레이션 배포 또는 세연 AI 보안 G0~G6 승인으로 자동 전환되지 않는다.
+
+
+## 10. 2026-10-13 R2-C — Production vs PG17 19 RPC aggregate exact 지문 비교 결과
+
+**실측 결과: `HOLD_R2_RPC_CATALOG_NOT_EQUIVALENT` — ACL 원본 지문만 불일치.**
+
+- Production에서 `scripts/operations/seyeon-r2-rpc-set-fingerprint-readonly.sql`을 SELECT로 실행. `2026-10-13` 당시 19/19 함수, 중복/누락 0, PG major=17, `anon`·`authenticated` EXECUTE 0. 함수 원문·인자 원문·ACL 원문·개인정보는 결과로 반환하지 않고 6가지 정렬 집계 SHA-256만 산출.
+- Production 집계 기록 `scripts/operations/seyeon-r2-production-rpc-set-fingerprint-20261013.json`은 **집합 해시 및 검증 카운트만** 포함하고 `authorizesProduction=false`를 고정한다. 이 데이터는 원격-only 104KB SQL의 digest/출처·적용 로그 증거와는 별개다.
+- 격리 PostgreSQL 17에서는 `test/db/run_ci_case.sh`의 `apply_pg17_migrations_through_seyeon_production_frontier`로 **저장소 번호 마이그레이션 1510까지 + 실제 보이는 timestamped 2개**만 재생. 1520~1720 21개는 재생하지 않고, 원격-only `20261008090417` 본문을 절대 가져오거나 재실행하지 않았다. 특수 0860 managed-principal 테스트는 기존 PG17 전용 제외 규칙대로 분리한다. 이것은 hosted Supabase 환경을 완전히 복제한 것이 아니다.
+- [PR #2046](https://github.com/gycha0109-beep/MyeongHa/pull/2046) 최초 HEAD `233bfec7c02d3e24763f9bbb9f03d2732e0d6a98`, [CI #38350068457](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38350068457) PG17 job `115140250094`의 실제 aggregate comparison:
+  - **MATCH:** function-name set 19, 정확한 함수 signature set, Owner set, `pg_get_functiondef` DDL set, SECURITY DEFINER/volatility/anon-auth 실행 가능 여부 flags set.
+  - **MISMATCH:** `pg_proc.proacl::text` 기반 **ACL set SHA-256** 단독 (`mismatchFields=["aclSetSha256"]`).
+  - **브라우저 실행:** 두 환경에서 `anon/authenticated` EXECUTE 0. ACL 표현 차이가 추가 role의 실제 권한 차이인지, ACL 배열 순서/표시 형태인지, default/explicit 차이인지는 *미분석*. 실무적 권한 동등성을 주장하지 않는다.
+- `scripts/operations/verify-seyeon-r2-rpc-set-fingerprint.mjs`은 기대 19, 중복·누락·공개 실행권한 0, 모든 집계 해시 형식을 엄격 검증한다. 대조가 불일치해도 **실행 자체가 정상 완료되었다는 진단 검사 성공**과 **계보 동등성 PASS**를 혼동하지 않도록 항상 `HOLD_R2_RPC_CATALOG_NOT_EQUIVALENT`를 출력하고 `match=false`, `drReady=false`, `authorizedForProduction=false`를 유지한다. CI의 GREEN은 ACL 일치/배포 승인 증거가 아니다.
+- **Owner의 다음 안전 조사:** 승인된 격리 환경에서 기존 `scripts/operations/seyeon-r2-rpc-catalog-readonly.sql` 양쪽 출력물을 일반 CI·공개 PR/이슈가 아닌 보호된 운영 파일로만 저장 → 기존 `verify-seyeon-r2-rpc-catalog.mjs isolated.json production.json`을 오프라인 실행해 불일치 객체/필드 이름 확인 → raw ACL 배열 요소의 순서/명시 grant/default 및 effective `service_role`·runtime role 권한 차이를 분리하고 DB/Security Owner 검토. 원격 104KB 작성·실행 provenance 및 timestamped migration 순서 감사는 여전히 별도 HOLD.
+
+**금지 유지:** Production migration repair/db push/DDL/Role/ACL/history 변경, 원격 SQL 재실행·공개 반출, G0~G6·유료 AI·사용자 공개, `dr_ready=true` 승격. 이전 R1 scoped restore PASS는 계속 유효하나 R2 또는 전체 DR Ready를 자동 승인하지 않는다.
