@@ -40,6 +40,7 @@ run_isolated_case() {
 }
 
 bash test/db/verify_no_schema_cardinality_hardcoding.sh
+node scripts/verify-cap-b2-runtime-writer-ingress-hold.mjs
 # Exercise the actual 1460..1510 -> 1400..1450 inversion only on a
 # disposable local PostgreSQL database in CI. Never use Production credentials.
 if [[ "${CI:-}" == 'true' && "${PGHOST:-}" == 'localhost' &&
