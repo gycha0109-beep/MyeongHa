@@ -261,3 +261,13 @@ S1에서 공통 잠금 함수 자체가 성공하더라도 **S2 전체 경로가
 - 범위: `1820` 비공개 1090/1220 wrapper와 PostgreSQL 실제 다중 연결 Receipt 신규 Grant INSERT/Reader bind 경쟁. 기존 Writer 원본에는 외부 cutover 및 ACL 변경이 없다.
 - 최초 Catalog hash mismatch 교정 후 최종 검증 PASS. 예상 해시: `645387bbf029d85e5413ba61fa696106d8522056407c13f98e21c60ffe478bf7`.
 - D2 PRIVATE 검증 완료. 하지만 direct 1080/1090/1220/1760/1790, Provider 환불, 미결속 Grant, D5 T2, 운영 #1941 복원 및 Product/Commerce/Privacy/Legal 승인 미완료. 병합/운영 공개 HOLD.
+
+## 20. D3 단계적 구현 — Verified cancellation L0-first / 미결속 최초 Grant (2026-10-13)
+
+**D3a 비공개 구현 후보, 전체 D3 완료 또는 운영 refund 활성화 아님.** PR #2024 D2 이력을 부모로 둔 신규 `1830_official_reader_verified_cancel_unified_scope_private_v1.sql`를 추가하였다.
+
+- 새 `internal_apply_official_reader_verified_cancel_scope_v2`: DB 검증된 `payment.cancelled` Provider Event→production Receipt→정본 Purchase Intent/Offer/Standard Product→단일 Purchase Grant를 조회하고, 해당 Grant의 연결된 공식 Reading×Reader 행 전체를 조회한다. **미결속 최초 Grant는 해당 Product L0만 선행**, 기결속 Grant는 Receipt Product와 모든 공식 Reading 정본 Product가 정확히 일치하는지 검사 후 Product L0→모든 Reading/Reader L1을 정렬해 확보한다. 대기 이후 원본 scope 재검증하고 원본 `1080`에 변경 없는 CAS·ordering·ledger·outbox를 위임한다. 범위 변동은 Statement 전체 rollback.
+- `internal_execute_official_reader_verified_cancel_v2`: DB-verified event/receipt/grant에서 canonical Subject를 도출하는 *dormant* SECURITY DEFINER bridge. 기존 다른 Subject 문맥 덮어쓰기 금지, 임시 문맥 예외 포함 복원. PUBLIC/anon/authenticated/service_role/API/Commerce executor 직접 EXECUTE 없음.
+- `test/db/official_reader_d3_verified_cancel_unified_three_session.sh`: 기존 verified Provider 두 방향 실제 PostgreSQL Reader 경합 시나리오를 D3 경로로 재실행하고, 독립 첫 구매 Receipt/Grant를 **공식 Reading 결속 없이** 새로 발행하여 L0 대기→환불 COMMIT→Grant revoked 및 정확한 Event ledger→환불 후 bind 거부 및 신규 Reading/Reader 권한 0을 검증한다. 이 테스트는 원본 DB fixture 및 disposable DB에서만 실행한다.
+- **D3 미완료 차단:** source-verified refund ingress/PortOne event normalization이 운영 호출자에 연결되어 있지 않다. 다른 provider event·restore·partial cancellation·만료 재권한·여러 Grant/Product 동시 영향은 이 narrow helper에서 거부한다. 1080/1770/1780 구 direct caller와 모든 Product/Commerce mutation cutover 미완료. legacy `1750` Reader 조회도 L0 선행이 아니므로 유료 T2와 공개는 계속 HOLD.
+- **실행 상태:** D3a 신규 SQL/테스트/문서 등록만 됐으며 CI exact HEAD PostgreSQL 15/17 실제 시험 결과가 확인되기 전 PASS 선언 금지. #1941 운영 복원, Product/Commerce/Privacy/Legal/DB 승인 전 merge/Production/Checkout/Paid Chat 금지.
