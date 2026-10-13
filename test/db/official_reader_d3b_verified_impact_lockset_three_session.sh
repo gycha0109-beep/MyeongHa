@@ -182,8 +182,10 @@ for label in normal reverse; do
  grep -qx '1:2:2:0' "$tmp/$label.out" ||
    { cat "$tmp/$label.out" >&2; fail "scope drift after L0 wait"; }
 done
+# The original fixture intentionally REVOKES both B2 and B3; a lock-only
+# resolver must not reactivate them or manufacture a new event.
 [[ "$(p -c "select count(*) from public.entitlement_grants
 where id in ('${grants[0]}'::uuid,'${grants[1]}'::uuid)
-and status='active'")" == 2 ]] ||
- fail "lock-only operation mutated Grant status"
+and status='revoked'")" == 2 ]] ||
+ fail "lock-only impact operation changed terminal Grant status"
 echo "PASS D3b: three PostgreSQL sessions, reverse verified pair order, L0 wait and no Grant mutation"
