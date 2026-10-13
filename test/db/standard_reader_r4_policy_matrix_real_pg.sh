@@ -55,3 +55,15 @@ and reader_character_id='seyeon'")" == 1 ]] ||
 where character_id='seyeon' and can_initiate=false")" == 1 ]] ||
  fail 'BIND-03 specialist capability was modified'
 echo 'PASS R4 BIND-02/03/14 precise Standard private issue/bind with false specialist Capability'
+
+# BIND-26: prevent stale-snapshot replay in a separate PostgreSQL session.
+if p >"$tmp/stale.out" 2>&1 <<SQL
+begin isolation level repeatable read;
+$(cat test/db/standard_reader_r4_initial_bind_call.sql)
+commit;
+SQL
+then fail 'BIND-26 stale snapshot replay was accepted'; fi
+grep -Fq 'READ COMMITTED' "$tmp/stale.out" ||
+ { cat "$tmp/stale.out"; fail 'BIND-26 rejected for unrelated reason'; }
+echo 'PASS R4 BIND-26 REPEATABLE READ denied by actual initial lock'
+echo 'PASS B2-R4 initial policy SQL matrix subset: 01/02/03/09-Standard-fallback/14/26'
