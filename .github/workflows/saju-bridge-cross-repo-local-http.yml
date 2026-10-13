@@ -10,6 +10,8 @@ on:
       - scripts/local/verify-saju-bridge-docker-local.mjs
       - scripts/local/saju-bridge-full.compose.yml
       - scripts/local/saju-bridge-http.compose.yml
+      - scripts/local/saju-bridge-tls.compose.yml
+      - scripts/local/saju-bridge-admission-tls-login.sql
       - scripts/local/verify-saju-bridge-docker-binding.mjs
       - scripts/local/saju-bridge-subject-local-login.sql
       - scripts/local/saju-bridge-nonce-local-login.sql
@@ -122,7 +124,7 @@ jobs:
         run: npm run build
       - name: Verify disposable Docker GoTrue, Birth, pinned Saju HMAC and isolated Nonce
         working-directory: myeongha
-        run: node scripts/local/verify-saju-bridge-docker-local.mjs --binding ../saju
+        run: node scripts/local/verify-saju-bridge-docker-local.mjs --tls ../saju
       - name: Bootstrap complete disposable Subject, Birth, and nonce authority
         working-directory: myeongha
         shell: bash
