@@ -134,3 +134,9 @@ PR #2034 SHA `99fa0bda9c0759fcccaf309fbc6cd3704190bc62` CI run `38339438218`: Po
 ## 9. D3e2 PortOne Cancellation Shadow와 Writer 안전 경계 (2026-10-13)
 
 새 `1860` 원장은 구매권 또는 환불 Writer가 아니라 verified PortOne candidate 정보를 위한 **별도 비공개 observation ledger**다. 동일 거래별 advisory lock 획득 후 immutable append, webhook identity replay/collision 및 event timestamp 역행 기록을 수행하며 1080 Entitlement Grant/Event/Projection/Outbox, D3b L0→L1, D3c 1850 호출에는 영향을 주지 않는다. 신규 테이블 public RLS=true + anon/authenticated/service_role/API/Commerce/Chat SELECT 및 함수 EXECUTE REVOKE. 운영 webhook path·사후 Settlement·Legal 승인·권한 있는 최소 actor를 추가하고 검증하기 전에는 shadow만으로 `full cancellation` 승인이나 사용자 Reader T2 공개 차단을 수행하지 않는다.
+
+### D3e2 영속 역순 / RLS / 실제 2세션 최종 증거 (2026-10-13)
+
+PR #2039 코드 SHA `4616d336f08a4f827dab516cdc278bd0d65a06f6` 검증 CI [38344545761](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38344545761) PG15/PG17/Content/Work Track/CI Verify PASS, Governance 및 Web Gate PASS. PostgreSQL 15 로그에서 동일 Webhook replay와 상충 데이터 거부, 역순 부분취소 분류, 가짜 full 차단, RLS/runtime ACL 거부, **두 독립 PostgreSQL 세션의 advisory 동일 Payment 대기/직렬 관측**, Entitlement effect 0을 모두 PASS 확인. 스키마 카탈로그 87 tables SHA `4273d61d1c244a44c116abad5a0b45f1b0035a2e8c774644441e05ddf74ca525`.
+
+남은 HOLD: PortOne 실제 verified cancellation → source-owned original Receipt/Offer/Grant/Legal approval → 별도 권한의 Commerce Worker → 기존 1080 CAS/1850 L0→L1 원자 일괄 효과, 구 Writer 직접 경로 차단과 T2. 이 Shadow 기록 자체는 결제 취소 발생·법적 환불 승인·Entitlement 권한 회수의 증거가 아님.
