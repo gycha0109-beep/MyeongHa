@@ -40,6 +40,7 @@ run_isolated_case() {
 }
 
 bash test/db/verify_no_schema_cardinality_hardcoding.sh
+node scripts/verify-cap-b2-runtime-writer-ingress-hold.mjs
 # Exercise the actual 1460..1510 -> 1400..1450 inversion only on a
 # disposable local PostgreSQL database in CI. Never use Production credentials.
 if [[ "${CI:-}" == 'true' && "${PGHOST:-}" == 'localhost' &&
@@ -196,5 +197,11 @@ if [[ "${CI:-}" == "true" && "${PGHOST:-}" == "localhost" ]]; then
     bash test/db/standard_reader_initial_refund_r2_real_pg.sh bind_first
   run_isolated_case myeongha_standard_b2_r2_no_grant_test \
     bash test/db/standard_reader_initial_no_grant_r2_real_pg.sh
+  run_isolated_case myeongha_b2_r3_policy_first \
+    bash test/db/standard_reader_policy_withdrawal_initial_bind_r3_real_pg.sh policy_first
+  run_isolated_case myeongha_b2_r3_bind_first \
+    bash test/db/standard_reader_policy_withdrawal_initial_bind_r3_real_pg.sh bind_first
+  run_isolated_case myeongha_b2_r3_multiscope_sorted \
+    bash test/db/standard_reader_multiscope_lock_order_r3_real_pg.sh
 fi
 bash test/db/catalog_snapshot.sh
