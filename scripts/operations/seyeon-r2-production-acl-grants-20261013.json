@@ -1,0 +1,185 @@
+{
+  "observation": "production-readonly-2026-10-13",
+  "source": "Supabase Production pg_catalog SELECT ONLY",
+  "readOnly": true,
+  "authorizedForProduction": false,
+  "containsRawAcl": false,
+  "containsPII": false,
+  "snapshot": {
+    "functions": [
+      {
+        "name": "assert_seyeon_chat_thread_runtime_v1",
+        "grantEdges": 2,
+        "anonExecute": false,
+        "explicitAcl": true,
+        "rawAclSha256": "4210182d3fb052f739cda4436a0e48abc5c19735400b582ac2edf709ce811bdc",
+        "authenticatedExecute": false,
+        "canonicalGrantSha256": "9dfb421bdefb71d66e58a91c15de77198d0bbcac81aa43a338245ce69dd9a282"
+      },
+      {
+        "name": "cmd_allocate_seyeon_chat_attempt_runtime_v1",
+        "grantEdges": 2,
+        "anonExecute": false,
+        "explicitAcl": true,
+        "rawAclSha256": "e38345ccf08498724976386a00c325eecf1438af2c1ffa963443df68515cb118",
+        "authenticatedExecute": false,
+        "canonicalGrantSha256": "c6219e43a5ba316273abf062124a425673547c08d61016c0ef133e88efbaa03d"
+      },
+      {
+        "name": "cmd_checkpoint_seyeon_post_turn_analysis_v1",
+        "grantEdges": 2,
+        "anonExecute": false,
+        "explicitAcl": true,
+        "rawAclSha256": "900874657adb2f87aee6aea1d00882efe3c3c74af927ff19a6cfeb75b44e9be5",
+        "authenticatedExecute": false,
+        "canonicalGrantSha256": "5cf99e179cb2a3ffd73d33ac6fb654b8a45863750690aeca3b554d6d4f7ad93e"
+      },
+      {
+        "name": "cmd_claim_seyeon_post_turn_analysis_v1",
+        "grantEdges": 2,
+        "anonExecute": false,
+        "explicitAcl": true,
+        "rawAclSha256": "900874657adb2f87aee6aea1d00882efe3c3c74af927ff19a6cfeb75b44e9be5",
+        "authenticatedExecute": false,
+        "canonicalGrantSha256": "5cf99e179cb2a3ffd73d33ac6fb654b8a45863750690aeca3b554d6d4f7ad93e"
+      },
+      {
+        "name": "cmd_claim_seyeon_relationship_sync_v1",
+        "grantEdges": 2,
+        "anonExecute": false,
+        "explicitAcl": true,
+        "rawAclSha256": "e23e421c55ea9a46d55c4b781f47074810687733c0bea31ebd6c20296b2d1190",
+        "authenticatedExecute": false,
+        "canonicalGrantSha256": "6d65c6dbdd9904664ba313d8777f79280a1748de63cfeba73726ec9580a95e6f"
+      },
+      {
+        "name": "cmd_commit_seyeon_chat_turn_runtime_v1",
+        "grantEdges": 2,
+        "anonExecute": false,
+        "explicitAcl": true,
+        "rawAclSha256": "e38345ccf08498724976386a00c325eecf1438af2c1ffa963443df68515cb118",
+        "authenticatedExecute": false,
+        "canonicalGrantSha256": "c6219e43a5ba316273abf062124a425673547c08d61016c0ef133e88efbaa03d"
+      },
+      {
+        "name": "cmd_commit_seyeon_chat_turn_runtime_v2",
+        "grantEdges": 2,
+        "anonExecute": false,
+        "explicitAcl": true,
+        "rawAclSha256": "e38345ccf08498724976386a00c325eecf1438af2c1ffa963443df68515cb118",
+        "authenticatedExecute": false,
+        "canonicalGrantSha256": "c6219e43a5ba316273abf062124a425673547c08d61016c0ef133e88efbaa03d"
+      },
+      {
+        "name": "cmd_complete_seyeon_post_turn_analysis_v1",
+        "grantEdges": 2,
+        "anonExecute": false,
+        "explicitAcl": true,
+        "rawAclSha256": "900874657adb2f87aee6aea1d00882efe3c3c74af927ff19a6cfeb75b44e9be5",
+        "authenticatedExecute": false,
+        "canonicalGrantSha256": "5cf99e179cb2a3ffd73d33ac6fb654b8a45863750690aeca3b554d6d4f7ad93e"
+      },
+      {
+        "name": "cmd_complete_seyeon_relationship_sync_v1",
+        "grantEdges": 2,
+        "anonExecute": false,
+        "explicitAcl": true,
+        "rawAclSha256": "e23e421c55ea9a46d55c4b781f47074810687733c0bea31ebd6c20296b2d1190",
+        "authenticatedExecute": false,
+        "canonicalGrantSha256": "6d65c6dbdd9904664ba313d8777f79280a1748de63cfeba73726ec9580a95e6f"
+      },
+      {
+        "name": "cmd_enqueue_seyeon_relationship_sync_v1",
+        "grantEdges": 2,
+        "anonExecute": false,
+        "explicitAcl": true,
+        "rawAclSha256": "e23e421c55ea9a46d55c4b781f47074810687733c0bea31ebd6c20296b2d1190",
+        "authenticatedExecute": false,
+        "canonicalGrantSha256": "6d65c6dbdd9904664ba313d8777f79280a1748de63cfeba73726ec9580a95e6f"
+      },
+      {
+        "name": "cmd_fail_seyeon_chat_attempt_runtime_v1",
+        "grantEdges": 2,
+        "anonExecute": false,
+        "explicitAcl": true,
+        "rawAclSha256": "e38345ccf08498724976386a00c325eecf1438af2c1ffa963443df68515cb118",
+        "authenticatedExecute": false,
+        "canonicalGrantSha256": "c6219e43a5ba316273abf062124a425673547c08d61016c0ef133e88efbaa03d"
+      },
+      {
+        "name": "cmd_mark_seyeon_chat_context_ready_runtime_v1",
+        "grantEdges": 2,
+        "anonExecute": false,
+        "explicitAcl": true,
+        "rawAclSha256": "e38345ccf08498724976386a00c325eecf1438af2c1ffa963443df68515cb118",
+        "authenticatedExecute": false,
+        "canonicalGrantSha256": "c6219e43a5ba316273abf062124a425673547c08d61016c0ef133e88efbaa03d"
+      },
+      {
+        "name": "cmd_persist_seyeon_chat_generated_runtime_v1",
+        "grantEdges": 2,
+        "anonExecute": false,
+        "explicitAcl": true,
+        "rawAclSha256": "e38345ccf08498724976386a00c325eecf1438af2c1ffa963443df68515cb118",
+        "authenticatedExecute": false,
+        "canonicalGrantSha256": "c6219e43a5ba316273abf062124a425673547c08d61016c0ef133e88efbaa03d"
+      },
+      {
+        "name": "cmd_persist_seyeon_chat_validated_runtime_v1",
+        "grantEdges": 2,
+        "anonExecute": false,
+        "explicitAcl": true,
+        "rawAclSha256": "e38345ccf08498724976386a00c325eecf1438af2c1ffa963443df68515cb118",
+        "authenticatedExecute": false,
+        "canonicalGrantSha256": "c6219e43a5ba316273abf062124a425673547c08d61016c0ef133e88efbaa03d"
+      },
+      {
+        "name": "cmd_receive_seyeon_chat_turn_runtime_v1",
+        "grantEdges": 2,
+        "anonExecute": false,
+        "explicitAcl": true,
+        "rawAclSha256": "e38345ccf08498724976386a00c325eecf1438af2c1ffa963443df68515cb118",
+        "authenticatedExecute": false,
+        "canonicalGrantSha256": "c6219e43a5ba316273abf062124a425673547c08d61016c0ef133e88efbaa03d"
+      },
+      {
+        "name": "qry_production_relationship_history_runtime_v1",
+        "grantEdges": 2,
+        "anonExecute": false,
+        "explicitAcl": true,
+        "rawAclSha256": "e23e421c55ea9a46d55c4b781f47074810687733c0bea31ebd6c20296b2d1190",
+        "authenticatedExecute": false,
+        "canonicalGrantSha256": "6d65c6dbdd9904664ba313d8777f79280a1748de63cfeba73726ec9580a95e6f"
+      },
+      {
+        "name": "qry_production_relationship_runtime_v1",
+        "grantEdges": 2,
+        "anonExecute": false,
+        "explicitAcl": true,
+        "rawAclSha256": "e23e421c55ea9a46d55c4b781f47074810687733c0bea31ebd6c20296b2d1190",
+        "authenticatedExecute": false,
+        "canonicalGrantSha256": "6d65c6dbdd9904664ba313d8777f79280a1748de63cfeba73726ec9580a95e6f"
+      },
+      {
+        "name": "qry_seyeon_post_turn_analysis_job_v1",
+        "grantEdges": 2,
+        "anonExecute": false,
+        "explicitAcl": true,
+        "rawAclSha256": "900874657adb2f87aee6aea1d00882efe3c3c74af927ff19a6cfeb75b44e9be5",
+        "authenticatedExecute": false,
+        "canonicalGrantSha256": "5cf99e179cb2a3ffd73d33ac6fb654b8a45863750690aeca3b554d6d4f7ad93e"
+      },
+      {
+        "name": "qry_seyeon_production_personal_record_context_v1",
+        "grantEdges": 2,
+        "anonExecute": false,
+        "explicitAcl": true,
+        "rawAclSha256": "9e4317343b272ea87c09d736a75a9183e021b5b0cf82b27436d7e3903f32e93d",
+        "authenticatedExecute": false,
+        "canonicalGrantSha256": "87c96523cf69d4787b74054ee4e58f5ced9893a08af0bc16f2d9681c2e6a5926"
+      }
+    ],
+    "postgresMajor": 17,
+    "schemaVersion": "seyeon-r2-acl-per-function-v1"
+  }
+}
