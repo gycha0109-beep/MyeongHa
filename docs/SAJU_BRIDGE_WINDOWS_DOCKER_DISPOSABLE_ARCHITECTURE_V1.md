@@ -73,13 +73,29 @@ node scripts/local/verify-saju-bridge-docker-local.mjs --http ../Saju
 
 **2단계 남은 작업:** GoTrue 발급 회원 UUID→Subject/Birth fixture→실제 Saju HTTP/HMAC→Nonce PostgreSQL 원자 claim까지 동일 Docker 실행에서 연결한다. 기존 테스트가 `127.0.0.1`과 별도 CI TLS hostname을 가정하므로, 운영 정책을 완화하지 않고 테스트 전용 DNS/네트워크 어댑터를 추가해야 한다.
 
+### 3B. Phase 2B — GoTrue JWT → Subject/Birth → Saju HMAC → 독립 Nonce PG (2026-10-13)
+
+1단계 `(인수 없음)`과 HTTP 단독 `--http`의 성공 계약은 그대로 유지한다. 다음 명령은 **추가** DB 바인딩 검증을 선택한다.
+
+```powershell
+# 명하 루트에서, 깨끗한 지정 Saju 커밋만 사용
+node scripts/local/verify-saju-bridge-docker-local.mjs --binding ../Saju-bridge-verify
+```
+
+- `--binding`은 Phase 1/2 GoTrue·DB/실제 HTTP/HMAC 검증을 선행한 뒤에만 진행한다. Subject DB에는 운영과 분리된 테스트용 `auth.users` 스텁 및 전체 기존 마이그레이션을 적용하고, 허용된 DB 이름만 사용하는 **합성 Subject/Birth fixture**를 적재한다. Nonce DB에는 기존 `1540_saju_source_proof_nonce_claim_authority_v1.sql`만 적용한다.
+- 각각의 물리 DB에 제한 로그인 `myeongha_runtime` / `myeongha_docker_nonce_login`을 발급하고, 서로의 역할·테이블에 접근할 수 없는 것을 검사한다. 생성·입력된 DB 비밀번호는 실행별 난수이다.
+- 기존 Production 바인딩 함수 `bindAuthenticatedMemberSajuHeldProofV1`를 실제 GoTrue `/user`와 Saju 발급 서비스에 연결한다. 테스트 전용 Auth `/auth/v1/user` 경로 매핑과 합성 `auth.users` 행을 사용하되 JWT·Subject ID는 클라이언트 메타데이터를 신뢰하지 않고 실제 소유 관계로 검증한다.
+- 검증 항목: 소유자의 JWT/Current Birth/원자 Nonce 소비 HELD(배포 가능 상태가 아님), 다른 회원의 위조 메타데이터 거부, 변조·누락 JWT 거부, 두 세션의 동일 Saju HMAC proof 동시 재사용 중 정확히 한 건만 소비, DB 격리와 ACL 거부.
+- 신규 테스트 `test/saju-held-docker-member-birth-nonce.test.ts` 및 전용 Saju loopback runner는 기존 기능 코드나 운영 API를 변경하지 않는다. `--binding`도 실행이 끝나면 동일한 Compose 소유 컨테이너/볼륨/네트워크 삭제를 확인한다.
+- **제한:** Subject/Nonce의 Docker 테스트 연결은 이 단계에서 아직 *plaintext 내부 네트워크*이다. CA 검증 TLS 및 Admission/Permit V2, 장애 주입·복구, 운영 Root/Attestor/R01–R14/2D-4는 HOLD이다. CI가 Linux에서 PASS여도 Windows 실기기 `--binding`은 직접 실행하지 않으면 NOT_VERIFIED로 남는다.
+
 ## 4. 단계별 로드맵 · 종료 게이트
 
 | 단계 | 구현 | 게이트 | 범위 상태 |
 |---|---|---|---|
 | 0 | 기존 GitHub 2J + 독립 TLS/두 DB 중단 처리 재사용, #1986 | exact-head 범위/최종 CI 성공·병합 | 완료: **합성 CI만** |
 | 1 | Windows Docker 기초 4DB + GoTrue + 폐기 실행기 | 단일 명령, 실 GoTrue JWT 검증, DB 네 곳 실 SQL, 자원 잔존 0, 기존 CI 최소 스모크 통과 | 이번 구현 |
-| 2 | 고정 Saju SHA의 실 HTTP/HMAC, Subject schema/fixture 및 기존 테스트 재사용 | 실제 Saju HTTP 200 proof, Auth JWT→Subject Current Birth→Nonce 원자 claim, 병렬 중복 차단 | **부분 구현:** Docker HTTP/HMAC, DB 바인딩 미구현 |
+| 2 | 고정 Saju SHA의 실 HTTP/HMAC, Subject schema/fixture 및 기존 테스트 재사용 | 실제 Saju HTTP 200 proof, Auth JWT→Subject Current Birth→Nonce 원자 claim, 병렬 중복 차단 | **Phase 2B 구현:** CI·Windows 실행 증빙 별도 |
 | 3 | 별도 Subject/Nonce/Admission TLS, 서로 다른 CA·SAN·제한 로그인, Permit V2 | TLS verify-full/틀린 CA/비TLS 차단, 한 번만 Permit 소비, RLS·ACL 거부 | 미구현 |
 | 4 | 실제 네트워크 중단·커밋 후 연결 단절·DB 재시작·볼륨 보존·복구 | 중복 허용 0, 불확실한 커밋 자동 재시도 0, 잘못된 승격 0, 재시작 후 사용 상태 유지 | 미구현 |
 | 5 | Windows Docker Desktop 실제 기기 및 Linux CI 공통 재현성 | 동일 테스트 매트릭스·정리·SHA/버전 기록, scoped + final CI PASS, 병합/issue 업데이트 | 미구현 |
