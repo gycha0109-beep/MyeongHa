@@ -9,6 +9,14 @@ import {
 } from '../apps/api/src/openai-seyeon-structured-provider-v1.js';
 import type { SeyeonStructuredProviderRequestV2 } from
   '../apps/api/src/seyeon-character-runtime-v2.js';
+import {
+  runSeyeonOfflineGrantedTurnV1,
+  replaySeyeonOfflineGrantedTurnV1,
+  type SeyeonOfflineGrantedTurnAuthorityV1,
+} from '../apps/api/src/seyeon-offline-granted-turn-v1.js';
+import type {
+  SeyeonExactModelPersonalSourceSelectionV1,
+} from '../apps/api/src/seyeon-exact-model-personal-source-selection-v1.js';
 
 const ENABLED=process.env.CI==='true' &&
   process.env.SEYEON_POSITIVE_GRANT_REAL_PG==='1' &&
@@ -56,7 +64,7 @@ async function setExecutor(client:PoolClient) {
   await client.query("select set_config('myeongha.subject_id',$1,true)",[SUBJECT]);
 }
 
-async function prepare(n:number):Promise<Fixture> {
+async function prepare(n:number, pin=true):Promise<Fixture> {
   const id=ids(n);
   const memory={
     kind:'memory' as const,
@@ -126,6 +134,7 @@ async function prepare(n:number):Promise<Fixture> {
         select * from public.cmd_allocate_chat_turn_attempt_v1(
           $1::uuid,$2::uuid,$3::uuid,$4::text)`,
         [SUBJECT,id.turnId,id.attemptId,'seyeon-production-chat-planner-v1']);
+      if(pin) {
       await setExecutor(client);
       const p=await client.query<{pinned:boolean}>(`
         select seyeon_positive_candidate.pin_source_set_r1(
@@ -140,7 +149,8 @@ async function prepare(n:number):Promise<Fixture> {
         ) as pinned`,[SUBJECT,id.threadId,id.turnId,id.attemptId,
           id.memoryId,id.grantId]);
       expect(legacy.rows[0]?.pinned).toBe(true);
-      await client.query('COMMIT'); // Guarantee Pin is durable BEFORE fetch.
+      }
+      await client.query('COMMIT'); // Preparation (and optional Pin) is durable.
     }catch(error){
       await client.query('ROLLBACK');
       throw error;
@@ -186,6 +196,158 @@ async function currentClaim(
       return result.rows[0]?.receipt??null;
     }catch(error){await client.query('ROLLBACK');throw error;}
   });
+}
+
+/**
+ * Test-only PostgreSQL authority implementing the EXISTING offline grant-turn
+ * contract. It is intentionally not exported from apps/api/ or installed in
+ * production. Every action uses a separately COMMITTED transaction, with the
+ * actual isolated DB SECURITY DEFINER functions and current-rights checks.
+ */
+function disposableAuthority(id:Fixture):SeyeonOfflineGrantedTurnAuthorityV1 {
+  return {
+    async pinBeforeModel({identity,selection}) {
+      if(identity.subjectId!==SUBJECT ||
+         identity.threadId!==id.threadId ||
+         identity.turnId!==id.turnId ||
+         identity.attemptId!==id.attemptId ||
+         identity.characterId!=='seyeon' ||
+         selection.selectedSourcesDigest!==id.selectionDigest ||
+         selection.selectedSources.length!==1 ||
+         selection.selectedSources[0]?.recordId!==id.memoryId ||
+         selection.selectedSources[0]?.grantId!==id.grantId) {
+        throw new Error('Synthetic G1 Attempt/Original Grant scope HOLD');
+      }
+      await withClient(async client=>{
+        await client.query('BEGIN');
+        try{
+          await setExecutor(client);
+          const result=await client.query<{admitted:boolean}>(`
+            select seyeon_positive_candidate.pin_source_set_r1(
+              $1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::jsonb,$6::text
+            ) as admitted`,[
+              SUBJECT,id.threadId,id.turnId,id.attemptId,
+              JSON.stringify([{recordId:id.memoryId,grantId:id.grantId}]),
+              selection.selectedSourcesDigest,
+            ]);
+          if(result.rows[0]?.admitted!==true) {
+            throw new Error('Synthetic G1 original SourceSet Pin HOLD');
+          }
+          const legacy=await client.query<{admitted:boolean}>(`
+            select seyeon_positive_candidate.pin_before_model_v1(
+              $1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6::uuid
+            ) as admitted`,[
+              SUBJECT,id.threadId,id.turnId,id.attemptId,
+              id.memoryId,id.grantId,
+            ]);
+          if(legacy.rows[0]?.admitted!==true) {
+            throw new Error('Synthetic G1 original Grant Pin HOLD');
+          }
+          await client.query('COMMIT');
+        }catch(error) {
+          await client.query('ROLLBACK');
+          throw error;
+        }
+      });
+      return {
+        attemptId:id.attemptId,selectedSourcesDigest:id.selectionDigest,
+        pinRef:'offline-db-pinned:'+id.attemptId,
+      };
+    },
+    async commitWithGrantRecheck({identity,pin,generatedText}) {
+      if(identity.subjectId!==SUBJECT || identity.attemptId!==id.attemptId ||
+         pin.pinRef!=='offline-db-pinned:'+id.attemptId ||
+         pin.selectedSourcesDigest!==id.selectionDigest) {
+        throw new Error('Synthetic G2 original Pin mismatch');
+      }
+      await withClient(async client=>{
+        await client.query('BEGIN');
+        try{
+          await setExecutor(client);
+          const result=await client.query<{committed:boolean}>(`
+            select seyeon_positive_candidate.commit_original_grant_locked_r2(
+              $1::uuid,$2::uuid,$3::text
+            ) as committed`,[SUBJECT,id.attemptId,generatedText]);
+          if(result.rows[0]?.committed!==true) {
+            throw new Error('Synthetic G2 current-rights Commit HOLD');
+          }
+          await client.query('COMMIT');
+        }catch(error){await client.query('ROLLBACK');throw error;}
+      });
+      return {
+        attemptId:id.attemptId,pinRef:pin.pinRef,
+        commitRef:'offline-db-commit:'+id.attemptId,
+      };
+    },
+    async revealCommitted({identity,commit}) {
+      if(identity.subjectId!==SUBJECT || identity.attemptId!==id.attemptId ||
+         commit.commitRef!=='offline-db-commit:'+id.attemptId) return null;
+      return readCurrentSyntheticText(id);
+    },
+    async replayWithCurrentGrantRecheck({subjectId,threadId,turnId,characterId}) {
+      if(subjectId!==SUBJECT || threadId!==id.threadId ||
+         turnId!==id.turnId || characterId!=='seyeon') return null;
+      // The DB derives the original Attempt from server-owned Turn/Pin rows;
+      // never accept a caller-supplied memory/grant ID at replay.
+      const actual=await withClient(client=>client.query<{attempt_id:string}>(`
+        select p.attempt_id::text
+        from seyeon_positive_candidate.attempt_source_pins p
+        join public.chat_turn_attempts a on a.id=p.attempt_id
+        join public.chat_turns t on t.id=a.turn_id
+        where p.subject_id=$1::uuid and p.thread_id=$2::uuid
+          and p.turn_id=$3::uuid and p.state='committed'
+          and a.subject_id=p.subject_id and t.thread_id=p.thread_id`,
+        [SUBJECT,threadId,turnId]));
+      if(actual.rows.length!==1 ||
+         actual.rows[0]?.attempt_id!==id.attemptId) return null;
+      return readCurrentSyntheticText(id);
+    },
+  };
+}
+
+async function readCurrentSyntheticText(id:Fixture):Promise<string|null> {
+  return withClient(async client=>{
+    await client.query('BEGIN');
+    try{
+      await setExecutor(client);
+      const result=await client.query<{text:string|null}>(`
+        select seyeon_positive_candidate.reveal_test_v1(
+          $1::uuid,$2::uuid
+        ) as text`,[SUBJECT,id.attemptId]);
+      await client.query('COMMIT');
+      return result.rows.length===1?result.rows[0]?.text??null:null;
+    }catch(error){await client.query('ROLLBACK');throw error;}
+  });
+}
+
+function selectionFor(id:Fixture):SeyeonExactModelPersonalSourceSelectionV1 {
+  const memory={
+    kind:'memory' as const,memoryId:'memory:'+id.memoryId,
+    claimKind:'fact' as const,
+    summary:'Disposable synthetic original Grant '+Number(id.memoryId.slice(-12)),
+    sourceRef:'memory:'+id.memoryId+':grant:'+id.grantId,
+    relevance:.8,salience:.5,
+  };
+  return selectSeyeonExactModelPersonalSourcesV1({
+    retrievedMemories:[memory],
+    sourceCandidates:[{
+      recordKind:'memory',recordId:id.memoryId,grantId:id.grantId,
+      recordType:'shared_detail',schemaVersion:'memory-v1',
+      projectedMemoryId:memory.memoryId,
+      rawRecordDigest:sha({
+        synthetic:Number(id.memoryId.slice(-12)),notDbAuthority:true,
+      }),
+      projectedMemoryDigest:sha(memory),
+      permitsAtomicCommit:false,permitsHttpReveal:false,
+    }],
+  });
+}
+
+function identityFor(id:Fixture) {
+  return {
+    subjectId:SUBJECT,threadId:id.threadId,
+    turnId:id.turnId,attemptId:id.attemptId,characterId:'seyeon' as const,
+  };
 }
 
 async function expectLockWait(label:string) {
@@ -308,6 +470,90 @@ describe.skipIf(!ENABLED)('Seyeon G1 Owner-style dispatch + G2 revoke/commit (di
       select state from seyeon_positive_candidate.attempt_source_pins
       where attempt_id=$1`,[id.attemptId]));
     expect(result.rows[0]?.state).toBe('pinned');
+  });
+
+  it('orchestrates Pin-before-model, guarded synthetic Commit and authorized first/replay from real PostgreSQL',async()=>{
+    const id=await prepare(8,false);
+    const before=await withClient(c=>c.query<{count:string}>(`
+      select count(*)::text as count
+      from seyeon_positive_candidate.source_sets_r1
+      where attempt_id=$1::uuid`,[id.attemptId]));
+    expect(before.rows[0]?.count).toBe('0');
+
+    const makeText=vi.fn(async()=>{
+      // The model callback can only begin after BOTH Pin rows are committed.
+      const pins=await withClient(c=>c.query<{count:string}>(`
+        select count(*)::text as count
+        from seyeon_positive_candidate.source_sets_r1 s
+        join seyeon_positive_candidate.attempt_source_pins p
+          on p.attempt_id=s.attempt_id
+        where s.attempt_id=$1::uuid and s.source_count=1 and p.state='pinned'
+      `,[id.attemptId]));
+      expect(pins.rows[0]?.count).toBe('1');
+      return '합성 세연 답변: 다음에 같이 정해요.';
+    });
+    const authority=disposableAuthority(id);
+    const result=await runSeyeonOfflineGrantedTurnV1({
+      identity:identityFor(id),selection:selectionFor(id),
+      authority,generateSyntheticText:makeText,
+    });
+    expect(result).toEqual({
+      state:'revealed',text:'합성 세연 답변: 다음에 같이 정해요.',
+    });
+    expect(makeText).toHaveBeenCalledTimes(1);
+    await expect(replaySeyeonOfflineGrantedTurnV1({
+      subjectId:SUBJECT,threadId:id.threadId,turnId:id.turnId,authority,
+    })).resolves.toEqual(result);
+
+    // Even a previously rendered output loses reveal rights after revoke.
+    await withClient(c=>c.query(
+      'update public.record_access_grants set revoked_at=clock_timestamp() where id=$1',
+      [id.grantId],
+    ));
+    await expect(replaySeyeonOfflineGrantedTurnV1({
+      subjectId:SUBJECT,threadId:id.threadId,turnId:id.turnId,authority,
+    })).resolves.toEqual({state:'held'});
+  });
+
+  it('pre-model revoke blocks G1 without starting the synthetic model',async()=>{
+    const id=await prepare(9,false);
+    await withClient(c=>c.query(
+      'update public.record_access_grants set revoked_at=clock_timestamp() where id=$1',
+      [id.grantId],
+    ));
+    const makeText=vi.fn(async()=> 'this must never reach the model');
+    await expect(runSeyeonOfflineGrantedTurnV1({
+      identity:identityFor(id),selection:selectionFor(id),
+      authority:disposableAuthority(id),generateSyntheticText:makeText,
+    })).resolves.toEqual({state:'held'});
+    expect(makeText).not.toHaveBeenCalled();
+    const parents=await withClient(c=>c.query<{count:string}>(`
+      select count(*)::text as count from
+        seyeon_positive_candidate.source_sets_r1
+      where attempt_id=$1::uuid`,[id.attemptId]));
+    expect(parents.rows[0]?.count).toBe('0');
+  });
+
+  it('revoke after successful Pin but before synthetic Commit blocks reveal',async()=>{
+    const id=await prepare(10,false);
+    const makeText=vi.fn(async()=>{
+      // Server-side revoke commits while generated synthetic text is in flight.
+      await withClient(c=>c.query(
+        'update public.record_access_grants set revoked_at=clock_timestamp() where id=$1',
+        [id.grantId],
+      ));
+      return 'synthetic text that is never disclosed';
+    });
+    const result=await runSeyeonOfflineGrantedTurnV1({
+      identity:identityFor(id),selection:selectionFor(id),
+      authority:disposableAuthority(id),generateSyntheticText:makeText,
+    });
+    expect(result).toEqual({state:'held'});
+    expect(makeText).toHaveBeenCalledTimes(1);
+    const pin=await withClient(c=>c.query<{state:string}>(`
+      select state from seyeon_positive_candidate.attempt_source_pins
+      where attempt_id=$1::uuid`,[id.attemptId]));
+    expect(pin.rows[0]?.state).toBe('pinned');
   });
 
   it('G2 commit-first: Grant revoke waits; later current-rights Reveal is denied',async()=>{
