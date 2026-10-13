@@ -59,5 +59,9 @@ insert into public.character_unlocks(
 );
 SQL
 
+# Synthetic Product approval records and negative probes are isolated from Production.
+psql -X -v ON_ERROR_STOP=1   -f test/db/standard_reader_approved_rule_real_pg.sql >/dev/null
+
 MYEONGHA_D01_REAL_PG=1 ./node_modules/.bin/vitest run \
-  test/postgres-standard-reader-approved-policy-real-db.test.ts
+  test/postgres-standard-reader-approved-policy-real-db.test.ts \
+  test/postgres-standard-reader-rule-real-db.test.ts
