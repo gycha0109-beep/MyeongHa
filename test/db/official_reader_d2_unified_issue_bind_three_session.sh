@@ -73,6 +73,61 @@ state="$(p -c "select concat(
 [[ "$state" == "1:2" ]] || fail "initial/additional did not reuse one Official Reading: $state"
 pass "exactly one official Reading, distinct purchase-backed Reader access rows"
 
+# A brand-new verified additional Reader Receipt, still WITHOUT a Grant.
+# This creates a genuine INSERT phantom candidate, rather than testing only
+# an idempotent replay of old rows.
+new_intent='d2024000-0000-0000-0000-000000000004'
+new_receipt='d2025000-0000-0000-0000-000000000004'
+p <<SQL >"$tmpdir/new-receipt-fixture.out"
+insert into public.purchase_intents(
+ id,subject_id,product_offer_id,provider_account_link_id,
+ idempotency_key,request_hash,offer_snapshot_jsonb,offer_snapshot_hash,
+ status,created_at,updated_at,expected_amount_minor,expected_currency,
+ charge_terms_version,capability_set_id,capability_snapshot_jsonb,
+ capability_snapshot_hash
+)
+select '$new_intent'::uuid,subject_id,product_offer_id,provider_account_link_id,
+ 'd2-independent-additional-receipt','sha256:test:d2-independent-additional-receipt',
+ offer_snapshot_jsonb,offer_snapshot_hash,'created',clock_timestamp(),
+ clock_timestamp(),expected_amount_minor,expected_currency,
+ charge_terms_version,capability_set_id,capability_snapshot_jsonb,
+ capability_snapshot_hash
+from public.purchase_intents where id='12192300-0000-0000-0000-000000000003'::uuid;
+insert into public.purchase_intent_reader_selections(
+ purchase_intent_id,product_id,reader_character_id,
+ reader_content_bundle_id,selection_contract_version,
+ selection_snapshot_jsonb,selection_hash,created_at
+)
+select '$new_intent'::uuid,product_id,reader_character_id,
+ reader_content_bundle_id,selection_contract_version,
+ selection_snapshot_jsonb,'sha256:test:d2-reader-selection',clock_timestamp()
+from public.purchase_intent_reader_selections
+where purchase_intent_id='12192300-0000-0000-0000-000000000003'::uuid;
+update public.purchase_intents set status='verified',updated_at=clock_timestamp()
+where id='$new_intent'::uuid;
+insert into public.commerce_receipts(
+ id,subject_id,purchase_intent_id,product_offer_id,
+ platform,provider,external_transaction_id,
+ receipt_fingerprint,verification_status,verified_payload_jsonb,
+ verified_at,created_at,environment,verifier_revision,
+ verified_amount_minor,verified_currency
+)
+select '$new_receipt'::uuid,subject_id,'$new_intent'::uuid,product_offer_id,
+ platform,provider,'tx-d2-independent-additional-receipt',
+ 'hmac-sha256:k1:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+ verification_status,verified_payload_jsonb,
+ clock_timestamp(),clock_timestamp(),environment,verifier_revision,
+ verified_amount_minor,verified_currency
+from public.commerce_receipts where id='12192000-0000-0000-0000-000000000003'::uuid;
+SQL
+[[ "$(p -c "select count(*) from public.commerce_receipts cr
+ where cr.id='$new_receipt'::uuid
+ and cr.verification_status='verified' and cr.environment='production'")" == 1 ]] ||
+ fail "new verified additional Receipt not persisted"
+[[ "$(p -c "select count(*) from public.entitlement_grants
+ where source_receipt_id='$new_receipt'::uuid")" == 0 ]] ||
+ fail "fresh independent Receipt already has a Grant"
+
 # Fresh source-bound classification; no Product/Reading comes from the caller.
 scope="$(p <<SQL
 begin;
@@ -130,8 +185,8 @@ SQL
 fi
 pass "private ACL, wrong subject and wrong isolation rejected"
 
-# THREE actual PG sessions. Two competing Reader bind REPLAYS attempt the same
-# Product under distinct Reader identities; neither may get around L0.
+# THREE actual PG sessions. Two Reader bind REPLAYS and one independent new Grant INSERT compete on
+# the same Product; all cooperating writers must wait on the original L0.
 p >"$tmpdir/holder.out" 2>&1 <<SQL &
 set application_name='d2_product_holder';
 set statement_timeout='20s';
@@ -152,7 +207,7 @@ done
  where application_name='d2_product_holder' and wait_event_type='Timeout'")" == 1 ]] ||
   fail "L0 holder did not acquire lock"
 
-for pair in initial additional; do
+for pair in initial additional issuance; do
   if [[ "$pair" == initial ]]; then
     intent="$initial"; sess='12103000-0000-0000-0000-000000000001'
     proposal="$reading"; hash="$(printf '1%.0s' {1..64})"
@@ -160,6 +215,23 @@ for pair in initial additional; do
     intent="$additional"; sess='12103000-0000-0000-0000-000000000099'
     proposal='12103100-0000-0000-0000-000000000099'
     hash="$(printf '2%.0s' {1..64})"
+  fi
+  if [[ "$pair" == issuance ]]; then
+    p >"$tmpdir/issuance.out" 2>&1 <<SQL &
+set application_name='d2_issuance_waiter';
+set statement_timeout='20s';
+begin;
+select pg_catalog.set_config('myeongha.subject_id','$subject',true);
+select case when result_grant_id is not null and result_replayed=false
+ then 'D2_NEW_GRANT' else 'D2_GRANT_MISMATCH' end
+from public.internal_apply_official_reader_unified_receipt_v1(
+ '$new_receipt'::uuid,array['test-reader-unit'],
+ array[transaction_timestamp()],array[transaction_timestamp()],
+ array[null]::timestamptz[],array[null]::text[]);
+commit;
+SQL
+    pids+=("$!")
+    continue
   fi
   p >"$tmpdir/$pair.out" 2>&1 <<SQL &
 set application_name='d2_${pair}_waiter';
@@ -193,6 +265,7 @@ wait_for_advisory() {
 }
 wait_for_advisory initial
 wait_for_advisory additional
+wait_for_advisory issuance
 
 for pid in "${pids[@]}"; do
   wait "$pid" || {
@@ -203,6 +276,10 @@ done
 pids=()
 grep -qx D2_initial_REPLAY "$tmpdir/initial.out" || fail "initial binder replay failed"
 grep -qx D2_additional_REPLAY "$tmpdir/additional.out" || fail "additional binder replay failed"
+grep -qx D2_NEW_GRANT "$tmpdir/issuance.out" || fail "fresh additional Receipt failed Grant INSERT"
+[[ "$(p -c "select count(*) from public.entitlement_grants
+ where source_receipt_id='$new_receipt'::uuid and status='active'")" == 1 ]] ||
+ fail "new Receipt was not given exactly one persisted active Grant"
 
 after="$(p -c "select concat(
  (select count(*) from public.standard_reading_official_bindings
@@ -212,5 +289,5 @@ after="$(p -c "select concat(
    where subject_id='$subject'::uuid and official_reading_id='$reading'::uuid
      and purchase_intent_id in ('$initial'::uuid,'$additional'::uuid)))")"
 [[ "$after" == "$state" ]] || fail "Reader replay changed immutable final state: $after vs $state"
-pass "real PG A/B/C: two Readers awaited same L0, both COMMIT, final state unchanged"
+pass "real PG A/B/C/D: both Reader replays and new Receipt Grant INSERT waited on L0; exact final states"
 echo "PASS: D2 PRIVATE staged unified issue/bind; external writers/refund/T2 still HOLD"
