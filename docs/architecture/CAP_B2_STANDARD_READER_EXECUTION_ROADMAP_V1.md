@@ -55,6 +55,8 @@
 - [#2032 R2](https://github.com/gycha0109-beep/MyeongHa/pull/2032): 1850 Private verified cancel → immutable initial scope lock → 0-Access 시 원 Commerce CAS/ledger, 결속된 Access 시 원 1770 Reader scope 이후 Commerce effect. 1860 Private event-first/Grant 0행 receipt issuer gate. `refund_first` / `bind_first` / `no_grant` 세 격리 실PG 동시성 테스트를 도입. exact HEAD CI 최종 통과 및 운영 Provider ingress/원자 caller/Privacy Owner 확인 전 **검증·출시 완료 아님**.
 - **R3 선행 통합 HOLD:** 기존 1830과 Provider event verification ingress는 새 1850/1860 caller로 cutover되지 않음. 실제 환불 서비스는 여전히 OFF. 운영 writer의 미참여가 확인된 상태에서 병합·신규 EXECUTE grant·T2 유료 공개 금지.
 
+**2026-10-13 R2 최종 CI·R3 착수:** [#2032](https://github.com/gycha0109-beep/MyeongHa/pull/2032) HEAD `299b82505a8c06eb693fa99695ea70d3e893e599` [CI #38338093367](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38338093367) **SUCCESS**, DB15 로그에 `PASS B2-R2/refund_first`, `bind_first`, `zero-Grant event-first`, 정확한 catalog SHA `1f986d97...` 검증. 별도 Governance #38338093025 **FAIL**, Privacy Owner 승인 필요. [#2035](https://github.com/gycha0109-beep/MyeongHa/pull/2035)는 R2 위 신규 Draft R3의 Product 승인 철회 ↔ 최초 Binder 실제 2 연결 순서·Catalog 참여 감사를 구현했습니다. **R3 HEAD CI 결과 대기**; Runtime ingress, Content retire/Unlock, multi-scope deadlock/T2와 Privacy Owner 계약은 계속 HOLD.
+
 **필수 선행:** R1의 불변 scope authority는 R2 환불과 R3 모든 Writer 경합의 근간이다. R4는 단위별 병렬화 가능하나 실제 권한 공개는 R1~R6 선행. R7을 CI GREEN만으로 허가하지 않는다.
 
 ## 3. 우선 착수할 1개 작업 — B2-R1
