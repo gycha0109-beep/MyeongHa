@@ -57,6 +57,8 @@
 
 **2026-10-13 R2 최종 CI·R3 착수:** [#2032](https://github.com/gycha0109-beep/MyeongHa/pull/2032) HEAD `299b82505a8c06eb693fa99695ea70d3e893e599` [CI #38338093367](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38338093367) **SUCCESS**, DB15 로그에 `PASS B2-R2/refund_first`, `bind_first`, `zero-Grant event-first`, 정확한 catalog SHA `1f986d97...` 검증. 별도 Governance #38338093025 **FAIL**, Privacy Owner 승인 필요. [#2035](https://github.com/gycha0109-beep/MyeongHa/pull/2035)는 R2 위 신규 Draft R3의 Product 승인 철회 ↔ 최초 Binder 실제 2 연결 순서·Catalog 참여 감사를 구현했습니다. **R3 HEAD CI 결과 대기**; Runtime ingress, Content retire/Unlock, multi-scope deadlock/T2와 Privacy Owner 계약은 계속 HOLD.
 
+**2026-10-13 R3 검증 확정:** [#2035](https://github.com/gycha0109-beep/MyeongHa/pull/2035) HEAD `06605a2da63fa49e2111222d3163bfe401e56fb9` [CI #38341592434](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38341592434) **SUCCESS**, 실PG15 db-authority-core에서 `PASS B2-R3/policy_first`, `bind_first`, `sorted multi-Reader 2-session wait/release`, R2 3경합 회귀 PASS, runtime ingress HOLD inventory **461개 파일/기존 호출 4종/Private Writer 7종 접근 차단** PASS, catalog `1f986d97...` PASS. Web·앱화도 PASS. **DB dependency PG17/Commerce/Content는 해당 HEAD에서 skipped**(R2 이전 HEAD 성공을 현재 HEAD 성공이라고 표시 금지). 별도 [Governance #38341592076](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38341592076) **FAIL**, R1 신규 Privacy FK의 승인된 140-edge P0-PR-01 계약 위반. R3는 SQL private proof 일부만 종료; 운영 ingress/v4 구매 시점 R1 pin 원자성·Provider 검증 도착 잠금·Reader/T2·Content retire·multi-Product deadlock 전체 경로는 **미통합/Owner HOLD**.
+
 **필수 선행:** R1의 불변 scope authority는 R2 환불과 R3 모든 Writer 경합의 근간이다. R4는 단위별 병렬화 가능하나 실제 권한 공개는 R1~R6 선행. R7을 CI GREEN만으로 허가하지 않는다.
 
 ## 3. 우선 착수할 1개 작업 — B2-R1
