@@ -38,10 +38,16 @@ if [[ "$mode" == sandbox || "$mode" == unverified ]]; then
  grep -Fq 'Verified initial Reader purchase Receipt is unavailable' "$tmp/issue.err" ||
  { cat "$tmp/issue.err" >&2; fail 'issuer denied for unrelated cause'; }
 else
- if p -c "select * from public.internal_apply_initial_official_reader_receipt_locked_v1(
+ # The DB issuer requires the trusted Subject context on this NEW connection.
+ if p >"$tmp/issue.out" 2>"$tmp/issue.err" <<SQL
+begin;
+select set_config('myeongha.subject_id','11390000-0000-0000-0000-000000000001',true);
+select * from public.internal_apply_initial_official_reader_receipt_locked_v1(
   '$receipt'::uuid,array['test-reader-unit'],array[transaction_timestamp()],
-  array[clock_timestamp()+interval '1 hour'],array[null]::timestamptz[],array[null]::text[])" \
-  >"$tmp/issue.out" 2>"$tmp/issue.err"; then
+  array[clock_timestamp()+interval '1 hour'],array[null]::timestamptz[],array[null]::text[]);
+commit;
+SQL
+ then
   fail 'Commerce issuer accepted future-active Grant'
  fi
  grep -Fq 'future-active entitlement effects are not allowed by MVP authority' "$tmp/issue.err" ||
