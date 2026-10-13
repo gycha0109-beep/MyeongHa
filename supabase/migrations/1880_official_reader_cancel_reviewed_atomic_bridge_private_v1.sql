@@ -12,7 +12,6 @@ create table public.official_reader_cancel_review_approvals_private_v1 (
   verified_provider_event_id uuid not null references public.commerce_provider_events(id),
   verified_receipt_id uuid not null references public.commerce_receipts(id),
   approved_grant_id uuid not null references public.entitlement_grants(id),
-  approved_subject_id uuid not null references public.subjects(id),
   source_fingerprint text not null check (source_fingerprint ~ '^sha256:v1:[0-9a-f]{64}$'),
   provider_rechecked_at timestamptz not null,
   commerce_reviewer_id uuid not null,
@@ -68,6 +67,7 @@ declare
   v_source public.official_reader_portone_cancel_observation_shadow_v1%rowtype;
   v_check record;
   v_grant public.entitlement_grants%rowtype;
+  v_subject uuid;
   v_event public.commerce_provider_events%rowtype;
   v_returned integer;
 begin
@@ -84,7 +84,10 @@ begin
     raise exception using errcode='P0001',
       message='No independent Commerce/Legal review approval for this cancellation';
   end if;
-  perform public.assert_myeongha_subject_context_v1(v_approval.approved_subject_id);
+  select cr.subject_id into strict v_subject
+    from public.commerce_receipts cr
+    where cr.id=v_approval.verified_receipt_id;
+  perform public.assert_myeongha_subject_context_v1(v_subject);
 
   select * into strict v_source
   from public.official_reader_portone_cancel_observation_shadow_v1 s
@@ -122,7 +125,7 @@ begin
       v_approval.approved_grant_id
     );
   if v_check.match_state<>'review_candidate'
-     or v_check.matched_subject_id is distinct from v_approval.approved_subject_id
+     or v_check.matched_subject_id is distinct from v_subject
      or v_check.matched_receipt_id is distinct from v_approval.verified_receipt_id
      or v_check.matched_grant_id is distinct from v_approval.approved_grant_id then
     raise exception using errcode='P0001',
@@ -136,7 +139,7 @@ begin
   from public.entitlement_grants
   where id=v_approval.approved_grant_id;
   if v_event.status<>'verified' or v_grant.status<>'active'
-     or v_grant.subject_id<>v_approval.approved_subject_id then
+     or v_grant.subject_id<>v_subject then
     raise exception using errcode='P0001',
       message='Approved source or Grant state changed';
   end if;
@@ -149,7 +152,7 @@ begin
            q.result_grant_revision,q.result_projection_revision,
            q.result_projection_changed,q.result_outbox_event_id,q.result_replayed
     from public.internal_apply_official_reader_verified_cancel_batch_v1(
-      v_approval.approved_subject_id,
+      v_subject,
       array[v_approval.verified_provider_event_id],
       array[v_approval.approved_grant_id],
       array[v_grant.revision],
