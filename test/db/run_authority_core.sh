@@ -166,6 +166,8 @@ run_isolated_case myeongha_reader_unified_scope_entry_private_test bash test/db/
 run_isolated_case myeongha_reader_multi_scope_lockset_three_session_test bash test/db/official_reader_multi_scope_lockset_three_session.sh
 # D2: private 1090/1220 unified purchase issue/bind, real three-connection contention and source-derived replay.
 run_isolated_case myeongha_reader_d2_unified_issue_bind_three_session_test bash test/db/official_reader_d2_unified_issue_bind_three_session.sh
+# D3: dormant verified Provider cancellation with bound Reader L0-L1 and unbound initial Grant L0-only; genuine PG waits.
+run_isolated_case myeongha_reader_d3_verified_cancel_unified_three_session_test bash test/db/official_reader_d3_verified_cancel_unified_three_session.sh
 bash test/db/entitlements_current_query.sh
 bash test/db/data_deletion_job_query.sh
 bash test/db/notification_preferences_query.sh
