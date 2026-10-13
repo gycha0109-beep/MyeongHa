@@ -1,12 +1,12 @@
 -- S5 PRIVATE historical initial Reading Scope pin. No runtime EXECUTE.
 -- Watchtower-Track: applizing
 create table public.standard_reader_initial_purchase_scope_pins_v1 (
- receipt_id uuid primary key references public.commerce_receipts(id),
- purchase_intent_id uuid not null references public.purchase_intents(id),
- subject_id uuid not null references public.subjects(id),
- product_id uuid not null references public.products(id),
- source_birth_revision_id uuid not null references public.birth_profile_revisions(id),
- entitlement_grant_id uuid not null unique references public.entitlement_grants(id),
+ receipt_id uuid primary key,
+ purchase_intent_id uuid not null,
+ subject_id uuid not null,
+ product_id uuid not null,
+ source_birth_revision_id uuid not null,
+ entitlement_grant_id uuid not null unique,
  approved_policy_revision text not null,
  scope_identity text not null,
  captured_at timestamptz not null default pg_catalog.clock_timestamp(),
@@ -19,6 +19,53 @@ create table public.standard_reader_initial_purchase_scope_pins_v1 (
 alter table public.standard_reader_initial_purchase_scope_pins_v1 enable row level security;
 revoke all on public.standard_reader_initial_purchase_scope_pins_v1
  from public,anon,authenticated,service_role;
+
+-- P0-PR-01's historical Subject/Transitive FK inventories are frozen and
+-- MUST NOT be silently rewritten by this applizing candidate. Keep these
+-- server-only pins explicitly PRIVACY/DR-HOLD; enforce exact relational
+-- lineage on INSERT with a read-only trigger, not unapproved new FK edges.
+create function public.tr_standard_reader_initial_scope_pin_validate_v1()
+returns trigger language plpgsql security invoker
+set search_path=pg_catalog,public
+as $s5_pin_check$
+begin
+ if not exists (
+  select 1
+  from public.commerce_receipts cr
+  join public.purchase_intents pi
+    on pi.id=cr.purchase_intent_id and pi.subject_id=cr.subject_id
+  join public.product_offers po
+    on po.id=cr.product_offer_id and po.id=pi.product_offer_id
+  join public.entitlement_grants eg
+    on eg.id=new.entitlement_grant_id
+   and eg.source_receipt_id=cr.id
+   and eg.subject_id=cr.subject_id
+   and eg.grant_source_type='purchase'
+  join public.birth_profile_revisions br
+    on br.id=new.source_birth_revision_id
+   and br.subject_id=cr.subject_id
+  join public.standard_reader_product_approved_rules_v1 rule
+    on rule.product_id=po.product_id
+   and rule.approved_policy_revision=new.approved_policy_revision
+   and rule.policy_kind='standard_all_readers'
+  where cr.id=new.receipt_id
+    and cr.purchase_intent_id=new.purchase_intent_id
+    and cr.subject_id=new.subject_id
+    and po.product_id=new.product_id
+    and cr.verification_status='verified'
+    and cr.environment='production'
+ ) then
+  raise exception using errcode='23514',
+   constraint='standard_s5_pin_exact_immutable_authority_required',
+   message='A pinned Reader scope requires exact verified Receipt/Grant/Subject/Birth/Product/Standard policy lineage';
+ end if;
+ return new;
+end
+$s5_pin_check$;
+create trigger tr_standard_reader_initial_scope_pin_validate_v1
+before insert on public.standard_reader_initial_purchase_scope_pins_v1
+for each row execute function public.tr_standard_reader_initial_scope_pin_validate_v1();
+revoke all on function public.tr_standard_reader_initial_scope_pin_validate_v1() from public;
 
 create function public.tr_standard_reader_initial_scope_pin_immutable_v1()
 returns trigger language plpgsql security invoker
