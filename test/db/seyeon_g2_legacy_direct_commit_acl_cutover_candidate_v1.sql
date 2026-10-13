@@ -77,6 +77,8 @@ declare
   v_constraint text;
   v_direct_denied boolean := false;
   v_v2_reached boolean := false;
+  v_context text;
+  v_sqlstate text;
 begin
   -- A REAL former API-executable v1 call must now fail at PostgreSQL ACL,
   -- regardless of attacker-supplied records, before any DB side effect.
@@ -130,6 +132,42 @@ begin
   if not v_v2_reached then
     raise exception 'authorized v2 entrypoint could not be reached';
   end if;
+
+  -- Follow an ACTUAL valid-shape v2 snapshot far enough to reach its
+  -- SECURITY DEFINER v1 wrapper and underlying core. The pinned positive
+  -- Attempt is still RUNNING, so core must HOLD without inserting anything.
+  -- This also proves removing API-direct v1 EXECUTE did not break the
+  -- v2-owned internal v1 call. No fake zero Proof or bypass is provided.
+  begin
+    perform *
+    from public.cmd_commit_seyeon_chat_turn_runtime_v2(
+      'd2000000-0000-4000-8000-000000000001',
+      'd4000000-0000-4000-8000-000000000001',
+      'd7000000-0000-4000-8000-000000000001',
+      'd7200000-0000-4000-8000-000000000001',
+      'd9900000-0000-4000-8000-000000000001',
+      'd9910000-0000-4000-8000-000000000001',
+      'd9920000-0000-4000-8000-000000000001',
+      jsonb_build_object(
+        'schemaVersion','seyeon-post-turn-analysis-snapshot-v1',
+        'turnId','d7000000-0000-4000-8000-000000000001',
+        'assistantMessageId','d9900000-0000-4000-8000-000000000001',
+        'userMessageId','d7100000-0000-4000-8000-000000000001'
+      ),
+      'sha256:v1:synthetic-never-committed'
+    );
+    raise exception 'G2 v2 accepted an unvalidated positive Attempt';
+  exception when others then
+    get stacked diagnostics v_context = PG_EXCEPTION_CONTEXT,
+      v_sqlstate = RETURNED_SQLSTATE;
+    if v_sqlstate = '42501' or
+       position('cmd_commit_seyeon_chat_turn_runtime_v1' in v_context)=0
+    then
+      raise exception
+        'v2 could not execute its real v1/core path after direct v1 ACL cutover (SQLSTATE=%)',
+        v_sqlstate;
+    end if;
+  end;
 end $real_calls$;
 reset role;
 
