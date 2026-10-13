@@ -18,6 +18,7 @@ import {
 } from '../apps/api/src/seyeon-character-runtime-v2.js';
 import { selectSeyeonExactModelPersonalSourcesV1 } from '../apps/api/src/seyeon-exact-model-personal-source-selection-v1.js';
 import type { SeyeonOfflineS0ContextCandidateV1 } from '../apps/api/src/seyeon-offline-s0-context-admission-v1.js';
+import { createSeyeonOfflineR2DerivedOutputLineageV1 } from '../apps/api/src/seyeon-offline-r2-derived-output-lineage-v1.js';
 import {
   observeSeyeonOfflineR2PostPreflightClosureV1,
   createSeyeonOfflineR2PostPreflightSyntheticProviderV1,
@@ -485,5 +486,192 @@ describe('R2 post-Preflight sealed five-stage continuity (offline only)', () => 
       chain.provider.generate(requests[0]!),
     )).rejects.toThrow('post-Preflight source closure held');
     expect(delegate).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * Native interpreter -> guarded packet -> admitted renderer draft -> reviewer.
+ * The next stage is built from the prior ACTUAL synthetic output, rather than
+ * pre-sealing unrelated fixture requests. Production authority is always false.
+ */
+function derivedInterpretation() {
+  return {
+    schemaVersion:'seyeon-turn-interpretation-v2',
+    userMove:'neutral_or_other',
+    notice:{summary:'S0 synthetic interpretation',evidenceRefs:[MESSAGE]},
+    immediateWant:{key:'create_next_step',summary:'Take one character-owned next beat'},
+    tension:{key:'none_material',summary:'No material tension'},
+    chosenAction:{key:'approach',rationale:'Respond to the current message'},
+    expressionState:'baseline',
+    reveal:{level:'public',triggerRef:null,supportingHistoryRefs:[]},
+    memoryRefsUsed:[],
+  };
+}
+
+function derivedDelegate(options?: {
+  rawInterpretation?: unknown;
+  rawRenderer?: unknown;
+  rejectReviewer?: boolean;
+}) {
+  return vi.fn(async (request:SeyeonStructuredProviderRequestV2) => {
+    if (request.purpose === 'turn_interpretation') {
+      return options?.rawInterpretation ?? derivedInterpretation();
+    }
+    if (request.purpose === 'dialogue_render') {
+      return options?.rawRenderer ?? {
+        schemaVersion:'seyeon-renderer-draft-v2',
+        utterance:'합성 세연의 현재 발화입니다.',
+        expressionState:'baseline',
+        revealLevel:'public',
+        memoryRefsMentioned:[],privateSourceRefsMentioned:[],disclosureSliceIds:[],
+      };
+    }
+    if (request.purpose === 'semantic_review') {
+      const input=request.input as {expectedUtteranceHash:string};
+      return {
+        schemaVersion:'seyeon-semantic-review-v2',
+        reviewedUtteranceHash:options?.rejectReviewer ? 'forged-hash' : input.expectedUtteranceHash,
+        failureCodes:[],evidence:[],
+      };
+    }
+    throw new Error('Unexpected synthetic stage');
+  });
+}
+
+describe('R2 native generated-output ancestry (offline only)', () => {
+  async function prepare(options?: Parameters<typeof derivedDelegate>[0]) {
+    const {candidate}=fixture();
+    const {result}=await realPreflight();
+    const actualContext=context(candidate);
+    const delegate=derivedDelegate(options);
+    const chain=createSeyeonOfflineR2DerivedOutputLineageV1({
+      candidate,preflight:result,actualContext,
+      delegate:{providerKey:'offline',modelKey:'synthetic',generate:delegate},
+    });
+    return {candidate,result,actualContext,delegate,chain};
+  }
+
+  it('derives both downstream native requests from ACTUAL admitted outputs; publishes nothing',async()=>{
+    const {delegate,chain}=await prepare();
+    expect(chain.snapshot().permitsProductionProvider).toBe(false);
+    expect(chain.snapshot().permitsProductionReveal).toBe(false);
+    expect(chain.nextRequestForOfflineTest()?.purpose).toBe('turn_interpretation');
+    for(const purpose of ['turn_interpretation','dialogue_render','semantic_review']) {
+      const request=chain.nextRequestForOfflineTest();
+      expect(request?.purpose).toBe(purpose);
+      await chain.provider.generate(request!);
+    }
+    const final=chain.snapshot();
+    expect(final.state).toBe('complete');
+    expect(final.completedPurposes).toEqual([
+      'turn_interpretation','dialogue_render','semantic_review',
+    ]);
+    expect(final.receipts).toHaveLength(3);
+    expect(final.receipts[0]!.priorReceiptDigest).toBe(null);
+    expect(final.receipts[1]!.priorReceiptDigest).toBe(final.receipts[0]!.receiptDigest);
+    expect(final.receipts[2]!.priorReceiptDigest).toBe(final.receipts[1]!.receiptDigest);
+    expect(final.envelopeDigest).toMatch(/^sha256:v1:[a-f0-9]{64}$/);
+    expect(final.permitsProductionReveal).toBe(false);
+    expect(chain.nextRequestForOfflineTest()).toBe(null);
+    await expect(Promise.resolve().then(()=>chain.provider.generate(
+      buildSeyeonTurnInterpreterRequestV2(context(fixture().candidate)),
+    ))).rejects.toThrow('lineage held');
+    expect(delegate).toHaveBeenCalledTimes(3);
+  });
+
+  it('rejects Renderer packet alteration, even when the original S0 Memory set is unchanged',async()=>{
+    const {delegate,chain}=await prepare();
+    await chain.provider.generate(chain.nextRequestForOfflineTest()!);
+    const renderer=chain.nextRequestForOfflineTest()!;
+    const input=renderer.input as {packet:Record<string,unknown>};
+    const altered={
+      ...renderer,input:{...input,packet:{
+        ...input.packet,unattributedClaim:'injected after interpreter',
+      }},
+    };
+    await expect(Promise.resolve().then(()=>chain.provider.generate(altered)))
+      .rejects.toThrow('lineage held');
+    expect(chain.snapshot().state).toBe('held');
+    expect(chain.snapshot().completedPurposes).toEqual(['turn_interpretation']);
+    expect(delegate).toHaveBeenCalledTimes(1);
+  });
+
+  it('refuses review of a different draft/utterance than the actual rendered result',async()=>{
+    const {delegate,chain}=await prepare();
+    await chain.provider.generate(chain.nextRequestForOfflineTest()!);
+    await chain.provider.generate(chain.nextRequestForOfflineTest()!);
+    const reviewer=chain.nextRequestForOfflineTest()!;
+    const input=reviewer.input as {rendererDraft:Record<string,unknown>};
+    await expect(Promise.resolve().then(()=>chain.provider.generate({
+      ...reviewer,input:{...input,rendererDraft:{
+        ...input.rendererDraft,utterance:'secret replacement',
+      }},
+    }))).rejects.toThrow('lineage held');
+    expect(chain.snapshot().state).toBe('held');
+    expect(delegate).toHaveBeenCalledTimes(2);
+  });
+
+  it('holds invalid generated Interpretation references before Renderer dispatch',async()=>{
+    const {chain,delegate}=await prepare({rawInterpretation:{
+      ...derivedInterpretation(),memoryRefsUsed:['memory:unapproved'],
+    }});
+    await expect(chain.provider.generate(chain.nextRequestForOfflineTest()!))
+      .rejects.toThrow('lineage held');
+    expect(chain.snapshot().state).toBe('held');
+    expect(chain.snapshot().completedPurposes).toEqual([]);
+    expect(chain.nextRequestForOfflineTest()).toBe(null);
+    expect(delegate).toHaveBeenCalledTimes(1);
+  });
+
+  it('holds review output with the wrong utterance hash and never marks complete',async()=>{
+    const {chain,delegate}=await prepare({rejectReviewer:true});
+    await chain.provider.generate(chain.nextRequestForOfflineTest()!);
+    await chain.provider.generate(chain.nextRequestForOfflineTest()!);
+    await expect(chain.provider.generate(chain.nextRequestForOfflineTest()!))
+      .rejects.toThrow('lineage held');
+    expect(chain.snapshot().state).toBe('held');
+    expect(chain.snapshot().completedPurposes).toEqual([
+      'turn_interpretation','dialogue_render',
+    ]);
+    expect(chain.snapshot().envelopeDigest).toBe(null);
+    expect(delegate).toHaveBeenCalledTimes(3);
+  });
+
+  it('refuses a late Preflight private source before Renderer and does not call its delegate',async()=>{
+    const {candidate}=fixture();
+    const {result}=await realPreflight();
+    const preflight=asPreflight({
+      ...result,retrievedPrivateSources:[...result.retrievedPrivateSources],
+    });
+    const delegate=derivedDelegate();
+    const chain=createSeyeonOfflineR2DerivedOutputLineageV1({
+      candidate,preflight,actualContext:context(candidate),
+      delegate:{providerKey:'offline',modelKey:'synthetic',generate:delegate},
+    });
+    await chain.provider.generate(chain.nextRequestForOfflineTest()!);
+    (preflight.retrievedPrivateSources as unknown[])
+      .push({sourceRef:'reader:private-late'});
+    await expect(chain.provider.generate(chain.nextRequestForOfflineTest()!))
+      .rejects.toThrow('lineage held');
+    expect(delegate).toHaveBeenCalledTimes(1);
+    expect(chain.snapshot().state).toBe('held');
+  });
+
+  it('cannot race two native Interpreter requests while one delegate is pending',async()=>{
+    const {candidate}=fixture();
+    const {result}=await realPreflight();
+    let resume:((value:unknown)=>void)|undefined;
+    const delegate=vi.fn(() => new Promise<unknown>(resolve=>{resume=resolve;}));
+    const chain=createSeyeonOfflineR2DerivedOutputLineageV1({
+      candidate,preflight:result,actualContext:context(candidate),
+      delegate:{providerKey:'offline',modelKey:'synthetic',generate:delegate},
+    });
+    const first=chain.provider.generate(chain.nextRequestForOfflineTest()!);
+    await expect(chain.provider.generate(buildSeyeonTurnInterpreterRequestV2(context(candidate))))
+      .rejects.toThrow('lineage held');
+    resume?.(derivedInterpretation());
+    await first;
+    expect(delegate).toHaveBeenCalledTimes(1);
+    expect(chain.snapshot().completedPurposes).toEqual(['turn_interpretation']);
   });
 });
