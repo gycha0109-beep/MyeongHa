@@ -241,3 +241,14 @@ S1에서 공통 잠금 함수 자체가 성공하더라도 **S2 전체 경로가
 - `test/db/official_reader_multi_scope_lockset_three_session.sh`: PostgreSQL 실제 A/B/C 연결에서 **정순/역순 2 Product Lockset 경쟁**과 **역순 2 Reader Lockset 경쟁**을 각각 확인한다. 독립 격리 시험으로 DB authority core에 등록.
 - 상세 감사 문서 [OFFICIAL_READER_D1_WRITER_LOCK_ORDER_AUDIT_20261012_V1.md](./OFFICIAL_READER_D1_WRITER_LOCK_ORDER_AUDIT_20261012_V1.md) 4절에 입력의 권위·교착 범위·남은 우회 경로를 갱신한다.
 - **미완료:** 모든 Commerce/Reader Writer가 이 순서를 사용하도록 전환, Verified Provider event 영향 범위 서버 resolver, 미결속 취소, 3-세션의 현실적 Grant Writer vs refund vs T2 통합 경쟁, Saju 근거·유료 본문 원자 T2·RR-04. 운영 DB migration·결제/유료 채팅 공개 계속 OFF.
+
+## 19. D2 진행 — 공식 Reader 최초/추가 구매권 발급·결속 공통 진입점 (2026-10-13)
+
+**구현 단계: 비공개 후보 (Draft, Production/Checkout/Chat OFF).** D1 #2012 (`760e599`)를 부모로 신규 `1820_official_reader_unified_issue_bind_private_v1.sql` 및 `official_reader_d2_unified_issue_bind_three_session.sh`를 추가했다.
+
+- `internal_apply_official_reader_unified_receipt_v1`: production/verified Receipt → 동일 Subject·Intent·Offer의 DB 정본 일치 확인 → D1 `internal_acquire_official_reader_purchase_scope_v2` 사용. `initial_reading`은 L0만, `additional_reader_interpretation`은 Reading 정본에서 L0→L1. 이후 원본 `1090` 실행; 원본 Commerce CAS/Provider ordering/Grant ledger/Outbox 유지. 전후 Intent/Receipt/Role/Reading/Reader scope 재검사 실패 시 거래 전체 오류.
+- `internal_cmd_bind_official_reader_unified_v1`: 동일 D1 공통 scope를 원본 `1220`의 Purchase/Grant/Birth 행 잠금 **전에** 확보. DB 정본 Reader/Bundle selection을 조회하고 원본 결과의 Product/Reader/Bundle/Role/Official Reading을 재검사. 최초 신규 bind는 공식 Reading 생성 필수, 추가 Reader는 기존 Reading 재사용만 허용. 원본 멱등성·Birth authority 유지.
+- 기존 `1090/1220`, `1760/1790`, `1080/1770/1780`, `0220` 함수 및 실제 runtime 호출 경로/GRANT는 변경하지 않았다. **기존 직접 Writer 우회 경로는 현재도 존재한다.** 이 신규 진입점에 PUBLIC, API/Commerce/Chat executor의 직접 SQL `EXECUTE`는 부여하지 않았다.
+- PostgreSQL 격리 fixture에서 positive 최초 Receipt와 최초/추가 bind를 D2 함수로 대체하고, 동일 Product에 대한 3개 실제 연결의 L0 대기 및 독립 Reader bind 멱등 재생·상태 보존·wrong subject/ACL/isolation 거절을 검증한다. 원본 test가 먼저 합격하더라도 신규 테스트 및 PostgreSQL 15/17 CI의 최종 결과 확인 전 **D2 완료 선언 금지**.
+
+**잔여 필수 검증/차단:** 신규 추가 Receipt가 공식 Reading commit보다 앞서는 경우 D1 source-bound resolver가 FAIL-CLOSED하며, 구 Commerce 호출자가 원본 1090/1080을 직접 사용하는 팬텀은 아직 막을 수 없다. 전체 1080 refund writer와 D3 trusted provider cancel/restore가 공통 L0→L1을 채택하고, 추가 신규 Grant INSERT·Birth 변경·Bundle ambiguity·부분 실패 경합 시험이 통과해야 D2→D3 통합 안전성을 주장할 수 있다. #1941 복원, Product/Commerce/Reader/Privacy/Legal 검토 및 병합/운영 승인은 계속 차단한다.
