@@ -26,12 +26,20 @@ awk '
  {print}
  END {if (changed!=1) exit 3}
 ' test/db/standard_love_relationship_reader_authority.sql >"$tmp/finite_capability.sql"
+# The preexisting synthetic first/additional Receipts also use this one
+# Capability Set. Re-issue their test effects with exact 3-second expiry.
 awk -v source="$tmp/finite_capability.sql" '
  $1=="\\i" && $2=="test/db/standard_love_relationship_reader_authority.sql" {
    print "\\i " source; changed++; next
  }
  /^-- Append the test Reader.s domain Capability as immutable published content/{exit}
+ index($0,"array[null]::timestamptz[],")>0 {
+   sub(/array\[null\]::timestamptz\[\],/,
+       "array[transaction_timestamp()+interval \x273 seconds\x27],")
+   issuers++
+ }
  {print}
+ END {if(changed!=1 || issuers!=2) exit 3}
 ' test/db/official_standard_reading_reader_interpretation.sql >"$tmp/setup.sql"
 grep -Fq "$tmp/finite_capability.sql" "$tmp/setup.sql" || fail 'test-only capability source not included'
 awk '/^create temp table _s4_initial_result as/{exit} {print}' \
