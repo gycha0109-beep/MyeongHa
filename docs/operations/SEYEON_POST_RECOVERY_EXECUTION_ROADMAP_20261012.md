@@ -229,3 +229,17 @@ Governor 04d4B 계열은 실제 격리 PostgreSQL 기반 영수증 임대·정�
 - 2026-10-13 현재 Production SELECT에서 초기 `1400~1510` 12/12, 후속 **`1520~1720` 0/21**. 기존 문서의 1520~1710 0/20은 구 인벤토리이며 최신 Reader scope 1720까지 포함해야 한다. 원격-only `20261008090417` SHA-256 동일성은 확인했지만, 독립 재현 및 전체 fingerprint parity와 Owner 정합성 결정은 아직 HOLD.
 - 같은 시각 다른 작업에서 [R2 패킷이 별도로 병합](https://github.com/gycha0109-beep/MyeongHa/commit/1b0282b7c0378f67d1860a83c373a040ca915f52)됐다. 신규 PR은 해당 기존 문서의 관측을 보강하는 것이며 계보 조정 결정을 대신하지 않는다.
 - [DR Readiness #38226729128](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38226729128) FAIL의 `1310` 역사적 증거를 임의 갱신하지 않는다. `dr_ready=false`, 후속 DB 적용·세연 G0~G6·유료 AI·공개는 별도 Owner 승인 전 HOLD.
+
+
+## 15. 2026-10-13 R1 종결 — 수정 코드의 실제 암호화 백업 격리 복원 성공
+
+**범위별 판정: R1 DONE — Production 앱 데이터·관계 함수/이력의 정확한 격리 복원 증거. 전체 Supabase DR Ready가 아님.**
+
+- **실제 실행:** [PostgreSQL Isolated Restore Drill #38337822738](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38337822738), `workflow_dispatch`, 2026-10-13T02:38:15Z 생성/02:39:19Z 완료 **SUCCESS**. 실행 main SHA `7af352c59738a0d36abd4d4fd78ba1789e57c121`로 #1998/#2011의 보수 코드 포함.
+- **백업 출처:** [암호화 백업 #38328139495](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38328139495), source SHA `9b7c10cb694afee5c1cb1d89050668eaa3d9f558`, backup completed 2026-10-13T00:40:24Z, artifact `11782211590`, GitHub artifact digest `sha256:6a6e68afaf91d0a3754d1fbe84ded0760aca30c418d9c89a79576e45be137567`.
+- **PostgreSQL 17 실제 격리 증명:** job `115101822725`에서 `PASS_SEYEON_RESTORE: snapshot 6/6, real restored pg_proc 11/11, RLS/ACL 6/6`, isolated creator default ACL browser-restricted PASS. `seyeon_early_history_restore_proof=restored_scoped_version_name_snapshot_6_pass`, `seyeon_early_functions_restore_proof=restored_public_function_catalog_11_and_rls_6_pass`.
+- **개인정보 복구 범위:** 복원 DB에서 Synthetic Privacy Replay/Finalization **PASS**. 실제 Production Privacy Ledger 및 Canary 미지정으로 authoritative replay 단계는 SKIPPED; 이를 non-zero 운영 개인정보 복구 증거로 확대하지 않는다.
+- **증거:** 정확한 백업 다운로드, 암호문 복원, self-contained evidence envelope 구축, frontier `20261008090417` 판정 및 업로드 단계 SUCCESS. Restore Evidence Artifact `postgres-isolated-restore-drill-38337822738` / ID `11785825091` / digest `sha256:b98e443f0c50b8af05b0d890971ae78b6284ed70d98940f04fefaeee9252c82a` / 만료 2026-11-12T02:39:14Z. 실행 결과는 [운영 이슈 #1887](https://github.com/gycha0109-beep/MyeongHa/issues/1887)에 누적.
+- **분리된 HOLD:** `supabase_managed_migration_ledger_fully_restored=false`, `dr_ready=false`. Provider Auth/Storage 전체 복구, Production 개인정보 원장 양수 복구, RPO/RTO Owner 승인, 원격-only `20261008090417` 계보 및 1520~1720 21건 배포 미승인. #1866 G0~G6·유료 AI·공개 활성화 자동 승격 금지. **Production DDL/DML/Role/ACL 변경 0**.
+
+이 절이 14절의 "복원 증거 미확보 / R1 HOLD" 관측보다 나중 시점의 R1 상태를 갱신한다. 과거 실패/사전 관측은 지우지 않는다.
