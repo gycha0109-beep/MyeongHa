@@ -271,3 +271,10 @@ S1에서 공통 잠금 함수 자체가 성공하더라도 **S2 전체 경로가
 - `test/db/official_reader_d3_verified_cancel_unified_three_session.sh`: 기존 verified Provider 두 방향 실제 PostgreSQL Reader 경합 시나리오를 D3 경로로 재실행하고, 독립 첫 구매 Receipt/Grant를 **공식 Reading 결속 없이** 새로 발행하여 L0 대기→환불 COMMIT→Grant revoked 및 정확한 Event ledger→환불 후 bind 거부 및 신규 Reading/Reader 권한 0을 검증한다. 이 테스트는 원본 DB fixture 및 disposable DB에서만 실행한다.
 - **D3 미완료 차단:** source-verified refund ingress/PortOne event normalization이 운영 호출자에 연결되어 있지 않다. 다른 provider event·restore·partial cancellation·만료 재권한·여러 Grant/Product 동시 영향은 이 narrow helper에서 거부한다. 1080/1770/1780 구 direct caller와 모든 Product/Commerce mutation cutover 미완료. legacy `1750` Reader 조회도 L0 선행이 아니므로 유료 T2와 공개는 계속 HOLD.
 - **실행 상태:** D3a 신규 SQL/테스트/문서 등록만 됐으며 CI exact HEAD PostgreSQL 15/17 실제 시험 결과가 확인되기 전 PASS 선언 금지. #1941 운영 복원, Product/Commerce/Privacy/Legal/DB 승인 전 merge/Production/Checkout/Paid Chat 금지.
+
+### D3a exact-SHA 최종 검증 (2026-10-13)
+
+- PR #2028의 마지막 **코드·테스트 SHA**: `0146a2de2db2a6437cf2b61f93dc8dcbeab20533`. CI [38336400038](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38336400038)에서 PostgreSQL 15 `db-authority-core` / PostgreSQL 17 dependency / Content dependency / Work Track / CI Verify 모두 SUCCESS. 동일 SHA의 Governance와 Web PR Domain Gates SUCCESS.
+- 직접 DB 로그의 검증 결과: `PASS D3: D3 bound Grant: real two-session Provider-first and Reader-first race, final revoked deny`; `PASS D3: first Reading unbound verified Grant: canonical L0 wait, revoke + ledger atomic COMMIT, zero Reader access`; `PASS D3: unbound refund-before-bind denies new official Reading and Reader access`. Catalog snapshot PASS `347eaaf2d0b1ddc3fcd88ff130c017864cb986edaf7940f44063dbd11bd6501b`.
+- 재검토 과정: 첫 실패는 새 `1830` 함수 추가로 인한 Catalog hash 불일치, 둘째는 신규 경합 스크립트의 Bash heredoc 구문 오류. 둘 다 수정 후 위 exact SHA에서 재검증 성공.
+- 판정: **D3a PRIVATE 구현 및 검증 완료**. 상용 refund ingest, old Writer direct bypass, event 영향을 받는 여러 상품의 동시 회수, partial/restore, D5 T2 원문 공개 허가는 여전히 HOLD. D3b는 영향 집합 원자 잠금·검증부터 별도 Draft에서 진행.
