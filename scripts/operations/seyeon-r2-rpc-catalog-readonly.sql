@@ -11,7 +11,7 @@ select pg_catalog.jsonb_build_object(
   'functions', coalesce(pg_catalog.jsonb_agg(
     pg_catalog.jsonb_build_object(
       'name', p.proname,
-      'signature', p.oid::pg_catalog.regprocedure::text,
+      'signature', pg_catalog.format('%I.%I(%s)', n.nspname, p.proname, pg_catalog.pg_get_function_identity_arguments(p.oid)),
       'owner', pg_catalog.pg_get_userbyid(p.proowner),
       'securityDefiner', p.prosecdef,
       'volatility', p.provolatile::text,
@@ -21,7 +21,7 @@ select pg_catalog.jsonb_build_object(
         pg_catalog.sha256(pg_catalog.convert_to(coalesce(p.proacl::text, '<DEFAULT>'), 'UTF8')), 'hex'),
       'anonExecute', pg_catalog.has_function_privilege('anon', p.oid, 'EXECUTE'),
       'authenticatedExecute', pg_catalog.has_function_privilege('authenticated', p.oid, 'EXECUTE')
-    ) order by p.proname, p.oid::pg_catalog.regprocedure::text
+    ) order by p.proname, pg_catalog.format('%I.%I(%s)', n.nspname, p.proname, pg_catalog.pg_get_function_identity_arguments(p.oid))
   ), '[]'::jsonb)
 )::text
 from pg_catalog.pg_proc p
