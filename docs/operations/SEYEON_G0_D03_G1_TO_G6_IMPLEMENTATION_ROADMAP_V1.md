@@ -63,6 +63,13 @@
 - **검증 한계:** R1은 실제 **두 backend 행 잠금 대기**이나 1640 유효 Zero proof/운영 G2 Commit의 동시 송신은 아님. R2 observation은 **테스트 호출자 제공 객체**이지 DB 서명된 권한 토큰이 아니며, DB/Node codec 상호 교환도 아님. Native Interpreter 요청까지 구조 관측할 뿐 Preflight/History/Reader/Relationship/Renderer/Worker의 완전한 transitive source closure·유료 Provider actual wire data 권한 미증명.
 - **자체 검토/종료:** [정밀 테스트·위협 경계 원장](../security/SEYEON_R1_R2_ACTUAL_PG_RACE_AND_SOURCE_BOUNDARY_V1.md). 정확한 최신 SHA의 기존 `db-authority-core`·Character·CI Verify·Governance·Web Gates가 성공하기 전 **PASS 미선언**. G0 D-01~D-10 Owner+SRC-25+O0 DR 승인 전 운영 G1/G2/G3/HISTORY/유료 AI/공개 계속 HOLD.
 
+### R2 Post-Preflight Source Closure / G1 Owner Sign-off (2026-10-13)
+
+- **실제 Native 검사:** `apps/api/src/seyeon-offline-r2-post-preflight-closure-v1.ts` / `test/seyeon-offline-r2-post-preflight-closure-v1.test.ts`가 실제 `runCharacterGovernedPreflightV1`을 호출해 Integrity/Disclosure 분류 결과를 얻은 다음 `assembleSeyeonRuntimeContextV2` 재조립 결과와 모델 Interpreter 직전 실제 Context 전체를 비교합니다. 나중에 생긴 Claim/Decision/Private Source/Relationship/History/Bible·behavior drift 및 초기 확인 후 mutable Context 변경은 **합성 Provider 이전 HOLD**. Test harness는 1회만 호출하고 계속 `permitsProductionProvider=false`입니다.
+- **설계 인수:** [G1 Owner 승인 계약 / D-02 Post-Preflight source closure / D-03·D-06 분리](../security/SEYEON_G1_OWNER_SIGNOFF_AND_POST_PREFLIGHT_SOURCE_CLOSURE_V1_PROPOSAL.md). **최초 DB Pin은 첫 Preflight Provider 전**, 분류 후 실제 요청 문맥이 생성되므로 최종 Provider bytes를 미리 Pin한 것으로 주장하지 않습니다. Owner 승인을 전제로 `immutable original SourceSet + append-only stage receipt`를 검토하며 현재는 후보입니다.
+- **남은 차단:** SRC-25·D-01~D-10 Security/DB/Character+Product 승인, 실제 G1 RPC/1640/legacy EXECUTE/G2 v2 atomic/Provider wire byte 결속, Reader/Relationship/Worker derived ancestry, D-04 공개 시점 및 #1887 운영 lineage/DR. **운영 SQL/유료 Provider/public route 변경 0**.
+- **검증:** 최신 PR HEAD에서 Character Tests+affected, DB Core, CI Verify, Governance, Web Gates 결과 확인 후에만 오프라인 B 완료로 판정. Owner 승인 C는 별도.
+
 ## 3. R1 — D-03 및 실제 SourceSet 구조의 격리 검증
 
 **기존 증거:** test/db/seyeon_positive_grant_attempt_bound_candidate_v1.sql, test/seyeon-source-digest-node-postgres-golden-v1.test.ts, 기존 Node/PG real HTTP 4건, 세연 S0 합성 17건. 2026-10-12 정확한 SHA에서 기존 PG/Node Golden 7건 PASS.
