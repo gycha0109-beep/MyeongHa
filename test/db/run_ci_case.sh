@@ -244,6 +244,11 @@ SQL
     test "$(psql -Atqc "select has_schema_privilege('myeongha_birth_profile_create_owner', 'public', 'CREATE');")" = 'f'
     bash test/db/birth_profile_create_runtime_authority.sh
     ;;
+  cap-b2-r4-initial-matrix)
+    verify_pg17
+    apply_pg17_migrations_without_birth_authority
+    MYEONGHA_R4_PG17_CI=1 bash test/db/standard_reader_r4_policy_matrix_real_pg.sh
+    ;;
   content-release-lifecycle)
     verify_pg17
     apply_pg17_migrations_without_birth_authority
