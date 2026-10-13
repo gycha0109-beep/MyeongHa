@@ -172,6 +172,8 @@ run_isolated_case myeongha_reader_d3_verified_cancel_unified_three_session_test 
 run_isolated_case myeongha_reader_d3b_verified_impact_lockset_three_session_test bash test/db/official_reader_d3b_verified_impact_lockset_three_session.sh
 # D3c: original 1080 full-revocation batch, second-Grant CAS induced all-or-nothing rollback.
 run_isolated_case myeongha_reader_d3c_verified_cancel_atomic_batch_test bash test/db/official_reader_d3c_verified_cancel_atomic_batch.sh
+# D3e2 PRIVATE durable cancellation observations only; no refunds or entitlements.
+run_isolated_case myeongha_reader_d3e2_cancel_observation_shadow_two_session_test bash test/db/official_reader_d3e2_cancel_observation_shadow_two_session.sh
 bash test/db/entitlements_current_query.sh
 bash test/db/data_deletion_job_query.sh
 bash test/db/notification_preferences_query.sh
