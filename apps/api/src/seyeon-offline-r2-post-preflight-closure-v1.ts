@@ -10,6 +10,7 @@ import type {
 import {
   buildSeyeonTurnInterpreterRequestV2,
   type SeyeonStructuredProviderPortV2,
+  type SeyeonStructuredProviderRequestV2,
 } from './seyeon-character-runtime-v2.js';
 import {
   admitSeyeonOfflineS0ContextCandidateV1,
@@ -134,7 +135,7 @@ export function createSeyeonOfflineR2PostPreflightSyntheticProviderV1(input: Rea
   return Object.freeze({
     providerKey: input.delegate.providerKey,
     modelKey: input.delegate.modelKey,
-    generate(request) {
+    generate(request: SeyeonStructuredProviderRequestV2) {
       // Preflight/context objects may still be mutable and the synthetic
       // callback may be invoked later: re-evaluate immediately before any
       // delegate call, not just when the wrapper is constructed.
