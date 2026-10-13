@@ -365,3 +365,11 @@ S1에서 공통 잠금 함수 자체가 성공하더라도 **S2 전체 경로가
 - CI [38344545761](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38344545761): PostgreSQL 15 Authority Core, PG17, Content, DB Work Track, CI Verify 모두 PASS. Governance [38344545545](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38344545545), Web Gates [38344545859](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38344545859) PASS.
 - PostgreSQL 15 로그 **직접 확인**: `PASS D3e2: durable exact replay, conflicting webhook reject, late partial order`; `PASS D3e2: partial-as-full fails; private RLS & executor ACL`; `PASS D3e2: two actual PG sessions serialize provider observation stream, zero entitlement effects`. Catalog PASS: **tables=87**, `4273d61d1c244a44c116abad5a0b45f1b0035a2e8c774644441e05ddf74ca525`.
 - **D3e2 오프라인 비공개 관측 원장 코드 검증 종료.** Source-native PortOne 실제 Server Lookup/Receipt 검증·영속 event order/Commerce·Legal 승인·독립 최소권한 Worker 및 그 Worker의 안전한 `1850` 호출은 다른 작업이며 미구현. 운영 webhook 미연결, 기존 Writer 미차단, 유료 Reader T2 노출 금지, 병합·배포 HOLD.
+
+## 26. 구매 내역과 취소 알림 대조 — 비공개 구현 (2026-10-13)
+
+- `1870_official_reader_cancel_purchase_match_private_v1.sql`: 취소 관측 기록의 **결제번호 → 서버 결제 시도 → 실제 영수증 → 검증된 취소 사건 → 구매자·상품 → 해당 이용권**을 모두 데이터베이스 정본에서 확인하는 읽기 전용 함수. 거래번호만 맞는다고 다른 구매 내역에 연결하지 않는다.
+- 영수증의 결제금액·통화와 원래 주문 금액이 정확히 일치해야 하며, 미확인 이벤트, 잘못된 결제번호, 부분·역순·중복 의심, 사용 불가능한 이용권, 여러 이용권에 걸친 영향 범위는 검토 후보로 통과시키지 않는다.
+- 일치하더라도 **'검토 대상'까지만 판단**한다. 실제 환불 승인이나 이용권 변경 권한은 언제나 `false`다. 운영 사용자 및 결제 실행 역할이 직접 실행할 수 없으며, 기존 콜백이나 1850 권한 회수 함수에 연결하지 않았다.
+- `test/db/official_reader_cancel_purchase_match_private.sh`: 실제 기존 구매·이용권 시험 데이터에 결제 시도를 추가한 별도 격리 환경에서 정본 일치, 교차 이용권, 다른 결제번호·금액·통화·이벤트, 역순 기록 발생 후 차단, 권한 무변경을 시험한다.
+- **아직 남은 작업:** 독립 조회된 실제 결제 취소 결과를 믿을 수 있는 서버 계층에서 저장하고, 법무·상거래 승인과 함께 별도 최소권한 실행자로 원자 회수까지 연결. 기존 우회 Writer 경로 차단과 유료 이용권 공개 차단도 미완료. 판매 및 운영 취소 기능 활성화 금지.
