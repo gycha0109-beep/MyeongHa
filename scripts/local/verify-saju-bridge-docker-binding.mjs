@@ -33,6 +33,17 @@ function guard() {
   for (const [key, value] of Object.entries(expected)) {
     if (process.env[key] !== value) throw new Error('Invalid internal Docker peer: ' + key);
   }
+  if (process.env.MYEONGHA_DOCKER_SAJU_TLS === '1') {
+    for (const name of ['subject', 'nonce', 'admission']) {
+      if (!existsSync('/certs/' + name + '/ca.crt')) {
+        throw new Error('Independent TLS CA not available: ' + name);
+      }
+    }
+    if (!process.env.SAJU_BRIDGE_LOCAL_ADMISSION_LOGIN_PASSWORD
+      || process.env.SAJU_BRIDGE_LOCAL_ADMISSION_LOGIN_PASSWORD.length < 40) {
+      throw new Error('Admission TLS-only disposable credential missing.');
+    }
+  }
   for (const key of ['SAJU_BRIDGE_LOCAL_SUBJECT_DB_PASSWORD',
     'SAJU_BRIDGE_LOCAL_SUBJECT_LOGIN_PASSWORD', 'SAJU_BRIDGE_LOCAL_NONCE_LOGIN_PASSWORD']) {
     if (!process.env[key] || process.env[key].length < 40) {
@@ -98,6 +109,12 @@ async function run() {
     const testEnv = {
       ...portable, NODE_ENV: 'test', MYEONGHA_DOCKER_SAJU_BINDING: '1',
       ...allow, ...identity,
+      ...(process.env.MYEONGHA_DOCKER_SAJU_TLS === '1'
+        ? {
+          MYEONGHA_DOCKER_SAJU_TLS: '1',
+          SAJU_BRIDGE_LOCAL_ADMISSION_LOGIN_PASSWORD:
+            process.env.SAJU_BRIDGE_LOCAL_ADMISSION_LOGIN_PASSWORD,
+        } : {}),
       SAJU_BRIDGE_LOCAL_SUBJECT_DB_PASSWORD: process.env.SAJU_BRIDGE_LOCAL_SUBJECT_DB_PASSWORD,
       SAJU_BRIDGE_LOCAL_SUBJECT_LOGIN_PASSWORD: process.env.SAJU_BRIDGE_LOCAL_SUBJECT_LOGIN_PASSWORD,
       SAJU_BRIDGE_LOCAL_NONCE_LOGIN_PASSWORD: process.env.SAJU_BRIDGE_LOCAL_NONCE_LOGIN_PASSWORD,
@@ -110,7 +127,9 @@ async function run() {
       test.once('exit', (code) => done(code ?? 1));
     });
     if (result !== 0) throw new Error('Docker GoTrue → Subject/Birth → Saju HTTP → Nonce binding failed.');
-    console.log('[saju-bridge] Real GoTrue→Subject/Birth→Saju HMAC→separate Nonce PG: PASS (synthetic, not TLS).');
+    console.log('[saju-bridge] Real GoTrue→Subject/Birth→Saju HMAC→separate Nonce PG: PASS ('
+      + (process.env.MYEONGHA_DOCKER_SAJU_TLS === '1' ? 'synthetic TLS verify-full' : 'synthetic plaintext')
+      + ').');
   } finally {
     if (!exited) child.kill('SIGTERM');
     await Promise.race([
