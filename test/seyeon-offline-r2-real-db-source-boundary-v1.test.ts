@@ -305,14 +305,15 @@ describe.skipIf(!ENABLED)(
           meteredBeforeDispatch:async(metadata,rawBody)=>{
             // Query the ORIGINAL Grant+Record again for EVERY dispatch; a
             // caller-cached prior row must never re-authorize a stale Attempt.
-            const fresh=await client.query<typeof observation>(evidenceSql,[ATTEMPT]);
+            const fresh=await client.query<
+              Omit<SeyeonOfflineR2DbSourceObservationV1,'originalGrantedAt'> & {
+                originalGrantedAt:Date;
+              }
+            >(evidenceSql,[ATTEMPT]);
             if(fresh.rows.length!==1) throw new Error('Missing original Grant');
             const dbRow=fresh.rows[0]!;
-            const exactObservation={
-              ...dbRow,
-              originalGrantedAt:dbRow.originalGrantedAt instanceof Date
-                ? dbRow.originalGrantedAt.toISOString()
-                : String(dbRow.originalGrantedAt),
+            const exactObservation:SeyeonOfflineR2DbSourceObservationV1={
+              ...dbRow,originalGrantedAt:dbRow.originalGrantedAt.toISOString(),
             };
             const proof=observeSeyeonOfflineR2DbWireBindingV1({
               candidate,observation:exactObservation,request,
