@@ -25,6 +25,7 @@ trap cleanup EXIT
 
 subject='d2000000-0000-4000-8000-000000000001'
 thread='d4000000-0000-4000-8000-000000000001'
+thread_zero='d4000000-0000-4000-8000-000000000002'
 turn_positive='d7000000-0000-4000-8000-000000000001'
 attempt_positive='d7200000-0000-4000-8000-000000000001'
 turn_zero='d7000000-0000-4000-8000-000000000002'
@@ -32,10 +33,31 @@ attempt_zero='d7200000-0000-4000-8000-000000000002'
 selection='sha256:v1:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
 sources='[{"recordId":"d5000000-0000-4000-8000-000000000001","grantId":"d6000000-0000-4000-8000-000000000001"},{"recordId":"d5000000-0000-4000-8000-000000000002","grantId":"d6000000-0000-4000-8000-000000000002"}]'
 
-# One new legitimately running Attempt WITHOUT the existing Positive Parent.
+# A NEW isolated thread is required: the original Positive Turn is still
+# running, and the core receive command forbids a second in-flight Turn on
+# the same thread. Do not bypass this production invariant.
 db <<SQL >"$tmp/setup.log"
+insert into public.conversation_threads(
+  id,subject_id,thread_type,status,title,active_content_release_id,
+  active_content_bundle_id,content_revision,next_sequence_no,created_at,updated_at
+) values (
+  '$thread_zero','$subject','single_character','active',
+  'offline-r1-zero-first-independent-thread',
+  'd3100000-0000-4000-8000-000000000001',
+  'd3000000-0000-4000-8000-000000000001',
+  0,1,clock_timestamp(),clock_timestamp()
+);
+insert into public.conversation_thread_characters(
+  id,thread_id,character_id,content_bundle_id,role,joined_at
+) values (
+  'd4100000-0000-4000-8000-000000000002',
+  '$thread_zero','seyeon',
+  'd3000000-0000-4000-8000-000000000001',
+  'primary',clock_timestamp()-interval '1 minute'
+);
+
 select * from public.cmd_receive_chat_turn_v1(
-  '$subject','$thread','synthetic-r1-zero-first-attempt',
+  '$subject','$thread_zero','synthetic-r1-zero-first-attempt',
   'sha256:v1:synthetic-r1-zero-first','chat-request-v1',
   '{"clientTurnId":"synthetic-r1-zero-first-attempt","text":"synthetic only","clientCapability":"0.0.1-dev"}'::jsonb,
   'd3100000-0000-4000-8000-000000000001',
@@ -153,7 +175,7 @@ begin;
 set local role myeongha_api_executor;
 set local myeongha.subject_id='$subject';
 select seyeon_positive_candidate.pin_source_set_r1(
-  '$subject','$thread','$turn_zero','$attempt_zero',
+  '$subject','$thread_zero','$turn_zero','$attempt_zero',
   '$sources'::jsonb,'$selection'
 );
 commit;
