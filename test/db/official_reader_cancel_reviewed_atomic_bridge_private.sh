@@ -46,12 +46,12 @@ grep -q 'No independent Commerce/Legal review' "$tmp/no-review.out" ||
 p <<SQL >/dev/null
 insert into public.official_reader_cancel_review_approvals_private_v1(
   id,source_observation_id,verified_provider_event_id,verified_receipt_id,
-  approved_grant_id,approved_subject_id,source_fingerprint,
+  approved_grant_id,source_fingerprint,
   provider_rechecked_at,commerce_reviewer_id,commerce_approved_at,
   legal_reviewer_id,legal_approved_at,approval_status
 )
 select '$approval'::uuid,'$obs'::uuid,'$event'::uuid,'$receipt'::uuid,
- '$grant'::uuid,'$subject'::uuid,s.source_evidence_fingerprint,
+ '$grant'::uuid,s.source_evidence_fingerprint,
  s.provider_status_changed_at,
  '18800000-0000-0000-0000-000000000002'::uuid,pg_catalog.clock_timestamp(),
  '18800000-0000-0000-0000-000000000003'::uuid,pg_catalog.clock_timestamp(),
