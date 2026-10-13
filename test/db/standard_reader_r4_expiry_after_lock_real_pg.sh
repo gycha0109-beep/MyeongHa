@@ -15,12 +15,29 @@ trap cleanup EXIT
 subject=11390000-0000-0000-0000-000000000001
 intent=b4220000-0000-4000-8000-000000000001
 receipt=b4230000-0000-4000-8000-000000000001
-awk '/^-- Append the test Reader.s domain Capability as immutable published content/{exit} {print}' \
- test/db/official_standard_reading_reader_interpretation.sql >"$tmp/setup.sql"
+# Use an immutable, test-only FIXED-DURATION Capability definition. The
+# original Standard Reader Product is unbounded and must NEVER be rewritten.
+awk '
+ /^  \x27unbounded\x27,$/ {
+   print "  \x27fixed_duration\x27,"
+   if (getline <= 0 || $0!="  null") exit 3
+   print "  3"; changed++; next
+ }
+ {print}
+ END {if (changed!=1) exit 3}
+' test/db/standard_love_relationship_reader_authority.sql >"$tmp/finite_capability.sql"
+awk -v source="$tmp/finite_capability.sql" '
+ $1=="\\i" && $2=="test/db/standard_love_relationship_reader_authority.sql" {
+   print "\\i " source; changed++; next
+ }
+ /^-- Append the test Reader.s domain Capability as immutable published content/{exit}
+ {print}
+' test/db/official_standard_reading_reader_interpretation.sql >"$tmp/setup.sql"
+grep -Fq "$tmp/finite_capability.sql" "$tmp/setup.sql" || fail 'test-only capability source not included'
 awk '/^create temp table _s4_initial_result as/{exit} {print}' \
  test/db/standard_reader_initial_policy_locked_positive.sql |
- sed "s/array\\[null\\]::timestamptz\\[\\],array\\[null\\]::text\\[\\]/array[clock_timestamp()+interval '3 seconds']::timestamptz[],array[null]::text[]/" >>"$tmp/setup.sql"
-grep -Fq "array[clock_timestamp()+interval '3 seconds']" "$tmp/setup.sql" || fail 'expiring Grant fixture missing'
+ sed "s/array\\[null\\]::timestamptz\\[\\],array\\[null\\]::text\\[\\]/array[transaction_timestamp()+interval '3 seconds']::timestamptz[],array[null]::text[]/" >>"$tmp/setup.sql"
+grep -Fq "array[transaction_timestamp()+interval '3 seconds']" "$tmp/setup.sql" || fail 'expiring Grant fixture missing'
 p -f "$tmp/setup.sql" >"$tmp/setup.out" 2>"$tmp/setup.err" ||
  { tail -n 60 "$tmp/setup.err" >&2; fail 'verified expiring Grant fixture'; }
 grant="$(p -c "select eg.id from public.entitlement_grants eg where eg.source_receipt_id='$receipt'::uuid and eg.status='active'")"
