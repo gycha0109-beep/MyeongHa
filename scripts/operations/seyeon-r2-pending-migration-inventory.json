@@ -1,0 +1,334 @@
+{
+  "schemaVersion": "seyeon-r2-forward-only-inventory-v1",
+  "baseline": "Production history 1400..1510 only; 20261008090417 remote-only HOLD",
+  "scope": {
+    "first": 1520,
+    "last": 1720,
+    "step": 10,
+    "expectedCount": 21,
+    "remoteOnlyVersion": "20261008090417"
+  },
+  "readOnly": true,
+  "drReady": false,
+  "authorizedForProduction": false,
+  "reviewUnits": [
+    "deletion",
+    "character-artifact",
+    "saju-proof",
+    "cost-governor-foundation",
+    "g1-memory-pin",
+    "governor-subject-lock",
+    "reader-locator",
+    "governor-guest-receipt",
+    "reader-product-scope"
+  ],
+  "migrations": [
+    {
+      "version": "1520",
+      "file": "1520_account_deletion_finalizer_relationship_runtime_sync.sql",
+      "blobSha": "9cab84727c33d2ffb6985119b22ec284c9ed025a",
+      "unit": "deletion",
+      "owner": "db-security",
+      "requires": [],
+      "proof": {
+        "kind": "function",
+        "name": "public.internal_finalize_account_deletion_db_v1"
+      },
+      "approval": "HOLD_OWNER_REVIEW"
+    },
+    {
+      "version": "1530",
+      "file": "1530_character_reading_artifact_durable_commit_v1.sql",
+      "blobSha": "0b369d4955c935992e5243dcb4c2ec87c722a876",
+      "unit": "character-artifact",
+      "owner": "character-security",
+      "requires": [
+        "1520"
+      ],
+      "proof": {
+        "kind": "table",
+        "name": "public.character_reading_artifacts"
+      },
+      "approval": "HOLD_OWNER_REVIEW"
+    },
+    {
+      "version": "1540",
+      "file": "1540_saju_source_proof_nonce_claim_authority_v1.sql",
+      "blobSha": "f6a87a80db1a1463cca34b7f09e157a8ede3b4cd",
+      "unit": "saju-proof",
+      "owner": "saju-security",
+      "requires": [],
+      "proof": {
+        "kind": "table",
+        "name": "public.saju_source_proof_nonce_claims"
+      },
+      "approval": "HOLD_OWNER_REVIEW"
+    },
+    {
+      "version": "1550",
+      "file": "1550_seyeon_ai_cost_ledger_v1.sql",
+      "blobSha": "e3c1d8a3f26866b8cc6b6e0f0c58f9eb90525677",
+      "unit": "cost-governor-foundation",
+      "owner": "character-security",
+      "requires": [],
+      "proof": {
+        "kind": "table",
+        "name": "public.seyeon_ai_call_cost_events"
+      },
+      "approval": "HOLD_OWNER_REVIEW"
+    },
+    {
+      "version": "1560",
+      "file": "1560_seyeon_ai_call_lifecycle_v1.sql",
+      "blobSha": "7ddf9e97635e65cc43402cd620af45b798d66b6e",
+      "unit": "cost-governor-foundation",
+      "owner": "character-security",
+      "requires": [
+        "1550"
+      ],
+      "proof": {
+        "kind": "function",
+        "name": "public.cmd_start_seyeon_ai_call_v1"
+      },
+      "approval": "HOLD_OWNER_REVIEW"
+    },
+    {
+      "version": "1570",
+      "file": "1570_seyeon_ai_cost_model_observability_v1.sql",
+      "blobSha": "0228eeb25dc30014e045b1995f2af32b43b91f6a",
+      "unit": "cost-governor-foundation",
+      "owner": "character-security",
+      "requires": [
+        "1550"
+      ],
+      "proof": {
+        "kind": "function",
+        "name": "public.qry_seyeon_ai_model_cost_v1"
+      },
+      "approval": "HOLD_OWNER_REVIEW"
+    },
+    {
+      "version": "1580",
+      "file": "1580_seyeon_ai_governor_atomic_admission_v1.sql",
+      "blobSha": "fb278c9e38646997ea75e8419c97dcff9ddf17ad",
+      "unit": "cost-governor-foundation",
+      "owner": "character-security",
+      "requires": [
+        "1550",
+        "1560"
+      ],
+      "proof": {
+        "kind": "table",
+        "name": "public.seyeon_ai_governor_model_policies_v1"
+      },
+      "approval": "HOLD_OWNER_REVIEW"
+    },
+    {
+      "version": "1590",
+      "file": "1590_seyeon_ai_governor_atomic_settlement_v1.sql",
+      "blobSha": "1a36e8f8b98f6c98c591572729685d7f6e319249",
+      "unit": "cost-governor-foundation",
+      "owner": "character-security",
+      "requires": [
+        "1560",
+        "1580"
+      ],
+      "proof": {
+        "kind": "function",
+        "name": "public.cmd_governed_settle_seyeon_ai_call_v1"
+      },
+      "approval": "HOLD_OWNER_REVIEW"
+    },
+    {
+      "version": "1600",
+      "file": "1600_seyeon_ai_governor_rate_card_integrity_v1.sql",
+      "blobSha": "a40ad2c1cbae8ab6653c817340f0c42f1784b08c",
+      "unit": "cost-governor-foundation",
+      "owner": "character-security",
+      "requires": [
+        "1590"
+      ],
+      "proof": {
+        "kind": "function",
+        "name": "public.guard_seyeon_ai_governor_rate_card_v1"
+      },
+      "approval": "HOLD_OWNER_REVIEW"
+    },
+    {
+      "version": "1610",
+      "file": "1610_seyeon_ai_governor_legacy_settlement_guard_v1.sql",
+      "blobSha": "ad4a961d4474b9048c8e397d092f354e032bd057",
+      "unit": "cost-governor-foundation",
+      "owner": "character-security",
+      "requires": [
+        "1590",
+        "1600"
+      ],
+      "proof": {
+        "kind": "function",
+        "name": "public.seyeon_ai_settle_internal_v1"
+      },
+      "approval": "HOLD_OWNER_REVIEW"
+    },
+    {
+      "version": "1620",
+      "file": "1620_seyeon_ai_governor_internal_start_v1.sql",
+      "blobSha": "35fc7a22627a1157e2b92d277e419bd8945d219c",
+      "unit": "cost-governor-foundation",
+      "owner": "character-security",
+      "requires": [
+        "1560",
+        "1610"
+      ],
+      "proof": {
+        "kind": "function",
+        "name": "public.seyeon_ai_start_internal_v1"
+      },
+      "approval": "HOLD_OWNER_REVIEW"
+    },
+    {
+      "version": "1630",
+      "file": "1630_seyeon_governed_execution_role_v1.sql",
+      "blobSha": "f02299ebc1d400532756c14101bc50e8423158d0",
+      "unit": "cost-governor-foundation",
+      "owner": "character-security",
+      "requires": [
+        "1620"
+      ],
+      "proof": {
+        "kind": "role",
+        "name": "myeongha_seyeon_governed_executor"
+      },
+      "approval": "HOLD_OWNER_REVIEW"
+    },
+    {
+      "version": "1640",
+      "file": "1640_seyeon_zero_personal_source_pre_model_pin_v1.sql",
+      "blobSha": "51862c2b4adcfcf65d76ab08459b1c26a12e0fba",
+      "unit": "g1-memory-pin",
+      "owner": "security-db",
+      "requires": [],
+      "proof": {
+        "kind": "function",
+        "name": "public.cmd_mark_seyeon_chat_context_ready_pinned_v1"
+      },
+      "approval": "HOLD_OWNER_REVIEW"
+    },
+    {
+      "version": "1650",
+      "file": "1650_seyeon_governed_active_subject_lock_v1.sql",
+      "blobSha": "702166644092b8bc4b91ef8428b36901c636811b",
+      "unit": "governor-subject-lock",
+      "owner": "character-security",
+      "requires": [
+        "1620"
+      ],
+      "proof": {
+        "kind": "function",
+        "name": "public.seyeon_ai_lock_active_subject_for_cost_v1"
+      },
+      "approval": "HOLD_OWNER_REVIEW"
+    },
+    {
+      "version": "1660",
+      "file": "1660_member_reader_existing_thread_locator_v1.sql",
+      "blobSha": "138eed0898a868c14200719e383f75302c379a26",
+      "unit": "reader-locator",
+      "owner": "reader-db",
+      "requires": [],
+      "proof": {
+        "kind": "function",
+        "name": "public.qry_member_single_character_thread_locator_v1"
+      },
+      "approval": "HOLD_OWNER_REVIEW"
+    },
+    {
+      "version": "1670",
+      "file": "1670_seyeon_governed_guest_context_lock_v1.sql",
+      "blobSha": "90bae4dd44811c07d81be8028c40da0cbb211891",
+      "unit": "governor-guest-receipt",
+      "owner": "character-security",
+      "requires": [],
+      "proof": {
+        "kind": "function",
+        "name": "public.begin_seyeon_governed_guest_subject_context_v1"
+      },
+      "approval": "HOLD_OWNER_REVIEW"
+    },
+    {
+      "version": "1680",
+      "file": "1680_seyeon_governed_guest_expiry_admission_guard_v1.sql",
+      "blobSha": "d1b63f472b620b3250153d59dfeab079c6585e23",
+      "unit": "governor-guest-receipt",
+      "owner": "character-security",
+      "requires": [
+        "1650",
+        "1670"
+      ],
+      "proof": {
+        "kind": "function",
+        "name": "public.seyeon_ai_lock_active_subject_for_cost_v1"
+      },
+      "approval": "HOLD_OWNER_REVIEW"
+    },
+    {
+      "version": "1690",
+      "file": "1690_seyeon_detached_cost_settlement_worker_v1.sql",
+      "blobSha": "79026a10855fbafaf2e4465e0a382e37ce1a16cd",
+      "unit": "governor-guest-receipt",
+      "owner": "character-security",
+      "requires": [
+        "1590",
+        "1610"
+      ],
+      "proof": {
+        "kind": "function",
+        "name": "public.cmd_settle_seyeon_ai_call_detached_v1"
+      },
+      "approval": "HOLD_OWNER_REVIEW"
+    },
+    {
+      "version": "1700",
+      "file": "1700_seyeon_governed_reservation_receipt_pin_v1.sql",
+      "blobSha": "fb8803f8cdb3b6cfb76dd8e1faa2cc8dcdcf043f",
+      "unit": "governor-guest-receipt",
+      "owner": "character-security",
+      "requires": [
+        "1550"
+      ],
+      "proof": {
+        "kind": "function",
+        "name": "public.pin_seyeon_governed_reservation_receipt_v1"
+      },
+      "approval": "HOLD_OWNER_REVIEW"
+    },
+    {
+      "version": "1710",
+      "file": "1710_seyeon_provider_receipt_queue_v1.sql",
+      "blobSha": "1d0e773a8e8b27474a0fde182d75433077d8add8",
+      "unit": "governor-guest-receipt",
+      "owner": "character-security",
+      "requires": [
+        "1550"
+      ],
+      "proof": {
+        "kind": "table",
+        "name": "public.seyeon_ai_provider_receipt_queue_v1"
+      },
+      "approval": "HOLD_OWNER_REVIEW"
+    },
+    {
+      "version": "1720",
+      "file": "1720_standard_reader_product_scope_read_v1.sql",
+      "blobSha": "659df0d5a039d6617de20407ea129aab95fe1201",
+      "unit": "reader-product-scope",
+      "owner": "reader-product-db",
+      "requires": [],
+      "proof": {
+        "kind": "function",
+        "name": "public.qry_standard_reading_product_scope_v1"
+      },
+      "approval": "HOLD_OWNER_REVIEW"
+    }
+  ]
+}
