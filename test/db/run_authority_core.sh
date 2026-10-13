@@ -192,5 +192,9 @@ if [[ "${CI:-}" == "true" && "${PGHOST:-}" == "localhost" ]]; then
     env S5_MODE=bound bash test/db/standard_reader_initial_provider_revoke_pinned_real_pg.sh
   run_isolated_case myeongha_standard_s5_refund_unbound_test \
     env S5_MODE=unbound bash test/db/standard_reader_initial_provider_revoke_pinned_real_pg.sh
+  run_isolated_case myeongha_standard_s5_refund_first_race \
+    env S5_ORDER=refund_first bash test/db/standard_reader_initial_refund_bind_race_s5.sh
+  run_isolated_case myeongha_standard_s5_bind_first_race \
+    env S5_ORDER=bind_first bash test/db/standard_reader_initial_refund_bind_race_s5.sh
 fi
 bash test/db/catalog_snapshot.sh
