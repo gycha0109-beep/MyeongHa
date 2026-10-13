@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import {
  validateR2AclSnapshot, validateR2ProductionAclEnvelope, compareR2AclSnapshots,
+ requireObservedR2AclHold,
 } from '../scripts/operations/verify-seyeon-r2-acl-grants.mjs';
 
 const prod=JSON.parse(readFileSync(new URL(
@@ -42,6 +43,21 @@ describe('R2 canonical ACL drift remains HOLD and never opens Production',()=>{
   const result=compareR2AclSnapshots(local,mk());
   expect(result.edgeCountDifferences).toEqual([name]);
   expect(result.explicitAclDifferences).toEqual([name]);
+ });
+ it('pins exactly one helper canonical grant mismatch and rejects any unreviewed change',()=>{
+  const local=mk();
+  const target=local.functions.find(x=>x.name==='assert_seyeon_chat_thread_runtime_v1');
+  target.canonicalGrantSha256='f'.repeat(64);
+  target.rawAclSha256='f'.repeat(64);
+  target.grantEdges-=1;
+  expect(requireObservedR2AclHold(compareR2AclSnapshots(local,mk())).status)
+    .toBe('HOLD_R2_ACL_METADATA_NOT_EQUIVALENT');
+  expect(()=>requireObservedR2AclHold(compareR2AclSnapshots(mk(),mk())))
+    .toThrow('HOLD_R2_ACL_UNEXPECTED_DRIFT_REQUIRES_OWNER_REVIEW');
+  const extraDrift=structuredClone(local);
+  extraDrift.functions[2].canonicalGrantSha256='f'.repeat(64);
+  expect(()=>requireObservedR2AclHold(compareR2AclSnapshots(extraDrift,mk())))
+    .toThrow('HOLD_R2_ACL_UNEXPECTED_DRIFT_REQUIRES_OWNER_REVIEW');
  });
  it('fails closed for missing/overloaded functions and elevated browser privilege',()=>{
   const a=mk();a.functions.pop();
