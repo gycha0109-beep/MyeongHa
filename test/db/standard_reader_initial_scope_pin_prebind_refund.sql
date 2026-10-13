@@ -8,6 +8,16 @@ select pg_temp.assert_v2_true(
    where receipt_id='b4230000-0000-4000-8000-000000000001'::uuid)
 );
 
+select pg_temp.assert_v2_fails(
+ 'S5 historical Reader purchase scope is append-only',
+ $sql$
+ update public.standard_reader_initial_purchase_scope_pins_v1
+ set scope_identity='tampered'
+ where receipt_id='b4230000-0000-4000-8000-000000000001'::uuid
+ $sql$,
+ 'standard_s5_initial_scope_pin_immutable'
+);
+
 insert into public.commerce_provider_events(
  id,provider,external_event_id,event_type,external_transaction_id,
  resolved_subject_id,resolution_source_type,resolved_receipt_id,
