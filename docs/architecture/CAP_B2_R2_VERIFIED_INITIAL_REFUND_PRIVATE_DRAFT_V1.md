@@ -21,9 +21,15 @@
 - 실제 DB 세션의 `pg_stat_activity.wait_event_type='Lock'` 관측 필수. mock-only 통과 불가.
 - 두 상황 각각 독립 DB fixture 사용. PostgreSQL 15 CI `run_authority_core.sh`에 등록.
 
+## 1860 보강 — Grant 0행 상태에서 verified 취소가 먼저 발생하는 경우
+
+- `internal_apply_b2_r2_initial_receipt_cancel_guarded_private_v1`: 구매 당시 1840 pin scope lock을 먼저 잡고 이미 verified/processed `payment.cancelled` event가 있으면 1830 원본 Receipt issuer 호출 전에 DENY. 호출 후 재검증에서도 이벤트 확인 시 거래 전체 롤백.
+- `test/db/standard_reader_initial_no_grant_r2_real_pg.sh`: A의 verified cancellation event 트랜잭션이 최초 Scope lock을 보유한 상태에서 B의 새 gated issuer가 실제 PostgreSQL lock wait 후 취소를 인식하여 거절하는 두 연결 테스트. event-first, Grant 0행, Entitlement Event 0, Reader Access 0 검증.
+- **중요:** 실제 verified Provider ingress가 아직 이 Scope lock을 채택하지 않았고, 실제 구매 issuer가 신규 1860으로 전환된 것도 아닙니다. 이 두 Owner 연결이 적용되기 전에는 race 안전을 운영상 보증하지 않습니다.
+
 ## 자체 검토: 출시 전 반드시 해결
 
-1. **Grant가 아직 0행인 verified 취소**는 원본 1080 Commerce Effect가 적용할 Grant가 없습니다. 검증된 Event가 먼저 존재한 뒤 새 Receipt issuer가 Grant를 만드는 Race는 기존 1830을 수정하지 않았으므로 방지되었다고 주장할 수 없습니다. DB/Commerce Owner의 `receipt→pin→event-gate→issuer` 원자 caller, negative authority, provider ingress shared lock 계약이 추가로 필요합니다. 이 상태에서 자동 환불 효과 활성화 금지.
+1. **Grant가 아직 0행인 verified 취소**는 원본 1080 Commerce Effect가 적용할 Grant가 없습니다. 1860 신규 비공개 issuer wrapper는 verified event-first를 거절하지만, 기존 1830 원본의 직접 실행은 변경하지 않았습니다. DB/Commerce Owner의 원자 wrapper 사용·legacy ingress 차단, `receipt→pin→event-gate→issuer` 계약 및 provider ingress shared lock 채택이 필요합니다. 자동 환불 효과 활성화 금지.
 2. Provider Event의 verification/commit writer는 아직 1810 초기 잠금에 참여하지 않습니다. 1850은 verified event가 이미 커밋된 경우만 처리하며, 이벤트 도착 순간의 선형화까지 보증하지 않습니다.
 3. 최초/추가 Binder, Provider revoke, Receipt issuer, Product Approval/Withdraw, Content Retire, T2 전체 실제 Writer의 잠금 순서·데드락 검증(B2-R3) 미완. 이미 존재하는 extra-reader 접근 경로의 초과 전파 권한을 임의 공개하지 않습니다.
 4. 구매 시점 R1 pin이 기존 trusted Purchase Intent 생성 경로에서 원자 호출된다는 실증 없음. 기존 구매에 사후 pin 복구/역산 금지.
