@@ -164,6 +164,8 @@ run_isolated_case myeongha_reader_initial_product_scope_lock_private_test bash t
 run_isolated_case myeongha_reader_unified_scope_entry_private_test bash test/db/official_reader_unified_scope_entry_private.sh
 # D1: sorted multi-Product L0 then multi-Reader L1; three independent PostgreSQL sessions in reversed order.
 run_isolated_case myeongha_reader_multi_scope_lockset_three_session_test bash test/db/official_reader_multi_scope_lockset_three_session.sh
+# D2: private 1090/1220 unified purchase issue/bind, real three-connection contention and source-derived replay.
+run_isolated_case myeongha_reader_d2_unified_issue_bind_three_session_test bash test/db/official_reader_d2_unified_issue_bind_three_session.sh
 bash test/db/entitlements_current_query.sh
 bash test/db/data_deletion_job_query.sh
 bash test/db/notification_preferences_query.sh

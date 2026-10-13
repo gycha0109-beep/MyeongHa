@@ -77,3 +77,20 @@
 ### 남은 Cutover 항목
 
 기존 `1080/1090/1220/0220` 및 `1750/1760/1770/1780/1790`은 아직 이 1810 진입점을 호출하지 않는다. Verified Provider 이벤트에 의해 실제 영향을 받는 모든 Product/Reader/Reading 집합을 추출하는 **read-only resolver**, 그리고 L0/L1 잠금 후 **이 집합이 변화하지 않았는지 보장하는 전체 Commerce 연결**이 필요하다. 신규 Grant Insert phantom/미결속 최초 회수와 T2 원자 저장은 별도 D2/D3/D5 검증·승인 범위이다.
+
+## 5. D2 비공개 Writer 참여 후보 — 1820 (2026-10-13)
+
+| 신규 진입점 | 최초 잠금 | 기존 원본 호출 | 뒤따르는 검사 | 미전환 우회 |
+| --- | --- | --- | --- | --- |
+| `internal_apply_official_reader_unified_receipt_v1` | verified Receipt/Intent의 Product 정본 L0 → 추가 구매에만 L1 | 원본 `1090` (Receipt→Grant/ledger/outbox) | Receipt↔Intent↔Offer 및 Role/Product/Reading/Reader 범위 전후 일치 | 원본 `1090` 직접 호출, `1760/1790` 이전 wrapper |
+| `internal_cmd_bind_official_reader_unified_v1` | verified Intent L0 → 추가 구매에만 L1 | 원본 `1220` (Intent→Grant→Birth→Reading/access) | Reader·Bundle·Role·Reading identity와 newly bound Birth Revision | 원본 `1220` 직접 호출, `1760/1790` 이전 wrapper |
+
+**역순 금지:** Wrapper 외부 호출자가 이미 Commerce/Grant/Birth/Chat 행을 잠근 다음 D2 함수에 진입해서는 안 된다. D2 신규 함수는 `SECURITY INVOKER` + 명시적 EXECUTE DENY이고 원본 SQL/Commerce CAS나 권한 허가를 변경하지 않는다. 선행 D1 scope는 lock target일 뿐 active grant가 아니다.
+
+**검증 게이트:** `test/db/official_reader_d2_unified_issue_bind_three_session.sh`는 최초 긍정 issuance/bind, 추가 bind, source-owned scope, 3세션 Product L0 wait와 Reader replay, final row-state 보존을 검사한다. *최신 CI 결과는 각 PR exact SHA로 확인하고 이 문서의 설계 기록과 구분해야 한다.*
+
+**여전히 P0:** Commerce `1080` 및 기존 `1090/1220/1760/1790` 외부 직접 Writer의 전환 미완료. 따라서 concurrent new-Grant INSERT phantom과 verified refund ↔ issue/bind 전역 linearization은 아직 승인할 수 없다. D3에서 전 영향 Product 정렬 L0→L1, 미결속 Grant revoke-before-bind, Provider normalized cancellation/restore를 구현·검증할 것. RR-03 source-owned proof, D5 보호 원문 원자 T2, #1941 복구·상품/결제/보안·법무 승인은 별도.
+
+### D2 최종 CI 확정 (2026-10-13)
+
+PR #2024의 코드 SHA `ea2503e502faac8e659785d22878ab7497975237`, CI run `38333789245`: PostgreSQL15 DB Authority Core / PostgreSQL17 / Content / Work Track / CI Verify PASS. Governance 및 Web PR Domain Gates PASS. 1820 PRIVATE 발급·결속 Wrapper의 신규 독립 Grant INSERT 및 Reader replay의 동일 Product 경합을 별도 PostgreSQL 연결로 검사. **1080/1090/1220 직접 Writer 통합 전환 및 D3 Provider 취소 처리 완료를 의미하지 않음.**
