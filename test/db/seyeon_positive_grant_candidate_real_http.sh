@@ -25,4 +25,8 @@ SEYEON_POSITIVE_GRANT_REAL_PG=1   ./node_modules/.bin/vitest run     test/seyeon
 # inspection after the synthetic G1/G2 tests. Never promote fixture commits.
 psql -X -v ON_ERROR_STOP=1 \
   -f test/db/seyeon_g2_production_compatibility_catalog_guard_v1.sql
+# Test the candidate privilege cutover only AFTER the baseline catalog proof.
+# Production v1/v2, app credentials and migration history are never changed.
+psql -X -v ON_ERROR_STOP=1 \
+  -f test/db/seyeon_g2_legacy_direct_commit_acl_cutover_candidate_v1.sql
 echo 'PASS: positive Pin -> test Commit -> real PG HTTP grant reveal and Node/Postgres D-03 dual-serializer golden vectors in disposable CI DB'
