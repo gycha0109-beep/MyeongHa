@@ -16,3 +16,24 @@ awk '
 ' test/db/standard_reader_initial_policy_locked_positive.sql >>"$tmp/base.sql"
 p -f "$tmp/base.sql" >"$tmp/base.out" 2>"$tmp/base.err" ||
  { cat "$tmp/base.err"; fail 'verified first purchase fixture'; }
+
+deny_standard(){
+ local label="$1"
+ if p -f test/db/standard_reader_r4_initial_bind_call.sql >"$tmp/deny.out" 2>"$tmp/deny.err"; then
+  fail "$label unexpectedly created Reader access"
+ fi
+ grep -Fq 'One current approved Standard Reader Product rule is required' "$tmp/deny.err" ||
+  { cat "$tmp/deny.err"; fail "$label rejected for unrelated cause"; }
+ [[ "$(p -c "select count(*) from public.standard_reading_reader_access_grants")" == 0 ]] ||
+  fail "$label created orphan Reader access"
+ [[ "$(p -c "select count(*) from public.standard_reading_official_bindings")" == 0 ]] ||
+  fail "$label created Official Reading"
+ echo "PASS R4 $label precise policy DENY and mutation=0"
+}
+deny_standard BIND-01
+p -f test/db/standard_reader_r4_premium_only.sql >/dev/null
+[[ "$(p -c "select count(*) from public.qry_standard_reader_approved_rule_v1(
+'11392000-0000-0000-0000-000000000001'::uuid,'v1','relationship',clock_timestamp())
+where policy_kind='premium_character_bound' and target_reader_id='seyeon'")" == 1 ]] ||
+ fail 'Premium must bind exactly one approved Reader in Product policy'
+deny_standard BIND-09-premium-no-Standard-fallback
