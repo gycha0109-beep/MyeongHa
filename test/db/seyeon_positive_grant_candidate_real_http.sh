@@ -12,9 +12,6 @@ psql -X -v ON_ERROR_STOP=1   -f test/db/seyeon_positive_grant_attempt_bound_cand
 # R1 parent+edge verification operates only on this disposable fixture database.
 psql -X -v ON_ERROR_STOP=1 \
   -f test/db/seyeon_positive_source_set_parent_edge_candidate_v1.sql
-# Two independent backend sessions; pg_stat_activity confirms lock contention
-# on the real Attempt before asserting the test-only XOR outcome.
-bash test/db/seyeon_positive_source_set_exact_attempt_race_v1.sh
 # Two actual independent PostgreSQL backends must block on the same Attempt
 # before observing opposite Zero/Positive Pin outcomes.
 bash test/db/seyeon_positive_source_set_exact_attempt_race_v1.sh
