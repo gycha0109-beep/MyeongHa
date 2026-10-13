@@ -84,7 +84,7 @@ function fixture(){
     ...context,
     schemaVersion:'seyeon-renderer-packet-v2',
     recentConversation:context.recentConversation,
-    memoryEvidence:context.retrievedMemories,
+    memoryEvidence:[], // Native packet projects only the interpretation's cited Memory IDs.
     integrity:context.integrity,
     disclosure:context.disclosure,
     interpretation:{
