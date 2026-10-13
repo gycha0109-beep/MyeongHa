@@ -52,6 +52,6 @@ SQL
 then fail 'additional Binder unexpectedly accepted forged/missing provenance'; fi
 grep -Fq "$expected" "$tmp/bind.err" || { cat "$tmp/bind.err" >&2; fail 'wrong fail-closed error'; }
 [[ "$(p -c "select count(*) from public.standard_reading_reader_access_grants where purchase_intent_id='b2020000-0000-4000-8000-000000000001'::uuid")" == 0 ]] || fail 'additional Reader Access leaked'
-[[ "$(p -c "select count(*) from public.standard_reading_reader_interpretations where purchase_intent_id='b2020000-0000-4000-8000-000000000001'::uuid")" == 0 ]] || fail 'additional Interpretation leaked'
+[[ "$(p -c "select count(*) from public.standard_reading_reader_interpretations where reader_character_id='baekheon'")" == 0 ]] || fail 'additional Interpretation leaked'
 [[ "$(p -c "select count(*) from public.entitlement_grants where source_receipt_id='b2030000-0000-4000-8000-000000000001'::uuid and status='active'")" == 1 ]] || fail 'original Commerce Grant changed'
 echo "PASS R4/$mode private additional Binder DENY, original Commerce Grant unchanged, zero additional Interpretation/Access"
