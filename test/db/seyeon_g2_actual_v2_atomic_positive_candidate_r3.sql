@@ -299,7 +299,7 @@ begin
   if has_function_privilege('myeongha_api_executor',
       'public.cmd_commit_seyeon_chat_turn_runtime_v1(uuid,uuid,uuid,uuid,uuid,uuid)','EXECUTE')
     or has_function_privilege('myeongha_api_executor',
-      'public.cmd_commit_seyeon_chat_turn_runtime_v2(uuid,uuid,uuid,uuid,uuid,uuid,uuid,uuid,jsonb,text)','EXECUTE')
+      'public.cmd_commit_seyeon_chat_turn_runtime_v2(uuid,uuid,uuid,uuid,uuid,uuid,uuid,jsonb,text)','EXECUTE')
     or has_table_privilege('myeongha_api_executor',
       'seyeon_positive_candidate.actual_v2_commit_admissions_r3','INSERT')
     or has_function_privilege('public',
