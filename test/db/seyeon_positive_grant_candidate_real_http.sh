@@ -12,5 +12,8 @@ psql -X -v ON_ERROR_STOP=1   -f test/db/seyeon_positive_grant_attempt_bound_cand
 # R1 parent+edge verification operates only on this disposable fixture database.
 psql -X -v ON_ERROR_STOP=1 \
   -f test/db/seyeon_positive_source_set_parent_edge_candidate_v1.sql
+# Two independent backend sessions; pg_stat_activity confirms lock contention
+# on the real Attempt before asserting the test-only XOR outcome.
+bash test/db/seyeon_positive_source_set_exact_attempt_race_v1.sh
 SEYEON_POSITIVE_GRANT_REAL_PG=1   ./node_modules/.bin/vitest run     test/seyeon-controlled-disclosure-real-postgres-candidate.test.ts test/seyeon-source-digest-node-postgres-golden-v1.test.ts --maxWorkers=1
 echo 'PASS: positive Pin -> test Commit -> real PG HTTP grant reveal and Node/Postgres D-03 dual-serializer golden vectors in disposable CI DB'
