@@ -90,7 +90,10 @@ begin
  join public.commerce_receipts cr on cr.id=eg.source_receipt_id
    and cr.subject_id=eg.subject_id
  where eg.source_receipt_id=p_receipt_id and eg.subject_id=v_subject
-   and eg.grant_source_type='purchase' and cr.purchase_intent_id=v_intent
+   and eg.grant_source_type='purchase' and eg.status='active'
+   and eg.valid_from<=pg_catalog.clock_timestamp()
+   and (eg.valid_until is null or pg_catalog.clock_timestamp()<eg.valid_until)
+   and cr.purchase_intent_id=v_intent
    and cr.verification_status='verified' and cr.environment='production';
  if v_grant_count<>1 or v_grant is null then
   raise exception using errcode='P0001',
@@ -191,10 +194,22 @@ begin
  join public.entitlement_grants eg on eg.id=pin.entitlement_grant_id
    and eg.source_receipt_id=pin.receipt_id
    and eg.subject_id=pin.subject_id
+   and eg.grant_source_type='purchase'
+ join public.commerce_receipts cr on cr.id=pin.receipt_id
+   and cr.subject_id=pin.subject_id
+   and cr.purchase_intent_id=pin.purchase_intent_id
+   and cr.environment='production'
+   and cr.verification_status in ('verified','revoked')
  join public.commerce_provider_events pe on pe.id=p_provider_event_id
    and pe.resolved_receipt_id=pin.receipt_id
    and pe.resolved_subject_id=pin.subject_id
    and pe.event_type='payment.cancelled'
+   and pe.status in ('verified','processed')
+   and pe.environment='production'
+   and pe.resolution_source_type='receipt'
+   and pe.provider=cr.provider
+   and (pe.external_transaction_id is null
+     or pe.external_transaction_id=cr.external_transaction_id)
  where pin.receipt_id=v_before.receipt_id and pin.entitlement_grant_id=p_grant_id;
  if v_after.scope_identity is distinct from v_before.scope_identity or
     v_after.subject_id is distinct from v_before.subject_id or
@@ -221,6 +236,8 @@ begin
  ('myeongha_api_executor','myeongha_commerce_internal_executor',
   'myeongha_seyeon_chat_runtime_owner')
  loop
+  execute pg_catalog.format(
+   'revoke all on table public.standard_reader_initial_purchase_scope_pins_v1 from %I',r);
   execute pg_catalog.format(
    'revoke all on function public.internal_issue_initial_reader_receipt_with_scope_pin_v1(uuid,text[],timestamptz[],timestamptz[],timestamptz[],text[]) from %I',r);
   execute pg_catalog.format(
