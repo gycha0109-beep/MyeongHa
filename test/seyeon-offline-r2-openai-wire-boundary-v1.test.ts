@@ -501,4 +501,62 @@ describe('R2 actual OpenAI Responses UTF-8 wire boundary (fake fetch; offline)',
     });
     expect(fetchImpl).not.toHaveBeenCalled();
   });
+  it.each([
+    ['revoked original Grant', (o:SeyeonOfflineR2DbSourceObservationV1)=>({
+      ...o,exactOriginalGrantActive:false,
+    })],
+    ['new original Grant ID', (o:SeyeonOfflineR2DbSourceObservationV1)=>({
+      ...o,originalGrantId:'a7000000-0000-4000-8000-000000000099',
+    })],
+    ['other Attempt', (o:SeyeonOfflineR2DbSourceObservationV1)=>({
+      ...o,attemptId:'a4000000-0000-4000-8000-000000000099',
+    })],
+    ['changed DB JSONB payload', (o:SeyeonOfflineR2DbSourceObservationV1)=>({
+      ...o,currentPayloadDigest:'sha256:pg-jsonb:v1:'+'f'.repeat(64),
+    })],
+    ['different pinned source selection', (o:SeyeonOfflineR2DbSourceObservationV1)=>({
+      ...o,selectedSourcesDigest:'sha256:v1:'+'f'.repeat(64),
+    })],
+    ['different record type', (o:SeyeonOfflineR2DbSourceObservationV1)=>({
+      ...o,recordType:'not-approved',
+    })],
+    ['cross-subject reuse', (o:SeyeonOfflineR2DbSourceObservationV1)=>({
+      ...o,subjectId:'a1000000-0000-4000-8000-000000000099',
+    })],
+  ] as const)('holds %s when the original DB-bound witness changes after Preflight',async(_label,change)=>{
+    const {candidate,actualContext}=fixture();
+    let activePreflight:CharacterGovernedPreflightResultV1|null=null;
+    let observation=syntheticDbObservation(candidate);
+    const probe=createOfflineWireProbe({dbWireContext:{
+      candidate,actualContext,
+      getPreflight:()=>activePreflight,
+      readCurrentObservation:()=>observation,
+    }});
+    activePreflight=await governedPreflight(probe.provider);
+    const chain=createSeyeonOfflineR2DerivedOutputLineageV1({
+      candidate,preflight:activePreflight,actualContext,delegate:probe.provider,
+    });
+    observation=change(observation);
+    await expect(chain.provider.generate(chain.nextRequestForOfflineTest()!))
+      .rejects.toThrow('R2 derived-output lineage held');
+    expect(chain.snapshot().state).toBe('held');
+    expect(probe.fetchImpl).toHaveBeenCalledTimes(2);
+    expect(probe.dbWireReceipts).toHaveLength(2);
+  });
+
+  it('holds an unavailable DB observation before any model-provider network call',async()=>{
+    const {candidate,actualContext}=fixture();
+    const probe=createOfflineWireProbe({dbWireContext:{
+      candidate,actualContext,
+      getPreflight:()=>null,
+      readCurrentObservation:async()=>{
+        throw new Error('Private DB unavailable, do not echo');
+      },
+    }});
+    await expect(governedPreflight(probe.provider))
+      .rejects.toMatchObject({code:'PRE_DISPATCH_REJECTED'});
+    expect(probe.fetchImpl).not.toHaveBeenCalled();
+    expect(probe.dbWireReceipts).toHaveLength(0);
+  });
+
 });
