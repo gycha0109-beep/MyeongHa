@@ -59,6 +59,8 @@
 
 **2026-10-13 R3 검증 확정:** [#2035](https://github.com/gycha0109-beep/MyeongHa/pull/2035) HEAD `06605a2da63fa49e2111222d3163bfe401e56fb9` [CI #38341592434](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38341592434) **SUCCESS**, 실PG15 db-authority-core에서 `PASS B2-R3/policy_first`, `bind_first`, `sorted multi-Reader 2-session wait/release`, R2 3경합 회귀 PASS, runtime ingress HOLD inventory **461개 파일/기존 호출 4종/Private Writer 7종 접근 차단** PASS, catalog `1f986d97...` PASS. Web·앱화도 PASS. **DB dependency PG17/Commerce/Content는 해당 HEAD에서 skipped**(R2 이전 HEAD 성공을 현재 HEAD 성공이라고 표시 금지). 별도 [Governance #38341592076](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38341592076) **FAIL**, R1 신규 Privacy FK의 승인된 140-edge P0-PR-01 계약 위반. R3는 SQL private proof 일부만 종료; 운영 ingress/v4 구매 시점 R1 pin 원자성·Provider 검증 도착 잠금·Reader/T2·Content retire·multi-Product deadlock 전체 경로는 **미통합/Owner HOLD**.
 
+**2026-10-13 R4 착수:** [#2041](https://github.com/gycha0109-beep/MyeongHa/pull/2041) 은 #2035 R3 위의 격리 Draft. #2003 D-01의 BIND-01~29를 ID 그대로 추적하고, 폐기된 Premium allowlist 대신 `premium_character_bound(targetReaderId)` 단일 대상을 적용했습니다. PG15 신규 테스트는 Rule 0건 Standard DENY, Premium target 일치여도 Standard Binder DENY, Standard 승인+specialist `can_initiate=false`에서 최초 Reading/Access 생성, REPEATABLE READ DENY에 한정됩니다. **R4 exact HEAD DB CI PASS 전이므로 검증 후보**, 전체 29건·9×domain·PG17·운영 T2/Commerce 통합 PASS라고 선언하지 않습니다. 관련 Owner별 Cutover 미승인, R1 Privacy Governance 및 1400~1450 DR HOLD 유지.
+
 **필수 선행:** R1의 불변 scope authority는 R2 환불과 R3 모든 Writer 경합의 근간이다. R4는 단위별 병렬화 가능하나 실제 권한 공개는 R1~R6 선행. R7을 CI GREEN만으로 허가하지 않는다.
 
 ## 3. 우선 착수할 1개 작업 — B2-R1
