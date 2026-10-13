@@ -34,6 +34,10 @@ const commerceEntitlementPatterns = [
 ];
 
 const postgres17Patterns = [
+  /^scripts\/operations\/seyeon-r2-rpc-set-fingerprint-readonly\.sql$/u,
+  /^scripts\/operations\/seyeon-r2-production-rpc-set-fingerprint-20261013\.json$/u,
+  /^scripts\/operations\/verify-seyeon-r2-rpc-set-fingerprint\.mjs$/u,
+  /^tests\/seyeon-r2-rpc-set-fingerprint\.test\.mjs$/u,
   /^scripts\/operations\/seyeon-r2-pending-migration-inventory\.json$/u,
   /^scripts\/operations\/verify-seyeon-r2-pending-migrations\.mjs$/u,
   /^tests\/seyeon-r2-pending-migrations\.test\.mjs$/u,
