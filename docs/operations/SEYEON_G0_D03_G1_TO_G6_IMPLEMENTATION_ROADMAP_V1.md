@@ -56,6 +56,13 @@
 - **R2 한계:** 이 full-request 지문은 **테스트 harness가 사전에 승인했다고 주장한 synthetic expectedRequests**만 동일한지 확인합니다. DB-signed immutable SourceSet, Provider가 실제 전송한 네트워크 바이트, 유료 모델·Reader/Saju·Worker 파생/기억 재사용에 대한 권한/출처 증명은 아닙니다. Production 경로에 설치/활성화하지 않습니다.
 - **검증 로그:** PR #1985의 **최종 정확한 HEAD** CI + PostgreSQL authority + Governance/Web을 확인한 이후만 PASS 판정. 상세 증거 [R1/R2 검증 원장](../security/SEYEON_R1_R2_SOURCE_SET_AND_MODEL_INGRESS_PROOF_V1.md).
 
+### R1/R2 추가 검증 — 실제 두 세션 경합·원본 Grant–모델 입력 연결 (2026-10-13)
+
+- **목적/변경 파일:** `test/db/seyeon_positive_source_set_exact_attempt_race_v1.sh`를 기존 `test/db/seyeon_positive_grant_candidate_real_http.sh` 격리 DB 실행기로 연결. 기존 부모/간선 시험 SQL·1640 시험용 Trigger를 그대로 이용. 두 독립 PostgreSQL backend에서 Positive-first와 Zero-first의 **실제 `pg_stat_activity.wait_event_type='Lock'` 대기**를 관측한 뒤, 기대하는 Zero/Positive 양방향 HOLD·Parent 미생성·원본 유지 검증. 새 워크플로/운영 마이그레이션 없음.
+- **R2 목적/변경 파일:** `apps/api/src/seyeon-offline-r2-db-source-set-binding-v1.ts`, `test/seyeon-offline-r2-real-db-source-boundary-v1.test.ts`. 실제 DB `cmd_receive_chat_turn_v1` + Attempt 할당 → single Memory original Grant를 test-only SourceSet/Edge에 Pin → DB Owner가 읽은 원본 Record/Grant·PG digest와 Node exactModel Selection/실제 native interpreter 요청의 동일 ID/SourceRef 결속. 그 뒤 타 Attempt/Grant/Ordinal/Selection tamper, original revoke, content payload mutation을 rollback·HOLD 확인.
+- **검증 한계:** R1은 실제 **두 backend 행 잠금 대기**이나 1640 유효 Zero proof/운영 G2 Commit의 동시 송신은 아님. R2 observation은 **테스트 호출자 제공 객체**이지 DB 서명된 권한 토큰이 아니며, DB/Node codec 상호 교환도 아님. Native Interpreter 요청까지 구조 관측할 뿐 Preflight/History/Reader/Relationship/Renderer/Worker의 완전한 transitive source closure·유료 Provider actual wire data 권한 미증명.
+- **자체 검토/종료:** [정밀 테스트·위협 경계 원장](../security/SEYEON_R1_R2_ACTUAL_PG_RACE_AND_SOURCE_BOUNDARY_V1.md). 정확한 최신 SHA의 기존 `db-authority-core`·Character·CI Verify·Governance·Web Gates가 성공하기 전 **PASS 미선언**. G0 D-01~D-10 Owner+SRC-25+O0 DR 승인 전 운영 G1/G2/G3/HISTORY/유료 AI/공개 계속 HOLD.
+
 ## 3. R1 — D-03 및 실제 SourceSet 구조의 격리 검증
 
 **기존 증거:** test/db/seyeon_positive_grant_attempt_bound_candidate_v1.sql, test/seyeon-source-digest-node-postgres-golden-v1.test.ts, 기존 Node/PG real HTTP 4건, 세연 S0 합성 17건. 2026-10-12 정확한 SHA에서 기존 PG/Node Golden 7건 PASS.
