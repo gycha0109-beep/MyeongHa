@@ -241,3 +241,12 @@ S1에서 공통 잠금 함수 자체가 성공하더라도 **S2 전체 경로가
 - `test/db/official_reader_multi_scope_lockset_three_session.sh`: PostgreSQL 실제 A/B/C 연결에서 **정순/역순 2 Product Lockset 경쟁**과 **역순 2 Reader Lockset 경쟁**을 각각 확인한다. 독립 격리 시험으로 DB authority core에 등록.
 - 상세 감사 문서 [OFFICIAL_READER_D1_WRITER_LOCK_ORDER_AUDIT_20261012_V1.md](./OFFICIAL_READER_D1_WRITER_LOCK_ORDER_AUDIT_20261012_V1.md) 4절에 입력의 권위·교착 범위·남은 우회 경로를 갱신한다.
 - **미완료:** 모든 Commerce/Reader Writer가 이 순서를 사용하도록 전환, Verified Provider event 영향 범위 서버 resolver, 미결속 취소, 3-세션의 현실적 Grant Writer vs refund vs T2 통합 경쟁, Saju 근거·유료 본문 원자 T2·RR-04. 운영 DB migration·결제/유료 채팅 공개 계속 OFF.
+
+## 19. D2 초기·추가 구매권 발급/사주 결속 단일 비공개 진입점 (2026-10-13)
+
+- `1820_official_reader_unified_purchase_dispatch_private_v1.sql` 후보: `internal_apply_official_reader_verified_receipt_unified_v1`과 `internal_cmd_bind_official_reader_unified_v1`. 검증된 production Receipt→Purchase Intent→원본 Offer 및 server-owned 구매 역할을 읽고 `1800` 구매 Scope Resolver에서 **회원×상품(L0), 추가 Reader에 한해 사주×캐릭터(L1)**를 원본 Commerce/Grant/Birth 행 잠금 전에 획득한다.
+- 최초 구매는 원본 `1790`에, 추가 Reader는 `1760`에 위임한다. 이들은 다시 같은 잠금을 취득할 수 있지만 역순 잠금은 새로 획득하지 않는다. 기존 `1090` 구매권·영수증 CAS/멱등·`1220` 불변 사주 결속 원본에 신규 직접 행 변경을 추가하지 않는다.
+- 진입 전에는 정확한 Receipt/Intent/Offer/Subject 계보를 확인하고, 잠금 대기 후 다시 검증한다. 이후 원본 함수 결과의 제품·구매 역할·Reading·Reader 범위와 source scope를 확인하고 이탈 시 전체 롤백한다.
+- 격리 DB 시험 `test/db/official_reader_unified_purchase_dispatch_private.sh`: 기존 공식 사주 생성 fixture에서 첫 발급/첫 생성 및 추가 캐릭터 결속을 신규 dispatcher로 대체; 이미 발생한 추가 영수증의 원본 replay 시나리오, wrong Subject·오래된 MVCC·런타임 EXECUTE 거부를 검증. `run_authority_core.sh` 등록.
+- **제한:** 신규 `1820`도 실제 Commerce API·Provider worker·사용자 실행 역할에는 열지 않았다. 기존 `1090/1220/1760/1790` 직접 호출 우회는 아직 가능하다. 추가 구매 영수증의 **최초 발급**과 환불·회수 경쟁, 미결속 초기 구매권 취소, 다중 Product Provider 이벤트, RR-03 출처/보호 본문 T2, RR-04 후속 조회는 이어서 검증·구현해야 한다.
+- **출시 차단:** 비공개 함수·합성 거래 테스트는 실결제 운영 계약이 아니다. 운영 마이그레이션 #1941 복원 및 DB/Commerce/Product/Privacy/Legal 검토 전 병합·공개 결제·유료 Chat OFF.
