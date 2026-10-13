@@ -89,6 +89,22 @@ node scripts/local/verify-saju-bridge-docker-local.mjs --binding ../Saju-bridge-
 - 신규 테스트 `test/saju-held-docker-member-birth-nonce.test.ts` 및 전용 Saju loopback runner는 기존 기능 코드나 운영 API를 변경하지 않는다. `--binding`도 실행이 끝나면 동일한 Compose 소유 컨테이너/볼륨/네트워크 삭제를 확인한다.
 - **제한:** Subject/Nonce의 Docker 테스트 연결은 이 단계에서 아직 *plaintext 내부 네트워크*이다. CA 검증 TLS 및 Admission/Permit V2, 장애 주입·복구, 운영 Root/Attestor/R01–R14/2D-4는 HOLD이다. CI가 Linux에서 PASS여도 Windows 실기기 `--binding`은 직접 실행하지 않으면 NOT_VERIFIED로 남는다.
 
+### 3C. Phase 3A — 세 개의 독립 Docker PostgreSQL TLS (2026-10-13)
+
+이전 `--http`와 `--binding` 호출은 변경 없이 유지한다. Windows Docker Desktop/Linux에서 **실제 전송계층 강제**를 검사하려면 명시적으로 `--tls`를 선택한다.
+
+```powershell
+node scripts/local/verify-saju-bridge-docker-local.mjs --tls ../Saju-bridge-verify
+```
+
+- Docker 프로젝트 내부에서만 접근할 수 있는 세 가지 **서로 다른 일회용 CA**(Subject, Nonce, Admission)를 만든다. 서버 인증서는 각 `subject-db`, `nonce-db`, `admission-db` DNS SAN에 귀속되며, TLS 1.2+를 요구한다. CA 키·인증서·DB 데이터는 실행별 프로젝트 볼륨에만 존재하고 종료 후 모두 제거한다.
+- `pg_hba.conf`에서 호스트 비TLS 접속을 명시적으로 거부하고 호스트 TLS 접속에는 SCRAM-SHA-256을 적용한다. 구성 후 fixture/bootstrap용 `psql`도 `PGSSLMODE=verify-full`과 해당 독립 CA 인증서를 사용한다.
+- 기존 GoTrue JWT→Subject/Birth→Saju HMAC→Nonce 원자 소비 테스트는 **Subject/Nonce의 TLS 검증 로그인**을 통해 실행한다. 추가로 Admission은 별도 `myeongha_docker_admission_tls_probe` 제한 LOGIN을 마련하지만 **Permit 테이블/Runner/서명 승인 절차는 생성하거나 실행하지 않는다**.
+- 세 DB 각각에서 `pg_stat_ssl`의 암호화 연결, 독립 CA 식별, **다른 DB의 CA를 이용한 접속 실패**, **일반 텍스트 접속 실패**, 다른 DB의 테이블 및 역할 부재를 검사한다.
+- GoTrue의 내부 Auth DB 연결은 Phase 1/2B의 별도 상태를 유지한다. Phase 3A 성공은 GoTrue 내부 DB 자체의 TLS 보증을 의미하지 않는다.
+- Scope CI는 같은 GitHub Actions 흐름에서 `--tls` 모드를 실행한다. 별도 워크플로, 운영 URL, 퍼블릭 호스트 포트, 인증서 영속 저장, 새로운 유료 자원을 만들지 않는다.
+- **Phase 3A는 Permit V2 소비 및 양 DB 커밋 분리/복구의 합격을 뜻하지 않는다.** 운영 Root/Attestor, R01–R14, 2D-4, 스테이징 입장·상품/판매 권한은 기존대로 HOLD다. Windows의 `--tls` 실측은 사용자가 직접 성공 로그를 제출하기 전 NOT_VERIFIED이다.
+
 ## 4. 단계별 로드맵 · 종료 게이트
 
 | 단계 | 구현 | 게이트 | 범위 상태 |
@@ -96,7 +112,7 @@ node scripts/local/verify-saju-bridge-docker-local.mjs --binding ../Saju-bridge-
 | 0 | 기존 GitHub 2J + 독립 TLS/두 DB 중단 처리 재사용, #1986 | exact-head 범위/최종 CI 성공·병합 | 완료: **합성 CI만** |
 | 1 | Windows Docker 기초 4DB + GoTrue + 폐기 실행기 | 단일 명령, 실 GoTrue JWT 검증, DB 네 곳 실 SQL, 자원 잔존 0, 기존 CI 최소 스모크 통과 | 이번 구현 |
 | 2 | 고정 Saju SHA의 실 HTTP/HMAC, Subject schema/fixture 및 기존 테스트 재사용 | 실제 Saju HTTP 200 proof, Auth JWT→Subject Current Birth→Nonce 원자 claim, 병렬 중복 차단 | **Phase 2B 구현:** CI·Windows 실행 증빙 별도 |
-| 3 | 별도 Subject/Nonce/Admission TLS, 서로 다른 CA·SAN·제한 로그인, Permit V2 | TLS verify-full/틀린 CA/비TLS 차단, 한 번만 Permit 소비, RLS·ACL 거부 | 미구현 |
+| 3 | 별도 Subject/Nonce/Admission TLS, 서로 다른 CA·SAN·제한 로그인, Permit V2 | TLS verify-full/틀린 CA/비TLS 차단, 한 번만 Permit 소비, RLS·ACL 거부 | **Phase 3A 구현:** TLS까지; Permit V2와 Windows --tls 실측 별도 |
 | 4 | 실제 네트워크 중단·커밋 후 연결 단절·DB 재시작·볼륨 보존·복구 | 중복 허용 0, 불확실한 커밋 자동 재시도 0, 잘못된 승격 0, 재시작 후 사용 상태 유지 | 미구현 |
 | 5 | Windows Docker Desktop 실제 기기 및 Linux CI 공통 재현성 | 동일 테스트 매트릭스·정리·SHA/버전 기록, scoped + final CI PASS, 병합/issue 업데이트 | 미구현 |
 
