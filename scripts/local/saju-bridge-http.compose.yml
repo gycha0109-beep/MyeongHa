@@ -1,0 +1,73 @@
+# Phase 2 overlay. Loaded ONLY with --http <pinned local Saju checkout>.
+# npm dependency preparation uses a disposable egress network; the actual
+# HTTP/HMAC verification runs solely on the isolated internal Docker network.
+services:
+  saju-deps-myeongha:
+    image: node:24-bookworm-slim
+    working_dir: /myeongha
+    entrypoint: ["npm", "ci", "--ignore-scripts", "--no-audit", "--no-fund"]
+    volumes:
+      - type: bind
+        source: ${SAJU_BRIDGE_LOCAL_MYEONGHA_DIR:?repository-checkout-required}
+        target: /myeongha
+        read_only: true
+      - type: volume
+        source: myeongha-node-modules
+        target: /myeongha/node_modules
+    networks: [npm-egress]
+
+  saju-deps-engine:
+    image: node:24-bookworm-slim
+    working_dir: /saju
+    entrypoint: ["/bin/sh", "-eu", "-c"]
+    command: ["npm ci --ignore-scripts --no-audit --no-fund && npm run build && test -s dist/source-reading-proof-server.js"]
+    volumes:
+      - type: bind
+        source: ${SAJU_BRIDGE_LOCAL_SAJU_DIR:?pinned-saju-checkout-required}
+        target: /saju
+        read_only: true
+      - type: volume
+        source: saju-node-modules
+        target: /saju/node_modules
+      - type: volume
+        source: saju-dist
+        target: /saju/dist
+    networks: [npm-egress]
+
+  saju-http-verifier:
+    image: node:24-bookworm-slim
+    working_dir: /myeongha
+    entrypoint: ["node", "scripts/local/verify-saju-bridge-http.mjs", "/saju"]
+    volumes:
+      - type: bind
+        source: ${SAJU_BRIDGE_LOCAL_MYEONGHA_DIR:?repository-checkout-required}
+        target: /myeongha
+        read_only: true
+      - type: volume
+        source: myeongha-node-modules
+        target: /myeongha/node_modules
+        read_only: true
+      - type: bind
+        source: ${SAJU_BRIDGE_LOCAL_SAJU_DIR:?pinned-saju-checkout-required}
+        target: /saju
+        read_only: true
+      - type: volume
+        source: saju-node-modules
+        target: /saju/node_modules
+        read_only: true
+      - type: volume
+        source: saju-dist
+        target: /saju/dist
+        read_only: true
+    environment:
+      NODE_ENV: test
+    networks: [disposable]
+
+networks:
+  npm-egress:
+    internal: false
+
+volumes:
+  myeongha-node-modules:
+  saju-node-modules:
+  saju-dist:
