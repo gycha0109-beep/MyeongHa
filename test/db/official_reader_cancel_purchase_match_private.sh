@@ -93,6 +93,8 @@ check() {
  '$observation'::uuid,'$event'::uuid,'$grant'::uuid)")" == "$receipt" ]] ||
  die "different Receipt returned"
 echo "PASS purchase match: provider payment ID, attempt, full receipt, verified event, Offer and active Grant"
+# Called only by the separate offline, never-production reviewed revoke fixture.
+if [[ "${MHA_PURCHASE_MATCH_SEED_ONLY:-0}" == 1 ]]; then exit 0; fi
 
 [[ "$(check "$observation" "$event" 'ffffffff-ffff-ffff-ffff-ffffffffffff')" == 'hold:false' ]] ||
  die "wrong Grant was accepted"
