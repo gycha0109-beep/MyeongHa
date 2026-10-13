@@ -63,7 +63,7 @@ node scripts/local/verify-saju-bridge-docker-local.mjs --http ../Saju
 ```
 
 - `--http` 모드는 Saju의 **정확한 고정 커밋**과 clean worktree를 요구하며, 임의 URL/원격 Saju 서버를 받지 않는다. Saju가 없거나 다른 SHA이면 성공 처리하지 않는다.
-- [2단계 Compose 오버레이](../scripts/local/saju-bridge-http.compose.yml)를 추가한다. `node:24-bookworm-slim`의 의존성 준비 컨테이너가 저장소를 **읽기 전용**으로 마운트하고, `.git`/`node_modules`/`.env*` 등을 제외한 소스 스냅샷을 **실행별 writable named volume**에 복사한다. 이 스냅샷 안에서 `npm ci --ignore-scripts`와 Saju `npm run build`를 실행하므로 Windows 호스트의 `node_modules`를 수정하거나 Linux 의존성으로 오염시키지 않는다. 실제 HTTP/HMAC 검증기는 해당 완성된 스냅샷 볼륨을 **읽기 전용**으로 마운트한다.
+- [2단계 Compose 오버레이](../scripts/local/saju-bridge-http.compose.yml)를 추가한다. `node:24-bookworm-slim`의 의존성 준비 컨테이너가 저장소를 **읽기 전용**으로 마운트하고, `.git`/`node_modules`/`.env*` 등을 제외한 소스 스냅샷을 **실행별 writable named volume**에 복사한다. 이 스냅샷 안에서 `npm ci --ignore-scripts`와 Saju `npm run build`를 실행하므로 Windows 호스트의 `node_modules`를 수정하거나 Linux 의존성으로 오염시키지 않는다. 실제 HTTP/HMAC 검증기는 Saju 스냅샷은 읽기 전용으로, 명하 스냅샷은 Vitest의 임시 `.vite-temp` 캐시 생성 때문에 쓰기 가능으로 마운트한다. **두 스냅샷 모두 일회용 볼륨이며 호스트 체크아웃은 끝까지 읽기 전용**이다.
 - 의존성 설치 단계만 일반 `npm-egress` 네트워크를 사용하여 npm 패키지를 내려받는다. 이 단계에 Auth/DB/HMAC 비밀값을 전달하지 않는다. 실제 HTTP/HMAC 검증기는 **Compose `internal: true` 네트워크**에서만 실행하며 호스트 포트를 열지 않는다. npm registry 다운로드에는 네트워크 연결이 필요할 수 있다.
 - 검증기는 기존 `verify-saju-bridge-http.mjs`와 `test/saju-held-cross-repo-local-http.test.ts`를 변경 없이 재사용한다. 동일 컨테이너 내에서 실제 Saju Node HTTP listener를 루프백에 띄우고, MyeongHa의 Bearer/HMAC·발급 Proof/위변조·경로 차단 검사를 실행한다. Saju HTTP 응답이 200 Proof가 아니면 테스트 실패이다.
 - 기존 1단계의 GoTrue·4개 DB SQL 스모크를 먼저 실행하며, HTTP 검증과 DB 바인딩은 **아직 서로 연결되지 않는다**. 이 단계에서 인증된 회원의 Current Birth 조회, PostgreSQL Nonce 원자 소비, Admission Permit을 통과했다고 주장하지 않는다.
