@@ -1,0 +1,34 @@
+# Opt-in Phase 4A, disposable real PostgreSQL stop/restart probes.
+# Never bind-mount Docker socket or any Production credentials.
+services:
+  saju-recovery-verifier:
+    image: node:24-bookworm-slim
+    working_dir: /myeongha
+    entrypoint: ["node", "node_modules/vitest/vitest.mjs", "run", "test/saju-held-docker-recovery-phase4a.test.ts"]
+    environment:
+      NODE_ENV: test
+      MYEONGHA_DOCKER_SAJU_RECOVERY: "1"
+      MYEONGHA_DOCKER_SAJU_TLS: "1"
+      MYEONGHA_DOCKER_SAJU_PERMIT: "1"
+      SAJU_BRIDGE_LOCAL_RECOVERY_STAGE: ${SAJU_BRIDGE_LOCAL_RECOVERY_STAGE:?recovery-stage-required}
+      SAJU_BRIDGE_LOCAL_RECOVERY_PERMIT_ID: ${SAJU_BRIDGE_LOCAL_RECOVERY_PERMIT_ID:?disposable-permit-id-required}
+      SAJU_BRIDGE_LOCAL_RECOVERY_NONCE_KEY: ${SAJU_BRIDGE_LOCAL_RECOVERY_NONCE_KEY:?disposable-nonce-key-required}
+      SAJU_BRIDGE_LOCAL_RECOVERY_PERMIT_ISSUED_MS: ${SAJU_BRIDGE_LOCAL_RECOVERY_PERMIT_ISSUED_MS:?disposable-issue-time-required}
+      SAJU_BRIDGE_LOCAL_RECOVERY_PERMIT_EXPIRES_MS: ${SAJU_BRIDGE_LOCAL_RECOVERY_PERMIT_EXPIRES_MS:?disposable-expiry-required}
+      SAJU_BRIDGE_LOCAL_RECOVERY_NONCE_EXPIRES_MS: ${SAJU_BRIDGE_LOCAL_RECOVERY_NONCE_EXPIRES_MS:?disposable-expiry-required}
+      SAJU_BRIDGE_LOCAL_SUBJECT_DB: myeongha_saju_subject_local_verify
+      SAJU_BRIDGE_LOCAL_NONCE_DB: myeongha_saju_nonce_local_verify
+      SAJU_BRIDGE_LOCAL_SUBJECT_DB_PASSWORD: ${SAJU_BRIDGE_LOCAL_SUBJECT_DB_PASSWORD:?disposable-secret-required}
+      SAJU_BRIDGE_LOCAL_SUBJECT_LOGIN_PASSWORD: ${SAJU_BRIDGE_LOCAL_SUBJECT_LOGIN_PASSWORD:?disposable-secret-required}
+      SAJU_BRIDGE_LOCAL_NONCE_DB_PASSWORD: ${SAJU_BRIDGE_LOCAL_NONCE_DB_PASSWORD:?disposable-secret-required}
+      SAJU_BRIDGE_LOCAL_NONCE_LOGIN_PASSWORD: ${SAJU_BRIDGE_LOCAL_NONCE_LOGIN_PASSWORD:?disposable-secret-required}
+      SAJU_BRIDGE_LOCAL_ADMISSION_DB_PASSWORD: ${SAJU_BRIDGE_LOCAL_ADMISSION_DB_PASSWORD:?disposable-secret-required}
+      SAJU_BRIDGE_LOCAL_ADMISSION_LOGIN_PASSWORD: ${SAJU_BRIDGE_LOCAL_ADMISSION_LOGIN_PASSWORD:?disposable-secret-required}
+    volumes:
+      - type: volume
+        source: myeongha-workspace
+        target: /myeongha
+      - subject-tls-certs:/certs/subject:ro
+      - nonce-tls-certs:/certs/nonce:ro
+      - admission-tls-certs:/certs/admission:ro
+    networks: [disposable]

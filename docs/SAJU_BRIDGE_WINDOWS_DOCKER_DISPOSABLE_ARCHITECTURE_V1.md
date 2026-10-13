@@ -118,7 +118,24 @@ node scripts/local/verify-saju-bridge-docker-local.mjs --permit ../Saju-bridge-v
 - 구현 재사용: `canonicalSajuHeldStagingPermitApprovalBytesV2`, `createSajuHeldStagingPostgresAdmissionPortV2`, 기존 Manifest/ConnectionPlan digest를 그대로 호출한다. 서로 다른 독립 PostgreSQL 세션이 같은 Permit을 동시에 소비할 때 **한 건만 성공**, 이후 재시도 불허, 서명·승인 키·계획·CA 지문 변조/취소/만료/연결 실패는 fail closed여야 한다.
 - Subject/Nonce/Admission TLS CA 값은 실제 일회용 컨테이너의 CA 인증서에서 계산한다. 단, 서명된 Manifest/ConnectionPlan의 도메인 이름은 **CI 합성 메타데이터**이며 실제 운영 DNS나 인프라의 승인 근거가 아니다.
 - `--permit`은 오직 `saju-bridge-permit.compose.yml`과 테스트 스크립트에서만 Admission Permit 테이블/권한을 추가한다. 평상시 `--tls` 및 `--binding`에는 전혀 새 Permits를 생성하지 않는다. 모든 테스트 종료 시 컨테이너·CA 볼륨·DB 볼륨을 삭제 확인한다.
-- **중요:** 합성 키/서명 검증 + 원자 소비는 실제 운영자 승인이나 stagingAdmission 성공을 의미하지 않는다. Runner는 **절대 호출하지 않는다**. COMMIT 불확실성, 네트워크 분할, Subject와 Nonce의 서로 다른 결과·복구는 별도 Phase 4로 HOLD한다. `canExecute`, `canPublish`, `canSell`은 계속 false다. Linux CI 통과와 Windows 실기기 `--permit` 검증은 별개이다.
+- **중요:** 합성 키/서명 검증 + 원자 소비는 실제 운영자 승인이나 stagingAdmission 성공을 의미하지 않는다. Runner는 **절대 호출하지 않는다**. COMMIT 불확실성, 네트워크 분할, Subject와 Nonce의 서로 다른 결과·복구는 별도 Phase 4로 HOLD한다. `canExecute`, `canPublish`, `canSell`은 계속 false다. Linux CI 통과와 Windows 실기기 `--permit` 검증은 별개이다. **2026-10-13 사용자가 `Phase 3B PASS` Windows 로그를 제출하여 Windows Phase 3B PASS로 반영했다.**
+
+### 3E. Phase 4A — 실제 DB 재시작·가용성 중단, 합성 COMMIT ACK 불확실성 (2026-10-13)
+
+`--recovery`는 **기존 Phase 1/2/2B/3A/3B를 전부 통과한 같은 일회용 Docker 프로젝트에서만** 실행한다.
+
+```powershell
+node scripts/local/verify-saju-bridge-docker-local.mjs --recovery ../Saju-bridge-verify
+```
+
+검증 계약:
+
+- 새 볼륨을 발급하지 않고 **Subject/Nonce/Admission의 기존 PG data 볼륨과 개별 CA**를 보존한 채 `docker compose restart`한다. 재시작 후 각 DB를 **하나씩 실제 정지**하고, 해당 제한 역할이 TLS 쿼리에 실패하는지 확인한 뒤 재기동한다.
+- 처음에 동일 단일 컨테이너 세션의 실제 Nonce DB unique claim과 실제 Admission Permit V2 소비를 발생시킨다. COMMIT 자체는 **실제 PostgreSQL 서버에서 완료**하고, 테스트 전용 어댑터가 그 **응답만 고의로 유실 처리**해 결과를 false로 만든다. 다른 독립 세션에서 row가 durable하게 기록됐는지 확인한다. 이 fault seam은 *모의 ACK 유실*이지 커밋 도중의 실제 패킷 단절 검증이 아니다.
+- 실제 PG 재시작과 순차 DB 중단을 거친 뒤, Nonce digest 1건, Permit `CONSUMED`, Subject fixture 불변을 검증한다. 같은 키·Permit의 재소비가 차단되는지 검사하고, 재시도 가능한 Nonce 만료 시각이 지나면 조용히 PASS하지 않고 테스트를 실패시킨다.
+- 네트워크/Docker 소켓을 테스트 컨테이너에 넘기지 않는다. Docker stop/restart는 기존 host runner만 수행하고, 연결 자격 증명/키/합성 ID/CA는 project-scoped ephemeral volume/env만 사용한다. 모든 종료 후 기존 `down --volumes --remove-orphans` 및 프로젝트 자원 잔존 0 검사를 동일하게 수행한다.
+- **남은 HOLD:** 커밋 진행 도중 *실제 네트워크 단절*, Subject와 Nonce에 각각 다른 commit 결과가 발생하는 분산 트랜잭션·보상·운영 복구, DB 영구 손상, 실제 Runner/Root/Attestor/stagingAdmission/서비스 승격. 이 실험이 성공해도 `canExecute`, `canPublish`, `canSell`은 false이고 운영 R01–R14/2D-4는 HOLD다.
+- Linux scoped/full CI가 통과하더라도 **Windows `--recovery` 실기기 실행은 별도 NOT_VERIFIED**다. 앞선 Windows 3B PASS와 혼동하지 않는다.
 
 ## 4. 단계별 로드맵 · 종료 게이트
 
@@ -128,7 +145,7 @@ node scripts/local/verify-saju-bridge-docker-local.mjs --permit ../Saju-bridge-v
 | 1 | Windows Docker 기초 4DB + GoTrue + 폐기 실행기 | 단일 명령, 실 GoTrue JWT 검증, DB 네 곳 실 SQL, 자원 잔존 0, 기존 CI 최소 스모크 통과 | 이번 구현 |
 | 2 | 고정 Saju SHA의 실 HTTP/HMAC, Subject schema/fixture 및 기존 테스트 재사용 | 실제 Saju HTTP 200 proof, Auth JWT→Subject Current Birth→Nonce 원자 claim, 병렬 중복 차단 | **Phase 2B 구현:** CI·Windows 실행 증빙 별도 |
 | 3 | 별도 Subject/Nonce/Admission TLS, 서로 다른 CA·SAN·제한 로그인, Permit V2 | TLS verify-full/틀린 CA/비TLS 차단, 한 번만 Permit 소비, RLS·ACL 거부 | **Phase 3A 구현:** TLS까지; Permit V2와 Windows --tls 실측 별도 |
-| 4 | 실제 네트워크 중단·커밋 후 연결 단절·DB 재시작·볼륨 보존·복구 | 중복 허용 0, 불확실한 커밋 자동 재시도 0, 잘못된 승격 0, 재시작 후 사용 상태 유지 | 미구현 |
+| 4 | 실제 네트워크 중단·커밋 후 연결 단절·DB 재시작·볼륨 보존·복구 | 중복 허용 0, 불확실한 커밋 자동 재시도 0, 잘못된 승격 0, 재시작 후 사용 상태 유지 | **4A 합성 ACK 유실 + 실제 stop/restart 구현**, 물리 mid-COMMIT 단절/분산 복구는 HOLD |
 | 5 | Windows Docker Desktop 실제 기기 및 Linux CI 공통 재현성 | 동일 테스트 매트릭스·정리·SHA/버전 기록, scoped + final CI PASS, 병합/issue 업데이트 | 미구현 |
 
 **Phase 1 완료 조건과 Phase 5 완료 조건을 혼동하지 않는다.** GitHub Ubuntu 성공만으로 Windows 호스트 실측 완료라고 쓰지 않는다. Windows 실제 장치에서 실행한 증빙이 없으면 Windows는 NOT_VERIFIED.
