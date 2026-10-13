@@ -107,3 +107,31 @@ Watchtower-Track: ops
 - 실제 PostgreSQL 17 복원 결과 `1400~1450` 이력 스냅샷 **6/6**, 복원 관계 함수 `pg_proc` **11/11**, 관계 RLS/ACL **6/6**, 브라우저 직접 권한 차단, Synthetic Privacy Recovery **PASS**. 정확한 encrypted backup source/envelope 검증 단계 통과. Evidence artifact ID `11785825091`, SHA-256 `b98e443f0c50b8af05b0d890971ae78b6284ed70d98940f04fefaeee9252c82a`.
 - **R1 scoped DONE**. 그러나 `dr_ready=false`, full `supabase_migrations` ledger 복원 false, hosted Supabase Auth/Storage 및 운영 개인정보 Privacy Ledger 실제 replay 미입증.
 - **R2 계속 HOLD:** remote-only 104KB SQL의 출처·객체/DDL 동등성·Owner 승인, 저장소 1520~1720 21개 의존성 및 forward-only 배포정책 미해결. [#2030](https://github.com/gycha0109-beep/MyeongHa/pull/2030)의 read-only 19 RPC catalog parity 도구는 R2 비교 증거를 위한 것이며, R1 성공 또는 CI Green이 Production history 수정 승인으로 바뀌지 않는다.
+
+
+## 9. 2026-10-13 R2-A/B — 원격 번들 제한적 객체 겹침 및 21개 후속 순서 검증 (배포 승인 아님)
+
+Watchtower-Track: ops. R1 정확한 격리 복원 증거는 8절을 따른다. 이 절은 **읽기 전용 Production SQL + 저장소 SQL의 불변성 검증**을 설명한다.
+
+### 원격 `20261008090417` SQL 본문 비반출 검사
+
+- 신규 `scripts/operations/seyeon-r2-remote-bundle-overlap-readonly.sql`: Production 이력의 **단일 SQL을 DB 메모리에서만** 읽어 크기·SHA-256를 계산하고, `CREATE [OR REPLACE] FUNCTION public.*` 형태의 정규식상 이름 겹침을 **숫자로만** 출력한다. 원문 SQL·미확인 객체 이름·레코드·인증정보를 결과로 반환하지 않는다.
+- 실제 Production SELECT 관측(2026-10-13 UTC): `20261008090417` **104,021 bytes**, SHA-256 `4f38e4483061a84899f0fcaa4a8d6cfa9e09ce1553b1d31089d4de9154c4d894` (기존 지문과 일치); 정의 토큰 **19**, 고유 함수명 **19**, 저장소 `1460~1510`의 대상 RPC 이름 중복 **19/19**.
+- **증거 한계:** 정규식이 SQL 주석·문자열·동적 SQL을 파싱하지 않으므로 이는 이름 수준의 **lexical overlap screen**이다. 함수 **매개변수·Owner·SECURITY DEFINER·ACL·DDL 본문 동등성**을 주장하지 않는다. 실행 일시·작성자·도구·원격 번들 원본 보관처 미입증. `scripts/operations/seyeon-r2-rpc-catalog-readonly.sql`의 양 환경 metadata snapshot exact comparison은 별도 필요.
+
+### 저장소 `1520~1720` 21개 forward-only 격리 검증
+
+- 불변 목록: `scripts/operations/seyeon-r2-pending-migration-inventory.json`. **21개 파일**의 원래 Git Blob SHA, 버전, 증명 대상 객체, 선행 마이그레이션, 단위별 Owner 검토 책임과 `HOLD_OWNER_REVIEW`를 명시. 실제 버전 계보의 재작성/변경 없음.
+- 검증기: `scripts/operations/verify-seyeon-r2-pending-migrations.mjs`. 누락·추가·중복·버전 순서 변경·원본 SQL 바이트 변조·선행 버전 역전·Owner 승인 암묵적 승격·원격-only 버전의 저장소 편입 시 fail-closed. 반환 결과의 `authorizedForProduction=false`, `drReady=false` 불변.
+- 실제 PG17: `test/db/seyeon_r2_pending_catalog.sql`에서 후속 SQL replay **후** 주요 함수 18개, RLS+브라우저 직접권한 차단 테이블 6개, 비로그인 Owner 3개를 카탈로그 확인. `tests/seyeon-r2-pending-migrations.test.mjs`는 checksum·버전·의존성·Owner·객체 누락·무단 승인 부정 테스트. 기존 PostgreSQL 17 CI suite의 `seyeon-r2-pending-migrations` case에서 실행.
+- 9개 묶음은 **연속된 버전의 검토 단위**이며 Production에 실행 가능한 배포 Batch가 아니다. 순서: ①1520 계정 삭제 ②1530 Character Artifact ③1540 Saju proof ④1550~1630 비용 Governor 기반 ⑤1640 G1 Pin ⑥1650 Subject lock ⑦1660 Reader locator ⑧1670~1710 Guest/정산/receipt ⑨1720 Reader Product scope. Supabase의 version 정렬 때문에 **앞 단위를 건너뛰어 뒤 단위만 push 불가**, 각 단위의 Owner 승인·회귀·Rollback/Recovery·사후검증 요구.
+- **보증 한계:** Git Blob 불변성과 SQL의 선행 이름/객체 존재는 *정적 계약*이며, 전체 SQL AST/실행 시 Side Effect/SQL 동등성 증명이 아니다. 합성 PG17 재생은 Supabase hosted Role/Ext/Schema 편차를 모두 재현하지 않는다. 기존 1460~1510 및 timestamped migrations와 `104KB` 간 DDL·권한·history double-apply 충돌은 여전히 미해결.
+
+### R2 Owner 결정에 남은 차단 조건
+
+1. 원격 104KB SQL의 비공개 원본 보관·작성/실행 감사 주체 확인. 원문/PII는 이슈·CI·PR 반출 금지.
+2. 저장소 1460~1510을 기존/원격 런타임과 **함수 정확한 시그니처·Owner·ACL·DDL fingerprint** 기준으로 격리 PG17 및 Production의 동일 major에서 검증; 의미적 차이는 별도 분석.
+3. Timestamped 버전 `20261007150457` / `20261008043000`, 원격-only 104KB 번들, 21개 후속 버전의 실제 순서 충돌·중복 DDL·호스팅 Role 상호작용을 재현.
+4. DB/Security/Character/Reader/Saju/Ops 각 Owner가 단위별 무효화·실패 복구 경로를 승인한 뒤 forward-only 대응을 결정. 기존 `20261008090417` 이력을 임의 수리·삭제·대체하지 않음.
+
+**현 판정: R2 forensic metadata + 불변 의존성 스캐폴드 구축 중; Production 1520~1720 0/21, remote-only 1, 전체 DR readiness HOLD.** CI/PR 성공이나 R1 성공은 마이그레이션 배포 또는 세연 AI 보안 G0~G6 승인으로 자동 전환되지 않는다.
