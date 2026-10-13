@@ -92,10 +92,20 @@ where id='12102000-0000-0000-0000-000000000001';
 
 -- Verified initial issuance acquires SAME initial scope lock as initial binding
 -- before the original Commerce grant writer may lock Receipt/Grant rows.
-select * from public.internal_apply_initial_official_reader_receipt_locked_v1(
+select * from public.internal_issue_initial_reader_receipt_with_scope_pin_v1(
   'b4230000-0000-4000-8000-000000000001',
   array['test-reader-unit'],array[transaction_timestamp()],
   array[transaction_timestamp()],array[null]::timestamptz[],array[null]::text[]
+);
+
+select pg_temp.assert_v2_true(
+  'S5 issuer atomically pins exact initial Receipt Grant Scope and approved revision',
+  (select count(*) = 1
+    and bool_and(pin.source_birth_revision_id =
+      '12101100-0000-0000-0000-000000000001'::uuid
+      and pin.approved_policy_revision = 's4-initial-standard-test-only'
+      and pin.receipt_id='b4230000-0000-4000-8000-000000000001'::uuid)
+   from public.standard_reader_initial_purchase_scope_pins_v1 pin)
 );
 
 select pg_temp.assert_v2_true(
@@ -180,5 +190,18 @@ select pg_temp.assert_v2_true(
         'EXECUTE'
       )
     )
+  )
+);
+
+select pg_temp.assert_v2_true(
+  'S5 scope pins cannot be overwritten/deleted by a caller',
+  not pg_catalog.has_table_privilege(
+    'authenticated','public.standard_reader_initial_purchase_scope_pins_v1','SELECT'
+  )
+  and not pg_catalog.has_function_privilege(
+    'public','public.internal_issue_initial_reader_receipt_with_scope_pin_v1(uuid,text[],timestamptz[],timestamptz[],timestamptz[],text[])','EXECUTE'
+  )
+  and not pg_catalog.has_function_privilege(
+    'public','public.internal_acquire_initial_receipt_scope_pin_for_revoke_v1(uuid,uuid)','EXECUTE'
   )
 );
