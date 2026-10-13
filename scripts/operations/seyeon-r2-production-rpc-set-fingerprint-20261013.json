@@ -22,5 +22,8 @@
     "aclSetSha256": "e0576c2bcd9c0826cf2799017f1a2396a7d14a11aaf094209ea40547bb1f9e88",
     "ddlSetSha256": "1d84ffa5cb1b248c4f356b4b7ed399ff9a718b3eff9b5b62db4afbfb5d69eec9",
     "flagsSetSha256": "dbb0cbf1837820efc2f01c870d8d4b216d09600eb1d86b6bcc73c70b86e00c93"
-  }
+  },
+  "expectedMismatchFields": [
+    "aclSetSha256"
+  ]
 }
