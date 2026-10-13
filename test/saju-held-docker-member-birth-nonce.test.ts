@@ -198,7 +198,7 @@ describe.skipIf(!enabled)('Windows-compatible isolated Docker GoTrue→Subject/B
         db: string; login: string; can_exec: boolean; can_nonce: boolean;
       }>("select current_database()::text as db, session_user::text as login, "
         + "pg_has_role(current_user,'myeongha_api_executor','MEMBER') as can_exec, "
-        + "exists(select 1 from pg_roles where rolname='myeongha_saju_proof_nonce_runtime') as can_nonce"),
+        + "pg_has_role(current_user,'myeongha_saju_proof_nonce_runtime','MEMBER') as can_nonce"),
       nonceA!.query<{
         db: string; login: string; can_nonce: boolean; can_subject: boolean;
       }>("select current_database()::text as db, session_user::text as login, "
