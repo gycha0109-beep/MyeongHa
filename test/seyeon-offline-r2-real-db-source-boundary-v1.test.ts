@@ -161,7 +161,7 @@ describe.skipIf(!ENABLED)(
           `select * from public.cmd_receive_chat_turn_v1(
             $1::uuid,$2::uuid,$3::text,$4::text,$5::text,$6::jsonb,
             $7::uuid,$8::uuid,$9::uuid,$10::uuid,$11::text,
-            $12::text,$13::text)`,
+            $12::jsonb,$13::text)`,
           [
             S,T,'synthetic-r2-db-source-bridge',
             'sha256:v1:synthetic-r2-owner-bridge','chat-request-v1',
