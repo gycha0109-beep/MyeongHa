@@ -287,3 +287,11 @@ S1에서 공통 잠금 함수 자체가 성공하더라도 **S2 전체 경로가
 - `test/db/official_reader_d3b_verified_impact_lockset_three_session.sh`는 독립 verified Receipt/Grant 두 쌍, 공식 Reading×Reader 결속 집합, 서로 뒤바꾼 Provider 입력 순서에 의한 PostgreSQL A/B/C 실제 L0 advisory wait, current Grant 무변경을 확인한다. 다른 회원·위조 이벤트/Grant 매칭·중복·오래된 격리·직접 runtime EXECUTE를 부정한다.
 - 이 첫 시험 fixture에서 실제 영향 Product는 **1개**다. D1 별도 2-Product 역순 잠금 시험은 통과했으나 이것을 D3b 실제 서로 다른 구매 Product refund 원자 효과 성공으로 둔갑시키지 않는다. 여러 Product를 실제 Provider 취소 하나의 트랜잭션으로 적용하는 것은 D3 후속 과제다.
 - **차단 유지:** D3b 신규 resolver 결과만으로 부분 취소/restore/다중 Grant 회수를 실행하지 않는다. PortOne cancellation ingress 서명·조회·부분 환불 검증, full set mutating dispatcher, 기존 1080 direct bypass 차단, Commerce+Security+Legal Owner 승인 필요. 병합·운영 배포·유료 공개 금지. PostgreSQL 15/17 exact-SHA CI 결과 확인 전 이 구현을 PASS로 표시하지 않는다.
+
+### D3b exact-SHA 검증 확정 (2026-10-13)
+
+- Draft PR #2031, 검증 코드 커밋 `352791b5c176f3144a13a63e426c2f5300dec01b`. CI [38337875997](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38337875997)에서 PostgreSQL 15 DB Authority Core / PostgreSQL 17 / Content / Work Track / CI Verify / Governance / Web PR Domain Gates 모두 PASS.
+- 실제 PostgreSQL 15 job log: `PASS D3b: verified event-to-Receipt-to-two Grants, two bound Reader scopes; no effect`; `PASS D3b: provider mismatch, duplicate/incomplete set, ACL, Subject and isolation denied`; `PASS D3b: three PostgreSQL sessions, reverse verified pair order, L0 wait and no Grant mutation`.
+- 최종 schema catalog `8852d1a7ee13d219383798b754fa8f8241ecfd72302f672199e844ffdc8130db`, 86 public tables, PASS.
+- 1차 자체 검토에서 fixture의 B2/B3가 **이미 revoked**인 사실을 재확인하여 lock-only 시험이 권한을 재활성화하지 않도록 테스트 기대값을 수정. 신규 1840 함수 2개에 따른 Catalog hash 변동도 실제 PostgreSQL15 값으로 교정.
+- **D3b PRIVATE 범위 검증 완료.** 이 구현은 2개 이벤트/독립 Grant가 *같은 Product*에 귀속되는 fixture에서 검증한 **read-only impact inventory 및 source-owned L0→L1 잠금**이다. 다른 Product를 가로지르는 실제 다중 환불 원자 효과, 신뢰된 PortOne cancellation ingest, 부분 취소·restore, 구 Commerce Writer cutover는 미완료. 이 PR도 Draft/운영 HOLD.
