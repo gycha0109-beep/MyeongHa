@@ -105,6 +105,11 @@ select pg_temp.assert_v2_true(
 );
 
 \if :S5_BOUND
+-- Provider bridge deliberately restores caller's EMPTY subject context;
+-- authorized Reader-side visibility check must set its own verified Subject.
+select pg_catalog.set_config(
+  'myeongha.subject_id','11390000-0000-0000-0000-000000000001',false
+);
 select pg_temp.assert_v2_true(
   'S5 refunded bound initial Reader access is no longer current',
   (select count(*)=1 from public.standard_reading_reader_access_grants a
