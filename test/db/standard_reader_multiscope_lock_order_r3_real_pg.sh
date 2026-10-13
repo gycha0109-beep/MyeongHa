@@ -17,9 +17,10 @@ subject=11390000-0000-0000-0000-000000000001
 reading=12103100-0000-0000-0000-000000000001
 # Use real persisted official Reading identity. Reader lock is merely a
 # transaction mutex, NOT authority for paid disclosure.
-awk '/^-- Append the test Reader.s domain Capability as immutable published content/{exit} {print}' \
- test/db/official_standard_reading_reader_interpretation.sql > "$tmp/setup.sql"
-p -f "$tmp/setup.sql" >"$tmp/setup.out" 2>"$tmp/setup.err" ||
+# Unlike pre-binding fixtures, this race needs an EXISTING persisted official
+# Reading to ground the Subject × Reading × multi-Reader scope keys.
+p -f test/db/official_standard_reading_reader_interpretation.sql \
+ >"$tmp/setup.out" 2>"$tmp/setup.err" ||
  { tail -n 40 "$tmp/setup.err"; fail fixture; }
 [[ "$(p -c "select count(*) from public.standard_reading_official_bindings
  where reading_id='$reading'::uuid and subject_id='$subject'::uuid")" == 1 ]] ||
