@@ -7,11 +7,11 @@
 
 ## 0. 변경 불가 제품·권위 계약
 
-1. **기존 일반 사주(Standard)**: 공식 Reader 9명은 동일 일반 사주 Product의 *상품 선택 적격성*을 갖는다. 전문 \`character_capabilities.can_initiate\`와 독립. 그러나 **정확한 Reader별 독립 구매권**, 현재 Purchase Intent·production verified Receipt·Grant·Official Reading·Content Release·Unlock·Saju Source는 각각 검증한다. **1회 구매로 9명 전체 권한 자동 생성 불가**.
-2. **미래 Premium**: \`premium_character_bound(targetReaderId)\`로 *하나의 Product ↔ 한 캐릭터*를 연결한다. 구 \`premium_restricted(allowedReaderIds[])\`는 이 신규 미병합 모델에서 폐기. 다른 Reader의 일반 사주 접근을 전역 차단하지 않는다. 전용 Premium 판매·실결속·전문 권한은 미승인/HOLD.
-3. **읽기/쓰기 분리**: 상품 적격성·사전 조회·과거 \`replayed=true\`는 현재 구매권이 아니다. 기존 1220 Binder, 공식 Saju 계산, Commerce 원본 Writer, Privacy 삭제/복원 이력은 직접 변경하지 않는다.
+1. **기존 일반 사주(Standard)**: 공식 Reader 9명은 동일 일반 사주 Product의 *상품 선택 적격성*을 갖는다. 전문 `character_capabilities.can_initiate`와 독립. 그러나 **정확한 Reader별 독립 구매권**, 현재 Purchase Intent·production verified Receipt·Grant·Official Reading·Content Release·Unlock·Saju Source는 각각 검증한다. **1회 구매로 9명 전체 권한 자동 생성 불가**.
+2. **미래 Premium**: `premium_character_bound(targetReaderId)`로 *하나의 Product ↔ 한 캐릭터*를 연결한다. 구 `premium_restricted(allowedReaderIds[])`는 이 신규 미병합 모델에서 폐기. 다른 Reader의 일반 사주 접근을 전역 차단하지 않는다. 전용 Premium 판매·실결속·전문 권한은 미승인/HOLD.
+3. **읽기/쓰기 분리**: 상품 적격성·사전 조회·과거 `replayed=true`는 현재 구매권이 아니다. 기존 1220 Binder, 공식 Saju 계산, Commerce 원본 Writer, Privacy 삭제/복원 이력은 직접 변경하지 않는다.
 4. **최소 권한**: 모든 새 Binder/발급/환불 실험은 disposable PostgreSQL의 private SQL/비공개 API 계약에서 검증한다. Public/anon/authenticated/service/API/Commerce runtime의 신규 SQL EXECUTE, 실제 Checkout, T2 유료 본문 공개, 자동 환불 거부는 Owner/DR/법무·개인정보 승인 전 금지.
-5. **잠금**: \`READ COMMITTED\`, 서버 유도 scope, advisory transaction lock이 Purchase/Receipt/Grant/Birth row lock보다 먼저. Lock 후 fresh read 및 \`clock_timestamp()\`. 특정 실험의 PASS는 **모든 운영 Writer가 해당 lock에 참여한다는 증거가 아니다**.
+5. **잠금**: `READ COMMITTED`, 서버 유도 scope, advisory transaction lock이 Purchase/Receipt/Grant/Birth row lock보다 먼저. Lock 후 fresh read 및 `clock_timestamp()`. 특정 실험의 PASS는 **모든 운영 Writer가 해당 lock에 참여한다는 증거가 아니다**.
 
 ## 1. 현재 검증 기준 및 PR 의존 그래프
 
@@ -24,15 +24,15 @@
 | CAP-B2 통합 | #2010 → #2013 → **#2014** | 1790 Product Rule + 1800 additional Binder, 1810 최초 scope/상품 승인·철회 lock, 1820 최초 Binder, 1830 최초 verified Receipt issuer. **비공개 Draft** |
 | 별도 RR | #1960(RR-03) → #1974(RR-04) | 출처 저장/후속 조회 후보만. **RR-03의 1720 번호 충돌과 Privacy/T2 계약 미해결** |
 
-- **#2014**: \`feat/applizing/cap-b2-initial-binder-private-s4\`, 2026-10-13 확인 HEAD \`0d857eeb247b3c9d870685c322b7902d1b0955c3\`; Draft/open/unmerged. 해당 HEAD의 CI Verify, db-authority-core, 앱화, PostgreSQL 17, Commerce payment/entitlement, Content, Governance, Web, GitGuardian **SUCCESS**. Runtime DB dependency는 route-skipped(성공이라고 주장하지 않는다).
-- 실제 DB15 로그: synthetic \`seyeon\`의 전문 Capability 행 0개에서 첫 Official Reading/Interpretation/Access 각각 1건 생성 **PASS**, historical replay→현재 Grant 승격 거절 **PASS**, 신규 private Binder 및 Receipt issuer ACL **PASS**. DB15 카탈로그 해시 \`e59dce38aaa7f9d2534d297825c398b90f6899a7ab46d49402a4c6387b972307\` (이 SHA는 1820/1830을 포함한 당시 스키마에만 해당).
+- **#2014**: `feat/applizing/cap-b2-initial-binder-private-s4`, 2026-10-13 확인 HEAD `0d857eeb247b3c9d870685c322b7902d1b0955c3`; Draft/open/unmerged. 해당 HEAD의 CI Verify, db-authority-core, 앱화, PostgreSQL 17, Commerce payment/entitlement, Content, Governance, Web, GitGuardian **SUCCESS**. Runtime DB dependency는 route-skipped(성공이라고 주장하지 않는다).
+- 실제 DB15 로그: synthetic `seyeon`의 전문 Capability 행 0개에서 첫 Official Reading/Interpretation/Access 각각 1건 생성 **PASS**, historical replay→현재 Grant 승격 거절 **PASS**, 신규 private Binder 및 Receipt issuer ACL **PASS**. DB15 카탈로그 해시 `e59dce38aaa7f9d2534d297825c398b90f6899a7ab46d49402a4c6387b972307` (이 SHA는 1820/1830을 포함한 당시 스키마에만 해당).
 - 최신 본선 SHA, PR HEAD, CI 결과, 마이그레이션 번호는 **항상 GitHub에서 재확인**. 상위 S0~S8 로드맵 및 개별 PR의 과거 상태는 현재 결과로 자동 승격하지 않는다.
 
 ### 통합 마이그레이션 후보
 
-- \`1740\` Reader scope, \`1750\` current bundle, \`1760\` additional lock, \`1770\` Provider revoke, \`1780\` verified revoke bridge.
-- \`1790\` Product approved Rule(**통합 스택에서만** 구 Product PR의 1770 중복을 분리), \`1800\` additional Standard Binder.
-- \`1810\` 초기 Subject/Product/Birth/Spec scope 및 Product approve/withdrawal 잠금, \`1820\` 초기 Reader Binder, \`1830\` 초기 verified Receipt issuer.
+- `1740` Reader scope, `1750` current bundle, `1760` additional lock, `1770` Provider revoke, `1780` verified revoke bridge.
+- `1790` Product approved Rule(**통합 스택에서만** 구 Product PR의 1770 중복을 분리), `1800` additional Standard Binder.
+- `1810` 초기 Subject/Product/Birth/Spec scope 및 Product approve/withdrawal 잠금, `1820` 초기 Reader Binder, `1830` 초기 verified Receipt issuer.
 - 원본 #1999/#2007 Product PR은 별도로 1770을 사용하므로 **병합 순서·번호 정렬 미완**. RR-03 #1960은 본선 Product의 1720과 충돌. 이미 운영 적용된 번호/해시를 재작성하지 말고 각 소유자가 forward-only numbering·이력·카탈로그를 승인해야 한다.
 
 ## 2. 다음 작업 순서 — B2-R0~R7
@@ -41,9 +41,9 @@
 |---|---|---|---|
 | **B2-R0 현황 동기화** | 본선과 #1983~#2014 최신 Draft/stack/HEAD/CI, S4 실PG 증거, 운영 DR, migration catalog 재조사 | 최신 스냅샷·변경 파일/충돌·실패 원인 기록 | **작성 시점 완료, 매 세션 재수행** |
 | **B2-R1 과거 구매 최초 Scope 영구 고정** | 1810의 *현재* Birth/Offer 의존은 환불 시점에 부적합. 검증된 Receipt/initial purchase의 immutable Subject/Product/spec/domain/구매당시 BirthRevision/Reader/Scope identity를 재해석 불가능한 authority pin으로 append-only 보관하는 별도 소유 계약·forward-only migration 제안 | 현재 Birth 수정·상품 retire·Reader release 교체 후에도 verified receipt lineage로 **동일 최초 scope 획득**; 다른 Subject/위조 pin DENY, ACL·개인정보 삭제 계약 | **다음 최우선 / 미완료** |
-| **B2-R2 최초 결속 전 환불·만료·회수** | Provider \`payment.cancelled\` verified event/receipt→immutable scope pin 조회→초기 scope lock→Product/Grant/CAS locking. **Access 0행이어도 회수**. 기존 1770/1780(이미 결속된 Scope)과 충돌 없이 분기. 임의 직접 Grant UPDATE 금지 | **환불 먼저→발급/Bind 거절**, **발급·Bind 먼저→환불 대기 후 새 접근 차단** 두 연결 PG15/17. Event 중복/순서 뒤집힘·복원·가짜 Receipt DENY; 무교착·Orphan 0 | **미완료 / R1 필요** |
+| **B2-R2 최초 결속 전 환불·만료·회수** | Provider `payment.cancelled` verified event/receipt→immutable scope pin 조회→초기 scope lock→Product/Grant/CAS locking. **Access 0행이어도 회수**. 기존 1770/1780(이미 결속된 Scope)과 충돌 없이 분기. 임의 직접 Grant UPDATE 금지 | **환불 먼저→발급/Bind 거절**, **발급·Bind 먼저→환불 대기 후 새 접근 차단** 두 연결 PG15/17. Event 중복/순서 뒤집힘·복원·가짜 Receipt DENY; 무교착·Orphan 0 | **미완료 / R1 필요** |
 | **B2-R3 전체 Writer 공통 잠금 통일** | 최초/추가 발급·Binder·Refund/Revoke/Expire·Reader 결속·T2 Reader 접근, Product 승인/withdraw, Content retire/Unlock 변경의 *실제 호출 함수*별 Lock order 표·도달성. 서로 다른 scope multi-lock 순서와 policy revision pin 설계 | 모든 쓰기 진입점 scope-first 적용; direct legacy bypass 0(또는 명시적 HOLD), 2-session 양방향 interleaving, READ COMMITTED·wait 이후 최신 Grant·policy·Release 검증 | **부분 구현 / 통합 미완료** |
-| **B2-R4 범용 Standard·Premium 제품 검증 완성** | CAP-B2 D-01의 **BIND-01~29**를 실제 PostgreSQL 및 Reader·API 경로로 구현. 구 BIND-08~12 \`premium_restricted\` 사례를 **단일 \`premium_character_bound(targetReaderId)\` 의미로 갱신**; Premium 실제 결속은 HOLD | 9×9 Standard 적격성은 상품·공식 Reader 기준, 정확한 Receipt/Grant/Release/Unlock 필요, 전문 \`can_initiate\` 0/false 허용; Premium target 불일치 DENY·일치만으로 paid access 0; replay/권한 철회·cross-subject·policy withdrawal 음성, PG15/17 | **부분·매트릭스 전체 PASS 아님** |
+| **B2-R4 범용 Standard·Premium 제품 검증 완성** | CAP-B2 D-01의 **BIND-01~29**를 실제 PostgreSQL 및 Reader·API 경로로 구현. 구 BIND-08~12 `premium_restricted` 사례를 **단일 `premium_character_bound(targetReaderId)` 의미로 갱신**; Premium 실제 결속은 HOLD | 9×9 Standard 적격성은 상품·공식 Reader 기준, 정확한 Receipt/Grant/Release/Unlock 필요, 전문 `can_initiate` 0/false 허용; Premium target 불일치 DENY·일치만으로 paid access 0; replay/권한 철회·cross-subject·policy withdrawal 음성, PG15/17 | **부분·매트릭스 전체 PASS 아님** |
 | **B2-R5 앱 API·Reader 읽기 권한 / T1→T2 경계** | Runtime API selection/admission에서 pinned policy revision + Reader + exact Grant/Source/Bundle 확인, 현재권한 재검증. 별도 유료 해설은 T1 체크→잠금 없는 비공개 생성→T2 현행 권한·출처 검증 후 원자 저장→그 뒤 공개 | refund/expire/retire 후 생성·재열람·AI memory/summary/notification 유출 0; 과거 답변 역사만으로 현재 권한 발급 0; protected output 경계와 Reader/Commerce/Privacy 승인 | **미완료 / 상위 S3~S6에 연결** |
 | **B2-R6 운영 준비·스택 정리** | #1983→#2014 순서·마이그레이션 버전·스키마 catalog·owner PR 경계/충돌 정리, RR-03 1720 재번호 Owner 의뢰, production 1400~1450 DR/isolated restore 해결, 권한/RLS/Privacy 삭제·복원·Legal 고지 확인 | 모든 병합 HEAD CI GREEN, PG15/17 full matrix, 실제 DR restore PASS, Product/DB/Commerce/Reader/Privacy/Legal 명시적 승인 | **미완료 / 병합·배포 HOLD** |
 | **B2-R7 단계적 유료 공개** | S0~S8 상위 Roadmap의 공개·T2 보호본문·RR-03/04 정식 연계 후 별도 release 판단 | checkout/reader public/T2 disclosure/auto-refund 운영 기능은 출시 승인 별도. 암묵 활성화 0 | **차단 유지** |
@@ -54,12 +54,12 @@
 
 ### 검증할 질문
 - 검증된 최초 구매의 **출생정보 개정/상품 규격/공식 Reader/결속 당시 Product 승인 Revision**을 어느 기존 immutable row에서 읽거나 어떤 신규 append-only row에 고정할 것인가?
-- **결속 이전** 취소 이벤트에는 \`standard_reading_reader_access_grants\`가 0행이다. 이 상황에서 결제사 이벤트가 초기 범위를 어떤 verified receipt provenance로 정확하게 조회하는가?
+- **결속 이전** 취소 이벤트에는 `standard_reading_reader_access_grants`가 0행이다. 이 상황에서 결제사 이벤트가 초기 범위를 어떤 verified receipt provenance로 정확하게 조회하는가?
 - 상품 retire, Birth revision 변경, 승인 Rule 철회 후에도 **환불은 거절되거나 무한 대기하면 안 된다**. 과거 scope lock 도출과 현재 paid access 결정은 독립적으로 유지되는가?
 - 최초/추가 Reader의 서로 다른 advisory-key와 Product lock, Grant row lock 간 전역 순서, 정책/Content 변경 Writer가 그 순서를 침범하는가?
 
 ### 작업 산출 순서
-1. \`#2014\` HEAD와 현재 본선/DB migration; 1820/1830/1810/1770/1780, \`purchase_intents\`/\`commerce_receipts\`/\`entitlement_grants\` 및 policy revision provenance를 실제 SQL로 조사한다.
+1. `#2014` HEAD와 현재 본선/DB migration; 1820/1830/1810/1770/1780, `purchase_intents`/`commerce_receipts`/`entitlement_grants` 및 policy revision provenance를 실제 SQL로 조사한다.
 2. DB·Commerce·Product Owner가 변경할 권위 테이블·함수 목록/lock order를 **문서/테스트 계약**으로 확정한다. 승인 없는 mutable product 상태를 immutable pin의 대체물로 쓰지 않는다.
 3. 격리 신규 Draft PR, 기존 production migration 비변경·기존 Commerce Writer 비우회 원칙으로 최소 append-only pin + exact source resolver의 private migration과 최소 권한을 작성한다.
 4. 합성 verified initial purchase→출생 개정/상품 은퇴→unbound refund intent→같은 scope pin 조회의 **실 PostgreSQL positive/negative**; 별도 연결에서 lock timeout·post-wait fresh check를 증명한다. 이때 환불 효과의 실제 집행은 R2가 준비되기 전 별도 HOLD.
@@ -81,10 +81,10 @@
 
 ## 5. 참조
 
-- \`docs/architecture/OFFICIAL_READER_PAID_CHAT_INTEGRATION_ROADMAP_20261012_V1.md\` — 공식 사주 채팅 전체 S0~S8.
-- \`docs/architecture/CAP_B2_INITIAL_PRIVATE_BIND_ISSUE_REFUND_S4_DRAFT_V1.md\` — #2014 private initial Binder/Receipt/Refund gap.
-- \`docs/architecture/CAP_B2_INITIAL_SCOPE_PRODUCT_POLICY_LOCK_S3_DRAFT_V1.md\` — #2013 initial scope + approved policy lock.
-- \`docs/architecture/CAP_B2_STANDARD_READER_DB_STACK_INTEGRATION_DRAFT_V1.md\` — #2010 DB+Product 통합.
-- \`docs/architecture/STANDARD_PREMIUM_READER_PRODUCT_ASSOCIATION_REMODEL_V1.md\` — #2007 현재 Product 모델.
-- \`docs/architecture/STANDARD_READER_V2_BIND_POLICY_SPLIT_D01_TEST_MATRIX_V1.md\` — #2003 BIND-01~29(구 Premium 목록 문구는 새 모델로 갱신 필요).
+- `docs/architecture/OFFICIAL_READER_PAID_CHAT_INTEGRATION_ROADMAP_20261012_V1.md` — 공식 사주 채팅 전체 S0~S8.
+- `docs/architecture/CAP_B2_INITIAL_PRIVATE_BIND_ISSUE_REFUND_S4_DRAFT_V1.md` — #2014 private initial Binder/Receipt/Refund gap.
+- `docs/architecture/CAP_B2_INITIAL_SCOPE_PRODUCT_POLICY_LOCK_S3_DRAFT_V1.md` — #2013 initial scope + approved policy lock.
+- `docs/architecture/CAP_B2_STANDARD_READER_DB_STACK_INTEGRATION_DRAFT_V1.md` — #2010 DB+Product 통합.
+- `docs/architecture/STANDARD_PREMIUM_READER_PRODUCT_ASSOCIATION_REMODEL_V1.md` — #2007 현재 Product 모델.
+- `docs/architecture/STANDARD_READER_V2_BIND_POLICY_SPLIT_D01_TEST_MATRIX_V1.md` — #2003 BIND-01~29(구 Premium 목록 문구는 새 모델로 갱신 필요).
 - 연동 PR: #1983, #1984, #1987, #1993, #1996, #1999, #2001, #2004, #2005, #2007, #2010, #2013, #2014, #1960, #1974.
