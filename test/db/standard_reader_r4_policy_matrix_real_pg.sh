@@ -37,3 +37,21 @@ p -f test/db/standard_reader_r4_premium_only.sql >/dev/null
 where policy_kind='premium_character_bound' and target_reader_id='seyeon'")" == 1 ]] ||
  fail 'Premium must bind exactly one approved Reader in Product policy'
 deny_standard BIND-09-premium-no-Standard-fallback
+
+p -f test/db/standard_reader_r4_approve_standard.sql >/dev/null
+p -f test/db/standard_reader_r4_specialist_false.sql >/dev/null
+[[ "$(p -c "select count(*) from public.character_capabilities
+where character_id='seyeon' and can_initiate=false")" == 1 ]] ||
+ fail 'false specialist capability fixture missing'
+p -f test/db/standard_reader_r4_initial_bind_call.sql >"$tmp/allow.out" 2>"$tmp/allow.err" ||
+ { cat "$tmp/allow.err"; fail 'BIND-02/03/14 legitimate Standard Binder'; }
+[[ "$(p -c "select count(*) from public.standard_reading_official_bindings")" == 1 ]] ||
+ fail 'BIND-14 one official Reading expected'
+[[ "$(p -c "select count(*) from public.standard_reading_reader_access_grants
+where purchase_intent_id='b4220000-0000-4000-8000-000000000001'::uuid
+and reader_character_id='seyeon'")" == 1 ]] ||
+ fail 'BIND-14 one exact Reader Access expected'
+[[ "$(p -c "select count(*) from public.character_capabilities
+where character_id='seyeon' and can_initiate=false")" == 1 ]] ||
+ fail 'BIND-03 specialist capability was modified'
+echo 'PASS R4 BIND-02/03/14 precise Standard private issue/bind with false specialist Capability'
