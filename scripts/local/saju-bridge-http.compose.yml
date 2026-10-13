@@ -1,37 +1,55 @@
 # Phase 2 overlay. Loaded ONLY with --http <pinned local Saju checkout>.
-# npm dependency preparation uses a disposable egress network; the actual
-# HTTP/HMAC verification runs solely on the isolated internal Docker network.
+# Dependency preparation uses a disposable egress network. A scrubbed source
+# snapshot is copied into per-run writable volumes (never mutate host checkout).
+# Actual HTTP/HMAC verification is internal-only and mounts snapshots read-only.
 services:
   saju-deps-myeongha:
     image: node:24-bookworm-slim
     working_dir: /myeongha
-    entrypoint: ["npm", "ci", "--ignore-scripts", "--no-audit", "--no-fund"]
+    entrypoint: ["/bin/sh", "-eu", "-c"]
+    command:
+      - >-
+        tar -C /checkout -cf -
+        --exclude=.git --exclude=node_modules --exclude=.env --exclude='.env.*'
+        --exclude='*/.git' --exclude='*/node_modules'
+        --exclude='*/.env' --exclude='*/.env.*'
+        --exclude='.next' --exclude='.vercel' --exclude='coverage'
+        --exclude='*/.next' --exclude='*/.vercel' --exclude='*/coverage'
+        . | tar -C /myeongha -xf - &&
+        npm ci --ignore-scripts --no-audit --no-fund
     volumes:
       - type: bind
         source: ${SAJU_BRIDGE_LOCAL_MYEONGHA_DIR:?repository-checkout-required}
-        target: /myeongha
+        target: /checkout
         read_only: true
       - type: volume
-        source: myeongha-node-modules
-        target: /myeongha/node_modules
+        source: myeongha-workspace
+        target: /myeongha
     networks: [npm-egress]
 
   saju-deps-engine:
     image: node:24-bookworm-slim
     working_dir: /saju
     entrypoint: ["/bin/sh", "-eu", "-c"]
-    command: ["npm ci --ignore-scripts --no-audit --no-fund && npm run build && test -s dist/source-reading-proof-server.js"]
+    command:
+      - >-
+        tar -C /checkout -cf -
+        --exclude=.git --exclude=node_modules --exclude=.env --exclude='.env.*'
+        --exclude='*/.git' --exclude='*/node_modules'
+        --exclude='*/.env' --exclude='*/.env.*'
+        --exclude='dist' --exclude='*/dist'
+        . | tar -C /saju -xf - &&
+        npm ci --ignore-scripts --no-audit --no-fund &&
+        npm run build &&
+        test -s dist/source-reading-proof-server.js
     volumes:
       - type: bind
         source: ${SAJU_BRIDGE_LOCAL_SAJU_DIR:?pinned-saju-checkout-required}
-        target: /saju
+        target: /checkout
         read_only: true
       - type: volume
-        source: saju-node-modules
-        target: /saju/node_modules
-      - type: volume
-        source: saju-dist
-        target: /saju/dist
+        source: saju-workspace
+        target: /saju
     networks: [npm-egress]
 
   saju-http-verifier:
@@ -39,25 +57,13 @@ services:
     working_dir: /myeongha
     entrypoint: ["node", "scripts/local/verify-saju-bridge-http.mjs", "/saju"]
     volumes:
-      - type: bind
-        source: ${SAJU_BRIDGE_LOCAL_MYEONGHA_DIR:?repository-checkout-required}
+      - type: volume
+        source: myeongha-workspace
         target: /myeongha
         read_only: true
       - type: volume
-        source: myeongha-node-modules
-        target: /myeongha/node_modules
-        read_only: true
-      - type: bind
-        source: ${SAJU_BRIDGE_LOCAL_SAJU_DIR:?pinned-saju-checkout-required}
+        source: saju-workspace
         target: /saju
-        read_only: true
-      - type: volume
-        source: saju-node-modules
-        target: /saju/node_modules
-        read_only: true
-      - type: volume
-        source: saju-dist
-        target: /saju/dist
         read_only: true
     environment:
       NODE_ENV: test
@@ -68,6 +74,5 @@ networks:
     internal: false
 
 volumes:
-  myeongha-node-modules:
-  saju-node-modules:
-  saju-dist:
+  myeongha-workspace:
+  saju-workspace:
