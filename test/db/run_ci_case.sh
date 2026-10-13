@@ -25,6 +25,38 @@ apply_pg17_migrations_without_birth_authority() {
   done
 }
 
+# Bound the R2 replay to the applied repository frontier 1510 plus both
+# known timestamped migrations. All 1520..1720 are Production HOLD.
+# No remote-only 20261008090417 SQL is fetched or executed.
+apply_pg17_migrations_through_seyeon_production_frontier() {
+  psql -v ON_ERROR_STOP=1 -f test/db/bootstrap_supabase_auth_stub.sql
+  local migration basename version
+  local timestamped_count=0
+  for migration in supabase/migrations/*.sql; do
+    basename="${migration##*/}"
+    version="${basename%%_*}"
+    if [[ "${version}" =~ ^[0-9]{4}$ ]]; then
+      if (( 10#${version} > 1510 )); then continue; fi
+    elif [[ "${version}" =~ ^[0-9]{14}$ ]]; then
+      case "${basename}" in
+        20261007150457_guest_promotion_auth_fk_validation.sql|20261008043000_seyeon_manifest_acl_restore.sql)
+          timestamped_count=$(( timestamped_count + 1 ))
+          ;;
+        *) echo "HOLD_R2_UNREVIEWED_TIMESTAMPED_MIGRATION" >&2; return 1 ;;
+      esac
+    else
+      echo "HOLD_R2_UNREVIEWED_MIGRATION_NAME" >&2; return 1
+    fi
+    if [[ "${basename}" == '0860_birth_profile_create_runtime_authority.sql' ]]; then
+      echo "Skipping managed-principal 0860 in isolated PG17 (dedicated owner test)"
+      continue
+    fi
+    echo "Applying ${migration}"
+    psql -v ON_ERROR_STOP=1 -f "${migration}" >/dev/null
+  done
+  test "${timestamped_count}" -eq 2
+}
+
 verify_pg17() {
   version_num="$(psql -Atqc "show server_version_num")"
   test "${version_num}" -ge 170000
@@ -254,6 +286,18 @@ SQL
     node scripts/operations/verify-seyeon-r2-pending-migrations.mjs > /dev/null
     apply_pg17_migrations_without_birth_authority
     psql -X -v ON_ERROR_STOP=1 -f test/db/seyeon_r2_pending_catalog.sql
+    ;;
+  seyeon-r2-cross-env-catalog)
+    verify_pg17
+    apply_pg17_migrations_through_seyeon_production_frontier
+    local_shape="$(mktemp)"
+    local_digest="$(mktemp)"
+    trap 'rm -f -- "$local_shape" "$local_digest"' EXIT
+    psql -X -qAt -v ON_ERROR_STOP=1 -f scripts/operations/seyeon-r2-rpc-catalog-readonly.sql > "$local_shape"
+    node scripts/operations/verify-seyeon-r2-rpc-catalog.mjs "$local_shape" > /dev/null
+    psql -X -qAt -v ON_ERROR_STOP=1 -f scripts/operations/seyeon-r2-rpc-set-fingerprint-readonly.sql > "$local_digest"
+    node scripts/operations/verify-seyeon-r2-rpc-set-fingerprint.mjs "$local_digest" \
+      scripts/operations/seyeon-r2-production-rpc-set-fingerprint-20261013.json
     ;;
   seyeon-r2-rpc-catalog)
     verify_pg17
