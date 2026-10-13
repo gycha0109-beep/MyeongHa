@@ -80,10 +80,10 @@ services:
         test "$(psql -X -Atqc 'select current_database()')" = 'myeongha_saju_subject_local_verify'
         psql -X -v ON_ERROR_STOP=1 -f test/db/bootstrap_supabase_auth_stub.sql
         for migration in supabase/migrations/*.sql; do
-          psql -X -v ON_ERROR_STOP=1 -f "$migration" >/dev/null
+          psql -X -v ON_ERROR_STOP=1 -f "$$migration" >/dev/null
         done
         psql -X -v ON_ERROR_STOP=1 -f test/db/fixtures/saju_local_subject_birth_proof_e2e.sql
-        psql -X -v ON_ERROR_STOP=1 -v "subject_password=$SAJU_BRIDGE_LOCAL_SUBJECT_LOGIN_PASSWORD" -f scripts/local/saju-bridge-subject-local-login.sql
+        psql -X -v ON_ERROR_STOP=1 -v "subject_password=$$SAJU_BRIDGE_LOCAL_SUBJECT_LOGIN_PASSWORD" -f scripts/local/saju-bridge-subject-local-login.sql
     environment:
       PGHOST: subject-db
       PGPORT: "5432"
@@ -106,7 +106,7 @@ services:
       - |
         test "$(psql -X -Atqc 'select current_database()')" = 'myeongha_saju_nonce_local_verify'
         psql -X -v ON_ERROR_STOP=1 -f supabase/migrations/1540_saju_source_proof_nonce_claim_authority_v1.sql
-        psql -X -v ON_ERROR_STOP=1 -v "nonce_password=$SAJU_BRIDGE_LOCAL_NONCE_LOGIN_PASSWORD" -f scripts/local/saju-bridge-nonce-local-login.sql
+        psql -X -v ON_ERROR_STOP=1 -v "nonce_password=$$SAJU_BRIDGE_LOCAL_NONCE_LOGIN_PASSWORD" -f scripts/local/saju-bridge-nonce-local-login.sql
     environment:
       PGHOST: nonce-db
       PGPORT: "5432"
