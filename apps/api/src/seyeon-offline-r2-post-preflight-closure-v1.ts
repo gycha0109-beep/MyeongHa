@@ -1,5 +1,9 @@
 import { createHash } from 'node:crypto';
 import {
+  createSeyeonOfflineR2SealedProviderChainV1,
+  type SeyeonOfflineR2SealedProviderChainV1,
+} from './seyeon-offline-r2-sealed-provider-chain-v1.js';
+import {
   assembleSeyeonRuntimeContextV2,
   canonicalJson,
   type SeyeonRuntimeContextV2,
@@ -155,5 +159,54 @@ export function createSeyeonOfflineR2PostPreflightSyntheticProviderV1(input: Rea
       dispatched = true;
       return input.delegate.generate(request);
     },
+  });
+}
+
+/**
+ * R2 offline five-stage continuation: reuse the existing native full-request
+ * sealed chain, but recheck the ACTUAL governed Preflight and S0 assembled
+ * Context before EVERY synthetic Provider dispatch, not only Interpreter.
+ *
+ * The supplied expectedRequests and Preflight result are test-harness inputs.
+ * These are NOT DB-signed Owner receipts or authenticated network wire bytes.
+ * Nothing returned here enables a paid/Production Provider or HTTP reveal.
+ */
+export function createSeyeonOfflineR2PostPreflightSealedChainV1(input: Readonly<{
+  candidate: SeyeonOfflineS0ContextCandidateV1;
+  preflight: CharacterGovernedPreflightResultV1;
+  actualContext: SeyeonRuntimeContextV2;
+  expectedRequests: readonly SeyeonStructuredProviderRequestV2[];
+  delegate: SeyeonStructuredProviderPortV2;
+}>): SeyeonOfflineR2SealedProviderChainV1 {
+  const initial = observeSeyeonOfflineR2PostPreflightClosureV1(input);
+  if (initial.state !== 'post_preflight_context_observed_synthetic_only' ||
+      !input.expectedRequests.some(request =>
+        request?.purpose === 'turn_interpretation' &&
+        same(request, buildSeyeonTurnInterpreterRequestV2(input.actualContext)))) {
+    throw new Error('Seyeon offline R2 five-stage post-Preflight baseline held');
+  }
+
+  const sealed = createSeyeonOfflineR2SealedProviderChainV1(input);
+  const provider = Object.freeze({
+    providerKey: sealed.provider.providerKey,
+    modelKey: sealed.provider.modelKey,
+    generate(request: SeyeonStructuredProviderRequestV2) {
+      // A sealed renderer/reviewer request may remain unchanged while the
+      // underlying Grant candidate, Preflight or context has changed.
+      // Check the full closure every time, including after Interpreter output.
+      const current = observeSeyeonOfflineR2PostPreflightClosureV1(input);
+      if (current.state !== 'post_preflight_context_observed_synthetic_only' ||
+          current.contextDigest !== initial.contextDigest ||
+          current.interpreterRequestDigest !== initial.interpreterRequestDigest ||
+          (request?.purpose === 'turn_interpretation' &&
+           !same(request, buildSeyeonTurnInterpreterRequestV2(input.actualContext)))) {
+        throw new Error('Seyeon offline R2 five-stage post-Preflight source closure held');
+      }
+      return sealed.provider.generate(request);
+    },
+  } satisfies SeyeonStructuredProviderPortV2);
+  return Object.freeze({
+    provider,
+    snapshot: () => sealed.snapshot(),
   });
 }
