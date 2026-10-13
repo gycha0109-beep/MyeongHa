@@ -207,7 +207,7 @@ if [[ "${CI:-}" == "true" && "${PGHOST:-}" == "localhost" ]]; then
   run_isolated_case myeongha_b2_r4_disabled bash test/db/standard_reader_r4_policy_release_denials_real_pg.sh disabled
   run_isolated_case myeongha_b2_r4_coming_soon bash test/db/standard_reader_r4_policy_release_denials_real_pg.sh coming_soon
   run_isolated_case myeongha_b2_r4_locked bash test/db/standard_reader_r4_policy_release_denials_real_pg.sh locked
-  run_isolated_case myeongha_b2_r4_release_retired bash test/db/standard_reader_r4_policy_release_denials_real_pg.sh release_retired
+  run_isolated_case myeongha_b2_r4_release_not_default bash test/db/standard_reader_r4_policy_release_denials_real_pg.sh release_not_default
   run_isolated_case myeongha_b2_r4_rule_future bash test/db/standard_reader_r4_policy_release_denials_real_pg.sh rule_future
   run_isolated_case myeongha_b2_r4_rule_ambiguous bash test/db/standard_reader_r4_policy_release_denials_real_pg.sh rule_ambiguous
   run_isolated_case myeongha_b2_r4_rule_withdrawn bash test/db/standard_reader_r4_policy_release_denials_real_pg.sh rule_withdrawn
