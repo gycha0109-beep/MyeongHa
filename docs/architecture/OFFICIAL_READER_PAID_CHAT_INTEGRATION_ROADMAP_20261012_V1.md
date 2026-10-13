@@ -331,3 +331,19 @@ S1에서 공통 잠금 함수 자체가 성공하더라도 **S2 전체 경로가
 - Draft PR #2037의 코드·테스트 SHA `ef5b576a648d7986fcc48a6ea2f4ac4ad87d83b0`, [GitHub CI 38340805623](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38340805623): Commerce Payment Work Track, 최종 CI Verify, Governance, Web PR Domain Gates 모두 SUCCESS. TypeScript/빌드 검사 성공. Commerce Work Track의 기존 775 tests PASS / 19 SKIP 및 **D3d 신규 25 tests PASS**를 해당 job의 출력에서 확인.
 - 본 작업에는 SQL 마이그레이션이 없다. PostgreSQL 15·17 dependent jobs는 scope router에 의해 SKIPPED이며, 이는 D3c DB 검증이 무효화됐다는 의미도 D3d DB 검증을 새로 수행했다는 의미도 아니다. D3c 1850의 별도 [CI 38339438218](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38339438218) PASS를 그대로 사용한다.
 - **D3d PURE HOLD 판정 검증 완료**. raw PortOne 취소 이벤트 서명/실제 provider API 조회·결제금액·부분환불·ordering 증명 인입, approved Commerce actor 연결, payment.cancelled 영속화, SQL 1850 호출, 1080 직접 Writer 우회 통제는 미구현. D3d candidate가 유료 접근 회수 또는 Provider 환불을 authorize하지 못하는 `false` 3종 불변으로 고정. Draft/병합·운영 활성화 HOLD.
+
+## 24. D3e PortOne V2 실제 취소 source 재조회 후보 (2026-10-13)
+
+**공식 문서 확인:**
+- https://developers.portone.io/opi/ko/integration/webhook/readme-v2 (버전 `2024-04-25`; `Transaction.CancelPending` / `Transaction.PartialCancelled` / `Transaction.Cancelled`; `data.paymentId`, `data.transactionId`, optional `data.cancellationId`; 재시도 시 webhook `timestamp` 동일)
+- https://developers.portone.io/opi/ko/integration/cancel/v2/readme?v=v2 (취소 내역 상태 `REQUESTED`/`FAILED`/`SUCCEEDED`, 부분 취소 지원)
+- https://portone-io.github.io/server-sdk/js/types/Payment.PaymentAmount.html (`amount.paid`, `amount.cancelled` 등)
+- https://portone-io.github.io/server-sdk/js/types/Payment.CancelledPayment.html (`GET /payments/{paymentId}`의 `status='CANCELLED'`, `cancellations[]`, `statusChangedAt` 등)
+- https://portone-io.github.io/server-sdk/js/types/Payment.SucceededPaymentCancellation.html (취소 ID `id`, `status='SUCCEEDED'`, `totalAmount`).
+
+**현재 후보:** `apps/api/src/portone-v2-cancellation-source-v1.ts`은 기존 `authenticatePortOneV2WebhookPaymentCompletionV1`의 원문 서명·timestamp 검증을 이용해 인증된 취소 type만 파싱하고, 서버 보유 API Secret으로 허용된 PortOne GET URL만 읽는다(고정 호스트, redirect 금지, timeout/body 64KiB 제한). Payment/Transaction/Store/TEST-LIVE identity가 서로 다르거나, `cancellations[]` 성공 금액의 합계가 `amount.cancelled`와 다르면 거부한다. `Transaction.Cancelled`에서도 `status='CANCELLED'`·실결제액 전액 누적취소·해당 `cancellationId`의 성공 기록이 있어야 `full_candidate`. 늦게 들어온 `Transaction.PartialCancelled`는 GET 조회 결과가 `CANCELLED`라도 `superseded`로 남긴다. `CancelPending`은 `pending`으로 유지.
+
+**불변:** 반환 `providerRefundAuthorized=false`, `entitlementMutationAuthorized=false`, `requiresDurableOrdering=true`. `full_candidate`는 DB Receipt 검증, 영속 중복/순서 판정, Legal/Commerce 승인 및 1850 원자회수 실행 권한과 별개다. webhook 현행 runtime dispatch는 건드리지 않고, 새 조회 함수를 어떤 운영 actor에도 연결하지 않는다. `cancellationId`는 공식 문서상 optional이지만 이 좁은 계약에서는 없으면 그 취소 사건을 특정할 수 없으므로 fail closed.
+
+**미구현:** 영속적인 Provider event-id/취소-id 중복·역순 원장, authoritative original Receipt 정합, 엄밀한 cumulative partial 분배, trusted worker 통합, 모든 legacy Writer 우회 제거, restore·T2·Legal 승인. D3e 코드를 CI 검증 전 PASS로 판정하지 않는다.
+
