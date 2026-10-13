@@ -315,3 +315,19 @@ S1에서 공통 잠금 함수 자체가 성공하더라도 **S2 전체 경로가
 - Draft PR #2034의 코드·테스트 SHA `99fa0bda9c0759fcccaf309fbc6cd3704190bc62`, GitHub Actions [38339438218](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38339438218)에서 PostgreSQL 15 DB Authority Core, PostgreSQL 17 dependency, Content dependency, Work Track, CI Verify 모두 PASS. Governance 및 Web PR Domain Gates PASS.
 - PostgreSQL15 실행 로그: `PASS D3c: second sorted Grant CAS failure rolled back first Grant revision and event`; `PASS D3c: two independent verified full cancellations atomically COMMIT with two immutable events`; `PASS D3c: replay denied, ledger unchanged, no runtime/Commerce EXECUTE`. Schema catalog `5d646e31f149eb3745646fe44705494b1cf09364f7bc7efb409490b3018e77a4` (86 tables) PASS.
 - **D3c PRIVATE 후보의 코드·테스트 검증 완료.** 시험은 동일 Product에 속한 두 별도 verified Provider Event/Receipt/Grant의 실험적 full cancellation이며, 실제 여러 Product 일괄 효과, 취소 금액/부분 환불/정상·역순 ordering의 독립 Provider 조회, Commerce worker 정식 등록, 원본 Writer direct bypass 제거, 복구·사후 정산·법무 정책은 미완료. Draft/병합·운영 서비스/유료 공개 HOLD.
+
+## 23. D3d 별도 Commerce Server 사전 판정 후보 — refund source truth (2026-10-13)
+
+**개발 후보 / HTTP·PortOne 운영 연결 없음 / 법무·운영 승인 전 HOLD.** `apps/api/src/official-reader-provider-cancel-preflight-v1.ts`은 기존 API 코드와 분리된 **순수 읽기 전용 판정 함수**이다. 입력은 외부에서 독립 검증된 서명 웹훅 결과, 독립 Provider API 재조회, verified production Commerce Receipt, 영속 이벤트의 중복·순서 판정, Commerce·Legal 검토 기록의 다섯 출처여야 한다. 전달된 `authority` 문자열은 *검증 증명서가 아니며 임의로 위조할 수 있으므로*, 함수의 `candidate` 출력은 운영 회수 승인이 아니다. **모든 반환값에서** `providerRefundAuthorized=false`, `entitlementMutationAuthorized=false`, `runtimeExecutionAuthorized=false`를 불변으로 둔다.
+
+- 정확한 payment/transaction/receipt ID 및 paid amount/currency 교차 검증, provider 결과가 `CANCELLED` + 누적 취소금액=원결제금액 + 잔액=0인 전액 취소 후보만 `candidate`; 그 외 부분 취소/취소 미완료/위조·누락/서로 다른 Product·회원 연결 후보는 HOLD.
+- 서버 소유 DB event-history에서 `isDuplicate=false` 및 `ordering='confirmed_newer'`를 **독립적으로 입증해야** 하며 Provider 원시 ordering key를 임의 문자열 비교하지 않는다. approved Commerce+Legal full cancellation review 증거가 없으면 후보 자체를 HOLD.
+- 신규 `tests/official-reader-provider-cancel-preflight-v1.test.ts`: 결제·거래·금액·통화 불일치, partial refund, 중복·stale/unknown ordering, 검증/정책 누락 및 prototype 오염, 완전한 후보조차 **0 mutation 권한**임을 시험한다.
+- **운영 사실:** 현행 `apps/api/src/portone-v2-webhook-payment-completion.ts`는 서명 검증 후 `Transaction.Paid` 이외의 원시 type을 `ignored`로 반환한다. D3d는 raw PortOne 취소 이벤트 타입 또는 provider endpoint 구조를 임의로 가정하거나 이를 교체하지 않는다. 추후 정확한 PortOne 공식 이벤트·API 사양 및 자체 Provider API 조회 adapter를 검증한 뒤 서버에서 독립 verified source를 생성해야 한다.
+- **미완료:** Provider 실제 refund API 조회/웹훅 인증·취소 유형 정규화, 금액별 부분 취소 영향 분배, 법무·Commerce 정책 최종 승인, 현재 `myeongha_commerce_internal_executor`의 최소권한 분리, 승인 후 1850/1080 실행 연결, direct legacy Writer bypass 차단, #1941 운영 복원, D5 protected T2. 이번 D3d Pure guard 자체는 환불 처리 또는 이를 대신할 충분 조건이 아니다.
+
+### D3d exact-SHA 안전 판정 후보 검증 (2026-10-13)
+
+- Draft PR #2037의 코드·테스트 SHA `ef5b576a648d7986fcc48a6ea2f4ac4ad87d83b0`, [GitHub CI 38340805623](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38340805623): Commerce Payment Work Track, 최종 CI Verify, Governance, Web PR Domain Gates 모두 SUCCESS. TypeScript/빌드 검사 성공. Commerce Work Track의 기존 775 tests PASS / 19 SKIP 및 **D3d 신규 25 tests PASS**를 해당 job의 출력에서 확인.
+- 본 작업에는 SQL 마이그레이션이 없다. PostgreSQL 15·17 dependent jobs는 scope router에 의해 SKIPPED이며, 이는 D3c DB 검증이 무효화됐다는 의미도 D3d DB 검증을 새로 수행했다는 의미도 아니다. D3c 1850의 별도 [CI 38339438218](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38339438218) PASS를 그대로 사용한다.
+- **D3d PURE HOLD 판정 검증 완료**. raw PortOne 취소 이벤트 서명/실제 provider API 조회·결제금액·부분환불·ordering 증명 인입, approved Commerce actor 연결, payment.cancelled 영속화, SQL 1850 호출, 1080 직접 Writer 우회 통제는 미구현. D3d candidate가 유료 접근 회수 또는 Provider 환불을 authorize하지 못하는 `false` 3종 불변으로 고정. Draft/병합·운영 활성화 HOLD.
