@@ -168,7 +168,7 @@ as $capture$
 #variable_conflict use_column
 declare
   v_pre record; v_post record; v_existing record;
-  v_count integer; v_approved text; v_birth uuid;
+  v_count integer; v_approved text; v_birth uuid; v_inserted integer;
 begin
   if p_subject_id is null or p_purchase_intent_id is null then
     raise exception using errcode='23514',
@@ -242,6 +242,7 @@ begin
     v_post.reading_period,v_post.reading_variant,v_post.product_spec_version,
     v_post.domain_capability_version,v_approved,v_post.scope_identity)
   on conflict (purchase_intent_id) do nothing;
+  get diagnostics v_inserted = row_count;
 
   select * into strict v_existing
   from public.standard_reader_initial_purchase_scope_pins_v1 pin
@@ -261,7 +262,7 @@ begin
   return query select v_existing.scope_identity,
     v_existing.source_birth_revision_id,v_existing.product_id,
     v_existing.approved_policy_revision,
-    (v_existing.captured_at < pg_catalog.clock_timestamp() - interval '1 second');
+    (v_inserted = 0);
 end
 $capture$;
 revoke all on function public.internal_capture_b2_r1_initial_checkout_scope_pin_v1(uuid,uuid)
