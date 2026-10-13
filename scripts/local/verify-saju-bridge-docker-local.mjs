@@ -33,6 +33,8 @@ for (const key of ['AUTH_DB_PASSWORD', 'SUBJECT_DB_PASSWORD', 'NONCE_DB_PASSWORD
   sandboxEnv['SAJU_BRIDGE_LOCAL_' + key] = randomBytes(28).toString('hex');
 }
 sandboxEnv.SAJU_BRIDGE_LOCAL_JWT_SECRET = randomBytes(48).toString('hex');
+sandboxEnv.SAJU_BRIDGE_LOCAL_SUBJECT_LOGIN_PASSWORD = randomBytes(28).toString('hex');
+sandboxEnv.SAJU_BRIDGE_LOCAL_NONCE_LOGIN_PASSWORD = randomBytes(28).toString('hex');
 sandboxEnv.SAJU_BRIDGE_LOCAL_AUTH_DB_URL = 'postgres://postgres:'
   + sandboxEnv.SAJU_BRIDGE_LOCAL_AUTH_DB_PASSWORD
   + '@auth-db:5432/myeongha_saju_gotrue_verify?sslmode=disable';
@@ -58,8 +60,8 @@ function docker(args, { capture = false, timeout = 240_000 } = {}) {
 
 function localSajuCheckout() {
   if (process.argv.length === 2) return null;
-  if (process.argv.length !== 4 || process.argv[2] !== '--http' || !process.argv[3]) {
-    throw new Error('Usage: node scripts/local/verify-saju-bridge-docker-local.mjs [--http ../Saju]');
+  if (process.argv.length !== 4 || !['--http', '--binding'].includes(process.argv[2]) || !process.argv[3]) {
+    throw new Error('Usage: node scripts/local/verify-saju-bridge-docker-local.mjs [--http ../Saju | --binding ../Saju]');
   }
   const saju = realpathSync(resolve(process.argv[3]));
   if (saju === root) throw new Error('A separate pinned Saju checkout is required.');
@@ -116,6 +118,7 @@ function remaining(kind) {
 }
 
 function main() {
+  const binding = process.argv[2] === '--binding';
   const saju = localSajuCheckout();
   if (saju) base = [...base, '-f', httpCompose];
   if (JSON.parse(readFileSync(packagePath, 'utf8')).name !== 'myeongha') {
@@ -145,7 +148,14 @@ function main() {
       composed('run', '--rm', '--no-deps', 'saju-deps-engine');
       console.log('[saju-bridge] Running pinned Saju HTTP/HMAC in isolated Docker network.');
       composed('run', '--rm', '--no-deps', 'saju-http-verifier');
-      console.log('[saju-bridge] Phase 2 actual Saju HTTP/HMAC: PASS (no DB binding yet).');
+      console.log('[saju-bridge] Phase 2 actual Saju HTTP/HMAC: PASS.');
+      if (binding) {
+        console.log('[saju-bridge] Bootstrapping disposable Subject/Birth and independent Nonce permissions.');
+        composed('run', '--rm', '--no-deps', 'saju-bootstrap-subject');
+        composed('run', '--rm', '--no-deps', 'saju-bootstrap-nonce');
+        console.log('[saju-bridge] Verifying GoTrue JWT → Subject/Birth → Saju HMAC → isolated Nonce.');
+        composed('run', '--rm', '--no-deps', 'saju-binding-verifier');
+      }
     }
   } catch (error) {
     failure = error;
@@ -173,7 +183,12 @@ function main() {
     console.log('[saju-bridge] Phase 1 PASS: disposable GoTrue and 4 DBs.');
     if (saju) {
       console.log('[saju-bridge] Phase 2 PASS: real pinned Saju HTTP/HMAC loopback.');
-      console.log('[saju-bridge] Docker Auth/Birth/Nonce binding, TLS/Permit/recovery and operational approval remain HOLD.');
+      if (binding) {
+        console.log('[saju-bridge] Phase 2B PASS: real Auth/Birth/Nonce Docker binding with isolated DBs.');
+        console.log('[saju-bridge] Separate TLS, Permit/recovery and operational approval remain HOLD.');
+      } else {
+        console.log('[saju-bridge] Docker Auth/Birth/Nonce binding, TLS/Permit/recovery and operational approval remain HOLD.');
+      }
     } else {
       console.log('[saju-bridge] Saju HTTP/TLS/Permit/recovery and operational approval remain HOLD.');
     }

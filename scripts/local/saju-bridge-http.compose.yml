@@ -70,6 +70,82 @@ services:
       NODE_ENV: test
     networks: [disposable]
 
+
+  saju-bootstrap-subject:
+    image: postgres:15
+    working_dir: /myeongha
+    entrypoint: ["/bin/sh", "-euc"]
+    command:
+      - |
+        test "$(psql -X -Atqc 'select current_database()')" = 'myeongha_saju_subject_local_verify'
+        psql -X -v ON_ERROR_STOP=1 -f test/db/bootstrap_supabase_auth_stub.sql
+        for migration in supabase/migrations/*.sql; do
+          psql -X -v ON_ERROR_STOP=1 -f "$$migration" >/dev/null
+        done
+        psql -X -v ON_ERROR_STOP=1 -f test/db/fixtures/saju_local_subject_birth_proof_e2e.sql
+        psql -X -v ON_ERROR_STOP=1 -v "subject_password=$$SAJU_BRIDGE_LOCAL_SUBJECT_LOGIN_PASSWORD" -f scripts/local/saju-bridge-subject-local-login.sql
+    environment:
+      PGHOST: subject-db
+      PGPORT: "5432"
+      PGUSER: postgres
+      PGDATABASE: myeongha_saju_subject_local_verify
+      PGPASSWORD: ${SAJU_BRIDGE_LOCAL_SUBJECT_DB_PASSWORD:?disposable-secret-required}
+      SAJU_BRIDGE_LOCAL_SUBJECT_LOGIN_PASSWORD: ${SAJU_BRIDGE_LOCAL_SUBJECT_LOGIN_PASSWORD:?disposable-secret-required}
+    volumes:
+      - type: volume
+        source: myeongha-workspace
+        target: /myeongha
+        read_only: true
+    networks: [disposable]
+
+  saju-bootstrap-nonce:
+    image: postgres:15
+    working_dir: /myeongha
+    entrypoint: ["/bin/sh", "-euc"]
+    command:
+      - |
+        test "$(psql -X -Atqc 'select current_database()')" = 'myeongha_saju_nonce_local_verify'
+        psql -X -v ON_ERROR_STOP=1 -f supabase/migrations/1540_saju_source_proof_nonce_claim_authority_v1.sql
+        psql -X -v ON_ERROR_STOP=1 -v "nonce_password=$$SAJU_BRIDGE_LOCAL_NONCE_LOGIN_PASSWORD" -f scripts/local/saju-bridge-nonce-local-login.sql
+    environment:
+      PGHOST: nonce-db
+      PGPORT: "5432"
+      PGUSER: postgres
+      PGDATABASE: myeongha_saju_nonce_local_verify
+      PGPASSWORD: ${SAJU_BRIDGE_LOCAL_NONCE_DB_PASSWORD:?disposable-secret-required}
+      SAJU_BRIDGE_LOCAL_NONCE_LOGIN_PASSWORD: ${SAJU_BRIDGE_LOCAL_NONCE_LOGIN_PASSWORD:?disposable-secret-required}
+    volumes:
+      - type: volume
+        source: myeongha-workspace
+        target: /myeongha
+        read_only: true
+    networks: [disposable]
+
+  saju-binding-verifier:
+    image: node:24-bookworm-slim
+    working_dir: /myeongha
+    entrypoint: ["node", "scripts/local/verify-saju-bridge-docker-binding.mjs", "/saju"]
+    volumes:
+      - type: volume
+        source: myeongha-workspace
+        target: /myeongha
+      - type: volume
+        source: saju-workspace
+        target: /saju
+        read_only: true
+    environment:
+      NODE_ENV: test
+      MYEONGHA_DOCKER_SAJU_BINDING: "1"
+      SAJU_BRIDGE_LOCAL_AUTH_URL: http://gotrue:9999
+      SAJU_BRIDGE_LOCAL_SUBJECT_HOST: subject-db
+      SAJU_BRIDGE_LOCAL_SUBJECT_DB: myeongha_saju_subject_local_verify
+      SAJU_BRIDGE_LOCAL_NONCE_HOST: nonce-db
+      SAJU_BRIDGE_LOCAL_NONCE_DB: myeongha_saju_nonce_local_verify
+      SAJU_BRIDGE_LOCAL_SUBJECT_DB_PASSWORD: ${SAJU_BRIDGE_LOCAL_SUBJECT_DB_PASSWORD:?disposable-secret-required}
+      SAJU_BRIDGE_LOCAL_SUBJECT_LOGIN_PASSWORD: ${SAJU_BRIDGE_LOCAL_SUBJECT_LOGIN_PASSWORD:?disposable-secret-required}
+      SAJU_BRIDGE_LOCAL_NONCE_LOGIN_PASSWORD: ${SAJU_BRIDGE_LOCAL_NONCE_LOGIN_PASSWORD:?disposable-secret-required}
+    networks: [disposable]
+
 networks:
   npm-egress:
     internal: false
