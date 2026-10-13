@@ -266,7 +266,7 @@ function createOfflineWireProbe(options?:Readonly<{
   const provider:SeyeonStructuredProviderPortV2=Object.freeze({
     providerKey:native.providerKey,
     modelKey:native.modelKey,
-    async generate(request) {
+    async generate(request:SeyeonStructuredProviderRequestV2) {
       const purpose=request.purpose;
       if(pending.has(purpose)) throw new Error('Repeated native wire stage');
       pending.set(purpose,{
