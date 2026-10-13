@@ -10,7 +10,7 @@ declare
   v_direct regprocedure := to_regprocedure(
     'public.cmd_commit_seyeon_chat_turn_runtime_v1(uuid,uuid,uuid,uuid,uuid,uuid)');
   v_v2 regprocedure := to_regprocedure(
-    'public.cmd_commit_seyeon_chat_turn_runtime_v2(uuid,uuid,uuid,uuid,uuid,uuid,uuid,uuid,jsonb,text)');
+    'public.cmd_commit_seyeon_chat_turn_runtime_v2(uuid,uuid,uuid,uuid,uuid,uuid,uuid,jsonb,text)');
   v_core regprocedure := to_regprocedure(
     'public.cmd_commit_chat_turn_v1(uuid,uuid,uuid,uuid,uuid,uuid,jsonb,jsonb,jsonb)');
   v_legacy regprocedure := to_regprocedure(
@@ -57,7 +57,7 @@ declare
   v_v1 regprocedure := to_regprocedure(
     'public.cmd_commit_seyeon_chat_turn_runtime_v1(uuid,uuid,uuid,uuid,uuid,uuid)');
   v_v2 regprocedure := to_regprocedure(
-    'public.cmd_commit_seyeon_chat_turn_runtime_v2(uuid,uuid,uuid,uuid,uuid,uuid,uuid,uuid,jsonb,text)');
+    'public.cmd_commit_seyeon_chat_turn_runtime_v2(uuid,uuid,uuid,uuid,uuid,uuid,uuid,jsonb,text)');
 begin
   if has_function_privilege('myeongha_api_executor',v_v1::oid,'EXECUTE')
     or not has_function_privilege('myeongha_api_executor',v_v2::oid,'EXECUTE')
