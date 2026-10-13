@@ -222,5 +222,7 @@ if [[ "${CI:-}" == "true" && "${PGHOST:-}" == "localhost" ]]; then
   run_isolated_case myeongha_b2_r4_domain_taegyeom bash test/db/standard_reader_r4_nine_reader_domain_real_pg.sh taegyeom
   run_isolated_case myeongha_b2_r4_domain_yunho bash test/db/standard_reader_r4_nine_reader_domain_real_pg.sh yunho
   run_isolated_case myeongha_b2_r4_domain_doyun bash test/db/standard_reader_r4_nine_reader_domain_real_pg.sh doyun
+  run_isolated_case myeongha_b2_r4_b13_pending bash test/db/standard_reader_r4_purchase_grant_denials_real_pg.sh pending
+  run_isolated_case myeongha_b2_r4_b13_missing_grant bash test/db/standard_reader_r4_purchase_grant_denials_real_pg.sh missing_grant
 fi
 bash test/db/catalog_snapshot.sh
