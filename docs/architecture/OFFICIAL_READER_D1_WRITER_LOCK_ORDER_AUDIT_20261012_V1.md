@@ -116,3 +116,13 @@ PR #2028 HEAD 코드 `0146a2de2db2a6437cf2b61f93dc8dcbeab20533`, CI `38336400038
 ### D3b PG15/17 검증 증거 (2026-10-13)
 
 PR #2031 code SHA `352791b5c176f3144a13a63e426c2f5300dec01b`, CI run `38337875997` 전체 PASS. PostgreSQL15 로그: verified Event 2건→Receipt→독립 Grant 2개를 완전한 source-owned scope로 도출, cross-source/중복/비인가/오래된 격리 거부, 3개 실제 연결에서 순서가 뒤집힌 event/grant 쌍의 **Product L0 advisory lock wait** 관측 및 terminal Grant 상태 불변. D3b의 1840은 **원본 1080을 실행하지 않는다**. Cross-Product Commerce effect/partial cancel/restore 및 현재 PortOne 서버의 authenticated non-Paid `ignored` 경로는 계속 P0 통합 차단이다.
+
+## 8. D3c 실제 Commerce 1080 원자효과 및 legacy direct-Writer 우회 지도 (2026-10-13)
+
+- **1850 PRIVATE:** trusted verified Event↔Receipt↔Grant full-set resolver `1840` → 전체 Product 정렬 L0 → 전체 Reading×Reader 정렬 L1 → Grant ID 정렬 `1080` original effect를 한 SQL Statement에 실행. 모든 효과는 새 immutable `entitlement_events` 행 필요, 하나라도 CAS 실패 시 전부 ROLLBACK. `1080`의 자체 Provider row lock과 Grant row lock은 L0/L1 다음에만 얻는다.
+- **Legacy 직접 효과** `1080`: Commerce Event FOR UPDATE, Grant FOR UPDATE, revision/order CAS, Event INSERT, Entitlement projection, Outbox. 직접 호출에 Product L0·Reader L1 없음.
+- **Legacy 발급/결속** `1090`: Receipt FOR UPDATE→`1080`; `1220`: Intent FOR UPDATE→Grant FOR UPDATE→Birth→Official binding. 1760·1790 wrapper 또는 원본 호출이 상존하여 1820을 전면 적용하지 않음.
+- **Legacy 환불/조회** `1770`: L1-only, unbound 불가. `1780`: 1770 dormant bridge. `1750`: L1-only runtime read. `0220`: 일반 Thread/Turn/Attempt 행 잠금, paid T2 전용 보호 본문 미분리.
+- **현재 PortOne/Webhook 런타임** `apps/api/src/portone-v2-webhook-payment-completion.ts`: 서명 검증→비 Paid 타입 ignored, `portone-v2-webhook-runtime.ts`는 Paid-only path. `commerce-provider-payment-completion-orchestration.ts`: API 조회→Verified payment evidence persistence. `postgres-commerce-internal-execution.ts`: `SET LOCAL ROLE myeongha_commerce_internal_executor`로 BEGIN/COMMIT하나 신규 1850 호출/EXECUTE 권한 없음.
+- **최소 권한/정책:** D3c 새 함수는 PUBLIC, anon, authenticated, service_role, API/Commerce/Chat executor 실행권을 거부. 고위 DB Owner 후보 검증 외 구 Writer를 변경하지 않았다. 부분 환불 판단/Provider status ordering/환불 완료 시각/승인 주체·Legal 제공 판단은 본 코드가 단독 결정하지 못한다. Live ingress를 연결하거나 legacy 직접 Writer를 유지하면서 전역 lock 통일 완료로 판정하지 않는다.
+- **실행 및 비교 기준:** `test/db/official_reader_d3c_verified_cancel_atomic_batch.sh` isolated 2-Grant second-CAS failure rollback→성공 2-event atomic commit→terminal retry deny를 PostgreSQL15와 PG17/Content CI에서 검증할 것. 미완료면 HOLD.
