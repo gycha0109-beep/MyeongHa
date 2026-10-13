@@ -278,3 +278,12 @@ S1에서 공통 잠금 함수 자체가 성공하더라도 **S2 전체 경로가
 - 직접 DB 로그의 검증 결과: `PASS D3: D3 bound Grant: real two-session Provider-first and Reader-first race, final revoked deny`; `PASS D3: first Reading unbound verified Grant: canonical L0 wait, revoke + ledger atomic COMMIT, zero Reader access`; `PASS D3: unbound refund-before-bind denies new official Reading and Reader access`. Catalog snapshot PASS `347eaaf2d0b1ddc3fcd88ff130c017864cb986edaf7940f44063dbd11bd6501b`.
 - 재검토 과정: 첫 실패는 새 `1830` 함수 추가로 인한 Catalog hash 불일치, 둘째는 신규 경합 스크립트의 Bash heredoc 구문 오류. 둘 다 수정 후 위 exact SHA에서 재검증 성공.
 - 판정: **D3a PRIVATE 구현 및 검증 완료**. 상용 refund ingest, old Writer direct bypass, event 영향을 받는 여러 상품의 동시 회수, partial/restore, D5 T2 원문 공개 허가는 여전히 HOLD. D3b는 영향 집합 원자 잠금·검증부터 별도 Draft에서 진행.
+
+## 21. D3b 검증된 Provider 영향 전체 집합 선조회·다중 잠금 후보 (2026-10-13)
+
+- **비공개 Draft 구현 / 전체 D3 미완료.** `1840_official_reader_verified_cancel_impact_lockset_private_v1.sql`은 trusted Provider Event ID + Grant ID 동수 배열(1~64)에 대해 DB verified `payment.cancelled` → production Receipt → 정확한 Purchase Intent/Product Offer/Standard Reading Product → 해당 Grant 전체를 source-owned 조회한다. 동일 Receipt의 다른 purchase Grant를 빠뜨리면 FAIL CLOSED; 다른 Subject·거래·Product/Reader에 속하는 결속은 DENY.
+- `internal_qry_official_reader_verified_cancel_impact_v1`은 **무잠금 조회**로 각 Provider/Receipt/Grant의 status/revision/ordering/Reader bound scope를 정렬한 authority snapshot 및 실제 영향 Product·Reading·Reader·Grant 배열을 제공한다. 구매권·환불 확정·재열람 허용의 증거가 아니다.
+- `internal_acquire_official_reader_verified_cancel_impact_lockset_v1`은 전체 Product L0를 UUID 정렬 취득 → fresh source-owned snapshot 대조 → 기존 D1 Reading lockset으로 모든 Reader L1 정렬 취득 → fresh snapshot 재대조. 변화나 미해결 범위는 rollback. **원본 1080 효과를 호출하거나 Grant를 변경하지 않는다.**
+- `test/db/official_reader_d3b_verified_impact_lockset_three_session.sh`는 독립 verified Receipt/Grant 두 쌍, 공식 Reading×Reader 결속 집합, 서로 뒤바꾼 Provider 입력 순서에 의한 PostgreSQL A/B/C 실제 L0 advisory wait, current Grant 무변경을 확인한다. 다른 회원·위조 이벤트/Grant 매칭·중복·오래된 격리·직접 runtime EXECUTE를 부정한다.
+- 이 첫 시험 fixture에서 실제 영향 Product는 **1개**다. D1 별도 2-Product 역순 잠금 시험은 통과했으나 이것을 D3b 실제 서로 다른 구매 Product refund 원자 효과 성공으로 둔갑시키지 않는다. 여러 Product를 실제 Provider 취소 하나의 트랜잭션으로 적용하는 것은 D3 후속 과제다.
+- **차단 유지:** D3b 신규 resolver 결과만으로 부분 취소/restore/다중 Grant 회수를 실행하지 않는다. PortOne cancellation ingress 서명·조회·부분 환불 검증, full set mutating dispatcher, 기존 1080 direct bypass 차단, Commerce+Security+Legal Owner 승인 필요. 병합·운영 배포·유료 공개 금지. PostgreSQL 15/17 exact-SHA CI 결과 확인 전 이 구현을 PASS로 표시하지 않는다.
