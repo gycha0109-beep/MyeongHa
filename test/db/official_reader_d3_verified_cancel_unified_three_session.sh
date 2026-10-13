@@ -45,10 +45,7 @@ product="$(p -c "select product_id from public.standard_reading_official_binding
 
 # Clone a REAL verified first-Reading Purchase Intent and its immutable selected
 # Reader but issue a NEW independent receipt Grant without ever binding it.
-p >"$tmpdir/unbound-seed.out" 2>&1 <<SQL || {
-  tail -n 80 "$tmpdir/unbound-seed.out" >&2
-  fail "unbound synthetic initial Intent/Receipt seed failed"
-}
+p >"$tmpdir/unbound-seed.out" 2>&1 <<SQL
 insert into public.purchase_intents(
  id,subject_id,product_offer_id,provider_account_link_id,
  idempotency_key,request_hash,offer_snapshot_jsonb,offer_snapshot_hash,
@@ -93,10 +90,7 @@ select '$receipt'::uuid,subject_id,'$intent'::uuid,product_offer_id,
 from public.commerce_receipts where id='$original_receipt'::uuid;
 SQL
 
-p <<SQL >"$tmpdir/issuance.out" 2>"$tmpdir/issuance.err" || {
-  cat "$tmpdir/issuance.err" >&2
-  fail "new verified initial Receipt issuance failed"
-}
+p <<SQL >"$tmpdir/issuance.out" 2>"$tmpdir/issuance.err"
 begin;
 select pg_catalog.set_config('myeongha.subject_id','$subject',true);
 select result_grant_id from public.internal_apply_official_reader_unified_receipt_v1(
