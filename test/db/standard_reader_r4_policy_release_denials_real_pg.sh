@@ -37,7 +37,11 @@ awk -v mode="$mode" '
 if p -f "$tmp/base.sql" >"$tmp/base.out" 2>"$tmp/base.err"; then
  :
 elif [[ "$mode" =~ ^(disabled|coming_soon|locked|release_not_default)$ ]] &&
-     grep -Fq 'selected Reader is not catalog-eligible for a new Standard Reading purchase' "$tmp/base.err"; then
+     { if [[ "$mode" == locked ]]; then
+         grep -Fq 'unlockable Reader requires an already-stored unlocked projection' "$tmp/base.err"
+       else
+         grep -Fq 'selected Reader is not catalog-eligible for a new Standard Reading purchase' "$tmp/base.err"
+       fi; }; then
  [[ "$(p -c "select count(*) from public.commerce_receipts where purchase_intent_id='b4220000-0000-4000-8000-000000000001'::uuid")" == 0 ]] || fail 'pre-purchase rejection leaked verified Receipt'
  [[ "$(p -c "select count(*) from public.standard_reading_reader_access_grants where purchase_intent_id='b4220000-0000-4000-8000-000000000001'::uuid")" == 0 ]] || fail 'pre-purchase rejection leaked Reader Access'
  echo "PASS R4/$mode pre-purchase Reader selection DENY, no Receipt or Reader Access"
