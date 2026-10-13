@@ -44,6 +44,13 @@ function guard() {
       throw new Error('Admission TLS-only disposable credential missing.');
     }
   }
+  if (process.env.MYEONGHA_DOCKER_SAJU_PERMIT === '1') {
+    if (process.env.MYEONGHA_DOCKER_SAJU_TLS !== '1'
+      || !process.env.SAJU_BRIDGE_LOCAL_ADMISSION_DB_PASSWORD
+      || process.env.SAJU_BRIDGE_LOCAL_ADMISSION_DB_PASSWORD.length < 40) {
+      throw new Error('Permit suite requires isolated TLS and disposable Admission admin input.');
+    }
+  }
   for (const key of ['SAJU_BRIDGE_LOCAL_SUBJECT_DB_PASSWORD',
     'SAJU_BRIDGE_LOCAL_SUBJECT_LOGIN_PASSWORD', 'SAJU_BRIDGE_LOCAL_NONCE_LOGIN_PASSWORD']) {
     if (!process.env[key] || process.env[key].length < 40) {
@@ -106,6 +113,7 @@ async function run() {
     }
     if (!ready) throw new Error('Actual pinned Saju proof listener not ready.');
     const allow = Object.fromEntries(Object.keys(expected).map(k => [k, process.env[k]]));
+    const permitMode = process.env.MYEONGHA_DOCKER_SAJU_PERMIT === '1';
     const testEnv = {
       ...portable, NODE_ENV: 'test', MYEONGHA_DOCKER_SAJU_BINDING: '1',
       ...allow, ...identity,
@@ -118,9 +126,14 @@ async function run() {
       SAJU_BRIDGE_LOCAL_SUBJECT_DB_PASSWORD: process.env.SAJU_BRIDGE_LOCAL_SUBJECT_DB_PASSWORD,
       SAJU_BRIDGE_LOCAL_SUBJECT_LOGIN_PASSWORD: process.env.SAJU_BRIDGE_LOCAL_SUBJECT_LOGIN_PASSWORD,
       SAJU_BRIDGE_LOCAL_NONCE_LOGIN_PASSWORD: process.env.SAJU_BRIDGE_LOCAL_NONCE_LOGIN_PASSWORD,
+      ...(permitMode ? {
+        MYEONGHA_DOCKER_SAJU_PERMIT: '1',
+        SAJU_BRIDGE_LOCAL_ADMISSION_DB_PASSWORD: process.env.SAJU_BRIDGE_LOCAL_ADMISSION_DB_PASSWORD,
+      } : {}),
     };
     const test = spawn(process.execPath, [vitest, 'run',
-      'test/saju-held-docker-member-birth-nonce.test.ts'],
+      'test/saju-held-docker-member-birth-nonce.test.ts',
+      ...(permitMode ? ['test/saju-held-docker-permit-v2.test.ts'] : [])],
     { cwd: root, env: testEnv, stdio: 'inherit' });
     const result = await new Promise((done, reject) => {
       test.once('error', reject);
