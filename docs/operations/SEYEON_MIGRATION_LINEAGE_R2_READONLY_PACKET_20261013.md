@@ -62,3 +62,31 @@ Watchtower-Track: ops
 - **전체 서비스 DR Ready: FALSE.**
 
 본 문서는 관측/의사결정 패킷이다. 실행 권한을 위임하거나 현재 미해결 게이트를 승인하지 않는다.
+
+## 6. 2026-10-13 후속 관측 — 최신 암호화 백업·1720까지의 미적용 인벤토리
+
+이 절은 1~5절의 역사적 관측을 대체하지 않고, **더 늦은 읽기 전용 Production/GitHub 관측**을 추가한다.
+
+- **보수 코드 기준:** [PR #2011](https://github.com/gycha0109-beep/MyeongHa/pull/2011) main `9b7c10cb694afee5c1cb1d89050668eaa3d9f558`. [exact-main CI #38226729382](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38226729382) SUCCESS; [Supabase Production #38226729166](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38226729166)에서 일반 migration 및 backfill SKIPPED, Production 쓰기 없음.
+- **새 post-fix 백업:** [#38328139495](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38328139495), 2026-10-13T00:40:24Z 완료 SUCCESS, 해당 main SHA. 암호화 artifact ID `11782211590`, 이름 `myeongha-postgres-20261013T003752Z`, artifact digest `sha256:6a6e68afaf91d0a3754d1fbe84ded0760aca30c418d9c89a79576e45be137567`; 만료 `2026-11-12T00:40:20Z`. strict TLS dump roles/schema/data PASS, frontier `20261008090417`. **백업 성공만 입증**하며 신규 격리 복원 증거는 2026-10-13T01:00Z 조회 시 없음. R1 HOLD.
+- **로컬 인벤토리 확대:** 저장소에 `supabase/migrations/1720_standard_reader_product_scope_read_v1.sql` 존재. Production `supabase_migrations.schema_migrations` SELECT에서는 **1520~1720 총 21개 중 적용 0/21**. 이전 본문의 1520~1710 0/20은 당시 확인 범위를 나타낸다. **1720 Reader/Product Authority** 검토는 별도 소유자 결정 사항이며 배포 금지.
+- **동일 원격 bundle 확인:** `20261008090417`은 1 statement, 104,021 bytes. 읽기 전용 재산출 SHA-256 `4f38e4483061a84899f0fcaa4a8d6cfa9e09ce1553b1d31089d4de9154c4d894`로 2026-10-12 기록과 일치. 지문 일치는 적용 출처·정당성이나 개별 1460~1510 SQL 정의 동등성 증명이 아니다.
+- **초기 관계 DB 유지:** version/name 이력 1400~1510 **12/12**(각 개별 행 statements 0), 함수 이름 **11/11**, 관계 테이블 **RLS/브라우저 DML 차단 6/6**. 이는 현재 Production 카탈로그 관측이며 격리 복원 완전성 입증은 아니다.
+
+### R1 수동 격리 복원 입력 (현재 우선)
+
+[PostgreSQL Isolated Restore Drill](https://github.com/gycha0109-beep/MyeongHa/actions/workflows/postgres-isolated-restore-drill.yml) → `Run workflow` → `main`.
+
+| 입력 | 값 |
+| --- | --- |
+| `backup_run_id` | `38328139495` |
+| `incident_reference_utc` | `2026-10-13T00:40:24Z` |
+| `watchtower_track` | `ops` |
+| `privacy_ledger_run_id`, `production_privacy_canary_run_id` | 둘 다 비움 |
+
+새 실행에서 동일 artifact/digest, migration snapshot **6/6**, 실제 restored PostgreSQL 함수 **11/11**, RLS 및 익명/인증 사용자 테이블 권한 **6/6**, synthetic privacy 및 evidence artifact가 모두 PASS하기 전에는 **R1 HOLD**. 검증 후에도 `supabase_managed_migration_ledger_fully_restored=false`, `dr_ready=false` 유지. 연결된 GitHub 도구는 수동 `workflow_dispatch`를 제공하지 않으므로 실행은 운영자 UI 조치가 필요하다.
+
+### 후속 R2·DR 안전 경계
+
+- 원격 104KB bundle의 Private original audit/source, 전체 SQL/Object/Owner/ACL fingerprint parity, **1520~1720 21건**의 Owner별 의존·회귀·rollback 및 forward-only 결정 전에는 Production 적용 금지.
+- [DR Readiness #38226729128](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38226729128)은 역사적 `1310` 증거와 repository frontier `20261008043000` 불일치로 FAIL. 단순 숫자 변경·게이트 우회로 GREEN 처리하지 않는다. G0~G6, 유료 AI, 공개 경로는 별도 HOLD.
