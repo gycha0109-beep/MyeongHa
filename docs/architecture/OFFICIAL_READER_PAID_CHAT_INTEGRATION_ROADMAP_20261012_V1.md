@@ -347,3 +347,9 @@ S1에서 공통 잠금 함수 자체가 성공하더라도 **S2 전체 경로가
 
 **미구현:** 영속적인 Provider event-id/취소-id 중복·역순 원장, authoritative original Receipt 정합, 엄밀한 cumulative partial 분배, trusted worker 통합, 모든 legacy Writer 우회 제거, restore·T2·Legal 승인. D3e 코드를 CI 검증 전 PASS로 판정하지 않는다.
 
+## 25. D3e2 영속 PortOne 취소 shadow 원장 (2026-10-13)
+
+- **비공개 Draft 구현 후보 — source verified 증거가 아니라 관측 기록.** `1860_official_reader_portone_cancel_observation_shadow_private_v1.sql`: 기존 public DB에 별도 RLS 활성화 shadow 테이블을 만들고, `portone_v2 + webhook_id` 유일성을 기준으로 결제/거래/취소 ID, 이벤트 type, source 분류, provider 상태 확인 시간, signed webhook 발생 시간, 실결제/누적 취소 금액 및 원문 비포함 fingerprint만 저장. 원문 Provider payload, 실사용자 개인정보, 생년월일, 상담본문·영수증 원문 없음.
+- `internal_record_official_reader_portone_cancel_shadow_v1`은 **잠금 후 insert 전용 private SECURITY INVOKER**이며 같은 webhookId 동일 사실의 재전송은 `replayed`, 동일 webhookId 다른 거래/금액/해시 재결합은 23505, 같은 transaction의 이미 기록된 최신 시각보다 늦게 수신된 오래된 사건은 `out_of_order`, 동일 시각의 별도 사건은 `ordering_unproven`으로 분리한다. 동일 Product/transaction 실시간 경합은 고유 별도 advisory lock으로 직렬화된다. 위 판단은 DB에서 관측되는 시간 관계이며 Provider의 법적·정산상의 ordering을 증명하지 않는다.
+- `test/db/official_reader_d3e2_cancel_observation_shadow_two_session.sh`에서 실제 재전송/identity 충돌/늦은 partial/부분취소-as-full 차단, RLS 및 anon/authenticated/service_role/API/Commerce/Chat 실행·조회 권한 거부, 두 개 PostgreSQL 동시 연결의 실 advisory 대기를 검증한다. 권리 Grant, T2 공개, 실제 환불 상태 변경 **0**.
+- 신규 shadow 결과는 **항상 `effect_authorized=false`**. SQL 함수는 외부 callback에도 Commerce 실행 역할에도 GRANT하지 않았고, `D3e` server source analyzer와 DB recorder를 실제 호출 경로로 연결하지 않았다. Provider API의 실 취소·부분 정산 상태와 legal policy, Receipt lineage, 멱등/ordering을 합친 권한 있는 Worker gate는 미구현. D3e2 CI exact SHA 전 PASS 판정 금지.
