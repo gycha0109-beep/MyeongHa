@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 
 const compose = fileURLToPath(new URL('./saju-bridge-full.compose.yml', import.meta.url));
 const httpCompose = fileURLToPath(new URL('./saju-bridge-http.compose.yml', import.meta.url));
+const tlsCompose = fileURLToPath(new URL('./saju-bridge-tls.compose.yml', import.meta.url));
 const root = realpathSync(fileURLToPath(new URL('../../', import.meta.url)));
 const pinnedSajuSha = 'cd0acf9abd447826ccaefba56112d046e560ee04';
 const packagePath = fileURLToPath(new URL('../../package.json', import.meta.url));
@@ -35,6 +36,7 @@ for (const key of ['AUTH_DB_PASSWORD', 'SUBJECT_DB_PASSWORD', 'NONCE_DB_PASSWORD
 sandboxEnv.SAJU_BRIDGE_LOCAL_JWT_SECRET = randomBytes(48).toString('hex');
 sandboxEnv.SAJU_BRIDGE_LOCAL_SUBJECT_LOGIN_PASSWORD = randomBytes(28).toString('hex');
 sandboxEnv.SAJU_BRIDGE_LOCAL_NONCE_LOGIN_PASSWORD = randomBytes(28).toString('hex');
+sandboxEnv.SAJU_BRIDGE_LOCAL_ADMISSION_LOGIN_PASSWORD = randomBytes(28).toString('hex');
 sandboxEnv.SAJU_BRIDGE_LOCAL_AUTH_DB_URL = 'postgres://postgres:'
   + sandboxEnv.SAJU_BRIDGE_LOCAL_AUTH_DB_PASSWORD
   + '@auth-db:5432/myeongha_saju_gotrue_verify?sslmode=disable';
@@ -60,8 +62,8 @@ function docker(args, { capture = false, timeout = 240_000 } = {}) {
 
 function localSajuCheckout() {
   if (process.argv.length === 2) return null;
-  if (process.argv.length !== 4 || !['--http', '--binding'].includes(process.argv[2]) || !process.argv[3]) {
-    throw new Error('Usage: node scripts/local/verify-saju-bridge-docker-local.mjs [--http ../Saju | --binding ../Saju]');
+  if (process.argv.length !== 4 || !['--http', '--binding', '--tls'].includes(process.argv[2]) || !process.argv[3]) {
+    throw new Error('Usage: node scripts/local/verify-saju-bridge-docker-local.mjs [--http ../Saju | --binding ../Saju | --tls ../Saju]');
   }
   const saju = realpathSync(resolve(process.argv[3]));
   if (saju === root) throw new Error('A separate pinned Saju checkout is required.');
@@ -118,9 +120,11 @@ function remaining(kind) {
 }
 
 function main() {
-  const binding = process.argv[2] === '--binding';
+  const tls = process.argv[2] === '--tls';
+  const binding = process.argv[2] === '--binding' || tls;
   const saju = localSajuCheckout();
   if (saju) base = [...base, '-f', httpCompose];
+  if (tls) base = [...base, '-f', tlsCompose];
   if (JSON.parse(readFileSync(packagePath, 'utf8')).name !== 'myeongha') {
     throw new Error('Expected MyeongHa repository checkout.');
   }
@@ -130,6 +134,10 @@ function main() {
   let failure = null;
   try {
     composed('config', '--quiet');
+    if (tls) {
+      console.log('[saju-bridge] Preparing three independent synthetic CA/SAN sets in disposable volumes.');
+      composed('run', '--rm', '--no-deps', 'saju-tls-prep');
+    }
     composed('up', '--detach', '--wait', '--wait-timeout', '150',
       ...services.map(([service]) => service));
     for (const [service, database] of services) {
@@ -153,6 +161,7 @@ function main() {
         console.log('[saju-bridge] Bootstrapping disposable Subject/Birth and independent Nonce permissions.');
         composed('run', '--rm', '--no-deps', 'saju-bootstrap-subject');
         composed('run', '--rm', '--no-deps', 'saju-bootstrap-nonce');
+        if (tls) composed('run', '--rm', '--no-deps', 'saju-bootstrap-admission');
         console.log('[saju-bridge] Verifying GoTrue JWT → Subject/Birth → Saju HMAC → isolated Nonce.');
         composed('run', '--rm', '--no-deps', 'saju-binding-verifier');
       }
@@ -185,7 +194,12 @@ function main() {
       console.log('[saju-bridge] Phase 2 PASS: real pinned Saju HTTP/HMAC loopback.');
       if (binding) {
         console.log('[saju-bridge] Phase 2B PASS: real Auth/Birth/Nonce Docker binding with isolated DBs.');
-        console.log('[saju-bridge] Separate TLS, Permit/recovery and operational approval remain HOLD.');
+        if (tls) {
+          console.log('[saju-bridge] Phase 3A PASS: independent verify-full Subject/Nonce/Admission TLS (Permit not exercised).');
+          console.log('[saju-bridge] Permit V2/recovery and operational approval remain HOLD.');
+        } else {
+          console.log('[saju-bridge] Separate TLS, Permit/recovery and operational approval remain HOLD.');
+        }
       } else {
         console.log('[saju-bridge] Docker Auth/Birth/Nonce binding, TLS/Permit/recovery and operational approval remain HOLD.');
       }
