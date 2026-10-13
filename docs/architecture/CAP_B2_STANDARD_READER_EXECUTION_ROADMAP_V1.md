@@ -50,6 +50,11 @@
 
 **2026-10-13 R1 동기화:** [#2029](https://github.com/gycha0109-beep/MyeongHa/pull/2029)는 #2014 HEAD 위 격리 Draft로 1840 Purchase Intent 사전 pin/verified Receipt 및 cancellation event의 역사적 Scope 조회·동일 1810 잠금, PG 격리 테스트를 신규 추가했습니다. **최신 HEAD DB CI PASS 전에는 R1 검증 완료가 아닙니다.** 운영 Purchase Intent 생성의 원자 capture 연동, Privacy 삭제/복원, Commerce R2 회수 Writer 채택, Production DR은 미완입니다. 늦은 사후 pin은 구매 당시 Birth authority를 입증할 수 없어 의도적으로 거절합니다.
 
+**2026-10-13 R1/R2 실제 구현 갱신:**
+- [#2029 R1](https://github.com/gycha0109-beep/MyeongHa/pull/2029) HEAD `76b46c0f4ce9325eccd9efc8332da2ac95443b41`: [CI #38337252515](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38337252515) **SUCCESS** (DB Authority Core, PostgreSQL17, Commerce Payment/Entitlement, Content 포함). 그러나 **Governance #38337252305 FAILURE**: Owner 승인된 P0-PR-01 삭제 처분 정책의 140-edge/59-table/fingerprint와 신규 R1 개인정보 FK 141-edge 그래프 불일치. 이 트랙은 기승인 Privacy 계약을 임의 재서명·재해시하지 않음; Privacy Owner의 신규 테이블 삭제/보존 계약 및 graph fingerprint 정식 변경이 필요. R1 **코드/DB 증명**과 **운영 통합 승인**은 분리.
+- [#2032 R2](https://github.com/gycha0109-beep/MyeongHa/pull/2032): 1850 Private verified cancel → immutable initial scope lock → 0-Access 시 원 Commerce CAS/ledger, 결속된 Access 시 원 1770 Reader scope 이후 Commerce effect. 1860 Private event-first/Grant 0행 receipt issuer gate. `refund_first` / `bind_first` / `no_grant` 세 격리 실PG 동시성 테스트를 도입. exact HEAD CI 최종 통과 및 운영 Provider ingress/원자 caller/Privacy Owner 확인 전 **검증·출시 완료 아님**.
+- **R3 선행 통합 HOLD:** 기존 1830과 Provider event verification ingress는 새 1850/1860 caller로 cutover되지 않음. 실제 환불 서비스는 여전히 OFF. 운영 writer의 미참여가 확인된 상태에서 병합·신규 EXECUTE grant·T2 유료 공개 금지.
+
 **필수 선행:** R1의 불변 scope authority는 R2 환불과 R3 모든 Writer 경합의 근간이다. R4는 단위별 병렬화 가능하나 실제 권한 공개는 R1~R6 선행. R7을 CI GREEN만으로 허가하지 않는다.
 
 ## 3. 우선 착수할 1개 작업 — B2-R1
