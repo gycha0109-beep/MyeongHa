@@ -15,6 +15,6 @@ GRANT myeongha_saju_proof_nonce_runtime TO myeongha_docker_nonce_login;
 DO $guard$
 BEGIN
  IF NOT pg_has_role('myeongha_docker_nonce_login','myeongha_saju_proof_nonce_runtime','MEMBER')
-    OR pg_has_role('myeongha_docker_nonce_login','myeongha_api_executor','MEMBER')
+    OR EXISTS (SELECT 1 FROM pg_roles WHERE rolname='myeongha_api_executor')
  THEN RAISE EXCEPTION 'Nonce login improperly scoped'; END IF;
 END $guard$;
