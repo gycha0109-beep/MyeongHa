@@ -14,6 +14,8 @@ G0→G6 **단계별 실행 로드맵(Owner 미승인)**: [R0~R8 Gate/검증/이�
 
 > 2026-10-12: 기존 Gate 표의 HOLD는 그대로입니다. 계획/설계서 작성, PR CI 통과 또는 AI가 작성한 decision table은 Owner 승인·Production 적용 증거가 아닙니다.
 
+**G1 Owner 인수 미결:** [G0 D-02 Post-Preflight closure와 D-03/D-06 positive SourceSet·StageReceipt 계약 제안](./SEYEON_G1_OWNER_SIGNOFF_AND_POST_PREFLIGHT_SOURCE_CLOSURE_V1_PROPOSAL.md). 최초 Preflight 이전의 immutable DB SourceSet과 이후 생성되는 실제 Provider Request/Output은 시간상 동일한 1회 해시로 미리 Pin할 수 없으므로 **별도 단계별 권한·무결성 결속 필요**. 문서·합성 CI 통과는 G0/G1 운영 승인 아님.
+
 ## 판정 정의
 
 - **A / 구현 완료**: 실제 Production Code + PostgreSQL owner 함수 + HTTP/Replay 경로까지 보호가 연결되어, 더는 Shadow/Candidate-only가 아니다. G0/G1/G2/G3/G4 구현 필수.
