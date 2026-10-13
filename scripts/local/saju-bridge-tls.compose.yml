@@ -1,0 +1,99 @@
+# Loaded ONLY by --tls; all certificates, CA keys and data are disposable.
+# Host ports = 0; three independent CA/SAN pairs; no Docker socket mounts.
+services:
+  saju-tls-prep:
+    image: postgres:15
+    entrypoint: ["/bin/sh", "-euc"]
+    command:
+      - |
+        command -v openssl >/dev/null
+        for spec in subject nonce admission; do
+          case "$$spec" in
+            subject) directory=/tls-subject ;;
+            nonce) directory=/tls-nonce ;;
+            admission) directory=/tls-admission ;;
+          esac
+          test -d "$$directory"
+          openssl req -x509 -newkey rsa:2048 -nodes -sha256 -days 1 -subj "/CN=MyeongHa local $$spec CA" -keyout "$$directory/ca.key" -out "$$directory/ca.crt" >/dev/null 2>&1
+          openssl req -new -newkey rsa:2048 -nodes -sha256 -subj "/CN=$$spec-db" -keyout "$$directory/server.key" -out "$$directory/server.csr" >/dev/null 2>&1
+          printf 'subjectAltName=DNS:%s-db\nextendedKeyUsage=serverAuth\n' "$$spec" > "$$directory/server.ext"
+          openssl x509 -req -sha256 -days 1 -in "$$directory/server.csr" -CA "$$directory/ca.crt" -CAkey "$$directory/ca.key" -CAcreateserial -extfile "$$directory/server.ext" -out "$$directory/server.crt" >/dev/null 2>&1
+          printf 'local all all trust\nhostnossl all all 0.0.0.0/0 reject\nhostnossl all all ::/0 reject\nhostssl all all 0.0.0.0/0 scram-sha-256\nhostssl all all ::/0 scram-sha-256\n' > "$$directory/pg_hba.conf"
+          chmod 600 "$$directory/ca.key" "$$directory/server.key"
+          chmod 644 "$$directory/ca.crt" "$$directory/server.crt" "$$directory/pg_hba.conf"
+          chown postgres:postgres "$$directory/server.key"
+          echo "[saju-bridge] Disposable $$spec TLS CA and SAN: prepared."
+        done
+    network_mode: none
+    volumes:
+      - subject-tls-certs:/tls-subject
+      - nonce-tls-certs:/tls-nonce
+      - admission-tls-certs:/tls-admission
+
+  subject-db:
+    command: ["postgres", "-c", "ssl=on", "-c", "ssl_cert_file=/tls/server.crt", "-c", "ssl_key_file=/tls/server.key", "-c", "ssl_ca_file=/tls/ca.crt", "-c", "ssl_min_protocol_version=TLSv1.2", "-c", "hba_file=/tls/pg_hba.conf"]
+    volumes:
+      - subject-tls-certs:/tls:ro
+
+  nonce-db:
+    command: ["postgres", "-c", "ssl=on", "-c", "ssl_cert_file=/tls/server.crt", "-c", "ssl_key_file=/tls/server.key", "-c", "ssl_ca_file=/tls/ca.crt", "-c", "ssl_min_protocol_version=TLSv1.2", "-c", "hba_file=/tls/pg_hba.conf"]
+    volumes:
+      - nonce-tls-certs:/tls:ro
+
+  admission-db:
+    command: ["postgres", "-c", "ssl=on", "-c", "ssl_cert_file=/tls/server.crt", "-c", "ssl_key_file=/tls/server.key", "-c", "ssl_ca_file=/tls/ca.crt", "-c", "ssl_min_protocol_version=TLSv1.2", "-c", "hba_file=/tls/pg_hba.conf"]
+    volumes:
+      - admission-tls-certs:/tls:ro
+
+  saju-bootstrap-subject:
+    environment:
+      PGSSLMODE: verify-full
+      PGSSLROOTCERT: /tls/ca.crt
+    volumes:
+      - subject-tls-certs:/tls:ro
+
+  saju-bootstrap-nonce:
+    environment:
+      PGSSLMODE: verify-full
+      PGSSLROOTCERT: /tls/ca.crt
+    volumes:
+      - nonce-tls-certs:/tls:ro
+
+  saju-bootstrap-admission:
+    image: postgres:15
+    working_dir: /myeongha
+    entrypoint: ["/bin/sh", "-euc"]
+    command:
+      - |
+        test "$$(psql -X -Atqc 'select current_database()')" = 'myeongha_saju_admission_local_verify'
+        psql -X -v ON_ERROR_STOP=1 -v "admission_password=$$SAJU_BRIDGE_LOCAL_ADMISSION_LOGIN_PASSWORD" -f scripts/local/saju-bridge-admission-tls-login.sql
+    environment:
+      PGHOST: admission-db
+      PGPORT: "5432"
+      PGUSER: postgres
+      PGDATABASE: myeongha_saju_admission_local_verify
+      PGPASSWORD: ${SAJU_BRIDGE_LOCAL_ADMISSION_DB_PASSWORD:?disposable-secret-required}
+      PGSSLMODE: verify-full
+      PGSSLROOTCERT: /tls/ca.crt
+      SAJU_BRIDGE_LOCAL_ADMISSION_LOGIN_PASSWORD: ${SAJU_BRIDGE_LOCAL_ADMISSION_LOGIN_PASSWORD:?disposable-secret-required}
+    volumes:
+      - type: volume
+        source: myeongha-workspace
+        target: /myeongha
+        read_only: true
+      - admission-tls-certs:/tls:ro
+    networks: [disposable]
+
+  saju-binding-verifier:
+    environment:
+      MYEONGHA_DOCKER_SAJU_TLS: "1"
+      SAJU_BRIDGE_LOCAL_ADMISSION_LOGIN_PASSWORD: ${SAJU_BRIDGE_LOCAL_ADMISSION_LOGIN_PASSWORD:?disposable-secret-required}
+    volumes:
+      - subject-tls-certs:/certs/subject:ro
+      - nonce-tls-certs:/certs/nonce:ro
+      - admission-tls-certs:/certs/admission:ro
+
+volumes:
+  subject-tls-certs:
+  nonce-tls-certs:
+  admission-tls-certs:
