@@ -5,10 +5,6 @@
 -- All input bytes stay in Production PostgreSQL memory.
 WITH expected(name) AS (
   VALUES
-    ('name'),
-    ('signature'),
-    ('owner'),
-    ('volatility'),
     ('qry_production_relationship_runtime_v1'),
     ('cmd_enqueue_seyeon_relationship_sync_v1'),
     ('cmd_claim_seyeon_relationship_sync_v1'),
