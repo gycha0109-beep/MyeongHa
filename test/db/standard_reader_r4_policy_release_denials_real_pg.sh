@@ -2,7 +2,7 @@
 set -euo pipefail
 mode="${1:-}"
 case "$mode" in
- disabled|coming_soon|locked|release_not_default|rule_future|rule_ambiguous|rule_withdrawn) ;;
+ disabled|coming_soon|locked|release_not_default|offer_disabled|spec_retired|rule_future|rule_ambiguous|rule_withdrawn) ;;
  *) echo 'FAIL R4: invalid mode'; exit 1;;
 esac
 [[ "${CI:-}" == true && "${PGHOST:-}" == localhost &&
@@ -40,6 +40,8 @@ revision=s4-initial-standard-test-only
 # published Character projections are immutable and must never be UPDATEd.
 case "$mode" in
  disabled|coming_soon|locked|release_not_default) ;;
+ offer_disabled) p -c "update public.product_offers set enabled=false where id=(select product_offer_id from public.purchase_intents where id='b4220000-0000-4000-8000-000000000001'::uuid)" >/dev/null;;
+ spec_retired) p -c "update public.standard_reading_product_specs set retired_at=clock_timestamp() where product_id='$product'::uuid" >/dev/null;;
  rule_withdrawn) p -c "insert into public.standard_reader_product_rule_withdrawals_v1(product_id,approved_policy_revision,withdrawn_at,withdrawal_record_ref) values ('$product'::uuid,'$revision',clock_timestamp(),'test-only:r4-withdraw')" >/dev/null;;
  rule_future|rule_ambiguous)
  if [[ "$mode" == rule_future ]]; then
@@ -53,6 +55,8 @@ if p -f test/db/standard_reader_r4_initial_bind_call.sql >"$tmp/try.out" 2>"$tmp
 fi
 if [[ "$mode" == rule_* ]]; then
  expected='One current approved Standard Reader Product rule is required'
+elif [[ "$mode" == offer_disabled || "$mode" == spec_retired ]]; then
+ expected='One DB-derived verified initial Reading Product/Birth scope is required'
 else expected='Current Reader Product publication, bundle and unlock are required'
 fi
 grep -Fq "$expected" "$tmp/try.err" || { cat "$tmp/try.err" >&2; fail 'wrong denial reason'; }
