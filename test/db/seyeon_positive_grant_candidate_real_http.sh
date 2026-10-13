@@ -29,4 +29,10 @@ psql -X -v ON_ERROR_STOP=1 \
 # Production v1/v2, app credentials and migration history are never changed.
 psql -X -v ON_ERROR_STOP=1 \
   -f test/db/seyeon_g2_legacy_direct_commit_acl_cutover_candidate_v1.sql
+# Actual v2/v1/core writes and both outboxes, with G2 exact original Grant
+# held until the same PostgreSQL transaction commits. Synthetic fixtures only.
+psql -X -v ON_ERROR_STOP=1 \
+  -f test/db/seyeon_g2_actual_v2_atomic_positive_candidate_r3.sql
+SEYEON_POSITIVE_GRANT_REAL_PG=1 ./node_modules/.bin/vitest run \
+  test/seyeon-g2-real-v2-atomic-disposable.test.ts --maxWorkers=1
 echo 'PASS: positive Pin -> test Commit -> real PG HTTP grant reveal and Node/Postgres D-03 dual-serializer golden vectors in disposable CI DB'
