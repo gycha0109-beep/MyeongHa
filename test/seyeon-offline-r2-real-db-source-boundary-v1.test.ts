@@ -30,7 +30,7 @@ const pool = ENABLED
   ? new Pool({ max: 1, connectionTimeoutMillis: 5000, statement_timeout: 5000 })
   : null;
 const S = 'd2000000-0000-4000-8000-000000000001';
-const T = 'd4000000-0000-4000-8000-000000000001';
+const T = 'd4000000-0000-4000-8000-000000000003';
 const TURN = 'd7000000-0000-4000-8000-000000000003';
 const ATTEMPT = 'd7200000-0000-4000-8000-000000000003';
 const USER_MESSAGE = 'd7100000-0000-4000-8000-000000000003';
@@ -157,6 +157,34 @@ describe.skipIf(!ENABLED)(
         await client.query('BEGIN');
         // All fixture writes, including the generated Attempt, stay in this
         // transaction. No production role, API, public Provider or DB migration.
+        // Original R1 turn is still in-flight, and the core allows only one
+        // active logical Turn per Thread: create a separate test thread.
+        await client.query(
+          `insert into public.conversation_threads(
+            id,subject_id,thread_type,status,title,active_content_release_id,
+            active_content_bundle_id,content_revision,next_sequence_no,
+            created_at,updated_at
+          ) values (
+            $1::uuid,$2::uuid,'single_character','active',
+            'offline-r2-real-db-source-bridge',
+            $3::uuid,$4::uuid,0,1,clock_timestamp(),clock_timestamp()
+          )`,
+          [
+            T,S,
+            'd3100000-0000-4000-8000-000000000001',
+            'd3000000-0000-4000-8000-000000000001',
+          ],
+        );
+        await client.query(
+          `insert into public.conversation_thread_characters(
+            id,thread_id,character_id,content_bundle_id,role,joined_at
+          ) values ($1::uuid,$2::uuid,'seyeon',$3::uuid,
+            'primary',clock_timestamp()-interval '1 minute')`,
+          [
+            'd4100000-0000-4000-8000-000000000003',
+            T,'d3000000-0000-4000-8000-000000000001',
+          ],
+        );
         await client.query(
           `select * from public.cmd_receive_chat_turn_v1(
             $1::uuid,$2::uuid,$3::text,$4::text,$5::text,$6::jsonb,
