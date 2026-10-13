@@ -292,12 +292,17 @@ SQL
     apply_pg17_migrations_through_seyeon_production_frontier
     local_shape="$(mktemp)"
     local_digest="$(mktemp)"
-    trap 'rm -f -- "$local_shape" "$local_digest"' EXIT
+    local_acl="$(mktemp)"
+    trap 'rm -f -- "$local_shape" "$local_digest" "$local_acl"' EXIT
     psql -X -qAt -v ON_ERROR_STOP=1 -f scripts/operations/seyeon-r2-rpc-catalog-readonly.sql > "$local_shape"
     node scripts/operations/verify-seyeon-r2-rpc-catalog.mjs "$local_shape" > /dev/null
     psql -X -qAt -v ON_ERROR_STOP=1 -f scripts/operations/seyeon-r2-rpc-set-fingerprint-readonly.sql > "$local_digest"
     node scripts/operations/verify-seyeon-r2-rpc-set-fingerprint.mjs "$local_digest" \
       scripts/operations/seyeon-r2-production-rpc-set-fingerprint-20261013.json
+    psql -X -qAt -v ON_ERROR_STOP=1 \
+      -f scripts/operations/seyeon-r2-acl-grants-canonical-readonly.sql > "$local_acl"
+    node scripts/operations/verify-seyeon-r2-acl-grants.mjs "$local_acl" \
+      scripts/operations/seyeon-r2-production-acl-grants-20261013.json
     ;;
   seyeon-r2-rpc-catalog)
     verify_pg17
