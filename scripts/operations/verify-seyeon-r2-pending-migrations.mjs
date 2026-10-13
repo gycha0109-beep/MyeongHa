@@ -26,7 +26,7 @@ export function gitBlobSha(contents) {
 function proofPresent(sql, proof) {
   // This is a bounded textual sanity test against immutable pinned SQL,
   // NOT a parser, runtime catalog proof, or Owner decision.
-  const id = proof.name.replaceAll('.', '\\.').replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
+  const id = proof.name.split('.').join('[.]');
   const re = proof.kind === 'function'
     ? new RegExp('\\bcreate\\s+(?:or\\s+replace\\s+)?function\\s+' + id + '\\s*\\(', 'iu')
     : proof.kind === 'table'
