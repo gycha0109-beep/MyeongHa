@@ -67,13 +67,30 @@ export function compareR2AclSnapshots(isolated,production) {
     authorizedForProduction:false,drReady:false,
   };
 }
+// Expected HOLD evidence is pinned separately from successful execution status.
+// A newly changed/corrected ACL must be reviewed, never silently admitted.
+export function requireObservedR2AclHold(result) {
+  const name='assert_seyeon_chat_thread_runtime_v1';
+  if (!result || result.status!=='HOLD_R2_ACL_METADATA_NOT_EQUIVALENT'
+      || JSON.stringify(result.rawOnly)!=='[]'
+      || JSON.stringify(result.canonicalGrantDifferences)!==JSON.stringify([name])
+      || JSON.stringify(result.edgeCountDifferences)!==JSON.stringify([name])
+      || JSON.stringify(result.explicitAclDifferences)!=='[]'
+      || result.normalizedGrantGraphMatch!==false
+      || result.authorizedForProduction!==false || result.drReady!==false) {
+    throw new Error('HOLD_R2_ACL_UNEXPECTED_DRIFT_REQUIRES_OWNER_REVIEW');
+  }
+  return result;
+}
+
 if (process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url)) {
   try {
     if(process.argv.length!==4)throw Error('HOLD_R2_ACL_USAGE');
     const isolated=JSON.parse(readFileSync(process.argv[2],'utf8'));
     const prodEnvelope=JSON.parse(readFileSync(process.argv[3],'utf8'));
     validateR2ProductionAclEnvelope(prodEnvelope);
-    console.log(JSON.stringify(compareR2AclSnapshots(isolated,prodEnvelope.snapshot)));
+    console.log(JSON.stringify(requireObservedR2AclHold(
+      compareR2AclSnapshots(isolated,prodEnvelope.snapshot))));
   } catch(e){
     console.error(String(e?.message??e).slice(0,250));
     process.exitCode=1;
