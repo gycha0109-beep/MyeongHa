@@ -219,3 +219,13 @@ Governor 04d4B 계열은 실제 격리 PostgreSQL 기반 영수증 임대·정�
 - **증명 계약:** 일회용 PG17 CI에서 의도적으로 GLOBAL PUBLIC + public-schema anon/auth 테이블 기본 GRANT를 재현 → 이전 객체는 그대로 두고 앞으로 생성되는 테이블의 브라우저 DML이 없음을 검증. 기존 관계 테이블에 명시적 `GRANT SELECT TO anon` 또는 `DISABLE ROW LEVEL SECURITY` 시 **반드시 실패**. 실패 시 로그에는 정확한 6개 객체의 이름/owner/RLS/ACL만 남기고 실제 행 또는 고객정보를 출력하지 않는다.
 - **다음 실제 실행:** 이 보수 PR의 exact HEAD/PG17/Full Integration PASS 및 merge 후 새 [PostgreSQL Isolated Restore Drill](https://github.com/gycha0109-beep/MyeongHa/actions/workflows/postgres-isolated-restore-drill.yml) 수동 실행. 백업 `38204929259` 재사용, `incident_reference_utc=2026-10-12T04:46:04Z`, `watchtower_track=ops`, optional privacy fields blank. 6 history snapshot, 11 functions, 6 RLS/ACL 및 전체 synthetic/evidence SUCCESS 확인 전에는 `HOLD_EXACT_RELATIONSHIP_RESTORE`.
 - **고정 안전 경계:** `supabase_migrations` full ledger 복원하지 않음, `dr_ready=false`, Production SQL/Role/ACL/DML 변화 없음, 원격-only lineage `20261008090417` 복구·AI G0~G6·paid/public activation 별도 HOLD. 기존 백업 및 운영 장애 증거를 덮어쓰지 않는다.
+
+## 14. 2026-10-13 최신 R1/R2 관측 및 다른 트랙의 병행 작업
+
+2026-10-12의 단계별 실행 기록은 역사적 근거로 보존한다. 2026-10-13 후속 확인은 기존 [R2 읽기 전용 계보 판단 패킷](SEYEON_MIGRATION_LINEAGE_R2_READONLY_PACKET_20261013.md)의 **6절 후속 관측**을 기준으로 한다. 별도의 중복 현황 문서는 만들지 않는다.
+
+- 복원 함수/테이블 기본권한을 격리 환경에서 정렬한 PR [#1998](https://github.com/gycha0109-beep/MyeongHa/pull/1998)·[#2011](https://github.com/gycha0109-beep/MyeongHa/pull/2011) 병합, 정확한 main SHA `9b7c10cb694afee5c1cb1d89050668eaa3d9f558`에서 CI/Governance SUCCESS. 운영 마이그레이션은 SKIPPED.
+- 병합 이후 암호화 백업 [#38328139495](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38328139495) SUCCESS. 반면 해당 백업의 **정확한 6/6·11/11·RLS 6/6 복원 증거는 미확보**. R1 HOLD. 원래 수동 입력값은 R2 패킷 6절에 기록한다.
+- 2026-10-13 현재 Production SELECT에서 초기 `1400~1510` 12/12, 후속 **`1520~1720` 0/21**. 기존 문서의 1520~1710 0/20은 구 인벤토리이며 최신 Reader scope 1720까지 포함해야 한다. 원격-only `20261008090417` SHA-256 동일성은 확인했지만, 독립 재현 및 전체 fingerprint parity와 Owner 정합성 결정은 아직 HOLD.
+- 같은 시각 다른 작업에서 [R2 패킷이 별도로 병합](https://github.com/gycha0109-beep/MyeongHa/commit/1b0282b7c0378f67d1860a83c373a040ca915f52)됐다. 신규 PR은 해당 기존 문서의 관측을 보강하는 것이며 계보 조정 결정을 대신하지 않는다.
+- [DR Readiness #38226729128](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38226729128) FAIL의 `1310` 역사적 증거를 임의 갱신하지 않는다. `dr_ready=false`, 후속 DB 적용·세연 G0~G6·유료 AI·공개는 별도 Owner 승인 전 HOLD.
