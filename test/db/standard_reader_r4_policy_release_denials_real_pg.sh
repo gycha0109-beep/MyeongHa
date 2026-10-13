@@ -2,7 +2,7 @@
 set -euo pipefail
 mode="${1:-}"
 case "$mode" in
- disabled|coming_soon|locked|release_retired|rule_future|rule_ambiguous|rule_withdrawn) ;;
+ disabled|coming_soon|locked|release_not_default|rule_future|rule_ambiguous|rule_withdrawn) ;;
  *) echo 'FAIL R4: invalid mode'; exit 1;;
 esac
 [[ "${CI:-}" == true && "${PGHOST:-}" == localhost &&
@@ -14,18 +14,32 @@ tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
 # real Birth, approved Standard, initial Reading still unbound.
 awk '/^-- Append the test Reader.s domain Capability as immutable published content/{exit} {print}' \
  test/db/official_standard_reading_reader_interpretation.sql >"$tmp/base.sql"
-awk '/^create temp table _s4_initial_result as/{exit} {print}' \
- test/db/standard_reader_initial_policy_locked_positive.sql >>"$tmp/base.sql"
+awk -v mode="$mode" '
+ /^create temp table _s4_initial_result as/ {exit}
+ mode=="disabled" && /\x27available\x27,true,clock_timestamp/ {
+   sub(/\x27available\x27,true/, "\x27available\x27,false"); changed++
+ }
+ mode=="coming_soon" && /\x27available\x27,true,clock_timestamp/ {
+   sub(/\x27available\x27,true/, "\x27coming_soon\x27,true"); changed++
+ }
+ mode=="locked" && /\x27available\x27,true,clock_timestamp/ {
+   sub(/\x27available\x27,true/, "\x27unlockable\x27,true"); changed++
+ }
+ mode=="release_not_default" && /\x27active\x27,true,null,\x27uniform-default-v1\x27/ {
+   sub(/\x27active\x27,true/, "\x27active\x27,false"); changed++
+ }
+ {print}
+ END {if (mode ~ /^(disabled|coming_soon|locked|release_not_default)$/ && changed!=1) exit 3}
+' test/db/standard_reader_initial_policy_locked_positive.sql >>"$tmp/base.sql"
 p -f "$tmp/base.sql" >"$tmp/base.out" 2>"$tmp/base.err" ||
  { tail -n 30 "$tmp/base.err" >&2; fail fixture; }
 product=11392000-0000-0000-0000-000000000001
 bundle=11391000-0000-0000-0000-000000000001
 revision=s4-initial-standard-test-only
+# Negative Reader catalog/default-release states are seeded before publication;
+# published Character projections are immutable and must never be UPDATEd.
 case "$mode" in
- disabled) p -c "update public.character_runtime_catalog set enabled=false where character_id='seyeon' and content_bundle_id='$bundle'::uuid" >/dev/null;;
- coming_soon) p -c "update public.character_runtime_catalog set availability='coming_soon' where character_id='seyeon' and content_bundle_id='$bundle'::uuid" >/dev/null;;
- locked) p -c "update public.character_runtime_catalog set availability='unlockable' where character_id='seyeon' and content_bundle_id='$bundle'::uuid" >/dev/null;;
- release_retired) p -c "update public.content_releases set retired_at=clock_timestamp() where content_bundle_id='$bundle'::uuid and release_key='s4-private-initial-reader-default'" >/dev/null;;
+ disabled|coming_soon|locked|release_not_default) ;;
  rule_withdrawn) p -c "insert into public.standard_reader_product_rule_withdrawals_v1(product_id,approved_policy_revision,withdrawn_at,withdrawal_record_ref) values ('$product'::uuid,'$revision',clock_timestamp(),'test-only:r4-withdraw')" >/dev/null;;
  rule_future|rule_ambiguous)
  if [[ "$mode" == rule_future ]]; then
