@@ -11,7 +11,7 @@ tmp="$(mktemp -d)";trap 'rm -rf "$tmp"' EXIT
 if [[ "$mode" == no_official ]]; then
  awk '/^-- Append the test Reader.s domain Capability as immutable published content/{exit} {print}' \
    test/db/official_standard_reading_reader_interpretation.sql >"$tmp/setup.sql"
- expected='Additional Reader Interpretation requires an existing committed official Standard Reading'
+ expected='One server-owned additional Reader and existing Official Reading scope is required'
 else
  awk '/^create temp table _v2_additional_result as/{exit} {print}' \
    test/db/official_standard_reading_reader_interpretation.sql >"$tmp/setup.sql"
