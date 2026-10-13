@@ -38,19 +38,18 @@ if [[ "$mode" == sandbox || "$mode" == unverified ]]; then
  grep -Fq 'Verified initial Reader purchase Receipt is unavailable' "$tmp/issue.err" ||
  { cat "$tmp/issue.err" >&2; fail 'issuer denied for unrelated cause'; }
 else
- p -c "select * from public.internal_apply_initial_official_reader_receipt_locked_v1(
+ if p -c "select * from public.internal_apply_initial_official_reader_receipt_locked_v1(
   '$receipt'::uuid,array['test-reader-unit'],array[transaction_timestamp()],
   array[clock_timestamp()+interval '1 hour'],array[null]::timestamptz[],array[null]::text[])" \
-  >"$tmp/issue.out" 2>"$tmp/issue.err" ||
-  { cat "$tmp/issue.err" >&2; fail 'future-dated verified Grant fixture'; }
- [[ "$(p -c "select count(*) from public.entitlement_grants
- where source_receipt_id='$receipt'::uuid and status='active'
- and valid_from>clock_timestamp()")" == 1 ]] ||
-  fail 'future-valid Grant is not staged'
+  >"$tmp/issue.out" 2>"$tmp/issue.err"; then
+  fail 'Commerce issuer accepted future-active Grant'
+ fi
+ grep -Fq 'future-active entitlement effects are not allowed by MVP authority' "$tmp/issue.err" ||
+ { cat "$tmp/issue.err" >&2; fail 'future-dated Grant denied for unrelated reason'; }
 fi
 ledger="$(p -c "select count(*) from public.entitlement_events where source_receipt_id='$receipt'::uuid")"
 if p -f test/db/standard_reader_r4_initial_bind_call.sql >"$tmp/bind.out" 2>"$tmp/bind.err"; then
- fail 'private Reader Binder accepted untrusted/future-dated source'
+ fail 'private Reader Binder accepted untrusted/no-Grant source'
 fi
 grep -Fq 'active purchase-backed Entitlement Grant for this Standard Reading purchase is unavailable' "$tmp/bind.err" ||
  { cat "$tmp/bind.err" >&2; fail 'wrong Binder denial'; }
