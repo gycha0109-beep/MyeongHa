@@ -34,6 +34,11 @@ const commerceEntitlementPatterns = [
 ];
 
 const postgres17Patterns = [
+  /^scripts\/operations\/seyeon-r2-assert-helper-acl-readonly\.sql$/u,
+  /^scripts\/operations\/seyeon-r2-acl-grants-canonical-readonly\.sql$/u,
+  /^scripts\/operations\/seyeon-r2-production-acl-grants-20261013\.json$/u,
+  /^scripts\/operations\/verify-seyeon-r2-acl-grants\.mjs$/u,
+  /^tests\/seyeon-r2-acl-grants\.test\.mjs$/u,
   /^scripts\/operations\/seyeon-r2-rpc-set-fingerprint-readonly\.sql$/u,
   /^scripts\/operations\/seyeon-r2-production-rpc-set-fingerprint-20261013\.json$/u,
   /^scripts\/operations\/verify-seyeon-r2-rpc-set-fingerprint\.mjs$/u,
