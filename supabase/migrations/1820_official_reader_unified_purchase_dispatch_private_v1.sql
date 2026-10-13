@@ -35,10 +35,14 @@ declare
   v_intent_id uuid;
   v_role text;
   v_product_id uuid;
+  v_reading_ref uuid;
+  v_reader_id text;
   v_receipt_count bigint;
   v_recheck_count bigint;
   v_after_role text;
   v_after_product uuid;
+  v_after_reading uuid;
+  v_after_reader text;
 begin
   if p_receipt_id is null then
     raise exception using errcode='23514',
@@ -64,8 +68,8 @@ begin
       message='Exact production verified Receipt lineage is required';
   end if;
 
-  select p.purchase_role,p.product_id
-    into strict v_role,v_product_id
+  select p.purchase_role,p.product_id,p.reading_ref,p.reader_character_id
+    into strict v_role,v_product_id,v_reading_ref,v_reader_id
   from public.internal_acquire_official_reader_purchase_scope_v2(
     v_subject_id,v_intent_id
   ) p;
@@ -104,18 +108,51 @@ begin
       message='Official Reader verified Receipt role unavailable';
   end if;
 
-  -- Recheck the same Product/Role AFTER original writer. The source scope
-  -- remains locked until COMMIT; changed lineage aborts the entire batch.
-  select p.purchase_role,p.product_id
-    into strict v_after_role,v_after_product
-  from public.internal_acquire_official_reader_purchase_scope_v2(
-    v_subject_id,v_intent_id
-  ) p;
-  if v_after_role is distinct from v_role
+  -- AFTER Commerce row locks: READ-ONLY recheck, NEVER call a function
+  -- which might try to acquire a NEW L0/L1 key after holding rows.
+  select count(*),(array_agg(roles.purchase_role))[1],
+         (array_agg(po.product_id))[1]
+    into v_recheck_count,v_after_role,v_after_product
+  from public.commerce_receipts cr
+  join public.purchase_intents pi
+    on pi.id=cr.purchase_intent_id
+   and pi.subject_id=cr.subject_id
+   and pi.product_offer_id=cr.product_offer_id
+   and pi.status='verified'
+  join public.product_offers po on po.id=pi.product_offer_id
+  join public.standard_reading_offer_roles roles
+    on roles.product_offer_id=po.id and roles.retired_at is null
+   and roles.purchase_role in ('initial_reading','additional_reader_interpretation')
+  where cr.id=p_receipt_id and cr.environment='production'
+    and cr.verification_status='verified'
+    and cr.subject_id=v_subject_id and cr.purchase_intent_id=v_intent_id;
+  if v_recheck_count <> 1 or v_after_role is distinct from v_role
      or v_after_product is distinct from v_product_id then
     raise exception using errcode='40001',
       constraint='reader_unified_receipt_scope_drift',
       message='Official Reader purchase scope changed during issuance';
+  end if;
+  if v_role='initial_reading' then
+    v_after_product := public.internal_qry_official_reader_initial_product_candidate_v1(
+      v_subject_id,v_intent_id
+    );
+    if v_after_product is distinct from v_product_id then
+      raise exception using errcode='40001',
+        constraint='reader_unified_receipt_scope_drift',
+        message='Initial Reader candidate changed after issuance';
+    end if;
+  else
+    select q.reading_ref,q.reader_character_id
+      into strict v_after_reading,v_after_reader
+    from public.internal_qry_official_reader_additional_scope_candidate_v1(
+      v_subject_id,v_intent_id
+    ) q;
+    if v_after_reading is distinct from v_reading_ref
+       or v_after_reader is distinct from v_reader_id then
+      raise exception using errcode='40001',
+        constraint='reader_unified_receipt_scope_drift',
+        message='Additional Reader scope changed after issuance';
+    end if;
   end if;
 end
 $unified_receipt_dispatch$;
@@ -152,6 +189,9 @@ declare
   v_scope record;
   v_result record;
   v_after record;
+  v_after_reading uuid;
+  v_after_reader text;
+  v_after_product uuid;
 begin
   if p_subject_id is null or p_purchase_intent_id is null
      or p_proposed_reading_session_id is null
@@ -205,17 +245,43 @@ begin
       message='Official Reader Product mismatch after binding';
   end if;
 
-  select * into strict v_after from
-    public.internal_acquire_official_reader_purchase_scope_v2(
-      p_subject_id,p_purchase_intent_id
-    );
+  -- The original v2 binder now owns Grant/Birth row locks. Do not acquire
+  -- a new Product/Reader advisory lock AFTER those row locks; read-only proof.
+  select roles.purchase_role,po.product_id into strict v_after
+  from public.purchase_intents pi
+  join public.product_offers po on po.id=pi.product_offer_id
+  join public.standard_reading_offer_roles roles
+    on roles.product_offer_id=po.id and roles.retired_at is null
+   and roles.purchase_role in ('initial_reading','additional_reader_interpretation')
+  where pi.id=p_purchase_intent_id and pi.subject_id=p_subject_id
+    and pi.status='verified';
   if v_after.purchase_role is distinct from v_scope.purchase_role
-     or v_after.product_id is distinct from v_scope.product_id
-     or v_after.reading_ref is distinct from v_scope.reading_ref
-     or v_after.reader_character_id is distinct from v_scope.reader_character_id then
+     or v_after.product_id is distinct from v_scope.product_id then
     raise exception using errcode='40001',
       constraint='reader_unified_bind_scope_drift',
-      message='Official Reader Purchase scope changed after binding';
+      message='Official Reader Purchase role/Product changed after binding';
+  end if;
+  if v_scope.purchase_role='initial_reading' then
+    v_after_product := public.internal_qry_official_reader_initial_product_candidate_v1(
+      p_subject_id,p_purchase_intent_id
+    );
+    if v_after_product is distinct from v_scope.product_id then
+      raise exception using errcode='40001',
+        constraint='reader_unified_bind_scope_drift',
+        message='Initial Reader Product changed after binding';
+    end if;
+  else
+    select q.reading_ref,q.reader_character_id
+      into strict v_after_reading,v_after_reader
+    from public.internal_qry_official_reader_additional_scope_candidate_v1(
+      p_subject_id,p_purchase_intent_id
+    ) q;
+    if v_after_reading is distinct from v_scope.reading_ref
+       or v_after_reader is distinct from v_scope.reader_character_id then
+      raise exception using errcode='40001',
+        constraint='reader_unified_bind_scope_drift',
+        message='Additional Reader source changed after binding';
+    end if;
   end if;
 
   return query select
