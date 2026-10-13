@@ -194,5 +194,7 @@ if [[ "${CI:-}" == "true" && "${PGHOST:-}" == "localhost" ]]; then
     bash test/db/standard_reader_initial_refund_r2_real_pg.sh refund_first
   run_isolated_case myeongha_standard_b2_r2_bind_first_test \
     bash test/db/standard_reader_initial_refund_r2_real_pg.sh bind_first
+  run_isolated_case myeongha_standard_b2_r2_no_grant_test \
+    bash test/db/standard_reader_initial_no_grant_r2_real_pg.sh
 fi
 bash test/db/catalog_snapshot.sh
