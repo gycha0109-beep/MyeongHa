@@ -22,6 +22,7 @@ trap cleanup EXIT
 # to the new D3 verified-cancel bridge and the explicit rejection wording.
 sed -e 's/internal_execute_official_reader_verified_provider_revoke_v1/internal_execute_official_reader_verified_cancel_v2/g' \
   -e 's/Provider revocation cannot override another Subject context/Provider callback may not override canonical Subject context/g' \
+  -e 's/Verified Provider Reader revocation requires READ COMMITTED/Verified cancellation and READ COMMITTED required/g' \
   test/db/official_reader_verified_provider_revoke_bridge_private.sh \
   >"$tmpdir/d3-bridge-race.sh"
 bash "$tmpdir/d3-bridge-race.sh" >"$tmpdir/bridge.out" 2>"$tmpdir/bridge.err" || {
