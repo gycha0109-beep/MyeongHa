@@ -18,6 +18,26 @@ select pg_temp.assert_v2_fails(
  'standard_s5_initial_scope_pin_immutable'
 );
 
+select pg_temp.assert_v2_fails(
+ 'S5 private pin rejects nonexistent Receipt/Grant lineage despite no new P0 FKs',
+ $sql$
+ insert into public.standard_reader_initial_purchase_scope_pins_v1(
+   receipt_id,purchase_intent_id,subject_id,product_id,
+   source_birth_revision_id,entitlement_grant_id,
+   approved_policy_revision,scope_identity
+ ) values (
+   'b4990000-0000-4000-8000-000000000001'::uuid,
+   'b4220000-0000-4000-8000-000000000001'::uuid,
+   '11390000-0000-0000-0000-000000000001'::uuid,
+   '11392000-0000-0000-0000-000000000001'::uuid,
+   '12101100-0000-0000-0000-000000000001'::uuid,
+   'b4990000-0000-4000-8000-000000000002'::uuid,
+   's4-initial-standard-test-only','forged-unpinned-scope'
+ )
+ $sql$,
+ 'standard_s5_pin_exact_immutable_authority_required'
+);
+
 insert into public.commerce_provider_events(
  id,provider,external_event_id,event_type,external_transaction_id,
  resolved_subject_id,resolution_source_type,resolved_receipt_id,
