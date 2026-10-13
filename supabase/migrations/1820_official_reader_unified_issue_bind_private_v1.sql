@@ -224,6 +224,14 @@ begin
       message='Original Binder returned a different purchase scope';
   end if;
 
+  if v_result.replayed is null
+     or v_result.official_reading_created is null
+     or v_result.entitlement_grant_id is null then
+    raise exception using errcode='40001',
+      constraint='reader_d2_bind_result_incomplete',
+      message='Original Binder returned incomplete purchase-backed result';
+  end if;
+
   if v_scope.purchase_role='initial_reading' then
     if v_result.access_role is distinct from 'initial_reader'
        or (v_result.replayed is false and
@@ -260,6 +268,25 @@ begin
     raise exception using errcode='40001',
       constraint='reader_d2_bind_scope_drift',
       message='Purchase scope changed during bind; rollback required';
+  end if;
+
+  -- Selection metadata can also drift through legacy/unparticipating paths.
+  -- Recheck both Reader and immutable Bundle after the original binder.
+  select count(*), (array_agg(sel.reader_character_id))[1],
+         (array_agg(sel.reader_content_bundle_id))[1]
+  into v_selection_count,v_selected_reader,v_selected_bundle
+  from public.purchase_intents pi
+  join public.product_offers po on po.id=pi.product_offer_id
+  join public.purchase_intent_reader_selections sel
+    on sel.purchase_intent_id=pi.id and sel.product_id=po.product_id
+  where pi.id=p_purchase_intent_id and pi.subject_id=p_subject_id
+    and pi.status='verified' and po.product_id=v_scope.product_id;
+  if v_selection_count <> 1
+     or v_selected_reader is distinct from v_result.reader_character_id
+     or v_selected_bundle is distinct from v_result.reader_content_bundle_id then
+    raise exception using errcode='40001',
+      constraint='reader_d2_reader_selection_drift',
+      message='Reader or Bundle selection drift after original bind';
   end if;
 
   if v_result.replayed is false then
