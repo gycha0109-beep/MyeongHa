@@ -16,6 +16,8 @@
 
 **현재 운영 경로 불변:** 0건 Personal Projector, 기존 zero-only Pin, public route OFF, 유료 Provider OFF, 운영 DB/DDL/ACL 변경 0. 모든 아래 SQL 이름·DDL은 **신규 forward-only migration을 작성할 때의 제안**이며 이 문서만으로 실행하지 않습니다.
 
+**2026-10-13 G1 Owner 인수 계약 보완:** [실제 Preflight 이후 출처 Closure / 단계별 요청 Receipt 제안 및 결정서](./SEYEON_G1_OWNER_SIGNOFF_AND_POST_PREFLIGHT_SOURCE_CLOSURE_V1_PROPOSAL.md). 기존 G1 `final_context_digest`/Provider 전체 Request digest는 **Preflight 실행 전에는 아직 생성될 수 없음**에 유의합니다. 최초 Pin은 불변 **원본 SourceSet**, Preflight·Interpreter·Renderer 결과는 이후 **승인된 Server-owned 단계별 Receipt**로 결속하는 것이 후보입니다. Caller가 보낸 checksum은 DB 서명·Provider wire attestation이 아니며, 새로운 출처 유입은 기본 HOLD입니다. 이는 Owner 결재가 아니라 설계상 시간순서를 명확히 한 것입니다.
+
 ## 1. 확인된 코드 근거 (진단)
 
 | 층 | 확인된 이름/행동 | G1 이관시 제약 |
