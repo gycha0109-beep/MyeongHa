@@ -244,6 +244,53 @@ describe.skipIf(!enabled)('G2 actual v2/v1/core and both Outboxes, disposable-on
     });
   });
 
+  it('a freshly regranted ID cannot authorize the old pinned Attempt',async()=>{
+    const id=await prepare(26);
+    await stage(id,proof(id));
+    await transaction(async c=>{
+      await c.query(
+        'update public.record_access_grants set revoked_at=clock_timestamp() where id=$1::uuid',
+        [id.grant],
+      );
+      await c.query(
+        "insert into public.record_access_grants(id,subject_id,life_fact_id,memory_item_id,grantee_character_id,grant_reason,granted_at,revoked_at) values($1,$2,null,$3,'seyeon','user_choice',clock_timestamp(),null)",
+        ['d6000000-0000-4000-8000-000000000126',subject,id.memory],
+      );
+    });
+    await expect(transaction(c=>actualCommit(c,id),true)).rejects.toMatchObject({
+      constraint:'seyeon_offline_r3_original_grant_revoked',
+    });
+    expect(await saved(id)).toMatchObject({
+      messages:'0',outboxes:'0',admissions:'0',
+      attempt_state:'validated',turn_state:'validated',
+    });
+  });
+
+  it('a late second-Outbox ID collision rolls back real v2 message, first Outbox and admission',async()=>{
+    const id=await prepare(27);
+    await stage(id,proof(id));
+    // Owner fixture reserves only the POST-turn event ID against a different
+    // aggregate, so the core first Chat Outbox insert is not pre-blocked.
+    await transaction(async c=>{
+      await c.query(
+        "insert into public.outbox_events(id,aggregate_type,aggregate_id,event_type,event_schema_version,dedupe_key,payload_jsonb,status,attempt_count,available_at,created_at) values($1::uuid,'chat_turn',$2::text,'CHAT_TURN_COMMITTED','v1','synthetic-id-collision-r3','{}'::jsonb,'pending',0,clock_timestamp(),clock_timestamp())",
+        [id.postOutbox,'offline-unrelated-fixture-27'],
+      );
+    });
+    await expect(transaction(c=>actualCommit(c,id),true)).rejects.toMatchObject({
+      code:'23505',constraint:'outbox_events_pkey',
+    });
+    expect(await saved(id)).toMatchObject({
+      messages:'0',outboxes:'0',admissions:'0',
+      attempt_state:'validated',turn_state:'validated',
+    });
+    const preserved=await clientAction(c=>c.query<{aggregate_id:string}>(
+      'select aggregate_id from public.outbox_events where id=$1::uuid',
+      [id.postOutbox],
+    ));
+    expect(preserved.rows[0]?.aggregate_id).toBe('offline-unrelated-fixture-27');
+  });
+
   it('revoke-first: real G2 Commit waits for Subject then refuses all writes',async()=>{
     const id=await prepare(24);
     await stage(id,proof(id));
