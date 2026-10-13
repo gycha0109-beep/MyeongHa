@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import {
   fieldNames, validateR2Aggregate, validateR2ProductionEnvelope, compareR2Aggregate,
+  requireR2ExpectedDiagnostic,
 } from '../scripts/operations/verify-seyeon-r2-rpc-set-fingerprint.mjs';
 
 const production = JSON.parse(readFileSync(
@@ -42,6 +43,18 @@ describe('R2 aggregate-only, fail-closed Production vs isolated PG17 19-RPC comp
     expect(() => validateR2Aggregate(b)).toThrow('HOLD_R2_AGGREGATE_INVALID_OR_UNSAFE');
     const c = fixture(); delete c.ownerSetSha256;
     expect(() => validateR2Aggregate(c)).toThrow('HOLD_R2_AGGREGATE_INVALID_OR_UNSAFE');
+  });
+  it('CI permits only observed ACL-only HOLD, never newly drifted Owner/DDL or false promotion', () => {
+    const a = fixture();
+    a.aclSetSha256 = a.aclSetSha256 === 'f'.repeat(64) ? 'e'.repeat(64) : 'f'.repeat(64);
+    const known = compareR2Aggregate(a, fixture());
+    expect(requireR2ExpectedDiagnostic(known,production).match).toBe(false);
+    const newDrift = structuredClone(a);
+    newDrift.ownerSetSha256 = 'f'.repeat(64) === a.ownerSetSha256 ? 'e'.repeat(64) : 'f'.repeat(64);
+    expect(() => requireR2ExpectedDiagnostic(compareR2Aggregate(newDrift,fixture()),production))
+      .toThrow('HOLD_R2_UNEXPECTED_PARITY_DRIFT_REQUIRES_REVIEW');
+    expect(() => requireR2ExpectedDiagnostic(compareR2Aggregate(fixture(),fixture()),production))
+      .toThrow('HOLD_R2_UNEXPECTED_PARITY_DRIFT_REQUIRES_REVIEW');
   });
   it('forbids silent source-origin or authorization mutation', () => {
     const a = structuredClone(production); a.authorizesProduction=true;
