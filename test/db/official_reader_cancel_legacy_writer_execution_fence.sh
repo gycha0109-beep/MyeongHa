@@ -27,8 +27,15 @@ begin
     if oid is null then
       raise exception 'writer signature missing: %', signature;
     end if;
-    if pg_catalog.has_function_privilege('public',oid,'EXECUTE') then
-      raise exception 'public can EXECUTE legacy writer: %',signature;
+    if exists (
+      select 1 from pg_catalog.pg_proc proc
+      cross join lateral pg_catalog.aclexplode(
+        coalesce(proc.proacl,pg_catalog.acldefault('f',proc.proowner))
+      ) acl
+      where proc.oid=oid::oid and acl.grantee=0
+        and acl.privilege_type='EXECUTE'
+    ) then
+      raise exception 'PUBLIC can EXECUTE legacy writer: %',signature;
     end if;
     for role_name in
       select r.rolname from pg_catalog.pg_roles r
