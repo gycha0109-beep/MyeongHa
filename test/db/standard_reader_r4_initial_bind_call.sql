@@ -1,3 +1,5 @@
+begin;
+select set_config('myeongha.subject_id','11390000-0000-0000-0000-000000000001',true);
 select * from public.internal_cmd_bind_standard_reader_initial_policy_locked_v1(
  '11390000-0000-0000-0000-000000000001'::uuid,
  'b4220000-0000-4000-8000-000000000001'::uuid,
@@ -7,3 +9,4 @@ select * from public.internal_cmd_bind_standard_reader_initial_policy_locked_v1(
  'standard-reading-access-bind-v2',
  '{"schemaVersion":"standard-reading-access-bind-v2","purchaseIntentId":"b4220000-0000-4000-8000-000000000001"}'::jsonb
 );
+commit;
