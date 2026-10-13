@@ -17,8 +17,8 @@ cleanup() {
 trap cleanup EXIT
 
 # Source fixture, no logical data rewritten:
-# replace ONLY first positive initial Receipt issuance, the actual positive
-# initial binder, and actual positive additional binder. The early negative
+# replace ONLY positive initial Receipt, later DB-C1 independent additional
+# Receipt, actual positive initial bind and actual positive additional bind. The early negative
 # legacy binder tests and pre-official additional Receipt remain unchanged.
 awk '
   NR==231 {
@@ -26,6 +26,14 @@ awk '
     sub("internal_apply_verified_receipt_capability_effects_v1",
         "internal_apply_official_reader_unified_receipt_v1")
     first++
+  }
+  NR==897 {
+    # DB-C1 second independently purchased additional Reader receipt: the
+    # already-committed Official Reading now exists, so L0->L1 is possible.
+    if ($0 !~ /internal_apply_verified_receipt_capability_effects_v1/) exit 13
+    sub("internal_apply_verified_receipt_capability_effects_v1",
+        "internal_apply_official_reader_unified_receipt_v1")
+    additional_issued++
   }
   NR==366 || NR==440 {
     if ($0 !~ /cmd_bind_standard_reading_access_v2/) exit 11
@@ -35,7 +43,7 @@ awk '
   }
   { print }
   END {
-    if (first != 1 || binds != 2) exit 12
+    if (first != 1 || binds != 2 || additional_issued != 1) exit 12
   }
 ' test/db/official_standard_reading_reader_interpretation.sql >"$tmpdir/fixture.sql" ||
   fail "source fixture format changed; explicit inspection required"
@@ -45,7 +53,7 @@ p -f "$tmpdir/fixture.sql" >"$tmpdir/fixture.out" 2>"$tmpdir/fixture.err" || {
   tail -n 70 "$tmpdir/fixture.out" >&2
   fail "original v2 fixture failed when three positive calls use D2"
 }
-pass "initial issuance + initial Reading creation + additional Reader binding under D1 unified locks"
+pass "initial/additional receipt issuance and both bind roles under D1 unified locks"
 
 subject='11390000-0000-0000-0000-000000000001'
 initial='11392300-0000-0000-0000-000000000001'
