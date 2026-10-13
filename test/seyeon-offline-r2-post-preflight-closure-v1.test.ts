@@ -273,14 +273,19 @@ describe('R2 post-Preflight closure through ACTUAL governed Preflight (offline o
   it('checks mutable post-Preflight context AGAIN before dispatch and fails closed',async()=>{
     const {candidate}=fixture();
     const {result}=await realPreflight();
-    const actualContext=context(candidate);
+    const original=context(candidate);
+    // Simulate a mutable adapter-owned copy of native Context (the original
+    // context builder may freeze its character metadata).
+    const actualContext=asContext({
+      ...original,character:{...original.character},
+    });
     const delegate=vi.fn(async()=>({synthetic:true}));
     const wrapper=createSeyeonOfflineR2PostPreflightSyntheticProviderV1({
       candidate,preflight:result,actualContext,
       delegate:{providerKey:'synthetic',modelKey:'not-paid',generate:delegate},
     });
-    // Native Context is read-only by TS convention, not frozen at every nested
-    // layer: simulate a later module modifying an embedded Bible field.
+    // Mutation between wrapper construction and synthetic Provider dispatch
+    // MUST NOT reuse the earlier context authorization observation.
     (actualContext.character as {sourceBibleBlobSha:string}).sourceBibleBlobSha =
       'changed-after-initial-attestation';
     await expect(Promise.resolve().then(()=>
