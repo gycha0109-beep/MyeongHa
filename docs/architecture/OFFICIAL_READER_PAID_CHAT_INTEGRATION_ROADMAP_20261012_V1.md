@@ -326,3 +326,8 @@ S1에서 공통 잠금 함수 자체가 성공하더라도 **S2 전체 경로가
 - **운영 사실:** 현행 `apps/api/src/portone-v2-webhook-payment-completion.ts`는 서명 검증 후 `Transaction.Paid` 이외의 원시 type을 `ignored`로 반환한다. D3d는 raw PortOne 취소 이벤트 타입 또는 provider endpoint 구조를 임의로 가정하거나 이를 교체하지 않는다. 추후 정확한 PortOne 공식 이벤트·API 사양 및 자체 Provider API 조회 adapter를 검증한 뒤 서버에서 독립 verified source를 생성해야 한다.
 - **미완료:** Provider 실제 refund API 조회/웹훅 인증·취소 유형 정규화, 금액별 부분 취소 영향 분배, 법무·Commerce 정책 최종 승인, 현재 `myeongha_commerce_internal_executor`의 최소권한 분리, 승인 후 1850/1080 실행 연결, direct legacy Writer bypass 차단, #1941 운영 복원, D5 protected T2. 이번 D3d Pure guard 자체는 환불 처리 또는 이를 대신할 충분 조건이 아니다.
 
+### D3d exact-SHA 안전 판정 후보 검증 (2026-10-13)
+
+- Draft PR #2037의 코드·테스트 SHA `ef5b576a648d7986fcc48a6ea2f4ac4ad87d83b0`, [GitHub CI 38340805623](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38340805623): Commerce Payment Work Track, 최종 CI Verify, Governance, Web PR Domain Gates 모두 SUCCESS. TypeScript/빌드 검사 성공. Commerce Work Track의 기존 775 tests PASS / 19 SKIP 및 **D3d 신규 25 tests PASS**를 해당 job의 출력에서 확인.
+- 본 작업에는 SQL 마이그레이션이 없다. PostgreSQL 15·17 dependent jobs는 scope router에 의해 SKIPPED이며, 이는 D3c DB 검증이 무효화됐다는 의미도 D3d DB 검증을 새로 수행했다는 의미도 아니다. D3c 1850의 별도 [CI 38339438218](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38339438218) PASS를 그대로 사용한다.
+- **D3d PURE HOLD 판정 검증 완료**. raw PortOne 취소 이벤트 서명/실제 provider API 조회·결제금액·부분환불·ordering 증명 인입, approved Commerce actor 연결, payment.cancelled 영속화, SQL 1850 호출, 1080 직접 Writer 우회 통제는 미구현. D3d candidate가 유료 접근 회수 또는 Provider 환불을 authorize하지 못하는 `false` 3종 불변으로 고정. Draft/병합·운영 활성화 HOLD.
