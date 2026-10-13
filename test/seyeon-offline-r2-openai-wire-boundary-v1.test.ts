@@ -1,5 +1,9 @@
 import { createHash } from 'node:crypto';
 import { describe, expect, it, vi } from 'vitest';
+import type { CharacterGovernedPreflightResultV1 } from '../apps/api/src/character-governed-preflight-v1.js';
+import { observeSeyeonOfflineR2DbWireBindingV1 } from '../apps/api/src/seyeon-offline-r2-db-wire-binding-v1.js';
+import type { SeyeonOfflineR2DbSourceObservationV1 } from '../apps/api/src/seyeon-offline-r2-db-source-set-binding-v1.js';
+import type { SeyeonRuntimeContextV2 } from '../packages/domain/src/index.js';
 import {
   assembleSeyeonRuntimeContextV2,
   canonicalJson,
@@ -102,6 +106,25 @@ function fixture() {
   return {candidate,actualContext};
 }
 
+function syntheticDbObservation(candidate:SeyeonOfflineS0ContextCandidateV1):
+  SeyeonOfflineR2DbSourceObservationV1 {
+  const selected=candidate.selection.selectedSources[0]!;
+  const raw='sha256:pg-jsonb:v1:'+'b'.repeat(64);
+  return {
+    attemptId:candidate.identity.attemptId,
+    subjectId:candidate.identity.subjectId,
+    threadId:candidate.identity.threadId,
+    turnId:candidate.identity.turnId,
+    sourceCount:1,selectedSourcesDigest:candidate.selection.selectedSourcesDigest,
+    edgeOrdinal:0,recordKind:'memory',
+    recordId:selected.recordId,originalGrantId:selected.grantId,
+    recordType:selected.recordType,schemaVersion:selected.schemaVersion,
+    originalGrantedAt:'2026-10-13T00:00:00.000Z',
+    pinnedPayloadDigest:raw,currentPayloadDigest:raw,
+    exactOriginalGrantActive:true,
+  };
+}
+
 function interpretation() {
   return {
     schemaVersion:'seyeon-turn-interpretation-v2',
@@ -127,6 +150,14 @@ function createOfflineWireProbe(options?:Readonly<{
   mutateBeforeSerializeAudit?:Hook;
   assertCurrentSourceClosure?:Hook;
   invalidateExpectedDigest?:boolean;
+  dbWireContext?:Readonly<{
+    candidate:SeyeonOfflineS0ContextCandidateV1;
+    actualContext:SeyeonRuntimeContextV2;
+    getPreflight:()=>CharacterGovernedPreflightResultV1|null;
+    readCurrentObservation:()=>
+      SeyeonOfflineR2DbSourceObservationV1 |
+      Promise<SeyeonOfflineR2DbSourceObservationV1>;
+  }>;
 }>) {
   // The request snapshots are independently recorded by the native caller.
   // Map by purpose, since both governed Preflight classifiers run in parallel.
@@ -140,6 +171,7 @@ function createOfflineWireProbe(options?:Readonly<{
     purpose:WireStage;
   }>>();
   const wireReceipts:WireReceipt[]=[];
+  const dbWireReceipts:Readonly<{purpose:WireStage;bindingDigest:string}>[]=[];
   const fetchImpl=vi.fn(async (url:string, init:RequestInit):Promise<Response>=>{
     if(url!=='https://api.openai.com/v1/responses' ||
        init.method!=='POST' || init.redirect!=='error') {
@@ -253,6 +285,30 @@ function createOfflineWireProbe(options?:Readonly<{
          options?.invalidateExpectedDigest===true) {
         throw new Error('Wire byte length or digest admission failed');
       }
+      if(options?.dbWireContext) {
+        const ctx=options.dbWireContext;
+        const current=await ctx.readCurrentObservation();
+        const classifier=metadata.purpose==='integrity_classification' ||
+          metadata.purpose==='disclosure_classification';
+        const preflight=classifier?null:ctx.getPreflight();
+        if(!classifier && !preflight) {
+          throw new Error('Missing governed Preflight at wire boundary');
+        }
+        const result=observeSeyeonOfflineR2DbWireBindingV1({
+          candidate:ctx.candidate,observation:current,
+          request:admitted.request,serializedRequestBody:rawBody,
+          expectedModel:'offline-model',
+          ...(classifier?{}:{preflight:preflight!,actualContext:ctx.actualContext}),
+        });
+        if(result.state!=='db_original_grant_to_wire_observed_offline_only' ||
+           result.wireDigest!==digest ||
+           result.wireByteLength!==metadata.requestBodyBytes) {
+          throw new Error('DB original Grant to wire binding held');
+        }
+        dbWireReceipts.push(Object.freeze({
+          purpose:metadata.purpose,bindingDigest:result.bindingDigest,
+        }));
+      }
       admittedByCallId.set(metadata.callId,{rawBody,digest,
         purpose:metadata.purpose});
       wireReceipts.push(Object.freeze({
@@ -275,7 +331,7 @@ function createOfflineWireProbe(options?:Readonly<{
       return native.generate(request);
     },
   });
-  return {provider,fetchImpl,wireReceipts,pending,admittedByCallId};
+  return {provider,fetchImpl,wireReceipts,dbWireReceipts,pending,admittedByCallId};
 }
 
 async function governedPreflight(
@@ -307,7 +363,13 @@ describe('R2 actual OpenAI Responses UTF-8 wire boundary (fake fetch; offline)',
   it('seals the real 2-classifier + 3 generated native stages at pre-dispatch AND fetch bytes',async()=>{
     const {candidate,actualContext}=fixture();
     let activePreflight:Awaited<ReturnType<typeof governedPreflight>>|null=null;
-    const probe=createOfflineWireProbe({assertCurrentSourceClosure(purpose){
+    let currentObservation=syntheticDbObservation(candidate);
+    const probe=createOfflineWireProbe({
+      dbWireContext:{candidate,actualContext,
+        getPreflight:()=>activePreflight,
+        readCurrentObservation:()=>currentObservation,
+      },
+      assertCurrentSourceClosure(purpose){
       if(purpose==='turn_interpretation' || purpose==='dialogue_render' ||
          purpose==='semantic_review') {
         if(!activePreflight || observeSeyeonOfflineR2PostPreflightClosureV1({
@@ -343,6 +405,11 @@ describe('R2 actual OpenAI Responses UTF-8 wire boundary (fake fetch; offline)',
       /^sha256:utf8:v1:[a-f0-9]{64}$/.test(r.exactWireDigest) &&
       r.exactByteLength>0)).toBe(true);
     expect(probe.admittedByCallId.size).toBe(0);
+    expect(probe.dbWireReceipts).toHaveLength(5);
+    expect(new Set(probe.dbWireReceipts.map(x=>x.purpose)).size).toBe(5);
+    expect(probe.dbWireReceipts.every(x=>
+      /^sha256:v1:[a-f0-9]{64}$/.test(x.bindingDigest))).toBe(true);
+    expect(currentObservation.exactOriginalGrantActive).toBe(true);
     expect(chain.snapshot().receipts).toHaveLength(3);
   });
 
