@@ -249,6 +249,12 @@ SQL
     apply_pg17_migrations_without_birth_authority
     bash test/db/content_release_lifecycle_authority.sh
     ;;
+  seyeon-r2-pending-migrations)
+    verify_pg17
+    node scripts/operations/verify-seyeon-r2-pending-migrations.mjs > /dev/null
+    apply_pg17_migrations_without_birth_authority
+    psql -X -v ON_ERROR_STOP=1 -f test/db/seyeon_r2_pending_catalog.sql
+    ;;
   seyeon-r2-rpc-catalog)
     verify_pg17
     apply_pg17_migrations_without_birth_authority
