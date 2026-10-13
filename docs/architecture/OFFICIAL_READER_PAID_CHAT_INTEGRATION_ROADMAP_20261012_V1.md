@@ -347,3 +347,8 @@ S1에서 공통 잠금 함수 자체가 성공하더라도 **S2 전체 경로가
 
 **미구현:** 영속적인 Provider event-id/취소-id 중복·역순 원장, authoritative original Receipt 정합, 엄밀한 cumulative partial 분배, trusted worker 통합, 모든 legacy Writer 우회 제거, restore·T2·Legal 승인. D3e 코드를 CI 검증 전 PASS로 판정하지 않는다.
 
+### D3e signed cancellation source exact-SHA 검증 (2026-10-13)
+
+- Draft PR #2038의 최종 **코드·테스트 SHA** `bd42ef651bbd513762db4ebafc5e7678a62efaa7`. GitHub Actions [38342099673](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38342099673): Commerce Work Track, Governance, Web PR Domain Gates 및 CI Verify PASS. Work Track TypeScript/빌드 통과.
+- Work Track 실제 출력: 전체 기존 775 tests PASS/19 SKIP, 신규 `tests/portone-v2-cancellation-source-v1.test.ts` **23/23 PASS**.
+- 인증된 `Transaction.Cancelled/PartialCancelled/CancelPending`의 exact payload를 다시 조회한 PortOne Payment API 필드와 연결하는 read-only 실험이다. 실 PortOne 원장과 실 결제 webhook 트래픽에 연결되거나 승인되지 않았다. DB dependency jobs는 scope router에 의해 SKIPPED. D3e2의 영속 shadow 원장은 별도 Draft에서 진행 중이다.
