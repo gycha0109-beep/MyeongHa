@@ -11,7 +11,7 @@ do $$
 declare
   signature text;
   role_name text;
-  oid pg_catalog.regprocedure;
+  v_function_oid pg_catalog.regprocedure;
 begin
   foreach signature in array array[
     'public.internal_apply_entitlement_effect_v1(text,uuid,uuid,text,bigint,text,text,timestamptz,text,timestamptz,timestamptz,text)',
@@ -23,8 +23,8 @@ begin
     'public.internal_apply_reviewed_official_reader_full_cancel_private_v1(uuid,uuid,uuid,uuid,uuid)'
   ]
   loop
-    oid := pg_catalog.to_regprocedure(signature);
-    if oid is null then
+    v_function_oid := pg_catalog.to_regprocedure(signature);
+    if v_function_oid is null then
       raise exception 'writer signature missing: %', signature;
     end if;
     if exists (
@@ -32,7 +32,7 @@ begin
       cross join lateral pg_catalog.aclexplode(
         coalesce(proc.proacl,pg_catalog.acldefault('f',proc.proowner))
       ) acl
-      where proc.oid=oid::oid and acl.grantee=0
+      where proc.oid=v_function_oid::oid and acl.grantee=0
         and acl.privilege_type='EXECUTE'
     ) then
       raise exception 'PUBLIC can EXECUTE legacy writer: %',signature;
@@ -44,7 +44,7 @@ begin
         'myeongha_commerce_internal_executor','myeongha_seyeon_chat_runtime_owner'
       )
     loop
-      if pg_catalog.has_function_privilege(role_name,oid,'EXECUTE') then
+      if pg_catalog.has_function_privilege(role_name,v_function_oid,'EXECUTE') then
         raise exception 'role % can EXECUTE legacy writer %',role_name,signature;
       end if;
     end loop;
