@@ -228,5 +228,9 @@ if [[ "${CI:-}" == "true" && "${PGHOST:-}" == "localhost" ]]; then
   run_isolated_case myeongha_b2_r4_b13_unverified bash test/db/standard_reader_r4_receipt_source_denials_real_pg.sh unverified
   run_isolated_case myeongha_b2_r4_b13_future_grant bash test/db/standard_reader_r4_receipt_source_denials_real_pg.sh future_grant
   run_isolated_case myeongha_b2_r4_b25_expiry bash test/db/standard_reader_r4_expiry_after_lock_real_pg.sh
+  run_isolated_case myeongha_b2_r4_additional_no_official bash test/db/standard_reader_r4_additional_denials_real_pg.sh no_official
+  run_isolated_case myeongha_b2_r4_additional_invalid_hash bash test/db/standard_reader_r4_additional_denials_real_pg.sh invalid_hash
+  run_isolated_case myeongha_b2_r4_additional_forged_snapshot bash test/db/standard_reader_r4_additional_denials_real_pg.sh forged_snapshot
+  run_isolated_case myeongha_b2_r4_additional_invalid_contract bash test/db/standard_reader_r4_additional_denials_real_pg.sh invalid_contract
 fi
 bash test/db/catalog_snapshot.sh
