@@ -15,3 +15,15 @@ BIND-04 Reader catalog, bundle, unlock: partial.
 BIND-05 Product/spec/domain/Offer mismatch: partial.
 BIND-06 future/withdraw/ambiguity: Product SQL and R3 concurrency partial PASS.
 BIND-07 official nine Readers by domain: not yet complete.
+
+BIND-08 Premium single target mismatch: negative Product policy; Premium Binder HOLD.
+BIND-09 Premium target match but specialist false: no Standard fallback; private R4 PG subset.
+BIND-10 Premium target match and specialist true: actual commerce/authorization HOLD.
+BIND-11 malformed or multiple Premium targets: Product SQL constraint subset.
+BIND-12 client policy/Reader spoof: Binder snapshot guard; integration incomplete.
+BIND-13 pending/unverified/sandbox/missing Grant: R1/R2 partial only.
+BIND-14 one initial official Reading + one Reader Access: S4 actual PG PASS.
+BIND-15 additional Reader exact purchase: S4 predecessor PG PASS.
+BIND-16 missing additional source / drift: integration incomplete.
+BIND-17 historical replay after revoked Grant: R2 PG partial PASS.
+BIND-18 request hash/bundle conflicts: existing tests partial.
