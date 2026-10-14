@@ -1,7 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
-[[ "${CI:-}" == true && "${PGHOST:-}" == localhost &&
-   "${PGDATABASE:-}" == "myeongha_b2_r4_b19_same_bundle" ]] || exit 1
+if [[ "$(printenv MYEONGHA_R4_PG17_CI || true)" == 1 ]]; then
+ [[ "${CI:-}" == true && "${PGHOST:-}" == localhost &&
+    "${PGDATABASE:-}" =~ ^myeongha_ci_case_[0-9]+$ ]] || exit 1
+ pgver="$(psql -X -Atqc 'show server_version_num')"
+ [[ "$pgver" -ge 170000 && "$pgver" -lt 180000 ]] || exit 1
+else
+ [[ "${CI:-}" == true && "${PGHOST:-}" == localhost &&
+    "${PGDATABASE:-}" == myeongha_b2_r4_b19_same_bundle ]] || exit 1
+fi
 p(){ psql -X -v ON_ERROR_STOP=1 -At "$@"; }
 fail(){ echo "FAIL R4/BIND-19 $*" >&2; exit 1; }
 tmp="$(mktemp -d)";trap 'rm -rf "$tmp"' EXIT
@@ -58,11 +65,86 @@ current_count(){
 first_grant="$(p -c "select entitlement_grant_id from public.standard_reading_reader_access_grants where purchase_intent_id='$first'::uuid")"
 second_grant="$(p -c "select entitlement_grant_id from public.standard_reading_reader_access_grants where purchase_intent_id='$second'::uuid")"
 [[ "$first_grant" != "$second_grant" ]] || fail 'not independent Commerce Grants'
-# Disposable fixture-only simulated revoke, same approach as original S4 tests;
-# does NOT certify real Provider event CAS/refund ingress.
-p -c "update public.entitlement_grants
- set status='revoked',revision=revision+1,last_effective_at=clock_timestamp(),updated_at=clock_timestamp()
- where id='$first_grant'::uuid" >/dev/null
+# Refund + repurchase ISOLATION: a verified-flag synthetic cancellation event
+# for the first Receipt must never revoke the second independent Receipt/Grant.
+# Use the original 1080 provider-event CAS, not a direct fixture UPDATE.
+# This is disposable test-only Provider evidence; NOT a signed PortOne webhook,
+# an operational refund Writer, or an ordering/freshness policy.
+first_receipt=b2030000-0000-4000-8000-000000000001
+second_receipt=b2130000-0000-4000-8000-000000000001
+old_event=b4c30000-0000-4000-8000-000000000001
+[[ "$(p -c "select source_receipt_id from public.entitlement_grants where id='$first_grant'::uuid")" == "$first_receipt" ]] ||
+ fail 'first Receipt/Grant lineage differs'
+[[ "$(p -c "select source_receipt_id from public.entitlement_grants where id='$second_grant'::uuid")" == "$second_receipt" ]] ||
+ fail 'repurchased Receipt/Grant lineage differs'
+second_before="$(p -c "select revision::text || '|' || status || '|' ||
+ coalesce(last_provider_ordering_key,'') from public.entitlement_grants
+ where id='$second_grant'::uuid")"
+first_event_before="$(p -c "select count(*) from public.entitlement_events where grant_id='$first_grant'::uuid")"
+second_event_before="$(p -c "select count(*) from public.entitlement_events where grant_id='$second_grant'::uuid")"
+p >"$tmp/event.out" 2>"$tmp/event.err" <<SQL ||
+ { cat "$tmp/event.err" >&2; fail 'old Receipt synthetic verified cancellation insert'; }
+insert into public.commerce_provider_events(
+ id,provider,external_event_id,event_type,external_transaction_id,
+ resolved_subject_id,resolution_source_type,resolved_receipt_id,
+ payload_fingerprint,provider_occurred_at,provider_ordering_key,
+ verified_payload_jsonb,status,received_at,environment,verifier_revision
+)
+select '$old_event'::uuid,cr.provider,'synthetic-b19-old-receipt-cancel',
+ 'payment.cancelled',cr.external_transaction_id,cr.subject_id,'receipt',cr.id,
+ 'sha256:v1:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+ clock_timestamp(),'synthetic-b19-old-receipt-order',
+ '{"schemaVersion":"commerce-evidence-v2"}'::jsonb,
+ 'verified',clock_timestamp(),'production','b19-test-only-verifier'
+from public.commerce_receipts cr where cr.id='$first_receipt'::uuid;
+SQL
+# Wrong-target attempt must be DENIED by the original Receipt/Grant lineage
+# check BEFORE any status, revision, event, projection or Reader mutation.
+if p >"$tmp/wrong.out" 2>"$tmp/wrong.err" <<SQL
+begin;
+select * from public.internal_apply_entitlement_effect_v1(
+ 'provider_event','$old_event'::uuid,'$second_grant'::uuid,null,
+ (select revision from public.entitlement_grants where id='$second_grant'::uuid),
+ (select last_provider_ordering_key from public.entitlement_grants where id='$second_grant'::uuid),
+ 'revoked',clock_timestamp(),'revoked',
+ (select valid_from from public.entitlement_grants where id='$second_grant'::uuid),
+ (select valid_until from public.entitlement_grants where id='$second_grant'::uuid),
+ 'synthetic_b19_wrong_target_must_deny');
+commit;
+SQL
+then fail 'old cancellation incorrectly targeted repurchased Grant'; fi
+grep -Fq 'provider event does not resolve to the target purchase Grant lineage' "$tmp/wrong.err" ||
+ { cat "$tmp/wrong.err" >&2; fail 'wrong-receipt denial did not use original lineage guard'; }
+[[ "$(p -c "select revision::text || '|' || status || '|' ||
+ coalesce(last_provider_ordering_key,'') from public.entitlement_grants
+ where id='$second_grant'::uuid")" == "$second_before" ]] ||
+ fail 'wrong-target attempt changed repurchased Grant'
+[[ "$(p -c "select count(*) from public.entitlement_events where grant_id='$second_grant'::uuid")" == "$second_event_before" ]] ||
+ fail 'wrong-target attempt changed repurchased ledger'
+[[ "$(current_count)" == 1 ]] || fail 'wrong-target denial altered current Reader access'
+# Apply the very same cancellation to its correct, original Grant through the
+# real Commerce 1080 CAS/projection/outbox function in one transaction.
+p >"$tmp/cancel.out" 2>"$tmp/cancel.err" <<SQL ||
+ { cat "$tmp/cancel.err" >&2; fail 'old Receipt original CAS cancellation'; }
+begin;
+select result_grant_id,result_entitlement_event_id,result_replayed
+from public.internal_apply_entitlement_effect_v1(
+ 'provider_event','$old_event'::uuid,'$first_grant'::uuid,null,
+ (select revision from public.entitlement_grants where id='$first_grant'::uuid),
+ (select last_provider_ordering_key from public.entitlement_grants where id='$first_grant'::uuid),
+ 'revoked',clock_timestamp(),'revoked',
+ (select valid_from from public.entitlement_grants where id='$first_grant'::uuid),
+ (select valid_until from public.entitlement_grants where id='$first_grant'::uuid),
+ 'synthetic_b19_old_purchase_cancel');
+commit;
+SQL
+[[ "$(p -c "select count(*) from public.entitlement_events
+ where grant_id='$first_grant'::uuid and source_provider_event_id='$old_event'::uuid
+ and event_type='revoked'")" == 1 ]] || fail 'old cancellation effect ledger missing'
+[[ "$(p -c "select count(*) from public.entitlement_events where grant_id='$first_grant'::uuid")" ==
+ "$((first_event_before + 1))" ]] || fail 'old Grant unexpected effect count'
+[[ "$(p -c "select count(*) from public.entitlement_events where grant_id='$second_grant'::uuid")" == "$second_event_before" ]] ||
+ fail 'repurchased Grant ledger changed by old cancellation'
 [[ "$(p -c "select status from public.entitlement_grants where id='$first_grant'::uuid")" == revoked ]] ||
  fail 'first Grant did not revoke'
 [[ "$(p -c "select status from public.entitlement_grants where id='$second_grant'::uuid")" == active ]] ||
@@ -88,4 +170,4 @@ SQL
 then fail 'historical first Purchase replay became fresh authority'; fi
 grep -Fq 'Historical Standard Reading replay cannot authorize current access' "$tmp/replay.err" ||
  { cat "$tmp/replay.err" >&2; fail 'replay denied for unrelated reason'; }
-echo 'PASS R4/BIND-19 same Reader and same bundle, two independent verified Grants; one fixture revoke leaves one current access, replay DENY'
+echo 'PASS R4/BIND-19 same-bundle two Receipts/Grants, old synthetic verified cancellation original 1080 CAS, wrong new Grant lineage DENY, new access survives, old replay DENY'
