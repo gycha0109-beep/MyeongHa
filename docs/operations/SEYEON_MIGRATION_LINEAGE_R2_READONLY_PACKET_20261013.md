@@ -285,3 +285,10 @@ Watchtower-Track: ops. R1 정확한 격리 복원 증거는 8절을 따른다. �
 - **보안 경계:** 새 `seyeon_ai_lock_active_subject_for_cost_v1(uuid)`은 SECURITY DEFINER, 공용·브라우저·service·API·governed executor 직접 EXECUTE 거부, 좁은 cost-meter Owner만 EXECUTE. 원본이 함수 소유자를 명시적으로 cost-meter로 넘기지 않아 **마이그레이션 실행 계정이 SECURITY DEFINER Owner로 남는지** 격리에서 측정하고 Owner/DB/Security의 운영 권한 검토 대상으로 HOLD한다. 테스트 PostgreSQL 17의 슈퍼유저 Owner 관찰이 실제 Production Actor의 소유자라는 뜻은 아니다.
 - **합성 부정경로:** 임의 미존재 Subject ID에 일치하는 트랜잭션 문맥을 설정해 적극 `active` 검사에서 거부되는지 확인. 실제 Subject/Guest 유효자격·삭제 경합·두 세션 SHARE 잠금/트랜잭션 COMMIT 경합·예약 결제·API 호출은 이 단위에서 실행하지 않는다.
 - 1660~1720, 원격-only 역사 SQL 및 Production 쓰기 금지. R2-G 출처 및 1530 Owner 멤버십/1640 Pin NULL-records HOLD, `dr_ready=false`, G0~G6·유료/공개 HOLD 유지.
+
+## 24. 2026-10-14 R2-H-10 — 1660 Member/Reader 기존 Thread Locator 격리 검증
+
+- 원본 `1660_member_reader_existing_thread_locator_v1.sql` Git blob `138eed0898a868c14200719e383f75302c379a26`, Owner unit `reader-locator` / `reader-db`, `requires=[]`, 원본 변경 없음.
+- 기존 Production 기준인 1510+2 timestamped 폐기형 PG17에서 `BEGIN → 1660 → ROLLBACK`, 3개 metadata snapshot과 합성 비정상 인자(NULL Subject, 공백 문자ID, 선행 공백 ID) 거부 검증. 함수는 `SECURITY INVOKER STABLE`, hardened `search_path`, API Executor EXECUTE만 부여, anon/authenticated/service 직접 호출 금지. 기존 RLS/Subject Context 선행 검사를 우회하지 않음.
+- 파일 Git blob을 검증하고 실제 쿼리 계약의 `active member`, `active single_character thread`, 활성 참여자, `order by ct.id limit 2` 소스 지문을 검사. 2건 반환은 상위 호출자가 **모호성 차단**하도록 하기 위한 것으로, 가장 최근/첫 번째를 선택하는 권한이 아님. 구매 증빙·Reader 공개·새 Thread 생성 없음.
+- **한계:** 실제 복수 기존 Thread fixture와 Member/Character 연결을 사용한 양수 조회/모호성 차단 호출은 수행하지 않으므로 별도 Reader Owner E2E 필요. SQL은 read-only이나 R2 원천 출처와 운영 배포 승인 불충분. 1650 SECURITY DEFINER Owner, 1640 NULL-record Pin, 1530 creator membership 모두 HOLD. Production 적용 0/21, `dr_ready=false`, Reader paid/public OFF.

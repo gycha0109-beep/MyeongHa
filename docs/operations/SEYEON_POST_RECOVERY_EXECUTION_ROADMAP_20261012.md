@@ -315,3 +315,8 @@ Governor 04d4B 계열은 실제 격리 PostgreSQL 기반 영수증 임대·정�
 
 - Cost Governor D4B Subject Lock 단위 `1650`을 1550~1630 선행 조건에 한정해 격리 PG17 검증한다. 내부 BEGIN/COMMIT이 있는 원본을 그대로 중첩 실행하는 함정을 피하도록 Git blob 검증+최상위 transaction-fence 정규화 후 원본 SQL 본문만 외부 롤백에서 재생한다. 정본 R2 패킷 [23절](SEYEON_MIGRATION_LINEAGE_R2_READONLY_PACKET_20261013.md).
 - SECURITY DEFINER helper Owner/SEARCH_PATH/EXECUTE boundary, governed start 함수 SHA/Owner/ACL 불변, 미존재 Subject 부정경로, 완전 롤백 확인. **함수 Owner가 실제 운영 마이그레이션 권한을 상속할 수 있는 위험은 별도 Owner/DB Security 검토**. Production 미적용 21개·DR/유료/공개 HOLD.
+
+## 27. 2026-10-14 R2-H 1660 Member/Reader 기존 Thread Locator
+
+- SQL blob 유지, 독립 1660을 1510+timestamped 폐기형 PG17에서 직접 재생. Catalog 3-state, SECURITY INVOKER/RLS/API-only EXECUTE, 비정상 ID 거부 및 전체 ROLLBACK을 검증. 기존 R2 정본 패킷 [24절](SEYEON_MIGRATION_LINEAGE_R2_READONLY_PACKET_20261013.md) 참고.
+- 기존 대화방 **최대 2건** 후보 제공은 Reader admission/구매 entitlement가 아님. 실제 중복 대화방 처리·positive Subject E2E·Reader 공개/배포는 Owner HOLD. 1650 Cost Governor Owner 위험 등 다른 미승인 R2 단위에 영향 없음.
