@@ -6,6 +6,7 @@
 
 ## 현재 증거
 
+- [R4 CI #38504283064](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38504283064): HEAD `f52a32094a9a9c87d2fc256977da13e7925cc2b3`에서 PostgreSQL 15 Authority Core·CI Verify·PostgreSQL 17 의존성·Commerce·Content·Runtime **SUCCESS**. 로그 `PASS R4/BIND-18 two independent current purchased Reader bundles; scope lock ambiguity DENY; one revoke preserves other` 확인. **BIND-18 신규 사례는 이 HEAD에서 PG15만 실행**; PG17 신규 동일 사례와 앱 API의 새 회귀는 후속 HEAD 검증 후보입니다. Governance Privacy 별도 HOLD.
 - [R4 CI #38498134483](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38498134483): 코드 HEAD `b632511c55a35c31be6ba1b5a69e97014f31809f`에서 **실 PostgreSQL 15 db-authority-core SUCCESS**. 신규 BIND-17(Grant 만료/Offer disabled 후 replay DENY), BIND-20(합성 직접 Guest→Member 병합 계보의 Reader/Reading 보존·교차 Subject/Reader DENY), BIND-21(실제 레거시 1170 결속 이력과 신규 공식 v2 권한 격리·독립 신규 공식 결속) **5개 격리 테스트 모두 PASS**. PG17/Commerce/Content/Runtime 의존성 Job은 해당 HEAD에서 SUCCESS; 신규 5종은 PG15 전용입니다. CI Verify의 최종 결론은 별도 확인 필요. Governance는 승인된 Privacy graphRef edgeCount와 신규 FK 실제 그래프 불일치로 FAIL이며 운영 미승인.
 - [R4 CI #38495013601](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38495013601): **SUCCESS**, BIND-16/19/20 신규 실PG15 및 전체 CI Verify PASS, PG17/Commerce/Content/Runtime PASS; **별도 Governance Privacy FAIL**. 코드 HEAD `6c66f6925e55cff18f86ea2f25f4e5ae3e6ee813`.
 - [R4 CI #38356466547](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38356466547): **SUCCESS**, PostgreSQL 15 Authority Core·CI Verify 및 PostgreSQL 17/Commerce/Content/Runtime. BIND-16 원문 부재와 BIND-18 요청 위조 4개 실PG PASS. HEAD `ff2eae33f6a0aa28f693b9c489269fd135570375`.
@@ -33,7 +34,7 @@
 | 15 | 별도 verified 추가 Reader 구매 → Reading 0 증가, Access 1: S4/1800 실PG PASS | 운영 |
 | 16 | committed official Source 없음: PG PASS. BirthRevision·Saju domain Capability version drift 2건 실PG15 DENY PASS | 실제 운영 Saju Source 개정·발행 전 경합은 HOLD |
 | 17 | 기존 R2/S4 replay + **별도 PG15 합성 Grant 만료/Offer disabled 후 동일 Intent replay DENY**, 공식 Reading/Access/Commerce event 불변 PASS (#38498134483) | 운영 Commerce revoke/expire Writer·동시 경합 미연결 |
-| 18 | invalid request hash·forged snapshot·invalid contract: 추가 Binder DENY PG PASS | 같은 Reader의 두 current bundle 충돌 |
+| 18 | 기존 해시·스냅샷·계약 위조 DENY + **같은 Reader/공식 Reading에 독립된 두 verified 구매가 서로 다른 현행 Bundle로 결속되는 합성 Content Release 교체 후, 잠금 범위 조회가 `ambiguous_bundles|2|NULL`로 공개 대상 결정을 거부**, 한 Grant만 회수하면 남은 Bundle은 정상 1건, 공식 Reading/해설 이력 불변, 실PG15 PASS (#38504283064) | 운영 Content Release/Commerce Writer 경합, API/T2 실통합 HOLD. PG17 동일 신규 사례·TS 경계 테스트는 후속 HEAD 최종 검증 필요 |
 | 19 | 기존 서로 다른 Reader 권한의 개별 보존 PG PASS; **같은 Reader·같은 bundle의 독립 구매권 2개, 1개 synthetic revoke** 후 다른 권한 보존·폐기 구매 replay 차단 실PG15 PASS | 실제 Provider refund CAS 및 운영 ingress 미검증 |
 | 20 | 기존 실행 Subject 위조 DENY + **합성 직접 Guest→Member 계보에서 동일 baekheon·정확한 Reading 열람 보존, 다른 Member·미구매 seyeon·위조 거래 문맥 DENY**, 원 Guest 기록 유지 PG15 PASS (#38498134483) | 운영 Guest merge 명령/세션 검증·교차 Reading/Reader 전체 경우의 수와 API 종단 HOLD |
 | 21 | **실제 1170 구매→cmd_bind_standard_reading_unit_v1 이력 생성** 이후 추가 Reader 구매가 이를 Official v2 Source로 승격하지 못함; 별도 검증된 최초 구매는 새 공식 Reading을 독립 생성하고 1170 이력 보존, PG15 PASS (#38498134483) | 운영 1170 호출 경로 cutover 및 migration/Privacy 승인 HOLD |
@@ -66,4 +67,11 @@
 - `test/db/standard_reader_r4_direct_merge_lineage_real_pg.sh`: 합성 `subjects` 직계 병합을 DB에 구성해 `internal_qry_character_standard_reading_access_v2`의 원 Guest Purchase 소유권 보존, 회원 계보·Reader 범위와 거래 Subject 위조 방지 확인. **실제 Guest claim/merge Writer, 다른 Reading 결속, API 종단 증명 아님**.
 - `test/db/standard_reader_r4_legacy_1170_isolation_real_pg.sh`: 진짜 레거시 1170 함수 호출과 새 v2 Reader Binder를 서로 다른 검증 구매로 대조. 레거시 이력을 공식 원본으로 자동 채택 불가하며 별도 독립 공식 구매의 정상 결속은 허용. 기존 구매/Reading 이력 불변.
 - 위 5종의 **PG15 격리 fixture PASS**는 [#38498134483](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38498134483)의 `db-authority-core` 실로그에 기록. 테스트 범위 확대이지 BIND-01~29 전면 완료, PG17 신규 5종 PASS, 운영/출시 승인으로 승격하지 않음.
-- **남은 우선순위:** BIND-18 한 Reader에 현재 유효한 서로 다른 2개 Bundle 충돌; BIND-20 실 Guest merge Writer·cross-reading; R3 전 Writer 잠금 공동참여, R5 T1→T2 보호 본문; Privacy P0-PR-01/1840 FK, 1400~1450 DR, Owner 출시 승인 모두 HOLD.
+- **남은 우선순위:** BIND-18 운영 Content/Commerce/API 실결속과 PG17 확장, BIND-20 실제 Guest merge Writer·cross-reading, R3 전 Writer 잠금 공동참여, R5 T1→T2 보호 본문. Privacy P0-PR-01/1840 FK, 1400~1450 DR, Owner 출시 승인 모두 HOLD.
+
+## BIND-18 상이한 current Bundle 충돌 — 실PG15 완료 / API·PG17 확장 후보
+
+- `test/db/standard_reader_r4_distinct_current_bundles_real_pg.sh`: 먼저 정상 공식 Source에 첫 Baekheon 독립 verified 추가 구매를 결속, 합성 **단 하나의 default Content Release**를 기존 Bundle→새 Bundle로 교체한 후 동일 Reader·같은 Official Reading의 다른 verified 구매를 정확한 신규 Bundle에 결속. 서로 다른 현재 유효 Bundle 2개를 `internal_qry_character_standard_reading_access_v2`에서 확인하고, `internal_qry_official_reader_locked_bundle_scope_v1`은 `ambiguous_bundles/2/NULL`로 fail-closed. 합성 한 Grant 회수 후 `one_current_bundle` 및 남은 독립 권한 유지. Content Release/Commerce 운영 Writer를 건드리지 않았으며, 최초 Reading/Interpretation 역사 중복 0.
+- [PG15 실로그 CI #38504283064](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38504283064) **PASS**. 이전 표의 BIND-18 요청 위조 차단과 구분되는 신규 범위.
+- 후속 후보: PostgreSQL 17 동일 testcase (`run_ci_case.sh`, `db-suites.json` 등록), `test/official-reading-reader-admission-v1.test.ts`의 access→policy/artifact 이전 차단, `test/official-reader-held-t1-t2-preflight-v1.test.ts`의 생성 도중 T2 복수 Bundle 신생 → rollback/무공개. **새 exact HEAD CI GREEN 전에는 후속 3건 PASS 아님**.
+- R3 운영 Writer cutover·R5 T2 paid reveal은 계속 소유자 승인 HOLD. 공개 함수 ACL, 기존 1220/Commerce Writer, Privacy 140-edge와 운영 DR 계약 불변.
