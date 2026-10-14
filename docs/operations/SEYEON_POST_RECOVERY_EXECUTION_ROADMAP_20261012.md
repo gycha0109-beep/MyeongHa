@@ -270,3 +270,9 @@ Governor 04d4B 계열은 실제 격리 PostgreSQL 기반 영수증 임대·정�
 - 기존 R2 패킷 [16절](SEYEON_MIGRATION_LINEAGE_R2_READONLY_PACKET_20261013.md)에 SQL·CI·Owner HOLD 증거를 단일 정본으로 누적. `1520` 선행 적용 후 `1530`만 새 SQL로 실험하고 savepoint와 전체 rollback을 각각 검증한다.
 - 확인 대상: 지속 Artifact의 RLS/FK/무결성·트리거/명령 API 최소권한 및 마이그레이션 실행자가 부여받는 narrow-role membership의 잔존 여부. 멤버십이 남으면 승인 가능한 상태로 간주하지 않고 Security/DB/Character Owner가 forward-only 변경·향후 멤버십 반납·DR/배포 영향 결정을 요구한다.
 - 합성 PG17 증거/병합은 Production 배포 권한이 아니다. 21개 후속 전부 미배포, lineage R2/DR Ready/G0~G6 보류.
+
+## 20. 2026-10-14 R2-H 1540 Saju Proof Nonce Registry 독립 검증
+
+- 기존 R2 정본 패킷 [17절](SEYEON_MIGRATION_LINEAGE_R2_READONLY_PACKET_20261013.md)에 상세 증거 누적. `1540`은 인벤토리상 선행 의존성이 없는 독립 `saju-proof` 단위로 1510+timestamped 기준에 대해 하나의 트랜잭션으로 replay/rollback 한다.
+- 3-state catalog와 합성 digest/유효기간/중복키 거부 테스트, RLS/FORCE 및 runtime/GC 최소 컬럼 ACL을 PG17 기존 CI에 편입. Saju Source/보호 HTTP proof/credential/GC 실제 활성화 근거와 구별한다.
+- Production 쓰기 0, migration 1520~1720 미배포, R2 Owner 승인/출처/DR Ready 및 #1866 G0~G6/유료/공개 HOLD 유지.
