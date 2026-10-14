@@ -300,3 +300,8 @@ Governor 04d4B 계열은 실제 격리 PostgreSQL 기반 영수증 임대·정�
 - 1550~1610 비용 단위 모두를 폐기형 PG17의 한 트랜잭션에서 순차 재생하고 1620 private start + legacy/governed wrapper 분기, 1630 NOLOGIN governed executor 최소권한/멤버십 0을 5개 스냅샷으로 검증; 전체 ROLLBACK. R2 단일 정본 패킷 [21절](SEYEON_MIGRATION_LINEAGE_R2_READONLY_PACKET_20261013.md)에 증거 누적.
 - 역할 생성/GRANT는 CI 격리 DB 전용. Production Executor credential provisioning, 실 소비계정 정산 호출/DB 예산 시드/유료 AI/공개 제공/DR Ready는 승인하지 않는다.
 - 이 단위를 검증하더라도 R2 전체 21개 migration Owner HOLD, 1530 Owner 멤버십 잔존, R2-G 원천 계보 미확인, `dr_ready=false`; 후속 1640 G1 Memory Pin은 별도 검토 대상.
+
+## 25. 2026-10-14 R2-H 1640 G1 ZERO Pre-Model Source Pin 재생
+
+- 기존 정본 패킷 [22절](SEYEON_MIGRATION_LINEAGE_R2_READONLY_PACKET_20261013.md)에 증거 집약. 원본 SQL blob 보존, 일회용 PG17 단일 `BEGIN → 1640 → ROLLBACK`에서 API EXECUTE 구 Pin 경로 회수/신 Pin RPC·Trigger 권한, 실제 Trigger 함수를 임시 테이블 합성 행에서 호출해 positive/negative 시나리오를 검증한다.
+- `zeroProof.records` 누락과 SQL three-valued NULL 비교의 안전성은 독립 Owner HOLD 진단으로 반드시 기록한다. 형식적 카탈로그 GREEN은 actual G1/G2/G3 개인기록 허가/모델 호출 또는 운영 마이그레이션 권한을 의미하지 않는다. Source provenance R2-G/DR Ready 및 21개 Owner 리뷰 단위 유지.
