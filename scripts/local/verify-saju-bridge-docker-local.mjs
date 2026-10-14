@@ -13,6 +13,7 @@ const httpCompose = fileURLToPath(new URL('./saju-bridge-http.compose.yml', impo
 const tlsCompose = fileURLToPath(new URL('./saju-bridge-tls.compose.yml', import.meta.url));
 const permitCompose = fileURLToPath(new URL('./saju-bridge-permit.compose.yml', import.meta.url));
 const recoveryCompose = fileURLToPath(new URL('./saju-bridge-recovery.compose.yml', import.meta.url));
+const commitFaultRunner = fileURLToPath(new URL('./verify-saju-bridge-docker-inflight-commit.mjs', import.meta.url));
 const root = realpathSync(fileURLToPath(new URL('../../', import.meta.url)));
 const pinnedSajuSha = 'cd0acf9abd447826ccaefba56112d046e560ee04';
 const packagePath = fileURLToPath(new URL('../../package.json', import.meta.url));
@@ -64,8 +65,8 @@ function docker(args, { capture = false, timeout = 240_000 } = {}) {
 
 function localSajuCheckout() {
   if (process.argv.length === 2) return null;
-  if (process.argv.length !== 4 || !['--http', '--binding', '--tls', '--permit', '--recovery'].includes(process.argv[2]) || !process.argv[3]) {
-    throw new Error('Usage: node scripts/local/verify-saju-bridge-docker-local.mjs [--http ../Saju | --binding ../Saju | --tls ../Saju | --permit ../Saju | --recovery ../Saju]');
+  if (process.argv.length !== 4 || !['--http', '--binding', '--tls', '--permit', '--recovery', '--crash-commit'].includes(process.argv[2]) || !process.argv[3]) {
+    throw new Error('Usage: node scripts/local/verify-saju-bridge-docker-local.mjs [--http ../Saju | --binding ../Saju | --tls ../Saju | --permit ../Saju | --recovery ../Saju | --crash-commit ../Saju]');
   }
   const saju = realpathSync(resolve(process.argv[3]));
   if (saju === root) throw new Error('A separate pinned Saju checkout is required.');
@@ -122,7 +123,8 @@ function remaining(kind) {
 }
 
 function main() {
-  const recovery = process.argv[2] === '--recovery';
+  const crashCommit = process.argv[2] === '--crash-commit';
+  const recovery = process.argv[2] === '--recovery' || crashCommit;
   const permit = process.argv[2] === '--permit' || recovery;
   const tls = process.argv[2] === '--tls' || permit;
   const binding = process.argv[2] === '--binding' || tls;
@@ -210,6 +212,18 @@ function main() {
           sandboxEnv.SAJU_BRIDGE_LOCAL_RECOVERY_STAGE = 'verify';
           console.log('[saju-bridge] Phase 4A: verify durable Nonce/Permit consumption and Subject fixture after recovery.');
           composed('run', '--rm', '--no-deps', 'saju-recovery-verifier');
+          if (crashCommit) {
+            sandboxEnv.SAJU_BRIDGE_LOCAL_COMMIT_FAULT = '1';
+            console.log('[saju-bridge] Phase 4B: start real in-flight PostgreSQL COMMIT interruption test (synthetic Nonce only).');
+            const fault = spawnSync(process.execPath, [commitFaultRunner], {
+              cwd: root, shell: false, env: sandboxEnv,
+              stdio: 'inherit', timeout: 150_000, windowsHide: true,
+            });
+            if (fault.error || fault.status !== 0) {
+              throw new Error('Phase 4B real COMMIT interruption failed: '
+                + (fault.error?.code || fault.signal || 'exit ' + fault.status));
+            }
+          }
         }
       }
     }
@@ -247,7 +261,12 @@ function main() {
             console.log('[saju-bridge] Phase 3B PASS: signed synthetic Permit V2 consumed once in isolated Admission TLS DB (no Runner).');
             if (recovery) {
               console.log('[saju-bridge] Phase 4A PASS: real DB stop/restart durability and synthetic COMMIT-ACK uncertainty (not physical mid-COMMIT loss).');
-              console.log('[saju-bridge] Physical mid-COMMIT partition, distributed recovery, Runner and operational approval remain HOLD.');
+              if (crashCommit) {
+                console.log('[saju-bridge] Phase 4B PASS: physical Nonce DB SIGKILL observed during deferred COMMIT, fail-closed and durable rollback.');
+                console.log('[saju-bridge] Actual network-only partition, Admission in-flight COMMIT and distributed recovery remain HOLD.');
+              } else {
+                console.log('[saju-bridge] Physical mid-COMMIT partition, distributed recovery, Runner and operational approval remain HOLD.');
+              }
             } else {
               console.log('[saju-bridge] Recovery and all operational approvals remain HOLD.');
             }
