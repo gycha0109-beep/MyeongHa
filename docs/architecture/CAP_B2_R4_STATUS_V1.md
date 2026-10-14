@@ -6,6 +6,7 @@
 
 ## 현재 증거
 
+- [R4 CI #38495013601](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38495013601): **SUCCESS**, BIND-16/19/20 신규 실PG15 및 전체 CI Verify PASS, PG17/Commerce/Content/Runtime PASS; **별도 Governance Privacy FAIL**. 코드 HEAD `6c66f6925e55cff18f86ea2f25f4e5ae3e6ee813`.
 - [R4 CI #38356466547](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38356466547): **SUCCESS**, PostgreSQL 15 Authority Core·CI Verify 및 PostgreSQL 17/Commerce/Content/Runtime. BIND-16 원문 부재와 BIND-18 요청 위조 4개 실PG PASS. HEAD `ff2eae33f6a0aa28f693b9c489269fd135570375`.
 - 이전 [R4 CI #38353544317](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38353544317): **SUCCESS**, BIND-13 Receipt exceptions와 BIND-25 2-connection 시간 경합 PASS.
 - 위 증거는 **운영 API/Commerce/T2 Writer 연결이나 Owner 승인**이 아닙니다. 별도 Governance는 Privacy P0-PR-01 graph 140→141 경계로 FAIL.
@@ -29,11 +30,11 @@
 | 13 | pending Intent·no-Grant·sandbox Receipt·unverified Receipt·future-active Grant 5종 실PG DENY, Reading/Access 증가 0 | 기타 다중 Grant/취소·wrong Offer 조합 |
 | 14 | 최초 공식 Reading 1 + 정확한 Reader Access 1 PG PASS | 운영 |
 | 15 | 별도 verified 추가 Reader 구매 → Reading 0 증가, Access 1: S4/1800 실PG PASS | 운영 |
-| 16 | committed official Source 없음: PG PASS. Birth revision·domain Capability version drift 2개 실PG 테스트 신규 추가 | 신규 drift 사례는 정확한 HEAD CI PASS 전까지 미인증 |
+| 16 | committed official Source 없음: PG PASS. BirthRevision·Saju domain Capability version drift 2건 실PG15 DENY PASS | 실제 운영 Saju Source 개정·발행 전 경합은 HOLD |
 | 17 | 역사적 replay가 새 current Access 허용하지 않음: R2/S4 범위 PASS | Product disabled/expire 혼합 전체 |
 | 18 | invalid request hash·forged snapshot·invalid contract: 추가 Binder DENY PG PASS | 같은 Reader의 두 current bundle 충돌 |
-| 19 | 기존 서로 다른 Reader 권한의 개별 보존 PG PASS; **같은 Reader·같은 bundle의 독립 구매권 2개, 1개 synthetic revoke** 실PG 테스트 신규 추가 | 신규 테스트 CI 결과 미확정. 실제 Provider refund CAS 및 운영 ingress 미검증 |
-| 20 | Subject execution-context guard 설치, cross-Subject 위조 거부 실PG 테스트 신규 추가 | 신규 테스트 CI 미확정; cross-Reading/Reader 및 Guest→Member 합법·위조 계보 종단 미완 |
+| 19 | 기존 서로 다른 Reader 권한의 개별 보존 PG PASS; **같은 Reader·같은 bundle의 독립 구매권 2개, 1개 synthetic revoke** 후 다른 권한 보존·폐기 구매 replay 차단 실PG15 PASS | 실제 Provider refund CAS 및 운영 ingress 미검증 |
+| 20 | Subject execution-context guard 설치, cross-Subject 실행 문맥 위조 차단 실PG15 PASS | cross-Reading/Reader 및 Guest→Member 합법·위조 계보 종단 미완 |
 | 21 | legacy 1170 별도 이력 유지 | 1170/v2 교차 자동권한 승격 방지 종단 미완 |
 | 22 | 실제 T2 Writer 연결 | HOLD |
 | 23 | R2 revoke↔최초 Binder 2-connection PASS | T2 공개 경합 HOLD |
@@ -52,8 +53,8 @@
 
 **종료 판정:** 위 좁은 실DB 사례 PASS / BIND-01~29 전체 인증 및 유료 운영 출시 **HOLD**. PR #2041 Draft·미병합, live Checkout/Refund/paid Reveal OFF.
 
-## BIND-16/19/20 신규 실DB 후보 — 검증 대기
+## BIND-16/19/20 실DB 검증 완료 — 운영 연결 HOLD
 
 - `standard_reader_r4_additional_source_drift_real_pg.sh`: 최초 공식 Source를 보존한 채 current BirthRevision 또는 Saju domain Capability version을 변경할 때 추가 Binder가 새 Access/Interpretation을 만들지 않는지 확인. 별도의 cross-Subject 요청은 신뢰된 실행 Subject 문맥 불일치를 거부해야 함.
 - `standard_reader_r4_same_bundle_independent_grants_real_pg.sh`: 한 Reader·한 bundle에서 서로 다른 verified Purchase Intent/Receipt/Grant 두 개를 만든 후, 하나만 **격리 fixture에서 직접** revoke했을 때 다른 Grant의 current access를 보존하고 폐기 구매의 Binder replay를 거부하는지 확인.
-- 신규 사례는 [CI #38494720766](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38494720766) 및 이후의 최종 정확한 HEAD 결과 전까지 PASS로 표시하지 않습니다. 실운영 Refund·Consent·T2 검증과 동치가 아닙니다.
+- 신규 사례는 [CI #38495013601](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38495013601), 코드·테스트 검증 HEAD `6c66f6925e55cff18f86ea2f25f4e5ae3e6ee813`에서 PostgreSQL 15 Authority Core·CI Verify PASS. 실제 Provider Refund CAS·Guest→Member 권한 계보·운영 T2 검증과 동치가 아닙니다.
