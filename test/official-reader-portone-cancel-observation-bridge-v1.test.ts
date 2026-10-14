@@ -205,8 +205,8 @@ describe('private PortOne cancellation observation candidate', () => {
     expect(sql).toContain('internal_record_official_reader_portone_cancel_shadow_v1');
     expect(sql).not.toMatch(/\b(?:insert|update|delete|grant|revoke)\b/iu);
     expect(params).toHaveLength(12);
-    expect(params[0]).toBe('webhook-1');
-    expect(params[8]).toBe(PAID);
+    expect(params?.[0]).toBe('webhook-1');
+    expect(params?.[8]).toBe(PAID);
 
     const bad = createPrivateOfficialReaderCancelObservationRecorderTestV1({
       query: async () => ({ rows: [{ shadowResult: 'observed', effectAuthorized: true }] }),
