@@ -244,6 +244,56 @@ SQL
     test "$(psql -Atqc "select has_schema_privilege('myeongha_birth_profile_create_owner', 'public', 'CREATE');")" = 'f'
     bash test/db/birth_profile_create_runtime_authority.sh
     ;;
+  cap-b2-r4-initial-matrix)
+    verify_pg17
+    apply_pg17_migrations_without_birth_authority
+    MYEONGHA_R4_PG17_CI=1 bash test/db/standard_reader_r4_policy_matrix_real_pg.sh
+    ;;
+  cap-b2-r4-distinct-bundles)
+    verify_pg17
+    apply_pg17_migrations_without_birth_authority
+    MYEONGHA_R4_PG17_CI=1 bash test/db/standard_reader_r4_distinct_current_bundles_real_pg.sh
+    ;;
+  cap-b2-r4-wrong-receipt-offer)
+    verify_pg17
+    apply_pg17_migrations_without_birth_authority
+    MYEONGHA_R4_PG17_CI=1 bash test/db/standard_reader_r4_b13_wrong_receipt_offer_real_pg.sh
+    ;;
+  cap-b2-r4-receipt-issuer-binder-race)
+    verify_pg17
+    apply_pg17_migrations_without_birth_authority
+    MYEONGHA_R4_PG17_CI=1 bash test/db/standard_reader_r4_b13_receipt_issuer_vs_binder_race_real_pg.sh
+    ;;
+  cap-b2-r4-receipt-issuer-recovery)
+    verify_pg17
+    apply_pg17_migrations_without_birth_authority
+    MYEONGHA_R4_PG17_CI=1 bash test/db/standard_reader_r4_b13_receipt_issuer_recovery_real_pg.sh
+    ;;
+  cap-b2-r4-issuer-before-cancel)
+    verify_pg17
+    apply_pg17_migrations_without_birth_authority
+    MYEONGHA_R4_PG17_CI=1 bash test/db/standard_reader_r4_b13_issuer_before_cancel_real_pg.sh
+    ;;
+  cap-b2-r4-provider-cancel-denials)
+    verify_pg17
+    apply_pg17_migrations_without_birth_authority
+    MYEONGHA_R4_PG17_CI=1 bash test/db/standard_reader_r4_b13_provider_cancel_contract_denials_real_pg.sh
+    ;;
+  cap-b2-r4-provider-cancel-replay)
+    verify_pg17
+    apply_pg17_migrations_without_birth_authority
+    MYEONGHA_R4_PG17_CI=1 bash test/db/standard_reader_r4_b13_cancel_replay_semantics_real_pg.sh
+    ;;
+  cap-b2-r4-refund-repurchase-isolation)
+    verify_pg17
+    apply_pg17_migrations_without_birth_authority
+    MYEONGHA_R4_PG17_CI=1 bash test/db/standard_reader_r4_same_bundle_independent_grants_real_pg.sh
+    ;;
+  cap-b2-r4-actual-new-member-promotion)
+    verify_pg17
+    apply_pg17_migrations_without_birth_authority
+    MYEONGHA_R4_PG17_CI=1 bash test/db/standard_reader_r4_b20_actual_new_member_promotion_real_pg.sh
+    ;;
   content-release-lifecycle)
     verify_pg17
     apply_pg17_migrations_without_birth_authority

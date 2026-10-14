@@ -220,6 +220,19 @@ describe('A2-beta server-only Reading × Reader admission', () => {
     expect(f.readArtifactSource).not.toHaveBeenCalled();
   });
 
+  it('BIND-18: denies two paid current bundles for the same Reader/Reading before policy or protected artifact', async () => {
+    const f = fixtures({ accessRows: [
+      accessRow(),
+      { ...accessRow(), readerContentBundleId: '77777777-7777-4777-8777-777777777777' },
+    ] });
+    await expect(prepareOfficialReadingReaderAdmissionV1(f.input)).rejects.toMatchObject({
+      code: 'ACCESS_DENIED',
+    });
+    expect(f.events).toEqual(['thread', 'access']);
+    expect(f.readApprovedRule).not.toHaveBeenCalled();
+    expect(f.readArtifactSource).not.toHaveBeenCalled();
+  });
+
   it.each([
     { label: 'unclassified', policy: { status: 'withheld', reason: 'unclassified' } as const },
     { label: 'disabled', policy: { status: 'withheld', reason: 'disabled' } as const },

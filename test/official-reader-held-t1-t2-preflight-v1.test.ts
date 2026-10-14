@@ -23,6 +23,7 @@ const PRIVATE = 'PRIVATE_DRAFT_NEVER_PUBLIC';
 
 function fixture(options: {
   revokedAtT2?: boolean;
+  ambiguousBundleAtT2?: boolean;
   threadDriftAtT2?: boolean;
   sourceDriftAtT2?: boolean;
   policyDriftAtT2?: boolean;
@@ -100,8 +101,8 @@ function fixture(options: {
       threadId: THREAD, readingId: READING, effectiveAt,
       contentEntry,
       threadBindingAuthorityPort: { readRuntimeBinding },
-      accessAuthorityPort: { readAccessibleReadings: async () =>
-        phase === 2 && options.revokedAtT2 ? [] : [{
+      accessAuthorityPort: { readAccessibleReadings: async () => {
+        const exact = {
           subjectId: scope.resolvedSubject.subjectId,
           readingId: READING, readingSessionId: '22222222-2222-4222-8222-222222222222',
           productId: PRODUCT, readerCharacterId: 'seyeon',
@@ -111,7 +112,14 @@ function fixture(options: {
           productSpecVersion: 'standard-reading-v1', domainCapabilityVersion: 'general-v1',
           readingContractVersion: 'myeonghwa-product-reading-response-v2',
           sajuEngineVersion: 'saju-engine-v1', responseHash: hash,
-        }] },
+        };
+        return phase === 2 && options.revokedAtT2 ? [] : [
+          exact,
+          ...(phase === 2 && options.ambiguousBundleAtT2
+            ? [{ ...exact, readerContentBundleId: '77777777-7777-4777-8777-777777777777' }]
+            : []),
+        ];
+      } },
       artifactAuthorityPort: { readArtifactSource: async () => [{
         readingId: READING, productId: PRODUCT, readerCharacterId: 'seyeon',
         readingContractVersion: 'myeonghwa-product-reading-response-v2',
@@ -185,6 +193,7 @@ describe('Deny-only Reader T1 / private generation / fresh T2 staging', () => {
 
   it.each([
     ['revoke during generation', { revokedAtT2: true }],
+    ['new distinct current Reader bundle during generation (BIND-18)', { ambiguousBundleAtT2: true }],
     ['Thread revision drift', { threadDriftAtT2: true }],
     ['Official source hash drift', { sourceDriftAtT2: true }],
     ['approved Product policy revision drift', { policyDriftAtT2: true }],

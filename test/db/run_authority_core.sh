@@ -203,5 +203,86 @@ if [[ "${CI:-}" == "true" && "${PGHOST:-}" == "localhost" ]]; then
     bash test/db/standard_reader_policy_withdrawal_initial_bind_r3_real_pg.sh bind_first
   run_isolated_case myeongha_b2_r3_multiscope_sorted \
     bash test/db/standard_reader_multiscope_lock_order_r3_real_pg.sh
+  # BIND-18: two independent current bundle purchases, lock-time ambiguity DENY.
+  run_isolated_case myeongha_b2_r4_b18_distinct_bundles \
+    bash test/db/standard_reader_r4_distinct_current_bundles_real_pg.sh
+  # BIND-29: test-only cooperating Content Publisher rotates the one default
+  # while an initial Binder waits; after lock, old selected bundle must DENY.
+  run_isolated_case myeongha_b2_r4_b29_release_after_receipt \
+    bash test/db/standard_reader_r4_content_release_after_receipt_race_real_pg.sh
+  # BIND-17: replay cannot mint current Reader authority after revoke/expiry
+  # or after an Offer is disabled; no production Commerce writer is exercised.
+  run_isolated_case myeongha_b2_r4_b17_expired_grant \
+    bash test/db/standard_reader_r4_post_bind_replay_real_pg.sh expired_grant
+  run_isolated_case myeongha_b2_r4_b17_offer_disabled \
+    bash test/db/standard_reader_r4_post_bind_replay_real_pg.sh offer_disabled
+  # BIND-20: synthetic direct merged-Guest lineage and forged/current Reader reads.
+  # This does not replace the production merge Writer or API trust proof.
+  # BIND-13: Receipt's different valid Offer cannot become initial Grant/Access.
+  run_isolated_case myeongha_b2_r4_b13_wrong_receipt_offer \
+    bash test/db/standard_reader_r4_b13_wrong_receipt_offer_real_pg.sh
+  # BIND-13: initial Reader Binder waits for actual staged Receipt issuer COMMIT.
+  run_isolated_case myeongha_b2_r4_b13_receipt_bind_race \
+    bash test/db/standard_reader_r4_b13_receipt_issuer_vs_binder_race_real_pg.sh
+  # BIND-13: disposable same-transaction Receipt+issuer failure, concurrent
+  # retry, exact idempotent replay and divergent replay DENY.
+  run_isolated_case myeongha_b2_r4_b13_receipt_issuer_recovery \
+    bash test/db/standard_reader_r4_b13_receipt_issuer_recovery_real_pg.sh
+  # BIND-13: private guarded issuer FIRST, synthetic cooperating cancellation
+  # verifier waits on same R1/S3, then real 1850 Commerce revoke CAS.
+  run_isolated_case myeongha_b2_r4_b13_issuer_before_cancel \
+    bash test/db/standard_reader_r4_b13_issuer_before_cancel_real_pg.sh
+  # Negative ingress contract: no unverified/non-production/wrong-lineage
+  # Provider event, stale CAS or forged Subject may revoke a purchase.
+  run_isolated_case myeongha_b2_r4_b13_cancel_denials \
+    bash test/db/standard_reader_r4_b13_provider_cancel_contract_denials_real_pg.sh
+  # BIND-13: same verified Provider cancellation source must replay exactly;
+  # divergent effect and duplicate external event identities fail closed.
+  run_isolated_case myeongha_b2_r4_b13_cancel_replay \
+    bash test/db/standard_reader_r4_b13_cancel_replay_semantics_real_pg.sh
+  run_isolated_case myeongha_b2_r4_b20_direct_merge \
+    bash test/db/standard_reader_r4_direct_merge_lineage_real_pg.sh
+  # BIND-20: actual new-member promotion command; SRC-24 existing-member
+  # Guest merge is separately BLOCKED, never impersonated by synthetic DML.
+  run_isolated_case myeongha_b2_r4_b20_actual_promotion \
+    bash test/db/standard_reader_r4_b20_actual_new_member_promotion_real_pg.sh
+  # BIND-21: separate legacy 1170 paid Reading from private Official v2.
+  run_isolated_case myeongha_b2_r4_b21_additional_denied \
+    bash test/db/standard_reader_r4_legacy_1170_isolation_real_pg.sh additional_denied
+  run_isolated_case myeongha_b2_r4_b21_fresh_official \
+    bash test/db/standard_reader_r4_legacy_1170_isolation_real_pg.sh fresh_official
+  run_isolated_case myeongha_b2_r4_private_matrix bash test/db/standard_reader_r4_policy_matrix_real_pg.sh
+  run_isolated_case myeongha_b2_r4_disabled bash test/db/standard_reader_r4_policy_release_denials_real_pg.sh disabled
+  run_isolated_case myeongha_b2_r4_coming_soon bash test/db/standard_reader_r4_policy_release_denials_real_pg.sh coming_soon
+  run_isolated_case myeongha_b2_r4_locked bash test/db/standard_reader_r4_policy_release_denials_real_pg.sh locked
+  run_isolated_case myeongha_b2_r4_release_not_default bash test/db/standard_reader_r4_policy_release_denials_real_pg.sh release_not_default
+  run_isolated_case myeongha_b2_r4_offer_disabled bash test/db/standard_reader_r4_policy_release_denials_real_pg.sh offer_disabled
+  run_isolated_case myeongha_b2_r4_spec_retired bash test/db/standard_reader_r4_policy_release_denials_real_pg.sh spec_retired
+  run_isolated_case myeongha_b2_r4_rule_future bash test/db/standard_reader_r4_policy_release_denials_real_pg.sh rule_future
+  run_isolated_case myeongha_b2_r4_rule_ambiguous bash test/db/standard_reader_r4_policy_release_denials_real_pg.sh rule_ambiguous
+  run_isolated_case myeongha_b2_r4_rule_withdrawn bash test/db/standard_reader_r4_policy_release_denials_real_pg.sh rule_withdrawn
+  run_isolated_case myeongha_b2_r4_domain_seyeon bash test/db/standard_reader_r4_nine_reader_domain_real_pg.sh seyeon
+  run_isolated_case myeongha_b2_r4_domain_baekheon bash test/db/standard_reader_r4_nine_reader_domain_real_pg.sh baekheon
+  run_isolated_case myeongha_b2_r4_domain_yeoul bash test/db/standard_reader_r4_nine_reader_domain_real_pg.sh yeoul
+  run_isolated_case myeongha_b2_r4_domain_seorin bash test/db/standard_reader_r4_nine_reader_domain_real_pg.sh seorin
+  run_isolated_case myeongha_b2_r4_domain_rahyeon bash test/db/standard_reader_r4_nine_reader_domain_real_pg.sh rahyeon
+  run_isolated_case myeongha_b2_r4_domain_mira bash test/db/standard_reader_r4_nine_reader_domain_real_pg.sh mira
+  run_isolated_case myeongha_b2_r4_domain_taegyeom bash test/db/standard_reader_r4_nine_reader_domain_real_pg.sh taegyeom
+  run_isolated_case myeongha_b2_r4_domain_yunho bash test/db/standard_reader_r4_nine_reader_domain_real_pg.sh yunho
+  run_isolated_case myeongha_b2_r4_domain_doyun bash test/db/standard_reader_r4_nine_reader_domain_real_pg.sh doyun
+  run_isolated_case myeongha_b2_r4_b13_pending bash test/db/standard_reader_r4_purchase_grant_denials_real_pg.sh pending
+  run_isolated_case myeongha_b2_r4_b13_missing_grant bash test/db/standard_reader_r4_purchase_grant_denials_real_pg.sh missing_grant
+  run_isolated_case myeongha_b2_r4_b13_sandbox bash test/db/standard_reader_r4_receipt_source_denials_real_pg.sh sandbox
+  run_isolated_case myeongha_b2_r4_b13_unverified bash test/db/standard_reader_r4_receipt_source_denials_real_pg.sh unverified
+  run_isolated_case myeongha_b2_r4_b13_future_grant bash test/db/standard_reader_r4_receipt_source_denials_real_pg.sh future_grant
+  run_isolated_case myeongha_b2_r4_b25_expiry bash test/db/standard_reader_r4_expiry_after_lock_real_pg.sh
+  run_isolated_case myeongha_b2_r4_additional_no_official bash test/db/standard_reader_r4_additional_denials_real_pg.sh no_official
+  run_isolated_case myeongha_b2_r4_additional_invalid_hash bash test/db/standard_reader_r4_additional_denials_real_pg.sh invalid_hash
+  run_isolated_case myeongha_b2_r4_additional_forged_snapshot bash test/db/standard_reader_r4_additional_denials_real_pg.sh forged_snapshot
+  run_isolated_case myeongha_b2_r4_additional_invalid_contract bash test/db/standard_reader_r4_additional_denials_real_pg.sh invalid_contract
+  run_isolated_case myeongha_b2_r4_scope_birth_revision bash test/db/standard_reader_r4_additional_source_drift_real_pg.sh birth_revision
+  run_isolated_case myeongha_b2_r4_scope_domain_version bash test/db/standard_reader_r4_additional_source_drift_real_pg.sh domain_version
+  run_isolated_case myeongha_b2_r4_scope_cross_subject bash test/db/standard_reader_r4_additional_source_drift_real_pg.sh cross_subject
+  run_isolated_case myeongha_b2_r4_b19_same_bundle bash test/db/standard_reader_r4_same_bundle_independent_grants_real_pg.sh
 fi
 bash test/db/catalog_snapshot.sh
