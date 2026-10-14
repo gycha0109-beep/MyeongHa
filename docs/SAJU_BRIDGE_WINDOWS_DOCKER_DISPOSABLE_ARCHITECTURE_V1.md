@@ -217,6 +217,22 @@ node scripts/local/verify-saju-bridge-docker-local.mjs --snapshot-race ../Saju-b
 - **중요한 정확도 경계:** 변경 탐지는 **두 차례 관측 사이에 DB 상태가 바뀌었다는 실증**이지, 글로벌 원자적 스냅샷·변경이 없던 구간의 존재 증명·이벤트 발생 순서의 권위 검증·동일한 실제 업무 attempt의 인과적 결속·안전한 보상 정책이 아니다. 두 번 같게 관측되어도 실행 또는 자동 복구 승인은 절대 생성하지 않는다. 컨테이너 B의 합성 fixture 전진은 실환경의 자동 재시도/보상 허가가 아니다.
 - 실제 운영 Root/Attestor/Runner 및 R01–R14, 2D-4, 스테이징·상품·판매 승인은 HOLD/false. **Linux CI는 Windows Docker Desktop 실기기 검증을 대체하지 않는다.** Windows `--snapshot-race` 출력은 별도 증빙이 필요하다.
 
+### 3K. Phase 4E — 증거 출처·동일 논리 시도 인과결속·수동검토 적격성 HOLD (2026-10-14)
+
+```powershell
+node scripts/local/verify-saju-bridge-docker-local.mjs --provenance ../Saju-bridge-verify
+```
+
+- 기존 **동일한 일회용 Docker 프로젝트**에서 Phase 4A/4B/4C-1/4C-2/4C-3/4D를 모두 수행한 뒤에만 새 Phase 4E를 실행한다. 이전 `--snapshot-race` 플래그 동작은 바꾸지 않는다.
+- `test/saju-held-docker-provenance-phase4e.test.ts`는 서로 구분된 실제 Subject·Nonce·Admission PostgreSQL의 TLS CA 검증 연결을 사용한다. SQL은 `BEGIN READ ONLY`를 통해서만 실행하며 각 세션의 `transaction_read_only=on`, `pg_stat_ssl.ssl=true`, 고정된 임시 DB 식별자를 검사한다.
+- 실제 PostgreSQL의 `pg_catalog`에서 Nonce `replay_key_digest`, Permit V2 `permit_id` 각 열과 `FORCE ROW LEVEL SECURITY`를 확인하고 **두 표에 공통의 권위 있는 `attempt_id`·`logical_attempt_id`·`correlation_id`·`operation_id` 열이 없음**을 검증한다. 이 부재의 확인은 다른 곳에 절대로 식별자가 존재하지 않는다는 전역 증명이 아니라 **이번 폐기형 fixture 스키마 관측**일 뿐이다.
+- Phase 4D에서 독립적으로 커밋한 Nonce 및 서명된 합성 Permit의 최종 영속 상태를 새 세션에서 읽는다. 두 상태가 모두 영속되어도 각 레코드가 **동일한 실제 업무 attempt**의 결과이거나 인과적인 선후 관계를 갖는다고 추론하지 않는다.
+- 순수 `scripts/local/saju-bridge-provenance-review-v1.mjs` 판별기는 허용된 **합성 의미 상태/임시 DB 이름/TLS·READ ONLY 관측 사실**만 허용한다. 결과는 `UNLINKED_DISPOSABLE_EVIDENCE_HOLD`, 출처/상태 부정확 `UNKNOWN_HOLD`, 호출자 주장 승격 `UNTRUSTED_AUTHORITY_CLAIM_HOLD` 또는 `UNVERIFIED_LINKAGE_CLAIM_HOLD`이다. 어떤 값도 승인 성공이 아니다.
+- 임의의 `approved`, `sameAttempt`, 시간 일치, 서명·증언, 유사한 키/해시 이름, 변조된 연결 사실을 주입하는 부정 테스트에서 **항상** `sameLogicalAttempt=NOT_PROVEN`, `globalCommitOrder=NOT_PROVEN`, `manualReviewAdmissibility=NOT_ADMISSIBLE`, `HOLD_MANUAL_REVIEW`이어야 한다. 결과에 원본 토큰·ID·인증서·인적 정보가 복사되면 안 된다.
+- 추후 외부 검토에 필요한 미확보 증거: **독립 출처 증명, 동일 논리 시도 결속의 권위, 커밋 인과 순서의 신뢰할 수 있는 증거, 독립 수동 승인, 문서화·검증된 복구/롤백 정책**. 이 문서는 *검토에 필요한 조건*을 설명할 뿐 승인 체계/복구 엔진을 구현하지 않는다.
+- `canExecute/canPublish/canSell=false`, `automaticRetry/automaticCompensation=false`. 실제 Root/Attestor/Runner, R01–R14, 2D-4, 운영·스테이징 접근 및 배포/결제 권한 모두 HOLD. Docker 소켓이나 운영 자격증명 사용 없음. 부모의 `down --volumes --remove-orphans` 및 잔여 리소스 0 검증 유지.
+- Linux GitHub CI 결과는 Windows Docker Desktop 실기기 acceptance 증빙이 아니다. **Windows Phase 4E는 별도 실행 로그를 확인하기 전까지 NOT_VERIFIED.**
+
 ## 4. 단계별 로드맵 · 종료 게이트
 
 | 단계 | 구현 | 게이트 | 범위 상태 |
