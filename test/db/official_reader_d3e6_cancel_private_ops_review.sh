@@ -46,15 +46,45 @@ p -c "update public.official_reader_portone_cancel_ingress_inbox_v1
  public.official_reader_portone_cancel_ingress_inbox_v1 where id='$d_id'::uuid")" == dead_letter:LEASE_EXHAUSTED ]] ||
  fail "dead letter source state missing"
 
+# D3e11 security fence: LEASE_EXHAUSTED gives NO evidence of a transient
+# provider lookup failure. Old D3e6 accepted this ambiguous case. Never
+# requeue it, even under the privileged owner fixture.
+if review "$d_id" retry_transient OPS-2001 >/dev/null 2>&1; then
+ fail "ambiguous LEASE_EXHAUSTED dead-letter incorrectly requeued"
+fi
+[[ "$(p -c "select count(*) from public.official_reader_portone_cancel_ops_review_v1
+ where inbox_id='$d_id'::uuid")" == 0 ]] ||
+ fail "rejected lease-exhaustion retry wrote an operator audit"
+[[ "$(p -c "select inbox_state||':'||last_failure_code from
+ public.official_reader_portone_cancel_ingress_inbox_v1 where id='$d_id'::uuid")" == dead_letter:LEASE_EXHAUSTED ]] ||
+ fail "rejected ambiguous retry modified the original terminal state"
+
+# Positive control: the EIGHTH claimed attempt explicitly records a
+# retryable LOOKUP_TIMEOUT while the lease remains live. Only this
+# independently classified dead-letter can receive one manual retry.
+[[ "$(enqueue proven_timeout)" == queued ]] || fail "proven timeout fixture enqueue"
+t="$(claim d3e6_timeout_worker)"
+IFS='|' read -r t_id t_token t_count <<< "$t"
+[[ "$t_count" == 1 && -n "$t_token" ]] || fail "timeout fixture lease missing"
+p -c "update public.official_reader_portone_cancel_ingress_inbox_v1
+ set attempt_count=8 where id='$t_id'::uuid" >/dev/null
+[[ "$(p -c "select failure_state from public.internal_fail_official_reader_cancel_work_v1(
+ '$t_id'::uuid,'d3e6_timeout_worker','$t_token'::uuid,'LOOKUP_TIMEOUT',true)")" == dead_letter ]] ||
+ fail "explicit eighth LOOKUP_TIMEOUT did not become dead_letter"
+[[ "$(p -c "select inbox_state||':'||last_failure_code from
+ public.official_reader_portone_cancel_ingress_inbox_v1 where id='$t_id'::uuid")" == dead_letter:LOOKUP_TIMEOUT ]] ||
+ fail "explicit transient proof not persisted"
+d_id="$t_id"
+
 health="$(p -c "select held::text||'|'||dead_letter::text||'|'||effect_authorized::text
  from public.internal_private_cancel_queue_health_v1()")"
-[[ "$health" == 1\|1\|false ]] || fail "private aggregated health wrong: $health"
+[[ "$health" == 1\|2\|false ]] || fail "private aggregated health wrong: $health"
 if p -c "select * from public.internal_private_cancel_review_v1(
  '$d_id'::uuid,'retry_transient','UNSAFE FULL CUSTOMER NOTE')" >/dev/null 2>&1; then
  fail "unbounded operator note stored"
 fi
 [[ "$(review "$d_id" retry_transient OPS-2002)" == queued:false ]] ||
- fail "one reviewed transient dead letter cannot be requeued"
+ fail "explicit LOOKUP_TIMEOUT one-time requeue rejected"
 [[ "$(p -c "select inbox_state||':'||attempt_count||':'||coalesce(last_failure_code,'none')
  from public.official_reader_portone_cancel_ingress_inbox_v1 where id='$d_id'::uuid")" == queued:0:none ]] ||
  fail "review did not reset transient attempt budget"
