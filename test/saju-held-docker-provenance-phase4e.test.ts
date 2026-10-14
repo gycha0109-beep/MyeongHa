@@ -46,7 +46,7 @@ function guard() {
   if (!enabled || !['cross-provenance','cross-review-packet'].includes(stage ?? '')
     || (packetStage && (process.env.MYEONGHA_DOCKER_SAJU_REVIEW_PACKET !== '1'
       || !/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/u.test(
-        process.env.SAJU_BRIDGE_LOCAL_REVIEW_RUN_ID ?? ''))))
+        process.env.SAJU_BRIDGE_LOCAL_REVIEW_RUN_ID ?? '')))
     || process.env.MYEONGHA_DOCKER_SAJU_TLS !== '1'
     || process.env.MYEONGHA_DOCKER_SAJU_PERMIT !== '1'
     || process.env.SAJU_BRIDGE_LOCAL_CROSS_DB_FAULT !== '1'
