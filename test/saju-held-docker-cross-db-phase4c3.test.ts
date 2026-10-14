@@ -297,6 +297,9 @@ describe.skipIf(!enabled)('Phase 4C-3 actual isolated PostgreSQL partial durable
         canExecute: false, canPublish: false, canSell: false,
         automaticRetry: false, automaticCompensation: false });
     }
+    if (stage === 'cross-seed') {
+      console.log('[saju-bridge] Phase 4C-3 cross-seed evidence: three independent partial states HOLD.');
+    }
     // No DML or retries in any observer stage. Repeat to detect hidden writes.
     if (stage === 'cross-verify' || stage === 'cross-final') {
       for (const id of ids) expect(await observe(id, peers)).toEqual(snapshots[id]);
