@@ -40,8 +40,9 @@ where purchase_intent_id='$legacy_intent'::uuid and reading_id='b2170000-0000-40
  fail '1170 was silently promoted to Official Reading'
 [[ "$(p -c 'select count(*) from public.standard_reading_reader_access_grants')" == 0 ]] ||
  fail '1170 generated v2 Reader Access'
-[[ "$(p -c "select count(*) from public.internal_qry_character_standard_reading_access_v2(
-'$subject'::uuid,'test-standard-reader',clock_timestamp())")" == 0 ]] ||
+[[ "$(p -c "select set_config('myeongha.subject_id','$subject',false);
+select count(*) from public.internal_qry_character_standard_reading_access_v2(
+'$subject'::uuid,'test-standard-reader',clock_timestamp())" | tail -n 1)" == 0 ]] ||
  fail 'legacy Reader silently gained current v2 access'
 case "$mode" in
  additional_denied)
