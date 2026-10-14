@@ -320,3 +320,9 @@ Governor 04d4B 계열은 실제 격리 PostgreSQL 기반 영수증 임대·정�
 
 - SQL blob 유지, 독립 1660을 1510+timestamped 폐기형 PG17에서 직접 재생. Catalog 3-state, SECURITY INVOKER/RLS/API-only EXECUTE, 비정상 ID 거부 및 전체 ROLLBACK을 검증. 기존 R2 정본 패킷 [24절](SEYEON_MIGRATION_LINEAGE_R2_READONLY_PACKET_20261013.md) 참고.
 - 기존 대화방 **최대 2건** 후보 제공은 Reader admission/구매 entitlement가 아님. 실제 중복 대화방 처리·positive Subject E2E·Reader 공개/배포는 Owner HOLD. 1650 Cost Governor Owner 위험 등 다른 미승인 R2 단위에 영향 없음.
+
+## 28. 2026-10-14 R2-H 1670 실제 내부 COMMIT 및 Guest 승격 경합 검증
+
+- R2 패킷 [26절](SEYEON_MIGRATION_LINEAGE_R2_READONLY_PACKET_20261013.md)의 PG17 결과를 정본으로 사용. PR https://github.com/gycha0109-beep/MyeongHa/pull/2093 기술 HEAD 9622c4c62777cdbf99d7abccc4e34d9189cfcf79, https://github.com/gycha0109-beep/MyeongHa/actions/runs/38541247399 PG17 job 115776819584 SUCCESS. Original 1670 SQL Git blob pin 보존, 1510+2 timestamped 및 1550~1630 선행 SQL 다음 원본 내부 COMMIT 포함 실행. 독립 Guest/Promotion 양방향 lock wait + stale 거부 + old RPC ACL + 원본 중복 적용 실패 및 독립 case DB 폐기까지 검증.
+- 새로운 Security/DB Owner HOLD: 새 SECURITY DEFINER Guest resolver가 격리 환경 superuser 실행자 소유로 남음. Production migration 실행 identity/Owner/권한을 승인받고 필요하면 forward-only remediation 검토. 기술 PASS는 Production 승인/DR Ready가 아니며 Provider call/실제 Guest/고객정보와 운영 DB 쓰기 없음.
+- R2-G historical provenance, 1530 Owner membership, 1640 SQL NULL-records Commit 방어, 1650 SECURITY DEFINER Owner, 1660 Reader E2E, 21개의 1520~1720 Owner HOLD, G0~G6/paid/public 모두 그대로. dr_ready=false. 다음 후보 1680.requires=['1650','1670']는 별도 검토 단위이며 자동 배포 순서 아님.

@@ -64,6 +64,7 @@
       "seyeon-r2-rpc-catalog",
       "seyeon-r2-cross-env-catalog",
       "seyeon-r2-pending-migrations",
+      "seyeon-r2-h-1670-forward",
       "saju-staging-operator-admission",
       "saju-staging-operator-admission-v2"
     ]
