@@ -187,6 +187,8 @@ run_isolated_case myeongha_reader_d3e5_durable_worker_lifecycle_test bash test/d
 run_isolated_case myeongha_reader_d3e5_real_driver_pg_test bash test/db/official_reader_d3e5_real_driver_pg.sh
 # D3e6 owner-only aggregate monitoring and one-shot audited operator review.
 run_isolated_case myeongha_reader_d3e6_private_ops_review_test bash test/db/official_reader_d3e6_cancel_private_ops_review.sh
+# D3e7 PRIVATE aggregate-derived alert outbox, two-step delivery fencing, retry/backoff and ACL.
+run_isolated_case myeongha_reader_d3e7_cancel_private_alert_outbox_test bash test/db/official_reader_d3e7_cancel_private_alert_outbox.sh
 run_isolated_case myeongha_official_cancel_purchase_match_private_test bash test/db/official_reader_cancel_purchase_match_private.sh
 run_isolated_case myeongha_official_reader_reviewed_cancel_bridge_test bash test/db/official_reader_cancel_reviewed_atomic_bridge_private.sh
 # Prevent historic direct or SECURITY DEFINER cancellation writers bypassing reviewed entitlement revoke via public/API/Commerce roles.
