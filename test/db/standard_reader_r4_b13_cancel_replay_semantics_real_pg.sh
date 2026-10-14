@@ -46,8 +46,7 @@ if [[ -z "$original_order" ]]; then
 else
  expected_order="'$original_order'::text"
 fi
-p >"$tmp/event.out" 2>"$tmp/event.err" <<SQL ||
- { cat "$tmp/event.err" >&2; fail 'verified-flag synthetic cancellation Event insert'; }
+if ! p >"$tmp/event.out" 2>"$tmp/event.err" <<SQL
 insert into public.commerce_provider_events(
  id,provider,external_event_id,event_type,external_transaction_id,
  resolved_subject_id,resolution_source_type,resolved_receipt_id,
@@ -61,6 +60,10 @@ select '$event'::uuid,cr.provider,'synthetic-b13-replay-one',
  'verified',clock_timestamp(),'production','b13-replay-test-verifier'
 from public.commerce_receipts cr where cr.id='$receipt'::uuid;
 SQL
+then
+ cat "$tmp/event.err" >&2
+ fail 'verified-flag synthetic cancellation Event insert'
+fi
 effect(){
  local reason="$1"
  cat <<SQL
