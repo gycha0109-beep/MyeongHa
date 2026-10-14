@@ -369,4 +369,72 @@ describe('authenticated provider payment completion orchestration', () => {
     expect(harness.events).toContain('rollback:2');
     expect(harness.events).not.toContain('commit:2');
   });
+
+  it('CAP-B2 BIND-13 rejects a different provider Product at verified ingress before any persistence transaction', async () => {
+    const harness = makeHarness();
+    const adapter: CommercePaymentVerificationAdapterV1 = {
+      verify: vi.fn(async (context) => ({
+        providerRequestId: context.providerRequestId,
+        evidence: verifiedEvidence({ externalProductId: 'other-valid-reader-product-offer' }),
+      })),
+    };
+
+    await expect(executeAuthenticatedCommerceProviderPaymentCompletionV1({
+      pool: harness.pool,
+      ingress: { providerTransport: 'opaque' },
+      authenticator: authenticatorFor(harness.events, {
+        provider: 'provider-test',
+        environment: 'sandbox',
+        providerRequestId: 'request-1',
+      }),
+      verificationAdapter: adapter,
+    })).rejects.toMatchObject({
+      name: 'CommercePaymentVerificationErrorV1',
+      code: 'PRODUCT_MISMATCH',
+    });
+
+    expect(adapter.verify).toHaveBeenCalledTimes(1);
+    expect(harness.events).toEqual([
+      'authenticate', 'connect:1', 'begin:1', 'role:1',
+      'context:1', 'commit:1', 'release:1:ok',
+    ]);
+    expect(harness.connect).toHaveBeenCalledTimes(1);
+    expect(harness.persistCalls).toHaveLength(0);
+  });
+
+  it('CAP-B2 BIND-13 rejects post-verification Product authority drift at DB persistence and rolls back', async () => {
+    const harness = makeHarness({
+      persistError: {
+        constraint: 'cmd_persist_verified_payment_evidence_v1_product_authority_mismatch',
+      },
+    });
+    const adapter: CommercePaymentVerificationAdapterV1 = {
+      verify: vi.fn(async (context) => {
+        expect(harness.events).toContain('commit:1');
+        return {
+          providerRequestId: context.providerRequestId,
+          evidence: verifiedEvidence(),
+        };
+      }),
+    };
+
+    await expect(executeAuthenticatedCommerceProviderPaymentCompletionV1({
+      pool: harness.pool,
+      ingress: { providerTransport: 'opaque' },
+      authenticator: authenticatorFor(harness.events, {
+        provider: 'provider-test',
+        environment: 'sandbox',
+        providerRequestId: 'request-1',
+      }),
+      verificationAdapter: adapter,
+    })).rejects.toMatchObject({
+      name: 'ApiCommandError',
+      code: 'NOT_FOUND',
+    });
+    expect(adapter.verify).toHaveBeenCalledTimes(1);
+    expect(harness.persistCalls).toHaveLength(1);
+    expect(harness.events).toContain('rollback:2');
+    expect(harness.events).not.toContain('commit:2');
+    expect(harness.events).toContain('release:2:error');
+  });
 });
