@@ -220,3 +220,11 @@ Watchtower-Track: ops. R1 정확한 격리 복원 증거는 8절을 따른다. �
 - **재생 경계:** 기존 `apply_pg17_migrations_through_seyeon_production_frontier`에서 1510과 허용된 timestamped 2개까지만 격리 적용한 후, 별도 **한 연결의 BEGIN → 1520 → ROLLBACK** 실행. 전/후/복구 시 함수 `internal_finalize_account_deletion_db_v1(uuid,uuid,text)`의 DDL·Owner·ACL 지문 및 `SECURITY DEFINER`, `search_path`, browser/API/service EXECUTE, 1530 이후 객체 부재를 비교한다. 실제 개인정보 또는 권한 원문은 출력하지 않는다.
 - **검증기/부정 테스트:** `verify-seyeon-r2-h-1520.mjs`, `tests/seyeon-r2-h-1520.test.mjs`는 교체 미발생, Owner/ACL 변형, 4개 Role 권한 상승, 잘못된 SECURITY DEFINER/search_path, 1530 선적용, ROLLBACK 불완전·승인 플래그 변조를 fail-closed로 거부한다. 기존 PostgreSQL 17 R2 교차환경 CI에 결합한다.
 - **판정 경계:** 코드 검증 통과는 1520의 합성 재현 범위에서만 유효하다. 삭제 처리 실제 양수 데이터·운영 Lock 경합·회복, R2-G 출처·권한 의도, 9개 검토 단위의 Production 배포 승인은 미확인. Production SQL/Role/ACL/history/개인정보 쓰기 없음. `dr_ready=false`, R2/후속 migration/G0~G6/유료 모델/공개 HOLD 유지.
+
+## 16. 2026-10-14 R2-H-2 — 1530 Character Artifact / 1520 의존성 통제 검증
+
+- **검토 범위:** `1530_character_reading_artifact_durable_commit_v1.sql` (git blob `0b369d4955c935992e5243dcb4c2ec87c722a876`), 기존 `character-artifact` 단위. `1520` 의존성을 유지하되 운영 반영하지 않는다. `1540~1720` 및 원격-only 104KB bundle 재실행 금지.
+- **재생:** 일회용 PG17, 기존 `1510 + timestamped 2` 기준 → 한 연결 `BEGIN` → 로컬 `1520` → SAVEPOINT → 로컬 `1530` → SAVEPOINT ROLLBACK → FULL ROLLBACK. 지문/카탈로그 **다섯 스냅샷**으로 1520이 실제 재생되었고 1530이 이를 변경하지 않으며 두 롤백이 정확한지 확인. 실제 고객 데이터 및 1530 유료 AI 사용 없음.
+- **구체적 검증:** `character_reading_artifacts` 1개 테이블, RLS, PK 1/UNIQUE 2/FK 2/CHECK 4/index 4, trigger 1 (BEFORE UPDATE/DELETE), 단일 좁은 Role, RLS 정책 2개(Subject와 허용된 face artifact), SECURITY DEFINER 명령 1, Server executor EXECUTE, 브라우저·service 직접 EXECUTE / 테이블 DML 거부. Owner/DDL/ACL raw 정보는 출력하지 않음. 테스트·CI에서도 SHA/건수/boolean만 출력.
+- **잠재 미승인 보안 사항:** 1530 원본은 `GRANT myeongha_character_reading_artifact_runtime_owner TO current_user` 이후 직접 멤버십 `REVOKE`를 포함하지 않는다. 격리에서 creator의 멤버십 잔존 여부를 측정하며 **성공적으로 재현되어도 `HOLD_R2_H_1530_CREATOR_ROLE_MEMBERSHIP_RETAINED_OWNER_REVIEW`**로 표기한다. Owner/Security 검증 없이 원본 파일을 바꾸거나 Production Role을 수정하지 않는다.
+- **추가 미검증:** 실 운영 계정 삭제/생체 원본 오염 차단의 양수 트랜잭션, 두 세션 경합, Owner 실행 경계 및 롤백 Runbook. R2 원본 출처·승인 HOLD, `dr_ready=false`, G0~G6/유료/공개 HOLD.

@@ -264,3 +264,9 @@ Governor 04d4B 계열은 실제 격리 PostgreSQL 기반 영수증 임대·정�
 - R2-H 9개 Owner 검토 단위 중 deletion(1520)만 기존 PG17 CI의 `seyeon-r2-cross-env-catalog` 재생 뒤 독립 트랜잭션에서 전/후/ROLLBACK 검사. 기존 21개 인벤토리·순서·blob SHA는 불변.
 - 목표 증거: 대상 단일 함수 본문 교체, Owner·ACL·보안 속성·서버/브라우저 실행권한 불변, 1530 선적용 없음, rollback 상태가 최초와 정확히 일치. 부정 테스트/PG17/CI/Full Integration 및 병합 후 main 확인 후 `#1887`에 실행 SHA·Run ID 누적.
 - Production 배포 승인이 아닌 **첫 검토 단위의 합성 재현**이다. R2-G 계보 출처·1520 실제 삭제/복구 시나리오·Owner 승인·DR Ready·G0~G6는 계속 HOLD.
+
+## 19. 2026-10-14 R2-H 두 번째 검토 단위 — 1530 Character Artifact
+
+- 기존 R2 패킷 [16절](SEYEON_MIGRATION_LINEAGE_R2_READONLY_PACKET_20261013.md)에 SQL·CI·Owner HOLD 증거를 단일 정본으로 누적. `1520` 선행 적용 후 `1530`만 새 SQL로 실험하고 savepoint와 전체 rollback을 각각 검증한다.
+- 확인 대상: 지속 Artifact의 RLS/FK/무결성·트리거/명령 API 최소권한 및 마이그레이션 실행자가 부여받는 narrow-role membership의 잔존 여부. 멤버십이 남으면 승인 가능한 상태로 간주하지 않고 Security/DB/Character Owner가 forward-only 변경·향후 멤버십 반납·DR/배포 영향 결정을 요구한다.
+- 합성 PG17 증거/병합은 Production 배포 권한이 아니다. 21개 후속 전부 미배포, lineage R2/DR Ready/G0~G6 보류.
