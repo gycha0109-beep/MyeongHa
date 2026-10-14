@@ -149,6 +149,10 @@ SQL
  fail 'first Grant did not revoke'
 [[ "$(p -c "select status from public.entitlement_grants where id='$second_grant'::uuid")" == active ]] ||
  fail 'independent Grant was revoked'
+[[ "$(p -c "select revision::text || '|' || status || '|' ||
+ coalesce(last_provider_ordering_key,'') from public.entitlement_grants
+ where id='$second_grant'::uuid")" == "$second_before" ]] ||
+ fail 'old cancellation changed repurchased Grant provenance'
 [[ "$(current_count)" == 1 ]] || fail 'revoke of one Grant removed independent same-bundle entitlement'
 [[ "$(p -c "select count(*) from public.standard_reading_official_bindings")" == 1 ]] ||
  fail 'independent Reading changed'
