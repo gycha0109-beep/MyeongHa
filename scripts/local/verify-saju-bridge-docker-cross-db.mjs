@@ -184,7 +184,7 @@ async function run() {
       if (env.SAJU_BRIDGE_LOCAL_SYNTHETIC_SIGNATURES_FAULT !== '1') {
         throw new Error('Phase 4H requires prior Phase 4G real cryptographic synthetic verifier.');
       }
-      runStage('cross-replay-review', 'Phase 4G real DB: replay and independent-run semantic reuse held; stale peer held; no trusted registry or execution.');
+      runStage('cross-replay-review', 'Phase 4H real DB: replay and independent-run semantic reuse held; stale peer held; no trusted registry or execution.');
       console.log('[saju-bridge] Phase 4H: replay and cross-run semantic reuse remain HOLD; no trusted registry or permission.');
     }
   } catch (error) {
