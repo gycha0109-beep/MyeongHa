@@ -109,3 +109,9 @@
 - **단계 상태 불변**: R1 immutable pin/R2 private revoke 격리 진척, R3 실제 운영 Writer 공동잠금 **HOLD**, R4 검증 계속, R5 T1→T2 paid 공개 **HOLD**, R6 Privacy/DR/Owner·migration 스택 승인 **HOLD**, R7 출시 **OFF**. 별도 소스 결정: distinct Provider ordering-key 의미·no-op status 처리, refund+repurchase Receipt/Grant 독립성은 Commerce/Provider Owner 정책 필요. 기존 회원 병합 SRC-24는 OPEN/BLOCKING.
 - 다음 안전한 검증: 새 Receipt/Grant가 생긴 경우 취소 이벤트가 옛 Receipt의 Grant만 취소하고 새 구매권을 건드리지 않는지 실PG15/17 격리 테스트; 의미적 우선순위나 운영 Writer, 정책을 임의 구현하지 않음. 모든 이력과 한계는 #2041 PR에 누적.
 
+## 2026-10-14 B2-R0 갱신 / B2-R4 BIND-19 환불 후 재구매 격리 완료 (앱화 우선순위 복귀)
+
+- **완료된 좁은 검증**: 코드 Draft [#2041](https://github.com/gycha0109-beep/MyeongHa/pull/2041), 검증된 코드 HEAD `5a103a55b46ea1ac3eac8f43a0c4fb7014ffbe04`. [CI #38533318866](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38533318866) **9/9 SUCCESS**, PG15/PG17 양쪽에서 `PASS R4/BIND-19 same-bundle two Receipts/Grants, old synthetic verified cancellation original 1080 CAS, wrong new Grant lineage DENY, new access survives, old replay DENY` 로그 확인. Web·Work Track SUCCESS, **46 total / 43 unique** 사례.
+- **증명한 것**: 두 개의 독립 구매 Receipt/Grant가 동일 Reader·bundle을 가질 때 옛 구매의 synthetic verified-flag cancellation은 새 Grant를 가리킬 수 없음(lineage DENY). 원본 Commerce 1080 CAS로 옛 Grant만 revoked 처리 후 새 Grant provenance/ledger와 현재 Reader 권한이 살아 있고 과거 Binder replay가 거부됨. 기존 fixture-only 직접 Grant UPDATE 검증보다 현실적인 Commerce 원본 함수 경로로 좁게 강화함.
+- **증명하지 않은 것**: 실제 PortOne 환불 ingress, signed Provider verification, refund payment settlement, 이벤트 간 실시간 최신성/ordering-key 정책, 모든 운영 Writer의 S3 잠금, R5 T2 유료 콘텐츠 오픈. 별도 Governance [#38533318848](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38533318848) **FAILURE**(Privacy 그래프 140/1840 충돌), SRC-24 기존 회원 병합 및 DR/Owner 승인은 **HOLD**.
+- **이 트랙의 이번 작업 종료 조건**: BIND-19 신규 테스트 **PG15/17 PASS (A)**, B2-R4 전체 **PARTIAL**, R3 운영 전환/R5~R7 **HOLD**, Draft PR 미병합. 추가로 결제/권한 서브트랙을 파생하지 않고 **원래 앱화 트랙의 제품 UI·사용자 동선 우선순위로 복귀**. 운영 Writer·Provider 정책 추가 구현은 별도 명시적 승인 전 금지.
