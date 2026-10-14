@@ -294,3 +294,9 @@ Governor 04d4B 계열은 실제 격리 PostgreSQL 기반 영수증 임대·정�
 - 1600 불변 정책 트리거/모델 가격·정책 버전 수정·삭제 차단, is_active만 허용; 1610 내부 정산 private helper와 legacy/정부관장 governed settlement 함수 DDL/ACL 경계 분리.
 - 1550~1590 선행 5개 이관을 일회용 PG17 내부에서 재생한 후 1600/1610 스냅샷 및 rollback, 합성 Rate Card 부정 테스트 수행. 자세한 근거는 정본 R2 패킷 [20절](SEYEON_MIGRATION_LINEAGE_R2_READONLY_PACKET_20261013.md)에만 기록.
 - Production 및 마이그레이션 SQL blob 변경 0. 1620·1630 실행 권한/실제 credential, LLM 비용정산, 사용자 삭제 동시성, R2 Owner 승인, `dr_ready=false` 및 G0~G6/유료/public HOLD.
+
+## 24. 2026-10-14 R2-H 1620/1630 Internal Start·Execution Role
+
+- 1550~1610 비용 단위 모두를 폐기형 PG17의 한 트랜잭션에서 순차 재생하고 1620 private start + legacy/governed wrapper 분기, 1630 NOLOGIN governed executor 최소권한/멤버십 0을 5개 스냅샷으로 검증; 전체 ROLLBACK. R2 단일 정본 패킷 [21절](SEYEON_MIGRATION_LINEAGE_R2_READONLY_PACKET_20261013.md)에 증거 누적.
+- 역할 생성/GRANT는 CI 격리 DB 전용. Production Executor credential provisioning, 실 소비계정 정산 호출/DB 예산 시드/유료 AI/공개 제공/DR Ready는 승인하지 않는다.
+- 이 단위를 검증하더라도 R2 전체 21개 migration Owner HOLD, 1530 Owner 멤버십 잔존, R2-G 원천 계보 미확인, `dr_ready=false`; 후속 1640 G1 Memory Pin은 별도 검토 대상.
