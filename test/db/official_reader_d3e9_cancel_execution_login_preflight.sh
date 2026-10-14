@@ -128,11 +128,11 @@ done
 
 # The SQL design cannot implement least-privilege delegation merely by
 # granting D3e8: both D3e8 and its D3e6 callee are SECURITY INVOKER.
-[[ "$(db -c "select prosecdef::text from pg_proc
+[[ "$(db -c "select case when prosecdef then 't' else 'f' end from pg_proc
  where oid='public.internal_private_cancel_commit_review_approval_v1(
  uuid,text,text,uuid,timestamptz,timestamptz,text,text,text,text,text)'::regprocedure")" == f ]] ||
  fail 'D3e8 changed away from SECURITY INVOKER'
-[[ "$(db -c "select prosecdef::text from pg_proc
+[[ "$(db -c "select case when prosecdef then 't' else 'f' end from pg_proc
  where oid='public.internal_private_cancel_review_v1(uuid,text,text)'::regprocedure")" == f ]] ||
  fail 'D3e6 changed away from SECURITY INVOKER'
 [[ "$(db -c "select count(*) from public.entitlement_events")" == 0 ]] ||
