@@ -8,6 +8,7 @@ import {
   replayCommittedPortOneV2CancelInboxToShadowPrivateV1,
   type OfficialReaderCancelPrivateInboxStoreV1,
   type OfficialReaderCancelStoredInboxRowV1,
+  type OfficialReaderCancelInboxObservationTransactionV1,
 } from '../apps/api/src/official-reader-portone-cancel-inbox-replay-worker-private-v1.js';
 import type {
   OfficialReaderCancelObservationInputV1,
@@ -261,7 +262,7 @@ describe('private committed PortOne cancellation inbox replay -> 1860 shadow', (
     await expect(replayCommittedPortOneV2CancelInboxToShadowPrivateV1({
       inboxId: 'not-a-uuid', store: {
         readQueued: async () => row,
-        withReadCommittedTransaction: async (action) => action({
+        withReadCommittedTransaction: async <T>(action: (tx: OfficialReaderCancelInboxObservationTransactionV1) => Promise<T>): Promise<T> => action({
           readQueuedForUpdate: async () => row,
           recordVerified: async () => ({ shadowResult: 'observed', effectAuthorized: false }),
         }),
@@ -274,7 +275,7 @@ describe('private committed PortOne cancellation inbox replay -> 1860 shadow', (
   it('uses private PostgreSQL SELECT FOR UPDATE, existing 1860 writer and explicit BEGIN/COMMIT only', async () => {
     const row = await signedInbox();
     const statements: string[] = [];
-    const pool: PostgresSubjectPoolV1 = {
+    const pool = {
       connect: async () => ({
         query: async (sql: string) => {
           statements.push(sql);
@@ -287,7 +288,7 @@ describe('private committed PortOne cancellation inbox replay -> 1860 shadow', (
         release: () => {},
       }),
     };
-    const store = createPrivateOfficialReaderInboxReplayStoreTestV1(pool);
+    const store = createPrivateOfficialReaderInboxReplayStoreTestV1(pool as unknown as PostgresSubjectPoolV1);
     const fetchImpl = async () => new Response(JSON.stringify(providerPayment()), {
       headers: { 'content-type': 'application/json' },
     });
