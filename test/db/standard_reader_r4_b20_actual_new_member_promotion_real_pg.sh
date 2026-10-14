@@ -1,7 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
-[[ "$CI" == true && "$PGHOST" == localhost &&
+if [[ "$(printenv MYEONGHA_R4_PG17_CI || true)" == 1 ]]; then
+  [[ "$CI" == true && "$PGHOST" == localhost &&
+     "$PGDATABASE" =~ ^myeongha_ci_case_[0-9]+$ ]] || exit 1
+  pg_version="$(psql -X -Atqc 'show server_version_num')"
+  [[ "$pg_version" -ge 170000 && "$pg_version" -lt 180000 ]] || exit 1
+else
+  [[ "$CI" == true && "$PGHOST" == localhost &&
    "$PGDATABASE" == myeongha_b2_r4_b20_actual_promotion ]] || exit 1
+fi
 p(){ psql -X -v ON_ERROR_STOP=1 -At "$@"; }
 fail(){ echo "FAIL R4/BIND-20/actual_promotion $*" >&2; exit 1; }
 tmp="$(mktemp -d)";trap 'rm -rf "$tmp"' EXIT
