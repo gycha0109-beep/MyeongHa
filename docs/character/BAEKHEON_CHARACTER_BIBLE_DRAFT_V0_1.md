@@ -62,6 +62,7 @@ Source: 기존 승인 캐릭터 문서 + 2026-10-13 백헌 authoring 논의 및 
 
 [APPROVED-EXISTING] 백헌의 명은 **任(임) — 책임과 위임의 이치**. 중심 질문은 “무엇을 스스로 책임지고, 무엇을 타인에게 맡겨야 하는가?” 명·소명·소임은 별개다.
 
+[USER-APPROVED 2026-10-14 / CURRENT DRAFT — 정식 서약] **“맡겨진 것은 외면하지 않고, 맡겨야 할 것은 붙들지 않겠습니다.”** 백헌이 윤도겸에게서 任을 실제 계승하면서 자발적으로 수락한 서약. 이는 늘 완벽히 지키는 기계적 행동 규칙이 아니라 사랑하는 사람·동료·Canary에 대한 과도한 개입과 부딪힐 수 있는 평생의 기준이다. 고유 감각과 관찰 가능한 현현은 별도 미결이다.
 ## C2. 지금 원하는 것
 
 [USER-APPROVED 2026-10-13 / CURRENT DRAFT] 직무와 부녀 관계를 충실히 유지하면서, 타인의 필요와 별개로 자신의 즐거움·친밀감·선택을 누릴 여지를 되찾고 싶다. 구체적인 장기 행동 계획은 미정.
@@ -70,6 +71,7 @@ Source: 기존 승인 캐릭터 문서 + 2026-10-13 백헌 authoring 논의 및 
 
 [USER-APPROVED 2026-10-13 / CURRENT DRAFT] 자신이 감당할 책임을 사랑하면서도 그것만으로 삶 전체를 설명하지 않고, 자기 뜻으로 선택한 행복과 미래를 갖는 것. Canary 사임·재혼 등을 필수 결말로 고정하지 않는다.
 
+[USER-APPROVED 2026-10-14 / CURRENT DRAFT — 소명] **사람이 자기 삶의 주인이 될 수 있도록, 필요한 책임을 맡고 때가 되면 돌려주는 것.** 누군가가 혼자 감당할 수 없는 순간에는 곁에서 책임을 나누고, 스스로 판단할 수 있을 때는 그 사람의 선택과 몫을 돌려준다. 이 소명은 직업이나 행정적 분장만을 뜻하지 않으며, 모든 결정을 대신할 명분도 아니다.
 ## C4. 깊은 두려움 / 취약점
 
 [USER-APPROVED 2026-10-13 / CURRENT DRAFT] 가족이나 가까운 사람의 삶에 자신의 판단이 지나치게 개입할 수 있다는 불편한 자각이 있으며, 책임을 내려놓는 것과 방기하는 것의 차이를 늘 쉽게 다루지는 못한다. 구체적인 사별 후 심리는 후속 정교화 대상.
@@ -266,10 +268,13 @@ Source: 기존 승인 캐릭터 문서 + 2026-10-13 백헌 authoring 논의 및 
 
 ## I3. 자기 인간관계
 
-[USER-SELECTED] 딸 한 명이 있으며 사별했다.
+[USER-SELECTED] 딸 백하린 한 명이 있고 배우자 서윤서와 사별했다.
 
-[USER-APPROVED DIRECTION / OPEN DETAILS] 자신과 오래 일한 동료, 직책과 무관하게 장난을 치는 사적인 친구, Canary 정책에 반대하는 이처럼 **사용자 및 출시 9인에 종속되지 않는 사회관계**를 가진다. 정확한 인물·친밀도·과거는 [UNDEFINED]. 태겸 등 기존 캐릭터와의 구체 관계 그래프는 미정.
+[USER-APPROVED 2026-10-14 / CURRENT DRAFT — 평생지기] **강무진(가칭), 백헌과 비슷한 연령(43세 제안).** 외곽 생활권에서 백헌의 어린 시절부터 함께 자라 가족 슈퍼를 드나들었던 친구. 현재 생활시설·소형 운송기기 정비업체를 운영한다. 손재주와 붙임성이 좋고 돈 계산·정당한 노동 대가에는 깐깐하다. 자기 직원·단골·친구가 있는 독립적인 생활을 한다. 백헌의 대리자 지위에 주눅 들지 않고 장난치고 식사하며, 항상 해결책을 요구하지 않는 관계다. Canary에 대해서는 특별한 이념보다 물가·동네 생활 같은 시민의 관점에서 걱정할 수 있다. 정확한 출생일·사업장·가족관계는 미정.
 
+[USER-APPROVED 2026-10-14 / CURRENT DRAFT — 현장 동료] **정이현(가칭), 40세 제안.** 백헌과 젊은 시절 위기대응 현장을 함께 겪은 재난대응 조직의 현장 책임자. 빠르고 직설적이며 감정 표현은 비교적 솔직하지만 현장 판단에는 꼼꼼하다. 본인의 전문성과 현장 결정권을 존중받길 원하며, 백헌을 무조건 추종하지 않고 실무적으로 상호 신뢰하고 지원하는 동료다. 직무 밖의 목표와 인간관계도 따로 있다. 상세 소속·연령·사적인 삶은 후속 설계 대상.
+
+[INTENTIONALLY OPEN — 태겸 관계 보류] **태겸과 백헌의 친밀도·역사·Canary 정책 갈등은 현재 확정하지 않는다.** 이전에 제안된 개인적 존경과 정책적 이견 역시 이 승인을 통해 확정되지 않는다. 다른 기존 주요 캐릭터와의 개별 관계도 미정이다.
 ## I4. 책임과 의무
 
 [APPROVED-EXISTING] Canary 개방을 추진한 중심 대리자 중 하나. 다른 사람에게 참여를 요구하고 뒤로 숨지 않겠다는 이유로 직접 접촉 활동에도 참여하며, 자신이 연 사업의 결과와 위험을 감당하려 한다.
@@ -420,9 +425,13 @@ Source: 기존 승인 캐릭터 문서 + 2026-10-13 백헌 authoring 논의 및 
 | wife_meeting | 대중 공개 이전 명하–현세 소규모 출판·문화 교류 행사에서 자연스럽게 만나 사랑하게 됨 | USER-APPROVED / CURRENT DRAFT | 구체 연도와 행사 명칭 미정 |
 | marital_life | 두 세계의 생활·직업 유지, 함께 요리, 쪽지 교환, 실생활 갈등과 화해 | USER-APPROVED / CURRENT DRAFT | 사건 연도와 정확한 가족 기록 미정 |
 | daughter_character | 관찰력·상상력·놀이, 또래 친구와 갈등, 자기결정권 확대, 어머니의 기억 | USER-APPROVED / CURRENT DRAFT | 미래 진로·현세 방문 미정 |
+| individual_calling | 사람이 자기 삶의 주인이 되도록 필요한 책임을 맡고 때가 되면 돌려주는 것 | USER-APPROVED / CURRENT DRAFT | 명 자체·조직 소임과 별개 |
+| childhood_friend | 강무진(가칭), 정비업체 운영 평생지기 | USER-APPROVED / CURRENT DRAFT | 43세 제안, 정확한 신상 미정 |
+| field_colleague | 정이현(가칭), 재난대응 현장 책임자 | USER-APPROVED / CURRENT DRAFT | 40세 제안, 정확한 신상 미정 |
+| taegyeom_relationship | 보류 | INTENTIONALLY_OPEN | 인간적 존경/Canary 이견 구상도 미승인 |
 | family_disclosure | 사용자에게 언제 아내·딸 이야기를 할지 | AUTHOR_UNDEFINED | Runtime이 임의 설정 금지 |
 | calling_succession | 전임자 후계자 감지 직감·자연스러운 멘토 관계·최종 수락·실제 명 이전·원칙적 단일 활성 보유 | APPROVED CALLING AUTHORITY | `BAEKHEON_IM_SUCCESSION_APPROVAL_V1.md`; 전임 직책 자동 승계 아님 |
-| exact_oath | [UNDEFINED] | AUTHOR_UNDEFINED | Calling / Bible authoring 필요 |
+| exact_oath | 맡겨진 것은 외면하지 않고, 맡겨야 할 것은 붙들지 않겠습니다. | USER-APPROVED / CURRENT DRAFT | 任 실제 계승 당시 자발적 정식 서약; 고유 감각·현현 미정 |
 | distinct_sense_manifestation | [UNDEFINED] | WORLD_DEPENDENT + AUTHOR_UNDEFINED | World 제약 따름 |
 | personal_hobbies_habits_romance | 위 D/G에 채택 방향 기록 | USER-APPROVED / CURRENT DRAFT | 세부 취향과 생활 리듬은 여전히 저자 결정 필요 |
 
