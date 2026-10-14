@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from 'node:crypto';
+import { createHash, generateKeyPairSync, randomUUID, sign } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { Pool } from 'pg';
 import { afterAll, describe, expect, it } from 'vitest';
@@ -13,10 +13,16 @@ import {
   SAJU_BRIDGE_REVIEW_PACKET_VERSION_V1 as packetVersion,
   type SajuBridgeReviewPacketV1,
 } from '../scripts/local/saju-bridge-review-packet-v1.mjs';
+import {
+  assessSajuBridgeSyntheticAttestationV1 as assessSignature,
+  makeSajuBridgeSyntheticAttestationMessageV1 as signatureMessage,
+  type SajuBridgeSyntheticSignerV1,
+} from '../scripts/local/saju-bridge-synthetic-attestation-v1.mjs';
 
 const enabled = process.env.MYEONGHA_DOCKER_SAJU_PROVENANCE === '1';
 const stage = process.env.SAJU_BRIDGE_LOCAL_RECOVERY_STAGE;
-const packetStage = stage === 'cross-review-packet';
+const syntheticStage = stage === 'cross-synthetic-signatures';
+const packetStage = stage === 'cross-review-packet' || syntheticStage;
 const cases = ['NONCE_ONLY', 'PERMIT_ONLY', 'REVOKED_WITH_NONCE'] as const;
 type Case = typeof cases[number];
 const permitIds: Record<Case, string> = {
@@ -43,10 +49,11 @@ const certs = enabled ? {
 const pools: Pool[] = [];
 const peers: Record<Peer, Pool> = {} as Record<Peer, Pool>;
 function guard() {
-  if (!enabled || !['cross-provenance','cross-review-packet'].includes(stage ?? '')
+  if (!enabled || !['cross-provenance','cross-review-packet','cross-synthetic-signatures'].includes(stage ?? '')
     || (packetStage && (process.env.MYEONGHA_DOCKER_SAJU_REVIEW_PACKET !== '1'
       || !/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/u.test(
         process.env.SAJU_BRIDGE_LOCAL_REVIEW_RUN_ID ?? '')))
+    || (syntheticStage && process.env.MYEONGHA_DOCKER_SAJU_SYNTHETIC_SIGNATURES !== '1')
     || process.env.MYEONGHA_DOCKER_SAJU_TLS !== '1'
     || process.env.MYEONGHA_DOCKER_SAJU_PERMIT !== '1'
     || process.env.SAJU_BRIDGE_LOCAL_CROSS_DB_FAULT !== '1'
@@ -171,6 +178,91 @@ function denyPacket(value: unknown, nowMs: number, wanted: string) {
   expect(JSON.stringify(x)).not.toContain('signatureClaimBase64url');
   return x;
 }
+function signSyntheticPacket(packet: SajuBridgeReviewPacketV1) {
+  const registry: SajuBridgeSyntheticSignerV1[] = [];
+  const pairs = packet.submissions.map(claim => {
+    const kp = generateKeyPairSync('ed25519');
+    registry.push({
+      type: claim.type, sourceId: claim.sourceId,
+      publicKeySpkiDerBase64: kp.publicKey.export({type:'spki',format:'der'}).toString('base64'),
+    });
+    return {claim,privateKey:kp.privateKey};
+  });
+  const signed = {
+    ...packet,
+    submissions: pairs.map(({claim,privateKey}) => {
+      const payload = signatureMessage(packet,claim);
+      if (!payload) throw new Error('Synthetic signing fixture was rejected.');
+      return {...claim,signatureClaimBase64url:sign(null,payload,privateKey).toString('base64url')};
+    }),
+  };
+  return {signed,registry};
+}
+function denySignature(packet: unknown, now: number, registry: unknown,
+  classification: string, verification: string) {
+  const decision = assessSignature(packet,now,registry);
+  expect(decision).toMatchObject({
+    classification, signatureVerification:verification,
+    keyCustodyAuthority:'NOT_ESTABLISHED',
+    independentSourceAuthority:'NOT_ESTABLISHED',
+    sameLogicalAttempt:'NOT_PROVEN', globalCommitOrder:'NOT_PROVEN',
+    manualReviewAdmissibility:'NOT_ADMISSIBLE',
+    decision:'HOLD_MANUAL_REVIEW',
+    canExecute:false,canPublish:false,canSell:false,
+    automaticRetry:false,automaticCompensation:false,
+  });
+  expect(Object.isFrozen(decision)).toBe(true);
+  expect(JSON.stringify(decision)).not.toContain('publicKeySpkiDerBase64');
+  expect(JSON.stringify(decision)).not.toContain('signatureClaimBase64url');
+  return decision;
+}
+describe('Phase 4G synthetic Ed25519 signatures with no trust promotion', () => {
+  it('detects wrong keys, replay across run scopes, tampering and signer/key reuse', () => {
+    const now = 1900000000000;
+    const evidence = sample();
+    const packet = claimPacket(evidence,now,randomUUID());
+    const {signed,registry} = signSyntheticPacket(packet);
+    denySignature(signed,now,registry,
+      'SYNTHETIC_SIGNATURES_VALID_UNTRUSTED_HOLD','SYNTHETIC_ONLY_VERIFIED');
+    const alternateKey = generateKeyPairSync('ed25519');
+    denySignature(signed,now,registry.map((r,i) => i===1
+      ? {...r,publicKeySpkiDerBase64: alternateKey.publicKey
+        .export({type:'spki',format:'der'}).toString('base64')} : r),
+    'SIGNATURE_INVALID_HOLD','REJECTED');
+    denySignature(signed,now,registry.map((r,i) => i===1
+      ? {...r,publicKeySpkiDerBase64:registry[0]!.publicKeySpkiDerBase64} : r),
+    'REUSED_SYNTHETIC_KEY_HOLD','NOT_PERFORMED');
+    denySignature(signed,now,registry.map((r,i) => i===1
+      ? {...r,sourceId:'different-synthetic-source'} : r),
+    'SYNTHETIC_SIGNER_MISMATCH_HOLD','REJECTED');
+    denySignature({...signed,submissions:signed.submissions.map((s,i) => i===0
+      ? {...s,signatureClaimBase64url:signed.submissions[1]!.signatureClaimBase64url}:s)},
+    now,registry,'SIGNATURE_INVALID_HOLD','REJECTED');
+    denySignature({...signed,submissions:signed.submissions.map((s,i) => i===0
+      ? {...s,statementDigestSha256:'f'.repeat(64)}:s)},
+    now,registry,'SIGNATURE_INVALID_HOLD','REJECTED');
+    denySignature({...signed,submissions:signed.submissions.map((s,i) => i===0
+      ? {...s,submittedAtMs:now-1000}:s)},
+    now,registry,'SIGNATURE_INVALID_HOLD','REJECTED');
+    const otherRun = randomUUID();
+    const digest = fingerprintPacket(otherRun,evidence);
+    if (!digest) throw new Error('Test replay fingerprint blocked unexpectedly.');
+    const relabeled = {
+      ...signed,runId:otherRun,evidenceDigestSha256:digest,
+      submissions:signed.submissions.map(s=>({...s,evidenceDigestSha256:digest})),
+    };
+    denySignature(relabeled,now,registry,'SIGNATURE_INVALID_HOLD','REJECTED');
+    denySignature({...signed,submissions:signed.submissions.slice(0,4)},
+      now,registry,'REVIEW_PACKET_INVALID_HOLD','NOT_PERFORMED');
+    denySignature({...signed,scope:'PRODUCTION'},now,registry,
+      'REVIEW_PACKET_INVALID_HOLD','NOT_PERFORMED');
+    denySignature(signed,now,[], 'UNTRUSTED_SYNTHETIC_KEY_SET_HOLD','NOT_PERFORMED');
+    denySignature(signed,now,registry.map((r,i) => i===0
+      ? {...r,publicKeySpkiDerBase64:'INVALID_FAKE_KEY'} : r),
+    'UNTRUSTED_SYNTHETIC_KEY_SET_HOLD','NOT_PERFORMED');
+  });
+});
+
 describe('Phase 4F untrusted manual review submission contract', () => {
   it('rejects omissions, wrong scope, digest swap, duplicate authorities and forged approvals', () => {
     const now = 1900000000000;
@@ -327,6 +419,18 @@ describe.skipIf(!enabled)('Phase 4E actual independent disposable authority obse
         i === 1 ? {...x, sourceId:packet.submissions[0]!.sourceId} : x)},
         nowMs, 'DUPLICATE_OR_NONINDEPENDENT_SOURCE_HOLD');
       console.log('[saju-bridge] Phase 4F real DB: five untrusted claimed receipts bound to ephemeral read-only evidence; missing/foreign/duplicate rejected; even structurally complete NOT_ATTESTED, NOT_ADMISSIBLE; no action.');
+      if (syntheticStage) {
+        const {signed,registry} = signSyntheticPacket(packet);
+        denySignature(signed,nowMs,registry,
+          'SYNTHETIC_SIGNATURES_VALID_UNTRUSTED_HOLD','SYNTHETIC_ONLY_VERIFIED');
+        denySignature(signed,nowMs,registry.map((r,i) => i===2
+          ? {...r,sourceId:'unrecognized-source'}:r),
+        'SYNTHETIC_SIGNER_MISMATCH_HOLD','REJECTED');
+        denySignature({...signed,submissions:signed.submissions.map((s,i) => i===0
+          ? {...s,signatureClaimBase64url:signed.submissions[1]!.signatureClaimBase64url}:s)},
+        nowMs,registry,'SIGNATURE_INVALID_HOLD','REJECTED');
+        console.log('[saju-bridge] Phase 4G real DB: independent TLS read-only evidence, five distinct ephemeral Ed25519 signing keys; cryptographic tampering/foreign signer rejected; synthetic signature validity NEVER authorizes operation.');
+      }
     }
   }, 100000);
 });

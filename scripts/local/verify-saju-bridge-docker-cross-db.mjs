@@ -58,18 +58,21 @@ function stageArgs(stage) {
   ];
   return ['run', '--rm', '--no-deps', '--entrypoint', 'node',
     '-e', 'MYEONGHA_DOCKER_SAJU_CROSS_DB=1',
-    ...(['cross-provenance', 'cross-review-packet'].includes(stage) ? [
+    ...(['cross-provenance', 'cross-review-packet', 'cross-synthetic-signatures'].includes(stage) ? [
       '-e', 'MYEONGHA_DOCKER_SAJU_PROVENANCE=1',
       '-e', 'SAJU_BRIDGE_LOCAL_CROSS_DB_FAULT=1',
     ] : []),
-    ...(stage === 'cross-review-packet' ? [
+    ...(['cross-review-packet','cross-synthetic-signatures'].includes(stage) ? [
       '-e', 'MYEONGHA_DOCKER_SAJU_REVIEW_PACKET=1',
       '-e', 'SAJU_BRIDGE_LOCAL_REVIEW_RUN_ID=' + env.SAJU_BRIDGE_LOCAL_REVIEW_RUN_ID,
+    ] : []),
+    ...(stage === 'cross-synthetic-signatures' ? [
+      '-e','MYEONGHA_DOCKER_SAJU_SYNTHETIC_SIGNATURES=1',
     ] : []),
     '-e', 'SAJU_BRIDGE_LOCAL_RECOVERY_STAGE=' + stage,
     ...values.flatMap(([key,value]) => ['-e', key + '=' + value]),
     'saju-recovery-verifier', 'node_modules/vitest/vitest.mjs', 'run',
-    ['cross-provenance', 'cross-review-packet'].includes(stage)
+    ['cross-provenance', 'cross-review-packet', 'cross-synthetic-signatures'].includes(stage)
       ? 'test/saju-held-docker-provenance-phase4e.test.ts'
       : 'test/saju-held-docker-cross-db-phase4c3.test.ts'];
 }
@@ -168,6 +171,13 @@ async function run() {
       }
       runStage('cross-review-packet', 'Phase 4F real DB: five untrusted claimed receipts bound to ephemeral read-only evidence; missing/foreign/duplicate rejected; even structurally complete NOT_ATTESTED, NOT_ADMISSIBLE; no action.');
       console.log('[saju-bridge] Phase 4F: read-only review submission contract rejects missing, altered, duplicated or stale claims; full presentation still NOT_ATTESTED and all grants HOLD.');
+    }
+    if (env.SAJU_BRIDGE_LOCAL_SYNTHETIC_SIGNATURES_FAULT === '1') {
+      if (env.SAJU_BRIDGE_LOCAL_REVIEW_PACKET_FAULT !== '1') {
+        throw new Error('Phase 4G requires the Phase 4F review packet test.');
+      }
+      runStage('cross-synthetic-signatures', 'Phase 4G real DB: independent TLS read-only evidence, five distinct ephemeral Ed25519 signing keys; cryptographic tampering/foreign signer rejected; synthetic signature validity NEVER authorizes operation.');
+      console.log('[saju-bridge] Phase 4G: synthetic Ed25519 signatures verified and tampering rejected against disposable evidence; no independent trust root or operational approval.');
     }
   } catch (error) {
     primaryError = error;

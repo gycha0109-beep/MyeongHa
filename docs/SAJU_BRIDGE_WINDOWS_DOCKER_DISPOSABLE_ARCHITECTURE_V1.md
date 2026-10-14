@@ -247,6 +247,19 @@ node scripts/local/verify-saju-bridge-docker-local.mjs --review-packet ../Saju-b
 - `canExecute/canPublish/canSell=false`, `automaticRetry/automaticCompensation=false`; Root/Attestor/Runner, R01–R14, 2D-4, 실제 분산 복구/운영 승인·스테이징 접근 모두 HOLD. 쓰기 가능한 복구 코드·DB 마이그레이션·실제 Permit 발급/철회·외부 자격증명·Docker 소켓 변경 없음. 기존 부모 일회용 컨테이너·네트워크·볼륨 잔존 0 체크를 따른다.
 - **검증 경계:** GitHub Linux Docker의 PASS는 Windows 실기기 acceptance를 대체하지 않는다. 실제 독립 출처 검증·키 보관·신원 분리, 서명 검증, 안전한 인과 관계 및 승인/복구 정책이 마련되기 전에는 단순 제출 패킷으로 어떠한 권한도 생성하지 않는다.
 
+### 3M. Phase 4G — 폐기형 Ed25519 서명 무결성 검증과 절대 HOLD (2026-10-14)
+
+```powershell
+node scripts/local/verify-saju-bridge-docker-local.mjs --synthetic-signatures ../Saju-bridge-verify
+```
+
+- 이전 Phase 4A–4F의 **동일 일회용 Docker 프로젝트와 테스트 순서**를 보존한 뒤, `cross-synthetic-signatures` 검증용 컨테이너에서만 Phase 4G를 추가 실행한다. `--review-packet` 이하 구형 옵션은 변경하지 않는다. 실제 세 독립 Subject/Nonce/Admission PostgreSQL의 상호 분리 TLS 및 `BEGIN READ ONLY` 스키마·최종 영속 상태 검증을 *다시 실시한다*.
+- `scripts/local/saju-bridge-synthetic-attestation-v1.mjs`는 Node.js Ed25519 `verify`를 사용해, 완전한 4F 패킷의 `type/sourceId/statementDigestSha256/evidenceDigestSha256/submittedAtMs` 및 `scope/runId` 전체를 **도메인 분리된 바이트열**로 결속한다. 각 5개 카테고리마다 서로 다른 테스트 전용 Ed25519 키쌍을 동적으로 생성하며 검증기에는 공개 SPKI만 전달한다.
+- **위조/재사용 부정 경로:** 틀린 공개키, 다른 카테고리의 서명 바꿔치기, 주장 문장 지문 또는 시각의 변조, 새 `runId`로 재라벨링, 다른 제출자/출처 주장, 동일 공개키의 복수 카테고리 공유, 틀린 공개키 인코딩, 미완성 제출 패킷 및 비폐기 스코프를 차단한다. 키쌍·원본 DB ID·원본 증거 키·서명 문자열은 로그로 출력하지 않는다.
+- **판정의 의미:** 성공은 `SYNTHETIC_SIGNATURES_VALID_UNTRUSTED_HOLD / SYNTHETIC_ONLY_VERIFIED`이다. 이것은 **폐기형 테스트가 제공한 공개키에 맞는 테스트 서명**임을 확인할 뿐이다. 키 레지스트리는 외부 Root가 공증하거나 독립 기관이 보관하지 않으며, 실제 출처의 동일성/권한/직무 분리, 실 업무 attempt 인과성, 전역 커밋 순서, 수동 검토 진정성, 재사용 방지 권위·실복구 안전성을 인증하지 않는다. 암호학적 무결성과 운영 신뢰는 다른 차원이다.
+- 성공/실패 전부 `HOLD_MANUAL_REVIEW`, `keyCustodyAuthority=NOT_ESTABLISHED`, `independentSourceAuthority=NOT_ESTABLISHED`, `sameLogicalAttempt=NOT_PROVEN`, `globalCommitOrder=NOT_PROVEN`, `manualReviewAdmissibility=NOT_ADMISSIBLE` 및 `canExecute/canPublish/canSell/automaticRetry/automaticCompensation=false`이다. 새 API·마이그레이션·운영 키·Runner·실제 승인/재시도/보상 로직 없음.
+- Linux GitHub CI의 폐기형 실증 완료와 Windows Docker Desktop **실기기 Acceptance**는 별개이다. Windows의 `--synthetic-signatures` PASS/FAIL은 실제 기기 로그 제출 전에는 NOT_VERIFIED이다. 기존 Docker 컨테이너·네트워크·볼륨 잔존 0 검사는 보존한다.
+
 ## 4. 단계별 로드맵 · 종료 게이트
 
 | 단계 | 구현 | 게이트 | 범위 상태 |
