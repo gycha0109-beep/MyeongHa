@@ -99,7 +99,8 @@
       "unit": "cost-governor-foundation",
       "owner": "character-security",
       "requires": [
-        "1550"
+        "1550",
+        "1560"
       ],
       "proof": {
         "kind": "function",
