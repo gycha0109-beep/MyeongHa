@@ -736,6 +736,12 @@ describe('D3e16 independently signed current-policy epoch fence (OFFLINE ONLY)',
     await expect(e.boot({pinnedEpochSigner:{
       keyId:e.pin.keyId,publicKeyPem:pub(f.issuer),
     }})).rejects.toThrow('must differ');
+    await expect(e.boot({pinnedEpochSigner:{
+      keyId:e.pin.keyId,publicKeyPem:pub(f.idp),
+    }})).rejects.toThrow('must differ');
+    await expect(e.boot({pinnedEpochSigner:{
+      keyId:e.pin.keyId,publicKeyPem:pub(f.requester),
+    }})).rejects.toThrow('must differ');
     await expect(e.boot({readCurrentEpoch:async()=>{throw new Error('offline');}}))
       .rejects.toThrow('source unavailable');
     expect(f.store.commitAuthorizedReview).not.toHaveBeenCalled();
