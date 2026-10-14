@@ -254,6 +254,16 @@ SQL
     apply_pg17_migrations_without_birth_authority
     MYEONGHA_R4_PG17_CI=1 bash test/db/standard_reader_r4_distinct_current_bundles_real_pg.sh
     ;;
+  cap-b2-r4-wrong-receipt-offer)
+    verify_pg17
+    apply_pg17_migrations_without_birth_authority
+    MYEONGHA_R4_PG17_CI=1 bash test/db/standard_reader_r4_b13_wrong_receipt_offer_real_pg.sh
+    ;;
+  cap-b2-r4-actual-new-member-promotion)
+    verify_pg17
+    apply_pg17_migrations_without_birth_authority
+    MYEONGHA_R4_PG17_CI=1 bash test/db/standard_reader_r4_b20_actual_new_member_promotion_real_pg.sh
+    ;;
   content-release-lifecycle)
     verify_pg17
     apply_pg17_migrations_without_birth_authority
