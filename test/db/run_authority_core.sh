@@ -206,6 +206,10 @@ if [[ "${CI:-}" == "true" && "${PGHOST:-}" == "localhost" ]]; then
   # BIND-18: two independent current bundle purchases, lock-time ambiguity DENY.
   run_isolated_case myeongha_b2_r4_b18_distinct_bundles \
     bash test/db/standard_reader_r4_distinct_current_bundles_real_pg.sh
+  # BIND-29: test-only cooperating Content Publisher rotates the one default
+  # while an initial Binder waits; after lock, old selected bundle must DENY.
+  run_isolated_case myeongha_b2_r4_b29_release_after_receipt \
+    bash test/db/standard_reader_r4_content_release_after_receipt_race_real_pg.sh
   # BIND-17: replay cannot mint current Reader authority after revoke/expiry
   # or after an Offer is disabled; no production Commerce writer is exercised.
   run_isolated_case myeongha_b2_r4_b17_expired_grant \
