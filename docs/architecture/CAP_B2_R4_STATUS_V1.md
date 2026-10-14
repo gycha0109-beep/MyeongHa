@@ -107,3 +107,11 @@
 - 같은 식별자·Capability Item·effective_at·valid_from의 정확한 발급 재전송은 `result_replayed=true`, 새 Event/Outbox/Grant 없는 멱등 처리. 효과 시간을 1초 변경한 재전송은 `internal_entitlement_effect_source_semantic_conflict`로 거부하고 Event·Grant identity/Outbox count 불변이어야 함. 본 테스트에서는 공식 Reading·Reader Access가 **발급만으로 생성되면 안 됨**.
 - `test/db/run_authority_core.sh` PG15 전용 격리 DB와 `test/db/run_ci_case.sh` PostgreSQL17 분리 사례 `cap-b2-r4-receipt-issuer-recovery`에 등록, `db-suites.json` **42 cases / 39 unique** 및 Work Track assertion 동기화. **새 exact HEAD CI 성공 및 개별 PASS 로그 전에는 검증 완료로 표시하지 않음**.
 - 미증명: 실운영 Provider 검증→원본 Receipt 영속화→Entitlement issuer를 단일 트랜잭션으로 연결한 end-to-end Writer, 실결제 Provider webhook 동시 순서, 환불 CAS와 반대 방향 경합, R5 T2 원자 공개. 관련 Owner 승인 및 Privacy/DR 선행 **HOLD**.
+
+## BIND-13 검증된 Receipt 발급 FIRST ↔ verified cancellation 이벤트 경합 (2026-10-14)
+
+- 기존 `test/db/standard_reader_initial_no_grant_r2_real_pg.sh`: **이벤트 FIRST**일 때 합성 cooperating verifier가 R1/S3 Scope Advisory Lock을 잡아 `payment.cancelled` verified Event를 먼저 커밋 → 실제 `internal_apply_b2_r2_initial_receipt_cancel_guarded_private_v1`가 대기 후 `b2_r2_cancelled_receipt_issuance_denied` 및 Grant/Access 0. 기존 독립 검증이며 운영 Writer 연결이 아님.
+- 신규 `test/db/standard_reader_r4_b13_issuer_before_cancel_real_pg.sh`: **발급 FIRST**일 때 R1 Checkout Scope Pin을 가진 verified 표시 테스트 Receipt·Grant 0으로 시작. 실제 private `1860` Guarded Issuer가 동일 S3 lock을 유지한 채 original Commerce Entitlement Event/Grant를 쓰지만 아직 미커밋 → 합성 cooperating Provider Event Writer는 **반드시 그 S3 lock을 먼저 획득한 뒤에만** verified `payment.cancelled` 이벤트를 저장하도록 테스트 스크립트가 강제. 두 번째 PostgreSQL 세션의 실제 `pg_stat_activity.wait_event_type='Lock'`과 미커밋 Grant 비가시성을 증명하도록 구성.
+- 발급 COMMIT 후 Event Writer는 자체 동일 트랜잭션 내에서 verified cancellation 이벤트 + **실제 private R2 1850 Commerce CAS Revoke**를 실행. Receipt의 정확한 하나의 Grant는 `revoked`, `granted` 1 Event + Provider `revoked` 1 Event, 공식 Reading/Reader Access 0이어야 함. 이후 Guarded Issuer 재발급은 verified 취소 이벤트 존재로 **DENY**, 원장 불변.
+- **핵심 제약:** 운영 Provider 이벤트 검증·저장 코드가 실제로 S3 lock에 참여한다는 증거가 아님. 테스트만 lock을 자발적으로 획득합니다. 취소 전/후 반대 방향 두 사례는 각 별도의 격리 검증이며, **R3 통합 Writer cutover 승인·실환불·Provider ordering·R5 paid T2 공개** 모두 HOLD.
+- PG15 `run_authority_core.sh` 및 PG17 `cap-b2-r4-issuer-before-cancel` 등록. Suite manifest **43 cases / 40 unique**. 이 신규 사례는 **exact HEAD CI PASS 로그 검증 전에는 완료로 승격 금지**.
