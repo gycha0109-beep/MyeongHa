@@ -22,8 +22,7 @@ const COLUMNS = [
   'store_id as "storeId"',
   'cancellation_id as "cancellationId"',
   'event_type as "eventType"',
-  "to_char(event_occurred_at AT TIME ZONE 'UTC',",
-  "  'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"') as \"eventOccurredAt\"",
+  "to_char(event_occurred_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"') as \"eventOccurredAt\"",
   'ingress_fingerprint as "ingressFingerprint"',
   'inbox_state as "inboxState"',
 ].join(', ');
