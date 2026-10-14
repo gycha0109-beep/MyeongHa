@@ -24,10 +24,10 @@ import {
 } from './official-reader-portone-cancel-observation-bridge-v1.js';
 import type { PortOneV2PaymentHttpFetchV1 } from './portone-v2-payment-verification-adapter.js';
 
-export type OfficialReaderCancelStoredInboxRowV1 = Readonly<{
+export type OfficialReaderCancelStoredInboxRowV1<S extends 'queued' | 'leased' = 'queued'> = Readonly<{
   id: string;
   provider: 'portone_v2';
-  inboxState: 'queued';
+  inboxState: S;
   ingressFingerprint: string;
 } & OfficialReaderCancelInboxEnvelopeV1>;
 
@@ -66,13 +66,15 @@ function safeId(value: unknown, label: string): string {
   return value;
 }
 
-function validatedRow(value: unknown, requestedId: string, secret: string): OfficialReaderCancelStoredInboxRowV1 {
+export function validateCommittedPortOneInboxRowPrivateV1<S extends 'queued' | 'leased'>(
+  value: unknown, requestedId: string, secret: string, expectedState: S,
+): OfficialReaderCancelStoredInboxRowV1<S> {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) {
     throw new Error('Committed PortOne cancellation inbox row is unavailable.');
   }
   const item = value as Record<string, unknown>;
   if (item.id !== requestedId || item.provider !== 'portone_v2'
-    || item.inboxState !== 'queued'
+    || item.inboxState !== expectedState
     || (item.environment !== 'production' && item.environment !== 'sandbox')
     || (item.eventType !== 'Transaction.CancelPending'
       && item.eventType !== 'Transaction.PartialCancelled'
@@ -104,12 +106,14 @@ function validatedRow(value: unknown, requestedId: string, secret: string): Offi
     throw new Error('Committed PortOne cancellation inbox authenticity recheck failed.');
   }
   return Object.freeze({
-    id: requestedId, provider: 'portone_v2' as const, inboxState: 'queued' as const,
+    id: requestedId, provider: 'portone_v2' as const, inboxState: expectedState,
     ...envelope, ingressFingerprint: item.ingressFingerprint,
   });
 }
 
-function identicalRow(a: OfficialReaderCancelStoredInboxRowV1, b: OfficialReaderCancelStoredInboxRowV1): boolean {
+export function identicalCommittedPortOneInboxRowPrivateV1<S extends 'queued' | 'leased'>(
+  a: OfficialReaderCancelStoredInboxRowV1<S>, b: OfficialReaderCancelStoredInboxRowV1<S>,
+): boolean {
   return a.id === b.id && a.provider === b.provider && a.environment === b.environment
     && a.inboxState === b.inboxState && a.webhookId === b.webhookId
     && a.paymentId === b.paymentId && a.transactionId === b.transactionId
@@ -130,8 +134,8 @@ export async function replayCommittedPortOneV2CancelInboxToShadowPrivateV1(input
   if (typeof input.inboxId !== 'string' || !UUID.test(input.inboxId)) {
     throw new Error('Private cancellation replay requires a valid DB inbox UUID.');
   }
-  const original = validatedRow(
-    await input.store.readQueued(input.inboxId), input.inboxId, input.evidenceHmacSecret,
+  const original = validateCommittedPortOneInboxRowPrivateV1(
+    await input.store.readQueued(input.inboxId), input.inboxId, input.evidenceHmacSecret, 'queued',
   );
   // Do not construct a fake webhook or re-sign expired provider signatures.
   // The HMAC is verified above and GET is the independent source of truth.
@@ -155,11 +159,11 @@ export async function replayCommittedPortOneV2CancelInboxToShadowPrivateV1(input
   // then record verified facts in existing 1860. The injected store must COMMIT
   // before resolving. If any step fails: rollback and retry/HOLD; no rights.
   return input.store.withReadCommittedTransaction(async (tx) => {
-    const fresh = validatedRow(
+    const fresh = validateCommittedPortOneInboxRowPrivateV1(
       await tx.readQueuedForUpdate(input.inboxId),
-      input.inboxId, input.evidenceHmacSecret,
+      input.inboxId, input.evidenceHmacSecret, 'queued',
     );
-    if (!identicalRow(original, fresh)) {
+    if (!identicalCommittedPortOneInboxRowPrivateV1(original, fresh)) {
       throw new Error('PortOne cancellation inbox changed during independent verification.');
     }
     const saved = await recordVerifiedPortOneV2CancellationShadowV1({
