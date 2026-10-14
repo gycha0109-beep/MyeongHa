@@ -42,7 +42,7 @@ snapshot(){
 }
 before="$(snapshot)"
 seed(){
- local id="$1" status="$2" env="$3" kind="$4" resolution="$5" tx="$6"
+ local id="$1" status="$2" env="$3" kind="$4" resolution="$5" tx="$6" expected="$7"
  if p >"$tmp/seed-$id.out" 2>"$tmp/seed-$id.err" <<SQL
 insert into public.commerce_provider_events(
  id,provider,external_event_id,event_type,external_transaction_id,
@@ -60,10 +60,16 @@ select '$id'::uuid,cr.provider,'synthetic-contract-$id',
 from public.commerce_receipts cr where cr.id='$receipt'::uuid;
 SQL
  then
-  :
+  [[ -z "$expected" ]] || fail "DB accepted forbidden Provider Event $id before private CAS"
  else
-  cat "$tmp/seed-$id.err" >&2
-  fail 'valid event-table fixture rejected'
+  if [[ -z "$expected" ]]; then
+   cat "$tmp/seed-$id.err" >&2
+   fail "valid event-table fixture $id rejected"
+  fi
+  grep -Fq "$expected" "$tmp/seed-$id.err" ||
+   { cat "$tmp/seed-$id.err" >&2; fail "event $id failed for unrelated early DB constraint"; }
+  [[ "$(p -c "select count(*) from public.commerce_provider_events where id='$id'::uuid")" == 0 ]] ||
+   fail "forbidden Provider Event $id persisted despite trigger denial"
  fi
 }
 cancel_sql(){
@@ -94,18 +100,17 @@ deny(){
 }
 # Database FK/shape valid events that do NOT qualify for verified cancellation
 # authority. Distinct status, environment, type, resolution and transaction.
-seed b4c10000-0000-4000-8000-000000000001 received production payment.cancelled receipt tx-s4-initial-seyeon
-seed b4c10000-0000-4000-8000-000000000002 verified sandbox payment.cancelled receipt tx-s4-initial-seyeon
-seed b4c10000-0000-4000-8000-000000000003 verified production payment.refunded receipt tx-s4-initial-seyeon
-seed b4c10000-0000-4000-8000-000000000004 verified production payment.cancelled manual tx-s4-initial-seyeon
-seed b4c10000-0000-4000-8000-000000000005 verified production payment.cancelled receipt wrong-provider-transaction
-seed b4c10000-0000-4000-8000-000000000006 verified production payment.cancelled receipt tx-s4-initial-seyeon
+seed b4c10000-0000-4000-8000-000000000001 received production payment.cancelled receipt tx-s4-initial-seyeon ''
+# Existing 0930 DB trigger rejects environment/manual/wrong transaction
+# AT INSERT, before the 1850 PRIVATE cancellation ingress is invoked.
+seed b4c10000-0000-4000-8000-000000000002 verified sandbox payment.cancelled receipt tx-s4-initial-seyeon 'provider event environment must match the resolved receipt environment'
+seed b4c10000-0000-4000-8000-000000000003 verified production payment.refunded receipt tx-s4-initial-seyeon ''
+seed b4c10000-0000-4000-8000-000000000004 verified production payment.cancelled manual tx-s4-initial-seyeon 'manual provider-event resolution is disabled'
+seed b4c10000-0000-4000-8000-000000000005 verified production payment.cancelled receipt wrong-provider-transaction 'provider event transaction identity does not match the resolved receipt lineage'
+seed b4c10000-0000-4000-8000-000000000006 verified production payment.cancelled receipt tx-s4-initial-seyeon ''
 reason='Exact verified initial cancellation purchase lineage is required'
 deny unverified b4c10000-0000-4000-8000-000000000001 "$reason" 0 "$grant"
-deny sandbox b4c10000-0000-4000-8000-000000000002 "$reason" 0 "$grant"
 deny wrong_type b4c10000-0000-4000-8000-000000000003 "$reason" 0 "$grant"
-deny wrong_resolution b4c10000-0000-4000-8000-000000000004 "$reason" 0 "$grant"
-deny wrong_transaction b4c10000-0000-4000-8000-000000000005 "$reason" 0 "$grant"
 deny foreign_grant b4c10000-0000-4000-8000-000000000006 "$reason" 0 ffffffff-ffff-ffff-ffff-ffffffffffff
 deny stale_cas b4c10000-0000-4000-8000-000000000006 'Grant revision/order provenance changed' 99 "$grant"
 
@@ -177,4 +182,4 @@ then
  cat "$tmp/acl.err" >&2
  fail 'private cancellation ACL check'
 fi
-echo 'PASS R4/BIND-13 original R2 private cancel DENY invalid status/environment/type/resolution/transaction/Grant, stale CAS, Subject, isolation; atomic bad-CAS event rollback, private ACL'
+echo 'PASS R4/BIND-13 original 0930 provider-event DB trigger DENY environment/manual/transaction at INSERT; 1850 private cancel DENY unverified/type/wrong Grant/stale CAS/Subject/RR; atomic event-CAS rollback, private ACL'
