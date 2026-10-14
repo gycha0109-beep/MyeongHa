@@ -191,6 +191,8 @@ run_isolated_case myeongha_reader_d3e6_private_ops_review_test bash test/db/offi
 run_isolated_case myeongha_reader_d3e7_cancel_private_alert_outbox_test bash test/db/official_reader_d3e7_cancel_private_alert_outbox.sh
 # D3e8 private sandbox-only dual-signed review nonce and atomic D3e6 audit, no new role grants.
 run_isolated_case myeongha_reader_d3e8_dual_approval_preflight_test bash test/db/official_reader_d3e8_cancel_dual_approval_preflight.sh
+# D3e9: exact TS→SQL isolated login ACL preflight; overgrant, membership, direct bypass denied.
+run_isolated_case myeongha_reader_d3e9_execution_login_preflight_test bash test/db/official_reader_d3e9_cancel_execution_login_preflight.sh
 run_isolated_case myeongha_official_cancel_purchase_match_private_test bash test/db/official_reader_cancel_purchase_match_private.sh
 run_isolated_case myeongha_official_reader_reviewed_cancel_bridge_test bash test/db/official_reader_cancel_reviewed_atomic_bridge_private.sh
 # Prevent historic direct or SECURITY DEFINER cancellation writers bypassing reviewed entitlement revoke via public/API/Commerce roles.
