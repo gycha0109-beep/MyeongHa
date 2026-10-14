@@ -204,6 +204,19 @@ node scripts/local/verify-saju-bridge-docker-local.mjs --cross-db ../Saju-bridge
 - **범위 한정:** 이것은 분산 **자동 복구 구현이 아니다.** 실제 장애에서 커밋된 쌍이 동일 logical attempt에 속한다는 승인, 전역 시간/순서 보장, 보상·재시도 정책 및 cross-DB exactly-once 처리는 증명하지 않는다. 소스 근거가 없는 운영 복구는 금지한다. Phase 4C-3는 READ-ONLY 진단/격리 관측의 PASS만 의미한다.
 - **미검증/HOLD:** Windows 실기기 4C-3 로그, Root/Attestor/Runner, R01–R14, 2D-4, 스테이징 운영 승인과 실제 분산 보상 절차, `canExecute/canPublish/canSell` 모두 HOLD/false. **Linux GitHub CI PASS는 Windows Acceptance의 대체가 아니다.**
 
+### 3J. Phase 4D — 독립 관측 시점 사이 변경(TOCTOU) 탐지 및 불변 HOLD (2026-10-14)
+
+```powershell
+node scripts/local/verify-saju-bridge-docker-local.mjs --snapshot-race ../Saju-bridge-verify
+```
+
+- 앞선 `--cross-db` 전체 검증(4A/4B/4C-1/4C-2/4C-3)을 **동일한 새로운 폐기형 프로젝트**에서 모두 수행한 다음 새 4D 관측 경계를 테스트한다. 기존 `--cross-db` 옵션은 변경하지 않는다.
+- **순서:** (1) 새로운 검증 컨테이너 A가 세 독립 DB의 `BEGIN READ ONLY` 쿼리로 초기 Nonce/Admission/Subject 상태를 관측, (2) 별도 컨테이너 B가 기존 restricted TLS Nonce 클레임과 실제 합성 Ed25519 서명 Permit V2 소비 어댑터를 이용하여 **서로 독립된 두 DB에 실제 커밋** (4C-3의 Nonce-only Permit을 소비, Permit-only에 Nonce를 새로 기록), (3) 제3의 검증 컨테이너 C에서 재관측, (4) 기존 데이터를 유지하고 해당 두 DB를 재시작한 뒤 제4의 컨테이너에서 재관측. 원본 Permit/Nonce를 임의로 복구하거나 replay하지 않으며 실환경 접근은 전혀 없다.
+- 순수 `assessSajuBridgeCrossDbSnapshotRaceV1` 함수는 **세 지정된 합성 케이스의 전체 의미 상태**를 서로 비교한다. 변경된 값이 한 건이라도 있으면 `EVIDENCE_CHANGED_HOLD`; 두 관측이 동일해도 `UNCHANGED_UNVERIFIED_HOLD`; 데이터가 누락되거나 한 DB가 불명확하거나 malformed면 `UNKNOWN_HOLD`를 반환한다. 모든 판정은 `HOLD_MANUAL_REVIEW`이고 `canExecute/canPublish/canSell/automaticRetry/automaticCompensation=false`다.
+- 원본 replay key/Permit UUID, 인증 서명, CA, 암호, 개인 데이터는 로그에 출력하지 않는다. 판별기가 읽는 값은 미리 지정된 3개 합성 사례의 `PRESENT/CLAIMED/ABSENT/ISSUED/CONSUMED/REVOKED`만이다. 기존 부모 컨트롤러가 Docker 컨테이너·네트워크·볼륨 잔존 0을 다시 확인한다.
+- **중요한 정확도 경계:** 변경 탐지는 **두 차례 관측 사이에 DB 상태가 바뀌었다는 실증**이지, 글로벌 원자적 스냅샷·변경이 없던 구간의 존재 증명·이벤트 발생 순서의 권위 검증·동일한 실제 업무 attempt의 인과적 결속·안전한 보상 정책이 아니다. 두 번 같게 관측되어도 실행 또는 자동 복구 승인은 절대 생성하지 않는다. 컨테이너 B의 합성 fixture 전진은 실환경의 자동 재시도/보상 허가가 아니다.
+- 실제 운영 Root/Attestor/Runner 및 R01–R14, 2D-4, 스테이징·상품·판매 승인은 HOLD/false. **Linux CI는 Windows Docker Desktop 실기기 검증을 대체하지 않는다.** Windows `--snapshot-race` 출력은 별도 증빙이 필요하다.
+
 ## 4. 단계별 로드맵 · 종료 게이트
 
 | 단계 | 구현 | 게이트 | 범위 상태 |
