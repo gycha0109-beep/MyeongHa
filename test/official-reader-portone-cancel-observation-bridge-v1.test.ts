@@ -1,11 +1,11 @@
 import { createHmac } from 'node:crypto';
 import { describe, expect, it, vi } from 'vitest';
 import {
-  createPrivateOfficialReaderCancelObservationRecorderV1,
   observeVerifiedPortOneV2CancellationShadowV1,
   type OfficialReaderCancelObservationRecorderV1,
 } from '../apps/api/src/official-reader-portone-cancel-observation-bridge-v1.js';
 import type { PostgresTransactionQueryV1 } from '../apps/api/src/postgres-subject-execution.js';
+import { createPrivateOfficialReaderCancelObservationRecorderTestV1 } from './support/private-official-reader-cancel-recorder-v1.js';
 
 const SECRET_BYTES = Buffer.alloc(32, 11);
 const SECRET = 'whsec_' + SECRET_BYTES.toString('base64');
@@ -68,13 +68,13 @@ function execution(input: {
 } = {}) {
   const request = signed(input.eventType, input.data);
   if (input.signatureInvalid) request.headers['webhook-signature'] = 'v1,' + Buffer.alloc(32).toString('base64');
-  const fetchImpl = vi.fn(async () => {
+  const fetchImpl = vi.fn(async (_url: string, _init: unknown) => {
     if (input.lookupFail) throw new Error('upstream timeout');
     return new Response(JSON.stringify(payment(input.provider)), {
       headers: { 'content-type': 'application/json' },
     });
   });
-  const recordVerified = vi.fn(async () => ({
+  const recordVerified = vi.fn(async (_fact: import('../apps/api/src/official-reader-portone-cancel-observation-bridge-v1.js').OfficialReaderCancelObservationInputV1) => ({
     shadowResult: 'observed' as const, effectAuthorized: false as const,
   }));
   const recorder = input.recorder ?? { recordVerified };
@@ -192,10 +192,10 @@ describe('private PortOne cancellation observation candidate', () => {
   });
 
   it('adapts only the pre-existing private shadow SQL and fails closed on malformed DB rows', async () => {
-    const query = vi.fn(async () => ({
+    const query = vi.fn(async (_sql: string, _params?: readonly unknown[]) => ({
       rows: [{ shadowResult: 'replayed', effectAuthorized: false }],
     }));
-    const recorder = createPrivateOfficialReaderCancelObservationRecorderV1({
+    const recorder = createPrivateOfficialReaderCancelObservationRecorderTestV1({
       query,
     } as unknown as PostgresTransactionQueryV1);
     const run = execution({ recorder });
@@ -208,7 +208,7 @@ describe('private PortOne cancellation observation candidate', () => {
     expect(params[0]).toBe('webhook-1');
     expect(params[8]).toBe(PAID);
 
-    const bad = createPrivateOfficialReaderCancelObservationRecorderV1({
+    const bad = createPrivateOfficialReaderCancelObservationRecorderTestV1({
       query: async () => ({ rows: [{ shadowResult: 'observed', effectAuthorized: true }] }),
     } as unknown as PostgresTransactionQueryV1);
     await expect(execution({ recorder: bad }).promise).rejects.toThrow('invalid no-effect result');
