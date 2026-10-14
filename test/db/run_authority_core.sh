@@ -221,6 +221,9 @@ if [[ "${CI:-}" == "true" && "${PGHOST:-}" == "localhost" ]]; then
   # BIND-13: Receipt's different valid Offer cannot become initial Grant/Access.
   run_isolated_case myeongha_b2_r4_b13_wrong_receipt_offer \
     bash test/db/standard_reader_r4_b13_wrong_receipt_offer_real_pg.sh
+  # BIND-13: initial Reader Binder waits for actual staged Receipt issuer COMMIT.
+  run_isolated_case myeongha_b2_r4_b13_receipt_bind_race \
+    bash test/db/standard_reader_r4_b13_receipt_issuer_vs_binder_race_real_pg.sh
   run_isolated_case myeongha_b2_r4_b20_direct_merge \
     bash test/db/standard_reader_r4_direct_merge_lineage_real_pg.sh
   # BIND-20: actual new-member promotion command; SRC-24 existing-member
