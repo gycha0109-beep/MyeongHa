@@ -228,3 +228,10 @@ Watchtower-Track: ops. R1 정확한 격리 복원 증거는 8절을 따른다. �
 - **구체적 검증:** `character_reading_artifacts` 1개 테이블, RLS, PK 1/UNIQUE 2/FK 2/CHECK 4/index 4, trigger 1 (BEFORE UPDATE/DELETE), 단일 좁은 Role, RLS 정책 2개(Subject와 허용된 face artifact), SECURITY DEFINER 명령 1, Server executor EXECUTE, 브라우저·service 직접 EXECUTE / 테이블 DML 거부. Owner/DDL/ACL raw 정보는 출력하지 않음. 테스트·CI에서도 SHA/건수/boolean만 출력.
 - **잠재 미승인 보안 사항:** 1530 원본은 `GRANT myeongha_character_reading_artifact_runtime_owner TO current_user` 이후 직접 멤버십 `REVOKE`를 포함하지 않는다. 격리에서 creator의 멤버십 잔존 여부를 측정하며 **성공적으로 재현되어도 `HOLD_R2_H_1530_CREATOR_ROLE_MEMBERSHIP_RETAINED_OWNER_REVIEW`**로 표기한다. Owner/Security 검증 없이 원본 파일을 바꾸거나 Production Role을 수정하지 않는다.
 - **추가 미검증:** 실 운영 계정 삭제/생체 원본 오염 차단의 양수 트랜잭션, 두 세션 경합, Owner 실행 경계 및 롤백 Runbook. R2 원본 출처·승인 HOLD, `dr_ready=false`, G0~G6/유료/공개 HOLD.
+
+## 17. 2026-10-14 R2-H-3 — 1540 Saju Proof Nonce Registry 독립 격리 검증
+
+- **인벤토리/의존성:** `1540_saju_source_proof_nonce_claim_authority_v1.sql` Git blob `f6a87a80db1a1463cca34b7f09e157a8ede3b4cd`; `saju-proof`, Owner `saju-security`, requires `[]`. 1520/1530 또는 1550~1720을 이 검증에서 실행하지 않으며 21개 인벤토리/원본 SQL을 변경하지 않는다.
+- **검증 경계:** 기존 1510 + 타임스탬프 2개가 적용된 폐기형 PostgreSQL 17에서 한 연결 `BEGIN → 1540 → synthetic digest/retention/duplicate constraint probes → ROLLBACK`. 운영 DB Production 읽기 전용, 실제 사용자·원본 nonce·서명·생년 정보 없음. 3개 보호 메타데이터 스냅샷으로 스키마 생성, RLS + FORCE RLS, replay digest 64자 검사/retention check, PK·index, 두 NOLOGIN/NOINHERIT/NOBYPASSRLS Role, 최소 컬럼별 GRANT, 4개 분리 RLS 정책 및 rollback을 검증.
+- **부정 계약:** `anon`/`authenticated`/`service_role`/`myeongha_api_executor` 직접 테이블 DML 불가; runtime SELECT digest만/INSERT digest+retention만, DELETE 불가; GC SELECT digest+retention 및 DELETE만, INSERT/UPDATE 불가; 생성자의 두 신규 Role 직접 멤버십 없음. 원문 SQL·ACL·Row·Role graph 외부 반출 없이 건수/boolean만 확인.
+- **범위 제한:** 원본 nonce가 API에서 SHA-256 도메인 분리되어 전달되는지, HTTP proof 경로 활성화, 키 관리, 클라이언트 replay 공격/동시성, 실제 GC 운영·만료 처리는 이번 DB 격리 카탈로그/합성 row 검증의 결과로 인정하지 않는다. GitHub CI GREEN은 Production 배포 승인/승격이 아니다. Owner 검토/배포/롤백 Runbook 및 R2-G 원천감사 HOLD; `dr_ready=false`, G0~G6/유료/공개 HOLD.
