@@ -95,8 +95,36 @@ p -c "update public.official_reader_portone_cancel_ingress_inbox_v1
  set attempt_count=8,lease_expires_at=clock_timestamp()-interval '1 second'
  where id='$dead_id'::uuid" >/dev/null
 [[ -z "$(claim_work d3e8_sweeper)" ]] || fail "eighth expired attempt claimed"
-[[ "$(p -c "select inbox_state from public.official_reader_portone_cancel_ingress_inbox_v1
- where id='$dead_id'::uuid")" == dead_letter ]] || fail "dead letter absent"
+[[ "$(p -c "select inbox_state||':'||last_failure_code from
+ public.official_reader_portone_cancel_ingress_inbox_v1 where id='$dead_id'::uuid")" == dead_letter:LEASE_EXHAUSTED ]] || fail "lease-exhausted fixture absent"
+
+# D3e11: even two structurally distinct signers and a unique nonce cannot
+# turn an ambiguous lease expiry into evidence of a transient lookup failure.
+if commit_review "$dead_id" retry_transient OPS-2003 \
+ 'a003a003-a003-4003-8003-a003a003a003' >/dev/null 2>&1; then
+ fail "dual-signed ambiguous LEASE_EXHAUSTED replay was accepted"
+fi
+[[ "$(p -c "select count(*) from public.official_reader_cancel_review_approval_v1")" == 1 ]] ||
+ fail "denied ambiguous replay persisted approval proof"
+[[ "$(p -c "select count(*) from public.official_reader_portone_cancel_ops_review_v1
+ where inbox_id='$dead_id'::uuid")" == 0 ]] ||
+ fail "denied ambiguous replay left D3e6 review data"
+
+# Positive signed-retry fixture: explicitly diagnosed transient lookup
+# failure on eighth live lease. It cannot be inferred from a timeout sweep.
+[[ "$(enqueue transient_proven)" == queued ]] || fail "proven lookup fixture intake"
+claim="$(claim_work d3e8_lookup_worker)"
+IFS='|' read -r transient_id transient_token <<< "$claim"
+[[ -n "$transient_id" && -n "$transient_token" ]] || fail "transient lease absent"
+p -c "update public.official_reader_portone_cancel_ingress_inbox_v1
+ set attempt_count=8 where id='$transient_id'::uuid" >/dev/null
+[[ "$(p -c "select failure_state from public.internal_fail_official_reader_cancel_work_v1(
+ '$transient_id'::uuid,'d3e8_lookup_worker','$transient_token'::uuid,'LOOKUP_FAILED',true)")" == dead_letter ]] ||
+ fail "explicit transient lookup dead letter failed"
+[[ "$(p -c "select inbox_state||':'||last_failure_code from
+ public.official_reader_portone_cancel_ingress_inbox_v1 where id='$transient_id'::uuid")" == dead_letter:LOOKUP_FAILED ]] ||
+ fail "transient evidence absent from stored last_failure_code"
+dead_id="$transient_id"
 retry_nonce='a003a003-a003-4003-8003-a003a003a003'
 [[ "$(commit_review "$dead_id" retry_transient OPS-2003 "$retry_nonce")" == 'queued|false' ]] ||
  fail "valid transient dead-letter approval failed"
