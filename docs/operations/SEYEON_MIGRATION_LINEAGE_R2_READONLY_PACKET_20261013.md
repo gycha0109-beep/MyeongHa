@@ -201,3 +201,15 @@ Watchtower-Track: ops. R1 정확한 격리 복원 증거는 8절을 따른다. �
 - 아직 **확인되지 않은 것**: 2026-10-08 실제 Role/도구/실행자·시각, 실제 Grant 승인자, helper 직접 호출하는 별도 privileged code, 불필요 Grant를 제거해도 영향 없다는 운영 증거. Character/API/DB/Security Owner가 helper의 직접 EXECUTE 필요 여부와 제거/유지 정책을 별도로 승인해야 한다.
 - 정책 불변: Production `REVOKE`/`GRANT`/migration repair/db push 금지; `dr_ready=false`, R2/1520~1720/G0~G6/paid/public HOLD. PG17 합성 GREEN은 Production 배포·권한 정당성 승인 아님.
 
+
+## 14. 2026-10-14 R2-G — timestamped ContentManifest ACL overlap / 최종 PG17 catalog 추가 감사
+
+**계보 승인 아님.** 104KB SQL 원문·실제 사용자 레코드·Role graph·ACL 원문은 Production 밖으로 반출하지 않고, DB 내부 read-only 정규식 건수와 SHA-256만 확인한다.
+
+- 원격-only `20261008090417`: 단일 SQL **104,021 bytes**, SHA-256 `4f38e4483061a84899f0fcaa4a8d6cfa9e09ce1553b1d31089d4de9154c4d894` 재확인. 저장소 번호 이력 `1460~1510` 6개 및 timestamped `20261007150457`/`20261008043000` 2개가 원격 ledger에 존재. Version 정렬은 보이지만 실제 실행 시각/트랜잭션 순서/도구 증거가 아니다.
+- 원격 SQL **lexical-only**: `qry_content_bundle_manifest_v1` 문자열 8건, 이 함수의 정규식상 `REVOKE ALL` 2건·`GRANT EXECUTE` 1건, CREATE FUNCTION 0건. `assert_seyeon_chat_thread_runtime_v1` CREATE 1건, OWNER ALTER 1건, 직접 EXECUTE GRANT 0건. `cmd_promote_guest_v1` CREATE 0건. 정규식은 SQL 실행/주석/문자열/동적 SQL을 완전히 구별하지 못하므로 **실제 중복 DDL 여부·Grant 행위 및 성공/적용 순서를 확정하지 않는다**.
+- 저장소 `1510_seyeon_production_runtime_composition_v1.sql` 및 `20261008043000_seyeon_manifest_acl_restore.sql`도 같은 ContentManifest 함수의 REVOKE/GRANT를 기술하므로, 원격 bundle과 **권한 효과의 중첩 검토 대상**이다. Timestamped `20261007150457`의 Guest Promotion CREATE 정의는 원격에서 lexical nonmatch; 이는 의존성이 없다는 증명이 아니다.
+- 신규 `scripts/operations/seyeon-r2-g-remote-timestamped-readonly.sql` 및 `seyeon-r2-g-manifest-rpc-readonly.sql`: Production remote SQL은 DB 메모리에서만 검사. ContentManifest 최종 Owner/DDL/정규화 Grant/원본 ACL SHA와 SECURITY INVOKER·서버/브라우저 실행권한의 hash/category만 출력.
+- Production ContentManifest catalog: 1 함수, 정규화 Grant edge **2**, SECURITY INVOKER, `myeongha_api_executor` EXECUTE 허용, `service_role`/browser 실행 불허. PG17 격리 재생(`1510 + timestamped 2`, 원격-only bundle 재실행 없음) 비교 결과는 기존 `seyeon-r2-cross-env-catalog`에 추가된 `verify-seyeon-r2-g-lineage.mjs` 검증으로 고정. 유효권한/Owner/DDL mismatch는 fail-closed; ACL raw-only drift도 HOLD로 기록. 부정 테스트는 잘못된 remote digest·history·토큰·ACL·브라우저 접근·Role/DDL drift를 거부한다.
+- **원천 감사 미충족**: 승인된 비공개 원본 SQL 아카이브의 출처·보존 hash, 실제 실행 도구/주체/시각·승인자, timestamped/번호 migration의 실제 전환 트랜잭션 재구성이 필요. PostgreSQL 일반 catalog와 실패 로그만으로 역사적 성공 경로를 복원하거나 권한 의도를 승인하지 않는다.
+- Production history/Role/ACL/DDL/DML **쓰기 0**. R1 scoped DONE; R2/R2-G source audit HOLD, `1520~1720` 0/21, `dr_ready=false`, #1866 G0~G6/유료 AI·사용자 공개 HOLD.

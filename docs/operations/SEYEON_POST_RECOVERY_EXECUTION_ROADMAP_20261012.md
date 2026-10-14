@@ -251,3 +251,10 @@ Governor 04d4B 계열은 실제 격리 PostgreSQL 기반 영수증 임대·정�
 - 격리 PG17의 기존 1510 + timestamped 2개 replay 환경에서 임시 service_role GRANT 하나에 대한 before/after/ROLLBACK 유효권한 차이와 부정 테스트를 추가. 이것은 R2-E의 ACL hash 재현과 구분되는 실질 권한 검사다.
 - **R2-F Owner 결정 필요:** (1) helper 직접 호출자 존재/필요성, (2) managed service_role의 적법 사용 경계, (3) 유지 vs 별도 forward-only 폐기 제안, (4) 승인 시 복구/중단·롤백. Production 변경/권한 자동 수정 금지.
 - 순서: R2-F 소유권 판단 후 R2-G 비공개 원격 계보 감사, R2-H 21 migration Owner 검토. DR Ready/G0~G6 자동 승격 금지.
+
+## 17. 2026-10-14 R2-G 한정 구현 — 원격/타임스탬프 겹침 및 Manifest 최종권한 재생
+
+- 기존 R2 패킷 [14절](SEYEON_MIGRATION_LINEAGE_R2_READONLY_PACKET_20261013.md)에 세부 증거 및 출처 감사의 미완료 항목 누적. 별도 로드맵/중복 현황 문서 생성 안 함.
+- `20261008090417` SQL 본문은 Production DB 메모리 밖으로 내보내지 않고 known identifier/token count, SQL digest, 6개 Marker 및 timestamped 2개 ledger metadata만 감사. `1510` + `20261008043000` + 원격 bundle의 ContentManifest ACL 공통 대상을 확인하되 순서·실제 행위는 추측하지 않음.
+- 추가 R2-G 기초 증거: 실제 ContentManifest owner/DDL/ACL SHA 및 유효 EXECUTE를 Production vs 격리 PG17 원격 SQL **미적용** 최종 상태로 비교. mismatch는 Owner 조사 HOLD; 테스트 PASS는 historique provenance 승인과 구별.
+- **Owner 결정 필수:** 비공개 104KB 실행 원본·서명/보관, 감사 주체/도구/시각, 순서·forward-only 정책, R2-H 9개 검토 단위/21 migrations 사전 승인·롤백/Recovery. Production 변경, `migration repair`, `dr_ready` 승격 금지.

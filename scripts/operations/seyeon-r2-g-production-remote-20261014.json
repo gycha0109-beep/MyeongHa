@@ -1,0 +1,29 @@
+{
+  "schemaVersion": "seyeon-r2-g-protected-metadata-v1",
+  "source": "2026-10-14-production-readonly",
+  "snapshot": {
+    "schemaVersion": "seyeon-r2-g-remote-timestamped-v1",
+    "postgresMajor": 17,
+    "remoteRows": 1,
+    "remoteBytes": 104021,
+    "remoteSqlSha256": "4f38e4483061a84899f0fcaa4a8d6cfa9e09ce1553b1d31089d4de9154c4d894",
+    "earlyMarkerRows": 6,
+    "timestampedExactRows": 2,
+    "lexicalIndicators": {
+      "manifestCreate": 0,
+      "manifestRevoke": 2,
+      "manifestGrant": 1,
+      "manifestReference": 8,
+      "guestPromotionCreate": 0,
+      "helperCreate": 1,
+      "helperDirectGrant": 0,
+      "helperOwnerAlter": 1
+    },
+    "timestampedVersionSortBeforeRemote": true,
+    "actualExecutionChronologyEstablished": false,
+    "originEstablished": false,
+    "authorizedForProduction": false,
+    "drReady": false
+  },
+  "approval": "HOLD_OWNER_PRIVATE_SOURCE_AUDIT"
+}

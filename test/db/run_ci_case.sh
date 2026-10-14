@@ -321,6 +321,14 @@ SQL
     psql -X -qAt -v ON_ERROR_STOP=1 \
       -f test/db/seyeon_r2_effective_helper_grant_transient.sql > "$local_effective"
     node scripts/operations/verify-seyeon-r2-effective-helper.mjs "$local_effective"
+    local_manifest="$(mktemp)"
+    trap 'rm -f -- "$local_shape" "$local_digest" "$local_acl" "$local_acl_transient" "$local_acl_rollback" "$local_effective" "$local_manifest"' EXIT
+    psql -X -qAt -v ON_ERROR_STOP=1 \
+      -f scripts/operations/seyeon-r2-g-manifest-rpc-readonly.sql > "$local_manifest"
+    node scripts/operations/verify-seyeon-r2-g-lineage.mjs \
+      "$local_manifest" \
+      scripts/operations/seyeon-r2-g-production-manifest-20261014.json \
+      scripts/operations/seyeon-r2-g-production-remote-20261014.json
     ;;
   seyeon-r2-rpc-catalog)
     verify_pg17
