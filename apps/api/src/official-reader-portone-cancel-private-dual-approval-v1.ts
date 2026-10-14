@@ -172,22 +172,22 @@ function signature(
   });
 }
 
+export type PrivateCancelVerifiedReviewCommandV1 =
+  Parameters<PrivateCancelReviewAuthorizedStoreV1['commitAuthorizedReview']>[0];
+
 /**
- * Full check occurs BEFORE the store is called. The store MUST be a sandbox
- * DB-owner-only adapter to 1950 with a durable uniqueness fence. A privileged
- * caller can still bypass this TS shim by using D3e6 directly: not production.
+ * D3e10: isolate D3e8's exact two-signature verifier from database effects.
+ * It returns bounded, verified command facts only. A plain TS object is NEVER
+ * authority on its own: a detached trusted issuer must sign it (D3e10).
  */
-export async function commitPrivateCancelDualApprovedReviewV1(input: Readonly<{
+export function verifyPrivateCancelDualSignaturesV1(input: Readonly<{
   statement: unknown;
   attestations: readonly unknown[];
   trustedKeys: PrivateCancelReviewTrustRegistryV1;
   now: Date;
-  store: PrivateCancelReviewAuthorizedStoreV1;
-}>): Promise<PrivateCancelReviewAuthorizedResultV1> {
-  if (typeof input.store?.commitAuthorizedReview!=='function'
-    || input.trustedKeys===null || typeof input.trustedKeys!=='object'
-    || Array.isArray(input.trustedKeys)
-    || !(input.now instanceof Date)) {
+}>): PrivateCancelVerifiedReviewCommandV1 {
+  if (input.trustedKeys===null || typeof input.trustedKeys!=='object'
+    || Array.isArray(input.trustedKeys) || !(input.now instanceof Date)) {
     throw new Error('Private cancellation approval requires explicit trusted dependencies.');
   }
   const statement=approvedStatement(input.statement,input.now);
@@ -201,7 +201,8 @@ export async function commitPrivateCancelDualApprovedReviewV1(input: Readonly<{
     || requester.principalId===approver.principalId) {
     throw new Error('Private cancellation approval requires two distinct trusted principals.');
   }
-  // Do not persist raw signatures. This is a checksum, NOT proof of a human identity.
+  // Digest binds BOTH signatures and their verified key IDs without storing
+  // raw signatures or any secret key material. It is not human identity proof.
   const digest='sha256:'+createHash('sha256')
     .update('myeongha-private-cancel-review-proof-v1\0')
     .update(bytes)
@@ -210,21 +211,21 @@ export async function commitPrivateCancelDualApprovedReviewV1(input: Readonly<{
     .update('\0'+approver.keyId+'\0')
     .update(approver.signatureBytes)
     .digest('hex');
-
-  const response=await input.store.commitAuthorizedReview(Object.freeze({
-    inboxId:statement.inboxId,
-    action:statement.action,
-    ticketReference:statement.ticketReference,
-    challengeId:statement.challengeId,
-    issuedAt:statement.issuedAt,
-    expiresAt:statement.expiresAt,
-    requesterKeyId:requester.keyId,
-    approverKeyId:approver.keyId,
+  return Object.freeze({
+    inboxId:statement.inboxId,action:statement.action,
+    ticketReference:statement.ticketReference,challengeId:statement.challengeId,
+    issuedAt:statement.issuedAt,expiresAt:statement.expiresAt,
+    requesterKeyId:requester.keyId,approverKeyId:approver.keyId,
     requesterPrincipalId:requester.principalId,
     approverPrincipalId:approver.principalId,
     statementDigest:digest,
-  }));
+  });
+}
 
+/** Independently fail-closed on a PostgreSQL atomic review receipt. */
+export function validatePrivateCancelReviewReceiptV1(
+  command: PrivateCancelVerifiedReviewCommandV1, response: unknown,
+): PrivateCancelReviewAuthorizedResultV1 {
   if (response===null || typeof response!=='object' || Array.isArray(response)) {
     throw new Error('Private cancellation approval DB response is invalid.');
   }
@@ -232,15 +233,40 @@ export async function commitPrivateCancelDualApprovedReviewV1(input: Readonly<{
   if (row.effectAuthorized!==false
     || typeof row.authorizationReceiptId!=='string'
     || !UUID.test(row.authorizationReceiptId)
-    || (statement.action==='retry_transient' && row.reviewState!=='queued')
-    || (statement.action==='acknowledge'
+    || (command.action==='retry_transient' && row.reviewState!=='queued')
+    || (command.action==='acknowledge'
       && row.reviewState!=='held' && row.reviewState!=='dead_letter')) {
     throw new Error('Private cancellation approval receipt does not confirm atomic review.');
   }
   return Object.freeze({
     reviewState:row.reviewState as 'held'|'dead_letter'|'queued',
-    approvalRecorded:true,
-    effectAuthorized:false,providerRefundAuthorized:false,
+    approvalRecorded:true,effectAuthorized:false,providerRefundAuthorized:false,
     entitlementMutationAuthorized:false,
   });
+}
+
+/**
+ * Original D3e8 atomic review flow retained, implemented through the same
+ * verifier and receipt validator as the detached D3e10 transport candidate.
+ * Caller still needs DB owner; NOT a production identity boundary.
+ */
+export async function commitPrivateCancelDualApprovedReviewV1(input: Readonly<{
+  statement: unknown;
+  attestations: readonly unknown[];
+  trustedKeys: PrivateCancelReviewTrustRegistryV1;
+  now: Date;
+  store: PrivateCancelReviewAuthorizedStoreV1;
+}>): Promise<PrivateCancelReviewAuthorizedResultV1> {
+  if (typeof input.store?.commitAuthorizedReview!=='function') {
+    throw new Error('Private cancellation approval requires explicit trusted dependencies.');
+  }
+  const command=verifyPrivateCancelDualSignaturesV1({
+    statement:input.statement,
+    attestations:input.attestations,
+    trustedKeys:input.trustedKeys,
+    now:input.now,
+  });
+  return validatePrivateCancelReviewReceiptV1(
+    command,await input.store.commitAuthorizedReview(command),
+  );
 }
