@@ -181,3 +181,11 @@ Watchtower-Track: ops. R1 정확한 격리 복원 증거는 8절을 따른다. �
 - 기존 PostgreSQL 17 CI `seyeon-r2-cross-env-catalog` case에 결합해 복원/재생 가능한 저장소 증거로만 사용한다. CI 합격은 **가설 재현 성공**이지 역사적 책임 확인·권한 수정 승인·R2 lineage 합격이 아니다.
 
 **후속 Owner 결정:** 추가 직접 Grant가 서비스에 필요한지 Character/API/DB/Security Owner가 증명해야 한다. 제거가 필요하더라도 Production `REVOKE`/Role 변경은 별도 승인된 forward-only 안전 변경·영향 평가·Rollback·운영 검증 절차 뒤에만 가능하다. 재현이 정확히 맞더라도 역사적 104KB SQL 원본과 관리형 Audit는 비공개로 별도 확인해야 한다. `1520~1720` 적용 `0/21`, `dr_ready=false`, G0~G6/유료 모델/공개 HOLD 유지.
+
+
+### 2026-10-14 PG17 실제 실행 검증 (가설의 재현 성공, 역사적 출처 HOLD)
+
+- 정확한 PR 구현 HEAD `e1f09918c17cf7b98b8381c4b4c7d695ac862d11`에서 [CI #38492147105](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38492147105)의 PostgreSQL17 job `115619675865` **SUCCESS**.
+- 격리에서 `PASS_R2_SYNTHETIC_POSTGRES_CREATOR_DEFAULT_EXECUTE_NOT_HISTORICAL_ACTOR`: 테스트 함수 생성 당시 `postgres` `public` 스키마 함수 기본권한을 통해 `service_role EXECUTE`가 부여되고 `PUBLIC REVOKE` 및 Owner 이전 뒤에도 해당 명시 권한이 유지되는 메커니즘을 재현.
+- `PASS_R2_ONE_EDGE_ACL_EFFECT_REPRODUCED_ORIGIN_UNVERIFIED`: 격리 `assert_seyeon_chat_thread_runtime_v1`에 단 **1개의 임시 `service_role EXECUTE`**를 추가했을 때 19개 RPC의 정규화 Grant 그래프뿐 아니라 **원본 `proacl` SHA-256까지** Production 관측값과 일치 (`exactRawAclMatch=true`, `normalizedGrantGraphMatch=true`, `rawAclRemainingDifferences=[]`). 무관한 18 RPC, 브라우저 직접 EXECUTE 0, ROLLBACK 후 이전 ACL로 복구도 검증.
+- **범위별 결론:** 저장소 1490의 `PUBLIC` 철회만으로 `service_role` 기본 권한을 자동 철회하지 않는다는 *기술적 메커니즘*이 설명력을 갖는다. **2026-10-08 실제 기본권한 이력·실제 실행 역할/시각·원격 SQL 적용 경로·권한 의도는 별개로 미증명**. 이 증거로 과거 적용 주체를 지목하거나 Production 권한을 임의로 변경하지 않는다. `originEstablished=false`, `authorizedForProduction=false`, `dr_ready=false`, R2 계보 및 G0~G6 HOLD.
