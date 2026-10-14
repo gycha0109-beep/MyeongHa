@@ -14,6 +14,7 @@ const tlsCompose = fileURLToPath(new URL('./saju-bridge-tls.compose.yml', import
 const permitCompose = fileURLToPath(new URL('./saju-bridge-permit.compose.yml', import.meta.url));
 const recoveryCompose = fileURLToPath(new URL('./saju-bridge-recovery.compose.yml', import.meta.url));
 const commitFaultRunner = fileURLToPath(new URL('./verify-saju-bridge-docker-inflight-commit.mjs', import.meta.url));
+const networkFaultRunner = fileURLToPath(new URL('./verify-saju-bridge-docker-network-partition.mjs', import.meta.url));
 const root = realpathSync(fileURLToPath(new URL('../../', import.meta.url)));
 const pinnedSajuSha = 'cd0acf9abd447826ccaefba56112d046e560ee04';
 const packagePath = fileURLToPath(new URL('../../package.json', import.meta.url));
@@ -65,8 +66,8 @@ function docker(args, { capture = false, timeout = 240_000 } = {}) {
 
 function localSajuCheckout() {
   if (process.argv.length === 2) return null;
-  if (process.argv.length !== 4 || !['--http', '--binding', '--tls', '--permit', '--recovery', '--crash-commit'].includes(process.argv[2]) || !process.argv[3]) {
-    throw new Error('Usage: node scripts/local/verify-saju-bridge-docker-local.mjs [--http ../Saju | --binding ../Saju | --tls ../Saju | --permit ../Saju | --recovery ../Saju | --crash-commit ../Saju]');
+  if (process.argv.length !== 4 || !['--http', '--binding', '--tls', '--permit', '--recovery', '--crash-commit', '--partition-commit'].includes(process.argv[2]) || !process.argv[3]) {
+    throw new Error('Usage: node scripts/local/verify-saju-bridge-docker-local.mjs [--http ../Saju | --binding ../Saju | --tls ../Saju | --permit ../Saju | --recovery ../Saju | --crash-commit ../Saju | --partition-commit ../Saju]');
   }
   const saju = realpathSync(resolve(process.argv[3]));
   if (saju === root) throw new Error('A separate pinned Saju checkout is required.');
@@ -123,7 +124,8 @@ function remaining(kind) {
 }
 
 function main() {
-  const crashCommit = process.argv[2] === '--crash-commit';
+  const networkCommit = process.argv[2] === '--partition-commit';
+  const crashCommit = process.argv[2] === '--crash-commit' || networkCommit;
   const recovery = process.argv[2] === '--recovery' || crashCommit;
   const permit = process.argv[2] === '--permit' || recovery;
   const tls = process.argv[2] === '--tls' || permit;
@@ -241,6 +243,18 @@ function main() {
                 + (fault.error?.code || fault.signal || 'exit ' + fault.status));
             }
           }
+          if (networkCommit) {
+            sandboxEnv.SAJU_BRIDGE_LOCAL_NETWORK_FAULT = '1';
+            console.log('[saju-bridge] Phase 4C-1: physical network-only partition of in-flight client during Nonce COMMIT.');
+            const fault = spawnSync(process.execPath, [networkFaultRunner], {
+              cwd: root, shell: false, env: sandboxEnv,
+              stdio: 'inherit', timeout: 175_000, windowsHide: true,
+            });
+            if (fault.error || fault.status !== 0) {
+              throw new Error('Phase 4C-1 physical network-only partition failed: '
+                + (fault.error?.code || fault.signal || 'exit ' + fault.status));
+            }
+          }
         }
       }
     }
@@ -280,7 +294,12 @@ function main() {
               console.log('[saju-bridge] Phase 4A PASS: real DB stop/restart durability and synthetic COMMIT-ACK uncertainty (not physical mid-COMMIT loss).');
               if (crashCommit) {
                 console.log('[saju-bridge] Phase 4B PASS: physical Nonce DB SIGKILL observed during deferred COMMIT, fail-closed and durable rollback.');
-                console.log('[saju-bridge] Actual network-only partition, Admission in-flight COMMIT and distributed recovery remain HOLD.');
+                if (networkCommit) {
+                  console.log('[saju-bridge] Phase 4C-1 PASS: client-only Docker network disconnect during actual Nonce COMMIT; server-side outcome independently reconciled, no automatic replay.');
+                  console.log('[saju-bridge] Admission in-flight COMMIT and cross-DB distributed recovery remain HOLD.');
+                } else {
+                  console.log('[saju-bridge] Actual network-only partition, Admission in-flight COMMIT and distributed recovery remain HOLD.');
+                }
               } else {
                 console.log('[saju-bridge] Physical mid-COMMIT partition, distributed recovery, Runner and operational approval remain HOLD.');
               }

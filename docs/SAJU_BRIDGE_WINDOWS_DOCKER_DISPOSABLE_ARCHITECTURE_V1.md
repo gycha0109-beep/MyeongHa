@@ -152,6 +152,22 @@ node scripts/local/verify-saju-bridge-docker-local.mjs --crash-commit ../Saju-br
 - 테스트 컨테이너에는 Docker 소켓/호스트 포트를 마운트하지 않고, 로컬에서 이미 허용한 Docker CLI만 해당 실행별 Compose 프로젝트에 사용한다. 성공·실패 후 트리거 삭제, 기존 `down --volumes --remove-orphans` 잔여 자원 0 확인이 선행돼야 PASS 가능하다.
 - 운영 Root/Attestor/Runner/R01–R14/2D-4, 승인 가능한 Permit, 서비스/판매/출시 권한은 전부 HOLD. `canExecute`, `canPublish`, `canSell`은 false. **실제 네트워크 분할, Admission COMMIT 중단, 분산 DB 트랜잭션 보상·복구는 별도 다음 단계**이다.
 
+### 3G. Phase 4C-1 — 실제 네트워크 단절 중 Nonce COMMIT (2026-10-14)
+
+Phase 4A/4B의 의미를 확대하지 않는다. 네트워크 단절 실험은 물리적인 DB 종료와 별도이며, 아래 명령은 이전 4A·4B 검증 후 **동일 일회용 Docker 프로젝트**에서 4C-1을 실행한다.
+
+```powershell
+node scripts/local/verify-saju-bridge-docker-local.mjs --partition-commit ../Saju-bridge-verify
+```
+
+- 호스트 컨트롤러가 실제 Nonce PostgreSQL의 `pg_stat_activity`에서 지연 트리거 내부 `query=COMMIT / wait_event=PgSleep`를 관측한다. 이 때 **DB에는 손대지 않고** 실행별 이름 및 Docker Compose project/service label로 검증한 `saju-recovery-verifier` 컨테이너만 일회용 internal `disposable` 네트워크에서 실제 `docker network disconnect --force`한다.
+- 단절 후 테스트 클라이언트의 Docker network endpoint가 제거됐는지 확인한다. 같은 Nonce PostgreSQL의 `pg_postmaster_start_time()`이 단절 전후 불변이어야 한다. Docker CLI는 호스트에만 있으며 테스트 컨테이너로 소켓을 넘기지 않는다.
+- 기존 운영 Nonce claim adapter를 실제 TLS `verify-full` 연결에서 **단 한 번** 호출한다. 네트워크 단절 후 이 호출은 `false`여야 하며, 새 연결을 열어 자동 재시도해서는 안 된다. 실험 제어용 쿼리/통신 timeout은 성공 근거가 아니다. 단절·COMMIT 진입·서버 생존·클라이언트 실패를 각각 검증한다.
+- 새 검증 컨테이너로 DB의 실제 replay digest 기록을 읽는다. 단절 상황에서 서버의 COMMIT 결과는 **0 또는 1**일 수 있으며, 결과를 미리 롤백이라고 가정하지 않는다. `1`이면 별도 명시적 중복 차단 probe가 `false`인지 확인하고, `0`이면 retry를 **실행하지 않는다**. 이미 Phase 4A에서 `CONSUMED`인 합성 Admission Permit은 불변이어야 한다.
+- 네트워크 연결 복구는 원래 단절된 일회용 클라이언트의 자동 재실행이 아니라 새 검증 컨테이너의 정상 TLS 접속으로 증명한다. 컨트롤러는 오직 확인된 일회용 클라이언트만 제거하며, 부모의 `down --volumes --remove-orphans`가 프로젝트 컨테이너·네트워크·볼륨 0개를 최종 확인한다.
+- 기존 `--crash-commit`의 Phase 4B 검증 및 출력은 변경하지 않는다. 기존 CI는 중복 인프라 실행 없이 `--partition-commit` 한 번으로 4B + 4C-1까지 검사한다. **Linux CI 통과는 Windows 실기기 증빙이 아니다.**
+- **범위 제한:** 이것은 **클라이언트 컨테이너의 네트워크 분리**이지 서버-서버 분리나 임의 packet-loss simulation, Admission COMMIT 실패 또는 3DB 분산 복구가 아니다. `durable=0`인 결과에서 자동 보상/재수행을 허용한다는 뜻이 아니다. Production 운영 Root/Attestor/Runner, R01–R14, 2D-4, `canExecute`, `canPublish`, `canSell`은 모두 HOLD/false 그대로다.
+
 ## 4. 단계별 로드맵 · 종료 게이트
 
 | 단계 | 구현 | 게이트 | 범위 상태 |
