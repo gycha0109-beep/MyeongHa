@@ -69,6 +69,14 @@ export async function createOfflinePrivateCancelRevocationFencedExecutorV1(
     permitIssuerPublicKeyPems:Object.values(boot.trustedPermitIssuers)
       .filter((x):x is NonNullable<typeof x>=>x!==undefined)
       .map(x=>x.publicKeyPem),
+    idpAndOperatorPublicKeyPems:[
+      ...Object.values(boot.pinnedIdpKeys)
+        .filter((x):x is NonNullable<typeof x>=>x!==undefined)
+        .map(x=>x.publicKeyPem),
+      ...Object.values(boot.trustedOperatorKeys)
+        .filter((x):x is NonNullable<typeof x>=>x!==undefined)
+        .map(x=>x.publicKeyPem),
+    ],
   });
   const current:PrivateCancelPolicyContextV1=Object.freeze({
     rootKeyId:boot.rootKeyId,policyId:boot.policyId,
