@@ -102,7 +102,8 @@ describe('D3e6 private cancel queue monitoring and bounded window',()=>{
       maxTicks:1,staleThresholdSeconds:60,
     })).rejects.toThrow('effect');
     await expect(runPrivateCancelBoundedWindowV1({
-      health:{snapshot:async()=>health},tick:async()=>({kind:'bogus',effectAuthorized:false}) as never,
+      health:{snapshot:async()=>health},tick:async()=>({kind:'bogus',effectAuthorized:false,
+        providerRefundAuthorized:false,entitlementMutationAuthorized:false}) as never,
       maxTicks:1,staleThresholdSeconds:60,
     })).rejects.toThrow('unknown');
     await expect(runPrivateCancelBoundedWindowV1({
