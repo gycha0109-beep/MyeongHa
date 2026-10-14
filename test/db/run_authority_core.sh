@@ -40,6 +40,9 @@ run_isolated_case() {
 }
 
 bash test/db/verify_no_schema_cardinality_hardcoding.sh
+# Every migration/app runtime commit rechecks the recognized paid Reader Writer caller graph.
+node scripts/ci/official-reader-writer-call-graph.mjs --self-test
+node scripts/ci/official-reader-writer-call-graph.mjs --report
 # Exercise the actual 1460..1510 -> 1400..1450 inversion only on a
 # disposable local PostgreSQL database in CI. Never use Production credentials.
 if [[ "${CI:-}" == 'true' && "${PGHOST:-}" == 'localhost' &&
@@ -178,6 +181,8 @@ run_isolated_case myeongha_official_cancel_purchase_match_private_test bash test
 run_isolated_case myeongha_official_reader_reviewed_cancel_bridge_test bash test/db/official_reader_cancel_reviewed_atomic_bridge_private.sh
 # Prevent historic direct or SECURITY DEFINER cancellation writers bypassing reviewed entitlement revoke via public/API/Commerce roles.
 run_isolated_case myeongha_official_reader_cancel_writer_execution_fence_test bash test/db/official_reader_cancel_legacy_writer_execution_fence.sh
+# Guard the SECOND SECURITY DEFINER cancellation bridge and old Receipt/Reader wrappers.
+run_isolated_case myeongha_official_reader_additional_writer_fence_test bash test/db/official_reader_private_writer_surface_closure.sh
 bash test/db/entitlements_current_query.sh
 bash test/db/data_deletion_job_query.sh
 bash test/db/notification_preferences_query.sh
