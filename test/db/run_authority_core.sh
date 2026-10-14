@@ -181,6 +181,10 @@ run_isolated_case myeongha_reader_d3e2_cancel_observation_shadow_two_session_tes
 run_isolated_case myeongha_reader_d3e3_cancel_inbox_two_session_test bash test/db/official_reader_d3e3_cancel_inbox_two_session.sh
 # D3e4 synthetic DB contract: row lock + existing 1860 replay share COMMIT/ROLLBACK.
 run_isolated_case myeongha_reader_d3e4_inbox_to_shadow_transaction_test bash test/db/official_reader_d3e4_cancel_inbox_to_shadow_transaction.sh
+# D3e5 PRIVATE: SKIP LOCKED, expired lease fencing, backoff/HOLD, 1860 atomic completion.
+run_isolated_case myeongha_reader_d3e5_durable_worker_lifecycle_test bash test/db/official_reader_d3e5_cancel_durable_worker_lifecycle.sh
+# D3e5 full signed-HTTP→1910→1920 claim→mock GET→1860+completion TS↔PostgreSQL.
+run_isolated_case myeongha_reader_d3e5_real_driver_pg_test bash test/db/official_reader_d3e5_real_driver_pg.sh
 run_isolated_case myeongha_official_cancel_purchase_match_private_test bash test/db/official_reader_cancel_purchase_match_private.sh
 run_isolated_case myeongha_official_reader_reviewed_cancel_bridge_test bash test/db/official_reader_cancel_reviewed_atomic_bridge_private.sh
 # Prevent historic direct or SECURITY DEFINER cancellation writers bypassing reviewed entitlement revoke via public/API/Commerce roles.
