@@ -10,7 +10,7 @@
  * or issuer key is still possible in a shared JS process. Production requires
  * independently managed secret custody, immutable trusted bootstrap and IdP.
  */
-import {createPrivateKey,createPublicKey} from 'node:crypto';
+import {createPrivateKey,createPublicKey,sign as edSign} from 'node:crypto';
 import {
   issueIdentityBoundSandboxPrivateCancelPermitV1,
 } from './official-reader-portone-cancel-private-identity-attestation-v1.js';
@@ -19,12 +19,15 @@ import {
   type PrivateCancelSignedTrustPolicyV1,
   type PrivateCancelTrustedRootV1,
 } from './official-reader-portone-cancel-private-signed-trust-policy-v1.js';
-import type {
-  PrivateCancelDetachedPermitV1,
-} from './official-reader-portone-cancel-detached-permit-private-v1.js';
+import {
+  buildPrivateCancelPermitPolicyBindingV1,
+  canonicalPrivateCancelPermitPolicyBindingV1,
+  type PrivateCancelPolicyBoundPermitV1,
+  type PrivateCancelPolicyContextV1,
+} from './official-reader-portone-cancel-private-policy-bound-permit-v1.js';
 
 export type PrivateCancelOfflineIssuerBoundaryV1=Readonly<{
-  issue(input:unknown):PrivateCancelDetachedPermitV1;
+  issue(input:unknown):PrivateCancelPolicyBoundPermitV1;
 }>;
 
 function requestShape(input:unknown):input is Readonly<{
@@ -77,8 +80,14 @@ export function createOfflinePrivateCancelIssuerBoundaryV1(input:Readonly<{
   }
   const issuerKeyId=input.issuerKeyId,issuerPrivateKeyPem=input.issuerPrivateKeyPem;
   const clock=input.trustedClock,policyExpiresAt=Date.parse(bootPolicy.expiresAt);
+  const policyContext:PrivateCancelPolicyContextV1=Object.freeze({
+    rootKeyId:bootPolicy.rootKeyId,
+    policyId:bootPolicy.policyId,
+    revision:bootPolicy.revision,
+    policyDigest:bootPolicy.policyDigest,
+  });
   return Object.freeze({
-    issue(request:unknown):PrivateCancelDetachedPermitV1{
+    issue(request:unknown):PrivateCancelPolicyBoundPermitV1{
       if(!requestShape(request)
         || !Array.isArray(request.operatorAttestations)
         || !Array.isArray(request.identityAssertions)){
@@ -91,7 +100,7 @@ export function createOfflinePrivateCancelIssuerBoundaryV1(input:Readonly<{
         || now.valueOf()>=policyExpiresAt){
         throw new Error('Offline cancellation signed policy expired or clock invalid.');
       }
-      return issueIdentityBoundSandboxPrivateCancelPermitV1({
+      const inner=issueIdentityBoundSandboxPrivateCancelPermitV1({
         statement:request.statement,
         operatorAttestations:request.operatorAttestations,
         identityAssertions:request.identityAssertions,
@@ -101,6 +110,22 @@ export function createOfflinePrivateCancelIssuerBoundaryV1(input:Readonly<{
         issuerKeyId,
         issuerPrivateKeyPem,
         now,
+      });
+      // The separate outer Ed25519 proof authenticates exactly which
+      // ROOT-SIGNED policy snapshot authorized this previously signed permit.
+      // Merely changing the revision, root or policy hash invalidates the outer
+      // proof. The executor independently checks BOTH signatures before SQL.
+      const binding=buildPrivateCancelPermitPolicyBindingV1({
+        policyContext,innerPermit:inner,now,
+      });
+      const proof=edSign(
+        null,canonicalPrivateCancelPermitPolicyBindingV1(binding),
+        createPrivateKey(issuerPrivateKeyPem),
+      );
+      return Object.freeze({
+        ...inner,
+        policyBinding:binding,
+        policyBindingSignatureBase64:proof.toString('base64'),
       });
     },
   });

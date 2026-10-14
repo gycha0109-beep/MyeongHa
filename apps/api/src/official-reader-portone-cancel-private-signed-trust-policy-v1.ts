@@ -54,6 +54,8 @@ export type PrivateCancelTrustedRootV1=Readonly<{
 }>;
 
 export type PrivateCancelOfflineValidatedPolicyV1=Readonly<{
+  rootKeyId:string;
+  policyDigest:string;
   policyId:string;
   revision:number;
   expiresAt:string;
@@ -282,6 +284,8 @@ export function verifyOfflinePrivateCancelSignedTrustPolicyV1(input:Readonly<{
     publicKeyPem:k.publicKeyPem,enabled:true,
   });
   return Object.freeze({
+    rootKeyId:root.keyId,
+    policyDigest:'sha256:'+createHash('sha256').update(bytes).digest('hex'),
     policyId:validBody.policyId,
     revision:validBody.revision,
     expiresAt:validBody.expiresAt,

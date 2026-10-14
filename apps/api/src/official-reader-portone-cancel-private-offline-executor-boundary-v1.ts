@@ -13,8 +13,12 @@
  */
 import {
   executeSandboxPrivateCancelReviewPermitV1,
-  type PrivateCancelDetachedPermitV1,
 } from './official-reader-portone-cancel-detached-permit-private-v1.js';
+import {
+  verifyPrivateCancelPolicyBoundPermitV1,
+  type PrivateCancelPolicyBoundPermitV1,
+  type PrivateCancelPolicyContextV1,
+} from './official-reader-portone-cancel-private-policy-bound-permit-v1.js';
 import type {
   PrivateCancelReviewAuthorizedStoreV1,
   PrivateCancelReviewAuthorizedResultV1,
@@ -30,7 +34,7 @@ export type PrivateCancelOfflineExecutorBoundaryV1=Readonly<{
 }>;
 
 function permitRequestShape(input:unknown):input is Readonly<{
-  permit:PrivateCancelDetachedPermitV1;
+  permit:PrivateCancelPolicyBoundPermitV1;
 }>{
   return input!==null && typeof input==='object' && !Array.isArray(input)
     && JSON.stringify(Object.keys(input))===JSON.stringify(['permit']);
@@ -58,6 +62,12 @@ export function createOfflinePrivateCancelExecutorBoundaryV1(input:Readonly<{
   });
   const trustedIssuers=bootPolicy.trustedPermitIssuers;
   const expiresAt=Date.parse(bootPolicy.expiresAt);
+  const policyContext:PrivateCancelPolicyContextV1=Object.freeze({
+    rootKeyId:bootPolicy.rootKeyId,
+    policyId:bootPolicy.policyId,
+    revision:bootPolicy.revision,
+    policyDigest:bootPolicy.policyDigest,
+  });
   const clock=input.trustedClock,store=input.testStore;
   return Object.freeze({
     async execute(request:unknown):Promise<PrivateCancelReviewAuthorizedResultV1>{
@@ -71,8 +81,17 @@ export function createOfflinePrivateCancelExecutorBoundaryV1(input:Readonly<{
         || now.valueOf()>=expiresAt){
         throw new Error('Offline cancellation signed policy expired or clock invalid.');
       }
-      return executeSandboxPrivateCancelReviewPermitV1({
+      // Fail BEFORE SQL when a permit was minted under a retired policy,
+      // even if its original 60-second D3e10 signature remains unexpired.
+      // The current policy context comes only from independently signed boot.
+      const inner=verifyPrivateCancelPolicyBoundPermitV1({
         permit:request.permit,
+        policyContext,
+        trustedPermitIssuers:trustedIssuers,
+        now,
+      });
+      return executeSandboxPrivateCancelReviewPermitV1({
+        permit:inner,
         trustedIssuers,
         now,
         store,
