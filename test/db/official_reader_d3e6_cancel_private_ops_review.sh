@@ -98,7 +98,7 @@ select count(*) from public.official_reader_portone_cancel_ops_review_v1
 rollback;
 SQL
 )"
-[[ "$cascade" == *$'\n0\n'* ]] || fail "private review audit did not cascade with removed inbox"
+[[ "$cascade" == 0 ]] || fail "private review audit did not cascade with removed inbox"
 
 for signature in \
   'public.internal_private_cancel_queue_health_v1()' \
