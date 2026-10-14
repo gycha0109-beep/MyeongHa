@@ -396,3 +396,12 @@ S1에서 공통 잠금 함수 자체가 성공하더라도 **S2 전체 경로가
 - 설계 대상: 서명 웹훅의 내구 접수 → 서버의 PortOne 독립 재조회 → 취소/실결제/영수증/Grant 정본 대조 → 상거래·법무 이중 검토의 실제 신원 증명 → 최소권한 회수 진입점 → Product L0/Reader L1 잠금 후 원자 회수 → 누락/중복·역순/장애 대사 및 회복.
 - 작업 순서·운영 권한/승인 결정권·보류 규칙·28개 시험 시나리오·롤백/비상 차단·남은 소유자 승인은 상세 설계에서 정의한다. **설계 문서 작성만으로 기능 구현·검증·병합·운영 허가는 발생하지 않는다.**
 
+
+
+## 30. 서명 + 독립 재조회 → 기존 취소 관측 원장 비공개 연결 후보 (2026-10-14)
+
+- 이전 #2054 Writer 표면 감사 직후의 다음 구현. 신규 \`apps/api/src/official-reader-portone-cancel-observation-bridge-v1.ts\`는 기존 PortOne V2 서명·독립 GET 검증자를 재사용하고, 일치하는 취소 사건만 주입된 비공개 관측 기록 경계로 넘긴다. 일반 Paid webhook 처리와 공개 HTTP route는 전혀 변경하지 않는다.
+- 기존 1860 원장의 \`observed/out_of_order/ordering_unproven/replayed\` 분류를 재사용한다. 취소·부분취소·대기·이후 상태에서 뒤늦게 도착한 사건을 전액 회수 명령으로 승격하지 않는다. 모든 반환에서 Provider 환불·Entitlement 변경 권한은 false.
+- 비공개 DB 함수에 대한 애플리케이션 직접 SQL 호출을 금지하는 1900 정적 차단을 유지하기 위해, SQL 어댑터는 \`test/support/private-official-reader-cancel-recorder-v1.ts\`에 **시험 전용**으로 둔다. 실제 서비스 실행 역할/엔드포인트/새 스키마/저장 권한은 없으며, 테스트 경로만 존재한다.
+- 검증 범위: 서명 위조·다른 거래/상점·부분취소·지연된 이전 사건·조회 실패·저장 실패·이상한 DB 응답·동일 관측 지문·Paid 경로 무변경, 1860의 실제 PostgreSQL 멱등/역순/2세션 및 역할 거부 회귀. 정확한 CI SHA와 결과는 Draft PR에 기록한다.
+- **다음 P0:** 별도 서명된 **접수→내구 inbox COMMIT→공급사 조회** 단계가 아직 없다. 현재 후보는 **GET 뒤 기록**하므로 조회 실패 시 재전송에 의존한다. 새 inbox 및 보존·삭제/복구 규칙은 Privacy Owner 검토 후만 생성한다. 동일 webhookId에 최신 Provider snapshot이 달라진 재전송은 충돌 HOLD로 남길 수 있다. DB Owner/운영 이미지/수동 SQL 감사, reviewer 진위, 전용 executor 역시 미완료. 운영 구매/환불/회수/유료 공개 OFF.
