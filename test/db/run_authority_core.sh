@@ -209,6 +209,10 @@ if [[ "${CI:-}" == "true" && "${PGHOST:-}" == "localhost" ]]; then
     bash test/db/standard_reader_r4_post_bind_replay_real_pg.sh expired_grant
   run_isolated_case myeongha_b2_r4_b17_offer_disabled \
     bash test/db/standard_reader_r4_post_bind_replay_real_pg.sh offer_disabled
+  # BIND-20: synthetic direct merged-Guest lineage and forged/current Reader reads.
+  # This does not replace the production merge Writer or API trust proof.
+  run_isolated_case myeongha_b2_r4_b20_direct_merge \
+    bash test/db/standard_reader_r4_direct_merge_lineage_real_pg.sh
   # BIND-21: separate legacy 1170 paid Reading from private Official v2.
   run_isolated_case myeongha_b2_r4_b21_additional_denied \
     bash test/db/standard_reader_r4_legacy_1170_isolation_real_pg.sh additional_denied
