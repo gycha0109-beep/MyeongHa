@@ -184,6 +184,26 @@ node scripts/local/verify-saju-bridge-docker-local.mjs --admission-crash ../Saju
 - 기존 CI workflow의 한 Docker 실증 단계에서 `--admission-crash`를 사용한다. Linux PASS를 Windows 실기기 검증으로 바꾸지 않는다.
 - **HOLD:** 실제 운영 Root/Attestor/Runner, R01–R14/2D-4 및 스테이징/상품/결제 권한 승인, Subject·Nonce·Admission 상이 결과에 대한 분산 복구·보상(4C-3)은 여전히 미검증. `canExecute=false`, `canPublish=false`, `canSell=false`.
 
+### 3I. Phase 4C-3 — 독립 DB의 부분 성공 관측과 읽기 전용 HOLD (2026-10-14)
+
+**검증 명령 (Windows Docker Desktop / Linux):**
+
+```powershell
+node scripts/local/verify-saju-bridge-docker-local.mjs --cross-db ../Saju-bridge-verify
+```
+
+- 각 호출은 일회용 프로젝트 `myeongha-saju-full-<12 hex>`만 사용하며 Phase 1→4A→4B→4C-1→4C-2를 먼저 거친다. `--admission-crash` 등 기존 옵션의 동작은 그대로 유지한다.
+- 새 `test/saju-held-docker-cross-db-phase4c3.test.ts`에서 **서로 겹치지 않는 세 합성 Permit V2와 세 Replay key**를 생성한다. 기존 실제 Nonce PG claim adapter, 실제 Ed25519 서명 Permit V2 소비 adapter를 사용한다. 서로 다른 데이터베이스에 각각 *독립 커밋*을 남겨 다음 사례를 고정한다.
+  1. **Nonce 단독 성공:** Nonce `CLAIMED`, Permit `ISSUED`.
+  2. **Permit 단독 소비:** Nonce `ABSENT`, Permit `CONSUMED`.
+  3. **Nonce + 철회 Permit:** Nonce `CLAIMED`, Permit `REVOKED`.
+- Subject는 독립된 기존 일회용 fixture에 존재해야 한다. 각 DB 영속 볼륨을 유지한 상태로 **세 DB 실제 재시작** 후 각 상태를 별도 `BEGIN READ ONLY` 트랜잭션으로 관측·판별한다. DB 간 글로벌 원자적 스냅샷·2PC·Saga 합의는 **없으며 이 결과로 간주해서도 안 된다.** 서로 다른 커밋이 교차한 불일치 증거만 입증한다.
+- 실제 `nonce-db`, `admission-db`, `subject-db`를 각각 물리적으로 `docker compose stop`하고 접근 불가를 테스트한다. 어느 한 DB든 읽지 못하면 *이미 확인한 과거 결과를 재사용하지 않고* `UNKNOWN_HOLD`가 반환돼야 한다. 각 DB를 다시 시작하고 최종 상태 불변을 재검증한다.
+- 판별기 `scripts/local/saju-bridge-cross-db-observation-v1.mjs`는 **순수 읽기 전용 분류 함수**이고 애플리케이션 라우트·배포 DB 로그인·Runner·실제 Authorization에 연결되지 않는다. `NONCE_ONLY_HOLD`, `PERMIT_ONLY_HOLD`, `REVOKED_WITH_NONCE_HOLD` 및 양측이 모두 영속된 `BOTH_DURABLE_UNVERIFIED_HOLD`까지 모든 분류의 `decision=HOLD_MANUAL_REVIEW`, `automaticRetry=false`, `automaticCompensation=false`, `canExecute/canPublish/canSell=false`를 강제한다.
+- 검증용 `postgres` 로그인은 **폐기 가능한 PG의 실측 전용**으로만 사용되며 운영/스테이징 관측 권한을 만들지 않는다. observer는 원본 키·비밀번호를 기록하지 않고, 실행별 컨테이너·네트워크·볼륨 전부 `down --volumes --remove-orphans` 후 잔존 0을 검사한다. Docker 소켓이 컨테이너에 없다.
+- **범위 한정:** 이것은 분산 **자동 복구 구현이 아니다.** 실제 장애에서 커밋된 쌍이 동일 logical attempt에 속한다는 승인, 전역 시간/순서 보장, 보상·재시도 정책 및 cross-DB exactly-once 처리는 증명하지 않는다. 소스 근거가 없는 운영 복구는 금지한다. Phase 4C-3는 READ-ONLY 진단/격리 관측의 PASS만 의미한다.
+- **미검증/HOLD:** Windows 실기기 4C-3 로그, Root/Attestor/Runner, R01–R14, 2D-4, 스테이징 운영 승인과 실제 분산 보상 절차, `canExecute/canPublish/canSell` 모두 HOLD/false. **Linux GitHub CI PASS는 Windows Acceptance의 대체가 아니다.**
+
 ## 4. 단계별 로드맵 · 종료 게이트
 
 | 단계 | 구현 | 게이트 | 범위 상태 |

@@ -14,6 +14,9 @@ on:
       - scripts/local/saju-bridge-permit.compose.yml
       - scripts/local/saju-bridge-recovery.compose.yml
       - scripts/local/verify-saju-bridge-docker-inflight-commit.mjs
+      - scripts/local/verify-saju-bridge-docker-cross-db.mjs
+      - scripts/local/saju-bridge-cross-db-observation-v1.mjs
+      - test/saju-held-docker-cross-db-phase4c3.test.ts
       - test/saju-held-docker-inflight-commit-phase4b.test.ts
       - test/saju-held-docker-recovery-phase4a.test.ts
       - scripts/local/saju-bridge-permit-docker-login.sql
@@ -131,7 +134,7 @@ jobs:
         run: npm run build
       - name: Verify disposable Docker GoTrue, Birth, pinned Saju HMAC and isolated Nonce
         working-directory: myeongha
-        run: node scripts/local/verify-saju-bridge-docker-local.mjs --admission-crash ../saju
+        run: node scripts/local/verify-saju-bridge-docker-local.mjs --cross-db ../saju
       - name: Bootstrap complete disposable Subject, Birth, and nonce authority
         working-directory: myeongha
         shell: bash
