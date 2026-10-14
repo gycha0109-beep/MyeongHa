@@ -99,3 +99,11 @@
 - **DB private issuer↔Binder 두 세션**: `test/db/standard_reader_r4_b13_receipt_issuer_vs_binder_race_real_pg.sh`는 정상 verified-표시 합성 Receipt + 현행 Offer/Intent를 설치하지만 초기 Grant는 만들지 않음. 선발급 Binder DENY → 다른 거래에서 실제 private `internal_apply_initial_official_reader_receipt_locked_v1`로 Grant를 발급하고 **커밋 전 S3 lock 유지** → 초기 Binder가 `pg_stat_activity.wait_event_type='Lock'`에 머물러 dirty Grant read 불가 → 발급 커밋 후 정확한 Grant에 공식 Reading·Reader Access 각 1건, Event 1건. **운영 verified Receipt persistence↔issuance의 트랜잭션 원자성·Provider 콜백 직렬화 증거는 아님**.
 - PostgreSQL15 격리 Authority Core 및 PostgreSQL17 명시적 `cap-b2-r4-receipt-issuer-binder-race` 사례 등록. `db-suites.json` 41 cases / 38 unique, `tests/verification-plan.test.ts` 동기화. **현재 구간의 신규 CI 완료 전까지 PASS 미선언**.
 - 운영 Writer 통합·실제 Checkout·Provider 서명 검증·영수증↔Entitlement 원자 cutover, 별도 Privacy Governance 및 R5 유료 공개는 **HOLD**.
+
+## BIND-13 Receipt persistence↔Entitlement issuance 합성 트랜잭션 rollback/recovery — 격리 신규 증거 대기
+
+- 새 `test/db/standard_reader_r4_b13_receipt_issuer_recovery_real_pg.sh`는 실제 Receipt 스키마 제약과 private `internal_apply_initial_official_reader_receipt_locked_v1`을 사용하지만 **운영 `cmd_persist_verified_payment_evidence_v1` 경로가 아닌, 테스트에서 합성한 하나의 트랜잭션**입니다. verified 표기된 테스트용 Receipt만 사용하며 실제 Provider 검증 결과가 아닙니다.
+- 세션 A가 동일한 Receipt 식별자를 INSERT하고 Grant/Event/projection/outbox를 발급한 직후 커밋 전에 **의도된 division-by-zero 실패** → 별도 세션에서 미커밋 Receipt/Grant/Event 모두 0을 확인. 세션 B는 동일 Receipt INSERT 시 PG 실제 row/unique transaction lock을 기다렸다가 세션 A의 전체 rollback 후 **하나의 Receipt/Grant/Event만 commit**하도록 설계.
+- 같은 식별자·Capability Item·effective_at·valid_from의 정확한 발급 재전송은 `result_replayed=true`, 새 Event/Outbox/Grant 없는 멱등 처리. 효과 시간을 1초 변경한 재전송은 `internal_entitlement_effect_source_semantic_conflict`로 거부하고 Event·Grant identity/Outbox count 불변이어야 함. 본 테스트에서는 공식 Reading·Reader Access가 **발급만으로 생성되면 안 됨**.
+- `test/db/run_authority_core.sh` PG15 전용 격리 DB와 `test/db/run_ci_case.sh` PostgreSQL17 분리 사례 `cap-b2-r4-receipt-issuer-recovery`에 등록, `db-suites.json` **42 cases / 39 unique** 및 Work Track assertion 동기화. **새 exact HEAD CI 성공 및 개별 PASS 로그 전에는 검증 완료로 표시하지 않음**.
+- 미증명: 실운영 Provider 검증→원본 Receipt 영속화→Entitlement issuer를 단일 트랜잭션으로 연결한 end-to-end Writer, 실결제 Provider webhook 동시 순서, 환불 CAS와 반대 방향 경합, R5 T2 원자 공개. 관련 Owner 승인 및 Privacy/DR 선행 **HOLD**.
