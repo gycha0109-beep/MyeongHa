@@ -147,8 +147,7 @@ fi
 [[ "$(p -c "select count(*) from public.entitlement_events
  where grant_id='$first_grant'::uuid and source_provider_event_id='$old_event'::uuid
  and event_type='revoked'")" == 1 ]] || fail 'old cancellation effect ledger missing'
-[[ "$(p -c "select count(*) from public.entitlement_events where grant_id='$first_grant'::uuid")" ==
- "$((first_event_before + 1))" ]] || fail 'old Grant unexpected effect count'
+[[ "$(p -c "select count(*) from public.entitlement_events where grant_id='$first_grant'::uuid")" == "$((first_event_before + 1))" ]] || fail 'old Grant unexpected effect count'
 [[ "$(p -c "select count(*) from public.entitlement_events where grant_id='$second_grant'::uuid")" == "$second_event_before" ]] ||
  fail 'repurchased Grant ledger changed by old cancellation'
 [[ "$(p -c "select status from public.entitlement_grants where id='$first_grant'::uuid")" == revoked ]] ||
