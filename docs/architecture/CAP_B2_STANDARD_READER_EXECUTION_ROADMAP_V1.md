@@ -101,3 +101,11 @@
 - `docs/architecture/STANDARD_PREMIUM_READER_PRODUCT_ASSOCIATION_REMODEL_V1.md` — #2007 현재 Product 모델.
 - `docs/architecture/STANDARD_READER_V2_BIND_POLICY_SPLIT_D01_TEST_MATRIX_V1.md` — #2003 BIND-01~29(구 Premium 목록 문구는 새 모델로 갱신 필요).
 - 연동 PR: #1983, #1984, #1987, #1993, #1996, #1999, #2001, #2004, #2005, #2007, #2010, #2013, #2014, #1960, #1974.
+
+## 2026-10-14 B2-R0 갱신 / B2-R4 BIND-13 신규 좁은 증거
+
+- 코드 PR [#2041](https://github.com/gycha0109-beep/MyeongHa/pull/2041)은 **Draft/미병합**, R3 Draft [#2035](https://github.com/gycha0109-beep/MyeongHa/pull/2035) 위의 구현 브랜치 `feat/applizing/cap-b2-bind-matrix-r4-real-pg`. 신규 **검증된 코드 HEAD `135435db18fa126f4a872dccb882f5f8d9d6c94b`** 기준 [CI #38528059539](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38528059539) 9/9 SUCCESS, PG15 Authority Core·PG17 각각 `PASS R4/BIND-13 two-session distinct synthetic Provider cancellations S3 WAIT and stale CAS rollback` 로그 존재. Work Track·Commerce·Content·Runtime·Web 역시 PASS. 별도 Governance #38528059562는 P0-PR-01 140-edge 승인 그래프/1840 FK 불일치로 **FAILURE**.
+- **진척 정의**: R4/BIND-13은 합성 verified-flag 서로 다른 두 Provider 취소 Event가 동일 초기 Receipt/Grant S3 scope를 경합할 때 stale expected revision/last-order-key CAS 거부와 event+CAS rollback을 실제 두 연결에서 검증. 동일 source replay 이전 증거 유지. **실제 Provider 최신성 판단/역순 유입 정책을 인증한 것은 아님**. BIND-01~29 전체는 PARTIAL.
+- **단계 상태 불변**: R1 immutable pin/R2 private revoke 격리 진척, R3 실제 운영 Writer 공동잠금 **HOLD**, R4 검증 계속, R5 T1→T2 paid 공개 **HOLD**, R6 Privacy/DR/Owner·migration 스택 승인 **HOLD**, R7 출시 **OFF**. 별도 소스 결정: distinct Provider ordering-key 의미·no-op status 처리, refund+repurchase Receipt/Grant 독립성은 Commerce/Provider Owner 정책 필요. 기존 회원 병합 SRC-24는 OPEN/BLOCKING.
+- 다음 안전한 검증: 새 Receipt/Grant가 생긴 경우 취소 이벤트가 옛 Receipt의 Grant만 취소하고 새 구매권을 건드리지 않는지 실PG15/17 격리 테스트; 의미적 우선순위나 운영 Writer, 정책을 임의 구현하지 않음. 모든 이력과 한계는 #2041 PR에 누적.
+
