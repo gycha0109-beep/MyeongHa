@@ -44,3 +44,10 @@
 - 원본 R3 `docs/architecture/CAP_B2_R3_OPERATIONAL_WRITER_CUTOVER_CONTRACT_V1.md` C2/C3/C6 및 G1–G4 HOLD 우선. Privacy P0-PR-01 canonical 140-edge vs 1840 FK / DR 1400–1450 불일치 해결은 **권한 있는 Owner의 별도 결정**, 임의 재해시/우회 금지. PR #2041 Draft·미병합.
 
 **결론:** Verified Cancellation의 최초 운영 ingress, R1/S3 lock을 취득하는 Provider Event 저장 Writer 및 1850 CAS의 원자적 접속은 **미구현/미승인**입니다. 현재 확보 가능한 증거는 DB PRIVATE 함수를 호출하는 결정론적 negative/concurrency 경계에 국한됩니다.
+
+## 5. 검증 기록 갱신 및 동일 취소 이벤트 재전송 계약 (2026-10-14)
+
+- [PR #2041 HEAD `acf25309` CI #38521923071](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38521923071): **PostgreSQL15 Authority Core·PostgreSQL17 명시 사례·Work Track 모두 SUCCESS**, Web PR Domain Gates SUCCESS. 이 검증의 개별 실DB PASS는 **원본 0930 DB trigger가 sandbox/manual resolution/거래 계보 위반 이벤트를 INSERT 단계에서 거부**하고, 그 밖의 `received`/wrong type/foreign Grant/forged Subject/READ COMMITTED 요구/낡은 CAS를 **1850 private effect가 거부**함을 분리해 확인한 결과입니다. 서로 다른 계층의 거부를 모두 1850 증거로 표기하지 마십시오.
+- 신규 `test/db/standard_reader_r4_b13_cancel_replay_semantics_real_pg.sh`: 이미 verified-flag 합성 취소 이벤트로 한 번 `1850→1080` CAS한 후 **같은 원본 Event ID + 동일 효과 시각/Reason/원 Grant 이력**으로 재시도. `result_replayed=true`와 같은 원장 이벤트 UUID, Grant revision/provider-order/원장/Outbox 불변을 요구. 동일 Event ID에 다른 Reason을 부여하면 `internal_entitlement_effect_source_semantic_conflict`로 DENY, 별도 Event 행으로 중복 `provider + external_event_id`를 삽입하면 기존 유니크 제약에서 DENY. 폐기된 구매가 Reader Access를 생성하지 않아야 함. **이 신규 사례는 exact HEAD의 PG15·PG17 CI 전에는 PASS 미선언**.
+- Suite `45 cases / 42 unique`. 이는 **원본 이벤트의 정확한 멱등성**과 영속성 불변에 대한 검증이며, **서로 다른 Provider 이벤트의 시간순/ordering-key 우선순위 정책을 입증하지 않음**. `1080`은 기대 revision/order를 CAS하고 exact source replay를 확인하지만, `provider_ordering_key`의 의미적 비교·최신성 판단은 호출자 계약으로 남습니다.
+- 여전히 P1–P7 운영 연결·Provider 검증 서명·실환불·R3 cutover·R5 paid 공개는 HOLD. 별도 Privacy Governance 불일치 해결 전 production migration 및 공개 EXECUTE 금지.
