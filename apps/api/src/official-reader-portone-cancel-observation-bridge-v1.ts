@@ -20,7 +20,6 @@ import type {
   PortOneV2WebhookPaymentCompletionConfigV1,
 } from './portone-v2-webhook-payment-completion.js';
 import type { PortOneV2PaymentHttpFetchV1 } from './portone-v2-payment-verification-adapter.js';
-import type { PostgresTransactionQueryV1 } from './postgres-subject-execution.js';
 
 export type OfficialReaderCancelObservationResultV1 = Readonly<{
   kind: 'ignored' | 'observed';
@@ -49,48 +48,6 @@ export interface OfficialReaderCancelObservationRecorderV1 {
   recordVerified(input: OfficialReaderCancelObservationInputV1): Promise<
     Readonly<{ shadowResult: 'observed' | 'out_of_order' | 'ordering_unproven' | 'replayed'; effectAuthorized: false }>
   >;
-}
-
-const PRIVATE_SQL = [
-  'select shadow_result as "shadowResult", effect_authorized as "effectAuthorized"',
-  'from public.internal_record_official_reader_portone_cancel_shadow_v1(',
-  '$1::text,$2::text,$3::text,$4::text,$5::text,$6::text,',
-  '$7::timestamptz,$8::timestamptz,$9::bigint,$10::bigint,$11::text,$12::text)',
-].join(' ');
-
-/**
- * Only for a trusted private DB-owner test/worker transaction. This does NOT
- * SET ROLE, confer EXECUTE, grant DML, or issue COMMIT.
- */
-export function createPrivateOfficialReaderCancelObservationRecorderV1(
-  client: PostgresTransactionQueryV1,
-): OfficialReaderCancelObservationRecorderV1 {
-  return Object.freeze({
-    async recordVerified(input: OfficialReaderCancelObservationInputV1) {
-      const result = await client.query<{
-        shadowResult: unknown;
-        effectAuthorized: unknown;
-      }>(PRIVATE_SQL, [
-        input.webhookId, input.paymentId, input.transactionId,
-        input.cancellationId, input.eventType, input.sourceDisposition,
-        input.eventOccurredAt, input.providerStatusChangedAt,
-        input.paidAmountMinor, input.cancelledAmountMinor,
-        input.currency, input.evidenceFingerprint,
-      ]);
-      if (result.rows.length !== 1
-        || !['observed', 'out_of_order', 'ordering_unproven', 'replayed'].includes(
-          result.rows[0]?.shadowResult as string,
-        )
-        || result.rows[0]?.effectAuthorized !== false) {
-        throw new Error('Private cancellation observation returned an invalid no-effect result.');
-      }
-      const row = result.rows[0];
-      return Object.freeze({
-        shadowResult: row.shadowResult as 'observed' | 'out_of_order' | 'ordering_unproven' | 'replayed',
-        effectAuthorized: false as const,
-      });
-    },
-  });
 }
 
 function requireVerifiedSource(source: PortOneV2CancelSourceV1): OfficialReaderCancelObservationInputV1 {
