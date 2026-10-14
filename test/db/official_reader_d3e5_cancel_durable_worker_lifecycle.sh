@@ -131,6 +131,11 @@ wait "$holder_pid" || fail "lease regression lock holder failed"
 grep -q 'Private cancellation failure requires a live fenced lease' "$tmp/stale.out" ||
  fail "post-lock expiry was not rejected by lease fence"
 echo "PASS D3e5: lease expiry while waiting for row lock cannot finalize"
+# Reclaim expired race row so the following HOLD fixture is the next queued item.
+reissued_race="$(claim race_recovery)"
+IFS='|' read -r race_new_id race_new_token race_new_attempt <<< "$reissued_race"
+[[ "$race_new_id" == "$race_id" && "$race_new_attempt" == 2 && "$race_new_token" != "$race_token" ]] ||
+ fail "expired race lease could not be safely reissued"
 
 [[ "$(enqueue held)" == queued ]] || fail "hold fixture"
 h="$(claim hold_worker)"
