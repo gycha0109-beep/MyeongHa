@@ -321,7 +321,7 @@ describe('Phase 4F untrusted manual review submission contract', () => {
   });
 });
 
-describe('Phase 4G cross-run replay and conflict HOLD', () => {
+describe('Phase 4H cross-run replay and conflict HOLD', () => {
   it('rejects replay, conflicting same-run evidence, cross-run semantic reuse and malformed peers', () => {
     const now = 1900000000000;
     const first = claimPacket(sample(), now, randomUUID());
@@ -469,7 +469,7 @@ describe.skipIf(!enabled)('Phase 4E actual independent disposable authority obse
         const expired = claimPacket(actual, nowMs - 300001, randomUUID());
         expect(assessReplay(expired, packet, nowMs).classification)
           .toBe('UNVERIFIED_PACKET_PAIR_HOLD');
-        console.log('[saju-bridge] Phase 4G real DB: replay and independent-run semantic reuse held; stale peer held; no trusted registry or execution.');
+        console.log('[saju-bridge] Phase 4H real DB: replay and independent-run semantic reuse held; stale peer held; no trusted registry or execution.');
       }
       if (syntheticStage) {
         const {signed,registry} = signSyntheticPacket(packet);
