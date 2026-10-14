@@ -1,5 +1,5 @@
 import {
-  generateKeyPairSync,randomUUID,sign as edSign,
+  createHash,generateKeyPairSync,randomUUID,sign as edSign,
   type KeyObject,
 } from 'node:crypto';
 import {describe,expect,it,vi} from 'vitest';
@@ -27,6 +27,13 @@ import {
 import {
   createOfflinePrivateCancelExecutorBoundaryV1,
 } from '../apps/api/src/official-reader-portone-cancel-private-offline-executor-boundary-v1.js';
+import {
+  canonicalPrivateCancelExecutionEpochV1,
+  type PrivateCancelExecutionEpochBodyV1,
+} from '../apps/api/src/official-reader-portone-cancel-private-execution-epoch-v1.js';
+import {
+  createOfflinePrivateCancelRevocationFencedExecutorV1,
+} from '../apps/api/src/official-reader-portone-cancel-private-epoch-fenced-executor-v1.js';
 
 const ROOT_ID='root_offline_001';
 const IDP_ID='idp_offline_001';
@@ -138,6 +145,47 @@ function rig(){
     operatorAttestations,request,store,issuerBoot,executorBoot,
   };
 }
+
+/** Ephemeral, independent epoch-authority fixture. No runtime network/DB. */
+function epochRig(f:ReturnType<typeof rig>){
+  const signer=generateKeyPairSync('ed25519');
+  const validated=verifyOfflinePrivateCancelSignedTrustPolicyV1({
+    envelope:f.envelope,pinnedRoot:f.pin,now:f.clock(),
+  });
+  const pin={keyId:'epoch_independent_001',publicKeyPem:pub(signer)};
+  function signEpoch(changes:Partial<PrivateCancelExecutionEpochBodyV1>={},
+    privateKey=signer.privateKey){
+    const now=f.clock().valueOf();
+    const body:PrivateCancelExecutionEpochBodyV1={
+      protocol:'myeongha.cancel.ops.execution-epoch.v1',
+      environment:'sandbox',
+      audience:'myeongha.cancel.ops.private-executor.v1',
+      signerKeyId:pin.keyId,sequence:1,status:'active',
+      rootKeyId:validated.rootKeyId,
+      policyId:validated.policyId,
+      policyRevision:validated.revision,
+      policyDigest:validated.policyDigest,
+      issuedAt:new Date(now).toISOString(),
+      expiresAt:new Date(now+4000).toISOString(),
+      ...changes,
+    };
+    return {body,signatureBase64:edSign(
+      null,canonicalPrivateCancelExecutionEpochV1(body),privateKey,
+    ).toString('base64')};
+  }
+  let current:unknown=signEpoch();
+  const source=vi.fn(async()=>current);
+  const set=(next:unknown)=>{current=next;};
+  const boot=(changes:Record<string,unknown>={})=>
+    createOfflinePrivateCancelRevocationFencedExecutorV1({
+      signedPolicy:f.envelope,pinnedRoot:f.pin,
+      pinnedEpochSigner:pin,readCurrentEpoch:source,
+      trustedClock:f.clock,testStore:f.store,
+      ...changes,
+    });
+  return {signer,signEpoch,source,set,boot,pin,validated};
+}
+
 describe('D3e14 offline signed-trust verifier and executor separation (NOT LIVE)',()=>{
   it('accepts independently root-verified policy at BOTH boundaries and a real 3-hop signature chain',async()=>{
     const f=rig();
@@ -526,5 +574,195 @@ describe('D3e14 offline signed-trust verifier and executor separation (NOT LIVE)
     });
     await expect(contradictory.execute({permit})).rejects.toThrow('approval');
     expect(f.store.commitAuthorizedReview).not.toHaveBeenCalled();
+  });
+});
+
+
+describe('D3e16 independently signed current-policy epoch fence (OFFLINE ONLY)',()=>{
+  it('checks independent epoch at BOOT, per execution AND immediately before test-store commit',async()=>{
+    const f=rig(),e=epochRig(f);
+    const executor=await e.boot();
+    expect(e.source).toHaveBeenCalledTimes(1);
+    const permit=f.issuerBoot().issue(f.request);
+    expect(await executor.execute({permit})).toMatchObject({
+      reviewState:'held',approvalRecorded:true,effectAuthorized:false,
+      providerRefundAuthorized:false,entitlementMutationAuthorized:false,
+    });
+    expect(e.source).toHaveBeenCalledTimes(3);
+    expect(f.store.commitAuthorizedReview).toHaveBeenCalledOnce();
+  });
+
+  it('a running OLD executor rejects freshly signed policy change and becomes permanently fenced',async()=>{
+    const f=rig(),e=epochRig(f),old=await e.boot();
+    const permit=f.issuerBoot().issue(f.request);
+    e.set(e.signEpoch({sequence:2,policyRevision:8}));
+    await expect(old.execute({permit})).rejects.toThrow('policy changed');
+    e.set(e.signEpoch({sequence:3}));
+    await expect(old.execute({permit})).rejects.toThrow('permanently fenced');
+    expect(e.source).toHaveBeenCalledTimes(2);
+    expect(f.store.commitAuthorizedReview).not.toHaveBeenCalled();
+  });
+
+  it('a signed emergency HALT makes the old executor permanently inert',async()=>{
+    const f=rig(),e=epochRig(f),old=await e.boot();
+    const permit=f.issuerBoot().issue(f.request);
+    e.set(e.signEpoch({sequence:2,status:'halted'}));
+    await expect(old.execute({permit})).rejects.toThrow('HALTED');
+    e.set(e.signEpoch({sequence:3,status:'active'}));
+    await expect(old.execute({permit})).rejects.toThrow('permanently fenced');
+    expect(f.store.commitAuthorizedReview).not.toHaveBeenCalled();
+  });
+
+  it('policy swap DURING preflight is caught by second epoch check before SQL',async()=>{
+    const f=rig(),e=epochRig(f);
+    const executor=await e.boot();
+    const permit=f.issuerBoot().issue(f.request);
+    let calls=0;
+    const eventSource=vi.fn(async()=>{
+      calls++;
+      return calls===2?e.signEpoch({sequence:2,status:'halted'}):
+        e.signEpoch({sequence:1});
+    });
+    // independent boot read (1), execute read (2), pre-store read (3)
+    // Simulate: current at bootstrap and first execution, HALT at pre-store.
+    let gateReads=0;
+    const staged=vi.fn(async()=>{
+      gateReads++;
+      return gateReads<=2?e.signEpoch({sequence:1}):
+        e.signEpoch({sequence:2,status:'halted'});
+    });
+    const guarded=await e.boot({readCurrentEpoch:staged});
+    await expect(guarded.execute({permit})).rejects.toThrow('HALTED');
+    expect(staged).toHaveBeenCalledTimes(3);
+    expect(f.store.commitAuthorizedReview).not.toHaveBeenCalled();
+    expect(executor).toBeDefined();
+    expect(eventSource).not.toHaveBeenCalled();
+  });
+
+  it('source unavailable, malformed, forged, expired or stale proof DENIES; never fails open',async()=>{
+    const f=rig(),e=epochRig(f),executor=await e.boot();
+    const permit=f.issuerBoot().issue(f.request);
+    for(const invalid of [
+      null,{},e.signEpoch({sequence:1,status:'unknown' as never}),
+      e.signEpoch({sequence:1,environment:'production' as never}),
+      e.signEpoch({sequence:1,audience:'myeongha.refunds' as never}),
+      e.signEpoch({sequence:1,issuedAt:'2026-10-14T04:59:55.000Z'}),
+      e.signEpoch({sequence:1,expiresAt:'2026-10-14T05:00:00.000Z'}),
+      e.signEpoch({sequence:1,expiresAt:'2026-10-14T05:00:10.000Z'}),
+      {...e.signEpoch(),extra:'untrusted'},
+      {...e.signEpoch(),signatureBase64:'bad'},
+      e.signEpoch({sequence:1},f.rogue.privateKey),
+      {...e.signEpoch(),body:{...e.signEpoch().body,policyDigest:'sha256:'+'a'.repeat(64)}},
+    ]){
+      e.set(invalid);
+      await expect(executor.execute({permit})).rejects.toThrow();
+    }
+    e.set(e.signEpoch());
+    await expect(executor.execute({permit})).resolves.toMatchObject({
+      approvalRecorded:true,effectAuthorized:false,
+    });
+    expect(f.store.commitAuthorizedReview).toHaveBeenCalledOnce();
+  });
+
+  it('provider failure is fail-closed per attempt, not a permanent incident HALT',async()=>{
+    const f=rig(),e=epochRig(f);
+    let healthy=true;
+    const source=vi.fn(async()=>{
+      if(!healthy)throw new Error('network secret');
+      return e.signEpoch();
+    });
+    const executor=await e.boot({readCurrentEpoch:source});
+    const permit=f.issuerBoot().issue(f.request);
+    healthy=false;
+    await expect(executor.execute({permit})).rejects.toThrow('source unavailable');
+    expect(f.store.commitAuthorizedReview).not.toHaveBeenCalled();
+    healthy=true;
+    await expect(executor.execute({permit})).resolves.toMatchObject({
+      effectAuthorized:false,
+    });
+    expect(f.store.commitAuthorizedReview).toHaveBeenCalledOnce();
+  });
+
+  it('signed epoch sequence rollback cannot revive old executor, even with unexpired token',async()=>{
+    const f=rig(),e=epochRig(f),executor=await e.boot();
+    const permit=f.issuerBoot().issue(f.request);
+    e.set(e.signEpoch({sequence:5}));
+    expect(await executor.execute({permit})).toMatchObject({approvalRecorded:true});
+    e.set(e.signEpoch({sequence:4}));
+    await expect(executor.execute({permit})).rejects.toThrow('rollback/equivocation');
+    e.set(e.signEpoch({sequence:6}));
+    await expect(executor.execute({permit})).rejects.toThrow('permanently fenced');
+    expect(f.store.commitAuthorizedReview).toHaveBeenCalledOnce();
+  });
+
+  it('two valid differently signed statements at SAME sequence are equivocation',async()=>{
+    const f=rig(),e=epochRig(f),executor=await e.boot();
+    const permit=f.issuerBoot().issue(f.request);
+    // Same sequence, different expiry but still current, separately signed.
+    e.set(e.signEpoch({sequence:1,expiresAt:'2026-10-14T05:00:03.000Z'}));
+    await expect(executor.execute({permit})).rejects.toThrow('rollback/equivocation');
+    await expect(executor.execute({permit})).rejects.toThrow('permanently fenced');
+    expect(f.store.commitAuthorizedReview).not.toHaveBeenCalled();
+  });
+
+  it('wrong policy digest/ID/root and revoked key may NOT be injected via request',async()=>{
+    const f=rig(),e=epochRig(f),executor=await e.boot();
+    const permit=f.issuerBoot().issue(f.request);
+    for(const change of [
+      {pinnedEpochSigner:e.pin},
+      {readCurrentEpoch:()=>Promise.resolve(e.signEpoch())},
+      {trustedClock:f.clock},
+      {trustedIdentityDirectory:{}},
+      {testStore:f.store},
+      {epoch:e.signEpoch()},
+    ]){
+      await expect(executor.execute({permit,...change})).rejects.toThrow('caller-owned');
+    }
+    expect(f.store.commitAuthorizedReview).not.toHaveBeenCalled();
+    for(const changes of [
+      {policyId:'policy_different_999'},
+      {rootKeyId:'root_different_999'},
+      {policyDigest:'sha256:'+'f'.repeat(64)},
+    ]){
+      const instance=await e.boot();
+      e.set(e.signEpoch({sequence:2,...changes}));
+      await expect(instance.execute({permit})).rejects.toThrow('policy changed');
+      e.set(e.signEpoch());
+    }
+    expect(f.store.commitAuthorizedReview).not.toHaveBeenCalled();
+  });
+
+  it('wrong pinned epoch signer and reused root/permit signer cannot bootstrap',async()=>{
+    const f=rig(),e=epochRig(f);
+    await expect(e.boot({pinnedEpochSigner:{
+      keyId:e.pin.keyId,publicKeyPem:pub(f.rogue),
+    }})).rejects.toThrow('signature');
+    await expect(e.boot({pinnedEpochSigner:{
+      keyId:e.pin.keyId,publicKeyPem:pub(f.root),
+    }})).rejects.toThrow('must differ');
+    await expect(e.boot({pinnedEpochSigner:{
+      keyId:e.pin.keyId,publicKeyPem:pub(f.issuer),
+    }})).rejects.toThrow('must differ');
+    await expect(e.boot({readCurrentEpoch:async()=>{throw new Error('offline');}}))
+      .rejects.toThrow('source unavailable');
+    expect(f.store.commitAuthorizedReview).not.toHaveBeenCalled();
+  });
+
+  it('rollback minimum after process restart needs external durable trust, not the in-memory fence',async()=>{
+    const f=rig(),e=epochRig(f);
+    e.set(e.signEpoch({sequence:9}));
+    const current=await e.boot();
+    expect(current).toBeDefined();
+    e.set(e.signEpoch({sequence:1}));
+    // Known limitation: a newly constructed process with only a pinned ROOT
+    // and no independently persisted minimum sequence can accept an old
+    // signed ACTIVE snapshot still within its 5s freshness window.
+    const restarted=await e.boot();
+    const permit=f.issuerBoot().issue(f.request);
+    expect(await restarted.execute({permit})).toMatchObject({
+      approvalRecorded:true,effectAuthorized:false,
+    });
+    // This proves a mandatory future durable minEpoch / generation watermark
+    // and independently controlled signed response source.
   });
 });
