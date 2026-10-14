@@ -19,13 +19,13 @@ create table public.official_reader_cancel_review_approval_v1 (
   ticket_reference text not null
     check (ticket_reference ~ '^OPS-[0-9]{4,12}$'),
   requester_key_id text not null
-    check (requester_key_id ~ '^key_[a-z0-9]{6,32}$'),
+    check (requester_key_id ~ '^key_[a-z0-9_]{6,32}$'),
   approver_key_id text not null
-    check (approver_key_id ~ '^key_[a-z0-9]{6,32}$'),
+    check (approver_key_id ~ '^key_[a-z0-9_]{6,32}$'),
   requester_principal_id text not null
-    check (requester_principal_id ~ '^op_[a-z0-9]{6,32}$'),
+    check (requester_principal_id ~ '^op_[a-z0-9_]{6,32}$'),
   approver_principal_id text not null
-    check (approver_principal_id ~ '^op_[a-z0-9]{6,32}$'),
+    check (approver_principal_id ~ '^op_[a-z0-9_]{6,32}$'),
   statement_digest text not null
     check (statement_digest ~ '^sha256:[a-f0-9]{64}$'),
   issued_at timestamptz not null,
@@ -82,14 +82,14 @@ begin
     or p_ticket_reference is null
     or p_ticket_reference !~ '^OPS-[0-9]{4,12}$'
     or p_requester_key_id is null
-    or p_requester_key_id !~ '^key_[a-z0-9]{6,32}$'
+    or p_requester_key_id !~ '^key_[a-z0-9_]{6,32}$'
     or p_approver_key_id is null
-    or p_approver_key_id !~ '^key_[a-z0-9]{6,32}$'
+    or p_approver_key_id !~ '^key_[a-z0-9_]{6,32}$'
     or p_requester_key_id=p_approver_key_id
     or p_requester_principal_id is null
-    or p_requester_principal_id !~ '^op_[a-z0-9]{6,32}$'
+    or p_requester_principal_id !~ '^op_[a-z0-9_]{6,32}$'
     or p_approver_principal_id is null
-    or p_approver_principal_id !~ '^op_[a-z0-9]{6,32}$'
+    or p_approver_principal_id !~ '^op_[a-z0-9_]{6,32}$'
     or p_requester_principal_id=p_approver_principal_id
     or p_statement_digest is null
     or p_statement_digest !~ '^sha256:[a-f0-9]{64}$'
