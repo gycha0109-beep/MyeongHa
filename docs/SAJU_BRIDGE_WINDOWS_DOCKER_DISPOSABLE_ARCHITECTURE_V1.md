@@ -135,7 +135,22 @@ node scripts/local/verify-saju-bridge-docker-local.mjs --recovery ../Saju-bridge
 - 실제 PG 재시작과 순차 DB 중단을 거친 뒤, Nonce digest 1건, Permit `CONSUMED`, Subject fixture 불변을 검증한다. 같은 키·Permit의 재소비가 차단되는지 검사하고, 재시도 가능한 Nonce 만료 시각이 지나면 조용히 PASS하지 않고 테스트를 실패시킨다.
 - 네트워크/Docker 소켓을 테스트 컨테이너에 넘기지 않는다. Docker stop/restart는 기존 host runner만 수행하고, 연결 자격 증명/키/합성 ID/CA는 project-scoped ephemeral volume/env만 사용한다. 모든 종료 후 기존 `down --volumes --remove-orphans` 및 프로젝트 자원 잔존 0 검사를 동일하게 수행한다.
 - **남은 HOLD:** 커밋 진행 도중 *실제 네트워크 단절*, Subject와 Nonce에 각각 다른 commit 결과가 발생하는 분산 트랜잭션·보상·운영 복구, DB 영구 손상, 실제 Runner/Root/Attestor/stagingAdmission/서비스 승격. 이 실험이 성공해도 `canExecute`, `canPublish`, `canSell`은 false이고 운영 R01–R14/2D-4는 HOLD다.
-- Linux scoped/full CI가 통과하더라도 **Windows `--recovery` 실기기 실행은 별도 NOT_VERIFIED**다. 앞선 Windows 3B PASS와 혼동하지 않는다.
+- Linux scoped/full CI가 통과하더라도 **Windows `--recovery`는 2026-10-14 사용자 제출 로그로 **PASS** 확인. Phase 4B `--crash-commit` Windows 실기기 실행은 별도 NOT_VERIFIED**다. 앞선 Windows 3B PASS와 혼동하지 않는다.
+
+### 3F. Phase 4B — 실제 PostgreSQL COMMIT 진입 중 DB SIGKILL (2026-10-14)
+
+`--crash-commit`은 **Phase 1/2/2B/3A/3B/4A를 먼저 통과한 같은 일회용 Docker 프로젝트**에서 Nonce 전용 4B 테스트를 추가한다.
+
+```powershell
+node scripts/local/verify-saju-bridge-docker-local.mjs --crash-commit ../Saju-bridge-verify
+```
+
+- 실 PostgreSQL Nonce DB에서만 일회용 `DEFERRABLE INITIALLY DEFERRED` 트리거를 삽입한다. 해당 트리거는 **COMMIT 명령 처리 도중** `pg_sleep`로 제어 가능한 관측 지점을 만든다. 호스트 측 테스트 전용 컨트롤러가 `pg_stat_activity`의 `query=COMMIT` 및 `wait_event=PgSleep`를 **직접 확인한 후**, 그 프로젝트의 **Nonce DB 컨테이너 하나에만** `docker compose kill -s SIGKILL`을 호출한다.
+- 실제 Nonce 소비는 기존 `createSajuSourceProofPostgresNonceClaimV1`을 그대로 사용하며 독립 TLS `verify-full` 연결이다. COMMIT 시점의 DB 소멸로 결과가 false여야 하며, 자동 재시도는 없다. 같은 데이터 볼륨으로 복구한 뒤 해당 합성 replay digest가 DB에 남지 않았는지 확인한다. 미관측/롤백 실패/서비스 복구 실패는 BLOCKED 처리한다.
+- 독립 Admission Permit V2는 앞선 Phase 4A의 이미 소비된 `CONSUMED` 상태가 불변인지만 확인한다. **Admission DB 자체를 COMMIT 도중 죽이는 실험은 이 단계에 포함하지 않는다.**
+- 이 방법은 **실제 COMMIT 처리 중 물리적 DB 프로세스 중단**을 검증하지만 **네트워크만 끊는 파티션**도 아니고, 임의 시점의 crash가 항상 롤백된다는 일반적인 보장도 아니다. 지연 트리거를 통해 의도적으로 COMMIT 완료 전 중단하는 *한 가지 결정적 시나리오*만 증명한다.
+- 테스트 컨테이너에는 Docker 소켓/호스트 포트를 마운트하지 않고, 로컬에서 이미 허용한 Docker CLI만 해당 실행별 Compose 프로젝트에 사용한다. 성공·실패 후 트리거 삭제, 기존 `down --volumes --remove-orphans` 잔여 자원 0 확인이 선행돼야 PASS 가능하다.
+- 운영 Root/Attestor/Runner/R01–R14/2D-4, 승인 가능한 Permit, 서비스/판매/출시 권한은 전부 HOLD. `canExecute`, `canPublish`, `canSell`은 false. **실제 네트워크 분할, Admission COMMIT 중단, 분산 DB 트랜잭션 보상·복구는 별도 다음 단계**이다.
 
 ## 4. 단계별 로드맵 · 종료 게이트
 
