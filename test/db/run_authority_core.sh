@@ -224,6 +224,10 @@ if [[ "${CI:-}" == "true" && "${PGHOST:-}" == "localhost" ]]; then
   # BIND-13: initial Reader Binder waits for actual staged Receipt issuer COMMIT.
   run_isolated_case myeongha_b2_r4_b13_receipt_bind_race \
     bash test/db/standard_reader_r4_b13_receipt_issuer_vs_binder_race_real_pg.sh
+  # BIND-13: disposable same-transaction Receipt+issuer failure, concurrent
+  # retry, exact idempotent replay and divergent replay DENY.
+  run_isolated_case myeongha_b2_r4_b13_receipt_issuer_recovery \
+    bash test/db/standard_reader_r4_b13_receipt_issuer_recovery_real_pg.sh
   run_isolated_case myeongha_b2_r4_b20_direct_merge \
     bash test/db/standard_reader_r4_direct_merge_lineage_real_pg.sh
   # BIND-20: actual new-member promotion command; SRC-24 existing-member
