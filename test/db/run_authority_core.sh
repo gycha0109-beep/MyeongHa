@@ -203,6 +203,12 @@ if [[ "${CI:-}" == "true" && "${PGHOST:-}" == "localhost" ]]; then
     bash test/db/standard_reader_policy_withdrawal_initial_bind_r3_real_pg.sh bind_first
   run_isolated_case myeongha_b2_r3_multiscope_sorted \
     bash test/db/standard_reader_multiscope_lock_order_r3_real_pg.sh
+  # BIND-17: replay cannot mint current Reader authority after revoke/expiry
+  # or after an Offer is disabled; no production Commerce writer is exercised.
+  run_isolated_case myeongha_b2_r4_b17_expired_grant \
+    bash test/db/standard_reader_r4_post_bind_replay_real_pg.sh expired_grant
+  run_isolated_case myeongha_b2_r4_b17_offer_disabled \
+    bash test/db/standard_reader_r4_post_bind_replay_real_pg.sh offer_disabled
   # BIND-21: separate legacy 1170 paid Reading from private Official v2.
   run_isolated_case myeongha_b2_r4_b21_additional_denied \
     bash test/db/standard_reader_r4_legacy_1170_isolation_real_pg.sh additional_denied
