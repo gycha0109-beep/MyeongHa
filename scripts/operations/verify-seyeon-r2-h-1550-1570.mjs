@@ -62,7 +62,7 @@ export function validateCostState(obj,stage){
  if(!Number.isInteger(stage)||stage<0||stage>3)fail('INVALID_STAGE');
  if(counted.some(k=>obj[k]!==expected[stage][k]))fail('CATALOG_OR_DEPENDENCY_DRIFT');
  const wanted=stage===0
- ? Object.fromEntries(flags.map(k=>[k,null]))
+ ? Object.fromEntries(flags.map(k=>[k,(k==='browserOrServiceCallable'||k==='cleanupApiCallable')?false:null]))
  : {rowSecurity:true,forceRowSecurity:true,meterRoleSchemaCreate:false,
     meterRoleTableUpdate:stage>=2,meterRoleTableDelete:true,
     browserOrServiceCallable:false,cleanupApiCallable:false,

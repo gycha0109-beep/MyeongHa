@@ -14,7 +14,7 @@ const counts={
 const flags=['rowSecurity','forceRowSecurity','meterRoleSchemaCreate','meterRoleTableUpdate',
  'meterRoleTableDelete','browserOrServiceCallable','cleanupApiCallable',
  'anonTableDml','authenticatedTableDml','serviceRoleTableDml','apiExecutorTableDml'];
-const original=()=>({...proto,...counts,...Object.fromEntries(flags.map(k=>[k,null]))});
+const original=()=>({...proto,...counts,...Object.fromEntries(flags.map(k=>[k,(k==='browserOrServiceCallable'||k==='cleanupApiCallable')?false:null]))});
 const states=()=>{
  const a=original(),b=structuredClone(a),c=structuredClone(a),d=structuredClone(a);
  Object.assign(b,{tableCount:1,columnCount:15,pkCount:1,checkCount:5,indexCount:3,
