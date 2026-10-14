@@ -59,6 +59,22 @@ fi
  public.official_reader_portone_cancel_ingress_inbox_v1 where id='$d_id'::uuid")" == dead_letter:LEASE_EXHAUSTED ]] ||
  fail "rejected ambiguous retry modified the original terminal state"
 
+# SQL three-valued logic: NULL NOT IN (...) is UNKNOWN, not TRUE.
+# A missing failure code and a security/ordering classification must both
+# be explicitly rejected; rejected reviews must have no audit side effects.
+for failure_case in NULL "'ORDERING_REVIEW'" "'SOURCE_MISMATCH'"; do
+ p -c "update public.official_reader_portone_cancel_ingress_inbox_v1
+ set last_failure_code=$failure_case where id='$d_id'::uuid" >/dev/null
+ if review "$d_id" retry_transient OPS-2004 >/dev/null 2>&1; then
+  fail "missing or non-transient dead-letter classification requeued: $failure_case"
+ fi
+ [[ "$(p -c "select count(*) from public.official_reader_portone_cancel_ops_review_v1
+ where inbox_id='$d_id'::uuid")" == 0 ]] ||
+  fail "rejected classification wrote a review audit: $failure_case"
+done
+p -c "update public.official_reader_portone_cancel_ingress_inbox_v1
+ set last_failure_code='LEASE_EXHAUSTED' where id='$d_id'::uuid" >/dev/null
+
 # Positive control: the EIGHTH claimed attempt explicitly records a
 # retryable LOOKUP_TIMEOUT while the lease remains live. Only this
 # independently classified dead-letter can receive one manual retry.
@@ -74,6 +90,16 @@ p -c "update public.official_reader_portone_cancel_ingress_inbox_v1
 [[ "$(p -c "select inbox_state||':'||last_failure_code from
  public.official_reader_portone_cancel_ingress_inbox_v1 where id='$t_id'::uuid")" == dead_letter:LOOKUP_TIMEOUT ]] ||
  fail "explicit transient proof not persisted"
+
+# A forged terminal state with seven attempts cannot qualify as a genuine
+# exhausted transient. The eighth attempt must be part of the durable proof.
+p -c "update public.official_reader_portone_cancel_ingress_inbox_v1
+ set attempt_count=7 where id='$t_id'::uuid" >/dev/null
+if review "$t_id" retry_transient OPS-2005 >/dev/null 2>&1; then
+ fail "insufficient attempt history accepted transient dead-letter review"
+fi
+p -c "update public.official_reader_portone_cancel_ingress_inbox_v1
+ set attempt_count=8 where id='$t_id'::uuid" >/dev/null
 d_id="$t_id"
 
 health="$(p -c "select held::text||'|'||dead_letter::text||'|'||effect_authorized::text
