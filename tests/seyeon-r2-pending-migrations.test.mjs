@@ -83,6 +83,24 @@ describe('R2 held 1520..1720 pending migration dependency inventory', () => {
         .toThrow('HOLD_R2_1570_MISSING_LIFECYCLE_DEPENDENCY');
     });
   });
+  it('rejects omitted 1630 executor dependency of 1670 governed Guest lock', () => {
+    withFixture((root, dir, manifest) => {
+      manifest.migrations.find(row => row.version === '1670').requires = [];
+      expect(() => validateR2PendingInventory(root, manifest))
+        .toThrow('HOLD_R2_1670_MISSING_GOVERNED_EXECUTOR_DEPENDENCY');
+    });
+  });
+  it('rejects unsafe 1670 transaction-boundary source even if digest is re-pinned', () => {
+    withFixture((root, dir, manifest) => {
+      const row = manifest.migrations.find(x => x.version === '1670');
+      const file = join(dir, row.file);
+      const modified = readFileSync(file, 'utf8').replace(/^commit;$/m, 'select 1;');
+      writeFileSync(file, modified);
+      row.blobSha = gitBlobSha(Buffer.from(modified));
+      expect(() => validateR2PendingInventory(root, manifest))
+        .toThrow('HOLD_R2_1670_TRANSACTION_BOUNDARY_OR_ROLE_DRIFT');
+    });
+  });
   it('rejects changed review-unit order or count', () => {
     withFixture((root, dir, manifest) => {
       manifest.migrations[5].unit = 'deletion';

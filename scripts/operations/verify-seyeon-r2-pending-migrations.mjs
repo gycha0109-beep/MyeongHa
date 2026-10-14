@@ -100,6 +100,15 @@ export function validateR2PendingInventory(root, manifest) {
     && readFileSync(join(dir, manifest.migrations.find(row => row.version === '1560').file), 'utf8')
       .includes('add column lifecycle_state'),
     '1570_LIFECYCLE_SOURCE_DRIFT');
+  // 1670 resolves only via the governed executor role created by 1630.
+  // Its checked-in source also commits its own transaction, so a surrounding
+  // BEGIN/ROLLBACK is not a valid disposable PG17 rollback harness.
+  const stage1670 = manifest.migrations.find(row => row.version === '1670');
+  const src1670 = readFileSync(join(dir, stage1670.file), 'utf8');
+  assert(stage1670.requires.includes('1630'), '1670_MISSING_GOVERNED_EXECUTOR_DEPENDENCY');
+  assert(src1670.includes("rolname='myeongha_seyeon_governed_executor'")
+    && src1670.includes('begin;') && src1670.includes('commit;'),
+    '1670_TRANSACTION_BOUNDARY_OR_ROLE_DRIFT');
   assert(grouped.size === 9, 'REVIEW_UNIT_CARDINALITY');
   const reviewUnits = [...grouped].map(([unit, versions]) => ({
     unit, versions, start: versions[0], end: versions.at(-1),
