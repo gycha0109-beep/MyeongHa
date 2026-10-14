@@ -159,11 +159,28 @@ function main() {
     composed('up', '--detach', '--wait', '--wait-timeout', '150',
       ...services.map(([service]) => service));
     for (const [service, database] of services) {
-      const output = docker([...base, 'exec', '-T', service,
-        'psql', '-X', '-A', '-t', '-v', 'ON_ERROR_STOP=1',
-        '-U', 'postgres', '-d', database,
-        '-c', 'select current_database() || chr(58) || 1::text'], { capture: true });
-      if (output !== database + ':1') throw new Error('DB identity mismatch: ' + service);
+      // pg_isready can momentarily report ready during entrypoint's bootstrap
+      // shutdown/restart. Retry ONLY known SQL startup transients; wrong DB
+      // identity, credentials and all other SQL errors still fail closed.
+      let verified = false;
+      for (let attempt = 0; attempt < 20; attempt++) {
+        try {
+          const output = docker([...base, 'exec', '-T', service,
+            'psql', '-X', '-A', '-t', '-v', 'ON_ERROR_STOP=1',
+            '-U', 'postgres', '-d', database,
+            '-c', 'select current_database() || chr(58) || 1::text'],
+          { capture: true, timeout: 12000 });
+          if (output !== database + ':1') throw new Error('DB identity mismatch: ' + service);
+          verified = true;
+          break;
+        } catch (error) {
+          const message = error instanceof Error ? error.message : '';
+          if (!/database system is (?:shutting down|starting up|in recovery mode)|Connection refused|No such file or directory/iu.test(message)
+            || attempt === 19) throw error;
+          Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 600);
+        }
+      }
+      if (!verified) throw new Error('DB SQL readiness not confirmed: ' + service);
       console.log('[saju-bridge] ' + service + ' independent SQL connection: PASS');
     }
     composed('up', '--detach', 'gotrue');
