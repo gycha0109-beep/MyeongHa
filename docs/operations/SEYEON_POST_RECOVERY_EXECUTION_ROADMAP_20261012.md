@@ -310,3 +310,8 @@ Governor 04d4B 계열은 실제 격리 PostgreSQL 기반 영수증 임대·정�
 
 - [PR #2084](https://github.com/gycha0109-beep/MyeongHa/pull/2084)의 폐기형 PG17에서 동일 Trigger 함수를 TEMP 행으로 호출한 부정 실험 결과, `zeroProof.records` 키가 없는 Pin에 대한 validated→committed 차단 실패 **재현**. 로그에는 개인정보 없이 `malformedMissingRecordsCommitAccepted=true` 및 Owner HOLD만 남긴다.
 - 다음 실행 허들: Security/DB Owner의 NULL-safe/shape-safe SQL Trigger forward-only 보강 범위 합의 → 합성 정상/악성 변환 + 실제 RPC 권한 + 배포 Runbook/DR 교차 검증. 독립 방어 수정 전 이 단위를 PASS/승인으로 표시하지 않는다. R2-G 계보·1530 권한 멤버십·21개 마이그레이션 승인·G1/G2/G3 양수 흐름·G0~G6/public/paid HOLD.
+
+## 26. 2026-10-14 R2-H 1650 Active Subject Lock 격리 검토
+
+- Cost Governor D4B Subject Lock 단위 `1650`을 1550~1630 선행 조건에 한정해 격리 PG17 검증한다. 내부 BEGIN/COMMIT이 있는 원본을 그대로 중첩 실행하는 함정을 피하도록 Git blob 검증+최상위 transaction-fence 정규화 후 원본 SQL 본문만 외부 롤백에서 재생한다. 정본 R2 패킷 [23절](SEYEON_MIGRATION_LINEAGE_R2_READONLY_PACKET_20261013.md).
+- SECURITY DEFINER helper Owner/SEARCH_PATH/EXECUTE boundary, governed start 함수 SHA/Owner/ACL 불변, 미존재 Subject 부정경로, 완전 롤백 확인. **함수 Owner가 실제 운영 마이그레이션 권한을 상속할 수 있는 위험은 별도 Owner/DB Security 검토**. Production 미적용 21개·DR/유료/공개 HOLD.
