@@ -329,6 +329,11 @@ SQL
       "$local_manifest" \
       scripts/operations/seyeon-r2-g-production-manifest-20261014.json \
       scripts/operations/seyeon-r2-g-production-remote-20261014.json
+    local_h_1520="$(mktemp)"
+    trap 'rm -f -- "$local_shape" "$local_digest" "$local_acl" "$local_acl_transient" "$local_acl_rollback" "$local_effective" "$local_manifest" "$local_h_1520"' EXIT
+    node scripts/operations/verify-seyeon-r2-pending-migrations.mjs > /dev/null
+    psql -X -qAt -v ON_ERROR_STOP=1 -f test/db/seyeon_r2_h_1520_transaction.sql > "$local_h_1520"
+    node scripts/operations/verify-seyeon-r2-h-1520.mjs "$local_h_1520"
     ;;
   seyeon-r2-rpc-catalog)
     verify_pg17
