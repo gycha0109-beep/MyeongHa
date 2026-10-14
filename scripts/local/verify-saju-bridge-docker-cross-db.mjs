@@ -58,7 +58,10 @@ function stageArgs(stage) {
   ];
   return ['run', '--rm', '--no-deps', '--entrypoint', 'node',
     '-e', 'MYEONGHA_DOCKER_SAJU_CROSS_DB=1',
-    ...(stage === 'cross-provenance' ? ['-e', 'MYEONGHA_DOCKER_SAJU_PROVENANCE=1'] : []),
+    ...(stage === 'cross-provenance' ? [
+      '-e', 'MYEONGHA_DOCKER_SAJU_PROVENANCE=1',
+      '-e', 'SAJU_BRIDGE_LOCAL_CROSS_DB_FAULT=1',
+    ] : []),
     '-e', 'SAJU_BRIDGE_LOCAL_RECOVERY_STAGE=' + stage,
     ...values.flatMap(([key,value]) => ['-e', key + '=' + value]),
     'saju-recovery-verifier', 'node_modules/vitest/vitest.mjs', 'run',
