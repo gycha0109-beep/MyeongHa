@@ -50,26 +50,30 @@ export function createOfflinePrivateCancelExecutorBoundaryV1(input:Readonly<{
     || typeof input.testStore?.commitAuthorizedReview!=='function'){
     throw new Error('Offline cancellation executor requires trusted boot dependencies.');
   }
-  const signedPolicy:PrivateCancelSignedTrustPolicyV1=structuredClone(input.signedPolicy);
-  const pinnedRoot:PrivateCancelTrustedRootV1=Object.freeze({...input.pinnedRoot});
-  verifyOfflinePrivateCancelSignedTrustPolicyV1({
-    envelope:signedPolicy,pinnedRoot,now:input.trustedClock(),
+  // Only signed issuer PUBLIC keys and policy expiry survive in the
+  // executor closure: never retain IdP/organization directory or root input.
+  const bootPolicy=verifyOfflinePrivateCancelSignedTrustPolicyV1({
+    envelope:input.signedPolicy,pinnedRoot:input.pinnedRoot,
+    now:input.trustedClock(),
   });
+  const trustedIssuers=bootPolicy.trustedPermitIssuers;
+  const expiresAt=Date.parse(bootPolicy.expiresAt);
   const clock=input.trustedClock,store=input.testStore;
   return Object.freeze({
     async execute(request:unknown):Promise<PrivateCancelReviewAuthorizedResultV1>{
       if(!permitRequestShape(request)){
         throw new Error('Offline cancellation executor refuses caller-supplied credentials and store.');
       }
-      // Rechecks time/revision/signature at execution time. Revocation via
-      // a NEW policy still requires a new externally provisioned bootstrap.
+      // The root was verified at startup. Reject expired snapshots at each
+      // use; a newly revoked signer requires a new trusted bootstrap.
       const now=clock();
-      const policy=verifyOfflinePrivateCancelSignedTrustPolicyV1({
-        envelope:signedPolicy,pinnedRoot,now,
-      });
+      if(!(now instanceof Date)||!Number.isFinite(now.valueOf())
+        || now.valueOf()>=expiresAt){
+        throw new Error('Offline cancellation signed policy expired or clock invalid.');
+      }
       return executeSandboxPrivateCancelReviewPermitV1({
         permit:request.permit,
-        trustedIssuers:policy.trustedPermitIssuers,
+        trustedIssuers,
         now,
         store,
       });
