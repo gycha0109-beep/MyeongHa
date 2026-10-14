@@ -276,3 +276,9 @@ Governor 04d4B 계열은 실제 격리 PostgreSQL 기반 영수증 임대·정�
 - 기존 R2 정본 패킷 [17절](SEYEON_MIGRATION_LINEAGE_R2_READONLY_PACKET_20261013.md)에 상세 증거 누적. `1540`은 인벤토리상 선행 의존성이 없는 독립 `saju-proof` 단위로 1510+timestamped 기준에 대해 하나의 트랜잭션으로 replay/rollback 한다.
 - 3-state catalog와 합성 digest/유효기간/중복키 거부 테스트, RLS/FORCE 및 runtime/GC 최소 컬럼 ACL을 PG17 기존 CI에 편입. Saju Source/보호 HTTP proof/credential/GC 실제 활성화 근거와 구별한다.
 - Production 쓰기 0, migration 1520~1720 미배포, R2 Owner 승인/출처/DR Ready 및 #1866 G0~G6/유료/공개 HOLD 유지.
+
+## 21. 2026-10-14 R2-H 1550~1570 Cost Governor Foundation 의존성 정밀화
+
+- 1550 table/trigger/기본 RPC, 1560 lifecycle_state·start/settle, 1570 model/unsettled 관측의 **1550→1560→1570** 격리 의존성을 PG17 5-state/ROLLBACK과 synthetic negative test로 검증. 기존 R2 패킷 [18절](SEYEON_MIGRATION_LINEAGE_R2_READONLY_PACKET_20261013.md)에 증거 집중.
+- 1570의 선언된 `requires`는 `1550`만 명시했지만 실제 `lifecycle_state` 컬럼은 1560이 제공함. 승인 없는 배포 방지를 위해 read-only 21-file Review Inventory의 `1570.requires`를 1550+1560으로 보정하고 fail-closed 테스트 추가. 21 SQL blob/Owner HOLD/실 운영 History 변경 0.
+- 1580~1630 추가 Cost Governor 정책·정산·실행 역할은 별도 Owner 검토 대상이며 1550~1570 GREEN은 그 배포 허가가 아니다. 실제 AI dispatch/usage 정산, 비공개 원천 SQL 감사, DR Ready 및 G0~G6/유료/public HOLD 유지.

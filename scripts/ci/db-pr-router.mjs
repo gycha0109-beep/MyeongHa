@@ -34,6 +34,10 @@ const commerceEntitlementPatterns = [
 ];
 
 const postgres17Patterns = [
+  /^scripts\/operations\/(?:seyeon-r2-h-1550-1570-catalog-readonly\.sql|verify-seyeon-r2-h-1550-1570\.mjs)$/u,
+  /^test\/db\/seyeon_r2_h_15(?:50|60)_synthetic\.sql$/u,
+  /^test\/db\/seyeon_r2_h_1550_1570_transaction\.sql$/u,
+  /^tests\/seyeon-r2-h-1550-1570\.test\.mjs$/u,
   /^scripts\/operations\/(?:seyeon-r2-h-1540-catalog-readonly\.sql|verify-seyeon-r2-h-1540\.mjs)$/u,
   /^test\/db\/seyeon_r2_h_1540_(?:transaction|synthetic)\.sql$/u,
   /^tests\/seyeon-r2-h-1540\.test\.mjs$/u,

@@ -76,6 +76,13 @@ describe('R2 held 1520..1720 pending migration dependency inventory', () => {
       expect(() => validateR2PendingInventory(root, manifest)).toThrow('HOLD_R2_APPROVAL_OR_OWNER_DRIFT');
     });
   });
+  it('rejects omitted 1560 runtime dependency of 1570 observability', () => {
+    withFixture((root, dir, manifest) => {
+      manifest.migrations.find(row => row.version === '1570').requires = ['1550'];
+      expect(() => validateR2PendingInventory(root, manifest))
+        .toThrow('HOLD_R2_1570_MISSING_LIFECYCLE_DEPENDENCY');
+    });
+  });
   it('rejects changed review-unit order or count', () => {
     withFixture((root, dir, manifest) => {
       manifest.migrations[5].unit = 'deletion';

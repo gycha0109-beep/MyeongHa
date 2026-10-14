@@ -90,6 +90,16 @@ export function validateR2PendingInventory(root, manifest) {
     if (!grouped.has(row.unit)) grouped.set(row.unit, []);
     grouped.get(row.unit).push(row.version);
   }
+  // 1570 queries lifecycle_state/started, introduced by 1560 (not 1550).
+  // Check the review plan's true runtime column dependency, never authorize migration.
+  const stage1570 = manifest.migrations.find(row => row.version === '1570');
+  assert(stage1570?.requires.includes('1550')
+    && stage1570.requires.includes('1560'),
+    '1570_MISSING_LIFECYCLE_DEPENDENCY');
+  assert(readFileSync(join(dir, stage1570.file), 'utf8').includes('lifecycle_state')
+    && readFileSync(join(dir, manifest.migrations.find(row => row.version === '1560').file), 'utf8')
+      .includes('add column lifecycle_state'),
+    '1570_LIFECYCLE_SOURCE_DRIFT');
   assert(grouped.size === 9, 'REVIEW_UNIT_CARDINALITY');
   const reviewUnits = [...grouped].map(([unit, versions]) => ({
     unit, versions, start: versions[0], end: versions.at(-1),
