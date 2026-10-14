@@ -44,7 +44,7 @@ returns table (
   oldest_unresolved_age_seconds bigint,
   effect_authorized boolean
 )
-language plpgsql stable security invoker
+language plpgsql volatile security invoker
 set search_path=pg_catalog,public
 as $d3e6_health$
 declare v_now timestamptz := pg_catalog.clock_timestamp();
