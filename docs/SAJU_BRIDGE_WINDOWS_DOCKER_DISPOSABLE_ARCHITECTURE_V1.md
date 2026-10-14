@@ -168,6 +168,22 @@ node scripts/local/verify-saju-bridge-docker-local.mjs --partition-commit ../Saj
 - 기존 `--crash-commit`의 Phase 4B 검증 및 출력은 변경하지 않는다. 기존 CI는 중복 인프라 실행 없이 `--partition-commit` 한 번으로 4B + 4C-1까지 검사한다. **Linux CI 통과는 Windows 실기기 증빙이 아니다.**
 - **범위 제한:** 이것은 **클라이언트 컨테이너의 네트워크 분리**이지 서버-서버 분리나 임의 packet-loss simulation, Admission COMMIT 실패 또는 3DB 분산 복구가 아니다. `durable=0`인 결과에서 자동 보상/재수행을 허용한다는 뜻이 아니다. Production 운영 Root/Attestor/Runner, R01–R14, 2D-4, `canExecute`, `canPublish`, `canSell`은 모두 HOLD/false 그대로다.
 
+### 3H. Phase 4C-2 — Admission Permit V2 실제 COMMIT 도중 DB SIGKILL (2026-10-14)
+
+`--admission-crash`는 Phase 1/2/2B/3A/3B/4A/4B/4C-1을 같은 실행별 Docker 프로젝트에서 선행하고 **새 합성 Permit V2**에 대해 4C-2를 별도 검증한다.
+
+```powershell
+node scripts/local/verify-saju-bridge-docker-local.mjs --admission-crash ../Saju-bridge-verify
+```
+
+- 일회용 Admission DB만 대상으로 `DEFERRABLE INITIALLY DEFERRED` UPDATE constraint trigger에 `pg_sleep`을 설치한다. 실제 제한 로그인 + 독립 CA TLS `verify-full` 및 기존 `createSajuHeldStagingPostgresAdmissionPortV2`의 Ed25519 서명 검증 경로에서 합성 `ISSUED → CONSUMED`를 1회 시도한다.
+- 호스트의 `pg_stat_activity`에서 **Admission PostgreSQL `COMMIT` / `PgSleep`**을 관측한 경우에만 이 프로젝트의 `admission-db`에 `docker compose kill -s SIGKILL`을 실행한다. Nonce/Subject/Auth 컨테이너는 강제 종료하지 않는다. 관측 실패면 테스트 실패이고 모의 ACK 유실로 성공 처리하지 않는다.
+- 장애 시 소비 어댑터가 `false`를 반환하고 **동일 인스턴스의 재소비도 거부**해야 한다. DB 재시작 후 중단 대상은 `ISSUED, consumed_at_ms IS NULL`; 사전에 만든 `REVOKED`는 그대로 `REVOKED`; Phase 4A에서 정상 커밋한 다른 Permit은 `CONSUMED`를 유지해야 한다. Nonce 1건과 Subject fixture도 불변임을 별도로 읽는다.
+- **중요한 안전 경계:** 이번 결과는 *실제 COMMIT 처리 중 물리적 프로세스 종료로 해당 트랜잭션이 롤백된 결정적 사례*다. 일반적인 COMMIT 장애가 언제나 롤백된다는 뜻이 아니다. 서버가 이미 커밋한 뒤 ACK만 유실되는 경우는 Phase 4A/4C-1에서 별도 취급한다. 실패 반환 뒤 **새 권한/새 세션으로 동일 Permit 자동 재시도·승인**은 검증하거나 허용하지 않는다. 원래 Permit이 ISSUED로 남아도 운영 승인으로 승격되지 않는다.
+- 테스트 컨테이너는 Docker 소켓을 소유하지 않는다. 호스트에서 검사된 실행별 자원만 중단한다. `admission-db`를 복구하고 지연 트리거를 제거한 뒤 부모의 `down --volumes --remove-orphans`가 해당 실행의 컨테이너·네트워크·볼륨 잔존 0을 확인해야 PASS다.
+- 기존 CI workflow의 한 Docker 실증 단계에서 `--admission-crash`를 사용한다. Linux PASS를 Windows 실기기 검증으로 바꾸지 않는다.
+- **HOLD:** 실제 운영 Root/Attestor/Runner, R01–R14/2D-4 및 스테이징/상품/결제 권한 승인, Subject·Nonce·Admission 상이 결과에 대한 분산 복구·보상(4C-3)은 여전히 미검증. `canExecute=false`, `canPublish=false`, `canSell=false`.
+
 ## 4. 단계별 로드맵 · 종료 게이트
 
 | 단계 | 구현 | 게이트 | 범위 상태 |
