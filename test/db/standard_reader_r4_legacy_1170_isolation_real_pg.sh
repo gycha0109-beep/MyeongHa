@@ -31,6 +31,18 @@ select * from public.cmd_bind_standard_reading_unit_v1(
  '{"schemaVersion":"standard-reading-unit-request-v1","purchaseIntentId":"11392300-0000-0000-0000-000000000001"}'::jsonb
 );
 SQL
+# Source fixtures define pg_temp assertions. Execute all fixture SQL within
+# the SAME PostgreSQL connection, before trying any v2 bind.
+case "$mode" in
+ additional_denied)
+  awk '/^create temp table _b2_additional_result as/{exit} {print}' \
+   test/db/standard_reader_additional_policy_locked_positive.sql >>"$tmp/setup.sql"
+  ;;
+ fresh_official)
+  awk '/^create temp table _s4_initial_result as/{exit} {print}' \
+   test/db/standard_reader_initial_policy_locked_positive.sql >>"$tmp/setup.sql"
+  ;;
+esac
 p -f "$tmp/setup.sql" >"$tmp/setup.out" 2>"$tmp/setup.err" ||
  { tail -n 45 "$tmp/setup.err" >&2; fail 'verified 1170 binding fixture'; }
 [[ "$(p -c "select count(*) from public.standard_reading_unit_bindings
@@ -46,10 +58,6 @@ select count(*) from public.internal_qry_character_standard_reading_access_v2(
  fail 'legacy Reader silently gained current v2 access'
 case "$mode" in
  additional_denied)
-  awk '/^create temp table _b2_additional_result as/{exit} {print}' \
-   test/db/standard_reader_additional_policy_locked_positive.sql >"$tmp/new.sql"
-  p -f "$tmp/new.sql" >"$tmp/new.out" 2>"$tmp/new.err" ||
-   { tail -n 45 "$tmp/new.err" >&2; fail 'independent additional Receipt fixture'; }
   if p >"$tmp/bind.out" 2>"$tmp/bind.err" <<SQL
 begin;
 select set_config('myeongha.subject_id','$subject',true);
@@ -74,10 +82,6 @@ where source_receipt_id='b2030000-0000-4000-8000-000000000001'::uuid and status=
    fail 'independent Commerce Grant was lost'
   ;;
  fresh_official)
-  awk '/^create temp table _s4_initial_result as/{exit} {print}' \
-   test/db/standard_reader_initial_policy_locked_positive.sql >"$tmp/new.sql"
-  p -f "$tmp/new.sql" >"$tmp/new.out" 2>"$tmp/new.err" ||
-   { tail -n 45 "$tmp/new.err" >&2; fail 'independent first-purchase fixture'; }
   p -f test/db/standard_reader_r4_initial_bind_call.sql >"$tmp/bind.out" 2>"$tmp/bind.err" ||
    { cat "$tmp/bind.err" >&2; fail 'genuine new verified Official Reading'; }
   [[ "$(p -c 'select count(*) from public.standard_reading_official_bindings')" == 1 ]] ||
