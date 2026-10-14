@@ -250,3 +250,10 @@ Watchtower-Track: ops. R1 정확한 격리 복원 증거는 8절을 따른다. �
 - 실험: `1510 + timestamped 2` 검증 기준 → `BEGIN → 1550 → 1560 → 1570 → 1580 → 1590 → ROLLBACK`. 5개 catalog state(baseline, 선행 완료, 1580 완료, 1590 완료, 복구)를 비교. 2개 모델/일일 예산 테이블 RLS+FORCE, Owner와 정책 3개, 원장 Quote 6칼럼·제약/부분 Index, 1590 stored effective cost, 2개 governed RPC의 SECURITY DEFINER/Owner/검색경로/직접 EXECUTE를 검증한다.
 - 합성 부정 입력: 두 개의 동시 활성 모델 정책 거부, token context window 초과 거부, 0원 일일 예산 거부, started 상태의 예약 비용 유지(500), settled/estimated 상태 실제 비용 반영(300). 가짜 UUID와 fixture 행만 사용하고 모두 삭제·마지막 트랜잭션 전체 ROLLBACK. 동시 세션·실 provider·실 계정·실 유료 결제나 본인 데이터 없음.
 - `1600` rate-card 불변성과 `1610~1630` 내부 정산·실행 Role 분리/최종 승인, 실제 Subject deletion 경합/운영 예산 프로비저닝·유료 모델 활성화는 이 증거의 범위 밖. 기존 `1530` creator Role 잔존 HOLD 및 R2-G historical provenance HOLD 유지. `dr_ready=false`, Production 전혀 쓰지 않음.
+
+## 20. 2026-10-14 R2-H-6 — 1600 Immutable Rate Card / 1610 Legacy Settlement Guard 격리 검증
+
+- **원본 보존:** `1600_seyeon_ai_governor_rate_card_integrity_v1.sql` Git blob `a40ad2c1cbae8ab6653c817340f0c42f1784b08c`; `1610_seyeon_ai_governor_legacy_settlement_guard_v1.sql` Git blob `ad4a961d4474b9048c8e397d092f354e032bd057`. 선행 1550~1590 실험 내부에서 재생, 1620~1720과 원격-only SQL 배제.
+- **5단계 PG17:** baseline 1510+2 timestamped → 1550~1590 → 1600 → 1610 → ROLLBACK. SHA256 digest는 출력하지만 SQL body, ACL 원문, Role graph, 개인정보 출력 금지. `1600` rate-card UPDATE/DELETE BEFORE trigger, invoker search_path, public EXECUTE 거부, governed settlement DB 원가 재계산 DDL 교체 확인. 합성 정책 행으로 is_active만 변경 가능, rate/price_version UPDATE 및 DELETE 차단 검증.
+- **1610 계약:** `seyeon_ai_settle_internal_v1` private SECURITY DEFINER / cost-meter Owner와 search_path, 브라우저·service·API EXECUTE 거부 확인. 기존 legacy settle RPC는 같은 ACL/Owner를 유지하되 guarded wrapper DDL로 교체하고 governed settle은 private helper를 호출하도록 교체; 원본 SQL Digest 변경과 Role 멤버십·Schema CREATE 잔존 금지, 전체 롤백 검증.
+- **미검증/차단:** 이번 카탈로그·합성 Rate Card 검증은 Subject-bound 실 정산 호출, 사용자 삭제/회수 동시성, 실 Token 과금, 1620 Internal Start/1630 governed credential/ROLE 분리나 최종 Provider 호출 권한이 아니므로 Owner 승인 필요. R2-G historical source provenance와 1530 creator membership HOLD, `dr_ready=false`, 21 pending migrations, G0~G6/유료/공개 유지.
