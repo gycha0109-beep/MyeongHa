@@ -38,7 +38,7 @@ describe('shared CI verification plan', () => {
     const plan = resolveVerificationPlan(['scripts/ci/db-suites.json']);
     expect(plan.db).toBe(true);
     expect(plan.db_suites).toHaveLength(5);
-    expect(plan.db_suites.flatMap((suite: string) => getDbSuite(suite).cases)).toHaveLength(45);
+    expect(plan.db_suites.flatMap((suite: string) => getDbSuite(suite).cases)).toHaveLength(46);
     const cases = plan.db_suites.flatMap((suite: string) => getDbSuite(suite).cases);
     expect(cases.filter((name: string) => name === 'saju-staging-operator-admission')).toHaveLength(2);
     expect(cases.filter((name: string) => name === 'saju-staging-operator-admission-v2')).toHaveLength(2);
@@ -55,6 +55,7 @@ describe('shared CI verification plan', () => {
     expect(getDbSuite('postgres17').cases).toContain('cap-b2-r4-issuer-before-cancel');
     expect(getDbSuite('postgres17').cases).toContain('cap-b2-r4-provider-cancel-denials');
     expect(getDbSuite('postgres17').cases).toContain('cap-b2-r4-provider-cancel-replay');
+    expect(getDbSuite('postgres17').cases).toContain('cap-b2-r4-refund-repurchase-isolation');
     expect(getDbSuite('postgres17').cases).toContain('cap-b2-r4-actual-new-member-promotion');
     const dispatcher = readFileSync('test/db/run_ci_case.sh', 'utf8');
     for (const caseName of cases) expect(dispatcher).toContain(`${caseName})`);
