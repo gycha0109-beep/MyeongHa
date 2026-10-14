@@ -8,7 +8,7 @@ import { canonicalSajuHeldStagingPermitApprovalBytesV2 } from '../apps/api/src/s
 import { digestSajuHeldStagingTargetManifestV1 } from '../apps/api/src/saju-held-staging-target-manifest-v1.js';
 import { digestSajuHeldStagingConnectionPlanV1 } from '../apps/api/src/saju-held-staging-connection-plan-v1.js';
 import type { PostgresQueryResultV1, PostgresSubjectPoolV1 } from '../apps/api/src/postgres-subject-execution.js';
-import { classifySajuBridgeCrossDbObservationV1 as classify } from '../scripts/local/saju-bridge-cross-db-observation-v1.mjs';
+import { classifySajuBridgeCrossDbObservationV1 as classify, assessSajuBridgeCrossDbSnapshotRaceV1 as assessRace } from '../scripts/local/saju-bridge-cross-db-observation-v1.mjs';
 
 type Peer = 'subject' | 'nonce' | 'admission';
 type Evidence = { subject: string; nonce: string; permit: string };
@@ -59,7 +59,9 @@ function pg(peer: Peer, admin = false): Pool {
 }
 function guard() {
   if (!enabled || !['cross-seed', 'cross-verify', 'cross-outage-nonce',
-    'cross-outage-admission', 'cross-outage-subject', 'cross-final'].includes(stage ?? '')
+    'cross-outage-admission', 'cross-outage-subject', 'cross-final',
+    'cross-stability-before', 'cross-stability-mutate',
+    'cross-stability-after', 'cross-stability-confirm'].includes(stage ?? '')
     || process.env.MYEONGHA_DOCKER_SAJU_TLS !== '1'
     || process.env.MYEONGHA_DOCKER_SAJU_PERMIT !== '1'
     || process.env.SAJU_BRIDGE_LOCAL_SUBJECT_DB !== config.subject[1]
@@ -245,6 +247,36 @@ describe('Phase 4C-3 cross-DB fail-closed classification', () => {
   });
 });
 
+describe('Phase 4D cross-DB stale snapshot race HOLD', () => {
+  it('never infers recovery permission from changed, unchanged or missing observations', () => {
+    const before = {
+      NONCE_ONLY: {subject:'PRESENT',nonce:'CLAIMED',permit:'ISSUED'},
+      PERMIT_ONLY: {subject:'PRESENT',nonce:'ABSENT',permit:'CONSUMED'},
+      REVOKED_WITH_NONCE: {subject:'PRESENT',nonce:'CLAIMED',permit:'REVOKED'},
+    };
+    const after = {
+      NONCE_ONLY: {subject:'PRESENT',nonce:'CLAIMED',permit:'CONSUMED'},
+      PERMIT_ONLY: {subject:'PRESENT',nonce:'CLAIMED',permit:'CONSUMED'},
+      REVOKED_WITH_NONCE: {subject:'PRESENT',nonce:'CLAIMED',permit:'REVOKED'},
+    };
+    for (const [first, last, expected] of [
+      [before, after, 'EVIDENCE_CHANGED_HOLD'],
+      [after, after, 'UNCHANGED_UNVERIFIED_HOLD'],
+      [before, before, 'UNCHANGED_UNVERIFIED_HOLD'],
+      [before, { ...after, PERMIT_ONLY: {subject:'PRESENT',nonce:'UNKNOWN',permit:'CONSUMED'} }, 'UNKNOWN_HOLD'],
+      [before, null, 'UNKNOWN_HOLD'],
+      [before, { ...after, EXTRA: {} }, 'UNKNOWN_HOLD'],
+    ] as const) {
+      const result = assessRace(first, last);
+      expect(result.classification).toBe(expected);
+      expect(result).toMatchObject({decision:'HOLD_MANUAL_REVIEW',
+        canExecute:false, canPublish:false, canSell:false,
+        automaticRetry:false, automaticCompensation:false});
+      expect(Object.isFrozen(result)).toBe(true);
+    }
+  });
+});
+
 describe.skipIf(!enabled)('Phase 4C-3 actual isolated PostgreSQL partial durable states', () => {
   afterAll(async () => { await Promise.all(pools.map(p => p.end())); });
   it('retains partial commits but never converts a cross-DB read into recovery permission', async () => {
@@ -271,6 +303,17 @@ describe.skipIf(!enabled)('Phase 4C-3 actual isolated PostgreSQL partial durable
       expect(await consume.consumeAuthorizedAttemptOnce()).toBe(true);
       expect(await consume.consumeAuthorizedAttemptOnce()).toBe(false);
     }
+    // Phase 4D mutations are deliberate, isolated fixture writes in a NEW
+    // verifier process; NOT distributed compensation or an operational retry.
+    if (stage === 'cross-stability-mutate') {
+      const approval = signedPermit(permitIds.NONCE_ONLY, port(pg('admission')));
+      const admitted = createSajuHeldStagingPostgresAdmissionPortV2(approval.options);
+      expect(await admitted.consumeAuthorizedAttemptOnce()).toBe(true);
+      expect(await admitted.consumeAuthorizedAttemptOnce()).toBe(false);
+      const nonceRuntime = createSajuSourceProofPostgresNonceClaimV1({pool:port(pg('nonce'))});
+      expect(await nonceRuntime(replayKeys.PERMIT_ONLY, Date.now() + 120000)).toBe(true);
+      console.log('[saju-bridge] Phase 4D controlled independent signed Permit/Nonce changes COMMITTED; no compensation.');
+    }
     const snapshots: Record<Case, Evidence> = {} as Record<Case, Evidence>;
     for (const id of ids) {
       const e = await observe(id, peers);
@@ -288,6 +331,12 @@ describe.skipIf(!enabled)('Phase 4C-3 actual isolated PostgreSQL partial durable
         expect(e).toMatchObject({ subject: 'UNKNOWN', nonce: expected[id].nonce,
           permit: expected[id].permit });
         expect(decision.classification).toBe('UNKNOWN_HOLD');
+      } else if (stage === 'cross-stability-mutate'
+        || stage === 'cross-stability-after' || stage === 'cross-stability-confirm') {
+        expect(e).toEqual({ subject:'PRESENT', nonce:'CLAIMED',
+          permit:id === 'REVOKED_WITH_NONCE' ? 'REVOKED' : 'CONSUMED' });
+        expect(decision.classification).toBe(id === 'REVOKED_WITH_NONCE'
+          ? 'REVOKED_WITH_NONCE_HOLD' : 'BOTH_DURABLE_UNVERIFIED_HOLD');
       } else {
         expect(e).toEqual({ subject: expected[id].subject,
           nonce: expected[id].nonce, permit: expected[id].permit });
@@ -296,6 +345,11 @@ describe.skipIf(!enabled)('Phase 4C-3 actual isolated PostgreSQL partial durable
       expect(decision).toMatchObject({ decision: 'HOLD_MANUAL_REVIEW',
         canExecute: false, canPublish: false, canSell: false,
         automaticRetry: false, automaticCompensation: false });
+    }
+    if (['cross-stability-before', 'cross-stability-after',
+      'cross-stability-confirm'].includes(stage ?? '')) {
+      // Only semantic statuses, never replay keys, UUIDs or credentials.
+      console.log('[saju-bridge] Phase 4D snapshot ' + stage + ': ' + JSON.stringify(snapshots));
     }
     if (stage === 'cross-seed') {
       console.log('[saju-bridge] Phase 4C-3 cross-seed evidence: three independent partial states HOLD.');
