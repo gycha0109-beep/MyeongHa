@@ -123,7 +123,7 @@ function harness(row: OfficialReaderCancelStoredInboxRowV1, options: {
       expect(id).toBe(ID);
       return row;
     },
-    async withReadCommittedTransaction<T>(action) {
+    async withReadCommittedTransaction<T>(action: (tx: OfficialReaderCancelInboxObservationTransactionV1) => Promise<T>): Promise<T> {
       calls.push('begin');
       if (options.txFailure) throw new Error('synthetic DB begin failure');
       const result = await action({
