@@ -58,21 +58,22 @@ function stageArgs(stage) {
   ];
   return ['run', '--rm', '--no-deps', '--entrypoint', 'node',
     '-e', 'MYEONGHA_DOCKER_SAJU_CROSS_DB=1',
-    ...(['cross-provenance', 'cross-review-packet', 'cross-synthetic-signatures'].includes(stage) ? [
+    ...(['cross-provenance', 'cross-review-packet', 'cross-synthetic-signatures', 'cross-replay-review'].includes(stage) ? [
       '-e', 'MYEONGHA_DOCKER_SAJU_PROVENANCE=1',
       '-e', 'SAJU_BRIDGE_LOCAL_CROSS_DB_FAULT=1',
     ] : []),
-    ...(['cross-review-packet','cross-synthetic-signatures'].includes(stage) ? [
+    ...(['cross-review-packet','cross-synthetic-signatures', 'cross-replay-review'].includes(stage) ? [
       '-e', 'MYEONGHA_DOCKER_SAJU_REVIEW_PACKET=1',
       '-e', 'SAJU_BRIDGE_LOCAL_REVIEW_RUN_ID=' + env.SAJU_BRIDGE_LOCAL_REVIEW_RUN_ID,
     ] : []),
+    ...(stage === 'cross-replay-review' ? ['-e', 'MYEONGHA_DOCKER_SAJU_REPLAY_REVIEW=1'] : []),
     ...(stage === 'cross-synthetic-signatures' ? [
       '-e','MYEONGHA_DOCKER_SAJU_SYNTHETIC_SIGNATURES=1',
     ] : []),
     '-e', 'SAJU_BRIDGE_LOCAL_RECOVERY_STAGE=' + stage,
     ...values.flatMap(([key,value]) => ['-e', key + '=' + value]),
     'saju-recovery-verifier', 'node_modules/vitest/vitest.mjs', 'run',
-    ['cross-provenance', 'cross-review-packet', 'cross-synthetic-signatures'].includes(stage)
+    ['cross-provenance', 'cross-review-packet', 'cross-synthetic-signatures', 'cross-replay-review'].includes(stage)
       ? 'test/saju-held-docker-provenance-phase4e.test.ts'
       : 'test/saju-held-docker-cross-db-phase4c3.test.ts'];
 }
@@ -178,6 +179,13 @@ async function run() {
       }
       runStage('cross-synthetic-signatures', 'Phase 4G real DB: independent TLS read-only evidence, five distinct ephemeral Ed25519 signing keys; cryptographic tampering/foreign signer rejected; synthetic signature validity NEVER authorizes operation.');
       console.log('[saju-bridge] Phase 4G: synthetic Ed25519 signatures verified and tampering rejected against disposable evidence; no independent trust root or operational approval.');
+    }
+    if (env.SAJU_BRIDGE_LOCAL_REPLAY_REVIEW_FAULT === '1') {
+      if (env.SAJU_BRIDGE_LOCAL_SYNTHETIC_SIGNATURES_FAULT !== '1') {
+        throw new Error('Phase 4H requires prior Phase 4G real cryptographic synthetic verifier.');
+      }
+      runStage('cross-replay-review', 'Phase 4H real DB: replay and independent-run semantic reuse held; stale peer held; no trusted registry or execution.');
+      console.log('[saju-bridge] Phase 4H: replay and cross-run semantic reuse remain HOLD; no trusted registry or permission.');
     }
   } catch (error) {
     primaryError = error;

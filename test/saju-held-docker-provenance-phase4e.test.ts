@@ -14,6 +14,9 @@ import {
   type SajuBridgeReviewPacketV1,
 } from '../scripts/local/saju-bridge-review-packet-v1.mjs';
 import {
+  assessSajuBridgeCrossRunReviewV1 as assessReplay,
+} from '../scripts/local/saju-bridge-review-replay-v1.mjs';
+import {
   assessSajuBridgeSyntheticAttestationV1 as assessSignature,
   makeSajuBridgeSyntheticAttestationMessageV1 as signatureMessage,
   type SajuBridgeSyntheticSignerV1,
@@ -22,7 +25,8 @@ import {
 const enabled = process.env.MYEONGHA_DOCKER_SAJU_PROVENANCE === '1';
 const stage = process.env.SAJU_BRIDGE_LOCAL_RECOVERY_STAGE;
 const syntheticStage = stage === 'cross-synthetic-signatures';
-const packetStage = stage === 'cross-review-packet' || syntheticStage;
+const replayStage = stage === 'cross-replay-review';
+const packetStage = stage === 'cross-review-packet' || syntheticStage || replayStage;
 const cases = ['NONCE_ONLY', 'PERMIT_ONLY', 'REVOKED_WITH_NONCE'] as const;
 type Case = typeof cases[number];
 const permitIds: Record<Case, string> = {
@@ -49,11 +53,12 @@ const certs = enabled ? {
 const pools: Pool[] = [];
 const peers: Record<Peer, Pool> = {} as Record<Peer, Pool>;
 function guard() {
-  if (!enabled || !['cross-provenance','cross-review-packet','cross-synthetic-signatures'].includes(stage ?? '')
+  if (!enabled || !['cross-provenance','cross-review-packet','cross-synthetic-signatures','cross-replay-review'].includes(stage ?? '')
     || (packetStage && (process.env.MYEONGHA_DOCKER_SAJU_REVIEW_PACKET !== '1'
       || !/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/u.test(
         process.env.SAJU_BRIDGE_LOCAL_REVIEW_RUN_ID ?? '')))
     || (syntheticStage && process.env.MYEONGHA_DOCKER_SAJU_SYNTHETIC_SIGNATURES !== '1')
+    || (replayStage && process.env.MYEONGHA_DOCKER_SAJU_REPLAY_REVIEW !== '1')
     || process.env.MYEONGHA_DOCKER_SAJU_TLS !== '1'
     || process.env.MYEONGHA_DOCKER_SAJU_PERMIT !== '1'
     || process.env.SAJU_BRIDGE_LOCAL_CROSS_DB_FAULT !== '1'
@@ -316,6 +321,42 @@ describe('Phase 4F untrusted manual review submission contract', () => {
   });
 });
 
+describe('Phase 4H cross-run replay and conflict HOLD', () => {
+  it('rejects replay, conflicting same-run evidence, cross-run semantic reuse and malformed peers', () => {
+    const now = 1900000000000;
+    const first = claimPacket(sample(), now, randomUUID());
+    const original = sample();
+    const changed = {...original, cases: {...original.cases,
+      NONCE_ONLY: {subject:'PRESENT', nonce:'ABSENT', permit:'ISSUED'},
+    }};
+    const sameRunConflict = claimPacket(changed, now, first.runId);
+    const otherRunSameEvidence = claimPacket(sample(), now, randomUUID());
+    const otherRunDifferent = claimPacket(changed, now, randomUUID());
+    const checks = [
+      [first, first, 'IDENTICAL_RUN_REPLAY_HOLD'],
+      [sameRunConflict, first, 'SAME_RUN_CONFLICT_HOLD'],
+      [otherRunSameEvidence, first, 'CROSS_RUN_DIGEST_REUSE_HOLD'],
+      [otherRunDifferent, first, 'DISTINCT_UNVERIFIED_RUNS_HOLD'],
+      [first, {...first, approved:true}, 'UNVERIFIED_PACKET_PAIR_HOLD'],
+      [first, null, 'UNVERIFIED_PACKET_PAIR_HOLD'],
+    ] as const;
+    for (const [latest, previous, expected] of checks) {
+      const result = assessReplay(latest, previous, now);
+      expect(result).toMatchObject({
+        classification:expected, replayRegistry:'NOT_AVAILABLE',
+        crossRunLinkage:'NOT_PROVEN', independentAuthority:'NOT_ATTESTED',
+        manualReviewAdmissibility:'NOT_ADMISSIBLE', decision:'HOLD_MANUAL_REVIEW',
+        canExecute:false, canPublish:false, canSell:false,
+        automaticRetry:false, automaticCompensation:false,
+      });
+      expect(Object.isFrozen(result)).toBe(true);
+      expect(JSON.stringify(result)).not.toContain('synthetic-claim-source');
+    }
+    expect(assessReplay(first, otherRunSameEvidence, NaN).classification)
+      .toBe('UNVERIFIED_PACKET_PAIR_HOLD');
+  });
+});
+
 describe('Phase 4E non-authorizing manual review provenance', () => {
   it('never promotes a matching or apparently attested pair', () => {
     const packet = sample();
@@ -419,6 +460,17 @@ describe.skipIf(!enabled)('Phase 4E actual independent disposable authority obse
         i === 1 ? {...x, sourceId:packet.submissions[0]!.sourceId} : x)},
         nowMs, 'DUPLICATE_OR_NONINDEPENDENT_SOURCE_HOLD');
       console.log('[saju-bridge] Phase 4F real DB: five untrusted claimed receipts bound to ephemeral read-only evidence; missing/foreign/duplicate rejected; even structurally complete NOT_ATTESTED, NOT_ADMISSIBLE; no action.');
+      if (replayStage && process.env.MYEONGHA_DOCKER_SAJU_REPLAY_REVIEW === '1') {
+        const repeated = claimPacket(actual, nowMs, randomUUID());
+        expect(assessReplay(packet, packet, nowMs).classification)
+          .toBe('IDENTICAL_RUN_REPLAY_HOLD');
+        expect(assessReplay(repeated, packet, nowMs).classification)
+          .toBe('CROSS_RUN_DIGEST_REUSE_HOLD');
+        const expired = claimPacket(actual, nowMs - 300001, randomUUID());
+        expect(assessReplay(expired, packet, nowMs).classification)
+          .toBe('UNVERIFIED_PACKET_PAIR_HOLD');
+        console.log('[saju-bridge] Phase 4H real DB: replay and independent-run semantic reuse held; stale peer held; no trusted registry or execution.');
+      }
       if (syntheticStage) {
         const {signed,registry} = signSyntheticPacket(packet);
         denySignature(signed,nowMs,registry,

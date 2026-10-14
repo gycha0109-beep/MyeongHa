@@ -260,6 +260,19 @@ node scripts/local/verify-saju-bridge-docker-local.mjs --synthetic-signatures ..
 - 성공/실패 전부 `HOLD_MANUAL_REVIEW`, `keyCustodyAuthority=NOT_ESTABLISHED`, `independentSourceAuthority=NOT_ESTABLISHED`, `sameLogicalAttempt=NOT_PROVEN`, `globalCommitOrder=NOT_PROVEN`, `manualReviewAdmissibility=NOT_ADMISSIBLE` 및 `canExecute/canPublish/canSell/automaticRetry/automaticCompensation=false`이다. 새 API·마이그레이션·운영 키·Runner·실제 승인/재시도/보상 로직 없음.
 - Linux GitHub CI의 폐기형 실증 완료와 Windows Docker Desktop **실기기 Acceptance**는 별개이다. Windows의 `--synthetic-signatures` PASS/FAIL은 실제 기기 로그 제출 전에는 NOT_VERIFIED이다. 기존 Docker 컨테이너·네트워크·볼륨 잔존 0 검사는 보존한다.
 
+### 3N. Phase 4H — 교차 실행 패킷 재사용·충돌 관측의 비권위적 HOLD (2026-10-14)
+
+```powershell
+node scripts/local/verify-saju-bridge-docker-local.mjs --replay-review ../Saju-bridge-verify
+```
+
+- **선행 Phase 4G는 합성 Ed25519 서명 검증**이다. Phase 4H는 그 뒤에 순서대로 실행되며 기존 옵션·검증을 교체하지 않는다.
+- 순수 `saju-bridge-review-replay-v1.mjs`는 Phase 4F의 두 개의 엄격하게 검증된 비권위적 증거 제출 패킷을 동일 시점에 비교한다. 똑같은 실행 ID/지문: `IDENTICAL_RUN_REPLAY_HOLD`; 같은 실행 ID/서로 다른 합성 증거: `SAME_RUN_CONFLICT_HOLD`; 실행 ID만 다르고 합성 의미 증거 동일: `CROSS_RUN_DIGEST_REUSE_HOLD`; 서로 다른 두 패킷: `DISTINCT_UNVERIFIED_RUNS_HOLD`; 위조·누락·오래된 패킷: `UNVERIFIED_PACKET_PAIR_HOLD`.
+- 실제 일회용 Subject·Nonce·Admission TLS/READ ONLY 검증 이후 새 검증 컨테이너에서 재사용·다른 runId의 동일 합성 증거·시간 초과를 확인한다. 원본 키/사용자 정보 출력 금지. 기존 프로젝트 컨테이너·네트워크·볼륨 잔존 0 정리 유지.
+- 이 검사는 **두 개의 입력된 패킷만 비교**한다. 운영 원장, 외부 출처 신뢰, 지속적 재사용 방지 레지스트리, 독립 실행 시도의 인과 관계, 공인 승인 증명이 아니다. 같은 runId가 서로 다른 DB 변경을 설명한다는 주장은 거부하고, 서로 다른 runId가 안전하다는 주장도 인정하지 않는다.
+- 모든 반환은 `HOLD_MANUAL_REVIEW`, `replayRegistry=NOT_AVAILABLE`, `crossRunLinkage=NOT_PROVEN`, `manualReviewAdmissibility=NOT_ADMISSIBLE`, `canExecute/canPublish/canSell=false`, `automaticRetry/automaticCompensation=false`.
+- 운영 Root/Attestor/Runner, R01–R14, 2D-4, 실제 자동 복구·수동 운영 승인 모두 HOLD. Windows 실기기 Phase 4H는 사용자 로컬 실행 증빙 전까지 NOT_VERIFIED이며, Linux CI가 이를 대체하지 않는다.
+
 ## 4. 단계별 로드맵 · 종료 게이트
 
 | 단계 | 구현 | 게이트 | 범위 상태 |
