@@ -68,8 +68,8 @@ function docker(args, { capture = false, timeout = 240_000 } = {}) {
 
 function localSajuCheckout() {
   if (process.argv.length === 2) return null;
-  if (process.argv.length !== 4 || !['--http', '--binding', '--tls', '--permit', '--recovery', '--crash-commit', '--partition-commit', '--admission-crash', '--cross-db'].includes(process.argv[2]) || !process.argv[3]) {
-    throw new Error('Usage: node scripts/local/verify-saju-bridge-docker-local.mjs [--http ../Saju | --binding ../Saju | --tls ../Saju | --permit ../Saju | --recovery ../Saju | --crash-commit ../Saju | --partition-commit ../Saju | --admission-crash ../Saju | --cross-db ../Saju]');
+  if (process.argv.length !== 4 || !['--http', '--binding', '--tls', '--permit', '--recovery', '--crash-commit', '--partition-commit', '--admission-crash', '--cross-db', '--snapshot-race'].includes(process.argv[2]) || !process.argv[3]) {
+    throw new Error('Usage: node scripts/local/verify-saju-bridge-docker-local.mjs [--http ../Saju | --binding ../Saju | --tls ../Saju | --permit ../Saju | --recovery ../Saju | --crash-commit ../Saju | --partition-commit ../Saju | --admission-crash ../Saju | --cross-db ../Saju | --snapshot-race ../Saju]');
   }
   const saju = realpathSync(resolve(process.argv[3]));
   if (saju === root) throw new Error('A separate pinned Saju checkout is required.');
@@ -126,7 +126,8 @@ function remaining(kind) {
 }
 
 function main() {
-  const crossDb = process.argv[2] === '--cross-db';
+  const stability = process.argv[2] === '--snapshot-race';
+  const crossDb = process.argv[2] === '--cross-db' || stability;
   const admissionCrash = process.argv[2] === '--admission-crash' || crossDb;
   const networkCommit = process.argv[2] === '--partition-commit' || admissionCrash;
   const crashCommit = process.argv[2] === '--crash-commit' || networkCommit;
@@ -273,6 +274,7 @@ function main() {
           }
           if (crossDb) {
             sandboxEnv.SAJU_BRIDGE_LOCAL_CROSS_DB_FAULT = '1';
+            if (stability) sandboxEnv.SAJU_BRIDGE_LOCAL_STABILITY_FAULT = '1';
             console.log('[saju-bridge] Phase 4C-3: observe independently durable cross-DB partial states, physical peer outages and fail-closed HOLD.');
             const probe = spawnSync(process.execPath, [crossDbRunner], {
               cwd: root, shell: false, env: sandboxEnv,
@@ -328,6 +330,7 @@ function main() {
                     console.log('[saju-bridge] Phase 4C-2 PASS: physical Admission DB SIGKILL inside Permit V2 COMMIT, durable rollback, no duplicate consume and no status promotion.');
                     if (crossDb) {
                       console.log('[saju-bridge] Phase 4C-3 PASS: three independently durable cross-DB divergence cases, actual peer outages and read-only fail-closed HOLD; no retry or compensation.');
+                      if (stability) console.log('[saju-bridge] Phase 4D PASS: cross-session stale snapshot invalidated by real independent DB commits; unchanged later evidence still HOLD.');
                       console.log('[saju-bridge] Distributed automatic recovery, Runner and operational approvals remain HOLD.');
                     } else {
                       console.log('[saju-bridge] Cross-DB partial-commit reconciliation and distributed recovery remain HOLD.');
