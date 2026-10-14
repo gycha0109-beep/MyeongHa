@@ -55,12 +55,11 @@ export function createOfflinePrivateCancelIssuerBoundaryV1(input:Readonly<{
     || input.issuerPrivateKeyPem.length>4096){
     throw new Error('Offline cancellation issuer requires trusted boot dependencies.');
   }
-  // Own an independent copy: caller mutation of boot input is not a policy
-  // update. Policy cannot change except through a fresh, signed bootstrap.
-  const signedPolicy:PrivateCancelSignedTrustPolicyV1=structuredClone(input.signedPolicy);
-  const pinnedRoot:PrivateCancelTrustedRootV1=Object.freeze({...input.pinnedRoot});
+  // Validate once at trusted bootstrap, retain only frozen, verified policy
+  // facts; never retain the mutable caller-supplied envelope or trust root.
   const bootPolicy=verifyOfflinePrivateCancelSignedTrustPolicyV1({
-    envelope:signedPolicy,pinnedRoot,now:input.trustedClock(),
+    envelope:input.signedPolicy,pinnedRoot:input.pinnedRoot,
+    now:input.trustedClock(),
   });
   const pinnedIssuer=bootPolicy.trustedPermitIssuers[input.issuerKeyId];
   if(!pinnedIssuer){
@@ -77,7 +76,7 @@ export function createOfflinePrivateCancelIssuerBoundaryV1(input:Readonly<{
     throw new Error('Offline cancellation issuer private key mismatch.');
   }
   const issuerKeyId=input.issuerKeyId,issuerPrivateKeyPem=input.issuerPrivateKeyPem;
-  const clock=input.trustedClock;
+  const clock=input.trustedClock,policyExpiresAt=Date.parse(bootPolicy.expiresAt);
   return Object.freeze({
     issue(request:unknown):PrivateCancelDetachedPermitV1{
       if(!requestShape(request)
@@ -85,22 +84,20 @@ export function createOfflinePrivateCancelIssuerBoundaryV1(input:Readonly<{
         || !Array.isArray(request.identityAssertions)){
         throw new Error('Offline cancellation issuer rejects caller-owned trust settings.');
       }
-      // Recheck policy expiration and root signature at each issue, rather than
-      // allowing a closure to outlive a short-lived signed policy.
+      // Root signature was verified at boot; frozen trusted facts cannot
+      // change via caller mutation. Expiry is checked again per issuance.
       const now=clock();
-      const policy=verifyOfflinePrivateCancelSignedTrustPolicyV1({
-        envelope:signedPolicy,pinnedRoot,now,
-      });
-      if(!policy.trustedPermitIssuers[issuerKeyId]){
-        throw new Error('Offline cancellation permit issuer was revoked.');
+      if(!(now instanceof Date)||!Number.isFinite(now.valueOf())
+        || now.valueOf()>=policyExpiresAt){
+        throw new Error('Offline cancellation signed policy expired or clock invalid.');
       }
       return issueIdentityBoundSandboxPrivateCancelPermitV1({
         statement:request.statement,
         operatorAttestations:request.operatorAttestations,
         identityAssertions:request.identityAssertions,
-        trustedOperatorKeys:policy.trustedOperatorKeys,
-        pinnedIdpKeys:policy.pinnedIdpKeys,
-        trustedIdentityDirectory:policy.trustedIdentityDirectory,
+        trustedOperatorKeys:bootPolicy.trustedOperatorKeys,
+        pinnedIdpKeys:bootPolicy.pinnedIdpKeys,
+        trustedIdentityDirectory:bootPolicy.trustedIdentityDirectory,
         issuerKeyId,
         issuerPrivateKeyPem,
         now,
