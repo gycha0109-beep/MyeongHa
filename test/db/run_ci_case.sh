@@ -249,6 +249,11 @@ SQL
     apply_pg17_migrations_without_birth_authority
     MYEONGHA_R4_PG17_CI=1 bash test/db/standard_reader_r4_policy_matrix_real_pg.sh
     ;;
+  cap-b2-r4-distinct-bundles)
+    verify_pg17
+    apply_pg17_migrations_without_birth_authority
+    MYEONGHA_R4_PG17_CI=1 bash test/db/standard_reader_r4_distinct_current_bundles_real_pg.sh
+    ;;
   content-release-lifecycle)
     verify_pg17
     apply_pg17_migrations_without_birth_authority
