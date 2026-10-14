@@ -97,9 +97,34 @@ function requireVerifiedSource(source: PortOneV2CancelSourceV1): OfficialReaderC
 }
 
 /**
- * Verification and private observation only. The injected recorder must
- * commit durably before any HTTP success response; a lookup or write failure
- * must propagate (retry, never acknowledge). No entitlement effect exists.
+ * Consume ONLY independently verified PortOne facts. Recorder should write to
+ * existing 1860 shadow within caller-owned DB transaction; effect stays false.
+ */
+export async function recordVerifiedPortOneV2CancellationShadowV1(input: Readonly<{
+  verifiedSource: PortOneV2CancelSourceV1;
+  recorder: OfficialReaderCancelObservationRecorderV1;
+}>): Promise<OfficialReaderCancelObservationResultV1> {
+  if (input.verifiedSource.disposition === 'ignored') {
+    throw new Error('Ignored PortOne event cannot be recorded in cancellation shadow.');
+  }
+  const verified = requireVerifiedSource(input.verifiedSource);
+  const saved = await input.recorder.recordVerified(verified);
+  if (saved.effectAuthorized !== false
+    || !['observed', 'out_of_order', 'ordering_unproven', 'replayed'].includes(saved.shadowResult)) {
+    throw new Error('Private cancellation observation must not authorize entitlement effects.');
+  }
+  return Object.freeze({
+    kind: 'observed',
+    sourceDisposition: input.verifiedSource.disposition,
+    shadowResult: saved.shadowResult,
+    providerRefundAuthorized: false,
+    entitlementMutationAuthorized: false,
+  });
+}
+
+/**
+ * Legacy direct signed webhook path: immutable signed facts + independent GET.
+ * New persisted-inbox worker shares the same recorder via the pure bridge.
  */
 export async function observeVerifiedPortOneV2CancellationShadowV1(input: Readonly<{
   request: PortOneV2WebhookRequestV1;
@@ -122,16 +147,7 @@ export async function observeVerifiedPortOneV2CancellationShadowV1(input: Readon
       providerRefundAuthorized: false, entitlementMutationAuthorized: false,
     });
   }
-  const verified = requireVerifiedSource(source);
-  const saved = await input.recorder.recordVerified(verified);
-  if (saved.effectAuthorized !== false) {
-    throw new Error('Private cancellation observation must not authorize entitlement effects.');
-  }
-  return Object.freeze({
-    kind: 'observed',
-    sourceDisposition: source.disposition,
-    shadowResult: saved.shadowResult,
-    providerRefundAuthorized: false,
-    entitlementMutationAuthorized: false,
+  return recordVerifiedPortOneV2CancellationShadowV1({
+    verifiedSource: source, recorder: input.recorder,
   });
 }

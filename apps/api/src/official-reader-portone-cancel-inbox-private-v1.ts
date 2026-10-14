@@ -24,6 +24,8 @@ export type OfficialReaderCancelInboxSignedEnvelopeV1 = Readonly<{
   ingressFingerprint: string;
 }>;
 
+export type OfficialReaderCancelInboxEnvelopeV1 = Omit<OfficialReaderCancelInboxSignedEnvelopeV1, 'ingressFingerprint'>;
+
 export interface OfficialReaderCancelInboxRecorderV1 {
   /** Caller must resolve only after the owning DB transaction COMMITs. */
   enqueueSigned(input: OfficialReaderCancelInboxSignedEnvelopeV1): Promise<Readonly<{
@@ -68,7 +70,9 @@ function occurredAt(value: unknown): string {
     || !Number.isFinite(Date.parse(value))) {
     throw new Error('Signed cancellation timestamp is invalid.');
   }
-  return value;
+  // timestamptz preserves the instant, not textual timezone/fractional format.
+  // Canonicalize at ingress so HMAC survives PostgreSQL round-trip and replay.
+  return new Date(Date.parse(value)).toISOString();
 }
 
 function decodeRawSignedBody(request: PortOneV2WebhookRequestV1): Record<string, unknown> {
@@ -82,6 +86,27 @@ function decodeRawSignedBody(request: PortOneV2WebhookRequestV1): Record<string,
   } catch {
     throw new Error('Signed cancellation payload is invalid.');
   }
+}
+
+/**
+ * Canonical identity binding shared by intake and the private persisted worker.
+ * This is an equality/authenticity check for server-owned stored facts, not
+ * anonymization, a PortOne signature, or user/entitlement authority.
+ */
+export function fingerprintOfficialReaderCancelInboxEnvelopeV1(
+  envelope: OfficialReaderCancelInboxEnvelopeV1,
+  evidenceHmacSecret: string,
+): string {
+  return fingerprintProductionCommerceEvidenceV1({
+    domain: PRODUCTION_COMMERCE_EVIDENCE_FINGERPRINT_BINDING_V1.domains.providerEventPayload,
+    canonicalEvidenceBytes: Buffer.from(JSON.stringify([
+      'official-reader-portone-cancel-inbox-v1',
+      envelope.environment, envelope.webhookId, envelope.paymentId,
+      envelope.transactionId, envelope.storeId, envelope.cancellationId,
+      envelope.eventType, envelope.eventOccurredAt,
+    ]), 'utf8'),
+    secret: evidenceHmacSecret,
+  });
 }
 
 /**
@@ -120,17 +145,9 @@ export async function stageSignedPortOneV2CancellationInboxV1(input: Readonly<{
     eventType,
     eventOccurredAt: occurredAt(payload.timestamp),
   });
-  // Uses the existing approved provider-event keyed HMAC scheme. Not anonymization.
-  const ingressFingerprint = fingerprintProductionCommerceEvidenceV1({
-    domain: PRODUCTION_COMMERCE_EVIDENCE_FINGERPRINT_BINDING_V1.domains.providerEventPayload,
-    canonicalEvidenceBytes: Buffer.from(JSON.stringify([
-      'official-reader-portone-cancel-inbox-v1',
-      envelope.environment, envelope.webhookId, envelope.paymentId,
-      envelope.transactionId, envelope.storeId, envelope.cancellationId,
-      envelope.eventType, envelope.eventOccurredAt,
-    ]), 'utf8'),
-    secret: input.evidenceHmacSecret,
-  });
+  const ingressFingerprint = fingerprintOfficialReaderCancelInboxEnvelopeV1(
+    envelope, input.evidenceHmacSecret,
+  );
   const record = await input.recorder.enqueueSigned(Object.freeze({
     ...envelope, ingressFingerprint,
   }));

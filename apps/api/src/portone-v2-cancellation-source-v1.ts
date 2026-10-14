@@ -140,44 +140,45 @@ async function lookup(input: {
   }
 }
 
-export async function verifyPortOneV2CancellationSourceV1(input: Readonly<{
-  request: PortOneV2WebhookRequestV1;
-  webhookConfig: PortOneV2WebhookPaymentCompletionConfigV1;
+/**
+ * Minimal envelope previously authenticated at HTTP ingress and committed to
+ * the private inbox. This type alone proves NOTHING: the private worker must
+ * independently validate its server-keyed ingress fingerprint before calling
+ * this provider lookup.
+ */
+export type PortOneV2PersistedCancelEnvelopeV1 = Readonly<{
+  environment: 'sandbox' | 'production';
+  webhookId: string;
+  paymentId: string;
+  transactionId: string;
+  storeId: string;
+  cancellationId: string;
+  eventType: 'Transaction.CancelPending' | 'Transaction.PartialCancelled' | 'Transaction.Cancelled';
+  eventOccurredAt: string;
+}>;
+
+/** Shared source-of-truth GET validation for signed-direct and persisted-inbox paths. */
+export async function verifyPortOneV2CancelEnvelopeAgainstProviderV1(input: Readonly<{
+  envelope: PortOneV2PersistedCancelEnvelopeV1;
   apiSecret: string;
   fetchImpl?: PortOneV2PaymentHttpFetchV1;
   timeoutMs?: number;
 }>): Promise<PortOneV2CancelSourceV1> {
-  const signed = authenticatePortOneV2WebhookPaymentCompletionV1({
-    request: input.request, config: input.webhookConfig,
-  });
-  const webhookId = signed.providerWebhookId;
-  const event = signed.kind === 'ignored' ? signed.eventType : 'Transaction.Paid';
+  const envelope = input.envelope;
+  if (envelope.environment !== 'production' && envelope.environment !== 'sandbox') {
+    return fail('INVALID_SOURCE');
+  }
+  const webhookId = id(envelope.webhookId);
+  const paymentId = id(envelope.paymentId);
+  const transactionId = id(envelope.transactionId);
+  const storeId = id(envelope.storeId);
+  const cancellationId = id(envelope.cancellationId);
+  const event = envelope.eventType;
   if (event !== 'Transaction.CancelPending'
     && event !== 'Transaction.PartialCancelled'
-    && event !== 'Transaction.Cancelled') {
-    return output({
-      disposition: 'ignored', providerWebhookId: webhookId, eventType: event,
-      paymentId: null, transactionId: null, cancellationId: null,
-      providerStatusChangedAt: null, eventOccurredAt: null,
-      providerPaidAmountMinor: null, providerCancelledAmountMinor: null, currency: null,
-    });
-  }
-  let envelope: Obj;
-  try {
-    const raw = input.request.rawBody;
-    if (typeof raw !== 'string' && !(raw instanceof Uint8Array)) return fail('INVALID_SOURCE');
-    envelope = obj(JSON.parse(typeof raw === 'string' ? raw :
-      new TextDecoder('utf-8', { fatal: true }).decode(raw)) as unknown);
-  } catch { return fail('INVALID_SOURCE'); }
-  if (envelope.type !== event) return fail('INVALID_SOURCE');
-  const at = when(envelope.timestamp);
-  const data = obj(envelope.data);
-  const paymentId = id(data.paymentId);
-  const transactionId = id(data.transactionId);
-  const storeId = id(data.storeId);
-  // Officially optional; absent ID is insufficient to disambiguate retries
-  // from earlier partial cancellations, so D3e holds.
-  const cancellationId = id(data.cancellationId);
+    && event !== 'Transaction.Cancelled') return fail('INVALID_SOURCE');
+  const at = when(envelope.eventOccurredAt);
+
   const payment = obj(await lookup({
     paymentId,
     apiSecret: input.apiSecret,
@@ -186,7 +187,7 @@ export async function verifyPortOneV2CancellationSourceV1(input: Readonly<{
   }));
   if (id(payment.id) !== paymentId || id(payment.transactionId) !== transactionId
     || id(payment.storeId) !== storeId
-    || obj(payment.channel).type !== (input.webhookConfig.environment === 'production' ? 'LIVE' : 'TEST')) {
+    || obj(payment.channel).type !== (envelope.environment === 'production' ? 'LIVE' : 'TEST')) {
     return fail('SOURCE_MISMATCH');
   }
   const statusAt = when(payment.statusChangedAt);
@@ -220,12 +221,60 @@ export async function verifyPortOneV2CancellationSourceV1(input: Readonly<{
     disposition = 'partial';
   } else if (event === 'Transaction.Cancelled' && payment.status === 'CANCELLED'
     && cancelled === paid && matching) disposition = 'full_candidate';
-  // An old PartialCancelled event with a newer CANCELLED API snapshot stays
-  // superseded, NOT promoted to full access revocation.
+  // An older partial notification with newer full-cancel GET remains superseded.
   return output({
     disposition, providerWebhookId: webhookId, eventType: event,
     paymentId, transactionId, cancellationId,
     providerStatusChangedAt: statusAt, eventOccurredAt: at,
     providerPaidAmountMinor: paid, providerCancelledAmountMinor: cancelled, currency,
+  });
+}
+
+/** Existing direct signed webhook entry retains its original strict signature gate. */
+export async function verifyPortOneV2CancellationSourceV1(input: Readonly<{
+  request: PortOneV2WebhookRequestV1;
+  webhookConfig: PortOneV2WebhookPaymentCompletionConfigV1;
+  apiSecret: string;
+  fetchImpl?: PortOneV2PaymentHttpFetchV1;
+  timeoutMs?: number;
+}>): Promise<PortOneV2CancelSourceV1> {
+  const signed = authenticatePortOneV2WebhookPaymentCompletionV1({
+    request: input.request, config: input.webhookConfig,
+  });
+  const webhookId = signed.providerWebhookId;
+  const event = signed.kind === 'ignored' ? signed.eventType : 'Transaction.Paid';
+  if (event !== 'Transaction.CancelPending'
+    && event !== 'Transaction.PartialCancelled'
+    && event !== 'Transaction.Cancelled') {
+    return output({
+      disposition: 'ignored', providerWebhookId: webhookId, eventType: event,
+      paymentId: null, transactionId: null, cancellationId: null,
+      providerStatusChangedAt: null, eventOccurredAt: null,
+      providerPaidAmountMinor: null, providerCancelledAmountMinor: null, currency: null,
+    });
+  }
+  let parsed: Obj;
+  try {
+    const raw = input.request.rawBody;
+    if (typeof raw !== 'string' && !(raw instanceof Uint8Array)) return fail('INVALID_SOURCE');
+    parsed = obj(JSON.parse(typeof raw === 'string' ? raw :
+      new TextDecoder('utf-8', { fatal: true }).decode(raw)) as unknown);
+  } catch { return fail('INVALID_SOURCE'); }
+  if (parsed.type !== event) return fail('INVALID_SOURCE');
+  const data = obj(parsed.data);
+  return verifyPortOneV2CancelEnvelopeAgainstProviderV1({
+    envelope: Object.freeze({
+      environment: input.webhookConfig.environment,
+      webhookId,
+      paymentId: id(data.paymentId),
+      transactionId: id(data.transactionId),
+      storeId: id(data.storeId),
+      cancellationId: id(data.cancellationId),
+      eventType: event,
+      eventOccurredAt: when(parsed.timestamp),
+    }),
+    apiSecret: input.apiSecret,
+    ...(input.fetchImpl === undefined ? {} : { fetchImpl: input.fetchImpl }),
+    ...(input.timeoutMs === undefined ? {} : { timeoutMs: input.timeoutMs }),
   });
 }
