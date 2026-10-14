@@ -67,7 +67,8 @@
       "cap-b2-r4-distinct-bundles",
       "cap-b2-r4-wrong-receipt-offer",
       "cap-b2-r4-actual-new-member-promotion",
-      "cap-b2-r4-receipt-issuer-binder-race"
+      "cap-b2-r4-receipt-issuer-binder-race",
+      "cap-b2-r4-receipt-issuer-recovery"
     ]
   }
 }
