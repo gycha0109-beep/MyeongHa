@@ -68,7 +68,8 @@ export function validateCostState(obj,stage){
     browserOrServiceCallable:false,cleanupApiCallable:false,
     anonTableDml:false,authenticatedTableDml:false,
     serviceRoleTableDml:false,apiExecutorTableDml:false};
- if(flags.some(k=>obj[k]!==wanted[k]))fail('RLS_ACL_OR_CREATOR_DRIFT');
+ const drift=flags.find(k=>obj[k]!==wanted[k]);
+ if(drift)fail('RLS_ACL_OR_CREATOR_DRIFT_STAGE_'+stage+'_'+drift);
  return obj;
 }
 export function verifyR2HCostSequence(before,after1550,after1560,after1570,restored){
