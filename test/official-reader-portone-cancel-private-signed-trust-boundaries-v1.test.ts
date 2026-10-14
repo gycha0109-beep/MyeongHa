@@ -312,7 +312,7 @@ describe('D3e14 offline signed-trust verifier and executor separation (NOT LIVE)
     await expect(executor.execute({permit:{
       ...original,signatureBase64:edSign(null,Buffer.from('fake'),
         f.rogue.privateKey).toString('base64'),
-    }})).rejects.toThrow('signature');
+    }})).rejects.toThrow('inner signed digest mismatched');
     expect(f.store.commitAuthorizedReview).not.toHaveBeenCalled();
   });
   it('enforces source-level verifier/executor capability separation and no LIVE SQL grant',()=>{
