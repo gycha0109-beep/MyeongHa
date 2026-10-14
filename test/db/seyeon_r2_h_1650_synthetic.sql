@@ -2,9 +2,10 @@
 -- No Subject row, provider dispatch, actual data, or Production write.
 -- Watchtower-Track: ops
 DO $r2h1650$
-DECLARE v_subject uuid:='fab00000-0000-4000-8000-000000001650';
-DECLARE v_constraint text;
-DECLARE v_blocked boolean:=false;
+DECLARE
+ v_subject uuid:='fab00000-0000-4000-8000-000000001650';
+ v_constraint text;
+ v_blocked boolean:=false;
 BEGIN
  PERFORM pg_catalog.set_config('myeongha.subject_id',v_subject::text,true);
  BEGIN
