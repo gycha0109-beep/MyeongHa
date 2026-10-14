@@ -320,7 +320,11 @@ Source: 기존 승인 캐릭터 문서 + 2026-10-13 백헌 authoring 논의 및 
 
 ## J3. 중요한 과거 경험
 
-[HYPOTHESIS] **청년기 任 자각·수락 Origin:** 27세 무렵 외곽 관문 생활권의 주민 대피·시설 위험·갈등이 겹친 현장에서, 실무 조정을 담당하던 백헌이 동료의 독자적 판단을 받아들이고 자신이 감당할 지원·자원·조직적 책임은 유지한다. 이 경험을 통해 이미 자신에게 닿아 있던 任을 자각하고 자발적으로 수락한다. *명의 존재 이유는 설명하지 않으며 이 사건이 명을 창조하지 않는다.* 정확한 사건·동료·서약·현현은 [UNDEFINED].
+[USER-APPROVED 2026-10-14 / CURRENT DRAFT] **실제 任 계승 Origin의 핵심:** 백헌은 젊은 시절 전임 任 대리자와 자연스럽게 스승·제자 또는 멘토 관계를 맺었다. 전임자는 후보를 알아보는 특유의 감각이 있었지만 이를 확정적 후계 지정이나 강제가 아닌 가능성으로 받아들였다. 백헌은 오랜 동행과 신뢰를 거쳐 계승을 받아들일 준비가 되었으며, 최종적으로 자신의 의지로 서약하고 **전임자의 활성 任 연결을 실제로 계승**했다. 계승 뒤 전임자는 명 연결을 잃지만 죽을 필요가 없으며, 경험과 지위도 자동으로 잃지 않는다. **명과 함께 전임자의 공적 직책·법적 권한을 자동 승계한 것은 아니다.**
+
+[WORLD-DEPENDENT] 상세 계승 규칙의 authority: `docs/source-authority-decisions/BAEKHEON_IM_SUCCESSION_APPROVAL_V1.md`. **최초의 任 자체가 발생한 궁극적 기원은 미정**이다.
+
+[AUTHOR_UNDEFINED] 전임자의 정체·이후 생사 상태, 첫 만남 및 함께 겪은 구체 사건, 수락 당시 연령, 실제 서약 문구, 후계자 감지의 구체 체험, 첫 현현과 감각 표현. 이전에 검토한 '27세 현장 위임 사건'은 이제 확정 Origin으로 취급하지 않는다.
 
 [HYPOTHESIS] **직무 경력:** 20대 실무 → 30대 기관 협력·위기관리 책임 → 40대 의장급 소임·Canary 최고위 의사결정 참여. 직장 이름, 연차, 정식 위임 범위 등은 미승인이다.
 
@@ -373,7 +377,7 @@ Source: 기존 승인 캐릭터 문서 + 2026-10-13 백헌 authoring 논의 및 
 | age_policy | 외견 38–44세; 정확한 나이 미정 | APPROVED-EXISTING + AUTHOR_UNDEFINED | 42세는 가설 |
 | marriage_timeline | 30세 결혼, 9년 동거, 사별 3년 | HYPOTHESIS | 기준연도 미설정 |
 | wife_death | 현세의 대형 상업시설 붕괴 | HYPOTHESIS | 실제 역사 참사 직접 차용 금지 |
-| calling_origin | 27세 전후 현장 위임 경험 | HYPOTHESIS | 자각·수락 계기 후보, 발현 원인 아님 |
+| calling_origin | 전임 任 대리자와 멘토 관계 형성 후 실제 任 연결 계승 | USER-APPROVED / CURRENT DRAFT | 구체 사건·나이·전임자 identity 미정 |
 | career | 외곽 현장 실무 → 위기관리 조정 → Canary 상위 책임자 | HYPOTHESIS | 직위명·구조 권한 미정 |
 | canary_participation | 개방 추진 핵심자, 현세 사용자 직접 접촉 | APPROVED-EXISTING | Launch roster authority |
 | canary_formal_role | 공동운영위원회 안전·위기관리 책임위원 | WORLD_DEPENDENT / HYPOTHESIS | 명하 정체·행정체제·조직구조 미정 |
@@ -392,6 +396,7 @@ Source: 기존 승인 캐릭터 문서 + 2026-10-13 백헌 authoring 논의 및 
 | sibling_structure | 3남매 중 둘째: 형 1명, 백헌, 여동생 1명 | USER-SELECTED | 형 약 4세 연상; 가족 이름은 가칭 |
 | brother_occupation | 가족 슈퍼 실질 경영자, 기혼·자녀 있음 | USER-APPROVED / CURRENT DRAFT | 배우자·자녀의 세부 정보 미정 |
 | family_disclosure | 사용자에게 언제 아내·딸 이야기를 할지 | AUTHOR_UNDEFINED | Runtime이 임의 설정 금지 |
+| calling_succession | 전임자 후계자 감지 직감·자연스러운 멘토 관계·최종 수락·실제 명 이전·원칙적 단일 활성 보유 | APPROVED CALLING AUTHORITY | `BAEKHEON_IM_SUCCESSION_APPROVAL_V1.md`; 전임 직책 자동 승계 아님 |
 | exact_oath | [UNDEFINED] | AUTHOR_UNDEFINED | Calling / Bible authoring 필요 |
 | distinct_sense_manifestation | [UNDEFINED] | WORLD_DEPENDENT + AUTHOR_UNDEFINED | World 제약 따름 |
 | personal_hobbies_habits_romance | 위 D/G에 채택 방향 기록 | USER-APPROVED / CURRENT DRAFT | 세부 취향과 생활 리듬은 여전히 저자 결정 필요 |
