@@ -319,3 +319,10 @@ PortOne signed webhook
 - 국내 디지털 Reading 환불 고지 정책: docs/COMMERCE_DIGITAL_READING_REFUND_DISCLOSURE_POLICY_V1.md
 - PortOne source verifier: apps/api/src/portone-v2-cancellation-source-v1.ts
 - 핵심 DB: supabase/migrations/1840, 1850, 1860, 1870, 1880, 1890 (정확한 파일명은 각 마이그레이션 참조)
+
+## 18. 첫 구현 단계: Writer 실제 호출·권한 조사 결과 (2026-10-14)
+
+- [공식 리더 Writer 호출·관리자 우회 경로 1차 감사](./OFFICIAL_READER_WRITER_SURFACE_AUDIT_20261014_V1.md)에 1080/1090/1220/1760/1770/1780/1790/1820/1830/1850/1880의 호출 관계와 운영 역할 우회 여부를 별도로 기록했다.
+- 누락된 이전 `1830`의 두 번째 **관리자 권한 취소 함수**를 포함해 비공개 함수 8개의 앱 계정 실행권을 `1900`에서 명시적으로 다시 차단하고, 실제 PostgreSQL 역할 전환 시험을 추가했다.
+- 새 정적 검사로 미검토 원본 이용권 변경 함수 호출 파일이나 앱 직접 호출 경로가 추가되면 CI에서 검출한다. 단, 동적 SQL·DB 관리자 직접 작업 및 운영 배포 이미지 목록은 **정적 검사만으로 완결되지 않는다**.
+- 코드·시험은 비공개 후보이며, 안전한 실제 취소 내구 수신과 별도 승인 서비스가 만들어지기 전까지 운영 회수는 활성화하지 않는다.
