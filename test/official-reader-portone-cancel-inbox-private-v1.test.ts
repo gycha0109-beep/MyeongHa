@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   stageSignedPortOneV2CancellationInboxV1,
   type OfficialReaderCancelInboxRecorderV1,
+  type OfficialReaderCancelInboxSignedEnvelopeV1,
 } from '../apps/api/src/official-reader-portone-cancel-inbox-private-v1.js';
 import { createPrivateOfficialReaderCancelInboxRecorderTestV1 } from './support/private-official-reader-cancel-inbox-recorder-v1.js';
 import type { PostgresTransactionQueryV1 } from '../apps/api/src/postgres-subject-execution.js';
@@ -41,7 +42,7 @@ function run(input: {
   evidenceHmacSecret?: string;
   recorder?: OfficialReaderCancelInboxRecorderV1;
 } = {}) {
-  const enqueueSigned = vi.fn(async () => ({
+  const enqueueSigned = vi.fn(async (_input: OfficialReaderCancelInboxSignedEnvelopeV1) => ({
     intakeResult: 'queued' as const, effectAuthorized: false as const,
   }));
   const recorder = input.recorder ?? { enqueueSigned };
@@ -131,7 +132,7 @@ describe('D3e3 signed cancellation inbox (private candidate only)', () => {
   });
 
   it('maps only exact private enqueue function and rejects malformed rows', async () => {
-    const query = vi.fn(async () => ({ rows: [{
+    const query = vi.fn(async (_sql: string, _params?: readonly unknown[]) => ({ rows: [{
       intakeResult: 'replayed', effectAuthorized: false,
     }] }));
     const recorder = createPrivateOfficialReaderCancelInboxRecorderTestV1({
