@@ -20,3 +20,10 @@ export interface SajuBridgeCrossDbHoldDecisionV1 {
 export declare function classifySajuBridgeCrossDbObservationV1(
   evidence: SajuBridgeCrossDbEvidenceV1 | null | undefined,
 ): Readonly<SajuBridgeCrossDbHoldDecisionV1>;
+
+export declare function assessSajuBridgeCrossDbSnapshotRaceV1(
+  before: Readonly<Record<'NONCE_ONLY' | 'PERMIT_ONLY' | 'REVOKED_WITH_NONCE', SajuBridgeCrossDbEvidenceV1>> | unknown,
+  after: Readonly<Record<'NONCE_ONLY' | 'PERMIT_ONLY' | 'REVOKED_WITH_NONCE', SajuBridgeCrossDbEvidenceV1>> | unknown,
+): Readonly<Omit<SajuBridgeCrossDbHoldDecisionV1, 'version'> & {
+  readonly version: 'myeongha-saju-cross-db-snapshot-race-hold-v1';
+}>;

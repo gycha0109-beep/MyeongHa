@@ -33,3 +33,32 @@ export function classifySajuBridgeCrossDbObservationV1(evidence) {
     automaticRetry: false, automaticCompensation: false,
   });
 }
+
+
+// Phase 4D: compare two *independently observed* read-only snapshots.
+// This only detects a change, never proves atomicity, temporal stability,
+// source authority or a safe recovery plan. No DB/Runner adapter is exposed.
+export function assessSajuBridgeCrossDbSnapshotRaceV1(before, after) {
+  const ids = ['NONCE_ONLY', 'PERMIT_ONLY', 'REVOKED_WITH_NONCE'];
+  const shape = snapshot => snapshot !== null && typeof snapshot === 'object'
+    && !Array.isArray(snapshot)
+    && Object.keys(snapshot).length === ids.length
+    && ids.every(id => {
+      const value = snapshot[id];
+      if (value === null || typeof value !== 'object' || Array.isArray(value)
+        || Object.keys(value).length !== 3) return false;
+      return ['subject', 'nonce', 'permit'].every(k => Object.hasOwn(value, k))
+        && classifySajuBridgeCrossDbObservationV1(value).classification !== 'UNKNOWN_HOLD';
+    });
+  const known = shape(before) && shape(after);
+  const changed = known && ids.some(id =>
+    ['subject', 'nonce', 'permit'].some(k => before[id][k] !== after[id][k]));
+  return Object.freeze({
+    version: 'myeongha-saju-cross-db-snapshot-race-hold-v1',
+    classification: !known ? 'UNKNOWN_HOLD'
+      : changed ? 'EVIDENCE_CHANGED_HOLD' : 'UNCHANGED_UNVERIFIED_HOLD',
+    decision: 'HOLD_MANUAL_REVIEW',
+    canExecute: false, canPublish: false, canSell: false,
+    automaticRetry: false, automaticCompensation: false,
+  });
+}

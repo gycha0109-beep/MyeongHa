@@ -4,6 +4,7 @@
 import { spawnSync } from 'node:child_process';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
+import { assessSajuBridgeCrossDbSnapshotRaceV1 } from './saju-bridge-cross-db-observation-v1.mjs';
 
 const files = [
   'saju-bridge-full.compose.yml', 'saju-bridge-http.compose.yml',
@@ -65,8 +66,17 @@ function stageArgs(stage) {
 function runStage(stage, match) {
   const out = docker(stageArgs(stage), 110000);
   if (match && !out.includes(match)) {
-    throw new Error('Required Phase 4C-3 evidence missing at ' + stage);
+    throw new Error('Required Phase 4C-3/4D evidence missing at ' + stage);
   }
+  return out;
+}
+function snapshot(stage) {
+  const out = runStage(stage, '[saju-bridge] Phase 4D snapshot ' + stage + ': ');
+  const line = out.split(/\r?\n/u).find(l => l.includes('[saju-bridge] Phase 4D snapshot ' + stage + ': '));
+  const raw = line?.split('Phase 4D snapshot ' + stage + ': ')[1]?.trim();
+  if (!raw || raw.length > 700) throw new Error('Missing bounded semantic snapshot for ' + stage);
+  try { return JSON.parse(raw); }
+  catch { throw new Error('Malformed semantic snapshot for ' + stage); }
 }
 async function run() {
   const now = Date.now();
@@ -105,6 +115,35 @@ async function run() {
     }
     runStage('cross-final', 'Phase 4C-3 durable cross-DB evidence:');
     console.log('[saju-bridge] Phase 4C-3: three durable partial states, real peer outages, restart reconciliation and read-only fail-closed HOLD PASS.');
+    if (env.SAJU_BRIDGE_LOCAL_STABILITY_FAULT === '1') {
+      // Separate verifier containers prevent sharing any connection or
+      // in-process snapshot between the evidence readers and fixture writer.
+      const before = snapshot('cross-stability-before');
+      runStage('cross-stability-mutate',
+        'Phase 4D controlled independent signed Permit/Nonce changes COMMITTED; no compensation.');
+      const after = snapshot('cross-stability-after');
+      const changed = assessSajuBridgeCrossDbSnapshotRaceV1(before, after);
+      if (changed.classification !== 'EVIDENCE_CHANGED_HOLD'
+        || changed.decision !== 'HOLD_MANUAL_REVIEW'
+        || changed.canExecute !== false || changed.automaticRetry !== false
+        || changed.automaticCompensation !== false) {
+        throw new Error('Phase 4D stale first snapshot was not invalidated.');
+      }
+      // Read again from newly restarted physical DB processes, same data
+      // volumes. Even an unchanged second observation grants no permission.
+      docker(['restart','nonce-db','admission-db'], 150000);
+      docker(['up','--detach','--wait','--wait-timeout','120','nonce-db','admission-db'], 150000);
+      const confirmed = snapshot('cross-stability-confirm');
+      const unchanged = assessSajuBridgeCrossDbSnapshotRaceV1(after, confirmed);
+      if (unchanged.classification !== 'UNCHANGED_UNVERIFIED_HOLD'
+        || unchanged.decision !== 'HOLD_MANUAL_REVIEW'
+        || unchanged.canExecute !== false || unchanged.canPublish !== false
+        || unchanged.canSell !== false || unchanged.automaticRetry !== false
+        || unchanged.automaticCompensation !== false) {
+        throw new Error('Phase 4D steady-state evidence incorrectly authorizes recovery.');
+      }
+      console.log('[saju-bridge] Phase 4D: changed original cross-DB snapshot rejected; later unchanged snapshot remains HOLD; no automatic retry, compensation or permission.');
+    }
   } catch (error) {
     primaryError = error;
   } finally {
