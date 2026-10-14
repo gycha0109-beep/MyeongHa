@@ -203,6 +203,11 @@ if [[ "${CI:-}" == "true" && "${PGHOST:-}" == "localhost" ]]; then
     bash test/db/standard_reader_policy_withdrawal_initial_bind_r3_real_pg.sh bind_first
   run_isolated_case myeongha_b2_r3_multiscope_sorted \
     bash test/db/standard_reader_multiscope_lock_order_r3_real_pg.sh
+  # BIND-21: separate legacy 1170 paid Reading from private Official v2.
+  run_isolated_case myeongha_b2_r4_b21_additional_denied \
+    bash test/db/standard_reader_r4_legacy_1170_isolation_real_pg.sh additional_denied
+  run_isolated_case myeongha_b2_r4_b21_fresh_official \
+    bash test/db/standard_reader_r4_legacy_1170_isolation_real_pg.sh fresh_official
   run_isolated_case myeongha_b2_r4_private_matrix bash test/db/standard_reader_r4_policy_matrix_real_pg.sh
   run_isolated_case myeongha_b2_r4_disabled bash test/db/standard_reader_r4_policy_release_denials_real_pg.sh disabled
   run_isolated_case myeongha_b2_r4_coming_soon bash test/db/standard_reader_r4_policy_release_denials_real_pg.sh coming_soon
