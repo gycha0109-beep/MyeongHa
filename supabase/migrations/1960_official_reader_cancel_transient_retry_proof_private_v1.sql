@@ -21,7 +21,7 @@ begin
   if not exists (
     select 1 from pg_catalog.pg_proc p
     where p.oid=v_oid and not p.prosecdef and p.provolatile='v'
-  ) or pg_catalog.position('LEASE_EXHAUSTED' in v_function)=0 then
+  ) or pg_catalog.strpos(v_function,'LEASE_EXHAUSTED')=0 then
     raise exception using errcode='55000',
       message='D3e11 legacy review classification changed unexpectedly';
   end if;
@@ -115,7 +115,7 @@ begin
   if exists (
     select 1 from pg_catalog.pg_proc p
     cross join lateral pg_catalog.aclexplode(
-      pg_catalog.coalesce(p.proacl,pg_catalog.acldefault('f',p.proowner))
+      coalesce(p.proacl,pg_catalog.acldefault('f',p.proowner))
     ) a
     where p.oid='public.internal_private_cancel_review_v1(uuid,text,text)'::pg_catalog.regprocedure
       and a.grantee=0 and a.privilege_type='EXECUTE'
