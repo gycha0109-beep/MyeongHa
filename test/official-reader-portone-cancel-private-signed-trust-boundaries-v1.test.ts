@@ -1,5 +1,5 @@
 import {
-  createHash,generateKeyPairSync,randomUUID,sign as edSign,
+  generateKeyPairSync,randomUUID,sign as edSign,
   type KeyObject,
 } from 'node:crypto';
 import {describe,expect,it,vi} from 'vitest';
@@ -617,12 +617,6 @@ describe('D3e16 independently signed current-policy epoch fence (OFFLINE ONLY)',
     const f=rig(),e=epochRig(f);
     const executor=await e.boot();
     const permit=f.issuerBoot().issue(f.request);
-    let calls=0;
-    const eventSource=vi.fn(async()=>{
-      calls++;
-      return calls===2?e.signEpoch({sequence:2,status:'halted'}):
-        e.signEpoch({sequence:1});
-    });
     // independent boot read (1), execute read (2), pre-store read (3)
     // Simulate: current at bootstrap and first execution, HALT at pre-store.
     let gateReads=0;
@@ -636,7 +630,6 @@ describe('D3e16 independently signed current-policy epoch fence (OFFLINE ONLY)',
     expect(staged).toHaveBeenCalledTimes(3);
     expect(f.store.commitAuthorizedReview).not.toHaveBeenCalled();
     expect(executor).toBeDefined();
-    expect(eventSource).not.toHaveBeenCalled();
   });
 
   it('source unavailable, malformed, forged, expired or stale proof DENIES; never fails open',async()=>{
