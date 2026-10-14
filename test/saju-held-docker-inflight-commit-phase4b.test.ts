@@ -28,12 +28,11 @@ const admissionAdmin = enabled ? new Pool({
   user: 'postgres', password: process.env.SAJU_BRIDGE_LOCAL_ADMISSION_DB_PASSWORD,
   ssl: { ca: adminCa, rejectUnauthorized: true }, max: 1, connectionTimeoutMillis: 1600,
 }) : undefined;
-let observedClientDisconnects = 0;
 // A physical backend SIGKILL can emit a second, asynchronous PG socket
 // error after the in-flight COMMIT promise rejects. Handle the transport
 // event explicitly; the actual operation still must return false and the
 // post-restart database check must independently confirm rollback.
-nonce?.on('error', () => { observedClientDisconnects++; });
+nonce?.on('error', () => { /* Expected transport error; COMMIT denial asserted below. */ });
 function guard() {
   if (!enabled || (mode !== 'inflight-fire' && mode !== 'inflight-verify')
     || process.env.MYEONGHA_DOCKER_SAJU_TLS !== '1'
@@ -51,7 +50,7 @@ function guard() {
 function adapt(pool: Pool): PostgresSubjectPoolV1 {
   return { async connect() {
     const c = await pool.connect();
-    c.on('error', () => { observedClientDisconnects++; });
+    c.on('error', () => { /* Expected transport error from forcibly killed backend. */ });
     return {
       async query<Row = Record<string, unknown>>(sql: string, values?: readonly unknown[]):
         Promise<PostgresQueryResultV1<Row>> {
@@ -83,8 +82,7 @@ describe.skipIf(!enabled)('Phase 4B real DB crash inside deferred COMMIT callbac
       const once = createSajuSourceProofPostgresNonceClaimV1({ pool: adapt(nonce!) });
       expect(await once(nonceKey, nonceExpiry)).toBe(false);
       // One attempt only, no retry and no returned success after lost connection.
-      // Connection/socket errors remain denial evidence, never a retry cue.
-      expect(observedClientDisconnects).toBeGreaterThanOrEqual(0);
+      // Connection/socket errors are never a retry cue.
       return;
     }
     const row = await nonceAdmin!.query<{ count: string }>(
