@@ -25,7 +25,8 @@ import {
 const enabled = process.env.MYEONGHA_DOCKER_SAJU_PROVENANCE === '1';
 const stage = process.env.SAJU_BRIDGE_LOCAL_RECOVERY_STAGE;
 const syntheticStage = stage === 'cross-synthetic-signatures';
-const packetStage = stage === 'cross-review-packet' || syntheticStage;
+const replayStage = stage === 'cross-replay-review';
+const packetStage = stage === 'cross-review-packet' || syntheticStage || replayStage;
 const cases = ['NONCE_ONLY', 'PERMIT_ONLY', 'REVOKED_WITH_NONCE'] as const;
 type Case = typeof cases[number];
 const permitIds: Record<Case, string> = {
@@ -52,11 +53,12 @@ const certs = enabled ? {
 const pools: Pool[] = [];
 const peers: Record<Peer, Pool> = {} as Record<Peer, Pool>;
 function guard() {
-  if (!enabled || !['cross-provenance','cross-review-packet','cross-synthetic-signatures'].includes(stage ?? '')
+  if (!enabled || !['cross-provenance','cross-review-packet','cross-synthetic-signatures','cross-replay-review'].includes(stage ?? '')
     || (packetStage && (process.env.MYEONGHA_DOCKER_SAJU_REVIEW_PACKET !== '1'
       || !/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/u.test(
         process.env.SAJU_BRIDGE_LOCAL_REVIEW_RUN_ID ?? '')))
     || (syntheticStage && process.env.MYEONGHA_DOCKER_SAJU_SYNTHETIC_SIGNATURES !== '1')
+    || (replayStage && process.env.MYEONGHA_DOCKER_SAJU_REPLAY_REVIEW !== '1')
     || process.env.MYEONGHA_DOCKER_SAJU_TLS !== '1'
     || process.env.MYEONGHA_DOCKER_SAJU_PERMIT !== '1'
     || process.env.SAJU_BRIDGE_LOCAL_CROSS_DB_FAULT !== '1'
@@ -458,7 +460,7 @@ describe.skipIf(!enabled)('Phase 4E actual independent disposable authority obse
         i === 1 ? {...x, sourceId:packet.submissions[0]!.sourceId} : x)},
         nowMs, 'DUPLICATE_OR_NONINDEPENDENT_SOURCE_HOLD');
       console.log('[saju-bridge] Phase 4F real DB: five untrusted claimed receipts bound to ephemeral read-only evidence; missing/foreign/duplicate rejected; even structurally complete NOT_ATTESTED, NOT_ADMISSIBLE; no action.');
-      if (process.env.MYEONGHA_DOCKER_SAJU_REPLAY_REVIEW === '1') {
+      if (replayStage && process.env.MYEONGHA_DOCKER_SAJU_REPLAY_REVIEW === '1') {
         const repeated = claimPacket(actual, nowMs, randomUUID());
         expect(assessReplay(packet, packet, nowMs).classification)
           .toBe('IDENTICAL_RUN_REPLAY_HOLD');
