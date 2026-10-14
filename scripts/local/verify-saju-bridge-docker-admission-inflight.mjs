@@ -122,7 +122,7 @@ async function run() {
     ]);
     if (outcome.code !== 0) {
       throw new Error('Signed Permit adapter did not deny physical Admission COMMIT interruption: '
-        + (outcome.code === -2 ? 'timeout' : output.replace(/[^\\x20-\\x7e\\n]/gu, '').slice(-750)));
+        + (outcome.code === -2 ? 'timeout' : output.replace(/[^\x20-\x7e\n]/gu, '').slice(-750)));
     }
     docker(['up', '--detach', '--wait', '--wait-timeout', '120', 'admission-db'],
       { timeout: 150000 });
