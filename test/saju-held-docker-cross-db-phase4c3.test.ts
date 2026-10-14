@@ -175,7 +175,7 @@ function params(permit: ReturnType<typeof signedPermit>['permit'], status: strin
 }
 // Every reconciliation read is its own explicitly READ ONLY transaction.
 // The reads are NOT a serializable distributed snapshot across peers.
-async function readOnly<Row>(p: Pool, statement: string, values: unknown[]): Promise<Row[]> {
+async function readOnly<Row extends Record<string, unknown>>(p: Pool, statement: string, values: unknown[]): Promise<Row[]> {
   const client = await p.connect();
   try {
     await client.query('BEGIN READ ONLY');
