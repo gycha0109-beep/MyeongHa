@@ -34,7 +34,7 @@ export function validateRemote(x){
  ||x.earlyMarkerRows!==6||x.timestampedExactRows!==2
  ||x.timestampedVersionSortBeforeRemote!==true
  ||x.actualExecutionChronologyEstablished!==false||!zeroApproval(x)
- ||!x.lexicalIndicators||!keyEq(x.lexicalIndicators,Object.keys(expectedTokens))
+ ||!x.lexicalIndicators||!keyEq(x.lexicalIndicators,expectedTokens)
  ||Object.entries(expectedTokens).some(([key,value])=>x.lexicalIndicators[key]!==value))
  hold('REMOTE_METADATA_DRIFT_OR_SOURCE_UNVERIFIED');
  return x;
