@@ -293,7 +293,9 @@ SQL
     local_shape="$(mktemp)"
     local_digest="$(mktemp)"
     local_acl="$(mktemp)"
-    trap 'rm -f -- "$local_shape" "$local_digest" "$local_acl"' EXIT
+    local_acl_transient="$(mktemp)"
+    local_acl_rollback="$(mktemp)"
+    trap 'rm -f -- "$local_shape" "$local_digest" "$local_acl" "$local_acl_transient" "$local_acl_rollback"' EXIT
     psql -X -qAt -v ON_ERROR_STOP=1 -f scripts/operations/seyeon-r2-rpc-catalog-readonly.sql > "$local_shape"
     node scripts/operations/verify-seyeon-r2-rpc-catalog.mjs "$local_shape" > /dev/null
     psql -X -qAt -v ON_ERROR_STOP=1 -f scripts/operations/seyeon-r2-rpc-set-fingerprint-readonly.sql > "$local_digest"
@@ -305,6 +307,15 @@ SQL
       scripts/operations/seyeon-r2-production-acl-grants-20261013.json
     psql -X -qAt -v ON_ERROR_STOP=1 \
       -f scripts/operations/seyeon-r2-assert-helper-acl-readonly.sql
+    psql -X -qAt -v ON_ERROR_STOP=1 \
+      -f test/db/seyeon_r2_creator_default_acl_synthetic.sql
+    psql -X -qAt -v ON_ERROR_STOP=1 \
+      -f test/db/seyeon_r2_helper_grant_transient.sql > "$local_acl_transient"
+    psql -X -qAt -v ON_ERROR_STOP=1 \
+      -f scripts/operations/seyeon-r2-acl-grants-canonical-readonly.sql > "$local_acl_rollback"
+    node scripts/operations/verify-seyeon-r2-helper-grant-causality.mjs \
+      "$local_acl" "$local_acl_transient" "$local_acl_rollback" \
+      scripts/operations/seyeon-r2-production-acl-grants-20261013.json
     ;;
   seyeon-r2-rpc-catalog)
     verify_pg17

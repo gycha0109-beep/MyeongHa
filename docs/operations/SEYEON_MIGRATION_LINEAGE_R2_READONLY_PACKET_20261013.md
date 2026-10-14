@@ -162,3 +162,30 @@ Watchtower-Track: ops. R1 정확한 격리 복원 증거는 8절을 따른다. �
 - 해당 함수의 Production **내부 read-only 범주형 권한 검사**: 명시 Grant 2개 중 Owner 자체 1개, `service_role` 직접 EXECUTE 1개. `anon` / `authenticated` / PUBLIC 직접 EXECUTE 0, Grant Option 0. 저장소 `1490_seyeon_production_chat_execution_runtime_v1.sql`에서 해당 helper 함수는 PUBLIC REVOKE 및 narrow owner 변경이 보이지만, wrapper와 달리 `service_role`에 대한 해당 직접 GRANT 선언을 확인하지 못했다. **Production 추가 Grant의 작성자·생성 시점·승인 상태는 미입증**이다.
 - 격리 DB helper만의 별도 권한 수치 확인용 `scripts/operations/seyeon-r2-assert-helper-acl-readonly.sql` 추가. 실제 [CI #38352921252](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38352921252) PG17 job `115149262006`: **격리 DB totalEdges=1 / ownerEdges=1 / serverRoleDirectExecute=0 / browserRoleDirectExecute=0**, Production 읽기 전용 관측 **totalEdges=2 / ownerEdges=1 / service_role 직접 EXECUTE=1 / browser 직접 EXECUTE=0**. 따라서 실제로 저장소 재생에는 없는 privileged server role의 **명시적 Grant 1건이 Production에 추가**돼 있다는 정밀 증거다. 역할 상속·호출 경로 및 부여 시점·승인 원인은 별도 Owner 검증 대상이다. 로그에는 원문 ACL/Role graph/SQL을 기록하지 않았다.
 - **보안 판단:** privileged server Role의 직접 EXECUTE 차이는 확인됐지만, 그 역할이 맡는 호출 경로의 정당성·Role 상속·추가 권한·Supabase 관리형 적용 역사는 조사 필요. 브라우저 직접 접근이 허용된 것으로 판단하지 않는다. Production ACL 제거/추가, 원격-only `20261008090417` repair/replay, 사용자 공개나 DR Ready 승격은 **모두 금지**. 본 PR은 예상된 함수 1개의 정규화 Grant/항목 수 불일치만 진단 성공으로 허용하고, 그 항목이 바뀌거나 다른 함수 ACL 차이가 생기거나 우연히 일치해도 `HOLD_R2_ACL_UNEXPECTED_DRIFT_REQUIRES_OWNER_REVIEW`로 CI를 실패시킨다. CI GREEN은 불일치 해소·보안 승인 의미가 아니다. DB/Security Owner가 기존 운영 Grant를 유지할지, 별도 forward-only 변경을 승인할지 판단해야 한다. R2 전체 **HOLD**.
+
+
+## 12. 2026-10-14 R2-E — `service_role` ACL 생성 경로의 제한적 재현 (운영 변경 없음)
+
+**선행 관측(확정):** [PR #2048](https://github.com/gycha0109-beep/MyeongHa/pull/2048)에서 19 RPC 중 18개 Grant 그래프가 일치했고 `assert_seyeon_chat_thread_runtime_v1(uuid,uuid)`만 Production에서 소유자 외 직접 `service_role EXECUTE` 1건이 추가로 존재한다. 브라우저 `anon/authenticated` 직접 EXECUTE는 0. PG catalog의 Grantor/Owner는 과거의 사람·실행시각을 알려주지 않는다.
+
+**새 읽기 전용 관측:** `scripts/operations/seyeon-r2-creator-default-acl-readonly.sql`은 Production 현재 `postgres`의 함수 DEFAULT ACL 중 전역과 `public` 스키마 범위의 `service_role`·브라우저 EXECUTE 항목 **건수만** 계산한다. 2026-10-14 관측 결과는 `globalServiceRoleFunctionExecuteCount=0`, `publicSchemaServiceRoleFunctionExecuteCount=1`, `publicSchemaBrowserFunctionExecuteCount=0`이다. 이 결과는 **조회 당시 설정**이고 2026-10-08에 똑같았다는 과거 증거가 아니다.
+
+**저장소 원인 후보:** `1490_seyeon_production_chat_execution_runtime_v1.sql`은 보조 RPC를 먼저 생성한 후 `REVOKE ALL ... FROM PUBLIC`하고 Owner를 `myeongha_seyeon_chat_runtime_owner`로 이전한다. 이 보조 RPC에는 명시적 `REVOKE ... FROM service_role`이 없다. 따라서 새 함수에 부여되는 `postgres`의 스키마 단위 기본권한이 원천이라면, `PUBLIC`만 철회해도 `service_role`의 직접 EXECUTE가 남는다는 **가설**이 성립한다. 이는 원격-only 104KB SQL의 실제 작성자·적용 도구·시각에 관한 단정이 아니다.
+
+**통제된 격리 PostgreSQL 17 재현:**
+
+- `test/db/seyeon_r2_creator_default_acl_synthetic.sql`: 오직 disposable PG17 트랜잭션에서 `postgres`의 `public` 함수 기본 `service_role EXECUTE`를 설정 → 개인정보 없는 테스트 함수 CREATE → `PUBLIC` REVOKE → Owner 이전 → 소유자 1 + `service_role` 1 + 브라우저 직접 허용 0 검사 → 전체 `ROLLBACK`.
+- `test/db/seyeon_r2_helper_grant_transient.sql`: 위 재현과 별개로 동일 disposable DB의 실제 보조 RPC에 Owner 권한으로 정확한 추가 `service_role EXECUTE` **한 건만** 임시 부여하고 19개 원본/정규화 ACL 해시를 계산한 뒤 `ROLLBACK`.
+- `scripts/operations/verify-seyeon-r2-helper-grant-causality.mjs`: 실제 격리 **변경 전 → 임시 한 건 추가 → ROLLBACK 후** 스냅샷을 2026-10-13 Production 보호된 해시 증거와 비교한다. 변경 전 불일치가 보조 RPC **한 개**뿐이어야 하고, 임시 추가 후 전체 정규화 Grant 집합이 일치해야 하며, 나머지 18개 RPC·브라우저 권한 및 ROLLBACK 이후가 불변이어야 PASS한다. 원본 ACL 표현 일치 여부는 별도 결과로 기록하며 과거 출처는 항상 `originEstablished=false`.
+- 부정 테스트 `tests/seyeon-r2-helper-grant-causality.test.mjs`: 임의 다른 함수 ACL 변경, 새 브라우저 허용, 일관성 없는 단일 Grant, 실패한 ROLLBACK, 비정상 메타데이터를 fail-closed로 차단한다.
+- 기존 PostgreSQL 17 CI `seyeon-r2-cross-env-catalog` case에 결합해 복원/재생 가능한 저장소 증거로만 사용한다. CI 합격은 **가설 재현 성공**이지 역사적 책임 확인·권한 수정 승인·R2 lineage 합격이 아니다.
+
+**후속 Owner 결정:** 추가 직접 Grant가 서비스에 필요한지 Character/API/DB/Security Owner가 증명해야 한다. 제거가 필요하더라도 Production `REVOKE`/Role 변경은 별도 승인된 forward-only 안전 변경·영향 평가·Rollback·운영 검증 절차 뒤에만 가능하다. 재현이 정확히 맞더라도 역사적 104KB SQL 원본과 관리형 Audit는 비공개로 별도 확인해야 한다. `1520~1720` 적용 `0/21`, `dr_ready=false`, G0~G6/유료 모델/공개 HOLD 유지.
+
+
+### 2026-10-14 PG17 실제 실행 검증 (가설의 재현 성공, 역사적 출처 HOLD)
+
+- 정확한 PR 구현 HEAD `e1f09918c17cf7b98b8381c4b4c7d695ac862d11`에서 [CI #38492147105](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38492147105)의 PostgreSQL17 job `115619675865` **SUCCESS**.
+- 격리에서 `PASS_R2_SYNTHETIC_POSTGRES_CREATOR_DEFAULT_EXECUTE_NOT_HISTORICAL_ACTOR`: 테스트 함수 생성 당시 `postgres` `public` 스키마 함수 기본권한을 통해 `service_role EXECUTE`가 부여되고 `PUBLIC REVOKE` 및 Owner 이전 뒤에도 해당 명시 권한이 유지되는 메커니즘을 재현.
+- `PASS_R2_ONE_EDGE_ACL_EFFECT_REPRODUCED_ORIGIN_UNVERIFIED`: 격리 `assert_seyeon_chat_thread_runtime_v1`에 단 **1개의 임시 `service_role EXECUTE`**를 추가했을 때 19개 RPC의 정규화 Grant 그래프뿐 아니라 **원본 `proacl` SHA-256까지** Production 관측값과 일치 (`exactRawAclMatch=true`, `normalizedGrantGraphMatch=true`, `rawAclRemainingDifferences=[]`). 무관한 18 RPC, 브라우저 직접 EXECUTE 0, ROLLBACK 후 이전 ACL로 복구도 검증.
+- **범위별 결론:** 저장소 1490의 `PUBLIC` 철회만으로 `service_role` 기본 권한을 자동 철회하지 않는다는 *기술적 메커니즘*이 설명력을 갖는다. **2026-10-08 실제 기본권한 이력·실제 실행 역할/시각·원격 SQL 적용 경로·권한 의도는 별개로 미증명**. 이 증거로 과거 적용 주체를 지목하거나 Production 권한을 임의로 변경하지 않는다. `originEstablished=false`, `authorizedForProduction=false`, `dr_ready=false`, R2 계보 및 G0~G6 HOLD.
