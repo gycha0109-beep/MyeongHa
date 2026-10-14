@@ -15,7 +15,7 @@
  * production requires removal/closure of that path and independent identity
  * provisioning, issuer key custody, and DB privileges before enabling it.
  */
-import {createPublicKey, verify as edVerify} from 'node:crypto';
+import {createPrivateKey,createPublicKey,sign as edSign,verify as edVerify} from 'node:crypto';
 import {
   verifyPrivateCancelDualSignaturesV1,
   type PrivateCancelReviewActionV1,
@@ -24,7 +24,8 @@ import {
   type PrivateCancelVerifiedReviewCommandV1,
 } from './official-reader-portone-cancel-private-dual-approval-v1.js';
 import {
-  issueSandboxPrivateCancelReviewPermitV1,
+  canonicalPrivateCancelDetachedPermitV1,
+  validateSandboxPrivateCancelDetachedPayloadV1,
   type PrivateCancelDetachedPermitV1,
 } from './official-reader-portone-cancel-detached-permit-private-v1.js';
 
@@ -217,7 +218,16 @@ export function verifyOfflinePrivateCancelIdentityPairV1(input:Readonly<{
   return command;
 }
 
-/** Test-only end-to-end identity gate. No new HTTP or DB execution rights. */
+/**
+ * D3e13: single offline source-level issuance function. Both signed operator
+ * statements AND independently signed IdP identity assertions are REQUIRED.
+ * The raw Ed25519 permit signer is no longer exported by the executor module.
+ *
+ * IMPORTANT: caller-injected key directories and PEM private key are trusted
+ * dependencies, NOT a production issuer authentication boundary. A caller
+ * that controls these can still manufacture a synthetic trust configuration;
+ * no production HTTP/DB privileges or key provisioning are enabled.
+ */
 export function issueIdentityBoundSandboxPrivateCancelPermitV1(input:Readonly<{
   statement:unknown;
   operatorAttestations:readonly unknown[];
@@ -229,13 +239,36 @@ export function issueIdentityBoundSandboxPrivateCancelPermitV1(input:Readonly<{
   issuerPrivateKeyPem:string;
   now:Date;
 }>):PrivateCancelDetachedPermitV1{
-  verifyOfflinePrivateCancelIdentityPairV1(input);
-  return issueSandboxPrivateCancelReviewPermitV1({
-    statement:input.statement,
-    attestations:input.operatorAttestations,
-    trustedOperatorKeys:input.trustedOperatorKeys,
+  const command=verifyOfflinePrivateCancelIdentityPairV1(input);
+  if (typeof input.issuerKeyId!=='string'
+    || !/^issuer_[a-z0-9_]{6,32}$/u.test(input.issuerKeyId)
+    || typeof input.issuerPrivateKeyPem!=='string'
+    || input.issuerPrivateKeyPem.length>4096) {
+    throw new Error('Private identity-bound permit issuer dependencies are invalid.');
+  }
+  // The original operator assertion cannot be extended by the service permit.
+  const expires=Math.min(input.now.valueOf()+60_000,Date.parse(command.expiresAt));
+  const payload:PrivateCancelDetachedPermitV1['payload']=Object.freeze({
+    protocol:'myeongha.cancel.ops.detached-permit.v1',
+    environment:'sandbox',
     issuerKeyId:input.issuerKeyId,
-    issuerPrivateKeyPem:input.issuerPrivateKeyPem,
-    now:input.now,
+    permitIssuedAt:input.now.toISOString(),
+    permitExpiresAt:new Date(expires).toISOString(),
+    command,
+  });
+  const checked=validateSandboxPrivateCancelDetachedPayloadV1(payload,input.now);
+  let signature:Buffer;
+  try {
+    const signer=createPrivateKey(input.issuerPrivateKeyPem);
+    if (signer.type!=='private' || signer.asymmetricKeyType!=='ed25519') {
+      throw new Error('issuer key algorithm not Ed25519');
+    }
+    signature=edSign(null,canonicalPrivateCancelDetachedPermitV1(checked),signer);
+  } catch {
+    throw new Error('Private identity-bound permit requires a trusted Ed25519 verifier signer.');
+  }
+  return Object.freeze({
+    payload:checked,
+    signatureBase64:signature.toString('base64'),
   });
 }

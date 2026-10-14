@@ -10,9 +10,11 @@ import {
 import {
   canonicalPrivateCancelDetachedPermitV1,
   executeSandboxPrivateCancelReviewPermitV1,
-  issueSandboxPrivateCancelReviewPermitV1,
   type PrivateCancelDetachedPermitV1,
 } from '../apps/api/src/official-reader-portone-cancel-detached-permit-private-v1.js';
+import {
+  issueSandboxPrivateCancelReviewPermitV1,
+} from './support/private-official-reader-cancel-legacy-permit-issuer-v1.js';
 
 const NOW=new Date('2026-10-14T05:00:00.000Z');
 const RECEIPT='00000000-0000-4000-8000-000000000077';

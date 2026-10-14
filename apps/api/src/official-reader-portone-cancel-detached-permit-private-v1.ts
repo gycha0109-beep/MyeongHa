@@ -1,9 +1,8 @@
 /**
  * D3e10 OFFLINE ONLY: detached verifier -> signed permit -> executor simulation.
  *
- * Verifier: verifies two independent D3e8 operator Ed25519 signatures and
- * signs a short-lived, sandbox-scoped execution permit with a DISTINCT
- * verifier-service Ed25519 private key (explicit injected dependency).
+ * Executor-only: verifies an IdP-gated, short-lived Ed25519 permit signed
+ * by a separately trusted verifier; NEVER imports a signing private key.
  *
  * Executor: holds only a PINNED issuer public-key registry and an injected
  * offline DB-owner test store. It verifies the permit BEFORE any SQL access.
@@ -12,17 +11,11 @@
  * accept caller-supplied signing keys as trusted, or deploy a SECURITY DEFINER
  * facade. DB owner and legacy D3e6 remain bypass paths. No live authorization.
  */
+import {createPublicKey,verify as edVerify} from 'node:crypto';
 import {
-  createPrivateKey,createPublicKey,
-  sign as edSign,verify as edVerify,
-} from 'node:crypto';
-import {
-  verifyPrivateCancelDualSignaturesV1,
   validatePrivateCancelReviewReceiptV1,
   type PrivateCancelReviewAuthorizedStoreV1,
   type PrivateCancelReviewAuthorizedResultV1,
-  type PrivateCancelReviewTrustedKeyV1,
-  type PrivateCancelReviewStatementV1,
   type PrivateCancelVerifiedReviewCommandV1,
 } from './official-reader-portone-cancel-private-dual-approval-v1.js';
 
@@ -101,7 +94,10 @@ function validCommand(value:unknown,now:Date):PrivateCancelVerifiedReviewCommand
     statementDigest:value.statementDigest,
   });
 }
-function validatedPayload(input:unknown,now:Date):PrivateCancelDetachedPermitV1['payload'] {
+/** Pure shape/time check. Does NOT issue/authorize a permit or commit SQL. */
+export function validateSandboxPrivateCancelDetachedPayloadV1(
+  input:unknown,now:Date,
+):PrivateCancelDetachedPermitV1['payload'] {
   if (!isShape(input,PAYLOAD_FIELDS)
     || input.protocol!==PROTOCOL || input.environment!=='sandbox'
     || typeof input.issuerKeyId!=='string' || !ISSUER.test(input.issuerKeyId)
@@ -147,56 +143,11 @@ export function canonicalPrivateCancelDetachedPermitV1(
 }
 
 /**
- * Called ONLY inside a detached, independently authenticated offline verifier.
- * Signing private key belongs to that verifier ONLY, never the executor.
+ * D3e13: this module is VERIFY-ONLY. It never accepts an issuer private key.
+ * Production issuer policy is outside this executor; the offline D3e12 identity
+ * gate is the only issuer implementation under apps/api/src.
+ * Legacy raw issuer is deliberately test/support ONLY (never runtime).
  */
-export function issueSandboxPrivateCancelReviewPermitV1(input:Readonly<{
-  statement:unknown;
-  attestations:readonly unknown[];
-  trustedOperatorKeys:Readonly<
-    Record<string,PrivateCancelReviewTrustedKeyV1|undefined>>;
-  issuerKeyId:string;
-  issuerPrivateKeyPem:string;
-  now:Date;
-}>):PrivateCancelDetachedPermitV1 {
-  if (!Number.isFinite(input.now?.valueOf())
-    || typeof input.issuerKeyId!=='string' || !ISSUER.test(input.issuerKeyId)
-    || typeof input.issuerPrivateKeyPem!=='string'
-    || input.issuerPrivateKeyPem.length>4096) {
-    throw new Error('Private detached permit issuer dependencies are invalid.');
-  }
-  // No SQL is touched here: the first boundary verifies BOTH operator proofs.
-  const command=verifyPrivateCancelDualSignaturesV1({
-    statement:input.statement as PrivateCancelReviewStatementV1,
-    attestations:input.attestations,
-    trustedKeys:input.trustedOperatorKeys,
-    now:input.now,
-  });
-  const expiry=Math.min(input.now.valueOf()+60_000,Date.parse(command.expiresAt));
-  const payload:PrivateCancelDetachedPermitV1['payload']=Object.freeze({
-    protocol:PROTOCOL,environment:'sandbox',
-    issuerKeyId:input.issuerKeyId,
-    permitIssuedAt:input.now.toISOString(),
-    permitExpiresAt:new Date(expiry).toISOString(),
-    command,
-  });
-  // This validates all timing/protocol edges BEFORE signing.
-  const checked=validatedPayload(payload,input.now);
-  let signature:Buffer;
-  try {
-    const privateKey=createPrivateKey(input.issuerPrivateKeyPem);
-    if (privateKey.asymmetricKeyType!=='ed25519' || privateKey.type!=='private') {
-      throw new Error('not an Ed25519 issuer key');
-    }
-    signature=edSign(null,canonicalPrivateCancelDetachedPermitV1(checked),privateKey);
-  } catch {
-    throw new Error('Private detached permit requires a trusted Ed25519 verifier signer.');
-  }
-  return Object.freeze({
-    payload:checked,
-    signatureBase64:signature.toString('base64'),
-  });
-}
 
 /**
  * Executor requires only the trusted verifier PUBLIC key, not human signatures
@@ -219,7 +170,7 @@ export async function executeSandboxPrivateCancelReviewPermitV1(input:Readonly<{
     || !SIG.test(input.permit.signatureBase64)) {
     throw new Error('Private detached permit envelope or encoding invalid.');
   }
-  const payload=validatedPayload(input.permit.payload,input.now);
+  const payload=validateSandboxPrivateCancelDetachedPayloadV1(input.permit.payload,input.now);
   const issuer=input.trustedIssuers[payload.issuerKeyId];
   if (!issuer || issuer.enabled!==true
     || typeof issuer.publicKeyPem!=='string'
