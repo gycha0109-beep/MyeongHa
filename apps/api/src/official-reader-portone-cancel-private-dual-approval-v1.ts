@@ -72,8 +72,8 @@ export type PrivateCancelReviewAuthorizedResultV1 = Readonly<{
 const PROTOCOL='myeongha.cancel.ops.review.ed25519.v1' as const;
 const UUID=/^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/iu;
 const TICKET=/^OPS-[0-9]{4,12}$/u;
-const KEY=/^key_[a-z0-9]{6,32}$/u;
-const PERSON=/^op_[a-z0-9]{6,32}$/u;
+const KEY=/^key_[a-z0-9_]{6,32}$/u;
+const PERSON=/^op_[a-z0-9_]{6,32}$/u;
 const B64=/^[A-Za-z0-9+/]{86}==$/u;
 const EXPECTED_STATEMENT_KEYS=Object.freeze([
   'action','challengeId','environment','expiresAt',
