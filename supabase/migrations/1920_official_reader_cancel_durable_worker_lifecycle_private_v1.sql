@@ -159,7 +159,7 @@ language plpgsql volatile security invoker
 set search_path=pg_catalog, public
 as $d3e5_complete$
 declare
-  v_now timestamptz := pg_catalog.clock_timestamp();
+  v_now timestamptz;
   v_work public.official_reader_portone_cancel_ingress_inbox_v1%rowtype;
   v_shadow public.official_reader_portone_cancel_observation_shadow_v1%rowtype;
   v_state text;
@@ -170,6 +170,8 @@ begin
   select * into v_work
   from public.official_reader_portone_cancel_ingress_inbox_v1
   where id=p_inbox_id for update;
+  -- Re-read DB clock AFTER acquiring row lock; never permit an expired lease.
+  v_now:=pg_catalog.clock_timestamp();
   if not found or v_work.inbox_state<>'leased'
     or p_worker_id is null or p_claim_token is null
     or v_work.lease_owner is distinct from p_worker_id
@@ -225,7 +227,7 @@ language plpgsql volatile security invoker
 set search_path=pg_catalog, public
 as $d3e5_fail$
 declare
-  v_now timestamptz := pg_catalog.clock_timestamp();
+  v_now timestamptz;
   v_work public.official_reader_portone_cancel_ingress_inbox_v1%rowtype;
   v_state text;
   v_due timestamptz;
@@ -253,6 +255,8 @@ begin
   select * into v_work
   from public.official_reader_portone_cancel_ingress_inbox_v1
   where id=p_inbox_id for update;
+  -- Re-read DB clock AFTER acquiring row lock; never permit an expired lease.
+  v_now:=pg_catalog.clock_timestamp();
   if not found or v_work.inbox_state<>'leased'
     or p_worker_id is null or p_claim_token is null
     or v_work.lease_owner is distinct from p_worker_id
