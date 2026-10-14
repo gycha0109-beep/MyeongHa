@@ -354,6 +354,10 @@ SQL
     trap 'rm -f -- "$local_shape" "$local_digest" "$local_acl" "$local_acl_transient" "$local_acl_rollback" "$local_effective" "$local_manifest" "$local_h_1520" "$local_h_1530" "$local_h_1540" "$local_h_cost" "$local_h_governor" "$local_h_rate"' EXIT
     psql -X -qAt -v ON_ERROR_STOP=1 -f test/db/seyeon_r2_h_1600_1610_transaction.sql > "$local_h_rate"
     node scripts/operations/verify-seyeon-r2-h-1600-1610.mjs "$local_h_rate"
+    local_h_governed_role="$(mktemp)"
+    trap 'rm -f -- "$local_shape" "$local_digest" "$local_acl" "$local_acl_transient" "$local_acl_rollback" "$local_effective" "$local_manifest" "$local_h_1520" "$local_h_1530" "$local_h_1540" "$local_h_cost" "$local_h_governor" "$local_h_rate" "$local_h_governed_role"' EXIT
+    psql -X -qAt -v ON_ERROR_STOP=1 -f test/db/seyeon_r2_h_1620_1630_transaction.sql > "$local_h_governed_role"
+    node scripts/operations/verify-seyeon-r2-h-1620-1630.mjs "$local_h_governed_role"
     ;;
   seyeon-r2-rpc-catalog)
     verify_pg17
