@@ -6,7 +6,7 @@
  * from a request, signed envelope or same untrusted key registry. The caller
  * controlling the boot trust root is still a trusted operator (HOLD).
  */
-import {createPublicKey,verify as edVerify} from 'node:crypto';
+import {createHash,createPublicKey,verify as edVerify} from 'node:crypto';
 import type {
   PrivateCancelReviewRoleV1,PrivateCancelReviewTrustedKeyV1,
 } from './official-reader-portone-cancel-private-dual-approval-v1.js';
@@ -91,7 +91,9 @@ function iso(value:unknown):value is string{
     && new Date(Date.parse(value)).toISOString()===value;
 }
 function keyPem(value:unknown):value is string{
-  if(typeof value!=='string' || value.length<60 || value.length>4096) return false;
+  if(typeof value!=='string' || value.length<60 || value.length>4096
+    || !value.startsWith('-----BEGIN PUBLIC KEY-----\n')
+    || !value.trimEnd().endsWith('-----END PUBLIC KEY-----')) return false;
   try{
     const pub=createPublicKey(value);
     return pub.type==='public' && pub.asymmetricKeyType==='ed25519';
@@ -99,11 +101,15 @@ function keyPem(value:unknown):value is string{
     return false;
   }
 }
+function fingerprint(pem:string):string {
+  const key=createPublicKey(pem);
+  return createHash('sha256').update(key.export({type:'spki',format:'der'})).digest('hex');
+}
 function operators(value:unknown):PrivateCancelTrustOperatorV1[]{
   if(!Array.isArray(value) || value.length<2 || value.length>30){
     throw new Error('Offline cancel trust policy requires bounded operators.');
   }
-  const orgs=new Set<string>(),people=new Set<string>(),keys=new Set<string>();
+  const orgs=new Set<string>(),people=new Set<string>(),keys=new Set<string>(),cryptoKeys=new Set<string>();
   const result:PrivateCancelTrustOperatorV1[]=[];
   for(const raw of value){
     if(!exact(raw,OP_FIELDS) || typeof raw.orgSubjectId!=='string'
@@ -116,10 +122,11 @@ function operators(value:unknown):PrivateCancelTrustOperatorV1[]{
       throw new Error('Offline cancel trust policy has invalid operator assignment.');
     }
     if(orgs.has(raw.orgSubjectId)||people.has(raw.principalId)
-      || keys.has(raw.signingKeyId)){
+      || keys.has(raw.signingKeyId) || cryptoKeys.has(fingerprint(raw.publicKeyPem))){
       throw new Error('Offline cancel trust policy has duplicate operator identity or signing key.');
     }
     orgs.add(raw.orgSubjectId);people.add(raw.principalId);keys.add(raw.signingKeyId);
+    cryptoKeys.add(fingerprint(raw.publicKeyPem));
     result.push(Object.freeze({
       orgSubjectId:raw.orgSubjectId,principalId:raw.principalId,
       signingKeyId:raw.signingKeyId,role:raw.role,status:raw.status,
@@ -209,7 +216,7 @@ export function verifyOfflinePrivateCancelSignedTrustPolicyV1(input:Readonly<{
     || p.environment!=='sandbox'
     || p.audience!=='myeongha.cancel.ops.offline-boundaries.v1'
     || typeof p.policyId!=='string'||!ID.test(p.policyId)
-    || !Number.isSafeInteger(p.revision)||!(p.revision as number>0)
+    || !Number.isSafeInteger(p.revision)||(p.revision as number)<=0
     || (p.revision as number)<root.minimumRevision
     || !iso(p.issuedAt)||!iso(p.expiresAt)){
     throw new Error('Offline cancel signed policy context or revision rejected.');
@@ -222,6 +229,14 @@ export function verifyOfflinePrivateCancelSignedTrustPolicyV1(input:Readonly<{
   const ops=operators(p.operators);
   const idps=issuers(p.idpIssuers,IDP_KEY,'IdP');
   const permits=issuers(p.permitIssuers,PERMIT_KEY,'permit');
+  // Key-ID separation alone is insufficient. Never reuse the same Ed25519
+  // key across operator, IdP, permit issuer or independent trust root roles.
+  const allKeys=[root.publicKeyPem,...ops.map(x=>x.publicKeyPem),
+    ...idps.map(x=>x.publicKeyPem),...permits.map(x=>x.publicKeyPem)]
+    .map(fingerprint);
+  if(new Set(allKeys).size!==allKeys.length){
+    throw new Error('Offline cancel trust policy reuses a cryptographic key across trust roles.');
+  }
   const validBody:PrivateCancelSignedTrustPolicyBodyV1={
     protocol:'myeongha.cancel.ops.signed-trust-policy.v1',
     environment:'sandbox',audience:'myeongha.cancel.ops.offline-boundaries.v1',
