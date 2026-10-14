@@ -243,3 +243,10 @@ Watchtower-Track: ops. R1 정확한 격리 복원 증거는 8절을 따른다. �
 - **격리 PG17 재생:** 기존 `1510 + timestamped 2` 일회용 기준에서 `BEGIN → 1550 → 1560 → 1570 → ROLLBACK`. baseline/각 이관 직후/복귀 시점의 **5개 카탈로그 스냅샷**을 비교한다. 1550 테이블+FORCE RLS, 비용/unknown 추정 불변식, Owner Role·2개 서버 RPC+cleanup trigger, 1560 lifecycle/시작·정산 RPC와 이전 데이터 settled 시각 채움, 1570 관측용 모델·미정산 RPC 2개, 함수 Owner·SECURITY DEFINER·검색경로/ACL·Role membership·정확한 ROLLBACK 모두 단계별 검증한다. 1580~1720 / 원격-only SQL 실행 금지.
 - **합성 데이터 경계:** 일회용 DB 가짜 UUID의 cost unknown 값에 금액 금지, 중복 call ID 실패, 1560 이전 기록의 settled_at backfill, started/settled 상태 제약 역행 거부를 DB 내에서만 시험하고 전체 롤백. 실제 provider/API 호출·실제 비용·유료 모델 사용은 없다.
 - **남은 증명·Owner HOLD:** 수동 lifecycle SQL 제약의 성공이 실 운영 결제/Provider dispatch 책임, 실 사용자 삭제 복구, 1570 모델별 합산 결과/동시성/알림/원장 정합성을 입증하지 않는다. R2-G 계보 원천 감사, 1550~1630 전체 cost-governor 운영 결정, `dr_ready=false`, G0~G6 및 유료/public 활성화 HOLD.
+
+## 19. 2026-10-14 R2-H-5 — 1580/1590 Atomic Governor Admission·Settlement 격리 검증
+
+- 대상 SQL blob 불변: `1580_seyeon_ai_governor_atomic_admission_v1.sql` (`fb278c9e38646997ea75e8419c97dcff9ddf17ad`), `1590_seyeon_ai_governor_atomic_settlement_v1.sql` (`1a36e8f8b98f6c98c591572729685d7f6e319249`); 기존 1550→1560→1570 Owner-HOLD 선행 의존성을 독립 폐기형 PG17에서만 재생. 1600~1720과 원격-only SQL은 실행하지 않는다.
+- 실험: `1510 + timestamped 2` 검증 기준 → `BEGIN → 1550 → 1560 → 1570 → 1580 → 1590 → ROLLBACK`. 5개 catalog state(baseline, 선행 완료, 1580 완료, 1590 완료, 복구)를 비교. 2개 모델/일일 예산 테이블 RLS+FORCE, Owner와 정책 3개, 원장 Quote 6칼럼·제약/부분 Index, 1590 stored effective cost, 2개 governed RPC의 SECURITY DEFINER/Owner/검색경로/직접 EXECUTE를 검증한다.
+- 합성 부정 입력: 두 개의 동시 활성 모델 정책 거부, token context window 초과 거부, 0원 일일 예산 거부, started 상태의 예약 비용 유지(500), settled/estimated 상태 실제 비용 반영(300). 가짜 UUID와 fixture 행만 사용하고 모두 삭제·마지막 트랜잭션 전체 ROLLBACK. 동시 세션·실 provider·실 계정·실 유료 결제나 본인 데이터 없음.
+- `1600` rate-card 불변성과 `1610~1630` 내부 정산·실행 Role 분리/최종 승인, 실제 Subject deletion 경합/운영 예산 프로비저닝·유료 모델 활성화는 이 증거의 범위 밖. 기존 `1530` creator Role 잔존 HOLD 및 R2-G historical provenance HOLD 유지. `dr_ready=false`, Production 전혀 쓰지 않음.
