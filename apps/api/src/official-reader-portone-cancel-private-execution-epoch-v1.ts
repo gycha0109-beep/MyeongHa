@@ -175,6 +175,7 @@ export function assertPrivateCancelEpochSignerSeparateV1(input:Readonly<{
   pinnedSigner:PrivateCancelTrustedEpochSignerV1;
   policyRootPublicKeyPem:string;
   permitIssuerPublicKeyPems:readonly string[];
+  idpAndOperatorPublicKeyPems:readonly string[];
 }>):void{
   if(typeof input.pinnedSigner?.keyId!=='string'
     ||!ID.test(input.pinnedSigner.keyId)){
@@ -188,7 +189,8 @@ export function assertPrivateCancelEpochSignerSeparateV1(input:Readonly<{
     );
   };
   if(compare(input.policyRootPublicKeyPem)
-    ||input.permitIssuerPublicKeyPems.some(compare)){
-    throw new Error('Offline cancel epoch signer must differ from root and permit signing keys.');
+    ||input.permitIssuerPublicKeyPems.some(compare)
+    ||input.idpAndOperatorPublicKeyPems.some(compare)){
+    throw new Error('Offline cancel epoch signer must differ from root and all other trust roles.');
   }
 }
