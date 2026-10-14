@@ -258,3 +258,9 @@ Governor 04d4B 계열은 실제 격리 PostgreSQL 기반 영수증 임대·정�
 - `20261008090417` SQL 본문은 Production DB 메모리 밖으로 내보내지 않고 known identifier/token count, SQL digest, 6개 Marker 및 timestamped 2개 ledger metadata만 감사. `1510` + `20261008043000` + 원격 bundle의 ContentManifest ACL 공통 대상을 확인하되 순서·실제 행위는 추측하지 않음.
 - 추가 R2-G 기초 증거: 실제 ContentManifest owner/DDL/ACL SHA 및 유효 EXECUTE를 Production vs 격리 PG17 원격 SQL **미적용** 최종 상태로 비교. mismatch는 Owner 조사 HOLD; 테스트 PASS는 historique provenance 승인과 구별.
 - **Owner 결정 필수:** 비공개 104KB 실행 원본·서명/보관, 감사 주체/도구/시각, 순서·forward-only 정책, R2-H 9개 검토 단위/21 migrations 사전 승인·롤백/Recovery. Production 변경, `migration repair`, `dr_ready` 승격 금지.
+
+## 18. 2026-10-14 R2-H 첫 검토 단위 — 1520 격리 함수 교체/권한/ROLLBACK
+
+- R2-H 9개 Owner 검토 단위 중 deletion(1520)만 기존 PG17 CI의 `seyeon-r2-cross-env-catalog` 재생 뒤 독립 트랜잭션에서 전/후/ROLLBACK 검사. 기존 21개 인벤토리·순서·blob SHA는 불변.
+- 목표 증거: 대상 단일 함수 본문 교체, Owner·ACL·보안 속성·서버/브라우저 실행권한 불변, 1530 선적용 없음, rollback 상태가 최초와 정확히 일치. 부정 테스트/PG17/CI/Full Integration 및 병합 후 main 확인 후 `#1887`에 실행 SHA·Run ID 누적.
+- Production 배포 승인이 아닌 **첫 검토 단위의 합성 재현**이다. R2-G 계보 출처·1520 실제 삭제/복구 시나리오·Owner 승인·DR Ready·G0~G6는 계속 HOLD.

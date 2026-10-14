@@ -213,3 +213,10 @@ Watchtower-Track: ops. R1 정확한 격리 복원 증거는 8절을 따른다. �
 - Production ContentManifest catalog: 1 함수, 정규화 Grant edge **2**, SECURITY INVOKER, `myeongha_api_executor` EXECUTE 허용, `service_role`/browser 실행 불허. PG17 격리 재생(`1510 + timestamped 2`, 원격-only bundle 재실행 없음) 비교 결과는 기존 `seyeon-r2-cross-env-catalog`에 추가된 `verify-seyeon-r2-g-lineage.mjs` 검증으로 고정. 유효권한/Owner/DDL mismatch는 fail-closed; ACL raw-only drift도 HOLD로 기록. 부정 테스트는 잘못된 remote digest·history·토큰·ACL·브라우저 접근·Role/DDL drift를 거부한다.
 - **원천 감사 미충족**: 승인된 비공개 원본 SQL 아카이브의 출처·보존 hash, 실제 실행 도구/주체/시각·승인자, timestamped/번호 migration의 실제 전환 트랜잭션 재구성이 필요. PostgreSQL 일반 catalog와 실패 로그만으로 역사적 성공 경로를 복원하거나 권한 의도를 승인하지 않는다.
 - Production history/Role/ACL/DDL/DML **쓰기 0**. R1 scoped DONE; R2/R2-G source audit HOLD, `1520~1720` 0/21, `dr_ready=false`, #1866 G0~G6/유료 AI·사용자 공개 HOLD.
+
+## 15. 2026-10-14 R2-H-1 — 1520 독립 Owner 검토 단위: 격리 PG17 함수교체·롤백 증명
+
+- **검토 범위:** 9개 Owner 검토 단위 중 첫 번째 `deletion` / `1520_account_deletion_finalizer_relationship_runtime_sync.sql`만 대상으로 한다. 기존 인벤토리의 blob SHA `9cab84727c33d2ffb6985119b22ec284c9ed025a`를 변경하지 않는다. 1530~1720 및 원격 전용 `20261008090417` SQL은 실행하지 않는다.
+- **재생 경계:** 기존 `apply_pg17_migrations_through_seyeon_production_frontier`에서 1510과 허용된 timestamped 2개까지만 격리 적용한 후, 별도 **한 연결의 BEGIN → 1520 → ROLLBACK** 실행. 전/후/복구 시 함수 `internal_finalize_account_deletion_db_v1(uuid,uuid,text)`의 DDL·Owner·ACL 지문 및 `SECURITY DEFINER`, `search_path`, browser/API/service EXECUTE, 1530 이후 객체 부재를 비교한다. 실제 개인정보 또는 권한 원문은 출력하지 않는다.
+- **검증기/부정 테스트:** `verify-seyeon-r2-h-1520.mjs`, `tests/seyeon-r2-h-1520.test.mjs`는 교체 미발생, Owner/ACL 변형, 4개 Role 권한 상승, 잘못된 SECURITY DEFINER/search_path, 1530 선적용, ROLLBACK 불완전·승인 플래그 변조를 fail-closed로 거부한다. 기존 PostgreSQL 17 R2 교차환경 CI에 결합한다.
+- **판정 경계:** 코드 검증 통과는 1520의 합성 재현 범위에서만 유효하다. 삭제 처리 실제 양수 데이터·운영 Lock 경합·회복, R2-G 출처·권한 의도, 9개 검토 단위의 Production 배포 승인은 미확인. Production SQL/Role/ACL/history/개인정보 쓰기 없음. `dr_ready=false`, R2/후속 migration/G0~G6/유료 모델/공개 HOLD 유지.
