@@ -38,17 +38,19 @@ describe('shared CI verification plan', () => {
     const plan = resolveVerificationPlan(['scripts/ci/db-suites.json']);
     expect(plan.db).toBe(true);
     expect(plan.db_suites).toHaveLength(5);
-    expect(plan.db_suites.flatMap((suite: string) => getDbSuite(suite).cases)).toHaveLength(38);
+    expect(plan.db_suites.flatMap((suite: string) => getDbSuite(suite).cases)).toHaveLength(40);
     const cases = plan.db_suites.flatMap((suite: string) => getDbSuite(suite).cases);
     expect(cases.filter((name: string) => name === 'saju-staging-operator-admission')).toHaveLength(2);
     expect(cases.filter((name: string) => name === 'saju-staging-operator-admission-v2')).toHaveLength(2);
-    expect(new Set(cases).size).toBe(35);
+    expect(new Set(cases).size).toBe(37);
     expect(getDbSuite('content').cases).toContain('official-reader-provider-revoke-race');
     expect(getDbSuite('runtime').cases).toContain('guest-promotion-auth-fk');
     expect(getDbSuite('runtime').cases).toContain('reader-memory-tenant-boundary');
     expect(getDbSuite('postgres17').cases).toContain('guest-promotion-auth-fk');
     expect(getDbSuite('postgres17').cases).toContain('cap-b2-r4-initial-matrix');
     expect(getDbSuite('postgres17').cases).toContain('cap-b2-r4-distinct-bundles');
+    expect(getDbSuite('postgres17').cases).toContain('cap-b2-r4-wrong-receipt-offer');
+    expect(getDbSuite('postgres17').cases).toContain('cap-b2-r4-actual-new-member-promotion');
     const dispatcher = readFileSync('test/db/run_ci_case.sh', 'utf8');
     for (const caseName of cases) expect(dispatcher).toContain(`${caseName})`);
     for (const suiteName of plan.db_suites) {
