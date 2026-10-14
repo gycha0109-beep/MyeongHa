@@ -58,14 +58,19 @@ function stageArgs(stage) {
   ];
   return ['run', '--rm', '--no-deps', '--entrypoint', 'node',
     '-e', 'MYEONGHA_DOCKER_SAJU_CROSS_DB=1',
-    ...(stage === 'cross-provenance' ? [
+    ...(['cross-provenance', 'cross-review-packet'].includes(stage) ? [
       '-e', 'MYEONGHA_DOCKER_SAJU_PROVENANCE=1',
       '-e', 'SAJU_BRIDGE_LOCAL_CROSS_DB_FAULT=1',
+    ] : []),
+    ...(stage === 'cross-review-packet' ? [
+      '-e', 'MYEONGHA_DOCKER_SAJU_REVIEW_PACKET=1',
+      '-e', 'SAJU_BRIDGE_LOCAL_REVIEW_RUN_ID=' + env.SAJU_BRIDGE_LOCAL_REVIEW_RUN_ID,
     ] : []),
     '-e', 'SAJU_BRIDGE_LOCAL_RECOVERY_STAGE=' + stage,
     ...values.flatMap(([key,value]) => ['-e', key + '=' + value]),
     'saju-recovery-verifier', 'node_modules/vitest/vitest.mjs', 'run',
-    stage === 'cross-provenance' ? 'test/saju-held-docker-provenance-phase4e.test.ts'
+    ['cross-provenance', 'cross-review-packet'].includes(stage)
+      ? 'test/saju-held-docker-provenance-phase4e.test.ts'
       : 'test/saju-held-docker-cross-db-phase4c3.test.ts'];
 }
 function runStage(stage, match) {
@@ -85,6 +90,7 @@ function snapshot(stage) {
 }
 async function run() {
   const now = Date.now();
+  env.SAJU_BRIDGE_LOCAL_REVIEW_RUN_ID = randomUUID();
   env.SAJU_BRIDGE_LOCAL_CROSS_DB_PERMIT_NONCE = randomUUID();
   env.SAJU_BRIDGE_LOCAL_CROSS_DB_PERMIT_ADMISSION = randomUUID();
   env.SAJU_BRIDGE_LOCAL_CROSS_DB_PERMIT_REVOKED = randomUUID();
@@ -155,6 +161,13 @@ async function run() {
       }
       runStage('cross-provenance', 'Phase 4E real DB: independent TLS and READ ONLY; replay digest != Permit UUID; shared attempt authority NOT_PROVEN; manual review NOT_ADMISSIBLE; HOLD.');
       console.log('[saju-bridge] Phase 4E: real 3-DB scoped provenance and hostile approval claims rejected; no causal attempt attestation or operator approval.');
+    }
+    if (env.SAJU_BRIDGE_LOCAL_REVIEW_PACKET_FAULT === '1') {
+      if (env.SAJU_BRIDGE_LOCAL_PROVENANCE_FAULT !== '1') {
+        throw new Error('Phase 4F requires the Phase 4E real DB provenance gate.');
+      }
+      runStage('cross-review-packet', 'Phase 4F real DB: five untrusted claimed receipts bound to ephemeral read-only evidence; missing/foreign/duplicate rejected; even structurally complete NOT_ATTESTED, NOT_ADMISSIBLE; no action.');
+      console.log('[saju-bridge] Phase 4F: read-only review submission contract rejects missing, altered, duplicated or stale claims; full presentation still NOT_ATTESTED and all grants HOLD.');
     }
   } catch (error) {
     primaryError = error;

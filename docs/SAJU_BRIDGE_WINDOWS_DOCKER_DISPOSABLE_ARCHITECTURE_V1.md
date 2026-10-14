@@ -233,6 +233,20 @@ node scripts/local/verify-saju-bridge-docker-local.mjs --provenance ../Saju-brid
 - `canExecute/canPublish/canSell=false`, `automaticRetry/automaticCompensation=false`. 실제 Root/Attestor/Runner, R01–R14, 2D-4, 운영·스테이징 접근 및 배포/결제 권한 모두 HOLD. Docker 소켓이나 운영 자격증명 사용 없음. 부모의 `down --volumes --remove-orphans` 및 잔여 리소스 0 검증 유지.
 - Linux GitHub CI 결과는 Windows Docker Desktop 실기기 acceptance 증빙이 아니다. **Windows Phase 4E는 별도 실행 로그를 확인하기 전까지 NOT_VERIFIED.**
 
+### 3L. Phase 4F — 증거 제출 계약·수동 검토 패킷의 비권위적 검증 (2026-10-14)
+
+```powershell
+node scripts/local/verify-saju-bridge-docker-local.mjs --review-packet ../Saju-bridge-verify
+```
+
+- 폐기형 `--review-packet`은 이전 Phase 4A~4E 전체 실증 후에만 실행하며, `--provenance`과 이전 옵션들은 그대로 유지한다. `test/saju-held-docker-provenance-phase4e.test.ts`의 별도 검증 컨테이너가 실제 Subject·Nonce·Admission TLS PostgreSQL에서 동일한 `BEGIN READ ONLY` 스키마·영속 상태 검사를 반복한다. 패킷의 근거는 해당 단계의 검사된 **합성 의미 상태**뿐이다.
+- 제출용 `scripts/local/saju-bridge-review-packet-v1.mjs`은 엄격히 한정된 `version`, `scope=DISPOSABLE_DOCKER_ONLY`, 실행별 합성 `runId`, 검증된 Phase 4E `evidence`, 결정적인 `evidenceDigestSha256`, `submissions` 배열만 허용한다. 증거 지문은 구조 정규화·도메인 분리된 SHA-256이며 **출처 서명이나 교차 DB 인과 관계의 증명은 아니다**. `runId`도 호출자 생성 식별자이며 운영 anti-replay 권위가 아니다.
+- 제출 카테고리 다섯 가지는 (1) `INDEPENDENT_SOURCE_ATTESTATION`, (2) `SAME_LOGICAL_ATTEMPT_AUTHORITY`, (3) `CAUSAL_COMMIT_ORDER_EVIDENCE`, (4) `INDEPENDENT_MANUAL_REVIEW_APPROVAL`, (5) `DOCUMENTED_RECOVERY_AND_ROLLBACK_POLICY`이다. 각 제출 주장에는 **정해진 카테고리·합성 출처 ID·문장 지문·근거 지문·제출 시각·서명 *주장* 문자열**만 올 수 있다. 실제 서명 키·독립 인증 주체·권위 원장 검증은 **구현하지 않았다**.
+- 누락된 증거, 다른 실행/증거에 대한 재결속, 지문 변경, 중복 카테고리·중복 제출자, 범위 변조, 추가 `approved/sameAttempt` 필드, 잘못된 서명 형식, 5분 초과 또는 미래 제출 시각 모두 비허가 HOLD로 분류한다. 제출 패킷이나 입력 데이터의 비밀·인증서·원본 식별자는 판정 결과·로그에 복사하지 않는다.
+- **완벽하게 형식이 맞는 5개 증거 주장도 `STRUCTURALLY_COMPLETE_UNVERIFIED_HOLD`**이며 `signatureVerification=NOT_PERFORMED`, `evidenceAuthority=NOT_ATTESTED`, `logicalAttemptBinding=NOT_PROVEN`, `independentReviewerApproval=NOT_OBTAINED`, `manualReviewAdmissibility=NOT_ADMISSIBLE`다. 이 형식 검사는 증거를 신뢰하거나 심사 자격을 주는 단계가 아니다. 클라이언트 자체 서명·타임스탬프·출처명이 일치해도 실제 독립 검토가 존재한다는 뜻이 아니다.
+- `canExecute/canPublish/canSell=false`, `automaticRetry/automaticCompensation=false`; Root/Attestor/Runner, R01–R14, 2D-4, 실제 분산 복구/운영 승인·스테이징 접근 모두 HOLD. 쓰기 가능한 복구 코드·DB 마이그레이션·실제 Permit 발급/철회·외부 자격증명·Docker 소켓 변경 없음. 기존 부모 일회용 컨테이너·네트워크·볼륨 잔존 0 체크를 따른다.
+- **검증 경계:** GitHub Linux Docker의 PASS는 Windows 실기기 acceptance를 대체하지 않는다. 실제 독립 출처 검증·키 보관·신원 분리, 서명 검증, 안전한 인과 관계 및 승인/복구 정책이 마련되기 전에는 단순 제출 패킷으로 어떠한 권한도 생성하지 않는다.
+
 ## 4. 단계별 로드맵 · 종료 게이트
 
 | 단계 | 구현 | 게이트 | 범위 상태 |

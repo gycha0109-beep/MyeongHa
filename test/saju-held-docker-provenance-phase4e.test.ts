@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { Pool } from 'pg';
 import { afterAll, describe, expect, it } from 'vitest';
@@ -6,9 +6,17 @@ import {
   assessSajuBridgeProvenanceReviewV1 as assessReview,
   type SajuBridgeDisposableReviewPacketV1,
 } from '../scripts/local/saju-bridge-provenance-review-v1.mjs';
+import {
+  assessSajuBridgeReviewSubmissionV1 as assessPacket,
+  fingerprintSajuBridgeReviewEvidenceV1 as fingerprintPacket,
+  SAJU_BRIDGE_REQUIRED_PROOF_TYPES_V1 as proofTypes,
+  SAJU_BRIDGE_REVIEW_PACKET_VERSION_V1 as packetVersion,
+  type SajuBridgeReviewPacketV1,
+} from '../scripts/local/saju-bridge-review-packet-v1.mjs';
 
 const enabled = process.env.MYEONGHA_DOCKER_SAJU_PROVENANCE === '1';
 const stage = process.env.SAJU_BRIDGE_LOCAL_RECOVERY_STAGE;
+const packetStage = stage === 'cross-review-packet';
 const cases = ['NONCE_ONLY', 'PERMIT_ONLY', 'REVOKED_WITH_NONCE'] as const;
 type Case = typeof cases[number];
 const permitIds: Record<Case, string> = {
@@ -35,7 +43,10 @@ const certs = enabled ? {
 const pools: Pool[] = [];
 const peers: Record<Peer, Pool> = {} as Record<Peer, Pool>;
 function guard() {
-  if (!enabled || stage !== 'cross-provenance'
+  if (!enabled || !['cross-provenance','cross-review-packet'].includes(stage ?? '')
+    || (packetStage && (process.env.MYEONGHA_DOCKER_SAJU_REVIEW_PACKET !== '1'
+      || !/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/u.test(
+        process.env.SAJU_BRIDGE_LOCAL_REVIEW_RUN_ID ?? '')))
     || process.env.MYEONGHA_DOCKER_SAJU_TLS !== '1'
     || process.env.MYEONGHA_DOCKER_SAJU_PERMIT !== '1'
     || process.env.SAJU_BRIDGE_LOCAL_CROSS_DB_FAULT !== '1'
@@ -127,6 +138,92 @@ function deny(packet: unknown, classification: string) {
   return result;
 }
 
+function claimPacket(evidence: SajuBridgeDisposableReviewPacketV1,
+  nowMs: number, runId: string): SajuBridgeReviewPacketV1 {
+  const digest = fingerprintPacket(runId, evidence);
+  if (!digest) throw new Error('Test evidence is malformed; no review receipt may be generated.');
+  return {
+    version: packetVersion, scope: 'DISPOSABLE_DOCKER_ONLY',
+    runId, evidence, evidenceDigestSha256: digest,
+    // These are deliberately self-asserted TEST CLAIMS, not signed or trusted.
+    submissions: proofTypes.map((type, i) => ({
+      type, sourceId: 'synthetic-claim-source-' + i,
+      statementDigestSha256: createHash('sha256').update('untrusted-test-claim-' + i).digest('hex'),
+      evidenceDigestSha256: digest, submittedAtMs: nowMs,
+      signatureClaimBase64url: 'A'.repeat(86),
+    })),
+  };
+}
+function denyPacket(value: unknown, nowMs: number, wanted: string) {
+  const x = assessPacket(value, nowMs);
+  expect(x).toMatchObject({
+    classification: wanted, evidenceAuthority:'NOT_ATTESTED',
+    signatureVerification:'NOT_PERFORMED', logicalAttemptBinding:'NOT_PROVEN',
+    globalCommitOrder:'NOT_PROVEN',
+    independentReviewerApproval:'NOT_OBTAINED',
+    manualReviewAdmissibility:'NOT_ADMISSIBLE',
+    decision:'HOLD_MANUAL_REVIEW', canExecute:false, canPublish:false,
+    canSell:false, automaticRetry:false, automaticCompensation:false,
+  });
+  expect(Object.isFrozen(x)).toBe(true);
+  expect(Object.isFrozen(x.missingProofTypes)).toBe(true);
+  expect(JSON.stringify(x)).not.toContain('synthetic-claim-source');
+  expect(JSON.stringify(x)).not.toContain('signatureClaimBase64url');
+  return x;
+}
+describe('Phase 4F untrusted manual review submission contract', () => {
+  it('rejects omissions, wrong scope, digest swap, duplicate authorities and forged approvals', () => {
+    const now = 1900000000000;
+    const evidence = sample();
+    const runId = randomUUID();
+    const packet = claimPacket(evidence, now, runId);
+    expect(fingerprintPacket(runId, structuredClone(evidence))).toBe(packet.evidenceDigestSha256);
+    expect(fingerprintPacket(randomUUID(), evidence)).not.toBe(packet.evidenceDigestSha256);
+    denyPacket(packet, now, 'STRUCTURALLY_COMPLETE_UNVERIFIED_HOLD');
+    const less = {...packet, submissions:packet.submissions.slice(0,4)};
+    expect(denyPacket(less, now, 'MISSING_REQUIRED_PROOF_HOLD').missingProofTypes)
+      .toEqual(['DOCUMENTED_RECOVERY_AND_ROLLBACK_POLICY']);
+    denyPacket({...packet, scope:'STAGING'}, now, 'UNTRUSTED_SUBMISSION_HOLD');
+    denyPacket({...packet, approved:true, sameAttempt:true},
+      now, 'UNTRUSTED_SUBMISSION_HOLD');
+    denyPacket({...packet, runId:randomUUID()}, now, 'EVIDENCE_BINDING_MISMATCH_HOLD');
+    denyPacket({...packet, evidenceDigestSha256:'0'.repeat(64)},
+      now, 'EVIDENCE_BINDING_MISMATCH_HOLD');
+    denyPacket({...packet, evidence:{...evidence, cases:{
+      ...evidence.cases, NONCE_ONLY:{subject:'PRESENT',nonce:'ABSENT',permit:'CONSUMED'},
+    }}}, now, 'EVIDENCE_BINDING_MISMATCH_HOLD');
+    denyPacket({...packet, submissions:packet.submissions.map((x,i) =>
+      i === 0 ? {...x, evidenceDigestSha256:'0'.repeat(64)} : x)},
+      now, 'FOREIGN_EVIDENCE_REFERENCE_HOLD');
+    denyPacket({...packet, submissions:packet.submissions.map((x,i) =>
+      i === 1 ? {...x, sourceId:packet.submissions[0]!.sourceId} : x)},
+      now, 'DUPLICATE_OR_NONINDEPENDENT_SOURCE_HOLD');
+    denyPacket({...packet, submissions:packet.submissions.map((x,i) =>
+      i === 1 ? {...x, type:packet.submissions[0]!.type} : x)},
+      now, 'DUPLICATE_OR_NONINDEPENDENT_SOURCE_HOLD');
+    denyPacket({...packet, submissions:packet.submissions.map((x,i) =>
+      i === 0 ? {...x, signatureClaimBase64url:'SIGNED_AND_APPROVED'} : x)},
+      now, 'UNTRUSTED_PROOF_SHAPE_HOLD');
+    denyPacket({...packet, submissions:packet.submissions.map((x,i) =>
+      i === 0 ? {...x, approved:true} : x)},
+      now, 'UNTRUSTED_PROOF_SHAPE_HOLD');
+    denyPacket({...packet, submissions:packet.submissions.map((x,i) =>
+      i === 0 ? {...x, submittedAtMs:now-300001} : x)},
+      now, 'EXPIRED_OR_FUTURE_CLAIM_HOLD');
+    denyPacket({...packet, submissions:packet.submissions.map((x,i) =>
+      i === 0 ? {...x, submittedAtMs:now+1} : x)},
+      now, 'EXPIRED_OR_FUTURE_CLAIM_HOLD');
+    denyPacket({...packet, evidence:{...evidence, peers:{
+      ...evidence.peers, nonce:{...evidence.peers.nonce, tlsVerified:false},
+    }}}, now, 'UNTRUSTED_SUBMISSION_HOLD');
+    denyPacket({secret:'PRIVATE_EXAMPLE_ACCESS_TOKEN', approved:true},
+      now, 'UNTRUSTED_SUBMISSION_HOLD');
+    expect(JSON.stringify(assessPacket({secret:'PRIVATE_EXAMPLE_ACCESS_TOKEN'},now)))
+      .not.toContain('PRIVATE_EXAMPLE_ACCESS_TOKEN');
+    denyPacket(packet, NaN, 'UNKNOWN_HOLD');
+  });
+});
+
 describe('Phase 4E non-authorizing manual review provenance', () => {
   it('never promotes a matching or apparently attested pair', () => {
     const packet = sample();
@@ -216,5 +313,20 @@ describe.skipIf(!enabled)('Phase 4E actual independent disposable authority obse
     // Even same-looking valid records do NOT confer an operator attestation
     // nor establish that these rows came from a single logical attempt.
     console.log('[saju-bridge] Phase 4E real DB: independent TLS and READ ONLY; replay digest != Permit UUID; shared attempt authority NOT_PROVEN; manual review NOT_ADMISSIBLE; HOLD.');
+    if (packetStage) {
+      const runId = process.env.SAJU_BRIDGE_LOCAL_REVIEW_RUN_ID ?? '';
+      const nowMs = Date.now();
+      const packet = claimPacket(actual, nowMs, runId);
+      const complete = denyPacket(packet, nowMs, 'STRUCTURALLY_COMPLETE_UNVERIFIED_HOLD');
+      expect(complete.missingProofTypes).toEqual([]);
+      denyPacket({...packet, evidenceDigestSha256:'0'.repeat(64)},
+        nowMs, 'EVIDENCE_BINDING_MISMATCH_HOLD');
+      denyPacket({...packet, submissions:packet.submissions.slice(0,2)},
+        nowMs, 'MISSING_REQUIRED_PROOF_HOLD');
+      denyPacket({...packet, submissions:packet.submissions.map((x,i) =>
+        i === 1 ? {...x, sourceId:packet.submissions[0]!.sourceId} : x)},
+        nowMs, 'DUPLICATE_OR_NONINDEPENDENT_SOURCE_HOLD');
+      console.log('[saju-bridge] Phase 4F real DB: five untrusted claimed receipts bound to ephemeral read-only evidence; missing/foreign/duplicate rejected; even structurally complete NOT_ATTESTED, NOT_ADMISSIBLE; no action.');
+    }
   }, 100000);
 });
