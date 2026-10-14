@@ -158,7 +158,10 @@ async function run() {
     if (serverStart() !== originalServerStart) {
       throw new Error('PostgreSQL restarted after network-only partition.');
     }
-    command(clientArgs('partition-verify'), { compose: true, timeout: 90000 });
+    const verification = command(clientArgs('partition-verify'), { compose: true, timeout: 90000 });
+    const evidence = verification.match(/\[saju-bridge\] Phase 4C-1 server durable nonce count=(0|1); disconnected client denied; no automatic retry\./u);
+    if (!evidence) throw new Error('Phase 4C-1 server-side durable outcome evidence missing.');
+    console.log('[saju-bridge] Phase 4C-1 server durable nonce count=' + evidence[1] + '; lost-client-ACK response=false; no automatic retry.');
     console.log('[saju-bridge] Phase 4C-1: network-only disconnect, unknown COMMIT reconciliation and no automatic replay PASS.');
   } catch (error) {
     primaryError = error;
