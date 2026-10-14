@@ -3,6 +3,7 @@ import {
   type KeyObject,
 } from 'node:crypto';
 import {describe,expect,it,vi} from 'vitest';
+import {readFileSync} from 'node:fs';
 import {
   canonicalPrivateCancelReviewStatementV1,
   type PrivateCancelReviewAuthorizedStoreV1,
@@ -312,6 +313,31 @@ describe('D3e14 offline signed-trust verifier and executor separation (NOT LIVE)
         f.rogue.privateKey).toString('base64'),
     }})).rejects.toThrow('signature');
     expect(f.store.commitAuthorizedReview).not.toHaveBeenCalled();
+  });
+  it('enforces source-level verifier/executor capability separation and no LIVE SQL grant',()=>{
+    const issuer=readFileSync(
+      'apps/api/src/official-reader-portone-cancel-private-offline-issuer-boundary-v1.ts',
+      'utf8',
+    );
+    const executor=readFileSync(
+      'apps/api/src/official-reader-portone-cancel-private-offline-executor-boundary-v1.ts',
+      'utf8',
+    );
+    const core=readFileSync(
+      'apps/api/src/official-reader-portone-cancel-private-signed-trust-policy-v1.ts',
+      'utf8',
+    );
+    expect(issuer).toContain('issueIdentityBoundSandboxPrivateCancelPermitV1');
+    expect(issuer).not.toContain('commitAuthorizedReview(');
+    expect(issuer).not.toContain('executeSandboxPrivateCancelReviewPermitV1');
+    expect(executor).toContain('executeSandboxPrivateCancelReviewPermitV1');
+    expect(executor).not.toMatch(/\bcreatePrivateKey\s*\(/u);
+    expect(executor).not.toContain('issuerPrivateKeyPem');
+    expect(executor).not.toContain('issueIdentityBoundSandboxPrivateCancelPermitV1');
+    expect(executor).not.toContain('verifyOfflinePrivateCancelIdentityPairV1');
+    expect(executor).not.toContain('trustedIdentityDirectory');
+    expect(executor).not.toContain('pinnedIdpKeys');
+    expect(core).not.toMatch(/\b(?:grant\s+execute|security\s+definer|refund)\b/iu);
   });
   it('SQL error or ambiguous DB owner receipt is never interpreted as approval',async()=>{
     const f=rig(),issuer=f.issuerBoot();
