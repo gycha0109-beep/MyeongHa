@@ -179,6 +179,8 @@ run_isolated_case myeongha_reader_d3c_verified_cancel_atomic_batch_test bash tes
 run_isolated_case myeongha_reader_d3e2_cancel_observation_shadow_two_session_test bash test/db/official_reader_d3e2_cancel_observation_shadow_two_session.sh
 # D3e3: signed-only, no-effect durable intake with two-session real PostgreSQL replay/ACL.
 run_isolated_case myeongha_reader_d3e3_cancel_inbox_two_session_test bash test/db/official_reader_d3e3_cancel_inbox_two_session.sh
+# D3e4 synthetic DB contract: row lock + existing 1860 replay share COMMIT/ROLLBACK.
+run_isolated_case myeongha_reader_d3e4_inbox_to_shadow_transaction_test bash test/db/official_reader_d3e4_cancel_inbox_to_shadow_transaction.sh
 run_isolated_case myeongha_official_cancel_purchase_match_private_test bash test/db/official_reader_cancel_purchase_match_private.sh
 run_isolated_case myeongha_official_reader_reviewed_cancel_bridge_test bash test/db/official_reader_cancel_reviewed_atomic_bridge_private.sh
 # Prevent historic direct or SECURITY DEFINER cancellation writers bypassing reviewed entitlement revoke via public/API/Commerce roles.
