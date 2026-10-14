@@ -305,3 +305,8 @@ Governor 04d4B 계열은 실제 격리 PostgreSQL 기반 영수증 임대·정�
 
 - 기존 정본 패킷 [22절](SEYEON_MIGRATION_LINEAGE_R2_READONLY_PACKET_20261013.md)에 증거 집약. 원본 SQL blob 보존, 일회용 PG17 단일 `BEGIN → 1640 → ROLLBACK`에서 API EXECUTE 구 Pin 경로 회수/신 Pin RPC·Trigger 권한, 실제 Trigger 함수를 임시 테이블 합성 행에서 호출해 positive/negative 시나리오를 검증한다.
 - `zeroProof.records` 누락과 SQL three-valued NULL 비교의 안전성은 독립 Owner HOLD 진단으로 반드시 기록한다. 형식적 카탈로그 GREEN은 actual G1/G2/G3 개인기록 허가/모델 호출 또는 운영 마이그레이션 권한을 의미하지 않는다. Source provenance R2-G/DR Ready 및 21개 Owner 리뷰 단위 유지.
+
+### 25.1 R2-H 1640 실제 우회 관측과 차단 조건
+
+- [PR #2084](https://github.com/gycha0109-beep/MyeongHa/pull/2084)의 폐기형 PG17에서 동일 Trigger 함수를 TEMP 행으로 호출한 부정 실험 결과, `zeroProof.records` 키가 없는 Pin에 대한 validated→committed 차단 실패 **재현**. 로그에는 개인정보 없이 `malformedMissingRecordsCommitAccepted=true` 및 Owner HOLD만 남긴다.
+- 다음 실행 허들: Security/DB Owner의 NULL-safe/shape-safe SQL Trigger forward-only 보강 범위 합의 → 합성 정상/악성 변환 + 실제 RPC 권한 + 배포 Runbook/DR 교차 검증. 독립 방어 수정 전 이 단위를 PASS/승인으로 표시하지 않는다. R2-G 계보·1530 권한 멤버십·21개 마이그레이션 승인·G1/G2/G3 양수 흐름·G0~G6/public/paid HOLD.
