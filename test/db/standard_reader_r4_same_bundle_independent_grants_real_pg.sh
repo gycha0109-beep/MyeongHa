@@ -82,8 +82,7 @@ second_before="$(p -c "select revision::text || '|' || status || '|' ||
  where id='$second_grant'::uuid")"
 first_event_before="$(p -c "select count(*) from public.entitlement_events where grant_id='$first_grant'::uuid")"
 second_event_before="$(p -c "select count(*) from public.entitlement_events where grant_id='$second_grant'::uuid")"
-p >"$tmp/event.out" 2>"$tmp/event.err" <<SQL ||
- { cat "$tmp/event.err" >&2; fail 'old Receipt synthetic verified cancellation insert'; }
+if ! p >"$tmp/event.out" 2>"$tmp/event.err" <<SQL
 insert into public.commerce_provider_events(
  id,provider,external_event_id,event_type,external_transaction_id,
  resolved_subject_id,resolution_source_type,resolved_receipt_id,
@@ -98,6 +97,10 @@ select '$old_event'::uuid,cr.provider,'synthetic-b19-old-receipt-cancel',
  'verified',clock_timestamp(),'production','b19-test-only-verifier'
 from public.commerce_receipts cr where cr.id='$first_receipt'::uuid;
 SQL
+then
+ cat "$tmp/event.err" >&2
+ fail 'old Receipt synthetic verified cancellation insert'
+fi
 # Wrong-target attempt must be DENIED by the original Receipt/Grant lineage
 # check BEFORE any status, revision, event, projection or Reader mutation.
 if p >"$tmp/wrong.out" 2>"$tmp/wrong.err" <<SQL
@@ -124,8 +127,7 @@ grep -Fq 'provider event does not resolve to the target purchase Grant lineage' 
 [[ "$(current_count)" == 1 ]] || fail 'wrong-target denial altered current Reader access'
 # Apply the very same cancellation to its correct, original Grant through the
 # real Commerce 1080 CAS/projection/outbox function in one transaction.
-p >"$tmp/cancel.out" 2>"$tmp/cancel.err" <<SQL ||
- { cat "$tmp/cancel.err" >&2; fail 'old Receipt original CAS cancellation'; }
+if ! p >"$tmp/cancel.out" 2>"$tmp/cancel.err" <<SQL
 begin;
 select result_grant_id,result_entitlement_event_id,result_replayed
 from public.internal_apply_entitlement_effect_v1(
@@ -138,6 +140,10 @@ from public.internal_apply_entitlement_effect_v1(
  'synthetic_b19_old_purchase_cancel');
 commit;
 SQL
+then
+ cat "$tmp/cancel.err" >&2
+ fail 'old Receipt original CAS cancellation'
+fi
 [[ "$(p -c "select count(*) from public.entitlement_events
  where grant_id='$first_grant'::uuid and source_provider_event_id='$old_event'::uuid
  and event_type='revoked'")" == 1 ]] || fail 'old cancellation effect ledger missing'
