@@ -6,6 +6,7 @@
 import type { PostgresTransactionQueryV1 } from '../../apps/api/src/postgres-subject-execution.js';
 import type {
   OfficialReaderCancelInboxRecorderV1,
+  OfficialReaderCancelInboxSignedEnvelopeV1,
 } from '../../apps/api/src/official-reader-portone-cancel-inbox-private-v1.js';
 
 const PRIVATE_SQL = [
@@ -19,7 +20,7 @@ export function createPrivateOfficialReaderCancelInboxRecorderTestV1(
   client: PostgresTransactionQueryV1,
 ): OfficialReaderCancelInboxRecorderV1 {
   return Object.freeze({
-    async enqueueSigned(input) {
+    async enqueueSigned(input: OfficialReaderCancelInboxSignedEnvelopeV1) {
       const result = await client.query<{
         intakeResult: unknown;
         effectAuthorized: unknown;
