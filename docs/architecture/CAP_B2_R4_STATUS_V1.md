@@ -115,3 +115,9 @@
 - 발급 COMMIT 후 Event Writer는 자체 동일 트랜잭션 내에서 verified cancellation 이벤트 + **실제 private R2 1850 Commerce CAS Revoke**를 실행. Receipt의 정확한 하나의 Grant는 `revoked`, `granted` 1 Event + Provider `revoked` 1 Event, 공식 Reading/Reader Access 0이어야 함. 이후 Guarded Issuer 재발급은 verified 취소 이벤트 존재로 **DENY**, 원장 불변.
 - **핵심 제약:** 운영 Provider 이벤트 검증·저장 코드가 실제로 S3 lock에 참여한다는 증거가 아님. 테스트만 lock을 자발적으로 획득합니다. 취소 전/후 반대 방향 두 사례는 각 별도의 격리 검증이며, **R3 통합 Writer cutover 승인·실환불·Provider ordering·R5 paid T2 공개** 모두 HOLD.
 - PG15 `run_authority_core.sh` 및 PG17 `cap-b2-r4-issuer-before-cancel` 등록. Suite manifest **43 cases / 40 unique**. 이 신규 사례는 **exact HEAD CI PASS 로그 검증 전에는 완료로 승격 금지**.
+
+## R4/BIND-13 운영 Provider 취소 진입 계약 감사 — 2026-10-14
+
+- 호출 경로별 실제 소스/미구현 지점, R1/S3→S2/Commerce row lock 순서, event+CAS 단일 커밋 요구 및 Owner HOLD를 `docs/architecture/CAP_B2_R4_PROVIDER_CANCEL_INGRESS_PREFLIGHT_V1.md`에 분리했습니다. PortOne V2 운영 웹훅은 **`Transaction.Paid`만** 결제 완료로 연결하고 다른 event type은 `ignored`; verified cancellation을 1850 CAS까지 전달하는 운영 Writer 증거는 없습니다.
+- 신규 `test/db/standard_reader_r4_b13_provider_cancel_contract_denials_real_pg.sh`는 status/environment/type/Receipt lineage/transaction/Grant/Subject/CAS/isolation 불일치 및 합성 event+CAS rollback을 독립 PG15/17에서 검증하도록 등록. `tests/cap-b2-r4-provider-cancel-operating-ingress-hold.test.ts`로 paid-only와 private-only 정적 경계를 감시. Manifest 44 cases / 41 unique.
+- **새 exact HEAD PG15/17 및 Work Track CI의 개별 PASS 전에는 결과 미확정**. 기존 Privacy Governance, R3 all-operating-Writer S3 채택, R5 T2, SRC-24 및 DR 1400–1450 모두 HOLD.
