@@ -145,10 +145,10 @@ describe('D3e10 detached offline verifier-signed cancellation review permits',()
     };
     await expect(f.execute(p,{trustedIssuers:wrongIssuer}))
       .rejects.toThrow('signature');
-    await expect(f.issue({attestations:[
+    expect(()=>f.issue({attestations:[
       {...f.attestations[0],keyId:'key_approver_002'},
       f.attestations[1],
-    ]})).rejects.toThrow();
+    ]})).toThrow();
     expect(f.store.commitAuthorizedReview).not.toHaveBeenCalled();
   });
   it('rejects unknown, disabled, malformed and wrong-algorithm verifier keys',async()=>{
@@ -163,9 +163,9 @@ describe('D3e10 detached offline verifier-signed cancellation review permits',()
       await expect(f.execute(p,{trustedIssuers:registry})).rejects.toThrow();
     }
     const rsa=generateKeyPairSync('rsa',{modulusLength:2048});
-    await expect(f.issue({
+    expect(()=>f.issue({
       issuerPrivateKeyPem:rsa.privateKey.export({format:'pem',type:'pkcs8'}) as string,
-    })).rejects.toThrow('Ed25519');
+    })).toThrow('Ed25519');
     expect(f.store.commitAuthorizedReview).not.toHaveBeenCalled();
   });
 
