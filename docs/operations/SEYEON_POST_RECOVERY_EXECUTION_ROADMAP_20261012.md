@@ -243,3 +243,11 @@ Governor 04d4B 계열은 실제 격리 PostgreSQL 기반 영수증 임대·정�
 - **분리된 HOLD:** `supabase_managed_migration_ledger_fully_restored=false`, `dr_ready=false`. Provider Auth/Storage 전체 복구, Production 개인정보 원장 양수 복구, RPO/RTO Owner 승인, 원격-only `20261008090417` 계보 및 1520~1720 21건 배포 미승인. #1866 G0~G6·유료 AI·공개 활성화 자동 승격 금지. **Production DDL/DML/Role/ACL 변경 0**.
 
 이 절이 14절의 "복원 증거 미확보 / R1 HOLD" 관측보다 나중 시점의 R1 상태를 갱신한다. 과거 실패/사전 관측은 지우지 않는다.
+
+## 16. 2026-10-14 R2-F 읽기 전용 권한 실측 및 독립 합성 검증
+
+- 최상위 로드맵 P1/R2 진행 중. R1의 최신 완료 판정은 **15절**, R2 세부 증거 정본은 [R2 패킷 13절](SEYEON_MIGRATION_LINEAGE_R2_READONLY_PACKET_20261013.md)이다.
+- Production SELECT-only: helper RPC에서 `service_role`의 직접/유효 EXECUTE 허용 확인. 일반 API 실행 Role 및 브라우저 Role은 유효 EXECUTE 거부. wrapper를 통한 DB 내부 호출 경로와 직접 서버 바인딩을 구분; 실제 historical/grant intent는 미확인.
+- 격리 PG17의 기존 1510 + timestamped 2개 replay 환경에서 임시 service_role GRANT 하나에 대한 before/after/ROLLBACK 유효권한 차이와 부정 테스트를 추가. 이것은 R2-E의 ACL hash 재현과 구분되는 실질 권한 검사다.
+- **R2-F Owner 결정 필요:** (1) helper 직접 호출자 존재/필요성, (2) managed service_role의 적법 사용 경계, (3) 유지 vs 별도 forward-only 폐기 제안, (4) 승인 시 복구/중단·롤백. Production 변경/권한 자동 수정 금지.
+- 순서: R2-F 소유권 판단 후 R2-G 비공개 원격 계보 감사, R2-H 21 migration Owner 검토. DR Ready/G0~G6 자동 승격 금지.
