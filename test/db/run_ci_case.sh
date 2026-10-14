@@ -316,6 +316,11 @@ SQL
     node scripts/operations/verify-seyeon-r2-helper-grant-causality.mjs \
       "$local_acl" "$local_acl_transient" "$local_acl_rollback" \
       scripts/operations/seyeon-r2-production-acl-grants-20261013.json
+    local_effective="$(mktemp)"
+    trap 'rm -f -- "$local_shape" "$local_digest" "$local_acl" "$local_acl_transient" "$local_acl_rollback" "$local_effective"' EXIT
+    psql -X -qAt -v ON_ERROR_STOP=1 \
+      -f test/db/seyeon_r2_effective_helper_grant_transient.sql > "$local_effective"
+    node scripts/operations/verify-seyeon-r2-effective-helper.mjs "$local_effective"
     ;;
   seyeon-r2-rpc-catalog)
     verify_pg17

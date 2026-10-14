@@ -189,3 +189,15 @@ Watchtower-Track: ops. R1 정확한 격리 복원 증거는 8절을 따른다. �
 - 격리에서 `PASS_R2_SYNTHETIC_POSTGRES_CREATOR_DEFAULT_EXECUTE_NOT_HISTORICAL_ACTOR`: 테스트 함수 생성 당시 `postgres` `public` 스키마 함수 기본권한을 통해 `service_role EXECUTE`가 부여되고 `PUBLIC REVOKE` 및 Owner 이전 뒤에도 해당 명시 권한이 유지되는 메커니즘을 재현.
 - `PASS_R2_ONE_EDGE_ACL_EFFECT_REPRODUCED_ORIGIN_UNVERIFIED`: 격리 `assert_seyeon_chat_thread_runtime_v1`에 단 **1개의 임시 `service_role EXECUTE`**를 추가했을 때 19개 RPC의 정규화 Grant 그래프뿐 아니라 **원본 `proacl` SHA-256까지** Production 관측값과 일치 (`exactRawAclMatch=true`, `normalizedGrantGraphMatch=true`, `rawAclRemainingDifferences=[]`). 무관한 18 RPC, 브라우저 직접 EXECUTE 0, ROLLBACK 후 이전 ACL로 복구도 검증.
 - **범위별 결론:** 저장소 1490의 `PUBLIC` 철회만으로 `service_role` 기본 권한을 자동 철회하지 않는다는 *기술적 메커니즘*이 설명력을 갖는다. **2026-10-08 실제 기본권한 이력·실제 실행 역할/시각·원격 SQL 적용 경로·권한 의도는 별개로 미증명**. 이 증거로 과거 적용 주체를 지목하거나 Production 권한을 임의로 변경하지 않는다. `originEstablished=false`, `authorizedForProduction=false`, `dr_ready=false`, R2 계보 및 G0~G6 HOLD.
+
+## 13. 2026-10-14 R2-F — helper RPC 실질 EXECUTE 경로 조사 (Production 읽기 전용)
+
+**승인 상태: HOLD.** R2-E의 ACL 생성 가설 검증과 별개의, **실제 Role 권한** 검증이다. Production schema/ACL/role/history 쓰기 없음.
+
+- 2026-10-14 Production PostgreSQL 17에서 대상 `assert_seyeon_chat_thread_runtime_v1(uuid,uuid)` 1개에 대해 `has_function_privilege`, `has_schema_privilege`, `pg_has_role`, `aclexplode`를 **SELECT로만 실행**. 확인된 현재 상태: `service_role`은 직접 Grant를 통한 유효 EXECUTE를 가지며, 일반 `myeongha_api_executor`와 브라우저 `anon/authenticated`는 유효 EXECUTE가 없음. Narrow owner는 EXECUTE 허용. Role 목록·실제 membership graph·raw ACL·함수 본문·고객 데이터는 증거/CI/문서에 반출하지 않음.
+- 저장소 API 바인딩 `apps/api/src/postgres-seyeon-production-chat-execution-v1.ts`에서 서버의 직접 SQL 호출은 `cmd_receive_seyeon_chat_turn_runtime_v1` 등 **wrapper RPC**를 사용한다. `1490_seyeon_production_chat_execution_runtime_v1.sql`에서는 보조 helper를 각 wrapper 내부에서 호출하며 helper는 SECURITY INVOKER이고 wrapper들은 SECURITY DEFINER다. **조사한 바인딩에서 helper의 직접 호출은 미확인**이나, 저장소 밖의 Privileged 호출·과거 운영 호출 부재까지 증명하지 않는다.
+- 신규 `scripts/operations/seyeon-r2-effective-helper-readonly.sql`: 운영/격리에서 동일한 고정 Role 범주에 대한 direct/effective/schema/owner-inheritance 결과를 읽기 전용 측정. 출력 원본은 보호된 환경에만 보관.
+- 신규 `test/db/seyeon_r2_effective_helper_grant_transient.sql`: 격리 PG17에서 보조 helper에 한 건만 합성 Grant → EXECUTE 측정 → ROLLBACK → 재측정. `verify-seyeon-r2-effective-helper.mjs` 및 부정 테스트가 브라우저·API Role 무단 실행, owner membership 경로, ROLLBACK 누수, 기타 drift에 fail-closed. 기존 R2 cross-env PostgreSQL 17 CI에 추가. 이 테스트는 원격 전용 SQL을 실행하지 않는다.
+- 아직 **확인되지 않은 것**: 2026-10-08 실제 Role/도구/실행자·시각, 실제 Grant 승인자, helper 직접 호출하는 별도 privileged code, 불필요 Grant를 제거해도 영향 없다는 운영 증거. Character/API/DB/Security Owner가 helper의 직접 EXECUTE 필요 여부와 제거/유지 정책을 별도로 승인해야 한다.
+- 정책 불변: Production `REVOKE`/`GRANT`/migration repair/db push 금지; `dr_ready=false`, R2/1520~1720/G0~G6/paid/public HOLD. PG17 합성 GREEN은 Production 배포·권한 정당성 승인 아님.
+
