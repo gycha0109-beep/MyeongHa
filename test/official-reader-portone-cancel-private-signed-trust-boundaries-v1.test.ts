@@ -1,5 +1,6 @@
 import {
   generateKeyPairSync,randomUUID,sign as edSign,
+  type KeyObject,
 } from 'node:crypto';
 import {describe,expect,it,vi} from 'vitest';
 import {
@@ -30,10 +31,10 @@ const IDP_ID='idp_offline_001';
 const ISSUER_ID='issuer_offline_001';
 const NOW='2026-10-14T05:00:00.000Z';
 const RECEIPT='00000000-0000-4000-8000-000000000090';
-function pub(pair:ReturnType<typeof generateKeyPairSync<'ed25519'>>):string{
+function pub(pair:{publicKey:KeyObject}):string{
   return pair.publicKey.export({type:'spki',format:'pem'}) as string;
 }
-function priv(pair:ReturnType<typeof generateKeyPairSync<'ed25519'>>):string{
+function priv(pair:{privateKey:KeyObject}):string{
   return pair.privateKey.export({type:'pkcs8',format:'pem'}) as string;
 }
 function rig(){
@@ -282,8 +283,8 @@ describe('D3e14 offline signed-trust verifier and executor separation (NOT LIVE)
   it('isolates an immutable policy snapshot against caller mutation AFTER bootstrap',async()=>{
     const f=rig();
     const verifier=f.issuerBoot(),executor=f.executorBoot();
-    (f.envelope.policy.operators as Array<{status:string}>)[0]!.status='disabled';
-    (f.envelope.policy.permitIssuers as Array<{enabled:boolean}>)[0]!.enabled=false;
+    (f.envelope.policy.operators as unknown as Array<{status:string}>)[0]!.status='disabled';
+    (f.envelope.policy.permitIssuers as unknown as Array<{enabled:boolean}>)[0]!.enabled=false;
     const permit=verifier.issue(f.request);
     expect(await executor.execute({permit})).toMatchObject({
       approvalRecorded:true,effectAuthorized:false,
