@@ -185,7 +185,7 @@ describe('D3e8 sandbox-only dual-signed cancel operator preflight',()=>{
       expect(f.records).toHaveLength(0);
     }
     const f=fixture();
-    await expect(f.run({store:null as never})).rejects.toThrow('dependencies');
+    await expect(f.run({store:{} as never})).rejects.toThrow('dependencies');
   });
 
   it('never claims successful review when the DB failed, rejected or returned rights flags',async()=>{
