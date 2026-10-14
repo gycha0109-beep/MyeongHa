@@ -279,6 +279,11 @@ SQL
     apply_pg17_migrations_without_birth_authority
     MYEONGHA_R4_PG17_CI=1 bash test/db/standard_reader_r4_b13_provider_cancel_contract_denials_real_pg.sh
     ;;
+  cap-b2-r4-provider-cancel-replay)
+    verify_pg17
+    apply_pg17_migrations_without_birth_authority
+    MYEONGHA_R4_PG17_CI=1 bash test/db/standard_reader_r4_b13_cancel_replay_semantics_real_pg.sh
+    ;;
   cap-b2-r4-actual-new-member-promotion)
     verify_pg17
     apply_pg17_migrations_without_birth_authority
