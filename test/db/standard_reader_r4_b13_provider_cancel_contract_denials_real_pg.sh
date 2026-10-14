@@ -43,8 +43,7 @@ snapshot(){
 before="$(snapshot)"
 seed(){
  local id="$1" status="$2" env="$3" kind="$4" resolution="$5" tx="$6"
- p >"$tmp/seed-$id.out" 2>"$tmp/seed-$id.err" <<SQL ||
- { cat "$tmp/seed-$id.err" >&2; fail 'valid event-table fixture rejected'; }
+ if p >"$tmp/seed-$id.out" 2>"$tmp/seed-$id.err" <<SQL
 insert into public.commerce_provider_events(
  id,provider,external_event_id,event_type,external_transaction_id,
  resolved_subject_id,resolution_source_type,resolved_receipt_id,
@@ -60,6 +59,12 @@ select '$id'::uuid,cr.provider,'synthetic-contract-$id',
  '$status',clock_timestamp(),'$env','b13-test-only-verifier'
 from public.commerce_receipts cr where cr.id='$receipt'::uuid;
 SQL
+ then
+  :
+ else
+  cat "$tmp/seed-$id.err" >&2
+  fail 'valid event-table fixture rejected'
+ fi
 }
 cancel_sql(){
  local id="$1" offset="$2" target="$3"
@@ -149,8 +154,7 @@ grep -Fq 'Grant revision/order provenance changed' "$tmp/atomic.err" ||
 [[ "$(p -c "select status from public.entitlement_grants where id='$grant'::uuid")" == active ]] ||
  fail 'failed in-transaction CAS revoked Grant'
 
-p <<SQL >"$tmp/acl.out" 2>"$tmp/acl.err" ||
- { cat "$tmp/acl.err" >&2; fail 'private cancellation ACL check'; }
+if ! p <<SQL >"$tmp/acl.out" 2>"$tmp/acl.err"
 do \$acl\$
 declare r text;
 begin
@@ -169,4 +173,8 @@ begin
 end
 \$acl\$;
 SQL
+then
+ cat "$tmp/acl.err" >&2
+ fail 'private cancellation ACL check'
+fi
 echo 'PASS R4/BIND-13 original R2 private cancel DENY invalid status/environment/type/resolution/transaction/Grant, stale CAS, Subject, isolation; atomic bad-CAS event rollback, private ACL'
