@@ -232,6 +232,10 @@ if [[ "${CI:-}" == "true" && "${PGHOST:-}" == "localhost" ]]; then
   # verifier waits on same R1/S3, then real 1850 Commerce revoke CAS.
   run_isolated_case myeongha_b2_r4_b13_issuer_before_cancel \
     bash test/db/standard_reader_r4_b13_issuer_before_cancel_real_pg.sh
+  # Negative ingress contract: no unverified/non-production/wrong-lineage
+  # Provider event, stale CAS or forged Subject may revoke a purchase.
+  run_isolated_case myeongha_b2_r4_b13_cancel_denials \
+    bash test/db/standard_reader_r4_b13_provider_cancel_contract_denials_real_pg.sh
   run_isolated_case myeongha_b2_r4_b20_direct_merge \
     bash test/db/standard_reader_r4_direct_merge_lineage_real_pg.sh
   # BIND-20: actual new-member promotion command; SRC-24 existing-member
