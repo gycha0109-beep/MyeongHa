@@ -21,7 +21,7 @@ export function createPrivateCancelDualApprovalStoreTestV1(
   pool: PostgresSubjectPoolV1,
 ): PrivateCancelReviewAuthorizedStoreV1 {
   return Object.freeze({
-    async commitAuthorizedReview(data) {
+    async commitAuthorizedReview(data: Parameters<PrivateCancelReviewAuthorizedStoreV1['commitAuthorizedReview']>[0]) {
       const client=await pool.connect();
       try {
         // Each SQL invocation is a single autocommitted database statement.
