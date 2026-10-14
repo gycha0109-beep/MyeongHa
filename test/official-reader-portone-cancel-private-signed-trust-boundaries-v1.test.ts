@@ -3,6 +3,7 @@ import {
   type KeyObject,
 } from 'node:crypto';
 import {describe,expect,it,vi} from 'vitest';
+import {canonicalPrivateCancelPermitPolicyBindingV1} from '../apps/api/src/official-reader-portone-cancel-private-policy-bound-permit-v1.js';
 import {readFileSync} from 'node:fs';
 import {
   canonicalPrivateCancelReviewStatementV1,
@@ -339,6 +340,178 @@ describe('D3e14 offline signed-trust verifier and executor separation (NOT LIVE)
     expect(executor).not.toContain('pinnedIdpKeys');
     expect(core).not.toMatch(/\b(?:grant\s+execute|security\s+definer|refund)\b/iu);
   });
+  it('D3e15 binds both permit signatures to verified policy root, revision and SHA256 snapshot',async()=>{
+    const f=rig(),issuer=f.issuerBoot(),executor=f.executorBoot();
+    const permit=issuer.issue(f.request);
+    expect(permit.policyBinding).toMatchObject({
+      protocol:'myeongha.cancel.ops.policy-bound-permit.v1',
+      environment:'sandbox',
+      rootKeyId:ROOT_ID,
+      policyId:'policy_private_001',
+      policyRevision:7,
+      issuerKeyId:ISSUER_ID,
+    });
+    expect(permit.policyBinding.policyDigest).toMatch(/^sha256:[0-9a-f]{64}$/u);
+    expect(permit.policyBinding.permitDigest).toMatch(/^sha256:[0-9a-f]{64}$/u);
+    expect(permit.policyBindingSignatureBase64).toMatch(/^[A-Za-z0-9+/]{86}==$/u);
+    expect(permit.policyBinding.policyDigest)
+      .not.toBe(permit.policyBinding.permitDigest);
+    expect(await executor.execute({permit})).toMatchObject({
+      approvalRecorded:true,effectAuthorized:false,
+      providerRefundAuthorized:false,entitlementMutationAuthorized:false,
+    });
+  });
+
+  it('D3e15 refuses legacy D3e10 permits without bound policy and unknown outer fields',async()=>{
+    const f=rig(),signed=f.issuerBoot().issue(f.request),executor=f.executorBoot();
+    const legacy={payload:signed.payload,signatureBase64:signed.signatureBase64};
+    await expect(executor.execute({permit:legacy})).rejects.toThrow('envelope');
+    await expect(executor.execute({permit:{
+      ...signed,debug:'attacker-token',
+    }})).rejects.toThrow('envelope');
+    await expect(executor.execute({permit:{
+      ...signed,policyBinding:{...signed.policyBinding,freeText:'untrusted'},
+    }})).rejects.toThrow('envelope');
+    expect(f.store.commitAuthorizedReview).not.toHaveBeenCalled();
+  });
+
+  it('D3e15 rejects root, revision, digest, purpose and issuer substitutions BEFORE DB',async()=>{
+    const f=rig(),permit=f.issuerBoot().issue(f.request),executor=f.executorBoot();
+    const mutations=[
+      {rootKeyId:'root_attacker_001'},
+      {policyId:'policy_wrong_001'},
+      {policyRevision:8},
+      {policyDigest:'sha256:'+'b'.repeat(64)},
+      {permitDigest:'sha256:'+'a'.repeat(64)},
+      {issuerKeyId:'issuer_attacker_001'},
+      {environment:'production'},
+      {protocol:'myeongha.cancel.ops.unknown.v1'},
+    ];
+    for(const changed of mutations){
+      await expect(executor.execute({permit:{
+        ...permit,policyBinding:{...permit.policyBinding,...changed},
+      }})).rejects.toThrow();
+    }
+    expect(f.store.commitAuthorizedReview).not.toHaveBeenCalled();
+  });
+
+  it('D3e15 rejects tampered inner signature/claim and forged outer Ed25519 signature',async()=>{
+    const f=rig(),permit=f.issuerBoot().issue(f.request),executor=f.executorBoot();
+    const forged=edSign(null,
+      canonicalPrivateCancelPermitPolicyBindingV1(permit.policyBinding),
+      f.rogue.privateKey,
+    ).toString('base64');
+    for(const invalid of [
+      {...permit,policyBindingSignatureBase64:forged},
+      {...permit,signatureBase64:forged},
+      {...permit,payload:{...permit.payload,issuerKeyId:'issuer_attacker_001'}},
+      {...permit,payload:{...permit.payload,command:{
+        ...permit.payload.command,ticketReference:'OPS-99999999',
+      }}},
+      {...permit,policyBindingSignatureBase64:'not-base64'},
+    ]){
+      await expect(executor.execute({permit:invalid})).rejects.toThrow();
+    }
+    expect(f.store.commitAuthorizedReview).not.toHaveBeenCalled();
+  });
+
+  it('D3e15 rejects an old unexpired permit after signed revision rotation and accepts a new one',async()=>{
+    const f=rig(),prior=f.issuerBoot().issue(f.request);
+    const rotated=f.signPolicy({...f.policy,revision:8});
+    const nextRoot={...f.pin,minimumRevision:8};
+    const freshExecutor=f.executorBoot({
+      signedPolicy:rotated,pinnedRoot:nextRoot,
+    });
+    await expect(freshExecutor.execute({permit:prior})).rejects.toThrow(
+      'ACTIVE signed policy',
+    );
+    const freshIssuer=f.issuerBoot({
+      signedPolicy:rotated,pinnedRoot:nextRoot,
+    });
+    const current=freshIssuer.issue(f.request);
+    expect(current.policyBinding.policyRevision).toBe(8);
+    expect(current.policyBinding.policyDigest)
+      .not.toBe(prior.policyBinding.policyDigest);
+    expect(await freshExecutor.execute({permit:current})).toMatchObject({
+      approvalRecorded:true,effectAuthorized:false,
+    });
+    expect(f.store.commitAuthorizedReview).toHaveBeenCalledOnce();
+  });
+
+  it('D3e15 rejects SAME-revision signed policy replacements by canonical digest',async()=>{
+    const f=rig(),old=f.issuerBoot().issue(f.request);
+    const replaced=f.signPolicy({
+      ...f.policy,
+      idpIssuers:[{
+        ...f.policy.idpIssuers[0]!,
+        publicKeyPem:pub(f.rogue),
+      }],
+    });
+    const next=f.executorBoot({signedPolicy:replaced});
+    await expect(next.execute({permit:old})).rejects.toThrow(
+      'ACTIVE signed policy',
+    );
+    expect(f.store.commitAuthorizedReview).not.toHaveBeenCalled();
+  });
+
+  it('D3e15 rejects retired permit signing key under independently signed replacement policy',async()=>{
+    const f=rig(),old=f.issuerBoot().issue(f.request);
+    const rotated=f.signPolicy({
+      ...f.policy,revision:8,
+      permitIssuers:[
+        {...f.policy.permitIssuers[0]!,enabled:false},
+        {keyId:'issuer_rotated_002',publicKeyPem:pub(f.rogue),enabled:true},
+      ],
+    });
+    const nextRoot={...f.pin,minimumRevision:8};
+    const next=f.executorBoot({signedPolicy:rotated,pinnedRoot:nextRoot});
+    await expect(next.execute({permit:old})).rejects.toThrow(
+      'ACTIVE signed policy',
+    );
+    expect(()=>f.issuerBoot({signedPolicy:rotated,pinnedRoot:nextRoot}))
+      .toThrow('not active');
+    expect(f.store.commitAuthorizedReview).not.toHaveBeenCalled();
+  });
+
+  it('D3e15 rejects a permit from the old policy root after independently signed root rotation',async()=>{
+    const f=rig(),old=f.issuerBoot().issue(f.request);
+    const nextRoot=generateKeyPairSync('ed25519');
+    const rootId='root_rotated_002';
+    const signed={
+      rootKeyId:rootId,policy:f.policy,
+      signatureBase64:edSign(null,canonicalPrivateCancelTrustPolicyV1(
+        rootId,f.policy,
+      ),nextRoot.privateKey).toString('base64'),
+    };
+    const next=f.executorBoot({
+      signedPolicy:signed,
+      pinnedRoot:{keyId:rootId,publicKeyPem:pub(nextRoot),minimumRevision:7},
+    });
+    await expect(next.execute({permit:old})).rejects.toThrow(
+      'ACTIVE signed policy',
+    );
+    expect(f.store.commitAuthorizedReview).not.toHaveBeenCalled();
+  });
+
+  it('D3e15 does NOT claim instantaneous revocation of a stale already-running executor',async()=>{
+    const f=rig(),oldExecutor=f.executorBoot();
+    const unexpired=f.issuerBoot().issue(f.request);
+    const replacement=f.signPolicy({...f.policy,revision:8});
+    const freshExecutor=f.executorBoot({
+      signedPolicy:replacement,
+      pinnedRoot:{...f.pin,minimumRevision:8},
+    });
+    await expect(freshExecutor.execute({permit:unexpired})).rejects.toThrow(
+      'ACTIVE signed policy',
+    );
+    // Explicit limitation: without a trusted push/watch/kill-switch to the
+    // already-running process, its old boot snapshot remains accepted until
+    // its signed 60-second permit and policy expiry checks reject it.
+    expect(await oldExecutor.execute({permit:unexpired})).toMatchObject({
+      approvalRecorded:true,effectAuthorized:false,
+    });
+  });
+
   it('SQL error or ambiguous DB owner receipt is never interpreted as approval',async()=>{
     const f=rig(),issuer=f.issuerBoot();
     const permit=issuer.issue(f.request);
