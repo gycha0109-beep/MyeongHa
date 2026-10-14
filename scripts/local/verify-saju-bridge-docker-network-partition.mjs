@@ -80,7 +80,7 @@ function inspectClient() {
     throw new Error('Phase 4C-1 verifier container identity mismatch.');
   }
   return JSON.parse(command(['inspect', '--format',
-    '{{json .NetworkSettings.Networks}}', clientName]));
+    '{{json .NetworkSettings.Networks}}', clientName])) ?? {};
 }
 function networkId() {
   const networks = command(['network', 'ls', '-q',
@@ -131,6 +131,13 @@ async function run() {
     if (Object.keys(connections).length !== 1 || !connections[name]) {
       throw new Error('Verifier not exclusively on owned disposable network.');
     }
+    const nonceContainer = command(['ps', '-q', 'nonce-db'], { compose: true });
+    if (!/^[a-f0-9]{12,64}$/u.test(nonceContainer)) {
+      throw new Error('Expected running disposable Nonce PostgreSQL container.');
+    }
+    const nonceNetworks = JSON.parse(command(['inspect', '--format',
+      '{{json .NetworkSettings.Networks}}', nonceContainer])) ?? {};
+    if (!nonceNetworks[name]) throw new Error('Nonce DB is not on the expected network.');
     tracked = true;
     console.log('[saju-bridge] Phase 4C-1: PostgreSQL COMMIT observed; detach only disposable verifier network.');
     command(['network', 'disconnect', '--force', network, clientName], { timeout: 20000 });
