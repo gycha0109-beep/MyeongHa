@@ -10,7 +10,7 @@ WITH rate_table AS (
  SELECT oid,prosecdef,proconfig FROM pg_catalog.pg_proc
  WHERE oid=to_regprocedure('public.guard_seyeon_ai_governor_rate_card_v1()')
 ), trg AS (
- SELECT oid,tgtype,tgenabled FROM pg_catalog.pg_trigger t
+ SELECT t.oid,t.tgtype,t.tgenabled FROM pg_catalog.pg_trigger t
  JOIN rate_table r ON t.tgrelid=r.oid
  WHERE t.tgname='guard_seyeon_ai_governor_rate_card_v1'
  AND t.tgfoid=to_regprocedure('public.guard_seyeon_ai_governor_rate_card_v1()')
