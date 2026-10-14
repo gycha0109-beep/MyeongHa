@@ -96,8 +96,8 @@ describe('D3e8 sandbox-only dual-signed cancel operator preflight',()=>{
       });
       expect(record.statementDigest).toMatch(/^sha256:[a-f0-9]{64}$/u);
       const str=JSON.stringify(record);
-      expect(str).not.toContain(f.attestations[0].signatureBase64);
-      expect(str).not.toContain(f.attestations[1].signatureBase64);
+      expect(str).not.toContain(f.attestations[0]!.signatureBase64);
+      expect(str).not.toContain(f.attestations[1]!.signatureBase64);
       expect(str).not.toContain('PRIVATE KEY');
     },
   );
