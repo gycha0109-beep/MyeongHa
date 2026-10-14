@@ -435,6 +435,8 @@ describe('authenticated provider payment completion orchestration', () => {
     expect(harness.persistCalls).toHaveLength(1);
     expect(harness.events).toContain('rollback:2');
     expect(harness.events).not.toContain('commit:2');
-    expect(harness.events).toContain('release:2:error');
+    // A successful ROLLBACK leaves the pooled connection reusable; only
+    // rollback failure marks the connection for discard.
+    expect(harness.events).toContain('release:2:ok');
   });
 });
