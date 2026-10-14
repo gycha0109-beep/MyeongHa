@@ -7,7 +7,7 @@ do $d3e5_remove_queued_only_check$
 declare v_constraint text;
 declare v_count bigint;
 begin
-  select count(*), min(con.conname) into v_count, v_constraint
+  select count(*), min(con.conname::text) into v_count, v_constraint
   from pg_catalog.pg_constraint con
   where con.conrelid='public.official_reader_portone_cancel_ingress_inbox_v1'::pg_catalog.regclass
     and con.contype='c'
@@ -242,6 +242,13 @@ begin
   ) or p_retryable is null then
     raise exception using errcode='23514',
       message='D3e5 requires a bounded public-safe failure code';
+  end if;
+  -- Only actual lookup outage/timeouts and bounded internal recovery may retry.
+  if p_retryable and p_failure_code not in (
+    'LOOKUP_FAILED','LOOKUP_TIMEOUT','INTERNAL_FAILURE'
+  ) then
+    raise exception using errcode='23514',
+      message='Non-transient cancellation failure cannot be retried';
   end if;
   select * into v_work
   from public.official_reader_portone_cancel_ingress_inbox_v1
