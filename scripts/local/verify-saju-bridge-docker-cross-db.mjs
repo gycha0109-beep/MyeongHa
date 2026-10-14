@@ -58,10 +58,12 @@ function stageArgs(stage) {
   ];
   return ['run', '--rm', '--no-deps', '--entrypoint', 'node',
     '-e', 'MYEONGHA_DOCKER_SAJU_CROSS_DB=1',
+    ...(stage === 'cross-provenance' ? ['-e', 'MYEONGHA_DOCKER_SAJU_PROVENANCE=1'] : []),
     '-e', 'SAJU_BRIDGE_LOCAL_RECOVERY_STAGE=' + stage,
     ...values.flatMap(([key,value]) => ['-e', key + '=' + value]),
     'saju-recovery-verifier', 'node_modules/vitest/vitest.mjs', 'run',
-    'test/saju-held-docker-cross-db-phase4c3.test.ts'];
+    stage === 'cross-provenance' ? 'test/saju-held-docker-provenance-phase4e.test.ts'
+      : 'test/saju-held-docker-cross-db-phase4c3.test.ts'];
 }
 function runStage(stage, match) {
   const out = docker(stageArgs(stage), 110000);
@@ -143,6 +145,13 @@ async function run() {
         throw new Error('Phase 4D steady-state evidence incorrectly authorizes recovery.');
       }
       console.log('[saju-bridge] Phase 4D: changed original cross-DB snapshot rejected; later unchanged snapshot remains HOLD; no automatic retry, compensation or permission.');
+    }
+    if (env.SAJU_BRIDGE_LOCAL_PROVENANCE_FAULT === '1') {
+      if (env.SAJU_BRIDGE_LOCAL_STABILITY_FAULT !== '1') {
+        throw new Error('Phase 4E requires Phase 4D actual changed and unchanged snapshots.');
+      }
+      runStage('cross-provenance', 'Phase 4E real DB: independent TLS and READ ONLY; replay digest != Permit UUID; shared attempt authority NOT_PROVEN; manual review NOT_ADMISSIBLE; HOLD.');
+      console.log('[saju-bridge] Phase 4E: real 3-DB scoped provenance and hostile approval claims rejected; no causal attempt attestation or operator approval.');
     }
   } catch (error) {
     primaryError = error;
