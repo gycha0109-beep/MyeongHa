@@ -69,6 +69,7 @@ begin
   if p_action='retry_transient' and
      (v_row.inbox_state<>'dead_letter'
        or v_row.shadow_observation_id is not null
+       or v_row.last_failure_code is null
        or v_row.last_failure_code not in (
          'LOOKUP_FAILED','LOOKUP_TIMEOUT','INTERNAL_FAILURE'
        )
