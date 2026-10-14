@@ -65,7 +65,7 @@ begin
       message='Private cancellation aggregate health is unavailable';
   end if;
   v_window:=pg_catalog.to_timestamp(
-    (pg_catalog.floor(pg_catalog.extract(epoch from v_now)/900)*900)::double precision
+    (pg_catalog.floor(extract(epoch from v_now)/900)*900)::double precision
   );
   insert into public.official_reader_portone_cancel_ops_alert_outbox_v1
     (alert_code,window_started_at)
