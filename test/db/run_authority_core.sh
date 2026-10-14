@@ -185,6 +185,8 @@ run_isolated_case myeongha_reader_d3e4_inbox_to_shadow_transaction_test bash tes
 run_isolated_case myeongha_reader_d3e5_durable_worker_lifecycle_test bash test/db/official_reader_d3e5_cancel_durable_worker_lifecycle.sh
 # D3e5 full signed-HTTP→1910→1920 claim→mock GET→1860+completion TS↔PostgreSQL.
 run_isolated_case myeongha_reader_d3e5_real_driver_pg_test bash test/db/official_reader_d3e5_real_driver_pg.sh
+# D3e6 owner-only aggregate monitoring and one-shot audited operator review.
+run_isolated_case myeongha_reader_d3e6_private_ops_review_test bash test/db/official_reader_d3e6_cancel_private_ops_review.sh
 run_isolated_case myeongha_official_cancel_purchase_match_private_test bash test/db/official_reader_cancel_purchase_match_private.sh
 run_isolated_case myeongha_official_reader_reviewed_cancel_bridge_test bash test/db/official_reader_cancel_reviewed_atomic_bridge_private.sh
 # Prevent historic direct or SECURITY DEFINER cancellation writers bypassing reviewed entitlement revoke via public/API/Commerce roles.
