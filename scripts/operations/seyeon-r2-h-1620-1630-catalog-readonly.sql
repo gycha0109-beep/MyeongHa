@@ -82,23 +82,23 @@ SELECT pg_catalog.jsonb_build_object(
  'governedRoleLeastPrivilegeCount',(SELECT count(*) FROM role_flags WHERE least_priv),
  'governedRoleMembershipEdgeCount',(SELECT count(*) FROM pg_catalog.pg_auth_members am
    JOIN governed_role g ON g.oid=am.roleid OR g.oid=am.member),
- 'governedRoleSchemaUsage',(SELECT has_schema_privilege('myeongha_seyeon_governed_executor','public','USAGE') FROM governed_role),
- 'governedRoleSchemaCreate',(SELECT has_schema_privilege('myeongha_seyeon_governed_executor','public','CREATE') FROM governed_role),
+ 'governedRoleSchemaUsage',(SELECT has_schema_privilege(g.oid,'public'::regnamespace,'USAGE') FROM governed_role g),
+ 'governedRoleSchemaCreate',(SELECT has_schema_privilege(g.oid,'public'::regnamespace,'CREATE') FROM governed_role g),
  'governedContextFunctions',(SELECT count(*) FROM f JOIN governed_role g ON true
   WHERE f.proname IN ('current_myeongha_subject_id','assert_myeongha_subject_context_v1',
                      'begin_member_subject_context_v1','begin_guest_subject_context_v1')
-    AND has_function_privilege('myeongha_seyeon_governed_executor',f.oid,'EXECUTE')),
+    AND has_function_privilege(g.oid,f.oid,'EXECUTE')),
  'governedCostFunctions',(SELECT count(*) FROM f JOIN governed_role g ON true
   WHERE f.proname IN ('cmd_governed_start_seyeon_ai_call_v1','cmd_governed_settle_seyeon_ai_call_v1')
-    AND has_function_privilege('myeongha_seyeon_governed_executor',f.oid,'EXECUTE')),
+    AND has_function_privilege(g.oid,f.oid,'EXECUTE')),
  'governedLegacyFunctions',(SELECT count(*) FROM f JOIN governed_role g ON true
   WHERE f.proname IN ('cmd_start_seyeon_ai_call_v1','cmd_settle_seyeon_ai_call_v1',
                      'cmd_record_seyeon_ai_call_cost_v1')
-    AND has_function_privilege('myeongha_seyeon_governed_executor',f.oid,'EXECUTE')),
+    AND has_function_privilege(g.oid,f.oid,'EXECUTE')),
  'governedPrivateFunctions',(SELECT count(*) FROM priv JOIN governed_role g ON true
-  WHERE has_function_privilege('myeongha_seyeon_governed_executor',priv.oid,'EXECUTE')),
+  WHERE has_function_privilege(g.oid,priv.oid,'EXECUTE')),
  'governedDirectTableDml',(SELECT coalesce(bool_or(
-   has_table_privilege('myeongha_seyeon_governed_executor',c.oid,'SELECT,INSERT,UPDATE,DELETE')),false)
+   has_table_privilege(g.oid,c.oid,'SELECT,INSERT,UPDATE,DELETE')),false)
    FROM pg_catalog.pg_class c JOIN governed_role g ON true WHERE c.oid IN
     (to_regclass('public.seyeon_ai_call_cost_events'),
      to_regclass('public.seyeon_ai_governor_model_policies_v1'),
