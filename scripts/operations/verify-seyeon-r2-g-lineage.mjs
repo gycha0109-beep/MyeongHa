@@ -10,7 +10,7 @@ const expectedTokens=Object.freeze({
  guestPromotionCreate:0,helperCreate:1,helperDirectGrant:0,helperOwnerAlter:1,
  manifestCreate:0,manifestGrant:1,manifestReference:8,manifestRevoke:2
 });
-const keyEq=(actual,expected)=>equals(Object.keys(actual).sort(),[...expected].sort());
+const keyEq=(actual,expected)=>equals(Object.keys(actual).sort(),(Array.isArray(expected)?[...expected]:Object.keys(expected)).sort());
 function envelope(input,kind){
  if(!input||typeof input!=='object'||Array.isArray(input)
   ||!keyEq(input,['schemaVersion','source','snapshot','approval'])
