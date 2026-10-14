@@ -325,10 +325,10 @@ describe('Phase 4H cross-run replay and conflict HOLD', () => {
   it('rejects replay, conflicting same-run evidence, cross-run semantic reuse and malformed peers', () => {
     const now = 1900000000000;
     const first = claimPacket(sample(), now, randomUUID());
-    const changed = structuredClone(sample());
-    changed.cases.NONCE_ONLY = {
-      subject:'PRESENT', nonce:'ABSENT', permit:'ISSUED',
-    };
+    const original = sample();
+    const changed = {...original, cases: {...original.cases,
+      NONCE_ONLY: {subject:'PRESENT', nonce:'ABSENT', permit:'ISSUED'},
+    }};
     const sameRunConflict = claimPacket(changed, now, first.runId);
     const otherRunSameEvidence = claimPacket(sample(), now, randomUUID());
     const otherRunDifferent = claimPacket(changed, now, randomUUID());
