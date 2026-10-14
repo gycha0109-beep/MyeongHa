@@ -71,7 +71,8 @@
       "cap-b2-r4-receipt-issuer-recovery",
       "cap-b2-r4-issuer-before-cancel",
       "cap-b2-r4-provider-cancel-denials",
-      "cap-b2-r4-provider-cancel-replay"
+      "cap-b2-r4-provider-cancel-replay",
+      "cap-b2-r4-refund-repurchase-isolation"
     ]
   }
 }
