@@ -249,7 +249,9 @@
       "blobSha": "90bae4dd44811c07d81be8028c40da0cbb211891",
       "unit": "governor-guest-receipt",
       "owner": "character-security",
-      "requires": [],
+      "requires": [
+        "1630"
+      ],
       "proof": {
         "kind": "function",
         "name": "public.begin_seyeon_governed_guest_subject_context_v1"

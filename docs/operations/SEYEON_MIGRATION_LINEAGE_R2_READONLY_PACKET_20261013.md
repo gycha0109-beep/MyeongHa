@@ -292,3 +292,9 @@ Watchtower-Track: ops. R1 정확한 격리 복원 증거는 8절을 따른다. �
 - 기존 Production 기준인 1510+2 timestamped 폐기형 PG17에서 `BEGIN → 1660 → ROLLBACK`, 3개 metadata snapshot과 합성 비정상 인자(NULL Subject, 공백 문자ID, 선행 공백 ID) 거부 검증. 함수는 `SECURITY INVOKER STABLE`, hardened `search_path`, API Executor EXECUTE만 부여, anon/authenticated/service 직접 호출 금지. 기존 RLS/Subject Context 선행 검사를 우회하지 않음.
 - 파일 Git blob을 검증하고 실제 쿼리 계약의 `active member`, `active single_character thread`, 활성 참여자, `order by ct.id limit 2` 소스 지문을 검사. 2건 반환은 상위 호출자가 **모호성 차단**하도록 하기 위한 것으로, 가장 최근/첫 번째를 선택하는 권한이 아님. 구매 증빙·Reader 공개·새 Thread 생성 없음.
 - **한계:** 실제 복수 기존 Thread fixture와 Member/Character 연결을 사용한 양수 조회/모호성 차단 호출은 수행하지 않으므로 별도 Reader Owner E2E 필요. SQL은 read-only이나 R2 원천 출처와 운영 배포 승인 불충분. 1650 SECURITY DEFINER Owner, 1640 NULL-record Pin, 1530 creator membership 모두 HOLD. Production 적용 0/21, `dr_ready=false`, Reader paid/public OFF.
+
+## 25. 2026-10-14 R2-H 1670 Governed Guest Resolver — 실행 전 의존성·트랜잭션 경계 HOLD
+
+- 1670 SQL 원문 blob `90bae4dd44811c07d81be8028c40da0cbb211891` 보존. `myeongha_seyeon_governed_executor`는 1630에서 생성되는 역할로, 1670의 명시적 role preflight / grant/revoke는 이를 요구한다. 기존 읽기 전용 인벤토리 `1670.requires=[]`는 누락: **`['1630']`로 검토 계획만 수정** (Owner approval HOLD, Production schema/history/ACL 변경 0).
+- 1670 체크인 SQL에 `begin;`·`commit;`이 모두 있으므로 기존 외부 `BEGIN → \ir 1670 → ROLLBACK` 방식은 독립 ROLLBACK 보증에 부적절하다. 격리 검증은 **폐기 가능한 완전 별도 DB 또는 동일 바이트의 테스트 전용 안전 변환+비파괴 증거**가 준비되기 전까지 수행하지 않는다. 수정된 dependency validator는 1630 prerequisite 및 SQL transaction boundary pin을 fail-closed 검사하되 PostgreSQL 실재생/Owner 승인이라고 주장하지 않는다.
+- 다음 단계: 새 disposable PG17 DB 구축 + 선행 1550~1630 적용 후 1670 내부 COMMIT까지 재생하고 DB를 **통째로 폐기**, 새 세션 Role/Function/ACL과 Guest promotion race/lock-order 동작 검증. Production 쓰기 0, DR Ready/G0~G6/유료/공개 HOLD.
