@@ -98,6 +98,40 @@ wait "$pid1" && wait "$pid2" || fail "competing SQL claims errored"
  fail "two claim owners for one row"
 echo "PASS D3e5: two independent PostgreSQL claim sessions never double-own"
 
+# Regression: lease can expire while a contender WAITS for a locked row.
+# Complete/fail must compare clock_timestamp AFTER lock acquisition.
+race_claim="$(cat "$tmp/a" "$tmp/b" | grep .)"
+IFS='|' read -r race_id race_token race_attempt <<< "$race_claim"
+if [[ -s "$tmp/a" ]]; then race_owner='race_A'; else race_owner='race_B'; fi
+p -c "update public.official_reader_portone_cancel_ingress_inbox_v1
+ set lease_expires_at=clock_timestamp()+interval '1 second'
+ where id='$race_id'::uuid" >/dev/null
+p >"$tmp/holder.out" 2>&1 <<SQL &
+set application_name='d3e5_lease_lock_holder';
+begin;
+select id from public.official_reader_portone_cancel_ingress_inbox_v1
+ where id='$race_id'::uuid for update;
+select pg_sleep(3);
+commit;
+SQL
+holder_pid=$!
+locked=0
+for attempt in $(seq 1 120); do
+ if [[ "$(p -c "select count(*) from pg_stat_activity
+ where application_name='d3e5_lease_lock_holder' and wait_event_type='Timeout'")" == 1 ]]; then
+   locked=1;break;
+ fi
+ sleep .04
+done
+[[ "$locked" == 1 ]] || fail "lease regression holder never acquired the row"
+if failure "$race_id" "$race_owner" "$race_token" LOOKUP_TIMEOUT true >"$tmp/stale.out" 2>&1; then
+  fail "an expired lease succeeded after waiting for row lock"
+fi
+wait "$holder_pid" || fail "lease regression lock holder failed"
+grep -q 'Private cancellation failure requires a live fenced lease' "$tmp/stale.out" ||
+ fail "post-lock expiry was not rejected by lease fence"
+echo "PASS D3e5: lease expiry while waiting for row lock cannot finalize"
+
 [[ "$(enqueue held)" == queued ]] || fail "hold fixture"
 h="$(claim hold_worker)"
 IFS='|' read -r h_id h_token h_attempt <<< "$h"
