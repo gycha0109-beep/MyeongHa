@@ -282,3 +282,9 @@ Governor 04d4B 계열은 실제 격리 PostgreSQL 기반 영수증 임대·정�
 - 1550 table/trigger/기본 RPC, 1560 lifecycle_state·start/settle, 1570 model/unsettled 관측의 **1550→1560→1570** 격리 의존성을 PG17 5-state/ROLLBACK과 synthetic negative test로 검증. 기존 R2 패킷 [18절](SEYEON_MIGRATION_LINEAGE_R2_READONLY_PACKET_20261013.md)에 증거 집중.
 - 1570의 선언된 `requires`는 `1550`만 명시했지만 실제 `lifecycle_state` 컬럼은 1560이 제공함. 승인 없는 배포 방지를 위해 read-only 21-file Review Inventory의 `1570.requires`를 1550+1560으로 보정하고 fail-closed 테스트 추가. 21 SQL blob/Owner HOLD/실 운영 History 변경 0.
 - 1580~1630 추가 Cost Governor 정책·정산·실행 역할은 별도 Owner 검토 대상이며 1550~1570 GREEN은 그 배포 허가가 아니다. 실제 AI dispatch/usage 정산, 비공개 원천 SQL 감사, DR Ready 및 G0~G6/유료/public HOLD 유지.
+
+## 22. 2026-10-14 R2-H 1580/1590 비용 예약·정산 첫 검증 단위
+
+- 이전 [21절] 1550~1570 의존성 증명을 유지하고 1580/1590만 원본 그대로 일회용 PG17 재생에 추가. 정본 패킷 [19절](SEYEON_MIGRATION_LINEAGE_R2_READONLY_PACKET_20261013.md).
+- 모델 정책·일일 예산의 FORCE RLS/role/ACL·Quote 제약, 중복 활성 모델·0원 예산의 합성 거부, started 예약금과 settled 실제 금액의 generated-column 전환, 두 governed RPC 전후 DDL 지문, 전체 ROLLBACK을 CI 검증한다. 실패 시 fail-closed.
+- 운영 시드, provider dispatch, 계정 삭제 동시성, 1600~1630 불변 Rate Card·내부 실행 권한은 아직 HOLD. Production 마이그레이션 0/21, `dr_ready=false`, G0~G6·유료/public OFF.
