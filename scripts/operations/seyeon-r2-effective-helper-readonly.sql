@@ -7,7 +7,7 @@ WITH fn AS (
  FROM pg_catalog.pg_proc p
  JOIN pg_catalog.pg_namespace n ON n.oid=p.pronamespace
  WHERE n.nspname='public' AND p.proname='assert_seyeon_chat_thread_runtime_v1'
- AND p.proargtypes='uuid uuid'::pg_catalog.oidvector
+ AND pg_catalog.pg_get_function_identity_arguments(p.oid)='p_subject_id uuid, p_thread_id uuid'
 ), targets(kind,rolename) AS (VALUES
  ('server_service','service_role'),
  ('api_executor','myeongha_api_executor'),
