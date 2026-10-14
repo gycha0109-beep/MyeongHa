@@ -203,6 +203,9 @@ if [[ "${CI:-}" == "true" && "${PGHOST:-}" == "localhost" ]]; then
     bash test/db/standard_reader_policy_withdrawal_initial_bind_r3_real_pg.sh bind_first
   run_isolated_case myeongha_b2_r3_multiscope_sorted \
     bash test/db/standard_reader_multiscope_lock_order_r3_real_pg.sh
+  # BIND-18: two independent current bundle purchases, lock-time ambiguity DENY.
+  run_isolated_case myeongha_b2_r4_b18_distinct_bundles \
+    bash test/db/standard_reader_r4_distinct_current_bundles_real_pg.sh
   # BIND-17: replay cannot mint current Reader authority after revoke/expiry
   # or after an Offer is disabled; no production Commerce writer is exercised.
   run_isolated_case myeongha_b2_r4_b17_expired_grant \
