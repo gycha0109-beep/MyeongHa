@@ -10,6 +10,7 @@ import type {
   OfficialReaderCancelPrivateInboxStoreV1,
   OfficialReaderCancelInboxObservationTransactionV1,
 } from '../../apps/api/src/official-reader-portone-cancel-inbox-replay-worker-private-v1.js';
+import type { OfficialReaderCancelObservationInputV1 } from '../../apps/api/src/official-reader-portone-cancel-observation-bridge-v1.js';
 import { createPrivateOfficialReaderCancelObservationRecorderTestV1 } from './private-official-reader-cancel-recorder-v1.js';
 
 const COLUMNS = [
@@ -68,7 +69,7 @@ export function createPrivateOfficialReaderInboxReplayStoreTestV1(
         const recorder = createPrivateOfficialReaderCancelObservationRecorderTestV1(client);
         const tx: OfficialReaderCancelInboxObservationTransactionV1 = Object.freeze({
           readQueuedForUpdate: (id: string) => readOne(client, id, true),
-          recordVerified: (facts) => recorder.recordVerified(facts),
+          recordVerified: (facts: OfficialReaderCancelObservationInputV1) => recorder.recordVerified(facts),
         });
         const result = await execute(tx);
         await client.query('COMMIT');
