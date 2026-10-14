@@ -79,7 +79,7 @@ select * from public.internal_cmd_bind_standard_reader_initial_policy_locked_v1(
  '$subject'::uuid,'$intent'::uuid,
  'b4240000-0000-4000-8000-000000000001'::uuid,
  'b4250000-0000-4000-8000-000000000001'::uuid,
- 'sha256:v1:4444444444444444444444444444444444444444444444444444444444',
+ 'sha256:v1:4444444444444444444444444444444444444444444444444444444444444444',
  'standard-reading-access-bind-v2',
  '{"schemaVersion":"standard-reading-access-bind-v2","purchaseIntentId":"$intent"}'::jsonb);
 commit;
