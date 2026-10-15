@@ -234,14 +234,15 @@ export function createSeyeonOfflineTurnDisclosurePortR5(
               input.turnId,input.attemptId,input.assistantMessageId,
             ],
           );
+          const assistantText = result.rows[0]?.assistantText;
           if (result.rows.length !== 1 ||
-              !nonblank(result.rows[0]?.assistantText) ||
-              result.rows[0].assistantText.length > 8000) {
+              !nonblank(assistantText) ||
+              assistantText.length > 8000) {
             return Object.freeze({state:'held' as const});
           }
           return Object.freeze({
             state:'authorized' as const,
-            assistantText:result.rows[0].assistantText,
+            assistantText,
           });
         },
       });
