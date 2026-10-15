@@ -44,7 +44,9 @@ begin
     or not exists (select 1 from pg_proc where oid=f
       and replace(array_to_string(proconfig,','),' ','') like '%search_path=pg_catalog,public%')
  then raise exception 'HOLD_1700_INVOKER_SEARCH_PATH'; end if;
- if has_function_privilege('PUBLIC',f,'EXECUTE')
+ if exists (select 1 from pg_proc p
+    cross join lateral aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) a
+    where p.oid=f and a.grantee=0 and a.privilege_type='EXECUTE')
    or has_function_privilege('anon',f,'EXECUTE')
    or has_function_privilege('authenticated',f,'EXECUTE')
  then raise exception 'HOLD_1700_PUBLIC_EXECUTE'; end if;
