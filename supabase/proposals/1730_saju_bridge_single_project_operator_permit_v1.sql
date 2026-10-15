@@ -78,7 +78,8 @@ create table saju_bridge_private.operator_permits_v1 (
     (status in ('ISSUED','REVOKED') and consumed_at is null)
     or (status = 'CONSUMED'
         and consumed_at is not null
-        and consumed_at >= issued_at)
+        and consumed_at >= issued_at
+    and consumed_at < expires_at)
   )
 );
 
@@ -147,6 +148,16 @@ begin
     or p_saju_sha !~ '^[a-f0-9]{40}$'
     or p_audit_digest !~ '^[a-f0-9]{64}$'
   then
+    return false;
+  end if;
+
+  -- Lock the row in a separate statement BEFORE time evaluation. PostgreSQL
+  -- may evaluate a volatile expiry predicate before waiting for a row lock;
+  -- this explicit lock then distinct UPDATE guarantees an AFTER-WAIT recheck.
+  perform p.permit_id from saju_bridge_private.operator_permits_v1 p
+  where p.permit_id = p_permit_id
+  for update;
+  if not found then
     return false;
   end if;
 
