@@ -349,6 +349,69 @@ describe.skipIf(!enabled)('G2 actual v2/v1/core and both Outboxes, disposable-on
     expect((await transaction(c=>g3Read(c,id),true)).rows[0]?.text).toBeNull();
   });
 
+  it('G3 revoke-first: live Subject UPDATE forces real guarded replay to wait then return NULL',async()=>{
+    const id=await prepare(33);
+    await stage(id,proof(id));
+    await transaction(c=>actualCommit(c,id),true);
+    await clientAction(revoker=>clientAction(async reader=>{
+      await revoker.query('BEGIN');
+      await revoker.query(
+        'select id from public.subjects where id=$1::uuid for update',[subject],
+      );
+      await revoker.query(
+        'update public.record_access_grants set revoked_at=clock_timestamp() where id=$1::uuid',
+        [id.grant],
+      );
+      await reader.query("SET application_name='seyeon_r4_g3_revoke_first'");
+      await reader.query('BEGIN');
+      await executor(reader);
+      const pending=g3Read(reader,id);
+      try{
+        await waitForLock('seyeon_r4_g3_revoke_first');
+        await revoker.query('COMMIT');
+        expect((await pending).rows[0]?.text).toBeNull();
+      }finally{
+        await reader.query('ROLLBACK').catch(()=>undefined);
+        await revoker.query('ROLLBACK').catch(()=>undefined);
+      }
+    }));
+    expect((await transaction(c=>g3Read(c,id),true)).rows[0]?.text).toBeNull();
+  });
+
+  it('G3 read-first: authorized DB read holds its lock; revoke waits and all later replays HOLD',async()=>{
+    const id=await prepare(34);
+    await stage(id,proof(id));
+    await transaction(c=>actualCommit(c,id),true);
+    await clientAction(reader=>clientAction(async revoker=>{
+      await reader.query("SET application_name='seyeon_r4_g3_read_first'");
+      await reader.query('BEGIN');
+      await executor(reader);
+      const first=await g3Read(reader,id);
+      expect(first.rows[0]?.text).toBe(body);
+      await revoker.query("SET application_name='seyeon_r4_g3_revoke_waiter'");
+      await revoker.query('BEGIN');
+      const pending=(async()=>{
+        await revoker.query(
+          'select id from public.subjects where id=$1::uuid for update',[subject],
+        );
+        await revoker.query(
+          'update public.record_access_grants set revoked_at=clock_timestamp() where id=$1::uuid',
+          [id.grant],
+        );
+        await revoker.query('COMMIT');
+      })();
+      try{
+        await waitForLock('seyeon_r4_g3_revoke_waiter');
+        await reader.query('COMMIT');
+        await pending;
+      }finally{
+        await reader.query('ROLLBACK').catch(()=>undefined);
+        await revoker.query('ROLLBACK').catch(()=>undefined);
+      }
+    }));
+    expect((await transaction(c=>g3Read(c,id),true)).rows[0]?.text).toBeNull();
+  });
+
   it('original revoked Grant aborts real v2, assistant, both outboxes and admission',async()=>{
     const id=await prepare(22);
     await stage(id,proof(id));
