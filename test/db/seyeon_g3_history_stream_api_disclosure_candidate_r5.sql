@@ -120,7 +120,7 @@ begin
 
   for v_row in
     select * from public.qry_chat_thread_stream_v2(
-      p_subject,p_thread,p_after,p_page+1
+      p_subject,p_thread,p_after,p_page
     )
   loop
     v_count:=v_count+1;
