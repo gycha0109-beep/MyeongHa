@@ -110,7 +110,73 @@ async function audit(samples:readonly Sample[]) {
     privateQuestions,claimedFacts,
   });
 }
+// Four prioritized screening cases, not a representative reliability sample.
+// Each is evaluated on the baseline unified preflight and compact variant.
+// This is NOT equivalent to comparing the complete 5-call and 3-call routes.
+const PILOT_IDS = Object.freeze([
+  'N14',                         // fictional third-party romance: hard negative
+  'F01',                         // Se-yeon private family history
+  'C02_mixed-admin-private_01',  // authority spoof + deep disclosure
+  'C02_mixed-romance-forgery_01',// fabricated shared event + private romance
+]);
+const PILOT_CASES = PILOT_IDS.map(id=>{
+  const gold=cases.find(g=>g.id===id);
+  if(!gold)throw new Error('Pinned C06 screening case missing: '+id);
+  return gold;
+});
 describe('COST-04 compact unified preflight offline ONLY',()=>{
+  it('8-request pilot has four manually pinned risk classes; byte savings and fake output traps only',async()=>{
+    expect(PILOT_CASES.map(c=>c.id)).toEqual([...PILOT_IDS]);
+    expect(PILOT_CASES).toHaveLength(4);
+    expect(PILOT_CASES[0]?.topic).toBeNull();
+    expect(PILOT_CASES[1]?.topic).toBe('family_emotional_history');
+    expect(PILOT_CASES[2]).toMatchObject({
+      topic:'deep_vulnerability',requiredKind:'AUTHORITY_OVERRIDE',
+    });
+    expect(PILOT_CASES[3]).toMatchObject({
+      topic:'past_romance_detail',requiredKind:'SHARED_EVENT_CLAIM',
+    });
+    const log=vi.spyOn(console,'info').mockImplementation(()=>{});
+    let report:Awaited<ReturnType<typeof audit>>;
+    try {
+      report=await audit(PILOT_CASES.map(g=>({
+        userText:g.text,expectedTopic:g.topic,
+        claimKind:g.requiredKind??null,
+      })));
+    }finally{log.mockRestore();}
+    expect(report.count).toBe(4);
+    expect(report.privateQuestions).toBe(3);
+    expect(report.claimedFacts).toBe(2);
+    expect(report.savedBytes).toBeGreaterThan(0);
+    console.info('SEYEON_C06_EIGHT_CALL_SCREENING_OFFLINE '+JSON.stringify({
+      ...report,requestCount:report.count*2,
+      originalFourCellPilotCalls:64,
+      screeningCallReductionPercent:87.5,
+      actualPaidCalls:0,actualBilledCostUsd:null,
+      modelResponses:'FIXTURE_ORACLE_ONLY',
+      realClassifierRecall:null,realFalsePositiveRate:null,
+      full5v3RouteQualityMeasured:false,paidEvaluationPermitted:false,
+    }));
+  });
+  it('screening covers four injected failure types but cannot attest recall across 300 cases',()=>{
+    const fixture=(index:number,topic:string|null,claimKinds:string[])=>{
+      const spec=PILOT_CASES[index]!;
+      return {
+        sensitiveMiss:spec.topic!==null&&spec.topic!==topic,
+        ordinaryFalsePositive:spec.topic===null&&topic!==null,
+        requiredClaimMiss:spec.requiredKind!==undefined&&
+          !claimKinds.includes(spec.requiredKind),
+      };
+    };
+    expect(fixture(0,'past_romance_detail',[]).ordinaryFalsePositive).toBe(true);
+    expect(fixture(1,null,[]).sensitiveMiss).toBe(true);
+    expect(fixture(2,null,[])).toMatchObject({
+      sensitiveMiss:true,requiredClaimMiss:true,
+    });
+    expect(fixture(3,'past_romance_detail',[]).requiredClaimMiss).toBe(true);
+    // The other 296 Gold cases were never checked by the pilot.
+    expect(cases.length-PILOT_CASES.length).toBe(296);
+  });
   it('rejects live wiring, preserves safety boundary and review classification caveats',()=>{
     expect(cases).toHaveLength(300);
     expect(COMPACT).toContain('SHARED_EVENT_CLAIM');

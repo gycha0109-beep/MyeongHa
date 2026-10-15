@@ -25,3 +25,11 @@ Status: **OFFLINE TEST ONLY / COST-02 and COST-05/06 HOLD**.
 - 추가로 발견된 종류 또는 Gold에 필수 주장 라벨이 없는 사례의 자발적 주장 분류는 **잘못된 판정으로 단정하지 않고** `unreviewedClaimIds`에 별도 기록하며, `UNREVIEWED_CLAIM_KIND_REQUIRES_OWNER_LABEL`로 자동 통과를 차단한다.
 - 단순한 주장 배열 순서 차이는 결과 불일치로 계산하지 않는다. 외부 모델 응답이나 실제 사용자 기록을 저장하지 않고 검증한다.
 - 이 강화는 실모델 품질의 증명이 아니라 **기존 오프라인 평가에서의 거짓 성공 가능성 제거**다. 사용자 승인된 유료 키 `OPENAI_API_KEY2`를 사용하지 않았다.
+
+## 초소형 8회 선별 테스트 — 무과금 예비 검증
+
+- 같은 분류 단계의 기존 Unified 지시문 4회 + Compact 지시문 4회를 비교한다. 전체 5단계 기존 대화 경로와 3단계 신규 경로의 품질 비교가 **아니다**.
+- 고정 사례: `N14`(드라마 속 전 연인, 오탐 방지), `F01`(세연 가족 내력), `C02_mixed-admin-private_01`(관리자 사칭+깊은 트라우마), `C02_mixed-romance-forgery_01`(허위 공동 경험+이별 상세). 4개 문장으로 4가지 고위험 분류 상황을 선별한다. 300개 중 296개는 실험 대상에서 제외되어 실제 모델의 전체 Recall/Precision 보증 불가.
+- `test/seyeon-cost-c04-preflight-compact-offline-v1.test.ts`가 **실제 Provider 요청 직렬화**로 구성한 8개 JSON을 Fake transport로 캡처하며, 결과는 정답을 돌려주는 **Oracle**이다. CI의 `SEYEON_C06_EIGHT_CALL_SCREENING_OFFLINE` 로그에서 요청 바이트를 감사한다. `requestCount=8`, `actualPaidCalls=0`, `actualBilledCostUsd=null`.
+- 호출 수만 기준으로 기존 4조건×4사례 64회 대비 87.5% 감소한다. 그러나 첫 테스트는 모델 prompt 2종을 다루는 **탐색 검증**이며 전체 경로·모델·보안·캐릭터 품질 검사와 직접적인 절감률 비교는 불가. 실비 역시 토큰/요금/영수증 없이 추정 금지.
+- 현재 `COST-05/#1816` 비용 사고 HOLD, 공식 단가·독립 비용 hard cap·영수증·Owner 별도 검토 및 `OPENAI_API_KEY2` 실행 경로가 마련되지 않았다. 보호된 workflow의 `if: false`를 우회하지 않았으며 **실모델 8회 시험은 아직 미실행**.
