@@ -121,7 +121,8 @@ describe('COST-03 authored 10/20/30-turn synthetic-only assessment',()=>{
       candidate:fakeRun('fast_3',t=> '다른 응답 '+t.id),
     });
     const x=inspectSeyeonC03LexicalRepetitionV1(trial);
-    expect(x.X.exactDuplicateCount+x.Y.exactDuplicateCount).toBe(59);
+    // 60 fixed replies split into two balanced 30-turn slot streams: 29+29.
+    expect(x.X.exactDuplicateCount+x.Y.exactDuplicateCount).toBe(58);
     expect(x.X.diagnosticOnly&&x.Y.diagnosticOnly).toBe(true);
   });
 
