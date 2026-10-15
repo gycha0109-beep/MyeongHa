@@ -1,7 +1,8 @@
 import { router } from 'expo-router';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { resolveMobileChatCharacterPresentationV1 } from '@/features/chat/chat-character-presentation';
+import { resolveMobileChatPortraitV1 } from '@/features/chat/chat-character-portraits';
 import { MOBILE_CHAT_LAUNCH_ROSTER_V1 } from '@/features/chat/chat-launch-roster';
 import { useMobileChatOpenV1 } from '@/features/chat/use-mobile-chat-open';
 import { MobileScreen } from '@/ui/MobileScreen';
@@ -21,7 +22,7 @@ export default function ChatHubScreen() {
     <MobileScreen
       eyebrow="CONVERSATION"
       title="대화"
-      description="9명의 캐릭터를 둘러보고, 로그인하면 대화를 시작하거나 이어갈 수 있습니다."
+      description="출시 예정 대리자 6명을 둘러보고, 로그인하면 대화를 시작하거나 이어갈 수 있습니다."
     >
       <View style={styles.card}>
         <Text style={styles.kicker}>CONTINUE</Text>
@@ -38,7 +39,7 @@ export default function ChatHubScreen() {
         <Text style={styles.kicker}>MEET</Text>
         <Text style={styles.title}>대화 상대 선택</Text>
         <Text style={styles.body}>
-          승인된 출시 9명을 한눈에 보고 대화 상대를 고를 수 있습니다. 실제 사용 가능 여부와 대화방 생성·재사용은 서버가 결정합니다.
+          런칭 목록의 6명을 둘러보고 대화 상대를 고를 수 있습니다. 실제 사용 가능 여부와 대화방 생성·재사용은 서버가 결정합니다.
         </Text>
 
         {state.access === 'checking' ? (
@@ -66,6 +67,7 @@ export default function ChatHubScreen() {
         <View style={styles.roster}>
           {MOBILE_CHAT_LAUNCH_ROSTER_V1.map((character) => {
             const presentation = resolveMobileChatCharacterPresentationV1(character.characterId);
+            const portrait = resolveMobileChatPortraitV1(character.characterId);
             const opening = state.openingCharacterId === character.characterId;
             const canOpen = state.access === 'member';
             const disabled = !canOpen || state.openingCharacterId !== null;
@@ -79,9 +81,16 @@ export default function ChatHubScreen() {
                 style={[styles.characterRow, opening && styles.disabled]}
               >
                 <View style={styles.characterMark}>
-                  <Text style={styles.characterMarkText}>
-                    {character.displayName.slice(0, 1)}
-                  </Text>
+                  {portrait === null ? (
+                    <Text style={styles.characterMarkText}>{character.displayName.slice(0, 1)}</Text>
+                  ) : (
+                    <Image
+                      source={portrait}
+                      style={styles.characterPortrait}
+                      resizeMode="cover"
+                      accessibilityLabel={`${character.displayName} 대리자 초상화`}
+                    />
+                  )}
                 </View>
                 <View style={styles.characterCopy}>
                   <View style={styles.characterTitleRow}>
@@ -113,7 +122,7 @@ export default function ChatHubScreen() {
       <View style={styles.memoryNote}>
         <Text style={styles.memoryMark}>◇</Text>
         <Text style={styles.memoryCopy}>
-          9명 모두 캐릭터를 선택해 대화방을 열 수 있습니다. 세연은 실제 AI 대화가 가능하며, 다른 8명의 답변 기능은 준비 중입니다.
+          6명의 대리자를 먼저 소개합니다. 세연은 회원 로그인 후 AI 대화가 가능하며, 다른 대리자의 답변 기능은 준비 중입니다.
         </Text>
       </View>
     </MobileScreen>
@@ -157,15 +166,17 @@ const styles = StyleSheet.create({
   },
   disabled: { opacity: 0.55 },
   characterMark: {
-    width: 40,
-    height: 40,
+    width: 76,
+    height: 88,
+    overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: mobileColors.gold,
-    borderRadius: 20,
+    borderRadius: 14,
     backgroundColor: mobileColors.surface,
   },
+  characterPortrait: { width: '100%', height: '100%' },
   characterMarkText: { color: mobileColors.navy, fontSize: 16, fontWeight: '900' },
   characterCopy: { flex: 1, gap: 6 },
   characterTitleRow: { flexDirection: 'row', alignItems: 'baseline', gap: 8 },
