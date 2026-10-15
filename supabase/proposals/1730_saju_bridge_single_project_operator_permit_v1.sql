@@ -78,7 +78,8 @@ create table saju_bridge_private.operator_permits_v1 (
     (status in ('ISSUED','REVOKED') and consumed_at is null)
     or (status = 'CONSUMED'
         and consumed_at is not null
-        and consumed_at >= issued_at)
+        and consumed_at >= issued_at
+    and consumed_at < expires_at)
   )
 );
 
@@ -150,6 +151,16 @@ begin
     return false;
   end if;
 
+  -- Lock the row in a separate statement BEFORE time evaluation. PostgreSQL
+  -- may evaluate a volatile expiry predicate before waiting for a row lock;
+  -- this explicit lock then distinct UPDATE guarantees an AFTER-WAIT recheck.
+  perform p.permit_id from saju_bridge_private.operator_permits_v1 p
+  where p.permit_id = p_permit_id
+  for update;
+  if not found then
+    return false;
+  end if;
+
   -- The conditional UPDATE is the atomic, single-DB, cross-replica claim.
   -- PostgreSQL evaluates the expiry using the actual DB clock.
   update saju_bridge_private.operator_permits_v1 p
@@ -182,22 +193,8 @@ begin
 end
 $consume$;
 
--- Transfer owner before granting any EXECUTE. The function owner is NOLOGIN,
--- owns only the new private tables and cannot access unrelated public data.
-grant create on schema saju_bridge_private
-  to myeongha_saju_bridge_permit_owner;
-grant myeongha_saju_bridge_permit_owner to current_user;
-alter table saju_bridge_private.operator_permits_v1
-  owner to myeongha_saju_bridge_permit_owner;
-alter table saju_bridge_private.audit_events_v1
-  owner to myeongha_saju_bridge_permit_owner;
-alter function saju_bridge_private.cmd_consume_operator_permit_v1(
-  uuid,text,text,text,text,text,uuid,text
-) owner to myeongha_saju_bridge_permit_owner;
-revoke create on schema saju_bridge_private
-  from myeongha_saju_bridge_permit_owner;
-revoke myeongha_saju_bridge_permit_owner from current_user;
-
+-- Configure REVOKE/GRANT/COMMENT while the managed migration principal
+-- still owns these objects (NOINHERIT role membership grants no owner DCL).
 -- PostgreSQL grants function EXECUTE to PUBLIC by default. Remove it explicitly.
 revoke all on function saju_bridge_private.cmd_consume_operator_permit_v1(
   uuid,text,text,text,text,text,uuid,text
@@ -238,7 +235,24 @@ grant execute on function saju_bridge_private.cmd_consume_operator_permit_v1(
 -- An operator can never activate this with the existing production DB pool.
 comment on schema saju_bridge_private is
 'Private Saju single-project integration alternative: unmounted, shared-DB risk; no independent Root/Attestor.';
+
 comment on function saju_bridge_private.cmd_consume_operator_permit_v1(
   uuid,text,text,text,text,text,uuid,text
 ) is
 'Non-public, one-shot integration PROBE permit. Caller-bound SHA/digests are not independent Owner approval. No product release/commerce authorization.';
+
+-- All ACL/COMMENT operations finish before transferring object ownership.
+-- The NOLOGIN function owner cannot read unrelated public data.
+grant create on schema saju_bridge_private
+  to myeongha_saju_bridge_permit_owner;
+grant myeongha_saju_bridge_permit_owner to current_user;
+alter table saju_bridge_private.operator_permits_v1
+  owner to myeongha_saju_bridge_permit_owner;
+alter table saju_bridge_private.audit_events_v1
+  owner to myeongha_saju_bridge_permit_owner;
+alter function saju_bridge_private.cmd_consume_operator_permit_v1(
+  uuid,text,text,text,text,text,uuid,text
+) owner to myeongha_saju_bridge_permit_owner;
+revoke create on schema saju_bridge_private
+  from myeongha_saju_bridge_permit_owner;
+revoke myeongha_saju_bridge_permit_owner from current_user;

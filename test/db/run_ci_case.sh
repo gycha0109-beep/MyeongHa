@@ -495,6 +495,15 @@ SQL
     psql -v ON_ERROR_STOP=1 -f test/db/fixtures/saju_staging_operator_admission_schema_8c2b2d302.sql >/dev/null
     bash test/db/saju_staging_operator_admission_v2_authority.sh
     ;;
+  saju-single-project-operator-permit-pg17)
+    verify_pg17
+    [[ "${GITHUB_ACTIONS:-}" == true && "${DB_SUITE:-}" == postgres17
+        && "${PGHOST:-}" == localhost
+        && "${PGDATABASE:-}" =~ ^myeongha_ci_case_[0-9]+$ ]] || {
+      echo HOLD_SAJU_SINGLE_PROJECT_NOT_DISPOSABLE_PG17 >&2; exit 1;
+    }
+    bash test/db/saju_single_project_operator_permit_pg17.sh
+    ;;
   *)
     echo "Unknown DB CI case: $case_name" >&2
     exit 2
