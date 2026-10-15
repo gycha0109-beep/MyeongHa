@@ -4,7 +4,7 @@ import { handleSupabaseAuthRequestV1 } from './supabase-auth-http.js';
 
 const env = {
   MYEONGHA_SUPABASE_URL: 'https://cnsfpcdiyofqvhpcegfc.supabase.co',
-  MYEONGHA_SUPABASE_API_KEY: 'test-publishable-key-that-is-long-enough',
+  MYEONGHA_SUPABASE_API_KEY: 'sb_publishable_synthetic_auth_proxy_key_1234567890',
 };
 const encoder = new TextEncoder();
 
@@ -81,6 +81,36 @@ afterEach(() => {
 });
 
 describe('Supabase auth HTTP proxy', () => {
+  it('rejects admin-grade Supabase API keys before any Auth endpoint call', async () => {
+    const upstream = vi.fn();
+    vi.stubGlobal('fetch', upstream);
+    const legacyService = [
+      Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url'),
+      Buffer.from(JSON.stringify({ role: 'service_role' })).toString('base64url'),
+      'fake_local_auth_proxy_signature',
+    ].join('.');
+    for (const badKey of [
+      'sb_secret_synthetic_admin_auth_proxy_key_123456789',
+      legacyService,
+    ]) {
+      const envWithBadKey = { ...env, MYEONGHA_SUPABASE_API_KEY: badKey };
+      let thrownMessage = '';
+      try {
+        await handleSupabaseAuthRequestV1({
+          request: request({ email: 'person@example.com', password: 'irrelevant-password' }),
+          env: envWithBadKey,
+          action: 'sign-in',
+          passwordCompromiseGuard: clearPasswordGuard,
+        });
+      } catch (error) {
+        thrownMessage = (error as Error).message;
+      }
+      expect(thrownMessage).toContain('only accepts a publishable or legacy anon');
+      expect(thrownMessage).not.toContain(badKey);
+    }
+    expect(upstream).not.toHaveBeenCalled();
+  });
+
   it('returns a sanitized member session for password sign-in', async () => {
     const upstream = vi.fn(async (_input: string | URL | Request, init?: RequestInit) => {
       expect(init?.headers).toMatchObject({ apikey: env.MYEONGHA_SUPABASE_API_KEY });

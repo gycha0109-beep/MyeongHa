@@ -4,7 +4,7 @@ import { handleSupabaseAuthRequestV1 } from './supabase-auth-http.js';
 const encoder = new TextEncoder();
 const env = {
   MYEONGHA_SUPABASE_URL: 'https://cnsfpcdiyofqvhpcegfc.supabase.co',
-  MYEONGHA_SUPABASE_API_KEY: 'test-publishable-key-that-is-long-enough',
+  MYEONGHA_SUPABASE_API_KEY: 'sb_publishable_synthetic_auth_regression_key_1234567890',
 };
 
 function signOutRequest(input: {

@@ -193,6 +193,32 @@ describe('Supabase Member identity verifier', () => {
     });
   });
 
+  it('rejects privileged API key configurations even when verifier is constructed directly', () => {
+    const fakeLegacyServiceRole = [
+      Buffer.from(JSON.stringify({ typ: 'JWT', alg: 'HS256' })).toString('base64url'),
+      Buffer.from(JSON.stringify({ role: 'service_role' })).toString('base64url'),
+      'fake_signature_for_identity_verifier_test',
+    ].join('.');
+    for (const privileged of [
+      'sb_secret_synthetic_admin_key_for_test_only',
+      fakeLegacyServiceRole,
+    ]) {
+      const build = () => new SupabaseMemberIdentityEvidenceVerifierV1({
+        supabaseOrigin: ORIGIN,
+        supabaseApiKey: privileged,
+        fetchImpl: async () => {
+          throw new Error('unexpected network request from invalid verifier');
+        },
+      });
+      expect(build).toThrow('only accepts a publishable or legacy anon API key');
+      try {
+        build();
+      } catch (error) {
+        expect((error as Error).message).not.toContain(privileged);
+      }
+    }
+  });
+
   it('rejects unsafe verifier configuration before any request can be made', () => {
     expect(
       () =>

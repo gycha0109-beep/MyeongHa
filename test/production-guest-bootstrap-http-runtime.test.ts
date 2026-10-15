@@ -13,7 +13,7 @@ const BASE_PRODUCTION_ENV = Object.freeze({
   MYEONGHA_DATABASE_SSL_ROOT_CERT_PEM:
     '-----BEGIN CERTIFICATE-----\\ntest-only\\n-----END CERTIFICATE-----',
   MYEONGHA_SUPABASE_URL: 'https://cnsfpcdiyofqvhpcegfc.supabase.co',
-  MYEONGHA_SUPABASE_API_KEY: 'test-publishable-key-value',
+  MYEONGHA_SUPABASE_API_KEY: 'sb_publishable_synthetic_guest_bootstrap_key_1234567890',
   MYEONGHA_GUEST_FINGERPRINT_SECRET:
     'test-guest-fingerprint-secret-value-0000000000000000',
 } as const);

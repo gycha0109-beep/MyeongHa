@@ -186,6 +186,42 @@ describe('production user-data runtime configuration', () => {
     );
   });
 
+  it('fails closed on an elevated Supabase API key in the user-facing production verifier', () => {
+    const legacyServiceRole = [
+      Buffer.from(JSON.stringify({ typ: 'JWT', alg: 'HS256' })).toString('base64url'),
+      Buffer.from(JSON.stringify({ role: 'service_role' })).toString('base64url'),
+      'fake_signature_for_credential_classification',
+    ].join('.');
+    for (const invalidKey of [
+      'sb_secret_synthetic_admin_key_not_for_user_auth',
+      legacyServiceRole,
+      'nonstandard_api_key_synthetic_long_enough_123456789',
+    ]) {
+      const env = validEnv();
+      env[PRODUCTION_USER_DATA_RUNTIME_ENV_V1.supabaseApiKey] = invalidKey;
+      let message = '';
+      try {
+        parseProductionUserDataRuntimeConfigV1(env);
+      } catch (error) {
+        expect(error).toBeInstanceOf(ProductionUserDataRuntimeConfigErrorV1);
+        message = (error as Error).message;
+      }
+      expect(message).toContain('publishable or legacy anon key');
+      expect(message).not.toContain(invalidKey);
+    }
+  });
+
+  it('accepts the legacy anon key class only for backward compatibility', () => {
+    const env = validEnv();
+    const legacyAnon = [
+      Buffer.from(JSON.stringify({ typ: 'JWT', alg: 'HS256' })).toString('base64url'),
+      Buffer.from(JSON.stringify({ role: 'anon' })).toString('base64url'),
+      'fake_signature_for_legacy_anon_contract',
+    ].join('.');
+    env[PRODUCTION_USER_DATA_RUNTIME_ENV_V1.supabaseApiKey] = legacyAnon;
+    expect(parseProductionUserDataRuntimeConfigV1(env).supabaseApiKey).toBe(legacyAnon);
+  });
+
   it('classifies PostgreSQL TLS modes without returning connection authority material', () => {
     expect(inspectProductionDatabaseTlsPostureV1(DATABASE_URL)).toEqual({
       mode: 'require',

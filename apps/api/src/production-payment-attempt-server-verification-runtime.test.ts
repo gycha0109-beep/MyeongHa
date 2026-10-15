@@ -34,7 +34,7 @@ const ENV = Object.freeze({
   MYEONGHA_DATABASE_SSL_ROOT_CERT_PEM:
     '-----BEGIN CERTIFICATE-----\\ntest-only\\n-----END CERTIFICATE-----',
   MYEONGHA_SUPABASE_URL: 'https://cnsfpcdiyofqvhpcegfc.supabase.co',
-  MYEONGHA_SUPABASE_API_KEY: 'supabase-server-key-123456789',
+  MYEONGHA_SUPABASE_API_KEY: 'sb_publishable_synthetic_payment_verifier_key_123456789',
   MYEONGHA_GUEST_FINGERPRINT_SECRET: 'g'.repeat(32),
 });
 

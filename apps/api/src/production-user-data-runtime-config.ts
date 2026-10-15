@@ -1,3 +1,5 @@
+import { isLeastPrivilegeSupabaseAuthApiKeyV1 } from './supabase-auth-api-key-least-privilege.js';
+
 export const MYEONGHA_PRODUCTION_SUPABASE_PROJECT_REF =
   'cnsfpcdiyofqvhpcegfc' as const;
 export const MYEONGHA_PRODUCTION_SUPABASE_ORIGIN =
@@ -274,6 +276,11 @@ export function parseProductionUserDataRuntimeConfigV1(
     requiredEnv(env, PRODUCTION_USER_DATA_RUNTIME_ENV_V1.supabaseApiKey),
     20,
   );
+  if (!isLeastPrivilegeSupabaseAuthApiKeyV1(supabaseApiKey)) {
+    return fail(
+      'MYEONGHA_SUPABASE_API_KEY must be a publishable or legacy anon key for member verification.',
+    );
+  }
   const guestFingerprintSecret = requireSecret(
     PRODUCTION_USER_DATA_RUNTIME_ENV_V1.guestFingerprintSecret,
     requiredEnv(env, PRODUCTION_USER_DATA_RUNTIME_ENV_V1.guestFingerprintSecret),

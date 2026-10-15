@@ -43,6 +43,9 @@ bash test/db/verify_no_schema_cardinality_hardcoding.sh
 # Every migration/app runtime commit rechecks the recognized paid Reader Writer caller graph.
 # D3e24: application code must not regain access to an administrator DB password.
 node scripts/ci/official-reader-production-admin-secret-fence.mjs
+# D3e25: Supabase member verification must never receive admin/secret API keys.
+# Uses synthetic keys and mocked Auth upstream only; no actual API requests.
+npx vitest run test/supabase-auth-api-key-least-privilege.test.ts test/production-user-data-runtime-config.test.ts test/supabase-member-identity-verifier.test.ts apps/api/src/supabase-auth-http.test.ts apps/api/src/supabase-auth-response-body-deadline.test.ts apps/api/src/supabase-member-identity-verifier.test.ts
 node scripts/ci/official-reader-writer-call-graph.mjs --self-test
 node scripts/ci/official-reader-writer-call-graph.mjs --report
 # Exercise the actual 1460..1510 -> 1400..1450 inversion only on a

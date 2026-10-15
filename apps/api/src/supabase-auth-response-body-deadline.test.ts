@@ -6,10 +6,10 @@ import {
 
 const authEnv = {
   MYEONGHA_SUPABASE_URL: 'https://cnsfpcdiyofqvhpcegfc.supabase.co',
-  MYEONGHA_SUPABASE_API_KEY: 'test-publishable-key-that-is-long-enough',
+  MYEONGHA_SUPABASE_API_KEY: 'sb_publishable_synthetic_auth_deadline_key_1234567890',
 };
 const memberOrigin = 'https://example.supabase.co';
-const memberApiKey = 'test-publishable-key-that-is-long-enough';
+const memberApiKey = 'sb_publishable_synthetic_auth_deadline_key_1234567890';
 
 function signInRequest(): Request {
   return new Request('https://myeongha.example/api/auth/sign-in', {
