@@ -271,7 +271,7 @@ node scripts/local/verify-saju-bridge-docker-local.mjs --replay-review ../Saju-b
 - 실제 일회용 Subject·Nonce·Admission TLS/READ ONLY 검증 이후 새 검증 컨테이너에서 재사용·다른 runId의 동일 합성 증거·시간 초과를 확인한다. 원본 키/사용자 정보 출력 금지. 기존 프로젝트 컨테이너·네트워크·볼륨 잔존 0 정리 유지.
 - 이 검사는 **두 개의 입력된 패킷만 비교**한다. 운영 원장, 외부 출처 신뢰, 지속적 재사용 방지 레지스트리, 독립 실행 시도의 인과 관계, 공인 승인 증명이 아니다. 같은 runId가 서로 다른 DB 변경을 설명한다는 주장은 거부하고, 서로 다른 runId가 안전하다는 주장도 인정하지 않는다.
 - 모든 반환은 `HOLD_MANUAL_REVIEW`, `replayRegistry=NOT_AVAILABLE`, `crossRunLinkage=NOT_PROVEN`, `manualReviewAdmissibility=NOT_ADMISSIBLE`, `canExecute/canPublish/canSell=false`, `automaticRetry/automaticCompensation=false`.
-- 운영 Root/Attestor/Runner, R01–R14, 2D-4, 실제 자동 복구·수동 운영 승인 모두 HOLD. Windows Phase 4H는 사용자 제공 **최종 PASS 한 줄**이 존재한다(아래 Phase 5 증빙 분류 참조). 출력 단독으로 실행 호스트·정확한 SHA·Node/Compose 버전·전체 stdout·프로세스 종료코드를 독립 검증했다고 주장하지 않으며, Linux CI도 이를 대체하지 않는다.
+- 운영 Root/Attestor/Runner, R01–R14, 2D-4, 실제 자동 복구·수동 운영 승인 모두 HOLD. Windows Phase 4H는 2026-10-15 사용자 제공 전체 로컬 로그·종료코드·환경 정보를 추가 인수했다(아래 Phase 5 증빙 분류 참조). Linux CI나 사용자 제출 로컬 근거를 독립 운영 인가로 승격하지 않는다.
 
 ## 4. 단계별 로드맵 · 종료 게이트
 
@@ -280,29 +280,33 @@ node scripts/local/verify-saju-bridge-docker-local.mjs --replay-review ../Saju-b
 | 단계 | 구현·검증 범위 | 현재 근거와 상태 | 아직 남은 게이트 |
 |---|---|---|---|
 | 0 | 기존 GitHub 로컬 HTTP/TLS/GoTrue 2J·#1986 | 기존 scoped/full CI 및 병합 완료 | 운영 증빙과 별개 |
-| 1–2 | 폐기형 GoTrue/4 DB, 실제 고정 Saju HTTP/HMAC, Subject/Birth/Nonce | Linux Docker CI 확인; 이후 4H 통합 체인의 선행 단계 | Windows 환경 메타데이터와 전체 로그 인수 |
+| 1–2 | 폐기형 GoTrue/4 DB, 실제 고정 Saju HTTP/HMAC, Subject/Birth/Nonce | Linux CI 및 사용자 제출 Windows 전체 로그에서 PASS 확인 | 운영 증빙과 별개 |
 | 3A–3B | 세 DB 독립 TLS, 제한 로그인, 합성 서명 Permit V2 원자 소비 | CI/병합 완료; 3A Windows 단독 PASS 보고 이력 | 운영 CA/Root·Permit 인가 아님 |
 | 4A–4C-2 | DB stop/restart·ACK 유실·Nonce COMMIT SIGKILL·client-only 파티션·Admission COMMIT SIGKILL | #2047, #2056, #2059, #2065 병합 및 scoped/full CI 확인 | 임의 장애 결과 일반화·자동 재시도 금지 |
 | 4C-3–4F | 세 DB 부분 커밋 관측·TOCTOU·출처/인과관계 검토·증거 패킷 부정 검사 | #2069, #2072, #2077, #2082 병합 및 CI 확인 | cross-DB 원자성/복구·독립 증거 여전히 HOLD |
 | 4G–4H | 합성 Ed25519 및 stateless cross-run replay HOLD | #2089, [#2092](https://github.com/gycha0109-beep/MyeongHa/pull/2092) 병합; [4H Docker CI](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38539255532) SUCCESS·[4H 전체 CI](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38540349736) 11/11 SUCCESS | 실제 독립 Root/재사용 방지 영속원장·운영 인가 아님 |
-| **5 — Windows Docker Acceptance** | 정확한 환경/양쪽 SHA·Node/Compose·선행 단계 전체 PASS·fail-closed·project-scoped 컨테이너/네트워크/볼륨 잔존 0·종료코드 | **사용자 제출 Phase 4H PASS 한 줄 확보; 전체 증빙 패킷 인수 미완료** | 아래 Phase 5 증빙 항목 미확보; 로드맵 완료 선언 보류 |
+| **5 — Windows Docker Acceptance** | 양쪽 SHA·Node/Docker/Compose·선행 단계 전체 PASS·fail-closed·project-scoped 컨테이너/네트워크/볼륨 잔존 0·종료코드 | **Windows 사용자 제출 증빙 인수 PASS (2026-10-15)**; Phase 1–4H 15개 PASS, exit 0 및 cleanup 확인 | 사용자 제출 근거로 한정; OS 빌드·Docker Desktop 앱 버전 별도 미제출, 운영 Root/Runner/HOLD와 무관 |
 
-### 4A. Phase 5 — 증명 가능한 범위와 미확보 증거
+### 4A. Phase 5 — Windows 실기기 사용자 제출 증빙 인수 PASS (2026-10-15)
 
-2026-10-15 사용자가 제공한 Windows 실행 결과(전달 텍스트 원본):
+**범위 제한:** 사용자 PC의 Windows PowerShell 로컬 폐기형 Docker 검증에 대한 *제출 자료 검토 완료*이며, 별도의 원격 호스트 직접 감사·운영 Root/Runner/3-04-03B/2D-4 승인·실환경 연결 증빙은 아니다.
 
-```text
-[saju-bridge] Phase 4H PASS: cross-run replay, inconsistent same-run evidence, reused synthetic semantics and stale claims all remain HOLD; no persistent registry or permissions.
-```
+| 인수 항목 | 2026-10-15 확인 근거 |
+|---|---|
+| Windows 로컬 호출 | 사용자 PowerShell 실행: `node scripts/local/verify-saju-bridge-docker-local.mjs --replay-review ../Saju-bridge-verify` |
+| MyeongHa HEAD | 사용자 실행 후 `git rev-parse HEAD` → `2ddb1d4fe3f7101244ee3a628b2d1a6a7f6bc1f5` (문서 갱신 PR #2097 squash). `git status --porcelain`: `?? saju-phase5.log`만 보고; **추적 코드 수정 없음**, 로그는 미추적 로컬 산출물 |
+| Saju 검증 checkout HEAD | 사용자 실행 후 `git rev-parse HEAD` → `cd0acf9abd447826ccaefba56112d046e560ee04`; `git status --porcelain` 출력 없음 |
+| 로컬 버전 | Node.js `v24.20.0`, Docker Engine/CLI `29.8.2` (build `7fc2dff`), Docker Compose `v5.5.1`; 정확한 Windows OS 빌드 및 Docker Desktop GUI 배포 버전은 **별도 확인하지 않음** |
+| 전체 검증 증거 | 사용자가 전달한 `saju-phase5.log` (PowerShell `Tee-Object`, UTF-16 LE, 630 physical lines, SHA-256 `6f9a42d407897f89a26a9d0be31f1bbb722bd7d2058d5b9cd7dbb651a4b500e6`); 원본 파일 자체는 Git에 업로드하지 않음 |
+| 단계별 결과 | 종료 요약의 Phase **1, 2, 2B, 3A, 3B, 4A, 4B, 4C-1, 4C-2, 4C-3, 4D, 4E, 4F, 4G, 4H** = 모두 **PASS** (15개). 실제 PostgreSQL 중단/재시작/COMMIT SIGKILL, Docker client-only network partition, 영속 상태 판정 및 fail-closed HOLD 관찰 |
+| 정리·종료 | 로그에 해당 실행별 컨테이너·네트워크·볼륨 개별 `Removed` 및 `Project containers, network and volumes: fully removed.`; 사용자 별도 `$LASTEXITCODE` 출력 `0` |
+| 비차단 표기 | 로컬 PowerShell stderr 래핑으로 `NativeCommandError`가 앞부분 Docker Compose `Creating` 진행 메시지에 나타남. 최종 결과·정리에 실패 흔적이 없고 exit 0 보고됨. 오작동으로 오인하지 않음 |
+| 출처 한계 | SHA/상태/버전/종료코드는 **테스트 직후 사용자 제출 텍스트**이며 로그 안에 자체 서명·호스트 원격 증명으로 함께 봉인된 것은 아님. 테스트 전체 내용과 해시는 제출 파일 직접 확인. 운영 신뢰 또는 R01–R14 attestation 주장 금지 |
 
-- **코드 경로 확인:** `--replay-review`는 선행 1/2/2B/3A/3B/4A/4B/4C-1/4C-2/4C-3/4D/4E/4F/4G를 선택한다. 현행 실행기는 `finally`에서 `down --volumes --remove-orphans` 및 해당 프로젝트의 컨테이너·볼륨·네트워크 잔존 0 확인을 통과하고 `failure`가 없을 때만 Phase 4H PASS 문구를 출력한다. **단, 제출된 한 줄로 해당 실행 전체의 출력·종료코드·출처/환경을 독립 검증할 수는 없다.**
-- **GitHub에서 독립 확인:** PR #2092의 HEAD `2be8c6e5de3d8fa8d7378e752b86200e6485fc75`, squash `939626e5597fd8d0970784e141da493f0f7ec24a`, Docker run `38539255532` SUCCESS, 전체 통합 run `38540349736` **11/11 SUCCESS**. Linux 결과를 Windows 결과로 대체하지 않는다.
-- **사용자 로컬에서 아직 확인되지 않은 메타데이터:** 실제 사용한 MyeongHa HEAD·working tree cleanliness, 검증 전용 Saju HEAD와 cleanliness(요구 SHA `cd0acf9abd447826ccaefba56112d046e560ee04`), Node 24 정확 버전, Windows/Docker Desktop/Compose 버전, 전체 1–4H stdout·stderr, 종료코드, 최종 정리 문자열 및 실제 잔존 리소스 조회.
-- **인수용 최소 비밀 없는 증빙:** `git rev-parse HEAD`/관련 `git status --porcelain` 양쪽, `node --version`, `docker version`/ `docker compose version`, `--replay-review` 실행 전체의 민감값 제거 로그 및 `$LASTEXITCODE`, 마지막 `Project containers, network and volumes: fully removed.`와 전 단계 PASS/HOLD 출력. 다른 Docker 프로젝트는 점검·삭제하지 않는다.
-- 이 메타데이터가 없다면 **Windows Phase 4H 결과=USER_REPORTED_PASS / Phase 5 Acceptance=NOT_FULLY_EVIDENCED**. 검증기 구현이나 Linux 병합 완료를 취소하는 뜻이 아니다. 필요한 증빙 수집을 위해 새 Phase 4I나 새로운 합성 신뢰 엔진을 만들지 않는다.
-- **종료 판정 C:** Windows 인수 증거 및 외부 운영 인가 대기. `stagingAdmission=HOLD`, `stagingConnection=NOT_VERIFIED`, `operationalEvidence=NOT_VERIFIED`, `canRunOnce/canExecute/canPublish/canSell=false`, `automaticRetry/automaticCompensation=false`.
-
-**Phase 1과 Phase 5를 혼동하지 않는다.** Linux PASS, 사용자 제공 PASS 문자열, 완결된 환경/정리 로그, 외부 운영 인가는 서로 다른 증거 등급이다.
+- **Windows Phase 5 결과:** `USER_SUBMITTED_LOCAL_ACCEPTANCE_PASS` — 인수 대상인 일회용 로컬 Docker 실행, fail-closed 검사, 전 단계 PASS, cleanup, 종료코드와 사용 코드 버전을 확인했다. OS 빌드·Docker Desktop GUI 버전의 별도 메타데이터 공백은 기록하되 **전체 폐기형 테스트 재실행을 요구하지 않는다**. 향후 호스트 출시/상호운용성 문제 발생 시에만 해당 메타데이터를 수집한다.
+- 독립 근거: [Phase 4H #2092](https://github.com/gycha0109-beep/MyeongHa/pull/2092)의 [Docker CI #38539255532](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38539255532), [full CI #38540349736](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38540349736). 사용자 제출 이력: [Issue #1871](https://github.com/gycha0109-beep/MyeongHa/issues/1871) Windows 로그 인수 코멘트. GitHub CI 자체를 Windows 실기기 증거로 대체하지 않는다.
+- **운영 게이트는 그대로 미완료:** `stagingAdmission=HOLD`, `stagingConnection=NOT_VERIFIED`, `operationalEvidence=NOT_VERIFIED`, `canRunOnce/canExecute/canPublish/canSell=false`, `automaticRetry/automaticCompensation=false`. Root/key custody, R01–R14 운영 확인, 3-04-04, 2D-4는 별도 사전 승인·증빙 필요. Phase 4I 또는 추가 합성 Phase 생성 금지.
+- **종료 판정:** Windows 로컬 acceptance 인수 **A 완료** / 실제 운영 완료는 **C 외부 승인·증빙 대기**.
 
 ## 5. 기술 위험 및 검증 범위
 
