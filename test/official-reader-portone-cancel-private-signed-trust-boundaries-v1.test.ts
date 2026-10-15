@@ -868,8 +868,8 @@ describe('Offline restart-safe persisted cancellation-policy watermark (no LIVE 
       await expect(a.execute({permit})).rejects.toThrow('policy changed');
       // A separately booted OLD process must refuse the new revision even
       // though its own in-memory sequence is still at 1.
-      await expect(b.execute({permit})).rejects.toThrow('watermark rejected');
-      await expect(d.boot(d.port())).rejects.toThrow('watermark rejected');
+      await expect(b.execute({permit})).rejects.toThrow('policy changed');
+      await expect(d.boot(d.port())).rejects.toThrow('policy changed');
       // A new independently root-verified policy can bootstrap safely on the
       // *current* epoch without a storage reset or network call.
       const newProcess=await d.boot(d.port(),{
@@ -975,9 +975,9 @@ describe('Offline restart-safe persisted cancellation-policy watermark (no LIVE 
   it('missing durable port is refused by restart-safe factory even with valid signed token',async()=>{
     const d=durableRig();
     try{
-      await expect(d.boot(undefined as never,{
+      expect(()=>d.boot(undefined as never,{
         durableWatermark:null,
-      })).rejects.toThrow('durable monotonic authority');
+      })).toThrow('durable monotonic authority');
       expect(d.f.store.commitAuthorizedReview).not.toHaveBeenCalled();
     }finally{d.cleanup()}
   });
