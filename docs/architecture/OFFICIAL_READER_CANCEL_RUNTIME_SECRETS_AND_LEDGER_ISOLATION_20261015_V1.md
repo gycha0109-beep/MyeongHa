@@ -45,3 +45,9 @@
 5. DBA/보안/Commerce/Legal/Privacy/Ops가 권한 변경, 관리자 비밀키 수탁, 감사 로그, 정상 동작·롤백 결과와 배포 범위를 각자 확인하고 **명시적으로 승인하기 전에는 운영 권한 변경·코드 병합·배포·실결제 실행 금지**.
 
 **현재 결론: 전용 로그인 계정의 존재와 코드상 연결 정책은 확인. 실제 Vercel 환경변수 접근은 403으로 미확인. service_role 운영 DML 격리와 실서비스 무손상 보증은 HOLD.**
+
+## D3e23 보충 실사 — 단일 원장 외의 공용 계정 쓰기 경로
+
+연결된 MyengHa PostgreSQL의 읽기 전용 pg_catalog 실사에서 `service_role`의 직접 INSERT/UPDATE/DELETE 유효 권한을 가진 7개 중요 테이블을 확인했습니다. `commerce_account_links`, `commerce_provider_events`, `commerce_receipts`, `entitlement_events`, `entitlement_grants`, `entitlements`, `purchase_intents`입니다. 각 테이블은 현재 RLS 비활성화 상태입니다. REST API 노출 여부와 실제 키 사용자는 미확인입니다. **이용권 기록 1개 테이블의 권한만 축소해선 전체 우회 경로가 차단되지 않습니다.**
+
+자세한 실측과 3개 독립 구매·취소 복제 시험 계획: [OFFICIAL_READER_CANCEL_SEVEN_TABLE_SERVICE_ROLE_ACL_READINESS_20261015_V1.md](OFFICIAL_READER_CANCEL_SEVEN_TABLE_SERVICE_ROLE_ACL_READINESS_20261015_V1.md). 테스트 환경에만 적용하며, 실제 운영 설정과 DB 권한은 변경하지 않습니다.
