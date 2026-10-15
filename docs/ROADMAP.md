@@ -65,11 +65,13 @@
 |---|---|---|---|
 | **COST-01** | 현재 5회/3회 호출 그래프 + 조건부 2회/압축·캐시 3회 대안 및 잠금 점검 | [정적 구조 감사·실측/미측정 분리](character-memory-seyeon-cost-architecture-c01-c02-offline-2026-10-15.md), 5/3/2 실험 파일, 정확한 SHA CI 근거 | **STATIC AUDIT DONE (CI #38669315810); P0 전체 HOLD** |
 | **COST-02** | 무료 회귀: 통합 분류 → 독립 권한 Resolver, 통합 Interpreter/Renderer → Semantic+Output Guard, 최소 300건(민감질문/허위 Memory 포함)에서 비인가 누락 0 | 기존 Gold 100개 + 새로 쓴 문장 200개 = **서로 다른 300개**의 기대 라벨을 Fake Provider로 실제 Preflight/Resolver에 주입하여 두 분류 경로를 비교. [실행/한계 상세](character-memory-seyeon-cost-c02-300-gold-preflight-audit-v1.md); 실제 모델의 분류 누락·오탐, 세연다움, 적응형 2회 안전성은 **미검증** | **PARTIAL / 무과금 통합 Guard 후보 구현, 실모델 검증 OPEN/HOLD** |
-| **COST-03** | 세연다운 자연스러움 검증: 다중 턴 대화, 첫 인사/속도/상태/취향/관계 변화/반복, 실제 Memory 없이 가능한 공개 컨텍스트부터 | 고정된 블라인드 평가 rubric, 기준/후보 품질 비열등성 및 장기 일관성 결과; 실패 케이스 기록 | **OPEN** |
+| **COST-03** | 세연다운 자연스러움 검증: 10·20·30턴 공개·무개인출처 다중 턴, 첫 인사/상대 속도/의견 충돌/관계 허위 주장/반복 | [COST-03 설계·중단 조건](character-memory-seyeon-cost-c03-multiturn-voice-2026-10-15.md) · 60턴 합성 고정 입력, 5회/3회 X/Y 블라인드 패킷, 평가자 2명×2경로×60턴=240셀, 7개 차원/하드위반 기준/중복·누락 HOLD; 실제 응답·인간평가·비열등성 **미측정** | **PARTIAL: 무과금 평가 체계 후보 구현 / 실모델·Canon Authority 드리프트·인간평가 HOLD** |
 | **COST-04** | 토큰/실패·추정 비용 최적화: 프롬프트 중복·역할별 출력 상한·컨텍스트 크기·캐시/추론토큰; 품질/권한 게이트 유지 | 정확한 요청별 call count/input/cached/output/reasoning/실패·재시도·예상비용 계측 및 비교 증거 | **OPEN** |
 | **COST-05** | 비용 사고 재개 조건 검토: 예산 정책·모델/토큰 공식 단가·Provider 사용량 불명 보수 정산·kill switch·Provider outcome durability·별도 DB 로그인·운영 #1887 | 비용/Security/Ops 승인된 **별도 PR**과 재개 범위/최대 예산/kill switch 문서, 없으면 HOLD | **BLOCKED: 승인 필요** |
 | **COST-06** | 승인 후에만 16건/다중 턴/4-cell A(5/V1) B(5/V2) C(3/V1) D(3/V2) 유료 평가 설계 검토 및 수행 | 동일 입력/모델 snapshot/요금표, 재시도 0, 개별·총액 상한, 실제 비용·P50/P95·승인율·보안/자연스러움 비열등성, 정확한 실행 URL | **BLOCKED: COST-05** |
 | **COST-07** | 5→3 경로 최종 선택 후 명시적 Stage/Canary·롤백 계획 작성 | 사용자 응답의 무단 권한 침해 0, 품질·비용 비열등성, 운영 Owner 승인·정확한 SHA/배포/비용 관측 | **BLOCKED: COST-02~06** |
+
+**COST-03 추가 차단:** 현행 Bible v0.2의 사실·공개 깊이 Source Authority와 서버 Projection/Fact Registry에 미동기화 차이가 존재한다. Character/DB Owner가 소스 해시·정의한 Fact Key와 ACL 차이를 승인하기 전 실제 Character 캐논 비교/3회 Production 승격 불가. 보수적 이중 분류 불일치 HOLD 후보는 결과가 일치해도 권한 승인하지 않으며, 모델 호출 추가 비용도 별도 측정 필요. [근거](character-memory-seyeon-cost-c03-multiturn-voice-2026-10-15.md).
 
 **COST-01 정적 검증 기준:** [CI #38669315810](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38669315810) · [Governance #38669315492](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38669315492) · [Web #38669315625](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38669315625) 모두 성공. 구조 평가 7개 단위 테스트와 300건 변형 라우팅 검사 통과. 이 결과는 2회 모델 실행·300건 모델 분류·캐릭터 품질·유료 비용 검증이 **아니며**, COST-02~07은 그대로 OPEN/HOLD. 문서 갱신 후 최종 HEAD의 CI 결과는 별도 확인.
 
@@ -85,7 +87,9 @@ npx vitest run \
   test/seyeon-inference-efficiency-phase1.test.ts \
   test/seyeon-provider-output-budget-candidate-v1.test.ts \
   test/seyeon-cost-architecture-offline-v1.test.mjs \
-  test/seyeon-cost-c02-authority-and-review-offline-v1.test.ts
+  test/seyeon-cost-c02-authority-and-review-offline-v1.test.ts \
+  test/seyeon-cost-c03-multiturn-blind-offline-v1.test.mjs \
+  test/seyeon-cost-c03-character-source-parity-v1.test.ts
 ```
 위 명령은 유료 실측 결과를 생산하지 않는다. 오프라인 차단 확인/코드 기반 효과 점검용이다.
 
@@ -123,8 +127,9 @@ npx vitest run \
 
 1. **[COST-01 정적 감사 DONE / 2026-10-15]**: [5회/3회/2회 구조 재평가](character-memory-seyeon-cost-architecture-c01-c02-offline-2026-10-15.md), `scripts/seyeon-cost-architecture-offline-v1.mjs`, `test/seyeon-cost-architecture-offline-v1.test.mjs`를 정확한 HEAD CI로 검증한다. v3 실행 Artifact 증거는 없으면 `UNVERIFIED` 유지. **2회는 모델 실행 불가능한 설계 가설**이다.
 2. **[COST-02 무과금 본검증 부분 구현 / NEXT 실모델 의미 분류]**: 100개 기존+200개 신규 수작업 시나리오 총 300개를 실제 서버 Guard로 연결했으나 **모델 출력은 골드로 결정된 합성 값**이다. 분류 false-negative → Owner 조회 미실행 및 false-positive → 불필요한 HOLD를 재현했다. 이 블로커가 해소되기 전 2회 최적화 또는 고정 3회 운영 전환 금지. 승인 전 유료 실모델 평가 금지. 별도의 모델 분류 누락/오탐·실제 캐릭터 품질 지표와 재발방지 설계 필요.
-3. **COST-03~04**: 토큰 중복·호출 횟수·비용 계측과 품질 개선을 반복한다. 무과금 검증만 수행한다.
-4. **COST-05 차단 해소 요청**: 비용 사고·예산/kill switch·정산 영수증·G0 및 #1887 의존성을 증거화해 승인 전 유료 워크플로를 절대 재개하지 않는다.
+3. **[COST-03 무과금 평가 체계 후보 구현 / NEXT 원본 Authority 정합성 및 실제 품질]**: 10·20·30턴 총 60개 수작업 공개 시나리오와 블라인드 두 평가자 240셀 채점 구조를 만들었다. 현재 세연 Bible v0.2 Author Register의 여러 CANON 필드와 서버 `seyeon-fact-authority-v1.ts`의 `AUTHOR_UNDEFINED` 및 오래된 Projection/Runtime SHA가 충돌한다. Author/Character/DB Owner 승인 없이 자동 동기화하지 않는다. 실제 답변 생성·모델 오류율·인간 자연스러움 평가는 **NOT_RUN/HOLD**. [상세](character-memory-seyeon-cost-c03-multiturn-voice-2026-10-15.md).
+4. **[NEXT 무과금] COST-04 준비**: 동일 품질 보전 전제에서 stage별 프롬프트 중복·캐시·출력 토큰/추론비·오류/재시도 비용을 정적 계산한다. **실제 요금 절감은 주장 금지**. Character Authority 불일치·모델 판정 누락 완화는 P0 차단으로 병행한다.
+5. **COST-05 차단 해소 요청**: 비용 사고·예산/kill switch·정산 영수증·G0 및 #1887 의존성을 증거화해 승인 전 유료 워크플로를 절대 재개하지 않는다.
 5. P0 평가가 종료 조건에 미달하면 **HOLD를 숨기지 않는다**. 이전 작업은 P1에서 재개하되 비용 최적화를 “완료”로 보고하지 않는다.
 
 **완료 보고 템플릿:** `대상 / 기준 브랜치·정확한 SHA / 변경 파일 / 실측 또는 무과금 검증 / PASS·FAIL·HOLD / 남은 게이트 / 다음 명령`. `CI green`만으로 비용 최적화 Done 금지.
