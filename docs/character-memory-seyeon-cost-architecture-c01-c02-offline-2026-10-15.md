@@ -18,6 +18,17 @@
 
 **중요한 범위 차이:** 성공 시 5/3회란 **전면 대화 주요 모델 호출 수**이지, Post-turn 사건 추출, 공식 input-token counting, 실패 응답/모호한 재시도/미정산 Provider Event까지 포함한 *실제 세션 총비용*이 아니다. 비용 비교에는 후속 작업까지 별도 열을 둬야 한다.
 
+### main 대비 코드 정합성 (2026-10-15 점검)
+
+GitHub Compare `main...feat/seyeon-offline-granted-turn-consent-gates-v1`는 **DIVERGED**, branch가 main보다 **146 commits ahead / 56 commits behind**, merge-base `0a2b2362d2d47b1827d7c9dd40553ad1d81c6841`로 보고되었다. 다만 아래 **비용 구조 핵심 4개 파일은 현재 main과 이 Draft PR에서 blob SHA가 정확히 동일**했다:
+
+- `apps/api/src/production-seyeon-chat-runtime-v1.ts`
+- `apps/api/src/seyeon-character-runtime-v2.ts`
+- `apps/api/src/seyeon-fast-dialogue-shadow-v1.ts`
+- `apps/api/src/seyeon-unified-governance-candidate-v1.ts`
+
+따라서 현재 호출 그래프 정적 분석은 이 네 파일에 한해 양쪽 일치하지만, **PR 병합/최종 운영 전 반드시 main 56개 신규 커밋과 재검증**해야 한다. 기존의 production Cost/Schema/Workflow 상태를 코드 유사성만으로 추정하지 않는다.
+
 ## 2. 대안 간 엄격한 비교
 
 | 평가 축 | 기준 5회 | 통합 3회 | 조건부 2회 후보 | 압축/캐시 3회 |
