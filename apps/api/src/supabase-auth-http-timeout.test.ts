@@ -4,7 +4,7 @@ import { SUPABASE_AUTH_UPSTREAM_DEFAULT_TIMEOUT_MS_V1 } from './supabase-auth-up
 
 const env = {
   MYEONGHA_SUPABASE_URL: 'https://cnsfpcdiyofqvhpcegfc.supabase.co',
-  MYEONGHA_SUPABASE_API_KEY: 'test-publishable-key-that-is-long-enough',
+  MYEONGHA_SUPABASE_API_KEY: 'sb_publishable_synthetic_auth_regression_key_1234567890',
 };
 const clearPasswordGuard = Object.freeze({
   async check() {
