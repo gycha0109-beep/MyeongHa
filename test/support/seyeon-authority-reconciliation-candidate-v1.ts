@@ -60,7 +60,7 @@ export function inspectSeyeonAuthorityReconciliationCandidateV1(input: {
     if(!/^\|\s*`[a-z0-9_.]+`\s*\|/u.test(line))continue;
     const tokens=line.trim().split('|').slice(1,-1).map(cell);
     if(tokens.length!==7) throw new TypeError('Invalid authored fact appendix row');
-    const [factKey,value,sourceAuthority,characterKnowledge,disclosureDefault,section,closureNote]=tokens;
+    const [factKey,value,sourceAuthority,characterKnowledge,disclosureDefault,section,closureNote]=tokens as [string,string,string,string,string,string,string];
     if(values.has(factKey))throw new TypeError('Duplicate authored fact key');
     values.set(factKey,value);
     if(sourceAuthority==='RUNTIME_DEPENDENT' || disclosureDefault==='DYNAMIC'){
@@ -99,7 +99,7 @@ export function inspectSeyeonAuthorityReconciliationCandidateV1(input: {
       }),
       entries:Object.freeze(entries),
     }));
-  const old=new Map(SEYEON_FACT_AUTHORITY_REGISTRY_V1.entries.map(e=>[e.factKey,e]));
+  const old=new Map<string,CharacterFactAuthorityEntryV1>(SEYEON_FACT_AUTHORITY_REGISTRY_V1.entries.map(e=>[e.factKey,e]));
   const reviewRows:SeyeonAuthoringReviewRowV1[]=entries.map(entry=>{
     const previous=old.get(entry.factKey);
     const difference=previous===undefined?'MISSING_IN_SERVER_REGISTRY':
