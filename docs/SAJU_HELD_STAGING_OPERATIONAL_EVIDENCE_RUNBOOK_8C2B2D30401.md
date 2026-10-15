@@ -33,6 +33,27 @@ Watchtower-Track: saju-bridge
 7. 하나의 API/CI/AI/workload 신원이 자체 승인·자체 증빙·자체 실행을 모두 수행하지 못하도록 권한을 분리한다. break-glass는 실행 승인이 아닌 중지·복구 전용이다.
 8. 증빙 확보 전까지 `StagingTargetAuthorityPortV1`의 Proof Origin → Boolean 계약을 실제 Target Authority로 재사용하지 않는다.
 
+## 2A. 2026-10-15 SO-3 운영 준비 진입 — 무권한 결정 게이트
+
+**이번 진입의 실제 범위:** Windows Phase 5 로컬 인수 완료(#2103)를 선행 사실로 고정하고, 1인 Owner/SO-3의 **운영 관리 평면 선정·사전 승인에 필요한 결정을 접수**한다. 이는 기존 단계 `3-04-02(D)`를 시작하기 위한 준비이며 신규 합성 Phase·실환경 운영 완료 선언·승인 발급이 아니다. 사용자 지시만으로 P2/P3/P4의 행위별 재인증·예산·환경 식별·권한 승인에 갈음하지 않는다.
+
+| 결정 게이트 | 실제 필요한 비밀 아닌 결정/근거 | 진입 시 상태 및 차단 조건 |
+|---|---|---|
+| **S01 — 격리 환경/운영 계정** | 이용할 클라우드/보안 계정의 종류, Staging 식별자, Production과의 계정·프로젝트·네트워크·데이터·IAM 분리 방식, 승인 책임 Owner | **미선정/NOT_VERIFIED.** Production 자격 재사용 금지 |
+| **S02 — Owner 인증·복구** | P2/P4 행위별 피싱 저항 인증 수단, 재인증/복구 경로, 권한 변경 감사, 사고 시 즉시 정지 책임 | **미실증/HOLD.** 채팅 지시·로그인·PR 병합은 행위별 인증이 아님 |
+| **S03 — Root/Registry custody (R01/R02)** | 앱·CI와 분리된 비반출 Root 관리 제공자/보안 계정, pin 출처, durable revision high-water·철회/백업 복구·독립 조회·감사 보관 방식 | **미선정/NOT_VERIFIED.** 임의 테스트 Root·자체 제출 pin 승인 금지 |
+| **S04 — Operator/Challenge/Attestor (R03/R04)** | Sign 전용 신원과 read-only attestor의 서비스 계정·키 용도 구분, permit-scoped one-time ledger·재사용 차단·감사 경로 | **미선정/NOT_VERIFIED.** 같은 서비스 신원에 승인·관측·실행 권한 집중 금지 |
+| **S05 — 증빙·비용·폐기** | R01–R14 저장 위치(원본은 제한 보관), 보존 기간·변조 방지/복구, 리허설 기한·폐기 시각, 공급자별 요금/월·사용량 상한, 별도 비용 승인 | **미결정/HOLD.** 유료 리소스/계정/키/저장소 생성 금지 |
+| **S06 — 범위 고정/실접속 (R05–R14)** | Auth 프로젝트, 3개 DB, Saju Proof의 비밀 아닌 대상 ID 및 두 배포 SHA·Manifest/Plan digest, 읽기 전용 probe 권한/기한 및 Owner의 별도 승인 | **미결정/NOT_VERIFIED.** 실제 자격증명·접속/DB GRANT/HTTPS 배포 금지 |
+
+- **실행 순서:** (1) S01–S05의 공급자·비용·인증/보안 분리 안을 Owner가 검토한다 → (2) 승인된 정확한 변경 요청에 한해 별도 재인증·예산 상한·감사/중단 경로 확정 → (3) `3-04-02(D)`에서 **R01–R04** 실제 관리 평면/Root·Signer·Registry Floor/Challenge provenance를 독립 조회로 실증 → (4) 추가 범위 승인 후 `3-04-03B`의 **R05–R14** 실제 출처 조사 → (5) `3-04-04` 실행 전 신뢰 게이트 검증 → (6) **또다른 P3 승인**을 받은 경우에만 `2D-4` 단회 격리 리허설 검토.
+- **지금 즉시 허용된 작업:** 비밀 없는 보안 제공자 비교, 기존 소스/문서/합성 테스트·CI 검토, 사전 변경 요청/증빙 수집 양식 작성, 중단·복구·예산 설계. 현재 제출된 Windows 로컬 Docker 결과는 **운영 R01–R14**가 아니다.
+- **Owner 승인 요청에 포함할 구체 항목:** 대상 환경/계정 식별자, 액션 분류(P1/P2/P4 등), 특정 작업(읽기 전용 조회/신규 리소스 생성/키 등록/GRANT), 기간·폐기 시각, 최대 요금, 인증/감사 출처, 실패 시 수동 중단·복구 방법. 중요 작업은 대상·scope를 고정한 후 행위별 재인증 필요. 이 표의 작성만으로 승인됐다고 기록하지 않는다.
+- **비밀 보호:** private key, JWT, DB URL·비밀번호, CA PEM 원문, Subject/Birth, Root 복구 자료는 GitHub 문서/Issue/채팅에 붙이지 않는다. 본 문서에는 비밀 아닌 근거 링크·digest·상태만 기록한다.
+- **중단 규칙:** 미선정·비용 미승인·관리자 신원 미증명·Root/권한 혼합·auditing 불능·drift·외부 프로브 접근 미허가·COMMIT 불명확은 **HOLD**이며 어떠한 자동 재시도/보상/Runner 연결도 허용하지 않는다.
+
+**진입 판정:** `SO3_PREPARATION_STARTED_P0` / `SO3_OPERATIONAL_ADMISSION_NOT_APPROVED` / `R01_R14_NOT_VERIFIED`. P1 read-only 최초 접속조차 Owner의 별도 범위 승인을 받기 전에는 수행하지 않는다. 모든 기존 `stagingAdmission=HOLD`, `stagingConnection=NOT_VERIFIED`, `operationalEvidence=NOT_VERIFIED`, `canRunOnce/canExecute/canPublish/canSell=false`, `automaticRetry/automaticCompensation=false` 유지.
+
 ## 3. 필수 Evidence 항목과 신뢰 가능한 출처
 
 | ID | 증빙 | 독립 관찰·승인 출처 | 실패 시 |
