@@ -1,4 +1,11 @@
 import {
+  advanceOfflinePrivateCancelDurableEpochV1,
+  createOfflinePrivateCancelDurableEpochExecutorV1,
+  offlinePrivateCancelDurableEpochGenesisFixtureV1,
+  type PrivateCancelDurableEpochWatermarkV1,
+} from '../apps/api/src/official-reader-portone-cancel-private-durable-epoch-executor-v1.js';
+
+import {
   generateKeyPairSync,randomUUID,sign as edSign,
   type KeyObject,
 } from 'node:crypto';
@@ -766,13 +773,6 @@ describe('D3e16 independently signed current-policy epoch fence (OFFLINE ONLY)',
   });
 });
 
-import {
-  advanceOfflinePrivateCancelDurableEpochV1,
-  createOfflinePrivateCancelDurableEpochExecutorV1,
-  offlinePrivateCancelDurableEpochGenesisFixtureV1,
-  type PrivateCancelDurableEpochWatermarkV1,
-} from '../apps/api/src/official-reader-portone-cancel-private-durable-epoch-executor-v1.js';
-
 /** Atomic, serializable IN-MEMORY TEST FIXTURE with shared lifetime across
  * "restarted" executor instances. Not independent anti-rollback storage.
  */
@@ -948,16 +948,16 @@ describe('D3e17 restart-persistent shared epoch fence (OFFLINE/NO LIVE)',()=>{
     expect(f.store.commitAuthorizedReview).not.toHaveBeenCalled();
   });
 
-  it('pure transition rejects arbitrary/corrupt prior state, not caller-chosen genesis',()=>{
+  it('pure transition rejects arbitrary/corrupt prior state, not caller-chosen genesis',async()=>{
     expect(()=>advanceOfflinePrivateCancelDurableEpochV1(
       {sequence:100},{} as never,'0'.repeat(64),NOW,
     )).toThrow('missing or corrupt');
     const f=rig(),e=epochRig(f);
-    expect(()=>createOfflinePrivateCancelDurableEpochExecutorV1({
+    await expect(createOfflinePrivateCancelDurableEpochExecutorV1({
       signedPolicy:f.envelope,pinnedRoot:f.pin,
       pinnedEpochSigner:e.pin,readCurrentEpoch:e.source,
       trustedClock:f.clock,testStore:f.store,
       durableStore:{} as never,
-    })).toThrow; // async bootstrap is covered by missing-store branch below
+    })).rejects.toThrow('separately trusted boot');
   });
 });
