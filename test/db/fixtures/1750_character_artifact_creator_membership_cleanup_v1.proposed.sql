@@ -26,9 +26,10 @@ $guard$;
 revoke myeongha_character_reading_artifact_runtime_owner from current_user;
 do $verify$
 begin
- if pg_catalog.pg_has_role(current_user,
-       'myeongha_character_reading_artifact_runtime_owner','MEMBER')
-    or exists (select 1 from pg_catalog.pg_auth_members
+ -- A PostgreSQL superuser can report pg_has_role(..., 'MEMBER')=true
+ -- without a direct pg_auth_members edge. Only revoke the exact explicit edge;
+ -- do not claim to restrict a superuser's inherent effective privileges.
+ if exists (select 1 from pg_catalog.pg_auth_members
        where roleid='myeongha_character_reading_artifact_runtime_owner'::regrole
          and member=current_user::regrole)
     or pg_catalog.has_schema_privilege(
