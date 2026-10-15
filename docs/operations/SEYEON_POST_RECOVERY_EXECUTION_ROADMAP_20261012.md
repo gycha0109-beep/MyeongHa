@@ -373,3 +373,9 @@ Governor 04d4B 계열은 실제 격리 PostgreSQL 기반 영수증 임대·정�
 - 다음 1710 원본 `1d0e773a8e8b27474a0fde182d75433077d8add8` 불변. 검토 인벤토리의 `requires`만 `['1550','1580','1630','1690','1700']`으로 보정. 기존 PG17 CI 일회용 DB에 원본 1690 COMMIT과 1700을 선행 적용한 후, 원본 1710 롤백 및 Forward 재생·Queue/RLS/FK/Owner/Store-Claim-Ack 분리 ACL·Role cleanup을 검증한다.
 - `outcome`/`costStatus` 필수 Enum 필드가 누락되었을 때 SQL `NOT IN` 조건이 UNKNOWN으로 평가되는 **잠재 malformed receipt admission**을 독립 진단한다. 전체 실제 Ledger 예약·Store·Claim·Settle·Ack E2E, 액터 간 경합/Provider 송신/운영 Actor 증명은 **미수행**이므로 별도 Owner 승인 전에는 절대로 큐/AI/유료/Reader를 활성화하지 않는다.
 - 범위와 HOLD의 세부 정본은 [R2 패킷 §30](SEYEON_MIGRATION_LINEAGE_R2_READONLY_PACKET_20261013.md). 실제 PG17 결과·PR Full Integration·병합 기록은 후속 측정 없이 성공으로 간주하지 않는다.
+
+### 32.1 1710 PG17 실제 증거 — Worker ACL 분리 PASS / Enum NULL Owner HOLD
+
+- [PR #2108](https://github.com/gycha0109-beep/MyeongHa/pull/2108), 기술 HEAD `6376f7eaf42f4881382cf0d2034f449c7e1aab25`, [PG17 CI #38687231433 job 116264893185](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38687231433) SUCCESS. 원본 1690 COMMIT/1700 이후 1710 Rollback, 1710 원문 Forward, Queue FK/FORCE RLS/Cost Owner, Store/Claim/Ack 실행 Role 분리, public/browser/service 직접·Queue DML 거부, 임시 권한 청소, Replay fail-closed 및 disposable DB 폐기 PASS.
+- **`HOLD_R2_H_1710_MISSING_REQUIRED_ENUM_SQL_NULL_DIAGNOSTIC`**: `outcome`/`costStatus` 필드가 빠졌을 때 SQL `NOT IN`은 UNKNOWN으로 판정됨을 PG17에서 관찰. 실제 본문 함수가 malformed Provider 결과를 영속 저장했다고 단정하지 않는다. NULL-safe 권한 정책/실 저장 RPC 부정 E2E, Claim/Ack 경합, 실제 예약 비용 정산은 Owner 후속 별도 결재 필요. 상세 증거와 한계는 [R2 패킷 §30.1](SEYEON_MIGRATION_LINEAGE_R2_READONLY_PACKET_20261013.md).
+- 이 PG17 PASS는 전체 CI/Full Integration 또는 운영 변경 승인 아님. 1700 기존 Receipt CHECK 결함, 1710 필수 Enum 검증 의문, 기존 모든 Owner HOLD/G0~G6 paid/public OFF, DR Ready=false 유지.
