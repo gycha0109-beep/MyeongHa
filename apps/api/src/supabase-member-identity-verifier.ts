@@ -1,3 +1,4 @@
+import { isLeastPrivilegeSupabaseAuthApiKeyV1 } from './supabase-auth-api-key-least-privilege.js';
 import type { IdentityEvidenceVerificationPortV1 } from './current-subject-profile-http.js';
 import {
   fetchSupabaseAuthWithDeadlineV1,
@@ -91,7 +92,14 @@ function requireApiKey(value: unknown): string {
       'Supabase Member verifier API key is missing or invalid.',
     );
   }
-  return value.trim();
+  const normalized = value.trim();
+  if (!isLeastPrivilegeSupabaseAuthApiKeyV1(normalized)) {
+    throw new SupabaseMemberIdentityVerifierErrorV1(
+      'SUPABASE_MEMBER_VERIFIER_CONFIG_INVALID',
+      'Supabase Member verifier only accepts a publishable or legacy anon API key.',
+    );
+  }
+  return normalized;
 }
 
 function requireTimeoutMs(value: number | undefined): number {
