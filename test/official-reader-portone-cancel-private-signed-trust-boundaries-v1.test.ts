@@ -873,7 +873,13 @@ describe('D3e17 restart-persistent shared epoch fence (OFFLINE/NO LIVE)',()=>{
     const f=rig(),e=epochRig(f),db=durableEpochFixture();
     const old=await durableBoot(f,e,db);
     const revision8=f.signPolicy({...f.policy,revision:8});
-    e.set(e.signEpoch({sequence:2,policyRevision:8}));
+    const policy8=verifyOfflinePrivateCancelSignedTrustPolicyV1({
+      envelope:revision8,pinnedRoot:{...f.pin,minimumRevision:8},
+      now:f.clock(),
+    });
+    e.set(e.signEpoch({
+      sequence:2,policyRevision:8,policyDigest:policy8.policyDigest,
+    }));
     const replacement=await durableBoot(f,e,db,{
       signedPolicy:revision8,pinnedRoot:{...f.pin,minimumRevision:8},
     });
