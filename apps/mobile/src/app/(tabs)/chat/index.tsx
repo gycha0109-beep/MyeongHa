@@ -21,7 +21,7 @@ export default function ChatHubScreen() {
     <MobileScreen
       eyebrow="CONVERSATION"
       title="대화"
-      description="회원은 승인된 출시 캐릭터와의 대화를 열거나 이어갈 수 있습니다."
+      description="9명의 캐릭터를 둘러보고, 로그인하면 대화를 시작하거나 이어갈 수 있습니다."
     >
       <View style={styles.card}>
         <Text style={styles.kicker}>CONTINUE</Text>
@@ -49,59 +49,61 @@ export default function ChatHubScreen() {
         ) : state.access === 'guest' ? (
           <View style={styles.guestBox}>
             <Text style={styles.note}>
-              새 대화 시작은 회원 전용입니다. 기존 계정으로 로그인한 뒤 이용해 주세요.
+              캐릭터 소개는 로그인 없이 둘러볼 수 있습니다. 대화를 시작할 때만 로그인이 필요합니다.
             </Text>
             <Pressable
               accessibilityRole="button"
               onPress={() => router.push('/my')}
               style={styles.loginAction}
             >
-              <Text style={styles.loginActionText}>마이에서 로그인</Text>
+              <Text style={styles.loginActionText}>로그인하고 대화하기</Text>
             </Pressable>
           </View>
         ) : state.access === 'error' ? (
           <Text style={styles.errorText}>{state.errorMessage}</Text>
-        ) : (
-          <View style={styles.roster}>
-            {MOBILE_CHAT_LAUNCH_ROSTER_V1.map((character) => {
-              const presentation = resolveMobileChatCharacterPresentationV1(character.characterId);
-              const opening = state.openingCharacterId === character.characterId;
-              const disabled = state.openingCharacterId !== null;
-              return (
-                <Pressable
-                  key={character.characterId}
-                  accessibilityRole="button"
-                  disabled={disabled}
-                  onPress={() => void handleOpen(character.characterId)}
-                  style={[styles.characterRow, disabled && styles.disabled]}
-                >
-                  <View style={styles.characterMark}>
-                    <Text style={styles.characterMarkText}>
-                      {character.displayName.slice(0, 1)}
-                    </Text>
-                  </View>
-                  <View style={styles.characterCopy}>
-                    <View style={styles.characterTitleRow}>
-                      <Text style={styles.characterName}>{character.displayName}</Text>
-                      <Text style={styles.characterTitle}>{presentation.title}</Text>
-                    </View>
-                    <Text style={styles.characterLine}>{presentation.openingLine}</Text>
-                    <View style={styles.characterTags}>
-                      {presentation.tags.map((tag) => (
-                        <View key={tag} style={styles.characterTag}>
-                          <Text style={styles.characterTagText}>{tag}</Text>
-                        </View>
-                      ))}
-                    </View>
-                  </View>
-                  <Text style={styles.characterAction}>
-                    {opening ? '여는 중…' : '대화 열기'}
+        ) : null}
+
+        <View style={styles.roster}>
+          {MOBILE_CHAT_LAUNCH_ROSTER_V1.map((character) => {
+            const presentation = resolveMobileChatCharacterPresentationV1(character.characterId);
+            const opening = state.openingCharacterId === character.characterId;
+            const canOpen = state.access === 'member';
+            const disabled = !canOpen || state.openingCharacterId !== null;
+            return (
+              <Pressable
+                key={character.characterId}
+                accessibilityRole="button"
+                accessibilityState={{ disabled }}
+                disabled={disabled}
+                onPress={() => void handleOpen(character.characterId)}
+                style={[styles.characterRow, opening && styles.disabled]}
+              >
+                <View style={styles.characterMark}>
+                  <Text style={styles.characterMarkText}>
+                    {character.displayName.slice(0, 1)}
                   </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-        )}
+                </View>
+                <View style={styles.characterCopy}>
+                  <View style={styles.characterTitleRow}>
+                    <Text style={styles.characterName}>{character.displayName}</Text>
+                    <Text style={styles.characterTitle}>{presentation.title}</Text>
+                  </View>
+                  <Text style={styles.characterLine}>{presentation.openingLine}</Text>
+                  <View style={styles.characterTags}>
+                    {presentation.tags.map((tag) => (
+                      <View key={tag} style={styles.characterTag}>
+                        <Text style={styles.characterTagText}>{tag}</Text>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+                <Text style={styles.characterAction}>
+                  {opening ? '여는 중…' : canOpen ? '대화 열기' : '로그인 후 대화'}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
 
         {state.errorMessage !== null && state.access !== 'error' ? (
           <Text style={styles.errorText}>{state.errorMessage}</Text>

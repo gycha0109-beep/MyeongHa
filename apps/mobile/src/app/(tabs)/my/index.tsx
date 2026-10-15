@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
 import {
@@ -10,12 +11,8 @@ import {
   MyProfileCard,
   MySectionError,
 } from '@/features/my/MyComponents';
-import {
-  MyTargetPersonCreateCard,
-  MyTargetPersonsEmpty,
-  MyTargetPersonsSection,
-} from '@/features/my/MyTargetPersons';
 import { MyPushNotifications } from '@/features/my/MyPushNotifications';
+import { nativeMobileRuntimeV1 } from '@/core/runtime/native-mobile-runtime';
 import { useMobileMemberAuthV1 } from '@/features/my/use-mobile-member-auth';
 import { useMobilePushV1 } from '@/features/my/use-mobile-push';
 import { useMobileMyV1 } from '@/features/my/use-mobile-my';
@@ -31,41 +28,46 @@ export default function MyScreen() {
     state,
     retryProfile,
     retryBirth,
-    retryTargetPersons,
-    targetPersonCreate,
-    createTargetPerson,
   } = useMobileMyV1();
   const memberAuth = useMobileMemberAuthV1();
   const mobilePush = useMobilePushV1();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [memberSessionPresent, setMemberSessionPresent] = useState<boolean | null>(null);
+
+  useFocusEffect(useCallback(() => {
+    let active = true;
+    void nativeMobileRuntimeV1.memberSession.read()
+      .then((session) => {
+        if (active) setMemberSessionPresent(session !== null);
+      })
+      .catch(() => {
+        if (active) setMemberSessionPresent(null);
+      });
+    return () => { active = false; };
+  }, []));
 
   async function reloadOwnerProjection() {
-    await Promise.all([
-      retryProfile(),
-      retryBirth(),
-      retryTargetPersons(),
-    ]);
+    await Promise.all([retryProfile(), retryBirth()]);
   }
 
   useEffect(() => {
     if (memberAuth.authRevision === 0) return;
-    void Promise.all([
-      retryProfile(),
-      retryBirth(),
-      retryTargetPersons(),
-    ]);
+    void Promise.all([retryProfile(), retryBirth()]);
+    void nativeMobileRuntimeV1.memberSession.read()
+      .then((session) => setMemberSessionPresent(session !== null))
+      .catch(() => setMemberSessionPresent(null));
   }, [
     memberAuth.authRevision,
     retryProfile,
     retryBirth,
-    retryTargetPersons,
   ]);
 
   async function handleSignIn() {
     const signedIn = await memberAuth.signIn(email, password);
     if (!signedIn) return;
     setPassword('');
+    setMemberSessionPresent(true);
     await reloadOwnerProjection();
   }
 
@@ -73,7 +75,10 @@ export default function MyScreen() {
     const result = await memberAuth.signUp(email, password);
     if (result === false) return;
     setPassword('');
-    if (result === 'authenticated') await reloadOwnerProjection();
+    if (result === 'authenticated') {
+      setMemberSessionPresent(true);
+      await reloadOwnerProjection();
+    }
   }
 
   async function handleCompleteSignUp() {
@@ -84,6 +89,7 @@ export default function MyScreen() {
     );
     if (!completed) return;
     setPassword('');
+    setMemberSessionPresent(true);
     await reloadOwnerProjection();
   }
 
@@ -96,6 +102,7 @@ export default function MyScreen() {
     const signedOut = await memberAuth.signOut();
     if (!signedOut) return;
     setPassword('');
+    setMemberSessionPresent(false);
     await reloadOwnerProjection();
   }
 
@@ -105,23 +112,10 @@ export default function MyScreen() {
       title="마이"
       description="현재 주체와 출생정보를 기준으로 명하에서 이어지는 흐름을 확인합니다."
     >
-      {state.profile.kind === 'loading' ? (
-        <View style={styles.loadingCard}>
-          <ActivityIndicator color={mobileColors.navy} />
-          <Text style={styles.loadingText}>내 정보를 불러오는 중입니다…</Text>
-        </View>
-      ) : state.profile.kind === 'error' ? (
-        <MySectionError
-          message="현재 내 정보를 불러올 수 없습니다."
-          onRetry={() => void retryProfile()}
-        />
-      ) : (
-        <MyProfileCard profile={createMobileMyProfileViewV1(state.profile.profile)} />
-      )}
-
-      {state.profile.kind === 'ready' ? (
-        <MyMemberAuthCard
-          subjectKind={state.profile.profile.subjectKind}
+      <MyMemberAuthCard
+          subjectKind={state.profile.kind === 'ready'
+            ? state.profile.profile.subjectKind
+            : memberSessionPresent === true ? 'member' : 'guest'}
           email={email}
           password={password}
           pending={
@@ -158,7 +152,21 @@ export default function MyScreen() {
           onSocialSignIn={(provider) => void memberAuth.signInWithSocial(provider)}
           onCancelSocialSignIn={() => void memberAuth.cancelSocialSignIn()}
         />
-      ) : null}
+
+
+      {state.profile.kind === 'loading' ? (
+        <View style={styles.loadingCard}>
+          <ActivityIndicator color={mobileColors.navy} />
+          <Text style={styles.loadingText}>내 정보를 불러오는 중입니다…</Text>
+        </View>
+      ) : state.profile.kind === 'error' ? (
+        <MySectionError
+          message="현재 내 정보를 불러올 수 없습니다."
+          onRetry={() => void retryProfile()}
+        />
+      ) : (
+        <MyProfileCard profile={createMobileMyProfileViewV1(state.profile.profile)} />
+      )}
 
       {state.birth.kind === 'loading' ? (
         <View style={styles.loadingCard}>
@@ -175,30 +183,6 @@ export default function MyScreen() {
       ) : (
         <MyBirthCard birth={createMobileMyBirthViewV1(state.birth.birth)} />
       )}
-
-      {state.targetPersons.kind === 'loading' ? (
-        <View style={styles.loadingCard}>
-          <ActivityIndicator color={mobileColors.navy} />
-          <Text style={styles.loadingText}>등록된 대상을 확인하는 중입니다…</Text>
-        </View>
-      ) : state.targetPersons.kind === 'error' ? (
-        <MySectionError
-          message="현재 등록된 대상을 불러올 수 없습니다."
-          onRetry={() => void retryTargetPersons()}
-        />
-      ) : state.targetPersons.kind === 'empty' ? (
-        <MyTargetPersonsEmpty />
-      ) : (
-        <MyTargetPersonsSection items={state.targetPersons.items} />
-      )}
-
-      <MyTargetPersonCreateCard
-        submitting={targetPersonCreate.kind === 'submitting'}
-        errorMessage={
-          targetPersonCreate.kind === 'error' ? targetPersonCreate.message : null
-        }
-        onCreate={createTargetPerson}
-      />
 
       <MyPushNotifications
         status={
