@@ -39,7 +39,13 @@ export interface SeyeonAuthoringReviewRowV1 {
   readonly candidateDisclosure:CharacterFactAuthorityEntryV1['disclosureDefault'];
   readonly sourceSection:string|null;
   readonly existingState:CharacterFactAuthorityEntryV1['sourceAuthority']|null;
+  readonly existingKnowledge:CharacterFactAuthorityEntryV1['characterKnowledge']|null;
   readonly existingDisclosure:CharacterFactAuthorityEntryV1['disclosureDefault']|null;
+  readonly missingFromServer:boolean;
+  readonly authorityChanged:boolean;
+  readonly knowledgeChanged:boolean;
+  readonly disclosureChanged:boolean;
+  readonly sourceSectionChanged:boolean;
   readonly difference:'MISSING_IN_SERVER_REGISTRY'|'CHANGED_AUTHORITY_OR_DISCLOSURE'|'ALIGNED';
 }
 export function inspectSeyeonAuthorityReconciliationCandidateV1(input: {
@@ -115,7 +121,13 @@ export function inspectSeyeonAuthorityReconciliationCandidateV1(input: {
       candidateDisclosure:entry.disclosureDefault,
       sourceSection:entry.sourceSection,
       existingState:previous?.sourceAuthority??null,
+      existingKnowledge:previous?.characterKnowledge??null,
       existingDisclosure:previous?.disclosureDefault??null,
+      missingFromServer:previous===undefined,
+      authorityChanged:previous!==undefined&&previous.sourceAuthority!==entry.sourceAuthority,
+      knowledgeChanged:previous!==undefined&&previous.characterKnowledge!==entry.characterKnowledge,
+      disclosureChanged:previous!==undefined&&previous.disclosureDefault!==entry.disclosureDefault,
+      sourceSectionChanged:previous!==undefined&&previous.sourceSection!==entry.sourceSection,
       difference,
     });
   });
@@ -131,6 +143,15 @@ export function inspectSeyeonAuthorityReconciliationCandidateV1(input: {
     authoredFactsCount:entries.length,
     dynamicKeysRequiringSeparateAuthority:Object.freeze(manualReviewKeys),
     changedOrNewCount:reviewRows.filter(r=>r.difference!=='ALIGNED').length,
+    // Separate facts' adoption from their knowledge, disclosure and provenance.
+    // Missing entries are unreviewed, NOT implicitly granted PUBLIC access.
+    reviewSummary:Object.freeze({
+      missingInServer:reviewRows.filter(r=>r.missingFromServer).length,
+      authorityChanged:reviewRows.filter(r=>r.authorityChanged).length,
+      knowledgeChanged:reviewRows.filter(r=>r.knowledgeChanged).length,
+      disclosureChanged:reviewRows.filter(r=>r.disclosureChanged).length,
+      sourceSectionChanged:reviewRows.filter(r=>r.sourceSectionChanged).length,
+    }),
     reviewRows:Object.freeze(reviewRows),
     candidateRegistry,
     candidateValuesForReviewOnly:values,

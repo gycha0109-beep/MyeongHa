@@ -19,6 +19,13 @@
 - `test/seyeon-authority-reconciliation-candidate-v1.test.ts`: 후보 검증, Birthday / 현재 직업 / 가족 / 과거연애 / 중요한 사건의 원문 등급과 공개 깊이 보존, 실제 서버 레지스트리 변경 없음, 원문 누락/변형 거부.
 - 기존 `test/seyeon-cost-c03-character-source-parity-v1.test.ts`가 추적하는 실제 drift를 덮어쓰거나 테스트를 삭제하지 않는다.
 
+### Owner 심사용 차이 차원 분리 (2026-10-15)
+
+- 기존 summary의 CHANGED_AUTHORITY_OR_DISCLOSURE는 기존 사용자와의 호환성을 위해 유지하되 각 키의 sourceAuthority, characterKnowledge, disclosureDefault, sourceSection 변경 여부를 독립 필드로 반환한다.
+- 누락된 서버 키는 missingFromServer로 별도 집계한다. 서버에 없는 키의 모든 차원을 변경으로 간주하거나 자동 공개 승인하지 않는다.
+- 생일은 SERVER AUTHOR_UNDEFINED / NOT_APPLICABLE에서 초안 CANON / CONTEXTUAL로 차이가 난다. 사실 채택 자체가 공개 등급 변경 승인 또는 실제 사용자에게 공개할 권한을 부여하지 않는다.
+- 새 reviewSummary 통계는 Owner 검토용 TEST-only 수치이며 기존 운영 Registry / Projection / Release / Provider 프롬프트는 손대지 않는다.
+
 ### 주요 판단 사례
 | 사실 키 | 현재 Bible 초안 | 서버 Runtime 기존 레지스트리 | 안전한 후보 |
 |---|---|---|---|

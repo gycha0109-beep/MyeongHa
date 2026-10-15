@@ -79,4 +79,39 @@ describe('COST-03 authority reconciliation remains draft-only / no Production gr
     expect(SEYEON_FACT_AUTHORITY_REGISTRY_V1.entries.find(x=>x.factKey==='identity.birthday')?.sourceAuthority)
       .toBe('AUTHOR_UNDEFINED');
   });
+  it('tracks Canon adoption and disclosure tier separately without granting either',()=>{
+    const r=report();
+    expect(r.reviewSummary.missingInServer).toBeGreaterThan(0);
+    const birth=r.reviewRows.find(x=>x.factKey==='identity.birthday');
+    expect(birth).toMatchObject({
+      missingFromServer:false,
+      authorityChanged:true,
+      knowledgeChanged:true,
+      disclosureChanged:true,
+      existingState:'AUTHOR_UNDEFINED',
+      existingKnowledge:'NOT_APPLICABLE',
+      existingDisclosure:'NOT_APPLICABLE',
+      candidateState:'CANON',
+      candidateKnowledge:'KNOWN',
+      candidateDisclosure:'CONTEXTUAL',
+    });
+    const name=r.reviewRows.find(x=>x.factKey==='identity.name');
+    expect(name).toMatchObject({
+      missingFromServer:false,authorityChanged:false,
+      knowledgeChanged:false,disclosureChanged:false,
+      candidateDisclosure:'PUBLIC',
+    });
+    const neverGuessed=r.reviewRows.find(x=>x.factKey==='identity.birth_year');
+    expect(neverGuessed?.missingFromServer).toBe(true);
+    expect(neverGuessed?.candidateState).toBe('AUTHOR_UNDEFINED');
+    expect(r.reviewSummary.disclosureChanged).toBe(
+      r.reviewRows.filter(x=>x.disclosureChanged).length,
+    );
+    expect(r.reviewSummary.authorityChanged).toBe(
+      r.reviewRows.filter(x=>x.authorityChanged).length,
+    );
+    expect(r.ownerApprovalRecorded).toBe(false);
+    expect(r.runtimePublicationAllowed).toBe(false);
+    expect(r.personalSourceAccessAllowed).toBe(false);
+  });
 });
