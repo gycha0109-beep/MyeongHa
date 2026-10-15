@@ -11,7 +11,13 @@ const make=(i=0)=>({
   callId:uuid(i),purpose:P.purpose,modelKey:P.model,
   requestBodyBytes:4500,
 });
+import {execFileSync} from 'node:child_process';
 describe('C06 manual-only, single eight-call budget and consent scope',()=>{
+  it('paid runner parses without importing dist or making any API request',()=>{
+    expect(()=>execFileSync(process.execPath,
+      ['--check','scripts/run-seyeon-cost-c06-eight-call-v1.mjs'],
+      {stdio:'pipe'})).not.toThrow();
+  });
   it('defines a pinned 8-call Luna screen with <$0.03 prospective reserve',()=>{
     expect(P).toMatchObject({
       model:'gpt-5.6-luna',callCap:8,
