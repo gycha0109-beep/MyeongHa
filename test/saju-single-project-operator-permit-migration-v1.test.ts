@@ -1,15 +1,15 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   SAJU_SINGLE_PROJECT_CONSUME_SQL_V1,
 } from '../apps/api/src/saju-single-project-operator-permit-v1.js';
 
 const sql = readFileSync(new URL(
-  '../supabase/migrations/1730_saju_bridge_single_project_operator_permit_v1.sql',
+  '../supabase/proposals/1730_saju_bridge_single_project_operator_permit_v1.sql',
   import.meta.url,
 ), 'utf8');
 
-describe('Single-Supabase dormant DB authority SQL proposal', () => {
+describe('Single-Supabase dormant DB authority SQL proposal', () => {\n  it('cannot trigger main-push Supabase production migrations', () => {\n    expect(existsSync(new URL(\n      '../supabase/migrations/1730_saju_bridge_single_project_operator_permit_v1.sql',\n      import.meta.url,\n    ))).toBe(false);\n    expect(existsSync(new URL(\n      '../supabase/proposals/1730_saju_bridge_single_project_operator_permit_v1.sql',\n      import.meta.url,\n    ))).toBe(true);\n  });
   it('uses one non-public schema and never creates another database or a login identity', () => {
     expect(sql).toContain('create schema saju_bridge_private;');
     expect(sql).toContain('revoke all on schema saju_bridge_private from public;');
