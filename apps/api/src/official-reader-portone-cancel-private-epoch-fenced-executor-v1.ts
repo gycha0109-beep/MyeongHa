@@ -33,6 +33,9 @@ import type {
   PrivateCancelReviewAuthorizedResultV1,
   PrivateCancelReviewAuthorizedStoreV1,
 } from './official-reader-portone-cancel-private-dual-approval-v1.js';
+import type {
+  PrivateCancelDurableEpochWatermarkPortV1,
+} from './official-reader-portone-cancel-private-durable-epoch-watermark-v1.js';
 
 export type PrivateCancelRevocationFencedExecutorV1=Readonly<{
   execute(input:unknown):Promise<PrivateCancelReviewAuthorizedResultV1>;
@@ -44,15 +47,19 @@ export type PrivateCancelRevocationFencedExecutorV1=Readonly<{
  * browser/request-supplied cache. Failures and timeouts are a DENY, not
  * permission to fall back to the D3e15 stale snapshot executor.
  */
-export async function createOfflinePrivateCancelRevocationFencedExecutorV1(
-  input:Readonly<{
-    signedPolicy:PrivateCancelSignedTrustPolicyV1;
-    pinnedRoot:PrivateCancelTrustedRootV1;
-    pinnedEpochSigner:PrivateCancelTrustedEpochSignerV1;
-    readCurrentEpoch:()=>Promise<unknown>;
-    trustedClock:()=>Date;
-    testStore:PrivateCancelReviewAuthorizedStoreV1;
-  }>,
+type PrivateCancelEpochFenceBootInputV1=Readonly<{
+  signedPolicy:PrivateCancelSignedTrustPolicyV1;
+  pinnedRoot:PrivateCancelTrustedRootV1;
+  pinnedEpochSigner:PrivateCancelTrustedEpochSignerV1;
+  readCurrentEpoch:()=>Promise<unknown>;
+  trustedClock:()=>Date;
+  testStore:PrivateCancelReviewAuthorizedStoreV1;
+}>;
+
+/** Shared verification logic. Legacy mode is exclusively for offline tests. */
+async function createOfflinePrivateCancelEpochFenceCoreV1(
+  input:PrivateCancelEpochFenceBootInputV1,
+  durableWatermark?:PrivateCancelDurableEpochWatermarkPortV1,
 ):Promise<PrivateCancelRevocationFencedExecutorV1>{
   if(typeof input.readCurrentEpoch!=='function'
     ||typeof input.trustedClock!=='function'
@@ -118,6 +125,17 @@ export async function createOfflinePrivateCancelRevocationFencedExecutorV1(
     const verified=verifyPrivateCancelSignedExecutionEpochV1({
       envelope,pinnedSigner:signer,now,
     });
+    // Restart-safe entrypoint has an independently owned durable compare-
+    // and-commit authority. A missing/corrupted record or any store failure
+    // is DENY; a failure permanently fences this process until trusted reboot.
+    if(durableWatermark){
+      try{
+        await durableWatermark.observeVerifiedEpoch(verified);
+      }catch{
+        fenced=true;
+        throw new Error('Offline cancel persistent policy watermark rejected: executor fenced.');
+      }
+    }
     if(verified.sequence<seenSequence
       ||(verified.sequence===seenSequence
         &&verified.fingerprint!==seenFingerprint)){
@@ -173,4 +191,34 @@ export async function createOfflinePrivateCancelRevocationFencedExecutorV1(
       });
     },
   });
+}
+
+/**
+ * Historical offline factory retained solely for earlier regression vectors.
+ * WITHOUT durable watermark this is NOT restart-rollback safe. Do not expose
+ * through an API/service/production role.
+ */
+export function createOfflinePrivateCancelRevocationFencedExecutorV1(
+  input:PrivateCancelEpochFenceBootInputV1,
+):Promise<PrivateCancelRevocationFencedExecutorV1>{
+  return createOfflinePrivateCancelEpochFenceCoreV1(input);
+}
+
+/**
+ * D3e17 STRICT offline entrypoint: requires a trusted, independently
+ * provisioned durable monotonic watermark store BEFORE first epoch read.
+ * Missing/corrupted state never auto-initializes; shutdown/rollback remains
+ * sticky across restarted application instances sharing the store.
+ */
+export function createOfflinePrivateCancelRestartSafeExecutorV1(
+  input:PrivateCancelEpochFenceBootInputV1 & Readonly<{
+    durableWatermark:PrivateCancelDurableEpochWatermarkPortV1;
+  }>,
+):Promise<PrivateCancelRevocationFencedExecutorV1>{
+  if(typeof input.durableWatermark?.observeVerifiedEpoch!=='function'){
+    throw new Error('Offline cancel restart-safe executor requires durable monotonic authority.');
+  }
+  return createOfflinePrivateCancelEpochFenceCoreV1(
+    input,input.durableWatermark,
+  );
 }
