@@ -340,3 +340,10 @@ Governor 04d4B 계열은 실제 격리 PostgreSQL 기반 영수증 임대·정�
 - [PR #2096](https://github.com/gycha0109-beep/MyeongHa/pull/2096) 검증 HEAD `756a39d52dbd9e12ac6a95118e2fa89c472fbd6d`: [PG17 CI #38663201408 job 116189400351](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38663201408) SUCCESS. 세부 실측 및 필수 HOLD는 [R2 패킷 §27.1](SEYEON_MIGRATION_LINEAGE_R2_READONLY_PACKET_20261013.md)만 정본으로 유지한다.
 - 원본 1650/1670/1680의 내부 COMMIT 재생, 1680 교체 전후 권한·Owner 불변, 합성 만료 후 승인 거부, Guest↔Promotion 두 방향 실제 잠금 경합, 테스트 데이터베이스 폐기를 검증. **실제 funded admission E2E·프로덕션 보안 Owner 승인/DR Ready가 아님**.
 - PR 최종 CI·Full Integration/병합 SHA는 확인 전까지 미확정; 기술 증거만으로 1690의 운영 활성화 또는 G0~G6 승격 금지.
+
+## 30. 2026-10-15 R2-H 1690 Detached Cost Settlement Worker — 단독 검토 단위
+
+- 1680은 [PR #2096](https://github.com/gycha0109-beep/MyeongHa/pull/2096) / [Full Integration #38664422670](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38664422670) SUCCESS 후 main `1dc1857cfeb0ee991149a6ce7d021fa45cd092f8`에 병합. 1680 권한/Owner/G0~G6 운영 HOLD 해제는 아님.
+- 다음 기술 단위 1690의 상세 정본은 R2 패킷 [28절](SEYEON_MIGRATION_LINEAGE_R2_READONLY_PACKET_20261013.md). 원본 Git blob `79026a10855fbafaf2e4465e0a382e37ce1a16cd` 불변, `requires=['1590','1610','1630']`로 검토 인벤토리 누락만 보정.
+- 독립 PG17 case DB에서 기존 SQL 1550~1630 선행 및 원본 1690 내부 COMMIT을 그대로 실행한 뒤 Role/SECURITY DEFINER Owner/ACL/멤버십·스키마 CREATE 복귀와 부정 RPC 경계를 검증. 실제 정산 승인·운영 Credential·Production SQL 변경 없음.
+- 본 단위는 실 예약된 Provider Call 정산 성공이나 금액/중복 청구 E2E, worker 서비스 배포를 승인하지 않는다. 검증 완료 시에만 1700 예약 영수증 Pin을 별도 검토한다. 기존 모든 Security/Owner/DR HOLD 지속.
