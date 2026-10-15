@@ -13,7 +13,7 @@ function configuredEnv(): Record<string, string> {
     MYEONGHA_DATABASE_SSL_ROOT_CERT_PEM:
       '-----BEGIN CERTIFICATE-----\\ntest-only\\n-----END CERTIFICATE-----',
     MYEONGHA_SUPABASE_URL: MYEONGHA_PRODUCTION_SUPABASE_ORIGIN,
-    MYEONGHA_SUPABASE_API_KEY: 'supabase-api-key-value-1234567890',
+    MYEONGHA_SUPABASE_API_KEY: 'sb_publishable_synthetic_readiness_key_1234567890',
     MYEONGHA_GUEST_FINGERPRINT_SECRET:
       'guest-fingerprint-secret-value-1234567890',
     MYEONGHA_SAJU_SERVICE_ORIGIN: 'https://saju.example.com',
