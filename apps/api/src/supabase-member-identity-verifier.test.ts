@@ -6,7 +6,7 @@ import {
 import { SUPABASE_MEMBER_JSON_RESPONSE_MAXIMUM_BYTES_V1 } from './upstream-json-response-resource.js';
 
 const supabaseOrigin = 'https://example.supabase.co';
-const supabaseApiKey = 'test-publishable-key-that-is-long-enough';
+const supabaseApiKey = 'sb_publishable_synthetic_member_deadline_key_1234567890';
 
 function memberRequest(): Request {
   return new Request('https://myeongha.example/api/me', {
