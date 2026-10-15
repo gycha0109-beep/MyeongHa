@@ -69,7 +69,7 @@ export function createOfflinePrivateCancelAtomicReviewStoreTestV1(input:Readonly
   }
   const {pool,trustedClock,readCurrentSignedEpoch,pinnedEpochSigner,expectedPolicy}=input;
   return Object.freeze({
-    async commitAuthorizedReview(command){
+    async commitAuthorizedReview(command:Parameters<PrivateCancelReviewAuthorizedStoreV1['commitAuthorizedReview']>[0]){
       const client=await pool.connect();
       let begun=false;
       try{
