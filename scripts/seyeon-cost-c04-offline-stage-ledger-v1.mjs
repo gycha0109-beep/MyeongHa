@@ -21,6 +21,8 @@ function validUsage(usage){
     (outputTokens===null||reasoningTokens===null||reasoningTokens<=outputTokens);
 }
 const options=new Set(['response_received','http_failure','network_failure','timeout','invalid_response']);
+// The two-call route is an unexecutable design hypothesis.
+const auditedRoutes=new Set(['legacy_5','fixed_3']);
 const postTurnStates=new Set(['NOT_APPLICABLE','CAPTURED','UNKNOWN']);
 function stageRate(model){
   const p=SEYEON_DIALOGUE_PATH_PRICES_V1[model];
@@ -69,14 +71,14 @@ function priceCeiling(model,upper,outputCap){
  */
 export function auditSeyeonC04SyntheticRouteV1(input){
   const route=input?.route,plan=SEYEON_COST_REFERENCE_PLANS_V1[route];
-  if(!plan||input.scope!=='SYNTHETIC_OFFLINE_ONLY'||
+  if(!auditedRoutes.has(route)||!plan||input.scope!=='SYNTHETIC_OFFLINE_ONLY'||
      !['COMPLETE','ABORTED'].includes(input.completion)||
      !postTurnStates.has(input.postTurnState)||
      !postTurnStates.has(input.tokenCounterState)||
      !Array.isArray(input.calls)||input.calls.length===0||input.calls.length>60){
     throw new TypeError('C04 synthetic route envelope invalid');
   }
-  const ids=new Set(),counts=new Map();
+  const ids=new Set(),counts=new Map(),lastOutcomeByStage=new Map();
   let knownMicro=0n,quotedCeilingMicro=0n,unknownUsage=0,unknownCeilings=0,
       failed=0,retries=0,knownCached=0n,knownInput=0n,
       knownOutput=0n,knownReasoning=0n;
@@ -96,14 +98,22 @@ export function auditSeyeonC04SyntheticRouteV1(input){
        !(call.requestBodyBytes===null||validInt(call.requestBodyBytes,1))){
       throw new TypeError('C04 invalid or unauthorised stage accounting row');
     }
+    if(call.usage.inputTokens!==null &&
+       call.verifiedInputTokenUpperBound!==null &&
+       call.usage.inputTokens>call.verifiedInputTokenUpperBound){
+      throw new TypeError('C04 observed input exceeds claimed verified ceiling');
+    }
     if(call.usage.outputTokens!==null &&
        call.enforcedOutputTokenLimit!==null &&
        call.usage.outputTokens>call.enforcedOutputTokenLimit){
       throw new TypeError('C04 observed output exceeds claimed enforced ceiling');
     }
+    if(lastOutcomeByStage.get(call.stageIndex)==='response_received')
+      throw new TypeError('C04 retry after successful stage is invalid');
     const next=(counts.get(call.stageIndex)||0)+1;
     if(call.attempt!==next)throw new TypeError('C04 missing/duplicate retry attempt');
     counts.set(call.stageIndex,next);
+    lastOutcomeByStage.set(call.stageIndex,call.outcome);
     ids.add(call.callId);
     if(call.attempt>1)retries++;
     if(call.outcome!=='response_received')failed++;
@@ -124,8 +134,15 @@ export function auditSeyeonC04SyntheticRouteV1(input){
     if(u.outputTokens!==null)knownOutput+=BigInt(u.outputTokens);
     if(u.reasoningTokens!==null)knownReasoning+=BigInt(u.reasoningTokens);
   }
-  if(input.completion==='COMPLETE'&&counts.size!==plan.length)
-    throw new TypeError('C04 complete route missing one or more stages');
+  if(input.completion==='COMPLETE'&&
+     (counts.size!==plan.length||
+      plan.some((_,i)=>lastOutcomeByStage.get(i)!=='response_received'))){
+    throw new TypeError('C04 complete route requires terminal success at every stage');
+  }
+  if([knownInput,knownCached,knownOutput,knownReasoning].some(
+      n=>n>BigInt(Number.MAX_SAFE_INTEGER))){
+    throw new RangeError('C04 token totals exceed safe integer range');
+  }
   if(knownMicro>BigInt(Number.MAX_SAFE_INTEGER)||
      quotedCeilingMicro>BigInt(Number.MAX_SAFE_INTEGER)){
     throw new RangeError('C04 calculation exceeds safe integer');
@@ -135,8 +152,9 @@ export function auditSeyeonC04SyntheticRouteV1(input){
   // with their own verified rate cards before a session-total is knowable.
   const outsideUnknown=input.postTurnState!=='NOT_APPLICABLE'||
     input.tokenCounterState!=='NOT_APPLICABLE';
-  const allKnown=unknownUsage===0&&!outsideUnknown;
-  const allCeilings=unknownCeilings===0&&!outsideUnknown;
+  // ABORTED is only an accounted portion, not a completed-turn total.
+  const allKnown=input.completion==='COMPLETE'&&unknownUsage===0&&!outsideUnknown;
+  const allCeilings=input.completion==='COMPLETE'&&unknownCeilings===0&&!outsideUnknown;
   return Object.freeze({
     status:allKnown?'CONDITIONAL_REPO_PRICE_ESTIMATE':'UNKNOWN_TOTAL_COST',
     scope:SEYEON_COST_C04_OFFLINE_VERSION_V1,

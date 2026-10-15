@@ -62,7 +62,7 @@ describe('COST-04 historical synthetic stage ledger / NOT a live model cost',()=
     rows[1].outcome='timeout';
     rows[1].usage={inputTokens:null,cachedInputTokens:null,
       outputTokens:null,reasoningTokens:null};
-    const result=audit('fixed_3',rows);
+    const result=audit('fixed_3',rows,{completion:'ABORTED'});
     expect(result.status).toBe('UNKNOWN_TOTAL_COST');
     expect(result.unknownUsageAttempts).toBe(1);
     expect(result.failedCallAttempts).toBe(1);
@@ -71,6 +71,7 @@ describe('COST-04 historical synthetic stage ledger / NOT a live model cost',()=
   });
   it('separately prices all explicit retry attempts and never assumes the original failure cost zero',()=>{
     const rows=calls('fixed_3');
+    rows[1].outcome='timeout'; // retry follows a failed attempt
     const retried={...rows[1],callId:'retry-of-stage-1',
       attempt:2,outcome:'response_received',usage:{...rows[1].usage}};
     rows.splice(2,0,retried);
@@ -163,5 +164,37 @@ describe('COST-04 historical synthetic stage ledger / NOT a live model cost',()=
     expect(governance).toContain('maximumOutputTokens');
     expect(governance).toContain('no speculative cache discount');
     expect(governance).toContain('contextWindowTokens');
+  });
+
+  it('requires terminal success on every stage before claiming COMPLETE',()=>{
+    const rows=calls('fixed_3');
+    rows[2].outcome='invalid_response';
+    expect(()=>audit('fixed_3',rows)).toThrow(/terminal success/u);
+    const partial=audit('fixed_3',rows,{completion:'ABORTED'});
+    expect(partial.status).toBe('UNKNOWN_TOTAL_COST');
+    expect(partial.totalConditionalMicroUsd).toBeNull();
+    expect(partial.knownPortionMicroUsd).toBeGreaterThan(0);
+    expect(partial.totalAdmissionCeilingMicroUsd).toBeNull();
+  });
+  it('rejects a retry following an already successful stage',()=>{
+    const rows=calls('fixed_3');
+    rows.splice(1,0,{...rows[0],callId:'retry-after-success',attempt:2});
+    expect(()=>audit('fixed_3',rows)).toThrow(/retry after successful/u);
+  });
+  it('rejects observed input usage above the verified pre-dispatch ceiling',()=>{
+    const rows=calls('fixed_3');rows[0].usage.inputTokens=2001;
+    expect(()=>audit('fixed_3',rows)).toThrow(/input exceeds claimed verified ceiling/u);
+  });
+  it('does not price the two-call design hypothesis as executed',()=>{
+    expect(()=>audit('proposed_2',calls('proposed_2'))).toThrow(/envelope invalid/u);
+  });
+  it('rejects unsafe aggregate token precision',()=>{
+    const rows=calls('fixed_3');
+    for(const row of rows){
+      row.usage={inputTokens:Number.MAX_SAFE_INTEGER,cachedInputTokens:Number.MAX_SAFE_INTEGER,
+        outputTokens:0,reasoningTokens:0};
+      row.verifiedInputTokenUpperBound=Number.MAX_SAFE_INTEGER;
+    }
+    expect(()=>audit('fixed_3',rows)).toThrow(/safe integer/u);
   });
 });

@@ -52,6 +52,15 @@
 - 단가가 역사적 추정이고 Source/Label을 호출자가 위조할 수 있으므로 반환 객체는 항상 `liveRateVerified=false`, `providerInvoiceReconciled=false`, `cacheSavingsProven=false`, `personaQualityVerified=false`, `productionPromotionAllowed=false`.
 - `test/seyeon-cost-c04-offline-stage-ledger-v1.test.mjs`: 캐시 절감 추정과 실제 Budget Ceiling 분리, Retry/Fallback, reasoning double count 방지, Unknown 비용, Provider optional output cap, 무권한 모델/단계 입력 거부. 네트워크/유료 모델 호출 없음.
 
+### 2026-10-15 후속 무과금 Ledger 경계 보강
+
+- COMPLETE는 모든 단계의 마지막 시도가 성공해야 한다. 실패로 끝난 실행은 가격 데이터가 있어도 성공 턴 총액으로 인정하지 않는다.
+- 성공 후 재시도, 관측 입력 토큰이 검증 상한을 넘는 기록, 누적 토큰 안전 정수 초과를 거부한다.
+- ABORTED에서는 알고 있는 비용만 knownPortionMicroUsd로 보존하고 전체 턴 총액과 전체 Admission Ceiling은 null로 유지한다.
+- proposed_2는 실행 불가능한 설계 가설이며 Ledger의 실제 호출 경로로 허용하지 않는다.
+- COST-05 별도 테스트는 보호된 유료 workflow 둘의 compare 작업이 여전히 false로 잠겨 있는지 검증한다.
+- 여전히 synthetic/offline ONLY. Provider 영수증/청구·모델 품질·현행 단가·운영 Kill Switch·Production 승격을 입증하지 않는다.
+
 ### 실제 비용 절감을 확정하지 못하는 이유
 
 - 정적 Byte/코드 분석으로는 캐시 히트 여부와 실제 입력/추론 토큰을 알 수 없다. **Static Prefix가 반복된다는 사실만으로 캐시 성공이 아니다.** 캐시는 Provider usage의 cached input과 당시 정책/모델을 기록해야 한다.
