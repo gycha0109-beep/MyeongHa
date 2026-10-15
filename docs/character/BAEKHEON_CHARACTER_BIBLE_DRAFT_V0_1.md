@@ -1,5 +1,7 @@
 # 백헌 Character Bible Draft v0.1
 
+> **SUPERSEDED AUTHORING SNAPSHOT:** 이 파일은 2026-10-13~14 피드백 이력의 v0.1 초안이다. 최신 저자 승인 초안은 [BAEKHEON_CHARACTER_BIBLE_DRAFT_V0_2.md](./BAEKHEON_CHARACTER_BIBLE_DRAFT_V0_2.md)이다. v0.1에 남은 미정/가설/중복 표현은 v0.2의 정리 상태를 대체하지 않으며, 어느 버전도 Production Canon은 아니다.
+
 Status: **AUTHORING DRAFT v0.1 (2026-10-13 feedback revision) / NOT PRODUCTION APPROVED**  
 Document Type: CHARACTER BIBLE INSTANCE  
 Character: 백헌 (`baekheon`)  
