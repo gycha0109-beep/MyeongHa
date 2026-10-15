@@ -105,7 +105,12 @@ export function comparePrivateCancelDurableEpochV1(
   const fresh=next;
   const deny=(reason:PrivateCancelDurableEpochDecisionV1['reason']):
     PrivateCancelDurableEpochDecisionV1=>Object.freeze({
-      allowed:false,nextRecord:old,reason,
+      allowed:false,
+      // Durable security incidents cannot be cured by reboot. An observed
+      // rollback, equivocation or policy conflict STICKS as HALTED until an
+      // independently authorized reset protocol (not implemented).
+      nextRecord:reason==='halted'?old:Object.freeze({...old,status:'halted'}),
+      reason,
     });
   if(old.status==='halted')return deny('halted');
   if(fresh.sequence<old.sequence)return deny('rollback');
