@@ -42,6 +42,37 @@ Watchtower-Track: saju-bridge
 - 미래 계획의 Auth+Subject 동일 Supabase project 구성 허용은 *설계만*이며 관리·키 custody 및 R05 검증은 별도. 실제 R05 요구가 독립 Auth 제어 평면이면 분리할 때까지 HOLD.
 - `test/saju-so4-supabase-staging-isolation-preflight-v1.test.ts`는 S01–S16 synthetic fixtures를 검증. 실제 Supabase 리소스를 변경하거나 네트워크를 호출하지 않는다.
 
+## 4A. 2026-10-15 로컬 Docker 재사용 우선 — 실환경 미보유 확인 및 R01–R14 격차 인수
+
+**새 서버부터 준비하지 않는다.** 사용자는 별도의 스테이징 서버·보안/백업 인프라를 보유하지 않으며, 이 제약 때문에 기존 Docker 폐기형 검증을 사용했다. [Windows Phase 5 #2103](https://github.com/gycha0109-beep/MyeongHa/pull/2103)에서 MyeongHa SHA 2ddb1d4fe3f7101244ee3a628b2d1a6a7f6bc1f5 / 검증용 Saju SHA cd0acf9abd447826ccaefba56112d046e560ee04, Node 24.20.0, Docker 29.8.2 / Compose 5.5.1의 로컬 --replay-review 15개 Phase PASS·일회용 컨테이너/네트워크/볼륨 완전 정리·종료 코드 0을 **사용자 제출 자료**로 인수했다. 전체 원본 로그는 사용자 대화에 있으며 GitHub에 올리지 않았다.
+
+**공급자 설계 결정과 실제 인프라를 분리:** 본 문서 §2의 **Supabase-first는 이미 채택된 설계 방향**이다. §1의 2026-10-12 관리 평면 인벤토리는 그 시점의 읽기 전용 관찰일 뿐 오늘의 독립 스테이징 프로젝트나 현재 요금을 보증하지 않는다. 기존 MyengHa / Refund_management 프로젝트를 임의로 전용 스테이징으로 변경하지 않는다. 따라서 [3-04-01 런북 §2A의 S01](./SAJU_HELD_STAGING_OPERATIONAL_EVIDENCE_RUNBOOK_8C2B2D30401.md)은 **공급자 설계안 존재 / 실 스테이징 자원·보안 계정·비용 승인 없음**으로 해석하고 공급자 선택을 사용자에게 다시 처음부터 묻지 않는다.
+
+### 기존 테스트가 입증한 것과 남은 실제 증거
+
+LOCAL_TESTED는 **폐기형 Docker 환경에서만** 실측되었음을 뜻한다. DESIGN_OR_SYNTHETIC_ONLY는 코드/검증 계약 또는 테스트 전용 값만 있고 독립 출처가 없다는 뜻이다. 어느 쪽이든 운영 열은 전부 NOT_VERIFIED다.
+
+| 증빙 | 추가 비용 없는 기존 근거 및 정확한 한계 | 실환경에만 남은 증거 | 운영 상태 |
+|---|---|---|---|
+| R01 Root custody | Phase 4G 합성 Ed25519 서명·변조 차단; SO-2 pin 계약: DESIGN_OR_SYNTHETIC_ONLY | 별도 관리 계정의 비반출 Root 키·SPKI pin·IAM·custody audit | NOT_VERIFIED |
+| R02 Registry/floor | SO-2 DB 합성 floor / rollback·revocation 부정 검사: DESIGN_OR_SYNTHETIC_ONLY | 별도 영속 high-water·독립 backup restore·회전/철회 감사 | NOT_VERIFIED |
+| R03 Operator approval | Phase 3B 합성 Permit V2 서명/일회 소비·SO-3B 목적 분리 계약: DESIGN_OR_SYNTHETIC_ONLY | Owner 행위별 인증·서명 서비스 신원·키 목적·승인 원장 | NOT_VERIFIED |
+| R04 Challenge | Phase 2B/3B/4A–4C의 합성 Nonce/Permit 원자 상태 및 장애 차단: LOCAL_TESTED | 외부 Challenge issuer/ledger·독립 조회·불명확 COMMIT 감사 | NOT_VERIFIED |
+| R05 Auth | 폐기형 GoTrue 가입·JWT·/user 및 Member/Birth 결속: LOCAL_TESTED | 별도 Auth 프로젝트·관리 평면/Production 분리 | NOT_VERIFIED |
+| R06 Subject TLS | 폐기형 Subject PG CA/SAN/TLS verify-full 로그인: LOCAL_TESTED | 실제 클러스터 식별·CA/peer/DNS SAN·network provenance | NOT_VERIFIED |
+| R07 Subject 권한 | 폐기형 Subject/Birth RLS·제한 권한 DB 검증: LOCAL_TESTED | 실제 role membership·권한 거부·ACL/RLS 실측 | NOT_VERIFIED |
+| R08 Nonce 클러스터 | 폐기형 분리 Nonce PG TLS·재사용 차단 및 물리적 COMMIT 장애: LOCAL_TESTED | 별도 스테이징 PG 클러스터·TLS/role/audit 출처 | NOT_VERIFIED |
+| R09 Admission 클러스터 | 폐기형 분리 Admission PG TLS·Permit V2 일회 소비, COMMIT SIGKILL: LOCAL_TESTED | 별도 스테이징 클러스터·실제 제한 권한·V1 차단 | NOT_VERIFIED |
+| R10 Saju ingress | **로컬 HTTP/HMAC loopback** 검증: LOCAL_TESTED | 실제 HTTPS ingress/TLS peer·DNS/SSRF·loopback 프록시 | NOT_VERIFIED |
+| R11 Saju keys | 합성 Bearer/HMAC 결속·오염/재생 차단: LOCAL_TESTED | 실제 Secret custody·issuer/audience·rotation·키 분리 | NOT_VERIFIED |
+| R12 배포 SHA | Windows 사용자 제출 두 checkout SHA 확인: LOCAL_TESTED | 스테이징 배포 두 SHA·Manifest/Plan의 서명 provenance | NOT_VERIFIED |
+| R13 시험 Member | 폐기형 GoTrue/Subject/Birth 합성 회원 검증·자원 삭제: LOCAL_TESTED | 격리 스테이징의 시험 계정만 접근·사용 후 폐기 기록 | NOT_VERIFIED |
+| R14 중단/복구 | 로컬 DB stop/restart·network partition·SIGKILL·fail-closed/cleanup: LOCAL_TESTED | 실제 키 revoke·감사·백업 복원·Owner 복구 절차의 증빙 | NOT_VERIFIED |
+
+**P0 실행 결론:** 위 테스트를 같은 조건으로 재실행해도 R01–R14 운영 증명은 늘어나지 않는다. 새로운 4I/합성 신뢰 엔진·유사 스테이징 시뮬레이션을 추가하지 않는다. 현재 로컬 경로는 **재현 가능한 회귀 검증/회수 증빙으로 유지**하고 재시험은 새 결함·코드 변경·환경 변경의 근거가 있을 때만 실시한다.
+
+**외부 의존 시작점:** R01–R04는 실제 보안 관리 평면·Key custody·audit/ledger에, R05–R14는 별도 실환경의 Auth/DB/HTTPS·배포/복구에 의존한다. 실서비스 권한, 실제 스테이징 비용·인증 수단·격리 방식이 정해지기 전에는 SO3_PREPARATION_STARTED_P0 / SO3_OPERATIONAL_ADMISSION_NOT_APPROVED에서 중지한다. 공급자별 리소스와 비용표를 검토하더라도 **프로젝트/KMS/WORM/Secret/DB GRANT·서버 생성 또는 Runner 실행을 자동으로 하지 않는다.**
+
 ## 5. 다음 작업과 절대 금지
 
 1. P0 범위 CI/전체 통합 CI PASS → Squash 병합 → 이슈 #1871에 읽기 전용 발견사항 및 남은 P2 비용/권한 승인 기록.
