@@ -36,6 +36,8 @@ const commerceEntitlementPatterns = [
 const postgres17Patterns = [
   /^test\/db\/seyeon_r2_h_1730_forward\.sh$/u,
   /^test\/db\/seyeon_r2_h_1740_forward\.sh$/u,
+  /^test\/db\/seyeon_r2_h_1750_forward\.sh$/u,
+  /^test\/db\/fixtures\/1750_character_artifact_creator_membership_cleanup_v1\.proposed\.sql$/u,
   /^test\/db\/fixtures\/1740_seyeon_zero_source_pin_trigger_null_safe_v1\.proposed\.sql$/u,
   /^test\/db\/seyeon_r2_h_1720_forward\.sh$/u,
   /^tests\/seyeon-r2-h-1720\.test\.mjs$/u,
