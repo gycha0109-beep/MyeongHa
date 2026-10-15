@@ -386,3 +386,8 @@ Governor 04d4B 계열은 실제 격리 PostgreSQL 기반 영수증 임대·정�
 - 원본 `1720_standard_reader_product_scope_read_v1.sql` Git blob `659df0d5a039d6617de20407ea129aab95fe1201` 불변. `requires=[]` 상태 유지. 이 D-01은 활성 상품과 Spec 범위만 읽는 서버 전용 조회 함수이며 판매·Reader 승인·Grant 발급과 무관.
 - 원본 마지막 ACL 자체 검증에 `has_function_privilege('public', …)` 표현식이 들어 있으므로 PG17에서 역할 해석이 실패하는지 원문 재생 실측. 폐기형 DB의 1510+timestamped 두 개 Frontier에서 원본 `psql -1`으로 실행, 예측 밖 에러는 fail-closed, 실패 후 함수·ACL 미잔존 및 전체 DB 폐기 확인. 원본 SQL/운영 ACL/Role/History 변경 없음.
 - 실제 Owner/SECURITY DEFINER 최소권한 및 Reader Product/Offer/Grant E2E 승인이 없으면 운영 배포·Reader 공개를 절대 허용하지 않는다. 세부 진단 및 한계는 [R2 패킷 §31](SEYEON_MIGRATION_LINEAGE_R2_READONLY_PACKET_20261013.md). 실제 CI 결과는 후속 실측 전 미확정.
+
+### 33.1 1720 최초 PG17 결과 — PUBLIC 실패 가설 기각, 권한 실증으로 재검증
+
+- [PR #2114](https://github.com/gycha0109-beep/MyeongHa/pull/2114)의 최초 [PG17 #38691463763 job 116278148588](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38691463763) FAILURE는 테스트 오류다. 원본 1720은 `has_function_privilege('public', …)` 검사를 성공적으로 완료해 독립 DB에 적용됐으며, **원본 실패 가설은 기각**했다. 다음 테스트에서는 원본 Rollback/Forward·PUBLIC ACL·SECURITY DEFINER Creator Owner 및 Product/Spec ACL 보존을 직접 검사한다.
+- 정확한 PG17 로그 해석과 한계는 [R2 패킷 §31.1](SEYEON_MIGRATION_LINEAGE_R2_READONLY_PACKET_20261013.md) 참조. 실 Read Positive fixture·Reader 구매/Grant/Rule E2E, Owner Production Privilege 검증은 미수행이며 Owner HOLD·Reader public/paid OFF, DR Ready=false.
