@@ -11,6 +11,13 @@ export const MOBILE_READER_PRESENTATIONS_V1 = Object.freeze([
   Object.freeze({ key: 'doyun', name: '도윤', title: '대리자', tone: '복잡한 설명보다 걸리는 부분부터 시작합니다.' }),
 ] as const);
 
+/** Presentation-only mobile launch filter; not a paid Reader-eligibility mutation. */
+export const MOBILE_READER_VISIBLE_LAUNCH_PRESENTATIONS_V1 = Object.freeze(
+  MOBILE_READER_PRESENTATIONS_V1.filter(
+    ({ key }) => key !== 'seorin' && key !== 'mira' && key !== 'doyun',
+  ),
+);
+
 export type MobileReaderPresentationIdV1 =
   (typeof MOBILE_READER_PRESENTATIONS_V1)[number]['key'];
 
