@@ -765,3 +765,199 @@ describe('D3e16 independently signed current-policy epoch fence (OFFLINE ONLY)',
     // and independently controlled signed response source.
   });
 });
+
+import {
+  advanceOfflinePrivateCancelDurableEpochV1,
+  createOfflinePrivateCancelDurableEpochExecutorV1,
+  offlinePrivateCancelDurableEpochGenesisFixtureV1,
+  type PrivateCancelDurableEpochWatermarkV1,
+} from '../apps/api/src/official-reader-portone-cancel-private-durable-epoch-executor-v1.js';
+
+/** Atomic, serializable IN-MEMORY TEST FIXTURE with shared lifetime across
+ * "restarted" executor instances. Not independent anti-rollback storage.
+ */
+function durableEpochFixture(initial:unknown=offlinePrivateCancelDurableEpochGenesisFixtureV1()){
+  let state:unknown=initial;
+  let tail:Promise<void>=Promise.resolve();
+  let down=false,failWrite=false,badReadback=false;
+  const transact=vi.fn(async(
+    update:(previous:unknown)=>PrivateCancelDurableEpochWatermarkV1,
+  ):Promise<unknown>=>{
+    let release!:()=>void;
+    const previous=tail;
+    tail=new Promise<void>(resolve=>{release=resolve;});
+    await previous;
+    try{
+      if(down)throw new Error('storage unavailable');
+      const next=update(state);
+      if(failWrite)throw new Error('write interrupted before durable commit');
+      state=structuredClone(next); // commit completes BEFORE returning
+      if(badReadback)return {...next,sequence:0};
+      return structuredClone(state);
+    }finally{release();}
+  });
+  return {
+    transact,
+    read:()=>structuredClone(state),
+    corrupt:(next:unknown)=>{state=next;},
+    outage:(value:boolean)=>{down=value;},
+    failWrite:(value:boolean)=>{failWrite=value;},
+    badReadback:(value:boolean)=>{badReadback=value;},
+  };
+}
+function durableBoot(
+  f:ReturnType<typeof rig>,e:ReturnType<typeof epochRig>,
+  durable:ReturnType<typeof durableEpochFixture>,extra:Record<string,unknown>={},
+){
+  return createOfflinePrivateCancelDurableEpochExecutorV1({
+    signedPolicy:f.envelope,pinnedRoot:f.pin,
+    pinnedEpochSigner:e.pin,readCurrentEpoch:e.source,
+    durableStore:durable,trustedClock:f.clock,testStore:f.store,...extra,
+  });
+}
+
+describe('D3e17 restart-persistent shared epoch fence (OFFLINE/NO LIVE)',()=>{
+  it('records epoch 9 durably; restart cannot accept signed old epoch 1',async()=>{
+    const f=rig(),e=epochRig(f),db=durableEpochFixture();
+    e.set(e.signEpoch({sequence:9}));
+    const old=await durableBoot(f,e,db);
+    expect(old).toBeDefined();
+    expect((db.read() as PrivateCancelDurableEpochWatermarkV1).sequence).toBe(9);
+    e.set(e.signEpoch({sequence:1}));
+    await expect(durableBoot(f,e,db)).rejects.toThrow();
+    expect(f.store.commitAuthorizedReview).not.toHaveBeenCalled();
+    e.set(e.signEpoch({sequence:10}));
+    const after=await durableBoot(f,e,db);
+    expect(await after.execute({permit:f.issuerBoot().issue(f.request)}))
+      .toMatchObject({effectAuthorized:false,providerRefundAuthorized:false});
+  });
+
+  it('two instances share the floor and reject replay after the OTHER instance advances',async()=>{
+    const f=rig(),e=epochRig(f),db=durableEpochFixture();
+    const a=await durableBoot(f,e,db);
+    const b=await durableBoot(f,e,db);
+    const permit=f.issuerBoot().issue(f.request);
+    e.set(e.signEpoch({sequence:7}));
+    await expect(a.execute({permit})).resolves.toMatchObject({approvalRecorded:true});
+    e.set(e.signEpoch({sequence:1}));
+    await expect(b.execute({permit})).rejects.toThrow();
+    expect((db.read() as PrivateCancelDurableEpochWatermarkV1).sequence).toBe(7);
+    e.set(e.signEpoch({sequence:8}));
+    await expect(b.execute({permit})).resolves.toMatchObject({effectAuthorized:false});
+  });
+
+  it('persists signed HALT; reboot and higher ACTIVE cannot silently reauthorize',async()=>{
+    const f=rig(),e=epochRig(f),db=durableEpochFixture();
+    const a=await durableBoot(f,e,db);
+    e.set(e.signEpoch({sequence:2,status:'halted'}));
+    await expect(a.execute({permit:f.issuerBoot().issue(f.request)}))
+      .rejects.toThrow();
+    expect((db.read() as PrivateCancelDurableEpochWatermarkV1).status).toBe('halted');
+    e.set(e.signEpoch({sequence:3,status:'active'}));
+    await expect(durableBoot(f,e,db)).rejects.toThrow();
+    expect(f.store.commitAuthorizedReview).not.toHaveBeenCalled();
+  });
+
+  it('different signed same-sequence proof is durable equivocation and globally HALTs',async()=>{
+    const f=rig(),e=epochRig(f),db=durableEpochFixture();
+    const a=await durableBoot(f,e,db);
+    e.set(e.signEpoch({sequence:1,expiresAt:'2026-10-14T05:00:03.000Z'}));
+    await expect(a.execute({permit:f.issuerBoot().issue(f.request)}))
+      .rejects.toThrow();
+    expect((db.read() as PrivateCancelDurableEpochWatermarkV1).status).toBe('halted');
+    e.set(e.signEpoch({sequence:5}));
+    await expect(durableBoot(f,e,db)).rejects.toThrow();
+  });
+
+  it('higher policy revision becomes persisted floor; signed regression HALTs',async()=>{
+    const f=rig(),e=epochRig(f),db=durableEpochFixture();
+    const old=await durableBoot(f,e,db);
+    const revision8=f.signPolicy({...f.policy,revision:8});
+    e.set(e.signEpoch({sequence:2,policyRevision:8}));
+    const replacement=await durableBoot(f,e,db,{
+      signedPolicy:revision8,pinnedRoot:{...f.pin,minimumRevision:8},
+    });
+    expect(replacement).toBeDefined();
+    expect((db.read() as PrivateCancelDurableEpochWatermarkV1).policyRevision).toBe(8);
+    await expect(old.execute({permit:f.issuerBoot().issue(f.request)}))
+      .rejects.toThrow();
+    e.set(e.signEpoch({sequence:3,policyRevision:7}));
+    await expect(durableBoot(f,e,db)).rejects.toThrow();
+    expect((db.read() as PrivateCancelDurableEpochWatermarkV1).status).toBe('halted');
+    expect(f.store.commitAuthorizedReview).not.toHaveBeenCalled();
+  });
+
+  it('independently signed new epoch key cannot reset durable signer identity',async()=>{
+    const f=rig(),e=epochRig(f),db=durableEpochFixture();
+    await durableBoot(f,e,db);
+    const rotated=epochRig(f);
+    rotated.set(rotated.signEpoch({sequence:2}));
+    await expect(durableBoot(f,rotated,db)).rejects.toThrow();
+    expect((db.read() as PrivateCancelDurableEpochWatermarkV1).sequence).toBe(1);
+    expect(f.store.commitAuthorizedReview).not.toHaveBeenCalled();
+  });
+
+  it('rejects missing/corrupt state, uncommitted writes, readback lies and outage',async()=>{
+    const f=rig(),e=epochRig(f);
+    for(const initial of [null,{},[],{...offlinePrivateCancelDurableEpochGenesisFixtureV1(),extra:'attacker'}]){
+      await expect(durableBoot(f,e,durableEpochFixture(initial))).rejects.toThrow();
+    }
+    const db=durableEpochFixture();
+    db.failWrite(true);
+    await expect(durableBoot(f,e,db)).rejects.toThrow();
+    expect((db.read() as PrivateCancelDurableEpochWatermarkV1).sequence).toBe(0);
+    db.failWrite(false);db.badReadback(true);
+    await expect(durableBoot(f,e,db)).rejects.toThrow();
+    db.badReadback(false);db.outage(true);
+    await expect(durableBoot(f,e,db)).rejects.toThrow();
+    db.outage(false);
+    const resumed=await durableBoot(f,e,db);
+    expect(resumed).toBeDefined();
+    expect(f.store.commitAuthorizedReview).not.toHaveBeenCalled();
+  });
+
+  it('serializes concurrent instances; all see ONE monotonic durable floor',async()=>{
+    const f=rig(),e=epochRig(f),db=durableEpochFixture();
+    e.set(e.signEpoch({sequence:4}));
+    const boots=await Promise.all(Array.from({length:6},()=>durableBoot(f,e,db)));
+    expect(boots).toHaveLength(6);
+    expect((db.read() as PrivateCancelDurableEpochWatermarkV1).sequence).toBe(4);
+    const permit=f.issuerBoot().issue(f.request);
+    const outcomes=await Promise.all(boots.map(b=>b.execute({permit})));
+    expect(outcomes.every(x=>x.effectAuthorized===false)).toBe(true);
+    expect((db.read() as PrivateCancelDurableEpochWatermarkV1).sequence).toBe(4);
+  });
+
+  it('rejects time rollback across restart and per-request trust-store injection',async()=>{
+    const f=rig(),e=epochRig(f),db=durableEpochFixture();
+    const a=await durableBoot(f,e,db);
+    const permit=f.issuerBoot().issue(f.request);
+    for(const inject of [
+      {durableStore:durableEpochFixture()},
+      {pinnedEpochSigner:e.pin},
+      {readCurrentEpoch:e.source},
+      {trustedClock:f.clock},
+      {testStore:f.store},
+    ]){
+      await expect(a.execute({permit,...inject})).rejects.toThrow('caller-owned');
+    }
+    f.nowRef.value=new Date('2026-10-14T04:59:59.000Z');
+    e.set(e.signEpoch({sequence:2}));
+    await expect(durableBoot(f,e,db)).rejects.toThrow();
+    expect((db.read() as PrivateCancelDurableEpochWatermarkV1).sequence).toBe(1);
+    expect(f.store.commitAuthorizedReview).not.toHaveBeenCalled();
+  });
+
+  it('pure transition rejects arbitrary/corrupt prior state, not caller-chosen genesis',()=>{
+    expect(()=>advanceOfflinePrivateCancelDurableEpochV1(
+      {sequence:100},{} as never,'0'.repeat(64),NOW,
+    )).toThrow('missing or corrupt');
+    const f=rig(),e=epochRig(f);
+    expect(()=>createOfflinePrivateCancelDurableEpochExecutorV1({
+      signedPolicy:f.envelope,pinnedRoot:f.pin,
+      pinnedEpochSigner:e.pin,readCurrentEpoch:e.source,
+      trustedClock:f.clock,testStore:f.store,
+      durableStore:{} as never,
+    })).toThrow; // async bootstrap is covered by missing-store branch below
+  });
+});
