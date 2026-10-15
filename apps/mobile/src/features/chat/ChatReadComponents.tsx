@@ -2,10 +2,12 @@ import type { MobileChatThreadSnapshotV1 } from '@/features/chat/mobile-chat-rea
 import { createMobileChatMessageViewV1 } from '@/features/chat/chat-view-model';
 import { resolveMobileChatCharacterPresentationV1 } from '@/features/chat/chat-character-presentation';
 import { projectMobileChatEmptyGreetingV1 } from '@/features/chat/mobile-chat-empty-greeting';
-import { MOBILE_CHAT_LAUNCH_ROSTER_V1 } from '@/features/chat/chat-launch-roster';
+import { MOBILE_CHAT_KNOWN_CHARACTERS_V1 } from '@/features/chat/chat-launch-roster';
+import { resolveMobileChatPortraitV1 } from '@/features/chat/chat-character-portraits';
 import { mobileColors } from '@/ui/mobile-colors';
 import {
   ActivityIndicator,
+  Image,
   Pressable,
   TextInput,
   StyleSheet,
@@ -20,13 +22,14 @@ export function ChatReadHeader({
 }) {
   const character = snapshot.characterId === null
     ? null
-    : MOBILE_CHAT_LAUNCH_ROSTER_V1.find(
+    : MOBILE_CHAT_KNOWN_CHARACTERS_V1.find(
         (entry) => entry.characterId === snapshot.characterId,
       ) ?? null;
   const presentation = character === null
     ? null
     : resolveMobileChatCharacterPresentationV1(character.characterId);
   const displayName = character?.displayName ?? '대화 상대';
+  const portrait = resolveMobileChatPortraitV1(snapshot.characterId);
   const isSeyeonTheme = snapshot.characterId === 'seyeon';
   const meta = presentation === null
     ? '서버가 확인한 대화방'
@@ -35,9 +38,18 @@ export function ChatReadHeader({
   return (
     <View style={[styles.headerCard, isSeyeonTheme && styles.seyeonSurface]}>
       <View style={styles.avatar}>
-        <Text style={styles.avatarText}>
-          {character === null ? '明' : displayName.slice(0, 1)}
-        </Text>
+        {portrait === null ? (
+          <Text style={styles.avatarText}>
+            {character === null ? '明' : displayName.slice(0, 1)}
+          </Text>
+        ) : (
+          <Image
+            source={portrait}
+            style={styles.avatarPortrait}
+            resizeMode="cover"
+            accessibilityLabel={`${displayName} 대리자 초상화`}
+          />
+        )}
       </View>
       <View style={styles.headerCopy}>
         <Text style={styles.headerTitle}>{displayName}</Text>
@@ -240,10 +252,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 24,
+    overflow: 'hidden',
     borderWidth: 1,
     borderColor: mobileColors.gold,
   },
   avatarText: { color: mobileColors.navy, fontSize: 20, fontWeight: '900' },
+  avatarPortrait: { width: '100%', height: '100%' },
   seyeonSurface: {
     backgroundColor: 'rgba(255, 250, 242, 0.90)',
     borderColor: 'rgba(181, 132, 94, 0.24)',
