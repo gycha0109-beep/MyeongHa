@@ -48,8 +48,47 @@ Watchtower-Track: saju-bridge
 
 ## 5. 다음 작업의 분리
 
-- **현재 진행 중:** Source SQL 수정/폐기형 PG17 검증과 CI 및 정확한 대상·권한 리뷰.
-- **사용자 판단 대기 지점:** S2 PASS + baseline/백업/적용 리스크 최종 확인을 마친 뒤 **S3A DB DDL 허가**만 질문한다.
+- **S2 완료:** 실제 폐기형 PostgreSQL 17 및 비슈퍼유저 managed migration actor 검증 PASS — PR #2128 병합, 최종 통합 CI 11/11 PASS. S2 증빙은 운영 DB 복원 증빙과 별개입니다.
+- **사용자 판단 대기 지점:** S2 PASS와 정확한 소스·대상·위험을 제시해 **S3A DB DDL 허가만** 질문한다. 허가 후라도 최신 백업에 결속된 복원 리허설과 fresh preflight 등 미충족 안전 게이트가 있으면 SQL 적용 금지.
 - **향후(첫 승인으로 수행하지 않음):** 제한적 DB 연결·Owner 인증/서명·실제 사주 엔진 검증, Reading/Entitlement 서비스 테스트, 단계적 출시 승인.
 
 **불변:** `stagingAdmission=HOLD`, `operationalEvidence=NOT_VERIFIED`, `canRunOnce/canExecute/canPublish/canSell=false`, 기존 R01–R14는 NOT_VERIFIED. 누적 테스트 성공을 실제 출시 인가로 해석하지 않는다.
+
+
+## 6. S2 병합 후 변경 원문 및 운영 증빙 고정 — 2026-10-15 추가 검토
+
+> **S3A 코드 검증 완료 / 실제 운영 DDL 미적용 / 복구 gate 미충족.** 이 추가 검토는 새 인증·배포·실행 권한을 부여하지 않는다.
+
+### 6.1 정확한 승인 대상 (immutable source pin)
+
+- 저장소: `gycha0109-beep/MyeongHa` / 병합된 기준 `main@4f7accaa614b9faa15737c068f665e5ef8172123` (PR #2128, 2026-10-15 19:17 KST).
+- SQL 파일: `supabase/proposals/1730_saju_bridge_single_project_operator_permit_v1.sql` — **절대 `supabase/migrations/`로 이동하지 않음**.
+- 파일 Git blob SHA-1: `42e076799d627bc9e19fe28e1ad25b4548e05e61`.
+- SQL 전체 내용 SHA-256 (파일에 저장된 9951 ASCII bytes, 최종 개행 포함): `900e0771915776b4a7c2a8b3cf60e24b83c79fcec14f27cf6356b44685b385e2`.
+- PR HEAD: `c1e2dac0dd7e527947627bdf58b256da4b0e2f0b`; [최종 fixed-head CI #38718512449](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38718512449) **11/11 SUCCESS**; [PG17 scoped CI #38717886391](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38717886391) **9/9 SUCCESS**. 격리형 PG17에서 역할·RLS·거부 권한·정확한 permit·경합·잠금 대기 후 만료·실패 원자성 확인.
+- 병합 후 [Supabase Production workflow #38719197486](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38719197486): `detect-production-db-relevance=success`, **`deploy-migrations=skipped`**. 따라서 이 병합의 일반 마이그레이션 배포 경로는 실행되지 않았다.
+
+### 6.2 확인한 운영 인프라 경계 (읽기 전용)
+
+- 연결된 실프로젝트 `MyengHa` / ref `cnsfpcdiyofqvhpcegfc` / Singapore / `ACTIVE_HEALTHY` / PostgreSQL **17.6.1.166**, 최신 관리 평면 조회로 일치.
+- 연결된 프로젝트의 `list_migrations`: **173개**, 번호형 최신 **1510**, 최종 원격 타임스탬프 **20261008090417**. `1520`–`1720`, 특히 `1540` nonce는 소스에 있지만 적용 이력에 없음.
+- `list_tables(saju_bridge_private)`는 **0개**로 응답. 이는 해당 schema·역할·함수 부재를 단독으로 보증하지 않는다. 이미 기록된 운영 `pg_catalog` 읽기 조회는 해당 객체 부재를 확인했지만, 이번 신규 사전 조회에서 민감한 시스템 카탈로그 SQL은 도구 보안 게이트가 차단했으므로 **승인 후 최종 적용 직전 별도 권한 있는 읽기 전용 확인이 다시 필요**하다.
+- Security Advisor 재조회: 기존 `policy_exists_rls_disabled` 6건 및 `auth_leaked_password_protection` 1건. 별도 제품 위험이며 이번 S3A의 신설 private 객체에 대한 정책 자동 승격이나 임의 수정은 불허.
+
+### 6.3 복구 증빙 — **현재 S3A 적용 보류 원인**
+
+- [암호화 운영 논리 백업 #38641851823](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38641851823): **SUCCESS**, 2026-10-15 06:38 KST 시작. Artifact `myeongha-postgres-20261014T213954Z`, artifact ID `11930481921`, **expired=false**, 만료 예정 **2026-11-14 06:42 KST**. 백업 내용 다운로드·복호화·개인정보 조회는 하지 않음.
+- 확인된 [격리 복원 리허설 #38090483306](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38090483306)은 **SUCCESS**이지만 **2026-10-11 07:11 KST 시작한 과거 복원**이다. 위 #38641851823의 백업과 **같은 아티팩트를 복원했다는 증거가 아니므로**, S3A 직전 fresh backup → isolated restore chain gate는 **NOT_VERIFIED**.
+- **적용 전 필수:** 동일한 최근 백업 run/artifact를 출처로 한 새 격리 복원 리허설의 run ID, 성공, checksum/manifest, migration frontier, 의도한 복원 검증 통과를 독립 확인. 기존 Actions `postgres-isolated-restore-drill.yml` 재사용, 대상은 폐기형 격리 DB. Production에는 어떤 쓰기도 하지 않는다. 해당 검증이 완료되지 않으면 S3A를 승인받아도 적용 중단.
+
+### 6.4 단일 SQL만의 일회성 적용 절차 — 아직 **미실행**
+
+1. Owner가 S3A 범위·단일 프로젝트 공유 실패 도메인을 별도로 명시 승인하고, 실행 시간 창과 중단 책임자를 지정한다. 승인 전 쿼리·DDL에 신규 변경 없음.
+2. 운영 마이그레이션 이력 및 대상 `pg_namespace/pg_roles/pg_class/pg_proc` 충돌을 **실행 직전** 읽기 전용으로 검증한다. 프로젝트 ref, DB host/TLS `verify-full` CA 검증, PostgreSQL major, 최소 관리자 실행 identity와 권한, source/commit/digest, 백업→동일 아티팩트 복원 증빙 모두 일치해야 한다. SQL 내용·지정 객체·기존 migration 경로가 바뀌면 HOLD.
+3. 기존 `scripts/operations/run-supabase-production-migrations.sh` 및 `supabase db push --include-all` **사용 금지**. 운영 DB 연결은 승인된 executor/세션에서 **하나의 SQL 원문을 하나의 트랜잭션**(`BEGIN`→승인 SQL 원문→검증→`COMMIT`)으로 제한. 빈 테이블/새 역할/비공개 함수 외의 변화는 금지. 마이그레이션 history에 임의 버전 삽입·`migration repair` 금지. 승인하지 않은 신규 login/키 또는 서비스 호출 금지.
+4. COMMIT 전/후 검증: schema 1개, 신설 empty table 2개, NOLOGIN/NOINHERIT/NOBYPASSRLS 역할 2개, 비공개 함수 1개, FORCE RLS, 기본 함수 `PUBLIC EXECUTE` 제거, client/API/service_role/기존 runtime 차단 및 executor의 permit 직접 쓰기 차단. `pg_roles`·객체 권한 catalog만 읽고 기존 회원·출생·Reading 행은 조회하지 않음. `supabase_migrations` 변동 없음, 기존 Production ACL/기능 변동 없음.
+5. 프리플라이트나 commit 후 권한 차이 발견 시 즉시 서비스 연동·소비를 계속 HOLD. 트랜잭션 실패는 전체 ROLLBACK. COMMIT 여부 불명확하면 **재실행 금지** 후 읽기 전용 실제 catalog 판정. 이미 COMMIT된 객체는 Owner의 별도 변경 승인 없이 `DROP`/강제 복원/감사 삭제 금지. 독립된 되돌리기 계획을 먼저 심의한다.
+
+### 6.5 S3A와 실제 사주 운영 승인 분리
+
+S3A는 DB 내부 **미연결·무발급·0행 구조**만 만드는 승인이다. 기존 고격리 R01–R14는 모두 NOT_VERIFIED. 현 단계에서는 Owner 강인증/독립 서명, Login/Secret/연결, `1540` nonce 배포, 실사주 호출, 실사용자 Reading, 공개/판매, Runner 실행을 승인하거나 검증하지 않는다. 계속 `stagingAdmission=HOLD`, `operationalEvidence=NOT_VERIFIED`, `canRunOnce/canExecute/canPublish/canSell=false`.
