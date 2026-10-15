@@ -154,6 +154,22 @@ export function validateR2PendingInventory(root, manifest) {
     '1710_RPC_OWNER_ROLE_SOURCE_DRIFT');
   assert(!/^begin;$/imu.test(src1710) && !/^commit;$/imu.test(src1710),
     '1710_TRANSACTION_BOUNDARY_DRIFT');
+  // 1720 is a D-01 Reader Product read bridge, not a sale or grant.
+  // Its role-named PUBLIC privilege check is part of its pinned original
+  // SQL and must be tested, not silently normalized or Production-applied.
+  const stage1720 = manifest.migrations.find(row => row.version === '1720');
+  const src1720 = readFileSync(join(dir, stage1720.file), 'utf8');
+  assert(stage1720.requires.length === 0, '1720_PENDING_REVIEW_DEPENDENCY_DRIFT');
+  assert(src1720.includes('standard_reading_product_specs')
+    && src1720.includes('join public.products product')
+    && src1720.includes('security definer')
+    && src1720.includes('myeongha_api_executor')
+    && src1720.includes("pg_catalog.has_function_privilege(\n      'public',")
+    && src1720.includes("spec.reader_selection_mode = 'required'")
+    && src1720.includes("spec.purchase_unit_mode = 'topic_reader_reading'"),
+    '1720_PUBLIC_ROLE_CHECK_OR_SCOPE_SOURCE_DRIFT');
+  assert(!/^begin;$/imu.test(src1720) && !/^commit;$/imu.test(src1720),
+    '1720_TRANSACTION_BOUNDARY_DRIFT');
   assert(grouped.size === 9, 'REVIEW_UNIT_CARDINALITY');
   const reviewUnits = [...grouped].map(([unit, versions]) => ({
     unit, versions, start: versions[0], end: versions.at(-1),
