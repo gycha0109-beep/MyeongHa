@@ -397,3 +397,9 @@ Governor 04d4B 계열은 실제 격리 PostgreSQL 기반 영수증 임대·정�
 - [PR #2114](https://github.com/gycha0109-beep/MyeongHa/pull/2114), 기술 HEAD `2ee6a337e687643f393d74608473f45e898e0e56`, [CI #38692238411 PG17 job 116280741031](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38692238411) SUCCESS. 원본 1720 Rollback/Forward, PRODUCT/SPEC 기존 ACL 불변, API Executor EXECUTE만 허용, browser/service/PUBLIC 거부, NULL/빈 Product Scope 입력 거부, 폐기 DB 삭제 PASS. `has_function_privilege('public', …)` 원문 검사는 **정상 작동**함.
 - **`HOLD_R2_H_1720_PRIVILEGED_SECURITY_DEFINER_CREATOR_OWNER_REVIEW`**: PG17 원본 실행 Creator=`postgres`가 SECURITY DEFINER Owner로 남는다. 실제 운영 DDL Actor와 다를 수 있으며 Reader-Product DB/Security Owner의 최소권한 승인과 활성 Product 양수 조회·Reader Rule/Offer/Grant/Purchase E2E 필요. 자세한 근거는 [R2 패킷 §31.2](SEYEON_MIGRATION_LINEAGE_R2_READONLY_PACKET_20261013.md).
 - PG17 기술 PASS는 최종 PR HEAD CI/Full Integration·병합 및 Production 적용 승인 아님. 원본 SQL·운영 ACL/Role/History 변경 0, 21건 Owner HOLD와 Reader/AI paid/public OFF, `drReady=false` 지속.
+
+## 34. 2026-10-15 R2-H 독립 검토 이후 Owner 결정 핸드오프 (배포 HOLD)
+
+- [PR #2114](https://github.com/gycha0109-beep/MyeongHa/pull/2114) exact-head [Full Integration #38693317122](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38693317122) SUCCESS 후 main `b58954caee0c28c81bd4ef5f5b7ff0eb6ccb965b` 병합. 병합 후 [Supabase Production #38693883787](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38693883787) SUCCESS이나 **배포·Backfill SKIPPED**.
+- 같은 날 운영 DB에서 SELECT-only 신규 집계: 1400~1510 적용 이력 **12/12**, 1520~1720 **0/21**, 원격 전용 `20261008090417` **1**. 원격 전용 본문 메타데이터 **1 statement / 104,021 bytes / MD5 `f70776d8c0f6369f6f13484ba9fa2271`** 재확인. 이는 출처/서명/승인을 증명하지 않으며 계보 복구 작업 금지 상태를 바꾸지 않는다.
+- 전체 승인/위험/소유자 결정과 read-only 재검증 SQL은 **[R2 Owner 결정 핸드오프 (2026-10-15)](SEYEON_R2_OWNER_DECISION_HANDOFF_20261015.md)**에서 통합 관리. 1520~1660 전 구간 기술 승인 완료를 선언하지 않는다. 21건 모두 `HOLD_OWNER_REVIEW`, G0~G6/paid/public OFF, `drReady=false`.
