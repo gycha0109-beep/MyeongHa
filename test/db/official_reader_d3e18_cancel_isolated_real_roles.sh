@@ -76,7 +76,7 @@ begin
     where rolname in ('myeongha_cancel_d3e18_verifier_ci',
                       'myeongha_cancel_d3e18_executor_ci',
                       'myeongha_cancel_d3e18_owner_ci')
-    and (not rolcanlogin or rolcaninherit or rolsuper or rolbypassrls
+    and (not rolcanlogin or rolinherit or rolsuper or rolbypassrls
          or rolcreaterole or rolcreatedb)
   ) then raise exception 'synthetic service roles are privileged'; end if;
 end $$;
