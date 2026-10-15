@@ -152,7 +152,7 @@ function checkedOwnerPage(rows: readonly OwnerPageRow[], input: PageInput) {
 export function createSeyeonOfflineHistoryDisclosurePortR5():
     SeyeonChatHistoryDisclosurePortV1 {
   return Object.freeze({
-    async readAuthorizedPage(input) {
+    async readAuthorizedPage(input: Parameters<SeyeonChatHistoryDisclosurePortV1['readAuthorizedPage']>[0]) {
       if (input.characterId !== 'seyeon' ||
           !nonblank(input.subjectId) || !nonblank(input.threadId) ||
           !Number.isSafeInteger(input.afterSequenceNo) ||
@@ -182,7 +182,7 @@ export function createSeyeonOfflineStreamDisclosurePortR5(
 ): ChatThreadStreamReadAuthorityPortV1 {
   const history = createSeyeonOfflineHistoryDisclosurePortR5();
   return Object.freeze({
-    async readStream(input) {
+    async readStream(input: Parameters<ChatThreadStreamReadAuthorityPortV1['readStream']>[0]) {
       const messages = await history.readAuthorizedPage({
         client,subjectId:input.subjectId,threadId:input.threadId,
         afterSequenceNo:input.afterSequenceNo,pageSize:50,
@@ -212,7 +212,7 @@ export function createSeyeonOfflineTurnDisclosurePortR5(
   pool: PostgresSubjectPoolV1,
 ): SeyeonChatTurnControlledDisclosurePortV1 {
   return Object.freeze({
-    async reveal(input) {
+    async reveal(input: Parameters<SeyeonChatTurnControlledDisclosurePortV1['reveal']>[0]) {
       if (!nonblank(input.subjectId) || !nonblank(input.threadId) ||
           !nonblank(input.turnId) || !nonblank(input.attemptId) ||
           !nonblank(input.assistantMessageId) ||
