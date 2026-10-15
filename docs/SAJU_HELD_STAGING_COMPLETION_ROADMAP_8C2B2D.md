@@ -76,6 +76,16 @@ Watchtower-Track: saju-bridge
 
 1인 Owner 운영 정책 SO-2의 폐기형 검증을 `apps/api/src/saju-held-staging-registry-floor-v1.ts` 및 PostgreSQL 격리 CI에 추가한다. 서명/Root pin과 floor 변경 결속·role ACL·원자적 고수위·복원 역행·revocation/동시성 테스트가 목표다. **검증된 별도 운영 Root custody/KMS·관리 평면·외부 high-water anchor·실환경 R01–R14를 입증하지 않는다.** 자세한 보안 한계는 [SO-2 검증 경계](./SAJU_SOLO_OWNER_SO2_REGISTRY_FLOOR_SYNTHETIC.md) 참고. `NOT_VERIFIED/HOLD` 및 실행/판매 false 유지.
 
+## 2G. Windows Phase 5 Acceptance 및 Phase 4A–4H 상태 인수 (2026-10-15)
+
+- **실제 마지막 완료 코드 단계:** Phase 4H [PR #2092](https://github.com/gycha0109-beep/MyeongHa/pull/2092), HEAD `2be8c6e5de3d8fa8d7378e752b86200e6485fc75`, squash `939626e5597fd8d0970784e141da493f0f7ec24a`; [폐기형 Docker CI #38539255532](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38539255532) SUCCESS, [전체 CI #38540349736](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38540349736) **11/11 SUCCESS**. Phase 4A–4F 및 4G는 각 해당 병합과 CI가 선행되며, Phase 4I는 이 로드맵에 없다.
+- **Windows 로컬 사용자 제출:** `[saju-bridge] Phase 4H PASS: cross-run replay, inconsistent same-run evidence, reused synthetic semantics and stale claims all remain HOLD; no persistent registry or permissions.` (사용자 제공 텍스트; 독립 수집 원본 로그 아님).
+- **현행 실행기 제어 흐름:** 해당 PASS는 1–4H 순차 옵션과 disposable cleanup 성공 후 실패가 없을 때 출력된다. 하지만 전달된 단일 로그행으로 Windows/Node/Compose의 정확한 버전, 로컬 양쪽 HEAD, 전체 중간 PASS, 실제 종료코드·정리 결과까지 제삼자 독립 확인했다고 기록해서는 안 된다.
+- **첫 번째 무권한 미완료 인수 조건:** [Windows Docker Phase 5 설계/증빙 매트릭스](./SAJU_BRIDGE_WINDOWS_DOCKER_DISPOSABLE_ARCHITECTURE_V1.md#4a-phase-5--증명-가능한-범위와-미확보-증거)의 양쪽 SHA·working tree 상태, Windows/Node/Docker/Compose, 완전한 1–4H 결과, fail-closed, project-scoped 자원 잔존 0과 프로세스 종료코드. 상태는 **USER_REPORTED_PASS / PHASE_5_NOT_FULLY_EVIDENCED**.
+- 이 증빙 부족은 Phase 4H 코드/CI 완료를 되돌리지 않으며 새 합성 Phase를 열 근거도 아니다. Windows 호스트는 현재 GitHub CI 실행기가 직접 관찰할 수 없으므로 사용자 실기기에서 수집한 비밀 없는 원본 증빙이 필요하다. 관련 구현은 추가하지 않는다.
+- **운영 완료와 독립:** 3-04-02 실제 Root/Key custody, 3-04-03B 실제 R01–R14, 3-04-04 제한 Target Authority V2, 2D-4 승인 단일 격리 실행은 모두 미검증/HOLD. 별도 1인 Owner 강인증·키/서비스·관리 평면 분리·운영 증빙/비용 승인 선행. 두 서비스 ID가 두 명의 독립 인간 승인자는 아니다.
+- **종료 기준 C:** 추가 구현보다 Windows 실기기 증빙과 운영 외부 승인에 종속. `stagingAdmission=HOLD`, `stagingConnection=NOT_VERIFIED`, `operationalEvidence=NOT_VERIFIED`, `canRunOnce/canExecute/canPublish/canSell=false`, `automaticRetry/automaticCompensation=false`.
+
 ## 3. 코드·운영 병렬화와 범위 제한
 
 - 3-04-02의 **명세/테스트 포트**는 실환경 운영 권한 없이 미리 검토 가능하다. Root/KMS/저장소 생성·권한 부여는 별도 운영 결정 후 진행.
@@ -91,6 +101,7 @@ Watchtower-Track: saju-bridge
 | 서명/정적 신뢰 평가 | #1850 #1851 #1862 | 코드 완료 / 운영 비인증 |
 | 운영 증빙 목록 및 중단 절차 | #1856, R01–R14 | 문서 완료 / 운영 미검증 |
 | 개별 부정 시험 T01–T40 | 기존 합성 테스트 분산 | **개별 대응표 미완료** |
+| Windows Docker Phase 5 Acceptance | Phase 1–4H 폐기형 CI·[#2092](https://github.com/gycha0109-beep/MyeongHa/pull/2092), 사용자 제공 Windows 4H PASS 한 줄 | **부분 증빙:** 전체 호스트 환경·양쪽 HEAD·중간 로그·종료코드/cleanup 원본 미확보; 최종 인수 미완료 |
 | 독립 Root 및 durable revision/challenge | 3-04-02 | 합성 저장소 검증 #1925 병합 / 운영 미검증 |
 | 실환경 Auth·DB 3종·Saju Proof | 로컬 2A–2I 합성/실소켓 검증, Admission 38 PASS·병합 #1913; 3-04-03A 인덱스 계약 / 03B 실제 probe | 3 DB 동일 검증 흐름(2J) 합성 완료, R05–R14 독립 운영 관찰 미완료 |
 | Target Authority V2 + Runner | 3-04-04 | 미연결 |
