@@ -27,7 +27,7 @@ describe('read-only Vercel Production OAuth gate inspection', () => {
   });
 
   it('calls project-scoped Vercel metadata with GET only and never sends a body', async () => {
-    const fetchImpl = vi.fn(async () => ({
+    const fetchImpl = vi.fn(async (_url: URL, _options: RequestInit) => ({
       ok: true,
       json: async () => ({ envs: [] }),
     }));
@@ -39,7 +39,9 @@ describe('read-only Vercel Production OAuth gate inspection', () => {
     });
     expect(result.flags.MYEONGHA_SOCIAL_AUTH_GOOGLE_ENABLED).toBe('missing');
     expect(fetchImpl).toHaveBeenCalledOnce();
-    const [url, options] = fetchImpl.mock.calls[0];
+    const call = fetchImpl.mock.calls[0];
+    expect(call).toBeDefined();
+    const [url, options] = call!;
     expect(String(url)).toContain(pinned.projectId);
     expect(String(url)).toContain(pinned.teamId);
     expect(options.method).toBe('GET');
