@@ -60,7 +60,7 @@ HA="myeongha-guest-bearer-hmac-sha256-v1:$(printf 'a%.0s' {1..64})"
 HB="myeongha-guest-bearer-hmac-sha256-v1:$(printf 'b%.0s' {1..64})"
 HC="myeongha-guest-bearer-hmac-sha256-v1:$(printf 'c%.0s' {1..64})"
 psql -X -q -v ON_ERROR_STOP=1 -v ha="$HA" -v hb="$HB" -v hc="$HC" <<'SQL' >/dev/null
-insert into auth.users(id) values('e1100000-0000-0000-0000-000000000001'),('e1100000-0000-0000-0000-000000000002');
+insert into auth.users(id) values('e1100000-0000-0000-0000-000000000001'),('e1100000-0000-0000-0000-000000000002'),('e1100000-0000-0000-0000-000000000003');
 insert into public.subjects(id,kind,auth_user_id,status,merged_into_subject_id,created_at,updated_at) values
 ('e1200000-0000-0000-0000-000000000001','guest',null,'active',null,clock_timestamp(),clock_timestamp()),
 ('e1200000-0000-0000-0000-000000000002','guest',null,'active',null,clock_timestamp(),clock_timestamp()),
@@ -104,5 +104,20 @@ wait "$guest_pid" || hold GUEST_SESSION_FAILED
 wait "$promotion_pid" || hold PROMOTION_SESSION_FAILED
 deny PROMOTED_PROOF 'no longer an active canonical Guest' "begin; set local role myeongha_seyeon_governed_executor; select subject_kind from public.begin_seyeon_governed_guest_subject_context_v1('$HC');"
 pass SUBJECT_SESSION_LOCK_ORDER
+# Reverse race: promotion holds Subject UPDATE; resolver must wait and reject
+# the now-consumed Guest proof, never return a stale session context.
+(
+  PGAPPNAME=seyeon_1680_promotion_first psql -X -qAt -v ON_ERROR_STOP=1 -c "begin; select set_config('myeongha.subject_id','e1200000-0000-0000-0000-000000000001',true); select subject_kind from public.cmd_promote_guest_runtime_v1('e1200000-0000-0000-0000-000000000001','e1300000-0000-0000-0000-000000000001','e1100000-0000-0000-0000-000000000003'); select pg_sleep(1.8); commit;" >"$race/promote_first" 2>&1
+) & promotion_pid=$!
+sleep 0.4
+(
+  PGAPPNAME=seyeon_1680_guest_wait psql -X -qAt -v ON_ERROR_STOP=1 -c "begin; set local role myeongha_seyeon_governed_executor; select subject_kind from public.begin_seyeon_governed_guest_subject_context_v1('$HA'); commit;" >"$race/guest_wait" 2>&1
+) & guest_pid=$!
+sleep 0.4
+[[ "$(psql -X -Atqc "select count(*) from pg_stat_activity where application_name='seyeon_1680_guest_wait' and wait_event_type='Lock'")" == 1 ]] || hold GUEST_NOT_BLOCKED_BY_PROMOTION
+wait "$promotion_pid" || hold PROMOTION_FIRST_FAILED
+if wait "$guest_pid"; then hold STALE_GUEST_AFTER_PROMOTION_ALLOWED; fi
+grep -q 'no longer an active canonical Guest' "$race/guest_wait" || hold WRONG_STALE_GUEST_DENIAL
+pass PROMOTION_FIRST_STALE_GUEST_DENIED
 [[ "$(catalog)" == "$meta_before" ]] || hold POST_TEST_OWNER_ACL_DRIFT
 echo "HOLD_R2_H_1680_OWNER_APPROVAL_REQUIRED fundedAdmissionE2E=false productionWrites=0 drReady=false"
