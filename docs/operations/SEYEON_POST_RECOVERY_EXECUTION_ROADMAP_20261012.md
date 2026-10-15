@@ -366,3 +366,10 @@ Governor 04d4B 계열은 실제 격리 PostgreSQL 기반 영수증 임대·정�
 - [PR #2104](https://github.com/gycha0109-beep/MyeongHa/pull/2104), 검증 HEAD `3b38bf1f56f5b42f88686b83ecb0e392fc269d29`, [PG17 #38669716462 job 116209852396](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38669716462) SUCCESS. 원본 `1700` 롤백·단일 트랜잭션 Forward, Rate Snapshot Pin, immutable/invalid ceiling/ungoverned 부정, 카탈로그 권한 보존 및 DB 폐기 확인. 세부 기술·위험 증거는 [R2 패킷 §29.1](SEYEON_MIGRATION_LINEAGE_R2_READONLY_PACKET_20261013.md)만 정본으로 참조.
 - **`HOLD_R2_H_1700_SQL_NULL_RECEIPT_SHAPE_GAP_REPRODUCED`:** 원본 Receipt CHECK와 동형의 TEMP SQL에서 `pinned_at` 존재/입력 Rate `NULL` 행이 CHECK를 우회했다. UPDATE-only Trigger가 일반 INSERT도 보호한다고 주장할 수 없음. 실제 API 직접 권한/Production 악용은 미검증. NULL-safe forward-only 대안·별도 Owner 승인 및 실제 Ledger INSERT 경계를 평가하기 전까지 1700 Owner HOLD/Production 적용 금지.
 - 이 증거는 PostgreSQL 기술 재현이지 Owner approval/DR Ready, 최종 PR HEAD Full Integration·병합 승인 아님. `fundedAdmissionE2E=false`, `drReady=false`, 21건 Owner HOLD 및 G0~G6/paid/public OFF 유지.
+
+## 32. 2026-10-15 R2-H 1710 — Provider Receipt Queue 격리 보안 검토 (Owner HOLD)
+
+- 이전 단위 1700 검증·문서 PR [#2104](https://github.com/gycha0109-beep/MyeongHa/pull/2104)는 최신 Base Full Integration [#38685929021](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38685929021) 전부 SUCCESS, squash merge `fb3b07bf38f063a3269529e8e1704a0ce6bbc3bc`. 원본 1700 **SQL NULL Receipt CHECK 우회 Owner HOLD**와 운영 비활성 상태는 계속 유지된다.
+- 다음 1710 원본 `1d0e773a8e8b27474a0fde182d75433077d8add8` 불변. 검토 인벤토리의 `requires`만 `['1550','1580','1630','1690','1700']`으로 보정. 기존 PG17 CI 일회용 DB에 원본 1690 COMMIT과 1700을 선행 적용한 후, 원본 1710 롤백 및 Forward 재생·Queue/RLS/FK/Owner/Store-Claim-Ack 분리 ACL·Role cleanup을 검증한다.
+- `outcome`/`costStatus` 필수 Enum 필드가 누락되었을 때 SQL `NOT IN` 조건이 UNKNOWN으로 평가되는 **잠재 malformed receipt admission**을 독립 진단한다. 전체 실제 Ledger 예약·Store·Claim·Settle·Ack E2E, 액터 간 경합/Provider 송신/운영 Actor 증명은 **미수행**이므로 별도 Owner 승인 전에는 절대로 큐/AI/유료/Reader를 활성화하지 않는다.
+- 범위와 HOLD의 세부 정본은 [R2 패킷 §30](SEYEON_MIGRATION_LINEAGE_R2_READONLY_PACKET_20261013.md). 실제 PG17 결과·PR Full Integration·병합 기록은 후속 측정 없이 성공으로 간주하지 않는다.
