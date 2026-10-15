@@ -78,13 +78,12 @@ Watchtower-Track: saju-bridge
 
 ## 2G. Windows Phase 5 Acceptance 및 Phase 4A–4H 상태 인수 (2026-10-15)
 
-- **실제 마지막 완료 코드 단계:** Phase 4H [PR #2092](https://github.com/gycha0109-beep/MyeongHa/pull/2092), HEAD `2be8c6e5de3d8fa8d7378e752b86200e6485fc75`, squash `939626e5597fd8d0970784e141da493f0f7ec24a`; [폐기형 Docker CI #38539255532](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38539255532) SUCCESS, [전체 CI #38540349736](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38540349736) **11/11 SUCCESS**. Phase 4A–4F 및 4G는 각 해당 병합과 CI가 선행되며, Phase 4I는 이 로드맵에 없다.
-- **Windows 로컬 사용자 제출:** `[saju-bridge] Phase 4H PASS: cross-run replay, inconsistent same-run evidence, reused synthetic semantics and stale claims all remain HOLD; no persistent registry or permissions.` (사용자 제공 텍스트; 독립 수집 원본 로그 아님).
-- **현행 실행기 제어 흐름:** 해당 PASS는 1–4H 순차 옵션과 disposable cleanup 성공 후 실패가 없을 때 출력된다. 하지만 전달된 단일 로그행으로 Windows/Node/Compose의 정확한 버전, 로컬 양쪽 HEAD, 전체 중간 PASS, 실제 종료코드·정리 결과까지 제삼자 독립 확인했다고 기록해서는 안 된다.
-- **첫 번째 무권한 미완료 인수 조건:** [Windows Docker Phase 5 설계/증빙 매트릭스](./SAJU_BRIDGE_WINDOWS_DOCKER_DISPOSABLE_ARCHITECTURE_V1.md#4a-phase-5--증명-가능한-범위와-미확보-증거)의 양쪽 SHA·working tree 상태, Windows/Node/Docker/Compose, 완전한 1–4H 결과, fail-closed, project-scoped 자원 잔존 0과 프로세스 종료코드. 상태는 **USER_REPORTED_PASS / PHASE_5_NOT_FULLY_EVIDENCED**.
-- 이 증빙 부족은 Phase 4H 코드/CI 완료를 되돌리지 않으며 새 합성 Phase를 열 근거도 아니다. Windows 호스트는 현재 GitHub CI 실행기가 직접 관찰할 수 없으므로 사용자 실기기에서 수집한 비밀 없는 원본 증빙이 필요하다. 관련 구현은 추가하지 않는다.
-- **운영 완료와 독립:** 3-04-02 실제 Root/Key custody, 3-04-03B 실제 R01–R14, 3-04-04 제한 Target Authority V2, 2D-4 승인 단일 격리 실행은 모두 미검증/HOLD. 별도 1인 Owner 강인증·키/서비스·관리 평면 분리·운영 증빙/비용 승인 선행. 두 서비스 ID가 두 명의 독립 인간 승인자는 아니다.
-- **종료 기준 C:** 추가 구현보다 Windows 실기기 증빙과 운영 외부 승인에 종속. `stagingAdmission=HOLD`, `stagingConnection=NOT_VERIFIED`, `operationalEvidence=NOT_VERIFIED`, `canRunOnce/canExecute/canPublish/canSell=false`, `automaticRetry/automaticCompensation=false`.
+- **최종 완료 코드 단계:** Phase 4H [PR #2092](https://github.com/gycha0109-beep/MyeongHa/pull/2092), HEAD `2be8c6e5de3d8fa8d7378e752b86200e6485fc75`, squash `939626e5597fd8d0970784e141da493f0f7ec24a`; [Docker CI #38539255532](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38539255532) SUCCESS, [통합 CI #38540349736](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38540349736) **11/11 SUCCESS**. Phase 4A–4H 전부 병합·검증 완료; Phase 4I는 없다.
+- **사용자 Windows 실기기 전체 증빙 인수:** `saju-phase5.log` (SHA-256 `6f9a42d407897f89a26a9d0be31f1bbb722bd7d2058d5b9cd7dbb651a4b500e6`)의 **Phase 1–4H 15개 PASS**, 동작 중 DB crash/network partition fail-closed, 해당 프로젝트 컨테이너·네트워크·볼륨 전체 제거, 사용자 보고 종료 코드 `0`. 원본 파일은 로컬·대화 제공이며 Git에 비밀/전체 로그를 넣지 않는다.
+- **사용자 제출 호스트 메타데이터:** MyeongHa `main @ 2ddb1d4fe3f7101244ee3a628b2d1a6a7f6bc1f5`, 추적 코드 수정 없음(미추적 `saju-phase5.log`만 존재); 검증 전용 Saju `cd0acf9abd447826ccaefba56112d046e560ee04`, working tree clean. Node `v24.20.0`, Docker `29.8.2`, Compose `v5.5.1`. 정확한 Windows OS 빌드·Docker Desktop GUI 버전, 호스트가 서명한 로그-코드 결속 증명은 수집하지 않았다.
+- **Windows Phase 5 상태: `USER_SUBMITTED_LOCAL_ACCEPTANCE_PASS` (A 완료).** 별도의 OS/GUI 버전 공백은 명시하고 운영 권한의 독립 증명으로 확대하지 않는다. 로컬 전체 폐기형 테스트를 메타데이터만을 위해 재실행할 필요 없음. 상세 증빙 표: [Windows Phase 5 Acceptance](./SAJU_BRIDGE_WINDOWS_DOCKER_DISPOSABLE_ARCHITECTURE_V1.md#4a-phase-5--windows-실기기-사용자-제출-증빙-인수-pass-2026-10-15).
+- **운영 완료와 독립:** 3-04-02 실제 Root/Key custody, 3-04-03B 실제 R01–R14, 3-04-04 제한 Target Authority V2, 2D-4 승인 단일 격리 실행은 모두 미검증/HOLD. 1인 Owner 강인증·키/서비스·관리 평면 분리와 비용 승인 선행. 두 서비스 ID는 두 명의 독립 인간 승인자가 아니다.
+- **운영 종료 판정 C:** 운영 외부 인가/증빙 대기. `stagingAdmission=HOLD`, `stagingConnection=NOT_VERIFIED`, `operationalEvidence=NOT_VERIFIED`, `canRunOnce/canExecute/canPublish/canSell=false`, `automaticRetry/automaticCompensation=false`.
 
 ## 3. 코드·운영 병렬화와 범위 제한
 
@@ -101,7 +100,7 @@ Watchtower-Track: saju-bridge
 | 서명/정적 신뢰 평가 | #1850 #1851 #1862 | 코드 완료 / 운영 비인증 |
 | 운영 증빙 목록 및 중단 절차 | #1856, R01–R14 | 문서 완료 / 운영 미검증 |
 | 개별 부정 시험 T01–T40 | 기존 합성 테스트 분산 | **개별 대응표 미완료** |
-| Windows Docker Phase 5 Acceptance | Phase 1–4H 폐기형 CI·[#2092](https://github.com/gycha0109-beep/MyeongHa/pull/2092), 사용자 제공 Windows 4H PASS 한 줄 | **부분 증빙:** 전체 호스트 환경·양쪽 HEAD·중간 로그·종료코드/cleanup 원본 미확보; 최종 인수 미완료 |
+| Windows Docker Phase 5 Acceptance | Phase 1–4H 폐기형 CI·[#2092](https://github.com/gycha0109-beep/MyeongHa/pull/2092), 사용자 Windows 전체 실행 로그 SHA-256 고정 및 양쪽 HEAD·환경 버전·exit 0·cleanup 제출 | **사용자 제출 로컬 인수 PASS**; Windows OS 빌드·Desktop GUI 버전 별도 미제출, 실환경 운영 승인은 무관 |
 | 독립 Root 및 durable revision/challenge | 3-04-02 | 합성 저장소 검증 #1925 병합 / 운영 미검증 |
 | 실환경 Auth·DB 3종·Saju Proof | 로컬 2A–2I 합성/실소켓 검증, Admission 38 PASS·병합 #1913; 3-04-03A 인덱스 계약 / 03B 실제 probe | 3 DB 동일 검증 흐름(2J) 합성 완료, R05–R14 독립 운영 관찰 미완료 |
 | Target Authority V2 + Runner | 3-04-04 | 미연결 |
