@@ -20,10 +20,10 @@ describe('R2-H 1720 D-01 original scope bridge (Owner HOLD)',()=>{
     expect(sql).toContain(fragment);
   expect(sql).not.toMatch(/^commit;$/im);
  });
- it('executes original only in disposable PG17 and verifies aborted DDL rollback',()=>{
+ it('executes original only in disposable PG17 and verifies original rollback and narrow ACL after forward',()=>{
   for(const fragment of ['NOT_DISPOSABLE','SOURCE_BLOB_DRIFT','NO_LITERAL_PUBLIC_ROLE',
-    'ORIGINAL_FORWARD_ABORTED_ON_PUBLIC_PSEUDOROLE','FAILURE_ROLLS_BACK_FUNCTION_AND_ACL',
-    'ORIGINAL_PUBLIC_PRIVILEGE_CHECK_BLOCKS_APPLY','drReady=false'])expect(sh).toContain(fragment);
+    'ORIGINAL_ROLLBACK','ORIGINAL_FORWARD_CATALOG_OWNER_ACL',
+    'PUBLIC_PRIVILEGE_CHECK_EXECUTED_AS_DESIGNED','PRIVILEGED_SECURITY_DEFINER_CREATOR_OWNER_REVIEW','drReady=false'])expect(sh).toContain(fragment);
   expect(read('test/db/run_ci_case.sh')).toContain('seyeon-r2-h-1720-forward)');
   expect(read('scripts/ci/run-db-track.mjs')).toContain('seyeon-r2-h-1720-forward');
   expect(JSON.parse(read('scripts/ci/db-suites.json')).postgres17.cases).toContain('seyeon-r2-h-1720-forward');
