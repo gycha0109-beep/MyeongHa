@@ -46,8 +46,8 @@ q "create role ci_saju_managed_migration
   login nosuperuser createdb createrole noinherit noreplication nobypassrls;
   grant create on database \"$PGDATABASE\" to ci_saju_managed_migration;" >/dev/null
 {
-  printf '%s\\n' 'set session authorization ci_saju_managed_migration;'
-  printf '%s\\n' '\\i supabase/proposals/1730_saju_bridge_single_project_operator_permit_v1.sql'
+  printf '%s\n' 'set session authorization ci_saju_managed_migration;'
+  printf '%s\n' '\\i supabase/proposals/1730_saju_bridge_single_project_operator_permit_v1.sql'
 } | psql -X -1 -v ON_ERROR_STOP=1 >/dev/null
 [[ "$(q "select pg_get_userbyid(nspowner) from pg_namespace
   where nspname='saju_bridge_private'")" == ci_saju_managed_migration ]] ||
