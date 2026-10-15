@@ -46,7 +46,7 @@ node scripts/ci/official-reader-production-admin-secret-fence.mjs
 # D3e26: no real Vercel keys read here; prove safe offline attestation and
 # stop new unreviewed direct Supabase Auth key env reads before deployment.
 node scripts/ci/official-reader-supabase-auth-key-source-fence.mjs
-node --test test/verify-production-supabase-auth-key-class-local.test.mjs
+npx vitest run test/verify-production-supabase-auth-key-class-local.test.mjs
 # D3e25: Supabase member verification must never receive admin/secret API keys.
 # Uses synthetic keys and mocked Auth upstream only; no actual API requests.
 npx vitest run test/supabase-auth-api-key-least-privilege.test.ts test/production-user-data-runtime-config.test.ts test/supabase-member-identity-verifier.test.ts apps/api/src/supabase-auth-http.test.ts apps/api/src/supabase-auth-response-body-deadline.test.ts apps/api/src/supabase-member-identity-verifier.test.ts
