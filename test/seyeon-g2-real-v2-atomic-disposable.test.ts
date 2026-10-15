@@ -58,7 +58,7 @@ async function transaction<T>(
   });
 }
 
-async function prepare(n:number):Promise<Fixture> {
+async function prepare(n:number,pin=true):Promise<Fixture> {
   const id=ids(n);
   await transaction(async c=>{
     await c.query(
@@ -91,6 +91,7 @@ async function prepare(n:number):Promise<Fixture> {
       [subject,id.turn,id.attempt,'seyeon-production-chat-planner-v1'],
     );
   });
+  if(!pin)return {...id,rawDigest:''};
   // G1 R4: DB owns BOTH immutable original SourceSet+Grant and the real
   // core context_ready transition in the same SQL transaction.
   const g1=await transaction(async c=>{
@@ -139,6 +140,20 @@ async function stage(id:Fixture,validationProof:Record<string,unknown>) {
     );
     expect(validated.rows[0]?.ok).toBe(false);
   },true);
+}
+async function g1Pin(c:PoolClient,id:Fixture) {
+  return c.query<{receipt:Record<string,unknown}>(
+    'select seyeon_positive_candidate.pin_and_context_ready_r4($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::jsonb,$6::text) as receipt',
+    [subject,id.thread,id.turn,id.attempt,
+     JSON.stringify([{recordId:id.memory,grantId:id.grant}]),
+     id.selectionDigest],
+  );
+}
+async function g3Read(c:PoolClient,id:Fixture,thread=id.thread) {
+  return c.query<{text:string|null}>(
+    'select seyeon_positive_candidate.reveal_actual_v2_r4($1::uuid,$2::uuid,$3::uuid) as text',
+    [subject,thread,id.turn],
+  );
 }
 async function actualCommit(c:PoolClient,id:Fixture) {
   return c.query<{receipt:Record<string,unknown>}>(
@@ -206,6 +221,132 @@ describe.skipIf(!enabled)('G2 actual v2/v1/core and both Outboxes, disposable-on
       'CHAT_TURN_COMMITTED','SEYEON_POST_TURN_ANALYSIS_REQUESTED',
     ]);
     expect(e.rows.every(v=>v.body_text===body)).toBe(true);
+  });
+
+  it('G1 atomic pre-commit: Original Grant/SourceSet and actual ContextReady appear together',async()=>{
+    const id=await prepare(28,false);
+    const before=await clientAction(c=>c.query<{state:string}>(
+      'select state from public.chat_turns where id=$1::uuid',[id.turn],
+    ));
+    expect(before.rows[0]?.state).toBe('planned');
+    const g1=await transaction(c=>g1Pin(c,id),true);
+    expect(g1.rows[0]?.receipt).toMatchObject({
+      contextReady:true,attemptId:id.attempt,
+      selectedSourcesDigest:id.selectionDigest,
+      originalGrantId:id.grant,
+    });
+    const after=await clientAction(c=>c.query<{
+      state:string;parents:string;pins:string;edges:string;
+    }>(
+      'select t.state,'+
+      ' (select count(*)::text from seyeon_positive_candidate.source_sets_r1 where attempt_id=$2::uuid) as parents,'+
+      ' (select count(*)::text from seyeon_positive_candidate.attempt_source_pins where attempt_id=$2::uuid) as pins,'+
+      ' (select count(*)::text from seyeon_positive_candidate.source_edges_r1 where attempt_id=$2::uuid) as edges'+
+      ' from public.chat_turns t where t.id=$1::uuid',
+      [id.turn,id.attempt],
+    ));
+    expect(after.rows[0]).toMatchObject({
+      state:'context_ready',parents:'1',pins:'1',edges:'1',
+    });
+    // Both bypass pin endpoints are now forbidden to the executor.
+    await expect(transaction(c=>c.query(
+      'select seyeon_positive_candidate.pin_source_set_r1($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::jsonb,$6::text)',
+      [subject,id.thread,id.turn,id.attempt,
+       JSON.stringify([{recordId:id.memory,grantId:id.grant}]),
+       id.selectionDigest],
+    ),true)).rejects.toMatchObject({code:'42501'});
+    await expect(transaction(c=>g1Pin(c,id),true)).rejects.toMatchObject({
+      constraint:'seyeon_offline_r4_g1_turn_not_planned',
+    });
+  });
+
+  it('G1 revoke-before-pin prevents all source/context writes',async()=>{
+    const id=await prepare(29,false);
+    await clientAction(c=>c.query(
+      'update public.record_access_grants set revoked_at=clock_timestamp() where id=$1::uuid',
+      [id.grant],
+    ));
+    await expect(transaction(c=>g1Pin(c,id),true)).rejects.toMatchObject({
+      constraint:'seyeon_offline_r4_g1_original_source_set_refused',
+    });
+    const after=await clientAction(c=>c.query<{
+      state:string;parents:string;pins:string;
+    }>(
+      'select t.state,'+
+      ' (select count(*)::text from seyeon_positive_candidate.source_sets_r1 where attempt_id=$2::uuid) as parents,'+
+      ' (select count(*)::text from seyeon_positive_candidate.attempt_source_pins where attempt_id=$2::uuid) as pins'+
+      ' from public.chat_turns t where t.id=$1::uuid',
+      [id.turn,id.attempt],
+    ));
+    expect(after.rows[0]).toMatchObject({
+      state:'planned',parents:'0',pins:'0',
+    });
+  });
+
+  it('G1 core ContextReady failure rolls back previously inserted Original Pin+SourceSet',async()=>{
+    const id=await prepare(30,false);
+    // Fixture-only poisoned turn sequence: the G1 wrapper first inserts two
+    // positive source rows, then the actual core ContextReady must reject.
+    await clientAction(c=>c.query(
+      'update public.chat_turns set next_attempt_no=next_attempt_no+1 where id=$1::uuid',
+      [id.turn],
+    ));
+    await expect(transaction(c=>g1Pin(c,id),true)).rejects.toMatchObject({
+      constraint:'cmd_chat_context_state_conflict',
+    });
+    const after=await clientAction(c=>c.query<{
+      state:string;parents:string;pins:string;edges:string;
+    }>(
+      'select t.state,'+
+      ' (select count(*)::text from seyeon_positive_candidate.source_sets_r1 where attempt_id=$2::uuid) as parents,'+
+      ' (select count(*)::text from seyeon_positive_candidate.attempt_source_pins where attempt_id=$2::uuid) as pins,'+
+      ' (select count(*)::text from seyeon_positive_candidate.source_edges_r1 where attempt_id=$2::uuid) as edges'+
+      ' from public.chat_turns t where t.id=$1::uuid',
+      [id.turn,id.attempt],
+    ));
+    expect(after.rows[0]).toMatchObject({
+      state:'planned',parents:'0',pins:'0',edges:'0',
+    });
+  });
+
+  it('G3 actual stored reply: first read and replay work while original consent exists; revoke blocks both',async()=>{
+    const id=await prepare(31);
+    await stage(id,proof(id));
+    await transaction(c=>actualCommit(c,id),true);
+    const first=await transaction(c=>g3Read(c,id),true);
+    expect(first.rows[0]?.text).toBe(body);
+    const replay=await transaction(c=>g3Read(c,id),true);
+    expect(replay.rows[0]?.text).toBe(body);
+    const foreign=await transaction(c=>g3Read(
+      c,id,'d4000000-0000-4000-8000-000000000099',
+    ),true);
+    expect(foreign.rows[0]?.text).toBeNull();
+
+    await clientAction(c=>c.query(
+      'update public.record_access_grants set revoked_at=clock_timestamp() where id=$1::uuid',
+      [id.grant],
+    ));
+    const held=await transaction(c=>g3Read(c,id),true);
+    expect(held.rows[0]?.text).toBeNull();
+    // New replacement Grant may not revive the old committed assistant body.
+    await clientAction(c=>c.query(
+      "insert into public.record_access_grants(id,subject_id,life_fact_id,memory_item_id,grantee_character_id,grant_reason,granted_at,revoked_at) values($1,$2,null,$3,'seyeon','user_choice',clock_timestamp(),null)",
+      ['d6000000-0000-4000-8000-000000000131',subject,id.memory],
+    ));
+    const stillHeld=await transaction(c=>g3Read(c,id),true);
+    expect(stillHeld.rows[0]?.text).toBeNull();
+  });
+
+  it('G3 original Memory content changed or original message redacted means no replay',async()=>{
+    const id=await prepare(32);
+    await stage(id,proof(id));
+    await transaction(c=>actualCommit(c,id),true);
+    expect((await transaction(c=>g3Read(c,id),true)).rows[0]?.text).toBe(body);
+    await clientAction(c=>c.query(
+      "update public.memory_items set content_jsonb='{\"fixture\":\"changed\"}'::jsonb where id=$1::uuid",
+      [id.memory],
+    ));
+    expect((await transaction(c=>g3Read(c,id),true)).rows[0]?.text).toBeNull();
   });
 
   it('original revoked Grant aborts real v2, assistant, both outboxes and admission',async()=>{
@@ -353,6 +494,7 @@ describe.skipIf(!enabled)('G2 actual v2/v1/core and both Outboxes, disposable-on
       messages:'1',outboxes:'2',admissions:'1',
       attempt_state:'committed',turn_state:'committed',
     });
+    expect((await transaction(c=>g3Read(c,id),true)).rows[0]?.text).toBeNull();
     const grant=await clientAction(c=>c.query<{revoked_at:Date|null}>(
       'select revoked_at from public.record_access_grants where id=$1::uuid',
       [id.grant],
