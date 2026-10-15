@@ -448,6 +448,14 @@ SQL
     psql -X -q -1 -v ON_ERROR_STOP=1 -f supabase/migrations/1700_seyeon_governed_reservation_receipt_pin_v1.sql > /dev/null
     bash test/db/seyeon_r2_h_1710_forward.sh
     ;;
+  seyeon-r2-h-1720-forward)
+    verify_pg17
+    [[ "$GITHUB_ACTIONS" == true && "$DB_SUITE" == postgres17 ]] || { echo HOLD_R2_H_1720_NOT_CI >&2; exit 1; }
+    [[ "$PGHOST" == localhost && "$PGPORT" == 5432 && "$PGDATABASE" =~ ^myeongha_ci_case_[0-9]+$ ]] || { echo HOLD_R2_H_1720_NOT_DISPOSABLE >&2; exit 1; }
+    node scripts/operations/verify-seyeon-r2-pending-migrations.mjs > /dev/null
+    apply_pg17_migrations_through_seyeon_production_frontier
+    bash test/db/seyeon_r2_h_1720_forward.sh
+    ;;
   seyeon-r2-rpc-catalog)
     verify_pg17
     apply_pg17_migrations_without_birth_authority
