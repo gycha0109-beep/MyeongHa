@@ -44,7 +44,7 @@ begin
     'internal_apply_official_reader_verified_cancel_batch_v1',
     'internal_execute_official_reader_verified_cancel_v2'
   ] loop
-    select count(*),min(p.oid) into count_found,oid_found
+    select count(*),(array_agg(p.oid))[1] into count_found,oid_found
     from pg_catalog.pg_proc p join pg_catalog.pg_namespace n
       on n.oid=p.pronamespace
     where n.nspname='public' and p.proname=routine;
