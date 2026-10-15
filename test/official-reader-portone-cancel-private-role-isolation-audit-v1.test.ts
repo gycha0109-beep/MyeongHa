@@ -6,7 +6,7 @@ import {
   PRIVATE_CANCEL_OTHER_APP_ROLES_D3E18,
   PRIVATE_CANCEL_ROLE_CATALOG_READ_SQL_D3E18,
   type PrivateCancelD3e18RoleNames,
-} from '../apps/api/src/official-reader-portone-cancel-private-role-isolation-audit-v1.js';
+} from './support/official-reader-portone-cancel-private-role-isolation-audit-v1.js';
 
 const serviceRoles: PrivateCancelD3e18RoleNames = Object.freeze({
   verifier:'myeongha_cancel_verifier_offline',
