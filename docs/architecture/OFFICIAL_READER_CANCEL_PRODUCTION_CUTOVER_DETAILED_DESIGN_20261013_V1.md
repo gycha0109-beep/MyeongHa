@@ -349,7 +349,7 @@ PortOne signed webhook
 | D3e8~D3e11 | 이중 서명 검토, 로그인 실행 계정 부정 검증, 명시적 transient만 재시도 | 선행 Draft CI PASS 기록, 운영 권한 없음 |
 | D3e12~D3e15 | 조직 신원 오프라인 증명, 발급 API 우회 축소, 루트 서명 정책, 정책 리비전·해시 결합 | Draft #2081~#2088, D3e15 CI PASS, LIVE 미적용 |
 | **D3e16** | **이미 실행 중인 구형 실행자**가 독립 서명된 정책 epoch를 호출마다 확인. 변경/HALT/역행/위조/오프라인/만료 증거는 작업 **전** 거부. DB 호출 직전 2차 검사. | 현재 Draft 구현, CI 검증 필요 |
-| **D3e17** | **영속 최소 epoch와 재부팅 rollback 방지**, 안전한 독립 정책 변경/회수 원천 및 두 인스턴스 검증 | Offline transaction prototype in child Draft, exact-head CI pending; independently protected durable store/real service NOT verified |
+| **D3e17** | **영속 최소 epoch와 재부팅 rollback 방지**, 안전한 독립 정책 변경/회수 원천 및 두 인스턴스 검증 | Offline Draft #2099; D3e17 code SHA 1e36445279967123b741fdb0a6d1f7993eca6680 CI/Web/Governance PASS; true independent durable store/roles NOT verified |
 | **D3e18** | 서명 검증자·실행자·DB owner의 실제 프로세스/로그인 분리. D3e6/8/1880 및 1080/1850 직접 실행 부정 증명 | 미착수, DB Owner·Security |
 | **D3e19** | 독립된 서명·epoch 결정과 DB 원자 변경 사이의 경쟁 제거. 최소권한 진입점·동시성·시계열 실제 PostgreSQL 검증 | 미착수, DB Owner 승인 |
 | **D3e20 / 운영 전환** | PortOne 서버 조회, 정확한 영수증/Grant, 상거래·법무 이중 승인, 이용권 회수, T2 재열람 차단, 복원/개인정보/운영 승인 | 미착수, Commerce·Legal·Privacy·Ops |
@@ -363,7 +363,9 @@ PortOne signed webhook
 
 ### D3e17 영속 epoch / 두 인스턴스 오프라인 실험 (2026-10-15)
 
-**구현 상태:** 자식 Draft 브랜치의 실험 코드. 외부 DB/서비스 적용, 운영 권한 부여, 결제 취소, 이용권 변경, Production 배포 **없음**. CI 결과는 해당 PR과 정확한 HEAD의 실행 기록을 기준으로만 확정한다.
+**검증 근거:** D3e17 코드 HEAD `1e36445279967123b741fdb0a6d1f7993eca6680`의 [CI 38665269510](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38665269510) / [Web 38665269535](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38665269535) / [Governance 38665269519](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38665269519)는 PASS. Work Track affected D3e14~17: 42 PASS; 160 test files PASS / 4 SKIP, 828 tests PASS / 19 SKIP. Shared TypeScript/API typecheck/build PASS, CI Verify PASS. DB jobs SKIP은 PG 부정 검증 PASS가 아니다. 이 근거는 명시된 코드 커밋에만 귀속되며 문서 갱신 이후 HEAD는 새 CI로 재확인한다.
+
+**구현 범위:** 자식 Draft 브랜치의 실험 코드. 외부 DB/서비스 적용, 운영 권한 부여, 결제 취소, 이용권 변경, Production 배포 **없음**.
 
 - `apps/api/src/official-reader-portone-cancel-private-durable-epoch-executor-v1.ts`는 기존 D3e16 실행자의 서명 epoch read를 감싼다. 매 호출 시 epoch Ed25519 서명/TTL 검증 이후, **별도 프로비저닝된 공유 영속 상태를 원자적으로 read/compare/advance/commit**하고, commit 확인 뒤에만 D3e16 기존 검증으로 들어간다. D3e16의 per-execution/pre-store 이중 확인과 D3e15 permit binding은 그대로 유지한다.
 - 상태는 `sequence`, epoch fingerprint, policy root/ID/revision/digest, pinned epoch signer fingerprint, sticky `HALT`, 마지막 trusted observed time을 보관한다. 서명된 구형 sequence, 같은 sequence의 상이한 서명 상태, 정책 revision 역행, epoch signer 변경, clock 역행, 상태 유실/형식 훼손, 저장 실패 및 확인값 불일치는 실행을 거부한다. 서명된 HALT와 동등 sequence의 equivocation, 더 높은 sequence에서의 정책 revision 역행은 지속 HALT 상태로 커밋한다.
