@@ -92,3 +92,22 @@ Watchtower-Track: saju-bridge
 ### 6.5 S3A와 실제 사주 운영 승인 분리
 
 S3A는 DB 내부 **미연결·무발급·0행 구조**만 만드는 승인이다. 기존 고격리 R01–R14는 모두 NOT_VERIFIED. 현 단계에서는 Owner 강인증/독립 서명, Login/Secret/연결, `1540` nonce 배포, 실사주 호출, 실사용자 Reading, 공개/판매, Runner 실행을 승인하거나 검증하지 않는다. 계속 `stagingAdmission=HOLD`, `operationalEvidence=NOT_VERIFIED`, `canRunOnce/canExecute/canPublish/canSell=false`.
+
+## 7. Owner S3A 조건부 승인 후 동일 백업 복원 성공 — 2026-10-15 21:08 KST 재검증
+
+> **S3A 승인 수신 / 동일 백업 격리 복원 gate PASS / S3A 운영 DDL 아직 미적용 / 남은 TLS·운영 executor gate HOLD.** 이 절은 6.3의 2026-10-15 20:50 KST 현재 미완료 상태를 후속 증거로 갱신한다. S3B, permit 소비·발급, 사주 연동, 공개 및 판매를 승인하지 않는다.
+
+- Owner의 **조건부 S3A 승인**은 정확한 private 비활성 DB 객체에 한정한다. 모든 안전 게이트가 완비되기 전에는 단일 트랜잭션조차 실행하지 말라는 조건이 명시되어 있다.
+- 최신 선택 백업: [Production PostgreSQL Logical Backup #38641851823](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38641851823), encrypted governed artifact `myeongha-postgres-20261014T213954Z` / ID `11930481921`, source SHA `8b62a3ee6fd882606bac2324f1c8c0c97bcbd141`.
+- **정확한 원본에 대한 새 복원 PASS:** [Isolated Restore Drill #38731492782](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38731492782), 2026-10-15 12:01 UTC 시작, `workflow_dispatch`, `main@027c22cfb5ec1711e508bc56c0c925bd9c6f0957`, job `116410110318` **SUCCESS**. 로그에 `BACKUP_RUN_ID=38641851823`, 다운로드 원본 ID `11930481921`, archive SHA256 검증 `OK`, 실제 `github-actions-loopback-supabase-postgres` restore `success`, 스코프 복구 검증 및 `backup_migration_frontier=20261008090417`이 명시되어 있다. restore evidence artifact `postgres-isolated-restore-drill-38731492782` / ID `11970571071`. 운영 DB에는 복원하지 않았으며 새 Production 변경은 발생하지 않았다.
+- 복원 workflow의 `dr_ready=false` 및 `authoritative_privacy_reconciliation=not_exercised_without_production_ledger` 경계는 그대로 유지한다. 이번 한 번의 동일 백업 복원 PASS가 전체 Production disaster recovery acceptance나 실제 개인정보 원장 리플레이 합격을 의미하지 않는다.
+- **복원 후 read-only Production 확인:** 2026-10-15 12:08:12 UTC, `MyengHa` ref `cnsfpcdiyofqvhpcegfc`, `ACTIVE_HEALTHY`, PostgreSQL `17.6`, `current_user=postgres`. `pg_stat_ssl.ssl=true`인 관리 연결에서 target schema 0, `operator_permits_v1` 0, `audit_events_v1` 0, S3A 두 역할 0, private 함수 0. 현재 원격 migration 173개, timestamp 최종 `20261008090417`; `1540`·`1730`은 미적용. GitHub `main`도 `027c22cfb5ec1711e508bc56c0c925bd9c6f0957` 그대로.
+- 승인된 SQL 원문은 변경 없음: Git blob `42e076799d627bc9e19fe28e1ad25b4548e05e61`, SHA-256 `900e0771915776b4a7c2a8b3cf60e24b83c79fcec14f27cf6356b44685b385e2`, 9951 bytes.
+
+### 7.1 남은 강제 게이트 — 운영 DDL 적용 금지
+
+1. 백업 생성 기존 경로에는 `PGSSLMODE=verify-full`, `PGSSLROOTCERT`, 루트 CA fingerprint pin을 검증하는 `scripts/operations/prepare-production-postgres-strict-libpq.mjs`가 있다. **그러나 현재 Supabase MCP 관리 연결은 TLS 암호화 여부(`ssl=true`)만 확인되었고, 실제 S3A DDL 적용 세션의 대상 pooler 호스트·CA·hostname `verify-full` 증빙은 없다.** 관리 연결의 암호화만으로 이 gate를 통과시켜서는 안 된다.
+2. S3A 전용 일회성 승인 executor가 검증된 기존 Production `postgres.<project-ref>` Session Pooler 및 위의 pinned-CA `verify-full` 경로를 이용해 **정확한 파일만**, 이전과 동일한 backup/restore run 증거·Git blob/SHA-256·실행 직전 충돌/권한/원격 migration frontier·운영 실행 창/중단 책임자를 확인하고, 일회 트랜잭션 내에서 후조건(2 empty tables, 2 NOLOGIN roles, RLS/ACL/function/role membership, no migration history change)을 강제할 수 있는지 확인해야 한다.
+3. 안전 증거 미충족, 새로운 백업이 이미 최신이 됨, main/SQL 변경, 예상 밖 기존 객체, TLS 검증 실패, 적용 세션 오류면 즉시 **HOLD**, Production 쓰기 금지. 기존 `supabase db push --include-all` / `migration repair` 금지. 승인이 신규 사용자·Auth·Birth·Reading·Commerce 행 조회를 허용하는 것은 아니다.
+
+**현재 판정:** `S3A_OWNER_CONDITIONALLY_APPROVED`, `RESTORE_GATE=PASS`, `TLS_EXECUTOR_GATE=NOT_VERIFIED`, `S3A_APPLICATION=HOLD`; `stagingAdmission=HOLD`, `operationalEvidence=NOT_VERIFIED`, `canRunOnce/canExecute/canPublish/canSell=false`, R01–R14 `NOT_VERIFIED`.
