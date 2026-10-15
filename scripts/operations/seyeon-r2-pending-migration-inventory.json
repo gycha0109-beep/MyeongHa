@@ -282,7 +282,8 @@
       "owner": "character-security",
       "requires": [
         "1590",
-        "1610"
+        "1610",
+        "1630"
       ],
       "proof": {
         "kind": "function",
