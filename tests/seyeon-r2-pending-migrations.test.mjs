@@ -158,6 +158,19 @@ describe('R2 held 1520..1720 pending migration dependency inventory', () => {
         .toThrow('HOLD_R2_1710_RPC_OWNER_ROLE_SOURCE_DRIFT');
     });
   });
+  it('rejects altered 1720 pseudo-PUBLIC assertion even when SQL blob is re-pinned', () => {
+    withFixture((root, dir, manifest) => {
+      const row = manifest.migrations.find(x=>x.version==='1720');
+      const file = join(dir,row.file);
+      const altered = readFileSync(file, 'utf8').replace(
+        "pg_catalog.has_function_privilege(\n      'public',",
+        "pg_catalog.has_function_privilege(\n      'authenticated',");
+      writeFileSync(file,altered);
+      row.blobSha = gitBlobSha(Buffer.from(altered));
+      expect(() => validateR2PendingInventory(root, manifest))
+        .toThrow('HOLD_R2_1720_PUBLIC_ROLE_CHECK_OR_SCOPE_SOURCE_DRIFT');
+    });
+  });
   it('rejects changed review-unit order or count', () => {
     withFixture((root, dir, manifest) => {
       manifest.migrations[5].unit = 'deletion';
