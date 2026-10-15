@@ -142,7 +142,7 @@ async function stage(id:Fixture,validationProof:Record<string,unknown>) {
   },true);
 }
 async function g1Pin(c:PoolClient,id:Fixture) {
-  return c.query<{receipt:Record<string,unknown}>(
+  return c.query<{receipt:Record<string,unknown>}>(
     'select seyeon_positive_candidate.pin_and_context_ready_r4($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::jsonb,$6::text) as receipt',
     [subject,id.thread,id.turn,id.attempt,
      JSON.stringify([{recordId:id.memory,grantId:id.grant}]),
