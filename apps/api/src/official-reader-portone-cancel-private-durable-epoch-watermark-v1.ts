@@ -51,12 +51,12 @@ function context(value:unknown):value is PrivateCancelPolicyContextV1{
   return exact(value,['policyDigest','policyId','revision','rootKeyId'])
     && typeof value.rootKeyId==='string'&&ROOT.test(value.rootKeyId)
     && typeof value.policyId==='string'&&POLICY.test(value.policyId)
-    && Number.isSafeInteger(value.revision)&&value.revision>=1
+    && typeof value.revision==='number' && Number.isSafeInteger(value.revision) && value.revision>=1
     && typeof value.policyDigest==='string'&&HASH.test(value.policyDigest);
 }
 function verifiedEpoch(value:unknown):value is PrivateCancelVerifiedEpochV1{
   return exact(value,['fingerprint','policyContext','sequence','status'])
-    && Number.isSafeInteger(value.sequence)&&value.sequence>=1
+    && typeof value.sequence==='number' && Number.isSafeInteger(value.sequence) && value.sequence>=1
     && typeof value.fingerprint==='string'&&FINGERPRINT.test(value.fingerprint)
     && (value.status==='active'||value.status==='halted')
     && context(value.policyContext);
@@ -68,7 +68,7 @@ export function isPrivateCancelDurableEpochRecordV1(
     'fingerprint','policyContext','schema','sequence','status',
   ])
     && value.schema==='myeongha.cancel.ops.durable-epoch.v1'
-    && Number.isSafeInteger(value.sequence)&&value.sequence>=1
+    && typeof value.sequence==='number' && Number.isSafeInteger(value.sequence) && value.sequence>=1
     && typeof value.fingerprint==='string'&&FINGERPRINT.test(value.fingerprint)
     && (value.status==='active'||value.status==='halted')
     && context(value.policyContext);
