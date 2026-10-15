@@ -12,10 +12,8 @@ import {
   type MobileFaceMediaAssetV1,
   type MobileFaceMediaPickerResultV1,
 } from '@/platform/media/mobile-face-media';
-import {
-  pickMobileFaceMediaFromCameraV1,
-  pickMobileFaceMediaFromLibraryV1,
-} from '@/platform/media/expo-face-media-picker';
+import { pickMobileFaceMediaFromLibraryV1 } from '@/platform/media/expo-face-media-picker';
+import { MobileFrontCameraV1 } from '@/platform/media/MobileFrontCameraV1';
 import { ReadingSubnav } from '@/features/reading/ReadingSubnav';
 import { MobileReaderPicker } from '@/features/reading/MobileReaderPicker';
 import { findMobileReaderPresentationV1, type MobileReaderPresentationIdV1 } from '@/features/reading/mobile-reader-presentation';
@@ -36,6 +34,7 @@ function sizeLabel(bytes: number | null): string {
 
 export default function FaceScreen() {
   const [state, setState] = useState<FaceMediaStateV1>({ kind: 'idle' });
+  const [frontCameraOpen, setFrontCameraOpen] = useState(false);
   const [presentationReader, setPresentationReader] = useState<MobileReaderPresentationIdV1>('seyeon');
   const readerPresentation = findMobileReaderPresentationV1(presentationReader);
 
@@ -133,7 +132,7 @@ export default function FaceScreen() {
         <Pressable
           accessibilityRole="button"
           disabled={picking}
-          onPress={() => void choose('camera', pickMobileFaceMediaFromCameraV1)}
+          onPress={() => setFrontCameraOpen(true)}
           style={styles.secondary}
         >
           <Text style={styles.secondaryText}>▣ 사진 촬영</Text>
@@ -177,6 +176,16 @@ export default function FaceScreen() {
           {ready === null ? '사진을 먼저 준비해 주세요' : '얼굴 구조 확인 연결 준비 중'}
         </Text>
       </Pressable>
+
+      {frontCameraOpen ? (
+        <MobileFrontCameraV1
+          onClose={() => setFrontCameraOpen(false)}
+          onCaptured={(photo) => {
+            setState({ kind: 'ready', asset: photo });
+            setFrontCameraOpen(false);
+          }}
+        />
+      ) : null}
 
       <Text style={styles.privacyNote}>
         선택한 사진은 이 화면에서만 일시적으로 사용하며 기기 보안 저장소나 앱 기록에 저장하지 않습니다.
