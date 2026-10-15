@@ -195,11 +195,16 @@ describe('COST-04 compact unified preflight offline ONLY',()=>{
     }
     for(const p of [
       '.github/workflows/seyeon-dialogue-path-real-api-eval-v1.yml',
-      '.github/workflows/seyeon-model-eval-v1.yml',
     ]) {
       const workflow=readFileSync(new URL('../'+p,import.meta.url),'utf8');
       expect(workflow).toMatch(/if:\s*\$\{\{\s*false\s*\}\}/u);
     }
+  });
+  it('C06 scope-only manual screening preserves all other paid evaluation holds',()=>{
+    const workflow=readFileSync(new URL('../.github/workflows/seyeon-model-eval-v1.yml',import.meta.url),'utf8');
+    expect(workflow).toContain('secrets.OPENAI_API_KEY2');
+    expect(workflow).toContain('run-seyeon-cost-c06-eight-call-v1.mjs');
+    expect(workflow).not.toContain('run-seyeon-model-eval-v1.mjs');
   });
   it('same-schema, same-input 300 fake-provider cases preserve SERVER GUARD results; real ML unknown',async()=>{
     const spy=vi.spyOn(console,'info').mockImplementation(()=>{});

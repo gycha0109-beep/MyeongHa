@@ -33,3 +33,6 @@ Status: **OFFLINE TEST ONLY / COST-02 and COST-05/06 HOLD**.
 - `test/seyeon-cost-c04-preflight-compact-offline-v1.test.ts`가 **실제 Provider 요청 직렬화**로 구성한 8개 JSON을 Fake transport로 캡처하며, 결과는 정답을 돌려주는 **Oracle**이다. CI의 `SEYEON_C06_EIGHT_CALL_SCREENING_OFFLINE` 로그에서 요청 바이트를 감사한다. `requestCount=8`, `actualPaidCalls=0`, `actualBilledCostUsd=null`.
 - 호출 수만 기준으로 기존 4조건×4사례 64회 대비 87.5% 감소한다. 그러나 첫 테스트는 모델 prompt 2종을 다루는 **탐색 검증**이며 전체 경로·모델·보안·캐릭터 품질 검사와 직접적인 절감률 비교는 불가. 실비 역시 토큰/요금/영수증 없이 추정 금지.
 - 현재 `COST-05/#1816` 비용 사고 HOLD, 공식 단가·독립 비용 hard cap·영수증·Owner 별도 검토 및 `OPENAI_API_KEY2` 실행 경로가 마련되지 않았다. 보호된 workflow의 `if: false`를 우회하지 않았으며 **실모델 8회 시험은 아직 미실행**.
+
+## 별도 C06 8회 전용 잠금 해제 리뷰 브랜치
+- 기존 전체 경로 평가의 if:false 유지. 기존 대량 모델 분류 워크플로를 8회 수동·main·OPENAI_API_KEY2에 한정해 교체하는 별도 PR 검토 중. 미병합·유료 API 미호출 상태에서는 실제 효력이 없다.
