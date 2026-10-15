@@ -247,7 +247,7 @@ const validDraft=Object.freeze({
 });
 
 function fastShadow(raw:unknown,reviewMode:'valid'|'bad-hash'|'refused'='valid'){
-  const generate=vi.fn(async()=>raw);
+  const generate=vi.fn(async(_request:unknown)=>raw);
   const review=vi.fn(async(input:unknown)=>{
     const request=input as {input:{expectedUtteranceHash:string}};
     return {
