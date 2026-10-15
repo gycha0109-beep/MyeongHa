@@ -349,7 +349,7 @@ PortOne signed webhook
 | D3e8~D3e11 | 이중 서명 검토, 로그인 실행 계정 부정 검증, 명시적 transient만 재시도 | 선행 Draft CI PASS 기록, 운영 권한 없음 |
 | D3e12~D3e15 | 조직 신원 오프라인 증명, 발급 API 우회 축소, 루트 서명 정책, 정책 리비전·해시 결합 | Draft #2081~#2088, D3e15 CI PASS, LIVE 미적용 |
 | **D3e16** | **이미 실행 중인 구형 실행자**가 독립 서명된 정책 epoch를 호출마다 확인. 변경/HALT/역행/위조/오프라인/만료 증거는 작업 **전** 거부. DB 호출 직전 2차 검사. | 현재 Draft 구현, CI 검증 필요 |
-| **D3e17** | **영속 최소 epoch와 재부팅 rollback 방지**, 안전한 독립 정책 변경/회수 원천 및 두 인스턴스 검증 | 미착수, 운영·신뢰 원천 필요 |
+| **D3e17** | **영속 최소 epoch와 재부팅 rollback 방지**, 안전한 독립 정책 변경/회수 원천 및 두 인스턴스 검증 | Offline transaction prototype in child Draft, exact-head CI pending; independently protected durable store/real service NOT verified |
 | **D3e18** | 서명 검증자·실행자·DB owner의 실제 프로세스/로그인 분리. D3e6/8/1880 및 1080/1850 직접 실행 부정 증명 | 미착수, DB Owner·Security |
 | **D3e19** | 독립된 서명·epoch 결정과 DB 원자 변경 사이의 경쟁 제거. 최소권한 진입점·동시성·시계열 실제 PostgreSQL 검증 | 미착수, DB Owner 승인 |
 | **D3e20 / 운영 전환** | PortOne 서버 조회, 정확한 영수증/Grant, 상거래·법무 이중 승인, 이용권 회수, T2 재열람 차단, 복원/개인정보/운영 승인 | 미착수, Commerce·Legal·Privacy·Ops |
@@ -359,6 +359,18 @@ PortOne signed webhook
 1. **D3e15:** 새 정책으로 부팅한 실행자는 옛 허가증을 거부한다. 기존 구형 프로세스를 자동으로 중지하지는 않는다.
 2. **D3e16:** 부팅 시 독립적으로 주입한 epoch 조회 기능이 매번 정확히 최신 서명 정책을 반환한다는 조건에서, 구형 실행자는 바뀐 정책/보안 HALT를 확인해 인스턴스를 영구 차단한다. 조회 장애와 오래된 증명은 해당 요청을 거부한다. 두 검사 사이 정책 변경도 확인한다.
 3. **D3e17~D3e19 필수:** 조회 원천 자체가 오래된 상태를 반환하거나, 재시작 직후 과거 서명 epoch로 롤백하거나, 마지막 조회 이후 DB 원자 변경이 진행되면 D3e16만으로 즉시 회수 보증 불가. 독립 영속 watermark, OS/DB 역할 격리, DB 트랜잭션 내부 정책 재확인이 필요하다.
+
+
+### D3e17 영속 epoch / 두 인스턴스 오프라인 실험 (2026-10-15)
+
+**구현 상태:** 자식 Draft 브랜치의 실험 코드. 외부 DB/서비스 적용, 운영 권한 부여, 결제 취소, 이용권 변경, Production 배포 **없음**. CI 결과는 해당 PR과 정확한 HEAD의 실행 기록을 기준으로만 확정한다.
+
+- `apps/api/src/official-reader-portone-cancel-private-durable-epoch-executor-v1.ts`는 기존 D3e16 실행자의 서명 epoch read를 감싼다. 매 호출 시 epoch Ed25519 서명/TTL 검증 이후, **별도 프로비저닝된 공유 영속 상태를 원자적으로 read/compare/advance/commit**하고, commit 확인 뒤에만 D3e16 기존 검증으로 들어간다. D3e16의 per-execution/pre-store 이중 확인과 D3e15 permit binding은 그대로 유지한다.
+- 상태는 `sequence`, epoch fingerprint, policy root/ID/revision/digest, pinned epoch signer fingerprint, sticky `HALT`, 마지막 trusted observed time을 보관한다. 서명된 구형 sequence, 같은 sequence의 상이한 서명 상태, 정책 revision 역행, epoch signer 변경, clock 역행, 상태 유실/형식 훼손, 저장 실패 및 확인값 불일치는 실행을 거부한다. 서명된 HALT와 동등 sequence의 equivocation, 더 높은 sequence에서의 정책 revision 역행은 지속 HALT 상태로 커밋한다.
+- 새 부팅에서 저장 기록이 없으면 **절대 0으로 초기화하지 않는다.** 별도 테스트 fixture만 첫 genesis를 프로비저닝한다. 둘 이상의 실행자가 동일한 `transact(update)` 직렬화 인터페이스에 접근해야 한다. 이는 **진짜 독립 저장소 구현 자체가 아니다**. fixture의 mutex 및 process-restart 재구성으로 동작을 시뮬레이션한다.
+- 파일/테스트: `test/official-reader-portone-cancel-private-signed-trust-boundaries-v1.test.ts`. 재시작 seq9→seq1, 타 인스턴스 floor 상승, 다중 동시 요청, HALT latch, signer 교체, 정책 리비전 상승/역행, 외부 장애, 손상 및 중단된 write를 부정 검증한다.
+- **운영 상의 필수 미검증:** 실제 durable commit 및 readback의 선형화 가능성, 이전 정상 checkpoint로의 저장소 자체 rollback 방지 (WORM/HSM/독립 합의 권한), root/key 교체 승인, 인증된 독립 epoch source, 프로세스/DB 소유자 격리, 저장소 백업/복구, cross-service outage 모델은 fixture로 증명되지 않는다. `transact`가 거짓 성공을 반환하거나 공격자가 오래된 상태를 유효 상태로 복원할 수 있으면 D3e17 코드만으로 막지 못한다. **재시작 후 완전 비우회성 보증은 여전히 HOLD.**
+- 최종 epoch 검사 이후 DB 쓰기 직전의 경쟁은 아직 남는다. 이 원자성은 D3e19에서 실제 PostgreSQL 트랜잭션/역할 검증이 필요하다. D3e18의 DB owner 직접 실행 차단도 별도 필요하다.
 
 ### 소스·검증·중단 규칙
 
