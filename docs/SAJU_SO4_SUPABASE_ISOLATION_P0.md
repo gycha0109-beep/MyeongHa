@@ -2,6 +2,8 @@
 
 Watchtower-Track: saju-bridge
 
+> **동일 프로젝트 제품 통합 대안(2026-10-15):** [기존 명하 Supabase 단일 프로젝트 설계](./SAJU_BRIDGE_SINGLE_SUPABASE_INTEGRATION_DESIGN_V1.md). 본 SO-4의 독립 클러스터 staging 검증과는 **별도 보안·실행 프로파일**이다. §2의 Production staging 재사용 금지는 기존 **고격리 운영 증빙 R01–R14**에 계속 적용된다. 새로운 제품 통합 프로파일은 물리적 분리 미충족을 명시하고 Owner 위험 수용 및 별도 출시 승인을 받기 전 미실행/HOLD다. 세 schema를 3DB처럼 가장하거나 기존 evidence 상태를 승격하지 않는다.
+
 > **목적:** 3-04-03B의 R01–R14 실환경 검증을 위한 공급자 선택·별도 환경의 조건을 고정한다. **이번 변경은 신규 Supabase 프로젝트 생성, 비용 지출, Production 연결, DB GRANT, 키 생성, SQL 변경, Runner 실행을 전혀 수행하지 않는다.**
 >
 > 선행: SO-3B #1963, [운영 증빙 런북](./SAJU_HELD_STAGING_OPERATIONAL_EVIDENCE_RUNBOOK_8C2B2D30401.md), [1인 운영 설계](./MYEONGHA_SOLO_OWNER_SEGREGATED_AUTHORITY_ARCHITECTURE_V0_1.md), #1871.
