@@ -135,6 +135,23 @@ export function validateR2PendingInventory(root, manifest) {
     '1700_RECEIPT_TRIGGER_SOURCE_DRIFT');
   assert(!/^begin;$/imu.test(src1700) && !/^commit;$/imu.test(src1700),
     '1700_TRANSACTION_BOUNDARY_DRIFT');
+  // 1710 reads the 1700 immutable receipt and uses the governed executor
+  // from 1630 plus detached worker from 1690. This is a REVIEW dependency,
+  // never a permission to apply 1710 or seed Provider receipts.
+  const stage1710 = manifest.migrations.find(row => row.version === '1710');
+  const src1710 = readFileSync(join(dir, stage1710.file), 'utf8');
+  assert(['1550','1580','1630','1690','1700'].every(x => stage1710.requires.includes(x)),
+    '1710_MISSING_GOVERNOR_RECEIPT_WORKER_DEPENDENCY');
+  assert(src1710.includes('governor_receipt_pinned_at')
+    && src1710.includes('myeongha_seyeon_governed_executor')
+    && src1710.includes('myeongha_seyeon_settlement_worker')
+    && src1710.includes('cmd_store_seyeon_provider_receipt_v1')
+    && src1710.includes('cmd_claim_seyeon_provider_receipt_v1')
+    && src1710.includes('cmd_ack_seyeon_provider_receipt_v1')
+    && src1710.includes('grant myeongha_seyeon_cost_meter_owner to current_user;'),
+    '1710_RPC_OWNER_ROLE_SOURCE_DRIFT');
+  assert(!/^begin;$/imu.test(src1710) && !/^commit;$/imu.test(src1710),
+    '1710_TRANSACTION_BOUNDARY_DRIFT');
   assert(grouped.size === 9, 'REVIEW_UNIT_CARDINALITY');
   const reviewUnits = [...grouped].map(([unit, versions]) => ({
     unit, versions, start: versions[0], end: versions.at(-1),
