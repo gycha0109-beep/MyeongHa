@@ -27,10 +27,20 @@ settle="public.cmd_governed_settle_seyeon_ai_call_v1(uuid,uuid,uuid,text,jsonb)"
 [[ "$(psql -X -Atqc "select count(*) from pg_roles where rolname='$worker'")" == 0 ]] || hold WORKER_ALREADY_PRESENT
 [[ "$(psql -X -Atqc "select to_regprocedure('$func') is null")" == t ]] || hold FUNCTION_ALREADY_PRESENT
 role_graph() { psql -X -Atqc "select md5(coalesce(string_agg(roleid::text||':'||member::text||':'||grantor::text,'|' order by roleid,member,grantor),'EMPTY')) from pg_auth_members"; }
-schema_acl() { psql -X -Atqc "select coalesce(nspacl::text,'NULL') from pg_namespace where nspname='public'"; }
+# Compare the exact existing grantee grant options; the new Worker must gain
+# its own USAGE-only entry, so the raw nspacl text intentionally changes.
+schema_existing_acl() {
+  psql -X -Atqc "select md5(coalesce(string_agg(
+    a.grantee::text||':'||a.grantor::text||':'||a.privilege_type||':'||a.is_grantable::text,
+    '|' order by a.grantee,a.grantor,a.privilege_type,a.is_grantable),'EMPTY'))
+    from pg_namespace n
+    cross join lateral aclexplode(coalesce(n.nspacl,acldefault('n',n.nspowner))) a
+    where n.nspname='public'
+      and a.grantee::text <> coalesce((select oid::text from pg_roles where rolname='$worker'),'-1')"
+}
 routine() { psql -X -Atqc "select md5(pg_get_functiondef('$1'::regprocedure))"; }
 graph_before="$(role_graph)"
-schema_before="$(schema_acl)"
+schema_before="$(schema_existing_acl)"
 start_before="$(routine "$start")"
 settle_before="$(routine "$settle")"
 [[ -n "$graph_before" && -n "$schema_before" ]] || hold BASELINE_CATALOG
@@ -39,7 +49,7 @@ settle_before="$(routine "$settle")"
 psql -X -q -v ON_ERROR_STOP=1 -f supabase/migrations/1690_seyeon_detached_cost_settlement_worker_v1.sql >/dev/null || hold ORIGINAL_COMMIT_FAILED
 [[ "$(routine "$start")" == "$start_before" && "$(routine "$settle")" == "$settle_before" ]] || hold HISTORICAL_SETTLEMENT_DRIFT
 [[ "$(role_graph)" == "$graph_before" ]] || hold TRANSIENT_ROLE_MEMBERSHIP_REMAINED
-[[ "$(schema_acl)" == "$schema_before" ]] || hold TRANSIENT_SCHEMA_CREATE_REMAINED
+[[ "$(schema_existing_acl)" == "$schema_before" ]] || hold TRANSIENT_SCHEMA_CREATE_REMAINED
 
 psql -X -q -v ON_ERROR_STOP=1 <<'SQL' >/dev/null
 do $audit$
@@ -76,6 +86,13 @@ begin
   if has_table_privilege('myeongha_seyeon_settlement_worker','public.seyeon_ai_call_cost_events','SELECT,INSERT,UPDATE,DELETE')
     or has_table_privilege('myeongha_seyeon_settlement_worker','public.seyeon_ai_governor_daily_budgets_v1','SELECT,INSERT,UPDATE,DELETE')
     or has_schema_privilege('myeongha_seyeon_cost_meter_owner','public','CREATE')
+    or not has_schema_privilege('myeongha_seyeon_settlement_worker','public','USAGE')
+    or has_schema_privilege('myeongha_seyeon_settlement_worker','public','CREATE')
+    or (select count(*) from pg_namespace n cross join lateral aclexplode(n.nspacl) a
+        where n.nspname='public' and a.grantee=v_worker) <> 1
+    or exists (select 1 from pg_namespace n cross join lateral aclexplode(n.nspacl) a
+        where n.nspname='public' and a.grantee=v_worker
+          and (a.privilege_type is distinct from 'USAGE' or a.is_grantable))
   then raise exception 'HOLD_1690_DIRECT_LEDGER_OR_SCHEMA_GRANT'; end if;
 end
 $audit$;
@@ -106,7 +123,7 @@ catalog_before="$(psql -X -Atqc "select md5(pg_get_functiondef('$func'::regproce
 if psql -X -q -v ON_ERROR_STOP=1 -f supabase/migrations/1690_seyeon_detached_cost_settlement_worker_v1.sql >/dev/null 2>&1; then
   hold DUPLICATE_APPLICATION_ALLOWED
 fi
-[[ "$(role_graph)" == "$graph_before" && "$(schema_acl)" == "$schema_before" ]] || hold REPLAY_GRANT_DRIFT
+[[ "$(role_graph)" == "$graph_before" && "$(schema_existing_acl)" == "$schema_before" ]] || hold REPLAY_GRANT_DRIFT
 [[ "$(psql -X -Atqc "select md5(pg_get_functiondef('$func'::regprocedure)||coalesce((select proacl::text from pg_proc where oid='$func'::regprocedure),'NULL'))")" == "$catalog_before" ]] || hold REPLAY_FUNCTION_DRIFT
 pass REPLAY_FAIL_CLOSED
 echo "HOLD_R2_H_1690_OWNER_APPROVAL_REQUIRED actualSettlementE2E=false credentialsProvisioned=false productionWrites=0 drReady=false"
