@@ -200,8 +200,7 @@ trap 'rm -rf "$scratch"' EXIT
 p1=$!
 sleep 0.4
 (
-  q "begin; set local role $executor; $(consume "$race"
-    '123e4567-e89b-42d3-a456-426614174112') commit;" \
+  q "begin; set local role $executor; $(consume "$race" '123e4567-e89b-42d3-a456-426614174112') commit;" \
       >"$scratch/race-second" 2>"$scratch/race-second.err"
 ) &
 p2=$!
