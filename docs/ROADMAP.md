@@ -64,7 +64,7 @@
 | 순서 | 작업 | 완료 판정 | 상태 |
 |---|---|---|---|
 | **COST-01** | 현재 5회/3회 호출 그래프 + 조건부 2회/압축·캐시 3회 대안 및 잠금 점검 | [정적 구조 감사·실측/미측정 분리](character-memory-seyeon-cost-architecture-c01-c02-offline-2026-10-15.md), 5/3/2 실험 파일, 정확한 SHA CI 근거 | **STATIC AUDIT DONE (CI #38669315810); P0 전체 HOLD** |
-| **COST-02** | 무료 회귀: 통합 분류 → 독립 권한 Resolver, 통합 Interpreter/Renderer → Semantic+Output Guard, 최소 300건(민감질문/허위 Memory 포함)에서 비인가 누락 0 | **이번 100 Gold × 3 변형=300건은 오직 Exact 후보 라우팅의 음성 검사**. 실제 모델/분류/대사 300건 품질 검증과 전혀 다름 | **PARTIAL / 본 검증 OPEN** |
+| **COST-02** | 무료 회귀: 통합 분류 → 독립 권한 Resolver, 통합 Interpreter/Renderer → Semantic+Output Guard, 최소 300건(민감질문/허위 Memory 포함)에서 비인가 누락 0 | 기존 Gold 100개 + 새로 쓴 문장 200개 = **서로 다른 300개**의 기대 라벨을 Fake Provider로 실제 Preflight/Resolver에 주입하여 두 분류 경로를 비교. [실행/한계 상세](character-memory-seyeon-cost-c02-300-gold-preflight-audit-v1.md); 실제 모델의 분류 누락·오탐, 세연다움, 적응형 2회 안전성은 **미검증** | **PARTIAL / 무과금 통합 Guard 후보 구현, 실모델 검증 OPEN/HOLD** |
 | **COST-03** | 세연다운 자연스러움 검증: 다중 턴 대화, 첫 인사/속도/상태/취향/관계 변화/반복, 실제 Memory 없이 가능한 공개 컨텍스트부터 | 고정된 블라인드 평가 rubric, 기준/후보 품질 비열등성 및 장기 일관성 결과; 실패 케이스 기록 | **OPEN** |
 | **COST-04** | 토큰/실패·추정 비용 최적화: 프롬프트 중복·역할별 출력 상한·컨텍스트 크기·캐시/추론토큰; 품질/권한 게이트 유지 | 정확한 요청별 call count/input/cached/output/reasoning/실패·재시도·예상비용 계측 및 비교 증거 | **OPEN** |
 | **COST-05** | 비용 사고 재개 조건 검토: 예산 정책·모델/토큰 공식 단가·Provider 사용량 불명 보수 정산·kill switch·Provider outcome durability·별도 DB 로그인·운영 #1887 | 비용/Security/Ops 승인된 **별도 PR**과 재개 범위/최대 예산/kill switch 문서, 없으면 HOLD | **BLOCKED: 승인 필요** |
@@ -84,7 +84,8 @@ npx vitest run \
   test/seyeon-fast-dialogue-shadow-v1.test.ts \
   test/seyeon-inference-efficiency-phase1.test.ts \
   test/seyeon-provider-output-budget-candidate-v1.test.ts \
-  test/seyeon-cost-architecture-offline-v1.test.mjs
+  test/seyeon-cost-architecture-offline-v1.test.mjs \
+  test/seyeon-cost-c02-authority-and-review-offline-v1.test.ts
 ```
 위 명령은 유료 실측 결과를 생산하지 않는다. 오프라인 차단 확인/코드 기반 효과 점검용이다.
 
@@ -121,7 +122,7 @@ npx vitest run \
 ## 5. 다음 작업자가 반드시 먼저 할 일 (단일 작업 큐)
 
 1. **[COST-01 정적 감사 DONE / 2026-10-15]**: [5회/3회/2회 구조 재평가](character-memory-seyeon-cost-architecture-c01-c02-offline-2026-10-15.md), `scripts/seyeon-cost-architecture-offline-v1.mjs`, `test/seyeon-cost-architecture-offline-v1.test.mjs`를 정확한 HEAD CI로 검증한다. v3 실행 Artifact 증거는 없으면 `UNVERIFIED` 유지. **2회는 모델 실행 불가능한 설계 가설**이다.
-2. **[NEXT] COST-02 실제 골드 평가**: 이미 작성한 100건×3 변형 Exact 라우팅 음성 테스트와 별도로 최소 300개의 **독립적인 공격/안전 골드와 기대 출력**을 구성하고 Unified Classifier→Authority Resolver→Semantic/Output Guard의 역할별 누락·과잉 거절·자연스러움을 계측한다. 모델 텍스트·사용자 기록 로그 금지.
+2. **[COST-02 무과금 본검증 부분 구현 / NEXT 실모델 의미 분류]**: 100개 기존+200개 신규 수작업 시나리오 총 300개를 실제 서버 Guard로 연결했으나 **모델 출력은 골드로 결정된 합성 값**이다. 분류 false-negative → Owner 조회 미실행 및 false-positive → 불필요한 HOLD를 재현했다. 이 블로커가 해소되기 전 2회 최적화 또는 고정 3회 운영 전환 금지. 승인 전 유료 실모델 평가 금지. 별도의 모델 분류 누락/오탐·실제 캐릭터 품질 지표와 재발방지 설계 필요.
 3. **COST-03~04**: 토큰 중복·호출 횟수·비용 계측과 품질 개선을 반복한다. 무과금 검증만 수행한다.
 4. **COST-05 차단 해소 요청**: 비용 사고·예산/kill switch·정산 영수증·G0 및 #1887 의존성을 증거화해 승인 전 유료 워크플로를 절대 재개하지 않는다.
 5. P0 평가가 종료 조건에 미달하면 **HOLD를 숨기지 않는다**. 이전 작업은 P1에서 재개하되 비용 최적화를 “완료”로 보고하지 않는다.
