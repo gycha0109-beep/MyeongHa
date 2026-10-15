@@ -1,3 +1,4 @@
+import { isLeastPrivilegeSupabaseAuthApiKeyV1 } from './supabase-auth-api-key-least-privilege.js';
 import {
   MYEONGHA_PRODUCTION_SUPABASE_ORIGIN,
   PRODUCTION_USER_DATA_RUNTIME_ENV_V1,
@@ -126,9 +127,15 @@ function parseConfig(env: ProductionUserDataRuntimeEnvV1): AuthProxyConfigV1 {
   if (typeof rawKey !== 'string' || rawKey.trim().length < 20) {
     throw new Error('Auth proxy Supabase API key is unavailable.');
   }
+  const apiKey = rawKey.trim();
+  if (!isLeastPrivilegeSupabaseAuthApiKeyV1(apiKey)) {
+    throw new Error(
+      'Auth proxy only accepts a publishable or legacy anon Supabase API key.',
+    );
+  }
   return Object.freeze({
     supabaseOrigin: MYEONGHA_PRODUCTION_SUPABASE_ORIGIN,
-    supabaseApiKey: rawKey.trim(),
+    supabaseApiKey: apiKey,
   });
 }
 
