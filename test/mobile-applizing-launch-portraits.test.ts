@@ -37,6 +37,16 @@ describe('Mobile launch visibility, portrait assets and notification UI', () => 
     expect(picker).toContain('MOBILE_READER_VISIBLE_LAUNCH_PRESENTATIONS_V1.map');
   });
 
+  it('keeps web discovery at six without deleting historical Character presentation source', async () => {
+    const web = await source('apps/web/chat-hub.js');
+    expect(web).toContain("key: 'seorin'");
+    expect(web).toContain("key: 'mira'");
+    expect(web).toContain("key: 'doyun'");
+    expect(web).toContain("key !== 'seorin' && key !== 'mira' && key !== 'doyun'");
+    expect(web).toContain('if (!searchTerm) return launchPeople;');
+    expect(web).toContain('return launchPeople.filter(');
+  });
+
   it('bundles real WebP portrait bytes for every launch Character', async () => {
     const resolver = await source('apps/mobile/src/features/chat/chat-character-portraits.ts');
     const hub = await source('apps/mobile/src/app/(tabs)/chat/index.tsx');
