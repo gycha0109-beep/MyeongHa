@@ -350,7 +350,7 @@ PortOne signed webhook
 | D3e12~D3e15 | 조직 신원 오프라인 증명, 발급 API 우회 축소, 루트 서명 정책, 정책 리비전·해시 결합 | Draft #2081~#2088, D3e15 CI PASS, LIVE 미적용 |
 | **D3e16** | **이미 실행 중인 구형 실행자**가 독립 서명된 정책 epoch를 호출마다 확인. 변경/HALT/역행/위조/오프라인/만료 증거는 작업 **전** 거부. DB 호출 직전 2차 검사. | 현재 Draft 구현, CI 검증 필요 |
 | **D3e17** | **영속 최소 epoch와 재부팅 rollback 방지**, 안전한 독립 정책 변경/회수 원천 및 두 인스턴스 검증 | Offline Draft #2099; D3e17 code SHA 1e36445279967123b741fdb0a6d1f7993eca6680 CI/Web/Governance PASS; true independent durable store/roles NOT verified |
-| **D3e18** | 서명 검증자·실행자·DB owner의 실제 프로세스/로그인 분리. D3e6/8/1880 및 1080/1850 직접 실행 부정 증명 | 미착수, DB Owner·Security |
+| **D3e18** | 서명 검증자·실행자·DB owner의 실제 프로세스/로그인 분리. D3e6/8/1880 및 1080/1850 직접 실행 부정 증명 | 읽기 전용 역할·직접 실행 부정 감사 및 모의시험 후보 구현. 실제 계정·프로세스·PostgreSQL 권한 검증 **미완료 / HOLD** |
 | **D3e19** | 독립된 서명·epoch 결정과 DB 원자 변경 사이의 경쟁 제거. 최소권한 진입점·동시성·시계열 실제 PostgreSQL 검증 | 미착수, DB Owner 승인 |
 | **D3e20 / 운영 전환** | PortOne 서버 조회, 정확한 영수증/Grant, 상거래·법무 이중 승인, 이용권 회수, T2 재열람 차단, 복원/개인정보/운영 승인 | 미착수, Commerce·Legal·Privacy·Ops |
 
@@ -373,6 +373,16 @@ PortOne signed webhook
 - 파일/테스트: `test/official-reader-portone-cancel-private-signed-trust-boundaries-v1.test.ts`. 재시작 seq9→seq1, 타 인스턴스 floor 상승, 다중 동시 요청, HALT latch, signer 교체, 정책 리비전 상승/역행, 외부 장애, 손상 및 중단된 write를 부정 검증한다.
 - **운영 상의 필수 미검증:** 실제 durable commit 및 readback의 선형화 가능성, 이전 정상 checkpoint로의 저장소 자체 rollback 방지 (WORM/HSM/독립 합의 권한), root/key 교체 승인, 인증된 독립 epoch source, 프로세스/DB 소유자 격리, 저장소 백업/복구, cross-service outage 모델은 fixture로 증명되지 않는다. `transact`가 거짓 성공을 반환하거나 공격자가 오래된 상태를 유효 상태로 복원할 수 있으면 D3e17 코드만으로 막지 못한다. **재시작 후 완전 비우회성 보증은 여전히 HOLD.**
 - 최종 epoch 검사 이후 DB 쓰기 직전의 경쟁은 아직 남는다. 이 원자성은 D3e19에서 실제 PostgreSQL 트랜잭션/역할 검증이 필요하다. D3e18의 DB owner 직접 실행 차단도 별도 필요하다.
+
+
+### D3e18 로그인·DB 직접 실행 차단 증거 수집 후보 (2026-10-15 / OFFLINE ONLY)
+
+- 후보 파일: \`apps/api/src/official-reader-portone-cancel-private-role-isolation-audit-v1.ts\`; 모의시험: \`test/official-reader-portone-cancel-private-role-isolation-audit-v1.test.ts\`. 신규 SQL migration, GRANT/REVOKE, 실 DB 연결, 운영 process/secret, PortOne 또는 이용권 변경은 **없다**.
+- 별도의 검증자 로그인, 서명 허가 실행자 로그인, DB 소유자 로그인 세 개가 **서로 다르고**, 애플리케이션 공용 계정 및 관리자/슈퍼유저 재사용이 아님을 DB catalogue 증거로 요구한다. 일반 앱 역할 6개를 포함해 서비스/Owner 역할 자체 또는 속임수 신원, 상속권한·\`SET ROLE\`을 통한 DB owner 탈취는 실패시킨다.
+- 공개 PostgreSQL 함수 6개(직접 검토 D3e6, 이중 승인 D3e8, 실제 취소 1880, 원본 1080/1850, 구 관리용 1830)에 대하여 **검증자·실행자·일반 앱 계정**의 유효 \`EXECUTE\`가 모두 false인지 \`pg_catalog\` 기반 조회로 확인한다. PUBLIC 경유/상속 EXECUTE도 \`has_function_privilege\`에서 검출한다. 누락 함수·오버로드·다른 스키마·예상하지 못한 인가·관리자 회원권·불명확한 열·조회 장애는 전부 DENY.
+- **중요:** DB owner는 자신의 SQL을 직접 실행할 수 있으므로 직접 실행권 부정 대상에서 **제외**한다. 여기서 DB owner의 실제 실행 제어, 임의 SQL 우회 또는 OS 프로세스/로그인 분리를 구현했다고 판단하면 안 된다. 테스트는 가짜 카탈로그 관측값만 사용한다. 읽기 전용 판정 결과를 런타임 실행 허가증으로 재사용해서도 안 된다.
+- 실제 D3e18 완료 판정은 DB Owner·Security 승인하에 독립된 운영/격리 환경의 **실 로그인 세션**으로 거부를 재현하고, 배포 이미지·프로세스 별 비밀 및 연결 풀 분리, DBA·마이그레이션 계정의 일상 사용 금지, 우회 경로 감사와 owner 접근 통제가 증명된 뒤에만 가능하다. 이 미증명 범위 및 D3e19 동시성 경쟁은 **HOLD**.
+- 검증 근거: 해당 Draft PR 최종 HEAD의 Actions 결과를 확인한 후 링크/판정 등록. 기존 D3e17/16 성공은 신규 D3e18 동작에 자동 적용되지 않는다.
 
 ### 소스·검증·중단 규칙
 
