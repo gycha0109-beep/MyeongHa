@@ -119,6 +119,26 @@ describe('R2 held 1520..1720 pending migration dependency inventory', () => {
         .toThrow('HOLD_R2_1670_TRANSACTION_BOUNDARY_OR_ROLE_DRIFT');
     });
   });
+  it('rejects missing 1580 Governor rate/ledger dependency of 1700', () => {
+    withFixture((root, dir, manifest) => {
+      manifest.migrations.find(row => row.version === '1700').requires = ['1550'];
+      expect(() => validateR2PendingInventory(root, manifest))
+        .toThrow('HOLD_R2_1700_MISSING_GOVERNOR_RATE_DEPENDENCY');
+    });
+  });
+  it('rejects changed receipt trigger source even when blob is re-pinned', () => {
+    withFixture((root, dir, manifest) => {
+      const row = manifest.migrations.find(x => x.version === '1700');
+      const file = join(dir,row.file);
+      const altered = readFileSync(file, 'utf8')
+        .replace('create trigger pin_seyeon_governed_reservation_receipt_v1',
+          'create trigger unexpected_receipt_pin');
+      writeFileSync(file,altered);
+      row.blobSha = gitBlobSha(Buffer.from(altered));
+      expect(() => validateR2PendingInventory(root, manifest))
+        .toThrow('HOLD_R2_1700_RECEIPT_TRIGGER_SOURCE_DRIFT');
+    });
+  });
   it('rejects changed review-unit order or count', () => {
     withFixture((root, dir, manifest) => {
       manifest.migrations[5].unit = 'deletion';
