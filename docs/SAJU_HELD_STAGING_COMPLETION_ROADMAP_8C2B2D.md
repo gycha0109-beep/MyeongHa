@@ -85,6 +85,15 @@ Watchtower-Track: saju-bridge
 - **운영 완료와 독립:** 3-04-02 실제 Root/Key custody, 3-04-03B 실제 R01–R14, 3-04-04 제한 Target Authority V2, 2D-4 승인 단일 격리 실행은 모두 미검증/HOLD. 1인 Owner 강인증·키/서비스·관리 평면 분리와 비용 승인 선행. 두 서비스 ID는 두 명의 독립 인간 승인자가 아니다.
 - **운영 종료 판정 C:** 운영 외부 인가/증빙 대기. `stagingAdmission=HOLD`, `stagingConnection=NOT_VERIFIED`, `operationalEvidence=NOT_VERIFIED`, `canRunOnce/canExecute/canPublish/canSell=false`, `automaticRetry/automaticCompensation=false`.
 
+## 2H. SO-3 실제 운영 준비 진입 (2026-10-15)
+
+- **선행 인수 종료:** Windows Phase 5 로컬 검증은 [#2103](https://github.com/gycha0109-beep/MyeongHa/pull/2103) 병합 / `main@2503a28bc7fee9e4ac89ff9372e2ea30e4debfef`, 11/11 통합 CI 성공. 다시 로컬 합성 Phase를 만들지 않는다.
+- **현재 첫 미완료 게이트:** 기존 Solo Owner 아키텍처의 **SO-3 운영 관리 평면 준비 / 3-04-02(D) 독립 Root custody와 R01–R04 실제 증빙**. 합성 SO-1/SO-2나 3-04-02(A/B/C)는 실제 키 보관·독립 Root pin, durable floor/ledger·재해 복구 증거가 아니다.
+- **진입 상태 = `SO3_PREPARATION_STARTED_P0`**. [3-04-01 런북 §2A](./SAJU_HELD_STAGING_OPERATIONAL_EVIDENCE_RUNBOOK_8C2B2D30401.md#2a-2026-10-15-so-3-운영-준비-진입--무권한-결정-게이트)에 S01–S06 공급자/환경·Owner 인증/복구·Root/Registry·Operator/Challenge/Attestor·감사·예산·실접속 결정표를 등록. 아직 선택/확인된 실환경 provider·권한·예산·Root/KMS·R01–R14 증빙은 없다.
+- **외부 사용자 결정 이전 P0 범위:** 현재 코드/CI·통제 설계·무권한 read-only *공개 코드* 감사/제안만 수행. 읽기 전용이라도 **최초 운영 계정 연결에는 별도 Owner 승인**이 필요하다. 클라우드/KMS/감사 저장소/스테이징 프로젝트 생성, Root/Operator/Attestor 키 생성·회전·노출, Secret·DB GRANT, 네트워크/probe, Runner·결제/배포/판매 전부 보류.
+- **실제 전진 순서:** S01–S05의 공급자·계정 분리·비용 상한·Owner 행위별 재인증 확정 → 별도 승인으로 R01–R04 실증 → R05–R14 승인된 실제 관측 → Target Authority V2의 fail-closed 검증 → 별도 승인 2D-4. 빠진 게이트를 Windows PASS나 채팅의 진행 지시로 채우지 않는다.
+- **종료 판정:** SO-3 준비 P0 진입 A, 3-04-02(D) 운영 증빙 C(외부 결정/승인 대기), 운영 `NOT_VERIFIED/HOLD`. Phase 4I 등의 신규 합성 단계는 만들지 않는다.
+
 ## 3. 코드·운영 병렬화와 범위 제한
 
 - 3-04-02의 **명세/테스트 포트**는 실환경 운영 권한 없이 미리 검토 가능하다. Root/KMS/저장소 생성·권한 부여는 별도 운영 결정 후 진행.
@@ -101,7 +110,7 @@ Watchtower-Track: saju-bridge
 | 운영 증빙 목록 및 중단 절차 | #1856, R01–R14 | 문서 완료 / 운영 미검증 |
 | 개별 부정 시험 T01–T40 | 기존 합성 테스트 분산 | **개별 대응표 미완료** |
 | Windows Docker Phase 5 Acceptance | Phase 1–4H 폐기형 CI·[#2092](https://github.com/gycha0109-beep/MyeongHa/pull/2092), 사용자 Windows 전체 실행 로그 SHA-256 고정 및 양쪽 HEAD·환경 버전·exit 0·cleanup 제출 | **사용자 제출 로컬 인수 PASS**; Windows OS 빌드·Desktop GUI 버전 별도 미제출, 실환경 운영 승인은 무관 |
-| 독립 Root 및 durable revision/challenge | 3-04-02 | 합성 저장소 검증 #1925 병합 / 운영 미검증 |
+| 독립 Root 및 durable revision/challenge | 3-04-02 / SO-3 | 합성 저장소 검증 #1925 병합; SO-3 P0 공급자·승인 결정표 진입(§2H) / R01–R04 운영 미검증 |
 | 실환경 Auth·DB 3종·Saju Proof | 로컬 2A–2I 합성/실소켓 검증, Admission 38 PASS·병합 #1913; 3-04-03A 인덱스 계약 / 03B 실제 probe | 3 DB 동일 검증 흐름(2J) 합성 완료, R05–R14 독립 운영 관찰 미완료 |
 | Target Authority V2 + Runner | 3-04-04 | 미연결 |
 | 실제 격리 스테이징 1회 | 2D-4 | 미실행 |
