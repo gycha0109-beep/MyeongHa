@@ -67,7 +67,7 @@
 | **COST-02** | 무료 회귀: 통합 분류 → 독립 권한 Resolver, 통합 Interpreter/Renderer → Semantic+Output Guard, 최소 300건(민감질문/허위 Memory 포함)에서 비인가 누락 0 | 기존 Gold 100개 + 새로 쓴 문장 200개 = **서로 다른 300개**의 기대 라벨을 Fake Provider로 실제 Preflight/Resolver에 주입하여 두 분류 경로를 비교. [실행/한계 상세](character-memory-seyeon-cost-c02-300-gold-preflight-audit-v1.md); 실제 모델의 분류 누락·오탐, 세연다움, 적응형 2회 안전성은 **미검증** | **PARTIAL / 무과금 통합 Guard 후보 구현, 실모델 검증 OPEN/HOLD** |
 | **COST-03** | 세연다운 자연스러움 검증: 10·20·30턴 공개·무개인출처 다중 턴, 첫 인사/상대 속도/의견 충돌/관계 허위 주장/반복 | [COST-03 설계·중단 조건](character-memory-seyeon-cost-c03-multiturn-voice-2026-10-15.md) · 60턴 합성 고정 입력, 5회/3회 X/Y 블라인드 패킷, 평가자 2명×2경로×60턴=240셀, 7개 차원/하드위반 기준/중복·누락 HOLD; 실제 응답·인간평가·비열등성 **미측정** | **PARTIAL: 무과금 평가 체계 후보 구현 / 실모델·Canon Authority 드리프트·인간평가 HOLD** |
 | **COST-04** | 토큰/실패·추정 비용 최적화: 프롬프트 입력·캐시·추론·출력 상한 및 각 모델 실패/재시도·후속 추출/Token Count | [COST-04 무과금 계측·Authority 정합성](character-memory-seyeon-authority-reconciliation-cost-c04-offline-v1.md): 5/3단계의 합성 호출별 역사적 단가/Cache/Reasoning/Output/실패/재시도/Unknown Ledger 구현. 실제 Tokenizer 사용량·캐시 Hit·실청구·최적 Prompt/Cap **미측정** | **PARTIAL / 합성 종료·재시도·입력 상한 회귀 보강, Provider 실비 HOLD** |
-| **COST-05** | 비용 사고 재개 조건 검토: 예산 정책·모델/토큰 공식 단가·Provider 사용량 불명 보수 정산·kill switch·Provider outcome durability·별도 DB 로그인·운영 #1887 | 비용/Security/Ops 승인된 **별도 PR**과 재개 범위/최대 예산/kill switch 문서, 없으면 HOLD | **BLOCKED: 승인 필요** |
+| **COST-05** | 비용 사고 재개 조건 검토: 예산 정책·모델/토큰 공식 단가·Provider 사용량 불명 보수 정산·kill switch·Provider outcome durability·별도 DB 로그인·운영 #1887 | [4-cell 무과금 비용 상한 입력 감사](character-memory-seyeon-cost-c05-offline-restart-preflight-v1.md) 구현. 실제 공식 단가/Provider Cap/예산·영수증/DB/Owner 승인 별도 PR, 없으면 HOLD | **PARTIAL: 무과금 조건부 상한 계산 후보 / 유료 평가 BLOCKED** |
 | **COST-06** | 승인 후에만 16건/다중 턴/4-cell A(5/V1) B(5/V2) C(3/V1) D(3/V2) 유료 평가 설계 검토 및 수행 | 동일 입력/모델 snapshot/요금표, 재시도 0, 개별·총액 상한, 실제 비용·P50/P95·승인율·보안/자연스러움 비열등성, 정확한 실행 URL | **BLOCKED: COST-05** |
 | **COST-07** | 5→3 경로 최종 선택 후 명시적 Stage/Canary·롤백 계획 작성 | 사용자 응답의 무단 권한 침해 0, 품질·비용 비열등성, 운영 Owner 승인·정확한 SHA/배포/비용 관측 | **BLOCKED: COST-02~06** |
 
@@ -94,7 +94,8 @@ npx vitest run \
   test/seyeon-cost-c03-character-source-parity-v1.test.ts \
   test/seyeon-authority-reconciliation-candidate-v1.test.ts \
   test/seyeon-cost-c04-offline-stage-ledger-v1.test.mjs \
-  test/seyeon-cost-c05-paid-eval-lock-offline-v1.test.mjs
+  test/seyeon-cost-c05-paid-eval-lock-offline-v1.test.mjs \\
+  test/seyeon-cost-c05-offline-restart-preflight-v1.test.mjs
 ```
 위 명령은 유료 실측 결과를 생산하지 않는다. 오프라인 차단 확인/코드 기반 효과 점검용이다.
 
@@ -134,7 +135,7 @@ npx vitest run \
 2. **[COST-02 무과금 본검증 부분 구현 / NEXT 실모델 의미 분류]**: 100개 기존+200개 신규 수작업 시나리오 총 300개를 실제 서버 Guard로 연결했으나 **모델 출력은 골드로 결정된 합성 값**이다. 분류 false-negative → Owner 조회 미실행 및 false-positive → 불필요한 HOLD를 재현했다. 이 블로커가 해소되기 전 2회 최적화 또는 고정 3회 운영 전환 금지. 승인 전 유료 실모델 평가 금지. 별도의 모델 분류 누락/오탐·실제 캐릭터 품질 지표와 재발방지 설계 필요.
 3. **[COST-03 무과금 평가 체계 후보 구현 / NEXT 원본 Authority 정합성 및 실제 품질]**: 10·20·30턴 총 60개 수작업 공개 시나리오와 블라인드 두 평가자 240셀 채점 구조를 만들었다. 현재 세연 Bible v0.2 Author Register의 여러 CANON 필드와 서버 `seyeon-fact-authority-v1.ts`의 `AUTHOR_UNDEFINED` 및 오래된 Projection/Runtime SHA가 충돌한다. Author/Character/DB Owner 승인 없이 자동 동기화하지 않는다. 실제 답변 생성·모델 오류율·인간 자연스러움 평가는 **NOT_RUN/HOLD**. [상세](character-memory-seyeon-cost-c03-multiturn-voice-2026-10-15.md).
 4. **[COST-04 정적 회계 및 종료 불변식 보강 / NEXT 실제 토큰 측정 승인 준비]**: `scripts/seyeon-cost-c04-offline-stage-ledger-v1.mjs`로 5/3단계 Stage별 모델/용도/실패·재시도·미정 사용량 및 Input/Cache/Output/Reasoning, Trusted Upper Bound·Output Cap 부재를 수치상 구분했다. 실제 API·Tokenizer·Provider 캐시 적중/요금표/실청구는 **NOT RUN**; Output Cap 자동 변경, 모델 호출, 불완전 원가로 최적 구조 확정 금지. Character Authority 정합성은 TEST-only 후보 상태. [근거](character-memory-seyeon-authority-reconciliation-cost-c04-offline-v1.md).
-5. **COST-05 유료 잠금 회귀 보강 / 차단 해소 요청**: 비용 사고·예산/kill switch·정산 영수증·G0 및 #1887 의존성을 증거화해 승인 전 유료 워크플로를 절대 재개하지 않는다.
+5. **COST-05 4-cell 비용 상한 후보 추가 / 차단 해소 요청**: [독립 무과금 상한 계산](character-memory-seyeon-cost-c05-offline-restart-preflight-v1.md)에서 4케이스 64호출/16케이스 256호출, 모델별 현행 공식 단가 미확인, 별도 Token Count·후속 작업 비용 미포함을 명시한다. 기존 128호출/$3 또는 400호출/$1.50 추정치를 총액 보증으로 사용하지 않는다.  비용 사고·예산/kill switch·정산 영수증·G0 및 #1887 의존성을 증거화해 승인 전 유료 워크플로를 절대 재개하지 않는다.
 5. P0 평가가 종료 조건에 미달하면 **HOLD를 숨기지 않는다**. 이전 작업은 P1에서 재개하되 비용 최적화를 “완료”로 보고하지 않는다.
 
 **완료 보고 템플릿:** `대상 / 기준 브랜치·정확한 SHA / 변경 파일 / 실측 또는 무과금 검증 / PASS·FAIL·HOLD / 남은 게이트 / 다음 명령`. `CI green`만으로 비용 최적화 Done 금지.

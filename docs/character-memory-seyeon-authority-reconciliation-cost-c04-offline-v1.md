@@ -87,3 +87,5 @@
 | 운영 모델/DB/PR 병합 | **HOLD** | #1887 운영 DR/Schema 등 포함 보안·운영 승인 |
 
 **비용 발생 전 보고 규칙:** 유료 Provider 요청·모델 Token Count 유료 호출·유료 샌드박스 또는 재평가 잠금 해제 전에 **예상 호출수/단가/총 상한/실패 시 중단 조건을 보고하고 명시적 승인 후 실행**한다. 본 작업의 사용자에게 청구되는 외부 모델 API 요청은 **0건**이다.
+
+## D. COST-05 후속 현황\n\n- [4-cell 무과금 평가 재개 사전 검토](character-memory-seyeon-cost-c05-offline-restart-preflight-v1.md): 현재 평가 코드를 검토하여 유료 평가용 과거 추정치에 의존할 수 없는 이유, 64/256회 계획, 조건부 단계별 최대액(Caller-provided 정책), 결제 증거/Owner 차단을 분리했다. **실유료 API 호출 0**.\n\n
