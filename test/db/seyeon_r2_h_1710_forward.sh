@@ -52,8 +52,11 @@ begin
  if exists (select 1 from pg_roles where rolname in ('myeongha_seyeon_governed_executor','myeongha_seyeon_settlement_worker')
    and (rolcanlogin or rolinherit or rolbypassrls))
  then raise exception 'HOLD_1710_SERVICE_ROLE_ATTRIBUTES'; end if;
- if pg_has_role('postgres','myeongha_seyeon_cost_meter_owner','MEMBER')
-   or has_schema_privilege('myeongha_seyeon_cost_meter_owner','public','CREATE')
+ if exists (
+   select 1 from pg_auth_members m
+   where m.roleid='myeongha_seyeon_cost_meter_owner'::regrole
+     and m.member='postgres'::regrole
+ ) or has_schema_privilege('myeongha_seyeon_cost_meter_owner','public','CREATE')
  then raise exception 'HOLD_1710_OWNER_TEMPORARY_MEMBERSHIP_OR_CREATE'; end if;
  foreach f in array array[f_store,f_claim,f_ack] loop
    if not exists (select 1 from pg_proc p where p.oid=f
