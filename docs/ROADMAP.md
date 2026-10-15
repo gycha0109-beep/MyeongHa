@@ -67,7 +67,7 @@
 | **COST-02** | 무료 회귀: 통합 분류 → 독립 권한 Resolver, 통합 Interpreter/Renderer → Semantic+Output Guard, 최소 300건(민감질문/허위 Memory 포함)에서 비인가 누락 0 | 기존 Gold 100개 + 새로 쓴 문장 200개 = **서로 다른 300개**의 기대 라벨을 Fake Provider로 실제 Preflight/Resolver에 주입하여 두 분류 경로를 비교. [실행/한계 상세](character-memory-seyeon-cost-c02-300-gold-preflight-audit-v1.md); 실제 모델의 분류 누락·오탐, 세연다움, 적응형 2회 안전성은 **미검증** | **PARTIAL / 무과금 통합 Guard 후보 구현, 실모델 검증 OPEN/HOLD** |
 | **COST-03** | 세연다운 자연스러움 검증: 10·20·30턴 공개·무개인출처 다중 턴, 첫 인사/상대 속도/의견 충돌/관계 허위 주장/반복 | [COST-03 설계·중단 조건](character-memory-seyeon-cost-c03-multiturn-voice-2026-10-15.md) · 60턴 합성 고정 입력, 5회/3회 X/Y 블라인드 패킷, 평가자 2명×2경로×60턴=240셀, 7개 차원/하드위반 기준/중복·누락 HOLD; 실제 응답·인간평가·비열등성 **미측정** | **PARTIAL: 무과금 평가 체계 후보 구현 / 실모델·Canon Authority 드리프트·인간평가 HOLD** |
 | **COST-04** | 토큰/실패·추정 비용 최적화: 프롬프트 입력·캐시·추론·출력 상한 및 각 모델 실패/재시도·후속 추출/Token Count | [COST-04 무과금 계측·Authority 정합성](character-memory-seyeon-authority-reconciliation-cost-c04-offline-v1.md): 5/3단계의 합성 호출별 역사적 단가/Cache/Reasoning/Output/실패/재시도/Unknown Ledger 구현. 실제 Tokenizer 사용량·캐시 Hit·실청구·최적 Prompt/Cap **미측정** | **PARTIAL / 합성 종료·재시도·입력 상한 회귀 보강, Provider 실비 HOLD** |
-| **COST-05** | 비용 사고 재개 조건 검토: 예산 정책·모델/토큰 공식 단가·Provider 사용량 불명 보수 정산·kill switch·Provider outcome durability·별도 DB 로그인·운영 #1887 | [4-cell 무과금 비용 상한 입력 감사](character-memory-seyeon-cost-c05-offline-restart-preflight-v1.md) 구현. 실제 공식 단가/Provider Cap/예산·영수증/DB/Owner 승인 별도 PR, 없으면 HOLD | **PARTIAL: 무과금 조건부 상한 계산 후보 / 유료 평가 BLOCKED** |
+| **COST-05** | 비용 사고 재개 조건 검토: 예산 정책·모델/토큰 공식 단가·Provider 사용량 불명 보수 정산·kill switch·Provider outcome durability·별도 DB 로그인·운영 #1887 | [4-cell 무과금 비용 상한 입력 감사](character-memory-seyeon-cost-c05-offline-restart-preflight-v1.md) 구현. 실제 공식 단가/Provider Cap/예산·영수증/DB/Owner 승인 별도 PR, 없으면 HOLD | **PARTIAL: 무과금 조건부 상한 및 예산·실패 예약 모의 검증 / 유료 평가 BLOCKED** |
 | **COST-06** | 승인 후에만 16건/다중 턴/4-cell A(5/V1) B(5/V2) C(3/V1) D(3/V2) 유료 평가 설계 검토 및 수행 | 동일 입력/모델 snapshot/요금표, 재시도 0, 개별·총액 상한, 실제 비용·P50/P95·승인율·보안/자연스러움 비열등성, 정확한 실행 URL | **BLOCKED: COST-05** |
 | **COST-07** | 5→3 경로 최종 선택 후 명시적 Stage/Canary·롤백 계획 작성 | 사용자 응답의 무단 권한 침해 0, 품질·비용 비열등성, 운영 Owner 승인·정확한 SHA/배포/비용 관측 | **BLOCKED: COST-02~06** |
 
@@ -77,7 +77,7 @@
 
 **2026-10-15 무과금 회계 보강:** C04 완료 경로의 최종 성공, 성공 뒤 재시도 거부, 사용량>검증 상한 거부, 중단 경로 총액 UNKNOWN, 2회 가설 경로 제외, 정수 정밀도 회귀를 추가했다. C05의 보호된 유료 workflow 잠금에 회귀 테스트를 추가했다. 실제 API/청구/캐릭터 품질은 미측정·승인 HOLD.
 
-**효율 개선의 정의**: 정상 응답 기준 호출 수 감소만이 아니라 전체 실패·재시도·거절·후속 정산 비용을 포함한 **동일 품질/권한 조건하 실제 턴당 비용 감소**를 증명해야 한다. 비교된 평가에서 지연 P50은 이미 기존보다 99ms 느리므로 “전 항목 성능 개선”으로 보고하지 않는다. 기준/비열등성 여유 범위와 최저 절감률은 평가 전에 Owner가 명시한다.
+**COST-05 추가 준비 (2026-10-15):** [64/256회 모의 예산·실패 선예약 검증](character-memory-seyeon-cost-c05-offline-restart-preflight-v1.md)을 추가했다. 합성 유료 요청 수 0, 실제 실청구 검증 미실행. 향후 승인되는 유료 시험 전용 Secret은 `OPENAI_API_KEY2`를 사용하도록 지정되었지만 기존 보호 워크플로의 잠금/Secret은 변경하지 않았으며 자동 대체 사용을 허가하지 않는다.\n\n**효율 개선의 정의**: 정상 응답 기준 호출 수 감소만이 아니라 전체 실패·재시도·거절·후속 정산 비용을 포함한 **동일 품질/권한 조건하 실제 턴당 비용 감소**를 증명해야 한다. 비교된 평가에서 지연 P50은 이미 기존보다 99ms 느리므로 “전 항목 성능 개선”으로 보고하지 않는다. 기준/비열등성 여유 범위와 최저 절감률은 평가 전에 Owner가 명시한다.
 
 **즉시 실행 가능한 무과금 검증 예시:**
 ```bash
@@ -95,7 +95,8 @@ npx vitest run \
   test/seyeon-authority-reconciliation-candidate-v1.test.ts \
   test/seyeon-cost-c04-offline-stage-ledger-v1.test.mjs \
   test/seyeon-cost-c05-paid-eval-lock-offline-v1.test.mjs \\
-  test/seyeon-cost-c05-offline-restart-preflight-v1.test.mjs
+  test/seyeon-cost-c05-offline-restart-preflight-v1.test.mjs \\
+  test/seyeon-cost-c05-offline-pilot-quota-v1.test.mjs
 ```
 위 명령은 유료 실측 결과를 생산하지 않는다. 오프라인 차단 확인/코드 기반 효과 점검용이다.
 

@@ -16,6 +16,13 @@
 - 함수는 `paidEvaluationPermitted=false`, `HOLD_COST_INCIDENT_APPROVAL_REQUIRED`을 **항상** 반환한다. Rate/Cap/예산 숫자와 성공적인 Unit Test는 Owner/보안 승인 증거가 아님.
 - `test/seyeon-cost-c05-offline-restart-preflight-v1.test.mjs`에서 64회/256회와 예산 부족, 미확인 단가·상한, 캐시 과도 할인, 중복·무권한 모델·재시도·정수 Overflow를 점검한다.
 
+## 호출·예산 차단 모의 검증 (2026-10-15 추가)
+
+- `scripts/seyeon-cost-c05-offline-pilot-quota-v1.mjs`는 C05 조건부 계산기를 받아 **합성 호출 전 선예약**을 확인한다. 4건 64회와 16건 256회, 0회 재시도, 모델/단계 위조, 예산 소진, 무응답/시간 초과, 중복·모순된 결과, 초과 추정치를 별도 테스트한다.
+- 실패/응답 없음/예상 비용 감소 이후에도 예약액은 절대 되돌려주지 않는다. 가격·출력 상한과 Count·후속 추출의 추가 비용은 여전히 **실제 보증되지 않았으며**, 모의 보조금액도 실제 청구 상한 근거가 아니다.
+- 신규 Gate는 `reserveSyntheticStage`와 가짜 결과 기록만 가능하며 **Provider fetch/DB/credential 참조 및 유료 요청 실행 함수가 없다**. 출력은 반드시 `paidEvaluationPermitted=false`이고 실 Provider 청구는 `null`.
+- 사용자가 향후 유료 평가에 사용할 키 이름을 **`OPENAI_API_KEY2`**로 지정했다. 기존 `OPENAI_API_KEY`를 사용하거나 자동 fallback 하지 않는다. **키 등록과 유료 평가 승인·한도 결정은 별개**이다. 비용·호출수·모델·중단 조건이 승인되고 별도 리뷰되기 전 워크플로 잠금을 변경하지 않는다.
+
 ## 실행 전 미해결 증거 및 승인
 
 1. Provider별 **현행 공식 모델 정확한 SKU/단가/계약 및 요청 상한**과 네 셀의 실제 동일 모델 스냅샷.
