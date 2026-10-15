@@ -149,8 +149,8 @@ export function validateR2PendingInventory(root, manifest) {
     && src1710.includes('cmd_claim_seyeon_provider_receipt_v1')
     && src1710.includes('cmd_ack_seyeon_provider_receipt_v1')
     && src1710.includes('grant myeongha_seyeon_cost_meter_owner to current_user;')
-    && /grant\\s+execute\\s+on\\s+function\\s+public\\.cmd_claim_seyeon_provider_receipt_v1\\(\\)\\s+to\\s+myeongha_seyeon_settlement_worker\\s*;/iu.test(src1710)
-    && /grant\\s+execute\\s+on\\s+function\\s+public\\.cmd_ack_seyeon_provider_receipt_v1\\(uuid,uuid\\)\\s+to\\s+myeongha_seyeon_settlement_worker\\s*;/iu.test(src1710),
+    && /grant\s+execute\s+on\s+function\s+public\.cmd_claim_seyeon_provider_receipt_v1\(\)\s+to\s+myeongha_seyeon_settlement_worker\s*;/iu.test(src1710)
+    && /grant\s+execute\s+on\s+function\s+public\.cmd_ack_seyeon_provider_receipt_v1\(uuid,uuid\)\s+to\s+myeongha_seyeon_settlement_worker\s*;/iu.test(src1710),
     '1710_RPC_OWNER_ROLE_SOURCE_DRIFT');
   assert(!/^begin;$/imu.test(src1710) && !/^commit;$/imu.test(src1710),
     '1710_TRANSACTION_BOUNDARY_DRIFT');
