@@ -199,6 +199,11 @@ run_isolated_case myeongha_official_reader_reviewed_cancel_bridge_test bash test
 run_isolated_case myeongha_official_reader_cancel_writer_execution_fence_test bash test/db/official_reader_cancel_legacy_writer_execution_fence.sh
 # Guard the SECOND SECURITY DEFINER cancellation bridge and old Receipt/Reader wrappers.
 run_isolated_case myeongha_official_reader_additional_writer_fence_test bash test/db/official_reader_private_writer_surface_closure.sh
+# D3e18: actual isolated PostgreSQL: dedicated synthetic logins + 48 direct function denials.
+run_isolated_case myeongha_cancel_d3e18_real_roles_ci bash test/db/official_reader_d3e18_cancel_isolated_real_roles.sh
+# D3e19: true two-session isolated PostgreSQL locking when policy changes mid-flight.
+# Synthetic review records only; NO LIVE cancellation/Grant/refund capability.
+run_isolated_case myeongha_cancel_d3e19_atomic_race_ci bash test/db/official_reader_d3e19_cancel_epoch_atomic_race.sh
 bash test/db/entitlements_current_query.sh
 bash test/db/data_deletion_job_query.sh
 bash test/db/notification_preferences_query.sh
