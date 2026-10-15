@@ -80,6 +80,7 @@ export function auditSeyeonC04SyntheticRouteV1(input){
   let knownMicro=0n,quotedCeilingMicro=0n,unknownUsage=0,unknownCeilings=0,
       failed=0,retries=0,knownCached=0n,knownInput=0n,
       knownOutput=0n,knownReasoning=0n;
+  const unknownTokenFields={input:0,cachedInput:0,output:0,reasoningOutput:0};
   for(const call of input.calls){
     const step=plan[call?.stageIndex];
     if(!step||typeof call.callId!=='string'||
@@ -114,6 +115,10 @@ export function auditSeyeonC04SyntheticRouteV1(input){
     if(upper===null)unknownCeilings++;
     else quotedCeilingMicro+=BigInt(upper);
     const u=call.usage;
+    if(u.inputTokens===null)unknownTokenFields.input++;
+    if(u.cachedInputTokens===null)unknownTokenFields.cachedInput++;
+    if(u.outputTokens===null)unknownTokenFields.output++;
+    if(u.reasoningTokens===null)unknownTokenFields.reasoningOutput++;
     if(u.inputTokens!==null)knownInput+=BigInt(u.inputTokens);
     if(u.cachedInputTokens!==null)knownCached+=BigInt(u.cachedInputTokens);
     if(u.outputTokens!==null)knownOutput+=BigInt(u.outputTokens);
@@ -125,8 +130,11 @@ export function auditSeyeonC04SyntheticRouteV1(input){
      quotedCeilingMicro>BigInt(Number.MAX_SAFE_INTEGER)){
     throw new RangeError('C04 calculation exceeds safe integer');
   }
-  const outsideUnknown=input.postTurnState==='UNKNOWN'||
-    input.tokenCounterState==='UNKNOWN';
+  // A CAPTURED status is not an itemized, priced event. This ledger has
+  // foreground stages ONLY; post-turn/token-counter costs need separate rows
+  // with their own verified rate cards before a session-total is knowable.
+  const outsideUnknown=input.postTurnState!=='NOT_APPLICABLE'||
+    input.tokenCounterState!=='NOT_APPLICABLE';
   const allKnown=unknownUsage===0&&!outsideUnknown;
   const allCeilings=unknownCeilings===0&&!outsideUnknown;
   return Object.freeze({
@@ -147,6 +155,7 @@ export function auditSeyeonC04SyntheticRouteV1(input){
       input:Number(knownInput),cachedInput:Number(knownCached),
       output:Number(knownOutput),reasoningOutput:Number(knownReasoning),
     }),
+    tokenUnknownAttemptCounts:Object.freeze(unknownTokenFields),
     cacheSavingsProven:false,
     liveRateVerified:false,providerInvoiceReconciled:false,
     personaQualityVerified:false,productionPromotionAllowed:false,
