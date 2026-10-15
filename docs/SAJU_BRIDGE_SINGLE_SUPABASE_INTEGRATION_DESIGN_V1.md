@@ -101,7 +101,7 @@ Watchtower-Track: saju-bridge
 
 **이번에 작성할/작성한 실제 소스 (Production 미적용):**
 
-- [미적용 migration 1730](../supabase/migrations/1730_saju_bridge_single_project_operator_permit_v1.sql): `saju_bridge_private` 비공개 스키마, 운영용 `operator_permits_v1`, 같은 DB 내 `audit_events_v1`, NOLOGIN/NOBYPASSRLS Owner/Executor 역할, 강제 RLS와 실행자 최소 `EXECUTE`만 정의. **발급자/로그인/기본 회원·Birth/Reading/실행 API/서비스 공개 없음.** `SINGLE_PROJECT_INTEGRATION_PROBE`만 허용하고 Production 활성화/판매 Permit을 발급할 수 없다.
+- [미적용 migration 1730](../supabase/proposals/1730_saju_bridge_single_project_operator_permit_v1.sql): `saju_bridge_private` 비공개 스키마, 운영용 `operator_permits_v1`, 같은 DB 내 `audit_events_v1`, NOLOGIN/NOBYPASSRLS Owner/Executor 역할, 강제 RLS와 실행자 최소 `EXECUTE`만 정의. **발급자/로그인/기본 회원·Birth/Reading/실행 API/서비스 공개 없음.** `SINGLE_PROJECT_INTEGRATION_PROBE`만 허용하고 Production 활성화/판매 Permit을 발급할 수 없다.
 - [미연결 원자 소비 어댑터](../apps/api/src/saju-single-project-operator-permit-v1.ts): 제한 역할을 `SET LOCAL ROLE`로 고정하고 DB 함수의 조건부 원자 claim과 감사 INSERT를 **한 DB 트랜잭션**으로 호출. 결과가 `COMMITTED_UNVERIFIED_OWNER_AUTHORITY`여도 `canRunOnce/canExecute/canPublish/canSell=false`; COMMIT 결과 불명확/권한 실패/중복 모두 FAIL CLOSED 및 재시도 금지. 어댑터 생성 자체는 무 I/O.
 - [소비 부정 테스트](../test/saju-single-project-operator-permit-v1.test.ts) / [미적용 SQL ACL 테스트](../test/saju-single-project-operator-permit-migration-v1.test.ts): 조작된 SHA/scope, 미발급·소비·만료·철회, 역할 차단, 유일성, 잘못된 DB 결과, COMMIT 응답 유실, 감사/권한 계약을 검사한다.
 
