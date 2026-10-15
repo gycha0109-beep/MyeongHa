@@ -9,7 +9,17 @@ const sql = readFileSync(new URL(
   import.meta.url,
 ), 'utf8');
 
-describe('Single-Supabase dormant DB authority SQL proposal', () => {\n  it('cannot trigger main-push Supabase production migrations', () => {\n    expect(existsSync(new URL(\n      '../supabase/migrations/1730_saju_bridge_single_project_operator_permit_v1.sql',\n      import.meta.url,\n    ))).toBe(false);\n    expect(existsSync(new URL(\n      '../supabase/proposals/1730_saju_bridge_single_project_operator_permit_v1.sql',\n      import.meta.url,\n    ))).toBe(true);\n  });
+describe('Single-Supabase dormant DB authority SQL proposal', () => {
+  it('cannot trigger main-push Supabase production migrations', () => {
+    expect(existsSync(new URL(
+      '../supabase/migrations/1730_saju_bridge_single_project_operator_permit_v1.sql',
+      import.meta.url,
+    ))).toBe(false);
+    expect(existsSync(new URL(
+      '../supabase/proposals/1730_saju_bridge_single_project_operator_permit_v1.sql',
+      import.meta.url,
+    ))).toBe(true);
+  });
   it('uses one non-public schema and never creates another database or a login identity', () => {
     expect(sql).toContain('create schema saju_bridge_private;');
     expect(sql).toContain('revoke all on schema saju_bridge_private from public;');
