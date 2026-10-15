@@ -52,6 +52,13 @@ describe('Single-Supabase dormant DB authority SQL proposal', () => {
     expect(sql).toContain("p.status = 'ISSUED'");
     expect(sql).toContain('p.consumed_at is null');
     expect(sql).toContain('p.expires_at > pg_catalog.clock_timestamp()');
+    // Expiry must be re-evaluated AFTER acquiring the row lock.
+    expect(sql).toContain('for update;\n  if not found then');
+    expect(sql).toContain('and consumed_at < expires_at');
+    // Managed Supabase migration principal is not SUPERUSER: COMMENT must
+    // precede REVOKE of membership in the NOLOGIN function owner.
+    expect(sql.indexOf('comment on function saju_bridge_private.cmd_consume_operator_permit_v1('))
+      .toBeLessThan(sql.indexOf('revoke myeongha_saju_bridge_permit_owner from current_user;'));
     expect(sql).toContain('update saju_bridge_private.operator_permits_v1');
     expect(sql).toContain('insert into saju_bridge_private.audit_events_v1');
     expect(sql).toContain("values (\n    p_audit_event_id, v_permit_id, 'PERMIT_CONSUMED', p_audit_digest");
