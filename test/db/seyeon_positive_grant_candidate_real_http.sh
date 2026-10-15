@@ -33,6 +33,10 @@ psql -X -v ON_ERROR_STOP=1 \
 # held until the same PostgreSQL transaction commits. Synthetic fixtures only.
 psql -X -v ON_ERROR_STOP=1 \
   -f test/db/seyeon_g2_actual_v2_atomic_positive_candidate_r3.sql
+# G1 original Pin + actual core ContextReady share one PostgreSQL RPC;
+# G3 first/Replay consult CURRENT original Grant against stored real Chat.
+psql -X -v ON_ERROR_STOP=1 \
+  -f test/db/seyeon_g1_g3_atomic_context_and_reveal_candidate_r4.sql
 SEYEON_POSITIVE_GRANT_REAL_PG=1 ./node_modules/.bin/vitest run \
   test/seyeon-g2-real-v2-atomic-disposable.test.ts --maxWorkers=1
 echo 'PASS: positive Pin -> test Commit -> real PG HTTP grant reveal and Node/Postgres D-03 dual-serializer golden vectors in disposable CI DB'
