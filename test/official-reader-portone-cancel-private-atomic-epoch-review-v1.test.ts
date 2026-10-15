@@ -70,8 +70,7 @@ function fixture(){
     return {rows:[]};
   });
   const release=vi.fn();
-  const pool={connect:vi.fn(async()=>({query:rows,release}))}
-    as unknown as PostgresSubjectPoolV1;
+  const pool={connect:vi.fn(async()=>({query:rows,release}))} as unknown as PostgresSubjectPoolV1;
   const run=()=>createOfflinePrivateCancelAtomicReviewStoreTestV1({
     pool,pinnedEpochSigner:pin,readCurrentSignedEpoch:readSigned,
     trustedClock:()=>new Date(NOW),expectedPolicy:policy,
