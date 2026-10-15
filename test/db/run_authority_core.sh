@@ -41,6 +41,8 @@ run_isolated_case() {
 
 bash test/db/verify_no_schema_cardinality_hardcoding.sh
 # Every migration/app runtime commit rechecks the recognized paid Reader Writer caller graph.
+# D3e24: application code must not regain access to an administrator DB password.
+node scripts/ci/official-reader-production-admin-secret-fence.mjs
 node scripts/ci/official-reader-writer-call-graph.mjs --self-test
 node scripts/ci/official-reader-writer-call-graph.mjs --report
 # Exercise the actual 1460..1510 -> 1400..1450 inversion only on a

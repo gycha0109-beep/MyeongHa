@@ -51,3 +51,9 @@
 연결된 MyengHa PostgreSQL의 읽기 전용 pg_catalog 실사에서 `service_role`의 직접 INSERT/UPDATE/DELETE 유효 권한을 가진 7개 중요 테이블을 확인했습니다. `commerce_account_links`, `commerce_provider_events`, `commerce_receipts`, `entitlement_events`, `entitlement_grants`, `entitlements`, `purchase_intents`입니다. 각 테이블은 현재 RLS 비활성화 상태입니다. REST API 노출 여부와 실제 키 사용자는 미확인입니다. **이용권 기록 1개 테이블의 권한만 축소해선 전체 우회 경로가 차단되지 않습니다.**
 
 자세한 실측과 3개 독립 구매·취소 복제 시험 계획: [OFFICIAL_READER_CANCEL_SEVEN_TABLE_SERVICE_ROLE_ACL_READINESS_20261015_V1.md](OFFICIAL_READER_CANCEL_SEVEN_TABLE_SERVICE_ROLE_ACL_READINESS_20261015_V1.md). 테스트 환경에만 적용하며, 실제 운영 설정과 DB 권한은 변경하지 않습니다.
+
+## 2026-10-15 후속 정정 (D3e24)
+
+기존 위의 Vercel 환경변수 접근 **403 Forbidden** 사실은 ChatGPT Vercel 연결 도구에 한정됩니다. 이후 프로젝트 소유자가 직접 **Production 설정 이름 7개와 `MYEONGHA_DATABASE_PRINCIPAL=myeongha_runtime`을 확인**했습니다. 단, 실제 배포 로그인/키 권한의 실행 증거는 아닙니다.
+
+또한 **`SUPABASE_DB_PASSWORD`는 원래 Vercel Production에 없었습니다.** 잘못된 안내 때문에 일시 추가되었다가 사용자가 삭제했습니다. 기존부터 배치된 관리자 비밀번호가 발견되었다는 해석은 틀렸습니다. GitHub Actions에 별도 지정되는 동일 이름의 마이그레이션 시크릿과 혼동하면 안 됩니다. 자세한 정정 및 보호 검사: [OFFICIAL_READER_CANCEL_PRODUCTION_ENV_EVIDENCE_AND_ADMIN_PASSWORD_FENCE_20261015_V1.md](OFFICIAL_READER_CANCEL_PRODUCTION_ENV_EVIDENCE_AND_ADMIN_PASSWORD_FENCE_20261015_V1.md).
