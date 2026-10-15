@@ -15,7 +15,7 @@ export interface VercelSocialAuthProductionInventoryV1 {
 }
 
 export function classifySocialAuthProductionEnvsV1(
-  envs: readonly Readonly<{ key?: string; target?: readonly string[]; value?: unknown }>[],
+  envs: readonly Readonly<{ key?: string; target?: readonly string[]; value?: unknown; type?: string }>[],
 ): VercelSocialAuthProductionInventoryV1;
 
 export function inspectVercelSocialAuthProductionV1(input: {
