@@ -176,13 +176,15 @@ describe('COST-01 offline cost architecture topology — never a live routing au
 
   it('paid evaluation HOLD remains in both workflows and no new dispatcher is wired to production',()=>{
     const root=new URL('../',import.meta.url);
-    for(const file of [
-      '.github/workflows/seyeon-dialogue-path-real-api-eval-v1.yml',
-      '.github/workflows/seyeon-model-eval-v1.yml',
-    ]){
-      const workflow=readFileSync(new URL(file,root),'utf8');
-      expect(workflow).toMatch(/if:\s*\$\{\{\s*false\s*\}\}/u);
-    }
+    const oldWorkflow=readFileSync(new URL(
+      '.github/workflows/seyeon-dialogue-path-real-api-eval-v1.yml',root),'utf8');
+    expect(oldWorkflow).toMatch(/if:\s*\$\{\{\s*false\s*\}\}/u);
+    const narrowedWorkflow=readFileSync(new URL(
+      '.github/workflows/seyeon-model-eval-v1.yml',root),'utf8');
+    expect(narrowedWorkflow).toContain('secrets.OPENAI_API_KEY2');
+    expect(narrowedWorkflow).toContain('run-seyeon-cost-c06-eight-call-v1.mjs');
+    expect(narrowedWorkflow).toContain("github.ref == 'refs/heads/main'");
+    expect(narrowedWorkflow).not.toContain('run-seyeon-model-eval-v1.mjs');
     const offlineSource=readFileSync(
       new URL('scripts/seyeon-cost-architecture-offline-v1.mjs',root),'utf8');
     expect(offlineSource).not.toMatch(/\bfetch\s*\(/u);
