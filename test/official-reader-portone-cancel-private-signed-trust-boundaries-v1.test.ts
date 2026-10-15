@@ -4,7 +4,9 @@ import {
 } from 'node:crypto';
 import {describe,expect,it,vi} from 'vitest';
 import {canonicalPrivateCancelPermitPolicyBindingV1} from '../apps/api/src/official-reader-portone-cancel-private-policy-bound-permit-v1.js';
-import {readFileSync} from 'node:fs';
+import {mkdtempSync,readFileSync,rmSync,unlinkSync,writeFileSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
 import {
   canonicalPrivateCancelReviewStatementV1,
   type PrivateCancelReviewAuthorizedStoreV1,
@@ -29,11 +31,21 @@ import {
 } from '../apps/api/src/official-reader-portone-cancel-private-offline-executor-boundary-v1.js';
 import {
   canonicalPrivateCancelExecutionEpochV1,
+  verifyPrivateCancelSignedExecutionEpochV1,
   type PrivateCancelExecutionEpochBodyV1,
 } from '../apps/api/src/official-reader-portone-cancel-private-execution-epoch-v1.js';
 import {
   createOfflinePrivateCancelRevocationFencedExecutorV1,
+  createOfflinePrivateCancelRestartSafeExecutorV1,
 } from '../apps/api/src/official-reader-portone-cancel-private-epoch-fenced-executor-v1.js';
+import {
+  comparePrivateCancelDurableEpochV1,
+  isPrivateCancelDurableEpochRecordV1,
+} from '../apps/api/src/official-reader-portone-cancel-private-durable-epoch-watermark-v1.js';
+import {
+  makeIsolatedFileEpochWatermarkV1,
+  seedIsolatedTestEpochWatermarkV1,
+} from './support/private-official-reader-cancel-isolated-file-watermark-v1.js';
 
 const ROOT_ID='root_offline_001';
 const IDP_ID='idp_offline_001';
@@ -763,5 +775,210 @@ describe('D3e16 independently signed current-policy epoch fence (OFFLINE ONLY)',
     });
     // This proves a mandatory future durable minEpoch / generation watermark
     // and independently controlled signed response source.
+  });
+});
+
+
+describe('Offline restart-safe persisted cancellation-policy watermark (no LIVE writer)',()=>{
+  function durableRig(){
+    const f=rig(),e=epochRig(f);
+    const temp=mkdtempSync(join(tmpdir(),'myeongha-cancel-epoch-'));
+    const path=join(temp,'private-epoch.json');
+    const verified=verifyPrivateCancelSignedExecutionEpochV1({
+      envelope:e.signEpoch(),pinnedSigner:e.pin,now:f.clock(),
+    });
+    seedIsolatedTestEpochWatermarkV1(path,verified);
+    const port=()=>makeIsolatedFileEpochWatermarkV1(path);
+    const boot=(watermark=port(),changes:Record<string,unknown>={})=>
+      createOfflinePrivateCancelRestartSafeExecutorV1({
+        signedPolicy:f.envelope,pinnedRoot:f.pin,pinnedEpochSigner:e.pin,
+        readCurrentEpoch:e.source,trustedClock:f.clock,testStore:f.store,
+        durableWatermark:watermark,...changes,
+      });
+    const cleanup=()=>rmSync(temp,{recursive:true,force:true});
+    return {f,e,temp,path,port,boot,cleanup,verified};
+  }
+
+  it('requires independently pre-provisioned record and never auto-seeds after deleting it',async()=>{
+    const d=durableRig();
+    try{
+      const running=await d.boot();
+      const permit=d.f.issuerBoot().issue(d.f.request);
+      unlinkSync(d.path);
+      await expect(running.execute({permit})).rejects.toThrow('watermark rejected');
+      await expect(d.boot()).rejects.toThrow('watermark rejected');
+      expect(d.f.store.commitAuthorizedReview).not.toHaveBeenCalled();
+    }finally{d.cleanup()}
+  });
+
+  it('persists highest sequence across independent adapters and prevents restarting at an older signed epoch',async()=>{
+    const d=durableRig();
+    try{
+      const running=await d.boot();
+      const permit=d.f.issuerBoot().issue(d.f.request);
+      d.e.set(d.e.signEpoch({sequence:7}));
+      expect(await running.execute({permit})).toMatchObject({
+        approvalRecorded:true,effectAuthorized:false,
+      });
+      const saved=JSON.parse(readFileSync(d.path,'utf8')) as {sequence:number;status:string};
+      expect(saved.sequence).toBe(7);
+      expect(saved.status).toBe('active');
+      d.e.set(d.e.signEpoch({sequence:1}));
+      // Different watermark adapter and NEW app executor, same persistent
+      // protected store. In-memory counters are gone but sequence floor isn't.
+      await expect(d.boot(d.port())).rejects.toThrow('watermark rejected');
+      expect(JSON.parse(readFileSync(d.path,'utf8'))).toMatchObject({
+        sequence:7,status:'halted',
+      });
+      d.e.set(d.e.signEpoch({sequence:8}));
+      await expect(d.boot(d.port())).rejects.toThrow('watermark rejected');
+      expect(d.f.store.commitAuthorizedReview).toHaveBeenCalledOnce();
+    }finally{d.cleanup()}
+  });
+
+  it('a signed emergency HALT stays denied after restart, even if a new ACTIVE epoch is signed',async()=>{
+    const d=durableRig();
+    try{
+      const running=await d.boot();
+      const permit=d.f.issuerBoot().issue(d.f.request);
+      d.e.set(d.e.signEpoch({sequence:2,status:'halted'}));
+      await expect(running.execute({permit})).rejects.toThrow('watermark rejected');
+      expect(JSON.parse(readFileSync(d.path,'utf8'))).toMatchObject({
+        sequence:2,status:'halted',
+      });
+      d.e.set(d.e.signEpoch({sequence:3,status:'active'}));
+      await expect(d.boot(d.port())).rejects.toThrow('watermark rejected');
+      expect(d.f.store.commitAuthorizedReview).not.toHaveBeenCalled();
+    }finally{d.cleanup()}
+  });
+
+  it('two separately created executors share one file watermark and a policy update fences both',async()=>{
+    const d=durableRig();
+    try{
+      const a=await d.boot(d.port()),b=await d.boot(d.port());
+      const permit=d.f.issuerBoot().issue(d.f.request);
+      const newPolicy=d.f.signPolicy({...d.f.policy,revision:8});
+      const valid=verifyOfflinePrivateCancelSignedTrustPolicyV1({
+        envelope:newPolicy,pinnedRoot:{...d.f.pin,minimumRevision:8},
+        now:d.f.clock(),
+      });
+      d.e.set(d.e.signEpoch({
+        sequence:2,policyRevision:8,policyDigest:valid.policyDigest,
+      }));
+      await expect(a.execute({permit})).rejects.toThrow('policy changed');
+      // A separately booted OLD process must refuse the new revision even
+      // though its own in-memory sequence is still at 1.
+      await expect(b.execute({permit})).rejects.toThrow('watermark rejected');
+      await expect(d.boot(d.port())).rejects.toThrow('watermark rejected');
+      // A new independently root-verified policy can bootstrap safely on the
+      // *current* epoch without a storage reset or network call.
+      const newProcess=await d.boot(d.port(),{
+        signedPolicy:newPolicy,pinnedRoot:{...d.f.pin,minimumRevision:8},
+      });
+      expect(newProcess).toBeDefined();
+      expect(JSON.parse(readFileSync(d.path,'utf8'))).toMatchObject({
+        sequence:2,status:'active',policyContext:{
+          revision:8,policyDigest:valid.policyDigest,
+        },
+      });
+      expect(d.f.store.commitAuthorizedReview).not.toHaveBeenCalled();
+    }finally{d.cleanup()}
+  });
+
+  it('a valid newer sequence with an OLDER policy revision permanently stops that shared authority',async()=>{
+    const d=durableRig();
+    try{
+      const record=JSON.parse(readFileSync(d.path,'utf8')) as Record<string,unknown>;
+      const newer={...record,sequence:5,policyContext:{
+        ...(record.policyContext as Record<string,unknown>),revision:8,
+      },fingerprint:'b'.repeat(64)};
+      writeFileSync(d.path,JSON.stringify(newer));
+      d.e.set(d.e.signEpoch({sequence:6,policyRevision:7}));
+      await expect(d.boot()).rejects.toThrow('watermark rejected');
+      expect(JSON.parse(readFileSync(d.path,'utf8'))).toMatchObject({
+        sequence:5,status:'halted',
+      });
+    }finally{d.cleanup()}
+  });
+
+  it('same sequence but different signed proof is durable equivocation and cannot be reset by restart',async()=>{
+    const d=durableRig();
+    try{
+      const running=await d.boot();
+      const permit=d.f.issuerBoot().issue(d.f.request);
+      d.e.set(d.e.signEpoch({sequence:1,expiresAt:'2026-10-14T05:00:03.000Z'}));
+      await expect(running.execute({permit})).rejects.toThrow('watermark rejected');
+      expect(JSON.parse(readFileSync(d.path,'utf8'))).toMatchObject({
+        sequence:1,status:'halted',
+      });
+      d.e.set(d.e.signEpoch({sequence:1}));
+      await expect(d.boot(d.port())).rejects.toThrow('watermark rejected');
+      expect(d.f.store.commitAuthorizedReview).not.toHaveBeenCalled();
+    }finally{d.cleanup()}
+  });
+
+  it('missing/corrupted/overlong store and contention fail closed before any test DB effect',async()=>{
+    for(const corruption of ['not json','{}','x'.repeat(5000)]){
+      const d=durableRig();
+      try{
+        writeFileSync(d.path,corruption);
+        await expect(d.boot()).rejects.toThrow('watermark rejected');
+        expect(d.f.store.commitAuthorizedReview).not.toHaveBeenCalled();
+      }finally{d.cleanup()}
+    }
+    const d=durableRig();
+    try{
+      // Simulated crash-left transaction lock: never guess a safe recovery.
+      const fs=await import('node:fs');
+      fs.mkdirSync(d.path+'.lock');
+      await expect(d.boot()).rejects.toThrow('watermark rejected');
+      expect(d.f.store.commitAuthorizedReview).not.toHaveBeenCalled();
+    }finally{d.cleanup()}
+  });
+
+  it('cannot force-reset a provisioned floor or inject another store on request',async()=>{
+    const d=durableRig();
+    try{
+      expect(()=>seedIsolatedTestEpochWatermarkV1(d.path,d.verified))
+        .toThrow('already provisioned');
+      const exec=await d.boot(),permit=d.f.issuerBoot().issue(d.f.request);
+      await expect(exec.execute({permit,durableWatermark:d.port()}))
+        .rejects.toThrow('caller-owned');
+      await expect(exec.execute({permit,readCurrentEpoch:d.e.source}))
+        .rejects.toThrow('caller-owned');
+      expect(d.f.store.commitAuthorizedReview).not.toHaveBeenCalled();
+    }finally{d.cleanup()}
+  });
+
+  it('strictly rejects malformed/corrupted durable records and rejects independently signed rollback',()=>{
+    const d=durableRig();
+    try{
+      const record=JSON.parse(readFileSync(d.path,'utf8')) as Record<string,unknown>;
+      expect(isPrivateCancelDurableEpochRecordV1(record)).toBe(true);
+      expect(isPrivateCancelDurableEpochRecordV1({...record,extra:true})).toBe(false);
+      expect(isPrivateCancelDurableEpochRecordV1({...record,sequence:0})).toBe(false);
+      expect(isPrivateCancelDurableEpochRecordV1({
+        ...record,policyContext:{...record.policyContext as object,revision:0},
+      })).toBe(false);
+      const next=verifyPrivateCancelSignedExecutionEpochV1({
+        envelope:d.e.signEpoch({sequence:2}),pinnedSigner:d.e.pin,
+        now:d.f.clock(),
+      });
+      expect(comparePrivateCancelDurableEpochV1(record,next))
+        .toMatchObject({allowed:true,reason:'advanced',nextRecord:{sequence:2}});
+      expect(comparePrivateCancelDurableEpochV1({...record,sequence:3},next))
+        .toMatchObject({allowed:false,reason:'rollback',nextRecord:{status:'halted'}});
+      expect(()=>comparePrivateCancelDurableEpochV1(null,next)).toThrow('absent');
+    }finally{d.cleanup()}
+  });
+
+  it('missing durable port is refused by restart-safe factory even with valid signed token',async()=>{
+    const d=durableRig();
+    try{
+      await expect(d.boot(undefined as never,{
+        durableWatermark:null,
+      })).rejects.toThrow('durable monotonic authority');
+      expect(d.f.store.commitAuthorizedReview).not.toHaveBeenCalled();
+    }finally{d.cleanup()}
   });
 });
