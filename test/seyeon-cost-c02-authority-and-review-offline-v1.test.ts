@@ -345,10 +345,13 @@ describe('COST-02: real combined interpretation, independent reviewer and output
     const governed=await preflight(gold,candidate);
     expect(governed.disclosure.status).toBe('not_sensitive');
     expect(governed.integrity.decisions).toEqual([]);
+    expect(governed.retrievedPrivateSources).toEqual([]);
     const context=assembleSeyeonRuntimeContextV2({
       relationship:null,
       recentMessages:[{messageId:'u1',role:'user' as const,text:gold.text}],
-      retrievedMemories:governed.retrievedPrivateSources,
+      // Different domain contracts: approved disclosure slices are NOT personal memories.
+      // Zero-source public first contact must contain zero of both.
+      retrievedMemories:[],
       integrityDecisions:governed.integrity.decisions,
       governedPreflightApplied:true,
       disclosure:{decision:governed.disclosure.decision,retrievedSources:[]},
