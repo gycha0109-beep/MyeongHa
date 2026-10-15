@@ -2,6 +2,13 @@
 
 명하는 **각 신의 대리자들과 지속적으로 관계를 맺으면서 사용자의 명식과 현재 삶의 기록을 함께 읽어가는 캐릭터 기반 사주 세계관 서비스**입니다.
 
+## Current work roadmap / 현재 진행 우선순위
+
+**[docs/ROADMAP.md](docs/ROADMAP.md)** — 현재 작업의 단일 통합 로드맵. **P0: 세연 AI 추론 비용 최적화 미완료**(5회→3회 Shadow 후보·소표본 비용 실측, 캐릭터 품질 검증·운영 적용·유료 평가 사고 해제 HOLD). **P1: 기억 동의/DB/History 보안 격리 후보**, 운영 전환 HOLD.
+
+- 모델 유료 평가 워크플로 두 개는 비용 사고 때문에 계속 잠금. 문서/CI 성공만으로 재개 또는 완료 선언 금지.
+- [실측·비교 상세](docs/character-memory-seyeon-real-api-path-eval-v1.md) · [비용 사고 차단](docs/SEYEON_SECURITY_BOUNDARY_EVAL_COST_HOLD_AND_NEGATIVES_V1.md) · [Draft PR #1985](https://github.com/gycha0109-beep/MyeongHa/pull/1985)
+
 ## Authority baseline
 
 구현은 `/docs/MASTER_SPEC_INDEX.md`에서 시작합니다.
