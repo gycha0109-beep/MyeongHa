@@ -207,6 +207,9 @@ run_isolated_case myeongha_cancel_d3e19_atomic_race_ci bash test/db/official_rea
 # D3e19 follow-up: exercise actual existing D3e8 sandbox review SQL behind an
 # independently signed epoch check INSIDE the same disposable PG transaction.
 run_isolated_case myeongha_cancel_d3e19_review_real_ci env MYEONGHA_D3E19_PG_REVIEW=1 npx vitest run test/official-reader-portone-cancel-private-atomic-epoch-review.postgres.test.ts
+# D3e20 preflight: NOLOGIN SQL owner + distinct verifier/executor + exclusive
+# synthetic, single-use, active-epoch review gateway. DB clone, never live.
+run_isolated_case myeongha_cancel_d3e20_role_boundary_ci bash test/db/official_reader_d3e20_cancel_nologin_owner_limited_gateway.sh
 bash test/db/entitlements_current_query.sh
 bash test/db/data_deletion_job_query.sh
 bash test/db/notification_preferences_query.sh
