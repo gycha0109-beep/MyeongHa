@@ -213,6 +213,11 @@ run_isolated_case myeongha_cancel_d3e20_role_boundary_ci bash test/db/official_r
 # D3e21 ONLY: reproduce connected live service_role entitlement ledger DML ACL
 # in a THROWAWAY DB, revoke DML only in clone, run legitimate read regression.
 run_isolated_case myeongha_cancel_d3e21_service_role_ci bash test/db/official_reader_d3e21_service_role_ledger_containment_clone.sh
+# D3e22: each real synthetic Commerce flow runs from a FRESH disposable clone
+# after reproducing and narrowing the service_role entitlement ledger ACL.
+run_isolated_case myeongha_cancel_d3e22_purchase_ci bash test/db/official_reader_d3e22_service_role_purchase_cancel_regressions.sh purchase
+run_isolated_case myeongha_cancel_d3e22_reviewed_ci bash test/db/official_reader_d3e22_service_role_purchase_cancel_regressions.sh reviewed_cancel
+run_isolated_case myeongha_cancel_d3e22_batch_ci bash test/db/official_reader_d3e22_service_role_purchase_cancel_regressions.sh atomic_batch
 bash test/db/entitlements_current_query.sh
 bash test/db/data_deletion_job_query.sh
 bash test/db/notification_preferences_query.sh
