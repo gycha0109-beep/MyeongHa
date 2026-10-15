@@ -27,7 +27,7 @@ describe('mobile M6-B Chat read UI structure', () => {
     for (const name of ['백헌', '세연', '여울', '서린', '라현', '미라', '태겸', '윤호', '도윤']) {
       expect(hub).not.toContain(`displayName: '${name}'`);
     }
-    expect(hub).not.toContain('portrait');
+    expect(hub).toContain('resolveMobileChatPortraitV1');
     expect(hub).not.toContain('recommend');
   });
 
