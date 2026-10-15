@@ -39,8 +39,19 @@ reject() {
 psql -X -1 -v ON_ERROR_STOP=1 -f test/db/bootstrap_supabase_auth_stub.sql >/dev/null
 q "create role myeongha_runtime nologin; create role myeongha_worker_runtime nologin;
   create role myeongha_api_executor nologin;" >/dev/null
-psql -X -1 -v ON_ERROR_STOP=1 \
-  -f supabase/proposals/1730_saju_bridge_single_project_operator_permit_v1.sql >/dev/null
+# Match Supabase's managed migration actor, NOT PostgreSQL SUPERUSER.
+# The managed principal can CREATE ROLE but cannot bypass object ownership;
+# this catches COMMENT/ALTER after owner membership has been revoked.
+q "create role ci_saju_managed_migration
+  login nosuperuser createdb createrole noinherit noreplication nobypassrls;
+  grant create on database \"$PGDATABASE\" to ci_saju_managed_migration;" >/dev/null
+{
+  printf '%s\\n' 'set session authorization ci_saju_managed_migration;'
+  printf '%s\\n' '\\i supabase/proposals/1730_saju_bridge_single_project_operator_permit_v1.sql'
+} | psql -X -1 -v ON_ERROR_STOP=1 >/dev/null
+[[ "$(q "select pg_get_userbyid(nspowner) from pg_namespace
+  where nspname='saju_bridge_private'")" == ci_saju_managed_migration ]] ||
+  fail "managed migration schema owner drift"
 
 schema=saju_bridge_private
 table="$schema.operator_permits_v1"
