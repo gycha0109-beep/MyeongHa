@@ -73,3 +73,12 @@ from supabase_migrations.schema_migrations where version='20261008090417';
 4. 출처 불명 원격-only 이력과 불합격 DR 복원 상태를 해결하기 전 `DR Ready=true` 및 21/21 운영 승인 표기를 금지한다.
 
 **최종 현재 판정: `HOLD_OWNER_RECONCILIATION_REQUIRED`, `authorizedForProduction=false`, `drReady=false`, `paidAi=false`, `publicReader=false`.**
+
+## 5. Owner 승인 후 분리 착수 — 1730 NULL-safe 보안 수정 후보 (2026-10-15, 여전히 배포 HOLD)
+
+- 사용자 승인 범위는 **읽기 전용 출처 조사, 코드상 결함 수정안, 일회용 PG17 CI 검증, 안전한 PR 병합**까지다. **Production DDL/DML/ACL/Role 변경, migration history repair, 유료 Provider, 공개 Reader, DR Ready 전환은 승인하지 않았다.**
+- 운영 `supabase_migrations.schema_migrations`의 **컬럼 정의만** 추가로 조회하고 `20261008090417`의 `version/name/created_by` 메타데이터를 운영 SELECT-only로 비교했다. 원격 전용 이력에는 `created_by` 값이 존재하고, 비교한 `1510` 및 `20261008043000`에서는 NULL이다. **해당 값은 작성자로 기록된 문자열일 뿐 인증된 실제 실행자·작업 원본·서명·Owner 승인 증명이 아니다.** 이메일/원문/고객 데이터는 저장소에 기록하지 않는다. R2-G 계보 HOLD를 해제할 수 없다.
+- **1730 forward-only 비배포 후보:** `test/db/fixtures/1730_seyeon_receipt_null_safe_constraints_v1.proposed.sql`. 운영 푸시 시 마이그레이션 변경이 배포 작업을 호출할 수 있으므로 \`supabase/migrations/\`에 등록하지 않은 검증용 SQL이다. Production 적용은 Owner 별도 승인 및 정식 마이그레이션 생성 이후에만 가능하다. 원본 1700 및 1710의 Git blob을 그대로 보존하고, 1700 Receipt shape CHECK를 `IS NOT NULL`을 명시한 검증된 조건으로 교체한다. 1710 Provider Queue에는 필수 `outcome`/`costStatus`에 대해 누락·JSON NULL·비문자열·허용 외 enum을 막는 별도 CHECK를 추가한다. **실제 큐 저장 경계의 안전장치**이며 원본 Store RPC 코드의 `NOT IN` 자체를 수정했다고 주장하지 않는다.
+- 신규 SQL은 트랜잭션과 `lock_timeout`을 사용하며 두 테이블의 기존 행을 CHECK로 검증한다. 위반 행/권한/잠금 문제가 있으면 전체 실패해야 한다. 기존 자료를 고치거나 무시하는 `NOT VALID` 우회가 없다. **실제 운영 데이터 규모, 기존 위반 행, 롤아웃 lock 영향은 배포 전에 별도 검증해야 한다.**
+- 새 PostgreSQL 17 독립 테스트 `seyeon-r2-h-1730-forward`는 기존 1510+원본 1690/1700/1710 선행 후 원본 1730을 일회용 DB에서 실행하고, **설치된 실제 CHECK 정의**를 복제한 합성 테이블에서 정상/NULL/누락/JSON NULL/잘못된 enum을 검증하도록 구성한다. 원본 함수 Owner·ACL·RLS의 보존과 재실행 fail-closed를 검증한다. 실제 CI 결과는 GitHub Actions 관측 전까지 PASS로 표기하지 않는다.
+- 상태: 기존 1520~1720 **21건 전부 HOLD**, 1730은 **배포 경로에서 제외된 Owner HOLD 수정 후보**. 코드 병합·PG17 PASS는 보안 Owner 또는 Production DB Authority 배포 승인, 예약 정산/Claim/Ack 양수 E2E, 원격 이력 재조정이나 DR 승인과 구별한다.
