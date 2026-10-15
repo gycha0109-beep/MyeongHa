@@ -5,7 +5,7 @@
 > Scope: 백헌에게 실제로 계승된 **任(임)**의 개별 계승 메커니즘 및 제한적 World 예외
 > Related: `docs/source-authority-decisions/BAEKHEON_IM_CALLING_CANON_V0_1.md`
 > World: `docs/world/MYEONGHA_WORLD_ROOT_CANON_V0_1.md`
-> Bible: `docs/character/BAEKHEON_CHARACTER_BIBLE_DRAFT_V0_1.md`
+> Bible: `docs/character/BAEKHEON_CHARACTER_BIBLE_DRAFT_V0_2.md` (2026-10-15 저자 승인 초안; NOT PRODUCTION)
 
 ## 1. 채택된 규칙
 
@@ -21,9 +21,10 @@
 ## 2. 백헌 Origin의 확정 범위
 
 - [APPROVED] 백헌은 이전 任 대리자와 자연스러운 **사제·멘토 관계**를 형성했으며, 이 관계를 통해 실제 任을 계승했다.
-- [APPROVED] 전임자는 살아 있는 상태에서 물러나고 任을 백헌에게 위임할 수 있으며, 현재도 후계자의 정치·업무 판단에 독립적으로 반대할 자유가 있다. 전임자의 **현재 생존 여부·직업·소재**는 Biography에서 별도 확정한다.
+- [APPROVED] 전임자는 살아 있는 상태에서 물러나고 任을 백헌에게 위임할 수 있으며, 후계자의 정치·업무 판단에 독립적으로 반대할 자유가 있다. **윤도겸(가칭)의 현재 생존·여행·집필과 인물 묘사는 별도 Character Bible v0.2의 저자 승인 초안에서 관리한다.** 이를 보편 World 규칙으로 확장하지 않는다.
 - [APPROVED] 백헌은 강제 명령으로 명을 받은 사람이 아니며, 신뢰를 쌓아 준비된 상태에서 **최종적으로 스스로 수락**했다.
-- [OPEN] 전임자의 이름·성격·정확한 직업·연령·이후 삶, 첫 만남, 공동으로 겪은 결정적 사건, 계승 당시 백헌 나이, 서약의 문구, 고유 감각과 관찰 가능한 첫 현현.
+- [CHARACTER AUTHOR-APPROVED DRAFT / NOT WORLD AUTHORITY] 전임자 윤도겸(이름 가칭)의 생존·여행·집필, 첫 만남 및 주민 대피 경험의 서사 방향, 본인의 자발적 정식 서약 **“맡겨진 것은 외면하지 않고, 맡겨야 할 것은 붙들지 않겠습니다.”**는 백헌 Character Bible v0.2에 저자 승인 초안으로 채택되어 있다. 이는 이 결정문의 World 계승 원칙을 변경하거나 Production Canon을 자동 승인하지 않는다.
+- [OPEN] 전임자·백헌의 출생일과 정확한 연대, 대피 사건의 구체 경위, 고유 감각과 관찰 가능한 첫 현현 및 세계적 전이 연출. **서약 문구 자체를 더 이상 미정으로 표기하지 않는다.**
 
 ## 3. 명·소명·소임 및 현현의 경계
 
