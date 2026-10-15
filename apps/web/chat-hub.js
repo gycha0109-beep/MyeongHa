@@ -66,6 +66,12 @@ const people = Object.freeze([
   },
 ]);
 
+// Public discovery only. Keep the full historical presentation index above
+// so existing Character Room deep links and past messages are not deleted.
+const launchPeople = Object.freeze(
+  people.filter(({ key }) => key !== 'seorin' && key !== 'mira' && key !== 'doyun'),
+);
+
 const portraitArt = Object.freeze({
   seyeon: Object.freeze({ src: 'assets/characters/seyeon-portrait-v2.webp' }),
   baekheon: Object.freeze({ src: 'assets/characters/baekheon-portrait-v2.webp' }),
@@ -194,8 +200,8 @@ function normalizedSearchText(person) {
 }
 
 function filteredPeople() {
-  if (!searchTerm) return people;
-  return people.filter((person) => normalizedSearchText(person).includes(searchTerm));
+  if (!searchTerm) return launchPeople;
+  return launchPeople.filter((person) => normalizedSearchText(person).includes(searchTerm));
 }
 
 function renderPeople() {
@@ -220,7 +226,7 @@ peopleSearch?.addEventListener('input', () => {
 });
 
 peopleMore?.addEventListener('click', () => {
-  visibleCount = Math.min(visibleCount + PAGE_SIZE, people.length);
+  visibleCount = Math.min(visibleCount + PAGE_SIZE, launchPeople.length);
   renderPeople();
 });
 

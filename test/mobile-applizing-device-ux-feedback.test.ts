@@ -6,13 +6,15 @@ async function source(path: string) {
 }
 
 describe('Android device feedback: public discovery and gated actions', () => {
-  it('presents all nine canonical characters even when guest, without opening member chat', async () => {
+  it('presents only six mobile launch Characters to guests, while gating member chat', async () => {
     const [screen, roster, service] = await Promise.all([
       source('apps/mobile/src/app/(tabs)/chat/index.tsx'),
       source('apps/mobile/src/features/chat/chat-launch-roster.ts'),
       source('apps/mobile/src/features/chat/mobile-chat-open-service.ts'),
     ]);
-    expect(roster.match(/characterId: '/gu)).toHaveLength(9);
+    expect(roster).toContain("characterId !== 'seorin'");
+    expect(roster).toContain("characterId !== 'mira'");
+    expect(roster).toContain("characterId !== 'doyun'");
     const renderedListAt = screen.indexOf('MOBILE_CHAT_LAUNCH_ROSTER_V1.map');
     const guestLoginAt = screen.indexOf("state.access === 'guest'");
     expect(guestLoginAt).toBeGreaterThan(0);

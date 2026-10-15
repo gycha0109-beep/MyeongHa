@@ -5,7 +5,11 @@ export interface MobileChatLaunchCharacterV1 {
   readonly displayName: string;
 }
 
-export const MOBILE_CHAT_LAUNCH_ROSTER_V1 = Object.freeze([
+/**
+ * Historical identity resolution only: de-listing a Character does not remove
+ * ownership of previously created threads or change the server's ID contract.
+ */
+export const MOBILE_CHAT_KNOWN_CHARACTERS_V1 = Object.freeze([
   Object.freeze({ characterId: 'seyeon', displayName: '세연' }),
   Object.freeze({ characterId: 'yeoul', displayName: '여울' }),
   Object.freeze({ characterId: 'seorin', displayName: '서린' }),
@@ -16,3 +20,12 @@ export const MOBILE_CHAT_LAUNCH_ROSTER_V1 = Object.freeze([
   Object.freeze({ characterId: 'doyun', displayName: '도윤' }),
   Object.freeze({ characterId: 'baekheon', displayName: '백헌' }),
 ] satisfies readonly MobileChatLaunchCharacterV1[]);
+
+/** Presentation-only launch visibility. Not server publication/capability authority. */
+export const MOBILE_CHAT_LAUNCH_ROSTER_V1 = Object.freeze(
+  MOBILE_CHAT_KNOWN_CHARACTERS_V1.filter(
+    ({ characterId }) => characterId !== 'seorin'
+      && characterId !== 'mira'
+      && characterId !== 'doyun',
+  ),
+);

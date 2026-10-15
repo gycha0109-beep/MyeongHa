@@ -2,6 +2,8 @@
 
 Watchtower-Track: saju-bridge
 
+> **2026-10-15 기존 명하 Supabase 단일 프로젝트 대안 설계:** [통합 설계 v1](./SAJU_BRIDGE_SINGLE_SUPABASE_INTEGRATION_DESIGN_V1.md). 새 프로젝트·Neon 없이 **기존 Production Auth/Subject/Reading + 비공개 Bridge schema·제한 역할**을 이용하는 *제품 통합 대안*이다. 이는 아래 고격리 staging/독립 3DB·Root/R01–R14/2D-4 종료 조건의 달성이 아니며, **Owner의 단일 DB 실패 도메인 위험 수용과 별도 제품 배포 게이트가 필요한 미승인 설계**다. 실제 Supabase DDL/GRANT/Secret/배포는 미실행.
+
 > **2026-10-15 개발·로컬 검증 범위 종료:** [사주 브릿지 개발/Windows Docker 인수 종료 기록](./SAJU_BRIDGE_DEVELOPMENT_LOCAL_CLOSEOUT_20261015.md) — `SAJU_BRIDGE_DEV_LOCAL_CLOSED_OPS_HOLD`. 개발·합성/폐기형 CI·Windows Phase 5 인수 완료, 다음 Docker 전체 재검증/임의 Phase 신설 중단. **별도의 "배포" 트랙은 만들지 않으며**, 기존 [Issue #1871](https://github.com/gycha0109-beep/MyeongHa/issues/1871)에서 실제 스테이징 운영 승인/증빙 R01–R14를 **미완료·OPEN/HOLD**로 유지한다. 개발 종료는 이 문서의 **브릿지 최종 완료(운영)** 또는 **서비스 출시**가 아니다.
 
 > **1인 운영 전환 설계:** [1인 Owner·분리된 보안 권한 설계 v0.1](./MYEONGHA_SOLO_OWNER_SEGREGATED_AUTHORITY_ARCHITECTURE_V0_1.md). 기존 본문의 사람 2명 승인·이중 확인은 **기존 구상**이며 단일 Owner·행위별 재인증·보안 계정/키/서비스 신원 분리 설계로 교체한다. 실제 관리 평면의 강제 정책·복구·증빙이 검증되기 전 운영 허가는 그대로 HOLD. 서비스 ID가 2개라도 인간 2인 검토로 주장하지 않는다.
