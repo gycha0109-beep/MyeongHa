@@ -1,5 +1,7 @@
 # 세연 G0 D-03 / G1 양수 Memory → G6 상세 실행 로드맵 v1
 
+> **2026-10-15 우선순위 안내:** 이 문서는 **P1 기억/권한/DB 보안 상세 계획**입니다. 전체 현재 작업 순서와 다음 실행은 반드시 **[통합 로드맵 docs/ROADMAP.md](../ROADMAP.md)**를 먼저 확인합니다. **P0 세연 비용 최적화가 미완료**이며, 비용 사고 `if: false` 유료 평가 잠금을 해제하지 않습니다. R1~R6 시험 DB에서 진척이 있어도 Production Owner 승인·#1887는 여전히 HOLD입니다.
+
 > Watchtower-Track: ops
 >
 > **Status: EXECUTION PLAN PROPOSED · DB/Security/Character OWNER SIGN-OFF HOLD**
