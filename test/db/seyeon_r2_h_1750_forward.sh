@@ -19,9 +19,11 @@ psql -X -qAt -v ON_ERROR_STOP=1 -f scripts/operations/seyeon-r2-h-1530-catalog-r
 node --input-type=module - "$before" "$after" <<'JS'
 import {readFileSync} from 'node:fs';
 const [a,b]=process.argv.slice(2).map(p=>JSON.parse(readFileSync(p,'utf8').trim()));
-if(a.creatorRoleMembership!==true||b.creatorRoleMembership!==false)throw Error('MEMBERSHIP_CLEANUP_FAILED');
+// The disposable migration creator is postgres (superuser): pg_has_role MEMBER
+// remains true after REVOKE even with pg_auth_members direct edge absent.
+if(a.creatorRoleMembership!==true||b.creatorRoleMembership!==true)
+ throw Error('EXPECTED_SUPERUSER_MEMBERSHIP_SEMANTICS_CHANGED');
 for(const key of Object.keys(a)){
- if(key==='creatorRoleMembership')continue;
  if(JSON.stringify(a[key])!==JSON.stringify(b[key]))throw Error('UNEXPECTED_CATALOG_DRIFT_'+key);
 }
 if(b.tableCount!==1||b.tableRls!==true||b.writerOwnedByNarrowRole!==true
@@ -31,7 +33,7 @@ if(b.tableCount!==1||b.tableRls!==true||b.writerOwnedByNarrowRole!==true
  ||b.serviceWriterExecute!==false||b.apiTableDml!==false
  ||b.authorizedForProduction!==false||b.drReady!==false)
  throw Error('ACCESS_CONTROL_BASELINE_FAILED');
-console.log('PASS_R2_H_1750_ONLY_CREATOR_MEMBERSHIP_REMOVED_CATALOG_PRESERVED');
+console.log('PASS_R2_H_1750_DIRECT_MEMBERSHIP_ONLY_REMOVED_CATALOG_PRESERVED');
 JS
 [[ "$(psql -X -Atqc "select count(*) from pg_auth_members where roleid='myeongha_character_reading_artifact_runtime_owner'::regrole and member=current_user::regrole")" == 0 ]] || hold ROLE_MEMBERSHIP_RETAINED
 if psql -X -q -v ON_ERROR_STOP=1 -f test/db/fixtures/1750_character_artifact_creator_membership_cleanup_v1.proposed.sql >/dev/null 2>&1; then
