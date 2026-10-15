@@ -95,6 +95,20 @@ Watchtower-Track: saju-bridge
 
 **선택 조건:** Owner가 단일 프로젝트 운영 모델의 한계(동일 관리자/키/복구/장애 도메인, Production에서 테스트할 경우 데이터·가용성 위험)를 명시적으로 수용하면, **고격리 rehearsal 게이트를 통과했다고 주장하는 대신** 새 제품 통합/출시 검증 기준을 정의해 별도로 인수한다. 제품 수준의 보안 책임을 생략하거나 기존 `R01–R14`를 자동 충족으로 재해석해서는 안 된다. 기존 격리 SO-4 요구를 유지해야 하는 경우 이 대안은 합격이 아닌 HOLD다.
 
+## 3A. S1 구현 결정 — 기존 Reading/Proof 중복 제거 (2026-10-15)
+
+**S1 최소 범위:** 기존 `public.readings`에는 이미 `UNIQUE(subject_id, request_idempotency_key)`가 있고, 기존 `public.reading_execution_attempts`는 Reading별 실행 상태를 보유한다. 또한 [기존 migration 1540](../supabase/migrations/1540_saju_source_proof_nonce_claim_authority_v1.sql)은 `public.saju_source_proof_nonce_claims`의 **별도 권한/원자 nonce 중복 방지**를 정의한다. **따라서 별도의 `request_claims`/일반 `execution_ledger` 테이블을 이번 S1에서 추가하지 않는다.** 2A 표는 후보 초안이며 이 S1 결정을 우선한다.
+
+**이번에 작성할/작성한 실제 소스 (Production 미적용):**
+
+- [미적용 migration 1730](../supabase/proposals/1730_saju_bridge_single_project_operator_permit_v1.sql): `saju_bridge_private` 비공개 스키마, 운영용 `operator_permits_v1`, 같은 DB 내 `audit_events_v1`, NOLOGIN/NOBYPASSRLS Owner/Executor 역할, 강제 RLS와 실행자 최소 `EXECUTE`만 정의. **발급자/로그인/기본 회원·Birth/Reading/실행 API/서비스 공개 없음.** `SINGLE_PROJECT_INTEGRATION_PROBE`만 허용하고 Production 활성화/판매 Permit을 발급할 수 없다.
+- [미연결 원자 소비 어댑터](../apps/api/src/saju-single-project-operator-permit-v1.ts): 제한 역할을 `SET LOCAL ROLE`로 고정하고 DB 함수의 조건부 원자 claim과 감사 INSERT를 **한 DB 트랜잭션**으로 호출. 결과가 `COMMITTED_UNVERIFIED_OWNER_AUTHORITY`여도 `canRunOnce/canExecute/canPublish/canSell=false`; COMMIT 결과 불명확/권한 실패/중복 모두 FAIL CLOSED 및 재시도 금지. 어댑터 생성 자체는 무 I/O.
+- [소비 부정 테스트](../test/saju-single-project-operator-permit-v1.test.ts) / [미적용 SQL ACL 테스트](../test/saju-single-project-operator-permit-migration-v1.test.ts): 조작된 SHA/scope, 미발급·소비·만료·철회, 역할 차단, 유일성, 잘못된 DB 결과, COMMIT 응답 유실, 감사/권한 계약을 검사한다.
+
+**실제 운영 DB baseline 주의:** 2026-10-15 **읽기 전용 SQL 조회**에서 현재 명하 Supabase에는 `1540`·`1530`·`1720` migrations가 적용됐다는 기록이 없고 `saju_source_proof_nonce_claims` 테이블과 `myeongha_saju_%` 역할도 없었다. 즉 **소스에 있는 DB migration이 Production에 실제 적용됐다고 가정하면 안 된다.** 1730을 Production에서 **독립적으로 수동 실행하는 것도 금지**하고, 선행 미적용 migration 전체의 의존성·호환성·승인 순서를 정리할 때까지 S3는 HOLD한다.
+
+**보안 한계:** Owner intent digest가 DB row와 일치한다고 해서 **사용자의 실제 행위별 강인증/서명 검증**이 되는 것은 아니다. 이 S1에는 Permit 발급 경로/실제 Owner 인증/Root custody/independent audit를 구현하지 않는다. 운영 권한은 증빙·승인 전 계속 HOLD. 동일 DB 내 audit는 독립 불변 감사가 아니다.
+
 ## 4. 실행 순서 및 검증 게이트 (추가 프로젝트/유료 자원 없음)
 
 | 단계 | 구체적 구현·검사 | 종료 조건 |
