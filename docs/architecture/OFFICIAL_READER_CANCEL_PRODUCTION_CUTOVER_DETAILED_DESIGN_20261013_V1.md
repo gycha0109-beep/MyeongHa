@@ -410,6 +410,13 @@ PortOne signed webhook
 - **반드시 인정할 한계:** PostgreSQL의 진짜 슈퍼유저는 NOLOGIN 소유자 역할도 대신할 수 있고, 객체 소유자는 자신의 함수를 직접 실행할 수 있다. 본 실험은 슈퍼유저의 그 능력을 실제로 확인하며 이를 해결했다고 주장하지 않는다. DBA/마이그레이션 비밀, 역할 회원권, 실제 프로세스별 계정과 네트워크·백업 접근 통제는 운영 범위의 별도 승인 및 독립 증거가 필요하다. 기존 1950 직접 호출, 1880/1850/1080 이용권 회수, 실 운영 영속 epoch·서명·결제사 접속·감사 추적은 **전부 그대로 보류**.
 - 시험 결과는 해당 자식 Draft PR의 **정확한 최신 커밋**에서 실 PostgreSQL 검사 통과 확인 후 판정할 것. CI 실행 없이 '운영 우회 차단 완료' 또는 'D3e20 배포 준비 완료'라 보고하지 않는다.
 
+### D3e20 준비: 연결된 MyengHa 실제 DB ACL 실사 (2026-10-15, READ-ONLY)
+
+- 상세 증거 및 운영 전환 차단 조건: docs/architecture/OFFICIAL_READER_CANCEL_LIVE_ACL_CUTOVER_READINESS_20261015_V1.md
+- 실제 연결 DB 6개 대상 함수 중 5개 미배포, 3개 전용 운영 역할 미존재, 3개 Reader 취소 운영 테이블 미존재 확인. 오프라인 fixture의 PASS를 운영 상태로 간주할 수 없다.
+- service_role은 실측 entitlement_events SELECT/INSERT/UPDATE/DELETE 가능하고 BYPASSRLS 역할이다. postgres는 LOGIN/BYPASSRLS/CREATEROLE을 보유하며 기존 한 개의 효과 함수 owner다. 실제 배포 자격증명 사용 여부는 미확인이다.
+- 이 자식 Draft에서는 재실행 가능한 pg_catalog SELECT 감사 SQL과 근거 부족 시 HOLD 평가 테스트만 추가. 운영 자격증명 조회/수정, GRANT/REVOKE, migration, 데이터 수정, provider 환불, 배포 없음.
+- 이 단계는 실제 DB의 관리 권한 우회를 제거한 것이 아니라 위험을 실측하고 전환 차단 조건을 확정한 것이다. 수탁·계정 분리·DBA 통제·Commerce/Legal/Ops 승인 전에는 무조건 HOLD.
 ### 소스·검증·중단 규칙
 
 - Epoch 서명 계약: apps/api/src/official-reader-portone-cancel-private-execution-epoch-v1.ts
