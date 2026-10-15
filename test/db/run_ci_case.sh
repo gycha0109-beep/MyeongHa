@@ -386,6 +386,19 @@ SQL
     done
     bash test/db/seyeon_r2_h_1670_forward.sh
     ;;
+  seyeon-r2-h-1680-forward)
+    verify_pg17
+    [[ "$GITHUB_ACTIONS" == true && "$DB_SUITE" == postgres17 ]] || { echo HOLD_R2_H_1680_NOT_CI >&2; exit 1; }
+    [[ "$PGHOST" == localhost && "$PGPORT" == 5432 && "$PGDATABASE" =~ ^myeongha_ci_case_[0-9]+$ ]] || { echo HOLD_R2_H_1680_WRONG_DB >&2; exit 1; }
+    node scripts/operations/verify-seyeon-r2-pending-migrations.mjs > /dev/null
+    apply_pg17_migrations_through_seyeon_production_frontier
+    for migration in 1550 1560 1570 1580 1590 1600 1610 1620 1630 1650 1670; do
+      path=(supabase/migrations/"$migration"_*.sql)
+      [[ ${#path[@]} == 1 && -f "${path[0]}" ]] || { echo HOLD_R2_H_1680_MISSING_DEPENDENCY >&2; exit 1; }
+      psql -X -q -v ON_ERROR_STOP=1 -f "${path[0]}" >/dev/null
+    done
+    bash test/db/seyeon_r2_h_1680_forward.sh
+    ;;
   seyeon-r2-rpc-catalog)
     verify_pg17
     apply_pg17_migrations_without_birth_authority

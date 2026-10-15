@@ -309,3 +309,22 @@ Watchtower-Track: ops. R1 정확한 격리 복원 증거는 8절을 따른다. �
 - **신규 보안 HOLD**: 원본은 새 함수 Owner를 좁은 NOLOGIN Role로 변경하지 않아 격리 PG17에서 migration creator(superuser)가 SECURITY DEFINER owner로 남았다. HOLD_R2_H_1670_PRIVILEGED_SECURITY_DEFINER_CREATOR_OWNER_REVIEW. 운영 적용 시 동일 owner라고 단정하지 않는다. DB/Security/Character Owner가 Production DDL 실행 identity, owner 권한, 실행 체인, 최소권한 및 필요 시 별도 forward-only remediation 승인 필요. SQL 원본을 임의 수정하거나 운영 권한을 부여하지 않는다.
 - **계속 HOLD**: R2-G remote-only 20261008090417 계보, 1530 creator membership, 1640 NULL-record SQL trigger 우회, 1650 function Owner, 1660 Reader positive E2E/ambiguity, 21개 pending migrations 모두 HOLD_OWNER_REVIEW, Production 1520~1720 미적용, AI G0~G6/유료/공개 OFF, dr_ready=false. 기술 격리 PASS는 Owner/Production/DR 승인 아님.
 - 다음은 1680.requires=['1650','1670']의 정확한 선행 SQL/트랜잭션/Guest 만료·Admission Lock 검토 (독립 검증 범위, 운영 배포 순서 아님).
+
+## 27. 2026-10-15 R2-H 1680 — 비용 승인 직전 Guest 만료 재검사 (검증 후보, Owner HOLD)
+
+- **대상 원본:** `1680_seyeon_governed_guest_expiry_admission_guard_v1.sql`, Git blob `d1b63f472b620b3250153d59dfeab079c6585e23`, 원본 **불변**. 인벤토리 `1680.requires=['1650','1670']`, `approval=HOLD_OWNER_REVIEW`.
+- **트랜잭션 안전:** 1650·1670·1680 원본 모두 자체 `BEGIN/COMMIT`를 사용한다. 외부 트랜잭션 롤백을 격리 보증으로 사용하지 않는다. 기존 CI `postgres17`의 일회용 `myeongha_ci_case_*` DB에서 1510+두 timestamped → 1550~1630 → 1650 → 1670 → 1680 순서로 **원본 COMMIT**을 재생하며, CI가 DB 자체와 생성 Role을 폐기한다. 안전조건 불충족 시 fail-closed.
+- **1680 계약:** 기존 governed Guest resolver에서 Subject→exact Guest Session 순서의 SHARE 잠금과 transaction-local session ID Pin; 비용 승인용 active Subject helper에서 동일 Subject/Session과 fresh `clock_timestamp()` 만료를 재검사한다. Member는 Guest proof 없이 기존 active Subject guard를 사용한다. 기존 Owner/ACL/OID/SECURITY DEFINER 검색경로, governed Start 함수 및 기존 legacy Guest resolver의 본문 불변 확인이 선행.
+- **합성 PG17 부정 검증 후보:** Guest active, Member positive; Guest session ID 없음·다른 Subject session 혼입·governed Role의 private helper 직접 호출 거부; 정상 Guest resolve **이후** 만료되면 Guard에서 거부; Guest/Promotion 양방향 독립 세션 잠금·stale proof 거부. 여기서 `pg_sleep` 후 직접 private Guard 호출은 fresh-expiry 로직 증명이지 **일일 예산 행 실제 잠금 대기 후 `cmd_governed_start...` 유료 예약의 전체 양수 E2E가 아니다**.
+- **반드시 남길 HOLD:** 1650/1670 SECURITY DEFINER Migration Creator Owner의 운영 최소권한·실행 Role 검토, 1680 함수 Owner 확인 및 정책 승인; Provider/예산 시드/실 Credential/유료·공개 호출 OFF. 1640 Trigger SQL NULL 우회, 1530 Role membership, R2-G remote-only 계보, 1660 Reader E2E, 1520~1720 21개 Owner 승인, G0~G6, DR Ready=false 유지. 다른 원본 SQL 또는 Production ACL·Role·migration history 수리 금지.
+- **관측 지위:** 이 절의 검증은 후보 설계이며 PG17/CI/Full Integration 실제 PASS 및 병합 SHA는 별도로 측정하여 누적한다. 증거 없이 PASS 승격하지 않는다.
+
+### 27.1 실제 disposable PG17 결과 — 2026-10-15 (Owner HOLD)
+
+- [PR #2096](https://github.com/gycha0109-beep/MyeongHa/pull/2096), 검증 HEAD `756a39d52dbd9e12ac6a95118e2fa89c472fbd6d`, [CI #38663201408](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38663201408)의 PostgreSQL 17 job `116189400351` **SUCCESS**. 이는 PG17 job 결과이며 이 시점의 **CI 전체/Full Integration 및 merge 검증 완료 선언이 아님**.
+- `PASS_R2_H_1680_SOURCE_COMMIT_OWNER_ACL_PRESERVED`: 원본 1650·1670·1680 Git blob 검증 후 순서대로 실제 COMMIT, 기존 OID/Owner/ACL 및 기존 Start/legacy Guest DDL 보존, 대상 본문 교체 확인.
+- `PASS_R2_H_1680_VALID_GUEST_GUARD`, `MEMBER_PATH`, `DENY_MISSING_GUEST_SESSION`, `DENY_CROSS_SUBJECT_SESSION`, `DENY_DIRECT_COST_GUARD`: 합성 정상·부정 접근 판정.
+- `PASS_R2_H_1680_DENY_EXPIRED_AFTER_RESOLUTION`, `POST_RESOLUTION_EXPIRY_GUARD`: Guest resolver 통과 뒤 유효기간이 끝나면 private cost guard가 fresh clock으로 거부함. **실제 일일 예산 행 대기/유료 예약 전체 E2E는 실행하지 않음**.
+- `PASS_R2_H_1680_SUBJECT_SESSION_LOCK_ORDER`, `PROMOTION_FIRST_STALE_GUEST_DENIED`: 두 방향 독립 PostgreSQL 세션의 잠금과 stale Guest 거부. `PASS_R2_H_1680_DISPOSABLE_DATABASE_DESTROYED`: 완료 후 테스트 DB 자체가 제거됨.
+- **`HOLD_R2_H_1680_PRIVILEGED_SECURITY_DEFINER_OWNER_REVIEW`**: disposable PG17에서 기존 두 SECURITY DEFINER Owner가 슈퍼유저로 관측됨. 1680은 이들의 Owner/ACL을 보존했으며 실제 Production DDL 실행 identity를 증명하지 않는다. 기존 1650/1670 Owner 및 신규 1680 운용 승인 모두 HOLD.
+- `HOLD_R2_H_1680_OWNER_APPROVAL_REQUIRED fundedAdmissionE2E=false productionWrites=0 drReady=false`. R2-G 계보, 1530 Owner 멤버십, 1640 JSONB NULL 우회, 1660 Reader, 21 pending, AI G0~G6, paid/public HOLD를 해제하지 않음.

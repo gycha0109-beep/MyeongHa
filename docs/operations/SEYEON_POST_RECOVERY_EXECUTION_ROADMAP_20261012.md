@@ -326,3 +326,17 @@ Governor 04d4B 계열은 실제 격리 PostgreSQL 기반 영수증 임대·정�
 - R2 패킷 [26절](SEYEON_MIGRATION_LINEAGE_R2_READONLY_PACKET_20261013.md)의 PG17 결과를 정본으로 사용. PR https://github.com/gycha0109-beep/MyeongHa/pull/2093 기술 HEAD 9622c4c62777cdbf99d7abccc4e34d9189cfcf79, https://github.com/gycha0109-beep/MyeongHa/actions/runs/38541247399 PG17 job 115776819584 SUCCESS. Original 1670 SQL Git blob pin 보존, 1510+2 timestamped 및 1550~1630 선행 SQL 다음 원본 내부 COMMIT 포함 실행. 독립 Guest/Promotion 양방향 lock wait + stale 거부 + old RPC ACL + 원본 중복 적용 실패 및 독립 case DB 폐기까지 검증.
 - 새로운 Security/DB Owner HOLD: 새 SECURITY DEFINER Guest resolver가 격리 환경 superuser 실행자 소유로 남음. Production migration 실행 identity/Owner/권한을 승인받고 필요하면 forward-only remediation 검토. 기술 PASS는 Production 승인/DR Ready가 아니며 Provider call/실제 Guest/고객정보와 운영 DB 쓰기 없음.
 - R2-G historical provenance, 1530 Owner membership, 1640 SQL NULL-records Commit 방어, 1650 SECURITY DEFINER Owner, 1660 Reader E2E, 21개의 1520~1720 Owner HOLD, G0~G6/paid/public 모두 그대로. dr_ready=false. 다음 후보 1680.requires=['1650','1670']는 별도 검토 단위이며 자동 배포 순서 아님.
+
+## 29. 2026-10-15 R2-H 1680 Guest Expiry at Governed Admission — 독립 검증 단위
+
+- 기존 R2 패킷 [27절](SEYEON_MIGRATION_LINEAGE_R2_READONLY_PACKET_20261013.md)만 세부 증거 정본으로 사용한다. 1680 source Git blob `d1b63f472b620b3250153d59dfeab079c6585e23` 유지, 검토 Owner `character-security`, 실 의존성 `['1650','1670']`.
+- 1670의 2026-10-14 main PG17 1회 회귀는 합성 `guest_sessions`의 `consumed_at`와 `created_at` 시각 역전으로 실패했다. 원본 마이그레이션 결함으로 단정하지 않고 별도 fixture-only 수정 PR #2094로 격리한다. PR의 exact-head/Full Integration/병합 여부는 실제 Actions 확인 후 갱신한다.
+- 1680은 **일회용 독립 PostgreSQL 17 DB**에서만 1650→1670→1680 내부 COMMIT을 포함하여 재생한다. 새로운 운영 워크플로 생성 없음. 함수 OID/Owner/ACL/SECURITY DEFINER 보존, Guest proof에서 session ID Pin, 실제 만료시각 재검사, Member 경로, 잠금 경합과 stale 거부를 검증한다. 기존 1670 합성 회귀 케이스와 독립 실행한다.
+- 실 비용 예산 예약 E2E와 Provider 호출·운영 credential·Production 배포 및 SQL/Role 수정은 이번 단위에 포함되지 않는다. 1650/1670/1680의 privileged function ownership, 이전 Owner HOLD, R2-G, 1640 NULL 비교 Trigger, 21개 마이그레이션 승인, G0~G6 및 dr_ready=false 유지.
+- 실제 검증 통과 이후에만 다음 후보 1690 Dependency/COMMIT 감사를 연다. 1690→1700→1710→1720은 **개별 검증 후보 순서**이며 승인된 Production 적용 순서가 아니다.
+
+### 29.1 1680 격리 PG17 기술 증거 (Owner HOLD, 2026-10-15)
+
+- [PR #2096](https://github.com/gycha0109-beep/MyeongHa/pull/2096) 검증 HEAD `756a39d52dbd9e12ac6a95118e2fa89c472fbd6d`: [PG17 CI #38663201408 job 116189400351](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38663201408) SUCCESS. 세부 실측 및 필수 HOLD는 [R2 패킷 §27.1](SEYEON_MIGRATION_LINEAGE_R2_READONLY_PACKET_20261013.md)만 정본으로 유지한다.
+- 원본 1650/1670/1680의 내부 COMMIT 재생, 1680 교체 전후 권한·Owner 불변, 합성 만료 후 승인 거부, Guest↔Promotion 두 방향 실제 잠금 경합, 테스트 데이터베이스 폐기를 검증. **실제 funded admission E2E·프로덕션 보안 Owner 승인/DR Ready가 아님**.
+- PR 최종 CI·Full Integration/병합 SHA는 확인 전까지 미확정; 기술 증거만으로 1690의 운영 활성화 또는 G0~G6 승격 금지.
