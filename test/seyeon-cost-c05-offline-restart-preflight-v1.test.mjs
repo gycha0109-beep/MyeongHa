@@ -6,12 +6,12 @@ import {inspectSeyeonC05OfflineRestartBudgetV1 as audit} from '../scripts/seyeon
 const ids=SEYEON_DIALOGUE_PATH_CASE_IDS_V1;
 const sample=()=>({
   scope:'SYNTHETIC_OFFLINE_ONLY',caseIds:ids.slice(0,4),retries:0,
-  proposedBudgetMicroUsd:100000,
+  proposedBudgetMicroUsd:120000,
   rateCards:[
     {providerKey:'openai-responses',modelKey:'gpt-5.6-luna',priceVersion:'synthetic-v1',
-     inputMicroUsdPerMillion:1000000,cachedInputMicroUsdPerMillion:100000,outputMicroUsdPerMillion:2000000},
+     inputMicroUsdPerMillion:1000000,cachedInputMicroUsdPerMillion:100000,cacheWriteMicroUsdPerMillion:1250000,outputMicroUsdPerMillion:2000000},
     {providerKey:'openai-responses',modelKey:'gpt-5.6-terra',priceVersion:'synthetic-v1',
-     inputMicroUsdPerMillion:1000000,cachedInputMicroUsdPerMillion:100000,outputMicroUsdPerMillion:2000000},
+     inputMicroUsdPerMillion:1000000,cachedInputMicroUsdPerMillion:100000,cacheWriteMicroUsdPerMillion:1250000,outputMicroUsdPerMillion:2000000},
   ],
   stageBounds:[...new Map(SEYEON_SECURITY_EVAL_CELLS_V1.flatMap(c=>c.stages)
     .map(([purpose,modelKey])=>[purpose,{purpose,modelKey,
@@ -22,7 +22,7 @@ describe('COST-05 offline four-cell stage budget is never a paid-evaluation appr
     const r=audit(sample());
     expect(r.callCeiling).toBe(64);
     expect(r.cells.map(c=>c.callCeiling)).toEqual([20,20,12,12]);
-    expect(r.stageOnlyConditionalMicroUsd).toBe(89600);
+    expect(r.stageOnlyConditionalMicroUsd).toBe(105600);
     expect(r.exceedsProposedBudget).toBe(false);
     expect(r.allInMaximumMicroUsd).toBeNull();
     expect(r.paidEvaluationPermitted).toBe(false);
@@ -32,7 +32,7 @@ describe('COST-05 offline four-cell stage budget is never a paid-evaluation appr
     const i=sample();i.caseIds=[...ids];
     const r=audit(i);
     expect(r.callCeiling).toBe(256);
-    expect(r.stageOnlyConditionalMicroUsd).toBe(358400);
+    expect(r.stageOnlyConditionalMicroUsd).toBe(422400);
     expect(r.exceedsProposedBudget).toBe(true);
     expect(r.blockerCodes).toContain('PROPOSED_BUDGET_TOO_SMALL');
   });
@@ -51,6 +51,21 @@ describe('COST-05 offline four-cell stage budget is never a paid-evaluation appr
     for(const p of i.rateCards)p.cachedInputMicroUsdPerMillion=p.inputMicroUsdPerMillion;
     expect(audit(i).stageOnlyConditionalMicroUsd).toBe(miss);
   });
+  it('includes cache-write premium; prospective ceiling cannot assume uncached-only input',()=>{
+    const x=sample();
+    expect(audit(x).stageOnlyConditionalMicroUsd).toBe(105600);
+    for(const rate of x.rateCards)
+      rate.cacheWriteMicroUsdPerMillion=rate.inputMicroUsdPerMillion;
+    expect(audit(x).stageOnlyConditionalMicroUsd).toBe(89600);
+  });
+  it('refuses 272001-token short-context input or missing cache-write rate',()=>{
+    const x=sample();
+    x.stageBounds[0].verifiedInputTokenUpperBound=272001;
+    expect(()=>audit(x)).toThrow(/invalid stage token bounds/u);
+    const y=sample();
+    delete y.rateCards[0].cacheWriteMicroUsdPerMillion;
+    expect(()=>audit(y)).toThrow(/rate shape/u);
+  });
   it('rejects retries, forged case IDs, budget/price nonsense and mislabeled models',()=>{
     const invalid=[x=>x.retries=1,x=>x.caseIds=[ids[0],ids[0]],
       x=>x.caseIds=['unlisted-case'],x=>x.proposedBudgetMicroUsd=-1,
@@ -68,8 +83,9 @@ describe('COST-05 offline four-cell stage budget is never a paid-evaluation appr
     x=sample();x.stageBounds.push({...x.stageBounds[0]});
     expect(()=>audit(x)).toThrow();
     x=sample();
-    x.stageBounds[0].verifiedInputTokenUpperBound=Number.MAX_SAFE_INTEGER;
+    x.stageBounds[0].verifiedInputTokenUpperBound=272000;
     x.rateCards[0].inputMicroUsdPerMillion=Number.MAX_SAFE_INTEGER;
+    x.rateCards[0].cacheWriteMicroUsdPerMillion=Number.MAX_SAFE_INTEGER;
     expect(()=>audit(x)).toThrow(/safe integer range/u);
   });
   it('no budget or unverified auxiliary costs can ever allow live inference',()=>{

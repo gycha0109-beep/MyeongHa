@@ -5,13 +5,14 @@ import { createSeyeonC05OfflinePilotQuotaV1 as gate } from '../scripts/seyeon-co
 
 function fixture() {
   return {
-    mode: 'NO_NETWORK_SYNTHETIC_ONLY', callCap: 64, auxiliaryReserveMicroUsd: 10400,
+    mode: 'NO_NETWORK_SYNTHETIC_ONLY', callCap: 64, auxiliaryReserveMicroUsd: 14400,
     reviewInput: {
       scope: 'SYNTHETIC_OFFLINE_ONLY', caseIds: CASES.slice(0, 4),
-      retries: 0, proposedBudgetMicroUsd: 100000,
+      retries: 0, proposedBudgetMicroUsd: 120000,
       rateCards: ['gpt-5.6-luna','gpt-5.6-terra'].map(modelKey => ({
         providerKey:'openai-responses',modelKey,priceVersion:'fictional-test-only',
         inputMicroUsdPerMillion:1000000,cachedInputMicroUsdPerMillion:100000,
+        cacheWriteMicroUsdPerMillion:1250000,
         outputMicroUsdPerMillion:2000000,
       })),
       stageBounds: [...new Map(CELLS.flatMap(c => c.stages)
@@ -31,11 +32,11 @@ describe('COST-05 synthetic quota: never a real dispatch/Provider admission', ()
         const result = quota.reserveSyntheticStage({cell:cell.cell,caseId,purpose});
         expect(result.dispatchAuthorized).toBe(false);
         expect(result.paidEvaluationPermitted).toBe(false);
-        expect(result.stageOnlyReservedMicroUsd).toBe(1400);
+        expect(result.stageOnlyReservedMicroUsd).toBe(1650);
       }
     }
     expect(quota.snapshot()).toMatchObject({
-      reservedCalls:64,stageOnlyReservedMicroUsd:89600,
+      reservedCalls:64,stageOnlyReservedMicroUsd:105600,
       remainingStageOnlyMicroUsd:0,unresolvedOutcomes:64,
       auxiliaryAssumedReserveMicroUsd:10400,
       paidEvaluationPermitted:false,actualProviderInvoiceMicroUsd:null,
@@ -53,7 +54,7 @@ describe('COST-05 synthetic quota: never a real dispatch/Provider admission', ()
   });
   it('blocks budget BEFORE new reservation and never assigns zero to missing usage', () => {
     const i=fixture();i.auxiliaryReserveMicroUsd=0;
-    i.reviewInput.proposedBudgetMicroUsd=2800;
+    i.reviewInput.proposedBudgetMicroUsd=3300;
     const quota=gate(i);
     const q=quota.reserveSyntheticStage(first);
     quota.reserveSyntheticStage({...first,purpose:'disclosure_classification'});
@@ -64,7 +65,7 @@ describe('COST-05 synthetic quota: never a real dispatch/Provider admission', ()
       ...first,purpose:'turn_interpretation',
     })).toThrow(/ceiling exhausted/u);
     expect(quota.snapshot()).toMatchObject({
-      stageOnlyReservedMicroUsd:2800,unknownOrOverCeilingOutcomes:1,
+      stageOnlyReservedMicroUsd:3300,unknownOrOverCeilingOutcomes:1,
       actualProviderInvoiceMicroUsd:null,
     });
   });
@@ -75,14 +76,14 @@ describe('COST-05 synthetic quota: never a real dispatch/Provider admission', ()
       callRef:q.callRef,outcome:'response_received',estimatedCostMicroUsd:50,
     }).observation).toBe('UNVERIFIED_SYNTHETIC_ESTIMATE');
     expect(quota.snapshot()).toMatchObject({
-      reservedCalls:1,stageOnlyReservedMicroUsd:1400,
-      unresolvedOutcomes:0,remainingStageOnlyMicroUsd:88200,
+      reservedCalls:1,stageOnlyReservedMicroUsd:1650,
+      unresolvedOutcomes:0,remainingStageOnlyMicroUsd:103950,
       hasDurableProviderReceiptEvidence:false,
     });
     expect(quota.recordSyntheticOutcome({
       callRef:q.callRef,outcome:'response_received',estimatedCostMicroUsd:50,
     }).observation).toBe('DUPLICATE_SYNTHETIC_OUTCOME');
-    expect(quota.snapshot().stageOnlyReservedMicroUsd).toBe(1400);
+    expect(quota.snapshot().stageOnlyReservedMicroUsd).toBe(1650);
   });
   it('conflicting outcome replays fail rather than overwriting first evidence', () => {
     const quota=gate(fixture());const q=quota.reserveSyntheticStage(first);
@@ -97,9 +98,9 @@ describe('COST-05 synthetic quota: never a real dispatch/Provider admission', ()
   it('over-ceiling synthetic observations remain UNKNOWN and reserve remains intact', () => {
     const quota=gate(fixture());const q=quota.reserveSyntheticStage(first);
     expect(quota.recordSyntheticOutcome({
-      callRef:q.callRef,outcome:'response_received',estimatedCostMicroUsd:1401,
+      callRef:q.callRef,outcome:'response_received',estimatedCostMicroUsd:1651,
     }).observation).toBe('UNKNOWN_OR_OVER_CEILING_HOLD');
-    expect(quota.snapshot().stageOnlyReservedMicroUsd).toBe(1400);
+    expect(quota.snapshot().stageOnlyReservedMicroUsd).toBe(1650);
   });
   it('cannot accept forged cases, extra stages, duplicate call identities or outcomes', () => {
     const quota=gate(fixture());
@@ -119,7 +120,7 @@ describe('COST-05 synthetic quota: never a real dispatch/Provider admission', ()
     })).toThrow();
   });
   it('fails closed if auxiliary budget, model price or trusted stage limit is missing', () => {
-    let i=fixture();i.auxiliaryReserveMicroUsd=100000;
+    let i=fixture();i.auxiliaryReserveMicroUsd=120000;
     expect(()=>gate(i)).toThrow(/no budget/u);
     i=fixture();i.auxiliaryReserveMicroUsd=null;
     expect(()=>gate(i)).toThrow();
@@ -132,13 +133,13 @@ describe('COST-05 synthetic quota: never a real dispatch/Provider admission', ()
   });
   it('full 16-case four-cell 256-call budget cannot reuse the old 128-call cap', () => {
     const i=fixture();i.callCap=256;i.reviewInput.caseIds=[...CASES];
-    i.reviewInput.proposedBudgetMicroUsd=360000;
+    i.reviewInput.proposedBudgetMicroUsd=424000;
     i.auxiliaryReserveMicroUsd=1600;
     const quota=gate(i);
     for(const cell of CELLS)for(const caseId of CASES)for(const [purpose] of cell.stages)
       quota.reserveSyntheticStage({cell:cell.cell,caseId,purpose});
     expect(quota.snapshot()).toMatchObject({
-      reservedCalls:256,stageOnlyReservedMicroUsd:358400,
+      reservedCalls:256,stageOnlyReservedMicroUsd:422400,
       remainingStageOnlyMicroUsd:0,paidEvaluationPermitted:false,
     });
   });

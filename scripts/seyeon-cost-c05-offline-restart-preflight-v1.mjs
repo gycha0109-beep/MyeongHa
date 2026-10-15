@@ -9,6 +9,10 @@ import { SEYEON_DIALOGUE_PATH_CASE_IDS_V1 } from './seyeon-dialogue-path-eval-co
 
 export const SEYEON_C05_OFFLINE_PREFLIGHT_VERSION_V1='seyeon-cost-c05-offline-restart-v1';
 const MODELS=new Set(SEYEON_SECURITY_EVAL_CELLS_V1.flatMap(c=>c.stages.map(s=>s[1])));
+// Provider model docs: above this input size, longer-context price
+// multipliers apply. This offline estimator supports short context ONLY.
+// A bound beyond this limit must not silently reuse the cheaper rate.
+export const SEYEON_C05_STANDARD_RATE_MAX_INPUT_TOKENS_V1=272000;
 const STAGES=new Map();
 for(const cell of SEYEON_SECURITY_EVAL_CELLS_V1){
   for(const [purpose,modelKey] of cell.stages){
@@ -25,7 +29,10 @@ function requireFields(v,expected,label){
     throw new TypeError('C05 invalid '+label+' shape');
 }
 function microCost(inputTokens,outputTokens,price){
-  const uncachedMax=Math.max(price.inputMicroUsdPerMillion,price.cachedInputMicroUsdPerMillion);
+  // Cache writes may cost MORE than ordinary uncached input (e.g. 1.25x).
+  // No discount is reserved prospectively, and cache-write uplift is included.
+  const uncachedMax=Math.max(price.inputMicroUsdPerMillion,
+    price.cachedInputMicroUsdPerMillion,price.cacheWriteMicroUsdPerMillion);
   const numerator=BigInt(inputTokens)*BigInt(uncachedMax)+
                   BigInt(outputTokens)*BigInt(price.outputMicroUsdPerMillion);
   return (numerator+999999n)/1000000n; // round UP per dispatch; never assume cache
@@ -53,12 +60,14 @@ export function inspectSeyeonC05OfflineRestartBudgetV1(input){
   const prices=new Map(),bounds=new Map();
   for(const rate of input.rateCards){
     requireFields(rate,['providerKey','modelKey','priceVersion','inputMicroUsdPerMillion',
-       'cachedInputMicroUsdPerMillion','outputMicroUsdPerMillion'],'rate');
+       'cachedInputMicroUsdPerMillion','cacheWriteMicroUsdPerMillion',
+       'outputMicroUsdPerMillion'],'rate');
     if(rate.providerKey!=='openai-responses'||!MODELS.has(rate.modelKey)||
        typeof rate.priceVersion!=='string'||!/^[a-zA-Z0-9._:-]{1,100}$/.test(rate.priceVersion)||
        prices.has(rate.modelKey)||
        !safeInt(rate.inputMicroUsdPerMillion,1)||
        !safeInt(rate.cachedInputMicroUsdPerMillion)||
+       !safeInt(rate.cacheWriteMicroUsdPerMillion,1)||
        !safeInt(rate.outputMicroUsdPerMillion,1))
       throw new TypeError('C05 unauthorized or malformed model rate');
     prices.set(rate.modelKey,rate);
@@ -69,6 +78,7 @@ export function inspectSeyeonC05OfflineRestartBudgetV1(input){
     if(!STAGES.has(bound.purpose)||STAGES.get(bound.purpose)!==bound.modelKey||
        bounds.has(bound.purpose)||
        !safeInt(bound.verifiedInputTokenUpperBound,1)||
+       bound.verifiedInputTokenUpperBound>SEYEON_C05_STANDARD_RATE_MAX_INPUT_TOKENS_V1||
        !safeInt(bound.enforcedOutputTokenLimit,1))
       throw new TypeError('C05 invalid stage token bounds');
     bounds.set(bound.purpose,bound);
