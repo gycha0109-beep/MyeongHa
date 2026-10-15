@@ -207,6 +207,12 @@ alter function saju_bridge_private.cmd_consume_operator_permit_v1(
 ) owner to myeongha_saju_bridge_permit_owner;
 revoke create on schema saju_bridge_private
   from myeongha_saju_bridge_permit_owner;
+-- Supabase managed postgres is not SUPERUSER. COMMENT must be executed
+-- while the migration principal still has membership in the new function owner.
+comment on function saju_bridge_private.cmd_consume_operator_permit_v1(
+  uuid,text,text,text,text,text,uuid,text
+) is
+'Non-public, one-shot integration PROBE permit. Caller-bound SHA/digests are not independent Owner approval. No product release/commerce authorization.';
 revoke myeongha_saju_bridge_permit_owner from current_user;
 
 -- PostgreSQL grants function EXECUTE to PUBLIC by default. Remove it explicitly.
@@ -249,7 +255,3 @@ grant execute on function saju_bridge_private.cmd_consume_operator_permit_v1(
 -- An operator can never activate this with the existing production DB pool.
 comment on schema saju_bridge_private is
 'Private Saju single-project integration alternative: unmounted, shared-DB risk; no independent Root/Attestor.';
-comment on function saju_bridge_private.cmd_consume_operator_permit_v1(
-  uuid,text,text,text,text,text,uuid,text
-) is
-'Non-public, one-shot integration PROBE permit. Caller-bound SHA/digests are not independent Owner approval. No product release/commerce authorization.';
