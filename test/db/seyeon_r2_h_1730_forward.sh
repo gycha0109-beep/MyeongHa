@@ -11,7 +11,7 @@ pass() { echo "PASS_R2_H_1730_$1"; }
 [[ "$(psql -X -Atqc 'select current_database()')" == "$PGDATABASE" ]] || hold DB_MISMATCH
 [[ "$(git hash-object supabase/migrations/1700_seyeon_governed_reservation_receipt_pin_v1.sql)" == fb8803f8cdb3b6cfb76dd8e1faa2cc8dcdcf043f ]] || hold SOURCE_1700_DRIFT
 [[ "$(git hash-object supabase/migrations/1710_seyeon_provider_receipt_queue_v1.sql)" == 1d0e773a8e8b27474a0fde182d75433077d8add8 ]] || hold SOURCE_1710_DRIFT
-[[ "$(git hash-object supabase/migrations/1730_seyeon_receipt_null_safe_constraints_v1.sql)" == bce667156a7235b59b7f0cd6d885d83f6e203e6b ]] || hold SOURCE_1730_DRIFT
+[[ "$(git hash-object test/db/fixtures/1730_seyeon_receipt_null_safe_constraints_v1.proposed.sql)" == bce667156a7235b59b7f0cd6d885d83f6e203e6b ]] || hold SOURCE_1730_DRIFT
 
 before_catalog="$(psql -X -Atqc "select string_agg(c.relname||':'||c.relowner||':'||coalesce(c.relacl::text,'NULL')||':'||c.relrowsecurity||':'||c.relforcerowsecurity,'|' order by c.relname) from pg_class c where c.oid in ('public.seyeon_ai_call_cost_events'::regclass,'public.seyeon_ai_provider_receipt_queue_v1'::regclass)")"
 before_rpc="$(psql -X -Atqc "select string_agg(p.proname||':'||p.proowner||':'||coalesce(p.proacl::text,'NULL')||':'||p.prosecdef,'|' order by p.proname) from pg_proc p where p.oid in ('public.cmd_store_seyeon_provider_receipt_v1(uuid,uuid,uuid,text,jsonb)'::regprocedure,'public.cmd_claim_seyeon_provider_receipt_v1()'::regprocedure,'public.cmd_ack_seyeon_provider_receipt_v1(uuid,uuid)'::regprocedure)")"
@@ -19,7 +19,7 @@ before_rpc="$(psql -X -Atqc "select string_agg(p.proname||':'||p.proowner||':'||
 [[ "$(psql -X -Atqc "select count(*) from pg_constraint where conname='seyeon_provider_queue_required_enums_v1'")" == 0 ]] || hold NOT_FRESH
 
 # The 1730 proposal is internally atomic and revalidates both real tables.
-psql -X -q -v ON_ERROR_STOP=1 -f supabase/migrations/1730_seyeon_receipt_null_safe_constraints_v1.sql >/dev/null || hold APPLY
+psql -X -q -v ON_ERROR_STOP=1 -f test/db/fixtures/1730_seyeon_receipt_null_safe_constraints_v1.proposed.sql >/dev/null || hold APPLY
 [[ "$(psql -X -Atqc "select string_agg(c.relname||':'||c.relowner||':'||coalesce(c.relacl::text,'NULL')||':'||c.relrowsecurity||':'||c.relforcerowsecurity,'|' order by c.relname) from pg_class c where c.oid in ('public.seyeon_ai_call_cost_events'::regclass,'public.seyeon_ai_provider_receipt_queue_v1'::regclass)")" == "$before_catalog" ]] || hold OWNER_ACL_RLS_CHANGED
 [[ "$(psql -X -Atqc "select string_agg(p.proname||':'||p.proowner||':'||coalesce(p.proacl::text,'NULL')||':'||p.prosecdef,'|' order by p.proname) from pg_proc p where p.oid in ('public.cmd_store_seyeon_provider_receipt_v1(uuid,uuid,uuid,text,jsonb)'::regprocedure,'public.cmd_claim_seyeon_provider_receipt_v1()'::regprocedure,'public.cmd_ack_seyeon_provider_receipt_v1(uuid,uuid)'::regprocedure)")" == "$before_rpc" ]] || hold RPC_OWNER_ACL_CHANGED
 [[ "$(psql -X -Atqc "select count(*) from pg_constraint where (conrelid='public.seyeon_ai_call_cost_events'::regclass and conname='seyeon_ai_governor_receipt_pin_shape_v1' and convalidated) or (conrelid='public.seyeon_ai_provider_receipt_queue_v1'::regclass and conname='seyeon_provider_queue_required_enums_v1' and convalidated)")" == 2 ]] || hold REQUIRED_CONSTRAINTS_NOT_VALIDATED
@@ -107,7 +107,7 @@ end $negative$;
 SQL
 
 # A second application must fail closed without erasing validated constraints.
-if psql -X -q -v ON_ERROR_STOP=1 -f supabase/migrations/1730_seyeon_receipt_null_safe_constraints_v1.sql >/dev/null 2>&1; then
+if psql -X -q -v ON_ERROR_STOP=1 -f test/db/fixtures/1730_seyeon_receipt_null_safe_constraints_v1.proposed.sql >/dev/null 2>&1; then
   hold REPLAY_ALLOWED
 fi
 [[ "$(psql -X -Atqc "select count(*) from pg_constraint where (conrelid='public.seyeon_ai_call_cost_events'::regclass and conname='seyeon_ai_governor_receipt_pin_shape_v1' and convalidated) or (conrelid='public.seyeon_ai_provider_receipt_queue_v1'::regclass and conname='seyeon_provider_queue_required_enums_v1' and convalidated)")" == 2 ]] || hold REPLAY_DROPPED_CONSTRAINTS
