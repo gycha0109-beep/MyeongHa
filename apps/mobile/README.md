@@ -84,3 +84,13 @@ npm run verify:mobile-release-readiness-contract
 ```
 
 That mode still fails on malformed release configuration and any non-canonical `EXPO_PUBLIC_MYEONGHA_API_ORIGIN`. The production app identity and activated EAS project identity are now fixed; store signing remains external.
+
+## 2026-10-15 Android field UX follow-up (PR candidate)
+
+- Chat Launch 9 introductions are viewable before sign-in; opening or sending a Chat remains Member-only and server-owned.
+- The My authentication card is shown independently of Profile API fetch success. Existing-Member guest merge remains disabled.
+- Add Person and saved target lists are hidden from My until Compatibility entry UX is approved; Target Person APIs and data remain intact.
+- Face "사진 촬영" uses an in-app Expo CameraView front-facing selfie preview rather than an OEM system camera picker. Photos remain ephemeral and no Face upload/analysis is enabled.
+- Guest subjects can register their own Birth and calculate current Saju through Guest bearer authority. Paid Official Reader interpretation stays closed.
+- Push permission remains opt-in from My. First-entry explanation and opt-out persistence need a separate scoped onboarding contract before an OS permission dialog is introduced.
+- This candidate needs a new native APK and Android hardware validation; TypeScript/export tests alone cannot prove the default front camera or OS permissions.
