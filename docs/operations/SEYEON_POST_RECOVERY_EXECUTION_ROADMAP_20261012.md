@@ -391,3 +391,9 @@ Governor 04d4B 계열은 실제 격리 PostgreSQL 기반 영수증 임대·정�
 
 - [PR #2114](https://github.com/gycha0109-beep/MyeongHa/pull/2114)의 최초 [PG17 #38691463763 job 116278148588](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38691463763) FAILURE는 테스트 오류다. 원본 1720은 `has_function_privilege('public', …)` 검사를 성공적으로 완료해 독립 DB에 적용됐으며, **원본 실패 가설은 기각**했다. 다음 테스트에서는 원본 Rollback/Forward·PUBLIC ACL·SECURITY DEFINER Creator Owner 및 Product/Spec ACL 보존을 직접 검사한다.
 - 정확한 PG17 로그 해석과 한계는 [R2 패킷 §31.1](SEYEON_MIGRATION_LINEAGE_R2_READONLY_PACKET_20261013.md) 참조. 실 Read Positive fixture·Reader 구매/Grant/Rule E2E, Owner Production Privilege 검증은 미수행이며 Owner HOLD·Reader public/paid OFF, DR Ready=false.
+
+### 33.2 1720 PG17 실측 — 원본 정상 Apply·ACL PASS, SECURITY DEFINER Owner HOLD
+
+- [PR #2114](https://github.com/gycha0109-beep/MyeongHa/pull/2114), 기술 HEAD `2ee6a337e687643f393d74608473f45e898e0e56`, [CI #38692238411 PG17 job 116280741031](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38692238411) SUCCESS. 원본 1720 Rollback/Forward, PRODUCT/SPEC 기존 ACL 불변, API Executor EXECUTE만 허용, browser/service/PUBLIC 거부, NULL/빈 Product Scope 입력 거부, 폐기 DB 삭제 PASS. `has_function_privilege('public', …)` 원문 검사는 **정상 작동**함.
+- **`HOLD_R2_H_1720_PRIVILEGED_SECURITY_DEFINER_CREATOR_OWNER_REVIEW`**: PG17 원본 실행 Creator=`postgres`가 SECURITY DEFINER Owner로 남는다. 실제 운영 DDL Actor와 다를 수 있으며 Reader-Product DB/Security Owner의 최소권한 승인과 활성 Product 양수 조회·Reader Rule/Offer/Grant/Purchase E2E 필요. 자세한 근거는 [R2 패킷 §31.2](SEYEON_MIGRATION_LINEAGE_R2_READONLY_PACKET_20261013.md).
+- PG17 기술 PASS는 최종 PR HEAD CI/Full Integration·병합 및 Production 적용 승인 아님. 원본 SQL·운영 ACL/Role/History 변경 0, 21건 Owner HOLD와 Reader/AI paid/public OFF, `drReady=false` 지속.
