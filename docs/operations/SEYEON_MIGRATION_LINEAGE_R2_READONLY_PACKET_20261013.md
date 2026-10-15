@@ -387,3 +387,10 @@ Watchtower-Track: ops. R1 정확한 격리 복원 증거는 8절을 따른다. �
 - **원본 DDL 잠재 HOLD:** 마지막 검증 DO 블록에서 `pg_catalog.has_function_privilege('public', 'public.qry_standard_reading_product_scope_v1(uuid,text)'::regprocedure, 'EXECUTE')`를 호출한다. PostgreSQL의 `PUBLIC`은 일반 Login Role이 아니라 ACL의 특수 grantee이며, 이 오버로드가 문자 `public`을 일반 Role 이름으로 해석할 가능성이 있다. CI-owned disposable PG17에서 원본을 **수정하지 않고** `psql -1` 트랜잭션으로 재생하여 실패/성공을 측정하고, 실패 시 신규 함수 및 ACL 롤백·DB 전체 폐기를 확인한다. 정상 apply라고 추측하지 않는다.
 - **원본 실패가 실증되더라도** 마이그레이션 원본을 고치거나 운영 SQL에 반영하지 않는다. Reader/Product/DB Owner가 SQL PUBLIC 그랜티 확인·SECURITY DEFINER Owner 최소권한 및 필요한 경우 **별도 forward-only remediation**의 권한과 배포 순서를 판단한다. Reader Purchase/Grant/Offer와 실제 활성 Product row E2E, 암묵적 Reader 승인·paid/public/DR 승격 금지.
 - R2-G 계보, 1530 Creator membership, 1640 JSONB NULL Trigger, 1650/1670/1680 SECURITY DEFINER Owner, 1690 funded Settlement, 1700 Rate CHECK SQL NULL, 1710 Provider Enum SQL NULL, 21건 Owner HOLD, G0~G6 유료·공개 OFF, `drReady=false`. 실제 CI·PG17 증거 관찰 전 PASS/FAIL 승격 금지.
+
+### 31.1 최초 PG17 관측에 따른 가설 정정 — `PUBLIC` 내장 함수가 Role literal을 정상 처리
+
+- [PR #2114](https://github.com/gycha0109-beep/MyeongHa/pull/2114) 최초 PG17 CI [#38691463763](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38691463763), job `116278148588`은 **FAILURE**. 단, 실패 이유는 원본 1720 SQL 실패가 아니라, 새 검증기가 `has_function_privilege('public', …)`를 오류라고 잘못 예상했기 때문이다.
+- 실제 로그 `PASS_R2_H_1720_NO_LITERAL_PUBLIC_ROLE`, `HOLD_R2_H_1720_ORIGINAL_PUBLIC_CHECK_UNEXPECTED_SUCCESS`, 테스트 DB 삭제 `PASS_R2_H_1720_DISPOSABLE_DATABASE_DESTROYED`. PostgreSQL 17에서 이름이 `public`인 일반 Role이 없어도 `has_function_privilege('public', …)` 내장 권한 검사와 **원본 SQL 적용이 정상 처리되었다.** 따라서 **원본 1720의 PUBLIC 검사 실패/취약점이 재현됐다는 주장은 철회한다**.
+- 후속 검증기는 원본 SQL의 `BEGIN→source→ROLLBACK` 복귀와 별도 원문 Forward, SOURCE hash·Function Owner/SECURITY DEFINER/Search Path, API Executor EXECUTE/기타 Role/PUBLIC 차단, Product/Spec 기존 ACL/RLS 불변 및 NULL/빈 인자 조회 거부를 측정한다. 일반 슈퍼유저 PG17 마이그레이션 Creator가 SECURITY DEFINER Owner로 남는 경우 **Owner 최소권한 검토 HOLD**를 유지하고 실제 운영 Creator와 동일하다고 추정하지 않는다.
+- 현재 이 후속 PG17 결과는 미확정. 원본 마이그레이션·Production Role/DDL 변경이나 Reader 판매/공개 승격은 전혀 없다.
