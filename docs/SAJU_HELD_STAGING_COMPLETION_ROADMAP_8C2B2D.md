@@ -89,10 +89,19 @@ Watchtower-Track: saju-bridge
 
 - **선행 인수 종료:** Windows Phase 5 로컬 검증은 [#2103](https://github.com/gycha0109-beep/MyeongHa/pull/2103) 병합 / `main@2503a28bc7fee9e4ac89ff9372e2ea30e4debfef`, 11/11 통합 CI 성공. 다시 로컬 합성 Phase를 만들지 않는다.
 - **현재 첫 미완료 게이트:** 기존 Solo Owner 아키텍처의 **SO-3 운영 관리 평면 준비 / 3-04-02(D) 독립 Root custody와 R01–R04 실제 증빙**. 합성 SO-1/SO-2나 3-04-02(A/B/C)는 실제 키 보관·독립 Root pin, durable floor/ledger·재해 복구 증거가 아니다.
-- **진입 상태 = `SO3_PREPARATION_STARTED_P0`**. [3-04-01 런북 §2A](./SAJU_HELD_STAGING_OPERATIONAL_EVIDENCE_RUNBOOK_8C2B2D30401.md#2a-2026-10-15-so-3-운영-준비-진입--무권한-결정-게이트)에 S01–S06 공급자/환경·Owner 인증/복구·Root/Registry·Operator/Challenge/Attestor·감사·예산·실접속 결정표를 등록. 아직 선택/확인된 실환경 provider·권한·예산·Root/KMS·R01–R14 증빙은 없다.
+- **진입 상태 = `SO3_PREPARATION_STARTED_P0`**. [3-04-01 런북 §2A](./SAJU_HELD_STAGING_OPERATIONAL_EVIDENCE_RUNBOOK_8C2B2D30401.md#2a-2026-10-15-so-3-운영-준비-진입--무권한-결정-게이트)에 S01–S06 결정표를 등록. **설계 차원의 Supabase-first 공급자 방향은 기존 SO-4에서 채택되어 있다.** 다만 별도 스테이징 프로젝트·보안 계정·Root/KMS·권한·예산·R01–R14 실증은 없으며 이들을 이미 선택/승인했다고 기록하지 않는다.
 - **외부 사용자 결정 이전 P0 범위:** 현재 코드/CI·통제 설계·무권한 read-only *공개 코드* 감사/제안만 수행. 읽기 전용이라도 **최초 운영 계정 연결에는 별도 Owner 승인**이 필요하다. 클라우드/KMS/감사 저장소/스테이징 프로젝트 생성, Root/Operator/Attestor 키 생성·회전·노출, Secret·DB GRANT, 네트워크/probe, Runner·결제/배포/판매 전부 보류.
 - **실제 전진 순서:** S01–S05의 공급자·계정 분리·비용 상한·Owner 행위별 재인증 확정 → 별도 승인으로 R01–R04 실증 → R05–R14 승인된 실제 관측 → Target Authority V2의 fail-closed 검증 → 별도 승인 2D-4. 빠진 게이트를 Windows PASS나 채팅의 진행 지시로 채우지 않는다.
 - **종료 판정:** SO-3 준비 P0 진입 A, 3-04-02(D) 운영 증빙 C(외부 결정/승인 대기), 운영 `NOT_VERIFIED/HOLD`. Phase 4I 등의 신규 합성 단계는 만들지 않는다.
+
+## 2I. 신규 서버 없는 Docker 재사용 인수와 실제 외부 의존성 (2026-10-15)
+
+- **사용자 환경 제약:** 별도 격리 스테이징 서버 및 운영 보안/백업 서버 없음. 이 때문에 Windows Phase 5까지 무료 일회용 Docker로 검증한 것이다. 새로운 서버 구매나 무료 인프라가 존재한다고 가정하지 않는다.
+- **재활용 가능한 검증은 이미 인수:** Phase 1–4H 15개 PASS, 실제 테스트용 PostgreSQL SIGKILL/격리 네트워크 분리/3DB 부분 커밋·일회 소비·fail-closed HOLD와 Docker 완전 폐기, 사용자 보고 exit 0. 로컬 테스트를 반복해도 실제 R01–R14 운영 증거가 발생하지 않는다.
+- **기존 SO-4 설계 재사용:** [SO-4 Supabase-first P0](./SAJU_SO4_SUPABASE_ISOLATION_P0.md) §2에서 Supabase 우선 설계와 'Production/Refund 재사용 금지' 이미 결정. 당시 조회된 프로젝트 인벤토리는 2026-10-12 시점만 보증하며 현재의 운영 자원 존재/무료 한도/가격을 확증하지 않는다.
+- **검증 격차를 명시적으로 인수:** [SO-4 §4A](./SAJU_SO4_SUPABASE_ISOLATION_P0.md#4a-2026-10-15-로컬-docker-재사용-우선--실환경-미보유-확인-및-r01r14-격차-인수) R01–R14 행별로 (a) 로컬 테스트/합성 계약 결과와 (b) 실제 관리 평면에만 존재하는 미확보 출처를 분리. **운영은 14개 모두 NOT_VERIFIED**, 한 건도 local PASS를 operational PASS로 자동 승격하지 않는다.
+- **기존 T01–T40 중복 방지:** [SO-3B 출처·검증 추적표](./SAJU_SOLO_OWNER_SO3B_R_T_COVERAGE_MATRIX.md)에는 **SO-3B 자체의** T01–T27 구현/합성 테스트 및 T28–T40 실환경 미래 요구가 이미 정의되어 있다. 이것을 전체 프로젝트 공통 T01–T40 정식 인수표와 동일하다고 오인하지 않으며 새 번호를 발명하지 않는다. 기존 전체 최종 인수 대응표는 별도 식별자/범위 정합성 확인이 남는다.
+- **다음 실행 조건:** 실환경 R01–R04는 독립 신뢰 Root/원장·감사 계정, R05–R14는 별도 Auth·3DB·Proof·배포·복구를 필요로 한다. 신규 리소스·KMS·DB GRANT·실접속은 사용자 별도 범위/비용·행위별 승인 전 HOLD. **지금은 P0 로컬 결과 인수/설계 재사용까지 완료, 실제 운영 증빙은 외부 의존성 대기**다. 새 4I나 중복 Docker 검증 코드는 추가하지 않는다.
 
 ## 3. 코드·운영 병렬화와 범위 제한
 
@@ -108,7 +117,7 @@ Watchtower-Track: saju-bridge
 |---|---|---|
 | 서명/정적 신뢰 평가 | #1850 #1851 #1862 | 코드 완료 / 운영 비인증 |
 | 운영 증빙 목록 및 중단 절차 | #1856, R01–R14 | 문서 완료 / 운영 미검증 |
-| 개별 부정 시험 T01–T40 | 기존 합성 테스트 분산 | **개별 대응표 미완료** |
+| 개별 부정 시험 T01–T40 | [SO-3B 고유 T01–T40 계획](./SAJU_SOLO_OWNER_SO3B_R_T_COVERAGE_MATRIX.md): T01–T27 합성 구현·T28–T40 운영 의존 | **SO-3B 하위 매핑 존재** / 전체 프로젝트 최종 인수 ID·coverage와 동일성 미확인, 운영 14건 미검증 |
 | Windows Docker Phase 5 Acceptance | Phase 1–4H 폐기형 CI·[#2092](https://github.com/gycha0109-beep/MyeongHa/pull/2092), 사용자 Windows 전체 실행 로그 SHA-256 고정 및 양쪽 HEAD·환경 버전·exit 0·cleanup 제출 | **사용자 제출 로컬 인수 PASS**; Windows OS 빌드·Desktop GUI 버전 별도 미제출, 실환경 운영 승인은 무관 |
 | 독립 Root 및 durable revision/challenge | 3-04-02 / SO-3 | 합성 저장소 검증 #1925 병합; SO-3 P0 공급자·승인 결정표 진입(§2H) / R01–R04 운영 미검증 |
 | 실환경 Auth·DB 3종·Saju Proof | 로컬 2A–2I 합성/실소켓 검증, Admission 38 PASS·병합 #1913; 3-04-03A 인덱스 계약 / 03B 실제 probe | 3 DB 동일 검증 흐름(2J) 합성 완료, R05–R14 독립 운영 관찰 미완료 |
