@@ -334,3 +334,9 @@ Governor 04d4B 계열은 실제 격리 PostgreSQL 기반 영수증 임대·정�
 - 1680은 **일회용 독립 PostgreSQL 17 DB**에서만 1650→1670→1680 내부 COMMIT을 포함하여 재생한다. 새로운 운영 워크플로 생성 없음. 함수 OID/Owner/ACL/SECURITY DEFINER 보존, Guest proof에서 session ID Pin, 실제 만료시각 재검사, Member 경로, 잠금 경합과 stale 거부를 검증한다. 기존 1670 합성 회귀 케이스와 독립 실행한다.
 - 실 비용 예산 예약 E2E와 Provider 호출·운영 credential·Production 배포 및 SQL/Role 수정은 이번 단위에 포함되지 않는다. 1650/1670/1680의 privileged function ownership, 이전 Owner HOLD, R2-G, 1640 NULL 비교 Trigger, 21개 마이그레이션 승인, G0~G6 및 dr_ready=false 유지.
 - 실제 검증 통과 이후에만 다음 후보 1690 Dependency/COMMIT 감사를 연다. 1690→1700→1710→1720은 **개별 검증 후보 순서**이며 승인된 Production 적용 순서가 아니다.
+
+### 29.1 1680 격리 PG17 기술 증거 (Owner HOLD, 2026-10-15)
+
+- [PR #2096](https://github.com/gycha0109-beep/MyeongHa/pull/2096) 검증 HEAD `756a39d52dbd9e12ac6a95118e2fa89c472fbd6d`: [PG17 CI #38663201408 job 116189400351](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38663201408) SUCCESS. 세부 실측 및 필수 HOLD는 [R2 패킷 §27.1](SEYEON_MIGRATION_LINEAGE_R2_READONLY_PACKET_20261013.md)만 정본으로 유지한다.
+- 원본 1650/1670/1680의 내부 COMMIT 재생, 1680 교체 전후 권한·Owner 불변, 합성 만료 후 승인 거부, Guest↔Promotion 두 방향 실제 잠금 경합, 테스트 데이터베이스 폐기를 검증. **실제 funded admission E2E·프로덕션 보안 Owner 승인/DR Ready가 아님**.
+- PR 최종 CI·Full Integration/병합 SHA는 확인 전까지 미확정; 기술 증거만으로 1690의 운영 활성화 또는 G0~G6 승격 금지.
