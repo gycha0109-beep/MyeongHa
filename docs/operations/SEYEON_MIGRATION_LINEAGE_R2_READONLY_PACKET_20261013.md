@@ -403,3 +403,9 @@ Watchtower-Track: ops. R1 정확한 격리 복원 증거는 8절을 따른다. �
 - `PASS_R2_H_1720_NULL_OR_EMPTY_SCOPE_DENIED`: 실제 상품 시드 없는 독립 DB에서 NULL Product 또는 빈 Spec 요청은 0건 반환. **활성 상품 양수 조회/모호성, Reader Rule·Offer·Grant·Purchase E2E는 실행하지 않음**. `PASS_R2_H_1720_DISPOSABLE_DATABASE_DESTROYED`: CI-owned DB 폐기 확인.
 - **`HOLD_R2_H_1720_PRIVILEGED_SECURITY_DEFINER_CREATOR_OWNER_REVIEW`**: 원본 함수는 SECURITY DEFINER Owner를 좁은 별도 Role로 재지정하지 않아 테스트 PG17에서는 migration creator=`postgres`가 함수 Owner. 이는 일회용 CI 슈퍼유저의 관측이지 Production DDL Actor가 슈퍼유저라는 증거가 아니다. Reader-Product DB/Security Owner가 운영 실행 Actor, 최소권한, 실제 Product row/RLS 경계를 검증하고 필요한 forward-only 소유자/권한 보강을 별도 승인할 때까지 `HOLD_OWNER_REVIEW`, `readerActivation=false`, `drReady=false`.
 - 21개 pending Production 적용 0/21(기존 확인 기준; 새로운 운영 DB 조회 없이 변경 주장 금지), G0~G6/public/paid OFF, 1700/1710 SQL NULL·R2-G/1530/1640 및 나머지 Owner HOLD 전부 지속.
+
+## 32. 2026-10-15 운영 최신 SELECT-only 증거 및 Owner 결정 링크
+
+- [PR #2114](https://github.com/gycha0109-beep/MyeongHa/pull/2114)의 final Integration [#38693317122](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38693317122) SUCCESS, 병합 main `b58954caee0c28c81bd4ef5f5b7ff0eb6ccb965b`; [Production Actions #38693883787](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38693883787)의 실제 migration deploy 및 governed backfill 모두 **SKIPPED**.
+- 2026-10-15 KST 명하 Supabase **SELECT-only** 재확인: 1400~1510 **12/12**, 1520~1720 **0/21**, 원격 전용 `20261008090417` **1건**. 해당 원격 버전의 `statements` 집계는 **1 statement, 104,021 bytes, MD5 `f70776d8c0f6369f6f13484ba9fa2271`**로 본 패킷의 이전 관찰과 일치. 원문·서명·실 적용자 출처는 아직 미확인; 단순 MD5 일치는 승인이 아니다.
+- 21개 Owner HOLD와 잠재/실증 결함의 **범위·한계·승인 소유자·다음 허용 작업**을 [R2 Owner 결정 핸드오프 (2026-10-15)](SEYEON_R2_OWNER_DECISION_HANDOFF_20261015.md)에 별도 기록. 원본 migration SQL, Production Role/ACL/DML/History, 유료 Provider/Reader/public 승격 0, `drReady=false` 유지.
