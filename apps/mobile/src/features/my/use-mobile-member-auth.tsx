@@ -10,6 +10,7 @@ import {
   MobileSocialAuthErrorV1,
 } from '@/core/auth/mobile-social-auth';
 import { nativeMobileSocialAuthServiceV1 } from '@/core/auth/native-mobile-social-auth';
+import { describeMobileAuthDiagnosticV1 } from '@/features/my/mobile-auth-error-diagnostics';
 import { nativeMobilePushServiceV1 } from '@/core/push/native-mobile-push-service';
 import { nativeMobileRuntimeV1 } from '@/core/runtime/native-mobile-runtime';
 import {
@@ -90,7 +91,7 @@ function messageFor(error: unknown): string {
       return '계정 서버에 연결하지 못했습니다.';
     }
   }
-  return '계정 작업을 완료하지 못했습니다.';
+  return describeMobileAuthDiagnosticV1(error) ?? '계정 작업을 완료하지 못했습니다. [UNEXPECTED_AUTH_ERROR]';
 }
 
 const VERIFICATION_MESSAGE =
