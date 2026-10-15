@@ -48,7 +48,7 @@ tables=(
   purchase_intents
 )
 [[ "${#tables[@]}" == 7 ]] || fail 'incomplete protected table list'
-[[ "$(db -c "SELECT rolcanlogin::text FROM pg_catalog.pg_roles
+[[ "$(db -c "SELECT rolcanlogin FROM pg_catalog.pg_roles
   WHERE rolname='service_role'")" == f ]] ||
   fail 'fixture service_role is not the known restricted direct-login API role'
 for table in "${tables[@]}"; do
