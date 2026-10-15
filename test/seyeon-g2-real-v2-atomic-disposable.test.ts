@@ -91,27 +91,21 @@ async function prepare(n:number):Promise<Fixture> {
       [subject,id.turn,id.attempt,'seyeon-production-chat-planner-v1'],
     );
   });
-  await transaction(async c=>{
-    const p=await c.query<{ok:boolean}>(
-      'select seyeon_positive_candidate.pin_source_set_r1($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::jsonb,$6::text) as ok',
+  // G1 R4: DB owns BOTH immutable original SourceSet+Grant and the real
+  // core context_ready transition in the same SQL transaction.
+  const g1=await transaction(async c=>{
+    return c.query<{receipt:{
+      attemptId:string;contextReady:boolean;selectedSourcesDigest:string;
+    }}>(
+      'select seyeon_positive_candidate.pin_and_context_ready_r4($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::jsonb,$6::text) as receipt',
       [subject,id.thread,id.turn,id.attempt,
        JSON.stringify([{recordId:id.memory,grantId:id.grant}]),
        id.selectionDigest],
     );
-    expect(p.rows[0]?.ok).toBe(true);
-    const legacy=await c.query<{ok:boolean}>(
-      'select seyeon_positive_candidate.pin_before_model_v1($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6::uuid) as ok',
-      [subject,id.thread,id.turn,id.attempt,id.memory,id.grant],
-    );
-    expect(legacy.rows[0]?.ok).toBe(true);
   },true);
-  // Test Owner transitions context-ready. Production positive G1 RPC does
-  // not exist yet: this is NOT a Production Pin+Context atomicity proof.
-  await transaction(async c=>{
-    await c.query(
-      'select public.cmd_mark_chat_turn_context_ready_v1($1::uuid,$2::uuid,$3::uuid)',
-      [subject,id.turn,id.attempt],
-    );
+  expect(g1.rows[0]?.receipt).toMatchObject({
+    attemptId:id.attempt,contextReady:true,
+    selectedSourcesDigest:id.selectionDigest,
   });
   const edge=await clientAction(c=>c.query<{pg_payload_digest:string}>(
     'select pg_payload_digest from seyeon_positive_candidate.source_edges_r1 where attempt_id=$1::uuid and ordinal=0',
