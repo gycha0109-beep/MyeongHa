@@ -105,6 +105,10 @@ for table in "${tables[@]}"; do
   deny "DELETE FROM public.$table WHERE false;" "$table DELETE"
 done
 echo "PASS D3e23 $case_name: 21 real service_role direct SQL writes denied across 7 tables"
+# D3e27: check for alternate writes through service_role executable
+# SECURITY DEFINER functions and updatable views. Inject then remove a
+# synthetic bypass in this same disposable DB to prove the guard detects it.
+bash test/db/official_reader_d3e27_alternate_writes_guard.sh
 
 # The original DB-owner-only fixtures contain synthetic receipt, grant,
 # review and cancellation checks. The original scripts are unmodified; only
