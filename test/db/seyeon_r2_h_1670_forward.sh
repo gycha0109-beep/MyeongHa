@@ -113,7 +113,7 @@ insert into public.guest_sessions(id,subject_id,token_hash,expires_at,consumed_a
 values
 ('e0300000-0000-0000-0000-000000000001','e0200000-0000-0000-0000-000000000001',:'ha',clock_timestamp()+interval '1 day',null,null,clock_timestamp()),
 ('e0300000-0000-0000-0000-000000000002','e0200000-0000-0000-0000-000000000002',:'hb',clock_timestamp()-interval '1 hour',null,null,clock_timestamp()),
-('e0300000-0000-0000-0000-000000000003','e0200000-0000-0000-0000-000000000003',:'hc',clock_timestamp()+interval '1 day',clock_timestamp(),null,clock_timestamp()),
+('e0300000-0000-0000-0000-000000000003','e0200000-0000-0000-0000-000000000003',:'hc',clock_timestamp()+interval '1 day',clock_timestamp()-interval '1 minute',null,clock_timestamp()-interval '1 day'),
 ('e0300000-0000-0000-0000-000000000004','e0200000-0000-0000-0000-000000000004',:'hd',clock_timestamp()+interval '1 day',null,null,clock_timestamp()),
 ('e0300000-0000-0000-0000-000000000005','e0200000-0000-0000-0000-000000000005',:'he',clock_timestamp()+interval '1 day',null,null,clock_timestamp());
 SQL
