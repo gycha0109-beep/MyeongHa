@@ -60,6 +60,10 @@ export type PrivateCancelReadOnlyCatalogD3e18 = Readonly<{
 }>;
 
 const ROLE_NAME = /^[a-z_][a-z0-9_]{1,62}$/u;
+const FORBIDDEN_SERVICE_LOGINS = new Set([
+  'postgres','supabase_admin','supabase_auth_admin',
+  'supabase_storage_admin','authenticator',
+]);
 const ROUTINES: readonly string[] = PRIVATE_CANCEL_DIRECT_ROUTINES_D3E18;
 const APP_ROLES: readonly string[] = PRIVATE_CANCEL_OTHER_APP_ROLES_D3E18;
 
@@ -73,7 +77,8 @@ function distinctRoles(roles: PrivateCancelD3e18RoleNames): string[] {
   const supplied = [roles?.verifier, roles?.executor, roles?.owner];
   if (supplied.some(x => typeof x !== 'string' || !ROLE_NAME.test(x))
     || new Set(supplied).size !== 3
-    || supplied.some(x => APP_ROLES.includes(x))) {
+    || supplied.some(x => APP_ROLES.includes(x)
+      || FORBIDDEN_SERVICE_LOGINS.has(x) || x.startsWith('pg_'))) {
     fail('untrusted, shared or ordinary application service identity');
   }
   return [...supplied, ...APP_ROLES];
