@@ -377,7 +377,7 @@ PortOne signed webhook
 
 ### D3e18 로그인·DB 직접 실행 차단 증거 수집 후보 (2026-10-15 / OFFLINE ONLY)
 
-- 후보 파일: \`apps/api/src/official-reader-portone-cancel-private-role-isolation-audit-v1.ts\`; 모의시험: \`test/official-reader-portone-cancel-private-role-isolation-audit-v1.test.ts\`. 신규 SQL migration, GRANT/REVOKE, 실 DB 연결, 운영 process/secret, PortOne 또는 이용권 변경은 **없다**.
+- 후보 파일: \`test/support/official-reader-portone-cancel-private-role-isolation-audit-v1.ts\`; 모의시험: \`test/official-reader-portone-cancel-private-role-isolation-audit-v1.test.ts\`. 신규 SQL migration, GRANT/REVOKE, 실 DB 연결, 운영 process/secret, PortOne 또는 이용권 변경은 **없다**.
 - 별도의 검증자 로그인, 서명 허가 실행자 로그인, DB 소유자 로그인 세 개가 **서로 다르고**, 애플리케이션 공용 계정 및 관리자/슈퍼유저 재사용이 아님을 DB catalogue 증거로 요구한다. 일반 앱 역할 6개를 포함해 서비스/Owner 역할 자체 또는 속임수 신원, 상속권한·\`SET ROLE\`을 통한 DB owner 탈취는 실패시킨다.
 - 공개 PostgreSQL 함수 6개(직접 검토 D3e6, 이중 승인 D3e8, 실제 취소 1880, 원본 1080/1850, 구 관리용 1830)에 대하여 **검증자·실행자·일반 앱 계정**의 유효 \`EXECUTE\`가 모두 false인지 \`pg_catalog\` 기반 조회로 확인한다. PUBLIC 경유/상속 EXECUTE도 \`has_function_privilege\`에서 검출한다. 누락 함수·오버로드·다른 스키마·예상하지 못한 인가·관리자 회원권·불명확한 열·조회 장애는 전부 DENY.
 - **중요:** DB owner는 자신의 SQL을 직접 실행할 수 있으므로 직접 실행권 부정 대상에서 **제외**한다. 여기서 DB owner의 실제 실행 제어, 임의 SQL 우회 또는 OS 프로세스/로그인 분리를 구현했다고 판단하면 안 된다. 테스트는 가짜 카탈로그 관측값만 사용한다. 읽기 전용 판정 결과를 런타임 실행 허가증으로 재사용해서도 안 된다.
