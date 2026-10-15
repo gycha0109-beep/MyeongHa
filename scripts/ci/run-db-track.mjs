@@ -23,12 +23,11 @@ for (const [index, caseName] of suite.cases.entries()) {
     failures.push(caseName);
   } finally {
     execFileSync('dropdb', ['--if-exists', database], { stdio: 'inherit' });
-    if (['seyeon-r2-h-1670-forward', 'seyeon-r2-h-1680-forward'].includes(caseName)) {
+    if (['seyeon-r2-h-1670-forward', 'seyeon-r2-h-1680-forward', 'seyeon-r2-h-1690-forward'].includes(caseName)) {
       const count = execFileSync('psql', ['-Atqc', `select count(*) from pg_database where datname='${database}'`], { encoding: 'utf8' }).trim();
-      if (count !== '0') throw new Error('HOLD_R2_H_1670_DB_NOT_DESTROYED');
-      console.log(caseName === 'seyeon-r2-h-1670-forward'
-        ? 'PASS_R2_H_1670_DISPOSABLE_DATABASE_DESTROYED'
-        : 'PASS_R2_H_1680_DISPOSABLE_DATABASE_DESTROYED');
+      const version = caseName.match(/h-(\d{4})-forward/u)?.[1];
+      if (!version || count !== '0') throw new Error(`HOLD_R2_H_${version ?? 'UNKNOWN'}_DB_NOT_DESTROYED`);
+      console.log(`PASS_R2_H_${version}_DISPOSABLE_DATABASE_DESTROYED`);
     }
     // Roles and memberships belong to the cluster, not the database. Remove
     // every case-created role after dropping its DB to preserve matrix parity.
