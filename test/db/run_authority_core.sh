@@ -210,6 +210,9 @@ run_isolated_case myeongha_cancel_d3e19_review_real_ci env MYEONGHA_D3E19_PG_REV
 # D3e20 preflight: NOLOGIN SQL owner + distinct verifier/executor + exclusive
 # synthetic, single-use, active-epoch review gateway. DB clone, never live.
 run_isolated_case myeongha_cancel_d3e20_role_boundary_ci bash test/db/official_reader_d3e20_cancel_nologin_owner_limited_gateway.sh
+# D3e21 ONLY: reproduce connected live service_role entitlement ledger DML ACL
+# in a THROWAWAY DB, revoke DML only in clone, run legitimate read regression.
+run_isolated_case myeongha_cancel_d3e21_service_role_ci bash test/db/official_reader_d3e21_service_role_ledger_containment_clone.sh
 bash test/db/entitlements_current_query.sh
 bash test/db/data_deletion_job_query.sh
 bash test/db/notification_preferences_query.sh
