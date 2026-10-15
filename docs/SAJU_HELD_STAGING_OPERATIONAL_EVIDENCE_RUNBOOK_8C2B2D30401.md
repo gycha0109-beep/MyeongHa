@@ -39,7 +39,7 @@ Watchtower-Track: saju-bridge
 
 | 결정 게이트 | 실제 필요한 비밀 아닌 결정/근거 | 진입 시 상태 및 차단 조건 |
 |---|---|---|
-| **S01 — 격리 환경/운영 계정** | 이용할 클라우드/보안 계정의 종류, Staging 식별자, Production과의 계정·프로젝트·네트워크·데이터·IAM 분리 방식, 승인 책임 Owner | **미선정/NOT_VERIFIED.** Production 자격 재사용 금지 |
+| **S01 — 격리 환경/운영 계정** | 기존 [SO-4 Supabase-first 설계](./SAJU_SO4_SUPABASE_ISOLATION_P0.md) 채택과 2026-10-12 읽기 전용 관리 평면 인벤토리 확인. 향후 전용 Staging ID·계정·IAM·물리 DB/네트워크 분리 및 Owner 승인 필요 | **설계 공급자 방향 결정 / 전용 스테이징 자원 없음 / 실제 독립성 NOT_VERIFIED.** 기존 Production·Refund 자원 재사용 금지 |
 | **S02 — Owner 인증·복구** | P2/P4 행위별 피싱 저항 인증 수단, 재인증/복구 경로, 권한 변경 감사, 사고 시 즉시 정지 책임 | **미실증/HOLD.** 채팅 지시·로그인·PR 병합은 행위별 인증이 아님 |
 | **S03 — Root/Registry custody (R01/R02)** | 앱·CI와 분리된 비반출 Root 관리 제공자/보안 계정, pin 출처, durable revision high-water·철회/백업 복구·독립 조회·감사 보관 방식 | **미선정/NOT_VERIFIED.** 임의 테스트 Root·자체 제출 pin 승인 금지 |
 | **S04 — Operator/Challenge/Attestor (R03/R04)** | Sign 전용 신원과 read-only attestor의 서비스 계정·키 용도 구분, permit-scoped one-time ledger·재사용 차단·감사 경로 | **미선정/NOT_VERIFIED.** 같은 서비스 신원에 승인·관측·실행 권한 집중 금지 |
@@ -53,6 +53,8 @@ Watchtower-Track: saju-bridge
 - **중단 규칙:** 미선정·비용 미승인·관리자 신원 미증명·Root/권한 혼합·auditing 불능·drift·외부 프로브 접근 미허가·COMMIT 불명확은 **HOLD**이며 어떠한 자동 재시도/보상/Runner 연결도 허용하지 않는다.
 
 **진입 판정:** `SO3_PREPARATION_STARTED_P0` / `SO3_OPERATIONAL_ADMISSION_NOT_APPROVED` / `R01_R14_NOT_VERIFIED`. P1 read-only 최초 접속조차 Owner의 별도 범위 승인을 받기 전에는 수행하지 않는다. 모든 기존 `stagingAdmission=HOLD`, `stagingConnection=NOT_VERIFIED`, `operationalEvidence=NOT_VERIFIED`, `canRunOnce/canExecute/canPublish/canSell=false`, `automaticRetry/automaticCompensation=false` 유지.
+
+**로컬 우선 원칙 갱신 (2026-10-15):** 별도 스테이징 서버·보안/백업 인프라가 없다는 사용자 설명은 기존 Docker 사용의 이유이며, 신규 서버·요금제 선택을 요구하는 근거가 아니다. [SO-4 로컬 Docker → R01–R14 격차표](./SAJU_SO4_SUPABASE_ISOLATION_P0.md#4a-2026-10-15-로컬-docker-재사용-우선--실환경-미보유-확인-및-r01r14-격차-인수)에 이미 인수된 증거와 실제 관리 평면이 필요한 항목을 분리한다. 동일한 Windows 전체 Docker 검증을 단지 자료 재수집용으로 반복하거나 신규 합성 검증 단계를 열지 않는다. 실제 대상/비용/Owner 인증 전에는 P0 문서·코드 검토에서 정지한다.
 
 ## 3. 필수 Evidence 항목과 신뢰 가능한 출처
 
