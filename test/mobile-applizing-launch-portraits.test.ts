@@ -22,6 +22,21 @@ describe('Mobile launch visibility, portrait assets and notification UI', () => 
     }
   });
 
+  it('keeps Reader history metadata while hiding delisted characters from the public picker', async () => {
+    const [
+      presentation,
+      picker,
+    ] = await Promise.all([
+      import('../apps/mobile/src/features/reading/mobile-reader-presentation.js'),
+      source('apps/mobile/src/features/reading/MobileReaderPicker.tsx'),
+    ]);
+    expect(presentation.MOBILE_READER_PRESENTATIONS_V1).toHaveLength(9);
+    expect(presentation.MOBILE_READER_VISIBLE_LAUNCH_PRESENTATIONS_V1.map(({ key }) => key)).toEqual([
+      'seyeon', 'baekheon', 'yeoul', 'rahyeon', 'taegyeom', 'yunho',
+    ]);
+    expect(picker).toContain('MOBILE_READER_VISIBLE_LAUNCH_PRESENTATIONS_V1.map');
+  });
+
   it('bundles real WebP portrait bytes for every launch Character', async () => {
     const resolver = await source('apps/mobile/src/features/chat/chat-character-portraits.ts');
     const hub = await source('apps/mobile/src/app/(tabs)/chat/index.tsx');
