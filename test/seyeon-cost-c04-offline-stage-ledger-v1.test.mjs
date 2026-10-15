@@ -93,6 +93,20 @@ describe('COST-04 historical synthetic stage ledger / NOT a live model cost',()=
       expect(result.status).toBe('UNKNOWN_TOTAL_COST');
     }
   });
+  it('a CAPTURED flag without actual priced post-turn/token-counter rows also holds session total',()=>{
+    for(const field of ['postTurnState','tokenCounterState']){
+      const result=audit('fixed_3',calls('fixed_3'),{[field]:'CAPTURED'});
+      expect(result.status).toBe('UNKNOWN_TOTAL_COST');
+      expect(result.totalConditionalMicroUsd).toBeNull();
+      expect(result.totalAdmissionCeilingMicroUsd).toBeNull();
+    }
+    const rows=calls('fixed_3');
+    rows[1].usage.reasoningTokens=null;
+    const unmeasured=audit('fixed_3',rows);
+    expect(unmeasured.tokenUnknownAttemptCounts.reasoningOutput).toBe(1);
+    // The charged output remains known, while the reasoning-token breakout does not.
+    expect(unmeasured.totalConditionalMicroUsd).not.toBeNull();
+  });
   it('cache is not an admission credit: ceiling is insensitive to speculative cache hits',()=>{
     const allMiss=calls('fixed_3').map(r=>({
       ...r,usage:{...r.usage,cachedInputTokens:0},
