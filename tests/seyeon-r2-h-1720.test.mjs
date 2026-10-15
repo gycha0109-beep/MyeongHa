@@ -21,7 +21,7 @@ describe('R2-H 1720 D-01 original scope bridge (Owner HOLD)',()=>{
   expect(sql).not.toMatch(/^commit;$/im);
  });
  it('executes original only in disposable PG17 and verifies original rollback and narrow ACL after forward',()=>{
-  for(const fragment of ['NOT_DISPOSABLE','SOURCE_BLOB_DRIFT','NO_LITERAL_PUBLIC_ROLE',
+  for(const fragment of ['NOT_DISPOSABLE','SOURCE_BLOB_DRIFT','PUBLIC_PSEUDO_GRANTEE_NO_NAMED_ROLE',
     'ORIGINAL_ROLLBACK','ORIGINAL_FORWARD_CATALOG_OWNER_ACL',
     'PUBLIC_PRIVILEGE_CHECK_EXECUTED_AS_DESIGNED','PRIVILEGED_SECURITY_DEFINER_CREATOR_OWNER_REVIEW','drReady=false'])expect(sh).toContain(fragment);
   expect(read('test/db/run_ci_case.sh')).toContain('seyeon-r2-h-1720-forward)');
