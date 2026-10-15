@@ -392,6 +392,15 @@ PortOne signed webhook
 - 두 실험 모두 \`test/db/run_authority_core.sh\`의 기존 \`run_isolated_case\`에서 연결된 DB에서만 수행한다. 새 운영 테이블/함수 마이그레이션, 실 운영 실행 계정 권한 부여, 유료 이용권 변경, 결제사 API, 환불 또는 배포는 **없다**. 합격 증거는 신규 자식 Draft PR HEAD의 실제 PG15/17 자동시험에서만 확정한다.
 - **중요 미완료:** D3e17 독립 영속 epoch와 D3e19 SQL-내부 최종 서명/epoch 검증을 실제 하나의 운영 권한 경계로 연결하지 않았다. 운영 DB owner는 자기 객체를 직접 실행할 수 있으므로 OS/자격증명/DB 소유권 격리 및 DBA 우회 제어는 별도 필요하다. 1080/1850/1880의 실제 결제·이용권 원자적 회수 경로는 그대로 **HOLD**. 단순 가짜 DB 테스트 성공을 전체 취소 차단 보증으로 주장하지 않는다.
 
+
+### D3e19 실제 Sandbox 검토 SQL에 정책 잠금 연결 (2026-10-15 / 비공개 격리 시험 ONLY)
+
+- **기존 SQL을 수정하지 않는 연결 후보:** \`test/support/private-official-reader-cancel-atomic-epoch-review-store-v1.ts\`가 D3e8의 실제 \`internal_private_cancel_commit_review_approval_v1\` (1950, 검토/재시도만) 호출을 감싼다. 기존 D3e16/17 실행자가 받는 \`commitAuthorizedReview\` 연결 지점에 시험용으로 주입할 수 있지만, 어떠한 API/Worker/실행자 운영 경로도 이 테스트를 import하지 않는다.
+- **한 DB 연결·한 트랜잭션:** BEGIN READ COMMITTED → 독립 시험용 epoch 원장 행 \`FOR UPDATE\` → 신뢰된 시계에서 독립 서명 epoch를 **잠금 후 다시 읽고** Ed25519 서명·신선도 검증 → 현재 행의 번호·지문·루트/정책 해시/개정과 정확히 동일한지 재확인 → 기존 1950 함수 호출 → no-effect 응답 검증 → COMMIT. 누락/손상/HALT/서명 위조·구형 번호/다른 정책/연결 중단/SQL 실패는 ROLLBACK, 1950 미실행 또는 거래 전체 취소. 현 단계 SQL 클라이언트는 시험 DB 소유자 한정이며 운영 role/GRANT는 생성하지 않는다.
+- **실제 PostgreSQL 격리 시험:** \`test/official-reader-portone-cancel-private-atomic-epoch-review.postgres.test.ts\`는 정확한 CI 호스트·DB 이름·시험 환경변수를 확인한 경우에만 실행한다. 기존 1910/1920의 \`sandbox\` 취소 수신/작업자 보류 테스트 자료를 만들고 **실제 1950 함수의 검토 기록**이 최신 정책에서만 남는지 확인한다. 과거 서명 번호/DB 정책 변경과 HALT 시 1950 승인 기록이 새로 생성되지 않아야 한다. \`test/db/run_authority_core.sh\`는 이 시험을 별도 폐기 전용 DB에 등록한다. 이용권 원장/환불/실 취소 호출 없음.
+- **진짜 보안 한계:** 1950은 원래부터 데이터베이스 소유자 직접 호출 가능하다. 위 신규 잠금은 **기존 함수 자체에 강제 삽입된 것이 아니라 테스트용 외부 연결 계약**이다. 통제 밖의 DB owner·구형 함수/DB 배포 계정·동적 SQL 직접 호출은 우회할 수 있으며, 실제 독립 영속 epoch 원장/권한 격리·백업 역행 방지/OS 비밀 분리/프로덕션 배포/Reader 원본 Grant 회수 함수 1880·1850/1080 **미연결**. 테스트가 PASS여도 해당 문제는 여전히 HOLD다.
+- 검증 근거 및 결과는 생성된 자식 Draft PR의 정확한 HEAD 자동 검사 완료 후 추가한다. DB 시험 외 일반 코드 검사 성공만으로 완료 판정 금지.
+
 ### 소스·검증·중단 규칙
 
 - Epoch 서명 계약: apps/api/src/official-reader-portone-cancel-private-execution-epoch-v1.ts

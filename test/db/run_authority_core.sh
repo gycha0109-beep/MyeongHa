@@ -204,6 +204,9 @@ run_isolated_case myeongha_cancel_d3e18_real_roles_ci bash test/db/official_read
 # D3e19: true two-session isolated PostgreSQL locking when policy changes mid-flight.
 # Synthetic review records only; NO LIVE cancellation/Grant/refund capability.
 run_isolated_case myeongha_cancel_d3e19_atomic_race_ci bash test/db/official_reader_d3e19_cancel_epoch_atomic_race.sh
+# D3e19 follow-up: exercise actual existing D3e8 sandbox review SQL behind an
+# independently signed epoch check INSIDE the same disposable PG transaction.
+run_isolated_case myeongha_cancel_d3e19_review_real_ci env MYEONGHA_D3E19_PG_REVIEW=1 npx vitest run test/official-reader-portone-cancel-private-atomic-epoch-review.postgres.test.ts
 bash test/db/entitlements_current_query.sh
 bash test/db/data_deletion_job_query.sh
 bash test/db/notification_preferences_query.sh
