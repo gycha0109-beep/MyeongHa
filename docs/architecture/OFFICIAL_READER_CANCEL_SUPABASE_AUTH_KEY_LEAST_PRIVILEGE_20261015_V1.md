@@ -30,7 +30,3 @@
 5. `SUPABASE_DB_PASSWORD`는 원래 Vercel에 없었고, 잘못된 안내로 임시 추가했다가 사용자가 삭제했다. 기존 운영 비밀번호가 배치돼 있었다는 결론은 **철회**. GitHub Actions의 승인된 DB 관리 비밀과 Vercel 앱의 변수는 다르다.
 
 **운영 계정·키 교체, 결제/환불, 운영 DB ACL·RLS, Production 병합·배포는 변경하지 않았다. 사용자에게 이번 단계의 추가 조치를 요청하지 않는다.**
-
-## D3e26 보충 — 운영 키 값을 공개하지 않는 검증
-
-실제 Production 키의 등급은 여전히 확인되지 않았습니다. 승인된 운영 프로세스 환경에서만 변수 **값을 내부 메모리로 판정**하고 결과 유형만 출력하는 비공개 검증 도구 및 새로운 API 키 소비 경로의 자동 감사가 추가됐습니다. 자세한 실행 조건·검사 범위·운영 전환 HOLD는 [OFFICIAL_READER_CANCEL_PRODUCTION_AUTH_KEY_PROOF_GATE_20261015_V1.md](OFFICIAL_READER_CANCEL_PRODUCTION_AUTH_KEY_PROOF_GATE_20261015_V1.md)를 참고하세요. 실제 운영 키를 추출하거나 변경하지 않았습니다.
