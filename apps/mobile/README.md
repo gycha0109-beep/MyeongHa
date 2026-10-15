@@ -37,7 +37,7 @@ Mobile now has:
 - Face Reading camera/library photo staging through Expo ImagePicker with image-only selection, 16MB client bound, local preview, and no server analysis;
 - source-authorized Expo Push Device Installation registration/refresh/rebind/revoke plumbing with SecureStore installation identity, user-initiated OS permission request, startup no-prompt sync, and account-switch fail-closed revoke;
 - activated EAS project identity `5c20243c-60a8-44f3-9d8c-ca06ccc8bebe` bound to `@johnny0109/myeongha-mobile` and EAS Production;
-- successful no-production-signing Android physical-smoke build (`2e5b3093-5f09-469a-a99d-38cc53e5f117`) using Node 24.14.0 and `:app:assembleDebug`;
+- historical no-production-signing `:app:assembleDebug` physical-smoke artifact (`2e5b3093-5f09-469a-a99d-38cc53e5f117`) only; that result does **not** prove offline standalone launch. The current EAS profile uses `:app:assembleRelease`, but fresh exact-main APK bytes and a Metro-free physical-device launch still require validation;
 - release-readiness preflight with iOS buildNumber / Android versionCode sequencing and fail-closed platform identity checks;
 - release-only API origin guard that requires the canonical Production origin and rejects staging/local overrides while preserving flexible development runtime configuration;
 - CI export smoke for both Android and iOS from the same Expo source, using isolated output directories after release preflight;
@@ -54,7 +54,7 @@ Still gated after M3-B / M11-A4:
 - production Character catalog/recommendation projection;
 - Face Reading engine intake / analysis upload. M7 does not treat `exif: false` as proof that selected file bytes are metadata-stripped;
 - Mobile iOS/Android transport is selected as Expo Push Notifications, but notification sending, attempt-provider provenance/resolution, retry/failover, and autonomous scheduling remain blocked by SRC-31 / SRC-32; M9-A only registers, refreshes, rebinds, and revokes the current device;
-- Push Production activation and the first Android physical-smoke build are complete; physical-device register/relaunch/logout/rebind evidence is still pending;
+- Push Production activation completed, but the historical Android debug build is not a standalone acceptance. User-reported `Unable to load script` on a stale debug APK is recorded; fresh main release APK verification and physical-device register/relaunch/logout/rebind evidence remain pending;
 - native store commerce;
 - signed store distribution still requires external Apple/Google developer-account and signing authority; production app identity is fixed to `com.myeongha.app` on both platforms.
 
