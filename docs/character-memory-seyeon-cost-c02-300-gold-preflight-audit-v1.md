@@ -19,8 +19,10 @@
 2. 기존 `evaluateCharacterIntegrityClaimV1`과 Authority Resolver의 `MISSING` 권한을 통과시켜 **허위 공유 이력/관계/캐릭터 주장·관리자 사칭이 사실로 승격되지 않는지** 비교. Permission resolver를 AI 판단으로 대체하지 않음.
 3. 민감한 질문은 실제 `runCharacterDisclosurePreflightV2`에서 Topic Descriptor까지 이르지만, **승인된 Character Fact Authority가 없음**을 확인하고, 검색·원문 공개 전 전체 거부. source/owner를 mock이 지어낸 것이라 실제 DB 권한 실증은 아니다.
 4. 무해한 대화는 두 경로에서 실제 Preflight Output 객체가 동일하며 Private Source 검색을 수행하지 않음. 출력 경계에서 불법 Topic/Kind/추가 필드/지나친 Claims 등을 거절한다.
-5. 실제 `createSeyeonFastDialogueShadowV1`, `guardSeyeonTurnInterpretationV2`, `guardSeyeonRiskBearingActionCausalityV1`, `admitSeyeonRendererDraftV2`, `guardSeyeonRendererOutputV2` 경유. 합성된 허용 발화는 **독립 Reviewer의 일치하는 해시**가 있어야 통과하고, 가짜 MemoryRef·privateRef·deep disclosure·Schema Injection·Semantic Review 거부/해시 불일치에서는 반환하지 않아야 한다.
-6. 문구/실제 모델 답변/사용자 개인정보를 CI 로그에 기록하지 않는다. 비용·토큰·실측 성공률은 측정하지 않는다.
+   - **추가로 300건 각각**에 의도적 Fake 분류 오류를 넣는다. 민감 대화를 비민감으로 오분류하면 서버의 기존 스키마 검증은 이를 감지하지 못함. 무해한 대화를 민감으로 오분류하면 서버는 권한 부재에 따라 과잉 HOLD. 허위 관계/기억 사실을 분류에서 누락할 경우 Authority Resolver가 호출되지 않음. 이 세 지표는 **실제 모델 오류율이 아니라 가상 오류 발생 시의 코드 동작**이다.
+5. **첫 인사 1건**은 실제 한 번의 서버 Unified Preflight Output으로 Runtime Context를 만들고, Interpreter/Draft·별도 Semantic Reviewer를 Fake Provider로 통과시켜 정확히 **3번의 합성 모델 호출**이 이루어지는지 검증한다. 이것은 실제 성공률/자연스러움 증거가 아니다.
+6. 실제 `createSeyeonFastDialogueShadowV1`, `guardSeyeonTurnInterpretationV2`, `guardSeyeonRiskBearingActionCausalityV1`, `admitSeyeonRendererDraftV2`, `guardSeyeonRendererOutputV2` 경유. 합성된 허용 발화는 **독립 Reviewer의 일치하는 해시**가 있어야 통과하고, 가짜 MemoryRef·privateRef·deep disclosure·Schema Injection·Semantic Review 거부/해시 불일치에서는 반환하지 않아야 한다.
+7. 문구/실제 모델 답변/사용자 개인정보를 CI 로그에 기록하지 않는다. 비용·토큰·실측 성공률은 측정하지 않는다.
 
 ## 3. 확인된 한계 — 반드시 유지할 안전 차단
 
