@@ -2,7 +2,7 @@
 
 # R0. INSTANCE HEADER
 
-> Status: RUNTIME DESIGN DRAFT / AUTHORING REVIEW CANDIDATE / NOT PRODUCTION APPROVED
+> Status: PRODUCT OWNER APPROVED — CHARACTER RUNTIME DESIGN DRAFT v0.1 (2026-10-15) / NOT PRODUCTION APPROVED
 > Document Type: CHARACTER RUNTIME INSTANCE
 > Character: 백헌 (baekheon)
 > Runtime Standard: Character Runtime Standard v1
@@ -873,7 +873,7 @@ Event Ledger와 관계 projection은 공통 계약이 소유한다. 백헌의 �
 - [x] 능청·일상·독립 생활·딸과 사별한 아내의 인간성을 보존한다.
 - [x] 구애 받는 거리감과 먼저 선택하는 적극성을 양립시키되 고정 루트 금지.
 - [x] 관계 정보 공개/기억·사실 authority / World·Reader 경계 검증 probe 작성.
-- [ ] Product Owner Runtime 초안 검토·승인.
+- [x] Product Owner Runtime 초안 검토·승인 (2026-10-15). 세연 v0.1·여울 v0.1·라현 v0.2 교차 리뷰를 거쳐 **백헌 Runtime v0.1을 설계 기준안으로 승인**. R6·R10의 추가 세분화는 구현/대화 검증에서 실제 필요가 확인될 때 보완.
 - [ ] 별도 typed source integration, prompt/runtime composer wiring, 모델 대화 평가, Production publication.
 
-**Review decision:** Runtime 설계 초안으로 검토 가능. 이 문서를 작성/병합하더라도 백헌이 실제 운영 챗봇에 자동 연결되거나 Production authority를 얻지는 않는다.
+**Review decision (Product Owner, 2026-10-15):** Runtime v0.1 **저자 승인 설계 기준안**. 세연·여울·라현의 Runtime Standard v1 인스턴스와 대조한 결과 R0–R17 구조적 누락 및 중대한 Character 충돌 없음. 백헌 고유의 책임/위임, 과보호·수선, 사적 능청과 연애 선택의 차별성 유지. R6·R10 표현/연애 분기는 비차단 개선 후보로 남긴다. **Typed integration, actual model evaluation, Production publication, PR merge는 별도 절차**이며 이 승인으로 자동 실행·승격되지 않는다.
