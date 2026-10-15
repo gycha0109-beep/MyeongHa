@@ -213,7 +213,6 @@ comment on function saju_bridge_private.cmd_consume_operator_permit_v1(
   uuid,text,text,text,text,text,uuid,text
 ) is
 'Non-public, one-shot integration PROBE permit. Caller-bound SHA/digests are not independent Owner approval. No product release/commerce authorization.';
-revoke myeongha_saju_bridge_permit_owner from current_user;
 
 -- PostgreSQL grants function EXECUTE to PUBLIC by default. Remove it explicitly.
 revoke all on function saju_bridge_private.cmd_consume_operator_permit_v1(
@@ -255,3 +254,8 @@ grant execute on function saju_bridge_private.cmd_consume_operator_permit_v1(
 -- An operator can never activate this with the existing production DB pool.
 comment on schema saju_bridge_private is
 'Private Saju single-project integration alternative: unmounted, shared-DB risk; no independent Root/Attestor.';
+
+-- All DCL on NOLOGIN-owned objects must finish before managed migration
+-- principal revokes its temporary owner-role membership; PostgreSQL managed
+-- actor is not SUPERUSER and loses ALTER/GRANT/REVOKE after this statement.
+revoke myeongha_saju_bridge_permit_owner from current_user;
