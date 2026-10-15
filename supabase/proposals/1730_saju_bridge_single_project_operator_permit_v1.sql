@@ -193,27 +193,8 @@ begin
 end
 $consume$;
 
--- Transfer owner before granting any EXECUTE. The function owner is NOLOGIN,
--- owns only the new private tables and cannot access unrelated public data.
-grant create on schema saju_bridge_private
-  to myeongha_saju_bridge_permit_owner;
-grant myeongha_saju_bridge_permit_owner to current_user;
-alter table saju_bridge_private.operator_permits_v1
-  owner to myeongha_saju_bridge_permit_owner;
-alter table saju_bridge_private.audit_events_v1
-  owner to myeongha_saju_bridge_permit_owner;
-alter function saju_bridge_private.cmd_consume_operator_permit_v1(
-  uuid,text,text,text,text,text,uuid,text
-) owner to myeongha_saju_bridge_permit_owner;
-revoke create on schema saju_bridge_private
-  from myeongha_saju_bridge_permit_owner;
--- Supabase managed postgres is not SUPERUSER. COMMENT must be executed
--- while the migration principal still has membership in the new function owner.
-comment on function saju_bridge_private.cmd_consume_operator_permit_v1(
-  uuid,text,text,text,text,text,uuid,text
-) is
-'Non-public, one-shot integration PROBE permit. Caller-bound SHA/digests are not independent Owner approval. No product release/commerce authorization.';
-
+-- Configure REVOKE/GRANT/COMMENT while the managed migration principal
+-- still owns these objects (NOINHERIT role membership grants no owner DCL).
 -- PostgreSQL grants function EXECUTE to PUBLIC by default. Remove it explicitly.
 revoke all on function saju_bridge_private.cmd_consume_operator_permit_v1(
   uuid,text,text,text,text,text,uuid,text
@@ -255,7 +236,23 @@ grant execute on function saju_bridge_private.cmd_consume_operator_permit_v1(
 comment on schema saju_bridge_private is
 'Private Saju single-project integration alternative: unmounted, shared-DB risk; no independent Root/Attestor.';
 
--- All DCL on NOLOGIN-owned objects must finish before managed migration
--- principal revokes its temporary owner-role membership; PostgreSQL managed
--- actor is not SUPERUSER and loses ALTER/GRANT/REVOKE after this statement.
+comment on function saju_bridge_private.cmd_consume_operator_permit_v1(
+  uuid,text,text,text,text,text,uuid,text
+) is
+'Non-public, one-shot integration PROBE permit. Caller-bound SHA/digests are not independent Owner approval. No product release/commerce authorization.';
+
+-- All ACL/COMMENT operations finish before transferring object ownership.
+-- The NOLOGIN function owner cannot read unrelated public data.
+grant create on schema saju_bridge_private
+  to myeongha_saju_bridge_permit_owner;
+grant myeongha_saju_bridge_permit_owner to current_user;
+alter table saju_bridge_private.operator_permits_v1
+  owner to myeongha_saju_bridge_permit_owner;
+alter table saju_bridge_private.audit_events_v1
+  owner to myeongha_saju_bridge_permit_owner;
+alter function saju_bridge_private.cmd_consume_operator_permit_v1(
+  uuid,text,text,text,text,text,uuid,text
+) owner to myeongha_saju_bridge_permit_owner;
+revoke create on schema saju_bridge_private
+  from myeongha_saju_bridge_permit_owner;
 revoke myeongha_saju_bridge_permit_owner from current_user;
