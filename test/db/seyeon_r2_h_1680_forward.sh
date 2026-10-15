@@ -60,7 +60,7 @@ HA="myeongha-guest-bearer-hmac-sha256-v1:$(printf 'a%.0s' {1..64})"
 HB="myeongha-guest-bearer-hmac-sha256-v1:$(printf 'b%.0s' {1..64})"
 HC="myeongha-guest-bearer-hmac-sha256-v1:$(printf 'c%.0s' {1..64})"
 psql -X -q -v ON_ERROR_STOP=1 -v ha="$HA" -v hb="$HB" -v hc="$HC" <<'SQL' >/dev/null
-insert into auth.users(id) values('e1100000-0000-0000-0000-000000000001');
+insert into auth.users(id) values('e1100000-0000-0000-0000-000000000001'),('e1100000-0000-0000-0000-000000000002');
 insert into public.subjects(id,kind,auth_user_id,status,merged_into_subject_id,created_at,updated_at) values
 ('e1200000-0000-0000-0000-000000000001','guest',null,'active',null,clock_timestamp(),clock_timestamp()),
 ('e1200000-0000-0000-0000-000000000002','guest',null,'active',null,clock_timestamp(),clock_timestamp()),
@@ -68,7 +68,7 @@ insert into public.subjects(id,kind,auth_user_id,status,merged_into_subject_id,c
 ('e1200000-0000-0000-0000-000000000004','member','e1100000-0000-0000-0000-000000000001','active',null,clock_timestamp(),clock_timestamp());
 insert into public.guest_sessions(id,subject_id,token_hash,expires_at,consumed_at,claimed_by_subject_id,created_at) values
 ('e1300000-0000-0000-0000-000000000001','e1200000-0000-0000-0000-000000000001',:'ha',clock_timestamp()+interval '1 day',null,null,clock_timestamp()-interval '1 day'),
-('e1300000-0000-0000-0000-000000000002','e1200000-0000-0000-0000-000000000002',:'hb',clock_timestamp()+interval '2 seconds',null,null,clock_timestamp()-interval '1 day'),
+('e1300000-0000-0000-0000-000000000002','e1200000-0000-0000-0000-000000000002',:'hb',clock_timestamp()+interval '5 seconds',null,null,clock_timestamp()-interval '1 day'),
 ('e1300000-0000-0000-0000-000000000003','e1200000-0000-0000-0000-000000000003',:'hc',clock_timestamp()+interval '1 day',null,null,clock_timestamp()-interval '1 day');
 SQL
 deny() {
@@ -85,7 +85,7 @@ deny MISSING_GUEST_SESSION 'requires a locked Guest proof' "begin; select set_co
 deny CROSS_SUBJECT_SESSION 'expired before paid admission' "begin; set local role myeongha_seyeon_governed_executor; select subject_kind from public.begin_seyeon_governed_guest_subject_context_v1('$HA'); select set_config('myeongha.seyeon_governed_guest_session_id','e1300000-0000-0000-0000-000000000003',true); set local role myeongha_seyeon_cost_meter_owner; select public.seyeon_ai_lock_active_subject_for_cost_v1('e1200000-0000-0000-0000-000000000001');"
 deny DIRECT_COST_GUARD 'permission denied' "begin; set local role myeongha_seyeon_governed_executor; select public.seyeon_ai_lock_active_subject_for_cost_v1('e1200000-0000-0000-0000-000000000001');"
 # Resolver succeeds; real clock crosses expiry before cost guard runs.
-deny EXPIRED_AFTER_RESOLUTION 'expired before paid admission' "begin; set local statement_timeout='10s'; set local role myeongha_seyeon_governed_executor; select subject_kind from public.begin_seyeon_governed_guest_subject_context_v1('$HB'); select pg_sleep(2.5); set local role myeongha_seyeon_cost_meter_owner; select public.seyeon_ai_lock_active_subject_for_cost_v1('e1200000-0000-0000-0000-000000000002');"
+deny EXPIRED_AFTER_RESOLUTION 'expired before paid admission' "begin; set local statement_timeout='10s'; set local role myeongha_seyeon_governed_executor; select subject_kind from public.begin_seyeon_governed_guest_subject_context_v1('$HB'); select pg_sleep(5.5); set local role myeongha_seyeon_cost_meter_owner; select public.seyeon_ai_lock_active_subject_for_cost_v1('e1200000-0000-0000-0000-000000000002');"
 pass POST_RESOLUTION_EXPIRY_GUARD
 
 # 1680 replaces the Guest resolver; check it still protects promotion locks.
@@ -96,7 +96,7 @@ trap 'rm -rf -- "$race"' EXIT
 ) & guest_pid=$!
 sleep 0.4
 (
-  PGAPPNAME=seyeon_1680_promotion psql -X -qAt -v ON_ERROR_STOP=1 -c "begin; select set_config('myeongha.subject_id','e1200000-0000-0000-0000-000000000003',true); select subject_kind from public.cmd_promote_guest_runtime_v1('e1200000-0000-0000-0000-000000000003','e1300000-0000-0000-0000-000000000003','e1100000-0000-0000-0000-000000000001'); commit;" >"$race/promotion" 2>&1
+  PGAPPNAME=seyeon_1680_promotion psql -X -qAt -v ON_ERROR_STOP=1 -c "begin; select set_config('myeongha.subject_id','e1200000-0000-0000-0000-000000000003',true); select subject_kind from public.cmd_promote_guest_runtime_v1('e1200000-0000-0000-0000-000000000003','e1300000-0000-0000-0000-000000000003','e1100000-0000-0000-0000-000000000002'); commit;" >"$race/promotion" 2>&1
 ) & promotion_pid=$!
 sleep 0.4
 [[ "$(psql -X -Atqc "select count(*) from pg_stat_activity where application_name='seyeon_1680_promotion' and wait_event_type='Lock'")" == 1 ]] || hold PROMOTION_NOT_LOCKED
