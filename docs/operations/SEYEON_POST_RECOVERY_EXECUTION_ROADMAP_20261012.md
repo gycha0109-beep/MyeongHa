@@ -347,3 +347,9 @@ Governor 04d4B 계열은 실제 격리 PostgreSQL 기반 영수증 임대·정�
 - 다음 기술 단위 1690의 상세 정본은 R2 패킷 [28절](SEYEON_MIGRATION_LINEAGE_R2_READONLY_PACKET_20261013.md). 원본 Git blob `79026a10855fbafaf2e4465e0a382e37ce1a16cd` 불변, `requires=['1590','1610','1630']`로 검토 인벤토리 누락만 보정.
 - 독립 PG17 case DB에서 기존 SQL 1550~1630 선행 및 원본 1690 내부 COMMIT을 그대로 실행한 뒤 Role/SECURITY DEFINER Owner/ACL/멤버십·스키마 CREATE 복귀와 부정 RPC 경계를 검증. 실제 정산 승인·운영 Credential·Production SQL 변경 없음.
 - 본 단위는 실 예약된 Provider Call 정산 성공이나 금액/중복 청구 E2E, worker 서비스 배포를 승인하지 않는다. 검증 완료 시에만 1700 예약 영수증 Pin을 별도 검토한다. 기존 모든 Security/Owner/DR HOLD 지속.
+
+### 30.1 1690 PG17 기술 검증 증거 — 운영 승인과 분리
+
+- [PR #2100](https://github.com/gycha0109-beep/MyeongHa/pull/2100) 기술 HEAD `729ddb238e62262a48c0a3bda3afdf33d130f287`, [PG17 #38666188838 job 116198661632](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38666188838) SUCCESS. 원본 내부 COMMIT, 신설 worker USAGE-only/Role 격리, 비용 정산 함수 최소권한, 기존 ACL/Role 멤버십 불변, 미예약 정산 부정, 중복 실행 차단, 폐기 DB 확인. 증거 세부사항은 [R2 패킷 §28.1](SEYEON_MIGRATION_LINEAGE_R2_READONLY_PACKET_20261013.md)만 정본.
+- 전체 schema ACL 문자열 변경 자체는 신설 Worker의 합법적 USAGE grant 때문에 발생한다. 검증기는 기존 Grantee들의 ACL 동등성과 Worker의 CREATE 금지를 별도로 확인하도록 보강함. 이는 기존 권한 확대 허용이 아님.
+- 현재는 **PG17 기술 PASS**이며 최종 PR HEAD 전체 CI, Full Integration 및 병합 SHA 미확정. Worker 운영 자격·예약 비용 실제 정산 E2E는 별도 HOLD이고 Owner/DR/G0~G6/paid/public 승격 금지.
