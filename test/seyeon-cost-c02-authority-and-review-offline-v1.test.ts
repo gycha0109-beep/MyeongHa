@@ -186,6 +186,63 @@ describe('COST-02: 300 authored synthetic classifier gold cases through real ser
     expect(result.retrievedPrivateSources).toEqual([]);
   });
 
+  it('300 synthetic model-error injections quantify server-dependency blind spots, NOT actual model error rates',async()=>{
+    let simulatedSensitiveMisses=0,simulatedFalseHolds=0;
+    let simulatedClaimMisses=0;
+    for(const gold of SEYEON_COST_C02_ALL_GOLD_V1){
+      const {governance,calls}=makeGovernance(gold);
+      if(gold.topic!==null){
+        // A hypothetical false-negative classifier skips the sensitive
+        // authority query. This MUST be recorded as a blocking blind spot.
+        const miss:Governance={
+          ...governance,
+          integrity:{...governance.integrity,
+            classifier:{classify:async()=>({claims:[]})}},
+          disclosure:{...governance.disclosure,
+            classifier:{classify:async()=>({
+              topicKey:null,questionContext:'casual_curiosity',
+            })}},
+        };
+        const wronglyAdmitted=await preflight(gold,miss);
+        expect(wronglyAdmitted.disclosure.status).toBe('not_sensitive');
+        expect(calls.descriptor).toBe(0);
+        expect(calls.factAuthority).toBe(0);
+        simulatedSensitiveMisses++;
+      }else{
+        // A false-positive means the independent authority is asked and
+        // holds, protecting disclosure but harming conversational UX.
+        const falsePositive:Governance={
+          ...governance,
+          disclosure:{...governance.disclosure,
+            classifier:{classify:async()=>({
+              topicKey:'deep_vulnerability',questionContext:'casual_curiosity',
+            })}},
+        };
+        await expect(preflight(gold,falsePositive)).rejects.toThrow(
+          /Missing Character Fact Authority/u,
+        );
+        expect(calls.retriever).toBe(0);
+        simulatedFalseHolds++;
+      }
+      if(gold.requiredKind!==undefined && gold.topic===null){
+        // A claim missed at classification never calls the authority
+        // resolver: a separate verified-detector requirement remains.
+        const noClaims:Governance={
+          ...governance,
+          integrity:{...governance.integrity,
+            classifier:{classify:async()=>({claims:[]})}},
+        };
+        const result=await preflight(gold,noClaims);
+        expect(result.integrity.decisions).toEqual([]);
+        simulatedClaimMisses++;
+      }
+    }
+    expect(simulatedSensitiveMisses).toBeGreaterThanOrEqual(90);
+    expect(simulatedFalseHolds).toBeGreaterThanOrEqual(150);
+    expect(simulatedClaimMisses).toBeGreaterThanOrEqual(40);
+    expect(simulatedSensitiveMisses+simulatedFalseHolds).toBe(300);
+  });
+
   it('model hallucinated labels and extra fields never grant private sources',async()=>{
     const gold=SEYEON_COST_C02_ALL_GOLD_V1[0];
     if(!gold) throw new Error('Missing corpus');
@@ -279,6 +336,32 @@ describe('COST-02: real combined interpretation, independent reviewer and output
       purpose:'turn_interpret_render_shadow',
       responseSchema:SEYEON_FAST_DIALOGUE_SHADOW_RESPONSE_SCHEMA_V1,
     });
+  });
+
+  it('binds one real safe preflight result to the combined draft and separate reviewer with exactly three fake calls',async()=>{
+    const gold=SEYEON_COST_C02_ALL_GOLD_V1.find(x=>x.id==='N01');
+    if(!gold) throw new Error('Missing pinned original safe case');
+    const {candidate,generate:classifier}=makeGovernance(gold);
+    const governed=await preflight(gold,candidate);
+    expect(governed.disclosure.status).toBe('not_sensitive');
+    expect(governed.integrity.decisions).toEqual([]);
+    const context=assembleSeyeonRuntimeContextV2({
+      relationship:null,
+      recentMessages:[{messageId:'u1',role:'user' as const,text:gold.text}],
+      retrievedMemories:governed.retrievedPrivateSources,
+      integrityDecisions:governed.integrity.decisions,
+      governedPreflightApplied:true,
+      disclosure:{decision:governed.disclosure.decision,retrievedSources:[]},
+    });
+    const {evaluator,generate:draft,review}=fastShadow({
+      interpretation:validInterpretation,draft:validDraft,
+    });
+    const result=await evaluator.evaluate(context);
+    expect(result.scope).toBe('SHADOW_ONLY_NOT_PRODUCTION');
+    expect(classifier).toHaveBeenCalledOnce();
+    expect(draft).toHaveBeenCalledOnce();
+    expect(review).toHaveBeenCalledOnce();
+    expect(result.envelope.utterance).toBe(validDraft.utterance);
   });
 
   it('blocks fabricated memory, private source, unauthorized disclosure and schema injection before publication',async()=>{
