@@ -42,7 +42,7 @@ function_evidence AS (
   SELECT n.routine_name, count(p.oid) AS matching_overloads,
     pg_catalog.string_agg(DISTINCT owner_role.rolname,',' ORDER BY owner_role.rolname) AS owner_roles,
     pg_catalog.bool_or(p.prosecdef) AS has_security_definer,
-    pg_catalog.bool_or(pg_catalog.has_function_privilege('PUBLIC',p.oid,'EXECUTE')) AS public_execute,
+    pg_catalog.bool_or(pg_catalog.has_function_privilege('public',p.oid,'EXECUTE')) AS public_execute,
     pg_catalog.bool_or(pg_catalog.has_function_privilege('anon',p.oid,'EXECUTE')) AS anon_execute,
     pg_catalog.bool_or(pg_catalog.has_function_privilege('authenticated',p.oid,'EXECUTE')) AS authenticated_execute,
     pg_catalog.bool_or(pg_catalog.has_function_privilege('service_role',p.oid,'EXECUTE')) AS service_role_execute,
@@ -58,16 +58,28 @@ entitlement_acl AS (
   SELECT 'public.entitlement_events' AS table_name,
     pg_catalog.to_regclass('public.entitlement_events') IS NOT NULL AS table_exists,
     CASE WHEN pg_catalog.to_regclass('public.entitlement_events') IS NOT NULL
-      THEN pg_catalog.has_table_privilege('service_role',
-        'public.entitlement_events','INSERT, UPDATE, DELETE')
+      THEN (pg_catalog.has_table_privilege('service_role',
+        'public.entitlement_events','INSERT') AND
+        pg_catalog.has_table_privilege('service_role',
+        'public.entitlement_events','UPDATE') AND
+        pg_catalog.has_table_privilege('service_role',
+        'public.entitlement_events','DELETE'))
       ELSE NULL END AS service_role_all_mutations,
     CASE WHEN pg_catalog.to_regclass('public.entitlement_events') IS NOT NULL
-      THEN pg_catalog.has_table_privilege('postgres',
-        'public.entitlement_events','INSERT, UPDATE, DELETE')
+      THEN (pg_catalog.has_table_privilege('postgres',
+        'public.entitlement_events','INSERT') AND
+        pg_catalog.has_table_privilege('postgres',
+        'public.entitlement_events','UPDATE') AND
+        pg_catalog.has_table_privilege('postgres',
+        'public.entitlement_events','DELETE'))
       ELSE NULL END AS postgres_all_mutations,
     CASE WHEN pg_catalog.to_regclass('public.entitlement_events') IS NOT NULL
-      THEN pg_catalog.has_table_privilege('myeongha_commerce_internal_executor',
-        'public.entitlement_events','INSERT, UPDATE, DELETE')
+      THEN (pg_catalog.has_table_privilege('myeongha_commerce_internal_executor',
+        'public.entitlement_events','INSERT') AND
+        pg_catalog.has_table_privilege('myeongha_commerce_internal_executor',
+        'public.entitlement_events','UPDATE') AND
+        pg_catalog.has_table_privilege('myeongha_commerce_internal_executor',
+        'public.entitlement_events','DELETE'))
       ELSE NULL END AS commerce_executor_all_mutations
 )
 SELECT pg_catalog.jsonb_build_object(
