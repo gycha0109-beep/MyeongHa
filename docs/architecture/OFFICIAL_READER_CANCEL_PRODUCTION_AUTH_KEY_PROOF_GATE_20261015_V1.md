@@ -35,8 +35,8 @@ node scripts/operations/verify-production-supabase-auth-key-class-local.mjs
 
 **`scripts/ci/official-reader-supabase-auth-key-source-fence.mjs`**
 
-- 기존 710개 규모의 Runtime 코드 인벤토리를 재사용해, API 서버 실행 코드에서 환경변수 이름 `MYEONGHA_SUPABASE_API_KEY`를 직접 읽는 파일이 기존에 검토한 **두 곳**(생산 환경 파서, 로그인 프록시) 이외로 늘어나면 실패합니다.
-- 회원 조회용 Supabase 검증기까지 포함한 **세 경로 모두** `isLeastPrivilegeSupabaseAuthApiKeyV1` 호출을 유지하는지 검사합니다.
+- 기존 710개 규모의 Runtime 코드 인벤토리를 재사용해, API 서버 실행 코드에서 환경변수 이름 `MYEONGHA_SUPABASE_API_KEY`를 직접 참조하는 파일을 폐쇄형 인벤토리로 검사합니다. 실제 직접 환경변수 이름을 선언하는 파일은 **생산용 런타임 파서 한 곳**이며, 로그인 프록시는 해당 파서의 환경변수 바인딩을 사용합니다. 추가로 **계정 삭제 관리 설정 한 곳은 일반 API 키를 관리자 전용 `MYEONGHA_SUPABASE_AUTH_ADMIN_SECRET`과 같지 않은지 비교하는 목적**으로만 참조합니다. 예상하지 못한 새 직접 참조가 생기면 실패합니다.
+- 회원 조회용 Supabase 검증기까지 포함한 **세 경로 모두** `isLeastPrivilegeSupabaseAuthApiKeyV1` 호출을 유지하는지 검사합니다. 별도의 계정 삭제 관리 설정은 일반 키와 관리자 키가 **서로 달라야 함**을 확인할 뿐, 일반 키를 관리자 API에 전달하는 것으로 판정하지 않습니다. 이 관리 기능의 실제 배포·관리자 비밀 구성은 별도 검증 대상입니다.
 - 오류에 **문제 파일명만** 출력하고 해당 코드 줄·키 값은 출력하지 않습니다. 문자열 결합이나 동적 속성명 생성, 서드파티 라이브러리, 실제 배포 비밀값에는 정적 검사 한계가 있습니다.
 
 `test/verify-production-supabase-auth-key-class-local.test.mjs`는 **합성 공개키/관리자키/레거시 키만** 환경변수에 주입한 독립 자식 Node 프로세스로 정상·거부·값 비노출·CLI 인자 거부를 검증합니다. 코드 인벤토리 검사 및 테스트는 기존 `test/db/run_authority_core.sh`에서 실행되므로, 합성 결제/취소 회귀 시험이 그대로 유지됩니다.
