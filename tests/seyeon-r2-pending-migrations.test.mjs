@@ -90,6 +90,24 @@ describe('R2 held 1520..1720 pending migration dependency inventory', () => {
         .toThrow('HOLD_R2_1670_MISSING_GOVERNED_EXECUTOR_DEPENDENCY');
     });
   });
+  it('rejects omitted 1630 executor dependency of 1690 detached worker', () => {
+    withFixture((root, dir, manifest) => {
+      manifest.migrations.find(row => row.version === '1690').requires = ['1590', '1610'];
+      expect(() => validateR2PendingInventory(root, manifest))
+        .toThrow('HOLD_R2_1690_MISSING_GOVERNED_EXECUTOR_DEPENDENCY');
+    });
+  });
+  it('rejects mutated 1690 role or commit fence even if blob is re-pinned', () => {
+    withFixture((root, dir, manifest) => {
+      const row = manifest.migrations.find(x => x.version === '1690');
+      const file = join(dir, row.file);
+      const modified = readFileSync(file, 'utf8').replace(/^commit;$/m, 'select 1;');
+      writeFileSync(file, modified);
+      row.blobSha = gitBlobSha(Buffer.from(modified));
+      expect(() => validateR2PendingInventory(root, manifest))
+        .toThrow('HOLD_R2_1690_ROLE_TRANSACTION_BOUNDARY_DRIFT');
+    });
+  });
   it('rejects unsafe 1670 transaction-boundary source even if digest is re-pinned', () => {
     withFixture((root, dir, manifest) => {
       const row = manifest.migrations.find(x => x.version === '1670');

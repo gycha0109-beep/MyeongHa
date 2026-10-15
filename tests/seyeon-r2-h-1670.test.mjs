@@ -42,6 +42,7 @@ describe('R2-H 1670 real forward replay CI-only barrier',()=>{
     expect(suites.postgres17.cases).toContain('seyeon-r2-h-1670-forward');
     expect(runner).toContain("execFileSync('createdb', [database]");
     expect(runner).toContain("execFileSync('dropdb', ['--if-exists', database]");
-    expect(runner).toContain('PASS_R2_H_1670_DISPOSABLE_DATABASE_DESTROYED');
+    expect(runner).toContain('seyeon-r2-h-1670-forward');
+    expect(runner).toContain('PASS_R2_H_${version}_DISPOSABLE_DATABASE_DESTROYED');
   });
 });

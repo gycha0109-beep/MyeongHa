@@ -328,3 +328,21 @@ Watchtower-Track: ops. R1 정확한 격리 복원 증거는 8절을 따른다. �
 - `PASS_R2_H_1680_SUBJECT_SESSION_LOCK_ORDER`, `PROMOTION_FIRST_STALE_GUEST_DENIED`: 두 방향 독립 PostgreSQL 세션의 잠금과 stale Guest 거부. `PASS_R2_H_1680_DISPOSABLE_DATABASE_DESTROYED`: 완료 후 테스트 DB 자체가 제거됨.
 - **`HOLD_R2_H_1680_PRIVILEGED_SECURITY_DEFINER_OWNER_REVIEW`**: disposable PG17에서 기존 두 SECURITY DEFINER Owner가 슈퍼유저로 관측됨. 1680은 이들의 Owner/ACL을 보존했으며 실제 Production DDL 실행 identity를 증명하지 않는다. 기존 1650/1670 Owner 및 신규 1680 운용 승인 모두 HOLD.
 - `HOLD_R2_H_1680_OWNER_APPROVAL_REQUIRED fundedAdmissionE2E=false productionWrites=0 drReady=false`. R2-G 계보, 1530 Owner 멤버십, 1640 JSONB NULL 우회, 1660 Reader, 21 pending, AI G0~G6, paid/public HOLD를 해제하지 않음.
+
+## 28. 2026-10-15 R2-H 1690 Detached Settlement Worker — 역할 의존성 및 COMMIT 검증 후보 (Owner HOLD)
+
+- 원본 SQL `1690_seyeon_detached_cost_settlement_worker_v1.sql` Git blob `79026a10855fbafaf2e4465e0a382e37ce1a16cd` **불변**. 단위 `governor-guest-receipt`, `owner=character-security`, `approval=HOLD_OWNER_REVIEW` 그대로.
+- 기존 `1690.requires=['1590','1610']`는 실제 SQL 참조 의존성 누락. 원본 `pg_has_role(...,'myeongha_seyeon_governed_executor','MEMBER')`와 `has_function_privilege(...cmd_governed_start...)`는 1620/1630 선행을 요구한다. 검토 인벤토리에 **`1630`을 추가해 `['1590','1610','1630']`으로 보정**한다. 운영 배포 순서/Owner 승인으로 해석하지 않는다.
+- 원본에 최상위 `BEGIN/COMMIT` 포함. 1510 및 승인된 timestamped 두 개 뒤 `1550~1610`을 정확한 순서로 재생하고 1630 이전 governed Role의 부재를 검사한 다음, `1620→1630→1690`을 **동일 CI-owned 폐기형 PostgreSQL 17 DB에서 실제 COMMIT**한다. 외부 BEGIN/ROLLBACK 중첩 재생 금지. 종료 시 데이터베이스 DROP 및 역할 정리를 기존 PG17 runner에서 수행한다.
+- 권한·계보 판정: 전후 기존 governed Start/Settle 함수 정의 지문 불변, Worker NOLOGIN/NOINHERIT/NOBYPASSRLS/멤버십 0, Detached SECURITY DEFINER 함수 Owner는 NOLOGIN cost meter, 고정 search_path, 전용 Worker EXECUTE만 허용. 브라우저·API·governed executor 직접 EXECUTE, Worker의 기존 Start/Settle·Ledger/일일예산 직접 접근은 거부. SQL 내부에서 임시 부여하는 `current_user` 멤버십 및 cost meter의 스키마 CREATE 권한은 COMMIT 뒤 전혀 잔존하지 않아야 함.
+- 합성 부정 계약: null/불완전 Event 거부, 미예약 Call/교차 Subject 권한 없는 정산 거부, Worker 외 직접 접근 거부, 원본 재실행 실패 뒤 Role graph/함수/ACL 지문 불변. 이는 **실제로 예약된 Call의 비용 정산 양수 E2E**, 삭제·승격 경합 및 실제 Provider 후속 처리를 포함하지 않는다. 테스트 통과 전 PASS 선언 금지.
+- 고정 HOLD: 새 Worker's 서버 전용 호출 증빙·DB Credential 발급·Operator 승인·Service Identity는 없음. 1650/1670/1680 SECURITY DEFINER Owner, 1530 Creator Membership, 1640 SQL NULL Trigger, 원격 전용 계보 R2-G, 1660 Reader, 21건 Owner 리뷰, G0~G6/paid/public OFF, dr_ready=false. SQL 원본·Production Schema/ACL/Role/history 및 실제 Provider 호출 변경 없음.
+
+### 28.1 1690 원본 COMMIT + PG17 최소권한 기술 증거 (2026-10-15, Owner HOLD)
+
+- [PR #2100](https://github.com/gycha0109-beep/MyeongHa/pull/2100)의 PG17 기술 HEAD `729ddb238e62262a48c0a3bda3afdf33d130f287`, [CI #38666188838](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38666188838), PG17 job `116198661632` **SUCCESS**. 검증 완료 당시 원본 1690 blob `79026a10855fbafaf2e4465e0a382e37ce1a16cd` 그대로. 이후 정본 증거 추가 HEAD의 전체 CI/Full Integration은 별도 판정.
+- `PASS_R2_H_1690_1630_ROLE_DEPENDENCY_CONFIRMED`: 실제 baseline 1550~1610에서 governed executor Role 부재 확인, 원본 1620/1630 적용 후 1690 실행. `1690.requires=['1590','1610','1630']`는 읽기 전용 **검토 인벤토리 보정**이며 운영 이관 승인 아님.
+- `PASS_R2_H_1690_ORIGINAL_FORWARD_COMMIT_ROLE_ACL_OWNER`: 원본 1690 자체 BEGIN/COMMIT, Worker NOLOGIN/NOINHERIT/NOBYPASSRLS, 멤버십 및 일시적 Cost Meter Owner Role/스키마 CREATE 권한 회수, 기존 governed Start/Settle 함수 본문 불변, Worker 전용 SECURITY DEFINER RPC Owner 및 기존 API/브라우저/governed executor 직접 실행 거부 검증.
+- **ACL 비교 기준 수정의 근거:** 초기 PG17 후보는 전체 public schema `nspacl` 문자열의 변화까지 오류로 판정했다. 원본은 새 Worker에 `public` schema **USAGE를 의도적으로 부여**하므로 이 전체 문자열 변화 자체는 정상이다. 수정한 검증은 기존 Grantee들의 실제 ACL/Grant Option 불변을 카탈로그 `aclexplode`로 비교하고, 신설 Worker에 정확히 USAGE만 있고 CREATE/GRANT OPTION은 없음을 검증했다. 이 구분 이후 PG17 PASS.
+- `PASS_R2_H_1690_DENY_INVALID_INPUT`, `DENY_UNRESERVED_CALL`, `DENY_GOVERNED_DIRECT`, `NO_ARBITRARY_RESERVATION_OR_REOPEN`, `REPLAY_FAIL_CLOSED`, `DISPOSABLE_DATABASE_DESTROYED`: Synthetic negative inputs, 원본 중복 적용 차단 및 재생 DB 통째 폐기. 실제 Provider/실 Customer/실 결제 데이터 미사용.
+- **범위 제한:** `HOLD_R2_H_1690_OWNER_APPROVAL_REQUIRED actualSettlementE2E=false credentialsProvisioned=false productionWrites=0 drReady=false`. 실 예약 행의 positive 정산/중복 비용 정합성, 비밀 서비스 Credential, 운영 Worker 백엔드 및 실제 스케줄링 미검증. R2-G 계보, 1530 creator membership, 1640 NULL Trigger, 1650/1670/1680 SECURITY DEFINER Owner, 1660 Reader E2E, 21개 Owner 승인과 G0~G6/public/paid/DR HOLD는 그대로.

@@ -31,7 +31,8 @@ describe('R2-H 1680 isolated guest expiry guard proof',()=>{
     expect(run).toContain('seyeon-r2-h-1680-forward)');
     const suites=JSON.parse(read('scripts/ci/db-suites.json'));
     expect(suites.postgres17.cases).toContain('seyeon-r2-h-1680-forward');
-    expect(read('scripts/ci/run-db-track.mjs')).toContain('PASS_R2_H_1680_DISPOSABLE_DATABASE_DESTROYED');
+    expect(read('scripts/ci/run-db-track.mjs')).toContain('seyeon-r2-h-1680-forward');
+    expect(read('scripts/ci/run-db-track.mjs')).toContain('PASS_R2_H_${version}_DISPOSABLE_DATABASE_DESTROYED');
   });
   it('tests OID/owner/ACL, valid guest/member, expired proof and lock order',()=>{
     for(const marker of [

@@ -109,6 +109,19 @@ export function validateR2PendingInventory(root, manifest) {
   assert(src1670.includes("rolname='myeongha_seyeon_governed_executor'")
     && src1670.includes('begin;') && src1670.includes('commit;'),
     '1670_TRANSACTION_BOUNDARY_OR_ROLE_DRIFT');
+  // 1690 refers to the 1630 executor by name in pg_has_role and checks
+  // the governed Start RPC. Its original BEGIN/COMMIT demands isolated replay.
+  const stage1690 = manifest.migrations.find(row => row.version === '1690');
+  const src1690 = readFileSync(join(dir, stage1690.file), 'utf8');
+  assert(stage1690.requires.includes('1590')
+    && stage1690.requires.includes('1610')
+    && stage1690.requires.includes('1630'),
+    '1690_MISSING_GOVERNED_EXECUTOR_DEPENDENCY');
+  assert(src1690.includes("pg_has_role('myeongha_seyeon_settlement_worker',")
+    && src1690.includes("'myeongha_seyeon_governed_executor','MEMBER')")
+    && src1690.includes('cmd_governed_start_seyeon_ai_call_v1')
+    && src1690.includes('begin;') && src1690.includes('commit;'),
+    '1690_ROLE_TRANSACTION_BOUNDARY_DRIFT');
   assert(grouped.size === 9, 'REVIEW_UNIT_CARDINALITY');
   const reviewUnits = [...grouped].map(([unit, versions]) => ({
     unit, versions, start: versions[0], end: versions.at(-1),
