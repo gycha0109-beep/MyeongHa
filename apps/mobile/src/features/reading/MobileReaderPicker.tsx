@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import {
   findMobileReaderPresentationV1,
-  MOBILE_READER_PRESENTATIONS_V1,
+  MOBILE_READER_VISIBLE_LAUNCH_PRESENTATIONS_V1,
   type MobileReaderPresentationIdV1,
   isMobileReaderPreviewSelectableV1,
 } from '@/features/reading/mobile-reader-presentation';
@@ -44,7 +44,7 @@ export function MobileReaderPicker({ selected, onChange, vertical }: MobileReade
       </View>
       {expanded ? (
         <View style={styles.grid}>
-          {MOBILE_READER_PRESENTATIONS_V1.map((option) => {
+          {MOBILE_READER_VISIBLE_LAUNCH_PRESENTATIONS_V1.map((option) => {
             const available = isMobileReaderPreviewSelectableV1(option.key);
             const accessView = createMobileReaderAccessViewStateV1(option.key);
             return (
