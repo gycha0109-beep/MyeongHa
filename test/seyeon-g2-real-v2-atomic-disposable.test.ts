@@ -166,6 +166,22 @@ async function actualCommit(c:PoolClient,id:Fixture) {
      }),'sha256:v1:synthetic-post-turn-hash',id.selectionDigest],
   );
 }
+async function ownerHistory(c:PoolClient,id:Fixture,after=0,pageSize=50) {
+  return c.query<{
+    message_id:string;sequence_no:string;sender_type:string;
+    character_id:string|null;body_text:string|null;message_payload_jsonb:null;
+  }>(
+    'select message_id::text,sequence_no::text,sender_type,character_id,body_text,message_payload_jsonb '+
+    'from seyeon_positive_candidate.read_authorized_page_r5($1::uuid,$2::uuid,$3::bigint,$4::integer)',
+    [subject,id.thread,after,pageSize],
+  );
+}
+async function ownerHttp(c:PoolClient,id:Fixture,attemptId=id.attempt,messageId=id.assistantMessage) {
+  return c.query<{text:string|null}>(
+    'select seyeon_positive_candidate.reveal_http_r5($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid) as text',
+    [subject,id.thread,id.turn,attemptId,messageId],
+  );
+}
 async function saved(id:Fixture) {
   return clientAction(async c=>{
     const r=await c.query<{
@@ -410,6 +426,87 @@ describe.skipIf(!enabled)('G2 actual v2/v1/core and both Outboxes, disposable-on
       }
     }));
     expect((await transaction(c=>g3Read(c,id),true)).rows[0]?.text).toBeNull();
+  });
+
+  it('R5 actual history/stream Owner page returns only current-consent rows; revoke holds whole page',async()=>{
+    const id=await prepare(35);
+    await stage(id,proof(id));
+    await transaction(c=>actualCommit(c,id),true);
+    const page=await transaction(c=>ownerHistory(c,id),true);
+    expect(page.rows.map(r=>r.sender_type)).toEqual(['user','character']);
+    expect(page.rows.map(r=>r.sequence_no)).toEqual(['1','2']);
+    expect(page.rows[1]?.body_text).toBe(body);
+    expect(page.rows.every(r=>r.message_payload_jsonb===null)).toBe(true);
+    const cursor=await transaction(c=>ownerHistory(c,id,1),true);
+    expect(cursor.rows).toHaveLength(1);
+    expect(cursor.rows[0]?.body_text).toBe(body);
+    const empty=await transaction(c=>ownerHistory(c,id,2),true);
+    expect(empty.rows).toHaveLength(0);
+    await clientAction(c=>c.query(
+      'update public.record_access_grants set revoked_at=clock_timestamp() where id=$1::uuid',
+      [id.grant],
+    ));
+    await expect(transaction(c=>ownerHistory(c,id),true)).rejects.toMatchObject({
+      constraint:'seyeon_offline_r5_page_held',
+    });
+  });
+
+  it('R5 exact HTTP first/replay validates committed Attempt + message and current Original Grant',async()=>{
+    const id=await prepare(36);
+    await stage(id,proof(id));
+    await transaction(c=>actualCommit(c,id),true);
+    expect((await transaction(c=>ownerHttp(c,id),true)).rows[0]?.text).toBe(body);
+    expect((await transaction(c=>ownerHttp(c,id),true)).rows[0]?.text).toBe(body);
+    expect((await transaction(c=>ownerHttp(c,id,
+      'd7200000-0000-4000-8000-000000000199'),true)).rows[0]?.text).toBeNull();
+    expect((await transaction(c=>ownerHttp(c,id,id.attempt,
+      'd8300000-0000-4000-8000-000000000199'),true)).rows[0]?.text).toBeNull();
+
+    await clientAction(c=>c.query(
+      'update public.record_access_grants set revoked_at=clock_timestamp() where id=$1::uuid',
+      [id.grant],
+    ));
+    expect((await transaction(c=>ownerHttp(c,id),true)).rows[0]?.text).toBeNull();
+    await expect(transaction(c=>ownerHistory(c,id),true)).rejects.toMatchObject({
+      constraint:'seyeon_offline_r5_page_held',
+    });
+  });
+
+  it('R5 history read-first locks current Original Grant before revoke; later history and HTTP both HOLD',async()=>{
+    const id=await prepare(37);
+    await stage(id,proof(id));
+    await transaction(c=>actualCommit(c,id),true);
+    await clientAction(reader=>clientAction(async revoker=>{
+      await reader.query("SET application_name='seyeon_r5_history_read_first'");
+      await reader.query('BEGIN');
+      await executor(reader);
+      const page=await ownerHistory(reader,id);
+      expect(page.rows[1]?.body_text).toBe(body);
+      await revoker.query("SET application_name='seyeon_r5_history_revoke_waiter'");
+      await revoker.query('BEGIN');
+      const pending=(async()=>{
+        await revoker.query(
+          'select id from public.subjects where id=$1::uuid for update',[subject],
+        );
+        await revoker.query(
+          'update public.record_access_grants set revoked_at=clock_timestamp() where id=$1::uuid',
+          [id.grant],
+        );
+        await revoker.query('COMMIT');
+      })();
+      try{
+        await waitForLock('seyeon_r5_history_revoke_waiter');
+        await reader.query('COMMIT');
+        await pending;
+      }finally{
+        await reader.query('ROLLBACK').catch(()=>undefined);
+        await revoker.query('ROLLBACK').catch(()=>undefined);
+      }
+    }));
+    expect((await transaction(c=>ownerHttp(c,id),true)).rows[0]?.text).toBeNull();
+    await expect(transaction(c=>ownerHistory(c,id),true)).rejects.toMatchObject({
+      constraint:'seyeon_offline_r5_page_held',
+    });
   });
 
   it('original revoked Grant aborts real v2, assistant, both outboxes and admission',async()=>{
