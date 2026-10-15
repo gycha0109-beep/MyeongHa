@@ -34,6 +34,13 @@
 7. **취소·이용권 처리의 원자적 신뢰:** 독립된 두 사람의 서명 승인, 복원 방지 가능한 정책 버전 기록, 실제 DB 최종 점검과 Reader 이용권 회수를 하나의 권한·트랜잭션 경계에서 검증한다. 서버 측 PortOne 취소 사실 확인, 증빙과 금액 정합성, 중복·동시·재실행·긴급중단, 결제 취소/재열람 차단·복원을 실결제 없이 먼저 시험한다.
 8. **독립 안전·운영 승인:** DB 운영, 보안, 상거래, 법무, 개인정보, 운영 담당자의 증거별 승인과 장애 복구·감사·고객 통지 정책이 준비된 뒤에만 별도의 운영 전환을 논의한다.
 
+## 3-A. D3e21 추가 검증 (2026-10-15, 실제 로그인 계정/복제 DB)
+
+- 실제 DB의 myeongha_runtime 및 myeongha_worker_runtime는 LOGIN 가능하지만 entitlement_events SELECT/INSERT/UPDATE/DELETE 및 기존 entitlement 효과 함수 EXECUTE 모두 없다. postgres 역할 회원권도 없다. 운영 서비스가 현재 이 계정으로 연결 중인지는 별도 문제다.
+- 일반 API 코드는 MYEONGHA_DATABASE_PRINCIPAL을 요구하고 연결에서 실제 PostgreSQL current_user 및 myeongha_api_executor 역할 회원권을 점검한다. 운영 마이그레이션은 관리자용 PostgreSQL 연결을 사용한다. 코드상 구분과 실제 배포 비밀의 일치 여부는 미확인이다.
+- Vercel myeongha 프로젝트는 GitHub 명하 저장소에 연결됨. 환경변수 목록 권한이 403 Forbidden이므로 실제 비밀번호/토큰 및 환경별 바인딩은 확인하지 못함. 값을 복호화하거나 얻으려는 우회 시도 없음.
+- 서비스 역할의 직접 DML 권한을 격리하는 **폐기형 DB 단독** 회귀 실험 추가. 상세 문서: docs/architecture/OFFICIAL_READER_CANCEL_RUNTIME_SECRETS_AND_LEDGER_ISOLATION_20261015_V1.md. 시험 DB 이외의 REVOKE는 절대 수행하지 않는다.
+
 ## 4. 재검증 및 중단 규칙
 
 - 읽기 전용 DB 권한 점검: scripts/security/official_reader_cancel_live_cutover_readonly_audit.sql
