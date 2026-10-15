@@ -298,7 +298,8 @@
       "unit": "governor-guest-receipt",
       "owner": "character-security",
       "requires": [
-        "1550"
+        "1550",
+        "1580"
       ],
       "proof": {
         "kind": "function",

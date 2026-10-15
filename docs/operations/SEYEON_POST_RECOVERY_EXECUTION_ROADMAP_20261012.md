@@ -353,3 +353,16 @@ Governor 04d4B 계열은 실제 격리 PostgreSQL 기반 영수증 임대·정�
 - [PR #2100](https://github.com/gycha0109-beep/MyeongHa/pull/2100) 기술 HEAD `729ddb238e62262a48c0a3bda3afdf33d130f287`, [PG17 #38666188838 job 116198661632](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38666188838) SUCCESS. 원본 내부 COMMIT, 신설 worker USAGE-only/Role 격리, 비용 정산 함수 최소권한, 기존 ACL/Role 멤버십 불변, 미예약 정산 부정, 중복 실행 차단, 폐기 DB 확인. 증거 세부사항은 [R2 패킷 §28.1](SEYEON_MIGRATION_LINEAGE_R2_READONLY_PACKET_20261013.md)만 정본.
 - 전체 schema ACL 문자열 변경 자체는 신설 Worker의 합법적 USAGE grant 때문에 발생한다. 검증기는 기존 Grantee들의 ACL 동등성과 Worker의 CREATE 금지를 별도로 확인하도록 보강함. 이는 기존 권한 확대 허용이 아님.
 - 현재는 **PG17 기술 PASS**이며 최종 PR HEAD 전체 CI, Full Integration 및 병합 SHA 미확정. Worker 운영 자격·예약 비용 실제 정산 E2E는 별도 HOLD이고 Owner/DR/G0~G6/paid/public 승격 금지.
+
+## 31. 2026-10-15 R2-H 1700 Receipt Pin — Owner HOLD 별도 검증
+
+- 1690 [PR #2100](https://github.com/gycha0109-beep/MyeongHa/pull/2100), 최신 Base Full Integration [#38668230447](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38668230447) SUCCESS, 병합 SHA `750582bbe6c4412dbfe34f277161d43304555f44`. 병합 후 Supabase Production Actions [#38668801102](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38668801102) SUCCESS, `deploy-migrations=SKIPPED` 및 Governed Backfill `SKIPPED`; 1690 Owner HOLD는 유지.
+- 다음 단위 1700의 실제 SQL 참조에 맞춰 **`requires=['1550','1580']`**만 검토 인벤토리에서 보정한다. 원본 Git blob `fb8803f8cdb3b6cfb76dd8e1faa2cc8dcdcf043f` 그대로. 세부 시험 계약과 SQL NULL Shape CHECK 잠재 우회는 [R2 패킷 §29](SEYEON_MIGRATION_LINEAGE_R2_READONLY_PACKET_20261013.md)에 기록한다.
+- 독립 폐기형 PG17에서 원본 롤백/원본 Forward·함수/ACL/Trigger/4컬럼/요금 Pin/Immutable 및 부정 테스트, TEMP CHECK의 SQL NULL 허용 여부 확인. 원본 SQL 수정 또는 운영 DB 이력/Role/ACL 변경 없음.
+- Owner가 별도 승인하지 않은 NULL-safe CHECK/forward-only SQL 보강, 실제 예약·정산 E2E, 1710/1720 및 공개/유료/DR 승격은 수행하지 않는다. 최신 PR/CI/Full Integration 증거를 확인하기 전에는 PASS/운영 승인으로 표기하지 않는다.
+
+### 31.1 1700 격리 PG17 실측 — NULL CHECK 우회 Owner HOLD
+
+- [PR #2104](https://github.com/gycha0109-beep/MyeongHa/pull/2104), 검증 HEAD `3b38bf1f56f5b42f88686b83ecb0e392fc269d29`, [PG17 #38669716462 job 116209852396](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38669716462) SUCCESS. 원본 `1700` 롤백·단일 트랜잭션 Forward, Rate Snapshot Pin, immutable/invalid ceiling/ungoverned 부정, 카탈로그 권한 보존 및 DB 폐기 확인. 세부 기술·위험 증거는 [R2 패킷 §29.1](SEYEON_MIGRATION_LINEAGE_R2_READONLY_PACKET_20261013.md)만 정본으로 참조.
+- **`HOLD_R2_H_1700_SQL_NULL_RECEIPT_SHAPE_GAP_REPRODUCED`:** 원본 Receipt CHECK와 동형의 TEMP SQL에서 `pinned_at` 존재/입력 Rate `NULL` 행이 CHECK를 우회했다. UPDATE-only Trigger가 일반 INSERT도 보호한다고 주장할 수 없음. 실제 API 직접 권한/Production 악용은 미검증. NULL-safe forward-only 대안·별도 Owner 승인 및 실제 Ledger INSERT 경계를 평가하기 전까지 1700 Owner HOLD/Production 적용 금지.
+- 이 증거는 PostgreSQL 기술 재현이지 Owner approval/DR Ready, 최종 PR HEAD Full Integration·병합 승인 아님. `fundedAdmissionE2E=false`, `drReady=false`, 21건 Owner HOLD 및 G0~G6/paid/public OFF 유지.

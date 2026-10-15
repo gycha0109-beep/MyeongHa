@@ -38,11 +38,11 @@ describe('shared CI verification plan', () => {
     const plan = resolveVerificationPlan(['scripts/ci/db-suites.json']);
     expect(plan.db).toBe(true);
     expect(plan.db_suites).toHaveLength(5);
-    expect(plan.db_suites.flatMap((suite: string) => getDbSuite(suite).cases)).toHaveLength(42);
+    expect(plan.db_suites.flatMap((suite: string) => getDbSuite(suite).cases)).toHaveLength(43);
     const cases = plan.db_suites.flatMap((suite: string) => getDbSuite(suite).cases);
     expect(cases.filter((name: string) => name === 'saju-staging-operator-admission')).toHaveLength(2);
     expect(cases.filter((name: string) => name === 'saju-staging-operator-admission-v2')).toHaveLength(2);
-    expect(new Set(cases).size).toBe(39);
+    expect(new Set(cases).size).toBe(40);
     expect(getDbSuite('content').cases).toContain('official-reader-provider-revoke-race');
     expect(getDbSuite('runtime').cases).toContain('guest-promotion-auth-fk');
     expect(getDbSuite('runtime').cases).toContain('reader-memory-tenant-boundary');
@@ -53,6 +53,7 @@ describe('shared CI verification plan', () => {
     expect(getDbSuite('postgres17').cases).toContain('seyeon-r2-h-1670-forward');
     expect(getDbSuite('postgres17').cases).toContain('seyeon-r2-h-1680-forward');
     expect(getDbSuite('postgres17').cases).toContain('seyeon-r2-h-1690-forward');
+    expect(getDbSuite('postgres17').cases).toContain('seyeon-r2-h-1700-forward');
     const dispatcher = readFileSync('test/db/run_ci_case.sh', 'utf8');
     for (const caseName of cases) expect(dispatcher).toContain(`${caseName})`);
     for (const suiteName of plan.db_suites) {

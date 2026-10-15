@@ -122,6 +122,19 @@ export function validateR2PendingInventory(root, manifest) {
     && src1690.includes('cmd_governed_start_seyeon_ai_call_v1')
     && src1690.includes('begin;') && src1690.includes('commit;'),
     '1690_ROLE_TRANSACTION_BOUNDARY_DRIFT');
+  // Receipt pin reads both the reserved 1580 ledger columns and 1580 rate table.
+  const stage1700 = manifest.migrations.find(row => row.version === '1700');
+  const src1700 = readFileSync(join(dir, stage1700.file), 'utf8');
+  assert(stage1700.requires.includes('1550')
+    && stage1700.requires.includes('1580'),
+    '1700_MISSING_GOVERNOR_RATE_DEPENDENCY');
+  assert(src1700.includes('seyeon_ai_governor_model_policies_v1')
+    && src1700.includes('governor_input_bound_tokens')
+    && src1700.includes('governor_receipt_pinned_at')
+    && src1700.includes('create trigger pin_seyeon_governed_reservation_receipt_v1'),
+    '1700_RECEIPT_TRIGGER_SOURCE_DRIFT');
+  assert(!/^begin;$/imu.test(src1700) && !/^commit;$/imu.test(src1700),
+    '1700_TRANSACTION_BOUNDARY_DRIFT');
   assert(grouped.size === 9, 'REVIEW_UNIT_CARDINALITY');
   const reviewUnits = [...grouped].map(([unit, versions]) => ({
     unit, versions, start: versions[0], end: versions.at(-1),
