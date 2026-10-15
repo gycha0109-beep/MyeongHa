@@ -86,6 +86,11 @@ describe('COST-05 offline four-cell stage budget is never a paid-evaluation appr
     x.stageBounds[0].verifiedInputTokenUpperBound=272000;
     x.rateCards[0].inputMicroUsdPerMillion=Number.MAX_SAFE_INTEGER;
     x.rateCards[0].cacheWriteMicroUsdPerMillion=Number.MAX_SAFE_INTEGER;
+    // 272k input tokens alone still fits JS safe integer microUSD. Force
+    // a genuinely overflowing capped output path instead of expecting a
+    // false-positive overflow rejection from a mathematically safe result.
+    x.stageBounds[0].enforcedOutputTokenLimit=Number.MAX_SAFE_INTEGER;
+    x.rateCards[0].outputMicroUsdPerMillion=Number.MAX_SAFE_INTEGER;
     expect(()=>audit(x)).toThrow(/safe integer range/u);
   });
   it('no budget or unverified auxiliary costs can ever allow live inference',()=>{

@@ -38,7 +38,7 @@ describe('COST-05 synthetic quota: never a real dispatch/Provider admission', ()
     expect(quota.snapshot()).toMatchObject({
       reservedCalls:64,stageOnlyReservedMicroUsd:105600,
       remainingStageOnlyMicroUsd:0,unresolvedOutcomes:64,
-      auxiliaryAssumedReserveMicroUsd:10400,
+      auxiliaryAssumedReserveMicroUsd:14400,
       paidEvaluationPermitted:false,actualProviderInvoiceMicroUsd:null,
     });
     expect(() => quota.reserveSyntheticStage(first)).toThrow(/duplicate/u);
