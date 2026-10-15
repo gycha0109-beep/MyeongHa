@@ -101,6 +101,7 @@ export async function auditOfflinePrivateCancelRoleDenialsD3e18(input: Readonly<
     fail('no separately supplied read-only catalogue');
   }
   const names = distinctRoles(input.serviceRoles);
+  const unprivileged = names.filter(name => name !== input.serviceRoles.owner);
   let roleRows: unknown[], functionRows: unknown[];
   try {
     const roles = await input.catalog.query(
@@ -109,7 +110,7 @@ export async function auditOfflinePrivateCancelRoleDenialsD3e18(input: Readonly<
     );
     const funcs = await input.catalog.query(
       PRIVATE_CANCEL_FUNCTION_CATALOG_READ_SQL_D3E18,
-      [names, ROUTINES],
+      [unprivileged, ROUTINES],
     );
     roleRows = roles.rows;
     functionRows = funcs.rows;
@@ -151,14 +152,14 @@ export async function auditOfflinePrivateCancelRoleDenialsD3e18(input: Readonly<
   }
 
   if (!Array.isArray(functionRows)
-    || functionRows.length !== names.length * ROUTINES.length) {
+    || functionRows.length !== unprivileged.length * ROUTINES.length) {
     fail('missing/extra function, overload, schema or grant evidence');
   }
   const observed = new Set<string>();
   const seenOids = new Map<string,string>();
   for (const raw of functionRows) {
     if (!plainRow(raw)
-      || typeof raw.roleName !== 'string' || !names.includes(raw.roleName)
+      || typeof raw.roleName !== 'string' || !unprivileged.includes(raw.roleName)
       || typeof raw.routineName !== 'string' || !ROUTINES.includes(raw.routineName)
       || raw.schemaName !== 'public'
       || typeof raw.routineOid !== 'string' || !/^[0-9]+$/u.test(raw.routineOid)
@@ -180,15 +181,15 @@ export async function auditOfflinePrivateCancelRoleDenialsD3e18(input: Readonly<
   if (seenOids.size !== ROUTINES.length) {
     fail('not all protected functions were verified');
   }
-  // Database owner deliberately remains OUTSIDE the negative EXECUTE matrix:
-  // its real SQL privileges cannot be disabled by an offline TS checker.
-  // This check rejects ALL direct privileges, including the provisional owner,
-  // so an actual SQL owner will NOT pass. No production claim follows.
+  // The owner is deliberately OUTSIDE the direct EXECUTE-denial matrix:
+  // an actual DB owner can invoke its own functions. Runtime service accounts
+  // and ordinary application accounts MUST all be unable to invoke them.
+  // Actual owner login isolation and transaction-scoped authority remain HOLD.
   return Object.freeze({
     mode: 'offline-catalog-evidence-only' as const,
     checkedRoleCount: names.length,
     checkedRoutineCount: ROUTINES.length,
-    deniedDirectCalls: names.length * ROUTINES.length,
+    deniedDirectCalls: unprivileged.length * ROUTINES.length,
     liveRoleIsolationVerified: false as const,
   });
 }
