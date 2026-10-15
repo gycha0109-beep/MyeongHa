@@ -88,6 +88,37 @@ describe('C04 pairwise review: errorful prompt shrink can never pass on bytes al
     expect(r.disagreementIds).toContain(claim);
     expect(JSON.stringify(r)).not.toContain('우리');
   });
+  it('HOLDs a spurious extra authority/history claim even when required gold kind is present',()=>{
+    const x=full();
+    replace(x,claim,'compact',{claimKinds:[GOLD.find(g=>g.id===claim).requiredKind,
+      'SHARED_EVENT_CLAIM']});
+    const r=score(x);
+    expect(r.compact.defectIds).not.toContain(claim);
+    expect(r.compact.unreviewedClaimIds).toContain(claim);
+    expect(r.hardFailureCodes).toContain('UNREVIEWED_CLAIM_KIND_REQUIRES_OWNER_LABEL');
+    expect(r.offlineGoldAndByteChecksPass).toBe(false);
+    expect(r.paidEvaluationPermitted).toBe(false);
+  });
+  it('HOLDs a claim on a gold case without a claim-kind label instead of inventing a false-positive judgment',()=>{
+    const spec=GOLD.find(g=>g.requiredKind===undefined&&g.noClaims!==true);
+    if(!spec)throw new Error('Need an under-labelled gold fixture');
+    const x=full();replace(x,spec.id,'compact',{claimKinds:['USER_SELF_REPORT']});
+    const r=score(x);
+    expect(r.compact.unreviewedClaimIds).toContain(spec.id);
+    expect(r.compact.defectIds).not.toContain(spec.id);
+    expect(r.offlineGoldAndByteChecksPass).toBe(false);
+  });
+  it('claim kind order alone is not a baseline-vs-compact disagreement',()=>{
+    const kind=GOLD.find(g=>g.id===claim).requiredKind;
+    const x=full();
+    replace(x,claim,'baseline',{claimKinds:[kind,'USER_SELF_REPORT']});
+    replace(x,claim,'compact',{claimKinds:['USER_SELF_REPORT',kind]});
+    const r=score(x);
+    expect(r.disagreementIds).not.toContain(claim);
+    expect(r.baseline.unreviewedClaimIds).toContain(claim);
+    expect(r.compact.unreviewedClaimIds).toContain(claim);
+    expect(r.offlineGoldAndByteChecksPass).toBe(false);
+  });
   it('without measured request bytes improvement a perfect oracle still HOLDs',()=>{
     const x=full();
     for(const row of x.rows)if(row.variant==='compact')row.serializedRequestBytes=2200;

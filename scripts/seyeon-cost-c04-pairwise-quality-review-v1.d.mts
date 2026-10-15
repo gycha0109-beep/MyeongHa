@@ -26,7 +26,9 @@ export declare function scoreSeyeonC04PairwiseOfflineV1(
   input: SeyeonC04PairwiseReviewInputV1,
 ): Readonly<{
   schemaVersion: string; scope: string; expectedCaseCount: number;
-  observedRows: number; baseline: Record<string,unknown>; compact: Record<string,unknown>;
+  observedRows: number;
+  baseline: Record<string,unknown> & { readonly unreviewedClaimIds: readonly string[] };
+  compact: Record<string,unknown> & { readonly unreviewedClaimIds: readonly string[] };
   disagreementIds: readonly string[]; regressionIds: readonly string[];
   baselineSerializedBytes: number|null; compactSerializedBytes: number|null;
   savedSerializedBytes: number|null; hardFailureCodes: readonly string[];

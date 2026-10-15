@@ -41,15 +41,33 @@ function checkRow(row) {
   if(row.outcome==='error'&&(row.topicKey!==null||row.claimKinds.length!==0))
     throw new TypeError('C04 failed attempt must not supply predictions');
 }
+/**
+ * The C02 gold describes a REQUIRED kind, not all permissible claims.
+ * Additional kinds are unreviewed evidence, not necessarily false positives.
+ * Never call such a row clean without an explicit second-person review.
+ */
+function hasUnreviewedClaimKinds(spec,row) {
+  if(row.claimKinds.length===0) return false;
+  if(spec.noClaims===true) return false; // already gold-labelled no claims
+  if(spec.requiredKind!==undefined)
+    return row.claimKinds.some(kind=>kind!==spec.requiredKind);
+  return true; // no claim-kind label: never infer approval for extra claims
+}
+function compareKinds(row){
+  return [...row.claimKinds].sort().join('|');
+}
 function analyze(ordered) {
   const scored=[];
   const errors=[];
+  const unreviewedClaimIds=[];
   for(const [spec,row] of ordered) {
     if(!row){errors.push(spec.id);continue;}
     if(row.outcome!=='ok'){errors.push(spec.id);continue;}
     scored.push(scoreSeyeonClassifierCaseV1(spec,
       {claims:row.claimKinds.map(kind=>({kind}))},
       {topicKey:row.topicKey}));
+    if(hasUnreviewedClaimKinds(spec,row))
+      unreviewedClaimIds.push(spec.id);
   }
   const aggregate=aggregateSeyeonEvalV1(scored);
   const defects=scored.filter(x=>!x.topicMatch ||
@@ -57,6 +75,8 @@ function analyze(ordered) {
   return Object.freeze({
     ...aggregate,unscoredOrFailedIds:Object.freeze(errors),
     defectIds:Object.freeze(defects.map(x=>x.id)),
+    // These are unresolved annotations, not established model mistakes.
+    unreviewedClaimIds:Object.freeze(unreviewedClaimIds),
     goldComplete:errors.length===0&&scored.length===GOLD.size,
     zeroGoldDefects:errors.length===0&&defects.length===0&&scored.length===GOLD.size,
   });
@@ -83,8 +103,10 @@ export function scoreSeyeonC04PairwiseOfflineV1(reviewInput) {
     const a=byKey.get('baseline:'+spec.id);
     const b=byKey.get('compact:'+spec.id);
     if(!a||!b||a.outcome!=='ok'||b.outcome!=='ok')continue;
+    // Claim arrays are unordered sets for this *review* comparison.
+    // Sort to avoid a false disagreement from a harmless permutation.
     if(a.topicKey!==b.topicKey||
-        a.claimKinds.join('|')!==b.claimKinds.join('|')) {
+        compareKinds(a)!==compareKinds(b)) {
       disagreements.push(spec.id);
     }
     const aScore=scoreSeyeonClassifierCaseV1(spec,
@@ -102,6 +124,8 @@ export function scoreSeyeonC04PairwiseOfflineV1(reviewInput) {
     ...(!complete?['INCOMPLETE_OR_FAILED_CASES']:[]),
     ...(!baseline.zeroGoldDefects?['BASELINE_GOLD_DEFECT']:[]),
     ...(!compact.zeroGoldDefects?['COMPACT_GOLD_DEFECT']:[]),
+    ...((baseline.unreviewedClaimIds.length||compact.unreviewedClaimIds.length)
+      ?['UNREVIEWED_CLAIM_KIND_REQUIRES_OWNER_LABEL']:[]),
     ...(regressions.length?['COMPACT_REGRESSION']:[]),
     ...(complete&&savedBytes<=0?['NO_REQUEST_BYTE_REDUCTION']:[]),
   ];

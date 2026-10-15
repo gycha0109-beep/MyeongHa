@@ -18,3 +18,10 @@ Status: **OFFLINE TEST ONLY / COST-02 and COST-05/06 HOLD**.
 - `test/seyeon-cost-c04-pairwise-quality-review-v1.test.mjs`는 완전한 가짜 예측, 민감 주제 누락, 허위 관계·권한 주장 누락, 일반 대화 과민 차단, 실패/중복/없는 표본, 기존 경로 불량, 역효과 등을 회귀 검증한다.
 - `offlineGoldAndByteChecksPass=true`는 단지 **입력된 값의 정합성 확인**이다. 입력이 Gold 답을 복제할 수 있으므로 실제 모델 accuracy, true recall, hallucination, prompt injection safety 또는 billed cost가 확인된 것이 아니다. `verdict=HOLD_REAL_MODEL_AND_OWNER_REVIEW`, `paidEvaluationPermitted=false`, `productionPromotionPermitted=false`로 고정한다.
 - 유료 평가에서는 `OPENAI_API_KEY2`를 사용해야 하지만 Model SKU·현행 단가·토큰 caps·횟수·승인된 금액·서버측 강제 상한/영수증 안정성이 선결되어야 한다. #1816/#1887 차단을 임의 해제하지 않는다.
+
+## 보강: 골드에 라벨이 없는 추가 주장도 검토 전 차단
+
+- Gold 300건의 `requiredKind`는 **그 주장 종류가 반드시 포함되어야 한다**는 뜻이지 다른 주장이 모두 허용됐다는 뜻이 아니다. 예: `AUTHORITY_OVERRIDE`를 맞히면서 `SHARED_EVENT_CLAIM`까지 만들어내면 기존 채점은 놓칠 수 있었다.
+- 추가로 발견된 종류 또는 Gold에 필수 주장 라벨이 없는 사례의 자발적 주장 분류는 **잘못된 판정으로 단정하지 않고** `unreviewedClaimIds`에 별도 기록하며, `UNREVIEWED_CLAIM_KIND_REQUIRES_OWNER_LABEL`로 자동 통과를 차단한다.
+- 단순한 주장 배열 순서 차이는 결과 불일치로 계산하지 않는다. 외부 모델 응답이나 실제 사용자 기록을 저장하지 않고 검증한다.
+- 이 강화는 실모델 품질의 증명이 아니라 **기존 오프라인 평가에서의 거짓 성공 가능성 제거**다. 사용자 승인된 유료 키 `OPENAI_API_KEY2`를 사용하지 않았다.
