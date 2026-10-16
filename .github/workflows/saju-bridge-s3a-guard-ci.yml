@@ -57,7 +57,7 @@ jobs:
           test "$(sha256sum supabase/proposals/1730_saju_bridge_single_project_operator_permit_v1.sql | awk '{print $1}')" = '900e0771915776b4a7c2a8b3cf60e24b83c79fcec14f27cf6356b44685b385e2'
           test "$(git hash-object supabase/proposals/1730_saju_bridge_single_project_operator_permit_v1.sql)" = '42e076799d627bc9e19fe28e1ad25b4548e05e61'
       - name: Validate fresh backup and restore provenance denial cases
-        run: node --test test/operations/saju_bridge_s3a_provenance.test.mjs
+        run: node --test test/operations/saju_bridge_s3a_provenance.node-check.mjs
       - name: Install PostgreSQL client
         run: |
           set -euo pipefail
