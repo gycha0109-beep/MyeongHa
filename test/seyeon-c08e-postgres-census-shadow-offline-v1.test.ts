@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
+import type { PostgresTransactionQueryV1 } from '../apps/api/src/postgres-subject-execution.js';
 import {
   createPostgresSeyeonFirstTurnCensusShadowV1,
   PostgresSeyeonFirstTurnCensusShadowHoldV1,
@@ -22,7 +23,7 @@ function fixture(rows: readonly unknown[] = [MATCHING]) {
   const query = vi.fn(async (_sql: string, _params?: readonly unknown[]) =>
     ({ rows }));
   const port = createPostgresSeyeonFirstTurnCensusShadowV1({
-    client: { query },
+    client: { query } as unknown as PostgresTransactionQueryV1,
     subjectId: SUBJECT,
     threadId: THREAD,
   });
@@ -115,7 +116,7 @@ describe('C08-E bounded PostgreSQL first-thread read-only shadow candidate', () 
     }
     expect(h.query).not.toHaveBeenCalled();
     expect(() => createPostgresSeyeonFirstTurnCensusShadowV1({
-      client: { query: h.query },
+      client: { query: h.query } as unknown as PostgresTransactionQueryV1,
       subjectId: 'not-uuid', threadId: THREAD,
     })).toThrow(PostgresSeyeonFirstTurnCensusShadowHoldV1);
   });
@@ -125,7 +126,7 @@ describe('C08-E bounded PostgreSQL first-thread read-only shadow candidate', () 
       throw Error('synthetic-private-database-data-NEVER-LOG');
     });
     const port = createPostgresSeyeonFirstTurnCensusShadowV1({
-      client: { query }, subjectId: SUBJECT, threadId: THREAD,
+      client: { query } as unknown as PostgresTransactionQueryV1, subjectId: SUBJECT, threadId: THREAD,
     });
     const generate = vi.fn(async () => {
       throw Error('model should never run');
