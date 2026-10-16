@@ -196,4 +196,9 @@ pass "verified evidence replay converges without duplicate Grant"
 bash test/db/official_reader_m1_06_verified_receipt_semantic_replay.sh \
  "$receipt" "$subject" "$intent" "$session" "$proposal" "$grant" "$official"
 
+# M1-07: run the EXACT TypeScript private-recovery SQL in PostgreSQL after
+# the already-committed verified Receipt and same-Grant/Reading replay.
+bash test/db/official_reader_m1_07_private_replay_source_sql.sh \
+ "$receipt" "$subject" "$intent" "$grant" "$official"
+
 echo "PASS M1-02: isolated PG receipt-to-D2 only; runtime authorization/T2 remain HOLD"
