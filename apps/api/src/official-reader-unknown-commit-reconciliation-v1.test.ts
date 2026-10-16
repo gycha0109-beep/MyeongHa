@@ -59,7 +59,7 @@ function source(input: {
   rows?: readonly Record<string, unknown>[];
   fail?: boolean;
 } = {}) {
-  const queries: { sql: string; values?: readonly unknown[] }[] = [];
+  const queries: { sql: string; values: readonly unknown[] | undefined }[] = [];
   const lifecycle: string[] = [];
   const transaction = {
     async execute<T>(fn: (c: PostgresTransactionQueryV1) => Promise<T>): Promise<T> {
