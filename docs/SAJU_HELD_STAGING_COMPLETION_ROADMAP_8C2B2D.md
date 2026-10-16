@@ -2,6 +2,8 @@
 
 Watchtower-Track: saju-bridge
 
+> **2026-10-16 단일 Supabase S3A 운영 적용 BLOCKED/HOLD (로드맵 현행 게이트):** [PR #2156](https://github.com/gycha0109-beep/MyeongHa/pull/2156)이 `929c304813aac60b30a528183835ea2e8b774cd8`로 병합됐고 [고정 HEAD 통합 CI #38847796203](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38847796203)의 11개 Job이 모두 성공했다. 하지만 실제 [운영 적용 #38846217625](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38846217625)는 PostgreSQL 17 비슈퍼유저 `CREATEROLE`의 자동 bootstrap ADMIN 멤버십과 **승인된 1730 SQL의 멤버십 0건 계약**이 충돌해 단일 트랜잭션 ROLLBACK됐다. 병합된 사전 검사는 객체 생성 전에 같은 불일치를 차단한다. **현행 운영 계정으로 S3A 수동 워크플로 재실행 금지.** 원본 1730 SHA256/Git blob 및 최종 zero-membership 검사는 불변. 다음 미완료 단계는 코드 추가가 아니라 **새 DB 역할 권한 계약·실행 경로에 대한 명시적 Owner 검토/승인**이다. 상세 [S3A 운영 런북](./SAJU_BRIDGE_S3A_GUARDED_MANUAL_APPLY_RUNBOOK_20261016.md), [이슈 #1871](https://github.com/gycha0109-beep/MyeongHa/issues/1871) 참조. 단일 프로젝트 S3A 차단과 기존 고격리 SO-3/R01–R14 미검증은 **서로 다른 HOLD**이며, 합성 CI 성공으로 어느 쪽도 승인되지 않는다.
+
 > **2026-10-15 기존 명하 Supabase 단일 프로젝트 대안 설계:** [통합 설계 v1](./SAJU_BRIDGE_SINGLE_SUPABASE_INTEGRATION_DESIGN_V1.md). 새 프로젝트·Neon 없이 **기존 Production Auth/Subject/Reading + 비공개 Bridge schema·제한 역할**을 이용하는 *제품 통합 대안*이다. 이는 아래 고격리 staging/독립 3DB·Root/R01–R14/2D-4 종료 조건의 달성이 아니며, **Owner의 단일 DB 실패 도메인 위험 수용과 별도 제품 배포 게이트가 필요한 미승인 설계**다. 실제 Supabase DDL/GRANT/Secret/배포는 미실행.
 
 > **2026-10-15 개발·로컬 검증 범위 종료:** [사주 브릿지 개발/Windows Docker 인수 종료 기록](./SAJU_BRIDGE_DEVELOPMENT_LOCAL_CLOSEOUT_20261015.md) — `SAJU_BRIDGE_DEV_LOCAL_CLOSED_OPS_HOLD`. 개발·합성/폐기형 CI·Windows Phase 5 인수 완료, 다음 Docker 전체 재검증/임의 Phase 신설 중단. **별도의 "배포" 트랙은 만들지 않으며**, 기존 [Issue #1871](https://github.com/gycha0109-beep/MyeongHa/issues/1871)에서 실제 스테이징 운영 승인/증빙 R01–R14를 **미완료·OPEN/HOLD**로 유지한다. 개발 종료는 이 문서의 **브릿지 최종 완료(운영)** 또는 **서비스 출시**가 아니다.
@@ -126,6 +128,7 @@ Watchtower-Track: saju-bridge
 | Windows Docker Phase 5 Acceptance | Phase 1–4H 폐기형 CI·[#2092](https://github.com/gycha0109-beep/MyeongHa/pull/2092), 사용자 Windows 전체 실행 로그 SHA-256 고정 및 양쪽 HEAD·환경 버전·exit 0·cleanup 제출 | **사용자 제출 로컬 인수 PASS**; Windows OS 빌드·Desktop GUI 버전 별도 미제출, 실환경 운영 승인은 무관 |
 | 독립 Root 및 durable revision/challenge | 3-04-02 / SO-3 | 합성 저장소 검증 #1925 병합; SO-3 P0 공급자·승인 결정표 진입(§2H) / R01–R04 운영 미검증 |
 | 실환경 Auth·DB 3종·Saju Proof | 로컬 2A–2I 합성/실소켓 검증, Admission 38 PASS·병합 #1913; 3-04-03A 인덱스 계약 / 03B 실제 probe | 3 DB 동일 검증 흐름(2J) 합성 완료, R05–R14 독립 운영 관찰 미완료 |
+| 단일 Supabase S3A 비활성 객체 적용 | #2156 병합 / 통합 CI #38847796203 PASS; 운영 #38846217625 PG17 자동 ADMIN 충돌 / 원자 ROLLBACK | **BLOCKED/HOLD: 신규 Owner DB 권한 모델 승인 필요**. 현행 실행 계정 재시도 금지, 원문 1730·zero-membership 검사 불변. 고격리 R01–R14와 별도 게이트 |
 | Target Authority V2 + Runner | 3-04-04 | 미연결 |
 | 실제 격리 스테이징 1회 | 2D-4 | 미실행 |
 | Production/Commerce | 별도 authority | 미승인 |
