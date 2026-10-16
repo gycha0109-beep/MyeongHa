@@ -157,6 +157,8 @@
 - **절대 재구현하지 않을 것:** #2153의 간접 definer/ACL snapshot·rollback 회귀 및 #2118 기반 7테이블 권한 거부 테스트.
 - **성공 판정:** 사용자에게 바로 검토 가능한 갭과 다음 **단일 작은 Draft** 범위가 나오고, 운영 DB·기존 PR 변경·실결제·병합은 0건. 다음에 M1의 실제 누락 경합부터 구현한다.
 
+> **M0-01 인벤토리 작성 (2026-10-16, 자식 Draft):** [Writer/잠금/역할·T2 미완료 경계 조사](./architecture/COMMERCE_READER_M0_WRITER_LOCK_ROLE_INVENTORY_20261016_V1.md). 다음에는 M1-01 실제 결제 완료→Reader 구매권 발급 caller/role의 최소 격리 검증으로 이동합니다. 본 문서화는 유료 공개·운영 ACL 변경의 승인이 아닙니다.
+
 ## 8. 각 단계의 검증·작업 운영 규칙
 
 - 일할 때마다 exact main/target PR HEAD·base·Draft/merged·selected CI(특히 PostgreSQL 15/17)·실배포 여부를 다시 확인한다. CI 성공은 정확한 SHA에만 귀속한다.
