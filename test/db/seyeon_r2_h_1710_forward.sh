@@ -116,4 +116,32 @@ if psql -X -q -1 -v ON_ERROR_STOP=1 -f supabase/migrations/1710_seyeon_provider_
 fi
 [[ "$(psql -X -Atqc "select to_regclass('public.seyeon_ai_provider_receipt_queue_v1') is not null")" == t ]] || hold REPLAY_CORRUPTED_QUEUE
 pass REPLAY_FAIL_CLOSED
+# R2-H 1760 nondeployable correction: prove the ORIGINAL Store RPC lets absent
+# required enum fields progress past its malformed-receipt guard into the ledger
+# lookup, then prove the proposed forward-only replacement rejects them BEFORE
+# that lookup. Use only synthetic UUIDs, no reservation or Provider invocation.
+fn_meta() {
+ psql -X -Atqc "select p.oid::text||':'||p.proowner::text||':'||p.prosecdef::text||':'||coalesce(p.proacl::text,'NULL')||':'||coalesce(array_to_string(p.proconfig,','),'NULL') from pg_proc p where p.oid=to_regprocedure('public.cmd_store_seyeon_provider_receipt_v1(uuid,uuid,uuid,text,jsonb)')"
+}
+original_fn_meta="$(fn_meta)"
+[[ -n "$original_fn_meta" ]] || hold 1760_ORIGINAL_FUNCTION_METADATA_MISSING
+psql -X -q -v ON_ERROR_STOP=1 -v expected_constraint=seyeon_provider_receipt_unreserved \
+  -f test/db/seyeon_r2_h_1760_required_enums.sql >/dev/null || hold 1760_ORIGINAL_GAP_NOT_REPRODUCED
+pass 1760_ORIGINAL_SQL_NULL_ENUM_GAP_REPRODUCED_REAL_RPC
+psql -X -q -v ON_ERROR_STOP=1 \
+  -f test/db/fixtures/1760_seyeon_provider_receipt_store_required_enums_v1.proposed.sql >/dev/null || hold 1760_PROPOSAL_REJECTED
+[[ "$(fn_meta)" == "$original_fn_meta" ]] || hold 1760_FUNCTION_OWNER_OR_ACL_DRIFT
+psql -X -q -v ON_ERROR_STOP=1 -v expected_constraint=seyeon_provider_receipt_malformed \
+  -f test/db/seyeon_r2_h_1760_required_enums.sql >/dev/null || hold 1760_REQUIRED_ENUMS_NOT_BLOCKED
+pass 1760_ABSENT_AND_JSON_NULL_ENUMS_REJECTED_BEFORE_LEDGER
+pass 1760_VALID_ENUM_UNRESERVED_PATH_PRESERVED
+if psql -X -q -v ON_ERROR_STOP=1 \
+  -f test/db/fixtures/1760_seyeon_provider_receipt_store_required_enums_v1.proposed.sql >/dev/null 2>&1; then
+  hold 1760_REPLAY_UNEXPECTEDLY_ALLOWED
+fi
+[[ "$(fn_meta)" == "$original_fn_meta" ]] || hold 1760_REPLAY_CHANGED_FUNCTION_METADATA
+[[ "$(psql -X -Atqc 'select count(*) from public.seyeon_ai_provider_receipt_queue_v1')" == 0 ]] || hold 1760_QUEUE_MUTATED
+pass 1760_REPLAY_FAIL_CLOSED_AND_ACL_OWNER_PRESERVED
+echo "HOLD_R2_H_1760_OWNER_APPROVAL_REQUIRED original1710Unchanged=true productionWrites=0 positiveReservedReceiptE2E=false authorizedForProduction=false drReady=false"
+
 echo "HOLD_R2_H_1710_OWNER_APPROVAL_REQUIRED missingEnumSqlNullDiagnostic=true actualReservedReceiptE2E=false claimAckConcurrencyE2E=false paidProviderCalls=0 productionWrites=0 drReady=false"
