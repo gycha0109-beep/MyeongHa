@@ -1,0 +1,67 @@
+name: "[WT:character-memory] C07 F02 R01 H02 유료 6회 단발성 검증"
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_total_100_krw_budget:
+        description: "이전 5회 포함 총 100원 예산, 새 최대 6회, 공급자 과금 하드캡 미확인을 이해했습니다"
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: seyeon-c07-six-call-manual-lifetime-once-v1
+  cancel-in-progress: false
+
+jobs:
+  compare:
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.confirm_total_100_krw_budget == true }}
+    name: C07 F02/R01/H02 Original-Compact 3-pair model screen
+    runs-on: ubuntu-24.04
+    environment: production
+    timeout-minutes: 15
+    steps:
+      - name: Checkout reviewed main only
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Node 24
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Verify C07 cumulative budget and single-dispatch policy offline
+        run: npx vitest run test/seyeon-cost-c07-six-call-budget-v1.test.mjs test/seyeon-paid-eval-hold-v1.test.mjs test/seyeon-cost-c07-cross-topic-boundary-v1.test.mjs
+      - name: Build evaluated runtime
+        run: npm run build
+      - name: Admit first ever C07 manual dispatch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          ADMITTED="$(node scripts/seyeon-cost-c07-six-call-once-admission-v1.mjs)"
+          test "$ADMITTED" = "$GITHUB_RUN_ID"
+          echo "SEYEON_C07_ONCE_ADMITTED_RUN_ID=$ADMITTED" >> "$GITHUB_ENV"
+      - name: Run max six synthetic Luna calls; stop on first HOLD
+        env:
+          OPENAI_API_KEY2: ${{ secrets.OPENAI_API_KEY2 }}
+          SEYEON_C07_EVIDENCE_PATH: ${{ runner.temp }}/seyeon-c07-six-call/attempts.jsonl
+          SEYEON_C07_REPORT_PATH: ${{ runner.temp }}/seyeon-c07-six-call/report.json
+        run: |
+          test -n "${OPENAI_API_KEY2:-}"
+          node scripts/run-seyeon-cost-c07-six-call-v1.mjs
+      - name: Preserve numeric-only results regardless of HOLD
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: seyeon-c07-six-call-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/seyeon-c07-six-call/
+          if-no-files-found: warn
+          retention-days: 14
