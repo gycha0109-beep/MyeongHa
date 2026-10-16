@@ -116,7 +116,7 @@ describe('shadow-only Se-yeon personal-record authority recheck', () => {
     async phase => {
       const { context } = await arrange();
       for (const changed of [
-        { ...row, payload: { ...row.payload, summary: 'changed raw consented record' } },
+        { ...row, payload: { summary: 'changed raw consented record' } },
         { ...row, schemaVersion: 'memory-v2' },
         { ...row, recordType: 'different_record_kind' },
       ]) {
