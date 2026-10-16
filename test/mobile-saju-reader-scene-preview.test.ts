@@ -25,7 +25,12 @@ describe('native Reader Saju preview scene admission and presentation', () => {
     expect(scene).toContain('result.kind === \'delivered\'');
     expect(scene).toContain('subscribeMobileSubjectCredentialChangesV1');
     expect(scene).toContain('이번 무료 프리뷰는 공식 Reading 기록으로 저장되지 않습니다');
-    expect(scene).toContain("router.replace('/chat')");
+    expect(scene).toContain("const opened = await openCharacter(admission.readerId)");
+    expect(scene).toContain("router.replace(`/chat/${opened.threadId}`)");
+    expect(scene).toContain("chatOpenState.access !== 'member'");
+    expect(scene).toContain("로그인 후 세연과 대화하기");
+    expect(scene).not.toContain("router.replace('/chat')");
+    expect(scene).not.toContain("router.push('/chat')");
     expect(scene).toContain("router.replace('/records?tab=readings')");
     expect(saju).toContain('onOpenPreview=');
   });
