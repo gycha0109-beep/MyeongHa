@@ -64,6 +64,23 @@ describe('Se-yeon Production personal-record pre-model safety interlock', () => 
     )).toThrow(SeyeonPersonalRecordPrecommitHoldV1);
   });
 
+  it('holds hidden personal projection candidates before Provider even with empty admissions', () => {
+    const baseline = context([], []);
+    expect(assertSeyeonPersonalRecordsNotUsedBeforeUnprotectedCommitV1({
+      ...baseline, personalRecordProjectionCandidates: [],
+    }).state).toBe('no_admitted_personal_records');
+    for (const projected of [
+      [{ recordKind: 'life_fact', recordId: 'hidden', grantId: 'revoked' }],
+      null, {}, 'not-an-array',
+    ]) {
+      const forged = {
+        ...baseline, personalRecordProjectionCandidates: projected,
+      } as unknown as GuardContext;
+      expect(() => assertSeyeonPersonalRecordsNotUsedBeforeUnprotectedCommitV1(forged))
+        .toThrow(SeyeonPersonalRecordPrecommitHoldV1);
+    }
+  });
+
   it('does not treat malformed or missing authority as proof of zero records', () => {
     for (const malformed of [
       null,
