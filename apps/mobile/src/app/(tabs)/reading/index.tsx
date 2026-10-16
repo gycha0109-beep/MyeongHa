@@ -19,6 +19,7 @@ import { SajuPreviewReadingView } from '@/features/saju/SajuPreviewReadingView';
 import { createMobileSajuViewModelV1 } from '@/features/saju/saju-view-model';
 import { MobileScreen } from '@/ui/MobileScreen';
 import { mobileColors } from '@/ui/mobile-colors';
+import { useMobilePullRefreshV1 } from '@/ui/use-mobile-pull-refresh';
 
 type ScreenState =
   | Readonly<{ kind: 'loading' }>
@@ -57,6 +58,8 @@ export default function SajuScreen() {
     }, [load]),
   );
 
+  const { refreshing, onRefresh } = useMobilePullRefreshV1(load);
+
   const viewModel = state.kind === 'ready'
     ? createMobileSajuViewModelV1({
         profile: state.profile,
@@ -68,6 +71,8 @@ export default function SajuScreen() {
     <MobileScreen
       eyebrow="READING"
       title="사주"
+      refreshing={refreshing}
+      onRefresh={() => void onRefresh()}
       description="현재 Birth revision의 계산 사실과 서버에서 검증된 사주 프리뷰를 확인합니다."
     >
       <ReadingSubnav />

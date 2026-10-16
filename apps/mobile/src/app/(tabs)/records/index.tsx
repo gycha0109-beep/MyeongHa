@@ -7,6 +7,7 @@ import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
 import {
   FlatList,
+  RefreshControl,
   SafeAreaView,
   StyleSheet,
   Text,
@@ -30,6 +31,7 @@ import {
   type RecordsTabV1,
 } from '@/features/records/records-view-model';
 import { mobileColors } from '@/ui/mobile-colors';
+import { useMobilePullRefreshV1 } from '@/ui/use-mobile-pull-refresh';
 
 type VisibleItem =
   | RecordTimelineItemV1
@@ -100,7 +102,8 @@ function initialLoadingForTab(tab: RecordsTabV1, snapshots: ReturnType<typeof us
 
 export default function RecordsScreen() {
   const [tab, setTab] = useState<RecordsTabV1>('all');
-  const { snapshots, retryFailed, loadMore } = useMobileRecordsV1();
+  const { snapshots, retryFailed, loadMore, refreshAll } = useMobileRecordsV1();
+  const { refreshing, onRefresh } = useMobilePullRefreshV1(refreshAll);
 
   const items = useMemo(() => visibleItems(tab, snapshots), [snapshots, tab]);
   const failedLabels = failedCollectionLabelsV1(snapshots, tab);
@@ -120,6 +123,14 @@ export default function RecordsScreen() {
     <SafeAreaView style={styles.safeArea}>
       <FlatList
         data={items}
+        refreshControl={(
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => void onRefresh()}
+            tintColor={mobileColors.navy}
+            colors={[mobileColors.navy]}
+          />
+        )}
         keyExtractor={(item) => `${item.kind}:${item.id}`}
         renderItem={({ item }) => renderItem(item, openReading)}
         contentContainerStyle={styles.content}
