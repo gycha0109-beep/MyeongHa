@@ -5,8 +5,16 @@ export interface PrivateOfficialReaderRecoveryTransactionPortV1 {
 }
 
 export type PrivateOfficialReaderRecoveryResultV1 =
-  | Readonly<{ status: 'held'; publicDisclosureAuthorized: false }>
-  | Readonly<{ status: 'replayed'; publicDisclosureAuthorized: false }>;
+  | Readonly<{
+      status: 'held';
+      reason: 'UNFULFILLED_OR_UNAUTHORIZED';
+      publicDisclosureAuthorized: false;
+    }>
+  | Readonly<{
+      status: 'held';
+      reason: 'PRIVATE_WRITER_NOT_AUTHORIZED';
+      publicDisclosureAuthorized: false;
+    }>;
 
 const UUID = /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/iu;
 const REQUEST_HASH = /^sha256:v1:[0-9a-f]{64}$/u;
@@ -61,37 +69,6 @@ where cr.id=$1::uuid and cr.verification_status='verified'
    'definitionHash',pcs.definition_hash)
 order by pci.item_key`.trim();
 
-const SET_SUBJECT_SQL =
-  "select pg_catalog.set_config('myeongha.subject_id',$1::text,true)";
-
-const ISSUE_SQL = `select
- result_item_key as "itemKey",
- result_grant_id::text as "grantId",
- result_replayed as "replayed"
-from public.internal_apply_official_reader_unified_receipt_v1(
- $1::uuid,array[$2::text],
- array[$3::timestamptz],array[$4::timestamptz],
- array[$5::timestamptz],array[$6::text])`.trim();
-
-const BIND_SQL = `select
- reading_id::text as "readingId",
- entitlement_grant_id::text as "grantId",
- replayed
-from public.internal_cmd_bind_official_reader_unified_v1(
- $1::uuid,$2::uuid,$3::uuid,$4::uuid,
- $5::text,$6::text,$7::jsonb)`.trim();
-
-const CHECK_SQL = `select exists(
- select 1 from public.entitlement_grants eg
- join public.standard_reading_reader_access_grants a
-   on a.entitlement_grant_id=eg.id and a.subject_id=eg.subject_id
- where eg.id=$1::uuid and eg.source_receipt_id=$2::uuid
-   and eg.subject_id=$3::uuid and a.purchase_intent_id=$4::uuid
-   and a.official_reading_id=$5::uuid
-   and eg.status='active'
-   and eg.valid_from<=transaction_timestamp()
-   and (eg.valid_until is null or eg.valid_until>transaction_timestamp())
-) as "active"`.trim();
 
 interface AuthorityRowV1 {
   readonly receiptId?: unknown;
@@ -148,31 +125,18 @@ function isReady(row: AuthorityRowV1): row is
     row.contractVersion === BIND_VERSION && row.rowCount === 1;
 }
 
-function assertReplayed(
-  rows: readonly Record<string, unknown>[],
-  original: AuthorityRowV1,
-  kind: 'issue' | 'bind',
-): void {
-  const row = rows[0];
-  const same = kind === 'issue'
-    ? row?.grantId === original.grantId && row?.itemKey === original.itemKey
-    : row?.grantId === original.grantId && row?.readingId === original.readingId;
-  if (rows.length !== 1 || row?.replayed !== true || !same) {
-    throw new Error('Private Official Reader replay authority changed during transaction.');
-  }
-}
 
 /**
- * REPLAY ONLY: no first issuance, provider ingress or paid public output.
- * The transaction port MUST represent a separately approved PRIVATE DB owner;
- * this module creates no connection, runtime role, credentials or GRANT.
+ * READ ONLY: inspect an already bound original receipt/effect/Reading.
+ * This does not execute any private DB writer, create a Grant, resolve
+ * credentials, or authorize paid disclosure. An unreviewed issuer remains HOLD.
  */
-export async function recoverAlreadyBoundOfficialReaderReceiptV1(input: Readonly<{
+export async function preflightAlreadyBoundOfficialReaderReceiptV1(input: Readonly<{
   readonly transaction: PrivateOfficialReaderRecoveryTransactionPortV1;
   readonly receiptId: unknown;
 }>): Promise<PrivateOfficialReaderRecoveryResultV1> {
   if (!uuid(input.receiptId)) {
-    throw new Error('Private Official Reader recovery requires a valid Receipt UUID.');
+    throw new Error('Private Official Reader preflight requires a valid Receipt UUID.');
   }
 
   return input.transaction.execute(async (client) => {
@@ -183,37 +147,14 @@ export async function recoverAlreadyBoundOfficialReaderReceiptV1(input: Readonly
         !isReady(original) || original.receiptId !== input.receiptId) {
       return Object.freeze({
         status: 'held',
+        reason: 'UNFULFILLED_OR_UNAUTHORIZED',
         publicDisclosureAuthorized: false,
       } as const);
     }
 
-    await client.query(SET_SUBJECT_SQL, [original.subjectId]);
-    const issue = await client.query<Record<string, unknown>>(ISSUE_SQL, [
-      original.receiptId, original.itemKey, original.effectiveAt,
-      original.validFrom, original.validUntil, original.reasonCode,
-    ]);
-    assertReplayed(issue.rows, original, 'issue');
-
-    const bind = await client.query<Record<string, unknown>>(BIND_SQL, [
-      original.subjectId, original.intentId, original.sessionId,
-      original.readingId, original.requestHash, original.contractVersion,
-      JSON.stringify({
-        schemaVersion: BIND_VERSION,
-        purchaseIntentId: original.intentId,
-      }),
-    ]);
-    assertReplayed(bind.rows, original, 'bind');
-
-    const current = await client.query<{ active?: unknown }>(CHECK_SQL, [
-      original.grantId, original.receiptId, original.subjectId,
-      original.intentId, original.readingId,
-    ]);
-    if (current.rows.length !== 1 || current.rows[0]?.active !== true) {
-      throw new Error('Private Official Reader replay Grant is not currently active.');
-    }
-
     return Object.freeze({
-      status: 'replayed',
+      status: 'held',
+      reason: 'PRIVATE_WRITER_NOT_AUTHORIZED',
       publicDisclosureAuthorized: false,
     } as const);
   });
