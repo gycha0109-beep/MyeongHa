@@ -4,14 +4,12 @@ import {createSeyeonUnifiedPreflightShadowV1} from
  '../apps/api/src/seyeon-unified-preflight-shadow-v1.js';
 import {runCharacterIntegrityPreflightV1} from
  '../apps/api/src/character-integrity-preflight-v1.js';
-import {SEYEON_C07_BOUNDARY_MATRIX_V1 as MATRIX,
- scoreSeyeonC07BoundaryV1 as score,
- assessSeyeonC07BoundaryV1 as assess}
- from '../scripts/seyeon-cost-c07-cross-topic-boundary-v1.mjs';
-import {SEYEON_C04_UNIFIED_PREFLIGHT_COMPACT_CANDIDATE_V1 as COMPACT}
- from '../scripts/seyeon-cost-c04-preflight-compact-offline-v1.mjs';
-import {SEYEON_C07_COMPLETED_EVIDENCE_V1 as COST}
- from '../scripts/seyeon-cost-c07-completed-evidence-v1.mjs';
+// @ts-expect-error: Versioned offline MJS module has no type declarations.
+import {SEYEON_C07_BOUNDARY_MATRIX_V1 as MATRIX, scoreSeyeonC07BoundaryV1 as score, assessSeyeonC07BoundaryV1 as assess} from '../scripts/seyeon-cost-c07-cross-topic-boundary-v1.mjs';
+// @ts-expect-error: Versioned offline MJS module has no type declarations.
+import {SEYEON_C04_UNIFIED_PREFLIGHT_COMPACT_CANDIDATE_V1 as COMPACT} from '../scripts/seyeon-cost-c04-preflight-compact-offline-v1.mjs';
+// @ts-expect-error: Versioned offline MJS module has no type declarations.
+import {SEYEON_C07_COMPLETED_EVIDENCE_V1 as COST} from '../scripts/seyeon-cost-c07-completed-evidence-v1.mjs';
 
 const HIGH_RISK_IDS=[
  'A01','A04','A05',
@@ -23,7 +21,7 @@ const HIGH_RISK_IDS=[
 ] as const;
 const VARIANTS=['original','compact'] as const;
 const RISK=HIGH_RISK_IDS.map(id=>{
- const c=MATRIX.find(x=>x.id===id);
+ const c=MATRIX.find((x:{id:string})=>x.id===id);
  if(!c)throw Error('C08 missing immutable source Gold: '+id);
  return c;
 });
@@ -169,7 +167,7 @@ describe('C08-A: 11 high-risk C07 synthetic cases, 2 prompt profiles (NO MODEL C
 
  it('preserves negative question-only boundary; provider false positives are not concealed',async()=>{
   for(const id of ['F02','R01']){
-   const gold=MATRIX.find(x=>x.id===id)!;
+   const gold=MATRIX.find((x:{id:string})=>x.id===id)!;
    for(const variant of VARIANTS){
     const fake={claims:[{claimId:'fp',kind:'CHARACTER_FACT_CLAIM',
      statement:'invented claim'}],topicKey:gold.topic,questionContext:'casual_curiosity'};
