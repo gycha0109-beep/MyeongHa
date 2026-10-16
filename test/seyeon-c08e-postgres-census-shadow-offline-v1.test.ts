@@ -23,8 +23,10 @@ function fixture(rows: readonly unknown[] = [MATCHING]) {
   const query = vi.fn(async (_sql: string, _params?: readonly unknown[]) =>
     ({ rows }));
   const port = createPostgresSeyeonFirstTurnCensusShadowV1({
-    client: { query } as unknown as PostgresTransactionQueryV1,
-    subjectId: SUBJECT,
+    scope: {
+      resolvedSubject: { subjectId: SUBJECT, subjectKind: 'member' },
+      client: { query } as unknown as PostgresTransactionQueryV1,
+    },
     threadId: THREAD,
   });
   const request = {
@@ -116,8 +118,11 @@ describe('C08-E bounded PostgreSQL first-thread read-only shadow candidate', () 
     }
     expect(h.query).not.toHaveBeenCalled();
     expect(() => createPostgresSeyeonFirstTurnCensusShadowV1({
-      client: { query: h.query } as unknown as PostgresTransactionQueryV1,
-      subjectId: 'not-uuid', threadId: THREAD,
+      scope: {
+        resolvedSubject: { subjectId: 'not-uuid', subjectKind: 'member' },
+        client: { query: h.query } as unknown as PostgresTransactionQueryV1,
+      },
+      threadId: THREAD,
     })).toThrow(PostgresSeyeonFirstTurnCensusShadowHoldV1);
   });
 
@@ -126,7 +131,11 @@ describe('C08-E bounded PostgreSQL first-thread read-only shadow candidate', () 
       throw Error('synthetic-private-database-data-NEVER-LOG');
     });
     const port = createPostgresSeyeonFirstTurnCensusShadowV1({
-      client: { query } as unknown as PostgresTransactionQueryV1, subjectId: SUBJECT, threadId: THREAD,
+      scope: {
+        resolvedSubject: { subjectId: SUBJECT, subjectKind: 'member' },
+        client: { query } as unknown as PostgresTransactionQueryV1,
+      },
+      threadId: THREAD,
     });
     const generate = vi.fn(async () => {
       throw Error('model should never run');
