@@ -9,7 +9,6 @@ export function FortuneCookie() {
   const [index, setIndex] = useState(-1);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
-  const redrawRef = useRef<HTMLButtonElement>(null);
 
   function closeReveal() {
     setRevealed(false);
@@ -17,7 +16,7 @@ export function FortuneCookie() {
   }
 
   function openReveal() {
-    setIndex(previous => pickFortuneCookieIndexV1(previous));
+    setIndex(previous => previous < 0 ? pickFortuneCookieIndexV1(previous) : previous);
     setPreviewOpen(false);
     setRevealed(true);
   }
@@ -32,17 +31,10 @@ export function FortuneCookie() {
         setRevealed(false);
         triggerRef.current?.focus();
       }
-      // Keep keyboard focus within the two dialog controls.
-      if (event.key !== 'Tab') return;
-      const first = closeRef.current;
-      const last = redrawRef.current;
-      if (!first || !last) return;
-      if (event.shiftKey && document.activeElement === first) {
+      // The dialog has only one focusable control: keep Tab on close.
+      if (event.key === 'Tab') {
         event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
+        closeRef.current?.focus();
       }
     }
 
@@ -96,7 +88,6 @@ export function FortuneCookie() {
                 <span className="fortune-cookie-reveal-ornament" aria-hidden="true">◇</span>
               </div>
             </div>
-            <button ref={redrawRef} className="fortune-cookie-redraw" type="button" onClick={() => setIndex(previous => pickFortuneCookieIndexV1(previous))}>다른 쪽지 뽑기 ↻</button>
           </section>
         </div>,
         document.body,
