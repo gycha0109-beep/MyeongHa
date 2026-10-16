@@ -1,3 +1,5 @@
+> **최신 실행 로드맵 (2026-10-16):** [세연 AI 보안→실서비스 실행 v2](SEYEON_AI_SECURITY_EXECUTION_ROADMAP_V2_20261016.md). 아래 10월 12일 기준 로드맵은 역사적 복구 실행 기록으로 보존한다. R2-G 과거 실행자 감사의 개발 차단은 [위험 수용](SEYEON_R2_G_OWNER_RISK_ACCEPTANCE_20261016.md)으로 종료했고, 1710/1730/1760 영수증 보안 실DB 검증은 PR #2167·#2173·#2181에서 진전했다. 별도의 운영 DB 적용·DR·G0~G6 승인 HOLD는 유지한다.
+
 # 세연 Production 관계 DB 복구 이후 통합 실행 설계·로드맵 v1
 
 > Watchtower-Track: ops
