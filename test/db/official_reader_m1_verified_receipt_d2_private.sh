@@ -156,26 +156,13 @@ grep -q 'cmd_standard_reading_access_v2_request_hash\|request hash is invalid' "
  fail "failed bind left immutable Reader access"
 pass "failed bind rolls back same-transaction issuance; verified Receipt remains"
 
-# Retrying from the same persisted Receipt now issues AND binds in a single
-# READ COMMITTED transaction. No new provider lookup or Evidence insert.
-atomic="$(p <<SQL
-begin;
-select pg_catalog.set_config('myeongha.subject_id','$subject',true);
-select 'ISSUE',result_grant_id,result_replayed
-from public.internal_apply_official_reader_unified_receipt_v1(
- '$receipt'::uuid,array['test-reader-unit'],
- array[transaction_timestamp()],array[transaction_timestamp()],
- array[null]::timestamptz[],array[null]::text[]);
-select 'BIND',reading_id,entitlement_grant_id,access_role,official_reading_created
-from public.internal_cmd_bind_official_reader_unified_v1(
- '$subject'::uuid,'$intent'::uuid,'$session'::uuid,'$proposal'::uuid,
- 'sha256:v1:$(printf '7%.0s' {1..64})',
- 'standard-reading-access-bind-v2',
- pg_catalog.jsonb_build_object('schemaVersion','standard-reading-access-bind-v2',
- 'purchaseIntentId','$intent'));
-commit;
-SQL
-)"
+# M1-12: first issuance is now the REAL TCP lost-COMMIT-ACK path, not
+# just a successful psql-owned transaction. The fixture-owner D2 issue+bind
+# still commits atomically; the test client sees the connection drop after
+# the PostgreSQL backend emitted CommandComplete(COMMIT), but before delivery.
+# Its output includes only independently re-read authoritative identities.
+atomic="$(node test/db/official_reader_m1_12_first_issuance_commit_ack_drop_proxy.mjs \
+ "$receipt" "$subject" "$intent" "$session" "$proposal" "$official")"
 issue_line="$(printf '%s\n' "$atomic" | grep '^ISSUE|')"
 bind_line="$(printf '%s\n' "$atomic" | grep '^BIND|')"
 IFS='|' read -r issue_marker grant issue_replay <<<"$issue_line"
