@@ -77,8 +77,7 @@ after="$(audit)"
 jq -e "$clean_shape" >/dev/null <<< "$after" || {
  echo 'FAIL D3e29: definer candidates remained after cleanup' >&2; exit 1
 }
-[[ "$(jq -Sc 'del(.observed_at)' <<< "$before")" ==
-   "$(jq -Sc 'del(.observed_at)' <<< "$after")" ]] || {
+[[ "$(jq -Sc 'del(.observed_at)' <<< "$before")" == "$(jq -Sc 'del(.observed_at)' <<< "$after")" ]] || {
  echo 'FAIL D3e29: read-only catalog not restored after probe cleanup' >&2; exit 1
 }
 echo 'PASS D3e29: indirect/dynamic SECURITY DEFINER bypass candidates detected, then removed'
