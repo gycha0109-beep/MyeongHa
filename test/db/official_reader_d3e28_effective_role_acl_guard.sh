@@ -15,6 +15,7 @@ audit() { db -f scripts/security/official_reader_cancel_effective_role_execution
 pass_shape='
   .evidence_type == "d3e28_reader_cancel_role_execution_inventory_v1" and
   .existing_guarded_tables == 7 and
+  (.guarded_table_rls | length) == 7 and
   .restricted_role_write_count == 0 and
   (.restricted_role_write_rows | length) == 0 and
   (.elevated_app_role_edges | length) == 0 and
