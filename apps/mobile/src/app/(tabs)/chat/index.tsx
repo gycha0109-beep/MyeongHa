@@ -74,6 +74,7 @@ export default function ChatHubScreen() {
               accessibilityState={{ disabled }}
               disabled={disabled}
               onPress={() => void handleOpen(character.characterId)}
+              accessibilityLabel={`${character.displayName}, ${presentation.title}, ${character.characterId === 'seyeon' ? 'AI 대화 가능' : 'AI 준비 중'}, ${canOpen ? '대화방 열기' : '로그인 필요'}`}
               style={[styles.characterCard, opening && styles.disabled]}
             >
               <View style={styles.cardMain}>
@@ -94,25 +95,16 @@ export default function ChatHubScreen() {
                     <Text style={styles.characterName}>{character.displayName}</Text>
                     <Text style={styles.characterTitle}>{presentation.title}</Text>
                   </View>
-                  <Text style={styles.characterLine}>{presentation.openingLine}</Text>
-                  <View style={styles.characterTags}>
-                    {presentation.tags.map((tag) => (
-                      <View key={tag} style={styles.characterTag}>
-                        <Text style={styles.characterTagText}>{tag}</Text>
-                      </View>
-                    ))}
-                  </View>
+                  <Text style={styles.characterLine} numberOfLines={2}>{presentation.openingLine}</Text>
+                  <Text style={[styles.characterStatus, character.characterId === 'seyeon' && styles.characterStatusAvailable]}>
+                    {character.characterId === 'seyeon' ? '●  AI 대화 가능' : '◇  AI 답변 준비 중 · 기록 열람 가능'}
+                  </Text>
                 </View>
-              </View>
-              <View style={styles.characterFooter}>
-                <Text style={styles.characterFooterText}>
-                  {character.characterId === 'seyeon'
-                    ? '세연과 실시간 대화'
-                    : '대화 기록 · 기능 준비 중'}
-                </Text>
-                <Text style={[styles.characterAction, !canOpen && styles.actionUnavailable]}>
-                  {opening ? '여는 중…' : canOpen ? '대화 열기  →' : '로그인 후 대화'}
-                </Text>
+                <View style={styles.characterActionWrap}>
+                  <Text style={[styles.characterAction, !canOpen && styles.actionUnavailable]}>
+                    {opening ? '…' : canOpen ? '›' : '잠금'}
+                  </Text>
+                </View>
               </View>
             </Pressable>
           );
@@ -162,38 +154,29 @@ const styles = StyleSheet.create({
     alignItems: 'center', paddingVertical: 13,
   },
   loginActionText: { color: mobileColors.surface, fontSize: 13, fontWeight: '800' },
-  roster: { gap: 14 },
+  roster: { gap: 9 },
   characterCard: {
-    borderWidth: 1, borderColor: mobileColors.border, borderRadius: 19,
-    backgroundColor: mobileColors.surface, padding: 14, gap: 13,
+    borderWidth: 1, borderColor: mobileColors.border, borderRadius: 16,
+    backgroundColor: mobileColors.surface, padding: 11,
   },
-  cardMain: { flexDirection: 'row', alignItems: 'flex-start', gap: 14 },
+  cardMain: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   characterMark: {
-    width: 100, height: 124, borderRadius: 14, overflow: 'hidden',
+    width: 76, height: 90, borderRadius: 12, overflow: 'hidden',
     borderWidth: 1, borderColor: mobileColors.gold, backgroundColor: mobileColors.canvas,
     alignItems: 'center', justifyContent: 'center',
   },
   characterPortrait: { width: '100%', height: '100%' },
-  characterMarkText: { fontSize: 22, color: mobileColors.navy, fontWeight: '900' },
-  characterCopy: { flex: 1, gap: 9, paddingTop: 1 },
-  characterTitleRow: { flexDirection: 'row', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' },
-  characterName: { color: mobileColors.ink, fontSize: 21, fontWeight: '900' },
+  characterMarkText: { fontSize: 19, color: mobileColors.navy, fontWeight: '900' },
+  characterCopy: { flex: 1, gap: 5 },
+  characterTitleRow: { flexDirection: 'row', alignItems: 'baseline', gap: 7, flexWrap: 'wrap' },
+  characterName: { color: mobileColors.ink, fontSize: 18, fontWeight: '900' },
   characterTitle: { color: mobileColors.muted, fontSize: 12, fontWeight: '700' },
-  characterLine: { color: mobileColors.ink, fontSize: 14, lineHeight: 21 },
-  characterTags: { flexDirection: 'row', flexWrap: 'wrap', gap: 5 },
-  characterTag: {
-    borderWidth: 1, borderColor: mobileColors.border, borderRadius: 999,
-    paddingHorizontal: 9, paddingVertical: 4,
-  },
-  characterTagText: { color: mobileColors.muted, fontSize: 11, fontWeight: '700' },
-  characterFooter: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    gap: 10, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: mobileColors.border,
-    paddingTop: 11,
-  },
-  characterFooterText: { color: mobileColors.muted, fontSize: 11, flex: 1 },
-  characterAction: { color: mobileColors.navy, fontSize: 13, fontWeight: '900' },
-  actionUnavailable: { color: mobileColors.muted },
+  characterLine: { color: mobileColors.ink, fontSize: 12, lineHeight: 18 },
+  characterStatus: { color: mobileColors.muted, fontSize: 11, fontWeight: '700' },
+  characterStatusAvailable: { color: mobileColors.navy },
+  characterActionWrap: { minWidth: 32, minHeight: 48, alignItems: 'center', justifyContent: 'center' },
+  characterAction: { color: mobileColors.navy, fontSize: 26, fontWeight: '700' },
+  actionUnavailable: { color: mobileColors.muted, fontSize: 11 },
   disabled: { opacity: 0.55 },
   errorText: { color: mobileColors.seal, fontSize: 12, lineHeight: 18 },
   pendingSection: { gap: 10, paddingTop: 18, borderTopWidth: 1, borderTopColor: mobileColors.border },
