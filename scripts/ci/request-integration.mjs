@@ -29,8 +29,13 @@ const decision = decideIntegrationSubmission({
   hasLabel: current.labels.some(label => label.name === integrationLabel),
 });
 if (decision.action === 'no-op') {
-  console.log(`Integration not re-requested: ${decision.reason} for frozen PR #${pr}, head=${candidate.head}, run=${decision.runId}`);
-  console.log('Do not update the PR head while integration is queued or running; advancing main alone is not a retry trigger.');
+  const runSuffix = decision.runId === undefined ? '' : `, run=${decision.runId}`;
+  console.log(`Integration not re-requested: ${decision.reason} for frozen PR #${pr}, head=${candidate.head}${runSuffix}`);
+  if (decision.reason === 'LABEL_PRESENT_RUN_NOT_YET_INDEXED') {
+    console.log('Label already present; GitHub may not have indexed the workflow run yet. Do not toggle it. If no run appears after indexing, inspect the PR label event and retry through an explicit reviewed re-submission.');
+  } else {
+    console.log('Do not update the PR head while integration is queued or running; advancing main alone is not a retry trigger.');
+  }
   process.exit(0);
 }
 
