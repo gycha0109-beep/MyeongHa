@@ -52,6 +52,7 @@ import {
 } from './seyeon-production-runtime-ids-v1.js';
 import {
   createSeyeonProductionSubjectTransactionRunnerV1,
+  type SeyeonProductionSubjectTransactionRunnerV1,
 } from './seyeon-production-subject-transaction-v1.js';
 import {
   createSeyeonGovernedCostTransactionRunnerV1,
