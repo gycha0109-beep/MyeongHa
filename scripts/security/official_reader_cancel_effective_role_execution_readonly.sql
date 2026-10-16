@@ -96,6 +96,7 @@ SELECT pg_catalog.jsonb_build_object(
  'database',current_database(),
  'observed_at',pg_catalog.clock_timestamp(),
  'existing_guarded_tables',(SELECT count(*) FROM protected_relations WHERE oid IS NOT NULL),
+ 'guarded_table_rls',(SELECT coalesce(pg_catalog.jsonb_agg(pg_catalog.jsonb_build_object('table_name',name,'rls_enabled',rls_enabled) ORDER BY name),'[]'::jsonb) FROM protected_relations),
  'roles',(SELECT pg_catalog.jsonb_agg(pg_catalog.to_jsonb(x) ORDER BY name) FROM role_catalog x),
  'membership_edges',(SELECT coalesce(pg_catalog.jsonb_agg(pg_catalog.to_jsonb(x) ORDER BY actor,target),'[]'::jsonb) FROM role_edges x),
  'elevated_app_role_edges',(SELECT coalesce(pg_catalog.jsonb_agg(pg_catalog.to_jsonb(x) ORDER BY actor,target),'[]'::jsonb) FROM elevated_role_edges x),
