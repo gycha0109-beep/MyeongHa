@@ -110,6 +110,10 @@ bash test/db/official_reader_m1_05_invoker_execute_only_probe.sh "$receipt" "$su
 # issuer MUST NOT enable a real runtime session_user to assume that role.
 bash test/db/official_reader_m1_08_private_issuer_session_assumption.sh "$receipt" "$subject" "$intent"
 
+# M1-09: simulate a real database statement timeout AFTER uncommitted D2
+# issuance and BEFORE bind/COMMIT; verify no orphan grant and fresh recovery.
+bash test/db/official_reader_m1_09_issuer_timeout_recovery.sh "$receipt" "$subject" "$intent"
+
 # M1-03: The existing verified Receipt MUST survive a downstream bind
 # error while ALL issuance writes from the same transaction are rolled back.
 # Use the isolated DB fixture owner, NOT an API or Commerce runtime account.
