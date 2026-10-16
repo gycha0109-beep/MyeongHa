@@ -32,7 +32,8 @@ export const MOBILE_CHAT_LAUNCH_ROSTER_V1 = Object.freeze(
 
 /** Inactive historical identities: display at the bottom, never send to Chat Open. */
 export const MOBILE_CHAT_PENDING_ROSTER_V1 = Object.freeze(
-  ['doyun', 'seorin', 'mira'].map(characterId =>
-    MOBILE_CHAT_KNOWN_CHARACTERS_V1.find(character => character.characterId === characterId),
-  ).filter((character): character is MobileChatLaunchCharacterV1 => character !== undefined),
+  ['doyun', 'seorin', 'mira'].flatMap(characterId => {
+    const match = MOBILE_CHAT_KNOWN_CHARACTERS_V1.find(character => character.characterId === characterId);
+    return match === undefined ? [] : [match];
+  }),
 );
