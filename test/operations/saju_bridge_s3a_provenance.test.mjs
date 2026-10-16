@@ -8,6 +8,8 @@ const auth=()=>({
   GITHUB_REPOSITORY:S3A.repo,
   GITHUB_REF:'refs/heads/main',
   GITHUB_ACTOR:S3A.actor,
+  GITHUB_TRIGGERING_ACTOR:S3A.actor,
+  GITHUB_RUN_ATTEMPT:'1',
   MYEONGHA_WATCHTOWER_TRACK:'saju-bridge',
   S3A_CONFIRM:S3A.confirm,
   SUPABASE_PROJECT_ID:S3A.project,
@@ -56,7 +58,8 @@ const envelope=(graph)=>({
 test('requires exact Owner actor, project, scope and bounded UTC stop window',()=>{
   assert.equal(validateAuthority(auth(),t0).backupId,'100');
   for(const [field,value] of [
-    ['GITHUB_ACTOR','someone-else'],['GITHUB_EVENT_NAME','push'],
+    ['GITHUB_ACTOR','someone-else'],['GITHUB_TRIGGERING_ACTOR','someone-else'],
+    ['GITHUB_RUN_ATTEMPT','2'],['GITHUB_EVENT_NAME','push'],
     ['SUPABASE_PROJECT_ID','different'],['S3A_CONFIRM','approve'],
     ['MYEONGHA_WATCHTOWER_TRACK','ops'],
     ['S3A_WINDOW_END_UTC','2026-10-16T10:35:00Z'],
