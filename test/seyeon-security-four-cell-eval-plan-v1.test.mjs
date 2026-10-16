@@ -57,15 +57,20 @@ describe('four-cell security paid-evaluation readiness (no model dispatch)', () 
   });
 
   it('retains explicit disabled paid evaluations until a separately approved change', () => {
-    const workflowPaths = [
-      '.github/workflows/seyeon-dialogue-path-real-api-eval-v1.yml',
-      '.github/workflows/seyeon-model-eval-v1.yml',
-    ];
-    for (const path of workflowPaths) {
-      const content = readFileSync(new URL('../' + path, import.meta.url), 'utf8');
-      expect(content).toContain('if: ${{ false }}');
-      expect(content).toContain('Cost incident hold');
-    }
+    const disabled=readFileSync(new URL(
+      '../.github/workflows/seyeon-dialogue-path-real-api-eval-v1.yml',
+      import.meta.url), 'utf8');
+    expect(disabled).toContain('if: ${{ false }}');
+    expect(disabled).toContain('Cost incident hold');
+    const scoped=readFileSync(new URL(
+      '../.github/workflows/seyeon-model-eval-v1.yml',
+      import.meta.url), 'utf8');
+    expect(scoped).toContain('secrets.OPENAI_API_KEY2');
+    expect(scoped).toContain('run-seyeon-cost-c06-eight-call-v1.mjs');
+    expect(scoped).toContain('workflow_dispatch:');
+    expect(scoped).toContain("github.ref == 'refs/heads/main'");
+    expect(scoped).not.toMatch(/^\s+push:\s*$/m);
+    expect(scoped).not.toContain('run-seyeon-model-eval-v1.mjs');
     const costContract = readFileSync(
       new URL('../apps/api/src/seyeon-cost-governor-contract-v1.ts', import.meta.url),
       'utf8',
