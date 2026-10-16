@@ -24,7 +24,8 @@ export class SeyeonPersonalRecordPrecommitHoldV1 extends Error {
 
 type PersonalRecordContextV1 = Pick<
   SeyeonProductionContextSnapshotV1,
-  'retrievedMemories' | 'personalRecordAdmissions'
+  'retrievedMemories' | 'personalRecordAdmissions' |
+  'personalRecordProjectionCandidates'
 >;
 
 export function assertSeyeonPersonalRecordsNotUsedBeforeUnprotectedCommitV1(
@@ -39,7 +40,10 @@ export function assertSeyeonPersonalRecordsNotUsedBeforeUnprotectedCommitV1(
   if (
     context === null || typeof context !== 'object' ||
     !Array.isArray(context.retrievedMemories) ||
-    !Array.isArray(context.personalRecordAdmissions)
+    !Array.isArray(context.personalRecordAdmissions) ||
+    (context.personalRecordProjectionCandidates !== undefined &&
+     (!Array.isArray(context.personalRecordProjectionCandidates) ||
+      context.personalRecordProjectionCandidates.length !== 0))
   ) {
     throw new SeyeonPersonalRecordPrecommitHoldV1();
   }
