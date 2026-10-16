@@ -1,7 +1,8 @@
 import { createHash } from 'node:crypto';
 import { canonicalJson } from '../../../packages/domain/src/index.js';
-import type {
-  SeyeonProductionContextSnapshotV1,
+import {
+  SEYEON_PRODUCTION_CONTEXT_VERSION_V1,
+  type SeyeonProductionContextSnapshotV1,
 } from './seyeon-production-context-v1.js';
 import type {
   SeyeonProductionContextReadAuthorityPortV1,
@@ -87,15 +88,27 @@ export async function evaluateSeyeonPersonalRecordPublicationShadowV1(input: {
 }): Promise<SeyeonPersonalRecordPublicationCheckV1> {
   const snapshot = input.serverComposedContext;
   if (snapshot === null || typeof snapshot !== 'object' ||
+      snapshot.version !== SEYEON_PRODUCTION_CONTEXT_VERSION_V1 ||
       !Array.isArray(snapshot.retrievedMemories) ||
       !Array.isArray(snapshot.personalRecordAdmissions) ||
       !Array.isArray(snapshot.recentMessages) ||
+      !Array.isArray(snapshot.relationshipHistoryRecords) ||
+      !Number.isSafeInteger(snapshot.activeRelationshipEventCount) ||
+      snapshot.activeRelationshipEventCount < 0 ||
+      !Number.isSafeInteger(snapshot.historyThroughRevision) ||
+      snapshot.historyThroughRevision < 0 ||
+      (snapshot.relationshipRevisionUsedForTurn !== null &&
+       (!Number.isSafeInteger(snapshot.relationshipRevisionUsedForTurn) ||
+        snapshot.relationshipRevisionUsedForTurn < 0)) ||
+      snapshot.historyThroughRevision !== (snapshot.relationshipRevisionUsedForTurn ?? 0) ||
       (snapshot.personalRecordProjectionCandidates !== undefined &&
        !Array.isArray(snapshot.personalRecordProjectionCandidates))) {
     return result(input.phase, 0, 'UNVERIFIABLE_PINNED_REFERENCE');
   }
   const memories = snapshot.retrievedMemories;
-  if (memories.some(m => m === null || typeof m !== 'object') ||
+  if (memories.some(m => m === null || typeof m !== 'object' ||
+        (m.kind !== 'memory' && m.kind !== 'life_fact' &&
+         m.kind !== 'relationship_event')) ||
       snapshot.personalRecordAdmissions.some(a =>
         a === null || typeof a !== 'object' ||
         (a.reason !== 'ADMITTED' && a.reason !== 'UNSUPPORTED_SCHEMA'))) {
@@ -114,9 +127,14 @@ export async function evaluateSeyeonPersonalRecordPublicationShadowV1(input: {
     return result(input.phase, referenced.length, 'UNVERIFIABLE_PINNED_REFERENCE');
   }
 
+  // A history or relationship revision can still have influenced the model
+  // after an event was reversed, deleted, or truncated from the active list.
+  // A "zero personal records" result must never erase that derived lineage.
   const untrackedDerived = snapshot.recentMessages.length !== 0 ||
     memories.some(m => m.kind === 'relationship_event') ||
-    snapshot.relationshipHistoryRecords?.length !== 0;
+    snapshot.relationshipHistoryRecords.length !== 0 ||
+    snapshot.activeRelationshipEventCount !== 0 ||
+    snapshot.historyThroughRevision !== 0;
   if (untrackedDerived) {
     return result(input.phase, referenced.length, 'UNVERIFIABLE_DERIVED_CONTEXT');
   }
