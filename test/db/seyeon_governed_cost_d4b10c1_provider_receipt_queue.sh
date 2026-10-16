@@ -130,6 +130,84 @@ done
  where call_id in ('$estimated','$unknown') and governor_receipt_pinned_at is not null")" == 2 ]] || exit 5
 [[ "$(db -c "select count(*) from public.seyeon_ai_provider_receipt_queue_v1")" == 0 ]] || exit 6
 
+# Optional 1730-only real admitted-RPC rejection: the original Store RPC's
+# SQL NULL enum gap must be stopped by the installed, validated queue CHECK.
+# Keep the same two genuine governed reservations for the later positive E2E.
+if [[ "${SEYEON_R2_H_1730_RESERVED_NEGATIVE:-}" == 1 ]]; then
+  [[ "${CI:-}" == true && "${GITHUB_ACTIONS:-}" == true \
+    && "${DB_SUITE:-}" == postgres17 && "${PGHOST:-}" == localhost \
+    && "${PGPORT:-}" == 5432 && "${PGUSER:-}" == postgres \
+    && "${PGDATABASE:-}" =~ ^myeongha_ci_case_[0-9]+$ ]] || {
+      echo 'HOLD_R2_H_1730_RESERVED_PROBE_NOT_DISPOSABLE' >&2
+      exit 41
+    }
+  [[ "$(db -c "select count(*) from pg_constraint where
+    conrelid='public.seyeon_ai_provider_receipt_queue_v1'::regclass
+    and conname='seyeon_provider_queue_required_enums_v1'
+    and contype='c' and convalidated")" == 1 ]] || {
+      echo 'HOLD_R2_H_1730_REQUIRED_CHECK_NOT_INSTALLED' >&2
+      exit 42
+    }
+  [[ "$(db -c "select occupied_micro_usd from
+    public.seyeon_ai_governor_daily_budgets_v1
+    where bucket_utc_date='$day'")" == 7400 ]] || exit 43
+
+  malformed_record() {
+    local call="$1" kind="$2" variant="$3" source modified
+    source="$(event "$call" "$kind")"
+    case "$variant" in
+      missing_outcome) modified="($source - 'outcome')" ;;
+      missing_cost_status) modified="($source - 'costStatus')" ;;
+      json_null_outcome) modified="jsonb_set(($source),'{outcome}','null'::jsonb)" ;;
+      json_null_cost_status) modified="jsonb_set(($source),'{costStatus}','null'::jsonb)" ;;
+      nonstring_outcome) modified="jsonb_set(($source),'{outcome}','42'::jsonb)" ;;
+      nonstring_cost_status) modified="jsonb_set(($source),'{costStatus}','42'::jsonb)" ;;
+      invalid_outcome) modified="jsonb_set(($source),'{outcome}','\"invented\"'::jsonb)" ;;
+      invalid_cost_status) modified="jsonb_set(($source),'{costStatus}','\"invoiced\"'::jsonb)" ;;
+      *) echo 'HOLD_R2_H_1730_UNKNOWN_VARIANT' >&2; return 1 ;;
+    esac
+    cat <<SQL
+set session authorization myeongha_seyeon_d4_login_ci;
+begin;
+set local role myeongha_seyeon_governed_executor;
+select subject_id from public.begin_member_subject_context_v1('$auth');
+select call_id,replayed from public.cmd_store_seyeon_provider_receipt_v1(
+ '$subject','$turn','$attempt','post_turn',$modified);
+commit;
+SQL
+  }
+
+  for variant in missing_outcome missing_cost_status json_null_outcome \
+      json_null_cost_status nonstring_outcome nonstring_cost_status \
+      invalid_outcome invalid_cost_status; do
+    malformed_record "$unknown" unknown "$variant" >"$tmp/1730-$variant.sql"
+    if db -f "$tmp/1730-$variant.sql" >"$tmp/1730-$variant.log" 2>&1; then
+      echo "FAIL 1730 accepted reserved malformed $variant" >&2
+      exit 44
+    fi
+    grep -Fq '23514' "$tmp/1730-$variant.log" || {
+      echo "FAIL 1730 wrong SQLSTATE $variant" >&2; exit 45
+    }
+    case "$variant" in
+      missing_*|json_null_*)
+        grep -Fq 'seyeon_provider_queue_required_enums_v1' "$tmp/1730-$variant.log" || {
+          echo "FAIL 1730 missing CHECK enforcement $variant" >&2; exit 46
+        } ;;
+      *)
+        grep -Fq 'seyeon_provider_receipt_malformed' "$tmp/1730-$variant.log" || {
+          echo "FAIL 1730 original malformed RPC enforcement $variant" >&2; exit 47
+        } ;;
+    esac
+    [[ "$(db -c "select count(*) from public.seyeon_ai_provider_receipt_queue_v1")" == 0 ]] || exit 48
+    [[ "$(db -c "select count(*) from public.seyeon_ai_call_cost_events
+      where call_id in ('$estimated','$unknown')
+        and lifecycle_state='started' and governor_receipt_pinned_at is not null")" == 2 ]] || exit 49
+    [[ "$(db -c "select occupied_micro_usd from public.seyeon_ai_governor_daily_budgets_v1
+      where bucket_utc_date='$day'")" == 7400 ]] || exit 50
+  done
+  echo 'PASS_R2_H_1730_RESERVED_MALFORMED_REAL_RPC_ATOMIC_REJECTION_BUDGET_UNCHANGED'
+fi
+
 record "$estimated" estimated >"$tmp/record-estimated.sql"
 record "$unknown" unknown >"$tmp/record-unknown.sql"
 db -f "$tmp/record-estimated.sql" >"$tmp/record-estimated.log" 2>&1 || {
