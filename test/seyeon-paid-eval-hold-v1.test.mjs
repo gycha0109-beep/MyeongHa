@@ -8,6 +8,7 @@ const root = new URL('../.github/workflows/', import.meta.url);
 // explicit so lifting the hold requires a reviewed change and test update.
 const paidJobs = Object.freeze({
   'seyeon-dialogue-path-real-api-eval-v1.yml': ['compare'],
+  'seyeon-model-eval-v1.yml': ['compare'],
   'seyeon-unified-shadow-v1.yml': ['compare'],
   'seyeon-first-meeting-live-main-bridge.yml': ['live'],
   'seyeon-first-meeting-predeploy-final-validation.yml': ['luna', 'terra'],
@@ -27,11 +28,27 @@ function jobBody(workflow, job) {
 }
 
 describe('Se-yeon paid model evaluation hold', () => {
-  it('excepts only a bounded manual 8-call classification screening job',()=>{
+  it('re-locks former eight-call exception pending durable lifetime budget evidence',()=>{
     const src=readFileSync(fileURLToPath(new URL('seyeon-model-eval-v1.yml',root)),'utf8');
     const body=jobBody('seyeon-model-eval-v1.yml','compare');
-    expect(body).toContain("github.event_name == 'workflow_dispatch'");
-    expect(body).toContain("github.ref == 'refs/heads/main'");
+    expect(body).toContain('if: 
+    expect(src).not.toMatch(/^\s+push:\s*$/m);
+    expect(src).toContain('secrets.OPENAI_API_KEY2');
+    expect(src).not.toContain('secrets.OPENAI_API_KEY }}');
+    expect(src).toContain('run-seyeon-cost-c06-eight-call-v1.mjs');
+    expect(src).not.toContain('run-seyeon-model-eval-v1.mjs');
+  });
+  for (const [workflow, jobs] of Object.entries(paidJobs)) {
+    for (const job of jobs) {
+      it(`denies ${workflow}:${job} even if triggered manually or on push`, () => {
+        const body = jobBody(workflow, job);
+        expect(body).toMatch(/^    if: \$\{\{ false \}\}$/m);
+      });
+    }
+  }
+});
++'{{ false }}');
+    expect(src).toContain('Run #38845185681 consumed 3 paid calls');
     expect(src).not.toMatch(/^\s+push:\s*$/m);
     expect(src).toContain('secrets.OPENAI_API_KEY2');
     expect(src).not.toContain('secrets.OPENAI_API_KEY }}');

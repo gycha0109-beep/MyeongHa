@@ -1,4 +1,4 @@
-name: "[WT:character-memory] 세연 C06 8회 유료 분류 선별 (Owner review required)"
+name: "[WT:character-memory] 세연 C06 8회 유료 분류 선별 (F01 HOLD)"
 
 on:
   workflow_dispatch:
@@ -14,7 +14,10 @@ jobs:
   compare:
     # Reviewed-scope replacement: this is NOT the legacy 100/400-call runner.
     # Main-only, manual-only, dedicated KEY2, max 8 attempts, 0 retries.
-    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' }}
+    # Run #38845185681 consumed 3 paid calls; prior-run budget is not durable.
+    # C06 F01 original overclassification HOLD. Never replay all 8 by pressing Re-run.
+    # A separate owner-reviewed carry-forward + lifetime budget gate is required.
+    if: ${{ false }}
     name: 세연 기존/압축 통합 분류 지시문 4쌍 (최대 8회)
     runs-on: ubuntu-24.04
     environment: production
