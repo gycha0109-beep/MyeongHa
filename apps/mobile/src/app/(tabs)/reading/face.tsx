@@ -19,6 +19,7 @@ import { MobileReaderPicker } from '@/features/reading/MobileReaderPicker';
 import { findMobileReaderPresentationV1, type MobileReaderPresentationIdV1 } from '@/features/reading/mobile-reader-presentation';
 import { MobileScreen } from '@/ui/MobileScreen';
 import { mobileColors } from '@/ui/mobile-colors';
+import { useMobilePullRefreshV1 } from '@/ui/use-mobile-pull-refresh';
 
 type FaceMediaStateV1 =
   | Readonly<{ kind: 'idle' }>
@@ -37,6 +38,12 @@ export default function FaceScreen() {
   const [frontCameraOpen, setFrontCameraOpen] = useState(false);
   const [presentationReader, setPresentationReader] = useState<MobileReaderPresentationIdV1>('seyeon');
   const readerPresentation = findMobileReaderPresentationV1(presentationReader);
+  // The face picker has no server read yet. Refresh only clears a transient
+  // picker error; never erase the selected photo or change the reader.
+  const refreshLocalMedia = async () => {
+    setState((current) => current.kind === 'error' ? { kind: 'idle' } : current);
+  };
+  const { refreshing, onRefresh } = useMobilePullRefreshV1(refreshLocalMedia);
 
   async function choose(
     source: 'camera' | 'library',
@@ -76,6 +83,8 @@ export default function FaceScreen() {
     <MobileScreen
       eyebrow="FACE READING"
       title="관상"
+      refreshing={refreshing}
+      onRefresh={() => void onRefresh()}
       description="정면 사진을 준비하고, 얼굴 구조 확인 단계까지 안전하게 이어갑니다."
     >
       <ReadingSubnav />
