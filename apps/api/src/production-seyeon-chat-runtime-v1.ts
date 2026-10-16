@@ -74,6 +74,44 @@ import type {
   VerifiedSubjectIdentityEvidenceV1,
 } from './subject-identity-resolver.js';
 
+/** Missing immutable pre-model Pin must never fall back to legacy context-ready. */
+export class SeyeonProductionPinMigrationRequiredV1 extends Error {
+  readonly code = 'SEYEON_PIN_MIGRATION_REQUIRED' as const;
+  constructor() {
+    super('Required secure Se-yeon Chat Pin migration is unavailable in this database.');
+    this.name = 'SeyeonProductionPinMigrationRequiredV1';
+  }
+}
+
+/** Owner/ACL readiness under the existing canonical Member Subject transaction. */
+export async function assertSeyeonProductionPinReadinessV1(
+  runner: SeyeonProductionSubjectTransactionRunnerV1,
+  canonicalSubjectId: string,
+): Promise<void> {
+  const result = await runner.run(canonicalSubjectId, (client) =>
+    client.query<{ ready: boolean }>(`
+      select
+        to_regprocedure(
+          'public.cmd_mark_seyeon_chat_context_ready_pinned_v1(uuid,uuid,uuid,jsonb)'
+        ) is not null
+        and coalesce((
+          select has_function_privilege(
+            'myeongha_api_executor',
+            p.oid,
+            'EXECUTE'
+          )
+          from pg_catalog.pg_proc p
+          where p.oid = to_regprocedure(
+            'public.cmd_mark_seyeon_chat_context_ready_pinned_v1(uuid,uuid,uuid,jsonb)'
+          )
+        ),false) as "ready"
+    `),
+  );
+  if (result.rows.length !== 1 || result.rows[0]?.ready !== true) {
+    throw new SeyeonProductionPinMigrationRequiredV1();
+  }
+}
+
 export const PRODUCTION_SEYEON_CHAT_RUNTIME_VERSION_V1 =
   'production-seyeon-chat-runtime-v1' as const;
 
@@ -300,6 +338,9 @@ export function createProductionSeyeonChatRuntimeV1(
         'subject_resolution',
         () => runner.resolveSubject(),
       );
+      // Prior to durable receive/attempt creation: fail closed when Production
+      // has not applied the 1640 immutable zero-source Pin and executor ACL.
+      await assertSeyeonProductionPinReadinessV1(runner, resolvedSubject.subjectId);
       // The main Subject Runner remains responsible for Chat/Outbox writes.
       // Governed Start and Settle use a different DB LOGIN + role only.
       const costRunner = costPoolLease === null
