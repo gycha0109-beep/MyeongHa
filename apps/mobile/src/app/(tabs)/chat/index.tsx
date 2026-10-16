@@ -7,9 +7,11 @@ import { MOBILE_CHAT_LAUNCH_ROSTER_V1 } from '@/features/chat/chat-launch-roster
 import { useMobileChatOpenV1 } from '@/features/chat/use-mobile-chat-open';
 import { MobileScreen } from '@/ui/MobileScreen';
 import { mobileColors } from '@/ui/mobile-colors';
+import { useMobilePullRefreshV1 } from '@/ui/use-mobile-pull-refresh';
 
 export default function ChatHubScreen() {
-  const { state, openCharacter } = useMobileChatOpenV1();
+  const { state, openCharacter, refreshAccess } = useMobileChatOpenV1();
+  const { refreshing, onRefresh } = useMobilePullRefreshV1(refreshAccess);
 
   async function handleOpen(
     characterId: (typeof MOBILE_CHAT_LAUNCH_ROSTER_V1)[number]['characterId'],
@@ -22,6 +24,8 @@ export default function ChatHubScreen() {
     <MobileScreen
       eyebrow="CONVERSATION"
       title="대화"
+      refreshing={refreshing}
+      onRefresh={() => void onRefresh()}
       description="출시 예정 대리자 6명을 둘러보고, 로그인하면 대화를 시작하거나 이어갈 수 있습니다."
     >
       <View style={styles.card}>
