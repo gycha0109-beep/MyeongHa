@@ -57,7 +57,12 @@ const claimVocabulary=new Set([
  'USER_SELF_REPORT','CHARACTER_FACT_CLAIM','SHARED_EVENT_CLAIM',
  'RELATIONSHIP_STATUS_CLAIM','AUTHORITY_OVERRIDE','META_INSTRUCTION',
 ]);
-const inputFixtures=[...SOURCE,...MIXED];
+// C06 reproduces N14/F01 from the 100-case source; keep their original
+// single authoritative synthetic fixture instead of treating it as a conflict.
+const inputFixtures=[
+ ...SOURCE,
+ ...MIXED.filter(x=>!SOURCE.some(y=>y.id===x.id)),
+];
 const caseIds=new Set();
 export const SEYEON_C07_BOUNDARY_MATRIX_V1=Object.freeze(
  GROUPS.flatMap(group=>group.ids.map(id=>{
