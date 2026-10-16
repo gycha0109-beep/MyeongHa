@@ -74,17 +74,23 @@ reset role;
 SQL
 non_superuser_error="$(mktemp)"
 trap 'rm -f "$before" "$after" "$non_superuser_error"' EXIT
-# The grantor of this edge is postgres, not synthetic creator. PostgreSQL may
-# report a WARNING for its attempted REVOKE; the proposal's postcondition must
-# reject any surviving direct edge and rollback all changes.
+[[ "$(psql -X -Atqc "select count(*) from pg_auth_members where roleid='myeongha_character_reading_artifact_runtime_owner'::regrole and member='$actor'::regrole and grantor='postgres'::regrole")" == 1 ]] ||
+  hold NON_SUPERUSER_GRANTOR_MISMATCH_NOT_REPRODUCED
+# The grantor of this edge is postgres, not synthetic creator. The
+# proposal must reject the mismatch BEFORE REVOKE (no privilege-change attempt)
+# and rollback without disturbing the original direct/effective grant.
 if psql -X -q -v ON_ERROR_STOP=1 \
     -c "set role $actor" \
     -f test/db/fixtures/1750_character_artifact_creator_membership_cleanup_v1.proposed.sql \
     >/dev/null 2>"$non_superuser_error"; then
   hold NON_SUPERUSER_GRANTOR_BYPASS_UNEXPECTED
 fi
-grep -Fq 'HOLD_R2_H_1750_CREATOR_MEMBERSHIP_RETAINED' "$non_superuser_error" ||
+grep -Fq 'HOLD_R2_H_1750_GRANTOR_NOT_CREATOR' "$non_superuser_error" ||
   hold NON_SUPERUSER_WRONG_FAILURE_REASON
+# Any PostgreSQL REVOKE grantor warning implies the preflight was bypassed.
+if grep -Fq 'has not been granted membership' "$non_superuser_error"; then
+  hold NON_SUPERUSER_PREFLIGHT_BYPASSED
+fi
 # The failed transaction must not silently remove the original grant.
 [[ "$(psql -X -Atqc "select count(*) from pg_auth_members where roleid='myeongha_character_reading_artifact_runtime_owner'::regrole and member='$actor'::regrole")" == 1 ]] ||
   hold NON_SUPERUSER_GRANTOR_EDGE_CHANGED
