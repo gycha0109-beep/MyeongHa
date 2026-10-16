@@ -16,6 +16,8 @@ export function assertF01V2SingleDispatch(data,runId){
 }
 export function checkF01V2GitHubAdmission(){
  const id=process.env.GITHUB_RUN_ID;
+ if(process.env.GITHUB_RUN_ATTEMPT!=='1')
+  throw Error('C06 F01 V2 rerun attempt denied');
  if(!process.env.GH_TOKEN||
    process.env.GITHUB_REPOSITORY!=='gycha0109-beep/MyeongHa'||
    process.env.GITHUB_REF!=='refs/heads/main')

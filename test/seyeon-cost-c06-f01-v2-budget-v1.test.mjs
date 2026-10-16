@@ -59,6 +59,11 @@ describe('C06 F01 V2 two-call cumulative 100 KRW owner-budget estimate',()=>{
   expect(()=>q.reserve({...req(0),requestBodyBytes:7000})).toThrow();
   expect(()=>q.reserve({...req(0),modelKey:'gpt-5.6-terra'})).toThrow();
  });
+ it('rejects GitHub workflow retry even when the run ID stays unchanged',()=>{
+  const once=readFileSync(new URL('../scripts/seyeon-cost-c06-f01-v2-once-admission-v1.mjs',
+    import.meta.url),'utf8');
+  expect(once).toContain("GITHUB_RUN_ATTEMPT!=='1'");
+ });
  it('requires the current run to be the sole dispatch in GitHub history',()=>{
   const one={total_count:1,workflow_runs:[{
    id:100,event:'workflow_dispatch',head_branch:'main',

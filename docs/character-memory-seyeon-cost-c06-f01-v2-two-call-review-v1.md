@@ -18,7 +18,7 @@ Watchtower-Track: character-memory
 
 ## 중복 과금 방지
 - 독립 workflow seyeon-c06-f01-v2-manual-eval.yml은 main에서만 수동으로 1회 허용.
-- GitHub Actions API를 조회해 같은 workflow의 수동 실행이 **현재 run ID 하나뿐일 때만** 사용. 이후 Re-run 및 새 Run workflow는 거부. 동시 실행 방지는 concurrency.
+- GitHub Actions API를 조회해 같은 workflow의 수동 실행이 **현재 run ID 하나뿐이며 GITHUB_RUN_ATTEMPT=1일 때만** 사용. 이후 Re-run 및 새 Run workflow는 거부. 동시 실행 방지는 concurrency.
 - GitHub 과거 Run 보존과 API 정상 조회에 의존하므로 외부 공급자 지출 하드캡과 동등하진 않다.
 - 원래 8회 워크플로와 러너는 여전히 잠겨 있다. Secret OPENAI_API_KEY2 이외 사용하지 않는다.
 - 실행 Artifact는 case/topic/claimKinds, 토큰/지연/추정비용만 포함; 실제 응답 원문/개인정보 저장 금지.
