@@ -3,8 +3,8 @@ import type {
   MemoryItemV1,
   ReadingHistoryItemV1,
 } from '@myeongha/api-client';
-import { router } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { router, useLocalSearchParams } from 'expo-router';
+import { useEffect, useMemo, useState } from 'react';
 import {
   FlatList,
   RefreshControl,
@@ -101,7 +101,10 @@ function initialLoadingForTab(tab: RecordsTabV1, snapshots: ReturnType<typeof us
 }
 
 export default function RecordsScreen() {
-  const [tab, setTab] = useState<RecordsTabV1>('all');
+  const { tab: routeTab } = useLocalSearchParams<{ tab?: string }>();
+  const requestedTab: RecordsTabV1 = routeTab === 'readings' ? 'readings' : 'all';
+  const [tab, setTab] = useState<RecordsTabV1>(requestedTab);
+  useEffect(() => { setTab(requestedTab); }, [requestedTab]);
   const { snapshots, retryFailed, loadMore, refreshAll } = useMobileRecordsV1();
   const { refreshing, onRefresh } = useMobilePullRefreshV1(refreshAll);
 
