@@ -73,7 +73,12 @@ export function verifyR2GManifestLocalAgainstProduction(local,productionEvidence
 export function verifyR2GRemoteObservation(remoteEvidence){
  const x=envelope(remoteEvidence,'remote');
  return {
-  status:'HOLD_R2_G_REMOTE_LEXICAL_OVERLAP_ORIGIN_UNVERIFIED',
+  // The actor-provenance investigation was closed by explicit Owner risk
+  // acceptance on 2026-10-16. Evidence is still unverified as provenance;
+  // this is NEVER an authorization to repair/deploy Production.
+  status:'CLOSED_R2_G_HISTORICAL_ACTOR_AUDIT_RISK_ACCEPTED',
+  historicalActorAuditClosed:true,historicalActorRiskAccepted:true,
+  fullMigrationLineageParityProven:false,
   remoteSqlSha256:x.remoteSqlSha256,remoteBytes:x.remoteBytes,
   manifestRevokeTokens:x.lexicalIndicators.manifestRevoke,
   manifestGrantTokens:x.lexicalIndicators.manifestGrant,
