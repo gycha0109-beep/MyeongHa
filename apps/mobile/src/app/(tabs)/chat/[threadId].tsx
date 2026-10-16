@@ -2,7 +2,7 @@ import { parseChatThreadIdV1 } from '@myeongha/api-client';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useRef } from 'react';
 import {
-  ImageBackground, KeyboardAvoidingView, Platform, Pressable,
+  ImageBackground, KeyboardAvoidingView, Platform, Pressable, RefreshControl,
   SafeAreaView, ScrollView, StyleSheet, Text, View,
 } from 'react-native';
 
@@ -14,6 +14,7 @@ import {
 } from '@/features/chat/ChatReadComponents';
 import { useMobileChatThreadV1 } from '@/features/chat/use-mobile-chat-thread';
 import { mobileColors } from '@/ui/mobile-colors';
+import { useMobilePullRefreshV1 } from '@/ui/use-mobile-pull-refresh';
 
 const SEYEON_CHAT_THEME_BACKGROUND = require('../../../../assets/characters/chat-themes/seyeon-chat-theme-mobile-v1.webp');
 
@@ -27,8 +28,9 @@ function resolveThreadId(value: string | string[] | undefined): string | null {
 }
 
 function ValidChatThread({ threadId }: { threadId: string }) {
-  const { snapshot, loadMore, draft, setDraft, sending, sendStatus, send } =
+  const { snapshot, refresh, loadMore, draft, setDraft, sending, sendStatus, send } =
     useMobileChatThreadV1(threadId);
+  const { refreshing, onRefresh } = useMobilePullRefreshV1(refresh);
   const scrollRef = useRef<ScrollView>(null);
   const isSeyeonTheme = snapshot.characterId === 'seyeon';
 
@@ -42,6 +44,15 @@ function ValidChatThread({ threadId }: { threadId: string }) {
         style={styles.stream}
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
+        refreshControl={(
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => void onRefresh()}
+            enabled={!sending}
+            tintColor={mobileColors.navy}
+            colors={[mobileColors.navy]}
+          />
+        )}
         onContentSizeChange={() => {
           if (!snapshot.hasMore) scrollRef.current?.scrollToEnd({ animated: true });
         }}
