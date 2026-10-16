@@ -2,7 +2,9 @@
 
 > **현재: OWNER_CONDITIONALLY_APPROVED / EXECUTION=HOLD.** `saju_bridge_private`의 비활성 객체 생성만 허가됨. Owner의 승인으로 인증·Reading·허가증 발급·기능 공개·결제·고격리 R01–R14 검증이 되었다고 해석하지 않는다.
 
-> **2026-10-16 Owner 옵션 1 추가 지시:** 기존 zero-membership 계약을 유지하는 조사·설계·폐기형 PG17 양성/음성 테스트만 승인. 운영 DB 변경은 **별도 승인**. 공급자 지원 privileged 실행 경로는 아직 확인되지 않았으며 현행 수동 실행기는 계속 **재실행 금지**. 자세한 검증 경로, 공급자 질의 초안, 지원 불가 시 중단 조건은 [PG17 무멤버십 공급자 지원 경로 검토](./SAJU_BRIDGE_S3A_PG17_ZERO_MEMBERSHIP_PROVIDER_PATH_20261016.md) 참조.\n\n## 2026-10-16 실행 차단: PostgreSQL 17 비슈퍼유저 자동 ADMIN 멤버십
+> **2026-10-16 Owner 옵션 1 추가 지시:** 기존 zero-membership 계약을 유지하는 조사·설계·폐기형 PG17 양성/음성 테스트만 승인. 운영 DB 변경은 **별도 승인**. 공급자 지원 privileged 실행 경로는 아직 확인되지 않았으며 현행 수동 실행기는 계속 **재실행 금지**. 자세한 검증 경로, 공급자 질의 초안, 지원 불가 시 중단 조건은 [PG17 무멤버십 공급자 지원 경로 검토](./SAJU_BRIDGE_S3A_PG17_ZERO_MEMBERSHIP_PROVIDER_PATH_20261016.md) 참조.
+
+## 2026-10-16 실행 차단: PostgreSQL 17 비슈퍼유저 자동 ADMIN 멤버십
 
 - [수동 S3A 실행 #38846217625](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38846217625)는 최신 동일 백업/복원 검증, `verify-full` TLS, 정확한 SQL 해시와 트랜잭션 내 사전검사까지 통과한 후, **`saju-bridge-s3a-postcheck.sql:115`의 `S3A HOLD: unexpected explicit role membership`** 에서 `psql exit code 3`으로 중단됐다.
 - 실행기는 단일 트랜잭션이므로 해당 실패는 전량 ROLLBACK. 2026-10-16 03:40 UTC 운영 DB 읽기 전용 재확인에서 스키마/테이블/역할/함수 모두 존재하지 않으며, 마이그레이션은 173건이다. 사주 브릿지 운영 변경은 0건.
