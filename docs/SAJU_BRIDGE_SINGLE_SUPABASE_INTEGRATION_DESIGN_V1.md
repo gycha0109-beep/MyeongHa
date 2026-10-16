@@ -1,5 +1,8 @@
 # 사주 브릿지 — 기존 명하 Supabase 단일 프로젝트 통합 설계 v1 (2026-10-15)
 
+> **2026-10-16 후속 Owner 결정 — 활성 제품 설계는 [EXISTING_AUTHORITIES_V2 (새 DB 역할 0개)](./SAJU_BRIDGE_EXISTING_AUTHORITIES_NO_NEW_ROLES_V2_20261016.md)로 대체.** 기존 회원 Auth, `myeongha_runtime` 로그인과 `myeongha_api_executor` 실행 역할, Current Birth·서버 Saju 연결을 재사용한다. S3A의 신규 Permit Owner/Executor 역할 2개, private schema/테이블은 **일반 회원 사주 브릿지의 필수 의존성에서 삭제**했다. 이 문서의 아래 S1–S3A 기술·승인 계획은 **옛 역할 생성 기반 설계의 역사적 기록**이며 신규 작업 지침으로 사용하면 안 된다. S3A SQL은 수정·실행하지 않고 원형 보존한다. 실제 운영 DB 변경, 기능 공개, 추가 Auth/DB 권한, Reading/판매·R01–R14 운영 승인은 여전히 HOLD. 기존 HTTP 계산 라우트는 존재하나 preview 외부 라우트는 아직 설치되지 않았다.
+
+
 Watchtower-Track: saju-bridge
 
 > **2026-10-16 운영 상태 우선:** S1·S2 소스/폐기형 검증은 완료됐으나 **S3A 비활성 DB 객체 적용은 `BLOCKED/HOLD`**이다. PostgreSQL 17의 운영 `postgres`는 비슈퍼유저 `CREATEROLE`이며 새 역할 생성 시 자동 bootstrap ADMIN 멤버십이 생겨, 승인된 `1730` SQL의 zero-membership 최종 검사를 통과할 수 없다. 실제 단일 트랜잭션 [#38846217625](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38846217625)은 ROLLBACK되고 대상 스키마·역할·테이블·함수 0건이었다. [#2156](https://github.com/gycha0109-beep/MyeongHa/pull/2156) 병합 / [고정 통합 CI #38847796203](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38847796203) SUCCESS로 **객체 생성 전 거부**를 검증했다. 현행 계정으로 실행/재시도하지 않으며, 승인된 SQL·SHA256·Git blob·zero-membership postcheck를 변경하거나 보안을 완화하지 않는다. 재개에는 공급자가 지원하는 안전한 권한 경로의 검증 또는 새로운 역할 권한 계약에 대한 **별도 명시적 Owner 승인**이 필요하다. [S3A 운영 런북](./SAJU_BRIDGE_S3A_GUARDED_MANUAL_APPLY_RUNBOOK_20261016.md)과 [이슈 #1871](https://github.com/gycha0109-beep/MyeongHa/issues/1871)이 실행 게이트의 최신 근거다.
