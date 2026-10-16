@@ -1,5 +1,5 @@
 name: Saju Bridge S3A Guard Tests
-run-name: "[WT:saju-bridge] S3A guarded executor PR tests (disposable only)"
+run-name: "Saju Bridge S3A guarded executor PR tests (disposable only)"
 
 on:
   pull_request:
