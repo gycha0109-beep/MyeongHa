@@ -1,5 +1,7 @@
 # 명하 공식 사주 해설 × 단일 일반 채팅방 — 단계별 구현 로드맵 v1
 
+> **2026-10-16 진행 상태 갱신:** 아래 S0~S8, 2026-10-12 완료/미완료 표는 당시의 정확한 기록입니다. #1983/#1984/#1987과 Commerce 취소 보안 Draft #2118~#2153 후속 증거를 반영한 **현재 실행 순서/중복 제거/출시 HOLD**는 [`COMMERCE_READER_PAYMENT_INTEGRATION_ROADMAP_20261016_V2.md`](../COMMERCE_READER_PAYMENT_INTEGRATION_ROADMAP_20261016_V2.md)를 먼저 참조하십시오. S2의 오프라인 경합 검증이 진전됐어도 실제 Writer+T2 통합 승인은 아직 입증되지 않았으며, 기존 단계별 수락 조건은 유지됩니다.
+
 - 기준: 2026-10-12 제품 결정 `docs/MOBILE_READER_PRODUCT_OWNER_DECISION_20261012_V1.md`.
 - 작업 분류: `db-authority-core`; 관련 Reader RR-03/04/09, 결제·권한 경합 #1827, 출처 저장 #1884, 운영 복구 #1941.
 - 상태: **설계·비공개 검증 진행 / 유료 해설 공개 금지 / 결제 개시 금지 / 운영 DB 변경 금지**.
