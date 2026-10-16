@@ -190,4 +190,10 @@ IFS='|' read -r receipt2 event2 replay2 <<<"$second"
  where source_receipt_id='$receipt'::uuid")" == 1 ]] ||
  fail "replay created a duplicate Grant"
 pass "verified evidence replay converges without duplicate Grant"
+
+# M1-06: re-run D2 issue + binder against this same REAL 1050 Receipt,
+# proving that only the authoritative original effect timestamps can replay.
+bash test/db/official_reader_m1_06_verified_receipt_semantic_replay.sh \
+ "$receipt" "$subject" "$intent" "$session" "$proposal" "$grant" "$official"
+
 echo "PASS M1-02: isolated PG receipt-to-D2 only; runtime authorization/T2 remain HOLD"
