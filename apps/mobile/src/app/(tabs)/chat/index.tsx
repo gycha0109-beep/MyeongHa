@@ -40,6 +40,12 @@ export default function ChatHubScreen() {
         <Text style={styles.body}>
           캐릭터별 분위기를 둘러보세요. 대화방과 기존 기록은 현재 회원 계정에 연결됩니다.
         </Text>
+        <Text style={styles.note}>
+          세연은 회원 로그인 후 AI 대화가 가능하며, 다른 대리자의 AI 답변은 준비 중입니다.
+        </Text>
+        <Text style={styles.note}>
+          최근 대화 목록은 아직 서버에서 제공하지 않아 별도 목록으로 표시하지 않습니다.
+        </Text>
         {state.access === 'checking' ? (
           <View style={styles.centerState}>
             <ActivityIndicator color={mobileColors.navy} />
