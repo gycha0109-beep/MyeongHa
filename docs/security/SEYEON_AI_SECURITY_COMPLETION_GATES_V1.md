@@ -28,6 +28,8 @@ AI 경량 보안 정책 평가: [#1816](https://github.com/gycha0109-beep/Myeong
 | G5 통합 검증 | 실제 DB·HTTP·AI 제어 경로, 정확한 HEAD CI·Governance·전체 Integration | 권한/유출/무단 유료 호출 핵심 0, PostgreSQL 2세션 race 모두 PASS | Security + QA | **HOLD** |
 | G6 운영 승인 | 제한적 synthetic + 내부 smoke, privacy-safe 관측·경보·복구·권한/배포 승인 | 승인자·범위·증거 URL·본번 main sha·rollback 기준·잔여 위험 명시 | Integration Owner | **HOLD** |
 
+> **S2 G0 정책 초안**: [동의 취소·재승인·과거 대화 출처·Reveal 선형화 후보 v1](SEYEON_G0_REVOKE_REGRANT_REVEAL_POLICY_CANDIDATE_V1.md). Shadow-only 검증은 결함 재현 및 설계 증거이며 G0 승인/G2 원자 Commit/G3 HTTP 공개 PASS가 아니다.
+
 ## G0 결정이 필요한 구체적 권한 계약
 
 ### 1. 정확히 모델에 들어가는 데이터
