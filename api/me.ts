@@ -36,6 +36,7 @@ const CHAT_THREAD_PARAM = '__myeongha_chat_thread_id' as const;
 const CHAT_TURN_SEND_PARAM = '__myeongha_chat_turn_send' as const;
 const VERCEL_DYNAMIC_CHAT_THREAD_PARAM = 'threadId' as const;
 const CHAT_CURSOR_PARAM = 'afterSequenceNo' as const;
+const CHAT_PAGE_SIZE_PARAM = 'pageSize' as const;
 const TARGET_PERSON_READ_PARAM = '__myeongha_target_person_read' as const;
 const TARGET_PERSON_ID_PARAM = '__myeongha_target_person_id' as const;
 const DEVICE_INSTALLATION_ACTION_PARAM = '__myeongha_device_installation_action' as const;
@@ -173,7 +174,7 @@ type DispatchTarget =
       readonly readingId?: string;
     }
   | { readonly kind: 'chat-open'; readonly route: typeof CHAT_OPEN_ROUTE }
-  | { readonly kind: 'chat-read'; readonly route: string; readonly afterSequenceNo?: string }
+  | { readonly kind: 'chat-read'; readonly route: string; readonly afterSequenceNo?: string; readonly pageSize?: string }
   | { readonly kind: 'chat-turn-send'; readonly route: string; readonly threadId: string }
   | {
       readonly kind: 'target-person-list';
@@ -327,6 +328,7 @@ function resolveDispatchTarget(request: Request): DispatchTarget | null {
     CHAT_TURN_SEND_PARAM,
     VERCEL_DYNAMIC_CHAT_THREAD_PARAM,
     CHAT_CURSOR_PARAM,
+    CHAT_PAGE_SIZE_PARAM,
     TARGET_PERSON_READ_PARAM,
     TARGET_PERSON_ID_PARAM,
     DEVICE_INSTALLATION_ACTION_PARAM,
@@ -370,6 +372,18 @@ function resolveDispatchTarget(request: Request): DispatchTarget | null {
   if (vercelDynamicThreadId === null) return null;
   const afterSequenceNo = getSingleNonEmptyParam(url.searchParams, CHAT_CURSOR_PARAM);
   if (afterSequenceNo === null) return null;
+  const pageSize = getSingleNonEmptyParam(url.searchParams, CHAT_PAGE_SIZE_PARAM);
+  if (pageSize === null) return null;
+  // Page size belongs only to an authenticated owner-scoped Chat read.
+  // Reject unknown/mixed pagination instead of silently stripping it.
+  if (pageSize !== undefined && (
+    request.method !== 'GET' ||
+    chatThreadId === undefined ||
+    chatTurnSend !== undefined ||
+    !/^[1-9][0-9]*$/u.test(pageSize) ||
+    !Number.isSafeInteger(Number(pageSize)) ||
+    Number(pageSize) > 50
+  )) return null;
 
   const sajuPreviewReading = getSingleNonEmptyParam(
     url.searchParams,
@@ -669,6 +683,7 @@ function resolveDispatchTarget(request: Request): DispatchTarget | null {
     kind: 'chat-read',
     route: `${CHAT_ROUTE_PREFIX}${chatThreadId}`,
     ...(afterSequenceNo === undefined ? {} : { afterSequenceNo }),
+    ...(pageSize === undefined ? {} : { pageSize }),
   };
 }
 
@@ -685,8 +700,13 @@ export function toCanonicalMeRequestForTestV1(
   if (target === null) throw new Error('Cannot canonicalize an unresolved /api/me dispatch target.');
 
   const url = new URL(`https://myeongha.internal${target.route}`);
-  if (target.kind === 'chat-read' && target.afterSequenceNo !== undefined) {
-    url.searchParams.set(CHAT_CURSOR_PARAM, target.afterSequenceNo);
+  if (target.kind === 'chat-read') {
+    if (target.afterSequenceNo !== undefined) {
+      url.searchParams.set(CHAT_CURSOR_PARAM, target.afterSequenceNo);
+    }
+    if (target.pageSize !== undefined) {
+      url.searchParams.set(CHAT_PAGE_SIZE_PARAM, target.pageSize);
+    }
   }
   if (target.kind === 'records' && target.route === READINGS_ROUTE && target.readingId !== undefined) {
     url.searchParams.set(READING_RECORD_ID_PARAM, target.readingId);

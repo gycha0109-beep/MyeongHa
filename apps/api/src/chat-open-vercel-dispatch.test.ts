@@ -90,4 +90,44 @@ describe('POST /api/chat Vercel dispatch', () => {
     );
     expect(canonical.method).toBe('GET');
   });
+  it('accepts and preserves the Android pageSize=30 on the rewritten Chat read request', async () => {
+    const request = new Request(
+      `https://myeongha.vercel.app/api/me?__myeongha_chat_thread_id=${THREAD_ID}&afterSequenceNo=0&pageSize=30`,
+      { headers: { Authorization: 'Bearer member-token' } },
+    );
+    const target = resolveMeDispatchTargetForTestV1(request);
+    expect(target).toEqual({
+      kind: 'chat-read',
+      route: `/api/chat/${THREAD_ID}`,
+      afterSequenceNo: '0',
+      pageSize: '30',
+    });
+    const canonical = toCanonicalMeRequestForTestV1(request, target ?? undefined);
+    expect(canonical.url).toBe(
+      `https://myeongha.internal/api/chat/${THREAD_ID}?afterSequenceNo=0&pageSize=30`,
+    );
+    expect(canonical.headers.get('authorization')).toBe('Bearer member-token');
+  });
+
+  it('accepts pageSize when Vercel preserves the original Chat read pathname', () => {
+    const request = new Request(
+      `https://myeongha.vercel.app/api/chat/${THREAD_ID}?__myeongha_chat_thread_id=${THREAD_ID}&afterSequenceNo=0&pageSize=30`,
+    );
+    expect(resolveMeDispatchTargetForTestV1(request)).toMatchObject({
+      kind: 'chat-read', pageSize: '30',
+    });
+  });
+
+  it.each([
+    `https://myeongha.vercel.app/api/me?__myeongha_chat_thread_id=${THREAD_ID}&pageSize=0`,
+    `https://myeongha.vercel.app/api/me?__myeongha_chat_thread_id=${THREAD_ID}&pageSize=51`,
+    `https://myeongha.vercel.app/api/me?__myeongha_chat_thread_id=${THREAD_ID}&pageSize=NaN`,
+    `https://myeongha.vercel.app/api/me?__myeongha_chat_thread_id=${THREAD_ID}&pageSize=30&pageSize=30`,
+    'https://myeongha.vercel.app/api/me?__myeongha_chat_open=1&pageSize=30',
+    `https://myeongha.vercel.app/api/me?__myeongha_chat_turn_send=1&__myeongha_chat_thread_id=${THREAD_ID}&pageSize=30`,
+    'https://myeongha.vercel.app/api/me?pageSize=30',
+  ])('rejects invalid or cross-route pageSize: %s', (url) => {
+    expect(resolveMeDispatchTargetForTestV1(new Request(url))).toBeNull();
+  });
+
 });
