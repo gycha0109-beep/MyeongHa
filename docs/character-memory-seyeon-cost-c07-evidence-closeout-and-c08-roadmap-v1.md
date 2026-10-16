@@ -90,6 +90,9 @@ Watchtower-Track: character-memory
 
 ### C08-C — 권한·기억·자연스러움 순서
 
+> **C08-C 현재 구현:** 관계 상태가 비어 있어도 실제 대화 Context에 이전 메시지가 있으면 3회 첫 대화 Shadow 경로를 거부하고, 기억/분류 실패 상황의 무료 회귀를 추가했습니다. [상세 검증 범위](character-memory-seyeon-c08c-first-turn-privacy-retry-offline-v1.md). 전체 DB 대화 이력 기반 첫 턴 증빙·실제 철회 경쟁 조건·Production 전환은 **미완료(HOLD)**입니다.
+
+
 1. **권한 및 Fail-Closed P0:** 권한 미허가, revoked grant, 타인 소유, 잘못된 공유 사건/관계 조작, state retry/disconnect 검증. 이 단계가 빠지면 다음 단계 승격 불가.
 2. **3회 Shadow 전경로 검증 P0:** deterministic inputs / guard / fallback + turn count 계측. Production turn-send/DB/ACL 변경 없음.
 3. **Persona P1:** 첫 만남·친밀도·갈등·장기 재방문·공감/질문 균형에 대해 두 경로의 사람 평가 프로토콜과 blindness 확보. 테스트 PASS는 사람 평가 대체 불가.
