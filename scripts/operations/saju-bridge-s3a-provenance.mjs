@@ -36,6 +36,7 @@ export function validateAuthority(env, now = Date.now()) {
     env.GITHUB_RUN_ATTEMPT === '1', 'UNAUTHORIZED_DISPATCH_OR_RERUN');
   requireCondition(env.MYEONGHA_WATCHTOWER_TRACK === 'saju-bridge' &&
     env.S3A_CONFIRM === S3A.confirm &&
+    env.S3A_STOP_OWNER === S3A.actor &&
     env.SUPABASE_PROJECT_ID === S3A.project, 'OWNER_SCOPE_MISMATCH');
   requireCondition(/^[0-9a-f]{40}$/.test(env.GITHUB_SHA ?? ''), 'INVALID_HEAD_SHA');
   requireCondition(numericId(env.S3A_BACKUP_RUN_ID) &&
