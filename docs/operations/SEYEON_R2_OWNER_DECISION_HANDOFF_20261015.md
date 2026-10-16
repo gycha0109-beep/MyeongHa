@@ -110,3 +110,9 @@ from supabase_migrations.schema_migrations where version='20261008090417';
 - 비슈퍼유저의 효과도 단순히 `ADMIN OPTION`을 받았다는 사실만으로 보장되지 않는다. [PR #2147](https://github.com/gycha0109-beep/MyeongHa/pull/2147)의 최초 [PG17 #38843237739](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38843237739)은 합성 NOLOGIN/NOSUPERUSER/NOINHERIT/NOCREATEROLE Creator가 **postgres가 부여한 membership**을 `REVOKE ... FROM current_user`로 제거하려 했을 때 경고를 남기고 직접 edge가 계속 남음을 보여 주었다. 1750의 내부 검증은 `HOLD_R2_H_1750_CREATOR_MEMBERSHIP_RETAINED`로 실패. **이는 grantor별 권한 경계를 보여 주는 중요한 반증**이며, 비슈퍼유저 Creator에서 성공한 것으로 해석하면 안 된다.
 - 수정된 PG17 검증은 같은 합성 Actor에 임시 `ADMIN OPTION`을 부여하고 **1750 후보의 거부 동작과 트랜잭션 rollback**을 기대하며 검사한다. 직접 edge·유효 `MEMBER`가 **그대로 유지**돼야 하고, 원 grantor인 CI `postgres`만 격리 DB에서 임시 edge를 정리한다. 합성 Creator 삭제 및 기존 카탈로그/Owner/RLS/ACL 불변을 검증한다. 1750 **후보 SQL과 원본 1530은 수정하지 않는다.**
 - **Owner 결정:** 실제 Production migration creator와 역할 멤버십 **grantor/admin option/inheritance**가 알려지지 않았다. Owner가 원본·실제 실행 권한과 정책을 별도 감사하고, 필요한 경우 새로운 명시적 승인·forward-only 계획을 세우기 전에는 `1750` 운영 적용 금지. 해당 부정 검증의 CI SUCCESS는 **배포 후보 승인이나 비슈퍼유저 실제 접근 제거 증거가 아니다**. R2-G/1520~1720 21건/G0~G6/유료·공개/DR Ready HOLD, `authorizedForProduction=false`, `drReady=false`.
+
+## 10. 2026-10-16 후속 Owner 결정 — R2-G 과거 실행자 감사 개발 차단 해제
+
+[2026-10-16 R2-G 사용자 위험 수용 정본](SEYEON_R2_G_OWNER_RISK_ACCEPTANCE_20261016.md)이 위 1~9절의 **당시 미승인 조사 상태를 업데이트**한다. 과거 실행자/관리 API 요청 ID/COMMIT 감사 추적 항목은 `CLOSED_RISK_ACCEPTED`로 종료하고, 이 항목만으로 이후 안전한 개발·테스트·PR 병합을 막지 않는다. 실재하지 않는 과거 인증 증거를 만들거나 `originEstablished=true`로 바꾸지 않는다.
+
+**운영 적용은 독립:** 저장소↔운영 객체/함수·권한 parity, 후속 마이그레이션 순서, DR 복원, 유료 AI·공개 Reader 활성화는 각각 별도 검증/범위 승인. `authorizedForProduction=false`, `drReady=false`. 사용자 결정으로 해제된 것은 **R2-G의 역사적 행위자 조사 차단**이지 21개 운영 SQL 일괄 적용 권한이 아니다.
