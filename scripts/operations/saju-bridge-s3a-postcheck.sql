@@ -95,12 +95,16 @@ begin
     then raise exception 'S3A HOLD: function/schema exposed to %', v_role; end if;
   end loop;
 
-  if pg_catalog.pg_has_role('postgres',
-       'myeongha_saju_bridge_permit_owner','MEMBER')
-    or pg_catalog.pg_has_role(
-       'myeongha_saju_bridge_permit_executor',
-       'myeongha_saju_bridge_permit_owner','MEMBER')
-  then raise exception 'S3A HOLD: unexpected role membership'; end if;
+  -- pg_has_role(MEMBER) includes a superuser's implicit privileges;
+  -- only pg_auth_members proves an actual role membership grant.
+  if exists (
+    select 1 from pg_catalog.pg_auth_members m
+    join pg_catalog.pg_roles r on r.oid = m.roleid
+    where r.rolname in (
+      'myeongha_saju_bridge_permit_owner',
+      'myeongha_saju_bridge_permit_executor'
+    )
+  ) then raise exception 'S3A HOLD: unexpected explicit role membership'; end if;
 
   select count(*) into v_count from supabase_migrations.schema_migrations;
   if v_count <> 173 or exists (
