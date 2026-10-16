@@ -2,6 +2,16 @@
 
 > **현재: OWNER_CONDITIONALLY_APPROVED / EXECUTION=HOLD.** `saju_bridge_private`의 비활성 객체 생성만 허가됨. Owner의 승인으로 인증·Reading·허가증 발급·기능 공개·결제·고격리 R01–R14 검증이 되었다고 해석하지 않는다.
 
+## 2026-10-16 실행 차단: PostgreSQL 17 비슈퍼유저 자동 ADMIN 멤버십
+
+- [수동 S3A 실행 #38846217625](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38846217625)는 최신 동일 백업/복원 검증, `verify-full` TLS, 정확한 SQL 해시와 트랜잭션 내 사전검사까지 통과한 후, **`saju-bridge-s3a-postcheck.sql:115`의 `S3A HOLD: unexpected explicit role membership`** 에서 `psql exit code 3`으로 중단됐다.
+- 실행기는 단일 트랜잭션이므로 해당 실패는 전량 ROLLBACK. 2026-10-16 03:40 UTC 운영 DB 읽기 전용 재확인에서 스키마/테이블/역할/함수 모두 존재하지 않으며, 마이그레이션은 173건이다. 사주 브릿지 운영 변경은 0건.
+- **재현된 원인:** 실제 Supabase Production `postgres`는 `rolsuper=false`, `rolcreaterole=true`인 PostgreSQL 17 계정이다. PostgreSQL 16+에서는 비슈퍼유저 `CREATEROLE`이 새 역할을 생성하면 bootstrap superuser 명의의 `ADMIN TRUE / SET FALSE / INHERIT FALSE` 멤버십이 생성자에게 자동 부여된다. 비슈퍼유저 생성자가 `REVOKE ... FROM CURRENT_USER`를 해도 해당 bootstrap grant를 제거하지 못한다. [PostgreSQL 17 role-attributes 공식 문서](https://www.postgresql.org/docs/17/role-attributes.html).
+- **승인된 불변 SQL과 보안 조건의 충돌:** 원본 `1730`은 `pg_auth_members` 대상 멤버십 **0건**을 필수로 요구하지만, 현재 Production 관리 접속자는 자동 멤버십을 회피/제거할 수 없다. 임의로 postcheck를 완화하거나 새 비밀값/슈퍼유저 우회를 마련하는 것은 Owner가 승인한 정확한 적용 범위를 벗어난다.
+- 재발 방지를 위해 `saju-bridge-s3a-preflight.sql`에서 `rolsuper`를 확인하고 **객체 생성 전** `S3A HOLD: PostgreSQL 17 non-superuser role creator cannot satisfy zero-membership contract`를 발생시키도록 개선했다. 별도 disposable PG17 CI는 비슈퍼유저 CREATEROLE의 자동 bootstrap ADMIN 멤버십을 실증하고, 기존 SQL/후속 단계가 실행되기 전에 실패하며 객체가 남지 않는지 확인한다. 승인된 원본 `1730` 및 SHA256/Git blob, 최종 `postcheck`의 무멤버십 불변 조건은 변경하지 않는다.
+- **즉시 중단:** 현행 프로덕션 계정으로 수동 워크플로를 **재실행하지 않는다**. 기존 백업/복원/시간 조건이 충족되어도 정상 적용이 불가능하다.
+- **다음 Owner 승인 분기 필요:** (1) 원래 무멤버십 조건을 충족하는 공급자 지원·감사 가능한 역할 설치 권한 및 실행 경로를 별도 검증/승인하거나, (2) bootstrap 자동 관리자 멤버십 위험을 명시적으로 수용하고 역할 위임·재위임 공격면을 재설계한 새로운 권한 계약과 exact SQL/checks/증빙에 대해 별도 승인한다. 어느 경로도 이번 조건부 S3A 승인에 포함되지 않는다. 모든 제품 기능·발급·판매·운영 admission은 HOLD.
+
 ## 승인된 정확한 소스
 
 - 기존 단일 Supabase `MyengHa` (`cnsfpcdiyofqvhpcegfc`), PostgreSQL major 17.
