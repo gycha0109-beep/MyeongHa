@@ -116,6 +116,8 @@ pass REPLAY_FAIL_CLOSED
 # The validated NULL-safe constraints must also allow a genuine synthetic
 # governed admission -> Provider Store -> fenced Claim -> detached Settle -> Ack.
 # Reuse the existing least-privilege real-RPC fixture in this disposable PG17 DB.
-bash test/db/seyeon_governed_cost_d4b10c1_provider_receipt_queue.sh || hold VALIDATED_CONSTRAINTS_POSITIVE_E2E_FAILED
+SEYEON_R2_H_1730_RESERVED_NEGATIVE=1 \
+  bash test/db/seyeon_governed_cost_d4b10c1_provider_receipt_queue.sh || hold VALIDATED_CONSTRAINTS_POSITIVE_E2E_FAILED
+pass RESERVED_MALFORMED_REAL_RPC_ATOMIC_REJECTION_BUDGET_UNCHANGED
 pass VALIDATED_CONSTRAINTS_REAL_RPC_STORE_CLAIM_SETTLE_ACK_SYNTHETIC
 echo "HOLD_R2_H_1730_OWNER_APPROVAL_REQUIRED actualFundedE2E=false syntheticReservedReceiptE2E=true sourceLineageReconciled=false productionWrites=0 drReady=false"
