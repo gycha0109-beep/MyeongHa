@@ -98,42 +98,81 @@ for signature in \
 done
 pass "runtime Commerce executor remains denied both private D2 functions"
 
-# D2 calls below use the *isolated PG fixture owner*, never an API executor.
-issued="$(p -c "begin;
- select pg_catalog.set_config('myeongha.subject_id','$subject',true);
- select result_grant_id,result_replayed
- from public.internal_apply_official_reader_unified_receipt_v1(
+# M1-03: The existing verified Receipt MUST survive a downstream bind
+# error while ALL issuance writes from the same transaction are rolled back.
+# Use the isolated DB fixture owner, NOT an API or Commerce runtime account.
+tmp_error="$(mktemp)"
+trap 'rm -f "$tmp_error"' EXIT
+if p <<SQL > /dev/null 2>"$tmp_error"; then
+begin;
+select pg_catalog.set_config('myeongha.subject_id','$subject',true);
+select result_grant_id
+from public.internal_apply_official_reader_unified_receipt_v1(
  '$receipt'::uuid,array['test-reader-unit'],
  array[transaction_timestamp()],array[transaction_timestamp()],
  array[null]::timestamptz[],array[null]::text[]);
- commit;" | grep -E '^[0-9a-f-]{36}\|[tf]$')"
-IFS='|' read -r grant issue_replay <<<"$issued"
-[[ -n "$grant" && "$issue_replay" == f ]] ||
- fail "D2 did not issue new purchased Grant: $issued"
-[[ "$(p -c "select count(*) from public.entitlement_grants
- where id='$grant'::uuid and source_receipt_id='$receipt'::uuid
- and subject_id='$subject'::uuid and status='active'")" == 1 ]] ||
- fail "D2 grant does not bind exact verified Receipt"
+-- Deliberately invalid *bind* request hash; after successful issue above.
+select reading_id from public.internal_cmd_bind_official_reader_unified_v1(
+ '$subject'::uuid,'$intent'::uuid,'$session'::uuid,'$proposal'::uuid,
+ 'not-a-request-hash','standard-reading-access-bind-v2',
+ pg_catalog.jsonb_build_object('schemaVersion','standard-reading-access-bind-v2',
+ 'purchaseIntentId','$intent'));
+commit;
+SQL
+ fail "invalid Reader bind unexpectedly committed after D2 issuance"
+fi
+grep -q 'cmd_standard_reading_access_v2_request_hash\|request hash is invalid' "$tmp_error" ||
+ { cat "$tmp_error" >&2; fail "D2 failure was not the intended downstream bind error"; }
 
-bound="$(p -c "begin;
- select pg_catalog.set_config('myeongha.subject_id','$subject',true);
- select reading_id,entitlement_grant_id,access_role,official_reading_created
- from public.internal_cmd_bind_official_reader_unified_v1(
+[[ "$(p -c "select count(*) from public.commerce_receipts
+ where id='$receipt'::uuid and verification_status='verified'")" == 1 ]] ||
+ fail "downstream failure lost already-committed canonical Receipt"
+[[ "$(p -c "select count(*) from public.entitlement_grants
+ where source_receipt_id='$receipt'::uuid")" == 0 ]] ||
+ fail "failed bind left a phantom purchased Grant"
+[[ "$(p -c "select count(*) from public.standard_reading_reader_access_grants
+ where purchase_intent_id='$intent'::uuid")" == 0 ]] ||
+ fail "failed bind left immutable Reader access"
+pass "failed bind rolls back same-transaction issuance; verified Receipt remains"
+
+# Retrying from the same persisted Receipt now issues AND binds in a single
+# READ COMMITTED transaction. No new provider lookup or Evidence insert.
+atomic="$(p <<SQL
+begin;
+select pg_catalog.set_config('myeongha.subject_id','$subject',true);
+select 'ISSUE',result_grant_id,result_replayed
+from public.internal_apply_official_reader_unified_receipt_v1(
+ '$receipt'::uuid,array['test-reader-unit'],
+ array[transaction_timestamp()],array[transaction_timestamp()],
+ array[null]::timestamptz[],array[null]::text[]);
+select 'BIND',reading_id,entitlement_grant_id,access_role,official_reading_created
+from public.internal_cmd_bind_official_reader_unified_v1(
  '$subject'::uuid,'$intent'::uuid,'$session'::uuid,'$proposal'::uuid,
  'sha256:v1:$(printf '7%.0s' {1..64})',
  'standard-reading-access-bind-v2',
  pg_catalog.jsonb_build_object('schemaVersion','standard-reading-access-bind-v2',
- 'purchaseIntentId','$intent')); commit;" |
- grep -E '^[0-9a-f-]{36}\|[0-9a-f-]{36}\|')"
-IFS='|' read -r bound_reading bound_grant role created <<<"$bound"
-[[ "$bound_reading" == "$official" && "$bound_grant" == "$grant" &&
+ 'purchaseIntentId','$intent'));
+commit;
+SQL
+)"
+issue_line="$(printf '%s\n' "$atomic" | grep '^ISSUE|')"
+bind_line="$(printf '%s\n' "$atomic" | grep '^BIND|')"
+IFS='|' read -r issue_marker grant issue_replay <<<"$issue_line"
+IFS='|' read -r bind_marker bound_reading bound_grant role created <<<"$bind_line"
+[[ "$issue_marker" == ISSUE && "$bind_marker" == BIND &&
+ -n "$grant" && "$issue_replay" == f &&
+ "$bound_reading" == "$official" && "$bound_grant" == "$grant" &&
  "$role" == additional_reader && "$created" == f ]] ||
- fail "D2 bind failed to reuse official Reading/Grant: $bound"
+ fail "atomic D2 issuance/bind mismatch: $atomic"
+[[ "$(p -c "select count(*) from public.entitlement_grants
+ where id='$grant'::uuid and source_receipt_id='$receipt'::uuid
+ and subject_id='$subject'::uuid and status='active'")" == 1 ]] ||
+ fail "atomic Grant does not match exact 1050 Receipt"
 [[ "$(p -c "select count(*) from public.standard_reading_reader_access_grants
  where purchase_intent_id='$intent'::uuid and entitlement_grant_id='$grant'::uuid
  and official_reading_id='$official'::uuid")" == 1 ]] ||
- fail "Reader access row missing"
-pass "real 1050 Receipt -> private D2 purchased Grant -> Reader binding"
+ fail "atomic bind did not persist exact purchase-backed Reader access"
+pass "verified Receipt retry atomically issues Grant and binds existing Official Reading"
 
 second="$(persist)"
 IFS='|' read -r receipt2 event2 replay2 <<<"$second"
