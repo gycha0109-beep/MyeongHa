@@ -1,5 +1,7 @@
 # COST-07 — F01 이외 한국어 질문·사실 주장 경계 검증
 
+> **2026-10-16 사후 상태 갱신:** 실제 모델 F02/R01/H02 3개 사례 × Original/Compact 6회가 [Actions #38859692050](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38859692050)에서 Gold 6/6 MATCH로 완료되었습니다. 이 문서의 기존 5회 누적 및 '다음 유료 후보' 설명은 **그 이전 설계 이력**으로만 유지합니다. 누적 11회 / 추정 3,770 microUSD / 예약 36,047 microUSD(가정 환산 90.1175원), 미측정 66/72 슬롯이며 새 유료 호출은 금지입니다. 현재 공식 상태는 [C07 closeout/C08 roadmap](character-memory-seyeon-cost-c07-evidence-closeout-and-c08-roadmap-v1.md)에 기록했습니다.
+
 Watchtower-Track: character-memory
 상태: **무과금 오프라인 품질 판정기 구현 / 다표본 실모델 정확도 HOLD**
 
