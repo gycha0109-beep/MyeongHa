@@ -89,6 +89,11 @@ IFS='|' read -r receipt event replay <<<"$first"
  fail "1050 unexpectedly minted a Grant"
 pass "real 1050 role-scoped Receipt/Event persistence, zero Grant"
 
+# M1-10: no visible committed D2 effects after verified Receipt is never
+# proof that a lost COMMIT failed; automatic reissue must remain HOLD.
+bash test/db/official_reader_m1_10_unknown_commit_source.sh \
+ "$receipt" "$subject" "$intent" preissue none none
+
 for signature in \
  'public.internal_apply_official_reader_unified_receipt_v1(uuid,text[],timestamptz[],timestamptz[],timestamptz[],text[])' \
  'public.internal_cmd_bind_official_reader_unified_v1(uuid,uuid,uuid,uuid,text,text,jsonb)'; do
@@ -208,5 +213,10 @@ bash test/db/official_reader_m1_06_verified_receipt_semantic_replay.sh \
 # the already-committed verified Receipt and same-Grant/Reading replay.
 bash test/db/official_reader_m1_07_private_replay_source_sql.sh \
  "$receipt" "$subject" "$intent" "$grant" "$official"
+
+# M1-10: model lost caller COMMIT acknowledgement after the existing
+# successful private owner commit, then inspect exact DB lineage, READ ONLY.
+bash test/db/official_reader_m1_10_unknown_commit_source.sh \
+ "$receipt" "$subject" "$intent" committed "$grant" "$official"
 
 echo "PASS M1-02: isolated PG receipt-to-D2 only; runtime authorization/T2 remain HOLD"
