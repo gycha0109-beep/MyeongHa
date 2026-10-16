@@ -73,6 +73,9 @@ Watchtower-Track: character-memory
 
 ### C08-B — 5회와 3회 end-to-end Shadow 비교 계획 (오프라인부터)
 
+> **구현 현황:** 공개 첫 만남을 대상으로 실제 서버 Guard를 호출하는 **모의 Provider 5회/3회 비교 테스트**를 추가했습니다. [C08-B 오프라인 비교](character-memory-seyeon-c08b-five-three-real-guards-offline-v1.md). 이는 E2E Production, 유료 모델 정확도, 장기 기억 동등성의 검증 완료가 아닙니다.
+
+
 동일 synthetic 입력 / 동일 사전 상태 / 동일 캐릭터 Canon 버전 / 동일 허용된 기억 Grant snapshot을 사용하되, 각 경로의 실제 실행 topology를 추적한다.
 
 | 검증 단계 | 비교 내용 | 불합격 / HOLD |
