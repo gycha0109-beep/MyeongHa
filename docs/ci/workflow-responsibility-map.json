@@ -308,6 +308,18 @@
       "mainMode": "narrow",
       "workTrackAttribution": "pr-metadata"
     },
+    "saju-bridge-s3a-guard-ci.yml": {
+      "responsibility": "saju-bridge-s3a-disposable-pg17-verification",
+      "prMode": "narrow",
+      "mainMode": "manual-only",
+      "workTrackAttribution": "pr-metadata"
+    },
+    "saju-bridge-s3a-guarded-apply.yml": {
+      "responsibility": "saju-bridge-s3a-dormant-production-ddl",
+      "prMode": "none",
+      "mainMode": "manual-only",
+      "workTrackAttribution": "dispatch-input"
+    },
     "saju-bridge-cross-repo-local-http.yml": {
       "responsibility": "saju-bridge-local-transport-verification",
       "prMode": "narrow",
