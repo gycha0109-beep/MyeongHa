@@ -2,7 +2,17 @@
 set -euo pipefail
 # D4B-10C1: isolated PostgreSQL, synthetic metering, NO Provider/network.
 # Watchtower-Track: character-memory
-[[ "${PGDATABASE:-}" == "myeongha_seyeon_d4b10c1_test" ]] || exit 2
+# Also allow the R2-H PG17 runner to reuse this real-RPC positive path,
+# strictly inside the disposable GitHub Actions case database.
+if [[ "${PGDATABASE:-}" != myeongha_seyeon_d4b10c1_test ]]; then
+  [[ "${CI:-}" == true && "${GITHUB_ACTIONS:-}" == true \
+    && "${DB_SUITE:-}" == postgres17 && "${PGHOST:-}" == localhost \
+    && "${PGPORT:-}" == 5432 && "${PGUSER:-}" == postgres \
+    && "${PGDATABASE:-}" =~ ^myeongha_ci_case_[0-9]+$ ]] || {
+    echo 'HOLD_R2_H_1710_POSITIVE_E2E_NOT_DISPOSABLE' >&2
+    exit 2
+  }
+fi
 db() { psql -X -qAt -F '|' -v ON_ERROR_STOP=1 --set=VERBOSITY=verbose "$@"; }
 tmp="$(mktemp -d)"
 cleanup() {
