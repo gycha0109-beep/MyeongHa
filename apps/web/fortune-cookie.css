@@ -1,4 +1,4 @@
-/* A dismissible, entertainment-only floating fortune cookie on the logged-in home. */
+/* An opt-in fortune-cookie launcher and a separate centered scroll-ready reveal. */
 .fortune-cookie {
   position: fixed;
   z-index: 80;
@@ -29,7 +29,9 @@
 .fortune-cookie-trigger span { color: #d8b379; font-size: 18px; }
 .fortune-cookie-trigger:focus-visible,
 .fortune-cookie-close:focus-visible,
-.fortune-cookie-draw:focus-visible { outline: 3px solid #c99958; outline-offset: 3px; }
+.fortune-cookie-draw:focus-visible,
+.fortune-cookie-reveal-close:focus-visible,
+.fortune-cookie-redraw:focus-visible { outline: 3px solid #c99958; outline-offset: 3px; }
 .fortune-cookie-panel {
   width: min(340px, calc(100vw - 32px));
   padding: 20px;
@@ -39,14 +41,140 @@
   background: #fcf7ef;
   box-shadow: 0 20px 55px rgba(17, 29, 43, .22);
 }
-.fortune-cookie-panel-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
-.fortune-cookie-eyebrow { display: block; margin-bottom: 7px; color: #987348; font: 700 10px Georgia, serif; letter-spacing: .14em; }
-.fortune-cookie-panel h2 { margin: 0; color: #263346; font-size: 20px; line-height: 1.4; }
-.fortune-cookie-close { width: 32px; height: 32px; border: 0; border-radius: 50%; color: #5a5044; background: #eee4d6; font-size: 25px; cursor: pointer; }
-.fortune-cookie-message { display: flex; align-items: center; justify-content: center; min-height: 112px; margin: 18px 0 14px; padding: 18px; border: 1px solid rgba(175, 136, 84, .3); border-radius: 10px; color: #3c3630; background: #f6ede1; font-size: 15px; line-height: 1.8; text-align: center; }
-.fortune-cookie-draw { width: 100%; min-height: 44px; border: 0; border-radius: 9px; color: #f9f1e5; background: #1c3047; font-size: 13px; font-weight: 700; cursor: pointer; }
-.fortune-cookie-disclaimer { margin: 12px 0 0; color: #70675e; font-size: 11px; line-height: 1.6; }
+.fortune-cookie-panel-head, .fortune-cookie-reveal-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.fortune-cookie-eyebrow {
+  display: block;
+  margin-bottom: 7px;
+  color: #987348;
+  font: 700 10px Georgia, serif;
+  letter-spacing: .14em;
+}
+.fortune-cookie-panel h2, .fortune-cookie-reveal h2 {
+  margin: 0;
+  color: #263346;
+  font-family: var(--mh-serif, Georgia, serif);
+  font-size: 21px;
+  line-height: 1.4;
+}
+.fortune-cookie-close, .fortune-cookie-reveal-close {
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 50%;
+  color: #5a5044;
+  background: #eee4d6;
+  font-size: 25px;
+  cursor: pointer;
+}
+.fortune-cookie-invitation {
+  margin: 20px 0;
+  color: #51493f;
+  font-size: 14px;
+  line-height: 1.7;
+}
+.fortune-cookie-draw, .fortune-cookie-redraw {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 14px;
+  border: 0;
+  border-radius: 9px;
+  color: #f9f1e5;
+  background: #1c3047;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+/* Portal into document.body keeps the modal centered independently of home stacking contexts. */
+.fortune-cookie-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  animation: fortune-backdrop-appear 230ms ease both;
+}
+.fortune-cookie-backdrop {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  border: 0;
+  background: rgba(10, 20, 32, .48);
+  cursor: pointer;
+}
+.fortune-cookie-reveal {
+  position: relative;
+  z-index: 1;
+  width: min(510px, 100%);
+  max-height: calc(100dvh - 40px);
+  overflow-y: auto;
+  padding: clamp(18px, 4vw, 28px);
+  border: 1px solid rgba(178, 135, 74, .6);
+  border-radius: 18px;
+  color: #373027;
+  background: #fbf6ec;
+  box-shadow: 0 25px 70px rgba(4, 16, 28, .32);
+  animation: fortune-reveal-appear 360ms cubic-bezier(.2,.75,.18,1) both;
+}
+.fortune-cookie-reveal-stage {
+  margin: 21px 0;
+  padding: 6px 0;
+  perspective: 800px;
+}
+.fortune-cookie-reveal-paper {
+  min-height: 205px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 25px 27px;
+  border: 1px solid rgba(170, 123, 64, .35);
+  border-radius: 5px;
+  background:
+    linear-gradient(90deg, rgba(191,146,84,.13), transparent 8%, transparent 92%, rgba(191,146,84,.13)),
+    #f6ead8;
+  box-shadow: inset 0 0 0 6px rgba(255,255,255,.22), 0 10px 24px rgba(75,47,25,.09);
+  transform-origin: 50% 50%;
+  animation: fortune-paper-unfold 490ms cubic-bezier(.16,.85,.25,1) both;
+}
+.fortune-cookie-reveal-ornament { color: #a98451; font-size: 18px; }
+.fortune-cookie-reveal-message {
+  margin: 0;
+  color: #39332e;
+  font-family: var(--mh-serif, Georgia, serif);
+  font-size: clamp(17px, 4vw, 22px);
+  font-weight: 600;
+  line-height: 1.85;
+  text-align: center;
+  word-break: keep-all;
+}
+.fortune-cookie-redraw { background: #293b50; }
+@keyframes fortune-backdrop-appear {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes fortune-reveal-appear {
+  from { opacity: 0; transform: translateY(15px) scale(.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes fortune-paper-unfold {
+  from { opacity: 0; clip-path: inset(43% 0 43% 0); transform: scaleY(.28); }
+  to { opacity: 1; clip-path: inset(0 0 0 0); transform: scaleY(1); }
+}
 @media (max-width: 767px) {
   .fortune-cookie { bottom: calc(82px + env(safe-area-inset-bottom)); right: 12px; }
   .fortune-cookie-trigger { min-height: 44px; }
+  .fortune-cookie-reveal { max-height: calc(100dvh - 24px); }
+  .fortune-cookie-overlay { padding: 12px; }
+  .fortune-cookie-reveal-paper { min-height: 180px; padding: 20px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fortune-cookie-overlay, .fortune-cookie-reveal, .fortune-cookie-reveal-paper { animation: none; }
 }
