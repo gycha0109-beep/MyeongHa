@@ -1,9 +1,10 @@
 import { MyeongHaApiClientErrorV1, type BirthCalendarTypeV1, type BirthSexV1 } from '@myeongha/api-client';
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
+  RefreshControl,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -20,6 +21,7 @@ import {
 import { mobileBirthServiceV1 } from '@/features/birth/native-mobile-birth-service';
 import { mobileHomeControllerV1 } from '@/features/home/native-mobile-home-controller';
 import { mobileColors } from '@/ui/mobile-colors';
+import { useMobilePullRefreshV1 } from '@/ui/use-mobile-pull-refresh';
 
 const sexOptions = [
   { value: 'male', label: '남성' },
@@ -38,6 +40,20 @@ export default function BirthInputScreen() {
   const [sex, setSex] = useState<BirthSexV1>('unspecified');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+
+  const refreshBirthStatus = useCallback(async () => {
+    if (submitting) return;
+    // Inspect current authority without overwriting the unsaved form fields.
+    try {
+      const current = await mobileBirthServiceV1.readCurrent();
+      setError(current === null
+        ? ''
+        : '이미 등록된 출생정보가 있습니다. 현재 내용은 사주 탭에서 확인해 주세요.');
+    } catch {
+      setError('현재 출생정보를 다시 확인하지 못했습니다. 입력 내용은 그대로 유지됩니다.');
+    }
+  }, [submitting]);
+  const { refreshing, onRefresh } = useMobilePullRefreshV1(refreshBirthStatus);
 
   const chooseCalendar = (value: BirthCalendarTypeV1) => {
     setCalendarType(value);
@@ -110,6 +126,15 @@ export default function BirthInputScreen() {
       <ScrollView
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={styles.content}
+        refreshControl={(
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => void onRefresh()}
+            enabled={!submitting}
+            tintColor={mobileColors.navy}
+            colors={[mobileColors.navy]}
+          />
+        )}
       >
         <Pressable accessibilityRole="button" onPress={() => router.back()}>
           <Text style={styles.back}>‹ 사주로 돌아가기</Text>
