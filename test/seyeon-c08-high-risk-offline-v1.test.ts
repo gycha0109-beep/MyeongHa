@@ -183,9 +183,9 @@ describe('C08-A: 11 high-risk C07 synthetic cases, 2 prompt profiles (NO MODEL C
 
  it('uses only test providers; no secrets, Production wiring or paid replay',()=>{
   const text=readFileSync(new URL('./seyeon-c08-high-risk-offline-v1.test.ts',import.meta.url),'utf8');
-  expect(text).not.toContain('process.env.OPENAI_API_KEY');
-  expect(text).not.toContain('createOpenAiSeyeonStructuredProviderV1');
-  expect(text).not.toContain('workflow_dispatch');
-  expect(text).not.toContain('fetch(');
+  expect(text).not.toContain('process.env.'+'OPENAI_API_KEY');
+  expect(text).not.toContain('createOpenAiSeyeon'+'StructuredProviderV1');
+  expect(text).not.toContain('workflow_'+'dispatch');
+  expect(text).not.toContain('fetch'+'(');
  });
 });
