@@ -15,7 +15,24 @@ const run = (id, status, conclusion = null, changes = {}) => ({
 describe('idempotent CI integration submission for parallel PRs', () => {
   it('requests once for an untested frozen head, using the existing label correctly', () => {
     expect(decideIntegrationSubmission({ ...req, runs: [], hasLabel: false }).action).toBe('add-label');
-    expect(decideIntegrationSubmission({ ...req, runs: [], hasLabel: true }).action).toBe('refresh-label');
+    expect(decideIntegrationSubmission({ ...req, runs: [], hasLabel: true })).toMatchObject({
+      action: 'no-op', reason: 'LABEL_PRESENT_RUN_NOT_YET_INDEXED',
+    });
+  });
+  it('prevents two simultaneous requesters from creating duplicate runs before GitHub indexes the first label event', () => {
+    const first = decideIntegrationSubmission({ ...req, runs: [], hasLabel: false });
+    const second = decideIntegrationSubmission({ ...req, runs: [], hasLabel: true });
+    expect(first.action).toBe('add-label');
+    expect(second).toEqual({ action: 'no-op', reason: 'LABEL_PRESENT_RUN_NOT_YET_INDEXED' });
+    expect(Object.hasOwn(second, 'runId')).toBe(false);
+  });
+  it('does not treat another PR run as proof when a label is already present', () => {
+    const otherRun = run(87, 'completed', 'success', {
+      display_title: 'Integration PR #2176 at ' + head,
+    });
+    expect(decideIntegrationSubmission({ ...req, runs: [otherRun], hasLabel: true })).toMatchObject({
+      action: 'no-op', reason: 'LABEL_PRESENT_RUN_NOT_YET_INDEXED',
+    });
   });
   it.each(['queued', 'pending', 'in_progress', 'waiting', 'requested'])(
     'does not flood the queue or edit PR when the same head is %s',
