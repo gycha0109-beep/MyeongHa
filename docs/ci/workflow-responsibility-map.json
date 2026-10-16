@@ -308,6 +308,12 @@
       "mainMode": "narrow",
       "workTrackAttribution": "pr-metadata"
     },
+    "saju-bridge-cross-repo-local-http.yml": {
+      "responsibility": "saju-bridge-local-transport-verification",
+      "prMode": "narrow",
+      "mainMode": "manual-only",
+      "workTrackAttribution": "pr-metadata"
+    },
     "saju-bridge-s3a-guard-ci.yml": {
       "responsibility": "saju-bridge-s3a-disposable-pg17-verification",
       "prMode": "narrow",
@@ -320,11 +326,11 @@
       "mainMode": "manual-only",
       "workTrackAttribution": "dispatch-input"
     },
-    "saju-bridge-cross-repo-local-http.yml": {
-      "responsibility": "saju-bridge-local-transport-verification",
-      "prMode": "narrow",
-      "mainMode": "manual-only",
-      "workTrackAttribution": "pr-metadata"
+    "seyeon-c06-f01-v2-manual-eval.yml": {
+      "responsibility": "production-character-model-evaluation",
+      "prMode": "none",
+      "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "commit-metadata"
     },
     "seyeon-dialogue-path-real-api-eval-v1.yml": {
       "responsibility": "production-character-model-evaluation",
