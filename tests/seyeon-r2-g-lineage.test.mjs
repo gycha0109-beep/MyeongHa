@@ -12,7 +12,10 @@ describe('R2-G immutable, non-authorizing remote provenance and manifest parity'
  it('pins actual Production hash+timestamped overlap without lineage promotion',()=>{
   const x=verifyR2GRemoteObservation(remote);
   expect(x).toMatchObject({
-   status:'HOLD_R2_G_REMOTE_LEXICAL_OVERLAP_ORIGIN_UNVERIFIED',
+   status:'CLOSED_R2_G_HISTORICAL_ACTOR_AUDIT_RISK_ACCEPTED',
+   historicalActorAuditClosed:true,historicalActorRiskAccepted:true,
+   fullMigrationLineageParityProven:false,
+   authorizedForProduction:false,
    remoteBytes:104021,manifestRevokeTokens:2,manifestGrantTokens:1,
    timestampedHistoryRows:2,originEstablished:false,drReady:false
   });
