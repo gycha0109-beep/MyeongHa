@@ -209,6 +209,18 @@ function mapExecutionError(error: unknown, requestId: string): Response | null {
 
   const constraint = postgresConstraint(error);
   if (constraint === null) return null;
+  // A prior failed_retryable logical turn blocks a DIFFERENT clientTurnId.
+  // Keep the original Member turn/idempotency authority; do not abandon it.
+  if (constraint === 'cmd_chat_receive_turn_in_flight' ||
+      constraint === 'seyeon_chat_runtime_turn_in_flight') {
+    return jsonError({
+      status: 409,
+      code: 'TURN_IN_FLIGHT',
+      messageKey: 'chat.pending_turn_must_be_retried',
+      retryable: true,
+      requestId,
+    });
+  }
   if (constraint.includes('idempotency')) {
     return jsonError({
       status: 409,
