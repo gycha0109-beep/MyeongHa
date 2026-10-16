@@ -196,6 +196,85 @@ describe('shadow-only Se-yeon personal-record authority recheck', () => {
     },
   );
 
+
+  it.each(['before_commit', 'before_reveal'] as const)(
+    '%s refuses a derived relationship revision even when no active event text is present',
+    async phase => {
+      const { context } = await arrange();
+      const revisions = [
+        { ...context, relationshipRevisionUsedForTurn: 1, historyThroughRevision: 1,
+          activeRelationshipEventCount: 0, relationshipHistoryRecords: [] },
+        { ...context, relationshipRevisionUsedForTurn: 1, historyThroughRevision: 1,
+          activeRelationshipEventCount: 1, relationshipHistoryRecords: [] },
+      ];
+      for (const snapshot of revisions) {
+        const fresh = vi.fn(async () => [row]);
+        const result = await evaluateSeyeonPersonalRecordPublicationShadowV1({
+          resolvedSubjectId: subject, phase, serverComposedContext: snapshot,
+          currentAuthority: { readPersonalRecords: fresh },
+        });
+        expect(result).toMatchObject({
+          disposition: 'hold', reason: 'UNVERIFIABLE_DERIVED_CONTEXT',
+          permitsPublication: false, authorityIsAtomicWithCommit: false,
+        });
+        expect(fresh).not.toHaveBeenCalled();
+      }
+    },
+  );
+
+  it.each(['before_commit', 'before_reveal'] as const)(
+    '%s refuses malformed, absent, or inconsistent derived-source census metadata',
+    async phase => {
+      const { context } = await arrange();
+      const broken = [
+        { ...context, relationshipHistoryRecords: undefined },
+        { ...context, relationshipHistoryRecords: null },
+        { ...context, relationshipHistoryRecords: {} },
+        { ...context, activeRelationshipEventCount: undefined },
+        { ...context, activeRelationshipEventCount: -1 },
+        { ...context, historyThroughRevision: Number.NaN },
+        { ...context, historyThroughRevision: 1 },
+        { ...context, relationshipRevisionUsedForTurn: 1 },
+        { ...context, version: 'unrecognized-context-v2' },
+        { ...context, retrievedMemories: [{ kind: 'future_unreviewed_derived_source',
+          memoryId: 'unknown', sourceRef: 'unknown', summary: injection }] },
+      ];
+      for (const snapshot of broken) {
+        const fresh = vi.fn(async () => [row]);
+        const result = await evaluateSeyeonPersonalRecordPublicationShadowV1({
+          resolvedSubjectId: subject, phase,
+          serverComposedContext: snapshot as typeof context,
+          currentAuthority: { readPersonalRecords: fresh },
+        });
+        expect(result).toMatchObject({
+          disposition: 'hold', reason: 'UNVERIFIABLE_PINNED_REFERENCE',
+          permitsPublication: false,
+        });
+        expect(JSON.stringify(result)).not.toContain(injection);
+        expect(fresh).not.toHaveBeenCalled();
+      }
+    },
+  );
+
+  it('does not claim a clean zero-record snapshot when only relationship revision survived', async () => {
+    const { context } = await arrange();
+    const fresh = vi.fn(async () => { throw new Error('must not access'); });
+    const result = await evaluateSeyeonPersonalRecordPublicationShadowV1({
+      resolvedSubjectId: subject, phase: 'before_reveal',
+      serverComposedContext: {
+        ...context, retrievedMemories: [], personalRecordAdmissions: [],
+        personalRecordProjectionCandidates: [], relationshipRevisionUsedForTurn: 2,
+        historyThroughRevision: 2, activeRelationshipEventCount: 0,
+      },
+      currentAuthority: { readPersonalRecords: fresh },
+    });
+    expect(result).toMatchObject({
+      reason: 'UNVERIFIABLE_DERIVED_CONTEXT', disposition: 'hold',
+      permitsPublication: false,
+    });
+    expect(fresh).not.toHaveBeenCalled();
+  });
+
   it('fails closed on duplicate authority rows or DB failure', async () => {
     const { context } = await arrange();
     const check = (readPersonalRecords: () => Promise<typeof row[]>) =>
