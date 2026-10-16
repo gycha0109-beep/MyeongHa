@@ -1,5 +1,5 @@
 import type { PropsWithChildren, ReactNode } from 'react';
-import { SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { RefreshControl, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { mobileColors } from '@/ui/mobile-colors';
 
@@ -7,12 +7,24 @@ type MobileScreenProps = PropsWithChildren<{
   title: string;
   eyebrow?: string;
   description?: ReactNode;
+  refreshing?: boolean;
+  onRefresh?: () => void;
 }>;
 
-export function MobileScreen({ title, eyebrow, description, children }: MobileScreenProps) {
+export function MobileScreen({ title, eyebrow, description, refreshing = false, onRefresh, children }: MobileScreenProps) {
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        refreshControl={onRefresh === undefined ? undefined : (
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={mobileColors.navy}
+            colors={[mobileColors.navy]}
+          />
+        )}
+      >
         <View style={styles.header}>
           {eyebrow ? <Text style={styles.eyebrow}>{eyebrow}</Text> : null}
           <Text style={styles.title}>{title}</Text>
