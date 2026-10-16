@@ -140,12 +140,15 @@ function createPersonCard(person, { pending = false } = {}) {
   art.dataset.character = person.key;
   art.setAttribute('aria-hidden', 'true');
 
-  const initial = document.createElement('span');
-  initial.className = 'chat-person-initial';
-  initial.textContent = person.name;
-  art.append(initial);
-
   const portrait = portraitArt[person.key];
+  // Keep initials solely as an image-less fallback, never overlay them on a portrait.
+  if (!portrait) {
+    const initial = document.createElement('span');
+    initial.className = 'chat-person-initial';
+    initial.textContent = person.name;
+    art.append(initial);
+  }
+
   if (portrait) {
     const image = document.createElement('img');
     image.className = 'chat-person-art-image';
