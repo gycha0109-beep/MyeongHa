@@ -57,6 +57,8 @@ Watchtower-Track: character-memory
 - 공급자 청구 원장 및 실제 프로젝트 예산 하드캡.
 - 이 문서는 **Production 승인/라우팅 변경 권한이 없다**.
 
+> **C08-A 진행 상황 (2026-10-16):** 고위험 11개 사례의 **22개 오프라인 모의 Provider/실제 서버 Guard 회귀**를 `test/seyeon-c08-high-risk-offline-v1.test.ts`에 추가했습니다. Gold·유료 비용·Production 권한을 변경하지 않았으며 **실모델 신규 관측은 0회**입니다. 상세 내용: [C08-A 무료 검증](character-memory-seyeon-c08-high-risk-offline-v1.md). C08-A의 실모델 판정 및 C08-B end-to-end는 미완료입니다.
+
 ## 4. C08 — 추가 과금 없는 단계별 평가 설계
 
 ### C08-A — 고위험 Gold 무과금 매트릭스 강화
