@@ -109,6 +109,9 @@ echo "PASS D3e23 $case_name: 21 real service_role direct SQL writes denied acros
 # SECURITY DEFINER functions and updatable views. Inject then remove a
 # synthetic bypass in this same disposable DB to prove the guard detects it.
 bash test/db/official_reader_d3e27_alternate_writes_guard.sh
+# D3e28: effective login-to-SET-ROLE graph and direct executor-side grants.
+# Exercises one injected ordinary execution-role grant, never on operating DB.
+bash test/db/official_reader_d3e28_effective_role_acl_guard.sh
 
 # The original DB-owner-only fixtures contain synthetic receipt, grant,
 # review and cancellation checks. The original scripts are unmodified; only
