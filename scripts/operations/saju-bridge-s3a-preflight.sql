@@ -14,12 +14,10 @@ begin
   then
     raise exception 'S3A HOLD: incorrect database, executor or PostgreSQL major';
   end if;
-  if not coalesce((
-    select s.ssl from pg_catalog.pg_stat_ssl s
-    where s.pid = pg_catalog.pg_backend_pid()
-  ), false) then
-    raise exception 'S3A HOLD: backend SSL not proven';
-  end if;
+  -- External TLS is asserted by the guarded shell entrypoint using pinned
+  -- CA + PGSSLMODE=verify-full and actual libpq/psql client SSL evidence.
+  -- pg_stat_ssl here reflects the session-pooler-to-PostgreSQL hop, not the
+  -- runner-to-pooler peer, and is not a valid external TLS assertion.
   if pg_catalog.to_regnamespace('saju_bridge_private') is not null
     or pg_catalog.to_regclass('saju_bridge_private.operator_permits_v1') is not null
     or pg_catalog.to_regclass('saju_bridge_private.audit_events_v1') is not null
