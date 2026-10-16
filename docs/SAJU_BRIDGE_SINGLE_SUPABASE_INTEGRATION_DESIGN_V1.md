@@ -2,6 +2,8 @@
 
 Watchtower-Track: saju-bridge
 
+> **2026-10-16 운영 상태 우선:** S1·S2 소스/폐기형 검증은 완료됐으나 **S3A 비활성 DB 객체 적용은 `BLOCKED/HOLD`**이다. PostgreSQL 17의 운영 `postgres`는 비슈퍼유저 `CREATEROLE`이며 새 역할 생성 시 자동 bootstrap ADMIN 멤버십이 생겨, 승인된 `1730` SQL의 zero-membership 최종 검사를 통과할 수 없다. 실제 단일 트랜잭션 [#38846217625](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38846217625)은 ROLLBACK되고 대상 스키마·역할·테이블·함수 0건이었다. [#2156](https://github.com/gycha0109-beep/MyeongHa/pull/2156) 병합 / [고정 통합 CI #38847796203](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38847796203) SUCCESS로 **객체 생성 전 거부**를 검증했다. 현행 계정으로 실행/재시도하지 않으며, 승인된 SQL·SHA256·Git blob·zero-membership postcheck를 변경하거나 보안을 완화하지 않는다. 재개에는 공급자가 지원하는 안전한 권한 경로의 검증 또는 새로운 역할 권한 계약에 대한 **별도 명시적 Owner 승인**이 필요하다. [S3A 운영 런북](./SAJU_BRIDGE_S3A_GUARDED_MANUAL_APPLY_RUNBOOK_20261016.md)과 [이슈 #1871](https://github.com/gycha0109-beep/MyeongHa/issues/1871)이 실행 게이트의 최신 근거다.
+
 > **설계 판단: `SINGLE_PROJECT_DESIGN_READY / OWNER_RISK_ACCEPTANCE_PENDING`.** 별도 배포 트랙, Neon, 신규 Supabase 프로젝트, 새 서버/백업 서버를 만들지 않고 **기존 명하 Supabase Production 프로젝트 내부**에 사주 브릿지의 필요한 DB 기록과 최소권한 경계를 구성하는 **대안 운영 모델**이다. 이 문서는 **설계 및 읽기 전용 현황 조사 결과**이다. 운영 DDL/GRANT/Secret/사용자 데이터/배포·판매 설정을 변경하거나 Owner의 실제 적용·잔여 위험 승인을 대신하지 않는다.
 >
 > **중요한 보안 계약의 차이:** 이 설계는 기존 [SO-4 격리 3DB 토폴로지](./SAJU_SO4_SUPABASE_ISOLATION_P0.md)의 물리적 3클러스터/독립 Root/Attestor 요건을 **충족하지 않는다**. 세 스키마를 만들어 세 서버라고 부르지 않는다. 기존 R01–R14와 Target Authority V2/2D-4의 보안 지표를 거짓으로 `VERIFIED`로 바꾸지 않으며, 새 **단일 프로젝트 운영 프로파일**에서 달라진 잔여 위험을 Owner가 별도로 채택해야 한다. 기존 고격리 스테이징 프로파일은 사용자가 선택하지 않는 한 그대로 HOLD한다.
@@ -116,18 +118,19 @@ Watchtower-Track: saju-bridge
 | **S0 — 조사** | 기존 DB 스키마/roles/GRANT/RLS/함수 서명·마이그레이션·Supabase Advisor **읽기 전용** 조회 | **실측 완료(2026-10-15)**. 개인정보/Secret 조회 없음 |
 | **S1 — 코드/계약** | 기존 Reading/Nonce/Permit 데이터 소유권 중복 정리; `SINGLE_PROJECT_V1` 보안·위험 승인 타입/주입 포트, private schema migration을 **소스에만** 작성 | TypeScript 타입 검사 및 부정 테스트 PASS. 기존 3DB 보호 계약 영향 없음 |
 | **S2 — 폐기형 검증** | 기존 Docker/CI를 이용해 **추가된 코드와 migration 부분만** 제한 검증: 익명·타회원·Guest 거부, expired JWT·다른 Birth revision, Role escape/GRANT, nonce/permit 중복·경합, 2단계 COMMIT 불확실, 잘못된 Saju 서명/Origin 거부, 취소/결제 권한 | 코드 변경 관련 검사 PASS. 기존 Windows Phase 1–5 전체 재검증 요구 안 함 |
-| **S3 — Owner 운영 변경 승인** | 정확한 `MyengHa` project ref, **신설 private schema만** 포함한 DDL/역할/Secret/접속 계획, 최소 비용 0원, 백업/롤백·가용성 영향·기존 RLS Advisor 6건 위험 검토 | Owner가 **DB DDL/GRANT와 Secret 연결**의 범위를 명시적으로 승인할 때까지 **적용 금지** |
+| **S3 — Owner 운영 변경 승인** | 정확한 `MyengHa` project ref, **신설 private schema만** 포함한 DDL/역할/Secret/접속 계획, 백업/롤백·가용성 영향·기존 RLS Advisor 6건 위험 검토. PG17 자동 ADMIN 권한 충돌을 별도로 해결·증빙 | **S3A BLOCKED/HOLD**: 기존 조건부 승인은 권한 계약 재설계를 포함하지 않음. 현행 역할 재시도 금지; 수정 계약·안전 실행 경로에 대한 신규 Owner 승인 필요 |
 | **S4 — 실제 DB 보안 수용** | 승인된 migration, post-migration schema/privilege/role/SECURITY DEFINER/Advisor 재조회, 제한된 Synthetic transaction/rollback 검사, 원장 충돌·TTL·오류·불명확 COMMIT의 읽기 전용 대조 | 실제 DB role/권한/원자성 확인. 현 Production 사용자 데이터 읽기/변경·서비스 공개 없음 |
 | **S5 — 실제 사주 연결** | 서버만 HTTPS Saju origin과 키 접근; SHA/transport/Proof, member→current Birth→Saju→기존 Reading DB 일관성; synthetic test Member 조건 및 감사·삭제 검증 | 실제 endpoint/키 증빙+Owner가 대상/출시 승인. Saju 엔진 배포가 아직 없으면 **이 단계만 HOLD** |
 | **S6 — 제한 공개/복구** | 계정·키 회전, 차단 스위치, 응답 오류·불명확 처리, 원상복구/운영 모니터링, feature flag 단계적 enable | Owner의 별도 **Production 공개/결제 승인** + 결함 없음. 해당 feature만 활성화, 다른 명하 제품과 무관 |
 
-**가장 빠른 안전한 다음 실작업은 S1:** 신규 프로젝트 생성/운영 DB 변경 없이 코드+미적용 migration과 부정 테스트를 작성하고 CI 확인한다. S3에서 승인 받을 때는 GitHub diff와 정확한 SQL·영향 테이블·복구 절차를 보여준다.
+**2026-10-16 현재의 다음 미완료 작업은 S3A Owner 결정 게이트:** S1·S2 코드 및 폐기형 검증은 이미 수행됐다. #2156이 실패 원인을 검증하고 pre-DDL HOLD를 병합했으므로 이를 다시 구현하지 않는다. 승인된 1730 원문 SHA256 `900e0771915776b4a7c2a8b3cf60e24b83c79fcec14f27cf6356b44685b385e2` / Git blob `42e076799d627bc9e19fe28e1ad25b4548e05e61`은 불변이다. Owner가 공급자 지원 역할 실행 경로의 안전성 또는 별도 보안 계약 재설계를 명시적으로 결정·승인하기 전에는 S3A 재적용과 S4–S6 활성화를 진행하지 않는다. 별도로 고격리 SO-3/R01–R14는 계속 `NOT_VERIFIED/HOLD`이며, 독립 업무는 기존 코드·문서 감사 범위에서만 계속한다.
 
 ## 5. 비용·보안 결론, 불변 상태
 
 - **Supabase 프로젝트 추가 0개, Neon 0개, 현재 연결된 서비스 외 신규 유료 자원 0원**을 기본 제약으로 한다. 기존 Free 프로젝트 안에서 운영 비용/사용량 증가 가능성까지 0원이라 단정하지 않는다.
 - Production 인스턴스 안에 테이블을 추가하는 변경이므로 **실제 DDL/GRANT는 배포/운영 변경**이고 그 자체가 기존 데이터 가용성에 위험을 줄 수 있다. 먼저 소스와 폐기형 테스트로 안전성을 입증한 뒤 별도 Owner 승인받는다.
-- **2026-10-15 기준 현재 상태:** `SINGLE_PROJECT_DESIGN_READY`는 설계 결과 **뿐**이며 `OWNER_RISK_ACCEPTANCE_PENDING`; `stagingAdmission=HOLD`, `stagingConnection=NOT_VERIFIED`, `operationalEvidence=NOT_VERIFIED`, `canRunOnce/canExecute/canPublish/canSell=false`. 기존 고격리 R01–R14도 그대로 NOT_VERIFIED.
+- **2026-10-16 운영 적용 최신 상태:** `S3A_APPLICATION=BLOCKED/HOLD`, `OWNER_REVISED_AUTHORITY_APPROVAL=REQUIRED`, 운영 SQL 적용/서비스 활성화 증빙 없음. #2156 병합으로 사고 방지 코드만 완료됐으며, 본 문서의 과거 S1 권고·2026-10-15 snapshot보다 이 상태가 우선한다.
+- **2026-10-15 기준 설계 snapshot:** `SINGLE_PROJECT_DESIGN_READY`는 설계 결과 **뿐**이며 `OWNER_RISK_ACCEPTANCE_PENDING`; `stagingAdmission=HOLD`, `stagingConnection=NOT_VERIFIED`, `operationalEvidence=NOT_VERIFIED`, `canRunOnce/canExecute/canPublish/canSell=false`. 기존 고격리 R01–R14도 그대로 NOT_VERIFIED.
 - 기존 [사주 브릿지 완료 로드맵](./SAJU_HELD_STAGING_COMPLETION_ROADMAP_8C2B2D.md), [SO-4 고격리 설계](./SAJU_SO4_SUPABASE_ISOLATION_P0.md), [개발/로컬 인수 종료](./SAJU_BRIDGE_DEVELOPMENT_LOCAL_CLOSEOUT_20261015.md), [Issue #1871](https://github.com/gycha0109-beep/MyeongHa/issues/1871)과 연계해 동일 트랙에서 다음 적용·검증을 이어간다.
 
 ## 6. 참조
