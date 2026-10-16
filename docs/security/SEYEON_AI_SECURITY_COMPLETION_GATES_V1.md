@@ -1,3 +1,5 @@
+> **2026-10-16 실행 우선순위:** [개정 로드맵 v2](../operations/SEYEON_AI_SECURITY_EXECUTION_ROADMAP_V2_20261016.md). 이 문서는 G0~G6 판정·권한 계약의 정본이며, 로드맵은 S1 개인정보 0건 후보 방어부터 G1/G2/G3 실제 서비스 연결을 진행한다. R2-G 역사 실행자 조사는 위험 수용으로 종료했지만, 운영 배포·DR·paid/public 승인은 별개다.
+
 # 명하 세연 AI 보안 트랙 — 완료 판정·증거 계약 v1
 
 Watchtower-Track: security
