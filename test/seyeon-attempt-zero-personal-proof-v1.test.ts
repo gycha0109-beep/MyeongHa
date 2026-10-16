@@ -72,6 +72,26 @@ describe('Se-yeon server-owned zero-record attempt provenance', () => {
     expect(JSON.stringify(proof)).not.toContain('memory');
   });
 
+  it('rejects inconsistent candidate-only personal source evidence instead of minting an empty proof', () => {
+    const noRecords = context();
+    expect(mint({ context: { ...noRecords, personalRecordProjectionCandidates: [] } }))
+      .toEqual(mint());
+    for (const candidates of [
+      [{ recordId: 'unexpected-memory', grantId: 'unexpected-grant' }],
+      null, {}, 'not-an-array',
+    ]) {
+      const snapshot = {
+        ...noRecords, personalRecordProjectionCandidates: candidates,
+      } as unknown as SourceContext;
+      expect(() => mint({ context: snapshot }))
+        .toThrow(SeyeonAttemptZeroPersonalProofHoldV1);
+    }
+    expect(() => mint({ context: {
+      ...context([], [{ recordId: 'unsupported', reason: 'UNSUPPORTED_SCHEMA' }]),
+      personalRecordProjectionCandidates: [{ recordId: 'inconsistent' }],
+    } as unknown as SourceContext })).toThrow(SeyeonAttemptZeroPersonalProofHoldV1);
+  });
+
   it('fails closed on any admitted memory, life fact, malformed or absent source evidence', () => {
     for (const value of [
       context([{ kind: 'memory' }], []),
