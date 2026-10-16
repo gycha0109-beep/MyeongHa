@@ -19,10 +19,10 @@ pass_shape='
   (.restricted_role_write_rows | length) == 0 and
   (.elevated_app_role_edges | length) == 0 and
   .service_role_writable_table_count == 0 and
-  (.roles | map(select(.name == "myeongha_api_executor" or
-                        .name == "myeongha_commerce_internal_executor" or
-                        .name == "myeongha_runtime" or
-                        .name == "myeongha_worker_runtime") | .oid != null) | all) and
+  (.roles | [ .[] | select(.name == "myeongha_api_executor" or
+                            .name == "myeongha_commerce_internal_executor" or
+                            .name == "myeongha_runtime" or
+                            .name == "myeongha_worker_runtime") | select(.oid != null) ] | length) == 4 and
   .deployed_credential_binding_verified == false and
   .indirect_dynamic_calls_verified == false and
   .cutover_authorized == false
