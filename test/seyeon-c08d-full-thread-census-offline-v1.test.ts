@@ -25,7 +25,7 @@ function context(){
 }
 function scenario(answer:unknown=valid,withoutPort=false){
  const read=vi.fn(async()=>answer);
- const candidate=vi.fn(async()=>{throw Error('SYNTHETIC_COMBINED_STAGE_REACHED');});
+ const candidate=vi.fn(async(_request:unknown)=>{throw Error('SYNTHETIC_COMBINED_STAGE_REACHED');});
  const reviewer=vi.fn(async()=>{throw Error('SYNTHETIC_REVIEWER_SHOULD_NOT_RUN');});
  const port:SeyeonFullThreadCensusShadowPortV1={
   subjectId:'subject-123',threadId:'thread-123',
@@ -34,7 +34,7 @@ function scenario(answer:unknown=valid,withoutPort=false){
  const shadow=createSeyeonFastDialogueShadowV1({
   candidateProvider:{providerKey:'fixture',modelKey:'fixture',generate:candidate},
   reviewerProvider:{providerKey:'fixture',modelKey:'fixture',generate:reviewer},
-  ...withoutPort?{}:{fullThreadCensus:port},
+  ...(withoutPort?{}:{fullThreadCensus:port}),
  });
  return {read,candidate,reviewer,shadow,port};
 }
