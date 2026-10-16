@@ -125,17 +125,17 @@ fn_meta() {
 }
 original_fn_meta="$(fn_meta)"
 [[ -n "$original_fn_meta" ]] || hold 1760_ORIGINAL_FUNCTION_METADATA_MISSING
-psql -X -q -v ON_ERROR_STOP=1 -v expected_constraint=seyeon_provider_receipt_unreserved \\
+psql -X -q -v ON_ERROR_STOP=1 -v expected_constraint=seyeon_provider_receipt_unreserved \
   -f test/db/seyeon_r2_h_1760_required_enums.sql >/dev/null || hold 1760_ORIGINAL_GAP_NOT_REPRODUCED
 pass 1760_ORIGINAL_SQL_NULL_ENUM_GAP_REPRODUCED_REAL_RPC
-psql -X -q -v ON_ERROR_STOP=1 \\
+psql -X -q -v ON_ERROR_STOP=1 \
   -f test/db/fixtures/1760_seyeon_provider_receipt_store_required_enums_v1.proposed.sql >/dev/null || hold 1760_PROPOSAL_REJECTED
 [[ "$(fn_meta)" == "$original_fn_meta" ]] || hold 1760_FUNCTION_OWNER_OR_ACL_DRIFT
-psql -X -q -v ON_ERROR_STOP=1 -v expected_constraint=seyeon_provider_receipt_malformed \\
+psql -X -q -v ON_ERROR_STOP=1 -v expected_constraint=seyeon_provider_receipt_malformed \
   -f test/db/seyeon_r2_h_1760_required_enums.sql >/dev/null || hold 1760_REQUIRED_ENUMS_NOT_BLOCKED
 pass 1760_ABSENT_AND_JSON_NULL_ENUMS_REJECTED_BEFORE_LEDGER
 pass 1760_VALID_ENUM_UNRESERVED_PATH_PRESERVED
-if psql -X -q -v ON_ERROR_STOP=1 \\
+if psql -X -q -v ON_ERROR_STOP=1 \
   -f test/db/fixtures/1760_seyeon_provider_receipt_store_required_enums_v1.proposed.sql >/dev/null 2>&1; then
   hold 1760_REPLAY_UNEXPECTEDLY_ALLOWED
 fi
