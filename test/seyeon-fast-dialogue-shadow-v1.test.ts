@@ -6,16 +6,14 @@ import {
 import { assembleSeyeonRuntimeContextV2, type SeyeonRuntimeContextV2 } from '../packages/domain/src/index.js';
 
 function publicContext(): SeyeonRuntimeContextV2 {
-  return {
-    character: { characterId: 'seyeon' },
-    integrity: { governedPreflightApplied: true, decisions: [] },
-    disclosure: { decision: null, retrievedSources: [] },
+  return assembleSeyeonRuntimeContextV2({
+    relationship: null,
+    recentMessages: [{ messageId: 'u1', role: 'user', text: '안녕, 세연아.' }],
     retrievedMemories: [],
-    relationship: null, relationshipSemantics: null,
-    recentConversation: [], actionPolicy: {
-      allowedActionKeys: ['approach'], allowedExpressionStates: ['baseline'],
-    },
-  } as unknown as SeyeonRuntimeContextV2;
+    integrityDecisions: [],
+    governedPreflightApplied: true,
+    disclosure: { decision: null, retrievedSources: [] },
+  });
 }
 
 describe('Seyeon low-risk combined dialogue Shadow', () => {

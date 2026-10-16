@@ -64,6 +64,11 @@ export function createSeyeonFastDialogueShadowV1(input: {
     async evaluate(context: SeyeonRuntimeContextV2) {
       // Eligibility is intentionally stricter than future general-chat routing.
       if (context.character.characterId !== 'seyeon' ||
+          // No persisted relationship is NOT proof of first contact. A resumed
+          // thread can still have previous messages, including assistant text.
+          context.behaviorPolicy.interactionDepth !== 'public_first_contact' ||
+          context.recentConversation.length !== 1 ||
+          context.recentConversation[0]?.role !== 'user' ||
           !context.integrity.governedPreflightApplied ||
           context.integrity.decisions.length !== 0 ||
           context.disclosure.decision !== null ||
