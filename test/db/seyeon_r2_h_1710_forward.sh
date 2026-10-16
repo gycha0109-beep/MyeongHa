@@ -142,6 +142,13 @@ fi
 [[ "$(fn_meta)" == "$original_fn_meta" ]] || hold 1760_REPLAY_CHANGED_FUNCTION_METADATA
 [[ "$(psql -X -Atqc 'select count(*) from public.seyeon_ai_provider_receipt_queue_v1')" == 0 ]] || hold 1760_QUEUE_MUTATED
 pass 1760_REPLAY_FAIL_CLOSED_AND_ACL_OWNER_PRESERVED
-echo "HOLD_R2_H_1760_OWNER_APPROVAL_REQUIRED original1710Unchanged=true productionWrites=0 positiveReservedReceiptE2E=false authorizedForProduction=false drReady=false"
+# Exercise the EXISTING D4B-10C1 success-path contract against the
+# exact original 1710 queue and the isolated 1760 guard proposal.
+# This is a true governed RPC reservation -> Store -> Claim -> detached Settle
+# -> fenced Ack using synthetic events and non-login internal roles.
+# It does not call a Provider or authorize an operational migration.
+bash test/db/seyeon_governed_cost_d4b10c1_provider_receipt_queue.sh || hold POSITIVE_RECEIPT_E2E_FAILED
+pass 1710_1760_REAL_RPC_STORE_CLAIM_SETTLE_ACK_SYNTHETIC
 
-echo "HOLD_R2_H_1710_OWNER_APPROVAL_REQUIRED missingEnumSqlNullDiagnostic=true actualReservedReceiptE2E=false claimAckConcurrencyE2E=false paidProviderCalls=0 productionWrites=0 drReady=false"
+echo "HOLD_R2_H_1760_OWNER_APPROVAL_REQUIRED original1710Unchanged=true productionWrites=0 positiveReservedReceiptE2E=synthetic-only authorizedForProduction=false drReady=false"
+echo "HOLD_R2_H_1710_OWNER_APPROVAL_REQUIRED missingEnumSqlNullDiagnostic=true actualReservedReceiptE2E=synthetic-only claimAckConcurrencyE2E=separate-d4b10d paidProviderCalls=0 productionWrites=0 drReady=false"
