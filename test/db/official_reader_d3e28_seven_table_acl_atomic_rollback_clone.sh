@@ -8,7 +8,7 @@ esac
 [[ "${CI:-}" == 'true' && "${PGHOST:-}" == 'localhost' && "${PGUSER:-}" == 'postgres' ]] || {
  echo 'D3e28 DENY: CI/localhost/postgres required' >&2; exit 2
 }
-db() { psql -X -qAt -v ON_ERROR_STOP=1 "$"; }
+db() { psql -X -qAt -v ON_ERROR_STOP=1 "${@}"; }
 fail() { echo "FAIL D3e28: $*" >&2; exit 1; }
 tables='public.commerce_account_links, public.commerce_provider_events,
  public.commerce_receipts, public.entitlement_events,
