@@ -11,7 +11,7 @@ Watchtower-Track: character-memory
 - `supabase/migrations/0520_chat_thread_stream_query.sql`: `conversation_messages`의 Subject/Thread/sequence_no, redacted tombstone, 소유자 확인 규칙을 근거로 사용합니다.
 - `supabase/migrations/0950_chat_read_runtime_authority.sql`: `myeongha_api_executor`의 RLS와 기존 함수 실행·컬럼 읽기 권한을 근거로 합니다.
 - `supabase/migrations/1303_chat_thread_primary_participant_authority.sql`: `qry_chat_thread_runtime_binding_v1`가 활성화된 단일 primary Character 소유권/대화방 검증을 수행한다는 계약을 사용합니다.
-- 새 SQL·마이그레이션·권한 부여 명령을 DB에 설치하지 않습니다. 애플리케이션의 서버 소유·주체 확인 완료 트랜잭션 Query 포트를 받아 **SELECT만** 수행하는 모듈입니다.
+- 새 SQL·마이그레이션·권한 부여 명령을 DB에 설치하지 않습니다. 사용자가 제공한 임의 `subjectId`를 받지 않고 **`PostgresSubjectExecutionScopeV1.resolvedSubject.subjectId`에서만 Subject를 추출**합니다. 같은 스코프에 포함된 인증 완료 PostgreSQL 트랜잭션 Query 포트로 **SELECT만** 수행합니다.
 - `apps/api/src/postgres-seyeon-first-turn-census-shadow-v1.ts`: 기존 소유자 권한 함수와 `conversation_messages`에서 **본문/페이로드 없이 ID, sequence, sender, redacted만 최대 첫 2건** 조회합니다. 1건이 정확히 요청 메시지이며 user/비삭제, 활성 Thread·참여 Character가 세연 1명임을 확인합니다. 두 번째 메시지가 **삭제 흔적(tombstone)**이라도 2건으로 판단하여 거부합니다.
 
 ## 테스트 결과 판단 기준
