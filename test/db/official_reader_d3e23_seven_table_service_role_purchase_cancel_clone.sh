@@ -109,6 +109,8 @@ echo "PASS D3e23 $case_name: 21 real service_role direct SQL writes denied acros
 # SECURITY DEFINER functions and updatable views. Inject then remove a
 # synthetic bypass in this same disposable DB to prove the guard detects it.
 bash test/db/official_reader_d3e27_alternate_writes_guard.sh
+# D3e28: transactional cutover and rollback must restore exact ACLs; only disposable DB.
+bash test/db/official_reader_d3e28_seven_table_acl_atomic_rollback_clone.sh
 
 # The original DB-owner-only fixtures contain synthetic receipt, grant,
 # review and cancellation checks. The original scripts are unmodified; only
