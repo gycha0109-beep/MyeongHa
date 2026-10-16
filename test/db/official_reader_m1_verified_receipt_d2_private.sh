@@ -219,4 +219,15 @@ bash test/db/official_reader_m1_07_private_replay_source_sql.sh \
 bash test/db/official_reader_m1_10_unknown_commit_source.sh \
  "$receipt" "$subject" "$intent" committed "$grant" "$official"
 
+# M1-11: a loopback TCP proxy suppresses the real PostgreSQL COMMIT
+# CommandComplete frame after the DB has committed a private D2 replay.
+# The psql client sees a broken connection; a fresh direct read MUST agree.
+node test/db/official_reader_m1_11_commit_ack_drop_proxy.mjs \
+ "$receipt" "$subject" "$intent" "$session" "$proposal" "$grant" "$official"
+
+# The original typed reconciliation SELECT still classifies the committed
+# receipt without trusting the intentionally lost acknowledgement.
+bash test/db/official_reader_m1_10_unknown_commit_source.sh \
+ "$receipt" "$subject" "$intent" committed "$grant" "$official"
+
 echo "PASS M1-02: isolated PG receipt-to-D2 only; runtime authorization/T2 remain HOLD"
