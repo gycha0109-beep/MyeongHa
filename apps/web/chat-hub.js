@@ -72,6 +72,10 @@ const launchPeople = Object.freeze(
   people.filter(({ key }) => key !== 'seorin' && key !== 'mira' && key !== 'doyun'),
 );
 
+const pendingPeople = Object.freeze(
+  ['doyun', 'seorin', 'mira'].map(key => people.find(person => person.key === key)).filter(Boolean),
+);
+
 const portraitArt = Object.freeze({
   seyeon: Object.freeze({ src: 'assets/characters/seyeon-portrait-v2.webp' }),
   baekheon: Object.freeze({ src: 'assets/characters/baekheon-portrait-v2.webp' }),
@@ -85,6 +89,7 @@ const portraitArt = Object.freeze({
 });
 
 const peopleGrid = document.querySelector('[data-people-grid]');
+const pendingPeopleGrid = document.querySelector('[data-pending-people-grid]');
 const peopleSearch = document.querySelector('[data-people-search]');
 const peopleMore = document.querySelector('[data-people-more]');
 const searchEmpty = document.querySelector('[data-search-empty]');
@@ -125,9 +130,9 @@ function roomHref(characterKey, threadId) {
   url.searchParams.set('character', safeKey);
   return `${url.pathname.split('/').pop()}${url.search}`;
 }
-function createPersonCard(person) {
+function createPersonCard(person, { pending = false } = {}) {
   const article = document.createElement('article');
-  article.className = 'chat-person-card';
+  article.className = pending ? 'chat-person-card is-pending' : 'chat-person-card';
   article.dataset.character = person.key;
 
   const art = document.createElement('div');
@@ -167,7 +172,7 @@ function createPersonCard(person) {
 
   const line = document.createElement('p');
   line.className = 'chat-person-line';
-  line.textContent = person.line;
+  line.textContent = pending ? '이 대리자는 현재 등록을 준비 중입니다.' : person.line;
 
   const tags = document.createElement('div');
   tags.className = 'chat-person-tags';
@@ -178,19 +183,22 @@ function createPersonCard(person) {
     tags.append(tagNode);
   });
 
-  const action = document.createElement('a');
-  action.className = 'chat-person-action';
-  action.href = roomHref(person.key);
-  action.dataset.chatPreviewCharacter = person.key;
+  const action = document.createElement(pending ? 'span' : 'a');
+  action.className = pending ? 'chat-person-action chat-person-pending-label' : 'chat-person-action';
+  if (!pending) {
+    action.href = roomHref(person.key);
+    action.dataset.chatPreviewCharacter = person.key;
+  }
 
   const actionLabel = document.createElement('span');
-  actionLabel.textContent = '이야기하기';
+  actionLabel.textContent = pending ? '등록 중 · 대화 준비 중' : '이야기하기';
   const actionArrow = document.createElement('span');
   actionArrow.setAttribute('aria-hidden', 'true');
-  actionArrow.textContent = '→';
+  actionArrow.textContent = pending ? '◇' : '→';
   action.append(actionLabel, actionArrow);
 
-  copy.append(titleRow, line, tags, action);
+  if (pending) copy.append(titleRow, line, action);
+  else copy.append(titleRow, line, tags, action);
   article.append(art, copy);
   return article;
 }
@@ -218,6 +226,10 @@ function renderPeople() {
     const label = peopleMore.querySelector('span');
     if (label) label.textContent = '다른 사람 더 보기';
   }
+}
+
+if (pendingPeopleGrid) {
+  pendingPeopleGrid.replaceChildren(...pendingPeople.map(person => createPersonCard(person, { pending: true })));
 }
 
 peopleSearch?.addEventListener('input', () => {
