@@ -18,6 +18,7 @@ import type {
 import {
   SeyeonProductionChatExecutionErrorV1,
 } from './seyeon-production-chat-execution-v1.js';
+import { SeyeonProductionPinMigrationRequiredV1 } from './production-seyeon-chat-runtime-v1.js';
 
 const POST_METHOD = 'POST' as const;
 const ROUTE_PREFIX = '/api/chat/' as const;
@@ -138,6 +139,15 @@ function postgresConstraint(error: unknown): string | null {
 }
 
 function mapExecutionError(error: unknown, requestId: string): Response | null {
+  if (error instanceof SeyeonProductionPinMigrationRequiredV1) {
+    return jsonError({
+      status: 503,
+      code: 'CAPABILITY_UNAVAILABLE',
+      messageKey: 'chat.secure_runtime_migration_required',
+      retryable: true,
+      requestId,
+    });
+  }
   if (error instanceof ApiCommandError) {
     switch (error.code) {
       case 'AUTH_REQUIRED':
