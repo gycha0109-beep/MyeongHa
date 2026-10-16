@@ -102,13 +102,29 @@ export default function SajuScreen() {
 
       {viewModel !== null ? (
         <>
+          <MobileReaderPicker selected={presentationReader} onChange={setPresentationReader} vertical="saju" />
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="선택한 Reader와 전체 사주 읽기 시작"
+            onPress={() => router.push({
+              pathname: '/reading/scene',
+              params: { reader: presentationReader, topic: 'temperament' },
+            })}
+            style={styles.primaryButton}
+          >
+            <Text style={styles.primaryButtonText}>세연과 전체 사주 읽기 시작 →</Text>
+          </Pressable>
+          <SajuPreviewReadingView
+            onOpenPreview={(topic) => router.push({
+              pathname: '/reading/scene',
+              params: { reader: presentationReader, topic: topic.key },
+            })}
+          />
           <BirthSummaryCard summary={viewModel.birthSummary} />
           <SajuPillarGrid pillars={viewModel.pillars} />
           <DayMasterCard dayMaster={viewModel.dayMaster} />
           <ElementBalance elementBalance={viewModel.elementBalance} />
           <CalculationCompleteness completeness={viewModel.completeness} />
-          <MobileReaderPicker selected={presentationReader} onChange={setPresentationReader} vertical="saju" />
-          <SajuPreviewReadingView />
         </>
       ) : null}
 

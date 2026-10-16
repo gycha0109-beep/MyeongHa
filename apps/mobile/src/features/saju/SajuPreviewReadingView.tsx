@@ -93,7 +93,7 @@ function errorCopy(error: unknown): Readonly<{ message: string; retryable: boole
   });
 }
 
-export function SajuPreviewReadingView() {
+export function SajuPreviewReadingView({ onOpenPreview }: { onOpenPreview?: (topic: MobileSajuTopicV1) => void }) {
   const [state, setState] = useState<PreviewStateV1>({ kind: 'idle' });
 
   async function load(
@@ -133,6 +133,10 @@ export function SajuPreviewReadingView() {
   function selectTopic(topic: MobileSajuTopicV1) {
     const availability = topic.availability;
     if (availability.kind === 'preview') {
+      if (onOpenPreview !== undefined) {
+        onOpenPreview(topic);
+        return;
+      }
       void load(topic, availability.readingText);
       return;
     }
