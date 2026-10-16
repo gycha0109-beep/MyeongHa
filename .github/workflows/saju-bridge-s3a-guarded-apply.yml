@@ -61,7 +61,6 @@ jobs:
       S3A_WINDOW_END_UTC: ${{ inputs.execution_window_end_utc }}
       S3A_STOP_OWNER: ${{ inputs.stop_owner }}
       GH_TOKEN: ${{ github.token }}
-      S3A_RESTORE_EVIDENCE_DIR: ${{ runner.temp }}/saju-s3a-restore-evidence
       SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
       SUPABASE_PRODUCTION_SESSION_POOLER_HOST: ${{ secrets.SUPABASE_PRODUCTION_SESSION_POOLER_HOST }}
       SUPABASE_PRODUCTION_SERVER_ROOT_CERT_PEM: ${{ secrets.SUPABASE_PRODUCTION_SERVER_ROOT_CERT_PEM }}
@@ -89,9 +88,11 @@ jobs:
           run-id: ${{ inputs.restore_run_id }}
           artifact-ids: ${{ steps.source.outputs.restore_artifact_id }}
           merge-multiple: true
-          path: ${{ env.S3A_RESTORE_EVIDENCE_DIR }}
+          path: ${{ runner.temp }}/saju-s3a-restore-evidence
 
       - name: Validate exact restore evidence envelope without accessing user records
+        env:
+          S3A_RESTORE_EVIDENCE_DIR: ${{ runner.temp }}/saju-s3a-restore-evidence
         run: node scripts/operations/saju-bridge-s3a-provenance.mjs verify
 
       - name: Install PostgreSQL client
@@ -102,6 +103,8 @@ jobs:
           psql --version
 
       - name: Strict pinned-CA verify-full and guarded single-transaction S3A
+        env:
+          S3A_RESTORE_EVIDENCE_DIR: ${{ runner.temp }}/saju-s3a-restore-evidence
         run: bash scripts/operations/run-saju-bridge-s3a-guarded-apply.sh
 
       - name: Record HOLD boundary; do not activate any consumer
