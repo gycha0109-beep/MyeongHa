@@ -31,7 +31,9 @@ export function validateAuthority(env, now = Date.now()) {
   requireCondition(env.GITHUB_EVENT_NAME === 'workflow_dispatch' &&
     env.GITHUB_REPOSITORY === S3A.repo &&
     env.GITHUB_REF === 'refs/heads/main' &&
-    env.GITHUB_ACTOR === S3A.actor, 'UNAUTHORIZED_DISPATCH');
+    env.GITHUB_ACTOR === S3A.actor &&
+    env.GITHUB_TRIGGERING_ACTOR === S3A.actor &&
+    env.GITHUB_RUN_ATTEMPT === '1', 'UNAUTHORIZED_DISPATCH_OR_RERUN');
   requireCondition(env.MYEONGHA_WATCHTOWER_TRACK === 'saju-bridge' &&
     env.S3A_CONFIRM === S3A.confirm &&
     env.SUPABASE_PROJECT_ID === S3A.project, 'OWNER_SCOPE_MISMATCH');
