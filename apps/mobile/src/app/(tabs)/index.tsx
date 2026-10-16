@@ -10,6 +10,7 @@ import {
 import { createMobileHomeViewModelV1 } from '@/features/home/home-view-model';
 import { useMobileHomeV1 } from '@/features/home/use-mobile-home';
 import { mobileColors } from '@/ui/mobile-colors';
+import { MobileFortuneCookie } from '@/features/home/MobileFortuneCookie';
 
 export default function HomeScreen() {
   const { snapshot, refresh } = useMobileHomeV1();
@@ -30,6 +31,7 @@ export default function HomeScreen() {
         <HomeBrandHeader greeting={view.greeting} subheading={view.subheading} />
         <View style={styles.divider} />
         <HomeTodayCard card={view.today} />
+        <MobileFortuneCookie />
         <HomeContinuationCard card={view.continuation} />
         <HomeReadingTopics topics={view.readingTopics} />
         <HomeCharacterPending
