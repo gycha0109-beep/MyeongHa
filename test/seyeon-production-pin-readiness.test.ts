@@ -3,6 +3,7 @@ import {
   SeyeonProductionPinMigrationRequiredV1,
   assertSeyeonProductionPinReadinessV1,
 } from '../apps/api/src/production-seyeon-chat-runtime-v1.js';
+import type { SeyeonProductionSubjectTransactionRunnerV1 } from '../apps/api/src/seyeon-production-subject-transaction-v1.js';
 
 const subjectId = '11111111-1111-4111-8111-111111111111';
 
@@ -23,7 +24,7 @@ describe('production Se-yeon pinned Chat DB readiness', () => {
   it('allows only an installed owner RPC with executor EXECUTE; query is read-only', async () => {
     const sql: string[] = [];
     const runner = runnerFor([{ ready: true }], s => sql.push(s));
-    await expect(assertSeyeonProductionPinReadinessV1(runner, subjectId)).resolves.toBeUndefined();
+    await expect(assertSeyeonProductionPinReadinessV1(runner as unknown as SeyeonProductionSubjectTransactionRunnerV1, subjectId)).resolves.toBeUndefined();
     expect(runner.run).toHaveBeenCalledTimes(1);
     expect(sql).toHaveLength(1);
     expect(sql[0]).toContain('to_regprocedure(');
