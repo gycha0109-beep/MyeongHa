@@ -20,6 +20,7 @@ import {
 } from '@/features/my/my-view-model';
 import { MobileScreen } from '@/ui/MobileScreen';
 import { mobileColors } from '@/ui/mobile-colors';
+import { useMobilePullRefreshV1 } from '@/ui/use-mobile-pull-refresh';
 
 export default function MyScreen() {
   const {
@@ -44,9 +45,16 @@ export default function MyScreen() {
     return () => { active = false; };
   }, []));
 
-  async function reloadOwnerProjection() {
+  const reloadOwnerProjection = useCallback(async () => {
     await Promise.all([retryProfile(), retryBirth()]);
-  }
+  }, [retryProfile, retryBirth]);
+
+  const refreshCurrentAccount = useCallback(async () => {
+    await reloadOwnerProjection();
+    const session = await nativeMobileRuntimeV1.memberSession.read().catch(() => null);
+    setMemberSessionPresent(session !== null);
+  }, [reloadOwnerProjection]);
+  const { refreshing, onRefresh } = useMobilePullRefreshV1(refreshCurrentAccount);
 
   useEffect(() => {
     if (memberAuth.authRevision === 0) return;
@@ -107,6 +115,8 @@ export default function MyScreen() {
     <MobileScreen
       eyebrow="MY MYEONGHA"
       title="마이"
+      refreshing={refreshing}
+      onRefresh={() => void onRefresh()}
       description="현재 주체와 출생정보를 기준으로 명하에서 이어지는 흐름을 확인합니다."
     >
       <MyMemberAuthCard
