@@ -112,4 +112,10 @@ if psql -X -q -v ON_ERROR_STOP=1 -f test/db/fixtures/1730_seyeon_receipt_null_sa
 fi
 [[ "$(psql -X -Atqc "select count(*) from pg_constraint where (conrelid='public.seyeon_ai_call_cost_events'::regclass and conname='seyeon_ai_governor_receipt_pin_shape_v1' and convalidated) or (conrelid='public.seyeon_ai_provider_receipt_queue_v1'::regclass and conname='seyeon_provider_queue_required_enums_v1' and convalidated)")" == 2 ]] || hold REPLAY_DROPPED_CONSTRAINTS
 pass REPLAY_FAIL_CLOSED
-echo "HOLD_R2_H_1730_OWNER_APPROVAL_REQUIRED actualFundedE2E=false sourceLineageReconciled=false productionWrites=0 drReady=false"
+
+# The validated NULL-safe constraints must also allow a genuine synthetic
+# governed admission -> Provider Store -> fenced Claim -> detached Settle -> Ack.
+# Reuse the existing least-privilege real-RPC fixture in this disposable PG17 DB.
+bash test/db/seyeon_governed_cost_d4b10c1_provider_receipt_queue.sh || hold VALIDATED_CONSTRAINTS_POSITIVE_E2E_FAILED
+pass VALIDATED_CONSTRAINTS_REAL_RPC_STORE_CLAIM_SETTLE_ACK_SYNTHETIC
+echo "HOLD_R2_H_1730_OWNER_APPROVAL_REQUIRED actualFundedE2E=false syntheticReservedReceiptE2E=true sourceLineageReconciled=false productionWrites=0 drReady=false"
