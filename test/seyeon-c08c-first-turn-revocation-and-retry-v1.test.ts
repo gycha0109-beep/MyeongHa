@@ -24,7 +24,7 @@ const EXCHANGE=[
  CURRENT,
 ];
 const DATA={
- schemaVersion:'seyeon-production-context-v1' as const,
+ version:'seyeon-production-context-v1' as const,
  retrievedMemories:[],
  personalRecordAdmissions:[],
 };
