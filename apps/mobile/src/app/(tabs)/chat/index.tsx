@@ -53,7 +53,7 @@ export default function ChatHubScreen() {
           </View>
         ) : state.access === 'guest' ? (
           <Pressable accessibilityRole="button" onPress={() => router.push('/my')} style={styles.loginAction}>
-            <Text style={styles.loginActionText}>로그인하고 대화하기 →</Text>
+            <Text style={styles.loginActionText}>로그인 후 대화하기 →</Text>
           </Pressable>
         ) : state.access === 'error' ? (
           <Text style={styles.errorText}>{state.errorMessage}</Text>
