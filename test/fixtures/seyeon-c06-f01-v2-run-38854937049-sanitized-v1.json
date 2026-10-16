@@ -1,0 +1,35 @@
+{
+  "schemaVersion": "seyeon-c06-f01-v2-real-usage-evidence-v1",
+  "sourceRunId": 38854937049,
+  "sourceArtifactId": 12026239456,
+  "sourceCommitSha": "6062755fb840480c8486741175db06303ba08b55",
+  "sourceRunAttempt": 1,
+  "providerModel": "gpt-5.6-luna",
+  "providerInvoiceReconciled": false,
+  "actualBilledKrw": null,
+  "qualityScope": "ONE_SYNTHETIC_F01_QUESTION_ONLY",
+  "completeF01Pair": true,
+  "stopReason": null,
+  "results": [
+    {
+      "caseId": "F01",
+      "variant": "original",
+      "topicKey": "family_emotional_history",
+      "claimKinds": [],
+      "verdict": "MATCHED_GOLD_SCREEN",
+      "inputTokens": 1044,
+      "outputTokens": 37,
+      "estimatedCostMicroUsd": 306
+    },
+    {
+      "caseId": "F01",
+      "variant": "compact",
+      "topicKey": "family_emotional_history",
+      "claimKinds": [],
+      "verdict": "MATCHED_GOLD_SCREEN",
+      "inputTokens": 773,
+      "outputTokens": 72,
+      "estimatedCostMicroUsd": 280
+    }
+  ]
+}
