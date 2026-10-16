@@ -244,6 +244,15 @@ async function runSeyeonTurnRuntimePhaseV1<T>(
     const sqlState = typeof rawCode === 'string' && /^[A-Z0-9]{5}$/u.test(rawCode)
       ? rawCode
       : null;
+    // PostgreSQL constraint is server-defined; emit only narrowly shaped
+    // identifiers. Never log SQL error.message/detail or user Chat content.
+    const rawConstraint =
+      typeof error === 'object' && error !== null && 'constraint' in error
+        ? (error as { constraint?: unknown }).constraint : null;
+    const sqlConstraint =
+      typeof rawConstraint === 'string' &&
+      /^(?:cmd_|seyeon_)[a-z0-9_]{1,95}$/u.test(rawConstraint)
+        ? rawConstraint : null;
     const runtimeStage =
       error instanceof SeyeonCharacterRuntimeErrorV2 ? error.stage : null;
     const providerCause =
@@ -258,6 +267,7 @@ async function runSeyeonTurnRuntimePhaseV1<T>(
         stage,
         errorName: error instanceof Error ? error.name : 'UnknownError',
         sqlState,
+        sqlConstraint,
         runtimeStage,
         providerFailureCode: providerCause?.code ?? null,
         providerHttpStatus: providerCause?.httpStatus ?? null,
