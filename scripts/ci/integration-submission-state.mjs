@@ -5,7 +5,7 @@ export function selectIntegrationRunForHead(runs, { pr, head }) {
   const expectedTitle = `Integration PR #${pr} at ${head}`;
   const matching = runs.filter(run =>
     run.event === 'pull_request'
-    && run.display_title === expectedTitle
+    && (run.display_title === expectedTitle || run.name === expectedTitle)
     && run.head_sha === head);
   return matching.sort((a, b) => b.id - a.id)[0] ?? null;
 }
