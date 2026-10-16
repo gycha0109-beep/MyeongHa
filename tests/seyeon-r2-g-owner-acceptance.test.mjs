@@ -6,6 +6,7 @@ const decision = read('../docs/operations/SEYEON_R2_G_OWNER_RISK_ACCEPTANCE_2026
 const handoff = read('../docs/operations/SEYEON_R2_OWNER_DECISION_HANDOFF_20261015.md');
 const test1730 = read('../test/db/seyeon_r2_h_1730_forward.sh');
 const original1710 = read('../supabase/migrations/1710_seyeon_provider_receipt_queue_v1.sql');
+const observer = read('../scripts/operations/verify-seyeon-r2-g-lineage.mjs');
 
 describe('R2-G historical audit risk acceptance and independent release gates', () => {
   it('closes only the historical actor investigation, without fabricating provenance', () => {
@@ -14,6 +15,9 @@ describe('R2-G historical audit risk acceptance and independent release gates', 
     expect(decision).toContain('4f38e4483061a84899f0fcaa4a8d6cfa9e09ce1553b1d31089d4de9154c4d894');
     expect(decision).toContain('originEstablished=true');
     expect(handoff).toContain('SEYEON_R2_G_OWNER_RISK_ACCEPTANCE_20261016.md');
+    expect(observer).toContain('CLOSED_R2_G_HISTORICAL_ACTOR_AUDIT_RISK_ACCEPTED');
+    expect(observer).toContain('fullMigrationLineageParityProven:false');
+    expect(observer).toContain('authorizedForProduction:false');
   });
   it('retains distinct Production, DR and paid/public deployment barriers', () => {
     for (const term of [
