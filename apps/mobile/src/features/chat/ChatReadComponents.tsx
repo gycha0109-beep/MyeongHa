@@ -79,8 +79,11 @@ export function ChatReadMessages({
       <View style={[styles.stateCard, isSeyeonTheme && styles.seyeonSurface]}>
         <Text style={styles.errorTitle}>대화를 불러오지 못했습니다</Text>
         <Text style={styles.stateText}>
-          이 대화가 현재 계정에 속하지 않거나 더 이상 사용할 수 없을 수 있습니다.
+          대화 기록을 확인하지 못했습니다. 아래에서 다시 불러올 수 있습니다.
         </Text>
+        {snapshot.errorCode !== null ? (
+          <Text style={styles.diagnosticText}>오류 코드: {snapshot.errorCode}</Text>
+        ) : null}
       </View>
     );
   }
@@ -149,10 +152,19 @@ export function ChatReadMessages({
 export function ChatReadMore({
   snapshot,
   onLoadMore,
+  onRetry,
 }: {
   snapshot: MobileChatThreadSnapshotV1;
   onLoadMore: () => void;
+  onRetry?: () => void;
 }) {
+  if (snapshot.status === 'error' && snapshot.messages.length === 0) {
+    return onRetry === undefined ? null : (
+      <Pressable accessibilityRole="button" onPress={onRetry} style={styles.loadMore}>
+        <Text style={styles.loadMoreText}>대화 다시 불러오기 ↻</Text>
+      </Pressable>
+    );
+  }
   if (!snapshot.hasMore) {
     return <Text style={styles.endText}>현재 확인할 수 있는 기록의 끝입니다.</Text>;
   }
@@ -281,6 +293,7 @@ const styles = StyleSheet.create({
     padding: 22,
   },
   stateText: { color: mobileColors.muted, fontSize: 14, lineHeight: 21, textAlign: 'center' },
+  diagnosticText: { color: mobileColors.seal, fontSize: 12, fontWeight: '700', textAlign: 'center' },
   errorTitle: { color: mobileColors.ink, fontSize: 17, fontWeight: '800', textAlign: 'center' },
   emptyMark: { color: mobileColors.gold, fontSize: 24, fontWeight: '800' },
   messages: { gap: 12 },
