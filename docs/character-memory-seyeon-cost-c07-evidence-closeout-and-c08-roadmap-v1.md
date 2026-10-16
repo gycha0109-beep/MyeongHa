@@ -90,6 +90,8 @@ Watchtower-Track: character-memory
 
 > **C08-D 전체 이력 입장 경계:** 최근 대화 일부로는 첫 대화를 확정하지 못하므로, 3회 Shadow 합성 후보 호출 전에 Subject/Thread/CurrentMessage를 고정한 **전체 대화 건수 포트**를 반드시 검증합니다. [C08-D 무료 검증](character-memory-seyeon-c08d-full-thread-census-shadow-v1.md). 실제 DB 권한·snapshot 일치·동시성은 아직 HOLD이며 Production 라우팅은 연결하지 않았습니다.
 
+> **C08-E PostgreSQL 읽기 전용 후보:** 신규 데이터베이스 변경 없이 기존 Subject 소유 Thread 조회/RLS를 사용하여 전체 메시지에서 최대 앞 2건의 존재를 확인하는 Shadow Query를 추가합니다. 실제 DB/RLS·동시성 테스트와 운영 사용은 **HOLD**입니다. [C08-E 설계·테스트](character-memory-seyeon-c08e-postgres-bounded-census-shadow-v1.md).
+
 ### C08-C — 권한·기억·자연스러움 순서
 
 > **C08-C 현재 구현:** 관계 상태가 비어 있어도 실제 대화 Context에 이전 메시지가 있으면 3회 첫 대화 Shadow 경로를 거부하고, 기억/분류 실패 상황의 무료 회귀를 추가했습니다. [상세 검증 범위](character-memory-seyeon-c08c-first-turn-privacy-retry-offline-v1.md). 전체 DB 대화 이력 기반 첫 턴 증빙·실제 철회 경쟁 조건·Production 전환은 **미완료(HOLD)**입니다.
