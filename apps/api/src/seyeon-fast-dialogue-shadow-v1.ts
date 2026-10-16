@@ -76,7 +76,7 @@ function validCensusId(value: unknown): value is string {
     value.length <= 256 && value.trim() === value;
 }
 
-async function requireAuthoritativeFirstTurnCensusShadowV1(input: Readonly<{
+export async function requireAuthoritativeFirstTurnCensusShadowV1(input: Readonly<{
   port: SeyeonFullThreadCensusShadowPortV1 | undefined;
   currentUserMessageId: string;
 }>): Promise<void> {
