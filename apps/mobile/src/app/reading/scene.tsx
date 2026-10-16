@@ -10,6 +10,7 @@ import {
 } from '@myeongha/api-client';
 
 import { subscribeMobileSubjectCredentialChangesV1 } from '@/core/session/mobile-subject-credential-changes';
+import { useMobileChatOpenV1 } from '@/features/chat/use-mobile-chat-open';
 import { resolveMobileSajuSceneAdmissionV1 } from '@/features/saju/mobile-saju-reader-scene';
 import { mobileSajuPreviewServiceV1 } from '@/features/saju/native-mobile-saju-preview-service';
 import { mobileColors } from '@/ui/mobile-colors';
@@ -41,6 +42,7 @@ export default function SajuReaderSceneScreen() {
   const [introFinished, setIntroFinished] = useState(false);
   const [index, setIndex] = useState(0);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const { state: chatOpenState, openCharacter } = useMobileChatOpenV1();
   const frameProgress = useRef(new Animated.Value(0)).current;
   const stageProgress = useRef(new Animated.Value(0)).current;
 
@@ -88,6 +90,14 @@ export default function SajuReaderSceneScreen() {
       setIntroFinished(false);
     };
   }, [readerId, topicKey, frameProgress, stageProgress]));
+
+  async function continueToReaderChat() {
+    if (admission === null || chatOpenState.access !== 'member' || chatOpenState.openingCharacterId !== null) return;
+    // The server opens/reuses the Member-owned Thread for this exact Reader.
+    // Never derive a Thread ID from the Preview scene or route via generic Chat hub.
+    const opened = await openCharacter(admission.readerId);
+    if (opened !== null) router.replace(`/chat/${opened.threadId}`);
+  }
 
   if (admission === null) {
     return (
@@ -148,9 +158,26 @@ export default function SajuReaderSceneScreen() {
             <Text style={styles.eyebrow}>READING COMPLETE</Text>
             <Text style={styles.title}>이번 사주 프리뷰를 마쳤습니다.</Text>
             <Text style={styles.muted}>계속 대화하거나 기존에 저장된 공식 사주 기록을 확인할 수 있습니다.</Text>
-            <Pressable accessibilityRole="button" style={styles.action} onPress={() => router.replace('/chat')}>
-              <Text style={styles.actionText}>대화로 넘어가기 →</Text>
-            </Pressable>
+            {chatOpenState.access === 'guest' ? (
+              <Pressable accessibilityRole="button" style={styles.action} onPress={() => router.push('/my')}>
+                <Text style={styles.actionText}>로그인 후 세연과 대화하기 →</Text>
+              </Pressable>
+            ) : (
+              <Pressable
+                accessibilityRole="button"
+                disabled={chatOpenState.access !== 'member' || chatOpenState.openingCharacterId !== null}
+                accessibilityState={{ disabled: chatOpenState.access !== 'member' || chatOpenState.openingCharacterId !== null }}
+                style={[styles.action, (chatOpenState.access !== 'member' || chatOpenState.openingCharacterId !== null) && styles.actionDisabled]}
+                onPress={() => void continueToReaderChat()}
+              >
+                <Text style={styles.actionText}>
+                  {chatOpenState.openingCharacterId !== null ? '세연과의 대화 불러오는 중…' : '세연과 대화로 넘어가기 →'}
+                </Text>
+              </Pressable>
+            )}
+            {chatOpenState.errorMessage !== null ? (
+              <Text style={styles.chatError}>{chatOpenState.errorMessage}</Text>
+            ) : null}
             <Pressable accessibilityRole="button" style={styles.secondary} onPress={() => router.replace('/records?tab=readings')}>
               <Text style={styles.secondaryText}>기록으로 넘어가기 →</Text>
             </Pressable>
@@ -216,6 +243,8 @@ const styles = StyleSheet.create({
   muted: { color: mobileColors.muted, fontSize: 14, lineHeight: 22 },
   action: { minHeight: 48, backgroundColor: mobileColors.navy, paddingHorizontal: 18, paddingVertical: 12, borderRadius: 13, justifyContent: 'center', alignItems: 'center' },
   actionText: { color: mobileColors.surface, fontSize: 14, fontWeight: '800' },
+  actionDisabled: { opacity: 0.55 },
+  chatError: { color: mobileColors.seal, fontSize: 13, lineHeight: 19 },
   secondary: { minHeight: 46, borderWidth: 1, borderColor: mobileColors.border, borderRadius: 13, paddingHorizontal: 17, paddingVertical: 10, justifyContent: 'center', alignItems: 'center' },
   secondaryText: { color: mobileColors.navy, fontWeight: '800', fontSize: 14 },
   detailButton: { alignSelf: 'flex-start', paddingVertical: 7 },
