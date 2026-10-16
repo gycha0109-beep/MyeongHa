@@ -37,7 +37,7 @@ describe('production Se-yeon pinned Chat DB readiness', () => {
     'fails closed without an exact, executor-authorized Pin RPC: %j',
     async (...rows) => {
       const runner = runnerFor(rows);
-      await expect(assertSeyeonProductionPinReadinessV1(runner, subjectId))
+      await expect(assertSeyeonProductionPinReadinessV1(runner as unknown as SeyeonProductionSubjectTransactionRunnerV1, subjectId))
         .rejects.toBeInstanceOf(SeyeonProductionPinMigrationRequiredV1);
     },
   );
