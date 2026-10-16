@@ -1,5 +1,5 @@
 import type { MobileChatThreadSnapshotV1 } from '@/features/chat/mobile-chat-read-repository';
-import { createMobileChatMessageViewV1 } from '@/features/chat/chat-view-model';
+import { groupMobileChatMessagesV1 } from '@/features/chat/chat-view-model';
 import { resolveMobileChatCharacterPresentationV1 } from '@/features/chat/chat-character-presentation';
 import { projectMobileChatEmptyGreetingV1 } from '@/features/chat/mobile-chat-empty-greeting';
 import { MOBILE_CHAT_KNOWN_CHARACTERS_V1 } from '@/features/chat/chat-launch-roster';
@@ -94,12 +94,20 @@ export function ChatReadMessages({
     // This line is presentation, not an invented stored Chat message.
     const greeting = projectMobileChatEmptyGreetingV1(snapshot);
     if (greeting !== null) {
+      const portrait = resolveMobileChatPortraitV1(greeting.characterId);
       return (
         <View style={styles.messages}>
-          <View style={styles.messageRow}>
-            <View style={[styles.bubble, isSeyeonTheme && styles.seyeonSurface]}>
-              <Text style={styles.messageLabel}>{greeting.displayName}</Text>
-              <Text style={styles.messageBody}>{greeting.openingLine}</Text>
+          <View style={styles.messageGroup}>
+            <View style={styles.messageAvatar}>
+              {portrait === null
+                ? <Text style={styles.messageAvatarFallback}>{greeting.displayName.slice(0, 1)}</Text>
+                : <Image source={portrait} style={styles.avatarPortrait} resizeMode="cover" accessibilityLabel={greeting.displayName + ' 프로필'} />}
+            </View>
+            <View style={styles.messageGroupStack}>
+              <Text style={styles.messageGroupName}>{greeting.displayName}</Text>
+              <View style={[styles.bubble, isSeyeonTheme && styles.seyeonBubble]}>
+                <Text style={styles.messageBody}>{greeting.openingLine}</Text>
+              </View>
             </View>
           </View>
         </View>
@@ -113,34 +121,84 @@ export function ChatReadMessages({
     );
   }
 
+  const character = MOBILE_CHAT_KNOWN_CHARACTERS_V1.find(
+    entry => entry.characterId === snapshot.characterId,
+  );
+  // The room's verified Character identity, not a guess from a message body.
+  const displayName = character?.displayName ?? '대화 상대';
+  const groups = groupMobileChatMessagesV1(snapshot.messages, displayName);
+
   return (
     <View style={styles.messages}>
-      {snapshot.messages.map((message) => {
-        const view = createMobileChatMessageViewV1(message);
-        const user = view.role === 'user';
-        const system = view.role === 'system';
+      {groups.map(group => {
+        const user = group.role === 'user';
+        const system = group.role === 'system';
+        const characterGroup = group.role === 'character';
+        const portrait = characterGroup ? resolveMobileChatPortraitV1(group.characterId) : null;
         return (
           <View
-            key={view.id}
+            key={group.id}
             style={[
-              styles.messageRow,
-              user && styles.messageRowUser,
-              system && styles.messageRowSystem,
+              styles.messageGroup,
+              user && styles.messageGroupUser,
+              system && styles.messageGroupSystem,
             ]}
           >
-            <View
-              style={[
-                styles.bubble,
-                user && styles.userBubble,
-                system && styles.systemBubble,
-                view.redacted && styles.redactedBubble,
-              ]}
-            >
-              <Text style={styles.messageLabel}>{view.label}</Text>
-              <Text style={[styles.messageBody, user && styles.userMessageBody]}>
-                {view.body}
-              </Text>
-              <Text style={styles.messageTime}>{view.timeLabel}</Text>
+            {characterGroup ? (
+              <View style={styles.messageAvatar}>
+                {portrait === null ? (
+                  <Text style={styles.messageAvatarFallback}>{displayName.slice(0, 1)}</Text>
+                ) : (
+                  <Image
+                    source={portrait}
+                    style={styles.avatarPortrait}
+                    resizeMode="cover"
+                    accessibilityLabel={displayName + ' 프로필'}
+                  />
+                )}
+              </View>
+            ) : null}
+            <View style={[
+              styles.messageGroupStack,
+              user && styles.messageGroupStackUser,
+              system && styles.messageGroupStackSystem,
+            ]}>
+              {!user ? (
+                <Text style={[styles.messageGroupName, system && styles.systemGroupName]}>
+                  {group.label}
+                </Text>
+              ) : null}
+              {group.messages.map((message, index) => {
+                const last = index === group.messages.length - 1;
+                return (
+                  <View
+                    key={message.id}
+                    style={[
+                      styles.messageLine,
+                      user && styles.messageLineUser,
+                      system && styles.messageLineSystem,
+                    ]}
+                  >
+                    {user && last && group.timeLabel !== '' ? (
+                      <Text style={styles.messageTime}>{group.timeLabel}</Text>
+                    ) : null}
+                    <View style={[
+                      styles.bubble,
+                      user && styles.userBubble,
+                      system && styles.systemBubble,
+                      characterGroup && isSeyeonTheme && styles.seyeonBubble,
+                      message.redacted && styles.redactedBubble,
+                    ]}>
+                      <Text style={[styles.messageBody, user && styles.userMessageBody]}>
+                        {message.body}
+                      </Text>
+                    </View>
+                    {!user && last && group.timeLabel !== '' ? (
+                      <Text style={styles.messageTime}>{group.timeLabel}</Text>
+                    ) : null}
+                  </View>
+                );
+              })}
             </View>
           </View>
         );
@@ -296,28 +354,39 @@ const styles = StyleSheet.create({
   diagnosticText: { color: mobileColors.seal, fontSize: 12, fontWeight: '700', textAlign: 'center' },
   errorTitle: { color: mobileColors.ink, fontSize: 17, fontWeight: '800', textAlign: 'center' },
   emptyMark: { color: mobileColors.gold, fontSize: 24, fontWeight: '800' },
-  messages: { gap: 12 },
-  messageRow: { alignItems: 'flex-start' },
-  messageRowUser: { alignItems: 'flex-end' },
-  messageRowSystem: { alignItems: 'center' },
+  messages: { gap: 16 },
+  messageGroup: { flexDirection: 'row', alignItems: 'flex-start', gap: 9, width: '100%' },
+  messageGroupUser: { justifyContent: 'flex-end' },
+  messageGroupSystem: { justifyContent: 'center' },
+  messageAvatar: {
+    width: 38, height: 38, borderRadius: 13, overflow: 'hidden',
+    borderWidth: 1, borderColor: mobileColors.border,
+    backgroundColor: mobileColors.surface, alignItems: 'center', justifyContent: 'center',
+  },
+  messageAvatarFallback: { color: mobileColors.navy, fontWeight: '800', fontSize: 15 },
+  messageGroupStack: { flex: 1, gap: 5, minWidth: 0 },
+  messageGroupStackUser: { alignItems: 'flex-end' },
+  messageGroupStackSystem: { alignItems: 'center' },
+  messageGroupName: { color: mobileColors.ink, fontWeight: '700', fontSize: 12, marginBottom: 1 },
+  systemGroupName: { color: mobileColors.muted },
+  messageLine: { flexDirection: 'row', alignItems: 'flex-end', width: '100%', gap: 5 },
+  messageLineUser: { justifyContent: 'flex-end' },
+  messageLineSystem: { justifyContent: 'center' },
   bubble: {
-    maxWidth: '84%',
-    minWidth: 110,
+    maxWidth: '82%',
     borderWidth: 1,
     borderColor: mobileColors.border,
-    borderRadius: 16,
+    borderRadius: 14,
     backgroundColor: mobileColors.surface,
-    paddingHorizontal: 14,
-    paddingVertical: 11,
-    gap: 5,
+    paddingHorizontal: 13,
+    paddingVertical: 10,
   },
   userBubble: { backgroundColor: mobileColors.navy, borderColor: mobileColors.navy },
-  systemBubble: { maxWidth: '94%', backgroundColor: mobileColors.canvas },
+  systemBubble: { maxWidth: '88%', backgroundColor: mobileColors.canvas },
   redactedBubble: { opacity: 0.7 },
-  messageLabel: { color: mobileColors.gold, fontSize: 10, fontWeight: '900', letterSpacing: 0.6 },
   messageBody: { color: mobileColors.ink, fontSize: 15, lineHeight: 22 },
   userMessageBody: { color: mobileColors.surface },
-  messageTime: { color: mobileColors.muted, fontSize: 10 },
+  messageTime: { color: mobileColors.muted, fontSize: 10, flexShrink: 0, paddingBottom: 2 },
   loadMore: {
     minHeight: 46,
     alignItems: 'center',
