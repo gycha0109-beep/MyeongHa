@@ -102,6 +102,10 @@ pass "runtime Commerce executor remains denied both private D2 functions"
 # persisted 1050 evidence, before the fixture owner issues any purchased Grant.
 bash test/db/official_reader_m1_04_provider_role_execute_deny.sh "$receipt" "$subject" "$intent"
 
+# M1-05: disposable only. Prove that granting one D2 EXECUTE to a new
+# NOLOGIN role does not give SECURITY INVOKER's transitive data authority.
+bash test/db/official_reader_m1_05_invoker_execute_only_probe.sh "$receipt" "$subject" "$intent"
+
 # M1-03: The existing verified Receipt MUST survive a downstream bind
 # error while ALL issuance writes from the same transaction are rolled back.
 # Use the isolated DB fixture owner, NOT an API or Commerce runtime account.
