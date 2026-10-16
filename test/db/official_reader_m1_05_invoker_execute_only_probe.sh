@@ -6,7 +6,8 @@ set -euo pipefail
 [[ "$(printenv CI 2>/dev/null || true)" == true &&
    "$(printenv PGHOST 2>/dev/null || true)" == localhost &&
    "$(printenv PGUSER 2>/dev/null || true)" == postgres &&
-   "$(printenv PGDATABASE 2>/dev/null || true)" == myeongha_ci_case_* ]] || {
+   ( "$(printenv PGDATABASE 2>/dev/null || true)" == myeongha_ci_case_* ||
+     "$(printenv PGDATABASE 2>/dev/null || true)" == myeongha_test ) ]] || {
   echo 'M1-05 DENY: disposable localhost CI PostgreSQL required' >&2
   exit 2
 }
