@@ -14,6 +14,20 @@ begin
   then
     raise exception 'S3A HOLD: incorrect database, executor or PostgreSQL major';
   end if;
+  -- PostgreSQL 16+ automatically grants a non-superuser CREATEROLE
+  -- principal ADMIN TRUE / SET FALSE / INHERIT FALSE membership on each
+  -- newly created role, attributed to the bootstrap superuser. Its creator
+  -- cannot revoke that bootstrap grant. The exact Owner-approved 1730 SQL
+  -- requires NO explicit membership, so the current production 'postgres'
+  -- principal (rolsuper=false, rolcreaterole=true) cannot pass postcheck.
+  -- Reject BEFORE role/schema/table/function DDL, not after repeated attempts.
+  -- Do not weaken the immutable approved proposal or its membership fence.
+  if not exists (
+    select 1 from pg_catalog.pg_roles
+    where rolname = current_user and rolsuper
+  ) then
+    raise exception 'S3A HOLD: PostgreSQL 17 non-superuser role creator cannot satisfy zero-membership contract; explicit Owner-approved redesign required';
+  end if;
   -- External TLS is asserted by the guarded shell entrypoint using pinned
   -- CA + PGSSLMODE=verify-full and actual libpq/psql client SSL evidence.
   -- pg_stat_ssl here reflects the session-pooler-to-PostgreSQL hop, not the
