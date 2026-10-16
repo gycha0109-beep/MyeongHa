@@ -21,8 +21,12 @@ describe('mobile chat + Reader portrait + Fortune Cookie parity', () => {
     expect(hub).toContain('MOBILE_CHAT_PENDING_ROSTER_V1.map');
     expect(hub).toContain('대리자 등록 중');
     expect(hub).toContain('disabled={disabled}');
-    expect(hub).toContain('style={styles.characterFooter}');
+    expect(hub).toContain('style={styles.cardMain}');
     expect(hub).toContain('style={styles.characterPortrait}');
+    expect(hub).toContain('numberOfLines={2}');
+    expect(hub).toContain('AI 답변 준비 중 · 기록 열람 가능');
+    expect(hub).not.toContain('characterTags.map');
+    expect(hub).not.toContain('onPress={() => void handleOpen(character.characterId)}' + '\\n' + '              style={styles.pendingRow}');
   });
 
   it('uses the same bundled portrait resolver for expanded and collapsed Reader selection on Face and Saju', async () => {
