@@ -67,6 +67,7 @@ for table in "${tables[@]}"; do
       fail "cannot reproduce live ACL $table $permission"
   done
 done
+bash test/db/official_reader_d3e29_acl_snapshot_rollback.sh snapshot > "$tmpdir/d3e29_open_acl.json"
 echo "PASS D3e23 $case_name: all 7 live-observed service_role DML exposures reproduced in disposable clone"
 
 # Only the disposable clone's ACL is modified. Preserve SELECT to let
@@ -84,6 +85,10 @@ for table in "${tables[@]}"; do
       fail "$table still writable by service_role via inherited/PUBLIC grants"
   done
 done
+
+# Sealed metadata-only reduced snapshot. Later verify exact restoration after the
+# original synthetic purchase/reviewed-cancel/atomic-cancel transaction.
+bash test/db/official_reader_d3e29_acl_snapshot_rollback.sh snapshot > "$tmpdir/d3e29_reduced_acl.json"
 
 deny() {
   local statement="$1" label="$2"
@@ -112,6 +117,8 @@ bash test/db/official_reader_d3e27_alternate_writes_guard.sh
 # D3e28: effective login-to-SET-ROLE graph and direct executor-side grants.
 # Exercises one injected ordinary execution-role grant, never on operating DB.
 bash test/db/official_reader_d3e28_effective_role_acl_guard.sh
+# D3e29: catch hidden SECURITY DEFINER calls behind SQL helpers/dynamic SQL.
+bash test/db/official_reader_d3e29_indirect_definer_guard.sh
 
 # The original DB-owner-only fixtures contain synthetic receipt, grant,
 # review and cancellation checks. The original scripts are unmodified; only
@@ -137,5 +144,9 @@ for table in "${tables[@]}"; do
       fail "$table gained service_role write privilege after Commerce script"
   done
 done
+# Restore original live-like ACL and re-contain the seven tables, checking
+# every pg_catalog grantor/grantee/operation and synthetic fixture row count.
+bash test/db/official_reader_d3e29_acl_snapshot_rollback.sh cycle \
+ "$tmpdir/d3e29_open_acl.json" "$tmpdir/d3e29_reduced_acl.json"
 echo "PASS D3e23 $case_name: original Commerce test passed while all 7 generic direct DML paths remained closed"
 echo 'HOLD D3e23: no live API/Worker, other products, PortOne refund, superuser custody or rollout evidence'
