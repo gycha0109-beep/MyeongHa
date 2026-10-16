@@ -3,7 +3,7 @@ import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'rea
 
 import { resolveMobileChatCharacterPresentationV1 } from '@/features/chat/chat-character-presentation';
 import { resolveMobileChatPortraitV1 } from '@/features/chat/chat-character-portraits';
-import { MOBILE_CHAT_LAUNCH_ROSTER_V1 } from '@/features/chat/chat-launch-roster';
+import { MOBILE_CHAT_LAUNCH_ROSTER_V1, MOBILE_CHAT_PENDING_ROSTER_V1 } from '@/features/chat/chat-launch-roster';
 import { useMobileChatOpenV1 } from '@/features/chat/use-mobile-chat-open';
 import { MobileScreen } from '@/ui/MobileScreen';
 import { mobileColors } from '@/ui/mobile-colors';
@@ -129,6 +129,33 @@ export default function ChatHubScreen() {
           6명의 대리자를 먼저 소개합니다. 세연은 회원 로그인 후 AI 대화가 가능하며, 다른 대리자의 답변 기능은 준비 중입니다.
         </Text>
       </View>
+
+      <View style={styles.card}>
+        <Text style={styles.kicker}>COMING SOON</Text>
+        <Text style={styles.title}>대리자 등록 중</Text>
+        <Text style={styles.note}>도윤 · 서린 · 미라는 아직 대화할 수 없습니다.</Text>
+        <View style={styles.roster}>
+          {MOBILE_CHAT_PENDING_ROSTER_V1.map(character => {
+            const portrait = resolveMobileChatPortraitV1(character.characterId);
+            return (
+              <View key={character.characterId} style={[styles.characterRow, styles.pendingRow]} accessibilityLabel={`${character.displayName}, 대리자 등록 중, 대화 불가`}>
+                <View style={styles.characterMark}>
+                  {portrait === null ? (
+                    <Text style={styles.characterMarkText}>{character.displayName.slice(0, 1)}</Text>
+                  ) : (
+                    <Image source={portrait} style={[styles.characterPortrait, styles.pendingPortrait]} resizeMode="cover" accessibilityLabel={`${character.displayName} 대리자 초상화`} />
+                  )}
+                </View>
+                <View style={styles.characterCopy}>
+                  <Text style={styles.characterName}>{character.displayName}</Text>
+                  <Text style={styles.note}>대리자 등록 중</Text>
+                </View>
+                <Text style={styles.pendingAction}>준비 중</Text>
+              </View>
+            );
+          })}
+        </View>
+      </View>
     </MobileScreen>
   );
 }
@@ -169,6 +196,9 @@ const styles = StyleSheet.create({
     backgroundColor: mobileColors.canvas,
   },
   disabled: { opacity: 0.55 },
+  pendingRow: { opacity: 0.7, minHeight: 112 },
+  pendingPortrait: { opacity: 0.6 },
+  pendingAction: { color: mobileColors.muted, fontSize: 11, fontWeight: '800' },
   characterMark: {
     width: 76,
     height: 88,

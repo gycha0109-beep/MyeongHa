@@ -73,6 +73,14 @@ export function ChatHubPage() {
         <p>이전 대화 목록은 아직 이 화면에 연결되지 않았습니다. 대리자 탐색은 이용할 수 있으며, 실제 대화 시작과 접근 가능 여부는 서버에서 확인합니다.</p>
       </aside>
       <p className="conversation-hub-verified-empty" data-hub-verified-empty hidden role="status">아직 이어지는 대화가 없습니다. 마음에 드는 대리자와 이야기를 시작해보세요.</p>
+
+      <section className="chat-pending-section" aria-labelledby="chat-pending-title">
+        <div className="chat-pending-heading">
+          <div><span className="chat-hub-section-kicker">COMING SOON</span><h2 id="chat-pending-title">대리자 등록 중</h2></div>
+          <p>세 대리자는 소개만 먼저 공개됩니다. 대화 기능은 준비 중입니다.</p>
+        </div>
+        <div className="chat-people-grid" data-pending-people-grid />
+      </section>
     </div>
   );
 }
