@@ -43,12 +43,13 @@ export PGPASSWORD="$SUPABASE_DB_PASSWORD"
 export PGSSLMODE=verify-full
 export PGSSLROOTCERT="$cert"
 
-# Uses the same pinned CA and strict hostname verification as the existing
-# governed Production PostgreSQL backup, never an arbitrary MCP SQL session.
-# No user/reading/commerce rows are selected.
-psql -X -At --set ON_ERROR_STOP=1 -c \
-  "select 'strict-tls-backend=' || coalesce((select ssl::text from pg_catalog.pg_stat_ssl where pid=pg_catalog.pg_backend_pid()), 'missing');" \
-  | grep -Fx 'strict-tls-backend=true'
+# Confirm real client-side TLS on the exact libpq connection to the governed
+# Supabase Session Pooler. pg_stat_ssl describes the *pooler-to-DB* hop and
+# cannot prove/reject the GitHub-runner-to-pooler verify-full handshake.
+# The checker never prints the raw connection information or any secrets.
+# pipefail fails closed on psql connectivity and on the TLS assertion.
+LC_ALL=C psql -X -At --set ON_ERROR_STOP=1 -c '\conninfo' \
+  | node scripts/operations/saju-bridge-s3a-client-tls-check.mjs
 
 # Close TOCTOU window: latest backup, exact restored evidence, current
 # default branch and execution time window are rechecked immediately before DDL.

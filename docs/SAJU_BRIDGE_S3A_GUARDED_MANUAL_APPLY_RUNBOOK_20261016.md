@@ -16,7 +16,7 @@
 3. 최신 백업 성공 완료 30시간 이내, 그 백업의 격리 복원 성공 완료 4시간 이내. 둘의 run ID, project ref, source SHA, 체크섬, frontier `20261008090417`와 restore envelope를 독립 검증. `dr_ready=false`는 그대로 유지한다.
 4. 실제 실행 시 GitHub `main`의 SHA 고정·현재 HEAD 일치, Owner가 지정한 UTC 실행 종료 시각이 **실행 시점으로부터 30분 이내**여야 한다.
 5. 기존 Production secret 이름 `SUPABASE_DB_PASSWORD`, `SUPABASE_PRODUCTION_SESSION_POOLER_HOST`, `SUPABASE_PRODUCTION_SERVER_ROOT_CERT_PEM`만 사용. 실행 세션에서 기존 `prepare-production-postgres-strict-libpq.mjs`로 CA 지문·접속 대상·호스트명을 검증하고, libpq `PGSSLMODE=verify-full` / `PGSSLROOTCERT`를 적용한다.
-6. 관리자 read-only preflight: DB/PG17/SSL, S3A 객체·역할 충돌 0개, remote migration 총 173건/latest timestamp `20261008090417`, `1540`·`1730` 미적용. 하나라도 다르면 **HOLD**.
+6. 관리자 read-only preflight: DB/PG17, 실제 libpq 클라이언트 `verify-full` TLS(고정 CA·호스트명 및 `psql \\conninfo`의 TLS handshake 확인), S3A 객체·역할 충돌 0개, remote migration 총 173건/latest timestamp `20261008090417`, `1540`·`1730` 미적용. 하나라도 다르면 **HOLD**. Supabase Session Pooler가 TLS를 종단할 수 있으므로 PostgreSQL 내부 `pg_stat_ssl`은 클라이언트→Pooler 암호화를 증명하는 지표가 아니다. 연결 확인 출력에는 호스트명·접속 문자열을 남기지 않는다.
 
 ## 실제 일회성 트리거
 
