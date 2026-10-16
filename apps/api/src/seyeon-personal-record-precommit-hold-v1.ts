@@ -91,7 +91,9 @@ export function assertSeyeonPersonalRecordsNotUsedBeforeUnprotectedCommitV1(
     context.relationshipHistoryRecords.length !== 0 ||
     context.activeRelationshipEventCount !== 0 ||
     context.historyThroughRevision !== 0 ||
-    context.retrievedMemories.some(memory => memory.kind === 'relationship_event');
+    context.retrievedMemories.some(memory =>
+      memory !== null && typeof memory === 'object' &&
+      memory.kind === 'relationship_event');
 
   if (modelUsedPersonalRecord || unsafeMemoryKind || admittedOrUnknown ||
       unverifiedDerivedSource) {
