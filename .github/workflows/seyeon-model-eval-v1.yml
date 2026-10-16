@@ -33,7 +33,7 @@ jobs:
         run: npm ci --ignore-scripts --no-audit --no-fund
 
       - name: Verify eight-call budget and legacy lock
-        run: npx vitest run test/seyeon-cost-c06-eight-call-budget-v1.test.mjs test/seyeon-cost-c05-paid-eval-lock-offline-v1.test.mjs
+        run: npx vitest run test/seyeon-cost-c06-eight-call-budget-v1.test.mjs test/seyeon-paid-eval-hold-v1.test.mjs test/seyeon-security-four-cell-eval-plan-v1.test.mjs
 
       - name: Build evaluated runtime
         run: npm run build
