@@ -1,3 +1,4 @@
+import {syntheticFirstTurnCensusShadowV1} from './fixtures/seyeon-first-turn-census-shadow-v1.js';
 import {describe,expect,it,vi} from 'vitest';
 import {readFileSync} from 'node:fs';
 import {
@@ -128,6 +129,7 @@ async function runFast(text=PUBLIC_TEXT,opts:Options={}){
  });
  const shadow=createSeyeonFastDialogueShadowV1({
   candidateProvider:h.provider,reviewerProvider:h.provider,
+ fullThreadCensus: syntheticFirstTurnCensusShadowV1(),
  });
  const result=await shadow.evaluate(context);
  return {result,preflight,context,...h};
@@ -177,6 +179,7 @@ describe('C08-B: 5-call runtime vs 3-call candidate using real guards and fake p
   });
   await expect(createSeyeonFastDialogueShadowV1({
    candidateProvider:fast.provider,reviewerProvider:fast.provider,
+  fullThreadCensus: syntheticFirstTurnCensusShadowV1(),
   }).evaluate(c)).rejects.toThrow();
   expect(fast.calls).toEqual(FAST);
  });
@@ -206,6 +209,7 @@ describe('C08-B: 5-call runtime vs 3-call candidate using real guards and fake p
   });
   await expect(createSeyeonFastDialogueShadowV1({
    candidateProvider:fast.provider,reviewerProvider:fast.provider,
+  fullThreadCensus: syntheticFirstTurnCensusShadowV1(),
   }).evaluate(c)).rejects.toThrow();
   expect(fast.calls).toEqual(FAST.slice(0,2));
  });
@@ -236,6 +240,7 @@ describe('C08-B: 5-call runtime vs 3-call candidate using real guards and fake p
    });
    await expect(createSeyeonFastDialogueShadowV1({
     candidateProvider:h.provider,reviewerProvider:h.provider,
+   fullThreadCensus: syntheticFirstTurnCensusShadowV1(),
    }).evaluate(c)).rejects.toThrow();
    expect(h.calls).toEqual(FAST.slice(0,1));
   },
@@ -257,6 +262,7 @@ describe('C08-B: 5-call runtime vs 3-call candidate using real guards and fake p
    const h=harness('fast');
    await expect(createSeyeonFastDialogueShadowV1({
     candidateProvider:h.provider,reviewerProvider:h.provider,
+   fullThreadCensus: syntheticFirstTurnCensusShadowV1(),
    }).evaluate(c as SeyeonRuntimeContextV2)).rejects.toThrow();
    expect(h.calls).toEqual([]);
   }

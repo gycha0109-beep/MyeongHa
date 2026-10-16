@@ -18,6 +18,7 @@ import {
 export const SEYEON_FAST_DIALOGUE_SHADOW_VERSION_V1 =
   'seyeon-fast-dialogue-shadow-v1' as const;
 export type SeyeonFastDialogueShadowStageFailureCodeV1 =
+  | 'FAST_THREAD_CENSUS_REJECTED'
   | 'FAST_INTERPRETATION_GUARD_REJECTED'
   | 'FAST_RISK_CAUSALITY_REJECTED'
   | 'FAST_RENDERER_PACKET_REJECTED'
@@ -51,6 +52,70 @@ export const SEYEON_FAST_DIALOGUE_SHADOW_RESPONSE_SCHEMA_V1 = Object.freeze({
   }),
 });
 
+export const SEYEON_FIRST_TURN_CENSUS_SHADOW_VERSION_V1 =
+  'seyeon-first-turn-census-shadow-v1' as const;
+
+/**
+ * Server-side shadow dependency. The caller must supply a complete,
+ * subject/thread-scoped authoritative read, not a bounded recent-message
+ * window, client count, or model-generated statement. No production adapter
+ * has been approved or wired.
+ */
+export interface SeyeonFullThreadCensusShadowPortV1 {
+  readonly subjectId: string;
+  readonly threadId: string;
+  readFullThreadCensus(input: Readonly<{
+    subjectId: string;
+    threadId: string;
+    currentUserMessageId: string;
+  }>): unknown | Promise<unknown>;
+}
+
+function validCensusId(value: unknown): value is string {
+  return typeof value === 'string' && value.length > 0 &&
+    value.length <= 256 && value.trim() === value;
+}
+
+async function requireAuthoritativeFirstTurnCensusShadowV1(input: Readonly<{
+  port: SeyeonFullThreadCensusShadowPortV1 | undefined;
+  currentUserMessageId: string;
+}>): Promise<void> {
+  const failure = () =>
+    new SeyeonFastDialogueShadowStageErrorV1('FAST_THREAD_CENSUS_REJECTED');
+  const port = input.port;
+  if (!port || !validCensusId(port.subjectId) ||
+      !validCensusId(port.threadId) ||
+      !validCensusId(input.currentUserMessageId) ||
+      typeof port.readFullThreadCensus !== 'function') {
+    throw failure();
+  }
+  let raw: unknown;
+  try {
+    raw = await port.readFullThreadCensus({
+      subjectId: port.subjectId,
+      threadId: port.threadId,
+      currentUserMessageId: input.currentUserMessageId,
+    });
+  } catch {
+    // Do not expose private storage exceptions, model text, or subject IDs.
+    throw failure();
+  }
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    throw failure();
+  }
+  const census = raw as Record<string, unknown>;
+  if (Object.keys(census).length !== 7 ||
+      census.schemaVersion !== SEYEON_FIRST_TURN_CENSUS_SHADOW_VERSION_V1 ||
+      census.subjectId !== port.subjectId ||
+      census.threadId !== port.threadId ||
+      census.currentUserMessageId !== input.currentUserMessageId ||
+      census.messageCount !== 1 ||
+      census.latestSenderType !== 'user' ||
+      census.complete !== true) {
+    throw failure();
+  }
+}
+
 /**
  * Offline, opt-in candidate: one model request for interpretation + draft,
  * followed by the existing independent semantic reviewer and server guards.
@@ -59,6 +124,7 @@ export const SEYEON_FAST_DIALOGUE_SHADOW_RESPONSE_SCHEMA_V1 = Object.freeze({
 export function createSeyeonFastDialogueShadowV1(input: {
   readonly candidateProvider: SeyeonStructuredProviderPortV2;
   readonly reviewerProvider: SeyeonStructuredProviderPortV2;
+  readonly fullThreadCensus?: SeyeonFullThreadCensusShadowPortV1;
 }) {
   return Object.freeze({
     async evaluate(context: SeyeonRuntimeContextV2) {
@@ -78,6 +144,10 @@ export function createSeyeonFastDialogueShadowV1(input: {
           context.relationshipSemantics !== null) {
         throw new TypeError('Fast-dialogue Shadow requires a governed, public, first-contact ordinary turn.');
       }
+      await requireAuthoritativeFirstTurnCensusShadowV1({
+        port: input.fullThreadCensus,
+        currentUserMessageId: context.recentConversation[0]!.messageId,
+      });
       const request = buildSeyeonTurnInterpreterRequestV2(context);
       const raw: unknown = await input.candidateProvider.generate({
         contractVersion: 'seyeon-structured-provider-v2',

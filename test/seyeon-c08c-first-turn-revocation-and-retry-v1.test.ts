@@ -1,3 +1,4 @@
+import {syntheticFirstTurnCensusShadowV1} from './fixtures/seyeon-first-turn-census-shadow-v1.js';
 import {describe,expect,it,vi} from 'vitest';
 import {readFileSync} from 'node:fs';
 import {assembleSeyeonRuntimeContextV2} from
@@ -48,6 +49,7 @@ function providers(){
  const provider={providerKey:'synthetic',modelKey:'synthetic',generate};
  return {generate,shadow:createSeyeonFastDialogueShadowV1({
   candidateProvider:provider,reviewerProvider:provider,
+ fullThreadCensus: syntheticFirstTurnCensusShadowV1(),
  })};
 }
 const PERSONAL={
