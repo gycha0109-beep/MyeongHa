@@ -21,6 +21,7 @@ export default function RootLayout() {
         }}
       >
         <Stack.Screen name="(tabs)" />\n        <Stack.Screen name="birth" />
+        <Stack.Screen name="auth/callback" />
       </Stack>
     </>
   );
