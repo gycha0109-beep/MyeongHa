@@ -178,8 +178,8 @@ begin
  if fn is null or not exists (select 1 from pg_catalog.pg_proc p
     where p.oid=fn and p.prosecdef
       and p.proowner='myeongha_seyeon_cost_meter_owner'::regrole)
-    or position('(p_event->>''outcome'') IS NULL' in pg_get_functiondef(fn))=0
-    or position('(p_event->>''costStatus'') IS NULL' in pg_get_functiondef(fn))=0 then
+    or position('(p_event->>''outcome'') is null' in pg_get_functiondef(fn))=0
+    or position('(p_event->>''costStatus'') is null' in pg_get_functiondef(fn))=0 then
    raise exception 'HOLD_R2_H_1760_NULL_SAFE_INGRESS_REPLACEMENT_MISSING';
  end if;
 end
