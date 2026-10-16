@@ -100,7 +100,8 @@ describe('C06 manual-only, single eight-call budget and consent scope',()=>{
     const script=read('scripts/run-seyeon-cost-c06-eight-call-v1.mjs');
     expect(scoped).toMatch(/workflow_dispatch:/u);
     expect(scoped).not.toMatch(/^\s+push:/mu);
-    expect(scoped).toContain("github.ref == 'refs/heads/main'");
+    expect(scoped).toContain('if: $'+'{{ false }}');
+    expect(scoped).toContain('Run #38845185681 consumed 3 paid calls');
     expect(scoped).toContain('secrets.OPENAI_API_KEY2');
     expect(scoped).not.toContain('secrets.OPENAI_API_KEY }}');
     expect(scoped).toContain('run-seyeon-cost-c06-eight-call-v1.mjs');

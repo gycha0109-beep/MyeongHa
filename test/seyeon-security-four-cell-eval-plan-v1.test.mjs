@@ -68,7 +68,8 @@ describe('four-cell security paid-evaluation readiness (no model dispatch)', () 
     expect(scoped).toContain('secrets.OPENAI_API_KEY2');
     expect(scoped).toContain('run-seyeon-cost-c06-eight-call-v1.mjs');
     expect(scoped).toContain('workflow_dispatch:');
-    expect(scoped).toContain("github.ref == 'refs/heads/main'");
+    expect(scoped).toContain('if: $'+'{{ false }}');
+    expect(scoped).toContain('Run #38845185681 consumed 3 paid calls');
     expect(scoped).not.toMatch(/^\s+push:\s*$/m);
     expect(scoped).not.toContain('run-seyeon-model-eval-v1.mjs');
     const costContract = readFileSync(
