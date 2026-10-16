@@ -245,7 +245,7 @@ async function runSeyeonTurnRuntimePhaseV1<T>(
       ? rawCode
       : null;
     // PostgreSQL constraint is server-defined; emit only narrowly shaped
-    // identifiers. Never log SQL error.message/detail or user Chat content.
+    // identifiers. Never log raw exception text, SQL detail, or user Chat content.
     const rawConstraint =
       typeof error === 'object' && error !== null && 'constraint' in error
         ? (error as { constraint?: unknown }).constraint : null;
