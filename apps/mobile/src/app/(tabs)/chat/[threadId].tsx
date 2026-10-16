@@ -62,7 +62,7 @@ function ValidChatThread({ threadId }: { threadId: string }) {
         </Pressable>
         <ChatReadHeader snapshot={snapshot} />
         <ChatReadMessages snapshot={snapshot} />
-        <ChatReadMore snapshot={snapshot} onLoadMore={() => void loadMore()} />
+        <ChatReadMore snapshot={snapshot} onLoadMore={() => void loadMore()} onRetry={() => void refresh()} />
       </ScrollView>
       <ChatComposer
         snapshot={snapshot}
