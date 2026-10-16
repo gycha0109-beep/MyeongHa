@@ -21,6 +21,17 @@ begin
        and p.proowner=owner_role and p.prosecdef) then
    raise exception 'HOLD_R2_H_1750_CREATOR_ROLE_OR_OWNER_PRECONDITION_FAILED';
  end if;
+
+ -- In PG17 role membership is grantor-scoped. An ADMIN OPTION on its own
+ -- does not prove current_user can revoke a different grantor's membership.
+ -- Fail before REVOKE, including ambiguous multiple-grantor memberships.
+ if (select count(*) from pg_catalog.pg_auth_members
+       where roleid=owner_role and member=current_user::regrole) <> 1
+    or not exists (select 1 from pg_catalog.pg_auth_members
+       where roleid=owner_role and member=current_user::regrole
+         and grantor=current_user::regrole) then
+   raise exception 'HOLD_R2_H_1750_GRANTOR_NOT_CREATOR';
+ end if;
 end
 $guard$;
 revoke myeongha_character_reading_artifact_runtime_owner from current_user;
