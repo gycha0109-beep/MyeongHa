@@ -8,7 +8,8 @@ set -euo pipefail
    "$(printenv PGHOST 2>/dev/null || true)" == localhost &&
    "$(printenv PGUSER 2>/dev/null || true)" == postgres &&
    ( "$(printenv PGDATABASE 2>/dev/null || true)" == myeongha_ci_case_* ||
-     "$(printenv PGDATABASE 2>/dev/null || true)" == myeongha_test ) ]] || {
+     "$(printenv PGDATABASE 2>/dev/null || true)" == myeongha_test ||
+     "$(printenv PGDATABASE 2>/dev/null || true)" == myeongha_official_standard_reader_interpretation_test ) ]] || {
   echo 'M1-05 DENY: disposable localhost CI PostgreSQL required' >&2
   echo "M1 CI guard: ci=$(printenv CI 2>/dev/null || true) github_actions=$(printenv GITHUB_ACTIONS 2>/dev/null || true) host=$(printenv PGHOST 2>/dev/null || true) user=$(printenv PGUSER 2>/dev/null || true) database=$(printenv PGDATABASE 2>/dev/null || true)" >&2
   exit 2
