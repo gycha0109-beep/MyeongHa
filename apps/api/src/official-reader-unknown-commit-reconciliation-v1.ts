@@ -15,6 +15,9 @@ const UNKNOWN_COMMIT_READ_SQL = `select
  pci.item_key as "itemKey",
  eg.id::text as "grantId",
  eg.status as "grantStatus",
+ (eg.status='active' and eg.valid_from<=transaction_timestamp()
+  and (eg.valid_until is null or eg.valid_until>transaction_timestamp()))
+  as "grantActiveAtDb",
  eg.valid_from::text as "grantValidFrom",
  eg.valid_until::text as "grantValidUntil",
  ee.id::text as "eventId",
@@ -106,12 +109,9 @@ function optionalTimestamp(value: unknown): boolean {
 }
 
 function present(event: EvidenceRow): boolean {
-  return uuid(event.grantId) && event.grantStatus === 'active' &&
+  return uuid(event.grantId) && event.grantStatus === 'active' && event.grantActiveAtDb === true &&
     timestamp(event.grantValidFrom) &&
     optionalTimestamp(event.grantValidUntil) &&
-    new Date(event.grantValidFrom).getTime() <= Date.now() &&
-    (event.grantValidUntil === null ||
-      new Date(event.grantValidUntil as string).getTime() > Date.now()) &&
     uuid(event.eventId) && typeof event.eventDedupeKey === 'string' &&
     event.eventDedupeKey.length > 0 && timestamp(event.eventEffectiveAt) &&
     event.eventTargetStatus === 'active' &&
