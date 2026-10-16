@@ -18,10 +18,18 @@ import { SEYEON_C06_EIGHT_CALL_POLICY_V1 as P,
   createSeyeonC06EightCallQuotaV1 as quotaFactory }
   from './seyeon-cost-c06-eight-call-budget-v1.mjs';
 
+import {scoreSeyeonC06ScreenCaseV1} from
+  './seyeon-cost-c06-screen-score-v1.mjs';
+
 const evidence=process.env.SEYEON_C06_EVIDENCE_PATH||
   './.evidence/seyeon-c06-eight-call-eval-v1.jsonl';
 const reportPath=process.env.SEYEON_C06_REPORT_PATH||
   './.evidence/seyeon-c06-eight-call-eval-v1.json';
+// The original 8-call script was used for 3 paid requests in run #38845185681.
+// This runner has no durable cross-run usage/cost ledger. A manual re-run would
+// reissue those three requests. V1 is deliberately retired/fail-closed.
+// Review and implement a new, pinned cumulative resume protocol separately.
+const C06_V1_REPLAY_LOCKED_AFTER_3_PAID_REQUESTS=true;
 const key=process.env.OPENAI_API_KEY2?.trim();
 const outputConfig=Object.freeze({
   model:P.model,maxOutputTokens:P.providerOutputTokenCap,
@@ -33,25 +41,14 @@ async function journal(record){
   })+'\n',{mode:0o600});
 }
 function decide(spec,result){
-  const topic=result.disclosure.topicKey;
-  const kinds=[...new Set(result.integrity.claims.map(c=>c.kind))];
-  const topicMatch=topic===spec.topic;
-  const requiredClaimFound=spec.requiredKind===undefined?null:
-    kinds.includes(spec.requiredKind);
-  const ordinaryClaimViolation=spec.noClaims===true&&kinds.length>0;
-  const unreviewedClaimKinds=spec.noClaims===true?[]:
-    spec.requiredKind===undefined?kinds:
-      kinds.filter(kind=>kind!==spec.requiredKind);
-  return Object.freeze({
-    caseId:spec.id,expectedTopic:spec.topic,observedTopic:topic,
-    topicMatch,requiredClaimFound,ordinaryClaimViolation,
-    unreviewedClaimKinds,claimKinds:kinds,
-    candidateGoldCheck:topicMatch&&requiredClaimFound!==false&&
-      !ordinaryClaimViolation&&unreviewedClaimKinds.length===0
-      ?'MATCHED_GOLD_SCREEN':'REVIEW_OR_DEFECT_HOLD',
+  return scoreSeyeonC06ScreenCaseV1(spec,{
+    topicKey:result.disclosure.topicKey,
+    claimKinds:result.integrity.claims.map(claim=>claim.kind),
   });
 }
 async function main(){
+  if(C06_V1_REPLAY_LOCKED_AFTER_3_PAID_REQUESTS)
+    throw new Error('C06_V1_REPLAY_LOCKED_AFTER_3_PAID_REQUESTS');
   if(!key||key.length<20)throw Error('Dedicated OPENAI_API_KEY2 missing; no fallback');
   await mkdir(dirname(evidence),{recursive:true});
   await mkdir(dirname(reportPath),{recursive:true});
