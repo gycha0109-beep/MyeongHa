@@ -332,6 +332,12 @@
       "mainMode": "one-shot-trigger",
       "workTrackAttribution": "commit-metadata"
     },
+    "seyeon-c07-six-call-model-eval-v1.yml": {
+      "responsibility": "production-character-model-evaluation",
+      "prMode": "none",
+      "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "commit-metadata"
+    },
     "seyeon-dialogue-path-real-api-eval-v1.yml": {
       "responsibility": "production-character-model-evaluation",
       "prMode": "none",
