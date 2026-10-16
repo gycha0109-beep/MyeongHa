@@ -98,6 +98,10 @@ for signature in \
 done
 pass "runtime Commerce executor remains denied both private D2 functions"
 
+# M1-04: assert actual SET LOCAL ROLE invocation denial against the newly
+# persisted 1050 evidence, before the fixture owner issues any purchased Grant.
+bash test/db/official_reader_m1_04_provider_role_execute_deny.sh "$receipt" "$subject" "$intent"
+
 # M1-03: The existing verified Receipt MUST survive a downstream bind
 # error while ALL issuance writes from the same transaction are rolled back.
 # Use the isolated DB fixture owner, NOT an API or Commerce runtime account.
