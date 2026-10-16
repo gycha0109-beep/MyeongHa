@@ -60,4 +60,24 @@ describe('mobile social auth structure', () => {
     expect(signInRoute).toContain("routeId: 'api.auth.social.start'");
     expect(signInRoute).toContain('handleSocialAuthStartRequestV1');
   });
+  it('registers exactly the native Google OAuth callback path and returns to My without moving tokens', async () => {
+    const appJson = JSON.parse(await readRepoFile('apps/mobile/app.json'));
+    const layout = await readRepoFile('apps/mobile/src/app/_layout.tsx');
+    const route = await readRepoFile('apps/mobile/src/app/auth/callback.tsx');
+    const auth = await readRepoFile('apps/mobile/src/core/auth/mobile-social-auth.ts');
+    const hook = await readRepoFile('apps/mobile/src/features/my/use-mobile-member-auth.tsx');
+    const redirect = auth.match(/'myeongha:\/\/auth\/callback'/)?.[0];
+    expect(appJson.expo.scheme).toBe('myeongha');
+    expect(redirect).toBe("'myeongha://auth/callback'");
+    expect(layout).toContain('<Stack.Screen name="auth/callback" />');
+    expect(route).toContain("router.replace('/my')");
+    expect(route).not.toContain('useLocalSearchParams');
+    expect(route).not.toContain('access_token');
+    expect(route).not.toContain('refresh_token');
+    expect(route).not.toContain('session=');
+    expect(hook).toContain("Linking.addEventListener('url'");
+    expect(hook).toContain('Linking.getInitialURL()');
+    expect(hook).toContain('nativeMobileSocialAuthServiceV1.complete(url)');
+  });
+
 });
