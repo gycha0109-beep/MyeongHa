@@ -156,7 +156,7 @@ jobs:
           BACKUP_ARTIFACT_NAME: ${{ steps.source.outputs.artifact_name }}
         run: bash scripts/operations/audit-production-postgres-privacy-delta.sh
       - name: Upload count-only audit evidence
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: postgres-privacy-delta-count-audit-${{ github.run_id }}
           path: ${{ steps.audit.outputs.evidence_path }}
