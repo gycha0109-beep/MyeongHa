@@ -113,7 +113,10 @@ select purchase_role from public.internal_acquire_official_reader_purchase_scope
 commit;
 SQL
 )"
-[[ "$fresh" == additional_reader_interpretation ]] ||
+[[ "$fresh" == "$subject"
+echo 'PASS M1-09: fresh DB session reacquires verified Reader purchase scope after timed-out issuer connection'
+echo 'HOLD M1-09: downstream M1-03 retries same Receipt atomically in isolated owner fixture; production Worker credentials, issue authority and release remain unapproved'
+\n'additional_reader_interpretation ]] ||
  fail "fresh post-timeout D1 purchase scope cannot be reacquired: $fresh"
 echo 'PASS M1-09: fresh DB session reacquires verified Reader purchase scope after timed-out issuer connection'
 echo 'HOLD M1-09: downstream M1-03 retries same Receipt atomically in isolated owner fixture; production Worker credentials, issue authority and release remain unapproved'
