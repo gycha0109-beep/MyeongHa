@@ -106,6 +106,10 @@ bash test/db/official_reader_m1_04_provider_role_execute_deny.sh "$receipt" "$su
 # NOLOGIN role does not give SECURITY INVOKER's transitive data authority.
 bash test/db/official_reader_m1_05_invoker_execute_only_probe.sh "$receipt" "$subject" "$intent"
 
+# M1-08: a top-level D2 EXECUTE grant to an otherwise isolated synthetic
+# issuer MUST NOT enable a real runtime session_user to assume that role.
+bash test/db/official_reader_m1_08_private_issuer_session_assumption.sh "$receipt" "$subject" "$intent"
+
 # M1-03: The existing verified Receipt MUST survive a downstream bind
 # error while ALL issuance writes from the same transaction are rolled back.
 # Use the isolated DB fixture owner, NOT an API or Commerce runtime account.
