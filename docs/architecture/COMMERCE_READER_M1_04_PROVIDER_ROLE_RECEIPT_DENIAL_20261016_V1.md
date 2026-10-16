@@ -12,7 +12,7 @@
 
 ## New executable integration check
 
-`test/db/official_reader_m1_04_provider_role_execute_deny.sh` is invoked immediately after **actual `1050` persistence** and before the isolated owner issues a Grant. It runs on the existing Content DB Suite fixture only, with a disposable `CI=true` or `GITHUB_ACTIONS=true`, `PGHOST=localhost`, `PGUSER=postgres`, `myeongha_ci_case_*` or `myeongha_test` CI-only database guard.
+`test/db/official_reader_m1_04_provider_role_execute_deny.sh` is invoked immediately after **actual `1050` persistence** and before the isolated owner issues a Grant. It runs on the existing Content DB Suite fixture only, with a disposable `CI=true` or `GITHUB_ACTIONS=true`, `PGHOST=localhost`, `PGUSER=postgres`, `myeongha_ci_case_*`, `myeongha_test`, or `myeongha_official_standard_reader_interpretation_test` CI-only database guard.
 
 The test:
 
