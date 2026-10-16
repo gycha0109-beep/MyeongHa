@@ -168,3 +168,10 @@
 - 상태 보고 형식은 항상 짧게 **완료 / 문제 / 다음 작업**을 기본으로 한다.
 
 **한 줄 결론:** 새로운 Commerce 보안 기초를 반복하지 않는다. **M0 Writer/lock/role 인벤토리 → M1 새 Grant·취소·T2 통합 경합 → M2 Saju 권위/Reader 적격성 → M3 비공개 원자 공개·재조회 → M4 Sandbox 구매 전체 흐름 → M5 운영 Cutover/출시** 순서로 진행한다.
+
+
+### M1-01 진행 기록 — 2026-10-16 (종속 Draft)
+
+- 실제 Provider 결제 완료 호출자의 Verified Receipt persistence까지만 이어지는 단절점을 신규 Vitest 경계 시험으로 고정했다. [M1-01 실행 근거](./architecture/COMMERCE_READER_M1_01_COMPLETION_FULFILLMENT_BOUNDARY_20261016_V1.md).
+- 현재 `myeongha_commerce_internal_executor`는 1050 persistence를 실행할 수 있지만, D2 1820의 두 private 함수는 실행 권한을 열지 않았다. 신규 시험은 합성·오프라인이며 실제 PG15/17에서 Receipt→D2 성공이나 유료 T2 공개를 증명하지 않는다.
+- **M1-01의 caller gap은 미해결**이다. 다음 M1-02는 기존 D2 테스트를 재사용하는 실제 1050 Receipt→D2 private caller/role/트랜잭션 통합 검증이다. Product/DB/Security 승인 전 런타임 EXECUTE·Offer·Reader 공개·운영 변경 금지.
