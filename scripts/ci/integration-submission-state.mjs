@@ -20,8 +20,17 @@ export function decideIntegrationSubmission({ pr, head, runs, hasLabel }) {
       return Object.freeze({ action: 'no-op', reason: 'CURRENT_HEAD_INTEGRATION_PASSED', runId: latest.id });
     }
   }
+  // GitHub indexes new workflow runs asynchronously after the label event.
+  // Treat an already-present label with no indexed run as an outstanding
+  // submission, not an invitation to toggle and trigger duplicate workflows.
+  // A genuinely stale label on a new head requires explicit diagnosis/resubmission.
+  if (latest === null && hasLabel) {
+    return Object.freeze({
+      action: 'no-op', reason: 'LABEL_PRESENT_RUN_NOT_YET_INDEXED',
+    });
+  }
   return Object.freeze({
-    action: hasLabel ? 'refresh-label' : 'add-label',
+    action: latest === null ? 'add-label' : (hasLabel ? 'refresh-label' : 'add-label'),
     reason: latest === null ? 'CURRENT_HEAD_INTEGRATION_NOT_REQUESTED' : 'CURRENT_HEAD_INTEGRATION_NOT_SUCCESSFUL',
     ...(latest === null ? {} : { runId: latest.id }),
   });
