@@ -9,6 +9,7 @@ on:
       - 'scripts/operations/saju-bridge-s3a-*'
       - 'scripts/operations/run-saju-bridge-s3a-guarded-apply.sh'
       - 'test/operations/saju_bridge_s3a_*'
+      - 'docs/SAJU_BRIDGE_S3A_GUARDED_MANUAL_APPLY_RUNBOOK_20261016.md'
       - 'supabase/proposals/1730_saju_bridge_single_project_operator_permit_v1.sql'
   workflow_dispatch:
 
