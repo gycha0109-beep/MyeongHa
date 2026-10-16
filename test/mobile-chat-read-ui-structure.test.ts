@@ -35,6 +35,11 @@ describe('mobile M6-B Chat read UI structure', () => {
     const components = await readRepoFile('apps/mobile/src/features/chat/ChatReadComponents.tsx');
     expect(components).not.toContain('messagePayloadJsonb');
     expect(components).not.toContain('bodyText');
-    expect(components).toContain('createMobileChatMessageViewV1');
+    expect(components).toContain('groupMobileChatMessagesV1');
+    expect(components).toContain('resolveMobileChatPortraitV1(group.characterId)');
+    expect(components).toContain('styles.messageGroupName');
+    expect(components).toContain('last && group.timeLabel');
+    const model = await readRepoFile('apps/mobile/src/features/chat/chat-view-model.ts');
+    expect(model).toContain('createMobileChatMessageViewV1(message, verifiedCharacterDisplayName)');
   });
 });
