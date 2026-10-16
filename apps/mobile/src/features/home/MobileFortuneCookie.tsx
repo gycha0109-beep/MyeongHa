@@ -9,8 +9,8 @@ export function MobileFortuneCookie() {
   const [revealed, setRevealed] = useState(false);
   const [index, setIndex] = useState(-1);
 
-  function draw() {
-    setIndex((previous) => pickFortuneCookieIndexV1(previous));
+  function openNote() {
+    if (index === -1) setIndex(pickFortuneCookieIndexV1(-1));
     setRevealed(true);
   }
 
@@ -18,20 +18,17 @@ export function MobileFortuneCookie() {
     <View style={styles.section}>
       <View style={styles.head}>
         <Text style={styles.kicker}>A LITTLE FORTUNE</Text>
-        <Text style={styles.title}>오늘의 운세</Text>
-        <Text style={styles.description}>가볍게 뽑아 보는 오늘의 포춘쿠키</Text>
+        <Text style={styles.title}>오늘의 쪽지</Text>
       </View>
-      <Pressable accessibilityRole="button" onPress={draw} style={styles.card}>
+      <Pressable accessibilityRole="button" onPress={openNote} style={styles.card}>
         <View style={styles.symbol}>
           <Text style={styles.symbolText}>✦</Text>
         </View>
         <View style={styles.copy}>
           <Text style={styles.callToAction}>행운의 쪽지 열기</Text>
-          <Text style={styles.note}>오늘의 작은 행운을 한 장 뽑아보세요.</Text>
         </View>
         <Text style={styles.arrow}>→</Text>
       </Pressable>
-      <Text style={styles.disclaimer}>재미로 보는 무작위 메시지입니다. 개인 사주 풀이가 아닙니다.</Text>
       <Modal
         visible={revealed}
         animationType="fade"
@@ -53,10 +50,6 @@ export function MobileFortuneCookie() {
               {index < 0 ? '' : FORTUNE_COOKIE_MESSAGES_V1[index]}
             </Text>
             <Text style={styles.ornament}>◇</Text>
-            <Pressable accessibilityRole="button" onPress={draw} style={styles.redraw}>
-              <Text style={styles.redrawText}>다른 쪽지 뽑기 ↻</Text>
-            </Pressable>
-            <Text style={styles.disclaimer}>이 쪽지는 재미로 읽는 메시지입니다.</Text>
           </View>
         </View>
       </Modal>
@@ -69,7 +62,6 @@ const styles = StyleSheet.create({
   head: { gap: 5 },
   kicker: { color: mobileColors.gold, fontSize: 11, letterSpacing: 1.1, fontWeight: '900' },
   title: { color: mobileColors.ink, fontSize: 23, fontWeight: '900' },
-  description: { color: mobileColors.muted, fontSize: 13 },
   card: {
     flexDirection: 'row', alignItems: 'center', gap: 15,
     borderRadius: 19, backgroundColor: mobileColors.surface,
@@ -85,9 +77,7 @@ const styles = StyleSheet.create({
   symbolText: { color: mobileColors.gold, fontSize: 32 },
   copy: { flex: 1, gap: 7 },
   callToAction: { color: mobileColors.ink, fontSize: 16, fontWeight: '900' },
-  note: { color: mobileColors.muted, fontSize: 12, lineHeight: 18 },
   arrow: { color: mobileColors.navy, fontSize: 22, fontWeight: '700' },
-  disclaimer: { color: mobileColors.muted, fontSize: 11, lineHeight: 17, textAlign: 'center' },
   overlay: {
     flex: 1, justifyContent: 'center', padding: 22,
     backgroundColor: 'rgba(20, 30, 42, 0.67)',
@@ -107,9 +97,4 @@ const styles = StyleSheet.create({
     color: mobileColors.ink, fontSize: 21, fontWeight: '700',
     lineHeight: 32, textAlign: 'center', paddingHorizontal: 7, paddingVertical: 18,
   },
-  redraw: {
-    alignSelf: 'stretch', borderRadius: 12, backgroundColor: mobileColors.navy,
-    alignItems: 'center', paddingVertical: 14,
-  },
-  redrawText: { color: mobileColors.surface, fontWeight: '800', fontSize: 14 },
 });

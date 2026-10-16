@@ -52,8 +52,13 @@ describe('mobile chat + Reader portrait + Fortune Cookie parity', () => {
     const home = await source('apps/mobile/src/app/(tabs)/index.tsx');
     const cookie = await source('apps/mobile/src/features/home/MobileFortuneCookie.tsx');
     expect(home).toContain('<MobileFortuneCookie />');
-    expect(cookie).toContain('오늘의 운세');
-    expect(cookie).toContain('개인 사주 풀이가 아닙니다');
+    expect(cookie).toContain('오늘의 쪽지');
+    expect(cookie).toContain('function openNote()');
+    expect(cookie).toContain('if (index === -1)');
+    expect(cookie).not.toContain('다른 쪽지 뽑기');
+    expect(cookie).not.toContain('재미로 보는');
+    expect(cookie).not.toContain('재미로 읽는');
+    expect(cookie).not.toContain('개인 사주 풀이가 아닙니다');
   });
 
   it('never downgrades chat room read credentials from Member to Guest and shows a safe retry code', async () => {
