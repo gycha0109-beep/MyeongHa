@@ -7,6 +7,7 @@ import { useCallback, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
+  RefreshControl,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -23,6 +24,7 @@ import {
   readingTitleV1,
 } from '@/features/records/records-view-model';
 import { mobileColors } from '@/ui/mobile-colors';
+import { useMobilePullRefreshV1 } from '@/ui/use-mobile-pull-refresh';
 
 type DetailStateV1 =
   | Readonly<{ kind: 'loading' }>
@@ -95,6 +97,8 @@ export default function OfficialReadingDetailScreen() {
     }
   }, [readingId]);
 
+  const { refreshing, onRefresh } = useMobilePullRefreshV1(load);
+
   useFocusEffect(useCallback(() => {
     focused.current = true;
     const unsubscribe = subscribeMobileSubjectCredentialChangesV1(() => {
@@ -116,7 +120,16 @@ export default function OfficialReadingDetailScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView contentContainerStyle={styles.content}
+        refreshControl={(
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => void onRefresh()}
+            tintColor={mobileColors.navy}
+            colors={[mobileColors.navy]}
+          />
+        )}
+      >
         <Pressable
           accessibilityRole="button"
           onPress={() => router.back()}
