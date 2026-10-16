@@ -130,18 +130,18 @@ export default function SajuReaderSceneScreen() {
         </ImageBackground>
         <Text style={styles.sceneNote}>장면 연출 · 실제 해석 내용은 서버의 검증된 사주 프리뷰만 사용합니다.</Text>
 
-        {!introFinished || state.kind === 'loading' ? (
-          <View style={styles.block}>
-            <ActivityIndicator color={mobileColors.navy} />
-            <Text style={styles.muted}>세연이 명식을 살펴보는 장면입니다…</Text>
-          </View>
-        ) : state.kind === 'unavailable' ? (
+        {state.kind === 'unavailable' ? (
           <View style={styles.block}>
             <Text style={styles.title}>읽기를 표시하지 못했습니다</Text>
             <Text style={styles.muted}>{state.message}</Text>
             <Pressable accessibilityRole="button" style={styles.action} onPress={() => router.replace('/reading')}>
               <Text style={styles.actionText}>사주로 돌아가기</Text>
             </Pressable>
+          </View>
+        ) : !introFinished || state.kind === 'loading' ? (
+          <View style={styles.block}>
+            <ActivityIndicator color={mobileColors.navy} />
+            <Text style={styles.muted}>세연이 명식을 살펴보는 장면입니다…</Text>
           </View>
         ) : completed ? (
           <View style={styles.block}>
