@@ -3,12 +3,14 @@ set -euo pipefail
 
 # M1-05: execute-only permission is insufficient for a SECURITY INVOKER
 # D2 issuer. Everything below takes place in one disposable CI database.
-[[ "$(printenv CI 2>/dev/null || true)" == true &&
+[[ ( "$(printenv CI 2>/dev/null || true)" == true ||
+      "$(printenv GITHUB_ACTIONS 2>/dev/null || true)" == true ) &&
    "$(printenv PGHOST 2>/dev/null || true)" == localhost &&
    "$(printenv PGUSER 2>/dev/null || true)" == postgres &&
    ( "$(printenv PGDATABASE 2>/dev/null || true)" == myeongha_ci_case_* ||
      "$(printenv PGDATABASE 2>/dev/null || true)" == myeongha_test ) ]] || {
   echo 'M1-05 DENY: disposable localhost CI PostgreSQL required' >&2
+  echo "M1 CI guard: ci=$(printenv CI 2>/dev/null || true) github_actions=$(printenv GITHUB_ACTIONS 2>/dev/null || true) host=$(printenv PGHOST 2>/dev/null || true) user=$(printenv PGUSER 2>/dev/null || true) database=$(printenv PGDATABASE 2>/dev/null || true)" >&2
   exit 2
 }
 [[ "$#" == 3 ]] || { echo 'M1-05: receipt subject intent required' >&2; exit 2; }
