@@ -3,9 +3,18 @@
 Watchtower-Track: security
 상위 종료 원장: [#1866](https://github.com/gycha0109-beep/MyeongHa/issues/1866)
 P0 Memory Grant/Commit/Reveal: [#1843](https://github.com/gycha0109-beep/MyeongHa/issues/1843)
+G0 Owner 검토 중인 **제안서(승인 아님)**: [세연 개인기록 출처·파생정보·공개 선형화 계약 v1](./SEYEON_G0_PERSONAL_SOURCE_AND_DERIVED_DISCLOSURE_CONTRACT_V1_PROPOSAL.md)
 Reader 구매 기반 권한: [#1827](https://github.com/gycha0109-beep/MyeongHa/issues/1827)
 AI 경량 보안 정책 평가: [#1816](https://github.com/gycha0109-beep/MyeongHa/issues/1816)
 플랫폼 전반 감사: [#1529](https://github.com/gycha0109-beep/MyeongHa/issues/1529)
+
+G0 **상세 기술설계(Owner 미승인)**: [Positive Attempt SourceSet·D-03 Codec·1640 Zero Trigger·G2 Commit Blueprint](./SEYEON_G0_D03_G1_POSITIVE_PIN_DB_BLUEPRINT_V1_PROPOSED.md)
+
+G0→G6 **단계별 실행 로드맵(Owner 미승인)**: [R0~R8 Gate/검증/이관](../operations/SEYEON_G0_D03_G1_TO_G6_IMPLEMENTATION_ROADMAP_V1.md)
+
+> 2026-10-12: 기존 Gate 표의 HOLD는 그대로입니다. 계획/설계서 작성, PR CI 통과 또는 AI가 작성한 decision table은 Owner 승인·Production 적용 증거가 아닙니다.
+
+**G1 Owner 인수 미결:** [G0 D-02 Post-Preflight closure와 D-03/D-06 positive SourceSet·StageReceipt 계약 제안](./SEYEON_G1_OWNER_SIGNOFF_AND_POST_PREFLIGHT_SOURCE_CLOSURE_V1_PROPOSAL.md). 최초 Preflight 이전의 immutable DB SourceSet과 이후 생성되는 실제 Provider Request/Output은 시간상 동일한 1회 해시로 미리 Pin할 수 없으므로 **별도 단계별 권한·무결성 결속 필요**. 문서·합성 CI 통과는 G0/G1 운영 승인 아님.
 
 ## 판정 정의
 
@@ -25,6 +34,12 @@ AI 경량 보안 정책 평가: [#1816](https://github.com/gycha0109-beep/Myeong
 | G4 AI Governor | 서버 승인 비용/모델/역할 계약, 레거시 DB EXECUTE·Provider 우회 제거 | 독립 DB 세션 예산 경합, 중복 정산·크래시·direct RPC 차단·운영 정책 | Character + DB + Security | **IN PROGRESS / HOLD** |
 | G5 통합 검증 | 실제 DB·HTTP·AI 제어 경로, 정확한 HEAD CI·Governance·전체 Integration | 권한/유출/무단 유료 호출 핵심 0, PostgreSQL 2세션 race 모두 PASS | Security + QA | **HOLD** |
 | G6 운영 승인 | 제한적 synthetic + 내부 smoke, privacy-safe 관측·경보·복구·권한/배포 승인 | 승인자·범위·증거 URL·본번 main sha·rollback 기준·잔여 위험 명시 | Integration Owner | **HOLD** |
+
+## G0 설계 착수 판정 (2026-10-12, Owner 승인 전)
+
+- Draft PR #1985에서 운영 연결 이전 필요한 Owner의 **D-01~D-10 결정 원장**, source-class/파생 closure, raw/projected/context digest 분리, exact Grant revoke/Reveal 선형화, History/Reader/Relationship 무출처 HOLD, 제한적 S0 scope 및 G1~G6 테스트 요건을 버전 있는 G0 제안서로 기록.
+- **G0=PROPOSAL PREPARED, APPROVED 아님**. 이 문서의 개별 제안이 `SRC-25` type registry나 `SRC-22` 관계 정책, #1827 구매 entitlement 및 Production migration #1887을 확정하지 않음.
+- Security + DB + Character 외 Source Authority/Reader/Product/Ops가 각각 자기가 담당하는 D-ID를 명시 승인하거나 서명한 `OUT_OF_SCOPE + FAIL_CLOSED`를 남겨야 다음 운영 positive 단계 진행 가능. AI 작성·PR CI·테스트 PASS는 승인 대체 불가.
 
 ## G0 결정이 필요한 구체적 권한 계약
 

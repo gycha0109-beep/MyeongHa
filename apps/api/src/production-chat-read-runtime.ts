@@ -1,6 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import { handleChatOpenRequestV1 } from './chat-open-http.js';
-import { handleChatReadRequestV1 } from './chat-read-http.js';
+import {
+  handleChatReadRequestV1,
+  type SeyeonChatHistoryDisclosurePortV1,
+} from './chat-read-http.js';
 import type { PostgresSubjectPoolV1 } from './postgres-subject-execution.js';
 import { createProductionPostgresSubjectPoolLeaseV1 } from './production-postgres-subject-pool-lease.js';
 import { createProductionRequestIdentityVerifierV1 } from './production-request-identity-verifier.js';
@@ -29,6 +32,11 @@ export interface CreateProductionChatReadRuntimeInputV1 {
   readonly memberFetchImpl?: SupabaseMemberVerifierFetchV1;
   /** Server-side deterministic-test injection only. */
   readonly createUuid?: () => string;
+  /**
+   * Current-rights history authority, DB Owner supplied only.
+   * Absent by default: Se-yeon historical reads fail closed, not raw stream.
+   */
+  readonly seyeonHistoryDisclosurePort?: SeyeonChatHistoryDisclosurePortV1;
 }
 
 function cancelUnusedRequestBodyBestEffort(request: Request): void {
@@ -77,6 +85,9 @@ export function createProductionChatReadRuntimeV1(
             serverTime: requestInput.serverTime,
             identityEvidenceVerifier,
             pool: poolLease.pool,
+            ...(input.seyeonHistoryDisclosurePort === undefined
+              ? {}
+              : { seyeonHistoryDisclosurePort: input.seyeonHistoryDisclosurePort }),
           });
 
       if (response.status === 405) {

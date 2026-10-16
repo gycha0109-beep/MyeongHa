@@ -2,6 +2,8 @@
 
 Watchtower-Track: character-memory
 
+> **2026-10-15 현황 재점검: P0 비용 최적화는 미완료/HOLD.** 이 문서의 8건 실측과 v3 16건 실행 설계는 Production 비용/품질/보안 최종 판정이 아니다. 통합 로드맵 [docs/ROADMAP.md](ROADMAP.md)의 **COST-01~07**을 다음 실행 순서로 한다. 현재 `.github/workflows/seyeon-dialogue-path-real-api-eval-v1.yml`의 유료 평가 job은 비용 사고 `if: ${{ false }}` 잠금 상태이며 별도 승인 없이 해제하거나 유료 호출을 재개해서는 안 된다. v3 16건의 실제 실행 결과는 이 문서에 확인 가능한 증거가 없어 **UNVERIFIED**로 남긴다. 기억·보안 R5 CI 성공은 비용 최적화 종료 근거가 아니다.
+
 - 대상: `scripts/seyeon-model-eval-cases-v1.mjs` 중 공개 일상 대화 8건(N01–N06, N09–N10). 사용자 계정/실제 세션/DB/비공개 Canon/관계 메모리는 사용하지 않는다.
 - 기존: Terra 2개 병렬 분류 + Terra 의도 해석 + Terra 렌더러 + Terra 의미 검증. 합계 **성공 시 5회**.
 - 후보: Luna 통합 사전 분류 + Terra 해석/대사 결합 Shadow + Terra 독립 의미 검증. 합계 **성공 시 3회**.
