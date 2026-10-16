@@ -111,7 +111,7 @@ function scenario(options: {
     contextInput?: RunSeyeonCharacterTurnV2Input['contextInput'];
     userText?: string;
     userMessageRef?: string;
-    gate?: 'PUBLIC' | 'SURFACE';
+    gate?: 'PUBLIC' | 'FAMILIAR';
   } = {}) {
     return runSeyeonCensusFirstThreeCallShadowV1({
       userMessageRef: overrides.userMessageRef ?? CURRENT.messageId,
