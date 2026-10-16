@@ -48,7 +48,7 @@ export PGSSLROOTCERT="$cert"
 # cannot prove/reject the GitHub-runner-to-pooler verify-full handshake.
 # The checker never prints the raw connection information or any secrets.
 # pipefail fails closed on psql connectivity and on the TLS assertion.
-LC_ALL=C psql -X -At --set ON_ERROR_STOP=1 -c '\\conninfo' \
+LC_ALL=C psql -X -At --set ON_ERROR_STOP=1 -c '\conninfo' \
   | node scripts/operations/saju-bridge-s3a-client-tls-check.mjs
 
 # Close TOCTOU window: latest backup, exact restored evidence, current
