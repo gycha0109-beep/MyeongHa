@@ -1,4 +1,4 @@
-import type { PostgresTransactionQueryV1 } from './postgres-subject-execution.js';
+import type { PostgresSubjectExecutionScopeV1 } from './postgres-subject-execution.js';
 import {
   SEYEON_FIRST_TURN_CENSUS_SHADOW_VERSION_V1,
   type SeyeonFullThreadCensusShadowPortV1,
@@ -75,17 +75,18 @@ function assertUuid(value: unknown): asserts value is string {
 }
 
 export function createPostgresSeyeonFirstTurnCensusShadowV1(input: Readonly<{
-  client: PostgresTransactionQueryV1;
-  subjectId: string;
+  scope: PostgresSubjectExecutionScopeV1;
   threadId: string;
 }>): SeyeonFullThreadCensusShadowPortV1 {
-  assertUuid(input.subjectId);
+  const subjectId = input.scope?.resolvedSubject?.subjectId;
+  const client = input.scope?.client;
+  assertUuid(subjectId);
   assertUuid(input.threadId);
-  if (!input.client || typeof input.client.query !== 'function') {
+  if (!client || typeof client.query !== 'function' ||
+      (input.scope.resolvedSubject.subjectKind !== 'member' &&
+       input.scope.resolvedSubject.subjectKind !== 'guest')) {
     throw new PostgresSeyeonFirstTurnCensusShadowHoldV1();
   }
-  const client = input.client;
-  const subjectId = input.subjectId;
   const threadId = input.threadId;
   return Object.freeze({
     subjectId,
