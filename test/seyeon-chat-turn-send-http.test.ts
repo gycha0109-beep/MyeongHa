@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { SeyeonProductionPinMigrationRequiredV1 } from '../apps/api/src/production-seyeon-chat-runtime-v1.js';
 import {
   handleSeyeonChatTurnSendRequestV1,
 } from '../apps/api/src/chat-turn-send-http.js';
@@ -135,4 +136,39 @@ describe('Seyeon Member turn-send HTTP', () => {
       expect(response.status).toBe(400);
     }
   });
+  it('returns a structured 503 when the immutable source-Pin RPC is not deployed', async () => {
+    const response = await handleSeyeonChatTurnSendRequestV1({
+      request: request(),
+      requestId: 'req-missing-pin',
+      serverTime: '2026-10-16T08:00:00.000Z',
+      identityEvidenceVerifier: memberVerifier(),
+      runtime: { run: async () => { throw new SeyeonProductionPinMigrationRequiredV1(); } },
+    });
+    expect(response.status).toBe(503);
+    expect((await response.json()).error).toMatchObject({
+      code: 'CAPABILITY_UNAVAILABLE',
+      messageKey: 'chat.secure_runtime_migration_required',
+      retryable: true,
+    });
+  });
+
+  it('maps a second clientTurnId blocked by an old failed_retryable turn to 409', async () => {
+    const failure = Object.assign(new Error('server-owned in-flight turn'), {
+      code: 'P0001',
+      constraint: 'cmd_chat_receive_turn_in_flight',
+    });
+    const response = await handleSeyeonChatTurnSendRequestV1({
+      request: request(),
+      requestId: 'req-stale-turn',
+      serverTime: '2026-10-16T08:00:00.000Z',
+      identityEvidenceVerifier: memberVerifier(),
+      runtime: { run: async () => { throw failure; } },
+    });
+    expect(response.status).toBe(409);
+    expect((await response.json()).error).toMatchObject({
+      code: 'TURN_IN_FLIGHT',
+      messageKey: 'chat.pending_turn_must_be_retried',
+    });
+  });
+
 });
