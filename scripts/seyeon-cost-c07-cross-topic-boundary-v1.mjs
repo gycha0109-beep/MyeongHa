@@ -158,7 +158,8 @@ export function assessSeyeonC07BoundaryV1(rows){
   issues:Object.freeze(issues),
   verdict:reason===null?'MATCHED_GOLD_SCREEN':'HOLD',
   reason,
-  modelQualityVerified:complete&&issues.length===0,
+  // Evidence rows may be fake or unverified; score PASS is not model proof.
+  modelQualityVerified:false,
   productionPromotionPermitted:false,
   actualProviderBilledKrw:null,
  });
