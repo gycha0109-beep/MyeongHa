@@ -103,3 +103,10 @@ from supabase_migrations.schema_migrations where version='20261008090417';
 - 별도 **754-byte** 관리 API 로그 7건의 `-- user:` 값은 UUID 형태이고 **고유값 1개**다. 이 짧은 로그들과 80,003-byte SQL 로그는 같은 DB 세션이 아니며, 보안상 UUID 원문은 밖으로 내보내지 않았다. Production `created_by`가 이메일 형식이라는 것도 확인했지만 이 계정을 긴 SQL 실행자/승인자로 지목할 수 없다.
 - 현재 조직 단위 Platform Audit Logs 접근은 계정 플랜 범위 밖. Owner 비공개에서는 Supabase **Account Audit Logs** 및 기존 감사 보존 채널을 확인하고, 플랫폼 요청 ID·인증 주체·실행 결과를 비교해야 한다. [Supabase 원칙](https://supabase.com/docs/guides/security/platform-audit-logs), [SQL Editor 사용자 추적](https://supabase.com/docs/guides/troubleshooting/tracking-postgres-role-activity-to-specific-dashboard-users-8d3715). 미확보 시 **확정 불가**.
 - 원격 SQL 현재 SHA-256 pin/104,021 bytes는 Production SELECT-only로 재확인됨. 외부의 승인된 원본 파일·서명 및 실제 플랫폼 요청/Commit 근거와는 독립된 증거다. 기존 `test/db/seyeon_remote_bundle_pg17_isolated.sh`의 격리 검증 경계만 재사용하고, Private SQL/로그 원문이나 ID를 GitHub에 보관하지 않는다. **Owner HOLD 유지**, 원본 마이그레이션 및 운영 Role/ACL/이력 수정 없음.
+
+## 9. 2026-10-16 R2-H 1750 비슈퍼유저 Creator 멤버십 검증 (비배포)
+
+- 1750 제안의 기존 PostgreSQL 17 실측은 `postgres` 슈퍼유저가 원본 1530을 재생한 뒤 직접 `pg_auth_members` 멤버십 edge 제거만 증명했다. **슈퍼유저는 REVOKE 후에도 유효한 특권을 가지므로** `pg_has_role(..., 'MEMBER')`가 계속 true인 것은 의도된 한계다.
+- 새로운 동일 disposable PG17 검증에서 별도의 **NOLOGIN/NOSUPERUSER/NOCREATEROLE/NOINHERIT 합성 Creator**를 임시로 만들어 정확한 Owner Role의 멤버십과 `ADMIN OPTION`을 부여한다. 이 비슈퍼유저의 `SET ROLE` 컨텍스트로 기존 **비배포 1750 후보를 실제 실행**하여 직접 멤버십과 유효 `MEMBER`가 모두 true→false인지 확인한다. 중복 실행 실패, synthetic Creator 제거, 1530 함수 Owner/SECURITY DEFINER·전체 기존 카탈로그 불변도 검증한다.
+- **증거 범위:** 비슈퍼유저가 Role REVOKE 권한을 명시적으로 위임받은 경우의 행위만 시험한다. 실제 Production 마이그레이션 생성자, 슈퍼유저 본래 권한 제거, 간접 Role 상속, 실제 인증 Credential/부하/E2E를 증명하지 않는다. Owner의 계보·실행 주체 승인 전 운영 Role 멤버십 변경 금지. `authorizedForProduction=false`, `drReady=false`, 21건 Owner HOLD, R2-G/유료·공개/G0~G6 HOLD 유지.
+- 테스트 코드 `test/db/seyeon_r2_h_1750_forward.sh`에만 합성 분기를 추가했고 원본 1530 및 비배포 후보 SQL은 변경하지 않는다. CI/PG17 검증 성공 여부는 [해당 PR](https://github.com/gycha0109-beep/MyeongHa/pulls)에서 실제 관측 후 확정한다.

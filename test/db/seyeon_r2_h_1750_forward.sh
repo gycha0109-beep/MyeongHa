@@ -41,4 +41,77 @@ if psql -X -q -v ON_ERROR_STOP=1 -f test/db/fixtures/1750_character_artifact_cre
 fi
 [[ "$(psql -X -Atqc "select count(*) from pg_auth_members where roleid='myeongha_character_reading_artifact_runtime_owner'::regrole and member=current_user::regrole")" == 0 ]] || hold REAPPLY_DRIFT
 echo PASS_R2_H_1750_REAPPLY_FAIL_CLOSED
+
+# Separate non-superuser actor probe: unlike the postgres CI superuser,
+# a normal role must lose effective role membership after the exact proposal.
+# Run only inside this disposable CI database. No login/credential is issued.
+# The original 1530 was executed by the CI bootstrap superuser above; this
+# synthetic probe tests the 1750 REVOKE under a deliberately delegated actor,
+# NOT the unknown Production migration creator.
+actor=myeongha_r2_h_1750_synthetic_creator
+psql -X -q -v ON_ERROR_STOP=1 >/dev/null <<'SQL' || hold SYNTHETIC_CREATOR_APPLY_FAILED
+create role myeongha_r2_h_1750_synthetic_creator
+  nologin nosuperuser nocreatedb nocreaterole noinherit noreplication nobypassrls;
+-- Admin option is required for a non-superuser actor to revoke its own grant.
+-- Never grant superuser, create role, schema CREATE, or credentials.
+grant myeongha_character_reading_artifact_runtime_owner
+  to myeongha_r2_h_1750_synthetic_creator with admin option;
+set role myeongha_r2_h_1750_synthetic_creator;
+do $pre$
+begin
+ if current_user <> 'myeongha_r2_h_1750_synthetic_creator'
+  or (select rolsuper or rolcreaterole or rolcanlogin
+      from pg_catalog.pg_roles where rolname=current_user)
+  or not exists (
+    select 1 from pg_catalog.pg_auth_members
+    where roleid='myeongha_character_reading_artifact_runtime_owner'::regrole
+      and member=current_user::regrole)
+  or not pg_catalog.pg_has_role(
+      current_user, 'myeongha_character_reading_artifact_runtime_owner', 'MEMBER')
+ then
+  raise exception 'HOLD_R2_H_1750_NON_SUPERUSER_PRECONDITION_FAILED';
+ end if;
+end
+$pre$;
+\i test/db/fixtures/1750_character_artifact_creator_membership_cleanup_v1.proposed.sql
+do $post$
+begin
+ if current_user <> 'myeongha_r2_h_1750_synthetic_creator'
+  or exists (
+    select 1 from pg_catalog.pg_auth_members
+    where roleid='myeongha_character_reading_artifact_runtime_owner'::regrole
+      and member=current_user::regrole)
+  or pg_catalog.pg_has_role(
+      current_user, 'myeongha_character_reading_artifact_runtime_owner', 'MEMBER')
+  or not exists (
+    select 1 from pg_catalog.pg_proc p
+    where p.oid=to_regprocedure('public.cmd_commit_character_face_governed_reading_artifact_v1(uuid,uuid,uuid,uuid,text,text,text,text,text,text,text,text,text,text,jsonb)')
+      and p.proowner='myeongha_character_reading_artifact_runtime_owner'::regrole
+      and p.prosecdef)
+ then
+  raise exception 'HOLD_R2_H_1750_NON_SUPERUSER_EFFECTIVE_ROLE_REVOKE_FAILED';
+ end if;
+end
+$post$;
+reset role;
+SQL
+# The same non-superuser must not be able to apply the proposal twice.
+if psql -X -q -v ON_ERROR_STOP=1 \
+    -c "set role $actor" \
+    -f test/db/fixtures/1750_character_artifact_creator_membership_cleanup_v1.proposed.sql >/dev/null 2>&1; then
+  hold NON_SUPERUSER_REAPPLY_ALLOWED
+fi
+[[ "$(psql -X -Atqc "select count(*) from pg_auth_members where roleid='myeongha_character_reading_artifact_runtime_owner'::regrole and member='$actor'::regrole")" == 0 ]] ||
+  hold NON_SUPERUSER_REAPPLY_DRIFT
+psql -X -q -v ON_ERROR_STOP=1 -c "drop role $actor" >/dev/null ||
+  hold SYNTHETIC_CREATOR_CLEANUP_FAILED
+[[ "$(psql -X -Atqc "select count(*) from pg_roles where rolname='$actor'")" == 0 ]] ||
+  hold SYNTHETIC_CREATOR_RETAINED
+synthetic_after="$(mktemp)"
+trap 'rm -f "$before" "$after" "$synthetic_after"' EXIT
+psql -X -qAt -v ON_ERROR_STOP=1 -f scripts/operations/seyeon-r2-h-1530-catalog-readonly.sql > "$synthetic_after"
+cmp -s "$after" "$synthetic_after" || hold SYNTHETIC_CATALOG_BASELINE_DRIFT
+echo PASS_R2_H_1750_NON_SUPERUSER_DIRECT_AND_EFFECTIVE_MEMBERSHIP_REMOVED
+echo PASS_R2_H_1750_NON_SUPERUSER_REAPPLY_FAIL_CLOSED_AND_CREATOR_CLEANED
+
 echo "HOLD_R2_H_1750_OWNER_APPROVAL_REQUIRED authorizedForProduction=false drReady=false productionWrites=0"
