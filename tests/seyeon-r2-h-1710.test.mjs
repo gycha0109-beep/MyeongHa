@@ -38,7 +38,16 @@ describe('1710 original queue and Worker boundary (Owner HOLD)',()=>{
  });
  it('never calls paid Provider or claims missing costStatus/outcome accepted by stored RPC',()=>{
    expect(sh).toContain('MISSING_REQUIRED_ENUM_SQL_NULL_DIAGNOSTIC');
-   expect(sh).toContain('actualReservedReceiptE2E=false');
+   expect(sh).toContain('actualReservedReceiptE2E=synthetic-only');
+   expect(sh).toContain('seyeon_governed_cost_d4b10c1_provider_receipt_queue.sh');
+   expect(sh).toContain('PASS_R2_H_1710_1710_1760_REAL_RPC_STORE_CLAIM_SETTLE_ACK_SYNTHETIC'.replace('PASS_R2_H_1710_', '')); // helper's pass() prefixes marker
+   const e2e=read('test/db/seyeon_governed_cost_d4b10c1_provider_receipt_queue.sh');
+   expect(e2e).toContain('HOLD_R2_H_1710_POSITIVE_E2E_NOT_DISPOSABLE');
+   expect(e2e).toContain('cmd_governed_start_seyeon_ai_call_v1');
+   expect(e2e).toContain('cmd_store_seyeon_provider_receipt_v1');
+   expect(e2e).toContain('cmd_claim_seyeon_provider_receipt_v1');
+   expect(e2e).toContain('cmd_settle_seyeon_ai_call_detached_v1');
+   expect(e2e).toContain('cmd_ack_seyeon_provider_receipt_v1');
    expect(sh).toContain('paidProviderCalls=0');
    expect(sh).toContain('productionWrites=0');
    expect(sql).toContain("p_event->>'outcome' not in");
