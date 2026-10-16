@@ -1,5 +1,7 @@
 # COST-07 — F02·R01·H02 실모델 6회 단발성 Pilot
 
+> **2026-10-16 사후 상태 갱신:** 이 문서의 아래 '수동 실행기 후보 / 현재 실모델 호출 0회' 등 표현은 **최초 PR #2169 작성 당시 이력**입니다. 해당 실모델 평가 [Actions #38859692050](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38859692050)가 이미 최초 1회로 실행되어 **F02/R01/H02 × Original/Compact 6/6 Gold MATCH**로 완료되었습니다. 누적 실제 호출 11회, 사용량 기반 추정 3,770 microUSD, 보수적 예약 36,047 microUSD(가정 환산 90.1175원)입니다. 과금 청구서는 미정산이며 **재실행·추가 유료 호출 금지**입니다. 공식 상세 결과와 남은 66개 미검증 슬롯은 [C07 closeout/C08 roadmap](character-memory-seyeon-cost-c07-evidence-closeout-and-c08-roadmap-v1.md)을 우선 참조하세요. 이 갱신은 기존 단발성 호출 안전장치를 해제하지 않습니다.
+
 Watchtower-Track: character-memory
 상태: **Owner 확인을 거치는 수동 실행기 후보 / 현재 실모델 호출 0회**
 
