@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, cpSync, mkdtempSync, appendFileSync, rmSync } from 'node:fs';
+import { readFileSync, cpSync, mkdtempSync, appendFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -74,4 +74,19 @@ test('unreviewed restore SQL fingerprint blocks any promotion', () => {
   });
   assert.equal(out.verdict, 'HOLD_M1_20_UNRECONCILED_SOURCE_OR_DEPENDENCY');
   assert.equal(out.migrationHistoryRepairAuthorized, false);
+});
+
+test('new unreviewed repository SQL cannot inherit old source-pin acceptance', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'm1-20-new-sql-'));
+  try {
+    cpSync('supabase/migrations', dir, { recursive: true });
+    writeFileSync(join(dir, '1980_unreviewed_runtime_write.sql'),
+      'create function public.unreviewed_writer() returns int language sql as $$ select 1 $$;');
+    const out = auditM120SafeStaging(original, dir);
+    assert.deepEqual(out.unreviewedSourceVersions, ['1980']);
+    assert.equal(out.verdict, 'HOLD_M1_20_UNRECONCILED_SOURCE_OR_DEPENDENCY');
+    assert.equal(out.safeToApplyMigrations, false);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
