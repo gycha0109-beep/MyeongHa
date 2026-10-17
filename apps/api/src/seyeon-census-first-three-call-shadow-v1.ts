@@ -10,6 +10,7 @@ import {
 import {
   createSeyeonFastDialogueShadowV1,
   requireAuthoritativeFirstTurnCensusShadowV1,
+  SeyeonFastDialogueShadowStageErrorV1,
   type SeyeonFullThreadCensusShadowPortV1,
 } from './seyeon-fast-dialogue-shadow-v1.js';
 import type {
@@ -25,6 +26,8 @@ export const SEYEON_CENSUS_FIRST_THREE_CALL_SHADOW_VERSION_V1 =
  * The first full-thread census is mandatory BEFORE even the first
  * AI preflight classification. A second census is performed by the
  * existing fast-dialogue guard BEFORE the second model request.
+ * A third census runs immediately before the independent semantic review.
+ * Any sensitive preflight must stop BEFORE Source Descriptor/fact lookup.
  *
  * Neither check pins a transaction, grants memory access, or
  * guarantees safety against changes after the read. No fallback,
@@ -73,6 +76,14 @@ export async function runSeyeonCensusFirstThreeCallShadowV1(input: Readonly<{
     relationship: governance.relationship,
     integrity: governance.integrity,
     disclosure: governance.disclosure,
+    // First-contact public Shadow has no G0 authority to read sensitive
+    // Se-yeon source metadata or private facts. Refuse before even the
+    // Source Descriptor lookup, not merely before dialogue generation.
+    beforeSourceDescriptorRead: () => {
+      throw new SeyeonFastDialogueShadowStageErrorV1(
+        'FAST_SENSITIVE_PREFLIGHT_REJECTED',
+      );
+    },
   });
 
   const context = assembleSeyeonRuntimeContextV2({
