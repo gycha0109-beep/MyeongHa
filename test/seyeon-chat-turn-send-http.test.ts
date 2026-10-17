@@ -161,7 +161,7 @@ describe('Seyeon Member turn-send HTTP', () => {
       expect(response.status).toBe(400);
     }
   });
-  it('returns a structured 503 when the immutable source-Pin RPC is not deployed', async () => {
+  it('denies before reaching the missing immutable source-Pin RPC diagnostic', async () => {
     const response = await handleSeyeonChatTurnSendRequestV1({
       request: request(),
       requestId: 'req-missing-pin',
@@ -171,13 +171,13 @@ describe('Seyeon Member turn-send HTTP', () => {
     });
     expect(response.status).toBe(503);
     expect((await response.json()).error).toMatchObject({
-      code: 'CAPABILITY_UNAVAILABLE',
-      messageKey: 'chat.secure_runtime_migration_required',
-      retryable: true,
+      code: 'SEYEON_FIRST_REVEAL_AUTHORITY_UNAVAILABLE',
+      messageKey: 'chat.secure_reveal_unavailable',
+      retryable: false,
     });
   });
 
-  it('maps a second clientTurnId blocked by an old failed_retryable turn to 409', async () => {
+  it('does not touch turn idempotency or persisted errors while first Reveal is HOLD', async () => {
     const failure = Object.assign(new Error('server-owned in-flight turn'), {
       code: 'P0001',
       constraint: 'cmd_chat_receive_turn_in_flight',
@@ -189,10 +189,11 @@ describe('Seyeon Member turn-send HTTP', () => {
       identityEvidenceVerifier: memberVerifier(),
       runtime: { run: async () => { throw failure; } },
     });
-    expect(response.status).toBe(409);
+    expect(response.status).toBe(503);
     expect((await response.json()).error).toMatchObject({
-      code: 'TURN_IN_FLIGHT',
-      messageKey: 'chat.pending_turn_must_be_retried',
+      code: 'SEYEON_FIRST_REVEAL_AUTHORITY_UNAVAILABLE',
+      messageKey: 'chat.secure_reveal_unavailable',
+      retryable: false,
     });
   });
 
