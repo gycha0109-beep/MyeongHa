@@ -125,7 +125,7 @@ describe('C08-T 5,000 KRW separate Owner allocation; unpaid gate remains CLOSED'
   expect(sources[0]).not.toContain('process.env.'+'OPENAI_API_KEY');
   expect(sources[0]).not.toContain('workflow_'+'dispatch');
   expect(sources[0]).not.toContain('fetch'+'(');
-  expect(sources[1]).toContain('seyeon-c07-six-call-once-admission-v1.mjs');
+  expect(sources[1]).toContain('seyeon-cost-c07-six-call-once-admission-v1.mjs');
   expect(P.paidDispatchEnabled).toBe(false);
  });
 });
