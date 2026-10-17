@@ -18,7 +18,7 @@ fail() { echo "FAIL_M1_24: $*" >&2; exit 1; }
   fail 'Production/Supabase credential settings forbidden'
 [[ "$(psql -X -qAt -v ON_ERROR_STOP=1 -c 'show server_version_num')" =~ ^17[0-9]{4}$ ]] ||
   fail 'PostgreSQL 17 required'
-[[ "$(psql -X -qAt -v ON_ERROR_STOP=1 -c "select rolname || '|' || rolsuper from pg_roles where rolname=current_user")" == "postgres|t" ]] ||
+[[ "$(psql -X -qAt -v ON_ERROR_STOP=1 -c "select rolname || '|' || rolsuper from pg_roles where rolname=current_user")" == "postgres|true" ]] ||
   fail 'Only a disposable postgres bootstrap is allowed'
 command -v openssl >/dev/null || fail 'openssl is required for disposable credentials'
 umask 077
