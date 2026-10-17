@@ -39,7 +39,8 @@ const GOOD_DRAFT = {
 };
 
 function scenario(options: {
-  census?: 'valid' | 'missing' | 'stale-after-preflight' | 'stale-after-dialogue' | 'failure';
+  census?: 'valid' | 'missing' | 'stale-after-preflight' | 'stale-after-dialogue' |
+    'stale-after-review' | 'failure' | 'failure-after-review';
   injectedClaim?: boolean;
   invalidCombined?: boolean;
   topicKey?: string;
@@ -75,7 +76,8 @@ function scenario(options: {
     subjectId: string; threadId: string; currentUserMessageId: string;
   }) => {
     attempts += 1;
-    if (options.census === 'failure') {
+    if (options.census === 'failure' ||
+      (options.census === 'failure-after-review' && attempts === 4)) {
       throw Error('PRIVATE_SYNTHETIC_DATABASE_FAILURE');
     }
     const valid = {
@@ -86,7 +88,8 @@ function scenario(options: {
     };
     return options.census === 'missing' ||
       (options.census === 'stale-after-preflight' && attempts === 2) ||
-      (options.census === 'stale-after-dialogue' && attempts === 3)
+      (options.census === 'stale-after-dialogue' && attempts === 3) ||
+      (options.census === 'stale-after-review' && attempts === 4)
       ? { ...valid, messageCount: 2 }
       : valid;
   });
@@ -195,6 +198,29 @@ describe('C08-F Shadow: authoritative census BEFORE every model stage', () => {
     expect(h.reviewer).not.toHaveBeenCalled();
   });
 
+  it.each(['stale-after-review', 'failure-after-review'] as const)(
+    '%s: fail closed if final Census changes after reviewer, without leaking text',
+    async census => {
+      const h = scenario({ census });
+      const rejection = await h.run().then(
+        () => null,
+        (err: unknown) => err,
+      );
+      expect(rejection).toMatchObject({ code: 'FAST_THREAD_CENSUS_REJECTED' });
+      expect(String(rejection)).not.toContain('PRIVATE_SYNTHETIC_DATABASE_FAILURE');
+      expect(h.readFullThreadCensus).toHaveBeenCalledTimes(4);
+      expect(h.purposes).toEqual([
+        'unified_preflight_shadow', 'turn_interpret_render_shadow', 'semantic_review',
+      ]);
+      expect(h.unified).toHaveBeenCalledOnce();
+      expect(h.candidate).toHaveBeenCalledOnce();
+      expect(h.reviewer).toHaveBeenCalledOnce();
+      expect(h.sourceDescriptorRead).not.toHaveBeenCalled();
+      expect(h.privateFactRead).not.toHaveBeenCalled();
+      expect(h.privateRetrieve).not.toHaveBeenCalled();
+    },
+  );
+
   it.each(['F02','R01','C02_mixed-admin-private_01',
     'C02_mixed-romance-forgery_01'] as const)(
     '%s: protected sensitive Gold stops before any Source Descriptor or private read',
@@ -231,7 +257,7 @@ describe('C08-F Shadow: authoritative census BEFORE every model stage', () => {
     expect(result.interpretation.chosenAction.key).toBe('approach');
     expect(result.preflight.integrity.decisions).toEqual([]);
     expect(result.context.retrievedMemories).toEqual([]);
-    expect(h.readFullThreadCensus).toHaveBeenCalledTimes(3);
+    expect(h.readFullThreadCensus).toHaveBeenCalledTimes(4);
     expect(h.purposes).toEqual([
       'unified_preflight_shadow', 'turn_interpret_render_shadow', 'semantic_review',
     ]);
