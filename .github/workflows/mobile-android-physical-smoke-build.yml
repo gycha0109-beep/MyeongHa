@@ -102,6 +102,23 @@ jobs:
         run: |
           set -euo pipefail
           apk="$RUNNER_TEMP/myeongha-android-physical-smoke-local.apk"
+
+          # eas-cli@24.10.0 invokes local-build-plugin@24.9.0 through npx.
+          # On npm 11 the implicit npx executable resolution fails (exit 127).
+          # Preinstall exactly that version and use EAS CLI's supported path
+          # override; never pass the EAS job payload on the command line.
+          local_plugin_root="$RUNNER_TEMP/myeongha-eas-local-plugin"
+          mkdir -p "$local_plugin_root"
+          npm install \
+            --prefix "$local_plugin_root" \
+            --no-save --no-package-lock --ignore-scripts \
+            --no-audit --no-fund \
+            eas-cli-local-build-plugin@24.9.0
+          local_plugin_bin="$local_plugin_root/node_modules/.bin/eas-cli-local-build-plugin"
+          test -x "$local_plugin_bin"
+          test "$(node -p "require('$local_plugin_root/node_modules/eas-cli-local-build-plugin/package.json').version")" = "24.9.0"
+          export EAS_LOCAL_BUILD_PLUGIN_PATH="$local_plugin_bin"
+
           pushd apps/mobile >/dev/null
 
           npm exec --yes --package=eas-cli@24.10.0 -- \
