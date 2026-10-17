@@ -95,9 +95,9 @@ for (const [fileName, expected] of requiredChecks) {
   // Match the actual job display name, not comments, steps, or a stale
   // name copied elsewhere in the workflow.
   const requiredName = expected.slice('name: '.length);
-  const declared = jobs?.split('\\n').some(line =>
-    /^    name:\\s*(.+?)\\s*(?:#.*)?$/u.exec(line)?.[1]
-      ?.replace(/^(['"])(.*)\\1$/u, '$2') === requiredName);
+  const declared = jobs?.split('\n').some(line =>
+    /^    name:\s*(.+?)\s*(?:#.*)?$/u.exec(line)?.[1]
+      ?.replace(/^(['"])(.*)\1$/u, '$2') === requiredName);
   if (!declared) {
     failures.push(`${fileName}: required check contract missing: ${expected}`);
   }
