@@ -52,10 +52,27 @@ async function main() {
     process.stdout.write('C08_DOCKER_ISOLATED_PG17 ' + version + '\n');
     // Applies ONLY reviewed migrations to a newly created scratch database.
     // This never forwards anything to the user's localhost/host network.
+    // Windows Git (core.autocrlf=true) can materialize CRLF even when
+    // committed scripts use LF. Bash inside Linux reads the trailing CR as
+    // part of "pipefail", causing an immediate syntax failure.
+    // Do NOT edit the caller's checkout or the read-only /repo bind mount:
+    // copy just the fixture scripts into disposable container storage,
+    // normalize ALL nested *.sh dependencies, then run from there.
+    const scratch = '/tmp/myeongha-c08-case';
+    const prepareAndRun = [
+      'set -euo pipefail',
+      'mkdir -p ' + scratch + '/test',
+      'cp -R /repo/test/db ' + scratch + '/test/db',
+      'ln -s /repo/supabase ' + scratch + '/supabase',
+      'find ' + scratch + '/test/db -type f -name "*.sh" -exec sed -i "s/\\r$//" {} +',
+      'cd ' + scratch,
+      'printf "C08_DOCKER_SHELL_LINE_ENDINGS_NORMALIZED\\n"',
+      'bash test/db/run_ci_case.sh seyeon-c08-first-turn-local-pg17',
+    ].join('\\n');
     run(['exec', '--user', 'postgres', '--workdir', '/repo',
       '--env', 'PGUSER=postgres',
       '--env', 'PGDATABASE=' + database,
-      name, 'bash', 'test/db/run_ci_case.sh', 'seyeon-c08-first-turn-local-pg17'],
+      name, 'bash', '-c', prepareAndRun],
     { stdio: 'inherit', timeout: 1_800_000 });
     process.stdout.write('PASS_C08_DOCKER_LOCAL_PG17_READONLY_CENSUS_SMOKE\n');
   } finally {
