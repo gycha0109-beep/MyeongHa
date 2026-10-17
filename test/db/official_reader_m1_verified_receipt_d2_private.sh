@@ -119,6 +119,13 @@ bash test/db/official_reader_m1_08_private_issuer_session_assumption.sh "$receip
 # issuance and BEFORE bind/COMMIT; verify no orphan grant and fresh recovery.
 bash test/db/official_reader_m1_09_issuer_timeout_recovery.sh "$receipt" "$subject" "$intent"
 
+# M1-13: keep a real first issue+bind uncommitted in one PostgreSQL session.
+# A separate M1-10 read-only snapshot must see zero committed rights and
+# HOLD auto-retry; a competing issuer must fail at the actual D1/D2 lock.
+# Roll back before existing M1-03 and M1-12 first-issue proofs.
+node test/db/official_reader_m1_13_inflight_first_issue_mvcc_probe.mjs \
+ "$receipt" "$subject" "$intent" "$session" "$proposal" "$official"
+
 # M1-03: The existing verified Receipt MUST survive a downstream bind
 # error while ALL issuance writes from the same transaction are rolled back.
 # Use the isolated DB fixture owner, NOT an API or Commerce runtime account.
