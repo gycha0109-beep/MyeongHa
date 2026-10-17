@@ -446,5 +446,3 @@ describe.skipIf(!enabled)('G2 original Grant actual-v2 two-session race, disposa
     // remains closed and needs its own DB-owned reader.
   });
 });
-
-});
