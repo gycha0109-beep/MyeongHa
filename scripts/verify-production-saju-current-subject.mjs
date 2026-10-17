@@ -252,6 +252,11 @@ async function requestPreviewReading({ label, authorizationHeader }) {
   });
 }
 
+const smokeScope = process.env.MYEONGHA_SAJU_SMOKE_SCOPE ?? 'member_and_guest';
+if (smokeScope !== 'member_only' && smokeScope !== 'member_and_guest') {
+  throw new Error('MYEONGHA_SAJU_SMOKE_SCOPE must be member_only or member_and_guest.');
+}
+
 const expectedSubjectId = requireUuid(
   'MYEONGHA_PRODUCTION_MEMBER_EXPECTED_SUBJECT_ID',
   requireSecret('MYEONGHA_PRODUCTION_MEMBER_EXPECTED_SUBJECT_ID'),
@@ -648,6 +653,21 @@ async function createGuestSajuFixture() {
   });
 }
 
+if (smokeScope === 'member_only') {
+  if (
+    JSON.stringify(memberBody).includes(accessToken) ||
+    JSON.stringify(birthProfileBody).includes(accessToken) ||
+    JSON.stringify(firstCalculation.body).includes(accessToken) ||
+    JSON.stringify(repeatCalculation.body).includes(accessToken) ||
+    JSON.stringify(previewReading.body).includes(accessToken)
+  ) {
+    throw new Error('Production Member Saju response reflected the fresh Member access token.');
+  }
+
+  console.log(
+    `MyeongHa production Member-only Saju smoke passed: memberSignIn=200, freshSession=true, memberSubjectMatch=true, birthProfilePresent=true, birthRevisionMatch=true, calculationFirst=200, calculationRepeat=200, deterministicRepeat=true, previewReading=200, previewState=${previewReading.state}, guestFixtureCreated=false, authority=calculation_only, ingressContract=v1, cacheControl=no-store, measurementObservedAtUtc=${measurementObservedAtUtc}, memberRoundTripMs=${memberRoundTripMs}, birthProfileRoundTripMs=${birthProfileRoundTripMs}, calculationFirstRoundTripMs=${firstCalculation.roundTripMs}, calculationRepeatRoundTripMs=${repeatCalculation.roundTripMs}, previewReadingRoundTripMs=${previewReading.roundTripMs}, timingThresholdApplied=false.`,
+  );
+} else {
 const guest = await createGuestSajuFixture();
 const guestCalculation = await requestCalculation({
   label: 'Production Guest Saju calculation',
@@ -681,3 +701,4 @@ if (
 console.log(
   `MyeongHa production current-subject Saju smoke passed: memberSignIn=200, freshSession=true, memberSubjectMatch=true, birthProfilePresent=true, birthRevisionMatch=true, calculationFirst=200, calculationRepeat=200, deterministicRepeat=true, previewReading=200, previewState=${previewReading.state}, guestBootstrap=200, guestSubjectMatch=true, guestBirthCreate=201, guestCalculation=200, guestPreviewReading=200, guestPreviewState=${guestPreviewReading.state}, authority=calculation_only, ingressContract=v1, cacheControl=no-store, measurementObservedAtUtc=${measurementObservedAtUtc}, memberRoundTripMs=${memberRoundTripMs}, birthProfileRoundTripMs=${birthProfileRoundTripMs}, calculationFirstRoundTripMs=${firstCalculation.roundTripMs}, calculationRepeatRoundTripMs=${repeatCalculation.roundTripMs}, previewReadingRoundTripMs=${previewReading.roundTripMs}, guestBootstrapRoundTripMs=${guest.bootstrapRoundTripMs}, guestMeRoundTripMs=${guest.guestMeRoundTripMs}, guestBirthCreateRoundTripMs=${guest.birthCreateRoundTripMs}, guestCalculationRoundTripMs=${guestCalculation.roundTripMs}, guestPreviewReadingRoundTripMs=${guestPreviewReading.roundTripMs}, timingThresholdApplied=false.`,
 );
+}
