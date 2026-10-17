@@ -36,6 +36,13 @@ cleanup_isolated_template() {
 }
 trap cleanup_isolated_template EXIT
 
+# EPOCHREALTIME is a Bash builtin: profiling adds no process, SQL, or test waits.
+# Arithmetic uses microseconds internally; logged millisecond deltas are integers.
+authority_profile_duration_ms() {
+  local start="${1/./}" end="${2/./}"
+  printf -v "$3" '%d' "$(((10#$end - 10#$start) / 1000))"
+}
+
 ensure_isolated_template() {
   # Run in the parent shell and reuse this result for every cloned case.
   # The original implementation re-queried pg_database for each subshell.
@@ -44,11 +51,28 @@ ensure_isolated_template() {
   fi
   if psql -Atqc "select 1 from pg_database where datname = '${isolated_template_db}'" | grep -qx '1'; then
     isolated_template_ready=1
+    if [[ "${MYEONGHA_AUTHORITY_PROFILE:-0}" == '1' ]]; then
+      printf 'AUTHORITY_CORE_TEMPLATE source=existing create_ms=0 migrate_ms=0\n'
+    fi
     return 0
   fi
 
+  local create_started='' create_finished='' migrate_finished=''
+  local create_ms=0 migrate_ms=0
+  if [[ "${MYEONGHA_AUTHORITY_PROFILE:-0}" == '1' ]]; then
+    create_started=$EPOCHREALTIME
+  fi
   createdb "$isolated_template_db"
+  if [[ "${MYEONGHA_AUTHORITY_PROFILE:-0}" == '1' ]]; then
+    create_finished=$EPOCHREALTIME
+  fi
   apply_migrations "$isolated_template_db"
+  if [[ "${MYEONGHA_AUTHORITY_PROFILE:-0}" == '1' ]]; then
+    migrate_finished=$EPOCHREALTIME
+    authority_profile_duration_ms "$create_started" "$create_finished" create_ms
+    authority_profile_duration_ms "$create_finished" "$migrate_finished" migrate_ms
+    printf 'AUTHORITY_CORE_TEMPLATE source=created create_ms=%d migrate_ms=%d\n' "$create_ms" "$migrate_ms"
+  fi
   isolated_template_ready=1
 }
 
@@ -59,10 +83,34 @@ run_isolated_case() {
   local started_seconds=$SECONDS
   (
     set -euo pipefail
+    local profile="${MYEONGHA_AUTHORITY_PROFILE:-0}"
+    local pre_drop_started='' clone_started='' command_started='' command_finished=''
+    local pre_drop_ms=0 clone_ms=0 command_ms=0
+    if [[ "$profile" == '1' ]]; then pre_drop_started=$EPOCHREALTIME; fi
     dropdb --if-exists "$db" >/dev/null 2>&1 || true
+    if [[ "$profile" == '1' ]]; then clone_started=$EPOCHREALTIME; fi
     createdb --template="$isolated_template_db" "$db"
-    trap 'dropdb --if-exists "$db" >/dev/null 2>&1 || true' EXIT
+    if [[ "$profile" == '1' ]]; then command_started=$EPOCHREALTIME; fi
+    cleanup_isolated_case() {
+      local cleanup_started='' cleanup_finished='' cleanup_ms=0
+      if [[ "$profile" == '1' ]]; then cleanup_started=$EPOCHREALTIME; fi
+      dropdb --if-exists "$db" >/dev/null 2>&1 || true
+      # Failed cases still clean up, but never emit a complete success-phase record.
+      if [[ "$profile" == '1' && -n "$command_finished" ]]; then
+        cleanup_finished=$EPOCHREALTIME
+        authority_profile_duration_ms "$cleanup_started" "$cleanup_finished" cleanup_ms
+        printf 'AUTHORITY_CORE_PHASE db=%s pre_drop_ms=%d clone_ms=%d command_ms=%d cleanup_ms=%d\n' \
+          "$db" "$pre_drop_ms" "$clone_ms" "$command_ms" "$cleanup_ms"
+      fi
+    }
+    trap cleanup_isolated_case EXIT
     PGDATABASE="$db" "$@"
+    if [[ "$profile" == '1' ]]; then
+      command_finished=$EPOCHREALTIME
+      authority_profile_duration_ms "$pre_drop_started" "$clone_started" pre_drop_ms
+      authority_profile_duration_ms "$clone_started" "$command_started" clone_ms
+      authority_profile_duration_ms "$command_started" "$command_finished" command_ms
+    fi
   )
   if [[ "${MYEONGHA_AUTHORITY_PROFILE:-0}" == '1' ]]; then
     printf 'AUTHORITY_CORE_CASE db=%s duration_seconds=%d\n' "$db" "$((SECONDS - started_seconds))"
