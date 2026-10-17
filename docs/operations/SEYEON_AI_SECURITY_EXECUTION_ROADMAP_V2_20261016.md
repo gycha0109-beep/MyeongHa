@@ -198,3 +198,11 @@ S8의 **비파괴/격리 검토는 S2~S7과 병렬 진행 가능**하며, S8 Pro
 - **R7 추가 검증 범위:** 이름이 고정된 폐기용 CI PostgreSQL에서 실제 G1 positive Pin→기존 v2→v1→core Commit/2 Outbox→R5 Owner-style HTTP Read COMMIT이 정상적으로 반환한 합성 Assistant bytes를 별도 버퍼에 유지한 채 원본 Grant 철회를 확정합니다. 이후 fresh DB Read는 거부되지만 **과거 버퍼에는 본문이 남는 사실**을 확인합니다. 그 사이 async Member 검증을 대기 중인 실제 Production 세연 HTTP 핸들러는 기존 first Reveal interlock 때문에 503/no-store, Runtime 호출 0회, Assistant wire bytes 0건이어야 합니다.
 - **해석 제한:** 기존 Production HTTP 경로는 최초 공개 전체를 HOLD하므로 R7은 **현재 HOLD 안전 회귀**와 **DB Read COMMIT만으로 실제 뒤늦은 전송 안전성을 증명할 수 없다는 반례**입니다. G3 정식 긍정 공개가 가능하다는 증거가 아니며, 미래 락/epoch/취소 완료 응답/송신 경계 계약(D-04)은 DB+Security+API 기술 서명이 필요합니다.
 - **변경 금지:** Production migration/ACL/DML, 양수 Projector, 실 Provider, Runtime 공개 연결, 유료/공개 전환 0건. 실 G0 Character/Source D-01·DB+Security D-03/D-06·Security/API/DB D-04/D-05/D-09 기술 승인은 여전히 OPEN. Product Owner 기존 정책 승인 재요청 금지. 본 R7 PR의 exact-head CI/Governance/Web/Full Integration 및 병합 증거는 #1866 원장으로 별도 추적합니다.
+
+## 22. 2026-10-18 R8 — D-04 로컬 실제 HTTP 송출 지연 경합 (승인 전 부정 테스트)
+
+- **목적:** R7의 DB→Node 버퍼 반례 및 PR #2277의 Web Response/라우터 시험 다음에 실제 `127.0.0.1` HTTP 소켓에서 `Response` 구성과 클라이언트 수신 사이의 시간 분리를 검증합니다.
+- **추가 코드:** `test/seyeon-d04-loopback-http-revoke-race-v1.test.ts`. 실제 Node HTTP 서버를 통해 Vercel 정규화 함수와 Production 세연 최초 POST 핸들러를 호출하고, 서버가 `Response`를 만든 뒤 소켓 쓰기를 보류합니다. 합성 취소 이벤트 이후 전송해도 현재 HOLD 경로에서 503/no-store, Runtime 0회, 비밀 Assistant canary 0바이트를 요구합니다. 원본·재작성 두 경로를 모두 검사합니다.
+- **실패 계약 실증:** 별도의 **고의로 불안전한 합성 서버**에서는 취소 이전에 생성한 `Response.json`을 취소 이후 실제 소켓으로 보낼 수 있음을 보여줍니다. Production 핸들러에 양수 공개 분기를 추가하지 않습니다.
+- **증거 한계:** 이는 loopback Node bridge이고 실제 Vercel Edge/Proxy, 실제 DB 취소 COMMIT과 네트워크의 분산 원자성, 이미 전송된 잔여 바이트 제어, Worker/History 권한을 입증하지 않습니다. 따라서 G0 D-04 미승인, G1 양수/G2/G3/G6 HOLD입니다.
+- **검증 규칙:** 정확한 PR HEAD의 CI·Governance·Web와 Full Integration 11/11, squash 후 main CI/Governance/Production 및 migration/backfill SKIPPED가 확인될 때만 이번 격리 회귀 작업 완료로 기록합니다. Owner 기술 서명이나 실제 전송 허가로 승격하지 않습니다.
