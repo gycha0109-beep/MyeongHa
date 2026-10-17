@@ -10,6 +10,10 @@ if [[ "${CI:-}" != "true" || "${PGHOST:-}" != "localhost" ||
 fi
 # R1's already-reviewed exact-Attempt & XOR fixture is a prerequisite.
 bash test/db/seyeon_r1_disposable_positive_source_xor.sh
+# DB-authoritative original JSONB digest must not be confused with Node
+# canonical-json projection hashes. Same REAL exact Attempt, synthetic only.
+SEYEON_POSITIVE_GRANT_REAL_PG=1 ./node_modules/.bin/vitest run \
+  test/seyeon-source-digest-node-postgres-golden-v1.test.ts --maxWorkers=1
 # Verify real zero-only baseline before changing *only* this disposable clone.
 psql -X -v ON_ERROR_STOP=1 -f test/db/seyeon_g2_production_compatibility_catalog_guard_v1.sql
 psql -X -v ON_ERROR_STOP=1 -f test/db/seyeon_g2_legacy_direct_commit_acl_cutover_candidate_v1.sql
