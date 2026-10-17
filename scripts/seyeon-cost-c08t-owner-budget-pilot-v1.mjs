@@ -37,6 +37,19 @@ if(GOLD.length!==36||VARIANTS.join(',')!=='original,compact'||
 
 const slots=Object.freeze(ids.flatMap(caseId=>VARIANTS.map(variant=>
  Object.freeze({caseId,variant}))));
+// Entire C07 matrix is authoritative; don't count the historical 6 as new.
+const previous=new Set(historical.results.map(row=>row.caseId+':'+row.variant));
+if(previous.size!==6||historical.results.some(row=>
+ !byId.has(row.caseId)||!VARIANTS.includes(row.variant)))
+ throw Error('C08-T historical observations are duplicate or out of scope');
+export const SEYEON_C08T_REMAINING_C07_SLOTS_V1=Object.freeze(
+ GOLD.flatMap(g=>VARIANTS.map(variant=>Object.freeze({
+  caseId:g.id,variant,
+ }))).filter(x=>!previous.has(x.caseId+':'+x.variant)));
+if(SEYEON_C08T_REMAINING_C07_SLOTS_V1.length!==66||
+ slots.some(x=>!SEYEON_C08T_REMAINING_C07_SLOTS_V1.some(
+  y=>x.caseId===y.caseId&&x.variant===y.variant)))
+ throw Error('C08-T remaining C07 evaluation scope drifted');
 const uint=x=>Number.isSafeInteger(x)&&x>=0;
 const quoteCost=(input,output)=>Number((BigInt(input)*
  BigInt(RATES.maxInputRateMicroUsdPerMillion)+BigInt(output)*
@@ -57,6 +70,8 @@ export const SEYEON_C08T_FIRST_PAID_PILOT_POLICY_V1=Object.freeze({
  perCallReservedMicroUsd:RESERVE,
  firstBatchReservedMicroUsd:RESERVE*slots.length,
  firstBatchReservedKrw:RESERVE*slots.length*2500/1000000,
+ allRemainingSlots:SEYEON_C08T_REMAINING_C07_SLOTS_V1.length,
+ allRemainingConservativeReserveKrw:RESERVE*66*2500/1000000,
  providerHardLimitVerified:false,
  // This can be changed ONLY in a separately reviewed, independently attested
  // paid-execution workflow. A boolean supplied by a caller cannot unlock it.
@@ -104,7 +119,7 @@ export function createSeyeonC08TOfflineQuotaSimulationV1(){
  return Object.freeze({
   reserve(request){
    const next=slots[attempted.length];
-   if(halted||!next||!request||request.caseId!==next.caseId||
+   if(halted||attempted.length!==outcomes.size||!next||!request||request.caseId!==next.caseId||
       request.variant!==next.variant||
       request.model!==P.model||request.purpose!==P.purpose||
       typeof request.callId!=='string'||!/^[-a-f0-9]{36}$/iu.test(request.callId)||
