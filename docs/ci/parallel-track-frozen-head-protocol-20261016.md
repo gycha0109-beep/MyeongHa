@@ -24,6 +24,8 @@
 
 `request-integration.mjs`의 현재 계약:
 - 같은 PR/head의 활성·성공 실행 발견 ⇒ no-op
+- 동일 PR/head에 여러 실행 기록이 있으면 **어느 하나라도 활성 상태인 동안** 최신 실패 기록만 보고 재라벨하지 않음
+- 실행 status가 미확정이거나 완료 status의 conclusion이 아직 없으면 `CURRENT_HEAD_INTEGRATION_UNRESOLVED`로 no-op. 운영자가 결과를 재확인한 뒤 명시적인 실패만 재제출
 - **현재 헤드 실행이 아직 목록에 없고 PR에 라벨이 이미 존재** ⇒ `LABEL_PRESENT_RUN_NOT_YET_INDEXED`로 **no-op**, 재라벨하지 않음
 - 라벨 없고 실행 없음 ⇒ 한 번만 라벨 추가
 - 같은 헤드의 최신 실행이 완료했으나 실패한 것이 명확 ⇒ 원인 확인 후 재요청 가능
