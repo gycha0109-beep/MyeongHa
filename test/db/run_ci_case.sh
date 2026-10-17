@@ -274,6 +274,11 @@ SQL
     echo 'HOLD M1-20: full-source PG17 clone excludes historical live-only SQL'
     echo 'HOLD M1-20: migration history/Owner/DR/nonproduction cutover not approved'
     ;;
+  official-reader-m1-21-pg17-fault-replay)
+    # Four source-pinned transactional fault/replay checkpoints in CI only.
+    verify_pg17
+    bash test/db/official_reader_m1_21_pg17_fault_replay.sh
+    ;;
   saju-staging-operator-admission-v2)
     psql -v ON_ERROR_STOP=1 -f test/db/fixtures/saju_staging_operator_admission_schema_8c2b2d302.sql >/dev/null
     bash test/db/saju_staging_operator_admission_v2_authority.sh
