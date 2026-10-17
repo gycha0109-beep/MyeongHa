@@ -86,6 +86,7 @@ const requiredChecks = new Map([
   ['ci.yml', 'name: CI Verify'],
   ['governance.yml', 'name: Governance Verify'],
   ['web-pr-domain-gates.yml', 'name: Web PR Verify'],
+  ['ci-integration.yml', 'name: CI Integration Verify'],
 ]);
 
 for (const [fileName, expected] of requiredChecks) {
@@ -102,5 +103,5 @@ if (failures.length > 0) {
 }
 
 console.log(
-  `CI responsibility governance passed: workflows=${workflowFiles.length} deprecated_track_markers=0 static_pr_track_markers=0 required_checks=3`,
+  `CI responsibility governance passed: workflows=${workflowFiles.length} deprecated_track_markers=0 static_pr_track_markers=0 required_checks=${requiredChecks.size}`,
 );
