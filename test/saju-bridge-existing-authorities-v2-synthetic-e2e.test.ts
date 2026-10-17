@@ -109,6 +109,8 @@ function fixture(options: {
   /** Synthetic Saju preview response. Other tests keep the 503 baseline. */
   readonly previewResponse?: 'admitted' | 'missing-admission' | 'missing-lifecycle' | 'wrong-envelope';
   readonly calculationResponse?: 'admitted' | 'birth-mismatch' | 'schema-mismatch';
+  /** Never retry an upstream error within the same authenticated request. */
+  readonly upstreamFailure?: 'network' | 'rate-limited' | 'server-unavailable';
 } = {}) {
   const events: string[] = [];
   const sqlQueries: { sql: string; values?: readonly unknown[] }[] = [];
@@ -179,6 +181,15 @@ function fixture(options: {
     );
     const payload = JSON.parse(init.body) as { birth?: { date?: string } };
     expect(payload.birth?.date).toBe('2001-07-14');
+    if (options.upstreamFailure === 'network') {
+      throw new Error(`synthetic network interruption: ${ENV.MYEONGHA_SAJU_SERVICE_BEARER}`);
+    }
+    if (options.upstreamFailure === 'rate-limited') {
+      return Response.json({ reason: 'synthetic upstream throttle' }, { status: 429 });
+    }
+    if (options.upstreamFailure === 'server-unavailable') {
+      return Response.json({ reason: 'synthetic upstream failure' }, { status: 503 });
+    }
     if (String(url).endsWith('/api/calculations') && options.calculationResponse !== undefined) {
       const payload = calculationResponseFixture();
       if (options.calculationResponse === 'schema-mismatch') {
@@ -389,6 +400,71 @@ describe('Saju V2 synthetic Member Auth -> existing Subject DB -> Saju transport
         expect(JSON.stringify(payload)).not.toContain('synthetic test section');
         expect(f.events.filter(x => x === 'SAJU')).toHaveLength(1);
         expect(f.events.indexOf('RELEASE')).toBeLessThan(f.events.indexOf('SAJU'));
+      } finally {
+        await f.runtime.close();
+      }
+    },
+  );
+
+
+  it.each(['calculation', 'preview-reading'] as const)(
+    '%s makes exactly one upstream attempt on network failure, never replays authenticated Birth input',
+    async route => {
+      const f = fixture({ upstreamFailure: 'network' });
+      try {
+        const response = await handle(f, route);
+        expect(response.status).toBe(503);
+        const body = await response.json();
+        expect(body).toMatchObject({
+          ok: false,
+          error: {
+            code: route === 'calculation'
+              ? 'SAJU_TEMPORARILY_UNAVAILABLE'
+              : 'SAJU_PREVIEW_TEMPORARILY_UNAVAILABLE',
+            retryable: true,
+          },
+        });
+        expect(JSON.stringify(body)).not.toContain(ENV.MYEONGHA_SAJU_SERVICE_BEARER);
+        expect(JSON.stringify(body)).not.toContain('2001-07-14');
+        expect(JSON.stringify(body)).not.toContain('synthetic network interruption');
+        expect(f.memberFetchImpl).toHaveBeenCalledOnce();
+        expect(f.connect).toHaveBeenCalledOnce();
+        expect(f.sajuFetchImpl).toHaveBeenCalledOnce();
+        expect(f.events.indexOf('COMMIT')).toBeLessThan(f.events.indexOf('RELEASE'));
+        expect(f.events.indexOf('RELEASE')).toBeLessThan(f.events.indexOf('SAJU'));
+      } finally {
+        await f.runtime.close();
+      }
+    },
+  );
+
+  it.each(['rate-limited', 'server-unavailable'] as const)(
+    'does not automatically retry a %s Saju upstream response for either V2 route',
+    async upstreamFailure => {
+      const f = fixture({ upstreamFailure });
+      try {
+        for (const route of ['calculation', 'preview-reading'] as const) {
+          const response = await handle(f, route);
+          expect(response.status).toBe(503);
+          const body = await response.json();
+          expect(body).toMatchObject({
+            ok: false,
+            error: {
+              code: route === 'calculation'
+                ? 'SAJU_TEMPORARILY_UNAVAILABLE'
+                : 'SAJU_PREVIEW_TEMPORARILY_UNAVAILABLE',
+            },
+          });
+          expect(JSON.stringify(body)).not.toContain('synthetic upstream');
+          expect(JSON.stringify(body)).not.toContain(ENV.MYEONGHA_SAJU_SERVICE_BEARER);
+          // One outbound call for each distinct authenticated request, no automatic replay.
+          expect(f.sajuFetchImpl).toHaveBeenCalledTimes(
+            route === 'calculation' ? 1 : 2,
+          );
+        }
+        expect(f.memberFetchImpl).toHaveBeenCalledTimes(2);
+        expect(f.connect).toHaveBeenCalledTimes(2);
+        expect(f.events.filter(x => x === 'SAJU')).toHaveLength(2);
       } finally {
         await f.runtime.close();
       }
