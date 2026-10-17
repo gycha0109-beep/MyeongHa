@@ -78,6 +78,9 @@ describe('mobile social auth structure', () => {
     expect(hook).toContain("Linking.addEventListener('url'");
     expect(hook).toContain('Linking.getInitialURL()');
     expect(hook).toContain('nativeMobileSocialAuthServiceV1.complete(url)');
+    expect(hook).toContain('if (socialCallbackInFlight.current) return;');
+    expect(hook).toContain('socialCallbackInFlight.current = true;');
+    expect(hook).toContain('socialCallbackInFlight.current = false;');
   });
 
 });
