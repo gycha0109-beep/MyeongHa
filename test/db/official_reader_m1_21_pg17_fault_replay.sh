@@ -52,7 +52,7 @@ with function_catalog as (
   where n.nspname='public'
 ),
 relation_catalog as (
-  select 'r:' || c.oid::regclass::text || ':' || c.relkind || ':' ||
+  select 'r:' || c.oid::regclass::text || ':' || c.relkind::text || ':' ||
     c.relowner::text || ':' || coalesce(c.relacl::text,'<NULL>') || ':' ||
     c.relrowsecurity::text || ':' || c.relforcerowsecurity::text as row
   from pg_catalog.pg_class c
