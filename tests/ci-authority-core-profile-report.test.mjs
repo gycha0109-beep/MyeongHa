@@ -111,7 +111,7 @@ describe('authority core read-only profile report', () => {
       });
       const caseLines = Array.from({ length: count }, (_, i) =>
         'AUTHORITY_CORE_CASE db=myeongha_fixture_' + i + ' duration_seconds=1');
-      return [...stageLines, ...caseLines].join('\\n');
+      return [...stageLines, ...caseLines].join('\n');
     };
     expect(summarizeAuthorityProfile(fixture(historic, 38)).valid).toBe(true);
     const updated = summarizeAuthorityProfile(fixture(next, 39));
@@ -123,11 +123,11 @@ describe('authority core read-only profile report', () => {
     expect(summarizeAuthorityProfile(fixture(next.toReversed(), 39)).valid).toBe(false);
 
     const detailed = fixture(next, 39) +
-      '\\nAUTHORITY_CORE_TEMPLATE source=created create_ms=1 migrate_ms=2' +
+      '\nAUTHORITY_CORE_TEMPLATE source=created create_ms=1 migrate_ms=2' +
       Array.from({ length: 39 }, (_, i) =>
-        '\\nAUTHORITY_CORE_PHASE db=myeongha_fixture_' + i +
+        '\nAUTHORITY_CORE_PHASE db=myeongha_fixture_' + i +
         ' pre_drop_ms=1 clone_ms=2 command_ms=3 cleanup_ms=4').join('');
     expect(summarizeAuthorityProfile(detailed).valid).toBe(true);
-    expect(summarizeAuthorityProfile(detailed.replace(/AUTHORITY_CORE_PHASE db=myeongha_fixture_38[^\\n]*$/, '')).valid).toBe(false);
+    expect(summarizeAuthorityProfile(detailed.replace(/AUTHORITY_CORE_PHASE db=myeongha_fixture_38[^\n]*$/, '')).valid).toBe(false);
   });
 });
