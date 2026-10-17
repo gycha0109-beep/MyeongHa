@@ -50,7 +50,8 @@ const UNKNOWN_COMMIT_READ_SQL = `select
  (select count(*)::integer from public.outbox_events ob
   join public.entitlement_events ev on ev.event_dedupe_key=ob.dedupe_key
   where ev.source_type='receipt' and ev.source_receipt_id=cr.id
-   and ob.aggregate_type='entitlement') as "outboxCount"
+   and ob.aggregate_type='entitlement') as "outboxCount",
+ pg_catalog.current_setting('transaction_isolation') as "snapshotIsolation"
 from public.commerce_receipts cr
 join public.purchase_intents pi on pi.id=cr.purchase_intent_id
  and pi.subject_id=cr.subject_id and pi.product_offer_id=cr.product_offer_id
@@ -88,6 +89,7 @@ export type UnknownCommitReconciliationOutcomeV1 = Readonly<{
   readonly reason:
     | 'SOURCE_UNAVAILABLE'
     | 'NO_COMMITTED_EFFECT_VISIBLE'
+    | 'STALE_SNAPSHOT_UNSUPPORTED'
     | 'COMMITTED_COMPLETE_REQUIRES_PRIVATE_REPLAY'
     | 'INCOMPLETE_OR_CONFLICTING_AUTHORITY';
   readonly automaticRetryAuthorized: false;
@@ -139,7 +141,8 @@ function held(reason: UnknownCommitReconciliationOutcomeV1['reason']):
 }
 
 /**
- * A single SQL statement gives a coherent PostgreSQL MVCC view. Missing rows
+ * Require READ COMMITTED statement-level visibility, never a reused RR/SI
+ * snapshot. A single SQL statement gives a coherent PostgreSQL MVCC view. Missing rows
  * cannot exclude concurrent uncommitted effects; the caller must never infer
  * "safe to issue" from an absent Grant. This function has no Writer port.
  */
@@ -165,6 +168,13 @@ export async function reconcileOfficialReaderUnknownCommitV1(input: Readonly<{
           typeof row.itemKey !== 'string' || !row.itemKey ||
           row.rowCount !== 1) {
         return held('INCOMPLETE_OR_CONFLICTING_AUTHORITY');
+      }
+
+      // Only a statement-level READ COMMITTED view is admissible. A caller
+      // reusing a REPEATABLE READ/SERIALIZABLE transaction can observe an
+      // earlier epoch even AFTER another issuer committed. HOLD, never retry.
+      if (row.snapshotIsolation !== 'read committed') {
+        return held('STALE_SNAPSHOT_UNSUPPORTED');
       }
 
       if (row.grantCount === 0 && row.eventCount === 0 &&
