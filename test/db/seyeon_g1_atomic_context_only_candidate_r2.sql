@@ -1,7 +1,6 @@
 -- Watchtower-Track: security
--- R4: atomic G1 real Turn context-ready plus DB-original Positive SourceSet
--- and G3 stored real-v2 Character message Reveal / Replay checked against
--- the CURRENT original Grant/Record at PostgreSQL read linearization.
+-- R2/G1 disposable pre-commit: real core ContextReady and exact DB Original Grant/SourceSet.
+-- Deliberately excludes every G3 Reveal/Replay/History function.
 --
 -- ONLY the named disposable PostgreSQL CI fixture. NOT a migration.
 -- No Production direct Execute, API route, user/LLM data or G0 permission.
