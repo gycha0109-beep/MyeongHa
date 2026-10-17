@@ -54,6 +54,7 @@ Watchtower-Track: saju-bridge
 - `test/saju-bridge-existing-authorities-v2-synthetic-e2e.test.ts`의 추가 성공/부정 검증은 **실제 Saju upstream 배포 없이** source admission/lifecycle/version이 유효한 Preview 200 응답만 반환하고 attestation 누락 또는 envelope 불일치 시 503으로 차단함을 확인한다. 이는 운영 R01–R14 또는 Production 활성화 증빙이 아니다.
 - 동일 합성 E2E의 계산 경로는 source-owned 계산 HTTP V1 200 payload를 실제 기존 ingress로 통과시키며, `calculation_only`/`interpretationAuthorized=false`/현재 Birth Revision 결속·민감 출생값의 응답 비노출을 검증한다. 변경된 Birth input 또는 스키마 버전의 upstream 200 응답은 503으로 fail closed한다. 계산 결과가 Product Reading 또는 판매·배포 권한을 얻는 것은 아니다.
 - **전송 실패/재호출 경계:** 동일 V2 합성 E2E에서 두 경로 모두 인증 후 Saju 네트워크 거절 및 429·503 응답을 503으로 fail closed하고, 원격 Bearer·출생값·원격 오류 본문을 반환하지 않으며 **단일 API 요청 내 자동 재전송은 0회**임을 검증한다. `retryable: true`는 자동 재실행 또는 중복 요청 방지 약속이 아니다. **별도 클라이언트 재전송·병렬 중복 호출의 전역 멱등성은 아직 제공·증명되지 않았으며**, 저장·유료 Reading/Entitlement를 여는 근거로 사용할 수 없다.
+- **V2 구성 종료 수명주기:** `createSajuBridgeExistingAuthoritiesV2`는 `close()`가 시작되면 새 요청을 503으로 거부하고, 이미 수락한 계산·미리보기 요청이 종료될 때까지 공유 DB 풀 종료를 늦춘다. 종료 호출은 하나의 Promise로 결속하고 upstream 지연/완료 순서를 기존 합성 E2E에서 검증한다. 이는 서버리스 외부 배포 설정이나 프로세스 강제 종료 신호를 제어하는 기능이 아니며, 전역 요청 중복 차단 또는 Production 출시 권한을 의미하지 않는다.
 - **운영 DB 변경/문의/기능 플래그/출시/유료 인프라 없음.** 신규 테이블이 없으므로 기존 Reading 원장이나 `1540` 미적용 nonce migration을 성공했다고 가장하지 않는다.
 
 ```text
