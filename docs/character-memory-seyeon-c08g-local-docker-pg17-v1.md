@@ -59,6 +59,14 @@ node scripts/run-seyeon-c08-local-docker-pg17.mjs --disposable-only
 
 ※ `git config --global core.autocrlf`를 변경하거나 수동으로 전체 파일 줄바꿈을 바꿀 필요는 없습니다. GitHub CI에서 수행하는 것은 CRLF 전처리의 회귀 테스트와 정적 안전성 확인이며, 로컬 Docker의 실제 SQL 전체 통과는 사용자가 실행한 출력으로 별도 판정합니다.
 
+## Docker 임시 PostgreSQL 서버와 실제 서버 전환 경합 (C08-L)
+
+C08-J까지 통과한 Windows 실행에서 다시 발생한 `createdb: connection to server on socket "/var/run/postgresql/.s.PGSQL.5432" failed: No such file or directory`는 SQL 계약 문제가 아닙니다. PostgreSQL 공식 Docker 이미지는 새로운 데이터 디렉터리를 초기화하면서 **임시 PostgreSQL 서버를 먼저 가동**하고 종료한 뒤 실제 PostgreSQL 프로세스를 기동합니다. 이전 실행기는 임시 서버의 `pg_isready` 성공을 곧바로 최종 준비 완료로 판단할 수 있었고, 그 이후 `createdb`가 서버 교체 구간에서 실패할 수 있었습니다.
+
+C08-L 수정은 Docker 컨테이너 내부 `/proc/1/comm`이 최종 서버 프로세스 `postgres`임을 확인하고, 그 **최종 서버에 `postgres` DB로 실제 `SELECT 1`이 성공한 뒤에만** 일회용 `createdb`를 수행합니다. 90회, 각 1초 간격의 한정된 준비 상태 확인을 사용하며, 끝내 성공하지 못하면 `HOLD_C08_DOCKER_FINAL_POSTMASTER_NOT_READY`를 출력하고 원래의 `finally` 경로로 컨테이너를 삭제합니다. `C08_DOCKER_FINAL_POSTMASTER_READY`가 출력되면 임시 서버를 오인하지 않았음을 나타냅니다.
+
+자동 검증에는 **임시 서버 → 최종 PID 1 → 첫 최종 서버 SQL 연결 실패 → 실제 SQL 성공 → createdb** 순서의 가짜 Docker CLI 회귀 테스트와, `createdb` 실패 시 조기 종료·컨테이너 삭제 검증이 포함됩니다. GitHub PostgreSQL 17 CI는 SQL 권한 및 2세션 검증을 별도로 계속 수행하지만 **Windows Docker Desktop의 이 초기화 전환 경합 자체를 실제 실행한 것으로 간주하지는 않습니다**. 집 PC 로컬 실행 결과로 최종 판정합니다.
+
 ## 컬럼별 RLS 권한 오류 대응 (C08-I)
 
 두 번째 실측에서 Docker PG17 및 Windows 줄바꿈 정규화는 통과했으나 `HOLD_C08_PG17_ROLE_RLS_PRIVILEGE_CONTRACT`가 발생했습니다. 원인은 `0950_chat_read_runtime_authority.sql`에서 API 실행 역할이 `conversation_messages`의 **필요 컬럼에만 SELECT** 권한을 받는데, 로컬 테스트가 `has_table_privilege(..., 'SELECT')`라는 **테이블 전체 SELECT**를 요구했기 때문입니다. 최소 권한 설계가 정상일 때도 실패하는 검증식 오류이며, 운영 권한을 넓혀 해결해서는 안 됩니다.
