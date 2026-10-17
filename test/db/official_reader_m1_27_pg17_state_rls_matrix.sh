@@ -174,7 +174,7 @@ select count(*) from (values
   fail 'Definer raw SELECT or API source SELECT closure invalid'
 
 api_read() {
-  local receipt_id="$1" expected_subject="${2:-$subject}" bound="${3:-$subject}" isolation="${4:-read committed}"
+  local receipt_id="$1" expected_subject="${2:-$subject}" bound="${3-$subject}" isolation="${4:-read committed}"
   psql -X -qAt -v ON_ERROR_STOP=1 -v VERBOSITY=sqlstate <<SQL
 begin isolation level $isolation read only;
 select pg_catalog.set_config('myeongha.subject_id','$bound',true);
@@ -186,7 +186,7 @@ SQL
 }
 assert_enum() {
   local label="$1" receipt_id="$2" expected="$3" output
-  if ! output="$(api_read "$receipt_id" 2>"$tmp/probe.err")"; then
+  if ! output="$(api_read "$receipt_id" "$subject" "$subject" "${4:-read committed}" 2>"$tmp/probe.err")"; then
     fail "$label SQL failed: $(tail -n 2 "$tmp/probe.err" | cut -c 1-140)"
   fi
   [[ "$(tail -n 1 <<<"$output")" == "$expected" ]] ||
@@ -256,10 +256,10 @@ assert_enum 'existing revoked/partial historical fixture Receipt' "$incomplete_r
 assert_enum 'no registered Receipt' 'a1270000-0000-4000-8000-000000000009' SOURCE_UNAVAILABLE
 
 assert_error 'missing subject context' 28000 \
-  api_read "$complete_receipt" "$subject" "$other_subject" # overwritten below for actual empty-context path
+  api_read "$complete_receipt" "$subject" ""
 assert_error 'subject mismatch' 42501 \
   api_read "$complete_receipt" "$subject" "$other_subject"
-assert_enum 'repeatable read unsupported snapshot' "$complete_receipt" STALE_SNAPSHOT_UNSUPPORTED
+assert_enum 'repeatable read unsupported snapshot' "$complete_receipt" STALE_SNAPSHOT_UNSUPPORTED "repeatable read"
 
 bash test/db/official_reader_m1_18_live_cutover_readonly_gate.sh
 echo 'PASS_M1_27_DISPOSABLE_PG17: no-effect, complete, conflicting, incomplete, cross-subject and RLS boundary'
