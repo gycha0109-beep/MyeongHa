@@ -17,14 +17,14 @@ read_policy as (
        and pg_catalog.array_to_string(p.proconfig, ',')
          like '%search_path=pg_catalog, pg_temp%'
    )) as trusted_definer,
-  pg_catalog.coalesce(
+  coalesce(
     pg_catalog.has_function_privilege(
       'myeongha_api_executor',o.read_function,'EXECUTE'),false
   ) as api_read_execute,
   not exists (
     select 1 from pg_catalog.pg_proc p
     cross join lateral pg_catalog.aclexplode(
-      pg_catalog.coalesce(
+      coalesce(
         p.proacl,pg_catalog.acldefault('f',p.proowner)
       )
     ) privilege
@@ -36,7 +36,7 @@ read_policy as (
       values ('anon'),('authenticated'),('service_role'),
              ('myeongha_commerce_internal_executor')
     ) deny(rolename)
-    where pg_catalog.coalesce(
+    where coalesce(
       pg_catalog.has_function_privilege(
         deny.rolename,o.read_function,'EXECUTE'
       ),false)
@@ -55,7 +55,7 @@ private_writers as (
       select o.issue_function as fn
       union all select o.bind_function
     ) f
-    where pg_catalog.coalesce(
+    where coalesce(
       pg_catalog.has_function_privilege(deny.rolename,f.fn,'EXECUTE'),
       false)
   ) as runtime_writer_execute_denied
@@ -63,8 +63,8 @@ private_writers as (
 ),
 source_acl as (
  select count(*)=5 as all_source_tables_exist,
-   pg_catalog.coalesce(bool_and(
-     not pg_catalog.coalesce(
+   coalesce(bool_and(
+     not coalesce(
        pg_catalog.has_table_privilege(
          'myeongha_api_executor',
          pg_catalog.to_regclass('public.'||name),
