@@ -9,7 +9,7 @@
 
 Watchtower-Track: saju-bridge
 
-> **2026-10-18 비용 정책 확정:** Owner가 **추가 비용 0원**으로 명시하여 신규 유료 Staging/Pro/KMS/OpenBao 호스팅·별도 서버/DB·과금 가능 CI 초과 사용을 추진하지 않는다. 기존 Docker·GoTrue·TLS/PG·TypeScript 검증과 기존 무과금 한도 내 CI를 재사용한다. 이전 문서의 P2 신규 클라우드/견적 경로는 *장기 보류된 설계 참조*로만 남고 실제 작업 대기열·승인 요청에서 제외한다. [SO-3 제로 비용 한계/가능 범위](./SAJU_SO3_FRAMEWORK_ADOPTION_BLUEPRINT_V0_1_20261018.md#6-owner-결정-반영--추가-비용-0원만-허용-유료-토폴로지-장기-중단) 참조. R01–R14 실제 독립 증빙은 미확보/HOLD로 남기되 일반 Product V2 경로 작업을 막지 않는다. 이 비용 제약을 바꾸기 전까지 신규 유료 대안 추천·승인 요청을 재개하지 않는다.
+> **2026-10-18 비용 정책 확정:** Owner가 **추가 비용 0원**으로 명시하여 신규 유료 Staging/Pro/KMS/OpenBao 호스팅·별도 서버/DB·과금 가능 CI 초과 사용을 추진하지 않는다. 기존 Docker·GoTrue·TLS/PG·TypeScript 검증과 기존 공개 저장소의 표준 무료 GitHub-hosted Actions CI만 재사용하고 Artifacts/Cache 초과 과금·large runner는 사용하지 않는다. 이전 문서의 P2 신규 클라우드/견적 경로는 *장기 보류된 설계 참조*로만 남고 실제 작업 대기열·승인 요청에서 제외한다. [SO-3 제로 비용 한계/가능 범위](./SAJU_SO3_FRAMEWORK_ADOPTION_BLUEPRINT_V0_1_20261018.md#6-owner-결정-반영--추가-비용-0원만-허용-유료-토폴로지-장기-중단) 참조. R01–R14 실제 독립 증빙은 미확보/HOLD로 남기되 일반 Product V2 경로 작업을 막지 않는다. 이 비용 제약을 바꾸기 전까지 신규 유료 대안 추천·승인 요청을 재개하지 않는다.
 
 > **2026-10-18 SO-3 도구별 세부 구상 P0:** [SO-3 프레임워크 조합 상세 설계](./SAJU_SO3_FRAMEWORK_ADOPTION_BLUEPRINT_V0_1_20261018.md)에 기존 Docker·CI 재사용, OpenTofu/OpenBao/OPA/InSpec 적합성, R01–R14 공급자·원본 증빙 매핑, 3개 신규 격리 Supabase 후보/견적 산식과 P2 승인·폐기 게이트를 정리한다. **신규 클라우드·키·권한·Runner는 생성하지 않으며** Product Member E2E와 SO-3 운영 HOLD를 혼합하지 않는다.
 
