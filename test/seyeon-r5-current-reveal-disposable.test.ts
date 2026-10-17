@@ -257,7 +257,7 @@ describe.skipIf(!enabled)('R5 disposable actual-v2 current-rights first/replay/h
  it('denies redacted stored generated message and fails closed on history',async()=>{
   const id=await committed(74);
   await clientAction(c=>c.query(
-    'update public.conversation_messages set redacted_at=clock_timestamp() where id=$1::uuid',
+    'update public.conversation_messages set redacted_at=clock_timestamp(), redaction_reason=\'conversation_delete\' where id=$1::uuid',
     [id.assistantMessage],
   ));
   expect(await reveal(id)).toBeNull();
