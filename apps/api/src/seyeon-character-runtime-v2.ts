@@ -112,6 +112,10 @@ export type SeyeonExperimentalRelationshipSemanticsPortV2 =
   SeyeonRelationshipSemanticsPortV2;
 
 export interface RunSeyeonCharacterTurnV2Input {
+  /** Production may require a new source-census check after Preflight retrieval. */
+  readonly assertGovernedPreflightSourceClosure?: (
+    preflight: CharacterGovernedPreflightResultV1,
+  ) => void | Promise<void>;
   readonly userMessageRef: string;
   readonly userText: string;
   readonly contextInput: Omit<
@@ -571,6 +575,13 @@ export async function runSeyeonCharacterTurnV2(
       error instanceof Error ? error.message : 'Se-yeon governed preflight failed.',
       error,
     );
+  }
+
+  // Preflight may introduce private sources AFTER an earlier model-input Pin.
+  // Production supplies a fail-closed callback; no further model stage or
+  // relationship/context assembly may run before its verdict succeeds.
+  if (input.assertGovernedPreflightSourceClosure !== undefined) {
+    await input.assertGovernedPreflightSourceClosure(governedPreflight);
   }
 
   let relationshipSemantics: SeyeonRelationshipRuntimeSemanticsV2 | null = null;
