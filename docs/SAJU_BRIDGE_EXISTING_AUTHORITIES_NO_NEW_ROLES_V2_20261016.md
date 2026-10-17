@@ -53,6 +53,7 @@ Watchtower-Track: saju-bridge
 - 기존 `test/current-subject-saju-calculation-http.test.ts`, `test/current-subject-saju-preview-reading-http.test.ts`, `test/api-me-saju-calculation-runtime.test.ts`, `test/api-me-runtime.test.ts`가 회원 소유권·Birth revision·원격 호출 순서·기존 rewrite 디스패처 계약을 검증한다.
 - `test/saju-bridge-existing-authorities-v2-synthetic-e2e.test.ts`의 추가 성공/부정 검증은 **실제 Saju upstream 배포 없이** source admission/lifecycle/version이 유효한 Preview 200 응답만 반환하고 attestation 누락 또는 envelope 불일치 시 503으로 차단함을 확인한다. 이는 운영 R01–R14 또는 Production 활성화 증빙이 아니다.
 - 동일 합성 E2E의 계산 경로는 source-owned 계산 HTTP V1 200 payload를 실제 기존 ingress로 통과시키며, `calculation_only`/`interpretationAuthorized=false`/현재 Birth Revision 결속·민감 출생값의 응답 비노출을 검증한다. 변경된 Birth input 또는 스키마 버전의 upstream 200 응답은 503으로 fail closed한다. 계산 결과가 Product Reading 또는 판매·배포 권한을 얻는 것은 아니다.
+- **전송 실패/재호출 경계:** 동일 V2 합성 E2E에서 두 경로 모두 인증 후 Saju 네트워크 거절 및 429·503 응답을 503으로 fail closed하고, 원격 Bearer·출생값·원격 오류 본문을 반환하지 않으며 **단일 API 요청 내 자동 재전송은 0회**임을 검증한다. `retryable: true`는 자동 재실행 또는 중복 요청 방지 약속이 아니다. **별도 클라이언트 재전송·병렬 중복 호출의 전역 멱등성은 아직 제공·증명되지 않았으며**, 저장·유료 Reading/Entitlement를 여는 근거로 사용할 수 없다.
 - **운영 DB 변경/문의/기능 플래그/출시/유료 인프라 없음.** 신규 테이블이 없으므로 기존 Reading 원장이나 `1540` 미적용 nonce migration을 성공했다고 가장하지 않는다.
 
 ```text
