@@ -111,6 +111,9 @@ function fixture(options: {
   readonly calculationResponse?: 'admitted' | 'birth-mismatch' | 'schema-mismatch';
   /** Never retry an upstream error within the same authenticated request. */
   readonly upstreamFailure?: 'network' | 'rate-limited' | 'server-unavailable';
+  /** Hold the upstream after the restricted Birth transaction has been released. */
+  readonly upstreamGate?: Promise<void>;
+  readonly onUpstreamEntered?: () => void;
 } = {}) {
   const events: string[] = [];
   const sqlQueries: { sql: string; values?: readonly unknown[] }[] = [];
@@ -174,6 +177,8 @@ function fixture(options: {
   });
   const sajuFetchImpl: SajuProductionCalculationHttpFetchV1 = vi.fn(async (url, init) => {
     events.push('SAJU');
+    options.onUpstreamEntered?.();
+    if (options.upstreamGate !== undefined) await options.upstreamGate;
     expect(url).toMatch(/^https:\/\/saju\.internal\.example\/api\/(?:calculations|preview\/readings)$/u);
     expect(init.method).toBe('POST');
     expect(new Headers(init.headers).get('authorization')).toBe(
@@ -466,6 +471,52 @@ describe('Saju V2 synthetic Member Auth -> existing Subject DB -> Saju transport
         expect(f.connect).toHaveBeenCalledTimes(2);
         expect(f.events.filter(x => x === 'SAJU')).toHaveLength(2);
       } finally {
+        await f.runtime.close();
+      }
+    },
+  );
+
+
+  it.each(['calculation', 'preview-reading'] as const)(
+    '%s drains an already authenticated in-flight upstream request before V2 bridge close',
+    async route => {
+      let releaseUpstream!: () => void;
+      let signalUpstream!: () => void;
+      const upstreamGate = new Promise<void>(resolve => { releaseUpstream = resolve; });
+      const upstreamEntered = new Promise<void>(resolve => { signalUpstream = resolve; });
+      const f = fixture({
+        upstreamGate,
+        onUpstreamEntered: () => signalUpstream(),
+      });
+      let closeCompleted = false;
+      try {
+        const pending = handle(f, route);
+        await upstreamEntered;
+        // The existing restricted DB transaction must be closed before Saju I/O.
+        expect(f.events.indexOf('COMMIT')).toBeLessThan(f.events.indexOf('RELEASE'));
+        expect(f.events.indexOf('RELEASE')).toBeLessThan(f.events.indexOf('SAJU'));
+
+        const firstClose = f.runtime.close();
+        const secondClose = f.runtime.close();
+        expect(secondClose).toBe(firstClose);
+        void firstClose.then(() => { closeCompleted = true; });
+        await Promise.resolve();
+        expect(closeCompleted).toBe(false);
+
+        // Once close begins, neither route may start fresh Auth/DB/Saju work.
+        const rejected = await handle(f, route);
+        expect(rejected.status).toBe(503);
+        expect(f.memberFetchImpl).toHaveBeenCalledOnce();
+        expect(f.connect).toHaveBeenCalledOnce();
+        expect(f.sajuFetchImpl).toHaveBeenCalledOnce();
+
+        releaseUpstream();
+        expect((await pending).status).toBe(503);
+        await firstClose;
+        expect(closeCompleted).toBe(true);
+        expect(f.sajuFetchImpl).toHaveBeenCalledOnce();
+      } finally {
+        releaseUpstream();
         await f.runtime.close();
       }
     },
