@@ -56,4 +56,43 @@ describe('authority core read-only profile report', () => {
     const log = sample() + '\nsome unrelated line with AUTHORITY_CORE_CASE db=myeongha_fake duration_seconds=999';
     expect(summarizeAuthorityProfile(log, { expectedCases: 2 }).complete_case_count).toBe(2);
   });
+
+  it('reads complete high-resolution DB preparation, command and cleanup costs', () => {
+    const detailed = sample() + [
+      '2026-10-17T08:02:00Z AUTHORITY_CORE_TEMPLATE source=created create_ms=100 migrate_ms=2000',
+      '2026-10-17T08:02:01Z AUTHORITY_CORE_PHASE db=myeongha_seyeon_d4a_test pre_drop_ms=10 clone_ms=400 command_ms=8100 cleanup_ms=250',
+      '2026-10-17T08:02:02Z AUTHORITY_CORE_PHASE db=myeongha_reader_test pre_drop_ms=15 clone_ms=450 command_ms=10900 cleanup_ms=260',
+    ].join('\n');
+    const result = summarizeAuthorityProfile(detailed, { expectedCases: 2 });
+    expect(result.valid).toBe(true);
+    expect(result.phase_detail_available).toBe(true);
+    expect(result.phase_breakdown).toEqual({
+      template: { source: 'created', create_ms: 100, migrate_ms: 2000 },
+      isolated_case_count: 2,
+      pre_drop_ms_sum: 25,
+      clone_ms_sum: 850,
+      command_ms_sum: 19000,
+      cleanup_ms_sum: 510,
+    });
+  });
+
+  it('keeps older complete logs valid without inventing a phase breakdown', () => {
+    const result = summarizeAuthorityProfile(sample(), { expectedCases: 2 });
+    expect(result.valid).toBe(true);
+    expect(result.phase_detail_available).toBe(false);
+    expect(result.phase_breakdown).toBe(null);
+  });
+
+  it('rejects missing, duplicate, mismatched, malformed or non-finite phase evidence', () => {
+    const template = '\nAUTHORITY_CORE_TEMPLATE source=created create_ms=1 migrate_ms=4';
+    const first = '\nAUTHORITY_CORE_PHASE db=myeongha_seyeon_d4a_test pre_drop_ms=1 clone_ms=2 command_ms=3 cleanup_ms=4';
+    const second = '\nAUTHORITY_CORE_PHASE db=myeongha_reader_test pre_drop_ms=1 clone_ms=2 command_ms=3 cleanup_ms=4';
+    expect(summarizeAuthorityProfile(sample() + template + first, { expectedCases: 2 }).valid).toBe(false);
+    expect(summarizeAuthorityProfile(sample() + template + first + first, { expectedCases: 2 }).errors).toContain('duplicate phase myeongha_seyeon_d4a_test');
+    expect(summarizeAuthorityProfile(sample() + template + second + first, { expectedCases: 2 }).valid).toBe(false);
+    expect(summarizeAuthorityProfile(sample() + template + first + second + '\nAUTHORITY_CORE_PHASE bad', { expectedCases: 2 }).valid).toBe(false);
+    expect(summarizeAuthorityProfile(sample() + template + first + second + template, { expectedCases: 2 }).valid).toBe(false);
+    expect(summarizeAuthorityProfile(sample() + template + first + second.replace('command_ms=3', 'command_ms=99999999999999999'), { expectedCases: 2 }).valid).toBe(false);
+    expect(summarizeAuthorityProfile(sample() + template.replace('created create_ms=1', 'existing create_ms=1') + first + second, { expectedCases: 2 }).valid).toBe(false);
+  });
 });
