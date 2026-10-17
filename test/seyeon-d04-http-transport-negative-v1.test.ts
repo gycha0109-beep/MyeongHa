@@ -83,6 +83,17 @@ describe('D-04 candidate: real HTTP ingress routes remain HOLD before Response b
     await assertHeld(canonical,calls);
   });
 
+  it('a consistent Vercel dynamic threadId alias remains canonical but never grants Reveal',async()=>{
+    const source=sourceRequest(
+      'https://myeongha.vercel.app/api/me?__myeongha_chat_turn_send=1&__myeongha_chat_thread_id='+THREAD+'&threadId='+THREAD,
+    );
+    const target=resolveMeDispatchTargetForTestV1(source);
+    expect(target).toMatchObject({kind:'chat-turn-send',threadId:THREAD});
+    const canonical=toCanonicalMeRequestForTestV1(source,target??undefined);
+    const calls={calls:0};
+    await assertHeld(canonical,calls);
+  });
+
   it('a delayed streamed request body cannot sneak a paid runtime or assistant bytes past HOLD',async()=>{
     let completeBody!:()=>void;
     const bodyGate=new Promise<void>(resolve=>{completeBody=resolve;});
@@ -115,7 +126,7 @@ describe('D-04 candidate: real HTTP ingress routes remain HOLD before Response b
     '?__myeongha_chat_turn_send=1&__myeongha_chat_thread_id='+THREAD+'&afterSequenceNo=1',
     '?__myeongha_chat_turn_send=1&__myeongha_chat_thread_id='+THREAD+'&__myeongha_chat_open=1',
     '?__myeongha_chat_turn_send=1&__myeongha_chat_thread_id='+THREAD+'&__myeongha_chat_turn_send=1',
-    '?__myeongha_chat_turn_send=1&__myeongha_chat_thread_id='+THREAD+'&threadId='+THREAD,
+    '?__myeongha_chat_turn_send=1&__myeongha_chat_thread_id='+THREAD+'&threadId=11111111-1111-4111-8111-111111111111',
   ])('mixed/repeated rewrite authority is rejected instead of silently stripped: %s',query=>{
     const source=sourceRequest('https://myeongha.vercel.app/api/me'+query);
     expect(resolveMeDispatchTargetForTestV1(source)).toBeNull();
