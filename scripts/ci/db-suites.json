@@ -70,7 +70,8 @@
       "official-reader-m1-24-pg17-independent-login-owner",
       "official-reader-m1-25-pg17-nonsuperuser-1970",
       "official-reader-m1-26-pg17-definer-data-backed",
-      "official-reader-m1-27-pg17-state-rls-matrix"
+      "official-reader-m1-27-pg17-state-rls-matrix",
+      "official-reader-m1-28-pg17-guest-resolver-session"
     ]
   }
 }
