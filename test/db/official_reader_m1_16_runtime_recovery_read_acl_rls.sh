@@ -52,8 +52,10 @@ for table in commerce_receipts entitlement_grants entitlement_events \
       on n.oid=c.relnamespace
     where n.nspname='public' and c.relname='$table'
       and c.relkind in ('r','p')")"
-  [[ "$(cut -d'|' -f1 <<<"$metadata")" == f &&
-     "$(cut -d'|' -f4 <<<"$metadata")" == f ]] ||
+  select_acl="$(cut -d'|' -f1 <<<"$metadata")"
+  owner_acl="$(cut -d'|' -f4 <<<"$metadata")"
+  [[ ( "$select_acl" == false || "$select_acl" == f ) &&
+     ( "$owner_acl" == false || "$owner_acl" == f ) ]] ||
     fail "$table SELECT/owner rights unexpectedly available: $metadata"
   echo "PASS M1-16 ACL: $table select=f rls=$(cut -d'|' -f2 <<<"$metadata") force=$(cut -d'|' -f3 <<<"$metadata") owner_usage=f"
 done
