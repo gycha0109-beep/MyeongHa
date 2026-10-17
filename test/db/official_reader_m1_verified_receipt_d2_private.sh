@@ -99,6 +99,11 @@ bash test/db/official_reader_m1_10_unknown_commit_source.sh \
 bash test/db/official_reader_m1_17_minimal_read_execute.sh \
  "$receipt" "$subject" "$intent" preissue
 
+# M1-18: DB catalog must fail closed if someone opens source SELECT,
+# public read EXECUTE, or private Writer EXECUTE. CI probes always ROLLBACK.
+bash test/db/official_reader_m1_18_live_cutover_readonly_gate.sh
+node --test scripts/commerce/m1-18-migration-parity-gate.test.mjs
+
 for signature in \
  'public.internal_apply_official_reader_unified_receipt_v1(uuid,text[],timestamptz[],timestamptz[],timestamptz[],text[])' \
  'public.internal_cmd_bind_official_reader_unified_v1(uuid,uuid,uuid,uuid,text,text,jsonb)'; do
