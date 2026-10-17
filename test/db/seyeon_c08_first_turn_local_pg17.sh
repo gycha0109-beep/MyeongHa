@@ -191,22 +191,11 @@ set -e
 }
 echo PASS_C08_PG17_CROSS_SUBJECT_DENIED
 
-# Insert a synthetic REDACTED tombstone, not a new visible text. It must count
-# as a second historic message even though the recent UI query masks it.
-"${run[@]}" >/dev/null <<'SQL'
-insert into public.conversation_messages(
- id,thread_id,subject_id,turn_id,sequence_no,sender_type,thread_character_id,
- character_content_bundle_id,body_text,message_payload_jsonb,message_schema_version,
- content_hash,created_at,redacted_at,redaction_reason
-) values(
- '68800000-0000-0000-0000-000000000002',
- '68400000-0000-0000-0000-000000000001',
- '68100000-0000-0000-0000-000000000001',
- null,2,'system',null,null,'SYNTHETIC_NEVER_REVEAL',
- '{"testOnly":true}'::jsonb,'system-message/v1',
- 'sha256:v1:'||repeat('c',64),now(),now(),'conversation_delete'
-);
-SQL
+# Two real PG17 sessions now produce the second (redacted) message:
+# A reads the first-turn census twice in a single READ COMMITTED transaction,
+# B commits the tombstone between them. A must observe 1 -> 2. Reuses the
+# same synthetic message fixture; no extra message count is introduced.
+bash test/db/seyeon_c08_two_session_census_race_pg17.sh
 
 second="$(census_sql "$subject" "$thread" "$message")"
 [[ "$second" == 'active|seyeon|2|f' ]] || {
