@@ -115,7 +115,7 @@ export interface RunSeyeonCharacterTurnV2Input {
   /** Production may require a new source-census check after Preflight retrieval. */
   readonly assertGovernedPreflightSourceClosure?: (
     preflight: CharacterGovernedPreflightResultV1,
-  ) => void | Promise<void>;
+  ) => unknown;
   readonly userMessageRef: string;
   readonly userText: string;
   readonly contextInput: Omit<
