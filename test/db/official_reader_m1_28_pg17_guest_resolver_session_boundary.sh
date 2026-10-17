@@ -209,17 +209,6 @@ echo 'PASS_M1_28_GUEST_LIFECYCLE: valid, other Subject, unknown, expired and con
 
 # Ensure resolver-bound GUC cannot persist into a later transaction on the
 # same TCP connection: SET LOCAL role and transaction-local subject both reset.
-session_reset="$(PGUSER="$login" PGPASSWORD="$password" psql -X -qAt \
-  -v ON_ERROR_STOP=1 <<SQL
-begin read only;
-set local role myeongha_api_executor;
-select subject_id from public.begin_guest_subject_context_v1('$bogus_hash') where false;
-rollback;
-select coalesce(nullif(current_setting('myeongha.subject_id',true),''),'CLEARED');
-SQL
-)" || true
-# The above intentionally exercises a short-circuit query only; a stronger
-# successful resolver reset test uses a fresh unconsumed fixture hash below.
 psql -X -qAt -v ON_ERROR_STOP=1 -c \
   "update public.guest_sessions set consumed_at=null where token_hash='$good_hash';" >/dev/null
 reset="$(PGUSER="$login" PGPASSWORD="$password" psql -X -qAt \
