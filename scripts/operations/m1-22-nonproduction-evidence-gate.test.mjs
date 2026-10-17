@@ -97,8 +97,11 @@ test('source/history drift overrides any staged catalog success',()=>{
     'HOLD_M1_22_LIVE_OR_SOURCE_DRIFT');
   const newRemote=structuredClone(live);
   newRemote.installedVersions.push('20261019999999');
-  assert.equal(auditM122NonproductionGate(newRemote,isolate,owners).verdict,
-    'HOLD_M1_22_LIVE_OR_SOURCE_DRIFT');
+  const report=auditM122NonproductionGate(newRemote,isolate,owners);
+  assert.equal(report.verdict,'HOLD_M1_22_LIVE_OR_SOURCE_DRIFT');
+  assert.equal(report.liveVsDisposableIsolate.repositorySourceVersions,217);
+  assert.deepEqual(report.liveVsDisposableIsolate.otherRemoteOnlyVersions,
+    ['20261019999999']);
 });
 
 test('any missing or broadened candidate read/Writer privilege fails closed',()=>{
