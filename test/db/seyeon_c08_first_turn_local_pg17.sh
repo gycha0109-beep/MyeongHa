@@ -210,3 +210,8 @@ where thread_id='$thread' and subject_id='$subject';")"
  echo HOLD_C08_PG17_READ_MUTATED_MESSAGE_COUNT >&2; exit 1;
 }
 echo PASS_C08_PG17_READ_ONLY_CENSUS
+
+# C08-K uses the other, initially empty synthetic thread. It runs AFTER
+# C08-I/J cardinality checks so the original 1->2 redacted census remains
+# independently reproducible. Both actual receives use the governed RPC.
+bash test/db/seyeon_c08k_receive_rpc_two_session_pg17.sh
