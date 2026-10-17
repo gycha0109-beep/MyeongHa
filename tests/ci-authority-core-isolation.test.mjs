@@ -65,8 +65,8 @@ describe.skipIf(process.platform === 'win32')('disposable authority-core templat
     expect(result.stdout).toContain('AUTHORITY_CORE_CASE db=myeongha_case_one duration_seconds=');
     expect(result.stdout).toContain('AUTHORITY_CORE_STAGE stage=baseline-and-early-guards');
     expect(result.stdout).toContain('AUTHORITY_CORE_TEMPLATE source=created create_ms=');
-    expect(result.stdout).toMatch(/AUTHORITY_CORE_CASE db=myeongha_case_one duration_seconds=\\d+ index=1/);
-    expect(result.stdout).toMatch(/AUTHORITY_CORE_CASE db=myeongha_case_two duration_seconds=\\d+ index=2/);
+    expect(result.stdout).toMatch(/AUTHORITY_CORE_CASE db=myeongha_case_one duration_seconds=\d+ index=1/);
+    expect(result.stdout).toMatch(/AUTHORITY_CORE_CASE db=myeongha_case_two duration_seconds=\d+ index=2/);
     expect(result.stdout).toMatch(/AUTHORITY_CORE_PHASE db=myeongha_case_one pre_drop_ms=\d+ clone_ms=\d+ command_ms=\d+ cleanup_ms=\d+/);
     expect(result.stdout).toMatch(/AUTHORITY_CORE_PHASE db=myeongha_case_two pre_drop_ms=\d+ clone_ms=\d+ command_ms=\d+ cleanup_ms=\d+/);
     expect(result.calls.at(-1)).toBe('dropdb|--if-exists myeongha_authority_core_template');
