@@ -34,10 +34,10 @@ trap cleanup EXIT
 BEGIN ISOLATION LEVEL READ COMMITTED;
 SET LOCAL ROLE myeongha_api_executor;
 select subject_id from public.begin_member_subject_context_v1('68000000-0000-0000-0000-000000000001');
-\\o $race_dir/reader_pid
+\o $race_dir/reader_pid
 select pg_backend_pid();
-\\o
-\\o $race_dir/before
+\o
+\o $race_dir/before
 with authorized_thread as materialized (
   select thread_id, status, participant_character_ids
   from public.qry_chat_thread_runtime_binding_v1(
@@ -59,10 +59,10 @@ select t.status, array_to_string(t.participant_character_ids, ','),
     and m.sender_type = 'user' and m.redacted_at is null)
     from first_two_messages m order by m.sequence_no desc limit 1), false)
 from authorized_thread t;
-\\o
-\\! touch $race_dir/reader_ready
-\\! timeout 20 sh -c 'until test -f "$race_dir/writer_committed"; do sleep 0.05; done'
-\\o $race_dir/after
+\o
+\! touch $race_dir/reader_ready
+\! timeout 20 sh -c 'until test -f "$race_dir/writer_committed"; do sleep 0.05; done'
+\o $race_dir/after
 with authorized_thread as materialized (
   select thread_id, status, participant_character_ids
   from public.qry_chat_thread_runtime_binding_v1(
@@ -84,7 +84,7 @@ select t.status, array_to_string(t.participant_character_ids, ','),
     and m.sender_type = 'user' and m.redacted_at is null)
     from first_two_messages m order by m.sequence_no desc limit 1), false)
 from authorized_thread t;
-\\o
+\o
 ROLLBACK;
 SQL
 ) &
