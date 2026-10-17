@@ -109,6 +109,9 @@ export function auditM120SafeStaging(snapshot, directory = 'supabase/migrations'
   const pinned = Object.keys(REVIEWED_SOURCE_BLOBS_V1).sort();
   const sourceDrift = pinned.filter(v =>
     !source.has(v) || source.get(v).blobSha !== REVIEWED_SOURCE_BLOBS_V1[v]);
+  // New repository SQL that the M1-19 review did not classify is not covered
+  // by the 45 pinned historical source approvals. It must HOLD independently.
+  const unreviewedSourceVersions = impact.unreviewedSourceVersions;
   const missing = new Set(impact.migrationInventory.map(x => x.version));
   const installed = new Set(snapshot.installedVersions);
   const graph = impact.migrationInventory.map(entry => {
@@ -148,7 +151,7 @@ export function auditM120SafeStaging(snapshot, directory = 'supabase/migrations'
   const excludedMissing = [...missing].filter(v => !closure.has(v)).sort();
   const historicCorrect = impact.historicalBundleStatus ===
     'IDENTIFIED_EXISTING_SEYEON_RESTORE_UNRECONCILED';
-  const safeState = sourceDrift.length || unknownPredecessors.length ||
+  const safeState = sourceDrift.length || unreviewedSourceVersions.length || unknownPredecessors.length ||
       !historicCorrect || impact.unmatchedRemoteCount !== 1 ||
       impact.unmatchedRemoteVersions[0] !== HISTORICAL_BUNDLE.version
     ? 'HOLD_M1_20_UNRECONCILED_SOURCE_OR_DEPENDENCY'
@@ -158,6 +161,7 @@ export function auditM120SafeStaging(snapshot, directory = 'supabase/migrations'
     basedOnM119: impact.verdict,
     reviewedSourceCount: pinned.length,
     sourceDrift,
+    unreviewedSourceVersions,
     unknownPredecessors,
     requiredMissingForRead,
     excludedMissing,
