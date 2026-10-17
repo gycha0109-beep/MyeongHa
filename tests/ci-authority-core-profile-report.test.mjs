@@ -58,7 +58,7 @@ describe('authority core read-only profile report', () => {
   });
 
   it('reads complete high-resolution DB preparation, command and cleanup costs', () => {
-    const detailed = sample() + [
+    const detailed = sample() + '\n' + [
       '2026-10-17T08:02:00Z AUTHORITY_CORE_TEMPLATE source=created create_ms=100 migrate_ms=2000',
       '2026-10-17T08:02:01Z AUTHORITY_CORE_PHASE db=myeongha_seyeon_d4a_test pre_drop_ms=10 clone_ms=400 command_ms=8100 cleanup_ms=250',
       '2026-10-17T08:02:02Z AUTHORITY_CORE_PHASE db=myeongha_reader_test pre_drop_ms=15 clone_ms=450 command_ms=10900 cleanup_ms=260',
