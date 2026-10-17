@@ -34,6 +34,7 @@ import {
 import {
   assertSeyeonPersonalRecordsNotUsedBeforeUnprotectedCommitV1,
 } from './seyeon-personal-record-precommit-hold-v1.js';
+import { assertSeyeonPreflightZeroPrivateSourceClosureV1 } from './seyeon-preflight-source-closure-hold-v1.js';
 import {
   createSeyeonAttemptZeroPersonalProofV1,
 } from './seyeon-attempt-zero-personal-proof-v1.js';
@@ -740,6 +741,7 @@ export async function runSeyeonProductionChatExecutionV1(
         });
 
         const runtime = await runSeyeonCharacterTurnV2({
+          assertGovernedPreflightSourceClosure: assertSeyeonPreflightZeroPrivateSourceClosureV1,
           userMessageRef: receivedTurn.userMessageId,
           userText: receivedTurn.userText,
           contextInput,
