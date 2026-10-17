@@ -2,6 +2,8 @@
 
 Watchtower-Track: saju-bridge
 
+> **2026-10-18 Owner 상위 제약 — 추가 비용 0원 확정:** SO-3에는 신규 유료 구독·클라우드 프로젝트/컴퓨트·KMS·서버·저장소·데이터 전송·CI 초과 과금을 **일절 집행하지 않는다.** 기존 시스템을 이용하더라도 추가 청구가 발생할 수 있으면 실행하지 않는다. 아래 P2/P3 신규 자원 토폴로지는 **비활성 장기 대안 설계**일 뿐 현재 도입 후보/비용 승인 요청/구축 로드맵이 아니다. P0 로컬/기존 한도 안에서 무비용으로 입증 가능한 것만 진행한다. 사용자가 이 제약을 새로 명시적으로 변경하지 않는 한 유료 공급자 추천·견적/승인 반복 요구도 하지 않는다. **고격리 실환경 R01–R14를 비용 없이 충족했다고 주장하지 않는다.**
+
 > **상태: 설계/공급자 적합성 평가만 착수 — P0, 운영 미연결.** 이 문서는 신규 운영 실행 단계가 아니며 기존 3-04-02 → 3-04-03B → 3-04-04 → 2D-4의 하위 구현 선택 문서다. 설계·가격 조사·소스 기반 검증 외에 새 클라우드 프로젝트, 유료 리소스, DB/Secret/IAM/서명 키, 독립 Probe, Runner를 생성·수정·실행하지 않는다.
 >
 > **제품 경로와 분리:** 일반 명하 회원의 Saju Calculation/Preview는 신규 계정 없는 EXISTING_AUTHORITIES_V2를 사용하며 [Member-only Production E2E #39034130032](https://github.com/gycha0109-beep/MyeongHa/actions/runs/39034130032)에서 해당 SHA 시점 성공. Guest 운영 양성 E2E/영속 테스트 데이터 정리 결정은 [#2266](https://github.com/gycha0109-beep/MyeongHa/issues/2266)에서 별도 관리. **본 SO-3은 Member/Guest 제품 사용에 필요한 추가 DB 역할, S3A Permit 설치 또는 출시 전제조건이 아니다.**
@@ -122,40 +124,45 @@ Watchtower-Track: saju-bridge
 - **폐기:** 사전 TTL + 파기 체크리스트. staging Guest/Member/Birth와 서비스 키/DB/서버/임시 State, 백업과 보존 원장을 **서로 구분**해 종료. `kubectl delete` / `tofu destroy` 성공만으로 데이터·백업 완전 삭제 주장 금지.
 - **GitHub Integration:** 기존 `Watchtower-Track: saju-bridge`, scope CI 및 exact-head Integration 경로만 사용. 별도 상시 자동배포·유료 리소스 apply 워크플로/승인 자동화 신설 금지.
 
-## 6. 비용 모델 (확정 견적 아님)
+## 6. Owner 결정 반영 — 추가 비용 0원만 허용 (유료 토폴로지 장기 중단)
 
-현재 SO-4 공급자 설계는 **신규 독립 Supabase Project 최소 3개**(Auth+Subject A, Nonce B, Admission C)로 시작한다. 향후 R05 요구가 Auth 독립 control-plane까지 강제하면 4개 이상으로 재견적한다.
+### 집행 불가 / 예산 불변식
 
-공식 Supabase 가격 문서 기준(2026-10 조사 시점): 유료 Pro 조직은 월 기본 $25와 신규 Micro 인스턴스별 월 약 $10의 compute(실사용 시간 비례), 조직당 월 $10 compute credit이 예시로 제시된다. 따라서 **완전히 별도 유료 조직에서 세 Micro를 한 달 내내 실행하는 단순 예시**는 `$25 + 3×$10 − $10 = 약 $45/월`이다. **기존 유료 조직에 세 개를 추가**한다면 기존 credit 사용 여부에 따라 **추가 compute 약 $30/월**이 될 수 있다. 이것은 사용자의 실제 계정/기존 요금제 견적, 4번째 Auth project, KV/KMS/Secret, storage/backup, egress, staging HTTPS/Cloud Run, 감사/attestor 비용을 **제외**한 숫자다. 비용 상한 또는 최소 청구액 확정이 아니다.
+```text
+MAX_INCREMENTAL_SPEND_KRW=0
+MAX_INCREMENTAL_SPEND_USD_CENTS=0
+PAID_STAGING_PROVISIONING=PROHIBITED
+SUPABASE_NEW_PAID_PROJECT=PROHIBITED
+PAID_KMS_OPENBAO_HOSTING=PROHIBITED
+PAID_CLOUD_RUN_OR_AUDIT_STORAGE=PROHIBITED
+BILLABLE_CI_OVERAGE=PROHIBITED
+AUTO_UPGRADE_OR_PAYMENT_METHOD_CHANGE=PROHIBITED
+```
 
-| 항목 | P0 새 비용 | 승인 이후 견적 입력 | 비용 위험 |
-|---|---:|---|---|
-| 기존 Compose/Actions/TS 계약 | $0 증분 | 기존 CI 시간·쿼터 확인 | 재실행·CI 사용량 |
-| 신규 Supabase Auth+Subject/Nonce/Admission 3 프로젝트 | **미생성** | 조직 플랜, 실제 프로젝트별 인스턴스, 시간×단가, 보유 credit | 프로젝트는 실행 시간에 따라 청구; 유료 project 컴퓨트는 Spend Cap 밖 |
-| Saju staging HTTPS 및 독립 Attestor | **미생성** | 서비스 인스턴스/리전, 요청·CPU·메모리·egress, 온/오프 시간 | Prod origin/secret 재사용 금지 |
-| 독립 Root KMS 또는 OpenBao security plane | **미생성** | 호스팅·키/호출·HA·백업/복구·로그 retention | self-host OpenBao도 관리 서버/보안 운영 비용 0은 아님 |
-| 감사/원본 증빙 보관 + 폐기 | **미생성** | WORM/append-only 옵션·보존 기간·복구·소유권 | 삭제 뒤 백업/감사 데이터 잔존 비용 |
-| OpenTofu/OPA/InSpec 선택 도구 | 도구 자체 평가만 | 도구 버전·라이선스·CI runner 사용량 | tool free ≠ 운영 인프라 free |
+- 이전 단순 견적/월 요금 예시는 **실행 대안에서 철회**한다. 가격이 싸거나 시간당 과금이 작다는 이유로 신규 유료 환경을 생성하지 않는다.
+- **현재 무료/보유 자원만 사용:** 이미 인수된 Docker Compose, GoTrue/PostgreSQL(폐기형), TypeScript Trust/Evidence 계약, 기존 CI 설정과 유료 초과 없는 무료 실행분. 동일 Docker Phase 5를 증거 재수집 목적으로 반복하지 않는다.
+- OpenTofu/OPA/OpenBao/InSpec를 소프트웨어로 무료 설치할 수 있더라도 **기존 장비 내 도구 사용은 독립된 Root custody/클라우드 3DB/외부 Attestor의 운영 입증이 아니다.** 기존 코드가 동일 검사를 한다면 도입하지 않는다.
+- 새 서비스의 *무료 티어*도 무조건 무료라고 가정하지 않는다. 카드 등록·자동 과금·사용량 초과·free 한도/종료 정책을 사전 증명하지 못하면 **신규 리소스 0개**. 신뢰된 별도 관리 도메인/세 독립 Postgres 클러스터가 없다면 실제 SO-3 실행은 계속 HOLD.
+- 현재 저장소는 **public**이며 기존 `ci-integration.yml`은 표준 `ubuntu-latest` runner를 사용한다. GitHub 공식 정책상 **공개 저장소의 표준 GitHub-hosted runner 실행 시간은 무료**이므로 기존 PR/Integration 검증 경로는 유지할 수 있다. 단 **Artifacts/Cache 등의 저장소 초과 과금과 larger runner**는 별개이므로 신규 과금 기능/대용량 영구 산출물/기존 quota 초과를 유발하는 설정은 추가하지 않는다. [GitHub Actions billing](https://docs.github.com/en/billing/concepts/product-billing/github-actions), [runners](https://docs.github.com/en/actions/reference/runners/github-hosted-runners).
+- Product EXISTING_AUTHORITIES_V2의 일반 Member Calculation/Preview는 이 고격리 인프라와 **별개**이므로 기존 운영 경로를 비용 없이 유지한다. Guest E2E는 #2266의 영속 데이터/승인 기준을 따른다.
 
-**P2 예산 입력이 결정되지 않으면 무조건 HOLD:** 조직/계정 ID, 실제 견적 화면 또는 가격 증빙, 승인된 최대 월·회차 비용 USD cents, 최대 런타임, 과금 종료/파기 기한, 경보/중단 수단, 초과 시 STOP, 청구 책임자. 현재 순수 평가 포트들은 `maxIncrementalCostUsdCents=0` 계약이므로, 추후 양의 금액 예산을 승인하더라도 계약/운영 절차 변경 없이 값만 0보다 크게 넣고 통과시키는 것은 금지한다.
+### 0원으로 가능한 결과와 불가능한 결과
 
-공식 출처/후속 재확인:
-- Supabase: https://supabase.com/docs/guides/platform/billing-faq
-- Supabase compute/hourly: https://supabase.com/docs/guides/platform/manage-your-usage/compute
-- Supabase local CLI: https://supabase.com/docs/guides/local-development/cli-workflows
-- OpenTofu state/plan encryption: https://opentofu.org/docs/language/state/encryption/
-- OpenTofu backend secret risk: https://opentofu.org/docs/language/settings/backends/configuration/
-- OpenBao Transit (Ed25519 sign/verify): https://openbao.org/docs/secrets/transit/
-- OPA policy tests/CI: https://www.openpolicyagent.org/docs/policy-testing
-- Chef InSpec structured reporters: https://docs.chef.io/inspec/5.23/configure/reporters/
+| 구분 | 제로 비용 실행/평가 | 판정 가능 범위 |
+|---|---|---|
+| 기존 로컬 Compose/GoTrue/3PG/TLS/Nonce·Admission | 검증 완료 근거와 회귀 테스트 인수, 추가 비용 없는 수정에 한정 | `LOCAL_TESTED` 또는 `SYNTHETIC_ONLY`; 실환경 독립성 없음 |
+| SO-3 Target Evidence/Registry/Challenge/Owner Intent | 기존 정적 계약/부정 케이스 강화, redacted sourceKind 인덱스 재사용 | `INDEXED_UNVERIFIED` 또는 `SIGNED_ASSERTIONS_UNANCHORED` 이상으로 운영 승격 금지 |
+| OPA/Conftest/OpenTofu 등 | 무료 실행 가능한 정적 규칙/plan lint가 **실제 중복 제거**에 유익할 때만 선택 | 정책/구성상 오류 검출; IAM/프로젝트/키 실증 아님 |
+| 신규 독립 Staging Auth/Subject/Nonce/Admission + 외부 Root/Attestor | 추가 비용 발생 또는 무과금·독립성 미증명 시 구축하지 않음 | R01–R14 `NOT_VERIFIED`; 2D-4 `HOLD` |
+| 일반 Product V2 현재 운영 | 기존 Prod 인프라·계약 및 이미 수행한 Member E2E 근거만 사용 | Member 운영 경로의 당시 검증 유지; 고격리 Staging/출시·결제 승인 아님 |
 
-**공식 문서의 가능/가격 사실과 본 프로젝트의 공급자 적합성/운영 독립 증빙은 별개다.** 관리형 KMS에서 요구 서명 알고리즘/내부 키 API가 일치하는지는 반드시 설계 승인 전에 별도 호환성 시험 결과로 확인한다.
+**종료 선택:** 비과금 환경으로 세 클러스터 및 외부 Root/Attestor 요건을 충족하는 독립 공급자가 실제 존재함이 입증되지 않는 한, SO-3을 억지로 PASS시키거나 Production/Refund 프로젝트를 우회 재사용하지 않는다. "현재 비용 0원으로는 운영 독립 증빙 일부를 얻을 수 없다"는 결론을 정식 HOLD로 기록한다.
 
 ## 7. 다음 실행 가능한 행동 / 완료 기준
 
-**P0에서 지금 완료할 수 있는 일:** 본 설계에 대한 코드·런북 경계 리뷰 → 누락 R01–R14/신뢰 출처/가격/리소스 재사용 위험 검토 → docs-only PR scope CI/최종 통합 CI → main 병합. 기존 Docker/GoTrue/TLS/Nonce 테스트 재실행이나 신규 Phase 신설 없음.
+**P0에서 지금 완료할 수 있는 일:** 기존 R01–R14 증빙 공백 분류·코드/런북/무료 도구의 중복 제거 및 무과금 검증 → docs-only PR 검증·병합. 유료 견적/신규 리소스 구매 제안·기존 Docker Phase 5 재실행·신규 Phase 신설 없음. 기존 PR/Integration CI 또한 무료 실행 한도 및 과금 차단 범위 내에서만 수행.
 
-**운영 진입 전에 여전히 결정해야 하는 것(S01–S06):**
+**장기 보류된 실환경 운영 진입 조건(S01–S06) — 현재 0원 정책으로 신규 유료 구축 불가:**
 - S01: 별도 보안·Staging 소유 조직/계정, 신규 Supabase 3프로젝트 실제 계획, 격리 수준, 지역.
 - S02: Owner 행위별 강인증(P2/P3/P4), 복구 인증기, kill switch.
 - S03: Ed25519 Root pin/Registry floor/revocation의 실제 custody 공급자와 관리자 분리.
@@ -167,6 +174,9 @@ Watchtower-Track: saju-bridge
 
 ```text
 BRIDGE_PRODUCT_INTEGRATION_PROFILE=EXISTING_AUTHORITIES_V2
+SO3_INCREMENTAL_COST_CAP_KRW=0
+SO3_PAID_STAGING=PROHIBITED
+SO3_FREE_EXISTING_RESOURCES_ONLY=true
 SO3_FRAMEWORK_ADOPTION=DESIGN_ONLY
 SO3_NEW_CLOUD_RESOURCES=0
 SO3_NEW_PRODUCTION_DB_ROLES=0

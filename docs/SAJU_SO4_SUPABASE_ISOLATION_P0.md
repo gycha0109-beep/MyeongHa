@@ -2,6 +2,8 @@
 
 Watchtower-Track: saju-bridge
 
+> **2026-10-18 Owner 지시: 추가 지출 0원(하드 제약).** 기존 Supabase-first 신규 3프로젝트 토폴로지는 **과금 가능한 구축 대안에서 제외하고 장기 보류**한다. 별도 유료 조직/Pro/Micro/Branch/KMS/서버/스토리지/CI 초과 과금은 승인하지 않으며, 무료 티어의 과금 가능성이 차단되었다는 근거 없이 프로젝트를 만들지 않는다. 기존 MyengHa Production 또는 Refund_management 재사용 금지는 유지한다. 가능한 범위는 기존 무과금 Docker·코드·CI 증빙뿐이고, 독립 Root/클러스터 R01–R14는 계속 NOT_VERIFIED. 후속 제약·한계는 [제로 비용 실행안](./SAJU_SO3_FRAMEWORK_ADOPTION_BLUEPRINT_V0_1_20261018.md#6-owner-결정-반영--추가-비용-0원만-허용-유료-토폴로지-장기-중단)을 따른다.
+
 > **2026-10-18 프레임워크 적합성 상세안:** [SO-3 실행 공급자 조합 설계 v0.1](./SAJU_SO3_FRAMEWORK_ADOPTION_BLUEPRINT_V0_1_20261018.md)은 본 문서의 **Supabase-first 최소 3개 독립 Postgres 클러스터** 결정을 변경하지 않는다. OpenTofu/OpenBao/OPA/InSpec는 향후 승인된 관리 평면에 맞춰 선택 도입할 후보일 뿐, Compose 인수 반복이나 실제 운영 R01–R14 통과 주장이 아니다. P0 현재 신규 비용·리소스 0.
 
 > **동일 프로젝트 제품 통합 대안(2026-10-15):** [기존 명하 Supabase 단일 프로젝트 설계](./SAJU_BRIDGE_SINGLE_SUPABASE_INTEGRATION_DESIGN_V1.md). 본 SO-4의 독립 클러스터 staging 검증과는 **별도 보안·실행 프로파일**이다. §2의 Production staging 재사용 금지는 기존 **고격리 운영 증빙 R01–R14**에 계속 적용된다. 새로운 제품 통합 프로파일은 물리적 분리 미충족을 명시하고 Owner 위험 수용 및 별도 출시 승인을 받기 전 미실행/HOLD다. 세 schema를 3DB처럼 가장하거나 기존 evidence 상태를 승격하지 않는다.
