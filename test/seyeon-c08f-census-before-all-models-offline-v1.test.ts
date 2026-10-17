@@ -204,7 +204,9 @@ describe('C08-F Shadow: authoritative census BEFORE every model stage', () => {
       }[]).find(entry=>entry.id===id);
       expect(gold).toBeDefined();
       expect(gold!.topic).not.toBeNull();
-      const h=scenario({topicKey:gold!.topic!,claimKind:gold!.expectedKinds[0]});
+      const h=scenario({topicKey:gold!.topic!,
+        ...(gold!.expectedKinds[0] === undefined ? {} : {claimKind:gold!.expectedKinds[0]}),
+      });
       const current={...CURRENT,text:gold!.text};
       await expect(h.run({
         userText:gold!.text,contextInput:{...BASE,recentMessages:[current]},
