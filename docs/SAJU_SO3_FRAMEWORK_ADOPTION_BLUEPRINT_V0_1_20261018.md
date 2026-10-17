@@ -143,7 +143,7 @@ AUTO_UPGRADE_OR_PAYMENT_METHOD_CHANGE=PROHIBITED
 - **현재 무료/보유 자원만 사용:** 이미 인수된 Docker Compose, GoTrue/PostgreSQL(폐기형), TypeScript Trust/Evidence 계약, 기존 CI 설정과 유료 초과 없는 무료 실행분. 동일 Docker Phase 5를 증거 재수집 목적으로 반복하지 않는다.
 - OpenTofu/OPA/OpenBao/InSpec를 소프트웨어로 무료 설치할 수 있더라도 **기존 장비 내 도구 사용은 독립된 Root custody/클라우드 3DB/외부 Attestor의 운영 입증이 아니다.** 기존 코드가 동일 검사를 한다면 도입하지 않는다.
 - 새 서비스의 *무료 티어*도 무조건 무료라고 가정하지 않는다. 카드 등록·자동 과금·사용량 초과·free 한도/종료 정책을 사전 증명하지 못하면 **신규 리소스 0개**. 신뢰된 별도 관리 도메인/세 독립 Postgres 클러스터가 없다면 실제 SO-3 실행은 계속 HOLD.
-- GitHub Actions도 플랜에 따른 과금 위험이 있으므로 별도 고비용 반복 실행/신규 백그라운드 워크플로를 만들지 않는다. 기존 필수 PR/Integration CI는 가용 무료 한도/과금 중지 보장이 확인되는 범위에서만 사용한다.
+- 현재 저장소는 **public**이며 기존 `ci-integration.yml`은 표준 `ubuntu-latest` runner를 사용한다. GitHub 공식 정책상 **공개 저장소의 표준 GitHub-hosted runner 실행 시간은 무료**이므로 기존 PR/Integration 검증 경로는 유지할 수 있다. 단 **Artifacts/Cache 등의 저장소 초과 과금과 larger runner**는 별개이므로 신규 과금 기능/대용량 영구 산출물/기존 quota 초과를 유발하는 설정은 추가하지 않는다. [GitHub Actions billing](https://docs.github.com/en/billing/concepts/product-billing/github-actions), [runners](https://docs.github.com/en/actions/reference/runners/github-hosted-runners).
 - Product EXISTING_AUTHORITIES_V2의 일반 Member Calculation/Preview는 이 고격리 인프라와 **별개**이므로 기존 운영 경로를 비용 없이 유지한다. Guest E2E는 #2266의 영속 데이터/승인 기준을 따른다.
 
 ### 0원으로 가능한 결과와 불가능한 결과
