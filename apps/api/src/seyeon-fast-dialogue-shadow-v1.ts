@@ -198,6 +198,14 @@ export function createSeyeonFastDialogueShadowV1(input: {
           rawOutput: obj.draft,
           packet,
         }));
+      // Re-read authoritative full-thread history after candidate generation,
+      // before independently reviewing the candidate draft. A concurrent
+      // RECEIVE can invalidate first-contact eligibility between model 2 and
+      // model 3. This check does not pin a transaction or authorize Reveal.
+      await requireAuthoritativeFirstTurnCensusShadowV1({
+        port: input.fullThreadCensus,
+        currentUserMessageId: context.recentConversation[0]!.messageId,
+      });
       const review: unknown = await input.reviewerProvider.generate(
         buildSeyeonSemanticReviewRequestV2({
           packet,

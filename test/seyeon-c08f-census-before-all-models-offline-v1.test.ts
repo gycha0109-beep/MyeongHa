@@ -37,7 +37,7 @@ const GOOD_DRAFT = {
 };
 
 function scenario(options: {
-  census?: 'valid' | 'missing' | 'stale-after-preflight' | 'failure';
+  census?: 'valid' | 'missing' | 'stale-after-preflight' | 'stale-after-dialogue' | 'failure';
   injectedClaim?: boolean;
   invalidCombined?: boolean;
 } = {}) {
@@ -80,7 +80,8 @@ function scenario(options: {
       messageCount: 1, latestSenderType: 'user', complete: true,
     };
     return options.census === 'missing' ||
-      (options.census === 'stale-after-preflight' && attempts === 2)
+      (options.census === 'stale-after-preflight' && attempts === 2) ||
+      (options.census === 'stale-after-dialogue' && attempts === 3)
       ? { ...valid, messageCount: 2 }
       : valid;
   });
@@ -175,6 +176,16 @@ describe('C08-F Shadow: authoritative census BEFORE every model stage', () => {
     expect(h.reviewer).not.toHaveBeenCalled();
   });
 
+  it('rechecks census after candidate dialogue; late RECEIVE blocks independent reviewer', async () => {
+    const h = scenario({ census: 'stale-after-dialogue' });
+    await expect(h.run()).rejects.toMatchObject({ code: 'FAST_THREAD_CENSUS_REJECTED' });
+    expect(h.readFullThreadCensus).toHaveBeenCalledTimes(3);
+    expect(h.purposes).toEqual(['unified_preflight_shadow', 'turn_interpret_render_shadow']);
+    expect(h.unified).toHaveBeenCalledOnce();
+    expect(h.candidate).toHaveBeenCalledOnce();
+    expect(h.reviewer).not.toHaveBeenCalled();
+  });
+
   it('produces the exact three model stages for valid governed public first contact', async () => {
     const h = scenario();
     const result = await h.run();
@@ -184,7 +195,7 @@ describe('C08-F Shadow: authoritative census BEFORE every model stage', () => {
     expect(result.interpretation.chosenAction.key).toBe('approach');
     expect(result.preflight.integrity.decisions).toEqual([]);
     expect(result.context.retrievedMemories).toEqual([]);
-    expect(h.readFullThreadCensus).toHaveBeenCalledTimes(2);
+    expect(h.readFullThreadCensus).toHaveBeenCalledTimes(3);
     expect(h.purposes).toEqual([
       'unified_preflight_shadow', 'turn_interpret_render_shadow', 'semantic_review',
     ]);
