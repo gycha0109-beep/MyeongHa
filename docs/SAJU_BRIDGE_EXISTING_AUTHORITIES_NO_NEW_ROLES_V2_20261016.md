@@ -32,7 +32,7 @@ Watchtower-Track: saju-bridge
 ```
 
 - 계산: `/api/me/saju/calculation` — **기존 공개 API 파일이 이미 존재**하며 새 DB 역할을 사용하지 않는다. 계산 자료는 원래 계약에 따라 해석/출시 허가가 아니다.
-- 미리보기: `/api/me/saju/preview-reading` — 기존 검증된 HTTP **소스 핸들러**가 있다. 새 V2 내부 조합에서는 사용할 수 있지만 **실제 외부 API 라우트 파일은 아직 없고 이번에 생성하지 않는다.** 비밀/등록 기능을 공개 API로 추가하는 행위는 별도 출시·배포 검수 후 진행한다.
+- 미리보기: `/api/me/saju/preview-reading` — 기존 검증된 HTTP 핸들러가 있다. **2026-10-17 현재 `vercel.json`의 rewrite → `api/me.ts` 디스패처 → 기존 Preview Runtime 연결이 `main`에 존재한다.** 독립 `api/me/saju/preview-reading.ts` 파일은 없다. 라우팅 코드 존재는 실제 Saju 서비스 배포, 운영 환경변수 검증, 공개 출시·유료 Reading 승인을 증명하지 않는다. 이 작업은 기존 라우트를 새로 만들거나 활성화하지 않는다.
 - DB 세션: `createProductionPostgresSubjectPoolLeaseV1`를 **공유**해 별도 DB 로그인이나 전용 connection pool 자격증명을 요구하지 않는다. `production-current-subject-saju-calculation-runtime.ts`에 기존 pool 주입 기능을 추가했고, 기존 preview runtime의 pool 주입을 그대로 재사용한다.
 - 신규 구성: `apps/api/src/saju-bridge-existing-authorities-v2.ts`. 정확한 두 기존 경로 외에는 404로 거부한다. 기존 검증 로직(인증, Birth 소유권, SHA/응답 검증, TLS, 기존 트랜잭션, 실패 시 차단)을 중복 구현하거나 우회하지 않는다.
 - 권한 상향 및 발급: permit DB 호출, Owner 허가증 발행, S3A DDL/GRANT, migration push, `SET ROLE postgres`, 신규 로그인 생성 **모두 없음**.
@@ -43,14 +43,15 @@ Watchtower-Track: saju-bridge
 
 1. 기존 `myeongha_api_executor` 및 Subject/Birth 조회 함수·권한의 **현재 운영 DB 배치 여부**를 read-only로 확인한다. 이미 역할이 존재한다는 사실만으로 모든 소스 함수가 배치됐다고 단정하지 않는다.
 2. 실제 사주 엔진의 서버-side HTTPS Origin/Bearer/Proof/제품 해석 Authority는 별도 실행 검증 대상이며, 이번 PR은 원격 연결·Secret 발급을 하지 않는다.
-3. 미리보기 HTTP 엔트리포인트를 실제 활성화하거나 결과 저장/Reading entitlement·유료 판매를 열려면 기존 제품 출시/정산/민감정보 검수와 별도 Owner 승인 필요.
+3. 미리보기 rewrite/디스패처가 소스에 이미 연결돼 있지만, **실제 외부 배포 및 실행 가능 여부는 미검증**이다. 서비스 설정 변경·결과 저장/Reading entitlement·유료 판매·추가 공개 활성화는 기존 제품 출시/정산/민감정보 검수와 별도 Owner 승인 필요.
 4. 기존 고격리 3DB·R01–R14·독립 Root/Attestor/2D-4는 **단일 프로젝트 V2로 대체 달성했다고 주장하지 않음**. 필요 시 독립 운영 트랙에서 그대로 HOLD.
 
 ## 4. 구현/검증 및 금지 경계
 
 - [새 V2 통합 모듈](../apps/api/src/saju-bridge-existing-authorities-v2.ts) — 공유 제한 DB 풀, 기존 두 핸들러만 라우팅, 미승인 경로·쿼리 차단.
 - [무계정/무승인 부정 테스트](../test/saju-bridge-existing-authorities-v2.test.ts) — 정확한 역할/계정 재사용, 익명 요청 401(DB 및 사주 호출 전 거부), 권한 위조/permit 경로 404, 본문 권한 위조 400, HTTP POST-only, 풀 종료.
-- 기존 `test/current-subject-saju-calculation-http.test.ts`, `test/current-subject-saju-preview-reading-http.test.ts`, `test/api-me-saju-calculation-runtime.test.ts`가 실제 회원 소유권·Birth revision·원격 호출 순서·route 계약을 독립 검증한다.
+- 기존 `test/current-subject-saju-calculation-http.test.ts`, `test/current-subject-saju-preview-reading-http.test.ts`, `test/api-me-saju-calculation-runtime.test.ts`, `test/api-me-runtime.test.ts`가 회원 소유권·Birth revision·원격 호출 순서·기존 rewrite 디스패처 계약을 검증한다.
+- `test/saju-bridge-existing-authorities-v2-synthetic-e2e.test.ts`의 추가 성공/부정 검증은 **실제 Saju upstream 배포 없이** source admission/lifecycle/version이 유효한 Preview 200 응답만 반환하고 attestation 누락 또는 envelope 불일치 시 503으로 차단함을 확인한다. 이는 운영 R01–R14 또는 Production 활성화 증빙이 아니다.
 - **운영 DB 변경/문의/기능 플래그/출시/유료 인프라 없음.** 신규 테이블이 없으므로 기존 Reading 원장이나 `1540` 미적용 nonce migration을 성공했다고 가장하지 않는다.
 
 ```text
@@ -60,7 +61,7 @@ NEW_DB_SCHEMAS_REQUIRED=false
 LEGACY_S3A_OPERATOR_PERMIT=RETIRED_FROM_PRODUCT_CRITICAL_PATH
 LEGACY_S3A_APPLICATION=HOLD
 PRODUCTION_DB_CHANGE=NOT_AUTHORIZED
-EXTERNAL_PREVIEW_ROUTE=NOT_MOUNTED
+EXTERNAL_PREVIEW_ROUTE=REWRITE_REGISTERED_RELEASE_NOT_VERIFIED
 stagingAdmission=HOLD
 operationalEvidence=NOT_VERIFIED
 R01-R14=NOT_VERIFIED
