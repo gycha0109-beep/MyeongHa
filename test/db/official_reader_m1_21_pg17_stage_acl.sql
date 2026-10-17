@@ -33,12 +33,12 @@ checked as (
         from (values ('anon'), ('authenticated'), ('service_role'),
           ('myeongha_api_executor'), ('myeongha_commerce_internal_executor'),
           ('myeongha_seyeon_chat_runtime_owner')) actor(role_name)
-        where pg_catalog.coalesce(
+        where coalesce(
           pg_catalog.has_function_privilege(actor.role_name, p.oid, 'EXECUTE'), true)
       ) and not exists (
         select 1
         from pg_catalog.aclexplode(
-          pg_catalog.coalesce(p.proacl, pg_catalog.acldefault('f',p.proowner))
+          coalesce(p.proacl, pg_catalog.acldefault('f',p.proowner))
         ) a
         where a.grantee = 0 and a.privilege_type = 'EXECUTE'
       )
@@ -53,7 +53,7 @@ checked as (
 select case when
   (select count(*) from stage_expected) > 0
   and (select count(*) from checked) = (select count(*) from stage_expected)
-  and (select pg_catalog.coalesce(pg_catalog.bool_and(
+  and (select coalesce(pg_catalog.bool_and(
     function_count = 1 and all_runtime_closed),false) from checked)
 then 'PASS_M1_21_STAGE_CLOSED'
 else 'FAIL_M1_21_STAGE_ACL_OPEN_OR_AMBIGUOUS'
