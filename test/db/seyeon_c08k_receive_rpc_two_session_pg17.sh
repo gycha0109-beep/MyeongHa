@@ -11,6 +11,18 @@ fi
 [[ "$(psql -X -qAt -v ON_ERROR_STOP=1 -c 'show server_version_num')" =~ ^17[0-9]{4}$ ]] || {
   echo HOLD_C08K_PG17_REQUIRED >&2; exit 1;
 }
+# C08-M demands the actual governed production Commit wrapper, not an
+# unavailable EXECUTE privilege or a caller-held direct INSERT workaround.
+commit_acl="$(psql -X -qAt -F '|' -v ON_ERROR_STOP=1 -c "
+select pg_catalog.has_function_privilege(
+  'myeongha_api_executor',
+  'public.cmd_commit_seyeon_chat_turn_runtime_v2(uuid,uuid,uuid,uuid,uuid,uuid,uuid,jsonb,text)',
+  'EXECUTE'),
+  pg_catalog.has_table_privilege('myeongha_api_executor','public.conversation_messages','INSERT');")"
+[[ "$commit_acl" == 't|f' ]] || {
+  echo "HOLD_C08M_REAL_COMMIT_WRAPPER_ROLE_ACL: $commit_acl" >&2; exit 1;
+}
+
 # The second Subject/thread from the C08-I fixture has no prior messages.
 subject=68100000-0000-0000-0000-000000000002
 thread=68400000-0000-0000-0000-000000000002
@@ -65,6 +77,40 @@ select t.status,array_to_string(t.participant_character_ids,','),
 \o
 \! touch $dir/reader_ready
 \! timeout 25 sh -c 'until test -f "$dir/writer_committed"; do sleep 0.05; done'
+-- C08-M: A's last Census was 1. B has now committed a second real Receive
+-- after the first Turn's governed abandon. WITHOUT another Census, A attempts
+-- the ACTUAL production Commit v2 with its obsolete first Attempt. The DB
+-- state machine must reject the stale validated-commit claim in THIS SAME
+-- READ COMMITTED session, even though Census itself held no durable lock.
+DO \$c08m\$
+declare v_constraint text;
+begin
+  begin
+    perform * from public.cmd_commit_seyeon_chat_turn_runtime_v2(
+      '$subject'::uuid,
+      '$thread'::uuid,
+      '$first_turn'::uuid,
+      '68600000-0000-0000-0000-000000000020'::uuid,
+      '68800000-0000-0000-0000-000000000055'::uuid,
+      '68700000-0000-0000-0000-000000000056'::uuid,
+      '68700000-0000-0000-0000-000000000057'::uuid,
+      jsonb_build_object(
+        'schemaVersion','seyeon-post-turn-analysis-snapshot-v1',
+        'turnId','$first_turn',
+        'userMessageId','$first_msg',
+        'assistantMessageId','68800000-0000-0000-0000-000000000055'),
+      'sha256:v1:'||repeat('c',64));
+    raise exception 'HOLD_C08M_STALE_ATTEMPT_WAS_COMMITTED';
+  exception when others then
+    get stacked diagnostics v_constraint = CONSTRAINT_NAME;
+    if v_constraint is distinct from 'cmd_chat_commit_not_validated' then
+      raise;
+    end if;
+  end;
+end \$c08m\$;
+\o $dir/c08m_commit_denied
+select 'PASS_C08M_ACTUAL_COMMIT_V2_DENIES_STALE_ATTEMPT_AFTER_REAL_RECEIVE';
+\o
 \o $dir/after
 with t as materialized (
  select thread_id,status,participant_character_ids from
@@ -192,6 +238,10 @@ wait "$reader_pid" || {
   cat "$dir/reader.log" >&2; exit 1;
 }
 reader_pid=''
+[[ "$(cat "$dir/c08m_commit_denied")" ==
+   'PASS_C08M_ACTUAL_COMMIT_V2_DENIES_STALE_ATTEMPT_AFTER_REAL_RECEIVE' ]] || {
+  echo HOLD_C08M_STALE_COMMIT_REJECTION_NOT_PROVEN >&2; exit 1;
+}
 [[ "$(cat "$dir/after")" == 'active|seyeon|2|f' ]] || {
   echo HOLD_C08K_STALE_FIRST_CONTACT_AFTER_RPC >&2; exit 1;
 }
@@ -249,3 +299,21 @@ select (select next_sequence_no from public.conversation_threads where id='$thre
 }
 echo PASS_C08K_REPLAY_CROSS_SUBJECT_SEQUENCE_AND_ATTEMPT_ATOMICITY
 echo C08K_HOLD_NOT_A_FINAL_COMMIT_REVEAL_OR_REVOCATION_LOCK
+
+# All denial paths above must leave the exact original user-message and
+# sequence ledger intact. The v2 Commit wrapper must create zero assistant
+# messages and zero Chat Commit outbox events for the abandoned first Turn.
+commit_shape="$(psql -X -qAt -F '|' -v ON_ERROR_STOP=1 -c "
+select
+ (select count(*) from public.conversation_messages
+   where turn_id='$first_turn' and sender_type='character'),
+ (select count(*) from public.outbox_events
+   where aggregate_type='chat_turn' and aggregate_id='$first_turn'
+     and event_type='CHAT_TURN_COMMITTED'),
+ (select state from public.chat_turns where id='$first_turn');")"
+[[ "$commit_shape" == '0|0|abandoned' ]] || {
+  echo "HOLD_C08M_STALE_COMMIT_MUTATED_LEDGER: $commit_shape" >&2; exit 1;
+}
+echo PASS_C08M_REAL_COMMIT_V2_STALE_ATTEMPT_NO_ASSISTANT_OR_OUTBOX
+echo C08M_HOLD_NO_POSITIVE_GRANT_PIN_OR_HTTP_REVEAL_LINEARIZATION
+
