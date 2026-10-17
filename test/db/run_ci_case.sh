@@ -358,6 +358,20 @@ M122
     done
     bash test/db/official_reader_m1_25_pg17_nonsuperuser_1970_migration.sh
     ;;
+  official-reader-m1-26-pg17-definer-data-backed)
+    # CI-only checked-in source replay and existing synthetic Commerce/Reader
+    # fixture. Transfer 1970 function to restricted CI-only NOLOGIN owner.
+    verify_pg17
+    [[ "${CI:-}" == true && "${PGHOST:-}" == localhost &&
+       "${PGPORT:-}" == 5432 && "${PGUSER:-}" == postgres &&
+       "${PGDATABASE:-}" == myeongha_ci_case_* &&
+       -z "${SUPABASE_DB_PASSWORD:-}" ]] || {
+      echo 'M1-26: isolated PG17 fixture only' >&2; exit 2
+    }
+    apply_pg17_migrations_without_birth_authority
+    psql -X -v ON_ERROR_STOP=1 -f test/db/official_standard_reading_reader_interpretation.sql >/dev/null
+    bash test/db/official_reader_m1_26_pg17_definer_real_receipt_read.sh
+    ;;
   saju-staging-operator-admission-v2)
     psql -v ON_ERROR_STOP=1 -f test/db/fixtures/saju_staging_operator_admission_schema_8c2b2d302.sql >/dev/null
     bash test/db/saju_staging_operator_admission_v2_authority.sh
