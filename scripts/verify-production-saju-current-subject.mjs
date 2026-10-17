@@ -258,11 +258,18 @@ if (smokeScope !== 'member_only' && smokeScope !== 'member_and_guest') {
 }
 // Production Guest bootstrap + Birth creation is a write. Require a second,
 // exact operator intent before acquiring a Member session or calling an API.
-if (
-  smokeScope === 'member_and_guest' &&
-  process.env.MYEONGHA_SAJU_GUEST_WRITE_CONFIRM !== 'VERIFY_SAJU_GUEST_WRITE'
-) {
-  throw new Error('Production Guest fixture creation requires explicit VERIFY_SAJU_GUEST_WRITE confirmation.');
+if (smokeScope === 'member_and_guest') {
+  // A workflow re-run may repeat a Production bootstrap even if the first
+  // attempt failed after writing. Deny it before acquiring any credentials.
+  if (
+    process.env.GITHUB_EVENT_NAME !== 'workflow_dispatch' ||
+    process.env.GITHUB_RUN_ATTEMPT !== '1'
+  ) {
+    throw new Error('Production Guest fixture creation requires the first manual workflow_dispatch attempt; re-runs are forbidden.');
+  }
+  if (process.env.MYEONGHA_SAJU_GUEST_WRITE_CONFIRM !== 'VERIFY_SAJU_GUEST_WRITE') {
+    throw new Error('Production Guest fixture creation requires explicit VERIFY_SAJU_GUEST_WRITE confirmation.');
+  }
 }
 
 const expectedSubjectId = requireUuid(
