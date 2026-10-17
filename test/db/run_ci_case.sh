@@ -387,6 +387,22 @@ M122
       -f test/db/official_standard_reading_reader_interpretation.sql >/dev/null
     bash test/db/official_reader_m1_27_pg17_state_rls_matrix.sh
     ;;
+  official-reader-m1-28-pg17-guest-resolver-session)
+    # Source-pinned synthetic Reader fixture and real Guest context resolver
+    # called by an independent non-superuser API TCP LOGIN in CI ONLY.
+    verify_pg17
+    [[ "${CI:-}" == true && "${PGHOST:-}" == localhost &&
+       "${PGUSER:-}" == postgres && "${PGPORT:-}" == 5432 &&
+       "${PGDATABASE:-}" == myeongha_ci_case_* &&
+       -z "${SUPABASE_DB_PASSWORD:-}" &&
+       -z "${SUPABASE_PRODUCTION_SESSION_POOLER_HOST:-}" ]] || {
+      echo 'M1-28: disposable PG17 CI only' >&2; exit 2
+    }
+    apply_pg17_migrations_without_birth_authority
+    psql -X -v ON_ERROR_STOP=1 \
+      -f test/db/official_standard_reading_reader_interpretation.sql >/dev/null
+    bash test/db/official_reader_m1_28_pg17_guest_resolver_session_boundary.sh
+    ;;
   saju-staging-operator-admission-v2)
     psql -v ON_ERROR_STOP=1 -f test/db/fixtures/saju_staging_operator_admission_schema_8c2b2d302.sql >/dev/null
     bash test/db/saju_staging_operator_admission_v2_authority.sh
