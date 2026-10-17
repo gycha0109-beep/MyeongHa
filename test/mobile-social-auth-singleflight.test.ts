@@ -19,7 +19,7 @@ function createHeldCallbackService() {
     },
     guestStore: {
       read: async () => null,
-      clear: async () => {},
+      clear: async () => true,
     },
     memberStore: {
       write: async () => { throw new Error('not called'); },
