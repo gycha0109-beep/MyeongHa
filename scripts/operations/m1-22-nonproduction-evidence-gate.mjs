@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { MIGRATION_IMPACT_GROUPS, HISTORICAL_BUNDLE } from './m1-19-live-migration-impact.mjs';
+import { MIGRATION_IMPACT_GROUPS, HISTORICAL_BUNDLE, auditLiveMigrationImpactV1 } from './m1-19-live-migration-impact.mjs';
 import { auditM120SafeStaging } from './m1-20-safe-staging-preflight.mjs';
 
 // Evidence gate ONLY. Inputs are a dated SELECT-only historical observation,
@@ -62,6 +62,7 @@ function safeCatalog(c) {
 export function auditM122NonproductionGate(liveSnapshot, isolate, ownerEvidence,
   directory = 'supabase/migrations') {
   const pre = auditM120SafeStaging(liveSnapshot, directory);
+  const liveImpact = auditLiveMigrationImpactV1(liveSnapshot, directory);
   const sourceValid = pre.verdict === 'HOLD_M1_20_OWNER_STAGING_AND_RESTORE_EVIDENCE_REQUIRED' &&
     pre.reviewedSourceCount === 45 && pre.sourceDrift.length === 0 &&
     pre.unreviewedSourceVersions.length === 0 && pre.unknownPredecessors.length === 0;
@@ -98,15 +99,15 @@ export function auditM122NonproductionGate(liveSnapshot, isolate, ownerEvidence,
     snapshotIsHistoricalNotFresh: true,
     liveVsDisposableIsolate: {
       liveRecordedVersions: liveSnapshot.installedVersions.length,
-      repositorySourceVersions: pre.reviewedSourceCount +
-        liveSnapshot.installedVersions.filter(x => x !== HISTORICAL_BUNDLE.version).length,
-      missingFromLiveVersions: pre.graph.map(x => x.version),
+      repositorySourceVersions: liveImpact.repositoryMigrationCount,
+      missingFromLiveVersions: liveImpact.migrationInventory.map(x => x.version),
       liveOnlyRestoreVersion: HISTORICAL_BUNDLE.version,
       observedLiveCatalogGate: 'HOLD_MISSING_PRIVATE_D2_BASELINE',
       disposableCatalogGateAfterReplay: catalogValid ?
         'CATALOG_READY_MIGRATION_HISTORY_STILL_REQUIRED' : 'NOT_VERIFIED',
       liveD2IssuerAndMinimalReadMissingAtCapture: true,
-      otherRemoteOnlyVersions: [],
+      otherRemoteOnlyVersions: liveImpact.unmatchedRemoteVersions.filter(x =>
+        x !== HISTORICAL_BUNDLE.version),
       historicalStatementContentAvailableInCi: false,
       isolateCatalogCaptured: catalogValid,
       isolateHistoryLedgerPresent: isolate?.migrationLedgerTablePresent ?? null,
