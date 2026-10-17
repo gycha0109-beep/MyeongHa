@@ -142,3 +142,12 @@ S8의 **비파괴/격리 검토는 S2~S7과 병렬 진행 가능**하며, S8 Pro
 - **R0 서명 요청:** [G0 3개 기술 승인 요청서](../security/SEYEON_G0_OWNER_TECHNICAL_SIGNOFF_REQUEST_20261017.md)를 새 문서로 작성. 기존 [Product Owner 정책 방향 승인 기록(미병합 Draft #1985)](https://github.com/gycha0109-beep/MyeongHa/blob/feat/seyeon-offline-granted-turn-consent-gates-v1/docs/security/SEYEON_G0_PRODUCT_OWNER_POLICY_APPROVAL_2026-10-13.md)은 재승인 요청하지 않는다. D-01 SRC-25 타입/Provenance, D-03/06 DB Original Grant+zero XOR positive/Commit, D-04/05/09 Security/API Reveal 경합의 **실제 Owner 서명**은 여전히 OPEN.
 - **방어 코드:** `createProductionSeyeonChatRuntimeV1` 초기화 시점과 매 `run` 직전 **등록된 Projector가 빈 배열인지 검증**하여, G0/SRC-25/G1 승인 전에 실수로 양수 Memory Projector를 등록하더라도 DB Subject 처리/Provider 실행 전 HOLD. 서버 소유 범용 직접 테스트 seam과 차별화한다. 본 검사는 **Positive DB Pin 구현이 아니며**, 소스 권한을 부여하지 않는다.
 - **실행 제한:** Draft #1985의 합성 양수 Pin/Commit/Reveal 코드는 재현 자료로만 참고. 전체 병합·승인된 Provider/HTTP 권한으로 승격하지 않는다. 양수 DB SourceSet/Edge·Stage Receipt·1640 Commit 트리거/ACL/실 운영 DB 쓰기와 유료/공개 활성화는 정식 Owner 결정 + 각각의 Gate 전까지 HOLD. [#1887](https://github.com/gycha0109-beep/MyeongHa/issues/1887) Production 이력/DR도 미완료.
+
+
+## 16. 2026-10-17 R1 — 양수 SourceSet/Edge·1640 XOR 격리 회귀 검증
+
+- **작업 성격:** Draft #1985의 전체 병합이 아니라, 최신 main의 DB Authority CI에서 원본 Attempt와 original Grant에 묶인 test-only Positive SourceSet Parent/Edge 및 1640 zero-only Pin 양방향 XOR를 독립 PostgreSQL 세션으로 재검증하는 테스트 경로만 채택합니다.
+- **범위:** `test/db/seyeon_positive_grant_attempt_bound_candidate_v1.sql`, `test/db/seyeon_positive_source_set_parent_edge_candidate_v1.sql`, `test/db/seyeon_positive_source_set_exact_attempt_race_v1.sh`, 격리 runner 및 기존 `run_authority_core.sh` 연동. PostgreSQL DB 이름과 `CI=true`, `PGHOST=localhost`를 모두 강제합니다.
+- **검증 목표:** 실제 Chat Attempt 결속, 중복·교차·조작 Pin 거부, 원 Grant 취소 후 다른 Grant 재발급에 의한 기존 Attempt 재사용 거부, positive-first/zero-first의 실 DB lock-wait 후 상대 Pin 거부. 잘못된 영속 Positive 인가를 허용하지 않습니다.
+- **성격 제한:** 테스트 SQL은 disposable DB에서만 실행하며 **Production migration·기존 1640 trigger·API executor 실제 운영 권한·Projector·Provider·HTTP Reveal을 수정하지 않습니다**. 이 테스트가 성공해도 `G0=OPEN`, `G1 positive=HOLD`, `G2/G3=HOLD`입니다. Draft #1985의 G2/G3 Owner 후보는 본 변경에 포함하지 않습니다.
+- **검증 증거:** 이 섹션을 포함하는 security PR의 exact HEAD CI/Governance/Full Integration과 #1866 운영 원장의 URL·SHA로 추적합니다. 검사 전에는 PASS가 아닙니다.
