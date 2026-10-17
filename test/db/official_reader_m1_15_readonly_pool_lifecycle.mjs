@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import pg from 'pg';
+import { spawn } from 'node:child_process';
 
 const db = process.env.PGDATABASE ?? '';
 const ci = process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true';
@@ -11,107 +11,136 @@ function must(yes, message) {
 }
 must(ci && process.env.PGHOST === 'localhost' &&
   process.env.PGUSER === 'postgres' && dbAllowed,
-  'only disposable localhost CI PostgreSQL can run lifecycle tests');
+  'only disposable localhost CI PostgreSQL');
 
-const pool = new pg.Pool({ max: 1, ssl: false });
-const reset = 'ROLLBACK';
-const begin = 'BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED READ ONLY';
-const role = 'SET LOCAL ROLE myeongha_api_executor';
-
-async function run() {
-  let lastPid = null;
-  try {
-    // Simulate a caller that improperly returned a connection with a live,
-    // pinned REPEATABLE READ transaction. The M1-15 adapter's acquisition
-    // RESET must make that exact connection safe again.
-    const dirty = await pool.connect();
-    try {
-      await dirty.query('BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY');
-      const evidence = await dirty.query(
-        "select pg_catalog.current_setting('transaction_isolation') as isolation," +
-        " current_user as actor,pg_backend_pid() as pid");
-      must(evidence.rows.length === 1 &&
-        evidence.rows[0].isolation === 'repeatable read',
-        'did not establish an old MVCC snapshot');
-      lastPid = evidence.rows[0].pid;
-    } finally {
-      // Deliberately leave an open read-only transaction on pool return.
-      dirty.release();
-    }
-
-    const recovered = await pool.connect();
-    try {
-      const pid = await recovered.query('select pg_backend_pid() as pid');
-      must(pid.rows[0].pid === lastPid, 'single-connection pool was not reused');
-
-      await recovered.query(reset);
-      await recovered.query(begin);
-      await recovered.query(role);
-      const state = await recovered.query(
-        "select pg_catalog.current_setting('transaction_isolation') as isolation," +
-        " pg_catalog.current_setting('transaction_read_only') as read_only," +
-        " current_user as actor,session_user as login," +
-        " has_function_privilege(current_user," +
-        " 'public.internal_apply_official_reader_unified_receipt_v1(" +
-        "uuid,text[],timestamptz[],timestamptz[],timestamptz[],text[])'," +
-        " 'EXECUTE') as issuer," +
-        " has_function_privilege(current_user," +
-        " 'public.internal_cmd_bind_official_reader_unified_v1(" +
-        "uuid,uuid,uuid,uuid,text,text,jsonb)','EXECUTE') as binder"
-      );
-      must(state.rows.length === 1 &&
-        state.rows[0].isolation === 'read committed' &&
-        state.rows[0].read_only === 'on' &&
-        state.rows[0].actor === 'myeongha_api_executor' &&
-        state.rows[0].issuer === false &&
-        state.rows[0].binder === false,
-        'owned read-only API role did not reset old snapshot or lacks D2 writer denial');
-      await recovered.query('COMMIT');
-      console.log('PASS M1-15: reused PG15 connection drops inherited RR transaction and opens READ COMMITTED READ ONLY under API role without D2 Writer rights');
-    } finally {
-      recovered.release();
-    }
-
-    // Explicitly exercise a query error on the same physical connection.
-    // ROLLBACK must clear aborted transaction and the SET LOCAL role.
-    const failure = await pool.connect();
-    try {
-      await failure.query(reset);
-      await failure.query(begin);
-      await failure.query(role);
-      let errorCode = null;
-      try {
-        await failure.query('select 1/0');
-      } catch (error) {
-        errorCode = error.code;
+const child = spawn('psql', [
+  '-X', '-q', '-At', '-v', 'ON_ERROR_STOP=0', '-v', 'VERBOSITY=verbose',
+], {
+  stdio: ['pipe', 'pipe', 'pipe'],
+  env: { ...process.env, PGAPPNAME: 'myeongha_m1_15_same_backend_lease' },
+});
+let stdout = '';
+let stderr = '';
+let exited = false;
+child.stdout.on('data', value => { stdout += value.toString('utf8'); });
+child.stderr.on('data', value => { stderr += value.toString('utf8'); });
+const finished = new Promise((resolve, reject) => {
+  child.once('error', reject);
+  child.once('close', code => { exited = true; resolve(code); });
+});
+const watchdog = setTimeout(() => {
+  if (!exited) child.kill('SIGKILL');
+}, 15000);
+function until(marker) {
+  return new Promise((resolve, reject) => {
+    const alarm = setTimeout(() => {
+      clearInterval(tick);
+      reject(new Error('M1-15 marker timeout ' + marker + ' | ' + stdout + stderr));
+    }, 8000);
+    const tick = setInterval(() => {
+      if (stdout.includes(marker)) {
+        clearTimeout(alarm);
+        clearInterval(tick);
+        resolve();
+      } else if (exited) {
+        clearTimeout(alarm);
+        clearInterval(tick);
+        reject(new Error('M1-15 psql terminated: ' + stderr));
       }
-      must(errorCode === '22012', 'expected real PG division-by-zero callback fault');
-      await failure.query(reset);
-    } finally {
-      failure.release();
-    }
+    }, 15);
+  });
+}
+function lastLine(marker) {
+  const rows = stdout.split(/\r?\n/u).filter(row => row.startsWith(marker + '|'));
+  must(rows.length === 1, 'expected one ' + marker + ', got ' + stdout);
+  return rows[0].split('|');
+}
+async function main() {
+  try {
+    // Emulate a poorly returned pooled lease: keep an old RR transaction open
+    // on exactly ONE persistent PostgreSQL backend.
+    child.stdin.write([
+      'begin transaction isolation level repeatable read read only;',
+      "select 'M115_DIRTY',pg_backend_pid()," +
+      "pg_catalog.current_setting('transaction_isolation');",
+    ].join('\n') + '\n');
+    await until('M115_DIRTY|');
+    const dirty = lastLine('M115_DIRTY');
+    must(dirty.length === 3 && /^\d+$/u.test(dirty[1]) &&
+      dirty[2] === 'repeatable read', 'initial stale RR session was not established');
+    const pid = dirty[1];
 
-    const next = await pool.connect();
-    try {
-      const state = await next.query(
-        "select pg_backend_pid() as pid,current_user as actor," +
-        "pg_catalog.current_setting('transaction_isolation') as isolation," +
-        "pg_catalog.current_setting('transaction_read_only') as read_only");
-      must(state.rows[0].pid === lastPid &&
-        state.rows[0].actor === 'postgres' &&
-        state.rows[0].isolation === 'read committed' &&
-        state.rows[0].read_only === 'off',
-        'query failure carried aborted transaction, stale role or READ ONLY into next lease');
-      console.log('PASS M1-15: PostgreSQL callback error rolls back, resets transaction-local role and read-only state on subsequent pool lease');
-    } finally {
-      next.release();
-    }
-    console.log('HOLD M1-15: this physical pool test is owner-only CI; no new production connection credential, GRANT or private Writer runtime');
+    // The equivalent M1-15 adapter reset must clear the previous snapshot.
+    // Existing authenticated app role MUST NOT have either private D2 Writer.
+    child.stdin.write([
+      'rollback;',
+      'begin transaction isolation level read committed read only;',
+      'set local role myeongha_api_executor;',
+      "select 'M115_CLEAN',pg_backend_pid(),current_user," +
+      "pg_catalog.current_setting('transaction_isolation')," +
+      "pg_catalog.current_setting('transaction_read_only')," +
+      "has_function_privilege(current_user," +
+      "'public.internal_apply_official_reader_unified_receipt_v1(" +
+      "uuid,text[],timestamptz[],timestamptz[],timestamptz[],text[])'," +
+      "'EXECUTE')," +
+      "has_function_privilege(current_user," +
+      "'public.internal_cmd_bind_official_reader_unified_v1(" +
+      "uuid,uuid,uuid,uuid,text,text,jsonb)','EXECUTE');",
+      'commit;',
+      "select 'M115_POST_COMMIT',pg_backend_pid(),current_user," +
+      "pg_catalog.current_setting('transaction_isolation')," +
+      "pg_catalog.current_setting('transaction_read_only');",
+    ].join('\n') + '\n');
+    await until('M115_POST_COMMIT|');
+    const clean = lastLine('M115_CLEAN');
+    must(clean.length === 7 && clean[1] === pid &&
+      clean[2] === 'myeongha_api_executor' &&
+      clean[3] === 'read committed' && clean[4] === 'on' &&
+      clean[5] === 'f' && clean[6] === 'f',
+      'reset+BEGIN+SET LOCAL did not result in narrow read-only app role: ' +
+      clean.join('|'));
+    const afterCommit = lastLine('M115_POST_COMMIT');
+    must(afterCommit.length === 5 && afterCommit[1] === pid &&
+      afterCommit[2] === 'postgres' && afterCommit[3] === 'read committed' &&
+      afterCommit[4] === 'off',
+      'COMMIT did not clear role/read-only state on same backend: ' +
+      afterCommit.join('|'));
+    console.log('PASS M1-15: same PostgreSQL backend resets inherited RR snapshot and runs READ COMMITTED READ ONLY API role with both private D2 EXECUTEs denied');
+
+    // Query callback crashes in same persistent backend. Verify the transaction
+    // is ROLLBACKed, role resets and a subsequent lease is usable.
+    child.stdin.end([
+      'rollback;',
+      'begin transaction isolation level read committed read only;',
+      'set local role myeongha_api_executor;',
+      'select 1/0;',
+      'rollback;',
+      "select 'M115_POST_ERROR',pg_backend_pid(),current_user," +
+      "pg_catalog.current_setting('transaction_isolation')," +
+      "pg_catalog.current_setting('transaction_read_only');",
+    ].join('\n') + '\n');
+    const exitCode = await finished;
+    must(exitCode === 0, 'psql did not survive intended statement fault: ' + stderr);
+    must(stderr.includes('22012') && stderr.includes('division by zero'),
+      'did not hit the expected real PostgreSQL 22012 query failure');
+    const afterError = lastLine('M115_POST_ERROR');
+    must(afterError.length === 5 && afterError[1] === pid &&
+      afterError[2] === 'postgres' &&
+      afterError[3] === 'read committed' && afterError[4] === 'off',
+      'ROLLBACK failed to reset aborted read-only session and app role: ' +
+      afterError.join('|'));
+    console.log('PASS M1-15: PostgreSQL 22012 callback fault is rolled back and original backend has no sticky role, read-only state or aborted transaction');
+    console.log('HOLD M1-15: local fixture owner only; production pool credentials, Reader ACL, private issuer and paid T2 remain unapproved');
   } finally {
-    await pool.end();
+    clearTimeout(watchdog);
+    if (!exited) {
+      child.stdin.destroy();
+      child.kill('SIGKILL');
+      await finished.catch(() => undefined);
+    }
   }
 }
-run().catch(error => {
+main().catch(error => {
   console.error(error.stack ?? String(error));
   process.exitCode = 1;
 });
