@@ -114,7 +114,7 @@ Watchtower-Track: character-memory
 
 ---
 
-## 5. 2026-10-17 C08-G~M 실제 DB 실행 증거와 잔여 경계
+## 6. 2026-10-17 C08-G~M 실제 DB 실행 증거와 잔여 경계
 
 > 본 절은 앞선 시점의 계획 문구를 **실행 결과 기준으로 보정**합니다. 완료된 격리 PG17 테스트를 Production/G0~G6 승인으로 변경하지 않습니다.
 
@@ -122,10 +122,10 @@ Watchtower-Track: character-memory
 | --- | --- | --- |
 | C08-G/H/I | 폐기형 PostgreSQL 17 Docker 실행, Windows CRLF 보정, 실제 컬럼 ACL/RLS 검증 구현·병합. 사용자가 **C08-I Windows PG17 6개 PASS**를 전달함 | 최종 #2234 수정본 Windows 재실행 별도 |
 | C08-J | 두 독립 PG17 세션의 READ COMMITTED Census 1→2 재조회 및 redacted 합성 이력 검증 CI PASS | 직접 INSERT는 실제 채팅 Receive가 아님 |
-| C08-L | Docker 이미지 초기화 임시 서버/최종 PID 1 경합 수정 **PR #2234** 병합. [Full Integration #39018805880](https://github.com/gycha0109-beep/MyeongHa/actions/runs/39018805880) SUCCESS | 사용자 Windows Docker Desktop에서 #2234 이후 실행 결과 미접수 |
+| C08-L | Docker 임시/최종 서버 경합 수정 [PR #2234](https://github.com/gycha0109-beep/MyeongHa/pull/2234) 병합, [Full Integration #39018805880](https://github.com/gycha0109-beep/MyeongHa/actions/runs/39018805880) SUCCESS. **2026-10-17 사용자 Windows Docker 재실행에서 최종 `PASS_C08_DOCKER_LOCAL_PG17_READONLY_CENSUS_SMOKE` 보고**. 실행기상 최종 PID1+SQL barrier 및 disposable DB 스위트 성공 후에만 출력됨. | 전달된 것은 종료 부분 2줄만이며 개별 PASS 전체 stdout·실행 SHA는 별도 미수집. [사용자 보고 기록](https://github.com/gycha0109-beep/MyeongHa/pull/2234#issuecomment-6233473624). Production 검증 아님 |
 | **C08-K** | 실제 `cmd_receive_chat_turn_v1` 두 세션 경쟁·in-flight/failed_retryable 차단·정식 Abandon 후 수신·Census 재조회·중복/Hash·Subject 격리·Sequence/Attempt 검증. [PR #2241](https://github.com/gycha0109-beep/MyeongHa/pull/2241) **병합** (`4e50798c67f4b1324dd9e26357c914403614f587`), [정확 HEAD `4905c4a` Full Integration #39026266278](https://github.com/gycha0109-beep/MyeongHa/actions/runs/39026266278) **SUCCESS** | 실제 HTTP Receive, 운영 권한 및 모델·Commit·Reveal 전 구간 단일 원자성 미증명 |
-| **C08-M 후보** | 취소된 오래된 Attempt가 **실제 `cmd_commit_seyeon_chat_turn_runtime_v2`** 에서 거부되는지 독립 PG17 세션 장벽과 같은 READ COMMITTED 트랜잭션으로 증명하는 부정 테스트 구현. [C08-M 경계·한계 문서](character-memory-seyeon-c08m-stale-commit-after-real-receive-pg17-v1.md) | **현 PR의 실제 PG17 CI·Full Integration 전에는 PASS 주장 금지**. Validated 정상 Commit↔Revoke, Positive Grant Pin, 최초 Reveal/replay의 원자성은 G0~G3 공동 승인/구현까지 HOLD |
+| **C08-M** | 실제 `cmd_commit_seyeon_chat_turn_runtime_v2`의 **stale abandoned Attempt**를 독립 PG17 두 세션에서 정확히 `cmd_chat_commit_not_validated`로 거부, assistant/outbox 없음 및 Census 1→2 확인. [PR #2242](https://github.com/gycha0109-beep/MyeongHa/pull/2242) **병합** `2abd77f9b35c65c7f24e0a4d9050abe8b888451e`, 정확 PR HEAD `20363cf1fc51953885ee78cd1e8d8956022d480a`의 [Full Integration #39028080116](https://github.com/gycha0109-beep/MyeongHa/actions/runs/39028080116) **SUCCESS** (실제 PG17) | Validated 정상 Commit↔Revoke, Positive Grant Pin, 최초 Reveal/replay, SERIALIZABLE 보장은 G0~G3 공동 승인·구현까지 HOLD |
 
 - 최신 실제 비용·공개 상태: **추가 유료 AI 호출 0회, Production DDL/DML/ACL/배포/개인기록 양수 Projector 변경 0건**.
-- C08-M 이후 다음 frontier: G0 정책 공동 승인 대기와 별개로, 5회↔3회 **같은 Gold/Canon/Context/Guard**를 유지한 결정적 오프라인 비교·Fallback 검증. 실제 유료 품질/속도/가격 검증은 Owner 승인 전 금지.
+- C08-M 이후 다음 frontier: G0 정책 공동 승인 대기와 별개로, 5회↔3회 **같은 Gold/Canon/Context/Guard**를 유지한 결정적 오프라인 비교·Fallback 검증. 현재 C08-B 추가 실험은 두 경로의 **각 Provider 단계 합성 실패**에서 후속 단계 중단·3회 Shadow의 5회 자동 Fallback 없음 여부(5회 기존 경로의 두 Preflight 분류기는 병렬 실행이므로 한쪽 실패에도 이미 시작된 다른 분류기 호출은 허용)를 확인하는 테스트 후보이며 **CI 증거 확보 전 PASS 아님**. 실제 유료 품질/속도/가격 검증은 Owner 승인 전 금지.
 - **종료 규칙:** 3회 Production 활성화, 유료 검증, 개인기록 유출/Replay 경로 활성화, C08 전체 Production Ready 선언 금지. G0~G6 및 운영 배포/DR 정본은 [Security 종료 계약](security/SEYEON_AI_SECURITY_COMPLETION_GATES_V1.md), [Security 로드맵](operations/SEYEON_AI_SECURITY_EXECUTION_ROADMAP_V2_20261016.md)에서 별도로 판정.
