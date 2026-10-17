@@ -220,6 +220,14 @@ export function createSeyeonFastDialogueShadowV1(input: {
           packet,
           semanticReview: review,
         }));
+      // The independent semantic-review provider may take time. A new
+      // RECEIVE while it runs invalidates the initial first-turn snapshot.
+      // Fail closed before returning even a Shadow-only envelope; this
+      // fourth read is NOT a commit lock or authorization to HTTP Reveal.
+      await requireAuthoritativeFirstTurnCensusShadowV1({
+        port: input.fullThreadCensus,
+        currentUserMessageId: context.recentConversation[0]!.messageId,
+      });
       return Object.freeze({
         version: SEYEON_FAST_DIALOGUE_SHADOW_VERSION_V1,
         scope: 'SHADOW_ONLY_NOT_PRODUCTION' as const,
