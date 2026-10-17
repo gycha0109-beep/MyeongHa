@@ -28,6 +28,10 @@ psql -X -v ON_ERROR_STOP=1 -f test/db/seyeon_g1_atomic_context_only_candidate_r2
 SEYEON_POSITIVE_GRANT_REAL_PG=1 ./node_modules/.bin/vitest run \
   test/seyeon-g2-atomic-original-grant-race-disposable.test.ts --maxWorkers=1
 # R5 current-rights first/replay/history Owner-style checks ONLY in scratch clone.
+# R7 uses the same real PG test suite to force a revoke AFTER authorized DB
+# read COMMIT but BEFORE the asynchronous Production HTTP Member verifier
+# resolves; this confirms current 503/no-store HOLD and demonstrates why DB
+# read COMMIT alone cannot authorize delayed wire bytes.
 psql -X -v ON_ERROR_STOP=1 -f test/db/seyeon_r5_disposable_reveal_current_rights.sql
 SEYEON_POSITIVE_GRANT_REAL_PG=1 ./node_modules/.bin/vitest run \
   test/seyeon-r5-current-reveal-disposable.test.ts --maxWorkers=1
