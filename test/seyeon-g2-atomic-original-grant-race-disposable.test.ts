@@ -149,6 +149,18 @@ async function g1Pin(c:PoolClient,id:Fixture) {
      id.selectionDigest],
   );
 }
+async function actualCommit(c:PoolClient,id:Fixture) {
+  return c.query<{receipt:Record<string,unknown>}>(
+    'select seyeon_positive_candidate.commit_actual_v2_r3($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6::uuid,$7::uuid,$8::jsonb,$9::text,$10::text) as receipt',
+    [subject,id.thread,id.turn,id.attempt,id.assistantMessage,
+     id.chatOutbox,id.postOutbox,JSON.stringify({
+       schemaVersion:'seyeon-post-turn-analysis-snapshot-v1',
+       turnId:id.turn,assistantMessageId:id.assistantMessage,
+       userMessageId:id.userMessage,
+     }),'sha256:v1:synthetic-post-turn-hash',id.selectionDigest],
+  );
+}
+
 async function saved(id:Fixture) {
   return clientAction(async c=>{
     const r=await c.query<{
