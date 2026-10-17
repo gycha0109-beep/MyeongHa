@@ -1,9 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-[[ "${PGDATABASE:-}" == myeongha_c08_local_case_1 ]] || {
-  echo HOLD_C08_LOCAL_DISPOSABLE_DB_ONLY >&2; exit 1;
-}
+# This fixture is allowed ONLY in a disposable local Docker scratch DB or
+# the isolated GitHub Actions PG17 case DB created and destroyed by the suite.
+if [[ "${PGDATABASE:-}" != myeongha_c08_local_case_1 ]]; then
+  [[ "${GITHUB_ACTIONS:-}" == true && "${CI:-}" == true &&
+     "${DB_SUITE:-}" == postgres17 && "${PGHOST:-}" == localhost &&
+     "${PGDATABASE:-}" =~ ^myeongha_ci_case_[0-9]+$ ]] || {
+    echo HOLD_C08_LOCAL_DISPOSABLE_DB_ONLY >&2; exit 1;
+  }
+fi
 version="$(psql -X -qAt -v ON_ERROR_STOP=1 -c 'show server_version_num')"
 [[ "$version" =~ ^17[0-9]{4}$ ]] || {
   echo HOLD_C08_LOCAL_REQUIRES_POSTGRES_17 >&2; exit 1;
