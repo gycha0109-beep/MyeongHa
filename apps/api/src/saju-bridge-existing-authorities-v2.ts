@@ -25,7 +25,7 @@ import type { SupabaseMemberVerifierFetchV1 } from './supabase-member-identity-v
  * V2: member-facing Saju integration composes existing trusted authorities.
  * NO new database roles, schemas, LOGIN credentials, operator permits,
  * deployment migration, Owner-approval issuer or privileged DB session.
- * This is a server-only composition; it does NOT mount a public preview route,
+ * This composition does not change the separately mounted preview rewrite,
  * grant launch/rehearsal approval, or replace isolated staging R01-R14.
  */
 export const SAJU_BRIDGE_EXISTING_AUTHORITIES_V2 = Object.freeze({
@@ -71,7 +71,8 @@ export interface CreateSajuBridgeExistingAuthoritiesInputV2 {
  * one restricted subject pool; all Auth/current Birth/HTTPS response checks
  * remain in their existing production handlers.
  *
- * The preview path is composed but NOT mounted on a public entry point.
+ * Preview is already routed by the separate existing Vercel rewrite/API entrypoint;
+ * this composition changes neither public routing nor release authorization.
  * General paid Reading, entitlement and release activation are out of scope.
  */
 export function createSajuBridgeExistingAuthoritiesV2(
@@ -100,31 +101,49 @@ export function createSajuBridgeExistingAuthoritiesV2(
   }
 
   let closed = false;
+  let closing: Promise<void> | undefined;
+  const inFlight = new Set<Promise<void>>();
   return Object.freeze({
-    async handleRequest(requestInput: SajuBridgeExistingAuthoritiesRequestV2) {
-      if (closed) return new Response(null, { status: 503 });
+    handleRequest(requestInput: SajuBridgeExistingAuthoritiesRequestV2): Promise<Response> {
+      if (closed) return Promise.resolve(new Response(null, { status: 503 }));
+      // Register accepted requests before close() can begin draining them.
       // Dispatch only exact known routes. No permit/issuance or generic
       // reading/commerce endpoint is reachable via this composition.
-      let url: URL;
-      try {
-        url = new URL(requestInput.request.url);
-      } catch {
+      const response = (async (): Promise<Response> => {
+        let url: URL;
+        try {
+          url = new URL(requestInput.request.url);
+        } catch {
+          return new Response(null, { status: 404 });
+        }
+        if (url.search !== '' || url.hash !== '') return new Response(null, { status: 404 });
+        if (url.pathname === SAJU_BRIDGE_EXISTING_AUTHORITIES_V2.calculationRoute) {
+          return calculation.handleRequest(requestInput);
+        }
+        if (url.pathname === SAJU_BRIDGE_EXISTING_AUTHORITIES_V2.previewOnlyRoute) {
+          return preview.handleRequest(requestInput);
+        }
         return new Response(null, { status: 404 });
-      }
-      if (url.search !== '' || url.hash !== '') return new Response(null, { status: 404 });
-      if (url.pathname === SAJU_BRIDGE_EXISTING_AUTHORITIES_V2.calculationRoute) {
-        return calculation.handleRequest(requestInput);
-      }
-      if (url.pathname === SAJU_BRIDGE_EXISTING_AUTHORITIES_V2.previewOnlyRoute) {
-        return preview.handleRequest(requestInput);
-      }
-      return new Response(null, { status: 404 });
+      })();
+      // A rejected handler must still release the drain barrier. Never let
+      // an unobserved rejection escape from the tracking promise.
+      const settled = response.then(() => undefined, () => undefined);
+      inFlight.add(settled);
+      void settled.then(() => { inFlight.delete(settled); });
+      return response;
     },
-    async close() {
-      if (closed) return;
+    close(): Promise<void> {
+      if (closing !== undefined) return closing;
       closed = true;
-      await Promise.all([calculation.close(), preview.close()]);
-      await lease.close();
+      closing = (async (): Promise<void> => {
+        await Promise.all(inFlight);
+        try {
+          await Promise.all([calculation.close(), preview.close()]);
+        } finally {
+          await lease.close();
+        }
+      })();
+      return closing;
     },
   });
 }
