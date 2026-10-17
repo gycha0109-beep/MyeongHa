@@ -122,6 +122,34 @@ SQL
   fi
   echo "PASS_M1_24_SQLSTATE: $label -> $expected"
 }
+# PostgreSQL GRANT without GRANT OPTION may emit only a WARNING and exit 0
+# while applying no grant. Check the actual catalog effect, not the psql exit
+# code; a real PUBLIC EXECUTE broaden must fail the test even if rolled back.
+assert_public_execute_not_broadened() {
+  local actor="$1" login="$2" observed
+  if observed="$(PGUSER="$login" PGPASSWORD="$test_password" psql -X -qAt \
+    -v ON_ERROR_STOP=1 -v VERBOSITY=sqlstate 2>"$tmp/err" <<SQL
+begin;
+set local role $actor;
+grant execute on function public.qry_official_reader_unknown_commit_minimal_v1(uuid,uuid) to public;
+select case when exists (
+  select 1 from pg_catalog.pg_proc p
+  cross join lateral pg_catalog.aclexplode(
+    coalesce(p.proacl,pg_catalog.acldefault('f',p.proowner))) a
+  where p.oid='public.qry_official_reader_unknown_commit_minimal_v1(uuid,uuid)'::regprocedure
+    and a.grantee=0 and a.privilege_type='EXECUTE'
+) then 'PRIVILEGE_BROADENED' else 'ACL_UNCHANGED' end;
+rollback;
+SQL
+)"; then
+    [[ "$observed" == ACL_UNCHANGED ]] ||
+      fail "$actor could broaden minimal-read PUBLIC EXECUTE"
+  elif ! grep -Eq 'ERROR:[[:space:]]+42501([[:space:]]|$)' "$tmp/err"; then
+    fail "$actor GRANT attempt failed unexpectedly: $(tail -n 2 "$tmp/err" | tr '\n' ' ' | cut -c 1-160)"
+  fi
+  echo "PASS_M1_24_PUBLIC_GRANT_CLOSED: $actor cannot broaden minimal-read PUBLIC EXECUTE"
+}
+
 # Before SET ROLE, the login inherits NO grants from its single membership.
 if PGUSER=myeongha_m124_login_3 PGPASSWORD="$test_password" psql -X -qAt \
   -v ON_ERROR_STOP=1 -v VERBOSITY=sqlstate >"$tmp/out" 2>"$tmp/err" \
@@ -152,8 +180,7 @@ for i in "${!roles[@]}"; do
     "$login" "$actor" 'set role postgres;' 42501
   expect_sqlstate "$actor cannot CREATE ROLE" \
     "$login" "$actor" 'create role myeongha_m124_forbidden_role nologin;' 42501 rollback_ddl
-  expect_sqlstate "$actor cannot GRANT public minimal-read EXECUTE" \
-    "$login" "$actor" 'grant execute on function public.qry_official_reader_unknown_commit_minimal_v1(uuid,uuid) to public;' 42501 rollback_ddl
+  assert_public_execute_not_broadened "$actor" "$login"
   # Do not probe "OWNER TO postgres": existing function Owner is postgres
   # in this fixture, and PostgreSQL can treat a same-owner request as a no-op.
   # A *different* synthetic-login target forces an actual ownership transfer
