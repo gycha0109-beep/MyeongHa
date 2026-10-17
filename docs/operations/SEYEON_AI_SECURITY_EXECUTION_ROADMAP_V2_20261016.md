@@ -153,3 +153,12 @@ S8의 **비파괴/격리 검토는 S2~S7과 병렬 진행 가능**하며, S8 Pro
 - **작업 PR:** [#2245](https://github.com/gycha0109-beep/MyeongHa/pull/2245) (`Watchtower-Track: security`); 최초 테스트 코드 commit `3714364b92f835a8954c9c72cccd7516ab70285f`.
 - **첫 검증 (최초 코드 commit의 정확한 HEAD):** [CI #39029430475](https://github.com/gycha0109-beep/MyeongHa/actions/runs/39029430475)의 `db-authority-core`, `Work Track · security`, `CI Verify` SUCCESS; [Governance #39029430572](https://github.com/gycha0109-beep/MyeongHa/actions/runs/39029430572) SUCCESS; [Web #39029430458](https://github.com/gycha0109-beep/MyeongHa/actions/runs/39029430458) SUCCESS. 실패·재시도 0건 (첫 검증 기준). DB R1 검증은 기존 `run_authority_core.sh`의 `myeongha_seyeon_positive_pin_candidate_test` 격리 테스트에서 실행됐습니다.
 - **최종 HEAD 및 Full Integration:** 문서 증거 commit 이후 새 HEAD로 CI/Governance 및 Full Integration을 별도 확인합니다. 성공하지 않은 결과를 미리 PASS로 기록하지 않습니다. exact SHA·Full Integration Run·병합 결과·후속 main 증거는 PR #2245 및 #1866 원장에 추가합니다. `G0 OPEN`과 운영 DDL/Positive 권한/공개 HOLD는 변하지 않습니다.
+
+
+## 17. 2026-10-17 R2 — 실제 v2 Commit과 Original Grant 취소 경합의 격리 검증
+
+- **목적:** G0 기술 승인 없이 진행 가능한 R2 실증. Draft #1985 전체를 병합하지 않고 **실제 기존 `cmd_commit_seyeon_chat_turn_runtime_v2` → v1 → core + 두 Outbox**를 격리 PostgreSQL에서 호출해, 정확한 Original Grant 취소와 Commit의 2세션 선형화·원자성을 검증합니다.
+- **범위:** R1의 Parent/Edge/XOR 테스트 기반을 동일 이름의 **새 disposable clone**에서 재사용. 기존 운영 1640 트리거 함수 및 v1/v2 ACL은 **오직 격리 DB에서** 실제 후보로 교체/취소하며 운영 마이그레이션 파일은 변경하지 않습니다. G1 context_ready만 분리하여 G3 Reveal/History SQL을 설치하지 않습니다.
+- **필수 증거:** revoke-first에서 상대 세션이 실제 잠금 대기 후 Commit/메시지/두 Outbox/Admission 0건; commit-first에서 취소 세션이 잠금 대기 후 기존 v2 Commit + 두 Outbox가 정확히 1회 기록되고 Original Grant는 철회됨; 위조된 Proof·새 Grant 대체·후반 Outbox 충돌 시 전체 롤백. 실행 조건은 `CI=true` + `PGHOST=localhost` + 정확한 scratch DB 이름.
+- **금지:** G0 미서명인데도 실제 양수 Projector·Production G1/G2/G3·양수 모델 전달/최초 Reveal·Legacy 운영 ACL 변경·운영 DB DDL/DML/백필을 활성화하지 않습니다. 코드·테스트 준비 및 격리 PASS는 **운영 승인과 별개**이며 `G0 OPEN`, `G1 positive/G2/G3 HOLD`입니다.
+- **진행 상태:** 격리 SQL/Node 테스트와 기존 CI 연결 코드 PR 후보. PR/HEAD/CI/Full Integration/병합 검증 기록은 정확한 실제 결과 확인 후 추가합니다. #1866 승인 상태를 대체하지 않습니다.
