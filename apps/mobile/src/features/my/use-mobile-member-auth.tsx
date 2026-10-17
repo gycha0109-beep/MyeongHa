@@ -48,6 +48,9 @@ function messageFor(error: unknown): string {
     if (error.code === 'MOBILE_SOCIAL_AUTH_PENDING_EXPIRED') {
       return '소셜 로그인 요청 시간이 만료되었습니다. 다시 시도해 주세요.';
     }
+    if (error.code === 'MOBILE_SOCIAL_AUTH_CALLBACK_IN_FLIGHT') {
+      return '다른 소셜 로그인 응답을 확인 중입니다. 잠시 후 다시 시도해 주세요.';
+    }
     return '로그인을 시작한 게스트 세션이 변경되어 계정을 안전하게 연결할 수 없습니다.';
   }
   if (error instanceof MobileNewMemberEnrollmentErrorV1) {
@@ -104,6 +107,7 @@ export function useMobileMemberAuthV1() {
   );
   const [authRevision, setAuthRevision] = useState(0);
   const socialReturnGate = useRef(new MobileSocialAuthReturnGateV1());
+  const socialCallbackInFlight = useRef(false);
   const resumeCancelTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const clearResumeCancelTimer = useCallback(() => {
@@ -196,6 +200,10 @@ export function useMobileMemberAuthV1() {
       return;
     }
 
+    // Both initialURL and URL events can pass the async state check.
+    // Only one may mutate Push ownership and the Member session.
+    if (socialCallbackInFlight.current) return;
+    socialCallbackInFlight.current = true;
     setState(Object.freeze({ kind: 'submitting', message: null }));
     let pushPrepared = false;
     try {
@@ -227,6 +235,7 @@ export function useMobileMemberAuthV1() {
     } finally {
       socialReturnGate.current.finish();
       clearResumeCancelTimer();
+      socialCallbackInFlight.current = false;
     }
   }, [clearResumeCancelTimer]);
 
