@@ -5,9 +5,17 @@ on:
   workflow_dispatch:
     inputs:
       confirm:
-        description: 'Type VERIFY_SAJU_CURRENT_SUBJECT to run the production Member and Guest Saju calculation and Preview Reading smoke.'
+        description: 'Type VERIFY_SAJU_CURRENT_SUBJECT to run the production Member calculation and Preview Reading smoke (Guest scope is explicitly opt-in).'
         required: true
         type: string
+      scope:
+        description: 'member_only reads governed test Member Birth and checks calculation + Preview without Guest/Birth creation; member_and_guest additionally creates a synthetic Guest and Birth.'
+        required: true
+        type: choice
+        default: member_only
+        options:
+          - member_only
+          - member_and_guest
   push:
     branches:
       - main
@@ -28,6 +36,7 @@ jobs:
     environment: production
     env:
       DISPATCH_CONFIRM: ${{ github.event_name == 'push' && 'VERIFY_SAJU_CURRENT_SUBJECT' || inputs.confirm }}
+      MYEONGHA_SAJU_SMOKE_SCOPE: ${{ github.event_name == 'push' && 'member_and_guest' || inputs.scope }}
       MYEONGHA_PRODUCTION_MEMBER_EMAIL: ${{ secrets.MYEONGHA_PRODUCTION_MEMBER_EMAIL }}
       MYEONGHA_PRODUCTION_MEMBER_PASSWORD: ${{ secrets.MYEONGHA_PRODUCTION_MEMBER_PASSWORD }}
       MYEONGHA_PRODUCTION_MEMBER_EXPECTED_SUBJECT_ID: ${{ secrets.MYEONGHA_PRODUCTION_MEMBER_EXPECTED_SUBJECT_ID }}
@@ -37,6 +46,7 @@ jobs:
         run: |
           set -euo pipefail
           [[ "$DISPATCH_CONFIRM" == 'VERIFY_SAJU_CURRENT_SUBJECT' ]]
+          [[ "$MYEONGHA_SAJU_SMOKE_SCOPE" == 'member_only' || "$MYEONGHA_SAJU_SMOKE_SCOPE" == 'member_and_guest' ]]
           test -n "${MYEONGHA_PRODUCTION_MEMBER_EMAIL:-}"
           test -n "${MYEONGHA_PRODUCTION_MEMBER_PASSWORD:-}"
           test -n "${MYEONGHA_PRODUCTION_MEMBER_EXPECTED_SUBJECT_ID:-}"
@@ -50,5 +60,5 @@ jobs:
           node-version: '24'
           package-manager-cache: false
 
-      - name: Verify production Member and Guest Saju calculation and Preview Reading
+      - name: Verify governed Production Saju calculation and Preview Reading scope
         run: node scripts/verify-production-saju-current-subject.mjs
