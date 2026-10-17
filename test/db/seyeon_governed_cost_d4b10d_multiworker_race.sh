@@ -4,8 +4,17 @@ set -euo pipefail
 # Watchtower-Track: character-memory. No real Provider, LOGIN or Production.
 [[ "${PGDATABASE:-}" == "myeongha_seyeon_d4b10d_test" ]] || exit 2
 db() { psql -X -qAt -F '|' -v ON_ERROR_STOP=1 --set=VERBOSITY=verbose "$@"; }
+source test/db/await_pg_ci_marker.sh
 tmp="$(mktemp -d)"
+pid=''
+pid2=''
 cleanup() {
+  for child in "$pid" "$pid2"; do
+    if [[ -n "$child" ]]; then
+      kill "$child" 2>/dev/null || true
+      wait "$child" 2>/dev/null || true
+    fi
+  done
   db -c 'drop role if exists myeongha_seyeon_d4b10d_worker_ci' >/dev/null 2>&1 || true
   db -c 'drop role if exists myeongha_seyeon_d4_login_ci' >/dev/null 2>&1 || true
   rm -rf "$tmp"
@@ -125,15 +134,18 @@ done
 [[ "$(db -c "select count(*) from public.seyeon_ai_provider_receipt_queue_v1")" == 3 ]] || exit 6
 
 # Two REAL concurrent PostgreSQL clients must never obtain the same row.
-{ claim; echo 'select pg_sleep(2);'; echo 'commit;'; } >"$tmp/claim-one.sql"
+{ claim; printf '\\! touch "%s/claim-one-ready"\n' "$tmp"; echo 'select pg_sleep(2);'; echo 'commit;'; } >"$tmp/claim-one.sql"
 { claim; echo 'commit;'; } >"$tmp/claim-two.sql"
 db -f "$tmp/claim-one.sql" >"$tmp/claim-one.log" 2>&1 &
 pid=$!
-sleep 0.5
+await_pg_ci_marker "$tmp/claim-one-ready" "$pid" || {
+  cat "$tmp/claim-one.log" >&2; exit 7;
+}
 db -f "$tmp/claim-two.sql" >"$tmp/claim-two.log" 2>&1 || {
   cat "$tmp/claim-two.log" >&2; exit 7;
 }
 wait "$pid" || { cat "$tmp/claim-one.log" >&2; exit 8; }
+pid=''
 grep -Fq "$a|" "$tmp/claim-one.log" || { cat "$tmp/claim-one.log" >&2; exit 9; }
 grep -Fq "$b|" "$tmp/claim-two.log" || { cat "$tmp/claim-two.log" >&2; exit 10; }
 token_a="$(grep "^$a|" "$tmp/claim-one.log" | tail -1 | cut -d '|' -f14)"
@@ -160,15 +172,19 @@ grep -Fq 'seyeon_provider_receipt_ack_unsettled' "$tmp/ack-unsettled.log" || exi
 [[ "$(money)" == 11100 ]] || exit 20
 
 # Two competing real settlement sessions: only first changes the budget.
-{ settle "$a" known; echo 'select pg_sleep(2);'; echo 'commit;'; } >"$tmp/settle-first.sql"
+{ settle "$a" known; printf '\\! touch "%s/settle-first-ready"\n' "$tmp"; echo 'select pg_sleep(2);'; echo 'commit;'; } >"$tmp/settle-first.sql"
 { settle "$a" known; echo 'commit;'; } >"$tmp/settle-second.sql"
 db -f "$tmp/settle-first.sql" >"$tmp/settle-first.log" 2>&1 &
 pid=$!
-sleep 0.5
+await_pg_ci_marker "$tmp/settle-first-ready" "$pid" || {
+  cat "$tmp/settle-first.log" >&2; exit 21;
+}
 db -f "$tmp/settle-second.sql" >"$tmp/settle-second.log" 2>&1 &
 pid2=$!
 wait "$pid" || { cat "$tmp/settle-first.log" >&2; exit 21; }
+pid=''
 wait "$pid2" || { cat "$tmp/settle-second.log" >&2; exit 22; }
+pid2=''
 grep -Fq "$a|f|300" "$tmp/settle-first.log" || { cat "$tmp/settle-first.log" >&2; exit 23; }
 grep -Fq "$a|t|300" "$tmp/settle-second.log" || { cat "$tmp/settle-second.log" >&2; exit 24; }
 [[ "$(money)" == 7700 ]] || { echo "FAIL replay altered budget $(money)" >&2; exit 25; }
