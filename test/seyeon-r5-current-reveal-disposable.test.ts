@@ -2,6 +2,7 @@
 // Disposable CI PostgreSQL only: real v2/v1/core Chat Commit and BOTH outboxes.
 import { afterAll, describe, expect, it } from 'vitest';
 import { Pool, type PoolClient } from 'pg';
+import { handleSeyeonChatTurnSendRequestV1 } from '../apps/api/src/chat-turn-send-http.js';
 
 const enabled=process.env.CI==='true' &&
   process.env.SEYEON_POSITIVE_GRANT_REAL_PG==='1' &&
@@ -289,6 +290,64 @@ describe.skipIf(!enabled)('R5 disposable actual-v2 current-rights first/replay/h
    }
   }));
  });
+ it('R7 real PG stale read: revoke after DB COMMIT while HTTP identity is pending never releases buffered assistant bytes',async()=>{
+  const id=await committed(77);
+  // Positive read is legitimate only at its own SQL COMMIT linearization
+  // point. The text can remain in application memory after a later revoke.
+  const staleAuthorizedBytes=await http(id);
+  expect(staleAuthorizedBytes).toBe(body);
+  let releaseIdentity!:()=>void;
+  const pendingIdentity=new Promise<void>(resolve=>{releaseIdentity=resolve;});
+  let attemptedRuntimeCalls=0;
+  const pendingHttp=handleSeyeonChatTurnSendRequestV1({
+    request:new Request('https://myeongha.internal/api/chat/'+id.thread+'/turns',{
+      method:'POST',
+      headers:{authorization:'Bearer synthetic-member', 'content-type':'application/json'},
+      body:JSON.stringify({
+        clientTurnId:'423e4567-e89b-42d3-a456-426614174077',
+        text:'합성 대화',
+      }),
+    }),
+    requestId:'r7-late-transport-after-revoke',
+    serverTime:'2026-10-18T00:00:00.000Z',
+    identityEvidenceVerifier:{
+      verifyRequestIdentity:async()=>{
+        await pendingIdentity;
+        return Object.freeze({kind:'member' as const,verifiedAuthUserId:'synthetic-member'});
+      },
+    },
+    runtime:{run:async()=>{
+      attemptedRuntimeCalls+=1;
+      // An accidentally connected legacy replay would use stale bytes.
+      return {execution:{disposition:'committed_replay',assistantText:staleAuthorizedBytes}} as never;
+    }},
+  });
+  // The HTTP request is already alive but its Member lookup has not returned.
+  await transaction(async c=>{
+    await c.query(
+      'update public.record_access_grants set revoked_at=clock_timestamp() where id=$1::uuid',
+      [id.grant],
+    );
+  });
+  // A fresh real DB read denies. The previously buffered bytes have NOT
+  // disappeared, so DB COMMIT alone cannot prove safe late HTTP delivery.
+  expect(await http(id)).toBeNull();
+  expect(staleAuthorizedBytes).toBe(body);
+  releaseIdentity();
+  const response=await pendingHttp;
+  const wire=await response.text();
+  expect(response.status).toBe(503);
+  expect(response.headers.get('cache-control')).toBe('no-store');
+  expect(JSON.parse(wire).error).toMatchObject({
+    code:'SEYEON_FIRST_REVEAL_AUTHORITY_UNAVAILABLE',
+    retryable:false,
+  });
+  expect(attemptedRuntimeCalls).toBe(0);
+  expect(wire).not.toContain(body);
+  expect(wire).not.toContain(id.assistantMessage);
+  expect(wire).not.toContain(id.attempt);
+ });
+
  it('reader-first holds Subject lock until read COMMIT; later revoke prevents every fresh replay',async()=>{
   const id=await committed(76);
   await clientAction(reader=>clientAction(async revoker=>{
