@@ -8,7 +8,7 @@ From a checkout with an authenticated gh CLI that can read Actions runs and job 
 
     node scripts/ci/main-ci-evidence-report.mjs gycha0109-beep/MyeongHa 30
 
-The tool reads the main branch SHA, at most 30 recent push workflow runs (allowed 1–100), and exact job inventories. It reads main again after all requests. If main moved mid-read or job pagination is incomplete, it fails closed. It cannot launch, relabel, retry, cancel, or deploy anything.
+The tool reads the main branch SHA, at most 30 recent push workflow runs (allowed 1–100), and exact job inventories. It reads main again after all requests. If main moved mid-read or job pagination is incomplete, it fails closed. Pending/queued runs and cancelled runs that never allocated a job can have an empty but complete job page; these retain their explicit non-success status. A completed successful workflow with zero jobs is invalid evidence. It cannot launch, relabel, retry, cancel, or deploy anything.
 
 Output contracts:
 
