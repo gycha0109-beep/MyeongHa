@@ -23,7 +23,7 @@ The window is bounded; it is not exhaustive history. A successful workflow canno
 
 - Previous main CI runs at f2fdb5a3… and 6c24aee7… were cancelled by later pushes, not successful.
 - Main 8d1a22dc… had successful CI, Governance and db-authority-core results before PR #2247 merged.
-- PR #2247 merged as 69033e9e8cf88538cb716118550bd553fd0c0a92 and started new push CI and Governance runs. The initial in_progress outcomes were NOT counted as successful post-merge validation.
+- PR #2247 merged as 69033e9e8cf88538cb716118550bd553fd0c0a92 and started new push CI and Governance runs. The initial in_progress outcomes were NOT counted as success. They subsequently completed successfully on the exact merge SHA: CI run 39034522832 (including CI Verify and db-authority-core), Governance run 39034522716, and Web Browser Smoke run 39034522689. Supabase Production 39034522823 succeeded, but deploy-migrations and the backfill job were skipped.
 - Supabase Production run 39029625313 was successful but deploy-migrations was skipped. This proves the change gate, not a deployed migration.
 - Encrypted backup run 38966874424 succeeded; its artifact was unexpired at inspection. Isolated restore drill 38090483306 succeeded but restored an older backup (38088591661), and did not exercise an authoritative Production privacy ledger. Do not claim latest-backup recoverability or privacy-DR completeness.
 
