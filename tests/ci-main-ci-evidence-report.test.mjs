@@ -105,4 +105,20 @@ describe('latest-main CI outcome evidence', () => {
     expect(summarize(f).latest_main_full_ci_proven).toBe(false);
     expect(summarize(f).latest_main_workflows.find(x => x.name === 'CI').run_id).toBe(111);
   });
+
+  it('classifies zero-job queued runs and prior early cancellations but never zero-job success', () => {
+    const active = fixture();
+    active.runs[0] = { ...active.runs[0], status: 'queued', conclusion: null };
+    active.jobsByRun['101'] = [];
+    active.jobsByRun['100'] = [];
+    const result = summarize(active);
+    expect(result.latest_main_full_ci_proven).toBe(false);
+    expect(result.latest_main_workflows.find(x => x.name === 'CI')).toMatchObject({
+      outcome: 'in_progress', jobs: [],
+    });
+    expect(result.previous_main_cancelled).toBe(1);
+    const invalid = fixture();
+    invalid.jobsByRun['101'] = [];
+    expect(() => summarize(invalid)).toThrow('Missing job evidence');
+  });
 });
