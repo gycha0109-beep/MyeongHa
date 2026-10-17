@@ -94,6 +94,11 @@ pass "real 1050 role-scoped Receipt/Event persistence, zero Grant"
 bash test/db/official_reader_m1_10_unknown_commit_source.sh \
  "$receipt" "$subject" "$intent" preissue none none
 
+# M1-17: approved *function-only* API EXECUTE detects source with zero rights.
+# No direct ledger SELECT and no public/payment Writer grants.
+bash test/db/official_reader_m1_17_minimal_read_execute.sh \
+ "$receipt" "$subject" "$intent" preissue
+
 for signature in \
  'public.internal_apply_official_reader_unified_receipt_v1(uuid,text[],timestamptz[],timestamptz[],timestamptz[],text[])' \
  'public.internal_cmd_bind_official_reader_unified_v1(uuid,uuid,uuid,uuid,text,text,jsonb)'; do
@@ -227,6 +232,11 @@ bash test/db/official_reader_m1_10_unknown_commit_source.sh \
 # A successful owner-fixture read must NEVER imply production app READ access.
 bash test/db/official_reader_m1_16_runtime_recovery_read_acl_rls.sh \
  "$receipt" "$subject" "$intent" "$grant" "$official"
+
+# M1-17: after atomic issue+bind, the SAME minimal enum confirms one
+# committed candidate but never promotes paid T2 / automatic retry.
+bash test/db/official_reader_m1_17_minimal_read_execute.sh \
+ "$receipt" "$subject" "$intent" committed
 
 # M1-11: a loopback TCP proxy suppresses the real PostgreSQL COMMIT
 # CommandComplete frame after the DB has committed a private D2 replay.
