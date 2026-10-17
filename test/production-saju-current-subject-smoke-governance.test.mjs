@@ -35,13 +35,34 @@ describe('Production current-subject Saju smoke governance', () => {
     expect(source).not.toContain('console.log(guest.bearerToken)');
   });
 
-  it('keeps Member and Guest Saju coverage inside the existing governed Production smoke workflow', () => {
+  it('keeps the existing Member and Guest coverage gated by the governed Production workflow', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
 
     expect(workflow).toContain('VERIFY_SAJU_CURRENT_SUBJECT');
     expect(workflow).toContain('environment: production');
     expect(workflow).toContain('node scripts/verify-production-saju-current-subject.mjs');
-    expect(workflow).toContain('Member and Guest Saju calculation and Preview Reading');
+    expect(workflow).toContain('MYEONGHA_PRODUCTION_MEMBER_EXPECTED_SUBJECT_ID');
+    expect(workflow).toContain("github.event_name == 'push' && 'member_and_guest' || inputs.scope");
     expect(workflow).not.toContain('schedule:');
+  });
+
+  it('defaults manual dispatch to Member-only and does not create a Guest Birth fixture in that scope', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const source = readFileSync(scriptPath, 'utf8');
+
+    expect(workflow).toContain('type: choice');
+    expect(workflow).toContain('default: member_only');
+    expect(workflow).toContain('          - member_only');
+    expect(workflow).toContain('          - member_and_guest');
+    expect(workflow).toContain('MYEONGHA_SAJU_SMOKE_SCOPE');
+    expect(source).toContain("process.env.MYEONGHA_SAJU_SMOKE_SCOPE ?? 'member_and_guest'");
+    expect(source).toContain("smokeScope !== 'member_only' && smokeScope !== 'member_and_guest'");
+    const memberOnlyBranch = source.indexOf("if (smokeScope === 'member_only') {");
+    const guestCreation = source.indexOf('const guest = await createGuestSajuFixture();');
+    expect(memberOnlyBranch).toBeGreaterThan(0);
+    expect(guestCreation).toBeGreaterThan(memberOnlyBranch);
+    expect(source.slice(memberOnlyBranch, guestCreation)).toContain('} else {');
+    expect(source.slice(memberOnlyBranch, guestCreation)).toContain('guestFixtureCreated=false');
+    expect(source.slice(memberOnlyBranch, guestCreation)).toContain('JSON.stringify(previewReading.body).includes(accessToken)');
   });
 });
