@@ -101,3 +101,9 @@ S8의 **비파괴/격리 검토는 S2~S7과 병렬 진행 가능**하며, S8 Pro
 - **S2-D 위험:** 기존 `resolveSeyeonProductionCommittedReplayV1`은 Commit/Delivered의 assistantText를 오래된 저장 상태만으로 반환했다. `runSeyeonProductionChatExecutionV1`은 Model 이전 S2-C HOLD보다 먼저 재생 분기로 진입하므로 과거 파생 내용에 대한 새 권한 확인 없이 외부 Reveal할 위험이 있다.
 - **S2-D 안전 기본값:** 현재 정확한 원본 Record/Grant 및 파생 lineage의 재생 시점 권한 확인/취소 경합 선형화가 구현되지 않았으므로 Commit/Delivered `committed_replay`를 전부 FAIL-CLOSED한다. 이미 저장된 assistantText를 오류/응답에 싣지 않고, 기존 비재생·종결 재시도 구분은 유지한다. 정상 재생과 후속 재생 복구 작업까지 임시 중단될 수 있다.
 - **남은 실제 S5/G3:** 동일 권한을 HTTP 최초 공개, committed replay, worker 출력에 연결하고 두 PG 세션의 revoke↔reveal 경합을 검증해야 한다. 이번 코드·음성 테스트만으로 G3 PASS를 주장하지 않는다. Projectors=[], public/paid OFF, Production DB 쓰기 0 유지.
+
+## 10. G1 S3-A — Governed Preflight 후 비공개 출처 차단 (2026-10-17)
+
+- S2-D: [PR #2211](https://github.com/gycha0109-beep/MyeongHa/pull/2211), head `bfb181be338c0c20b4f521db1461f7d3c6e70c84`, [Full Integration #39010875270](https://github.com/gycha0109-beep/MyeongHa/actions/runs/39010875270) SUCCESS, main `f6fac0cb4b4fe0e0a57438ca25919ff18c666622`; [main CI #39011269777](https://github.com/gycha0109-beep/MyeongHa/actions/runs/39011269777) SUCCESS. Supabase Production migration/backfill SKIPPED.
+- G1 출처 결손: 1640 zero Pin 이전에 모델 입력 출처는 0건이어도, 후속 Governed Preflight의 별도 `retrievedPrivateSources`는 원래 Pin에 없다. 신규 S3-A 검사에서 Production 실행이 이 배열의 누락·손상·양수 값을 Interpreter/Renderer/Reviewer 이전에 HOLD하도록 연결한다.
+- **여전히 HOLD:** G0 Security/DB/Character 공동 승인, 양수 original Record/Grant DB Pin, Preflight 단계별 Provider Receipt, G2 atomic Commit 및 G3 HTTP 최초 Reveal. 이 검사 자체는 Provider 시작 전 DB 양수 Pin을 구현하지 않으며 Preflight classifier 동작까지 소급 차단하지 않는다. Projectors=[], public/paid OFF, Production DB writes=0 유지.
