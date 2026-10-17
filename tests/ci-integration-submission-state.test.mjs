@@ -71,6 +71,19 @@ describe('idempotent CI integration submission for parallel PRs', () => {
     ], req);
     expect(result.id).toBe(12);
   });
+
+  it('does not relabel when an older same-head run is still active despite a newer failure', () => {
+    const decision = decideIntegrationSubmission({
+      ...req, runs: [run(100, 'in_progress'), run(101, 'completed', 'failure')], hasLabel: true,
+    });
+    expect(decision).toEqual({ action: 'no-op', reason: 'CURRENT_HEAD_INTEGRATION_ACTIVE', runId: 100 });
+  });
+  it('does not interpret a missing completion conclusion or unknown in-flight status as a retryable failure', () => {
+    for (const entry of [run(120, 'completed', null), run(121, 'unknown', null)]) {
+      const decision = decideIntegrationSubmission({ ...req, runs: [entry], hasLabel: true });
+      expect(decision).toEqual({ action: 'no-op', reason: 'CURRENT_HEAD_INTEGRATION_UNRESOLVED', runId: entry.id });
+    }
+  });
   it('never interprets an unknown completion or malformed candidate as success', () => {
     expect(decideIntegrationSubmission({ ...req, runs: [run(18, 'completed', 'neutral')], hasLabel: true }).action).toBe('refresh-label');
     expect(() => decideIntegrationSubmission({ ...req, head: 'not-a-sha', runs: [], hasLabel: false })).toThrow('Invalid pinned');
