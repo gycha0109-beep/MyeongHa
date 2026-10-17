@@ -63,7 +63,7 @@ async function main() {
     if (!ready) {
       throw Error('HOLD_C08_DOCKER_FINAL_POSTMASTER_NOT_READY: final PID 1 and SQL probe not ready.');
     }
-    process.stdout.write('C08_DOCKER_FINAL_POSTMASTER_READY\\n');
+    process.stdout.write('C08_DOCKER_FINAL_POSTMASTER_READY\n');
     run(['exec', '--user', 'postgres', name, 'createdb', '-U', 'postgres', database]);
     const version = run(['exec', '--user', 'postgres', '--env', 'PGDATABASE=' + database,
       name, 'psql', '-X', '-qAt', '-v', 'ON_ERROR_STOP=1', '-c', 'show server_version_num;']).trim();
