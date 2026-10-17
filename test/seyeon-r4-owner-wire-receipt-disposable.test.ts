@@ -94,23 +94,23 @@ type Receipt={attemptId:string;purpose:string;callId:string;
   originalGrantId:string;selectedSourcesDigest:string;pgPayloadDigest:string};
 async function stage(id:Fixture,purpose:Stage){
   const native=request(purpose,id);
-  let fetches=0;let receipt:Receipt|null=null;let actualWire:string|null=null;
+  let fetches=0;const state:{receipt:Receipt|null;actualWire:string|null}={receipt:null,actualWire:null};
   const provider=createOpenAiSeyeonStructuredProviderV1({
     apiKey:'sk-test-only-not-an-actual-secret-000000000000',
     model:'offline-model',
     meteredBeforeDispatch:async (meta,body)=>{
-      receipt=await transaction(async c=>{
+      state.receipt=await transaction(async c=>{
         const q=await c.query<{receipt:Receipt|null}>(
           'select seyeon_positive_candidate.claim_owner_dispatch_r2($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::text,$6::uuid,$7::text,$8::text) as receipt',
           [subject,id.thread,id.turn,id.attempt,purpose,meta.callId,
             'sha256:v1:'+sha(canonicalJson(native)),body]);
         return q.rows[0]?.receipt??null;
       },true);
-      if(!receipt)throw Error('DB original Grant or stage order denied');
+      if(!state.receipt)throw Error('DB original Grant or stage order denied');
     },
     fetchImpl:async (_url,init)=>{
       fetches++;
-      actualWire=String(init.body);
+      state.actualWire=String(init.body);
       return new Response('{"error":"simulated provider unavailable"}',
         {status:503,headers:{'content-type':'application/json'}});
     },
@@ -118,7 +118,7 @@ async function stage(id:Fixture,purpose:Stage){
   // Successful DB admission still hits only the fake provider and rejects the
   // synthetic 503. No network, no model cost, no production HTTP response.
   await expect(provider.generate(native)).rejects.toThrow();
-  return {fetches,receipt,actualWire};
+  return {fetches,...state};
 }
 async function receipts(id:Fixture){
   return transaction(async c=>{
