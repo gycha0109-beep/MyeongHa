@@ -51,38 +51,63 @@ function replayResult() {
 }
 
 describe('Seyeon Member turn-send HTTP', () => {
-  it('accepts only clientTurnId + text and exposes a narrow replay-safe receipt', async () => {
-    let received: unknown;
-    const response = await handleSeyeonChatTurnSendRequestV1({
-      request: request(),
-      requestId: 'req-1',
-      serverTime: '2026-10-07T00:00:00.000Z',
-      identityEvidenceVerifier: memberVerifier(),
-      runtime: {
-        run: async (input) => {
-          received = input;
-          return replayResult() as never;
+  it.each(['committed_replay', 'executed'] as const)(
+    'refuses %s HTTP first Reveal before metered runtime and sends zero assistant bytes',
+    async (disposition) => {
+      let runtimeCalls = 0;
+      const response = await handleSeyeonChatTurnSendRequestV1({
+        request: request(),
+        requestId: 'req-first-reveal',
+        serverTime: '2026-10-17T08:30:00.000Z',
+        identityEvidenceVerifier: memberVerifier(),
+        runtime: {
+          run: async () => {
+            runtimeCalls += 1;
+            if (disposition === 'committed_replay') return replayResult() as never;
+            return {
+              ...replayResult(),
+              execution: {
+                ...replayResult().execution,
+                disposition: 'executed',
+                runtimeResult: {
+                  envelope: { utterance: 'UNAUTHORIZED_FIRST_REVEAL_CANARY' },
+                },
+              },
+            } as never;
+          },
         },
-      },
-    });
+      });
 
-    expect(response.status).toBe(200);
-    expect(received).toEqual({
-      verifiedEvidence: { kind: 'member', verifiedAuthUserId: 'auth-user' },
-      threadId: THREAD_ID,
-      clientTurnId: CLIENT_TURN_ID,
-      text: '안녕하세요.',
+      const text = await response.text();
+      expect(response.status).toBe(503);
+      expect(response.headers.get('cache-control')).toBe('no-store');
+      expect(JSON.parse(text)).toMatchObject({
+        ok: false,
+        error: {
+          code: 'SEYEON_FIRST_REVEAL_AUTHORITY_UNAVAILABLE',
+          messageKey: 'chat.secure_reveal_unavailable',
+          retryable: false,
+        },
+      });
+      expect(runtimeCalls).toBe(0);
+      expect(text).not.toContain('저장된 답변입니다.');
+      expect(text).not.toContain('UNAUTHORIZED_FIRST_REVEAL_CANARY');
+      expect(text).not.toContain(TURN_ID);
+      expect(text).not.toContain(MESSAGE_ID);
+    },
+  );
+
+  it('does not start even the zero-source internal dogfood Provider without HTTP Reveal proof', async () => {
+    let runtimeCalls = 0;
+    const response = await handleSeyeonChatTurnSendRequestV1({
+      request: request({ clientTurnId: CLIENT_TURN_ID, text: '안녕하세요.' }),
+      requestId: 'req-no-db-privilege',
+      serverTime: '2026-10-17T08:30:00.000Z',
+      identityEvidenceVerifier: memberVerifier(),
+      runtime: { run: async () => { runtimeCalls += 1; return replayResult() as never; } },
     });
-    const payload = await response.json();
-    expect(payload.data).toEqual({
-      turnId: TURN_ID,
-      assistantMessageId: MESSAGE_ID,
-      assistantText: '저장된 답변입니다.',
-      sequenceNo: 2,
-      replayed: true,
-    });
-    expect(payload.data.subjectId).toBeUndefined();
-    expect(payload.data.provider).toBeUndefined();
+    expect(response.status).toBe(503);
+    expect(runtimeCalls).toBe(0);
   });
 
   it('rejects authority injection fields before runtime execution', async () => {
@@ -136,7 +161,7 @@ describe('Seyeon Member turn-send HTTP', () => {
       expect(response.status).toBe(400);
     }
   });
-  it('returns a structured 503 when the immutable source-Pin RPC is not deployed', async () => {
+  it('denies before reaching the missing immutable source-Pin RPC diagnostic', async () => {
     const response = await handleSeyeonChatTurnSendRequestV1({
       request: request(),
       requestId: 'req-missing-pin',
@@ -146,13 +171,13 @@ describe('Seyeon Member turn-send HTTP', () => {
     });
     expect(response.status).toBe(503);
     expect((await response.json()).error).toMatchObject({
-      code: 'CAPABILITY_UNAVAILABLE',
-      messageKey: 'chat.secure_runtime_migration_required',
-      retryable: true,
+      code: 'SEYEON_FIRST_REVEAL_AUTHORITY_UNAVAILABLE',
+      messageKey: 'chat.secure_reveal_unavailable',
+      retryable: false,
     });
   });
 
-  it('maps a second clientTurnId blocked by an old failed_retryable turn to 409', async () => {
+  it('does not touch turn idempotency or persisted errors while first Reveal is HOLD', async () => {
     const failure = Object.assign(new Error('server-owned in-flight turn'), {
       code: 'P0001',
       constraint: 'cmd_chat_receive_turn_in_flight',
@@ -164,10 +189,11 @@ describe('Seyeon Member turn-send HTTP', () => {
       identityEvidenceVerifier: memberVerifier(),
       runtime: { run: async () => { throw failure; } },
     });
-    expect(response.status).toBe(409);
+    expect(response.status).toBe(503);
     expect((await response.json()).error).toMatchObject({
-      code: 'TURN_IN_FLIGHT',
-      messageKey: 'chat.pending_turn_must_be_retried',
+      code: 'SEYEON_FIRST_REVEAL_AUTHORITY_UNAVAILABLE',
+      messageKey: 'chat.secure_reveal_unavailable',
+      retryable: false,
     });
   });
 

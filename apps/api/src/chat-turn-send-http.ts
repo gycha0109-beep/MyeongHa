@@ -19,6 +19,10 @@ import {
   SeyeonProductionChatExecutionErrorV1,
 } from './seyeon-production-chat-execution-v1.js';
 import { SeyeonProductionPinMigrationRequiredV1 } from './production-seyeon-chat-runtime-v1.js';
+import {
+  assertSeyeonFirstHttpRevealAuthorizedV1,
+  SeyeonFirstHttpRevealHoldV1,
+} from './seyeon-first-http-reveal-hold-v1.js';
 
 const POST_METHOD = 'POST' as const;
 const ROUTE_PREFIX = '/api/chat/' as const;
@@ -139,6 +143,15 @@ function postgresConstraint(error: unknown): string | null {
 }
 
 function mapExecutionError(error: unknown, requestId: string): Response | null {
+  if (error instanceof SeyeonFirstHttpRevealHoldV1) {
+    return jsonError({
+      status: 503,
+      code: error.code,
+      messageKey: 'chat.secure_reveal_unavailable',
+      retryable: false,
+      requestId,
+    });
+  }
   if (error instanceof SeyeonProductionPinMigrationRequiredV1) {
     return jsonError({
       status: 503,
@@ -300,6 +313,9 @@ export async function handleSeyeonChatTurnSendRequestV1(
   }
 
   try {
+    // G0/G3 current-rights Reveal has no DB-owned linearization seam yet.
+    // Block before costly runtime/provider calls or any response serialization.
+    assertSeyeonFirstHttpRevealAuthorizedV1();
     const result = await input.runtime.run({
       verifiedEvidence,
       threadId: parsedRoute.threadId,
