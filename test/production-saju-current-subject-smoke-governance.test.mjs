@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { describe, expect, it } from 'vitest';
 
 const scriptPath = 'scripts/verify-production-saju-current-subject.mjs';
@@ -42,7 +43,7 @@ describe('Production current-subject Saju smoke governance', () => {
     expect(workflow).toContain('environment: production');
     expect(workflow).toContain('node scripts/verify-production-saju-current-subject.mjs');
     expect(workflow).toContain('MYEONGHA_PRODUCTION_MEMBER_EXPECTED_SUBJECT_ID');
-    expect(workflow).toContain("github.event_name == 'push' && 'member_and_guest' || inputs.scope");
+    expect(workflow).toContain("github.event_name == 'push' && 'member_only' || inputs.scope");
     expect(workflow).not.toContain('schedule:');
   });
 
@@ -55,7 +56,7 @@ describe('Production current-subject Saju smoke governance', () => {
     expect(workflow).toContain('          - member_only');
     expect(workflow).toContain('          - member_and_guest');
     expect(workflow).toContain('MYEONGHA_SAJU_SMOKE_SCOPE');
-    expect(source).toContain("process.env.MYEONGHA_SAJU_SMOKE_SCOPE ?? 'member_and_guest'");
+    expect(source).toContain("process.env.MYEONGHA_SAJU_SMOKE_SCOPE ?? 'member_only'");
     expect(source).toContain("smokeScope !== 'member_only' && smokeScope !== 'member_and_guest'");
     const memberOnlyBranch = source.indexOf("if (smokeScope === 'member_only') {");
     const guestCreation = source.indexOf('const guest = await createGuestSajuFixture();');
@@ -64,5 +65,26 @@ describe('Production current-subject Saju smoke governance', () => {
     expect(source.slice(memberOnlyBranch, guestCreation)).toContain('} else {');
     expect(source.slice(memberOnlyBranch, guestCreation)).toContain('guestFixtureCreated=false');
     expect(source.slice(memberOnlyBranch, guestCreation)).toContain('JSON.stringify(previewReading.body).includes(accessToken)');
+    expect(workflow).toContain('MYEONGHA_SAJU_GUEST_WRITE_CONFIRM');
+    expect(workflow).toContain('guest_write_confirm:');
+    expect(workflow).toContain('VERIFY_SAJU_GUEST_WRITE');
+    expect(source).toContain("smokeScope === 'member_and_guest'");
+    expect(source).toContain("process.env.MYEONGHA_SAJU_GUEST_WRITE_CONFIRM !== 'VERIFY_SAJU_GUEST_WRITE'");
+    expect(source.indexOf('VERIFY_SAJU_GUEST_WRITE')).toBeLessThan(source.indexOf('acquireProductionMemberSmokeSession()'));
+  });
+
+  it('rejects unauthorized Production Guest writes before any session acquisition or API request', () => {
+    const denied = spawnSync(process.execPath, [scriptPath], {
+      encoding: 'utf8',
+      timeout: 5000,
+      env: {
+        ...process.env,
+        MYEONGHA_SAJU_SMOKE_SCOPE: 'member_and_guest',
+        MYEONGHA_SAJU_GUEST_WRITE_CONFIRM: 'NOT_AUTHORIZED',
+      },
+    });
+    expect(denied.status).not.toBe(0);
+    expect(denied.stderr).toContain('Production Guest fixture creation requires explicit');
+    expect(denied.stdout).not.toContain('Saju smoke passed');
   });
 });
