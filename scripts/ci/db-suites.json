@@ -66,7 +66,8 @@
       "official-reader-m1-20-pg17-staging-fence",
       "official-reader-m1-21-pg17-fault-replay",
       "official-reader-m1-22-pg17-live-isolate-owner-hold",
-      "official-reader-m1-23-pg17-runtime-executor-acl"
+      "official-reader-m1-23-pg17-runtime-executor-acl",
+      "official-reader-m1-24-pg17-independent-login-owner"
     ]
   }
 }
