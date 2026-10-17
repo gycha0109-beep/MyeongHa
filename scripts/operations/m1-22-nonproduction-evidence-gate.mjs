@@ -97,13 +97,16 @@ export function auditM122NonproductionGate(liveSnapshot, isolate, ownerEvidence,
     observedLiveAt: liveSnapshot.capturedAt,
     snapshotIsHistoricalNotFresh: true,
     liveVsDisposableIsolate: {
-      liveRecordedVersions: pre.basedOnM119 && liveSnapshot.installedVersions.length,
-      repositorySourceVersions: pre.reviewedSourceCount + liveSnapshot.installedVersions
-        .filter(x => x !== HISTORICAL_BUNDLE.version &&
-          !['20261007150457', '20261008043000'].includes(x)).length - 1,
+      liveRecordedVersions: liveSnapshot.installedVersions.length,
+      repositorySourceVersions: pre.reviewedSourceCount +
+        liveSnapshot.installedVersions.filter(x => x !== HISTORICAL_BUNDLE.version).length,
       missingFromLiveVersions: pre.graph.map(x => x.version),
       liveOnlyRestoreVersion: HISTORICAL_BUNDLE.version,
-      remoteOnlyOtherLiveVersions: ['20261007150457','20261008043000'],
+      observedLiveCatalogGate: 'HOLD_MISSING_PRIVATE_D2_BASELINE',
+      disposableCatalogGateAfterReplay: catalogValid ?
+        'CATALOG_READY_MIGRATION_HISTORY_STILL_REQUIRED' : 'NOT_VERIFIED',
+      liveD2IssuerAndMinimalReadMissingAtCapture: true,
+      otherRemoteOnlyVersions: [],
       historicalStatementContentAvailableInCi: false,
       isolateCatalogCaptured: catalogValid,
       isolateHistoryLedgerPresent: isolate?.migrationLedgerTablePresent ?? null,
