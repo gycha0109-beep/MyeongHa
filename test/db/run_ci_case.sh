@@ -372,6 +372,21 @@ M122
     psql -X -v ON_ERROR_STOP=1 -f test/db/official_standard_reading_reader_interpretation.sql >/dev/null
     bash test/db/official_reader_m1_26_pg17_definer_real_receipt_read.sh
     ;;
+  official-reader-m1-27-pg17-state-rls-matrix)
+    # Source-tree replay with ONLY synthetic Official Reader fixture and an
+    # artificial restricted definer/RLS policy. Never a production clone.
+    verify_pg17
+    [[ "${CI:-}" == true && "${PGHOST:-}" == localhost &&
+       "${PGUSER:-}" == postgres && "${PGPORT:-}" == 5432 &&
+       "${PGDATABASE:-}" == myeongha_ci_case_* &&
+       -z "${SUPABASE_DB_PASSWORD:-}" ]] || {
+      echo 'M1-27: disposable CI PG17 only' >&2; exit 2
+    }
+    apply_pg17_migrations_without_birth_authority
+    psql -X -v ON_ERROR_STOP=1 \
+      -f test/db/official_standard_reading_reader_interpretation.sql >/dev/null
+    bash test/db/official_reader_m1_27_pg17_state_rls_matrix.sh
+    ;;
   saju-staging-operator-admission-v2)
     psql -v ON_ERROR_STOP=1 -f test/db/fixtures/saju_staging_operator_admission_schema_8c2b2d302.sql >/dev/null
     bash test/db/saju_staging_operator_admission_v2_authority.sh
