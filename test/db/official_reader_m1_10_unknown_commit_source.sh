@@ -33,7 +33,7 @@ NODE
 )"
 [[ -n "$sql" ]] || fail 'literal TypeScript query extraction failed'
 result="$(p <<SQL
-begin transaction isolation level repeatable read read only;
+begin transaction isolation level read committed read only;
 prepare m110_read(uuid) as
 $sql;
 execute m110_read('$receipt'::uuid);
@@ -47,7 +47,8 @@ const fs=require("node:fs");
 const [receipt,subject,intent,mode,grant,reading]=process.argv.slice(1);
 const fields=fs.readFileSync(0,"utf8").trimEnd().split("|");
 const assert=(yes,reason)=>{if(!yes)throw new Error(reason+":"+JSON.stringify(fields));};
-assert(fields.length===30,"column mismatch");
+assert(fields.length===31,"column mismatch");
+assert(fields[30]==="read committed","reconciliation demands statement-current READ COMMITTED isolation");
 assert(fields[0]===receipt&&fields[1]===subject&&fields[2]===intent,"Receipt lineage");
 assert(fields[3]==="test-reader-unit"&&fields[24]==="1","pinned single Capability");
 if(mode==="preissue"){

@@ -163,12 +163,16 @@ grep -q 'cmd_standard_reading_access_v2_request_hash\|request hash is invalid' "
  fail "failed bind left immutable Reader access"
 pass "failed bind rolls back same-transaction issuance; verified Receipt remains"
 
+# M1-14: hold an OLD repeatable-read snapshot across the M1-12 real TCP
+# FIRST issuance commit. The old reader must stay stale, a new READ COMMITTED
+# observer must see one committed Grant/Event/Reader, and the refreshed old
+# session must converge before the existing M1-03 fixture continues.
 # M1-12: first issuance is now the REAL TCP lost-COMMIT-ACK path, not
 # just a successful psql-owned transaction. The fixture-owner D2 issue+bind
 # still commits atomically; the test client sees the connection drop after
 # the PostgreSQL backend emitted CommandComplete(COMMIT), but before delivery.
 # Its output includes only independently re-read authoritative identities.
-atomic="$(node test/db/official_reader_m1_12_first_issuance_commit_ack_drop_proxy.mjs \
+atomic="$(node test/db/official_reader_m1_14_stale_snapshot_first_issue.mjs \
  "$receipt" "$subject" "$intent" "$session" "$proposal" "$official")"
 issue_line="$(printf '%s\n' "$atomic" | grep '^ISSUE|')"
 bind_line="$(printf '%s\n' "$atomic" | grep '^BIND|')"
