@@ -64,6 +64,9 @@ describe.skipIf(process.platform === 'win32')('disposable authority-core templat
     expect(result.stdout).toContain('case-two:myeongha_case_two');
     expect(result.stdout).toContain('AUTHORITY_CORE_CASE db=myeongha_case_one duration_seconds=');
     expect(result.stdout).toContain('AUTHORITY_CORE_STAGE stage=baseline-and-early-guards');
+    expect(result.stdout).toContain('AUTHORITY_CORE_TEMPLATE source=created create_ms=');
+    expect(result.stdout).toMatch(/AUTHORITY_CORE_PHASE db=myeongha_case_one pre_drop_ms=\d+ clone_ms=\d+ command_ms=\d+ cleanup_ms=\d+/);
+    expect(result.stdout).toMatch(/AUTHORITY_CORE_PHASE db=myeongha_case_two pre_drop_ms=\d+ clone_ms=\d+ command_ms=\d+ cleanup_ms=\d+/);
     expect(result.calls.at(-1)).toBe('dropdb|--if-exists myeongha_authority_core_template');
   });
 
@@ -72,12 +75,15 @@ describe.skipIf(process.platform === 'win32')('disposable authority-core templat
     expect(result.status).toBe(0);
     expect(result.stdout).not.toContain('AUTHORITY_CORE_STAGE');
     expect(result.stdout).not.toContain('AUTHORITY_CORE_CASE');
+    expect(result.stdout).not.toContain('AUTHORITY_CORE_PHASE');
+    expect(result.stdout).not.toContain('AUTHORITY_CORE_TEMPLATE');
   });
 
   it('fails closed on an isolated case error and still cleans up', () => {
     const result = runFixture({ profile: true, failure: true });
     expect(result.status).not.toBe(0);
     expect(result.stdout).not.toContain('UNREACHABLE');
+    expect(result.stdout).not.toContain('AUTHORITY_CORE_PHASE db=myeongha_case_failed');
     expect(result.calls).toContain('dropdb|--if-exists myeongha_case_failed');
     expect(result.calls.at(-1)).toBe('dropdb|--if-exists myeongha_authority_core_template');
   });
