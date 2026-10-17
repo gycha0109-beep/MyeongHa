@@ -73,6 +73,35 @@ describe('Production current-subject Saju smoke governance', () => {
     expect(source.indexOf('VERIFY_SAJU_GUEST_WRITE')).toBeLessThan(source.indexOf('acquireProductionMemberSmokeSession()'));
   });
 
+  it('denies Production Guest writes on repeat runs, push events, or missing run provenance', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const source = readFileSync(scriptPath, 'utf8');
+    expect(workflow).toContain('[[ "$GITHUB_RUN_ATTEMPT" == \'1\' ]]');
+    expect(source).toContain("process.env.GITHUB_RUN_ATTEMPT !== '1'");
+    expect(source).toContain("process.env.GITHUB_EVENT_NAME !== 'workflow_dispatch'");
+
+    for (const [eventName, attempt] of [
+      ['workflow_dispatch', '2'],
+      ['push', '1'],
+      ['workflow_dispatch', ''],
+    ]) {
+      const denied = spawnSync(process.execPath, [scriptPath], {
+        encoding: 'utf8',
+        timeout: 5000,
+        env: {
+          ...process.env,
+          MYEONGHA_SAJU_SMOKE_SCOPE: 'member_and_guest',
+          MYEONGHA_SAJU_GUEST_WRITE_CONFIRM: 'VERIFY_SAJU_GUEST_WRITE',
+          GITHUB_EVENT_NAME: eventName,
+          GITHUB_RUN_ATTEMPT: attempt,
+        },
+      });
+      expect(denied.status).not.toBe(0);
+      expect(denied.stderr).toContain('first manual workflow_dispatch attempt');
+      expect(denied.stdout).not.toContain('Saju smoke passed');
+    }
+  });
+
   it('rejects unauthorized Production Guest writes before any session acquisition or API request', () => {
     const denied = spawnSync(process.execPath, [scriptPath], {
       encoding: 'utf8',
@@ -80,6 +109,8 @@ describe('Production current-subject Saju smoke governance', () => {
       env: {
         ...process.env,
         MYEONGHA_SAJU_SMOKE_SCOPE: 'member_and_guest',
+        GITHUB_EVENT_NAME: 'workflow_dispatch',
+        GITHUB_RUN_ATTEMPT: '1',
         MYEONGHA_SAJU_GUEST_WRITE_CONFIRM: 'NOT_AUTHORIZED',
       },
     });
