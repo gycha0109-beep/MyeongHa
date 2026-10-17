@@ -238,8 +238,7 @@ wait "$reader_pid" || {
   cat "$dir/reader.log" >&2; exit 1;
 }
 reader_pid=''
-[[ "$(cat "$dir/c08m_commit_denied")" ==
-   'PASS_C08M_ACTUAL_COMMIT_V2_DENIES_STALE_ATTEMPT_AFTER_REAL_RECEIVE' ]] || {
+[[ "$(cat "$dir/c08m_commit_denied")" == 'PASS_C08M_ACTUAL_COMMIT_V2_DENIES_STALE_ATTEMPT_AFTER_REAL_RECEIVE' ]] || {
   echo HOLD_C08M_STALE_COMMIT_REJECTION_NOT_PROVEN >&2; exit 1;
 }
 [[ "$(cat "$dir/after")" == 'active|seyeon|2|f' ]] || {
