@@ -63,7 +63,7 @@ if (args[0] === 'run') {
 else process.exit(25);
 `;
 
-function withFakeDocker(mode: string, check: (output: { stdout: string; events: string[]; error?: Error }) => void) {
+function withFakeDocker(mode: string, check: (output: { stdout: string; events: string[]; error: Error | undefined }) => void) {
   const dir = mkdtempSync(join(tmpdir(), 'myeongha-c08l-fake-docker-'));
   try {
     const file = join(dir, 'docker');
