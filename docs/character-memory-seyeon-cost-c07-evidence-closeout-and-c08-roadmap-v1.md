@@ -162,3 +162,10 @@ Watchtower-Track: character-memory
 - `test/seyeon-c08f-census-before-all-models-offline-v1.test.ts`는 의미 검증 모델이 반환한 뒤 4번째 검증에 `messageCount=2`가 관측되는 합성 RECEIVE와 4차 Census의 저장소 예외를 모두 강제해, 모델 3회 호출을 숨기지 않고 사용자에게 Shadow 결과를 반환하지 않는지 검사한다. 정상 첫 턴: **Provider 3회, Census 4회**. 개인정보 Descriptor/Fact/Retrieval 0회.
 - 4차 Census는 **트랜잭션/스냅샷 잠금이 아니므로** 마지막 조회 직후의 추가 RECEIVE를 방지하지 못한다. 저장·HTTP Reveal·Replay가 운영에서 안전해지는 것은 아니며, G0~G6·positive Grant·실제 Commit↔Revoke·Production 전환은 계속 **HOLD**.
 - 외부 모델 호출, 민감정보 DB 조회, Gold/Canon 수정, 새 유료 AI 평가/배포는 수행하지 않는다. PR의 정확 HEAD 기본 CI 및 Full Integration PASS 확인 전에는 완료로 간주하지 않는다.
+
+### C08-Q — C07 전체 36건의 기존/통합 분류 Guard 쌍대 회귀
+
+- C08-B 고위험 11건과 F02/R01 2건(총 13건)의 기존 무료 Guard 비교를 **C07 전체 원본 Gold 36건**으로 확장한다. P1 민감 질문형(F03/F07/F10, R02/R07/R14, D01/D03/D08/D13, V01/V03/V08/V14), P2 일반 대화(N01/N02/N05/N09/N14/N16/N17/N18), P0 누락 H02 모두 동일 원본 Fixture에서 가져온다.
+- `test/seyeon-c08b-gold-paired-preflight-offline-v1.test.ts`에서 매 Case 기존 분류 Provider 2회 / 후보 Unified Provider 1회, 기존 서버 분류 Guard, 권한 MISSING Resolver, Gold Scorer, 공개 문답의 private retrieval 0회 및 민감 질문에서 Source Descriptor **이전 G0 HOLD**를 두 경로 동일하게 검증한다. 24개 무주장/12개 주장, 18개 민감 Topic/18개 비민감 Topic 불변 조건도 고정한다.
+- 새 합성 시험은 **36개 Case × 2 경로 = 72개 무료 Guard 실행**이지 원래 평가의 `original/compact` **실모델 72 슬롯이 아니다**. 유료 관측은 그대로 **6/72**, 나머지 **66 미검증**, `modelQualityVerified=false`. 실제 응답 자연스러움, 장기 Memory, Grant/Commit/Revoke/Reveal 검증 아님.
+- Production Chat·Provider 연결·개인 DB/ACL·Canon·예산·G0~G6 변경 없음. 정확 HEAD 기본 CI / Full Integration 검증 전 PASS 주장 금지.
