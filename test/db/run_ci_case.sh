@@ -335,6 +335,29 @@ M122
     bash test/db/official_reader_m1_18_live_cutover_readonly_gate.sh
     bash test/db/official_reader_m1_24_pg17_independent_login_owner_boundary.sh
     ;;
+  official-reader-m1-25-pg17-nonsuperuser-1970)
+    # Disposable source replay, intentionally withholding 0860 and 1970.
+    # Runs actual pinned 1970 as a *non-superuser independent TCP LOGIN*.
+    verify_pg17
+    [[ "${CI:-}" == true && "${PGHOST:-}" == localhost &&
+       "${PGPORT:-}" == 5432 && "${PGUSER:-}" == postgres &&
+       "${PGDATABASE:-}" == myeongha_ci_case_* &&
+       -z "${SUPABASE_DB_PASSWORD:-}" &&
+       -z "${SUPABASE_PRODUCTION_SESSION_POOLER_HOST:-}" ]] || {
+      echo 'M1-25: isolated PG17 CI only' >&2; exit 2
+    }
+    psql -v ON_ERROR_STOP=1 -f test/db/bootstrap_supabase_auth_stub.sql
+    for migration in supabase/migrations/*.sql; do
+      case "$migration" in
+        */0860_birth_profile_create_runtime_authority.sql|*/1970_official_reader_unknown_commit_minimal_read_v1.sql)
+          echo "M1-25 intentional source stage skip: $migration";;
+        *)
+          echo "M1-25 replay: $migration"
+          psql -v ON_ERROR_STOP=1 -f "$migration" >/dev/null;;
+      esac
+    done
+    bash test/db/official_reader_m1_25_pg17_nonsuperuser_1970_migration.sh
+    ;;
   saju-staging-operator-admission-v2)
     psql -v ON_ERROR_STOP=1 -f test/db/fixtures/saju_staging_operator_admission_schema_8c2b2d302.sql >/dev/null
     bash test/db/saju_staging_operator_admission_v2_authority.sh
