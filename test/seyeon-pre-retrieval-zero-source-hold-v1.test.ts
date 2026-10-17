@@ -61,7 +61,9 @@ describe('Se-yeon S3-B zero-only admission before private retrieval', () => {
 
   it('invokes the guard before the retriever and propagates a denial with zero private bytes', async () => {
     const before = vi.fn(() => { throw new SeyeonPreflightSourceClosureHoldV1(); });
-    const retriever = vi.fn(async () => [{ text: 'PRIVATE_CANARY' }]);
+    const retriever = vi.fn(async () => [
+      { text: 'PRIVATE_CANARY' },
+    ] as unknown as readonly import('../packages/domain/src/character-disclosure-gate-v2.js').CharacterDisclosureRetrievedSourceV2[]);
     const input = {
       characterId: 'seyeon' as const,
       userMessageRef: 'message-1',
