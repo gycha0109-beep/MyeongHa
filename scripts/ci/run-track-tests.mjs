@@ -14,6 +14,7 @@ execFileSync(process.execPath, [
   'scripts/commerce/m1-18-migration-parity-gate.test.mjs',
   'scripts/operations/m1-19-live-migration-impact.test.mjs',
   'scripts/operations/m1-20-safe-staging-preflight.test.mjs',
+  'scripts/operations/m1-22-nonproduction-evidence-gate.test.mjs',
 ], { stdio: 'inherit' });
 
 if (plan.full) {
