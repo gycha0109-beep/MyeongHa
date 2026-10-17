@@ -27,4 +27,8 @@ psql -X -v ON_ERROR_STOP=1 -f test/db/seyeon_g2_actual_v2_atomic_positive_candid
 psql -X -v ON_ERROR_STOP=1 -f test/db/seyeon_g1_atomic_context_only_candidate_r2.sql
 SEYEON_POSITIVE_GRANT_REAL_PG=1 ./node_modules/.bin/vitest run \
   test/seyeon-g2-atomic-original-grant-race-disposable.test.ts --maxWorkers=1
-echo 'PASS offline R2 G2 real v2 lock/revoke and outbox rollback; Production G0/G2/G3 still HOLD'
+# R5 current-rights first/replay/history Owner-style checks ONLY in scratch clone.
+psql -X -v ON_ERROR_STOP=1 -f test/db/seyeon_r5_disposable_reveal_current_rights.sql
+SEYEON_POSITIVE_GRANT_REAL_PG=1 ./node_modules/.bin/vitest run \
+  test/seyeon-r5-current-reveal-disposable.test.ts --maxWorkers=1
+echo 'PASS offline R2/R5 G2 v2 plus G3 SQL current-rights races; Production G0/G2/G3 HOLD'
