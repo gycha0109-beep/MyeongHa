@@ -317,6 +317,15 @@ M122
     rm -f -- "${evidence_file}"
     trap - EXIT
     ;;
+  official-reader-m1-23-pg17-runtime-executor-acl)
+    # Positive/negative actual SQL calls under non-superuser SET LOCAL ROLE.
+    # CI service postgres remains superuser; this is NOT a restored production
+    # or full managed-Owner/non-superuser migration principal rehearsal.
+    verify_pg17
+    apply_pg17_migrations_without_birth_authority
+    bash test/db/official_reader_m1_18_live_cutover_readonly_gate.sh
+    bash test/db/official_reader_m1_23_pg17_runtime_role_probes.sh
+    ;;
   saju-staging-operator-admission-v2)
     psql -v ON_ERROR_STOP=1 -f test/db/fixtures/saju_staging_operator_admission_schema_8c2b2d302.sql >/dev/null
     bash test/db/saju_staging_operator_admission_v2_authority.sh
