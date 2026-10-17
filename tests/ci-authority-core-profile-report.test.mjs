@@ -130,4 +130,33 @@ describe('authority core read-only profile report', () => {
     expect(summarizeAuthorityProfile(detailed).valid).toBe(true);
     expect(summarizeAuthorityProfile(detailed.replace(/AUTHORITY_CORE_PHASE db=myeongha_fixture_38[^\n]*$/, '')).valid).toBe(false);
   });
+
+  it('validates 40/7 R1 and R2 fresh clones on the same PGDATABASE by ordered indexes', () => {
+    const names = [
+      'baseline-and-early-guards', 'seyeon-r1-positive-pin-isolated',
+      'seyeon-r2-actual-v2-isolated', 'seyeon-governor-and-cost-races',
+      'character-and-record-concurrency', 'reader-and-grant-races',
+      'remaining-authority-and-catalog',
+    ];
+    const reused = 'myeongha_seyeon_positive_pin_candidate_test';
+    const dbNames = Array.from({ length: 40 }, (_, i) =>
+      i === 2 || i === 3 ? reused : 'myeongha_fixture_' + i);
+    const base = names.map((name, i) =>
+      'AUTHORITY_CORE_STAGE stage=' + name + ' duration_seconds=1 total_seconds=' + (i + 1));
+    const cases = dbNames.map((name, i) =>
+      'AUTHORITY_CORE_CASE db=' + name + ' duration_seconds=1 index=' + (i + 1));
+    const phases = dbNames.map((name, i) =>
+      'AUTHORITY_CORE_PHASE db=' + name +
+      ' pre_drop_ms=1 clone_ms=2 command_ms=3 cleanup_ms=4 index=' + (i + 1));
+    const full = [...base, ...cases,
+      'AUTHORITY_CORE_TEMPLATE source=created create_ms=1 migrate_ms=2', ...phases].join('\n');
+    const good = summarizeAuthorityProfile(full);
+    expect(good.valid).toBe(true);
+    expect(good.complete_case_count).toBe(40);
+    expect(good.phase_breakdown.isolated_case_count).toBe(40);
+    expect(summarizeAuthorityProfile(full.replace('index=40', 'index=39')).valid).toBe(false);
+    expect(summarizeAuthorityProfile(full.replace('AUTHORITY_CORE_PHASE db=' + reused,
+      'AUTHORITY_CORE_PHASE db=myeongha_wrong')).valid).toBe(false);
+    expect(summarizeAuthorityProfile([...base, ...cases].join('\n')).valid).toBe(false);
+  });
 });

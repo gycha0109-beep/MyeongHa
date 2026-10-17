@@ -76,10 +76,13 @@ ensure_isolated_template() {
   isolated_template_ready=1
 }
 
+authority_profile_case_index=0
 run_isolated_case() {
   local db="$1"
   shift
   ensure_isolated_template
+  authority_profile_case_index=$((authority_profile_case_index + 1))
+  local profile_index=$authority_profile_case_index
   local started_seconds=$SECONDS
   (
     set -euo pipefail
@@ -99,8 +102,8 @@ run_isolated_case() {
       if [[ "$profile" == '1' && -n "$command_finished" ]]; then
         cleanup_finished=$EPOCHREALTIME
         authority_profile_duration_ms "$cleanup_started" "$cleanup_finished" cleanup_ms
-        printf 'AUTHORITY_CORE_PHASE db=%s pre_drop_ms=%d clone_ms=%d command_ms=%d cleanup_ms=%d\n' \
-          "$db" "$pre_drop_ms" "$clone_ms" "$command_ms" "$cleanup_ms"
+        printf 'AUTHORITY_CORE_PHASE db=%s pre_drop_ms=%d clone_ms=%d command_ms=%d cleanup_ms=%d index=%d\n' \
+          "$db" "$pre_drop_ms" "$clone_ms" "$command_ms" "$cleanup_ms" "$profile_index"
       fi
     }
     trap cleanup_isolated_case EXIT
@@ -113,7 +116,7 @@ run_isolated_case() {
     fi
   )
   if [[ "${MYEONGHA_AUTHORITY_PROFILE:-0}" == '1' ]]; then
-    printf 'AUTHORITY_CORE_CASE db=%s duration_seconds=%d\n' "$db" "$((SECONDS - started_seconds))"
+    printf 'AUTHORITY_CORE_CASE db=%s duration_seconds=%d index=%d\n' "$db" "$((SECONDS - started_seconds))" "$profile_index"
   fi
 }
 
@@ -148,6 +151,10 @@ bash test/db/chat_attempt_commit_concurrency.sh
 # exclusively on an isolated PostgreSQL clone. Never apply candidate DDL to main.
 authority_profile_stage 'seyeon-r1-positive-pin-isolated'
 run_isolated_case myeongha_seyeon_positive_pin_candidate_test bash test/db/seyeon_r1_disposable_positive_source_xor.sh
+# R2: exact Original Grant revoke/Commit two independent PG sessions and
+# actual v2/core + both Outbox atomicity, in a NEW disposable cloned database.
+authority_profile_stage 'seyeon-r2-actual-v2-isolated'
+run_isolated_case myeongha_seyeon_positive_pin_candidate_test bash test/db/seyeon_r2_disposable_actual_v2_revoke_race.sh
 authority_profile_stage 'seyeon-governor-and-cost-races'
 psql -v ON_ERROR_STOP=1 -f test/db/seyeon_zero_personal_source_pre_model_pin_v1.sql
 psql -v ON_ERROR_STOP=1 -f test/db/seyeon_ai_call_lifecycle_v1.sql
