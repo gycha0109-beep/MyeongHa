@@ -100,6 +100,10 @@ bash test/db/chat_attempt_commit_concurrency.sh
 # exclusively on an isolated PostgreSQL clone. Never apply candidate DDL to main.
 authority_profile_stage 'seyeon-r1-positive-pin-isolated'
 run_isolated_case myeongha_seyeon_positive_pin_candidate_test bash test/db/seyeon_r1_disposable_positive_source_xor.sh
+# R2: exact Original Grant revoke/Commit two independent PG sessions and
+# actual v2/core + both Outbox atomicity, in a NEW disposable cloned database.
+authority_profile_stage 'seyeon-r2-actual-v2-isolated'
+run_isolated_case myeongha_seyeon_positive_pin_candidate_test bash test/db/seyeon_r2_disposable_actual_v2_revoke_race.sh
 authority_profile_stage 'seyeon-governor-and-cost-races'
 psql -v ON_ERROR_STOP=1 -f test/db/seyeon_zero_personal_source_pre_model_pin_v1.sql
 psql -v ON_ERROR_STOP=1 -f test/db/seyeon_ai_call_lifecycle_v1.sql
