@@ -7,8 +7,8 @@ const caseLine = /^AUTHORITY_CORE_CASE db=(myeongha_[a-z0-9_]+) duration_seconds
 const templateLine = /^AUTHORITY_CORE_TEMPLATE source=(created|existing) create_ms=(\d+) migrate_ms=(\d+)$/;
 const phaseLine = /^AUTHORITY_CORE_PHASE db=(myeongha_[a-z0-9_]+) pre_drop_ms=(\d+) clone_ms=(\d+) command_ms=(\d+) cleanup_ms=(\d+)$/;
 
-export function summarizeAuthorityProfile(log, { expectedCases = 38 } = {}) {
-  if (typeof log !== 'string' || !Number.isSafeInteger(expectedCases) || expectedCases < 1) {
+export function summarizeAuthorityProfile(log, { expectedCases } = {}) {
+  if (typeof log !== 'string' || (expectedCases !== undefined && (!Number.isSafeInteger(expectedCases) || expectedCases < 1))) {
     throw new Error('Provide log text and a positive expected case count');
   }
   const stages = [];
@@ -43,17 +43,27 @@ export function summarizeAuthorityProfile(log, { expectedCases = 38 } = {}) {
       errors.push('malformed profile record');
     }
   }
-  const stageNames = [
+  // These are explicitly allowlisted versions of the authority-core coverage contract.
+  // The new disposable R1 preflight adds a stage and a case; historical 38-case
+  // logs must remain readable without accepting arbitrary incomplete case counts.
+  const stageNames38 = [
     'baseline-and-early-guards',
     'seyeon-governor-and-cost-races',
     'character-and-record-concurrency',
     'reader-and-grant-races',
     'remaining-authority-and-catalog',
   ];
-  if (stages.length !== stageNames.length || stages.some((s, i) => s.name !== stageNames[i])) {
-    errors.push('missing or reordered authority stages');
-  }
-  if (cases.length !== expectedCases) errors.push('expected ' + expectedCases + ' isolated cases, received ' + cases.length);
+  const stageNames39 = [
+    'baseline-and-early-guards',
+    'seyeon-r1-positive-pin-isolated',
+    ...stageNames38.slice(1),
+  ];
+  const matchesStages = (names) => stages.length === names.length
+    && stages.every((stage, index) => stage.name === names[index]);
+  const version = matchesStages(stageNames39) ? 39 : matchesStages(stageNames38) ? 38 : null;
+  if (version === null) errors.push('missing or reordered authority stages');
+  const resolvedExpectedCases = expectedCases === undefined ? (version ?? 39) : expectedCases;
+  if (cases.length !== resolvedExpectedCases) errors.push('expected ' + resolvedExpectedCases + ' isolated cases, received ' + cases.length);
   if (stages.some((s, i) => !Number.isSafeInteger(s.seconds) || !Number.isSafeInteger(s.total_seconds)
     || s.total_seconds < s.seconds || (i > 0 && s.total_seconds !== stages[i - 1].total_seconds + s.seconds))) {
     errors.push('inconsistent stage durations');
@@ -62,7 +72,7 @@ export function summarizeAuthorityProfile(log, { expectedCases = 38 } = {}) {
   const detailed = templates.length > 0 || phases.length > 0;
   if (detailed) {
     if (templates.length !== 1) errors.push('expected one template timing record');
-    if (phases.length !== expectedCases || phases.some((p, i) => p.name !== cases[i]?.name)) {
+    if (phases.length !== resolvedExpectedCases || phases.some((p, i) => p.name !== cases[i]?.name)) {
       errors.push('missing or reordered isolated phase records');
     }
     if (templates.some(t => !Number.isSafeInteger(t.create_ms) || !Number.isSafeInteger(t.migrate_ms)
@@ -87,7 +97,7 @@ export function summarizeAuthorityProfile(log, { expectedCases = 38 } = {}) {
     valid: errors.length === 0,
     errors,
     complete_case_count: cases.length,
-    expected_case_count: expectedCases,
+    expected_case_count: resolvedExpectedCases,
     phase_detail_available: detailed,
     phase_breakdown: phaseBreakdown,
     total_script_seconds: total,

@@ -95,4 +95,39 @@ describe('authority core read-only profile report', () => {
     expect(summarizeAuthorityProfile(sample() + template + first + second.replace('command_ms=3', 'command_ms=99999999999999999'), { expectedCases: 2 }).valid).toBe(false);
     expect(summarizeAuthorityProfile(sample() + template.replace('created create_ms=1', 'existing create_ms=1') + first + second, { expectedCases: 2 }).valid).toBe(false);
   });
+
+  it('accepts complete 38/5 historical and 39/6 new preflight logs, with no arbitrary missing case', () => {
+    const historic = [
+      'baseline-and-early-guards', 'seyeon-governor-and-cost-races',
+      'character-and-record-concurrency', 'reader-and-grant-races',
+      'remaining-authority-and-catalog',
+    ];
+    const next = [historic[0], 'seyeon-r1-positive-pin-isolated', ...historic.slice(1)];
+    const fixture = (names, count) => {
+      let total = 0;
+      const stageLines = names.map((name) => {
+        total += 1;
+        return 'AUTHORITY_CORE_STAGE stage=' + name + ' duration_seconds=1 total_seconds=' + total;
+      });
+      const caseLines = Array.from({ length: count }, (_, i) =>
+        'AUTHORITY_CORE_CASE db=myeongha_fixture_' + i + ' duration_seconds=1');
+      return [...stageLines, ...caseLines].join('\\n');
+    };
+    expect(summarizeAuthorityProfile(fixture(historic, 38)).valid).toBe(true);
+    const updated = summarizeAuthorityProfile(fixture(next, 39));
+    expect(updated.valid).toBe(true);
+    expect(updated.expected_case_count).toBe(39);
+    expect(updated.stage_durations).toHaveLength(6);
+    expect(summarizeAuthorityProfile(fixture(next, 38)).valid).toBe(false);
+    expect(summarizeAuthorityProfile(fixture(historic, 39)).valid).toBe(false);
+    expect(summarizeAuthorityProfile(fixture(next.toReversed(), 39)).valid).toBe(false);
+
+    const detailed = fixture(next, 39) +
+      '\\nAUTHORITY_CORE_TEMPLATE source=created create_ms=1 migrate_ms=2' +
+      Array.from({ length: 39 }, (_, i) =>
+        '\\nAUTHORITY_CORE_PHASE db=myeongha_fixture_' + i +
+        ' pre_drop_ms=1 clone_ms=2 command_ms=3 cleanup_ms=4').join('');
+    expect(summarizeAuthorityProfile(detailed).valid).toBe(true);
+    expect(summarizeAuthorityProfile(detailed.replace(/AUTHORITY_CORE_PHASE db=myeongha_fixture_38[^\\n]*$/, '')).valid).toBe(false);
+  });
 });

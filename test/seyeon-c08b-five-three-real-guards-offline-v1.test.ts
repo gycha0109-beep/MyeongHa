@@ -43,11 +43,12 @@ const INTERPRETATION={
  memoryRefsUsed:[],
 };
 type ProviderMode='legacy'|'fast';
-type Options={badReview?:boolean;inventedFact?:boolean;claimKind?:'AUTHORITY_OVERRIDE'|'SHARED_EVENT_CLAIM'};
+type Options={badReview?:boolean;inventedFact?:boolean;claimKind?:'AUTHORITY_OVERRIDE'|'SHARED_EVENT_CLAIM';failPurpose?:string};
 function harness(mode:ProviderMode,opts:Options={}){
  const calls:string[]=[];
  const generate=vi.fn(async(req:SeyeonStructuredProviderRequestV2):Promise<unknown>=>{
   calls.push(req.purpose);
+  if(req.purpose===opts.failPurpose) throw Error('C08B_SYNTHETIC_PROVIDER_FAILURE');
   if(req.purpose==='integrity_classification')
    return {claims:opts.claimKind?[{claimId:'claim1',kind:opts.claimKind,statement:'synthetic false assertion'}]:[]};
   if(req.purpose==='disclosure_classification')
@@ -267,6 +268,53 @@ describe('C08-B: 5-call runtime vs 3-call candidate using real guards and fake p
    expect(h.calls).toEqual([]);
   }
  });
+
+ it.each(LEGACY)(
+  'fails closed on the legacy %s provider stage without further provider calls',async purpose=>{
+   const h=harness('legacy',{failPurpose:purpose});
+   await expect(runSeyeonCharacterTurnV2({
+    userMessageRef:USER_ID,userText:PUBLIC_TEXT,contextInput:contextInput(),
+    governance:governance(h.provider),
+    interpreterProvider:h.provider,rendererProvider:h.provider,
+    semanticReviewerProvider:h.provider,
+   })).rejects.toThrow();
+   // The two legacy governance classifiers are launched concurrently.
+   // Either failure still permits the other *already-started* preflight call,
+   // but must prevent interpreter, renderer and reviewer execution.
+   const expectedCount=Math.max(2,LEGACY.indexOf(purpose)+1);
+   expect(h.calls).toEqual(LEGACY.slice(0,expectedCount));
+   expect(h.generate).toHaveBeenCalledTimes(expectedCount);
+  },
+ );
+
+ it.each(FAST)(
+  'fails closed on the candidate %s provider stage without legacy fallback',async purpose=>{
+   const h=harness('fast',{failPurpose:purpose});
+   const run=async()=>{
+    const g=createSeyeonUnifiedGovernanceCandidateV1({
+     governance:governance(h.provider),provider:h.provider,
+    });
+    const p=await runCharacterGovernedPreflightV1({
+     characterId:'seyeon',userMessageRef:USER_ID,userText:PUBLIC_TEXT,
+     relationship:g.relationship,integrity:g.integrity,disclosure:g.disclosure,
+    });
+    const c=assembleSeyeonRuntimeContextV2({
+     ...contextInput(),integrityDecisions:p.integrity.decisions,
+     governedPreflightApplied:true,
+     disclosure:{decision:null,retrievedSources:p.retrievedPrivateSources},
+    });
+    return createSeyeonFastDialogueShadowV1({
+     candidateProvider:h.provider,reviewerProvider:h.provider,
+     fullThreadCensus:syntheticFirstTurnCensusShadowV1(),
+    }).evaluate(c);
+   };
+   await expect(run()).rejects.toThrow();
+   expect(h.calls).toEqual(FAST.slice(0,FAST.indexOf(purpose)+1));
+   expect(h.generate).toHaveBeenCalledTimes(FAST.indexOf(purpose)+1);
+   expect(h.calls).not.toContain('turn_interpretation');
+   expect(h.calls).not.toContain('dialogue_render');
+  },
+ );
 
  it('is a synthetic call-count/guard comparison only; no real models, token-cost claims or production activation',()=>{
   const path=new URL('./seyeon-c08b-five-three-real-guards-offline-v1.test.ts',import.meta.url);

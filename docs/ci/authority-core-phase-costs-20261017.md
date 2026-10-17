@@ -34,3 +34,9 @@ The existing `MYEONGHA_AUTHORITY_PROFILE=1` optional profile now emits additiona
 Run the existing Vitest isolation/profile regressions, ordinary PR CI, four required checks and one frozen-HEAD 11-job integration CI. Compare at least three **new** detailed, comparable successful PR-event runs before proposing a performance change. Do not confuse runner job duration, script `SECONDS` duration, sum of per-case durations, and GitHub integration queue delay.
 
 If clone/cleanup or template bootstrap accounts for material repeated cost, propose a bounded change with independent DB creation/cleanup regression tests; otherwise preserve the current comprehensive concurrency proof. Avoid unapproved bulk load, synthetic six-PR queues, deployment and Production database changes.
+
+## Current-main coverage change observed after #2247's first integration
+
+Other-track changes merged the disposable Se-yeon R1 positive-pin candidate preflight into the authority-core script. It adds `myeongha_seyeon_positive_pin_candidate_test` in a new `seyeon-r1-positive-pin-isolated` stage, expanding current-main coverage from **38 cases / 5 stages** to **39 cases / 6 stages**. This is an independent test, not an optimization introduced by ops; keep it intact.
+
+The profile parser explicitly recognizes both 38/5 historical and 39/6 current layouts and rejects case-count/stage mismatches. The new 39-case path must be proven in current-main-based CI, with all 39 isolated DB clone/cleanup operations and the new R1 test preserved. Historical four-run measurements above remain 38-case data and are **not** directly comparable to a 39-case total.
