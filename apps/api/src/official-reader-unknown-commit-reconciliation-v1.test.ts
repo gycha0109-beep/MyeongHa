@@ -15,6 +15,7 @@ const NO_EFFECT = Object.freeze({
   intentId: '33333333-3333-4333-8333-333333333333',
   itemKey: 'test-reader-unit',
   rowCount: 1,
+  snapshotIsolation: 'read committed',
   grantCount: 0,
   eventCount: 0,
   accessCount: 0,
@@ -131,6 +132,25 @@ describe('M1-10 lost COMMIT acknowledgement / no automatic new issuer', () => {
     expect(result.reason).toBe('INCOMPLETE_OR_CONFLICTING_AUTHORITY');
     expect(result.automaticRetryAuthorized).toBe(false);
     expect(ctx.queries).toHaveLength(1);
+  });
+
+  it.each([
+    { isolation: 'repeatable read', row: NO_EFFECT },
+    { isolation: 'repeatable read', row: COMMITTED },
+    { isolation: 'serializable', row: COMMITTED },
+  ])('never classifies $isolation old snapshots as current authority', async ({ isolation, row }) => {
+    const ctx = source({ rows: [{ ...row, snapshotIsolation: isolation }] });
+    const result = await reconcileOfficialReaderUnknownCommitV1({
+      receiptId: RECEIPT, transaction: ctx.transaction,
+    });
+    expect(result).toEqual({
+      status: 'held',
+      reason: 'STALE_SNAPSHOT_UNSUPPORTED',
+      automaticRetryAuthorized: false,
+      publicDisclosureAuthorized: false,
+    });
+    expect(ctx.queries).toHaveLength(1);
+    expect(ctx.queries[0]?.sql).toContain("current_setting('transaction_isolation')");
   });
 
   it('rejects absent and duplicate receipt-lineage evidence without automatic retry', async () => {
