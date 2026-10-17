@@ -64,8 +64,8 @@ describe('all four ruleset-required CI contexts', () => {
   it('does not mistake a stale comment or step name for the required integration job', () => {
     const result = verifyFixture((file, source) => file === 'ci-integration.yml'
       ? source.replace('    name: CI Integration Verify', '    name: CI Integration Passed')
-        + '  # name: CI Integration Verify\\n'
-        + '    steps:\\n      - name: CI Integration Verify\\n        run: true\\n'
+        + '  # name: CI Integration Verify\n'
+        + '    steps:\n      - name: CI Integration Verify\n        run: true\n'
       : source);
     expect(result.status).not.toBe(0);
     expect(result.stderr).toContain('ci-integration.yml: required check contract missing: name: CI Integration Verify');
