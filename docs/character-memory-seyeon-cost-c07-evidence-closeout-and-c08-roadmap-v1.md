@@ -138,3 +138,11 @@ Watchtower-Track: character-memory
 - 민감 질문과 결합한 혼합 Gold 2건, 질문형 F02/R01은 **별도 미승인 G0 Descriptor 조회 방지**로 최종 대화 출력까지 진행하지 않는다. 3-call fast first-contact Shadow는 무기억·무이력·무클레임 경계만 인정하므로 해당 사례를 3-call 정상 응답 성능 증명으로 취급하지 않는다.
 - 이번 증거는 **13개 case × 두 경로의 결정적 합성 분류 검사**일 뿐, C07 유료 72슬롯 관측(실측 6/72)을 변경하지 않는다. G0~G6, 개인정보 Grant/Commit/Reveal 원자성, Production 라우팅, 유료 AI 평가 모두 HOLD.
 - 작업 PR의 실제 CI 및 최신 HEAD Full Integration에 성공하기 전에는 이 후보를 PASS로 판정하지 않는다.
+
+### C08-N — 세 번째 Shadow 모델 호출 전 Census 재검증 (무과금)
+
+- 기존 C08-F 경로는 첫 통합 사전검사 전과 후보 Dialogue 생성 전, **2회의 전체 Thread Census**를 실행했다. 그러나 두 번째 모델의 결과를 생성한 후 독립 의미 검증(세 번째 모델 요청) 직전에는 재검사가 없어 그 사이 새 RECEIVE가 일어나도 마지막 검증 요청이 진행될 수 있었다.
+- `createSeyeonFastDialogueShadowV1().evaluate`에 마지막 `semantic_review` 직전 **세 번째 Census**를 추가했다. 누락·경합·권한/Thread 불일치는 기존 `FAST_THREAD_CENSUS_REJECTED`로 실패 처리하고 세 번째 모델은 호출하지 않는다.
+- `test/seyeon-c08f-census-before-all-models-offline-v1.test.ts`는 두 번째 Census 통과 후 세 번째 검사 시 `messageCount=2`로 변하는 합성 경합, 정상 실행 시 Census 3회/모델 3회를 검증한다. 운영 경로에 연결하거나 유료 모델 호출을 추가하지 않는다.
+- **검사 사이 경합을 줄일 뿐**, DB 트랜잭션 잠금, 첫 Commit·Grant Revoke의 최종 선형화, HTTP Reveal·Replay, G0~G6 승인을 증명하지 않는다. 세 번째 검사 직후에도 경합은 가능하므로 Production은 HOLD.
+- 해당 PR의 CI 및 정확 HEAD Full Integration 성공 전에는 신규 검증을 PASS로 판정하지 않는다.
