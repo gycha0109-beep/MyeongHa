@@ -279,6 +279,44 @@ SQL
     verify_pg17
     bash test/db/official_reader_m1_21_pg17_fault_replay.sh
     ;;
+  official-reader-m1-22-pg17-live-isolate-owner-hold)
+    # Candidate source-only PG17 is NOT a production clone or release permit.
+    verify_pg17
+    [[ "${CI:-}" == true && "${PGHOST:-}" == localhost &&
+       "${PGUSER:-}" == postgres &&
+       "${PGDATABASE:-}" == myeongha_ci_case_* &&
+       -z "${SUPABASE_DB_PASSWORD:-}" &&
+       -z "${SUPABASE_PRODUCTION_SESSION_POOLER_HOST:-}" ]] || {
+      echo 'M1-22: disposable localhost PG17 CI case required' >&2
+      exit 2
+    }
+    apply_pg17_migrations_without_birth_authority
+    bash test/db/official_reader_m1_18_live_cutover_readonly_gate.sh
+    evidence_file="$(mktemp)"
+    trap 'rm -f -- "${evidence_file:-}"' EXIT
+    psql -X -qAt -v ON_ERROR_STOP=1 \
+      -f test/db/official_reader_m1_22_pg17_capture.sql > "${evidence_file}"
+    node --input-type=module - "${evidence_file}" <<'M122'
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { auditM122NonproductionGate } from './scripts/operations/m1-22-nonproduction-evidence-gate.mjs';
+const live=JSON.parse(readFileSync('scripts/operations/fixtures/m1-19-20261017-live-migration-history.snapshot.json','utf8'));
+const owners=JSON.parse(readFileSync('scripts/operations/fixtures/m1-22-owner-release-evidence.HOLD.json','utf8'));
+const pg=JSON.parse(readFileSync(process.argv[2],'utf8'));
+const g=auditM122NonproductionGate(live,pg,owners);
+assert.equal(g.verdict,'HOLD_M1_22_LIVE_PARITY_RESTORE_AND_OWNERS');
+assert.equal(g.liveVsDisposableIsolate.isolateCatalogCaptured,true);
+assert.equal(g.liveVsDisposableIsolate.missingFromLiveVersions.length,45);
+assert.equal(g.liveVsDisposableIsolate.repositorySourceVersions,217);
+assert.equal(g.releaseEvidence.minimumOwnerDecisionCount,15);
+assert.equal(g.deployAuthorized,false);
+console.log('PASS_M1_22_PG17_CATALOG_OBSERVED: 45 missing live + 1 live-only historical restore + 15 independent HOLD evidence checks');
+console.log('HOLD_M1_22: missing production-equivalent restore, non-superuser/0860 parity, verified DR, history and Owner approval');
+M122
+    node --test scripts/operations/m1-22-nonproduction-evidence-gate.test.mjs
+    rm -f -- "${evidence_file}"
+    trap - EXIT
+    ;;
   saju-staging-operator-admission-v2)
     psql -v ON_ERROR_STOP=1 -f test/db/fixtures/saju_staging_operator_admission_schema_8c2b2d302.sql >/dev/null
     bash test/db/saju_staging_operator_admission_v2_authority.sh

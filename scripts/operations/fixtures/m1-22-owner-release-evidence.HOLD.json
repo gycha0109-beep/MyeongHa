@@ -1,0 +1,68 @@
+{
+  "scope": "M1_22_UNVERIFIED_APPROVAL_CLAIMS_ONLY",
+  "releaseAuthorization": false,
+  "domainOwners": {
+    "P1_ACCOUNT_DELETION": {
+      "status": "PENDING",
+      "evidenceRefs": []
+    },
+    "P2_READER_ARTIFACT_AND_SAJU_PROOF": {
+      "status": "PENDING",
+      "evidenceRefs": []
+    },
+    "P3_SEYEON_AI_GOVERNANCE_AND_COST": {
+      "status": "PENDING",
+      "evidenceRefs": []
+    },
+    "P4_SEYEON_PIN_AND_SCOPED_READER_QUERY": {
+      "status": "PENDING",
+      "evidenceRefs": []
+    },
+    "P5_PRIVATE_READER_LOCK_AND_FIRST_ISSUE": {
+      "status": "PENDING",
+      "evidenceRefs": []
+    },
+    "P6_CANCEL_AND_REVOKE_EFFECTS": {
+      "status": "PENDING",
+      "evidenceRefs": []
+    },
+    "P7_PRIVATE_WRITER_ACL_CLOSURE": {
+      "status": "PENDING",
+      "evidenceRefs": []
+    },
+    "P8_CANCEL_DURABLE_WORKER_AND_REVIEW": {
+      "status": "PENDING",
+      "evidenceRefs": []
+    },
+    "P9_APPROVED_MINIMAL_RECOVERY_READ": {
+      "status": "PENDING",
+      "evidenceRefs": []
+    }
+  },
+  "recovery": {
+    "SEYEON_RESTORE_LINEAGE": {
+      "status": "PENDING",
+      "evidenceRefs": []
+    },
+    "NONPRODUCTION_APPROVED_RESTORE": {
+      "status": "PENDING",
+      "evidenceRefs": []
+    },
+    "HISTORY_AND_CATALOG_PARITY": {
+      "status": "PENDING",
+      "evidenceRefs": []
+    },
+    "MANAGED_OWNER_ROLE_PARITY": {
+      "status": "PENDING",
+      "evidenceRefs": []
+    },
+    "INTERRUPTED_REPLAY_AND_DR": {
+      "status": "PENDING",
+      "evidenceRefs": []
+    },
+    "OPERATIONAL_RELEASE_AUTHORITY": {
+      "status": "PENDING",
+      "evidenceRefs": []
+    }
+  }
+}
