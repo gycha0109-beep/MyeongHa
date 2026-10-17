@@ -70,10 +70,17 @@ catalog_snapshot() {
 case "$case_name" in
   seyeon-c08-first-turn-local-pg17)
     verify_pg17
-    [[ "${PGDATABASE:-}" == myeongha_c08_local_case_1 ]] || {
-      echo 'HOLD_C08_PG17_DISPOSABLE_DATABASE_REQUIRED' >&2
-      exit 1
-    }
+    # Permit only (a) our local network-disabled Docker scratch DB or
+    # (b) the dedicated disposable GitHub Actions PG17 suite case database.
+    # Other DB targets / production environments always HOLD.
+    if [[ "${PGDATABASE:-}" != myeongha_c08_local_case_1 ]]; then
+      [[ "${GITHUB_ACTIONS:-}" == true && "${CI:-}" == true &&
+         "${DB_SUITE:-}" == postgres17 && "${PGHOST:-}" == localhost &&
+         "${PGDATABASE:-}" =~ ^myeongha_ci_case_[0-9]+$ ]] || {
+        echo 'HOLD_C08_PG17_DISPOSABLE_DATABASE_REQUIRED' >&2
+        exit 1
+      }
+    fi
     apply_pg17_migrations_through_seyeon_production_frontier
     bash test/db/seyeon_c08_first_turn_local_pg17.sh
     ;;

@@ -59,6 +59,14 @@ node scripts/run-seyeon-c08-local-docker-pg17.mjs --disposable-only
 
 ※ `git config --global core.autocrlf`를 변경하거나 수동으로 전체 파일 줄바꿈을 바꿀 필요는 없습니다. GitHub CI에서 수행하는 것은 CRLF 전처리의 회귀 테스트와 정적 안전성 확인이며, 로컬 Docker의 실제 SQL 전체 통과는 사용자가 실행한 출력으로 별도 판정합니다.
 
+## 컬럼별 RLS 권한 오류 대응 (C08-I)
+
+두 번째 실측에서 Docker PG17 및 Windows 줄바꿈 정규화는 통과했으나 `HOLD_C08_PG17_ROLE_RLS_PRIVILEGE_CONTRACT`가 발생했습니다. 원인은 `0950_chat_read_runtime_authority.sql`에서 API 실행 역할이 `conversation_messages`의 **필요 컬럼에만 SELECT** 권한을 받는데, 로컬 테스트가 `has_table_privilege(..., 'SELECT')`라는 **테이블 전체 SELECT**를 요구했기 때문입니다. 최소 권한 설계가 정상일 때도 실패하는 검증식 오류이며, 운영 권한을 넓혀 해결해서는 안 됩니다.
+
+수정된 사전 검사에서는 RLS 활성화, 소유자 SELECT 정책 존재, 실행 역할 `NOSUPERUSER/NOBYPASSRLS`, 조회에 필요한 컬럼 6개 SELECT, Thread binding EXECUTE, `anon`의 Function·Table 접근 차단을 따로 검증합니다. 실패 시 `C08_ACL_DIAGNOSTIC`과 함께 각 항목의 **진리값만** 표시하며 데이터·식별자·비밀번호는 출력하지 않습니다.
+
+이 검사는 원래 Windows Docker뿐 아니라 GitHub Actions PostgreSQL 17에서 생성하고 삭제하는 `myeongha_ci_case_*` 데이터베이스에서도 실제 실행하도록 등록했습니다. 두 경우 이외의 DB 대상에서는 실패하도록 격리 조건을 유지합니다. GitHub CI에서 이 테스트가 실제로 통과해야 전체 검사 성공으로 간주할 수 있습니다.
+
 ## 스크립트의 고정된 안전 경계
 
 - `postgres:17.6` 이미지, 임의 이름의 일회용 컨테이너 생성.
