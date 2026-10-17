@@ -37,6 +37,7 @@ import {
 import {
   assertSeyeonPreflightZeroPrivateSourceClosureV1,
   assertSeyeonZeroPrivateRetrievalBeforeReadV1,
+  assertSeyeonZeroPrivateDescriptorBeforeReadV1,
 } from './seyeon-preflight-source-closure-hold-v1.js';
 import {
   createSeyeonAttemptZeroPersonalProofV1,
@@ -744,6 +745,7 @@ export async function runSeyeonProductionChatExecutionV1(
         });
 
         const runtime = await runSeyeonCharacterTurnV2({
+          assertBeforePrivateSourceDescriptorRead: assertSeyeonZeroPrivateDescriptorBeforeReadV1,
           assertBeforePrivateSourceRetrieval: assertSeyeonZeroPrivateRetrievalBeforeReadV1,
           assertGovernedPreflightSourceClosure: assertSeyeonPreflightZeroPrivateSourceClosureV1,
           userMessageRef: receivedTurn.userMessageId,
