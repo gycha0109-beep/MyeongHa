@@ -16,10 +16,8 @@ import {guardCharacterIntegrityClassificationV1}
   from '../apps/api/src/character-integrity-preflight-v1.js';
 import {guardCharacterDisclosureTopicClassificationV2}
   from '../apps/api/src/character-disclosure-preflight-v2.js';
-// @ts-expect-error Versioned offline MJS Gold has no generated declarations.
-import {SEYEON_C07_BOUNDARY_MATRIX_V1 as MATRIX,
- scoreSeyeonC07BoundaryV1 as score} from
- '../scripts/seyeon-cost-c07-cross-topic-boundary-v1.mjs';
+// @ts-expect-error: Versioned offline MJS Gold has no generated declarations.
+import {SEYEON_C07_BOUNDARY_MATRIX_V1 as MATRIX, scoreSeyeonC07BoundaryV1 as score} from '../scripts/seyeon-cost-c07-cross-topic-boundary-v1.mjs';
 
 type Gold={id:string;text:string;topic:string|null;expectedKinds:readonly string[]};
 const IDS=[
