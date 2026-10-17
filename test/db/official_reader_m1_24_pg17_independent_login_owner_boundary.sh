@@ -154,8 +154,12 @@ for i in "${!roles[@]}"; do
     "$login" "$actor" 'create role myeongha_m124_forbidden_role nologin;' 42501 rollback_ddl
   expect_sqlstate "$actor cannot GRANT public minimal-read EXECUTE" \
     "$login" "$actor" 'grant execute on function public.qry_official_reader_unknown_commit_minimal_v1(uuid,uuid) to public;' 42501 rollback_ddl
-  expect_sqlstate "$actor cannot ALTER minimal-read Owner" \
-    "$login" "$actor" 'alter function public.qry_official_reader_unknown_commit_minimal_v1(uuid,uuid) owner to postgres;' 42501 rollback_ddl
+  # Do not probe "OWNER TO postgres": existing function Owner is postgres
+  # in this fixture, and PostgreSQL can treat a same-owner request as a no-op.
+  # A *different* synthetic-login target forces an actual ownership transfer
+  # attempt, which a restricted runtime identity must fail with 42501.
+  expect_sqlstate "$actor cannot transfer minimal-read Owner to its login" \
+    "$login" "$actor" "alter function public.qry_official_reader_unknown_commit_minimal_v1(uuid,uuid) owner to $login;" 42501 rollback_ddl
 done
 
 for table in commerce_receipts entitlement_grants entitlement_events \
