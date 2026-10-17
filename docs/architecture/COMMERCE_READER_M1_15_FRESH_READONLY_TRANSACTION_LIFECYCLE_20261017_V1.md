@@ -28,10 +28,10 @@ This is **not** permission for the app role to select protected rows in producti
 `apps/api/src/postgres-official-reader-unknown-commit-read-tx-v1.test.ts` checks the ordered SQL lifecycle, zero connection acquisition for invalid IDs, repeated calls acquiring a lease and resetting, strict canonical one-query acceptance, malformed/injected SQL rejection, role/query/BEGIN/reset/COMMIT failures, rollback and connection discard on uncertain outcomes. Existing M1-10 stale snapshot unit tests remain.
 
 `test/db/official_reader_m1_15_readonly_pool_lifecycle.mjs` executes against the **real disposable PostgreSQL 15** before the M1-12 successful first issuance:
-- Deliberately return a pool connection holding `REPEATABLE READ READ ONLY` without closing its transaction.
-- Reacquire the **same backend PID** through a one-connection `pg` pool. Explicitly reset the old transaction, begin `READ COMMITTED READ ONLY`, set local app role, require isolation/read-only/current user and **no API D2 issuer or binder EXECUTE**.
-- COMMIT and release; next lease provokes a real PostgreSQL `22012` query error, ROLLBACKs it and releases.
-- Reacquire the same backend PID and verify no inherited aborted transaction, no sticky app role and no sticky READ ONLY mode.
+- Deliberately hold an old `REPEATABLE READ READ ONLY` transaction on one persistent `psql` backend, modeling a dirty pooled connection without requiring a Node database package on the PG15 CI runner.
+- Reuse the **same backend PID** across successive transaction phases. Explicitly reset the old transaction, begin `READ COMMITTED READ ONLY`, set local app role, require isolation/read-only/current user and **no API D2 issuer or binder EXECUTE**.
+- COMMIT; the next transaction phase on the same backend provokes a real PostgreSQL `22012` query error and ROLLBACKs it.
+- Verify the same backend PID still has no inherited aborted transaction, no sticky app role and no sticky READ ONLY mode. This direct SQL lifecycle test complements mock-pool adapter tests; it does **not** prove a deployed production pool is configured or approved.
 
 The existing M1-13 in-flight first issue + competing lock `55P03`, M1-14 stale snapshot across M1-12 real TCP first-COMMIT-ACK loss, M1-06 exact immutable effect semantics, M1-10 source SELECT and M1-11 ACK replay fault continue unchanged.
 
