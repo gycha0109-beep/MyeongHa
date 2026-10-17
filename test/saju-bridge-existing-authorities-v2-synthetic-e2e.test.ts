@@ -28,12 +28,87 @@ const BIRTH_PROFILE_ID = '33333333-3333-4333-8333-333333333333';
 const REVISION_ID = '44444444-4444-4444-8444-444444444444';
 const MEMBER_JWT = 'header.payload.signature';
 
+/** Source's calculation HTTP V1 envelope, using only synthetic Birth data. */
+function calculationResponseFixture(): Record<string, unknown> {
+  const pillar = {
+    stem: { value: '갑', hanja: '甲', element: '목', yinYang: '양' },
+    branch: { value: '자', hanja: '子', element: '수', yinYang: '양' },
+  };
+  return {
+    responseSchemaVersion: 'myeonghwa-production-calculation-http-v1',
+    runtimeVersion: 'myeonghwa-production-calculation-runtime-v1',
+    authority: {
+      calculationPolicyId: 'myeonghwa-production-civil-midnight-v1',
+      authorizationId: 'myeonghwa-production-calculation-default-authorization-v1',
+      authorityRecordRef: 'docs/decisions/ADR-0006-production-calculation-default-v1.md',
+      policyVersion: 'myeonghwa-production-calculation-policy-v1',
+      contentHash: 'synthetic-authority-hash',
+    },
+    snapshot: {
+      snapshotId: 'snapshot:saju-bridge-synthetic:1',
+      schemaVersion: 'canonical-saju-snapshot-v1',
+      calculationHash: 'synthetic-calculation-hash',
+      createdAt: '2026-09-01T22:00:00.000Z',
+      input: {
+        calendarType: 'solar',
+        date: { year: 2001, month: 7, day: 14 },
+        time: { known: true, hour: 15, minute: 20 },
+        sexForTraditionalCalculation: 'female',
+      },
+      policy: {
+        policyId: 'myeonghwa/production/civil-midnight-v1',
+        policyVersion: 'myeonghwa-production-calculation-policy-v1',
+        dayBoundary: 'midnight',
+        trueSolarTime: {
+          enabled: false,
+          longitudeSource: 'not-applicable',
+          applyEquationOfTime: false,
+          applyHistoricalDst: false,
+        },
+        timeZonePolicy: { source: 'service-default', timeZone: 'Asia/Seoul' },
+        unknownBirthTimePolicy: 'preserve-unknown-and-enumerate-boundaries',
+      },
+      normalized: {},
+      pillars: {
+        year: { status: 'resolved', value: pillar },
+        month: { status: 'resolved', value: pillar },
+        day: { status: 'resolved', value: pillar },
+        hour: { status: 'unavailable', reasonCode: 'TEST_HOUR_UNAVAILABLE' },
+      },
+      derivedFacts: {},
+      luckCycle: { status: 'unavailable', reasonCode: 'TEST_LUCK_UNAVAILABLE' },
+      completeness: {
+        birthTimeKnown: true,
+        fullyResolved: false,
+        resolvedPaths: ['pillars.year', 'pillars.month', 'pillars.day'],
+        ambiguousPaths: [],
+        unavailablePaths: ['pillars.hour'],
+      },
+      provenance: {
+        engine: {
+          name: 'myeonghwa-saju-engine',
+          version: 'engine-v1',
+          sourceRepository: 'gycha0109-beep/Saju',
+        },
+        adapter: { name: 'manseryeok', version: '2.0.0' },
+        policy: {
+          id: 'myeonghwa/production/civil-midnight-v1',
+          version: 'myeonghwa-production-calculation-policy-v1',
+        },
+        schema: { id: 'canonical-saju-snapshot', version: 'v1' },
+        datasets: [],
+      },
+    },
+  };
+}
+
 function fixture(options: {
   readonly rejectAuth?: boolean;
   readonly wrongSubjectKind?: boolean;
   readonly driftedRevision?: boolean;
   /** Synthetic Saju preview response. Other tests keep the 503 baseline. */
   readonly previewResponse?: 'admitted' | 'missing-admission' | 'missing-lifecycle' | 'wrong-envelope';
+  readonly calculationResponse?: 'admitted' | 'birth-mismatch' | 'schema-mismatch';
 } = {}) {
   const events: string[] = [];
   const sqlQueries: { sql: string; values?: readonly unknown[] }[] = [];
@@ -104,6 +179,17 @@ function fixture(options: {
     );
     const payload = JSON.parse(init.body) as { birth?: { date?: string } };
     expect(payload.birth?.date).toBe('2001-07-14');
+    if (String(url).endsWith('/api/calculations') && options.calculationResponse !== undefined) {
+      const payload = calculationResponseFixture();
+      if (options.calculationResponse === 'schema-mismatch') {
+        payload.responseSchemaVersion = 'unknown-calculation-v2';
+      }
+      if (options.calculationResponse === 'birth-mismatch') {
+        const snapshot = payload.snapshot as { input: { date: { day: number } } };
+        snapshot.input.date.day = 15;
+      }
+      return Response.json(payload);
+    }
     if (String(url).endsWith('/api/preview/readings') && options.previewResponse !== undefined) {
       const responseVersion = options.previewResponse === 'wrong-envelope'
         ? 'unrecognized-product-response'
@@ -195,6 +281,63 @@ describe('Saju V2 synthetic Member Auth -> existing Subject DB -> Saju transport
         expect(f.sqlQueries.map(x => x.sql).join('\n')).not.toMatch(
           /saju_bridge_private|myeongha_saju_bridge_permit|CREATE ROLE|SET ROLE postgres/iu,
         );
+      } finally {
+        await f.runtime.close();
+      }
+    },
+  );
+
+
+  it('returns admitted calculation-only evidence bound to the current Birth revision', async () => {
+    const f = fixture({ calculationResponse: 'admitted' });
+    try {
+      const response = await handle(f, 'calculation');
+      expect(response.status).toBe(200);
+      const body = await response.json();
+      expect(body).toMatchObject({
+        ok: true,
+        data: {
+          calculation: {
+            schemaVersion: 'myeongha-saju-production-calculation-ingress-v1',
+            kind: 'saju_calculation_evidence',
+            semanticAuthority: 'calculation_only',
+            interpretationAuthorized: false,
+            birthRevisionRef: REVISION_ID,
+          },
+        },
+      });
+      expect(JSON.stringify(body)).not.toContain('2001-07-14');
+      expect(JSON.stringify(body)).not.toContain('15:20');
+      expect(body.data.calculation).not.toHaveProperty('reading');
+      expect(f.memberFetchImpl).toHaveBeenCalledOnce();
+      expect(f.connect).toHaveBeenCalledOnce();
+      expect(f.sajuFetchImpl).toHaveBeenCalledOnce();
+      expect(f.events.indexOf('COMMIT')).toBeLessThan(f.events.indexOf('RELEASE'));
+      expect(f.events.indexOf('RELEASE')).toBeLessThan(f.events.indexOf('SAJU'));
+      expect(f.sqlQueries.map(q => q.sql).join('\\n')).not.toMatch(
+        /saju_bridge_private|myeongha_saju_bridge_permit|CREATE ROLE|SET ROLE postgres/iu,
+      );
+    } finally {
+      await f.runtime.close();
+    }
+  });
+
+  it.each(['birth-mismatch', 'schema-mismatch'] as const)(
+    'rejects %s 200 calculation responses without promoting upstream evidence',
+    async calculationResponse => {
+      const f = fixture({ calculationResponse });
+      try {
+        const response = await handle(f, 'calculation');
+        expect(response.status).toBe(503);
+        const body = await response.json();
+        expect(body).toMatchObject({
+          ok: false,
+          error: { code: 'SAJU_TEMPORARILY_UNAVAILABLE' },
+        });
+        expect(body).not.toHaveProperty('data.calculation');
+        expect(JSON.stringify(body)).not.toContain('snapshot:saju-bridge-synthetic:1');
+        expect(f.sajuFetchImpl).toHaveBeenCalledOnce();
+        expect(f.events.indexOf('RELEASE')).toBeLessThan(f.events.indexOf('SAJU'));
       } finally {
         await f.runtime.close();
       }
