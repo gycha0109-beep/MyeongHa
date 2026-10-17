@@ -16,7 +16,7 @@ The test verifies separate `session_user` and `current_user` values, `NOSUPERUSE
 - Other five runtime roles trying that same minimal-read function must return **SQLSTATE 42501**.
 - All six roles attempting private D2 receipt issuer and Reader binder must return **42501**; no Writer side effects.
 - API identity attempting `SELECT * FROM` the five Receipt/Grant/Entitlement/Reader/Outbox source tables `LIMIT 0` must return **42501**.
-- Every independent role must be unable to `SET ROLE postgres`, `CREATE ROLE`, `GRANT EXECUTE` on the minimal read to PUBLIC, or change its function OWNER. Privileged DDL probes are wrapped in **rollback-only transactions**, with success treated as a test failure.
+- Every independent role must be unable to `SET ROLE postgres`, `CREATE ROLE` or transfer the minimal-read function OWNER (SQLSTATE `42501`). For `GRANT EXECUTE TO PUBLIC`, PostgreSQL may instead emit a warning and exit successfully without adding any privilege; **the test inspects the effective function ACL inside the rollbacked transaction** and fails only if PUBLIC EXECUTE actually becomes available. Privileged DDL probes are wrapped in rollback-only transactions.
 - M1-18 positive catalog and rollbacked four negative permission-drift checks are repeated. The source-tree `1970` function Owner is explicitly confirmed as **CI postgres**, producing a **HOLD, not a false Owner parity PASS**.
 
 ## Fixture trust boundary
