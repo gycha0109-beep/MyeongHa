@@ -11,8 +11,14 @@ type GuardContext = Parameters<
 
 const context = (memories: unknown[], admissions: unknown[]): GuardContext =>
   ({
+    version: 'seyeon-production-context-v1',
     retrievedMemories: memories,
     personalRecordAdmissions: admissions,
+    recentMessages: [],
+    relationshipHistoryRecords: [],
+    relationshipRevisionUsedForTurn: 0,
+    historyThroughRevision: 0,
+    activeRelationshipEventCount: 0,
   }) as unknown as GuardContext;
 
 const relationship = {
@@ -41,8 +47,44 @@ describe('Se-yeon Production personal-record pre-model safety interlock', () => 
     expect(Object.isFrozen(verdict)).toBe(true);
 
     expect(assertSeyeonPersonalRecordsNotUsedBeforeUnprotectedCommitV1(
-      context([relationship], [{ reason: 'UNSUPPORTED_SCHEMA' }]),
+      context([], [{ reason: 'UNSUPPORTED_SCHEMA' }]),
     ).state).toBe('no_admitted_personal_records');
+  });
+
+
+  it('blocks unapproved historical and relationship-derived context before any Provider', () => {
+    const clean = context([], []);
+    const cases = [
+      { ...clean, recentMessages: [{ messageId: 'old', role: 'user', text: 'private user canary' }] },
+      { ...clean, recentMessages: [{ messageId: 'old', role: 'assistant', text: 'private response canary' }] },
+      { ...clean, retrievedMemories: [relationship] },
+      { ...clean, relationshipHistoryRecords: [{ eventId: 'old-derived' }] },
+      { ...clean, relationshipRevisionUsedForTurn: 2, historyThroughRevision: 2 },
+      { ...clean, activeRelationshipEventCount: 1 },
+    ];
+    for (const candidate of cases) {
+      expect(() => assertSeyeonPersonalRecordsNotUsedBeforeUnprotectedCommitV1(
+        candidate as GuardContext,
+      )).toThrow(SeyeonPersonalRecordPrecommitHoldV1);
+    }
+  });
+
+  it('does not treat missing, corrupted, or inconsistent historical census as zero', () => {
+    const clean = context([], []);
+    for (const changed of [
+      { ...clean, recentMessages: null },
+      { ...clean, relationshipHistoryRecords: undefined },
+      { ...clean, relationshipHistoryRecords: { length: 0 } },
+      { ...clean, activeRelationshipEventCount: undefined },
+      { ...clean, activeRelationshipEventCount: -1 },
+      { ...clean, historyThroughRevision: 1 },
+      { ...clean, relationshipRevisionUsedForTurn: 1 },
+      { ...clean, version: 'unknown-source-v2' },
+    ]) {
+      expect(() => assertSeyeonPersonalRecordsNotUsedBeforeUnprotectedCommitV1(
+        changed as GuardContext,
+      )).toThrow(SeyeonPersonalRecordPrecommitHoldV1);
+    }
   });
 
   it('holds a Memory or Life Fact that would enter the actual model context', () => {
