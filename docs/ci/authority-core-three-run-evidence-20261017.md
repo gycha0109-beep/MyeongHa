@@ -18,15 +18,15 @@ The 40 **command** timings include PostgreSQL locks, waits, full race assertions
 
 | Stage | #2247 sec | #2257 sec | #2258 sec |
 | --- | ---: | ---: | ---: |
-| baseline-and-early-guards | 38 | 33 | see detailed run log |
-| seyeon-r1-positive-pin-isolated | 1 | 1 | see detailed run log |
-| seyeon-r2-actual-v2-isolated | 2 | 3 | see detailed run log |
-| seyeon-governor-and-cost-races | 118 | 109 | see detailed run log |
-| character-and-record-concurrency | 47 | 42 | see detailed run log |
-| reader-and-grant-races | 55 | 52 | see detailed run log |
-| remaining-authority-and-catalog | 14 | 13 | see detailed run log |
+| baseline-and-early-guards | 38 | 33 | 33 |
+| seyeon-r1-positive-pin-isolated | 1 | 1 | 1 |
+| seyeon-r2-actual-v2-isolated | 2 | 3 | 4 |
+| seyeon-governor-and-cost-races | 118 | 109 | 109 |
+| character-and-record-concurrency | 47 | 42 | 38 |
+| reader-and-grant-races | 55 | 52 | 52 |
+| remaining-authority-and-catalog | 14 | 13 | 12 |
 
-Where detailed per-stage values have not been collected here, the workflow log remains authoritative; no inferred values are shown.
+These are the exact seven stage durations recorded in each of the three completed PR-event job logs; scripts and runner job durations must not be conflated.
 
 ## Decision — no unsafe speedup
 
