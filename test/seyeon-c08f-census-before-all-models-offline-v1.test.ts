@@ -248,6 +248,46 @@ describe('C08-F Shadow: authoritative census BEFORE every model stage', () => {
     },
   );
 
+  it.each(MATRIX as readonly {
+    id:string; text:string; topic:string|null; expectedKinds:readonly string[];
+  }[])('$id: immutable C07 Gold routes through bounded first-turn Shadow without private access',
+    async gold => {
+      const h=scenario({
+        ...(gold.topic===null?{}:{topicKey:gold.topic}),
+        ...(gold.expectedKinds[0]===undefined?{}:{claimKind:gold.expectedKinds[0]}),
+      });
+      const args={
+        userText:gold.text,
+        contextInput:{...BASE,recentMessages:[{...CURRENT,text:gold.text}]},
+      };
+      if(gold.topic!==null){
+        await expect(h.run(args)).rejects.toMatchObject({
+          code:'FAST_SENSITIVE_PREFLIGHT_REJECTED',
+        });
+        expect(h.readFullThreadCensus).toHaveBeenCalledOnce();
+        expect(h.purposes).toEqual(['unified_preflight_shadow']);
+      }else if(gold.expectedKinds.length>0){
+        await expect(h.run(args)).rejects.toThrow(
+          'Fast-dialogue Shadow requires a governed, public, first-contact ordinary turn.',
+        );
+        expect(h.readFullThreadCensus).toHaveBeenCalledOnce();
+        expect(h.purposes).toEqual(['unified_preflight_shadow']);
+      }else{
+        const result=await h.run(args);
+        expect(result.scope).toBe('SHADOW_ONLY_NOT_PRODUCTION');
+        expect(result.envelope.utterance).toBe(GOOD_DRAFT.utterance);
+        expect(result.context.integrity.decisions).toEqual([]);
+        expect(h.readFullThreadCensus).toHaveBeenCalledTimes(4);
+        expect(h.purposes).toEqual([
+          'unified_preflight_shadow','turn_interpret_render_shadow','semantic_review',
+        ]);
+      }
+      expect(h.sourceDescriptorRead).not.toHaveBeenCalled();
+      expect(h.privateFactRead).not.toHaveBeenCalled();
+      expect(h.privateRetrieve).not.toHaveBeenCalled();
+    },
+  );
+
   it('produces the exact three model stages for valid governed public first contact', async () => {
     const h = scenario();
     const result = await h.run();
