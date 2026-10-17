@@ -138,7 +138,7 @@ after="$(p -c "select concat_ws('|',
   join public.entitlement_events e on e.event_dedupe_key=ob.dedupe_key
   where e.source_type='receipt' and e.source_receipt_id='$receipt'::uuid
     and ob.aggregate_type='entitlement'))")"
-[[ "$before" == "$after" || "$baseline" == "$after" ]] ||
+[[ "$baseline" == "$after" ]] ||
  fail 'denied app role calls mutated committed ledger'
 echo 'PASS M1-16: denied API reads preserve original Receipt/Grant/Event/Reader/Outbox with no side effects'
 echo 'HOLD M1-16: M1-15 app read adapter has no production source SELECT authority; positive read projection needs separate DB/Security approval'
