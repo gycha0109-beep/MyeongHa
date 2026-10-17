@@ -154,3 +154,11 @@ Watchtower-Track: character-memory
 - **Gold 회귀:** 원본 C07 고정 `F02`, `R01`, `C02_mixed-admin-private_01`, `C02_mixed-romance-forgery_01`에서 첫 통합 분류 모델 호출 1회 후 이후 모델 0회·민감 Descriptor/Fact/Retrieval 0회·추가 Census 0회를 검사한다. 이는 Gold 라벨을 주입하는 **결정적 Fixture 검사**이지 실모델 Gold 품질 검증이 아니다.
 - 공통 `runCharacterGovernedPreflightV1`의 Production 권한 정책이나 실제 운영 모델/DB/Canon을 수정하지 않는다. 개인정보가 없는 첫 만남 Shadow에는 여전히 운영 권한이 부여되지 않으며, Grant positive/Commit/Revoke/Reveal 등 G0~G6는 **HOLD**.
 - CI와 정확 HEAD Full Integration 검증 전에는 PASS로 판정하지 않는다.
+
+### C08-P — Semantic Review 이후 반환 직전 최종 Census 방어 (무과금 후보)
+
+- C08-N은 세 번째 Provider `semantic_review` 호출 **직전** Census 3차 검사를 수행했지만, **해당 독립 검증 요청 처리 중** 신규 RECEIVE가 발생하면 이미 생성된 예전 첫 턴 결과가 최종 반환될 수 있었다.
+- C08-P는 `guardSeyeonRendererOutputV2`가 성공한 직후와 Shadow 반환 사이에서 `requireAuthoritativeFirstTurnCensusShadowV1`를 **4차 호출**한다. 중간에 메시지가 늘거나 Census가 실패하면 `FAST_THREAD_CENSUS_REJECTED`로 결과 전체를 거부한다. 기존 세 Provider 호출 구성과 안전한 공개 첫 인사만 유지한다.
+- `test/seyeon-c08f-census-before-all-models-offline-v1.test.ts`는 의미 검증 모델이 반환한 뒤 4번째 검증에 `messageCount=2`가 관측되는 합성 RECEIVE와 4차 Census의 저장소 예외를 모두 강제해, 모델 3회 호출을 숨기지 않고 사용자에게 Shadow 결과를 반환하지 않는지 검사한다. 정상 첫 턴: **Provider 3회, Census 4회**. 개인정보 Descriptor/Fact/Retrieval 0회.
+- 4차 Census는 **트랜잭션/스냅샷 잠금이 아니므로** 마지막 조회 직후의 추가 RECEIVE를 방지하지 못한다. 저장·HTTP Reveal·Replay가 운영에서 안전해지는 것은 아니며, G0~G6·positive Grant·실제 Commit↔Revoke·Production 전환은 계속 **HOLD**.
+- 외부 모델 호출, 민감정보 DB 조회, Gold/Canon 수정, 새 유료 AI 평가/배포는 수행하지 않는다. PR의 정확 HEAD 기본 CI 및 Full Integration PASS 확인 전에는 완료로 간주하지 않는다.
