@@ -54,6 +54,9 @@ jobs:
           [[ "$MYEONGHA_SAJU_SMOKE_SCOPE" == 'member_only' || "$MYEONGHA_SAJU_SMOKE_SCOPE" == 'member_and_guest' ]]
           if [[ "$MYEONGHA_SAJU_SMOKE_SCOPE" == 'member_and_guest' ]]; then
             [[ "$GITHUB_EVENT_NAME" == 'workflow_dispatch' ]]
+            # A failed/cancelled first attempt may already have written the Guest fixture.
+            # Re-running the same workflow/job must never write another fixture.
+            [[ "$GITHUB_RUN_ATTEMPT" == '1' ]]
             [[ "$MYEONGHA_SAJU_GUEST_WRITE_CONFIRM" == 'VERIFY_SAJU_GUEST_WRITE' ]]
           fi
           test -n "${MYEONGHA_PRODUCTION_MEMBER_EMAIL:-}"
