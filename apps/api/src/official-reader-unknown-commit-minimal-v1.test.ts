@@ -27,7 +27,7 @@ function mock(observation: unknown = 'NO_COMMITTED_EFFECT_VISIBLE', failSql?: st
           if (failSql === sql) throw new Error('simulated DB error');
           return {rows: (
             sql===MINIMAL_UNKNOWN_COMMIT_READ_SQL ? [{observation}] : []
-          ) as readonly Row[]};
+          ) as unknown as readonly Row[]};
         },
         release(error?:unknown) {released.push(error);},
       };
