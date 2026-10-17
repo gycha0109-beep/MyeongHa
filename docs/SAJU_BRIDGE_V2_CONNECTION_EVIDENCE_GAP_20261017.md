@@ -2,6 +2,44 @@
 
 Watchtower-Track: saju-bridge
 
+## 2026-10-17 post-audit addendum — Product Member/Guest vs. separate high-isolation staging
+
+This addendum supersedes only the historical `NOT_VERIFIED` status of **narrow evidence dimensions** below. The 2026-09-16/09-21 historical audit and source-only checker remain valid as **what was known at that time**. The current Product V2 critical path is `EXISTING_AUTHORITIES_V2`; do not make the retired S3A/new-role permit a prerequisite for current Member Calculation/Preview.
+
+| Evidence dimension | Current evidence | Allowed conclusion / boundary |
+|---|---|---|
+| Current MyeongHa Supabase DB role/function catalog | Owner-approved read-only `pg_catalog` observation on project `cnsfpcdiyofqvhpcegfc`: `myeongha_runtime` LOGIN, `myeongha_api_executor` NOLOGIN, runtime may `SET ROLE` executor without ADMIN/inherit, four existing Subject/Birth functions present with executor EXECUTE grants | Current metadata VERIFIED at read time, not a proof of all actual API behavior |
+| Current Saju Cloud Run service identity | [read-only lineage #39030302217](https://github.com/gycha0109-beep/Saju/actions/runs/39030302217), sanitized [artifact #12100610837](https://github.com/gycha0109-beep/Saju/actions/runs/39030302217/artifacts/12100610837) on 2026-10-17 11:52 UTC | `saju-production-00013-lar` READY, 100% traffic on that revision as observed, not a claim that the then-latest Saju `main` was deployed |
+| Vercel Production secret *name/target* metadata | Owner-redacted Vercel dashboard list: `MYEONGHA_SAJU_SERVICE_ORIGIN` and `MYEONGHA_SAJU_SERVICE_BEARER` targeted Production | OWNER_UI_OBSERVED only; connected Vercel metadata API returned 403, values intentionally not accessed |
+| Member positive Production end-to-end | [Production Saju Current Subject Smoke #39034130032](https://github.com/gycha0109-beep/MyeongHa/actions/runs/39034130032) on tested MyeongHa `8d1a22dcf5e57bbc33fdc43edb55a4d590815fd2`, `member_only`, 2026-10-17 12:50 UTC | **VERIFIED at this tested SHA and instant**: governed Member authentication/current self Birth Revision, Calculation 200 twice/deterministic, Preview 200 `delivered`, no Guest fixture creation. Not a standing guarantee after future drift, a measured SLO, a license to publish, or evidence of all Product interpretation |
+| Guest positive Production Calculation/Preview | The existing `member_and_guest` smoke requires `POST /api/session/bootstrap` and `POST /api/birth-profiles` with synthetic birth input | **NOT_VERIFIED**; the positive Guest case has actual Production data creation side effects, not a read-only observation. No Guest-positive proof from Member-only run |
+| High-isolation `R01–R14`, Root/Registry/Attestor, 3 separate DBs, `2D-4` | Existing development/CI local and Docker evidence; no separately admitted actual staging authority or Runner evidence | **NOT_VERIFIED / HOLD** independently of Product V2 Member success |
+
+### Guest Product route — safe remaining sequence
+
+1. Existing product-code Guest API contracts and local/CI regression may be reviewed **without** triggering Production Guest bootstrap. A negative unauthorized probe is not positive Guest proof.
+2. Positive Production Guest smoke currently creates a temporary Guest session **and** Birth profile; expiration of Guest authentication does **not** by itself prove that all persisted Birth records were cleaned up. Do not claim zero Production writes or cleanup unless separately attested.
+3. The workflow `.github/workflows/production-saju-current-subject-smoke.yml` and verifier `scripts/verify-production-saju-current-subject.mjs` now protect `member_and_guest` behind a **manual workflow dispatch and a second exact Guest-write confirmation** (introduced by the guarded PR for this addendum), while triggered `push` and bare-script defaults remain `member_only`. The presence of that option does **not** authorize executing it.
+4. Before opting into Production Guest writes: approve one scoped synthetic fixture, explicit maximum operations, retention/cleanup evidence and accountable test identity; alternatively provision a non-production isolated Guest fixture and test there. Do not create new credentials, migrate DB, use actual Member records, or run `member_and_guest` under the general development approval.
+5. After an authorized run, record its exact SHA, response status/state and fixture cleanup evidence without logging secrets or personal Birth data. Until then `GUEST_PRODUCTION_POSITIVE_E2E=NOT_VERIFIED`.
+
+### Separate `3-04-02 / 3-04-03B / 3-04-04 / 2D-4` staging track
+
+This is **not** a continuation of the Member Product HTTP smoke and is **not** unlocked by the successful Member run. Read-only operating evidence requires separately approved S01–S06 environment, budget, authorization and disposal decisions; independently controlled Root pin/Registry revision floor/Operator/Attestor/Challenge, isolated Staging Auth plus Subject/Nonce/Admission DB identities and TLS, Saju Proof staging ingress/keys, original R01–R14 records, independent attestation, and a separately admitted Target Authority V2. The one-shot isolated Runner requires **another distinct P3 decision**. See [operational R01–R14 runbook](./SAJU_HELD_STAGING_OPERATIONAL_EVIDENCE_RUNBOOK_8C2B2D30401.md), [completion roadmap](./SAJU_HELD_STAGING_COMPLETION_ROADMAP_8C2B2D.md), and [single-Owner segregated authority design](./MYEONGHA_SOLO_OWNER_SEGREGATED_AUTHORITY_ARCHITECTURE_V0_1.md). No existing Production or Refund project may be repurposed for this staging.
+
+```text
+PRODUCT_MEMBER_CALCULATION_PREVIEW_E2E=VERIFIED_AT_2026-10-17_SHA_8d1a22dc
+PRODUCT_GUEST_CALCULATION_PREVIEW_E2E=NOT_VERIFIED
+PRODUCT_PUBLISH_OR_SELL_AUTHORITY=HOLD
+SO3_R01_R14=NOT_VERIFIED
+SO3_STAGING_ADMISSION=HOLD
+SO3_RUNNER_CAN_RUN_ONCE=false
+canExecute=false
+canPublish=false
+canSell=false
+```
+
+
 ## Decision boundary
 
 This is a **read-only GitHub/source audit**, not a live MyeongHa or Saju production test. Product path is `EXISTING_AUTHORITIES_V2`: the governed Member JWT, `myeongha_runtime`, `SET LOCAL ROLE myeongha_api_executor`, current self Birth Revision, and server-owned Saju HTTPS/Bearer. The legacy S3A role/Permit path is not a product prerequisite.
