@@ -172,3 +172,12 @@ S8의 **비파괴/격리 검토는 S2~S7과 병렬 진행 가능**하며, S8 Pro
 - **환경/범위:** `CI=true`, `PGHOST=localhost`, scratch DB `myeongha_seyeon_positive_pin_candidate_test`만; 운영 DB DDL/DML/ACL/Positive Projector, API/G3 Reveal, 새 Workflow 없음. 해당 R3 결과는 G0 권한 정책·Codec 승인이나 G1/G2/G3 Production PASS를 뜻하지 않습니다.
 - **실제 PR·첫 증거:** [PR #2253](https://github.com/gycha0109-beep/MyeongHa/pull/2253), 최초 commit `dc7da7c4880426b8fa9df4b2b12ed5cc75f70a2d`, 최초 요청 [CI #39032505352](https://github.com/gycha0109-beep/MyeongHa/actions/runs/39032505352), [Governance #39032505286](https://github.com/gycha0109-beep/MyeongHa/actions/runs/39032505286), [Web #39032505441](https://github.com/gycha0109-beep/MyeongHa/actions/runs/39032505441); 현재 수행 중이므로 PASS는 별도 결과 확인 후 기록합니다.
 - **최종 규칙:** 본 문서 evidence 수정 후 exact 새 HEAD에서 CI/Governance/Web/Full Integration을 다시 확인하고, 병합/병합 후 main Run 링크·SHA·실패/재시도는 PR과 #1866 원장에 기록합니다. G0 실제 Owner 승인 없음.
+
+
+## 19. 2026-10-17 R4 — 실제 OpenAI Adapter 요청 바이트와 DB Owner Stage Receipt의 격리 실증
+
+- **범위:** #1985 Draft에서 **격리 전용** `provider_stage_receipts_r2`와 `claim_owner_dispatch_r2`만 선별하고, 현재 main의 실제 `createOpenAiSeyeonStructuredProviderV1`가 직렬화한 본문을 `meteredBeforeDispatch`에서 DB로 제출해 **DB가 직접 `sha256:utf8:v1`과 바이트 길이**를 계산하는 것을 검증. 기존 R1 Original Grant / SourceSet과 정확한 Attempt를 확인.
+- **테스트:** 2종 Preflight classifier + Interpreter/Renderer/Reviewer 등 5종 Stage 순서·중복 차단, 취소된 original Grant의 새 Grant 재발급으로 옛 Attempt 구제 불가, Adapter `fetchImpl`에서 실제 동일 바이트 확인. Synthetic fake fetch만 사용하며 외부 API와 유료 모델 호출은 0건.
+- **제한:** Stage DB RPC는 운영 기능·DDL로 배포하지 않습니다. DB 세션이 Commit한 뒤 실제 HTTP 바이트 송출까지의 **revoke 경쟁·암호학적 서명·transport attestation은 보장되지 않음**. G0 D-03/D-04/D-06 승인 및 G1 positive/G2/G3 Production은 여전히 HOLD. Zero Projector, no public/paid, no existing workflow changes.
+- **첫 검증 증거:** [PR #2255](https://github.com/gycha0109-beep/MyeongHa/pull/2255), 최초 테스트 코드 HEAD `c049fbd8cb8ed5fd80f4ef6e3daafe28f9935f40`. [CI #39034090088](https://github.com/gycha0109-beep/MyeongHa/actions/runs/39034090088) SUCCESS: `db-authority-core`의 **3개 실제 OpenAI adapter → DB exact UTF-8 Stage Receipt 검사 PASS** + 보안 트랙 및 R1/R2/R3 회귀. [Governance #39034089993](https://github.com/gycha0109-beep/MyeongHa/actions/runs/39034089993), [Web #39034089992](https://github.com/gycha0109-beep/MyeongHa/actions/runs/39034089992) SUCCESS. 실패·재시도 0건 (첫 검증 기준).
+- **완료 조건:** 이 문서 증거 수정 뒤 **최종 HEAD**의 CI/Governance/Web, exact-head Full Integration 11/11, squash main SHA·main CI/Production skips 확인. 실행 기록은 [#1866](https://github.com/gycha0109-beep/MyeongHa/issues/1866)과 PR에 추가합니다. G0/G1/G2/G3 운영 승인은 계속 HOLD.
