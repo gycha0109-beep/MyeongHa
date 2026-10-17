@@ -32,17 +32,38 @@ async function main() {
       '--workdir', '/repo', '--env', 'POSTGRES_PASSWORD=' + password,
       image]);
     started = true;
+    // The official postgres image runs a TEMPORARY postmaster while initializing
+    // the cluster, then shuts it down before exec-ing the final PID 1 postmaster.
+    // pg_isready can succeed during this temporary window; running createdb
+    // immediately afterwards races the server shutdown ("socket ... not found").
+    //
+    // Require BOTH final PID 1 = postgres and a successful SQL probe on that
+    // final server. /proc/1/comm works inside this Linux container on Windows
+    // Docker Desktop and does not depend on localized Docker log messages.
     let ready = false;
-    for (let attempt = 0; attempt < 45; attempt += 1) {
+    for (let attempt = 0; attempt < 90; attempt += 1) {
       try {
-        run(['exec', '--user', 'postgres', name, 'pg_isready', '-U', 'postgres']);
-        ready = true;
-        break;
+        const processName = run(['exec', '--user', 'postgres', name,
+          'cat', '/proc/1/comm'], { timeout: 10_000 }).trim();
+        if (processName === 'postgres') {
+          const probe = run(['exec', '--user', 'postgres', name,
+            'psql', '-X', '-qAt', '-v', 'ON_ERROR_STOP=1',
+            '-U', 'postgres', '-d', 'postgres', '-c', 'select 1;'],
+          { timeout: 10_000 }).trim();
+          if (probe === '1') {
+            ready = true;
+            break;
+          }
+        }
       } catch {
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        // Docker may still be in initdb or the final server may be starting.
       }
+      await new Promise(resolve => setTimeout(resolve, 1000));
     }
-    if (!ready) throw Error('HOLD_C08_DOCKER: PostgreSQL did not become ready.');
+    if (!ready) {
+      throw Error('HOLD_C08_DOCKER_FINAL_POSTMASTER_NOT_READY: final PID 1 and SQL probe not ready.');
+    }
+    process.stdout.write('C08_DOCKER_FINAL_POSTMASTER_READY\\n');
     run(['exec', '--user', 'postgres', name, 'createdb', '-U', 'postgres', database]);
     const version = run(['exec', '--user', 'postgres', '--env', 'PGDATABASE=' + database,
       name, 'psql', '-X', '-qAt', '-v', 'ON_ERROR_STOP=1', '-c', 'show server_version_num;']).trim();
