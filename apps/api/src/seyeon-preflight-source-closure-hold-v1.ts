@@ -6,6 +6,7 @@ import {
 } from './character-governed-preflight-v1.js';
 import {
   CHARACTER_DISCLOSURE_PREFLIGHT_SCHEMA_VERSION_V2,
+  type CharacterDisclosurePreflightResultV2,
 } from './character-disclosure-preflight-v2.js';
 
 /**
@@ -54,4 +55,41 @@ export function assertSeyeonPreflightZeroPrivateSourceClosureV1(
     permitsPositiveSourcePin: false as const,
     permitsHttpReveal: false as const,
   });
+}
+
+/**
+ * S3-B: deny an additional private-source read itself, not only its subsequent
+ * inclusion in a model prompt. The earlier zero Pin has not authorized the
+ * private retriever. Only a structurally explicit zero retrieval scope may
+ * progress; no positive Grant or Reveal authority is created here.
+ */
+export function assertSeyeonZeroPrivateRetrievalBeforeReadV1(
+  preflight: CharacterDisclosurePreflightResultV2,
+): void {
+  if (
+    preflight === null || typeof preflight !== 'object' ||
+    preflight.schemaVersion !== CHARACTER_DISCLOSURE_PREFLIGHT_SCHEMA_VERSION_V2
+  ) {
+    throw new SeyeonPreflightSourceClosureHoldV1();
+  }
+  if (preflight.status === 'not_sensitive') {
+    if (
+      preflight.source !== null ||
+      preflight.factAuthority !== null ||
+      preflight.decision !== null
+    ) {
+      throw new SeyeonPreflightSourceClosureHoldV1();
+    }
+    return;
+  }
+  if (preflight.status !== 'sensitive') {
+    throw new SeyeonPreflightSourceClosureHoldV1();
+  }
+  const scope = preflight.decision?.retrievalScope;
+  if (
+    scope === null || typeof scope !== 'object' ||
+    scope.depth !== 'none' || scope.sourceRef !== null
+  ) {
+    throw new SeyeonPreflightSourceClosureHoldV1();
+  }
 }
