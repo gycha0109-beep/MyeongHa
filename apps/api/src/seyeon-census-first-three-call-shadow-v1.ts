@@ -26,11 +26,12 @@ export const SEYEON_CENSUS_FIRST_THREE_CALL_SHADOW_VERSION_V1 =
  * The first full-thread census is mandatory BEFORE even the first
  * AI preflight classification. A second census is performed by the
  * existing fast-dialogue guard BEFORE the second model request.
- * A third census runs immediately before the independent semantic review.
- * Any sensitive preflight must stop BEFORE Source Descriptor/fact lookup.
+ * A third census runs immediately before the independent semantic review;
+ * a fourth runs after review and output guards, before returning the Shadow
+ * result. Sensitive preflight stops BEFORE Source Descriptor/fact lookup.
  *
- * Neither check pins a transaction, grants memory access, or
- * guarantees safety against changes after the read. No fallback,
+ * No census read pins a transaction, grants memory access, or
+ * guarantees safety against changes after the final read. No fallback,
  * persistence, replay or model-network adapter is installed.
  */
 export async function runSeyeonCensusFirstThreeCallShadowV1(input: Readonly<{
