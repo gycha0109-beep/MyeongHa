@@ -126,6 +126,11 @@ bash test/db/official_reader_m1_09_issuer_timeout_recovery.sh "$receipt" "$subje
 node test/db/official_reader_m1_13_inflight_first_issue_mvcc_probe.mjs \
  "$receipt" "$subject" "$intent" "$session" "$proposal" "$official"
 
+# M1-15: isolated PG15 pool reuses a deliberately dirty RR lease and verifies
+# explicit RESET -> READ COMMITTED READ ONLY -> API ROLE -> COMMIT, plus
+# ROLLBACK/role reset after a real SQL error. No production credentials.
+node test/db/official_reader_m1_15_readonly_pool_lifecycle.mjs
+
 # M1-03: The existing verified Receipt MUST survive a downstream bind
 # error while ALL issuance writes from the same transaction are rolled back.
 # Use the isolated DB fixture owner, NOT an API or Commerce runtime account.
