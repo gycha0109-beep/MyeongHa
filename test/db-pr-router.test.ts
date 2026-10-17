@@ -55,6 +55,7 @@ describe('DB PR router', () => {
     for (const fixturePath of [
       'test/db/seyeon_c08_first_turn_local_pg17.sh',
       'test/db/seyeon_c08_two_session_census_race_pg17.sh',
+      'test/db/seyeon_c08k_receive_rpc_two_session_pg17.sh',
     ]) {
       const result = route([fixturePath]);
       expect(result.suites).toEqual(['postgres17']);

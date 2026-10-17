@@ -111,3 +111,21 @@ Watchtower-Track: character-memory
 - Runtime fixture는 실모델 재평가 경로가 **아니며** network/provider 키를 요구하지 않는다.
 - Production Chat, Character Canon, 사용자 memory/DB/ACL, Saju, 결제, Workflows의 유료 승인 조건 변경 금지.
 - 다음 PR은 높은 위험도 순으로 **오프라인 Shadow 경로 통합 및 실패 감지**를 구현한다. 실모델 추가 호출/운영 승격을 자동화하지 않는다.
+
+---
+
+## 5. 2026-10-17 C08-G~M 실제 DB 실행 증거와 잔여 경계
+
+> 본 절은 앞선 시점의 계획 문구를 **실행 결과 기준으로 보정**합니다. 완료된 격리 PG17 테스트를 Production/G0~G6 승인으로 변경하지 않습니다.
+
+| 단계 | 실제 확인 결과 | 남은 경계 |
+| --- | --- | --- |
+| C08-G/H/I | 폐기형 PostgreSQL 17 Docker 실행, Windows CRLF 보정, 실제 컬럼 ACL/RLS 검증 구현·병합. 사용자가 **C08-I Windows PG17 6개 PASS**를 전달함 | 최종 #2234 수정본 Windows 재실행 별도 |
+| C08-J | 두 독립 PG17 세션의 READ COMMITTED Census 1→2 재조회 및 redacted 합성 이력 검증 CI PASS | 직접 INSERT는 실제 채팅 Receive가 아님 |
+| C08-L | Docker 이미지 초기화 임시 서버/최종 PID 1 경합 수정 **PR #2234** 병합. [Full Integration #39018805880](https://github.com/gycha0109-beep/MyeongHa/actions/runs/39018805880) SUCCESS | 사용자 Windows Docker Desktop에서 #2234 이후 실행 결과 미접수 |
+| **C08-K** | 실제 `cmd_receive_chat_turn_v1` 두 세션 경쟁·in-flight/failed_retryable 차단·정식 Abandon 후 수신·Census 재조회·중복/Hash·Subject 격리·Sequence/Attempt 검증. [PR #2241](https://github.com/gycha0109-beep/MyeongHa/pull/2241) **병합** (`4e50798c67f4b1324dd9e26357c914403614f587`), [정확 HEAD `4905c4a` Full Integration #39026266278](https://github.com/gycha0109-beep/MyeongHa/actions/runs/39026266278) **SUCCESS** | 실제 HTTP Receive, 운영 권한 및 모델·Commit·Reveal 전 구간 단일 원자성 미증명 |
+| **C08-M 후보** | 취소된 오래된 Attempt가 **실제 `cmd_commit_seyeon_chat_turn_runtime_v2`** 에서 거부되는지 독립 PG17 세션 장벽과 같은 READ COMMITTED 트랜잭션으로 증명하는 부정 테스트 구현. [C08-M 경계·한계 문서](character-memory-seyeon-c08m-stale-commit-after-real-receive-pg17-v1.md) | **현 PR의 실제 PG17 CI·Full Integration 전에는 PASS 주장 금지**. Validated 정상 Commit↔Revoke, Positive Grant Pin, 최초 Reveal/replay의 원자성은 G0~G3 공동 승인/구현까지 HOLD |
+
+- 최신 실제 비용·공개 상태: **추가 유료 AI 호출 0회, Production DDL/DML/ACL/배포/개인기록 양수 Projector 변경 0건**.
+- C08-M 이후 다음 frontier: G0 정책 공동 승인 대기와 별개로, 5회↔3회 **같은 Gold/Canon/Context/Guard**를 유지한 결정적 오프라인 비교·Fallback 검증. 실제 유료 품질/속도/가격 검증은 Owner 승인 전 금지.
+- **종료 규칙:** 3회 Production 활성화, 유료 검증, 개인기록 유출/Replay 경로 활성화, C08 전체 Production Ready 선언 금지. G0~G6 및 운영 배포/DR 정본은 [Security 종료 계약](security/SEYEON_AI_SECURITY_COMPLETION_GATES_V1.md), [Security 로드맵](operations/SEYEON_AI_SECURITY_EXECUTION_ROADMAP_V2_20261016.md)에서 별도로 판정.
