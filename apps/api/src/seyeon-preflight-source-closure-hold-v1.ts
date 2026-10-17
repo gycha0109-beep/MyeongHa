@@ -7,6 +7,7 @@ import {
 import {
   CHARACTER_DISCLOSURE_PREFLIGHT_SCHEMA_VERSION_V2,
   type CharacterDisclosurePreflightResultV2,
+  type CharacterDisclosureTopicClassificationV2,
 } from './character-disclosure-preflight-v2.js';
 
 /**
@@ -89,6 +90,37 @@ export function assertSeyeonZeroPrivateRetrievalBeforeReadV1(
   if (
     scope === null || typeof scope !== 'object' ||
     scope.depth !== 'none' || scope.sourceRef !== null
+  ) {
+    throw new SeyeonPreflightSourceClosureHoldV1();
+  }
+}
+
+/**
+ * S3-C: a positive disclosure topic can trigger private source-descriptor and
+ * fact-authority reads before the S3-B retriever guard. No owner-approved
+ * positive source/Grant contract exists. Refuse that metadata read in
+ * Production; only an explicitly classified non-sensitive question may pass.
+ *
+ * This is a zero-only read boundary, NOT positive source authorization.
+ */
+export function assertSeyeonZeroPrivateDescriptorBeforeReadV1(
+  classification: CharacterDisclosureTopicClassificationV2,
+): void {
+  if (
+    classification === null ||
+    typeof classification !== 'object' ||
+    Array.isArray(classification) ||
+    classification.topicKey !== null ||
+    ![
+      'casual_curiosity',
+      'reciprocal_disclosure',
+      'continuation',
+      'relationship_relevant',
+      'pressuring',
+    ].includes(classification.questionContext) ||
+    Object.keys(classification).some(
+      key => key !== 'topicKey' && key !== 'questionContext',
+    )
   ) {
     throw new SeyeonPreflightSourceClosureHoldV1();
   }
