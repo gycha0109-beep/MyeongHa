@@ -42,7 +42,7 @@ begin
   end if;
 
   select cr.id, cr.subject_id, cr.purchase_intent_id,
-         pi.capability_set_id, pi.product_offer_id
+         pi.capability_set_id, pi.product_offer_id, po.product_id
     into v_receipt
   from public.commerce_receipts cr
   join public.purchase_intents pi
@@ -126,7 +126,7 @@ begin
    and a.subject_id = p_subject_id
   join public.purchase_intent_reader_selections sel
     on sel.purchase_intent_id = v_receipt.purchase_intent_id
-   and sel.product_id = v_receipt.product_offer_id
+   and sel.product_id = v_receipt.product_id
   join public.standard_reading_official_bindings o
     on o.reading_id = a.official_reading_id and o.subject_id = p_subject_id
   where g.source_receipt_id = p_receipt_id
