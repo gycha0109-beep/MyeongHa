@@ -222,6 +222,12 @@ bash test/db/official_reader_m1_07_private_replay_source_sql.sh \
 bash test/db/official_reader_m1_10_unknown_commit_source.sh \
  "$receipt" "$subject" "$intent" committed "$grant" "$official"
 
+# M1-16: prove the *actual* app session cannot read the committed private
+# Receipt/Grant/Event/Reader/Outbox tables, columns or literal M1-10 SQL.
+# A successful owner-fixture read must NEVER imply production app READ access.
+bash test/db/official_reader_m1_16_runtime_recovery_read_acl_rls.sh \
+ "$receipt" "$subject" "$intent" "$grant" "$official"
+
 # M1-11: a loopback TCP proxy suppresses the real PostgreSQL COMMIT
 # CommandComplete frame after the DB has committed a private D2 replay.
 # The psql client sees a broken connection; a fresh direct read MUST agree.
