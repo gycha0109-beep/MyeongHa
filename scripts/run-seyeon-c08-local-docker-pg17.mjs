@@ -68,7 +68,7 @@ async function main() {
       'cd ' + scratch,
       'printf "C08_DOCKER_SHELL_LINE_ENDINGS_NORMALIZED\\n"',
       'bash test/db/run_ci_case.sh seyeon-c08-first-turn-local-pg17',
-    ].join('\\n');
+    ].join('\n');
     run(['exec', '--user', 'postgres', '--workdir', '/repo',
       '--env', 'PGUSER=postgres',
       '--env', 'PGDATABASE=' + database,
