@@ -14,6 +14,11 @@ bash test/db/seyeon_r1_disposable_positive_source_xor.sh
 # canonical-json projection hashes. Same REAL exact Attempt, synthetic only.
 SEYEON_POSITIVE_GRANT_REAL_PG=1 ./node_modules/.bin/vitest run \
   test/seyeon-source-digest-node-postgres-golden-v1.test.ts --maxWorkers=1
+# R4: Test-only DB Owner stage receipt for ACTUAL OpenAI adapter bytes.
+# Must run before G1 context_ready changes the in-flight Attempt state.
+psql -X -v ON_ERROR_STOP=1 -f test/db/seyeon_positive_g1_owner_dispatch_receipt_candidate_v1.sql
+SEYEON_POSITIVE_GRANT_REAL_PG=1 ./node_modules/.bin/vitest run \
+  test/seyeon-r4-owner-wire-receipt-disposable.test.ts --maxWorkers=1
 # Verify real zero-only baseline before changing *only* this disposable clone.
 psql -X -v ON_ERROR_STOP=1 -f test/db/seyeon_g2_production_compatibility_catalog_guard_v1.sql
 psql -X -v ON_ERROR_STOP=1 -f test/db/seyeon_g2_legacy_direct_commit_acl_cutover_candidate_v1.sql
