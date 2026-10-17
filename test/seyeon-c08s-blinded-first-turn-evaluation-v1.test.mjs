@@ -75,7 +75,7 @@ describe('C08-S bounded synthetic blind reviewer packet prep (NO paid model)',()
    {...a.pairs[0].candidate,revealLevel:'private'},
    {...a.pairs[0].candidate,memoryRefs:['synthetic-revoked']},
    {...a.pairs[0].candidate,privateSourceRefs:['secret-record']},
-   {...a.pairs[0].candidate,utterance:'private\\nleak'},
+   {...a.pairs[0].candidate,utterance:'private'+String.fromCharCode(10)+'leak'},
    {...a.pairs[0].candidate,utterance:'a'.repeat(501)},
    {...a.pairs[0].candidate,providerKey:'debug-internals'},
   ];
