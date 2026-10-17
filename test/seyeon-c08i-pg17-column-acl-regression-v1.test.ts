@@ -33,6 +33,25 @@ describe('C08-I: PG17 actual least-privilege census admission matches migration 
     expect(script).toContain('PASS_C08_PG17_OWNER_RLS_COLUMN_ACL_FUNCTION_AND_BROWSER_DENIAL');
   });
 
+  it('runs real PostgreSQL 17 acceptance only on disposable local/CI targets', () => {
+    const harness = source('test/db/run_ci_case.sh');
+    const fixture = source('test/db/seyeon_c08_first_turn_local_pg17.sh');
+    const suites = JSON.parse(source('scripts/ci/db-suites.json')) as {
+      postgres17: { cases: string[] };
+    };
+    expect(suites.postgres17.cases).toContain('seyeon-c08-first-turn-local-pg17');
+    expect(harness).toContain('seyeon-c08-first-turn-local-pg17)');
+    expect(harness).toContain('apply_pg17_migrations_through_seyeon_production_frontier');
+    for (const script of [harness, fixture]) {
+      expect(script).toContain('myeongha_c08_local_case_1');
+      expect(script).toContain('GITHUB_ACTIONS');
+      expect(script).toContain('DB_SUITE');
+      expect(script).toContain('PGHOST');
+      expect(script).toContain('myeongha_ci_case_');
+      expect(script).toContain('HOLD_C08_');
+    }
+  });
+
   it('denies browser function and table reads, and never changes the production route', () => {
     const script = source('test/db/seyeon_c08_first_turn_local_pg17.sh');
     const production = source('apps/api/src/production-seyeon-chat-runtime-v1.ts');
