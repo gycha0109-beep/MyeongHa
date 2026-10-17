@@ -15,7 +15,7 @@
     "dev": "npm run dev -w @myeongha/web",
     "start": "npm run build:web && npm run preview -w @myeongha/web",
     "typecheck": "tsc -p tsconfig.json --noEmit && npm run typecheck -w @myeongha/api-client && npm run typecheck -w @myeongha/web && npm run typecheck -w @myeongha/mobile",
-    "test": "vitest run",
+    "test": "node --test scripts/commerce/m1-18-migration-parity-gate.test.mjs scripts/operations/m1-19-live-migration-impact.test.mjs scripts/operations/m1-20-safe-staging-preflight.test.mjs && vitest run",
     "build": "tsc -p tsconfig.build.json",
     "build:web": "node scripts/build-web-static.mjs && npm run build -w @myeongha/web",
     "verify:deployment-config": "node scripts/verify-web-deployment.mjs",
