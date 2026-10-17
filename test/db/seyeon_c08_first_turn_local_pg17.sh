@@ -17,21 +17,59 @@ other_subject='68100000-0000-0000-0000-000000000002'
 other_auth='68000000-0000-0000-0000-000000000002'
 other_thread='68400000-0000-0000-0000-000000000002'
 
-role_acl="$("${run[@]}" -c "
+# 0950 grants a deliberately restricted COLUMN-level SELECT, not the full
+# relation SELECT privilege. A table-level has_table_privilege(...,'SELECT')
+# is therefore false for a healthy runtime and must not be used as admission.
+# Every probe below is metadata-only, run as disposable PostgreSQL admin.
+role_acl="$("${run[@]}" -F '|' -c "
 select
- (select relrowsecurity from pg_class where oid='public.conversation_messages'::regclass)
- and has_table_privilege('myeongha_api_executor','public.conversation_messages','SELECT')
- and has_function_privilege(
-  'myeongha_api_executor',
-  'public.qry_chat_thread_runtime_binding_v1(uuid,uuid)','EXECUTE'
- )
- and not has_function_privilege(
-  'anon','public.qry_chat_thread_runtime_binding_v1(uuid,uuid)','EXECUTE'
- )
+ coalesce((
+   select c.relrowsecurity
+   from pg_catalog.pg_class c
+   where c.oid='public.conversation_messages'::regclass
+ ),false),
+ exists (
+   select 1 from pg_catalog.pg_policies p
+   where p.schemaname='public'
+     and p.tablename='conversation_messages'
+     and p.policyname='conversation_messages_api_current_select_v1'
+     and p.cmd='SELECT'
+     and 'myeongha_api_executor'=any(p.roles)
+     and p.qual like '%current_myeongha_subject_id%'
+ ),
+ coalesce((
+   select not r.rolsuper and not r.rolbypassrls
+   from pg_catalog.pg_roles r
+   where r.rolname='myeongha_api_executor'
+ ),false),
+ coalesce((
+   select bool_and(pg_catalog.has_column_privilege(
+     'myeongha_api_executor','public.conversation_messages',
+     required_column, 'SELECT'))
+   from unnest(array[
+     'id', 'thread_id', 'subject_id', 'sequence_no',
+     'sender_type', 'redacted_at'
+   ]) required_column
+ ),false),
+ pg_catalog.has_function_privilege(
+   'myeongha_api_executor',
+   'public.qry_chat_thread_runtime_binding_v1(uuid,uuid)',
+   'EXECUTE'
+ ),
+ not pg_catalog.has_function_privilege(
+   'anon','public.qry_chat_thread_runtime_binding_v1(uuid,uuid)','EXECUTE'
+ ),
+ not pg_catalog.has_table_privilege(
+   'anon','public.conversation_messages','SELECT'
+ );
 ")"
-[[ "$role_acl" == 't' ]] || {
-  echo HOLD_C08_PG17_ROLE_RLS_PRIVILEGE_CONTRACT >&2; exit 1;
-}
+if [[ "$role_acl" != 't|t|t|t|t|t|t' ]]; then
+  IFS='|' read -r rls policy non_bypass column_select executor_function     browser_no_execute browser_no_select <<< "$role_acl"
+  echo "HOLD_C08_PG17_ROLE_RLS_PRIVILEGE_CONTRACT" >&2
+  printf 'C08_ACL_DIAGNOSTIC rls=%s owner_policy=%s non_bypass=%s required_column_select=%s executor_function=%s browser_function_denied=%s browser_table_denied=%s\n'     "$rls" "$policy" "$non_bypass" "$column_select" "$executor_function"     "$browser_no_execute" "$browser_no_select" >&2
+  exit 1
+fi
+echo PASS_C08_PG17_OWNER_RLS_COLUMN_ACL_FUNCTION_AND_BROWSER_DENIAL
 
 "${run[@]}" > /dev/null <<'SQL'
 insert into auth.users(id) values
