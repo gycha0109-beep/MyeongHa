@@ -51,38 +51,63 @@ function replayResult() {
 }
 
 describe('Seyeon Member turn-send HTTP', () => {
-  it('accepts only clientTurnId + text and exposes a narrow replay-safe receipt', async () => {
-    let received: unknown;
-    const response = await handleSeyeonChatTurnSendRequestV1({
-      request: request(),
-      requestId: 'req-1',
-      serverTime: '2026-10-07T00:00:00.000Z',
-      identityEvidenceVerifier: memberVerifier(),
-      runtime: {
-        run: async (input) => {
-          received = input;
-          return replayResult() as never;
+  it.each(['committed_replay', 'executed'] as const)(
+    'refuses %s HTTP first Reveal before metered runtime and sends zero assistant bytes',
+    async (disposition) => {
+      let runtimeCalls = 0;
+      const response = await handleSeyeonChatTurnSendRequestV1({
+        request: request(),
+        requestId: 'req-first-reveal',
+        serverTime: '2026-10-17T08:30:00.000Z',
+        identityEvidenceVerifier: memberVerifier(),
+        runtime: {
+          run: async () => {
+            runtimeCalls += 1;
+            if (disposition === 'committed_replay') return replayResult() as never;
+            return {
+              ...replayResult(),
+              execution: {
+                ...replayResult().execution,
+                disposition: 'executed',
+                runtimeResult: {
+                  envelope: { utterance: 'UNAUTHORIZED_FIRST_REVEAL_CANARY' },
+                },
+              },
+            } as never;
+          },
         },
-      },
-    });
+      });
 
-    expect(response.status).toBe(200);
-    expect(received).toEqual({
-      verifiedEvidence: { kind: 'member', verifiedAuthUserId: 'auth-user' },
-      threadId: THREAD_ID,
-      clientTurnId: CLIENT_TURN_ID,
-      text: '안녕하세요.',
+      const text = await response.text();
+      expect(response.status).toBe(503);
+      expect(response.headers.get('cache-control')).toBe('no-store');
+      expect(JSON.parse(text)).toMatchObject({
+        ok: false,
+        error: {
+          code: 'SEYEON_FIRST_REVEAL_AUTHORITY_UNAVAILABLE',
+          messageKey: 'chat.secure_reveal_unavailable',
+          retryable: false,
+        },
+      });
+      expect(runtimeCalls).toBe(0);
+      expect(text).not.toContain('저장된 답변입니다.');
+      expect(text).not.toContain('UNAUTHORIZED_FIRST_REVEAL_CANARY');
+      expect(text).not.toContain(TURN_ID);
+      expect(text).not.toContain(MESSAGE_ID);
+    },
+  );
+
+  it('does not start even the zero-source internal dogfood Provider without HTTP Reveal proof', async () => {
+    let runtimeCalls = 0;
+    const response = await handleSeyeonChatTurnSendRequestV1({
+      request: request({ clientTurnId: CLIENT_TURN_ID, text: '안녕하세요.' }),
+      requestId: 'req-no-db-privilege',
+      serverTime: '2026-10-17T08:30:00.000Z',
+      identityEvidenceVerifier: memberVerifier(),
+      runtime: { run: async () => { runtimeCalls += 1; return replayResult() as never; } },
     });
-    const payload = await response.json();
-    expect(payload.data).toEqual({
-      turnId: TURN_ID,
-      assistantMessageId: MESSAGE_ID,
-      assistantText: '저장된 답변입니다.',
-      sequenceNo: 2,
-      replayed: true,
-    });
-    expect(payload.data.subjectId).toBeUndefined();
-    expect(payload.data.provider).toBeUndefined();
+    expect(response.status).toBe(503);
+    expect(runtimeCalls).toBe(0);
   });
 
   it('rejects authority injection fields before runtime execution', async () => {
