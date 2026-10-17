@@ -146,3 +146,11 @@ Watchtower-Track: character-memory
 - `test/seyeon-c08f-census-before-all-models-offline-v1.test.ts`는 두 번째 Census 통과 후 세 번째 검사 시 `messageCount=2`로 변하는 합성 경합, 정상 실행 시 Census 3회/모델 3회를 검증한다. 운영 경로에 연결하거나 유료 모델 호출을 추가하지 않는다.
 - **검사 사이 경합을 줄일 뿐**, DB 트랜잭션 잠금, 첫 Commit·Grant Revoke의 최종 선형화, HTTP Reveal·Replay, G0~G6 승인을 증명하지 않는다. 세 번째 검사 직후에도 경합은 가능하므로 Production은 HOLD.
 - 해당 PR의 CI 및 정확 HEAD Full Integration 성공 전에는 신규 검증을 PASS로 판정하지 않는다.
+
+### C08-O — 민감 Gold 첫 턴 Shadow Metadata 조회 전 차단 (무과금 후보)
+
+- **발견한 경계:** `runSeyeonCensusFirstThreeCallShadowV1`의 통합 Preflight는 민감한 질문 `topicKey`를 얻으면 `runCharacterGovernedPreflightV1`의 기본 동작에 따라 `sourceDescriptor.readDescriptor`와 `factAuthorityResolver`가 실행될 수 있었다. 그 뒤 빠른 응답 Guard가 거부해도 이미 발생한 개인정보 Metadata 접근을 되돌릴 수 없다.
+- **수정:** Shadow 전용 `beforeSourceDescriptorRead`를 적용하여 민감 결과가 나오면 **어떠한 Source Descriptor/Fact Authority/Private Retrieval 이전** `FAST_SENSITIVE_PREFLIGHT_REJECTED`로 중단한다. 정상 공개 첫 인사/일반 질문에는 기존 흐름이 유지된다.
+- **Gold 회귀:** 원본 C07 고정 `F02`, `R01`, `C02_mixed-admin-private_01`, `C02_mixed-romance-forgery_01`에서 첫 통합 분류 모델 호출 1회 후 이후 모델 0회·민감 Descriptor/Fact/Retrieval 0회·추가 Census 0회를 검사한다. 이는 Gold 라벨을 주입하는 **결정적 Fixture 검사**이지 실모델 Gold 품질 검증이 아니다.
+- 공통 `runCharacterGovernedPreflightV1`의 Production 권한 정책이나 실제 운영 모델/DB/Canon을 수정하지 않는다. 개인정보가 없는 첫 만남 Shadow에는 여전히 운영 권한이 부여되지 않으며, Grant positive/Commit/Revoke/Reveal 등 G0~G6는 **HOLD**.
+- CI와 정확 HEAD Full Integration 검증 전에는 PASS로 판정하지 않는다.
