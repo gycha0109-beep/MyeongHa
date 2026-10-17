@@ -145,7 +145,7 @@ done
 if ! api_call "$receipt" >"$test_dir/verified.out" 2>"$test_dir/verified.err"; then
   fail "Scoped definer SELECT still fails real synthetic receipt: $(tail -n 4 "$test_dir/verified.err" | cut -c 1-160)"
 fi
-result="$(tail -n 2 "$test_dir/verified.out" | head -n 1)"
+result="$(tail -n 1 "$test_dir/verified.out")"
 case "$result" in
   NO_COMMITTED_EFFECT_VISIBLE|INCOMPLETE_OR_CONFLICTING_AUTHORITY|COMMITTED_COMPLETE_REQUIRES_PRIVATE_REPLAY)
     echo "PASS_M1_26_SYNTHETIC_RECEIPT_READ: valid receipt yields non-enumerating authority enum ($result)";;
@@ -156,7 +156,7 @@ esac
 if ! api_call "$missing" >"$test_dir/missing.out" 2>"$test_dir/missing.err"; then
   fail 'Missing synthetic Receipt call failed'
 fi
-[[ "$(tail -n 2 "$test_dir/missing.out" | head -n 1)" == SOURCE_UNAVAILABLE ]] ||
+[[ "$(tail -n 1 "$test_dir/missing.out")" == SOURCE_UNAVAILABLE ]] ||
   fail 'Unknown receipt leaked different status'
 echo 'PASS_M1_26_UNKNOWN_SOURCE: unknown Receipt returns SOURCE_UNAVAILABLE'
 # Context mismatch is a denied request, not a lookup about another Subject.
@@ -167,22 +167,19 @@ grep -Eq 'ERROR:[[:space:]]+42501([[:space:]]|$)' "$test_dir/other.err" ||
   fail 'Subject context mismatch must deny with 42501'
 echo 'PASS_M1_26_CROSS_SUBJECT_DENIED: mismatch is 42501, no Receipt enumeration'
 
-# Rollbacked revocation should reliably fail the same valid Receipt. Do
-# not leave any permissions changed after the negative test.
-if psql -X -qAt -v ON_ERROR_STOP=1 -v VERBOSITY=sqlstate \
-  >"$test_dir/revoke.out" 2>"$test_dir/revoke.err" <<SQL
-begin;
-revoke select on public.commerce_receipts from $owner;
-select pg_catalog.set_config('myeongha.subject_id','$subject',true);
-set local role myeongha_api_executor;
-select public.qry_official_reader_unknown_commit_minimal_v1(
-  '$subject'::uuid,'$receipt'::uuid);
-rollback;
-SQL
-then fail 'Removing definer Receipt SELECT failed to block read'; fi
+# Revoke in disposable fixture, then call in a separate truly READ ONLY
+# transaction. PostgreSQL cannot use SET TRANSACTION READ ONLY after DDL
+# already executed in the same transaction.
+psql -X -qAt -v ON_ERROR_STOP=1 -c \
+  "revoke select on public.commerce_receipts from $owner;" >/dev/null
+if api_call "$receipt" >"$test_dir/revoke.out" 2>"$test_dir/revoke.err"; then
+  fail 'Removing definer Receipt SELECT failed to block real read'
+fi
 grep -Eq 'ERROR:[[:space:]]+42501([[:space:]]|$)' "$test_dir/revoke.err" ||
-  fail 'Revoked definer table permission must deny with 42501'
-echo 'PASS_M1_26_REVOKED_SOURCE_DENIED: negative ACL test rolled back'
+  fail 'Revoked definer table privilege must deny with 42501'
+psql -X -qAt -v ON_ERROR_STOP=1 -c \
+  "grant select on public.commerce_receipts to $owner;" >/dev/null
+echo 'PASS_M1_26_REVOKED_SOURCE_DENIED: restricted definer loses, then regains, source read'
 
 bash test/db/official_reader_m1_18_live_cutover_readonly_gate.sh
 echo 'PASS_M1_26_DISPOSABLE_PG17: data-backed synthetic receipt, restricted definer read and API/source ACL fences'
