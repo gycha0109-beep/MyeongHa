@@ -34,6 +34,9 @@ const commerceEntitlementPatterns = [
 ];
 
 const postgres17Patterns = [
+  // C08 first-turn census is an actual PostgreSQL 17 suite fixture;
+  // edits to nested shell helpers must schedule PG17 rather than static CI only.
+  /^test\/db\/seyeon_c08_(?:first_turn_local_pg17|two_session_census_race_pg17)\.sh$/u,
   /^test\/db\/seyeon_r2_h_1730_forward\.sh$/u,
   /^test\/db\/seyeon_r2_h_1740_forward\.sh$/u,
   /^test\/db\/seyeon_r2_h_1750_forward\.sh$/u,
