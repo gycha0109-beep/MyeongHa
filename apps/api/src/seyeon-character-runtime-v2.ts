@@ -35,6 +35,7 @@ import {
   runCharacterGovernedPreflightV1,
   type CharacterGovernedPreflightResultV1,
 } from './character-governed-preflight-v1.js';
+import type { CharacterDisclosurePreflightResultV2 } from './character-disclosure-preflight-v2.js';
 import type {
   CharacterIntegrityAuthorityResolverPortV1,
   CharacterIntegrityClaimClassifierPortV1,
@@ -112,6 +113,9 @@ export type SeyeonExperimentalRelationshipSemanticsPortV2 =
   SeyeonRelationshipSemanticsPortV2;
 
 export interface RunSeyeonCharacterTurnV2Input {
+  readonly assertBeforePrivateSourceRetrieval?: (
+    preflight: CharacterDisclosurePreflightResultV2,
+  ) => unknown;
   /** Production may require a new source-census check after Preflight retrieval. */
   readonly assertGovernedPreflightSourceClosure?: (
     preflight: CharacterGovernedPreflightResultV1,
@@ -568,6 +572,9 @@ export async function runSeyeonCharacterTurnV2(
       relationship: input.governance.relationship,
       integrity: input.governance.integrity,
       disclosure: input.governance.disclosure,
+      ...(input.assertBeforePrivateSourceRetrieval === undefined
+        ? {}
+        : { beforePrivateSourceRetrieval: input.assertBeforePrivateSourceRetrieval }),
     });
   } catch (error) {
     throw new SeyeonCharacterRuntimeErrorV2(
