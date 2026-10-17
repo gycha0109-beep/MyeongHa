@@ -252,9 +252,17 @@ async function requestPreviewReading({ label, authorizationHeader }) {
   });
 }
 
-const smokeScope = process.env.MYEONGHA_SAJU_SMOKE_SCOPE ?? 'member_and_guest';
+const smokeScope = process.env.MYEONGHA_SAJU_SMOKE_SCOPE ?? 'member_only';
 if (smokeScope !== 'member_only' && smokeScope !== 'member_and_guest') {
   throw new Error('MYEONGHA_SAJU_SMOKE_SCOPE must be member_only or member_and_guest.');
+}
+// Production Guest bootstrap + Birth creation is a write. Require a second,
+// exact operator intent before acquiring a Member session or calling an API.
+if (
+  smokeScope === 'member_and_guest' &&
+  process.env.MYEONGHA_SAJU_GUEST_WRITE_CONFIRM !== 'VERIFY_SAJU_GUEST_WRITE'
+) {
+  throw new Error('Production Guest fixture creation requires explicit VERIFY_SAJU_GUEST_WRITE confirmation.');
 }
 
 const expectedSubjectId = requireUuid(
