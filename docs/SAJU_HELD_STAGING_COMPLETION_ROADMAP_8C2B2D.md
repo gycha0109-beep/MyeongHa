@@ -9,6 +9,8 @@
 
 Watchtower-Track: saju-bridge
 
+> **2026-10-18 비용 정책 확정:** Owner가 **추가 비용 0원**으로 명시하여 신규 유료 Staging/Pro/KMS/OpenBao 호스팅·별도 서버/DB·과금 가능 CI 초과 사용을 추진하지 않는다. 기존 Docker·GoTrue·TLS/PG·TypeScript 검증과 기존 무과금 한도 내 CI를 재사용한다. 이전 문서의 P2 신규 클라우드/견적 경로는 *장기 보류된 설계 참조*로만 남고 실제 작업 대기열·승인 요청에서 제외한다. [SO-3 제로 비용 한계/가능 범위](./SAJU_SO3_FRAMEWORK_ADOPTION_BLUEPRINT_V0_1_20261018.md#6-owner-결정-반영--추가-비용-0원만-허용-유료-토폴로지-장기-중단) 참조. R01–R14 실제 독립 증빙은 미확보/HOLD로 남기되 일반 Product V2 경로 작업을 막지 않는다. 이 비용 제약을 바꾸기 전까지 신규 유료 대안 추천·승인 요청을 재개하지 않는다.
+
 > **2026-10-18 SO-3 도구별 세부 구상 P0:** [SO-3 프레임워크 조합 상세 설계](./SAJU_SO3_FRAMEWORK_ADOPTION_BLUEPRINT_V0_1_20261018.md)에 기존 Docker·CI 재사용, OpenTofu/OpenBao/OPA/InSpec 적합성, R01–R14 공급자·원본 증빙 매핑, 3개 신규 격리 Supabase 후보/견적 산식과 P2 승인·폐기 게이트를 정리한다. **신규 클라우드·키·권한·Runner는 생성하지 않으며** Product Member E2E와 SO-3 운영 HOLD를 혼합하지 않는다.
 
 > **2026-10-17 검증 범위 분리:** [V2 Production 최신 증빙/Guest·SO-3 분리표](./SAJU_BRIDGE_V2_CONNECTION_EVIDENCE_GAP_20261017.md#2026-10-17-post-audit-addendum--product-memberguest-vs-separate-high-isolation-staging)에서 Member-only Production E2E [#39034130032](https://github.com/gycha0109-beep/MyeongHa/actions/runs/39034130032)의 Calculation 200×2/Preview 200 `delivered`를 **해당 실행 SHA에서만 VERIFIED**로 갱신한다. Guest 양성 운영 검증은 Production Guest/Birth 생성 때문에 별도 명시 승인 전 HOLD. SO-3 독립 Root·3DB·R01–R14, Target Authority V2, 2D-4는 Member 성공과 무관하게 **여전히 NOT_VERIFIED/HOLD**이다. `EXISTING_AUTHORITIES_V2` 일반 제품 연결에 폐기된 S3A Permit 설치를 다시 필수화하지 않는다. 무승인 자동 Guest fixture 생성을 방지하는 워크플로 경계는 같은 변경에서 별도로 강화한다.
