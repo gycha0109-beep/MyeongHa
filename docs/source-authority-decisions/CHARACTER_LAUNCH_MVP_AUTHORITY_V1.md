@@ -12,9 +12,9 @@
 승인된 핵심 문장은 다음과 같다.
 
 ```text
-현재 working roster 9명 전부 출시
+2026-10-15 승인된 6명만 1차 출시
 미라를 최종 이름으로 사용
-9명 전부 출시 시 회원에게 즉시 사용 가능
+1차 출시 6명 전원 회원에게 즉시 사용 가능
 A/B / cohort 없이 모든 회원이 동일한 활성 기본 릴리스 사용
 새 기본 릴리스 활성화 시 기존 기본 릴리스는 rollback용 active non-default로 유지
 회원 + 캐릭터별 활성 single-character 대화방은 1개
@@ -24,31 +24,28 @@ A/B / cohort 없이 모든 회원이 동일한 활성 기본 릴리스 사용
 세부 캐릭터 Canon/Persona/Behavior는 별도 검토 후 확정
 ```
 
-## 2. D-CHAR-LAUNCH-01 — 출시 캐릭터 9명 확정
+## 2. D-CHAR-LAUNCH-01 — 1차 출시 캐릭터 6명 확정 (2026-10-15 개정)
 
-MVP Production Launch roster는 **정확히 9명**이다.
+MVP 1차 Production Launch roster는 **정확히 6명**이다. 이전 2026-09-06의 9명 출시 결정은 2026-10-15 제품 소유자의 명시적 변경 승인으로 **1차 출시 범위에 한하여 대체**한다. 9명 전체의 공식 표시 이름·캐릭터 후보 자산은 유지한다.
 
 ```text
 세연
 여울
-서린
 라현
-미라
+백헌
 태겸
 윤호
-도윤
-백헌
 ```
 
-위 9개 이름은 Launch roster의 **공식 표시 이름**으로 승인한다.
+위 6개 이름은 1차 Launch roster의 공식 표시 이름이다. **서린·미라·도윤은 삭제·폐기·잠금 캐릭터가 아니라 후속 출시 후보로 보류**한다. 9명 전체의 기존 이름 승인과 Concept 방향은 유효하다.
 
 기존 `미라 = temporary` 상태는 종료한다. `미라`를 그대로 공식 표시 이름으로 사용한다.
 
 이 결정이 확정하는 것:
 
-- Launch roster membership = 위 9명;
-- Launch roster cardinality = 9;
-- 위 9개의 공식 표시 이름;
+- 1차 Launch roster membership = 위 6명;
+- 1차 Launch roster cardinality = 6;
+- 위 6개의 출시 표시 이름(나머지 3명도 기존 공식 이름 유지);
 - `미라` temporary-name 상태 종료.
 
 이 결정이 아직 확정하지 않는 것:
@@ -63,17 +60,17 @@ MVP Production Launch roster는 **정확히 9명**이다.
 
 따라서 roster membership/name 권한은 확정되지만 상세 Character content publication은 아직 별도 authoring/검토가 필요하다.
 
-## 3. D-CHAR-UNLOCK-01 — Launch 9명 전원 즉시 사용 가능
+## 3. D-CHAR-UNLOCK-01 — Launch 6명 전원 즉시 사용 가능
 
-MVP Launch 시 위 9명은 **모든 정상 Member에게 처음부터 사용 가능**하다.
+MVP 1차 Launch 시 위 6명은 **모든 정상 Member에게 처음부터 사용 가능**하다.
 
 ```text
-Launch roster 9명
+Launch roster 6명
 → default available
 → 별도 관계 단계 / Reading / Episode / season / operator unlock 조건 불필요
 ```
 
-이 정책은 Launch 9명에 한정한다.
+이 정책은 1차 Launch 6명에 한정한다.
 
 향후 추가 캐릭터나 조건부 해금 콘텐츠에 대해서는 `SRC-23`의 조건/World Event 권한이 계속 필요하다.
 
@@ -207,7 +204,7 @@ Rollback은 rollback 후보인 active non-default release를 다시 default로 �
 ```text
 O-C1-05
 → PARTIAL RESOLUTION
-→ Launch roster membership + 공식 표시 이름 9명 확정
+→ 1차 Launch roster membership 6명 확정, 전체 9명 공식 표시 이름 유지
 → 상세 canon/gender/visual/characterId 등은 미해결
 
 SRC-15
@@ -221,7 +218,7 @@ SRC-16
 
 SRC-23
 → NOT REQUIRED FOR LAUNCH 9
-→ Launch 9명은 default available
+→ 1차 Launch 6명은 default available
 → 향후 조건부 해금은 OPEN
 
 SRC-27
@@ -236,7 +233,7 @@ SRC-34
 
 SRC-35
 → OPEN / BLOCKING
-→ exact Launch roster membership/name은 확정
+→ 1차 Launch 6명 membership과 9명 이름은 확정
 → 상세 content authoring 이후 differentiation acceptance가 필요
 ```
 
@@ -244,12 +241,20 @@ SRC-35
 
 향후 구현은 다음을 위반하면 안 된다.
 
-1. Launch roster를 5명으로 축소하지 않는다.
-2. 승인 없이 9명 외 캐릭터를 Launch roster에 추가하지 않는다.
+1. 승인된 1차 Launch roster를 6명 미만으로 임의 축소하거나 6명 외 캐릭터를 임의 추가하지 않는다.
+2. 보류된 서린·미라·도윤을 별도 출시 승인 없이 1차 Launch roster에 넣지 않는다.
 3. `미라`를 temporary name으로 취급하지 않는다.
-4. Launch 9명에 조건부 unlock을 새로 요구하지 않는다.
+4. 1차 Launch 6명에 조건부 unlock을 새로 요구하지 않는다.
 5. MVP Member를 cohort/hash로 다른 릴리스에 배정하지 않는다.
 6. 새 default 활성화 시 이전 default를 자동 retired 처리하지 않는다.
 7. 동일 Member + Character에 활성 single-character thread를 중복 생성하지 않는다.
 8. 기존 thread의 pinned release/bundle을 global default 변경으로 자동 변경하지 않는다.
 9. 아직 승인되지 않은 상세 Character canon이나 compatibility 알고리즘을 추론해서 채우지 않는다.
+
+## 10. 2026-10-15 변경 승인 및 이행 경계
+
+- 제품 소유자 명시 승인: **세연·여울·라현·백헌·태겸·윤호 (여 3 / 남 3)**, 2026년 10월 1차 런칭 목표.
+- **후속 출시 보류:** 서린·미라·도윤. 이들의 기존 Concept, 공식 표시 이름, 자료와 향후 출시 가능성은 유지한다. 1차 런칭에서의 미노출은 조건부 unlock 정책이 아니다.
+- 기존 2026-09-06 9명 전원 1차 출시 승인 중 **roster cardinality, membership, immediate availability**만 이 결정으로 supersede한다. uniform rollout, release pinning, member thread 재사용 및 기타 권한은 변경하지 않는다.
+- 구현·테스트·UI·콘텐츠 번들·서버 availability guard에서 실제 6명만 노출·생성 가능한지는 별도 변경과 검증이 필요하다. 이 문서 승인만으로 Production 적용 또는 배포가 완료되지는 않는다.
+- 기존 캐릭터 데이터나 9인 working roster를 파괴적으로 삭제하지 않는다. **concept pool 9 / initial launch 6**을 구분한다.
