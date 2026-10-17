@@ -32,6 +32,8 @@ function fixture(options: {
   readonly rejectAuth?: boolean;
   readonly wrongSubjectKind?: boolean;
   readonly driftedRevision?: boolean;
+  /** Synthetic Saju preview response. Other tests keep the 503 baseline. */
+  readonly previewResponse?: 'admitted' | 'missing-admission' | 'missing-lifecycle' | 'wrong-envelope';
 } = {}) {
   const events: string[] = [];
   const sqlQueries: { sql: string; values?: readonly unknown[] }[] = [];
@@ -102,6 +104,27 @@ function fixture(options: {
     );
     const payload = JSON.parse(init.body) as { birth?: { date?: string } };
     expect(payload.birth?.date).toBe('2001-07-14');
+    if (String(url).endsWith('/api/preview/readings') && options.previewResponse !== undefined) {
+      const responseVersion = options.previewResponse === 'wrong-envelope'
+        ? 'unrecognized-product-response'
+        : 'myeonghwa-product-reading-response-v2';
+      return Response.json({
+        responseVersion,
+        state: 'delivered',
+        sections: [{ sectionId: 'core', title: 'synthetic test section', blocks: [] }],
+      }, {
+        status: 200,
+        headers: {
+          ...(options.previewResponse === 'missing-admission' ? {} : {
+            'x-myeonghwa-product-reading-response-admitted':
+              'myeonghwa-product-reading-response-v2',
+          }),
+          ...(options.previewResponse === 'missing-lifecycle' ? {} : {
+            'x-myeonghwa-reading-lifecycle': 'preview',
+          }),
+        },
+      });
+    }
     return Response.json({ synthetic: 'upstream unavailable' }, { status: 503 });
   });
 
@@ -172,6 +195,57 @@ describe('Saju V2 synthetic Member Auth -> existing Subject DB -> Saju transport
         expect(f.sqlQueries.map(x => x.sql).join('\n')).not.toMatch(
           /saju_bridge_private|myeongha_saju_bridge_permit|CREATE ROLE|SET ROLE postgres/iu,
         );
+      } finally {
+        await f.runtime.close();
+      }
+    },
+  );
+
+  it('returns a source-attested preview reading over the existing Auth and Birth transaction', async () => {
+    const f = fixture({ previewResponse: 'admitted' });
+    try {
+      const response = await handle(f, 'preview-reading');
+      expect(response.status).toBe(200);
+      expect(response.headers.get('cache-control')).toBe('no-store');
+      await expect(response.json()).resolves.toMatchObject({
+        ok: true,
+        data: {
+          lifecycle: 'preview',
+          reading: {
+            responseVersion: 'myeonghwa-product-reading-response-v2',
+            state: 'delivered',
+          },
+        },
+      });
+      expect(f.connect).toHaveBeenCalledOnce();
+      expect(f.memberFetchImpl).toHaveBeenCalledOnce();
+      expect(f.sajuFetchImpl).toHaveBeenCalledOnce();
+      expect(f.events.indexOf('COMMIT')).toBeLessThan(f.events.indexOf('RELEASE'));
+      expect(f.events.indexOf('RELEASE')).toBeLessThan(f.events.indexOf('SAJU'));
+      expect(f.sqlQueries.map(q => q.sql).join('\\n')).not.toMatch(
+        /saju_bridge_private|myeongha_saju_bridge_permit|CREATE ROLE|SET ROLE postgres/iu,
+      );
+    } finally {
+      await f.runtime.close();
+    }
+  });
+
+  it.each(['missing-admission', 'missing-lifecycle', 'wrong-envelope'] as const)(
+    'fails closed on %s preview success response without disclosing unadmitted reading',
+    async previewResponse => {
+      const f = fixture({ previewResponse });
+      try {
+        const response = await handle(f, 'preview-reading');
+        expect(response.status).toBe(503);
+        expect(response.headers.get('cache-control')).toBe('no-store');
+        const payload = await response.json();
+        expect(payload).toMatchObject({
+          ok: false,
+          error: { code: 'SAJU_PREVIEW_TEMPORARILY_UNAVAILABLE' },
+        });
+        expect(JSON.stringify(payload)).not.toContain('synthetic test section');
+        expect(f.events.filter(x => x === 'SAJU')).toHaveLength(1);
+        expect(f.events.indexOf('RELEASE')).toBeLessThan(f.events.indexOf('SAJU'));
       } finally {
         await f.runtime.close();
       }
