@@ -94,3 +94,10 @@ S8의 **비파괴/격리 검토는 S2~S7과 병렬 진행 가능**하며, S8 Pro
 - **S2-B 결과:** [PR #2201](https://github.com/gycha0109-beep/MyeongHa/pull/2201), head `ca47a6cb81543043931100eacfce2b77ed61c6d8`, [Full Integration #38873621056](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38873621056) SUCCESS, main merge `0da7b19d99cb896943b939515d0d62c68621d987`. Shadow 검사가 제거·손상된 관계 이력 표식을 HOLD한다.
 - **S2-C 실경로 안전 기본값:** 생산 Chat의 기존 `assertSeyeonPersonalRecordsNotUsedBeforeUnprotectedCommitV1`을 확장하여 아직 출처 폐쇄가 승인되지 않은 과거 User/Assistant 메시지, Relationship Event/원장, 양수 Revision 및 손상된 역사 메타데이터를 **Context Ready DB Pin/Preflight/Provider 이전**에 HOLD한다. 기존 정상 zero-personal + zero-derived 0건 경로만 통과한다.
 - **의도적 기능 제한:** 기존 개별 대화 이력이 있는 내부 Chat은 이 정책 하에서 실행 불가할 수 있다. G0 파생 출처 검증 및 사용자 범위 승인 전까지 임의로 제외·우회하지 않는다. 이 경로는 `publicRoute=null`, `routeMounted=false`, Projectors=[] 및 유료 AI HOLD 그대로. S2-C 통과도 G0/G1 양수/G2/G3/G5 운영 PASS가 아니다.
+
+## 9. 2026-10-17 S2-C 병합 및 S2-D `committed_replay` Reveal 기본 차단 (개발 후보)
+
+- **S2-C 병합:** [PR #2206](https://github.com/gycha0109-beep/MyeongHa/pull/2206), exact head `4ec9fba58dfd905d0940d3c6d1e6a6cbf4a95b15`, [Full Integration #38876236891](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38876236891) SUCCESS (11/11 Job), main squash `2d86ea3bbecdd57a18d762fdac690dec553ac87a`. Governance SUCCESS; Supabase Production SUCCESS이며 `deploy-migrations` 및 `governed-seyeon-relationship-backfill-1400-1450`은 SKIPPED. G0 공동 승인이나 양수 개인기록 권한은 여전히 없다.
+- **S2-D 위험:** 기존 `resolveSeyeonProductionCommittedReplayV1`은 Commit/Delivered의 assistantText를 오래된 저장 상태만으로 반환했다. `runSeyeonProductionChatExecutionV1`은 Model 이전 S2-C HOLD보다 먼저 재생 분기로 진입하므로 과거 파생 내용에 대한 새 권한 확인 없이 외부 Reveal할 위험이 있다.
+- **S2-D 안전 기본값:** 현재 정확한 원본 Record/Grant 및 파생 lineage의 재생 시점 권한 확인/취소 경합 선형화가 구현되지 않았으므로 Commit/Delivered `committed_replay`를 전부 FAIL-CLOSED한다. 이미 저장된 assistantText를 오류/응답에 싣지 않고, 기존 비재생·종결 재시도 구분은 유지한다. 정상 재생과 후속 재생 복구 작업까지 임시 중단될 수 있다.
+- **남은 실제 S5/G3:** 동일 권한을 HTTP 최초 공개, committed replay, worker 출력에 연결하고 두 PG 세션의 revoke↔reveal 경합을 검증해야 한다. 이번 코드·음성 테스트만으로 G3 PASS를 주장하지 않는다. Projectors=[], public/paid OFF, Production DB 쓰기 0 유지.

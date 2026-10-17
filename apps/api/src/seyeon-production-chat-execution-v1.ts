@@ -383,21 +383,11 @@ export function resolveSeyeonProductionCommittedReplayV1(
         'Committed Chat replay is missing authoritative assistant material.',
       );
     }
-    return Object.freeze({
-      version: SEYEON_PRODUCTION_CHAT_EXECUTION_VERSION_V1,
-      disposition: 'committed_replay' as const,
-      receivedTurn,
-      committedTurn: Object.freeze({
-        turnId: receivedTurn.turnId,
-        attemptId: committed.attemptId,
-        assistantMessageId: committed.assistantMessageId,
-        sequenceNo: committed.sequenceNo,
-        committedAt: committed.committedAt,
-        postTurnOutboxEventId: null,
-        replayed: true,
-      }),
-      assistantText: committed.assistantText,
-    });
+    // G0/G3 have no current exact-Grant / derived-source revalidation at Reveal.
+    // Committed material is not permission to send it again, even for old zero Pins.
+    throw new SeyeonProductionChatExecutionErrorV1(
+      'Committed Chat replay reveal requires current source authorization.',
+    );
   }
 
   if (
