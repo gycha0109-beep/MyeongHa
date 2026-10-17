@@ -278,8 +278,12 @@ describe('C08-B: 5-call runtime vs 3-call candidate using real guards and fake p
     interpreterProvider:h.provider,rendererProvider:h.provider,
     semanticReviewerProvider:h.provider,
    })).rejects.toThrow();
-   expect(h.calls).toEqual(LEGACY.slice(0,LEGACY.indexOf(purpose)+1));
-   expect(h.generate).toHaveBeenCalledTimes(LEGACY.indexOf(purpose)+1);
+   // The two legacy governance classifiers are launched concurrently.
+   // Either failure still permits the other *already-started* preflight call,
+   // but must prevent interpreter, renderer and reviewer execution.
+   const expectedCount=Math.max(2,LEGACY.indexOf(purpose)+1);
+   expect(h.calls).toEqual(LEGACY.slice(0,expectedCount));
+   expect(h.generate).toHaveBeenCalledTimes(expectedCount);
   },
  );
 
