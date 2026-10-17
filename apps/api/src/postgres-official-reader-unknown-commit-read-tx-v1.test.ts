@@ -189,7 +189,7 @@ describe('M1-15 fresh read-only PostgreSQL unknown-COMMIT boundary', () => {
       'select * from public.commerce_receipts',
     ];
     for (const sql of bad) {
-      await expect(tx.execute(c => c.query(sql))).rejects.toThrow(
+      await expect(tx.execute(async c => c.query(sql))).rejects.toThrow(
         'only one canonical read-only Receipt query',
       );
     }
