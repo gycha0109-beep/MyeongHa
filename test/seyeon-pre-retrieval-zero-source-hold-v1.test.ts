@@ -66,7 +66,7 @@ describe('Se-yeon S3-B zero-only admission before private retrieval', () => {
       characterId: 'seyeon' as const,
       userMessageRef: 'message-1',
       userText: 'hello',
-      relationship: { gate: 'PUBLIC', trustBand: 'low' } as const,
+      relationship: { gate: 'PUBLIC', trustBand: 'low', relevantSharedHistoryRefs: [] } as const,
       integrity: {
         classifier: { classify: async () => ({ claims: [] }) },
         authorityResolver: { resolve: async () => { throw new Error('unused integrity authority'); } },
@@ -94,7 +94,7 @@ describe('Se-yeon S3-B zero-only admission before private retrieval', () => {
       characterId: 'seyeon',
       userMessageRef: 'message-1',
       userText: 'hello',
-      relationship: { gate: 'PUBLIC', trustBand: 'low' },
+      relationship: { gate: 'PUBLIC', trustBand: 'low', relevantSharedHistoryRefs: [] },
       integrity: {
         classifier: { classify: async () => ({ claims: [] }) },
         authorityResolver: { resolve: async () => { throw new Error('unused'); } },
