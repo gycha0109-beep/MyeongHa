@@ -129,3 +129,12 @@ Watchtower-Track: character-memory
 - 최신 실제 비용·공개 상태: **추가 유료 AI 호출 0회, Production DDL/DML/ACL/배포/개인기록 양수 Projector 변경 0건**.
 - C08-M 이후 다음 frontier: G0 정책 공동 승인 대기와 별개로, 5회↔3회 **같은 Gold/Canon/Context/Guard**를 유지한 결정적 오프라인 비교·Fallback 검증. 현재 C08-B 추가 실험은 두 경로의 **각 Provider 단계 합성 실패**에서 후속 단계 중단·3회 Shadow의 5회 자동 Fallback 없음 여부(5회 기존 경로의 두 Preflight 분류기는 병렬 실행이므로 한쪽 실패에도 이미 시작된 다른 분류기 호출은 허용)를 확인하는 테스트 후보이며 **CI 증거 확보 전 PASS 아님**. 실제 유료 품질/속도/가격 검증은 Owner 승인 전 금지.
 - **종료 규칙:** 3회 Production 활성화, 유료 검증, 개인기록 유출/Replay 경로 활성화, C08 전체 Production Ready 선언 금지. G0~G6 및 운영 배포/DR 정본은 [Security 종료 계약](security/SEYEON_AI_SECURITY_COMPLETION_GATES_V1.md), [Security 로드맵](operations/SEYEON_AI_SECURITY_EXECUTION_ROADMAP_V2_20261016.md)에서 별도로 판정.
+
+### C08-B Gold 쌍대 Preflight 회귀 후보 (2026-10-17)
+
+- 기존 C07 Gold **고위험 11건 + 질문만 있는 F02/R01 2건**, 총 13개를 원본 fixture 그대로 소비하는 `test/seyeon-c08b-gold-paired-preflight-offline-v1.test.ts`를 추가한다.
+- 기존 서버 `runCharacterGovernedPreflightV1`과 실제 `createIntegrityClassifier`/`createDisclosureClassifier`(2 분류 호출), `createSeyeonUnifiedGovernanceCandidateV1`(1 통합 분류 호출)을 동일 원본 Text/Subjectless 합성 환경과 동일 G0 거부 조건으로 비교한다. 각 모델 응답은 합성 Gold 값으로 주입한다. **모델의 Gold 적중률을 측정하는 시험이 아니다.**
+- 기존 `guardCharacterIntegrityClassificationV1`/`guardCharacterDisclosureTopicClassificationV2` 결과 및 `scoreSeyeonC07BoundaryV1`의 Gold 비교, 비민감 항목의 최종 integrity decision, 민감 항목의 **Source Descriptor 조회 이전 동일 HOLD**, 사적 출처 조회 0건과 전체 분류 호출 횟수를 확인한다.
+- 민감 질문과 결합한 혼합 Gold 2건, 질문형 F02/R01은 **별도 미승인 G0 Descriptor 조회 방지**로 최종 대화 출력까지 진행하지 않는다. 3-call fast first-contact Shadow는 무기억·무이력·무클레임 경계만 인정하므로 해당 사례를 3-call 정상 응답 성능 증명으로 취급하지 않는다.
+- 이번 증거는 **13개 case × 두 경로의 결정적 합성 분류 검사**일 뿐, C07 유료 72슬롯 관측(실측 6/72)을 변경하지 않는다. G0~G6, 개인정보 Grant/Commit/Reveal 원자성, Production 라우팅, 유료 AI 평가 모두 HOLD.
+- 작업 PR의 실제 CI 및 최신 HEAD Full Integration에 성공하기 전에는 이 후보를 PASS로 판정하지 않는다.
