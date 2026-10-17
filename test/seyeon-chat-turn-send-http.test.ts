@@ -110,6 +110,45 @@ describe('Seyeon Member turn-send HTTP', () => {
     expect(runtimeCalls).toBe(0);
   });
 
+  it('keeps first-Reveal HOLD across an asynchronous Member verification gap', async () => {
+    let allowIdentity!: () => void;
+    const identityGate = new Promise<void>((resolve) => { allowIdentity = resolve; });
+    let runtimeCalls = 0;
+    const pending = handleSeyeonChatTurnSendRequestV1({
+      request: request(),
+      requestId: 'req-delayed-member-verification',
+      serverTime: '2026-10-17T08:30:00.000Z',
+      identityEvidenceVerifier: {
+        verifyRequestIdentity: async () => {
+          await identityGate;
+          return Object.freeze({ kind: 'member' as const, verifiedAuthUserId: 'auth-user' });
+        },
+      },
+      runtime: {
+        run: async () => {
+          runtimeCalls += 1;
+          return replayResult() as never;
+        },
+      },
+    });
+    // A request waiting for authentication must never start a Provider or
+    // publish already-persisted assistant bytes, even after identity resolves.
+    expect(runtimeCalls).toBe(0);
+    allowIdentity();
+    const response = await pending;
+    const wire = await response.text();
+    expect(response.status).toBe(503);
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    expect(JSON.parse(wire).error).toMatchObject({
+      code: 'SEYEON_FIRST_REVEAL_AUTHORITY_UNAVAILABLE',
+      retryable: false,
+    });
+    expect(runtimeCalls).toBe(0);
+    expect(wire).not.toContain('저장된 답변입니다.');
+    expect(wire).not.toContain(TURN_ID);
+    expect(wire).not.toContain(MESSAGE_ID);
+  });
+
   it('rejects authority injection fields before runtime execution', async () => {
     let calls = 0;
     const response = await handleSeyeonChatTurnSendRequestV1({
