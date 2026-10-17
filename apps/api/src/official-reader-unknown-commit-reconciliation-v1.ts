@@ -84,6 +84,11 @@ where cr.id=$1::uuid and cr.verification_status='verified'
  'definitionHash',pcs.definition_hash)
 order by pci.item_key`.trim();
 
+/** Restrict injected transaction adapters to the original canonical SELECT. */
+export function isOfficialReaderUnknownCommitReadSqlV1(sql: string): boolean {
+  return sql === UNKNOWN_COMMIT_READ_SQL;
+}
+
 export type UnknownCommitReconciliationOutcomeV1 = Readonly<{
   readonly status: 'held';
   readonly reason:
