@@ -34,6 +34,10 @@ export async function runCharacterGovernedPreflightV1(input: {
   readonly userMessageRef: string;
   readonly userText: string;
   readonly relationship: CharacterDisclosureRelationshipEvidenceV2;
+  /** Production-only zero-authority check before a private DB/Content read. */
+  readonly beforePrivateSourceRetrieval?: (
+    preflight: CharacterDisclosurePreflightResultV2,
+  ) => unknown;
   readonly integrity: Readonly<{
     readonly classifier: CharacterIntegrityClaimClassifierPortV1;
     readonly authorityResolver: CharacterIntegrityAuthorityResolverPortV1;
@@ -64,6 +68,10 @@ export async function runCharacterGovernedPreflightV1(input: {
     factAuthorityResolver: input.disclosure.factAuthorityResolver,
   }),
   ]);
+
+  if (input.beforePrivateSourceRetrieval !== undefined) {
+    await input.beforePrivateSourceRetrieval(disclosure);
+  }
 
   const retrievedPrivateSources = await retrieveAllowedCharacterDisclosureSourcesV2({
     preflight: disclosure,
