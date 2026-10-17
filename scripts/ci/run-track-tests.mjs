@@ -7,6 +7,15 @@ const plan = resolveWorkTrackPlan(changed, { eventName: process.env.GITHUB_EVENT
 const vitest = 'node_modules/vitest/vitest.mjs';
 const run = (args) => execFileSync(process.execPath, [vitest, ...args], { stdio: 'inherit' });
 
+// These are Node built-in regression tests, not Vitest tests. Run them in
+// every Work Track (both full and incremental) without any dependency on PG.
+execFileSync(process.execPath, [
+  '--test',
+  'scripts/commerce/m1-18-migration-parity-gate.test.mjs',
+  'scripts/operations/m1-19-live-migration-impact.test.mjs',
+  'scripts/operations/m1-20-safe-staging-preflight.test.mjs',
+], { stdio: 'inherit' });
+
 if (plan.full) {
   run(['run']);
 } else {

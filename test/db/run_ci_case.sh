@@ -258,6 +258,22 @@ SQL
     psql -v ON_ERROR_STOP=1 -f test/db/fixtures/saju_staging_operator_admission_schema_8c2b2d1.sql >/dev/null
     bash test/db/saju_staging_operator_admission_authority.sh
     ;;
+  official-reader-m1-20-pg17-staging-fence)
+    # Disposable PostgreSQL 17 ONLY. Replays checked-in candidate migrations,
+    # not the remote-only 104KB historical restore, data, or production ledger.
+    verify_pg17
+    [[ "${CI:-}" == true && "${PGHOST:-}" == localhost &&
+       "${PGDATABASE:-}" == myeongha_ci_case_* ]] || {
+      echo 'M1-20: disposable PG17 CI case required' >&2
+      exit 2
+    }
+    apply_pg17_migrations_without_birth_authority
+    bash test/db/official_reader_m1_18_live_cutover_readonly_gate.sh
+    node --test scripts/operations/m1-19-live-migration-impact.test.mjs \
+      scripts/operations/m1-20-safe-staging-preflight.test.mjs
+    echo 'HOLD M1-20: full-source PG17 clone excludes historical live-only SQL'
+    echo 'HOLD M1-20: migration history/Owner/DR/nonproduction cutover not approved'
+    ;;
   saju-staging-operator-admission-v2)
     psql -v ON_ERROR_STOP=1 -f test/db/fixtures/saju_staging_operator_admission_schema_8c2b2d302.sql >/dev/null
     bash test/db/saju_staging_operator_admission_v2_authority.sh
