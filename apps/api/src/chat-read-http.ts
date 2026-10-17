@@ -15,6 +15,14 @@ const ROUTE_PREFIX = '/api/chat/' as const;
 const API_CONTRACT_VERSION = 'v0.9' as const;
 const NO_STORE = 'no-store' as const;
 
+/** G3/S5: no DB-current-rights Reveal for historical Se-yeon material yet. */
+class SeyeonChatHistoryRevealHoldV1 extends Error {
+  constructor() {
+    super('Se-yeon chat history Reveal requires current source authorization.');
+    this.name = 'SeyeonChatHistoryRevealHoldV1';
+  }
+}
+
 export const CHAT_READ_HTTP_BINDING_V1 = Object.freeze({
   method: GET_METHOD,
   route: '/api/chat/:threadId',
@@ -322,6 +330,13 @@ async function readChatState(
   }
   const binding = mapThreadBinding(bindingResult.rows[0], parsed.threadId);
 
+  // Enforce G3 fail-closed on the DB-owned participant set, not a caller
+  // supplied Character ID. Even a mixed thread can carry Se-yeon-derived
+  // assistant text; never fetch or serialize it before current-rights proof.
+  if (binding.participantCharacterIds.includes('seyeon')) {
+    throw new SeyeonChatHistoryRevealHoldV1();
+  }
+
   const streamResult = await client.query<StreamRow>(READ_STREAM_SQL, [
     subjectId,
     parsed.threadId,
@@ -401,6 +416,9 @@ export async function handleChatReadRequestV1(
       stringValue('server time', input.serverTime),
     );
   } catch (error) {
+    if (error instanceof SeyeonChatHistoryRevealHoldV1) {
+      return jsonError(503, 'SEYEON_HISTORY_REVEAL_HOLD', 'chat.unavailable', input.requestId);
+    }
     const constraint = postgresConstraint(error);
     if (constraint !== null && (
       constraint.includes('subject_ineligible') ||
