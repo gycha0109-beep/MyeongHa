@@ -47,6 +47,7 @@ import {
 import {
   createSeyeonProductionGovernanceV1,
 } from './seyeon-production-governance-v1.js';
+import { assertSeyeonPositiveProjectorsNotEnabledV1 } from './seyeon-positive-projector-admission-hold-v1.js';
 import {
   createSeyeonProductionRuntimeIdPortV1,
 } from './seyeon-production-runtime-ids-v1.js';
@@ -287,6 +288,9 @@ async function runSeyeonTurnRuntimePhaseV1<T>(
 export function createProductionSeyeonChatRuntimeV1(
   input: CreateProductionSeyeonChatRuntimeInputV1,
 ): ProductionSeyeonChatRuntimeV1 {
+  // Never initialize a Production Provider/DB runtime with a positive
+  // Projector while G0/G1/SRC-25 and atomic Commit are unapproved.
+  assertSeyeonPositiveProjectorsNotEnabledV1();
   if (input.costGovernorForRole !== undefined &&
       input.provider !== undefined) {
     throw new Error('Governed chat requires native, fully metered Provider config.');
@@ -332,6 +336,9 @@ export function createProductionSeyeonChatRuntimeV1(
     async run(
       runInput: RunProductionSeyeonChatInputV1,
     ): Promise<RunProductionSeyeonChatResultV1> {
+      // Recheck before Subject resolution: no new positive projector can
+      // silently ride an existing Production runtime instance.
+      assertSeyeonPositiveProjectorsNotEnabledV1();
       const threadId = text(runInput.threadId, 'threadId', 256);
       const clientTurnId = text(
         runInput.clientTurnId,
