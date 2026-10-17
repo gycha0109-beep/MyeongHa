@@ -3,13 +3,13 @@ set -euo pipefail
 # M1-25: source-pinned 1970 executed over an independently authenticated
 # non-superuser TCP connection in one disposable PostgreSQL 17 CI database.
 fail() { echo "FAIL_M1_25: $*" >&2; exit 1; }
-[[ "\${CI:-}" == true && "\${PGHOST:-}" == localhost &&
-   "\${PGPORT:-}" == 5432 && "\${PGUSER:-}" == postgres &&
-   "\${PGDATABASE:-}" == myeongha_ci_case_* && -n "\${PGPASSWORD:-}" ]] ||
+[[ "${CI:-}" == true && "${PGHOST:-}" == localhost &&
+   "${PGPORT:-}" == 5432 && "${PGUSER:-}" == postgres &&
+   "${PGDATABASE:-}" == myeongha_ci_case_* && -n "${PGPASSWORD:-}" ]] ||
    fail 'Only disposable localhost PG17 CI may run'
-[[ -z "\${SUPABASE_DB_PASSWORD:-}" &&
-   -z "\${SUPABASE_PRODUCTION_SESSION_POOLER_HOST:-}" &&
-   -z "\${SUPABASE_SERVICE_ROLE_KEY:-}" ]] ||
+[[ -z "${SUPABASE_DB_PASSWORD:-}" &&
+   -z "${SUPABASE_PRODUCTION_SESSION_POOLER_HOST:-}" &&
+   -z "${SUPABASE_SERVICE_ROLE_KEY:-}" ]] ||
    fail 'Production/Supabase credentials forbidden'
 [[ "$(psql -X -qAt -v ON_ERROR_STOP=1 -c 'show server_version_num')" =~ ^17[0-9]{4}$ ]] ||
    fail 'PG17 required'
