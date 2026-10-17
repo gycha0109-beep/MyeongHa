@@ -224,7 +224,7 @@ async function history(id:Fixture){
 describe.skipIf(!enabled)('R5 disposable actual-v2 current-rights first/replay/history',()=>{
  afterAll(async()=>{await pool?.end();});
  it('committed real v2: owner first/replay and page read only exact authorized body; no payload leak',async()=>{
-  const id=await committed(41);
+  const id=await committed(71);
   expect(await reveal(id)).toBe(body);
   expect(await http(id)).toBe(body);
   expect(await http(id)).toBe(body); // replay checks CURRENT Grant, not stored proof
@@ -234,14 +234,14 @@ describe.skipIf(!enabled)('R5 disposable actual-v2 current-rights first/replay/h
   expect(page.some(x=>x.sender_type==='user')).toBe(true);
  });
  it('forged message/attempt and wrong thread never reveal even with valid Grant',async()=>{
-  const id=await committed(42);
+  const id=await committed(72);
   expect(await http(id,{attempt:'d7200000-0000-4000-8000-000000000099'})).toBeNull();
   expect(await http(id,{assistantMessage:'d8300000-0000-4000-8000-000000000099'})).toBeNull();
   expect(await http(id,{thread:'d4000000-0000-4000-8000-000000000099'})).toBeNull();
   expect(await reveal(id)).toBe(body);
  });
  it('revoke and different regrant must HOLD both replay and whole history page',async()=>{
-  const id=await committed(43);
+  const id=await committed(73);
   expect(await http(id)).toBe(body);
   await transaction(async c=>{
     await c.query('update public.record_access_grants set revoked_at=clock_timestamp() where id=$1::uuid',[id.grant]);
@@ -255,7 +255,7 @@ describe.skipIf(!enabled)('R5 disposable actual-v2 current-rights first/replay/h
   await expect(history(id)).rejects.toMatchObject({constraint:'seyeon_offline_r5_page_held'});
  });
  it('denies redacted stored generated message and fails closed on history',async()=>{
-  const id=await committed(44);
+  const id=await committed(74);
   await clientAction(c=>c.query(
     'update public.conversation_messages set redacted_at=clock_timestamp() where id=$1::uuid',
     [id.assistantMessage],
@@ -267,7 +267,7 @@ describe.skipIf(!enabled)('R5 disposable actual-v2 current-rights first/replay/h
   expect(rows.every(x=>x.message_payload_jsonb==null)).toBe(true);
  });
  it('revoke-first independent PostgreSQL session blocks owner read until revoke COMMIT and reveals zero',async()=>{
-  const id=await committed(45);
+  const id=await committed(75);
   await clientAction(revoker=>clientAction(async reader=>{
    await revoker.query('BEGIN');
    try{
@@ -290,7 +290,7 @@ describe.skipIf(!enabled)('R5 disposable actual-v2 current-rights first/replay/h
   }));
  });
  it('reader-first holds Subject lock until read COMMIT; later revoke prevents every fresh replay',async()=>{
-  const id=await committed(46);
+  const id=await committed(76);
   await clientAction(reader=>clientAction(async revoker=>{
     await reader.query('BEGIN');
     try{
