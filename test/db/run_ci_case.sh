@@ -68,6 +68,15 @@ catalog_snapshot() {
 }
 
 case "$case_name" in
+  seyeon-c08-first-turn-local-pg17)
+    verify_pg17
+    [[ "${PGDATABASE:-}" == myeongha_c08_local_case_1 ]] || {
+      echo 'HOLD_C08_PG17_DISPOSABLE_DATABASE_REQUIRED' >&2
+      exit 1
+    }
+    apply_pg17_migrations_through_seyeon_production_frontier
+    bash test/db/seyeon_c08_first_turn_local_pg17.sh
+    ;;
   guest-promotion-auth-fk)
     version_num="$(psql -Atqc "show server_version_num")"
     if [[ "$version_num" -ge 160000 ]]; then
