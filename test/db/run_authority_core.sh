@@ -11,6 +11,25 @@ apply_migrations() {
 }
 
 isolated_template_db="myeongha_authority_core_template"
+isolated_template_ready=0
+
+# Optional, read-only CI profiling. Bash SECONDS avoids launching a timer
+# process or changing any PostgreSQL test invocation.
+authority_profile_started_seconds=$SECONDS
+authority_profile_previous_seconds=$SECONDS
+authority_profile_previous_stage=''
+authority_profile_stage() {
+  [[ "${MYEONGHA_AUTHORITY_PROFILE:-0}" == '1' ]] || return 0
+  local now=$SECONDS
+  if [[ -n "$authority_profile_previous_stage" ]]; then
+    printf 'AUTHORITY_CORE_STAGE stage=%s duration_seconds=%d total_seconds=%d\n' \
+      "$authority_profile_previous_stage" \
+      "$((now - authority_profile_previous_seconds))" \
+      "$((now - authority_profile_started_seconds))"
+  fi
+  authority_profile_previous_seconds=$now
+  authority_profile_previous_stage="$1"
+}
 
 cleanup_isolated_template() {
   dropdb --if-exists "$isolated_template_db" >/dev/null 2>&1 || true
@@ -18,26 +37,39 @@ cleanup_isolated_template() {
 trap cleanup_isolated_template EXIT
 
 ensure_isolated_template() {
+  # Run in the parent shell and reuse this result for every cloned case.
+  # The original implementation re-queried pg_database for each subshell.
+  if [[ "$isolated_template_ready" == '1' ]]; then
+    return 0
+  fi
   if psql -Atqc "select 1 from pg_database where datname = '${isolated_template_db}'" | grep -qx '1'; then
-    return
+    isolated_template_ready=1
+    return 0
   fi
 
   createdb "$isolated_template_db"
   apply_migrations "$isolated_template_db"
+  isolated_template_ready=1
 }
 
 run_isolated_case() {
   local db="$1"
   shift
+  ensure_isolated_template
+  local started_seconds=$SECONDS
   (
     set -euo pipefail
-    ensure_isolated_template
     dropdb --if-exists "$db" >/dev/null 2>&1 || true
     createdb --template="$isolated_template_db" "$db"
     trap 'dropdb --if-exists "$db" >/dev/null 2>&1 || true' EXIT
     PGDATABASE="$db" "$@"
   )
+  if [[ "${MYEONGHA_AUTHORITY_PROFILE:-0}" == '1' ]]; then
+    printf 'AUTHORITY_CORE_CASE db=%s duration_seconds=%d\n' "$db" "$((SECONDS - started_seconds))"
+  fi
 }
+
+authority_profile_stage 'baseline-and-early-guards'
 
 bash test/db/verify_no_schema_cardinality_hardcoding.sh
 # Exercise the actual 1460..1510 -> 1400..1450 inversion only on a
@@ -64,6 +96,7 @@ run_isolated_case myeongha_saju_custody_challenge_test bash test/db/saju_staging
 run_isolated_case myeongha_saju_so2_registry_test bash test/db/saju_so2_registry_floor_authority.sh
 bash test/db/chat_receive_concurrency.sh
 bash test/db/chat_attempt_commit_concurrency.sh
+authority_profile_stage 'seyeon-governor-and-cost-races'
 psql -v ON_ERROR_STOP=1 -f test/db/seyeon_zero_personal_source_pre_model_pin_v1.sql
 psql -v ON_ERROR_STOP=1 -f test/db/seyeon_ai_call_lifecycle_v1.sql
 psql -v ON_ERROR_STOP=1 -f test/db/seyeon_ai_governor_atomic_admission_v1.sql
@@ -89,6 +122,7 @@ run_isolated_case myeongha_seyeon_d4b10c1_test bash test/db/seyeon_governed_cost
 run_isolated_case myeongha_seyeon_d4b10d_test bash test/db/seyeon_governed_cost_d4b10d_multiworker_race.sh
 run_isolated_case myeongha_seyeon_d4b10f_test bash test/db/seyeon_detached_worker_preflight_real_roles.sh
 run_isolated_case myeongha_seyeon_d4b10g_test bash test/db/seyeon_detached_worker_real_driver_end_to_end.sh
+authority_profile_stage 'character-and-record-concurrency'
 psql -v ON_ERROR_STOP=1 -f test/db/seyeon_ai_legacy_cutover_revoke_simulation_v1.sql
 bash test/db/seyeon_legacy_cutover_readonly_preflight_v1.sh
 bash test/db/character_face_governed_artifact_commit.sh
@@ -139,6 +173,7 @@ bash test/db/notification_stored_ledger_query.sh
 bash test/db/notification_delivery_authority_queries.sh
 bash test/db/relationship_current_query.sh
 bash test/db/character_unlocks_current_query.sh
+authority_profile_stage 'reader-and-grant-races'
 run_isolated_case myeongha_standard_reader_runtime_test bash test/db/standard_reading_reader_runtime_query.sh
 run_isolated_case myeongha_reader_product_scope_app_test bash test/db/standard_reader_product_policy_real_postgres.sh
 run_isolated_case myeongha_standard_reading_unit_binding_test bash test/db/standard_reading_unit_binding.sh
@@ -151,6 +186,7 @@ run_isolated_case myeongha_reader_grant_lock_race_preflight_test bash test/db/of
 run_isolated_case myeongha_reader_new_grant_insert_phantom_preflight_test bash test/db/official_reader_new_grant_insert_phantom_preflight.sh
 run_isolated_case myeongha_reader_provider_effect_revoke_race_preflight_test bash test/db/official_reader_provider_effect_revoke_race_preflight.sh
 run_isolated_case myeongha_reader_birth_scope_lock_candidate_preflight_test bash test/db/official_reader_birth_scope_lock_candidate_preflight.sh
+authority_profile_stage 'remaining-authority-and-catalog'
 bash test/db/entitlements_current_query.sh
 bash test/db/data_deletion_job_query.sh
 bash test/db/notification_preferences_query.sh
@@ -171,3 +207,4 @@ bash test/db/subject_merge_job_query.sh
 bash test/db/direct_merged_guest_lineage_query.sh
 bash test/db/life_fact_supersede_concurrency.sh
 bash test/db/catalog_snapshot.sh
+authority_profile_stage 'complete'
