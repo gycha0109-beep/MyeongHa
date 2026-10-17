@@ -49,7 +49,10 @@ export function summarizeMainCiEvidence(runs, jobsByRun, { latestMainSha, observ
     if (createdAtMs > now) throw new Error('Workflow run created after observedAt');
     if (typeof run.name !== 'string' || !run.name.trim()) throw new Error('Missing workflow name');
     const jobs = jobsByRun[String(run.id)];
-    if (!Array.isArray(jobs) || jobs.length === 0) {
+    // Queued runs and early-cancelled/failed runs can legitimately have no
+    // jobs yet. Never let a completed SUCCESS claim full evidence with zero jobs.
+    if (!Array.isArray(jobs) || (jobs.length === 0
+      && run.status === 'completed' && run.conclusion === 'success')) {
       throw new Error('Missing job evidence for main run ' + run.id);
     }
     const jobNames = new Set();
