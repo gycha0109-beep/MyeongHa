@@ -25,11 +25,22 @@ const IDS=[
  'C02_mixed-admin-private_01','C02_mixed-romance-forgery_01',
  'F02','R01',
 ] as const;
-const GOLD:Gold[]=IDS.map(id=>{
+const P0_GOLD:Gold[]=IDS.map(id=>{
  const matches=(MATRIX as Gold[]).filter(x=>x.id===id);
  if(matches.length!==1)throw Error('C08-B missing or duplicate immutable Gold '+id);
  return matches[0]!;
 });
+// C08-Q extends the immutable C07 matrix across P0 / P1 / P2 without
+// changing the source labels, snapshots, or paid 6/72 observation ledger.
+const GOLD:Gold[]=[...(MATRIX as readonly Gold[])];
+if(GOLD.length!==36||new Set(GOLD.map(g=>g.id)).size!==36)
+ throw Error('C08-Q requires 36 unique immutable Gold cases');
+if(GOLD.filter(g=>g.expectedKinds.length===0).length!==24||
+   GOLD.filter(g=>g.expectedKinds.length>0).length!==12)
+ throw Error('C08-Q Gold claim split drifted');
+if(P0_GOLD.some(g=>!GOLD.some(full=>full.id===g.id&&
+ full.text===g.text&&full.topic===g.topic)))
+ throw Error('C08-Q moved pinned P0 cases');
 type Governance=RunSeyeonCharacterTurnV2Input['governance'];
 type Seen={integrity?:unknown;disclosure?:unknown};
 type Mode='legacy'|'unified';
@@ -119,18 +130,31 @@ function fixture(mode:Mode,gold:Gold){
  return {run,calls,generate,seen,blockedDescriptor,descriptorAdmission};
 }
 
-describe('C08-B Gold-paired real Preflight guards (fixture only, no Production)',()=>{
+describe('C08-Q complete C07 Gold 36-case paired guarded Preflight (fixture only)',()=>{
  it('pins 11 high-risk and two question-only immutable C07 Gold cases',()=>{
   expect(IDS).toHaveLength(13);
   expect(new Set(IDS).size).toBe(13);
-  expect(GOLD.filter(g=>g.expectedKinds.length>0)).toHaveLength(11);
-  expect(GOLD.filter(g=>g.expectedKinds.length===0).map(g=>g.id))
+  expect(P0_GOLD.filter(g=>g.expectedKinds.length>0)).toHaveLength(11);
+  expect(P0_GOLD.filter(g=>g.expectedKinds.length===0).map(g=>g.id))
    .toEqual(['F02','R01']);
-  expect(GOLD.filter(g=>g.topic!==null).map(g=>g.id))
+  expect(P0_GOLD.filter(g=>g.topic!==null).map(g=>g.id))
    .toEqual(['C02_mixed-admin-private_01',
     'C02_mixed-romance-forgery_01','F02','R01']);
  });
 
+ it('expands P0 to P1 questions and P2 ordinary talk without modifying Gold or claiming LLM quality',()=>{
+  expect(GOLD).toHaveLength(36);
+  expect(GOLD.filter(g=>g.expectedKinds.length===0)).toHaveLength(24);
+  expect(GOLD.filter(g=>g.expectedKinds.length>0)).toHaveLength(12);
+  expect(GOLD.filter(g=>g.topic!==null)).toHaveLength(18);
+  expect(GOLD.filter(g=>g.topic===null)).toHaveLength(18);
+  expect(GOLD.map(g=>g.id)).toEqual(expect.arrayContaining([
+   'F03','F07','F10','R02','R07','R14',
+   'D01','D03','D08','D13','V01','V03','V08','V14',
+   'N01','N02','N05','N09','N14','N16','N17','N18',
+   'H02',
+  ]));
+ });
  it.each(GOLD)('$id: legacy and unified guarded classification/authority are equivalent',async gold=>{
   const old=fixture('legacy',gold);
   const fast=fixture('unified',gold);
@@ -179,7 +203,7 @@ describe('C08-B Gold-paired real Preflight guards (fixture only, no Production)'
   }
  });
 
- it('does not represent 13 fixture pairs as 72 real-model observations',()=>{
+ it('does not represent 36 synthetic fixture pairs as 72 real-model observations',()=>{
   const source=readFileSync(
    new URL('./seyeon-c08b-gold-paired-preflight-offline-v1.test.ts',import.meta.url),
    'utf8');
