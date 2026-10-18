@@ -147,6 +147,7 @@ activate_b2
   echo "set application_name='m3b2b_effect_writer_first';"
   echo "set statement_timeout='12s';"
   echo "begin;"
+  echo "select pg_catalog.set_config('myeongha.subject_id', '$subject', true);"
   apply_effect_sql '12196000-0000-0000-0000-000000000001'
   echo "select pg_sleep(4);"
   echo "commit;"
@@ -194,6 +195,7 @@ wait_backend m3b2b_effect_reader_first Timeout
   echo "set application_name='m3b2b_effect_writer_after';"
   echo "set statement_timeout='12s';"
   echo "begin;"
+  echo "select pg_catalog.set_config('myeongha.subject_id', '$subject', true);"
   apply_effect_sql '12196000-0000-0000-0000-000000000002'
   echo "commit;"
 } | p >"$tmpdir/writer-after.out" 2>&1 &
