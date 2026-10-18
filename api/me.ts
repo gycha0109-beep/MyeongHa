@@ -2,6 +2,7 @@ import { executeSecurityObservedRequestV1 } from '../apps/api/src/security-obser
 import { createNodePostgresSubjectPoolV1 } from '../apps/api/src/node-postgres-subject-pool.js';
 import { createProductionChatReadRuntimeV1 } from '../apps/api/src/production-chat-read-runtime.js';
 import { createProductionSeyeonTurnSendRuntimeV1 } from '../apps/api/src/production-seyeon-turn-send-runtime-v1.js';
+import { enforceSeyeonVercelFetchRevealFenceV1 } from '../apps/api/src/seyeon-vercel-fetch-reveal-fence-v1.js';
 import { createProductionCurrentSubjectProfileRuntimeV1 } from '../apps/api/src/production-current-subject-profile-runtime.js';
 import { createProductionCurrentSubjectSajuPreviewReadingRuntimeV1 } from '../apps/api/src/production-current-subject-saju-preview-reading-runtime.js';
 import { createProductionDeviceInstallationRuntimeV1 } from '../apps/api/src/production-device-installation-runtime.js';
@@ -772,18 +773,26 @@ export default {
     return executeSecurityObservedRequestV1({
       request,
       routeId: 'api.me.dispatch',
-      execute: ({ requestId, serverTime }) => {
+      execute: async ({ requestId, serverTime }) => {
         const target = resolveDispatchTarget(request);
         if (target === null) {
           cancelUnusedRequestBodyBestEffort(request);
           return routeNotFound();
         }
 
-        return runtimeForTarget(target).handleRequest({
+        const result = await runtimeForTarget(target).handleRequest({
           request: toCanonicalMeRequestForTestV1(request, target),
           requestId,
           serverTime,
         });
+
+        // Last Vercel Fetch dispatch defense: a refactor removing the earlier
+        // pre-Provider G3 HOLD must NOT turn a generated assistant answer into
+        // a publicly serialized Response. Only the explicit original-Grant
+        // Node send boundary may eventually carry protected positive output.
+        return target.kind === 'chat-turn-send'
+          ? enforceSeyeonVercelFetchRevealFenceV1(result, requestId)
+          : result;
       },
     });
   },
