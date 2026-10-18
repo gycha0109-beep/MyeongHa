@@ -231,3 +231,10 @@ S8의 **비파괴/격리 검토는 S2~S7과 병렬 진행 가능**하며, S8 Pro
 - **기술 검토:** [D-04 R/V/S/ACK 후보](../security/SEYEON_D04_REVOKE_ACK_HTTP_SEND_CONTRACT_CANDIDATE_V1.md) §6. Node finish는 네트워크 인계일 뿐 실제 Vercel/Proxy/클라이언트 수신 보장이 아니고, DB 잠금을 HTTP 완료까지 지속하면 느린 클라이언트·자원 고갈 위험이 있으므로 운영 채택/positive Reveal에는 여전히 Owner 계약과 후속 검증이 필수.
 - **검증:** 동일 격리 CI database에서 R5/R9 기존 10개 + R10 2개 (총 12개) 실행. 정확한 PR HEAD의 db-authority-core·PG17·CI/Governance/Web 및 Full Integration 11/11 성공 뒤에만 병합. 실패 시 테스트·권한 검사를 완화하지 말고 격리 원인 수정. 실패/재시도/head/main 증거는 #1866 기록.
 - **절대 변경 금지:** Production migration/DDL/DML/ACL/history, real Provider, positive Projector, Production 첫 Reveal/Replay/History/Worker 허가·public/paid ON. G0 technical signoff 여전히 OPEN, G1 positive/G2/G3/G5/G6 HOLD.
+
+
+## 26. 2026-10-18 R11 — Node 송출 제어 모듈 구현, Vercel 기존 HOLD 유지
+
+- **실제 코드:** `apps/api/src/seyeon-node-original-grant-send-boundary-v1.ts`: 서버 소유 original Grant 잠금/권한 포트에서만 Node `ServerResponse` 단일 본문 송출 허용. `finish`까지 DB 권한 잠금 유지, 연결 해제·취소/제한 시간 초과 시 소켓 파기와 후발 송출 거부. `null` 권한은 503/no-store, 개인정보 본문 0바이트. **현재 Vercel Fetch `Response` 경로와 실제 Provider/운영 DB에는 연결하지 않는다.**
+- **최소 검사:** 실제 로컬 Node socket에서 정상/거부/취소 3건만 추가. R10 기존 실제 PG 양방향 경쟁 테스트는 재사용; 같은 케이스 증식 금지. G0 D-04 계약과 실제 Vercel 프록시 송출 보장은 여전히 미해결.
+- **승인/운영 상태:** Product Owner 정책은 기존 승인 유지. 기술 Owner 서명 전 G0=PROPOSED, G1 positive/G2/G3/G5/G6 HOLD, Projectors=[], Provider/공개/유료 OFF, Production DB writes=0. 정확한 HEAD CI 및 저장소 병합 필수 게이트 외 불필요한 반복 검증 금지.
