@@ -85,13 +85,20 @@ export function createSeyeonC08XOfflineRefGateV1({backend,admission}={}){
  if(!pinnedPolicy()||!FAKE_STORES.has(backend))throw hold();
  assertAdmission(admission);
  let phase='UNCLAIMED',index=0;
+ const checkRef=async ref=>{
+  const read=await backend.readReference({repository:REPO,ref});
+  assertResponse(read,200,ref,admission.exactMainSha);
+ };
+ const verifyPrior=async()=>{
+  await checkRef(refs.batch);
+  for(let i=0;i<index;i++)await checkRef(refs.slots[i]);
+ };
  const createAndReadOnce=async ref=>{
   // Exactly ONE CREATE, no retry even when ACK is unknown.
   const created=await backend.createReference({
    repository:REPO,ref,sha:admission.exactMainSha});
   assertResponse(created,201,ref,admission.exactMainSha);
-  const read=await backend.readReference({repository:REPO,ref});
-  assertResponse(read,200,ref,admission.exactMainSha);
+  await checkRef(ref);
  };
  return Object.freeze({
   scope:'C08X_FAKE_SHARED_REF_ONLY',
@@ -114,6 +121,7 @@ export function createSeyeonC08XOfflineRefGateV1({backend,admission}={}){
     if(event.kind!=='mock_reservation'||
        event.reservedMicroUsd!==P.perCallReservedMicroUsd)throw hold();
     phase='HALTED';
+    await verifyPrior();
     await createAndReadOnce(refs.slots[index]);
     phase='OBSERVING';
     return;
@@ -125,6 +133,9 @@ export function createSeyeonC08XOfflineRefGateV1({backend,admission}={}){
      event.estimatedMicroUsd>P.perCallReservedMicroUsd){
     phase='HALTED';throw hold();
    }
+   phase='HALTED';
+   await verifyPrior();
+   await checkRef(refs.slots[index]);
    index++;
    phase=index===slots.length?'FINISHED':'RESERVING';
   },
