@@ -189,3 +189,10 @@ S1에서 공통 잠금 함수 자체가 성공하더라도 **S2 전체 경로가
 - `official-reader-held-t1-t2-preflight-v1.ts`의 T1 종료 뒤 비공개 생성 결과는 최상위/중첩 모두 HTTP Response/Request/Stream/Blob/FormData, Buffer, Error, Promise, 콜백/getter 및 순환·과도한 중첩 구조이면 별도 T2 진입 전에 일관된 오류로 실패한다. 제한된 일반 JSON형 개인 Draft는 기존처럼 폐기하고 HOLD만 반환한다. 코드/합성 시험만 변경하며 실 HTTP·Message/Attempt/Memory/Outbox에 유료 본문을 쓰지 않는다.
 - Privacy Source of Truth는 `docs/operations/ACCOUNT_DELETION_FINALIZATION_POLICY_V1.json`의 P0-PR-01: 현행 `destructiveRuntimeAuthorized: false`, `authoritativePrivacyReconciliation: false`, `drReady: false`, P30D 백업·Commerce P5Y 법적 근거 보관이다. 기존 RR-03 [#1960](https://github.com/gycha0109-beep/MyeongHa/pull/1960) Draft는 **출처 이력만** 다루므로 유료 본문 원문 저장 승인으로 승격하지 않는다. Saju proof nonce DB 1540은 Preview 전용이며 신규 S3 서명 권한이 아니다.
 - `OFFICIAL_READER_S3_S4_SOURCE_AND_PRIVACY_HANDOFF_20261018_V1.md`에 유료 본문·생성 시도·출처·Memory/검색/요약·안전 표시·백업 복원별 **데이터 분류/삭제/복원 실물 증거**를 Owner 인수표로 명시했다. 현재 신규 보호 데이터 테이블 및 실제 유료 생성/저장/공개 기능은 미구현, S3·S4 Owner 정식 승인 전 S5 원자 저장 구현/출시 차단.
+
+
+### S3 실제 Reader 인가 Source → 공식 v2 근거 Closure 연결 (2026-10-19)
+
+- `apps/api/src/official-reader-s3-authoritative-artifact-coverage-v1.ts`에서 비공개 Reader Admission Scope와 실제 DB 인가 `CharacterStandardReadingKnowledgeSourceV1`의 회원·Reading·Reader·Bundle·Product·Spec·Domain·Reading Contract·원본 fingerprint를 교차 확인한 다음, 원본 공식 `ProductReadingResponse v2`의 보호 Segment·필수 Disclosure·Ambiguity를 **기존 도메인 Projector로 직접 생성**하여 S3 후보 근거 해시·출처 목록의 완전성을 대조한다.
+- 보조 증거 객체만 받아들이던 S3 구조 검사에 비해 실제 서버 인가 Source에서 출발하는 경로를 추가했다. 합성 시험은 교차 회원·Reader·상품·원본 변경/가짜 원본/partial fallback/누락된 근거·고지·모호성을 거부한다.
+- **실제 Saju Owner 발행 증명, Semantic/Output Guard 및 Privacy Owner 보호 본문 승인 전에는 이 경로도 무조건 HELD/BLOCKED만 반환**한다. 영구 저장·RLS 권한·HTTP·일반 Chat Writer·유료 응답을 추가하지 않는다. Saju #2410, Privacy #2318의 인수·승인 조건은 여전히 유효하다.
