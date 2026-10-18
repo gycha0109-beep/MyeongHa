@@ -2,7 +2,7 @@
 // Standalone, direct-TLS internal service launcher. Public deployment is still
 // HOLD: this starts a LOOPBACK-only socket, never a Vercel Fetch proxy.
 import { createPrivateKey, createPublicKey, X509Certificate } from 'node:crypto';
-import { lstatSync, readFileSync } from 'node:fs';
+import { closeSync, constants, fstatSync, lstatSync, openSync, readFileSync } from 'node:fs';
 import { isAbsolute, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import type { SeyeonProductionChatGovernorApprovalV1 } from './seyeon-production-governor-factory-v1.js';
@@ -64,17 +64,29 @@ function protectedPemOrJsonFile(
       'UNPROTECTED_SECRET_FILE', 'Direct HTTPS launcher requires an absolute file path.',
     );
   }
-  const stats = lstatSync(file);
-  if (!stats.isFile() || stats.isSymbolicLink() ||
-      stats.size < 1 || stats.size > maximumBytes ||
-      (!allowPublicRead && process.platform !== 'win32' && (stats.mode & 0o077) !== 0) ||
-      (typeof process.getuid === 'function' && !allowPublicRead &&
-       stats.uid !== process.getuid())) {
+  // O_NOFOLLOW + fstat on the OPEN descriptor prevents a symlink swap
+  // between validating permissions and reading private material.
+  if (lstatSync(file).isSymbolicLink()) {
     throw new SeyeonDirectHttpsLauncherErrorV1(
-      'UNPROTECTED_SECRET_FILE', 'Direct HTTPS launcher rejected unprotected or oversized TLS/governor material.',
+      'UNPROTECTED_SECRET_FILE', 'Direct HTTPS launcher refuses symbolic links.',
     );
   }
-  return readFileSync(file, 'utf8');
+  const fd = openSync(file, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
+  try {
+    const stats = fstatSync(fd);
+    if (!stats.isFile() ||
+        stats.size < 1 || stats.size > maximumBytes ||
+        (!allowPublicRead && process.platform !== 'win32' && (stats.mode & 0o077) !== 0) ||
+        (typeof process.getuid === 'function' && !allowPublicRead &&
+         stats.uid !== process.getuid())) {
+      throw new SeyeonDirectHttpsLauncherErrorV1(
+        'UNPROTECTED_SECRET_FILE', 'Direct HTTPS launcher rejected unprotected or oversized TLS/governor material.',
+      );
+    }
+    return readFileSync(fd, 'utf8');
+  } finally {
+    closeSync(fd);
+  }
 }
 
 function validateTlsPair(input: {
