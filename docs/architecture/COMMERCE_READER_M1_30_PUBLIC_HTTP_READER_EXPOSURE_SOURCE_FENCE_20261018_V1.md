@@ -19,7 +19,7 @@ It must fail on any reachable direct or indirect dependency on these two protect
 
 It also fails on unresolvable local/first-party imports, unknown dynamic imports, unverified internal workspace imports and rewrites that point to a nonexistent serverless function. Third-party imports are not recursively audited; dynamic registration and deployed bundle contents are not proven by this scanner.
 
-`scripts/ci/official-reader-minimal-public-route-fence.test.mjs` executes the real repository guard and tests it against temporary controlled fixture trees: legitimate route and rewrite, direct protected import, transitive re-export, dynamically computed import, unresolved internal workspace alias, and invalid rewrite target. This regression is wired into the standard `npm test` command and therefore runs in the regular Commerce CI.
+`scripts/ci/official-reader-minimal-public-route-fence.node.mjs` executes the real repository guard and tests it against temporary controlled fixture trees: legitimate route and rewrite, direct protected import, transitive re-export, dynamically computed import, unresolved internal workspace alias, and invalid rewrite target. This regression is wired into the standard `npm test` command and therefore runs in the regular Commerce CI.
 
 `apps/api/src/official-reader-public-dispatch-m1-30.test.ts` calls the actual `api/me.ts` public dispatch resolver and requires rejection of Reader-like paths, `receiptId`, `verifiedSubjectId`, `subjectId`, `myeongha.subject_id`, invented Reader selector keys, and attempt to route through a reading-history URL. The existing `/api/me` profile target must remain available. These are **route selection** checks, not production HTTP requests.
 
