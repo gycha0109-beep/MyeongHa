@@ -182,3 +182,10 @@ S1에서 공통 잠금 함수 자체가 성공하더라도 **S2 전체 경로가
 - S3 합성 Owner 인계 검증은 기존 Subject×Reading×Reader×Bundle×Release 외에 **Thread/Content Revision/Product/Spec/Domain/Reading Contract/Rule/Approved Policy**를 현재 서버 결속값과 비교한다. 후보가 실제 독립 서명으로 바뀌어도 한 항목의 변경·교차 적용을 거부하는 부정 시험을 추가했다. 성공 결과도 `held`, 실제 공식 발행/유료 사용권 **NOT_EVALUATED**다.
 - S4 내부 `runOfficialReaderHeldT1T2PreflightV1` 생성 반환값의 직접 HTTP `Response`·`Request`·스트림·`Blob`·`FormData` 형태를 일반화된 오류로 거부하고, T2 이전 유출형 결과 차단 시험을 추가한다. 기존처럼 생성 본문·해시·원본 식별자는 반환/저장하지 않는다. 생성 콜백 부작용(로그/기억/Outbox 등)은 별도 Privacy/Chat 감사가 필요한 미해결이므로 **S4 완료 아님**.
 - **S5 유료 원자 T2·보호 본문 보관/삭제/복원·S6 재열람·S7 전달을 승인하거나 구현한 것이 아니다.** Owner 승인 전 운영 DB/실결제/공개 OFF, PR Draft 유지.
+
+
+### S4 보호 데이터 실제 반환형 차단 및 기존 Privacy 정책 정합성 인계
+
+- `official-reader-held-t1-t2-preflight-v1.ts`의 T1 종료 뒤 비공개 생성 결과는 최상위/중첩 모두 HTTP Response/Request/Stream/Blob/FormData, Buffer, Error, Promise, 콜백/getter 및 순환·과도한 중첩 구조이면 별도 T2 진입 전에 일관된 오류로 실패한다. 제한된 일반 JSON형 개인 Draft는 기존처럼 폐기하고 HOLD만 반환한다. 코드/합성 시험만 변경하며 실 HTTP·Message/Attempt/Memory/Outbox에 유료 본문을 쓰지 않는다.
+- Privacy Source of Truth는 `docs/operations/ACCOUNT_DELETION_FINALIZATION_POLICY_V1.json`의 P0-PR-01: 현행 `destructiveRuntimeAuthorized: false`, `authoritativePrivacyReconciliation: false`, `drReady: false`, P30D 백업·Commerce P5Y 법적 근거 보관이다. 기존 RR-03 [#1960](https://github.com/gycha0109-beep/MyeongHa/pull/1960) Draft는 **출처 이력만** 다루므로 유료 본문 원문 저장 승인으로 승격하지 않는다. Saju proof nonce DB 1540은 Preview 전용이며 신규 S3 서명 권한이 아니다.
+- `OFFICIAL_READER_S3_S4_SOURCE_AND_PRIVACY_HANDOFF_20261018_V1.md`에 유료 본문·생성 시도·출처·Memory/검색/요약·안전 표시·백업 복원별 **데이터 분류/삭제/복원 실물 증거**를 Owner 인수표로 명시했다. 현재 신규 보호 데이터 테이블 및 실제 유료 생성/저장/공개 기능은 미구현, S3·S4 Owner 정식 승인 전 S5 원자 저장 구현/출시 차단.
