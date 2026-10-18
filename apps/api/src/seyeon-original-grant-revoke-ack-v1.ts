@@ -16,6 +16,7 @@ import {
 export const SEYEON_ORIGINAL_GRANT_REVOKE_ACK_V1 = Object.freeze({
   version: 'seyeon-original-grant-revoke-ack-v1',
   originalGrantRevokeRpc: 'public.cmd_revoke_memory_character_grant_v1',
+  privateCandidateRpc: 'seyeon_private.cmd_revoke_seyeon_memory_grant_v1',
   characterId: 'seyeon',
   subjectLockMode: 'FOR UPDATE',
   revokeAckAfterDbCommitOnly: true,
@@ -35,6 +36,19 @@ from public.cmd_revoke_memory_character_grant_v1(
 )
 `.trim();
 
+// Only selected by the server-owned, unmounted Production composition. This
+// candidate does not enable its HTTP write admission or deploy its migration.
+const PRIVATE_REVOKE_SQL = `
+select
+  memory_item_id::text as "memoryItemId",
+  character_id::text as "characterId",
+  revoked_grant_count as "revokedGrantCount",
+  replayed as "replayed"
+from seyeon_private.cmd_revoke_seyeon_memory_grant_v1(
+  $1::uuid, $2::uuid
+)
+`.trim();
+
 export class SeyeonOriginalGrantRevokeAckErrorV1 extends Error {
   constructor(readonly code: 'MEMBER_REQUIRED' | 'INVALID_MEMORY_ID') {
     super('Se-yeon Memory grant revocation requires verified Member authority.');
@@ -48,6 +62,8 @@ export interface RevokeSeyeonOriginalMemoryGrantAndAckInputV1 {
   readonly verifiedEvidence: VerifiedSubjectIdentityEvidenceV1;
   /** Record locator only; DB determines the current original Grant IDs. */
   readonly memoryItemId: string;
+  /** Internal only; default retains R15's already-tested original RPC. */
+  readonly dbCommand?: 'legacy_original' | 'private_candidate';
 }
 
 export interface SeyeonOriginalMemoryGrantRevokeAckV1 {
@@ -102,8 +118,11 @@ export async function revokeSeyeonOriginalMemoryGrantAndAckV1(
           async revokeCharacterGrants(locators) {
             const result =
               await client.query<MemoryGrantRevokeCommandAuthorityRowV1>(
-                REVOKE_SQL,
-                [locators.subjectId, locators.memoryItemId, locators.characterId],
+                input.dbCommand === 'private_candidate'
+                  ? PRIVATE_REVOKE_SQL : REVOKE_SQL,
+                input.dbCommand === 'private_candidate'
+                  ? [locators.subjectId, locators.memoryItemId]
+                  : [locators.subjectId, locators.memoryItemId, locators.characterId],
               );
             return result.rows;
           },

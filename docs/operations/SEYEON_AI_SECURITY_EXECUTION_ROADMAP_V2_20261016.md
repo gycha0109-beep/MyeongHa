@@ -261,3 +261,11 @@ S8의 **비파괴/격리 검토는 S2~S7과 병렬 진행 가능**하며, S8 Pro
 - **구현:** `apps/api/src/seyeon-memory-grant-revoke-http-v1.ts`의 검증된 Member 전용 POST 철회 후보, 본인 원본 Memory ID 이외 추가 입력 불허, 권한 승인 기본 OFF=503/no-store/DB 호출 0. 정상 권한 구성 시 이미 작성된 R15 COMMIT 뒤 ACK 사용. `production-seyeon-memory-grant-revoke-runtime-v1.ts`에는 실제 인증/DB composition만 준비하고 운영 Vercel route 미탑재.
 - **다음 개발:** 광범위 테이블 UPDATE/SELECT GRANT 없이 좁은 비공개 DB 철회 권한을 명시적으로 설계하고, 검토된 Owner/실제 역할 분리로 연결한 뒤 제한된 운영 활성화 결정. 그전까지 G0 기술 Owner OPEN, 첫 개인정보 기반 Reply HOLD, Production DDL/DML/ACL 0.
 - **검증 축소:** 이번 변경은 기본 OFF/정상 Member 매핑/COMMIT 불명확 시 실패의 작은 HTTP 테스트 4개, 운영 카탈로그 읽기 전용 조회, 저장소 필수 CI만.
+
+## 30. 2026-10-18 R17 — 비공개 최소 권한 원본 Grant 철회 후보 (검증 중)
+
+- **다음 미완료 의존성 해결 후보:** `scripts/operations/seyeon-private-memory-grant-revoke-r17-candidate.sql`은 `seyeon_private` 비공개 스키마에 **활성 canonical Member의 본인 Memory + 고정 세연**만 철회하는 `SECURITY DEFINER` 경계를 추가한다. 기존 `cmd_revoke_memory_character_grant_v1`의 원본 Subject 잠금/Grant 변경/재호출 no-op을 그대로 재사용한다.
+- **ACL:** **정식 Supabase 마이그레이션에 포함하지 않으며**, 격리된 CI 복제 DB에서만 수동 적용해 검증한다. 기존 `myeongha_api_executor`의 광범위 테이블 SELECT/UPDATE 및 public 원본 RPC EXECUTE 권한은 추가하지 않는다. `anon`/`authenticated`/`service_role` 직접 실행 및 schema USAGE 거부. 실제 설치 전 Owner·소유권·역할·미노출 Schema 검토 필요.
+- **연결:** R15 트랜잭션/COMMIT→ACK 코드를 변경 없이 재사용하되, R16의 운영 미탑재 구성에서만 private 명령을 선택하도록 연결. `approvedDbWriteAdmission` 미공급 상태는 그대로 503/no-store이며 SQL 파일 작성·PR 병합만으로 운영 DB에 실행하지 않는다.
+- **검증 기준:** 기존 CI가 새로 생성해 폐기하는 격리 PostgreSQL의 실제 restricted role에서 정확한 본인 세연 Grant 철회/재호출/타 사용자 거부/타 캐릭터 권한 보존을 확인하고, 기존 R15 COMMIT/ACK 회귀, CI/Governance/Web/Full Integration, 병합 후 main 확인. **검사 전 PASS 주장 금지**.
+- **미해결:** G0 Security/DB/API/Character 기술 승인, 실제 운영 DB 미적용 ACL/DDL·DR, R16 공개 라우트 admission, 최초 개인기억 답변·History·Replay·Vercel 프록시 송출 G3 HOLD. Projectors=[], Provider/public/paid OFF, Production DB writes=0.
