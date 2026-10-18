@@ -260,4 +260,72 @@ grep -qx ALLOW "$tmpdir/reader-first.out" ||
 assert_committed_revoke '12196000-0000-0000-0000-000000000002'
 pass "S2 real scoped revoke after Reader: FOR SHARE blocks Entitlement Effect writer"
 
+
+# CASE 3: The actual INTERNAL COMMERCE command persists an independently
+# server-verified PortOne full cancellation and applies existing 1770/1080
+# under the same scope lock. Unrelated products are never mutated.
+# The original B2 fixture was manually seeded without a payment attempt.
+# Supply the original attempt provenance only in this isolated database.
+p >"$tmpdir/original-attempt.out" 2>&1 <<SQL ||
+  { cat "$tmpdir/original-attempt.out" >&2; fail "original PortOne attempt seed failed"; }
+insert into public.commerce_payment_attempts(
+  id,purchase_intent_id,subject_id,product_offer_id,attempt_no,
+  provider,environment,idempotency_key,provider_request_id,
+  provider_transaction_id,status,created_at,updated_at
+)
+select '12197000-0000-0000-0000-000000000001'::uuid,
+  pi.id,pi.subject_id,pi.product_offer_id,1,cr.provider,cr.environment,
+  'synthetic-portone-full-cancel-request',
+  'synthetic-portone-reader-b2-payment',cr.external_transaction_id,
+  'response_received',clock_timestamp(),clock_timestamp()
+from public.commerce_receipts cr
+join public.purchase_intents pi on pi.id=cr.purchase_intent_id
+where cr.id='$receipt'::uuid;
+SQL
+activate_b2
+cancelled_at="$(p -c "select pg_catalog.to_char(clock_timestamp() at time zone 'UTC',
+  'YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"');")"
+apply_full_cancel() {
+  local amount="$1" cancellation="$2"
+  p -c "begin;
+    set local role myeongha_commerce_internal_executor;
+    select (public.cmd_apply_verified_portone_reader_full_cancellation_v1(
+      'synthetic-portone-reader-b2-payment',
+      'tx-official-reader-b2',
+      '$cancellation',
+      '$cancelled_at'::timestamptz,
+      $amount, 'KRW', 'production',
+      'hmac-sha256:k1:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd',
+      'synthetic-portone-cancel-verifier-v1'
+    )->>'contractVersion');
+    commit;"
+}
+if apply_full_cancel 9999 'wrong-amount-cancellation' >"$tmpdir/invalid-money.out" 2>&1; then
+  fail "mismatching original Receipt amount cannot cancel a Reader"
+fi
+[[ "$(p -c "select status from public.entitlement_grants where id='$b2'::uuid;")" == active ]] ||
+  fail "invalid PortOne payment evidence changed the Reader Grant"
+apply_full_cancel 1 'synthetic-full-cancel-b2' >"$tmpdir/full-cancel.out" 2>&1 ||
+  { cat "$tmpdir/full-cancel.out" >&2; fail "verified full-cancel command failed"; }
+grep -qx 'portone-reader-full-cancellation-v1' "$tmpdir/full-cancel.out" ||
+  fail "internal PortOne cancellation did not use authoritative DB command"
+[[ "$(p -c "select verification_status from public.commerce_receipts where id='$receipt'::uuid;")" == revoked ]] ||
+  fail "canonical original Receipt was not atomically marked revoked"
+[[ "$(p -c "select status from public.entitlement_grants where id='$b2'::uuid;")" == revoked ]] ||
+  fail "canonical Reader Grant was not atomically revoked"
+[[ "$(p -c "select count(*) from public.commerce_provider_events
+  where provider='portone_v2' and event_type='Transaction.Cancelled'
+  and resolved_receipt_id='$receipt'::uuid
+  and external_event_id='myeongha:portone-v2:full-cancel:v1:synthetic-full-cancel-b2';")" == 1 ]] ||
+  fail "verified full-cancel event provenance was not persisted"
+apply_full_cancel 1 'synthetic-full-cancel-b2' >"$tmpdir/replay.out" 2>&1 ||
+  { cat "$tmpdir/replay.out" >&2; fail "idempotent PortOne cancellation replay failed"; }
+[[ "$(p -c "select count(*) from public.entitlement_events ee
+  join public.commerce_provider_events pe on pe.id=ee.source_provider_event_id
+  where ee.grant_id='$b2'::uuid
+    and pe.external_event_id='myeongha:portone-v2:full-cancel:v1:synthetic-full-cancel-b2';")" == 1 ]] ||
+  fail "PortOne cancellation replay duplicated the Grant lifecycle event"
+pass "actual internal Commerce PortOne full cancellation: receipt + Reader Grant revoked and replay safe"
+
+
 echo "PASS: S2 real scoped provider-event -> Commerce EntitlementEffect Grant/Event/Projection mutation; no provider refund API call or paid Reader reveal"
