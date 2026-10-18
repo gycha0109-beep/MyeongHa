@@ -582,4 +582,147 @@ describe.skipIf(!enabled)('R5 disposable actual-v2 current-rights first/replay/h
     });
   });
 
+
+  it('R10 send-first: real PG original-rights lock covers Node socket finish before revoke DB COMMIT', async () => {
+    const id = await committed(81);
+    const events: string[] = [];
+    let authorized!: () => void;
+    let permitSocket!: () => void;
+    const authorizedAndHeld = new Promise<void>(resolve => { authorized = resolve; });
+    const sendGate = new Promise<void>(resolve => { permitSocket = resolve; });
+    let socketWrites = 0;
+
+    await withR9Loopback(async (request, response) => {
+      await r9ReadBody(request);
+      // Candidate-only direct Node bridge: unlike Web Response construction,
+      // the actual HTTP send occurs before releasing this DB transaction's
+      // original Subject/Grant SHARE locks.
+      await transaction(async c => {
+        await c.query("set local application_name='seyeon-r10-lock-held-sender'");
+        const current = await c.query<{ answer: string | null }>(
+          'select seyeon_positive_candidate.reveal_http_r5($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid) as answer',
+          [subject, id.thread, id.turn, id.attempt, id.assistantMessage],
+        );
+        expect(current.rows[0]?.answer).toBe(body);
+        authorized();
+        await sendGate;
+        const flushed = new Promise<void>((resolve, reject) => {
+          response.once('finish', resolve);
+          response.once('error', reject);
+        });
+        await r9WriteResponse(response, Response.json({ assistantText: current.rows[0]!.answer }, {
+          headers: { 'Cache-Control': 'no-store' },
+        }));
+        await flushed; // Node handed response to its HTTP send path; not client ACK.
+        socketWrites += 1;
+        events.push('S:node-finish');
+      }, true); // This COMMIT releases original Grant/Subject locks.
+    }, async origin => {
+      const pendingResponse = fetch(origin + '/r10-db-locked-send-first', {
+        method: 'POST', body: 'synthetic offline only',
+      });
+      try {
+        await authorizedAndHeld;
+        await clientAction(async revoker => {
+          await revoker.query('BEGIN');
+          try {
+            await revoker.query("set local application_name='seyeon-r10-revoke-after-sender'");
+            const pendingLock = revoker.query(
+              'select id from public.subjects where id=$1::uuid for update', [subject],
+            );
+            // A real second PostgreSQL connection cannot obtain its revoke
+            // serialization lock until the sender has actually written.
+            await waitForLock('seyeon-r10-revoke-after-sender');
+            expect(events).toEqual([]);
+            permitSocket();
+            await pendingLock;
+            await revoker.query(
+              'update public.record_access_grants set revoked_at=clock_timestamp() where id=$1::uuid',
+              [id.grant],
+            );
+            await revoker.query('COMMIT'); // R; ACK would follow this.
+            events.push('R:committed');
+          } finally {
+            await revoker.query('ROLLBACK').catch(() => undefined);
+          }
+        });
+        const received = await pendingResponse;
+        expect(received.status).toBe(200);
+        expect(received.headers.get('cache-control')).toBe('no-store');
+        expect(await received.text()).toContain(body);
+        expect(events).toEqual(['S:node-finish', 'R:committed']);
+        expect(socketWrites).toBe(1);
+      } finally {
+        permitSocket();
+      }
+    });
+
+    // Once revocation commits, every new current-rights check denies. The
+    // historical message stays stored but cannot be re-disclosed by R5.
+    expect(await http(id)).toBeNull();
+    await expect(history(id)).rejects.toMatchObject({
+      constraint: 'seyeon_offline_r5_page_held',
+    });
+    expect((await saved(id)).messages).toBe('1');
+  });
+
+  it('R10 revoke-first: independent PG revoke blocks HTTP authorization, releases 503 only', async () => {
+    const id = await committed(82);
+    let socketWrites = 0;
+    let startedRead!: () => void;
+    const readStarted = new Promise<void>(resolve => { startedRead = resolve; });
+
+    await clientAction(async revoker => {
+      await revoker.query('BEGIN');
+      try {
+        await revoker.query(
+          'select id from public.subjects where id=$1::uuid for update', [subject],
+        );
+        await revoker.query(
+          'update public.record_access_grants set revoked_at=clock_timestamp() where id=$1::uuid',
+          [id.grant],
+        );
+        await withR9Loopback(async (request, response) => {
+          await r9ReadBody(request);
+          await transaction(async reader => {
+            await reader.query("set local application_name='seyeon-r10-wait-for-revoke'");
+            startedRead();
+            const current = await reader.query<{ answer: string | null }>(
+              'select seyeon_positive_candidate.reveal_http_r5($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid) as answer',
+              [subject, id.thread, id.turn, id.attempt, id.assistantMessage],
+            );
+            expect(current.rows[0]?.answer).toBeNull();
+            await r9WriteResponse(response, Response.json({
+              ok: false, code: 'SEYEON_FIRST_REVEAL_AUTHORITY_UNAVAILABLE',
+            }, { status: 503, headers: { 'Cache-Control': 'no-store' } }));
+            socketWrites += 1;
+          }, true);
+        }, async origin => {
+          const pendingResponse = fetch(origin + '/r10-db-locked-revoke-first', {
+            method: 'POST', body: 'synthetic offline only',
+          });
+          await readStarted;
+          await waitForLock('seyeon-r10-wait-for-revoke');
+          // In this ordering the original Grant is already revoked before
+          // the second session can make its current-rights decision.
+          await revoker.query('COMMIT');
+          const received = await pendingResponse;
+          const bytes = await received.text();
+          expect(received.status).toBe(503);
+          expect(received.headers.get('cache-control')).toBe('no-store');
+          expect(bytes).not.toContain(body);
+          expect(bytes).toContain('SEYEON_FIRST_REVEAL_AUTHORITY_UNAVAILABLE');
+        });
+      } finally {
+        await revoker.query('ROLLBACK').catch(() => undefined);
+      }
+    });
+    expect(socketWrites).toBe(1); // One denied HTTP error, zero private bodies.
+    expect(await http(id)).toBeNull();
+    await expect(history(id)).rejects.toMatchObject({
+      constraint: 'seyeon_offline_r5_page_held',
+    });
+    expect((await saved(id)).messages).toBe('1');
+  });
+
 });
