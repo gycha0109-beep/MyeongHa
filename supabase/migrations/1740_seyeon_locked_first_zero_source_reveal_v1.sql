@@ -63,6 +63,19 @@ begin
     and t.thread_id=p_thread_id
     and t.state in ('committed','delivered')
     and t.committed_attempt_id=p_attempt_id
+    -- The canonical DB participant set must be exactly one active Seyeon.
+    -- Caller-supplied Character text can never establish this scope.
+    and exists (
+      select 1 from public.conversation_thread_characters sc
+      where sc.thread_id=p_thread_id
+        and sc.character_id='seyeon' and sc.left_at is null
+    )
+    and not exists (
+      select 1 from public.conversation_thread_characters other_sc
+      where other_sc.thread_id=p_thread_id
+        and other_sc.left_at is null
+        and other_sc.character_id <> 'seyeon'
+    )
     and a.id=p_attempt_id
     and a.state='committed'
     and a.planner_version='seyeon-production-chat-planner-v1'
