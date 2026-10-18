@@ -103,6 +103,9 @@ bash test/db/official_reader_m1_17_minimal_read_execute.sh \
 # public read EXECUTE, or private Writer EXECUTE. CI probes always ROLLBACK.
 bash test/db/official_reader_m1_18_live_cutover_readonly_gate.sh
 node --test scripts/commerce/m1-18-migration-parity-gate.test.mjs
+# M1-19: read-only 173-version live ledger evidence; every missing version
+# must map to one explicit security/operational review wave, always HOLD.
+node --test scripts/commerce/m1-19-live-migration-impact-audit.test.mjs
 
 for signature in \
  'public.internal_apply_official_reader_unified_receipt_v1(uuid,text[],timestamptz[],timestamptz[],timestamptz[],text[])' \
