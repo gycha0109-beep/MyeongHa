@@ -19,8 +19,10 @@ const NONCE = /^[A-Za-z0-9_-]{22,128}$/u;
 const HASH = /^[a-f0-9]{64}$/u;
 const PAYLOAD_KEYS = [
   'schemaVersion', 'lifecycle', 'issuer', 'audience', 'keyId', 'nonce',
-  'issuedAtMs', 'expiresAtMs', 'subjectId', 'readingId',
-  'readerCharacterId', 'readerContentBundleId', 'contentReleaseId',
+  'issuedAtMs', 'expiresAtMs', 'subjectId', 'threadId', 'contentRevision',
+  'readingId', 'readerCharacterId', 'readerContentBundleId', 'contentReleaseId',
+  'productId', 'productSpecVersion', 'sajuDomain', 'readingContractVersion',
+  'productRuleVersion', 'approvedPolicyRevision',
   'officialArtifactResponseHash', 'candidateDigest',
 ] as const;
 const MAX_TTL_MS = 120_000;
@@ -136,10 +138,18 @@ export async function rehearseOfficialReaderS3SajuOwnerHandoffV1(input: Readonly
       || payload.keyId !== trust.trustedKeyId
       || payload.nonce !== input.expectedNonce
       || payload.subjectId !== scope.subjectId
+      || payload.threadId !== scope.threadId
+      || payload.contentRevision !== scope.contentRevision
       || payload.readingId !== scope.readingId
       || payload.readerCharacterId !== scope.readerCharacterId
       || payload.readerContentBundleId !== scope.readerContentBundleId
       || payload.contentReleaseId !== scope.contentReleaseId
+      || payload.productId !== scope.productId
+      || payload.productSpecVersion !== scope.productSpecVersion
+      || payload.sajuDomain !== scope.sajuDomain
+      || payload.readingContractVersion !== scope.readingContractVersion
+      || payload.productRuleVersion !== scope.productRuleVersion
+      || payload.approvedPolicyRevision !== scope.approvedPolicyRevision
       || payload.officialArtifactResponseHash !== scope.officialArtifactResponseHash
       || typeof payload.candidateDigest !== 'string'
       || !HASH.test(payload.candidateDigest)
