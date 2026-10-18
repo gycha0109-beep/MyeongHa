@@ -106,17 +106,54 @@ function assertNoDrift(
 }
 
 /**
- * S4 PRE-APPROVAL guard: prevent a generated result from being represented
- * as an HTTP/stream delivery. This cannot audit side effects inside the
- * provider callback and does NOT approve any paid-content persistence.
+ * S4 PRE-APPROVAL guard at the PRIVATE generation boundary.
+ *
+ * The result is immediately discarded; do not allow any nested HTTP/stream,
+ * binary, error, callback, proxy accessor, or exotic object to carry protected
+ * text into a deferred log/transport/serialization sink.
+ *
+ * This bounds only the return *shape*; it cannot inspect side effects in the
+ * provider callback or authorize data retention / publication.
  */
 function assertNotDeliverablePrivateResult(result: unknown): void {
-  if (result instanceof Response ||
-      result instanceof Request ||
-      result instanceof ReadableStream ||
-      result instanceof Blob ||
-      result instanceof FormData) {
-    throw new OfficialReaderHeldPreflightErrorV1();
+  const seen = new WeakSet<object>();
+  const todo: { value: unknown; depth: number }[] = [{ value: result, depth: 0 }];
+  let count = 0;
+  while (todo.length > 0) {
+    const item = todo.pop()!;
+    if (++count > 512 || item.depth > 16) {
+      throw new OfficialReaderHeldPreflightErrorV1();
+    }
+    const value = item.value;
+    if (value === null || value === undefined ||
+        typeof value === 'string' || typeof value === 'boolean' ||
+        (typeof value === 'number' && Number.isFinite(value))) {
+      continue;
+    }
+    if (typeof value !== 'object' || seen.has(value)) {
+      throw new OfficialReaderHeldPreflightErrorV1();
+    }
+    seen.add(value);
+    // Plain records and arrays only; reject Request/Response, streams, Blob,
+    // FormData, Buffer, Error, Map/Set, Date, Promise and class instances.
+    const prototype: unknown = Object.getPrototypeOf(value);
+    const array = Array.isArray(value);
+    if (array ? prototype !== Array.prototype
+      : (prototype !== Object.prototype && prototype !== null)) {
+      throw new OfficialReaderHeldPreflightErrorV1();
+    }
+    // Never execute a property getter (including a deferred toJSON callback).
+    // Reject symbol keys and non-value descriptors; no serialization here.
+    for (const key of Reflect.ownKeys(value)) {
+      if (typeof key !== 'string') {
+        throw new OfficialReaderHeldPreflightErrorV1();
+      }
+      const descriptor = Object.getOwnPropertyDescriptor(value, key);
+      if (!descriptor || !Object.hasOwn(descriptor, 'value')) {
+        throw new OfficialReaderHeldPreflightErrorV1();
+      }
+      todo.push({ value: descriptor.value, depth: item.depth + 1 });
+    }
   }
 }
 
