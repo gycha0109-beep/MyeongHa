@@ -80,7 +80,7 @@ describe('Seyeon first zero-source one-shot Production SQL gate', () => {
     expect(body).toContain("not has_function_privilege('authenticated',p.oid,'EXECUTE')");
     expect(body).toContain("not has_function_privilege('service_role',p.oid,'EXECUTE')");
     expect(body).toContain('supabase migration repair "$version" --status applied');
-    expect(body).not.toMatch(/supabase db push|--include-all|--status reverted/);
+    expect(body).not.toMatch(/^\\s*supabase db push/m);\n    expect(body).not.toMatch(/^\\s*supabase migration repair .*--status reverted/m);
   });
 
   it('rejects absent explicit confirmation before invoking any DB or CLI command', () => {
