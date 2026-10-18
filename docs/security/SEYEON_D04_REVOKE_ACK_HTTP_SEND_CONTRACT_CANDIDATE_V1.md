@@ -81,3 +81,12 @@ original Grant 철회 COMMIT                  (R)
 - **한계:** finish는 Node가 자신의 송신 시스템에 데이터를 넘긴 완료이며 Vercel/Edge/Proxy/TLS, 다른 서버 인스턴스, 클라이언트 수신·표시는 포함하지 않는다. HTTP 송출이 느리거나 클라이언트가 절단되면 DB 트랜잭션/잠금도 장시간 붙잡혀 철회를 지연시키고 풀 고갈/DoS/타임아웃/중단 후 재시도가 발생할 수 있다. **이 원형은 구현 가능성 검증이지 운영에서 그대로 채택할 설계가 아니다.**
 - **출시 전 미해결:** Session/Proxy send fence 또는 중앙 DB-backed epoch 권한 계약, 철회 ACK 의미, 최대 lock/send 시간, client disconnect 시 ROLLBACK, 다중 Instance/Worker/Replay/History, 대상 Character/Source lineage 결속, 안전한 오류 응답, 보안·API·DB 공동 기술 서명. 보장할 수 없으면 현행 개인기억 기반 최초 Reveal HOLD 유지.
 - **테스트 위치:** 기존 격리 PostgreSQL 전용 R5/R9 파일의 R10 두 세션·실제 127.0.0.1 소켓 테스트. CI 승인에 해당하는 것은 latest HEAD의 실제 DB authority-core/PG17·Full Integration 결과이며, 독립 실행 전에는 PASS 표시 금지.
+
+
+## 7. R11 — 제한 시간/연결 중단을 가진 Node 전송 경계 구현 (미연결)
+
+- 구현: `apps/api/src/seyeon-node-original-grant-send-boundary-v1.ts`, `sendSeyeonNodeOriginalGrantResponseV1`. 원본 Grant/Record 및 immutable Attempt를 잠근 **서버 소유 DB 트랜잭션**이 `withLockedOriginalGrant({signal,deliver})`를 호출하고, `deliver`의 **실제 Node `http.ServerResponse.finish`까지 기다린 후** 잠금을 해제하는 포트다. `deliver(null)`이면 503/no-store, 양수 권한이면 최대 64KiB assistant 본문을 단일 JSON 응답으로 전송한다.
+- 취소: client abort, `ServerResponse.close/error`, 최대 10초 deadline에서 소켓 파기·후발 `deliver` 거부; DB 포트는 전달받은 `AbortSignal`에 따라 쿼리를 중단하고 반드시 트랜잭션 ROLLBACK/연결 반환을 보장해야 한다. 시간 초과 뒤 비동기 송출 재시도는 금지.
+- 배포 경계: 명하의 현재 `api/me.ts`는 Vercel **Fetch `Response`를 반환**하므로 이 Node 소켓 포트를 사용할 수 없다. `Response` 생성/반환이 `S`라는 주장은 금지한다. **운영 메모리 기반 첫 공개 HOLD 불변**. 이후 직접 제어 가능한 Node 송출 서비스나 동등하게 입증된 프록시 송출 계약이 준비돼야 연결 가능하다.
+- 운영 주의: 이 후보는 **DB 잠금을 실제 송출이 끝날 때까지 유지**하므로 작은 응답·짧은 deadline에서는 구현 가능하지만, 네트워크 병목/풀 고갈, multi-instance, 실패 뒤 ACK, 백그라운드 Worker와 History 재공개를 해결한 완성품이 아니다. 실제 배포 승인 전 해당 경계의 부하·취소·송출/철회 선형화 및 Owner 서명이 필요하다.
+- 최소 검증: 별도 실제 Node loopback에서 정상/권한 거부/중단 3건; 이미 R10에 실 DB 두 세션 순서 테스트 2건이 존재하므로 R11에서 DB 시나리오를 중복 증식하지 않는다.

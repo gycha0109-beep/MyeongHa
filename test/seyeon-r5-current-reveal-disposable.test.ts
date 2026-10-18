@@ -6,6 +6,7 @@ import type { AddressInfo } from 'node:net';
 import { resolveMeDispatchTargetForTestV1, toCanonicalMeRequestForTestV1 } from '../api/me.js';
 import { Pool, type PoolClient } from 'pg';
 import { handleSeyeonChatTurnSendRequestV1 } from '../apps/api/src/chat-turn-send-http.js';
+import { sendSeyeonNodeOriginalGrantResponseV1 } from '../apps/api/src/seyeon-node-original-grant-send-boundary-v1.js';
 
 const enabled=process.env.CI==='true' &&
   process.env.SEYEON_POSITIVE_GRANT_REAL_PG==='1' &&
@@ -597,26 +598,27 @@ describe.skipIf(!enabled)('R5 disposable actual-v2 current-rights first/replay/h
       // Candidate-only direct Node bridge: unlike Web Response construction,
       // the actual HTTP send occurs before releasing this DB transaction's
       // original Subject/Grant SHARE locks.
-      await transaction(async c => {
-        await c.query("set local application_name='seyeon-r10-lock-held-sender'");
-        const current = await c.query<{ answer: string | null }>(
-          'select seyeon_positive_candidate.reveal_http_r5($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid) as answer',
-          [subject, id.thread, id.turn, id.attempt, id.assistantMessage],
-        );
-        expect(current.rows[0]?.answer).toBe(body);
-        authorized();
-        await sendGate;
-        const flushed = new Promise<void>((resolve, reject) => {
-          response.once('finish', resolve);
-          response.once('error', reject);
-        });
-        await r9WriteResponse(response, Response.json({ assistantText: current.rows[0]!.answer }, {
-          headers: { 'Cache-Control': 'no-store' },
-        }));
-        await flushed; // Node handed response to its HTTP send path; not client ACK.
-        socketWrites += 1;
-        events.push('S:node-finish');
-      }, true); // This COMMIT releases original Grant/Subject locks.
+      const outcome = await sendSeyeonNodeOriginalGrantResponseV1({
+        response,
+        requestSignal: new AbortController().signal,
+        deadlineMs: 9_000,
+        withLockedOriginalGrant: async ({ deliver }) => transaction(async c => {
+          await c.query("set local application_name='seyeon-r10-lock-held-sender'");
+          const current = await c.query<{ answer: string | null }>(
+            'select seyeon_positive_candidate.reveal_http_r5($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid) as answer',
+            [subject, id.thread, id.turn, id.attempt, id.assistantMessage],
+          );
+          expect(current.rows[0]?.answer).toBe(body);
+          authorized();
+          await sendGate;
+          // The production-candidate adapter, not test-only socket code,
+          // waits for the actual Node finish while the original Grant is locked.
+          await deliver(current.rows[0]?.answer ?? null);
+          socketWrites += 1;
+          events.push('S:node-finish');
+        }, true), // SQL COMMIT releases original Grant/Subject locks.
+      });
+      expect(outcome).toBe('assistant_sent');
     }, async origin => {
       const pendingResponse = fetch(origin + '/r10-db-locked-send-first', {
         method: 'POST', body: 'synthetic offline only',
@@ -684,19 +686,23 @@ describe.skipIf(!enabled)('R5 disposable actual-v2 current-rights first/replay/h
         );
         await withR9Loopback(async (request, response) => {
           await r9ReadBody(request);
-          await transaction(async reader => {
-            await reader.query("set local application_name='seyeon-r10-wait-for-revoke'");
-            startedRead();
-            const current = await reader.query<{ answer: string | null }>(
-              'select seyeon_positive_candidate.reveal_http_r5($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid) as answer',
-              [subject, id.thread, id.turn, id.attempt, id.assistantMessage],
-            );
-            expect(current.rows[0]?.answer).toBeNull();
-            await r9WriteResponse(response, Response.json({
-              ok: false, code: 'SEYEON_FIRST_REVEAL_AUTHORITY_UNAVAILABLE',
-            }, { status: 503, headers: { 'Cache-Control': 'no-store' } }));
-            socketWrites += 1;
-          }, true);
+          const outcome = await sendSeyeonNodeOriginalGrantResponseV1({
+            response,
+            requestSignal: new AbortController().signal,
+            deadlineMs: 9_000,
+            withLockedOriginalGrant: async ({ deliver }) => transaction(async reader => {
+              await reader.query("set local application_name='seyeon-r10-wait-for-revoke'");
+              startedRead();
+              const current = await reader.query<{ answer: string | null }>(
+                'select seyeon_positive_candidate.reveal_http_r5($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid) as answer',
+                [subject, id.thread, id.turn, id.attempt, id.assistantMessage],
+              );
+              expect(current.rows[0]?.answer).toBeNull();
+              await deliver(null);
+              socketWrites += 1;
+            }, true),
+          });
+          expect(outcome).toBe('reveal_held');
         }, async origin => {
           const pendingResponse = fetch(origin + '/r10-db-locked-revoke-first', {
             method: 'POST', body: 'synthetic offline only',
