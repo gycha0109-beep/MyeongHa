@@ -71,3 +71,31 @@ The [65-workflow responsibility inventory](workflow-responsibility-map.json) and
 | Intentional paused workflows | **HOLD** | Each owner: release conditions and signoff |
 
 No change to checks, workflows, role/ACL, Production schema/history, queue settings, secrets, tokens, or externally triggered workload.
+
+
+## G. Follow-up: exact-head CI and newer backup-to-ledger source binding (2026-10-18 KST)
+
+This is a **subsequent read-only checkpoint** and does not retroactively revise the sampled evidence in sections A–F. These runs were checked against GitHub Actions run status, first-page job results, decoded job logs and unexpired artifact metadata. Any subsequent \`main\` push needs its own SHA-matched assessment.
+
+### Exact-head CI / deployment distinction
+
+- [Main CI #39066237847](https://github.com/gycha0109-beep/MyeongHa/actions/runs/39066237847) completed **SUCCESS** for \`d5f431542c292d18a83f8373ca99c7238bac6f05\`. Its \`Work Track · main-regression\`, \`db-authority-core\`, and final \`CI Verify\` jobs succeeded; conditional DB-dependency jobs were **skipped**, not executed coverage.
+- Newer \`main\` \`b836543f34201ddb305cfe2b18664f0638931078\` completed [CI #39066664973](https://github.com/gycha0109-beep/MyeongHa/actions/runs/39066664973) **SUCCESS**, including the same three required job outcomes. Governance #39066664867 **SUCCESS**.
+- [Supabase Production #39066664862](https://github.com/gycha0109-beep/MyeongHa/actions/runs/39066664862) completed **SUCCESS**, **but** \`deploy-migrations=skipped\` and \`governed-seyeon-relationship-backfill-1400-1450=skipped\`. This is **not** evidence of any Production migration rollout or repair of remote/local migration history.
+
+### Newer encrypted backup, exact source selection, and recovery ledger
+
+| Evidence | Observed source/identity and transport | Limit |
+| --- | --- | --- |
+| [Production backup #39067271230](https://github.com/gycha0109-beep/MyeongHa/actions/runs/39067271230) | Scheduled **SUCCESS**, job \`encrypted-logical-backup=success\`; \`strict_dump_transport=pass\` for roles, schema and data with TLS \`verify-full\`. Logs report \`migration_frontier=20261008090417\`. Artifact \`myeongha-postgres-20261017T203445Z\`, **ID 12113811530**, 181,631 bytes, uploaded SHA-256 \`a0490b1e0ac6ecdcae008482e283f31a77d83a2df6d3034995a876f1829daddd\`, expires **2026-11-16 20:36:52 UTC**. | Artifact success is evidence of encrypted backup creation, not tested restore or approved RPO/RTO. A remote frontier marker does not close lineage divergence. |
+| [Privacy ledger #39104521694](https://github.com/gycha0109-beep/MyeongHa/actions/runs/39104521694) | Scheduled **SUCCESS**; job \`encrypted-off-db-privacy-recovery-ledger=success\`. Its job log explicitly resolves **BACKUP_RUN_ID=39067271230**, backup artifact **ID 12113811530**, backup SHA \`b836543f34201ddb305cfe2b18664f0638931078\`, and confirms a GitHub artifact download SHA-256 identical to the backup upload digest above. Ledger artifact \`myeongha-privacy-ledger-20261018T063450Z\`, **ID 12128175913**, 2,803 bytes, uploaded SHA-256 \`4a041f46d1097091d6a27266fb5e353f44cb2e437382fc6cb62deda3fc3e2c31\`, expires **2026-11-17 06:34:50 UTC**. | **Backup-to-ledger provenance and outer artifact transfer integrity proven**. No successful same-pair isolated restore, authoritative ledger replay, non-zero privacy deletion canary or full DR readiness is established by this run. Ledger workflow success alone does not attest event count or a completed replay. |
+
+The repository's [isolated restore workflow](../../.github/workflows/postgres-isolated-restore-drill.yml) requires an **explicit protected** \`workflow_dispatch\` with exact \`backup_run_id\`, UTC incident reference, \`watchtower_track=ops\`, and—**when authoritative privacy replay is sought**—both the ledger run ID and a separately successful Production privacy canary run ID. The [Production privacy canary workflow](../../.github/workflows/production-privacy-recovery-canary.yml) is a protected manual operation with its own confirmation and Production-side synthetic mutations; this checkpoint does **not** authorize launching it. The restore workflow prints \`dr_ready=false\` even after scoped success. No documented matching restore or canary for the new pair was verified in the sampled recent runs.
+
+### Owner handoff / controls still binding
+
+1. **Ops + Production DB Authority**: review current remote/local migration provenance for [#1887](https://github.com/gycha0109-beep/MyeongHa/issues/1887) and decide whether/when to approve a governed exact-backup-ID isolated restore. Never infer approval from a successful CI, backup, or scheduled ledger.
+2. **Privacy + DB owners**: if authoritative replay is required, separately authorize and capture the correct successful Production privacy canary and matched ledger, then execute protected isolated replay and review evidence; request RPO/RTO/DR signoff. Do not claim non-zero replay from a scheduled ledger artifact.
+3. **Application/Security owner**: [#2200](https://github.com/gycha0109-beep/MyeongHa/issues/2200) remains a separate Production send incident with pinned-RPC rollout dependencies. Keep its safe readiness and deployment gates distinct.
+
+**No** Production SQL/DDL/DML, migration repair, workflow dispatch, credentials, external paid calls, CI protection changes, synthetic load generation, or DR readiness assertion was performed to produce this addendum.
