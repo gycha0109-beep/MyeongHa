@@ -115,8 +115,10 @@ describe('MyeongHa character-led Saju Reading v1', () => {
     expect(runtime).not.toContain("chat.html?character=");
     expect(runtime).not.toContain("next.searchParams.set('reader', readerKey)");
     expect(runtime).not.toContain('presentationReaderHint: readerKey');
-    expect(runtime).toContain("handoffUrl('records.html?tab=saju')");
-    expect(html).toContain('대화를 시작하려면 대화 상대를 새로 선택해 주세요.');
+    expect(runtime).toContain("isStoredRecord ? 'records.html?tab=saju' : 'reading.html'");
+    expect(runtime).toContain("isStoredRecord ? '기록에서 사주 보기' : '다른 사주 읽기'");
+    expect(html).toContain('이 프리뷰는 공식 풀이 기록에 저장되지 않습니다.');
+    expect(runtime).toContain('이 결과는 기록에 저장된 Official Reading입니다. 대화를 시작하려면 대화 상대를 새로 선택해 주세요.');
     expect(html).toContain('data-reading-route-action href="reading.html"');
     expect(html).toContain('data-reading-chat-link href="chat-hub.html"');
     expect(html).toContain('대화 상대 선택');
