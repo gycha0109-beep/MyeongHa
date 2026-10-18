@@ -235,7 +235,7 @@ select 'DIRECT_1220_REPLAY=' || replayed::text from public.cmd_bind_standard_rea
   '$b4_intent'::uuid,
   '12193000-0000-0000-0000-000000000004'::uuid,
   '12193100-0000-0000-0000-000000000004'::uuid,
-  'sha256:v1:7777777777777777777777777777777777777777777777777777777777',
+  'sha256:v1:7777777777777777777777777777777777777777777777777777777777777777',
   'standard-reading-access-bind-v2',
   '{"schemaVersion":"standard-reading-access-bind-v2","purchaseIntentId":"$b4_intent"}'::jsonb
 );
