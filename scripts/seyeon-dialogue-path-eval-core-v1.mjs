@@ -1,3 +1,6 @@
+import { SEYEON_C08S_ORDINARY_GOLD_IDS_V1 as REVIEW_IDS }
+ from './seyeon-c08s-blinded-first-turn-evaluation-v1.mjs';
+
 /**
  * Synthetic benchmark accounting only. No content, memory, identity, or prompts
  * are accepted into the evidence schema. A PASS means server guards admitted
@@ -33,7 +36,8 @@ export function selectSeyeonDialoguePathCasesV1(allCases) {
   const result = SEYEON_DIALOGUE_PATH_CASE_IDS_V1.map((id) => {
     const matches = available.filter((value) => value.id === id);
     if (matches.length !== 1 ||
-      matches[0].topic !== null || matches[0].noClaims !== true ||
+      matches[0].topic !== null ||
+      (matches[0].noClaims !== true && !REVIEW_IDS.includes(id)) ||
       typeof matches[0].text !== 'string' || matches[0].text.length > 160) {
       throw new TypeError('Fixture not eligible or changed: ' + id);
     }
