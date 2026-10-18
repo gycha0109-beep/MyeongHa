@@ -89,7 +89,7 @@ describe('Seyeon first zero-source one-shot Production SQL gate', () => {
     const subject = lockedSql.indexOf('from public.subjects locked_subject');
     const thread = lockedSql.indexOf('from public.conversation_threads locked_thread');
     const state = lockedSql.indexOf('from public.user_character_states locked_state');
-    const sourceCensus = lockedSql.indexOf('and not exists (\\n      select 1 from public.relationship_events');
+    const sourceCensus = lockedSql.indexOf('and not exists (\n      select 1 from public.relationship_events');
     const messageCensus = lockedSql.indexOf('select count(*) from public.conversation_messages previous');
     const lockSql = lockedSql.slice(subject, messageCensus);
     expect(subject).toBeGreaterThan(0);
