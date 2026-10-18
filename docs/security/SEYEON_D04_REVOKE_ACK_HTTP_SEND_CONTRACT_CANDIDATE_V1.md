@@ -106,3 +106,12 @@ original Grant 철회 COMMIT                  (R)
 - **ACK:** 명령 결과가 성공했더라도 PostgreSQL 트랜잭션의 **COMMIT이 성공적으로 끝난 뒤에만** `status='committed'`를 반환한다. Commit 응답 손실·실패·락 타임아웃에는 완료로 응답하지 않고 오류/재시도 처리에 맡긴다. 기록 삭제/타 캐릭터 Grant 삭제/기존 Attempt 재승인은 발생하지 않는다.
 - **전송 경합:** 실제 RPC는 `public.subjects FOR UPDATE`를 동작 초기에 획득한다. 기존 R13 current-original-Grant Reader는 같은 Subject를 `FOR SHARE`로 잠근 채 R11 Node `finish`를 기다린다. 따라서 **Node가 통제하는 전송 한정**으로, 둘 중 먼저 Subject 잠금을 확보한 순서대로 취소 COMMIT과 Node 전송 인계가 직렬화된다. 기존 R10의 두 실제 PostgreSQL 세션 테스트에서 수동 UPDATE 대신 이 실제 RPC를 사용한다.
 - **미승인 부분:** `cmd_revoke_memory_character_grant_v1`은 SECURITY INVOKER이므로 실제 운영 `myeongha_api_executor`의 실행/테이블 ACL 적합성은 별도 증명해야 한다. 이번 테스트의 revoker는 폐기용 DB 소유자 연결이며 실제 운영 권한 증거가 아니다. Vercel/Proxy 송출 경계 및 공개·재전송 승인도 여전히 미완료. **Production revoke ACK route는 미탑재**, Provider/양수 Reveal/Public/Paid/운영 DB 변경 없음.
+
+
+## 10. R16 — 실제 Supabase 운영 권한 확인과 사용자 철회 HTTP 후보
+
+- **운영 DB 카탈로그 직접 조회 (2026-10-18, 읽기 전용):** 명하 Supabase Project의 `myeongha_api_executor` 역할은 존재하고 `public.cmd_revoke_memory_character_grant_v1(uuid,uuid,text)`도 존재하지만, RPC는 `SECURITY INVOKER`이며 **해당 역할의 EXECUTE=false**. `public.subjects`와 `public.record_access_grants`의 UPDATE=false, `record_access_grants`·`memory_items` SELECT=false. **현재 운영 DB 권한으로는 R15 철회 SQL을 실행할 수 없다.** 실제 결과는 개인 기록을 읽지 않은 pg_catalog/has_*_privilege 조회이며 `scripts/operations/seyeon-original-grant-revoke-acl-readonly.sql`로 재현 가능하다.
+- **이번 코드:** `apps/api/src/seyeon-memory-grant-revoke-http-v1.ts`가 `POST /api/memories/:memoryItemId/grants/seyeon/revoke`를 구현. 서버의 인증된 Member만 허용하고, Body·Query에서 Subject/Character/Grant/Attempt override를 허용하지 않는다. DB 승인이 없으면 **기본 503/no-store**이고 DB 연결/쓰기 0회. 입장 허가 후에는 이미 구현된 R15 COMMIT 후 ACK 처리만 호출; 불명확한 COMMIT·권한 거부·DB 오류는 성공으로 표시하지 않는다.
+- **실 운영 구성:** `apps/api/src/production-seyeon-memory-grant-revoke-runtime-v1.ts`가 실제 Production Member 인증기와 DB pool을 묶으나 **DB 쓰기 승인도 OFF, Vercel `api/me.ts` 경로도 미탑재**. 테스트에서만 가짜 승인 함수를 주입해 정상 ACK 매핑을 확인한다.
+- **권한 해결 원칙:** `myeongha_api_executor`에 `record_access_grants`·`subjects`의 광범위 SELECT/UPDATE나 기존 SECURITY INVOKER RPC 호출권을 무심코 부여하지 않는다. 실제 진입에 필요한 것은 **비공개 스키마의 최소 권한 original-Grant 철회 소유 RPC** 또는 동등하게 검증된 좁은 권한 계약이다. 서버가 확인한 canonical Subject와 `character='seyeon'`을 고정하고, 사용자 단위 격리·커밋 후 ACK·이미 완료된 보내기 순서가 유지되어야 한다. 별도 기술 승인과 실제 restricted-role 검증 전까지 운영 ACL/마이그레이션/전송 기능을 건드리지 않는다.
+- **판정:** Product Owner 승인 재요청 없음. G0 기술 승인 OPEN, G3 positive 첫 Reveal/Replay/History HOLD, 철회 HTTP Production 미탑재, public/paid/Provider OFF.
