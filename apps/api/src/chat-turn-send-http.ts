@@ -4,6 +4,7 @@ import {
   readAuthenticatedJsonRequestBodyV1,
 } from './authenticated-json-request-resource.js';
 import type { IdentityEvidenceVerificationPortV1 } from './current-subject-profile-http.js';
+import type { VerifiedSubjectIdentityEvidenceV1 } from './subject-identity-resolver.js';
 import {
   createIngressRequestBodyCompletionDeadlineLeaseV1,
   IngressRequestBodyCompletionDeadlineExceededV1,
@@ -283,21 +284,41 @@ async function readBody(request: Request): Promise<unknown> {
   }
 }
 
-export async function handleSeyeonChatTurnSendRequestV1(
-  input: HandleSeyeonChatTurnSendRequestInputV1,
-): Promise<Response> {
+// This is the SAME strict authentication + route + bounded JSON admission
+// used by both the still-blocked Vercel Fetch route and the unmounted direct
+// Node ServerResponse candidate. It cannot authorize any assistant Reveal.
+export type SeyeonChatTurnSendPreflightResultV1 =
+  | Readonly<{ kind: 'denied'; response: Response }>
+  | Readonly<{
+      kind: 'admitted';
+      verifiedEvidence: Extract<VerifiedSubjectIdentityEvidenceV1, { kind: 'member' }>;
+      threadId: string;
+      clientTurnId: string;
+      text: string;
+    }>;
+
+export async function preflightSeyeonChatTurnSendRequestV1(input: Readonly<{
+  request: Request;
+  requestId: string;
+  identityEvidenceVerifier: IdentityEvidenceVerificationPortV1;
+}>): Promise<SeyeonChatTurnSendPreflightResultV1> {
   const parsedRoute = parseRoute(input.request);
-  if (parsedRoute === null) return registerSeyeonStaticPreflightDenialV1(
-    new Response(null, { status: 404, headers: { 'Cache-Control': NO_STORE } }),
-  );
-  if (input.request.method !== POST_METHOD) return methodNotAllowed();
+  if (parsedRoute === null) return {
+    kind: 'denied',
+    response: registerSeyeonStaticPreflightDenialV1(
+      new Response(null, { status: 404, headers: { 'Cache-Control': NO_STORE } }),
+    ),
+  };
+  if (input.request.method !== POST_METHOD) {
+    return { kind: 'denied', response: methodNotAllowed() };
+  }
 
   const verifiedEvidence = await input.identityEvidenceVerifier.verifyRequestIdentity(input.request);
   if (verifiedEvidence === null) {
-    return jsonError({ status: 401, code: 'AUTH_REQUIRED', messageKey: 'auth.required', retryable: false, requestId: input.requestId });
+    return { kind: 'denied', response: jsonError({ status: 401, code: 'AUTH_REQUIRED', messageKey: 'auth.required', retryable: false, requestId: input.requestId }) };
   }
   if (verifiedEvidence.kind !== 'member') {
-    return jsonError({ status: 403, code: 'FORBIDDEN', messageKey: 'chat.member_required', retryable: false, requestId: input.requestId });
+    return { kind: 'denied', response: jsonError({ status: 403, code: 'FORBIDDEN', messageKey: 'chat.member_required', retryable: false, requestId: input.requestId }) };
   }
 
   let rawBody: unknown;
@@ -305,28 +326,46 @@ export async function handleSeyeonChatTurnSendRequestV1(
     rawBody = await readBody(input.request);
   } catch (error) {
     if (error instanceof AuthenticatedJsonRequestBodyTooLargeV1) {
-      return jsonError({ status: 413, code: 'REQUEST_TOO_LARGE', messageKey: 'request.too_large', retryable: false, requestId: input.requestId });
+      return { kind: 'denied', response: jsonError({ status: 413, code: 'REQUEST_TOO_LARGE', messageKey: 'request.too_large', retryable: false, requestId: input.requestId }) };
     }
     if (error instanceof IngressRequestBodyCompletionDeadlineExceededV1) {
-      return jsonError({ status: 408, code: 'REQUEST_BODY_TIMEOUT', messageKey: 'auth.request_body_timeout', retryable: false, requestId: input.requestId });
+      return { kind: 'denied', response: jsonError({ status: 408, code: 'REQUEST_BODY_TIMEOUT', messageKey: 'auth.request_body_timeout', retryable: false, requestId: input.requestId }) };
     }
-    return jsonError({ status: 400, code: 'INVALID_REQUEST', messageKey: 'request.invalid', retryable: false, requestId: input.requestId });
+    return { kind: 'denied', response: jsonError({ status: 400, code: 'INVALID_REQUEST', messageKey: 'request.invalid', retryable: false, requestId: input.requestId }) };
   }
 
   const body = parseBody(rawBody);
   if (body === null) {
-    return jsonError({ status: 400, code: 'INVALID_REQUEST', messageKey: 'request.invalid', retryable: false, requestId: input.requestId });
+    return { kind: 'denied', response: jsonError({ status: 400, code: 'INVALID_REQUEST', messageKey: 'request.invalid', retryable: false, requestId: input.requestId }) };
   }
+  return Object.freeze({
+    kind: 'admitted',
+    verifiedEvidence,
+    threadId: parsedRoute.threadId,
+    clientTurnId: body.clientTurnId,
+    text: body.text,
+  });
+}
+
+export async function handleSeyeonChatTurnSendRequestV1(
+  input: HandleSeyeonChatTurnSendRequestInputV1,
+): Promise<Response> {
+  const preflight = await preflightSeyeonChatTurnSendRequestV1({
+    request: input.request,
+    requestId: input.requestId,
+    identityEvidenceVerifier: input.identityEvidenceVerifier,
+  });
+  if (preflight.kind === 'denied') return preflight.response;
 
   try {
     // G0/G3 current-rights Reveal has no DB-owned linearization seam yet.
     // Block before costly runtime/provider calls or any response serialization.
     assertSeyeonFirstHttpRevealAuthorizedV1();
     const result = await input.runtime.run({
-      verifiedEvidence,
-      threadId: parsedRoute.threadId,
-      clientTurnId: body.clientTurnId,
-      text: body.text,
+      verifiedEvidence: preflight.verifiedEvidence,
+      threadId: preflight.threadId,
+      clientTurnId: preflight.clientTurnId,
+      text: preflight.text,
     });
     return success(projectResult(result), input.requestId, input.serverTime);
   } catch (error) {
