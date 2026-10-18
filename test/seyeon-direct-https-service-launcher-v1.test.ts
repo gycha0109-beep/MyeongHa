@@ -71,11 +71,11 @@ describe('Direct HTTPS Node24 operator launcher (scope/secret isolation)',()=>{
   });
 
   it.each([
-    [],
-    ['--public'],
-    ['--internal-zero-source-only','--public'],
-    ['--vercel-proxy'],
-  ])('rejects non-internal launch args before reading secrets (%j)',args=>{
+    {args: []},
+    {args: ['--public']},
+    {args: ['--internal-zero-source-only','--public']},
+    {args: ['--vercel-proxy']},
+  ])('rejects non-internal launch args before reading secrets ($args)',({args})=>{
     expect(()=>prepareSeyeonDirectHttpsLauncherOptionsV1({env:{},args}))
       .toThrow(SeyeonDirectHttpsLauncherErrorV1);
   });
