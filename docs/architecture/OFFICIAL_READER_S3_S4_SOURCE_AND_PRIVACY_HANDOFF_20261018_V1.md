@@ -99,3 +99,12 @@ Saju Owner가 제공할 정식 보완물은 **Preview와 별도**인 운영 원�
 - **S3 공식 출처 발행:** Saju [#2410](https://github.com/gycha0109-beep/Saju/issues/2410)에 현행 MyeongHa S3 후보·합성 서명 코드의 한계와 Owner source-attested execution/Production 발행/검증/Anti-replay 계약을 인계했다. 열린 이슈의 A/B/C를 충족하기 전까지 Preview proof·합성 rehearsal을 공식 승인으로 승격하지 않는다.
 - **S4 보호 원문 개인정보:** MyeongHa [#2318](https://github.com/gycha0109-beep/MyeongHa/issues/2318)에 유료 원문·임시 결과·증명·로그·Memory/검색/알림 파생 자료별 처리 목적, 보존·삭제/복원 및 PostgreSQL 15/17·환불 후 미노출 승인 조건을 분리해 등록했다. P0-PR-01 및 RR-03 Draft의 기존 승인 범위를 넓히지 않는다.
 - **S5/T2:** 위 두 Owner 계약과 DB/Commerce S2 공통 잠금 인수를 모두 통과하기 전까지 유료 답변 최종 저장·일반 메시지 본문·공개·결제 활성화 금지. 이 기록은 승인이나 운영 적용이 아니다.
+
+
+## S3 실제 공식 Reading Source와 근거 후보 비교 연결 (2026-10-19)
+
+- `apps/api/src/official-reader-s3-authoritative-artifact-coverage-v1.ts`는 인가된 내부 `CharacterStandardReadingKnowledgeSourceV1`(실제 DB Resolver 결과만 전제)을 S3 Coverage 검사와 연결하는 비공개 어댑터다. 기존처럼 **클라이언트/모델이 전달한 근거 원본이나 외부 `protectedSegments` 객체**를 소유 근거로 채택하지 않는다.
+- Source의 Subject, Reading, Reader, Bundle, Product, Product Spec, Saju Domain, Reading Contract, Official Artifact Response Hash를 현재 내부 Reader Admission Scope와 일치시킨 뒤 `projectOfficialStandardReadingToProtectedCharacterSajuContextV1`을 통해 저장된 `ProductReadingResponse v2` 자체에서 원문/고지/모호성을 추출·해시한다. `delivered_with_fallback` 등 partial Reading을 정식 완전 근거로 승격하지 않는다.
+- 추출된 전체 선택/동반/Disclosure/ambiguity ref·hash를 `preflightOfficialReaderS3SourceCoverageV1`에 넘기며 반환은 오직 `held` 또는 `blocked`, Source/Semantic/Output `NOT_EVALUATED`, 유료 생성/공개/판매 false다. 원문·회원 ID·Reading ID·fingerprint는 결과에 포함하지 않는다. 별도 현실 Source → 서명 검증·발급 경계는 아직 없는 상태다.
+- 신규 시험은 실제 `ProductReadingResponse v2` 구조로 회원·Reader·Bundle·Product/Spec·Domain·Contract·Reading·원본 hash 불일치와 필수 Disclosure/동반/ambiguity 누락, 보호 원문 변조, partial Reading, 비정상 원본을 부정한다.
+- **전제조건/한계:** `source`는 기존 `resolveCharacterStandardReadingArtifactAfterAccessV1` 등 실제 서버 DB 권한 절차가 발급한 자료여야 한다. 일반 브라우저가 보낸 동일 타입 JSON을 안전하다고 판단할 수 없다. 이 어댑터는 서명자 진위·사주 계산 사실성·Semantic Guard·Privacy 승인·S2 유료 답변 T2 원자 저장을 제공하지 않는다. Saju [#2410](https://github.com/gycha0109-beep/Saju/issues/2410)과 Privacy [#2318](https://github.com/gycha0109-beep/MyeongHa/issues/2318)의 선행 승인 경로를 계속 유지한다.
