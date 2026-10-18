@@ -213,3 +213,12 @@ S8의 **비파괴/격리 검토는 S2~S7과 병렬 진행 가능**하며, S8 Pro
 - **과거 기록:** 철회와 일괄 대화 삭제를 동일시하지 않습니다. 하지만 보존된 메시지의 AI 재활용/검색/요약, 파생 출처, History GET·replay/Worker의 새로운 공개는 별도 현행 권한 검사가 없으면 HOLD합니다. 명시적 삭제 요청과 법률상 삭제 의무는 별도로 준수합니다.
 - **기술 승인 미완료:** G0의 exact Grant/Record, 최초 recordType/schema/projectorVersion, Digest/DB 잠금/ACL 및 D-04 `R/V/S/ACK` 취소-송출 선형화 계약은 Character/Source, DB/Security, API 기술 Owner 서명 및 실제 경합 테스트 전까지 PROPOSED입니다.
 - **절대 비승격:** 이번 승인은 G0 APPROVED, G1 양수/G2/G3/G5/G6 PASS, Production migrations/ACL/DB writes, real Provider, 유료/공개 활성화가 아닙니다. Projectors=[]·public/paid OFF·Production writes=0 유지합니다.
+
+## 24. 2026-10-18 R9 — 실제 PostgreSQL original Grant 철회 + 실제 HTTP 소켓 송출 경합 격리 시험
+
+- **승인된 제품 기준:** [2026-10-18 Product Owner 정책](../security/SEYEON_PRODUCT_OWNER_MEMORY_REVOKE_HISTORY_DECISION_20261018.md). 사용자의 기억 범위 선택 유지, 철회 후 새로운 기억 활용/미송출 공개 차단, 기송출 바이트 회수 불가, 과거 대화 보존과 AI 재사용/삭제 분리. 운영 G0 기술 서명은 여전히 별개.
+- **실제 테스트 추가:** 기존 전용 CI PostgreSQL 17 클론에서 \`seyeon_positive_candidate.reveal_http_r5\`의 실제 original Grant/Record/Attempt/Commit으로 정상 읽은 합성 Assistant text를 Node에 버퍼링. HTTP 송출이 아직 없는 \`127.0.0.1\` 서버에서 Vercel 원본/alias 경로의 Production 세연 POST 응답을 준비한 후, **별도 실제 PostgreSQL 트랜잭션으로 original Grant 철회 COMMIT**. 그 다음 원본 DB current-rights 조회/History는 거부되고, 실제 socket 송신에서도 503/no-store·Runtime 0회·합성 Assistant text 0바이트를 요구.
+- **반례 추가:** 같은 격리 DB 실증에서 실 DB 읽기 성공 후 철회하고 **고의로 안전하지 않게 구현한 합성 HTTP 소켓 서버**가 버퍼된 응답을 철회 후 보내는 반례를 검증. 이는 위험 재현이지 Production positive Reveal이 아니다.
+- **기술 계약 구체화:** [D-04 철회 ACK·송출 경계 기술 후보 v1](../security/SEYEON_D04_REVOKE_ACK_HTTP_SEND_CONTRACT_CANDIDATE_V1.md). \`P/C/V/R/S/ACK\`의 시점을 구분하고 \`V→R→ACK→S\` 위험, 원본 Grant·derived lineage, 비스트리밍, 송출 측 fence/lease·proxy·재시도 검증 필요를 Security/API/DB 기술 승인 후보로 기록.
+- **실행 경계:** 기존 \`test/db/seyeon_r2_disposable_actual_v2_revoke_race.sh\`가 호출하는 \`test/seyeon-r5-current-reveal-disposable.test.ts\`에 시험만 추가하며 운영 SQL·role·ACL·provider·positive Projector·HTTP 양수 공개 코드는 추가하지 않음. CI/Governance/Web/Full Integration 및 main 완료 증거는 PR과 #1866에 기록.
+- **미해결:** G0 technical signoff, 실제 Production positive pre-model source Pin 및 atomic Commit, 실제 Node/Proxy 송출과 철회 ACK의 보장, 최초 positive HTTP/History/Replay/Worker, G5/G6·DR 모두 HOLD. Production DB writes=0, public/paid OFF.
