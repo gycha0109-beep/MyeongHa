@@ -55,21 +55,18 @@ select x.id,cr.provider,x.event_id,'payment.cancelled',cr.external_transaction_i
 from public.commerce_receipts cr
 cross join (values
   ('12196000-0000-0000-0000-000000000001'::uuid,'synthetic-reader-revoke-race-1',
-   'sha256:v1:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa','race-order-1'),
-  ('12196000-0000-0000-0000-000000000002'::uuid,'synthetic-reader-revoke-race-2',
-   'sha256:v1:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb','race-order-2')
+   'sha256:v1:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa','race-order-1')
 ) as x(id,event_id,fingerprint,ordering_key)
 where cr.id='$receipt'::uuid and cr.subject_id='$subject'::uuid
   and cr.verification_status='verified' and cr.environment='production';
 SQL
 [[ "$(p -c "select count(*) from public.commerce_provider_events
-  where id in ('12196000-0000-0000-0000-000000000001'::uuid,
-               '12196000-0000-0000-0000-000000000002'::uuid);")" == 2 ]] ||
-  fail "both synthetic receipt-lineage events must exist"
+  where id='12196000-0000-0000-0000-000000000001'::uuid;")" == 1 ]] ||
+  fail "first verified synthetic receipt-lineage event must exist"
 
 activate_b2() {
   p -c "update public.entitlement_grants set status='active', revision=revision+1,
-    last_effective_at=clock_timestamp(), updated_at=clock_timestamp()
+    updated_at=clock_timestamp()
     where id='$b2'::uuid and grant_source_type='purchase';" >/dev/null
   [[ "$(p -c "select status from public.entitlement_grants where id='$b2'::uuid;")" == active ]] ||
     fail "synthetic B2 activation failed"
@@ -206,6 +203,28 @@ grep -qx DENY "$tmpdir/reader-after.out" ||
   { cat "$tmpdir/reader-after.out" >&2; fail "post-effect Reader-like locked read must DENY"; }
 assert_committed_revoke '12196000-0000-0000-0000-000000000001'
 pass "S2 real scoped revoke first: provider-event Grant FOR UPDATE blocks Reader, then DENY"
+
+# Insert a distinct newer provider cancellation AFTER the earlier effect has
+# been committed. An older event must not be replayed to rewrite newer state.
+p >"$tmpdir/second-event.out" 2>&1 <<SQL || fail "second cancellation fixture failed"
+insert into public.commerce_provider_events(
+  id,provider,external_event_id,event_type,external_transaction_id,
+  resolved_subject_id,resolution_source_type,resolved_receipt_id,
+  payload_fingerprint,provider_occurred_at,provider_ordering_key,
+  verified_payload_jsonb,status,received_at,environment,verifier_revision
+)
+select '12196000-0000-0000-0000-000000000002'::uuid,
+  cr.provider,'synthetic-reader-revoke-race-2','Transaction.Cancelled',
+  cr.external_transaction_id,cr.subject_id,'receipt',cr.id,
+  'sha256:v1:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+  clock_timestamp(),'race-order-2',
+  '{"schemaVersion":"commerce-evidence-v2"}'::jsonb,
+  'verified',clock_timestamp(),'production','synthetic-race-verifier-v1'
+from public.commerce_receipts cr where cr.id='$receipt'::uuid;
+SQL
+[[ "$(p -c "select count(*) from public.commerce_provider_events
+  where id='12196000-0000-0000-0000-000000000002'::uuid;")" == 1 ]] ||
+  fail "newer verified synthetic full cancellation missing"
 
 # CASE 2: Reader FOR SHARE owns the row first. The real Entitlement Effect
 # writer waits, then commits the independent second synthetic revoke event.
