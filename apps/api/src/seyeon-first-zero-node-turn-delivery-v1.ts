@@ -30,18 +30,21 @@ export const SEYEON_FIRST_ZERO_NODE_TURN_DELIVERY_V1 = Object.freeze({
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 const READINESS_SQL = `
-select (
-  to_regprocedure('public.qry_seyeon_locked_first_zero_source_reveal_v1(uuid,uuid,uuid,uuid)')
-    is not null
-  and coalesce(
-    has_function_privilege(
-      current_user,
-      to_regprocedure('public.qry_seyeon_locked_first_zero_source_reveal_v1(uuid,uuid,uuid,uuid)'),
-      'EXECUTE'
-    ), false
+select exists(
+  select 1 from pg_catalog.pg_proc p
+  where p.oid=to_regprocedure(
+    'public.qry_seyeon_locked_first_zero_source_reveal_v1(uuid,uuid,uuid,uuid)'
   )
+    and p.prosecdef
+    and pg_catalog.pg_get_userbyid(p.proowner)='postgres'
+    and 'row_security=off'=any(p.proconfig)
+    and pg_catalog.has_function_privilege(current_user,p.oid,'EXECUTE')
+    and pg_catalog.has_function_privilege('myeongha_api_executor',p.oid,'EXECUTE')
+    and not pg_catalog.has_function_privilege('anon',p.oid,'EXECUTE')
+    and not pg_catalog.has_function_privilege('authenticated',p.oid,'EXECUTE')
+    and not pg_catalog.has_function_privilege('service_role',p.oid,'EXECUTE')
 ) as "ready"
-`.trim();
+`.trim();;
 
 export class SeyeonFirstZeroNodeTurnDeliveryErrorV1 extends Error {
   constructor(readonly code: 'INVALID_SCOPE' | 'DB_NOT_READY' | 'INVALID_COMMIT') {
