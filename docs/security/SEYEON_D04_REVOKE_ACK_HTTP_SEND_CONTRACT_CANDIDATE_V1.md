@@ -98,3 +98,11 @@ original Grant 철회 COMMIT                  (R)
 - **오류·철회:** 철회 우선이면 SQL NULL→503, 전송 오류·취소면 ROLLBACK. 잠금 대기는 2초, SQL 실행은 5초로 제한하고 콜백은 요청당 한 번만 사용한다. 단, 네트워크 취소 시 이미 실행 중인 SQL의 중단은 lock/statement timeout에 의존한다.
 - **중요 제한:** 이 G3 SQL 함수는 **격리 테스트 DB에만 존재**한다. 인증된 Production 권한/DB 마이그레이션·Vercel 프록시 송출·철회 ACK는 여전히 미구현/미승인. 실제 운영 positive 공개를 켜지 않는다.
 - **추가 보완:** 기존 `api/me.ts` 외곽 Vercel 응답 방어에서 단순 임의 4xx/no-store가 보호 본문을 통과하는 문제를 막기 위해 **서버가 직접 생성·등록한 오류 객체만 통과**한다. 그 외 4xx 포함 모든 결과는 고정 503/no-store. 외부 입력·임의 응답/본문에서 보안 결정을 하지 않는다.
+
+
+## 9. R15 — 실제 Memory Grant 철회 명령과 성공 ACK 순서 연결 (운영 미연결)
+
+- **구현:** `apps/api/src/seyeon-original-grant-revoke-ack-v1.ts`에서 서버가 검증한 Member → canonical Subject를 기존 `executePostgresSubjectTransactionV1`으로 해결한 뒤, 서버 고정 `characterId='seyeon'`과 본인 Memory ID에 대해 기존 `public.cmd_revoke_memory_character_grant_v1`만 호출한다. 임의의 Subject/캐릭터/Grant ID를 요청자로부터 받지 않는다.
+- **ACK:** 명령 결과가 성공했더라도 PostgreSQL 트랜잭션의 **COMMIT이 성공적으로 끝난 뒤에만** `status='committed'`를 반환한다. Commit 응답 손실·실패·락 타임아웃에는 완료로 응답하지 않고 오류/재시도 처리에 맡긴다. 기록 삭제/타 캐릭터 Grant 삭제/기존 Attempt 재승인은 발생하지 않는다.
+- **전송 경합:** 실제 RPC는 `public.subjects FOR UPDATE`를 동작 초기에 획득한다. 기존 R13 current-original-Grant Reader는 같은 Subject를 `FOR SHARE`로 잠근 채 R11 Node `finish`를 기다린다. 따라서 **Node가 통제하는 전송 한정**으로, 둘 중 먼저 Subject 잠금을 확보한 순서대로 취소 COMMIT과 Node 전송 인계가 직렬화된다. 기존 R10의 두 실제 PostgreSQL 세션 테스트에서 수동 UPDATE 대신 이 실제 RPC를 사용한다.
+- **미승인 부분:** `cmd_revoke_memory_character_grant_v1`은 SECURITY INVOKER이므로 실제 운영 `myeongha_api_executor`의 실행/테이블 ACL 적합성은 별도 증명해야 한다. 이번 테스트의 revoker는 폐기용 DB 소유자 연결이며 실제 운영 권한 증거가 아니다. Vercel/Proxy 송출 경계 및 공개·재전송 승인도 여전히 미완료. **Production revoke ACK route는 미탑재**, Provider/양수 Reveal/Public/Paid/운영 DB 변경 없음.
