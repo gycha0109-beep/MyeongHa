@@ -81,6 +81,19 @@ begin
       message='PortOne cancellation is not linked to an original verified Receipt';
   end if;
 
+  -- Existing Commerce purchases without a stored Reader selection are not
+  -- Reader transactions. Leave their current lifecycle path unchanged: do not
+  -- revoke, mutate Receipt or force ordinary Commerce webhook retries.
+  if not exists (
+    select 1 from public.purchase_intent_reader_selections prs
+    where prs.purchase_intent_id=v_receipt.purchase_intent_id
+  ) then
+    return pg_catalog.jsonb_build_object(
+      'contractVersion','portone-reader-full-cancellation-v1',
+      'disposition','unrelated_commerce'
+    );
+  end if;
+
   -- Do not rely on caller Subject or Reader identifiers; all scopes derive
   -- solely from stored Reader access bindings and the original Receipt.
   perform pg_catalog.set_config('myeongha.subject_id',v_receipt.subject_id::text,true);
