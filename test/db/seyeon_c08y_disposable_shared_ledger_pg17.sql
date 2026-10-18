@@ -22,7 +22,13 @@ create table c08y_offline.trusted_admissions (
   batch_name text primary key
     check (batch_name='c08y-six-slot-v1'),
   owner_run bigint not null unique check (owner_run > 0),
-  head_sha text not null check (head_sha ~ '^[0-9a-f]{40}
+  head_sha text not null check (head_sha ~ '^[0-9a-f]{40}$'),
+  scope text not null check (scope='OFFLINE_ONLY'),
+  paid_dispatch_enabled boolean not null default false
+    check (paid_dispatch_enabled=false),
+  approved_at timestamptz not null default transaction_timestamp()
+);
+create table c08y_offline.reservations (
   batch_name text not null references c08y_offline.batch_claims(batch_name),
   ordinal smallint not null check (ordinal between 1 and 6),
   slot_id text not null,
