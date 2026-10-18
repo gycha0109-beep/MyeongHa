@@ -5,6 +5,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { request as httpsRequest } from 'node:https';
 import { tmpdir } from 'node:os';
+import type { TLSSocket } from 'node:tls';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { IdentityEvidenceVerificationPortV1 } from '../apps/api/src/current-subject-profile-http.js';
@@ -151,7 +152,7 @@ async function exchange(input: {
         ALPNProtocols: input.alpn === undefined ? ['http/1.1'] : [...input.alpn],
       }, res => {
         const chunks: Buffer[] = [];
-        const version = res.socket.getProtocol?.() ?? null;
+        const version = (res.socket as TLSSocket).getProtocol();
         res.on('data', chunk => chunks.push(Buffer.from(chunk)));
         res.on('end', () => resolve({
           status: res.statusCode ?? 0,
@@ -212,12 +213,16 @@ describe('direct HTTPS TLS-only synthetic Node host', () => {
     expect(db.connections).toBe(2);
   });
 
-  it.each([
+  it.each<[string, {
+    hostHeader?: string;
+    headers?: Record<string,string | string[]>;
+    alpn?: readonly string[];
+  }]>([
     ['wrong-host', { hostHeader: 'unexpected.local.test' }],
     ['forwarded-proxy', { headers: { 'X-Forwarded-For': '127.0.0.1' } }],
     ['duplicate-auth', { headers: { Authorization: ['Bearer memberA','Bearer memberB'] } }],
     ['alpn-missing', { alpn: [] }],
-  ] as const)('%s is rejected at TLS/Host admission before Member or DB', async (_, props) => {
+  ])('%s is rejected at TLS/Host admission before Member or DB', async (_, props) => {
     const res = await exchange(props);
     expect(res.status).toBe(503);
     expect(res.json?.error.code).toBe('SEYEON_FIRST_REVEAL_AUTHORITY_UNAVAILABLE');
