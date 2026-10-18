@@ -201,6 +201,36 @@ describe('Deny-only Reader T1 / private generation / fresh T2 staging', () => {
     expect(f.events).not.toContain('commit:2');
   });
 
+  it.each([
+    ['HTTP Response', () => new Response(PRIVATE)],
+    ['Request', () => new Request('https://example.invalid/internal', {
+      method: 'POST', body: PRIVATE,
+    })],
+    ['ReadableStream', () => new ReadableStream({
+      start(controller) {
+        controller.enqueue(PRIVATE);
+        controller.close();
+      },
+    })],
+    ['Blob', () => new Blob([PRIVATE])],
+    ['FormData', () => {
+      const form = new FormData();
+      form.append('protectedBody', PRIVATE);
+      return form;
+    }],
+  ])('rejects direct %s egress from private generation before fresh T2', async (_label, value) => {
+    const f = fixture();
+    const generatePrivate = vi.fn(async () => value());
+    await expect(runOfficialReaderHeldT1T2PreflightV1({
+      ...f.input, generatePrivate,
+    })).rejects.toEqual(new OfficialReaderHeldPreflightErrorV1());
+    expect(generatePrivate).toHaveBeenCalledOnce();
+    expect(f.events).toContain('commit:1');
+    expect(f.events).toContain('release:1');
+    expect(f.events).not.toContain('connect:2');
+    expect(JSON.stringify(f.events)).not.toContain(PRIVATE);
+  });
+
   it('sanitizes generation failure and never starts T2', async () => {
     const f = fixture({ generationFails: true });
     await expect(runOfficialReaderHeldT1T2PreflightV1(f.input))
