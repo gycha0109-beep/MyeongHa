@@ -16,9 +16,9 @@ revoke_rpc as (
   from pg_proc p
   join pg_namespace n on n.oid = p.pronamespace
   where n.nspname='public'
-    and p.proname='cmd_revoke_memory_character_grant_v1'
-    and pg_get_function_identity_arguments(p.oid) =
-      'p_subject_id uuid, p_memory_item_id uuid, p_character_id text'
+    and p.oid=to_regprocedure(
+      'public.cmd_revoke_memory_character_grant_v1(uuid,uuid,text)'
+    )
 ),
 table_targets as (
   select c.oid, c.relname
