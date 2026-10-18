@@ -529,16 +529,9 @@ function activatePreviewReading(preview) {
   const completionCopy = document.querySelector('[data-reading-completion-copy]');
   const chatLink = document.querySelector('[data-reading-chat-link]');
   const recordsLink = document.querySelector('[data-reading-records-link]');
+  const recordsLinkLabel = document.querySelector('[data-reading-completion-secondary-label]');
   const replayButton = document.querySelector('[data-reading-replay]');
   let completed = false;
-
-  function handoffUrl(path) {
-    const next = new URL(path, window.location.href);
-    next.searchParams.set('from', 'reading');
-    next.searchParams.set('topic', route.topic);
-    next.searchParams.set('scope', route.scope);
-    return `${next.pathname.replace(/^\//, '')}${next.search}`;
-  }
 
   function completeReadingExperience() {
     completed = true;
@@ -550,10 +543,11 @@ function activatePreviewReading(preview) {
     // Reading-to-Chat continuation claim. General Chat remains independently selectable.
     if (chatLink) chatLink.setAttribute('href', 'chat-hub.html');
     if (recordsLink) {
-      recordsLink.setAttribute(
-        'href',
-        isStoredRecord ? 'records.html?tab=saju' : handoffUrl('records.html?tab=saju'),
-      );
+      // A live Preview does not create a persisted Official Reading.
+      recordsLink.setAttribute('href', isStoredRecord ? 'records.html?tab=saju' : 'reading.html');
+    }
+    if (recordsLinkLabel) {
+      recordsLinkLabel.textContent = isStoredRecord ? '기록에서 사주 보기' : '다른 사주 읽기';
     }
   }
 
@@ -591,7 +585,7 @@ function activatePreviewReading(preview) {
     if (authorityNote) {
       authorityNote.textContent = isStoredRecord
         ? '기록 · 당시 저장된 공식 사주 풀이를 그대로 다시 읽고 있습니다.'
-        : 'Preview · 연구 검증 중인 원국 해석이며 확정적 미래 예측은 포함하지 않습니다.';
+        : 'Preview · 현재 주제의 검증용 읽기이며 공식 기록에 저장되지 않습니다.';
       if (preview.notice) authorityNote.title = preview.notice;
     }
     if (previousButton) previousButton.disabled = activeIndex === 0;
@@ -623,6 +617,10 @@ function activatePreviewReading(preview) {
   else delete root.dataset.readingRecordMode;
   if (routeState) routeState.hidden = true;
   if (stage) stage.hidden = false;
+  if (completionCopy && !isStoredRecord) {
+    completionCopy.textContent =
+      '이 프리뷰는 공식 풀이 기록에 저장되지 않습니다. 다른 사주 읽기는 사주 페이지에서 선택할 수 있습니다.';
+  }
   if (isStoredRecord) {
     clearPersistedReadingPresentation();
     if (stage) stage.setAttribute('aria-label', '저장된 공식 사주 풀이');
