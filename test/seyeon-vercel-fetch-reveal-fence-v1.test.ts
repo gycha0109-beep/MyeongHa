@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   enforceSeyeonVercelFetchRevealFenceV1,
+  registerSeyeonStaticPreflightDenialV1,
 } from '../apps/api/src/seyeon-vercel-fetch-reveal-fence-v1.js';
 
 const CANARY = 'NEVER_RETURN_PRIVATE_SEYEON_ASSISTANT_BODY';
@@ -38,11 +39,25 @@ describe('Vercel Fetch final SeYeon response fence', () => {
       ok: false,
       error: { code: 'AUTH_REQUIRED', messageKey: 'auth.required', retryable: false },
     }, { status: 401, headers: { 'Cache-Control': 'no-store' } });
-    const result = enforceSeyeonVercelFetchRevealFenceV1(input, 'r12-auth');
+    const result = enforceSeyeonVercelFetchRevealFenceV1(
+      registerSeyeonStaticPreflightDenialV1(input), 'r12-auth',
+    );
     expect(result).toBe(input);
     expect(result.status).toBe(401);
     expect((await result.json()) as object).toMatchObject({
       error: { code: 'AUTH_REQUIRED' },
     });
   });
+  it('blocks forged unregistered 401/403 errors carrying private assistant bytes', async () => {
+    for (const status of [401, 403]) {
+      const forged = Response.json(
+        { ok: false, error: { code: 'AUTH_REQUIRED' }, assistantText: CANARY },
+        { status, headers: { 'Cache-Control': 'no-store' } },
+      );
+      const result = enforceSeyeonVercelFetchRevealFenceV1(forged, 'r13-forged');
+      expect(result.status).toBe(503);
+      expect(await result.text()).not.toContain(CANARY);
+    }
+  });
+
 });
