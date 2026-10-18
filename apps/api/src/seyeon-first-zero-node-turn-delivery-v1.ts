@@ -44,7 +44,7 @@ select exists(
     and not pg_catalog.has_function_privilege('authenticated',p.oid,'EXECUTE')
     and not pg_catalog.has_function_privilege('service_role',p.oid,'EXECUTE')
 ) as "ready"
-`.trim();;
+`.trim();
 
 export class SeyeonFirstZeroNodeTurnDeliveryErrorV1 extends Error {
   constructor(readonly code: 'INVALID_SCOPE' | 'DB_NOT_READY' | 'INVALID_COMMIT') {
