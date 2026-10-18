@@ -196,3 +196,9 @@ S1에서 공통 잠금 함수 자체가 성공하더라도 **S2 전체 경로가
 - `apps/api/src/official-reader-s3-authoritative-artifact-coverage-v1.ts`에서 비공개 Reader Admission Scope와 실제 DB 인가 `CharacterStandardReadingKnowledgeSourceV1`의 회원·Reading·Reader·Bundle·Product·Spec·Domain·Reading Contract·원본 fingerprint를 교차 확인한 다음, 원본 공식 `ProductReadingResponse v2`의 보호 Segment·필수 Disclosure·Ambiguity를 **기존 도메인 Projector로 직접 생성**하여 S3 후보 근거 해시·출처 목록의 완전성을 대조한다.
 - 보조 증거 객체만 받아들이던 S3 구조 검사에 비해 실제 서버 인가 Source에서 출발하는 경로를 추가했다. 합성 시험은 교차 회원·Reader·상품·원본 변경/가짜 원본/partial fallback/누락된 근거·고지·모호성을 거부한다.
 - **실제 Saju Owner 발행 증명, Semantic/Output Guard 및 Privacy Owner 보호 본문 승인 전에는 이 경로도 무조건 HELD/BLOCKED만 반환**한다. 영구 저장·RLS 권한·HTTP·일반 Chat Writer·유료 응답을 추가하지 않는다. Saju #2410, Privacy #2318의 인수·승인 조건은 여전히 유효하다.
+
+
+### S3 실제 Saju 서명 Preview 응답과 공식 DB 원본 대조
+
+- `official-reader-s3-signed-source-artifact-reconciliation-v1.ts`는 **실제 Saju 서버 전용 발급기의 signed Preview envelope**를 기존 암호학적 검증기·원자 nonce ledger로 검증하고, DB에 인가·고정된 공식 ProductReadingResponse v2 원본의 canonical hash 및 Reading ID와 비교한다. 같은 Preview 서명이 유효해도 **DB에 저장된 해설 원본과 다르면 거부**한다. 필수 근거·동반/고지/모호성은 신규 `official-reader-s3-authoritative-artifact-coverage-v1.ts`를 통해 먼저 검증한다.
+- 공식 Production Source attestation은 Saju #2410에서 여전히 미발행, 신규 개인정보 유료 원문 보존·삭제·복원 승인은 Privacy #2318에서 미결이다. 이 연계는 **Preview 전송 무결성 + 원본 일치 확인**일 뿐 Official Source Authority·Semantic/Output PASS·S5 유료 본문 최종 원자 저장을 제공하지 않는다. 비공개 시험, `held/blocked`, PUBLIC OFF/Draft/운영 DB 미적용 유지.
