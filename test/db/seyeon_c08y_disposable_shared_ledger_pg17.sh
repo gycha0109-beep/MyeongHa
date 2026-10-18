@@ -56,14 +56,14 @@ for n in 1 2; do
     timeout 30 psql -X -qAt -v ON_ERROR_STOP=1 >"$race_dir/client$n.log" 2>&1 <<SQL
 BEGIN;
 SET LOCAL ROLE c08y_synthetic_reserver;
-\\o $race_dir/client$n.pid
+\o $race_dir/client$n.pid
 select pg_backend_pid();
-\\o
-\\! touch $race_dir/ready$n
-\\! timeout 15 sh -c 'until test -f "$race_dir/ready$other"; do sleep 0.05; done'
-\\o $race_dir/claim$n
+\o
+\! touch $race_dir/ready$n
+\! timeout 15 sh -c 'until test -f "$race_dir/ready$other"; do sleep 0.05; done'
+\o $race_dir/claim$n
 select c08y_offline.claim_batch_v1($run_id,'$sha');
-\\o
+\o
 COMMIT;
 SQL
   ) &
