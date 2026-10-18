@@ -51,3 +51,10 @@ S3 비공개 구조 검사는 위조·다른 Reading·고지/동반 근거 누�
 - `apps/api/src/official-reader-s3-saju-owner-handoff-rehearsal-v1.test.ts`는 교차 회원·Reading·Bundle·Release·원본 hash·위조 서명·변조 근거·만료·중복 nonce·공용 nonce 저장소 장애와 Preview proof 승격을 거부한다.
 - **Saju Owner 인계 시 별도 구현·재검토 필요:** 공식 제품 출처 Unit 계약과 실제 발행 API, 공식 승인 issuer·키 관리, Saju 계산/해석 trace 및 Semantic/Output 서명, Product/Revision 결속, 저장·삭제·복구 책임, 운영 환경 비밀 격리. 이 실험용 서명 포맷을 승인된 정식 API로 간주하거나 다른 소유 프로젝트에 강제하지 않는다.
 - S4 Privacy의 신규 테이블/삭제/복원 승인 전에는 개인 민감 원문 저장·S5 T2·S6 재열람·S7 전달/공개를 일절 추가하지 않는다.
+
+
+## 추가 인계: S3 전체 Scope 서명 결속 · S4 전송 객체 격리 (후속)
+
+- S3 합성 서명 인계 검증에서 Subject·Official Reading·Reader·Bundle·Release·Artifact hash 이외에 **현재 Thread ID, Content Revision, Product ID, Product Spec Version, Saju Domain, Reading Contract Version, Product Rule Version, Approved Policy Revision**도 일치해야 한다. 증명 내용 전체를 별도 도메인 키로 다시 서명하더라도 현재 DB가 승인한 범위에서 하나라도 다르면 `blocked`. 같은 서명/nonce를 다른 Product·정책·채팅 Revision에 재사용할 수 없다. **실제 Saju Owner 발행 계약이라고 주장하지 않음.**
+- S4 `apps/api/src/official-reader-held-t1-t2-preflight-v1.ts`의 비공개 생성 결과가 `Response`, `Request`, `ReadableStream`, `Blob`, `FormData`일 때 **새 T2 거래도 시작하기 전에 실패**시키고, 외부에는 민감 본문/생성 오류 없이 일반 `FINAL_DISCLOSURE_UNAVAILABLE`만 돌려준다. 그 밖의 결과도 기존처럼 결과/해시를 반환하거나 DB에 저장하지 않으며 T1 확정 후 생성·T2 신규 거래 구조를 보존한다.
+- **한계:** 생성 콜백 자체가 외부 네트워크·로그·Outbox·Memory에 쓰는 부작용은 이 객체 검사만으로 식별할 수 없다. 승인된 Privacy Owner의 데이터 분류·삭제/복원/로그 감사, Saju Owner 공식 발행 및 S2 잠금 기반 T2 Writer는 **여전히 없음**. 따라서 이 조치를 S4 완료·유료 개인정보 격리 승인 또는 S5 저장 개시로 해석하면 안 된다.
