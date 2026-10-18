@@ -156,10 +156,13 @@ export async function rehearseOfficialReaderS3SajuOwnerHandoffV1(input: Readonly
     if (expected.length !== received.length
       || !timingSafeEqual(expected, received)) return verdict('blocked');
 
-    const replayKey = [
+    // Canonical tuple digest prevents delimiter collisions across issuers,
+    // audience names, key rotations and shared-nonce-store namespaces.
+    const replayKey = digest([
       OFFICIAL_READER_S3_OWNER_HANDOFF_REHEARSAL_VERSION_V1,
-      trust.trustedIssuer, trust.expectedAudience, input.expectedNonce,
-    ].join(':');
+      trust.trustedIssuer, trust.expectedAudience, trust.trustedKeyId,
+      input.expectedNonce,
+    ]);
     if (!(await trust.claimNonceOnce(replayKey, payload.expiresAtMs as number))) {
       return verdict('blocked');
     }
