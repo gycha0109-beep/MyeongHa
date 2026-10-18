@@ -38,12 +38,13 @@ describe('shared CI verification plan', () => {
     const plan = resolveVerificationPlan(['scripts/ci/db-suites.json']);
     expect(plan.db).toBe(true);
     expect(plan.db_suites).toHaveLength(5);
-    expect(plan.db_suites.flatMap((suite: string) => getDbSuite(suite).cases)).toHaveLength(36);
+    expect(plan.db_suites.flatMap((suite: string) => getDbSuite(suite).cases)).toHaveLength(37);
     const cases = plan.db_suites.flatMap((suite: string) => getDbSuite(suite).cases);
     expect(cases.filter((name: string) => name === 'saju-staging-operator-admission')).toHaveLength(2);
     expect(cases.filter((name: string) => name === 'saju-staging-operator-admission-v2')).toHaveLength(2);
-    expect(new Set(cases).size).toBe(33);
+    expect(new Set(cases).size).toBe(34);
     expect(getDbSuite('content').cases).toContain('official-reader-provider-revoke-race');
+    expect(getDbSuite('content').cases).toContain('official-reader-s2-atomic-receipt-bind');
     expect(getDbSuite('runtime').cases).toContain('guest-promotion-auth-fk');
     expect(getDbSuite('runtime').cases).toContain('reader-memory-tenant-boundary');
     expect(getDbSuite('postgres17').cases).toContain('guest-promotion-auth-fk');
