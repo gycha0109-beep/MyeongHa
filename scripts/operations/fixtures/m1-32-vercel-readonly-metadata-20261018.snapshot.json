@@ -1,0 +1,48 @@
+{
+  "snapshotKind": "VERCEL_READONLY_DEPLOYMENT_METADATA_ONLY",
+  "observationDate": "2026-10-18",
+  "projectId": "prj_nXF0b5uv27Lyucz2SEBxzdCRXVsP",
+  "candidatePr": 2294,
+  "candidateHeadSha": "81fa7a2c7387717f7fb8d92d43ef1cc269d38b33",
+  "deployments": [
+    {
+      "id": "dpl_75wiaTqfBohQeXsxDRCYiNacZJmH",
+      "projectId": "prj_nXF0b5uv27Lyucz2SEBxzdCRXVsP",
+      "commitSha": "2d73b41500b6e6f3eb74ac358252602d0da686a7",
+      "target": "production",
+      "status": "BUILDING",
+      "sourceRef": "main"
+    },
+    {
+      "id": "dpl_GKh3QtaHQrpiqMCtVnSATTYcZHXx",
+      "projectId": "prj_nXF0b5uv27Lyucz2SEBxzdCRXVsP",
+      "commitSha": "49010a99cc2a746c93662a0d115afd73705a8ab0",
+      "target": "production",
+      "status": "READY",
+      "sourceRef": "main"
+    },
+    {
+      "id": "dpl_BdqGVBHJe5N5BR2Utj5134hTpoTy",
+      "projectId": "prj_nXF0b5uv27Lyucz2SEBxzdCRXVsP",
+      "commitSha": "5f9f9d7f26a6c9054582e812344b7e385573a1b9",
+      "target": "production",
+      "status": "READY",
+      "sourceRef": "main"
+    }
+  ],
+  "fileTreeReads": [
+    {
+      "deploymentId": "dpl_GKh3QtaHQrpiqMCtVnSATTYcZHXx",
+      "status": "unavailable",
+      "httpStatus": 404,
+      "detail": "file tree not found"
+    },
+    {
+      "deploymentId": "dpl_BdqGVBHJe5N5BR2Utj5134hTpoTy",
+      "status": "unavailable",
+      "httpStatus": 404,
+      "detail": "file tree not found"
+    }
+  ],
+  "scope": "Read-only Vercel project/deployment metadata only; no candidate deployment or built serverless files inspected; not release evidence"
+}
