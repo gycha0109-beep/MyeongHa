@@ -68,6 +68,13 @@ catalog_snapshot() {
 }
 
 case "$case_name" in
+  seyeon-c08y-disposable-shared-ledger-pg17)
+    verify_pg17
+    # Synthetic table/RPC schema only: NO repository/Production migrations.
+    # PGHOST, PGDATABASE, GitHub CI and DB_SUITE are independently rechecked
+    # by the child test before it is allowed to CREATE any scratch object.
+    bash test/db/seyeon_c08y_disposable_shared_ledger_pg17.sh
+    ;;
   seyeon-c08-first-turn-local-pg17)
     verify_pg17
     # Permit only (a) our local network-disabled Docker scratch DB or
