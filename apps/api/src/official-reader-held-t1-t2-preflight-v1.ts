@@ -106,6 +106,21 @@ function assertNoDrift(
 }
 
 /**
+ * S4 PRE-APPROVAL guard: prevent a generated result from being represented
+ * as an HTTP/stream delivery. This cannot audit side effects inside the
+ * provider callback and does NOT approve any paid-content persistence.
+ */
+function assertNotDeliverablePrivateResult(result: unknown): void {
+  if (result instanceof Response ||
+      result instanceof Request ||
+      result instanceof ReadableStream ||
+      result instanceof Blob ||
+      result instanceof FormData) {
+    throw new OfficialReaderHeldPreflightErrorV1();
+  }
+}
+
+/**
  * The only successful return is a HOLD without interpretation or its hash.
  * A future positive T2 must be a separate Owner-reviewed DB/Commerce change
  * with R2 writer participation, commit/send ordering and operational E2E.
@@ -127,7 +142,10 @@ export async function runOfficialReaderHeldT1T2PreflightV1(
 
     // This callback cannot receive or hold a PostgreSQL transaction scope.
     // Its return value is deliberately discarded before the second transaction.
-    await input.generatePrivate(first.source);
+    const privateGenerated = await input.generatePrivate(first.source);
+    // No browser-facing HTTP, binary body or streaming delivery can be used
+    // as the staging result. Everything else is also discarded, not persisted.
+    assertNotDeliverablePrivateResult(privateGenerated);
 
     await executePostgresSubjectTransactionV1({
       pool: input.pool,
