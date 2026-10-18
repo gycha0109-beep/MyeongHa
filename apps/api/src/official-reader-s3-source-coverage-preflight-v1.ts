@@ -96,7 +96,7 @@ export function preflightOfficialReaderS3SourceCoverageV1(input: Readonly<{
       'selectedUnits', 'coPresentUnits', 'disclosureUnits', 'ambiguityHashes',
       'semanticValidation', 'outputValidation',
     ]) || candidate.schemaVersion !== OFFICIAL_READER_S3_COVERAGE_PREFLIGHT_VERSION_V1
-      || !string(scope.readingId) || !validHash(scope.officialArtifactResponseHash)
+      || !string(scope.readingId) || !string(scope.officialArtifactResponseHash)
       || protectedSource.readingRef !== scope.readingId
       || protectedSource.domain !== scope.sajuDomain
       || candidate.officialReadingId !== scope.readingId
@@ -111,10 +111,14 @@ export function preflightOfficialReaderS3SourceCoverageV1(input: Readonly<{
       || selected.size === 0) return verdict('blocked');
 
     const expectedSegments = new Map<string, string>();
+    const segmentIds = new Set<string>();
     for (const segment of protectedSource.protectedSegments) {
-      if (!string(segment.sourceRef) || !validHash(segment.contentHash)
+      if (!string(segment.segmentId) || segmentIds.has(segment.segmentId)
+        || segment.sourceReadingRef !== scope.readingId
+        || !string(segment.sourceRef) || !validHash(segment.contentHash)
         || expectedSegments.has(segment.sourceRef)
         || hashProtectedSajuTextV1(segment.text) !== segment.contentHash) return verdict('blocked');
+      segmentIds.add(segment.segmentId);
       expectedSegments.set(segment.sourceRef, segment.contentHash);
     }
     const combined = new Map(selected);
@@ -126,9 +130,13 @@ export function preflightOfficialReaderS3SourceCoverageV1(input: Readonly<{
 
     const expectedDisclosures = new Map<string, string>();
     for (const unit of protectedSource.disclosures) {
-      if (!string(unit.sourceRef) || !validHash(unit.contentHash)
+      if (!string(unit.segmentId) || segmentIds.has(unit.segmentId)
+        || unit.sourceReadingRef !== scope.readingId
+        || expectedSegments.has(unit.sourceRef)
+        || !string(unit.sourceRef) || !validHash(unit.contentHash)
         || expectedDisclosures.has(unit.sourceRef)
         || hashProtectedSajuTextV1(unit.text) !== unit.contentHash) return verdict('blocked');
+      segmentIds.add(unit.segmentId);
       expectedDisclosures.set(unit.sourceRef, unit.contentHash);
     }
     if (!exactUnits(disclosures, expectedDisclosures)) return verdict('blocked');
