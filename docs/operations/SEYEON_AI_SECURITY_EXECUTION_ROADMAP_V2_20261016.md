@@ -264,8 +264,8 @@ S8의 **비파괴/격리 검토는 S2~S7과 병렬 진행 가능**하며, S8 Pro
 
 ## 30. 2026-10-18 R17 — 비공개 최소 권한 원본 Grant 철회 후보 (검증 중)
 
-- **다음 미완료 의존성 해결 후보:** `supabase/migrations/20261018234500_seyeon_private_memory_grant_revoke_v1.sql`은 `seyeon_private` 비공개 스키마에 **활성 canonical Member의 본인 Memory + 고정 세연**만 철회하는 `SECURITY DEFINER` 경계를 추가한다. 기존 `cmd_revoke_memory_character_grant_v1`의 원본 Subject 잠금/Grant 변경/재호출 no-op을 그대로 재사용한다.
-- **ACL:** 기존 `myeongha_api_executor`의 광범위 테이블 SELECT/UPDATE 및 public 원본 RPC EXECUTE 권한은 추가하지 않는다. `anon`/`authenticated`/`service_role` 직접 실행 및 schema USAGE 거부. 실제 설치 전 Owner·소유권·역할·미노출 Schema 검토 필요.
+- **다음 미완료 의존성 해결 후보:** `scripts/operations/seyeon-private-memory-grant-revoke-r17-candidate.sql`은 `seyeon_private` 비공개 스키마에 **활성 canonical Member의 본인 Memory + 고정 세연**만 철회하는 `SECURITY DEFINER` 경계를 추가한다. 기존 `cmd_revoke_memory_character_grant_v1`의 원본 Subject 잠금/Grant 변경/재호출 no-op을 그대로 재사용한다.
+- **ACL:** **정식 Supabase 마이그레이션에 포함하지 않으며**, 격리된 CI 복제 DB에서만 수동 적용해 검증한다. 기존 `myeongha_api_executor`의 광범위 테이블 SELECT/UPDATE 및 public 원본 RPC EXECUTE 권한은 추가하지 않는다. `anon`/`authenticated`/`service_role` 직접 실행 및 schema USAGE 거부. 실제 설치 전 Owner·소유권·역할·미노출 Schema 검토 필요.
 - **연결:** R15 트랜잭션/COMMIT→ACK 코드를 변경 없이 재사용하되, R16의 운영 미탑재 구성에서만 private 명령을 선택하도록 연결. `approvedDbWriteAdmission` 미공급 상태는 그대로 503/no-store이며 SQL 파일 작성·PR 병합만으로 운영 DB에 실행하지 않는다.
-- **검증 기준:** 기존 CI PostgreSQL의 실제 restricted role에서 정확한 본인 세연 Grant 철회/재호출/타 사용자 거부/타 캐릭터 권한 보존을 확인하고, 기존 R15 COMMIT/ACK 회귀, CI/Governance/Web/Full Integration, 병합 후 main 확인. **검사 전 PASS 주장 금지**.
+- **검증 기준:** 기존 CI가 새로 생성해 폐기하는 격리 PostgreSQL의 실제 restricted role에서 정확한 본인 세연 Grant 철회/재호출/타 사용자 거부/타 캐릭터 권한 보존을 확인하고, 기존 R15 COMMIT/ACK 회귀, CI/Governance/Web/Full Integration, 병합 후 main 확인. **검사 전 PASS 주장 금지**.
 - **미해결:** G0 Security/DB/API/Character 기술 승인, 실제 운영 DB 미적용 ACL/DDL·DR, R16 공개 라우트 admission, 최초 개인기억 답변·History·Replay·Vercel 프록시 송출 G3 HOLD. Projectors=[], Provider/public/paid OFF, Production DB writes=0.
