@@ -10,11 +10,11 @@ select public.cmd_apply_verified_portone_reader_full_cancellation_v1(
 ) as "result"
 `;
 
-export interface AppliedPortOneV2ReaderFullCancellationV1 {
-  readonly receiptId: string;
+export type AppliedPortOneV2ReaderFullCancellationV1 =
+  | Readonly<{ kind: 'unrelated_commerce' }>
+  | Readonly<{ kind: 'revoked'; receiptId: string;
   readonly providerEventId: string;
-  readonly grantCount: number;
-}
+  grantCount: number }>;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
 
 /**
@@ -47,6 +47,10 @@ export async function applyVerifiedPortOneV2ReaderFullCancellationV1(input: {
         throw new Error('Verified Reader cancellation did not return one committed result.');
       }
       const result = response.rows[0].result as Record<string,unknown>;
+      if (result.contractVersion === 'portone-reader-full-cancellation-v1'
+          && result.disposition === 'unrelated_commerce') {
+        return Object.freeze({ kind: 'unrelated_commerce' as const });
+      }
       const revoke = result.revoke;
       if (result.contractVersion !== 'portone-reader-full-cancellation-v1'
           || typeof result.receiptId !== 'string' || !UUID.test(result.receiptId)
@@ -59,6 +63,7 @@ export async function applyVerifiedPortOneV2ReaderFullCancellationV1(input: {
         throw new Error('Verified Reader cancellation result was not authoritative.');
       }
       return Object.freeze({
+        kind: 'revoked' as const,
         receiptId:result.receiptId,
         providerEventId:result.providerEventId,
         grantCount:(revoke as Record<string,unknown>).grantCount as number,
