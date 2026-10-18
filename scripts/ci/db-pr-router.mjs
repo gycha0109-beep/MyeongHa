@@ -34,6 +34,10 @@ const commerceEntitlementPatterns = [
 ];
 
 const postgres17Patterns = [
+  // R5/R9 exact-original-Grant tests require the named disposable PG17
+  // authority-core harness. A source-only test edit must not silently skip
+  // the real DB race suite on a normal PR.
+  /^test\/seyeon-r5-current-reveal-disposable\.test\.ts$/u,
   // C08 first-turn census is an actual PostgreSQL 17 suite fixture;
   // edits to nested shell helpers must schedule PG17 rather than static CI only.
   /^test\/db\/seyeon_c08_(?:first_turn_local_pg17|two_session_census_race_pg17)\.sh$/u,
