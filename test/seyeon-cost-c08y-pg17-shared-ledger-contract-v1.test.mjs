@@ -24,6 +24,14 @@ describe('C08-Y real PG17 shared ledger, disposable-only contract',()=>{
   expect(sql).toContain('create role c08y_synthetic_reserver nologin');
   expect(sql).toContain('revoke all on all tables in schema c08y_offline from c08y_synthetic_reserver');
   expect(sql).toContain('revoke all on all functions in schema c08y_offline from public');
+  const shell=read('test/db/seyeon_c08y_disposable_shared_ledger_pg17.sh');
+  for(const signature of [
+   'reserve_slot_v1(bigint,integer)',
+   'observe_slot_v1(bigint,integer,text,bigint)'
+  ]){
+   expect(sql).toContain(signature);
+   expect(shell).toContain(signature);
+  }
   expect(sql).toContain('for update;');
   expect(sql).toContain('on conflict do nothing');
   expect(sql).toContain("observed_count<>prior_count");
