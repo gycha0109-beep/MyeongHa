@@ -175,6 +175,10 @@ case "$case_name" in
     apply_standard_migrations
     bash test/db/official_reader_provider_effect_revoke_race_preflight.sh
     ;;
+  official-reader-s2-atomic-receipt-bind)
+    apply_standard_migrations
+    bash test/db/official_reader_s2_atomic_receipt_bind_live_writer_race.sh
+    ;;
   records-production-read-authority)
     apply_standard_migrations
     bash test/db/records_read_runtime_authority.sh
