@@ -1,6 +1,7 @@
 import type { PostgresSubjectPoolV1 } from './postgres-subject-execution.js';
 import {
   createPortOneV2PaymentVerificationAdapterV1,
+  createPortOneV2FullCancellationVerifierV1,
   type PortOneV2PaymentHttpFetchV1,
 } from './portone-v2-payment-verification-adapter.js';
 import {
@@ -53,6 +54,13 @@ export function createPortOneV2WebhookRuntimeV1(
     ...(configSnapshot.now === undefined ? {} : { now: configSnapshot.now }),
   });
 
+  const fullCancellationVerifier = createPortOneV2FullCancellationVerifierV1({
+    apiSecret: configSnapshot.apiSecret,
+    evidenceHmacSecret: configSnapshot.evidenceHmacSecret,
+    ...(configSnapshot.timeoutMs === undefined ? {} : { timeoutMs: configSnapshot.timeoutMs }),
+    ...(configSnapshot.fetchImpl === undefined ? {} : { fetchImpl: configSnapshot.fetchImpl }),
+  });
+
   const webhookConfig: PortOneV2WebhookPaymentCompletionConfigV1 = Object.freeze({
     environment: configSnapshot.environment,
     webhookSecrets: configSnapshot.webhookSecrets,
@@ -67,6 +75,7 @@ export function createPortOneV2WebhookRuntimeV1(
         pool,
         config: webhookConfig,
         verificationAdapter,
+        fullCancellationVerifier,
       }),
   });
 }
