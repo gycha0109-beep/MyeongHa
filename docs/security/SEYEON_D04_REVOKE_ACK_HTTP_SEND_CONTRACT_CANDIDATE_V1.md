@@ -16,14 +16,14 @@ Watchtower-Track: security
 | C | 같은 DB 트랜잭션에서 original Record/Grant 재확인·잠금 후 답변 Commit | Commit은 HTTP 송출 허가가 아니다 |
 | V | HTTP 최초 공개/Replay/History/Worker **각 공개 시점**의 현재 original Grant/Record/lineage 승인 | 오래된 캐시/재발급된 다른 Grant는 인정하지 않는다 |
 | R | 사용자의 original Grant 철회 DB Commit | R 직후에도 HTTP 버퍼에는 예전 응답이 남을 수 있다 |
-| S | 답변 바이트를 신뢰 가능한 **실제 HTTP 송신 경계에 인계**한 사건 | \`new Response\`, \`Response.json\`, DB READ COMMIT은 S가 아니다. Node/Proxy/Edge 경계 구분 필요 |
+| S | 답변 바이트를 신뢰 가능한 **실제 HTTP 송신 경계에 인계**한 사건 | `new Response`, `Response.json`, DB READ COMMIT은 S가 아니다. Node/Proxy/Edge 경계 구분 필요 |
 | ACK | 서버가 철회 완료를 사용자에게 확인해 준 사건 | ACK가 R보다 빠르면 안 되며, 송신자가 아직 가지고 있는 미송출 응답도 고려해야 한다 |
 
 제품 승인에 따른 목표: **철회 확정 이후 새로운 개인기억 사용·새 공개 차단, 처리 중 생성/송출 중단 시도, 이미 실제 송출한 바이트의 사후 도착 가능성은 명시**. 여기서 이미 송출했는지 아닌지는 추측이 아니라 송신 경계의 증거로 판별해야 한다.
 
 ## 2. 실증된 실패 순서
 
-\`\`\`
+```
 DB에서 원본 Grant 확인 및 답변 READ COMMIT  (V)
        ↓
 Node/Web Response 생성, 앱/Proxy 버퍼 보관
@@ -33,7 +33,7 @@ original Grant 철회 COMMIT                  (R)
 철회 완료 응답                            (ACK)
        ↓
 이전의 버퍼를 HTTP socket으로 실제 송신        (S)
-\`\`\`
+```
 
 - **실패**: V→R→ACK→S에서 과거 DB 조회 성공을 재사용해 송출하면 제품이 승인한 미송출 답변 차단을 어긴다.
 - **R8**: 순수 합성 127.0.0.1 HTTP Server에서 V와 S가 별개임을 실증.
@@ -44,9 +44,9 @@ original Grant 철회 COMMIT                  (R)
 
 1. **강한 원본 인증**: original Grant ID와 original Record, current content digest/버전, Subject/Character/Thread/Turn/Attempt/derived lineage가 원본 DB Authority에서 검증되어야 한다. 새 Grant로 이전 Attempt 구제 불가.
 2. **출처 선행 Pin**: 모델 실제 최종 사용 목록과 파생 출처를 G1 DB에 사전 불변 저장. 불명·권한 오류면 Provider 호출 0회.
-3. **동시 Commit**: G2의 실제 \`cmd_commit_seyeon_chat_turn_runtime_v2\` 같은 트랜잭션에서 원본 Grant/Record 잠금 검증. 다른 세션에서 철회가 먼저 Commit하면 Commit 불가.
-4. **별도 공개 권한**: 최초 HTTP 응답뿐 아니라 \`committed_replay\`, History GET, Worker, 캐시 조회에서도 V를 수행. 원본이나 파생 출처를 검증할 수 없으면 공개 금지.
-5. **송신 안전성**: 앱 서버 내 단순 V 후 \`Response\` 반환 방식으로는 충분하지 않다. **V와 실제 S의 경합**, 철회 API의 R→ACK, 발송 주체가 소유한 버퍼 폐기/중단에 대한 명시적 송신 경계가 필요하다. 구현 대안은 (a) 신뢰 가능한 송신자가 직렬화하는 서버 소유 per-Grant/epoch+send lease/fence, (b) 추가 HTTP/Proxy acknowledgment 계약이다. **이 대안들은 현재 확정된 구현이나 보안 보장이 아니다.** DB Lock을 V에서 해제한 직후 클라이언트에 보내는 단순 방식은 금지 후보.
+3. **동시 Commit**: G2의 실제 `cmd_commit_seyeon_chat_turn_runtime_v2` 같은 트랜잭션에서 원본 Grant/Record 잠금 검증. 다른 세션에서 철회가 먼저 Commit하면 Commit 불가.
+4. **별도 공개 권한**: 최초 HTTP 응답뿐 아니라 `committed_replay`, History GET, Worker, 캐시 조회에서도 V를 수행. 원본이나 파생 출처를 검증할 수 없으면 공개 금지.
+5. **송신 안전성**: 앱 서버 내 단순 V 후 `Response` 반환 방식으로는 충분하지 않다. **V와 실제 S의 경합**, 철회 API의 R→ACK, 발송 주체가 소유한 버퍼 폐기/중단에 대한 명시적 송신 경계가 필요하다. 구현 대안은 (a) 신뢰 가능한 송신자가 직렬화하는 서버 소유 per-Grant/epoch+send lease/fence, (b) 추가 HTTP/Proxy acknowledgment 계약이다. **이 대안들은 현재 확정된 구현이나 보안 보장이 아니다.** DB Lock을 V에서 해제한 직후 클라이언트에 보내는 단순 방식은 금지 후보.
 6. **ACK 정의**: 철회 R은 영속 확인돼야 한다. ACK 전에 미송출 공개를 금지시키는 방식과 outstanding send 취소/완료의 관측 가능한 기준을 DB/API/Security가 공동 확정한다. 송출 완료 통지는 클라이언트 수신/화면 표시를 뜻하지 않는다. ACK가 영구 데이터 삭제를 뜻하지도 않는다.
 7. **스트리밍 OFF**: 개인정보/파생 기억 응답 최초 출시에서 스트리밍하지 않는다. 비스트리밍도 위 경합이 자동 해결되는 것은 아니다.
 8. **사고 시 HOLD**: epoch/fence 누락, 네트워크 중단 후 재시도, Proxy buffering, DB 불능, worker 재전송, 취소 중 새 권한 발급 등 상태가 불명확하면 보호 본문 송출 금지.
@@ -64,8 +64,8 @@ original Grant 철회 COMMIT                  (R)
 
 ## 5. 변경할 수 없는 운영 안전 상태
 
-- \`SEYEON_PRODUCTION_PERSONAL_RECORD_PROJECTORS_V1=[]\`
-- \`routeMounted=false\`, 공개/유료 호출 OFF, 실제 Provider 호출 0
+- `SEYEON_PRODUCTION_PERSONAL_RECORD_PROJECTORS_V1=[]`
+- `routeMounted=false`, 공개/유료 호출 OFF, 실제 Provider 호출 0
 - Production DB DDL/DML/migration/ACL/history 변경 0
-- 기술 \`G0=PROPOSED\`, \`G1 positive/G2/G3/G5/G6=HOLD\`, \`authorizedForProduction=false\`, \`drReady=false\`
+- 기술 `G0=PROPOSED`, `G1 positive/G2/G3/G5/G6=HOLD`, `authorizedForProduction=false`, `drReady=false`
 - 이번 격리 R9 테스트가 성공해도 실제 positive 공개 권한이나 Owner 서명으로 자동 승격하지 않는다.
