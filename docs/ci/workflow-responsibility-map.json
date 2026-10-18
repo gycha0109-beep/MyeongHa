@@ -374,6 +374,12 @@
       "mainMode": "one-shot-trigger",
       "workTrackAttribution": "commit-metadata"
     },
+    "seyeon-first-zero-locked-function-one-shot.yml": {
+      "responsibility": "production-db-scoped-function-installation",
+      "prMode": "none",
+      "mainMode": "manual",
+      "workTrackAttribution": "commit-metadata"
+    },
     "seyeon-model-eval-v1.yml": {
       "responsibility": "production-character-model-evaluation",
       "prMode": "none",
