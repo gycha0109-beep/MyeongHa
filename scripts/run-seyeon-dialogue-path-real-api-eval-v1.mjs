@@ -254,7 +254,12 @@ for (let i = 0; i < cases.length; i += 1) {
         allCostUsd >= SEYEON_DIALOGUE_PATH_MAX_ESTIMATED_COST_USD_V1) {
       throw new Error('Synthetic benchmark budget exhausted before all cases.');
     }
-    rows.push(await evaluate(route, cases[i]));
+    const row=await evaluate(route, cases[i]);
+    rows.push(row);
+    // A rejected or unknown-outcome request may still have been charged.
+    // Never proceed to the next route/case after any failed real request.
+    if (row.outcome !== 'admitted')
+      throw new Error('SEYEON_DIALOGUE_PATH_SAMPLE_FAILURE_HOLD');
   }
 }
 const summary = summarizeSeyeonDialoguePathV1(rows, cases.length);
