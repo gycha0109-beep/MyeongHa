@@ -32,6 +32,8 @@ begin
   join public.product_offers po on po.id=pi.product_offer_id
   join public.purchase_intent_reader_selections prs
     on prs.purchase_intent_id=pi.id and prs.product_id=po.product_id
+  join public.standard_reading_delivery_policies dp
+    on dp.product_id=prs.product_id and dp.retired_at is null
   where cr.id=p_receipt_id;
 
   if not found then
@@ -46,7 +48,7 @@ begin
   end if;
   perform public.assert_myeongha_subject_context_v1(v_subject);
 
-  select count(*)::integer,min(b.reading_id)
+  select count(*)::integer,min(b.reading_id::text)::uuid
     into v_reading_count,v_reading
   from public.standard_reading_official_bindings b
   where b.subject_id=v_subject and b.product_id=v_product;
