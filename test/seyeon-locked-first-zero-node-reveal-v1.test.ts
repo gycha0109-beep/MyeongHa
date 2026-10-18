@@ -140,7 +140,7 @@ describe('G3 scoped first zero-source DB Owner → Node original send bridge', (
   });
 
   it('SQL admits only exact first zero-source, excludes derived history, and locks rows', () => {
-    const sql = readFileSync('supabase/migrations/1740_seyeon_locked_first_zero_source_reveal_v1.sql','utf8');
+    const sql = readFileSync('supabase/migrations/20261018190000_seyeon_locked_first_zero_source_reveal_v1.sql','utf8');
     expect(sql).toContain("set row_security=off");
     expect(sql).toContain("subj.kind='member'");
     expect(sql).toContain("t.committed_attempt_id=p_attempt_id");
