@@ -42,7 +42,8 @@ function fakeRevokeDb(input: {
         expect(values).toEqual([OWNER]);
         return {rows:[]};
       }
-      if(sql.includes('cmd_revoke_memory_character_grant_v1')){
+      if(sql.includes('cmd_revoke_memory_character_grant_v1') ||
+         sql.includes('cmd_revoke_seyeon_memory_grant_v1')){
         events.push('revoke:subject-for-update');
         args=values??[];
         return {rows:(input.rows ?? [{
@@ -106,6 +107,19 @@ describe('R15 verified-member original Grant revoke ACK',()=>{
       pool:empty.pool,verifiedEvidence:evidence,memoryItemId:'bad',
     })).rejects.toMatchObject({code:'INVALID_MEMORY_ID'});
     expect(empty.events).toEqual([]);
+  });
+
+
+  it('uses the private two-argument owner command only when explicitly selected and still waits for COMMIT',async()=>{
+    const db=fakeRevokeDb();
+    const result=await revokeSeyeonOriginalMemoryGrantAndAckV1({
+      pool:db.pool,verifiedEvidence:evidence,memoryItemId:MEMORY,
+      dbCommand:'private_candidate',
+    });
+    expect(db.args).toEqual([OWNER,MEMORY]);
+    expect(result.status).toBe('committed');
+    expect(db.events).toContain('COMMIT:completed');
+    expect(db.events.indexOf('COMMIT:completed')).toBeLessThan(db.events.indexOf('release'));
   });
 
   it('never reports success after a failed or ambiguous COMMIT',async()=>{
