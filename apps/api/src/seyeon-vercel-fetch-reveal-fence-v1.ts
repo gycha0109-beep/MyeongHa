@@ -4,6 +4,26 @@
 // Se-yeon assistant payloads here until the G0/G3 transport contract is signed.
 const NO_STORE = 'no-store' as const;
 
+// A caller-controlled 4xx status/Cache-Control header is NOT enough to prove
+// that the response body is a safe preflight denial. Only the tightly scoped
+// chat-turn handler's own static error constructors register the exact object.
+const trustedDenials = new WeakSet<Response>();
+
+export function registerSeyeonStaticPreflightDenialV1(
+  response: Response,
+): Response {
+  const contentType = response.headers.get('content-type')?.toLowerCase() ?? '';
+  if (
+    response.status < 400 || response.status > 499 ||
+    response.headers.get('cache-control') !== NO_STORE ||
+    contentType.includes('text/event-stream')
+  ) {
+    throw new Error('Untrusted Se-yeon preflight denial cannot be registered.');
+  }
+  trustedDenials.add(response);
+  return response;
+}
+
 export const SEYEON_VERCEL_FETCH_REVEAL_FENCE_V1 = Object.freeze({
   schemaVersion: 'seyeon-vercel-fetch-first-reveal-fence-v1',
   transport: 'vercel:web-fetch-response',
@@ -30,6 +50,7 @@ export function enforceSeyeonVercelFetchRevealFenceV1(
 ): Response {
   const contentType = candidate.headers.get('content-type')?.toLowerCase() ?? '';
   const isPreflightDenial =
+    trustedDenials.has(candidate) &&
     candidate.status >= 400 &&
     candidate.status <= 499 &&
     candidate.headers.get('cache-control') === NO_STORE &&
