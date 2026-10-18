@@ -23,11 +23,11 @@ function source() {
     domain: scope.sajuDomain,
     coverageState: 'complete',
     protectedSegments: [
-      { sourceRef: 'sections.0.0', text: raw, contentHash: hashProtectedSajuTextV1(raw) },
-      { sourceRef: 'sections.0.1', text: another, contentHash: hashProtectedSajuTextV1(another) },
+      { segmentId: 'unit-1', sourceReadingRef: scope.readingId, sourceRef: 'sections.0.0', text: raw, contentHash: hashProtectedSajuTextV1(raw) },
+      { segmentId: 'unit-2', sourceReadingRef: scope.readingId, sourceRef: 'sections.0.1', text: another, contentHash: hashProtectedSajuTextV1(another) },
     ],
     disclosures: [
-      { sourceRef: 'disclosures.0', text: disclosure, contentHash: hashProtectedSajuTextV1(disclosure) },
+      { segmentId: 'disclosure-1', sourceReadingRef: scope.readingId, sourceRef: 'disclosures.0', text: disclosure, contentHash: hashProtectedSajuTextV1(disclosure) },
     ],
     ambiguity: [ambiguous],
   } as CharacterStandardReadingProtectedSajuContextV1;
