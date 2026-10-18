@@ -168,6 +168,34 @@ fi
   fail "partial cancellation produced a full-revoke event"
 pass "verified partial cancellation is rejected without changing Reader rights"
 
+# The standalone receipt batch and single-effect primitives must both refuse
+# a bound Reader purchase unless the caller holds the S1 scope lock already.
+if p -c "begin;
+  select pg_catalog.set_config('myeongha.subject_id', '$subject', true);
+  select * from public.internal_apply_verified_receipt_capability_effects_v1(
+    '$receipt'::uuid,array['test-reader-unit'],
+    array[transaction_timestamp()],array[transaction_timestamp()],
+    array[null]::timestamptz[],array[null]::text[]
+  );
+  commit;" >"$tmpdir/direct1090.out" 2>&1; then
+  fail "direct legacy 1090 issued Reader entitlement without S1 scope"
+fi
+grep -q 'Legacy Reader receipt writer cannot bypass the S1 scope lock' "$tmpdir/direct1090.out" ||
+  { cat "$tmpdir/direct1090.out" >&2; fail "direct legacy 1090 failed for unrelated reason"; }
+if p -c "begin;
+  select pg_catalog.set_config('myeongha.subject_id', '$subject', true);
+  select * from public.internal_apply_entitlement_effect_v1(
+    'receipt','$receipt'::uuid,null,'test-reader-unit',
+    null,null,'granted',transaction_timestamp(),'active',
+    transaction_timestamp(),null,null
+  );
+  commit;" >"$tmpdir/direct1080grant.out" 2>&1; then
+  fail "direct legacy 1080 Receipt issued Reader entitlement without S1 scope"
+fi
+grep -q 'Legacy Reader receipt writer cannot bypass the S1 scope lock' "$tmpdir/direct1080grant.out" ||
+  { cat "$tmpdir/direct1080grant.out" >&2; fail "legacy 1080 initial grant failed for unrelated reason"; }
+pass "direct legacy 1090 batch and 1080 initial issuance deny Reader missing S1 lock"
+
 # Direct legacy 1080 must no longer mutate an official Reader purchase Grant
 # without the same held S1 scope lock as the 1770/1780 paths.
 activate_b2
