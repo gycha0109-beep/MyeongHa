@@ -43,7 +43,7 @@ function fakeAuthority(answer: string | null) {
       }
       if (statement.includes('seyeon_positive_candidate.reveal_http_r5')) {
         captured.sql = statement;
-        captured.values = values;
+        if (values !== undefined) captured.values = values;
         events.push('original-grant-lock-read');
         return { rows: [{ assistantText: answer }] as Row[] };
       }
