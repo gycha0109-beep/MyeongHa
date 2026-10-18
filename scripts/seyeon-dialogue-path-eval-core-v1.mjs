@@ -5,7 +5,7 @@
  */
 export const SEYEON_DIALOGUE_PATH_CASE_IDS_V1 = Object.freeze([
   'N01', 'N02', 'N03', 'N04', 'N05', 'N06', 'N09', 'N10',
-  'N19', 'N22', 'X01', 'X02', 'X03', 'X04', 'X05', 'X06',
+  'N14', 'N16', 'N17', 'N18', 'X01', 'X02', 'X03', 'X04',
 ]);
 /** These are fictional, no-claim, first-contact prompts. They do not join the 100-case classifier gold set. */
 export const SEYEON_DIALOGUE_PATH_ADDITIONAL_CASES_V1 = Object.freeze([
@@ -95,5 +95,37 @@ export function summarizeSeyeonDialoguePathV1(rows, totalCases) {
     characterVoiceQualityVerified: false,
     verdict: complete ? 'GUARD_SAMPLE_PASS' : 'HOLD',
     routes,
+  });
+}
+
+/**
+ * C08-B synthetic-only first-turn census for the actual 5-vs-3 benchmark.
+ * This never queries PostgreSQL and is not a real first-turn authority.
+ * The candidate must re-read three times, including after semantic review.
+ */
+export function createSeyeonDialoguePathSyntheticCensusV1(caseId, userMessageId) {
+  if (!SEYEON_DIALOGUE_PATH_CASE_IDS_V1.includes(caseId) ||
+      userMessageId !== 'synthetic:' + caseId)
+    throw new TypeError('Synthetic census restricted to fixed first-contact cases.');
+  let readCount = 0;
+  const subjectId = 'synthetic-subject:' + caseId;
+  const threadId = 'synthetic-thread:' + caseId;
+  return Object.freeze({
+    port: Object.freeze({
+      subjectId, threadId,
+      readFullThreadCensus(input) {
+        if (input?.subjectId !== subjectId ||
+            input?.threadId !== threadId ||
+            input?.currentUserMessageId !== userMessageId || readCount >= 3)
+          throw new TypeError('Synthetic first-turn identity/census mismatch.');
+        readCount++;
+        return Object.freeze({
+          schemaVersion: 'seyeon-first-turn-census-shadow-v1',
+          subjectId, threadId, currentUserMessageId: userMessageId,
+          messageCount: 1, latestSenderType: 'user', complete: true,
+        });
+      },
+    }),
+    get readCount() { return readCount; },
   });
 }
