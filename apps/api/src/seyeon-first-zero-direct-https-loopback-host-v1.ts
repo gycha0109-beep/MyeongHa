@@ -24,7 +24,7 @@ export const SEYEON_FIRST_ZERO_DIRECT_HTTPS_LOOPBACK_HOST_V1 = Object.freeze({
 } as const);
 
 const BIND_ADDRESS = SEYEON_FIRST_ZERO_DIRECT_HTTPS_LOOPBACK_HOST_V1.bindAddress;
-const MAX_FORWARD_HEADER_LENGTH = 8192;
+const MAX_RAW_HEADER_ITEMS = 128;
 const HOSTNAME = /^(?=.{1,253}$)[a-z0-9](?:[a-z0-9.-]*[a-z0-9])$/u;
 
 export interface StartSeyeonFirstZeroDirectHttpsLoopbackInputV1 {
@@ -81,7 +81,7 @@ function isDirectTlsRequest(
     socket.servername === expectedDnsHost &&
     socket.alpnProtocol === 'http/1.1' &&
     request.headers.host === expectedDnsHost &&
-    rawHeaders.length <= MAX_FORWARD_HEADER_LENGTH &&
+    rawHeaders.length <= MAX_RAW_HEADER_ITEMS &&
     !hasUntrustedProxyHeaders(rawHeaders) &&
     response.socket === socket &&
     socket.remoteAddress === BIND_ADDRESS &&
