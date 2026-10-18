@@ -66,15 +66,15 @@ test('privacy DELETE finalizer, persistent table DDL, private issuer and executa
 
 test('missing, duplicate, changed or previously unknown ledger data require new inspection, not a green release', () => {
   const modified={...snapshot,ledgerVersions:snapshot.ledgerVersions.filter(x=>x!=='1510')};
-  assert.throws(()=>auditM119LiveHistory({snapshot:modified}),/captured live SQL provenance counts or history changed/);
+  assert.throws(()=>auditM119LiveHistory({snapshot:modified}),/M1-19:/u);
   assert.throws(()=>auditM119LiveHistory({
     snapshot:{...snapshot,recoveredLiveOnly:{
       ...snapshot.recoveredLiveOnly,md5:'unknown',version:'20990101000000',
     }},
-  }),/captured live SQL provenance counts or history changed/);
+  }),/M1-19:/u);
   assert.throws(()=>auditM119LiveHistory({
     snapshot:{...snapshot,ledgerVersions:[...snapshot.ledgerVersions,'1970']},
-  }),/captured live SQL provenance counts or history changed/);
+  }),/M1-19:/u);
 });
 
 test('lexical DDL signals are evidence for human review, not runtime execution proofs or cutover permission', () => {
