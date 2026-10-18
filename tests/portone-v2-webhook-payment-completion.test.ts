@@ -219,13 +219,34 @@ describe('PortOne V2 webhook payment completion authentication', () => {
     }
   });
 
-  it('authenticates then ignores known non-paid and unknown future event types', () => {
-    for (const type of ['Transaction.Cancelled', 'Future.NewEvent']) {
+  it('ignores unsupported cancellation states but authenticates a complete cancellation for re-verification', () => {
+    for (const type of ['Transaction.PartialCancelled', 'Transaction.CancelPending', 'Future.NewEvent']) {
       const rawBody = body(type);
       expect(authenticatePortOneV2WebhookPaymentCompletionV1({ request: request({ rawBody }), config: config() })).toEqual({
         kind: 'ignored', providerWebhookId: 'msg_1', eventType: type,
       });
     }
+    const valid = body('Transaction.Cancelled', {
+      paymentId: 'payment-1',
+      transactionId: 'transaction-1',
+      cancellationId: 'cancellation-1',
+    });
+    expect(authenticatePortOneV2WebhookPaymentCompletionV1({
+      request: request({ rawBody: valid }), config: config(),
+    })).toEqual({
+      kind: 'payment_cancellation',
+      providerWebhookId: 'msg_1',
+      environment: 'sandbox',
+      paymentId: 'payment-1',
+      transactionId: 'transaction-1',
+      cancellationId: 'cancellation-1',
+    });
+    const missingId = body('Transaction.Cancelled', {
+      paymentId: 'payment-1', transactionId: 'transaction-1',
+    });
+    expectCode(() => authenticatePortOneV2WebhookPaymentCompletionV1({
+      request: request({ rawBody: missingId }), config: config(),
+    }), 'INVALID_WEBHOOK');
   });
 
   it('terminates authenticated ignored events before DB/provider verification', async () => {
