@@ -21,11 +21,18 @@ const WARNING = '불확실한 계산 경고';
 const READING = '11111111-1111-4111-8111-111111111111';
 const scope = {
   subjectId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+  threadId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+  contentRevision: 5,
   readingId: READING,
   readerCharacterId: 'seyeon',
   readerContentBundleId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
   contentReleaseId: 'synthetic-release',
+  productId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+  productSpecVersion: 'standard-reading-v1',
   sajuDomain: 'general',
+  readingContractVersion: 'myeonghwa-product-reading-response-v2',
+  productRuleVersion: 'standard-all-readers-v1',
+  approvedPolicyRevision: 'approved-policy-v1',
   officialArtifactResponseHash: 'sha256:test-official-reading-artifact',
 } as OfficialReadingReaderAdmissionScopeV1;
 const source: CharacterStandardReadingProtectedSajuContextV1 = {
@@ -76,10 +83,16 @@ function signedEnvelope(proposal: unknown = candidate()) {
     issuer: 'synthetic-saju-owner', audience: 'myeongha-s3-internal',
     keyId: 'rehearsal-owner-key',
     nonce: NONCE, issuedAtMs: NOW, expiresAtMs: NOW + 60_000,
-    subjectId: scope.subjectId, readingId: scope.readingId,
+    subjectId: scope.subjectId, threadId: scope.threadId,
+    contentRevision: scope.contentRevision, readingId: scope.readingId,
     readerCharacterId: scope.readerCharacterId,
     readerContentBundleId: scope.readerContentBundleId,
     contentReleaseId: scope.contentReleaseId,
+    productId: scope.productId, productSpecVersion: scope.productSpecVersion,
+    sajuDomain: scope.sajuDomain,
+    readingContractVersion: scope.readingContractVersion,
+    productRuleVersion: scope.productRuleVersion,
+    approvedPolicyRevision: scope.approvedPolicyRevision,
     officialArtifactResponseHash: scope.officialArtifactResponseHash,
     candidateDigest: hash(proposal),
   };
@@ -183,6 +196,31 @@ describe('S3 Saju Owner signed handoff rehearsal: never a release issuer', () =>
     const result = await run(build());
     expect(result).toMatchObject({ state: 'blocked', canPublish: false, canSell: false });
     expect(JSON.stringify(result)).not.toContain(TEXT);
+  });
+
+  it.each([
+    ['member', { subjectId: 'another-member' }],
+    ['thread', { threadId: 'another-thread' }],
+    ['thread revision', { contentRevision: 6 }],
+    ['official Reading', { readingId: 'another-reading' }],
+    ['Reader', { readerCharacterId: 'another-reader' }],
+    ['bundle', { readerContentBundleId: 'another-bundle' }],
+    ['release', { contentReleaseId: 'another-release' }],
+    ['Product', { productId: 'another-product' }],
+    ['Product spec', { productSpecVersion: 'changed-spec' }],
+    ['Saju domain', { sajuDomain: 'wealth' }],
+    ['Reading contract', { readingContractVersion: 'changed-contract' }],
+    ['Product rule', { productRuleVersion: 'changed-rule' }],
+    ['approved policy', { approvedPolicyRevision: 'changed-policy' }],
+    ['artifact source', { officialArtifactResponseHash: 'changed-fingerprint' }],
+  ])('rejects %s scope substitution even with a correctly recomputed rehearsal signature', async (_name, changes) => {
+    const x = signedEnvelope();
+    Object.assign(x.proof.payload, changes);
+    x.proof.signatureHex = createHmac('sha256', KEY)
+      .update(DOMAIN).update(hash(x.proof.payload)).digest('hex');
+    expect(await run(x)).toMatchObject({
+      state: 'blocked', sourceAuthority: 'NOT_EVALUATED', canPublish: false,
+    });
   });
 
   it('fails closed for expiration and unavailable shared replay storage', async () => {
