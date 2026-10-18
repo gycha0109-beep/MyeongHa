@@ -140,9 +140,7 @@ assert_committed_revoke() {
 
 # A signed-looking partial cancellation must never be promoted to a
 # verified full revocation. A separate partial-refund policy is required.
-p >"$tmpdir/partial-seed.out" 2>&1 <<SQL || {
-  cat "$tmpdir/partial-seed.out" >&2; fail "partial cancellation fixture failed";
-}
+p >"$tmpdir/partial-seed.out" 2>&1 <<SQL || fail "partial cancellation fixture failed"
 insert into public.commerce_provider_events(
   id,provider,external_event_id,event_type,external_transaction_id,
   resolved_subject_id,resolution_source_type,resolved_receipt_id,
