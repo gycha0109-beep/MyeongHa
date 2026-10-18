@@ -1,5 +1,6 @@
 import type { MobileChatThreadSnapshotV1 } from '@/features/chat/mobile-chat-read-repository';
 import { groupMobileChatMessagesV1 } from '@/features/chat/chat-view-model';
+import { isSeyeonHistoryRevealHoldV1 } from '@/features/chat/seyeon-history-hold-state';
 import { resolveMobileChatCharacterPresentationV1 } from '@/features/chat/chat-character-presentation';
 import { projectMobileChatEmptyGreetingV1 } from '@/features/chat/mobile-chat-empty-greeting';
 import { MOBILE_CHAT_KNOWN_CHARACTERS_V1 } from '@/features/chat/chat-launch-roster';
@@ -70,6 +71,19 @@ export function ChatReadMessages({
       <View style={[styles.stateCard, isSeyeonTheme && styles.seyeonSurface]}>
         <ActivityIndicator color={mobileColors.navy} />
         <Text style={styles.stateText}>대화 기록을 불러오는 중입니다…</Text>
+      </View>
+    );
+  }
+
+  if (isSeyeonHistoryRevealHoldV1(snapshot)) {
+    return (
+      <View style={[styles.stateCard, styles.seyeonSurface]}>
+        <Text style={styles.errorTitle}>세연 대화 기록을 현재 표시할 수 없습니다</Text>
+        <Text style={styles.stateText}>
+          개인정보 보호를 위한 서버 확인이 끝나지 않아 대화 기록을 표시할 수 없습니다.
+          반복해서 불러와도 해제되지 않습니다.
+        </Text>
+        <Text style={styles.diagnosticText}>오류 코드: SEYEON_HISTORY_REVEAL_HOLD</Text>
       </View>
     );
   }
@@ -216,6 +230,7 @@ export function ChatReadMore({
   onLoadMore: () => void;
   onRetry?: () => void;
 }) {
+  if (isSeyeonHistoryRevealHoldV1(snapshot)) return null;
   if (snapshot.status === 'error' && snapshot.messages.length === 0) {
     return onRetry === undefined ? null : (
       <Pressable accessibilityRole="button" onPress={onRetry} style={styles.loadMore}>
@@ -253,6 +268,18 @@ export function ChatComposer({
   sending: boolean;
   status: string | null;
 }) {
+  if (isSeyeonHistoryRevealHoldV1(snapshot)) {
+    return (
+      <View style={[styles.pendingCard, styles.seyeonSurface]}>
+        <Text style={styles.pendingTitle}>세연 대화는 서버의 보호 조치로 잠시 중단되었습니다</Text>
+        <Text style={styles.stateText}>
+          대화 기록과 메시지 보내기는 개인정보 공개 권한 검증이 끝난 뒤 이용할 수 있습니다.
+          앱을 다시 설치해도 이 제한은 해제되지 않습니다.
+        </Text>
+      </View>
+    );
+  }
+
   const ready = snapshot.status === 'ready' || snapshot.status === 'loading_more';
   const seyeon = snapshot.characterId === 'seyeon';
   const allowed = ready && seyeon;
