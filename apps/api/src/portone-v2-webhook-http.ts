@@ -188,7 +188,7 @@ export async function handlePortOneV2WebhookRequestV1(
       },
       config: input.config,
       verificationAdapter: input.verificationAdapter,
-      fullCancellationVerifier: input.fullCancellationVerifier,
+      ...(input.fullCancellationVerifier === undefined ? {} : { fullCancellationVerifier: input.fullCancellationVerifier }),
     });
     return noStoreResponse(204);
   } catch (error) {
