@@ -338,6 +338,12 @@
       "mainMode": "one-shot-trigger",
       "workTrackAttribution": "commit-metadata"
     },
+    "seyeon-c08u-eval-project-key-readiness-v1.yml": {
+      "responsibility": "character-memory-eval-key-read-only-preflight",
+      "prMode": "none",
+      "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "commit-metadata"
+    },
     "seyeon-dialogue-path-real-api-eval-v1.yml": {
       "responsibility": "production-character-model-evaluation",
       "prMode": "none",
