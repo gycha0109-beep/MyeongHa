@@ -161,3 +161,10 @@ S1에서 공통 잠금 함수 자체가 성공하더라도 **S2 전체 경로가
 - 1220의 기존 단일 결속, 단일 Grant, 정확한 Saju 출처, 1개 official Reading 재사용, immutable Reader access, idempotent replay의 모든 원래 의미를 유지한다. Public/Service/API EXECUTE, 유료 Reader 공개, 운영 DB 마이그레이션은 추가하지 않는다.
 - test/db/official_reader_new_grant_insert_phantom_preflight.sh의 기존 DB-C4는 더 이상 무잠금 1090을 허용하는 회귀 예외가 아니다. B4 발급도 직접 S1 범위를 선잠근 뒤 생성하며, 독립적인 B2 FOR SHARE **행 잠금만으로는 다른 Grant 삽입을 막을 수 없다는 근본 시험**은 유지한다. 신규 별도 연결 경합에서는 **다른 거래가 S1을 보유한 동안 직접 1220 replay도 advisory lock에서 반드시 대기**하고 해제 뒤 동일 Reader 접근 권한을 중복 생성 없이 재생해야 한다.
 - **S2 상태:** 실제 1760 발급+결속, 1770/1780 Provider 회수, 1790 Provider 직접 Effect, 1800 legacy Receipt 발급, 1810 직접 Reader 결속의 **핵심 DB Writer들은 공통 잠금에 참여**한다. 다만 S2 전체 Writer 목록·전역 잠금 순서·운영 복구 승인 없이 완료 승인하지 않는다. **S3 공식 Saju 근거 출처 및 S4 보호 본문/Memory 격리 선행 계약이 없어 S5 유료 본문 최종 원자 저장(T2)은 여전히 금지.** 일반 Chat 메시지에 유료 원문을 억지로 삽입하지 않는다.
+
+
+### S3/S4 초기 기능과 실제 인계 (2026-10-18 후속)
+
+- `apps/api/src/official-reader-s3-source-coverage-preflight-v1.ts`: 현재 DB가 허가한 공식 Reading에서 보호된 원본의 정확한 Source Unit ref/hash를 산출하고 선택·동반 근거·공시·모호성·Semantic/Output 검증 후보를 대조한다. 잘못된 Reading, 누락, 중복, 변조, 다른 원본 해시를 거부하는 TypeScript 음성 시험을 동봉했다. **형식적 통과도 `held`, Source/Semantic/Output Authority `NOT_EVALUATED`, 공개 false**다. Saju Owner가 공식 출처 발급·서명·진위 계약을 제공할 때까지 S3 완료가 아니다. 기존 signed Preview transport proof도 공개 권한으로 사용하지 않는다.
+- S4 실코드 위험면·Privacy/Chat/Saju/DB/Legal 인계: `docs/architecture/OFFICIAL_READER_S3_S4_SOURCE_AND_PRIVACY_HANDOFF_20261018_V1.md`. 일반 Chat 본문·생성 시도·Reader 최근 메시지·장기 기억·후속 분석·Outbox·로그를 확인해야 하며 신규 개인정보 보관 테이블/보존 규칙은 **Privacy 사전 승인 전 생성 금지**.
+- **S5 원자 T2 본문 저장 / S6 재열람 / S7 공개: 계속 미구현·차단**. S3/S4 정적 검사와 위험 감사 문서만으로 공개/정식 출처/유료 권한이 생기지 않는다. 기존 S0~S8 단계·승인 범위·운영 복구 HOLD 유지.
