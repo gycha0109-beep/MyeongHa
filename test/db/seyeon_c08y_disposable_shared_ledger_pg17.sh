@@ -102,12 +102,12 @@ sorted="$(printf '%s\n%s\n' "$(cat "$race_dir/claim1")" "$(cat "$race_dir/claim2
 echo PASS_C08Y_TWO_INDEPENDENT_PG17_BACKENDS_ONE_DURABLE_CLAIM
 
 as_role(){
-  psql -X -qAt -v ON_ERROR_STOP=1 -c "
-    BEGIN;
-    SET LOCAL ROLE c08y_synthetic_reserver;
-    select $1;
-    COMMIT;
-  " | tail -n 1
+  psql -X -qAt -v ON_ERROR_STOP=1 <<SQL | tail -n 1
+BEGIN;
+SET LOCAL ROLE c08y_synthetic_reserver;
+select $1;
+COMMIT;
+SQL
 }
 claim="c08y_offline.claim_batch_v1"
 reserve="c08y_offline.reserve_slot_v1"
