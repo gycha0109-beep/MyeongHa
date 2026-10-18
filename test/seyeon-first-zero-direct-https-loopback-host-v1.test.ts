@@ -150,7 +150,7 @@ async function exchange(input: {
         ca: cert,
         rejectUnauthorized: input.verifyServerCertificate ?? true,
         ALPNProtocols: input.alpn === undefined ? ['http/1.1'] : [...input.alpn],
-      }, res => {
+      } as import('node:https').RequestOptions & { ALPNProtocols: string[] }, res => {
         const chunks: Buffer[] = [];
         const version = (res.socket as TLSSocket).getProtocol();
         res.on('data', chunk => chunks.push(Buffer.from(chunk)));
