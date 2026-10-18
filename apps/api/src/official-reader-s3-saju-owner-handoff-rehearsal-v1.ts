@@ -112,8 +112,9 @@ export async function rehearseOfficialReaderS3SajuOwnerHandoffV1(input: Readonly
       || !exact(envelope.proof.payload, PAYLOAD_KEYS)
       || typeof envelope.proof.signatureHex !== 'string'
       || !HASH.test(envelope.proof.signatureHex)
-      || !ID.test(trust.trustedIssuer) || !ID.test(trust.expectedAudience)
-      || !ID.test(trust.trustedKeyId)
+      || typeof trust.trustedIssuer !== 'string' || !ID.test(trust.trustedIssuer)
+      || typeof trust.expectedAudience !== 'string' || !ID.test(trust.expectedAudience)
+      || typeof trust.trustedKeyId !== 'string' || !ID.test(trust.trustedKeyId)
       || !(trust.keyBytes instanceof Uint8Array) || trust.keyBytes.length < 32
       || typeof trust.claimNonceOnce !== 'function'
       || typeof input.expectedNonce !== 'string' || !NONCE.test(input.expectedNonce)
