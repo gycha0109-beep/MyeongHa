@@ -524,7 +524,9 @@ export async function executePortOneV2WebhookPaymentCompletionV1(input: {
     return Object.freeze({
       kind: 'cancelled',
       providerWebhookId: decision.providerWebhookId,
-      ...applied,
+      receiptId: applied.receiptId,
+      providerEventId: applied.providerEventId,
+      grantCount: applied.grantCount,
     });
   }
 
