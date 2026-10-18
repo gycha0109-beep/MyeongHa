@@ -264,24 +264,7 @@ pass "S2 real scoped revoke after Reader: FOR SHARE blocks Entitlement Effect wr
 # CASE 3: The actual INTERNAL COMMERCE command persists an independently
 # server-verified PortOne full cancellation and applies existing 1770/1080
 # under the same scope lock. Unrelated products are never mutated.
-# The original B2 fixture was manually seeded without a payment attempt.
-# Supply the original attempt provenance only in this isolated database.
-p >"$tmpdir/original-attempt.out" 2>&1 <<SQL ||
-  { cat "$tmpdir/original-attempt.out" >&2; fail "original PortOne attempt seed failed"; }
-insert into public.commerce_payment_attempts(
-  id,purchase_intent_id,subject_id,product_offer_id,attempt_no,
-  provider,environment,idempotency_key,provider_request_id,
-  provider_transaction_id,status,created_at,updated_at
-)
-select '12197000-0000-0000-0000-000000000001'::uuid,
-  pi.id,pi.subject_id,pi.product_offer_id,1,cr.provider,cr.environment,
-  'synthetic-portone-full-cancel-request',
-  'synthetic-portone-reader-b2-payment',cr.external_transaction_id,
-  'response_received',clock_timestamp(),clock_timestamp()
-from public.commerce_receipts cr
-join public.purchase_intents pi on pi.id=cr.purchase_intent_id
-where cr.id='$receipt'::uuid;
-SQL
+# The original verified B2 payment attempt is supplied by the shared fixture.
 activate_b2
 cancelled_at="$(p -c "select pg_catalog.to_char(clock_timestamp() at time zone 'UTC',
   'YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"');")"
