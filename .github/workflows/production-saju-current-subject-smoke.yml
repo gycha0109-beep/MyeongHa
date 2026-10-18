@@ -57,6 +57,7 @@ jobs:
             # A failed/cancelled first attempt may already have written the Guest fixture.
             # Re-running the same workflow/job must never write another fixture.
             [[ "$GITHUB_RUN_ATTEMPT" == '1' ]]
+            [[ "$GITHUB_RUN_ID" =~ ^[1-9][0-9]{0,19}$ ]]
             [[ "$MYEONGHA_SAJU_GUEST_WRITE_CONFIRM" == 'VERIFY_SAJU_GUEST_WRITE' ]]
           fi
           test -n "${MYEONGHA_PRODUCTION_MEMBER_EMAIL:-}"
