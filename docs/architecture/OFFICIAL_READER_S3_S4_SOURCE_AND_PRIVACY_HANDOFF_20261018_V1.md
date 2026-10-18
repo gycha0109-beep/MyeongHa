@@ -41,3 +41,13 @@ S3 내부 후보 검사 `apps/api/src/official-reader-s3-source-coverage-preflig
 ### 지금 구현/검증 가능하고 금지되는 것
 
 S3 비공개 구조 검사는 위조·다른 Reading·고지/동반 근거 누락·hash 변조·중복·미검증 Semantic/Output 부정 시험을 추가한다. **서버가 직접 확인한 Saju Owner 출처 서명이 없으므로 성공은 수락이 아니라 HOLD**다. S4는 현재의 유출면을 명시하고 승인 전 실제 사용자 데이터 보관 테이블을 만들지 않는다. 따라서 S5 유료 답변 최종 저장/공개/기억/지급과 실제 결제·운영 DB 수정은 불가하다.
+
+
+## S3 후속: 합성 서명 인계 검증 (정식 발행 아님)
+
+- `apps/api/src/official-reader-s3-saju-owner-handoff-rehearsal-v1.ts`는 사주 소유팀의 **실제 발행 계약이 오기 전에** 인수 측의 위조·범위 교차·만료·재생 공격 대응을 합성 자료로 검증하는 비공개 코드를 제공한다.
+- 서명 검증 입력은 `synthetic_rehearsal_only` 생애주기·별도 issuer/audience/keyId·별도 서명 HMAC 도메인과 키·한 번만 사용 가능한 nonce·만료 시각이다. **실제 운영 Saju 키나 Preview proof 키는 사용하지 않는다.** 현재 공식 DB 범위의 Subject, Reading, Reader, Bundle, Content Release, 원본 Artifact fingerprint, *정확한 후보 Unit 명세 digest*를 각각 고정한다.
+- 기존 `official-reader-s3-source-coverage-preflight-v1.ts`에서 원본 소스의 선택·동반·고지·모호성 정합성에 실패하면 **서명이 형식상 맞아도 차단**한다. 검증 성공도 `held`·`sourceAuthority: NOT_EVALUATED`·`privacyApproval: NOT_EVALUATED`·유료 원문 공개 false이며 API/DB/기억/Outbox에는 연결하지 않는다. 실패·성공 응답 모두 후보/서명/원문/hash/개인식별자를 싣지 않는다.
+- `apps/api/src/official-reader-s3-saju-owner-handoff-rehearsal-v1.test.ts`는 교차 회원·Reading·Bundle·Release·원본 hash·위조 서명·변조 근거·만료·중복 nonce·공용 nonce 저장소 장애와 Preview proof 승격을 거부한다.
+- **Saju Owner 인계 시 별도 구현·재검토 필요:** 공식 제품 출처 Unit 계약과 실제 발행 API, 공식 승인 issuer·키 관리, Saju 계산/해석 trace 및 Semantic/Output 서명, Product/Revision 결속, 저장·삭제·복구 책임, 운영 환경 비밀 격리. 이 실험용 서명 포맷을 승인된 정식 API로 간주하거나 다른 소유 프로젝트에 강제하지 않는다.
+- S4 Privacy의 신규 테이블/삭제/복원 승인 전에는 개인 민감 원문 저장·S5 T2·S6 재열람·S7 전달/공개를 일절 추가하지 않는다.
