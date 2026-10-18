@@ -143,7 +143,7 @@ begin
   -- current official identity. Only a genuinely new first Reading uses the
   -- proposed Reading, which is verified again after original binding.
   select prs.reader_character_id,
-         pg_catalog.coalesce(access.official_reading_id,o.reading_id,p_proposed_reading_id)
+         coalesce(access.official_reading_id,o.reading_id,p_proposed_reading_id)
     into v_locked_reader_character_id,v_locked_official_reading_id
   from public.purchase_intents pi
   join public.product_offers po
