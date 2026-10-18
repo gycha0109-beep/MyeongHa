@@ -161,7 +161,13 @@ describe('S3 Saju Owner signed handoff rehearsal: never a release issuer', () =>
     }],
     ['partial source coverage', () => signedEnvelope({ ...candidate(), disclosureUnits: [] })],
     ['tampered manifest after signing', () => {
-      const x = signedEnvelope(); x.candidate.selectedUnits[0]!.contentHash = 'sha256:v1:' + 'f'.repeat(64);
+      const x = signedEnvelope();
+      // Keep source coverage structurally valid; alter a signed verdict digest
+      // after signing to isolate the candidate fingerprint mismatch.
+      x.candidate = {
+        ...candidate(),
+        outputValidation: { ...candidate().outputValidation, evidenceDigest: 'e'.repeat(64) },
+      };
       return x;
     }],
     ['tampered HMAC', () => {
