@@ -3,7 +3,10 @@ import { EventEmitter } from 'node:events';
 import type { ServerResponse } from 'node:http';
 import { describe, expect, it } from 'vitest';
 import type { PostgresSubjectPoolV1 } from '../apps/api/src/postgres-subject-execution.js';
-import type { RunProductionSeyeonChatResultV1 } from '../apps/api/src/production-seyeon-chat-runtime-v1.js';
+import type {
+  RunProductionSeyeonChatInputV1,
+  RunProductionSeyeonChatResultV1,
+} from '../apps/api/src/production-seyeon-chat-runtime-v1.js';
 import {
   executeAndDeliverSeyeonFirstZeroNodeTurnV1,
   SeyeonFirstZeroNodeTurnDeliveryErrorV1,
@@ -103,7 +106,7 @@ function committedResult(override: Partial<{
 function request(input: {
   db: ReturnType<typeof testDb>;
   response: ResponseDouble;
-  run: () => Promise<RunProductionSeyeonChatResultV1>;
+  run: (args: RunProductionSeyeonChatInputV1) => Promise<RunProductionSeyeonChatResultV1>;
 }) {
   return {
     pool: input.db.pool,
