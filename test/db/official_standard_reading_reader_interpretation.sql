@@ -866,6 +866,22 @@ cross join (values
 ) as x(intent_id, bundle_id, selection_hash)
 where sel.purchase_intent_id = '12102300-0000-0000-0000-000000000001';
 
+-- Original payment-attempt provenance must exist BEFORE the purchase is
+-- verified. The real PortOne cancellation verifier later binds to this
+-- immutable provider request instead of trusting webhook-supplied identities.
+insert into public.commerce_payment_attempts(
+  id,purchase_intent_id,subject_id,product_offer_id,attempt_no,
+  provider,environment,idempotency_key,provider_request_id,
+  provider_transaction_id,status,created_at,updated_at
+)
+select '12197000-0000-0000-0000-000000000001'::uuid,
+  pi.id,pi.subject_id,pi.product_offer_id,1,'portone_v2','production',
+  'synthetic-portone-full-cancel-request',
+  'synthetic-portone-reader-b2-payment','tx-official-reader-b2',
+  'response_received',clock_timestamp(),clock_timestamp()
+from public.purchase_intents pi
+where pi.id='12192300-0000-0000-0000-000000000002';
+
 update public.purchase_intents
 set status = 'verified', updated_at = clock_timestamp()
 where id in (
