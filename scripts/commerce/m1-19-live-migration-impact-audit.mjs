@@ -160,6 +160,9 @@ export function auditM119LiveHistory({
       repair.version!=='20261008090417' ||
       parity.untrackedInstalledVersions.length!==1 ||
       parity.untrackedInstalledVersions[0]!==repair.version ||
+      repair.statementCount!==1 ||
+      repair.sqlLengthCharacters!==104021 ||
+      repair.md5!=='f70776d8c0f6369f6f13484ba9fa2271' ||
       repair.functionNamesFromSource?.length!==19 ||
       repair.policyNamesFromSource?.length!==19) {
     throw new Error('M1-19: captured live SQL provenance counts or history changed; re-inspect before release');
