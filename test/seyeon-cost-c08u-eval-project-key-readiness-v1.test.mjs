@@ -1,7 +1,7 @@
 import {describe,expect,it,vi} from 'vitest';
 import {readFileSync} from 'node:fs';
 import {
- SEYEON_C08U_READONLY_MODEL_URL_V1 as URL,
+ SEYEON_C08U_READONLY_MODEL_URL_V1 as MODEL_URL,
  verifySeyeonC08UEvaluationCredentialV1 as verify,
 } from '../scripts/seyeon-cost-c08u-eval-project-key-readiness-v1.mjs';
 import {
@@ -27,7 +27,7 @@ describe('C08-U isolated evaluation key credential GET only, NO paid call',()=>{
   expect(fetchImpl).toHaveBeenCalledTimes(1);
   const [url,options]=fetchImpl.mock.calls[0];
   expect(url).toBe('https://api.openai.com/v1/models/'+POLICY.model);
-  expect(url).toBe(URL);
+  expect(url).toBe(MODEL_URL);
   expect(options.method).toBe('GET');
   expect(options.redirect).toBe('error');
   expect(options.headers.Authorization).toBe('Bearer '+key);
