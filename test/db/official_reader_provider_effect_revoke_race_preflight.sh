@@ -168,6 +168,34 @@ fi
   fail "partial cancellation produced a full-revoke event"
 pass "verified partial cancellation is rejected without changing Reader rights"
 
+# Direct legacy 1080 must no longer mutate an official Reader purchase Grant
+# without the same held S1 scope lock as the 1770/1780 paths.
+activate_b2
+if p -c "begin;
+  select pg_catalog.set_config('myeongha.subject_id', '$subject', true);
+  select * from public.internal_apply_entitlement_effect_v1(
+    'provider_event',
+    '12196000-0000-0000-0000-000000000001'::uuid,
+    '$b2'::uuid,
+    null,
+    (select revision from public.entitlement_grants where id='$b2'::uuid),
+    null,
+    'revoked',
+    clock_timestamp(),
+    'revoked',
+    (select valid_from from public.entitlement_grants where id='$b2'::uuid),
+    (select valid_until from public.entitlement_grants where id='$b2'::uuid),
+    'legacy_direct_without_reader_scope_lock'
+  );
+  commit;" >"$tmpdir/direct1080.out" 2>&1; then
+  fail "legacy 1080 bypassed the official Reader shared scope lock"
+fi
+grep -q 'Legacy Reader provider effect cannot bypass the S1 scope lock' "$tmpdir/direct1080.out" ||
+  { cat "$tmpdir/direct1080.out" >&2; fail "legacy 1080 rejected for an unrelated reason"; }
+[[ "$(p -c "select status from public.entitlement_grants where id='$b2'::uuid;")" == active ]] ||
+  fail "legacy 1080 bypass modified Reader Grant"
+pass "direct legacy 1080 Reader effect requires an already held S1 scope lock"
+
 # CASE 1: Commerce effect owns the Grant row before Reader reads.
 # Reader must actually wait on PostgreSQL Lock and subsequently see DENY.
 activate_b2
