@@ -1,4 +1,9 @@
 import { performance } from 'node:perf_hooks';
+import {
+  buildProductionSajuGuestBirthLabel,
+  fingerprintProductionSajuGuestFixture,
+  requireProductionSajuGuestRunId,
+} from './production-saju-guest-fixture-audit.mjs';
 import { acquireProductionMemberSmokeSession } from './production-member-smoke-session.mjs';
 
 const PRODUCTION_ORIGIN = 'https://myeongha.vercel.app';
@@ -9,7 +14,7 @@ const BIRTH_PROFILES_URL = `${PRODUCTION_ORIGIN}/api/birth-profiles`;
 const SAJU_CALCULATION_URL = `${PRODUCTION_ORIGIN}/api/me/saju/calculation`;
 const SAJU_PREVIEW_READING_URL = `${PRODUCTION_ORIGIN}/api/me/saju/preview-reading`;
 const SAJU_PREVIEW_READING_TEXT = '전체 사주';
-const GUEST_BIRTH_LABEL = 'production-saju-guest-smoke-v1';
+// The durable synthetic Birth label includes the GitHub run identity for scoped reconciliation.
 const GUEST_BIRTH_INPUT = Object.freeze({
   calendarType: 'solar',
   birthDate: '2000-01-01',
@@ -253,6 +258,7 @@ async function requestPreviewReading({ label, authorizationHeader }) {
 }
 
 const smokeScope = process.env.MYEONGHA_SAJU_SMOKE_SCOPE ?? 'member_only';
+let guestRunId = null;
 if (smokeScope !== 'member_only' && smokeScope !== 'member_and_guest') {
   throw new Error('MYEONGHA_SAJU_SMOKE_SCOPE must be member_only or member_and_guest.');
 }
@@ -270,6 +276,7 @@ if (smokeScope === 'member_and_guest') {
   if (process.env.MYEONGHA_SAJU_GUEST_WRITE_CONFIRM !== 'VERIFY_SAJU_GUEST_WRITE') {
     throw new Error('Production Guest fixture creation requires explicit VERIFY_SAJU_GUEST_WRITE confirmation.');
   }
+  guestRunId = requireProductionSajuGuestRunId(process.env.GITHUB_RUN_ID);
 }
 
 const expectedSubjectId = requireUuid(
@@ -510,6 +517,9 @@ const previewReading = await requestPreviewReading({
 });
 
 async function createGuestSajuFixture() {
+  // A request can succeed server-side even when the reply is lost. Log each
+  // write boundary without exposing bearer tokens, Birth values or raw IDs.
+  console.log(`Production Saju Guest fixture: runId=${guestRunId}, stage=bootstrap_requested, writeOutcome=UNKNOWN_UNTIL_CONFIRMED, automaticRetry=false.`);
   const bootstrapStartedAt = performance.now();
   const bootstrapResponse = await fetchCanonical(BOOTSTRAP_URL, {
     method: 'POST',
@@ -568,6 +578,8 @@ async function createGuestSajuFixture() {
   );
   const authorizationHeader = { Authorization: `Bearer ${bearerToken}` };
   const bootstrapRoundTripMs = elapsedMillisecondsSince(bootstrapStartedAt);
+  const guestSubjectAuditRef = fingerprintProductionSajuGuestFixture('subject', guestSubjectId);
+  console.log(`Production Saju Guest fixture: runId=${guestRunId}, stage=bootstrap_confirmed, subjectAuditRef=${guestSubjectAuditRef}, birthCreate=NOT_STARTED, retainForManualReconciliation=true.`);
 
   const guestMeStartedAt = performance.now();
   const guestMeResponse = await fetchCanonical(MEMBER_ME_URL, {
@@ -611,6 +623,8 @@ async function createGuestSajuFixture() {
   const guestMeRoundTripMs = elapsedMillisecondsSince(guestMeStartedAt);
 
   const birthCreateStartedAt = performance.now();
+  const guestBirthLabel = buildProductionSajuGuestBirthLabel(guestRunId);
+  console.log(`Production Saju Guest fixture: runId=${guestRunId}, stage=birth_create_requested, subjectAuditRef=${guestSubjectAuditRef}, writeOutcome=UNKNOWN_UNTIL_CONFIRMED, automaticRetry=false.`);
   const birthCreateResponse = await fetchCanonical(BIRTH_PROFILES_URL, {
     method: 'POST',
     headers: {
@@ -618,7 +632,7 @@ async function createGuestSajuFixture() {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      label: GUEST_BIRTH_LABEL,
+      label: guestBirthLabel,
       input: GUEST_BIRTH_INPUT,
     }),
   });
@@ -641,7 +655,7 @@ async function createGuestSajuFixture() {
     'Production Saju smoke Guest Birth create data',
     birthCreateBody.data,
   );
-  requireUuid(
+  const birthProfileId = requireUuid(
     'Production Saju smoke Guest Birth profile id',
     birthCreateData.birthProfileId,
   );
@@ -655,6 +669,9 @@ async function createGuestSajuFixture() {
     1,
   );
   const birthCreateRoundTripMs = elapsedMillisecondsSince(birthCreateStartedAt);
+  const birthProfileAuditRef = fingerprintProductionSajuGuestFixture('birth_profile', birthProfileId);
+  const birthRevisionAuditRef = fingerprintProductionSajuGuestFixture('birth_revision', revisionId);
+  console.log(`Production Saju Guest fixture: runId=${guestRunId}, stage=birth_create_confirmed, subjectAuditRef=${guestSubjectAuditRef}, birthProfileAuditRef=${birthProfileAuditRef}, birthRevisionAuditRef=${birthRevisionAuditRef}, retainUntilSeparatelyApprovedCleanup=true.`);
 
   return Object.freeze({
     bearerToken,
@@ -693,6 +710,9 @@ const guestPreviewReading = await requestPreviewReading({
   label: 'Production Guest Saju Preview Reading',
   authorizationHeader: guest.authorizationHeader,
 });
+if (guestPreviewReading.state !== 'delivered' && guestPreviewReading.state !== 'delivered_with_fallback') {
+  throw new Error('Production Guest Saju Preview returned a non-delivered state; positive E2E remains NOT_VERIFIED and synthetic fixture is retained.');
+}
 
 if (
   JSON.stringify(memberBody).includes(accessToken) ||
@@ -714,6 +734,6 @@ if (
 }
 
 console.log(
-  `MyeongHa production current-subject Saju smoke passed: memberSignIn=200, freshSession=true, memberSubjectMatch=true, birthProfilePresent=true, birthRevisionMatch=true, calculationFirst=200, calculationRepeat=200, deterministicRepeat=true, previewReading=200, previewState=${previewReading.state}, guestBootstrap=200, guestSubjectMatch=true, guestBirthCreate=201, guestCalculation=200, guestPreviewReading=200, guestPreviewState=${guestPreviewReading.state}, authority=calculation_only, ingressContract=v1, cacheControl=no-store, measurementObservedAtUtc=${measurementObservedAtUtc}, memberRoundTripMs=${memberRoundTripMs}, birthProfileRoundTripMs=${birthProfileRoundTripMs}, calculationFirstRoundTripMs=${firstCalculation.roundTripMs}, calculationRepeatRoundTripMs=${repeatCalculation.roundTripMs}, previewReadingRoundTripMs=${previewReading.roundTripMs}, guestBootstrapRoundTripMs=${guest.bootstrapRoundTripMs}, guestMeRoundTripMs=${guest.guestMeRoundTripMs}, guestBirthCreateRoundTripMs=${guest.birthCreateRoundTripMs}, guestCalculationRoundTripMs=${guestCalculation.roundTripMs}, guestPreviewReadingRoundTripMs=${guestPreviewReading.roundTripMs}, timingThresholdApplied=false.`,
+  `MyeongHa production current-subject Saju smoke passed: memberSignIn=200, freshSession=true, memberSubjectMatch=true, birthProfilePresent=true, birthRevisionMatch=true, calculationFirst=200, calculationRepeat=200, deterministicRepeat=true, previewReading=200, previewState=${previewReading.state}, guestBootstrap=200, guestSubjectMatch=true, guestBirthCreate=201, guestCalculation=200, guestPreviewReading=200, guestPreviewState=${guestPreviewReading.state}, guestFixtureCreated=true, fixtureRunId=${guestRunId}, authority=calculation_only, ingressContract=v1, cacheControl=no-store, measurementObservedAtUtc=${measurementObservedAtUtc}, memberRoundTripMs=${memberRoundTripMs}, birthProfileRoundTripMs=${birthProfileRoundTripMs}, calculationFirstRoundTripMs=${firstCalculation.roundTripMs}, calculationRepeatRoundTripMs=${repeatCalculation.roundTripMs}, previewReadingRoundTripMs=${previewReading.roundTripMs}, guestBootstrapRoundTripMs=${guest.bootstrapRoundTripMs}, guestMeRoundTripMs=${guest.guestMeRoundTripMs}, guestBirthCreateRoundTripMs=${guest.birthCreateRoundTripMs}, guestCalculationRoundTripMs=${guestCalculation.roundTripMs}, guestPreviewReadingRoundTripMs=${guestPreviewReading.roundTripMs}, timingThresholdApplied=false.`,
 );
 }
