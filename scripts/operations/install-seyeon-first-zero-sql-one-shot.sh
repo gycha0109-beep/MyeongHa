@@ -6,7 +6,7 @@ set -euo pipefail
 project='cnsfpcdiyofqvhpcegfc'
 version='20261018190000'
 migration="supabase/migrations/${version}_seyeon_locked_first_zero_source_reveal_v1.sql"
-expected_blob='002da74911ee6c9f2d0d31b56ca69391b0c3d5c6'
+expected_blob='3fbe7322cb3f11484a3e0a42bdc0598879b3d1d8'
 : "${SUPABASE_DB_PASSWORD:?Production DB secret required}"
 : "${SUPABASE_PRODUCTION_SESSION_POOLER_HOST:?Production pooler host required}"
 : "${REVIEWED_MAIN_SHA:?Reviewed main SHA required}"

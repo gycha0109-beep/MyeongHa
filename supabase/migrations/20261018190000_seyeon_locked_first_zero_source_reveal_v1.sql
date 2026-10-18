@@ -40,6 +40,33 @@ begin
     p_subject_id,p_thread_id
   );
 
+  -- Lock the FK parent rows BEFORE evaluating any absence predicate. A row
+  -- SHARE lock alone is compatible with a concurrent child INSERT's FK
+  -- KEY SHARE check: a new message/history record could otherwise commit
+  -- after the zero-source SELECT but before the Node socket handoff.
+  --
+  -- Subject UPDATE blocks new conversation threads and character states;
+  -- thread UPDATE blocks new messages/participants; state UPDATE blocks
+  -- relationship event/history inserts through their FK parent.
+  -- Retain these locks in the same caller-owned transaction until send ends.
+  perform 1 from public.subjects locked_subject
+  where locked_subject.id=p_subject_id
+  for update;
+  if not found then return; end if;
+
+  perform 1 from public.conversation_threads locked_thread
+  where locked_thread.id=p_thread_id
+    and locked_thread.subject_id=p_subject_id
+  for update;
+  if not found then return; end if;
+
+  perform 1 from public.user_character_states locked_state
+  where locked_state.subject_id=p_subject_id
+    and locked_state.character_id='seyeon'
+  for update;
+  -- An absent state is legitimate for a first turn. The Subject UPDATE lock
+  -- prevents a new state row from appearing mid-reveal via its FK.
+
   -- Hold the canonical Subject, Turn, immutable Attempt and exact committed
   -- assistant message until the caller finishes the controlled Node send.
   -- All absence checks run as the trusted table owner with RLS disabled:

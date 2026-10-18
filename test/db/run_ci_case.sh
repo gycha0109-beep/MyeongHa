@@ -46,7 +46,7 @@ apply_pg17_migrations_through_seyeon_production_frontier() {
           # Post-frontier security migration is known but must NEVER be replayed
           # into the historical 1510 R2 catalog/restore authority fixture.
           # Reject a same-named modified migration instead of silently skipping.
-          [[ "$(git hash-object "$migration")" == '002da74911ee6c9f2d0d31b56ca69391b0c3d5c6' ]] || {
+          [[ "$(git hash-object "$migration")" == '3fbe7322cb3f11484a3e0a42bdc0598879b3d1d8' ]] || {
             echo "HOLD_R2_ZERO_REVEAL_SQL_FINGERPRINT_DRIFT" >&2; return 1;
           }
           continue

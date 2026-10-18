@@ -63,8 +63,13 @@ function testDb(input: {
             expect(args).toEqual([authId]);
             return { rows: [{ subjectId, subjectKind: 'member' }] };
           }
-          if (sql.includes("to_regprocedure('public.qry_seyeon_locked_first_zero_source_reveal_v1")) {
+          if (sql.includes('from pg_catalog.pg_proc p') && sql.includes('qry_seyeon_locked_first_zero_source_reveal_v1')) {
             events.push('readiness');
+            expect(sql).toContain("pg_get_userbyid(p.proowner)='postgres'");
+            expect(sql).toContain("'row_security=off'=any(p.proconfig)");
+            expect(sql).toContain("not pg_catalog.has_function_privilege('anon',p.oid,'EXECUTE')");
+            expect(sql).toContain("not pg_catalog.has_function_privilege('authenticated',p.oid,'EXECUTE')");
+            expect(sql).toContain("not pg_catalog.has_function_privilege('service_role',p.oid,'EXECUTE')");
             return { rows: [{ ready: input.ready ?? true }] };
           }
           if (sql.includes('from public.qry_seyeon_locked_first_zero_source_reveal_v1')) {
