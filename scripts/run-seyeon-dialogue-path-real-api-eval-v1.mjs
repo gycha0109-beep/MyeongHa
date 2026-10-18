@@ -1,5 +1,6 @@
 import { mkdir, writeFile } from 'node:fs/promises';
-import { dirname } from 'node:path';
+import { dirname, join } from 'node:path';
+import { randomBytes } from 'node:crypto';
 import { performance } from 'node:perf_hooks';
 import { createOpenAiSeyeonStructuredProviderV1 } from '../dist/apps/api/src/openai-seyeon-structured-provider-v1.js';
 import { createSeyeonUnifiedGovernanceCandidateV1 } from '../dist/apps/api/src/seyeon-unified-governance-candidate-v1.js';
@@ -19,11 +20,22 @@ import {
   SEYEON_DIALOGUE_PATH_MAX_CALLS_V1, SEYEON_DIALOGUE_PATH_MAX_ESTIMATED_COST_USD_V1,
   SEYEON_DIALOGUE_PATH_PRICES_V1, selectSeyeonDialoguePathCasesV1,
   estimateSeyeonDialoguePathCostV1, summarizeSeyeonDialoguePathV1,
+  createSeyeonDialoguePathSyntheticCensusV1,
 } from './seyeon-dialogue-path-eval-core-v1.mjs';
+import {
+ SEYEON_C08S_ORDINARY_GOLD_IDS_V1,
+ buildSeyeonC08SReviewerPackV1,
+ buildSeyeonC08SOwnerKeyV1,
+} from './seyeon-c08s-blinded-first-turn-evaluation-v1.mjs';
 
 const cases = selectSeyeonDialoguePathCasesV1(SEYEON_MODEL_EVAL_CASES_V1);
-const key = process.env.OPENAI_API_KEY?.trim();
-if (!key) throw new Error('Missing protected model evaluation credential.');
+// Manual benchmark only. Unreviewed usage must not start just because a
+// credential is present. Paid enabling needs a separate reviewed release.
+if (process.env.SEYEON_DIALOGUE_PATH_PAID_ADMISSION !== 'REVIEWED_AND_VERIFIED') {
+  throw new Error('SEYEON_DIALOGUE_PATH_PAID_EXECUTION_HOLD');
+}
+const key = process.env.OPENAI_EVAL_API_KEY?.trim();
+if (!key) throw new Error('Missing isolated evaluation-only credential.');
 if (cases.length !== 16 || SEYEON_DIALOGUE_PATH_CASE_IDS_V1.length !== 16) {
   throw new Error('Synthetic case cap changed unexpectedly.');
 }
@@ -54,6 +66,14 @@ function provider(route, model) {
       let body = null;
       if (response.ok) {
         try { body = await response.clone().json(); } catch { /* provider fails closed */ }
+      }
+      // Missing usage is UNKNOWN (possibly billable), never 0 USD.
+      if (response.ok && (!body?.usage ||
+         !Number.isSafeInteger(body.usage.input_tokens) ||
+         body.usage.input_tokens<1 ||
+         !Number.isSafeInteger(body.usage.output_tokens) ||
+         body.usage.output_tokens<1)) {
+        throw new Error('SEYEON_DIALOGUE_PATH_USAGE_UNKNOWN_HOLD');
       }
       const tokens = estimateSeyeonDialoguePathCostV1(body?.usage ?? {}, rates);
       routeUsage.estimatedCostUsd += tokens.usd;
@@ -131,6 +151,8 @@ function reason(error) {
   if (message.includes('Fast-dialogue Shadow requires')) return 'FAST_SHADOW_INELIGIBLE';
   if (message.includes('SYNTHETIC_PRIVATE_')) return 'PRIVATE_TOPIC_EXCLUDED';
   if (message.includes('BUDGET_STOP')) return 'BUDGET_STOP';
+  if (message.includes('USAGE_UNKNOWN_HOLD')) return 'USAGE_UNKNOWN_HOLD';
+  if (kind === 'FAST_THREAD_CENSUS_REJECTED') return kind;
   if (message.includes('renderer') || message.includes('Renderer')) return 'RENDERER_GUARD_REJECTED';
   if (message.includes('interpretation') || message.includes('interpret')) return 'INTERPRETATION_GUARD_REJECTED';
   return 'EVALUATION_GUARD_OR_PROVIDER_FAILURE';
@@ -146,15 +168,17 @@ async function evaluate(route, spec) {
     retrievedMemories: Object.freeze([]),
   });
   let outcome = 'admitted', errorCode = null;
+  let safeEnvelope = null;
   try {
     if (route === 'legacy_5_terra') {
-      await runSeyeonCharacterTurnV2({
+      const executed = await runSeyeonCharacterTurnV2({
         userMessageRef: id, userText: spec.text, contextInput,
         governance: governance(legacyPreflight),
         interpreterProvider: legacyInterpreter,
         rendererProvider: legacyRenderer,
         semanticReviewerProvider: legacyReviewer,
       });
+      safeEnvelope = executed.envelope;
     } else {
       const governanceCandidate = createSeyeonUnifiedGovernanceCandidateV1({
         governance: governance(candidatePreflight),
@@ -176,14 +200,33 @@ async function evaluate(route, spec) {
           retrievedSources: preflight.retrievedPrivateSources,
         },
       });
-      await createSeyeonFastDialogueShadowV1({
+      const census = createSeyeonDialoguePathSyntheticCensusV1(spec.id, id);
+      const executed = await createSeyeonFastDialogueShadowV1({
         candidateProvider: candidateDialogue,
         reviewerProvider: candidateReviewer,
+        fullThreadCensus: census.port,
       }).evaluate(context);
+      if (census.readCount !== 3 ||
+          executed.scope !== 'SHADOW_ONLY_NOT_PRODUCTION')
+        throw new Error('SYNTHETIC_FIRST_TURN_CENSUS_HOLD');
+      safeEnvelope = executed.envelope;
     }
   } catch (error) {
     outcome = 'rejected';
     errorCode = reason(error);
+  }
+  if (outcome === 'admitted' && approvedReviewIds.has(spec.id)) {
+    if (!safeEnvelope || safeEnvelope.revealLevel !== 'public' ||
+        safeEnvelope.memoryRefsMentioned.length !== 0 ||
+        safeEnvelope.privateSourceRefsMentioned.length !== 0 ||
+        safeEnvelope.disclosureSliceIds.length !== 0)
+      throw new Error('SEYEON_BLIND_REVIEW_SAFETY_HOLD');
+    const label = route === 'legacy_5_terra' ? 'legacy' : 'candidate';
+    const pair = reviewPairs.get(spec.id) ?? {id:spec.id};
+    if (pair[label]) throw new Error('SEYEON_BLIND_REVIEW_DUPLICATE_HOLD');
+    pair[label] = {guardApproved:true,revealLevel:'public',
+      memoryRefs:[],privateSourceRefs:[],utterance:safeEnvelope.utterance};
+    reviewPairs.set(spec.id,pair);
   }
   const after = usage[route];
   return Object.freeze({
@@ -201,6 +244,8 @@ async function evaluate(route, spec) {
 }
 
 const rows = [];
+const approvedReviewIds = new Set(SEYEON_C08S_ORDINARY_GOLD_IDS_V1);
+const reviewPairs = new Map();
 for (let i = 0; i < cases.length; i += 1) {
   const ordered = i % 2 === 0
     ? SEYEON_DIALOGUE_PATH_ROUTES_V1 : [...SEYEON_DIALOGUE_PATH_ROUTES_V1].reverse();
@@ -218,7 +263,8 @@ const evidence = {
   mode: 'OFFLINE_SYNTHETIC_ONLY',
   productionChanged: false,
   noRealUserRecords: true,
-  noUserOrAssistantTextPersisted: true,
+  noRealUserTextPersisted: true,
+  syntheticAssistantTextStoredOnlyInLocalBlindReviewerPack: true,
   priceBasis: 'Repository-defined estimated Standard API token rates',
   fixtureCount: cases.length,
   maxCalls: SEYEON_DIALOGUE_PATH_MAX_CALLS_V1,
@@ -230,6 +276,22 @@ const evidence = {
     route, entry.purposes,
   ])),
 };
+if (summary.verdict !== 'GUARD_SAMPLE_PASS' ||
+    reviewPairs.size !== SEYEON_C08S_ORDINARY_GOLD_IDS_V1.length)
+  throw new Error('SEYEON_BLIND_REVIEW_AND_GUARD_HOLD');
+const packetInput={
+  seed:randomBytes(32).toString('hex'),
+  pairs:SEYEON_C08S_ORDINARY_GOLD_IDS_V1.map(id=>reviewPairs.get(id)),
+};
+const reviewerPack=buildSeyeonC08SReviewerPackV1(packetInput);
+const ownerKey=buildSeyeonC08SOwnerKeyV1(packetInput);
+const packetDir=process.env.SEYEON_DIALOGUE_PATH_REVIEW_DIR
+  ?? './.evidence/seyeon-c08b-blind-review';
+await mkdir(packetDir,{recursive:true,mode:0o700});
+await writeFile(join(packetDir,'reviewer-only.json'),
+ JSON.stringify(reviewerPack,null,2),{flag:'wx',mode:0o600});
+await writeFile(join(packetDir,'owner-only-key.json'),
+ JSON.stringify(ownerKey,null,2),{flag:'wx',mode:0o600});
 const output = process.env.SEYEON_DIALOGUE_PATH_EVIDENCE_PATH
   ?? './.evidence/seyeon-real-api-path-benchmark-v1.json';
 await mkdir(dirname(output), { recursive: true });
@@ -241,6 +303,7 @@ console.log(JSON.stringify({
   estimatedCostUsd: evidence.estimatedCostUsd,
   routes: summary.routes,
   onlySyntheticPublicCases: true,
+  blindReviewerPacketLocalOnly: true,
   characterVoiceQualityVerified: false,
   productionChanged: false,
 }));
