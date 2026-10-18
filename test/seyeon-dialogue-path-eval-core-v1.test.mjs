@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import {SEYEON_C08S_ORDINARY_GOLD_IDS_V1} from '../scripts/seyeon-c08s-blinded-first-turn-evaluation-v1.mjs';
 import { SEYEON_MODEL_EVAL_CASES_V1 } from '../scripts/seyeon-model-eval-cases-v1.mjs';
 import {
   SEYEON_DIALOGUE_PATH_CASE_IDS_V1,
@@ -10,6 +12,7 @@ import {
   estimateSeyeonDialoguePathCostV1,
   percentileSeyeonDialoguePathV1,
   summarizeSeyeonDialoguePathV1,
+  createSeyeonDialoguePathSyntheticCensusV1,
 } from '../scripts/seyeon-dialogue-path-eval-core-v1.mjs';
 
 describe('Se-yeon real API dialogue-path benchmark accounting', () => {
@@ -18,7 +21,9 @@ describe('Se-yeon real API dialogue-path benchmark accounting', () => {
     expect(cases.map(x => x.id)).toEqual(SEYEON_DIALOGUE_PATH_CASE_IDS_V1);
     expect(cases).toHaveLength(16);
     expect(cases.filter(x => x.id.startsWith('X')).map(x => x.id))
-      .toEqual(['X01', 'X02', 'X03', 'X04', 'X05', 'X06']);
+      .toEqual(['X01', 'X02', 'X03', 'X04']);
+    expect(SEYEON_C08S_ORDINARY_GOLD_IDS_V1.every(id =>
+      cases.some(spec=>spec.id===id))).toBe(true);
     expect(cases.every(x => x.topic === undefined && x.text.length <= 160)).toBe(true);
     expect(() => selectSeyeonDialoguePathCasesV1([
       ...SEYEON_MODEL_EVAL_CASES_V1.filter(x => x.id !== 'N01'),
@@ -26,6 +31,41 @@ describe('Se-yeon real API dialogue-path benchmark accounting', () => {
     ])).toThrow('Fixture not eligible');
     expect(SEYEON_DIALOGUE_PATH_MAX_CALLS_V1).toBe(16 * (5 + 3));
     expect(SEYEON_DIALOGUE_PATH_MAX_ESTIMATED_COST_USD_V1).toBeLessThanOrEqual(3);
+  });
+
+  it('creates an exact three-read isolated synthetic first-contact Census for the 3-call path', () => {
+    const census=createSeyeonDialoguePathSyntheticCensusV1('N01','synthetic:N01');
+    const args={subjectId:'synthetic-subject:N01',
+      threadId:'synthetic-thread:N01',currentUserMessageId:'synthetic:N01'};
+    for(let i=0;i<3;i++) {
+      const result=census.port.readFullThreadCensus(args);
+      expect(result).toMatchObject({
+        schemaVersion:'seyeon-first-turn-census-shadow-v1',
+        messageCount:1,latestSenderType:'user',complete:true,
+      });
+    }
+    expect(census.readCount).toBe(3);
+    expect(()=>census.port.readFullThreadCensus(args)).toThrow();
+    expect(()=>createSeyeonDialoguePathSyntheticCensusV1('F02','synthetic:F02')).toThrow();
+    expect(()=>createSeyeonDialoguePathSyntheticCensusV1('N01','synthetic:N02')).toThrow();
+    const another=createSeyeonDialoguePathSyntheticCensusV1('N01','synthetic:N01');
+    expect(()=>another.port.readFullThreadCensus({...args,subjectId:'forged'})).toThrow();
+    expect(another.readCount).toBe(0);
+  });
+
+  it('wires real E2E benchmark to synthetic census and 8 public blinded cases, never production key',()=>{
+    const src=readFileSync(new URL(
+      '../scripts/run-seyeon-dialogue-path-real-api-eval-v1.mjs',import.meta.url),'utf8');
+    expect(src).toContain('fullThreadCensus: census.port');
+    expect(src).toContain('census.readCount !== 3');
+    expect(src).toContain('buildSeyeonC08SReviewerPackV1');
+    expect(src).toContain('buildSeyeonC08SOwnerKeyV1');
+    expect(src).toContain('SEYEON_DIALOGUE_PATH_USAGE_UNKNOWN_HOLD');
+    expect(src).toContain('SEYEON_DIALOGUE_PATH_PAID_EXECUTION_HOLD');
+    expect(src).toContain('process.env.OPENAI_EVAL_API_KEY');
+    expect(src).not.toContain('process.env.OPENAI_API_KEY');
+    expect(src).not.toContain('OPENAI_API_KEY2');
+    expect(src).toContain('flag:\'wx\'');
   });
 
   it('counts cached tokens against input, never double-counts or invents usage', () => {
