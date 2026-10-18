@@ -69,3 +69,15 @@ original Grant 철회 COMMIT                  (R)
 - Production DB DDL/DML/migration/ACL/history 변경 0
 - 기술 `G0=PROPOSED`, `G1 positive/G2/G3/G5/G6=HOLD`, `authorizedForProduction=false`, `drReady=false`
 - 이번 격리 R9 테스트가 성공해도 실제 positive 공개 권한이나 Owner 서명으로 자동 승격하지 않는다.
+
+
+## 6. R10 — 격리 전용 DB 잠금→실제 Node HTTP 송출 순서 후보
+
+> **Candidate, not a Production implementation or G0 signature.** 아래의 원형은 배포용 함수·Provider·공개 Route에 연결하지 않는다.
+
+- **Send-first:** 원본 Grant를 검증하는 DB 읽기 함수를 API executor의 실제 격리 PostgreSQL 트랜잭션에서 호출해 원본 Subject/Grant/Record의 SHARE 잠금을 유지한다. Node ServerResponse.end()의 실제 소켓 쓰기와 finish 신호 이후에만 DB 트랜잭션을 COMMIT한다. 두 번째 DB 연결의 철회 FOR UPDATE는 전송 구간에 실제로 블록되며, 그 후 original Grant 철회 COMMIT (R)이 가능하다. **이는 Node 송신 측 handoff의 순서이지, 클라이언트가 먼저 수신/렌더링했다는 보장이 아니다.**
+- **Revoke-first:** 철회 트랜잭션이 먼저 Subject FOR UPDATE 및 original Grant revoke를 수행하면 두 번째 DB 연결의 current-rights 읽기 함수는 블록되고, 철회 COMMIT 뒤 NULL을 반환해야 한다. Node는 503/no-store만 송신하며 개인기억 기반 Assistant 본문은 **0바이트**다.
+- **Retained history:** 양쪽 순서 모두 기존 기록 row는 남아 있지만, 철회 뒤의 새로운 HTTP/History 공개는 거부되어야 한다.
+- **한계:** finish는 Node가 자신의 송신 시스템에 데이터를 넘긴 완료이며 Vercel/Edge/Proxy/TLS, 다른 서버 인스턴스, 클라이언트 수신·표시는 포함하지 않는다. HTTP 송출이 느리거나 클라이언트가 절단되면 DB 트랜잭션/잠금도 장시간 붙잡혀 철회를 지연시키고 풀 고갈/DoS/타임아웃/중단 후 재시도가 발생할 수 있다. **이 원형은 구현 가능성 검증이지 운영에서 그대로 채택할 설계가 아니다.**
+- **출시 전 미해결:** Session/Proxy send fence 또는 중앙 DB-backed epoch 권한 계약, 철회 ACK 의미, 최대 lock/send 시간, client disconnect 시 ROLLBACK, 다중 Instance/Worker/Replay/History, 대상 Character/Source lineage 결속, 안전한 오류 응답, 보안·API·DB 공동 기술 서명. 보장할 수 없으면 현행 개인기억 기반 최초 Reveal HOLD 유지.
+- **테스트 위치:** 기존 격리 PostgreSQL 전용 R5/R9 파일의 R10 두 세션·실제 127.0.0.1 소켓 테스트. CI 승인에 해당하는 것은 latest HEAD의 실제 DB authority-core/PG17·Full Integration 결과이며, 독립 실행 전에는 PASS 표시 금지.
