@@ -90,3 +90,11 @@ original Grant 철회 COMMIT                  (R)
 - 배포 경계: 명하의 현재 `api/me.ts`는 Vercel **Fetch `Response`를 반환**하므로 이 Node 소켓 포트를 사용할 수 없다. `Response` 생성/반환이 `S`라는 주장은 금지한다. **운영 메모리 기반 첫 공개 HOLD 불변**. 이후 직접 제어 가능한 Node 송출 서비스나 동등하게 입증된 프록시 송출 계약이 준비돼야 연결 가능하다.
 - 운영 주의: 이 후보는 **DB 잠금을 실제 송출이 끝날 때까지 유지**하므로 작은 응답·짧은 deadline에서는 구현 가능하지만, 네트워크 병목/풀 고갈, multi-instance, 실패 뒤 ACK, 백그라운드 Worker와 History 재공개를 해결한 완성품이 아니다. 실제 배포 승인 전 해당 경계의 부하·취소·송출/철회 선형화 및 Owner 서명이 필요하다.
 - 최소 검증: 별도 실제 Node loopback에서 정상/권한 거부/중단 3건; 이미 R10에 실 DB 두 세션 순서 테스트 2건이 존재하므로 R11에서 DB 시나리오를 중복 증식하지 않는다.
+
+
+## 8. R13 — DB 원본동의 확인과 Node 송출 연결 (배포 미연결)
+
+- **코드:** `apps/api/src/seyeon-original-grant-pg-send-adapter-v1.ts`. 실명 확인을 통과한 Member 인증정보로만 서버 DB 트랜잭션을 시작하고, 그 트랜잭션에서 현재 original Grant/Record/Attempt/Message를 DB 소유 `seyeon_positive_candidate.reveal_http_r5`로 확인한다. 같은 트랜잭션 잠금 아래 `deliver()`가 Node `finish`를 완료한 이후에만 COMMIT. 다른 동의 철회 트랜잭션과의 선후관계를 R10 기존 실 DB 테스트에 재사용하여 연결한다.
+- **오류·철회:** 철회 우선이면 SQL NULL→503, 전송 오류·취소면 ROLLBACK. 잠금 대기는 2초, SQL 실행은 5초로 제한하고 콜백은 요청당 한 번만 사용한다. 단, 네트워크 취소 시 이미 실행 중인 SQL의 중단은 lock/statement timeout에 의존한다.
+- **중요 제한:** 이 G3 SQL 함수는 **격리 테스트 DB에만 존재**한다. 인증된 Production 권한/DB 마이그레이션·Vercel 프록시 송출·철회 ACK는 여전히 미구현/미승인. 실제 운영 positive 공개를 켜지 않는다.
+- **추가 보완:** 기존 `api/me.ts` 외곽 Vercel 응답 방어에서 단순 임의 4xx/no-store가 보호 본문을 통과하는 문제를 막기 위해 **서버가 직접 생성·등록한 오류 객체만 통과**한다. 그 외 4xx 포함 모든 결과는 고정 503/no-store. 외부 입력·임의 응답/본문에서 보안 결정을 하지 않는다.
