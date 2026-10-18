@@ -31,3 +31,10 @@ it('does not schedule Commerce added only to the base while Character work advan
     rmSync(directory, { recursive: true, force: true });
   }
 });
+
+it('routes SeYeon original-Grant revoke-to-socket regressions to actual PostgreSQL, not just unit tests', () => {
+  expect(resolveDbPrRouting(['test/seyeon-r5-current-reveal-disposable.test.ts']).suites)
+    .toEqual(['postgres17']);
+  expect(resolveDbPrRouting(['docs/security/SEYEON_D04_REVOKE_ACK_HTTP_SEND_CONTRACT_CANDIDATE_V1.md']).suites)
+    .toEqual([]);
+});
