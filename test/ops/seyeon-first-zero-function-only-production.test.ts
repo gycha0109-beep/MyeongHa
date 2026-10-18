@@ -68,7 +68,7 @@ describe('Seyeon first zero-source one-shot Production SQL gate', () => {
   });
 
   it('pins the exact reviewed SQL, refuses generic migrations and verifies strict ACL', () => {
-    expect(body).toContain('002da74911ee6c9f2d0d31b56ca69391b0c3d5c6');
+    expect(body).toContain('3fbe7322cb3f11484a3e0a42bdc0598879b3d1d8');
     expect(body).toContain('git hash-object "$migration"');
     expect(body).toContain('INSTALL_SEYEON_FIRST_ZERO_FUNCTION_ONLY');
     expect(body).toContain('refs/heads/main');
