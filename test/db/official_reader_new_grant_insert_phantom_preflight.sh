@@ -3,8 +3,8 @@ set -euo pipefail
 
 # DB-C4: actual NEW verified synthetic receipt -> independent purchase Grant
 # -> immutable Reader access INSERT, while an existing Reader Grant is locked.
-# This is a preflight showing the limitation of ONE ROW's FOR SHARE lock.
-# It is NOT an approved paid-Reader final-reveal or global writer-lock protocol.
+# Demonstrates a single Grant FOR SHARE is insufficient even after all actual
+# NEW purchase/bind writers join S1. No paid reveal or T2 approval.
 p() { command psql -X -v ON_ERROR_STOP=1 -At "$@"; }
 fail() { echo "FAIL $*" >&2; exit 1; }
 pass() { echo "PASS $*"; }
@@ -140,6 +140,12 @@ set statement_timeout='7s';
 begin;
 -- Match the fixture's canonical Subject authority; never infer from a receipt.
 select pg_catalog.set_config('myeongha.subject_id', '$subject', true);
+-- The former row-lock-only demonstration now participates in S1: a NEW B4
+-- Grant can still commit during unrelated B2 row SHARE, but never bypasses
+-- the canonical Reader scope lock shared with direct 1220 and T2.
+select public.internal_acquire_official_reader_scope_lock_v1(
+  '$subject'::uuid,'$reading'::uuid,'$reader'
+);
 select * from public.internal_apply_verified_receipt_capability_effects_v1(
   '$b4_receipt'::uuid,
   array['test-reader-unit'], array[transaction_timestamp()],
