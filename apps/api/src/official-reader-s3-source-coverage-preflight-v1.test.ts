@@ -10,7 +10,7 @@ import {
 const scope = {
   readingId: 'official-reading-A',
   sajuDomain: 'relationship',
-  officialArtifactResponseHash: 'a'.repeat(64),
+  officialArtifactResponseHash: 'sha256:test-official-reading-artifact',
 } as OfficialReadingReaderAdmissionScopeV1;
 const raw = '민감한 유료 사주 해설 원문';
 const another = '반드시 동반해야 하는 근거';
@@ -106,6 +106,20 @@ describe('S3 candidate-only source coverage: never a production Saju issuer', ()
     });
     expect(verdict).toMatchObject({ state: 'blocked', publicDisclosureAuthorized: false });
     expect(JSON.stringify(verdict)).not.toContain(raw);
+  });
+
+  it('rejects mixed source-unit Reading identity even when exact content hashes agree', () => {
+    const s = source();
+    const changed = {
+      ...s,
+      protectedSegments: [
+        { ...s.protectedSegments[0]!, sourceReadingRef: 'another-reading' },
+        s.protectedSegments[1]!,
+      ],
+    };
+    expect(evaluate(proposed(), changed)).toMatchObject({
+      state: 'blocked', publicDisclosureAuthorized: false,
+    });
   });
 
   it('blocks modified official protected content even if supplied manifest uses old hashes', () => {
