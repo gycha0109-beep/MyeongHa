@@ -135,3 +135,11 @@ S1에서 공통 잠금 함수 자체가 성공하더라도 **S2 전체 경로가
 - `test/db/official_reader_s2_atomic_receipt_bind_live_writer_race.sh`는 기존 S2 2세션 경합 fixture를 재사용해 **기존 수동 잠금 테스트 대신 실제 합성 Receipt·Grant·Reader 결속 함수를 호출**한다. T2 먼저→실제 발급 대기/커밋, Reader 묶음 충돌, 회수 먼저→T2 후 현재 권한 재조회가 핵심 인수 조건이다.
 - **여전히 미완료:** 원래 `internal_apply_entitlement_effect_v1`의 독립 공급자 회수·환불 Writer, 기존 1090의 직접 호출 경로, 모든 T2·추가 Reader 구매·기타 Commerce 경로에 공통 잠금을 강제한 상태가 아니다. 해당 우회 경로를 닫기 전에는 §3 **S2 완료**나 유료 해설 T2 정합성을 선언하지 않는다.
 - S2 전체 종료 전에 각 Writer의 기존 Receipt/Grant/Purchase/Birth 행 잠금과 새로운 범위 잠금의 **전역 획득 순서**를 검토하고, 독립 호출이 가능한 소유자 경로를 제한해야 한다. S3~S8은 원래 로드맵 순서와 소유자 승인을 그대로 따른다.
+
+
+### S2 기능 추가: Provider 환불 통보 → 이용권 회수 (2026-10-18)
+
+- `1770_official_reader_scope_provider_effect_revoke_v1.sql`: 별도 확인된 **Provider 환불·취소 이벤트**와 해당 구매 Grant의 영수증 출처를 대조한다. DB가 저장한 공식 Reading×Reader 범위를 전부 찾아 **동일 S1 범위 잠금을 정렬된 순서로 획득**하고, 기존 `internal_apply_entitlement_effect_v1`에서 실제 Grant 상태·Entitlement Event·Projection·Outbox를 **원자적으로 취소 또는 만료**한다. 입력으로 구매자·Reader 범위를 임의 선택하지 않는다.
+- 새 비공개 함수 `internal_apply_official_reader_provider_revoke_under_scope_v1`는 API/익명/일반 인증/Service Role의 호출을 차단하며, 환불 결제사 API를 직접 호출하지 않는다. 기존 Provider 이벤트가 사전에 저장·검증되어 있어야만 작동한다.
+- 기존 `official_reader_provider_effect_revoke_race_preflight.sh`의 **실제 Provider-Event 회수 작업을 새 S2 함수 호출로 교체**해, 회수 선행과 Reader 선행 순서 모두 기존 Grant·Event·Projection 반영이 이루어지는지 확인한다.
+- **S2 아직 미완료:** 운영상의 Provider 이벤트 디스패처가 이 진입점을 호출하도록 연결하고, 기존 직접 `1080/1090` Writer 우회 경로·T2 Chat 확정 경로를 통합해야 한다. 통합 전 유료 Reader 공개는 계속 OFF.
