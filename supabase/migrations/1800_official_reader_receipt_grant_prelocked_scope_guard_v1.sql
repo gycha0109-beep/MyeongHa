@@ -67,7 +67,7 @@ begin
       'myeongha.reader_pending_reading_id',true
     );
     if v_pending is null
-       or v_pending !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' then
+       or v_pending !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' then
       raise exception using errcode='P0001',
         constraint='official_reader_s2_initial_receipt_scope_required',
         message='Initial Reader receipt requires prelocked proposed official Reading';
