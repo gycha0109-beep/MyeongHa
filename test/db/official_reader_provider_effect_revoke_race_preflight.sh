@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# S2 actual private provider_event -> Reader revoke Writer (isolated synthetic PostgreSQL).
-# Tests the new shared-scope entrypoint delegating to the existing 1080
-# Grant/Event/projection/outbox Writer against Reader FOR SHARE. NOT an actual
+# S2 actual verified provider full-cancellation -> all scoped Reader Grants.
+# Tests the private event dispatcher (1770 -> existing 1080) against Reader
+# FOR SHARE and proves a partial cancellation never revokes a full Grant. NOT an actual
 # PortOne refund callback, approved T2 final reveal, or release authorization.
 p() { command psql -X -v ON_ERROR_STOP=1 -At "$@"; }
 fail() { echo "FAIL $*" >&2; exit 1; }
@@ -95,12 +95,10 @@ apply_effect_sql() {
   local event_id="$1"
   cat <<SQL
 select 'S2_PROVIDER_REVOKE=' || (result->>'contractVersion')
+  || ':' || (result->>'grantCount')
 from (
-  select public.internal_apply_official_reader_provider_revoke_under_scope_v1(
-    '$event_id'::uuid,'$b2'::uuid,
-    (select revision from public.entitlement_grants where id='$b2'::uuid),
-    (select last_provider_ordering_key from public.entitlement_grants where id='$b2'::uuid),
-    clock_timestamp(),'revoked','synthetic_reader_race_revoke'
+  select public.internal_dispatch_verified_official_reader_revoke_event_v1(
+    '$event_id'::uuid
   ) as result
 ) s;
 SQL
@@ -140,6 +138,41 @@ assert_committed_revoke() {
     fail "revoked Reader remained visible to production metadata or raw artifact query"
 }
 
+# A signed-looking partial cancellation must never be promoted to a
+# verified full revocation. A separate partial-refund policy is required.
+p >"$tmpdir/partial-seed.out" 2>&1 <<SQL || {
+  cat "$tmpdir/partial-seed.out" >&2; fail "partial cancellation fixture failed";
+}
+insert into public.commerce_provider_events(
+  id,provider,external_event_id,event_type,external_transaction_id,
+  resolved_subject_id,resolution_source_type,resolved_receipt_id,
+  payload_fingerprint,provider_occurred_at,provider_ordering_key,
+  verified_payload_jsonb,status,received_at,environment,verifier_revision
+)
+select '12196000-0000-0000-0000-000000000003'::uuid,
+  cr.provider,'synthetic-reader-partial-cancel','Transaction.PartialCancelled',
+  cr.external_transaction_id,cr.subject_id,'receipt',cr.id,
+  'sha256:v1:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc',
+  clock_timestamp(),'race-order-partial',
+  '{"schemaVersion":"commerce-evidence-v2"}'::jsonb,
+  'verified',clock_timestamp(),'production','synthetic-race-verifier-v1'
+from public.commerce_receipts cr where cr.id='$receipt'::uuid;
+SQL
+activate_b2
+if p -c "begin;
+  select pg_catalog.set_config('myeongha.subject_id', '$subject', true);
+  select public.internal_dispatch_verified_official_reader_revoke_event_v1(
+    '12196000-0000-0000-0000-000000000003'::uuid
+  ); commit;" >"$tmpdir/partial-reject.out" 2>&1; then
+  fail "partial cancellation illegally revoked all Reader rights"
+fi
+[[ "$(p -c "select status from public.entitlement_grants where id='$b2'::uuid;")" == active ]] ||
+  fail "partial cancellation changed the Reader purchase Grant"
+[[ "$(p -c "select count(*) from public.entitlement_events
+  where source_provider_event_id='12196000-0000-0000-0000-000000000003'::uuid;")" == 0 ]] ||
+  fail "partial cancellation produced a full-revoke event"
+pass "verified partial cancellation is rejected without changing Reader rights"
+
 # CASE 1: Commerce effect owns the Grant row before Reader reads.
 # Reader must actually wait on PostgreSQL Lock and subsequently see DENY.
 activate_b2
@@ -168,7 +201,7 @@ SQL
 reader_pid=$!
 wait_backend m3b2b_effect_reader_after Lock
 finish "$writer_pid" "$tmpdir/writer-first.out"; writer_pid=""
-grep -qx 'S2_PROVIDER_REVOKE=official-reader-s2-provider-revoke-v1' "$tmpdir/writer-first.out" ||
+grep -qx 'S2_PROVIDER_REVOKE=official-reader-s2-revoke-dispatch-v1:1' "$tmpdir/writer-first.out" ||
   fail "actual first scoped provider revoke writer did not complete"
 finish "$reader_pid" "$tmpdir/reader-after.out"; reader_pid=""
 grep -qx DENY "$tmpdir/reader-after.out" ||
@@ -203,7 +236,7 @@ writer_pid=$!
 wait_backend m3b2b_effect_writer_after Lock
 finish "$reader_pid" "$tmpdir/reader-first.out"; reader_pid=""
 finish "$writer_pid" "$tmpdir/writer-after.out"; writer_pid=""
-grep -qx 'S2_PROVIDER_REVOKE=official-reader-s2-provider-revoke-v1' "$tmpdir/writer-after.out" ||
+grep -qx 'S2_PROVIDER_REVOKE=official-reader-s2-revoke-dispatch-v1:1' "$tmpdir/writer-after.out" ||
   fail "actual second scoped provider revoke writer did not complete"
 grep -qx ALLOW "$tmpdir/reader-first.out" ||
   { cat "$tmpdir/reader-first.out" >&2; fail "Reader-first synthetic lock read changed"; }
