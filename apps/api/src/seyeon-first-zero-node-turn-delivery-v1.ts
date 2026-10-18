@@ -14,7 +14,9 @@ import type {
 import { createSeyeonLockedFirstZeroNodeRevealV1 } from './seyeon-locked-first-zero-node-reveal-v1.js';
 import {
   sendSeyeonNodeOriginalGrantResponseV1,
+  assertSeyeonNodeChatResponseMetadataV1,
   type SeyeonNodeOriginalGrantSendOutcomeV1,
+  type SeyeonNodeChatResponseMetadataV1,
 } from './seyeon-node-original-grant-send-boundary-v1.js';
 
 export const SEYEON_FIRST_ZERO_NODE_TURN_DELIVERY_V1 = Object.freeze({
@@ -66,6 +68,9 @@ export interface ExecuteAndDeliverSeyeonFirstZeroNodeTurnInputV1 {
   readonly threadId: string;
   readonly clientTurnId: string;
   readonly text: string;
+  /** Only server-generated request metadata, never caller-supplied. */
+  readonly requestId: string;
+  readonly serverTime: string;
   readonly runtime: Pick<ProductionSeyeonChatRuntimeV1, 'run'>;
   readonly deadlineMs?: number;
 }
@@ -107,6 +112,8 @@ export async function deliverSeyeonCommittedFirstZeroNodeTurnV1(input: Readonly<
   verifiedEvidence: VerifiedSubjectIdentityEvidenceV1;
   result: RunProductionSeyeonChatResultV1;
   expectedThreadId: string;
+  requestId: string;
+  serverTime: string;
   deadlineMs?: number;
 }>): Promise<SeyeonNodeOriginalGrantSendOutcomeV1> {
   const { result } = input;
@@ -123,6 +130,22 @@ export async function deliverSeyeonCommittedFirstZeroNodeTurnV1(input: Readonly<
     throw new SeyeonFirstZeroNodeTurnDeliveryErrorV1('INVALID_COMMIT');
   }
 
+  const chatResponseMetadata: SeyeonNodeChatResponseMetadataV1 = {
+    turnId: commit.turnId,
+    assistantMessageId: commit.assistantMessageId,
+    sequenceNo: commit.sequenceNo,
+    replayed:
+      result.execution.disposition === 'committed_replay' || commit.replayed,
+    requestId: input.requestId,
+    serverTime: input.serverTime,
+  };
+  try {
+    assertSeyeonNodeChatResponseMetadataV1(chatResponseMetadata);
+  } catch (error) {
+    input.response.destroy();
+    throw error;
+  }
+
   const withLockedOriginalGrant = createSeyeonLockedFirstZeroNodeRevealV1({
     pool: input.pool,
     verifiedEvidence: input.verifiedEvidence,
@@ -134,6 +157,7 @@ export async function deliverSeyeonCommittedFirstZeroNodeTurnV1(input: Readonly<
     response: input.response,
     requestSignal: input.requestSignal,
     withLockedOriginalGrant,
+    chatResponseMetadata,
     ...(input.deadlineMs === undefined ? {} : { deadlineMs: input.deadlineMs }),
   });
 }
@@ -155,6 +179,20 @@ export async function executeAndDeliverSeyeonFirstZeroNodeTurnV1(
     input.response.destroy();
     throw new SeyeonFirstZeroNodeTurnDeliveryErrorV1('INVALID_SCOPE');
   }
+  // Fail closed on malformed server metadata before DB writes or paid inference.
+  try {
+    assertSeyeonNodeChatResponseMetadataV1({
+      turnId: input.threadId,
+      assistantMessageId: input.clientTurnId,
+      sequenceNo: 0,
+      replayed: false,
+      requestId: input.requestId,
+      serverTime: input.serverTime,
+    });
+  } catch (error) {
+    input.response.destroy();
+    throw error;
+  }
   // This must precede runtime.run because that step may charge the provider.
   await assertSeyeonFirstZeroNodeDbReadyV1(input);
   if (input.requestSignal.aborted) {
@@ -175,6 +213,8 @@ export async function executeAndDeliverSeyeonFirstZeroNodeTurnV1(
     verifiedEvidence: input.verifiedEvidence,
     result,
     expectedThreadId: input.threadId,
+    requestId: input.requestId,
+    serverTime: input.serverTime,
     ...(input.deadlineMs === undefined ? {} : { deadlineMs: input.deadlineMs }),
   });
 }

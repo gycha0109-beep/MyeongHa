@@ -96,6 +96,8 @@ function committedResult(override: Partial<{
         turnId: override.receiptTurnId ?? turnId,
         attemptId: override.commitAttemptId ?? attemptId,
         assistantMessageId: messageId,
+        sequenceNo: 2,
+        replayed: false,
       },
       // Never read the model output: only the locked original SQL can reveal.
       get runtimeResult() { throw new Error('UNTRUSTED_MODEL_RESPONSE_WAS_READ'); },
@@ -116,6 +118,8 @@ function request(input: {
     threadId,
     clientTurnId,
     text: '  안녕 세연  ',
+    requestId: 'request-2312-synthetic',
+    serverTime: '2026-10-18T13:00:00.000Z',
     runtime: { run: input.run },
   } as const;
 }
@@ -142,7 +146,21 @@ describe('first zero-source Node turn execution-to-DB-to-socket bridge', () => {
     expect(events[events.length - 2]).toBe('COMMIT');
     expect(events[events.length - 1]).toBe('release');
     expect(response.statusCode).toBe(200);
-    expect(JSON.parse(response.body)).toEqual({ok:true,assistantText:'DB에서만 나온 세연 응답'});
+    expect(JSON.parse(response.body)).toEqual({
+      ok: true,
+      data: {
+        turnId,
+        assistantMessageId: messageId,
+        assistantText: 'DB에서만 나온 세연 응답',
+        sequenceNo: 2,
+        replayed: false,
+      },
+      meta: {
+        apiContractVersion: 'v0.9',
+        requestId: 'request-2312-synthetic',
+        serverTime: '2026-10-18T13:00:00.000Z',
+      },
+    });
     expect(response.headers.get('cache-control')).toBe('no-store');
   });
 
@@ -167,6 +185,14 @@ describe('first zero-source Node turn execution-to-DB-to-socket bridge', () => {
     expect(outcome).toBe('reveal_held');
     expect(response.statusCode).toBe(503);
     expect(response.body).not.toContain('assistantText');
+    expect(JSON.parse(response.body)).toMatchObject({
+      ok: false,
+      error: {
+        code: 'SEYEON_FIRST_REVEAL_AUTHORITY_UNAVAILABLE',
+        messageKey: 'chat.secure_reveal_unavailable',
+      },
+      meta: {apiContractVersion: 'v0.9',requestId: 'request-2312-synthetic'},
+    });
   });
 
   it('rejects inconsistent committed receipt without an original DB read', async () => {
@@ -179,6 +205,22 @@ describe('first zero-source Node turn execution-to-DB-to-socket bridge', () => {
     expect(db.events).not.toContain('locked-original-read');
     expect(response.destroyed).toBe(true);
     expect(response.body).toBe('');
+  });
+
+  it('rejects malformed response metadata before model execution or database access', async () => {
+    const db = testDb();
+    const response = new ResponseDouble();
+    let called = false;
+    const req = request({
+      db, response,
+      run: async () => { called = true; return committedResult(); },
+    });
+    await expect(executeAndDeliverSeyeonFirstZeroNodeTurnV1({
+      ...req, requestId: '<unsafe>',
+    })).rejects.toThrow();
+    expect(called).toBe(false);
+    expect(db.connects).toBe(0);
+    expect(response.destroyed).toBe(true);
   });
 
   it('rejects guest or aborted request before any DB connection or paid runtime', async () => {
