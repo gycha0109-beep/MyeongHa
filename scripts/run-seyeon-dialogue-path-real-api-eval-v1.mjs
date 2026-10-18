@@ -29,9 +29,12 @@ import {
 } from './seyeon-c08s-blinded-first-turn-evaluation-v1.mjs';
 
 const cases = selectSeyeonDialoguePathCasesV1(SEYEON_MODEL_EVAL_CASES_V1);
-// Manual benchmark only. Unreviewed usage must not start just because a
-// credential is present. Paid enabling needs a separate reviewed release.
-if (process.env.SEYEON_DIALOGUE_PATH_PAID_ADMISSION !== 'REVIEWED_AND_VERIFIED') {
+// This source is the prospective benchmark, NOT a paid dispatch authority.
+// A self-attested environment flag cannot verify invoices, project limits,
+// the global reservation ledger or monthly spend. A separate reviewed
+// execution workflow must own actual provider dispatch; never run here.
+const PAID_EXECUTION_ADMITTED = false;
+if (!PAID_EXECUTION_ADMITTED) {
   throw new Error('SEYEON_DIALOGUE_PATH_PAID_EXECUTION_HOLD');
 }
 const key = process.env.OPENAI_EVAL_API_KEY?.trim();
