@@ -81,12 +81,12 @@ describe('G3 scoped first zero-source DB Owner → Node original send bridge', (
   });
 
   it.each([
-    [] as readonly { assistantText: unknown }[],
-    [{ assistantText: 'x' }, { assistantText: 'x' }],
-    [{ assistantText: '' }],
-    [{ assistantText: null }],
-    [{ assistantText: 42 }],
-  ])('denies missing, ambiguous, empty, or untrusted DB authority without sending text: %j', async rows => {
+    { rows: [] as readonly { assistantText: unknown }[] },
+    { rows: [{ assistantText: 'x' }, { assistantText: 'x' }] },
+    { rows: [{ assistantText: '' }] },
+    { rows: [{ assistantText: null }] },
+    { rows: [{ assistantText: 42 }] },
+  ])('denies missing, ambiguous, empty, or untrusted DB authority without sending text: %j', async ({ rows }) => {
     const context = fakePool(rows);
     const reader = createSeyeonLockedFirstZeroNodeRevealV1(subjectInput(context.pool));
     let received: string | null | undefined;
