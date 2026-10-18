@@ -126,7 +126,6 @@ export async function sendSeyeonNodeOriginalGrantResponseV1(
   input.response.on('close', onEarlyClose);
   input.requestSignal.addEventListener('abort', onRequestAbort, { once: true });
   const deadline = setTimeout(abort, deadlineMs);
-  deadline.unref();
 
   const deliver = async (value: string | null): Promise<void> => {
     // DB authority may invoke deliver only while the exact original Grant and
