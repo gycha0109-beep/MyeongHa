@@ -65,7 +65,7 @@ end;
 $fn$;
 
 create function c08y_offline.reserve_slot_v1(
-  p_run bigint,p_ordinal smallint) returns boolean
+  p_run bigint,p_ordinal integer) returns boolean
 language plpgsql security definer
 set search_path = pg_catalog, c08y_offline
 as $fn$
@@ -108,7 +108,7 @@ end;
 $fn$;
 
 create function c08y_offline.observe_slot_v1(
-  p_run bigint,p_ordinal smallint,
+  p_run bigint,p_ordinal integer,
   p_outcome text,p_estimate bigint) returns boolean
 language plpgsql security definer
 set search_path = pg_catalog, c08y_offline
@@ -144,9 +144,9 @@ $fn$;
 revoke all on all functions in schema c08y_offline from public;
 grant execute on function c08y_offline.claim_batch_v1(bigint,text)
   to c08y_synthetic_reserver;
-grant execute on function c08y_offline.reserve_slot_v1(bigint,smallint)
+grant execute on function c08y_offline.reserve_slot_v1(bigint,integer)
   to c08y_synthetic_reserver;
-grant execute on function c08y_offline.observe_slot_v1(bigint,smallint,text,bigint)
+grant execute on function c08y_offline.observe_slot_v1(bigint,integer,text,bigint)
   to c08y_synthetic_reserver;
 -- Grant only EXECUTE. Tables and schema remain inaccessible to the browser
 -- and direct update, delete, insert, truncate are denied to the runner role.
