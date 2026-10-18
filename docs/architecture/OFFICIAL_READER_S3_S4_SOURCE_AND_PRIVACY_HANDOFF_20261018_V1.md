@@ -92,3 +92,10 @@ S3 비공개 구조 검사는 위조·다른 Reading·고지/동반 근거 누�
 [Saju/main `src/reading/source-reading-transport-proof.ts`](https://github.com/gycha0109-beep/Saju/blob/main/src/reading/source-reading-transport-proof.ts)의 서명 객체는 `lifecycle: 'preview'`, `sourceAuthority: NOT_EVALUATED`, `canPublish: false`, `canSell: false`다. 따라서 기존 Source Reading HMAC 서명과 S3 합성 Owner 인계 시험이 모두 통과해도 **공식 의미 증명·원본 발행자 확정·유료 해설 공개 허가의 증거는 아직 없다.**
 
 Saju Owner가 제공할 정식 보완물은 **Preview와 별도**인 운영 원본 발급/검증 계약, 공식 Source material의 식별·해시/서명·nonce/기한/키 교체/발급 주체, 의미/Output 검증 trace의 원본 결속, 정상/불완전/위조/상실 부정 시험, Product/Reader/Release/정책 변경 시 사용금지 규칙이다. MyeongHa는 해당 계약을 제공받기 전까지 `sourceAuthority: NOT_EVALUATED`에서 긍정으로 전환하지 않는다.
+
+
+## Owner 인계 추적 (2026-10-19)
+
+- **S3 공식 출처 발행:** Saju [#2410](https://github.com/gycha0109-beep/Saju/issues/2410)에 현행 MyeongHa S3 후보·합성 서명 코드의 한계와 Owner source-attested execution/Production 발행/검증/Anti-replay 계약을 인계했다. 열린 이슈의 A/B/C를 충족하기 전까지 Preview proof·합성 rehearsal을 공식 승인으로 승격하지 않는다.
+- **S4 보호 원문 개인정보:** MyeongHa [#2318](https://github.com/gycha0109-beep/MyeongHa/issues/2318)에 유료 원문·임시 결과·증명·로그·Memory/검색/알림 파생 자료별 처리 목적, 보존·삭제/복원 및 PostgreSQL 15/17·환불 후 미노출 승인 조건을 분리해 등록했다. P0-PR-01 및 RR-03 Draft의 기존 승인 범위를 넓히지 않는다.
+- **S5/T2:** 위 두 Owner 계약과 DB/Commerce S2 공통 잠금 인수를 모두 통과하기 전까지 유료 답변 최종 저장·일반 메시지 본문·공개·결제 활성화 금지. 이 기록은 승인이나 운영 적용이 아니다.
