@@ -667,19 +667,19 @@ describe.skipIf(!enabled)('R5 disposable actual-v2 current-rights first/replay/h
           await revoker.query('BEGIN');
           try {
             await revoker.query("set local application_name='seyeon-r10-revoke-after-sender'");
-            const pendingLock = revoker.query(
-              'select id from public.subjects where id=$1::uuid for update', [subject],
+            // Exercise the ACTUAL Memory Grant revoke RPC. It must acquire
+            // Subject FOR UPDATE itself, not a test-only manual lock.
+            const pendingRevoke = revoker.query<{
+              revoked_grant_count: number;
+            }>(
+              'select revoked_grant_count from public.cmd_revoke_memory_character_grant_v1($1::uuid,$2::uuid,$3::text)',
+              [subject, id.memory, 'seyeon'],
             );
-            // A real second PostgreSQL connection cannot obtain its revoke
-            // serialization lock until the sender has actually written.
             await waitForLock('seyeon-r10-revoke-after-sender');
             expect(events).toEqual([]);
             permitSocket();
-            await pendingLock;
-            await revoker.query(
-              'update public.record_access_grants set revoked_at=clock_timestamp() where id=$1::uuid',
-              [id.grant],
-            );
+            const revoked = await pendingRevoke;
+            expect(revoked.rows[0]?.revoked_grant_count).toBe(1);
             await revoker.query('COMMIT'); // R; ACK would follow this.
             events.push('R:committed');
           } finally {
@@ -715,13 +715,15 @@ describe.skipIf(!enabled)('R5 disposable actual-v2 current-rights first/replay/h
     await clientAction(async revoker => {
       await revoker.query('BEGIN');
       try {
-        await revoker.query(
-          'select id from public.subjects where id=$1::uuid for update', [subject],
+        // Same production-source SECURITY INVOKER revoke RPC; it obtains the
+        // Subject update lock and changes ONLY the original Se-yeon Grant.
+        const revoked = await revoker.query<{
+          revoked_grant_count: number;
+        }>(
+          'select revoked_grant_count from public.cmd_revoke_memory_character_grant_v1($1::uuid,$2::uuid,$3::text)',
+          [subject, id.memory, 'seyeon'],
         );
-        await revoker.query(
-          'update public.record_access_grants set revoked_at=clock_timestamp() where id=$1::uuid',
-          [id.grant],
-        );
+        expect(revoked.rows[0]?.revoked_grant_count).toBe(1);
         await withR9Loopback(async (request, response) => {
           await r9ReadBody(request);
           const outcome = await sendSeyeonNodeOriginalGrantResponseV1({

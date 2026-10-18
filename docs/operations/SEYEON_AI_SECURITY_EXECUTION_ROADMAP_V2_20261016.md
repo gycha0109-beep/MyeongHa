@@ -246,3 +246,10 @@ S8의 **비파괴/격리 검토는 S2~S7과 병렬 진행 가능**하며, S8 Pro
 - 보안 수정: 기존 Vercel 외곽 응답 가드의 4xx 무조건 통과를 폐지. `chat-turn-send-http.ts`가 직접 만든 고정 4xx 오류만 허용, 위조 401/403+보호 본문은 503으로 교체.
 - 운영은 불변: candidate G3 SQL은 named disposable PG만, Production G0 기술 Owner OPEN/G1+G2+G3+G5+G6 HOLD, Projectors=[], 첫 공개/Provider/public/paid OFF, Production DDL/DML/migration/ACL 0. Vercel/Proxy 마지막 홉의 안전한 양수 공개는 아직 기술 승인 전 미연결.
 - 검사: 신규 최소 모듈 테스트 3개, 기존 R10 실 DB 테스트 재사용, 저장소 필수 CI·통합 검사만 수행. 추가 불필요한 회귀 확장은 하지 않는다.
+
+
+## 28. 2026-10-18 R15 — 사용자 기억동의 철회 ACK와 원본 Grant 전송 잠금 연결
+
+- **코드:** `apps/api/src/seyeon-original-grant-revoke-ack-v1.ts`: 검증된 Member만 canonical Subject DB 트랜잭션에서 `cmd_revoke_memory_character_grant_v1`으로 세연의 정확한 Memory Grant 철회 가능. 성공 ACK는 DB COMMIT 이후만 가능; 손실/모호성 시 성공 주장 금지, 재시도는 DB 원장 기반 replay 사용.
+- **검증 변경 최소화:** 기존 R10 실제 PG 두 세션 전송/철회 경합에서 테스트용 직접 `UPDATE` 대신 **이미 존재하는 진짜 권한 철회 RPC** 사용. 새로운 DB fixture/시나리오 증식 없이 신규 모듈 테스트 3건만 추가.
+- **운영 HOLD:** Production Executor의 기존 SECURITY INVOKER 철회 명령 ACL 및 실제 사용자 HTTP Route는 별도 검증·승인 전 미연결. 현재 Vercel/Proxy 개인기억 최초 공개 불허, Projectors=[], Provider/public/paid OFF, 새 Production migration/DDL/DML 0.
