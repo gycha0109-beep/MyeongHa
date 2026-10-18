@@ -6,6 +6,8 @@ Watchtower-Track: security
 > 본 문서는 S2 개발/검증에 적용할 **거부 우선 기본 계약**을 명시한다. Security, DB Authority, Character의 공동 승인 및 운영 서비스의 동시 트랜잭션/HTTP 연결 증거가 없으므로 **G0 APPROVED, G2/G3 PASS, public/paid ON으로 표시하지 않는다**.
 > 기준: [AI 보안 로드맵 v2](../operations/SEYEON_AI_SECURITY_EXECUTION_ROADMAP_V2_20261016.md), [G0~G6 원장](SEYEON_AI_SECURITY_COMPLETION_GATES_V1.md), [#1843](https://github.com/gycha0109-beep/MyeongHa/issues/1843), [#1866](https://github.com/gycha0109-beep/MyeongHa/issues/1866).
 
+> **2026-10-18 Product Owner 선택 승인:** 기억 저장/캐릭터별 공유는 사용자 선택권 유지, 철회 후 새로운 사용·미송출 공개 차단, 이미 실제 송출된 바이트 회수 불가, 과거 대화 보존과 개인기억 재사용·재공개/삭제를 분리하는 제품 방향은 [결정문](SEYEON_PRODUCT_OWNER_MEMORY_REVOKE_HISTORY_DECISION_20261018.md)으로 승인되었습니다. **이 문서의 G0-D1~D5 기술 계약 및 Security/DB/Character/API Owner 서명은 여전히 미완료**이며 G0 상태는 PROPOSED, 양수 개인기록 Reveal은 HOLD입니다.
+
 ## 1. 누가 무엇을 사용할 수 있는가
 
 | 범위 | 권한의 근거 | 취소/변경 시 개발 기본값 | 승인되지 않은 우회 |
