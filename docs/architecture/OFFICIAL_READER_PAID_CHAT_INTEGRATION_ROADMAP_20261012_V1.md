@@ -143,3 +143,12 @@ S1에서 공통 잠금 함수 자체가 성공하더라도 **S2 전체 경로가
 - 새 비공개 함수 `internal_apply_official_reader_provider_revoke_under_scope_v1`는 API/익명/일반 인증/Service Role의 호출을 차단하며, 환불 결제사 API를 직접 호출하지 않는다. 기존 Provider 이벤트가 사전에 저장·검증되어 있어야만 작동한다.
 - 기존 `official_reader_provider_effect_revoke_race_preflight.sh`의 **실제 Provider-Event 회수 작업을 새 S2 함수 호출로 교체**해, 회수 선행과 Reader 선행 순서 모두 기존 Grant·Event·Projection 반영이 이루어지는지 확인한다.
 - **S2 아직 미완료:** 운영상의 Provider 이벤트 디스패처가 이 진입점을 호출하도록 연결하고, 기존 직접 `1080/1090` Writer 우회 경로·T2 Chat 확정 경로를 통합해야 한다. 통합 전 유료 Reader 공개는 계속 OFF.
+
+
+### S2 기능 추가: 기존 1080/1090 직접 발급·회수 우회 제한 (2026-10-18 후속)
+
+- **기존 §3 S2 납품 계약에 속하는 실제 코드 변경**이며 새 마일스톤이 아니다. 1790_official_reader_legacy_provider_effect_scope_guard_v1.sql은 기존 1080 Provider Event 회수 함수에 **실제 보유 중인 S1 advisory lock 확인**을 추가한다. Reader 구매 Grant와 결속된 모든 기존 공식 Reading 범위가 잠겨 있지 않으면 Provider/Grant 행을 잠그기 전에 거부한다. 원래 SQL 파일 1080은 직접 수정하지 않는다.
+- 1800_official_reader_receipt_grant_prelocked_scope_guard_v1.sql은 기존 1090 검증 Receipt 배치 발급 및 그보다 저수준인 1080 Receipt granted 직접 호출 **양쪽**에 동일 잠금 보유 전제조건을 넣는다. 적용 대상은 현재 공식 Reader Delivery Policy 및 해당 Product/Reader 구매 선택이 있는 Receipt이며, 일반 Commerce 및 과거 별개 Reader 구매 모델을 확장·재해석하지 않는다.
+- 기존 공식 Reading이 하나이면 DB에 저장된 Product×Subject의 Reading×Reader를 잠금 키로 확인한다. 새로운 공식 Reading이 아직 없을 때는 S2 1760이 동일 거래에서 선점한 예정 Reading을 거래 로컬 문맥으로 전달한다. 1090/1080은 **그 문맥만 믿지 않고** PostgreSQL pg_locks에 실제 advisory lock이 잡혀 있는지 확인한다. 1760은 발급과 결속 후 Reading/Reader 일치까지 확인하고 불일치 시 원자 롤백한다. 여러 공식 Reading이 발견되면 단일 Reading을 임의로 선택하지 않고 거절한다.
+- 합성 DB 시험은 기존 1090 Reader 구매 fixture를 **명시적 같은 거래의 실제 S1 잠금** 아래 실행하며, 1080 최초 Grant·1090 직접 호출·1080 Provider Effect 무잠금 우회를 각각 부정한다. 1790/1800에 의해 기존 Outbox 생산자 함수의 정의가 재배포되는 것은 탈퇴·삭제 preflight의 실제 Outbox 생산자 파일 목록에도 포함했다.
+- **S2 종료 전 미해결:** 독립적인 cmd_bind_standard_reading_access_v2 (1220) Reader 결속 명령은 아직 새 잠금의 강제 경계가 아니고, 미결의 최초 Reading 생성/다중 Reading 전역 잠금 순서 문제도 소유자 검토 대상이다. S3 공식 Saju 출처 발행과 S4 Privacy 승인된 보호 본문/메모리 격리 저장이 없으므로 **S5 실제 유료 본문 최종 저장 T2는 구현/활성화하지 않는다**. 기존 일반 Chat cmd_commit_chat_turn_v1에 유료 원문을 저장하지 않는다. Draft, PUBLIC OFF, 운영 DB 변경·실결제/환불 금지를 유지한다.
