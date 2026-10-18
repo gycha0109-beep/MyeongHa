@@ -10,6 +10,14 @@ describe('C08-Z: restricted PG17 fake-ledger requires external administrator pre
   expect(table).toContain("head_sha text not null check (head_sha ~ '^[0-9a-f]{40}$')");
   expect(table).toContain("scope text not null check (scope='OFFLINE_ONLY')");
   expect(table).toContain('paid_dispatch_enabled=false');
+  for(const decl of [
+   'create table c08y_offline.trusted_admissions',
+   'create table c08y_offline.reservations',
+   'create table c08y_offline.observations',
+  ])expect(sql.split(decl)).toHaveLength(2);
+  expect(sql.trimEnd().endsWith(
+   '-- and direct update, delete, insert, truncate are denied to the runner role.'
+  )).toBe(true);
   const claim=sql.slice(sql.indexOf('create function c08y_offline.claim_batch_v1'),sql.indexOf('create function c08y_offline.reserve_slot_v1'));
   expect(claim).toContain('from c08y_offline.trusted_admissions a');
   expect(claim).toContain('a.owner_run=p_run and a.head_sha=p_sha');
