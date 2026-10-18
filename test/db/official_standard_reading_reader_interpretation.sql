@@ -228,6 +228,21 @@ insert into public.commerce_receipts(
   clock_timestamp(), clock_timestamp(), 'production', 'test-verifier-v1', 1, 'KRW'
 );
 
+-- At initial issuance no official Reading exists. This synthetic fixture
+-- supplies the proposed Reading, taking the actual shared S1 lock first.
+begin;
+select pg_catalog.set_config(
+  'myeongha.subject_id','11390000-0000-0000-0000-000000000001',true);
+select pg_catalog.set_config(
+  'myeongha.reader_pending_reading_id',
+  '12103100-0000-0000-0000-000000000001',true);
+select public.internal_acquire_official_reader_scope_lock_v1(
+  '11390000-0000-0000-0000-000000000001',
+  '12103100-0000-0000-0000-000000000001','test-standard-reader');
+select public.internal_acquire_official_reader_scope_lock_v1(
+  '11390000-0000-0000-0000-000000000001',
+  '12103100-0000-0000-0000-000000000001','test-unlockable-reader');
+
 select * from public.internal_apply_verified_receipt_capability_effects_v1(
   '12102000-0000-0000-0000-000000000001',
   array['test-reader-unit'],
@@ -245,6 +260,7 @@ select * from public.internal_apply_verified_receipt_capability_effects_v1(
   array[null]::timestamptz[],
   array[null]::text[]
 );
+commit;
 
 select pg_catalog.set_config(
   'myeongha.subject_id',
@@ -910,12 +926,19 @@ cross join (values
 ) as x(receipt_id, intent_id, transaction_id, fingerprint)
 where cr.id = '12102000-0000-0000-0000-000000000002';
 
+begin;
+select pg_catalog.set_config('myeongha.subject_id',
+  '11390000-0000-0000-0000-000000000001',true);
+select public.internal_acquire_official_reader_scope_lock_v1(
+  '11390000-0000-0000-0000-000000000001',
+  '12103100-0000-0000-0000-000000000001','test-unlockable-reader');
 select * from public.internal_apply_verified_receipt_capability_effects_v1(
   '12192000-0000-0000-0000-000000000002',
   array['test-reader-unit'], array[transaction_timestamp()],
   array[transaction_timestamp()], array[null]::timestamptz[],
   array[null]::text[]
 );
+commit;
 
 select pg_temp.assert_v2_true(
   'DB-C1 B2 has a distinct verified receipt-backed active purchase Grant',
@@ -992,12 +1015,19 @@ select pg_temp.assert_v2_true(
 -- DB-C2 creates another independently verified purchase of the same Reader
 -- against a DIFFERENT published content bundle. The exact-one A2 chooser must
 -- reject the two distinct metadata candidates rather than select one.
+begin;
+select pg_catalog.set_config('myeongha.subject_id',
+  '11390000-0000-0000-0000-000000000001',true);
+select public.internal_acquire_official_reader_scope_lock_v1(
+  '11390000-0000-0000-0000-000000000001',
+  '12103100-0000-0000-0000-000000000001','test-unlockable-reader');
 select * from public.internal_apply_verified_receipt_capability_effects_v1(
   '12192000-0000-0000-0000-000000000003',
   array['test-reader-unit'], array[transaction_timestamp()],
   array[transaction_timestamp()], array[null]::timestamptz[],
   array[null]::text[]
 );
+commit;
 
 select pg_temp.assert_v2_true(
   'DB-C2 other-bundle B3 binds same official Reading but distinct bundle provenance',
