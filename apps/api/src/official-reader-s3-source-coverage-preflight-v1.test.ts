@@ -21,6 +21,7 @@ function source() {
   return {
     readingRef: scope.readingId,
     domain: scope.sajuDomain,
+    coverageState: 'complete',
     protectedSegments: [
       { sourceRef: 'sections.0.0', text: raw, contentHash: hashProtectedSajuTextV1(raw) },
       { sourceRef: 'sections.0.1', text: another, contentHash: hashProtectedSajuTextV1(another) },
