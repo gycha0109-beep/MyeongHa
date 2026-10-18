@@ -74,6 +74,7 @@ describe('S3 candidate-only source coverage: never a production Saju issuer', ()
     ['different official response hash', () => ({ ...proposed(), officialArtifactResponseHash: 'f'.repeat(64) })],
     ['omitted companion unit', () => ({ ...proposed(), coPresentUnits: [] })],
     ['tampered selected unit hash', () => ({ ...proposed(), selectedUnits: [{ sourceRef: 'sections.0.0', contentHash: 'f'.repeat(64) }] })],
+    ['tampered but format-valid selected unit hash', () => ({ ...proposed(), selectedUnits: [{ sourceRef: 'sections.0.0', contentHash: 'sha256:v1:' + 'f'.repeat(64) }] })],
     ['duplicate selection across categories', () => ({
       ...proposed(), coPresentUnits: [
         { sourceRef: 'sections.0.0', contentHash: hashProtectedSajuTextV1(raw) },
