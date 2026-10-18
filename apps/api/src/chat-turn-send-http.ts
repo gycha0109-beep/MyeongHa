@@ -19,6 +19,7 @@ import {
   SeyeonProductionChatExecutionErrorV1,
 } from './seyeon-production-chat-execution-v1.js';
 import { SeyeonProductionPinMigrationRequiredV1 } from './production-seyeon-chat-runtime-v1.js';
+import { registerSeyeonStaticPreflightDenialV1 } from './seyeon-vercel-fetch-reveal-fence-v1.js';
 import {
   assertSeyeonFirstHttpRevealAuthorizedV1,
   SeyeonFirstHttpRevealHoldV1,
@@ -90,7 +91,7 @@ function jsonError(input: {
   retryable: boolean;
   requestId: string;
 }): Response {
-  return Response.json({
+  const response = Response.json({
     ok: false,
     error: {
       code: input.code,
@@ -99,6 +100,9 @@ function jsonError(input: {
     },
     meta: { apiContractVersion: API_CONTRACT_VERSION, requestId: input.requestId },
   }, { status: input.status, headers: { 'Cache-Control': NO_STORE } });
+  return input.status >= 400 && input.status <= 499
+    ? registerSeyeonStaticPreflightDenialV1(response)
+    : response;
 }
 
 function success(
@@ -114,10 +118,10 @@ function success(
 }
 
 function methodNotAllowed(): Response {
-  return new Response(null, {
+  return registerSeyeonStaticPreflightDenialV1(new Response(null, {
     status: 405,
     headers: { Allow: POST_METHOD, 'Cache-Control': NO_STORE },
-  });
+  }));
 }
 
 function projectResult(result: RunProductionSeyeonChatResultV1) {
@@ -283,7 +287,9 @@ export async function handleSeyeonChatTurnSendRequestV1(
   input: HandleSeyeonChatTurnSendRequestInputV1,
 ): Promise<Response> {
   const parsedRoute = parseRoute(input.request);
-  if (parsedRoute === null) return new Response(null, { status: 404, headers: { 'Cache-Control': NO_STORE } });
+  if (parsedRoute === null) return registerSeyeonStaticPreflightDenialV1(
+    new Response(null, { status: 404, headers: { 'Cache-Control': NO_STORE } }),
+  );
   if (input.request.method !== POST_METHOD) return methodNotAllowed();
 
   const verifiedEvidence = await input.identityEvidenceVerifier.verifyRequestIdentity(input.request);
