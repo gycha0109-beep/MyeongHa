@@ -84,7 +84,7 @@ function assertAdmission(admission){
 export function createSeyeonC08XOfflineRefGateV1({backend,admission}={}){
  if(!pinnedPolicy()||!FAKE_STORES.has(backend))throw hold();
  assertAdmission(admission);
- let phase='UNCLAIMED',index=0;
+ let phase='UNCLAIMED',index=0,reserved=0;
  const checkRef=async ref=>{
   const read=await backend.readReference({repository:REPO,ref});
   assertResponse(read,200,ref,admission.exactMainSha);
@@ -123,6 +123,7 @@ export function createSeyeonC08XOfflineRefGateV1({backend,admission}={}){
     phase='HALTED';
     await verifyPrior();
     await createAndReadOnce(refs.slots[index]);
+    reserved++;
     phase='OBSERVING';
     return;
    }
@@ -150,8 +151,7 @@ export function createSeyeonC08XOfflineRefGateV1({backend,admission}={}){
     status:'PAID_DISPATCH_HOLD',
     scope:'C08X_FAKE_SHARED_REF_ONLY',
     claimed:phase!=='UNCLAIMED',
-    simulatedSlotsReserved:phase==='UNCLAIMED'?0:
-      (phase==='OBSERVING'?index+1:index),
+    simulatedSlotsReserved:reserved,
     simulatedSlotsObserved:index,
     mockComplete:phase==='FINISHED',
     providerHardLimitVerified:false,
