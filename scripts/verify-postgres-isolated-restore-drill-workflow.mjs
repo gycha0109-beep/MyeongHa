@@ -143,8 +143,15 @@ if (onSection.includes('push:')) {
   const seyeonIncident = onSection.includes(
     "'.github/ops/postgres-restore-seyeon-20261008090417.once'",
   );
-  if (legacy1310 === seyeonIncident) {
-    throw new Error('Restore one-shot push must have exactly one governed source marker.');
+  const latestOwnerApproved = onSection.includes(
+    "'.github/ops/postgres-restore-backup-39067271230-20261018.once'",
+  );
+  if (legacy1310 || !seyeonIncident || !latestOwnerApproved) {
+    throw new Error('Restore one-shot push must have only the two reviewed historical/current source markers.');
+  }
+  const triggerMarkers = [...onSection.matchAll(/'\\.github\\/ops\\/[^']+\\.once'/g)];
+  if (triggerMarkers.length !== 2) {
+    throw new Error('Restore one-shot push allows exactly two pinned marker paths.');
   }
   for (const fragment of ['branches:', '- main']) {
     requireFragment(onSection, fragment, workflowPath);
@@ -157,6 +164,10 @@ if (onSection.includes('push:')) {
     'Gate one-shot Se-yeon current-frontier restore marker',
     'POSTGRES-RESTORE-SEYEON-20261008090417-V1',
     "ops(dr): one-shot restore backup 38088591661 (#1947)",
+    "ops(dr): one-shot restore backup 39067271230",
+    'POSTGRES-RESTORE-BACKUP-39067271230-20261018-V1',
+    'backup_run_id=39067271230',
+    'incident_reference_utc=2026-10-18T08:00:00Z',
     'now - point <= 14400',
     'backup_run_id=38088591661',
     'incident_reference_utc=2026-10-10T21:44:36Z',
