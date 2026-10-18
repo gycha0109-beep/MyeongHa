@@ -60,6 +60,10 @@ function syntheticDb(ready = true) {
             events.push(sql);
             return { rows: [] };
           }
+          if (sql === 'SET LOCAL ROLE myeongha_api_executor' ||
+              sql.includes('public.assert_myeongha_subject_context_v1')) {
+            return { rows: [] };
+          }
           if (sql.includes('begin_member_subject_context_v1')) {
             expect(args).toEqual([authId]);
             return { rows: [{ subjectId, subjectKind: 'member' }] };
