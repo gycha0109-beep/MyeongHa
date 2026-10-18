@@ -8,6 +8,7 @@ import { join, resolve } from 'node:path';
 const script = resolve('scripts/operations/install-seyeon-first-zero-sql-one-shot.sh');
 const workflow = readFileSync('.github/workflows/seyeon-first-zero-locked-function-one-shot.yml', 'utf8');
 const body = readFileSync(script, 'utf8');
+const lockedSql = readFileSync('supabase/migrations/20261018190000_seyeon_locked_first_zero_source_reveal_v1.sql', 'utf8');
 
 function syntheticRun(confirmation: string, admission: string) {
   const temp = mkdtempSync(join(tmpdir(), 'myeongha-first-zero-sql-only-'));
@@ -82,6 +83,24 @@ describe('Seyeon first zero-source one-shot Production SQL gate', () => {
     expect(body).toContain('supabase migration repair "$version" --status applied');
     expect(body).not.toMatch(/^\s*supabase db push/m);
     expect(body).not.toMatch(/^\s*supabase migration repair .*--status reverted/m);
+  });
+
+  it('blocks concurrent child inserts through FK-parent UPDATE locks before first-zero absence checks', () => {
+    const subject = lockedSql.indexOf('from public.subjects locked_subject');
+    const thread = lockedSql.indexOf('from public.conversation_threads locked_thread');
+    const state = lockedSql.indexOf('from public.user_character_states locked_state');
+    const sourceCensus = lockedSql.indexOf('and not exists (\\n      select 1 from public.relationship_events');
+    const messageCensus = lockedSql.indexOf('select count(*) from public.conversation_messages previous');
+    const lockSql = lockedSql.slice(subject, messageCensus);
+    expect(subject).toBeGreaterThan(0);
+    expect(thread).toBeGreaterThan(subject);
+    expect(state).toBeGreaterThan(thread);
+    expect(messageCensus).toBeGreaterThan(state);
+    expect(sourceCensus).toBeGreaterThan(state);
+    expect((lockSql.match(/for update;/g) ?? [])).toHaveLength(3);
+    expect(lockedSql).toContain('if not found then return; end if;');
+    expect(lockedSql).toContain("and locked_thread.subject_id=p_subject_id");
+    expect(lockedSql).toContain("and locked_state.character_id='seyeon'");
   });
 
   it('rejects absent explicit confirmation before invoking any DB or CLI command', () => {
