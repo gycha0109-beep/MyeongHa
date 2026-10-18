@@ -338,6 +338,12 @@
       "mainMode": "one-shot-trigger",
       "workTrackAttribution": "commit-metadata"
     },
+    "seyeon-c08v-offline-once-pilot-v1.yml": {
+      "responsibility": "character-memory-offline-first-batch-mock-rehearsal",
+      "prMode": "none",
+      "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "commit-metadata"
+    },
     "seyeon-c08u-eval-project-key-readiness-v1.yml": {
       "responsibility": "character-memory-eval-key-read-only-preflight",
       "prMode": "none",
