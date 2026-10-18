@@ -80,7 +80,7 @@ describe('C08-U isolated evaluation key credential GET only, NO paid call',()=>{
    import.meta.url),'utf8');
   expect(workflow).toContain('secrets.OPENAI_EVAL_API_KEY');
   expect(workflow).not.toContain('secrets.OPENAI_API_KEY');
-  expect(workflow).not.toContain('environment: production');
+  expect(workflow).toContain('environment: production');
   expect(workflow).toContain("github.ref == 'refs/heads/main'");
   expect(workflow).toContain('node scripts/seyeon-cost-c08u-eval-project-key-readiness-v1.mjs');
   expect(workflow).not.toContain('run-seyeon-cost-c07-six-call-v1.mjs');
