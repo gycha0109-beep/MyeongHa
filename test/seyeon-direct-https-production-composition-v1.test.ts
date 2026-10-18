@@ -244,7 +244,7 @@ describe('Production dependency composition - direct Node HTTPS zero only',()=>{
     ['missing direct AI secret',(e:Record<string,string>)=>{delete e.OPENAI_API_KEY;}],
     ['missing model role',(e:Record<string,string>)=>{delete e.SEYEON_MODEL_INTERPRETER;}],
     ['missing independent cost DB',(e:Record<string,string>)=>{delete e.MYEONGHA_SEYEON_GOVERNED_DATABASE_URL;}],
-    ['equal cost DB password',(e:Record<string,string>)=>{e.MYEONGHA_SEYEON_GOVERNED_DATABASE_URL=e.MYEONGHA_SEYEON_GOVERNED_DATABASE_URL.replace('password-B','password-A');}],
+    ['equal cost DB password',(e:Record<string,string>)=>{e.MYEONGHA_SEYEON_GOVERNED_DATABASE_URL=e.MYEONGHA_SEYEON_GOVERNED_DATABASE_URL!.replace('password-B','password-A');}],
   ])('rejects %s before any socket is bound',async (_name,mutate)=>{
     const e=env();mutate(e);
     await expect(startSeyeonDirectHttpsProductionCompositionV1({
