@@ -2,6 +2,7 @@
 // Production-composition candidate: actual verified JWT/Subject DB port wired,
 // but the public dispatch remains UNMOUNTED and the DB-write gate remains DENY.
 import { handleSeyeonMemoryGrantRevokeRequestV1 } from './seyeon-memory-grant-revoke-http-v1.js';
+import { revokeSeyeonOriginalMemoryGrantAndAckV1 } from './seyeon-original-grant-revoke-ack-v1.js';
 import type { PostgresSubjectPoolV1 } from './postgres-subject-execution.js';
 import { createProductionPostgresSubjectPoolLeaseV1 } from './production-postgres-subject-pool-lease.js';
 import { createProductionRequestIdentityVerifierV1 } from './production-request-identity-verifier.js';
@@ -54,6 +55,13 @@ export function createProductionSeyeonMemoryGrantRevokeRuntimeV1(
         serverTime: requestInput.serverTime,
         identityEvidenceVerifier,
         pool: poolLease.pool,
+        // Future explicit admission will execute the private, fixed-SeYeon
+        // owner command, not the unprivileged R15 legacy SECURITY INVOKER.
+        // This closure cannot be influenced by HTTP payload or environment.
+        revoke: command => revokeSeyeonOriginalMemoryGrantAndAckV1({
+          ...command,
+          dbCommand: 'private_candidate',
+        }),
       });
     },
     close() { return poolLease.close(); },
