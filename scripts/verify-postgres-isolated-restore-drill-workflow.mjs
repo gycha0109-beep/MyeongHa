@@ -149,7 +149,7 @@ if (onSection.includes('push:')) {
   if (legacy1310 || !seyeonIncident || !latestOwnerApproved) {
     throw new Error('Restore one-shot push must have only the two reviewed historical/current source markers.');
   }
-  const triggerMarkers = [...onSection.matchAll(/'\\.github\\/ops\\/[^']+\\.once'/g)];
+  const triggerMarkers = onSection.split('\n').filter((line) => line.includes('.github/ops/') && line.includes('.once\''));
   if (triggerMarkers.length !== 2) {
     throw new Error('Restore one-shot push allows exactly two pinned marker paths.');
   }
