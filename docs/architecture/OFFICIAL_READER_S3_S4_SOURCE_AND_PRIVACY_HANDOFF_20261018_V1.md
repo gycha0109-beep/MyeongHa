@@ -108,3 +108,12 @@ Saju Owner가 제공할 정식 보완물은 **Preview와 별도**인 운영 원�
 - 추출된 전체 선택/동반/Disclosure/ambiguity ref·hash를 `preflightOfficialReaderS3SourceCoverageV1`에 넘기며 반환은 오직 `held` 또는 `blocked`, Source/Semantic/Output `NOT_EVALUATED`, 유료 생성/공개/판매 false다. 원문·회원 ID·Reading ID·fingerprint는 결과에 포함하지 않는다. 별도 현실 Source → 서명 검증·발급 경계는 아직 없는 상태다.
 - 신규 시험은 실제 `ProductReadingResponse v2` 구조로 회원·Reader·Bundle·Product/Spec·Domain·Contract·Reading·원본 hash 불일치와 필수 Disclosure/동반/ambiguity 누락, 보호 원문 변조, partial Reading, 비정상 원본을 부정한다.
 - **전제조건/한계:** `source`는 기존 `resolveCharacterStandardReadingArtifactAfterAccessV1` 등 실제 서버 DB 권한 절차가 발급한 자료여야 한다. 일반 브라우저가 보낸 동일 타입 JSON을 안전하다고 판단할 수 없다. 이 어댑터는 서명자 진위·사주 계산 사실성·Semantic Guard·Privacy 승인·S2 유료 답변 T2 원자 저장을 제공하지 않는다. Saju [#2410](https://github.com/gycha0109-beep/Saju/issues/2410)과 Privacy [#2318](https://github.com/gycha0109-beep/MyeongHa/issues/2318)의 선행 승인 경로를 계속 유지한다.
+
+
+## S3 실제 Saju Preview 서명 ↔ 공식 DB 원문 일치 검증
+
+- `apps/api/src/official-reader-s3-signed-source-artifact-reconciliation-v1.ts`는 [Saju의 기존 서버 전용 Preview 발급기](https://github.com/gycha0109-beep/Saju/blob/main/src/host/source-reading-proof-issuer-http.ts)가 실제 발급한 서명 응답과 DB가 허가한 공식 Reading v2 원본의 내용이 **동일한지** 비교하는 비공개 소비자 연결이다. 인증된 Saju Preview 응답이라고 해도 공식 DB 응답과 다른 실행·다른 해설이면 차단한다.
+- 먼저 현행 Reader Admission Scope와 DB Source의 Subject/Reading/Reader/Bundle/Product/Spec/Domain/Contract/원본 hash 및 Source Unit·Disclosure·모호성 누락을 기존 `preflightOfficialReaderS3FromAdmittedArtifactV1`로 검사한다.
+- 그다음 기존 `verifySajuHeldSourceProofV1`로 *실제 Saju* Preview 서명, issuer/audience/key, 요청 정규화 hash, 응답 본문 hash, nonce TTL, **다중 인스턴스 공유 DB nonce 원자 claim**을 검증한다. 검증한 signed `verifiedSource.readingId`와 응답의 canonical hash를 DB에 저장된 *정확한* v2 snapshot에서 독립 계산한 hash에 비교한다. 서명이 맞더라도 DB 원문과 다르면 `blocked`로 끝난다.
+- **승인 범위를 넘지 않음:** 본 코드는 서버 인가 원본과 Preview signed transport의 바이트 수준 일치만 증명하며, Saju Production 실행 의미/발행자 공식 Source Authority를 증명하지 않는다. 결과는 `held` 또는 `blocked`이며 `sourceAuthority/semanticAuthority/outputAuthority/privacyApproval: NOT_EVALUATED`, `canPublish/canSell: false`; 회원/Reading/원문/증명/해시를 반환하지 않는다. 브라우저 HTTP, DB 보호 원문 저장, 메모리/Outbox와 연결하지 않는다.
+- 실제 Saju Owner [#2410](https://github.com/gycha0109-beep/Saju/issues/2410)의 공식 **Production Source attestation**과 Privacy [#2318](https://github.com/gycha0109-beep/MyeongHa/issues/2318)의 유료 원문 분류·보존·삭제·복원 승인 이후 별도 발행·저장 계약이 필요하다. 이 Preview 비교를 S3 공식 발행 완료, S4 승인 또는 S5 T2 저장 권한으로 전환하는 것을 금지한다.
