@@ -1,6 +1,9 @@
 // Watchtower-Track: security
 // Disposable CI PostgreSQL only: real v2/v1/core Chat Commit and BOTH outboxes.
 import { afterAll, describe, expect, it } from 'vitest';
+import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
+import type { AddressInfo } from 'node:net';
+import { resolveMeDispatchTargetForTestV1, toCanonicalMeRequestForTestV1 } from '../api/me.js';
 import { Pool, type PoolClient } from 'pg';
 import { handleSeyeonChatTurnSendRequestV1 } from '../apps/api/src/chat-turn-send-http.js';
 
@@ -222,6 +225,52 @@ async function history(id:Fixture){
   [subject,id.thread,0,20],
  ),true);
 }
+
+type R9HttpHandler = (request: IncomingMessage, response: ServerResponse) => Promise<void>;
+
+async function withR9Loopback(
+  handler: R9HttpHandler,
+  check: (origin: string) => Promise<void>,
+): Promise<void> {
+  const server = createServer((request, response) => {
+    void handler(request, response).catch(error => {
+      // Ensure the test fails on route/assertion defects rather than hanging
+      // forever on the fetch side.
+      if (!response.headersSent) response.statusCode = 500;
+      response.end('r9-loopback-error:' + String(error));
+    });
+  });
+  await new Promise<void>((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', () => {
+      server.off('error', reject);
+      resolve();
+    });
+  });
+  try {
+    await check('http://127.0.0.1:' + (server.address() as AddressInfo).port);
+  } finally {
+    await new Promise<void>(resolve => {
+      server.close(() => resolve());
+      server.closeAllConnections();
+    });
+  }
+}
+
+async function r9ReadBody(request: IncomingMessage): Promise<string> {
+  const chunks: Buffer[] = [];
+  for await (const chunk of request) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  }
+  return Buffer.concat(chunks).toString('utf8');
+}
+
+async function r9WriteResponse(outgoing: ServerResponse, result: Response): Promise<void> {
+  outgoing.statusCode = result.status;
+  result.headers.forEach((value, name) => outgoing.setHeader(name, value));
+  outgoing.end(Buffer.from(await result.arrayBuffer()));
+}
+
 describe.skipIf(!enabled)('R5 disposable actual-v2 current-rights first/replay/history',()=>{
  afterAll(async()=>{await pool?.end();});
  it('committed real v2: owner first/replay and page read only exact authorized body; no payload leak',async()=>{
@@ -374,4 +423,163 @@ describe.skipIf(!enabled)('R5 disposable actual-v2 current-rights first/replay/h
   expect(await http(id)).toBeNull();
   await expect(history(id)).rejects.toMatchObject({constraint:'seyeon_offline_r5_page_held'});
  });
+
+  it.each([
+    { route: 'rewrite', fixture: 78 },
+    { route: 'direct-alias', fixture: 79 },
+  ])('R9 actual PostgreSQL revoke after authorized DB read but before real HTTP send: $route still returns 503 without assistant bytes', async ({ route, fixture }) => {
+    const id = await committed(fixture);
+    // Authoritative original Grant, original Record, and attempt are genuinely
+    // checked by the disposable DB. This successful SELECT is NOT a send permit.
+    const staleText = await http(id);
+    expect(staleText).toBe(body);
+
+    let ready!: () => void;
+    let allowSend!: () => void;
+    const responsePrepared = new Promise<void>(resolve => { ready = resolve; });
+    const sendGate = new Promise<void>(resolve => { allowSend = resolve; });
+    let runtimeCalls = 0;
+    await withR9Loopback(async (incoming, outgoing) => {
+      const rawBody = await r9ReadBody(incoming);
+      const source = new Request('http://127.0.0.1' + incoming.url, {
+        method: 'POST',
+        headers: {
+          authorization: String(incoming.headers.authorization ?? ''),
+          'content-type': 'application/json',
+          'x-seyeon-reveal-authorized': String(incoming.headers['x-seyeon-reveal-authorized'] ?? ''),
+        },
+        body: rawBody,
+      });
+      const target = resolveMeDispatchTargetForTestV1(source);
+      expect(target).toMatchObject({ kind: 'chat-turn-send', threadId: id.thread });
+      const canonical = toCanonicalMeRequestForTestV1(source, target ?? undefined);
+      const held = await handleSeyeonChatTurnSendRequestV1({
+        request: canonical,
+        requestId: 'r9-real-pg-delayed-send-' + route,
+        serverTime: '2026-10-18T00:00:00.000Z',
+        identityEvidenceVerifier: {
+          verifyRequestIdentity: async () => Object.freeze({
+            kind: 'member' as const, verifiedAuthUserId: 'r9-offline-synthetic',
+          }),
+        },
+        runtime: {
+          run: async () => {
+            ++runtimeCalls;
+            return {
+              execution: { disposition: 'committed_replay', assistantText: staleText },
+            } as never;
+          },
+        },
+      });
+      ready(); // Web Response prepared; no HTTP headers or bytes yet.
+      await sendGate;
+      await r9WriteResponse(outgoing, held);
+    }, async origin => {
+      const path = route === 'rewrite'
+        ? '/api/me?__myeongha_chat_turn_send=1&__myeongha_chat_thread_id=' + id.thread
+        : '/api/chat/' + id.thread + '/turns?__myeongha_chat_turn_send=1&__myeongha_chat_thread_id=' + id.thread;
+      const pending = fetch(origin + path, {
+        method: 'POST',
+        headers: {
+          authorization: 'Bearer r9-synthetic',
+          'content-type': 'application/json',
+          'x-seyeon-reveal-authorized': 'true',
+        },
+        body: JSON.stringify({
+          clientTurnId: '423e4567-e89b-42d3-a456-426614174078', text: '합성 요청',
+        }),
+      });
+      try {
+        await responsePrepared;
+        // Real PostgreSQL revoke COMMIT between response construction (V-like)
+        // and network socket write (S). Regrant is NOT permitted to rescue it.
+        await transaction(c => c.query(
+          'update public.record_access_grants set revoked_at=clock_timestamp() where id=$1::uuid',
+          [id.grant],
+        ));
+        expect(await http(id)).toBeNull();
+        await expect(history(id)).rejects.toMatchObject({ constraint: 'seyeon_offline_r5_page_held' });
+        // Product-approved separation: revoke future use/reveal, but DO NOT
+        // secretly delete the historical stored conversation on mere revoke.
+        const retained = await saved(id);
+        expect(retained.messages).toBe('1');
+        expect(retained.admissions).toBe('1');
+        expect(retained.turn_state).toBe('committed');
+        expect(staleText).toBe(body); // bytes survive in application memory
+        allowSend();
+        const received = await pending;
+        const wire = await received.text();
+        expect(received.status).toBe(503);
+        expect(received.headers.get('cache-control')).toBe('no-store');
+        expect(received.headers.get('content-type')).not.toContain('text/event-stream');
+        expect(wire).toContain('SEYEON_FIRST_REVEAL_AUTHORITY_UNAVAILABLE');
+        expect(wire).not.toContain(staleText);
+        expect(wire).not.toContain(id.grant);
+        expect(wire).not.toContain(id.assistantMessage);
+        expect(runtimeCalls).toBe(0);
+
+        // Revocation must also block a second request for the same logical
+        // turn; neither replay nor a caller-supplied "authorized" header
+        // restores an old original Grant after the first failed HTTP send.
+        const repeated = await fetch(origin + path, {
+          method: 'POST',
+          headers: {
+            authorization: 'Bearer r9-synthetic',
+            'content-type': 'application/json',
+            'x-seyeon-reveal-authorized': 'true',
+          },
+          body: JSON.stringify({
+            clientTurnId: '423e4567-e89b-42d3-a456-426614174078', text: '합성 요청',
+          }),
+        });
+        const repeatWire = await repeated.text();
+        expect(repeated.status).toBe(503);
+        expect(repeated.headers.get('cache-control')).toBe('no-store');
+        expect(repeatWire).not.toContain(staleText);
+        expect(runtimeCalls).toBe(0);
+      } finally {
+        allowSend();
+      }
+    });
+  });
+
+  it('R9 actual PostgreSQL stale-read counterexample: synthetic unsafe HTTP buffer sends after the original Grant is revoked', async () => {
+    const id = await committed(80);
+    let prepared!: () => void;
+    let releaseSocket!: () => void;
+    const responsePrepared = new Promise<void>(resolve => { prepared = resolve; });
+    const sendGate = new Promise<void>(resolve => { releaseSocket = resolve; });
+
+    await withR9Loopback(async (request, response) => {
+      await r9ReadBody(request);
+      // Intentionally UNSAFE synthetic bridge, never used by Production routing.
+      // Proves that a successful real DB SELECT doesn't govern HTTP wire timing.
+      const original = await http(id);
+      expect(original).toBe(body);
+      const buffered = Response.json({ assistantText: original });
+      prepared();
+      await sendGate;
+      await r9WriteResponse(response, buffered);
+    }, async origin => {
+      const pending = fetch(origin + '/unsafe-synthetic-only', {
+        method: 'POST', body: 'synthetic',
+      });
+      try {
+        await responsePrepared;
+        await transaction(c => c.query(
+          'update public.record_access_grants set revoked_at=clock_timestamp() where id=$1::uuid',
+          [id.grant],
+        ));
+        expect(await http(id)).toBeNull(); // current rights correctly rejected
+        releaseSocket();
+        const received = await pending;
+        const wire = await received.text();
+        expect(received.status).toBe(200);
+        expect(wire).toContain(body); // deliberate counterexample, not G3 success
+      } finally {
+        releaseSocket();
+      }
+    });
+  });
+
 });
