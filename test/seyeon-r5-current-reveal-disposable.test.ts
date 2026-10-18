@@ -7,6 +7,8 @@ import { resolveMeDispatchTargetForTestV1, toCanonicalMeRequestForTestV1 } from 
 import { Pool, type PoolClient } from 'pg';
 import { handleSeyeonChatTurnSendRequestV1 } from '../apps/api/src/chat-turn-send-http.js';
 import { sendSeyeonNodeOriginalGrantResponseV1 } from '../apps/api/src/seyeon-node-original-grant-send-boundary-v1.js';
+import { createSeyeonOriginalGrantPgSendAdapterV1 } from '../apps/api/src/seyeon-original-grant-pg-send-adapter-v1.js';
+import type { PostgresSubjectPoolV1 } from '../apps/api/src/postgres-subject-execution.js';
 
 const enabled=process.env.CI==='true' &&
   process.env.SEYEON_POSITIVE_GRANT_REAL_PG==='1' &&
@@ -62,6 +64,35 @@ async function transaction<T>(
     }catch(err){await c.query('ROLLBACK');throw err;}
   });
 }
+
+
+// Test-only Subject resolver fixture: canonical Subject is fixed by the named
+// disposable PG setup. All original Grant/Record/Attempt/Message rights are
+// still checked by the REAL database function, under the REAL API role.
+const offlineMemberId='d2010000-0000-4000-8000-000000000001';
+const offlineOriginalGrantPgPool:PostgresSubjectPoolV1={
+  async connect(){
+    if(!pool)throw Error('Requires named disposable PostgreSQL');
+    const c=await pool.connect();
+    return {
+      async query<Row>(sql:string, values?:readonly unknown[]){
+        if(sql.includes('public.begin_member_subject_context_v1')) {
+          if(values?.[0]!==offlineMemberId)throw Error('Unexpected offline member');
+          return {rows:[{subjectId:subject,subjectKind:'member'}] as unknown as readonly Row[]};
+        }
+        if(sql.includes('public.assert_myeongha_subject_context_v1')){
+          await c.query("select set_config('myeongha.subject_id',$1,true)",[subject]);
+          return {rows:[]};
+        }
+        const r=await c.query(sql,values===undefined?[]:[...values]);
+        return {rows:r.rows as readonly Row[]};
+      },
+      release(error?:unknown){
+        c.release(error instanceof Error?error:undefined);
+      },
+    };
+  },
+};
 
 async function prepare(n:number,pin=true):Promise<Fixture> {
   const id=ids(n);
@@ -602,21 +633,28 @@ describe.skipIf(!enabled)('R5 disposable actual-v2 current-rights first/replay/h
         response,
         requestSignal: new AbortController().signal,
         deadlineMs: 9_000,
-        withLockedOriginalGrant: async ({ deliver }) => transaction(async c => {
-          await c.query("set local application_name='seyeon-r10-lock-held-sender'");
-          const current = await c.query<{ answer: string | null }>(
-            'select seyeon_positive_candidate.reveal_http_r5($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid) as answer',
-            [subject, id.thread, id.turn, id.attempt, id.assistantMessage],
-          );
-          expect(current.rows[0]?.answer).toBe(body);
-          authorized();
-          await sendGate;
-          // The production-candidate adapter, not test-only socket code,
-          // waits for the actual Node finish while the original Grant is locked.
-          await deliver(current.rows[0]?.answer ?? null);
-          socketWrites += 1;
-          events.push('S:node-finish');
-        }, true), // SQL COMMIT releases original Grant/Subject locks.
+        withLockedOriginalGrant: async ({ signal, deliver }) => {
+          const lockedRead = createSeyeonOriginalGrantPgSendAdapterV1({
+            pool: offlineOriginalGrantPgPool,
+            verifiedEvidence: {kind:'member',verifiedAuthUserId:offlineMemberId},
+            threadId:id.thread,turnId:id.turn,
+            committedAttemptId:id.attempt,
+            committedAssistantMessageId:id.assistantMessage,
+          });
+          await lockedRead({
+            signal,
+            deliver: async value => {
+              expect(value).toBe(body);
+              authorized();
+              await sendGate;
+              // REAL original Grant locks remain in the R13 transaction until
+              // R11's Node socket finish. No untrusted Subject/Attempt override.
+              await deliver(value);
+              socketWrites += 1;
+              events.push('S:node-finish');
+            },
+          });
+        },
       });
       expect(outcome).toBe('assistant_sent');
     }, async origin => {
