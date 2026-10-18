@@ -17,7 +17,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit && npm run typecheck -w @myeongha/api-client && npm run typecheck -w @myeongha/web && npm run typecheck -w @myeongha/mobile",
     "test": "node --test scripts/commerce/m1-18-migration-parity-gate.test.mjs scripts/ci/official-reader-minimal-public-route-fence.node.mjs scripts/operations/m1-19-live-migration-impact.test.mjs scripts/operations/m1-20-safe-staging-preflight.test.mjs scripts/operations/m1-22-nonproduction-evidence-gate.test.mjs && vitest run",
     "build": "tsc -p tsconfig.build.json",
-    "build:web": "node scripts/build-web-static.mjs && npm run build -w @myeongha/web",
+    "build:web": "node scripts/build-web-static.mjs && npm run build -w @myeongha/web && node scripts/ci/official-reader-public-build-output-fence.mjs --check",
     "verify:deployment-config": "node scripts/verify-web-deployment.mjs",
     "verify:supabase-deployment-config": "node scripts/verify-supabase-deployment.mjs",
     "verify:production-guest-bootstrap-ttl-binding": "node scripts/verify-production-guest-bootstrap-ttl-binding.mjs",
