@@ -126,16 +126,22 @@ export function createSeyeonC08XOfflineRefGateV1({backend,admission}={}){
     phase='OBSERVING';
     return;
    }
+   const bounded=event.observation==='BOUNDED_ESTIMATE'&&
+     Number.isSafeInteger(event.estimatedMicroUsd)&&
+     event.estimatedMicroUsd>=0&&
+     event.estimatedMicroUsd<=P.perCallReservedMicroUsd;
+   const unknown=event.observation==='UNKNOWN_OUTCOME_HOLD'&&
+     event.estimatedMicroUsd===null;
    if(phase!=='OBSERVING'||event.kind!=='mock_observation'||
-     event.observation!=='BOUNDED_ESTIMATE'||
-     !Number.isSafeInteger(event.estimatedMicroUsd)||
-     event.estimatedMicroUsd<0||
-     event.estimatedMicroUsd>P.perCallReservedMicroUsd){
+     !(bounded||unknown)){
     phase='HALTED';throw hold();
    }
    phase='HALTED';
    await verifyPrior();
    await checkRef(refs.slots[index]);
+   // In an unknown-outcome case the upstream C08-V guard must report
+   // UNKNOWN_USAGE_HOLD; do not advance or mint any subsequent marker.
+   if(unknown)return;
    index++;
    phase=index===slots.length?'FINISHED':'RESERVING';
   },
