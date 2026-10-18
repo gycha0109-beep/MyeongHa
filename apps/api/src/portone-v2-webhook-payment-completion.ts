@@ -514,6 +514,13 @@ export async function executePortOneV2WebhookPaymentCompletionV1(input: {
       pool: input.pool,
       evidence,
     });
+    if (applied.kind === 'unrelated_commerce') {
+      return Object.freeze({
+        kind: 'ignored',
+        providerWebhookId: decision.providerWebhookId,
+        eventType: PORTONE_V2_WEBHOOK_FULL_CANCEL_EVENT_V1,
+      });
+    }
     return Object.freeze({
       kind: 'cancelled',
       providerWebhookId: decision.providerWebhookId,
