@@ -201,7 +201,7 @@ describe('direct HTTPS TLS-only synthetic Node host', () => {
       return committedResult();
     }}});
     expect(res.tlsVersion).toBe('TLSv1.3');
-    expect(res.status).toBe(200);
+    expect(res.status, JSON.stringify({ verifyCalls: res.verifyCalls, runtimeCalls: res.runtimeCalls, connections: db.connections, events: db.events })).toBe(200);
     expect(res.json).toMatchObject({
       ok: true,
       data: { turnId, assistantMessageId: messageId, assistantText: originalText },
