@@ -178,6 +178,7 @@ as $reader_revoke_dispatch_s2$
 declare
   v_subject uuid;
   v_receipt uuid;
+  v_event_at timestamptz;
   v_scope record;
   v_grant record;
   v_scope_count integer := 0;
@@ -199,8 +200,8 @@ begin
   -- Stored, provider-verified lineage is the only source. Webhook signatures
   -- alone never supply cancellation authority; no caller-supplied Subject,
   -- Reading, Reader, Grant status or provider ordering may select an effect.
-  select pe.resolved_subject_id, pe.resolved_receipt_id
-    into v_subject, v_receipt
+  select pe.resolved_subject_id, pe.resolved_receipt_id, pe.provider_occurred_at
+    into v_subject, v_receipt, v_event_at
   from public.commerce_provider_events pe
   join public.commerce_receipts cr
     on cr.id=pe.resolved_receipt_id
@@ -215,7 +216,8 @@ begin
     and cr.verification_status in ('verified','revoked')
     and (pe.external_transaction_id is null
       or pe.external_transaction_id=cr.external_transaction_id);
-  if not found or v_subject is null or v_receipt is null then
+  if not found or v_subject is null or v_receipt is null
+     or v_event_at is null or v_event_at>pg_catalog.clock_timestamp() then
     raise exception using errcode='P0001',
       constraint='official_reader_s2_dispatch_verified_cancellation_unavailable',
       message='Verified full-cancellation Receipt lineage is unavailable';
@@ -256,7 +258,14 @@ begin
   -- Each 1770 call rereads authority AFTER scope locks, uses the existing
   -- Commerce 1080 effect/CAS and commits atomically with the whole dispatch.
   for v_grant in
-    select eg.id,eg.revision,eg.last_provider_ordering_key
+    select eg.id,eg.revision,eg.last_provider_ordering_key,
+           eg.last_effective_at,
+           exists (
+             select 1 from public.entitlement_events ee
+             where ee.grant_id=eg.id
+               and ee.source_provider_event_id=p_provider_event_id
+               and ee.event_type='revoked'
+           ) as already_applied
     from public.entitlement_grants eg
     where eg.source_receipt_id=v_receipt
       and eg.subject_id=v_subject
@@ -268,12 +277,22 @@ begin
       )
     order by eg.id
   loop
+    -- Existing 1080 delegates provider ordering to the caller. At minimum
+    -- never rewrite an equal/newer committed Grant with an older full-cancel
+    -- event. Exact provider ordering policy is still Commerce-owner territory.
+    if v_grant.last_effective_at is not null
+       and v_event_at<=v_grant.last_effective_at
+       and not v_grant.already_applied then
+      raise exception using errcode='40001',
+        constraint='official_reader_s2_dispatch_stale_provider_event',
+        message='Provider cancellation is not newer than the Grant lifecycle';
+    end if;
     v_effect := public.internal_apply_official_reader_provider_revoke_under_scope_v1(
       p_provider_event_id,
       v_grant.id,
       v_grant.revision,
       v_grant.last_provider_ordering_key,
-      pg_catalog.clock_timestamp(),
+      v_event_at,
       'revoked',
       'verified_provider_full_cancellation'
     );
