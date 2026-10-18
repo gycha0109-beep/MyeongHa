@@ -133,14 +133,15 @@ export function preflightOfficialReaderS3SourceCoverageV1(input: Readonly<{
     }
     if (!exactUnits(disclosures, expectedDisclosures)) return verdict('blocked');
 
-    if (!Array.isArray(candidate.ambiguityHashes)
-      || candidate.ambiguityHashes.length !== protectedSource.ambiguity.length
-      || candidate.ambiguityHashes.length > 128
-      || candidate.ambiguityHashes.some((value: unknown) => !validHash(value))) return verdict('blocked');
+    const ambiguityHashes: unknown = candidate.ambiguityHashes;
+    if (!Array.isArray(ambiguityHashes)
+      || ambiguityHashes.length !== protectedSource.ambiguity.length
+      || ambiguityHashes.length > 128
+      || ambiguityHashes.some((value: unknown) => !validHash(value))) return verdict('blocked');
     const expectedAmbiguity = protectedSource.ambiguity.map(text => hashProtectedSajuTextV1(text));
     if (new Set(expectedAmbiguity).size !== expectedAmbiguity.length
-      || new Set(candidate.ambiguityHashes).size !== candidate.ambiguityHashes.length
-      || expectedAmbiguity.some((hash, i) => candidate.ambiguityHashes[i] !== hash)) return verdict('blocked');
+      || new Set(ambiguityHashes).size !== ambiguityHashes.length
+      || expectedAmbiguity.some((hash, i) => ambiguityHashes[i] !== hash)) return verdict('blocked');
     return verdict('held');
   } catch {
     return verdict('blocked');
