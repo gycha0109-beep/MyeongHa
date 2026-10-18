@@ -911,7 +911,7 @@ export function createPortOneV2PaymentVerificationAdapterV1(
 
 /**
  * Actual PortOne V2 full-cancellation verification, separate from PAID.
- * Webhook HMAC authentication only identifies the candidate; server GET must
+ * Ingress signature authentication only identifies the candidate; server GET must
  * independently confirm CANCELLED and the exact succeeded cancellation ID.
  * Partial/Pending/unknown payment states never authorize Reader revocation.
  */
