@@ -511,6 +511,26 @@ describe.skipIf(!enabled)('R5 disposable actual-v2 current-rights first/replay/h
         expect(wire).not.toContain(id.grant);
         expect(wire).not.toContain(id.assistantMessage);
         expect(runtimeCalls).toBe(0);
+
+        // Revocation must also block a second request for the same logical
+        // turn; neither replay nor a caller-supplied "authorized" header
+        // restores an old original Grant after the first failed HTTP send.
+        const repeated = await fetch(origin + path, {
+          method: 'POST',
+          headers: {
+            authorization: 'Bearer r9-synthetic',
+            'content-type': 'application/json',
+            'x-seyeon-reveal-authorized': 'true',
+          },
+          body: JSON.stringify({
+            clientTurnId: '423e4567-e89b-42d3-a456-426614174078', text: '합성 요청',
+          }),
+        });
+        const repeatWire = await repeated.text();
+        expect(repeated.status).toBe(503);
+        expect(repeated.headers.get('cache-control')).toBe('no-store');
+        expect(repeatWire).not.toContain(staleText);
+        expect(runtimeCalls).toBe(0);
       } finally {
         allowSend();
       }
