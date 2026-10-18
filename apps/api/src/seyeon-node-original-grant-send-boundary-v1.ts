@@ -16,6 +16,40 @@ export const SEYEON_NODE_ORIGINAL_GRANT_SEND_BOUNDARY_V1 = Object.freeze({
 
 export type SeyeonNodeOriginalGrantSendOutcomeV1 = 'assistant_sent' | 'reveal_held';
 
+/** Server-produced receipt metadata only. There is deliberately no text field. */
+export interface SeyeonNodeChatResponseMetadataV1 {
+  readonly turnId: string;
+  readonly assistantMessageId: string;
+  readonly sequenceNo: number;
+  readonly replayed: boolean;
+  readonly requestId: string;
+  readonly serverTime: string;
+}
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
+const API_CONTRACT_VERSION = 'v0.9' as const;
+
+export function assertSeyeonNodeChatResponseMetadataV1(
+  value: SeyeonNodeChatResponseMetadataV1,
+): void {
+  if (!value || typeof value !== 'object' ||
+      typeof value.turnId !== 'string' || !UUID.test(value.turnId) ||
+      typeof value.assistantMessageId !== 'string' ||
+      !UUID.test(value.assistantMessageId) ||
+      !Number.isSafeInteger(value.sequenceNo) || value.sequenceNo < 0 ||
+      typeof value.replayed !== 'boolean' ||
+      typeof value.requestId !== 'string' ||
+      !/^[a-zA-Z0-9_-]{1,128}$/u.test(value.requestId) ||
+      typeof value.serverTime !== 'string' ||
+      !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/u.test(value.serverTime) ||
+      !Number.isFinite(Date.parse(value.serverTime)) ||
+      new Date(value.serverTime).toISOString() !== value.serverTime) {
+    throw new SeyeonNodeOriginalGrantSendBoundaryErrorV1(
+      'Node Chat response metadata must be canonical server-owned identifiers.',
+    );
+  }
+}
+
 export class SeyeonNodeOriginalGrantSendBoundaryErrorV1 extends Error {
   constructor(message: string) {
     super(message);
@@ -48,6 +82,8 @@ export interface SendSeyeonNodeOriginalGrantResponseInputV1 {
   readonly withLockedOriginalGrant: SeyeonOriginalGrantLockedReadV1;
   /** Bounds the period this request may retain locks or attempt a send. */
   readonly deadlineMs?: number;
+  /** Exact existing Chat API envelope, assembled only from server receipt. */
+  readonly chatResponseMetadata?: SeyeonNodeChatResponseMetadataV1;
 }
 
 const HELD_BYTES = Buffer.from(JSON.stringify({
@@ -64,13 +100,31 @@ function deadlineValue(input: number | undefined): number {
   return chosen;
 }
 
-function responseBytes(value: string | null): Readonly<{
+function responseBytes(
+  value: string | null,
+  chatResponseMetadata?: SeyeonNodeChatResponseMetadataV1,
+): Readonly<{
   status: number;
   bytes: Buffer;
   outcome: SeyeonNodeOriginalGrantSendOutcomeV1;
 }> {
+  if (chatResponseMetadata !== undefined) {
+    assertSeyeonNodeChatResponseMetadataV1(chatResponseMetadata);
+  }
   if (value === null) {
-    return { status: 503, bytes: HELD_BYTES, outcome: 'reveal_held' };
+    return {
+      status: 503,
+      bytes: chatResponseMetadata === undefined ? HELD_BYTES : Buffer.from(JSON.stringify({
+        ok: false,
+        error: {
+          code: 'SEYEON_FIRST_REVEAL_AUTHORITY_UNAVAILABLE',
+          messageKey: 'chat.secure_reveal_unavailable',
+          retryable: false,
+        },
+        meta: { apiContractVersion: API_CONTRACT_VERSION, requestId: chatResponseMetadata.requestId },
+      }), 'utf8'),
+      outcome: 'reveal_held',
+    };
   }
   if (typeof value !== 'string' || value.trim().length === 0 ||
       Buffer.byteLength(value, 'utf8') >
@@ -79,7 +133,23 @@ function responseBytes(value: string | null): Readonly<{
   }
   return {
     status: 200,
-    bytes: Buffer.from(JSON.stringify({ ok: true, assistantText: value }), 'utf8'),
+    bytes: Buffer.from(JSON.stringify(chatResponseMetadata === undefined
+      ? { ok: true, assistantText: value }
+      : {
+          ok: true,
+          data: {
+            turnId: chatResponseMetadata.turnId,
+            assistantMessageId: chatResponseMetadata.assistantMessageId,
+            assistantText: value,
+            sequenceNo: chatResponseMetadata.sequenceNo,
+            replayed: chatResponseMetadata.replayed,
+          },
+          meta: {
+            apiContractVersion: API_CONTRACT_VERSION,
+            requestId: chatResponseMetadata.requestId,
+            serverTime: chatResponseMetadata.serverTime,
+          },
+        }), 'utf8'),
     outcome: 'assistant_sent',
   };
 }
@@ -100,6 +170,9 @@ export async function sendSeyeonNodeOriginalGrantResponseV1(
   input: SendSeyeonNodeOriginalGrantResponseInputV1,
 ): Promise<SeyeonNodeOriginalGrantSendOutcomeV1> {
   const deadlineMs = deadlineValue(input.deadlineMs);
+  if (input.chatResponseMetadata !== undefined) {
+    assertSeyeonNodeChatResponseMetadataV1(input.chatResponseMetadata);
+  }
   if (input.response.headersSent || input.response.writableEnded ||
       input.response.destroyed) {
     throw new SeyeonNodeOriginalGrantSendBoundaryErrorV1(
@@ -137,7 +210,7 @@ export async function sendSeyeonNodeOriginalGrantResponseV1(
       );
     }
     attempted = true;
-    const payload = responseBytes(value);
+    const payload = responseBytes(value, input.chatResponseMetadata);
     const finished = new Promise<void>((resolve, reject) => {
       const cleanup = () => {
         input.response.off('finish', onFinish);
