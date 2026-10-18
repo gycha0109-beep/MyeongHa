@@ -11,7 +11,7 @@ Watchtower-Track: character-memory
 ## 구현 범위
 
 - `scripts/seyeon-cost-c08u-eval-project-key-readiness-v1.mjs`: C08-T에서 고정한 `gpt-5.6-luna` 모델의 **GET `https://api.openai.com/v1/models/gpt-5.6-luna`** 단일 요청만 시도. 유효한 메타데이터만 `MODEL_GET_ACCESSIBLE`이고 나머지는 `HOLD`. 키·원본 응답/헤더/오류 본문은 어디에도 출력하지 않으며 결과 JSON은 고정 판정어만 포함한다. 모델 접근 성공도 프로젝트 동일성, 하드캡, 청구액을 증명하지 않는다.
-- `.github/workflows/seyeon-c08u-eval-project-key-readiness-v1.yml`: `main`에서 파일 변경시 push 1회 + 수동 `workflow_dispatch`로 동작. GitHub `OPENAI_EVAL_API_KEY` **하나만** 전달하고 `POST /v1/responses`·추론·실제 사용자 메시지·Production Secret/Environment·배포·권한 변경을 금지.
+- `.github/workflows/seyeon-c08u-eval-project-key-readiness-v1.yml`: `main`에서 파일 변경시 push 1회 + 수동 `workflow_dispatch`로 동작. GitHub `OPENAI_EVAL_API_KEY` **하나만** 전달한다. 저장소 Secret-consumer Trust Boundary에 따라 `environment: production`을 선언하되 Production 호출·배포·DB 권한은 없다. `POST /v1/responses`·추론·실제 사용자 메시지·Production Secret/Environment·배포·권한 변경을 금지.
 - `test/seyeon-cost-c08u-eval-project-key-readiness-v1.test.mjs`: 고정 URL/GET, 비밀 미유출, 유효하지 않은 키, 네트워크 실패/401/403/404/429, 응답 초과 크기, 모델 불일치, GitHub workflow의 유료 API 금지 회귀.
 
 ## 다음 경계
