@@ -206,3 +206,10 @@ S8의 **비파괴/격리 검토는 S2~S7과 병렬 진행 가능**하며, S8 Pro
 - **실패 계약 실증:** 별도의 **고의로 불안전한 합성 서버**에서는 취소 이전에 생성한 `Response.json`을 취소 이후 실제 소켓으로 보낼 수 있음을 보여줍니다. Production 핸들러에 양수 공개 분기를 추가하지 않습니다.
 - **증거 한계:** 이는 loopback Node bridge이고 실제 Vercel Edge/Proxy, 실제 DB 취소 COMMIT과 네트워크의 분산 원자성, 이미 전송된 잔여 바이트 제어, Worker/History 권한을 입증하지 않습니다. 따라서 G0 D-04 미승인, G1 양수/G2/G3/G6 HOLD입니다.
 - **검증 규칙:** 정확한 PR HEAD의 CI·Governance·Web와 Full Integration 11/11, squash 후 main CI/Governance/Production 및 migration/backfill SKIPPED가 확인될 때만 이번 격리 회귀 작업 완료로 기록합니다. Owner 기술 서명이나 실제 전송 허가로 승격하지 않습니다.
+
+## 23. 2026-10-18 Product Owner 기억·철회·과거대화 선택 승인 (기술 게이트는 HOLD)
+
+- **제품 선택 승인 기록:** [세연 개인기억·철회·과거대화 Product Owner 결정문](../security/SEYEON_PRODUCT_OWNER_MEMORY_REVOKE_HISTORY_DECISION_20261018.md). 사용자가 저장·캐릭터별 공유를 직접 정하며, 철회가 확정되면 미래 개인기억 활용·미송출 공개를 막고 진행 중 작업 중단을 시도합니다. 이미 네트워크로 전송된 바이트는 회수 불가합니다.
+- **과거 기록:** 철회와 일괄 대화 삭제를 동일시하지 않습니다. 하지만 보존된 메시지의 AI 재활용/검색/요약, 파생 출처, History GET·replay/Worker의 새로운 공개는 별도 현행 권한 검사가 없으면 HOLD합니다. 명시적 삭제 요청과 법률상 삭제 의무는 별도로 준수합니다.
+- **기술 승인 미완료:** G0의 exact Grant/Record, 최초 recordType/schema/projectorVersion, Digest/DB 잠금/ACL 및 D-04 `R/V/S/ACK` 취소-송출 선형화 계약은 Character/Source, DB/Security, API 기술 Owner 서명 및 실제 경합 테스트 전까지 PROPOSED입니다.
+- **절대 비승격:** 이번 승인은 G0 APPROVED, G1 양수/G2/G3/G5/G6 PASS, Production migrations/ACL/DB writes, real Provider, 유료/공개 활성화가 아닙니다. Projectors=[]·public/paid OFF·Production writes=0 유지합니다.
