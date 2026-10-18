@@ -38,7 +38,7 @@ begin
   end if;
   if p_provider_event_id is null or p_grant_id is null or
      p_expected_revision is null or p_effective_at is null or
-     p_event_type not in ('revoked','expired') or
+     (p_event_type is null or p_event_type not in ('revoked','expired')) or
      p_reason_code is null or pg_catalog.btrim(p_reason_code)='' then
     raise exception using
       errcode='23514',
