@@ -175,3 +175,10 @@ S1에서 공통 잠금 함수 자체가 성공하더라도 **S2 전체 경로가
 - `apps/api/src/official-reader-s3-saju-owner-handoff-rehearsal-v1.ts`는 **합성 서명**을 쓰는 비공개 Saju Owner 인수 측 검증기다. Saju Owner의 실제 승인된 발행 API/서명을 대체하지 않는다. S3 Unit 구조 검사 후 Subject×Reading×Reader×Bundle×Release×공식 원본 hash와 전체 Unit 후보 digest에 묶인 별도 domain HMAC, 발행 유효기간, 분산 재생 방지 nonce를 검증한다.
 - 검증의 성공과 실패는 각각 `held`/ `blocked`만 반환하며 둘 다 `sourceAuthority: NOT_EVALUATED`, `privacyApproval: NOT_EVALUATED`, `publicDisclosureAuthorized: false`; 본문, hash, 회원/Reading ID 등 개인정보·원문을 반환하지 않는다. 생성/유료 결제/응답/DB/Memory/Outbox와는 연결하지 않는다.
 - 교차 회원/Reading/Bundle/Release, 변경된 공식 원본, 조작된 Unit, Preview proof 오용, 기한 만료, nonce 재사용, 분산 nonce 저장소 장애를 합성 공격 시험한다. **실제 Saju Owner 및 Privacy Owner의 계약·승인이 없으므로 S3/S4/S5 완료라고 선언하지 않는다**. S5 원자 T2 저장과 출시 금지 유지.
+
+
+### S3/S4 선행 차단 보강: 정확한 출처 범위와 전송 객체 거부 (후속)
+
+- S3 합성 Owner 인계 검증은 기존 Subject×Reading×Reader×Bundle×Release 외에 **Thread/Content Revision/Product/Spec/Domain/Reading Contract/Rule/Approved Policy**를 현재 서버 결속값과 비교한다. 후보가 실제 독립 서명으로 바뀌어도 한 항목의 변경·교차 적용을 거부하는 부정 시험을 추가했다. 성공 결과도 `held`, 실제 공식 발행/유료 사용권 **NOT_EVALUATED**다.
+- S4 내부 `runOfficialReaderHeldT1T2PreflightV1` 생성 반환값의 직접 HTTP `Response`·`Request`·스트림·`Blob`·`FormData` 형태를 일반화된 오류로 거부하고, T2 이전 유출형 결과 차단 시험을 추가한다. 기존처럼 생성 본문·해시·원본 식별자는 반환/저장하지 않는다. 생성 콜백 부작용(로그/기억/Outbox 등)은 별도 Privacy/Chat 감사가 필요한 미해결이므로 **S4 완료 아님**.
+- **S5 유료 원자 T2·보호 본문 보관/삭제/복원·S6 재열람·S7 전달을 승인하거나 구현한 것이 아니다.** Owner 승인 전 운영 DB/실결제/공개 OFF, PR Draft 유지.
