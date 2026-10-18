@@ -62,6 +62,8 @@ describe('Se-yeon real API dialogue-path benchmark accounting', () => {
     expect(src).toContain('buildSeyeonC08SOwnerKeyV1');
     expect(src).toContain('SEYEON_DIALOGUE_PATH_USAGE_UNKNOWN_HOLD');
     expect(src).toContain('SEYEON_DIALOGUE_PATH_PAID_EXECUTION_HOLD');
+    expect(src).toContain('const PAID_EXECUTION_ADMITTED = false');
+    expect(src).toContain('SEYEON_DIALOGUE_PATH_SAMPLE_FAILURE_HOLD');
     expect(src).toContain('process.env.OPENAI_EVAL_API_KEY');
     expect(src).not.toContain('process.env.OPENAI_API_KEY');
     expect(src).not.toContain('OPENAI_API_KEY2');
