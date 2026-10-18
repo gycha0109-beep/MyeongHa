@@ -499,6 +499,12 @@ describe.skipIf(!enabled)('R5 disposable actual-v2 current-rights first/replay/h
         ));
         expect(await http(id)).toBeNull();
         await expect(history(id)).rejects.toMatchObject({ constraint: 'seyeon_offline_r5_page_held' });
+        // Product-approved separation: revoke future use/reveal, but DO NOT
+        // secretly delete the historical stored conversation on mere revoke.
+        const retained = await saved(id);
+        expect(retained.messages).toBe('1');
+        expect(retained.admissions).toBe('1');
+        expect(retained.turn_state).toBe('committed');
         expect(staleText).toBe(body); // bytes survive in application memory
         allowSend();
         const received = await pending;
