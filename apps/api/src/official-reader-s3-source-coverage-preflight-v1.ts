@@ -12,6 +12,7 @@ export const OFFICIAL_READER_S3_COVERAGE_PREFLIGHT_VERSION_V1 =
 
 type RecordValue = Record<string, unknown>;
 const HASH = /^[a-f0-9]{64}$/u;
+const PROTECTED_TEXT_HASH = /^sha256:v1:[a-f0-9]{64}$/u;
 function object(value: unknown): value is RecordValue {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
@@ -21,6 +22,9 @@ function fields(value: RecordValue, keys: readonly string[]): boolean {
 function validHash(value: unknown): value is string {
   return typeof value === 'string' && HASH.test(value);
 }
+function validProtectedHash(value: unknown): value is string {
+  return typeof value === 'string' && PROTECTED_TEXT_HASH.test(value);
+}
 function string(value: unknown): value is string {
   return typeof value === 'string' && value.length > 0 && value.length <= 512
     && value.trim() === value;
@@ -28,7 +32,7 @@ function string(value: unknown): value is string {
 type UnitV1 = Readonly<{ sourceRef: string; contentHash: string }>;
 function validUnit(item: unknown): item is UnitV1 {
   return object(item) && fields(item, ['sourceRef', 'contentHash'])
-    && string(item.sourceRef) && validHash(item.contentHash);
+    && string(item.sourceRef) && validProtectedHash(item.contentHash);
 }
 function indexedUnits(value: unknown): ReadonlyMap<string, string> | null {
   if (!Array.isArray(value) || value.length > 128) return null;
@@ -115,7 +119,7 @@ export function preflightOfficialReaderS3SourceCoverageV1(input: Readonly<{
     for (const segment of protectedSource.protectedSegments) {
       if (!string(segment.segmentId) || segmentIds.has(segment.segmentId)
         || segment.sourceReadingRef !== scope.readingId
-        || !string(segment.sourceRef) || !validHash(segment.contentHash)
+        || !string(segment.sourceRef) || !validProtectedHash(segment.contentHash)
         || expectedSegments.has(segment.sourceRef)
         || hashProtectedSajuTextV1(segment.text) !== segment.contentHash) return verdict('blocked');
       segmentIds.add(segment.segmentId);
@@ -133,7 +137,7 @@ export function preflightOfficialReaderS3SourceCoverageV1(input: Readonly<{
       if (!string(unit.segmentId) || segmentIds.has(unit.segmentId)
         || unit.sourceReadingRef !== scope.readingId
         || expectedSegments.has(unit.sourceRef)
-        || !string(unit.sourceRef) || !validHash(unit.contentHash)
+        || !string(unit.sourceRef) || !validProtectedHash(unit.contentHash)
         || expectedDisclosures.has(unit.sourceRef)
         || hashProtectedSajuTextV1(unit.text) !== unit.contentHash) return verdict('blocked');
       segmentIds.add(unit.segmentId);
@@ -145,7 +149,7 @@ export function preflightOfficialReaderS3SourceCoverageV1(input: Readonly<{
     if (!Array.isArray(ambiguityHashes)
       || ambiguityHashes.length !== protectedSource.ambiguity.length
       || ambiguityHashes.length > 128
-      || ambiguityHashes.some((value: unknown) => !validHash(value))) return verdict('blocked');
+      || ambiguityHashes.some((value: unknown) => !validProtectedHash(value))) return verdict('blocked');
     const expectedAmbiguity = protectedSource.ambiguity.map(text => hashProtectedSajuTextV1(text));
     if (new Set(expectedAmbiguity).size !== expectedAmbiguity.length
       || new Set(ambiguityHashes).size !== ambiguityHashes.length
