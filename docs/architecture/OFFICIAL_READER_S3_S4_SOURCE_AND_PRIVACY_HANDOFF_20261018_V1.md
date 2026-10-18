@@ -83,3 +83,12 @@ S3 비공개 구조 검사는 위조·다른 Reading·고지/동반 근거 누�
 **S4 완료 조건과 DB 인수:** Privacy가 위 데이터 계열의 목적/법적 근거/보존 주기/DELETE·ANONYMIZE·RETAIN 분류/복원 뒤 비재노출 책임을 **명시적으로 승인**한 뒤 새 migration 번호와 전용 최소 권한/RLS FORCE를 결정한다. 또한 (1) 일반 Chat 본문 정상 보존, (2) 탈퇴 즉시 원문 조회 0, (3) 환불·Grant 회수 시 재조회·AI 재주입 0, (4) 복원 백업 데이터도 원문 재노출 0, (5) 시도·로그·Outbox·Memory 파생 데이터 누수 0을 PG15/17 실제 DB 및 Chat/Privacy E2E로 확인한다. 보호 원문 T2는 S3 공식 발행과 **동일 거래 S2 공동 잠금**까지 충족해야만 검토 가능하다.
 
 **현재 코드 연결:** `official-reader-held-t1-t2-preflight-v1.ts`는 이제 반환값의 최상위뿐 아니라 중첩된 Response/Request/ReadableStream/Blob/FormData, Buffer, Error, Promise, callback, getter, 순환 참조, 무한 구조를 **T2 이전에** 실패 처리하고 결과를 폐기한다. 이는 민감한 전송 가능 객체의 직접 반출을 줄일 뿐 생성 콜백의 네트워크/로그/Memory 부작용은 차단하지 못한다. Privacy 승인 없이 생성 콜백을 실제 유료 운영에 연결하면 안 된다.
+
+
+## Saju 공식 발행 실제 소스 확인
+
+2026-10-19 확인: [Saju/main `src/reading/source-reading-proof-readiness.ts`](https://github.com/gycha0109-beep/Saju/blob/main/src/reading/source-reading-proof-readiness.ts)의 `SourceReadingProofReadinessV1`은 Source material의 `snapshotId`, `interpretationRunId`, `registrySnapshotId`, `executionId`, `preparationId`, `selectionId`, `profileRef`, `evidenceBundleHash`, `readingId`, `responseId`, `responseBodyHash`까지 내부 조회할 수 있으나, `proofAuthenticity: NOT_ATTESTED`, `productionInterpretationAuthority: NOT_EVALUATED`, `releaseAuthorization: NOT_EVALUATED`, `canSell: false`를 명시한다. `source_attestation_not_implemented`가 직접 차단 사유다.
+
+[Saju/main `src/reading/source-reading-transport-proof.ts`](https://github.com/gycha0109-beep/Saju/blob/main/src/reading/source-reading-transport-proof.ts)의 서명 객체는 `lifecycle: 'preview'`, `sourceAuthority: NOT_EVALUATED`, `canPublish: false`, `canSell: false`다. 따라서 기존 Source Reading HMAC 서명과 S3 합성 Owner 인계 시험이 모두 통과해도 **공식 의미 증명·원본 발행자 확정·유료 해설 공개 허가의 증거는 아직 없다.**
+
+Saju Owner가 제공할 정식 보완물은 **Preview와 별도**인 운영 원본 발급/검증 계약, 공식 Source material의 식별·해시/서명·nonce/기한/키 교체/발급 주체, 의미/Output 검증 trace의 원본 결속, 정상/불완전/위조/상실 부정 시험, Product/Reader/Release/정책 변경 시 사용금지 규칙이다. MyeongHa는 해당 계약을 제공받기 전까지 `sourceAuthority: NOT_EVALUATED`에서 긍정으로 전환하지 않는다.
