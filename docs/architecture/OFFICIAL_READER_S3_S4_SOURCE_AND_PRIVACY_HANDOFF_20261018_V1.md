@@ -58,3 +58,28 @@ S3 비공개 구조 검사는 위조·다른 Reading·고지/동반 근거 누�
 - S3 합성 서명 인계 검증에서 Subject·Official Reading·Reader·Bundle·Release·Artifact hash 이외에 **현재 Thread ID, Content Revision, Product ID, Product Spec Version, Saju Domain, Reading Contract Version, Product Rule Version, Approved Policy Revision**도 일치해야 한다. 증명 내용 전체를 별도 도메인 키로 다시 서명하더라도 현재 DB가 승인한 범위에서 하나라도 다르면 `blocked`. 같은 서명/nonce를 다른 Product·정책·채팅 Revision에 재사용할 수 없다. **실제 Saju Owner 발행 계약이라고 주장하지 않음.**
 - S4 `apps/api/src/official-reader-held-t1-t2-preflight-v1.ts`의 비공개 생성 결과가 `Response`, `Request`, `ReadableStream`, `Blob`, `FormData`일 때 **새 T2 거래도 시작하기 전에 실패**시키고, 외부에는 민감 본문/생성 오류 없이 일반 `FINAL_DISCLOSURE_UNAVAILABLE`만 돌려준다. 그 밖의 결과도 기존처럼 결과/해시를 반환하거나 DB에 저장하지 않으며 T1 확정 후 생성·T2 신규 거래 구조를 보존한다.
 - **한계:** 생성 콜백 자체가 외부 네트워크·로그·Outbox·Memory에 쓰는 부작용은 이 객체 검사만으로 식별할 수 없다. 승인된 Privacy Owner의 데이터 분류·삭제/복원/로그 감사, Saju Owner 공식 발행 및 S2 잠금 기반 T2 Writer는 **여전히 없음**. 따라서 이 조치를 S4 완료·유료 개인정보 격리 승인 또는 S5 저장 개시로 해석하면 안 된다.
+
+
+## S4 보관·삭제·복원 계약 연결 — 현행 정책과 승인 경계
+
+**기존 운영 근거를 정확히 구분:**
+
+- `docs/operations/ACCOUNT_DELETION_FINALIZATION_POLICY_V1.json`의 P0-PR-01은 **2026-09-19 승인된 기존 회원 삭제 계획**이다. 현재 `destructiveRuntimeAuthorized: false`, `authoritativePrivacyReconciliation: false`, `drReady: false`이다. 기존 백업 주기 `P30D` 및 법적 회계 근거 목적 Commerce `P5Y` 보관은 새로운 유료 원문을 영구 보관해도 된다는 의미가 **아니다**.
+- 기존 RR-03 Draft [#1960](https://github.com/gycha0109-beep/MyeongHa/pull/1960)에는 `official_reader_assistant_saju_provenance`라는 *출처 이력* 측면의 owner 승인 참조가 있으나, Draft 상태이고 `1720` 번호가 본선 Product migration과 충돌한다. 이 Draft의 출처 데이터·선행 Privacy 승인을 새로운 `유료 답변 원문`의 보관·개인정보 정책으로 승격하지 않는다.
+- RR-04 Draft [#1974](https://github.com/gycha0109-beep/MyeongHa/pull/1974)는 RR-03 위의 내부 조회 후보만 제공하며, 실 유료 본문 재열람권/환불 후 차단을 운영에서 보장하는 S6 승인 계약이 아니다.
+- `supabase/migrations/1540_saju_source_proof_nonce_claim_authority_v1.sql`의 DB nonce 기록은 **Preview transport proof 재사용 방지 전용**이다. S3 인수 합성 서명 replay key를 이 기존 테이블에 임의로 쓰거나, 이를 Saju 공식 발행권으로 간주하지 않는다.
+
+**Privacy Owner가 신규 유료 본문을 위해 반드시 명시해야 할 사항:**
+
+| 개인 데이터 계열 | 저장 경로(승인 전 없음) | 탈퇴/복원 정책 결론이 필요한 이유 |
+| --- | --- | --- |
+| 공식 유료 답변의 정확한 원문·내부 청크 | 일반 Chat `conversation_messages.body_text` 금지, 별도 보호 저장소 제안 | 원문 복호화 주체·삭제 순서·다른 사용자/Reader 교차 조회·환불 뒤 차단 |
+| 임시 생성·Attempt·검증/모델 출력 | 기존 Chat Attempt/AI 실행 로그·메시지·Outbox에 원문 금지 | 실패·Retry·기록 보존과 삭제 누락 또는 백업을 통한 재노출 |
+| Saju Unit·출처·서명·fingerprint | RR-03 sidecar와 신규 원문 자료를 분리 | 근거 원문 해시 및 추론 가능한 PII의 보관 분류, 원본 누락 시 실패 처리 |
+| 요약·Memory·검색 색인·후속 질문 맥락 | 현재 세연 일반 Memory/Non-memory 파이프라인에 유료 원문 주입 금지 | 환불·회수 후 모델에 다시 들어가는 파생 콘텐츠 0 |
+| 사용자가 보는 일반 Chat 안전 표시 | 민감 본문 대신 별도 권한 확인 후 표시되는 마커만 제안 | 기존 일반 대화는 보존하되 유료 원문은 후속 조회를 포함해 접근 차단 |
+| 데이터베이스 백업·복원·삭제 복구 기록 | 현재 P30D 백업/복원·P0-PR-01과 새로운 삭제 그래프 계약 연결 필요 | 탈퇴 후 백업에서 복원돼도 보호 답변이 재노출되지 않음을 실 데이터로 증명 |
+
+**S4 완료 조건과 DB 인수:** Privacy가 위 데이터 계열의 목적/법적 근거/보존 주기/DELETE·ANONYMIZE·RETAIN 분류/복원 뒤 비재노출 책임을 **명시적으로 승인**한 뒤 새 migration 번호와 전용 최소 권한/RLS FORCE를 결정한다. 또한 (1) 일반 Chat 본문 정상 보존, (2) 탈퇴 즉시 원문 조회 0, (3) 환불·Grant 회수 시 재조회·AI 재주입 0, (4) 복원 백업 데이터도 원문 재노출 0, (5) 시도·로그·Outbox·Memory 파생 데이터 누수 0을 PG15/17 실제 DB 및 Chat/Privacy E2E로 확인한다. 보호 원문 T2는 S3 공식 발행과 **동일 거래 S2 공동 잠금**까지 충족해야만 검토 가능하다.
+
+**현재 코드 연결:** `official-reader-held-t1-t2-preflight-v1.ts`는 이제 반환값의 최상위뿐 아니라 중첩된 Response/Request/ReadableStream/Blob/FormData, Buffer, Error, Promise, callback, getter, 순환 참조, 무한 구조를 **T2 이전에** 실패 처리하고 결과를 폐기한다. 이는 민감한 전송 가능 객체의 직접 반출을 줄일 뿐 생성 콜백의 네트워크/로그/Memory 부작용은 차단하지 못한다. Privacy 승인 없이 생성 콜백을 실제 유료 운영에 연결하면 안 된다.
