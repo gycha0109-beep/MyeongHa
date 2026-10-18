@@ -30,9 +30,9 @@ select
  has_function_privilege('$runner',
    'c08y_offline.claim_batch_v1(bigint,text)','EXECUTE'),
  has_function_privilege('$runner',
-   'c08y_offline.reserve_slot_v1(bigint,smallint)','EXECUTE'),
+   'c08y_offline.reserve_slot_v1(bigint,integer)','EXECUTE'),
  has_function_privilege('$runner',
-   'c08y_offline.observe_slot_v1(bigint,smallint,text,bigint)','EXECUTE')
+   'c08y_offline.observe_slot_v1(bigint,integer,text,bigint)','EXECUTE')
 ")"
 [[ "$acl" == "t|t|t|t|t|t|t|t|t|t|t|t" ]] || {
   echo HOLD_C08Y_WRITER_ACL_VIOLATION >&2; exit 1;
