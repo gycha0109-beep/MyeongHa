@@ -58,7 +58,7 @@ function portonePayment(overrides:Record<string,unknown>={}): Record<string,unkn
 }
 
 function verifier(overrides:Record<string,unknown>={}) {
-  const fetchImpl=vi.fn(async () => new Response(
+  const fetchImpl=vi.fn(async (_url: string, _init: unknown) => new Response(
     JSON.stringify(portonePayment(overrides)),
     {status:200,headers:{'content-type':'application/json'}},
   ));
