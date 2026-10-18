@@ -42,6 +42,15 @@ apply_pg17_migrations_through_seyeon_production_frontier() {
         20261007150457_guest_promotion_auth_fk_validation.sql|20261008043000_seyeon_manifest_acl_restore.sql)
           timestamped_count=$(( timestamped_count + 1 ))
           ;;
+        20261018190000_seyeon_locked_first_zero_source_reveal_v1.sql)
+          # Post-frontier security migration is known but must NEVER be replayed
+          # into the historical 1510 R2 catalog/restore authority fixture.
+          # Reject a same-named modified migration instead of silently skipping.
+          [[ "$(git hash-object "$migration")" == '002da74911ee6c9f2d0d31b56ca69391b0c3d5c6' ]] || {
+            echo "HOLD_R2_ZERO_REVEAL_SQL_FINGERPRINT_DRIFT" >&2; return 1;
+          }
+          continue
+          ;;
         *) echo "HOLD_R2_UNREVIEWED_TIMESTAMPED_MIGRATION" >&2; return 1 ;;
       esac
     else
