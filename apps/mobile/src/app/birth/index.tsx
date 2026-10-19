@@ -21,6 +21,7 @@ import {
 import { mobileBirthServiceV1 } from '@/features/birth/native-mobile-birth-service';
 import { mobileHomeControllerV1 } from '@/features/home/native-mobile-home-controller';
 import { mobileColors } from '@/ui/mobile-colors';
+import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
 import { useMobilePullRefreshV1 } from '@/ui/use-mobile-pull-refresh';
 
 const sexOptions = [
@@ -30,6 +31,7 @@ const sexOptions = [
 ] as const satisfies ReadonlyArray<{ value: Exclude<BirthSexV1, null>; label: string }>;
 
 export default function BirthInputScreen() {
+  const styles = useMobileThemedStyles(staticStyles);
   const [calendarType, setCalendarType] = useState<BirthCalendarTypeV1>('solar');
   const [year, setYear] = useState('');
   const [month, setMonth] = useState('');
@@ -329,3 +331,4 @@ const styles = StyleSheet.create({
   primaryButtonDisabled: { opacity: 0.65 },
   primaryButtonText: { color: mobileColors.surface, fontSize: 17, fontWeight: '800' },
 });
+const staticStyles = styles;

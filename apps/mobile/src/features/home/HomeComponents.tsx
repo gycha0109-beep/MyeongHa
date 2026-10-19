@@ -7,6 +7,7 @@ import type {
   MobileHomeTodayCardV1,
 } from '@/features/home/home-view-model';
 import { mobileColors } from '@/ui/mobile-colors';
+import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
 
 export function HomeBrandHeader({
   greeting,
@@ -15,6 +16,7 @@ export function HomeBrandHeader({
   greeting: string;
   subheading: string;
 }) {
+  const styles = useMobileThemedStyles(staticStyles);
   return (
     <View style={styles.brandSection}>
       <View style={styles.brandRow}>
@@ -35,6 +37,7 @@ export function HomeBrandHeader({
 }
 
 export function HomeTodayCard({ card }: { card: MobileHomeTodayCardV1 }) {
+  const styles = useMobileThemedStyles(staticStyles);
   if (card.kind === 'loading') {
     return (
       <View style={styles.heroCard}>
@@ -120,6 +123,7 @@ export function HomeContinuationCard({
 }: {
   card: MobileHomeContinuationCardV1;
 }) {
+  const styles = useMobileThemedStyles(staticStyles);
   return (
     <View style={styles.section}>
       <View style={styles.sectionHeading}>
@@ -190,6 +194,7 @@ export function HomeReadingTopics({
 }: {
   topics: readonly HomeReadingTopicV1[];
 }) {
+  const styles = useMobileThemedStyles(staticStyles);
   return (
     <View style={styles.section}>
       <View style={styles.sectionHeading}>
@@ -231,6 +236,7 @@ export function HomeCharacterPending({
   title: string;
   body: string;
 }) {
+  const styles = useMobileThemedStyles(staticStyles);
   return (
     <View style={styles.section}>
       <View>
@@ -370,3 +376,4 @@ const styles = StyleSheet.create({
   characterCopy: { flex: 1, gap: 5 },
   pendingBadge: { alignSelf: 'flex-start', color: mobileColors.muted, fontSize: 11, fontWeight: '800' },
 });
+const staticStyles = styles;

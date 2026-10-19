@@ -14,6 +14,7 @@ import {
   type RecordsTabV1,
 } from '@/features/records/records-view-model';
 import { mobileColors } from '@/ui/mobile-colors';
+import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
 
 export const RECORDS_TABS_V1 = Object.freeze([
   { key: 'all', label: '전체' },
@@ -29,6 +30,7 @@ export function RecordsTabs({
   selected: RecordsTabV1;
   onSelect: (tab: RecordsTabV1) => void;
 }) {
+  const styles = useMobileThemedStyles(staticStyles);
   return (
     <View style={styles.tabs}>
       {RECORDS_TABS_V1.map((tab) => (
@@ -49,6 +51,7 @@ export function RecordsTabs({
 }
 
 export function LifeFactCard({ item }: { item: LifeRecordFactV1 }) {
+  const styles = useMobileThemedStyles(staticStyles);
   const revoked = item.revokedAt !== null;
   return (
     <View style={[styles.card, revoked && styles.cardMuted]}>
@@ -74,6 +77,7 @@ export function ReadingHistoryCard({
   item: ReadingHistoryItemV1;
   onOpen?: () => void;
 }) {
+  const styles = useMobileThemedStyles(staticStyles);
   const openable = readingIsArchiveOpenableV1(item.productResponseState);
   const content = (
     <>
@@ -106,6 +110,7 @@ export function ReadingHistoryCard({
 }
 
 export function MemoryCard({ item }: { item: MemoryItemV1 }) {
+  const styles = useMobileThemedStyles(staticStyles);
   return (
     <View style={styles.card}>
       <View style={styles.cardTop}>
@@ -122,6 +127,7 @@ export function MemoryCard({ item }: { item: MemoryItemV1 }) {
 }
 
 export function RecordsEmptyState({ label }: { label: string }) {
+  const styles = useMobileThemedStyles(staticStyles);
   return (
     <View style={styles.empty}>
       <Text style={styles.emptySymbol}>之</Text>
@@ -138,6 +144,7 @@ export function RecordsFailureBanner({
   labels: readonly string[];
   onRetry: () => void;
 }) {
+  const styles = useMobileThemedStyles(staticStyles);
   if (labels.length === 0) return null;
   return (
     <View style={styles.failure}>
@@ -163,6 +170,7 @@ export function RecordsListFooter({
   error: boolean;
   onRetry: () => void;
 }) {
+  const styles = useMobileThemedStyles(staticStyles);
   if (loading) {
     return <ActivityIndicator color={mobileColors.navy} style={styles.footer} />;
   }
@@ -238,3 +246,4 @@ const styles = StyleSheet.create({
   footerButton: { alignItems: 'center', paddingVertical: 20 },
   footerSpacer: { height: 24 },
 });
+const staticStyles = styles;
