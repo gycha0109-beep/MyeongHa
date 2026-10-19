@@ -1,5 +1,5 @@
 import { mkdir, writeFile, open } from 'node:fs/promises';
-import {admitSeyeonLiveDialogueFirstPairV1} from './seyeon-live-dialogue-first-pair-admission-v1.mjs';
+import {admitSeyeonLiveDialoguePairRecoveryV2} from './seyeon-live-dialogue-pair-recovery-admission-v2.mjs';
 import { dirname, join } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { performance } from 'node:perf_hooks';
@@ -32,7 +32,7 @@ const cases = Object.freeze(selectSeyeonDialoguePathCasesV1(SEYEON_MODEL_EVAL_CA
 // A self-attested environment flag cannot verify invoices, project limits,
 // the global reservation ledger or monthly spend. A separate reviewed
 // execution workflow must own actual provider dispatch; never run here.
-const execution = admitSeyeonLiveDialogueFirstPairV1();
+const execution = admitSeyeonLiveDialoguePairRecoveryV2();
 const key = process.env.OPENAI_API_KEY2?.trim();
 if (!key) throw new Error('Missing isolated evaluation-only credential.');
 if (cases.length !== 1 || cases[0]?.id !== 'N01' || SEYEON_DIALOGUE_PATH_CASE_IDS_V1.length !== 16) {
@@ -115,11 +115,11 @@ function provider(route, model) {
         'unified_preflight_shadow', 'turn_interpretation', 'dialogue_render',
         'turn_interpret_render_shadow', 'semantic_review',
       ];
-      const purpose = allowed.find(s => stageName === 'myeongha_' + s + '_v2') ?? 'other';
-      const stage = routeUsage.purposes[purpose] ?? { calls: 0, elapsedMs: 0 };
+      const reportedPurpose = allowed.find(s => stageName === 'myeongha_' + s + '_v2') ?? 'other';
+      const stage = routeUsage.purposes[reportedPurpose] ?? { calls: 0, elapsedMs: 0 };
       stage.calls += 1;
       stage.elapsedMs += Math.round(performance.now() - start);
-      routeUsage.purposes[purpose] = stage;
+      routeUsage.purposes[reportedPurpose] = stage;
       return response;
     },
   });
