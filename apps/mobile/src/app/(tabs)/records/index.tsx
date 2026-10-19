@@ -31,6 +31,7 @@ import {
   type RecordsTabV1,
 } from '@/features/records/records-view-model';
 import { mobileColors } from '@/ui/mobile-colors';
+import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
 import { useMobileTheme } from '@/ui/mobile-theme';
 import { useMobilePullRefreshV1 } from '@/ui/use-mobile-pull-refresh';
 
@@ -102,6 +103,7 @@ function initialLoadingForTab(tab: RecordsTabV1, snapshots: ReturnType<typeof us
 }
 
 export default function RecordsScreen() {
+  const styles = useMobileThemedStyles(staticStyles);
   const { colors } = useMobileTheme();
   const { tab: routeTab } = useLocalSearchParams<{ tab?: string }>();
   const requestedTab: RecordsTabV1 = routeTab === 'readings' ? 'readings' : 'all';
@@ -205,3 +207,4 @@ const styles = StyleSheet.create({
   },
   loadingText: { color: mobileColors.muted, fontSize: 14 },
 });
+const staticStyles = styles;
