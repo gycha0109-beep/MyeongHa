@@ -46,7 +46,29 @@ apply_pg17_migrations_through_seyeon_production_frontier() {
           # Post-frontier security migration is known but must NEVER be replayed
           # into the historical 1510 R2 catalog/restore authority fixture.
           # Reject a same-named modified migration instead of silently skipping.
-          [[ "$(git hash-object "$migration")" == '3fbe7322cb3f11484a3e0a42bdc0598879b3d1d8' ]] || {
+          # The stock postgres:17.6 Docker image is intentionally minimal and
+          # need not include git. Compute the exact canonical Git blob SHA-1
+          # with coreutils if git is missing. Windows CRLF checkout is allowed
+          # ONLY when LF normalization produces the unchanged pinned SQL blob.
+          local reviewed_blob_sha1='3fbe7322cb3f11484a3e0a42bdc0598879b3d1d8'
+          local local_blob_sha1 local_bytes normalized_bytes
+          if command -v git >/dev/null 2>&1; then
+            local_blob_sha1="$(git hash-object "$migration")"
+          else
+            local_bytes="$(wc -c < "$migration" | tr -d '[:space:]')"
+            local_blob_sha1="$(
+              { printf 'blob %s\\0' "$local_bytes"; cat "$migration"; } |
+                sha1sum | cut -d ' ' -f 1
+            )"
+          fi
+          if [[ "$local_blob_sha1" != "$reviewed_blob_sha1" ]]; then
+            normalized_bytes="$(sed 's/\\r$//' "$migration" | wc -c | tr -d '[:space:]')"
+            local_blob_sha1="$(
+              { printf 'blob %s\\0' "$normalized_bytes"; sed 's/\\r$//' "$migration"; } |
+                sha1sum | cut -d ' ' -f 1
+            )"
+          fi
+          [[ "$local_blob_sha1" == "$reviewed_blob_sha1" ]] || {
             echo "HOLD_R2_ZERO_REVEAL_SQL_FINGERPRINT_DRIFT" >&2; return 1;
           }
           continue
