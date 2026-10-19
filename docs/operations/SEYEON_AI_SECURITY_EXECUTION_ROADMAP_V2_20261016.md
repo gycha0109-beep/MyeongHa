@@ -343,3 +343,10 @@ S8의 **비파괴/격리 검토는 S2~S7과 병렬 진행 가능**하며, S8 Pro
 - **구현 범위:** 이미 있는 비용 adapter의 ENFORCE 분기에서 **원본 Provider outcome 영수증이 실제 DB에 저장된 경우에만 정상 모델 응답을 Chat Commit 호출자에게 반환**한다. 저장 실패 시 현재 사전 예약을 남겨 나중에 조사·정산할 수 있도록 하고, 자동 재추론·재과금 없이 예외로 막는다. 기존 비용 adapter 테스트의 `admit → fake fetch → store failure` 사례를 승인된 응답에서 **Commit 전 차단**으로 보정한다. 저장 성공/별도 정산 실패의 기존 보수적 처리와 OFF 호환 경로는 변경하지 않는다.
 - **범위 한정:** 합성·비운영 코드와 기존 테스트만, 별도 SQL/DB/Workflow/운영 Provider 호출 없음. S6/G4 종단 전체 통합/Owner 비용 한도 및 D-04 계약 PASS가 아님. G0 OPEN, G1 양수/G2 Production/G3 Production/G4 Production/G5/G6 HOLD, `Projectors=[]`, `writeAdmission='DENY'`, Production DDL/DML/ACL/마이그레이션/유료 Provider/공개 0건 유지.
 - **검증·병합 규칙:** 이 변경의 exact PR HEAD에 대한 CI/Governance/Web, Full Integration 11/11 SUCCESS 확인 후에만 HEAD 고정 병합. merge 후 main CI/운영 skip은 별도로 기록. S8 운영 DB/DR은 기존 #1887과 격리·읽기 전용 범위에서 병렬 후속 검토.
+
+## 39. 2026-10-19 S6/G4 — 최종 Governor 정산 영수증 누락·상한 초과 시 Chat Commit HOLD (비운영)
+
+- **발견:** 기존 S6/G4 방어는 Provider 원본 영수증 저장 실패만 차단했다. 성공 응답과 Provider 영수증 저장 뒤 최종 governed settle DB 오류 또는 overCeiling=true 상태에서도 성공 결과가 상위 Chat Commit에 반환될 수 있었다.
+- **수정:** ENFORCE Governor 성공 응답은 정확한 callId의 Provider 영수증 DB 저장, 최종 비용 정산 DB ACK, overCeiling=false가 모두 있어야 반환한다. 오류 시 원본 예약·영수증을 유지하고 응답을 HOLD한다. Provider 재호출/자동 재과금, 새로운 운영 SQL·ACL·DDL·DML 없음. 레거시 비-Governor 동작과 비성공 Provider 정산 보존.
+- **검증:** 기존 합성 fake Provider/DB 테스트에 정산 DB 오류 및 상한 초과 부정 사례를 더한다. 정상 admit→fetch→store→settle 및 timeout 보수적 정산을 유지한다.
+- **운영 게이트:** 이 테스트만으로 S6/G4 종단 PASS 아님. G0 기술 승인, positive G1, Production G2/G3/G4/G5/G6 HOLD. Projectors=[], writeAdmission=DENY, 공개·실 Provider·유료 OFF, Production DB 변경 0. PR exact HEAD/Full Integration/병합 후 main 증거는 원장에 후속 기록.
