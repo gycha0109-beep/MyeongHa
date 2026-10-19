@@ -232,3 +232,10 @@ S1에서 공통 잠금 함수 자체가 성공하더라도 **S2 전체 경로가
 - 기존 1810의 신규 Reader 결속은 최초 Grant 유효성 검사 시 잠금 대기 전 `transaction_timestamp()`를 사용했고, 1220 독립 호출은 `REPEATABLE READ`/`SERIALIZABLE`에서 환불 이전 스냅샷으로 읽을 수 있었습니다. 독립 Reader Writer가 신규 Grant 결속에 오래된 권한 상태를 적용할 위험입니다.
 - 순방향 `1850_official_reader_binding_replay_current_right_and_fresh_clock_v1.sql`은 직접 1220 진입점에서 `READ COMMITTED`를 필수로 하고, S1 잠금 및 Grant 행 잠금 이후 `clock_timestamp()`로 유효기간을 재판정합니다. **기존 결속의 멱등 재생은 불변 이력 반환만 허용**하며, 실제 접근은 별도의 런타임 구매권 조회가 검증한다는 기존 계약을 변경하지 않습니다.
 - 실제 PostgreSQL 두 세션 Writer·T2 경합에 직접 1220의 반복읽기·직렬화 스냅샷 거부 회귀를 추가합니다. 공식 Source #2410 및 개인정보 #2318 승인 전 유료 본문 S5 저장·공개/운영 DB 적용 금지, Draft 유지.
+
+
+### S2 신규 Reader 결속 최종 확정 직전 구매권 재판정 (2026-10-19)
+
+- 발견: 기존 1850은 S1 범위 잠금과 Grant 행 잠금 직후에는 `clock_timestamp()`로 만료를 재판정하지만, 이후 Birth 행 잠금 대기·공식 Reading 생성·Reader 접근 INSERT 사이에 시간이 지나면 **구매권 만료 후 새 결속이 성공**할 수 있습니다. S1 advisory lock은 환불 Writer를 직렬화할 수 있어도 시계 기반 만료를 정지시키지는 않습니다.
+- 순방향 `1860_official_reader_bind_final_current_grant_guard_v1.sql`에서 **새 Reader Access INSERT 이후 성공 반환 전** 정확한 구매 Grant의 현재 active/유효기간 및 Production verified Receipt/원 구매 일치를 재검증합니다. 만료·회수된 경우 예외로 전체 거래를 원자 롤백합니다. 이전 구매의 **불변 결속 재생은 기존 이력 조회 전용 계약 그대로 보존**하고, 실제 접근권 확인은 런타임 별도 경로가 담당합니다.
+- 기존 B5 신규 Birth Revision/Reading 실 PostgreSQL 시험에 **Access INSERT 지연 3.5초 동안 2초짜리 검증 구매권 만료** 시나리오를 추가하고, Reading·Grant·결속 0건 롤백을 확인합니다. 테스트 트리거는 정리하며 실제 운영 데이터/유료 보호 본문·공개 경로 변경 없음. Saju #2410, Privacy #2318 승인과 전체 S2 종료 조건은 계속 HOLD입니다.

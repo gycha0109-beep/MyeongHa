@@ -553,4 +553,71 @@ grep -q 'official_reader_s2_legacy_receipt_scope_lock_required\|cannot bypass th
 pass "initial Reader receipt uses current Birth revision scope, not historical same-Product Reading"
 
 
+# New Reading/Reader binding can outlive its paid Grant even after the
+# post-lock check if the DB spends time creating the Reading/access row.
+# Force the exact B5 insert to wait beyond a short synthetic Grant lifetime.
+# No trigger/function survives this isolated integration scenario.
+p >"$tmpdir/expiring-insert-trigger.out" 2>&1 <<SQL || {
+  cat "$tmpdir/expiring-insert-trigger.out" >&2
+  fail "unable to install isolated expiring-bind insert delay"
+}
+create function public.test_reader_s2_expiring_insert_delay_v1()
+returns trigger language plpgsql security invoker
+set search_path=pg_catalog,public
+as \$slow_bind\$
+begin
+  perform pg_catalog.pg_sleep(3.5);
+  return new;
+end;
+\$slow_bind\$;
+create trigger test_reader_s2_expiring_insert_delay_v1
+  before insert on public.standard_reading_reader_access_grants
+  for each row
+  when (new.purchase_intent_id='$b5_intent'::uuid)
+  execute function public.test_reader_s2_expiring_insert_delay_v1();
+SQL
+
+if p >"$tmpdir/expiring-b5-writer.out" 2>&1 <<SQL
+set statement_timeout='20s';
+begin;
+select pg_catalog.set_config('myeongha.subject_id','$subject',true);
+select public.internal_apply_verified_reader_purchase_under_scope_v1(
+  '$subject'::uuid,'$new_reading'::uuid,'test-standard-reader',
+  '$b5_receipt'::uuid,'$b5_intent'::uuid,
+  array['test-reader-unit'],array[transaction_timestamp()],
+  array[transaction_timestamp()],
+  array[transaction_timestamp()+interval '2 seconds'],
+  array[null]::text[],
+  '12193000-0000-0000-0000-000000000005'::uuid,
+  '$new_reading'::uuid,
+  'sha256:v1:8888888888888888888888888888888888888888888888888888888888888888',
+  'standard-reading-access-bind-v2',
+  '{"schemaVersion":"standard-reading-access-bind-v2","purchaseIntentId":"$b5_intent"}'::jsonb
+);
+commit;
+SQL
+then
+  fail "new official Reader binding committed after its purchase Grant expired"
+fi
+grep -q 'Reader purchase Grant expired or was revoked before binding completed'   "$tmpdir/expiring-b5-writer.out" || {
+    cat "$tmpdir/expiring-b5-writer.out" >&2
+    fail "expiring Reader bind rejected for the wrong reason"
+  }
+p >"$tmpdir/expiring-trigger-cleanup.out" 2>&1 <<SQL || {
+  cat "$tmpdir/expiring-trigger-cleanup.out" >&2
+  fail "isolated Reader insert delay cleanup failed"
+}
+drop trigger test_reader_s2_expiring_insert_delay_v1
+  on public.standard_reading_reader_access_grants;
+drop function public.test_reader_s2_expiring_insert_delay_v1();
+SQL
+remaining_b5="$(p -c "select
+  (select count(*) from public.entitlement_grants where source_receipt_id='$b5_receipt'::uuid)::text
+  || '|' || (select count(*) from public.standard_reading_reader_access_grants where purchase_intent_id='$b5_intent'::uuid)::text
+  || '|' || (select count(*) from public.standard_reading_official_bindings where reading_id='$new_reading'::uuid)::text;")"
+[[ "$remaining_b5" == '0|0|0' ]] ||
+  fail "expired combined purchase failed to roll back its Grant, Reader access and official Reading: $remaining_b5"
+pass "new Reader bind rolls back Receipt Grant and Reading after expiry during access INSERT"
+
+
 echo "PASS: S2 instrumented two-direction PostgreSQL race; production integration HOLD"
