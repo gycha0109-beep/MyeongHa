@@ -2,11 +2,11 @@ import { RefreshControl, SafeAreaView, ScrollView, StyleSheet, View } from 'reac
 
 import {
   HomeBrandHeader,
-  HomeCharacterPending,
   HomeContinuationCard,
   HomeReadingTopics,
   HomeTodayCard,
 } from '@/features/home/HomeComponents';
+import { HomeCharacterFeature } from '@/features/home/HomeCharacterFeature';
 import { createMobileHomeViewModelV1 } from '@/features/home/home-view-model';
 import { useMobileHomeV1 } from '@/features/home/use-mobile-home';
 import { mobileColors } from '@/ui/mobile-colors';
@@ -31,13 +31,11 @@ export default function HomeScreen() {
         <HomeBrandHeader greeting={view.greeting} subheading={view.subheading} />
         <View style={styles.divider} />
         <HomeTodayCard card={view.today} />
+        <HomeCharacterFeature />
         <MobileFortuneCookie />
         <HomeContinuationCard card={view.continuation} />
         <HomeReadingTopics topics={view.readingTopics} />
-        <HomeCharacterPending
-          title={view.characterSurface.title}
-          body={view.characterSurface.body}
-        />
+
       </ScrollView>
     </SafeAreaView>
   );
