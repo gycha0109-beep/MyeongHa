@@ -225,3 +225,10 @@ S1에서 공통 잠금 함수 자체가 성공하더라도 **S2 전체 경로가
 - **실제 수정:** 순방향 `1840_official_reader_receipt_exact_revision_scope_guard_v1.sql`에서 **기존 1090/1080의 호출 함수** `internal_assert_reader_receipt_scope_prelocked_v1`를 그대로 재정의합니다. 구매에 이미 결속된 접근은 그 불변 Reading을 사용하고, 미결속 구매는 현재 Birth Revision×Product Spec×Saju Domain Capability의 정확한 공식 Reading만 선택합니다. 해당 Reading이 없는 *첫 구매*는 1760이 잠근 예정 Reading만 허용하며 추가 Reader 구매는 신규 Reading을 임의 생성하지 않습니다. 같은 S1 advisory lock 확인, 사전 READ COMMITTED, 기존 Commerce 비-Reader 경계 및 실행권은 유지합니다.
 - **실제 회귀:** 기존 `test/db/official_reader_s2_atomic_receipt_bind_live_writer_race.sh` fixture 끝에서 최초 Reading의 기존 구매 내역을 유지한 채 Birth revision을 갱신하고, 새 첫 구매가 새 Reading 범위 잠금에서만 허용되고 **이전 Reading 잠금은 거절**되는 PostgreSQL 실험을 추가합니다.
 - **계속 HOLD:** S2 전체 Writer 전역 잠금 순서/운영 증명은 여전히 미완료입니다. Saju #2410 공식 Production 출처, Privacy #2318 신규 보호 원문 삭제·복원 승인 전 S5 실제 저장·공개/운영 DB 변경·실결제 금지; Draft PR 유지.
+
+
+### S2 실제 Reader 결속 재생·회수·만료 및 잠금 대기 시간 경합 차단 (2026-10-19)
+
+- 기존 1810 `cmd_bind_standard_reading_access_v2`는 이미 결속된 구매의 재생 시 검증된 현행 영수증/Grant를 확인하지 않고 `replayed=true`를 반환하며, 미결속 구매의 구매권 시각을 잠금 대기 이전 `transaction_timestamp()`로 판정했습니다. 이는 §1의 **과거 결속 재생은 권리가 아니다** 경계와 충돌합니다.
+- 순방향 `1850_official_reader_binding_replay_current_right_and_fresh_clock_v1.sql`에서 S1 잠금 획득 및 Grant 행 잠금 후 실제 `clock_timestamp()`를 사용하고, 기존 결속 재생은 현재 Production verified Receipt와 저장된 정확한 미회수·미만료 Grant를 다시 확인합니다. 기존 Commerce 비-Reader 및 공개 권한은 변경하지 않습니다.
+- 기존 실제 PostgreSQL 경합 시험에 정상 재생, 회수 이후 재생 차단, 범위 잠금 대기 중 만료된 구매권의 재생 차단을 추가했습니다. S3 Production 공식 근거 #2410/Privacy #2318 승인 전 실제 유료 T2·보호 본문 저장/공개/운영 DB 적용 금지, PR Draft 유지.

@@ -324,6 +324,28 @@ after_new_scope="$(read_locked_scope_state)"
   fail "S5 must reject multiple concurrent purchase bundles"
 pass "same scoped new receipt Grant/Bind waits for T2; fresh access becomes ambiguous afterwards"
 
+# A historical binding may replay only while its verified purchase is current.
+replay_b4() {
+  p -c "
+    begin;
+    select pg_catalog.set_config('myeongha.subject_id','$subject',true);
+    select 'B4_REPLAY=' || replayed::text
+    from public.cmd_bind_standard_reading_access_v2(
+      '$subject'::uuid,'$b4_intent'::uuid,
+      '12193000-0000-0000-0000-000000000004'::uuid,
+      '12193100-0000-0000-0000-000000000004'::uuid,
+      'sha256:v1:7777777777777777777777777777777777777777777777777777777777',
+      'standard-reading-access-bind-v2',
+      '{"schemaVersion":"standard-reading-access-bind-v2","purchaseIntentId":"$b4_intent"}'::jsonb
+    );
+    commit;
+  " | grep -E '^B4_REPLAY='
+}
+[[ "$(replay_b4)" == 'B4_REPLAY=true' ]] ||
+  fail "current verified purchase must permit idempotent Reader binding replay"
+pass "verified current Reader purchase replays its existing binding"
+
+
 # Revoke B4 under the same proposed lock (only a disposable synthetic row).
 if ! p >"$tmpdir/revoke-b4.out" 2>&1 <<SQL
 begin;
@@ -414,6 +436,95 @@ after_all_revoke_scope="$(read_locked_scope_state)"
 [[ "$(s5_gate)" == 'blocked|no_current_purchase_right|false|false' ]] ||
   fail "S5 must reject refunded/fully revoked Reader rights"
 pass "revoke-first scope lock blocks T2 and its fresh read sees no active Grant"
+
+# Revoked purchase still has immutable access provenance, but no paid right.
+if replay_b4 >"$tmpdir/revoked-replay.out" 2>&1; then
+  fail "historical B4 binding replay authorized an already revoked purchase"
+fi
+grep -q 'Reader binding replay cannot authorize' "$tmpdir/revoked-replay.out" ||
+  fail "revoked historical bind replay failed for an unexpected reason"
+pass "revoked Reader purchase cannot revive old binding"
+
+# An expiry during the advisory lock wait must be compared to post-lock time.
+p -c "
+  begin;
+  select pg_catalog.set_config('myeongha.subject_id','$subject',true);
+  select public.internal_acquire_official_reader_scope_lock_v1(
+    '$subject'::uuid,'$reading'::uuid,'$reader'
+  );
+  update public.entitlement_grants
+  set status='active',valid_until=clock_timestamp()+interval '3 seconds',
+      revision=revision+1,updated_at=clock_timestamp()
+  where source_receipt_id='$b4_receipt'::uuid;
+  commit;
+" >"$tmpdir/expiring-grant-seed.out" 2>&1
+[[ "$(replay_b4)" == 'B4_REPLAY=true' ]] ||
+  fail "B4 must replay before its synthetic Grant expires"
+p >"$tmpdir/expiry-lock-holder.out" 2>&1 <<SQL &
+set application_name='rr_s2_expiry_lock_holder';
+set statement_timeout='20s';
+begin;
+select pg_catalog.set_config('myeongha.subject_id','$subject',true);
+select public.internal_acquire_official_reader_scope_lock_v1(
+  '$subject'::uuid,'$reading'::uuid,'$reader'
+);
+select pg_sleep(5);
+commit;
+SQL
+holder_pid=$!
+wait_for "expiry holder locks Reader scope" "
+  select count(*) from pg_catalog.pg_stat_activity
+  where application_name='rr_s2_expiry_lock_holder'
+    and state='active' and wait_event_type='Timeout';
+"
+p >"$tmpdir/expired-replay.out" 2>&1 <<SQL &
+set application_name='rr_s2_expired_bind_replay';
+set statement_timeout='20s';
+begin;
+select pg_catalog.set_config('myeongha.subject_id','$subject',true);
+select replayed
+from public.cmd_bind_standard_reading_access_v2(
+  '$subject'::uuid,'$b4_intent'::uuid,
+  '12193000-0000-0000-0000-000000000004'::uuid,
+  '12193100-0000-0000-0000-000000000004'::uuid,
+  'sha256:v1:7777777777777777777777777777777777777777777777777777777777',
+  'standard-reading-access-bind-v2',
+  '{"schemaVersion":"standard-reading-access-bind-v2","purchaseIntentId":"$b4_intent"}'::jsonb
+);
+commit;
+SQL
+writer_pid=$!
+wait_for "expired bind replay must wait on S1 scope" "
+  select count(distinct a.pid) from pg_catalog.pg_stat_activity a
+  join pg_catalog.pg_locks l on l.pid=a.pid
+  where a.application_name='rr_s2_expired_bind_replay'
+    and a.wait_event_type='Lock' and l.locktype='advisory'
+    and not l.granted;
+"
+if ! wait "$holder_pid"; then
+  cat "$tmpdir/expiry-lock-holder.out" >&2
+  fail "expiry scope holder failed"
+fi
+holder_pid=""
+if wait "$writer_pid"; then
+  fail "Reader replay accepted a Grant expired during S1 lock wait"
+fi
+writer_pid=""
+grep -q 'Reader binding replay cannot authorize' "$tmpdir/expired-replay.out" ||
+  fail "expiry-after-wait rejected for an unexpected reason"
+p -c "
+  begin;
+  select pg_catalog.set_config('myeongha.subject_id','$subject',true);
+  select public.internal_acquire_official_reader_scope_lock_v1(
+    '$subject'::uuid,'$reading'::uuid,'$reader'
+  );
+  update public.entitlement_grants
+  set status='revoked',revision=revision+1,updated_at=clock_timestamp()
+  where source_receipt_id='$b4_receipt'::uuid;
+  commit;
+" >"$tmpdir/expiry-cleanup.out" 2>&1
+pass "Reader replay cannot outlive its Grant during real PostgreSQL lock wait"
+
 
 # This verifies actual private combined Writer behavior. Unmodified
 # production Commerce/Grant paths may still bypass this advisory lock.
