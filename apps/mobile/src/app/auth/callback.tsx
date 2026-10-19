@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import { ActivityIndicator, SafeAreaView, StyleSheet, Text } from 'react-native';
 
 import { mobileColors } from '@/ui/mobile-colors';
+import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
 
 /**
  * React Navigation must recognize the same deep-link path accepted by
@@ -16,6 +17,7 @@ import { mobileColors } from '@/ui/mobile-colors';
  * This route is navigation only: arriving here never authenticates a user.
  */
 export default function MobileSocialAuthCallbackScreen() {
+  const styles = useMobileThemedStyles(staticStyles);
   useEffect(() => {
     router.replace('/my');
   }, []);
@@ -35,3 +37,4 @@ const styles = StyleSheet.create({
   },
   text: { color: mobileColors.ink, fontSize: 14 },
 });
+const staticStyles = styles;
