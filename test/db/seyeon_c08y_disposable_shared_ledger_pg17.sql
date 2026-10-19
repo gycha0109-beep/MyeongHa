@@ -15,6 +15,19 @@ create table c08y_offline.batch_claims (
   head_sha text not null check (head_sha ~ '^[0-9a-f]{40}$'),
   claimed_at timestamptz not null default transaction_timestamp()
 );
+-- Pre-authorization is written ONLY by the disposable test administrator.
+-- The untrusted runner cannot create a winning claim with invented run/SHA.
+-- This is NOT authentication of the real GitHub Actions/OIDC identity.
+create table c08y_offline.trusted_admissions (
+  batch_name text primary key
+    check (batch_name='c08y-six-slot-v1'),
+  owner_run bigint not null unique check (owner_run > 0),
+  head_sha text not null check (head_sha ~ '^[0-9a-f]{40}$'),
+  scope text not null check (scope='OFFLINE_ONLY'),
+  paid_dispatch_enabled boolean not null default false
+    check (paid_dispatch_enabled=false),
+  approved_at timestamptz not null default transaction_timestamp()
+);
 create table c08y_offline.reservations (
   batch_name text not null references c08y_offline.batch_claims(batch_name),
   ordinal smallint not null check (ordinal between 1 and 6),
@@ -57,8 +70,14 @@ begin
      p_sha is null or p_sha !~ '^[0-9a-f]{40}$' then
     return false;
   end if;
+  -- The run and SHA must BOTH match an administrator-pinned offline
+  -- admission. Caller-supplied identifiers alone are NEVER admission.
   insert into c08y_offline.batch_claims(batch_name,owner_run,head_sha)
-  values('c08y-six-slot-v1',p_run,p_sha)
+  select a.batch_name,a.owner_run,a.head_sha
+    from c08y_offline.trusted_admissions a
+   where a.batch_name='c08y-six-slot-v1'
+     and a.owner_run=p_run and a.head_sha=p_sha
+     and a.scope='OFFLINE_ONLY' and a.paid_dispatch_enabled=false
   on conflict do nothing returning true into won;
   return coalesce(won,false);
 end;
@@ -85,7 +104,13 @@ begin
     from c08y_offline.batch_claims
     where batch_name='c08y-six-slot-v1'
     for update;
-  if not found or stored_run<>p_run then return false; end if;
+  if not found or stored_run<>p_run or not exists (
+    select 1 from c08y_offline.trusted_admissions a
+    join c08y_offline.batch_claims c on c.batch_name=a.batch_name
+    where a.batch_name='c08y-six-slot-v1'
+      and a.owner_run=p_run and a.head_sha=c.head_sha
+      and a.scope='OFFLINE_ONLY' and a.paid_dispatch_enabled=false
+  ) then return false; end if;
   select count(*) into prior_count from c08y_offline.reservations
     where batch_name='c08y-six-slot-v1';
   select count(*) into observed_count from c08y_offline.observations
@@ -128,7 +153,13 @@ begin
     from c08y_offline.batch_claims
     where batch_name='c08y-six-slot-v1'
     for update;
-  if not found or stored_run<>p_run then return false; end if;
+  if not found or stored_run<>p_run or not exists (
+    select 1 from c08y_offline.trusted_admissions a
+    join c08y_offline.batch_claims c on c.batch_name=a.batch_name
+    where a.batch_name='c08y-six-slot-v1'
+      and a.owner_run=p_run and a.head_sha=c.head_sha
+      and a.scope='OFFLINE_ONLY' and a.paid_dispatch_enabled=false
+  ) then return false; end if;
   if not exists (
     select 1 from c08y_offline.reservations
     where batch_name='c08y-six-slot-v1' and ordinal=p_ordinal
