@@ -209,3 +209,11 @@ S1에서 공통 잠금 함수 자체가 성공하더라도 **S2 전체 경로가
 - S2 1750 `internal_qry_official_reader_locked_bundle_scope_v1`를 1820 순방향 migration으로 보강했다. 현행 구매권을 읽는 함수에서 **`READ COMMITTED`가 아니면 공동 잠금을 획득하기 전 PostgreSQL 오류**를 발생시킨다. 오래된 `REPEATABLE READ` / `SERIALIZABLE` 트랜잭션의 최초 스냅샷으로 환불/회수 후에도 과거 구매권을 다시 유효하게 판단하는 위험을 차단한다.
 - 기존 실제 S2 발급·회수 경합 preflight에 두 격리 수준의 부정 시험을 추가했다. 정상 READ COMMITTED 조회, 단일/다중 Bundle과 권한 회수 결과 검증은 기존 그대로 유지한다.
 - 이는 최종 T2가 요구하는 **잠금 뒤 최신 구매권 조회**의 선행 조건일 뿐, T2 유료 본문 저장/공개 권한이 아니다. Saju 공식 Production 출처 발급 [#2410](https://github.com/gycha0109-beep/Saju/issues/2410) 및 Privacy 신규 보호 본문 승인 [#2318](https://github.com/gycha0109-beep/MyeongHa/issues/2318)은 둘 다 여전히 열려 있다. 실제 유료 본문·Memory·일반 Chat·운영 DB/결제 경로 변경 없음, Draft·PUBLIC OFF 유지.
+
+
+### S5 비공개 최종저장 전 권한 관문 — 계약 미승인 시 보류 (2026-10-19)
+
+- `1830_official_reader_s5_precommit_held_scope_gate_v1.sql`에서 비공개 `internal_qry_official_reader_s5_precommit_held_scope_v1`를 구현했다. 기존 1740/1820이 강제하는 **같은 Subject×공식 Reading×Reader 거래 잠금**, `READ COMMITTED` 및 잠금 뒤 DB 현행 구매 Grant 묶음 조회를 **최종저장 선행 진입점에 직접 연결**한다.
+- 서버가 기대한 Reader Bundle UUID와 잠금 뒤 실제 유효 Bundle이 다르거나, 0개/2개 이상 활성 Bundle이면 `blocked`; 정확히 1개이고 동일 Bundle이어도 **`held`와 `can_persist=false`, `can_disclose=false`만 반환**한다. 본문·해시·출처·회원식별자 반환 없음. Saju Owner [#2410](https://github.com/gycha0109-beep/Saju/issues/2410) 공식 Production 원본 발행과 Privacy Owner [#2318](https://github.com/gycha0109-beep/MyeongHa/issues/2318) 보관·삭제/복원 계약 부재를 긍정으로 우회하지 않는다.
+- 기존 `official_reader_s2_atomic_receipt_bind_live_writer_race.sh`의 **실제 Receipt→Grant→Reader 결속, B4 추가 구매, 2개 Bundle 충돌, B4 회수, 최종 B2 회수** 상태마다 이 관문을 호출한다. 다중 Bundle 및 환불/회수 뒤에도 저장·공개 권한은 0이고, 정상 1개여도 Owner HOLD임을 확인한다. 일반 Public/API/Service/Chat/Commerce 역할에 새 EXECUTE가 없다.
+- **이것은 실제 유료 본문 저장·출처 발행·Privacy 승인·T2 commit이 아니다.** 함수에서 보호 테이블/출처 증명을 쓰지 않고, 운영 DB/실결제·일반 Chat/Memories/Outbox/HTTP를 변경하지 않는다. 실제 S5 Writer는 공식 발행과 Privacy 승인·S2 전체 Writer/전역 잠금 순서·릴리스 심사를 충족한 뒤에만 별도 구현한다.
