@@ -133,6 +133,27 @@ initial_scope="$(read_locked_scope_state)"
 [[ "$initial_scope" =~ ^one_current_bundle\|1\|[0-9a-f-]{36}$ ]] ||
   fail "private post-lock scope query missed initial single bundle"
 
+# A transaction-level repeatable snapshot must never be used as the
+# post-lock source of truth for the final paid Writer. In particular,
+# REPEATABLE READ could cache an active Grant before waiting on refund.
+for isolation in 'repeatable read' 'serializable'; do
+  if p >"$tmpdir/stale-snapshot-denied.out" 2>&1 <<SQL
+begin isolation level $isolation;
+select pg_catalog.set_config('myeongha.subject_id', '$subject', true);
+select * from public.internal_qry_official_reader_locked_bundle_scope_v1(
+  '$subject'::uuid, '$reading'::uuid, '$reader'
+);
+commit;
+SQL
+  then
+    fail "post-lock Reader query accepted stale transaction isolation: $isolation"
+  fi
+  grep -q 'Official Reader locked scope requires READ COMMITTED' \
+    "$tmpdir/stale-snapshot-denied.out" ||
+    { cat "$tmpdir/stale-snapshot-denied.out" >&2; fail "incorrect isolation guard for $isolation"; }
+done
+pass "post-lock Reader bundle query enforces READ COMMITTED and rejects stale transaction snapshots"
+
 # No public, session, or privileged API runtime role may call this
 # pre-authority helper; successful owner-side SQL tests do not grant EXECUTE.
 private_function_count="$(p -c "
