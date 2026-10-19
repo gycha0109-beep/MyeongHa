@@ -25,7 +25,7 @@ export function FaceEditorialIntro({ readerId }: { readerId: MobileReaderPresent
       <View pointerEvents="none" style={styles.innerFrame} />
       <View style={styles.content}>
         <Text style={styles.eyebrow}>FACE READING · 相</Text>
-        <Text style={styles.title}>얼굴에 담긴{'\'}n나의 이야기</Text>
+        <Text style={styles.title}>얼굴에 담긴 나의 이야기</Text>
         <Text style={styles.body}>
           정면 사진을 준비하고, {reader.name}과 함께할 관상 읽기의 시작을 만나보세요.
         </Text>
