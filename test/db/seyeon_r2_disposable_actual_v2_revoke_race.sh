@@ -10,6 +10,10 @@ if [[ "${CI:-}" != "true" || "${PGHOST:-}" != "localhost" ||
 fi
 # R1's already-reviewed exact-Attempt & XOR fixture is a prerequisite.
 bash test/db/seyeon_r1_disposable_positive_source_xor.sh
+# R19: real verified-Member -> canonical Subject -> immutable Parent+Edges COMMIT
+# before any possible model dispatch, in the SAME disposable database only.
+SEYEON_POSITIVE_GRANT_REAL_PG=1 ./node_modules/.bin/vitest run \
+  test/seyeon-positive-model-pre-model-db-pin-r19-candidate.test.ts --maxWorkers=1
 # DB-authoritative original JSONB digest must not be confused with Node
 # canonical-json projection hashes. Same REAL exact Attempt, synthetic only.
 SEYEON_POSITIVE_GRANT_REAL_PG=1 ./node_modules/.bin/vitest run \
