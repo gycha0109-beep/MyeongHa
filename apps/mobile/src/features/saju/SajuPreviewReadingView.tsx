@@ -155,11 +155,11 @@ export function SajuPreviewReadingView({ onOpenPreview }: { onOpenPreview?: (top
   return (
     <View style={styles.section}>
       <View style={styles.headerCard}>
-        <Text style={styles.eyebrow}>SAJU READING</Text>
+        <Text style={styles.eyebrow}>DISCOVER YOUR STORY · 사주</Text>
         <Text style={styles.title}>사주 읽기</Text>
         <Text style={styles.body}>
-          웹 사주 화면과 같은 주제 구성을 보여줍니다. 현재 서버 Preview 권한이 열린
-          주제만 바로 실행하고, 나머지는 필요한 입력이나 준비 상태를 그대로 표시합니다.
+          궁금한 주제를 선택해 더 깊이 살펴보세요. 준비된 풀이만 연결되며,
+          아직 확인이 필요한 주제는 현재 상태를 안내합니다.
         </Text>
         <Text style={styles.authorityNote}>
           다른 주제의 풀이로 자동 대체하지 않습니다.
@@ -337,13 +337,13 @@ export function SajuPreviewReadingView({ onOpenPreview }: { onOpenPreview?: (top
 }
 
 const styles = StyleSheet.create({
-  section: { gap: 16 },
+  section: { gap: 18 },
   headerCard: {
     borderWidth: 1,
     borderColor: mobileColors.border,
-    borderRadius: 18,
+    borderRadius: 14,
     backgroundColor: mobileColors.surface,
-    padding: 20,
+    padding: 22,
     gap: 10,
   },
   eyebrow: {
@@ -352,32 +352,32 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: 1.1,
   },
-  title: { color: mobileColors.ink, fontSize: 22, fontWeight: '800' },
+  title: { color: mobileColors.ink, fontSize: 24, fontWeight: '900', letterSpacing: -0.4 },
   body: { color: mobileColors.muted, fontSize: 14, lineHeight: 21 },
   authorityNote: { color: mobileColors.muted, fontSize: 11, lineHeight: 17 },
   topicSection: { gap: 10 },
   sectionHeading: { gap: 3, paddingHorizontal: 2 },
   sectionTitle: { color: mobileColors.ink, fontSize: 19, fontWeight: '800' },
   sectionSupport: { color: mobileColors.muted, fontSize: 12, lineHeight: 18 },
-  topicList: { gap: 8 },
+  topicList: { gap: 10 },
   topicCard: {
-    minHeight: 78,
+    minHeight: 90,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
     borderWidth: 1,
     borderColor: mobileColors.border,
-    borderRadius: 16,
+    borderRadius: 17,
     backgroundColor: mobileColors.surface,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
   },
   topicCardActive: {
     borderColor: mobileColors.navy,
   },
   topicIcon: {
-    width: 42,
-    height: 42,
+    width: 48,
+    height: 48,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 21,
@@ -388,8 +388,8 @@ const styles = StyleSheet.create({
   topicIconTextActive: { color: mobileColors.surface },
   topicCopy: { flex: 1, gap: 5 },
   topicTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
-  topicTitle: { color: mobileColors.ink, fontSize: 16, fontWeight: '800' },
-  topicDescription: { color: mobileColors.muted, fontSize: 12, lineHeight: 18 },
+  topicTitle: { color: mobileColors.ink, fontSize: 17, fontWeight: '800' },
+  topicDescription: { color: mobileColors.muted, fontSize: 12, lineHeight: 19 },
   statusBadge: {
     borderWidth: 1,
     borderRadius: 999,
