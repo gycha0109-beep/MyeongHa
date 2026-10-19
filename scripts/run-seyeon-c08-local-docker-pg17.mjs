@@ -9,7 +9,13 @@ import process from 'node:process';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const name = 'myeongha-c08-local-' + randomBytes(5).toString('hex');
-const database = 'myeongha_c08_local_case_1';
+const firstZero = process.argv[2] === '--first-zero-disposable-only';
+const database = firstZero
+  ? 'myeongha_first_zero_local_case_1'
+  : 'myeongha_c08_local_case_1';
+const ciCase = firstZero
+  ? 'seyeon-first-zero-locked-reveal-disposable-pg17'
+  : 'seyeon-c08-first-turn-local-pg17';
 const image = 'postgres:17.6';
 
 function run(args, opts = {}) {
@@ -19,7 +25,9 @@ function run(args, opts = {}) {
   });
 }
 async function main() {
-  if (process.argv.length !== 3 || process.argv[2] !== '--disposable-only') {
+  if (process.argv.length !== 3 ||
+      (process.argv[2] !== '--disposable-only' &&
+       process.argv[2] !== '--first-zero-disposable-only')) {
     throw Error('HOLD_C08_DOCKER: pass --disposable-only explicitly. Never use a production database.');
   }
   // This container has NO TCP network and NO persistent writable volume.
@@ -88,14 +96,16 @@ async function main() {
       'find ' + scratch + '/test/db -type f -name "*.sh" -exec sed -i "s/\\r$//" {} +',
       'cd ' + scratch,
       'printf "C08_DOCKER_SHELL_LINE_ENDINGS_NORMALIZED\\n"',
-      'bash test/db/run_ci_case.sh seyeon-c08-first-turn-local-pg17',
+      'bash test/db/run_ci_case.sh ' + ciCase,
     ].join('\n');
     run(['exec', '--user', 'postgres', '--workdir', '/repo',
       '--env', 'PGUSER=postgres',
       '--env', 'PGDATABASE=' + database,
       name, 'bash', '-c', prepareAndRun],
     { stdio: 'inherit', timeout: 1_800_000 });
-    process.stdout.write('PASS_C08_DOCKER_LOCAL_PG17_READONLY_CENSUS_SMOKE\n');
+    process.stdout.write(firstZero
+      ? 'PASS_FIRST_ZERO_DOCKER_LOCAL_PG17_ACTUAL_LOCKED_SQL\n'
+      : 'PASS_C08_DOCKER_LOCAL_PG17_READONLY_CENSUS_SMOKE\n');
   } finally {
     if (started) {
       try { run(['rm', '-f', name]); }
