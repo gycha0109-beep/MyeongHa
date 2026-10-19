@@ -473,7 +473,7 @@ insert into public.purchase_intents(
 )
 select '$b5_intent'::uuid,subject_id,product_offer_id,provider_account_link_id,
        'reader-b5-new-birth-revision','sha256:test:reader-b5-new-revision',
-       offer_snapshot_jsonb,offer_snapshot_hash,'verified',
+       offer_snapshot_jsonb,offer_snapshot_hash,'created',
        clock_timestamp(),clock_timestamp(),expected_amount_minor,
        expected_currency,charge_terms_version,capability_set_id,
        capability_snapshot_jsonb,capability_snapshot_hash
@@ -489,6 +489,22 @@ select '$b5_intent'::uuid,product_id,reader_character_id,
        clock_timestamp()
 from public.purchase_intent_reader_selections
 where purchase_intent_id='11392300-0000-0000-0000-000000000001'::uuid;
+-- Commerce attempt must predate the verified/terminal Purchase transition.
+insert into public.commerce_payment_attempts(
+  id,purchase_intent_id,subject_id,product_offer_id,attempt_no,
+  provider,environment,idempotency_key,provider_request_id,
+  provider_transaction_id,status,created_at,updated_at
+)
+select '12197000-0000-0000-0000-000000000005'::uuid,
+  pi.id,pi.subject_id,pi.product_offer_id,1,
+  'portone_v2','production',
+  'synthetic-b5-no-grant-cancel-request',
+  'synthetic-portone-b5-payment','tx-official-reader-b5-new-revision',
+  'response_received',clock_timestamp(),clock_timestamp()
+from public.purchase_intents pi where pi.id='$b5_intent'::uuid;
+update public.purchase_intents
+set status='verified',updated_at=clock_timestamp()
+where id='$b5_intent'::uuid;
 insert into public.commerce_receipts(
   id,subject_id,purchase_intent_id,product_offer_id,platform,provider,
   external_transaction_id,receipt_fingerprint,verification_status,
@@ -637,21 +653,11 @@ pass "new Reader bind rolls back Receipt Grant and Reading after expiry during a
 
 # Actual PortOne verified cancellation BEFORE any Grant/access exists.
 # The original B5 receipt has no purchase Grant (the expiry-path transaction
-# rolled back). Persist one separate real payment attempt for its lineage.
-p >"$tmpdir/no-grant-payment-attempt.out" 2>&1 <<SQL || { cat "$tmpdir/no-grant-payment-attempt.out" >&2; fail "no-Grant original payment attempt seed failed"; }
-insert into public.commerce_payment_attempts(
-  id,purchase_intent_id,subject_id,product_offer_id,attempt_no,
-  provider,environment,idempotency_key,provider_request_id,
-  provider_transaction_id,status,created_at,updated_at
-)
-select '12197000-0000-0000-0000-000000000005'::uuid,
-  cr.purchase_intent_id,cr.subject_id,cr.product_offer_id,1,
-  'portone_v2','production',
-  'synthetic-b5-no-grant-cancel-request',
-  'synthetic-portone-b5-payment',cr.external_transaction_id,
-  'response_received',clock_timestamp(),clock_timestamp()
-from public.commerce_receipts cr where cr.id='$b5_receipt'::uuid;
-SQL
+# rolled back). Its payment attempt was seeded before intent verification.
+[[ "$(p -c "select count(*) from public.commerce_payment_attempts
+  where purchase_intent_id='$b5_intent'::uuid
+    and provider_request_id='synthetic-portone-b5-payment';")" == 1 ]] ||
+  fail "no-Grant original verified payment attempt missing"
 b5_amount="$(p -c "select verified_amount_minor from public.commerce_receipts where id='$b5_receipt'::uuid;")"
 [[ "$b5_amount" =~ ^[1-9][0-9]*$ ]] || fail "no-Grant payment amount missing"
 cancelled_at="$(p -c "select pg_catalog.to_char(clock_timestamp() at time zone 'UTC','YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"');")"
