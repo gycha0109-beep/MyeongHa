@@ -3,8 +3,7 @@ import { dirname, join } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { performance } from 'node:perf_hooks';
 import { createOpenAiSeyeonStructuredProviderV1 } from '../dist/apps/api/src/openai-seyeon-structured-provider-v1.js';
-import { createSeyeonUnifiedGovernanceCandidateV1 } from '../dist/apps/api/src/seyeon-unified-governance-candidate-v1.js';
-import { createSeyeonFastDialogueShadowV1 } from '../dist/apps/api/src/seyeon-fast-dialogue-shadow-v1.js';
+import { runSeyeonCensusFirstThreeCallShadowV1 } from '../dist/apps/api/src/seyeon-census-first-three-call-shadow-v1.js';
 import {
   runSeyeonCharacterTurnV2,
 } from '../dist/apps/api/src/seyeon-character-runtime-v2.js';
@@ -12,8 +11,6 @@ import {
   createIntegrityClassifier,
   createDisclosureClassifier,
 } from '../dist/apps/api/src/seyeon-production-governance-v1.js';
-import { runCharacterGovernedPreflightV1 } from '../dist/apps/api/src/character-governed-preflight-v1.js';
-import { assembleSeyeonRuntimeContextV2 } from '../dist/packages/domain/src/index.js';
 import { SEYEON_MODEL_EVAL_CASES_V1 } from './seyeon-model-eval-cases-v1.mjs';
 import {
   SEYEON_DIALOGUE_PATH_CASE_IDS_V1, SEYEON_DIALOGUE_PATH_ROUTES_V1,
@@ -183,33 +180,20 @@ async function evaluate(route, spec) {
       });
       safeEnvelope = executed.envelope;
     } else {
-      const governanceCandidate = createSeyeonUnifiedGovernanceCandidateV1({
-        governance: governance(candidatePreflight),
-        provider: candidatePreflight,
-      });
-      const preflight = await runCharacterGovernedPreflightV1({
-        characterId: 'seyeon', userMessageRef: id, userText: spec.text,
-        relationship: governanceCandidate.relationship,
-        integrity: governanceCandidate.integrity,
-        disclosure: governanceCandidate.disclosure,
-      });
-      const context = assembleSeyeonRuntimeContextV2({
-        ...contextInput,
-        integrityDecisions: preflight.integrity.decisions,
-        governedPreflightApplied: true,
-        disclosure: {
-          decision: preflight.disclosure.status === 'sensitive'
-            ? preflight.disclosure.decision : null,
-          retrievedSources: preflight.retrievedPrivateSources,
-        },
-      });
       const census = createSeyeonDialoguePathSyntheticCensusV1(spec.id, id);
-      const executed = await createSeyeonFastDialogueShadowV1({
-        candidateProvider: candidateDialogue,
-        reviewerProvider: candidateReviewer,
+      const executed = await runSeyeonCensusFirstThreeCallShadowV1({
+        userMessageRef: id,
+        userText: spec.text,
+        contextInput,
+        governance: governance(candidatePreflight),
         fullThreadCensus: census.port,
-      }).evaluate(context);
-      if (census.readCount !== 3 ||
+        unifiedPreflightProvider: candidatePreflight,
+        candidateDialogueProvider: candidateDialogue,
+        independentSemanticReviewer: candidateReviewer,
+      });
+      // One preflight census before provider #1, then three within the
+      // guarded fast-dialogue shadow, including the final post-review read.
+      if (census.readCount !== 4 ||
           executed.scope !== 'SHADOW_ONLY_NOT_PRODUCTION')
         throw new Error('SYNTHETIC_FIRST_TURN_CENSUS_HOLD');
       safeEnvelope = executed.envelope;

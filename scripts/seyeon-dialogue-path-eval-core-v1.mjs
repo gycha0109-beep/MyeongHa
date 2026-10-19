@@ -105,7 +105,8 @@ export function summarizeSeyeonDialoguePathV1(rows, totalCases) {
 /**
  * C08-B synthetic-only first-turn census for the actual 5-vs-3 benchmark.
  * This never queries PostgreSQL and is not a real first-turn authority.
- * The candidate must re-read three times, including after semantic review.
+ * The candidate must read once before unified preflight and three more times
+ * around dialogue/semantic review, including the final post-review read.
  */
 export function createSeyeonDialoguePathSyntheticCensusV1(caseId, userMessageId) {
   if (!SEYEON_DIALOGUE_PATH_CASE_IDS_V1.includes(caseId) ||
@@ -120,7 +121,7 @@ export function createSeyeonDialoguePathSyntheticCensusV1(caseId, userMessageId)
       readFullThreadCensus(input) {
         if (input?.subjectId !== subjectId ||
             input?.threadId !== threadId ||
-            input?.currentUserMessageId !== userMessageId || readCount >= 3)
+            input?.currentUserMessageId !== userMessageId || readCount >= 4)
           throw new TypeError('Synthetic first-turn identity/census mismatch.');
         readCount++;
         return Object.freeze({

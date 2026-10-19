@@ -33,18 +33,18 @@ describe('Se-yeon real API dialogue-path benchmark accounting', () => {
     expect(SEYEON_DIALOGUE_PATH_MAX_ESTIMATED_COST_USD_V1).toBeLessThanOrEqual(3);
   });
 
-  it('creates an exact three-read isolated synthetic first-contact Census for the 3-call path', () => {
+  it('creates an exact four-read isolated synthetic first-contact Census for the 3-call path', () => {
     const census=createSeyeonDialoguePathSyntheticCensusV1('N01','synthetic:N01');
     const args={subjectId:'synthetic-subject:N01',
       threadId:'synthetic-thread:N01',currentUserMessageId:'synthetic:N01'};
-    for(let i=0;i<3;i++) {
+    for(let i=0;i<4;i++) {
       const result=census.port.readFullThreadCensus(args);
       expect(result).toMatchObject({
         schemaVersion:'seyeon-first-turn-census-shadow-v1',
         messageCount:1,latestSenderType:'user',complete:true,
       });
     }
-    expect(census.readCount).toBe(3);
+    expect(census.readCount).toBe(4);
     expect(()=>census.port.readFullThreadCensus(args)).toThrow();
     expect(()=>createSeyeonDialoguePathSyntheticCensusV1('F02','synthetic:F02')).toThrow();
     expect(()=>createSeyeonDialoguePathSyntheticCensusV1('N01','synthetic:N02')).toThrow();
@@ -57,7 +57,10 @@ describe('Se-yeon real API dialogue-path benchmark accounting', () => {
     const src=readFileSync(new URL(
       '../scripts/run-seyeon-dialogue-path-real-api-eval-v1.mjs',import.meta.url),'utf8');
     expect(src).toContain('fullThreadCensus: census.port');
-    expect(src).toContain('census.readCount !== 3');
+    expect(src).toContain('census.readCount !== 4');
+    expect(src).toContain('runSeyeonCensusFirstThreeCallShadowV1');
+    expect(src).not.toContain('runCharacterGovernedPreflightV1');
+    expect(src).not.toContain('createSeyeonFastDialogueShadowV1');
     expect(src).toContain('buildSeyeonC08SReviewerPackV1');
     expect(src).toContain('buildSeyeonC08SOwnerKeyV1');
     expect(src).toContain('SEYEON_DIALOGUE_PATH_USAGE_UNKNOWN_HOLD');
