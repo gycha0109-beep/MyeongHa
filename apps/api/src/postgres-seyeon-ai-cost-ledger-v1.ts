@@ -497,7 +497,18 @@ export function createPersistingSeyeonAiProviderV1(input: {
         },
       });
       try {
-        return await provider.generate(request);
+        const generated = await provider.generate(request);
+        // The raw Provider intentionally does not fail inference when its
+        // metering callback fails. Under ENFORCE that cannot authorize the
+        // Chat Commit or a successful reply: the server must have stored the
+        // actual outcome against its pre-dispatch reservation. Never issue a
+        // second inference to repair a lost receipt.
+        if (input.governor !== undefined &&
+            (state.callId === null ||
+             !durableProviderReceipts.has(state.callId))) {
+          throw new Error('Governed Provider outcome receipt was not persisted; Chat Commit denied.');
+        }
+        return generated;
       } finally {
         for (const event of events) {
           if (state.binding === null || state.callId !== event.callId) {
