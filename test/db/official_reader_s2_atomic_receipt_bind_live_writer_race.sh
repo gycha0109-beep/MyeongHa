@@ -1132,4 +1132,210 @@ grep -qx 'official-reader-s2-revoke-dispatch-v1' "$tmpdir/b7-bound-retry.out" ||
 pass "Reader bind-first forces unbound refund rollback; verified retry uses bound S1 lifecycle"
 
 
+
+# Multi-Receipt, same purchase intent: PortOne proof is per ORIGINAL payment
+# attempt and Receipt, not per purchase. Receipt A refund MUST leave B's paid
+# Grant untouched while a new C Receipt is issued in another DB session.
+b8_intent="12192300-0000-0000-0000-000000000008"
+b8_reading="12103100-0000-0000-0000-000000000008"
+b8_receipt_a="12192000-0000-0000-0000-000000000008"
+b8_receipt_b="12192000-0000-0000-0000-000000000009"
+b8_receipt_c="12192000-0000-0000-0000-000000000010"
+p >"$tmpdir/b8-three-receipts.out" 2>&1 <<SQL || { cat "$tmpdir/b8-three-receipts.out" >&2; fail "same purchase multi-Receipt seed failed"; }
+begin;
+insert into public.purchase_intents(
+  id,subject_id,product_offer_id,provider_account_link_id,
+  idempotency_key,request_hash,offer_snapshot_jsonb,offer_snapshot_hash,
+  status,created_at,updated_at,expected_amount_minor,expected_currency,
+  charge_terms_version,capability_set_id,capability_snapshot_jsonb,
+  capability_snapshot_hash
+)
+select '$b8_intent'::uuid,subject_id,product_offer_id,provider_account_link_id,
+       'reader-b8-multi-receipt','sha256:test:reader-b8-multi-receipt',
+       offer_snapshot_jsonb,offer_snapshot_hash,'created',
+       clock_timestamp(),clock_timestamp(),expected_amount_minor,
+       expected_currency,charge_terms_version,capability_set_id,
+       capability_snapshot_jsonb,capability_snapshot_hash
+from public.purchase_intents where id='$b7_intent'::uuid;
+insert into public.purchase_intent_reader_selections(
+  purchase_intent_id,product_id,reader_character_id,reader_content_bundle_id,
+  selection_contract_version,selection_snapshot_jsonb,selection_hash,created_at
+)
+select '$b8_intent'::uuid,product_id,reader_character_id,
+       reader_content_bundle_id,selection_contract_version,
+       selection_snapshot_jsonb,'sha256:test:reader-b8-selection',clock_timestamp()
+from public.purchase_intent_reader_selections
+where purchase_intent_id='$b7_intent'::uuid;
+insert into public.commerce_payment_attempts(
+  id,purchase_intent_id,subject_id,product_offer_id,attempt_no,
+  provider,environment,idempotency_key,provider_request_id,
+  provider_transaction_id,status,created_at,updated_at
+)
+select x.attempt_id::uuid,pi.id,pi.subject_id,pi.product_offer_id,x.attempt_no,
+  'portone_v2','production',x.idempotency_key,x.payment_id,x.transaction_id,
+  'response_received',clock_timestamp(),clock_timestamp()
+from public.purchase_intents pi
+cross join (values
+  ('12197000-0000-0000-0000-000000000008',1,'reader-b8-attempt-a','b8-payment-a','tx-reader-b8-a'),
+  ('12197000-0000-0000-0000-000000000009',2,'reader-b8-attempt-b','b8-payment-b','tx-reader-b8-b'),
+  ('12197000-0000-0000-0000-000000000010',3,'reader-b8-attempt-c','b8-payment-c','tx-reader-b8-c')
+) as x(attempt_id,attempt_no,idempotency_key,payment_id,transaction_id)
+where pi.id='$b8_intent'::uuid;
+update public.purchase_intents
+set status='verified',updated_at=clock_timestamp()
+where id='$b8_intent'::uuid;
+insert into public.commerce_receipts(
+  id,subject_id,purchase_intent_id,product_offer_id,platform,provider,
+  external_transaction_id,receipt_fingerprint,verification_status,
+  verified_payload_jsonb,verified_at,created_at,environment,
+  verifier_revision,verified_amount_minor,verified_currency
+)
+select x.receipt_id::uuid,cr.subject_id,'$b8_intent'::uuid,cr.product_offer_id,
+       cr.platform,cr.provider,x.transaction_id,
+       x.fingerprint,'verified',cr.verified_payload_jsonb,clock_timestamp(),
+       clock_timestamp(),cr.environment,cr.verifier_revision,
+       cr.verified_amount_minor,cr.verified_currency
+from public.commerce_receipts cr
+cross join (values
+  ('$b8_receipt_a','tx-reader-b8-a','hmac-sha256:k1:8181818181818181818181818181818181818181818181818181818181818181'),
+  ('$b8_receipt_b','tx-reader-b8-b','hmac-sha256:k1:8282828282828282828282828282828282828282828282828282828282'),
+  ('$b8_receipt_c','tx-reader-b8-c','hmac-sha256:k1:8383838383838383838383838383838383838383838383838383838383')
+) as x(receipt_id,transaction_id,fingerprint)
+where cr.id='$b7_receipt'::uuid;
+commit;
+SQL
+# Direct receipt issuer is allowed only after SAME S1 scope acquisition.
+for receipt in "$b8_receipt_a" "$b8_receipt_b"; do
+  p >"$tmpdir/b8-issued-$receipt.out" 2>&1 <<SQL || { cat "$tmpdir/b8-issued-$receipt.out" >&2; fail "multi-Receipt separate Grant issuance failed"; }
+begin;
+select pg_catalog.set_config('myeongha.subject_id','$subject',true);
+select pg_catalog.set_config('myeongha.reader_pending_reading_id','$b8_reading',true);
+select public.internal_acquire_official_reader_scope_lock_v1(
+  '$subject'::uuid,'$b8_reading'::uuid,'test-standard-reader'
+);
+select result_grant_id
+from public.internal_apply_verified_receipt_capability_effects_v1(
+  '$receipt'::uuid,array['test-reader-unit'],
+  array[transaction_timestamp()],array[transaction_timestamp()],
+  array[null]::timestamptz[],array[null]::text[]
+);
+commit;
+SQL
+done
+b8_grant_a="$(p -c "select id from public.entitlement_grants
+  where source_receipt_id='$b8_receipt_a'::uuid;")"
+b8_grant_b="$(p -c "select id from public.entitlement_grants
+  where source_receipt_id='$b8_receipt_b'::uuid;")"
+[[ "$b8_grant_a" =~ ^[0-9a-f-]{36}$ && "$b8_grant_b" =~ ^[0-9a-f-]{36}$ &&
+    "$b8_grant_a" != "$b8_grant_b" ]] ||
+  fail "multi-Receipt synthetic purchase must have TWO separate Grant lineages"
+
+# A sibling payment request must NOT authorize cancelling receipt A.
+b8_amount="$(p -c "select verified_amount_minor from public.commerce_receipts where id='$b8_receipt_a'::uuid;")"
+b8_cancel_at="$(p -c "select pg_catalog.to_char(clock_timestamp() at time zone 'UTC','YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"');")"
+if p >"$tmpdir/b8-wrong-attempt.out" 2>&1 <<SQL
+begin;
+set local role myeongha_commerce_internal_executor;
+select public.cmd_apply_verified_portone_reader_full_cancellation_v1(
+  'b8-payment-b','tx-reader-b8-a',
+  'b8-cross-attempt-forbidden','$b8_cancel_at'::timestamptz,
+  $b8_amount,'KRW','production',
+  'hmac-sha256:k1:8484848484848484848484848484848484848484848484848484848484848484',
+  'synthetic-b8-cross-check-v1'
+);
+commit;
+SQL
+then
+  fail "sibling PortOne attempt incorrectly authorized cancellation of original Receipt A"
+fi
+grep -q 'PortOne cancellation is not linked to an original verified Receipt' \
+  "$tmpdir/b8-wrong-attempt.out" ||
+  fail "cross-payment attempt rejected for unexpected reason"
+[[ "$(p -c "select status from public.entitlement_grants where id='$b8_grant_a'::uuid;")" == active ]] ||
+  fail "failed cross-payment cancellation still mutated exact Receipt A Grant"
+
+# A full cancel of A runs while verified C's independent receipt issues a
+# NEW Grant for the same purchase. Both retain separate receipt authority.
+p >"$tmpdir/b8-cancel-a-holder.out" 2>&1 <<SQL &
+set application_name='rr_s2_b8_cancel_exact_receipt';
+set statement_timeout='20s';
+begin;
+set local role myeongha_commerce_internal_executor;
+select 'B8_CANCEL=' ||
+  (public.cmd_apply_verified_portone_reader_full_cancellation_v1(
+    'b8-payment-a','tx-reader-b8-a',
+    'b8-cancel-exact-a','$b8_cancel_at'::timestamptz,
+    $b8_amount,'KRW','production',
+    'hmac-sha256:k1:8585858585858585858585858585858585858585858585858585858585',
+    'synthetic-b8-exact-receipt-v1'
+  )->'revoke'->>'disposition');
+select pg_sleep(4);
+commit;
+SQL
+holder_pid=$!
+wait_for "B8 exact Receipt A cancellation holds committed Grant effects" "
+  select count(*) from pg_catalog.pg_stat_activity
+  where application_name='rr_s2_b8_cancel_exact_receipt'
+    and state='active' and wait_event_type='Timeout';
+"
+p >"$tmpdir/b8-issue-c.out" 2>&1 <<SQL &
+set application_name='rr_s2_b8_issue_other_receipt';
+set statement_timeout='20s';
+begin;
+select pg_catalog.set_config('myeongha.subject_id','$subject',true);
+select pg_catalog.set_config('myeongha.reader_pending_reading_id','$b8_reading',true);
+select public.internal_acquire_official_reader_scope_lock_v1(
+  '$subject'::uuid,'$b8_reading'::uuid,'test-standard-reader'
+);
+select result_grant_id
+from public.internal_apply_verified_receipt_capability_effects_v1(
+  '$b8_receipt_c'::uuid,array['test-reader-unit'],
+  array[transaction_timestamp()],array[transaction_timestamp()],
+  array[null]::timestamptz[],array[null]::text[]
+);
+commit;
+SQL
+writer_pid=$!
+if ! wait "$holder_pid"; then
+  cat "$tmpdir/b8-cancel-a-holder.out" >&2
+  fail "exact first Receipt cancellation failed with sibling Grants"
+fi
+holder_pid=""
+grep -qx 'B8_CANCEL=cancelled_before_binding' \
+  "$tmpdir/b8-cancel-a-holder.out" ||
+  fail "multi-Receipt cancellation returned wrong disposition"
+if ! wait "$writer_pid"; then
+  cat "$tmpdir/b8-issue-c.out" >&2
+  fail "concurrent sibling Receipt C issuance should retain independent rights"
+fi
+writer_pid=""
+b8_grant_c="$(p -c "select id from public.entitlement_grants
+  where source_receipt_id='$b8_receipt_c'::uuid;")"
+[[ "$b8_grant_c" =~ ^[0-9a-f-]{36}$ ]] ||
+  fail "sibling Receipt C did not retain new purchase Grant"
+[[ "$(p -c "select status from public.entitlement_grants where id='$b8_grant_a'::uuid;")" == revoked ]] ||
+  fail "Receipt A Grant was not revoked"
+[[ "$(p -c "select status from public.entitlement_grants where id='$b8_grant_b'::uuid;")" == active ]] ||
+  fail "independent Receipt B Grant incorrectly revoked"
+[[ "$(p -c "select status from public.entitlement_grants where id='$b8_grant_c'::uuid;")" == active ]] ||
+  fail "independent newly issued Receipt C Grant incorrectly revoked"
+[[ "$(p -c "select verification_status from public.commerce_receipts where id='$b8_receipt_a'::uuid;")" == revoked ]] ||
+  fail "target Receipt A cancellation not persisted"
+[[ "$(p -c "select count(*) from public.commerce_receipts where id in
+  ('$b8_receipt_b'::uuid,'$b8_receipt_c'::uuid) and verification_status='verified';")" == 2 ]] ||
+  fail "sibling Receipts were incorrectly cancelled"
+[[ "$(p -c "select count(*) from public.entitlement_events ee
+  join public.commerce_provider_events pe on pe.id=ee.source_provider_event_id
+  where ee.grant_id='$b8_grant_a'::uuid
+    and pe.external_event_id='myeongha:portone-v2:full-cancel:v1:b8-cancel-exact-a'
+    and ee.event_type='revoked';")" == 1 ]] ||
+  fail "original Receipt A must record one authoritative revoked effect"
+[[ "$(p -c "select count(*) from public.entitlement_events ee
+  join public.commerce_provider_events pe on pe.id=ee.source_provider_event_id
+  where ee.grant_id in ('$b8_grant_b'::uuid,'$b8_grant_c'::uuid)
+    and pe.external_event_id='myeongha:portone-v2:full-cancel:v1:b8-cancel-exact-a';")" == 0 ]] ||
+  fail "original Receipt A event incorrectly changed sibling Grants"
+pass "multi-Receipt verified PortOne cancel targets only exact payment/Receipt; sibling Grant issuance survives race"
+
+
 echo "PASS: S2 instrumented two-direction PostgreSQL race; production integration HOLD"

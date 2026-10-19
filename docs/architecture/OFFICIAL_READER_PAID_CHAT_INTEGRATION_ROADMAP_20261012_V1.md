@@ -259,3 +259,10 @@ S1에서 공통 잠금 함수 자체가 성공하더라도 **S2 전체 경로가
 ### S2 역방향 Reader 결속 선점 경합 (2026-10-19)
 
 - 추가 실제 PostgreSQL 동시성 증명: 미결속 B7 Grant에 대해 독립 1220 결속이 `FOR UPDATE`를 선점해 정상 Reader Access를 확정하는 동안 PortOne 취소가 Receipt 잠금 후 Grant 행 잠금에서 기다립니다. 신규 1880은 대기 후 생긴 Access를 확인하고 **S1 잠금을 뒤늦게 취득하지 않고 트랜잭션을 취소**합니다. Verified 취소를 다시 실행하면 이미 존재하는 결속 범위를 먼저 S1 잠그고 1770 정식 Entitlement 회수 경로로 처리합니다.
+
+
+### S2 동일 구매의 복수 영수증·Grant 환불 증빙 분리 및 발급 경합 (2026-10-19)
+
+- 기존 1880은 같은 구매에 다른 Receipt의 Grant가 존재하면 원 결제 환불도 `official_reader_portone_cancel_other_receipt_grant_held`로 거부했고, PortOne 원거래 탐색 시 `provider_request_id`와 `external_transaction_id`를 **하나의 결제 시도에서 동시 대조하지 않아** 다른 영수증의 paymentId가 취소 권한으로 오용될 수 있었습니다.
+- 순방향 `1890_official_reader_exact_receipt_multi_payment_cancel_v1.sql`은 원 거래 검색에서 PaymentAttempt의 `provider_request_id=p_payment_id` **및** `provider_transaction_id=p_transaction_id`를 함께 검증합니다. 검증된 원본 Receipt의 행 잠금·해당 영수증 source Grant의 정렬 잠금·기존 Commerce 1080 이벤트·Projection·Outbox 갱신만 유지하고, 동일 purchase의 **다른 영수증 Grant는 독립 결제이므로 건드리지 않습니다.** 대상 Receipt에 구매 접근이 확정된 경우는 기존 bound S1 회수 경로와 S1 정렬 규칙을 그대로 따릅니다.
+- 실제 PostgreSQL B8 합성 경합은 하나의 구매에 별도 검증된 결제 시도 3건/Receipt 3건, 처음부터 분리된 Grant 2건을 보유하고, 다른 영수증의 paymentId를 이용한 환불이 거절되는지 확인합니다. A 영수증 취소와 C 영수증 독립 Grant 발급을 동시 수행하여 **A만 revoked, B/C는 active, 원 Event 단일, 형제 Grant에는 해당 이벤트 0건**을 증명합니다. Saju #2410, Privacy #2318 승인 없이 Production 데이터·유료 본문·공개 경로는 변경하지 않습니다.
