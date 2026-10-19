@@ -182,7 +182,13 @@ export async function verifySajuHeldSourceProofV1(
       .update(digest(payload)).digest();
     const received = Buffer.from(proof.signatureHex, 'hex');
     if (signed.length !== received.length || !timingSafeEqual(signed, received)) return blocked();
-    const replayKey = trust.trustedIssuer + ':' + trust.expectedAudience + ':' + context.expectedNonce;
+    // Issuer and audience permit ':'; concatenating them as delimited text
+    // aliases distinct identities in the cross-replica replay ledger.
+    // A versioned canonical tuple also scopes key rotation unambiguously.
+    const replayKey = 'saju-proof-v2:' + digest([
+      trust.trustedIssuer, trust.expectedAudience, trust.trustedKeyId,
+      context.expectedNonce,
+    ]);
     if (!(await trust.claimNonceOnce(replayKey, payload.expiresAtMs as number))) return blocked();
 
     const material = payload.material;
