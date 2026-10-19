@@ -227,8 +227,8 @@ S1에서 공통 잠금 함수 자체가 성공하더라도 **S2 전체 경로가
 - **계속 HOLD:** S2 전체 Writer 전역 잠금 순서/운영 증명은 여전히 미완료입니다. Saju #2410 공식 Production 출처, Privacy #2318 신규 보호 원문 삭제·복원 승인 전 S5 실제 저장·공개/운영 DB 변경·실결제 금지; Draft PR 유지.
 
 
-### S2 실제 Reader 결속 재생·회수·만료 및 잠금 대기 시간 경합 차단 (2026-10-19)
+### S2 직접 결속의 오래된 스냅샷 및 잠금 대기 중 만료 판정 차단 (2026-10-19)
 
-- 기존 1810 `cmd_bind_standard_reading_access_v2`는 이미 결속된 구매의 재생 시 검증된 현행 영수증/Grant를 확인하지 않고 `replayed=true`를 반환하며, 미결속 구매의 구매권 시각을 잠금 대기 이전 `transaction_timestamp()`로 판정했습니다. 이는 §1의 **과거 결속 재생은 권리가 아니다** 경계와 충돌합니다.
-- 순방향 `1850_official_reader_binding_replay_current_right_and_fresh_clock_v1.sql`에서 S1 잠금 획득 및 Grant 행 잠금 후 실제 `clock_timestamp()`를 사용하고, 기존 결속 재생은 현재 Production verified Receipt와 저장된 정확한 미회수·미만료 Grant를 다시 확인합니다. 기존 Commerce 비-Reader 및 공개 권한은 변경하지 않습니다.
-- 기존 실제 PostgreSQL 경합 시험에 정상 재생, 회수 이후 재생 차단, 범위 잠금 대기 중 만료된 구매권의 재생 차단을 추가했습니다. S3 Production 공식 근거 #2410/Privacy #2318 승인 전 실제 유료 T2·보호 본문 저장/공개/운영 DB 적용 금지, PR Draft 유지.
+- 기존 1810의 신규 Reader 결속은 최초 Grant 유효성 검사 시 잠금 대기 전 `transaction_timestamp()`를 사용했고, 1220 독립 호출은 `REPEATABLE READ`/`SERIALIZABLE`에서 환불 이전 스냅샷으로 읽을 수 있었습니다. 독립 Reader Writer가 신규 Grant 결속에 오래된 권한 상태를 적용할 위험입니다.
+- 순방향 `1850_official_reader_binding_replay_current_right_and_fresh_clock_v1.sql`은 직접 1220 진입점에서 `READ COMMITTED`를 필수로 하고, S1 잠금 및 Grant 행 잠금 이후 `clock_timestamp()`로 유효기간을 재판정합니다. **기존 결속의 멱등 재생은 불변 이력 반환만 허용**하며, 실제 접근은 별도의 런타임 구매권 조회가 검증한다는 기존 계약을 변경하지 않습니다.
+- 실제 PostgreSQL 두 세션 Writer·T2 경합에 직접 1220의 반복읽기·직렬화 스냅샷 거부 회귀를 추가합니다. 공식 Source #2410 및 개인정보 #2318 승인 전 유료 본문 S5 저장·공개/운영 DB 적용 금지, Draft 유지.

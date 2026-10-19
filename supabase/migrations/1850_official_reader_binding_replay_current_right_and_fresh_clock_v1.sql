@@ -1,7 +1,7 @@
--- S2 forward-only guard: legacy Reader bind replay is historical provenance,
--- never an access right after refund, revocation or expiry. Refresh the grant
--- validity clock AFTER waiting for the shared transaction scope lock.
--- Private contract only; no paid body, new storage or Production activation.
+-- S2: preserve legacy bind replay as provenance, not current access.
+-- Direct 1220 purchase binding must refuse old transaction snapshots and
+-- use fresh post-lock time to reject Grant expiry while waiting.
+-- Forward-only replacement of 1810; no protected paid body or public grant.
 -- Watchtower-Track: db-authority-core
 
 -- Official Reader S2: retrofit the EXISTING 1220 access binding function.
@@ -87,7 +87,6 @@ declare
   v_locked_official_reading_id uuid;
   v_locked_reader_character_id text;
   v_pending_reading_id text;
-  v_replay_authorized boolean;
 begin
   if p_subject_id is null
      or p_purchase_intent_id is null
@@ -97,6 +96,16 @@ begin
       errcode = '23514',
       constraint = 'cmd_standard_reading_access_v2_ids_required',
       message = 'Standard Reading v2 binding requires subject, purchase, and proposed Reading identities';
+  end if;
+
+  -- S1 scope locks only serialize fresh grant state under READ COMMITTED.
+  -- With REPEATABLE READ/SERIALIZABLE the snapshot may predate a completed
+  -- refund even after the advisory scope lock is finally acquired.
+  if pg_catalog.current_setting('transaction_isolation') <> 'read committed' then
+    raise exception using
+      errcode='25001',
+      constraint='official_reader_s2_bind_read_committed_required',
+      message='Official Reader binding requires READ COMMITTED';
   end if;
 
   perform public.assert_myeongha_subject_context_v1(p_subject_id);
@@ -206,8 +215,9 @@ begin
     p_subject_id,v_locked_official_reading_id,v_locked_reader_character_id
   );
 
-  -- transaction_timestamp() predates advisory-lock waits. Recheck clock
-  -- after waiting so a purchase cannot bind after its Grant has expired.
+  -- A transaction may wait for a Reader revoke or T2 holder. Use the
+  -- actual post-lock time rather than transaction_timestamp() from before
+  -- the wait when judging an active Grant's valid_from/valid_until.
   v_now := pg_catalog.clock_timestamp();
 
   select pi.status, pi.product_offer_id, pi.capability_set_id
@@ -252,36 +262,6 @@ begin
         errcode='40001',
         constraint='official_reader_s2_bind_replay_scope_changed',
         message='Reader binding replay is outside the locked official scope';
-    end if;
-
-    -- A historical Reader bind is not a right to use a refunded/expired
-    -- Grant. Reread verified purchase + current Receipt + the EXACT bound Grant
-    -- under the already-acquired S1 transaction lock before replay success.
-    select exists (
-      select 1
-      from public.purchase_intents pi
-      join public.commerce_receipts cr
-        on cr.purchase_intent_id=pi.id
-       and cr.subject_id=pi.subject_id
-       and cr.product_offer_id=pi.product_offer_id
-      join public.entitlement_grants eg
-        on eg.source_receipt_id=cr.id and eg.subject_id=cr.subject_id
-      where pi.id=p_purchase_intent_id
-        and pi.subject_id=p_subject_id
-        and pi.status='verified'
-        and cr.environment='production'
-        and cr.verification_status='verified'
-        and eg.id=v_existing_access.entitlement_grant_id
-        and eg.grant_source_type='purchase'
-        and eg.status='active'
-        and eg.valid_from<=v_now
-        and (eg.valid_until is null or v_now<eg.valid_until)
-    ) into v_replay_authorized;
-    if v_replay_authorized is distinct from true then
-      raise exception using
-        errcode='P0001',
-        constraint='official_reader_s2_bind_replay_current_right_required',
-        message='Reader binding replay cannot authorize a revoked or expired purchase';
     end if;
 
     return query
@@ -463,7 +443,8 @@ begin
       message = 'purchase-backed Entitlement Grant became unavailable before Standard Reading v2 binding';
   end if;
 
-  -- Grant expiry can also occur while waiting on the selected Grant row.
+  -- Also refresh after the selected Grant FOR UPDATE; another transaction
+  -- may hold that row even after the S1 advisory lock was acquired.
   v_now := pg_catalog.clock_timestamp();
 
   -- Preserve #1090 revoke-race hardening: after the selected Grant row is locked,
@@ -767,4 +748,4 @@ comment on function public.cmd_bind_standard_reading_access_v2(
 'Reader binding now acquires the actual S1 Subject x authoritative Official Reading x selected Reader transaction lock before Purchase/Grant/Birth row locks. Resolves replay/existing/current/initial separately and verifies exact bound identity before access INSERT. Direct legacy 1220 calls no longer bypass scope lock; no public paid activation.';
 
 comment on function public.cmd_bind_standard_reading_access_v2(uuid,uuid,uuid,uuid,text,text,jsonb) is
-'S2 Reader bind uses fresh post-S1-lock and post-Grant-row-lock validity clocks; historical bind replay only returns with current verified receipt and active unexpired purchase Grant. Private code, no content persistence or public grant.';
+'S2 direct Reader binder requires READ COMMITTED and fresh post-S1/post-Grant-lock validity time. Historical replay returns immutable provenance only; live paid access must be separately authorized. No new public grant or paid body storage.';
