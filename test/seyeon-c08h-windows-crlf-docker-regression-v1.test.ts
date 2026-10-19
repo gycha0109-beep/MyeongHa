@@ -52,7 +52,10 @@ describe('C08-H: Windows CRLF shell checkout supported by networkless Docker run
     expect(runner).toContain('find ');
     expect(runner).toContain('sed -i');
     expect(runner).toContain("'cd ' + scratch");
-    expect(runner).toContain("'bash test/db/run_ci_case.sh seyeon-c08-first-turn-local-pg17'");
+    expect(runner).toContain("const ciCase = firstZero");
+    expect(runner).toContain("'seyeon-c08-first-turn-local-pg17'");
+    expect(runner).toContain("'seyeon-first-zero-locked-reveal-disposable-pg17'");
+    expect(runner).toContain("'bash test/db/run_ci_case.sh ' + ciCase");
     expect(runner).toContain('C08_DOCKER_SHELL_LINE_ENDINGS_NORMALIZED');
     expect(runner).not.toContain('process.env.DATABASE_URL');
     expect(runner).not.toContain('process.env.SUPABASE_DB_URL');

@@ -89,6 +89,33 @@ describe('Seyeon 0-paid local Docker only', () => {
     expect(ignore).not.toContain('!**/.env');
   });
 
+  it('adds the actual first-zero owner SQL and two-backend lock race with no paid or external credentials', () => {
+    const launcher = text(script);
+    const disposable = text('scripts/run-seyeon-c08-local-docker-pg17.mjs');
+    const harness = text('test/db/run_ci_case.sh');
+    const suite = JSON.parse(text('scripts/ci/db-suites.json')) as {
+      postgres17: { cases: string[] };
+    };
+    const race = text('test/db/seyeon_first_zero_locked_reveal_disposable_pg17.sh');
+    const fixture = text('test/db/seyeon_first_zero_locked_reveal_disposable_pg17.sql');
+
+    expect(launcher).toContain("'--first-zero-disposable-only'");
+    expect(launcher).toContain('PASS_SEYEON_ZERO_COST_DOCKER_FIRST_ZERO_LOCKED_PG17');
+    expect(disposable).toContain("'myeongha_first_zero_local_case_1'");
+    expect(disposable).toContain("'--network', 'none'");
+    expect(harness).toContain('apply_pg17_migrations_without_birth_authority');
+    expect(harness).toContain('seyeon-first-zero-locked-reveal-disposable-pg17)');
+    expect(suite.postgres17.cases).toContain('seyeon-first-zero-locked-reveal-disposable-pg17');
+    expect(race).toContain('3fbe7322cb3f11484a3e0a42bdc0598879b3d1d8');
+    expect(race).toContain('HOLD_FIRST_ZERO_NOT_DISPOSABLE_DB');
+    expect(race).toContain('55P03');
+    expect(race).toContain('FOR UPDATE');
+    expect(fixture).toContain('cmd_mark_seyeon_chat_context_ready_pinned_v1');
+    expect(fixture).toContain('cmd_commit_seyeon_chat_turn_runtime_v2');
+    expect(fixture).not.toContain('OPENAI_API_KEY');
+    expect(fixture).not.toContain('sk-proj');
+  });
+
   it('reuses the existing clean, network-disabled, PG17 single-use census test', () => {
     const runner = text(script);
     const pg = text('scripts/run-seyeon-c08-local-docker-pg17.mjs');

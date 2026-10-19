@@ -13,7 +13,7 @@ import process from 'node:process';
 
 export const SEYEON_ZERO_COST_DOCKER_CONTRACT_V1 = Object.freeze({
   version: 'seyeon-zero-cost-disposable-docker-v1',
-  phases: ['synthetic-direct-https', 'disposable-postgres17-c08'] ,
+  phases: ['synthetic-direct-https', 'disposable-postgres17-c08', 'disposable-postgres17-locked-first-zero'] ,
   runtimeNetwork: 'none',
   hostPortsPublished: false,
   hostSourceMounted: false,
@@ -113,6 +113,16 @@ export async function runSeyeonZeroCostDockerV1(args) {
       'scripts/run-seyeon-c08-local-docker-pg17.mjs', '--disposable-only',
     ], { timeout: 1_800_000, stage: 'PG17' });
     process.stdout.write('PASS_SEYEON_ZERO_COST_DOCKER_DISPOSABLE_PG17\n');
+
+    // A fresh and entirely separate disposable PG17 database replays the
+    // exact 20261018190000 function (with its 1640 schema dependencies),
+    // synthetic first committed turn, executor ACL and independent lock race.
+    process.stdout.write('SEYEON_ZERO_COST_DOCKER_FIRST_ZERO_LOCKED_PG17_START\n');
+    command(process.execPath, [
+      'scripts/run-seyeon-c08-local-docker-pg17.mjs',
+      '--first-zero-disposable-only',
+    ], { timeout: 1_800_000, stage: 'FIRST_ZERO_PG17' });
+    process.stdout.write('PASS_SEYEON_ZERO_COST_DOCKER_FIRST_ZERO_LOCKED_PG17\n');
     process.stdout.write('PASS_SEYEON_ZERO_COST_DOCKER_ALL_OFFLINE_PHASES\n');
   } finally {
     if (built) {
