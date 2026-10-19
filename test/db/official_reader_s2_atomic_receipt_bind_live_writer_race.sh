@@ -1137,7 +1137,10 @@ pass "Reader bind-first forces unbound refund rollback; verified retry uses boun
 # attempt and Receipt, not per purchase. Receipt A refund MUST leave B's paid
 # Grant untouched while a new C Receipt is issued in another DB session.
 b8_intent="12192300-0000-0000-0000-000000000008"
-b8_reading="12103100-0000-0000-0000-000000000008"
+# B7 already committed the current official Reading for this Birth revision.
+# Additional Receipt effects MUST prelock that exact current Reading, not an
+# arbitrary second proposed identity for the same Subject/Product revision.
+b8_reading="$b7_reading"
 b8_receipt_a="12192000-0000-0000-0000-000000000008"
 b8_receipt_b="12192000-0000-0000-0000-000000000009"
 b8_receipt_c="12192000-0000-0000-0000-000000000010"
