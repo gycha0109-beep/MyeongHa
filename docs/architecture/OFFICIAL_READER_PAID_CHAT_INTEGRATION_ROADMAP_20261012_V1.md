@@ -254,3 +254,8 @@ S1에서 공통 잠금 함수 자체가 성공하더라도 **S2 전체 경로가
 - 이전 1870은 Reader access 미결속 구매의 verified full cancellation에서 Grant가 1건 이상 발급된 경우 전체 취소를 HOLD했습니다. 신규 1880은 **구매 잠금 후 영수증 FOR UPDATE → 해당 영수증의 모든 구매 Grant FOR UPDATE**를 결정적 순서로 취득하고 Reader 결속이 새로 생겼는지 재확인합니다. 이미 결속된 경우 잠긴 Receipt/Grant 이후에 S1 잠금을 뒤늦게 잡지 않고 트랜잭션을 실패시켜 새로운 정상 결속 환불 경로의 재실행만 허용합니다.
 - 원 결제 영수증 외 다른 영수증의 Grant가 연결됐으면 무조건 거부합니다. 정확한 미결속 구매권만 기존 1080 `internal_apply_entitlement_effect_v1`으로 `revoked` 처리하고 **원본 EntitlementEvent·Projection·Outbox·receipt status·검증된 ProviderEvent**를 한 트랜잭션에서 일치시킵니다. 이전 1790의 미결속 직접 효과 우회 거부는 유지하며, 실제 동일 구매 advisory lock과 검증된 취소 전용 transaction-local context를 함께 증명한 호출만 예외적으로 허용합니다. 정상 결속 거래는 기존 1770을 유지합니다.
 - 실제 PostgreSQL 두 세션 시험에서 미결속 상태로 정상 발급된 Grant가 있는 구매에 취소가 먼저 오면 독립 1220 결속이 **Grant 행 잠금을 기다린 후 거부**되는지, Receipt/Grant revoked, Provider/Entitlement 이벤트 정확히 1회, 반복 취소 시 revision 변경 없음, 직접 무잠금 레거시 효과 차단을 확인합니다. 승인 미확보 S3/S4/S5 및 운영 DB 활성화 금지는 유지합니다.
+
+
+### S2 역방향 Reader 결속 선점 경합 (2026-10-19)
+
+- 추가 실제 PostgreSQL 동시성 증명: 미결속 B7 Grant에 대해 독립 1220 결속이 `FOR UPDATE`를 선점해 정상 Reader Access를 확정하는 동안 PortOne 취소가 Receipt 잠금 후 Grant 행 잠금에서 기다립니다. 신규 1880은 대기 후 생긴 Access를 확인하고 **S1 잠금을 뒤늦게 취득하지 않고 트랜잭션을 취소**합니다. Verified 취소를 다시 실행하면 이미 존재하는 결속 범위를 먼저 S1 잠그고 1770 정식 Entitlement 회수 경로로 처리합니다.

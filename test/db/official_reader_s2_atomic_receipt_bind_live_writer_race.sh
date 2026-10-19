@@ -966,4 +966,170 @@ grep -qx 'cancelled_before_binding' "$tmpdir/b6-replay.out" ||
 pass "issued unbound Reader Grant cancels via existing Commerce effects, blocks direct bind and replays exactly once"
 
 
+
+# Opposite interleaving: the direct 1220 binder owns the issued B7 Grant
+# BEFORE the verified cancellation can lock it. The unbound cancel path
+# MUST NOT take a late S1 scope lock after Receipt/Grant rows. It aborts,
+# and a new verified cancellation retry follows the ordinary bound 1770 path.
+b7_intent="12192300-0000-0000-0000-000000000007"
+b7_receipt="12192000-0000-0000-0000-000000000007"
+b7_reading="12103100-0000-0000-0000-000000000007"
+p >"$tmpdir/b7-seed.out" 2>&1 <<SQL || { cat "$tmpdir/b7-seed.out" >&2; fail "B7 binder-first fixture failed"; }
+begin;
+insert into public.purchase_intents(
+  id,subject_id,product_offer_id,provider_account_link_id,
+  idempotency_key,request_hash,offer_snapshot_jsonb,offer_snapshot_hash,
+  status,created_at,updated_at,expected_amount_minor,expected_currency,
+  charge_terms_version,capability_set_id,capability_snapshot_jsonb,
+  capability_snapshot_hash
+)
+select '$b7_intent'::uuid,subject_id,product_offer_id,provider_account_link_id,
+       'reader-b7-bind-first','sha256:test:reader-b7-bind-first',
+       offer_snapshot_jsonb,offer_snapshot_hash,'created',
+       clock_timestamp(),clock_timestamp(),expected_amount_minor,
+       expected_currency,charge_terms_version,capability_set_id,
+       capability_snapshot_jsonb,capability_snapshot_hash
+from public.purchase_intents where id='$b6_intent'::uuid;
+insert into public.purchase_intent_reader_selections(
+  purchase_intent_id,product_id,reader_character_id,reader_content_bundle_id,
+  selection_contract_version,selection_snapshot_jsonb,selection_hash,created_at
+)
+select '$b7_intent'::uuid,product_id,reader_character_id,
+       reader_content_bundle_id,selection_contract_version,
+       selection_snapshot_jsonb,'sha256:test:reader-b7-selection',clock_timestamp()
+from public.purchase_intent_reader_selections
+where purchase_intent_id='$b6_intent'::uuid;
+insert into public.commerce_payment_attempts(
+  id,purchase_intent_id,subject_id,product_offer_id,attempt_no,
+  provider,environment,idempotency_key,provider_request_id,
+  provider_transaction_id,status,created_at,updated_at
+)
+select '12197000-0000-0000-0000-000000000007'::uuid,
+       pi.id,pi.subject_id,pi.product_offer_id,1,
+       'portone_v2','production','synthetic-b7-bind-first-request',
+       'synthetic-portone-b7-payment','tx-official-reader-b7-bind-first',
+       'response_received',clock_timestamp(),clock_timestamp()
+from public.purchase_intents pi where pi.id='$b7_intent'::uuid;
+update public.purchase_intents
+set status='verified',updated_at=clock_timestamp()
+where id='$b7_intent'::uuid;
+insert into public.commerce_receipts(
+  id,subject_id,purchase_intent_id,product_offer_id,platform,provider,
+  external_transaction_id,receipt_fingerprint,verification_status,
+  verified_payload_jsonb,verified_at,created_at,environment,
+  verifier_revision,verified_amount_minor,verified_currency
+)
+select '$b7_receipt'::uuid,subject_id,'$b7_intent'::uuid,product_offer_id,
+       platform,provider,'tx-official-reader-b7-bind-first',
+       'hmac-sha256:k1:bcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbc',
+       'verified',verified_payload_jsonb,clock_timestamp(),
+       clock_timestamp(),environment,verifier_revision,
+       verified_amount_minor,verified_currency
+from public.commerce_receipts where id='$b6_receipt'::uuid;
+commit;
+SQL
+p >"$tmpdir/b7-issue.out" 2>&1 <<SQL || { cat "$tmpdir/b7-issue.out" >&2; fail "B7 pre-bind grant issuance failed"; }
+begin;
+select pg_catalog.set_config('myeongha.subject_id','$subject',true);
+select pg_catalog.set_config('myeongha.reader_pending_reading_id','$b7_reading',true);
+select public.internal_acquire_official_reader_scope_lock_v1(
+  '$subject'::uuid,'$b7_reading'::uuid,'test-standard-reader'
+);
+select result_grant_id
+from public.internal_apply_verified_receipt_capability_effects_v1(
+  '$b7_receipt'::uuid,array['test-reader-unit'],
+  array[transaction_timestamp()],array[transaction_timestamp()],
+  array[null]::timestamptz[],array[null]::text[]
+);
+commit;
+SQL
+b7_grant="$(p -c "select id from public.entitlement_grants
+  where source_receipt_id='$b7_receipt'::uuid and status='active';")"
+[[ "$b7_grant" =~ ^[0-9a-f-]{36}$ ]] ||
+  fail "B7 direct binding initial Grant missing"
+b7_amount="$(p -c "select verified_amount_minor from public.commerce_receipts where id='$b7_receipt'::uuid;")"
+b7_cancel_at="$(p -c "select pg_catalog.to_char(clock_timestamp() at time zone 'UTC','YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"');")"
+p >"$tmpdir/b7-bind-first.out" 2>&1 <<SQL &
+set application_name='rr_s2_b7_bind_first';
+set statement_timeout='20s';
+begin;
+select pg_catalog.set_config('myeongha.subject_id','$subject',true);
+select 'B7_BIND='||reading_id::text
+from public.cmd_bind_standard_reading_access_v2(
+  '$subject'::uuid,'$b7_intent'::uuid,
+  '12193000-0000-0000-0000-000000000007'::uuid,
+  '$b7_reading'::uuid,
+  'sha256:v1:abababababababababababababababababababababababababababababababab',
+  'standard-reading-access-bind-v2',
+  '{"schemaVersion":"standard-reading-access-bind-v2","purchaseIntentId":"$b7_intent"}'::jsonb
+);
+select pg_sleep(4);
+commit;
+SQL
+holder_pid=$!
+wait_for "B7 direct Reader binder first holds the Grant row" "
+  select count(*) from pg_catalog.pg_stat_activity
+  where application_name='rr_s2_b7_bind_first'
+    and state='active' and wait_event_type='Timeout';
+"
+p >"$tmpdir/b7-unbound-cancel-loser.out" 2>&1 <<SQL &
+set application_name='rr_s2_b7_cancel_after_bind';
+set statement_timeout='20s';
+begin;
+set local role myeongha_commerce_internal_executor;
+select (public.cmd_apply_verified_portone_reader_full_cancellation_v1(
+  'synthetic-portone-b7-payment',
+  'tx-official-reader-b7-bind-first',
+  'synthetic-b7-bound-transition',
+  '$b7_cancel_at'::timestamptz,
+  $b7_amount,'KRW','production',
+  'hmac-sha256:k1:dededededededededededededededededededededededededededededededede',
+  'synthetic-verified-b7-v1'
+)->'revoke'->>'disposition');
+commit;
+SQL
+writer_pid=$!
+wait_for "unbound refund waits for B7 direct 1220 Grant lock" "
+  select count(*) from pg_catalog.pg_stat_activity
+  where application_name='rr_s2_b7_cancel_after_bind'
+    and state='active' and wait_event_type='Lock';
+"
+if ! wait "$holder_pid"; then
+  cat "$tmpdir/b7-bind-first.out" >&2
+  fail "B7 direct Reader binding first did not commit"
+fi
+holder_pid=""
+grep -qx "B7_BIND=$b7_reading" "$tmpdir/b7-bind-first.out" ||
+  fail "B7 direct Reader binding created wrong Reading"
+if wait "$writer_pid"; then
+  fail "unbound cancellation proceeded after concurrently committed Reader binding"
+fi
+writer_pid=""
+grep -q 'Reader binding completed during cancellation lock wait' \
+  "$tmpdir/b7-unbound-cancel-loser.out" ||
+  { cat "$tmpdir/b7-unbound-cancel-loser.out" >&2; fail "B7 transitioned cancellation failed for wrong reason"; }
+[[ "$(p -c "select status from public.entitlement_grants where id='$b7_grant'::uuid;")" == active ]] ||
+  fail "aborted B7 cancellation mutated an already bound Grant"
+[[ "$(p -c "select verification_status from public.commerce_receipts where id='$b7_receipt'::uuid;")" == verified ]] ||
+  fail "aborted B7 cancellation revoked original Receipt"
+# Verify the next legitimate full cancel switches to the bound S1 path.
+p >"$tmpdir/b7-bound-retry.out" 2>&1 <<SQL || { cat "$tmpdir/b7-bound-retry.out" >&2; fail "B7 retry under committed bound S1 failed"; }
+begin;
+set local role myeongha_commerce_internal_executor;
+select (public.cmd_apply_verified_portone_reader_full_cancellation_v1(
+  'synthetic-portone-b7-payment','tx-official-reader-b7-bind-first',
+  'synthetic-b7-bound-transition','$b7_cancel_at'::timestamptz,
+  $b7_amount,'KRW','production',
+  'hmac-sha256:k1:dededededededededededededededededededededededededededededededede',
+  'synthetic-verified-b7-v1'
+)->'revoke'->>'contractVersion');
+commit;
+SQL
+grep -qx 'official-reader-s2-revoke-dispatch-v1' "$tmpdir/b7-bound-retry.out" ||
+  fail "B7 retry did not dispatch through bound Reader lifecycle"
+[[ "$(p -c "select status from public.entitlement_grants where id='$b7_grant'::uuid;")" == revoked ]] ||
+  fail "B7 retry did not revoke bound purchase Grant"
+pass "Reader bind-first forces unbound refund rollback; verified retry uses bound S1 lifecycle"
+
+
 echo "PASS: S2 instrumented two-direction PostgreSQL race; production integration HOLD"
