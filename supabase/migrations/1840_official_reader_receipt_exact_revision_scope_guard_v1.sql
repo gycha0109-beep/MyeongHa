@@ -43,11 +43,20 @@ begin
     on dp.product_id=prs.product_id and dp.retired_at is null
    and dp.reading_identity_mode='official_subject_product_scope_birth_authority'
    and dp.reader_interpretation_mode='per_reader_purchase_grant'
-  join public.standard_reading_offer_roles sror
+  left join public.standard_reading_offer_roles sror
     on sror.product_offer_id=po.id and sror.retired_at is null
   where cr.id=p_receipt_id;
 
   if not found then return; end if;
+
+  -- A Reader purchase missing its original offer-role authority must be
+  -- rejected, not silently treated as unrelated Commerce by an inner join.
+  if v_purchase_role not in ('initial_reading','additional_reader_interpretation')
+     or v_purchase_role is null then
+    raise exception using errcode='P0001',
+      constraint='official_reader_s2_receipt_purchase_role_missing',
+      message='Stored Reader purchase role is unavailable';
+  end if;
 
   if pg_catalog.current_setting('transaction_isolation') <> 'read committed' then
     raise exception using errcode='25001',
