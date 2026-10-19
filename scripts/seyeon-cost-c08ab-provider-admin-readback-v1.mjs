@@ -137,7 +137,7 @@ export async function auditSeyeonEvaluationProviderV1({
   fail('COST_PAGINATION_INCOMPLETE');
  }catch(error){
   const code=error?.code;
-  result.failureCode=typeof code==='string'&&/^[A-Z_]+$/u.test(code)
+  result.failureCode=typeof code==='string'&&/^[A-Z0-9_]+$/u.test(code)
    ?code:'ADMIN_READBACK_FAILED';
   result.readback='NOT_COMPLETED';
   result.costReadback=false;
