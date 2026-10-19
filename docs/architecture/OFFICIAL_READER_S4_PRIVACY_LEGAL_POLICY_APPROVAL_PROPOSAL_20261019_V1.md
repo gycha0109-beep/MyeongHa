@@ -11,9 +11,9 @@
 
 | 기존 근거 | 확인된 승인·구현 범위 | 이번 S4에서 허가되지 않은 사항 |
 | --- | --- | --- |
-| \`docs/operations/ACCOUNT_DELETION_FINALIZATION_POLICY_V1.json\` / P0-PR-01 / [#964](https://github.com/gycha0109-beep/MyeongHa/issues/964) | PRODUCT_OWNER_APPROVED, 2026-09-19. 기존 Subject·Auth·개인화 삭제/익명화 분류, **현행 백업 주기 P30D**, 구매·결제·Entitlement의 법정 증빙 목적 **P5Y**. | 새 보호 원문 테이블·AI 시도물·요약/기억/로그의 개인 데이터 분류와 그 보관 허가. 현행 정본의 \`destructiveRuntimeAuthorized=false\`, \`authoritativePrivacyReconciliation=false\`, \`drReady=false\`를 새 S4 인수 근거로 승격 금지. |
-| [#964 이후 복원/원장 이력](https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5768562172) | 특정 Production captured-window에 한정한 authoritative privacy reconciliation 검증이 별도로 보고됨. | **미래 전역 복원·보호 원문 복원 증명 아님**. \`future_safe_privacy_reconciliation=false\`, \`dr_ready=false\` 범위 유지. 기존 JSON/승인 기록을 무단 수정하지 않음. |
-| [RR-03 #1884 Owner 승인](https://github.com/gycha0109-beep/MyeongHa/issues/1884#issuecomment-6103479019) / [Draft #1960](https://github.com/gycha0109-beep/MyeongHa/pull/1960) | 신규 \`official_reader_assistant_saju_provenance\` **출처 이력(증명)**을 별도 비공개 테이블에 두고 탈퇴 시 DELETE, P30D 복원 전 재조정, 환불/회수/만료 시 접근 차단하는 **구현 방향**을 승인. | 새 **유료 답변 전문/청크** 보관 승인 아님. RR-03 실 Writer·공개 조회·운영 배포는 별도. 과거 59/140과 후보 60/146의 정확한 Subject graph 버전을 섞지 않음. |
+| `docs/operations/ACCOUNT_DELETION_FINALIZATION_POLICY_V1.json` / P0-PR-01 / [#964](https://github.com/gycha0109-beep/MyeongHa/issues/964) | PRODUCT_OWNER_APPROVED, 2026-09-19. 기존 Subject·Auth·개인화 삭제/익명화 분류, **현행 백업 주기 P30D**, 구매·결제·Entitlement의 법정 증빙 목적 **P5Y**. | 새 보호 원문 테이블·AI 시도물·요약/기억/로그의 개인 데이터 분류와 그 보관 허가. 현행 정본의 `destructiveRuntimeAuthorized=false`, `authoritativePrivacyReconciliation=false`, `drReady=false`를 새 S4 인수 근거로 승격 금지. |
+| [#964 이후 복원/원장 이력](https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5768562172) | 특정 Production captured-window에 한정한 authoritative privacy reconciliation 검증이 별도로 보고됨. | **미래 전역 복원·보호 원문 복원 증명 아님**. `future_safe_privacy_reconciliation=false`, `dr_ready=false` 범위 유지. 기존 JSON/승인 기록을 무단 수정하지 않음. |
+| [RR-03 #1884 Owner 승인](https://github.com/gycha0109-beep/MyeongHa/issues/1884#issuecomment-6103479019) / [Draft #1960](https://github.com/gycha0109-beep/MyeongHa/pull/1960) | 신규 `official_reader_assistant_saju_provenance` **출처 이력(증명)**을 별도 비공개 테이블에 두고 탈퇴 시 DELETE, P30D 복원 전 재조정, 환불/회수/만료 시 접근 차단하는 **구현 방향**을 승인. | 새 **유료 답변 전문/청크** 보관 승인 아님. RR-03 실 Writer·공개 조회·운영 배포는 별도. 과거 59/140과 후보 60/146의 정확한 Subject graph 버전을 섞지 않음. |
 | [2026-10-12 유료 Reader 제품 결정](../MOBILE_READER_PRODUCT_OWNER_DECISION_20261012_V1.md) | 단일 회원×캐릭터 일반 채팅방; 공식 Reading×Reader×독립 구매권; T1 → 비공개 생성 → T2 COMMIT 이후에만 공개. 환불/철회/만료 이후 **새 생성·서버 재조회·모델 재주입 금지**; 다른 유효 독립 구매권은 별도 인정. | 사용자에게 실제 제공된 외부 사본까지 회수한다고 보장하거나, T2 전 공개·유료 원문을 일반 Chat에 저장하는 계약. |
 
 ## B. 적용 법령·가이드: 2026-10-19 시점 1차 검토
@@ -35,17 +35,17 @@
 
 ## C. 신규 개인정보 계열별 **권장 정책 초안** — 아직 승인 아님
 
-\`P30D\` / \`P5Y\`는 위 A의 기존 정본에만 적용. 아래 \`제안\`은 실제 운영 기준/사업 결정이 **아님**. 실제 최대 기간·생성 시점·파기 시행 시점은 개인정보 처리방침/DB 구현 전에 결정해야 함.
+`P30D` / `P5Y`는 위 A의 기존 정본에만 적용. 아래 `제안`은 실제 운영 기준/사업 결정이 **아님**. 실제 최대 기간·생성 시점·파기 시행 시점은 개인정보 처리방침/DB 구현 전에 결정해야 함.
 
 | 신규 분류·예시 | 목적·권장 처리 근거 | 권장 보존/회수·탈퇴 처리 | 권장 접근/전송 경계 | 승인 주체 |
 | --- | --- | --- | --- | --- |
-| **S4-A 보호 유료 원문/청크** (완료 해설, 개인화된 후속 답변) | 구매한 디지털 해설 **제공·재열람**. 계약이행에 필요한 최소 범위 후보, 법무 확정 필요. | **별도 보호 저장소**, 정확한 유효 권리·회원 상태 내 제공; 직접 삭제·회원 탈퇴 또는 해당 결과에 연결된 권리 소멸/환불 중 더 먼저 종료되는 목적에 따라 파기·접근 차단. 개별 유효한 **다른 Grant**가 존재하는 경우 임의 재활용이나 일괄 삭제 여부는 정확한 결속 정책으로 판정. 즉시 논리 차단 + 목적 상실 시 지체 없는 물리/암호학적 파기. **내부 운영 목표: 본 DB 24시간 이내 파기 검토(법정 24시간 규정 아님)**. | 일반 \`conversation_messages.body_text\`/메모리/Outbox/로그/분석에 원문 저장 금지; 원문에 대한 보호 key·Subject×Reading×Reader×Grant scope·RLS FORCE·서버만 권한 재조회. | Product + Privacy + DB + Chat + Legal |
+| **S4-A 보호 유료 원문/청크** (완료 해설, 개인화된 후속 답변) | 구매한 디지털 해설 **제공·재열람**. 계약이행에 필요한 최소 범위 후보, 법무 확정 필요. | **별도 보호 저장소**, 정확한 유효 권리·회원 상태 내 제공; 직접 삭제·회원 탈퇴 또는 해당 결과에 연결된 권리 소멸/환불 중 더 먼저 종료되는 목적에 따라 파기·접근 차단. 개별 유효한 **다른 Grant**가 존재하는 경우 임의 재활용이나 일괄 삭제 여부는 정확한 결속 정책으로 판정. 즉시 논리 차단 + 목적 상실 시 지체 없는 물리/암호학적 파기. **내부 운영 목표: 본 DB 24시간 이내 파기 검토(법정 24시간 규정 아님)**. | 일반 `conversation_messages.body_text`/메모리/Outbox/로그/분석에 원문 저장 금지; 원문에 대한 보호 key·Subject×Reading×Reader×Grant scope·RLS FORCE·서버만 권한 재조회. | Product + Privacy + DB + Chat + Legal |
 | **S4-B 미확정 임시 생성/실패 결과** (모델 응답/초안/partial chunk/stream/Retry) | T1 뒤 후보 생성 및 검증; T2 실패 시 고객 제공 목적 없음. | **영속 저장 기본 금지**, 실패·취소·timeout 뒤 즉시 메모리·버퍼 폐기. 장애 복구 필요를 주장하며 원문 retry cache를 새로 만들려면 별도 개별 승인. 타사 AI의 server-side 보관/학습 여부는 별도 검토. | T2 성공 전 외부 공개/스트리밍·일반 DB Attempt/AI log/Outbox/관측 플랫폼 전송 금지. | Privacy + API/LLM + Chat |
 | **S4-C 공식 출처 증명·Saju Unit·Semantic/Output proof·fingerprint** | 유효 해설의 사실성·변조 방지/감사. | 기존 **RR-03 provenance DELETE 승인 범위 재사용**; 확장 필드/신규 sidecar·서명/원문 조각은 재분류 후 삭제 graph 갱신. 환불/회수/만료 시 현재 권한 없는 원본 읽기 0. | 실제 Owner-minted 증명만 사용, 일반 Chat/LLM prompt에 해시/원본 임의 노출 금지. 출처 증명 자체도 회원과 결합하면 개인 데이터가 될 수 있음. | Privacy + Saju + DB |
 | **S4-D 안전 일반 Chat 표시** (예: '해설이 제공됨' + 비민감 상태/참조) | 기존 일반 채팅 기록과 UX 연속성. | 원문·내부 출처·PII/예측 요약이 **없는 마커만** 일반 Chat 이력으로 보유. 회원 탈퇴 시 기존 Chat DELETE 정책 따름. 환불 후 마커는 정보 유출 없는 상태로 남아도 되나 내용을 펼치려면 현재 Grant 재판정 필수. | 메시지 본문·notification에는 보호 본문 hash/요약/민감한 발췌 금지. | Product + Privacy + Chat |
 | **S4-E 원문 없는 운영 이벤트/관측 로그** (상태코드, 정책 버전, 시간, 제한된 비식별화된 correlation) | 접근 통제·복구·장애 분석. | 새 **로그 상한 90일을 제안**하되 법정 기간 아님; incident/legal hold, SIEM 운영/보안 보존과 충돌하는지 Security/Legal 별도 심사. 원문·Birth·Reader 질문·source Unit payload·직접 식별자 금지. | 최소 역할, 마스킹, 로그 수집 수탁자 인벤토리, TTL/삭제 실측. | Privacy + Security + Ops + Legal |
 | **S4-F Commerce 계약·청약철회·결제·Entitlement 증빙** | 거래·정산·법정 보관. | 이미 승인된 관련 9 Commerce 테이블 **P5Y** 범위를 그대로 적용. 거래와 무관한 원문/임시 해설/출처 전체를 P5Y로 확대하지 않음. 분쟁처리 이력은 법정 유형별 3년 또는 개별 법률 보존검토; 필요 최소정보/분리 보관. | 법정 목적의 별도 보관 영역; 일반 Reader 조회/모델 재주입 금지. | 기존 Product 승인 + Legal/Commerce 범위 검토 |
-| **S4-G 검색·요약·임베딩·Memory·분석 파생물** | 별도 추천/개인화/검색/학습 목적 후보. | **신규 생성·영속화 기본 불허**. 향후 별도 처리 목적·법적 근거·보존·삭제/재생성/권리회수 역추적 설계 후 신규 승인. | \`reader_context_memory\`, \`reader_context_non_memory\`, \`ai_execution_logs\`, 일반 \`chat_turn_attempts\`, \`outbox_events\`, 검색 인덱스/벡터 DB, 모델 제공업체의 학습용 재이용에 **미승인 본문 주입 금지**. | Product + Privacy + Legal + Character/AI |
+| **S4-G 검색·요약·임베딩·Memory·분석 파생물** | 별도 추천/개인화/검색/학습 목적 후보. | **신규 생성·영속화 기본 불허**. 향후 별도 처리 목적·법적 근거·보존·삭제/재생성/권리회수 역추적 설계 후 신규 승인. | `reader_context_memory`, `reader_context_non_memory`, `ai_execution_logs`, 일반 `chat_turn_attempts`, `outbox_events`, 검색 인덱스/벡터 DB, 모델 제공업체의 학습용 재이용에 **미승인 본문 주입 금지**. | Product + Privacy + Legal + Character/AI |
 | **S4-H 백업·복원·재해복구 자료** | 기존 데이터 복구. | 기존 **P30D 백업 수명주기 유지**는 승인된 한정 범위. 신규 보호 원문에 대해서는 삭제/회수 tombstone의 오프-DB 권한 기록, 복구 직후 **서비스 시작 전** 재조정·비재노출 검증을 새로 승인해야 함. 물리 백업 30일 보관은 '지체 없는 파기' 충족의 자동 증거가 아님. | 복원된 구 DB에서 해설 조회·모델 주입을 원천 HOLD, tombstone 선행 적용, key 폐기/복구 가능성·벤더 백업 범위 별도 검토. | Privacy + DB/DR + Security + Legal |
 
 ### 보존·삭제 결정에서 특히 오해하면 안 되는 사항
@@ -62,7 +62,7 @@
 
 **D1. 신규 보호 데이터 경계 승인**
 - [ ] 신규 해설 원문·청크는 일반 채팅 메시지/AI Attempt/Outbox/Memory와 분리하여 **서버 전용** 보호 저장. 정확한 신규 개인 데이터 테이블 수·FK graph·DELETE 분류를 최종 schema와 함께 별도 확정.
-- [ ] RR-03 이미 승인된 출처 sidecar DELETE 정책은 역사적 승인 그대로 유지. 추가로 생기는 원문 테이블이 기존 \`59/140\` 또는 RR-03 후보 \`60/146\` 그래프에 자동 포함된 것처럼 승인 정본을 수정하지 않는다.
+- [ ] RR-03 이미 승인된 출처 sidecar DELETE 정책은 역사적 승인 그대로 유지. 추가로 생기는 원문 테이블이 기존 `59/140` 또는 RR-03 후보 `60/146` 그래프에 자동 포함된 것처럼 승인 정본을 수정하지 않는다.
 
 **D2. 접근권과 파기 정책 승인**
 - [ ] 회원 탈퇴·명시적 삭제·환불/회수/만료 등으로 해당 콘텐츠에 대한 권리가 없으면 **즉시 서버 재조회·새 생성·모델 재주입 금지**. 일반 채팅 마커는 비민감 상태만 유지(탈퇴 시 기존 Chat 정책으로 처리).
@@ -90,7 +90,7 @@
 
 ## E. Approval decision record — 반드시 실제 Owner가 기재
 
-\`\`\`text
+```text
 Privacy #2318 decision: PENDING / APPROVED / REJECTED
 Approved scope: (D1~D6 조항별 명시, 예외 기재)
 Proposed new table(s) + Subject graph fingerprint/version: NOT YET DEFINED
@@ -103,7 +103,7 @@ Security / DB / Chat owners: NOT SIGNED
 Approval URL + timestamp + exact document revision: NOT RECORDED
 Implementation authority: NOT GRANTED
 Production migration / paid content persistence / checkout / public reveal: OFF
-\`\`\`
+```
 
 ### 승인 후에만 착수할 기술 검증
 
