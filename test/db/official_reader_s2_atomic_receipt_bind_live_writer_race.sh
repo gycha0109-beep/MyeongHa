@@ -948,7 +948,7 @@ select (public.cmd_apply_verified_portone_reader_full_cancellation_v1(
   'synthetic-portone-b6-payment','tx-official-reader-b6-unbound-issued',
   'synthetic-b6-unbound-full-cancel','$b6_cancel_at'::timestamptz,
   $b6_amount,'KRW','production',
-  'hmac-sh256:k1:cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd',
+  'hmac-sha256:k1:cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd',
   'synthetic-verified-b6-v1'
 )->'revoke'->>'disposition');
 commit;
