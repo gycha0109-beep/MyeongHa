@@ -25,3 +25,9 @@ Watchtower-Track: character-memory
 - 모델 배치, 비로그 정책, Production 분리 원칙, strict 전체 HOLD 규칙은 변하지 않는다. 각 경로별 gateVerdict를 추가해 후보 100% 통과와 기존 경로의 독립적 변동을 구분한다. 경로별 PASS가 Production 또는 Character 품질 PASS를 의미하지 않는다.
 - 호출 상한 128회, repository 예상 비용 상한 $3.00, 재시도 0, 순서 교차, 보호된 main 트리거 fire-2026-10-09-real-path-v3.
 - 이 평가는 아직 다중 턴·장기 기억·관계 변화·실제 캐릭터 자연스러움 평가가 아니다. 운영 경로 승격 HOLD.
+
+## 2026-10-19: 기존 유료 실행 워크플로 영구 보류
+
+- 과거 평가 워크플로의 `secrets.OPENAI_API_KEY` 운영 키 주입을 제거했습니다. 작업 자체의 `if: false`와 실행 단계의 명시적인 실패를 동시에 유지합니다.
+- 해당 기존 워크플로를 재가동하거나 Production 키로 추가 평가하지 않습니다. 현재 `scripts/run-seyeon-dialogue-path-real-api-eval-v1.mjs`의 유료 호출 차단은 변경하지 않았습니다.
+- 향후 최초 유료 6회 슬롯은 공급자 월 한도·청구·평가 키 귀속·전역 예약 원장 검증 이후 별도 검수된 `OPENAI_EVAL_API_KEY` 전용 워크플로가 필요합니다. 본 변경은 유료 평가 실행 승인이나 새 품질 측정이 아닙니다.

@@ -73,6 +73,19 @@ describe('Se-yeon real API dialogue-path benchmark accounting', () => {
     expect(src).toContain('flag:\'wx\'');
   });
 
+  it('retired real-model workflow is non-dispatchable and cannot receive the production key', () => {
+    const src = readFileSync(new URL(
+      '../.github/workflows/seyeon-dialogue-path-real-api-eval-v1.yml', import.meta.url,
+    ), 'utf8');
+    expect(src).toContain('if: ${{ false }}');
+    expect(src).toContain('SEYEON_LEGACY_EVAL_PAID_HOLD');
+    expect(src).not.toContain('secrets.OPENAI_API_KEY');
+    expect(src).not.toContain('secrets.OPENAI_API_KEY2');
+    expect(src).not.toContain('secrets.OPENAI_EVAL_API_KEY');
+    expect(src).not.toMatch(/^\s*OPENAI_(?:EVAL_)?API_KEY:/m);
+    expect(src).not.toContain('node scripts/run-seyeon-dialogue-path-real-api-eval-v1.mjs');
+  });
+
   it('counts cached tokens against input, never double-counts or invents usage', () => {
     const rates = SEYEON_DIALOGUE_PATH_PRICES_V1['gpt-5.6-terra'];
     const m = estimateSeyeonDialoguePathCostV1({
