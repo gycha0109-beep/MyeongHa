@@ -10,10 +10,12 @@ import {
 import { createMobileHomeViewModelV1 } from '@/features/home/home-view-model';
 import { useMobileHomeV1 } from '@/features/home/use-mobile-home';
 import { mobileColors } from '@/ui/mobile-colors';
+import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
 import { useMobileTheme } from '@/ui/mobile-theme';
 import { MobileFortuneCookie } from '@/features/home/MobileFortuneCookie';
 
 export default function HomeScreen() {
+  const styles = useMobileThemedStyles(staticStyles);
   const { colors } = useMobileTheme();
   const { snapshot, refresh } = useMobileHomeV1();
   const view = createMobileHomeViewModelV1(snapshot.state);
@@ -56,3 +58,4 @@ const styles = StyleSheet.create({
   },
   divider: { height: StyleSheet.hairlineWidth, backgroundColor: mobileColors.border },
 });
+const staticStyles = styles;
