@@ -113,13 +113,11 @@ begin
     end if;
 
     if v_reading_count=0 then
-      -- Only the trusted combined 1760 initial purchase may prelock a future
-      -- official Reading. Extra-Reader purchases require committed source truth.
-      if v_purchase_role is distinct from 'initial_reading' then
-        raise exception using errcode='P0001',
-          constraint='official_reader_s2_receipt_requires_existing_official',
-          message='Additional Reader purchase has no current official Reading';
-      end if;
+      -- Receipt/Capability fulfillment may precede the official bind for
+      -- BOTH purchase roles (existing 1090 fixture and 1760 orchestration).
+      -- Actual 1220 access binding separately enforces an existing committed
+      -- official Reading for additional Reader access. Never grant access
+      -- merely because this receipt-side pending lock is present.
       v_pending:=pg_catalog.current_setting(
         'myeongha.reader_pending_reading_id',true
       );
