@@ -2,8 +2,10 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import type { MobileSajuViewModelV1 } from './saju-view-model';
 import { mobileColors } from '@/ui/mobile-colors';
+import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
 
 export function BirthSummaryCard({ summary }: { summary: string }) {
+  const styles = useMobileThemedStyles(staticStyles);
   return (
     <View style={styles.card}>
       <Text style={styles.eyebrow}>CURRENT BIRTH</Text>
@@ -13,6 +15,7 @@ export function BirthSummaryCard({ summary }: { summary: string }) {
 }
 
 export function SajuPillarGrid({ pillars }: Pick<MobileSajuViewModelV1, 'pillars'>) {
+  const styles = useMobileThemedStyles(staticStyles);
   return (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>나의 명식</Text>
@@ -44,6 +47,7 @@ export function SajuPillarGrid({ pillars }: Pick<MobileSajuViewModelV1, 'pillars
 }
 
 export function DayMasterCard({ dayMaster }: Pick<MobileSajuViewModelV1, 'dayMaster'>) {
+  const styles = useMobileThemedStyles(staticStyles);
   return (
     <View style={styles.card}>
       <Text style={styles.sectionTitle}>나의 일간</Text>
@@ -59,6 +63,7 @@ export function DayMasterCard({ dayMaster }: Pick<MobileSajuViewModelV1, 'dayMas
 }
 
 export function ElementBalance({ elementBalance }: Pick<MobileSajuViewModelV1, 'elementBalance'>) {
+  const styles = useMobileThemedStyles(staticStyles);
   const maximum = Math.max(1, ...elementBalance.map((item) => item.count));
   return (
     <View style={styles.card}>
@@ -86,6 +91,7 @@ export function ElementBalance({ elementBalance }: Pick<MobileSajuViewModelV1, '
 export function CalculationCompleteness({
   completeness,
 }: Pick<MobileSajuViewModelV1, 'completeness'>) {
+  const styles = useMobileThemedStyles(staticStyles);
   return (
     <View style={styles.card}>
       <Text style={styles.sectionTitle}>계산 상태</Text>
@@ -145,3 +151,4 @@ const styles = StyleSheet.create({
   count: { width: 18, textAlign: 'right', color: mobileColors.navy, fontSize: 14, fontWeight: '800' },
   completenessHeadline: { color: mobileColors.navy, fontSize: 18, fontWeight: '800' },
 });
+const staticStyles = styles;
