@@ -1,0 +1,42 @@
+# Watchtower-Track: security
+# Deliberate allowlist for disposable offline test image.
+# Nothing under .git, docs, local env, or arbitrary top-level user files.
+**
+!package.json
+!package-lock.json
+!.npmrc
+!vitest.config.ts
+!tsconfig.json
+!tsconfig.build.json
+!apps
+!apps/**
+!packages
+!packages/**
+!api
+!api/**
+!test
+!test/**
+!scripts
+!scripts/**
+!supabase
+!supabase/**
+
+# Explicit exclusions take precedence over the source allowlist.
+**/.env
+**/.env.*
+**/node_modules
+**/node_modules/**
+**/dist
+**/dist/**
+**/.git
+**/.git/**
+**/build
+**/build/**
+**/*.pem
+**/*.key
+**/*.p12
+**/*.pfx
+**/*-credentials.json
+**/secrets.json
+**/.secrets
+**/.secrets/**
