@@ -117,3 +117,10 @@ Saju Owner가 제공할 정식 보완물은 **Preview와 별도**인 운영 원�
 - 그다음 기존 `verifySajuHeldSourceProofV1`로 *실제 Saju* Preview 서명, issuer/audience/key, 요청 정규화 hash, 응답 본문 hash, nonce TTL, **다중 인스턴스 공유 DB nonce 원자 claim**을 검증한다. 검증한 signed `verifiedSource.readingId`와 응답의 canonical hash를 DB에 저장된 *정확한* v2 snapshot에서 독립 계산한 hash에 비교한다. 서명이 맞더라도 DB 원문과 다르면 `blocked`로 끝난다.
 - **승인 범위를 넘지 않음:** 본 코드는 서버 인가 원본과 Preview signed transport의 바이트 수준 일치만 증명하며, Saju Production 실행 의미/발행자 공식 Source Authority를 증명하지 않는다. 결과는 `held` 또는 `blocked`이며 `sourceAuthority/semanticAuthority/outputAuthority/privacyApproval: NOT_EVALUATED`, `canPublish/canSell: false`; 회원/Reading/원문/증명/해시를 반환하지 않는다. 브라우저 HTTP, DB 보호 원문 저장, 메모리/Outbox와 연결하지 않는다.
 - 실제 Saju Owner [#2410](https://github.com/gycha0109-beep/Saju/issues/2410)의 공식 **Production Source attestation**과 Privacy [#2318](https://github.com/gycha0109-beep/MyeongHa/issues/2318)의 유료 원문 분류·보존·삭제·복원 승인 이후 별도 발행·저장 계약이 필요하다. 이 Preview 비교를 S3 공식 발행 완료, S4 승인 또는 S5 T2 저장 권한으로 전환하는 것을 금지한다.
+
+
+## S3 원문 불일치 시 Preview nonce 무소모 차단
+
+- `official-reader-s3-signed-source-artifact-reconciliation-v1.ts`는 서명 검증 전에 **아직 신뢰하지 않는 Saju 응답 원문**과 DB 승인 공식 Reading 원문이 동일한지를 deterministic canonical hash와 Reading ID로 먼저 대조한다. 내용이 다르면 **공용 PostgreSQL nonce replay ledger를 소모하지 않고** `blocked`를 반환한다.
+- 이 사전 비교를 서명이나 권한으로 신뢰하지 않는다. 원문이 일치하는 경우에만 기존 `verifySajuHeldSourceProofV1`의 서명·issuer/audience/key·nonce/TTL·요청 해시·응답 해시·공유 DB nonce 원자 claim을 계속 필수 실행한다.
+- 서로 다른 원문을 가진 실제 형식의 signed Preview가 먼저 도착해도 nonce를 소모하지 않고, 이후 올바른 원문이 도착하면 같은 nonce로 단 한 번만 HELD될 수 있는 공격/회복 시험을 추가했다. 결과는 여전히 `sourceAuthority: NOT_EVALUATED`, Privacy 미승인, 유료 공개/저장 OFF다.
