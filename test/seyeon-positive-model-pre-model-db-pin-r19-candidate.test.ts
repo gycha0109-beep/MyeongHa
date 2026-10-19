@@ -12,7 +12,8 @@ import {
 
 const AUTH='d1000000-0000-4000-8000-000000000001';
 const SUBJECT='d2000000-0000-4000-8000-000000000001';
-const THREAD='d4000000-0000-4000-8000-000000000001';
+const THREAD='d4000000-0000-4000-8000-000000000019';
+const PARTICIPANT='d4100000-0000-4000-8000-000000000019';
 const TURN='d7000000-0000-4000-8000-000000000019';
 const ATTEMPT='d7200000-0000-4000-8000-000000000019';
 const MEMORY1='d5000000-0000-4000-8000-000000000001';
@@ -139,6 +140,23 @@ realSuite('R19 disposable PostgreSQL actual Owner SourceSet storage',()=>{
 
   it('stores exact two original Grants against a new running Attempt before any Provider and rejects changed set',async()=>{
     if(!pg)throw Error('missing disposable PG');
+    // The R1 fixture's original thread already has an in-flight Attempt.
+    // New synthetic Turn must use its own Thread, not bypass the DB guard.
+    await pg.query(`
+insert into public.conversation_threads(
+ id,subject_id,thread_type,status,title,active_content_release_id,
+ active_content_bundle_id,content_revision,next_sequence_no,created_at,updated_at
+) values (
+ $1::uuid,$2::uuid,'single_character','active','r19-disposable',
+ $3::uuid,$4::uuid,0,1,clock_timestamp(),clock_timestamp()
+)
+`,[THREAD,SUBJECT,'d3100000-0000-4000-8000-000000000001',
+    'd3000000-0000-4000-8000-000000000001']);
+    await pg.query(`
+insert into public.conversation_thread_characters(
+ id,thread_id,character_id,content_bundle_id,role,joined_at
+) values ($1::uuid,$2::uuid,'seyeon',$3::uuid,'primary',clock_timestamp())
+`,[PARTICIPANT,THREAD,'d3000000-0000-4000-8000-000000000001']);
     await pg.query(`
 select * from public.cmd_receive_chat_turn_v1(
   $1::uuid,$2::uuid,$3::text,$4::text,'chat-request-v1',
