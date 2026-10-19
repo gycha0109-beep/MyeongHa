@@ -427,6 +427,12 @@
       "prMode": "required-router",
       "mainMode": "none",
       "workTrackAttribution": "pr-metadata"
+    },
+    "seyeon-c08-key2-pinned-recovery-real-v2.yml": {
+      "responsibility": "character-memory-bounded-real-model-evaluation",
+      "prMode": "none",
+      "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "commit-metadata"
     }
   }
 }

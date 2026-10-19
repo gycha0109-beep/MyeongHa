@@ -50,8 +50,8 @@ const quote=(input,output)=>{
  return Number((BigInt(input)*rateIn+BigInt(output)*rateOut+
   999999n)/1000000n);
 };
-async function main(){
- const auth=admit();
+export async function runSeyeonC08Key2RealSixV1(admitRun=admit){
+ const auth=admitRun();
  const key=process.env.OPENAI_API_KEY2?.trim();
  if(!key||key.length<20||process.env.GITHUB_RUN_ATTEMPT!=='1')
   throw Error('C08_KEY2_SECRET_MISSING_HOLD');
@@ -89,7 +89,7 @@ async function main(){
     throw Error('C08_KEY2_BUDGET_OR_PENDING_RESULT_HOLD');
    // Recheck main HEAD, GitHub run uniqueness, and attempt before EVERY
    // provider call; concurrent or rewritten runs never silently continue.
-   const check=admit();
+   const check=admitRun();
    if(check.runId!==auth.runId||check.mainSha!==auth.mainSha)
     throw Error('C08_KEY2_STALE_ADMISSION_HOLD');
    let event=null,reserved=false;
@@ -188,4 +188,4 @@ async function main(){
   throw Error('C08_KEY2_REAL_MODEL_BATCH_HOLD');
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href)
- await main();
+ await runSeyeonC08Key2RealSixV1();
