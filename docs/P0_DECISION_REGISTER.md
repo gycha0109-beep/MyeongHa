@@ -24,6 +24,7 @@
 | `P0-AI-01` | AI provider/model/fallback | **OPEN-P0** | provider, model family, fallback, grounded-response validation implementation |
 | `P0-AGE-01` | Minimum age / character content policy | **OPEN-P0** | 최소 이용 연령, 미성년 허용 여부, 표현 강도/제한; content bundle policy-tag slot은 미리 두되 threshold/matrix는 미확정 |
 | `P0-PR-01` | Retention / backup / legal retention | **DECIDED** | service/personalization DELETE; 4 structural tombstones ANONYMIZE; 9 Commerce evidence/history tables RETAIN `P5Y`; existing encrypted backup lifecycle `P30D` + restore reconciliation before serviceability |
+| `P0-PR-02` | Official Reader paid interpretation privacy | **DECIDED — PRODUCT POLICY ONLY** | [기본 브랜치 제품 개인정보 정책 정본](OFFICIAL_READER_S4_PRIVACY_POLICY_DECISION_V1.md); 24h 본 DB 삭제 목표/90d 일반 로그 상한, 정확한 유료 권한, 원문 격리. 법무·기술·저장·운영 승인은 별도 HOLD |
 | `P0-PR-01A` | Guest bearer/session authentication TTL | **DECIDED** | 7 days / 604800 seconds for newly issued Guest credentials; does not decide expired-Guest data deletion or parent retention policy |
 | `P0-PR-01B` | Commerce provider-evidence data minimization | **DECIDED** | no raw secret/bearer/receipt/PCI storage; versioned keyed fingerprints + allowlisted bounded verified payload; parent `P0-PR-01` now supplies the separate `P5Y` retention baseline |
 | `P0-AUTH-01` | API→PostgreSQL execution identity / RLS enforcement model | **DECIDED** | non-BYPASSRLS API execution role + transaction-scoped trusted canonical `subject_id` context |
@@ -42,6 +43,29 @@ SUPERSEDED
 ```
 
 ## 4. Decision Records
+
+### P0-PR-02
+
+```yaml
+id: P0-PR-02
+status: DECIDED
+approval_scope: PRODUCT_POLICY_ONLY
+decided_at: 2026-10-19
+owner: PRODUCT_OWNER
+record: docs/OFFICIAL_READER_S4_PRIVACY_POLICY_DECISION_V1.md
+scope:
+  - protected paid content separate from ordinary Chat/Memory/Outbox
+  - current exact Grant checked on each server read; revoke/refund/expiry immediately blocks further access and model reinjection when no valid right remains
+  - primary database paid body removal within 24 hours after a valid deletion trigger (internal target, not legal deadline)
+  - non-content ordinary operations logs maximum 90 days (internal policy ceiling)
+  - existing Commerce P5Y and encrypted backup P30D unchanged
+  - no additional external processors or paid-body external transfers authorized
+does_not_approve:
+  - production database migration, protected content storage, public paid response or checkout
+  - LEGAL-002 or actual third-party data-flow/international-transfer review
+  - protected-table FK/deletion graph, RLS and restored-state privacy acceptance
+  - Saju Production source attestation or S5 final commit
+```
 
 ### P0-SA-01
 
