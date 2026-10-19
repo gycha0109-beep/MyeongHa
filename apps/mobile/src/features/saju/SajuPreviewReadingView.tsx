@@ -11,6 +11,7 @@ import {
 } from './mobile-saju-topic-catalog';
 import { mobileSajuPreviewServiceV1 } from './native-mobile-saju-preview-service';
 import { mobileColors } from '@/ui/mobile-colors';
+import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
 
 type PreviewReadingTextV1 = Extract<
   MobileSajuTopicV1['availability'],
@@ -94,6 +95,7 @@ function errorCopy(error: unknown): Readonly<{ message: string; retryable: boole
 }
 
 export function SajuPreviewReadingView({ onOpenPreview }: { onOpenPreview?: (topic: MobileSajuTopicV1) => void }) {
+  const styles = useMobileThemedStyles(staticStyles);
   const [state, setState] = useState<PreviewStateV1>({ kind: 'idle' });
 
   async function load(
@@ -470,3 +472,4 @@ const styles = StyleSheet.create({
   supportTitle: { color: mobileColors.ink, fontSize: 13, fontWeight: '800' },
   supportText: { color: mobileColors.muted, fontSize: 13, lineHeight: 20 },
 });
+const staticStyles = styles;

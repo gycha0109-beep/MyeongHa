@@ -19,6 +19,7 @@ import { SajuPreviewReadingView } from '@/features/saju/SajuPreviewReadingView';
 import { createMobileSajuViewModelV1 } from '@/features/saju/saju-view-model';
 import { MobileScreen } from '@/ui/MobileScreen';
 import { mobileColors } from '@/ui/mobile-colors';
+import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
 import { useMobilePullRefreshV1 } from '@/ui/use-mobile-pull-refresh';
 
 type ScreenState =
@@ -39,6 +40,7 @@ function errorCopy(state: Exclude<MobileSajuLoadStateV1, { kind: 'birth_required
 }
 
 export default function SajuScreen() {
+  const styles = useMobileThemedStyles(staticStyles);
   const [state, setState] = useState<ScreenState>({ kind: 'loading' });
   const [presentationReader, setPresentationReader] = useState<MobileReaderPresentationIdV1>('seyeon');
 
@@ -179,3 +181,4 @@ const styles = StyleSheet.create({
   },
   secondaryButtonText: { color: mobileColors.navy, fontSize: 15, fontWeight: '700' },
 });
+const staticStyles = styles;

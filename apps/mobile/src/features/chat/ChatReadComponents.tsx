@@ -6,6 +6,7 @@ import { projectMobileChatEmptyGreetingV1 } from '@/features/chat/mobile-chat-em
 import { MOBILE_CHAT_KNOWN_CHARACTERS_V1 } from '@/features/chat/chat-launch-roster';
 import { resolveMobileChatPortraitV1 } from '@/features/chat/chat-character-portraits';
 import { mobileColors } from '@/ui/mobile-colors';
+import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
 import {
   ActivityIndicator,
   Image,
@@ -21,6 +22,7 @@ export function ChatReadHeader({
 }: {
   snapshot: MobileChatThreadSnapshotV1;
 }) {
+  const styles = useMobileThemedStyles(staticStyles);
   const character = snapshot.characterId === null
     ? null
     : MOBILE_CHAT_KNOWN_CHARACTERS_V1.find(
@@ -65,6 +67,7 @@ export function ChatReadMessages({
 }: {
   snapshot: MobileChatThreadSnapshotV1;
 }) {
+  const styles = useMobileThemedStyles(staticStyles);
   const isSeyeonTheme = snapshot.characterId === 'seyeon';
   if (snapshot.status === 'loading_initial' || snapshot.status === 'idle') {
     return (
@@ -230,6 +233,7 @@ export function ChatReadMore({
   onLoadMore: () => void;
   onRetry?: () => void;
 }) {
+  const styles = useMobileThemedStyles(staticStyles);
   if (isSeyeonHistoryRevealHoldV1(snapshot)) return null;
   if (snapshot.status === 'error' && snapshot.messages.length === 0) {
     return onRetry === undefined ? null : (
@@ -268,6 +272,7 @@ export function ChatComposer({
   sending: boolean;
   status: string | null;
 }) {
+  const styles = useMobileThemedStyles(staticStyles);
   if (isSeyeonHistoryRevealHoldV1(snapshot)) {
     return (
       <View style={[styles.pendingCard, styles.seyeonSurface]}>
@@ -442,3 +447,4 @@ const styles = StyleSheet.create({
   sendActionText: { color: mobileColors.surface, fontSize: 13, fontWeight: '800' },
   composerHelp: { fontSize: 11, color: mobileColors.muted, lineHeight: 16 },
 });
+const staticStyles = styles;

@@ -9,6 +9,7 @@ import {
 } from '@/features/reading/mobile-reader-presentation';
 import { createMobileReaderAccessViewStateV1 } from '@/features/reading/mobile-reader-access-view-model';
 import { mobileColors } from '@/ui/mobile-colors';
+import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
 import { resolveMobileChatPortraitV1 } from '@/features/chat/chat-character-portraits';
 
 interface MobileReaderPickerPropsV1 {
@@ -22,6 +23,7 @@ interface MobileReaderPickerPropsV1 {
  * create a Thread, assert eligibility, or alter the Saju/Face source result.
  */
 export function MobileReaderPicker({ selected, onChange, vertical }: MobileReaderPickerPropsV1) {
+  const styles = useMobileThemedStyles(staticStyles);
   const [expanded, setExpanded] = useState(false);
   const effectiveSelected = isMobileReaderPreviewSelectableV1(selected) ? selected : 'seyeon';
   const reader = findMobileReaderPresentationV1(effectiveSelected);
@@ -125,3 +127,4 @@ const styles = StyleSheet.create({
   selectedText: { color: mobileColors.surface },
   notice: { color: mobileColors.muted, fontSize: 11, lineHeight: 17 },
 });
+const staticStyles = styles;

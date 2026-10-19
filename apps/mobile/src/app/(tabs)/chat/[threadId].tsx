@@ -14,6 +14,7 @@ import {
 } from '@/features/chat/ChatReadComponents';
 import { useMobileChatThreadV1 } from '@/features/chat/use-mobile-chat-thread';
 import { mobileColors } from '@/ui/mobile-colors';
+import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
 import { useMobilePullRefreshV1 } from '@/ui/use-mobile-pull-refresh';
 
 const SEYEON_CHAT_THEME_BACKGROUND = require('../../../../assets/characters/chat-themes/seyeon-chat-theme-mobile-v1.webp');
@@ -28,6 +29,7 @@ function resolveThreadId(value: string | string[] | undefined): string | null {
 }
 
 function ValidChatThread({ threadId }: { threadId: string }) {
+  const styles = useMobileThemedStyles(staticStyles);
   const { snapshot, refresh, loadMore, draft, setDraft, sending, sendStatus, send } =
     useMobileChatThreadV1(threadId);
   const { refreshing, onRefresh } = useMobilePullRefreshV1(refresh);
@@ -92,6 +94,7 @@ function ValidChatThread({ threadId }: { threadId: string }) {
 }
 
 export default function ChatThreadScreen() {
+  const styles = useMobileThemedStyles(staticStyles);
   const { threadId: routeThreadId } = useLocalSearchParams<{ threadId?: string | string[] }>();
   const threadId = resolveThreadId(routeThreadId);
 
@@ -143,3 +146,4 @@ const styles = StyleSheet.create({
   },
   invalidActionText: { color: mobileColors.surface, fontSize: 14, fontWeight: '800' },
 });
+const staticStyles = styles;

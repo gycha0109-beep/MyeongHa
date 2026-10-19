@@ -2,6 +2,8 @@ import type { PropsWithChildren, ReactNode } from 'react';
 import { RefreshControl, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { mobileColors } from '@/ui/mobile-colors';
+import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
+import { useMobileTheme } from '@/ui/mobile-theme';
 
 type MobileScreenProps = PropsWithChildren<{
   title: string;
@@ -12,23 +14,25 @@ type MobileScreenProps = PropsWithChildren<{
 }>;
 
 export function MobileScreen({ title, eyebrow, description, refreshing = false, onRefresh, children }: MobileScreenProps) {
+  const styles = useMobileThemedStyles(staticStyles);
+  const { colors } = useMobileTheme();
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.canvas }]}>
       <ScrollView
         contentContainerStyle={styles.content}
         refreshControl={onRefresh === undefined ? undefined : (
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor={mobileColors.navy}
-            colors={[mobileColors.navy]}
+            tintColor={colors.navy}
+            colors={[colors.navy]}
           />
         )}
       >
         <View style={styles.header}>
-          {eyebrow ? <Text style={styles.eyebrow}>{eyebrow}</Text> : null}
-          <Text style={styles.title}>{title}</Text>
-          {description ? <Text style={styles.description}>{description}</Text> : null}
+          {eyebrow ? <Text style={[styles.eyebrow, { color: colors.gold }]}>{eyebrow}</Text> : null}
+          <Text style={[styles.title, { color: colors.ink }]}>{title}</Text>
+          {description ? <Text style={[styles.description, { color: colors.muted }]}>{description}</Text> : null}
         </View>
         {children}
       </ScrollView>
@@ -37,6 +41,7 @@ export function MobileScreen({ title, eyebrow, description, refreshing = false, 
 }
 
 export function FoundationCard({ title, body }: { title: string; body: string }) {
+  const styles = useMobileThemedStyles(staticStyles);
   return (
     <View style={styles.card}>
       <Text style={styles.cardTitle}>{title}</Text>
@@ -56,3 +61,4 @@ const styles = StyleSheet.create({
   cardTitle: { color: mobileColors.ink, fontSize: 20, fontWeight: '700' },
   cardBody: { color: mobileColors.muted, fontSize: 15, lineHeight: 22 },
 });
+const staticStyles = styles;

@@ -10,9 +10,11 @@ import {
 import { useMobileChatOpenV1 } from '@/features/chat/use-mobile-chat-open';
 import { MobileScreen } from '@/ui/MobileScreen';
 import { mobileColors } from '@/ui/mobile-colors';
+import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
 import { useMobilePullRefreshV1 } from '@/ui/use-mobile-pull-refresh';
 
 export default function ChatHubScreen() {
+  const styles = useMobileThemedStyles(staticStyles);
   const { state, openCharacter, refreshAccess } = useMobileChatOpenV1();
   const { refreshing, onRefresh } = useMobilePullRefreshV1(refreshAccess);
 
@@ -198,3 +200,4 @@ const styles = StyleSheet.create({
   pendingRole: { color: mobileColors.muted, fontSize: 11, fontWeight: '600' },
   pendingPill: { color: mobileColors.gold, fontSize: 11, fontWeight: '800' },
 });
+const staticStyles = styles;

@@ -19,6 +19,7 @@ import { MobileReaderPicker } from '@/features/reading/MobileReaderPicker';
 import { findMobileReaderPresentationV1, type MobileReaderPresentationIdV1 } from '@/features/reading/mobile-reader-presentation';
 import { MobileScreen } from '@/ui/MobileScreen';
 import { mobileColors } from '@/ui/mobile-colors';
+import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
 import { useMobilePullRefreshV1 } from '@/ui/use-mobile-pull-refresh';
 
 type FaceMediaStateV1 =
@@ -34,6 +35,7 @@ function sizeLabel(bytes: number | null): string {
 }
 
 export default function FaceScreen() {
+  const styles = useMobileThemedStyles(staticStyles);
   const [state, setState] = useState<FaceMediaStateV1>({ kind: 'idle' });
   const [frontCameraOpen, setFrontCameraOpen] = useState(false);
   const [presentationReader, setPresentationReader] = useState<MobileReaderPresentationIdV1>('seyeon');
@@ -284,3 +286,4 @@ const styles = StyleSheet.create({
   primaryDisabledText: { color: mobileColors.surface, fontSize: 14, fontWeight: '900' },
   privacyNote: { color: mobileColors.muted, fontSize: 11, lineHeight: 17 },
 });
+const staticStyles = styles;

@@ -1,7 +1,7 @@
 import { Tabs } from 'expo-router';
 import { StyleSheet, Text, type ColorValue } from 'react-native';
 
-import { mobileColors } from '@/ui/mobile-colors';
+import { useMobileTheme } from '@/ui/mobile-theme';
 
 const iconByRoute = Object.freeze({
   index: '⌂',
@@ -16,13 +16,14 @@ function TabIcon({ route, color }: { route: keyof typeof iconByRoute; color: Col
 }
 
 export default function TabLayout() {
+  const { colors } = useMobileTheme();
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: mobileColors.navy,
-        tabBarInactiveTintColor: mobileColors.muted,
-        tabBarStyle: styles.tabBar,
+        tabBarActiveTintColor: colors.navy,
+        tabBarInactiveTintColor: colors.muted,
+        tabBarStyle: [styles.tabBar, { backgroundColor: colors.surface, borderTopColor: colors.border }],
         tabBarLabelStyle: styles.label,
       }}
     >
@@ -41,8 +42,8 @@ const styles = StyleSheet.create({
     paddingTop: 8,
     paddingBottom: 8,
     borderTopWidth: 1,
-    borderTopColor: mobileColors.border,
-    backgroundColor: mobileColors.surface,
+    borderTopColor: '#DCC9A8',
+    backgroundColor: '#FBF7EF',
   },
   label: { fontSize: 12, fontWeight: '700' },
   icon: { fontSize: 23, lineHeight: 26 },
