@@ -16,6 +16,7 @@ import {
 import { loadMobileCurrentSajuV1, type MobileSajuLoadStateV1 } from '@/features/saju/mobile-saju-loader';
 import { mobileSajuServiceV1 } from '@/features/saju/native-mobile-saju-service';
 import { SajuPreviewReadingView } from '@/features/saju/SajuPreviewReadingView';
+import { SajuEditorialSummary } from '@/features/saju/SajuEditorialSummary';
 import { createMobileSajuViewModelV1 } from '@/features/saju/saju-view-model';
 import { MobileScreen } from '@/ui/MobileScreen';
 import { mobileColors } from '@/ui/mobile-colors';
@@ -75,7 +76,7 @@ export default function SajuScreen() {
       title="사주"
       refreshing={refreshing}
       onRefresh={() => void onRefresh()}
-      description="현재 Birth revision의 계산 사실과 서버에서 검증된 사주 프리뷰를 확인합니다."
+      description="태어난 순간의 이야기를 바탕으로 나의 명식을 알아보세요."
     >
       <ReadingSubnav />
 
@@ -104,6 +105,7 @@ export default function SajuScreen() {
 
       {viewModel !== null ? (
         <>
+          <SajuEditorialSummary viewModel={viewModel} />
           <MobileReaderPicker selected={presentationReader} onChange={setPresentationReader} vertical="saju" />
           <Pressable
             accessibilityRole="button"
@@ -114,7 +116,7 @@ export default function SajuScreen() {
             })}
             style={styles.primaryButton}
           >
-            <Text style={styles.primaryButtonText}>세연과 전체 사주 읽기 시작 →</Text>
+            <Text style={styles.primaryButtonText}>선택한 대리자로 사주 읽기 시작 →</Text>
           </Pressable>
           <SajuPreviewReadingView
             onOpenPreview={(topic) => router.push({

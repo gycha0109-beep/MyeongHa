@@ -2,11 +2,11 @@ import { RefreshControl, SafeAreaView, ScrollView, StyleSheet, View } from 'reac
 
 import {
   HomeBrandHeader,
-  HomeCharacterPending,
   HomeContinuationCard,
   HomeReadingTopics,
   HomeTodayCard,
 } from '@/features/home/HomeComponents';
+import { HomeCharacterFeature } from '@/features/home/HomeCharacterFeature';
 import { createMobileHomeViewModelV1 } from '@/features/home/home-view-model';
 import { useMobileHomeV1 } from '@/features/home/use-mobile-home';
 import { mobileColors } from '@/ui/mobile-colors';
@@ -33,15 +33,11 @@ export default function HomeScreen() {
         }
       >
         <HomeBrandHeader greeting={view.greeting} subheading={view.subheading} />
-        <View style={styles.divider} />
+        <HomeCharacterFeature />
         <HomeTodayCard card={view.today} />
         <MobileFortuneCookie />
         <HomeContinuationCard card={view.continuation} />
         <HomeReadingTopics topics={view.readingTopics} />
-        <HomeCharacterPending
-          title={view.characterSurface.title}
-          body={view.characterSurface.body}
-        />
       </ScrollView>
     </SafeAreaView>
   );
@@ -54,7 +50,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 24,
     paddingBottom: 40,
-    gap: 24,
+    gap: 21,
   },
   divider: { height: StyleSheet.hairlineWidth, backgroundColor: mobileColors.border },
 });

@@ -7,6 +7,7 @@ import { MOBILE_CHAT_KNOWN_CHARACTERS_V1 } from '@/features/chat/chat-launch-ros
 import { resolveMobileChatPortraitV1 } from '@/features/chat/chat-character-portraits';
 import { mobileColors } from '@/ui/mobile-colors';
 import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
+import { useMobileTheme } from '@/ui/mobile-theme';
 import {
   ActivityIndicator,
   Image,
@@ -23,6 +24,7 @@ export function ChatReadHeader({
   snapshot: MobileChatThreadSnapshotV1;
 }) {
   const styles = useMobileThemedStyles(staticStyles);
+  const { theme } = useMobileTheme();
   const character = snapshot.characterId === null
     ? null
     : MOBILE_CHAT_KNOWN_CHARACTERS_V1.find(
@@ -36,10 +38,10 @@ export function ChatReadHeader({
   const isSeyeonTheme = snapshot.characterId === 'seyeon';
   const meta = presentation === null
     ? '서버가 확인한 대화방'
-    : `${presentation.title} · ${isSeyeonTheme ? '실시간 대화' : '대화 기록'}`;
+    : `${presentation.title} · 대화 기록`;
 
   return (
-    <View style={[styles.headerCard, isSeyeonTheme && styles.seyeonSurface]}>
+    <View style={[styles.headerCard, isSeyeonTheme && (theme === 'dark' ? styles.seyeonSurfaceDark : styles.seyeonSurface)]}>
       <View style={styles.avatar}>
         {portrait === null ? (
           <Text style={styles.avatarText}>
@@ -55,6 +57,7 @@ export function ChatReadHeader({
         )}
       </View>
       <View style={styles.headerCopy}>
+        <Text style={styles.headerEyebrow}>THE CONVERSATION</Text>
         <Text style={styles.headerTitle}>{displayName}</Text>
         <Text style={styles.headerMeta}>{meta}</Text>
       </View>
@@ -68,10 +71,11 @@ export function ChatReadMessages({
   snapshot: MobileChatThreadSnapshotV1;
 }) {
   const styles = useMobileThemedStyles(staticStyles);
+  const { theme } = useMobileTheme();
   const isSeyeonTheme = snapshot.characterId === 'seyeon';
   if (snapshot.status === 'loading_initial' || snapshot.status === 'idle') {
     return (
-      <View style={[styles.stateCard, isSeyeonTheme && styles.seyeonSurface]}>
+      <View style={[styles.stateCard, isSeyeonTheme && (theme === 'dark' ? styles.seyeonSurfaceDark : styles.seyeonSurface)]}>
         <ActivityIndicator color={mobileColors.navy} />
         <Text style={styles.stateText}>대화 기록을 불러오는 중입니다…</Text>
       </View>
@@ -93,7 +97,7 @@ export function ChatReadMessages({
 
   if (snapshot.status === 'error' && snapshot.messages.length === 0) {
     return (
-      <View style={[styles.stateCard, isSeyeonTheme && styles.seyeonSurface]}>
+      <View style={[styles.stateCard, isSeyeonTheme && (theme === 'dark' ? styles.seyeonSurfaceDark : styles.seyeonSurface)]}>
         <Text style={styles.errorTitle}>대화를 불러오지 못했습니다</Text>
         <Text style={styles.stateText}>
           대화 기록을 확인하지 못했습니다. 아래에서 다시 불러올 수 있습니다.
@@ -122,7 +126,7 @@ export function ChatReadMessages({
             </View>
             <View style={styles.messageGroupStack}>
               <Text style={styles.messageGroupName}>{greeting.displayName}</Text>
-              <View style={[styles.bubble, isSeyeonTheme && styles.seyeonBubble]}>
+              <View style={[styles.bubble, isSeyeonTheme && (theme === 'dark' ? styles.seyeonBubbleDark : styles.seyeonBubble)]}>
                 <Text style={styles.messageBody}>{greeting.openingLine}</Text>
               </View>
             </View>
@@ -131,7 +135,7 @@ export function ChatReadMessages({
       );
     }
     return (
-      <View style={[styles.stateCard, isSeyeonTheme && styles.seyeonSurface]}>
+      <View style={[styles.stateCard, isSeyeonTheme && (theme === 'dark' ? styles.seyeonSurfaceDark : styles.seyeonSurface)]}>
         <Text style={styles.emptyMark}>◇</Text>
         <Text style={styles.errorTitle}>아직 표시할 메시지가 없습니다</Text>
       </View>
@@ -203,7 +207,7 @@ export function ChatReadMessages({
                       styles.bubble,
                       user && styles.userBubble,
                       system && styles.systemBubble,
-                      characterGroup && isSeyeonTheme && styles.seyeonBubble,
+                      characterGroup && isSeyeonTheme && (theme === 'dark' ? styles.seyeonBubbleDark : styles.seyeonBubble),
                       message.redacted && styles.redactedBubble,
                     ]}>
                       <Text style={[styles.messageBody, user && styles.userMessageBody]}>
@@ -234,6 +238,7 @@ export function ChatReadMore({
   onRetry?: () => void;
 }) {
   const styles = useMobileThemedStyles(staticStyles);
+  const { theme } = useMobileTheme();
   if (isSeyeonHistoryRevealHoldV1(snapshot)) return null;
   if (snapshot.status === 'error' && snapshot.messages.length === 0) {
     return onRetry === undefined ? null : (
@@ -251,7 +256,7 @@ export function ChatReadMore({
       accessibilityRole="button"
       disabled={snapshot.status === 'loading_more'}
       onPress={onLoadMore}
-      style={[styles.loadMore, snapshot.characterId === 'seyeon' && styles.seyeonSurface]}
+      style={[styles.loadMore, snapshot.characterId === 'seyeon' && (theme === 'dark' ? styles.seyeonSurfaceDark : styles.seyeonSurface)]}
     >
       {snapshot.status === 'loading_more' ? (
         <ActivityIndicator color={mobileColors.navy} />
@@ -273,9 +278,10 @@ export function ChatComposer({
   status: string | null;
 }) {
   const styles = useMobileThemedStyles(staticStyles);
+  const { theme } = useMobileTheme();
   if (isSeyeonHistoryRevealHoldV1(snapshot)) {
     return (
-      <View style={[styles.pendingCard, styles.seyeonSurface]}>
+      <View style={[styles.pendingCard, theme === 'dark' ? styles.seyeonSurfaceDark : styles.seyeonSurface]}>
         <Text style={styles.pendingTitle}>세연 대화는 서버의 보호 조치로 잠시 중단되었습니다</Text>
         <Text style={styles.stateText}>
           대화 기록과 메시지 보내기는 개인정보 공개 권한 검증이 끝난 뒤 이용할 수 있습니다.
@@ -307,7 +313,7 @@ export function ChatComposer({
     );
   }
   return (
-    <View style={[styles.composerCard, styles.seyeonSurface]}>
+    <View style={[styles.composerCard, theme === 'dark' ? styles.seyeonSurfaceDark : styles.seyeonSurface]}>
       <View style={styles.composerRow}>
         <TextInput
           accessibilityLabel="세연에게 보낼 메시지"
@@ -341,19 +347,20 @@ const styles = StyleSheet.create({
   headerCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 13,
+    gap: 16,
     borderWidth: 1,
     borderColor: mobileColors.border,
-    borderRadius: 18,
+    borderRadius: 19,
     backgroundColor: mobileColors.surface,
-    padding: 16,
+    paddingHorizontal: 17,
+    paddingVertical: 17,
   },
   avatar: {
-    width: 48,
-    height: 48,
+    width: 64,
+    height: 70,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 24,
+    borderRadius: 15,
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: mobileColors.gold,
@@ -365,11 +372,20 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(181, 132, 94, 0.24)',
   },
   seyeonBubble: {
-    backgroundColor: 'rgba(255, 252, 246, 0.92)',
-    borderColor: 'rgba(181, 132, 94, 0.20)',
+    backgroundColor: 'rgba(255, 252, 246, 0.96)',
+    borderColor: 'rgba(181, 132, 94, 0.24)',
   },
-  headerCopy: { flex: 1, gap: 3 },
-  headerTitle: { color: mobileColors.ink, fontSize: 18, fontWeight: '800' },
+  seyeonSurfaceDark: {
+    backgroundColor: 'rgba(17, 29, 40, 0.94)',
+    borderColor: 'rgba(213, 177, 130, 0.35)',
+  },
+  seyeonBubbleDark: {
+    backgroundColor: 'rgba(23, 36, 48, 0.96)',
+    borderColor: 'rgba(213, 177, 130, 0.33)',
+  },
+  headerCopy: { flex: 1, gap: 5 },
+  headerEyebrow: { color: mobileColors.gold, fontSize: 10, fontWeight: '900', letterSpacing: 1.35 },
+  headerTitle: { color: mobileColors.ink, fontSize: 22, fontWeight: '900' },
   headerMeta: { color: mobileColors.muted, fontSize: 12, lineHeight: 18 },
   stateCard: {
     minHeight: 120,
@@ -408,15 +424,15 @@ const styles = StyleSheet.create({
     maxWidth: '82%',
     borderWidth: 1,
     borderColor: mobileColors.border,
-    borderRadius: 14,
+    borderRadius: 17,
     backgroundColor: mobileColors.surface,
-    paddingHorizontal: 13,
-    paddingVertical: 10,
+    paddingHorizontal: 15,
+    paddingVertical: 13,
   },
   userBubble: { backgroundColor: mobileColors.navy, borderColor: mobileColors.navy },
   systemBubble: { maxWidth: '88%', backgroundColor: mobileColors.canvas },
   redactedBubble: { opacity: 0.7 },
-  messageBody: { color: mobileColors.ink, fontSize: 15, lineHeight: 22 },
+  messageBody: { color: mobileColors.ink, fontSize: 15, lineHeight: 24 },
   userMessageBody: { color: mobileColors.surface },
   messageTime: { color: mobileColors.muted, fontSize: 10, flexShrink: 0, paddingBottom: 2 },
   loadMore: {
@@ -439,10 +455,10 @@ const styles = StyleSheet.create({
     gap: 7,
   },
   pendingTitle: { color: mobileColors.ink, fontSize: 15, fontWeight: '800' },
-  composerCard: { paddingHorizontal: 14, paddingVertical: 12, gap: 7, borderTopWidth: 1, borderColor: mobileColors.border },
+  composerCard: { paddingHorizontal: 17, paddingVertical: 14, gap: 9, borderTopWidth: 1, borderColor: mobileColors.border },
   composerRow: { flexDirection: 'row', gap: 8, alignItems: 'flex-end' },
-  composerInput: { flex: 1, maxHeight: 130, minHeight: 44, color: mobileColors.ink, fontSize: 14, lineHeight: 20, borderRadius: 13, borderWidth: 1, borderColor: mobileColors.border, backgroundColor: mobileColors.surface, paddingHorizontal: 12, paddingVertical: 10, textAlignVertical: 'top' },
-  sendAction: { minWidth: 58, minHeight: 44, paddingHorizontal: 12, borderRadius: 12, justifyContent: 'center', alignItems: 'center', backgroundColor: mobileColors.navy },
+  composerInput: { flex: 1, maxHeight: 130, minHeight: 48, color: mobileColors.ink, fontSize: 14, lineHeight: 20, borderRadius: 13, borderWidth: 1, borderColor: mobileColors.border, backgroundColor: mobileColors.surface, paddingHorizontal: 12, paddingVertical: 10, textAlignVertical: 'top' },
+  sendAction: { minWidth: 62, minHeight: 48, paddingHorizontal: 12, borderRadius: 14, justifyContent: 'center', alignItems: 'center', backgroundColor: mobileColors.navy },
   sendDisabled: { opacity: 0.48 },
   sendActionText: { color: mobileColors.surface, fontSize: 13, fontWeight: '800' },
   composerHelp: { fontSize: 11, color: mobileColors.muted, lineHeight: 16 },

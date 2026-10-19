@@ -57,6 +57,8 @@ export interface CreateSeyeonOriginalGrantPgSendAdapterInputV1 {
   readonly turnId: string;
   readonly committedAttemptId: string;
   readonly committedAssistantMessageId: string;
+  /** R24 sealed CI candidate: reject any other DB before opening current-rights RPC. */
+  readonly expectedDisposableDatabase?: 'myeongha_seyeon_positive_pin_candidate_test';
 }
 
 function requireUuid(value: string): string {
@@ -123,6 +125,18 @@ export function createSeyeonOriginalGrantPgSendAdapterV1(
           throw new SeyeonOriginalGrantPgSendAdapterErrorV1(
             'INVALID_MEMBER_EVIDENCE',
           );
+        }
+        if (input.expectedDisposableDatabase !== undefined) {
+          const db = await client.query<{ dbName: unknown }>(
+            'select current_database() as "dbName"',
+          );
+          if (db.rows.length !== 1 ||
+              db.rows[0]?.dbName !== input.expectedDisposableDatabase) {
+            throw new SeyeonOriginalGrantPgSendAdapterErrorV1(
+              'INVALID_DB_AUTHORITY',
+            );
+          }
+          assertLive(signal);
         }
 
         // Query waits are bounded even if a request aborts while PostgreSQL

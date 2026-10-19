@@ -79,7 +79,10 @@ export function MobileFrontCameraV1({
           <Pressable accessibilityRole="button" onPress={onClose} style={styles.close}>
             <Text style={styles.text}>닫기</Text>
           </Pressable>
-          <Text style={styles.title}>정면 사진 촬영</Text>
+          <View style={styles.titleGroup}>
+            <Text style={styles.kicker}>MYEONGHA · CAMERA</Text>
+            <Text style={styles.title}>정면 사진 촬영</Text>
+          </View>
           <View style={styles.close} />
         </View>
 
@@ -95,6 +98,9 @@ export function MobileFrontCameraV1({
               onMountError={() => setError('전면 카메라를 열지 못했습니다.')}
             />
             <View pointerEvents="none" style={styles.oval} />
+            <View pointerEvents="none" style={styles.cameraGuide}>
+              <Text style={styles.cameraGuideText}>얼굴 전체가 타원 안에 들어오도록 맞춰주세요</Text>
+            </View>
           </View>
         ) : (
           <View style={styles.permission}>
@@ -124,7 +130,7 @@ export function MobileFrontCameraV1({
         )}
 
         {error !== null ? <Text style={styles.error}>{error}</Text> : null}
-        <Text style={styles.hint}>얼굴 전체가 타원 안에 들어오도록 정면을 바라봐 주세요.</Text>
+        <Text style={styles.hint}>밝은 곳에서 정면을 바라보고, 흔들리지 않게 촬영해 주세요.</Text>
         <Pressable
           accessibilityRole="button"
           accessibilityState={{ disabled: !permission?.granted || !ready || capturing }}
@@ -140,28 +146,48 @@ export function MobileFrontCameraV1({
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#101827' },
+  container: { flex: 1, backgroundColor: '#0D1D2C' },
   header: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: 18, paddingVertical: 16,
+    paddingHorizontal: 18, paddingTop: 21, paddingBottom: 18,
+    borderBottomWidth: 1, borderBottomColor: 'rgba(214,184,142,0.22)',
   },
-  title: { color: '#ffffff', fontSize: 17, fontWeight: '800' },
-  close: { width: 48, minHeight: 36, justifyContent: 'center' },
-  text: { color: '#ffffff', fontSize: 14, textAlign: 'center' },
-  preview: { flex: 1, marginHorizontal: 14, overflow: 'hidden', borderRadius: 20 },
+  titleGroup: { alignItems: 'center', gap: 5 },
+  kicker: { color: '#E4C18B', fontSize: 9, fontWeight: '900', letterSpacing: 1.2 },
+  title: { color: '#FFF8ED', fontSize: 18, fontWeight: '900' },
+  close: { width: 48, minHeight: 48, justifyContent: 'center' },
+  text: { color: '#FFF8ED', fontSize: 14, fontWeight: '700', textAlign: 'center' },
+  preview: {
+    flex: 1, marginHorizontal: 15, marginTop: 16,
+    overflow: 'hidden', borderRadius: 20,
+    borderWidth: 1, borderColor: '#947650', backgroundColor: '#14202A',
+  },
   oval: {
-    position: 'absolute', top: '13%', left: '15%', width: '70%', height: '72%',
-    borderWidth: 2, borderColor: 'rgba(255,255,255,0.8)', borderRadius: 999,
+    position: 'absolute', top: '12%', left: '15%', width: '70%', height: '71%',
+    borderWidth: 2, borderColor: '#E9D1A9', borderRadius: 999,
   },
+  cameraGuide: {
+    position: 'absolute', bottom: 18, left: 18, right: 18,
+    backgroundColor: 'rgba(12, 25, 39, 0.76)',
+    borderWidth: 1, borderColor: 'rgba(227, 189, 131, 0.45)',
+    borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10,
+  },
+  cameraGuideText: { color: '#FFF5E6', fontSize: 12, fontWeight: '700', textAlign: 'center' },
   permission: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 20, padding: 20 },
-  action: { paddingHorizontal: 24, paddingVertical: 14, borderRadius: 12, backgroundColor: '#ffffff' },
-  actionText: { color: '#101827', fontSize: 14, fontWeight: '800' },
-  error: { color: '#ffb4a9', fontSize: 13, textAlign: 'center', marginTop: 10 },
-  hint: { color: '#ffffff', fontSize: 13, textAlign: 'center', padding: 16 },
-  shutter: {
-    alignSelf: 'center', width: 180, minHeight: 54, alignItems: 'center',
-    justifyContent: 'center', borderRadius: 28, backgroundColor: '#ffffff', marginBottom: 24,
+  action: {
+    minHeight: 48, justifyContent: 'center',
+    paddingHorizontal: 24, paddingVertical: 12, borderRadius: 13,
+    backgroundColor: '#E7C18A',
   },
-  shutterText: { color: '#101827', fontSize: 16, fontWeight: '800' },
+  actionText: { color: '#0D1D2C', fontSize: 14, fontWeight: '900' },
+  error: { color: '#FFB7A9', fontSize: 13, textAlign: 'center', marginTop: 10 },
+  hint: { color: '#EDE3D5', fontSize: 13, lineHeight: 20, textAlign: 'center', padding: 17 },
+  shutter: {
+    alignSelf: 'center', width: 186, minHeight: 56, alignItems: 'center',
+    justifyContent: 'center', borderRadius: 28,
+    backgroundColor: '#E7C18A', marginBottom: 24,
+    borderWidth: 1, borderColor: '#F6E4C6',
+  },
+  shutterText: { color: '#142537', fontSize: 16, fontWeight: '900' },
   disabled: { opacity: 0.45 },
 });

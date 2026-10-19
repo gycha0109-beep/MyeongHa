@@ -20,7 +20,8 @@ describe('mobile Chat has six visible characters with nine historical server ide
     expect(hub).toContain('handleOpen(character.characterId)');
     const hook = await source('apps/mobile/src/features/chat/use-mobile-chat-open.tsx');
     expect(hook).toContain('mobileChatOpenServiceV1.open(characterId)');
-    expect(hub).toContain('세연은 회원 로그인 후 AI 대화가 가능');
+    expect(hub).toContain('일부 AI 답변과 기존 기록은 현재 이용이 제한될 수 있습니다.');
+    expect(hub).not.toContain('세연은 회원 로그인 후 AI 대화가 가능');
   });
 
   it('shares a reusable composer but does not offer eight unsupported AI backends', async () => {

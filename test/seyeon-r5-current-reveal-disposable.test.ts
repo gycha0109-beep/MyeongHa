@@ -8,6 +8,14 @@ import { Pool, type PoolClient } from 'pg';
 import { handleSeyeonChatTurnSendRequestV1 } from '../apps/api/src/chat-turn-send-http.js';
 import { sendSeyeonNodeOriginalGrantResponseV1 } from '../apps/api/src/seyeon-node-original-grant-send-boundary-v1.js';
 import { createSeyeonOriginalGrantPgSendAdapterV1 } from '../apps/api/src/seyeon-original-grant-pg-send-adapter-v1.js';
+import {
+  sendSeyeonR24OfflineG3V1,
+  SeyeonR24OfflineG3HoldV1,
+} from '../apps/api/src/seyeon-r24-offline-committed-node-reveal-v1.js';
+import type {
+  SeyeonR23OfflineG2CommitReceiptV1,
+} from '../apps/api/src/seyeon-g2-atomic-exact-final-source-commit-r23-candidate.js';
+
 import type { PostgresSubjectPoolV1 } from '../apps/api/src/postgres-subject-execution.js';
 
 const enabled=process.env.CI==='true' &&
@@ -614,6 +622,108 @@ describe.skipIf(!enabled)('R5 disposable actual-v2 current-rights first/replay/h
     });
   });
 
+
+  it('R24 real G2 committed receipt to Node G3: first, fresh replay, revoked/regranted replay 503, stale payload zero', async () => {
+    const id=await committed(83); // Existing R3 actual v2 with 2 Outboxes.
+    const g2Receipt:SeyeonR23OfflineG2CommitReceiptV1={
+      status:'disposable_atomic_v2_committed',
+      turnId:id.turn,attemptId:id.attempt,
+      assistantMessageId:id.assistantMessage,
+      postTurnOutboxEventId:id.postOutbox,
+      replayed:false,permitsProvider:false,permitsHttpReveal:false,
+    };
+    const result=async(purpose:'first'|'committed_replay',expected:'assistant_sent'|'reveal_held')=>{
+      let observed:{status:number;cache:string|null;wire:string}|null=null;
+      await withR9Loopback(async(req,response)=>{
+        await r9ReadBody(req);
+        const outcome=await sendSeyeonR24OfflineG3V1({
+          receipt:g2Receipt,pool:offlineOriginalGrantPgPool,
+          verifiedEvidence:{kind:'member',verifiedAuthUserId:offlineMemberId},
+          threadId:id.thread,response,
+          requestSignal:new AbortController().signal,
+          purpose,deadlineMs:9_000,
+          metadata:{
+            turnId:id.turn,assistantMessageId:id.assistantMessage,
+            sequenceNo:2,replayed:purpose==='committed_replay',
+            requestId:'r24-synthetic-'+purpose,
+            serverTime:'2026-10-19T00:00:00.000Z',
+          },
+        });
+        expect(outcome).toBe(expected);
+      },async origin=>{
+        const received=await fetch(origin+'/r24-offline-g2-to-g3',{
+          method:'POST',body:'synthetic-only',
+        });
+        observed={
+          status:received.status,
+          cache:received.headers.get('cache-control'),
+          wire:await received.text(),
+        };
+      });
+      if(observed===null)throw Error('R24 missing Node loopback delivery');
+      return observed as {status:number;cache:string|null;wire:string};
+    };
+    const first=await result('first','assistant_sent');
+    expect(first.status).toBe(200);
+    expect(first.cache).toBe('no-store');
+    expect(first.wire).toContain(body);
+    expect(first.wire).toContain('"replayed":false');
+    const replay=await result('committed_replay','assistant_sent');
+    expect(replay.status).toBe(200);
+    expect(replay.cache).toBe('no-store');
+    expect(replay.wire).toContain(body);
+    expect(replay.wire).toContain('"replayed":true');
+    await transaction(async c=>{
+      await c.query('update public.record_access_grants set revoked_at=clock_timestamp() where id=$1::uuid',[id.grant]);
+      await c.query(
+        "insert into public.record_access_grants(id,subject_id,life_fact_id,memory_item_id,grantee_character_id,grant_reason,granted_at,revoked_at) values($1::uuid,$2::uuid,null,$3::uuid,'seyeon','user_choice',clock_timestamp(),null)",
+        ['d6000000-0000-4000-8000-000000000183',subject,id.memory],
+      );
+    });
+    const denied=await result('committed_replay','reveal_held');
+    expect(denied.status).toBe(503);
+    expect(denied.cache).toBe('no-store');
+    expect(denied.wire).not.toContain(body);
+    expect(denied.wire).toContain('SEYEON_FIRST_REVEAL_AUTHORITY_UNAVAILABLE');
+    await expect(history(id)).rejects.toMatchObject({
+      constraint:'seyeon_offline_r5_page_held',
+    });
+    expect(await saved(id)).toMatchObject({
+      messages:'1',outboxes:'2',admissions:'1',
+    });
+
+    // Invalid post-Commit metadata must not even connect to PostgreSQL or
+    // write socket headers. Client-forged G2 receipts grant NO authority.
+    await withR9Loopback(async(req,response)=>{
+      await r9ReadBody(req);
+      let attemptedConnections=0;
+      await expect(sendSeyeonR24OfflineG3V1({
+        receipt:{...g2Receipt,assistantMessageId:'d8300000-0000-4000-8000-000000000099'},
+        pool:{connect:async()=>{
+          attemptedConnections++;
+          throw Error('must never open DB for malformed G2 receipt');
+        }},
+        verifiedEvidence:{kind:'member',verifiedAuthUserId:offlineMemberId},
+        threadId:id.thread,response,
+        requestSignal:new AbortController().signal,
+        purpose:'first',
+        metadata:{
+          turnId:id.turn,assistantMessageId:id.assistantMessage,
+          sequenceNo:2,replayed:false,requestId:'r24-forged',
+          serverTime:'2026-10-19T00:00:00.000Z',
+        },
+      })).rejects.toBeInstanceOf(SeyeonR24OfflineG3HoldV1);
+      expect(attemptedConnections).toBe(0);
+      expect(response.headersSent).toBe(false);
+      response.statusCode=503;
+      response.setHeader('cache-control','no-store');
+      response.end('R24_OFFLINE_HOLD');
+    },async origin=>{
+      const r=await fetch(origin+'/r24-forged',{method:'POST',body:'synthetic'});
+      expect(r.status).toBe(503);
+      expect(await r.text()).toBe('R24_OFFLINE_HOLD');
+    });
+  });
 
   it('R10 send-first: real PG original-rights lock covers Node socket finish before revoke DB COMMIT', async () => {
     const id = await committed(81);

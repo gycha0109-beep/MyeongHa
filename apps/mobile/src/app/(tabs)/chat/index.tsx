@@ -27,27 +27,22 @@ export default function ChatHubScreen() {
 
   return (
     <MobileScreen
-      eyebrow="CONVERSATION"
+      eyebrow="MEET THE CHARACTERS"
       title="대화"
-      description="누구와 이야기를 시작해 볼까요? 마음이 가는 대리자를 선택해 주세요."
+      description="저마다 다른 목소리로, 당신의 이야기를 들어줄 대리자들을 만나보세요."
       refreshing={refreshing}
       onRefresh={() => void onRefresh()}
     >
       <View style={styles.intro}>
         <View style={styles.introHeading}>
-          <Text style={styles.kicker}>MEET</Text>
+          <Text style={styles.kicker}>THE PEOPLE OF MYEONGHA</Text>
           <Text style={styles.introCounter}>대리자 {MOBILE_CHAT_LAUNCH_ROSTER_V1.length}명</Text>
         </View>
-        <Text style={styles.title}>대화 상대 선택</Text>
+        <Text style={styles.title}>당신은 누구와 이야기하고 싶으신가요?</Text>
         <Text style={styles.body}>
-          캐릭터별 분위기를 둘러보세요. 대화방과 기존 기록은 현재 회원 계정에 연결됩니다.
+          마음이 가는 인물을 고르세요. 각 대리자의 이야기와 분위기가 다릅니다.
         </Text>
-        <Text style={styles.note}>
-          세연은 회원 로그인 후 AI 대화가 가능하며, 다른 대리자의 AI 답변은 준비 중입니다.
-        </Text>
-        <Text style={styles.note}>
-          최근 대화 목록은 아직 서버에서 제공하지 않아 별도 목록으로 표시하지 않습니다.
-        </Text>
+        <Text style={styles.note}>대화 열기는 회원 로그인 후 가능합니다. 일부 AI 답변과 기존 기록은 현재 이용이 제한될 수 있습니다.</Text>
         {state.access === 'checking' ? (
           <View style={styles.centerState}>
             <ActivityIndicator color={mobileColors.navy} />
@@ -55,7 +50,7 @@ export default function ChatHubScreen() {
           </View>
         ) : state.access === 'guest' ? (
           <Pressable accessibilityRole="button" onPress={() => router.push('/my')} style={styles.loginAction}>
-            <Text style={styles.loginActionText}>로그인 후 대화하기 →</Text>
+            <Text style={styles.loginActionText}>로그인 후 대화하기  →</Text>
           </Pressable>
         ) : state.access === 'error' ? (
           <Text style={styles.errorText}>{state.errorMessage}</Text>
@@ -66,6 +61,7 @@ export default function ChatHubScreen() {
         {MOBILE_CHAT_LAUNCH_ROSTER_V1.map((character) => {
           const presentation = resolveMobileChatCharacterPresentationV1(character.characterId);
           const portrait = resolveMobileChatPortraitV1(character.characterId);
+          const featured = character.characterId === 'seyeon';
           const opening = state.openingCharacterId === character.characterId;
           const canOpen = state.access === 'member';
           const disabled = !canOpen || state.openingCharacterId !== null;
@@ -76,11 +72,16 @@ export default function ChatHubScreen() {
               accessibilityState={{ disabled }}
               disabled={disabled}
               onPress={() => void handleOpen(character.characterId)}
-              accessibilityLabel={`${character.displayName}, ${presentation.title}, ${character.characterId === 'seyeon' ? 'AI 대화 가능' : 'AI 준비 중'}, ${canOpen ? '대화방 열기' : '로그인 필요'}`}
-              style={[styles.characterCard, opening && styles.disabled]}
+              accessibilityLabel={`${character.displayName}, ${presentation.title}, ${featured ? 'AI 서비스 상태 확인 필요' : 'AI 답변 준비 중'}, ${canOpen ? '대화방 열기' : '로그인 필요'}`}
+              style={({ pressed }) => [
+                styles.characterCard,
+                featured && styles.featuredCard,
+                opening && styles.disabled,
+                pressed && styles.pressed,
+              ]}
             >
               <View style={styles.cardMain}>
-                <View style={styles.characterMark}>
+                <View style={[styles.characterMark, featured && styles.featuredMark]}>
                   {portrait === null ? (
                     <Text style={styles.characterMarkText}>{character.displayName.slice(0, 1)}</Text>
                   ) : (
@@ -89,37 +90,51 @@ export default function ChatHubScreen() {
                       style={styles.characterPortrait}
                       resizeMode="cover"
                       accessibilityLabel={`${character.displayName} 대리자 초상화`}
+                      accessible={false}
                     />
                   )}
-                </View>
-                <View style={styles.characterCopy}>
-                  <View style={styles.characterTitleRow}>
-                    <Text style={styles.characterName}>{character.displayName}</Text>
-                    <Text style={styles.characterTitle}>{presentation.title}</Text>
+                  <View pointerEvents="none" style={[styles.portraitShade, featured && styles.featuredShade]} />
+                  <View pointerEvents="none" style={styles.portraitLabel}>
+                    <Text style={styles.portraitLabelText}>{featured ? 'FEATURED PERSON' : presentation.title}</Text>
                   </View>
-                  <Text style={styles.characterLine} numberOfLines={2}>{presentation.openingLine}</Text>
-                  <Text style={[styles.characterStatus, character.characterId === 'seyeon' && styles.characterStatusAvailable]}>
-                    {character.characterId === 'seyeon' ? '●  AI 대화 가능' : '◇  AI 답변 준비 중 · 기록 열람 가능'}
-                  </Text>
+                  {featured ? (
+                    <View pointerEvents="none" style={styles.featuredImageCopy}>
+                      <Text style={styles.featuredCharacterName}>세연</Text>
+                      <Text style={styles.featuredImageLine}>오늘의 이야기를 함께할 대리자</Text>
+                    </View>
+                  ) : null}
                 </View>
-                <View style={styles.characterActionWrap}>
-                  <Text style={[styles.characterAction, !canOpen && styles.actionUnavailable]}>
-                    {opening ? '…' : canOpen ? '›' : '잠금'}
+                <View style={[styles.characterCopy, featured && styles.featuredCopy]}>
+                  <View style={styles.characterTitleRow}>
+                    <Text style={[styles.characterName, featured && styles.featuredText]}>{character.displayName}</Text>
+                    <Text style={[styles.characterTitle, featured && styles.featuredMutedText]}>{presentation.title}</Text>
+                  </View>
+                  <Text style={[styles.characterLine, featured && styles.featuredText]} numberOfLines={2}>
+                    {presentation.openingLine}
                   </Text>
+                  <Text style={[styles.characterStatus, featured && styles.featuredMutedText]}>
+                    {featured ? '이용 상태는 대화방에서 확인' : 'AI 답변 준비 중 · 기록 열람 가능'}
+                  </Text>
+                  <View style={[styles.characterActionWrap, featured && styles.featuredActionWrap]}>
+                    <Text style={[styles.characterAction, featured && styles.featuredActionText, !canOpen && styles.actionUnavailable]}>
+                      {opening ? '여는 중…' : canOpen ? '대화방 열기  →' : '로그인 후 열기  →'}
+                    </Text>
+                  </View>
                 </View>
               </View>
             </Pressable>
           );
         })}
-        {state.errorMessage !== null && state.access !== 'error' ? (
-          <Text style={styles.errorText}>{state.errorMessage}</Text>
-        ) : null}
       </View>
+
+      {state.errorMessage !== null && state.access !== 'error' ? (
+        <View style={styles.errorPanel}><Text style={styles.errorText}>{state.errorMessage}</Text></View>
+      ) : null}
 
       <View style={styles.pendingSection}>
         <Text style={styles.kicker}>COMING SOON</Text>
         <Text style={styles.pendingTitle}>대리자 등록 중</Text>
-        <Text style={styles.note}>곧 만나볼 수 있는 대리자들입니다. 현재 대화는 열 수 없습니다.</Text>
+        <Text style={styles.note}>조금 더 준비가 필요한 인물들입니다. 현재 대화는 열 수 없습니다.</Text>
         <View style={styles.pendingList}>
           {MOBILE_CHAT_PENDING_ROSTER_V1.map((character) => {
             const presentation = resolveMobileChatCharacterPresentationV1(character.characterId);
@@ -141,53 +156,117 @@ export default function ChatHubScreen() {
 }
 
 const styles = StyleSheet.create({
-  intro: {
-    paddingHorizontal: 4, gap: 9,
-  },
-  introHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  kicker: { color: mobileColors.gold, fontSize: 11, fontWeight: '900', letterSpacing: 1.1 },
+  intro: { gap: 10, paddingHorizontal: 2 },
+  introHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
+  kicker: { color: mobileColors.gold, fontSize: 10, fontWeight: '900', letterSpacing: 1.5 },
   introCounter: { color: mobileColors.muted, fontSize: 11, fontWeight: '700' },
-  title: { color: mobileColors.ink, fontSize: 22, fontWeight: '900' },
-  body: { color: mobileColors.muted, fontSize: 14, lineHeight: 21 },
-  note: { color: mobileColors.muted, fontSize: 12, lineHeight: 18 },
+  title: { color: mobileColors.ink, fontSize: 23, lineHeight: 31, fontWeight: '800', letterSpacing: -0.5 },
+  body: { color: mobileColors.ink, fontSize: 14, lineHeight: 21 },
+  note: { color: mobileColors.muted, fontSize: 12, lineHeight: 19 },
   centerState: { flexDirection: 'row', gap: 9, alignItems: 'center', paddingVertical: 9 },
   loginAction: {
-    borderRadius: 12, backgroundColor: mobileColors.navy,
-    alignItems: 'center', paddingVertical: 13,
+    minHeight: 48, borderRadius: 12, backgroundColor: mobileColors.navy,
+    alignItems: 'center', justifyContent: 'center', marginTop: 6,
   },
-  loginActionText: { color: mobileColors.surface, fontSize: 13, fontWeight: '800' },
-  roster: { gap: 9 },
+  loginActionText: { color: mobileColors.surface, fontSize: 14, fontWeight: '800' },
+  roster: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    justifyContent: 'space-between',
+    paddingTop: 2,
+  },
   characterCard: {
-    borderWidth: 1, borderColor: mobileColors.border, borderRadius: 16,
-    backgroundColor: mobileColors.surface, padding: 11,
+    width: '48%',
+    minWidth: 0,
+    borderWidth: 1,
+    borderColor: mobileColors.border,
+    borderRadius: 18,
+    backgroundColor: mobileColors.surface,
+    overflow: 'hidden',
   },
-  cardMain: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  featuredCard: {
+    width: '100%',
+    borderColor: '#C49A65',
+    backgroundColor: '#102235',
+    borderRadius: 20,
+  },
+  pressed: { opacity: 0.82 },
+  disabled: { opacity: 0.9 },
+  cardMain: { flexDirection: 'column' },
   characterMark: {
-    width: 76, height: 90, borderRadius: 12, overflow: 'hidden',
-    borderWidth: 1, borderColor: mobileColors.gold, backgroundColor: mobileColors.canvas,
-    alignItems: 'center', justifyContent: 'center',
+    width: '100%',
+    height: 168,
+    position: 'relative',
+    overflow: 'hidden',
+    backgroundColor: '#1F3240',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
+  featuredMark: { height: 248 },
   characterPortrait: { width: '100%', height: '100%' },
-  characterMarkText: { fontSize: 19, color: mobileColors.navy, fontWeight: '900' },
-  characterCopy: { flex: 1, gap: 5 },
-  characterTitleRow: { flexDirection: 'row', alignItems: 'baseline', gap: 7, flexWrap: 'wrap' },
+  characterMarkText: { fontSize: 28, color: '#FAF5E9', fontWeight: '900' },
+  portraitShade: {
+    position: 'absolute',
+    bottom: 0,
+    top: 0,
+    right: 0,
+    left: 0,
+    backgroundColor: 'rgba(11,25,39,0.12)',
+  },
+  featuredShade: { backgroundColor: 'rgba(8,22,38,0.32)' },
+  portraitLabel: {
+    position: 'absolute',
+    top: 11,
+    left: 11,
+    paddingHorizontal: 9,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: 'rgba(11,26,43,0.87)',
+    borderWidth: 1,
+    borderColor: 'rgba(226,194,144,0.35)',
+  },
+  portraitLabelText: { color: '#F8E9D0', fontSize: 10, fontWeight: '800', letterSpacing: 0.6 },
+  featuredImageCopy: {
+    position: 'absolute', left: 17, bottom: 14, right: 14, gap: 4,
+  },
+  featuredCharacterName: {
+    color: '#FFFFFF', fontSize: 32, fontWeight: '900',
+    textShadowColor: '#071422', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 6,
+  },
+  featuredImageLine: {
+    color: '#FFFFFF', fontSize: 12, fontWeight: '700',
+    textShadowColor: '#071422', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4,
+  },
+  characterCopy: { padding: 13, gap: 9, minHeight: 150, justifyContent: 'space-between' },
+  featuredCopy: { paddingHorizontal: 18, paddingVertical: 16, minHeight: 141 },
+  characterTitleRow: { flexDirection: 'row', alignItems: 'baseline', flexWrap: 'wrap', gap: 7 },
   characterName: { color: mobileColors.ink, fontSize: 18, fontWeight: '900' },
-  characterTitle: { color: mobileColors.muted, fontSize: 12, fontWeight: '700' },
-  characterLine: { color: mobileColors.ink, fontSize: 12, lineHeight: 18 },
-  characterStatus: { color: mobileColors.muted, fontSize: 11, fontWeight: '700' },
-  characterStatusAvailable: { color: mobileColors.navy },
-  characterActionWrap: { minWidth: 32, minHeight: 48, alignItems: 'center', justifyContent: 'center' },
-  characterAction: { color: mobileColors.navy, fontSize: 26, fontWeight: '700' },
-  actionUnavailable: { color: mobileColors.muted, fontSize: 11 },
-  disabled: { opacity: 0.55 },
+  characterTitle: { color: mobileColors.muted, fontSize: 11, fontWeight: '700' },
+  characterLine: { color: mobileColors.ink, fontSize: 12, lineHeight: 19 },
+  characterStatus: { color: mobileColors.muted, fontSize: 11, lineHeight: 17, fontWeight: '600' },
+  featuredText: { color: '#FFF8EC' },
+  featuredMutedText: { color: '#E6D1B5' },
+  characterActionWrap: {
+    minHeight: 42, borderRadius: 10, alignItems: 'center',
+    justifyContent: 'center', backgroundColor: mobileColors.canvas, paddingHorizontal: 8,
+  },
+  featuredActionWrap: { backgroundColor: '#E8C48D', minHeight: 48 },
+  characterAction: { color: mobileColors.navy, fontSize: 12, fontWeight: '800' },
+  featuredActionText: { color: '#102235', fontSize: 14 },
+  actionUnavailable: { opacity: 0.85 },
+  errorPanel: {
+    borderRadius: 12, backgroundColor: mobileColors.surface, borderWidth: 1,
+    borderColor: mobileColors.border, padding: 12,
+  },
   errorText: { color: mobileColors.seal, fontSize: 12, lineHeight: 18 },
-  pendingSection: { gap: 10, paddingTop: 18, borderTopWidth: 1, borderTopColor: mobileColors.border },
-  pendingTitle: { color: mobileColors.ink, fontSize: 20, fontWeight: '900' },
+  pendingSection: { gap: 11, paddingTop: 20, borderTopWidth: 1, borderTopColor: mobileColors.border },
+  pendingTitle: { color: mobileColors.ink, fontSize: 21, fontWeight: '800' },
   pendingList: { gap: 9, paddingTop: 3 },
   pendingRow: {
     flexDirection: 'row', alignItems: 'center', gap: 11,
     borderRadius: 14, borderWidth: 1, borderColor: mobileColors.border,
-    padding: 12, backgroundColor: mobileColors.canvas,
+    padding: 12, backgroundColor: mobileColors.surface,
   },
   pendingMark: {
     width: 45, height: 45, borderRadius: 11,
