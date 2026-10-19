@@ -557,10 +557,7 @@ pass "initial Reader receipt uses current Birth revision scope, not historical s
 # post-lock check if the DB spends time creating the Reading/access row.
 # Force the exact B5 insert to wait beyond a short synthetic Grant lifetime.
 # No trigger/function survives this isolated integration scenario.
-p >"$tmpdir/expiring-insert-trigger.out" 2>&1 <<SQL || {
-  cat "$tmpdir/expiring-insert-trigger.out" >&2
-  fail "unable to install isolated expiring-bind insert delay"
-}
+p >"$tmpdir/expiring-insert-trigger.out" 2>&1 <<SQL || { cat "$tmpdir/expiring-insert-trigger.out" >&2; fail "unable to install isolated expiring-bind insert delay"; }
 create function public.test_reader_s2_expiring_insert_delay_v1()
 returns trigger language plpgsql security invoker
 set search_path=pg_catalog,public
@@ -603,10 +600,7 @@ grep -q 'Reader purchase Grant expired or was revoked before binding completed' 
     cat "$tmpdir/expiring-b5-writer.out" >&2
     fail "expiring Reader bind rejected for the wrong reason"
   }
-p >"$tmpdir/expiring-trigger-cleanup.out" 2>&1 <<SQL || {
-  cat "$tmpdir/expiring-trigger-cleanup.out" >&2
-  fail "isolated Reader insert delay cleanup failed"
-}
+p >"$tmpdir/expiring-trigger-cleanup.out" 2>&1 <<SQL || { cat "$tmpdir/expiring-trigger-cleanup.out" >&2; fail "isolated Reader insert delay cleanup failed"; }
 drop trigger test_reader_s2_expiring_insert_delay_v1
   on public.standard_reading_reader_access_grants;
 drop function public.test_reader_s2_expiring_insert_delay_v1();
