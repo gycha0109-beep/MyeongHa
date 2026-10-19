@@ -338,6 +338,12 @@
       "mainMode": "one-shot-trigger",
       "workTrackAttribution": "commit-metadata"
     },
+    "seyeon-c08-key2-first-six-real-v1.yml": {
+      "responsibility": "character-memory-bounded-real-model-evaluation",
+      "prMode": "none",
+      "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "commit-metadata"
+    },
     "seyeon-c08v-offline-once-pilot-v1.yml": {
       "responsibility": "character-memory-offline-first-batch-mock-rehearsal",
       "prMode": "none",
