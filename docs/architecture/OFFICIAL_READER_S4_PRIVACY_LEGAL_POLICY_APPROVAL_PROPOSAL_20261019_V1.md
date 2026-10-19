@@ -2,7 +2,7 @@
 
 - 검토 기준일: **2026-10-19 (한국)**.
 - 분류: **S4 기존 단계의 Owner 승인 제안**, 새 단계·운영 정책의 자동 승인·실제 Legal 의견서가 아님.
-- 상태: **PROPOSED / PRIVACY & LEGAL REVIEW REQUIRED / OWNER NOT APPROVED / PUBLIC OFF**.
+- 상태: **제품 책임자 정책 방향 승인(2026-10-19) / PRIVACY TECHNICAL & LEGAL REVIEW PENDING / PUBLIC OFF**. [승인 결정문](OFFICIAL_READER_S4_PRODUCT_OWNER_PRIVACY_POLICY_DECISION_20261019_V1.md)이 아래 최초 제안서의 승인 상태 표기보다 우선합니다.
 - 범위: 공식 사주 Reading × Reader × 검증 구매권의 **신규 유료 해설 원문과 파생물**. 기존 일반 Chat·Commerce·계정 삭제 승인 범위를 무단 변경하지 않음.
 - 기준 추적: [Privacy #2318](https://github.com/gycha0109-beep/MyeongHa/issues/2318), [Draft PR #2301](https://github.com/gycha0109-beep/MyeongHa/pull/2301), [Product Owner 유료 Reader 방향](../MOBILE_READER_PRODUCT_OWNER_DECISION_20261012_V1.md), [S3/S4 기존 인계](OFFICIAL_READER_S3_S4_SOURCE_AND_PRIVACY_HANDOFF_20261018_V1.md).
 - 이 문서는 법률·규제 **1차 검토용 제안**이며 개별 사업자·수탁자·사용자 고지 현황에 대한 법률 자문 또는 적법성 확인을 대체하지 않음. 법정 의무와 제안된 내부 SLA/보존기간을 혼동하지 말 것.
@@ -88,7 +88,9 @@
 - [ ] 개인정보 열람·정정·삭제 요구와 거래 증빙 최소 열람 분리, 생성형 AI 사용 고지·표시 실기기 UX 검증.
 - [ ] Privacy Owner의 문서상 명시 승인 뒤에도 **실 PostgreSQL 15/17 populated-row 삭제·회수·역복원·RLS/ACL·Chat memory/Outbox 누출 0**, S3 공식 Source 발급과 S2 S5 T2 원자 writer 승인 전까지 S5 PUBLIC OFF.
 
-## E. Approval decision record — 반드시 실제 Owner가 기재
+## E. 최초 승인 확인란 (2026-10-19 제품 책임자 승인 후에는 아래 결정문을 정본으로 사용)
+
+**최신 상태:** 사용자 직접 승인으로 D1·D2·D3·D5·D6 제품 정책 및 내부 기간 후보가 승인되었습니다. D4는 신규 외부 업체 없음이라는 사용자 진술로 기록하지만 외부 전송은 승인하지 않았습니다. 아래 최초 작성 시점의 PENDING 템플릿은 이력용이며 **현행 승인 레지스터가 아닙니다**. 최신 결정: [S4 제품 책임자 승인 기록](OFFICIAL_READER_S4_PRODUCT_OWNER_PRIVACY_POLICY_DECISION_20261019_V1.md).
 
 ```text
 Privacy #2318 decision: PENDING / APPROVED / REJECTED

@@ -272,3 +272,9 @@ S1에서 공통 잠금 함수 자체가 성공하더라도 **S2 전체 경로가
 
 - 기존 P0-PR-01 계정 삭제·Commerce P5Y·백업 P30D와 RR-03 이미 승인된 **출처 provenance DELETE**는 새 원문 보관 권리로 확대하지 않습니다. [S4 별도 신규 승인 제안서](OFFICIAL_READER_S4_PRIVACY_LEGAL_POLICY_APPROVAL_PROPOSAL_20261019_V1.md)에서 보호 원문/청크, T2 이전 임시 생성, 출처 proof, Chat 안전 표시, 로그, AI Memory/검색·벡터 파생물, 백업/복원을 분리해 Privacy/Legal Owner 결정을 요청합니다.
 - 개인정보 보호법 제15·21·23·26·28조의8·29·30조, 전자상거래법·시행령 제6조, 인공지능기본법 제31조 및 개인정보위 생성형 AI 지침을 근거로 한 **초안이며 OWNER NOT APPROVED**. 실제 AI/호스팅 수탁자·국가, 처리근거 및 새 데이터별 보존/삭제 SLA는 미확정입니다. S4 승인·DB populated-row/복원 비재노출 증거·S3 Production Source가 준비되기 전까지 유료 원문 영속 저장·공개/운영 DB 적용 금지.
+
+
+### S4 신규 유료 해설 개인정보 정책 제품 승인 기록 (2026-10-19)
+
+- 사용자 직접 지시로 기존 [S4 법률·정책 제안](OFFICIAL_READER_S4_PRIVACY_LEGAL_POLICY_APPROVAL_PROPOSAL_20261019_V1.md)의 D1·D2·D3·D5·D6 처리 방향과 **본 DB 24시간 파기 목표·원문 없는 일반 운영 로그 90일 상한**을 **제품 책임자 승인**으로 기록했습니다. [별도 결정문](OFFICIAL_READER_S4_PRODUCT_OWNER_PRIVACY_POLICY_DECISION_20261019_V1.md) 참조. 신규 원문 처리 외부 업체는 현 시점 **없다는 사용자 진술**로 기록하며 **실제 인프라 감사 및 외부 원문 전송 승인 불포함**.
+- P0-PR-01 기존 P5Y Commerce·P30D 백업·RR-03 출처 DELETE 정본 무변경. #2318은 실 DB FK/RLS/탈퇴 삭제/복원, 현행 외부 데이터 흐름, 법률·약관·AI 고지 인수가 끝날 때까지 OPEN입니다. S5 T2 보호 원문 영속 저장, 공개, 실제 결제, 운영 migration 또는 PR merge 권한을 부여하지 않습니다.
