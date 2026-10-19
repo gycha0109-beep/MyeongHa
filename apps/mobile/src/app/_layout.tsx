@@ -3,9 +3,10 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 
 import { nativeMobilePushServiceV1 } from '@/core/push/native-mobile-push-service';
-import { mobileColors } from '@/ui/mobile-colors';
+import { MobileThemeProvider, useMobileTheme } from '@/ui/mobile-theme';
 
-export default function RootLayout() {
+function ThemedRootLayout() {
+  const { theme, colors } = useMobileTheme();
   useEffect(() => {
     void nativeMobilePushServiceV1.syncEnabledNoPrompt().catch(() => undefined);
     return nativeMobilePushServiceV1.startTokenRotationWatch();
@@ -13,11 +14,11 @@ export default function RootLayout() {
 
   return (
     <>
-      <StatusBar style="dark" />
+      <StatusBar style={theme === "dark" ? "light" : "dark"} />
       <Stack
         screenOptions={{
           headerShown: false,
-          contentStyle: { backgroundColor: mobileColors.canvas },
+          contentStyle: { backgroundColor: colors.canvas },
         }}
       >
         <Stack.Screen name="(tabs)" />\n        <Stack.Screen name="birth" />
@@ -25,4 +26,8 @@ export default function RootLayout() {
       </Stack>
     </>
   );
+}
+
+export default function RootLayout() {
+  return <MobileThemeProvider><ThemedRootLayout /></MobileThemeProvider>;
 }
