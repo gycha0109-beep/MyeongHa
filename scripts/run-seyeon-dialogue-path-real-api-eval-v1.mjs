@@ -249,7 +249,7 @@ for (let i = 0; i < cases.length; i += 1) {
       throw new Error('SEYEON_DIALOGUE_PATH_SAMPLE_FAILURE_HOLD');
   }
 }
-const summary = summarizeSeyeonDialoguePathV1(rows, cases.length);
+const summary = summarizeSeyeonDialoguePathV1(rows, cases.map(spec => spec.id));
 const evidence = {
   schemaVersion: 'seyeon-real-api-path-benchmark-v1',
   mode: 'OFFLINE_SYNTHETIC_ONLY',

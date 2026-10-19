@@ -66,7 +66,14 @@ export function percentileSeyeonDialoguePathV1(values, fraction) {
   return sorted[Math.ceil(sorted.length * fraction) - 1];
 }
 
-export function summarizeSeyeonDialoguePathV1(rows, totalCases) {
+export function summarizeSeyeonDialoguePathV1(rows, expectedCaseIds) {
+  if (!Array.isArray(rows) || !Array.isArray(expectedCaseIds) ||
+      expectedCaseIds.length === 0 ||
+      expectedCaseIds.some(id => typeof id !== 'string' || id.length === 0) ||
+      new Set(expectedCaseIds).size !== expectedCaseIds.length) {
+    throw new TypeError('Invalid expected paired case IDs.');
+  }
+  const expectedIds = new Set(expectedCaseIds);
   const routes = Object.fromEntries(SEYEON_DIALOGUE_PATH_ROUTES_V1.map(route => {
     const items = rows.filter(row => row.route === route);
     const success = items.filter(row => row.outcome === 'admitted');
@@ -77,7 +84,14 @@ export function summarizeSeyeonDialoguePathV1(rows, totalCases) {
       code: row.errorCode,
     }));
     const expectedCalls = route === 'legacy_5_terra' ? 5 : 3;
-    const gateVerdict = items.length === totalCases && success.length === totalCases &&
+    // Counts alone could mark a duplicate case as PASS while omitting another.
+    // Both routes must cover the exact, unique, preselected case identities.
+    const actualIds = items.map(row => row.id);
+    const exactCoverage = items.length === expectedCaseIds.length &&
+      new Set(actualIds).size === expectedCaseIds.length &&
+      actualIds.every(id => expectedIds.has(id));
+    const gateVerdict = exactCoverage &&
+      success.length === expectedCaseIds.length &&
       items.every(row => row.calls === expectedCalls) ? 'GUARD_SAMPLE_PASS' : 'HOLD';
     return [route, {
       gateVerdict,
@@ -91,7 +105,9 @@ export function summarizeSeyeonDialoguePathV1(rows, totalCases) {
       failureCases: errorIds,
     }];
   }));
-  const complete = SEYEON_DIALOGUE_PATH_ROUTES_V1.every(route =>
+  const noUnaccountedRoutes = rows.length ===
+    expectedCaseIds.length * SEYEON_DIALOGUE_PATH_ROUTES_V1.length;
+  const complete = noUnaccountedRoutes && SEYEON_DIALOGUE_PATH_ROUTES_V1.every(route =>
     routes[route].gateVerdict === 'GUARD_SAMPLE_PASS');
   return Object.freeze({
     scope: 'SYNTHETIC_PUBLIC_FIRST_CONTACT_GUARD_ACCEPTANCE_ONLY',
