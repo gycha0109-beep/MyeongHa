@@ -425,6 +425,8 @@ export function createPersistingSeyeonAiProviderV1(input: {
     async generate(request: Parameters<SeyeonStructuredProviderPortV2['generate']>[0]) {
       const events: SeyeonAiCostEventV1[] = [];
       const durableProviderReceipts = new Set<string>();
+      const settledGovernedCallIds = new Set<string>();
+      let providerSucceeded = false;
       const observer = input.config.observeMetric;
       const state: { binding: SeyeonAiCostLedgerBindingV1 | null; callId: string | null } = {
         binding: null, callId: null,
@@ -508,6 +510,7 @@ export function createPersistingSeyeonAiProviderV1(input: {
              !durableProviderReceipts.has(state.callId))) {
           throw new Error('Governed Provider outcome receipt was not persisted; Chat Commit denied.');
         }
+        providerSucceeded = true;
         return generated;
       } finally {
         for (const event of events) {
@@ -523,11 +526,21 @@ export function createPersistingSeyeonAiProviderV1(input: {
             continue;
           }
           try {
-            await input.runner.run(state.binding.subjectId, client =>
-              input.governor === undefined
-                ? settleSeyeonAiCallV1(client,state.binding!,event)
-                : settleGovernedSeyeonAiCallV1(client,state.binding!,event),
-            );
+            if (input.governor === undefined) {
+              await input.runner.run(state.binding.subjectId, client =>
+                settleSeyeonAiCallV1(client,state.binding!,event),
+              );
+            } else {
+              const receipt = await input.runner.run(state.binding.subjectId, client =>
+                settleGovernedSeyeonAiCallV1(client,state.binding!,event),
+              );
+              if (receipt.overCeiling) {
+                // Paid inference already occurred. Hold the reply, never retry.
+                console.error('MYEONGHA_SEYEON_COST_OVER_CEILING');
+              } else {
+                settledGovernedCallIds.add(receipt.callId);
+              }
+            }
           } catch {
             // Keep the started row for reconciliation. Never retry inference.
             console.error('MYEONGHA_SEYEON_COST_SETTLEMENT_FAILED');
@@ -535,6 +548,13 @@ export function createPersistingSeyeonAiProviderV1(input: {
         }
         if (state.callId !== null && events.length === 0) {
           console.error('MYEONGHA_SEYEON_COST_PROVIDER_EVENT_MISSING');
+        }
+        // A durable Provider outcome alone cannot authorize Chat Commit:
+        // the bounded DB settlement must also acknowledge the exact call.
+        if (input.governor !== undefined && providerSucceeded &&
+            (events.length !== 1 || state.callId === null ||
+             !settledGovernedCallIds.has(state.callId))) {
+          throw new Error('Governed cost settlement was not confirmed; Chat Commit denied.');
         }
       }
     },

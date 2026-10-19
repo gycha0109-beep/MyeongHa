@@ -240,6 +240,51 @@ describe('Se-yeon 04C governed provider adapter (fake HTTP and fake DB)', () => 
     }
   });
 
+  for (const settlementCase of ['db_failure','over_ceiling'] as const) {
+    it('blocks a successful Provider answer when governed settlement is ' + settlementCase, async () => {
+      const order: string[] = [];
+      const fetchImpl = vi.fn(async () => { order.push('fetch'); return response(); });
+      const query = vi.fn(async (sql:string, values:unknown[]) => {
+        const actualId = String(values[4]);
+        if (sql.includes('cmd_governed_start_seyeon_ai_call_v1')) {
+          order.push('admit');
+          return {rows:[{callId:actualId,ceilingMicroUsd:'3700',bucketUtcDate:'2026-10-10'}]};
+        }
+        if (sql.includes('cmd_store_seyeon_provider_receipt_v1')) {
+          order.push('store');
+          return {rows:[{callId:JSON.parse(String(values[4])).callId,replayed:false}]};
+        }
+        if (sql.includes('cmd_governed_settle_seyeon_ai_call_v1')) {
+          order.push('settle');
+          if (settlementCase === 'db_failure') throw new Error('secret-settlement-db-canary');
+          return {rows:[{callId:JSON.parse(String(values[4])).callId,replayed:false,
+            occupiedMicroUsd:'3701',overCeiling:true}]};
+        }
+        throw new Error('Unexpected SQL');
+      });
+      const errors = vi.spyOn(console,'error').mockImplementation(()=>undefined);
+      const info = vi.spyOn(console,'info').mockImplementation(()=>undefined);
+      try {
+        const provider = createPersistingSeyeonAiProviderV1({
+          config:{...config,fetchImpl},runner:runner(query),getBinding:()=>binding,
+          governor:{policy,certifiedInputTokenUpperBound:()=>500},
+        });
+        await expect(provider.generate(request)).rejects.toThrow(
+          'Governed cost settlement was not confirmed; Chat Commit denied.',
+        );
+        expect(order).toEqual(['admit','fetch','store','settle']);
+        expect(fetchImpl).toHaveBeenCalledOnce();
+        expect(query).toHaveBeenCalledTimes(3);
+        expect(errors.mock.calls.map(call=>call[0])).toContain(
+          settlementCase === 'db_failure'
+            ? 'MYEONGHA_SEYEON_COST_SETTLEMENT_FAILED'
+            : 'MYEONGHA_SEYEON_COST_OVER_CEILING',
+        );
+        expect(JSON.stringify(errors.mock.calls)).not.toContain('secret-settlement-db-canary');
+      } finally { errors.mockRestore(); info.mockRestore(); }
+    });
+  }
+
   it('stores an unknown-usage timeout before settling conservatively', async () => {
     const order:string[]=[];
     let admittedId='';
