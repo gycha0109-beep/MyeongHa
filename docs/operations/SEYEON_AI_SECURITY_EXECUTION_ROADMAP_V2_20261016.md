@@ -315,3 +315,12 @@ S8의 **비파괴/격리 검토는 S2~S7과 병렬 진행 가능**하며, S8 Pro
 - **실제 원자성:** 이미 격리 PostgreSQL에서 존재하는 R3 비공개 DB 함수는 verified Subject→Thread→Turn→Attempt→original Grant/Record 잠금 및 불변 Pin·Validation 출처 일치를 검사하며 실제 `public.cmd_commit_seyeon_chat_turn_runtime_v2`로 assistant 메시지와 Chat/Post-turn 두 Outbox를 **하나의 DB 트랜잭션**으로 생성한다. JS는 RPC 결과 후 DB `COMMIT`이 확인될 때만 synthetic-only 영수증을 반환한다. legacy API 직통 Commit 허용 없음.
 - **검증:** 새 격리 DB나 새 전용 SQL을 추가하지 않고 기존 `test/seyeon-g2-atomic-original-grant-race-disposable.test.ts`에서 생성된 synthetic 단일 Memory/Grant·stage/validation을 R23 API 어댑터로 통과시킨다. 실제 모델 입력 digest 변경·G1 Grant 영수증 바꿔치기는 G2 DB 접근 전 거부, 정상은 1개 Message/2개 Outbox, Replay는 재Commit 금지. 기존 revoke-first/commit-first 경합과 두 번째 Outbox 충돌 rollback 테스트 계속 활용한다.
 - **Production 계속 HOLD:** 본 시험은 **실제 모델/사용자 데이터/운영 DB 연결이 아니고**, S0 `shared_detail/memory-v1`은 합성 fixture일 뿐 SRC-25 승인된 운영 타입 아님. 추가 Preflight/History/Relationship derived source 전체 출처 폐쇄, Provider 호출 뒤 최종 프롬프트 증빙, G0 실제 기술 서명, Production DB Owner RPC 및 ACL, G3 HTTP Reveal/Proxy 신뢰 송신선형화, #1887 운영 DB/DR, G5/G6 미완료. `Projectors=[]`, positive Provider/public/paid OFF, `writeAdmission='DENY'`, Production DDL/DML/migration/ACL=0, G1 positive/G2 Production/G3/G5/G6 HOLD.
+
+## 36. 2026-10-19 R21 DB 보완 — 합성 개인기억 두 원본의 모델 전 원자 Pin/ContextReady 후보
+
+- **병행 관계:** 34절 R21의 서버 파생 출처 선차단과 구분되는 격리 PostgreSQL 트랜잭션 원자성 실증이다. 양쪽 증거는 서로 대체하지 않으며 함께 존재해도 운영 G1/G2 승격을 의미하지 않는다.
+
+- **구현 범위:** 이름 고정 폐기용 PG17에서 Subject/Thread/Turn/Attempt 잠금, 두 원본 Grant·Memory의 R1 불변 Parent/Edge Pin, 첫 원본의 기존 Attempt Pin과 대조, 두 원본의 현재 Grant/Schema/PG JSONB digest 재검증, 실제 cmd_mark_chat_turn_context_ready_v1까지 **같은 DB 트랜잭션**으로 실행. 원본 콘텐츠는 반환하지 않는다.
+- **검증 계획:** 동일 R1/R20/R3/R5 격리 DB에서 실제 2건 성공 및 두 번째 Grant 교체·누락·중복 시 DB 원장 전체 롤백. 새 CI Workflow나 운영 SQL migration은 만들지 않는다.
+- **제한:** 기존 Attempt Pin의 단일 원본 필드는 첫 Edge 결속만 담당. 2건 전체의 실 G2 Atomic Commit, 파생 출처 closure, 실제 SRC-25 Codec/타입, 최종 Wire/HTTP/Replay/Worker는 미완료. Owner 기술 서명과 운영 권한을 생성하지 않는다.
+- **불변:** G0 PROPOSED; G1 positive/G2/G3/G5/G6 HOLD. Projectors=[], 공개/유료/실 Provider OFF, Production DB DDL/DML/ACL/History 0건. 후보 receipt는 Provider/AtomicCommit/HTTPReveal 모두 false.
