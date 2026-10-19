@@ -761,4 +761,209 @@ grep -qx 'cancelled_before_grant' "$tmpdir/no-grant-replay.out" ||
 pass "verified cancellation before Grant serializes actual combined issuance, commits once and prevents Reader binding"
 
 
+
+# The previous B5 cancellation had zero Grants. B6 exercises the previously
+# HELD state: an original verified PortOne purchase with a committed unbound
+# purchase-backed Grant, but no ReaderAccess/official Reading binding.
+b6_intent="12192300-0000-0000-0000-000000000006"
+b6_receipt="12192000-0000-0000-0000-000000000006"
+p >"$tmpdir/b6-unbound-seed.out" 2>&1 <<SQL || { cat "$tmpdir/b6-unbound-seed.out" >&2; fail "B6 unbound issued-Grant fixture failed"; }
+begin;
+insert into public.purchase_intents(
+  id,subject_id,product_offer_id,provider_account_link_id,
+  idempotency_key,request_hash,offer_snapshot_jsonb,offer_snapshot_hash,
+  status,created_at,updated_at,expected_amount_minor,expected_currency,
+  charge_terms_version,capability_set_id,capability_snapshot_jsonb,
+  capability_snapshot_hash
+)
+select '$b6_intent'::uuid,subject_id,product_offer_id,provider_account_link_id,
+       'reader-b6-unbound-issued','sha256:test:reader-b6-unbound-issued',
+       offer_snapshot_jsonb,offer_snapshot_hash,'created',
+       clock_timestamp(),clock_timestamp(),expected_amount_minor,
+       expected_currency,charge_terms_version,capability_set_id,
+       capability_snapshot_jsonb,capability_snapshot_hash
+from public.purchase_intents where id='$b5_intent'::uuid;
+insert into public.purchase_intent_reader_selections(
+  purchase_intent_id,product_id,reader_character_id,reader_content_bundle_id,
+  selection_contract_version,selection_snapshot_jsonb,selection_hash,created_at
+)
+select '$b6_intent'::uuid,product_id,reader_character_id,
+       reader_content_bundle_id,selection_contract_version,
+       selection_snapshot_jsonb,'sha256:test:reader-b6-selection',clock_timestamp()
+from public.purchase_intent_reader_selections
+where purchase_intent_id='$b5_intent'::uuid;
+insert into public.commerce_payment_attempts(
+  id,purchase_intent_id,subject_id,product_offer_id,attempt_no,
+  provider,environment,idempotency_key,provider_request_id,
+  provider_transaction_id,status,created_at,updated_at
+)
+select '12197000-0000-0000-0000-000000000006'::uuid,
+       pi.id,pi.subject_id,pi.product_offer_id,1,
+       'portone_v2','production','synthetic-b6-issued-request',
+       'synthetic-portone-b6-payment','tx-official-reader-b6-unbound-issued',
+       'response_received',clock_timestamp(),clock_timestamp()
+from public.purchase_intents pi where pi.id='$b6_intent'::uuid;
+update public.purchase_intents
+set status='verified',updated_at=clock_timestamp()
+where id='$b6_intent'::uuid;
+insert into public.commerce_receipts(
+  id,subject_id,purchase_intent_id,product_offer_id,platform,provider,
+  external_transaction_id,receipt_fingerprint,verification_status,
+  verified_payload_jsonb,verified_at,created_at,environment,
+  verifier_revision,verified_amount_minor,verified_currency
+)
+select '$b6_receipt'::uuid,subject_id,'$b6_intent'::uuid,product_offer_id,
+       platform,provider,'tx-official-reader-b6-unbound-issued',
+       'hmac-sha256:k1:abababababababababababababababababababababababababababababababab',
+       'verified',verified_payload_jsonb,clock_timestamp(),
+       clock_timestamp(),environment,verifier_revision,
+       verified_amount_minor,verified_currency
+from public.commerce_receipts where id='$b5_receipt'::uuid;
+commit;
+SQL
+p >"$tmpdir/b6-receipt-grant.out" 2>&1 <<SQL || { cat "$tmpdir/b6-receipt-grant.out" >&2; fail "direct S1-locked 1090 B6 issuance failed"; }
+begin;
+select pg_catalog.set_config('myeongha.subject_id','$subject',true);
+select pg_catalog.set_config('myeongha.reader_pending_reading_id','$new_reading',true);
+select public.internal_acquire_official_reader_scope_lock_v1(
+  '$subject'::uuid,'$new_reading'::uuid,'test-standard-reader'
+);
+select result_grant_id
+from public.internal_apply_verified_receipt_capability_effects_v1(
+  '$b6_receipt'::uuid,array['test-reader-unit'],
+  array[transaction_timestamp()],array[transaction_timestamp()],
+  array[null]::timestamptz[],array[null]::text[]
+);
+commit;
+SQL
+b6_grant="$(p -c "select eg.id from public.entitlement_grants eg
+where eg.source_receipt_id='$b6_receipt'::uuid and eg.status='active'
+  and eg.grant_source_type='purchase';")"
+[[ "$b6_grant" =~ ^[0-9a-f-]{36}$ ]] ||
+  fail "unbound B6 must have one committed active purchase Grant"
+[[ "$(p -c "select count(*) from public.standard_reading_reader_access_grants
+  where purchase_intent_id='$b6_intent'::uuid;")" == 0 ]] ||
+  fail "B6 must be unbound before cancellation"
+
+# Existing direct 1080 provider effects must NOT gain a new bypass simply
+# because they target an unbound Grant. A held PURCHASE lock plus a matching
+# verified-cancellation context is required by the forward 1880 guard.
+if p >"$tmpdir/b6-direct-bypass.out" 2>&1 <<SQL
+begin;
+select pg_catalog.set_config('myeongha.subject_id','$subject',true);
+select public.internal_assert_reader_grant_scopes_prelocked_v1('$b6_grant'::uuid);
+rollback;
+SQL
+then
+  fail "direct unbound legacy Grant revoke bypassed purchase lock"
+fi
+grep -q 'Reader purchase Grant cannot be mutated without an official Reader access scope' \
+  "$tmpdir/b6-direct-bypass.out" ||
+  fail "unbound legacy Grant guard denied for wrong reason"
+pass "unbound direct 1080 remains denied outside verified purchase-locked cancellation"
+
+b6_amount="$(p -c "select verified_amount_minor from public.commerce_receipts where id='$b6_receipt'::uuid;")"
+b6_cancel_at="$(p -c "select pg_catalog.to_char(clock_timestamp() at time zone 'UTC','YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"');")"
+p >"$tmpdir/b6-cancel-first.out" 2>&1 <<SQL &
+set application_name='rr_s2_issued_unbound_cancel_holder';
+set statement_timeout='20s';
+begin;
+set local role myeongha_commerce_internal_executor;
+select 'ISSUED_CANCEL=' ||
+  (public.cmd_apply_verified_portone_reader_full_cancellation_v1(
+    'synthetic-portone-b6-payment',
+    'tx-official-reader-b6-unbound-issued',
+    'synthetic-b6-unbound-full-cancel',
+    '$b6_cancel_at'::timestamptz,
+    $b6_amount,'KRW','production',
+    'hmac-sha256:k1:cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd',
+    'synthetic-verified-b6-v1'
+  )->'revoke'->>'disposition');
+select pg_sleep(4);
+commit;
+SQL
+holder_pid=$!
+wait_for "unbound issued Grant revocation holds DB transaction" "
+  select count(*) from pg_catalog.pg_stat_activity
+  where application_name='rr_s2_issued_unbound_cancel_holder'
+    and state='active' and wait_event_type='Timeout';
+"
+# The direct 1220 binder is NOT covered by the purchase lock. It must wait
+# on the exact 1080 Grant FOR UPDATE row held by the live cancellation.
+p >"$tmpdir/b6-direct-bind-loser.out" 2>&1 <<SQL &
+set application_name='rr_s2_issued_unbound_bind_loser';
+set statement_timeout='20s';
+begin;
+select pg_catalog.set_config('myeongha.subject_id','$subject',true);
+select replayed from public.cmd_bind_standard_reading_access_v2(
+  '$subject'::uuid,'$b6_intent'::uuid,
+  '12193000-0000-0000-0000-000000000006'::uuid,
+  '$new_reading'::uuid,
+  'sha256:v1:9999999999999999999999999999999999999999999999999999999999999999',
+  'standard-reading-access-bind-v2',
+  '{"schemaVersion":"standard-reading-access-bind-v2","purchaseIntentId":"$b6_intent"}'::jsonb
+);
+commit;
+SQL
+writer_pid=$!
+wait_for "direct 1220 bound access writer waits on unbound Grant revoke" "
+  select count(*) from pg_catalog.pg_stat_activity
+  where application_name='rr_s2_issued_unbound_bind_loser'
+    and state='active' and wait_event_type='Lock';
+"
+if ! wait "$holder_pid"; then
+  cat "$tmpdir/b6-cancel-first.out" >&2
+  fail "issued-unbound verified PortOne cancellation failed"
+fi
+holder_pid=""
+grep -qx 'ISSUED_CANCEL=cancelled_before_binding' \
+  "$tmpdir/b6-cancel-first.out" ||
+  fail "issued unbound cancellation returned wrong disposition"
+if wait "$writer_pid"; then
+  fail "direct Reader bind created new access after a revoked unbound purchase"
+fi
+writer_pid=""
+grep -q 'Entitlement Grant' "$tmpdir/b6-direct-bind-loser.out" ||
+  { cat "$tmpdir/b6-direct-bind-loser.out" >&2; fail "direct 1220 failed for unrelated reason"; }
+[[ "$(p -c "select status from public.entitlement_grants where id='$b6_grant'::uuid;")" == revoked ]] ||
+  fail "issued-unbound verified cancellation did not revoke real Grant"
+[[ "$(p -c "select verification_status from public.commerce_receipts where id='$b6_receipt'::uuid;")" == revoked ]] ||
+  fail "issued-unbound verified cancellation did not revoke Receipt"
+[[ "$(p -c "select count(*) from public.standard_reading_reader_access_grants
+  where purchase_intent_id='$b6_intent'::uuid;")" == 0 ]] ||
+  fail "issued-unbound cancellation still allowed Reader Access"
+b6_event_count="$(p -c "select count(*) from public.entitlement_events ee
+  join public.commerce_provider_events pe on pe.id=ee.source_provider_event_id
+  where ee.grant_id='$b6_grant'::uuid
+    and pe.external_event_id='myeongha:portone-v2:full-cancel:v1:synthetic-b6-unbound-full-cancel'
+    and ee.event_type='revoked';")"
+[[ "$b6_event_count" == 1 ]] ||
+  fail "issued-unbound cancellation did not use exactly one authoritative Entitlement Event"
+# Replay the same proof without double-revoking or changing the grant revision.
+b6_revision="$(p -c "select revision from public.entitlement_grants where id='$b6_grant'::uuid;")"
+p >"$tmpdir/b6-replay.out" 2>&1 <<SQL || { cat "$tmpdir/b6-replay.out" >&2; fail "issued-unbound cancellation replay failed"; }
+begin;
+set local role myeongha_commerce_internal_executor;
+select (public.cmd_apply_verified_portone_reader_full_cancellation_v1(
+  'synthetic-portone-b6-payment','tx-official-reader-b6-unbound-issued',
+  'synthetic-b6-unbound-full-cancel','$b6_cancel_at'::timestamptz,
+  $b6_amount,'KRW','production',
+  'hmac-sh256:k1:cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd',
+  'synthetic-verified-b6-v1'
+)->'revoke'->>'disposition');
+commit;
+SQL
+grep -qx 'cancelled_before_binding' "$tmpdir/b6-replay.out" ||
+  fail "issued-unbound cancellation replay did not preserve disposition"
+[[ "$(p -c "select revision from public.entitlement_grants where id='$b6_grant'::uuid;")" == "$b6_revision" ]] ||
+  fail "idempotent unbound cancellation changed Grant revision"
+[[ "$(p -c "select count(*) from public.entitlement_events ee
+  join public.commerce_provider_events pe on pe.id=ee.source_provider_event_id
+  where ee.grant_id='$b6_grant'::uuid
+    and pe.external_event_id='myeongha:portone-v2:full-cancel:v1:synthetic-b6-unbound-full-cancel'
+    and ee.event_type='revoked';")" == 1 ]] ||
+  fail "issued-unbound replay duplicated Entitlement Event"
+pass "issued unbound Reader Grant cancels via existing Commerce effects, blocks direct bind and replays exactly once"
+
+
 echo "PASS: S2 instrumented two-direction PostgreSQL race; production integration HOLD"

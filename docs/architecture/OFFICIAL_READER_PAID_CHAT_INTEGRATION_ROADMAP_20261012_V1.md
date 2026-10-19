@@ -247,3 +247,10 @@ S1에서 공통 잠금 함수 자체가 성공하더라도 **S2 전체 경로가
 - 순방향 `1870_official_reader_unbound_zero_grant_cancel_purchase_lock_v1.sql`은 내부 1760 Receipt→Grant→Bind Writer와 PortOne 취소가 동일한 Purchase ID 기반 xact advisory lock을 **S1 및 Receipt/Grant 행 잠금보다 먼저** 취득하도록 정렬합니다. 검증된 PortOne 원결제·전액 취소 증거를 재검증한 뒤 **해당 구매의 모든 영수증에 Grant가 0건이고 Reader 결속도 0건**인 경우, 원래 Receipt를 `FOR UPDATE`로 잠가 독립 1080/1090 Writer와 충돌을 직렬화하고 검증된 ProviderEvent 기록 + Receipt revoked를 원자 확정합니다. 같은 취소 증거 재생은 이벤트를 중복 발급하지 않습니다.
 - **Grant가 한 건이라도 발급됐으나 아직 Reader access가 없는 구매는 승인된 정산/Scope Authority가 없어 HOLD/거절**합니다. 정상 결속 완료 건의 기존 1770 Grant/Event/Projection 회수 Writer는 유지합니다. 직접 1220 Reader 결속 및 기존 1080/1090는 신규 Purchase Lock에 재진입하지 않아 기존 S1→Grant/Receipt 잠금 역전은 만들지 않습니다.
 - 실제 PostgreSQL 두 세션 경합으로 무발급 취소가 Purchase 잠금을 선점하고 결속 Writer가 대기한 뒤 취소된 영수증으로 발급을 거부하는지, Grant·ReaderAccess·Reading이 0건인지, ProviderEvent 멱등성이 유지되는지 검증합니다. 이 작업은 Draft/격리 DB 전용이며 Saju #2410/Privacy #2318 승인 전 보호 본문·공개·운영 DB 배포 금지 유지.
+
+
+### S2 미결속·발급 완료 Reader 구매권의 검증된 취소 및 결속 경합 (2026-10-19)
+
+- 이전 1870은 Reader access 미결속 구매의 verified full cancellation에서 Grant가 1건 이상 발급된 경우 전체 취소를 HOLD했습니다. 신규 1880은 **구매 잠금 후 영수증 FOR UPDATE → 해당 영수증의 모든 구매 Grant FOR UPDATE**를 결정적 순서로 취득하고 Reader 결속이 새로 생겼는지 재확인합니다. 이미 결속된 경우 잠긴 Receipt/Grant 이후에 S1 잠금을 뒤늦게 잡지 않고 트랜잭션을 실패시켜 새로운 정상 결속 환불 경로의 재실행만 허용합니다.
+- 원 결제 영수증 외 다른 영수증의 Grant가 연결됐으면 무조건 거부합니다. 정확한 미결속 구매권만 기존 1080 `internal_apply_entitlement_effect_v1`으로 `revoked` 처리하고 **원본 EntitlementEvent·Projection·Outbox·receipt status·검증된 ProviderEvent**를 한 트랜잭션에서 일치시킵니다. 이전 1790의 미결속 직접 효과 우회 거부는 유지하며, 실제 동일 구매 advisory lock과 검증된 취소 전용 transaction-local context를 함께 증명한 호출만 예외적으로 허용합니다. 정상 결속 거래는 기존 1770을 유지합니다.
+- 실제 PostgreSQL 두 세션 시험에서 미결속 상태로 정상 발급된 Grant가 있는 구매에 취소가 먼저 오면 독립 1220 결속이 **Grant 행 잠금을 기다린 후 거부**되는지, Receipt/Grant revoked, Provider/Entitlement 이벤트 정확히 1회, 반복 취소 시 revision 변경 없음, 직접 무잠금 레거시 효과 차단을 확인합니다. 승인 미확보 S3/S4/S5 및 운영 DB 활성화 금지는 유지합니다.
