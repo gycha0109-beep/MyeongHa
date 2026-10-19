@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import type {
   HomeReadingTopicV1,
@@ -7,6 +7,7 @@ import type {
   MobileHomeTodayCardV1,
 } from '@/features/home/home-view-model';
 import { mobileColors } from '@/ui/mobile-colors';
+import { mobileDesign } from '@/ui/mobile-design-tokens';
 
 export function HomeBrandHeader({
   greeting,
@@ -88,28 +89,39 @@ export function HomeTodayCard({ card }: { card: MobileHomeTodayCardV1 }) {
   }
 
   return (
-    <View style={styles.heroCard}>
+    <View style={[styles.heroCard, styles.heroCardNight]}>
       <View style={styles.heroTop}>
         <View>
-          <Text style={styles.sectionKicker}>TODAY</Text>
-          <Text style={styles.heroTitle}>오늘의 흐름</Text>
+          <Text style={[styles.sectionKicker, styles.sectionKickerNight]}>TODAY</Text>
+          <Text style={[styles.heroTitle, styles.heroTitleNight]}>오늘의 흐름</Text>
         </View>
-        <Text style={styles.authorityChip}>{card.label}</Text>
+        <Text style={[styles.authorityChip, styles.authorityChipNight]}>{card.label}</Text>
       </View>
-      <View style={styles.dayMasterRow}>
-        <Text style={styles.dayMaster}>{card.dayMaster}</Text>
-        <Text style={styles.elementBadge}>{card.element}</Text>
+      <View style={styles.heroFactLayout}>
+        <View style={styles.heroFactCopy}>
+          <View style={styles.dayMasterRow}>
+            <Text style={[styles.dayMaster, styles.dayMasterNight]}>{card.dayMaster}</Text>
+            <Text style={[styles.elementBadge, styles.elementBadgeNight]}>{card.element}</Text>
+          </View>
+          <Text style={[styles.completeness, styles.completenessNight]}>{card.completeness}</Text>
+          <Text style={[styles.caption, styles.captionNight]}>
+            현재 출생정보를 기준으로 계산된 명식 사실만 보여줍니다.
+          </Text>
+        </View>
+        <Image
+          source={require('../../../assets/design/home-moon-gold-v1.webp')}
+          style={styles.heroArt}
+          resizeMode="cover"
+          accessible={false}
+          importantForAccessibility="no"
+        />
       </View>
-      <Text style={styles.completeness}>{card.completeness}</Text>
-      <Text style={styles.caption}>
-        현재 출생정보를 기준으로 계산된 명식 사실만 보여줍니다.
-      </Text>
       <Pressable
         accessibilityRole="button"
         onPress={() => router.push('/reading')}
-        style={styles.primaryButton}
+        style={[styles.primaryButton, styles.primaryButtonNight]}
       >
-        <Text style={styles.primaryButtonText}>내 사주 보기 →</Text>
+        <Text style={[styles.primaryButtonText, styles.primaryButtonTextNight]}>내 사주 보기 →</Text>
       </Pressable>
     </View>
   );
@@ -282,6 +294,19 @@ const styles = StyleSheet.create({
     gap: 13,
   },
   heroTop: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
+  heroCardNight: { backgroundColor: '#142638', borderColor: '#BE985E' },
+  heroTitleNight: { color: '#FFF5E6' },
+  sectionKickerNight: { color: '#DEBA7E' },
+  authorityChipNight: { backgroundColor: '#D9B97F', color: '#142638' },
+  heroFactLayout: { flexDirection: 'row', alignItems: 'center', gap: mobileDesign.space.md },
+  heroFactCopy: { flex: 1, gap: mobileDesign.space.sm },
+  heroArt: { width: 104, height: 138, borderRadius: 13 },
+  dayMasterNight: { color: '#FFF3DA' },
+  elementBadgeNight: { color: '#D9B97F' },
+  completenessNight: { color: '#F5EADD' },
+  captionNight: { color: '#D5C5AD' },
+  primaryButtonNight: { backgroundColor: '#D9B97F', minHeight: mobileDesign.minTouchTarget },
+  primaryButtonTextNight: { color: '#142638' },
   heroTitle: { marginTop: 3, color: mobileColors.ink, fontSize: 22, fontWeight: '800' },
   authorityChip: {
     alignSelf: 'flex-start',
