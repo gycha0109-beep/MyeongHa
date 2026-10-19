@@ -224,7 +224,11 @@ describe('Se-yeon 04C governed provider adapter (fake HTTP and fake DB)', () => 
         config:{...config,fetchImpl},runner:runner(query),getBinding:()=>binding,
         governor:{policy,certifiedInputTokenUpperBound:()=>500},
       });
-      await expect(provider.generate(request)).resolves.toEqual({ok:true});
+      // Paid inference may have completed, but missing durable evidence must
+      // never let its response advance to the Chat Commit or successful reply.
+      await expect(provider.generate(request)).rejects.toThrow(
+        'Governed Provider outcome receipt was not persisted; Chat Commit denied.',
+      );
       expect(order).toEqual(['admit','fetch','store-failed']);
       expect(query).toHaveBeenCalledTimes(2);
       expect(fetchImpl).toHaveBeenCalledOnce();
