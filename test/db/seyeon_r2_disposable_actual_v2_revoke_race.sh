@@ -45,4 +45,8 @@ SEYEON_POSITIVE_GRANT_REAL_PG=1 ./node_modules/.bin/vitest run \
 psql -X -v ON_ERROR_STOP=1 -f test/db/seyeon_r5_disposable_reveal_current_rights.sql
 SEYEON_POSITIVE_GRANT_REAL_PG=1 ./node_modules/.bin/vitest run \
   test/seyeon-r5-current-reveal-disposable.test.ts --maxWorkers=1
+# R21: TWO exact original Grants and REAL ContextReady in the SAME scratch PG transaction.
+# Only a disposable G1 candidate: no Provider, actual G2 or G3 Reveal authority.
+psql -X -v ON_ERROR_STOP=1 -f test/db/seyeon_g1_r21_two_originals_context_ready_candidate_v1.sql
+SEYEON_POSITIVE_GRANT_REAL_PG=1 ./node_modules/.bin/vitest run test/seyeon-positive-r21-two-source-context-ready-disposable.test.ts --maxWorkers=1
 echo 'PASS offline R2/R5 G2 v2 plus G3 SQL current-rights races; Production G0/G2/G3 HOLD'
