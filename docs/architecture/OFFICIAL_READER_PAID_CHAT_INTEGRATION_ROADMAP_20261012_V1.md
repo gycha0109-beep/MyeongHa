@@ -202,3 +202,10 @@ S1에서 공통 잠금 함수 자체가 성공하더라도 **S2 전체 경로가
 
 - `official-reader-s3-signed-source-artifact-reconciliation-v1.ts`는 **실제 Saju 서버 전용 발급기의 signed Preview envelope**를 기존 암호학적 검증기·원자 nonce ledger로 검증하고, DB에 인가·고정된 공식 ProductReadingResponse v2 원본의 canonical hash 및 Reading ID와 비교한다. 같은 Preview 서명이 유효해도 **DB에 저장된 해설 원본과 다르면 거부**한다. 필수 근거·동반/고지/모호성은 신규 `official-reader-s3-authoritative-artifact-coverage-v1.ts`를 통해 먼저 검증한다.
 - 공식 Production Source attestation은 Saju #2410에서 여전히 미발행, 신규 개인정보 유료 원문 보존·삭제·복원 승인은 Privacy #2318에서 미결이다. 이 연계는 **Preview 전송 무결성 + 원본 일치 확인**일 뿐 Official Source Authority·Semantic/Output PASS·S5 유료 본문 최종 원자 저장을 제공하지 않는다. 비공개 시험, `held/blocked`, PUBLIC OFF/Draft/운영 DB 미적용 유지.
+
+
+### 최종 저장 선행 권한 조회의 오래된 DB 스냅샷 차단 (2026-10-19)
+
+- S2 1750 `internal_qry_official_reader_locked_bundle_scope_v1`를 1820 순방향 migration으로 보강했다. 현행 구매권을 읽는 함수에서 **`READ COMMITTED`가 아니면 공동 잠금을 획득하기 전 PostgreSQL 오류**를 발생시킨다. 오래된 `REPEATABLE READ` / `SERIALIZABLE` 트랜잭션의 최초 스냅샷으로 환불/회수 후에도 과거 구매권을 다시 유효하게 판단하는 위험을 차단한다.
+- 기존 실제 S2 발급·회수 경합 preflight에 두 격리 수준의 부정 시험을 추가했다. 정상 READ COMMITTED 조회, 단일/다중 Bundle과 권한 회수 결과 검증은 기존 그대로 유지한다.
+- 이는 최종 T2가 요구하는 **잠금 뒤 최신 구매권 조회**의 선행 조건일 뿐, T2 유료 본문 저장/공개 권한이 아니다. Saju 공식 Production 출처 발급 [#2410](https://github.com/gycha0109-beep/Saju/issues/2410) 및 Privacy 신규 보호 본문 승인 [#2318](https://github.com/gycha0109-beep/MyeongHa/issues/2318)은 둘 다 여전히 열려 있다. 실제 유료 본문·Memory·일반 Chat·운영 DB/결제 경로 변경 없음, Draft·PUBLIC OFF 유지.
