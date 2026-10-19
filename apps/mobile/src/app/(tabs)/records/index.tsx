@@ -31,6 +31,7 @@ import {
   type RecordsTabV1,
 } from '@/features/records/records-view-model';
 import { mobileColors } from '@/ui/mobile-colors';
+import { useMobileTheme } from '@/ui/mobile-theme';
 import { useMobilePullRefreshV1 } from '@/ui/use-mobile-pull-refresh';
 
 type VisibleItem =
@@ -101,6 +102,7 @@ function initialLoadingForTab(tab: RecordsTabV1, snapshots: ReturnType<typeof us
 }
 
 export default function RecordsScreen() {
+  const { colors } = useMobileTheme();
   const { tab: routeTab } = useLocalSearchParams<{ tab?: string }>();
   const requestedTab: RecordsTabV1 = routeTab === 'readings' ? 'readings' : 'all';
   const [tab, setTab] = useState<RecordsTabV1>(requestedTab);
@@ -123,15 +125,15 @@ export default function RecordsScreen() {
     : snapshots[tab].status === 'error' && snapshots[tab].items.length > 0;
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.canvas }]}>
       <FlatList
         data={items}
         refreshControl={(
           <RefreshControl
             refreshing={refreshing}
             onRefresh={() => void onRefresh()}
-            tintColor={mobileColors.navy}
-            colors={[mobileColors.navy]}
+            tintColor={colors.navy}
+            colors={[colors.navy]}
           />
         )}
         keyExtractor={(item) => `${item.kind}:${item.id}`}
@@ -147,9 +149,9 @@ export default function RecordsScreen() {
         ListHeaderComponent={(
           <View style={styles.headerStack}>
             <View style={styles.header}>
-              <Text style={styles.eyebrow}>MY RECORDS</Text>
-              <Text style={styles.title}>기록</Text>
-              <Text style={styles.description}>
+              <Text style={[styles.eyebrow, { color: colors.gold }]}>MY RECORDS</Text>
+              <Text style={[styles.title, { color: colors.ink }]}>기록</Text>
+              <Text style={[styles.description, { color: colors.muted }]}>
                 삶의 사실, 사주 풀이 이력, 기억을 각 authority 그대로 확인합니다.
               </Text>
             </View>
