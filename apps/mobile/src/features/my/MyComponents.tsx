@@ -7,6 +7,7 @@ import type {
   MobileMyProfileViewV1,
 } from '@/features/my/my-view-model';
 import { mobileColors } from '@/ui/mobile-colors';
+import { useMobileTheme } from '@/ui/mobile-theme';
 
 export function MyProfileCard({
   profile,
@@ -353,16 +354,39 @@ const pendingSettings = Object.freeze([
 ] as const);
 
 export function MyPendingSettings() {
+  const { theme, setTheme, colors } = useMobileTheme();
   return (
     <View style={styles.section}>
       <View style={styles.sectionIntro}>
         <Text style={styles.kicker}>SETTINGS</Text>
         <Text style={styles.sectionTitle}>설정</Text>
       </View>
-      <View style={styles.settingsCard}>
+      <View style={[styles.settingsCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <Text style={[styles.settingTitle, { color: colors.ink }]}>화면 테마</Text>
+        <View style={{ flexDirection: 'row', gap: 10, marginBottom: 12 }}>
+          {(['light', 'dark'] as const).map((option) => (
+            <Pressable
+              key={option}
+              accessibilityRole="radio"
+              accessibilityState={{ selected: theme === option }}
+              accessibilityLabel={option === 'light' ? '라이트 모드' : '다크 모드'}
+              onPress={() => setTheme(option)}
+              style={{
+                flex: 1, minHeight: 48, alignItems: 'center', justifyContent: 'center',
+                borderWidth: 1, borderRadius: 12,
+                backgroundColor: theme === option ? colors.navy : colors.surface,
+                borderColor: theme === option ? colors.navy : colors.border,
+              }}
+            >
+              <Text style={{ color: theme === option ? colors.canvas : colors.ink, fontWeight: '700' }}>
+                {option === 'light' ? '☀ 라이트' : '☾ 다크'}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
         {pendingSettings.map((title) => (
           <View key={title} style={styles.settingRow}>
-            <Text style={styles.settingTitle}>{title}</Text>
+            <Text style={[styles.settingTitle, { color: colors.ink }]}>{title}</Text>
             <Text style={styles.pendingBadge}>준비 중</Text>
           </View>
         ))}
