@@ -20,9 +20,11 @@ import {
 } from '@/features/my/my-view-model';
 import { MobileScreen } from '@/ui/MobileScreen';
 import { mobileColors } from '@/ui/mobile-colors';
+import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
 import { useMobilePullRefreshV1 } from '@/ui/use-mobile-pull-refresh';
 
 export default function MyScreen() {
+  const styles = useMobileThemedStyles(staticStyles);
   const {
     state,
     retryProfile,
@@ -210,3 +212,4 @@ const styles = StyleSheet.create({
   },
   loadingText: { color: mobileColors.muted, fontSize: 13 },
 });
+const staticStyles = styles;
