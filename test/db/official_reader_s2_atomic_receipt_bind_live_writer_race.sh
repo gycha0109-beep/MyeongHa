@@ -1201,8 +1201,8 @@ select x.receipt_id::uuid,cr.subject_id,'$b8_intent'::uuid,cr.product_offer_id,
 from public.commerce_receipts cr
 cross join (values
   ('$b8_receipt_a','tx-reader-b8-a','hmac-sha256:k1:8181818181818181818181818181818181818181818181818181818181818181'),
-  ('$b8_receipt_b','tx-reader-b8-b','hmac-sha256:k1:8282828282828282828282828282828282828282828282828282828282'),
-  ('$b8_receipt_c','tx-reader-b8-c','hmac-sha256:k1:8383838383838383838383838383838383838383838383838383838383')
+  ('$b8_receipt_b','tx-reader-b8-b','hmac-sha256:k1:8282828282828282828282828282828282828282828282828282828282828282'),
+  ('$b8_receipt_c','tx-reader-b8-c','hmac-sha256:k1:8383838383838383838383838383838383838383838383838383838383838383')
 ) as x(receipt_id,transaction_id,fingerprint)
 where cr.id='$b7_receipt'::uuid;
 commit;
@@ -1269,7 +1269,7 @@ select 'B8_CANCEL=' ||
     'b8-payment-a','tx-reader-b8-a',
     'b8-cancel-exact-a','$b8_cancel_at'::timestamptz,
     $b8_amount,'KRW','production',
-    'hmac-sha256:k1:8585858585858585858585858585858585858585858585858585858585',
+    'hmac-sha256:k1:8585858585858585858585858585858585858585858585858585858585858585',
     'synthetic-b8-exact-receipt-v1'
   )->'revoke'->>'disposition');
 select pg_sleep(4);
