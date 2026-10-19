@@ -278,3 +278,9 @@ S1에서 공통 잠금 함수 자체가 성공하더라도 **S2 전체 경로가
 
 - 사용자 직접 지시로 기존 [S4 법률·정책 제안](OFFICIAL_READER_S4_PRIVACY_LEGAL_POLICY_APPROVAL_PROPOSAL_20261019_V1.md)의 D1·D2·D3·D5·D6 처리 방향과 **본 DB 24시간 파기 목표·원문 없는 일반 운영 로그 90일 상한**을 **제품 책임자 승인**으로 기록했습니다. [별도 결정문](OFFICIAL_READER_S4_PRODUCT_OWNER_PRIVACY_POLICY_DECISION_20261019_V1.md) 참조. 신규 원문 처리 외부 업체는 현 시점 **없다는 사용자 진술**로 기록하며 **실제 인프라 감사 및 외부 원문 전송 승인 불포함**.
 - P0-PR-01 기존 P5Y Commerce·P30D 백업·RR-03 출처 DELETE 정본 무변경. #2318은 실 DB FK/RLS/탈퇴 삭제/복원, 현행 외부 데이터 흐름, 법률·약관·AI 고지 인수가 끝날 때까지 OPEN입니다. S5 T2 보호 원문 영속 저장, 공개, 실제 결제, 운영 migration 또는 PR merge 권한을 부여하지 않습니다.
+
+
+### S4 보호 원문 비공개 저장·삭제·복원 설계 착수 (2026-10-19)
+
+- [S4 보호 데이터 저장 구조/권한/삭제·복원 설계](OFFICIAL_READER_S4_PROTECTED_CONTENT_STORAGE_DELETION_RECOVERY_DESIGN_V1.md)를 추가했습니다. 기본 브랜치 `P0-PR-02` [제품 정책 정본](../OFFICIAL_READER_S4_PRIVACY_POLICY_DECISION_V1.md)을 유일한 정책 권한으로 사용하고 이 설계는 실행 SQL 또는 추가 제품 승인이 아닙니다.
+- 기존 일반 Chat `conversation_messages`와 원문 분리, Reader/Reading/Bundle/current Grant 별도 Query, 기존 1520 계정 삭제 최종화에 대한 자식 삭제 순서, 24시간 본 DB 파기 목표/P30D 백업의 격리 복원, 90일 비민감 로그 상한, S3/S5 및 개인정보 실검증 게이트 정리. 운영 DB migration·유료 원문 저장/공개 권한 없음.

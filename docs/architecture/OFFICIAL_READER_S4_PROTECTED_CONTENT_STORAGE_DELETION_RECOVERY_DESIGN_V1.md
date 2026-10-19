@@ -1,0 +1,122 @@
+# Official Reader S4 보호 원문 저장·환불 삭제·복원 격리 — 설계 착수 v1
+
+- 작성 기준: 2026-10-19 / 명하 `db-authority-core` / S4 범위.
+- **제품 정책 정본:** [`P0-PR-02` 공식 Reader 유료 해설 개인정보 결정](../OFFICIAL_READER_S4_PRIVACY_POLICY_DECISION_V1.md) — 독립 문서, 기본 브랜치 정책 색인에서 확인. 정책의 승인 출처는 PR 댓글이 아님.
+- **상태:** DESIGN CANDIDATE / PRIVACY & LEGAL TECHNICAL ACCEPTANCE PENDING / NO EXECUTABLE MIGRATION / NO PAID BODY WRITE / PUBLIC OFF.
+- 이번 납품은 구조·정합성·삭제/복원 경계 설계다. 기존 Product Owner의 승인 정책을 재승인 요청하지 않으며 운영 DB, 기존 일반 세연 Chat/Commerce Writer, 1720/1730 RR-03/04 Draft, API public 권한을 변경하지 않는다.
+
+## 1. 기존 코드 기반 사실과 해결해야 하는 위험
+
+| 근거 (현행 참조) | 현행 행위/불변식 | S4 새 경계 |
+| --- | --- | --- |
+| `supabase/migrations/0040_conversation_core.sql` | `conversation_messages`는 `body_text`와 `message_payload_jsonb`, 일반 `chat_turns`·`chat_turn_attempts`를 갖는다. `sender_type='character'`는 Turn/Thread 참여·Bundle FK로 결속됨 | 보호 원문을 `body_text`·`message_payload_jsonb`에 절대 넣지 않는다. 기존 메시지에는 읽기 권한을 전혀 제공하지 않는 **안전한 상태 마커만** 남길 수 있음 |
+| `apps/api/src/seyeon-production-chat-execution-v1.ts` | 일반 세연 채팅은 `persistGenerated`, `persistValidated`, `commitTurn`, post-turn/Outbox 경유 | 유료 원문을 일반 생성·검증/Turn/Outbox/AI 실행 로그에 태우지 않는다. Reader 전용 Server API Writer 후보만 검토. 기존 일반 세연 동작은 보존 |
+| `apps/api/src/postgres-reader-context-non-memory.ts` 및 Reader Memory 경로 | 일반 메시지 body, 장기 기억을 AI 컨텍스트로 제공 | 안전 마커만 읽게 유지. 보호 원문·해설 유사 요약·유도 가능한 지문/출처를 이 경로로 재주입하지 않음 |
+| `apps/api/src/official-reader-held-t1-t2-preflight-v1.ts` | T1 fresh admission, DB 연결 해제 후 사설 생성, T2 fresh admission과 drift 검사, 결과 폐기 및 `held` 반환. **새 T2 잠금/영속화/공개는 구현되지 않음** | 이 HOLD가 기본 동작. 새 T2 Writer 완성·검증 전에는 생성 결과 문자열·로그·stream·provider callback 부작용의 영속화를 금지 |
+| `supabase/migrations/1520_account_deletion_finalizer_relationship_runtime_sync.sql` | 최종화 함수는 `standard_reading_reader_access_grants` 등을 앞에서 삭제한 뒤 `conversation_messages`, `chat_turn_attempts`, `chat_turns`, Thread, Birth/Profile을 순서대로 삭제. retained Commerce 별도 | **신규 보호 원문/연결 자료는 자식 행 → Assistant Marker/Turn → Thread/Reading 순서 이전에 명시적으로 삭제**. 기존 함수에 은밀하게 이어 붙이지 않음; 신규 forward-only 정의 및 FK/그래프 인수 필수 |
+| 기존 S2 Reader/PortOne 1740~1890 및 로드맵 | 정확한 Reading×Reader S1 lock, 구매 lock, 원래 Receipt/Grant lineage, 취소/결속 경합. 독립 sibling Grant 유지 | 보호 원문 조회 권한은 **Receipt 한 장 또는 과거 bind**가 아니라 현재 동일 Reading×Reader×정확한 Bundle/Release의 검증된 유효 Grant 집합과 일치해야 함. 다른 Receipt 환불이 sibling 권리를 임의 회수하지 않음 |
+| RR-03 출처 sidecar Draft #1960 | `official_reader_assistant_saju_provenance` 비공개/탈퇴 DELETE는 그 이력 범위에서 별도 제품 승인이 있음 | 새 원문/청크는 별도 개인 데이터 분류. 출처 이력의 내부 Unit/정규화 hash를 일반 Chat이나 로그에 복제하지 않음. RR-03만으로 최종 Assistant Writer 승인 아님 |
+
+## 2. 목표 데이터 이동 (승인 후 목표, 지금은 HOLD)
+
+```text
+인증된 회원·기존 Thread + 선택한 공식 Reading/Reader
+       |
+       v
+T1: 현재 정확한 Grant/Bundle/Release/Reading/회원 조회 → COMMIT
+       |
+       v
+사설 생성: 연결/잠금 없이 결과를 임시 메모리에 보관
+       |   외부 공급자·스트리밍·로그·자동 Memory/검색·영속 캐시 OFF
+       v
+Saju Owner 공식 서명·Semantic/Output/Disclosure 검증
+       |   S3 Production authority 전에는 HELD
+       v
+T2: 새 DB 거래
+    ├─ 동일 S2 scope lock + 현재 Grant/Reading/Reader/Product/
+    |   Bundle/Release/Thread/Revision/Source/원문 hash 재검증
+    ├─ 승인된 새 보호 원문 row + 안전 마커 + 출처/Attempt 포인터
+    |   : **하나의 거래에서 전부 확정, 일부 저장 0**
+    └─ COMMIT 성공 이후만 별도의 권한 검사로 유료 원문 전달
+       |
+       v
+재열람·후속 질문: 현재 유효 독립 구매권 + 별도 보호 Query 검증
+       |   안전 마커만 일반 채팅/컨텍스트에 남김
+       └─ 없거나 불명확하면 원문·AI 주입 0
+```
+
+T1·S3·T2 각 검사가 동일 원본/Scope를 pin해야 한다. `Response`·`ReadableStream` 등 전송 객체 구조 검사는 생성 콜백의 **실제 외부 부작용을 막는 통제 수단이 아님**. 생성 runner에서 HTTP/vendor client/로그·trace sink 주입 자체를 제거하거나 별도 엄격 감사가 필요하다.
+
+## 3. 새 보호 저장소: 후보 테이블/관계 명세 (DDL 미실행)
+
+테이블명은 아직 **설계 후보**: `official_reader_paid_answer_bodies`. 기존 보호 provenance 테이블·구독 메모리·Commerce 증빙과 병합하지 않는다.
+
+| 후보 컬럼/관계 | 제안 필드·제약 | 누출/삭제/정합성 근거 |
+| --- | --- | --- |
+| 식별 | `id UUID`, `subject_id UUID`, `thread_id UUID`, `turn_id UUID`, `attempt_id UUID`, `safe_message_id UUID` | 정확한 **같은** 회원×Thread×Turn×최종 Assistant Message를 가리키도록 *복합 FK 후보*. User가 supplied한 UUID로 선택 불가. DELETE 시 원문이 먼저 소멸해야 함 |
+| 공식 Reading | `official_reading_id UUID`, `reader_character_id TEXT`, `reading_contract_version`, `official_artifact_response_hash` | 서버가 승인한 공식 원본/Reader만 저장. 일반 Chat ID로 권리 인정 금지 |
+| Product/Character | `product_id UUID`, `product_spec_version`, `content_release_id UUID`, `reader_content_bundle_id TEXT/UUID(실제 참조 타입 결정 필요)`, `content_revision` | DB 실 타입/FK 확인 전 DDL 확정 금지. 정책 변동은 원본 해설 오염·권리 자동 승격으로 취급 금지 |
+| 구매권 출처 | `originating_entitlement_grant_id UUID`, 검증된 `purchase_intent_id`/Receipt 연계 참조 후보 | 원문 생성에 사용한 **원본 Grant 증빙**과 **현재 조회 허용 Grant 집합**을 구별. 생성 Grant가 환불돼도 별도 독립 유효 Grant의 처리 규칙을 제품 범위에 맞춰 검토. 다른 Bundle이면 차단 |
+| 승인된 출처 | `source_attestation_ref`, `source_response_hash`, `semantic_guard_version`, `output_guard_version` (서버 검증 참조) | Saju #2410 실제 Production 발행 권한과 서명/위변조 검사 필수. 사용자/LLM 작성 `passed:true`는 근거 아님. 구체 영속 컬럼은 Privacy 승인 데이터 분류 후 확정 |
+| 보호 본문 | `encrypted_body BYTEA` 또는 DB 외부 원문 금지 범위의 `body_ciphertext` 후보, `encryption_scheme_version`, `key_ref` | 평문 DB/로그/비인가 역할 금지. **키 보관/파기 권한 설계 미확정**: 암호화 제안만으로 개인정보 파기·복원 비노출을 증명하지 못함. 외부 KMS를 신규 업체로 자동 도입하지 않음 |
+| 상태·시각 | `created_at`, `committed_at`, `deleted_at`, `deletion_reason`, `deletion_requested_at` 후보 | 원문 조회허가는 row 상태값만으로 반환 금지. 삭제 시 원문/키 삭제와 비민감 tombstone 증거를 분리. 원문 컬럼을 null만 하는 방식도 backup 처리와 연결 필요 |
+| 무결성 | `unique (subject_id, turn_id, attempt_id)` 등 **후보**, 개인 식별 가능한 평문 해시 대신 keyed/verifier 증명 | Retry/Replay는 동일 불변 scope+원문+Guard/Source만 idempotent. 기존 Attempt/Message와 Row 일부만 commit 불가 |
+
+### Row/권한 설계의 차단 요건
+
+1. 신규 protected table과 조회 함수는 **RLS ENABLE + FORCE**, `PUBLIC`/`anon`/`authenticated`/`service_role`의 임의 SELECT/EXECUTE 차단, 내부 역할 allowlist와 trusted Subject 문맥 검증. `SECURITY DEFINER`만으로 사용자 ID/인증을 인정하지 않음.
+2. 전용 원문 조회 Query는 `subject_id`, `thread_id`, `official_reading_id`, `reader_character_id`, `bundle`, `release`, `product`와 최신 Grant 상태·만료·정책을 **같은 현재 DB 스냅샷/동시성 규약**으로 검증. 공개용 일반 `conversation_messages` SQL 조회로 우회 불가.
+3. 다른 독립 Grant가 남아 있으면 정확한 동일 범위의 유효권만 인정. 다른 Reading·Reader·Bundle이면 반드시 0. 독립 유효 Grant 간 `exact-one bundle` 모호성은 차단.
+4. 새 schema가 `subject_id`에 FK를 더하면 P0-PR-01 기존 **승인된 그래프 fingerprint/분류를 몰래 수정하지 않음**. 최종 확정된 그래프/DELETE 순서와 populated-row 회귀를 versioned delta로 인수.
+5. 본문·source Unit·생년월일·질문·비밀키·암호문까지 분석/오류/PG NOTICE/디버그 로그·Outbox payload로 유출 금지. 키 관리/봉투암호화 방식과 키 손실·복원/파기 경계는 Security/DB 검토 항목.
+6. `deleted` 또는 `tombstoned` 상태만 표기하고 ciphertext를 그대로 남겨두는 구현은 **본 DB 24h 파기 목표 달성으로 판정하지 않음**. 원문/키 실제 파기 실증 필요.
+
+## 4. 기존 일반 Chat 안전 마커 (원문 아님)
+
+- 동일 캐릭터 일반 Thread는 유지. `conversation_messages`가 `body_text` 또는 `message_payload_jsonb`로 원문을 보관하지 않도록 **비민감 마커**(`유료 해설 기록이 있습니다. 현재 구매권이 유효할 때만 열람할 수 있습니다.`)와 표시 가능한 상태 enum/서버 발급 opaque ID만 저장하는 모델 제안.
+- 마커의 `content_hash`, `message_payload_jsonb`, thread/turn/attempt metadata에 원문 암호문·원문 hash·Saju Source Unit·Birth 조각·요약을 넣지 않는다. 마커만 본 일반 Chat 조회로 유료 해설을 재구성할 수 없어야 한다.
+- 마커 생성과 보호 Row·출처 증명은 **T2 동일 거래**로 확정. 보호 Row만 있거나 Marker만 살아 있는 부분 commit 0. 실패/timeout 후 재시도는 같은 original Turn/Attempt/Scope를 재확인하고 다른 원문 자동 대체 금지.
+- 탈퇴 시 마커는 기존 Chat DELETE 정책을 따른다. 환불·권한 회수 후에는 비민감 마커가 일반 대화 이력에 남을 수 있으나 **열기/복원/모델 재주입은 현재권한 0으로 차단**.
+
+## 5. 권리 회수·삭제 상태·24시간 목표
+
+| 사건 | 즉시(동기) | 뒤따르는 파기 | 별개 보존 |
+| --- | --- | --- | --- |
+| 원래 Receipt 전액 취소, 해당 권리 0 | 검증된 Commerce 효과와 S2 잠금 확정 시 **새 원문 조회/모델 컨텍스트/추가 생성 0** | 마지막 유효 권리 소멸 시 protected row/key 파기 예약; 본 DB 실제 파기 완료 **24h 목표** | P5Y Commerce Receipt/Event/Grant/Entitlement는 원문 없이 보관 |
+| 같은 scope에 sibling Grant 생존 | **정확한 scope와 Bundle**로 남은 권리 재판정. 상충 Bundle·Source라면 차단 | 최종 원문 권리 소멸 때 파기. 다른 Receipt만 취소됐다고 모든 원문 제거하지 않음 | 독립 결제 증빙 무변경 |
+| Grant 만료/탈퇴/삭제 요청 | 조회와 모델 재주입 즉시 0. 탈퇴 시 회원 자체 비활성 | AccountDeletion Finalizer가 **원문 자식 행을 기존 Assistant Message/Turn/Thread/Reading 삭제 이전**에 제거하고 삭제 그래프 검증 | 필요한 최소 Commerce 증빙만 분리 |
+| 외부 생성 callback 실패/T2 실패/경합 롤백 | 후보 결과의 외부 공개 0, 원문 DB/로그/검색 0 | 생성 시도 비영속 기본. 이미 생긴 임시 메모리 버퍼 폐기 | 비민감 장애 카운트/trace만 운영 상한 내 기록 |
+| DB Worker 지연/실패 | 권리 확인 경로에서 계속 fail-closed, cleanup 재시도·알람 | 경고·재시도·dead-letter/실패 원인 **원문 없이** 추적. 24h 초과 시 사고 에스컬레이션 | 삭제 미완료를 '완료'로 표시 금지 |
+
+파기 자체가 법정 청약철회 권리나 환불/분쟁 심사를 변경하지 않는다. **삭제 24h 목표는 본 DB**만 가리키며, 백업은 아래 복원 비재노출을 별도로 증명해야 한다.
+
+## 6. P30D 백업·복원에서의 재노출 방지
+
+- 새 유료 해설 원문의 삭제/회수 이력은 **복원 대상 Primary DB 외부의 보호된 Privacy Ledger**에 연결할 수 있어야 한다. 기존 계정 삭제 원장에 적용 대상 event/읽기 폐기 키를 검토하되 현재 스키마가 그 타입을 지원한다고 가정하지 않는다.
+- DB 복원 직후 **Reader paid-read API/Chat Context/Outbox/Analytics 모든 원문 접근을 OFF**로 시작한다. 복원된 시점 이후의 회원 삭제/Grant revoke/콘텐츠 삭제/키 파기 이벤트를 검증해 적용한 뒤에만 개별 재개를 판정한다.
+- 검증할 수 있는 최신 privacy ledger가 없거나 누락·변조·복원 시각 불명·키 재활성화 위험이 있으면 **계속 OFF**; backup restore successful 또는 P30D 시간 경과만으로 서비스 가능 PASS 금지.
+- 백업 내 ciphertext가 남아 있어도 접근 가능한 key가 복원·재사용되면 유출될 수 있으므로 **키 생애주기·backup 분리·wipe 실증**이 필요. 새 KMS 공급업체/외부 수탁을 임의 추가하지 않는다.
+- **실제 격리 PostgreSQL 복원 테스트:** 복원 이전에 제공된 Row→환불/탈퇴/삭제→옛 백업 restore→tombstone replay→새 재열람/후속 모델 주입 0, 일반 Chat 안전 마커/Commerce 법정 증빙은 승인 범위에서만 유지.
+
+## 7. 최소 권한·비노출 공격 표 (PG15/PG17 실제 시험 전제)
+
+| 시험 | 성공 조건 |
+| --- | --- |
+| Subject A로 B의 Reading/Reader/Thread/Answer 조회 | row 수 0 또는 동일한 안전 거부; body/PII/존재 여부 추측 누출 0 |
+| 인증 없이 `SELECT`/`INSERT`/`UPDATE` 보호 테이블, public RPC 직접 호출 | `PUBLIC`/일반 사용자/범용 service-role 차단. 권한 있는 내부 역할만 trusted context |
+| 정확한 Grant 신규 발급↔Reader bind↔PortOne cancel↔paid T2 동시 | S1/구매 lock 순서 공통, stale Grant/Receipt/Bundle/Release 원문 공개 0, 서로 독립 sibling 권리 훼손 0 |
+| T2 source/semantic/outbound validation 후 환불 선점 | 원문·마커·출처 attempt 일부 commit 0, 조기 HTTP/chunk 0 |
+| T2 commit 성공 후 HTTP 전달 실패·Retry | 원본 Turn/Attempt/Body/Proof 불변. 중복 생성·다른 원문 덮어쓰기 0; 매 전달 시 현재권 재검증 |
+| Account Delete populated row, FK cycle, tombstone 재생 | 보호 row 완전 파기, 일반 Chat 기존 DELETE, P5Y Commerce만 보존, 복원 뒤 재노출 0 |
+| Outbox/AI execution logs/error stack/Memory/non-memory/vector/search/notification | 원문·청크·복원 가능한 요약·암호문·민감 해시 0 |
+| PostgreSQL 15/17 schema/ACL / RLS / catalog / Graph fingerprint | 이력 정본 변경 없이 신규 테이블·전용 권한·삭제 그래프 versioned delta/실데이터 E2E PASS |
+| 삭제 Worker Crash/retry 및 DB 장애/복원 | 즉시 접근 0 유지, 24h 목표 관측·원문 없는 경보, 중복 요청 idempotent, 백업 복원 재활성 0 |
+
+## 8. 책임·순서와 이번 작업의 범위
+
+1. **이번 설계 완료 대상:** 승인된 `P0-PR-02` 정책 → 데이터 영역/권한/삭제/복원/로그 범위 매핑, 후보 DB Row와 안전 마커, 권리 상실/형제 Grant 예외, 인수 시험 표를 문서화.
+2. **다음 구현:** DB 소유자가 실제 읽기·쓰기를 분리한 SQL 테이블 후보의 정확한 FK/subject graph·key management와 삭제 finalizer/복원 원장을 설계한 후, **비활성 migration/격리 합성 테스트**로 계약을 검증. 기존 migration 1520/Reader 1220 등을 직접 수정하지 않는다. Approval된 신규 P0-PR-02를 재승인 요청하지 않는다.
+3. **미승인·금지:** Privacy #2318 실데이터/법무 인수, Saju #2410 운영 출처, S5 T2, S6 조회, S7 고지·결제, S8 출시가 완료되지 않았으므로 **Production DB migration/실제 보호 원문 저장·외부 모델 송신/공개는 하지 않는다**.
+4. **정본/가이드 참조 순서:** `docs/MASTER_SPEC_INDEX.md` → `docs/P0_DECISION_REGISTER.md`(`P0-PR-02`) → `docs/OFFICIAL_READER_S4_PRIVACY_POLICY_DECISION_V1.md` → 이 S4 설계 → [S0~S8 로드맵](OFFICIAL_READER_PAID_CHAT_INTEGRATION_ROADMAP_20261012_V1.md). PR 댓글/이슈는 구현 증빙으로만 참조.
+
+**현재 설계 판정: 자료 구조/권한/삭제/복원 경계 DESIGN CANDIDATE 완성, 실행 가능한 DB/암호화/복원 운영 권한은 확보되지 않음.**

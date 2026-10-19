@@ -138,3 +138,10 @@ Saju Owner가 제공할 정식 보완물은 **Preview와 별도**인 운영 원�
 - 사용자 직접 결정: **“외부 업체는 일단 없다. 나머지는 승인”**. 승인된 정확한 범위와 추가 법률·기술 차단을 [S4 신규 유료 해설 개인정보 정책 승인 결정문](OFFICIAL_READER_S4_PRODUCT_OWNER_PRIVACY_POLICY_DECISION_20261019_V1.md)에 고정했습니다.
 - 유료 원문 분리, 미확정 결과·Memory/검색/모델 재학습 금지, 환불·만료·탈퇴 시 새 서버 접근 즉시 차단, 목적 소멸 시 **본 DB 24시간 이내 파기 내부 목표**, **원문 없는 일반 운영 로그 90일 상한**, 기존 P30D/P5Y 범위 불변을 **제품 방향 승인**합니다.
 - 신규 보호 원문 처리 외부 업체는 사용자 진술상 **현재 없음**. 이미 존재하는 결제·호스팅·DB·AI 등 인프라 공급자 관계는 별도 감사가 필요하며, 새 유료 원문을 해당 업체에 전송하는 권한은 **승인되지 않았습니다**. Privacy #2318 법률·실제 보호 테이블/삭제·복원 인수 및 Saju #2410 정식 출처는 계속 HOLD. 본문 영속 저장·공개·운영 DB 적용 금지.
+
+
+## S4 보호 원문 저장·삭제·복원 구조 설계 착수 (2026-10-19)
+
+- **제품 정책 결정은 별도 기본 브랜치 정본 `docs/OFFICIAL_READER_S4_PRIVACY_POLICY_DECISION_V1.md`(`P0-PR-02`)에서 확인**합니다. 기능 PR 댓글이 승인 Authority가 아닙니다.
+- [신규 S4 보호 데이터 구조 설계](OFFICIAL_READER_S4_PROTECTED_CONTENT_STORAGE_DELETION_RECOVERY_DESIGN_V1.md)에 정확한 보호 원문/안전 Chat 마커 분리, 기존 0040 Chat·1520 AccountDeletion Finalizer와 새 자식 삭제 순서, 24h 본 DB 파기 운영 목표, P30D 복원 후 비재노출, sibling Grant 재판정 및 RLS/ACL/Outbox/Memory 부정시험을 정리했습니다.
+- 실제 보호 DB migration/Writer/key handling, Privacy/Legal 운영 인수, Saju Production Source 및 S5 T2는 **미구현/HOLD**. Draft #2301에 포함된 코드는 계속 비공개입니다.
