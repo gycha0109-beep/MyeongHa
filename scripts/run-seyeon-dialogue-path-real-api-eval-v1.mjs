@@ -18,6 +18,7 @@ import {
   SEYEON_DIALOGUE_PATH_PRICES_V1, selectSeyeonDialoguePathCasesV1,
   estimateSeyeonDialoguePathCostV1, summarizeSeyeonDialoguePathV1,
   createSeyeonDialoguePathSyntheticCensusV1,
+  verifySeyeonDialoguePathStageTopologyV1,
 } from './seyeon-dialogue-path-eval-core-v1.mjs';
 import {
  SEYEON_C08S_ORDINARY_GOLD_IDS_V1,
@@ -160,6 +161,9 @@ function reason(error) {
 
 async function evaluate(route, spec) {
   const before = { ...usage[route] };
+  const beforeStages = Object.fromEntries(
+    Object.entries(usage[route].purposes).map(([stage, value]) => [stage, value.calls]),
+  );
   const startedAt = performance.now();
   const id = 'synthetic:' + spec.id;
   const contextInput = Object.freeze({
@@ -202,6 +206,22 @@ async function evaluate(route, spec) {
     outcome = 'rejected';
     errorCode = reason(error);
   }
+  // Count every actual provider stage for this individual synthetic case.
+  // The legacy classifiers may finish in either order, but each required
+  // stage must be observed once. Same number of calls with missing or
+  // repeated stages is a HOLD, never a 5→3 performance result.
+  const after = usage[route];
+  const stageCounts = Object.fromEntries(
+    Object.entries(after.purposes)
+      .map(([stage, value]) => [stage, value.calls - (beforeStages[stage] ?? 0)])
+      .filter(([, count]) => count > 0),
+  );
+  if (outcome === 'admitted' &&
+      !verifySeyeonDialoguePathStageTopologyV1(route, stageCounts)) {
+    outcome = 'rejected';
+    errorCode = 'STAGE_TOPOLOGY_HOLD';
+    safeEnvelope = null;
+  }
   if (outcome === 'admitted' && approvedReviewIds.has(spec.id)) {
     if (!safeEnvelope || safeEnvelope.revealLevel !== 'public' ||
         safeEnvelope.memoryRefsMentioned.length !== 0 ||
@@ -215,12 +235,12 @@ async function evaluate(route, spec) {
       memoryRefs:[],privateSourceRefs:[],utterance:safeEnvelope.utterance};
     reviewPairs.set(spec.id,pair);
   }
-  const after = usage[route];
   return Object.freeze({
     id: spec.id,
     route,
     outcome,
     errorCode,
+    stageCounts,
     elapsedMs: Math.round(performance.now() - startedAt),
     calls: after.calls - before.calls,
     estimatedCostUsd: Number((after.estimatedCostUsd - before.estimatedCostUsd).toFixed(6)),
