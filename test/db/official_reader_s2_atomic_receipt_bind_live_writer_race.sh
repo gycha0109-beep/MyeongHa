@@ -424,10 +424,7 @@ b5_intent="12192300-0000-0000-0000-000000000005"
 b5_receipt="12192000-0000-0000-0000-000000000005"
 new_revision="12101100-0000-0000-0000-000000000002"
 new_reading="12103100-0000-0000-0000-000000000005"
-p >"$tmpdir/revision-receipt-seed.out" 2>&1 <<SQL || {
-  cat "$tmpdir/revision-receipt-seed.out" >&2
-  fail "initial purchase after a new Birth revision seed failed"
-}
+if ! p >"$tmpdir/revision-receipt-seed.out" 2>&1 <<SQL
 begin;
 insert into public.birth_profile_revisions(
   id,birth_profile_id,subject_id,revision_no,calendar_type,birth_date,
@@ -482,14 +479,15 @@ from public.commerce_receipts
 where id='12102000-0000-0000-0000-000000000001'::uuid;
 commit;
 SQL
+then
+  cat "$tmpdir/revision-receipt-seed.out" >&2
+  fail "initial purchase after a new Birth revision seed failed"
+fi
 [[ "$(p -c "select count(*) from public.standard_reading_official_bindings
   where subject_id='$subject'::uuid and product_id='11392000-0000-0000-0000-000000000001'::uuid;")" == 1 ]] ||
   fail "historical official Reading setup unexpectedly changed"
 
-p >"$tmpdir/new-revision-prelock.out" 2>&1 <<SQL || {
-  cat "$tmpdir/new-revision-prelock.out" >&2
-  fail "new initial Reading receipt did not accept exact current revision S1 lock"
-}
+if ! p >"$tmpdir/new-revision-prelock.out" 2>&1 <<SQL
 begin;
 select pg_catalog.set_config('myeongha.subject_id','$subject',true);
 select pg_catalog.set_config('myeongha.reader_pending_reading_id','$new_reading',true);
@@ -501,6 +499,10 @@ from (select public.internal_assert_reader_receipt_scope_prelocked_v1(
   '$b5_receipt'::uuid)) guarded;
 commit;
 SQL
+then
+  cat "$tmpdir/new-revision-prelock.out" >&2
+  fail "new initial Reading receipt did not accept exact current revision S1 lock"
+fi
 grep -qx 'EXACT_NEW_REVISION_LOCK=ok' "$tmpdir/new-revision-prelock.out" ||
   fail "Reader receipt prelock did not select the new Birth revision scope"
 
