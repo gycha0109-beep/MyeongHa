@@ -77,10 +77,11 @@ function provider(route, model) {
           allCalls>=MAX_CALLS||(allCalls+1)*PER_CALL_RESERVE_USD>MAX_RESERVED_USD+1e-9)
         throw Error('SEYEON_FIRST_PAIR_PRE_DISPATCH_BOUNDS_HOLD');
       const routeUsage = usage[route];
-      await journalEntry({kind:'reserve',caseId:'N01',route,model,purpose,
-        nextCall:allCalls+1,reservedMicroUsd:80000,runId:execution.runId});
-      allCalls += 1;
+      // Account in memory before await so parallel legacy preflight gets unique slots.
+      const reservedCall=++allCalls;
       routeUsage.calls += 1;
+      await journalEntry({kind:'reserve',caseId:'N01',route,model,purpose,
+        nextCall:reservedCall,reservedMicroUsd:80000,runId:execution.runId});
       const start = performance.now();
       const response = await fetch(url, init);
       // Never persist request, instructions, response content or generated text.
