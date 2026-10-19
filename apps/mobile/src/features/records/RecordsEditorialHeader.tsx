@@ -27,8 +27,7 @@ export function RecordsEditorialHeader({
       </View>
       <View style={styles.copy}>
         <Text style={styles.eyebrow}>MY ARCHIVE · 명하</Text>
-        <Text style={styles.title}>지나온 이야기에도{'
-'}나의 결이 남습니다.</Text>
+        <Text style={styles.title}>지나온 이야기에도{'\n'}나의 결이 남습니다.</Text>
         <Text style={styles.description}>
           지금 확인할 수 있는 삶의 기록과 사주 풀이를 차분히 살펴보세요.
         </Text>
