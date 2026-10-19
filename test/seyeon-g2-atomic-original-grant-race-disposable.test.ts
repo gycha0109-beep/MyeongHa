@@ -2,6 +2,16 @@
 // Disposable CI PostgreSQL only: real v2/v1/core Chat Commit and BOTH outboxes.
 import { afterAll, describe, expect, it } from 'vitest';
 import { Pool, type PoolClient } from 'pg';
+import {createHash} from 'node:crypto';
+import {canonicalJson} from '../packages/domain/src/index.js';
+import type {SeyeonRetrievedMemoryV2} from '../packages/domain/src/seyeon-runtime-context-v2.js';
+import type {SeyeonPersonalRecordProjectionCandidateV1} from '../apps/api/src/seyeon-production-context-v1.js';
+import {selectSeyeonExactModelPersonalSourcesV1} from '../apps/api/src/seyeon-exact-model-personal-source-selection-v1.js';
+import type {PostgresSubjectPoolV1} from '../apps/api/src/postgres-subject-execution.js';
+import {
+  commitSeyeonR23OfflineAtomicV2V1,
+  SeyeonR23OfflineG2CommitHoldV1,
+} from '../apps/api/src/seyeon-g2-atomic-exact-final-source-commit-r23-candidate.js';
 
 const enabled=process.env.CI==='true' &&
   process.env.SEYEON_POSITIVE_GRANT_REAL_PG==='1' &&
@@ -58,8 +68,9 @@ async function transaction<T>(
   });
 }
 
-async function prepare(n:number,pin=true):Promise<Fixture> {
-  const id=ids(n);
+async function prepare(n:number,pin=true,selectionDigestOverride?:string):Promise<Fixture> {
+  const id={...ids(n),
+    ...(selectionDigestOverride===undefined?{}:{selectionDigest:selectionDigestOverride})};
   await transaction(async c=>{
     await c.query(
       "insert into public.memory_items(id,subject_id,memory_type,schema_version,content_jsonb,source_kind,created_by_character_id,revoked_at,created_at) values($1,$2,'shared_detail','memory-v1',$3::jsonb,'user_approved','seyeon',null,clock_timestamp())",
@@ -189,8 +200,136 @@ async function waitForLock(label:string) {
   throw Error('No actual independent PostgreSQL lock wait: '+label);
 }
 
+// R23 reuses the real G1/G2 PostgreSQL fixture above (no extra DB clone,
+// SQL migration, mock Provider or second atomic-commit test framework).
+const r23Hash=(value:unknown)=>'sha256:v1:'+
+  createHash('sha256').update(canonicalJson(value)).digest('hex');
+function r23FinalSource(id:ReturnType<typeof ids>){
+  const memory:SeyeonRetrievedMemoryV2={
+    memoryId:'memory:'+id.memory,kind:'memory',claimKind:'fact',
+    summary:'synthetic G2 single Memory',sourceRef:'memory:'+id.memory+
+      ':grant:'+id.grant,relevance:1,salience:1,
+  };
+  const sources:readonly SeyeonPersonalRecordProjectionCandidateV1[]=[{
+    recordKind:'memory',recordId:id.memory,grantId:id.grant,
+    recordType:'shared_detail',schemaVersion:'memory-v1',
+    projectedMemoryId:memory.memoryId,
+    rawRecordDigest:r23Hash({
+      kind:'memory',recordId:id.memory,grantId:id.grant,
+      recordType:'shared_detail',schemaVersion:'memory-v1',
+      payload:{fixture:Number(id.thread.slice(-12)),synthetic:true},
+    }),
+    projectedMemoryDigest:r23Hash(memory),
+    permitsAtomicCommit:false,permitsHttpReveal:false,
+  }];
+  const retrievedMemories=[memory];
+  const selection=selectSeyeonExactModelPersonalSourcesV1({
+    retrievedMemories,sourceCandidates:sources,
+  });
+  const sourceEnvelope={
+    version:'seyeon-r21-offline-derived-source-closure-v1' as const,
+    sourceSnapshot:{
+      version:'seyeon-production-context-v1' as const,
+      retrievedMemories,personalRecordProjectionCandidates:sources,
+      personalRecordAdmissions:[{
+        recordId:id.memory,recordKind:'memory' as const,
+        recordType:'shared_detail',schemaVersion:'memory-v1',
+        reason:'ADMITTED' as const,
+      }],
+      recentMessages:[],relationshipHistoryRecords:[],
+      activeRelationshipEventCount:0,historyThroughRevision:0,
+      relationshipRevisionUsedForTurn:null,
+    },
+    preflightState:'not_run' as const,
+    disclosureRetrievedPrivateSources:[],
+    readerDerivedSources:[],workerDerivedSources:[],
+    externalToolPrivateSources:[],
+  };
+  return {retrievedMemories,sourceCandidates:sources,selection,sourceEnvelope};
+}
+function r23Pool():PostgresSubjectPoolV1{
+  return {
+    async connect(){
+      if(!pool)throw Error('R23 disposable PG required');
+      const client=await pool.connect();
+      return {
+        async query<Row>(sql:string,params?:readonly unknown[]){
+          const result=await client.query(sql,params===undefined?[]:[...params]);
+          return {rows:result.rows as Row[]};
+        },
+        release(error?:unknown){
+          client.release(error instanceof Error?error:undefined);
+        },
+      };
+    },
+  };
+}
+
 describe.skipIf(!enabled)('G2 original Grant actual-v2 two-session race, disposable-only',()=>{
   afterAll(async()=>{await pool?.end();});
+
+  it('R23: server exact G1 manifest -> restricted real v2 atomic commit; later model rewrite is blocked before DB',async()=>{
+    const idShape=ids(31);
+    const final=r23FinalSource(idShape);
+    const id=await prepare(31,true,final.selection.selectedSourcesDigest);
+    await stage(id,proof(id));
+    const input={
+      pool:r23Pool(),
+      verifiedEvidence:{
+        kind:'member' as const,
+        verifiedAuthUserId:'d1000000-0000-4000-8000-000000000001',
+      },
+      threadId:id.thread,turnId:id.turn,attemptId:id.attempt,
+      assistantMessageId:id.assistantMessage,chatOutboxId:id.chatOutbox,
+      postTurnOutboxId:id.postOutbox,
+      postTurnSnapshot:{
+        schemaVersion:'seyeon-post-turn-analysis-snapshot-v1',
+        turnId:id.turn,assistantMessageId:id.assistantMessage,
+        userMessageId:id.userMessage,
+      },
+      postTurnSnapshotHash:'sha256:v1:'+'c'.repeat(64),
+      finalRetrievedMemories:final.retrievedMemories,
+      sourceCandidates:final.sourceCandidates,
+      sourceEnvelope:final.sourceEnvelope,
+      preModelSelection:final.selection,
+      g1Receipt:{
+        turnId:id.turn,attemptId:id.attempt,
+        selectedSourcesDigest:final.selection.selectedSourcesDigest,
+        recordId:id.memory,originalGrantId:id.grant,
+        pgPayloadDigest:id.rawDigest,contextReady:true as const,
+      },
+    };
+    await expect(commitSeyeonR23OfflineAtomicV2V1({
+      ...input,
+      finalRetrievedMemories:input.finalRetrievedMemories.map(m=>({
+        ...m,summary:'unapproved changed final prompt',
+      })),
+    })).rejects.toBeInstanceOf(SeyeonR23OfflineG2CommitHoldV1);
+    await expect(commitSeyeonR23OfflineAtomicV2V1({
+      ...input,g1Receipt:{...input.g1Receipt,
+        originalGrantId:'d6000000-0000-4000-8000-000000000099'},
+    })).rejects.toBeInstanceOf(SeyeonR23OfflineG2CommitHoldV1);
+    expect(await saved(id)).toMatchObject({
+      messages:'0',outboxes:'0',admissions:'0',
+      attempt_state:'validated',
+    });
+    const result=await commitSeyeonR23OfflineAtomicV2V1(input);
+    expect(result).toMatchObject({
+      status:'disposable_atomic_v2_committed',
+      assistantMessageId:id.assistantMessage,
+      postTurnOutboxEventId:id.postOutbox,
+      replayed:false,permitsProvider:false,permitsHttpReveal:false,
+    });
+    expect(await saved(id)).toMatchObject({
+      messages:'1',outboxes:'2',admissions:'1',
+      attempt_state:'committed',turn_state:'committed',
+    });
+    await expect(commitSeyeonR23OfflineAtomicV2V1(input))
+      .rejects.toBeInstanceOf(SeyeonR23OfflineG2CommitHoldV1);
+    expect(await saved(id)).toMatchObject({
+      messages:'1',outboxes:'2',admissions:'1',
+    });
+  });
 
   it('real v2 commits one assistant message and two outboxes with original Grant in one DB transaction',async()=>{
     const id=await prepare(21);
