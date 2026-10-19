@@ -19,7 +19,7 @@ export const mobileThemePalettes = Object.freeze({
 
 type MobileThemeContextValue = Readonly<{
   theme: MobileTheme;
-  colors: typeof mobileThemePalettes.light;
+  colors: Readonly<Record<keyof typeof mobileThemePalettes.light, string>>;
   setTheme: (theme: MobileTheme) => void;
 }>;
 const MobileThemeContext = createContext<MobileThemeContextValue | null>(null);
