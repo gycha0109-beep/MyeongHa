@@ -177,12 +177,28 @@ describe('S3: authentic Saju Preview envelope reconciled with DB-pinned official
     }
   });
 
-  it('rejects genuinely Saju-signed but differently generated response with same Reading ID', async () => {
+  it('rejects genuinely Saju-signed but differently generated response with same Reading ID without spending its nonce', async () => {
     const changed = response();
     changed.reading.sections[0]!.blocks[0]!.text = '실제로 다른 계산에서 나온 서명된 응답';
-    const result = await run({ previewEnvelope: envelope(changed) });
+    const shared = trust();
+    const result = await run({ previewEnvelope: envelope(changed), trust: shared });
     expect(result).toMatchObject({ state: 'blocked', transportIntegrity: 'NOT_VERIFIED' });
+    expect(shared.claimNonceOnce).not.toHaveBeenCalled();
     expect(JSON.stringify(result)).not.toContain(changed.reading.sections[0]!.blocks[0]!.text);
+  });
+
+  it('preserves the same signed nonce when a wrong Reading arrives first, then accepts the actual stored official artifact once', async () => {
+    const wrong = response();
+    wrong.reading.readingId = 'different-reading';
+    const shared = trust();
+    expect(await run({ previewEnvelope: envelope(wrong), trust: shared }))
+      .toMatchObject({ state: 'blocked' });
+    expect(shared.claimNonceOnce).not.toHaveBeenCalled();
+    expect(await run({ previewEnvelope: envelope(), trust: shared }))
+      .toMatchObject({ state: 'held', transportIntegrity: 'VERIFIED', canPublish: false });
+    expect(shared.claimNonceOnce).toHaveBeenCalledOnce();
+    expect(await run({ previewEnvelope: envelope(), trust: shared }))
+      .toMatchObject({ state: 'blocked' });
   });
 
   it('rejects a modified DB artifact even if the candidate is aligned to the old official source', async () => {
