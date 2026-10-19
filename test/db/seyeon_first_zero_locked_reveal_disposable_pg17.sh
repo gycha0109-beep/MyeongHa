@@ -31,6 +31,12 @@ else
   size="$(wc -c < "$sql_source" | tr -d '[:space:]')"
   actual="$({ printf 'blob %s\0' "$size"; cat "$sql_source"; } | sha1sum | cut -d' ' -f1)"
 fi
+if [[ "$actual" != "$exact_hash" ]]; then
+  # Windows core.autocrlf may materialize a CRLF-only copy. Accept ONLY
+  # byte-for-byte equivalence to the exact committed LF Git blob.
+  normalized_size="$(sed 's/\r$//' "$sql_source" | wc -c | tr -d '[:space:]')"
+  actual="$({ printf 'blob %s\0' "$normalized_size"; sed 's/\r$//' "$sql_source"; } | sha1sum | cut -d' ' -f1)"
+fi
 [[ "$actual" == "$exact_hash" ]] || {
   echo HOLD_FIRST_ZERO_PRODUCTION_FUNCTION_BLOB_MISMATCH >&2; exit 1;
 }
