@@ -122,6 +122,20 @@ case "$case_name" in
     apply_pg17_migrations_through_seyeon_production_frontier
     bash test/db/seyeon_c08_first_turn_local_pg17.sh
     ;;
+  seyeon-first-zero-locked-reveal-disposable-pg17)
+    verify_pg17
+    # Only the local --network none Docker scratch DB or the existing isolated
+    # GitHub Actions PG17 ephemeral suite database can run this test case.
+    if [[ "${PGDATABASE:-}" != myeongha_first_zero_local_case_1 ]]; then
+      [[ "${GITHUB_ACTIONS:-}" == true && "${CI:-}" == true &&
+         "${DB_SUITE:-}" == postgres17 && "${PGHOST:-}" == localhost &&
+         "${PGDATABASE:-}" =~ ^myeongha_ci_case_[0-9]+$ ]] || {
+        echo HOLD_FIRST_ZERO_NOT_DISPOSABLE_DB >&2; exit 1;
+      }
+    fi
+    apply_pg17_migrations_without_birth_authority
+    bash test/db/seyeon_first_zero_locked_reveal_disposable_pg17.sh
+    ;;
   guest-promotion-auth-fk)
     version_num="$(psql -Atqc "show server_version_num")"
     if [[ "$version_num" -ge 160000 ]]; then
