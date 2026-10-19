@@ -296,3 +296,10 @@ S8의 **비파괴/격리 검토는 S2~S7과 병렬 진행 가능**하며, S8 Pro
 - **코덱 차이 보존:** DB에서는 `sha256:pg-jsonb:v1` 해시를 현재 원본 및 Edge와 비교하고, 서버는 **동일한 DB JSON 값**에 대해 별도 `sha256:v1` canonical digest를 재계산한다. 두 직렬화 결과의 바이트/해시가 같다는 거짓 가정을 하지 않는다. DB 원본 payload는 이 격리 트랜잭션에서만 제한 역할로 노출하고 외부 응답·모델·로그에는 기록하지 않는다.
 - **실증:** 기존 격리 PostgreSQL 1곳의 R19 테스트 **다음**에 R20 SQL과 검증을 삽입한다. 새로운 독립 synthetic Thread/Attempt에서 변조된 서버 raw digest가 DB Pin 이후 COMMIT 전에 실패해 Parent/Edges 모두 롤백되는지, 올바른 두 원본은 정확한 순서로 영속화되는지 검증한다. SQL/ACL이 Production 마이그레이션에 포함되지 않는다.
 - **절대 남는 HOLD:** Node 재계산은 해당 서버 스냅샷 결속 증거이며, 아직 모든 History/Relationship/Reader/Preflight/비조회 파생 출처의 폐쇄를 증명하지 않는다. S0 실제 사용 가능한 `recordType/schemaVersion` 및 코덱의 Owner 승인 없음, Production positive Projector·Owner RPC·XOR·Provider G1·동일 트랜잭션 G2·G3 신뢰 송출 미연결. `G0=PROPOSED`, `G1 positive/G2/G3/G5/G6=HOLD`, `Projectors=[]`, positive Provider/public/paid OFF, R16 `writeAdmission=DENY`, 운영 DB DDL/DML/ACL 0.
+
+## 34. 2026-10-19 R21 — 합성 개인기억 두 원본의 모델 전 원자 Pin/ContextReady 후보
+
+- **구현 범위:** 이름 고정 폐기용 PG17에서 Subject/Thread/Turn/Attempt 잠금, 두 원본 Grant·Memory의 R1 불변 Parent/Edge Pin, 첫 원본의 기존 Attempt Pin과 대조, 두 원본의 현재 Grant/Schema/PG JSONB digest 재검증, 실제 cmd_mark_chat_turn_context_ready_v1까지 **같은 DB 트랜잭션**으로 실행. 원본 콘텐츠는 반환하지 않는다.
+- **검증 계획:** 동일 R1/R20/R3/R5 격리 DB에서 실제 2건 성공 및 두 번째 Grant 교체·누락·중복 시 DB 원장 전체 롤백. 새 CI Workflow나 운영 SQL migration은 만들지 않는다.
+- **제한:** 기존 Attempt Pin의 단일 원본 필드는 첫 Edge 결속만 담당. 2건 전체의 실 G2 Atomic Commit, 파생 출처 closure, 실제 SRC-25 Codec/타입, 최종 Wire/HTTP/Replay/Worker는 미완료. Owner 기술 서명과 운영 권한을 생성하지 않는다.
+- **불변:** G0 PROPOSED; G1 positive/G2/G3/G5/G6 HOLD. Projectors=[], 공개/유료/실 Provider OFF, Production DB DDL/DML/ACL/History 0건. 후보 receipt는 Provider/AtomicCommit/HTTPReveal 모두 false.
