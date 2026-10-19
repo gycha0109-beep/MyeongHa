@@ -33,18 +33,18 @@ describe('Se-yeon real API dialogue-path benchmark accounting', () => {
     expect(SEYEON_DIALOGUE_PATH_MAX_ESTIMATED_COST_USD_V1).toBeLessThanOrEqual(3);
   });
 
-  it('creates an exact three-read isolated synthetic first-contact Census for the 3-call path', () => {
+  it('creates an exact four-read isolated synthetic first-contact Census for the 3-call path', () => {
     const census=createSeyeonDialoguePathSyntheticCensusV1('N01','synthetic:N01');
     const args={subjectId:'synthetic-subject:N01',
       threadId:'synthetic-thread:N01',currentUserMessageId:'synthetic:N01'};
-    for(let i=0;i<3;i++) {
+    for(let i=0;i<4;i++) {
       const result=census.port.readFullThreadCensus(args);
       expect(result).toMatchObject({
         schemaVersion:'seyeon-first-turn-census-shadow-v1',
         messageCount:1,latestSenderType:'user',complete:true,
       });
     }
-    expect(census.readCount).toBe(3);
+    expect(census.readCount).toBe(4);
     expect(()=>census.port.readFullThreadCensus(args)).toThrow();
     expect(()=>createSeyeonDialoguePathSyntheticCensusV1('F02','synthetic:F02')).toThrow();
     expect(()=>createSeyeonDialoguePathSyntheticCensusV1('N01','synthetic:N02')).toThrow();
@@ -57,7 +57,10 @@ describe('Se-yeon real API dialogue-path benchmark accounting', () => {
     const src=readFileSync(new URL(
       '../scripts/run-seyeon-dialogue-path-real-api-eval-v1.mjs',import.meta.url),'utf8');
     expect(src).toContain('fullThreadCensus: census.port');
-    expect(src).toContain('census.readCount !== 3');
+    expect(src).toContain('census.readCount !== 4');
+    expect(src).toContain('runSeyeonCensusFirstThreeCallShadowV1');
+    expect(src).not.toContain('runCharacterGovernedPreflightV1');
+    expect(src).not.toContain('createSeyeonFastDialogueShadowV1');
     expect(src).toContain('buildSeyeonC08SReviewerPackV1');
     expect(src).toContain('buildSeyeonC08SOwnerKeyV1');
     expect(src).toContain('SEYEON_DIALOGUE_PATH_USAGE_UNKNOWN_HOLD');
@@ -92,7 +95,7 @@ describe('Se-yeon real API dialogue-path benchmark accounting', () => {
         calls: route === 'legacy_5_terra' ? 5 : 3,
         estimatedCostUsd: .01,
       })));
-    const summary = summarizeSeyeonDialoguePathV1(rows, 2);
+    const summary = summarizeSeyeonDialoguePathV1(rows, ['N01', 'N02']);
     expect(summary.verdict).toBe('GUARD_SAMPLE_PASS');
     expect(summary.characterVoiceQualityVerified).toBe(false);
     expect(summary.routes.legacy_5_terra.observedCalls).toBe(10);
@@ -103,20 +106,36 @@ describe('Se-yeon real API dialogue-path benchmark accounting', () => {
     const held = summarizeSeyeonDialoguePathV1([
       ...rows.slice(0,3),
       { ...rows[3], outcome: 'rejected', errorCode: 'SEMANTIC_GUARD_REJECTED' },
-    ], 2);
+    ], ['N01', 'N02']);
     const missingCalls = summarizeSeyeonDialoguePathV1([
       { ...rows[0], calls: 4 }, ...rows.slice(1),
-    ], 2);
+    ], ['N01', 'N02']);
     expect(missingCalls.verdict).toBe('HOLD');
     const baselineRejected = summarizeSeyeonDialoguePathV1([
       { ...rows[0], outcome: 'rejected', errorCode: 'SEMANTIC_GUARD_REJECTED' },
       ...rows.slice(1),
-    ], 2);
+    ], ['N01', 'N02']);
     expect(baselineRejected.verdict).toBe('HOLD');
     expect(baselineRejected.routes.legacy_5_terra.gateVerdict).toBe('HOLD');
     expect(baselineRejected.routes.fast_3_luna_terra.gateVerdict).toBe('GUARD_SAMPLE_PASS');
     expect(summary.routes.legacy_5_terra.gateVerdict).toBe('GUARD_SAMPLE_PASS');
     expect(summary.routes.fast_3_luna_terra.gateVerdict).toBe('GUARD_SAMPLE_PASS');
+    const duplicateCase = summarizeSeyeonDialoguePathV1([
+      { ...rows[0] }, { ...rows[0] }, ...rows.slice(2),
+    ], ['N01', 'N02']);
+    expect(duplicateCase.verdict).toBe('HOLD');
+    expect(duplicateCase.routes.legacy_5_terra.gateVerdict).toBe('HOLD');
+    const mismatchedCase = summarizeSeyeonDialoguePathV1([
+      ...rows.slice(0,2), { ...rows[2], id: 'N03' }, rows[3],
+    ], ['N01', 'N02']);
+    expect(mismatchedCase.verdict).toBe('HOLD');
+    const extraUnaccountedRoute = summarizeSeyeonDialoguePathV1([
+      ...rows, { ...rows[0], route: 'unknown_route' },
+    ], ['N01', 'N02']);
+    expect(extraUnaccountedRoute.verdict).toBe('HOLD');
+    expect(() => summarizeSeyeonDialoguePathV1(rows, ['N01','N01'])).toThrow(
+      'Invalid expected paired case IDs',
+    );
     expect(held.verdict).toBe('HOLD');
     expect(held.routes.fast_3_luna_terra.failureCases).toEqual([
       { id: 'N02', code: 'SEMANTIC_GUARD_REJECTED' },
