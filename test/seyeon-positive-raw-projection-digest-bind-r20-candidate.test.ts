@@ -6,6 +6,7 @@ import {Pool} from 'pg';
 import {canonicalJson} from '../packages/domain/src/index.js';
 import type {SeyeonRetrievedMemoryV2} from '../packages/domain/src/seyeon-runtime-context-v2.js';
 import type {SeyeonPersonalRecordProjectionCandidateV1} from '../apps/api/src/seyeon-production-context-v1.js';
+import type {SeyeonR21OfflineDerivedSourceEnvelopeV1} from '../apps/api/src/seyeon-r21-offline-derived-source-closure-v1.js';
 import {
   selectSeyeonExactModelPersonalSourcesV1,
   type SeyeonExactModelPersonalSourceSelectionV1,
@@ -58,7 +59,23 @@ function inputs(rawOverride?:string,projectionOverride?:string){
   const selection=selectSeyeonExactModelPersonalSourcesV1({
     retrievedMemories,sourceCandidates,
   });
-  return {retrievedMemories,sourceCandidates,selection};
+  const sourceEnvelope:SeyeonR21OfflineDerivedSourceEnvelopeV1={
+    version:'seyeon-r21-offline-derived-source-closure-v1',
+    sourceSnapshot:{
+      version:'seyeon-production-context-v1',
+      retrievedMemories,personalRecordProjectionCandidates:sourceCandidates,
+      personalRecordAdmissions:sourceCandidates.map(c=>({
+        recordId:c.recordId,recordKind:c.recordKind,recordType:c.recordType,
+        schemaVersion:c.schemaVersion,reason:'ADMITTED' as const,
+      })),
+      recentMessages:[],relationshipHistoryRecords:[],
+      activeRelationshipEventCount:0,historyThroughRevision:0,
+      relationshipRevisionUsedForTurn:null,
+    },
+    preflightState:'not_run',disclosureRetrievedPrivateSources:[],
+    readerDerivedSources:[],workerDerivedSources:[],externalToolPrivateSources:[],
+  };
+  return {retrievedMemories,sourceCandidates,selection,sourceEnvelope};
 }
 function call(pool:PostgresSubjectPoolV1,other:ReturnType<typeof inputs>){
   return persistSeyeonR20OfflineDigestBoundPinV1({
@@ -135,6 +152,89 @@ describe('R20 original JSONB ↔ final projection digest correspondence, no Prov
       SeyeonR20OfflineDigestHoldV1);
     expect(db.executed).not.toContain('COMMIT');
   });
+  it('R21 refuses old messages, relationship lineage, preflight/private source ingress before DB',async()=>{
+    const scenarios:(()=>ReturnType<typeof inputs>)[]=[
+      ()=>{
+        const a=inputs();
+        return {...a,sourceEnvelope:{...a.sourceEnvelope,sourceSnapshot:{
+          ...a.sourceEnvelope.sourceSnapshot,
+          recentMessages:[{messageId:'old-message',role:'user' as const,text:'historical private'}],
+        }}};
+      },
+      ()=>{
+        const a=inputs();
+        return {...a,sourceEnvelope:{...a.sourceEnvelope,sourceSnapshot:{
+          ...a.sourceEnvelope.sourceSnapshot,
+          activeRelationshipEventCount:1,
+        }}};
+      },
+      ()=>{
+        const a=inputs();
+        return {...a,sourceEnvelope:{...a.sourceEnvelope,sourceSnapshot:{
+          ...a.sourceEnvelope.sourceSnapshot,
+          historyThroughRevision:1,
+        }}};
+      },
+      ()=>{
+        const a=inputs();
+        return {...a,sourceEnvelope:{...a.sourceEnvelope,sourceSnapshot:{
+          ...a.sourceEnvelope.sourceSnapshot,
+          retrievedMemories:[...a.retrievedMemories,{
+            kind:'relationship_event' as const,memoryId:'relationship-event:unsafe',
+            claimKind:'fact' as const,summary:'derived private',
+            sourceRef:'relationship-event:unsafe',
+            causalAuthority:'authorized_shared_history' as const,
+            relevance:1,salience:1,
+          }],
+        }}};
+      },
+      ()=>{
+        const a=inputs();
+        return {...a,sourceEnvelope:{...a.sourceEnvelope,
+          disclosureRetrievedPrivateSources:['unapproved disclosure']}};
+      },
+      ()=>{
+        const a=inputs();
+        return {...a,sourceEnvelope:{...a.sourceEnvelope,
+          readerDerivedSources:['unapproved Reader']}};
+      },
+      ()=>{
+        const a=inputs();
+        return {...a,sourceEnvelope:{...a.sourceEnvelope,
+          workerDerivedSources:['unapproved summary']}};
+      },
+      ()=>{
+        const a=inputs();
+        return {...a,sourceEnvelope:{...a.sourceEnvelope,
+          externalToolPrivateSources:['unapproved tool source']}};
+      },
+      ()=>{
+        const a=inputs();
+        return {...a,sourceEnvelope:{...a.sourceEnvelope,
+          preflightState:'completed' as never}};
+      },
+      ()=>{
+        const a=inputs();
+        return {...a,sourceEnvelope:{...a.sourceEnvelope,sourceSnapshot:{
+          ...a.sourceEnvelope.sourceSnapshot,
+          personalRecordAdmissions:[],
+        }}};
+      },
+      ()=>{
+        const a=inputs();
+        return {...a,sourceEnvelope:{...a.sourceEnvelope,
+          shadowSource:'hidden unknown ingress'} as
+          typeof a.sourceEnvelope};
+      },
+    ];
+    for(const scenario of scenarios){
+      const db=mock();
+      await expect(call(db.pool,scenario())).rejects.toBeInstanceOf(
+        SeyeonR20OfflineDigestHoldV1);
+      expect(db.executed).toEqual([]);
+    }
+  });
+
   it('denies missing original Owner readback, mutated payload, replaced Grant, wrong DB and unknown COMMIT',async()=>{
     for(const opts of [{noInspect:true},{payloadTamper:true},
       {grantTamper:true},{pin:false},{db:'production'},{commitFail:true}]){

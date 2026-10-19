@@ -14,6 +14,10 @@ import {
   type PostgresSubjectPoolV1,
 } from './postgres-subject-execution.js';
 import type {VerifiedSubjectIdentityEvidenceV1} from './subject-identity-resolver.js';
+import {
+  assertSeyeonR21OfflineDerivedSourceClosureV1,
+  type SeyeonR21OfflineDerivedSourceEnvelopeV1,
+} from './seyeon-r21-offline-derived-source-closure-v1.js';
 
 const DB='myeongha_seyeon_positive_pin_candidate_test';
 const SHA=/^sha256:v1:[a-f0-9]{64}$/u;
@@ -36,6 +40,7 @@ export interface PersistSeyeonR20OfflineDigestBoundInputV1 {
   readonly sourceCandidates:readonly SeyeonPersonalRecordProjectionCandidateV1[];
   readonly maxRetrievedMemories?:number;
   readonly selection:SeyeonExactModelPersonalSourceSelectionV1;
+  readonly sourceEnvelope:SeyeonR21OfflineDerivedSourceEnvelopeV1;
 }
 export interface SeyeonR20OfflineDigestBoundReceiptV1 {
   readonly status:'disposable_original_and_projection_digests_committed';
@@ -71,6 +76,14 @@ export async function persistSeyeonR20OfflineDigestBoundPinV1(
       || !UUID.test(input.verifiedEvidence.verifiedAuthUserId)
       || !UUID.test(input.threadId)||!UUID.test(input.turnId)
       || !UUID.test(input.attemptId))throw new SeyeonR20OfflineDigestHoldV1();
+
+    // R21: deny unpinned History/Relationship/Reader/Worker/Preflight
+    // before R20 creates any positive Parent/Edge in PostgreSQL.
+    assertSeyeonR21OfflineDerivedSourceClosureV1({
+      envelope:input.sourceEnvelope,
+      retrievedMemories:input.retrievedMemories,
+      sourceCandidates:input.sourceCandidates,
+    });
 
     const selected=selectSeyeonExactModelPersonalSourcesV1({
       retrievedMemories:input.retrievedMemories,
