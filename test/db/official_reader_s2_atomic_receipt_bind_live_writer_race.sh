@@ -115,6 +115,45 @@ baseline="$(p -c "select count(distinct a.reader_content_bundle_id)
     and (g.valid_until is null or g.valid_until>clock_timestamp());")"
 [[ "$baseline" == 1 ]] || fail "expected exactly one active Reader B bundle at baseline"
 
+# S5 uses the same S1 lock and fresh authoritative bundle lookup, but is
+# permanently HOLD/BLOCKED pending official Saju and Privacy Owner approval.
+b2_bundle="$(p -c "select a.reader_content_bundle_id
+  from public.standard_reading_reader_access_grants a
+  where a.purchase_intent_id='$b2_intent'::uuid
+    and a.official_reading_id='$reading'::uuid
+    and a.reader_character_id='$reader';")"
+[[ "$b2_bundle" =~ ^[0-9a-f-]{36}$ ]] || fail "original current Reader bundle missing"
+s5_gate() {
+  local expected_bundle="${1:-$b2_bundle}"
+  p -c "
+    begin;
+    select pg_catalog.set_config('myeongha.subject_id', '$subject', true);
+    select gate_state || '|' || reason_code || '|' ||
+           can_persist::text || '|' || can_disclose::text
+    from public.internal_qry_official_reader_s5_precommit_held_scope_v1(
+      '$subject'::uuid, '$reading'::uuid, '$reader',
+      '$expected_bundle'::uuid
+    );
+    commit;
+  " | grep -E '^(held|blocked)[|]'
+}
+[[ "$(s5_gate)" == 'held|saju_and_privacy_owner_contracts_missing|false|false' ]] ||
+  fail "S5 matching current purchase bundle must remain HOLD"
+[[ "$(s5_gate 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa')" == 'blocked|current_bundle_changed|false|false' ]] ||
+  fail "S5 wrong expected bundle was not denied"
+s5_runtime_grants="$(p -c "
+  select count(*) from pg_catalog.pg_roles r
+  where r.rolname in (
+    'anon','authenticated','service_role','myeongha_api_executor',
+    'myeongha_seyeon_chat_runtime_owner','myeongha_commerce_internal_executor'
+  ) and pg_catalog.has_function_privilege(
+    r.rolname,
+    'public.internal_qry_official_reader_s5_precommit_held_scope_v1(uuid,uuid,text,uuid)',
+    'EXECUTE'
+  );")"
+[[ "$s5_runtime_grants" == 0 ]] || fail "S5 internal HOLD gate leaked runtime EXECUTE privilege"
+pass "S5 same-bundle HOLD, different-bundle denial, and private ACL"
+
 
 # Read after taking the same scope lock, inside one trusted transaction.
 read_locked_scope_state() {
@@ -281,6 +320,8 @@ active_bundles="$(p -c "select count(distinct a.reader_content_bundle_id)
 after_new_scope="$(read_locked_scope_state)"
 [[ "$after_new_scope" == 'ambiguous_bundles|2|' ]] ||
   fail "private post-lock scope query selected a bundle under two-bundle ambiguity"
+[[ "$(s5_gate)" == 'blocked|multiple_current_bundles|false|false' ]] ||
+  fail "S5 must reject multiple concurrent purchase bundles"
 pass "same scoped new receipt Grant/Bind waits for T2; fresh access becomes ambiguous afterwards"
 
 # Revoke B4 under the same proposed lock (only a disposable synthetic row).
@@ -310,6 +351,8 @@ active_only_b2="$(p -c "select count(distinct a.reader_content_bundle_id)
 after_b4_revoke_scope="$(read_locked_scope_state)"
 [[ "$after_b4_revoke_scope" =~ ^one_current_bundle\|1\|[0-9a-f-]{36}$ ]] ||
   fail "private post-lock scope query missed surviving B2"
+[[ "$(s5_gate)" == 'held|saju_and_privacy_owner_contracts_missing|false|false' ]] ||
+  fail "S5 must return to HOLD only after extra bundle has been revoked"
 
 
 # Case 2: Revoke of the last active Grant arrives FIRST. T2 must wait and
@@ -368,6 +411,8 @@ grep -qx 'T2_POST_REVOKE_BUNDLES=0' "$tmpdir/t2-after-revoke.out" ||
 after_all_revoke_scope="$(read_locked_scope_state)"
 [[ "$after_all_revoke_scope" == 'no_active_grant|0|' ]] ||
   fail "private post-lock scope query returned paid access after all Grants revoked"
+[[ "$(s5_gate)" == 'blocked|no_current_purchase_right|false|false' ]] ||
+  fail "S5 must reject refunded/fully revoked Reader rights"
 pass "revoke-first scope lock blocks T2 and its fresh read sees no active Grant"
 
 # This verifies actual private combined Writer behavior. Unmodified
