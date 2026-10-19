@@ -16,10 +16,12 @@ import { pickMobileFaceMediaFromLibraryV1 } from '@/platform/media/expo-face-med
 import { MobileFrontCameraV1 } from '@/platform/media/MobileFrontCameraV1';
 import { ReadingSubnav } from '@/features/reading/ReadingSubnav';
 import { MobileReaderPicker } from '@/features/reading/MobileReaderPicker';
+import { FaceEditorialIntro } from '@/features/face/FaceEditorialIntro';
 import { findMobileReaderPresentationV1, type MobileReaderPresentationIdV1 } from '@/features/reading/mobile-reader-presentation';
 import { MobileScreen } from '@/ui/MobileScreen';
 import { mobileColors } from '@/ui/mobile-colors';
 import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
+import { useMobileTheme } from '@/ui/mobile-theme';
 import { useMobilePullRefreshV1 } from '@/ui/use-mobile-pull-refresh';
 
 type FaceMediaStateV1 =
@@ -36,6 +38,7 @@ function sizeLabel(bytes: number | null): string {
 
 export default function FaceScreen() {
   const styles = useMobileThemedStyles(staticStyles);
+  const { colors } = useMobileTheme();
   const [state, setState] = useState<FaceMediaStateV1>({ kind: 'idle' });
   const [frontCameraOpen, setFrontCameraOpen] = useState(false);
   const [presentationReader, setPresentationReader] = useState<MobileReaderPresentationIdV1>('seyeon');
@@ -87,18 +90,22 @@ export default function FaceScreen() {
       title="관상"
       refreshing={refreshing}
       onRefresh={() => void onRefresh()}
-      description="정면 사진을 준비하고, 얼굴 구조 확인 단계까지 안전하게 이어갑니다."
+      description="얼굴에 담긴 이야기를 만나기 위한 첫 단계, 사진부터 준비해 보세요."
     >
       <ReadingSubnav />
+      <FaceEditorialIntro readerId={presentationReader} />
       <MobileReaderPicker selected={presentationReader} onChange={setPresentationReader} vertical="face" />
 
       <View style={styles.hero}>
-        <View>
-          <Text style={styles.kicker}>01 · 사진 준비</Text>
-          <Text style={styles.heroTitle}>{readerPresentation.name}에게 보여줄 정면 사진을 준비해 주세요.</Text>
+        <View style={styles.sectionHeading}>
+          <View style={styles.numberMark}><Text style={styles.numberText}>01</Text></View>
+          <View style={styles.sectionCopy}>
+            <Text style={styles.kicker}>PHOTO · 정면 사진</Text>
+            <Text style={styles.heroTitle}>{readerPresentation.name}에게 보여줄 사진</Text>
+          </View>
         </View>
         <Text style={styles.body}>
-          얼굴 전체가 프레임 안에 들어오고, 정면에 가깝고, 흔들림과 과도한 필터가 적은 사진이 좋습니다.
+          얼굴 전체가 보이도록 정면을 바라봐 주세요. 밝은 조명과 선명한 사진이 좋습니다.
         </Text>
       </View>
 
@@ -106,16 +113,25 @@ export default function FaceScreen() {
         {ready !== null ? (
           <Image
             accessibilityLabel="선택한 얼굴 사진 미리보기"
-            resizeMode="cover"
+            resizeMode="contain"
             source={{ uri: ready.uri }}
             style={styles.previewImage}
           />
         ) : (
           <View style={styles.placeholder}>
-            <Text style={styles.placeholderMark}>相</Text>
-            <Text style={styles.placeholderText}>정면 사진을 이 안에 맞춰주세요</Text>
+            <View style={styles.placeholderEmblem}>
+              <Text style={styles.placeholderMark}>相</Text>
+            </View>
+            <Text style={styles.placeholderTitle}>사진을 준비해 주세요</Text>
+            <Text style={styles.placeholderText}>정면 · 얼굴 전체 · 자연스러운 밝기</Text>
           </View>
         )}
+        <View pointerEvents="none" style={styles.previewFrame}>
+          <View style={[styles.frameCorner, styles.cornerTL]} />
+          <View style={[styles.frameCorner, styles.cornerTR]} />
+          <View style={[styles.frameCorner, styles.cornerBL]} />
+          <View style={[styles.frameCorner, styles.cornerBR]} />
+        </View>
       </View>
 
       {ready !== null ? (
@@ -142,37 +158,39 @@ export default function FaceScreen() {
       <View style={styles.actions}>
         <Pressable
           accessibilityRole="button"
+          accessibilityLabel="전면 카메라로 정면 사진 촬영"
           disabled={picking}
           onPress={() => setFrontCameraOpen(true)}
-          style={styles.secondary}
+          style={({ pressed }) => [styles.cameraAction, (pressed || picking) && styles.pressed]}
         >
-          <Text style={styles.secondaryText}>▣ 사진 촬영</Text>
+          <Text style={styles.cameraActionText}>▣  사진 촬영</Text>
         </Pressable>
         <Pressable
           accessibilityRole="button"
+          accessibilityLabel="사진첩에서 얼굴 사진 선택"
           disabled={picking}
           onPress={() => void choose('library', pickMobileFaceMediaFromLibraryV1)}
-          style={styles.secondary}
+          style={({ pressed }) => [styles.secondary, (pressed || picking) && styles.pressed]}
         >
-          <Text style={styles.secondaryText}>▧ 사진 선택</Text>
+          <Text style={styles.secondaryText}>▧  사진 선택</Text>
         </Pressable>
       </View>
 
       {picking ? (
         <View style={styles.loadingRow}>
-          <ActivityIndicator color={mobileColors.navy} />
+          <ActivityIndicator color={colors.navy} />
           <Text style={styles.body}>사진을 준비하는 중입니다…</Text>
         </View>
       ) : null}
 
       <View style={styles.statusCard}>
-        <Text style={styles.statusMark}>◇</Text>
+        <Text style={styles.statusMark}>◎</Text>
         <View style={styles.statusCopy}>
           <Text style={styles.statusTitle}>
             {ready === null ? `${readerPresentation.name}과 관상 보기 준비` : '사진 준비 완료'}
           </Text>
           <Text style={styles.body}>
-            현재 모바일에서는 사진 촬영·선택과 기기 내 미리보기까지만 제공합니다. 서버 분석은 시작하지 않습니다.
+            현재는 사진 촬영·선택과 미리보기만 가능합니다. 얼굴 분석과 관상 풀이는 아직 제공하지 않습니다.
           </Text>
         </View>
       </View>
@@ -184,7 +202,7 @@ export default function FaceScreen() {
         style={styles.primaryDisabled}
       >
         <Text style={styles.primaryDisabledText}>
-          {ready === null ? '사진을 먼저 준비해 주세요' : '얼굴 구조 확인 연결 준비 중'}
+          {ready === null ? '사진을 준비하면 다음 단계가 표시됩니다' : '관상 분석 기능 준비 중'}
         </Text>
       </Pressable>
 
@@ -207,83 +225,94 @@ export default function FaceScreen() {
 
 const styles = StyleSheet.create({
   hero: {
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: mobileColors.border,
-    paddingBottom: 18,
-    gap: 9,
+    gap: 13,
+    paddingHorizontal: 3,
+    paddingTop: 6,
+    paddingBottom: 2,
   },
-  kicker: { color: mobileColors.gold, fontSize: 10, fontWeight: '900', letterSpacing: 1.1 },
-  heroTitle: { marginTop: 4, color: mobileColors.ink, fontSize: 21, lineHeight: 29, fontWeight: '800' },
-  body: { color: mobileColors.muted, fontSize: 14, lineHeight: 21 },
+  sectionHeading: { flexDirection: 'row', alignItems: 'center', gap: 13 },
+  numberMark: {
+    width: 48, height: 48, borderRadius: 14,
+    borderWidth: 1, borderColor: mobileColors.gold,
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: mobileColors.surface,
+  },
+  numberText: { color: mobileColors.navy, fontSize: 17, fontWeight: '900' },
+  sectionCopy: { flex: 1, gap: 5 },
+  kicker: { color: mobileColors.gold, fontSize: 10, fontWeight: '900', letterSpacing: 1.3 },
+  heroTitle: { color: mobileColors.ink, fontSize: 21, lineHeight: 29, fontWeight: '900', letterSpacing: -0.4 },
+  body: { color: mobileColors.muted, fontSize: 13, lineHeight: 21 },
   preview: {
-    height: 360,
+    height: 360, position: 'relative',
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: mobileColors.border,
+    borderColor: mobileColors.gold,
     borderRadius: 22,
     backgroundColor: mobileColors.surface,
   },
   previewImage: { width: '100%', height: '100%' },
-  placeholder: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
-  placeholderMark: { color: mobileColors.gold, fontSize: 46, fontWeight: '800' },
-  placeholderText: { color: mobileColors.muted, fontSize: 13, fontWeight: '700' },
+  placeholder: {
+    flex: 1, alignItems: 'center', justifyContent: 'center',
+    gap: 12, paddingHorizontal: 28,
+  },
+  placeholderEmblem: {
+    width: 110, height: 110, borderRadius: 55,
+    borderWidth: 1, borderColor: mobileColors.border,
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: mobileColors.canvas,
+    marginBottom: 4,
+  },
+  placeholderMark: { color: mobileColors.gold, fontSize: 53, fontWeight: '700' },
+  placeholderTitle: { color: mobileColors.ink, fontSize: 18, fontWeight: '900' },
+  placeholderText: { color: mobileColors.muted, fontSize: 12, fontWeight: '700', textAlign: 'center', lineHeight: 19 },
+  previewFrame: {
+    position: 'absolute', top: 15, right: 15, bottom: 15, left: 15,
+    borderWidth: 1, borderColor: 'rgba(188,151,100,0.28)', borderRadius: 15,
+  },
+  frameCorner: { position: 'absolute', width: 30, height: 30, borderColor: mobileColors.gold },
+  cornerTL: { top: -1, left: -1, borderTopWidth: 3, borderLeftWidth: 3, borderTopLeftRadius: 12 },
+  cornerTR: { top: -1, right: -1, borderTopWidth: 3, borderRightWidth: 3, borderTopRightRadius: 12 },
+  cornerBL: { bottom: -1, left: -1, borderBottomWidth: 3, borderLeftWidth: 3, borderBottomLeftRadius: 12 },
+  cornerBR: { bottom: -1, right: -1, borderBottomWidth: 3, borderRightWidth: 3, borderBottomRightRadius: 12 },
   fileCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    borderWidth: 1,
-    borderColor: mobileColors.border,
-    borderRadius: 15,
-    backgroundColor: mobileColors.surface,
-    padding: 14,
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    borderWidth: 1, borderColor: mobileColors.border, borderRadius: 17,
+    backgroundColor: mobileColors.surface, padding: 16,
   },
-  fileMark: { color: mobileColors.gold, fontSize: 20, fontWeight: '900' },
-  fileCopy: { flex: 1, gap: 3 },
-  fileTitle: { color: mobileColors.ink, fontSize: 14, fontWeight: '800' },
-  fileMeta: { color: mobileColors.muted, fontSize: 11 },
-  readyBadge: { color: mobileColors.navy, fontSize: 11, fontWeight: '900' },
-  errorCard: {
-    borderWidth: 1,
-    borderColor: mobileColors.seal,
-    borderRadius: 14,
-    padding: 13,
-  },
+  fileMark: { color: mobileColors.gold, fontSize: 22, fontWeight: '900' },
+  fileCopy: { flex: 1, gap: 5 },
+  fileTitle: { color: mobileColors.ink, fontSize: 15, fontWeight: '900' },
+  fileMeta: { color: mobileColors.muted, fontSize: 12 },
+  readyBadge: { color: mobileColors.navy, fontSize: 12, fontWeight: '900' },
+  errorCard: { borderWidth: 1, borderColor: mobileColors.seal, borderRadius: 14, padding: 15 },
   errorText: { color: mobileColors.seal, fontSize: 13, lineHeight: 19 },
   actions: { flexDirection: 'row', gap: 10 },
-  secondary: {
-    flex: 1,
-    minHeight: 48,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: mobileColors.border,
-    borderRadius: 14,
-    backgroundColor: mobileColors.surface,
+  cameraAction: {
+    flex: 1, minHeight: 52, alignItems: 'center', justifyContent: 'center',
+    borderRadius: 14, backgroundColor: mobileColors.navy,
   },
-  secondaryText: { color: mobileColors.navy, fontSize: 14, fontWeight: '800' },
+  cameraActionText: { color: mobileColors.surface, fontSize: 14, fontWeight: '900' },
+  secondary: {
+    flex: 1, minHeight: 52, alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: mobileColors.border,
+    borderRadius: 14, backgroundColor: mobileColors.surface,
+  },
+  secondaryText: { color: mobileColors.navy, fontSize: 14, fontWeight: '900' },
+  pressed: { opacity: 0.72 },
   loadingRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
   statusCard: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 12,
-    borderWidth: 1,
-    borderColor: mobileColors.border,
-    borderRadius: 17,
-    backgroundColor: mobileColors.surface,
-    padding: 17,
+    flexDirection: 'row', alignItems: 'flex-start', gap: 13,
+    borderWidth: 1, borderColor: mobileColors.border,
+    borderRadius: 18, backgroundColor: mobileColors.surface, padding: 18,
   },
-  statusMark: { color: mobileColors.gold, fontSize: 18, fontWeight: '900' },
-  statusCopy: { flex: 1, gap: 5 },
-  statusTitle: { color: mobileColors.ink, fontSize: 15, fontWeight: '800' },
+  statusMark: { color: mobileColors.gold, fontSize: 21, fontWeight: '900' },
+  statusCopy: { flex: 1, gap: 6 },
+  statusTitle: { color: mobileColors.ink, fontSize: 16, fontWeight: '900' },
   primaryDisabled: {
-    minHeight: 50,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 14,
-    backgroundColor: mobileColors.navy,
-    opacity: 0.45,
+    minHeight: 52, alignItems: 'center', justifyContent: 'center',
+    borderRadius: 14, backgroundColor: mobileColors.navy, opacity: 0.46,
   },
   primaryDisabledText: { color: mobileColors.surface, fontSize: 14, fontWeight: '900' },
-  privacyNote: { color: mobileColors.muted, fontSize: 11, lineHeight: 17 },
+  privacyNote: { color: mobileColors.muted, fontSize: 11, lineHeight: 18 },
 });
 const staticStyles = styles;
