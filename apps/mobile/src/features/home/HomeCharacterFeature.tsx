@@ -2,7 +2,6 @@ import { router } from 'expo-router';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { resolveMobileChatPortraitV1 } from '@/features/chat/chat-character-portraits';
-import { mobileColors } from '@/ui/mobile-colors';
 import { useMobileTheme } from '@/ui/mobile-theme';
 
 /**
@@ -11,7 +10,7 @@ import { useMobileTheme } from '@/ui/mobile-theme';
  * access, implies a working AI response, or exposes held thread history.
  */
 export function HomeCharacterFeature() {
-  const { colors, theme } = useMobileTheme();
+  const { colors } = useMobileTheme();
   const portrait = resolveMobileChatPortraitV1('seyeon');
   return (
     <View style={styles.section}>
