@@ -18,6 +18,10 @@ psql -X -qAt -v ON_ERROR_STOP=1 -f test/db/seyeon_c08y_disposable_shared_ledger_
 # The dedicated role cannot SELECT, INSERT, UPDATE or DELETE any table.
 acl="$(psql -X -qAt -v ON_ERROR_STOP=1 -F '|' -c "
 select
+ not has_table_privilege('$runner','c08y_offline.trusted_admissions','SELECT'),
+ not has_table_privilege('$runner','c08y_offline.trusted_admissions','INSERT'),
+ not has_table_privilege('$runner','c08y_offline.trusted_admissions','UPDATE'),
+ not has_table_privilege('$runner','c08y_offline.trusted_admissions','DELETE'),
  not has_table_privilege('$runner','c08y_offline.batch_claims','SELECT'),
  not has_table_privilege('$runner','c08y_offline.batch_claims','INSERT'),
  not has_table_privilege('$runner','c08y_offline.batch_claims','UPDATE'),
@@ -34,10 +38,44 @@ select
  has_function_privilege('$runner',
    'c08y_offline.observe_slot_v1(bigint,integer,text,bigint)','EXECUTE')
 ")"
-[[ "$acl" == "t|t|t|t|t|t|t|t|t|t|t|t" ]] || {
+[[ "$acl" == "t|t|t|t|t|t|t|t|t|t|t|t|t|t|t|t" ]] || {
   echo HOLD_C08Y_WRITER_ACL_VIOLATION >&2; exit 1;
 }
 echo PASS_C08Y_RESTRICTED_RPC_NO_DIRECT_TABLE_READ_OR_WRITE
+
+# Untrusted calls cannot stake out the one-shot batch BEFORE a separate
+# disposable administrator has pinned the exact run ID, SHA and offline scope.
+as_reserver_claim(){
+  psql -X -qAt -v ON_ERROR_STOP=1 <<SQL | tail -n 1
+BEGIN;
+SET LOCAL ROLE c08y_synthetic_reserver;
+select c08y_offline.claim_batch_v1($1,'$2');
+COMMIT;
+SQL
+}
+[[ "$(as_reserver_claim 900 "$sha")" == f &&
+   "$(as_reserver_claim 901 "$sha")" == f &&
+   "$(as_reserver_claim 900 "$(printf 'f%.0s' {1..40})")" == f ]] || {
+  echo HOLD_C08Z_UNAUTHORIZED_PRECLAIM >&2; exit 1;
+}
+[[ "$(psql -X -qAt -v ON_ERROR_STOP=1 -c 'select count(*) from c08y_offline.batch_claims')" == 0 ]] || {
+  echo HOLD_C08Z_UNAUTHORIZED_CLAIM_PERSISTED >&2; exit 1;
+}
+# Admin-only synthetic admission is NOT GitHub OIDC attestation and is not
+# a provider hard-spend control. Only the literal test batch is allowed.
+psql -X -qAt -v ON_ERROR_STOP=1 <<SQL >/dev/null
+insert into c08y_offline.trusted_admissions(
+ batch_name,owner_run,head_sha,scope,paid_dispatch_enabled)
+values ('c08y-six-slot-v1',900,'$sha','OFFLINE_ONLY',false);
+SQL
+[[ "$(as_reserver_claim 900 "$(printf 'f%.0s' {1..40})")" == f &&
+   "$(as_reserver_claim 901 "$sha")" == f ]] || {
+  echo HOLD_C08Z_MISMATCHED_ADMIN_PIN >&2; exit 1;
+}
+[[ "$(psql -X -qAt -v ON_ERROR_STOP=1 -c 'select count(*) from c08y_offline.batch_claims')" == 0 ]] || {
+  echo HOLD_C08Z_ADMIN_PIN_BYPASS >&2; exit 1;
+}
+echo PASS_C08Z_PREAUTHORIZED_RUN_SHA_REQUIRED_BEFORE_PG17_CLAIM
 
 race_dir="$(mktemp -d /tmp/myeongha-c08y-pg17-XXXXXXXX)"
 pids=()
@@ -131,14 +169,27 @@ observe="c08y_offline.observe_slot_v1"
 }
 counts="$(psql -X -qAt -v ON_ERROR_STOP=1 -F '|' -c "
  select
+ (select count(*) from c08y_offline.trusted_admissions),
  (select count(*) from c08y_offline.batch_claims),
  (select count(*) from c08y_offline.reservations),
  (select count(*) from c08y_offline.observations),
  (select count(*) from c08y_offline.observations
    where outcome='UNKNOWN_OUTCOME_HOLD')
 ")"
-[[ "$counts" == '1|2|2|1' ]] || {
+[[ "$counts" == '1|1|2|2|1' ]] || {
   echo HOLD_C08Y_UNEXPECTED_RESERVED_OR_OBSERVED_COUNT >&2; exit 1;
 }
 echo PASS_C08Y_PG17_RESTART_DUPLICATE_REJECTED_AND_UNKNOWN_BLOCKS_NEXT
+
+# The admission row is administratively controlled. Simulate an admin
+# revocation (NOT available to the runner) to prove subsequent RPCs HOLD.
+psql -X -qAt -v ON_ERROR_STOP=1 -c "
+ delete from c08y_offline.trusted_admissions
+ where batch_name='c08y-six-slot-v1'" >/dev/null
+[[ "$(as_role "$reserve(900,3)")" == f &&
+   "$(as_role "$observe(900,2,'BOUNDED_ESTIMATE',100)")" == f ]] || {
+  echo HOLD_C08Z_REVOKED_ADMISSION_ACCEPTED >&2; exit 1;
+}
+echo PASS_C08Z_ADMIN_REVOKE_DENIES_FURTHER_RPC
+
 echo C08Y_HOLD_DISPOSABLE_ONLY_NOT_PROVIDER_BILLING_OR_PRODUCTION_HARD_CAP
