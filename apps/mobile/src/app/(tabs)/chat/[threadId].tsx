@@ -15,6 +15,7 @@ import {
 import { useMobileChatThreadV1 } from '@/features/chat/use-mobile-chat-thread';
 import { mobileColors } from '@/ui/mobile-colors';
 import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
+import { useMobileTheme } from '@/ui/mobile-theme';
 import { useMobilePullRefreshV1 } from '@/ui/use-mobile-pull-refresh';
 
 const SEYEON_CHAT_THEME_BACKGROUND = require('../../../../assets/characters/chat-themes/seyeon-chat-theme-mobile-v1.webp');
@@ -30,6 +31,7 @@ function resolveThreadId(value: string | string[] | undefined): string | null {
 
 function ValidChatThread({ threadId }: { threadId: string }) {
   const styles = useMobileThemedStyles(staticStyles);
+  const { theme, colors } = useMobileTheme();
   const { snapshot, refresh, loadMore, draft, setDraft, sending, sendStatus, send } =
     useMobileChatThreadV1(threadId);
   const { refreshing, onRefresh } = useMobilePullRefreshV1(refresh);
@@ -51,8 +53,8 @@ function ValidChatThread({ threadId }: { threadId: string }) {
             refreshing={refreshing}
             onRefresh={() => void onRefresh()}
             enabled={!sending}
-            tintColor={mobileColors.navy}
-            colors={[mobileColors.navy]}
+            tintColor={colors.navy}
+            colors={[colors.navy]}
           />
         )}
         onContentSizeChange={() => {
@@ -86,7 +88,7 @@ function ValidChatThread({ threadId }: { threadId: string }) {
           style={styles.seyeonThemeBackground}
           imageStyle={styles.seyeonThemeImage}
         >
-          <View style={styles.seyeonThemeWash}>{threadContent}</View>
+          <View style={[styles.seyeonThemeWash, theme === 'dark' && styles.seyeonThemeWashDark]}>{threadContent}</View>
         </ImageBackground>
       ) : threadContent}
     </SafeAreaView>
@@ -123,9 +125,10 @@ const styles = StyleSheet.create({
   stream: { flex: 1 },
   seyeonThemeBackground: { flex: 1 },
   seyeonThemeImage: { opacity: 0.98 },
-  seyeonThemeWash: { flex: 1, backgroundColor: 'rgba(255, 249, 240, 0.18)' },
-  content: { paddingHorizontal: 20, paddingTop: 18, paddingBottom: 18, gap: 18 },
-  back: { alignSelf: 'flex-start', paddingVertical: 6 },
+  seyeonThemeWash: { flex: 1, backgroundColor: 'rgba(255, 249, 240, 0.25)' },
+  seyeonThemeWashDark: { backgroundColor: 'rgba(7, 15, 25, 0.66)' },
+  content: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 23, gap: 20 },
+  back: { alignSelf: 'flex-start', minHeight: 48, justifyContent: 'center', paddingHorizontal: 4 },
   backText: { color: mobileColors.navy, fontSize: 14, fontWeight: '800' },
   invalidContent: {
     flex: 1,
