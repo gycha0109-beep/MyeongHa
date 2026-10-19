@@ -239,3 +239,11 @@ S1에서 공통 잠금 함수 자체가 성공하더라도 **S2 전체 경로가
 - 발견: 기존 1850은 S1 범위 잠금과 Grant 행 잠금 직후에는 `clock_timestamp()`로 만료를 재판정하지만, 이후 Birth 행 잠금 대기·공식 Reading 생성·Reader 접근 INSERT 사이에 시간이 지나면 **구매권 만료 후 새 결속이 성공**할 수 있습니다. S1 advisory lock은 환불 Writer를 직렬화할 수 있어도 시계 기반 만료를 정지시키지는 않습니다.
 - 순방향 `1860_official_reader_bind_final_current_grant_guard_v1.sql`에서 **새 Reader Access INSERT 이후 성공 반환 전** 정확한 구매 Grant의 현재 active/유효기간 및 Production verified Receipt/원 구매 일치를 재검증합니다. 만료·회수된 경우 예외로 전체 거래를 원자 롤백합니다. 이전 구매의 **불변 결속 재생은 기존 이력 조회 전용 계약 그대로 보존**하고, 실제 접근권 확인은 런타임 별도 경로가 담당합니다.
 - 기존 B5 신규 Birth Revision/Reading 실 PostgreSQL 시험에 **Access INSERT 지연 3.5초 동안 2초짜리 검증 구매권 만료** 시나리오를 추가하고, Reading·Grant·결속 0건 롤백을 확인합니다. 테스트 트리거는 정리하며 실제 운영 데이터/유료 보호 본문·공개 경로 변경 없음. Saju #2410, Privacy #2318 승인과 전체 S2 종료 조건은 계속 HOLD입니다.
+
+
+### S2 유료 Reader 결속 전 verified PortOne 무발급(Zero-Grant) 취소 경합 (2026-10-19)
+
+- 결함: 기존 1780은 이미 공식 Reader access가 결속된 경우에만 Scope를 찾아 full cancellation을 처리하고, 아직 **구매 Grant가 단 한 건도 발급되지 않은 검증된 결제**는 `official_reader_portone_cancel_access_not_yet_bound`로 차단했습니다. 결속 전에 정상 취소가 발생하면 원래 Receipt를 닫을 안전한 코드 경로가 없었습니다.
+- 순방향 `1870_official_reader_unbound_zero_grant_cancel_purchase_lock_v1.sql`은 내부 1760 Receipt→Grant→Bind Writer와 PortOne 취소가 동일한 Purchase ID 기반 xact advisory lock을 **S1 및 Receipt/Grant 행 잠금보다 먼저** 취득하도록 정렬합니다. 검증된 PortOne 원결제·전액 취소 증거를 재검증한 뒤 **해당 구매의 모든 영수증에 Grant가 0건이고 Reader 결속도 0건**인 경우, 원래 Receipt를 `FOR UPDATE`로 잠가 독립 1080/1090 Writer와 충돌을 직렬화하고 검증된 ProviderEvent 기록 + Receipt revoked를 원자 확정합니다. 같은 취소 증거 재생은 이벤트를 중복 발급하지 않습니다.
+- **Grant가 한 건이라도 발급됐으나 아직 Reader access가 없는 구매는 승인된 정산/Scope Authority가 없어 HOLD/거절**합니다. 정상 결속 완료 건의 기존 1770 Grant/Event/Projection 회수 Writer는 유지합니다. 직접 1220 Reader 결속 및 기존 1080/1090는 신규 Purchase Lock에 재진입하지 않아 기존 S1→Grant/Receipt 잠금 역전은 만들지 않습니다.
+- 실제 PostgreSQL 두 세션 경합으로 무발급 취소가 Purchase 잠금을 선점하고 결속 Writer가 대기한 뒤 취소된 영수증으로 발급을 거부하는지, Grant·ReaderAccess·Reading이 0건인지, ProviderEvent 멱등성이 유지되는지 검증합니다. 이 작업은 Draft/격리 DB 전용이며 Saju #2410/Privacy #2318 승인 전 보호 본문·공개·운영 DB 배포 금지 유지.

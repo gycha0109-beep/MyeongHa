@@ -634,4 +634,125 @@ remaining_b5="$(p -c "select
 pass "new Reader bind rolls back Receipt Grant and Reading after expiry during access INSERT"
 
 
+
+# Actual PortOne verified cancellation BEFORE any Grant/access exists.
+# The original B5 receipt has no purchase Grant (the expiry-path transaction
+# rolled back). Persist one separate real payment attempt for its lineage.
+p >"$tmpdir/no-grant-payment-attempt.out" 2>&1 <<SQL || { cat "$tmpdir/no-grant-payment-attempt.out" >&2; fail "no-Grant original payment attempt seed failed"; }
+insert into public.commerce_payment_attempts(
+  id,purchase_intent_id,subject_id,product_offer_id,attempt_no,
+  provider,environment,idempotency_key,provider_request_id,
+  provider_transaction_id,status,created_at,updated_at
+)
+select '12197000-0000-0000-0000-000000000005'::uuid,
+  cr.purchase_intent_id,cr.subject_id,cr.product_offer_id,1,
+  'portone_v2','production',
+  'synthetic-b5-no-grant-cancel-request',
+  'synthetic-portone-b5-payment',cr.external_transaction_id,
+  'response_received',clock_timestamp(),clock_timestamp()
+from public.commerce_receipts cr where cr.id='$b5_receipt'::uuid;
+SQL
+b5_amount="$(p -c "select verified_amount_minor from public.commerce_receipts where id='$b5_receipt'::uuid;")"
+[[ "$b5_amount" =~ ^[1-9][0-9]*$ ]] || fail "no-Grant payment amount missing"
+cancelled_at="$(p -c "select pg_catalog.to_char(clock_timestamp() at time zone 'UTC','YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"');")"
+p >"$tmpdir/no-grant-cancel-holder.out" 2>&1 <<SQL &
+set application_name='rr_s2_no_grant_cancel_holder';
+set statement_timeout='20s';
+begin;
+set local role myeongha_commerce_internal_executor;
+select 'NO_GRANT_CANCEL=' ||
+  (public.cmd_apply_verified_portone_reader_full_cancellation_v1(
+    'synthetic-portone-b5-payment',
+    'tx-official-reader-b5-new-revision',
+    'synthetic-b5-no-grant-cancel',
+    '$cancelled_at'::timestamptz,
+    $b5_amount,'KRW','production',
+    'hmac-sha256:k1:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee',
+    'synthetic-verified-no-grant-v1'
+  )->'revoke'->>'disposition');
+select pg_sleep(4);
+commit;
+SQL
+holder_pid=$!
+wait_for "no-Grant verified cancellation holds purchase transaction" "
+  select count(*) from pg_catalog.pg_stat_activity
+  where application_name='rr_s2_no_grant_cancel_holder'
+    and state='active' and wait_event_type='Timeout';
+"
+p >"$tmpdir/no-grant-issuance-loser.out" 2>&1 <<SQL &
+set application_name='rr_s2_no_grant_issuance_loser';
+set statement_timeout='20s';
+begin;
+select pg_catalog.set_config('myeongha.subject_id','$subject',true);
+select public.internal_apply_verified_reader_purchase_under_scope_v1(
+  '$subject'::uuid,'$new_reading'::uuid,'test-standard-reader',
+  '$b5_receipt'::uuid,'$b5_intent'::uuid,
+  array['test-reader-unit'],array[transaction_timestamp()],
+  array[transaction_timestamp()],array[null]::timestamptz[],
+  array[null]::text[],
+  '12193000-0000-0000-0000-000000000005'::uuid,
+  '$new_reading'::uuid,
+  'sha256:v1:8888888888888888888888888888888888888888888888888888888888888888',
+  'standard-reading-access-bind-v2',
+  '{"schemaVersion":"standard-reading-access-bind-v2","purchaseIntentId":"$b5_intent"}'::jsonb
+);
+commit;
+SQL
+writer_pid=$!
+wait_for "unbound purchase issuance blocked behind verified no-Grant cancellation" "
+  select count(distinct a.pid) from pg_catalog.pg_stat_activity a
+  join pg_catalog.pg_locks l on l.pid=a.pid
+  where a.application_name='rr_s2_no_grant_issuance_loser'
+    and a.wait_event_type='Lock' and l.locktype='advisory' and not l.granted;
+"
+if ! wait "$holder_pid"; then
+  cat "$tmpdir/no-grant-cancel-holder.out" >&2
+  fail "verified unbound no-Grant cancellation failed"
+fi
+holder_pid=""
+grep -qx 'NO_GRANT_CANCEL=cancelled_before_grant'   "$tmpdir/no-grant-cancel-holder.out" ||
+  fail "verified cancellation did not commit no-Grant disposition"
+if wait "$writer_pid"; then
+  fail "Reader grant issuance incorrectly succeeded after completed cancellation"
+fi
+writer_pid=""
+grep -q 'production verified Receipt authority is unavailable'   "$tmpdir/no-grant-issuance-loser.out" || {
+    cat "$tmpdir/no-grant-issuance-loser.out" >&2
+    fail "Reader issuance after cancel denied for unexpected reason"
+  }
+[[ "$(p -c "select verification_status from public.commerce_receipts where id='$b5_receipt'::uuid;")" == revoked ]] ||
+  fail "pre-Grant PortOne cancellation did not revoke canonical Receipt"
+[[ "$(p -c "select count(*) from public.entitlement_grants
+  where source_receipt_id='$b5_receipt'::uuid;")" == 0 ]] ||
+  fail "cancelled no-Grant Receipt still issued purchase entitlement"
+[[ "$(p -c "select count(*) from public.standard_reading_reader_access_grants
+  where purchase_intent_id='$b5_intent'::uuid;")" == 0 ]] ||
+  fail "cancelled no-Grant purchase created Reader access"
+[[ "$(p -c "select count(*) from public.standard_reading_official_bindings
+  where reading_id='$new_reading'::uuid;")" == 0 ]] ||
+  fail "cancelled no-Grant purchase created official Reading"
+[[ "$(p -c "select count(*) from public.commerce_provider_events
+  where external_event_id='myeongha:portone-v2:full-cancel:v1:synthetic-b5-no-grant-cancel'
+    and resolved_receipt_id='$b5_receipt'::uuid;")" == 1 ]] ||
+  fail "no-Grant cancelled provider evidence not stored exactly once"
+p >"$tmpdir/no-grant-replay.out" 2>&1 <<SQL || { cat "$tmpdir/no-grant-replay.out" >&2; fail "verified no-Grant cancellation replay failed"; }
+begin;
+set local role myeongha_commerce_internal_executor;
+select (public.cmd_apply_verified_portone_reader_full_cancellation_v1(
+  'synthetic-portone-b5-payment','tx-official-reader-b5-new-revision',
+  'synthetic-b5-no-grant-cancel','$cancelled_at'::timestamptz,
+  $b5_amount,'KRW','production',
+  'hmac-sha256:k1:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee',
+  'synthetic-verified-no-grant-v1'
+)->'revoke'->>'disposition');
+commit;
+SQL
+grep -qx 'cancelled_before_grant' "$tmpdir/no-grant-replay.out" ||
+  fail "idempotent no-Grant PortOne cancellation replay changed disposition"
+[[ "$(p -c "select count(*) from public.commerce_provider_events
+  where external_event_id='myeongha:portone-v2:full-cancel:v1:synthetic-b5-no-grant-cancel';")" == 1 ]] ||
+  fail "no-Grant cancellation replay duplicated provider event"
+pass "verified cancellation before Grant serializes actual combined issuance, commits once and prevents Reader binding"
+
+
 echo "PASS: S2 instrumented two-direction PostgreSQL race; production integration HOLD"
