@@ -57,14 +57,14 @@ apply_pg17_migrations_through_seyeon_production_frontier() {
           else
             local_bytes="$(wc -c < "$migration" | tr -d '[:space:]')"
             local_blob_sha1="$(
-              { printf 'blob %s\\0' "$local_bytes"; cat "$migration"; } |
+              { printf 'blob %s\0' "$local_bytes"; cat "$migration"; } |
                 sha1sum | cut -d ' ' -f 1
             )"
           fi
           if [[ "$local_blob_sha1" != "$reviewed_blob_sha1" ]]; then
-            normalized_bytes="$(sed 's/\\r$//' "$migration" | wc -c | tr -d '[:space:]')"
+            normalized_bytes="$(sed 's/\r$//' "$migration" | wc -c | tr -d '[:space:]')"
             local_blob_sha1="$(
-              { printf 'blob %s\\0' "$normalized_bytes"; sed 's/\\r$//' "$migration"; } |
+              { printf 'blob %s\0' "$normalized_bytes"; sed 's/\r$//' "$migration"; } |
                 sha1sum | cut -d ' ' -f 1
             )"
           fi
