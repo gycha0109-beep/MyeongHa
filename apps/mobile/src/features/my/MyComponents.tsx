@@ -353,8 +353,38 @@ const pendingSettings = Object.freeze([
   '고객지원',
 ] as const);
 
-export function MyPendingSettings() {
+function MyThemeSelector() {
   const { theme, setTheme, colors } = useMobileTheme();
+  return (
+    <>
+      <Text style={[styles.settingTitle, { color: colors.ink }]}>화면 테마</Text>
+      <View style={{ flexDirection: 'row', gap: 10, marginBottom: 12 }}>
+        {(['light', 'dark'] as const).map((option) => (
+          <Pressable
+            key={option}
+            accessibilityRole="radio"
+            accessibilityState={{ selected: theme === option }}
+            accessibilityLabel={option === 'light' ? '라이트 모드' : '다크 모드'}
+            onPress={() => setTheme(option)}
+            style={{
+              flex: 1, minHeight: 48, alignItems: 'center', justifyContent: 'center',
+              borderWidth: 1, borderRadius: 12,
+              backgroundColor: theme === option ? colors.navy : colors.surface,
+              borderColor: theme === option ? colors.navy : colors.border,
+            }}
+          >
+            <Text style={{ color: theme === option ? colors.canvas : colors.ink, fontWeight: '700' }}>
+              {option === 'light' ? '☀ 라이트' : '☾ 다크'}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+    </>
+  );
+}
+
+export function MyPendingSettings() {
+  const { colors } = useMobileTheme();
   return (
     <View style={styles.section}>
       <View style={styles.sectionIntro}>
@@ -362,28 +392,7 @@ export function MyPendingSettings() {
         <Text style={styles.sectionTitle}>설정</Text>
       </View>
       <View style={[styles.settingsCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-        <Text style={[styles.settingTitle, { color: colors.ink }]}>화면 테마</Text>
-        <View style={{ flexDirection: 'row', gap: 10, marginBottom: 12 }}>
-          {(['light', 'dark'] as const).map((option) => (
-            <Pressable
-              key={option}
-              accessibilityRole="radio"
-              accessibilityState={{ selected: theme === option }}
-              accessibilityLabel={option === 'light' ? '라이트 모드' : '다크 모드'}
-              onPress={() => setTheme(option)}
-              style={{
-                flex: 1, minHeight: 48, alignItems: 'center', justifyContent: 'center',
-                borderWidth: 1, borderRadius: 12,
-                backgroundColor: theme === option ? colors.navy : colors.surface,
-                borderColor: theme === option ? colors.navy : colors.border,
-              }}
-            >
-              <Text style={{ color: theme === option ? colors.canvas : colors.ink, fontWeight: '700' }}>
-                {option === 'light' ? '☀ 라이트' : '☾ 다크'}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
+        <MyThemeSelector />
         {pendingSettings.map((title) => (
           <View key={title} style={styles.settingRow}>
             <Text style={[styles.settingTitle, { color: colors.ink }]}>{title}</Text>
