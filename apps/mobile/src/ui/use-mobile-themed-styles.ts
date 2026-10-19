@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 
-import { mobileThemePalettes, useMobileTheme } from './mobile-theme';
+import { mobileThemePalettes, useMobileTheme } from './mobile-theme.js';
 
 /**
  * Adapt legacy static React Native StyleSheet tokens without changing every
