@@ -11,6 +11,7 @@ import {
   MyProfileCard,
   MySectionError,
 } from '@/features/my/MyComponents';
+import { MyEditorialWelcome } from '@/features/my/MyEditorialWelcome';
 import { nativeMobileRuntimeV1 } from '@/core/runtime/native-mobile-runtime';
 import { useMobileMemberAuthV1 } from '@/features/my/use-mobile-member-auth';
 import { useMobileMyV1 } from '@/features/my/use-mobile-my';
@@ -21,10 +22,12 @@ import {
 import { MobileScreen } from '@/ui/MobileScreen';
 import { mobileColors } from '@/ui/mobile-colors';
 import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
+import { useMobileTheme } from '@/ui/mobile-theme';
 import { useMobilePullRefreshV1 } from '@/ui/use-mobile-pull-refresh';
 
 export default function MyScreen() {
   const styles = useMobileThemedStyles(staticStyles);
+  const { colors } = useMobileTheme();
   const {
     state,
     retryProfile,
@@ -113,14 +116,21 @@ export default function MyScreen() {
     await reloadOwnerProjection();
   }
 
+  const currentAccount = state.profile.kind === 'ready'
+    ? state.profile.profile.subjectKind
+    : memberSessionPresent === true
+      ? 'member'
+      : memberSessionPresent === false ? 'guest' : 'checking';
+
   return (
     <MobileScreen
       eyebrow="MY MYEONGHA"
       title="마이"
       refreshing={refreshing}
       onRefresh={() => void onRefresh()}
-      description="현재 주체와 출생정보를 기준으로 명하에서 이어지는 흐름을 확인합니다."
+      description="나의 계정과 이야기, 설정을 살펴보세요."
     >
+      <MyEditorialWelcome account={currentAccount} />
       <MyMemberAuthCard
           subjectKind={state.profile.kind === 'ready'
             ? state.profile.profile.subjectKind
@@ -165,7 +175,7 @@ export default function MyScreen() {
 
       {state.profile.kind === 'loading' ? (
         <View style={styles.loadingCard}>
-          <ActivityIndicator color={mobileColors.navy} />
+          <ActivityIndicator color={colors.navy} />
           <Text style={styles.loadingText}>내 정보를 불러오는 중입니다…</Text>
         </View>
       ) : state.profile.kind === 'error' ? (
@@ -179,7 +189,7 @@ export default function MyScreen() {
 
       {state.birth.kind === 'loading' ? (
         <View style={styles.loadingCard}>
-          <ActivityIndicator color={mobileColors.navy} />
+          <ActivityIndicator color={colors.navy} />
           <Text style={styles.loadingText}>출생정보를 확인하는 중입니다…</Text>
         </View>
       ) : state.birth.kind === 'error' ? (
