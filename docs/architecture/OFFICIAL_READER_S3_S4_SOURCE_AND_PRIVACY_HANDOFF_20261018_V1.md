@@ -124,3 +124,4 @@ Saju Owner가 제공할 정식 보완물은 **Preview와 별도**인 운영 원�
 - `official-reader-s3-signed-source-artifact-reconciliation-v1.ts`는 서명 검증 전에 **아직 신뢰하지 않는 Saju 응답 원문**과 DB 승인 공식 Reading 원문이 동일한지를 deterministic canonical hash와 Reading ID로 먼저 대조한다. 내용이 다르면 **공용 PostgreSQL nonce replay ledger를 소모하지 않고** `blocked`를 반환한다.
 - 이 사전 비교를 서명이나 권한으로 신뢰하지 않는다. 원문이 일치하는 경우에만 기존 `verifySajuHeldSourceProofV1`의 서명·issuer/audience/key·nonce/TTL·요청 해시·응답 해시·공유 DB nonce 원자 claim을 계속 필수 실행한다.
 - 서로 다른 원문을 가진 실제 형식의 signed Preview가 먼저 도착해도 nonce를 소모하지 않고, 이후 올바른 원문이 도착하면 같은 nonce로 단 한 번만 HELD될 수 있는 공격/회복 시험을 추가했다. 결과는 여전히 `sourceAuthority: NOT_EVALUATED`, Privacy 미승인, 유료 공개/저장 OFF다.
+- `saju-held-source-proof-verifier-v1.ts`의 실제 PostgreSQL nonce claim 식별자도 종전 `issuer:audience:nonce` 결합 대신 **도메인 버전+정규화 tuple(issuer, audience, keyId, nonce)의 SHA-256**으로 구성한다. `:`을 포함하는 issuer/audience 분리 위치가 달라도 같은 key로 충돌하지 않고, 키 교체 시 replay namespace가 별개다. 이 수정은 운영 발행 권한을 추가하지 않는다.
