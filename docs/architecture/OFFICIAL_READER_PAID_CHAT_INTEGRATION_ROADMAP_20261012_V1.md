@@ -217,3 +217,11 @@ S1에서 공통 잠금 함수 자체가 성공하더라도 **S2 전체 경로가
 - 서버가 기대한 Reader Bundle UUID와 잠금 뒤 실제 유효 Bundle이 다르거나, 0개/2개 이상 활성 Bundle이면 `blocked`; 정확히 1개이고 동일 Bundle이어도 **`held`와 `can_persist=false`, `can_disclose=false`만 반환**한다. 본문·해시·출처·회원식별자 반환 없음. Saju Owner [#2410](https://github.com/gycha0109-beep/Saju/issues/2410) 공식 Production 원본 발행과 Privacy Owner [#2318](https://github.com/gycha0109-beep/MyeongHa/issues/2318) 보관·삭제/복원 계약 부재를 긍정으로 우회하지 않는다.
 - 기존 `official_reader_s2_atomic_receipt_bind_live_writer_race.sh`의 **실제 Receipt→Grant→Reader 결속, B4 추가 구매, 2개 Bundle 충돌, B4 회수, 최종 B2 회수** 상태마다 이 관문을 호출한다. 다중 Bundle 및 환불/회수 뒤에도 저장·공개 권한은 0이고, 정상 1개여도 Owner HOLD임을 확인한다. 일반 Public/API/Service/Chat/Commerce 역할에 새 EXECUTE가 없다.
 - **이것은 실제 유료 본문 저장·출처 발행·Privacy 승인·T2 commit이 아니다.** 함수에서 보호 테이블/출처 증명을 쓰지 않고, 운영 DB/실결제·일반 Chat/Memories/Outbox/HTTP를 변경하지 않는다. 실제 S5 Writer는 공식 발행과 Privacy 승인·S2 전체 Writer/전역 잠금 순서·릴리스 심사를 충족한 뒤에만 별도 구현한다.
+
+
+### S2 후속 실제 결함 수정 — 출생정보 개정 후 과거 Reading 잠금 오인 방지 (2026-10-19)
+
+- **발견된 결함:** 기존 1800 발급 잠금 확인은 Subject×Product의 *전체 과거* 공식 Reading 수를 집계했습니다. 출생정보 개정으로 동일 상품의 새로운 공식 Reading이 필요한 첫 구매가 과거 원문 Reading을 잠그거나, 과거 여러 개가 존재하면 정상 발급을 거부할 수 있었습니다.
+- **실제 수정:** 순방향 `1840_official_reader_receipt_exact_revision_scope_guard_v1.sql`에서 **기존 1090/1080의 호출 함수** `internal_assert_reader_receipt_scope_prelocked_v1`를 그대로 재정의합니다. 구매에 이미 결속된 접근은 그 불변 Reading을 사용하고, 미결속 구매는 현재 Birth Revision×Product Spec×Saju Domain Capability의 정확한 공식 Reading만 선택합니다. 해당 Reading이 없는 *첫 구매*는 1760이 잠근 예정 Reading만 허용하며 추가 Reader 구매는 신규 Reading을 임의 생성하지 않습니다. 같은 S1 advisory lock 확인, 사전 READ COMMITTED, 기존 Commerce 비-Reader 경계 및 실행권은 유지합니다.
+- **실제 회귀:** 기존 `test/db/official_reader_s2_atomic_receipt_bind_live_writer_race.sh` fixture 끝에서 최초 Reading의 기존 구매 내역을 유지한 채 Birth revision을 갱신하고, 새 첫 구매가 새 Reading 범위 잠금에서만 허용되고 **이전 Reading 잠금은 거절**되는 PostgreSQL 실험을 추가합니다.
+- **계속 HOLD:** S2 전체 Writer 전역 잠금 순서/운영 증명은 여전히 미완료입니다. Saju #2410 공식 Production 출처, Privacy #2318 신규 보호 원문 삭제·복원 승인 전 S5 실제 저장·공개/운영 DB 변경·실결제 금지; Draft PR 유지.

@@ -417,4 +417,112 @@ pass "revoke-first scope lock blocks T2 and its fresh read sees no active Grant"
 
 # This verifies actual private combined Writer behavior. Unmodified
 # production Commerce/Grant paths may still bypass this advisory lock.
+# S2: a new Birth revision must not make legacy Receipt issuance lock the
+# obsolete official Reading for the same Subject/Product. The next initial
+# purchase is not Reader-bound yet; verify the actual S1 lock identity.
+b5_intent="12192300-0000-0000-0000-000000000005"
+b5_receipt="12192000-0000-0000-0000-000000000005"
+new_revision="12101100-0000-0000-0000-000000000002"
+new_reading="12103100-0000-0000-0000-000000000005"
+p >"$tmpdir/revision-receipt-seed.out" 2>&1 <<SQL || {
+  cat "$tmpdir/revision-receipt-seed.out" >&2
+  fail "initial purchase after a new Birth revision seed failed"
+}
+begin;
+insert into public.birth_profile_revisions(
+  id,birth_profile_id,subject_id,revision_no,calendar_type,birth_date,
+  birth_time,time_known,is_leap_month,sex,input_hash,created_at
+)
+select '$new_revision'::uuid,birth_profile_id,subject_id,2,
+       calendar_type,birth_date+1,birth_time,time_known,is_leap_month,
+       sex,'sha256:test:official-reader-revision-two',clock_timestamp()
+from public.birth_profile_revisions
+where id='12101100-0000-0000-0000-000000000001'::uuid;
+update public.birth_profiles
+set current_revision_id='$new_revision'::uuid,updated_at=clock_timestamp()
+where id='12101000-0000-0000-0000-000000000001'::uuid;
+insert into public.purchase_intents(
+  id,subject_id,product_offer_id,provider_account_link_id,
+  idempotency_key,request_hash,offer_snapshot_jsonb,offer_snapshot_hash,
+  status,created_at,updated_at,expected_amount_minor,expected_currency,
+  charge_terms_version,capability_set_id,capability_snapshot_jsonb,
+  capability_snapshot_hash
+)
+select '$b5_intent'::uuid,subject_id,product_offer_id,provider_account_link_id,
+       'reader-b5-new-birth-revision','sha256:test:reader-b5-new-revision',
+       offer_snapshot_jsonb,offer_snapshot_hash,'verified',
+       clock_timestamp(),clock_timestamp(),expected_amount_minor,
+       expected_currency,charge_terms_version,capability_set_id,
+       capability_snapshot_jsonb,capability_snapshot_hash
+from public.purchase_intents
+where id='11392300-0000-0000-0000-000000000001'::uuid;
+insert into public.purchase_intent_reader_selections(
+  purchase_intent_id,product_id,reader_character_id,reader_content_bundle_id,
+  selection_contract_version,selection_snapshot_jsonb,selection_hash,created_at
+)
+select '$b5_intent'::uuid,product_id,reader_character_id,
+       reader_content_bundle_id,selection_contract_version,
+       selection_snapshot_jsonb,'sha256:test:reader-b5-selection',
+       clock_timestamp()
+from public.purchase_intent_reader_selections
+where purchase_intent_id='11392300-0000-0000-0000-000000000001'::uuid;
+insert into public.commerce_receipts(
+  id,subject_id,purchase_intent_id,product_offer_id,platform,provider,
+  external_transaction_id,receipt_fingerprint,verification_status,
+  verified_payload_jsonb,verified_at,created_at,environment,
+  verifier_revision,verified_amount_minor,verified_currency
+)
+select '$b5_receipt'::uuid,subject_id,'$b5_intent'::uuid,product_offer_id,
+       platform,provider,'tx-official-reader-b5-new-revision',
+       'hmac-sha256:k1:6666666666666666666666666666666666666666666666666666666666666666',
+       verification_status,verified_payload_jsonb,clock_timestamp(),
+       clock_timestamp(),environment,verifier_revision,
+       verified_amount_minor,verified_currency
+from public.commerce_receipts
+where id='12102000-0000-0000-0000-000000000001'::uuid;
+commit;
+SQL
+[[ "$(p -c "select count(*) from public.standard_reading_official_bindings
+  where subject_id='$subject'::uuid and product_id='11392000-0000-0000-0000-000000000001'::uuid;")" == 1 ]] ||
+  fail "historical official Reading setup unexpectedly changed"
+
+p >"$tmpdir/new-revision-prelock.out" 2>&1 <<SQL || {
+  cat "$tmpdir/new-revision-prelock.out" >&2
+  fail "new initial Reading receipt did not accept exact current revision S1 lock"
+}
+begin;
+select pg_catalog.set_config('myeongha.subject_id','$subject',true);
+select pg_catalog.set_config('myeongha.reader_pending_reading_id','$new_reading',true);
+select public.internal_acquire_official_reader_scope_lock_v1(
+  '$subject'::uuid,'$new_reading'::uuid,'test-standard-reader'
+);
+select 'EXACT_NEW_REVISION_LOCK=ok'
+from (select public.internal_assert_reader_receipt_scope_prelocked_v1(
+  '$b5_receipt'::uuid)) guarded;
+commit;
+SQL
+grep -qx 'EXACT_NEW_REVISION_LOCK=ok' "$tmpdir/new-revision-prelock.out" ||
+  fail "Reader receipt prelock did not select the new Birth revision scope"
+
+if p >"$tmpdir/obsolete-revision-prelock.out" 2>&1 <<SQL
+begin;
+select pg_catalog.set_config('myeongha.subject_id','$subject',true);
+select pg_catalog.set_config('myeongha.reader_pending_reading_id','$new_reading',true);
+select public.internal_acquire_official_reader_scope_lock_v1(
+  '$subject'::uuid,'$reading'::uuid,'test-standard-reader'
+);
+select public.internal_assert_reader_receipt_scope_prelocked_v1(
+  '$b5_receipt'::uuid
+);
+rollback;
+SQL
+then
+  fail "obsolete official Reading lock authorized a new-revision receipt"
+fi
+grep -q 'official_reader_s2_legacy_receipt_scope_lock_required\|cannot bypass the S1 scope lock' \
+  "$tmpdir/obsolete-revision-prelock.out" ||
+  fail "wrong lock rejected for unexpected reason"
+pass "initial Reader receipt uses current Birth revision scope, not historical same-Product Reading"
+
+
 echo "PASS: S2 instrumented two-direction PostgreSQL race; production integration HOLD"
