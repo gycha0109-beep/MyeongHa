@@ -26,7 +26,6 @@ declare
   v_lock_key bigint;
   v_count integer:=0;
   v_purchase uuid;
-  v_lock_key bigint;
   v_cancel_receipt_context text;
 begin
   if p_grant_id is null then return; end if;
