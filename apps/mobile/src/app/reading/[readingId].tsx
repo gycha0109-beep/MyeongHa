@@ -24,6 +24,7 @@ import {
   readingTitleV1,
 } from '@/features/records/records-view-model';
 import { mobileColors } from '@/ui/mobile-colors';
+import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
 import { useMobilePullRefreshV1 } from '@/ui/use-mobile-pull-refresh';
 
 type DetailStateV1 =
@@ -76,6 +77,7 @@ function errorState(error: unknown): Extract<DetailStateV1, { kind: 'error' }> {
 }
 
 export default function OfficialReadingDetailScreen() {
+  const styles = useMobileThemedStyles(staticStyles);
   const params = useLocalSearchParams<{ readingId?: string | string[] }>();
   const readingId = typeof params.readingId === 'string' ? params.readingId : '';
   const [state, setState] = useState<DetailStateV1>({ kind: 'loading' });
@@ -311,3 +313,4 @@ const styles = StyleSheet.create({
   supportTitle: { color: mobileColors.ink, fontSize: 13, fontWeight: '800' },
   supportText: { color: mobileColors.muted, fontSize: 13, lineHeight: 20 },
 });
+const staticStyles = styles;
