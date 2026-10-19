@@ -60,9 +60,7 @@ export function LifeFactCard({ item }: { item: LifeRecordFactV1 }) {
         <Text style={styles.date}>{formatRecordDateV1(item.confirmedAt)}</Text>
       </View>
       <Text style={styles.cardTitle}>{item.factType}</Text>
-      <Text style={styles.cardBody}>
-        {item.schemaVersion} · {item.sourceKind}
-      </Text>
+      <Text style={styles.caption}>기록 형식 {item.schemaVersion} · 출처 {item.sourceKind}</Text>
       <Text style={[styles.state, revoked && styles.revoked]}>
         {revoked ? '철회됨' : '기록됨'}
       </Text>
@@ -91,7 +89,7 @@ export function ReadingHistoryCard({
       {openable && onOpen !== undefined ? (
         <Text style={styles.openHint}>저장된 풀이 다시 읽기 →</Text>
       ) : null}
-      <Text style={styles.caption}>Reading contract · {item.readingContractVersion}</Text>
+      <Text style={styles.caption}>풀이 기록 형식 · {item.readingContractVersion}</Text>
     </>
   );
 
@@ -120,7 +118,7 @@ export function MemoryCard({ item }: { item: MemoryItemV1 }) {
       <Text style={styles.cardTitle}>{item.memoryType}</Text>
       <Text style={styles.cardBody}>저장된 기억</Text>
       <Text style={styles.caption}>
-        {item.schemaVersion}{item.createdByCharacterId === null ? '' : ' · 대리자 기록'}
+        기록 형식 {item.schemaVersion}{item.createdByCharacterId === null ? '' : ' · 대리자 기록'}
       </Text>
     </View>
   );
@@ -185,10 +183,10 @@ export function RecordsListFooter({
 }
 
 const styles = StyleSheet.create({
-  tabs: { flexDirection: 'row', gap: 7, paddingVertical: 4 },
+  tabs: { flexDirection: 'row', gap: 7, paddingVertical: 3 },
   tab: {
     flex: 1,
-    minHeight: 40,
+    minHeight: 48,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 999,
@@ -197,37 +195,38 @@ const styles = StyleSheet.create({
     backgroundColor: mobileColors.surface,
   },
   tabSelected: { backgroundColor: mobileColors.navy, borderColor: mobileColors.navy },
-  tabText: { color: mobileColors.muted, fontSize: 12, fontWeight: '800' },
+  tabText: { color: mobileColors.muted, fontSize: 12, fontWeight: '800', letterSpacing: -0.3 },
   tabTextSelected: { color: mobileColors.surface },
   card: {
     borderWidth: 1,
     borderColor: mobileColors.border,
-    borderRadius: 18,
+    borderRadius: 20,
     backgroundColor: mobileColors.surface,
-    padding: 18,
-    gap: 7,
+    padding: 20,
+    gap: 10,
   },
   cardMuted: { opacity: 0.7 },
   cardPressed: { opacity: 0.82 },
-  cardTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  symbol: { color: mobileColors.gold, fontSize: 20, fontWeight: '800' },
+  cardTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
+  symbol: { color: mobileColors.gold, fontSize: 23, fontWeight: '900' },
   date: { color: mobileColors.muted, fontSize: 12, fontWeight: '600' },
-  cardTitle: { color: mobileColors.ink, fontSize: 18, fontWeight: '800' },
-  cardBody: { color: mobileColors.muted, fontSize: 14, lineHeight: 20 },
-  state: { color: mobileColors.navy, fontSize: 13, fontWeight: '800' },
-  openHint: { color: mobileColors.navy, fontSize: 12, fontWeight: '800' },
+  cardTitle: { color: mobileColors.ink, fontSize: 19, fontWeight: '900', letterSpacing: -0.35 },
+  cardBody: { color: mobileColors.muted, fontSize: 14, lineHeight: 22 },
+  state: { color: mobileColors.navy, fontSize: 13, fontWeight: '900' },
+  openHint: { color: mobileColors.navy, fontSize: 13, fontWeight: '900', paddingTop: 6 },
   revoked: { color: mobileColors.seal },
-  caption: { color: mobileColors.muted, fontSize: 11, lineHeight: 17 },
+  caption: { color: mobileColors.muted, fontSize: 11, lineHeight: 18 },
   empty: {
     alignItems: 'center',
     borderWidth: 1,
     borderColor: mobileColors.border,
-    borderRadius: 18,
+    borderRadius: 20,
     backgroundColor: mobileColors.surface,
-    padding: 28,
-    gap: 8,
+    paddingHorizontal: 24,
+    paddingVertical: 38,
+    gap: 10,
   },
-  emptySymbol: { color: mobileColors.gold, fontSize: 30, fontWeight: '800' },
+  emptySymbol: { color: mobileColors.gold, fontSize: 34, fontWeight: '800' },
   failure: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -240,10 +239,10 @@ const styles = StyleSheet.create({
   },
   failureCopy: { flex: 1, gap: 3 },
   failureTitle: { color: mobileColors.seal, fontSize: 14, fontWeight: '800' },
-  retryButton: { paddingHorizontal: 12, paddingVertical: 9 },
+  retryButton: { minHeight: 48, paddingHorizontal: 12, justifyContent: 'center' },
   retryText: { color: mobileColors.navy, fontSize: 13, fontWeight: '800' },
   footer: { paddingVertical: 24 },
-  footerButton: { alignItems: 'center', paddingVertical: 20 },
+  footerButton: { minHeight: 48, alignItems: 'center', justifyContent: 'center', paddingVertical: 14 },
   footerSpacer: { height: 24 },
 });
 const staticStyles = styles;

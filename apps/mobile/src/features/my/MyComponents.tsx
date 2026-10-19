@@ -364,9 +364,9 @@ function MyThemeSelector() {
   const themedStyles = useMobileThemedStyles(styles);
   const { theme, setTheme, colors } = useMobileTheme();
   return (
-    <>
+    <View style={themedStyles.themeSection}>
       <Text style={[themedStyles.settingTitle, { color: colors.ink }]}>화면 테마</Text>
-      <View style={{ flexDirection: 'row', gap: 10, marginBottom: 12 }}>
+      <View style={themedStyles.themeChoices}>
         {(['light', 'dark'] as const).map((option) => (
           <Pressable
             key={option}
@@ -387,7 +387,7 @@ function MyThemeSelector() {
           </Pressable>
         ))}
       </View>
-    </>
+    </View>
   );
 }
 
@@ -418,14 +418,14 @@ export function MyPendingSettings() {
 
 const styles = StyleSheet.create({
   section: { gap: 12 },
-  sectionIntro: { gap: 5 },
+  sectionIntro: { gap: 6 },
   card: {
     borderWidth: 1,
     borderColor: mobileColors.border,
-    borderRadius: 18,
+    borderRadius: 20,
     backgroundColor: mobileColors.surface,
-    padding: 20,
-    gap: 12,
+    padding: 22,
+    gap: 14,
   },
   profileCard: {
     flexDirection: 'row',
@@ -433,41 +433,41 @@ const styles = StyleSheet.create({
     gap: 16,
     borderWidth: 1,
     borderColor: mobileColors.border,
-    borderRadius: 20,
+    borderRadius: 21,
     backgroundColor: mobileColors.surface,
-    padding: 20,
+    padding: 22,
   },
   profileMark: {
-    width: 58,
-    height: 58,
+    width: 67,
+    height: 72,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 29,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: mobileColors.gold,
   },
   profileMarkText: { color: mobileColors.navy, fontSize: 26, fontWeight: '800' },
   profileCopy: { flex: 1, gap: 4 },
-  profileName: { color: mobileColors.ink, fontSize: 21, fontWeight: '800' },
+  profileName: { color: mobileColors.ink, fontSize: 23, fontWeight: '900', letterSpacing: -0.4 },
   profileMeta: { color: mobileColors.muted, fontSize: 14 },
   profileStatus: { color: mobileColors.navy, fontSize: 12, fontWeight: '700' },
   kicker: { color: mobileColors.gold, fontSize: 11, fontWeight: '800', letterSpacing: 1.1 },
-  sectionTitle: { color: mobileColors.ink, fontSize: 20, fontWeight: '800' },
-  birthGrid: { gap: 9 },
-  birthFact: { flexDirection: 'row', justifyContent: 'space-between', gap: 16 },
+  sectionTitle: { color: mobileColors.ink, fontSize: 22, fontWeight: '900' },
+  birthGrid: { gap: 12, paddingVertical: 6 },
+  birthFact: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 14, minHeight: 32 },
   factLabel: { color: mobileColors.muted, fontSize: 13 },
-  factValue: { color: mobileColors.ink, fontSize: 14, fontWeight: '800' },
+  factValue: { color: mobileColors.ink, fontSize: 14, fontWeight: '800', flexShrink: 1, textAlign: 'right' },
   body: { color: mobileColors.muted, fontSize: 14, lineHeight: 20 },
   primaryAction: {
-    minHeight: 46,
+    minHeight: 48,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 12,
+    borderRadius: 13,
     backgroundColor: mobileColors.navy,
   },
   primaryActionText: { color: mobileColors.surface, fontSize: 14, fontWeight: '800' },
   secondaryAction: {
-    minHeight: 46,
+    minHeight: 48,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
@@ -477,7 +477,7 @@ const styles = StyleSheet.create({
   secondaryActionText: { color: mobileColors.navy, fontSize: 14, fontWeight: '800' },
   socialActions: { gap: 8 },
   socialAction: {
-    minHeight: 46,
+    minHeight: 48,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
@@ -521,24 +521,27 @@ const styles = StyleSheet.create({
     gap: 14,
     borderWidth: 1,
     borderColor: mobileColors.border,
-    borderRadius: 16,
+    borderRadius: 18,
     backgroundColor: mobileColors.surface,
-    padding: 16,
+    padding: 18,
+    minHeight: 96,
   },
   flowSymbol: { width: 30, color: mobileColors.gold, fontSize: 22, fontWeight: '800' },
   flowCopy: { flex: 1, gap: 2 },
   flowKicker: { color: mobileColors.gold, fontSize: 10, fontWeight: '800', letterSpacing: 1 },
-  flowTitle: { color: mobileColors.ink, fontSize: 16, fontWeight: '800' },
+  flowTitle: { color: mobileColors.ink, fontSize: 17, fontWeight: '900' },
   flowArrow: { color: mobileColors.navy, fontSize: 18, fontWeight: '800' },
+  themeSection: { paddingHorizontal: 17, paddingTop: 18, paddingBottom: 12, gap: 12 },
+  themeChoices: { flexDirection: 'row', gap: 10 },
   settingsCard: {
     borderWidth: 1,
     borderColor: mobileColors.border,
-    borderRadius: 18,
+    borderRadius: 20,
     backgroundColor: mobileColors.surface,
     overflow: 'hidden',
   },
   settingRow: {
-    minHeight: 52,
+    minHeight: 57,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',

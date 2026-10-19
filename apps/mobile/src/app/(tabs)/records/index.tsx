@@ -23,6 +23,7 @@ import {
   RecordsListFooter,
   RecordsTabs,
 } from '@/features/records/RecordsComponents';
+import { RecordsEditorialHeader } from '@/features/records/RecordsEditorialHeader';
 import { useMobileRecordsV1 } from '@/features/records/use-mobile-records';
 import {
   buildAllRecordTimelineV1,
@@ -154,9 +155,10 @@ export default function RecordsScreen() {
               <Text style={[styles.eyebrow, { color: colors.gold }]}>MY RECORDS</Text>
               <Text style={[styles.title, { color: colors.ink }]}>기록</Text>
               <Text style={[styles.description, { color: colors.muted }]}>
-                삶의 사실, 사주 풀이 이력, 기억을 각 authority 그대로 확인합니다.
+                삶의 사실과 지난 풀이, 저장된 기억을 차분히 찾아보세요.
               </Text>
             </View>
+            <RecordsEditorialHeader selected={tab} itemCount={initialLoading ? null : items.length} />
             <RecordsTabs selected={tab} onSelect={setTab} />
             <RecordsFailureBanner
               labels={failedLabels}
@@ -191,13 +193,13 @@ export default function RecordsScreen() {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: mobileColors.canvas },
-  content: { flexGrow: 1, paddingHorizontal: 20, paddingTop: 28, paddingBottom: 28 },
-  headerStack: { gap: 18, marginBottom: 18 },
-  header: { gap: 8 },
-  eyebrow: { color: mobileColors.gold, fontSize: 12, fontWeight: '700', letterSpacing: 1.2 },
-  title: { color: mobileColors.ink, fontSize: 32, fontWeight: '700' },
-  description: { color: mobileColors.muted, fontSize: 15, lineHeight: 22 },
-  separator: { height: 12 },
+  content: { flexGrow: 1, paddingHorizontal: 20, paddingTop: 25, paddingBottom: 36 },
+  headerStack: { gap: 18, marginBottom: 20 },
+  header: { gap: 7 },
+  eyebrow: { color: mobileColors.gold, fontSize: 10, fontWeight: '900', letterSpacing: 1.5 },
+  title: { color: mobileColors.ink, fontSize: 31, fontWeight: '900', letterSpacing: -0.55 },
+  description: { color: mobileColors.muted, fontSize: 14, lineHeight: 21 },
+  separator: { height: 13 },
   loadingCard: {
     borderWidth: 1,
     borderColor: mobileColors.border,
