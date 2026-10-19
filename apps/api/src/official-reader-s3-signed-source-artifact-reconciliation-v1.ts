@@ -88,6 +88,29 @@ export async function reconcileOfficialReaderS3SignedSourceArtifactV1(input: Rea
     // considering the transport useful for the Official Reader source.
     const actualStoredResponseHash =
       hashSajuHeldSourceProofRequestV1(input.source.responseSnapshotJsonb);
+
+    // Source mismatch must not consume a valid, globally single-use Saju
+    // nonce. Precompare the UNTRUSTED envelope bytes before calling the
+    // MAC verifier/claiming shared replay state. This precheck never grants
+    // integrity or authority: signature, request binding, TTL, and nonce
+    // verification below remain mandatory for any HELD result.
+    if (input.previewEnvelope === null
+      || typeof input.previewEnvelope !== 'object'
+      || Array.isArray(input.previewEnvelope)) return BLOCKED;
+    const untrusted = input.previewEnvelope as Record<string, unknown>;
+    if (untrusted.response === null
+      || typeof untrusted.response !== 'object'
+      || Array.isArray(untrusted.response)) return BLOCKED;
+    const signedCandidate = untrusted.response as Record<string, unknown>;
+    if (signedCandidate.state !== 'delivered'
+      || signedCandidate.reading === null
+      || typeof signedCandidate.reading !== 'object'
+      || Array.isArray(signedCandidate.reading)
+      || (signedCandidate.reading as Record<string, unknown>).readingId
+        !== input.source.readingId
+      || hashSajuHeldSourceProofRequestV1(signedCandidate)
+        !== actualStoredResponseHash) return BLOCKED;
+
     const verified = await verifySajuHeldSourceProofV1(
       input.previewEnvelope, input.trust, input.context,
     );
