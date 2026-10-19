@@ -615,8 +615,9 @@ echo "PASS outbox/domain failure leaves no half-commit (message/turn/world/seque
   'a6000000-0000-0000-0000-000000000005',
   'failed_final','test-stop-half');" >/dev/null
 
-# Two commit workers race on the same validated turn. Session B must block on the
-# thread/turn locks, then replay Session A's authoritative committed message.
+# Two commit workers race on the same validated turn. Wait for Session A's
+# successful uncommitted result before starting B, so CI runner scheduling cannot
+# invert the intended lock acquisition; B must then replay A's committed message.
 prepare_generated_turn \
   'a4000000-0000-0000-0000-000000000006' \
   'a5000000-0000-0000-0000-000000000006' \
@@ -635,6 +636,8 @@ validate_turn \
   'failed_final'
 
 before_race_seq="$("${PSQL[@]}" -Atqc "select next_sequence_no from public.conversation_threads where id='a3000000-0000-0000-0000-000000000001'")"
+ready_marker="/tmp/myeongha-chat-commit-a-ready"
+rm -f "${ready_marker}"
 (
   "${PSQL[@]}" <<'SQL'
 begin;
@@ -647,13 +650,27 @@ select * from public.cmd_commit_chat_turn_v1(
   'a9000000-0000-0000-0000-000000000006',
   null, null, null
 );
+\! touch /tmp/myeongha-chat-commit-a-ready
 select pg_sleep(1.5);
 commit;
 SQL
 ) >/tmp/myeongha-chat-commit-a.log 2>&1 &
 commit_first_pid=$!
 
-sleep 0.25
+# Wait only for the first transaction to hold the actual commit locks.
+# A bounded readiness check fails closed if A exits or never reaches that point.
+for ((wait_step=0; wait_step<400; wait_step++)); do
+  if [[ -f "${ready_marker}" ]]; then break; fi
+  if ! kill -0 "${commit_first_pid}" 2>/dev/null; then break; fi
+  sleep 0.05
+done
+if [[ ! -f "${ready_marker}" ]]; then
+  echo "FAIL first commit session did not reach the locked pre-COMMIT state" >&2
+  cat /tmp/myeongha-chat-commit-a.log >&2 || true
+  wait "${commit_first_pid}" || true
+  exit 30
+fi
+rm -f "${ready_marker}"
 commit_second="$("${PSQL[@]}" -At -F '|' -c "select turn_id,attempt_id,message_id,sequence_no,replayed from public.cmd_commit_chat_turn_v1(
   'a0000000-0000-0000-0000-000000000001',
   'a3000000-0000-0000-0000-000000000001',
