@@ -125,3 +125,9 @@ Saju Owner가 제공할 정식 보완물은 **Preview와 별도**인 운영 원�
 - 이 사전 비교를 서명이나 권한으로 신뢰하지 않는다. 원문이 일치하는 경우에만 기존 `verifySajuHeldSourceProofV1`의 서명·issuer/audience/key·nonce/TTL·요청 해시·응답 해시·공유 DB nonce 원자 claim을 계속 필수 실행한다.
 - 서로 다른 원문을 가진 실제 형식의 signed Preview가 먼저 도착해도 nonce를 소모하지 않고, 이후 올바른 원문이 도착하면 같은 nonce로 단 한 번만 HELD될 수 있는 공격/회복 시험을 추가했다. 결과는 여전히 `sourceAuthority: NOT_EVALUATED`, Privacy 미승인, 유료 공개/저장 OFF다.
 - `saju-held-source-proof-verifier-v1.ts`의 실제 PostgreSQL nonce claim 식별자도 종전 `issuer:audience:nonce` 결합 대신 **도메인 버전+정규화 tuple(issuer, audience, keyId, nonce)의 SHA-256**으로 구성한다. `:`을 포함하는 issuer/audience 분리 위치가 달라도 같은 key로 충돌하지 않고, 키 교체 시 replay namespace가 별개다. 이 수정은 운영 발행 권한을 추가하지 않는다.
+
+
+## S4 신규 개인정보·법률 검토안 — 2026-10-19
+
+- [S4 개인정보 처리·법률/보존/삭제 신규 승인 제안서](OFFICIAL_READER_S4_PRIVACY_LEGAL_POLICY_APPROVAL_PROPOSAL_20261019_V1.md)를 **승인 대기(PROPOSED)** 문서로 첨부합니다. 기존 P0-PR-01 Commerce P5Y·계정 삭제 P30D 및 [RR-03 #1884 승인](https://github.com/gycha0109-beep/MyeongHa/issues/1884#issuecomment-6103479019)은 재승인하지 않으며 **새 유료 원문·임시결과·로그·파생물만** 새 Privacy/Legal 대상으로 분리합니다.
+- 국내 2026-10-19 시행 개인정보보호법·전자상거래법·인공지능기본법 및 개인정보위 안내서를 근거로 한 **법률 검토 초안**이며 법률 자문/Privacy Owner 승인 아님. 계약·수탁자·국외 이전·민감정보·14세 미만 정책, 새 보존기간/삭제 SLA, 보호 원문 RLS/FK/backup 재조정 증명 미확정. S4 구현·운영 배포·S5 protected body·public reveal HOLD 유지.
