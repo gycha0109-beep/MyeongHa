@@ -121,8 +121,12 @@ describe('R20 original JSONB ↔ final projection digest correspondence, no Prov
     const db=mock();
     await expect(call(db.pool,inputs('sha256:v1:'+'0'.repeat(64))))
       .rejects.toBeInstanceOf(SeyeonR20OfflineDigestHoldV1);
-    await expect(call(db.pool,inputs(undefined,'sha256:v1:'+'0'.repeat(64))))
-      .rejects.toBeInstanceOf(SeyeonR20OfflineDigestHoldV1);
+    const badProjection=inputs();
+    await expect(call(db.pool,{
+      ...badProjection,
+      sourceCandidates:badProjection.sourceCandidates.map((c,i)=>i===0?
+        {...c,projectedMemoryDigest:'sha256:v1:'+'0'.repeat(64)}:c),
+    })).rejects.toBeInstanceOf(SeyeonR20OfflineDigestHoldV1);
     const a=inputs();
     const forged={...a,selection:{
       ...a.selection,selectedSourcesDigest:'sha256:v1:'+'0'.repeat(64),
