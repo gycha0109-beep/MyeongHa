@@ -278,3 +278,12 @@ S8의 **비파괴/격리 검토는 S2~S7과 병렬 진행 가능**하며, S8 Pro
 - **진행 조건:** Security/DB/API/Character 실제 Owner가 G0-D01/D03/D04/D05/D06/D08/D09 등의 범위·코덱·송출/ACK 계약을 검토해 **명시적 승인**하기 전 `G0=PROPOSED`. R17 SQL 운영 설치/마이그레이션 역사 수정/역할 ACL 및 공개 HTTP 마운트 금지. Owner 승인 기록은 Product Owner 기존 정책 승인을 대체하지 않으며 재요청하지 않는다.
 - **다음 실제 구현:** 계약 승인 후 제한된 G1 양수 원본·파생 Source Pin → G2 동일 DB 트랜잭션 Commit → G3 신뢰 가능한 Node/Proxy 송출·History/Replay 차단 → G5 실제 경합/보안 검증 → #1887 DB/DR 및 G6 별도 운영 승인 순서. 구현 준비용 후보가 먼저 작성되더라도 Production 기능 승격/허가로 취급하지 않는다.
 - **유지:** `Projectors=[]`, 세연 공개/실 Provider/유료 OFF, R16 revoke HTTP 미탑재, `writeAdmission:'DENY'`, 실제 Production DB 변경 0, G1 positive/G2/G3/G5/G6 HOLD.
+
+
+## 32. 2026-10-19 R19 — G1 양수 개인기억 모델 전 DB 출처 저장 어댑터 (격리 후보)
+
+- **개발 범위:** `apps/api/src/seyeon-positive-model-pre-model-db-pin-r19-candidate.ts`는 서버의 최종 선택 `SeyeonExactModelPersonalSourceSelectionV1`(현재 허가되지 않은 양수 출처)을 받아 검증된 Member→PG canonical Subject를 확인한 후 **오직** `myeongha_seyeon_positive_pin_candidate_test` 폐기 DB의 `seyeon_positive_candidate.pin_source_set_r1` Owner 후보를 실행한다. 실제 Record/Grant 최신 상태, Attempt·Thread·Turn 결속 및 1640 zero/positive XOR는 기존 R1 데이터베이스의 원본 행 잠금·불변 Parent+Edge 계약으로 검증한다. 새 SQL 마이그레이션을 생성하거나 Production 함수를 호출하지 않는다.
+- **모델 이전 COMMIT:** 한 Subject 트랜잭션 내 DB 이름·현재 원본 Grant/Memory 검증 → Parent/Edge 영속 저장 → **COMMIT 성공 뒤에만** `disposable_source_set_committed` 후보 영수증을 반환한다. DB 무권한/Grant 불일치/잘못된 원본 ID/후속 COMMIT 응답 유실은 전부 `HOLD`. 후보 영수증의 `permitsProvider=false, permitsAtomicCommit=false, permitsHttpReveal=false`는 바꿀 수 없다.
+- **격리 검증:** 기존 R1 클론(원본 두 Memory/Grant 및 immutable Parent/Edge) 위에 실제 새 Turn/Attempt를 생성해 API Member identity→PG 역할→DB Owner 함수→COMMIT 후 원장 조회를 검증. 최종 선택 변경/원본 Grant 교체·이종 Schema/비Member/잘못된 DB·RPC 거부·COMMIT 불명확 시 차단. 기존 `test/db/seyeon_r2_disposable_actual_v2_revoke_race.sh`의 R1 직후 기존 DB에 연결하며 새 중복 마이그레이션/테스트 클론 생성 금지.
+- **남은 정확한 차이:** 현재 합성 R1 Owner 함수는 source`recordId/grantId`와 PostgreSQL JSONB digest만 신뢰하며 Node projected/raw digest를 DB 원본과 **동등 비교하지 않음**. 최종 실제 모델 입력 전체 파생 출처(History/Relationship/Reader/Preflight), Owner 승인 타입·Codec, 생산용 positive 1640/XOR·비공개 RPC 역할, G2/G3 Commit/송출은 아직 없음. 따라서 R19은 **격리 DB Pin 연결 후보**일 뿐 G1 Production PASS 아님.
+- **불변:** 기존 Runtime `assertSeyeonPersonalRecordsNotUsedBeforeUnprotectedCommitV1` 및 positive pre-model HOLD, `Projectors=[]`, 공개/유료/Provider OFF, Production DB DDL/DML/ACL/migration/history 0, `G0=PROPOSED`, G1 positive/G2/G3/G5/G6 HOLD. Owner 실제 기술 서명을 이 PR로 대체하지 않음.
