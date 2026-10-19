@@ -25,7 +25,7 @@ node scripts/local/run-seyeon-zero-cost-docker.mjs --disposable-only
 1. Docker가 **로컬 Unix socket/Windows named pipe**에만 연결되어 있는지 검사합니다. 원격 SSH/TCP Docker 컨텍스트 또는 지정된 외부 Buildx Builder는 거부합니다.
 2. `node:24-bookworm-slim` 및 저장소에 잠긴 공개 npm 패키지로 테스트 이미지를 만듭니다. Dockerfile 전용 allowlist는 `.env`, 인증서·개인키, `node_modules`, `.git`, `dist`, 임의 사용자 파일의 복사를 차단합니다. **이미지 생성 단계에서만** 공개 의존성 다운로드를 수행할 수 있습니다.
 3. `--rm --network none --cap-drop ALL --security-opt no-new-privileges` 옵션으로 실제 TLS 1.3 / Member 인증·거부 / DB 원본 송출 / AI 비용 정책 거부 / 프로세스 진입점 보안 / Vercel 응답 HOLD 관련 **합성 Vitest**를 실행합니다. Docker 포트 바인딩 없음, 호스트 소스·비밀키 마운트 없음, Docker 환경변수로 인증정보 전달 없음. AI 모델 결과는 모두 **가짜 값**입니다.
-4. 기존 `scripts/run-seyeon-c08-local-docker-pg17.mjs --disposable-only`를 호출해 별도 `postgres:17.6`의 **네트워크 격리된 일회용 DB**에서 첫 Thread·RLS·redacted 과거 기록 집계 검사를 실행합니다. 이 단계는 **1510 기준선 재현**이며 운영에 설치된 `20261018190000` 최종 함수 자체의 PostgreSQL 재검증으로 간주하면 안 됩니다.
+4. 기존 `scripts/run-seyeon-c08-local-docker-pg17.mjs --disposable-only`를 호출해 별도 `postgres:17.6`의 **네트워크 격리된 일회용 DB**에서 첫 Thread·RLS·redacted 과거 기록 집계 검사를 실행합니다. 공식 PostgreSQL 이미지에 `git`이 없어도 pinned Git blob SHA-1을 검증하도록 coreutils 경로를 제공하며, Windows CRLF는 원본을 변경하지 않고 LF로 정규화한 **동일 고정 SQL 해시일 때만** 허용합니다. 이 단계는 **1510 기준선 재현**이며 운영에 설치된 `20261018190000` 최종 함수 자체의 PostgreSQL 재검증으로 간주하면 안 됩니다.
 5. 종료 또는 실패 시 컨테이너를 삭제하고 테스트 이미지를 제거합니다. 원본 저장소·운영 DB에는 SQL을 실행하지 않습니다.
 
 성공 시 두 단계가 각각 표시되고 최종적으로 아래가 출력됩니다.
