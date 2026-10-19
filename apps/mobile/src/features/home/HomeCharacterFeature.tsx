@@ -99,7 +99,7 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   imageCrop: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute', top: 0, right: 0, bottom: 0, left: 0,
     overflow: 'hidden',
   },
   portrait: {
@@ -111,7 +111,7 @@ const styles = StyleSheet.create({
     opacity: 0.88,
   },
   imageShade: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute', top: 0, right: 0, bottom: 0, left: 0,
     backgroundColor: 'rgba(9, 22, 36, 0.43)',
   },
   innerBorder: {
