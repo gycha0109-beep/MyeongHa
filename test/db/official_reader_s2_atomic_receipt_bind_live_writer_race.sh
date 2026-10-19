@@ -557,7 +557,24 @@ pass "initial Reader receipt uses current Birth revision scope, not historical s
 # post-lock check if the DB spends time creating the Reading/access row.
 # Force the exact B5 insert to wait beyond a short synthetic Grant lifetime.
 # No trigger/function survives this isolated integration scenario.
+# The published Capability Item is unbounded. Its Receipt writer must keep
+# refusing caller-supplied finite valid_until; only the disposable DB fixture
+# rewrites the NEW synthetic Grant row after verified issuance validation.
 p >"$tmpdir/expiring-insert-trigger.out" 2>&1 <<SQL || { cat "$tmpdir/expiring-insert-trigger.out" >&2; fail "unable to install isolated expiring-bind insert delay"; }
+create function public.test_reader_s2_expiring_grant_insert_v1()
+returns trigger language plpgsql security invoker
+set search_path=pg_catalog,public
+as \$short_grant\$
+begin
+  new.valid_until:=pg_catalog.clock_timestamp()+interval '2 seconds';
+  return new;
+end;
+\$short_grant\$;
+create trigger test_reader_s2_expiring_grant_insert_v1
+  before insert on public.entitlement_grants
+  for each row
+  when (new.source_receipt_id='$b5_receipt'::uuid)
+  execute function public.test_reader_s2_expiring_grant_insert_v1();
 create function public.test_reader_s2_expiring_insert_delay_v1()
 returns trigger language plpgsql security invoker
 set search_path=pg_catalog,public
@@ -583,7 +600,7 @@ select public.internal_apply_verified_reader_purchase_under_scope_v1(
   '$b5_receipt'::uuid,'$b5_intent'::uuid,
   array['test-reader-unit'],array[transaction_timestamp()],
   array[transaction_timestamp()],
-  array[transaction_timestamp()+interval '2 seconds'],
+  array[null]::timestamptz[],
   array[null]::text[],
   '12193000-0000-0000-0000-000000000005'::uuid,
   '$new_reading'::uuid,
@@ -604,6 +621,9 @@ p >"$tmpdir/expiring-trigger-cleanup.out" 2>&1 <<SQL || { cat "$tmpdir/expiring-
 drop trigger test_reader_s2_expiring_insert_delay_v1
   on public.standard_reading_reader_access_grants;
 drop function public.test_reader_s2_expiring_insert_delay_v1();
+drop trigger test_reader_s2_expiring_grant_insert_v1
+  on public.entitlement_grants;
+drop function public.test_reader_s2_expiring_grant_insert_v1();
 SQL
 remaining_b5="$(p -c "select
   (select count(*) from public.entitlement_grants where source_receipt_id='$b5_receipt'::uuid)::text
