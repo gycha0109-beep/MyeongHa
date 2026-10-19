@@ -66,6 +66,36 @@ export function percentileSeyeonDialoguePathV1(values, fraction) {
   return sorted[Math.ceil(sorted.length * fraction) - 1];
 }
 
+/**
+ * Hard prerequisite for counting a completed 5→3 end-to-end sample.
+ * An equal number of provider requests is insufficient: the real
+ * server stages must each execute exactly once, with no unclassified
+ * or duplicate/fallback model dispatch.
+ */
+export const SEYEON_DIALOGUE_PATH_EXPECTED_STAGE_COUNTS_V1 = Object.freeze({
+  legacy_5_terra: Object.freeze({
+    integrity_classification: 1,
+    disclosure_classification: 1,
+    turn_interpretation: 1,
+    dialogue_render: 1,
+    semantic_review: 1,
+  }),
+  fast_3_luna_terra: Object.freeze({
+    unified_preflight_shadow: 1,
+    turn_interpret_render_shadow: 1,
+    semantic_review: 1,
+  }),
+});
+
+export function verifySeyeonDialoguePathStageTopologyV1(route, counts) {
+  const expected = SEYEON_DIALOGUE_PATH_EXPECTED_STAGE_COUNTS_V1[route];
+  if (!expected || !counts || typeof counts !== 'object' ||
+      Array.isArray(counts)) return false;
+  const keys = Object.keys(counts);
+  return keys.length === Object.keys(expected).length &&
+    keys.every(key => Object.hasOwn(expected, key) && counts[key] === expected[key]);
+}
+
 export function summarizeSeyeonDialoguePathV1(rows, expectedCaseIds) {
   if (!Array.isArray(rows) || !Array.isArray(expectedCaseIds) ||
       expectedCaseIds.length === 0 ||

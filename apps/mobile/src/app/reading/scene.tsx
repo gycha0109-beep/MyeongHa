@@ -14,6 +14,7 @@ import { useMobileChatOpenV1 } from '@/features/chat/use-mobile-chat-open';
 import { resolveMobileSajuSceneAdmissionV1 } from '@/features/saju/mobile-saju-reader-scene';
 import { mobileSajuPreviewServiceV1 } from '@/features/saju/native-mobile-saju-preview-service';
 import { mobileColors } from '@/ui/mobile-colors';
+import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
 
 const ROOM_ART = require('../../../assets/characters/chat-themes/seyeon-chat-theme-mobile-v1.webp');
 const SEYEON_ART = require('../../../assets/characters/seyeon-portrait.webp');
@@ -34,6 +35,7 @@ function unavailableMessage(error: unknown): string {
 }
 
 export default function SajuReaderSceneScreen() {
+  const styles = useMobileThemedStyles(staticStyles);
   const params = useLocalSearchParams<{ reader?: string | string[]; topic?: string | string[] }>();
   const readerId = typeof params.reader === 'string' ? params.reader : null;
   const topicKey = typeof params.topic === 'string' ? params.topic : null;
@@ -253,3 +255,4 @@ const styles = StyleSheet.create({
   buttons: { flexDirection: 'row', gap: 8 },
   flex: { flex: 1 },
 });
+const staticStyles = styles;

@@ -3,9 +3,11 @@ import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { FORTUNE_COOKIE_MESSAGES_V1, pickFortuneCookieIndexV1 } from '@/features/home/mobile-fortune-cookie';
 import { mobileColors } from '@/ui/mobile-colors';
+import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
 
 /** Recreational random notes, not a birth-based or AI-generated Saju prediction. */
 export function MobileFortuneCookie() {
+  const styles = useMobileThemedStyles(staticStyles);
   const [revealed, setRevealed] = useState(false);
   const [index, setIndex] = useState(-1);
 
@@ -98,3 +100,4 @@ const styles = StyleSheet.create({
     lineHeight: 32, textAlign: 'center', paddingHorizontal: 7, paddingVertical: 18,
   },
 });
+const staticStyles = styles;

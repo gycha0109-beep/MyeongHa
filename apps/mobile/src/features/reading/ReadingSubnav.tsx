@@ -7,6 +7,7 @@ import {
   type MobileReadingSubtab,
 } from '@/navigation/mobile-navigation-contract';
 import { mobileColors } from '@/ui/mobile-colors';
+import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
 
 const items = [
   { key: 'saju', label: '사주' },
@@ -14,6 +15,7 @@ const items = [
 ] as const satisfies ReadonlyArray<{ key: MobileReadingSubtab; label: string }>;
 
 export function ReadingSubnav() {
+  const styles = useMobileThemedStyles(staticStyles);
   const pathname = usePathname();
   const active = resolveMobileReadingSubtab(pathname);
 
@@ -57,3 +59,4 @@ const styles = StyleSheet.create({
   label: { color: mobileColors.muted, fontSize: 16, fontWeight: '700' },
   labelSelected: { color: mobileColors.surface },
 });
+const staticStyles = styles;
