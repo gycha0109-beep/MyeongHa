@@ -16,7 +16,7 @@ export function RecordsEditorialHeader({
   itemCount,
 }: {
   selected: RecordsTabV1;
-  itemCount: number;
+  itemCount: number | null;
 }) {
   const { theme } = useMobileTheme();
   return (
@@ -36,7 +36,7 @@ export function RecordsEditorialHeader({
       <View style={styles.countRow}>
         <Text style={styles.countCategory}>{tabLabels[selected]}</Text>
         <View style={styles.countDivider} />
-        <Text style={styles.countText}>현재 불러온 기록 {itemCount}건</Text>
+        <Text style={styles.countText}>{itemCount === null ? '기록을 확인하는 중' : `현재 불러온 기록 ${itemCount}건`}</Text>
       </View>
     </View>
   );
