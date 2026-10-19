@@ -238,3 +238,43 @@ S8의 **비파괴/격리 검토는 S2~S7과 병렬 진행 가능**하며, S8 Pro
 - **실제 코드:** `apps/api/src/seyeon-node-original-grant-send-boundary-v1.ts`: 서버 소유 original Grant 잠금/권한 포트에서만 Node `ServerResponse` 단일 본문 송출 허용. `finish`까지 DB 권한 잠금 유지, 연결 해제·취소/제한 시간 초과 시 소켓 파기와 후발 송출 거부. `null` 권한은 503/no-store, 개인정보 본문 0바이트. **현재 Vercel Fetch `Response` 경로와 실제 Provider/운영 DB에는 연결하지 않는다.**
 - **최소 검사:** 실제 로컬 Node socket에서 정상/거부/취소 3건만 추가. R10 기존 실제 PG 양방향 경쟁 테스트는 재사용; 같은 케이스 증식 금지. G0 D-04 계약과 실제 Vercel 프록시 송출 보장은 여전히 미해결.
 - **승인/운영 상태:** Product Owner 정책은 기존 승인 유지. 기술 Owner 서명 전 G0=PROPOSED, G1 positive/G2/G3/G5/G6 HOLD, Projectors=[], Provider/공개/유료 OFF, Production DB writes=0. 정확한 HEAD CI 및 저장소 병합 필수 게이트 외 불필요한 반복 검증 금지.
+
+
+## 27. 2026-10-18 R13 — 원본 Grant DB 조회와 Node 소켓 송출을 하나의 트랜잭션으로 연결
+
+- 코드: `apps/api/src/seyeon-original-grant-pg-send-adapter-v1.ts`. 서버가 검증한 Member를 기존 Subject DB resolver에 바인딩하고, original Grant/Record/Attempt/Message를 DB 함수에서 현재 잠금/검사한다. DB 트랜잭션은 Node 응답 `finish` 이후 COMMIT; Abort/오류는 ROLLBACK. 기존 R10 **실제 DB/HTTP 송출 우선** 시험에 새 Adapter를 적용하고 중복 DB 경합 테스트를 신설하지 않는다.
+- 보안 수정: 기존 Vercel 외곽 응답 가드의 4xx 무조건 통과를 폐지. `chat-turn-send-http.ts`가 직접 만든 고정 4xx 오류만 허용, 위조 401/403+보호 본문은 503으로 교체.
+- 운영은 불변: candidate G3 SQL은 named disposable PG만, Production G0 기술 Owner OPEN/G1+G2+G3+G5+G6 HOLD, Projectors=[], 첫 공개/Provider/public/paid OFF, Production DDL/DML/migration/ACL 0. Vercel/Proxy 마지막 홉의 안전한 양수 공개는 아직 기술 승인 전 미연결.
+- 검사: 신규 최소 모듈 테스트 3개, 기존 R10 실 DB 테스트 재사용, 저장소 필수 CI·통합 검사만 수행. 추가 불필요한 회귀 확장은 하지 않는다.
+
+
+## 28. 2026-10-18 R15 — 사용자 기억동의 철회 ACK와 원본 Grant 전송 잠금 연결
+
+- **코드:** `apps/api/src/seyeon-original-grant-revoke-ack-v1.ts`: 검증된 Member만 canonical Subject DB 트랜잭션에서 `cmd_revoke_memory_character_grant_v1`으로 세연의 정확한 Memory Grant 철회 가능. 성공 ACK는 DB COMMIT 이후만 가능; 손실/모호성 시 성공 주장 금지, 재시도는 DB 원장 기반 replay 사용.
+- **검증 변경 최소화:** 기존 R10 실제 PG 두 세션 전송/철회 경합에서 테스트용 직접 `UPDATE` 대신 **이미 존재하는 진짜 권한 철회 RPC** 사용. 새로운 DB fixture/시나리오 증식 없이 신규 모듈 테스트 3건만 추가.
+- **운영 HOLD:** Production Executor의 기존 SECURITY INVOKER 철회 명령 ACL 및 실제 사용자 HTTP Route는 별도 검증·승인 전 미연결. 현재 Vercel/Proxy 개인기억 최초 공개 불허, Projectors=[], Provider/public/paid OFF, 새 Production migration/DDL/DML 0.
+
+
+## 29. 2026-10-18 R16 — 본인 동의 철회 HTTP 후보와 운영 DB 권한 실측
+
+- **실측:** Supabase 명하 운영 pg_catalog(데이터 읽기 없이) 확인 결과 `myeongha_api_executor`의 기존 `cmd_revoke_memory_character_grant_v1` EXECUTE=false, 필요 테이블 SELECT/UPDATE=false. 코드만 배포해서 실제 철회가 된다고 주장 금지.
+- **구현:** `apps/api/src/seyeon-memory-grant-revoke-http-v1.ts`의 검증된 Member 전용 POST 철회 후보, 본인 원본 Memory ID 이외 추가 입력 불허, 권한 승인 기본 OFF=503/no-store/DB 호출 0. 정상 권한 구성 시 이미 작성된 R15 COMMIT 뒤 ACK 사용. `production-seyeon-memory-grant-revoke-runtime-v1.ts`에는 실제 인증/DB composition만 준비하고 운영 Vercel route 미탑재.
+- **다음 개발:** 광범위 테이블 UPDATE/SELECT GRANT 없이 좁은 비공개 DB 철회 권한을 명시적으로 설계하고, 검토된 Owner/실제 역할 분리로 연결한 뒤 제한된 운영 활성화 결정. 그전까지 G0 기술 Owner OPEN, 첫 개인정보 기반 Reply HOLD, Production DDL/DML/ACL 0.
+- **검증 축소:** 이번 변경은 기본 OFF/정상 Member 매핑/COMMIT 불명확 시 실패의 작은 HTTP 테스트 4개, 운영 카탈로그 읽기 전용 조회, 저장소 필수 CI만.
+
+## 30. 2026-10-18 R17 — 비공개 최소 권한 원본 Grant 철회 후보 (코드 검증·병합 완료, 운영 미설치)
+
+- **다음 미완료 의존성 해결 후보:** `scripts/operations/seyeon-private-memory-grant-revoke-r17-candidate.sql`은 `seyeon_private` 비공개 스키마에 **활성 canonical Member의 본인 Memory + 고정 세연**만 철회하는 `SECURITY DEFINER` 경계를 추가한다. 기존 `cmd_revoke_memory_character_grant_v1`의 원본 Subject 잠금/Grant 변경/재호출 no-op을 그대로 재사용한다.
+- **ACL:** **정식 Supabase 마이그레이션에 포함하지 않으며**, 격리된 CI 복제 DB에서만 수동 적용해 검증한다. 기존 `myeongha_api_executor`의 광범위 테이블 SELECT/UPDATE 및 public 원본 RPC EXECUTE 권한은 추가하지 않는다. `anon`/`authenticated`/`service_role` 직접 실행 및 schema USAGE 거부. 실제 설치 전 Owner·소유권·역할·미노출 Schema 검토 필요.
+- **연결:** R15 트랜잭션/COMMIT→ACK 코드를 변경 없이 재사용하되, R16의 운영 미탑재 구성에서만 private 명령을 선택하도록 연결. `approvedDbWriteAdmission` 미공급 상태는 그대로 503/no-store이며 SQL 파일 작성·PR 병합만으로 운영 DB에 실행하지 않는다.
+- **검증 기준:** 기존 CI가 새로 생성해 폐기하는 격리 PostgreSQL의 실제 restricted role에서 정확한 본인 세연 Grant 철회/재호출/타 사용자 거부/타 캐릭터 권한 보존을 확인하고, 기존 R15 COMMIT/ACK 회귀, CI/Governance/Web/Full Integration, 병합 후 main 확인. **검사 전 PASS 주장 금지**.
+- **미해결:** G0 Security/DB/API/Character 기술 승인, 실제 운영 DB 미적용 ACL/DDL·DR, R16 공개 라우트 admission, 최초 개인기억 답변·History·Replay·Vercel 프록시 송출 G3 HOLD. Projectors=[], Provider/public/paid OFF, Production DB writes=0.
+
+
+## 31. 2026-10-19 R18 — G0 기술 계약·R17 최소권한 운영 적용 준비 (승인 전 차단)
+
+- **선행 완료 확인:** R17 [PR #2316](https://github.com/gycha0109-beep/MyeongHa/pull/2316)의 HEAD `4f4c4a34ec0c0eea73bc536eb56613628a5e0652`, Full Integration [#39142314457](https://github.com/gycha0109-beep/MyeongHa/actions/runs/39142314457) **11/11 SUCCESS**, squash main `16671989f050ca13d071e4c3c2ab1aaa1bb5b027`, 사후 [main CI #39144195981](https://github.com/gycha0109-beep/MyeongHa/actions/runs/39144195981) / Governance #39144195999 SUCCESS 및 [Production #39144195975](https://github.com/gycha0109-beep/MyeongHa/actions/runs/39144195975) SUCCESS(마이그레이션·백필 SKIPPED). 이는 **후보 코드 증거만** 확보했다는 뜻이다.
+- **이번 소스 산출물:** [R18 기술 결정·운영 권한 핸드오프](../security/SEYEON_R18_G0_TECHNICAL_AUTHORITY_HANDOFF_20261019.md)와 [R17 비공개 RPC/ACL 읽기 전용 카탈로그 조회](../../scripts/operations/seyeon-private-revoke-r18-readonly.sql). PostgreSQL `pg_catalog`/유효 권한만 조회하며 사용자 기억 테이블 행을 읽거나 DDL/DML/GRANT/REVOKE를 수행하지 않는다. 실제 운영 적용권한을 생성하지 않는다.
+- **진행 조건:** Security/DB/API/Character 실제 Owner가 G0-D01/D03/D04/D05/D06/D08/D09 등의 범위·코덱·송출/ACK 계약을 검토해 **명시적 승인**하기 전 `G0=PROPOSED`. R17 SQL 운영 설치/마이그레이션 역사 수정/역할 ACL 및 공개 HTTP 마운트 금지. Owner 승인 기록은 Product Owner 기존 정책 승인을 대체하지 않으며 재요청하지 않는다.
+- **다음 실제 구현:** 계약 승인 후 제한된 G1 양수 원본·파생 Source Pin → G2 동일 DB 트랜잭션 Commit → G3 신뢰 가능한 Node/Proxy 송출·History/Replay 차단 → G5 실제 경합/보안 검증 → #1887 DB/DR 및 G6 별도 운영 승인 순서. 구현 준비용 후보가 먼저 작성되더라도 Production 기능 승격/허가로 취급하지 않는다.
+- **유지:** `Projectors=[]`, 세연 공개/실 Provider/유료 OFF, R16 revoke HTTP 미탑재, `writeAdmission:'DENY'`, 실제 Production DB 변경 0, G1 positive/G2/G3/G5/G6 HOLD.

@@ -222,6 +222,9 @@ psql -v ON_ERROR_STOP=1 -f test/db/guest_promotion_auth_fk_authority.sql
 bash test/db/user_resource_revocation_concurrency.sh
 bash test/db/character_forget_concurrency.sh
 bash test/db/memory_grant_revoke_concurrency.sh
+# R17 candidate SQL is NOT in supabase/migrations. Install it only inside an
+# isolated disposable clone, run restricted Member ACL checks, then destroy DB.
+run_isolated_case myeongha_seyeon_private_revoke_r17_test bash test/db/seyeon_private_memory_grant_revoke_v1.sh
 bash test/db/life_fact_grant_revoke_concurrency.sh
 bash test/db/guest_bootstrap_concurrency.sh
 bash test/db/life_fact_revoke_concurrency.sh

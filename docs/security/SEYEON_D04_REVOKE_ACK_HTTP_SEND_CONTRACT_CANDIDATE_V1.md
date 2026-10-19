@@ -90,3 +90,28 @@ original Grant 철회 COMMIT                  (R)
 - 배포 경계: 명하의 현재 `api/me.ts`는 Vercel **Fetch `Response`를 반환**하므로 이 Node 소켓 포트를 사용할 수 없다. `Response` 생성/반환이 `S`라는 주장은 금지한다. **운영 메모리 기반 첫 공개 HOLD 불변**. 이후 직접 제어 가능한 Node 송출 서비스나 동등하게 입증된 프록시 송출 계약이 준비돼야 연결 가능하다.
 - 운영 주의: 이 후보는 **DB 잠금을 실제 송출이 끝날 때까지 유지**하므로 작은 응답·짧은 deadline에서는 구현 가능하지만, 네트워크 병목/풀 고갈, multi-instance, 실패 뒤 ACK, 백그라운드 Worker와 History 재공개를 해결한 완성품이 아니다. 실제 배포 승인 전 해당 경계의 부하·취소·송출/철회 선형화 및 Owner 서명이 필요하다.
 - 최소 검증: 별도 실제 Node loopback에서 정상/권한 거부/중단 3건; 이미 R10에 실 DB 두 세션 순서 테스트 2건이 존재하므로 R11에서 DB 시나리오를 중복 증식하지 않는다.
+
+
+## 8. R13 — DB 원본동의 확인과 Node 송출 연결 (배포 미연결)
+
+- **코드:** `apps/api/src/seyeon-original-grant-pg-send-adapter-v1.ts`. 실명 확인을 통과한 Member 인증정보로만 서버 DB 트랜잭션을 시작하고, 그 트랜잭션에서 현재 original Grant/Record/Attempt/Message를 DB 소유 `seyeon_positive_candidate.reveal_http_r5`로 확인한다. 같은 트랜잭션 잠금 아래 `deliver()`가 Node `finish`를 완료한 이후에만 COMMIT. 다른 동의 철회 트랜잭션과의 선후관계를 R10 기존 실 DB 테스트에 재사용하여 연결한다.
+- **오류·철회:** 철회 우선이면 SQL NULL→503, 전송 오류·취소면 ROLLBACK. 잠금 대기는 2초, SQL 실행은 5초로 제한하고 콜백은 요청당 한 번만 사용한다. 단, 네트워크 취소 시 이미 실행 중인 SQL의 중단은 lock/statement timeout에 의존한다.
+- **중요 제한:** 이 G3 SQL 함수는 **격리 테스트 DB에만 존재**한다. 인증된 Production 권한/DB 마이그레이션·Vercel 프록시 송출·철회 ACK는 여전히 미구현/미승인. 실제 운영 positive 공개를 켜지 않는다.
+- **추가 보완:** 기존 `api/me.ts` 외곽 Vercel 응답 방어에서 단순 임의 4xx/no-store가 보호 본문을 통과하는 문제를 막기 위해 **서버가 직접 생성·등록한 오류 객체만 통과**한다. 그 외 4xx 포함 모든 결과는 고정 503/no-store. 외부 입력·임의 응답/본문에서 보안 결정을 하지 않는다.
+
+
+## 9. R15 — 실제 Memory Grant 철회 명령과 성공 ACK 순서 연결 (운영 미연결)
+
+- **구현:** `apps/api/src/seyeon-original-grant-revoke-ack-v1.ts`에서 서버가 검증한 Member → canonical Subject를 기존 `executePostgresSubjectTransactionV1`으로 해결한 뒤, 서버 고정 `characterId='seyeon'`과 본인 Memory ID에 대해 기존 `public.cmd_revoke_memory_character_grant_v1`만 호출한다. 임의의 Subject/캐릭터/Grant ID를 요청자로부터 받지 않는다.
+- **ACK:** 명령 결과가 성공했더라도 PostgreSQL 트랜잭션의 **COMMIT이 성공적으로 끝난 뒤에만** `status='committed'`를 반환한다. Commit 응답 손실·실패·락 타임아웃에는 완료로 응답하지 않고 오류/재시도 처리에 맡긴다. 기록 삭제/타 캐릭터 Grant 삭제/기존 Attempt 재승인은 발생하지 않는다.
+- **전송 경합:** 실제 RPC는 `public.subjects FOR UPDATE`를 동작 초기에 획득한다. 기존 R13 current-original-Grant Reader는 같은 Subject를 `FOR SHARE`로 잠근 채 R11 Node `finish`를 기다린다. 따라서 **Node가 통제하는 전송 한정**으로, 둘 중 먼저 Subject 잠금을 확보한 순서대로 취소 COMMIT과 Node 전송 인계가 직렬화된다. 기존 R10의 두 실제 PostgreSQL 세션 테스트에서 수동 UPDATE 대신 이 실제 RPC를 사용한다.
+- **미승인 부분:** `cmd_revoke_memory_character_grant_v1`은 SECURITY INVOKER이므로 실제 운영 `myeongha_api_executor`의 실행/테이블 ACL 적합성은 별도 증명해야 한다. 이번 테스트의 revoker는 폐기용 DB 소유자 연결이며 실제 운영 권한 증거가 아니다. Vercel/Proxy 송출 경계 및 공개·재전송 승인도 여전히 미완료. **Production revoke ACK route는 미탑재**, Provider/양수 Reveal/Public/Paid/운영 DB 변경 없음.
+
+
+## 10. R16 — 실제 Supabase 운영 권한 확인과 사용자 철회 HTTP 후보
+
+- **운영 DB 카탈로그 직접 조회 (2026-10-18, 읽기 전용):** 명하 Supabase Project의 `myeongha_api_executor` 역할은 존재하고 `public.cmd_revoke_memory_character_grant_v1(uuid,uuid,text)`도 존재하지만, RPC는 `SECURITY INVOKER`이며 **해당 역할의 EXECUTE=false**. `public.subjects`와 `public.record_access_grants`의 UPDATE=false, `record_access_grants`·`memory_items` SELECT=false. **현재 운영 DB 권한으로는 R15 철회 SQL을 실행할 수 없다.** 실제 결과는 개인 기록을 읽지 않은 pg_catalog/has_*_privilege 조회이며 `scripts/operations/seyeon-original-grant-revoke-acl-readonly.sql`로 재현 가능하다.
+- **이번 코드:** `apps/api/src/seyeon-memory-grant-revoke-http-v1.ts`가 `POST /api/memories/:memoryItemId/grants/seyeon/revoke`를 구현. 서버의 인증된 Member만 허용하고, Body·Query에서 Subject/Character/Grant/Attempt override를 허용하지 않는다. DB 승인이 없으면 **기본 503/no-store**이고 DB 연결/쓰기 0회. 입장 허가 후에는 이미 구현된 R15 COMMIT 후 ACK 처리만 호출; 불명확한 COMMIT·권한 거부·DB 오류는 성공으로 표시하지 않는다.
+- **실 운영 구성:** `apps/api/src/production-seyeon-memory-grant-revoke-runtime-v1.ts`가 실제 Production Member 인증기와 DB pool을 묶으나 **DB 쓰기 승인도 OFF, Vercel `api/me.ts` 경로도 미탑재**. 테스트에서만 가짜 승인 함수를 주입해 정상 ACK 매핑을 확인한다.
+- **권한 해결 원칙:** `myeongha_api_executor`에 `record_access_grants`·`subjects`의 광범위 SELECT/UPDATE나 기존 SECURITY INVOKER RPC 호출권을 무심코 부여하지 않는다. 실제 진입에 필요한 것은 **비공개 스키마의 최소 권한 original-Grant 철회 소유 RPC** 또는 동등하게 검증된 좁은 권한 계약이다. 서버가 확인한 canonical Subject와 `character='seyeon'`을 고정하고, 사용자 단위 격리·커밋 후 ACK·이미 완료된 보내기 순서가 유지되어야 한다. 별도 기술 승인과 실제 restricted-role 검증 전까지 운영 ACL/마이그레이션/전송 기능을 건드리지 않는다.
+- **판정:** Product Owner 승인 재요청 없음. G0 기술 승인 OPEN, G3 positive 첫 Reveal/Replay/History HOLD, 철회 HTTP Production 미탑재, public/paid/Provider OFF.

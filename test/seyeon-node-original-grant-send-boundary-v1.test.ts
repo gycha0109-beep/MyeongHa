@@ -118,4 +118,74 @@ describe('R11 Node-owned bounded original Grant disclosure transport candidate',
     });
     expect(rejectedLateSend).toBe(true);
   });
+  it('delivers existing Chat API data/meta shape with only freshly authorized Node text', async () => {
+    const metadata = {
+      turnId: '44444444-4444-4444-8444-444444444444',
+      assistantMessageId: '66666666-6666-4666-8666-666666666666',
+      sequenceNo: 2,
+      replayed: false,
+      requestId: 'request-socket-canary',
+      serverTime: '2026-10-18T13:00:00.000Z',
+    } as const;
+    await withNodeSocket(async response => {
+      await sendSeyeonNodeOriginalGrantResponseV1({
+        response,
+        requestSignal: new AbortController().signal,
+        chatResponseMetadata: metadata,
+        withLockedOriginalGrant: async ({ deliver }) => { await deliver(CANARY); },
+      });
+    }, async url => {
+      const res = await fetch(url);
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({
+        ok: true,
+        data: {
+          turnId: metadata.turnId,
+          assistantMessageId: metadata.assistantMessageId,
+          assistantText: CANARY,
+          sequenceNo: 2,
+          replayed: false,
+        },
+        meta: {
+          apiContractVersion: 'v0.9',
+          requestId: metadata.requestId,
+          serverTime: metadata.serverTime,
+        },
+      });
+    });
+  });
+
+  it('keeps absent original authorization as app-compatible static 503 without user text', async () => {
+    await withNodeSocket(async response => {
+      await sendSeyeonNodeOriginalGrantResponseV1({
+        response,
+        requestSignal: new AbortController().signal,
+        chatResponseMetadata: {
+          turnId: '44444444-4444-4444-8444-444444444444',
+          assistantMessageId: '66666666-6666-4666-8666-666666666666',
+          sequenceNo: 2,
+          replayed: true,
+          requestId: 'request-held',
+          serverTime: '2026-10-18T13:00:00.000Z',
+        },
+        withLockedOriginalGrant: async ({ deliver }) => { await deliver(null); },
+      });
+    }, async url => {
+      const res = await fetch(url);
+      const body = await res.text();
+      expect(res.status).toBe(503);
+      expect(JSON.parse(body)).toMatchObject({
+        ok: false,
+        error: {
+          code: 'SEYEON_FIRST_REVEAL_AUTHORITY_UNAVAILABLE',
+          messageKey: 'chat.secure_reveal_unavailable',
+          retryable: false,
+        },
+        meta: { apiContractVersion: 'v0.9', requestId: 'request-held' },
+      });
+      expect(body).not.toContain(CANARY);
+      expect(body).not.toContain('assistantText');
+    });
+  });
+
 });
