@@ -22,7 +22,8 @@ describe('mobile M6-B Chat read UI structure', () => {
 
   it('keeps recent discovery blocked while consuming the separate source-approved Launch roster', async () => {
     const hub = await readRepoFile('apps/mobile/src/app/(tabs)/chat/index.tsx');
-    expect(hub).toContain('최근 대화 목록은 아직 서버에서 제공하지 않아');
+    expect(hub).not.toContain('recentThreads');
+    expect(hub).not.toContain('최근 대화 목록은 아직 서버에서 제공하지 않아');
     expect(hub).toContain('MOBILE_CHAT_LAUNCH_ROSTER_V1');
     for (const name of ['백헌', '세연', '여울', '서린', '라현', '미라', '태겸', '윤호', '도윤']) {
       expect(hub).not.toContain(`displayName: '${name}'`);
