@@ -190,7 +190,7 @@ export default function FaceScreen() {
             {ready === null ? `${readerPresentation.name}과 관상 보기 준비` : '사진 준비 완료'}
           </Text>
           <Text style={styles.body}>
-            현재는 사진 촬영·선택과 미리보기만 가능합니다. 얼굴 분석과 관상 풀이는 아직 제공하지 않습니다.
+            현재는 사진 촬영·선택과 미리보기만 가능합니다. 서버 분석은 시작하지 않습니다. 얼굴 분석과 관상 풀이는 아직 제공하지 않습니다.
           </Text>
         </View>
       </View>
