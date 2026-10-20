@@ -76,6 +76,7 @@ try{
     }
     const attrs=[];
     for(const el of document.querySelectorAll('[placeholder],[aria-label],[title],option')){
+      if(el.matches('.ui-locale-picker option')) continue;
       const label=el.getAttribute('placeholder')||el.getAttribute('aria-label')||el.getAttribute('title')||(el.tagName==='OPTION'?el.textContent:'')||'';
       if(/[가-힣]/u.test(label)&&label.length>1)attrs.push({tag:el.tagName,value:label.slice(0,140)});
     }
