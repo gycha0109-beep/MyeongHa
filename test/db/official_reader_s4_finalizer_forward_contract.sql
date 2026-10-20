@@ -97,11 +97,17 @@ select official_reader_s4_fixture.assert_forward_contract_v1('forward finalizer 
   '11390000-0000-0000-0000-000000000002'::uuid
  )=0
  and (select count(*)=1 from official_reader_s4_fixture.protected_bodies));
-select official_reader_s4_fixture.assert_forward_contract_v1('forward finalizer specimen deletes one paid child',
+-- Invoke the mutating function in its OWN statement. PostgreSQL must see
+-- the results with a new READ COMMITTED statement snapshot; SQL does not
+-- guarantee evaluation order of function calls versus subquery reads.
+select official_reader_s4_fixture.assert_forward_contract_v1(
+ 'forward finalizer specimen deletes exactly one paid child',
  official_reader_s4_fixture.rehearse_account_delete_child_first_v1(
   '11390000-0000-0000-0000-000000000001'::uuid
- )=1
- and not exists(select 1 from official_reader_s4_fixture.protected_bodies)
+ )=1);
+select official_reader_s4_fixture.assert_forward_contract_v1(
+ 'after child-first statement the Reader parent is gone while Commerce remains',
+ not exists(select 1 from official_reader_s4_fixture.protected_bodies)
  and not exists(select 1 from public.standard_reading_reader_access_grants
   where purchase_intent_id='12192300-0000-0000-0000-000000000002'::uuid)
  and exists(select 1 from public.commerce_receipts cr
