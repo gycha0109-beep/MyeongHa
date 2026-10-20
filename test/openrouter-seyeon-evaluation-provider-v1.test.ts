@@ -53,7 +53,7 @@ describe('OpenRouter Se-yeon eval adapter: offline / zero paid dispatch', () => 
   it('issues one governed Chat Completions request after awaited pre-dispatch reservation', async () => {
     const order: string[] = [];
     const beforeDispatch = vi.fn(async () => { order.push('reserve'); });
-    const afterOutcome = vi.fn(async () => { order.push('observe'); });
+    const afterOutcome = vi.fn(async (_metric: OpenRouterSeyeonMetricV1) => { order.push('observe'); });
     const fetchImpl = vi.fn(async (url: string, init: RequestInit) => {
       order.push('fetch');
       expect(url).toBe(URL);
