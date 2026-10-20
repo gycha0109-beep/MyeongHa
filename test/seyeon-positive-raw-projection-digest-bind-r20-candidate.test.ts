@@ -4,7 +4,10 @@ import {createHash} from 'node:crypto';
 import {afterAll,describe,expect,it} from 'vitest';
 import {Pool} from 'pg';
 import {canonicalJson} from '../packages/domain/src/index.js';
-import type {SeyeonRetrievedMemoryV2} from '../packages/domain/src/seyeon-runtime-context-v2.js';
+import {
+  assembleSeyeonRuntimeContextV2,
+  type SeyeonRetrievedMemoryV2,
+} from '../packages/domain/src/seyeon-runtime-context-v2.js';
 import type {SeyeonPersonalRecordProjectionCandidateV1} from '../apps/api/src/seyeon-production-context-v1.js';
 import type {SeyeonR21OfflineDerivedSourceEnvelopeV1} from '../apps/api/src/seyeon-r21-offline-derived-source-closure-v1.js';
 import {
@@ -75,7 +78,16 @@ function inputs(rawOverride?:string,projectionOverride?:string){
     preflightState:'not_run',disclosureRetrievedPrivateSources:[],
     readerDerivedSources:[],workerDerivedSources:[],externalToolPrivateSources:[],
   };
-  return {retrievedMemories,sourceCandidates,selection,sourceEnvelope};
+  const finalModelContext=assembleSeyeonRuntimeContextV2({
+    relationship:null,
+    relationshipSemantics:null,
+    integrityDecisions:[],
+    governedPreflightApplied:false,
+    recentMessages:[],
+    retrievedMemories,
+    disclosure:{decision:null,retrievedSources:[]},
+  });
+  return {retrievedMemories,sourceCandidates,selection,sourceEnvelope,finalModelContext};
 }
 function call(pool:PostgresSubjectPoolV1,other:ReturnType<typeof inputs>){
   return persistSeyeonR20OfflineDigestBoundPinV1({
@@ -131,6 +143,7 @@ describe('R20 original JSONB ↔ final projection digest correspondence, no Prov
     expect(proof).toMatchObject({
       status:'disposable_original_and_projection_digests_committed',
       selectedPersonalRecordCount:2,
+      finalModelContextDigest:hash(inputs().finalModelContext),
       permitsProvider:false,permitsAtomicCommit:false,permitsHttpReveal:false,
     });
   });
@@ -233,6 +246,57 @@ describe('R20 original JSONB ↔ final projection digest correspondence, no Prov
         SeyeonR20OfflineDigestHoldV1);
       expect(db.executed).toEqual([]);
     }
+  });
+
+  it('R34 denies post-selection model Context drift before ANY DB access',async()=>{
+    const attacks:(a:ReturnType<typeof inputs>)=>ReturnType<typeof inputs>=[
+      a=>({...a,finalModelContext:{
+        ...a.finalModelContext,
+        recentConversation:[{messageId:'unapproved-history',role:'user',text:'PRIVATE_CONTEXT_CANARY'}],
+      }}),
+      a=>({...a,finalModelContext:{
+        ...a.finalModelContext,
+        retrievedMemories:[...a.finalModelContext.retrievedMemories].reverse(),
+      }}),
+      a=>({...a,finalModelContext:{
+        ...a.finalModelContext,
+        retrievedMemories:a.finalModelContext.retrievedMemories.map((m,i)=>i===0?
+          {...m,summary:'tampered late projection'}:m),
+      }}),
+      a=>({...a,finalModelContext:{
+        ...a.finalModelContext,
+        integrity:{...a.finalModelContext.integrity,governedPreflightApplied:true},
+      }}),
+      a=>({...a,finalModelContext:{
+        ...a.finalModelContext,
+        disclosure:{decision:null,retrievedSources:[{
+          sourceRef:'private:CANARY',text:'PRIVATE_CONTEXT_CANARY',
+        }] as never},
+      }}),
+      a=>({...a,finalModelContext:{
+        ...a.finalModelContext,
+        relationship:{
+          stageKey:'S3_OPENED',closenessBand:'high',trustBand:'high',
+          frictionBand:'low',revision:1,policyVersion:'forged',
+        } as never,
+      }}),
+      a=>({...a,finalModelContext:{
+        ...a.finalModelContext,
+        unmodelledPrivateSource:'PRIVATE_CONTEXT_CANARY',
+      } as typeof a.finalModelContext}),
+    ];
+    for(const mutate of attacks){
+      const db=mock();
+      const changed=mutate(inputs());
+      await expect(call(db.pool,changed)).rejects
+        .toBeInstanceOf(SeyeonR20OfflineDigestHoldV1);
+      expect(db.executed).toEqual([]);
+    }
+    const db=mock();
+    const a=inputs();
+    await expect(call(db.pool,{...a,finalModelContext:null as never}))
+      .rejects.toBeInstanceOf(SeyeonR20OfflineDigestHoldV1);
+    expect(db.executed).toEqual([]);
   });
 
   it('denies missing original Owner readback, mutated payload, replaced Grant, wrong DB and unknown COMMIT',async()=>{
