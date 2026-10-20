@@ -1,3 +1,5 @@
+import { MOBILE_UI_NATIVE_COPY } from './mobile-ui-native-copy';
+
 /** Shared text values copied from apps/web/ui-i18n.js on this branch.
  * Static authored UI copy ONLY. Do not translate private chats, member-provided
  * content, official reading artifacts, factual values or server errors.
@@ -19,7 +21,7 @@ export function normalizeMobileUiLocale(value: unknown): MobileUiLocale {
 
 export function translateMobileUiCopy(source: string, locale: MobileUiLocale): string {
   if (locale === 'ko-KR') return source;
-  const row = COPY.get(source);
+  const row = COPY.get(source) ?? MOBILE_UI_NATIVE_COPY.get(source);
   return row?.[locale === 'ja-JP' ? 0 : 1] ?? source;
 }
 
@@ -36,5 +38,9 @@ export function localizeMobileLiteralText(value: string, locale: MobileUiLocale)
   const trimmed = value.trim();
   if (!trimmed) return value;
   const translated = translateMobileUiCopy(trimmed, locale);
-  return translated === trimmed ? value : value.replace(trimmed, translated);
+  const normalized = trimmed.replace(/\s+/gu, ' ');
+  const result = translated === trimmed && normalized !== trimmed
+    ? translateMobileUiCopy(normalized, locale)
+    : translated;
+  return result === trimmed ? value : value.replace(trimmed, result);
 }
