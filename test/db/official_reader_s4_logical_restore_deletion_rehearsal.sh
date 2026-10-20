@@ -12,6 +12,23 @@ check() {
   [[ "$actual" == t ]] || die "$label (actual=$actual)"
   echo "PASS S4 restore: $label"
 }
+# Both negative paths call the S4 fixture wrapper, which delegates to the
+# actual native 1190 ACK only AFTER protected cleanup is complete.
+s4_guarded_ack="select * from official_reader_s4_ledger_fixture.attempt_guarded_completion_ack_v1(
+ '11390000-0000-0000-0000-000000000001'::uuid,
+ 'fc800000-0000-0000-0000-000000000002'::uuid,
+ 'synthetic-no-active-worker-lease');"
+check_ack_denied() {
+ local label="$1" reason="$2" result
+ if result="$(p -c "$s4_guarded_ack" 2>&1)"; then
+  die "$label: unproven completion was accepted"
+ fi
+ [[ "$result" == *"$reason"* ]] || {
+  echo "$result" >&2
+  die "$label: wrong completion denial"
+ }
+ echo "PASS S4 restore: $label"
+}
 tmpdir="$(mktemp -d)"
 trap 'rm -rf "$tmpdir"' EXIT
 snapshot="$tmpdir/synthetic-protected-body.csv"
@@ -41,6 +58,7 @@ p -c "update public.entitlement_grants g set status='active',revision=revision+1
  where a.entitlement_grant_id=g.id and a.purchase_intent_id='$b2'::uuid;" >/dev/null
 check "before snapshot exact entitlement and safe marker can resolve the candidate" "select ($read_count)=1;"
 check "protected cleanup cannot ACK before independent deletion tombstone" "select not ($cleanup_ready);"
+check_ack_denied "guarded native completion blocks before tombstone" "Protected Reader deletion ledger or recovered bytes are not reconciled"
 check "other Subject without tombstone cannot ACK this deletion" "select not official_reader_s4_ledger_fixture.protected_cleanup_ready_for_completion_v1('11390000-0000-0000-0000-000000000002'::uuid);"
 # PostgreSQL client \copy exports real DB bytea rows into an isolated logical
 # snapshot, then imports those same rows after deletion. Works on PG15/PG17.
@@ -59,6 +77,7 @@ p -c "begin;
  commit;" >/dev/null
 check "primary row physically deleted with external tombstone retained" "select not exists(select 1 from official_reader_s4_fixture.protected_bodies) and exists(select 1 from official_reader_s4_ledger_fixture.deletion_events where body_id='$body'::uuid);"
 check "protected cleanup ACK blocked while ledger reconciliation is behind" "select not ($cleanup_ready);"
+check_ack_denied "guarded native completion blocks stale epoch" "Protected Reader deletion ledger or recovered bytes are not reconciled"
 
 # Restore the *old* protected row bytes. Parent Chat and Commerce tables are
 # intentionally still present: FKs alone therefore cannot save this scenario.
@@ -79,6 +98,7 @@ check "stale reconciliation prevents protected cleanup ACK" "select not ($cleanu
 p -c "update official_reader_s4_ledger_fixture.recovery_fence set reconciled_epoch=2 where singleton;" >/dev/null
 check "even reconciled rights cannot override independent subject deletion tombstone" "select ($read_count)=0;"
 check "reconciled epoch still cannot ACK with resurrected protected bytes" "select not ($cleanup_ready);"
+check_ack_denied "guarded native completion blocks resurrected bytes" "Protected Reader deletion ledger or recovered bytes are not reconciled"
 
 # 1520 starts with Reader-access removal BEFORE it removes Chat markers.
 # Its first parent DELETE must fail on a restored protected child.
@@ -122,6 +142,7 @@ p -c "delete from official_reader_s4_fixture.protected_bodies b
  where b.id=d.body_id and b.subject_id=d.subject_id;" >/dev/null
 check "replayed external tombstone physically scrubs old restored bytes" "select not exists(select 1 from official_reader_s4_fixture.protected_bodies);"
 check "reconciled tombstone and zero protected rows pass protected-only cleanup gate" "select ($cleanup_ready);"
+check_ack_denied "native completion still requires real deletion job after scrub" "account deletion completion requires the exact account deletion job"
 # Once the child is physically deleted the finalizer's Reader-access ordering
 # becomes valid. ROLLBACK to retain this fixture for the second restore.
 p -c "begin;
@@ -138,12 +159,14 @@ echo "PASS S4 restore: child-first scrub unblocks Reader-access finalizer orderi
 # A second replay/restore cannot resurrect an accessible row either.
 p -c "\\copy official_reader_s4_fixture.protected_bodies FROM '$snapshot' WITH (FORMAT csv)" >"$tmpdir/replay-import.log" || die "second old snapshot import failed"
 check "second old backup import remains unreadable" "select ($read_count)=0;"
+check_ack_denied "second restore reblocks native completion" "Protected Reader deletion ledger or recovered bytes are not reconciled"
 check "second restore immediately revokes protected completion readiness" "select not ($cleanup_ready);"
 p -c "delete from official_reader_s4_fixture.protected_bodies b
  using official_reader_s4_ledger_fixture.deletion_events d
  where b.id=d.body_id and b.subject_id=d.subject_id;" >/dev/null
 
 check "second scrub restores protected-only completion readiness" "select ($cleanup_ready);"
+check_ack_denied "second scrub still cannot bypass native worker/job requirements" "account deletion completion requires the exact account deletion job"
 
 # AccountDeletion child-first scope rehearsal. Commerce P5Y is intentionally
 # retained; this does not claim current AccountDeletion worker integration.
