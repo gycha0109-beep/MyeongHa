@@ -4,7 +4,7 @@
 import { lstat, readFile, readdir } from 'node:fs/promises';
 import { resolve, join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { renderCloudflareStaticHeaders } from './prepare-cloudflare-static.mjs';
+import { CLOUDFLARE_ROOT_REWRITE, renderCloudflareStaticHeaders } from './prepare-cloudflare-static.mjs';
 
 export const HTML_ENTRIES = Object.freeze([
   'index.html',
@@ -48,6 +48,11 @@ export async function verifyCloudflareStaticArtifact(options = {}) {
   const actualHeaders = await readFile(join(outputRoot, '_headers'), 'utf8');
   if (actualHeaders !== expectedHeaders) {
     throw new Error('Cloudflare _headers differs from the active Vercel security policy.');
+  }
+
+  const redirects = await readFile(join(outputRoot, '_redirects'), 'utf8');
+  if (redirects !== CLOUDFLARE_ROOT_REWRITE) {
+    throw new Error('Unexpected Cloudflare static redirect: only / -> /index.html 200 is allowed.');
   }
 
   for (const entry of HTML_ENTRIES) {
