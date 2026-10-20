@@ -130,12 +130,18 @@ function mountStaticUiLocale() {
   }
   setLocale(locale);
   let queued = false;
-  const observer = new MutationObserver(() => {
-    if (queued) return;
+  const pending = new Set();
+  const observer = new MutationObserver(mutations => {
+    for (const mutation of mutations) {
+      if (mutation.type === 'characterData') pending.add(mutation.target);
+      else for (const added of mutation.addedNodes) pending.add(added);
+    }
+    if (queued || pending.size === 0) return;
     queued = true;
     queueMicrotask(() => {
       queued = false;
-      paintDocument(locale);
+      for (const node of pending) paintSubtree(node, locale);
+      pending.clear();
     });
   });
   observer.observe(document.body, { childList: true, characterData: true, subtree: true });
