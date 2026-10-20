@@ -54,6 +54,10 @@ export interface OpenRouterSeyeonMetricV1 {
   /** Provider-reported usage is not an independently reconciled bill. */
   readonly invoiceReconciled: false;
   readonly failurePhase: OpenRouterSeyeonFailurePhaseV1 | null;
+  /** Kept in the callback only. Callers must never log this opaque ID. */
+  readonly generationId: string | null;
+  /** Provider's claimed cost; only GET /generation can corroborate it. */
+  readonly responseReportedCostMicroUsd: number | null;
 }
 
 export interface OpenRouterSeyeonEvaluationConfigV1 {
@@ -138,6 +142,7 @@ export function createOpenRouterSeyeonEvaluationProviderV1(
       const body = JSON.stringify({
         model,
         stream: false,
+        usage: { include: true },
         max_completion_tokens: config.maxCompletionTokens,
         messages: [
           { role: 'system', content: request.instructions + '\n\n' + UNTRUSTED_BOUNDARY },
@@ -177,6 +182,8 @@ export function createOpenRouterSeyeonEvaluationProviderV1(
         return fail('PRE_DISPATCH_REJECTED');
       }
       const controller = new AbortController();
+      let generationId: string | null = null;
+      let responseReportedCostMicroUsd: number | null = null;
       const timer = setTimeout(() => controller.abort(), timeout);
       let observed = false;
       const observe = async (
@@ -193,7 +200,7 @@ export function createOpenRouterSeyeonEvaluationProviderV1(
             httpStatus: status, elapsedMs: Math.round(performance.now() - started),
             promptTokens: usage?.prompt ?? null, completionTokens: usage?.completion ?? null,
             cachedPromptTokens: usage?.cached ?? null, reasoningTokens: usage?.reasoning ?? null,
-            invoiceReconciled: false, failurePhase,
+            invoiceReconciled: false, failurePhase, generationId, responseReportedCostMicroUsd,
           }));
         } catch {
           return fail('METERING_FAILED');
@@ -238,6 +245,17 @@ export function createOpenRouterSeyeonEvaluationProviderV1(
           await observe(controller.signal.aborted ? 'timeout' : 'invalid_response', response.status, null,
             controller.signal.aborted ? 'response_body_timeout' : 'response_body');
           return fail(controller.signal.aborted ? 'TIMEOUT' : 'INVALID_RESPONSE', response.status);
+        }
+        if (record(payload)) {
+          if (typeof payload.id === 'string' &&
+              /^gen-[A-Za-z0-9_-]{8,128}$/u.test(payload.id)) {
+            generationId = payload.id;
+          }
+          const charge = record(payload.usage) ? payload.usage.cost : null;
+          if (typeof charge === 'number' && Number.isFinite(charge) &&
+              charge >= 0 && charge <= 1) {
+            responseReportedCostMicroUsd = Math.round(charge * 1_000_000);
+          }
         }
         if (!record(payload) || (typeof payload.model === 'string' && payload.model !== model) ||
             !Array.isArray(payload.choices) || payload.choices.length !== 1 ||
@@ -297,4 +315,65 @@ export function createOpenRouterSeyeonEvaluationProviderV1(
       }
     },
   });
+}
+
+/**
+ * Read-only exact-generation cost lookup for synthetic Shadow experiments.
+ * No prompt, completion, user data, or raw provider body leaves this boundary.
+ * A successful generation ledger match is NOT a reconciled payment invoice.
+ */
+export async function lookupOpenRouterSeyeonGenerationChargeV1(config: Readonly<{
+  apiKey: string;
+  generationId: string;
+  expectedModel: string;
+  fetchImpl: (url: string, init: RequestInit) => Promise<Response>;
+}>): Promise<Readonly<{
+  lookupStatus: number | null;
+  generationCostMicroUsd: number | null;
+  generationCostVerified: boolean;
+  invoiceReconciled: false;
+}>> {
+  const empty = (status: number | null) => Object.freeze({
+    lookupStatus: status, generationCostMicroUsd: null,
+    generationCostVerified: false, invoiceReconciled: false as const,
+  });
+  if (!config || typeof config.apiKey !== 'string' ||
+      config.apiKey.trim().length < 20 ||
+      typeof config.generationId !== 'string' ||
+      !/^gen-[A-Za-z0-9_-]{8,128}$/u.test(config.generationId) ||
+      typeof config.expectedModel !== 'string' ||
+      typeof config.fetchImpl !== 'function') return empty(null);
+  try {
+    const url = 'https://openrouter.ai/api/v1/generation?id=' +
+      encodeURIComponent(config.generationId);
+    const response = await config.fetchImpl(url, {
+      method: 'GET', redirect: 'error', signal: AbortSignal.timeout(12_000),
+      headers: {
+        authorization: 'Bearer ' + config.apiKey.trim(),
+        accept: 'application/json',
+      },
+    });
+    if (response.status !== 200) return empty(response.status);
+    if (!/^application\/json(?:\s*;|$)/iu.test(response.headers.get('content-type') ?? '')) {
+      return empty(200);
+    }
+    const text = await readBoundedUpstreamJsonTextV1(response, {
+      maximumBodyBytes: 32_768, signal: AbortSignal.timeout(12_000),
+    });
+    const payload: unknown = JSON.parse(text);
+    if (!record(payload) || !record(payload.data) ||
+        payload.data.id !== config.generationId ||
+        payload.data.model !== config.expectedModel ||
+        typeof payload.data.total_cost !== 'number' ||
+        !Number.isFinite(payload.data.total_cost) ||
+        payload.data.total_cost < 0 || payload.data.total_cost > 1) return empty(200);
+    return Object.freeze({
+      lookupStatus: 200,
+      generationCostMicroUsd: Math.round(payload.data.total_cost * 1_000_000),
+      generationCostVerified: true,
+      invoiceReconciled: false as const,
+    });
+  } catch {
+    return empty(null);
+  }
 }

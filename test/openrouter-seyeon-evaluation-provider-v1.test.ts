@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   createOpenRouterSeyeonEvaluationProviderV1 as create,
   OPENROUTER_SEYEON_ENDPOINT_V1 as URL,
+  lookupOpenRouterSeyeonGenerationChargeV1,
   type OpenRouterSeyeonMetricV1,
   type OpenRouterSeyeonEvaluationConfigV1,
 } from '../apps/api/src/openrouter-seyeon-evaluation-provider-v1.js';
@@ -63,6 +64,7 @@ describe('OpenRouter Se-yeon eval adapter: offline / zero paid dispatch', () => 
       const body = JSON.parse(String(init.body)) as Record<string, any>;
       expect(body).toMatchObject({
         model: 'openai/gpt-oss-20b', max_completion_tokens: 1536, stream: false,
+        usage: {include:true},
         response_format: { type: 'json_schema',
           json_schema: { name: 'myeongha_unified_preflight_shadow_v2',
             strict: true, schema: request.responseSchema } },
@@ -155,6 +157,52 @@ describe('OpenRouter Se-yeon eval adapter: offline / zero paid dispatch', () => 
       const diagnostic=vi.mocked(afterOutcome).mock.calls[0]?.[0];
       expect(diagnostic?.failurePhase).toBe(phase);
       expect(JSON.stringify(diagnostic)).not.toContain('SECRET_NEVER_LOG');
+    }
+  });
+  it('passes generation billing metadata only to the guarded callback', async () => {
+    const fetchImpl=vi.fn(async()=>success(output,{
+      id:'gen-0123456789test',
+      usage:{prompt_tokens:115,completion_tokens:34,cost:0.0001234,
+        prompt_tokens_details:{cached_tokens:0},
+        completion_tokens_details:{reasoning_tokens:4}},
+    }));
+    const {provider,afterOutcome}=make(fetchImpl);
+    await provider.generate(request);
+    expect(vi.mocked(afterOutcome).mock.calls[0]?.[0]).toMatchObject({
+      generationId:'gen-0123456789test',
+      responseReportedCostMicroUsd:123,
+      invoiceReconciled:false,
+    });
+  });
+  it('reads one generation exact-cost record without retrieving prompt or completion',async()=>{
+    const fetchImpl=vi.fn(async (url:string,init:RequestInit)=>{
+      expect(url).toBe('https://openrouter.ai/api/v1/generation?id=gen-0123456789test');
+      expect(init.method).toBe('GET');
+      return Response.json({data:{id:'gen-0123456789test',
+        model:'openai/gpt-oss-20b',total_cost:0.00004567,
+        prompt:'PRIVATE_TEXT_MUST_NOT_LOG'}});
+    });
+    const result=await lookupOpenRouterSeyeonGenerationChargeV1({
+      apiKey:key,generationId:'gen-0123456789test',
+      expectedModel:'openai/gpt-oss-20b',fetchImpl});
+    expect(result).toEqual({lookupStatus:200,
+      generationCostMicroUsd:46,generationCostVerified:true,invoiceReconciled:false});
+    expect(JSON.stringify(result)).not.toContain('PRIVATE_TEXT_MUST_NOT_LOG');
+    expect(fetchImpl).toHaveBeenCalledOnce();
+  });
+  it('never invents a billed cost for 404, model mismatch or malformed data',async()=>{
+    const cases=[
+      Response.json({error:{message:'SECRET'}},{status:404}),
+      Response.json({data:{id:'gen-0123456789test',model:'other/model',total_cost:0.5}}),
+      Response.json({data:{id:'gen-0123456789test',model:'openai/gpt-oss-20b',total_cost:'0.2'}}),
+    ];
+    for(const response of cases){
+      const result=await lookupOpenRouterSeyeonGenerationChargeV1({
+        apiKey:key,generationId:'gen-0123456789test',
+        expectedModel:'openai/gpt-oss-20b',fetchImpl:vi.fn(async()=>response)});
+      expect(result.generationCostVerified).toBe(false);
+      expect(result.generationCostMicroUsd).toBeNull();
+      expect(JSON.stringify(result)).not.toContain('SECRET');
     }
   });
   it('fails closed on bounded response overflow; does not parse oversized content', async () => {
