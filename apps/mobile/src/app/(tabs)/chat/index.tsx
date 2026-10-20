@@ -9,6 +9,7 @@ import {
 } from '@/features/chat/chat-launch-roster';
 import { useMobileChatOpenV1 } from '@/features/chat/use-mobile-chat-open';
 import { MobileScreen } from '@/ui/MobileScreen';
+import { MobileUiText } from '@/ui/MobileUiText';
 import { mobileColors } from '@/ui/mobile-colors';
 import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
 import { useMobilePullRefreshV1 } from '@/ui/use-mobile-pull-refresh';
@@ -38,19 +39,19 @@ export default function ChatHubScreen() {
           <Text style={styles.kicker}>THE PEOPLE OF MYEONGHA</Text>
           <Text style={styles.introCounter}>대리자 {MOBILE_CHAT_LAUNCH_ROSTER_V1.length}명</Text>
         </View>
-        <Text style={styles.title}>당신은 누구와 이야기하고 싶으신가요?</Text>
-        <Text style={styles.body}>
+        <MobileUiText style={styles.title}>당신은 누구와 이야기하고 싶으신가요?</MobileUiText>
+        <MobileUiText style={styles.body}>
           마음이 가는 인물을 고르세요. 각 대리자의 이야기와 분위기가 다릅니다.
-        </Text>
-        <Text style={styles.note}>대화 열기는 회원 로그인 후 가능합니다. 일부 AI 답변과 기존 기록은 현재 이용이 제한될 수 있습니다.</Text>
+        </MobileUiText>
+        <MobileUiText style={styles.note}>대화 열기는 회원 로그인 후 가능합니다. 일부 AI 답변과 기존 기록은 현재 이용이 제한될 수 있습니다.</MobileUiText>
         {state.access === 'checking' ? (
           <View style={styles.centerState}>
             <ActivityIndicator color={mobileColors.navy} />
-            <Text style={styles.note}>회원 상태를 확인하는 중입니다…</Text>
+            <MobileUiText style={styles.note}>회원 상태를 확인하는 중입니다…</MobileUiText>
           </View>
         ) : state.access === 'guest' ? (
           <Pressable accessibilityRole="button" onPress={() => router.push('/my')} style={styles.loginAction}>
-            <Text style={styles.loginActionText}>로그인 후 대화하기  →</Text>
+            <MobileUiText style={styles.loginActionText}>로그인 후 대화하기  →</MobileUiText>
           </Pressable>
         ) : state.access === 'error' ? (
           <Text style={styles.errorText}>{state.errorMessage}</Text>
@@ -99,8 +100,8 @@ export default function ChatHubScreen() {
                   </View>
                   {featured ? (
                     <View pointerEvents="none" style={styles.featuredImageCopy}>
-                      <Text style={styles.featuredCharacterName}>세연</Text>
-                      <Text style={styles.featuredImageLine}>오늘의 이야기를 함께할 대리자</Text>
+                      <MobileUiText style={styles.featuredCharacterName}>세연</MobileUiText>
+                      <MobileUiText style={styles.featuredImageLine}>오늘의 이야기를 함께할 대리자</MobileUiText>
                     </View>
                   ) : null}
                 </View>
@@ -133,8 +134,8 @@ export default function ChatHubScreen() {
 
       <View style={styles.pendingSection}>
         <Text style={styles.kicker}>COMING SOON</Text>
-        <Text style={styles.pendingTitle}>대리자 등록 중</Text>
-        <Text style={styles.note}>조금 더 준비가 필요한 인물들입니다. 현재 대화는 열 수 없습니다.</Text>
+        <MobileUiText style={styles.pendingTitle}>대리자 등록 중</MobileUiText>
+        <MobileUiText style={styles.note}>조금 더 준비가 필요한 인물들입니다. 현재 대화는 열 수 없습니다.</MobileUiText>
         <View style={styles.pendingList}>
           {MOBILE_CHAT_PENDING_ROSTER_V1.map((character) => {
             const presentation = resolveMobileChatCharacterPresentationV1(character.characterId);
@@ -143,9 +144,9 @@ export default function ChatHubScreen() {
                 <View style={styles.pendingMark}><Text style={styles.pendingMarkText}>◇</Text></View>
                 <View style={styles.pendingCopy}>
                   <Text style={styles.pendingName}>{character.displayName} <Text style={styles.pendingRole}>· {presentation.title}</Text></Text>
-                  <Text style={styles.note}>캐릭터 소개 준비 중</Text>
+                  <MobileUiText style={styles.note}>캐릭터 소개 준비 중</MobileUiText>
                 </View>
-                <Text style={styles.pendingPill}>등록 중</Text>
+                <MobileUiText style={styles.pendingPill}>등록 중</MobileUiText>
               </View>
             );
           })}
