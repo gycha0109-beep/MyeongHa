@@ -350,3 +350,10 @@ S8의 **비파괴/격리 검토는 S2~S7과 병렬 진행 가능**하며, S8 Pro
 - **수정:** ENFORCE Governor 성공 응답은 정확한 callId의 Provider 영수증 DB 저장, 최종 비용 정산 DB ACK, overCeiling=false가 모두 있어야 반환한다. 오류 시 원본 예약·영수증을 유지하고 응답을 HOLD한다. Provider 재호출/자동 재과금, 새로운 운영 SQL·ACL·DDL·DML 없음. 레거시 비-Governor 동작과 비성공 Provider 정산 보존.
 - **검증:** 기존 합성 fake Provider/DB 테스트에 정산 DB 오류 및 상한 초과 부정 사례를 더한다. 정상 admit→fetch→store→settle 및 timeout 보수적 정산을 유지한다.
 - **운영 게이트:** 이 테스트만으로 S6/G4 종단 PASS 아님. G0 기술 승인, positive G1, Production G2/G3/G4/G5/G6 HOLD. Projectors=[], writeAdmission=DENY, 공개·실 Provider·유료 OFF, Production DB 변경 0. PR exact HEAD/Full Integration/병합 후 main 증거는 원장에 후속 기록.
+
+## 40. 2026-10-20 S6/G4 — 합산 비용 한도 안의 개별 입력·출력 토큰 상한 위반 차단 (비운영)
+
+- **실제 결손:** R25는 ENFORCE의 Provider 영수증 저장과 최종 정산 ACK 및 overCeiling=false를 모두 요구하지만, 합산 금액이 quote 이하라는 증명은 입력·출력 각각의 승인된 token ceiling 증명이 아니다. 예컨대 입력이 작고 출력이 한도를 초과해도 전체 비용이 예약액보다 작을 수 있다. 성공한 JSON 응답에 Provider 사용량이 누락되어도 보수적 최대 금액 정산으로 성공 처리될 수 있었다.
+- **구현:** 모델 발송 직전에 DB에서 승인된 immutable per-call quote의 inputCeilingTokens/outputCeilingTokens를 저장한다. Provider 결과 영수증 및 최종 정산을 먼저 영속화한 뒤 성공 결과의 실제 Provider inputTokens/outputTokens가 각 상한 이하, outcome=response_received, costStatus=estimated, 동일 rateCardVersion인지 확인한다. 위반/미확인 시 Chat Commit 이전 HOLD한다. 이미 실행된 모델을 반복 호출하거나 비용 정산을 건너뛰지 않는다.
+- **합성 회귀:** fake HTTP·fake DB에서 입력 501>승인 500, 출력 801>승인 800, 사용량 없는 성공 응답을 각각 정상 예약→모델→Provider 영수증 저장→비용 정산(overCeiling=false)까지 통과시키고도 Chat Commit 반환은 거부한다. 기존 정상·최대 예약/정산 실패·timeout 경로는 유지.
+- **범위:** 실제 서비스 활성화/운영 DB/ACL/마이그레이션/실 유료 Provider 호출 없음. G0 기술 승인, SRC-25 실 Codec, positive G1 및 Production G2/G3/G4/G5/G6 계속 HOLD. Projectors=[], writeAdmission=DENY, 공개·유료 OFF. PR exact HEAD 검증과 통합 11/11, 병합 뒤 main 결과를 별도로 확인한다.

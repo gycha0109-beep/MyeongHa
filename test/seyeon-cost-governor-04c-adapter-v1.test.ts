@@ -285,6 +285,69 @@ describe('Se-yeon 04C governed provider adapter (fake HTTP and fake DB)', () => 
     });
   }
 
+  for (const sample of [
+    {name:'input tokens above certified upper bound',inputTokens:501,outputTokens:1,
+      occupiedMicroUsd:'505',costStatus:'estimated'},
+    {name:'output tokens above enforced provider cap',inputTokens:50,outputTokens:801,
+      occupiedMicroUsd:'3254',costStatus:'estimated'},
+    {name:'successful response with missing token usage',inputTokens:null,outputTokens:null,
+      occupiedMicroUsd:'3700',costStatus:'usage_unknown'},
+  ] as const) {
+    it('holds ' + sample.name + ' even if total settled cost is not over ceiling', async () => {
+      const order: string[] = [];
+      let admittedId = '';
+      const query = vi.fn(async (sql:string, values:unknown[]) => {
+        if (sql.includes('cmd_governed_start_seyeon_ai_call_v1')) {
+          admittedId = String(values[4]);
+          order.push('admit');
+          return {rows:[{callId:admittedId,ceilingMicroUsd:'3700',bucketUtcDate:'2026-10-10'}]};
+        }
+        if (sql.includes('cmd_store_seyeon_provider_receipt_v1')) {
+          order.push('store');
+          const event = JSON.parse(String(values[4]));
+          expect(event).toMatchObject({
+            callId:admittedId,outcome:'response_received',costStatus:sample.costStatus,
+            inputTokens:sample.inputTokens,outputTokens:sample.outputTokens,
+          });
+          return {rows:[{callId:admittedId,replayed:false}]};
+        }
+        if (sql.includes('cmd_governed_settle_seyeon_ai_call_v1')) {
+          order.push('settle');
+          return {rows:[{callId:admittedId,replayed:false,
+            occupiedMicroUsd:sample.occupiedMicroUsd,overCeiling:false}]};
+        }
+        throw new Error('Unexpected SQL');
+      });
+      const fetchImpl = vi.fn(async () => {
+        order.push('fetch');
+        return Response.json({
+          status:'completed',
+          output:[{type:'message',content:[{type:'output_text',text:'{"ok":true}'}]}],
+          ...(sample.inputTokens === null ? {} : {
+            usage:{input_tokens:sample.inputTokens,output_tokens:sample.outputTokens,
+              input_tokens_details:{cached_tokens:0},
+              output_tokens_details:{reasoning_tokens:0}},
+          }),
+        });
+      });
+      const errors=vi.spyOn(console,'error').mockImplementation(()=>undefined);
+      const info=vi.spyOn(console,'info').mockImplementation(()=>undefined);
+      try {
+        const provider=createPersistingSeyeonAiProviderV1({
+          config:{...config,fetchImpl},runner:runner(query),getBinding:()=>binding,
+          governor:{policy,certifiedInputTokenUpperBound:()=>500},
+        });
+        await expect(provider.generate(request)).rejects.toThrow(
+          'Governed Provider token ceiling evidence failed; Chat Commit denied.',
+        );
+        expect(order).toEqual(['admit','fetch','store','settle']);
+        expect(query).toHaveBeenCalledTimes(3);
+        expect(fetchImpl).toHaveBeenCalledOnce();
+        expect(JSON.stringify(errors.mock.calls)).not.toContain('Synthetic 한글 text');
+      } finally { errors.mockRestore(); info.mockRestore(); }
+    });
+  }
+
   it('stores an unknown-usage timeout before settling conservatively', async () => {
     const order:string[]=[];
     let admittedId='';
