@@ -87,12 +87,7 @@ function paintSubtree(root, locale) {
     else repaintAttributes(node, locale);
   }
 }
-function paintDocument(locale) {
-  document.documentElement.lang = locale;
-  for (const input of document.querySelectorAll('input[type="date"], input[type="time"]')) input.lang = locale;
-  for (const root of [document.head, document.body]) {
-    if (root) paintSubtree(root, locale);
-  }
+function paintMonth(locale) {
   const month = document.getElementById('home-current-date');
   if (month) {
     const date = new Date();
@@ -101,6 +96,14 @@ function paintDocument(locale) {
     const next = label + ' · ' + suffix;
     if (month.textContent !== next) month.textContent = next;
   }
+}
+function paintDocument(locale) {
+  document.documentElement.lang = locale;
+  for (const input of document.querySelectorAll('input[type="date"], input[type="time"]')) input.lang = locale;
+  for (const root of [document.head, document.body]) {
+    if (root) paintSubtree(root, locale);
+  }
+  paintMonth(locale);
 }
 function createLanguagePicker(locale, onChange) {
   const wrap = document.createElement('label');
@@ -160,6 +163,7 @@ function mountStaticUiLocale() {
       queued = false;
       for (const node of pending) paintSubtree(node, locale);
       pending.clear();
+      paintMonth(locale);
     });
   });
   observer.observe(document.body, { childList: true, characterData: true, attributes: true, attributeFilter: ATTRIBUTES, subtree: true });
