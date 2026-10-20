@@ -135,6 +135,9 @@ jobs:
       - name: Check and build Web dependency
         if: needs.scope.outputs.web == 'true'
         run: npm run typecheck -w @myeongha/web && npm run build:web && npm run verify:deployment-config
+      - name: Check Cloudflare static preview artifact
+        if: needs.scope.outputs.web == 'true'
+        run: node scripts/prepare-cloudflare-static.mjs && npm run verify:cloudflare:static
       - name: Check Mobile dependency
         if: needs.scope.outputs.mobile == 'true'
         run: npm run typecheck -w @myeongha/mobile
