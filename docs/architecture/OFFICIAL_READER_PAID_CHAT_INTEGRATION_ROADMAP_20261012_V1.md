@@ -343,5 +343,5 @@ S1에서 공통 잠금 함수 자체가 성공하더라도 **S2 전체 경로가
 
 ### S2 verified Receipt 발급 우선 경합·S4 완료 전 복원 원장 TOCTOU 차단 표본 (2026-10-20)
 
-- S2: 같은 구매의 신규 E Receipt에 대해 **발급 Writer 선점(Purchase advisory→S1→Grant) → 정본 PortOne 취소 Writer 대기 → E Grant/Receipt만 revoked** 검증을 추가합니다. 기존 B5 취소 선행/발급 차단 시험과 서로 반대되는 실제 DB 연결 순서이며, 전체 결속 Writer 운영 인수를 의미하지 않습니다.
+- S2: B8과 동일 Reader S1 범위의 별도 E Purchase를 `created → payment attempt → verified` 순서로 만든 신규 E Receipt에 대해 **발급 Writer 선점(Purchase advisory→S1→Grant) → 정본 PortOne 취소 Writer 대기 → E Grant/Receipt만 revoked** 검증을 추가합니다. 기존 B5 취소 선행/발급 차단 시험과 서로 반대되는 실제 DB 연결 순서이며, 전체 결속 Writer 운영 인수를 의미하지 않습니다.
 - S4: 격리 완료 게이트가 `recovery_fence FOR UPDATE` 잠금을 1190 완료 재호출과 같은 트랜잭션 동안 보유하고, 복원 bytea INSERT/UPDATE가 같은 잠금을 공유하도록 보강합니다. 유효한 합성 completed replay가 실행되는 동안 독립 epoch 갱신 및 과거 snapshot 적재가 차단되는지 PG15/17 두 연결로 재현합니다. 실제 외부 Privacy Ledger·PITR/운영 완료 Worker 연결 및 승인 전 배포는 HOLD입니다.

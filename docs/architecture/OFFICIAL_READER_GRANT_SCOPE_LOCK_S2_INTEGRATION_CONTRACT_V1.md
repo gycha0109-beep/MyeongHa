@@ -131,6 +131,6 @@
 
 ## 16. verified 영수증 발급 선행 → 취소 후행 실제 Writer 경합 (2026-10-20)
 
-- 같은 B8 Purchase에서 **신규 E verified Receipt**를 합성하고, 첫 DB 연결이 `Purchase advisory → Reader S1` 공동 잠금하에 실제 `internal_apply_verified_receipt_capability_effects_v1`로 Grant를 발급한 뒤 COMMIT 전 대기합니다. 둘째 DB 연결에서 정본 `cmd_apply_verified_portone_reader_full_cancellation_v1` 취소가 구매 잠금에 대기했다가 첫 COMMIT 이후 E만 revoked 처리하는 **발급 선행 방향의 실경합**입니다.
+- 기존 B8과 **동일 Subject·Reader S1 범위이지만 별도 신규 E Purchase**를 `created`로 발행해 실제 결제 시도를 먼저 기록하고, `verified` 전환 이후 **신규 E Receipt**를 합성하고, 첫 DB 연결이 `Purchase advisory → Reader S1` 공동 잠금하에 실제 `internal_apply_verified_receipt_capability_effects_v1`로 Grant를 발급한 뒤 COMMIT 전 대기합니다. 둘째 DB 연결에서 정본 `cmd_apply_verified_portone_reader_full_cancellation_v1` 취소가 구매 잠금에 대기했다가 첫 COMMIT 이후 E만 revoked 처리하는 **발급 선행 방향의 실경합**입니다.
 - E Receipt revoked, 정확한 E Grant revoked·Reader 결속 0, E Provider Event 및 출처 Grant revoked Event 각각 1건, 기존 B/C 회수 상태 불변을 검사합니다. 앞선 B5 **취소 선행 → 발급 불가** 시험과 순서가 반대입니다.
 - 이 시험은 이미 존재하는 공식 Reading에 대해 **기존 Receipt→Grant Writer**를 공동 잠금으로 감싼 것입니다. 별도 공식 Reading 생성·Access 결속까지 수행하는 전체 `internal_apply_verified_reader_purchase_under_scope_v1` 경로의 운영 인수를 대신하지 않으며, 모든 외부 Commerce 발급 동시성 종료 판정도 아닙니다.
