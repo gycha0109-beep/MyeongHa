@@ -249,7 +249,7 @@ describe('R20 original JSONB ↔ final projection digest correspondence, no Prov
   });
 
   it('R34 denies post-selection model Context drift before ANY DB access',async()=>{
-    const attacks:(a:ReturnType<typeof inputs>)=>ReturnType<typeof inputs>=[
+    const attacks:((a:ReturnType<typeof inputs>)=>ReturnType<typeof inputs>)[]=[
       a=>({...a,finalModelContext:{
         ...a.finalModelContext,
         recentConversation:[{messageId:'unapproved-history',role:'user',text:'PRIVATE_CONTEXT_CANARY'}],
