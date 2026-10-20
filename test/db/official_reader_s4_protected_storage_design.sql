@@ -100,6 +100,51 @@ $gate$;
 revoke all on function official_reader_s4_ledger_fixture.protected_cleanup_ready_for_completion_v1(uuid)
  from public;
 
+-- S4 fixture ONLY: a protected-content precondition for the real 1190
+-- completion authority. It is not a worker implementation or migration.
+-- The existing 1190 function still owns account/job/outbox/Auth/lease checks.
+create function official_reader_s4_ledger_fixture.attempt_guarded_completion_ack_v1(
+ p_subject uuid,p_deletion_job uuid,p_owner text
+) returns table (completed boolean,replayed boolean,completed_at timestamptz)
+language plpgsql volatile security invoker
+set search_path=pg_catalog,public
+as $guarded_ack$
+begin
+ if not official_reader_s4_ledger_fixture.protected_cleanup_ready_for_completion_v1(p_subject)
+ then
+  raise exception using errcode='23514',
+   constraint='official_reader_s4_fixture_completion_not_ready',
+   message='Protected Reader deletion ledger or recovered bytes are not reconciled';
+ end if;
+ return query select c.completed,c.replayed,c.completed_at
+ from public.internal_complete_account_deletion_v1(p_subject,p_deletion_job,p_owner) c;
+end
+$guarded_ack$;
+revoke all on function official_reader_s4_ledger_fixture.attempt_guarded_completion_ack_v1(uuid,uuid,text)
+ from public;
+
+-- Drift detection on the ACTUAL native completion code, not fake ACK state.
+do $s4_native_ack_contract$
+declare v_definition text;
+begin
+ select pg_catalog.pg_get_functiondef(
+  'public.internal_complete_account_deletion_v1(uuid,uuid,text)'::regprocedure
+ ) into v_definition;
+ if v_definition is null
+  or pg_catalog.strpos(v_definition,'from public.subjects s')=0
+  or pg_catalog.strpos(v_definition,'from public.data_deletion_jobs dj')=0
+  or pg_catalog.strpos(v_definition,'from public.outbox_events oe')=0
+  or pg_catalog.strpos(v_definition,'account_deletion_complete_post_auth_state_required')=0
+  or pg_catalog.strpos(v_definition,'account_deletion_complete_active_lease_required')=0
+  or pg_catalog.strpos(v_definition,'cmd_complete_outbox_event_v1')=0
+  or pg_catalog.strpos(v_definition,'official_reader_s4_ledger_fixture')>0
+ then
+  raise exception 'S4 source drift: native AccountDeletion ACK guard changed';
+ end if;
+ raise notice 'PASS S4 native 1190 ACK has real Subject/Job/Outbox/Auth/lease checks';
+end
+$s4_native_ack_contract$;
+
 -- Exact source provenance cannot be supplied as an arbitrary Grant ID.
 create function official_reader_s4_fixture.assert_origin_scope()
 returns trigger language plpgsql security invoker set search_path=pg_catalog,public
