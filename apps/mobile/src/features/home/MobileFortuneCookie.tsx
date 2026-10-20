@@ -3,6 +3,7 @@ import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { FORTUNE_COOKIE_MESSAGES_V1, pickFortuneCookieIndexV1 } from '@/features/home/mobile-fortune-cookie';
 import { mobileColors } from '@/ui/mobile-colors';
+import { MobileUiText } from '@/ui/MobileUiText';
 import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
 
 /** Recreational random notes, not a birth-based or AI-generated Saju prediction. */
@@ -20,7 +21,7 @@ export function MobileFortuneCookie() {
     <View style={styles.section}>
       <View style={styles.head}>
         <Text style={styles.kicker}>A LITTLE FORTUNE</Text>
-        <Text style={styles.title}>오늘의 쪽지</Text>
+        <MobileUiText style={styles.title}>오늘의 쪽지</MobileUiText>
       </View>
       <Pressable accessibilityRole="button" onPress={openNote} style={styles.card}>
         <View style={styles.symbol}>
@@ -46,7 +47,7 @@ export function MobileFortuneCookie() {
                 <Text style={styles.closeText}>✕</Text>
               </Pressable>
             </View>
-            <Text style={styles.dialogTitle}>오늘의 쪽지</Text>
+            <MobileUiText style={styles.dialogTitle}>오늘의 쪽지</MobileUiText>
             <Text style={styles.ornament}>✦</Text>
             <Text style={styles.message}>
               {index < 0 ? '' : FORTUNE_COOKIE_MESSAGES_V1[index]}
