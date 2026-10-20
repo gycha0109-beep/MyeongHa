@@ -8,7 +8,7 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { HTML_ENTRIES } from './verify-cloudflare-static.mjs';
 
-export const WRANGLER_PIN = '4.149.0';
+export const WRANGLER_PIN = '4.151.2';
 const ORIGIN = 'http://127.0.0.1:8787';
 const READY_TIMEOUT_MS = 120_000;
 const TEST_TIMEOUT_MS = 8_000;
