@@ -45,7 +45,11 @@ insert into public.outbox_events(
  'd4810000-0000-4000-8000-000000000001'::uuid,
  'data_deletion_job','d4800000-0000-4000-8000-000000000001',
  'ACCOUNT_DELETION_STARTED','v1','account-delete-start-v1',
- '{"scope":"account","testFixture":true}'::jsonb,
+ pg_catalog.jsonb_build_object(
+  'scope','account',
+  'subjectId','11390000-0000-0000-0000-000000000001'::uuid,
+  'deletionJobId','d4800000-0000-4000-8000-000000000001'::uuid
+ ),
  'processed',clock_timestamp(),'synthetic-s4-completed-owner',
  clock_timestamp()+interval '10 minutes',0,clock_timestamp(),
  clock_timestamp(),clock_timestamp()
