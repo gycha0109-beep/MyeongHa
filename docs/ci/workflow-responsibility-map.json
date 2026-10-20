@@ -493,6 +493,12 @@
       "prMode": "none",
       "mainMode": "one-shot-trigger",
       "workTrackAttribution": "commit-metadata"
+    },
+    "seyeon-openrouter-zdr-json-catalog-v1.yml": {
+      "responsibility": "character-memory-openrouter-zdr-json-public-provider-metadata-only",
+      "prMode": "none",
+      "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "commit-metadata"
     }
   }
 }
