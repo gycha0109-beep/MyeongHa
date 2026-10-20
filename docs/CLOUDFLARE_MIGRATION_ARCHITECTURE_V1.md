@@ -28,7 +28,7 @@
 | GitHub | `main@3f7e31c...` / Node `>=24 <25` / npm workspaces | CI와 변경 기준 SHA 고정 |
 | Web | React 19 / Vite 8; `apps/web/vite.config.ts`는 **11개 HTML entry** | **SPA가 아닌 멀티페이지**. 없는 URL에 `index.html`을 무조건 반환하지 않음 |
 | Web build | `npm run build:web` → `public/`; `scripts/build-web-static.mjs` + Vite | Static Assets 입력은 우선 `public/` 후보. 빌드 결과만 공개 |
-| Vercel | `vercel.json`의 Node API Functions, 15개 rewrites, host redirect, CSP 등 | Worker의 명시적 경로 규칙으로 변환·동등성 검증 |
+| Vercel | `vercel.json`의 Node API Functions, 17개 rewrites, host redirect, CSP 등 | Worker의 명시적 경로 규칙으로 변환·동등성 검증 |
 | API | `api/me.ts`는 `process.env` + `pg` connection pool + 세연 fence; `api/readiness.ts`는 TLS canary | `nodejs_compat`만 켠 채 복사해서 실행해서는 안 됨 |
 | Auth | `api/auth/sign-in.ts`가 Naver bridge/social/start rewrite 파라미터에 의존 | callback, state, CSRF, cookie origin, redirect 일치 검증 |
 | Saju | `P0-SA-01 DECIDED`: 독립 HTTPS calculation-only producer, Bearer | Workers는 producer를 대체/내장하지 않음 |
