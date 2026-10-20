@@ -410,3 +410,10 @@ S8의 **비파괴/격리 검토는 S2~S7과 병렬 진행 가능**하며, S8 Pro
 - **현재 상태:** 같은 코드를 포함한 `main` SHA `1a8f6f57c2a368945740dde92de6d59b6ac0971a`의 CI #39377276529에서 DB authority-core SUCCESS. 이 성공만으로 과거 실행 순서 문제가 해소됐다고 간주하지 않음.
 - **수정 범위:** 기존 `test/db/chat_attempt_commit_concurrency.sh`의 동시 재시도 시나리오에서 첫 트랜잭션의 할당 완료 신호를 확인하고, 두 번째 PostgreSQL 세션이 실제 DB 잠금 대기 상태에 진입한 후 첫 트랜잭션을 해제하도록 변경. DB 함수/권한/스키마를 변경하지 않음.
 - **수락:** 정확한 PR HEAD의 CI·Governance·Web, 전체 Integration 11/11, 병합 후 정확한 main SHA 검증을 완료하기 전에는 통과 주장하지 않음. 기존 G0/D-04, G1 양수/G2/G3/G4/G5/G6 운영 HOLD, Projectors=[], writeAdmission=DENY 및 별도 Records Smoke 실패는 유지.
+
+## 48. 2026-10-20 S3/G1 — 모델 전 Preflight의 Integrity 권한 출처 폐쇄 (비운영)
+
+- **구체적 결손:** 기존 `assertSeyeonPreflightZeroPrivateSourceClosureV1`는 Disclosure의 검색 결과 배열만 확인했다. 같은 Preflight에서 `integrity.decisions`의 `VERIFIED`/권한 출처, 다른 메시지 출처, 비인가 `provenanceRefs`가 추가되어도 최종 모델 Context 조립 전 차단하지 못했다. 실제 Production 기본 Integrity Resolver는 현재 `MISSING`을 보수적으로 반환하지만, 주입된 Resolver 또는 향후 구성 변화가 이를 조용히 우회하도록 두지 않는다.
+- **실제 변경:** S3/G1 기존 post-Preflight HOLD에서 Integrity 결론과 분류 Claim/현재 Message의 상관관계를 검증하고, 허용된 것은 사용자의 Self Report·비권한 Instruction 및 Production의 정확한 `MISSING` 근거만이다. 새로운 `VERIFIED`·`CONTRADICTED`·양수 AuthorityRef/미고정 ProvenanceRef·사실로의 승격은 모델 Context Assembly 이전 차단. Disclosure도 `not_sensitive`, 명시적 null Topic·Fact·Decision·Source만 허용하고 불명·양수 출처를 빈 검색 목록으로 위장하지 못하게 한다.
+- **검증:** 기존 `test/seyeon-preflight-source-closure-hold-v1.test.ts`에 유효한 Self Report·MISSING, 위조된 다른 Turn·Private Ref·양수 Fact·민감한 Disclosure의 음성 사례 추가. 기존 Production model-stage ordering과 Zero Pin은 유지. 정확한 PR HEAD CI/Governance/Web, Full Integration 11/11, 병합 후 main 검증을 완료해야 완료 처리.
+- **제한:** 이 단계는 **모델 입력 전 차단 강화**이며 Preflight Classifier/외부 비용 자체의 양수 출처 Pin이나 Production Grant Authority를 확정하지 않는다. G0 기술 Owner/D-04, positive G1/G2/G3/G4/G5/G6 Production HOLD, Projectors=[], writeAdmission=DENY, 공개·유료 Provider·운영 DB DDL/DML/ACL/마이그레이션 변경 없음.
