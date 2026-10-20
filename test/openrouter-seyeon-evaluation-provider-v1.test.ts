@@ -226,6 +226,26 @@ describe('OpenRouter Se-yeon eval adapter: offline / zero paid dispatch', () => 
     expect(fetchImpl).toHaveBeenCalledOnce();
     expect(config.beforeDispatch).toHaveBeenCalledOnce();
   });
+  it('accepts only exact Xing public synthetic free model with an exact privacy-pinned provider tag',async()=>{
+    const fetchImpl=vi.fn(async (_url:string,init:RequestInit)=>{
+      const body=JSON.parse(String(init.body)) as Record<string,any>;
+      expect(body).toMatchObject({
+        model:'xingchen-agi/xing4.0-29b-a4b:free',
+        provider:{only:['phala'],allow_fallbacks:false,
+          zdr:true,data_collection:'deny',require_parameters:true},
+        response_format:{type:'json_schema',json_schema:{strict:true}},
+      });
+      return success(output,{model:'xingchen-agi/xing4.0-29b-a4b:free'});
+    });
+    const config={apiKey:key,maxCompletionTokens:1536,fetchImpl,
+      beforeDispatch:vi.fn(async()=>undefined),afterOutcome:vi.fn(async()=>undefined)};
+    expect(()=>create({...config,model:'xingchen-agi/xing4.0-29b-a4b:free'})).toThrow();
+    expect(()=>create({...config,model:'xingchen-agi/xing4.0-29b-a4b:free',approvedSyntheticFreeVariant:true,providerOnlyTag:'phala;other'})).toThrow();
+    const provider=create({...config,model:'xingchen-agi/xing4.0-29b-a4b:free',approvedSyntheticFreeVariant:true,
+      providerOnlyTag:'phala'});
+    await expect(provider.generate(request)).resolves.toEqual(output);
+    expect(fetchImpl).toHaveBeenCalledOnce();
+  });
   it('fails closed on bounded response overflow; does not parse oversized content', async () => {
     const fetchImpl = vi.fn(async () => Response.json({
       ...JSON.parse(await success().text()),padding:'CANARY'.repeat(150000),
