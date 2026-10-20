@@ -152,7 +152,7 @@ export function BirthDateCalendar({
               </>
             ) : step === 'month' ? (
               <>
-                <Text style={styles.sectionTitle}{year}{yearUnit} · {t('출생 월')}</Text>
+                <Text style={styles.sectionTitle}>{year}{yearUnit} · {t('출생 월')}</Text>
                 <View style={styles.choiceGrid}>
                   {MONTHS.map((choice) => (
                     <Pressable key={choice} accessibilityRole="button" accessibilityLabel={choice + monthUnit}
@@ -174,7 +174,7 @@ export function BirthDateCalendar({
                     style={styles.navButton}>
                     <Text style={styles.navText}>‹</Text>
                   </Pressable>
-                  <Text style={styles.navTitle}{year}{yearUnit} {month}{monthUnit} · {dateLabel}</Text>
+                  <Text style={styles.navTitle}>{year}{yearUnit} {month}{monthUnit} · {dateLabel}</Text>
                   <Pressable accessibilityRole="button" accessibilityLabel="다음 달"
                     disabled={year >= todayYear && month === 12}
                     onPress={() => {
