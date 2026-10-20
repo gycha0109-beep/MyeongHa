@@ -1,4 +1,4 @@
-\\set ON_ERROR_STOP on
+\set ON_ERROR_STOP on
 -- Disposable PostgreSQL 15/17 contract rehearsal ONLY, not a migration.
 -- The live 1520 finalizer is immutable; the candidate has no production rights.
 -- The private fixture schema and its Reader/Chat FKs are created beforehand.
@@ -72,15 +72,32 @@ begin
 end
 $candidate_contract$;
 
+-- This test runs in a fresh psql connection: pg_temp functions from the
+-- fixture setup connection do not survive, so use a private schema helper.
+create function official_reader_s4_fixture.assert_forward_contract_v1(
+ p_label text,p_ok boolean
+) returns void
+language plpgsql security invoker set search_path=pg_catalog,public
+as $assert$
+begin
+ if p_ok is distinct from true then
+  raise exception 'S4 forward contract FAIL: %',p_label;
+ end if;
+ raise notice 'PASS S4 forward contract: %',p_label;
+end
+$assert$;
+revoke all on function official_reader_s4_fixture.assert_forward_contract_v1(text,boolean)
+ from public;
+
 -- The specimen is exercised inside an outer rollback. It must remove the
 -- child and actual Reader-access parent, not merely return a proposed plan.
 begin;
-select pg_temp.require_s4('forward finalizer candidate rejects a different Subject',
+select official_reader_s4_fixture.assert_forward_contract_v1('forward finalizer candidate rejects a different Subject',
  official_reader_s4_fixture.rehearse_account_delete_child_first_v1(
   '11390000-0000-0000-0000-000000000002'::uuid
  )=0
  and (select count(*)=1 from official_reader_s4_fixture.protected_bodies));
-select pg_temp.require_s4('forward finalizer specimen deletes one paid child',
+select official_reader_s4_fixture.assert_forward_contract_v1('forward finalizer specimen deletes one paid child',
  official_reader_s4_fixture.rehearse_account_delete_child_first_v1(
   '11390000-0000-0000-0000-000000000001'::uuid
  )=1
@@ -94,8 +111,8 @@ select pg_temp.require_s4('forward finalizer specimen deletes one paid child',
      and g.grant_source_type='purchase' limit 1
   )));
 rollback;
-select pg_temp.require_s4('rollback restores protected child and Reader parent, with Commerce retained',
+select official_reader_s4_fixture.assert_forward_contract_v1('rollback restores protected child and Reader parent, with Commerce retained',
  (select count(*)=1 from official_reader_s4_fixture.protected_bodies)
  and exists(select 1 from public.standard_reading_reader_access_grants
   where purchase_intent_id='12192300-0000-0000-0000-000000000002'::uuid));
-\\echo 'PASS S4 isolated forward-only finalizer ordering contract (NOT live finalization)'
+\echo 'PASS S4 isolated forward-only finalizer ordering contract (NOT live finalization)'
