@@ -19,6 +19,7 @@ import { SajuPreviewReadingView } from '@/features/saju/SajuPreviewReadingView';
 import { SajuEditorialSummary } from '@/features/saju/SajuEditorialSummary';
 import { createMobileSajuViewModelV1 } from '@/features/saju/saju-view-model';
 import { MobileScreen } from '@/ui/MobileScreen';
+import { MobileUiText } from '@/ui/MobileUiText';
 import { mobileColors } from '@/ui/mobile-colors';
 import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
 import { useMobilePullRefreshV1 } from '@/ui/use-mobile-pull-refresh';
@@ -83,22 +84,22 @@ export default function SajuScreen() {
       {state.kind === 'loading' ? (
         <View style={styles.stateCard}>
           <ActivityIndicator color={mobileColors.navy} />
-          <Text style={styles.muted}>현재 출생정보와 명식을 확인하는 중입니다…</Text>
+          <MobileUiText style={styles.muted}>현재 출생정보와 명식을 확인하는 중입니다…</MobileUiText>
         </View>
       ) : null}
 
       {state.kind === 'birth_required' ? (
         <View style={styles.stateCard}>
-          <Text style={styles.cardTitle}>출생정보가 필요합니다</Text>
-          <Text style={styles.muted}>
+          <MobileUiText style={styles.cardTitle}>출생정보가 필요합니다</MobileUiText>
+          <MobileUiText style={styles.muted}>
             내 명식을 계산하려면 현재 자기 출생정보를 먼저 등록해 주세요.
-          </Text>
+          </MobileUiText>
           <Pressable
             accessibilityRole="button"
             onPress={() => router.push('/birth')}
             style={styles.primaryButton}
           >
-            <Text style={styles.primaryButtonText}>출생정보 입력하기</Text>
+            <MobileUiText style={styles.primaryButtonText}>출생정보 입력하기</MobileUiText>
           </Pressable>
         </View>
       ) : null}
@@ -116,7 +117,7 @@ export default function SajuScreen() {
             })}
             style={styles.primaryButton}
           >
-            <Text style={styles.primaryButtonText}>선택한 대리자로 사주 읽기 시작 →</Text>
+            <MobileUiText style={styles.primaryButtonText}>선택한 대리자로 사주 읽기 시작 →</MobileUiText>
           </Pressable>
           <SajuPreviewReadingView
             onOpenPreview={(topic) => router.push({
@@ -144,7 +145,7 @@ export default function SajuScreen() {
               onPress={() => void load()}
               style={styles.secondaryButton}
             >
-              <Text style={styles.secondaryButtonText}>다시 시도</Text>
+              <MobileUiText style={styles.secondaryButtonText}>다시 시도</MobileUiText>
             </Pressable>
           ) : null}
         </View>
