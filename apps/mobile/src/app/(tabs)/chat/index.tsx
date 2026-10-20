@@ -9,6 +9,7 @@ import {
 } from '@/features/chat/chat-launch-roster';
 import { useMobileChatOpenV1 } from '@/features/chat/use-mobile-chat-open';
 import { MobileScreen } from '@/ui/MobileScreen';
+import { useMobileUiLocale } from '@/ui/mobile-ui-locale';
 import { MobileUiText } from '@/ui/MobileUiText';
 import { mobileColors } from '@/ui/mobile-colors';
 import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
@@ -16,6 +17,7 @@ import { useMobilePullRefreshV1 } from '@/ui/use-mobile-pull-refresh';
 
 export default function ChatHubScreen() {
   const styles = useMobileThemedStyles(staticStyles);
+  const { t } = useMobileUiLocale();
   const { state, openCharacter, refreshAccess } = useMobileChatOpenV1();
   const { refreshing, onRefresh } = useMobilePullRefreshV1(refreshAccess);
 
@@ -29,8 +31,8 @@ export default function ChatHubScreen() {
   return (
     <MobileScreen
       eyebrow="MEET THE CHARACTERS"
-      title="대화"
-      description="저마다 다른 목소리로, 당신의 이야기를 들어줄 대리자들을 만나보세요."
+      title={t('대화')}
+      description={t('저마다 다른 목소리로, 당신의 이야기를 들어줄 대리자들을 만나보세요.')}
       refreshing={refreshing}
       onRefresh={() => void onRefresh()}
     >
