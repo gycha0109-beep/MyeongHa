@@ -95,3 +95,9 @@
 
 - S2 원시 DB 2연결 시험에서 **서로 다른 두 Reader 잠금 키(A·Z)**를 같은 Subject×Reading에 대해 사용합니다. 첫 연결이 A를 선점한 동안 두 번째 연결에는 일부러 Z→A 순으로 대상을 전달하지만 정렬된 A→Z 순서로 획득하게 하여 실제 advisory 대기와 두 트랜잭션 정상 커밋을 확인합니다. 잠긴 Reader와 무관한 별도 Reader 키의 `lock_timeout=200ms` 트랜잭션은 기다림 없이 통과해야 합니다.
 - 이는 실제 Reader 제품 선택이나 복수 Reading/Reader 생성을 **모사하지 않는 advisory-only 경합**이며 실 영수증·Grant는 변경하지 않습니다. 모든 Legacy Commerce Writer와 다범위 결속/최종 T2의 전역 정렬 인수는 여전히 미완료입니다.
+
+## 10. AccountDeletion Subject/Grant 선잠금과 실제 PortOne 환불 Writer 경합 (2026-10-20)
+
+- 실제 1520 계정 삭제는 Subject → 삭제 Job → Outbox를 잠그고 Reader 접근 자식 행을 삭제합니다. 운영 계정 삭제 요청이 없는 B8 합성 회원에 전체 1520을 호출하면 위험한 가짜 완료가 되므로, **독립 DB 연결이 Subject FOR UPDATE → 출처 Grant FOR UPDATE를 점유**하는 최악의 경합만 구성합니다.
+- 다른 DB 연결은 실제 `cmd_apply_verified_portone_reader_full_cancellation_v1`로 이미 결속된 B 영수증의 **검증된 환불을 실행**합니다. 첫 연결이 잠금을 놓을 때까지 PostgreSQL Lock 대기, 이후 B Receipt/Grant만 정확히 revoked·Provider Event 1개, C 형제 Receipt의 active Grant 유지·교착 없음이 필수입니다.
+- 이 실경합은 실제 1520 Job/Outbox lease, Auth 삭제와 Commerce webhook의 완전한 양방향 순서 인수가 **아닙니다**. 운영 Worker/결제 이벤트 통로에 추가 코드를 넣지 않고 기존 S2 미완료를 유지합니다.

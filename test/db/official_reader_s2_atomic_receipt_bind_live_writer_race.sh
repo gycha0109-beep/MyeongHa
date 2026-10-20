@@ -1619,4 +1619,75 @@ writer_pid=""
  fail "multi-scope advisory-only rehearsal unexpectedly changed paid Grants"
 pass "opposite enumeration converges to globally sorted S1 keys; unrelated Reader S1 proceeds"
 
+# Existing account-deletion finalizer serializes Subject → Job → Outbox
+# before removing Reader access. Its account state/lease cannot be invoked
+# for a paid-active fixture; hold the SAME Subject-first boundary plus the
+# source Grant as a pessimistic finalizer-shaped competing connection.
+# Execute the ACTUAL Commerce bound-Receipt cancellation concurrently.
+# This checks blocking/atomicity, NOT an approved deletion Worker replay.
+b8_b_cancel_at="$(p -c "select pg_catalog.to_char(
+ clock_timestamp() at time zone 'UTC','YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"');")"
+p >"$tmpdir/b8-delete-grant-holder.out" 2>&1 <<SQL &
+set application_name='rr_s2_account_delete_subject_then_grant';
+set statement_timeout='20s';
+begin;
+select id from public.subjects where id='$subject'::uuid for update;
+select id from public.entitlement_grants
+ where id='$b8_grant_b'::uuid for update;
+select pg_sleep(4);
+commit;
+SQL
+holder_pid=$!
+wait_for "account-deletion-shaped Subject→Grant holder active" "
+ select count(*) from pg_catalog.pg_stat_activity
+ where application_name='rr_s2_account_delete_subject_then_grant'
+ and state='active' and wait_event_type='Timeout';
+"
+p >"$tmpdir/b8-delete-versus-refund.out" 2>&1 <<SQL &
+set application_name='rr_s2_refund_during_account_delete_grant';
+set statement_timeout='20s';
+begin;
+set local role myeongha_commerce_internal_executor;
+select 'B_REFUND='||
+ (public.cmd_apply_verified_portone_reader_full_cancellation_v1(
+  'b8-payment-b','tx-reader-b8-b',
+  'b8-cancel-bound-b-after-account-lock',
+  '$b8_b_cancel_at'::timestamptz,$b8_amount,'KRW','production',
+  'hmac-sha256:k1:9797979797979797979797979797979797979797979797979797979797979797',
+  'synthetic-finalizer-lock-contention-v1'
+ )->'revoke'->>'contractVersion');
+commit;
+SQL
+writer_pid=$!
+wait_for "verified B refund waits on deletion-shaped Grant lock" "
+ select count(*) from pg_catalog.pg_stat_activity
+ where application_name='rr_s2_refund_during_account_delete_grant'
+ and state='active' and wait_event_type='Lock';
+"
+wait "$holder_pid" || {
+ cat "$tmpdir/b8-delete-grant-holder.out" >&2
+ fail "account-deletion-shaped Subject→Grant holder failed"
+}
+holder_pid=""
+wait "$writer_pid" || {
+ cat "$tmpdir/b8-delete-versus-refund.out" >&2
+ fail "real verified B refund deadlocked with deletion-shaped Subject→Grant holder"
+}
+writer_pid=""
+grep -q 'B_REFUND=official-reader-s2-revoke-dispatch-v1' "$tmpdir/b8-delete-versus-refund.out" ||
+ { cat "$tmpdir/b8-delete-versus-refund.out" >&2; fail "B refund did not use verified bound Reader revoke"; }
+[[ "$(p -c "select verification_status from public.commerce_receipts
+ where id='$b8_receipt_b'::uuid;")" == revoked ]] ||
+ fail "account-deletion contention left B Receipt verified"
+[[ "$(p -c "select count(*) from public.entitlement_grants
+ where id='$b8_grant_b'::uuid and status='revoked';")" == 1 ]] ||
+ fail "account-deletion contention failed to revoke exact B Grant"
+[[ "$(p -c "select count(*) from public.entitlement_grants
+ where id='$b8_grant_c'::uuid and status='active';")" == 1 ]] ||
+ fail "account-deletion contention mutated independent C Grant"
+[[ "$(p -c "select count(*) from public.commerce_provider_events
+ where external_event_id='myeongha:portone-v2:full-cancel:v1:b8-cancel-bound-b-after-account-lock';")" == 1 ]] ||
+ fail "bound B cancel provider event did not commit exactly once"
+pass "live bound-Receipt refund waits for deletion-shaped Subject/Grant lock and preserves sibling rights"
+
 echo "PASS: S2 instrumented two-direction PostgreSQL race; production integration HOLD"

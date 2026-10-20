@@ -23,6 +23,7 @@ marker="d4500000-0000-4000-8000-000000000001"
 thread="d4300000-0000-4000-8000-000000000001"
 b2="12192300-0000-0000-0000-000000000002"
 read_count="official_reader_s4_fixture.count_current('$subject'::uuid,'$reading'::uuid,'test-unlockable-reader','$bundle'::uuid)"
+cleanup_ready="official_reader_s4_ledger_fixture.protected_cleanup_ready_for_completion_v1('$subject'::uuid)"
 
 # Existing disposable S4 fixture has read tested but has not yet finalized
 # its synthetic Chat graph in this separate rehearsal.
@@ -39,6 +40,8 @@ p -c "update public.entitlement_grants g set status='active',revision=revision+1
  from public.standard_reading_reader_access_grants a
  where a.entitlement_grant_id=g.id and a.purchase_intent_id='$b2'::uuid;" >/dev/null
 check "before snapshot exact entitlement and safe marker can resolve the candidate" "select ($read_count)=1;"
+check "protected cleanup cannot ACK before independent deletion tombstone" "select not ($cleanup_ready);"
+check "other Subject without tombstone cannot ACK this deletion" "select not official_reader_s4_ledger_fixture.protected_cleanup_ready_for_completion_v1('11390000-0000-0000-0000-000000000002'::uuid);"
 # PostgreSQL client \copy exports real DB bytea rows into an isolated logical
 # snapshot, then imports those same rows after deletion. Works on PG15/PG17.
 p -c "\\copy official_reader_s4_fixture.protected_bodies TO '$snapshot' WITH (FORMAT csv)" >"$tmpdir/export.log" || die "snapshot export failed"
@@ -55,22 +58,27 @@ p -c "begin;
  delete from official_reader_s4_fixture.protected_bodies where id='$body'::uuid;
  commit;" >/dev/null
 check "primary row physically deleted with external tombstone retained" "select not exists(select 1 from official_reader_s4_fixture.protected_bodies) and exists(select 1 from official_reader_s4_ledger_fixture.deletion_events where body_id='$body'::uuid);"
+check "protected cleanup ACK blocked while ledger reconciliation is behind" "select not ($cleanup_ready);"
 
 # Restore the *old* protected row bytes. Parent Chat and Commerce tables are
 # intentionally still present: FKs alone therefore cannot save this scenario.
 p -c "\\copy official_reader_s4_fixture.protected_bodies FROM '$snapshot' WITH (FORMAT csv)" >"$tmpdir/import.log" || die "old snapshot import failed"
 check "old snapshot really resurrected encrypted-shaped candidate bytes" "select count(*)=1 and min(encode(synthetic_ciphertext,'hex'))='d00df00d' from official_reader_s4_fixture.protected_bodies;"
 check "restored old body cannot be read while recovery fence OFF" "select ($read_count)=0;"
+check "old backup protected body blocks completion readiness" "select not ($cleanup_ready);"
 
 # Absence and stale reconciliation are both hard DENY even though the restored
 # Receipt+Grant remain valid in the old branch snapshot.
 p -c "delete from official_reader_s4_ledger_fixture.recovery_fence where singleton;" >/dev/null
 check "missing external recovery status fails closed" "select ($read_count)=0;"
+check "missing external ledger prevents protected cleanup ACK" "select not ($cleanup_ready);"
 p -c "insert into official_reader_s4_ledger_fixture.recovery_fence(singleton,serving_allowed,required_epoch,reconciled_epoch)
  values(true,true,2,1);" >/dev/null
 check "stale recovery ledger epoch fails closed" "select ($read_count)=0;"
+check "stale reconciliation prevents protected cleanup ACK" "select not ($cleanup_ready);"
 p -c "update official_reader_s4_ledger_fixture.recovery_fence set reconciled_epoch=2 where singleton;" >/dev/null
 check "even reconciled rights cannot override independent subject deletion tombstone" "select ($read_count)=0;"
+check "reconciled epoch still cannot ACK with resurrected protected bytes" "select not ($cleanup_ready);"
 
 # 1520 starts with Reader-access removal BEFORE it removes Chat markers.
 # Its first parent DELETE must fail on a restored protected child.
@@ -113,6 +121,7 @@ p -c "delete from official_reader_s4_fixture.protected_bodies b
  using official_reader_s4_ledger_fixture.deletion_events d
  where b.id=d.body_id and b.subject_id=d.subject_id;" >/dev/null
 check "replayed external tombstone physically scrubs old restored bytes" "select not exists(select 1 from official_reader_s4_fixture.protected_bodies);"
+check "reconciled tombstone and zero protected rows pass protected-only cleanup gate" "select ($cleanup_ready);"
 # Once the child is physically deleted the finalizer's Reader-access ordering
 # becomes valid. ROLLBACK to retain this fixture for the second restore.
 p -c "begin;
@@ -129,9 +138,12 @@ echo "PASS S4 restore: child-first scrub unblocks Reader-access finalizer orderi
 # A second replay/restore cannot resurrect an accessible row either.
 p -c "\\copy official_reader_s4_fixture.protected_bodies FROM '$snapshot' WITH (FORMAT csv)" >"$tmpdir/replay-import.log" || die "second old snapshot import failed"
 check "second old backup import remains unreadable" "select ($read_count)=0;"
+check "second restore immediately revokes protected completion readiness" "select not ($cleanup_ready);"
 p -c "delete from official_reader_s4_fixture.protected_bodies b
  using official_reader_s4_ledger_fixture.deletion_events d
  where b.id=d.body_id and b.subject_id=d.subject_id;" >/dev/null
+
+check "second scrub restores protected-only completion readiness" "select ($cleanup_ready);"
 
 # AccountDeletion child-first scope rehearsal. Commerce P5Y is intentionally
 # retained; this does not claim current AccountDeletion worker integration.

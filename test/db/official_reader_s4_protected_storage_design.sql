@@ -65,6 +65,41 @@ insert into official_reader_s4_ledger_fixture.recovery_fence
 (singleton,serving_allowed,required_epoch,reconciled_epoch)
 values(true,true,1,1);
 
+-- Test-only protected cleanup readiness for the *existing* worker's
+-- completion ACK. It is NOT an ACK grant or a replacement for DB job/lease,
+-- hosted Auth cleanup, actual Privacy/Legal or whole-account graph checks.
+-- An off-backup tombstone, reconciled fence and physical child deletion are
+-- ALL required. In particular: old backup restored after reconciliation must
+-- deny until physically scrubbed again. No public EXECUTE.
+create function official_reader_s4_ledger_fixture.protected_cleanup_ready_for_completion_v1(
+ p_subject uuid
+) returns boolean
+language sql stable security invoker set search_path=pg_catalog,public
+as $gate$
+ select p_subject is not null
+ and exists (
+  select 1 from official_reader_s4_ledger_fixture.recovery_fence f
+  where f.singleton
+    and f.reconciled_epoch>=f.required_epoch
+    and exists (
+     select 1 from official_reader_s4_ledger_fixture.deletion_events d
+     where d.subject_id=p_subject
+       and d.event_epoch<=f.reconciled_epoch
+    )
+    and not exists (
+     select 1 from official_reader_s4_ledger_fixture.deletion_events d
+     where d.subject_id=p_subject
+       and d.event_epoch>f.reconciled_epoch
+    )
+ )
+ and not exists (
+  select 1 from official_reader_s4_fixture.protected_bodies b
+  where b.subject_id=p_subject
+ );
+$gate$;
+revoke all on function official_reader_s4_ledger_fixture.protected_cleanup_ready_for_completion_v1(uuid)
+ from public;
+
 -- Exact source provenance cannot be supplied as an arbitrary Grant ID.
 create function official_reader_s4_fixture.assert_origin_scope()
 returns trigger language plpgsql security invoker set search_path=pg_catalog,public

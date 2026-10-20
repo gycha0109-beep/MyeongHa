@@ -332,6 +332,74 @@ describe('claimed account deletion worker orchestration', () => {
     expect(complete.completeDeletion).not.toHaveBeenCalled();
   });
 
+
+  it('does not ACK after an interrupted DB finalizer, then safely replays from DB phase', async () => {
+    const calls: string[] = [];
+    let phase: AccountDeletionWorkerResumePhaseV1 = 'db_finalization_required';
+    let failFirst = true;
+    const brokenPreflight = new Error('synthetic protected Reader FK cleanup blocked');
+    const resumeStatePort: AccountDeletionWorkerResumeStatePortV1 = {
+      readResumeState: vi.fn(async () => {
+        calls.push(`resume:${phase}`);
+        return state(phase);
+      }),
+    };
+    const dbFinalizerPort: AccountDeletionWorkerDbFinalizerPortV1 = {
+      finalizeDatabase: vi.fn(async () => {
+        calls.push('db-finalize');
+        if (failFirst) {
+          failFirst = false;
+          throw brokenPreflight;
+        }
+        phase = 'auth_deletion_required';
+        return { finalized: true, replayed: false, authMappingPresent: true };
+      }),
+    };
+    const authDeletionPort: SupabaseAuthAdminUserDeletionPortV1 = {
+      deleteUser: vi.fn(async ({ authUserId }) => {
+        calls.push(`auth-delete:${authUserId}`);
+        phase = 'completion_ack_required';
+        return { outcome: 'deleted' as const };
+      }),
+    };
+    const completionPort: AccountDeletionWorkerCompletionPortV1 = {
+      completeDeletion: vi.fn(async () => {
+        calls.push('completion-ack');
+        phase = 'completed';
+        return {
+          completed: true,
+          replayed: false,
+          completedAt: '2026-10-20T00:00:00.000Z',
+        };
+      }),
+    };
+    const input = {
+      subjectId: SUBJECT_ID,
+      deletionJobId: JOB_ID,
+      lockOwner: LOCK_OWNER,
+      resumeStatePort,
+      dbFinalizerPort,
+      authDeletionPort,
+      completionPort,
+    };
+    await expect(runClaimedAccountDeletionWorkerV1(input)).rejects.toBe(brokenPreflight);
+    expect(phase).toBe('db_finalization_required');
+    expect(authDeletionPort.deleteUser).not.toHaveBeenCalled();
+    expect(completionPort.completeDeletion).not.toHaveBeenCalled();
+    const retry = await runClaimedAccountDeletionWorkerV1(input);
+    expect(retry.status).toBe('completed');
+    expect(retry.resumedFrom).toBe('db_finalization_required');
+    expect(dbFinalizerPort.finalizeDatabase).toHaveBeenCalledTimes(2);
+    expect(authDeletionPort.deleteUser).toHaveBeenCalledTimes(1);
+    expect(completionPort.completeDeletion).toHaveBeenCalledTimes(1);
+    expect(calls).toEqual([
+      'resume:db_finalization_required', 'db-finalize',
+      'resume:db_finalization_required', 'db-finalize',
+      'resume:auth_deletion_required', `auth-delete:${AUTH_USER_ID}`,
+      'resume:completion_ack_required', 'completion-ack',
+    ]);
+  });
+
   it('has no public route, browser authority, batch discovery, retry policy, or worker DB identity', () => {
     expect(ACCOUNT_DELETION_WORKER_ORCHESTRATION_BINDINGS_V1).toEqual({
       publicRoute: null,
