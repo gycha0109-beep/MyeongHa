@@ -172,7 +172,13 @@ case "$case_name" in
     catalog_snapshot
     ;;
   official-reader-s4-protected-storage-design)
-    apply_standard_migrations
+    version_num="$(psql -Atqc 'show server_version_num')"
+    if [[ "$version_num" -ge 170000 ]]; then
+      verify_pg17
+      apply_pg17_migrations_without_birth_authority
+    else
+      apply_standard_migrations
+    fi
     psql -X -v ON_ERROR_STOP=1 -f test/db/official_reader_s4_protected_storage_design.sql
     # test-only schema; catalog snapshot of deployed migrations intentionally unchanged
     ;;
