@@ -147,6 +147,9 @@ jobs:
       - name: Verify Cloudflare DB request-scope and subject transaction cleanup (synthetic)
         if: needs.scope.outputs.web == 'true'
         run: npm run test:cloudflare:scope
+      - name: Verify candidate Direct TCP admission rejects incomplete TLS (no DB)
+        if: needs.scope.outputs.web == 'true'
+        run: npm run test:cloudflare:direct-db
       - name: Check Mobile dependency
         if: needs.scope.outputs.mobile == 'true'
         run: npm run typecheck -w @myeongha/mobile
