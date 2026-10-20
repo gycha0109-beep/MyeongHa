@@ -8,6 +8,7 @@ import {
 } from '@/navigation/mobile-navigation-contract';
 import { mobileColors } from '@/ui/mobile-colors';
 import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
+import { useMobileUiLocale } from '@/ui/mobile-ui-locale';
 
 const items = [
   { key: 'saju', label: '사주' },
@@ -16,6 +17,7 @@ const items = [
 
 export function ReadingSubnav() {
   const styles = useMobileThemedStyles(staticStyles);
+  const { t } = useMobileUiLocale();
   const pathname = usePathname();
   const active = resolveMobileReadingSubtab(pathname);
 
@@ -31,7 +33,7 @@ export function ReadingSubnav() {
             onPress={() => router.replace(MOBILE_READING_SUBTAB_ROUTES[item.key])}
             style={[styles.tab, selected && styles.tabSelected]}
           >
-            <Text style={[styles.label, selected && styles.labelSelected]}>{item.label}</Text>
+            <Text style={[styles.label, selected && styles.labelSelected]}>{t(item.label)}</Text>
           </Pressable>
         );
       })}
