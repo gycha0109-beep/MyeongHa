@@ -351,8 +351,15 @@ S8의 **비파괴/격리 검토는 S2~S7과 병렬 진행 가능**하며, S8 Pro
 - **검증:** 기존 합성 fake Provider/DB 테스트에 정산 DB 오류 및 상한 초과 부정 사례를 더한다. 정상 admit→fetch→store→settle 및 timeout 보수적 정산을 유지한다.
 - **운영 게이트:** 이 테스트만으로 S6/G4 종단 PASS 아님. G0 기술 승인, positive G1, Production G2/G3/G4/G5/G6 HOLD. Projectors=[], writeAdmission=DENY, 공개·실 Provider·유료 OFF, Production DB 변경 0. PR exact HEAD/Full Integration/병합 후 main 증거는 원장에 후속 기록.
 
+## 40. 2026-10-20 S6/G4 — 합산 비용 한도 안의 개별 입력·출력 토큰 상한 위반 차단 (비운영)
 
-## 40. 2026-10-20 S8 — 운영 원격/로컬 마이그레이션 이력 실제 읽기 전용 재확인
+- **실제 결손:** R25는 ENFORCE의 Provider 영수증 저장과 최종 정산 ACK 및 overCeiling=false를 모두 요구하지만, 합산 금액이 quote 이하라는 증명은 입력·출력 각각의 승인된 token ceiling 증명이 아니다. 예컨대 입력이 작고 출력이 한도를 초과해도 전체 비용이 예약액보다 작을 수 있다. 성공한 JSON 응답에 Provider 사용량이 누락되어도 보수적 최대 금액 정산으로 성공 처리될 수 있었다.
+- **구현:** 모델 발송 직전에 DB에서 승인된 immutable per-call quote의 inputCeilingTokens/outputCeilingTokens를 저장한다. Provider 결과 영수증 및 최종 정산을 먼저 영속화한 뒤 성공 결과의 실제 Provider inputTokens/outputTokens가 각 상한 이하, outcome=response_received, costStatus=estimated, 동일 rateCardVersion인지 확인한다. 위반/미확인 시 Chat Commit 이전 HOLD한다. 이미 실행된 모델을 반복 호출하거나 비용 정산을 건너뛰지 않는다.
+- **합성 회귀:** fake HTTP·fake DB에서 입력 501>승인 500, 출력 801>승인 800, 사용량 없는 성공 응답을 각각 정상 예약→모델→Provider 영수증 저장→비용 정산(overCeiling=false)까지 통과시키고도 Chat Commit 반환은 거부한다. 기존 정상·최대 예약/정산 실패·timeout 경로는 유지.
+- **범위:** 실제 서비스 활성화/운영 DB/ACL/마이그레이션/실 유료 Provider 호출 없음. G0 기술 승인, SRC-25 실 Codec, positive G1 및 Production G2/G3/G4/G5/G6 계속 HOLD. Projectors=[], writeAdmission=DENY, 공개·유료 OFF. PR exact HEAD 검증과 통합 11/11, 병합 뒤 main 결과를 별도로 확인한다.
+
+
+## 41. 2026-10-20 S8 — 운영 원격/로컬 마이그레이션 이력 실제 읽기 전용 재확인
 
 - **조회 기준·범위:** 2026-10-19 최초 확인, 2026-10-20 재확인한 명하 연결된 Supabase `MyengHa`의 `list_migrations` 및 `supabase_migrations.schema_migrations` SELECT(쓰기 0), 현재 `main`의 `supabase/migrations/` 목록과 대조. 운영 데이터 테이블 조회/DDL/DML/Role/ACL/repair·workflow dispatch·배포 수행 없음.
 - **새로 확인된 현재 관측:** 운영 이력은 **195개**, 로컬 파일은 **194개**. `1520`~`1720`의 21개 버전은 **모두 원격 migration history에 존재**하며 로컬 파일도 전량 존재한다. 원격에만 있는 버전은 기존 원격-only `20261008090417` 단 1건이고, 최신 `20261018190000_seyeon_locked_first_zero_source_reveal_v1.sql`은 양쪽에 존재한다. 이전 로드맵의 ‘1520~1720 21개 미적용’은 **당시 역사적 스냅샷**이며, 현재 원격 이력 부재를 나타내지 않는다.

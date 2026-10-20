@@ -428,8 +428,12 @@ export function createPersistingSeyeonAiProviderV1(input: {
       const settledGovernedCallIds = new Set<string>();
       let providerSucceeded = false;
       const observer = input.config.observeMetric;
-      const state: { binding: SeyeonAiCostLedgerBindingV1 | null; callId: string | null } = {
-        binding: null, callId: null,
+      const state: {
+        binding: SeyeonAiCostLedgerBindingV1 | null;
+        callId: string | null;
+        admittedQuote: SeyeonCostGovernorQuoteV1 | null;
+      } = {
+        binding: null, callId: null, admittedQuote: null,
       };
       const provider = createOpenAiSeyeonStructuredProviderV1({
         ...input.config,
@@ -470,6 +474,9 @@ export function createPersistingSeyeonAiProviderV1(input: {
                 ...call, quote, requestBodyBytes: call.requestBodyBytes,
               }),
             );
+            // Bind the immutable approved token ceilings to THIS call only
+            // after the database has committed its matching reservation.
+            state.admittedQuote = quote;
           }
           state.binding = binding;
           state.callId = call.callId;
@@ -555,6 +562,25 @@ export function createPersistingSeyeonAiProviderV1(input: {
             (events.length !== 1 || state.callId === null ||
              !settledGovernedCallIds.has(state.callId))) {
           throw new Error('Governed cost settlement was not confirmed; Chat Commit denied.');
+        }
+        // Monetary overCeiling=false alone is insufficient: a large output
+        // with small input (or vice versa) may cost less than the *combined*
+        // quote while breaking an individually approved token ceiling.
+        // Account for the paid call first, then deny any unproven or
+        // out-of-contract successful Provider reply without retrying.
+        if (input.governor !== undefined && providerSucceeded) {
+          const event = events[0];
+          const quote = state.admittedQuote;
+          if (quote === null || event === undefined ||
+              event.outcome !== 'response_received' ||
+              event.costStatus !== 'estimated' ||
+              event.priceVersion !== quote.rateCardVersion ||
+              event.inputTokens === null ||
+              event.outputTokens === null ||
+              event.inputTokens > quote.inputCeilingTokens ||
+              event.outputTokens > quote.outputCeilingTokens) {
+            throw new Error('Governed Provider token ceiling evidence failed; Chat Commit denied.');
+          }
         }
       }
     },
