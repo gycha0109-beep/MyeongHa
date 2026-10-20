@@ -457,6 +457,12 @@
       "prMode": "none",
       "mainMode": "one-shot-trigger",
       "workTrackAttribution": "commit-metadata"
+    },
+    "seyeon-openrouter-three-call-first-turn-v1.yml": {
+      "responsibility": "character-memory-bounded-real-dialogue-e2e",
+      "prMode": "none",
+      "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "commit-metadata"
     }
   }
 }
