@@ -177,3 +177,10 @@ T1·S3·T2 각 검사가 동일 원본/Scope를 pin해야 한다. `Response`·`R
 
 - S4 격리 스키마에 `attempt_guarded_completion_ack_v1(subject,job,owner)`를 추가했습니다. 백업 외부 삭제 tombstone·epoch 대조·보호 원문 0개가 충족되지 않으면 완료 요청을 **현행 1190 함수 호출 전에 거부**하며, 조건 충족 시에는 실제 `internal_complete_account_deletion_v1`에 모든 최종 승인을 위임합니다. SQL 소스 드리프트 검사는 기존 함수의 Subject/Job/Outbox/호스팅 Auth/임대 검사를 확인합니다.
 - 과거 보호 데이터 재복원 및 재삭제 전후에 격리 요청을 실행해, 외부 원장 거부와 실제 1190의 삭제 Job 부재 거부를 구별합니다. 이는 유효한 실제 Worker 임대로 운영 완료를 실행했다는 증거가 아닙니다. **시험 전용 함수만 생성**하며 기존 DB 함수, Auth Worker, Privacy Ledger, 실제 삭제 그래프는 변경하지 않고 인수 전 HOLD를 유지합니다.
+
+
+## 18. 이미 완료된 작업 재호출과 오래된 백업 복원의 경합 (2026-10-20)
+
+- `test/db/official_reader_s4_completed_replay_restore_contract.sql`은 S4의 **두 번째 구백업 복원 직후**, PostgreSQL 테스트 전용 트랜잭션에 해당 회원의 `subjects.status='deleted'`, `data_deletion_jobs.status='completed'`, `outbox_events.status='processed'` 등 정본 1190의 완료 재호출 조건을 **합성**합니다. 이는 실제 Worker의 최종화를 수행한 것이 아닙니다.
+- 원문 후보 행이 복원되어 있으면 `attempt_guarded_completion_ack_v1`이 **기존 1190 완료 함수 호출 이전에 거부**하고, deleted Subject라면 읽기 후보도 0건입니다. 같은 트랜잭션 안에서 복원된 원문 후보를 물리 삭제한 후에는 정본 1190의 `completed=true,replayed=true` 경로로 위임해야 하며, Job 완료·Outbox 처리 시각을 변경해서는 안 됩니다.
+- 트랜잭션 전체를 ROLLBACK한 후에는 합성 완료 Job·Outbox·deleted 상태가 남지 않고 원래 구백업 보호 행이 다시 존재해 외부 tombstone으로 차단되는지 검사합니다. 운영 DB·실제 Worker·1190 함수·개인정보 복원 인수에는 변경이 없으며, **실제 완료된 계정과 PITR 데이터의 운용 차단 증명은 HOLD**입니다.
