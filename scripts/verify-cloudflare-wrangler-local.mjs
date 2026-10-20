@@ -68,7 +68,18 @@ async function probe() {
     assert(response.headers.get('content-type')?.includes('text/html'), `${page}: HTML MIME mismatch`);
   }
 
-  for (const missing of ['/missing-page.html', '/api', '/api/health', '/api/readings', '/api/unknown']) {
+  const health = await assertHttpStatus('/api/health', 200);
+  assert(health.headers.get('cache-control') === 'no-store', 'Public liveness must never be cached');
+  assert(health.headers.get('content-security-policy') === csp, 'Health response CSP mismatch');
+  assert(JSON.stringify(await health.json()) === '{"status":"ok"}', 'Health must return only a constant status');
+  for (const method of ['POST', 'OPTIONS', 'HEAD']) {
+    const denied = await assertHttpStatus('/api/health', 405, { method });
+    assert(denied.headers.get('allow') === 'GET', 'Health method restriction drift');
+    assert(denied.headers.get('cache-control') === 'no-store', 'Health rejection must not be cached');
+    assert(denied.headers.get('access-control-allow-origin') === null, 'Health CORS accidentally enabled');
+  }
+
+  for (const missing of ['/missing-page.html', '/api', '/api/readiness', '/api/readings', '/api/unknown', '/api/health?__myeongha_chat_open=1']) {
     const response = await assertHttpStatus(missing, 404);
     assert(response.headers.get('cache-control') === 'no-store', `${missing}: 404 must not be cached`);
     assert(response.headers.get('content-security-policy') === csp, `${missing}: deny CSP mismatch`);
@@ -101,7 +112,8 @@ async function probe() {
     runtime: 'wrangler dev (workerd), local only',
     wrangler: WRANGLER_PIN,
     htmlEntries: HTML_ENTRIES.length,
-    apiPositiveRoutes: 0,
+    apiPositiveRoutes: 1,
+    liveness: 'GET 200 / POST, HEAD, OPTIONS 405; readiness 404',
     seyeonFirstReveal: 'HOLD 503',
     checks: 'PASS',
   };
@@ -115,7 +127,7 @@ async function waitReady(child, getLogs) {
     }
     try {
       const res = await get('/api/health');
-      if (res.status === 404) return;
+      if (res.status === 200) return;
     } catch {
       // Listening socket may not be ready yet.
     }
