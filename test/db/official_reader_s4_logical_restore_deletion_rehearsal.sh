@@ -142,6 +142,85 @@ p -c "delete from official_reader_s4_fixture.protected_bodies b
  where b.id=d.body_id and b.subject_id=d.subject_id;" >/dev/null
 check "replayed external tombstone physically scrubs old restored bytes" "select not exists(select 1 from official_reader_s4_fixture.protected_bodies);"
 check "reconciled tombstone and zero protected rows pass protected-only cleanup gate" "select ($cleanup_ready);"
+
+# Reverse the previously proven ACK-FIRST overlap: the off-backup recovery
+# service changes the epoch FIRST and owns its DB-mirror recovery fence,
+# while a completion Worker tries to ACK and waits behind the writer.
+# The Worker must re-read the COMMITTED epoch after the lock wait, DENY, and
+# must never reach the native 1190 Job/lease error with a stale ledger.
+p >"$tmpdir/recovery-first-holder.out" 2>&1 <<SQL &
+set application_name='rr_s4_recovery_first_epoch_owner';
+set statement_timeout='20s';
+begin;
+update official_reader_s4_ledger_fixture.recovery_fence
+ set required_epoch=3,reconciled_epoch=2,serving_allowed=false
+ where singleton;
+select pg_sleep(4);
+commit;
+SQL
+recovery_pid=$!
+recovery_ready=0
+for ((try=0;try<150;try++)); do
+ if [[ "$(p -c "select count(*) from pg_catalog.pg_stat_activity
+    where application_name='rr_s4_recovery_first_epoch_owner'
+    and state='active' and wait_event_type='Timeout';")" == 1 ]]; then
+  recovery_ready=1
+  break
+ fi
+ if ! kill -0 "$recovery_pid" 2>/dev/null; then
+  cat "$tmpdir/recovery-first-holder.out" >&2
+  die "external-ledger candidate did not hold recovery-fence transaction"
+ fi
+ sleep 0.1
+done
+[[ "$recovery_ready" == 1 ]] || die "recovery owner never held the epoch transaction"
+p -c "$s4_guarded_ack" >"$tmpdir/recovery-first-ack-waiter.out" 2>&1 &
+recovery_ack_pid=$!
+recovery_ack_waiting=0
+for ((try=0;try<80;try++)); do
+ if [[ "$(p -c "select count(*) from pg_catalog.pg_stat_activity
+  where query like '%official_reader_s4_ledger_fixture.attempt_guarded_completion_ack_v1%'
+   and pid<>pg_backend_pid() and state='active' and wait_event_type='Lock';")" == 1 ]]; then
+  recovery_ack_waiting=1
+  break
+ fi
+ if ! kill -0 "$recovery_ack_pid" 2>/dev/null; then
+  cat "$tmpdir/recovery-first-ack-waiter.out" >&2
+  die "native completion ACK did not block behind restoration epoch"
+ fi
+ sleep 0.05
+done
+[[ "$recovery_ack_waiting" == 1 ]] || die "completion ACK did not wait for external recovery epoch owner"
+wait "$recovery_pid" || {
+ cat "$tmpdir/recovery-first-holder.out" >&2
+ die "external epoch owner failed"
+}
+if wait "$recovery_ack_pid"; then
+ die "completion ACK accepted new unreconciled epoch after waiting"
+fi
+grep -q 'Protected Reader deletion ledger or recovered bytes are not reconciled' \
+ "$tmpdir/recovery-first-ack-waiter.out" || {
+ cat "$tmpdir/recovery-first-ack-waiter.out" >&2
+ die "completion ACK failed for wrong reason after recovery epoch changed"
+}
+check "external recovery epoch blocks completion after lock wait" "select not ($cleanup_ready)"
+check "deleted protected bytes still absent after first-epoch overlap" "select not exists(select 1 from official_reader_s4_fixture.protected_bodies)"
+# Owner acknowledges reconciliation in a separate transaction. The ACK
+# precondition can then be true but the real 1190 Job/lease still must fail.
+p -c "update official_reader_s4_ledger_fixture.recovery_fence
+ set reconciled_epoch=3,serving_allowed=false where singleton;" >/dev/null
+check "external recovery reconciliation restores only protected cleanup readiness" "select ($cleanup_ready)"
+check_ack_denied "real native 1190 still rejects missing Worker/Job after epoch reconciliation" "account deletion completion requires the exact account deletion job"
+# Return the fixture to its preexisting independent-backup baseline.
+p -c "update official_reader_s4_ledger_fixture.recovery_fence
+ set required_epoch=2,reconciled_epoch=2,serving_allowed=true where singleton;" >/dev/null
+check "external recovery-first test leaves canonical fixture epoch unchanged" "select
+ (select required_epoch=2 and reconciled_epoch=2 and serving_allowed
+  from official_reader_s4_ledger_fixture.recovery_fence where singleton)
+ and ($cleanup_ready)"
+echo "PASS S4 restore: recovery-first epoch update blocks and invalidates completion ACK"
+
+
 check_ack_denied "native completion still requires real deletion job after scrub" "account deletion completion requires the exact account deletion job"
 # Once the child is physically deleted the finalizer's Reader-access ordering
 # becomes valid. ROLLBACK to retain this fixture for the second restore.
