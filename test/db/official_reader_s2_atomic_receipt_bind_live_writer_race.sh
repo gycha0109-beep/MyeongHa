@@ -1558,10 +1558,7 @@ wait_for "multi-scope holder owns first Reader key" "
  and state='active' and wait_event_type='Timeout';
 "
 # A separate scope must remain available even while the first is held.
-p >"$tmpdir/b8-multiscope-unrelated.out" 2>&1 <<SQL || {
- cat "$tmpdir/b8-multiscope-unrelated.out" >&2
- fail "an unrelated Reader scope waited for the occupied Reader S1"
-}
+if ! p >"$tmpdir/b8-multiscope-unrelated.out" 2>&1 <<SQL
 set statement_timeout='20s';
 begin;
 set local lock_timeout='200ms';
@@ -1571,6 +1568,10 @@ select public.internal_acquire_official_reader_scope_lock_v1(
 );
 commit;
 SQL
+then
+ cat "$tmpdir/b8-multiscope-unrelated.out" >&2
+ fail "an unrelated Reader scope waited for the occupied Reader S1"
+fi
 p >"$tmpdir/b8-multiscope-writer.out" 2>&1 <<SQL &
 set application_name='rr_s2_multiscope_order_writer';
 set statement_timeout='20s';
