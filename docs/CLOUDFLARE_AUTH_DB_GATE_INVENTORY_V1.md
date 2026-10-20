@@ -72,3 +72,13 @@
 ### 이 단계의 판정
 
 **Workers 모듈 로딩/정적 정책 호환성: PASS. 실제 DB 연결·TLS 핸드셰이크·RLS·OAuth E2E: NOT TESTED/HOLD.** 프리뷰 공개 API 범위에는 변동이 없다.
+
+## 7. 요청별 DB 연결 수명과 사용자 권한 유지 — 합성 검증
+
+- 추가 코드: `apps/api/src/cloudflare-request-subject-scope.ts` — **한 번의 Workers 요청 범위에서만** DB Pool을 생성할 수 있도록 factory를 `execute` callback 안에서 호출하고, 정상·오류 결과와 무관하게 `await pool.close()`를 실행한다. 호출자에게는 `connect()`만 노출하며 요청 범위가 끝나면 재사용을 거부한다.
+- 트랜잭션 authority는 재구현하지 않고 기존 `executePostgresSubjectTransactionV1`을 그대로 사용한다. 로그인 principal preflight → `BEGIN` → `SET LOCAL ROLE myeongha_api_executor` → canonical member/guest subject → `assert_myeongha_subject_context_v1` → `COMMIT`/오류 시 `ROLLBACK`.
+- 연결 해제 실패를 성공으로 취급하지 않으며, 작업 오류와 종료 오류가 동시에 발생하면 **AggregateError로 양쪽 오류를 보존**한다. 지연된 connect가 요청 종료 뒤 완료되면 반환을 거부하고 연결을 discard한다.
+- **실제 DB/사용자 데이터가 아닌** 기존 Node/Postgres adapter를 통한 합성 드라이버 테스트 11개: 회원·게스트 권한 흐름, 요청별 데이터 격리, 정상 commit/close, 작업 실패 rollback, login principal 불일치, execution role 없음, rollback 실패와 discard, close 실패, 동시 실패, 지연 connect, factory 실패.
+- 테스트 명령: `npm run test:cloudflare:scope`. GitHub CI의 `Verify Cloudflare DB request-scope and subject transaction cleanup (synthetic)`으로 필수화했다.
+- 이 코드는 **`wrangler.jsonc`의 정식 Cloudflare Worker에 import하지 않는다**. OAuth/DB secret을 만들거나 복사하지 않고, `/api/me`, `/api/auth/*`, `/api/readiness` 공개 경로는 기존 404를 유지한다.
+- **실연동 미완료:** 공급할 Pool factory의 Direct TCP 또는 Hyperdrive 결정을 포함하여 명하 실제 CA 지문 verify-full, DB principal/NOLOGIN role, RLS, 동시/장애/취소·timeout 및 인증 도메인 정책은 여전히 Security/API/DB 승인과 E2E가 필요하다. 이 합성 검증을 실제 DB 보안 수락으로 승격하지 않는다.
