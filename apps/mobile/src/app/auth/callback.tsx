@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import { ActivityIndicator, SafeAreaView, StyleSheet, Text } from 'react-native';
 
 import { mobileColors } from '@/ui/mobile-colors';
+import { MobileUiText } from '@/ui/MobileUiText';
 import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
 
 /**
@@ -25,7 +26,7 @@ export default function MobileSocialAuthCallbackScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <ActivityIndicator color={mobileColors.navy} />
-      <Text style={styles.text}>로그인 결과를 확인하고 있습니다…</Text>
+      <MobileUiText style={styles.text}>로그인 결과를 확인하고 있습니다…</MobileUiText>
     </SafeAreaView>
   );
 }
