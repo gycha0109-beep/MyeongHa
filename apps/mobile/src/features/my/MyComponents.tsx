@@ -446,6 +446,7 @@ function MyThemeSelector() {
 export function MyPendingSettings() {
   const themedStyles = useMobileThemedStyles(styles);
   const { colors } = useMobileTheme();
+  const { t } = useMobileUiLocale();
   return (
     <View style={themedStyles.section}>
       <View style={themedStyles.sectionIntro}>
@@ -457,7 +458,7 @@ export function MyPendingSettings() {
         <MyLocaleSelector />
         {pendingSettings.map((title) => (
           <View key={title} style={themedStyles.settingRow}>
-            <Text style={[themedStyles.settingTitle, { color: colors.ink }]}>{title}</Text>
+            <Text style={[themedStyles.settingTitle, { color: colors.ink }]}>{t(title)}</Text>
             <MobileUiText style={themedStyles.pendingBadge}>준비 중</MobileUiText>
           </View>
         ))}
