@@ -5,6 +5,12 @@
 import pg from 'pg';
 import { createHash, X509Certificate } from 'node:crypto';
 import { createSecureContext } from 'node:tls';
+import {
+  MEMBER_REFRESH_COOKIE_BINDING_V1,
+  readMemberRefreshCookieV1,
+  setMemberRefreshCookieV1,
+  clearMemberRefreshCookieV1,
+} from '../apps/api/src/member-refresh-cookie.ts';
 import { parseProductionUserDataRuntimeConfigV1 } from '../apps/api/src/production-user-data-runtime-config.ts';
 import { createNodePostgresSubjectPoolV1 } from '../apps/api/src/node-postgres-subject-pool.ts';
 import {
@@ -28,6 +34,33 @@ function configurationWithoutCredentialsIsDenied() {
   }
 }
 
+function offlineCookieContract() {
+  // A literal fixture is NOT a real refresh token. Never create a session or
+  // contact Supabase, and never log the value or the Set-Cookie payload.
+  const fixture = 'test-only-not-a-refresh-credential';
+  const binding = MEMBER_REFRESH_COOKIE_BINDING_V1;
+  const response = setMemberRefreshCookieV1(new Response(null), fixture);
+  const cookie = response.headers.get('set-cookie');
+  const readBack = readMemberRefreshCookieV1(new Request(
+    'https://offline-cookie.example.test/api/auth/refresh', {
+      headers: { Cookie: binding.name + '=' + encodeURIComponent(fixture) },
+    },
+  ));
+  const cleared = clearMemberRefreshCookieV1(new Response(null)).headers.get('set-cookie');
+  return binding.path === '/api/auth' &&
+    binding.httpOnly === true &&
+    binding.secure === true &&
+    binding.sameSite === 'Strict' &&
+    binding.domain === null &&
+    typeof cookie === 'string' &&
+    cookie.includes('; Path=/api/auth; HttpOnly; Secure; SameSite=Strict') &&
+    !cookie.includes('Domain=') &&
+    readBack === fixture &&
+    typeof cleared === 'string' &&
+    cleared.includes('Max-Age=0') &&
+    !cleared.includes('Domain=');
+}
+
 export function evaluateIsolatedAuthDbCompatibility() {
   return Object.freeze({
     postgresDriverExports: typeof pg.Client === 'function' && typeof pg.Pool === 'function',
@@ -37,6 +70,7 @@ export function evaluateIsolatedAuthDbCompatibility() {
       createHash('sha256').update('offline-only').digest('hex').length === 64,
     nodeTlsApiAvailable: typeof createSecureContext === 'function',
     missingCredentialsRejected: configurationWithoutCredentialsIsDenied(),
+    refreshCookieContractPreserved: offlineCookieContract(),
   });
 }
 
