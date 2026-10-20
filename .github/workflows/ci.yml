@@ -141,6 +141,9 @@ jobs:
       - name: Smoke local Cloudflare Worker runtime (no deploy)
         if: needs.scope.outputs.web == 'true'
         run: npm run verify:cloudflare:local
+      - name: Check isolated Cloudflare Auth DB workerd compatibility (no credentials)
+        if: needs.scope.outputs.web == 'true'
+        run: npm run verify:cloudflare:auth-db:local
       - name: Check Mobile dependency
         if: needs.scope.outputs.mobile == 'true'
         run: npm run typecheck -w @myeongha/mobile
