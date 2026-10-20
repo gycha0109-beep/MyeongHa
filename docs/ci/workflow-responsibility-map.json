@@ -445,6 +445,12 @@
       "prMode": "none",
       "mainMode": "one-shot-trigger",
       "workTrackAttribution": "commit-metadata"
+    },
+    "seyeon-live-dialogue-owner-key-first-pair-v1.yml": {
+      "responsibility": "character-memory-bounded-real-dialogue-e2e",
+      "prMode": "none",
+      "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "commit-metadata"
     }
   }
 }
