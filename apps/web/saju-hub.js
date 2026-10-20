@@ -231,7 +231,7 @@ function buildBirthRequest() {
   const birthTime = timeKnown ? byId('saju-birth-time').value : null;
   const sexValue = byId('saju-birth-sex').value;
 
-  if (timeKnown && !birthTime) throw new Error('출생시간을 입력하거나 시간 모름을 선택해 주세요.');
+  if (timeKnown && !/^(?:[01][0-9]|2[0-3]):[0-5][0-9]$/u.test(birthTime ?? '')) throw new Error('출생시간을 HH:mm 형식(00:00~23:59)으로 입력해 주세요.');
 
   return Object.freeze({
     label: null,

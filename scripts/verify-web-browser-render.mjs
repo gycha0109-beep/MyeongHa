@@ -345,6 +345,12 @@ try {
     return true;
   })()`);
   await waitForPage(client, '/reading-detail.html', '.reading-route-state');
+  // The Reading scene loads after React mounts; wait for the runtime contract, not just the shell.
+  for (let index = 0; index < 80; index += 1) {
+    const ready = await client.evaluate("document.body.dataset.readerSelection === 'explicit' && document.body.dataset.readerPresentation === 'reading-scene-v1'");
+    if (ready) break;
+    await new Promise(done => setTimeout(done, 50));
+  }
   const selectedReaderRoute = await client.evaluate(`(() => {
     const params = new URLSearchParams(location.search);
     return {

@@ -1,5 +1,6 @@
 import { READER_PRESENTATIONS, findReaderPresentation } from './reader-presentation-catalog.js';
 import { createDelegatePicker } from './reader-picker-dialog.js';
+import { formatStaticUi, getUiLocale, translateStaticUi } from './ui-i18n.js';
 
 const camera = document.querySelector('[data-face-camera]');
 const gallery = document.querySelector('[data-face-gallery]');
@@ -31,6 +32,10 @@ function resolveInitialReader() {
 }
 
 let selectedReader = resolveInitialReader();
+function faceText(template) {
+  const locale = getUiLocale();
+  return formatStaticUi(template, { reader: translateStaticUi(selectedReader.name, locale) }, locale);
+}
 
 function humanSize(bytes) {
   if (bytes < 1024 * 1024) return Math.max(1, Math.round(bytes / 1024)) + 'KB';
@@ -47,7 +52,7 @@ function renderReader() {
   document.body.dataset.reader = selectedReader.key;
 
   for (const node of readerNameNodes) {
-    node.textContent = selectedReader.name;
+    node.textContent = translateStaticUi(selectedReader.name, getUiLocale());
   }
 
   if (readerPortrait instanceof HTMLImageElement) {
@@ -55,24 +60,24 @@ function renderReader() {
     readerPortrait.alt = '';
   }
 
-  if (readerTitle) readerTitle.textContent = selectedReader.title;
-  if (readerTone) readerTone.textContent = selectedReader.tone;
+  if (readerTitle) readerTitle.textContent = translateStaticUi(selectedReader.title, getUiLocale());
+  if (readerTone) readerTone.textContent = translateStaticUi(selectedReader.tone, getUiLocale());
 
   if (selectedFile) {
     if (description) {
-      description.textContent = `사진이 준비되었습니다. ${selectedReader.name}과 함께 얼굴 구조 확인부터 이어갈 준비가 되었습니다.`;
+      description.textContent = faceText('사진이 준비되었습니다. {reader}과 함께 얼굴 구조 확인부터 이어갈 준비가 되었습니다.');
     }
-    if (analyzeLabel) analyzeLabel.textContent = `${selectedReader.name}에게 보여주기 준비 중`;
-    if (statusTitle) statusTitle.textContent = `${selectedReader.name}과 관상 보기 준비됨`;
+    if (analyzeLabel) analyzeLabel.textContent = faceText('{reader}에게 보여주기 준비 중');
+    if (statusTitle) statusTitle.textContent = faceText('{reader}과 관상 보기 준비됨');
     if (statusCopy) {
       statusCopy.textContent = '사진 준비를 마쳤습니다. 얼굴 구조 확인 기능이 연결되면 선택한 대리자의 풀이로 이어집니다.';
     }
   } else {
     if (description) {
-      description.textContent = `정면에서 얼굴이 잘 보이는 사진을 준비해주세요. ${selectedReader.name}과 함께 얼굴 구조 확인부터 시작합니다.`;
+      description.textContent = faceText('정면에서 얼굴이 잘 보이는 사진을 준비해주세요. {reader}과 함께 얼굴 구조 확인부터 시작합니다.');
     }
     if (analyzeLabel) analyzeLabel.textContent = '사진을 먼저 준비해주세요';
-    if (statusTitle) statusTitle.textContent = `${selectedReader.name}과 관상 보기`;
+    if (statusTitle) statusTitle.textContent = faceText('{reader}과 관상 보기');
     if (statusCopy) {
       statusCopy.textContent = '사진을 준비하면 얼굴 구조를 확인한 뒤 선택한 대리자의 풀이로 이어집니다.';
     }
@@ -203,3 +208,6 @@ gallery?.addEventListener('change', event => choose(event.currentTarget.files?.[
 readerChangeButton?.addEventListener('click', openReaderPicker);
 
 renderReader();
+
+// Recompose reader-dependent static labels when the display language changes.
+document.addEventListener('myeongha:localechange', () => renderReader());
