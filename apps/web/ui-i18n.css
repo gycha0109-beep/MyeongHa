@@ -8,3 +8,20 @@
 .landing-nav .ui-locale-picker { margin-left: 8px; }
 .product-utilities .ui-locale-picker { margin-right: 4px; }
 @media (max-width: 767px) { .ui-locale-select { max-width: 90px; min-height: 30px; padding: 2px 4px; font-size: 11px; } .landing-nav .ui-locale-picker { margin-left: 2px; } }
+
+/* Fit the new control beside the existing header navigation. */
+.product-utilities { gap: 6px; }
+.product-utilities .ui-locale-select { max-width: 92px; font-size: 11px; }
+@media (min-width: 1100px) {
+  .product-header-inner { grid-template-columns: 200px minmax(0, 1fr) 245px; gap: 18px; }
+  .product-header-inner .product-nav { gap: clamp(12px, 2vw, 30px); }
+}
+@media (min-width: 768px) and (max-width: 1099px) {
+  .product-header-inner { grid-template-columns: 145px minmax(0, 1fr) 218px; gap: 10px; }
+  .product-header-inner .product-nav { gap: 10px; }
+  .product-header-inner .product-nav-link { font-size: 14px; }
+  .product-utilities .ui-locale-select { max-width: 78px; font-size: 10px; }
+}
+@media (max-width: 767px) {
+  .product-utilities { gap: 6px; }
+}
