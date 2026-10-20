@@ -30,6 +30,79 @@ export class SeyeonPreflightSourceClosureHoldV1 extends Error {
   }
 }
 
+/**
+ * The governed integrity lane is a SECOND model-context source. A future
+ * resolver may return MATCH/CONFLICT or source references even while private
+ * disclosure retrieval is empty. Until exact source/Grant lineage can be
+ * pinned, the only admitted authority result is the Production conservative
+ * resolver's explicit MISSING, bound to this user message. Self-report and
+ * instruction claims contain no independently verified source.
+ *
+ * This is a post-Preflight model-input HOLD, not an authority resolver or
+ * approval to read/commit/reveal any personal record.
+ */
+function assertSeyeonZeroIntegrityAuthorityV1(
+  integrity: CharacterGovernedPreflightResultV1['integrity'],
+): void {
+  if (integrity === null || typeof integrity !== 'object' ||
+      integrity.schemaVersion !== 'character-integrity-preflight-v1' ||
+      integrity.characterId !== 'seyeon' ||
+      typeof integrity.userMessageRef !== 'string' ||
+      integrity.userMessageRef.trim() !== integrity.userMessageRef ||
+      integrity.userMessageRef.length === 0 ||
+      !Array.isArray(integrity.classification?.claims) ||
+      !Array.isArray(integrity.decisions) ||
+      integrity.classification.claims.length !== integrity.decisions.length ||
+      integrity.decisions.length > 8) {
+    throw new SeyeonPreflightSourceClosureHoldV1();
+  }
+
+  for (let i = 0; i < integrity.decisions.length; i++) {
+    const decision = integrity.decisions[i];
+    const classified = integrity.classification.claims[i];
+    if (decision === undefined || classified === undefined ||
+        decision.schemaVersion !== 'character-integrity-decision-v1' ||
+        decision.claim === null || typeof decision.claim !== 'object' ||
+        decision.claim.claimId !== classified.claimId ||
+        decision.claim.kind !== classified.kind ||
+        decision.claim.statement !== classified.statement ||
+        decision.claim.sourceRef !== integrity.userMessageRef ||
+        !Array.isArray(decision.authorityRefs) ||
+        decision.authorityRefs.length !== 0 ||
+        !Array.isArray(decision.provenanceRefs) ||
+        decision.mayEnterWorkingContextAsFact !== false ||
+        decision.mayCreateRelationshipEvent !== false ||
+        decision.mayMutateRelationshipState !== false) {
+      throw new SeyeonPreflightSourceClosureHoldV1();
+    }
+
+    const kind = decision.claim.kind;
+    const requiresExternalAuthority =
+      kind === 'CHARACTER_FACT_CLAIM' ||
+      kind === 'SHARED_EVENT_CLAIM' ||
+      kind === 'RELATIONSHIP_STATUS_CLAIM' ||
+      kind === 'THIRD_PARTY_CLAIM';
+    const selfReport = kind === 'USER_SELF_REPORT';
+    const expectedResult =
+      requiresExternalAuthority ? 'UNVERIFIED' :
+      selfReport ? 'USER_ASSERTED' :
+      kind === 'AUTHORITY_OVERRIDE' ? 'AUTHORITY_REJECT' :
+      kind === 'META_INSTRUCTION' ? 'NON_AUTHORITATIVE' : null;
+    const expectedRefs = requiresExternalAuthority
+      ? [integrity.userMessageRef, 'production-governance:unresolved:' + kind]
+      : [integrity.userMessageRef];
+
+    if (expectedResult === null ||
+        decision.result !== expectedResult ||
+        decision.mayEnterWorkingContextAsUserAssertion !== selfReport ||
+        decision.mayProposeUserMemory !== selfReport ||
+        decision.provenanceRefs.length !== expectedRefs.length ||
+        expectedRefs.some((ref, index) => decision.provenanceRefs[index] !== ref)) {
+      throw new SeyeonPreflightSourceClosureHoldV1();
+    }
+  }
+}
+
 export function assertSeyeonPreflightZeroPrivateSourceClosureV1(
   preflight: CharacterGovernedPreflightResultV1,
 ): Readonly<{
@@ -44,11 +117,17 @@ export function assertSeyeonPreflightZeroPrivateSourceClosureV1(
     preflight.disclosure === null ||
     typeof preflight.disclosure !== 'object' ||
     preflight.disclosure.schemaVersion !== CHARACTER_DISCLOSURE_PREFLIGHT_SCHEMA_VERSION_V2 ||
+    preflight.disclosure.status !== 'not_sensitive' ||
+    preflight.disclosure.classification?.topicKey !== null ||
+    preflight.disclosure.source !== null ||
+    preflight.disclosure.factAuthority !== null ||
+    preflight.disclosure.decision !== null ||
     !Array.isArray(preflight.retrievedPrivateSources) ||
     preflight.retrievedPrivateSources.length !== 0
   ) {
     throw new SeyeonPreflightSourceClosureHoldV1();
   }
+  assertSeyeonZeroIntegrityAuthorityV1(preflight.integrity);
 
   return Object.freeze({
     version: SEYEON_PREFLIGHT_SOURCE_CLOSURE_HOLD_VERSION_V1,
