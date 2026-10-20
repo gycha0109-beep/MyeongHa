@@ -1846,4 +1846,42 @@ grep -q 'PortOne full cancellation replay conflicts with persisted evidence' "$t
  fail "conflicting proof duplicated the original C Grant effect"
 pass "same cancellation ID with contradictory evidence fails without modifying prior event"
 
+
+# Reusing the C provider cancellation ID with a DIFFERENT original verified
+# Receipt B must fail, even though B and C belong to the same purchase.
+# The event's receipt-bound identity is immutable after C was committed.
+if p >"$tmpdir/b8-c-event-cross-receipt.out" 2>&1 <<SQL
+begin;
+set local role myeongha_commerce_internal_executor;
+select public.cmd_apply_verified_portone_reader_full_cancellation_v1(
+ 'b8-payment-b','tx-reader-b8-b','b8-cancel-concurrent-c',
+ '$c_cancel_at'::timestamptz,$b8_amount,'KRW','production',
+ 'hmac-sha256:k1:9898989898989898989898989898989898989898989898989898989898989898',
+ 'synthetic-c-same-event-v1'
+);
+commit;
+SQL
+then
+ fail "identical cancellation identity illegally redirected from C to sibling B"
+fi
+grep -q 'PortOne full cancellation replay conflicts with persisted evidence' "$tmpdir/b8-c-event-cross-receipt.out" || {
+ cat "$tmpdir/b8-c-event-cross-receipt.out" >&2
+ fail "cross-Receipt cancellation identity rejected for unexpected reason"
+}
+[[ "$(p -c "select count(*) from public.commerce_provider_events
+ where external_event_id='myeongha:portone-v2:full-cancel:v1:b8-cancel-concurrent-c'
+   and resolved_receipt_id='$b8_receipt_c'::uuid;")" == 1 ]] ||
+ fail "reused cancellation identity changed its C source Receipt"
+[[ "$(p -c "select count(*) from public.entitlement_events ee
+ join public.commerce_provider_events pe on ee.source_provider_event_id=pe.id
+ where pe.external_event_id='myeongha:portone-v2:full-cancel:v1:b8-cancel-concurrent-c'
+ and ee.grant_id='$b8_grant_b'::uuid;")" == 0 ]] ||
+ fail "reused C cancellation identity mutated sibling B Grant"
+[[ "$(p -c "select count(*) from public.entitlement_events ee
+ join public.commerce_provider_events pe on ee.source_provider_event_id=pe.id
+ where pe.external_event_id='myeongha:portone-v2:full-cancel:v1:b8-cancel-concurrent-c'
+ and ee.grant_id='$b8_grant_c'::uuid and ee.event_type='revoked';")" == 1 ]] ||
+ fail "C cancellation lineage lost its single committed Grant revoke"
+pass "same cancellation ID cannot be reused across sibling original Receipts"
+
 echo "PASS: S2 instrumented two-direction PostgreSQL race; production integration HOLD"
