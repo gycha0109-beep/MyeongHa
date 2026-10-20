@@ -1,5 +1,5 @@
 // Watchtower-Track: security
-import { createServer } from 'node:http';
+import { createServer, request as nodeRequest } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { describe, expect, it } from 'vitest';
 import type { IdentityEvidenceVerificationPortV1 } from '../apps/api/src/current-subject-profile-http.js';
@@ -21,7 +21,11 @@ const clientTurnId = '77777777-7777-4777-8777-777777777777';
 const secureDbAnswer = 'DB 원본에서 잠금 상태로 읽은 첫 답장';
 const untrustedModelAnswer = 'NEVER_SERIALIZE_MODEL_RESPONSE_CANARY';
 
-function database(input: { ready?: boolean; assistant?: string | null } = {}) {
+function database(input: {
+  ready?: boolean;
+  assistant?: string | null;
+  waitAtReadiness?: () => Promise<void>;
+} = {}) {
   const events: string[] = [];
   let connects = 0;
   const pool = {
@@ -40,6 +44,7 @@ function database(input: { ready?: boolean; assistant?: string | null } = {}) {
           if (sql.includes('from pg_catalog.pg_proc p') &&
               sql.includes('qry_seyeon_locked_first_zero_source_reveal_v1')) {
             events.push('readiness');
+            await input.waitAtReadiness?.();
             return { rows: [{ ready: input.ready ?? true }] };
           }
           if (sql.includes('from public.qry_seyeon_locked_first_zero_source_reveal_v1')) {
@@ -235,6 +240,68 @@ describe('unmounted Seyeon direct Node HTTP first-zero ingress', () => {
     expect(result.text).not.toContain(secureDbAnswer);
     expect(db.connects).toBe(1);
     expect(calls).toBe(0);
+  });
+
+  it('stops before the model when a completed POST disconnects during DB readiness', async () => {
+    let signalReadiness!: () => void;
+    let resumeReadiness!: () => void;
+    let responseClosed!: () => void;
+    let handlerCompleted!: () => void;
+    const reachedReadiness = new Promise<void>(resolve => { signalReadiness = resolve; });
+    const resume = new Promise<void>(resolve => { resumeReadiness = resolve; });
+    const closed = new Promise<void>(resolve => { responseClosed = resolve; });
+    const done = new Promise<void>(resolve => { handlerCompleted = resolve; });
+    const db = database({ waitAtReadiness: async () => {
+      signalReadiness();
+      await resume;
+    } });
+    let modelCalls = 0;
+    let outcome: SeyeonFirstZeroNodeHttpOutcomeV1 | undefined;
+    const server = createServer((incoming, response) => {
+      response.once('close', responseClosed);
+      void handleSeyeonFirstZeroDirectNodeHttpV1({
+        incoming, response,
+        identityEvidenceVerifier: {
+          verifyRequestIdentity: async () => ({
+            kind: 'member', verifiedAuthUserId: authId,
+          }),
+        },
+        pool: db.pool,
+        runtime: { run: async () => { modelCalls++; return committedResult(); } },
+        requestId: 'closed-before-model',
+        serverTime: '2026-10-19T00:00:00.000Z',
+      }).then(result => { outcome = result; }).finally(handlerCompleted);
+    });
+    await new Promise<void>((resolve, reject) => {
+      server.once('error', reject);
+      server.listen(0, '127.0.0.1', resolve);
+    });
+    const address = server.address() as AddressInfo;
+    const client = nodeRequest({
+      hostname: '127.0.0.1',
+      port: address.port,
+      method: 'POST',
+      path: `/api/chat/${threadId}/turns`,
+      headers: { Authorization: 'Bearer synthetic-member', 'Content-Type': 'application/json' },
+    });
+    client.on('error', () => undefined);
+    try {
+      client.end(JSON.stringify({ clientTurnId, text: '안녕 세연' }));
+      await reachedReadiness;
+      client.destroy();
+      await closed;
+      resumeReadiness();
+      await done;
+      expect(outcome).toBe('reveal_held');
+      expect(modelCalls).toBe(0);
+      expect(db.connects).toBe(1);
+      expect(db.events).not.toContain('fresh-original-read');
+    } finally {
+      resumeReadiness();
+      client.destroy();
+      server.closeAllConnections();
+      await new Promise<void>(resolve => server.close(() => resolve()));
+    }
   });
 
   it('rejects a stale/no-source committed attempt with static 503, not model output', async () => {

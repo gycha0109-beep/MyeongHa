@@ -198,7 +198,10 @@ export async function executeAndDeliverSeyeonFirstZeroNodeTurnV1(
   }
   // This must precede runtime.run because that step may charge the provider.
   await assertSeyeonFirstZeroNodeDbReadyV1(input);
-  if (input.requestSignal.aborted) {
+  // DB readiness can complete after the peer disconnects. Neither a stale
+  // request signal nor a successful readiness result licenses a paid call.
+  if (input.requestSignal.aborted || input.response.destroyed ||
+      input.response.headersSent || input.response.writableEnded) {
     input.response.destroy();
     throw new SeyeonFirstZeroNodeTurnDeliveryErrorV1('INVALID_SCOPE');
   }
