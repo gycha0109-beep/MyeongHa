@@ -55,7 +55,7 @@ export function ReadingPage() {
               </label>
               <label className="saju-field">
                 <span>출생시간</span>
-                <input id="saju-birth-time" type="time" step="60" required />
+                <input id="saju-birth-time" type="text" inputMode="numeric" autoComplete="off" placeholder="HH:mm" maxLength={5} pattern="(?:[01][0-9]|2[0-3]):[0-5][0-9]" aria-label="출생시간 (24시간제 HH:mm)" required />
               </label>
             </div>
 

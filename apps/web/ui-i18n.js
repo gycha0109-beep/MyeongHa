@@ -14,7 +14,7 @@ export function translateStaticUi(source, locale) {
   return row?.[locale === 'ja-JP' ? 0 : locale === 'zh-TW' ? 1 : -1] ?? source;
 }
 
-const BLOCKED_TEXT = 'script, style, noscript, textarea, option, pre, code, svg, [contenteditable], .conversation-message-stream, .conversation-message-body, .character-dialogue-line, .reading-sheet-body, .reading-block, [data-message-id], [data-chat-message], [data-reading-content], [data-official-reading]';
+const BLOCKED_TEXT = 'script, style, noscript, pre, code, svg, [contenteditable], .conversation-message-stream .conversation-message:not([data-chat-intro]), [data-message-id], [data-chat-message], [data-reading-content], [data-official-reading], [data-reading-step-body], [data-reading-structure-body], [data-reader-comment], [data-context-title], [data-thread-bar-title]';
 const trackedText = new WeakMap();
 const trackedAttributes = new WeakMap();
 const ATTRIBUTES = ['aria-label', 'title', 'placeholder'];
@@ -32,7 +32,7 @@ function isBlocked(element) {
 }
 function repaintText(textNode, locale) {
   const parent = textNode.parentElement;
-  if (!parent || isBlocked(parent)) return;
+  if (!parent || parent.matches('textarea') || isBlocked(parent)) return;
   const current = textNode.nodeValue ?? '';
   const trimmed = current.trim();
   let korean = trackedText.get(textNode);
@@ -82,6 +82,7 @@ function paintSubtree(root, locale) {
 }
 function paintDocument(locale) {
   document.documentElement.lang = locale;
+  for (const input of document.querySelectorAll('input[type="date"], input[type="time"]')) input.lang = locale;
   for (const root of [document.head, document.body]) {
     if (root) paintSubtree(root, locale);
   }
@@ -134,6 +135,7 @@ function mountStaticUiLocale() {
   const observer = new MutationObserver(mutations => {
     for (const mutation of mutations) {
       if (mutation.type === 'characterData') pending.add(mutation.target);
+      else if (mutation.type === 'attributes') pending.add(mutation.target);
       else for (const added of mutation.addedNodes) pending.add(added);
     }
     if (queued || pending.size === 0) return;
@@ -144,7 +146,7 @@ function mountStaticUiLocale() {
       pending.clear();
     });
   });
-  observer.observe(document.body, { childList: true, characterData: true, subtree: true });
+  observer.observe(document.body, { childList: true, characterData: true, attributes: true, attributeFilter: ATTRIBUTES, subtree: true });
   window.addEventListener('storage', event => {
     if (event.key === UI_LOCALE_STORAGE_KEY) setLocale(storedLocale());
   });
