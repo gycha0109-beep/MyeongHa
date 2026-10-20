@@ -27,6 +27,7 @@ import {
 import { mobileHomeControllerV1 } from '@/features/home/native-mobile-home-controller';
 import { mobileColors } from '@/ui/mobile-colors';
 import { MobileUiText } from '@/ui/MobileUiText';
+import { useMobileUiLocale } from '@/ui/mobile-ui-locale';
 import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
 import { useMobilePullRefreshV1 } from '@/ui/use-mobile-pull-refresh';
 
@@ -38,6 +39,7 @@ const sexOptions = [
 
 export default function BirthInputScreen() {
   const styles = useMobileThemedStyles(staticStyles);
+  const { t } = useMobileUiLocale();
   const [calendarType, setCalendarType] = useState<BirthCalendarTypeV1>('solar');
   const [year, setYear] = useState('');
   const [month, setMonth] = useState('');
@@ -185,7 +187,7 @@ export default function BirthInputScreen() {
           <MobileUiText style={styles.label}>생년월일</MobileUiText>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="출생 생년월일 달력 열기"
+            accessibilityLabel={t('출생 생년월일 달력 열기')}
             onPress={() => setDatePickerVisible(true)}
             style={({ pressed }) => [styles.dateButton, pressed && styles.pressed]}
           >
@@ -193,7 +195,7 @@ export default function BirthInputScreen() {
               <Text style={styles.dateIconText}>▦</Text>
             </View>
             <View style={styles.dateCopy}>
-              <Text style={styles.dateHint}>{calendarType === 'solar' ? '양력 생년월일' : '음력 생년월일'}</Text>
+              <Text style={styles.dateHint}>{t(calendarType === 'solar' ? '양력 생년월일' : '음력 생년월일')}</Text>
               <Text style={[styles.dateValue, !year && styles.datePlaceholder]}>
                 {year && month && day
                   ? year + '년 ' + Number(month) + '월 ' + Number(day) + '일'

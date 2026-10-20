@@ -104,7 +104,7 @@ export default function FaceScreen() {
           <View style={styles.numberMark}><Text style={styles.numberText}>01</Text></View>
           <View style={styles.sectionCopy}>
             <MobileUiText style={styles.kicker}>PHOTO · 정면 사진</MobileUiText>
-            <Text style={styles.heroTitle}>{readerPresentation.name}에게 보여줄 사진</Text>
+            <Text style={styles.heroTitle}>{t('{reader}에게 보여줄 사진').replace('{reader}', readerPresentation.name)}</Text>
           </View>
         </View>
         <MobileUiText style={styles.body}>
@@ -115,7 +115,7 @@ export default function FaceScreen() {
       <View style={styles.preview}>
         {ready !== null ? (
           <Image
-            accessibilityLabel="선택한 얼굴 사진 미리보기"
+            accessibilityLabel={t('선택한 얼굴 사진 미리보기')}
             resizeMode="contain"
             source={{ uri: ready.uri }}
             style={styles.previewImage}
@@ -161,7 +161,7 @@ export default function FaceScreen() {
       <View style={styles.actions}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="전면 카메라로 정면 사진 촬영"
+          accessibilityLabel={t('전면 카메라로 정면 사진 촬영')}
           disabled={picking}
           onPress={() => setFrontCameraOpen(true)}
           style={({ pressed }) => [styles.cameraAction, (pressed || picking) && styles.pressed]}
@@ -170,7 +170,7 @@ export default function FaceScreen() {
         </Pressable>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="사진첩에서 얼굴 사진 선택"
+          accessibilityLabel={t('사진첩에서 얼굴 사진 선택')}
           disabled={picking}
           onPress={() => void choose('library', pickMobileFaceMediaFromLibraryV1)}
           style={({ pressed }) => [styles.secondary, (pressed || picking) && styles.pressed]}

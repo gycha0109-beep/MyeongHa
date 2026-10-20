@@ -15,6 +15,7 @@ import { resolveMobileSajuSceneAdmissionV1 } from '@/features/saju/mobile-saju-r
 import { mobileSajuPreviewServiceV1 } from '@/features/saju/native-mobile-saju-preview-service';
 import { mobileColors } from '@/ui/mobile-colors';
 import { MobileUiText } from '@/ui/MobileUiText';
+import { useMobileUiLocale } from '@/ui/mobile-ui-locale';
 import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
 
 const ROOM_ART = require('../../../assets/characters/chat-themes/seyeon-chat-theme-mobile-v1.webp');
@@ -37,6 +38,7 @@ function unavailableMessage(error: unknown): string {
 
 export default function SajuReaderSceneScreen() {
   const styles = useMobileThemedStyles(staticStyles);
+  const { t } = useMobileUiLocale();
   const params = useLocalSearchParams<{ reader?: string | string[]; topic?: string | string[] }>();
   const readerId = typeof params.reader === 'string' ? params.reader : null;
   const topicKey = typeof params.topic === 'string' ? params.topic : null;
@@ -131,7 +133,7 @@ export default function SajuReaderSceneScreen() {
           <View style={styles.sceneWash}>
             <Animated.Image
               source={SEYEON_ART}
-              accessibilityLabel="세연 대리자"
+              accessibilityLabel={t('세연 대리자')}
               resizeMode="cover"
               style={[styles.portrait, { opacity: frameProgress, transform: [{ translateY: portraitTranslate }] }]}
             />
@@ -188,16 +190,16 @@ export default function SajuReaderSceneScreen() {
           </View>
         ) : currentStep !== undefined ? (
           <View style={styles.block}>
-            <Text style={styles.eyebrow}>{admission.topic.label} · 읽기 {index + 1} / {state.result.steps.length}</Text>
+            <Text style={styles.eyebrow}>{admission.topic.label} · {t('읽기')} {index + 1} / {state.result.steps.length}</Text>
             <Text style={styles.title}>{currentStep.title}</Text>
             <Text style={styles.body}>{currentStep.primary}</Text>
             <Pressable accessibilityRole="button" onPress={() => setDetailsOpen(v => !v)} style={styles.detailButton}>
-              <Text style={styles.secondaryText}>{detailsOpen ? '근거·상세 접기 ▲' : '근거·상세 보기 ▼'}</Text>
+              <Text style={styles.secondaryText}>{t(detailsOpen ? '근거·상세 접기 ▲' : '근거·상세 보기 ▼')}</Text>
             </Pressable>
             {detailsOpen ? (
               <View style={styles.detailBox}>
                 {currentStep.structure.map((text, i) => (
-                  <Text key={'structure:' + i} style={styles.muted}>근거 · {text}</Text>
+                  <Text key={'structure:' + i} style={styles.muted}>{t('근거')} · {text}</Text>
                 ))}
                 {currentStep.supporting.map((text, i) => (
                   <Text key={'support:' + i} style={styles.muted}>{text}</Text>
@@ -217,7 +219,7 @@ export default function SajuReaderSceneScreen() {
                 </Pressable>
               ) : null}
               <Pressable accessibilityRole="button" style={[styles.action, styles.flex]} onPress={() => { setIndex(i => i + 1); setDetailsOpen(false); }}>
-                <Text style={styles.actionText}>{index + 1 === state.result.steps.length ? '읽기 마치기 →' : '다음 읽기 →'}</Text>
+                <Text style={styles.actionText}>{t(index + 1 === state.result.steps.length ? '읽기 마치기 →' : '다음 읽기 →')}</Text>
               </Pressable>
             </View>
           </View>

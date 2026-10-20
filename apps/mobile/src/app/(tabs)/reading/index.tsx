@@ -112,7 +112,7 @@ export default function SajuScreen() {
           <MobileReaderPicker selected={presentationReader} onChange={setPresentationReader} vertical="saju" />
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="선택한 Reader와 전체 사주 읽기 시작"
+            accessibilityLabel={t('선택한 Reader와 전체 사주 읽기 시작')}
             onPress={() => router.push({
               pathname: '/reading/scene',
               params: { reader: presentationReader, topic: 'temperament' },

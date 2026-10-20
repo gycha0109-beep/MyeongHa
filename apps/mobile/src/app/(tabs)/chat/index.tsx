@@ -39,7 +39,7 @@ export default function ChatHubScreen() {
       <View style={styles.intro}>
         <View style={styles.introHeading}>
           <Text style={styles.kicker}>THE PEOPLE OF MYEONGHA</Text>
-          <Text style={styles.introCounter}>대리자 {MOBILE_CHAT_LAUNCH_ROSTER_V1.length}명</Text>
+          <Text style={styles.introCounter}>{t('대리자 {count}명').replace('{count}', String(MOBILE_CHAT_LAUNCH_ROSTER_V1.length))}</Text>
         </View>
         <MobileUiText style={styles.title}>당신은 누구와 이야기하고 싶으신가요?</MobileUiText>
         <MobileUiText style={styles.body}>

@@ -1,6 +1,7 @@
 import { StyleSheet, Text, View } from 'react-native';
 
 import { useMobileTheme } from '@/ui/mobile-theme';
+import { useMobileUiLocale } from '@/ui/mobile-ui-locale';
 import { MobileUiText } from '@/ui/MobileUiText';
 
 type MyAccountPresentation = 'guest' | 'member' | 'checking';
@@ -11,6 +12,7 @@ type MyAccountPresentation = 'guest' | 'member' | 'checking';
  */
 export function MyEditorialWelcome({ account }: { account: MyAccountPresentation }) {
   const { theme } = useMobileTheme();
+  const { t } = useMobileUiLocale();
   const accountStatus = account === 'member'
     ? '회원 계정으로 이용 중'
     : account === 'guest'
@@ -25,7 +27,7 @@ export function MyEditorialWelcome({ account }: { account: MyAccountPresentation
       </View>
       <View style={styles.copy}>
         <MobileUiText style={styles.eyebrow}>MY MYEONGHA · 나의 공간</MobileUiText>
-        <Text style={styles.title}>나의 이야기를{'\n'}이어가는 공간</Text>
+        <Text style={styles.title}>{t('나의 이야기를')}{'\n'}{t('이어가는 공간')}</Text>
         <MobileUiText style={styles.subtitle}>
           계정, 출생정보와 명하에서 이어지는 길을 한곳에서 살펴보세요.
         </MobileUiText>
