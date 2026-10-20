@@ -8,7 +8,11 @@ import {
   type SeyeonExactModelPersonalSourceSelectionV1,
 } from './seyeon-exact-model-personal-source-selection-v1.js';
 import type {SeyeonPersonalRecordProjectionCandidateV1} from './seyeon-production-context-v1.js';
-import type {SeyeonRetrievedMemoryV2} from '../../../packages/domain/src/seyeon-runtime-context-v2.js';
+import {
+  assembleSeyeonRuntimeContextV2,
+  type SeyeonRetrievedMemoryV2,
+  type SeyeonRuntimeContextV2,
+} from '../../../packages/domain/src/seyeon-runtime-context-v2.js';
 import {
   executePostgresSubjectTransactionV1,
   type PostgresSubjectPoolV1,
@@ -37,6 +41,8 @@ export interface PersistSeyeonR20OfflineDigestBoundInputV1 {
   readonly turnId:string;
   readonly attemptId:string;
   readonly retrievedMemories:readonly SeyeonRetrievedMemoryV2[];
+  /** Exact server-assembled model Context, sealed before disposable DB Pin. */
+  readonly finalModelContext:SeyeonRuntimeContextV2;
   readonly sourceCandidates:readonly SeyeonPersonalRecordProjectionCandidateV1[];
   readonly maxRetrievedMemories?:number;
   readonly selection:SeyeonExactModelPersonalSourceSelectionV1;
@@ -46,6 +52,8 @@ export interface SeyeonR20OfflineDigestBoundReceiptV1 {
   readonly status:'disposable_original_and_projection_digests_committed';
   readonly selectedPersonalRecordCount:number;
   readonly selectedSourcesDigest:string;
+  /** SHA of checked model packet; not persisted as DB authority or a signature. */
+  readonly finalModelContextDigest:string;
   readonly permitsProvider:false;
   readonly permitsAtomicCommit:false;
   readonly permitsHttpReveal:false;
@@ -84,6 +92,31 @@ export async function persistSeyeonR20OfflineDigestBoundPinV1(
       retrievedMemories:input.retrievedMemories,
       sourceCandidates:input.sourceCandidates,
     });
+
+    // R34: an R20 selection can be internally correct while a separate final
+    // model Context silently adds a previous message, disclosure, relationship,
+    // Integrity evidence or a different retrieved-memory ordering/cap.
+    // For this disposable-only candidate the ONLY admissible model Context
+    // is the actual deterministic zero-derived/preflight-not-run assembly.
+    // Compare the ENTIRE assembled packet, not merely its personal source list.
+    // Never use a client/model-produced digest as proof of authorization.
+    const reconstructedModelContext=assembleSeyeonRuntimeContextV2({
+      relationship:null,
+      relationshipSemantics:null,
+      recentMessages:[],
+      retrievedMemories:input.retrievedMemories,
+      integrityDecisions:[],
+      governedPreflightApplied:false,
+      disclosure:{decision:null,retrievedSources:[]},
+      ...(input.maxRetrievedMemories===undefined?{}:{
+        maxRetrievedMemories:input.maxRetrievedMemories,
+      }),
+    });
+    if(!input.finalModelContext ||
+      canonicalJson(input.finalModelContext)!==canonicalJson(reconstructedModelContext)){
+      throw new SeyeonR20OfflineDigestHoldV1();
+    }
+    const finalModelContextDigest=digest(reconstructedModelContext);
 
     const selected=selectSeyeonExactModelPersonalSourcesV1({
       retrievedMemories:input.retrievedMemories,
@@ -169,6 +202,7 @@ select seyeon_positive_candidate.inspect_pinned_raw_source_r20(
       status:'disposable_original_and_projection_digests_committed' as const,
       selectedPersonalRecordCount:selected.selectedPersonalRecordCount,
       selectedSourcesDigest:selected.selectedSourcesDigest,
+      finalModelContextDigest,
       permitsProvider:false as const,permitsAtomicCommit:false as const,
       permitsHttpReveal:false as const,
     });
