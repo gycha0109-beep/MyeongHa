@@ -2016,7 +2016,7 @@ insert into public.commerce_payment_attempts(
  provider_transaction_id,status,created_at,updated_at
 )
 select '12197000-0000-0000-0000-000000000012'::uuid,
- pi.id,pi.subject_id,pi.product_offer_id,5,
+ pi.id,pi.subject_id,pi.product_offer_id,1,
  'portone_v2','production','reader-b8-attempt-e',
  'b8-payment-e','tx-reader-b8-e',
  'response_received',clock_timestamp(),clock_timestamp()
