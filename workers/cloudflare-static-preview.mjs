@@ -4,6 +4,7 @@
 // Watchtower-Track: ops
 
 const BASE_HEADERS = Object.freeze({
+  'Content-Security-Policy': "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; img-src 'self' data:; font-src 'self'; style-src 'self'; script-src 'self'; connect-src 'self'",
   'Cache-Control': 'no-store',
   'X-Robots-Tag': 'noindex, nofollow, noarchive',
   'X-Content-Type-Options': 'nosniff',
