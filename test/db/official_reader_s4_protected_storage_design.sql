@@ -66,7 +66,7 @@ with active_bundles as (
   and g.status='active' and g.valid_from<=clock_timestamp()
   and (g.valid_until is null or clock_timestamp()<g.valid_until)
 ), uniquely_entitled as (
- select count(*) as bundles, min(reader_content_bundle_id) as only_bundle
+ select count(*) as bundles, min(reader_content_bundle_id::text)::uuid as only_bundle
  from active_bundles
 )
 select count(*) from official_reader_s4_fixture.protected_bodies b
