@@ -400,6 +400,84 @@ describe('claimed account deletion worker orchestration', () => {
     ]);
   });
 
+  it('holds native completion ACK on restored Reader bytes and resumes only after ledger reconciliation', async () => {
+    const calls: string[] = [];
+    let phase: AccountDeletionWorkerResumePhaseV1 = 'completion_ack_required';
+    let oldProtectedBytesPresent = true;
+    let deletionLedgerReconciled = false;
+    const restorationBlocker = new Error(
+      'synthetic protected Reader backup has not been reconciled with deletion tombstone',
+    );
+    const resumeStatePort: AccountDeletionWorkerResumeStatePortV1 = {
+      readResumeState: vi.fn(async () => {
+        calls.push(`resume:${phase}`);
+        return state(phase);
+      }),
+    };
+    const db = finalizer(calls);
+    const authPort = auth(calls);
+    const completionPort: AccountDeletionWorkerCompletionPortV1 = {
+      completeDeletion: vi.fn(async (input) => {
+        calls.push('completion-gate');
+        expect(input).toEqual({
+          subjectId: SUBJECT_ID,
+          deletionJobId: JOB_ID,
+          lockOwner: LOCK_OWNER,
+        });
+        if (oldProtectedBytesPresent || !deletionLedgerReconciled) {
+          throw restorationBlocker;
+        }
+        calls.push('native-1190-completion-ack');
+        phase = 'completed';
+        return {
+          completed: true,
+          replayed: false,
+          completedAt: '2026-10-20T00:00:00.000Z',
+        };
+      }),
+    };
+    const input = {
+      subjectId: SUBJECT_ID,
+      deletionJobId: JOB_ID,
+      lockOwner: LOCK_OWNER,
+      resumeStatePort,
+      dbFinalizerPort: db,
+      authDeletionPort: authPort,
+      completionPort,
+    };
+    await expect(runClaimedAccountDeletionWorkerV1(input)).rejects.toBe(
+      restorationBlocker,
+    );
+    expect(phase).toBe('completion_ack_required');
+    expect(db.finalizeDatabase).not.toHaveBeenCalled();
+    expect(authPort.deleteUser).not.toHaveBeenCalled();
+
+    // Even after removing old bytes, an outdated off-backup reconciliation
+    // epoch must continue to deny ACK. A retry never repeats hosted Auth.
+    oldProtectedBytesPresent = false;
+    await expect(runClaimedAccountDeletionWorkerV1(input)).rejects.toBe(
+      restorationBlocker,
+    );
+    expect(phase).toBe('completion_ack_required');
+    deletionLedgerReconciled = true;
+    const success = await runClaimedAccountDeletionWorkerV1(input);
+    expect(success.status).toBe('completed');
+    expect(success.resumedFrom).toBe('completion_ack_required');
+    expect(success.completionInvoked).toBe(true);
+    expect(completionPort.completeDeletion).toHaveBeenCalledTimes(3);
+    expect(db.finalizeDatabase).not.toHaveBeenCalled();
+    expect(authPort.deleteUser).not.toHaveBeenCalled();
+    const after = await runClaimedAccountDeletionWorkerV1(input);
+    expect(after.alreadyCompleted).toBe(true);
+    expect(completionPort.completeDeletion).toHaveBeenCalledTimes(3);
+    expect(calls).toEqual([
+      'resume:completion_ack_required', 'completion-gate',
+      'resume:completion_ack_required', 'completion-gate',
+      'resume:completion_ack_required', 'completion-gate',
+      'native-1190-completion-ack', 'resume:completed',
+    ]);
+  });
+
   it('has no public route, browser authority, batch discovery, retry policy, or worker DB identity', () => {
     expect(ACCOUNT_DELETION_WORKER_ORCHESTRATION_BINDINGS_V1).toEqual({
       publicRoute: null,
