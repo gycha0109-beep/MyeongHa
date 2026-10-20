@@ -1,5 +1,18 @@
 # Cloudflare 실제 프리뷰 배포 핸드오프 (2026-10-20)
 
+## 2026-10-20 실제 클라우드 프리뷰 실행 결과 (최신 기록)
+
+- 사용자 계정에서 직접 `myeongha` Worker와 Cloudflare GitHub 연동을 설정함. 기존 프로젝트 재생성 없음.
+- 최초 Cloudflare `main` 빌드는 `Missing script: "build:cloudflare:static"`로 실패: Cloudflare 빌드 대상 `main`에 이관 PR 코드가 없었기 때문임.
+- 이관 작업 브랜치에서 `wrangler.jsonc`의 Worker 이름을 **`myeongha`**로 변경. 프리뷰 명령이 요구한 `"previews": {}`도 추가.
+- Cloudflare Preview 빌드 `de9adc92-a753-454c-91b8-33578dadf683`: HTML 11개, 정적 파일 185개 생성과 `wrangler preview` 배포 단계 성공.
+- 프리뷰만 접근하도록 `/workers/scripts/myeongha/subdomain`에서 `enabled=false`, `previews_enabled=true` 적용.
+- Cloudflare Workers API가 반환한 실제 프리뷰 주소: **https://feat-ops-cloudflare-static-preview-20261020-myeongha.gycha0109.workers.dev**
+- Cloudflare Workers Preview `deployed_on=2026-10-20T08:46:32Z`. **Cloudflare API 배포 확인 완료**, 다만 현재 도구에서 프리뷰 URL DNS 조회에 실패하므로 **원격 HTTP 응답, CSP parity, 브라우저 화면에 대한 실측은 미완료**.
+- DNS/운영 도메인/Vercel/DB/결제/시크릿 변경 없음. PR은 draft/미병합.
+- 아래 '배포 이전 단계'의 일부 정보(Worker 0개, 연동 실패, 프로젝트 이름 `myeongha-static-preview`)는 **이전 시점 기록이며 현재 상태가 아님**. 현재 원격 Worker 이름은 `myeongha`.
+
+
 > 작업 저장소: `gycha0109-beep/MyeongHa`  
 > 대상 구현: [PR #2384](https://github.com/gycha0109-beep/MyeongHa/pull/2384) (`feat/ops/cloudflare-static-preview-20261020`, **draft, 미병합**)  
 > 참조 설계: [PR #2381](https://github.com/gycha0109-beep/MyeongHa/pull/2381) (미병합)  
