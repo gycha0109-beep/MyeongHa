@@ -56,6 +56,8 @@ describe('PR-04D3A Production Governor pre-activation gates (offline)', () => {
       { ...base, fetchImpl: vi.fn() },
       { ...base, beforeDispatch: vi.fn() },
       { ...base, meteredBeforeDispatch: vi.fn() },
+      { ...base, meteredAfterOutcome: vi.fn() },
+      { ...base, observeMetric: vi.fn() },
     ];
     for (const config of malicious) {
       expect(() => assertSeyeonProductionGovernorBoundaryV1({
@@ -71,6 +73,14 @@ describe('PR-04D3A Production Governor pre-activation gates (offline)', () => {
     const worker = {mode: 'ENFORCE' as const,target:'post_turn' as const,
       providerConfig: base, governorConfigured:true};
     expect(() => assertSeyeonProductionGovernorBoundaryV1(worker)).not.toThrow();
+    for (const injected of [
+      {...base,meteredAfterOutcome:vi.fn()},
+      {...base,observeMetric:vi.fn()},
+    ]) {
+      expect(() => assertSeyeonProductionGovernorBoundaryV1({
+        ...worker,providerConfig:injected,
+      })).toThrow('injected Provider');
+    }
     expect(() => assertSeyeonProductionGovernorBoundaryV1({
       ...worker, governorConfigured:false,
     })).toThrow('server-owned');
