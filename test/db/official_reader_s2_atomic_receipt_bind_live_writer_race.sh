@@ -1472,4 +1472,62 @@ pass "bound sibling B cannot block zero-Grant Receipt D verified refund/replay; 
 
 
 
+# S2 lock-order cross-over: combined verified issuance / refund owns
+# purchase advisory BEFORE scope; standalone direct binder owns scope BEFORE
+# the purchase-intent ROW lock. The former MUST NOT lock a purchase ROW
+# before obtaining scope or the two live operations could deadlock.
+# This is a two-session primitive/row-lock order test, not T2 activation.
+p >"$tmpdir/b8-lock-order-scope-row.out" 2>&1 <<SQL &
+set application_name='rr_s2_b8_scope_then_purchase_row';
+set statement_timeout='20s';
+begin;
+select public.internal_acquire_official_reader_scope_lock_v1(
+ '$subject'::uuid,'$b8_reading'::uuid,'test-standard-reader'
+);
+select pg_sleep(3);
+select id from public.purchase_intents
+ where id='$b8_intent'::uuid for update;
+commit;
+SQL
+holder_pid=$!
+wait_for "scope-first Writer holds S1 without purchase row lock" "
+ select count(*) from pg_catalog.pg_stat_activity
+ where application_name='rr_s2_b8_scope_then_purchase_row'
+ and state='active' and wait_event_type='Timeout';
+"
+p >"$tmpdir/b8-lock-order-purchase-scope.out" 2>&1 <<SQL &
+set application_name='rr_s2_b8_purchase_then_scope';
+set statement_timeout='20s';
+begin;
+select public.internal_acquire_official_reader_purchase_lock_v1(
+ '$b8_intent'::uuid
+);
+select public.internal_acquire_official_reader_scope_lock_v1(
+ '$subject'::uuid,'$b8_reading'::uuid,'test-standard-reader'
+);
+commit;
+SQL
+writer_pid=$!
+wait_for "purchase-first Writer waits on S1 while owning purchase advisory only" "
+ select count(*) from pg_catalog.pg_stat_activity
+ where application_name='rr_s2_b8_purchase_then_scope'
+ and state='active' and wait_event_type='Lock'
+ and wait_event='advisory';
+"
+wait "$holder_pid" || {
+ cat "$tmpdir/b8-lock-order-scope-row.out" >&2
+ fail "scope-first Writer unexpectedly deadlocked against purchase advisory"
+}
+holder_pid=""
+wait "$writer_pid" || {
+ cat "$tmpdir/b8-lock-order-purchase-scope.out" >&2
+ fail "purchase-first Writer unexpectedly deadlocked against scope-first row writer"
+}
+writer_pid=""
+[[ "$(p -c "select count(*) from public.entitlement_grants
+ where id in ('$b8_grant_b'::uuid,'$b8_grant_c'::uuid)
+ and status='active';")" == 2 ]] ||
+ fail "S2 lock order cross-over mutated independent sibling Grants"
+pass "two-session purchase advisory->scope vs scope->purchase row finishes without deadlock"
+
 echo "PASS: S2 instrumented two-direction PostgreSQL race; production integration HOLD"

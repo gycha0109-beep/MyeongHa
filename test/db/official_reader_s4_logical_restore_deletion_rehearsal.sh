@@ -30,6 +30,10 @@ p -v s4_restore_rehearsal=1 -f test/db/official_reader_s4_protected_storage_desi
   tail -60 "$tmpdir/setup.log" >&2
   die "fixture failed"
 }
+p -f test/db/official_reader_s4_finalizer_forward_contract.sql >"$tmpdir/forward-contract.log" 2>&1 || {
+ tail -65 "$tmpdir/forward-contract.log" >&2
+ die "forward-only finalizer ordering contract failed"
+}
 p -c "update public.entitlement_grants g set status='active',revision=revision+1,
  last_effective_at=clock_timestamp(),updated_at=clock_timestamp()
  from public.standard_reading_reader_access_grants a

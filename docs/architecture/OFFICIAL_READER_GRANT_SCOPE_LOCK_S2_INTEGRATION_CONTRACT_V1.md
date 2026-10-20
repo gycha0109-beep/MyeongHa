@@ -76,3 +76,17 @@
 - 해당 함수는 `SECURITY INVOKER`, 외부/런타임 역할에 실행 권한을 주지 않는다. 공식 사주 원본·개별 구매권 증빙·Product 규칙·출처 검증·최종 결과 저장을 대신하지 않는다.
 - 동일 합성 영수증의 기존 S2 경합 시험에서 현재 묶음 수 **1 → 서로 다른 묶음 2 → 하나 회수 1 → 모두 회수 0**의 경계를 추가 검증한다.
 - 부모 #1984의 실제 경합 검증과 이 후보 조회 함수는 **실서비스 권한 판단 함수가 아니며**, Commerce 모든 원본 Writer의 공동 잠금 참여 전에는 최종 유료 공개 근거로 사용할 수 없다.
+
+## 8. 소스 기반 상호 잠금 순서표 및 별개 소유자 경계 (2026-10-20)
+
+| Writer (실제 순방향 정의) | 먼저 취득하는 잠금 | 후속 대상 | 교착 검토 |
+| --- | --- | --- | --- |
+| `1870 internal_apply_verified_reader_purchase_under_scope_v1` | Purchase XACT advisory → Reader S1 | 1090 Receipt/Grant → 1220 Purchase/Grant/Birth | Purchase advisory 상태에서 Purchase **행**을 보유하지 않고 S1 획득. 다른 1220과 순환 대기 금지 |
+| `1900 cmd_apply_verified_portone_reader_full_cancellation_v1` | Purchase XACT advisory → 출처 Receipt의 정렬 S1(이미 결속) | 미결속이면 정확한 Receipt FOR UPDATE → 해당 Grant id 순서 FOR UPDATE; 결속이면 1770 dispatch | **기존 범위를 찾지 못한 분기에서 Receipt/Grant 행을 잠근 후 새 S1을 획득하지 않는다.** 결속 경합 발견 시 전체 롤백·재시도 |
+| `1810 cmd_bind_standard_reading_access_v2` | 정확한 Reader S1(제안 ID는 초회만) | Purchase Intent FOR UPDATE → Grant FOR UPDATE → Birth FOR UPDATE | Purchase advisory 미취득; 구매 advisory 보유자가 S1을 기다려도 1220의 Purchase **행** 취득이 가능해야 함 |
+| `1770 internal_dispatch_verified_official_reader_revoke_event_v1` | 원본 Receipt의 모든 Reading×Reader S1 정렬 | Grant별 1080 event effect / CAS | 임의 Grant 순서대로 개별 S1 잠금하면 역방향 교착. 해당 함수는 전체 스코프 선점 |
+| `1790/1800/1840/1900` legacy writer guards | 호출자 S1 held 여부를 검증(본 함수가 S1 추가 취득하지 않음) | 기존 1080/1090 Grant/Receipt | 직접 호출 우회 시 사전 보유 잠금 없으면 DENY; 새로운 Writer는 전체 범위 정렬 필수 |
+| 향후 S5 유료 T2 (미구현) | 정확한 Reader S1 → 재검증 | 본문/시도/원본/출처 원자 저장 | 범위 취득 이후 Purchase/Grant row 잠금 순서와 실제 저장 Writer를 별도 검증해야 함 |
+
+- **DB 실경합 인수:** 구매 advisory만 가진 A가 Reader S1에 대기하는 동안 S1을 가진 B가 **Purchase Intent 행을 잠그고 커밋**해야 합니다. 두 연결 모두 20초 이내 정상 종료, SQLSTATE `40P01`/시간초과·형제 Grant 변경 0. 이 시험은 잠금 원시 순서를 재현하며 모든 원본 Writer 경로의 실서비스 안전성 입증은 아닙니다.
+- **잔여 S2 리스크:** 외부 Commerce 이벤트 디스패처/비Reader Grant 혼용, Receipt 이외의 잠금 행, 다중 Reading/Reader scope 재발견, 예약된/후속 T2 Writer, Auth·탈퇴 finalizer와 Grant/Birth 교차 대기는 아직 한 거래 안에서 전역 순서 인수 미완료입니다. 잠금 이후 재조회와 실제 DB 소유자별 교착 계측, 승인 경로 제한이 끝나기 전 S2 전체 완료 판정 금지.
