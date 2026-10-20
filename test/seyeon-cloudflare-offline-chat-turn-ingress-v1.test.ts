@@ -100,7 +100,7 @@ describe('S-CF1.5 Cloudflare first chat turn ingress, offline only', () => {
       const legacy = await preflightSeyeonChatTurnSendRequestV1({
         request: request(),
         requestId: REQUEST_ID,
-        identityEvidenceVerifier: verifier(identity === undefined ? null : await identity.verifyRequestIdentity(request())),
+        identityEvidenceVerifier: verifier(await identity.verifyRequestIdentity()),
       });
       expect(legacy.kind).toBe('denied');
       if (legacy.kind === 'denied') {
