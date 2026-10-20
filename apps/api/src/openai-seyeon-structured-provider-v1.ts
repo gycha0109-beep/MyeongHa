@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto';
 import {
   awaitBoundedUpstreamJsonResponseHeadersV1,
   readBoundedUpstreamJsonTextV1,
@@ -105,16 +104,19 @@ export async function readSeyeonProviderFailureDiagnosticV1(response: Response) 
   let raw = '';
   try {
     if (reader) {
-      const chunks: Uint8Array[] = [];
+      // Standard Fetch/Streams APIs only: no Node Buffer or Node crypto is
+      // needed at the Cloudflare Worker boundary. Incremental UTF-8 decoding
+      // preserves split multi-byte diagnostics within the existing byte cap.
+      const decoder = new TextDecoder();
       let size = 0;
       while (true) {
         const result = await Promise.race([reader.read(), deadline]);
         if (result.done) break;
         size += result.value.byteLength;
         if (size > 16_384) break;
-        chunks.push(result.value);
+        raw += decoder.decode(result.value, { stream: true });
       }
-      raw = new TextDecoder().decode(Buffer.concat(chunks));
+      raw += decoder.decode();
     }
   } catch {
     // Missing, oversized, or unreadable error bodies never replace HTTP_FAILURE.
@@ -380,7 +382,7 @@ export function createOpenAiSeyeonStructuredProviderV1(
       request: SeyeonStructuredProviderRequestV2,
     ): Promise<unknown> {
       const startedAt = performance.now();
-      const callId = randomUUID();
+      const callId = crypto.randomUUID();
       const requestBody = JSON.stringify({
             model,
             ...(endpoint === 'https://ai-gateway.vercel.sh/v1/responses' && model.startsWith('openai/')
