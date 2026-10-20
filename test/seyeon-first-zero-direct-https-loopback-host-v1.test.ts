@@ -14,6 +14,8 @@ import type { ProductionSeyeonChatRuntimeV1 } from '../apps/api/src/production-s
 import {
   startSeyeonFirstZeroDirectHttpsLoopbackV1,
   SEYEON_FIRST_ZERO_DIRECT_HTTPS_LOOPBACK_HOST_V1,
+  SEYEON_FIRST_ZERO_DIRECT_HTTPS_NETWORK_CANDIDATE_V1,
+  startSeyeonFirstZeroDirectHttpsNetworkCandidateV1,
 } from '../apps/api/src/seyeon-first-zero-direct-https-loopback-host-v1.js';
 
 const hostname = 'seyeon.local.test';
@@ -208,6 +210,51 @@ describe('direct HTTPS TLS-only synthetic Node host', () => {
       reverseProxySupported: false,
       independentlyApprovedForProduction: false,
     });
+  });
+
+  it('keeps the external direct listener unmounted and requires fixed TCP/443 plus separate start approval', () => {
+    expect(SEYEON_FIRST_ZERO_DIRECT_HTTPS_NETWORK_CANDIDATE_V1).toMatchObject({
+      bindAddress: '0.0.0.0',
+      port: 443,
+      publicRouteMounted: false,
+      deploymentEntrypointInstalled: false,
+      finalClientDeliveryAcknowledged: false,
+      reverseProxySupported: false,
+    });
+    const base = {
+      certificatePem: cert, privateKeyPem: key, expectedDnsHost: hostname,
+      allowedBrowserOrigin: 'https://app.myeongha.test',
+      identityEvidenceVerifier: { verifyRequestIdentity: async () => null },
+      pool: syntheticDb().pool,
+      runtime: { run: async () => { throw new Error('no live runtime'); } },
+    };
+    expect(() => startSeyeonFirstZeroDirectHttpsNetworkCandidateV1({
+      ...base, ownerApprovedNetworkStart: false as never,
+      listener: { bindAddress: '0.0.0.0', port: 443 },
+    })).toThrow('requires explicit owner scope');
+    expect(() => startSeyeonFirstZeroDirectHttpsNetworkCandidateV1({
+      ...base, ownerApprovedNetworkStart: true,
+      listener: { bindAddress: '127.0.0.1' as never, port: 443 },
+    })).toThrow('requires explicit owner scope');
+    expect(() => startSeyeonFirstZeroDirectHttpsNetworkCandidateV1({
+      ...base, ownerApprovedNetworkStart: true,
+      listener: { bindAddress: '0.0.0.0', port: 8443 as never },
+    })).toThrow('requires explicit owner scope');
+  });
+
+  it('rejects a mismatched DNS SAN or TLS private key before opening even the local listener', async () => {
+    const base = {
+      certificatePem: cert, privateKeyPem: key,
+      identityEvidenceVerifier: { verifyRequestIdentity: async () => null },
+      pool: syntheticDb().pool,
+      runtime: { run: async () => { throw new Error('no live runtime'); } },
+    };
+    await expect(startSeyeonFirstZeroDirectHttpsLoopbackV1({
+      ...base, expectedDnsHost: 'not-the-certificate.local.test',
+    })).rejects.toThrow('certificate must match');
+    await expect(startSeyeonFirstZeroDirectHttpsLoopbackV1({
+      ...base, expectedDnsHost: hostname, privateKeyPem: 'invalid private key',
+    })).rejects.toThrow('certificate must match');
   });
 
   it('completes real TLS 1.3 + SNI + JWT-verified Member preflight -> DB original -> finish, without model body serialization', async () => {
