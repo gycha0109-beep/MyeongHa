@@ -240,6 +240,32 @@ try {
   const auth=await inspect("(() => ({lang:document.documentElement.lang, text:document.body.innerText.replace(/한국어/g,''),overflow:document.documentElement.scrollWidth-innerWidth}))()");
   assert(auth.lang==='ja-JP' && !/[가-힣]/u.test(auth.text),'Japanese auth UI contains untranslated Hangul: '+auth.text.match(/.{0,30}[가-힣].{0,40}/gu)?.slice(0,12).join(' | '));
   assert(auth.overflow<=2,'Japanese auth layout overflow');
+
+  // Verify the user-visible daily fortune, not just its button label. The
+  // random content is authored copy and must never fall back to Korean.
+  await navigate(client,origin,'/hall.html','.fortune-cookie-trigger');
+  await sleep(350);
+  const trigger=await inspect("(() => ({lang:document.documentElement.lang,text:document.querySelector('.fortune-cookie-trigger')?.textContent.trim(),pending:document.documentElement.dataset.uiPending??null,boot:!!document.querySelector('script[src=\"/ui-i18n-boot.js\"]')}))()");
+  assert(trigger.lang==='ja-JP' && trigger.text.includes('今日の運勢'),'Japanese fortune trigger not localized: '+JSON.stringify(trigger));
+  assert(trigger.pending===null && trigger.boot,'Early locale bootstrap was missing or never completed');
+  await inspect("(() => {document.querySelector('.fortune-cookie-trigger').click(); return true;})()");
+  await sleep(150);
+  await inspect("(() => {const button=document.querySelector('.fortune-cookie-draw'); if(!button)throw Error('fortune draw missing');button.click();return true;})()");
+  await sleep(200);
+  const daily=await inspect("(() => ({message:document.querySelector('#fortune-cookie-reveal-message')?.textContent.trim(),title:document.querySelector('#fortune-cookie-reveal-title')?.textContent.trim()}))()");
+  assert(daily.message && !/[가-힣]/u.test(daily.message+daily.title),'Daily fortune revealed Korean: '+JSON.stringify(daily));
+
+  // Offline/unavailable chat is still a fixed UI state. It is not a user
+  // message and must show the chosen language even on a failed API request.
+  await navigate(client,origin,'/chat.html?character=seyeon','[data-compose-status]');
+  let offline=null;
+  for(let i=0;i<70;i++){
+    offline=await inspect("(() => ({compose:document.querySelector('[data-compose-status]')?.textContent.trim(),loading:document.querySelector('[data-room-loading]')?.textContent.trim(),pending:document.documentElement.dataset.uiPending??null}))()");
+    if(offline.compose || offline.loading)break;
+    await sleep(100);
+  }
+  assert(offline && offline.pending===null,'Chat UI remained hidden waiting for localization');
+  assert(!/[가-힣]/u.test((offline.compose??'')+(offline.loading??'')),'Japanese offline chat status mixed Korean: '+JSON.stringify(offline));
   await inspect("(() => {let s=document.querySelector('.ui-locale-select');s.value='zh-TW';s.dispatchEvent(new Event('change',{bubbles:true}));return true;})()");
   await navigate(client,origin,'/reading.html','#saju-birth-sex');
   await sleep(350);
