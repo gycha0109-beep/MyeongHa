@@ -487,6 +487,12 @@
       "prMode": "none",
       "mainMode": "one-shot-trigger",
       "workTrackAttribution": "commit-metadata"
+    },
+    "seyeon-openrouter-nemotron-free-three-call-n01-v1.yml": {
+      "responsibility": "character-memory-bounded-free-model-public-shadow-evaluation",
+      "prMode": "none",
+      "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "commit-metadata"
     }
   }
 }
