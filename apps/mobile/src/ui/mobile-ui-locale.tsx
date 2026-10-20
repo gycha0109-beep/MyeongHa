@@ -8,7 +8,7 @@ import {
   normalizeMobileUiLocale,
   translateMobileUiCopy,
   type MobileUiLocale,
-} from './mobile-ui-copy';
+} from './mobile-ui-copy.js';
 
 type MobileUiLocaleContextValue = Readonly<{
   locale: MobileUiLocale;
