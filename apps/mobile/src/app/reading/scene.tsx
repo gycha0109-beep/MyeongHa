@@ -14,6 +14,7 @@ import { useMobileChatOpenV1 } from '@/features/chat/use-mobile-chat-open';
 import { resolveMobileSajuSceneAdmissionV1 } from '@/features/saju/mobile-saju-reader-scene';
 import { mobileSajuPreviewServiceV1 } from '@/features/saju/native-mobile-saju-preview-service';
 import { mobileColors } from '@/ui/mobile-colors';
+import { MobileUiText } from '@/ui/MobileUiText';
 import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
 
 const ROOM_ART = require('../../../assets/characters/chat-themes/seyeon-chat-theme-mobile-v1.webp');
@@ -105,10 +106,10 @@ export default function SajuReaderSceneScreen() {
     return (
       <SafeAreaView style={styles.page}>
         <View style={styles.block}>
-          <Text style={styles.title}>현재 열 수 없는 사주 읽기입니다</Text>
-          <Text style={styles.muted}>승인된 Reader와 프리뷰 주제를 먼저 선택해 주세요.</Text>
+          <MobileUiText style={styles.title}>현재 열 수 없는 사주 읽기입니다</MobileUiText>
+          <MobileUiText style={styles.muted}>승인된 Reader와 프리뷰 주제를 먼저 선택해 주세요.</MobileUiText>
           <Pressable accessibilityRole="button" onPress={() => router.replace('/reading')} style={styles.action}>
-            <Text style={styles.actionText}>사주로 돌아가기</Text>
+            <MobileUiText style={styles.actionText}>사주로 돌아가기</MobileUiText>
           </Pressable>
         </View>
       </SafeAreaView>
@@ -124,7 +125,7 @@ export default function SajuReaderSceneScreen() {
     <SafeAreaView style={styles.page}>
       <ScrollView contentContainerStyle={styles.scroll}>
         <Pressable accessibilityRole="button" onPress={() => router.back()}>
-          <Text style={styles.back}>‹ 사주로 돌아가기</Text>
+          <MobileUiText style={styles.back}>‹ 사주로 돌아가기</MobileUiText>
         </Pressable>
         <ImageBackground source={ROOM_ART} style={styles.scene} imageStyle={styles.sceneArt} resizeMode="cover">
           <View style={styles.sceneWash}>
@@ -135,34 +136,34 @@ export default function SajuReaderSceneScreen() {
               style={[styles.portrait, { opacity: frameProgress, transform: [{ translateY: portraitTranslate }] }]}
             />
             <Animated.View style={[styles.sceneCaption, { opacity: identityOpacity }]}>
-              <Text style={styles.sceneName}>세연 · 무녀</Text>
-              <Text style={styles.sceneLine}>명식의 흐름을 함께 살펴볼게요.</Text>
+              <MobileUiText style={styles.sceneName}>세연 · 무녀</MobileUiText>
+              <MobileUiText style={styles.sceneLine}>명식의 흐름을 함께 살펴볼게요.</MobileUiText>
             </Animated.View>
           </View>
         </ImageBackground>
-        <Text style={styles.sceneNote}>장면 연출 · 실제 해석 내용은 서버의 검증된 사주 프리뷰만 사용합니다.</Text>
+        <MobileUiText style={styles.sceneNote}>장면 연출 · 실제 해석 내용은 서버의 검증된 사주 프리뷰만 사용합니다.</MobileUiText>
 
         {state.kind === 'unavailable' ? (
           <View style={styles.block}>
-            <Text style={styles.title}>읽기를 표시하지 못했습니다</Text>
+            <MobileUiText style={styles.title}>읽기를 표시하지 못했습니다</MobileUiText>
             <Text style={styles.muted}>{state.message}</Text>
             <Pressable accessibilityRole="button" style={styles.action} onPress={() => router.replace('/reading')}>
-              <Text style={styles.actionText}>사주로 돌아가기</Text>
+              <MobileUiText style={styles.actionText}>사주로 돌아가기</MobileUiText>
             </Pressable>
           </View>
         ) : !introFinished || state.kind === 'loading' ? (
           <View style={styles.block}>
             <ActivityIndicator color={mobileColors.navy} />
-            <Text style={styles.muted}>세연이 명식을 살펴보는 장면입니다…</Text>
+            <MobileUiText style={styles.muted}>세연이 명식을 살펴보는 장면입니다…</MobileUiText>
           </View>
         ) : completed ? (
           <View style={styles.block}>
             <Text style={styles.eyebrow}>READING COMPLETE</Text>
-            <Text style={styles.title}>이번 사주 프리뷰를 마쳤습니다.</Text>
-            <Text style={styles.muted}>계속 대화하거나 기존에 저장된 공식 사주 기록을 확인할 수 있습니다.</Text>
+            <MobileUiText style={styles.title}>이번 사주 프리뷰를 마쳤습니다.</MobileUiText>
+            <MobileUiText style={styles.muted}>계속 대화하거나 기존에 저장된 공식 사주 기록을 확인할 수 있습니다.</MobileUiText>
             {chatOpenState.access === 'guest' ? (
               <Pressable accessibilityRole="button" style={styles.action} onPress={() => router.push('/my')}>
-                <Text style={styles.actionText}>로그인 후 세연과 대화하기 →</Text>
+                <MobileUiText style={styles.actionText}>로그인 후 세연과 대화하기 →</MobileUiText>
               </Pressable>
             ) : (
               <Pressable
@@ -181,9 +182,9 @@ export default function SajuReaderSceneScreen() {
               <Text style={styles.chatError}>{chatOpenState.errorMessage}</Text>
             ) : null}
             <Pressable accessibilityRole="button" style={styles.secondary} onPress={() => router.replace('/records?tab=readings')}>
-              <Text style={styles.secondaryText}>기록으로 넘어가기 →</Text>
+              <MobileUiText style={styles.secondaryText}>기록으로 넘어가기 →</MobileUiText>
             </Pressable>
-            <Text style={styles.footnote}>이번 무료 프리뷰는 공식 Reading 기록으로 저장되지 않습니다. 대화 화면에서도 이 프리뷰가 자동으로 세연의 지식에 추가되지는 않습니다.</Text>
+            <MobileUiText style={styles.footnote}>이번 무료 프리뷰는 공식 Reading 기록으로 저장되지 않습니다. 대화 화면에서도 이 프리뷰가 자동으로 세연의 지식에 추가되지는 않습니다.</MobileUiText>
           </View>
         ) : currentStep !== undefined ? (
           <View style={styles.block}>
@@ -202,7 +203,7 @@ export default function SajuReaderSceneScreen() {
                   <Text key={'support:' + i} style={styles.muted}>{text}</Text>
                 ))}
                 {currentStep.structure.length === 0 && currentStep.supporting.length === 0 ? (
-                  <Text style={styles.muted}>현재 제공된 추가 근거가 없습니다.</Text>
+                  <MobileUiText style={styles.muted}>현재 제공된 추가 근거가 없습니다.</MobileUiText>
                 ) : null}
                 {state.result.notices.map((text, i) => (
                   <Text key={'notice:' + i} style={styles.footnote}>{text}</Text>
@@ -212,7 +213,7 @@ export default function SajuReaderSceneScreen() {
             <View style={styles.buttons}>
               {index > 0 ? (
                 <Pressable accessibilityRole="button" style={styles.secondary} onPress={() => { setIndex(i => i - 1); setDetailsOpen(false); }}>
-                  <Text style={styles.secondaryText}>이전</Text>
+                  <MobileUiText style={styles.secondaryText}>이전</MobileUiText>
                 </Pressable>
               ) : null}
               <Pressable accessibilityRole="button" style={[styles.action, styles.flex]} onPress={() => { setIndex(i => i + 1); setDetailsOpen(false); }}>
