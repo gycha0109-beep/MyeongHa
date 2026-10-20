@@ -2134,4 +2134,204 @@ b8_grant_e="$(p -c "select id from public.entitlement_grants
  fail "independent B/C rights were revived by E issue-and-revoke race"
 pass "verified E issuance-first Grant Writer and later cancellation serialize by purchase and preserve B/C"
 
+
+# Three real DB sessions: combined verified F issuance+Reader bind owns BOTH
+# purchase and Reader S1, direct legacy binder waits on S1 and PortOne full
+# refund waits on F purchase advisory. Refund's prelock view is unbound,
+# so after F becomes bound it MUST abort and retry via bound S1. No paid
+# disclosure/operational activation is attempted by these synthetic writers.
+f_intent='12192300-0000-0000-0000-000000000014'
+f_receipt='12192000-0000-0000-0000-000000000014'
+f_attempt='12197000-0000-0000-0000-000000000014'
+f_session='12193000-0000-0000-0000-000000000014'
+f_hash='sha256:v1:1414141414141414141414141414141414141414141414141414141414'
+if ! p >"$tmpdir/f-threeway-seed.out" 2>&1 <<SQL
+begin;
+insert into public.purchase_intents(
+ id,subject_id,product_offer_id,provider_account_link_id,
+ idempotency_key,request_hash,offer_snapshot_jsonb,offer_snapshot_hash,
+ status,created_at,updated_at,expected_amount_minor,expected_currency,
+ charge_terms_version,capability_set_id,capability_snapshot_jsonb,
+ capability_snapshot_hash
+)
+select '$f_intent'::uuid,subject_id,product_offer_id,provider_account_link_id,
+ 'reader-f-threeway','sha256:test:reader-f-threeway',
+ offer_snapshot_jsonb,offer_snapshot_hash,'created',
+ clock_timestamp(),clock_timestamp(),expected_amount_minor,expected_currency,
+ charge_terms_version,capability_set_id,capability_snapshot_jsonb,
+ capability_snapshot_hash
+from public.purchase_intents where id='$b8_e_intent'::uuid;
+insert into public.purchase_intent_reader_selections(
+ purchase_intent_id,product_id,reader_character_id,reader_content_bundle_id,
+ selection_contract_version,selection_snapshot_jsonb,selection_hash,created_at
+)
+select '$f_intent'::uuid,product_id,reader_character_id,
+ reader_content_bundle_id,selection_contract_version,
+ selection_snapshot_jsonb,'sha256:test:reader-f-selection',clock_timestamp()
+from public.purchase_intent_reader_selections
+where purchase_intent_id='$b8_e_intent'::uuid;
+insert into public.commerce_payment_attempts(
+ id,purchase_intent_id,subject_id,product_offer_id,attempt_no,
+ provider,environment,idempotency_key,provider_request_id,
+ provider_transaction_id,status,created_at,updated_at
+)
+select '$f_attempt'::uuid,pi.id,pi.subject_id,pi.product_offer_id,1,
+ 'portone_v2','production','reader-f-threeway-attempt',
+ 'f-payment','tx-reader-f','response_received',clock_timestamp(),clock_timestamp()
+from public.purchase_intents pi where pi.id='$f_intent'::uuid;
+update public.purchase_intents set status='verified',updated_at=clock_timestamp()
+ where id='$f_intent'::uuid;
+insert into public.commerce_receipts(
+ id,subject_id,purchase_intent_id,product_offer_id,platform,provider,
+ external_transaction_id,receipt_fingerprint,verification_status,
+ verified_payload_jsonb,verified_at,created_at,environment,
+ verifier_revision,verified_amount_minor,verified_currency
+)
+select '$f_receipt'::uuid,subject_id,'$f_intent'::uuid,product_offer_id,
+ platform,provider,'tx-reader-f',
+ 'hmac-sha256:k1:1515151515151515151515151515151515151515151515151515151515151515',
+ 'verified',verified_payload_jsonb,clock_timestamp(),clock_timestamp(),
+ environment,verifier_revision,verified_amount_minor,verified_currency
+from public.commerce_receipts where id='$b8_receipt_e'::uuid;
+commit;
+SQL
+then
+ cat "$tmpdir/f-threeway-seed.out" >&2
+ fail "new verified F three-way purchase seed failed"
+fi
+[[ "$(p -c "select count(*) from public.entitlement_grants where source_receipt_id='$f_receipt'::uuid;")" == 0 ]] ||
+ fail "three-way F must have no Grant or bind before real combined writer starts"
+p >"$tmpdir/f-combined-writer.out" 2>&1 <<SQL &
+set application_name='rr_s2_f_combined_issue_and_bind';
+set statement_timeout='30s';
+begin;
+select pg_catalog.set_config('myeongha.subject_id','$subject',true);
+select 'F_COMBINED=' || (public.internal_apply_verified_reader_purchase_under_scope_v1(
+ '$subject'::uuid,'$b8_reading'::uuid,'test-standard-reader',
+ '$f_receipt'::uuid,'$f_intent'::uuid,
+ array['test-reader-unit'],array[transaction_timestamp()],
+ array[transaction_timestamp()],array[null]::timestamptz[],
+ array[null]::text[],
+ '$f_session'::uuid,'$b8_reading'::uuid,
+ '$f_hash','standard-reading-access-bind-v2',
+ '{"schemaVersion":"standard-reading-access-bind-v2","purchaseIntentId":"$f_intent"}'::jsonb
+ )->>'contractVersion');
+select pg_sleep(6);
+commit;
+SQL
+holder_pid=$!
+wait_for "three-way combined Grant issuer completed Reader bind but holds transaction" "
+ select count(*) from pg_catalog.pg_stat_activity
+ where application_name='rr_s2_f_combined_issue_and_bind'
+ and state='active' and wait_event_type='Timeout';
+"
+p >"$tmpdir/f-direct-binder.out" 2>&1 <<SQL &
+set application_name='rr_s2_f_direct_bind_replay';
+set statement_timeout='30s';
+begin;
+select pg_catalog.set_config('myeongha.subject_id','$subject',true);
+select 'F_DIRECT_BIND='||reading_id::text
+from public.cmd_bind_standard_reading_access_v2(
+ '$subject'::uuid,'$f_intent'::uuid,
+ '$f_session'::uuid,'$b8_reading'::uuid,
+ '$f_hash','standard-reading-access-bind-v2',
+ '{"schemaVersion":"standard-reading-access-bind-v2","purchaseIntentId":"$f_intent"}'::jsonb
+);
+commit;
+SQL
+reader_pid=$!
+wait_for "three-way direct Reader binder waits on combined issuer S1" "
+ select count(*) from pg_catalog.pg_stat_activity
+ where application_name='rr_s2_f_direct_bind_replay'
+ and state='active' and wait_event_type='Lock'
+ and wait_event='advisory';
+"
+f_cancel_at="$(p -c "select pg_catalog.to_char(clock_timestamp() at time zone 'UTC','YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"');")"
+p >"$tmpdir/f-cancel-transient.out" 2>&1 <<SQL &
+set application_name='rr_s2_f_verified_refund_after_bind';
+set statement_timeout='30s';
+begin;
+set local role myeongha_commerce_internal_executor;
+select 'F_REFUND='||(public.cmd_apply_verified_portone_reader_full_cancellation_v1(
+ 'f-payment','tx-reader-f','f-cancel-exact-after-bind',
+ '$f_cancel_at'::timestamptz,$b8_amount,'KRW','production',
+ 'hmac-sha256:k1:1616161616161616161616161616161616161616161616161616161616161616',
+ 'synthetic-f-refund-after-threeway-v1'
+ )->'revoke'->>'contractVersion');
+commit;
+SQL
+writer_pid=$!
+wait_for "three-way verified refund waits behind issuance purchase advisory" "
+ select count(*) from pg_catalog.pg_stat_activity
+ where application_name='rr_s2_f_verified_refund_after_bind'
+ and state='active' and wait_event_type='Lock'
+ and wait_event='advisory';
+"
+wait "$holder_pid" || {
+ cat "$tmpdir/f-combined-writer.out" >&2
+ fail "three-way verified Grant+Reader bind was not atomic and successful"
+}
+holder_pid=""
+grep -q 'F_COMBINED=official-reader-s2-atomic-receipt-bind-v1' "$tmpdir/f-combined-writer.out" ||
+ { cat "$tmpdir/f-combined-writer.out" >&2; fail "three-way issuer did not bind through the real atomic writer"; }
+wait "$reader_pid" || {
+ cat "$tmpdir/f-direct-binder.out" >&2
+ fail "three-way direct Reader bind retry deadlocked or failed"
+}
+reader_pid=""
+grep -q "F_DIRECT_BIND=$b8_reading" "$tmpdir/f-direct-binder.out" ||
+ { cat "$tmpdir/f-direct-binder.out" >&2; fail "three-way direct binder did not replay exact official Reading"; }
+if wait "$writer_pid"; then
+ fail "three-way initial unbound refund illegally completed after F became bound"
+fi
+writer_pid=""
+grep -q 'Reader binding completed during cancellation lock wait; retry under its bound scope' "$tmpdir/f-cancel-transient.out" ||
+ { cat "$tmpdir/f-cancel-transient.out" >&2; fail "three-way verified refund failed for unexpected reason"; }
+[[ "$(p -c "select verification_status from public.commerce_receipts where id='$f_receipt'::uuid;")" == verified ]] ||
+ fail "failed first refund mutated bound F Receipt"
+[[ "$(p -c "select count(*) from public.commerce_provider_events where external_event_id='myeongha:portone-v2:full-cancel:v1:f-cancel-exact-after-bind';")" == 0 ]] ||
+ fail "failed first refund committed verified Provider Event"
+f_grant="$(p -c "select g.id from public.entitlement_grants g where g.source_receipt_id='$f_receipt'::uuid;")"
+[[ "$f_grant" =~ ^[0-9a-f-]{36}$ ]] || fail "F combined writer failed to persist Grant"
+[[ "$(p -c "select count(*) from public.standard_reading_reader_access_grants
+ where entitlement_grant_id='$f_grant'::uuid and official_reading_id='$b8_reading'::uuid;")" == 1 ]] ||
+ fail "F three-way lost immutable Reader access binding after retry"
+
+# Retry re-discovers the stored Reader access and acquires the correct S1
+# BEFORE existing Receipt/Grant row locks. Exactly one verified full cancellation.
+p >"$tmpdir/f-bound-refund-retry.out" 2>&1 <<SQL || {
+ cat "$tmpdir/f-bound-refund-retry.out" >&2
+ fail "F bound Reader refund retry failed"
+}
+begin;
+set local role myeongha_commerce_internal_executor;
+select 'F_REFUND_RETRY='||(public.cmd_apply_verified_portone_reader_full_cancellation_v1(
+ 'f-payment','tx-reader-f','f-cancel-exact-after-bind',
+ '$f_cancel_at'::timestamptz,$b8_amount,'KRW','production',
+ 'hmac-sha256:k1:1616161616161616161616161616161616161616161616161616161616161616',
+ 'synthetic-f-refund-after-threeway-v1'
+ )->'revoke'->>'contractVersion');
+commit;
+SQL
+grep -q 'F_REFUND_RETRY=official-reader-s2-revoke-dispatch-v1' "$tmpdir/f-bound-refund-retry.out" ||
+ fail "F refund retry did not switch to bound S1 revoke"
+[[ "$(p -c "select status from public.entitlement_grants where id='$f_grant'::uuid;")" == revoked ]] ||
+ fail "F combined paid Grant remained active after verified refund"
+[[ "$(p -c "select verification_status from public.commerce_receipts where id='$f_receipt'::uuid;")" == revoked ]] ||
+ fail "F Receipt not revoked after bound retry"
+[[ "$(p -c "select count(*) from public.commerce_provider_events
+ where external_event_id='myeongha:portone-v2:full-cancel:v1:f-cancel-exact-after-bind'
+ and resolved_receipt_id='$f_receipt'::uuid;")" == 1 ]] ||
+ fail "F provider cancellation duplicated or resolved wrong Receipt"
+[[ "$(p -c "select count(*) from public.entitlement_events ee
+ join public.commerce_provider_events pe on ee.source_provider_event_id=pe.id
+ where pe.external_event_id='myeongha:portone-v2:full-cancel:v1:f-cancel-exact-after-bind'
+ and ee.grant_id='$f_grant'::uuid and ee.event_type='revoked';")" == 1 ]] ||
+ fail "F bound refund did not commit one authoritative revoke effect"
+[[ "$(p -c "select count(*) from public.entitlement_grants
+ where id in ('$b8_grant_b'::uuid,'$b8_grant_c'::uuid,'$b8_grant_e'::uuid)
+ and status='revoked';")" == 3 ]] ||
+ fail "F combined three-way race changed sibling B/C/E rights"
+pass "three concurrent real issuance+bind, direct bind and verified refund serialize; retry revokes only F"
+
 echo "PASS: S2 instrumented two-direction PostgreSQL race; production integration HOLD"
