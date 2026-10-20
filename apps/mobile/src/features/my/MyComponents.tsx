@@ -7,6 +7,7 @@ import type {
   MobileMyProfileViewV1,
 } from '@/features/my/my-view-model';
 import { mobileColors } from '@/ui/mobile-colors';
+import { MobileUiText } from '@/ui/MobileUiText';
 import { useMobileTheme } from '@/ui/mobile-theme';
 import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
 import { useMobileUiLocale } from '@/ui/mobile-ui-locale';
@@ -74,10 +75,10 @@ export function MyMemberAuthCard({
     return (
       <View style={themedStyles.card}>
         <Text style={themedStyles.kicker}>ACCOUNT</Text>
-        <Text style={themedStyles.sectionTitle}>회원으로 이용 중</Text>
-        <Text style={themedStyles.body}>
+        <MobileUiText style={themedStyles.sectionTitle}>회원으로 이용 중</MobileUiText>
+        <MobileUiText style={themedStyles.body}>
           이 기기에서는 회원 세션을 우선 사용합니다.
-        </Text>
+        </MobileUiText>
         {errorMessage !== null ? <Text style={themedStyles.error}>{errorMessage}</Text> : null}
         <Pressable
           accessibilityRole="button"
@@ -96,10 +97,10 @@ export function MyMemberAuthCard({
   return (
     <View style={themedStyles.card}>
       <Text style={themedStyles.kicker}>ACCOUNT</Text>
-      <Text style={themedStyles.sectionTitle}>계정으로 이어가기</Text>
-      <Text style={themedStyles.body}>
+      <MobileUiText style={themedStyles.sectionTitle}>계정으로 이어가기</MobileUiText>
+      <MobileUiText style={themedStyles.body}>
         기존 계정으로 로그인하거나, 현재 게스트 기록을 그대로 이어받는 새 계정을 만들 수 있습니다.
-      </Text>
+      </MobileUiText>
 
       {verificationRequired === null ? (
         <>
@@ -125,21 +126,21 @@ export function MyMemberAuthCard({
           </View>
           {socialPendingProvider !== null ? (
             <>
-              <Text style={themedStyles.caption}>
+              <MobileUiText style={themedStyles.caption}>
                 외부 로그인 화면에서 확인을 마치면 자동으로 돌아옵니다.
-              </Text>
+              </MobileUiText>
               <Pressable
                 accessibilityRole="button"
                 onPress={onCancelSocialSignIn}
                 style={themedStyles.pendingAction}
               >
-                <Text style={themedStyles.pendingText}>소셜 로그인 취소</Text>
+                <MobileUiText style={themedStyles.pendingText}>소셜 로그인 취소</MobileUiText>
               </Pressable>
             </>
           ) : null}
           <View style={themedStyles.authDivider}>
             <View style={themedStyles.authDividerLine} />
-            <Text style={themedStyles.authDividerText}>또는 이메일로 계속</Text>
+            <MobileUiText style={themedStyles.authDividerText}>또는 이메일로 계속</MobileUiText>
             <View style={themedStyles.authDividerLine} />
           </View>
           <TextInput
@@ -192,19 +193,19 @@ export function MyMemberAuthCard({
                 themedStyles.disabledAction,
             ]}
           >
-            <Text style={themedStyles.secondaryActionText}>새 계정 만들기</Text>
+            <MobileUiText style={themedStyles.secondaryActionText}>새 계정 만들기</MobileUiText>
           </Pressable>
-          <Text style={themedStyles.caption}>
+          <MobileUiText style={themedStyles.caption}>
             새 계정은 현재 게스트 주체를 그대로 회원으로 승격합니다. 기존 회원 계정과의 게스트 기록 병합은 아직 지원하지 않습니다.
-          </Text>
+          </MobileUiText>
         </>
       ) : (
         <>
           <Text style={themedStyles.body}>{verificationRequired.message}</Text>
           <Text style={themedStyles.verificationEmail}>{verificationRequired.email}</Text>
-          <Text style={themedStyles.caption}>
+          <MobileUiText style={themedStyles.caption}>
             확인 링크는 현재 Web 확인 화면으로 열립니다. 이메일 확인을 마친 뒤 앱으로 돌아와 비밀번호를 다시 입력해 주세요.
-          </Text>
+          </MobileUiText>
           <TextInput
             accessibilityLabel="비밀번호"
             autoCapitalize="none"
@@ -238,7 +239,7 @@ export function MyMemberAuthCard({
             onPress={onCancelSignUp}
             style={[themedStyles.secondaryAction, pending && themedStyles.disabledAction]}
           >
-            <Text style={themedStyles.secondaryActionText}>가입 흐름 취소</Text>
+            <MobileUiText style={themedStyles.secondaryActionText}>가입 흐름 취소</MobileUiText>
           </Pressable>
         </>
       )}
@@ -258,7 +259,7 @@ export function MySectionError({
     <View style={themedStyles.card}>
       <Text style={themedStyles.error}>{message}</Text>
       <Pressable accessibilityRole="button" onPress={onRetry} style={themedStyles.retry}>
-        <Text style={themedStyles.retryText}>다시 시도</Text>
+        <MobileUiText style={themedStyles.retryText}>다시 시도</MobileUiText>
       </Pressable>
     </View>
   );
@@ -273,18 +274,18 @@ export function MyBirthCard({
   return (
     <View style={themedStyles.card}>
       <Text style={themedStyles.kicker}>TODAY</Text>
-      <Text style={themedStyles.sectionTitle}>오늘의 나</Text>
+      <MobileUiText style={themedStyles.sectionTitle}>오늘의 나</MobileUiText>
       <View style={themedStyles.birthGrid}>
         <View style={themedStyles.birthFact}>
-          <Text style={themedStyles.factLabel}>생년월일</Text>
+          <MobileUiText style={themedStyles.factLabel}>생년월일</MobileUiText>
           <Text style={themedStyles.factValue}>{birth.birthDate}</Text>
         </View>
         <View style={themedStyles.birthFact}>
-          <Text style={themedStyles.factLabel}>태어난 시간</Text>
+          <MobileUiText style={themedStyles.factLabel}>태어난 시간</MobileUiText>
           <Text style={themedStyles.factValue}>{birth.birthTime}</Text>
         </View>
         <View style={themedStyles.birthFact}>
-          <Text style={themedStyles.factLabel}>기준</Text>
+          <MobileUiText style={themedStyles.factLabel}>기준</MobileUiText>
           <Text style={themedStyles.factValue}>{birth.basis} · {birth.sex}</Text>
         </View>
       </View>
@@ -293,10 +294,10 @@ export function MyBirthCard({
         onPress={() => router.push('/reading')}
         style={themedStyles.primaryAction}
       >
-        <Text style={themedStyles.primaryActionText}>내 사주 보기 →</Text>
+        <MobileUiText style={themedStyles.primaryActionText}>내 사주 보기 →</MobileUiText>
       </Pressable>
       <View style={themedStyles.pendingAction}>
-        <Text style={themedStyles.pendingText}>출생 정보 수정 · 준비 중</Text>
+        <MobileUiText style={themedStyles.pendingText}>출생 정보 수정 · 준비 중</MobileUiText>
       </View>
       <Text style={themedStyles.caption}>{birth.revisionLabel}</Text>
     </View>
@@ -308,14 +309,14 @@ export function MyBirthEmptyCard() {
   return (
     <View style={themedStyles.card}>
       <Text style={themedStyles.kicker}>TODAY</Text>
-      <Text style={themedStyles.sectionTitle}>오늘의 나</Text>
-      <Text style={themedStyles.body}>저장된 본인 출생정보가 없습니다.</Text>
+      <MobileUiText style={themedStyles.sectionTitle}>오늘의 나</MobileUiText>
+      <MobileUiText style={themedStyles.body}>저장된 본인 출생정보가 없습니다.</MobileUiText>
       <Pressable
         accessibilityRole="button"
         onPress={() => router.push('/birth')}
         style={themedStyles.primaryAction}
       >
-        <Text style={themedStyles.primaryActionText}>출생정보 입력하기 →</Text>
+        <MobileUiText style={themedStyles.primaryActionText}>출생정보 입력하기 →</MobileUiText>
       </Pressable>
     </View>
   );
@@ -333,7 +334,7 @@ export function MyFlowCards() {
     <View style={themedStyles.section}>
       <View style={themedStyles.sectionIntro}>
         <Text style={themedStyles.kicker}>MY FLOW</Text>
-        <Text style={themedStyles.sectionTitle}>내 흐름</Text>
+        <MobileUiText style={themedStyles.sectionTitle}>내 흐름</MobileUiText>
       </View>
       {flowItems.map((item) => (
         <Pressable
@@ -416,7 +417,7 @@ function MyThemeSelector() {
   const { theme, setTheme, colors } = useMobileTheme();
   return (
     <View style={themedStyles.themeSection}>
-      <Text style={[themedStyles.settingTitle, { color: colors.ink }]}>화면 테마</Text>
+      <MobileUiText style={[themedStyles.settingTitle, { color: colors.ink }]}>화면 테마</MobileUiText>
       <View style={themedStyles.themeChoices}>
         {(['light', 'dark'] as const).map((option) => (
           <Pressable
@@ -449,7 +450,7 @@ export function MyPendingSettings() {
     <View style={themedStyles.section}>
       <View style={themedStyles.sectionIntro}>
         <Text style={themedStyles.kicker}>SETTINGS</Text>
-        <Text style={themedStyles.sectionTitle}>설정</Text>
+        <MobileUiText style={themedStyles.sectionTitle}>설정</MobileUiText>
       </View>
       <View style={[themedStyles.settingsCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
         <MyThemeSelector />
@@ -457,13 +458,13 @@ export function MyPendingSettings() {
         {pendingSettings.map((title) => (
           <View key={title} style={themedStyles.settingRow}>
             <Text style={[themedStyles.settingTitle, { color: colors.ink }]}>{title}</Text>
-            <Text style={themedStyles.pendingBadge}>준비 중</Text>
+            <MobileUiText style={themedStyles.pendingBadge}>준비 중</MobileUiText>
           </View>
         ))}
       </View>
-      <Text style={themedStyles.caption}>
+      <MobileUiText style={themedStyles.caption}>
         연결되지 않은 결제·상세 계정관리·지원 상태는 임의로 표시하지 않습니다.
-      </Text>
+      </MobileUiText>
     </View>
   );
 }
