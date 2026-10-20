@@ -193,6 +193,14 @@ begin
 end
 $delegated_replay$;
 
+-- Optional two-connection race: after a valid native completed replay
+-- succeeds, hold the recovery fence's XACT row lock while a second session
+-- attempts to advance the epoch and import protected snapshot bytes.
+\if :{?s4_race_rehearsal}
+set application_name='rr_s4_native_ack_fence_owner';
+select pg_sleep(5);
+\endif
+
 rollback;
 
 -- Test-proof that all synthetic completed state changes were discarded and
