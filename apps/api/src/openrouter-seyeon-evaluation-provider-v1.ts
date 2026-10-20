@@ -64,6 +64,8 @@ export interface OpenRouterSeyeonEvaluationConfigV1 {
   readonly apiKey: string;
   readonly model: string;
   readonly maxCompletionTokens: number;
+  /** Free route is allowed only for one PUBLIC SYNTHETIC evaluation model. */
+  readonly approvedSyntheticFreeVariant?: boolean;
   readonly timeoutMs?: number;
   /** Must be explicitly injected; no hidden network transport. */
   readonly fetchImpl: (url: string, init: RequestInit) => Promise<Response>;
@@ -115,7 +117,10 @@ export function createOpenRouterSeyeonEvaluationProviderV1(
       config.apiKey.trim().length < 20 ||
       typeof config.model !== 'string' ||
       !/^[A-Za-z0-9][A-Za-z0-9._-]*\/[A-Za-z0-9][A-Za-z0-9._:-]*$/u.test(config.model) ||
-      config.model.length > 128 || config.model.endsWith(':free') ||
+      config.model.length > 128 ||
+      (config.model.endsWith(':free') &&
+        !(config.approvedSyntheticFreeVariant === true &&
+          config.model === 'nvidia/nemotron-3-super-120b-a12b:free')) ||
       !boundedInteger(config.maxCompletionTokens, 1, 1536) ||
       !boundedInteger(config.timeoutMs ?? 30_000, 1, 30_000) ||
       typeof config.beforeDispatch !== 'function' ||
