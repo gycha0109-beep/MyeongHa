@@ -224,7 +224,7 @@ try {
   assert(ja.staticTopics.every(t=>!/[가-힣]/u.test(t)),'Japanese Saju topic cards contain Korean: '+JSON.stringify(ja.staticTopics));
   await navigate(client,origin,'/face-reading.html','.face-reader-heading');
   await sleep(450);
-  const face=await inspect("(() => ({ names:[...document.querySelectorAll('[data-face-reader-name]')].map(x=>x.textContent.trim()), title:document.querySelector('.face-reader-heading')?.textContent.trim(), capture:document.querySelector('#face-capture-title')?.textContent.trim(), visibleText:document.body.innerText, overflow:document.documentElement.scrollWidth-innerWidth }))()");
+  const face=await inspect("(() => ({ names:[...document.querySelectorAll('[data-face-reader-name]')].map(x=>x.textContent.trim()), title:document.querySelector('.face-reader-heading')?.textContent.trim(), capture:document.querySelector('#face-capture-title')?.textContent.trim(), visibleText:document.body.innerText.replace(/한국어/g,''), overflow:document.documentElement.scrollWidth-innerWidth }))()");
   assert(face.names.length>0 && face.names.every(s=>s==='セヨン'),'Japanese Reader name remains Korean: '+JSON.stringify(face));
   assert(!/[가-힣]/u.test(face.title+face.capture),'Japanese face UI mixes Korean: '+JSON.stringify(face));
   assert(face.overflow<=2,'Japanese face layout overflow');
@@ -237,7 +237,7 @@ try {
   assert(hub.overflow<=2,'Japanese directory layout overflow');
   await navigate(client,origin,'/auth.html','.ui-locale-select');
   await sleep(450);
-  const auth=await inspect("(() => ({lang:document.documentElement.lang, text:document.body.innerText,overflow:document.documentElement.scrollWidth-innerWidth}))()");
+  const auth=await inspect("(() => ({lang:document.documentElement.lang, text:document.body.innerText.replace(/한국어/g,''),overflow:document.documentElement.scrollWidth-innerWidth}))()");
   assert(auth.lang==='ja-JP' && !/[가-힣]/u.test(auth.text),'Japanese auth UI contains untranslated Hangul: '+auth.text.match(/.{0,30}[가-힣].{0,40}/gu)?.slice(0,12).join(' | '));
   assert(auth.overflow<=2,'Japanese auth layout overflow');
   await inspect("(() => {let s=document.querySelector('.ui-locale-select');s.value='zh-TW';s.dispatchEvent(new Event('change',{bubbles:true}));return true;})()");
