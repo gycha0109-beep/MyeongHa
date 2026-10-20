@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 
 import { nativeMobilePushServiceV1 } from '@/core/push/native-mobile-push-service';
 import { MobileThemeProvider, useMobileTheme } from '@/ui/mobile-theme';
+import { MobileUiLocaleProvider } from '@/ui/mobile-ui-locale';
 
 function ThemedRootLayout() {
   const { theme, colors } = useMobileTheme();
@@ -29,5 +30,5 @@ function ThemedRootLayout() {
 }
 
 export default function RootLayout() {
-  return <MobileThemeProvider><ThemedRootLayout /></MobileThemeProvider>;
+  return <MobileThemeProvider><MobileUiLocaleProvider><ThemedRootLayout /></MobileUiLocaleProvider></MobileThemeProvider>;
 }
