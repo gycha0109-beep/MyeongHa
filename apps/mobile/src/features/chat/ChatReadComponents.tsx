@@ -6,6 +6,7 @@ import { projectMobileChatEmptyGreetingV1 } from '@/features/chat/mobile-chat-em
 import { MOBILE_CHAT_KNOWN_CHARACTERS_V1 } from '@/features/chat/chat-launch-roster';
 import { resolveMobileChatPortraitV1 } from '@/features/chat/chat-character-portraits';
 import { mobileColors } from '@/ui/mobile-colors';
+import { MobileUiText } from '@/ui/MobileUiText';
 import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
 import { useMobileTheme } from '@/ui/mobile-theme';
 import {
@@ -77,7 +78,7 @@ export function ChatReadMessages({
     return (
       <View style={[styles.stateCard, isSeyeonTheme && (theme === 'dark' ? styles.seyeonSurfaceDark : styles.seyeonSurface)]}>
         <ActivityIndicator color={mobileColors.navy} />
-        <Text style={styles.stateText}>대화 기록을 불러오는 중입니다…</Text>
+        <MobileUiText style={styles.stateText}>대화 기록을 불러오는 중입니다…</MobileUiText>
       </View>
     );
   }
@@ -85,12 +86,12 @@ export function ChatReadMessages({
   if (isSeyeonHistoryRevealHoldV1(snapshot)) {
     return (
       <View style={[styles.stateCard, styles.seyeonSurface]}>
-        <Text style={styles.errorTitle}>세연 대화 기록을 현재 표시할 수 없습니다</Text>
-        <Text style={styles.stateText}>
+        <MobileUiText style={styles.errorTitle}>세연 대화 기록을 현재 표시할 수 없습니다</MobileUiText>
+        <MobileUiText style={styles.stateText}>
           개인정보 보호를 위한 서버 확인이 끝나지 않아 대화 기록을 표시할 수 없습니다.
           반복해서 불러와도 해제되지 않습니다.
-        </Text>
-        <Text style={styles.diagnosticText}>오류 코드: SEYEON_HISTORY_REVEAL_HOLD</Text>
+        </MobileUiText>
+        <MobileUiText style={styles.diagnosticText}>오류 코드: SEYEON_HISTORY_REVEAL_HOLD</MobileUiText>
       </View>
     );
   }
@@ -98,10 +99,10 @@ export function ChatReadMessages({
   if (snapshot.status === 'error' && snapshot.messages.length === 0) {
     return (
       <View style={[styles.stateCard, isSeyeonTheme && (theme === 'dark' ? styles.seyeonSurfaceDark : styles.seyeonSurface)]}>
-        <Text style={styles.errorTitle}>대화를 불러오지 못했습니다</Text>
-        <Text style={styles.stateText}>
+        <MobileUiText style={styles.errorTitle}>대화를 불러오지 못했습니다</MobileUiText>
+        <MobileUiText style={styles.stateText}>
           대화 기록을 확인하지 못했습니다. 아래에서 다시 불러올 수 있습니다.
-        </Text>
+        </MobileUiText>
         {snapshot.errorCode !== null ? (
           <Text style={styles.diagnosticText}>오류 코드: {snapshot.errorCode}</Text>
         ) : null}
@@ -137,7 +138,7 @@ export function ChatReadMessages({
     return (
       <View style={[styles.stateCard, isSeyeonTheme && (theme === 'dark' ? styles.seyeonSurfaceDark : styles.seyeonSurface)]}>
         <Text style={styles.emptyMark}>◇</Text>
-        <Text style={styles.errorTitle}>아직 표시할 메시지가 없습니다</Text>
+        <MobileUiText style={styles.errorTitle}>아직 표시할 메시지가 없습니다</MobileUiText>
       </View>
     );
   }
@@ -243,12 +244,12 @@ export function ChatReadMore({
   if (snapshot.status === 'error' && snapshot.messages.length === 0) {
     return onRetry === undefined ? null : (
       <Pressable accessibilityRole="button" onPress={onRetry} style={styles.loadMore}>
-        <Text style={styles.loadMoreText}>대화 다시 불러오기 ↻</Text>
+        <MobileUiText style={styles.loadMoreText}>대화 다시 불러오기 ↻</MobileUiText>
       </Pressable>
     );
   }
   if (!snapshot.hasMore) {
-    return <Text style={styles.endText}>현재 확인할 수 있는 기록의 끝입니다.</Text>;
+    return <MobileUiText style={styles.endText}>현재 확인할 수 있는 기록의 끝입니다.</MobileUiText>;
   }
 
   return (
@@ -261,7 +262,7 @@ export function ChatReadMore({
       {snapshot.status === 'loading_more' ? (
         <ActivityIndicator color={mobileColors.navy} />
       ) : (
-        <Text style={styles.loadMoreText}>다음 메시지 불러오기</Text>
+        <MobileUiText style={styles.loadMoreText}>다음 메시지 불러오기</MobileUiText>
       )}
     </Pressable>
   );
@@ -282,11 +283,11 @@ export function ChatComposer({
   if (isSeyeonHistoryRevealHoldV1(snapshot)) {
     return (
       <View style={[styles.pendingCard, theme === 'dark' ? styles.seyeonSurfaceDark : styles.seyeonSurface]}>
-        <Text style={styles.pendingTitle}>세연 대화는 서버의 보호 조치로 잠시 중단되었습니다</Text>
-        <Text style={styles.stateText}>
+        <MobileUiText style={styles.pendingTitle}>세연 대화는 서버의 보호 조치로 잠시 중단되었습니다</MobileUiText>
+        <MobileUiText style={styles.stateText}>
           대화 기록과 메시지 보내기는 개인정보 공개 권한 검증이 끝난 뒤 이용할 수 있습니다.
           앱을 다시 설치해도 이 제한은 해제되지 않습니다.
-        </Text>
+        </MobileUiText>
       </View>
     );
   }
@@ -335,7 +336,7 @@ export function ChatComposer({
         >
           {sending
             ? <ActivityIndicator color={mobileColors.surface} />
-            : <Text style={styles.sendActionText}>전송</Text>}
+            : <MobileUiText style={styles.sendActionText}>전송</MobileUiText>}
         </Pressable>
       </View>
       <Text style={styles.composerHelp}>{status ?? '회원 전용 · 세연과의 대화는 서버에 보관됩니다.'}</Text>
