@@ -1181,7 +1181,8 @@ from public.purchase_intents pi
 cross join (values
   ('12197000-0000-0000-0000-000000000008',1,'reader-b8-attempt-a','b8-payment-a','tx-reader-b8-a'),
   ('12197000-0000-0000-0000-000000000009',2,'reader-b8-attempt-b','b8-payment-b','tx-reader-b8-b'),
-  ('12197000-0000-0000-0000-000000000010',3,'reader-b8-attempt-c','b8-payment-c','tx-reader-b8-c')
+  ('12197000-0000-0000-0000-000000000010',3,'reader-b8-attempt-c','b8-payment-c','tx-reader-b8-c'),
+  ('12197000-0000-0000-0000-000000000011',4,'reader-b8-attempt-d','b8-payment-d','tx-reader-b8-d')
 ) as x(attempt_id,attempt_no,idempotency_key,payment_id,transaction_id)
 where pi.id='$b8_intent'::uuid;
 update public.purchase_intents
@@ -1202,7 +1203,8 @@ from public.commerce_receipts cr
 cross join (values
   ('$b8_receipt_a','tx-reader-b8-a','hmac-sha256:k1:8181818181818181818181818181818181818181818181818181818181818181'),
   ('$b8_receipt_b','tx-reader-b8-b','hmac-sha256:k1:8282828282828282828282828282828282828282828282828282828282828282'),
-  ('$b8_receipt_c','tx-reader-b8-c','hmac-sha256:k1:8383838383838383838383838383838383838383838383838383838383838383')
+  ('$b8_receipt_c','tx-reader-b8-c','hmac-sha256:k1:8383838383838383838383838383838383838383838383838383838383838383'),
+  ('12192000-0000-0000-0000-000000000011','tx-reader-b8-d','hmac-sha256:k1:8989898989898989898989898989898989898989898989898989898989898989')
 ) as x(receipt_id,transaction_id,fingerprint)
 where cr.id='$b7_receipt'::uuid;
 commit;
@@ -1379,36 +1381,11 @@ b8_grant_c="$(p -c "select id from public.entitlement_grants
 pass "multi-Receipt verified PortOne cancel targets only exact payment/Receipt; sibling Grant issuance survives race"
 
 # Same purchase B remains bound, A already cancelled, C independently active.
+# The fourth original payment/Receipt D was seeded before the Purchase became
+# verified; no prohibited late new payment attempt is created.
 # Verify an additional Receipt D with ZERO issued Grants can be fully cancelled
 # without choosing B's access scope or touching any of B/C's entitlements.
 b8_receipt_d="12192000-0000-0000-0000-000000000011"
-p >"$tmpdir/b8-zero-grant-sibling-seed.out" 2>&1 <<SQL || { cat "$tmpdir/b8-zero-grant-sibling-seed.out" >&2; fail "B8 zero-Grant sibling Receipt seed failed"; }
-begin;
-insert into public.commerce_payment_attempts(
- id,purchase_intent_id,subject_id,product_offer_id,attempt_no,
- provider,environment,idempotency_key,provider_request_id,
- provider_transaction_id,status,created_at,updated_at
-)
-select '12197000-0000-0000-0000-000000000011'::uuid,
-       pi.id,pi.subject_id,pi.product_offer_id,4,
-       'portone_v2','production','reader-b8-attempt-d',
-       'b8-payment-d','tx-reader-b8-d',
-       'response_received',clock_timestamp(),clock_timestamp()
-from public.purchase_intents pi where pi.id='$b8_intent'::uuid;
-insert into public.commerce_receipts(
- id,subject_id,purchase_intent_id,product_offer_id,platform,provider,
- external_transaction_id,receipt_fingerprint,verification_status,
- verified_payload_jsonb,verified_at,created_at,environment,
- verifier_revision,verified_amount_minor,verified_currency
-)
-select '$b8_receipt_d'::uuid,subject_id,purchase_intent_id,product_offer_id,
-       platform,provider,'tx-reader-b8-d',
-       'hmac-sha256:k1:8989898989898989898989898989898989898989898989898989898989898989',
-       'verified',verified_payload_jsonb,clock_timestamp(),clock_timestamp(),
-       environment,verifier_revision,verified_amount_minor,verified_currency
-from public.commerce_receipts where id='$b8_receipt_c'::uuid;
-commit;
-SQL
 [[ "$(p -c "select count(*) from public.entitlement_grants where source_receipt_id='$b8_receipt_d'::uuid;")" == 0 ]] ||
   fail "B8 exact D must not have any Grant before full cancellation"
 b8_d_at="$(p -c "select pg_catalog.to_char(clock_timestamp() at time zone 'UTC','YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"');")"
