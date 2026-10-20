@@ -22,8 +22,11 @@ $precheck$;
 
 -- These are native 1190 Job/Outbox fields, not an alternate completion
 -- function. No permanent account state is changed; rollback is mandatory.
+-- Original Reader source fixture is a guest; native AccountDeletion
+-- replay authorizes MEMBER only. Reclassify solely in this ROLLED-BACK
+-- synthetic completed-job snapshot; no real guest promotion is claimed.
 update public.subjects
-set status='deleted',auth_user_id=null
+set kind='member',status='deleted',auth_user_id=null
 where id='11390000-0000-0000-0000-000000000001'::uuid;
 
 insert into public.data_deletion_jobs(
