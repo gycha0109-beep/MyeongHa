@@ -26,6 +26,33 @@ export const SEYEON_FIRST_ZERO_DIRECT_HTTPS_LOOPBACK_HOST_V1 = Object.freeze({
 const BIND_ADDRESS = SEYEON_FIRST_ZERO_DIRECT_HTTPS_LOOPBACK_HOST_V1.bindAddress;
 const MAX_RAW_HEADER_ITEMS = 128;
 const HOSTNAME = /^(?=.{1,253}$)[a-z0-9](?:[a-z0-9.-]*[a-z0-9])$/u;
+const CHAT_POST_PATH = /^\/api\/chat\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/turns$/iu;
+
+function allowedOrigin(value: string | undefined): string | null {
+  if (value === undefined) return null;
+  try {
+    const parsed = new URL(value);
+    if (parsed.protocol !== 'https:' || parsed.username || parsed.password ||
+        parsed.pathname !== '/' || parsed.search || parsed.hash ||
+        parsed.origin !== value || !HOSTNAME.test(parsed.hostname)) {
+      throw new Error('invalid origin');
+    }
+    return value;
+  } catch {
+    throw new Error('Direct HTTPS browser origin must be one exact HTTPS origin.');
+  }
+}
+
+function validBrowserPreflight(headers: import('node:http').IncomingHttpHeaders): boolean {
+  const requested = headers['access-control-request-headers'];
+  if (headers.authorization !== undefined ||
+      headers.cookie !== undefined ||
+      headers['access-control-request-method'] !== 'POST' ||
+      typeof requested !== 'string') return false;
+  const names = requested.split(',').map(v => v.trim().toLowerCase());
+  return names.length === 2 && new Set(names).size === 2 &&
+    names.includes('authorization') && names.includes('content-type');
+}
 
 export interface StartSeyeonFirstZeroDirectHttpsLoopbackInputV1 {
   /** TLS fixture/injected PEM bytes; never read secrets from request headers. */
@@ -33,6 +60,8 @@ export interface StartSeyeonFirstZeroDirectHttpsLoopbackInputV1 {
   readonly privateKeyPem: string | Buffer;
   /** Exact server-side name: matching SNI and exactly one HTTP Host header. */
   readonly expectedDnsHost: string;
+  /** One exact HTTPS web app origin. Optional; native direct clients need none. */
+  readonly allowedBrowserOrigin?: string;
   readonly identityEvidenceVerifier: IdentityEvidenceVerificationPortV1;
   readonly pool: PostgresSubjectPoolV1;
   readonly runtime: Pick<ProductionSeyeonChatRuntimeV1, 'run'>;
@@ -48,6 +77,7 @@ function hasUntrustedProxyHeaders(headers: readonly string[]): boolean {
   if (headers.length % 2 !== 0) return true;
   let hostCount = 0;
   let authorizationCount = 0;
+  let originCount = 0;
   let contentLengthCount = 0;
   let transferEncodingCount = 0;
   for (let i = 0; i < headers.length; i += 2) {
@@ -55,6 +85,7 @@ function hasUntrustedProxyHeaders(headers: readonly string[]): boolean {
     if (header === undefined) return true;
     if (header === 'host') hostCount++;
     if (header === 'authorization') authorizationCount++;
+    if (header === 'origin') originCount++;
     if (header === 'content-length') contentLengthCount++;
     if (header === 'transfer-encoding') transferEncodingCount++;
     if (header === 'forwarded' || header === 'via' ||
@@ -65,7 +96,7 @@ function hasUntrustedProxyHeaders(headers: readonly string[]): boolean {
   }
   // Node can discard/combine duplicate authorization or Host headers.
   // Reject based on the raw wire header list, not its normalized copy.
-  return hostCount !== 1 || authorizationCount > 1 ||
+  return hostCount !== 1 || authorizationCount > 1 || originCount > 1 ||
     contentLengthCount > 1 || transferEncodingCount > 1 ||
     (contentLengthCount > 0 && transferEncodingCount > 0);
 }
@@ -130,6 +161,7 @@ export async function startSeyeonFirstZeroDirectHttpsLoopbackV1(
       input.expectedDnsHost !== input.expectedDnsHost.toLowerCase()) {
     throw new Error('Loopback TLS admission requires one exact DNS host.');
   }
+  const browserOrigin = allowedOrigin(input.allowedBrowserOrigin);
   const server = createServer({
     key: input.privateKeyPem,
     cert: input.certificatePem,
@@ -145,6 +177,40 @@ export async function startSeyeonFirstZeroDirectHttpsLoopbackV1(
       staticTlsHold(response, requestId);
       return;
     }
+
+    // The web app is a different origin from this direct-TLS host. Origin
+    // never replaces authenticated Member verification for the actual POST.
+    if (incoming.headers.origin !== undefined || incoming.method === 'OPTIONS') {
+      if (browserOrigin === null ||
+          incoming.headers.origin !== browserOrigin ||
+          incoming.headers.cookie !== undefined ||
+          !CHAT_POST_PATH.test(incoming.url ?? '') ||
+          (incoming.method !== 'POST' && incoming.method !== 'OPTIONS')) {
+        staticTlsHold(response, requestId);
+        return;
+      }
+      if (incoming.method === 'OPTIONS') {
+        if (!validBrowserPreflight(incoming.headers)) {
+          staticTlsHold(response, requestId);
+          return;
+        }
+        response.statusCode = 204;
+        response.setHeader('Cache-Control', 'no-store');
+        response.setHeader('Access-Control-Allow-Origin', browserOrigin);
+        response.setHeader('Access-Control-Allow-Methods', 'POST');
+        response.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type');
+        response.setHeader('Access-Control-Max-Age', '0');
+        response.setHeader('Vary', 'Origin');
+        response.setHeader('Content-Length', '0');
+        response.end();
+        return;
+      }
+      // Never emit Allow-Credentials or a wildcard origin. The existing
+      // server-side Member verifier remains mandatory for the real POST.
+      response.setHeader('Access-Control-Allow-Origin', browserOrigin);
+      response.setHeader('Vary', 'Origin');
+    }
+
     void handleSeyeonFirstZeroDirectNodeHttpV1({
       incoming,
       response,
