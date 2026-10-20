@@ -1233,6 +1233,30 @@ b8_grant_b="$(p -c "select id from public.entitlement_grants
     "$b8_grant_a" != "$b8_grant_b" ]] ||
   fail "multi-Receipt synthetic purchase must have TWO separate Grant lineages"
 
+# Bind Receipt B through the actual 1220 writer while Receipt A is
+# still unbound. Refund A must ignore B's independent Reader access.
+p >"$tmpdir/b8-bind-sibling-b.out" 2>&1 <<SQL || { cat "$tmpdir/b8-bind-sibling-b.out" >&2; fail "independent sibling Receipt B binding failed"; }
+begin;
+select pg_catalog.set_config('myeongha.subject_id','$subject',true);
+select reading_id from public.cmd_bind_standard_reading_access_v2(
+  '$subject'::uuid,'$b8_intent'::uuid,
+  '12193000-0000-0000-0000-000000000008'::uuid,
+  '$b8_reading'::uuid,
+  'sha256:v1:abababababababababababababababababababababababababababababababab',
+  'standard-reading-access-bind-v2',
+  '{"schemaVersion":"standard-reading-access-bind-v2","purchaseIntentId":"$b8_intent"}'::jsonb
+);
+commit;
+SQL
+[[ "$(p -c "select count(*) from public.standard_reading_reader_access_grants
+  where entitlement_grant_id='$b8_grant_b'::uuid
+    and purchase_intent_id='$b8_intent'::uuid;")" == 1 ]] ||
+  fail "sibling B must have one verified Reader access binding"
+[[ "$(p -c "select count(*) from public.standard_reading_reader_access_grants
+  where entitlement_grant_id='$b8_grant_a'::uuid;")" == 0 ]] ||
+  fail "cancel target A must remain unbound while sibling B is bound"
+pass "independent sibling Receipt B bound; exact target Receipt A unbound"
+
 # A sibling payment request must NOT authorize cancelling receipt A.
 b8_amount="$(p -c "select verified_amount_minor from public.commerce_receipts where id='$b8_receipt_a'::uuid;")"
 b8_cancel_at="$(p -c "select pg_catalog.to_char(clock_timestamp() at time zone 'UTC','YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"');")"
@@ -1320,6 +1344,12 @@ b8_grant_c="$(p -c "select id from public.entitlement_grants
   fail "Receipt A Grant was not revoked"
 [[ "$(p -c "select status from public.entitlement_grants where id='$b8_grant_b'::uuid;")" == active ]] ||
   fail "independent Receipt B Grant incorrectly revoked"
+[[ "$(p -c "select count(*) from public.standard_reading_reader_access_grants a
+  join public.entitlement_grants eg on eg.id=a.entitlement_grant_id
+  where eg.source_receipt_id='$b8_receipt_b'::uuid
+    and a.entitlement_grant_id='$b8_grant_b'::uuid
+    and eg.status='active';")" == 1 ]] ||
+  fail "sibling B Reader binding/active Grant lost after cancelling A"
 [[ "$(p -c "select status from public.entitlement_grants where id='$b8_grant_c'::uuid;")" == active ]] ||
   fail "independent newly issued Receipt C Grant incorrectly revoked"
 [[ "$(p -c "select verification_status from public.commerce_receipts where id='$b8_receipt_a'::uuid;")" == revoked ]] ||

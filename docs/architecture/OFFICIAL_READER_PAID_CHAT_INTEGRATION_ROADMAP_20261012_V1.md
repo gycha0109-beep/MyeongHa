@@ -284,3 +284,9 @@ S1에서 공통 잠금 함수 자체가 성공하더라도 **S2 전체 경로가
 
 - [S4 보호 데이터 저장 구조/권한/삭제·복원 설계](OFFICIAL_READER_S4_PROTECTED_CONTENT_STORAGE_DELETION_RECOVERY_DESIGN_V1.md)를 추가했습니다. 기본 브랜치 `P0-PR-02` [제품 정책 정본](../OFFICIAL_READER_S4_PRIVACY_POLICY_DECISION_V1.md)을 유일한 정책 권한으로 사용하고 이 설계는 실행 SQL 또는 추가 제품 승인이 아닙니다.
 - 기존 일반 Chat `conversation_messages`와 원문 분리, Reader/Reading/Bundle/current Grant 별도 Query, 기존 1520 계정 삭제 최종화에 대한 자식 삭제 순서, 24시간 본 DB 파기 목표/P30D 백업의 격리 복원, 90일 비민감 로그 상한, S3/S5 및 개인정보 실검증 게이트 정리. 운영 DB migration·유료 원문 저장/공개 권한 없음.
+
+### S2 독립 Receipt 환불 범위 보정 (2026-10-20)
+
+- `1900_official_reader_receipt_local_unbound_cancellation_v1.sql`은 과거 1880/1890 migration을 수정하지 않고, 동일 Purchase의 **다른 Receipt**가 이미 Reader에 결속된 경우에도 **취소 대상 미결속 Receipt**에 한정해 검증된 환불을 처리하도록 내부 검사를 순방향 교체합니다. 취소 대상 Receipt를 직접 결속한 경합은 기존 Receipt/Grant 행 잠금 후 롤백·공동 잠금 재시도 규칙을 유지합니다.
+- 기존 S2 독립 PostgreSQL 2연결 경합에 실제 1220으로 B를 결속한 상태의 미결속 A 환불과 독립 C 발급 경쟁을 추가했습니다. A만 취소하고 B의 결속·권리, C의 발급을 유지하는 것이 인수 조건입니다.
+- **S2 전체 종료 아님.** S3 Production 출처 증명, S4 기술/법무 인수·실보호 테이블·삭제/복원, S5 유료 T2 원자 저장, 공개/운영 적용 모두 HOLD입니다. PR Draft 상태를 유지합니다.
