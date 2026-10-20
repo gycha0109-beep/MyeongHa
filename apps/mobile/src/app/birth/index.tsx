@@ -10,7 +10,6 @@ import {
   StyleSheet,
   Switch,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 
@@ -19,6 +18,12 @@ import {
   buildMobileBirthProfileCreateRequestV1,
 } from '@/features/birth/birth-input';
 import { mobileBirthServiceV1 } from '@/features/birth/native-mobile-birth-service';
+import { BirthDateCalendar } from '@/features/birth/BirthDateCalendar';
+import { BirthTime12HourField } from '@/features/birth/BirthTime12HourField';
+import {
+  formatMobileBirthClock24HourV1,
+  type MobileBirthMeridiemV1,
+} from '@/features/birth/birth-clock-12hour';
 import { mobileHomeControllerV1 } from '@/features/home/native-mobile-home-controller';
 import { mobileColors } from '@/ui/mobile-colors';
 import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
@@ -36,7 +41,10 @@ export default function BirthInputScreen() {
   const [year, setYear] = useState('');
   const [month, setMonth] = useState('');
   const [day, setDay] = useState('');
-  const [birthTime, setBirthTime] = useState('');
+  const [datePickerVisible, setDatePickerVisible] = useState(false);
+  const [meridiem, setMeridiem] = useState<MobileBirthMeridiemV1>('am');
+  const [hour12, setHour12] = useState('');
+  const [minute, setMinute] = useState('00');
   const [timeKnown, setTimeKnown] = useState(true);
   const [isLeapMonth, setIsLeapMonth] = useState(false);
   const [sex, setSex] = useState<BirthSexV1>('unspecified');
@@ -66,6 +74,9 @@ export default function BirthInputScreen() {
     setError('');
     let request;
     try {
+      const birthTime = timeKnown
+        ? formatMobileBirthClock24HourV1({ meridiem, hour12, minute })
+        : '';
       request = buildMobileBirthProfileCreateRequestV1({
         calendarType,
         year,
@@ -171,38 +182,40 @@ export default function BirthInputScreen() {
 
         <View style={styles.section}>
           <Text style={styles.label}>생년월일</Text>
-          <View style={styles.dateRow}>
-            <TextInput
-              accessibilityLabel="출생 연도"
-              value={year}
-              onChangeText={(value) => setYear(value.replace(/\D/gu, '').slice(0, 4))}
-              keyboardType="number-pad"
-              maxLength={4}
-              placeholder="1995"
-              placeholderTextColor={mobileColors.muted}
-              style={[styles.input, styles.yearInput]}
-            />
-            <TextInput
-              accessibilityLabel="출생 월"
-              value={month}
-              onChangeText={(value) => setMonth(value.replace(/\D/gu, '').slice(0, 2))}
-              keyboardType="number-pad"
-              maxLength={2}
-              placeholder="08"
-              placeholderTextColor={mobileColors.muted}
-              style={[styles.input, styles.shortInput]}
-            />
-            <TextInput
-              accessibilityLabel="출생 일"
-              value={day}
-              onChangeText={(value) => setDay(value.replace(/\D/gu, '').slice(0, 2))}
-              keyboardType="number-pad"
-              maxLength={2}
-              placeholder="17"
-              placeholderTextColor={mobileColors.muted}
-              style={[styles.input, styles.shortInput]}
-            />
-          </View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="출생 생년월일 달력 열기"
+            onPress={() => setDatePickerVisible(true)}
+            style={({ pressed }) => [styles.dateButton, pressed && styles.pressed]}
+          >
+            <View style={styles.dateIcon}>
+              <Text style={styles.dateIconText}>▦</Text>
+            </View>
+            <View style={styles.dateCopy}>
+              <Text style={styles.dateHint}>{calendarType === 'solar' ? '양력 생년월일' : '음력 생년월일'}</Text>
+              <Text style={[styles.dateValue, !year && styles.datePlaceholder]}>
+                {year && month && day
+                  ? year + '년 ' + Number(month) + '월 ' + Number(day) + '일'
+                  : '달력에서 날짜 선택'}
+              </Text>
+            </View>
+            <Text style={styles.dateChevron}>›</Text>
+          </Pressable>
+          <Text style={styles.helper}>
+            연도 → 월 → 날짜 순서로 선택할 수 있습니다.
+          </Text>
+          <BirthDateCalendar
+            visible={datePickerVisible}
+            calendarType={calendarType}
+            value={{ year, month, day }}
+            onClose={() => setDatePickerVisible(false)}
+            onSelect={(value) => {
+              setYear(value.year);
+              setMonth(value.month);
+              setDay(value.day);
+              setError('');
+            }}
+          />
         </View>
 
         <View style={styles.section}>
@@ -214,19 +227,23 @@ export default function BirthInputScreen() {
                 value={!timeKnown}
                 onValueChange={(unknown) => {
                   setTimeKnown(!unknown);
-                  if (unknown) setBirthTime('');
+                  if (unknown) {
+                    setHour12('');
+                    setMinute('00');
+                    setMeridiem('am');
+                  }
                 }}
               />
             </View>
           </View>
-          <TextInput
-            accessibilityLabel="출생시간"
-            editable={timeKnown}
-            value={birthTime}
-            onChangeText={setBirthTime}
-            placeholder={timeKnown ? '14:30' : '시간 모름'}
-            placeholderTextColor={mobileColors.muted}
-            style={[styles.input, !timeKnown && styles.inputDisabled]}
+          <BirthTime12HourField
+            meridiem={meridiem}
+            hour12={hour12}
+            minute={minute}
+            disabled={!timeKnown}
+            onMeridiemChange={setMeridiem}
+            onHourChange={setHour12}
+            onMinuteChange={setMinute}
           />
         </View>
 
@@ -280,14 +297,14 @@ export default function BirthInputScreen() {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: mobileColors.canvas },
-  content: { paddingHorizontal: 24, paddingTop: 20, paddingBottom: 44, gap: 22 },
+  content: { paddingHorizontal: 22, paddingTop: 20, paddingBottom: 48, gap: 24 },
   back: { color: mobileColors.navy, fontSize: 15, fontWeight: '700' },
   header: { gap: 8 },
   eyebrow: { color: mobileColors.gold, fontSize: 12, fontWeight: '700', letterSpacing: 1.2 },
-  title: { color: mobileColors.ink, fontSize: 32, fontWeight: '700' },
+  title: { color: mobileColors.ink, fontSize: 32, fontWeight: '900' },
   description: { color: mobileColors.muted, fontSize: 15, lineHeight: 22 },
-  section: { gap: 10 },
-  label: { color: mobileColors.ink, fontSize: 16, fontWeight: '700' },
+  section: { gap: 13 },
+  label: { color: mobileColors.ink, fontSize: 17, fontWeight: '900' },
   helper: { marginTop: 4, color: mobileColors.muted, fontSize: 13 },
   segmentRow: { flexDirection: 'row', gap: 8 },
   segment: {
@@ -303,20 +320,34 @@ const styles = StyleSheet.create({
   segmentSelected: { backgroundColor: mobileColors.navy, borderColor: mobileColors.navy },
   segmentText: { color: mobileColors.muted, fontSize: 15, fontWeight: '700' },
   segmentTextSelected: { color: mobileColors.surface },
-  dateRow: { flexDirection: 'row', gap: 8 },
-  input: {
-    minHeight: 50,
+  dateButton: {
+    minHeight: 82,
     borderWidth: 1,
     borderColor: mobileColors.border,
-    borderRadius: 12,
+    borderRadius: 17,
     backgroundColor: mobileColors.surface,
-    color: mobileColors.ink,
-    paddingHorizontal: 14,
-    fontSize: 17,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 15,
+    paddingHorizontal: 16,
   },
-  inputDisabled: { opacity: 0.55 },
-  yearInput: { flex: 2 },
-  shortInput: { flex: 1 },
+  dateIcon: {
+    width: 46,
+    height: 46,
+    borderWidth: 1,
+    borderColor: mobileColors.gold,
+    borderRadius: 13,
+    backgroundColor: mobileColors.canvas,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dateIconText: { color: mobileColors.gold, fontSize: 28, fontWeight: '800' },
+  dateCopy: { flex: 1, gap: 6 },
+  dateHint: { color: mobileColors.muted, fontSize: 12, fontWeight: '800' },
+  dateValue: { color: mobileColors.ink, fontSize: 17, fontWeight: '900' },
+  datePlaceholder: { color: mobileColors.muted, fontSize: 16 },
+  dateChevron: { color: mobileColors.navy, fontSize: 28, fontWeight: '700' },
+  pressed: { opacity: 0.76 },
   rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   inlineSwitch: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   switchLabel: { color: mobileColors.muted, fontSize: 13 },
