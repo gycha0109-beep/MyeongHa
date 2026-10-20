@@ -171,3 +171,9 @@ T1·S3·T2 각 검사가 동일 원본/Scope를 pin해야 한다. `Response`·`R
 - 기존 `runClaimedAccountDeletionWorkerV1`는 **DB 최종화 → Auth 삭제 → 완료 ACK** 순서를 쓰며, DB 최종화가 예외를 던지면 Auth/ACK를 **호출하지 않습니다**. 기존 Worker 오케스트레이션 테스트에 S4 보호 자식 FK가 DB 최종화를 막는 *합성 실패*를 주입하고, 미완료 상태 유지·재시도 시 동일 DB Finalizer 재실행·Auth/ACK 각 1회만 처리함을 추가 검증합니다. 실제 Worker 실행 코드는 변경하지 않습니다.
 - 외부 `official_reader_s4_ledger_fixture`에 **테스트 전용** `protected_cleanup_ready_for_completion_v1(subject)`를 추가해, 독립 삭제 Tombstone + 복원 epoch 대조 + 해당 Subject 보호 행 0개가 모두 확인돼야 보호 데이터 측 완료 *준비*를 인정합니다. 이전 백업 복원/원장 누락/epoch 지연/다른 Subject는 DENY. 삭제 후 같은 구버전 백업 재적재 시 즉시 DENY→재파기 후 준비 복귀를 검증합니다.
 - **중요:** 이것은 전체 계정 삭제 완료 승인을 내리는 함수가 아니며, 일반 Chat·Auth·Commerce·Worker lease·Privacy Ledger 운영 소유자를 대신하지 않습니다. 현행 `internal_complete_account_deletion_v1`와 실제 Worker에 새 게이트를 연결하지 않았으므로, 운영용 강제 증명·재노출 차단 인수는 계속 HOLD입니다.
+
+
+## 17. 현행 1190 완료 승인 함수와 복원 차단 상태 연계 표본 (2026-10-20)
+
+- S4 격리 스키마에 `attempt_guarded_completion_ack_v1(subject,job,owner)`를 추가했습니다. 백업 외부 삭제 tombstone·epoch 대조·보호 원문 0개가 충족되지 않으면 완료 요청을 **현행 1190 함수 호출 전에 거부**하며, 조건 충족 시에는 실제 `internal_complete_account_deletion_v1`에 모든 최종 승인을 위임합니다. SQL 소스 드리프트 검사는 기존 함수의 Subject/Job/Outbox/호스팅 Auth/임대 검사를 확인합니다.
+- 과거 보호 데이터 재복원 및 재삭제 전후에 격리 요청을 실행해, 외부 원장 거부와 실제 1190의 삭제 Job 부재 거부를 구별합니다. 이는 유효한 실제 Worker 임대로 운영 완료를 실행했다는 증거가 아닙니다. **시험 전용 함수만 생성**하며 기존 DB 함수, Auth Worker, Privacy Ledger, 실제 삭제 그래프는 변경하지 않고 인수 전 HOLD를 유지합니다.

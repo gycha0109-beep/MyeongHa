@@ -101,3 +101,9 @@
 - 실제 1520 계정 삭제는 Subject → 삭제 Job → Outbox를 잠그고 Reader 접근 자식 행을 삭제합니다. 운영 계정 삭제 요청이 없는 B8 합성 회원에 전체 1520을 호출하면 위험한 가짜 완료가 되므로, **독립 DB 연결이 Subject FOR UPDATE → 출처 Grant FOR UPDATE를 점유**하는 최악의 경합만 구성합니다.
 - 다른 DB 연결은 실제 `cmd_apply_verified_portone_reader_full_cancellation_v1`로 이미 결속된 B 영수증의 **검증된 환불을 실행**합니다. 첫 연결이 잠금을 놓을 때까지 PostgreSQL Lock 대기, 이후 B Receipt/Grant만 정확히 revoked·Provider Event 1개, C 형제 Receipt의 active Grant 유지·교착 없음이 필수입니다.
 - 이 실경합은 실제 1520 Job/Outbox lease, Auth 삭제와 Commerce webhook의 완전한 양방향 순서 인수가 **아닙니다**. 운영 Worker/결제 이벤트 통로에 추가 코드를 넣지 않고 기존 S2 미완료를 유지합니다.
+
+
+## 12. 동일 PortOne 검증 이벤트 동시 재처리 (2026-10-20)
+
+- 기존 B 환불/계정 삭제형 행 잠금 경합 이후, 독립 C Receipt를 대상으로 두 개의 **실제 DB 취소 Writer 거래**가 동일 cancellation ID·원본 거래·시각·증명 fingerprint를 가지고 동시에 처리합니다. 선행 거래가 커밋 전 4초간 구매 advisory를 보유하는 동안 재처리 거래가 잠금 대기한 뒤 커밋해야 합니다.
+- 정확한 C Receipt/Grant revoked, 동일 Provider Event 1건·연계 Entitlement revoke Event 1건, 이미 회수된 B Grant 복구 0건을 확인합니다. 포트원 API/실거래는 호출하지 않으며, 서로 다른 이벤트의 역순 도착·모든 Writer 범위 인수는 계속 미완료입니다.

@@ -315,3 +315,9 @@ S1에서 공통 잠금 함수 자체가 성공하더라도 **S2 전체 경로가
 
 - S2: 계정 삭제와 같은 Subject 선잠금 + 출처 Grant 점유 상태에서 **실제 검증된 B 영수증 환불 Writer**가 대기하고 B만 회수·C는 유지하는지 PG15·17에서 검증합니다. 최종 AccountDeletion 본체와 운영 결제 기능은 호출하지 않습니다.
 - S4: 실제 Worker DB-finalizer 실패→Auth/완료 ACK 차단→재시도 인계 Unit Test와 외부 삭제 원장 누락·stale epoch·구백업 복원 데이터 잔존 시 보호 콘텐츠 완료 준비 DENY를 격리 SQL에 추가했습니다. 이는 신규 운영용 ACK 정책이 아니며 개인정보 기술·법무 승인 전 실제 Worker/정본 migration/프로덕션에 연결하지 않습니다.
+
+
+### S2 중복 취소 동시 커밋·S4 완료 승인 위임 회귀시험 (2026-10-20)
+
+- S2: 원본 C Verified Receipt의 동일 Provider 취소 이벤트가 실제 DB Writer 두 연결에서 겹쳐도 구매 advisory를 통해 직렬화, Provider/Event/Grant 각각 정확한 1회 회수와 B 형제 권리 불변을 시험합니다.
+- S4: 격리 Privacy Ledger가 미대조이거나 이전 백업 보호 원문이 되살아나면 **완료 승인 함수 위임 전 거부**, 완전 재파기 후에도 정본 1190 Worker Job/lease가 없으면 해당 승인 함수가 거부하는 경계 시험을 추가합니다. 실제 Worker/완료 함수 및 운영 DB/정본 정책은 수정하지 않았습니다.
