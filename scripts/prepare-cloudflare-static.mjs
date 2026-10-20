@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 
 // Preserve the root landing URL while disabling automatic clean-URL HTML rewriting.
 // Cloudflare Static Assets supports same-site 200 proxying via _redirects.
-export const CLOUDFLARE_ROOT_REWRITE = '/ /index.html 200\\n';
+export const CLOUDFLARE_ROOT_REWRITE = '/ /index.html 200\n';
 
 export const REQUIRED_SECURITY_HEADERS = Object.freeze([
   'Content-Security-Policy',
