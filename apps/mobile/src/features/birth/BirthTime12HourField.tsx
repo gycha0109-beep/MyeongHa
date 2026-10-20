@@ -131,7 +131,7 @@ export function BirthTime12HourField({
           <View style={styles.modalSheet}>
             <View style={styles.modalHeader}>
               <View style={styles.modalHeading}>
-                <Text style={styles.modalEyebrow}>{periodLabel} · 12시간제</Text>
+                <Text style={styles.modalEyebrow}>{periodLabel} · {t('12시간제')}</Text>
                 <MobileUiText style={styles.modalTitle}>태어난 시각 선택</MobileUiText>
               </View>
               <Pressable accessibilityRole="button"
