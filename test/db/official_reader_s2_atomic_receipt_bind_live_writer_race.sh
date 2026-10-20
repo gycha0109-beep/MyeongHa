@@ -1884,4 +1884,95 @@ grep -q 'PortOne full cancellation replay conflicts with persisted evidence' "$t
  fail "C cancellation lineage lost its single committed Grant revoke"
 pass "same cancellation ID cannot be reused across sibling original Receipts"
 
+
+# Two DIFFERENT committed cancellation events, B (bound scope) and C
+# (unbound receipt), share a purchase but must retain distinct provenance.
+# Replay their actual verified writers concurrently: B owns the purchase
+# advisory until COMMIT; C waits and must replay its OWN Receipt/Grant.
+p >"$tmpdir/b8-cross-event-b-holder.out" 2>&1 <<SQL &
+set application_name='rr_s2_distinct_b_event_holder';
+set statement_timeout='25s';
+begin;
+set local role myeongha_commerce_internal_executor;
+select 'B_DISTINCT_REPLAY='||
+ (public.cmd_apply_verified_portone_reader_full_cancellation_v1(
+  'b8-payment-b','tx-reader-b8-b','b8-cancel-bound-b-after-account-lock',
+  '$b8_b_cancel_at'::timestamptz,$b8_amount,'KRW','production',
+  'hmac-sha256:k1:9797979797979797979797979797979797979797979797979797979797979797',
+  'synthetic-finalizer-lock-contention-v1'
+ )->'revoke'->>'contractVersion');
+select pg_sleep(4);
+commit;
+SQL
+holder_pid=$!
+wait_for "distinct B provider replay holds shared purchase advisory" "
+ select count(*) from pg_catalog.pg_stat_activity
+ where application_name='rr_s2_distinct_b_event_holder'
+ and state='active' and wait_event_type='Timeout';
+"
+p >"$tmpdir/b8-cross-event-c-writer.out" 2>&1 <<SQL &
+set application_name='rr_s2_distinct_c_event_waiter';
+set statement_timeout='25s';
+begin;
+set local role myeongha_commerce_internal_executor;
+select 'C_DISTINCT_REPLAY='||
+ (public.cmd_apply_verified_portone_reader_full_cancellation_v1(
+  'b8-payment-c','tx-reader-b8-c','b8-cancel-concurrent-c',
+  '$c_cancel_at'::timestamptz,$b8_amount,'KRW','production',
+  'hmac-sha256:k1:9898989898989898989898989898989898989898989898989898989898989898',
+  'synthetic-c-same-event-v1'
+ )->'revoke'->>'contractVersion');
+commit;
+SQL
+writer_pid=$!
+wait_for "different C provider event waits for B purchase advisory" "
+ select count(*) from pg_catalog.pg_stat_activity
+ where application_name='rr_s2_distinct_c_event_waiter'
+ and state='active' and wait_event_type='Lock'
+ and wait_event='advisory';
+"
+wait "$holder_pid" || {
+ cat "$tmpdir/b8-cross-event-b-holder.out" >&2
+ fail "B bound-event replay failed in cross-Receipt contention"
+}
+holder_pid=""
+wait "$writer_pid" || {
+ cat "$tmpdir/b8-cross-event-c-writer.out" >&2
+ fail "C unbound-event replay deadlocked or failed after B release"
+}
+writer_pid=""
+grep -q 'B_DISTINCT_REPLAY=official-reader-s2-revoke-dispatch-v1' "$tmpdir/b8-cross-event-b-holder.out" || {
+ cat "$tmpdir/b8-cross-event-b-holder.out" >&2
+ fail "B cross-event replay lost exact bound Reader scope"
+}
+grep -q 'C_DISTINCT_REPLAY=official-reader-s2-unbound-grant-cancellation-v1' "$tmpdir/b8-cross-event-c-writer.out" || {
+ cat "$tmpdir/b8-cross-event-c-writer.out" >&2
+ fail "C cross-event replay lost exact unbound Receipt scope"
+}
+[[ "$(p -c "select count(*) from public.commerce_provider_events pe
+ where (pe.external_event_id='myeongha:portone-v2:full-cancel:v1:b8-cancel-bound-b-after-account-lock'
+        and pe.resolved_receipt_id='$b8_receipt_b'::uuid)
+    or (pe.external_event_id='myeongha:portone-v2:full-cancel:v1:b8-cancel-concurrent-c'
+        and pe.resolved_receipt_id='$b8_receipt_c'::uuid);")" == 2 ]] ||
+ fail "B/C cross-event replays changed Provider Event counts or original Receipt lineage"
+[[ "$(p -c "select count(*) from public.entitlement_events ee
+ join public.commerce_provider_events pe on pe.id=ee.source_provider_event_id
+ where ((pe.external_event_id='myeongha:portone-v2:full-cancel:v1:b8-cancel-bound-b-after-account-lock'
+        and ee.grant_id='$b8_grant_b'::uuid)
+    or (pe.external_event_id='myeongha:portone-v2:full-cancel:v1:b8-cancel-concurrent-c'
+        and ee.grant_id='$b8_grant_c'::uuid))
+ and ee.event_type='revoked';")" == 2 ]] ||
+ fail "B/C distinct replay did not preserve one revoke effect per exact Grant"
+[[ "$(p -c "select count(*) from public.entitlement_events ee
+ join public.commerce_provider_events pe on pe.id=ee.source_provider_event_id
+ where (pe.external_event_id='myeongha:portone-v2:full-cancel:v1:b8-cancel-bound-b-after-account-lock'
+        and ee.grant_id='$b8_grant_c'::uuid)
+    or (pe.external_event_id='myeongha:portone-v2:full-cancel:v1:b8-cancel-concurrent-c'
+        and ee.grant_id='$b8_grant_b'::uuid);")" == 0 ]] ||
+ fail "distinct B/C cancellation events wrote cross-Receipt Grant effects"
+[[ "$(p -c "select count(*) from public.entitlement_grants
+ where id in ('$b8_grant_b'::uuid,'$b8_grant_c'::uuid) and status='revoked';")" == 2 ]] ||
+ fail "B/C Grant lifecycle changed on cross-Receipt event replay"
+pass "distinct B bound and C unbound verified events serialize and replay with no cross-Receipt effects"
+
 echo "PASS: S2 instrumented two-direction PostgreSQL race; production integration HOLD"
