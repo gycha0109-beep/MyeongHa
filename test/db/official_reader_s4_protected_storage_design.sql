@@ -110,6 +110,16 @@ language plpgsql volatile security invoker
 set search_path=pg_catalog,public
 as $guarded_ack$
 begin
+ -- Acquire the same disposable off-backup fence lock as every protected-body
+ -- INSERT/UPDATE before checking its epoch and delegating to 1190. The row
+ -- lock lasts to transaction END, not merely the end of this function call.
+ perform 1 from official_reader_s4_ledger_fixture.recovery_fence f
+ where f.singleton for update;
+ if not found then
+  raise exception using errcode='23514',
+   constraint='official_reader_s4_fixture_recovery_fence_absent',
+   message='Protected Reader deletion ledger or recovered bytes are not reconciled';
+ end if;
  if not official_reader_s4_ledger_fixture.protected_cleanup_ready_for_completion_v1(p_subject)
  then
   raise exception using errcode='23514',
@@ -144,6 +154,32 @@ begin
  raise notice 'PASS S4 native 1190 ACK has real Subject/Job/Outbox/Auth/lease checks';
 end
 $s4_native_ack_contract$;
+
+-- Disposable restore/writer participant in the SAME lock discipline.
+-- A restored ciphertext-shaped bytea row may still be imported after a
+-- completed ACK, but cannot race into the gap between the epoch check and
+-- ACK transaction without waiting for the fence. Read-side tombstones keep
+-- every restored byte invisible until the independent scrub reconciles it.
+create function official_reader_s4_fixture.lock_recovery_fence_before_write_v1()
+returns trigger language plpgsql security invoker
+set search_path=pg_catalog,public
+as $fence_writer$
+begin
+ perform 1 from official_reader_s4_ledger_fixture.recovery_fence f
+ where f.singleton for update;
+ if not found then
+  raise exception using errcode='23514',
+   constraint='official_reader_s4_fixture_recovery_fence_absent',
+   message='Protected Reader recovery fence must exist for protected writes';
+ end if;
+ return new;
+end
+$fence_writer$;
+revoke all on function official_reader_s4_fixture.lock_recovery_fence_before_write_v1()
+ from public;
+create trigger official_reader_s4_fixture_recovery_fence_writer
+before insert or update on official_reader_s4_fixture.protected_bodies
+for each row execute function official_reader_s4_fixture.lock_recovery_fence_before_write_v1();
 
 -- Exact source provenance cannot be supplied as an arbitrary Grant ID.
 create function official_reader_s4_fixture.assert_origin_scope()
