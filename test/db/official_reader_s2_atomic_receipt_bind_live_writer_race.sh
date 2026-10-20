@@ -1704,7 +1704,7 @@ set local role myeongha_commerce_internal_executor;
 select 'C_FIRST='||(public.cmd_apply_verified_portone_reader_full_cancellation_v1(
  'b8-payment-c','tx-reader-b8-c','b8-cancel-concurrent-c',
  '$c_cancel_at'::timestamptz,$b8_amount,'KRW','production',
- 'hmac-sha256:k1:9898989898989898989898989898989898989898989898989898989898989898',
+ 'hmac-sha256:k1:9898989898989898989898989898989898989898989898989898989898989898989898',
  'synthetic-c-same-event-v1')->'revoke'->>'contractVersion');
 select pg_sleep(4);
 commit;
