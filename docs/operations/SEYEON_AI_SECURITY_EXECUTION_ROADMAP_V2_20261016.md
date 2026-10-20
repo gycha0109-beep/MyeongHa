@@ -381,3 +381,10 @@ S8의 **비파괴/격리 검토는 S2~S7과 병렬 진행 가능**하며, S8 Pro
 - **수정:** 네 Chat 역할 및 Post-turn의 Governor 생성 전에 검증된 역할 정책의 문자열·토큰·금액과 `allowedPurposes`/`priceQuote`를 별도 복제 후 동결한다. 동일 스냅샷을 Provider rate card와 공식 token-count Governor에 전달한다. 운영 native Provider 구성과 ENFORCE pre-activation에서 외부 계측 콜백을 모두 금지한다.
 - **합성 회귀:** 초기화 뒤 승인 원본의 허용 작업·개별 토큰 상한·단가·정책 버전을 변경해도 Chat/Post-turn Governor 및 Provider 설정이 바뀌지 않아야 한다. 중첩 승인 배열·단가 객체의 직접 변조도 거부한다. Chat 4역할 및 Post-turn 임의 계측 훅은 Provider/DB 접속 전 거부.
 - **불변:** 신규 SQL·운영 DDL/DML/ACL/마이그레이션 없음, 실 Provider 호출·운영 공개/유료 호출 없음. G0 기술 승인/D-04 미확정, Production G1 positive/G2/G3/G4/G5/G6 HOLD, Projectors=[], writeAdmission=DENY 유지. PR exact-head CI/Full Integration 및 main post-merge 기록 필요.
+
+## 44. 2026-10-20 S6/G4 — 모델 교체에도 유효한 Input Token Count 응답 리소스 상한 (비운영)
+
+- **실제 결손:** `seyeon-openai-input-token-count-port-v1.ts`가 Pre-Dispatch 공식 `/responses/input_tokens`의 응답을 `Response.text()`로 무제한 읽은 뒤 8KiB 초과 여부를 검사했다. 비정상 upstream 스트림은 사후 검사 전에 메모리를 소모할 수 있고, 헤더 `application/jsonp` 역시 `includes` 검사만으로 허용됐다. 이 단계는 Governor DB 예약 및 유료 생성보다 먼저 실행된다.
+- **구현:** 서비스에서 이미 사용하는 `readBoundedUpstreamJsonTextV1` 공통 제한 읽기 계약을 적용한다. Content-Length 조기 차단, 스트림 **읽기 도중** 최대 8192바이트 제한, AbortSignal로 응답 본문 무응답 시 종료, 정확한 `application/json` 및 매개변수만 허용한다. 실패 시 비용 DB 예약·모델 생성으로 진행하지 않으며 임의 토큰 추정·유료 Provider 재시도 없음.
+- **합성 테스트:** 4096+4097 바이트 분할 본문, Content-Length 과다 헤더, 본문 중간 정지/타임아웃, JSON 유사 MIME(`application/jsonp`)를 거부한다. 기존 정상 official count→reserve→model→receipt→settle 회귀 유지. 실제 외부 요청·유료 API 호출 없음.
+- **운영 제약:** 새 저가 모델의 실제 identifier/가격표·토큰 규격은 Owner 별도 승인 전에 변경하지 않음. 다른 모델/제공업체까지 검증됐다는 뜻 아님. G0 기술 및 D-04 미확정, Production G1 positive/G2/G3/G4/G5/G6 HOLD, `Projectors=[]`, `writeAdmission='DENY'`; Production DB SQL/ACL/배포·공개·유료 OFF 유지.
