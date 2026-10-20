@@ -4,10 +4,12 @@ import {
   denySeyeonCloudflareFirstRevealBeforeProviderV1,
   enforceSeyeonCloudflareOfflineFetchEgressFenceV1,
   executeSeyeonCloudflareOfflineEgressFenceV1,
+  executeSeyeonCloudflareOfflineFirstRevealV1,
   SEYEON_CLOUDFLARE_OFFLINE_REVEAL_FENCE_V1,
 } from '../apps/api/src/seyeon-cloudflare-offline-reveal-fence-v1.js';
 
 const CANARY = 'PRIVATE_SEYEON_ASSISTANT_TEXT_MUST_NEVER_LEAVE_THE_FENCE';
+const SERVER_REQUEST_ID = '00000000-0000-4000-8000-000000000001';
 
 async function assertSafeHold(response: Response, requestId?: string): Promise<void> {
   expect(response.status).toBe(503);
@@ -30,14 +32,16 @@ describe('S-CF1 Cloudflare offline deny-only first Reveal gate', () => {
       actualCloudflareEdgeSendProven: false,
       revokeSendAckContractApproved: false,
     });
-    await assertSafeHold(denySeyeonCloudflareFirstRevealBeforeProviderV1('cf-first-post'), 'cf-first-post');
+    await assertSafeHold(denySeyeonCloudflareFirstRevealBeforeProviderV1(SERVER_REQUEST_ID), SERVER_REQUEST_ID);
   });
 
-  it('does not import a Provider/DB runtime or expose an authorized first send', async () => {
+  it('does not invoke an explicitly supplied Provider/DB continuation', async () => {
     const provider = vi.fn().mockResolvedValue(new Response(CANARY, { status: 200 }));
-    // The only first-Reveal entrypoint is an unconditional pre-Provider HOLD:
-    // there is no continuation argument or route binding that can run provider().
-    await assertSafeHold(denySeyeonCloudflareFirstRevealBeforeProviderV1('cf-provider-zero'));
+    const result = await executeSeyeonCloudflareOfflineFirstRevealV1({
+      requestId: SERVER_REQUEST_ID,
+      executeProtectedCandidate: provider,
+    });
+    await assertSafeHold(result, SERVER_REQUEST_ID);
     expect(provider).not.toHaveBeenCalled();
   });
 
@@ -65,9 +69,9 @@ describe('S-CF1 factory-owned fixed 4xx preflight denials', () => {
   ] as const)('passes through only its own %s static denial', async (kind, status, code) => {
     const created = createSeyeonCloudflareStaticPreflightDenialV1({
       kind,
-      requestId: 'cf-static-safe',
+      requestId: SERVER_REQUEST_ID,
     });
-    const passed = enforceSeyeonCloudflareOfflineFetchEgressFenceV1(created, 'cf-egress');
+    const passed = enforceSeyeonCloudflareOfflineFetchEgressFenceV1(created, SERVER_REQUEST_ID);
     expect(passed).toBe(created);
     expect(passed.status).toBe(status);
     expect(passed.headers.get('cache-control')).toBe('no-store');
@@ -78,7 +82,7 @@ describe('S-CF1 factory-owned fixed 4xx preflight denials', () => {
     } else {
       const payload = await passed.text();
       expect(payload).toContain(code);
-      expect(payload).toContain('cf-static-safe');
+      expect(payload).toContain(SERVER_REQUEST_ID);
       expect(payload).not.toContain(CANARY);
     }
   });
@@ -86,7 +90,7 @@ describe('S-CF1 factory-owned fixed 4xx preflight denials', () => {
   it('rejects arbitrary code, kind and requestId rather than registering a caller response', () => {
     expect(() => createSeyeonCloudflareStaticPreflightDenialV1({
       kind: 'model_response' as never,
-      requestId: 'cf-unknown',
+      requestId: SERVER_REQUEST_ID,
     })).toThrow(/Unknown static/);
     expect(() => createSeyeonCloudflareStaticPreflightDenialV1({
       kind: 'auth_required',
@@ -100,43 +104,43 @@ describe('S-CF1 factory-owned fixed 4xx preflight denials', () => {
         ok: false, error: { code: 'AUTH_REQUIRED' }, assistantText: CANARY,
       }, { status, headers: { 'Cache-Control': 'no-store' } });
       await assertSafeHold(
-        enforceSeyeonCloudflareOfflineFetchEgressFenceV1(forged, 'cf-forged'),
-        'cf-forged',
+        enforceSeyeonCloudflareOfflineFetchEgressFenceV1(forged, SERVER_REQUEST_ID),
+        SERVER_REQUEST_ID,
       );
     }
   });
 
   it('does not trust a clone, mutated headers or already-read trusted body', async () => {
     const original = createSeyeonCloudflareStaticPreflightDenialV1({
-      kind: 'auth_required', requestId: 'cf-clone',
+      kind: 'auth_required', requestId: SERVER_REQUEST_ID,
     });
     const clone = original.clone();
-    await assertSafeHold(enforceSeyeonCloudflareOfflineFetchEgressFenceV1(clone, 'cf-clone-bad'));
+    await assertSafeHold(enforceSeyeonCloudflareOfflineFetchEgressFenceV1(clone, SERVER_REQUEST_ID));
 
     const changed = createSeyeonCloudflareStaticPreflightDenialV1({
-      kind: 'forbidden', requestId: 'cf-header',
+      kind: 'forbidden', requestId: SERVER_REQUEST_ID,
     });
     changed.headers.set('X-SeYeon-Debug', CANARY);
-    await assertSafeHold(enforceSeyeonCloudflareOfflineFetchEgressFenceV1(changed, 'cf-header-bad'));
+    await assertSafeHold(enforceSeyeonCloudflareOfflineFetchEgressFenceV1(changed, SERVER_REQUEST_ID));
 
     const streaming = createSeyeonCloudflareStaticPreflightDenialV1({
-      kind: 'forbidden', requestId: 'cf-sse',
+      kind: 'forbidden', requestId: SERVER_REQUEST_ID,
     });
     streaming.headers.set('Content-Type', 'text/event-stream');
-    await assertSafeHold(enforceSeyeonCloudflareOfflineFetchEgressFenceV1(streaming, 'cf-sse-bad'));
+    await assertSafeHold(enforceSeyeonCloudflareOfflineFetchEgressFenceV1(streaming, SERVER_REQUEST_ID));
 
     const read = createSeyeonCloudflareStaticPreflightDenialV1({
-      kind: 'not_found', requestId: 'cf-consumed',
+      kind: 'not_found', requestId: SERVER_REQUEST_ID,
     });
     await read.text();
-    await assertSafeHold(enforceSeyeonCloudflareOfflineFetchEgressFenceV1(read, 'cf-consumed-bad'));
+    await assertSafeHold(enforceSeyeonCloudflareOfflineFetchEgressFenceV1(read, SERVER_REQUEST_ID));
 
     const locked = createSeyeonCloudflareStaticPreflightDenialV1({
-      kind: 'not_found', requestId: 'cf-locked',
+      kind: 'not_found', requestId: SERVER_REQUEST_ID,
     });
     const reader = locked.body?.getReader();
     try {
-      await assertSafeHold(enforceSeyeonCloudflareOfflineFetchEgressFenceV1(locked, 'cf-locked-bad'));
+      await assertSafeHold(enforceSeyeonCloudflareOfflineFetchEgressFenceV1(locked, SERVER_REQUEST_ID));
     } finally {
       reader?.releaseLock();
     }
@@ -150,13 +154,13 @@ describe('S-CF1 outer Fetch egress fence is independent from ingress hold', () =
         status,
         headers: { 'Cache-Control': 'no-store', 'Content-Type': 'application/json' },
       });
-      await assertSafeHold(enforceSeyeonCloudflareOfflineFetchEgressFenceV1(candidate, 'cf-status'));
+      await assertSafeHold(enforceSeyeonCloudflareOfflineFetchEgressFenceV1(candidate, SERVER_REQUEST_ID));
     },
   );
 
   it('holds empty/undefined/non-Response/204 result without reading private payload', async () => {
     for (const candidate of [undefined, null, { status: 403, body: CANARY }, new Response(null, { status: 204 })]) {
-      await assertSafeHold(enforceSeyeonCloudflareOfflineFetchEgressFenceV1(candidate, 'cf-empty'));
+      await assertSafeHold(enforceSeyeonCloudflareOfflineFetchEgressFenceV1(candidate, SERVER_REQUEST_ID));
     }
   });
 
@@ -170,26 +174,26 @@ describe('S-CF1 outer Fetch egress fence is independent from ingress hold', () =
       status: 200,
       headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store' },
     });
-    const actual = enforceSeyeonCloudflareOfflineFetchEgressFenceV1(candidate, 'cf-sse-stream');
+    const actual = enforceSeyeonCloudflareOfflineFetchEgressFenceV1(candidate, SERVER_REQUEST_ID);
     await assertSafeHold(actual);
     expect(actual.headers.get('content-type')).toContain('application/json');
   });
 
   it('returns a fixed 503 for thrown errors and async rejected/time-limited candidates', async () => {
     const thrown = await executeSeyeonCloudflareOfflineEgressFenceV1({
-      requestId: 'cf-throw',
+      requestId: SERVER_REQUEST_ID,
       executeCandidate: () => { throw new Error(CANARY); },
     });
     await assertSafeHold(thrown);
 
     const rejected = await executeSeyeonCloudflareOfflineEgressFenceV1({
-      requestId: 'cf-timeout',
+      requestId: SERVER_REQUEST_ID,
       executeCandidate: async () => Promise.reject(new Error('upstream timeout ' + CANARY)),
     });
     await assertSafeHold(rejected);
 
     const unsafeSuccess = await executeSeyeonCloudflareOfflineEgressFenceV1({
-      requestId: 'cf-success',
+      requestId: SERVER_REQUEST_ID,
       executeCandidate: async () => Response.json({ assistantText: CANARY }),
     });
     await assertSafeHold(unsafeSuccess);
@@ -197,10 +201,10 @@ describe('S-CF1 outer Fetch egress fence is independent from ingress hold', () =
 
   it('preserves only the explicitly factory-created object on async egress', async () => {
     const knownDenial = createSeyeonCloudflareStaticPreflightDenialV1({
-      kind: 'invalid_request', requestId: 'cf-registered',
+      kind: 'invalid_request', requestId: SERVER_REQUEST_ID,
     });
     const output = await executeSeyeonCloudflareOfflineEgressFenceV1({
-      requestId: 'cf-outer',
+      requestId: SERVER_REQUEST_ID,
       executeCandidate: async () => knownDenial,
     });
     expect(output).toBe(knownDenial);
