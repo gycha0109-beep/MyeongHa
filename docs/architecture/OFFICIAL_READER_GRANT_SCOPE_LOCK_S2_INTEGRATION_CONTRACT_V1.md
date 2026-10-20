@@ -127,3 +127,10 @@
 - 같은 Purchase의 **결속된 B Receipt**와 **미결속 C Receipt**에 대해 각각 이미 검증·확정된 서로 다른 PortOne 취소 ID를, 실제 `cmd_apply_verified_portone_reader_full_cancellation_v1`의 **독립 DB 연결 2개**에서 동시에 재생합니다. B 거래가 purchase advisory lock을 획득한 상태에서 커밋 전 지연되고, C 거래가 동일 구매 잠금에서 기다린 뒤 정상 종료해야 합니다.
 - 재생 완료 후 B/C Provider Event의 `resolved_receipt_id`가 서로 뒤바뀌지 않고 각 1건, 정확한 출처 Grant의 `entitlement_events`만 각 1건, 잘못된 형제 Grant와의 교차 효과 0건, 이미 회수된 B/C 권리 재활성화 0건을 검사합니다.
 - 이는 **기존 검증된 서로 다른 취소 이벤트의 동시 멱등 재처리**이며 서로 다른 새 유료 결제나 외부 PortOne API를 실행하지 않습니다. 외부 비Reader Writer·상대 서비스의 순서 및 운영 상태 기동은 S2 전체 종료 검증에 남아 있습니다.
+
+
+## 16. verified 영수증 발급 선행 → 취소 후행 실제 Writer 경합 (2026-10-20)
+
+- 같은 B8 Purchase에서 **신규 E verified Receipt**를 합성하고, 첫 DB 연결이 `Purchase advisory → Reader S1` 공동 잠금하에 실제 `internal_apply_verified_receipt_capability_effects_v1`로 Grant를 발급한 뒤 COMMIT 전 대기합니다. 둘째 DB 연결에서 정본 `cmd_apply_verified_portone_reader_full_cancellation_v1` 취소가 구매 잠금에 대기했다가 첫 COMMIT 이후 E만 revoked 처리하는 **발급 선행 방향의 실경합**입니다.
+- E Receipt revoked, 정확한 E Grant revoked·Reader 결속 0, E Provider Event 및 출처 Grant revoked Event 각각 1건, 기존 B/C 회수 상태 불변을 검사합니다. 앞선 B5 **취소 선행 → 발급 불가** 시험과 순서가 반대입니다.
+- 이 시험은 이미 존재하는 공식 Reading에 대해 **기존 Receipt→Grant Writer**를 공동 잠금으로 감싼 것입니다. 별도 공식 Reading 생성·Access 결속까지 수행하는 전체 `internal_apply_verified_reader_purchase_under_scope_v1` 경로의 운영 인수를 대신하지 않으며, 모든 외부 Commerce 발급 동시성 종료 판정도 아닙니다.

@@ -198,3 +198,10 @@ T1·S3·T2 각 검사가 동일 원본/Scope를 pin해야 한다. `Response`·`R
 - 실제 오케스트레이터 `runClaimedAccountDeletionWorkerV1` 단위시험에서 외부 복원 원장의 조회가 실패하면 완료 ACK 포트가 예외를 던지고 기존 `completion_ack_required` 상태를 유지하도록 모의합니다. 조회가 회복된 다음 정본 1190 완료 거래는 **커밋했지만 네트워크 응답이 유실**된 상황을 재현하면 Worker 호출자는 즉시 성공을 추정하지 않고 오류를 반환해야 하며, 다음 재개는 DB에 저장된 `completed`를 읽어 완료 ACK·Auth 삭제·DB 최종화를 **재실행하지 않아야 합니다**.
 - 별도 PostgreSQL 테스트에서 구백업 원문을 물리 파기하고 외부 tombstone/epoch 대조를 완료한 뒤에도, **다른 Worker 소유자**로 정본 완료 재호출을 하면 `account deletion completion replay state is inconsistent` 거부가 나와야 합니다. 올바른 소유자만 정본 1190 멱등 반환을 받아 Job/Outbox 완료 시간을 보존합니다.
 - 둘 다 **실제 외부 원장 호출이나 운영 ACK 전환이 아닌 격리 계약**입니다. 원장 대조와 1190 승인 사이의 분산 원자성, lease 경쟁 및 이미 완료된 작업의 read-side 복원 차단은 기술·법무 인수와 운영 복구 설계에서 구현해야 합니다. 기존 User/Auth/Commerce 실서비스·Prod DB·삭제 Worker 구현은 이번 범위에서 바꾸지 않습니다.
+
+
+## 21. 복원 원장 대조·완료 ACK 사이의 실제 트랜잭션 경합 (2026-10-20)
+
+- 기존 시험 전용 `attempt_guarded_completion_ack_v1`은 삭제 원장 버전을 조회만 하고 바로 정본 1190에 위임하여 **조회 직후 복원 epoch 갱신**과 교차할 위험이 있었습니다. 이번에는 `recovery_fence singleton FOR UPDATE`를 **완료 전 확인부터 거래 종료까지** 보유하도록 격리 후보를 고쳤습니다. 보호 `bytea` 복원/변경도 같은 행을 선점하는 BEFORE INSERT/UPDATE 트리거를 추가했습니다. 원장 행 부재 시에는 실패합니다.
+- 새 실 DB 2연결 시험은 **합성 completed Subject/Job/Outbox를 만들어 정본 1190 완료 재호출까지 성공한 첫 거래가 원장 행 잠금을 유지**하는 중에, 두 번째 거래의 `required_epoch` 증가와 구백업 `\\copy` 재주입이 모두 `lock_timeout`으로 차단되는지를 PostgreSQL 15·17에서 확인합니다. 첫 거래는 전체 ROLLBACK, 이후 원장 epoch 변경은 가능하되 미대조 상태의 완료 위임은 DENY해야 합니다. 읽기 재노출은 독립 tombstone과 serving fence가 계속 차단합니다.
+- **운영 배포 전 남은 필수 조건:** 복원 작업자·외부 원장 소유자·완료 Worker가 동일한 분산 잠금/트랜잭션 프로토콜을 실제로 공유해야 합니다. 현재 시험 트리거는 격리 DB 백업 행 복원만 직렬화하며 외부 백업 시스템의 PITR 전체 교체, 실제 복원 프로세스의 서비스 비노출·원장 확정, 완료 ACK 후 복원 방지에 자동 적용되지 않습니다. 운영 함수·Worker·마이그레이션은 여전히 미변경, Privacy/Legal #2318까지 HOLD입니다.

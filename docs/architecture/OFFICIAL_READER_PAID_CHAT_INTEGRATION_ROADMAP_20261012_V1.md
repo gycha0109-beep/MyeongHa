@@ -339,3 +339,9 @@ S1에서 공통 잠금 함수 자체가 성공하더라도 **S2 전체 경로가
 
 - S2: 결속 B·미결속 C의 **서로 다른 verified cancellation ID**를 두 연결에서 동시에 재처리해 공유 Purchase 잠금 대기/정상 커밋, B·C 이벤트 각 1개·Grant 출처별 효과 각 1개·교차 효과 0을 시험합니다. 이는 운영용 Commerce Writer 전부를 활성화한다는 의미가 아닙니다.
 - S4: 외부 복원 원장 조회 실패 시 완료 ACK 보류, 재시도 후 DB 완료가 커밋된 상태에서 응답 유실 시 새 worker-run의 persisted `completed` 수렴·중복 Auth/ACK 없음, 그리고 복원 대조를 마친 뒤에도 다른 Worker 소유자에 의한 completed replay를 정본 1190이 거절하는지 시험합니다. 실제 외부 Privacy Ledger·Worker 연결과 Production 복구는 계속 HOLD입니다.
+
+
+### S2 verified Receipt 발급 우선 경합·S4 완료 전 복원 원장 TOCTOU 차단 표본 (2026-10-20)
+
+- S2: 같은 구매의 신규 E Receipt에 대해 **발급 Writer 선점(Purchase advisory→S1→Grant) → 정본 PortOne 취소 Writer 대기 → E Grant/Receipt만 revoked** 검증을 추가합니다. 기존 B5 취소 선행/발급 차단 시험과 서로 반대되는 실제 DB 연결 순서이며, 전체 결속 Writer 운영 인수를 의미하지 않습니다.
+- S4: 격리 완료 게이트가 `recovery_fence FOR UPDATE` 잠금을 1190 완료 재호출과 같은 트랜잭션 동안 보유하고, 복원 bytea INSERT/UPDATE가 같은 잠금을 공유하도록 보강합니다. 유효한 합성 completed replay가 실행되는 동안 독립 epoch 갱신 및 과거 snapshot 적재가 차단되는지 PG15/17 두 연결로 재현합니다. 실제 외부 Privacy Ledger·PITR/운영 완료 Worker 연결 및 승인 전 배포는 HOLD입니다.
