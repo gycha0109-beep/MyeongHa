@@ -403,3 +403,10 @@ S8의 **비파괴/격리 검토는 S2~S7과 병렬 진행 가능**하며, S8 Pro
 - **수정:** R30 헤더 계약을 공유 upstream 리소스 유틸로 이동하고 토큰 Count 및 실제 구조화 Provider에 동일 적용한다. 헤더 미응답 타임아웃 시 호출을 `TIMEOUT`으로 종료·비용 계측하고, 마감 뒤 도착한 Provider 응답을 폐기한다. 지연 성공을 Chat Commit으로 승격하거나 재추론/재과금하지 않는다.
 - **합성 회귀:** AbortSignal을 무시하며 응답하지 않는 Provider(정확한 1회 호출, 1회 timeout 이벤트), 마감 뒤 정상 JSON을 반환하는 Provider(본문 cancel, 성공 불인정). 기존 count→reserve→Provider→receipt→settle, R29 8KiB 리소스 제한, R30 절대 deadline 회귀 유지.
 - **제한:** 유료 Provider 요청은 이미 송신됐을 수 있으므로 네트워크 타임아웃이 과금 부재를 증명하지 않는다. 예약·실제 청구 reconciliation은 별개 G4 승인 문제이며 이번 변경으로 운영 사용 승인 불가. G0/D-04 OPEN, positive G1/G2/G3/G4/G5/G6 Production HOLD, Projectors=[], writeAdmission=DENY. Production DB DDL/DML/ACL/migration·공개/유료 활성화·모델 변경 없음.
+
+## 47. 2026-10-20 S7/G5 — DB 동시 재시도 검증의 실행 순서 결함 수정
+
+- **발견 증거:** R31 병합 직후 `main` CI #39376157327의 `concurrent attempt retry dedupe`가 `...0021|2|f`로 실패. 스크립트는 첫 DB 세션에서 작업을 실제로 할당했는지 확인하지 않고 `sleep 0.25` 뒤 두 번째 세션을 시작했으므로, CI 스케줄링에 따라 두 번째 요청이 첫 시도로 실행될 수 있었다.
+- **현재 상태:** 같은 코드를 포함한 `main` SHA `1a8f6f57c2a368945740dde92de6d59b6ac0971a`의 CI #39377276529에서 DB authority-core SUCCESS. 이 성공만으로 과거 실행 순서 문제가 해소됐다고 간주하지 않음.
+- **수정 범위:** 기존 `test/db/chat_attempt_commit_concurrency.sh`의 동시 재시도 시나리오에서 첫 트랜잭션의 할당 완료 신호를 확인하고, 두 번째 PostgreSQL 세션이 실제 DB 잠금 대기 상태에 진입한 후 첫 트랜잭션을 해제하도록 변경. DB 함수/권한/스키마를 변경하지 않음.
+- **수락:** 정확한 PR HEAD의 CI·Governance·Web, 전체 Integration 11/11, 병합 후 정확한 main SHA 검증을 완료하기 전에는 통과 주장하지 않음. 기존 G0/D-04, G1 양수/G2/G3/G4/G5/G6 운영 HOLD, Projectors=[], writeAdmission=DENY 및 별도 Records Smoke 실패는 유지.
