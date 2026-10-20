@@ -14,6 +14,7 @@ import {
 } from '@/features/chat/ChatReadComponents';
 import { useMobileChatThreadV1 } from '@/features/chat/use-mobile-chat-thread';
 import { mobileColors } from '@/ui/mobile-colors';
+import { MobileUiText } from '@/ui/MobileUiText';
 import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
 import { useMobileTheme } from '@/ui/mobile-theme';
 import { useMobilePullRefreshV1 } from '@/ui/use-mobile-pull-refresh';
@@ -62,7 +63,7 @@ function ValidChatThread({ threadId }: { threadId: string }) {
         }}
       >
         <Pressable accessibilityRole="button" onPress={() => router.back()} style={styles.back}>
-          <Text style={styles.backText}>‹ 대화로 돌아가기</Text>
+          <MobileUiText style={styles.backText}>‹ 대화로 돌아가기</MobileUiText>
         </Pressable>
         <ChatReadHeader snapshot={snapshot} />
         <ChatReadMessages snapshot={snapshot} />
@@ -105,14 +106,14 @@ export default function ChatThreadScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.invalidContent}>
-        <Text style={styles.invalidTitle}>대화 링크를 확인할 수 없습니다</Text>
-        <Text style={styles.invalidBody}>올바른 기존 대화 링크로 다시 들어와 주세요.</Text>
+        <MobileUiText style={styles.invalidTitle}>대화 링크를 확인할 수 없습니다</MobileUiText>
+        <MobileUiText style={styles.invalidBody}>올바른 기존 대화 링크로 다시 들어와 주세요.</MobileUiText>
         <Pressable
           accessibilityRole="button"
           onPress={() => router.replace('/chat')}
           style={styles.invalidAction}
         >
-          <Text style={styles.invalidActionText}>대화로 돌아가기</Text>
+          <MobileUiText style={styles.invalidActionText}>대화로 돌아가기</MobileUiText>
         </Pressable>
       </View>
     </SafeAreaView>
