@@ -1975,4 +1975,132 @@ grep -q 'C_DISTINCT_REPLAY=official-reader-s2-unbound-grant-cancellation-v1' "$t
  fail "B/C Grant lifecycle changed on cross-Receipt event replay"
 pass "distinct B bound and C unbound verified events serialize and replay with no cross-Receipt effects"
 
+# Complement the previous refund-FIRST races with a verified Grant
+# ISSUANCE-FIRST race on an independent E Receipt of the same B8 purchase.
+# The legacy real Receipt/Grant writer is explicitly covered by shared
+# purchase advisory -> Reader S1 before its first mutation; the verified
+# PortOne cancellation must wait and then revoke only E.
+b8_receipt_e='12192000-0000-0000-0000-000000000012'
+p >"$tmpdir/b8-e-verified-receipt-seed.out" 2>&1 <<SQL || {
+ cat "$tmpdir/b8-e-verified-receipt-seed.out" >&2
+ fail "new verified sibling E Receipt seed failed"
+}
+begin;
+insert into public.commerce_payment_attempts(
+ id,purchase_intent_id,subject_id,product_offer_id,attempt_no,
+ provider,environment,idempotency_key,provider_request_id,
+ provider_transaction_id,status,created_at,updated_at
+)
+select '12197000-0000-0000-0000-000000000012'::uuid,
+ pi.id,pi.subject_id,pi.product_offer_id,5,
+ 'portone_v2','production','reader-b8-attempt-e',
+ 'b8-payment-e','tx-reader-b8-e',
+ 'response_received',clock_timestamp(),clock_timestamp()
+from public.purchase_intents pi where pi.id='$b8_intent'::uuid;
+insert into public.commerce_receipts(
+ id,subject_id,purchase_intent_id,product_offer_id,platform,provider,
+ external_transaction_id,receipt_fingerprint,verification_status,
+ verified_payload_jsonb,verified_at,created_at,environment,
+ verifier_revision,verified_amount_minor,verified_currency
+)
+select '$b8_receipt_e'::uuid,subject_id,'$b8_intent'::uuid,product_offer_id,
+ platform,provider,'tx-reader-b8-e',
+ 'hmac-sha256:k1:9393939393939393939393939393939393939393939393939393939393939393',
+ 'verified',verified_payload_jsonb,clock_timestamp(),clock_timestamp(),
+ environment,verifier_revision,verified_amount_minor,verified_currency
+from public.commerce_receipts where id='$b8_receipt_c'::uuid;
+commit;
+SQL
+[[ "$(p -c "select count(*) from public.entitlement_grants
+ where source_receipt_id='$b8_receipt_e'::uuid;")" == 0 ]] ||
+ fail "E verified receipt must be unissued before overlap"
+
+p >"$tmpdir/b8-e-issue-first.out" 2>&1 <<SQL &
+set application_name='rr_s2_e_issued_grant_holds_purchase';
+set statement_timeout='25s';
+begin;
+select pg_catalog.set_config('myeongha.subject_id','$subject',true);
+select pg_catalog.set_config('myeongha.reader_pending_reading_id','$b8_reading',true);
+select public.internal_acquire_official_reader_purchase_lock_v1('$b8_intent'::uuid);
+select public.internal_acquire_official_reader_scope_lock_v1(
+ '$subject'::uuid,'$b8_reading'::uuid,'test-standard-reader'
+);
+select result_grant_id
+from public.internal_apply_verified_receipt_capability_effects_v1(
+ '$b8_receipt_e'::uuid,array['test-reader-unit'],
+ array[transaction_timestamp()],array[transaction_timestamp()],
+ array[null]::timestamptz[],array[null]::text[]
+);
+select pg_sleep(4);
+commit;
+SQL
+holder_pid=$!
+wait_for "actual E Grant issuance has executed while holding purchase and S1 locks" "
+ select count(*) from pg_catalog.pg_stat_activity
+ where application_name='rr_s2_e_issued_grant_holds_purchase'
+ and state='active' and wait_event_type='Timeout';
+"
+b8_e_cancel_at="$(p -c "select pg_catalog.to_char(
+ clock_timestamp() at time zone 'UTC','YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"');")"
+p >"$tmpdir/b8-e-cancel-waiter.out" 2>&1 <<SQL &
+set application_name='rr_s2_e_cancel_after_issuance';
+set statement_timeout='25s';
+begin;
+set local role myeongha_commerce_internal_executor;
+select 'E_CANCEL='||
+ (public.cmd_apply_verified_portone_reader_full_cancellation_v1(
+  'b8-payment-e','tx-reader-b8-e','b8-cancel-issued-first-e',
+  '$b8_e_cancel_at'::timestamptz,$b8_amount,'KRW','production',
+  'hmac-sha256:k1:9494949494949494949494949494949494949494949494949494949494949494',
+  'synthetic-e-issuance-before-cancellation-v1'
+ )->'revoke'->>'disposition');
+commit;
+SQL
+writer_pid=$!
+wait_for "E provider refund waits on same purchase behind in-flight Grant issuance" "
+ select count(*) from pg_catalog.pg_stat_activity
+ where application_name='rr_s2_e_cancel_after_issuance'
+ and state='active' and wait_event_type='Lock' and wait_event='advisory';
+"
+wait "$holder_pid" || {
+ cat "$tmpdir/b8-e-issue-first.out" >&2
+ fail "actual E Grant issuance failed in purchase-lock first race"
+}
+holder_pid=""
+wait "$writer_pid" || {
+ cat "$tmpdir/b8-e-cancel-waiter.out" >&2
+ fail "verified E refund failed after same-Receipt Grant committed"
+}
+writer_pid=""
+grep -q 'E_CANCEL=cancelled_before_binding' "$tmpdir/b8-e-cancel-waiter.out" || {
+ cat "$tmpdir/b8-e-cancel-waiter.out" >&2
+ fail "verified E cancellation lost its exact unbound source after issuance"
+}
+b8_grant_e="$(p -c "select id from public.entitlement_grants
+ where source_receipt_id='$b8_receipt_e'::uuid;")"
+[[ "$b8_grant_e" =~ ^[0-9a-f-]{36}$ ]] ||
+ fail "verified E first issuance never created its Grant"
+[[ "$(p -c "select status from public.entitlement_grants
+ where id='$b8_grant_e'::uuid;")" == revoked ]] ||
+ fail "verified E cancellation did not revoke newly issued E Grant"
+[[ "$(p -c "select verification_status from public.commerce_receipts
+ where id='$b8_receipt_e'::uuid;")" == revoked ]] ||
+ fail "verified E original receipt was not revoked"
+[[ "$(p -c "select count(*) from public.standard_reading_reader_access_grants
+ where entitlement_grant_id='$b8_grant_e'::uuid;")" == 0 ]] ||
+ fail "E issued-first refund created unexpected Reader binding"
+[[ "$(p -c "select count(*) from public.commerce_provider_events
+ where external_event_id='myeongha:portone-v2:full-cancel:v1:b8-cancel-issued-first-e'
+ and resolved_receipt_id='$b8_receipt_e'::uuid;")" == 1 ]] ||
+ fail "verified E purchase cancellation event duplicated or changed source"
+[[ "$(p -c "select count(*) from public.entitlement_events ee
+ join public.commerce_provider_events pe on pe.id=ee.source_provider_event_id
+ where pe.external_event_id='myeongha:portone-v2:full-cancel:v1:b8-cancel-issued-first-e'
+ and ee.grant_id='$b8_grant_e'::uuid and ee.event_type='revoked';")" == 1 ]] ||
+ fail "verified E cancellation did not record one exact Grant revoke"
+[[ "$(p -c "select count(*) from public.entitlement_grants
+ where id in ('$b8_grant_b'::uuid,'$b8_grant_c'::uuid) and status='revoked';")" == 2 ]] ||
+ fail "independent B/C rights were revived by E issue-and-revoke race"
+pass "verified E issuance-first Grant Writer and later cancellation serialize by purchase and preserve B/C"
+
 echo "PASS: S2 instrumented two-direction PostgreSQL race; production integration HOLD"
