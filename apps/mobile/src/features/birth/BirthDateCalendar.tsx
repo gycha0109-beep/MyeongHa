@@ -11,6 +11,7 @@ import {
 
 import type { BirthCalendarTypeV1 } from '@myeongha/api-client';
 import { mobileColors } from '@/ui/mobile-colors';
+import { MobileUiText } from '@/ui/MobileUiText';
 import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
 
 type PickerStep = 'year' | 'month' | 'day';
@@ -91,10 +92,10 @@ export function BirthDateCalendar({
           <View style={styles.topRow}>
             <View style={styles.heading}>
               <Text style={styles.kicker}>BIRTH DATE · {dateLabel}</Text>
-              <Text style={styles.title}>생년월일 선택</Text>
+              <MobileUiText style={styles.title}>생년월일 선택</MobileUiText>
             </View>
             <Pressable accessibilityRole="button" onPress={onClose} style={styles.close}>
-              <Text style={styles.closeText}>닫기 ✕</Text>
+              <MobileUiText style={styles.closeText}>닫기 ✕</MobileUiText>
             </Pressable>
           </View>
 
@@ -139,7 +140,7 @@ export function BirthDateCalendar({
                     );
                   })}
                 </View>
-                <Text style={styles.hint}>화살표로 10년 단위 이동 후 출생 연도를 선택하세요.</Text>
+                <MobileUiText style={styles.hint}>화살표로 10년 단위 이동 후 출생 연도를 선택하세요.</MobileUiText>
               </>
             ) : step === 'month' ? (
               <>
@@ -202,7 +203,7 @@ export function BirthDateCalendar({
                   </View>
                 ) : (
                   <>
-                    <Text style={styles.hint}>음력은 양력의 요일 배열과 다릅니다. 해당 월의 날짜를 선택해 주세요.</Text>
+                    <MobileUiText style={styles.hint}>음력은 양력의 요일 배열과 다릅니다. 해당 월의 날짜를 선택해 주세요.</MobileUiText>
                     <View style={styles.daysGrid}>
                       {dayChoices.map((choice) => {
                         const active = Number(value.year) === year &&
@@ -218,7 +219,7 @@ export function BirthDateCalendar({
                         );
                       })}
                     </View>
-                    <Text style={styles.hint}>음력 29일·30일 및 윤달의 실제 존재 여부는 저장 시 서버에서 확인합니다.</Text>
+                    <MobileUiText style={styles.hint}>음력 29일·30일 및 윤달의 실제 존재 여부는 저장 시 서버에서 확인합니다.</MobileUiText>
                   </>
                 )}
               </>
