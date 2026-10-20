@@ -4,11 +4,13 @@ import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { FORTUNE_COOKIE_MESSAGES_V1, pickFortuneCookieIndexV1 } from '@/features/home/mobile-fortune-cookie';
 import { mobileColors } from '@/ui/mobile-colors';
 import { MobileUiText } from '@/ui/MobileUiText';
+import { useMobileUiLocale } from '@/ui/mobile-ui-locale';
 import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
 
 /** Recreational random notes, not a birth-based or AI-generated Saju prediction. */
 export function MobileFortuneCookie() {
   const styles = useMobileThemedStyles(staticStyles);
+  const { t } = useMobileUiLocale();
   const [revealed, setRevealed] = useState(false);
   const [index, setIndex] = useState(-1);
 
@@ -39,10 +41,10 @@ export function MobileFortuneCookie() {
         onRequestClose={() => setRevealed(false)}
       >
         <View style={styles.overlay}>
-          <View style={styles.dialog} accessibilityLabel="오늘의 포춘쿠키 쪽지">
+          <View style={styles.dialog} accessibilityLabel={t('오늘의 포춘쿠키 쪽지')}>
             <View style={styles.dialogTop}>
               <Text style={styles.kicker}>A LITTLE FORTUNE</Text>
-              <Pressable accessibilityRole="button" accessibilityLabel="쪽지 닫기"
+              <Pressable accessibilityRole="button" accessibilityLabel={t('쪽지 닫기')}
                 onPress={() => setRevealed(false)} style={styles.closeButton}>
                 <Text style={styles.closeText}>✕</Text>
               </Pressable>
