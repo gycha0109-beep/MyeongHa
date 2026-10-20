@@ -155,6 +155,32 @@ describe('R11 Node-owned bounded original Grant disclosure transport candidate',
     });
   });
 
+  it('contains a synchronous Node socket write failure without an unhandled send rejection', async () => {
+    let lockReleasedAfterFailure = false;
+    await withNodeSocket(async response => {
+      // Emulate an adapter/socket rejecting a synchronous end() call after
+      // the finished/error/abort handlers were installed.
+      response.end = (() => {
+        throw new Error('synthetic synchronous Node write failure');
+      }) as typeof response.end;
+      await expect(sendSeyeonNodeOriginalGrantResponseV1({
+        response,
+        requestSignal: new AbortController().signal,
+        withLockedOriginalGrant: async ({ deliver }) => {
+          try {
+            await deliver(CANARY);
+          } finally {
+            lockReleasedAfterFailure = true;
+          }
+        },
+      })).rejects.toThrow('synthetic synchronous Node write failure');
+      expect(response.destroyed).toBe(true);
+      expect(lockReleasedAfterFailure).toBe(true);
+    }, async url => {
+      await expect(fetch(url)).rejects.toThrow();
+    });
+  });
+
   it('keeps absent original authorization as app-compatible static 503 without user text', async () => {
     await withNodeSocket(async response => {
       await sendSeyeonNodeOriginalGrantResponseV1({
