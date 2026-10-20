@@ -4,6 +4,7 @@ import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { resolveMobileChatPortraitV1 } from '@/features/chat/chat-character-portraits';
 import { useMobileTheme } from '@/ui/mobile-theme';
 import { MobileUiText } from '@/ui/MobileUiText';
+import { useMobileUiLocale } from '@/ui/mobile-ui-locale';
 
 /**
  * Product-only editorial entrance to the character hub.
@@ -12,6 +13,7 @@ import { MobileUiText } from '@/ui/MobileUiText';
  */
 export function HomeCharacterFeature() {
   const { colors } = useMobileTheme();
+  const { t } = useMobileUiLocale();
   const portrait = resolveMobileChatPortraitV1('seyeon');
   return (
     <View style={styles.section}>
@@ -33,7 +35,7 @@ export function HomeCharacterFeature() {
           <MobileUiText style={styles.heroDescription}>여섯 대리자의 이야기를 만나보세요.</MobileUiText>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="캐릭터 선택 화면으로 이동"
+            accessibilityLabel={t('캐릭터 선택 화면으로 이동')}
             onPress={() => router.push('/chat')}
             style={({ pressed }) => [styles.heroAction, pressed && styles.actionPressed]}
           >
@@ -45,7 +47,7 @@ export function HomeCharacterFeature() {
       <View style={styles.quickActions}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="내 사주 화면으로 이동"
+          accessibilityLabel={t('내 사주 화면으로 이동')}
           onPress={() => router.push('/reading')}
           style={({ pressed }) => [
             styles.quickAction,
@@ -62,7 +64,7 @@ export function HomeCharacterFeature() {
         </Pressable>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="지난 이야기 기록 화면으로 이동"
+          accessibilityLabel={t('지난 이야기 기록 화면으로 이동')}
           onPress={() => router.push('/records')}
           style={({ pressed }) => [
             styles.quickAction,
