@@ -1,7 +1,7 @@
 # Cloudflare 이관 호환성 인벤토리 v1 (2026-10-20)
 
 > 대상: `gycha0109-beep/MyeongHa` / 조사한 기준 `main@afd500c5f8638517ea24b430be736057c7a0aa6e`  
-> 상태: **기존 코드·배포 설정 기반 inventory**. 실제 Worker 프리뷰, 런타임 호환성, Production 동등성은 아직 PASS가 아님.  
+> 상태: **기존 코드·배포 설정 기반 inventory** + 현재 API 라우터 분류 계약. Worker Preview와 공개 health는 확인했으나 Auth/DB/AI/Commerce Production 동등성은 아직 미검증.  
 > 설계/로드맵: [설계 PR #2381](https://github.com/gycha0109-beep/MyeongHa/pull/2381) (미병합)  
 > Track Key: `ops`
 
@@ -46,7 +46,7 @@
 | 16 | `/api/target-persons` | `me?__myeongha_target_person_read=list` | Target person owner |
 | 17 | `/api/target-persons/:id` | `me?__myeongha_target_person_read=detail&__myeongha_target_person_id=:id` | Detail cross-user deny |
 
-**이관 첫 Worker는 위 29개 표기 경로 전체에 대해 API 성공 응답을 제공하지 않는다.** 직접 엔트리/rewrites의 `/api/*` 영역을 deny-only로 묶는다. 다음 별도 단계에서 endpoint 단위로만 positive admission을 허용한다.
+**초기 프리뷰는 29개 경로 모두 차단했다. 이후 로드맵 4단계에서 직접 엔트리 중 `GET /api/health`만 외부 의존성 없는 `200 {"status":"ok"}` 상태 확인으로 허용했다.** `/api/health`는 GET 이외 메서드 405, 쿼리/인코딩 변형 404이며 **readiness의 TLS Canary는 404 차단**이다. 나머지 API와 17개 rewrites는 여전히 404, `POST /api/chat/:threadId/turns`는 별도 503 HOLD다. 경로 매칭은 `workers/cloudflare-api-router.mjs`에 표와 1:1로 고정하고, Vercel의 marker query를 privileged handler로 전달하지 않는다.
 
 ## 3. 정적 빌드 계약(실제 확인)
 
