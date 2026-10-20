@@ -47,6 +47,9 @@ function repaintText(textNode, locale) {
     korean = trimmed;
     trackedText.set(textNode, korean);
   } else if (!korean) {
+    // The user-facing shell is static, but some React/JS screen titles mix fixed
+    // phrases with inline elements. Never use substring translation of arbitrary
+    // text: user names, account data and chat messages may also contain Korean.
     return;
   } else if (trimmed !== korean && trimmed !== translateStaticUi(korean, 'ja-JP')
     && trimmed !== translateStaticUi(korean, 'zh-TW')) {
@@ -99,6 +102,7 @@ function paintMonth(locale) {
 }
 function paintDocument(locale) {
   document.documentElement.lang = locale;
+  document.documentElement.dataset.uiLocale = locale;
   for (const input of document.querySelectorAll('input[type="date"], input[type="time"]')) input.lang = locale;
   for (const root of [document.head, document.body]) {
     if (root) paintSubtree(root, locale);
@@ -171,6 +175,17 @@ function mountStaticUiLocale() {
     if (event.key === UI_LOCALE_STORAGE_KEY) setLocale(storedLocale());
   });
 }
+
+// Native select popups may retain old option labels after React replaces a
+// select. Repaint on focus as well as DOM insertion; do not change option values.
+if (typeof document !== 'undefined') {
+  document.addEventListener('focusin', event => {
+    if (event.target instanceof HTMLSelectElement) {
+      paintSubtree(event.target, storedLocale());
+    }
+  });
+}
+
 if (typeof document !== 'undefined') {
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', mountStaticUiLocale, { once: true });
