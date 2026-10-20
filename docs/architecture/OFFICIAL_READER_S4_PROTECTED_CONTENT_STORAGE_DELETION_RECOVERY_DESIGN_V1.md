@@ -135,3 +135,9 @@ T1·S3·T2 각 검사가 동일 원본/Scope를 pin해야 한다. `Response`·`R
 - 위조된 Attempt·Marker UUID 및 다른 Reader 출처 Grant는 FK/Scope trigger로 거부. `Reader×Bundle×참여자`, `Subject×Thread×Turn×Attempt`와 시스템 안전 마커까지 관계적으로 결속합니다.
 - 부모 `conversation_messages`를 보호 행보다 먼저 삭제하면 FK가 차단되고, **보호 행→안전 마커→Attempt→Turn→참여자→Thread** 순서로 제거하면 합성 개인 데이터가 남지 않는지 검증합니다. 이는 현행 AccountDeletion 최종화 함수에 향후 반영할 **자식 우선 삭제 계약**이며 실제 운영 finalizer 변경 또는 개인정보 정본 그래프 인수로 간주하지 않습니다.
 - 실제 T2 성공 커밋 및 Chat `state='committed'`/AI 생성·검증 포인터, 단일 유료 권한 Writer·암호화, 개인정보 24시간 삭제 Worker·P30D 백업 복구는 아직 실행하지 않았습니다. 현재 합성 Chat Attempt는 `running`, Turn은 `received`이며 **운영 전 상태를 모사하지 않습니다**.
+
+## 11. 최신 Receipt·안전 마커 동시 재검증의 격리 시험 (2026-10-20)
+
+- 기존 PostgreSQL 15·17 합성 보호 저장소의 읽기 후보에 **정확한 구매 Grant와 원본 Receipt의 현재 `verified` 상태**, active 회원, 원래 Thread·Turn·Reader 참여자, **본문이 없는 안전한 상태 마커**를 함께 요구했습니다.
+- 보호 Row의 복합 FK가 맞더라도 다른 일반 메시지를 안전 마커로 대체하면 거절합니다. 환불된 Receipt 아래에 Grant 상태가 오래된 `active`로 남은 합성 상태에서도 결과는 0건이며, 변경은 시험 트랜잭션에서 롤백합니다.
+- **격리 시험용 후보일 뿐 운영 조회 구현이 아닙니다.** 실제 보호 DB/암호화, 삭제 Worker·백업 복원, 모델 재주입 보호 API, Saju Production 출처, 최종 유료 T2 저장, 공개·운영 적용은 계속 HOLD입니다. 기존 migration과 개인정보 정책 정본은 변경하지 않습니다.

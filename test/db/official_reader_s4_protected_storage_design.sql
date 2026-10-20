@@ -94,9 +94,14 @@ create function official_reader_s4_fixture.count_current(
 with active_bundles as (
  select distinct a.reader_content_bundle_id
  from public.standard_reading_reader_access_grants a
- join public.entitlement_grants g on g.id=a.entitlement_grant_id
+ join public.entitlement_grants g
+   on g.id=a.entitlement_grant_id and g.subject_id=a.subject_id
+ join public.commerce_receipts cr
+   on cr.id=g.source_receipt_id and cr.subject_id=g.subject_id
  where a.subject_id=p_subject and a.official_reading_id=p_reading
   and a.reader_character_id=p_reader
+  and g.grant_source_type='purchase'
+  and cr.verification_status='verified'
   and g.status='active' and g.valid_from<=clock_timestamp()
   and (g.valid_until is null or clock_timestamp()<g.valid_until)
 ), uniquely_entitled as (
@@ -104,6 +109,21 @@ with active_bundles as (
  from active_bundles
 )
 select count(*) from official_reader_s4_fixture.protected_bodies b
+join public.subjects s
+ on s.id=b.subject_id and s.status='active'
+join public.conversation_messages m
+ on m.id=b.safe_message_id
+ and m.thread_id=b.synthetic_thread_id
+ and m.turn_id=b.synthetic_turn_id
+ and m.subject_id=b.subject_id
+ and m.sender_type='system'
+ and m.body_text='유료 해설 기록이 있습니다.'
+ and m.message_payload_jsonb is null
+join public.conversation_thread_characters c
+ on c.id=b.synthetic_participation_id
+ and c.thread_id=b.synthetic_thread_id
+ and c.character_id=b.reader_character_id
+ and c.content_bundle_id=b.reader_content_bundle_id
 cross join uniquely_entitled e
 where b.subject_id=p_subject and b.official_reading_id=p_reading
  and b.reader_character_id=p_reader and b.reader_content_bundle_id=p_bundle
@@ -237,6 +257,34 @@ begin
  raise exception 'FAIL S4 forged Chat marker accepted';
 end;
 $bad_message$;
+-- A valid foreign key to a message is NOT enough for safe-marker admission.
+-- The message must be a non-sensitive system marker for the same exact scope.
+insert into public.conversation_messages(
+ id,thread_id,subject_id,turn_id,sequence_no,sender_type,
+ body_text,message_payload_jsonb,content_hash,created_at
+) values (
+ 'd4500000-0000-4000-8000-000000000002',
+ 'd4300000-0000-4000-8000-000000000001',
+ '11390000-0000-0000-0000-000000000001',
+ 'd4100000-0000-4000-8000-000000000001',
+ 2,'system','합성 일반 상태 안내입니다.',null,
+ 'sha256:synthetic-s4-invalid-status-marker',clock_timestamp()
+);
+do $bad_existing_message$
+begin
+ begin
+  update official_reader_s4_fixture.protected_bodies
+     set safe_message_id='d4500000-0000-4000-8000-000000000002';
+ exception when check_violation then
+  raise notice 'PASS S4 FK-valid but non-marker Chat body denied';
+  return;
+ end;
+ raise exception 'FAIL S4 non-marker Chat text accepted as protected-content marker';
+end;
+$bad_existing_message$;
+delete from public.conversation_messages
+ where id='d4500000-0000-4000-8000-000000000002';
+
 select pg_temp.require_s4('exact Chat identity unchanged after negative probes',
  (select synthetic_attempt_id='d4200000-0000-4000-8000-000000000001'::uuid
      and safe_message_id='d4500000-0000-4000-8000-000000000001'::uuid
@@ -278,6 +326,22 @@ select pg_temp.require_s4('B2 surviving exact Grant permits scoped candidate',
  and official_reader_s4_fixture.count_current(
  '11390000-0000-0000-0000-000000000002','12103100-0000-0000-0000-000000000001',
  'test-unlockable-reader','11391000-0000-0000-0000-000000000001')=0);
+
+-- A revoked original Receipt must hide the body even if its Grant row
+-- has not caught up. The transaction is rolled back to preserve the fixture.
+begin;
+update public.commerce_receipts cr
+ set verification_status='revoked'
+from public.entitlement_grants g
+join public.standard_reading_reader_access_grants a
+ on a.entitlement_grant_id=g.id
+where cr.id=g.source_receipt_id
+ and a.purchase_intent_id='12192300-0000-0000-0000-000000000002'::uuid;
+select pg_temp.require_s4('revoked Receipt blocks stale active Grant',
+ official_reader_s4_fixture.count_current(
+ '11390000-0000-0000-0000-000000000001','12103100-0000-0000-0000-000000000001',
+ 'test-unlockable-reader','11391000-0000-0000-0000-000000000001')=0);
+rollback;
 
 update public.entitlement_grants g set status='active',revision=revision+1,
  last_effective_at=clock_timestamp(),updated_at=clock_timestamp()
@@ -344,4 +408,4 @@ select pg_temp.require_s4('synthetic protected rows, marker, attempt, turn, thre
  and not exists(select 1 from public.chat_turn_attempts where id='d4200000-0000-4000-8000-000000000001')
  and not exists(select 1 from public.chat_turns where id='d4100000-0000-4000-8000-000000000001')
  and not exists(select 1 from public.conversation_threads where id='d4300000-0000-4000-8000-000000000001'));
-\echo 'PASS S4 candidate: real Chat FK, exact Reader rights and child-first deletion'
+\echo 'PASS S4 candidate: exact Receipt + Grant + safe marker, Chat FK and child-first deletion'
