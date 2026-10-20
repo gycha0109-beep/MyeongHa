@@ -38,8 +38,14 @@ async function check(path, status, options = {}) {
   }
   if (response.status !== status) failures.push({path,reason:'http-status',expected:status,actual:response.status});
   for (const key of expected) {
-    if (response.headers.get(key) !== baseline.get(key)) failures.push({
-      path,reason:'security-header',header:key,expected:baseline.get(key),actual:response.headers.get(key),
+    const actual = response.headers.get(key);
+    // Cloudflare adds/replaces X-Robots-Tag with exactly "noindex" on
+    // Workers.dev Preview URLs (documented platform behavior).
+    // Keep the Vercel baseline exact on every other security header;
+    // never accept a missing indexing restriction.
+    const previewManagedRobots = key === 'x-robots-tag' && actual === 'noindex';
+    if (actual !== baseline.get(key) && !previewManagedRobots) failures.push({
+      path,reason:'security-header',header:key,expected:baseline.get(key),actual,
     });
   }
   if (response.headers.has('set-cookie')) failures.push({path,reason:'unexpected-cookie'});
