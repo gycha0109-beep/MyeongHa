@@ -45,8 +45,11 @@ export const SEYEON_CLOUDFLARE_OFFLINE_REVEAL_FENCE_V1 = Object.freeze({
 } as const);
 
 function validServerRequestId(requestId: unknown): requestId is string {
+  // The actual security observer issues crypto.randomUUID() values. A
+  // merely bounded string could be caller-supplied sensitive text and MUST
+  // NOT be copied into a public error's meta.requestId.
   return typeof requestId === 'string' &&
-    /^[a-zA-Z0-9_-]{1,100}$/u.test(requestId);
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(requestId);
 }
 
 function safeServerRequestId(requestId: unknown): string {
@@ -98,6 +101,18 @@ export function denySeyeonCloudflareFirstRevealBeforeProviderV1(
     throw new Error('SeYeon first Reveal authority contract changed.');
   }
   return fixedRevealHold(requestId);
+}
+
+/**
+ * A composed first POST offline seam: even a supplied handler that would
+ * perform expensive/unsafe work is NEVER evaluated. This is a separate
+ * ingress HOLD, not the final egress fence or future positive admission.
+ */
+export async function executeSeyeonCloudflareOfflineFirstRevealV1(input: Readonly<{
+  requestId: string;
+  executeProtectedCandidate: () => Response | Promise<Response>;
+}>): Promise<Response> {
+  return denySeyeonCloudflareFirstRevealBeforeProviderV1(input.requestId);
 }
 
 /**
