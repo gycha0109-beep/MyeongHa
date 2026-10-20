@@ -1,5 +1,8 @@
 import { randomUUID } from 'node:crypto';
-import { readBoundedUpstreamJsonTextV1 } from './upstream-json-response-resource.js';
+import {
+  awaitBoundedUpstreamJsonResponseHeadersV1,
+  readBoundedUpstreamJsonTextV1,
+} from './upstream-json-response-resource.js';
 import {
   createSeyeonAiCostEventV1,
   estimateSeyeonAiCallCostV1,
@@ -454,7 +457,7 @@ export function createOpenAiSeyeonStructuredProviderV1(
 
       let response: Response;
       try {
-        response = await fetchImpl(endpoint, {
+        response = await awaitBoundedUpstreamJsonResponseHeadersV1(fetchImpl(endpoint, {
           method: 'POST',
           headers: {
             accept: 'application/json',
@@ -465,7 +468,7 @@ export function createOpenAiSeyeonStructuredProviderV1(
           body: requestBody,
           redirect: 'error',
           signal: controller.signal,
-        });
+        }), controller.signal);
       } catch {
         clearTimeout(timer);
         await meter(timedOut ? 'timeout' : 'network_failure', null);

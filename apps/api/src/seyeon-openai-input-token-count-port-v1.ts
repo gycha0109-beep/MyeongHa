@@ -1,5 +1,6 @@
 import {
   readBoundedUpstreamJsonTextV1,
+  awaitBoundedUpstreamJsonResponseHeadersV1,
   UpstreamJsonResponseTooLargeV1,
 } from './upstream-json-response-resource.js';
 import type { SeyeonStructuredProviderRequestV2 } from './seyeon-character-runtime-v2.js';
@@ -37,48 +38,6 @@ function isRecord(x: unknown): x is Record<string, unknown> {
 }
 
 export const SEYEON_OPENAI_INPUT_TOKEN_COUNT_MAX_RESPONSE_BYTES_V1 = 8192 as const;
-
-/**
- * AbortSignal is advisory to fetch implementations. Own the header deadline
- * even when the transport ignores abort or a synthetic adapter never settles.
- * A response arriving after expiry must never authorize DB reservation.
- */
-function awaitCountResponseHeadersV1(
-  pending: Promise<Response>,
-  signal: AbortSignal,
-): Promise<Response> {
-  return new Promise<Response>((resolve,reject) => {
-    let finished = false;
-    const onAbort = (): void => {
-      if (finished) return;
-      finished = true;
-      signal.removeEventListener('abort',onAbort);
-      reject(new Error('Input token count header deadline exceeded.'));
-    };
-    signal.addEventListener('abort',onAbort,{once:true});
-    if (signal.aborted) onAbort();
-    void pending.then(
-      response => {
-        if (finished || signal.aborted) {
-          // Transport finished too late: discard the response body without
-          // ever promoting its token count to a cost reservation.
-          try { void response.body?.cancel().catch(() => undefined); }
-          catch { /* best-effort drain after a denied request */ }
-          return;
-        }
-        finished = true;
-        signal.removeEventListener('abort',onAbort);
-        resolve(response);
-      },
-      error => {
-        if (finished) return;
-        finished = true;
-        signal.removeEventListener('abort',onAbort);
-        reject(error);
-      },
-    );
-  });
-}
 
 const BODY_FIELDS = new Set([
   'model','store','max_output_tokens','instructions','input','text',
@@ -160,7 +119,7 @@ export function createSeyeonOpenAiInputTokenCountAdmissionV1(
       let result: Response;
       try {
         try {
-          result = await awaitCountResponseHeadersV1(send(SEYEON_OPENAI_INPUT_TOKEN_COUNT_ENDPOINT_V1,{
+          result = await awaitBoundedUpstreamJsonResponseHeadersV1(send(SEYEON_OPENAI_INPUT_TOKEN_COUNT_ENDPOINT_V1,{
             method:'POST',
             headers:{
               authorization:'Bearer '+config.apiKey,
