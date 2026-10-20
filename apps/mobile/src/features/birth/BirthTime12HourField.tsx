@@ -182,7 +182,7 @@ const styles = StyleSheet.create({
   minuteUnit: { color: mobileColors.muted, fontSize: 13, fontWeight: '800' },
   preview: { color: mobileColors.muted, fontSize: 12, lineHeight: 19 },
   overlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(6,15,26,0.6)' },
-  scrim: { ...StyleSheet.absoluteFillObject },
+  scrim: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 },
   modalSheet: {
     backgroundColor: mobileColors.canvas, borderTopLeftRadius: 24, borderTopRightRadius: 24,
     borderWidth: 1, borderColor: mobileColors.border, padding: 22, gap: 17,
