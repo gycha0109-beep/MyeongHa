@@ -95,7 +95,7 @@ export function BirthDateCalendar({
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <SafeAreaView style={styles.overlay}>
-        <Pressable accessibilityRole="button" accessibilityLabel="달력 닫기" onPress={onClose} style={styles.scrim} />
+        <Pressable accessibilityRole="button" accessibilityLabel={t('달력 닫기')} onPress={onClose} style={styles.scrim} />
         <View style={styles.sheet}>
           <View style={styles.topRow}>
             <View style={styles.heading}>
@@ -126,12 +126,12 @@ export function BirthDateCalendar({
             {step === 'year' ? (
               <>
                 <View style={styles.navRow}>
-                  <Pressable accessibilityRole="button" accessibilityLabel="10년 전" disabled={decade <= MIN_YEAR}
+                  <Pressable accessibilityRole="button" accessibilityLabel={t('10년 전')} disabled={decade <= MIN_YEAR}
                     onPress={() => setDecade((prev) => prev - 10)} style={styles.navButton}>
                     <Text style={styles.navText}>‹</Text>
                   </Pressable>
                   <Text style={styles.navTitle}>{decade}–{decade + 9}{yearUnit}</Text>
-                  <Pressable accessibilityRole="button" accessibilityLabel="10년 후" disabled={decade + 10 > todayYear}
+                  <Pressable accessibilityRole="button" accessibilityLabel={t('10년 후')} disabled={decade + 10 > todayYear}
                     onPress={() => setDecade((prev) => prev + 10)} style={styles.navButton}>
                     <Text style={styles.navText}>›</Text>
                   </Pressable>
@@ -166,7 +166,7 @@ export function BirthDateCalendar({
             ) : (
               <>
                 <View style={styles.navRow}>
-                  <Pressable accessibilityRole="button" accessibilityLabel="이전 달"
+                  <Pressable accessibilityRole="button" accessibilityLabel={t('이전 달')}
                     onPress={() => {
                       if (month === 1) { setYear((prev) => Math.max(MIN_YEAR, prev - 1)); setMonth(12); }
                       else setMonth((prev) => prev - 1);
@@ -175,7 +175,7 @@ export function BirthDateCalendar({
                     <Text style={styles.navText}>‹</Text>
                   </Pressable>
                   <Text style={styles.navTitle}>{year}{yearUnit} {month}{monthUnit} · {dateLabel}</Text>
-                  <Pressable accessibilityRole="button" accessibilityLabel="다음 달"
+                  <Pressable accessibilityRole="button" accessibilityLabel={t('다음 달')}
                     disabled={year >= todayYear && month === 12}
                     onPress={() => {
                       if (month === 12) { setYear((prev) => prev + 1); setMonth(1); }
