@@ -1737,10 +1737,10 @@ wait "$holder_pid" || { cat "$tmpdir/b8-c-first.out" >&2; fail "first C cancella
 holder_pid=""
 wait "$writer_pid" || { cat "$tmpdir/b8-c-replay.out" >&2; fail "same-event replay failed"; }
 writer_pid=""
-grep -q 'C_FIRST=official-reader-s2-revoke-dispatch-v1' "$tmpdir/b8-c-first.out" ||
- fail "first C provider event missed bound S1 path"
-grep -q 'C_REPLAY=official-reader-s2-revoke-dispatch-v1' "$tmpdir/b8-c-replay.out" ||
- { cat "$tmpdir/b8-c-replay.out" >&2; fail "replay missed bound S1 path"; }
+grep -q 'C_FIRST=official-reader-s2-unbound-grant-cancellation-v1' "$tmpdir/b8-c-first.out" ||
+ fail "first C provider event missed unbound verified Grant route"
+grep -q 'C_REPLAY=official-reader-s2-unbound-grant-cancellation-v1' "$tmpdir/b8-c-replay.out" ||
+ { cat "$tmpdir/b8-c-replay.out" >&2; fail "replay missed unbound verified Grant route"; }
 [[ "$(p -c "select count(*) from public.commerce_provider_events where external_event_id='myeongha:portone-v2:full-cancel:v1:b8-cancel-concurrent-c';")" == 1 ]] ||
  fail "duplicate verified event persisted twice"
 [[ "$(p -c "select count(*) from public.entitlement_events ev
