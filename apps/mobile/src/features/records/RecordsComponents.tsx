@@ -16,6 +16,7 @@ import {
 import { mobileColors } from '@/ui/mobile-colors';
 import { MobileUiText } from '@/ui/MobileUiText';
 import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
+import { useMobileUiLocale } from '@/ui/mobile-ui-locale';
 
 export const RECORDS_TABS_V1 = Object.freeze([
   { key: 'all', label: '전체' },
@@ -32,6 +33,7 @@ export function RecordsTabs({
   onSelect: (tab: RecordsTabV1) => void;
 }) {
   const styles = useMobileThemedStyles(staticStyles);
+  const { t } = useMobileUiLocale();
   return (
     <View style={styles.tabs}>
       {RECORDS_TABS_V1.map((tab) => (
@@ -43,7 +45,7 @@ export function RecordsTabs({
           style={[styles.tab, selected === tab.key && styles.tabSelected]}
         >
           <Text style={[styles.tabText, selected === tab.key && styles.tabTextSelected]}>
-            {tab.label}
+            {t(tab.label)}
           </Text>
         </Pressable>
       ))}
