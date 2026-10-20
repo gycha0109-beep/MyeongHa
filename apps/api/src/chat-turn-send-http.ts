@@ -1,14 +1,6 @@
 import { ApiCommandError } from './api-error.js';
-import {
-  AuthenticatedJsonRequestBodyTooLargeV1,
-  readAuthenticatedJsonRequestBodyV1,
-} from './authenticated-json-request-resource.js';
 import type { IdentityEvidenceVerificationPortV1 } from './current-subject-profile-http.js';
 import type { VerifiedSubjectIdentityEvidenceV1 } from './subject-identity-resolver.js';
-import {
-  createIngressRequestBodyCompletionDeadlineLeaseV1,
-  IngressRequestBodyCompletionDeadlineExceededV1,
-} from './ingress-request-body-deadline.js';
 import {
   OpenAiSeyeonStructuredProviderErrorV1,
 } from './openai-seyeon-structured-provider-v1.js';
@@ -21,14 +13,13 @@ import {
 } from './seyeon-production-chat-execution-v1.js';
 import { SeyeonProductionPinMigrationRequiredV1 } from './production-seyeon-chat-runtime-v1.js';
 import { registerSeyeonStaticPreflightDenialV1 } from './seyeon-vercel-fetch-reveal-fence-v1.js';
+import { preflightSeyeonChatTurnSendCoreV1 } from './seyeon-chat-turn-send-preflight-core-v1.js';
 import {
   assertSeyeonFirstHttpRevealAuthorizedV1,
   SeyeonFirstHttpRevealHoldV1,
 } from './seyeon-first-http-reveal-hold-v1.js';
 
 const POST_METHOD = 'POST' as const;
-const ROUTE_PREFIX = '/api/chat/' as const;
-const ROUTE_SUFFIX = '/turns' as const;
 const API_CONTRACT_VERSION = 'v0.9' as const;
 const NO_STORE = 'no-store' as const;
 
@@ -48,41 +39,6 @@ export interface HandleSeyeonChatTurnSendRequestInputV1 {
   readonly serverTime: string;
   readonly identityEvidenceVerifier: IdentityEvidenceVerificationPortV1;
   readonly runtime: Pick<ProductionSeyeonChatRuntimeV1, 'run'>;
-}
-
-type ParsedRouteV1 = Readonly<{ threadId: string }>;
-type ParsedBodyV1 = Readonly<{ clientTurnId: string; text: string }>;
-
-function isUuid(value: string): boolean {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(value);
-}
-
-function parseRoute(request: Request): ParsedRouteV1 | null {
-  const url = new URL(request.url);
-  if (url.search !== '' || url.hash !== '') return null;
-  if (!url.pathname.startsWith(ROUTE_PREFIX) || !url.pathname.endsWith(ROUTE_SUFFIX)) {
-    return null;
-  }
-  const raw = url.pathname.slice(ROUTE_PREFIX.length, -ROUTE_SUFFIX.length);
-  if (raw.length === 0 || raw.includes('/')) return null;
-  try {
-    const threadId = decodeURIComponent(raw);
-    return isUuid(threadId) ? Object.freeze({ threadId }) : null;
-  } catch {
-    return null;
-  }
-}
-
-function parseBody(value: unknown): ParsedBodyV1 | null {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
-  const record = value as Record<string, unknown>;
-  const keys = Object.keys(record).sort();
-  if (keys.length !== 2 || keys[0] !== 'clientTurnId' || keys[1] !== 'text') return null;
-  if (typeof record.clientTurnId !== 'string' || !isUuid(record.clientTurnId)) return null;
-  if (typeof record.text !== 'string') return null;
-  const text = record.text.trim();
-  if (text.length === 0 || text.length > 8000) return null;
-  return Object.freeze({ clientTurnId: record.clientTurnId, text });
 }
 
 function jsonError(input: {
@@ -273,20 +229,9 @@ function mapExecutionError(error: unknown, requestId: string): Response | null {
   return null;
 }
 
-async function readBody(request: Request): Promise<unknown> {
-  const deadline = createIngressRequestBodyCompletionDeadlineLeaseV1();
-  try {
-    return await readAuthenticatedJsonRequestBodyV1(request, {
-      waitForRead: (pending) => deadline.waitFor(pending),
-    });
-  } finally {
-    deadline.release();
-  }
-}
-
-// This is the SAME strict authentication + route + bounded JSON admission
-// used by both the still-blocked Vercel Fetch route and the unmounted direct
-// Node ServerResponse candidate. It cannot authorize any assistant Reveal.
+// All route/member/bounded-body decisions are shared with the Cloudflare
+// deny-only adapter. This Vercel wrapper maps the exact reason into the
+// existing registered-static 4xx envelope, retaining old HTTP behavior.
 export type SeyeonChatTurnSendPreflightResultV1 =
   | Readonly<{ kind: 'denied'; response: Response }>
   | Readonly<{
@@ -302,49 +247,45 @@ export async function preflightSeyeonChatTurnSendRequestV1(input: Readonly<{
   requestId: string;
   identityEvidenceVerifier: IdentityEvidenceVerificationPortV1;
 }>): Promise<SeyeonChatTurnSendPreflightResultV1> {
-  const parsedRoute = parseRoute(input.request);
-  if (parsedRoute === null) return {
-    kind: 'denied',
-    response: registerSeyeonStaticPreflightDenialV1(
-      new Response(null, { status: 404, headers: { 'Cache-Control': NO_STORE } }),
-    ),
-  };
-  if (input.request.method !== POST_METHOD) {
-    return { kind: 'denied', response: methodNotAllowed() };
-  }
-
-  const verifiedEvidence = await input.identityEvidenceVerifier.verifyRequestIdentity(input.request);
-  if (verifiedEvidence === null) {
-    return { kind: 'denied', response: jsonError({ status: 401, code: 'AUTH_REQUIRED', messageKey: 'auth.required', retryable: false, requestId: input.requestId }) };
-  }
-  if (verifiedEvidence.kind !== 'member') {
-    return { kind: 'denied', response: jsonError({ status: 403, code: 'FORBIDDEN', messageKey: 'chat.member_required', retryable: false, requestId: input.requestId }) };
-  }
-
-  let rawBody: unknown;
-  try {
-    rawBody = await readBody(input.request);
-  } catch (error) {
-    if (error instanceof AuthenticatedJsonRequestBodyTooLargeV1) {
-      return { kind: 'denied', response: jsonError({ status: 413, code: 'REQUEST_TOO_LARGE', messageKey: 'request.too_large', retryable: false, requestId: input.requestId }) };
-    }
-    if (error instanceof IngressRequestBodyCompletionDeadlineExceededV1) {
-      return { kind: 'denied', response: jsonError({ status: 408, code: 'REQUEST_BODY_TIMEOUT', messageKey: 'auth.request_body_timeout', retryable: false, requestId: input.requestId }) };
-    }
-    return { kind: 'denied', response: jsonError({ status: 400, code: 'INVALID_REQUEST', messageKey: 'request.invalid', retryable: false, requestId: input.requestId }) };
-  }
-
-  const body = parseBody(rawBody);
-  if (body === null) {
-    return { kind: 'denied', response: jsonError({ status: 400, code: 'INVALID_REQUEST', messageKey: 'request.invalid', retryable: false, requestId: input.requestId }) };
-  }
-  return Object.freeze({
-    kind: 'admitted',
-    verifiedEvidence,
-    threadId: parsedRoute.threadId,
-    clientTurnId: body.clientTurnId,
-    text: body.text,
+  const parsed = await preflightSeyeonChatTurnSendCoreV1({
+    request: input.request,
+    identityEvidenceVerifier: input.identityEvidenceVerifier,
   });
+  if (parsed.kind === 'admitted') return parsed;
+
+  switch (parsed.reason) {
+    case 'not_found':
+      return { kind: 'denied', response: registerSeyeonStaticPreflightDenialV1(
+        new Response(null, { status: 404, headers: { 'Cache-Control': NO_STORE } }),
+      ) };
+    case 'method_not_allowed':
+      return { kind: 'denied', response: methodNotAllowed() };
+    case 'auth_required':
+      return { kind: 'denied', response: jsonError({
+        status: 401, code: 'AUTH_REQUIRED', messageKey: 'auth.required',
+        retryable: false, requestId: input.requestId,
+      }) };
+    case 'forbidden':
+      return { kind: 'denied', response: jsonError({
+        status: 403, code: 'FORBIDDEN', messageKey: 'chat.member_required',
+        retryable: false, requestId: input.requestId,
+      }) };
+    case 'request_too_large':
+      return { kind: 'denied', response: jsonError({
+        status: 413, code: 'REQUEST_TOO_LARGE', messageKey: 'request.too_large',
+        retryable: false, requestId: input.requestId,
+      }) };
+    case 'request_body_timeout':
+      return { kind: 'denied', response: jsonError({
+        status: 408, code: 'REQUEST_BODY_TIMEOUT', messageKey: 'auth.request_body_timeout',
+        retryable: false, requestId: input.requestId,
+      }) };
+    case 'invalid_request':
+      return { kind: 'denied', response: jsonError({
+        status: 400, code: 'INVALID_REQUEST', messageKey: 'request.invalid',
+        retryable: false, requestId: input.requestId,
+      }) };
+  }
 }
 
 export async function handleSeyeonChatTurnSendRequestV1(
