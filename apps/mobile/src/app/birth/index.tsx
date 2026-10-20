@@ -27,6 +27,7 @@ import {
 import { mobileHomeControllerV1 } from '@/features/home/native-mobile-home-controller';
 import { mobileColors } from '@/ui/mobile-colors';
 import { MobileUiText } from '@/ui/MobileUiText';
+import { useMobileUiLocale } from '@/ui/mobile-ui-locale';
 import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
 import { useMobilePullRefreshV1 } from '@/ui/use-mobile-pull-refresh';
 
@@ -38,6 +39,7 @@ const sexOptions = [
 
 export default function BirthInputScreen() {
   const styles = useMobileThemedStyles(staticStyles);
+  const { t } = useMobileUiLocale();
   const [calendarType, setCalendarType] = useState<BirthCalendarTypeV1>('solar');
   const [year, setYear] = useState('');
   const [month, setMonth] = useState('');
