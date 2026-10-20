@@ -138,6 +138,9 @@ jobs:
       - name: Check Cloudflare static preview artifact
         if: needs.scope.outputs.web == 'true'
         run: node scripts/prepare-cloudflare-static.mjs && npm run verify:cloudflare:static
+      - name: Smoke local Cloudflare Worker runtime (no deploy)
+        if: needs.scope.outputs.web == 'true'
+        run: npm run verify:cloudflare:local
       - name: Check Mobile dependency
         if: needs.scope.outputs.mobile == 'true'
         run: npm run typecheck -w @myeongha/mobile
