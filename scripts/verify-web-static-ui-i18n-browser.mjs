@@ -101,6 +101,11 @@ try{
   await change('zh-TW');
   const zh=await evaluate('('+audit+')()');
   if(zh.locale!=='zh-TW'||zh.total||zh.attrTotal)failures.push({page:'auth.html',lang:'zh-TW',...zh});
+  for(const [file,selector] of pages){
+    await navigate(file,selector);
+    const result=await evaluate('('+audit+')()');
+    if(result.locale!=='zh-TW'||result.stored!=='zh-TW'||result.total||result.attrTotal)failures.push({page:file,lang:'zh-TW',...result});
+  }
   await navigate('reading.html','#saju-birth-form');
   const chineseFields=await evaluate('(()=>({lang:document.documentElement.lang,male:document.querySelector("#saju-birth-sex option[value=male]")?.textContent}))()');
   if(chineseFields.lang!=='zh-TW'||chineseFields.male!=='男性')failures.push({page:'reading.html',chineseFields});
@@ -108,6 +113,12 @@ try{
   const ko=await evaluate('(()=>({lang:document.documentElement.lang,male:document.querySelector("#saju-birth-sex option[value=male]")?.textContent}))()');
   if(ko.lang!=='ko-KR'||ko.male!=='남성')failures.push({page:'reading.html',ko});
   await change('ja-JP');
+  await send('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});
+  for(const [file,selector] of pages.filter(([file])=>['index.html','hall.html','reading.html','face-reading.html','chat-hub.html','auth.html','my.html'].includes(file))){
+    await navigate(file,selector);
+    const measure=await evaluate('(()=>({overflow:document.documentElement.scrollWidth-innerWidth,lang:document.documentElement.lang}))()');
+    if(measure.overflow>3||measure.lang!=='ja-JP')failures.push({page:file,viewport:'390px',...measure});
+  }
   await navigate('chat.html','.conversation-chat-panel');
   await evaluate('(()=>{const m=document.createElement("article");m.className="conversation-message";m.dataset.sender="user";m.textContent="사주";document.querySelector("[data-chat-stream]").append(m);const r=document.createElement("div");r.dataset.officialReading="";r.textContent="사주";document.body.append(r);})()');
   await sleep(150);
