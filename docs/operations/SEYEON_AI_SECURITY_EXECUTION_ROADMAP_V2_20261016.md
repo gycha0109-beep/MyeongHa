@@ -374,3 +374,10 @@ S8의 **비파괴/격리 검토는 S2~S7과 병렬 진행 가능**하며, S8 Pro
 - **수정:** 각 역할의 `allowedPurposes`를 서버 소유 역할 계약과 정확히 일치시킨다. Preflight는 `integrity_classification`/`disclosure_classification` 두 개, Interpreter는 `turn_interpretation`, Renderer는 `dialogue_render`, Reviewer는 `semantic_review`, Post-turn은 `event_extraction`만 승인한다. 누락과 불필요한 추가 권한 모두 **Pool·Provider 생성 전** 차단한다.
 - **합성 회귀:** 렌더러가 Post-turn, Interpreter가 Reviewer, Preflight가 Interpreter, Post-turn이 Chat 권한까지 허용한 잘못된 정책을 각각 거부한다. 올바른 4역할 설정은 유지한다.
 - **불변:** 실제 운영 비용/개인기록/Provider 호출·Production DB 변경 없음. G0 기술 승인 및 Production G1 양수/G2/G3/G4/G5/G6 HOLD, `Projectors=[]`, 공개/유료 OFF 유지.
+
+## 43. 2026-10-20 S6/G4 — 승인 비용·토큰·역할 정책의 부트스트랩 불변성 및 외부 계측 훅 차단 (비운영)
+
+- **발견:** Production Governor가 승인 입력의 `policy`, `priceQuote`, `allowedPurposes` 객체를 그대로 전달해 `Object.freeze`된 겉 객체 아래에서도 호출자가 원본 참조를 수정할 수 있었다. ENFORCE 설정은 `beforeDispatch`를 금지했지만 `observeMetric`/`meteredAfterOutcome` 주입은 거부하지 않아 서버 전용 비용 계측 경계가 모호했다.
+- **수정:** 네 Chat 역할 및 Post-turn의 Governor 생성 전에 검증된 역할 정책의 문자열·토큰·금액과 `allowedPurposes`/`priceQuote`를 별도 복제 후 동결한다. 동일 스냅샷을 Provider rate card와 공식 token-count Governor에 전달한다. 운영 native Provider 구성과 ENFORCE pre-activation에서 외부 계측 콜백을 모두 금지한다.
+- **합성 회귀:** 초기화 뒤 승인 원본의 허용 작업·개별 토큰 상한·단가·정책 버전을 변경해도 Chat/Post-turn Governor 및 Provider 설정이 바뀌지 않아야 한다. 중첩 승인 배열·단가 객체의 직접 변조도 거부한다. Chat 4역할 및 Post-turn 임의 계측 훅은 Provider/DB 접속 전 거부.
+- **불변:** 신규 SQL·운영 DDL/DML/ACL/마이그레이션 없음, 실 Provider 호출·운영 공개/유료 호출 없음. G0 기술 승인/D-04 미확정, Production G1 positive/G2/G3/G4/G5/G6 HOLD, Projectors=[], writeAdmission=DENY 유지. PR exact-head CI/Full Integration 및 main post-merge 기록 필요.

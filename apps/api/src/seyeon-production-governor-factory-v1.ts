@@ -25,6 +25,18 @@ const PURPOSES = Object.freeze({
   reviewer: ['semantic_review'],
 } as const);
 
+/** Snapshot trusted approval before it crosses the runtime/Provider boundary. */
+function pinApprovedPolicy(
+  source: SeyeonCostGovernorModelPolicyV1,
+): SeyeonCostGovernorModelPolicyV1 {
+  const approved = validateSeyeonCostGovernorModelPolicyV1(source);
+  return Object.freeze({
+    ...approved,
+    allowedPurposes: Object.freeze([...approved.allowedPurposes]),
+    priceQuote: Object.freeze({ ...approved.priceQuote }),
+  });
+}
+
 function bindNative(
   config: OpenAiSeyeonStructuredProviderConfigV1,
   policy: SeyeonCostGovernorModelPolicyV1,
@@ -35,6 +47,8 @@ function bindNative(
       config.origin !== undefined || config.fetchImpl !== undefined ||
       config.beforeDispatch !== undefined ||
       config.meteredBeforeDispatch !== undefined ||
+      config.meteredAfterOutcome !== undefined ||
+      config.observeMetric !== undefined ||
       (config.maxOutputTokens !== undefined &&
        config.maxOutputTokens !== p.maximumOutputTokens) ||
       p.allowedPurposes.length !== purposes.length ||
@@ -84,8 +98,9 @@ export function createSeyeonProductionChatGovernorsV1(input: {
   const configs = {} as Record<SeyeonGovernorChatRoleV1, OpenAiSeyeonStructuredProviderConfigV1>;
   const admission = {} as Record<SeyeonGovernorChatRoleV1, SeyeonAiGovernorAdmissionV1>;
   for (const role of SEYEON_GOVERNOR_CHAT_ROLES_V1) {
-    const policy = approval.policies[role];
-    if (policy === undefined) throw new Error('Production Governor requires all four approved role policies.');
+    const suppliedPolicy = approval.policies[role];
+    if (suppliedPolicy === undefined) throw new Error('Production Governor requires all four approved role policies.');
+    const policy = pinApprovedPolicy(suppliedPolicy);
     const config = bindNative(
       input.roleProviderConfigs?.[role] ?? input.baseProviderConfig,
       policy, PURPOSES[role],
@@ -120,11 +135,12 @@ export function createSeyeonProductionPostTurnGovernorV1(input: {
   providerConfig: OpenAiSeyeonStructuredProviderConfigV1;
   costGovernor: SeyeonAiGovernorAdmissionV1;
 }> {
-  const config = bindNative(input.providerConfig, input.policy, ['event_extraction']);
+  const policy = pinApprovedPolicy(input.policy);
+  const config = bindNative(input.providerConfig, policy, ['event_extraction']);
   return Object.freeze({
     providerConfig: config,
     costGovernor: createSeyeonOpenAiInputTokenCountAdmissionV1({
-      apiKey: config.apiKey, model: config.model, policy: input.policy,
+      apiKey: config.apiKey, model: config.model, policy,
       reservedHeadroomTokens: input.reservedHeadroomTokens,
       ...(input.timeoutMs === undefined ? {} : { timeoutMs: input.timeoutMs }),
     }),
