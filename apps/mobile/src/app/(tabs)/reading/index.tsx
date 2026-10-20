@@ -19,6 +19,7 @@ import { SajuPreviewReadingView } from '@/features/saju/SajuPreviewReadingView';
 import { SajuEditorialSummary } from '@/features/saju/SajuEditorialSummary';
 import { createMobileSajuViewModelV1 } from '@/features/saju/saju-view-model';
 import { MobileScreen } from '@/ui/MobileScreen';
+import { useMobileUiLocale } from '@/ui/mobile-ui-locale';
 import { MobileUiText } from '@/ui/MobileUiText';
 import { mobileColors } from '@/ui/mobile-colors';
 import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
@@ -43,6 +44,7 @@ function errorCopy(state: Exclude<MobileSajuLoadStateV1, { kind: 'birth_required
 
 export default function SajuScreen() {
   const styles = useMobileThemedStyles(staticStyles);
+  const { t } = useMobileUiLocale();
   const [state, setState] = useState<ScreenState>({ kind: 'loading' });
   const [presentationReader, setPresentationReader] = useState<MobileReaderPresentationIdV1>('seyeon');
 
@@ -74,10 +76,10 @@ export default function SajuScreen() {
   return (
     <MobileScreen
       eyebrow="READING"
-      title="사주"
+      title={t('사주')}
       refreshing={refreshing}
       onRefresh={() => void onRefresh()}
-      description="태어난 순간의 이야기를 바탕으로 나의 명식을 알아보세요."
+      description={t('태어난 순간의 이야기를 바탕으로 나의 명식을 알아보세요.')}
     >
       <ReadingSubnav />
 
