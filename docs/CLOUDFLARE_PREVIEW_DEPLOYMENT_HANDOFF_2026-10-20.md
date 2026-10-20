@@ -1,80 +1,51 @@
-# Cloudflare 실제 프리뷰 배포 핸드오프 (2026-10-20)
+# Cloudflare 프리뷰 배포·실측 검증 결과 (2026-10-20)
 
-## 2026-10-20 실제 클라우드 프리뷰 실행 결과 (최신 기록)
+## 현재 기준
 
-- 사용자 계정에서 직접 `myeongha` Worker와 Cloudflare GitHub 연동을 설정함. 기존 프로젝트 재생성 없음.
-- 최초 Cloudflare `main` 빌드는 `Missing script: "build:cloudflare:static"`로 실패: Cloudflare 빌드 대상 `main`에 이관 PR 코드가 없었기 때문임.
-- 이관 작업 브랜치에서 `wrangler.jsonc`의 Worker 이름을 **`myeongha`**로 변경. 프리뷰 명령이 요구한 `"previews": {}`도 추가.
-- Cloudflare Preview 빌드 `de9adc92-a753-454c-91b8-33578dadf683`: HTML 11개, 정적 파일 185개 생성과 `wrangler preview` 배포 단계 성공.
-- 프리뷰만 접근하도록 `/workers/scripts/myeongha/subdomain`에서 `enabled=false`, `previews_enabled=true` 적용.
-- Cloudflare Workers API가 반환한 실제 프리뷰 주소: **https://feat-ops-cloudflare-static-preview-20261020-myeongha.gycha0109.workers.dev**
-- Cloudflare Workers Preview `deployed_on=2026-10-20T08:46:32Z`. **Cloudflare API 배포 확인 완료**, 다만 현재 도구에서 프리뷰 URL DNS 조회에 실패하므로 **원격 HTTP 응답, CSP parity, 브라우저 화면에 대한 실측은 미완료**.
-- DNS/운영 도메인/Vercel/DB/결제/시크릿 변경 없음. PR은 draft/미병합.
-- 아래 '배포 이전 단계'의 일부 정보(Worker 0개, 연동 실패, 프로젝트 이름 `myeongha-static-preview`)는 **이전 시점 기록이며 현재 상태가 아님**. 현재 원격 Worker 이름은 `myeongha`.
+- Cloudflare Worker 프로젝트: **`myeongha`**. 본 이관의 정식 프로젝트 이름이며 다시 만들지 않는다.
+- 배포 출처: `gycha0109-beep/MyeongHa` / `feat/ops/cloudflare-static-preview-20261020` ([구현 PR #2384](https://github.com/gycha0109-beep/MyeongHa/pull/2384), **Draft/미병합**).
+- 실제 배포 프리뷰: **https://feat-ops-cloudflare-static-preview-20261020-myeongha.gycha0109.workers.dev**
+- Cloudflare `workers.dev` 운영용 경로: **disabled** (`enabled=false`); **preview only** (`previews_enabled=true`). 운영 DNS/Vercel/Supabase/AI/PortOne 미변경.
+- Cloudflare 빌드 설정: `npm run build:cloudflare:static`; 작업 브랜치 Preview는 `npx wrangler preview`. 프리뷰는 **정적 화면 + API deny-only**이며 실제 기능 API를 사용할 수 없다.
 
+## 실행 이력과 원인
 
-> 작업 저장소: `gycha0109-beep/MyeongHa`  
-> 대상 구현: [PR #2384](https://github.com/gycha0109-beep/MyeongHa/pull/2384) (`feat/ops/cloudflare-static-preview-20261020`, **draft, 미병합**)  
-> 참조 설계: [PR #2381](https://github.com/gycha0109-beep/MyeongHa/pull/2381) (미병합)  
-> 상태: **GitHub CI의 Wrangler workerd 로컬 검증 PASS. Cloudflare 실제 프리뷰 배포 불가 — 계정 GitHub 연결 및 workers.dev 미초기화.**
+1. Cloudflare 초기 `main` 빌드 `b969abc1`: `npm run build:cloudflare:static` 스크립트가 `main`에 아직 없어 실패. **이관 PR을 운영 `main`에 병합하지 않는다.**
+2. 작업 브랜치 `wrangler.jsonc`를 Cloudflare Worker `myeongha` 이름에 정렬하고 `"previews": {}`를 추가: 프리뷰 전용 배포 성공.
+3. `workers.dev` 프리뷰 URL만 활성화하고 운영 경로는 계속 차단함.
+4. Cloudflare API에서 Worker Preview URL 및 배포 기록 확인. 이후 GitHub Actions 기반의 **실제 원격 HTTP + Headless Chrome** 검증 추가.
+5. 처음 원격 검사에서 `X-Robots-Tag`가 21개 응답 모두 **`noindex`**로 나옴. 이는 Workers.dev 프리뷰에 Cloudflare가 자동 적용하는 값으로 [공식 문서](https://developers.cloudflare.com/workers/previews/custom-domains/#protect-preview-content)에서 확인. **Vercel 보안 정책 변경 없이** 원격 프리뷰에서만 이 동작을 허용하도록 검사 수정.
+6. 최신 원격 실측 [GitHub Actions 성공 실행 39431693825](https://github.com/gycha0109-beep/MyeongHa/actions/runs/39431693825), 커밋 `a3fab7efa2c494d707c010f320fdf8e46aac37fe`:
+   - 원격 HTTPS 요청 **21개 PASS, 실패 0건**.
+   - `GET /` 및 HTML **11개 모두 HTTP 200**, MIME/기본 HTML 형태 확인.
+   - Vercel 기준 CSP, Referrer-Policy, X-Content-Type-Options, X-Frame-Options parity 및 Preview 강제 `noindex` 확인.
+   - HTML/no-store, API/no-store, `Set-Cookie` 부재 확인.
+   - 존재하지 않는 경로 및 미이관 API `404`, 응답 본문 비공개.
+   - `POST /api/chat/synthetic-thread-id/turns` `503 SEYEON_FIRST_REVEAL_AUTHORITY_UNAVAILABLE`; GET 같은 경로 `404`.
+   - 실제 Chrome 브라우저에서 **11개 HTML 페이지의 DOM 렌더링 성공**, 실패 0건.
+7. 별도 Web PR Domain Gates에 기존 일본어/중국어 테마 접근성 레이블 `밤 화면으로 전환` 번역 누락이 있어 코드·단위 테스트 보강. 해당 수정의 최종 CI 결과는 정확한 최신 PR SHA로 별도 확인할 것.
 
-## 1. 실제 Cloudflare API 확인 결과
+## 검증 범위와 제외 범위
 
-2026-10-20 Cloudflare 연결된 사용자 계정에 읽기/쓰기 API로 확인한 결과:
-
-- Workers script: **0개** (Cloudflare REST `GET /accounts/{account_id}/workers/scripts` 성공).
-- Workers Builds 토큰: **0개** (`GET /accounts/{account_id}/builds/tokens` 성공).
-- `workers.dev` 계정 서브도메인: **없음** (`GET /accounts/{account_id}/workers/subdomain`: 404/10007, Cloudflare의 최초 Workers & Pages 페이지 진입 안내).
-- `gycha0109-beep/MyeongHa` GitHub 저장소 연결 시도: `PUT /accounts/{account_id}/builds/repos/connections`에서 **404/8000008 Git account disconnected**, 저장소 연결 미생성.
-- `GET /accounts/{account_id}/builds/account/limits`: build minutes 제한 소진 아님.
-- 따라서 실제 Worker 생성/배포/원격 URL 획득/HTTP 실측은 **수행되지 않았음**. 외부 DNS/Vercel/결제/secret 변경 0.
-
-위 장애는 빌드 코드 실패가 아니라 **Cloudflare 계정 최초 초기화 + Cloudflare GitHub App 계정 승인**에 필요한 절차임. 승인 없이 API로 GitHub App 설치를 대신하거나 거짓 성공을 기록하지 않는다.
-
-## 2. 사용자 계정에서 반드시 필요한 최초 작업(1회)
-
-Cloudflare 대시보드 [Workers & Pages](https://dash.cloudflare.com/?to=/:account/workers-and-pages)에 진입해 해당 계정의 Workers 화면을 열어 `workers.dev` 서브도메인을 초기화한다. 도메인 이름은 운영 도메인에 영향을 주지 않는 계정 전용 이름을 선택한다.
-
-이어서 Cloudflare의 Worker **Settings → Builds → Connect → GitHub** 또는 **Create application → Import Git repository → GitHub** 경로를 열어 **Cloudflare Workers and Pages GitHub App** 설치/연동을 승인하고, 저장소 접근 대상에 **`gycha0109-beep/MyeongHa`만 선택**한다. 이는 계정/리포지터리 OAuth/App 설치 동의이므로 사용자가 GitHub/Cloudflare UI에서 직접 수행해야 한다. GitHub 앱 설치 상태는 [GitHub 설치 관리](https://github.com/settings/installations)에서 확인할 수 있다.
-
-계정 초기화/앱 설치 전에는 자동 Build 토큰 발급 및 저장소 연결이 실패할 수 있으며, 민감 정보를 챗/커밋에 복사하지 않는다.
-
-## 3. 배포 설정(초기화 완료 후 적용)
-
-| 항목 | 값 / 제한 |
+| 경계 | 현재 결과 |
 |---|---|
-| Workers 이름 | `myeongha-static-preview` (기존 `wrangler.jsonc` 일치 필수) |
-| 저장소 | `gycha0109-beep/MyeongHa` |
-| 소스 / 검증 브랜치 | `feat/ops/cloudflare-static-preview-20261020` |
-| 빌드 환경 | Node 24 |
-| 설치 | `npm ci --ignore-scripts --no-audit --no-fund` |
-| Build 명령 | `npm run build:cloudflare:static` |
-| Preview 명령 | `npx --yes wrangler@4.151.2 preview` |
-| 실제 운영 Deploy | **비활성 / HOLD**. `wrangler deploy`를 이관 완료 전 실행하지 않음 |
-| 배포 설정 | 루트 `wrangler.jsonc` / `public/` Static Assets |
-| 프리뷰 노출 | 필요 시 계정의 Access로 제한하고 외부 공개 전 404/503 deny 확인 |
-| 시크릿 및 변수 | 0개 (Supabase/PortOne/OpenAI/Saju 비연결) |
-| DNS, Vercel Production | 변경 금지 |
-| 결제/Reader/세연 first Reveal | 보안 게이트 지속 HOLD |
+| Cloudflare 계정 및 GitHub 연동 | 완료 |
+| Cloudflare 프리뷰 배포 | 완료 |
+| 원격 HTTP 21개 검사 | PASS |
+| Chrome 실제 화면 11개 진입·렌더링 | PASS |
+| Worker 로컬 런타임 `wrangler dev` 4.151.2 | PASS (이전 CI) |
+| 인증/DB/API 실제 이관 | **미착수** |
+| 사주 producer/관상 업로드/AI/결제 운영 | **미승인·비활성** |
+| 로그인·회원 개인정보·전체 사용자 흐름 E2E | **미검증** (의도적 API 차단) |
+| Vercel 운영 DNS 전환 | **미실행** |
+| 실제 접근 제어(Cloudflare Access) | **OFF**, 프리뷰 URL 외부 공개 상태 (데이터/API 없음) |
+| 기존 GitHub Web Domain Gate | 테마 i18n 누락 수정을 추가했으며 최신 CI 추적 필요 |
 
-**주의:** Workers Builds의 'production branch'는 해당 Cloudflare 프리뷰 전용 프로젝트에서도 Production 배포를 유발한다. 실제 계정 연결 직후 자동배포를 허용하지 말고 프리뷰 브랜치 동작/배포 명령을 검토한다. GitHub PR을 기존 Vercel 운영에 병합하지 않는다.
+## 다음 단계
 
-## 4. 검증에 쓰는 GitHub CI의 확정 결과
+1. GitHub PR 최신 SHA에서 Cloudflare 원격 HTTP·Chrome, 기존 CI 및 Web Domain Gate의 결과를 추적해 단일 PASS 여부를 확인한다.
+2. [설계/로드맵 PR #2381](https://github.com/gycha0109-beep/MyeongHa/pull/2381)의 순서에 따라 **기본 라우터와 Health 기능의 격리 이관**을 별도 승인·회귀 경계 아래 진행한다.
+3. 인증·DB, 사주·관상, AI·결제는 상호 분리된 단계로 이관하고 운영 트래픽 전환 전에 회귀/보안/데이터 승인 절차를 거친다.
+4. 새 Worker를 만들거나 `main`에 프리뷰 구현을 병합해 운영 배포하지 않는다.
 
-- `npm run build:web` 이후 `scripts/prepare-cloudflare-static.mjs`와 `verify-cloudflare-static.mjs`: HTML 11개, 정적 파일 185개, 최대 281,150 byte, CSP 파생·`_redirects` 생성과 파일 크기 경계 PASS.
-- `wrangler dev` **4.151.2**, 로컬 workerd 실제 HTTP smoke: HTML 11개 PASS, 미이관 API `404`, `POST /api/chat/:id/turns` **503** 및 고정 error code PASS.
-- Cloudflare 전체 시스템/원격 라우팅/실사용 브라우저 성능/원격 worker preview 검증은 **미수행**.
-- 기존 `Web PR Domain Gates` 실패는 일본어/중국어 `aria-label`에 남은 한국어 `밤 화면으로 전환`에 기인. 이관 프리뷰와 무관한 기존 웹 i18n 문제로 별도 수정을 요함.
-
-## 5. 원격 프리뷰가 생긴 뒤 실측해야 하는 항목
-
-1. Cloudflare에서 실제 발급한 **프리뷰 URL**을 공식 UI/API로 취득하여 기록. URL을 추측해 만들지 않는다.
-2. HTML 11개: 200, content-type HTML, CSP/Vercel parity, `X-Robots-Tag=noindex`, 보안 헤더.
-3. `GET /`: 200/HTML, `/missing-page.html`: **404, SPA fallback 200 금지**.
-4. `GET /api/health`, `GET /api/unknown`, `POST /api/auth/sign-in`: **404**. 기능적 API가 아직 없는 프리뷰다.
-5. `POST /api/chat/synthetic-thread/turns`: **503 SEYEON_FIRST_REVEAL_AUTHORITY_UNAVAILABLE**; response body에 assistant 생성 결과 없음.
-6. 일반 브라우저 console/network에서 secret, 외부 API, Set-Cookie, 로그인 정보, 미승인 캐시 노출 없음 확인.
-7. 원격 배포 artifact 기준 파일 수/크기/Worker CPU·요청 수 점검 후 새 기능을 한 엔드포인트씩 gate 검증.
-8. 이관 실패 시 **프리뷰만 폐기 가능**, Vercel Production/DB/도메인 원상태 유지.
-
-공식 근거: [Workers Builds](https://developers.cloudflare.com/workers/ci-cd/builds/), [Workers Builds API prerequisites](https://developers.cloudflare.com/workers/ci-cd/builds/api-reference/), [workers.dev 서브도메인](https://developers.cloudflare.com/workers/configuration/routing/workers-dev/), [Preview](https://developers.cloudflare.com/workers/previews/).
+참고: [Workers Builds](https://developers.cloudflare.com/workers/ci-cd/builds/) · [Previews](https://developers.cloudflare.com/workers/previews/) · [Workers.dev 프리뷰 noindex](https://developers.cloudflare.com/workers/previews/custom-domains/#protect-preview-content).
