@@ -1,5 +1,16 @@
 # Cloudflare 프리뷰 배포·실측 검증 결과 (2026-10-20)
 
+## 로드맵 4단계 후속 실행 증거 (API Health/라우터)
+
+- **추가한 공개 경로는 단 하나:** `GET /api/health → 200 {"status":"ok"}` (DB·Auth·Saju·AI와 무관한 정적 liveness).
+- health의 POST/PUT/DELETE/OPTIONS/HEAD: `405 Allow: GET`, `Cache-Control: no-store`; query marker/URL 변형은 404로 거부.
+- **`/api/readiness`와 사설 Postgres TLS Canary는 GET/POST 포함 모두 404 HOLD**, 인증·회원 데이터/기록/사주 계산도 404.
+- Vercel 12 직접 API 경로와 17 재작성 경로를 `workers/cloudflare-api-router.mjs`에서 1:1 매칭하고 내부 query marker 위조·중복값을 handler로 전달하지 않음. 세연 최초 `POST /api/chat/:threadId/turns`는 503 HOLD 유지.
+- 원격 [Cloudflare Preview HTTP/Chrome 실행 #39436910190](https://github.com/gycha0109-beep/MyeongHa/actions/runs/39436910190): 실제 HTTPS **55개 요청 PASS, 실패 0**, Chrome 11개 화면 PASS. `GET /api/health` 200, 나머지 메서드 405, readiness 404, 세연 503 확인.
+- 기존 `workers.dev` 운영용 경로는 계속 **비활성화**; Preview URL만 활성화. PR Draft/미병합.
+- **다음 단계 5:** Auth/DB 격리 이관. Security/API/DB 승인 및 secret·OAuth callback·RLS/TLS 검증 전에는 보호된 positive API 허용 금지.
+
+
 ## 현재 기준
 
 - Cloudflare Worker 프로젝트: **`myeongha`**. 본 이관의 정식 프로젝트 이름이며 다시 만들지 않는다.
@@ -43,7 +54,7 @@
 
 ## 다음 단계
 
-1. GitHub PR 최신 SHA에서 Cloudflare 원격 HTTP·Chrome, 기존 CI 및 Web Domain Gate의 결과를 추적해 단일 PASS 여부를 확인한다.
+1. 최신 SHA에서 원격 55개 HTTP / Chrome 11개 / 전체 CI·Governance·Mobile·Web 검사를 확인하고 기술 증거를 고정한다.
 2. [설계/로드맵 PR #2381](https://github.com/gycha0109-beep/MyeongHa/pull/2381)의 순서에 따라 **기본 라우터와 Health 기능의 격리 이관**을 별도 승인·회귀 경계 아래 진행한다.
 3. 인증·DB, 사주·관상, AI·결제는 상호 분리된 단계로 이관하고 운영 트래픽 전환 전에 회귀/보안/데이터 승인 절차를 거친다.
 4. 새 Worker를 만들거나 `main`에 프리뷰 구현을 병합해 운영 배포하지 않는다.
