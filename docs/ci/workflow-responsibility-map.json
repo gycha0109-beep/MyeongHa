@@ -475,6 +475,12 @@
       "prMode": "none",
       "mainMode": "one-shot-trigger",
       "workTrackAttribution": "commit-metadata"
+    },
+    "seyeon-openrouter-gptoss120b-three-call-n01-v1.yml": {
+      "responsibility": "character-memory-bounded-real-model-evaluation",
+      "prMode": "none",
+      "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "commit-metadata"
     }
   }
 }
