@@ -71,7 +71,8 @@
     "verify:mobile-export-artifacts": "node scripts/verify-mobile-export-artifacts.mjs",
     "verify:mobile-push-activation-readiness": "node scripts/verify-mobile-push-activation-readiness.mjs",
     "verify:mobile-push-activation-readiness-contract": "node scripts/verify-mobile-push-activation-readiness.mjs --allow-blocked",
-    "verify:mobile-android-physical-smoke-readiness": "node scripts/verify-mobile-android-physical-smoke-readiness.mjs"
+    "verify:mobile-android-physical-smoke-readiness": "node scripts/verify-mobile-android-physical-smoke-readiness.mjs",
+    "verify:cloudflare:local": "node scripts/verify-cloudflare-wrangler-local.mjs"
   },
   "dependencies": {
     "@vercel/oidc": "3.2.0",
