@@ -107,7 +107,8 @@ describe('Cloudflare static-only deployment boundary', () => {
     await writeCloudflareStaticHeaders({ cwd: folder });
     const verified = await verifyCloudflareStaticArtifact({ cwd: folder });
     expect(verified.entryCount).toBe(11);
-    expect(verified.fileCount).toBe(12);
+    expect(verified.fileCount).toBe(13);
+    expect(await readFile(join(publicDir, '_redirects'), 'utf8')).toBe('/ /index.html 200\n');
     await writeFile(join(publicDir, '_headers'), '/*\n  X-Frame-Options: DENY\n');
     await expect(verifyCloudflareStaticArtifact({ cwd: folder })).rejects.toThrow();
   });
