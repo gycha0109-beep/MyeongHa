@@ -152,7 +152,7 @@ begin
     where id='d4810000-0000-4000-8000-000000000001'::uuid)
     or not exists(select 1 from public.subjects
     where id='11390000-0000-0000-0000-000000000001'::uuid
-      and status='active')
+      and kind='guest' and status='active')
  then raise exception 'S4 synthetic completed-state transaction leaked after rollback'; end if;
  raise notice 'PASS S4 completed-state rehearsal rolled back, restored backup still blocked';
 end
