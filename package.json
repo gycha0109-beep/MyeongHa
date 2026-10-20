@@ -73,7 +73,8 @@
     "verify:mobile-push-activation-readiness-contract": "node scripts/verify-mobile-push-activation-readiness.mjs --allow-blocked",
     "verify:mobile-android-physical-smoke-readiness": "node scripts/verify-mobile-android-physical-smoke-readiness.mjs",
     "verify:cloudflare:local": "node scripts/verify-cloudflare-wrangler-local.mjs",
-    "verify:cloudflare:auth-db:local": "node scripts/verify-cloudflare-auth-db-local.mjs"
+    "verify:cloudflare:auth-db:local": "node scripts/verify-cloudflare-auth-db-local.mjs",
+    "test:cloudflare:scope": "node node_modules/vitest/vitest.mjs run test/cloudflare-request-subject-scope.test.ts"
   },
   "dependencies": {
     "@vercel/oidc": "3.2.0",
