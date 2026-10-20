@@ -103,4 +103,36 @@ describe('Mobile / Web UI localization parity', () => {
     expect(sourceCopy).toContain('export function translateMobileUiCopy');
     expect(sourceCopy).not.toContain('fetch(');
   });
+
+  it('translates audited native-only screen guidance and accessible controls without touching private data', async () => {
+    for (const sourceText of [
+      '얼굴에 담긴 이야기를 만나기 위한 첫 단계, 사진부터 준비해 보세요.',
+      '저마다 다른 목소리로, 당신의 이야기를 들어줄 대리자들을 만나보세요.',
+      '나의 계정과 이야기, 설정을 살펴보세요.',
+      '태어난 순간의 이야기를 바탕으로 나의 명식을 알아보세요.',
+      '달력 닫기',
+      '10년 전',
+      '이전 달',
+      '전면 카메라로 정면 사진 촬영',
+      '선택한 Reader와 전체 사주 읽기 시작',
+      '근거·상세 보기 ▼',
+    ]) {
+      expect(translateMobileUiCopy(sourceText, 'ja-JP')).not.toBe(sourceText);
+      expect(translateMobileUiCopy(sourceText, 'zh-TW')).not.toBe(sourceText);
+    }
+    expect(formatMobileUiCopy('{reader}에게 보여줄 사진', { reader: '세연' }, 'ja-JP'))
+      .toBe('セヨンに見せる写真'.replace('セヨン', '세연'));
+    const [calendar, face, scene, composer] = await Promise.all([
+      source('apps/mobile/src/features/birth/BirthDateCalendar.tsx'),
+      source('apps/mobile/src/app/(tabs)/reading/face.tsx'),
+      source('apps/mobile/src/app/reading/scene.tsx'),
+      source('apps/mobile/src/features/chat/ChatReadComponents.tsx'),
+    ]);
+    expect(calendar).toContain("accessibilityLabel={t('달력 닫기')}");
+    expect(face).toContain("accessibilityLabel={t('전면 카메라로 정면 사진 촬영')}");
+    expect(scene).toContain("t('근거')");
+    expect(scene).toContain('{currentStep.primary}');
+    expect(composer).toContain('SEYEON_HISTORY_REVEAL_HOLD');
+  });
+
 });
