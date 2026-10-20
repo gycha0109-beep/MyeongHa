@@ -1981,10 +1981,7 @@ pass "distinct B bound and C unbound verified events serialize and replay with n
 # purchase advisory -> Reader S1 before its first mutation; the verified
 # PortOne cancellation must wait and then revoke only E.
 b8_receipt_e='12192000-0000-0000-0000-000000000012'
-p >"$tmpdir/b8-e-verified-receipt-seed.out" 2>&1 <<SQL || {
- cat "$tmpdir/b8-e-verified-receipt-seed.out" >&2
- fail "new verified sibling E Receipt seed failed"
-}
+if ! p >"$tmpdir/b8-e-verified-receipt-seed.out" 2>&1 <<SQL
 begin;
 insert into public.commerce_payment_attempts(
  id,purchase_intent_id,subject_id,product_offer_id,attempt_no,
@@ -2011,6 +2008,10 @@ select '$b8_receipt_e'::uuid,subject_id,'$b8_intent'::uuid,product_offer_id,
 from public.commerce_receipts where id='$b8_receipt_c'::uuid;
 commit;
 SQL
+then
+ cat "$tmpdir/b8-e-verified-receipt-seed.out" >&2
+ fail "new verified sibling E Receipt seed failed"
+fi
 [[ "$(p -c "select count(*) from public.entitlement_grants
  where source_receipt_id='$b8_receipt_e'::uuid;")" == 0 ]] ||
  fail "E verified receipt must be unissued before overlap"
