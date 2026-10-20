@@ -7,6 +7,7 @@ import type {
   MobileHomeTodayCardV1,
 } from '@/features/home/home-view-model';
 import { mobileColors } from '@/ui/mobile-colors';
+import { MobileUiText } from '@/ui/MobileUiText';
 import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
 
 export function HomeBrandHeader({
@@ -24,7 +25,7 @@ export function HomeBrandHeader({
           <Text style={styles.brandMarkText}>命</Text>
         </View>
         <View>
-          <Text style={styles.brandName}>명하</Text>
+          <MobileUiText style={styles.brandName}>명하</MobileUiText>
           <Text style={styles.brandRoman}>MYEONGHA</Text>
         </View>
       </View>
@@ -200,7 +201,7 @@ export function HomeReadingTopics({
       <View style={styles.sectionHeading}>
         <View>
           <Text style={styles.sectionKicker}>READING</Text>
-          <Text style={styles.sectionTitle}>사주 읽기 주제</Text>
+          <MobileUiText style={styles.sectionTitle}>사주 읽기 주제</MobileUiText>
         </View>
         <Pressable
           accessibilityRole="button"
