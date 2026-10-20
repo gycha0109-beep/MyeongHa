@@ -187,7 +187,13 @@ case "$case_name" in
     bash test/db/official_reader_provider_effect_revoke_race_preflight.sh
     ;;
   official-reader-s2-atomic-receipt-bind)
-    apply_standard_migrations
+    version_num="$(psql -Atqc 'show server_version_num')"
+    if [[ "$version_num" -ge 170000 ]]; then
+      verify_pg17
+      apply_pg17_migrations_without_birth_authority
+    else
+      apply_standard_migrations
+    fi
     bash test/db/official_reader_s2_atomic_receipt_bind_live_writer_race.sh
     ;;
   records-production-read-authority)
