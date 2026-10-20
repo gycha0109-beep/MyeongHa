@@ -118,6 +118,7 @@ async function exchange(input: {
   method?: string;
   payload?: unknown;
   verifyServerCertificate?: boolean;
+  allowedBrowserOrigin?: string;
 }) {
   const db = input.db ?? syntheticDb();
   let verifyCalls = 0;
@@ -126,6 +127,9 @@ async function exchange(input: {
     certificatePem: cert,
     privateKeyPem: key,
     expectedDnsHost: hostname,
+    ...(input.allowedBrowserOrigin === undefined ? {} : {
+      allowedBrowserOrigin: input.allowedBrowserOrigin,
+    }),
     identityEvidenceVerifier: { verifyRequestIdentity: async req => {
       verifyCalls++;
       return input.verify === undefined
@@ -139,7 +143,11 @@ async function exchange(input: {
     }},
   });
   try {
-    const response = await new Promise<{ status: number; body: string; tlsVersion: string | null }>((resolve,reject) => {
+    const response = await new Promise<{
+      status: number; body: string; tlsVersion: string | null;
+      cors: string | null; allowMethods: string | null;
+      allowHeaders: string | null; allowCredentials: string | null;
+    }>((resolve,reject) => {
       const outgoing = httpsRequest({
         hostname: '127.0.0.1', port: lease.port,
         servername: input.servername ?? hostname,
@@ -147,7 +155,9 @@ async function exchange(input: {
         path: `/api/chat/${threadId}/turns`,
         headers: {
           Host: input.hostHeader ?? hostname,
-          Authorization: 'Bearer synthetic-member',
+          ...(input.method === 'OPTIONS' ? {} : {
+            Authorization: 'Bearer synthetic-member',
+          }),
           'Content-Type': 'application/json',
           ...input.headers,
         },
@@ -162,11 +172,15 @@ async function exchange(input: {
           status: res.statusCode ?? 0,
           body: Buffer.concat(chunks).toString('utf8'),
           tlsVersion: version,
+          cors: res.headers['access-control-allow-origin']?.toString() ?? null,
+          allowMethods: res.headers['access-control-allow-methods']?.toString() ?? null,
+          allowHeaders: res.headers['access-control-allow-headers']?.toString() ?? null,
+          allowCredentials: res.headers['access-control-allow-credentials']?.toString() ?? null,
         }));
         res.on('error', reject);
       });
       outgoing.on('error', reject);
-      if (input.method !== 'GET') {
+      if (input.method !== 'GET' && input.method !== 'OPTIONS') {
         outgoing.end(JSON.stringify(input.payload ?? { clientTurnId, text: ' 안녕 세연 ' }));
       } else {
         outgoing.end();
@@ -244,6 +258,94 @@ describe('direct HTTPS TLS-only synthetic Node host', () => {
     expect(res.status).toBe(503);
     expect(res.verifyCalls).toBe(0);
     expect(res.db.connections).toBe(0);
+  });
+
+  it('admits a single pinned browser preflight without identity, DB or paid inference', async () => {
+    const origin = 'https://app.myeongha.test';
+    const res = await exchange({
+      allowedBrowserOrigin: origin, method: 'OPTIONS',
+      headers: {
+        Origin: origin,
+        'Access-Control-Request-Method': 'POST',
+        'Access-Control-Request-Headers': 'content-type,authorization',
+      },
+    });
+    expect(res.status).toBe(204);
+    expect(res.cors).toBe(origin);
+    expect(res.allowMethods).toBe('POST');
+    expect(res.allowHeaders).toBe('Authorization, Content-Type');
+    expect(res.allowCredentials).toBeNull();
+    expect(res.verifyCalls).toBe(0);
+    expect(res.runtimeCalls).toBe(0);
+    expect(res.db.connections).toBe(0);
+    expect(res.body).toBe('');
+  });
+
+  it('requires normal Member and current DB authority for a pinned browser POST', async () => {
+    const origin = 'https://app.myeongha.test';
+    const res = await exchange({
+      allowedBrowserOrigin: origin,
+      headers: { Origin: origin },
+    });
+    expect(res.status).toBe(200);
+    expect(res.cors).toBe(origin);
+    expect(res.allowCredentials).toBeNull();
+    expect(res.verifyCalls).toBe(1);
+    expect(res.runtimeCalls).toBe(1);
+    expect(res.json?.data.assistantText).toBe(originalText);
+    expect(res.body).not.toContain(untrustedText);
+  });
+
+  it.each([
+    ['wrong origin POST', 'POST', { Origin: 'https://attacker.test' }],
+    ['browser origin not configured', 'POST', { Origin: 'https://app.myeongha.test' }],
+    ['unrecognized preflight header', 'OPTIONS', {
+      Origin: 'https://app.myeongha.test',
+      'Access-Control-Request-Method': 'POST',
+      'Access-Control-Request-Headers': 'authorization,content-type,x-unsafe',
+    }],
+    ['unsupported preflight method', 'OPTIONS', {
+      Origin: 'https://app.myeongha.test',
+      'Access-Control-Request-Method': 'GET',
+      'Access-Control-Request-Headers': 'authorization,content-type',
+    }],
+    ['missing browser origin', 'OPTIONS', {
+      'Access-Control-Request-Method': 'POST',
+      'Access-Control-Request-Headers': 'authorization,content-type',
+    }],
+    ['duplicate Origin', 'POST', {
+      Origin: ['https://app.myeongha.test', 'https://app.myeongha.test'],
+    }],
+    ['cookie in browser POST', 'POST', {
+      Origin: 'https://app.myeongha.test', Cookie: 'session=untrusted',
+    }],
+  ] as const)('%s cannot reach authentication, DB or model', async (_name, method, headers) => {
+    const res = await exchange({
+      ...(_name === 'browser origin not configured' ? {} : {
+        allowedBrowserOrigin: 'https://app.myeongha.test',
+      }),
+      method,
+      headers: headers as Record<string, string | string[]>,
+    });
+    expect(res.status).toBe(503);
+    expect(res.cors).toBeNull();
+    expect(res.verifyCalls).toBe(0);
+    expect(res.runtimeCalls).toBe(0);
+    expect(res.db.connections).toBe(0);
+    expect(res.body).not.toContain(originalText);
+  });
+
+  it('does not start a listener for a wildcard, HTTP or path-bearing browser origin', async () => {
+    for (const badOrigin of ['*', 'http://app.myeongha.test',
+      'https://app.myeongha.test/path', 'https://user:secret@app.myeongha.test']) {
+      await expect(startSeyeonFirstZeroDirectHttpsLoopbackV1({
+        certificatePem: cert, privateKeyPem: key,
+        expectedDnsHost: hostname, allowedBrowserOrigin: badOrigin,
+        identityEvidenceVerifier: { verifyRequestIdentity: async () => null },
+        pool: syntheticDb().pool,
+        runtime: { run: async () => { throw new Error('never invoke'); } },
+      })).rejects.toThrow('one exact HTTPS origin');
+    }
   });
 
   it('passes validated guest/invalid payload denials without any paid call', async () => {
