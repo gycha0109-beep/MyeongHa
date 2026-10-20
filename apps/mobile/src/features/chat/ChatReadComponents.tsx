@@ -9,6 +9,7 @@ import { mobileColors } from '@/ui/mobile-colors';
 import { MobileUiText } from '@/ui/MobileUiText';
 import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
 import { useMobileTheme } from '@/ui/mobile-theme';
+import { useMobileUiLocale } from '@/ui/mobile-ui-locale';
 import {
   ActivityIndicator,
   Image,
@@ -280,6 +281,7 @@ export function ChatComposer({
 }) {
   const styles = useMobileThemedStyles(staticStyles);
   const { theme } = useMobileTheme();
+  const { t } = useMobileUiLocale();
   if (isSeyeonHistoryRevealHoldV1(snapshot)) {
     return (
       <View style={[styles.pendingCard, theme === 'dark' ? styles.seyeonSurfaceDark : styles.seyeonSurface]}>
@@ -317,7 +319,7 @@ export function ChatComposer({
     <View style={[styles.composerCard, theme === 'dark' ? styles.seyeonSurfaceDark : styles.seyeonSurface]}>
       <View style={styles.composerRow}>
         <TextInput
-          accessibilityLabel="세연에게 보낼 메시지"
+          accessibilityLabel={t('세연에게 보낼 메시지')}
           multiline
           maxLength={8000}
           value={draft}
@@ -329,7 +331,7 @@ export function ChatComposer({
         />
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="메시지 보내기"
+          accessibilityLabel={t('메시지 보내기')}
           disabled={sending || draft.trim().length === 0}
           onPress={onSend}
           style={[styles.sendAction, (sending || draft.trim().length === 0) && styles.sendDisabled]}
@@ -339,7 +341,7 @@ export function ChatComposer({
             : <MobileUiText style={styles.sendActionText}>전송</MobileUiText>}
         </Pressable>
       </View>
-      <Text style={styles.composerHelp}>{status ?? '회원 전용 · 세연과의 대화는 서버에 보관됩니다.'}</Text>
+      <Text style={styles.composerHelp}>{status ?? t('회원 전용 · 세연과의 대화는 서버에 보관됩니다.')}</Text>
     </View>
   );
 }
