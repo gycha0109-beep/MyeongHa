@@ -41,6 +41,10 @@ export async function verifyCloudflareStaticArtifact(options = {}) {
     throw new Error('Cloudflare preview routing or isolation policy has changed.');
   }
 
+  if (outputRoot !== resolve(cwd, workerConfig.assets.directory)) {
+    throw new Error('Cloudflare output directory does not match the configured Static Assets directory.');
+  }
+
   const currentVercelConfig = JSON.parse(
     await readFile(resolve(cwd, 'vercel.json'), 'utf8'),
   );
