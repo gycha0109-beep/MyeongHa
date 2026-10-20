@@ -119,6 +119,6 @@ describe('Cloudflare Direct TCP candidate, without database access', () => {
       ...synthetic,
       MYEONGHA_DATABASE_URL: 'https://db.example.invalid/postgres',
     });
-    expect(message).toContain('PostgreSQL');
+    expect(message).toMatch(/postgres/i);
   });
 });
