@@ -1,3 +1,4 @@
+import { MobileUiText } from '@/ui/MobileUiText';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -77,11 +78,11 @@ export function MobileFrontCameraV1({
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
           <Pressable accessibilityRole="button" onPress={onClose} style={styles.close}>
-            <Text style={styles.text}>닫기</Text>
+            <MobileUiText style={styles.text}>닫기</MobileUiText>
           </Pressable>
           <View style={styles.titleGroup}>
             <Text style={styles.kicker}>MYEONGHA · CAMERA</Text>
-            <Text style={styles.title}>정면 사진 촬영</Text>
+            <MobileUiText style={styles.title}>정면 사진 촬영</MobileUiText>
           </View>
           <View style={styles.close} />
         </View>
@@ -99,14 +100,14 @@ export function MobileFrontCameraV1({
             />
             <View pointerEvents="none" style={styles.oval} />
             <View pointerEvents="none" style={styles.cameraGuide}>
-              <Text style={styles.cameraGuideText}>얼굴 전체가 타원 안에 들어오도록 맞춰주세요</Text>
+              <MobileUiText style={styles.cameraGuideText}>얼굴 전체가 타원 안에 들어오도록 맞춰주세요</MobileUiText>
             </View>
           </View>
         ) : (
           <View style={styles.permission}>
-            <Text style={styles.text}>
+            <MobileUiText style={styles.text}>
               정면 사진을 촬영하려면 카메라 권한이 필요합니다.
-            </Text>
+            </MobileUiText>
             {permission === null ? (
               <ActivityIndicator color="#ffffff" />
             ) : permission.canAskAgain ? (
@@ -115,7 +116,7 @@ export function MobileFrontCameraV1({
                 onPress={() => void requestPermission()}
                 style={styles.action}
               >
-                <Text style={styles.actionText}>카메라 권한 허용</Text>
+                <MobileUiText style={styles.actionText}>카메라 권한 허용</MobileUiText>
               </Pressable>
             ) : (
               <Pressable
@@ -123,14 +124,14 @@ export function MobileFrontCameraV1({
                 onPress={() => void Linking.openSettings()}
                 style={styles.action}
               >
-                <Text style={styles.actionText}>기기 설정에서 카메라 허용</Text>
+                <MobileUiText style={styles.actionText}>기기 설정에서 카메라 허용</MobileUiText>
               </Pressable>
             )}
           </View>
         )}
 
         {error !== null ? <Text style={styles.error}>{error}</Text> : null}
-        <Text style={styles.hint}>밝은 곳에서 정면을 바라보고, 흔들리지 않게 촬영해 주세요.</Text>
+        <MobileUiText style={styles.hint}>밝은 곳에서 정면을 바라보고, 흔들리지 않게 촬영해 주세요.</MobileUiText>
         <Pressable
           accessibilityRole="button"
           accessibilityState={{ disabled: !permission?.granted || !ready || capturing }}
