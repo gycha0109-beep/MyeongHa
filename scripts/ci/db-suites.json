@@ -28,7 +28,8 @@
       "standard-reading-artifact-reread",
       "official-standard-reading-reader-interpretation",
       "official-reader-provider-revoke-race",
-      "official-reader-s2-atomic-receipt-bind"
+      "official-reader-s2-atomic-receipt-bind",
+      "official-reader-s4-protected-storage-design"
     ]
   },
   "commerce-payment": {
@@ -63,7 +64,8 @@
       "content-release-lifecycle",
       "member-character-thread-open",
       "saju-staging-operator-admission",
-      "saju-staging-operator-admission-v2"
+      "saju-staging-operator-admission-v2",
+      "official-reader-s4-protected-storage-design"
     ]
   }
 }

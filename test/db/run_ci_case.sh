@@ -171,6 +171,11 @@ case "$case_name" in
     bash test/db/official_standard_reading_reader_interpretation.sh
     catalog_snapshot
     ;;
+  official-reader-s4-protected-storage-design)
+    apply_standard_migrations
+    psql -X -v ON_ERROR_STOP=1 -f test/db/official_reader_s4_protected_storage_design.sql
+    # test-only schema; catalog snapshot of deployed migrations intentionally unchanged
+    ;;
   official-reader-provider-revoke-race)
     apply_standard_migrations
     bash test/db/official_reader_provider_effect_revoke_race_preflight.sh

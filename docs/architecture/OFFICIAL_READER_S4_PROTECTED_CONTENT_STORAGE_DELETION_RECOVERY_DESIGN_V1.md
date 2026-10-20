@@ -120,3 +120,10 @@ T1·S3·T2 각 검사가 동일 원본/Scope를 pin해야 한다. `Response`·`R
 4. **정본/가이드 참조 순서:** `docs/MASTER_SPEC_INDEX.md` → `docs/P0_DECISION_REGISTER.md`(`P0-PR-02`) → `docs/OFFICIAL_READER_S4_PRIVACY_POLICY_DECISION_V1.md` → 이 S4 설계 → [S0~S8 로드맵](OFFICIAL_READER_PAID_CHAT_INTEGRATION_ROADMAP_20261012_V1.md). PR 댓글/이슈는 구현 증빙으로만 참조.
 
 **현재 설계 판정: 자료 구조/권한/삭제/복원 경계 DESIGN CANDIDATE 완성, 실행 가능한 DB/암호화/복원 운영 권한은 확보되지 않음.**
+
+
+## 9. 실제 DB 참조 기반 일회용 구조 시험 (2026-10-20)
+
+- `test/db/official_reader_s4_protected_storage_design.sql`은 실제 공식 Reading·Reader·Entitlement Grant 테스트 자료와 FK를 연결한 **격리 PostgreSQL 전용** 시험입니다. `supabase/migrations/`와 운영 Writer·HTTP는 변경하지 않습니다. 생성한 `official_reader_s4_fixture` 스키마는 테스트 DB와 함께 폐기됩니다.
+- FORCE RLS·ACL 무허가, 출처 Grant의 Subject×Reading×Reader×Bundle 일치, B2 독립 Grant의 정확한 조회, B3 다른 Bundle 동시 유효 시 조회 0, 다른 Bundle 회수 시 B2 보존, 마지막 Grant 철회 직후 조회 0 및 합성 바이트의 물리 DELETE를 검사합니다. PostgreSQL 15/17 CI에 동일 테스트 케이스를 등록했습니다.
+- 이는 **설계 시나리오 검증**이지 최종 유료 원문 Writer/데이터 암호화·실제 Chat Message/Turn FK·Semantic/Output proof·전체 RLS/삭제 Worker·백업 복원 완료가 아닙니다. 외부 전송·실데이터 저장·운영 DB 적용·공개는 계속 금지됩니다.
