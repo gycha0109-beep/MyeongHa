@@ -1,10 +1,12 @@
-# 명하 세연 — 개인정보·AI 채팅·운영 적용 실행 로드맵 v2 (2026-10-16)
+# 명하 세연 — 개인정보·AI 채팅·운영 적용 실행 로드맵 v2 (2026-10-16, Cloudflare 실행 경계 2026-10-20 반영)
 
 > Watchtower-Track: security
 >
 > **현재 실행 기준선**: [AI 보안 종료 원장 #1866](https://github.com/gycha0109-beep/MyeongHa/issues/1866), [P0 Grant/Commit/Reveal #1843](https://github.com/gycha0109-beep/MyeongHa/issues/1843), [운영 DB/DR #1887](https://github.com/gycha0109-beep/MyeongHa/issues/1887), [G0~G6 계약](../security/SEYEON_AI_SECURITY_COMPLETION_GATES_V1.md).
 >
-> **개정 이유**: 10월 12일 사후복구 로드맵의 당시 HOLD 및 1730 미검증 서술을 **2026-10-16까지의 실증 결과로 갱신**하고, 역사적 로그 추적을 반복하지 않고 실제 개인정보 보호·서비스 통합·안전한 운영 적용으로 전진한다. 옛 문서의 과거 실행 기록은 보존한다.
+> **2026-10-20 현재 실행 추가 기준**: [세연 Cloudflare Workers 전송·철회 보안 경계 재설계](../security/SEYEON_CLOUDFLARE_WORKERS_BOUNDARY_REDESIGN_V1_20261020.md) 및 [Security PR #2383](https://github.com/gycha0109-beep/MyeongHa/pull/2383). 상위 [Ops Cloudflare 이관 설계·로드맵 PR #2381](https://github.com/gycha0109-beep/MyeongHa/pull/2381)의 API 라우터·프리뷰 생성 시점에 종속되며, **두 PR 모두 설계·로드맵 제안이며, 실제 Owner 서명·실배포·세연 공개 완료 증거가 아니다**. 현재 상태·다음 실행은 §50를 우선한다.
+>
+> **개정 이유**: 10월 12일 사후복구 로드맵의 당시 HOLD 및 1730 미검증 서술을 **2026-10-16까지의 실증 결과로 갱신**하고, 역사적 로그 추적을 반복하지 않고 실제 개인정보 보호·서비스 통합·안전한 운영 적용으로 전진한다. 옛 문서의 과거 실행 기록은 보존한다. 2026-10-20에는 **기존 플랫폼 독립 권한·DB 로드맵을 유지한 채** Cloudflare Worker의 응답 전송 경계, 이관 트랙 의존성, 별도 완료 조건을 추가했다.
 
 ## 1. 확인된 현재 상태
 
@@ -16,29 +18,34 @@
 | G2/G3 | Atomic Commit/Controlled Reveal 후보와 제한적 실험이 존재 | `cmd_commit_seyeon_chat_turn_runtime_v2`의 exact Grant 동시 잠금, HTTP 최초 Reveal/committed replay 보호 **미완료** |
 | 운영 DB | **2026-10-19 읽기 전용 재확인:** 1520~1720 원격 이력 **21/21 등록**, `cmd_mark_seyeon_chat_context_ready_pinned_v1` 실제 함수 존재; 원격-only `20261008090417`은 그대로 보존 | 이력과 함수 존재만으로 DDL/Owner/ACL/정책 전량 동일성, DR 준비, 운영 승인 완료 아님; 일괄 push/repair 금지 |
 | G0~G6 종료 | 세연 공개/개인기록 양수 Projector/유료 평가 기본 OFF | A(구현)+B(실DB)+C(운영 승인) 최종 PASS **아님** |
+| **Cloudflare 이관 분리 (2026-10-20)** | Ops [#2381](https://github.com/gycha0109-beep/MyeongHa/pull/2381): Worker + Static Assets 단계별 이관 설계·로드맵. Security [#2383](https://github.com/gycha0109-beep/MyeongHa/pull/2383): 세연 보안 전송 경계 **재설계 제안**, 구현 전 | Cloudflare 프리뷰 실배포·Worker 세연 hard fence 연결·G0-D04 기술 서명·브라우저 송출 증명 **없음**; Vercel 503 유지 |
 
 실제 상태가 바뀌면 각 증거를 확인해 상태를 수정한다. 단위 테스트·Shadow·후보 SQL 병합만으로 운영 GREEN을 기입하지 않는다.
 
 ## 2. 개발 원칙 및 우선순위
 
-**P1 개인정보 접근·취소(최우선) → P2 실제 AI 채팅 통합 → P3 운영 DB/DR 사전검증 → P4 별도 승인 후 제한적 활성화** 순서.
+**P1 개인정보 접근·취소(최우선) → P2 실제 AI 채팅 통합 → P3 운영 DB/DR 사전검증 → P4 별도 승인 후 제한적 활성화** 순서. **Cloudflare S-CF1/S-CF2 차단 작업은 P1과 병렬 가능**하며, S-CF5의 실제 송출 경합 검증은 Ops Worker 프리뷰와 DB/기술 Owner 선행조건이 필요하다.
 
 - 신규 Workflow나 R2-G 역사 실행자 추적 업무를 되살리지 않는다. 기존 `CI`, `Governance`, `Full Integration`을 재사용한다.
 - 현재 `SEYEON_PRODUCTION_PERSONAL_RECORD_PROJECTORS_V1 = []`, 공개 세연 Route OFF, 개인기록 출처가 양수이거나 모호하면 Provider/Commit/Reveal로 진행하지 않는다.
 - 개발 중 Production DB에 **DDL/DML/Role/ACL/migration history 변경 금지**. `authorizedForProduction=false`, `drReady=false`, `paidAi=false`, `publicReader=false`.
 - 위 상태값은 운영 범위별 Owner가 별도 인가하기 전까지 PASS로 바꾸지 않는다.
+- Cloudflare로 전환하더라도 Vercel `api/me.ts`와 현재 첫 Reveal 503 fence는 유지한다. Worker에서는 **Provider 호출 이전 ingress HOLD + 브라우저 노출 이전 최종 Fetch egress fence**라는 독립 이중 경계를 사용한다. Node `ServerResponse.finish`, Worker `Response` 반환/stream 완료 및 단독 client ACK를 실제 네트워크 송출 증명으로 간주하지 않는다.
+- 웹/일반 API Cloudflare 이전은 Ops 소유이며 보안 트랙은 Wrangler·프로젝트 생성·DNS·Git 연결·요금제·Production 프록시를 변경하지 않는다. **세연 보안 승인과 Cloudflare 일반 호스팅 운영 전환 승인은 서로 독립**이다.
 
 ## 3. 작업 큐 (완료 조건까지 고정)
 
 | 단계 | 우선순위/책임 | 실행 작업 | 증거와 완료 조건 | 이번 기준 |
 | --- | --- | --- | --- | --- |
-| **S1 0건 출처 무결성** | P1 Security/API | 0건 proof/Pre-Model HOLD에 개인기록 Projector **candidate가 남거나 구조가 잘못된 경우 차단**. 서버 최종 선택에 없는 후보도 0건으로 위장하지 못하게 함 | 후보 누락/양수/비배열·지원 안 되는 Schema/정상 빈 배열, Provider 이전 HOLD 테스트·exact-head CI | **이 로드맵 개정 PR에서 착수** |
+| **S1 0건 출처 무결성** | P1 Security/API | 0건 proof/Pre-Model HOLD에 개인기록 Projector **candidate가 남거나 구조가 잘못된 경우 차단**. 서버 최종 선택에 없는 후보도 0건으로 위장하지 못하게 함 | 후보 누락/양수/비배열·지원 안 되는 Schema/정상 빈 배열, Provider 이전 HOLD 테스트·exact-head CI | **2026-10-16 #2186 병합** (§6 증거), 양수 G1 승인은 별도 |
 | **S2 G0 권한 모델 확정** | P1 Security+DB+Character | `recordId/grantId` 원본, 새 Grant 발급은 기존 Grant를 복원하지 않음, Record revoke/supersede, Context/파생 메시지, Streaming OFF 권고의 각 선형화 정책 결정 | 버전 있는 승인 계약 + revoke 직후/재승인/과거 문맥 테스트 케이스. 승인 없는 규칙은 PROPOSED | **G0 후보 규칙·Shadow 음성 검증 PR 진행, 공동 승인 미완료** |
 | **S3 G1 양수 출처 선행 Pin** | P1 DB+Character | 모델에 실제 들어가는 Memory/Life Fact 및 파생 출처의 서버 생성 exact Record/Grant/Schema/Raw/Projection digest, Subject/Thread/Turn/Attempt 결속. **모델 호출 전** DB 불변 저장; 0건/누락/미지원/불명을 구분 | 원본 SQL 검토, 격리 PG17 Owner/ACL, 변조·누락·재발급/중복부여 음성, Provider 호출 0회 증명. 기존 1640 원본/1740 후보 기술 결함 독립 해결 | 0건 일부, 양수 미완료 |
 | **S4 G2 원자적 Commit** | P1 DB+Security | 기존 Production Commit `cmd_commit_seyeon_chat_turn_runtime_v2`의 **동일 트랜잭션**에서 exact Grant/Record/Pin lock+validate+Commit. 별도 SELECT-before-COMMIT 금지 | 두 독립 PG 세션 Commit↔Revoke, 신규 Grant ID로 구제 실패, Subject/Character/Thread 교차 격리, deadlock/timeout, DB 최소권한 | 후보·격리 실험만, 실제 경로 미완료 |
-| **S5 G3 최초 공개·Replay 보호** | P1 API+Security | HTTP 최초 Reveal, `committed_replay`, 과거 대화/Relationship Event/Reader 지식, worker 공개 직전에 현재 권한 재검증. 미확정 파생 출처·취소 시 **본문 0바이트** | API+DB 계약/무인가 Reveal 0회, 취소↔Reveal 독립 세션 경합, non-streaming 결정. 이미 전송된 바이트는 회수 불가 | 미완료 |
+| **S5 G3 최초 공개·Replay 보호** | P1 API+Security+DB | Vercel 최초 Reveal/Replay/History 503 유지. Cloudflare Worker에서는 Ops router의 명시적 보호 경로에 **pre-Provider HOLD + 최종 Fetch Response hard fence**를 연결. 추후 G0-D04가 정의할 `V/R/S/ACK` 송출 경계·취소 이후 버퍼·Edge/Proxy·Reader 파생 출처 검증 | 최초/Replay/History 비인가 본문 **0바이트**, Provider 0, DB 원본 Grant+HTTP/Proxy **두 독립 세션** 경합 증거. `V→R→ACK→S` 반례 차단·실송출 보장과 Owner 서명 전 positive Reveal 금지 | **Vercel 503 유지; Cloudflare 제안만, Worker fence 미구현/실증 HOLD** |
+| **S-CF1~S-CF2 Worker deny-only** | P1 Security/API (Ops router에 의존) | Vercel 운영을 건드리지 않고 오프라인 등록형 정적 4xx/503/no-store 차단 계약·음성 테스트 작성 → Ops 단계 4 Worker router가 실제 준비되면 보호된 HTTP ingress/egress 경계에 이중 장착. 절대 positive Reveal 구현 아님 | fake Worker Response/stream/redirect/exception/unknown API/HTML fallback/OPTIONS/History/Replay 부정 시험 및 실제 Worker Preview에서 보호 본문 유출·Provider 호출 **0회**. 상세 CF-D01~D10은 §50 | **S-CF0 설계 PR #2383 심사 중, S-CF1 PR #2388 병합 완료; S-CF2 Ops router 대기** |
+| **S-CF5 Worker 송출 경계 기술 검증** | P1 Security+API+DB, QA | 관리형 Cloudflare Edge/Proxy에서 실제 송출과 철회 ACK 순서, 인플라이트 버퍼·timeout·취소·다중 isolate/PoP·History/Replay 검증. Node 직접 TLS/finish 기존 후보는 연구 증거로만 보존 | 신뢰 가능한 `S`·철회 barrier의 버전 있는 G0-D04 서명 + 실제 Worker Version/PG 독립 2세션/HTTP·Proxy·브라우저 경합. 불충족 시 503 지속 | **G0-D04 기술 서명 OPEN, 설계·실증 HOLD** |
 | **S6 G4 실제 비용/모델 통합** | P2 Character+DB+Security | 기존 영수증·예약·Worker 테스트를 실제 서버 Governor→Persist→Commit→Reply 경로에 연결. 레거시 RPC·직접 Provider 우회·중복 비용 방어 | 비용 없는 합성 E2E, 크래시/재시도/다중 Worker, 역할 ACL, 원장 idempotency. **유료 호출은 Owner 별도 승인** | 비용 하부 구조 부분 PASS, 종단 미완료 |
-| **S7 G5 보안 종합/서비스 흐름** | P2 Security+QA | 1 사용자↔타 사용자, Grant 취소·재승인, 이전/현재 Context, Commit/Reveal/replay, 재시도·비용·장애·로그 인젝션 전수 매트릭스 | 테스트 대상=실제 서비스 경로, PG 2세션/HTTP, exact head CI+Full Integration → 병합 main CI. 유출·무단 비용·무단 공개 **0건** | 미완료 |
+| **S7 G5 보안 종합/서비스 흐름** | P2 Security+QA | 1 사용자↔타 사용자, Grant 취소·재승인, 이전/현재 Context, Commit/Reveal/replay, 재시도·비용·장애·로그 인젝션 전수 매트릭스. Cloudflare 실제 Worker Version에서 ingress/egress 차단·R/V/S/ACK·Edge buffering·Abort를 추가 | 테스트 대상=실제 허용 대상 서비스 경로, PG 2세션/HTTP/Cloudflare 프리뷰, exact head CI+Full Integration → 병합 main CI. 유출·무단 비용·무단 공개 **0건**; Owner signoff 이전 mock-only는 최종 PASS 아님 | 미완료; Worker Preview 준비 전 실전 검증 불가 |
 | **S8 DB 이력/배포/복구** | P3 Ops+DB | 2026-10-19 기준 1520~1720 원격 이력 21/21과 로컬 파일의 **실제 DDL/Owner/ACL/정책 동등성**을 대조. 원격-only `20261008090417` 보존, 새 `20261018190000` 포함 최신 스키마 기준 재해복구 증거·잠금·재시도·forward-only 절차 검토. 임의 repair·재실행 금지 | 버전별 manifest/diff·권한/함수 실측·운영 dry-run 근거, 최신 배포 스키마와 **같은 백업의** 격리 복원·digest·RPO/RTO 승인. **과거 actor 신원 재조사 불필요** | **이력 21/21 확인, 동등성/DR HOLD** |
 | **S9 G6 제한적 운영** | P4 Integration Owner | G0~G5 증거/DR·보안 로그·알림·되돌리기 기준 승인 후, 내부 synthetic smoke→제한적 공개/유료 판단 | 범위, Owner, SHA, run URL, 사고 중단·권한 회수·비용 상한. 전단계 승인 없는 PUBLIC/PAYMENT 불가 | HOLD |
 
@@ -64,6 +71,10 @@ S1 → S2(G0 공동 승인) → S3(G1 모델 전 양수 Pin)
                           ↓
 S8(운영 이력/동일 백업 복원 검증) ───┬→ S9(G6 운영 승인)
                                     └→ paid/public 여부 별도 의사결정
+
+병렬 방어: S-CF1(오프라인 deny 계약) ──→ [Ops 단계 4 Worker router] ──→ S-CF2(Worker 이중 fence)
+                                       [Ops Preview + DB 기술 승인] ──→ S-CF5(G0-D04 실제 Edge/철회 경합)
+S5/G3 최종 PASS = G0-D04 Owner 서명 + 해당 실제 런타임에서 송출 경계 증명. Ops 일반 배포 완료 ≠ S5 PASS.
 ```
 
 S8의 **비파괴/격리 검토는 S2~S7과 병렬 진행 가능**하며, S8 Production 쓰기·실배포는 항상 별도 권한으로 분리한다. 사용자 승인 없이 운영 정책 확정, 배포, 유료 AI 호출, 공개 Route 활성화를 수행하지 않는다.
@@ -75,7 +86,7 @@ S8의 **비파괴/격리 검토는 S2~S7과 병렬 진행 가능**하며, S8 Pro
 - 기존 [보안 완료 계약](../security/SEYEON_AI_SECURITY_COMPLETION_GATES_V1.md)의 A/B/C 판정 및 [#1866](https://github.com/gycha0109-beep/MyeongHa/issues/1866) 체크리스트를 변경 없이 존중한다.
 - 각 PR은 `{stage, scope, owner, exact_head_sha, CI/Full Integration, merge_sha, post-main CI, negative/positive cases, hold_reason, production_writes=0}`을 명시한다.
 - 순서가 바뀌거나 차단 사유를 해결하면 이 **현재 로드맵의 해당 단계 상태를 실제 증거로 갱신**한다. 이슈에 작업 로그만 누적하고 로드맵을 옛 상태로 방치하지 않는다.
-- **즉시 작업 S1:** 0건 출처 후보 위장/누락을 모델 이전에 차단하는 코드와 회귀 테스트를 작성하고 CI 통과 후 병합. 이후 S2+S3의 실제 exact Grant/Pin 설계를 처리한다.
+- **2026-10-20 실행 갱신:** Security의 **S-CF1: Workers 독립 deny-only 계약/37개 음성 테스트는 PR #2388 병합 완료**(실배포·Provider·DB 쓰기 없음). 기존 S3의 **정확한 모델 입력 전체 출처·실 original Grant/Record 선행 영속 Pin**은 Character/DB Owner 기술 승인 범위에서 병렬로만 진행한다. Ops 이관 단계 4 router 준비가 확인되면 S-CF2 부착, 단계 7 및 실제 Preview/PG 조건이 준비된 이후에만 S-CF5 경합 증명. §50 완료 기준 참조.
 
 ## 6. 2026-10-16 S1 병합 후 S2 G0 진입 기록
 
@@ -425,3 +436,61 @@ S8의 **비파괴/격리 검토는 S2~S7과 병렬 진행 가능**하며, S8 Pro
 - **실제 보완:** R20 필수 입력 `finalModelContext`를 서버 `assembleSeyeonRuntimeContextV2`의 결정적 조립 결과(동일 선택기·정렬·상한)와 **전체 필드** 비교한다. 격리 시험에서 인정하는 Context는 과거 메시지/관계/파생 Disclosure/Integrity/Preflight가 전혀 없는 상태뿐이다. 불일치·숨은 필드·정렬 변경·무단 민감 텍스트 추가는 **PostgreSQL 접속 이전 HOLD**, 일치하는 경우에만 기존 R1 Pin→R20 DB 원본 읽기→COMMIT의 순서를 그대로 진행한다. 모델 Context의 무키 SHA를 비권한 후보 영수증에 남기되 DB 권한·서명·공개 승인으로 사용하지 않는다.
 - **격리 검증:** 기존 R20 합성 및 명명된 폐기 PostgreSQL 회귀 테스트에 Context 변조·지연된 과거 메시지·무단 Disclosure·Integrity/관계와 추가 필드 거부를 포함한다. 정상 합성 2건의 원본 Grant/Record/Projection은 같은 TX에서만 Pin 성공. 신규 SQL/테스트 클론/CI Workflow 금지.
 - **완료가 아닌 항목:** 이는 **Provider 비연결**인 최종 조립 스냅샷 검증으로, 실제 외부 모델 HTTP 페이로드와 영속 Pin의 최종 end-to-end 등가, 실 사용 가능한 SRC-25 타입·코덱·Owner ACL, G0/D-04 기술 서명, Production positive G1/G2/G3/G5/G6 승격의 증거가 아니다. `Projectors=[]`, `writeAdmission=DENY`, 최초/Replay 공개 503, 유료 Provider OFF, 운영 DB DDL/DML/ACL/migration 0 유지.
+
+## 50. 2026-10-20 — Cloudflare Workers 이관에 따른 세연 Security 실행 로드맵 재기준
+
+> **상태:** Security 설계 PR [#2383](https://github.com/gycha0109-beep/MyeongHa/pull/2383) 작성·심사 중. **코드 구현·Workers 실배포·Security/API/DB 기술 서명 없음.** 이 절은 2026-10-16~20의 과거 실행 기록 (§6~48)을 바꾸지 않는 **현재 후속 작업 큐**이며, 정확한 [보안 재설계 계약](../security/SEYEON_CLOUDFLARE_WORKERS_BOUNDARY_REDESIGN_V1_20261020.md)을 따른다.
+
+### 49.1 실제 책임 및 플랫폼 경계
+
+| Owner/영역 | 해야 하는 것 | 이 보안 트랙이 하지 않는 것 |
+| --- | --- | --- |
+| **Ops Cloudflare 이관 [#2381](https://github.com/gycha0109-beep/MyeongHa/pull/2381)** | Workers + Static Assets, 11 HTML/정적 헤더, Vercel rewrite 계약과 Worker `/api/*` 명시적 라우터, preview-only, Auth·DB adapter, CI/rollback/cost, 별도 출시 승인 | 보안 승인 대신 첫 세연 assistant 200/stream을 열거나 미승인 DB/결제 경로 활성화 |
+| **Security 세연 이 트랙** | 기존 Vercel 503 보존, Workers 보호 경로용 **Provider 이전 HOLD + 최종 Fetch response hard fence**, History/Replay 파생 출처, deny/race negative E2E 및 G0-D04 계약 증거 | Cloudflare 프로젝트 생성, GitHub App/OAuth redirect, Wrangler 운영 설정, 시크릿 배포, 유료 플랜, DNS, Vercel 삭제 |
+| **Security+API+DB+Character** | 실제 S0 recordType/codec, 모델 최종 SourceSet/derived lineage, Grant/Record DB 영속 Pin, DB 동일 트랜잭션 Commit, `V/R/S/ACK` 정확한 선형화 기술 Owner 서명 | 제안·단위 시험을 APPROVED로 승격하거나 사용자의 기존 제품 정책 재승인 요구 |
+| **QA/Integration** | 실제 Cloudflare Worker version/edge/proxy/브라우저, 독립 PG 두 세션, 예산/보안/복구, exact SHA 증거를 Gate G5/G6로 판단 | Mock/local/CI 성공만으로 실수신·최초 Reveal 승인 선언 |
+
+**독립 RELEASE Gate:** Cloudflare 일반 웹·비세연 API 이관이 성공해도 세연 AI의 최초 Reveal/History/Replay/개인기억 공개, 유료 호출은 **별도 Security/API/DB 기술 서명 및 G0~G6 해당 범위 증거**가 없으면 503 또는 기존 차단을 유지한다. 제품 책임자의 기억 철회·재동의·비스트리밍 정책은 이미 [2026-10-18 승인](../security/SEYEON_PRODUCT_OWNER_MEMORY_REVOKE_HISTORY_DECISION_20261018.md)되어 재확인하지 않는다.
+
+### 49.2 실행 순서·의존성·검증 증거
+
+| 순서 | 시점/선행 조건 | 이 트랙의 정확한 작업 | 완료 조건 | 2026-10-20 상태 |
+| --- | --- | --- | --- | --- |
+| **S-CF0 재설계 문서** | Ops #2381의 아키텍처·로드맵을 읽음 | Security #2383으로 Workers 전송 경계·Owner·송출 ACK·Node 연구 후보의 한계를 작성, Ops 인계 | 문서가 PR HEAD에 있고 Ops PR에 interface 전달; 운영 승인 아님 | **문서 작성 완료 / #2383 미병합** |
+| **S-CF1 오프라인 차단** | S-CF0, Cloudflare 계정 불필요 | Vercel Production 경계 유지, 플랫폼 독립적인 pre-Provider HOLD 및 trusted static 4xx vs unknown body의 최종 503 계약·테스트. Node 전용 `ServerResponse`를 Worker에 import하지 않음 | CF-D01~D03/D07/D08 offline negative, protected 본문 0, Provider 0, no-store; 기존 Vercel 회귀 PASS | **PR #2388 병합 완료** — squash `944bdad3163ce0c799d4b036b4952488964de4be`; 37/37 테스트, PR CI/Governance/Web SUCCESS, [전체 통합 11/11 SUCCESS](https://github.com/gycha0109-beep/MyeongHa/actions/runs/39388933920). 병합 후 main CI 별도 확인. **Cloudflare 미배포·G3 HOLD** |
+| **S-CF2 Workers 실제 entrypoint 차단** | Ops 단계 4 Worker `/api/*` explicit router 인터페이스 확정. 실제 preview 접근 시 별도 Ops 승인 | chat first POST, replay, history, related protected GET/worker에 ingress/egress 연결. 404/405/OPTIONS/CORS/CSP, Vercel marker 위·변조, static HTML fallback 거부 | CF-D02~D05/D08/D10의 실제 Worker deny 경로 검증; 보호 응답 200/stream/redirect/5xx body 없음 | **BLOCKED_BY_OPS_ROUTER / 구현 전** |
+| **S-CF3 정확한 개인기억 출처 G1** | 실제 Character SRC-25 타입, Security/DB 기술 결정, Ops Auth/DB adapter 안정성 | 기존 S3/R19~R23 original Grant/Record raw·projection digest 및 파생 출처를 **모델 이전** PG 소유 영속 Pin; 0건 Pin 유지, 자격 미승인 positive 조회 불가 | 실제 승인 타입·전체 모델 입력 집합·테스트 DB와 현행 운영 role/RLS 동등성; 실패 시 Provider 0 | **G0 출처 승인 OPEN, positive G1 HOLD** |
+| **S-CF4 원자 Commit·철회 G2** | DB Owner/권한·독립 2세션 격리 PG 준비, Ops adapter의 strict TLS/RLS 검증 | 동일 트랜잭션 exact source lock→validity→Chat Commit, revoke/regrant/idempotent retry와 원본 digest 변경 경합 | 두 PG 세션 race/ACL/role/timeout PASS, 긍정 운영 DDL/ACL 변경은 별도 승인 | **G2 PRODUCTION HOLD** |
+| **S-CF5 G0-D04 실제 송출 검증** | S-CF2 + Ops 단계 7의 승인된 preview + G0 기술 Owner 계약 + 격리 DB | Cloudflare `fetch` 반환 vs Edge/Proxy 실제 송출 `S`, revoke `R`, 권한 `V`, 철회 성공 ACK의 시간 관계·abort/late buffers/duplicate·다중 isolate/PoP 경합 검증. 초기 개인기억 응답 비스트리밍 | (V→R→ACK→S) 미송출 보호 본문 0, (S→R)는 **입증된 송출 바이트만** 도착 허용. Security/API/DB가 신뢰 경계와 signed contract 승인한 후 G3 후보 | **G0-D04 OPEN, G3 HOLD** |
+| **S-CF6 G5/G6 수락·제한적 공개** | G0~G4 해당 정확한 scope PASS, Ops 단계 9/10 복구·비용 증거 | 실제 Worker version 및 HEAD·PG 독립 2세션/Edge/HTTP/브라우저·History/Reader/worker E2E, 기존 CI/Governance/Full Integration, 예산/DR·rollbacks | 실경로 0 비인가 본문/무단 비용/권한 우회, 실제 Owner 서명·정확한 evidence URL. **별도 출시 승인 필수** | **HOLD** |
+
+**진행 흐름:** `S-CF0 → S-CF1 → (Ops router) S-CF2`는 기존 `S2 → S3(G1) → S4(G2)`의 승인 준비와 병렬 가능하다. **positive Reveal/G3 승격은 `S-CF2 + S-CF3 + S-CF4 + S-CF5`의 기술 근거가 합쳐질 때만** 가능하고, 운영 출시는 추가로 S-CF6을 요구한다. S-CF5의 실 Cloudflare 실험은 Preview 환경 없이 PASS 판정 불가. 별도 Node TLS 후보를 다시 구현하는 반복 작업으로 대체하지 않는다.
+
+### 49.3 최소 부정 시험과 명확한 거부 상태
+
+| 시험 | 반드시 입증할 사실 |
+| --- | --- |
+| CF-D01~03 | 정확한 세연 first POST는 **Provider 호출 이전 503/no-store**. 검증된 등록형 비스트리밍 고정 4xx만 제한 통과; 다른 4xx/200 JSON/stream/SSE/WS/3xx/오류 body는 모두 503·보호 바이트 0 |
+| CF-D04~05 | `committed_replay`·History·Reader·Relation/Worker 파생 답변과 URL marker/OPTIONS/method/404/HTML fallback에서 보호 데이터 누출 0 |
+| CF-D06~07 | `V→R→ACK→S`, `S→R`, proxy 지연, request abort/timeout, 다중 PoP/중복, client ACK 지연·유실을 **실제 Edge+독립 PG 2세션**에서 관측; Mock만으로 송출 증명 불가 |
+| CF-D08~10 | Cloudflare secret/DB/TLS 오류, 캐시·CSP/CORS 회귀, Worker CPU 10ms·메모리 **128MB/isolate** 한도, 원본 Vercel과 분리, Preview가 Production으로 무단 프록시하지 않음 |
+
+**원칙:** `Response` 객체 반환, `ReadableStream` close/write, `request.signal`, `ctx.waitUntil`, 단일 client receipt ACK, Node `finish`는 클라이언트 실제 수신·신뢰된 네트워크 송출 `S`를 단독 입증하지 못한다. 제품 정책상 **철회 전에 이미 실제 송출된 바이트**는 철회 완료 뒤 도착할 수 있지만, 그 사실을 이용하여 철회 뒤 미송출된 바이트를 허용하지 않는다. 기술 Owner가 `S`의 의미·송신자·버퍼·철회 COMMIT/ACK 정합성을 서명하기 전까지 보호 본문은 **0바이트**다.
+
+### 49.4 변경 금지·기록·다음 작업
+
+- **변경 금지:** Vercel Production `api/me.ts`의 `enforceSeyeonVercelFetchRevealFenceV1` 및 `assertSeyeonFirstHttpRevealAuthorizedV1` 무단 제거, `Projectors=[]`에서 긍정 projector 추가, `writeAdmission='DENY'` 해제, 공통 History/Replay fail-closed 해제, 실 Provider·유료/결제 활성화, Production DB SQL/DDL/DML/ACL/migration/이력 repair.
+- **재사용:** G1 정확한 모델 선택/출처 검증·0건 Pin, G2 original Grant PostgreSQL 취소 경합 및 R17 최소권한 후보, G4 Governor/Provider deadline·비용 영수증 후보, 기존 Vercel 등록형 4xx/503 fence. Node 직접 TLS 서버 및 `finish` 경계는 격리 연구 자료로 남긴다.
+- **기록:** 각 Security PR과 #1866에 `{stage, owner, exact_head_sha, CI/Governance/Web, Full Integration, main_merge_sha, post_main_ci, worker_version_if_any, pg_two_sessions_if_any, negative_cases, positive_admission=HOLD, production_writes=0, blocker}`를 기입. Worker version/실 DB 시험이 없으면 명확히 **NOT_TESTED**.
+- **S-CF1 실행 완료:** [PR #2388](https://github.com/gycha0109-beep/MyeongHa/pull/2388)에서 독립 Cloudflare 사전/최종 503 차단과 37개 음성 테스트 병합. **다음 실행:** Ops 단계 4의 Workers router 인터페이스 준비 후 S-CF2 실경로 연결. 그전에는 승인되지 않은 positive response를 만들지 않으며, G1 exact source/codec/Grant 영속 Pin은 Owner 기술 승인 범위에서 병행 검토. G1 exact source/codec/Grant 영속 Pin은 Owner 기술 결정이 존재하는 범위에서 별도 진행.
+- **남은 blocker:** `G0-D04` 기술 Owner Security/API/DB signed transport contract, S0 Character SRC-25 실 타입/Codec, DB positive Pin·G2 원자 경로, 실제 Cloudflare 프리뷰/edge·독립 PG 송출 시험, DB/DR 및 G5/G6 승인. 사용자에게 이미 승인받은 **제품 정책은 재질문하지 않는다**.
+
+이 절은 **Cloudflare 이관 트랙의 도메인·배포·비용·GitHub 운영 로드맵을 대체하지 않는다**. 일반 웹사이트의 이전만 성공한 경우에도 **세연 protected positive Reveal/Replay/History는 계속 HOLD**한다.
+
+
+### 50.5 S-CF1 병합 증거 (2026-10-20)
+
+- 구현 PR [#2388](https://github.com/gycha0109-beep/MyeongHa/pull/2388), exact HEAD `de8f95c3b51e790c2ac3363bc157ea750a204cd2`, squash main `944bdad3163ce0c799d4b036b4952488964de4be`.
+- 오프라인 `apps/api/src/seyeon-cloudflare-offline-reveal-fence-v1.ts`와 `test/seyeon-cloudflare-offline-reveal-fence-v1.test.ts` 추가. Provider 이전 최초 Reveal 고정 503, 자체 생성 고정 4xx에 한정한 최종 Fetch egress, 임의 JSON/SSE/3xx/5xx/error 응답 503/no-store 및 비정상 요청 ID 비노출.
+- 전용 테스트 37/37 PASS, [PR CI](https://github.com/gycha0109-beep/MyeongHa/actions/runs/39388739597)·[Governance](https://github.com/gycha0109-beep/MyeongHa/actions/runs/39388739538)·[Web](https://github.com/gycha0109-beep/MyeongHa/actions/runs/39388739552) SUCCESS, [Full Integration](https://github.com/gycha0109-beep/MyeongHa/actions/runs/39388933920) 11/11 SUCCESS. 병합 후 main CI는 별도 결과만 인정한다.
+- **S-CF1 ≠ Workers 실배포·S-CF2·G0-D04 승인·G3 PASS.** 기존 Vercel 503, `Projectors=[]`, `writeAdmission=DENY` 유지. 다음은 Ops Worker router 준비 후 S-CF2; 실제 Edge 송출/철회는 S-CF5/Owner 서명 필요.
