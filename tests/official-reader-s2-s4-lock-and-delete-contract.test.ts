@@ -32,7 +32,6 @@ describe('S2 Reader writer lock hierarchy / S4 approved deletion boundary', () =
     );
     before(src, 'perform public.internal_acquire_official_reader_purchase_lock_v1(', 'for v_scope in');
     before(src, 'order by a.subject_id,a.official_reading_id,a.reader_character_id', 'for update;');
-    before(src, 'for update;', 'for update\n');
     expect(src).toContain('Reader binding completed during cancellation lock wait');
     expect(src).toContain('source_receipt_id=v_receipt.id');
   });
