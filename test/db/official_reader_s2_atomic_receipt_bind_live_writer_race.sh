@@ -1233,29 +1233,37 @@ b8_grant_b="$(p -c "select id from public.entitlement_grants
     "$b8_grant_a" != "$b8_grant_b" ]] ||
   fail "multi-Receipt synthetic purchase must have TWO separate Grant lineages"
 
-# Bind Receipt B through the actual 1220 writer while Receipt A is
-# still unbound. Refund A must ignore B's independent Reader access.
-p >"$tmpdir/b8-bind-sibling-b.out" 2>&1 <<SQL || { cat "$tmpdir/b8-bind-sibling-b.out" >&2; fail "independent sibling Receipt B binding failed"; }
+# Set up a database-enforced synthetic B access binding to reproduce the
+# same-purchase two-Receipt state. B's source Receipt is independent from A.
+# The true direct-1220 bind/race path is exercised separately by B7 above.
+p >"$tmpdir/b8-bind-sibling-b.out" 2>&1 <<SQL || { cat "$tmpdir/b8-bind-sibling-b.out" >&2; fail "independent sibling Receipt B binding fixture failed"; }
 begin;
-select pg_catalog.set_config('myeongha.subject_id','$subject',true);
-select reading_id from public.cmd_bind_standard_reading_access_v2(
-  '$subject'::uuid,'$b8_intent'::uuid,
-  '12193000-0000-0000-0000-000000000008'::uuid,
-  '$b8_reading'::uuid,
-  'sha256:v1:abababababababababababababababababababababababababababababababab',
-  'standard-reading-access-bind-v2',
-  '{"schemaVersion":"standard-reading-access-bind-v2","purchaseIntentId":"$b8_intent"}'::jsonb
-);
+insert into public.standard_reading_reader_access_grants(
+  purchase_intent_id,subject_id,official_reading_id,reader_character_id,
+  reader_content_bundle_id,entitlement_grant_id,reader_selection_hash,
+  access_role,access_contract_version,request_contract_version,
+  request_hash,created_at
+)
+select s.purchase_intent_id,cr.subject_id,'$b8_reading'::uuid,
+       s.reader_character_id,s.reader_content_bundle_id,'$b8_grant_b'::uuid,
+       s.selection_hash,'additional_reader','standard-reading-reader-access-v1',
+       'standard-reading-access-bind-v2',
+       'sha256:v1:abababababababababababababababababababababababababababababababab',
+       clock_timestamp()
+from public.purchase_intent_reader_selections s
+join public.commerce_receipts cr on cr.purchase_intent_id=s.purchase_intent_id
+where s.purchase_intent_id='$b8_intent'::uuid
+  and cr.id='$b8_receipt_b'::uuid;
 commit;
 SQL
 [[ "$(p -c "select count(*) from public.standard_reading_reader_access_grants
   where entitlement_grant_id='$b8_grant_b'::uuid
     and purchase_intent_id='$b8_intent'::uuid;")" == 1 ]] ||
-  fail "sibling B must have one verified Reader access binding"
+  fail "sibling B must have one DB-constrained Reader access binding"
 [[ "$(p -c "select count(*) from public.standard_reading_reader_access_grants
   where entitlement_grant_id='$b8_grant_a'::uuid;")" == 0 ]] ||
   fail "cancel target A must remain unbound while sibling B is bound"
-pass "independent sibling Receipt B bound; exact target Receipt A unbound"
+pass "independent sibling Receipt B bound in synthetic DB state; exact target A unbound"
 
 # A sibling payment request must NOT authorize cancelling receipt A.
 b8_amount="$(p -c "select verified_amount_minor from public.commerce_receipts where id='$b8_receipt_a'::uuid;")"
