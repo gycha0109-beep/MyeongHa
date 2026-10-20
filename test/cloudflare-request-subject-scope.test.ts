@@ -251,7 +251,7 @@ describe('Cloudflare request-scoped subject pool (synthetic only)', () => {
     const connecting = new Promise<{ query(): Promise<{ rows: readonly never[] }>; release(error?: unknown): void }>(
       resolve => { finishConnect = resolve; },
     );
-    let pending: Promise<unknown> | undefined;
+    let pending!: Promise<unknown>;
     let closeCalls = 0;
     const requestResult = await withCloudflareRequestSubjectScopeV1({
       createPool: () => ({
@@ -259,7 +259,7 @@ describe('Cloudflare request-scoped subject pool (synthetic only)', () => {
         close: async () => { closeCalls++; },
       }),
       execute: pool => {
-        pending = pool.connect();
+        pending = Promise.resolve(pool.connect());
         // A real caller should await checkout; the adapter must still
         // discard an unsafe connection if a caller violates this rule.
         void pending.catch(() => undefined);
