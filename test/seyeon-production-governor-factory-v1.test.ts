@@ -61,6 +61,18 @@ describe('PR-04D3B1 trusted Production Governor assembly (offline)',()=>{
     } as unknown as typeof ready})).toThrow('four approved');
     expect(()=>build({approval:{...ready,policies:{...ready.policies,
       reviewer:policy(['event_extraction'])}}})).toThrow('approved native');
+    // Role policies must be exact, never a superset of the role's
+    // permitted purposes: renderer must not inherit worker/preflight rights.
+    expect(()=>build({approval:{...ready,policies:{...ready.policies,
+      renderer:policy(['dialogue_render','event_extraction'])}}}))
+      .toThrow('approved native');
+    expect(()=>build({approval:{...ready,policies:{...ready.policies,
+      preflight:policy(['integrity_classification','disclosure_classification',
+        'turn_interpretation'])}}}))
+      .toThrow('approved native');
+    expect(()=>build({approval:{...ready,policies:{...ready.policies,
+      interpreter:policy(['turn_interpretation','semantic_review'])}}}))
+      .toThrow('approved native');
     for(const bad of [
       {...native,model:'unapproved'},
       {...native,origin:'https://ai-gateway.vercel.sh'},
@@ -86,6 +98,10 @@ describe('PR-04D3B1 trusted Production Governor assembly (offline)',()=>{
     expect(approved.costGovernor.policy.allowedPurposes).toContain('event_extraction');
     expect(()=>createSeyeonProductionPostTurnGovernorV1({
       providerConfig:native,policy:policy(['dialogue_render']),
+      reservedHeadroomTokens:64,
+    })).toThrow('approved native role');
+    expect(()=>createSeyeonProductionPostTurnGovernorV1({
+      providerConfig:native,policy:policy(['event_extraction','dialogue_render']),
       reservedHeadroomTokens:64,
     })).toThrow('approved native role');
     const dbConfig={} as Parameters<typeof createProductionSeyeonPostTurnWorkerRuntimeV1>[0]['databaseConfig'];

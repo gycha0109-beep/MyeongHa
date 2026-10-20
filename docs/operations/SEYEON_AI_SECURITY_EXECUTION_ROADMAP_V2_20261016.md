@@ -367,3 +367,10 @@ S8의 **비파괴/격리 검토는 S2~S7과 병렬 진행 가능**하며, S8 Pro
 - **2026-10-20 RPC 유효 권한 재확인:** 운영 `pg_catalog`의 `has_function_privilege` 읽기 전용 측정에서 `myeongha_api_executor`는 정확한 4인자 `cmd_mark_seyeon_chat_context_ready_pinned_v1` **EXECUTE=true**, 기존 3인자 `cmd_mark_seyeon_chat_context_ready_runtime_v1` **EXECUTE=false**이며 `anon`/`authenticated`는 해당 4인자 RPC 직접 실행 불가. 운영 API 실제 성공/보안 G3 송출 허가와는 구분한다.
 - **남은 정확한 차이:** 원격-only `20261008090417`의 기록을 임의 삭제/repair하지 않는다. 21개 이력 등록 ≠ 소스 SQL 전체 body, Owner, EXECUTE, RLS, 트리거·정책, 기존 데이터와 의존성의 동등성 검증; 현재 버전 기준 최신 암호화 백업→**동일 ID** 격리 복원·프라이버시 원장 재생·RPO/RTO 승인 또한 미완료. 과거 실행자 확인은 기존 Owner 위험 수용대로 **추가 개발 블로커로 재개하지 않는다**.
 - **후속 원칙:** #1887 Ops/DB는 **이력 미적용 21건 자동 배포**가 아니라 **현재 스키마/권한의 비파괴적 동등성 및 최신 DR 증거**를 판정해야 한다. 충분한 근거와 별도 범위 승인 전 `authorizedForProduction=false`, `drReady=false`; 세연 G0=PROPOSED, G1 양수/G2/G3/G4/G5/G6 HOLD, Projectors=[], 실 Provider/공개/유료 OFF, Production 쓰기 0 유지.
+
+## 42. 2026-10-20 S6/G4 — Production 역할별 Governor Purpose 권한 최소화 (비운영)
+
+- **발견:** 네 역할별 native Provider 정책은 필요한 Purpose의 **포함 여부**만 확인했다. Renderer 정책에 `event_extraction`, Interpreter 정책에 `semantic_review`, Preflight 정책에 `turn_interpretation` 등이 추가돼도 ENFORCE 초기화가 허용됐으며, Post-turn의 `event_extraction` 정책에도 Chat Purpose를 함께 허용할 수 있었다.
+- **수정:** 각 역할의 `allowedPurposes`를 서버 소유 역할 계약과 정확히 일치시킨다. Preflight는 `integrity_classification`/`disclosure_classification` 두 개, Interpreter는 `turn_interpretation`, Renderer는 `dialogue_render`, Reviewer는 `semantic_review`, Post-turn은 `event_extraction`만 승인한다. 누락과 불필요한 추가 권한 모두 **Pool·Provider 생성 전** 차단한다.
+- **합성 회귀:** 렌더러가 Post-turn, Interpreter가 Reviewer, Preflight가 Interpreter, Post-turn이 Chat 권한까지 허용한 잘못된 정책을 각각 거부한다. 올바른 4역할 설정은 유지한다.
+- **불변:** 실제 운영 비용/개인기록/Provider 호출·Production DB 변경 없음. G0 기술 승인 및 Production G1 양수/G2/G3/G4/G5/G6 HOLD, `Projectors=[]`, 공개/유료 OFF 유지.

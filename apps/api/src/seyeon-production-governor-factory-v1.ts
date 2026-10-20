@@ -37,6 +37,7 @@ function bindNative(
       config.meteredBeforeDispatch !== undefined ||
       (config.maxOutputTokens !== undefined &&
        config.maxOutputTokens !== p.maximumOutputTokens) ||
+      p.allowedPurposes.length !== purposes.length ||
       purposes.some(purpose => !p.allowedPurposes.includes(
         purpose as (typeof p.allowedPurposes)[number],
       ))) {
