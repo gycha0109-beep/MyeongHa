@@ -345,3 +345,9 @@ S1에서 공통 잠금 함수 자체가 성공하더라도 **S2 전체 경로가
 
 - S2: B8과 동일 Reader S1 범위의 별도 E Purchase를 `created → payment attempt → verified` 순서로 만든 신규 E Receipt에 대해 **발급 Writer 선점(Purchase advisory→S1→Grant) → 정본 PortOne 취소 Writer 대기 → E Grant/Receipt만 revoked** 검증을 추가합니다. 기존 B5 취소 선행/발급 차단 시험과 서로 반대되는 실제 DB 연결 순서이며, 전체 결속 Writer 운영 인수를 의미하지 않습니다.
 - S4: 격리 완료 게이트가 `recovery_fence FOR UPDATE` 잠금을 1190 완료 재호출과 같은 트랜잭션 동안 보유하고, 복원 bytea INSERT/UPDATE가 같은 잠금을 공유하도록 보강합니다. 유효한 합성 completed replay가 실행되는 동안 독립 epoch 갱신 및 과거 snapshot 적재가 차단되는지 PG15/17 두 연결로 재현합니다. 실제 외부 Privacy Ledger·PITR/운영 완료 Worker 연결 및 승인 전 배포는 HOLD입니다.
+
+
+### S2 발급·Reader 결속·환불 3중 경합 및 S4 복원 Owner 선행 잠금 인계 (2026-10-20)
+
+- S2: 합성 신규 F verified Purchase/Receipt를 실제 Commerce 상태 전이 순서로 생성하고, **combined Grant 발급+Reader 결속**, **독립 Reader 결속 멱등 재시도**, **검증된 Provider 환불** 3개 DB 연결을 함께 실행합니다. 기존 취소 Writer의 결속 전 관측이 뒤늦게 무효해지면 즉시 롤백하고, 새 트랜잭션에서 bound S1으로 재시도하여 F만 정확히 revoke하는지 검증합니다.
+- S4: 기존 완료 ACK 선행 vs 복원 epoch/구백업 재주입 잠금 시험의 **반대 방향**, 즉 **복원 epoch 소유자 선점 → 완료 ACK가 미러 원장 잠금 대기 → 갱신된 stale epoch로 완료 거부 → 재대조 후 정본 Job/Worker 조건 유지**를 두 연결로 검증합니다. 실제 외부 복원 Owner와 Worker의 토큰·독립 원장·PITR 공동 잠금 요구사항은 별도 인계 계약으로 구체화했으며 운영 적용은 HOLD입니다.

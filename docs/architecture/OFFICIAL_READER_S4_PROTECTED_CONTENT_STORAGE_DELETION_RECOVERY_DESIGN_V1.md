@@ -205,3 +205,17 @@ T1·S3·T2 각 검사가 동일 원본/Scope를 pin해야 한다. `Response`·`R
 - 기존 시험 전용 `attempt_guarded_completion_ack_v1`은 삭제 원장 버전을 조회만 하고 바로 정본 1190에 위임하여 **조회 직후 복원 epoch 갱신**과 교차할 위험이 있었습니다. 이번에는 `recovery_fence singleton FOR UPDATE`를 **완료 전 확인부터 거래 종료까지** 보유하도록 격리 후보를 고쳤습니다. 보호 `bytea` 복원/변경도 같은 행을 선점하는 BEFORE INSERT/UPDATE 트리거를 추가했습니다. 원장 행 부재 시에는 실패합니다.
 - 새 실 DB 2연결 시험은 **합성 completed Subject/Job/Outbox를 만들어 정본 1190 완료 재호출까지 성공한 첫 거래가 원장 행 잠금을 유지**하는 중에, 두 번째 거래의 `required_epoch` 증가와 구백업 `\\copy` 재주입이 모두 `lock_timeout`으로 차단되는지를 PostgreSQL 15·17에서 확인합니다. 첫 거래는 전체 ROLLBACK, 이후 원장 epoch 변경은 가능하되 미대조 상태의 완료 위임은 DENY해야 합니다. 읽기 재노출은 독립 tombstone과 serving fence가 계속 차단합니다.
 - **운영 배포 전 남은 필수 조건:** 복원 작업자·외부 원장 소유자·완료 Worker가 동일한 분산 잠금/트랜잭션 프로토콜을 실제로 공유해야 합니다. 현재 시험 트리거는 격리 DB 백업 행 복원만 직렬화하며 외부 백업 시스템의 PITR 전체 교체, 실제 복원 프로세스의 서비스 비노출·원장 확정, 완료 ACK 후 복원 방지에 자동 적용되지 않습니다. 운영 함수·Worker·마이그레이션은 여전히 미변경, Privacy/Legal #2318까지 HOLD입니다.
+
+
+## 22. 실제 복원 시스템·완료 Worker 공동 잠금 인계 계약 (2026-10-20)
+
+**잠금 대상·소유:** 기존 PostgreSQL의 `official_reader_s4_ledger_fixture.recovery_fence`는 **격리 시험용 동일 DB 미러 행**이며 실제 백업 외부 Privacy Ledger 또는 PITR 전체 복원을 보호하지 않습니다. 운영 책임자는 개인정보 삭제 Owner, 실제 복원 Owner, 삭제 Worker의 합의된 **강한 일관성의 독립 fencing authority** 및 토큰 발급·검증 방식이 필요합니다. 최소 인계 식별자는 `subjectId / deletionTombstoneId / backupGeneration / restoreId / requiredEpoch / reconciledEpoch / fenceToken / writerLeaseOwner`이며, 로그인/Auth·원문·유료 결제 증빙이나 복원된 원문 자체를 외부 원장에 복제해서는 안 됩니다.
+
+**역할별 순서:**
+
+1. **복원 시작 Owner:** 서비스 노출을 먼저 차단(별도 read-side tombstone/fence), 독립 Authority에 `requiredEpoch` 단조 증가와 새 `restoreId/fenceToken`을 확정한 뒤에만 오래된 스냅샷 적재를 시작합니다. DB 복원으로 미러 잠금이 되살아날 수 있으므로 독립 원장 상태가 항상 우선합니다.
+2. **복원 정리 Owner:** 구백업 보호 원문을 tombstone 범위로 재파기하고, 삭제된 Subject의 Reader 결속·원문 참조·Chat 자식까지 검증한 다음 같은 `restoreId/fenceToken` 아래 `reconciledEpoch >= requiredEpoch`를 확정합니다. 복원 세대가 바뀌었거나 토큰이 만료되면 실패 닫힘으로 다시 검사합니다.
+3. **완료 Worker:** 실제 1190 완료 승인과 별도 외부 원장 점검이 **서로 다른 거래**임을 전제로, 인계된 `fenceToken/backupGeneration`이 여전히 현재인지 원자적 보호 구간에서 확인해야 합니다. 미확인·통신 실패·epoch 변경·보호 행 재생성 시 완료 ACK는 불가하며, DB Job/Outbox/Auth/lease 정본 검증을 절대로 대체하지 않습니다. 완료 응답 유실은 저장된 `completed`부터 재개하고, 복원 요청은 완료된 뒤에도 외부 read fence를 유지합니다.
+4. **복원 후 조회 Owner:** 과거 유료 내용을 표시하기 직전에도 독립 삭제 tombstone·현재 세대를 확인하고 안전 마커만 보존합니다. **완료 승인 성공 ≠ 과거 백업 안전**이므로 조회 측 차단은 완료 Worker가 재실행되지 않아도 독립적으로 유지돼야 합니다.
+
+**기술 인수 전 필수 장애 시험:** 복원 선점→완료 ACK 대기 후 거절, 완료 ACK 선점→복원 epoch 갱신 대기, 재복원·원장 유실·오래된 토큰·PITR 복구 후 미러 역행·Worker 임대 상실·응답 유실·동시에 두 복원 소유자 경합. 이 중 이번 격리 PostgreSQL 15·17은 **두 방향의 미러 행 잠금 경쟁**을 확인하고, 실제 외부 원장·PITR·KMS·분산 토큰의 강한 원자성은 검증하지 않습니다. PRIVACY/LEGAL #2318 기술 인수 전에 정본 SQL·실서비스 Worker·운영 복원 도구는 변경하지 않습니다.

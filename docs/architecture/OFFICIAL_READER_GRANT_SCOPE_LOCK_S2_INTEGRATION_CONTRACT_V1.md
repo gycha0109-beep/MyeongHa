@@ -134,3 +134,10 @@
 - 기존 B8과 **동일 Subject·Reader S1 범위이지만 별도 신규 E Purchase**를 `created`로 발행해 실제 결제 시도를 먼저 기록하고, `verified` 전환 이후 **신규 E Receipt**를 합성하고, 첫 DB 연결이 `Purchase advisory → Reader S1` 공동 잠금하에 실제 `internal_apply_verified_receipt_capability_effects_v1`로 Grant를 발급한 뒤 COMMIT 전 대기합니다. 둘째 DB 연결에서 정본 `cmd_apply_verified_portone_reader_full_cancellation_v1` 취소가 구매 잠금에 대기했다가 첫 COMMIT 이후 E만 revoked 처리하는 **발급 선행 방향의 실경합**입니다.
 - E Receipt revoked, 정확한 E Grant revoked·Reader 결속 0, E Provider Event 및 출처 Grant revoked Event 각각 1건, 기존 B/C 회수 상태 불변을 검사합니다. 앞선 B5 **취소 선행 → 발급 불가** 시험과 순서가 반대입니다.
 - 이 시험은 이미 존재하는 공식 Reading에 대해 **기존 Receipt→Grant Writer**를 공동 잠금으로 감싼 것입니다. 별도 공식 Reading 생성·Access 결속까지 수행하는 전체 `internal_apply_verified_reader_purchase_under_scope_v1` 경로의 운영 인수를 대신하지 않으며, 모든 외부 Commerce 발급 동시성 종료 판정도 아닙니다.
+
+
+## 17. 발급·결속·환불 3중 Writer 실경합과 bound 재시도 (2026-10-20)
+
+- 독립 신규 F verified Purchase/Receipt를 **정본 순서(created → Attempt → verified → Receipt)**로 생성합니다. 첫 DB 연결에서 `internal_apply_verified_reader_purchase_under_scope_v1`이 `Purchase advisory → S1 → Grant 발급 → 실제 Reader Access 결속`을 한 트랜잭션으로 처리하고 COMMIT 전 잠금을 유지합니다.
+- 두 번째 연결은 **실제 `cmd_bind_standard_reading_access_v2`**로 같은 F 결속의 멱등 재시도를 시도하며 S1 advisory에 대기합니다. 세 번째 연결은 **실제 검증된 PortOne F 취소 Writer**로 F Purchase advisory에 대기합니다. 최초 취소 경로는 결속 전 상태를 관측했으므로 선행 결속 커밋 뒤 잠금 재확인에서 `Reader binding completed during cancellation lock wait; retry under its bound scope`로 **전체 롤백**되어야 하며, 원본 Receipt와 Provider Event는 건드리지 않아야 합니다.
+- 이후 새 거래에서 같은 취소 증빙으로 bound S1 회수 경로를 재시도해 F Receipt/Grant revoked, F Access 출처 보존, Provider Event 및 Grant revoked Event 각각 1회, 다른 B/C/E 출처 불변을 증명합니다. **세 연결 모두 실제 데이터베이스 함수**를 호출하지만 합성 결제·인증 정보로만 시험합니다. 운영 모든 Commerce Writer 인수, T2/S5 유료 노출은 여전히 HOLD입니다.
