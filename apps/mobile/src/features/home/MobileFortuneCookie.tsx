@@ -28,7 +28,7 @@ export function MobileFortuneCookie() {
           <Text style={styles.symbolText}>✦</Text>
         </View>
         <View style={styles.copy}>
-          <Text style={styles.callToAction}>행운의 쪽지 열기</Text>
+          <MobileUiText style={styles.callToAction}>행운의 쪽지 열기</MobileUiText>
         </View>
         <Text style={styles.arrow}>→</Text>
       </Pressable>
