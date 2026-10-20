@@ -1690,4 +1690,70 @@ grep -q 'B_REFUND=official-reader-s2-revoke-dispatch-v1' "$tmpdir/b8-delete-vers
  fail "bound B cancel provider event did not commit exactly once"
 pass "live bound-Receipt refund waits for deletion-shaped Subject/Grant lock and preserves sibling rights"
 
+
+# Exact SAME provider cancellation is concurrently replayed by two real
+# DB writer sessions: one event and one EntitlementEvent may be committed.
+c_cancel_at="$(p -c "select pg_catalog.to_char(clock_timestamp() at time zone 'UTC','YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"');")"
+[[ "$(p -c "select verification_status from public.commerce_receipts where id='$b8_receipt_c'::uuid;")" == verified ]] ||
+ fail "concurrent same-event C seed is not verified"
+p >"$tmpdir/b8-c-first.out" 2>&1 <<SQL &
+set application_name='rr_s2_c_event_first';
+set statement_timeout='25s';
+begin;
+set local role myeongha_commerce_internal_executor;
+select 'C_FIRST='||(public.cmd_apply_verified_portone_reader_full_cancellation_v1(
+ 'b8-payment-c','tx-reader-b8-c','b8-cancel-concurrent-c',
+ '$c_cancel_at'::timestamptz,$b8_amount,'KRW','production',
+ 'hmac-sha256:k1:9898989898989898989898989898989898989898989898989898989898989898',
+ 'synthetic-c-same-event-v1')->'revoke'->>'contractVersion');
+select pg_sleep(4);
+commit;
+SQL
+holder_pid=$!
+wait_for "first same-event C writer holds purchase transaction" "
+ select count(*) from pg_catalog.pg_stat_activity
+ where application_name='rr_s2_c_event_first' and state='active'
+ and wait_event_type='Timeout';
+"
+p >"$tmpdir/b8-c-replay.out" 2>&1 <<SQL &
+set application_name='rr_s2_c_event_replay';
+set statement_timeout='25s';
+begin;
+set local role myeongha_commerce_internal_executor;
+select 'C_REPLAY='||(public.cmd_apply_verified_portone_reader_full_cancellation_v1(
+ 'b8-payment-c','tx-reader-b8-c','b8-cancel-concurrent-c',
+ '$c_cancel_at'::timestamptz,$b8_amount,'KRW','production',
+ 'hmac-sha256:k1:9898989898989898989898989898989898989898989898989898989898',
+ 'synthetic-c-same-event-v1')->'revoke'->>'contractVersion');
+commit;
+SQL
+writer_pid=$!
+wait_for "same-event C replay waits for purchase advisory" "
+ select count(*) from pg_catalog.pg_stat_activity
+ where application_name='rr_s2_c_event_replay' and state='active'
+ and wait_event_type='Lock' and wait_event='advisory';
+"
+wait "$holder_pid" || { cat "$tmpdir/b8-c-first.out" >&2; fail "first C cancellation failed"; }
+holder_pid=""
+wait "$writer_pid" || { cat "$tmpdir/b8-c-replay.out" >&2; fail "same-event replay failed"; }
+writer_pid=""
+grep -q 'C_FIRST=official-reader-s2-revoke-dispatch-v1' "$tmpdir/b8-c-first.out" ||
+ fail "first C provider event missed bound S1 path"
+grep -q 'C_REPLAY=official-reader-s2-revoke-dispatch-v1' "$tmpdir/b8-c-replay.out" ||
+ { cat "$tmpdir/b8-c-replay.out" >&2; fail "replay missed bound S1 path"; }
+[[ "$(p -c "select count(*) from public.commerce_provider_events where external_event_id='myeongha:portone-v2:full-cancel:v1:b8-cancel-concurrent-c';")" == 1 ]] ||
+ fail "duplicate verified event persisted twice"
+[[ "$(p -c "select count(*) from public.entitlement_events ev
+ join public.commerce_provider_events pe on pe.id=ev.source_provider_event_id
+ where pe.external_event_id='myeongha:portone-v2:full-cancel:v1:b8-cancel-concurrent-c'
+ and ev.grant_id='$b8_grant_c'::uuid and ev.event_type='revoked';")" == 1 ]] ||
+ fail "replay duplicated C Grant effect"
+[[ "$(p -c "select count(*) from public.entitlement_grants
+ where (id='$b8_grant_c'::uuid or id='$b8_grant_b'::uuid) and status='revoked';")" == 2 ]] ||
+ fail "same-event replay revived B or missed C"
+[[ "$(p -c "select verification_status from public.commerce_receipts
+ where id='$b8_receipt_c'::uuid;")" == revoked ]] ||
+ fail "same-event C original Receipt was not revoked"
+pass "two live verified C cancellations serialize; exactly one provider and Grant event"
+
 echo "PASS: S2 instrumented two-direction PostgreSQL race; production integration HOLD"
