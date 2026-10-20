@@ -3,6 +3,7 @@ import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { resolveMobileChatPortraitV1 } from '@/features/chat/chat-character-portraits';
 import { useMobileTheme } from '@/ui/mobile-theme';
+import { MobileUiText } from '@/ui/MobileUiText';
 
 /**
  * Product-only editorial entrance to the character hub.
@@ -54,7 +55,7 @@ export function HomeCharacterFeature() {
         >
           <Text style={[styles.quickSymbol, { color: colors.gold }]}>命</Text>
           <View style={styles.quickCopy}>
-            <Text style={[styles.quickTitle, { color: colors.ink }]}>내 사주</Text>
+            <MobileUiText style={[styles.quickTitle, { color: colors.ink }]}>내 사주</MobileUiText>
             <Text style={[styles.quickSubtitle, { color: colors.muted }]}>명식과 풀이 살펴보기</Text>
           </View>
           <Text style={[styles.quickArrow, { color: colors.navy }]}>›</Text>
