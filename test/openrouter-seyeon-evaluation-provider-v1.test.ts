@@ -138,6 +138,25 @@ describe('OpenRouter Se-yeon eval adapter: offline / zero paid dispatch', () => 
       expect(afterOutcome).toHaveBeenCalledOnce();
     }
   });
+  it('identifies the safe failure phase without persisting content or retrying', async () => {
+    const variants = [
+      { response: success(output, {choices:[{finish_reason:'length',message:{role:'assistant',content:'{}'}}]}), phase:'finish_length' },
+      { response: success(output, {choices:[{finish_reason:'unknown',message:{role:'assistant',content:'{}'}}]}), phase:'finish_nonstop' },
+      { response: success(output, {choices:[{finish_reason:'stop',message:{role:'assistant',content:'SECRET_NEVER_LOG'}}]}), phase:'structured_json_parse' },
+      { response: success(output, {usage:undefined}), phase:'usage_missing' },
+      { response: new Response('SECRET_NEVER_LOG',{headers:{'content-type':'text/plain'}}), phase:'response_content_type' },
+    ] as const;
+    for (const {response,phase} of variants) {
+      const fetchImpl=vi.fn(async()=>response);
+      const {provider,afterOutcome}=make(fetchImpl);
+      await expect(provider.generate(request)).rejects.toThrow();
+      expect(fetchImpl).toHaveBeenCalledOnce();
+      expect(afterOutcome).toHaveBeenCalledOnce();
+      const diagnostic=vi.mocked(afterOutcome).mock.calls[0]?.[0];
+      expect(diagnostic?.failurePhase).toBe(phase);
+      expect(JSON.stringify(diagnostic)).not.toContain('SECRET_NEVER_LOG');
+    }
+  });
   it('fails closed on bounded response overflow; does not parse oversized content', async () => {
     const fetchImpl = vi.fn(async () => Response.json({
       ...JSON.parse(await success().text()),padding:'CANARY'.repeat(150000),
