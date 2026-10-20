@@ -147,3 +147,9 @@ T1·S3·T2 각 검사가 동일 원본/Scope를 pin해야 한다. `Response`·`R
 - `test/db/official_reader_s4_logical_restore_deletion_rehearsal.sh`는 기존 일회용 보호 테이블·정확한 Chat 복합 FK를 재사용해 PostgreSQL `\\copy`로 **보호 데이터의 실제 합성 bytea 행을 로컬 파일에 내보냈다가 다시 적재**합니다. 보존 당시 Reader 구매권·안전 마커가 유효한 상태를 만든 다음, 백업 외부에 존재하는 **테스트 전용 삭제 원장과 복원 차단 상태**를 기록하고 본 DB 후보 원문을 물리 DELETE합니다.
 - 오래된 파일로 원문 후보를 두 번 복원하고도 복원 차단 상태/삭제 원장 미존재·원장 epoch 지연·원장 재대조/삭제 tombstone 각각에서 **보호 조회 결과 0**, 이후 tombstone 재생으로 원문 후보 **물리 삭제 0행 잔존**을 검사합니다. 보유 중인 Commerce 증빙을 삭제하지 않은 채 `보호 원문 → 안전 마커 → Attempt → Turn → 참여자 → Thread` 자식 우선 순서를 확인합니다.
 - 기존 S4 보호 조회 함수에 **시험 전용 백업 외부 원장 JOIN**을 추가했습니다. 이는 운영 원장이나 서비스 가능 전환의 권한을 부여하지 않고, `\\copy` 행 단위 논리 백업 연습일 뿐 **실제 P30D 전체 백업/PITR·KMS 키 파기·운영 AccountDeletion Worker 실행 및 법무/Privacy 인수가 아닙니다**. PostgreSQL 15·17 기존 S4 CI에 통합하며 기존 승인 정책과 운영 migration 무변경입니다.
+
+## 13. Reader 결속 부모 FK와 1520 계정 삭제 순서 (2026-10-20)
+
+- 기존 1520 최종화 함수는 가장 먼저 `standard_reading_reader_access_grants`를 DELETE하고, 이후 `conversation_messages`·Attempt·Turn을 지웁니다. S4 최초 합성 저장소의 Reader 출처 trigger는 INSERT 시에만 검사하므로 이 부모 DELETE를 구조적으로 막지 못했습니다.
+- 격리 S4 후보에 `originating_grant_id → standard_reading_reader_access_grants(entitlement_grant_id)` 실제 FK를 추가했습니다. **보호 행이 존재하는 동안 1520의 첫 Reader-access DELETE 및 Chat Marker DELETE가 둘 다 차단**되고, 보호 행을 물리 삭제해야 관계 부모를 삭제할 수 있는지를 PG15/17과 오래된 행 복원 시험에서 확인합니다.
+- **현행 1520은 보호 테이블 도입 후 그대로 쓸 수 없습니다.** 앞으로 개인정보 기술 인수 후 별도 forward-only 정의에서 보호 자식 DELETE → Reader-access·Chat·Reading 부모 순서로 실제 finalizer를 연결해야 하며 기존 1520, 운영 migration, Policy 정본·graph fingerprint는 이번 변경에서 수정하지 않습니다.

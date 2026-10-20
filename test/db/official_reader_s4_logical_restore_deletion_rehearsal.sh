@@ -68,6 +68,27 @@ check "stale recovery ledger epoch fails closed" "select ($read_count)=0;"
 p -c "update official_reader_s4_ledger_fixture.recovery_fence set reconciled_epoch=2 where singleton;" >/dev/null
 check "even reconciled rights cannot override independent subject deletion tombstone" "select ($read_count)=0;"
 
+# 1520 starts with Reader-access removal BEFORE it removes Chat markers.
+# Its first parent DELETE must fail on a restored protected child.
+p >"$tmpdir/reader-first.out" 2>&1 <<SQL || die "Reader-access parent-first negative fixture failed"
+do \$reader_first\$
+begin
+ begin
+  delete from public.standard_reading_reader_access_grants
+   where purchase_intent_id='$b2'::uuid;
+ exception when foreign_key_violation then
+  raise notice 'PASS S4 restored paid child blocks old finalizer Reader-access DELETE';
+  return;
+ end;
+ raise exception 'FAIL S4 restored Reader access removed before paid child';
+end;
+\$reader_first\$;
+SQL
+check "restored paid child preserves parent Reader-access row" "select
+ (select count(*) from official_reader_s4_fixture.protected_bodies)=1
+ and exists(select 1 from public.standard_reading_reader_access_grants
+  where purchase_intent_id='$b2'::uuid);"
+
 # Child-first deletion: the original Chat message cannot disappear before
 # the resurrected protected child is scrubbed.
 p >"$tmpdir/parent-first.out" 2>&1 <<SQL || die "parent-first negative fixture failed"
@@ -88,6 +109,18 @@ p -c "delete from official_reader_s4_fixture.protected_bodies b
  using official_reader_s4_ledger_fixture.deletion_events d
  where b.id=d.body_id and b.subject_id=d.subject_id;" >/dev/null
 check "replayed external tombstone physically scrubs old restored bytes" "select not exists(select 1 from official_reader_s4_fixture.protected_bodies);"
+# Once the child is physically deleted the finalizer's Reader-access ordering
+# becomes valid. ROLLBACK to retain this fixture for the second restore.
+p -c "begin;
+ delete from public.standard_reading_reader_access_grants
+  where purchase_intent_id='$b2'::uuid;
+ do \$ordered\$ begin
+  if exists(select 1 from public.standard_reading_reader_access_grants
+    where purchase_intent_id='$b2'::uuid)
+  then raise exception 'FAIL S4 child-first Reader-access cleanup'; end if;
+ end \$ordered\$;
+ rollback;" >/dev/null
+echo "PASS S4 restore: child-first scrub unblocks Reader-access finalizer ordering"
 
 # A second replay/restore cannot resurrect an accessible row either.
 p -c "\\copy official_reader_s4_fixture.protected_bodies FROM '$snapshot' WITH (FORMAT csv)" >"$tmpdir/replay-import.log" || die "second old snapshot import failed"

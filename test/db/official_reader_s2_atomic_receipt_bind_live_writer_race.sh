@@ -1389,6 +1389,60 @@ b8_receipt_d="12192000-0000-0000-0000-000000000011"
 [[ "$(p -c "select count(*) from public.entitlement_grants where source_receipt_id='$b8_receipt_d'::uuid;")" == 0 ]] ||
   fail "B8 exact D must not have any Grant before full cancellation"
 b8_d_at="$(p -c "select pg_catalog.to_char(clock_timestamp() at time zone 'UTC','YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"');")"
+# Lock-timeout is a legitimate losing purchase/cancellation interleaving.
+# Assert the timed-out attempt leaves no provider event or changed Receipt.
+p >"$tmpdir/b8-d-purchase-holder.out" 2>&1 <<SQL &
+set application_name='rr_s2_b8_d_purchase_holder';
+set statement_timeout='20s';
+begin;
+select public.internal_acquire_official_reader_purchase_lock_v1(
+ '$b8_intent'::uuid
+);
+select pg_sleep(4);
+commit;
+SQL
+holder_pid=$!
+wait_for "B8 D purchase lock held independently" "
+ select count(*) from pg_catalog.pg_stat_activity
+ where application_name='rr_s2_b8_d_purchase_holder'
+ and state='active' and wait_event_type='Timeout';
+"
+if p >"$tmpdir/b8-d-timeout.out" 2>&1 <<SQL
+set application_name='rr_s2_b8_d_cancel_timeout';
+begin;
+set local lock_timeout='150ms';
+set local role myeongha_commerce_internal_executor;
+select public.cmd_apply_verified_portone_reader_full_cancellation_v1(
+ 'b8-payment-d','tx-reader-b8-d','b8-cancel-exact-zero-d',
+ '$b8_d_at'::timestamptz,$b8_amount,'KRW','production',
+ 'hmac-sha256:k1:9090909090909090909090909090909090909090909090909090909090909090',
+ 'synthetic-b8-zero-grant-cancel-v1'
+);
+commit;
+SQL
+then
+ fail "D cancellation bypassed conflicting purchase lock"
+fi
+grep -q 'canceling statement due to lock timeout' "$tmpdir/b8-d-timeout.out" || {
+ cat "$tmpdir/b8-d-timeout.out" >&2
+ fail "D cancellation rejected for reason other than purchase lock timeout"
+}
+[[ "$(p -c "select verification_status from public.commerce_receipts where id='$b8_receipt_d'::uuid;")" == verified ]] ||
+ fail "timed-out D cancellation modified original Receipt"
+[[ "$(p -c "select count(*) from public.commerce_provider_events
+ where external_event_id='myeongha:portone-v2:full-cancel:v1:b8-cancel-exact-zero-d';")" == 0 ]] ||
+ fail "timed-out D cancellation committed a provider event"
+[[ "$(p -c "select count(*) from public.entitlement_grants
+ where id in ('$b8_grant_b'::uuid,'$b8_grant_c'::uuid)
+ and status='active';")" == 2 ]] ||
+ fail "timed-out D cancellation modified sibling B/C"
+wait "$holder_pid" || {
+ cat "$tmpdir/b8-d-purchase-holder.out" >&2
+ fail "purchase holder failed"
+}
+holder_pid=""
+pass "D timeout rolls back without Receipt, provider event or sibling Grant mutation"
+
 for replay in 1 2; do
   outcome="$(p -c "begin; set local role myeongha_commerce_internal_executor;
     select (public.cmd_apply_verified_portone_reader_full_cancellation_v1(

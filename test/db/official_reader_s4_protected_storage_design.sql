@@ -12,6 +12,9 @@ create table official_reader_s4_fixture.protected_bodies (
  reader_character_id text not null,
  reader_content_bundle_id uuid not null,
  originating_grant_id uuid not null references public.entitlement_grants(id),
+ -- INSERT trigger alone does not protect the 1520 finalizer's first DELETE.
+ foreign key (originating_grant_id)
+  references public.standard_reading_reader_access_grants(entitlement_grant_id),
  synthetic_thread_id uuid not null,
  synthetic_participation_id uuid not null,
  synthetic_turn_id uuid not null,
@@ -411,6 +414,27 @@ select pg_temp.require_s4('last B2 revoked instantly hides still-stored bytes',
 \quit
 \endif
 
+-- Actual 1520 finalizer first deletes Reader Access, then Chat messages.
+-- Both existing parents must reject deletion before the paid child is wiped.
+do $block_reader_parent$
+begin
+ begin
+  delete from public.standard_reading_reader_access_grants
+   where entitlement_grant_id=(select originating_grant_id
+     from official_reader_s4_fixture.protected_bodies limit 1);
+ exception when foreign_key_violation then
+  raise notice 'PASS S4 1520 Reader-access first DELETE blocked until paid child removed';
+  return;
+ end;
+ raise exception 'FAIL S4 Reader-access parent was removed before protected child';
+end;
+$block_reader_parent$;
+select pg_temp.require_s4('Reader-access parent and paid child survive rejection',
+ (select count(*)=1 from official_reader_s4_fixture.protected_bodies)
+ and exists(select 1 from public.standard_reading_reader_access_grants
+   where entitlement_grant_id=(select originating_grant_id
+      from official_reader_s4_fixture.protected_bodies limit 1)));
+
 -- Account-deletion finalizer MUST delete protected content BEFORE Chat rows.
 -- Simulate the ordered DELETE under an isolated DB. No finalizer is granted.
 do $delete_order$
@@ -429,6 +453,14 @@ $delete_order$;
 delete from official_reader_s4_fixture.protected_bodies;
 select pg_temp.require_s4('primary protected body removed before Chat finalization',
  not exists(select 1 from official_reader_s4_fixture.protected_bodies));
+-- Removing Reader access AFTER the protected child must be permitted.
+begin;
+delete from public.standard_reading_reader_access_grants
+ where purchase_intent_id='12192300-0000-0000-0000-000000000002'::uuid;
+select pg_temp.require_s4('Reader-access parent can be removed after paid child',
+ not exists(select 1 from public.standard_reading_reader_access_grants
+ where purchase_intent_id='12192300-0000-0000-0000-000000000002'::uuid));
+rollback;
 delete from public.conversation_messages
  where id='d4500000-0000-4000-8000-000000000001';
 delete from public.chat_turn_attempts
