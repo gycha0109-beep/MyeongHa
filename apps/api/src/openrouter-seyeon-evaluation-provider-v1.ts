@@ -31,6 +31,14 @@ export type OpenRouterSeyeonOutcomeV1 =
   'response_received' | 'http_failure' | 'timeout' | 'network_failure' |
   'invalid_response' | 'usage_unknown';
 
+/** Numeric-only, allowlisted failure diagnostics. Never stores model content. */
+export type OpenRouterSeyeonFailurePhaseV1 =
+  | 'request_timeout' | 'request_network' | 'http_status'
+  | 'response_content_type' | 'response_body_timeout' | 'response_body'
+  | 'response_envelope' | 'finish_length' | 'finish_nonstop'
+  | 'assistant_message' | 'usage_missing' | 'usage_invalid'
+  | 'structured_json_parse' | 'structured_json_root';
+
 export interface OpenRouterSeyeonMetricV1 {
   readonly callId: string;
   readonly providerKey: typeof OPENROUTER_SEYEON_PROVIDER_KEY_V1;
@@ -45,6 +53,7 @@ export interface OpenRouterSeyeonMetricV1 {
   readonly reasoningTokens: number | null;
   /** Provider-reported usage is not an independently reconciled bill. */
   readonly invoiceReconciled: false;
+  readonly failurePhase: OpenRouterSeyeonFailurePhaseV1 | null;
 }
 
 export interface OpenRouterSeyeonEvaluationConfigV1 {
@@ -173,6 +182,7 @@ export function createOpenRouterSeyeonEvaluationProviderV1(
       const observe = async (
         outcome: OpenRouterSeyeonOutcomeV1, status: number | null,
         usage: { prompt: number; completion: number; cached: number; reasoning: number } | null = null,
+        failurePhase: OpenRouterSeyeonFailurePhaseV1 | null = null,
       ): Promise<void> => {
         if (observed) return fail('METERING_FAILED');
         observed = true;
@@ -183,7 +193,7 @@ export function createOpenRouterSeyeonEvaluationProviderV1(
             httpStatus: status, elapsedMs: Math.round(performance.now() - started),
             promptTokens: usage?.prompt ?? null, completionTokens: usage?.completion ?? null,
             cachedPromptTokens: usage?.cached ?? null, reasoningTokens: usage?.reasoning ?? null,
-            invoiceReconciled: false,
+            invoiceReconciled: false, failurePhase,
           }));
         } catch {
           return fail('METERING_FAILED');
@@ -204,17 +214,17 @@ export function createOpenRouterSeyeonEvaluationProviderV1(
           });
         } catch {
           const outcome = controller.signal.aborted ? 'timeout' : 'network_failure';
-          await observe(outcome, null);
+          await observe(outcome, null, null, controller.signal.aborted ? 'request_timeout' : 'request_network');
           return fail(controller.signal.aborted ? 'TIMEOUT' : 'NETWORK_FAILURE');
         }
         if (!response.ok) {
           void response.body?.cancel().catch(() => undefined);
-          await observe('http_failure', response.status);
+          await observe('http_failure', response.status, null, 'http_status');
           return fail(response.status === 402 ? 'CREDIT_REQUIRED' : 'HTTP_FAILURE', response.status);
         }
         if (!/^application\/json(?:\s*;|$)/iu.test(response.headers.get('content-type') ?? '')) {
           void response.body?.cancel().catch(() => undefined);
-          await observe('invalid_response', response.status);
+          await observe('invalid_response', response.status, null, 'response_content_type');
           return fail('INVALID_RESPONSE', response.status);
         }
         let payload: unknown;
@@ -225,24 +235,31 @@ export function createOpenRouterSeyeonEvaluationProviderV1(
           });
           payload = JSON.parse(text);
         } catch {
-          await observe(controller.signal.aborted ? 'timeout' : 'invalid_response', response.status);
+          await observe(controller.signal.aborted ? 'timeout' : 'invalid_response', response.status, null,
+            controller.signal.aborted ? 'response_body_timeout' : 'response_body');
           return fail(controller.signal.aborted ? 'TIMEOUT' : 'INVALID_RESPONSE', response.status);
         }
         if (!record(payload) || (typeof payload.model === 'string' && payload.model !== model) ||
             !Array.isArray(payload.choices) || payload.choices.length !== 1 ||
-            !record(payload.choices[0]) ||
-            payload.choices[0].finish_reason !== 'stop' ||
-            !record(payload.choices[0].message) ||
-            payload.choices[0].message.role !== 'assistant' ||
-            typeof payload.choices[0].message.content !== 'string' ||
-            payload.choices[0].message.content.trim().length === 0 ||
-            payload.choices[0].message.refusal ||
-            payload.choices[0].message.tool_calls) {
-          await observe('invalid_response', response.status);
+            !record(payload.choices[0])) {
+          await observe('invalid_response', response.status, null, 'response_envelope');
+          return fail('INVALID_RESPONSE', response.status);
+        }
+        const choice = payload.choices[0];
+        if (choice.finish_reason !== 'stop') {
+          await observe('invalid_response', response.status, null,
+            choice.finish_reason === 'length' ? 'finish_length' : 'finish_nonstop');
+          return fail('INVALID_RESPONSE', response.status);
+        }
+        if (!record(choice.message) || choice.message.role !== 'assistant' ||
+            typeof choice.message.content !== 'string' ||
+            choice.message.content.trim().length === 0 ||
+            choice.message.refusal || choice.message.tool_calls) {
+          await observe('invalid_response', response.status, null, 'assistant_message');
           return fail('INVALID_RESPONSE', response.status);
         }
         if (!record(payload.usage)) {
-          await observe('usage_unknown', response.status);
+          await observe('usage_unknown', response.status, null, 'usage_missing');
           return fail('USAGE_UNKNOWN', response.status);
         }
         const prompt = token(payload.usage.prompt_tokens);
@@ -257,18 +274,18 @@ export function createOpenRouterSeyeonEvaluationProviderV1(
         if (prompt === null || prompt < 1 || completion === null ||
             completion < 1 || cached === null || cached > prompt ||
             reasoning === null || reasoning > completion) {
-          await observe('usage_unknown', response.status);
+          await observe('usage_unknown', response.status, null, 'usage_invalid');
           return fail('USAGE_UNKNOWN', response.status);
         }
         let structured: unknown;
         try {
-          structured = JSON.parse(payload.choices[0].message.content);
+          structured = JSON.parse(choice.message.content);
         } catch {
-          await observe('invalid_response', response.status);
+          await observe('invalid_response', response.status, null, 'structured_json_parse');
           return fail('INVALID_RESPONSE', response.status);
         }
         if (!record(structured)) {
-          await observe('invalid_response', response.status);
+          await observe('invalid_response', response.status, null, 'structured_json_root');
           return fail('INVALID_RESPONSE', response.status);
         }
         await observe('response_received', response.status, { prompt, completion, cached, reasoning });
