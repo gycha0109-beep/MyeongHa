@@ -51,3 +51,24 @@
 - **완료:** 단계 4 health + deny-first router/HTTP·Chrome·로컬 런타임 검증. Stage 5 필요한 Auth/DB 의존성 및 host binding 단절 지점 분류.
 - **미완료:** Cloudflare DB TCP/Hyperdrive/Node-compat 실제 경로 실측, OAuth 콜백/secret 실제 바인딩, subject/transaction RLS E2E, 실회원 로그인/사용자 데이터.
 - **다음 실제 작업:** 승인된 환경 격리 방법과 호스트 정책이 정해지면 사용자 데이터 연결 없이 Worker 런타임 호환 adapter와 negative Auth/DB 테스트부터 이관. 승인 전에는 작업 범위를 문서/비밀값 없는 계약 검증으로 제한.
+
+
+## 6. Workers 실측 결과 — 격리 로컬 런타임 (단계 5, 2026-10-20)
+
+- [실제 GitHub Actions CI 실행](https://github.com/gycha0109-beep/MyeongHa/actions/runs/39444480921)에서 `npm run verify:cloudflare:auth-db:local` **PASS**. `wrangler@4.151.2`, `2026-10-20` 호환성 날짜의 실제 `workerd`를 사용함.
+- **`pg` Client/Pool 모듈**, 기존 `createNodePostgresSubjectPoolV1` 및 `buildProductionPostgresStrictTlsTargetV1` 모듈 **로딩 가능**. `node:crypto` SHA-256/X509과 `node:tls` API export 사용 가능. 이는 TCP 연결/인증서 피어 검증의 실제 성공이 아님.
+- **자격증명 없는 환경을 기존 `parseProductionUserDataRuntimeConfigV1`이 거부**함을 확인. Workerd에서 기존 `member-refresh-cookie.ts`의 synthetic-only 쿠키 발급·읽기·폐기 및 `Path=/api/auth; HttpOnly; Secure; SameSite=Strict`, no Domain 계약 유지.
+- 로컬 테스트는 `workers/cloudflare-auth-db-compat.local.jsonc`와 테스트 전용 Worker 엔트리로만 실행. **Cloudflare에 별도 프로젝트 생성 0, 배포 0, 비밀값 0, DB 쿼리 0, OAuth 호출 0**. 실제 프리뷰는 여전히 `wrangler.jsonc`의 `myeongha` 정적 Worker이며 Auth/DB API 404 차단.
+- [Cloudflare 공식 Postgres/Node 호환 안내](https://developers.cloudflare.com/workers/tutorials/postgres/): 호환성 날짜 2026-08-04 이후 Node 호환 기능은 기본값. 이 설정만으로 명하 DB 보안 수락이 완료되지는 않음.
+
+### 실연동 전에 반드시 변경해야 하는 구조
+
+1. **요청 간 DB 연결 공유 금지.** 기존 `api/me.ts`와 `api/birth-profiles.ts`의 모듈 전역 `sharedPostgresPool` 캐시는 Vercel/Node 서버 중심 코드다. Workers는 [TCP 소켓을 전역에서 공유하거나 다른 요청에서 재사용할 수 없음](https://developers.cloudflare.com/workers/runtime-apis/tcp-sockets/). Workers 런타임에는 요청 내부에서 Client/Pool을 생성·연결·해제하는 별도 adapter가 필요하고, 기존 Vercel Pool은 그대로 둔다.
+2. **Direct TCP vs Hyperdrive 미결정.** Direct `pg`는 Workers 내부에서 CA·peer 및 네트워크 지연 검증이 필요. [Hyperdrive](https://developers.cloudflare.com/hyperdrive/concepts/connection-pooling/)는 트랜잭션 풀링 방식으로 같은 `BEGIN/COMMIT` 범위의 `SET`/SQL을 같은 연결에서 실행하며 종료 후 `RESET`하지만, 명하의 `SET LOCAL ROLE`·subject binding·RLS E2E 및 성능·사용량 검증은 별도 필요. 둘 중 어느 쪽도 자동 채택하지 않는다.
+3. **TLS 신뢰 경계 구분.** [Hyperdrive는 verify-full과 사용자 지정 CA를 지원](https://developers.cloudflare.com/hyperdrive/reference/supported-databases-and-features/)하지만, 기존 앱이 실행하는 X509 피어 검증/고정 SHA-256 fingerprint와 **검증 주체가 동일하다고 가정할 수 없다**. Root CA·인증서 지문·피어 호스트를 입증하기 전 Hyperdrive 리소스를 만들지 않는다.
+4. **호스트 및 세션 분리.** Vercel 고정 OAuth redirect와 host-only refresh cookie가 Workers.dev Preview에서 자동 연동되는 것은 불가능하다. 실제 콜백/쿠키 허용 호스트 정책과 Security/API/DB 승인이 확정되기 전에는 User Auth/DB route는 계속 404.
+5. **최종 positive admission 요건:** 격리 DB에서 TLS verify-full, 전용 NOLOGIN execution role, 요청별 `BEGIN → SET LOCAL ROLE → canonical subject → RLS 검사 → COMMIT/ROLLBACK`, cross-user deny, pool isolation, TTL/CSRF, 네트워크 실패/timeout/동시성 회귀. 인증·DB 기능 공개/운영 전환은 별도 승인.
+
+### 이 단계의 판정
+
+**Workers 모듈 로딩/정적 정책 호환성: PASS. 실제 DB 연결·TLS 핸드셰이크·RLS·OAuth E2E: NOT TESTED/HOLD.** 프리뷰 공개 API 범위에는 변동이 없다.
