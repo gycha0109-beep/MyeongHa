@@ -158,6 +158,20 @@ echo "PASS S4 restore: child-first scrub unblocks Reader-access finalizer orderi
 
 # A second replay/restore cannot resurrect an accessible row either.
 p -c "\\copy official_reader_s4_fixture.protected_bodies FROM '$snapshot' WITH (FORMAT csv)" >"$tmpdir/replay-import.log" || die "second old snapshot import failed"
+# A separate transaction supplies completed Job/Outbox metadata to the
+# ACTUAL native 1190 completed-replay path without committing a fake deletion.
+# It denies the old bytes, delegates after an in-transaction scrub, and then
+# ROLLBACK restores this snapshot for the existing second tombstone replay.
+p -f test/db/official_reader_s4_completed_replay_restore_contract.sql >"$tmpdir/completed-replay.log" 2>&1 || {
+ tail -85 "$tmpdir/completed-replay.log" >&2
+ die "native completed-state old-backup replay contract failed"
+}
+grep -q 'PASS S4 scrubbed bytes delegate native completed replay' "$tmpdir/completed-replay.log" ||
+ die "native completed-state delegation was not exercised"
+grep -q 'PASS S4 completed-state rehearsal rolled back' "$tmpdir/completed-replay.log" ||
+ die "completed-state rehearsal did not restore the prior backup state"
+echo "PASS S4 restore: already-completed native ACK replay gated by old protected bytes"
+
 check "second old backup import remains unreadable" "select ($read_count)=0;"
 check_ack_denied "second restore reblocks native completion" "Protected Reader deletion ledger or recovered bytes are not reconciled"
 check "second restore immediately revokes protected completion readiness" "select not ($cleanup_ready);"
