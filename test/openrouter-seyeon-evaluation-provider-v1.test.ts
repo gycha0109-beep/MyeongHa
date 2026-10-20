@@ -3,6 +3,7 @@ import {
   createOpenRouterSeyeonEvaluationProviderV1 as create,
   OPENROUTER_SEYEON_ENDPOINT_V1 as URL,
   type OpenRouterSeyeonMetricV1,
+  type OpenRouterSeyeonEvaluationConfigV1,
 } from '../apps/api/src/openrouter-seyeon-evaluation-provider-v1.js';
 import { runSeyeonCensusFirstThreeCallShadowV1 } from '../apps/api/src/seyeon-census-first-three-call-shadow-v1.js';
 import { createIntegrityClassifier, createDisclosureClassifier } from '../apps/api/src/seyeon-production-governance-v1.js';
@@ -41,8 +42,8 @@ function success(value: unknown = output, extra: Record<string, unknown> = {}) {
   });
 }
 function make(fetchImpl: (_url: string, init: RequestInit) => Promise<Response>,
-  beforeDispatch = vi.fn(async () => undefined),
-  afterOutcome = vi.fn(async (_metric: OpenRouterSeyeonMetricV1) => undefined)) {
+  beforeDispatch: OpenRouterSeyeonEvaluationConfigV1['beforeDispatch'] = vi.fn(async () => undefined),
+  afterOutcome: OpenRouterSeyeonEvaluationConfigV1['afterOutcome'] = vi.fn(async (_metric: OpenRouterSeyeonMetricV1) => undefined)) {
   return { provider: create({ apiKey: key, model: 'openai/gpt-oss-20b',
     maxCompletionTokens: 1536, fetchImpl, beforeDispatch, afterOutcome }),
     beforeDispatch, afterOutcome };
@@ -79,7 +80,7 @@ describe('OpenRouter Se-yeon eval adapter: offline / zero paid dispatch', () => 
     expect(fetchImpl).toHaveBeenCalledOnce();
     expect(beforeDispatch).toHaveBeenCalledOnce();
     expect(afterOutcome).toHaveBeenCalledOnce();
-    expect(afterOutcome.mock.calls[0]?.[0]).toMatchObject({
+    expect(vi.mocked(afterOutcome).mock.calls[0]?.[0]).toMatchObject({
       outcome: 'response_received',httpStatus:200,
       promptTokens:115,completionTokens:34,cachedPromptTokens:0,
       reasoningTokens:4,invoiceReconciled:false });
@@ -116,7 +117,7 @@ describe('OpenRouter Se-yeon eval adapter: offline / zero paid dispatch', () => 
       code:'CREDIT_REQUIRED',httpStatus:402,
     });
     expect(fetchImpl).toHaveBeenCalledOnce();
-    expect(afterOutcome.mock.calls[0]?.[0]).toMatchObject({
+    expect(vi.mocked(afterOutcome).mock.calls[0]?.[0]).toMatchObject({
       outcome:'http_failure',httpStatus:402,promptTokens:null,completionTokens:null,
     });
   });
