@@ -1481,6 +1481,7 @@ p >"$tmpdir/b8-lock-order-scope-row.out" 2>&1 <<SQL &
 set application_name='rr_s2_b8_scope_then_purchase_row';
 set statement_timeout='20s';
 begin;
+select pg_catalog.set_config('myeongha.subject_id','$subject',true);
 select public.internal_acquire_official_reader_scope_lock_v1(
  '$subject'::uuid,'$b8_reading'::uuid,'test-standard-reader'
 );
@@ -1499,6 +1500,7 @@ p >"$tmpdir/b8-lock-order-purchase-scope.out" 2>&1 <<SQL &
 set application_name='rr_s2_b8_purchase_then_scope';
 set statement_timeout='20s';
 begin;
+select pg_catalog.set_config('myeongha.subject_id','$subject',true);
 select public.internal_acquire_official_reader_purchase_lock_v1(
  '$b8_intent'::uuid
 );

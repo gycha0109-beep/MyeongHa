@@ -4,21 +4,21 @@
 -- The private fixture schema and its Reader/Chat FKs are created beforehand.
 do $verify_current_finalizer$
 declare
- definition text;
+ v_fn_definition text;
  reader_delete text := 'delete from public.standard_reading_reader_access_grants where subject_id = p_subject_id;';
  chat_delete text := 'delete from public.conversation_messages where subject_id = p_subject_id;';
 begin
  select pg_catalog.pg_get_functiondef(
   'public.internal_finalize_account_deletion_db_v1(uuid,uuid,text)'::regprocedure
- ) into definition;
- if definition is null
-  or pg_catalog.position(reader_delete in definition)=0
-  or pg_catalog.position(chat_delete in definition)=0
-  or pg_catalog.position(reader_delete in definition)
-     >=pg_catalog.position(chat_delete in definition)
-  or pg_catalog.position('set constraints all deferred;' in definition)=0
-  or pg_catalog.position('internal_account_deletion_finalization_preflight_v1' in definition)=0
-  or pg_catalog.position('official_reader_s4_fixture' in definition)>0
+ ) into v_fn_definition;
+ if v_fn_definition is null
+  or pg_catalog.strpos(v_fn_definition,reader_delete)=0
+  or pg_catalog.strpos(v_fn_definition,chat_delete)=0
+  or pg_catalog.strpos(v_fn_definition,reader_delete)
+     >=pg_catalog.strpos(v_fn_definition,chat_delete)
+  or pg_catalog.strpos(v_fn_definition,'set constraints all deferred;')=0
+  or pg_catalog.strpos(v_fn_definition,'internal_account_deletion_finalization_preflight_v1')=0
+  or pg_catalog.strpos(v_fn_definition,'official_reader_s4_fixture')>0
  then
   raise exception 'S4 finalizer source drift: review account deletion FK graph, approvals and patch location';
  end if;
