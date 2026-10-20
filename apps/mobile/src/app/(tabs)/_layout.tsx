@@ -2,6 +2,7 @@ import { Tabs } from 'expo-router';
 import { StyleSheet, Text, type ColorValue } from 'react-native';
 
 import { useMobileTheme } from '@/ui/mobile-theme';
+import { useMobileUiLocale } from '@/ui/mobile-ui-locale';
 
 const iconByRoute = Object.freeze({
   index: '⌂',
@@ -17,6 +18,7 @@ function TabIcon({ route, color }: { route: keyof typeof iconByRoute; color: Col
 
 export default function TabLayout() {
   const { colors } = useMobileTheme();
+  const { t } = useMobileUiLocale();
   return (
     <Tabs
       screenOptions={{
@@ -27,11 +29,11 @@ export default function TabLayout() {
         tabBarLabelStyle: styles.label,
       }}
     >
-      <Tabs.Screen name="index" options={{ title: '홈', tabBarIcon: ({ color }) => <TabIcon route="index" color={color} /> }} />
-      <Tabs.Screen name="reading" options={{ title: '사주', tabBarIcon: ({ color }) => <TabIcon route="reading" color={color} /> }} />
-      <Tabs.Screen name="chat" options={{ title: '대화', tabBarIcon: ({ color }) => <TabIcon route="chat" color={color} /> }} />
-      <Tabs.Screen name="records" options={{ title: '기록', tabBarIcon: ({ color }) => <TabIcon route="records" color={color} /> }} />
-      <Tabs.Screen name="my" options={{ title: '마이', tabBarIcon: ({ color }) => <TabIcon route="my" color={color} /> }} />
+      <Tabs.Screen name="index" options={{ title: t('홈'), tabBarIcon: ({ color }) => <TabIcon route="index" color={color} /> }} />
+      <Tabs.Screen name="reading" options={{ title: t('사주'), tabBarIcon: ({ color }) => <TabIcon route="reading" color={color} /> }} />
+      <Tabs.Screen name="chat" options={{ title: t('대화'), tabBarIcon: ({ color }) => <TabIcon route="chat" color={color} /> }} />
+      <Tabs.Screen name="records" options={{ title: t('기록'), tabBarIcon: ({ color }) => <TabIcon route="records" color={color} /> }} />
+      <Tabs.Screen name="my" options={{ title: t('마이'), tabBarIcon: ({ color }) => <TabIcon route="my" color={color} /> }} />
     </Tabs>
   );
 }
