@@ -9,6 +9,7 @@ import type {
 import { mobileColors } from '@/ui/mobile-colors';
 import { useMobileTheme } from '@/ui/mobile-theme';
 import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
+import { useMobileUiLocale } from '@/ui/mobile-ui-locale';
 
 export function MyProfileCard({
   profile,
@@ -360,6 +361,56 @@ const pendingSettings = Object.freeze([
   '고객지원',
 ] as const);
 
+
+const localeChoices = [
+  { value: 'ko-KR', label: '한국어' },
+  { value: 'ja-JP', label: '日本語' },
+  { value: 'zh-TW', label: '繁體中文' },
+] as const;
+
+function MyLocaleSelector() {
+  const themedStyles = useMobileThemedStyles(styles);
+  const { locale, setLocale, t } = useMobileUiLocale();
+  const { colors } = useMobileTheme();
+  return (
+    <View style={themedStyles.localeSection}>
+      <Text style={[themedStyles.settingTitle, { color: colors.ink }]}>{t('언어 선택')}</Text>
+      <View style={themedStyles.localeChoices}>
+        {localeChoices.map((choice) => {
+          const selected = locale === choice.value;
+          return (
+            <Pressable
+              key={choice.value}
+              accessibilityRole="radio"
+              accessibilityState={{ selected }}
+              accessibilityLabel={choice.label}
+              onPress={() => setLocale(choice.value)}
+              style={[
+                themedStyles.localeChoice,
+                {
+                  backgroundColor: selected ? colors.navy : colors.surface,
+                  borderColor: selected ? colors.navy : colors.border,
+                },
+              ]}
+            >
+              <Text style={{ color: selected ? colors.canvas : colors.ink, fontSize: 13, fontWeight: '800' }}>
+                {choice.label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+      <Text style={themedStyles.caption}>
+        {locale === 'ja-JP'
+          ? '画面の固定ラベルのみを翻訳します。会話・個人情報・公式鑑定は変更しません。'
+          : locale === 'zh-TW'
+            ? '只翻譯介面的固定文字，不改動對話、個人資料或正式解讀。'
+            : '화면에 고정된 안내 문구만 번역합니다. 대화·개인정보·공식 해석은 변경하지 않습니다.'}
+      </Text>
+    </View>
+  );
+}
+
 function MyThemeSelector() {
   const themedStyles = useMobileThemedStyles(styles);
   const { theme, setTheme, colors } = useMobileTheme();
@@ -402,6 +453,7 @@ export function MyPendingSettings() {
       </View>
       <View style={[themedStyles.settingsCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
         <MyThemeSelector />
+        <MyLocaleSelector />
         {pendingSettings.map((title) => (
           <View key={title} style={themedStyles.settingRow}>
             <Text style={[themedStyles.settingTitle, { color: colors.ink }]}>{title}</Text>
@@ -533,6 +585,9 @@ const styles = StyleSheet.create({
   flowArrow: { color: mobileColors.navy, fontSize: 18, fontWeight: '800' },
   themeSection: { paddingHorizontal: 17, paddingTop: 18, paddingBottom: 12, gap: 12 },
   themeChoices: { flexDirection: 'row', gap: 10 },
+  localeSection: { paddingHorizontal: 17, paddingTop: 12, paddingBottom: 18, gap: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: mobileColors.border },
+  localeChoices: { flexDirection: 'row', gap: 8 },
+  localeChoice: { flex: 1, minHeight: 49, borderWidth: 1, borderRadius: 12, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3 },
   settingsCard: {
     borderWidth: 1,
     borderColor: mobileColors.border,
