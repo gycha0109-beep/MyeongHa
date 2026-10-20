@@ -143,6 +143,27 @@ $stale_epoch_after_scrub$;
 update official_reader_s4_ledger_fixture.recovery_fence
  set reconciled_epoch=3 where singleton;
 
+-- Reconciliation permits DELEGATION, never replacement of native 1190's
+-- worker-owner binding. A foreign worker cannot replay the completed Job.
+do $foreign_worker_lease$
+begin
+ begin
+  perform * from official_reader_s4_ledger_fixture.attempt_guarded_completion_ack_v1(
+   '11390000-0000-0000-0000-000000000001'::uuid,
+   'd4800000-0000-4000-8000-000000000001'::uuid,
+   'synthetic-s4-foreign-owner'
+  );
+ exception when check_violation then
+  if sqlerrm <> 'account deletion completion replay state is inconsistent' then
+   raise exception 'S4 foreign ACK owner failed for wrong reason: %',sqlerrm;
+  end if;
+  raise notice 'PASS S4 reconciled cleanup still delegates native ACK worker-owner proof';
+  return;
+ end;
+ raise exception 'FAIL S4 foreign worker bypassed completed job native owner proof';
+end
+$foreign_worker_lease$;
+
 do $delegated_replay$
 declare
  v_completed boolean;
