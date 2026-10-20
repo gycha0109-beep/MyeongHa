@@ -1,60 +1,54 @@
-# Cloudflare 정적 프리뷰 구현·검증 실행 안내 (v1, 2026-10-20)
+# Cloudflare 정적 프리뷰 + 기본 API 라우터 실행 안내 (2026-10-20)
 
-> 작업 브랜치: `feat/ops/cloudflare-static-preview-20261020`  
-> 참고 설계/로드맵: [문서 PR #2381](https://github.com/gycha0109-beep/MyeongHa/pull/2381)  
-> 현재 범위: **로컬 정적 빌드 및 API deny-only Worker 코드**. 계정/사이트/실제 Cloudflare 배포 미실시.
+> 저장소: `gycha0109-beep/MyeongHa` / [구현 PR #2384](https://github.com/gycha0109-beep/MyeongHa/pull/2384) (**Draft, 미병합**)  
+> 참조: [이관 로드맵 PR #2381](https://github.com/gycha0109-beep/MyeongHa/pull/2381)  
+> Cloudflare 단일 Worker 프로젝트: **`myeongha`** (운영 도메인은 여전히 Vercel)  
+> 현재 범위: 로드맵 1~4단계, Static Assets 11개 + 유일한 공개 liveness `GET /api/health`.
 
-## 바로 실행할 수 있는 명령 (Node 24, npm)
+## 검증 및 재현 (Node 24, GitHub CI)
 
 1. `npm ci --ignore-scripts --no-audit --no-fund`
-2. `npm run test:cloudflare:static` — Worker API 거부, 세연 최초 Reveal 503, CSP 생성·변조 거부, 정적 산출물 검사 단위 테스트.
-3. `npm run build:cloudflare:static` — **기존** `npm run build:web` 그대로 실행 → `public/_headers` 생성 → 11 HTML, 파일 한도, 보안 헤더 검증.
-4. `npm run verify:deployment-config` — 기존 Vercel 배포 산출물 회귀 검증. `_headers`는 Cloudflare 용도로만 생성되므로 이 단계는 별도로 PASS 여부 판단.
+2. `npm run test:cloudflare:static`: 모든 직접 엔트리 12개/rewrites 17개 경로 분류와 권한 차단, health `200/405`, readiness `404`, 세연 `503`, CSP·헤더·파일 검증.
+3. `npm run build:cloudflare:static`: 웹 기존 11 HTML 빌드 → `public/_headers`·`_redirects` 생성 → 전체 정적 자산/파일 노출/헤더 정책 검사.
+4. `npm run verify:cloudflare:local`: `wrangler@4.151.2`를 CI에서 일회성 설치한 **실제 workerd 로컬 HTTP 검사**. AWS/Cloudflare credential 불필요, 외부 배포 없음.
+5. `node scripts/verify-cloudflare-preview-remote.mjs`: 실제 배포된 Cloudflare Preview URL에서 HTTPS 경로·보안 헤더·차단 정책 검사. PR에 있는 `Cloudflare Preview Remote Smoke` Workflow가 자동 실행한다.
+6. `node scripts/verify-cloudflare-preview-browser.mjs`: Actions Runner Headless Chrome으로 원격 11개 화면 렌더링 검사.
+7. `npm run verify:deployment-config`: 기존 Vercel 배포 구조 회귀 검사. Vercel 설정은 바꾸지 않는다.
 
-이 PR은 기존 Vercel 배포 설정이나 package-lock.json을 변경하지 않는다. CI에서 `npm exec --yes --package=wrangler@4.151.2 -- wrangler dev`로 버전을 정확히 지정하여 로컬 workerd 실행을 검증한다. 이 방식은 npm CI 호스트에서 해당 패키지를 동적으로 설치하며 **Cloudflare 계정에 배포하지 않는다**. 실제 검사 결과는 PR의 최신 GitHub Actions 로그에서 판단한다. 클라우드 프리뷰/운영 검증 PASS를 주장하지 않는다.
+## 운영/프리뷰 격리
 
-## 설계한 배포 경계
+- Cloudflare Worker `myeongha`: `wrangler.jsonc`의 `workers_dev=false`, `preview_urls=true`, `previews={}`.
+- Production Worker URL은 Cloudflare API에서 **disabled**, Preview URL만 enabled.
+- GitHub Branch Preview: `feat/ops/cloudflare-static-preview-20261020`; 빌드 `npm run build:cloudflare:static`, Publish `npx wrangler preview`.
+- 정적 자산 `./public`, `html_handling:none`, `not_found_handling:none`, `run_worker_first:['/api','/api/*']`; `/`만 `/index.html`로 200 rewrite.
+- 보안 헤더 `public/_headers`는 **Vercel `vercel.json`에서 5종을 정확히 생성**. Worker API 응답은 별도 명시된 동일 보안 헤더와 `no-store` 사용.
+- Workers.dev Preview는 Cloudflare가 `X-Robots-Tag: noindex`로 응답을 덮어쓴다. 그 경계만 원격 검사에서 허용하고 나머지 헤더는 exact Vercel policy를 요구한다.
+- 프리뷰 URL: https://feat-ops-cloudflare-static-preview-20261020-myeongha.gycha0109.workers.dev
+- 사용자 로그인/토큰/DB·Saju producer/OpenAI·PortOne secret **전달·보관하지 않음**.
 
-- `wrangler.jsonc`: `assets.directory=./public`, `html_handling=none`, `not_found_handling=none`, `run_worker_first=["/api", "/api/*"]`.
-- Worker `workers/cloudflare-static-preview.mjs`: 새 Cloudflare 실행 환경에 대한 **deny-only** handler. 모든 `/api/*`의 positive response는 아직 허용하지 않음. `POST /api/chat/:threadId/turns`는 `503 SEYEON_FIRST_REVEAL_AUTHORITY_UNAVAILABLE`; 다른 API는 `404`; 자산 미일치 URL도 `404`.
-- `workers_dev=false`: 운영 Worker 기본 공개 서브도메인 자동 노출을 피함. `preview_urls=true`는 승인 후에만 계정을 통해 배포될 미리보기 경로용; 프리뷰도 외부 접속 가능성으로 취급.
-- 정적 파일은 Worker 코드보다 자산 우선순위로 제공되어 API용 CPU와 혼동하지 않는다. **아직 Cloudflare에서 실제 라우팅을 실측하지 않았다.**
-- `scripts/prepare-cloudflare-static.mjs`: 현재 `vercel.json`의 전역 5개 보안 헤더를 strict validation 후 `public/_headers`에 복제. CSP 약화·헤더 누락·변조·중복이면 빌드 실패.
-- `scripts/verify-cloudflare-static.mjs`: 11 HTML, 전체 정적 파일, Cloudflare 설정, 보안 헤더, `source.map`/시크릿 파일 금지, Workers Free 정적 파일 수/크기를 점검.
-- `public/`는 빌드 산출물이며 Git에 넣지 않는다. 실제 HTML 화면·헤더·캐시는 Worker 프리뷰 이후 브라우저에서 재검증.
+## 단계 4 공개 API와 거부 계약
 
-## 고의적으로 하지 않은 작업
-
-1. `vercel.json`, 기존 `api/`/DB/보안 로직, 환경변수/secret, GitHub Actions workflow, Supabase 설정 미변경.
-2. 외부 API 프록시, OAuth callback 재설정, Saju producer 재호스팅, 관상 이미지 전달, OpenAI 호출, 결제 웹훅 공개 **없음**.
-3. 세연 first Reveal의 `503` guard/G0-D04, 메모리 철회·수신 ACK, Reader grant를 느슨하게 하지 않음.
-4. GitHub 저장소를 Cloudflare Builds에 연결하거나 Cloudflare Worker를 생성하지 않음.
-5. Wrangler 배포 검증/실제 11페이지 브라우저 렌더링/CPU·메모리/요청량 실측을 완료했다고 선언하지 않음.
-
-## 검증 시나리오(후속 런타임 단계)
-
-| HTTP 입력 | 현재 설계 예상 결과 | 다음 단계 증명 |
+| HTTP | Cloudflare Preview 기대값 | 근거/제한 |
 |---|---|---|
-| `GET /`, `GET /index.html` | 정적 index 제공(\`/\`은 정적 rewrite) | MIME/CSP/cache/브라우저 캡처 |
-| `GET /chat.html`, `/face-reading.html` 등 11개 | 같은 경로의 HTML 제공 | Vercel과 정적 자원/상대경로 parity |
-| `GET /missing-page.html` | 404 | SPA fallback 금지 |
-| `GET /api/health` | 404 (미이관) | Worker 우선 처리 |
-| `POST /api/auth/sign-in` | 404 (미이관) | credentials/user-data 호출 0 |
-| `POST /api/chat/thread/turns` | 503 fixed JSON | protected assistant body 0 |
-| `GET /api/unknown` | 404/no-store | 정적 HTML 노출 0 |
-| 쿠키/헤더/기밀 파일 | static/cdn에 응답·cache 되면 안 됨 | 실제 브라우저/HTTP negative 검사 |
+| `GET /`, `GET /index.html` 및 11개 HTML | 200 HTML | 보안 헤더 / 캐시 no-store |
+| `GET /api/health` | 200 `{"status":"ok"}` | **유일한 공개 positive API**. 서비스/DB readiness를 나타내지 않음 |
+| `POST/HEAD/OPTIONS/PUT/DELETE /api/health` | 405 `Allow: GET` | CORS 허용하지 않음 |
+| `GET /api/health?...` 및 인코딩/슬래시 변형 | 404 | rewrite marker/중복·변조 불수용 |
+| `GET/POST /api/readiness` | **404** | Vercel의 비공개 Postgres TLS Canary는 절대 호출하지 않음 |
+| `GET/POST /api/auth/*`, `/api/me/*`, 기존 rewrites | **404** | 12 direct + 17 rewrite는 명시적 matcher로 분류하되 승인 없이 dispatch 금지 |
+| `POST /api/chat/:threadId/turns` | **503 `SEYEON_FIRST_REVEAL_AUTHORITY_UNAVAILABLE`** | 세연 최초 Reveal HOLD 유지 |
+| `GET /api/chat/:threadId/turns` | 404 | 차단 우회 금지 |
+| 존재하지 않는 HTML, unknown `/api/*` | 404 | SPA fallback 200 금지 |
 
-## 다음 실제 작업
+별도 보안 경계: marker query parameter를 사용한 handler spoofing, CORS preflight, method mismatch, URL 인코딩·추가 세그먼트와 비공개 TLS canary 접근 모두 거부. 405는 공개 health에서만 허용한다.
 
-1. Node24 환경에서 `npm run test:cloudflare:static`, `npm run build:cloudflare:static`, `npm run verify:cloudflare:local`을 실행하고 정확한 SHA의 CI 결과를 확인한다.
-2. 파일 용량/정적 라우팅 등의 출력 기록을 근거로 문제만 수정한다.
-3. `npm run verify:cloudflare:local`로 핀 고정된 Wrangler 로컬 HTTP 테스트를 통과시키고, 오류가 있으면 해당 URL·응답 경계만 수정한다.
-4. 사용자에게 계정 내 전용 Worker 및 GitHub preview 연동에 관한 명시 승인 범위가 정해질 때에만 Cloudflare 리소스 생성·배포를 실행한다.
-5. 이후부터 기존 로드맵대로 health + router, Auth/DB, Saju/Face, AI/Commerce 독립 승인 단계를 밟는다.
+## 확인된 실행 기록 및 후속 승인
 
-## 사용자 보고
+- 로컬 정적 파일: 11 HTML / 185 files / 최대 281,150 bytes, 원격 정적 브라우저 11개 PASS.
+- 기존 Stage 3 원격 [HTTP 21개·Chrome 11개 검증 성공](https://github.com/gycha0109-beep/MyeongHa/actions/runs/39433142823).
+- Stage 4 원격 [HTTP 55개·Chrome 11개 검증](https://github.com/gycha0109-beep/MyeongHa/actions/runs/39436910190): `GET /api/health` 200 / 메서드 405 / readiness 404 / 세연 503.
+- 검증 완결 판단은 **최신 PR SHA의 전체 CI 결과**를 포함하여 내린다.
 
-- 한 작업: 실제 수정·검증 결과만.
-- 남은 작업: 아직 수행하지 않은 주요 항목.
-- 다음 작업: 바로 이어지는 로드맵 작업.
-- 승인/차단: 외부 계정/과금/보안/운영 변경 승인 필요 시에만.
+**금지:** PR 자동병합, `wrangler deploy`(운영), Vercel/DNS 전환, Auth/DB 연결/secret 등록, RLS 완화, Saju producer 인증 우회, 세연 AI positive Reveal, 결제 웹훅/판매 활성화.
+
+**다음 단계:** 로드맵 5단계(Auth/DB)에서 OAuth·session/guest subject·TLS verify-full·unprivileged DB role·RLS·cookie 경계를 별도 권한 승인 및 격리된 E2E로 확인한다. 이를 충족하지 않으면 Auth/DB 경로는 404 HOLD로 유지한다.
