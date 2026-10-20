@@ -8,6 +8,6 @@ export const FORTUNE_COOKIE_LOCALE_COPY_V1 = Object.freeze({
 
 export function fortuneCookieMessageV1(index: number, locale: string): string {
   if (!Number.isInteger(index) || index < 0 || index >= FORTUNE_COOKIE_MESSAGES_V1.length) return '';
-  if (locale === 'ja-JP' || locale === 'zh-TW') return FORTUNE_COOKIE_LOCALE_COPY_V1[locale][index];
-  return FORTUNE_COOKIE_MESSAGES_V1[index];
+  if (locale === 'ja-JP' || locale === 'zh-TW') return FORTUNE_COOKIE_LOCALE_COPY_V1[locale][index] ?? '';
+  return FORTUNE_COOKIE_MESSAGES_V1[index] ?? '';
 }
