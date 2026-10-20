@@ -109,6 +109,40 @@ $nonread$;
 delete from official_reader_s4_fixture.protected_bodies
 where subject_id='11390000-0000-0000-0000-000000000001'::uuid;
 
+-- A new recovery epoch may be required AFTER the old bytes are scrubbed.
+-- A completed Job still cannot bypass the off-backup reconciliation fence.
+update official_reader_s4_ledger_fixture.recovery_fence
+ set required_epoch=3,reconciled_epoch=2
+ where singleton;
+
+do $stale_epoch_after_scrub$
+begin
+ if not exists(select 1 from public.data_deletion_jobs
+   where id='d4800000-0000-4000-8000-000000000001'::uuid
+   and status='completed')
+   or exists(select 1 from official_reader_s4_fixture.protected_bodies)
+ then raise exception 'S4 post-scrub stale epoch fixture incomplete'; end if;
+ begin
+  perform * from official_reader_s4_ledger_fixture.attempt_guarded_completion_ack_v1(
+   '11390000-0000-0000-0000-000000000001'::uuid,
+   'd4800000-0000-4000-8000-000000000001'::uuid,
+   'synthetic-s4-completed-owner'
+  );
+ exception when check_violation then
+  if sqlerrm <> 'Protected Reader deletion ledger or recovered bytes are not reconciled' then
+   raise exception 'S4 stale epoch denied for unexpected reason: %',sqlerrm;
+  end if;
+  raise notice 'PASS S4 post-scrub completed replay denied by stale recovery epoch';
+  return;
+ end;
+ raise exception 'FAIL S4 stale epoch bypassed completed replay gate';
+end
+$stale_epoch_after_scrub$;
+
+-- Reconcile only the new required epoch, then delegate the native 1190 replay.
+update official_reader_s4_ledger_fixture.recovery_fence
+ set reconciled_epoch=3 where singleton;
+
 do $delegated_replay$
 declare
  v_completed boolean;
