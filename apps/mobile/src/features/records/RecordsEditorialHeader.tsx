@@ -2,6 +2,7 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import type { RecordsTabV1 } from '@/features/records/records-view-model';
 import { useMobileTheme } from '@/ui/mobile-theme';
+import { MobileUiText } from '@/ui/MobileUiText';
 
 const tabLabels: Readonly<Record<RecordsTabV1, string>> = Object.freeze({
   all: '전체', life: '현세록', readings: '지난 읽기', memories: '기억',
@@ -26,11 +27,11 @@ export function RecordsEditorialHeader({
         <Text style={styles.stampText}>錄</Text>
       </View>
       <View style={styles.copy}>
-        <Text style={styles.eyebrow}>MY ARCHIVE · 명하</Text>
+        <MobileUiText style={styles.eyebrow}>MY ARCHIVE · 명하</MobileUiText>
         <Text style={styles.title}>지나온 이야기에도{'\n'}나의 결이 남습니다.</Text>
-        <Text style={styles.description}>
+        <MobileUiText style={styles.description}>
           지금 확인할 수 있는 삶의 기록과 사주 풀이를 차분히 살펴보세요.
-        </Text>
+        </MobileUiText>
       </View>
       <View style={styles.countRow}>
         <Text style={styles.countCategory}>{tabLabels[selected]}</Text>
