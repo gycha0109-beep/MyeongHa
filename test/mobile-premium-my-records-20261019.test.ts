@@ -46,7 +46,9 @@ describe('mobile premium My and Records presentation', () => {
     const header = await source('apps/mobile/src/features/records/RecordsEditorialHeader.tsx');
     expect(screen).toContain('visibleItems(tab, snapshots)');
     expect(screen).toContain('itemCount={initialLoading ? null : items.length}');
-    expect(header).toContain("itemCount === null ? '기록을 확인하는 중'");
+    expect(header).toContain("itemCount === null");
+    expect(header).toContain("t('기록을 확인하는 중')");
+    expect(header).toContain("t(tabLabels[selected])");
     expect(header).toContain('현재 불러온 기록');
     expect(screen).toContain('<RecordsTabs selected={tab} onSelect={setTab} />');
     expect(screen).toContain('failedCollectionLabelsV1');
