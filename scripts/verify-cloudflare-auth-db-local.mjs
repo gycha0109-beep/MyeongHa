@@ -71,7 +71,7 @@ async function validate() {
   const keys = [
     'postgresDriverExports','productionPoolAdapterLoadable',
     'strictTlsAuthorityBuilderLoadable','nodeCryptoAvailable',
-    'nodeTlsApiAvailable','missingCredentialsRejected',
+    'nodeTlsApiAvailable','missingCredentialsRejected','refreshCookieContractPreserved',
   ];
   assert(value.status === 'pass', 'Worker signaled failed compatibility');
   assert(Object.keys(value.checks ?? {}).sort().join() === keys.sort().join(),
@@ -98,6 +98,7 @@ async function validate() {
     productionSubjectPoolModule:'LOADABLE_ONLY',
     tls:'API_EXPORTS_ONLY_NOT_HANDSHAKE',
     emptyCredentials:'DENIED',
+    refreshCookie:'HTTPONLY_SECURE_SAMESITE_STRICT_HOST_ONLY',
     networkOrDatabaseCalls:0,
     productionDeployment:'NONE',
     checks:'PASS',
