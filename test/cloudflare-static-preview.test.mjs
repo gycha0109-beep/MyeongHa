@@ -54,6 +54,8 @@ describe('Cloudflare static-only deployment boundary', () => {
   });
 
   it('never returns a successful or streaming response for unported APIs', async () => {
+    const vercel = JSON.parse(await readFile(vercelUrl, 'utf8'));
+    const csp = vercel.headers[0].headers.find((header) => header.key === 'Content-Security-Policy').value;
     for (const [method, path] of [
       ['GET', '/api/health'],
       ['POST', '/api/auth/sign-in'],
@@ -67,6 +69,7 @@ describe('Cloudflare static-only deployment boundary', () => {
       );
       expect(response.status).toBe(404);
       expect(response.headers.get('cache-control')).toBe('no-store');
+      expect(response.headers.get('content-security-policy')).toBe(csp);
       expect(response.headers.get('x-robots-tag')).toContain('noindex');
       expect(await response.text()).toBe('');
     }
