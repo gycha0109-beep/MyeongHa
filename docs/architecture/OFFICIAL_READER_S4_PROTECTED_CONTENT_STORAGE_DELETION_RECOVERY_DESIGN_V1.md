@@ -127,3 +127,11 @@ T1·S3·T2 각 검사가 동일 원본/Scope를 pin해야 한다. `Response`·`R
 - `test/db/official_reader_s4_protected_storage_design.sql`은 실제 공식 Reading·Reader·Entitlement Grant 테스트 자료와 FK를 연결한 **격리 PostgreSQL 전용** 시험입니다. `supabase/migrations/`와 운영 Writer·HTTP는 변경하지 않습니다. 생성한 `official_reader_s4_fixture` 스키마는 테스트 DB와 함께 폐기됩니다.
 - FORCE RLS·ACL 무허가, 출처 Grant의 Subject×Reading×Reader×Bundle 일치, B2 독립 Grant의 정확한 조회, B3 다른 Bundle 동시 유효 시 조회 0, 다른 Bundle 회수 시 B2 보존, 마지막 Grant 철회 직후 조회 0 및 합성 바이트의 물리 DELETE를 검사합니다. PostgreSQL 15/17 CI에 동일 테스트 케이스를 등록했습니다.
 - 이는 **설계 시나리오 검증**이지 최종 유료 원문 Writer/데이터 암호화·실제 Chat Message/Turn FK·Semantic/Output proof·전체 RLS/삭제 Worker·백업 복원 완료가 아닙니다. 외부 전송·실데이터 저장·운영 DB 적용·공개는 계속 금지됩니다.
+
+
+## 10. 실제 Chat Thread/Turn/Attempt·안전 마커 결속 및 삭제 순서 시험 (2026-10-20)
+
+- 격리 PostgreSQL에서 기존 `conversation_threads`, `conversation_thread_characters`, `chat_turns`, `chat_turn_attempts`, `conversation_messages`에 **합성 한 세트**를 만들고 원문 후보 테이블과 **복합 FK**를 연결했습니다. 메시지에는 `유료 해설 기록이 있습니다.`만 저장하고 `message_payload_jsonb=null`로 고정합니다.
+- 위조된 Attempt·Marker UUID 및 다른 Reader 출처 Grant는 FK/Scope trigger로 거부. `Reader×Bundle×참여자`, `Subject×Thread×Turn×Attempt`와 시스템 안전 마커까지 관계적으로 결속합니다.
+- 부모 `conversation_messages`를 보호 행보다 먼저 삭제하면 FK가 차단되고, **보호 행→안전 마커→Attempt→Turn→참여자→Thread** 순서로 제거하면 합성 개인 데이터가 남지 않는지 검증합니다. 이는 현행 AccountDeletion 최종화 함수에 향후 반영할 **자식 우선 삭제 계약**이며 실제 운영 finalizer 변경 또는 개인정보 정본 그래프 인수로 간주하지 않습니다.
+- 실제 T2 성공 커밋 및 Chat `state='committed'`/AI 생성·검증 포인터, 단일 유료 권한 Writer·암호화, 개인정보 24시간 삭제 Worker·P30D 백업 복구는 아직 실행하지 않았습니다. 현재 합성 Chat Attempt는 `running`, Turn은 `received`이며 **운영 전 상태를 모사하지 않습니다**.

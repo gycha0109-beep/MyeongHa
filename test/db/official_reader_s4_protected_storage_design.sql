@@ -12,10 +12,12 @@ create table official_reader_s4_fixture.protected_bodies (
  reader_character_id text not null,
  reader_content_bundle_id uuid not null,
  originating_grant_id uuid not null references public.entitlement_grants(id),
+ synthetic_thread_id uuid not null,
+ synthetic_participation_id uuid not null,
  synthetic_turn_id uuid not null,
  synthetic_attempt_id uuid not null,
+ safe_message_id uuid not null,
  synthetic_ciphertext bytea not null check (octet_length(synthetic_ciphertext)>0),
- safe_marker text not null check (safe_marker='유료 해설 기록이 있습니다.'),
  created_at timestamptz not null default clock_timestamp(),
  unique (subject_id,synthetic_turn_id,synthetic_attempt_id),
  foreign key (official_reading_id,subject_id)
@@ -23,7 +25,17 @@ create table official_reader_s4_fixture.protected_bodies (
  foreign key (official_reading_id,reader_character_id)
   references public.standard_reading_reader_interpretations(official_reading_id,reader_character_id),
  foreign key (reader_character_id,reader_content_bundle_id)
-  references public.character_runtime_catalog(character_id,content_bundle_id)
+  references public.character_runtime_catalog(character_id,content_bundle_id),
+ foreign key (synthetic_thread_id,subject_id)
+  references public.conversation_threads(id,subject_id),
+ foreign key (synthetic_turn_id,synthetic_thread_id,subject_id)
+  references public.chat_turns(id,thread_id,subject_id),
+ foreign key (synthetic_attempt_id,synthetic_turn_id,subject_id)
+  references public.chat_turn_attempts(id,turn_id,subject_id),
+ foreign key (safe_message_id,synthetic_turn_id,subject_id)
+  references public.conversation_messages(id,turn_id,subject_id),
+ foreign key (synthetic_participation_id,synthetic_thread_id,reader_content_bundle_id)
+  references public.conversation_thread_characters(id,thread_id,content_bundle_id)
 );
 alter table official_reader_s4_fixture.protected_bodies enable row level security;
 alter table official_reader_s4_fixture.protected_bodies force row level security;
@@ -45,6 +57,28 @@ begin
    raise exception using errcode='23514',
     constraint='official_reader_s4_fixture_origin_mismatch',
     message='Synthetic Reader grant provenance mismatch';
+ end if;
+ -- Public marker is a non-sensitive SYSTEM status, never the paid body or a
+ -- derived paraphrase. Bind it to this exact Thread/Turn/Reader participation.
+ if not exists (
+   select 1
+   from public.conversation_messages m
+   join public.conversation_thread_characters c
+     on c.id=new.synthetic_participation_id
+     and c.thread_id=new.synthetic_thread_id
+   where m.id=new.safe_message_id
+     and m.thread_id=new.synthetic_thread_id
+     and m.turn_id=new.synthetic_turn_id
+     and m.subject_id=new.subject_id
+     and m.sender_type='system'
+     and m.body_text='유료 해설 기록이 있습니다.'
+     and m.message_payload_jsonb is null
+     and c.character_id=new.reader_character_id
+     and c.content_bundle_id=new.reader_content_bundle_id
+ ) then
+   raise exception using errcode='23514',
+     constraint='official_reader_s4_fixture_marker_scope_mismatch',
+     message='Synthetic Reader safe-marker scope mismatch';
  end if;
  return new;
 end;
@@ -104,19 +138,109 @@ select pg_temp.require_s4('private FORCE RLS, no policies',
   where oid='official_reader_s4_fixture.protected_bodies'::regclass)
  and not exists(select 1 from pg_policies where schemaname='official_reader_s4_fixture'));
 
+-- A disposable instance of the ACTUAL public Chat relational graph.
+-- No production Chat command, paid model call, content bytes or send happens.
+insert into public.conversation_threads(
+ id,subject_id,thread_type,status,created_at,updated_at
+) values (
+ 'd4300000-0000-4000-8000-000000000001',
+ '11390000-0000-0000-0000-000000000001',
+ 'single_character','active',clock_timestamp(),clock_timestamp()
+);
+insert into public.conversation_thread_characters(
+ id,thread_id,character_id,content_bundle_id,role,joined_at
+) values (
+ 'd4400000-0000-4000-8000-000000000001',
+ 'd4300000-0000-4000-8000-000000000001',
+ 'test-unlockable-reader',
+ '11391000-0000-0000-0000-000000000001',
+ 'primary',clock_timestamp()
+);
+insert into public.chat_turns(
+ id,thread_id,subject_id,client_turn_id,request_hash,
+ request_contract_version,request_snapshot_jsonb,state,created_at,updated_at
+) values (
+ 'd4100000-0000-4000-8000-000000000001',
+ 'd4300000-0000-4000-8000-000000000001',
+ '11390000-0000-0000-0000-000000000001',
+ 'synthetic-s4-turn','sha256:synthetic-s4-non-content',
+ 'synthetic-s4-test-only','{}'::jsonb,'received',
+ clock_timestamp(),clock_timestamp()
+);
+insert into public.chat_turn_attempts(
+ id,turn_id,subject_id,attempt_no,state,started_at
+) values (
+ 'd4200000-0000-4000-8000-000000000001',
+ 'd4100000-0000-4000-8000-000000000001',
+ '11390000-0000-0000-0000-000000000001',
+ 1,'running',clock_timestamp()
+);
+insert into public.conversation_messages(
+ id,thread_id,subject_id,turn_id,sequence_no,sender_type,
+ body_text,message_payload_jsonb,content_hash,created_at
+) values (
+ 'd4500000-0000-4000-8000-000000000001',
+ 'd4300000-0000-4000-8000-000000000001',
+ '11390000-0000-0000-0000-000000000001',
+ 'd4100000-0000-4000-8000-000000000001',
+ 1,'system','유료 해설 기록이 있습니다.',null,
+ 'sha256:synthetic-s4-public-marker',clock_timestamp()
+);
+select pg_temp.require_s4('real Chat graph contains only a non-sensitive marker',
+ (select count(*)=1 from public.conversation_messages
+  where id='d4500000-0000-4000-8000-000000000001'
+    and sender_type='system'
+    and body_text='유료 해설 기록이 있습니다.'
+    and message_payload_jsonb is null));
+
 insert into official_reader_s4_fixture.protected_bodies
 (id,subject_id,official_reading_id,reader_character_id,reader_content_bundle_id,
- originating_grant_id,synthetic_turn_id,synthetic_attempt_id,synthetic_ciphertext,safe_marker)
+ originating_grant_id,synthetic_thread_id,synthetic_participation_id,
+ synthetic_turn_id,synthetic_attempt_id,safe_message_id,synthetic_ciphertext)
 select 'd4000000-0000-4000-8000-000000000001',
  a.subject_id,a.official_reading_id,a.reader_character_id,
  a.reader_content_bundle_id,a.entitlement_grant_id,
+ 'd4300000-0000-4000-8000-000000000001',
+ 'd4400000-0000-4000-8000-000000000001',
  'd4100000-0000-4000-8000-000000000001',
  'd4200000-0000-4000-8000-000000000001',
- decode('d00df00d','hex'),'유료 해설 기록이 있습니다.'
+ 'd4500000-0000-4000-8000-000000000001',
+ decode('d00df00d','hex')
 from public.standard_reading_reader_access_grants a
 where a.purchase_intent_id='12192300-0000-0000-0000-000000000002'::uuid;
 select pg_temp.require_s4('one synthetic body with real Reading+Reader+Grant FK',
  (select count(*)=1 from official_reader_s4_fixture.protected_bodies));
+-- The protected body must be tied to the exact real Chat Turn/Attempt/Marker
+-- identities. A forged attempt or marker cannot be used as an alternate origin.
+do $bad_attempt$
+begin
+ begin
+  update official_reader_s4_fixture.protected_bodies
+     set synthetic_attempt_id='d4200000-0000-4000-8000-000000000002';
+ exception when foreign_key_violation then
+  raise notice 'PASS S4 mismatched Chat attempt FK denied';
+  return;
+ end;
+ raise exception 'FAIL S4 forged Chat attempt accepted';
+end;
+$bad_attempt$;
+
+do $bad_message$
+begin
+ begin
+  update official_reader_s4_fixture.protected_bodies
+     set safe_message_id='d4500000-0000-4000-8000-000000000002';
+ exception when foreign_key_violation then
+  raise notice 'PASS S4 mismatched Chat marker FK denied';
+  return;
+ end;
+ raise exception 'FAIL S4 forged Chat marker accepted';
+end;
+$bad_message$;
+select pg_temp.require_s4('exact Chat identity unchanged after negative probes',
+ (select synthetic_attempt_id='d4200000-0000-4000-8000-000000000001'::uuid
+     and safe_message_id='d4500000-0000-4000-8000-000000000001'::uuid
+  from official_reader_s4_fixture.protected_bodies));
 
 do $negative$
 declare other_grant uuid;
@@ -186,7 +310,38 @@ select pg_temp.require_s4('last B2 revoked instantly hides still-stored bytes',
  'test-unlockable-reader','11391000-0000-0000-0000-000000000001')=0
  and (select count(*)=1 from official_reader_s4_fixture.protected_bodies));
 
+-- Account-deletion finalizer MUST delete protected content BEFORE Chat rows.
+-- Simulate the ordered DELETE under an isolated DB. No finalizer is granted.
+do $delete_order$
+begin
+ begin
+  delete from public.conversation_messages
+   where id='d4500000-0000-4000-8000-000000000001';
+ exception when foreign_key_violation then
+  raise notice 'PASS S4 marker deletion blocked until protected child DELETE';
+  return;
+ end;
+ raise exception 'FAIL S4 marker orphaned protected body';
+end;
+$delete_order$;
+
 delete from official_reader_s4_fixture.protected_bodies;
-select pg_temp.require_s4('synthetic cleanup physically deletes test bytes',
+select pg_temp.require_s4('primary protected body removed before Chat finalization',
  not exists(select 1 from official_reader_s4_fixture.protected_bodies));
-\echo 'PASS S4 candidate: exact grants, single-bundle ambiguity, private ACL and physical cleanup'
+delete from public.conversation_messages
+ where id='d4500000-0000-4000-8000-000000000001';
+delete from public.chat_turn_attempts
+ where id='d4200000-0000-4000-8000-000000000001';
+delete from public.chat_turns
+ where id='d4100000-0000-4000-8000-000000000001';
+delete from public.conversation_thread_characters
+ where id='d4400000-0000-4000-8000-000000000001';
+delete from public.conversation_threads
+ where id='d4300000-0000-4000-8000-000000000001';
+select pg_temp.require_s4('synthetic protected rows, marker, attempt, turn, thread all deleted',
+ (select count(*)=0 from official_reader_s4_fixture.protected_bodies)
+ and not exists(select 1 from public.conversation_messages where id='d4500000-0000-4000-8000-000000000001')
+ and not exists(select 1 from public.chat_turn_attempts where id='d4200000-0000-4000-8000-000000000001')
+ and not exists(select 1 from public.chat_turns where id='d4100000-0000-4000-8000-000000000001')
+ and not exists(select 1 from public.conversation_threads where id='d4300000-0000-4000-8000-000000000001'));
+\echo 'PASS S4 candidate: real Chat FK, exact Reader rights and child-first deletion'
