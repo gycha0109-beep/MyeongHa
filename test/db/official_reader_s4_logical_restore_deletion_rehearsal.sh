@@ -158,6 +158,76 @@ echo "PASS S4 restore: child-first scrub unblocks Reader-access finalizer orderi
 
 # A second replay/restore cannot resurrect an accessible row either.
 p -c "\\copy official_reader_s4_fixture.protected_bodies FROM '$snapshot' WITH (FORMAT csv)" >"$tmpdir/replay-import.log" || die "second old snapshot import failed"
+# Reproduce an ACTUAL two-connection time-of-check/time-of-use overlap:
+# completed native 1190 replay has already passed the protected cleanup gate
+# but is still in its own transaction holding the recovery-fence FOR UPDATE.
+# Both another epoch writer and restored-byte INSERT must wait on that fence.
+p -v s4_race_rehearsal=1 -f test/db/official_reader_s4_completed_replay_restore_contract.sql >"$tmpdir/ack-fence-holder.out" 2>&1 &
+ack_fence_pid=$!
+fence_ready=0
+for ((try=0;try<150;try++)); do
+ if [[ "$(p -c "select count(*) from pg_catalog.pg_stat_activity
+    where application_name='rr_s4_native_ack_fence_owner'
+    and state='active' and wait_event_type='Timeout';")" == 1 ]]; then
+  fence_ready=1
+  break
+ fi
+ if ! kill -0 "$ack_fence_pid" 2>/dev/null; then
+  cat "$tmpdir/ack-fence-holder.out" >&2
+  die "synthetic completed ACK finished before shared recovery-fence overlap"
+ fi
+ sleep 0.1
+done
+[[ "$fence_ready" == 1 ]] || die "native completed ACK did not reach recovery-fence hold"
+if p >"$tmpdir/recovery-epoch-lock-loser.out" 2>&1 <<SQL
+begin;
+set local lock_timeout='150ms';
+update official_reader_s4_ledger_fixture.recovery_fence
+ set required_epoch=3 where singleton;
+commit;
+SQL
+then
+ die "recovery required epoch changed concurrently during guarded native ACK"
+fi
+grep -q 'canceling statement due to lock timeout' "$tmpdir/recovery-epoch-lock-loser.out" || {
+ cat "$tmpdir/recovery-epoch-lock-loser.out" >&2
+ die "competing ledger epoch update failed for unexpected reason"
+}
+# The BEFORE INSERT trigger takes exactly the same lock, so a restored
+# snapshot cannot slip into the interval after gate check and before ACK.
+if p -c "set lock_timeout='150ms';" -c "\\copy official_reader_s4_fixture.protected_bodies FROM '$snapshot' WITH (FORMAT csv)" >"$tmpdir/recovery-import-lock-loser.out" 2>&1; then
+ die "old backup import bypassed guarded native ACK recovery-fence lock"
+fi
+grep -q 'canceling statement due to lock timeout' "$tmpdir/recovery-import-lock-loser.out" || {
+ cat "$tmpdir/recovery-import-lock-loser.out" >&2
+ die "competing restored-byte writer failed for unexpected reason"
+}
+wait "$ack_fence_pid" || {
+ cat "$tmpdir/ack-fence-holder.out" >&2
+ die "guarded native ACK and rollback failed while owning recovery fence"
+}
+ack_fence_pid=""
+grep -q 'PASS S4 scrubbed bytes delegate native completed replay' "$tmpdir/ack-fence-holder.out" ||
+ die "native completed ACK was not reached in the two-connection overlap"
+check "concurrent epoch and snapshot writers did not commit during guarded ACK" "select
+ (select required_epoch=2 and reconciled_epoch=2
+  from official_reader_s4_ledger_fixture.recovery_fence where singleton)
+ and (select count(*)=1 from official_reader_s4_fixture.protected_bodies)
+ and not exists(select 1 from public.data_deletion_jobs
+  where id='d4800000-0000-4000-8000-000000000001'::uuid);"
+# After the ACK's transaction has rolled back, an independent epoch change
+# can proceed but the guard must DENY until reconciliation is complete.
+p -c "update official_reader_s4_ledger_fixture.recovery_fence
+ set required_epoch=3 where singleton;" >/dev/null
+check "post-ACK epoch advancement independently blocks completion readiness" "select not ($cleanup_ready);"
+check_ack_denied "native completion wrapper denies new unreconciled recovery epoch" "Protected Reader deletion ledger or recovered bytes are not reconciled"
+p -c "update official_reader_s4_ledger_fixture.recovery_fence
+ set required_epoch=2,reconciled_epoch=2 where singleton;" >/dev/null
+check "recovery fence reset after lock-overlap rehearsal" "select
+ (select required_epoch=2 and reconciled_epoch=2 from official_reader_s4_ledger_fixture.recovery_fence where singleton)
+ and (select count(*)=1 from official_reader_s4_fixture.protected_bodies);"
+echo "PASS S4 restore: guarded native ACK serializes recovery ledger epoch and old backup import"
+
 # A separate transaction supplies completed Job/Outbox metadata to the
 # ACTUAL native 1190 completed-replay path without committing a fake deletion.
 # It denies the old bytes, delegates after an in-transaction scrub, and then
