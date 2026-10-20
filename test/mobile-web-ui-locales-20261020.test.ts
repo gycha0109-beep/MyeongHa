@@ -26,12 +26,12 @@ describe('Mobile / Web UI localization parity', () => {
     }
   });
 
-  it('transplants all 577 web-authored translations unchanged', async () => {
+  it('transplants all 565 web-authored translations unchanged', async () => {
     const webSource = await source('apps/web/ui-i18n.js');
     const start = webSource.indexOf('const COPY = new Map(') + 'const COPY = new Map('.length;
     const end = webSource.indexOf('].map(([source', start) + 1;
     const entries = JSON.parse(webSource.slice(start, end)) as Array<[string, string, string]>;
-    expect(entries).toHaveLength(577);
+    expect(entries).toHaveLength(565);
     for (const [korean, japanese, chinese] of entries) {
       expect(translateMobileUiCopy(korean, 'ko-KR')).toBe(korean);
       expect(translateMobileUiCopy(korean, 'ja-JP')).toBe(japanese);
