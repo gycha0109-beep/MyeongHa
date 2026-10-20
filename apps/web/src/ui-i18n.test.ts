@@ -51,4 +51,19 @@ describe('fixed web UI localization', () => {
     }
   });
 
+  it('localizes offline chat connection errors and status labels', () => {
+    for (const source of [
+      '현재 대화 기록 연결을 사용할 수 없습니다.',
+      '대화방을 준비하지 못했습니다. 잠시 후 다시 시도해 주세요.',
+      '대화를 불러오지 못했습니다.',
+      '로그인 상태가 만료되었습니다. 다시 로그인해 주세요.',
+      '현재 이 대화는 서버 연결이 준비되지 않았습니다. 입력한 내용은 보내지지 않았습니다.',
+    ]) {
+      for (const locale of ['ja-JP', 'zh-TW'] as const) {
+        expect(translateStaticUi(source, locale)).not.toBe(source);
+        expect(translateStaticUi(source, locale)).not.toMatch(/[가-힣]/u);
+      }
+    }
+  });
+
 });
