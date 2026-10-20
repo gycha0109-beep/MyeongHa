@@ -71,6 +71,7 @@ export function MyMemberAuthCard({
   onCancelSocialSignIn: () => void;
 }) {
   const themedStyles = useMobileThemedStyles(styles);
+  const { t } = useMobileUiLocale();
   if (subjectKind === 'member') {
     return (
       <View style={themedStyles.card}>
@@ -87,7 +88,7 @@ export function MyMemberAuthCard({
           style={[themedStyles.secondaryAction, pending && themedStyles.disabledAction]}
         >
           <Text style={themedStyles.secondaryActionText}>
-            {pending ? '처리 중…' : '로그아웃'}
+            {t(pending ? '처리 중…' : '로그아웃')}
           </Text>
         </Pressable>
       </View>
@@ -119,7 +120,7 @@ export function MyMemberAuthCard({
                 style={[themedStyles.socialAction, pending && themedStyles.disabledAction]}
               >
                 <Text style={themedStyles.socialActionText}>
-                  {socialPendingProvider === provider ? '확인 중…' : label}
+                  {t(socialPendingProvider === provider ? '확인 중…' : label)}
                 </Text>
               </Pressable>
             ))}
@@ -144,25 +145,25 @@ export function MyMemberAuthCard({
             <View style={themedStyles.authDividerLine} />
           </View>
           <TextInput
-            accessibilityLabel="이메일"
+            accessibilityLabel={t('이메일')}
             autoCapitalize="none"
             autoCorrect={false}
             editable={!pending}
             keyboardType="email-address"
             onChangeText={onEmailChange}
-            placeholder="이메일"
+            placeholder={t('이메일')}
             placeholderTextColor={mobileColors.muted}
             style={themedStyles.authInput}
             value={email}
           />
           <TextInput
-            accessibilityLabel="비밀번호"
+            accessibilityLabel={t('비밀번호')}
             autoCapitalize="none"
             autoCorrect={false}
             editable={!pending}
             onChangeText={onPasswordChange}
             onSubmitEditing={onSignIn}
-            placeholder="비밀번호"
+            placeholder={t('비밀번호')}
             placeholderTextColor={mobileColors.muted}
             secureTextEntry
             style={themedStyles.authInput}
@@ -180,7 +181,7 @@ export function MyMemberAuthCard({
             ]}
           >
             <Text style={themedStyles.primaryActionText}>
-              {pending ? '처리 중…' : '기존 계정으로 로그인'}
+              {t(pending ? '처리 중…' : '기존 계정으로 로그인')}
             </Text>
           </Pressable>
           <Pressable
@@ -207,13 +208,13 @@ export function MyMemberAuthCard({
             확인 링크는 현재 Web 확인 화면으로 열립니다. 이메일 확인을 마친 뒤 앱으로 돌아와 비밀번호를 다시 입력해 주세요.
           </MobileUiText>
           <TextInput
-            accessibilityLabel="비밀번호"
+            accessibilityLabel={t('비밀번호')}
             autoCapitalize="none"
             autoCorrect={false}
             editable={!pending}
             onChangeText={onPasswordChange}
             onSubmitEditing={onCompleteSignUp}
-            placeholder="비밀번호 다시 입력"
+            placeholder={t('비밀번호 다시 입력')}
             placeholderTextColor={mobileColors.muted}
             secureTextEntry
             style={themedStyles.authInput}
@@ -230,7 +231,7 @@ export function MyMemberAuthCard({
             ]}
           >
             <Text style={themedStyles.primaryActionText}>
-              {pending ? '처리 중…' : '가입 완료 후 이어가기'}
+              {t(pending ? '처리 중…' : '가입 완료 후 이어가기')}
             </Text>
           </Pressable>
           <Pressable
@@ -330,6 +331,7 @@ const flowItems = Object.freeze([
 
 export function MyFlowCards() {
   const themedStyles = useMobileThemedStyles(styles);
+  const { t } = useMobileUiLocale();
   return (
     <View style={themedStyles.section}>
       <View style={themedStyles.sectionIntro}>
@@ -346,8 +348,8 @@ export function MyFlowCards() {
           <Text style={themedStyles.flowSymbol}>{item.symbol}</Text>
           <View style={themedStyles.flowCopy}>
             <Text style={themedStyles.flowKicker}>{item.kicker}</Text>
-            <Text style={themedStyles.flowTitle}>{item.title}</Text>
-            <Text style={themedStyles.body}>{item.body}</Text>
+            <Text style={themedStyles.flowTitle}>{t(item.title)}</Text>
+            <Text style={themedStyles.body}>{t(item.body)}</Text>
           </View>
           <Text style={themedStyles.flowArrow}>→</Text>
         </Pressable>
