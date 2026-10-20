@@ -20,6 +20,7 @@ import {
   createMobileMyProfileViewV1,
 } from '@/features/my/my-view-model';
 import { MobileScreen } from '@/ui/MobileScreen';
+import { useMobileUiLocale } from '@/ui/mobile-ui-locale';
 import { MobileUiText } from '@/ui/MobileUiText';
 import { mobileColors } from '@/ui/mobile-colors';
 import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
@@ -28,6 +29,7 @@ import { useMobilePullRefreshV1 } from '@/ui/use-mobile-pull-refresh';
 
 export default function MyScreen() {
   const styles = useMobileThemedStyles(staticStyles);
+  const { t } = useMobileUiLocale();
   const { colors } = useMobileTheme();
   const {
     state,
@@ -126,10 +128,10 @@ export default function MyScreen() {
   return (
     <MobileScreen
       eyebrow="MY MYEONGHA"
-      title="마이"
+      title={t('마이')}
       refreshing={refreshing}
       onRefresh={() => void onRefresh()}
-      description="나의 계정과 이야기, 설정을 살펴보세요."
+      description={t('나의 계정과 이야기, 설정을 살펴보세요.')}
     >
       <MyEditorialWelcome account={currentAccount} />
       <MyMemberAuthCard
