@@ -478,6 +478,71 @@ describe('claimed account deletion worker orchestration', () => {
     ]);
   });
 
+  it('does not repeat native ACK when persistence commits but its response is lost after ledger retry', async () => {
+    let phase: AccountDeletionWorkerResumePhaseV1 = 'completion_ack_required';
+    const calls: string[] = [];
+    let ledgerAvailable = false;
+    const ledgerFailure = new Error('synthetic external recovery ledger unavailable');
+    const ackResponseLost = new Error('synthetic network drop after native ACK commit');
+    const resumeStatePort: AccountDeletionWorkerResumeStatePortV1 = {
+      readResumeState: vi.fn(async () => {
+        calls.push(`resume:${phase}`);
+        return state(phase);
+      }),
+    };
+    const db = finalizer(calls);
+    const authPort = auth(calls);
+    let committed = false;
+    const complete: AccountDeletionWorkerCompletionPortV1 = {
+      completeDeletion: vi.fn(async () => {
+        calls.push('read-independent-recovery-ledger');
+        if (!ledgerAvailable) throw ledgerFailure;
+        if (committed) {
+          throw new Error('duplicate native ACK after committed state');
+        }
+        calls.push('native-1190-ack-committed');
+        committed = true;
+        phase = 'completed';
+        // The DB transaction committed and its response was dropped. The
+        // runner must NOT cache success; it must retry from persisted phase.
+        throw ackResponseLost;
+      }),
+    };
+    const input = {
+      subjectId: SUBJECT_ID,
+      deletionJobId: JOB_ID,
+      lockOwner: LOCK_OWNER,
+      resumeStatePort,
+      dbFinalizerPort: db,
+      authDeletionPort: authPort,
+      completionPort: complete,
+    };
+
+    await expect(runClaimedAccountDeletionWorkerV1(input)).rejects.toBe(
+      ledgerFailure,
+    );
+    expect(phase).toBe('completion_ack_required');
+    expect(committed).toBe(false);
+    ledgerAvailable = true;
+    await expect(runClaimedAccountDeletionWorkerV1(input)).rejects.toBe(
+      ackResponseLost,
+    );
+    expect(committed).toBe(true);
+    expect(phase).toBe('completed');
+    const recovered = await runClaimedAccountDeletionWorkerV1(input);
+    expect(recovered.status).toBe('completed');
+    expect(recovered.alreadyCompleted).toBe(true);
+    expect(recovered.completionInvoked).toBe(false);
+    expect(db.finalizeDatabase).not.toHaveBeenCalled();
+    expect(authPort.deleteUser).not.toHaveBeenCalled();
+    expect(complete.completeDeletion).toHaveBeenCalledTimes(2);
+    expect(calls).toEqual([
+      'resume:completion_ack_required', 'read-independent-recovery-ledger',
+      'resume:completion_ack_required', 'read-independent-recovery-ledger',
+      'native-1190-ack-committed', 'resume:completed',
+    ]);
+  });
+
   it('has no public route, browser authority, batch discovery, retry policy, or worker DB identity', () => {
     expect(ACCOUNT_DELETION_WORKER_ORCHESTRATION_BINDINGS_V1).toEqual({
       publicRoute: null,
