@@ -232,7 +232,7 @@ export function BirthDateCalendar({
 
 const styles = StyleSheet.create({
   overlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(6,15,26,0.6)' },
-  scrim: { ...StyleSheet.absoluteFillObject },
+  scrim: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 },
   sheet: { backgroundColor: mobileColors.canvas, borderTopLeftRadius: 25, borderTopRightRadius: 25, borderWidth: 1, borderColor: mobileColors.border, padding: 22, maxHeight: '91%', minHeight: 370, gap: 18 },
   topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 10 },
   heading: { flex: 1, gap: 5 },
