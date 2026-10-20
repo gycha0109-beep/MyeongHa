@@ -321,8 +321,9 @@ describe('direct HTTPS TLS-only synthetic Node host', () => {
     }],
   ] as const)('%s cannot reach authentication, DB or model', async (_name, method, headers) => {
     const res = await exchange({
-      allowedBrowserOrigin: _name === 'browser origin not configured'
-        ? undefined : 'https://app.myeongha.test',
+      ...(_name === 'browser origin not configured' ? {} : {
+        allowedBrowserOrigin: 'https://app.myeongha.test',
+      }),
       method,
       headers: headers as Record<string, string | string[]>,
     });
