@@ -405,10 +405,12 @@ if [[ "${failed_validation_shape}" != 'failed_retryable|failed_retryable|0|0' ]]
 fi
 echo "PASS Output Guard failure leaves no public assistant message/outbox"
 
-# Two concurrent retry allocators serialize on the turn. The second call must replay
-# the already-allocated active attempt rather than allocate attempt_no 3.
+# Two retry allocators must truly overlap, not rely on a startup sleep.
+race_dir="$(mktemp -d)"
+race_ready="${race_dir}/ready"
+race_release="${race_dir}/release"
 (
-  "${PSQL[@]}" <<'SQL'
+  "${PSQL[@]}" <<SQL
 begin;
 select * from public.cmd_allocate_chat_turn_attempt_v1(
   'a0000000-0000-0000-0000-000000000001',
@@ -416,24 +418,62 @@ select * from public.cmd_allocate_chat_turn_attempt_v1(
   'a6000000-0000-0000-0000-000000000020',
   'planner-v1'
 );
-select pg_sleep(1.5);
+\! touch ${race_ready}
+\! timeout 20 sh -c 'until test -e "${race_release}"; do sleep 0.05; done'
 commit;
 SQL
-) >/tmp/myeongha-chat-attempt-a.log 2>&1 &
+) >"${race_dir}/first.log" 2>&1 &
 retry_first_pid=$!
-
-sleep 0.25
-retry_second="$("${PSQL[@]}" -At -F '|' -c "select attempt_id,attempt_no,replayed from public.cmd_allocate_chat_turn_attempt_v1(
-  'a0000000-0000-0000-0000-000000000001',
-  'a4000000-0000-0000-0000-000000000002',
-  'a6000000-0000-0000-0000-000000000021',
-  'planner-v1'
-);")"
+for ((probe=0; probe<200; probe++)); do
+  [[ -f "${race_ready}" ]] && break
+  if ! kill -0 "${retry_first_pid}" 2>/dev/null; then break; fi
+  sleep 0.05
+done
+if [[ ! -f "${race_ready}" ]]; then
+  touch "${race_release}"
+  wait "${retry_first_pid}" || true
+  cat "${race_dir}/first.log" >&2
+  rm -rf "${race_dir}"
+  echo "FAIL first retry allocator did not start" >&2
+  exit 27
+fi
+(
+  "${PSQL[@]}" -At -F '|' -c "select attempt_id,attempt_no,replayed from public.cmd_allocate_chat_turn_attempt_v1(
+    'a0000000-0000-0000-0000-000000000001',
+    'a4000000-0000-0000-0000-000000000002',
+    'a6000000-0000-0000-0000-000000000021',
+    'planner-v1'
+  );"
+) >"${race_dir}/second.out" 2>"${race_dir}/second.err" &
+retry_second_pid=$!
+retry_second_waiting=f
+for ((probe=0; probe<200; probe++)); do
+  retry_second_waiting="$("${PSQL[@]}" -Atqc "select exists(
+    select 1 from pg_stat_activity
+    where datname=current_database() and pid<>pg_backend_pid()
+      and wait_event_type='Lock'
+      and query like '%a6000000-0000-0000-0000-000000000021%'
+  );")"
+  [[ "${retry_second_waiting}" == t ]] && break
+  if ! kill -0 "${retry_second_pid}" 2>/dev/null; then break; fi
+  sleep 0.05
+done
+touch "${race_release}"
 wait "${retry_first_pid}"
+wait "${retry_second_pid}"
+retry_second="$(cat "${race_dir}/second.out")"
+if [[ "${retry_second_waiting}" != t ]]; then
+  cat "${race_dir}/first.log" "${race_dir}/second.err" >&2
+  rm -rf "${race_dir}"
+  echo "FAIL second retry allocator did not block on first transaction" >&2
+  exit 27
+fi
+rm -rf "${race_dir}"
 if [[ "${retry_second}" != 'a6000000-0000-0000-0000-000000000020|2|t' ]]; then
   echo "FAIL concurrent attempt retry dedupe: ${retry_second}" >&2
   exit 27
 fi
+
 retry_attempt_shape="$("${PSQL[@]}" -At -F '|' -c "select
   (select count(*) from public.chat_turn_attempts where turn_id='a4000000-0000-0000-0000-000000000002'),
   (select next_attempt_no from public.chat_turns where id='a4000000-0000-0000-0000-000000000002');")"
