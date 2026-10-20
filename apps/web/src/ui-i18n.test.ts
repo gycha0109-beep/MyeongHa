@@ -31,7 +31,7 @@ describe('fixed web UI localization', () => {
       '현재 웹 대화는 회원 계정에서 시작할 수 있습니다.',
       '로그인', '회원가입', '이메일', '비밀번호',
       '프리뷰 확인', '지금의 길, 더 나은 길로',
-      '흐르는 기회를 잡는 법',
+      '흐르는 기회를 잡는 법', '밤 화면으로 전환',
     ];
     for (const source of labels) {
       for (const locale of ['ja-JP', 'zh-TW'] as const) {
