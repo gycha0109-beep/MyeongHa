@@ -230,8 +230,8 @@ begin
  begin
   update official_reader_s4_fixture.protected_bodies
      set safe_message_id='d4500000-0000-4000-8000-000000000002';
- exception when foreign_key_violation then
-  raise notice 'PASS S4 mismatched Chat marker FK denied';
+ exception when foreign_key_violation or check_violation then
+  raise notice 'PASS S4 mismatched Chat marker denied by exact-scope trigger or FK';
   return;
  end;
  raise exception 'FAIL S4 forged Chat marker accepted';
