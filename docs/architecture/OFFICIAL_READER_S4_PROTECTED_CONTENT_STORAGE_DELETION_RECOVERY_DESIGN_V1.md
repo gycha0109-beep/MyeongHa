@@ -141,3 +141,9 @@ T1·S3·T2 각 검사가 동일 원본/Scope를 pin해야 한다. `Response`·`R
 - 기존 PostgreSQL 15·17 합성 보호 저장소의 읽기 후보에 **정확한 구매 Grant와 원본 Receipt의 현재 `verified` 상태**, active 회원, 원래 Thread·Turn·Reader 참여자, **본문이 없는 안전한 상태 마커**를 함께 요구했습니다.
 - 보호 Row의 복합 FK가 맞더라도 다른 일반 메시지를 안전 마커로 대체하면 거절합니다. 환불된 Receipt 아래에 Grant 상태가 오래된 `active`로 남은 합성 상태에서도 결과는 0건이며, 변경은 시험 트랜잭션에서 롤백합니다.
 - **격리 시험용 후보일 뿐 운영 조회 구현이 아닙니다.** 실제 보호 DB/암호화, 삭제 Worker·백업 복원, 모델 재주입 보호 API, Saju Production 출처, 최종 유료 T2 저장, 공개·운영 적용은 계속 HOLD입니다. 기존 migration과 개인정보 정책 정본은 변경하지 않습니다.
+
+## 12. AccountDeletion·이전 백업 재노출의 독립 합성 복원 시험 (2026-10-20)
+
+- `test/db/official_reader_s4_logical_restore_deletion_rehearsal.sh`는 기존 일회용 보호 테이블·정확한 Chat 복합 FK를 재사용해 PostgreSQL `\\copy`로 **보호 데이터의 실제 합성 bytea 행을 로컬 파일에 내보냈다가 다시 적재**합니다. 보존 당시 Reader 구매권·안전 마커가 유효한 상태를 만든 다음, 백업 외부에 존재하는 **테스트 전용 삭제 원장과 복원 차단 상태**를 기록하고 본 DB 후보 원문을 물리 DELETE합니다.
+- 오래된 파일로 원문 후보를 두 번 복원하고도 복원 차단 상태/삭제 원장 미존재·원장 epoch 지연·원장 재대조/삭제 tombstone 각각에서 **보호 조회 결과 0**, 이후 tombstone 재생으로 원문 후보 **물리 삭제 0행 잔존**을 검사합니다. 보유 중인 Commerce 증빙을 삭제하지 않은 채 `보호 원문 → 안전 마커 → Attempt → Turn → 참여자 → Thread` 자식 우선 순서를 확인합니다.
+- 기존 S4 보호 조회 함수에 **시험 전용 백업 외부 원장 JOIN**을 추가했습니다. 이는 운영 원장이나 서비스 가능 전환의 권한을 부여하지 않고, `\\copy` 행 단위 논리 백업 연습일 뿐 **실제 P30D 전체 백업/PITR·KMS 키 파기·운영 AccountDeletion Worker 실행 및 법무/Privacy 인수가 아닙니다**. PostgreSQL 15·17 기존 S4 CI에 통합하며 기존 승인 정책과 운영 migration 무변경입니다.

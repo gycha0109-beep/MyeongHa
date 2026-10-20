@@ -180,7 +180,8 @@ case "$case_name" in
       apply_standard_migrations
     fi
     psql -X -v ON_ERROR_STOP=1 -f test/db/official_reader_s4_protected_storage_design.sql
-    # test-only schema; catalog snapshot of deployed migrations intentionally unchanged
+    bash test/db/official_reader_s4_logical_restore_deletion_rehearsal.sh
+    # test-only schemas; catalog snapshot of deployed migrations intentionally unchanged
     ;;
   official-reader-provider-revoke-race)
     apply_standard_migrations

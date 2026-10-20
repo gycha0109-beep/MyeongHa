@@ -41,6 +41,27 @@ alter table official_reader_s4_fixture.protected_bodies enable row level securit
 alter table official_reader_s4_fixture.protected_bodies force row level security;
 revoke all on official_reader_s4_fixture.protected_bodies from public;
 
+-- External-to-backup recovery ledger *fixture*. The logical backup below
+-- includes only official_reader_s4_fixture, never this independent schema.
+-- These are not Production privacy tables or an approved recovery authority.
+create schema official_reader_s4_ledger_fixture;
+revoke all on schema official_reader_s4_ledger_fixture from public;
+create table official_reader_s4_ledger_fixture.recovery_fence (
+ singleton boolean primary key default true check (singleton),
+ serving_allowed boolean not null,
+ required_epoch bigint not null check (required_epoch>=0),
+ reconciled_epoch bigint not null check (reconciled_epoch>=0)
+);
+create table official_reader_s4_ledger_fixture.deletion_events (
+ body_id uuid primary key,
+ subject_id uuid not null,
+ event_epoch bigint not null check (event_epoch>0)
+);
+revoke all on all tables in schema official_reader_s4_ledger_fixture from public;
+insert into official_reader_s4_ledger_fixture.recovery_fence
+(singleton,serving_allowed,required_epoch,reconciled_epoch)
+values(true,true,1,1);
+
 -- Exact source provenance cannot be supplied as an arbitrary Grant ID.
 create function official_reader_s4_fixture.assert_origin_scope()
 returns trigger language plpgsql security invoker set search_path=pg_catalog,public
@@ -124,8 +145,16 @@ join public.conversation_thread_characters c
  and c.thread_id=b.synthetic_thread_id
  and c.character_id=b.reader_character_id
  and c.content_bundle_id=b.reader_content_bundle_id
+-- Fail closed while restore/deletion ledger is missing, stale, or OFF.
+join official_reader_s4_ledger_fixture.recovery_fence f
+ on f.singleton and f.serving_allowed
+ and f.reconciled_epoch>=f.required_epoch
 cross join uniquely_entitled e
-where b.subject_id=p_subject and b.official_reading_id=p_reading
+where not exists (
+ select 1 from official_reader_s4_ledger_fixture.deletion_events d
+ where d.body_id=b.id or d.subject_id=b.subject_id
+)
+ and b.subject_id=p_subject and b.official_reading_id=p_reading
  and b.reader_character_id=p_reader and b.reader_content_bundle_id=p_bundle
  and e.bundles=1 and e.only_bundle=p_bundle
 $query$;
@@ -373,6 +402,14 @@ select pg_temp.require_s4('last B2 revoked instantly hides still-stored bytes',
  '11390000-0000-0000-0000-000000000001','12103100-0000-0000-0000-000000000001',
  'test-unlockable-reader','11391000-0000-0000-0000-000000000001')=0
  and (select count(*)=1 from official_reader_s4_fixture.protected_bodies));
+
+-- The separate logical snapshot/restore rehearsal uses the exact same
+-- protected row, real Chat composite FKs and current-rights function, but
+-- carries out the account-deletion graph in a separate SQL session.
+\if :{?s4_restore_rehearsal}
+\echo 'PASS S4 setup: synthetic candidate ready for logical snapshot/restore rehearsal'
+\quit
+\endif
 
 -- Account-deletion finalizer MUST delete protected content BEFORE Chat rows.
 -- Simulate the ordered DELETE under an isolated DB. No finalizer is granted.

@@ -1378,5 +1378,67 @@ b8_grant_c="$(p -c "select id from public.entitlement_grants
   fail "original Receipt A event incorrectly changed sibling Grants"
 pass "multi-Receipt verified PortOne cancel targets only exact payment/Receipt; sibling Grant issuance survives race"
 
+# Same purchase B remains bound, A already cancelled, C independently active.
+# Verify an additional Receipt D with ZERO issued Grants can be fully cancelled
+# without choosing B's access scope or touching any of B/C's entitlements.
+b8_receipt_d="12192000-0000-0000-0000-000000000011"
+p >"$tmpdir/b8-zero-grant-sibling-seed.out" 2>&1 <<SQL || { cat "$tmpdir/b8-zero-grant-sibling-seed.out" >&2; fail "B8 zero-Grant sibling Receipt seed failed"; }
+begin;
+insert into public.commerce_payment_attempts(
+ id,purchase_intent_id,subject_id,product_offer_id,attempt_no,
+ provider,environment,idempotency_key,provider_request_id,
+ provider_transaction_id,status,created_at,updated_at
+)
+select '12197000-0000-0000-0000-000000000011'::uuid,
+       pi.id,pi.subject_id,pi.product_offer_id,4,
+       'portone_v2','production','reader-b8-attempt-d',
+       'b8-payment-d','tx-reader-b8-d',
+       'response_received',clock_timestamp(),clock_timestamp()
+from public.purchase_intents pi where pi.id='$b8_intent'::uuid;
+insert into public.commerce_receipts(
+ id,subject_id,purchase_intent_id,product_offer_id,platform,provider,
+ external_transaction_id,receipt_fingerprint,verification_status,
+ verified_payload_jsonb,verified_at,created_at,environment,
+ verifier_revision,verified_amount_minor,verified_currency
+)
+select '$b8_receipt_d'::uuid,subject_id,purchase_intent_id,product_offer_id,
+       platform,provider,'tx-reader-b8-d',
+       'hmac-sha256:k1:8989898989898989898989898989898989898989898989898989898989898989',
+       'verified',verified_payload_jsonb,clock_timestamp(),clock_timestamp(),
+       environment,verifier_revision,verified_amount_minor,verified_currency
+from public.commerce_receipts where id='$b8_receipt_c'::uuid;
+commit;
+SQL
+[[ "$(p -c "select count(*) from public.entitlement_grants where source_receipt_id='$b8_receipt_d'::uuid;")" == 0 ]] ||
+  fail "B8 exact D must not have any Grant before full cancellation"
+b8_d_at="$(p -c "select pg_catalog.to_char(clock_timestamp() at time zone 'UTC','YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"');")"
+for replay in 1 2; do
+  outcome="$(p -c "begin; set local role myeongha_commerce_internal_executor;
+    select (public.cmd_apply_verified_portone_reader_full_cancellation_v1(
+      'b8-payment-d','tx-reader-b8-d','b8-cancel-exact-zero-d',
+      '$b8_d_at'::timestamptz,$b8_amount,'KRW','production',
+      'hmac-sha256:k1:9090909090909090909090909090909090909090909090909090909090909090',
+      'synthetic-b8-zero-grant-cancel-v1'
+    )->'revoke'->>'disposition'); commit;")" ||
+    fail "verified zero-Grant D cancellation failed with sibling Reader already bound"
+  [[ "$outcome" == cancelled_before_grant ]] ||
+    fail "verified zero-Grant D cancellation returned wrong disposition"
+done
+[[ "$(p -c "select verification_status from public.commerce_receipts where id='$b8_receipt_d'::uuid;")" == revoked ]] ||
+  fail "original zero-Grant D Receipt was not revoked"
+[[ "$(p -c "select count(*) from public.commerce_provider_events where external_event_id='myeongha:portone-v2:full-cancel:v1:b8-cancel-exact-zero-d';")" == 1 ]] ||
+  fail "zero-Grant D cancellation replay duplicated verified event"
+[[ "$(p -c "select count(*) from public.entitlement_grants where source_receipt_id='$b8_receipt_d'::uuid;")" == 0 ]] ||
+  fail "zero-Grant D cancellation unexpectedly created entitlement"
+[[ "$(p -c "select count(*) from public.entitlement_grants
+  where id in ('$b8_grant_b'::uuid,'$b8_grant_c'::uuid)
+    and status='active';")" == 2 ]] ||
+  fail "zero-Grant D cancellation affected B or C independent entitlements"
+[[ "$(p -c "select count(*) from public.standard_reading_reader_access_grants where entitlement_grant_id='$b8_grant_b'::uuid;")" == 1 ]] ||
+  fail "zero-Grant D cancellation changed sibling B Reader binding"
+pass "bound sibling B cannot block zero-Grant Receipt D verified refund/replay; C preserved"
+
+
+
 
 echo "PASS: S2 instrumented two-direction PostgreSQL race; production integration HOLD"
