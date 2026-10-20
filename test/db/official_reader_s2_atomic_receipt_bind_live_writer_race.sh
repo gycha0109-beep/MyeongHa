@@ -1756,4 +1756,94 @@ grep -q 'C_REPLAY=official-reader-s2-unbound-grant-cancellation-v1' "$tmpdir/b8-
  fail "same-event C original Receipt was not revoked"
 pass "two live verified C cancellations serialize; exactly one provider and Grant event"
 
+
+# Distinct older cancellation arriving AFTER the newer C cancellation must
+# fail even if it first waits behind a separate same-purchase Writer. The
+# aborted provider event must not be persisted or change the revoked Grant.
+c_stale_at="$(p -c "select pg_catalog.to_char(
+ ('$c_cancel_at'::timestamptz-interval '1 second') at time zone 'UTC',
+ 'YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"');")"
+p >"$tmpdir/b8-c-stale-holder.out" 2>&1 <<SQL &
+set application_name='rr_s2_c_stale_purchase_holder';
+set statement_timeout='20s';
+begin;
+select public.internal_acquire_official_reader_purchase_lock_v1('$b8_intent'::uuid);
+select pg_sleep(3);
+commit;
+SQL
+holder_pid=$!
+wait_for "stale event meets independent purchase lock holder" "
+ select count(*) from pg_catalog.pg_stat_activity
+ where application_name='rr_s2_c_stale_purchase_holder'
+ and state='active' and wait_event_type='Timeout';
+"
+p >"$tmpdir/b8-c-stale-loser.out" 2>&1 <<SQL &
+set application_name='rr_s2_c_stale_distinct_event';
+set statement_timeout='20s';
+begin;
+set local role myeongha_commerce_internal_executor;
+select public.cmd_apply_verified_portone_reader_full_cancellation_v1(
+ 'b8-payment-c','tx-reader-b8-c','b8-cancel-older-distinct-c',
+ '$c_stale_at'::timestamptz,$b8_amount,'KRW','production',
+ 'hmac-sha256:k1:9191919191919191919191919191919191919191919191919191919191919191',
+ 'synthetic-c-older-distinct-v1'
+);
+commit;
+SQL
+writer_pid=$!
+wait_for "different older C event waits for purchase advisory" "
+ select count(*) from pg_catalog.pg_stat_activity
+ where application_name='rr_s2_c_stale_distinct_event' and state='active'
+ and wait_event_type='Lock' and wait_event='advisory';
+"
+wait "$holder_pid" || {
+ cat "$tmpdir/b8-c-stale-holder.out" >&2
+ fail "purchase holder for stale C event failed"
+}
+holder_pid=""
+if wait "$writer_pid"; then fail "older distinct C cancellation was accepted"; fi
+writer_pid=""
+grep -q 'Unbound Reader cancellation is older than Grant lifecycle' "$tmpdir/b8-c-stale-loser.out" || {
+ cat "$tmpdir/b8-c-stale-loser.out" >&2
+ fail "different old C event was denied for unexpected reason"
+}
+[[ "$(p -c "select count(*) from public.commerce_provider_events
+ where external_event_id='myeongha:portone-v2:full-cancel:v1:b8-cancel-older-distinct-c';")" == 0 ]] ||
+ fail "stale different C event committed despite failed lifecycle ordering"
+[[ "$(p -c "select count(*) from public.entitlement_grants
+ where id='$b8_grant_c'::uuid and status='revoked'
+ and last_effective_at='$c_cancel_at'::timestamptz;")" == 1 ]] ||
+ fail "stale different event changed committed C Grant ordering"
+pass "older distinct C cancellation waited then aborted without provider or Grant mutation"
+
+# A re-used provider cancellation identity with CHANGED evidence is not a
+# legitimate replay. It must fail before mutating the already revoked source.
+if p >"$tmpdir/b8-c-replay-mismatch.out" 2>&1 <<SQL
+begin;
+set local role myeongha_commerce_internal_executor;
+select public.cmd_apply_verified_portone_reader_full_cancellation_v1(
+ 'b8-payment-c','tx-reader-b8-c','b8-cancel-concurrent-c',
+ '$c_cancel_at'::timestamptz,$b8_amount,'KRW','production',
+ 'hmac-sha256:k1:9292929292929292929292929292929292929292929292929292929292929292',
+ 'synthetic-c-same-event-v1'
+);
+commit;
+SQL
+then
+ fail "same cancellation identity was accepted with contradictory provider proof"
+fi
+grep -q 'PortOne full cancellation replay conflicts with persisted evidence' "$tmpdir/b8-c-replay-mismatch.out" || {
+ cat "$tmpdir/b8-c-replay-mismatch.out" >&2
+ fail "contradictory C evidence failed for unexpected reason"
+}
+[[ "$(p -c "select count(*) from public.commerce_provider_events
+ where external_event_id='myeongha:portone-v2:full-cancel:v1:b8-cancel-concurrent-c';")" == 1 ]] ||
+ fail "conflicting replay mutated canonical verified C event"
+[[ "$(p -c "select count(*) from public.entitlement_events ee
+ join public.commerce_provider_events pe on pe.id=ee.source_provider_event_id
+ where pe.external_event_id='myeongha:portone-v2:full-cancel:v1:b8-cancel-concurrent-c'
+ and ee.grant_id='$b8_grant_c'::uuid and ee.event_type='revoked';")" == 1 ]] ||
+ fail "conflicting proof duplicated the original C Grant effect"
+pass "same cancellation ID with contradictory evidence fails without modifying prior event"
+
 echo "PASS: S2 instrumented two-direction PostgreSQL race; production integration HOLD"
