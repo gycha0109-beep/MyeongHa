@@ -1,7 +1,7 @@
 import { Text, type TextProps } from 'react-native';
 
-import { localizeMobileLiteralText } from './mobile-ui-copy';
-import { useMobileUiLocale } from './mobile-ui-locale';
+import { localizeMobileLiteralText } from './mobile-ui-copy.js';
+import { useMobileUiLocale } from './mobile-ui-locale.js';
 
 /**
  * Opt-in ONLY for leaf UI literals. Never replace Text around user messages,
