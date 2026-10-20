@@ -396,3 +396,10 @@ S8의 **비파괴/격리 검토는 S2~S7과 병렬 진행 가능**하며, S8 Pro
 - **수정:** fetch Promise와 AbortSignal을 서버가 직접 경쟁시키는 응답 헤더 마감 계약을 추가한다. Abort를 무시한 Promise도 지정된 시간 내 거절하며 지연되어 도착한 성공 응답 본문을 폐기한다. 카운트 결과 반환 직전에도 deadline 경과 여부를 재확인한다. DB 예약/유료 Provider는 해당 count 성공 전 절대 호출되지 않는다.
 - **합성 회귀:** AbortSignal을 영원히 무시하는 fake transport에서도 `PRE_DISPATCH_REJECTED`, 비용 DB 0회/모델 0회 보장; 마감 이후 늦게 반환하는 정상 응답으로도 승격하지 않는다. 기존 정상 count→reserve→paid Provider→영수증→정산, R29 스트림 응답 제한 유지.
 - **불변:** 새 저가 모델 ID/가격표 선택 없음. 운영 공개/유료 호출 및 Production DB DDL/DML/ACL/마이그레이션 없음. G0/D-04 미확정, positive G1/G2/G3/G4/G5/G6 Production HOLD, Projectors=[], writeAdmission=DENY 유지.
+
+## 46. 2026-10-20 S6/G4 — 실제 유료 Provider 응답 헤더 시간 제한 독립 보장 (비운영)
+
+- **실제 결손:** R30은 공식 토큰 Count의 AbortSignal 무시/지연 성공을 차단했으나, 실제 `/responses` AI 추론 요청은 여전히 `await fetchImpl(...)`만 사용하여 AbortSignal을 무시하는 전송 계층에서 무기한 대기할 수 있었다. 정상 헤더 이후 bounded body timeout과 별개의 결손이다.
+- **수정:** R30 헤더 계약을 공유 upstream 리소스 유틸로 이동하고 토큰 Count 및 실제 구조화 Provider에 동일 적용한다. 헤더 미응답 타임아웃 시 호출을 `TIMEOUT`으로 종료·비용 계측하고, 마감 뒤 도착한 Provider 응답을 폐기한다. 지연 성공을 Chat Commit으로 승격하거나 재추론/재과금하지 않는다.
+- **합성 회귀:** AbortSignal을 무시하며 응답하지 않는 Provider(정확한 1회 호출, 1회 timeout 이벤트), 마감 뒤 정상 JSON을 반환하는 Provider(본문 cancel, 성공 불인정). 기존 count→reserve→Provider→receipt→settle, R29 8KiB 리소스 제한, R30 절대 deadline 회귀 유지.
+- **제한:** 유료 Provider 요청은 이미 송신됐을 수 있으므로 네트워크 타임아웃이 과금 부재를 증명하지 않는다. 예약·실제 청구 reconciliation은 별개 G4 승인 문제이며 이번 변경으로 운영 사용 승인 불가. G0/D-04 OPEN, positive G1/G2/G3/G4/G5/G6 Production HOLD, Projectors=[], writeAdmission=DENY. Production DB DDL/DML/ACL/migration·공개/유료 활성화·모델 변경 없음.
