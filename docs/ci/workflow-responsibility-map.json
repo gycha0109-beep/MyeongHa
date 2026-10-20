@@ -499,6 +499,12 @@
       "prMode": "none",
       "mainMode": "one-shot-trigger",
       "workTrackAttribution": "commit-metadata"
+    },
+    "seyeon-openrouter-xing-free-three-call-n01-v1.yml": {
+      "responsibility": "character-memory-free-model-exact-zdr-json-public-only-shadow",
+      "prMode": "none",
+      "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "commit-metadata"
     }
   }
 }
