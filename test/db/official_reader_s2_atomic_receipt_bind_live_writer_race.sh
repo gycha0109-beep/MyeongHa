@@ -1398,7 +1398,7 @@ for replay in 1 2; do
       'synthetic-b8-zero-grant-cancel-v1'
     )->'revoke'->>'disposition'); commit;")" ||
     fail "verified zero-Grant D cancellation failed with sibling Reader already bound"
-  [[ "$outcome" == cancelled_before_grant ]] ||
+  [[ "$(printf '%s\n' "$outcome" | grep -xc 'cancelled_before_grant' || true)" == 1 ]] ||
     fail "verified zero-Grant D cancellation returned wrong disposition: [$outcome]"
 done
 [[ "$(p -c "select verification_status from public.commerce_receipts where id='$b8_receipt_d'::uuid;")" == revoked ]] ||
