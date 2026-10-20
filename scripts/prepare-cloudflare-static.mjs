@@ -5,6 +5,10 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+// Preserve the root landing URL while disabling automatic clean-URL HTML rewriting.
+// Cloudflare Static Assets supports same-site 200 proxying via _redirects.
+export const CLOUDFLARE_ROOT_REWRITE = '/ /index.html 200\\n';
+
 export const REQUIRED_SECURITY_HEADERS = Object.freeze([
   'Content-Security-Policy',
   'Referrer-Policy',
@@ -89,6 +93,7 @@ export async function writeCloudflareStaticHeaders(options = {}) {
   await readFile(join(outputRoot, 'index.html'));
   await mkdir(outputRoot, { recursive: true });
   await writeFile(join(outputRoot, '_headers'), headers, { encoding: 'utf8' });
+  await writeFile(join(outputRoot, '_redirects'), CLOUDFLARE_ROOT_REWRITE, { encoding: 'utf8' });
   return join(outputRoot, '_headers');
 }
 
