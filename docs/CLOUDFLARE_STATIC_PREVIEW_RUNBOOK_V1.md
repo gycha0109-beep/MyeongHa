@@ -35,7 +35,7 @@
 
 | HTTP 입력 | 현재 설계 예상 결과 | 다음 단계 증명 |
 |---|---|---|
-| `GET /`, `GET /index.html` | 정적 index 제공 | MIME/CSP/cache/브라우저 캡처 |
+| `GET /`, `GET /index.html` | 정적 index 제공(\`/\`은 정적 rewrite) | MIME/CSP/cache/브라우저 캡처 |
 | `GET /chat.html`, `/face-reading.html` 등 11개 | 같은 경로의 HTML 제공 | Vercel과 정적 자원/상대경로 parity |
 | `GET /missing-page.html` | 404 | SPA fallback 금지 |
 | `GET /api/health` | 404 (미이관) | Worker 우선 처리 |
