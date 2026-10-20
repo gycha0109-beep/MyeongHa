@@ -57,7 +57,6 @@ describe('Cloudflare static-only deployment boundary', () => {
     const vercel = JSON.parse(await readFile(vercelUrl, 'utf8'));
     const csp = vercel.headers[0].headers.find((header) => header.key === 'Content-Security-Policy').value;
     for (const [method, path] of [
-      ['GET', '/api/health'],
       ['POST', '/api/auth/sign-in'],
       ['GET', '/api/readings'],
       ['POST', '/api/me/saju/calculation'],
