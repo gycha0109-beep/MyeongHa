@@ -1,6 +1,6 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
-  "name": "myeongha-static-preview",
+  "name": "myeongha",
   "main": "./workers/cloudflare-static-preview.mjs",
   "compatibility_date": "2026-10-20",
   "workers_dev": false,
