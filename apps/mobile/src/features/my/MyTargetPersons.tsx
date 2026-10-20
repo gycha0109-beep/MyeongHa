@@ -21,6 +21,7 @@ import {
 } from '@/features/my/target-person-create-input';
 import { mobileColors } from '@/ui/mobile-colors';
 import { MobileUiText } from '@/ui/MobileUiText';
+import { useMobileUiLocale } from '@/ui/mobile-ui-locale';
 
 const sexOptions = [
   { value: 'male', label: '남성' },
@@ -126,6 +127,7 @@ export function MyTargetPersonCreateCard({
   readonly errorMessage: string | null;
   readonly onCreate: (request: TargetPersonCreateRequestV1) => Promise<boolean>;
 }) {
+  const { t } = useMobileUiLocale();
   const [displayLabel, setDisplayLabel] = useState('');
   const [relationshipLabel, setRelationshipLabel] = useState('');
   const [calendarType, setCalendarType] = useState<BirthCalendarTypeV1>('solar');
@@ -192,7 +194,7 @@ export function MyTargetPersonCreateCard({
       </View>
 
       <TextInput
-        accessibilityLabel="대상 이름"
+        accessibilityLabel={t('대상 이름')}
         value={displayLabel}
         onChangeText={setDisplayLabel}
         placeholder="이름 또는 별칭"
@@ -200,7 +202,7 @@ export function MyTargetPersonCreateCard({
         style={styles.input}
       />
       <TextInput
-        accessibilityLabel="관계"
+        accessibilityLabel={t('관계')}
         value={relationshipLabel}
         onChangeText={setRelationshipLabel}
         placeholder="관계 (예: 친구)"
@@ -229,7 +231,7 @@ export function MyTargetPersonCreateCard({
 
       <View style={styles.dateRow}>
         <TextInput
-          accessibilityLabel="대상 출생 연도"
+          accessibilityLabel={t('대상 출생 연도')}
           value={year}
           onChangeText={(value) => setYear(value.replace(/\D/gu, '').slice(0, 4))}
           keyboardType="number-pad"
@@ -239,7 +241,7 @@ export function MyTargetPersonCreateCard({
           style={[styles.input, styles.yearInput]}
         />
         <TextInput
-          accessibilityLabel="대상 출생 월"
+          accessibilityLabel={t('대상 출생 월')}
           value={month}
           onChangeText={(value) => setMonth(value.replace(/\D/gu, '').slice(0, 2))}
           keyboardType="number-pad"
@@ -249,7 +251,7 @@ export function MyTargetPersonCreateCard({
           style={[styles.input, styles.shortInput]}
         />
         <TextInput
-          accessibilityLabel="대상 출생 일"
+          accessibilityLabel={t('대상 출생 일')}
           value={day}
           onChangeText={(value) => setDay(value.replace(/\D/gu, '').slice(0, 2))}
           keyboardType="number-pad"
@@ -274,7 +276,7 @@ export function MyTargetPersonCreateCard({
         </View>
       </View>
       <TextInput
-        accessibilityLabel="대상 출생시간"
+        accessibilityLabel={t('대상 출생시간')}
         editable={timeKnown}
         value={birthTime}
         onChangeText={setBirthTime}
