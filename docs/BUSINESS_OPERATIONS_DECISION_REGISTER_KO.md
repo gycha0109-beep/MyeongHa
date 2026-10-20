@@ -5,6 +5,11 @@
 - 구분: **확정 / 기존 시스템 결정 / 권장 후보 / 보류 / 외부회신 대기 / 실행·증빙 미확인**. 이 문서는 사업 운영 결정의 기록이며 관계기관·전문가의 법률·세무 확답이 아니다.
 - 기술·상품·데이터 결정의 우선 자료: `docs/P0_DECISION_REGISTER.md`, `docs/COMMERCE_MERCHANT_FACT_INTAKE_V1.md`, `docs/COMMERCE_DIGITAL_READING_REFUND_DISCLOSURE_POLICY_V1.md`.
 
+## 신규 공식 Reader 개인정보 정책 확정 (2026-10-19)
+
+- **제품 정책 `P0-PR-02` 승인:** [기본 브랜치 정본](OFFICIAL_READER_S4_PRIVACY_POLICY_DECISION_V1.md). 보호 유료 해설 전용 비공개 보관, 환불·탈퇴/권한 상실 즉시 서버 접근 차단, 본 DB 24h 파기 내부 목표, 일반 로그 ≤90일, AI Memory/검색 재사용 금지. 새 유료 원문 처리 외부 업체 없음(사용자 진술).
+- **별도 대기:** LEGAL-002 실제 업체/위탁·국외 이전 검토, 개인정보 보관·삭제·백업/복원 기술 인수, S3/S5, 출시/결제 승인. 기존 P0-PR-01의 P5Y/P30D·서명은 그대로 둡니다.
+
 ## 1. 확정된 사업 방향
 | 항목 | 상태 | 내용 |
 |---|---|---|
