@@ -1,3 +1,5 @@
+import { matchCloudflareApiRoute } from './cloudflare-api-router.mjs';
+
 // Cloudflare static preview: explicitly NOT the production API runtime.
 // Every /api request goes through this deny-only Worker; Static Assets serve
 // known files directly. Do not connect Supabase, OpenAI, Saju or PortOne here.
@@ -32,10 +34,24 @@ export function isSeyeonTurnSendPath(pathname) {
 
 export function handleCloudflareStaticPreviewRequest(request) {
   const url = new URL(request.url);
+  const route = matchCloudflareApiRoute(url.pathname);
+
+  // This is the only positive API route. It is a constant liveness signal
+  // with no DB/TLS readiness, auth, upstream calls, cookies, or sensitive data.
+  // Reject all query strings to avoid marker-param confusion.
+  if (route?.id === 'api.health' && url.search === '') {
+    if (request.method !== 'GET') {
+      return new Response(null, {
+        status: 405,
+        headers: { ...BASE_HEADERS, Allow: 'GET' },
+      });
+    }
+    return Response.json({ status: 'ok' }, { status: 200, headers: BASE_HEADERS });
+  }
 
   if (
     request.method === 'POST' &&
-    isSeyeonTurnSendPath(url.pathname)
+    route?.id === 'rewrite.chat.turns'
   ) {
     // Preserve the positive first-reveal HOLD. Never forward or stream.
     return Response.json(FIRST_REVEAL_ERROR, {
@@ -44,8 +60,9 @@ export function handleCloudflareStaticPreviewRequest(request) {
     });
   }
 
-  // All other API requests, including unknown paths and wrong methods,
-  // are deliberately NOT routed to a Vercel fallback or a placeholder 200.
+  // All other APIs (including /api/readiness and the private TLS canary),
+  // unknown paths, rewritten paths, and method mismatches remain closed.
+  // Never translate a rewrite marker into a trusted handler or Vercel proxy.
   return new Response(null, {
     status: 404,
     headers: BASE_HEADERS,
