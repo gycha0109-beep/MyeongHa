@@ -2,7 +2,7 @@
 // A REAL TLS-terminating Node host for synthetic/loopback acceptance only.
 // Deliberately no executable production entrypoint, public listener, rewrite,
 // reverse-proxy trust, or automatic Provider/DB credential composition.
-import { randomUUID } from 'node:crypto';
+import { createPrivateKey, randomUUID, X509Certificate } from 'node:crypto';
 import { createServer, type Server as HttpsServer } from 'node:https';
 import type { TLSSocket } from 'node:tls';
 import type { IdentityEvidenceVerificationPortV1 } from './current-subject-profile-http.js';
@@ -24,6 +24,8 @@ export const SEYEON_FIRST_ZERO_DIRECT_HTTPS_LOOPBACK_HOST_V1 = Object.freeze({
 } as const);
 
 const BIND_ADDRESS = SEYEON_FIRST_ZERO_DIRECT_HTTPS_LOOPBACK_HOST_V1.bindAddress;
+const NETWORK_BIND_ADDRESS = '0.0.0.0' as const;
+const NETWORK_HTTPS_PORT = 443 as const;
 const MAX_RAW_HEADER_ITEMS = 128;
 const HOSTNAME = /^(?=.{1,253}$)[a-z0-9](?:[a-z0-9.-]*[a-z0-9])$/u;
 const CHAT_POST_PATH = /^\/api\/chat\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/turns$/iu;
@@ -67,6 +69,35 @@ export interface StartSeyeonFirstZeroDirectHttpsLoopbackInputV1 {
   readonly runtime: Pick<ProductionSeyeonChatRuntimeV1, 'run'>;
 }
 
+/**
+ * Prepared direct TLS network listener. It is NOT an executable deployment
+ * entrypoint or authority to reveal after revoke; external approval and the
+ * final last-hop G0-D04 contract remain separate.
+ */
+export const SEYEON_FIRST_ZERO_DIRECT_HTTPS_NETWORK_CANDIDATE_V1 = Object.freeze({
+  bindAddress: NETWORK_BIND_ADDRESS,
+  port: NETWORK_HTTPS_PORT,
+  requiredOwnerNetworkStartApproval: true,
+  publicRouteMounted: false,
+  deploymentEntrypointInstalled: false,
+  vercelFetchSupported: false,
+  reverseProxySupported: false,
+  finalClientDeliveryAcknowledged: false,
+} as const);
+
+export interface StartSeyeonFirstZeroDirectHttpsNetworkCandidateInputV1
+  extends StartSeyeonFirstZeroDirectHttpsLoopbackInputV1 {
+  /** Explicit operational start permission, NOT G0/Reveal approval. */
+  readonly ownerApprovedNetworkStart: true;
+  /** The network service must have an explicitly configured browser origin. */
+  readonly allowedBrowserOrigin: string;
+  /** Exact direct TLS bind; proxies, alternate ports and implicit defaults forbidden. */
+  readonly listener: Readonly<{
+    bindAddress: '0.0.0.0';
+    port: 443;
+  }>;
+}
+
 export interface SeyeonFirstZeroDirectHttpsLoopbackLeaseV1 {
   readonly port: number;
   readonly server: HttpsServer;
@@ -105,6 +136,7 @@ function isDirectTlsRequest(
   request: import('node:http').IncomingMessage,
   response: import('node:http').ServerResponse,
   expectedDnsHost: string,
+  onlyLoopbackPeer: boolean,
 ): boolean {
   const socket = request.socket as TLSSocket;
   const rawHeaders = request.rawHeaders;
@@ -115,7 +147,9 @@ function isDirectTlsRequest(
     rawHeaders.length <= MAX_RAW_HEADER_ITEMS &&
     !hasUntrustedProxyHeaders(rawHeaders) &&
     response.socket === socket &&
-    socket.remoteAddress === BIND_ADDRESS &&
+    (onlyLoopbackPeer
+      ? socket.remoteAddress === BIND_ADDRESS
+      : typeof socket.remoteAddress === 'string' && socket.remoteAddress.length > 0) &&
     !response.headersSent && !response.writableEnded &&
     !response.destroyed;
 }
@@ -152,8 +186,27 @@ function staticTlsHold(
  * same-socket handler, after Member verification and fresh DB zero-source read.
  * TLS and Node 'finish' do NOT prove an external proxy/client has received data.
  */
-export async function startSeyeonFirstZeroDirectHttpsLoopbackV1(
+function verifyDirectTlsCertificate(input: StartSeyeonFirstZeroDirectHttpsLoopbackInputV1): void {
+  try {
+    const cert = new X509Certificate(input.certificatePem);
+    const key = createPrivateKey(input.privateKeyPem);
+    if (cert.checkHost(input.expectedDnsHost, { subject: 'never' }) !== input.expectedDnsHost ||
+        !cert.checkPrivateKey(key) ||
+        !Number.isFinite(Date.parse(cert.validFrom)) ||
+        !Number.isFinite(Date.parse(cert.validTo)) ||
+        Date.now() < Date.parse(cert.validFrom) ||
+        Date.now() >= Date.parse(cert.validTo)) {
+      throw new Error('invalid TLS identity');
+    }
+  } catch {
+    throw new Error('Direct HTTPS certificate must match the exact DNS SAN, private key and validity period.');
+  }
+}
+
+async function startDirectHttpsHost(
   input: StartSeyeonFirstZeroDirectHttpsLoopbackInputV1,
+  bindAddress: '127.0.0.1' | '0.0.0.0',
+  port: number,
 ): Promise<SeyeonFirstZeroDirectHttpsLoopbackLeaseV1> {
   if (!HOSTNAME.test(input.expectedDnsHost) ||
       input.expectedDnsHost.includes('..') ||
@@ -162,6 +215,7 @@ export async function startSeyeonFirstZeroDirectHttpsLoopbackV1(
     throw new Error('Loopback TLS admission requires one exact DNS host.');
   }
   const browserOrigin = allowedOrigin(input.allowedBrowserOrigin);
+  verifyDirectTlsCertificate(input);
   const server = createServer({
     key: input.privateKeyPem,
     cert: input.certificatePem,
@@ -173,7 +227,7 @@ export async function startSeyeonFirstZeroDirectHttpsLoopbackV1(
   }, (incoming, response) => {
     const requestId = randomUUID();
     response.shouldKeepAlive = false;
-    if (!isDirectTlsRequest(incoming, response, input.expectedDnsHost)) {
+    if (!isDirectTlsRequest(incoming, response, input.expectedDnsHost, bindAddress === BIND_ADDRESS)) {
       staticTlsHold(response, requestId);
       return;
     }
@@ -232,14 +286,15 @@ export async function startSeyeonFirstZeroDirectHttpsLoopbackV1(
   try {
     await new Promise<void>((resolve, reject) => {
       server.once('error', reject);
-      server.listen(0, BIND_ADDRESS, () => {
+      server.listen(port, bindAddress, () => {
         server.off('error', reject);
         resolve();
       });
     });
     const address = server.address();
     if (address === null || typeof address === 'string' ||
-        address.address !== BIND_ADDRESS || address.port < 1) {
+        address.address !== bindAddress || address.port < 1 ||
+        (port !== 0 && address.port !== port)) {
       throw new Error('HTTPS listener did not bind the reserved loopback address.');
     }
     return Object.freeze({
@@ -256,4 +311,31 @@ export async function startSeyeonFirstZeroDirectHttpsLoopbackV1(
     server.close();
     throw error;
   }
+}
+
+/** Existing synthetic, same-host real TLS tests remain loopback-only. */
+export function startSeyeonFirstZeroDirectHttpsLoopbackV1(
+  input: StartSeyeonFirstZeroDirectHttpsLoopbackInputV1,
+): Promise<SeyeonFirstZeroDirectHttpsLoopbackLeaseV1> {
+  return startDirectHttpsHost(input, BIND_ADDRESS, 0);
+}
+
+/**
+ * The owner-selected *code candidate* for a dedicated externally addressable
+ * TLS 1.3 Node process. No production entrypoint invokes this function yet.
+ * Network permission alone cannot authorize data disclosure or paid models:
+ * verified Member evidence and exact DB-owner source locks still decide each
+ * response. Sending via an external proxy is outside this design.
+ */
+export function startSeyeonFirstZeroDirectHttpsNetworkCandidateV1(
+  input: StartSeyeonFirstZeroDirectHttpsNetworkCandidateInputV1,
+): Promise<SeyeonFirstZeroDirectHttpsLoopbackLeaseV1> {
+  if (input.ownerApprovedNetworkStart !== true ||
+      input.listener?.bindAddress !== NETWORK_BIND_ADDRESS ||
+      input.listener.port !== NETWORK_HTTPS_PORT ||
+      typeof input.allowedBrowserOrigin !== 'string') {
+    throw new Error('Direct HTTPS network listener requires explicit owner scope and fixed TCP/443.');
+  }
+  // Hostname, origin and TLS certificate are checked again before listening.
+  return startDirectHttpsHost(input, NETWORK_BIND_ADDRESS, NETWORK_HTTPS_PORT);
 }
