@@ -22,4 +22,33 @@ describe('fixed web UI localization', () => {
       expect(translateStaticUi('1988-01-01 12:30', lang)).toBe('1988-01-01 12:30');
     }
   });
+  it('localizes the fixed labels that previously remained Korean in Japanese and Traditional Chinese', () => {
+    const labels = [
+      '세연', '백헌', '여울', '라현', '태겸', '윤호',
+      '선택하지 않음', '남성', '여성', '미지정',
+      '출생시간', '출생시간 (24시간제 HH:mm)',
+      '과 함께 관상을 봅니다.', '에게 관상 보기',
+      '현재 웹 대화는 회원 계정에서 시작할 수 있습니다.',
+      '로그인', '회원가입', '이메일', '비밀번호',
+      '프리뷰 확인', '지금의 길, 더 나은 길로',
+      '흐르는 기회를 잡는 법',
+    ];
+    for (const source of labels) {
+      for (const locale of ['ja-JP', 'zh-TW'] as const) {
+        const text = translateStaticUi(source, locale);
+        expect(text, `Missing ${locale}: ${source}`).not.toBe(source);
+        expect(/[가-힣]/u.test(text), `Korean leaked to ${locale}: ${source}`).toBe(false);
+      }
+    }
+  });
+
+  it('does not change form option values or external user content', () => {
+    for (const locale of SUPPORTED_UI_LOCALES) {
+      expect(translateStaticUi('male', locale)).toBe('male');
+      expect(translateStaticUi('female', locale)).toBe('female');
+      expect(translateStaticUi('00:35', locale)).toBe('00:35');
+      expect(translateStaticUi('고객이 자유롭게 입력한 개인적인 한국어 대화', locale)).toBe('고객이 자유롭게 입력한 개인적인 한국어 대화');
+    }
+  });
+
 });
