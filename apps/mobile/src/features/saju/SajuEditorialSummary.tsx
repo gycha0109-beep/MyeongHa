@@ -2,6 +2,7 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import type { MobileSajuViewModelV1 } from '@/features/saju/saju-view-model';
 import { useMobileTheme } from '@/ui/mobile-theme';
+import { MobileUiText } from '@/ui/MobileUiText';
 
 /**
  * Editorial treatment of server-calculated birth-chart evidence.
@@ -17,8 +18,8 @@ export function SajuEditorialSummary({ viewModel }: { viewModel: MobileSajuViewM
       <View pointerEvents="none" style={styles.borderFrame} />
       <View style={styles.heading}>
         <Text style={styles.eyebrow}>MY FOUR PILLARS · 命</Text>
-        <Text style={styles.title}>나의 명식, 나를 읽는 첫 장</Text>
-        <Text style={styles.subtitle}>태어난 순간의 정보를 토대로 계산한 명식을 확인해 보세요.</Text>
+        <MobileUiText style={styles.title}>나의 명식, 나를 읽는 첫 장</MobileUiText>
+        <MobileUiText style={styles.subtitle}>태어난 순간의 정보를 토대로 계산한 명식을 확인해 보세요.</MobileUiText>
       </View>
       <View style={styles.divider} />
       <View style={styles.facts}>
@@ -26,7 +27,7 @@ export function SajuEditorialSummary({ viewModel }: { viewModel: MobileSajuViewM
           <Text style={styles.sealHanja}>{dayConfirmed ? day.hanja : '命'}</Text>
         </View>
         <View style={styles.factCopy}>
-          <Text style={styles.factLabel}>나의 일간</Text>
+          <MobileUiText style={styles.factLabel}>나의 일간</MobileUiText>
           <Text style={styles.factPrimary}>{dayConfirmed ? day.hangul : '계산 상태 확인 필요'}</Text>
           <Text style={styles.factSecondary}>
             {dayConfirmed ? [day.element, day.yinYang].filter(Boolean).join(' · ') : '확정된 기둥만 표시합니다.'}
@@ -37,7 +38,7 @@ export function SajuEditorialSummary({ viewModel }: { viewModel: MobileSajuViewM
         <View style={styles.stateMark} />
         <Text style={styles.stateLabel}>{viewModel.completeness.headline}</Text>
       </View>
-      <Text style={styles.disclaimer}>이 정보는 검증된 명식 계산 결과입니다. 하루 운세나 미래를 예측한 내용이 아닙니다.</Text>
+      <MobileUiText style={styles.disclaimer}>이 정보는 검증된 명식 계산 결과입니다. 하루 운세나 미래를 예측한 내용이 아닙니다.</MobileUiText>
     </View>
   );
 }

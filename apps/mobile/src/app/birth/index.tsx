@@ -26,6 +26,7 @@ import {
 } from '@/features/birth/birth-clock-12hour';
 import { mobileHomeControllerV1 } from '@/features/home/native-mobile-home-controller';
 import { mobileColors } from '@/ui/mobile-colors';
+import { MobileUiText } from '@/ui/MobileUiText';
 import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
 import { useMobilePullRefreshV1 } from '@/ui/use-mobile-pull-refresh';
 
@@ -150,19 +151,19 @@ export default function BirthInputScreen() {
         )}
       >
         <Pressable accessibilityRole="button" onPress={() => router.back()}>
-          <Text style={styles.back}>‹ 사주로 돌아가기</Text>
+          <MobileUiText style={styles.back}>‹ 사주로 돌아가기</MobileUiText>
         </Pressable>
 
         <View style={styles.header}>
           <Text style={styles.eyebrow}>BIRTH PROFILE</Text>
-          <Text style={styles.title}>출생정보</Text>
-          <Text style={styles.description}>
+          <MobileUiText style={styles.title}>출생정보</MobileUiText>
+          <MobileUiText style={styles.description}>
             명식을 계산하기 위한 현재 자기 출생정보를 등록합니다.
-          </Text>
+          </MobileUiText>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.label}>달력</Text>
+          <MobileUiText style={styles.label}>달력</MobileUiText>
           <View style={styles.segmentRow}>
             {(['solar', 'lunar'] as const).map((value) => (
               <Pressable
@@ -181,7 +182,7 @@ export default function BirthInputScreen() {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.label}>생년월일</Text>
+          <MobileUiText style={styles.label}>생년월일</MobileUiText>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="출생 생년월일 달력 열기"
@@ -201,9 +202,9 @@ export default function BirthInputScreen() {
             </View>
             <Text style={styles.dateChevron}>›</Text>
           </Pressable>
-          <Text style={styles.helper}>
+          <MobileUiText style={styles.helper}>
             연도 → 월 → 날짜 순서로 선택할 수 있습니다.
-          </Text>
+          </MobileUiText>
           <BirthDateCalendar
             visible={datePickerVisible}
             calendarType={calendarType}
@@ -220,9 +221,9 @@ export default function BirthInputScreen() {
 
         <View style={styles.section}>
           <View style={styles.rowBetween}>
-            <Text style={styles.label}>출생시간</Text>
+            <MobileUiText style={styles.label}>출생시간</MobileUiText>
             <View style={styles.inlineSwitch}>
-              <Text style={styles.switchLabel}>시간 모름</Text>
+              <MobileUiText style={styles.switchLabel}>시간 모름</MobileUiText>
               <Switch
                 value={!timeKnown}
                 onValueChange={(unknown) => {
@@ -250,15 +251,15 @@ export default function BirthInputScreen() {
         {calendarType === 'lunar' ? (
           <View style={[styles.section, styles.rowBetween]}>
             <View>
-              <Text style={styles.label}>윤달</Text>
-              <Text style={styles.helper}>윤달로 태어난 경우에만 켜 주세요.</Text>
+              <MobileUiText style={styles.label}>윤달</MobileUiText>
+              <MobileUiText style={styles.helper}>윤달로 태어난 경우에만 켜 주세요.</MobileUiText>
             </View>
             <Switch value={isLeapMonth} onValueChange={setIsLeapMonth} />
           </View>
         ) : null}
 
         <View style={styles.section}>
-          <Text style={styles.label}>성별</Text>
+          <MobileUiText style={styles.label}>성별</MobileUiText>
           <View style={styles.segmentRow}>
             {sexOptions.map((option) => (
               <Pressable
@@ -287,7 +288,7 @@ export default function BirthInputScreen() {
           {submitting ? (
             <ActivityIndicator color={mobileColors.surface} />
           ) : (
-            <Text style={styles.primaryButtonText}>내 사주 보기</Text>
+            <MobileUiText style={styles.primaryButtonText}>내 사주 보기</MobileUiText>
           )}
         </Pressable>
       </ScrollView>

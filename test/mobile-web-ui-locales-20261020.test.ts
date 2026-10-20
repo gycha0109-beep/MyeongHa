@@ -1,0 +1,106 @@
+import { readFile } from 'node:fs/promises';
+import { describe, expect, it } from 'vitest';
+
+import {
+  normalizeUiLocale,
+  translateStaticUi,
+  SUPPORTED_UI_LOCALES,
+} from '../apps/web/ui-i18n.js';
+import {
+  normalizeMobileUiLocale,
+  translateMobileUiCopy,
+  formatMobileUiCopy,
+  localizeMobileLiteralText,
+  SUPPORTED_MOBILE_UI_LOCALES,
+} from '../apps/mobile/src/ui/mobile-ui-copy.js';
+
+async function source(path: string) {
+  return readFile(new URL('../' + path, import.meta.url), 'utf8');
+}
+
+describe('Mobile / Web UI localization parity', () => {
+  it('uses the same Korean / Japanese / Traditional Chinese language roster and fallback', () => {
+    expect(SUPPORTED_MOBILE_UI_LOCALES).toEqual(SUPPORTED_UI_LOCALES);
+    for (const value of ['ko-KR', 'ja-JP', 'zh-TW', 'zh-CN', 'en-US', null, undefined, '']) {
+      expect(normalizeMobileUiLocale(value)).toBe(normalizeUiLocale(value));
+    }
+  });
+
+  it('transplants every current web-authored translation without changing wording', async () => {
+    const webSource = await source('apps/web/ui-i18n.js');
+    const start = webSource.indexOf('const COPY = new Map(') + 'const COPY = new Map('.length;
+    const end = webSource.indexOf('].map(([source', start) + 1;
+    const entries = JSON.parse(webSource.slice(start, end)) as Array<[string, string, string]>;
+    expect(entries.length).toBeGreaterThan(0);
+    for (const [korean, japanese, chinese] of entries) {
+      expect(translateMobileUiCopy(korean, 'ko-KR')).toBe(korean);
+      expect(translateMobileUiCopy(korean, 'ja-JP')).toBe(japanese);
+      expect(translateMobileUiCopy(korean, 'zh-TW')).toBe(chinese);
+      expect(translateMobileUiCopy(korean, 'ja-JP')).toBe(translateStaticUi(korean, 'ja-JP'));
+      expect(translateMobileUiCopy(korean, 'zh-TW')).toBe(translateStaticUi(korean, 'zh-TW'));
+    }
+  });
+
+  it('keeps unknown or private text, submitted facts, and model output unchanged', () => {
+    for (const value of [
+      '사용자의 고유한 대화 내용',
+      '1995-08-17 19:30',
+      'PERSONAL_JOURNAL_SECRET_2026',
+      '오늘 우울해서 친구에게만 말하고 싶었어요.',
+    ]) {
+      for (const locale of SUPPORTED_MOBILE_UI_LOCALES) {
+        expect(translateMobileUiCopy(value, locale)).toBe(value);
+      }
+    }
+  });
+
+  it('supports web placeholders, mobile-only fixed copy and indented React Native literal leaves', () => {
+    expect(translateMobileUiCopy('홈', 'ja-JP')).toBe('ホーム');
+    expect(translateMobileUiCopy('사주', 'zh-TW')).toBe('八字命理');
+    expect(translateMobileUiCopy('출생정보', 'ja-JP')).toBe('出生情報');
+    expect(translateMobileUiCopy('화면 테마', 'zh-TW')).toBe('畫面主題');
+    expect(formatMobileUiCopy('{reader}과 관상 보기', { reader: '세연' }, 'ja-JP'))
+      .toBe('세연と人相鑑定'); // character label supplied by caller unchanged
+    expect(localizeMobileLiteralText('\n          생년월일\n        ', 'ja-JP'))
+      .toBe('\n          生年月日\n        ');
+    expect(localizeMobileLiteralText('\n          출생정보\n        ', 'zh-TW'))
+      .toBe('\n          出生資料\n        ');
+  });
+
+  it('has an app-wide persisted locale, settings choices and tab localization', async () => {
+    const [root, provider, my, tabs, text] = await Promise.all([
+      source('apps/mobile/src/app/_layout.tsx'),
+      source('apps/mobile/src/ui/mobile-ui-locale.tsx'),
+      source('apps/mobile/src/features/my/MyComponents.tsx'),
+      source('apps/mobile/src/app/(tabs)/_layout.tsx'),
+      source('apps/mobile/src/ui/MobileUiText.tsx'),
+    ]);
+    expect(root).toContain('<MobileUiLocaleProvider>');
+    expect(provider).toContain("SecureStore.getItemAsync(MOBILE_UI_LOCALE_STORAGE_KEY)");
+    expect(provider).toContain('SecureStore.setItemAsync(MOBILE_UI_LOCALE_STORAGE_KEY, normalized)');
+    expect(my).toContain("value: 'ko-KR', label: '한국어'");
+    expect(my).toContain("value: 'ja-JP', label: '日本語'");
+    expect(my).toContain("value: 'zh-TW', label: '繁體中文'");
+    expect(my).toContain('<MyLocaleSelector />');
+    expect(tabs).toContain("title: t('사주')");
+    expect(tabs).toContain("title: t('마이')");
+    expect(text).toContain("typeof children === 'string'");
+  });
+
+  it('only opts in fixed JSX leaf text and does not change chat, readings, or API payloads', async () => {
+    const [chat, saju, records, birth, sourceCopy] = await Promise.all([
+      source('apps/mobile/src/features/chat/ChatReadComponents.tsx'),
+      source('apps/mobile/src/features/saju/SajuPreviewReadingView.tsx'),
+      source('apps/mobile/src/features/records/RecordsComponents.tsx'),
+      source('apps/mobile/src/app/birth/index.tsx'),
+      source('apps/mobile/src/ui/mobile-ui-copy.ts'),
+    ]);
+    expect(chat).toContain('SEYEON_HISTORY_REVEAL_HOLD');
+    expect(chat).toContain('<MobileUiText');
+    expect(saju).toContain('<MobileUiText');
+    expect(records).toContain('<MobileUiText');
+    expect(birth).toContain('<MobileUiText');
+    expect(sourceCopy).toContain('export function translateMobileUiCopy');
+    expect(sourceCopy).not.toContain('fetch(');
+  });
+});

@@ -20,6 +20,7 @@ import {
   buildMobileTargetPersonCreateRequestV1,
 } from '@/features/my/target-person-create-input';
 import { mobileColors } from '@/ui/mobile-colors';
+import { MobileUiText } from '@/ui/MobileUiText';
 
 const sexOptions = [
   { value: 'male', label: '남성' },
@@ -59,10 +60,10 @@ export function MyTargetPersonsSection({
     <View style={styles.section}>
       <View style={styles.intro}>
         <Text style={styles.kicker}>PEOPLE</Text>
-        <Text style={styles.title}>등록된 대상</Text>
-        <Text style={styles.description}>
+        <MobileUiText style={styles.title}>등록된 대상</MobileUiText>
+        <MobileUiText style={styles.description}>
           현재 계정에 등록된 대상의 출생정보를 확인합니다.
-        </Text>
+        </MobileUiText>
       </View>
 
       {items.map((item) => (
@@ -76,15 +77,15 @@ export function MyTargetPersonsSection({
             ) : null}
           </View>
           <View style={styles.factRow}>
-            <Text style={styles.factLabel}>생년월일</Text>
+            <MobileUiText style={styles.factLabel}>생년월일</MobileUiText>
             <Text style={styles.factValue}>{item.currentRevision.input.birthDate}</Text>
           </View>
           <View style={styles.factRow}>
-            <Text style={styles.factLabel}>태어난 시간</Text>
+            <MobileUiText style={styles.factLabel}>태어난 시간</MobileUiText>
             <Text style={styles.factValue}>{timeLabel(item)}</Text>
           </View>
           <View style={styles.factRow}>
-            <Text style={styles.factLabel}>기준</Text>
+            <MobileUiText style={styles.factLabel}>기준</MobileUiText>
             <Text style={styles.factValue}>
               {calendarLabel(item)} · {sexLabel(item)}
             </Text>
@@ -95,9 +96,9 @@ export function MyTargetPersonsSection({
         </View>
       ))}
 
-      <Text style={styles.caption}>
+      <MobileUiText style={styles.caption}>
         신규 추가만 지원합니다. 수정·삭제·궁합 실행은 아직 지원하지 않습니다.
-      </Text>
+      </MobileUiText>
     </View>
   );
 }
@@ -107,10 +108,10 @@ export function MyTargetPersonsEmpty() {
     <View style={styles.section}>
       <View style={styles.intro}>
         <Text style={styles.kicker}>PEOPLE</Text>
-        <Text style={styles.title}>등록된 대상</Text>
+        <MobileUiText style={styles.title}>등록된 대상</MobileUiText>
       </View>
       <View style={styles.card}>
-        <Text style={styles.description}>현재 등록된 대상이 없습니다.</Text>
+        <MobileUiText style={styles.description}>현재 등록된 대상이 없습니다.</MobileUiText>
       </View>
     </View>
   );
@@ -184,10 +185,10 @@ export function MyTargetPersonCreateCard({
     <View style={styles.createCard}>
       <View style={styles.intro}>
         <Text style={styles.kicker}>ADD PERSON</Text>
-        <Text style={styles.title}>새 대상 추가</Text>
-        <Text style={styles.description}>
+        <MobileUiText style={styles.title}>새 대상 추가</MobileUiText>
+        <MobileUiText style={styles.description}>
           궁합 등에 사용할 상대의 기본 정보와 출생정보를 등록합니다.
-        </Text>
+        </MobileUiText>
       </View>
 
       <TextInput
@@ -260,9 +261,9 @@ export function MyTargetPersonCreateCard({
       </View>
 
       <View style={styles.rowBetween}>
-        <Text style={styles.factLabel}>출생시간</Text>
+        <MobileUiText style={styles.factLabel}>출생시간</MobileUiText>
         <View style={styles.inlineSwitch}>
-          <Text style={styles.caption}>시간 모름</Text>
+          <MobileUiText style={styles.caption}>시간 모름</MobileUiText>
           <Switch
             value={!timeKnown}
             onValueChange={(unknown) => {
@@ -284,7 +285,7 @@ export function MyTargetPersonCreateCard({
 
       {calendarType === 'lunar' ? (
         <View style={styles.rowBetween}>
-          <Text style={styles.factLabel}>윤달</Text>
+          <MobileUiText style={styles.factLabel}>윤달</MobileUiText>
           <Switch value={isLeapMonth} onValueChange={setIsLeapMonth} />
         </View>
       ) : null}
@@ -320,13 +321,13 @@ export function MyTargetPersonCreateCard({
         {submitting ? (
           <ActivityIndicator color={mobileColors.surface} />
         ) : (
-          <Text style={styles.primaryButtonText}>대상 추가</Text>
+          <MobileUiText style={styles.primaryButtonText}>대상 추가</MobileUiText>
         )}
       </Pressable>
 
-      <Text style={styles.caption}>
+      <MobileUiText style={styles.caption}>
         생성 후 라벨 수정·삭제·출생정보 수정·궁합 실행은 아직 열지 않습니다.
-      </Text>
+      </MobileUiText>
     </View>
   );
 }

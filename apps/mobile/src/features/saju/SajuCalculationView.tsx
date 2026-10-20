@@ -2,6 +2,7 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import type { MobileSajuViewModelV1 } from './saju-view-model';
 import { mobileColors } from '@/ui/mobile-colors';
+import { MobileUiText } from '@/ui/MobileUiText';
 import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
 
 export function BirthSummaryCard({ summary }: { summary: string }) {
@@ -18,7 +19,7 @@ export function SajuPillarGrid({ pillars }: Pick<MobileSajuViewModelV1, 'pillars
   const styles = useMobileThemedStyles(staticStyles);
   return (
     <View style={styles.section}>
-      <Text style={styles.sectionTitle}>나의 명식</Text>
+      <MobileUiText style={styles.sectionTitle}>나의 명식</MobileUiText>
       <View style={styles.pillarRow}>
         {pillars.map((pillar) => (
           <View
@@ -50,13 +51,13 @@ export function DayMasterCard({ dayMaster }: Pick<MobileSajuViewModelV1, 'dayMas
   const styles = useMobileThemedStyles(staticStyles);
   return (
     <View style={styles.card}>
-      <Text style={styles.sectionTitle}>나의 일간</Text>
+      <MobileUiText style={styles.sectionTitle}>나의 일간</MobileUiText>
       <Text style={styles.dayMasterHanja}>{dayMaster.hanja}</Text>
       <Text style={styles.dayMasterHangul}>{dayMaster.hangul}</Text>
       {dayMaster.status === 'resolved' ? (
         <Text style={styles.muted}>{dayMaster.element} · {dayMaster.yinYang}</Text>
       ) : (
-        <Text style={styles.muted}>일주가 확정되면 일간을 표시합니다.</Text>
+        <MobileUiText style={styles.muted}>일주가 확정되면 일간을 표시합니다.</MobileUiText>
       )}
     </View>
   );
@@ -67,8 +68,8 @@ export function ElementBalance({ elementBalance }: Pick<MobileSajuViewModelV1, '
   const maximum = Math.max(1, ...elementBalance.map((item) => item.count));
   return (
     <View style={styles.card}>
-      <Text style={styles.sectionTitle}>오행 균형</Text>
-      <Text style={styles.caption}>확정된 기둥의 천간·지지만 집계합니다.</Text>
+      <MobileUiText style={styles.sectionTitle}>오행 균형</MobileUiText>
+      <MobileUiText style={styles.caption}>확정된 기둥의 천간·지지만 집계합니다.</MobileUiText>
       {elementBalance.map((item) => (
         <View key={item.element} style={styles.balanceRow}>
           <Text style={styles.elementLabel}>{item.element}</Text>
@@ -94,10 +95,10 @@ export function CalculationCompleteness({
   const styles = useMobileThemedStyles(staticStyles);
   return (
     <View style={styles.card}>
-      <Text style={styles.sectionTitle}>계산 상태</Text>
+      <MobileUiText style={styles.sectionTitle}>계산 상태</MobileUiText>
       <Text style={styles.completenessHeadline}>{completeness.headline}</Text>
       <Text style={styles.muted}>{completeness.detail}</Text>
-      <Text style={styles.caption}>이 화면은 계산 사실만 표시하며 해석을 생성하지 않습니다.</Text>
+      <MobileUiText style={styles.caption}>이 화면은 계산 사실만 표시하며 해석을 생성하지 않습니다.</MobileUiText>
     </View>
   );
 }

@@ -12,9 +12,17 @@ import {
 
 import type { MobileBirthMeridiemV1 } from './birth-clock-12hour.js';
 import { mobileColors } from '@/ui/mobile-colors';
+import { MobileUiText } from '@/ui/MobileUiText';
 import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
+import { useMobileUiLocale } from '@/ui/mobile-ui-locale';
 
 const HOURS = Array.from({ length: 12 }, (_, index) => String(index + 1));
+
+function periodLabelFor(option: MobileBirthMeridiemV1, locale: 'ko-KR' | 'ja-JP' | 'zh-TW'): string {
+  if (locale === 'ja-JP') return option === 'am' ? '午前' : '午後';
+  if (locale === 'zh-TW') return option === 'am' ? '上午' : '下午';
+  return option === 'am' ? '오전' : '오후';
+}
 
 export function BirthTime12HourField({
   meridiem, hour12, minute, disabled, onMeridiemChange, onHourChange, onMinuteChange,
@@ -28,13 +36,20 @@ export function BirthTime12HourField({
   onMinuteChange: (value: string) => void;
 }) {
   const styles = useMobileThemedStyles(staticStyles);
+  const { locale, t } = useMobileUiLocale();
+  const hourUnit = locale === 'ko-KR' ? '시' : locale === 'ja-JP' ? '時' : '時';
+  const minuteUnit = locale === 'ko-KR' ? '분' : locale === 'ja-JP' ? '分' : '分';
   const [hourModalVisible, setHourModalVisible] = useState(false);
-  const periodLabel = meridiem === 'am' ? '오전' : '오후';
+  const periodLabel = locale === 'ja-JP'
+    ? meridiem === 'am' ? '午前' : '午後'
+    : locale === 'zh-TW'
+      ? meridiem === 'am' ? '上午' : '下午'
+      : meridiem === 'am' ? '오전' : '오후';
 
   return (
     <>
       <View style={[styles.container, disabled && styles.disabled]}>
-        <Text style={styles.helper}>24시간 숫자 대신 오전/오후와 시각을 선택해 주세요.</Text>
+        <MobileUiText style={styles.helper}>24시간 숫자 대신 오전/오후와 시각을 선택해 주세요.</MobileUiText>
         <View style={styles.meridiemRow}>
           {(['am', 'pm'] as const).map((option) => {
             const selected = meridiem === option;
@@ -42,13 +57,13 @@ export function BirthTime12HourField({
               <Pressable
                 key={option}
                 accessibilityRole="button"
-                accessibilityLabel={option === 'am' ? '오전' : '오후'}
+                accessibilityLabel={t(option === 'am' ? '오전' : '오후')}
                 accessibilityState={{ selected, disabled }}
                 disabled={disabled}
                 onPress={() => onMeridiemChange(option)}
                 style={[styles.meridiemButton, selected && styles.selected]}>
                 <Text style={[styles.meridiemText, selected && styles.selectedText]}>
-                  {option === 'am' ? '오전 (AM)' : '오후 (PM)'}
+                  {periodLabelFor(option, locale) + (option === 'am' ? ' (AM)' : ' (PM)')}
                 </Text>
               </Pressable>
             );
@@ -56,27 +71,27 @@ export function BirthTime12HourField({
         </View>
         <View style={styles.clockRow}>
           <View style={styles.clockPart}>
-            <Text style={styles.fieldLabel}>시</Text>
+            <MobileUiText style={styles.fieldLabel}>시</MobileUiText>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="출생시간 시 선택"
+              accessibilityLabel={t('출생시간 시 선택')}
               accessibilityState={{ disabled }}
               disabled={disabled}
               onPress={() => setHourModalVisible(true)}
               style={styles.hourButton}
             >
               <Text style={[styles.hourText, !hour12 && styles.placeholderText]}>
-                {hour12 ? hour12 + '시' : '시 선택'}
+                {hour12 ? hour12 + hourUnit : t('시 선택')}
               </Text>
               <Text style={styles.chevron}>⌄</Text>
             </Pressable>
           </View>
           <Text style={styles.colon}>:</Text>
           <View style={styles.clockPart}>
-            <Text style={styles.fieldLabel}>분</Text>
+            <MobileUiText style={styles.fieldLabel}>분</MobileUiText>
             <View style={styles.minuteWrapper}>
               <TextInput
-                accessibilityLabel="출생시간 분"
+                accessibilityLabel={t('출생시간 분')}
                 editable={!disabled}
                 keyboardType="number-pad"
                 maxLength={2}
@@ -87,16 +102,16 @@ export function BirthTime12HourField({
                 placeholderTextColor={mobileColors.muted}
                 style={styles.minuteInput}
               />
-              <Text style={styles.minuteUnit}>분</Text>
+              <MobileUiText style={styles.minuteUnit}>분</MobileUiText>
             </View>
           </View>
         </View>
         <Text style={styles.preview}>
           {disabled
-            ? '출생시간을 모르는 경우 시간은 저장하지 않습니다.'
+            ? t('출생시간을 모르는 경우 시간은 저장하지 않습니다.')
             : hour12
-              ? periodLabel + ' ' + hour12 + '시 ' + (minute || '—') + '분'
-              : '먼저 태어난 시각을 선택해 주세요. 분은 00~59로 입력합니다.'}
+              ? periodLabel + ' ' + hour12 + hourUnit + ' ' + (minute || '—') + minuteUnit
+              : t('먼저 태어난 시각을 선택해 주세요. 분은 00~59로 입력합니다.')}
         </Text>
       </View>
 
@@ -109,7 +124,7 @@ export function BirthTime12HourField({
         <SafeAreaView style={styles.overlay}>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="시 선택 닫기"
+            accessibilityLabel={t('시 선택 닫기')}
             onPress={() => setHourModalVisible(false)}
             style={styles.scrim}
           />
@@ -117,11 +132,11 @@ export function BirthTime12HourField({
             <View style={styles.modalHeader}>
               <View style={styles.modalHeading}>
                 <Text style={styles.modalEyebrow}>{periodLabel} · 12시간제</Text>
-                <Text style={styles.modalTitle}>태어난 시각 선택</Text>
+                <MobileUiText style={styles.modalTitle}>태어난 시각 선택</MobileUiText>
               </View>
               <Pressable accessibilityRole="button"
                 onPress={() => setHourModalVisible(false)} style={styles.closeButton}>
-                <Text style={styles.closeText}>닫기 ✕</Text>
+                <MobileUiText style={styles.closeText}>닫기 ✕</MobileUiText>
               </Pressable>
             </View>
             <ScrollView contentContainerStyle={styles.hourGrid}>
@@ -129,12 +144,12 @@ export function BirthTime12HourField({
                 const selected = hour12 === hour;
                 return (
                   <Pressable
-                    key={hour} accessibilityRole="button" accessibilityLabel={periodLabel + ' ' + hour + '시'}
+                    key={hour} accessibilityRole="button" accessibilityLabel={periodLabel + ' ' + hour + hourUnit}
                     accessibilityState={{ selected }}
                     onPress={() => { onHourChange(hour); setHourModalVisible(false); }}
                     style={[styles.hourChoice, selected && styles.selected]}
                   >
-                    <Text style={[styles.hourChoiceText, selected && styles.selectedText]}>{hour}시</Text>
+                    <Text style={[styles.hourChoiceText, selected && styles.selectedText]}>{hour}{hourUnit}</Text>
                   </Pressable>
                 );
               })}

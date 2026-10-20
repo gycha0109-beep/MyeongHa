@@ -19,6 +19,8 @@ import { MobileReaderPicker } from '@/features/reading/MobileReaderPicker';
 import { FaceEditorialIntro } from '@/features/face/FaceEditorialIntro';
 import { findMobileReaderPresentationV1, type MobileReaderPresentationIdV1 } from '@/features/reading/mobile-reader-presentation';
 import { MobileScreen } from '@/ui/MobileScreen';
+import { useMobileUiLocale } from '@/ui/mobile-ui-locale';
+import { MobileUiText } from '@/ui/MobileUiText';
 import { mobileColors } from '@/ui/mobile-colors';
 import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
 import { useMobileTheme } from '@/ui/mobile-theme';
@@ -38,6 +40,7 @@ function sizeLabel(bytes: number | null): string {
 
 export default function FaceScreen() {
   const styles = useMobileThemedStyles(staticStyles);
+  const { t } = useMobileUiLocale();
   const { colors } = useMobileTheme();
   const [state, setState] = useState<FaceMediaStateV1>({ kind: 'idle' });
   const [frontCameraOpen, setFrontCameraOpen] = useState(false);
@@ -87,10 +90,10 @@ export default function FaceScreen() {
   return (
     <MobileScreen
       eyebrow="FACE READING"
-      title="관상"
+      title={t('관상')}
       refreshing={refreshing}
       onRefresh={() => void onRefresh()}
-      description="얼굴에 담긴 이야기를 만나기 위한 첫 단계, 사진부터 준비해 보세요."
+      description={t('얼굴에 담긴 이야기를 만나기 위한 첫 단계, 사진부터 준비해 보세요.')}
     >
       <ReadingSubnav />
       <FaceEditorialIntro readerId={presentationReader} />
@@ -100,13 +103,13 @@ export default function FaceScreen() {
         <View style={styles.sectionHeading}>
           <View style={styles.numberMark}><Text style={styles.numberText}>01</Text></View>
           <View style={styles.sectionCopy}>
-            <Text style={styles.kicker}>PHOTO · 정면 사진</Text>
+            <MobileUiText style={styles.kicker}>PHOTO · 정면 사진</MobileUiText>
             <Text style={styles.heroTitle}>{readerPresentation.name}에게 보여줄 사진</Text>
           </View>
         </View>
-        <Text style={styles.body}>
+        <MobileUiText style={styles.body}>
           얼굴 전체가 보이도록 정면을 바라봐 주세요. 밝은 조명과 선명한 사진이 좋습니다.
-        </Text>
+        </MobileUiText>
       </View>
 
       <View style={styles.preview}>
@@ -122,8 +125,8 @@ export default function FaceScreen() {
             <View style={styles.placeholderEmblem}>
               <Text style={styles.placeholderMark}>相</Text>
             </View>
-            <Text style={styles.placeholderTitle}>사진을 준비해 주세요</Text>
-            <Text style={styles.placeholderText}>정면 · 얼굴 전체 · 자연스러운 밝기</Text>
+            <MobileUiText style={styles.placeholderTitle}>사진을 준비해 주세요</MobileUiText>
+            <MobileUiText style={styles.placeholderText}>정면 · 얼굴 전체 · 자연스러운 밝기</MobileUiText>
           </View>
         )}
         <View pointerEvents="none" style={styles.previewFrame}>
@@ -145,7 +148,7 @@ export default function FaceScreen() {
               {ready.width} × {ready.height} · {sizeLabel(ready.fileSize)}
             </Text>
           </View>
-          <Text style={styles.readyBadge}>준비됨</Text>
+          <MobileUiText style={styles.readyBadge}>준비됨</MobileUiText>
         </View>
       ) : null}
 
@@ -163,7 +166,7 @@ export default function FaceScreen() {
           onPress={() => setFrontCameraOpen(true)}
           style={({ pressed }) => [styles.cameraAction, (pressed || picking) && styles.pressed]}
         >
-          <Text style={styles.cameraActionText}>▣  사진 촬영</Text>
+          <MobileUiText style={styles.cameraActionText}>▣  사진 촬영</MobileUiText>
         </Pressable>
         <Pressable
           accessibilityRole="button"
@@ -172,14 +175,14 @@ export default function FaceScreen() {
           onPress={() => void choose('library', pickMobileFaceMediaFromLibraryV1)}
           style={({ pressed }) => [styles.secondary, (pressed || picking) && styles.pressed]}
         >
-          <Text style={styles.secondaryText}>▧  사진 선택</Text>
+          <MobileUiText style={styles.secondaryText}>▧  사진 선택</MobileUiText>
         </Pressable>
       </View>
 
       {picking ? (
         <View style={styles.loadingRow}>
           <ActivityIndicator color={colors.navy} />
-          <Text style={styles.body}>사진을 준비하는 중입니다…</Text>
+          <MobileUiText style={styles.body}>사진을 준비하는 중입니다…</MobileUiText>
         </View>
       ) : null}
 
@@ -189,9 +192,9 @@ export default function FaceScreen() {
           <Text style={styles.statusTitle}>
             {ready === null ? `${readerPresentation.name}과 관상 보기 준비` : '사진 준비 완료'}
           </Text>
-          <Text style={styles.body}>
+          <MobileUiText style={styles.body}>
             현재는 사진 촬영·선택과 미리보기만 가능합니다. 서버 분석은 시작하지 않습니다. 얼굴 분석과 관상 풀이는 아직 제공하지 않습니다.
-          </Text>
+          </MobileUiText>
         </View>
       </View>
 
@@ -216,9 +219,9 @@ export default function FaceScreen() {
         />
       ) : null}
 
-      <Text style={styles.privacyNote}>
+      <MobileUiText style={styles.privacyNote}>
         선택한 사진은 이 화면에서만 일시적으로 사용하며 기기 보안 저장소나 앱 기록에 저장하지 않습니다.
-      </Text>
+      </MobileUiText>
     </MobileScreen>
   );
 }

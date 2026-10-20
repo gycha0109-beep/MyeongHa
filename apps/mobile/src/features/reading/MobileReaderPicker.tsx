@@ -9,6 +9,7 @@ import {
 } from '@/features/reading/mobile-reader-presentation';
 import { createMobileReaderAccessViewStateV1 } from '@/features/reading/mobile-reader-access-view-model';
 import { mobileColors } from '@/ui/mobile-colors';
+import { MobileUiText } from '@/ui/MobileUiText';
 import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
 import { resolveMobileChatPortraitV1 } from '@/features/chat/chat-character-portraits';
 
@@ -40,7 +41,7 @@ export function MobileReaderPicker({ selected, onChange, vertical }: MobileReade
           />
         ) : null}
         <View style={styles.headingCopy}>
-          <Text style={styles.kicker}>READER · 세연 프리뷰 장면</Text>
+          <MobileUiText style={styles.kicker}>READER · 세연 프리뷰 장면</MobileUiText>
           <Text style={styles.title}>{reader.name} <Text style={styles.subtitle}>· {reader.title}</Text></Text>
           <Text style={styles.tone}>{reader.tone}</Text>
         </View>
@@ -93,8 +94,8 @@ export function MobileReaderPicker({ selected, onChange, vertical }: MobileReade
           })}
         </View>
       ) : null}
-      <Text style={styles.notice}>현재 세연만 프리뷰 장면을 선택할 수 있으며, 유료 Reader 해석은 아직 공개되지 않았습니다.</Text>
-      <Text style={styles.notice}>Reader 표시와 프리뷰 선택은 상품 지원, 구매 접근권, 공개 승인 또는 공식 Reading 열람 권한을 뜻하지 않습니다. 이 권한들은 서버가 각각 확인해야 합니다.</Text>
+      <MobileUiText style={styles.notice}>현재 세연만 프리뷰 장면을 선택할 수 있으며, 유료 Reader 해석은 아직 공개되지 않았습니다.</MobileUiText>
+      <MobileUiText style={styles.notice}>Reader 표시와 프리뷰 선택은 상품 지원, 구매 접근권, 공개 승인 또는 공식 Reading 열람 권한을 뜻하지 않습니다. 이 권한들은 서버가 각각 확인해야 합니다.</MobileUiText>
       <Text style={styles.notice}>
         {vertical === 'saju'
           ? '선택한 Reader는 현재 사주 프리뷰 화면의 표시만 바꿉니다. 해석 근거와 내용은 변경되지 않습니다.'

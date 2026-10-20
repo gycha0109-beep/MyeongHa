@@ -1,6 +1,7 @@
 import { StyleSheet, Text, View } from 'react-native';
 
 import { useMobileTheme } from '@/ui/mobile-theme';
+import { MobileUiText } from '@/ui/MobileUiText';
 
 type MyAccountPresentation = 'guest' | 'member' | 'checking';
 
@@ -23,11 +24,11 @@ export function MyEditorialWelcome({ account }: { account: MyAccountPresentation
         <Text style={styles.ornamentText}>命</Text>
       </View>
       <View style={styles.copy}>
-        <Text style={styles.eyebrow}>MY MYEONGHA · 나의 공간</Text>
+        <MobileUiText style={styles.eyebrow}>MY MYEONGHA · 나의 공간</MobileUiText>
         <Text style={styles.title}>나의 이야기를{'\n'}이어가는 공간</Text>
-        <Text style={styles.subtitle}>
+        <MobileUiText style={styles.subtitle}>
           계정, 출생정보와 명하에서 이어지는 길을 한곳에서 살펴보세요.
-        </Text>
+        </MobileUiText>
       </View>
       <View style={styles.statusRow}>
         <View style={styles.statusDot} />

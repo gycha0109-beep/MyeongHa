@@ -19,6 +19,8 @@ import { SajuPreviewReadingView } from '@/features/saju/SajuPreviewReadingView';
 import { SajuEditorialSummary } from '@/features/saju/SajuEditorialSummary';
 import { createMobileSajuViewModelV1 } from '@/features/saju/saju-view-model';
 import { MobileScreen } from '@/ui/MobileScreen';
+import { useMobileUiLocale } from '@/ui/mobile-ui-locale';
+import { MobileUiText } from '@/ui/MobileUiText';
 import { mobileColors } from '@/ui/mobile-colors';
 import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
 import { useMobilePullRefreshV1 } from '@/ui/use-mobile-pull-refresh';
@@ -42,6 +44,7 @@ function errorCopy(state: Exclude<MobileSajuLoadStateV1, { kind: 'birth_required
 
 export default function SajuScreen() {
   const styles = useMobileThemedStyles(staticStyles);
+  const { t } = useMobileUiLocale();
   const [state, setState] = useState<ScreenState>({ kind: 'loading' });
   const [presentationReader, setPresentationReader] = useState<MobileReaderPresentationIdV1>('seyeon');
 
@@ -73,32 +76,32 @@ export default function SajuScreen() {
   return (
     <MobileScreen
       eyebrow="READING"
-      title="사주"
+      title={t('사주')}
       refreshing={refreshing}
       onRefresh={() => void onRefresh()}
-      description="태어난 순간의 이야기를 바탕으로 나의 명식을 알아보세요."
+      description={t('태어난 순간의 이야기를 바탕으로 나의 명식을 알아보세요.')}
     >
       <ReadingSubnav />
 
       {state.kind === 'loading' ? (
         <View style={styles.stateCard}>
           <ActivityIndicator color={mobileColors.navy} />
-          <Text style={styles.muted}>현재 출생정보와 명식을 확인하는 중입니다…</Text>
+          <MobileUiText style={styles.muted}>현재 출생정보와 명식을 확인하는 중입니다…</MobileUiText>
         </View>
       ) : null}
 
       {state.kind === 'birth_required' ? (
         <View style={styles.stateCard}>
-          <Text style={styles.cardTitle}>출생정보가 필요합니다</Text>
-          <Text style={styles.muted}>
+          <MobileUiText style={styles.cardTitle}>출생정보가 필요합니다</MobileUiText>
+          <MobileUiText style={styles.muted}>
             내 명식을 계산하려면 현재 자기 출생정보를 먼저 등록해 주세요.
-          </Text>
+          </MobileUiText>
           <Pressable
             accessibilityRole="button"
             onPress={() => router.push('/birth')}
             style={styles.primaryButton}
           >
-            <Text style={styles.primaryButtonText}>출생정보 입력하기</Text>
+            <MobileUiText style={styles.primaryButtonText}>출생정보 입력하기</MobileUiText>
           </Pressable>
         </View>
       ) : null}
@@ -116,7 +119,7 @@ export default function SajuScreen() {
             })}
             style={styles.primaryButton}
           >
-            <Text style={styles.primaryButtonText}>선택한 대리자로 사주 읽기 시작 →</Text>
+            <MobileUiText style={styles.primaryButtonText}>선택한 대리자로 사주 읽기 시작 →</MobileUiText>
           </Pressable>
           <SajuPreviewReadingView
             onOpenPreview={(topic) => router.push({
@@ -144,7 +147,7 @@ export default function SajuScreen() {
               onPress={() => void load()}
               style={styles.secondaryButton}
             >
-              <Text style={styles.secondaryButtonText}>다시 시도</Text>
+              <MobileUiText style={styles.secondaryButtonText}>다시 시도</MobileUiText>
             </Pressable>
           ) : null}
         </View>

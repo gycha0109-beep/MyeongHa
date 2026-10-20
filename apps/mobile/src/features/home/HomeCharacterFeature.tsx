@@ -3,6 +3,7 @@ import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { resolveMobileChatPortraitV1 } from '@/features/chat/chat-character-portraits';
 import { useMobileTheme } from '@/ui/mobile-theme';
+import { MobileUiText } from '@/ui/MobileUiText';
 
 /**
  * Product-only editorial entrance to the character hub.
@@ -16,7 +17,7 @@ export function HomeCharacterFeature() {
     <View style={styles.section}>
       <View style={styles.sectionHeading}>
         <Text style={[styles.kicker, { color: colors.gold }]}>YOUR STORY, MYEONGHA</Text>
-        <Text style={[styles.sectionTitle, { color: colors.ink }]}>이야기가 머무는 곳</Text>
+        <MobileUiText style={[styles.sectionTitle, { color: colors.ink }]}>이야기가 머무는 곳</MobileUiText>
       </View>
       <View style={styles.hero}>
         <View pointerEvents="none" style={styles.imageCrop}>
@@ -27,16 +28,16 @@ export function HomeCharacterFeature() {
         </View>
         <View pointerEvents="none" style={styles.innerBorder} />
         <View style={styles.heroContent}>
-          <Text style={styles.heroEyebrow}>MEET SEYEON · 세연</Text>
-          <Text style={styles.heroTitle}>오늘은 어떤 이야기를 나눠볼까요?</Text>
-          <Text style={styles.heroDescription}>여섯 대리자의 이야기를 만나보세요.</Text>
+          <MobileUiText style={styles.heroEyebrow}>MEET SEYEON · 세연</MobileUiText>
+          <MobileUiText style={styles.heroTitle}>오늘은 어떤 이야기를 나눠볼까요?</MobileUiText>
+          <MobileUiText style={styles.heroDescription}>여섯 대리자의 이야기를 만나보세요.</MobileUiText>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="캐릭터 선택 화면으로 이동"
             onPress={() => router.push('/chat')}
             style={({ pressed }) => [styles.heroAction, pressed && styles.actionPressed]}
           >
-            <Text style={styles.heroActionText}>캐릭터 만나기</Text>
+            <MobileUiText style={styles.heroActionText}>캐릭터 만나기</MobileUiText>
             <Text style={styles.heroActionArrow} accessible={false}>→</Text>
           </Pressable>
         </View>
@@ -54,8 +55,8 @@ export function HomeCharacterFeature() {
         >
           <Text style={[styles.quickSymbol, { color: colors.gold }]}>命</Text>
           <View style={styles.quickCopy}>
-            <Text style={[styles.quickTitle, { color: colors.ink }]}>내 사주</Text>
-            <Text style={[styles.quickSubtitle, { color: colors.muted }]}>명식과 풀이 살펴보기</Text>
+            <MobileUiText style={[styles.quickTitle, { color: colors.ink }]}>내 사주</MobileUiText>
+            <MobileUiText style={[styles.quickSubtitle, { color: colors.muted }]}>명식과 풀이 살펴보기</MobileUiText>
           </View>
           <Text style={[styles.quickArrow, { color: colors.navy }]}>›</Text>
         </Pressable>
@@ -71,15 +72,15 @@ export function HomeCharacterFeature() {
         >
           <Text style={[styles.quickSymbol, { color: colors.gold }]}>錄</Text>
           <View style={styles.quickCopy}>
-            <Text style={[styles.quickTitle, { color: colors.ink }]}>지난 이야기</Text>
-            <Text style={[styles.quickSubtitle, { color: colors.muted }]}>저장된 기록 확인하기</Text>
+            <MobileUiText style={[styles.quickTitle, { color: colors.ink }]}>지난 이야기</MobileUiText>
+            <MobileUiText style={[styles.quickSubtitle, { color: colors.muted }]}>저장된 기록 확인하기</MobileUiText>
           </View>
           <Text style={[styles.quickArrow, { color: colors.navy }]}>›</Text>
         </Pressable>
       </View>
-      <Text style={[styles.accessNote, { color: colors.muted }]}>
+      <MobileUiText style={[styles.accessNote, { color: colors.muted }]}>
         대화 가능 여부와 기록 접근은 로그인 및 현재 서비스 상태에 따라 달라집니다.
-      </Text>
+      </MobileUiText>
     </View>
   );
 }

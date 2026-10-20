@@ -11,6 +11,7 @@ import {
 } from './mobile-saju-topic-catalog';
 import { mobileSajuPreviewServiceV1 } from './native-mobile-saju-preview-service';
 import { mobileColors } from '@/ui/mobile-colors';
+import { MobileUiText } from '@/ui/MobileUiText';
 import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
 
 type PreviewReadingTextV1 = Extract<
@@ -155,15 +156,15 @@ export function SajuPreviewReadingView({ onOpenPreview }: { onOpenPreview?: (top
   return (
     <View style={styles.section}>
       <View style={styles.headerCard}>
-        <Text style={styles.eyebrow}>DISCOVER YOUR STORY · 사주</Text>
-        <Text style={styles.title}>사주 읽기</Text>
-        <Text style={styles.body}>
+        <MobileUiText style={styles.eyebrow}>DISCOVER YOUR STORY · 사주</MobileUiText>
+        <MobileUiText style={styles.title}>사주 읽기</MobileUiText>
+        <MobileUiText style={styles.body}>
           궁금한 주제를 선택해 더 깊이 살펴보세요. 준비된 풀이만 연결되며,
           아직 확인이 필요한 주제는 현재 상태를 안내합니다.
-        </Text>
-        <Text style={styles.authorityNote}>
+        </MobileUiText>
+        <MobileUiText style={styles.authorityNote}>
           다른 주제의 풀이로 자동 대체하지 않습니다.
-        </Text>
+        </MobileUiText>
       </View>
 
       {MOBILE_SAJU_TOPIC_SECTIONS_V1.map((section) => (
@@ -233,12 +234,12 @@ export function SajuPreviewReadingView({ onOpenPreview }: { onOpenPreview?: (top
 
       {state.kind === 'blocked' ? (
         <View style={styles.stateCard}>
-          <Text style={styles.stateKicker}>현재 실행 범위</Text>
+          <MobileUiText style={styles.stateKicker}>현재 실행 범위</MobileUiText>
           <Text style={styles.stateTitle}>{state.topic.label}</Text>
           <Text style={styles.muted}>{state.message}</Text>
-          <Text style={styles.authorityNote}>
+          <MobileUiText style={styles.authorityNote}>
             웹과 동일하게 권한이 열리기 전에는 다른 풀이를 대신 실행하지 않습니다.
-          </Text>
+          </MobileUiText>
         </View>
       ) : null}
 
@@ -259,7 +260,7 @@ export function SajuPreviewReadingView({ onOpenPreview }: { onOpenPreview?: (top
               onPress={() => void load(state.topic, state.readingText)}
               style={styles.retryButton}
             >
-              <Text style={styles.retryButtonText}>다시 시도</Text>
+              <MobileUiText style={styles.retryButtonText}>다시 시도</MobileUiText>
             </Pressable>
           ) : null}
         </View>
@@ -275,7 +276,7 @@ export function SajuPreviewReadingView({ onOpenPreview }: { onOpenPreview?: (top
               onPress={() => void load(state.topic, state.readingText)}
               style={styles.retryButton}
             >
-              <Text style={styles.retryButtonText}>다시 시도</Text>
+              <MobileUiText style={styles.retryButtonText}>다시 시도</MobileUiText>
             </Pressable>
           ) : null}
         </View>
@@ -285,14 +286,14 @@ export function SajuPreviewReadingView({ onOpenPreview }: { onOpenPreview?: (top
         <>
           <View style={styles.resultHeading}>
             <Text style={styles.resultTitle}>{state.topic.label}</Text>
-            <Text style={styles.authorityNote}>
+            <MobileUiText style={styles.authorityNote}>
               Preview · 연구 검증 중인 원국 해석이며 확정적 미래 예측은 포함하지 않습니다.
-            </Text>
+            </MobileUiText>
           </View>
 
           {state.result.notices.length > 0 ? (
             <View style={styles.noticeCard}>
-              <Text style={styles.noticeTitle}>읽기 범위 안내</Text>
+              <MobileUiText style={styles.noticeTitle}>읽기 범위 안내</MobileUiText>
               {state.result.notices.map((notice, index) => (
                 <Text key={`${String(index)}:${notice}`} style={styles.noticeText}>
                   {notice}
@@ -309,7 +310,7 @@ export function SajuPreviewReadingView({ onOpenPreview }: { onOpenPreview?: (top
 
               {step.structure.length > 0 ? (
                 <View style={styles.supportBlock}>
-                  <Text style={styles.supportTitle}>이 해석의 사주 근거</Text>
+                  <MobileUiText style={styles.supportTitle}>이 해석의 사주 근거</MobileUiText>
                   {step.structure.map((text, itemIndex) => (
                     <Text key={`structure:${String(itemIndex)}:${text}`} style={styles.supportText}>
                       {text}
@@ -320,7 +321,7 @@ export function SajuPreviewReadingView({ onOpenPreview }: { onOpenPreview?: (top
 
               {step.supporting.length > 0 ? (
                 <View style={styles.supportBlock}>
-                  <Text style={styles.supportTitle}>함께 볼 포인트</Text>
+                  <MobileUiText style={styles.supportTitle}>함께 볼 포인트</MobileUiText>
                   {step.supporting.map((text, itemIndex) => (
                     <Text key={`support:${String(itemIndex)}:${text}`} style={styles.supportText}>
                       {text}

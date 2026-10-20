@@ -3,6 +3,7 @@ import { Image, StyleSheet, Text, View } from 'react-native';
 import { resolveMobileChatPortraitV1 } from '@/features/chat/chat-character-portraits';
 import { findMobileReaderPresentationV1, type MobileReaderPresentationIdV1 } from '@/features/reading/mobile-reader-presentation';
 import { useMobileTheme } from '@/ui/mobile-theme';
+import { MobileUiText } from '@/ui/MobileUiText';
 
 /**
  * Face-reading onboarding hero.
@@ -25,13 +26,13 @@ export function FaceEditorialIntro({ readerId }: { readerId: MobileReaderPresent
       <View pointerEvents="none" style={styles.innerFrame} />
       <View style={styles.content}>
         <Text style={styles.eyebrow}>FACE READING · 相</Text>
-        <Text style={styles.title}>얼굴에 담긴 나의 이야기</Text>
+        <MobileUiText style={styles.title}>얼굴에 담긴 나의 이야기</MobileUiText>
         <Text style={styles.body}>
           정면 사진을 준비하고, {reader.name}과 함께할 관상 읽기의 시작을 만나보세요.
         </Text>
         <View style={styles.statusRow}>
           <View style={styles.statusDot} />
-          <Text style={styles.statusText}>사진 촬영·미리보기 제공 · 분석 준비 중</Text>
+          <MobileUiText style={styles.statusText}>사진 촬영·미리보기 제공 · 분석 준비 중</MobileUiText>
         </View>
       </View>
     </View>

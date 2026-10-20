@@ -32,6 +32,7 @@ import {
   type RecordsTabV1,
 } from '@/features/records/records-view-model';
 import { mobileColors } from '@/ui/mobile-colors';
+import { MobileUiText } from '@/ui/MobileUiText';
 import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
 import { useMobileTheme } from '@/ui/mobile-theme';
 import { useMobilePullRefreshV1 } from '@/ui/use-mobile-pull-refresh';
@@ -153,10 +154,10 @@ export default function RecordsScreen() {
           <View style={styles.headerStack}>
             <View style={styles.header}>
               <Text style={[styles.eyebrow, { color: colors.gold }]}>MY RECORDS</Text>
-              <Text style={[styles.title, { color: colors.ink }]}>기록</Text>
-              <Text style={[styles.description, { color: colors.muted }]}>
+              <MobileUiText style={[styles.title, { color: colors.ink }]}>기록</MobileUiText>
+              <MobileUiText style={[styles.description, { color: colors.muted }]}>
                 삶의 사실과 지난 풀이, 저장된 기억을 차분히 찾아보세요.
-              </Text>
+              </MobileUiText>
             </View>
             <RecordsEditorialHeader selected={tab} itemCount={initialLoading ? null : items.length} />
             <RecordsTabs selected={tab} onSelect={setTab} />
@@ -166,7 +167,7 @@ export default function RecordsScreen() {
             />
             {initialLoading ? (
               <View style={styles.loadingCard}>
-                <Text style={styles.loadingText}>기록을 불러오는 중입니다…</Text>
+                <MobileUiText style={styles.loadingText}>기록을 불러오는 중입니다…</MobileUiText>
               </View>
             ) : null}
           </View>

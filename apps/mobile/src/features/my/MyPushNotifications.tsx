@@ -2,6 +2,7 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-nati
 
 import type { MobilePushStatusV1 } from '@/core/push/mobile-push-service';
 import { mobileColors } from '@/ui/mobile-colors';
+import { MobileUiText } from '@/ui/MobileUiText';
 
 function copyFor(status: MobilePushStatusV1 | null): Readonly<{
   title: string;
@@ -68,7 +69,7 @@ export function MyPushNotifications({
       {pending ? (
         <View style={styles.pending}>
           <ActivityIndicator color={mobileColors.navy} />
-          <Text style={styles.pendingText}>알림 연결을 확인하는 중입니다…</Text>
+          <MobileUiText style={styles.pendingText}>알림 연결을 확인하는 중입니다…</MobileUiText>
         </View>
       ) : enabled ? (
         <Pressable
@@ -76,7 +77,7 @@ export function MyPushNotifications({
           onPress={onDisable}
           style={styles.secondary}
         >
-          <Text style={styles.secondaryText}>이 기기 알림 끄기</Text>
+          <MobileUiText style={styles.secondaryText}>이 기기 알림 끄기</MobileUiText>
         </Pressable>
       ) : status?.kind === 'needs_sync' ? (
         <Pressable
@@ -84,7 +85,7 @@ export function MyPushNotifications({
           onPress={onRetry}
           style={styles.primary}
         >
-          <Text style={styles.primaryText}>다시 연결</Text>
+          <MobileUiText style={styles.primaryText}>다시 연결</MobileUiText>
         </Pressable>
       ) : (
         <Pressable
@@ -92,13 +93,13 @@ export function MyPushNotifications({
           onPress={onEnable}
           style={styles.primary}
         >
-          <Text style={styles.primaryText}>알림 허용 및 기기 등록</Text>
+          <MobileUiText style={styles.primaryText}>알림 허용 및 기기 등록</MobileUiText>
         </Pressable>
       )}
 
-      <Text style={styles.caption}>
+      <MobileUiText style={styles.caption}>
         지금은 기기 등록·갱신·해제 기반만 활성화합니다. 자동 발송 시점과 빈도는 아직 적용하지 않습니다.
-      </Text>
+      </MobileUiText>
     </View>
   );
 }

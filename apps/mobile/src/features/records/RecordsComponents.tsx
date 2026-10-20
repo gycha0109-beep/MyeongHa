@@ -14,7 +14,9 @@ import {
   type RecordsTabV1,
 } from '@/features/records/records-view-model';
 import { mobileColors } from '@/ui/mobile-colors';
+import { MobileUiText } from '@/ui/MobileUiText';
 import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
+import { useMobileUiLocale } from '@/ui/mobile-ui-locale';
 
 export const RECORDS_TABS_V1 = Object.freeze([
   { key: 'all', label: '전체' },
@@ -31,6 +33,7 @@ export function RecordsTabs({
   onSelect: (tab: RecordsTabV1) => void;
 }) {
   const styles = useMobileThemedStyles(staticStyles);
+  const { t } = useMobileUiLocale();
   return (
     <View style={styles.tabs}>
       {RECORDS_TABS_V1.map((tab) => (
@@ -42,7 +45,7 @@ export function RecordsTabs({
           style={[styles.tab, selected === tab.key && styles.tabSelected]}
         >
           <Text style={[styles.tabText, selected === tab.key && styles.tabTextSelected]}>
-            {tab.label}
+            {t(tab.label)}
           </Text>
         </Pressable>
       ))}
@@ -87,7 +90,7 @@ export function ReadingHistoryCard({
       <Text style={styles.cardBody}>{readingReaderLabelV1(item.readerCharacterIds)}</Text>
       <Text style={styles.state}>{readingStateLabelV1(item.productResponseState)}</Text>
       {openable && onOpen !== undefined ? (
-        <Text style={styles.openHint}>저장된 풀이 다시 읽기 →</Text>
+        <MobileUiText style={styles.openHint}>저장된 풀이 다시 읽기 →</MobileUiText>
       ) : null}
       <Text style={styles.caption}>풀이 기록 형식 · {item.readingContractVersion}</Text>
     </>
@@ -116,7 +119,7 @@ export function MemoryCard({ item }: { item: MemoryItemV1 }) {
         <Text style={styles.date}>{formatRecordDateV1(item.createdAt)}</Text>
       </View>
       <Text style={styles.cardTitle}>{item.memoryType}</Text>
-      <Text style={styles.cardBody}>저장된 기억</Text>
+      <MobileUiText style={styles.cardBody}>저장된 기억</MobileUiText>
       <Text style={styles.caption}>
         기록 형식 {item.schemaVersion}{item.createdByCharacterId === null ? '' : ' · 대리자 기록'}
       </Text>
@@ -130,7 +133,7 @@ export function RecordsEmptyState({ label }: { label: string }) {
     <View style={styles.empty}>
       <Text style={styles.emptySymbol}>之</Text>
       <Text style={styles.cardTitle}>아직 {label}이 없습니다</Text>
-      <Text style={styles.cardBody}>확인된 기록이 생기면 이곳에 표시됩니다.</Text>
+      <MobileUiText style={styles.cardBody}>확인된 기록이 생기면 이곳에 표시됩니다.</MobileUiText>
     </View>
   );
 }
@@ -147,11 +150,11 @@ export function RecordsFailureBanner({
   return (
     <View style={styles.failure}>
       <View style={styles.failureCopy}>
-        <Text style={styles.failureTitle}>일부 기록을 불러오지 못했습니다</Text>
+        <MobileUiText style={styles.failureTitle}>일부 기록을 불러오지 못했습니다</MobileUiText>
         <Text style={styles.cardBody}>{labels.join(' · ')}</Text>
       </View>
       <Pressable accessibilityRole="button" onPress={onRetry} style={styles.retryButton}>
-        <Text style={styles.retryText}>다시 시도</Text>
+        <MobileUiText style={styles.retryText}>다시 시도</MobileUiText>
       </Pressable>
     </View>
   );
@@ -175,7 +178,7 @@ export function RecordsListFooter({
   if (error && hasMore) {
     return (
       <Pressable accessibilityRole="button" onPress={onRetry} style={styles.footerButton}>
-        <Text style={styles.retryText}>더 불러오기 다시 시도</Text>
+        <MobileUiText style={styles.retryText}>더 불러오기 다시 시도</MobileUiText>
       </Pressable>
     );
   }

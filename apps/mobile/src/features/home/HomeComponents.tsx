@@ -7,6 +7,7 @@ import type {
   MobileHomeTodayCardV1,
 } from '@/features/home/home-view-model';
 import { mobileColors } from '@/ui/mobile-colors';
+import { MobileUiText } from '@/ui/MobileUiText';
 import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
 
 export function HomeBrandHeader({
@@ -24,7 +25,7 @@ export function HomeBrandHeader({
           <Text style={styles.brandMarkText}>命</Text>
         </View>
         <View>
-          <Text style={styles.brandName}>명하</Text>
+          <MobileUiText style={styles.brandName}>명하</MobileUiText>
           <Text style={styles.brandRoman}>MYEONGHA</Text>
         </View>
       </View>
@@ -42,8 +43,8 @@ export function HomeTodayCard({ card }: { card: MobileHomeTodayCardV1 }) {
     return (
       <View style={styles.heroCard}>
         <Text style={styles.sectionKicker}>TODAY</Text>
-        <Text style={styles.heroTitle}>오늘의 흐름</Text>
-        <Text style={styles.body}>현재 명식을 확인하는 중입니다…</Text>
+        <MobileUiText style={styles.heroTitle}>오늘의 흐름</MobileUiText>
+        <MobileUiText style={styles.body}>현재 명식을 확인하는 중입니다…</MobileUiText>
       </View>
     );
   }
@@ -52,16 +53,16 @@ export function HomeTodayCard({ card }: { card: MobileHomeTodayCardV1 }) {
     return (
       <View style={styles.heroCard}>
         <Text style={styles.sectionKicker}>TODAY</Text>
-        <Text style={styles.heroTitle}>오늘의 흐름</Text>
-        <Text style={styles.body}>
+        <MobileUiText style={styles.heroTitle}>오늘의 흐름</MobileUiText>
+        <MobileUiText style={styles.body}>
           아직 내 명식이 없습니다. 출생정보를 등록하면 현재 명식을 확인할 수 있습니다.
-        </Text>
+        </MobileUiText>
         <Pressable
           accessibilityRole="button"
           onPress={() => router.push('/birth')}
           style={styles.primaryButton}
         >
-          <Text style={styles.primaryButtonText}>출생정보 입력하기 →</Text>
+          <MobileUiText style={styles.primaryButtonText}>출생정보 입력하기 →</MobileUiText>
         </Pressable>
       </View>
     );
@@ -77,14 +78,14 @@ export function HomeTodayCard({ card }: { card: MobileHomeTodayCardV1 }) {
     return (
       <View style={styles.heroCard}>
         <Text style={styles.sectionKicker}>TODAY</Text>
-        <Text style={styles.heroTitle}>오늘의 흐름</Text>
+        <MobileUiText style={styles.heroTitle}>오늘의 흐름</MobileUiText>
         <Text style={styles.body}>{copy}</Text>
         <Pressable
           accessibilityRole="button"
           onPress={() => router.push('/reading')}
           style={styles.secondaryButton}
         >
-          <Text style={styles.secondaryButtonText}>사주에서 확인 →</Text>
+          <MobileUiText style={styles.secondaryButtonText}>사주에서 확인 →</MobileUiText>
         </Pressable>
       </View>
     );
@@ -95,7 +96,7 @@ export function HomeTodayCard({ card }: { card: MobileHomeTodayCardV1 }) {
       <View style={styles.heroTop}>
         <View>
           <Text style={styles.sectionKicker}>TODAY</Text>
-          <Text style={styles.heroTitle}>오늘의 흐름</Text>
+          <MobileUiText style={styles.heroTitle}>오늘의 흐름</MobileUiText>
         </View>
         <Text style={styles.authorityChip}>{card.label}</Text>
       </View>
@@ -104,15 +105,15 @@ export function HomeTodayCard({ card }: { card: MobileHomeTodayCardV1 }) {
         <Text style={styles.elementBadge}>{card.element}</Text>
       </View>
       <Text style={styles.completeness}>{card.completeness}</Text>
-      <Text style={styles.caption}>
+      <MobileUiText style={styles.caption}>
         현재 출생정보를 기준으로 계산된 명식 사실만 보여줍니다.
-      </Text>
+      </MobileUiText>
       <Pressable
         accessibilityRole="button"
         onPress={() => router.push('/reading')}
         style={styles.primaryButton}
       >
-        <Text style={styles.primaryButtonText}>내 사주 보기 →</Text>
+        <MobileUiText style={styles.primaryButtonText}>내 사주 보기 →</MobileUiText>
       </Pressable>
     </View>
   );
@@ -129,13 +130,13 @@ export function HomeContinuationCard({
       <View style={styles.sectionHeading}>
         <View>
           <Text style={styles.sectionKicker}>CONTINUE</Text>
-          <Text style={styles.sectionTitle}>이어지는 이야기</Text>
+          <MobileUiText style={styles.sectionTitle}>이어지는 이야기</MobileUiText>
         </View>
       </View>
 
       {card.kind === 'loading' ? (
         <View style={styles.card}>
-          <Text style={styles.body}>최근 저장된 풀이를 확인하는 중입니다…</Text>
+          <MobileUiText style={styles.body}>최근 저장된 풀이를 확인하는 중입니다…</MobileUiText>
         </View>
       ) : null}
 
@@ -146,42 +147,42 @@ export function HomeContinuationCard({
             <Text style={styles.date}>{card.dateLabel}</Text>
           </View>
           <Text style={styles.cardTitle}>{card.title}</Text>
-          <Text style={styles.body}>가장 최근 저장된 공식 사주 풀이</Text>
+          <MobileUiText style={styles.body}>가장 최근 저장된 공식 사주 풀이</MobileUiText>
           <Text style={styles.stateText}>{card.status}</Text>
           <Pressable
             accessibilityRole="button"
             onPress={() => router.push('/records')}
             style={styles.textAction}
           >
-            <Text style={styles.textActionText}>기록에서 보기 →</Text>
+            <MobileUiText style={styles.textActionText}>기록에서 보기 →</MobileUiText>
           </Pressable>
         </View>
       ) : null}
 
       {card.kind === 'empty' ? (
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>아직 이어갈 풀이가 없습니다</Text>
-          <Text style={styles.body}>내 사주를 확인하면 읽기의 시작점을 찾을 수 있습니다.</Text>
+          <MobileUiText style={styles.cardTitle}>아직 이어갈 풀이가 없습니다</MobileUiText>
+          <MobileUiText style={styles.body}>내 사주를 확인하면 읽기의 시작점을 찾을 수 있습니다.</MobileUiText>
           <Pressable
             accessibilityRole="button"
             onPress={() => router.push('/reading')}
             style={styles.textAction}
           >
-            <Text style={styles.textActionText}>사주 보기 →</Text>
+            <MobileUiText style={styles.textActionText}>사주 보기 →</MobileUiText>
           </Pressable>
         </View>
       ) : null}
 
       {card.kind === 'unavailable' ? (
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>최근 풀이를 불러오지 못했습니다</Text>
-          <Text style={styles.body}>다른 홈 정보는 그대로 사용할 수 있습니다.</Text>
+          <MobileUiText style={styles.cardTitle}>최근 풀이를 불러오지 못했습니다</MobileUiText>
+          <MobileUiText style={styles.body}>다른 홈 정보는 그대로 사용할 수 있습니다.</MobileUiText>
           <Pressable
             accessibilityRole="button"
             onPress={() => router.push('/records')}
             style={styles.textAction}
           >
-            <Text style={styles.textActionText}>기록에서 확인 →</Text>
+            <MobileUiText style={styles.textActionText}>기록에서 확인 →</MobileUiText>
           </Pressable>
         </View>
       ) : null}
@@ -200,14 +201,14 @@ export function HomeReadingTopics({
       <View style={styles.sectionHeading}>
         <View>
           <Text style={styles.sectionKicker}>READING</Text>
-          <Text style={styles.sectionTitle}>사주 읽기 주제</Text>
+          <MobileUiText style={styles.sectionTitle}>사주 읽기 주제</MobileUiText>
         </View>
         <Pressable
           accessibilityRole="button"
           onPress={() => router.push('/reading')}
           style={styles.inlineAction}
         >
-          <Text style={styles.inlineActionText}>사주에서 보기 →</Text>
+          <MobileUiText style={styles.inlineActionText}>사주에서 보기 →</MobileUiText>
         </Pressable>
       </View>
 
@@ -222,9 +223,9 @@ export function HomeReadingTopics({
           </View>
         ))}
       </View>
-      <Text style={styles.caption}>
+      <MobileUiText style={styles.caption}>
         주제를 선택하는 기능은 사주 화면에서 연결됩니다.
-      </Text>
+      </MobileUiText>
     </View>
   );
 }
@@ -248,9 +249,9 @@ export function HomeCharacterPending({
           <Text style={styles.characterMarkText}>明</Text>
         </View>
         <View style={styles.characterCopy}>
-          <Text style={styles.cardTitle}>대화할 사람 만나기</Text>
+          <MobileUiText style={styles.cardTitle}>대화할 사람 만나기</MobileUiText>
           <Text style={styles.body}>{body}</Text>
-          <Text style={styles.pendingBadge}>준비 중</Text>
+          <MobileUiText style={styles.pendingBadge}>준비 중</MobileUiText>
         </View>
       </View>
     </View>
