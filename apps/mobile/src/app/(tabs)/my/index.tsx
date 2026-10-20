@@ -20,6 +20,7 @@ import {
   createMobileMyProfileViewV1,
 } from '@/features/my/my-view-model';
 import { MobileScreen } from '@/ui/MobileScreen';
+import { MobileUiText } from '@/ui/MobileUiText';
 import { mobileColors } from '@/ui/mobile-colors';
 import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
 import { useMobileTheme } from '@/ui/mobile-theme';
@@ -176,7 +177,7 @@ export default function MyScreen() {
       {state.profile.kind === 'loading' ? (
         <View style={styles.loadingCard}>
           <ActivityIndicator color={colors.navy} />
-          <Text style={styles.loadingText}>내 정보를 불러오는 중입니다…</Text>
+          <MobileUiText style={styles.loadingText}>내 정보를 불러오는 중입니다…</MobileUiText>
         </View>
       ) : state.profile.kind === 'error' ? (
         <MySectionError
@@ -190,7 +191,7 @@ export default function MyScreen() {
       {state.birth.kind === 'loading' ? (
         <View style={styles.loadingCard}>
           <ActivityIndicator color={colors.navy} />
-          <Text style={styles.loadingText}>출생정보를 확인하는 중입니다…</Text>
+          <MobileUiText style={styles.loadingText}>출생정보를 확인하는 중입니다…</MobileUiText>
         </View>
       ) : state.birth.kind === 'error' ? (
         <MySectionError
