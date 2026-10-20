@@ -344,11 +344,19 @@ S8의 **비파괴/격리 검토는 S2~S7과 병렬 진행 가능**하며, S8 Pro
 - **범위 한정:** 합성·비운영 코드와 기존 테스트만, 별도 SQL/DB/Workflow/운영 Provider 호출 없음. S6/G4 종단 전체 통합/Owner 비용 한도 및 D-04 계약 PASS가 아님. G0 OPEN, G1 양수/G2 Production/G3 Production/G4 Production/G5/G6 HOLD, `Projectors=[]`, `writeAdmission='DENY'`, Production DDL/DML/ACL/마이그레이션/유료 Provider/공개 0건 유지.
 - **검증·병합 규칙:** 이 변경의 exact PR HEAD에 대한 CI/Governance/Web, Full Integration 11/11 SUCCESS 확인 후에만 HEAD 고정 병합. merge 후 main CI/운영 skip은 별도로 기록. S8 운영 DB/DR은 기존 #1887과 격리·읽기 전용 범위에서 병렬 후속 검토.
 
+## 39. 2026-10-19 S6/G4 — 최종 Governor 정산 영수증 누락·상한 초과 시 Chat Commit HOLD (비운영)
 
-## 39. 2026-10-19 S8 — 운영 원격/로컬 마이그레이션 이력 실제 읽기 전용 재확인
+- **발견:** 기존 S6/G4 방어는 Provider 원본 영수증 저장 실패만 차단했다. 성공 응답과 Provider 영수증 저장 뒤 최종 governed settle DB 오류 또는 overCeiling=true 상태에서도 성공 결과가 상위 Chat Commit에 반환될 수 있었다.
+- **수정:** ENFORCE Governor 성공 응답은 정확한 callId의 Provider 영수증 DB 저장, 최종 비용 정산 DB ACK, overCeiling=false가 모두 있어야 반환한다. 오류 시 원본 예약·영수증을 유지하고 응답을 HOLD한다. Provider 재호출/자동 재과금, 새로운 운영 SQL·ACL·DDL·DML 없음. 레거시 비-Governor 동작과 비성공 Provider 정산 보존.
+- **검증:** 기존 합성 fake Provider/DB 테스트에 정산 DB 오류 및 상한 초과 부정 사례를 더한다. 정상 admit→fetch→store→settle 및 timeout 보수적 정산을 유지한다.
+- **운영 게이트:** 이 테스트만으로 S6/G4 종단 PASS 아님. G0 기술 승인, positive G1, Production G2/G3/G4/G5/G6 HOLD. Projectors=[], writeAdmission=DENY, 공개·실 Provider·유료 OFF, Production DB 변경 0. PR exact HEAD/Full Integration/병합 후 main 증거는 원장에 후속 기록.
 
-- **조회 기준·범위:** 2026-10-19, 명하 연결된 Supabase `MyengHa`의 `list_migrations` 및 `supabase_migrations.schema_migrations` SELECT(쓰기 0), 현재 `main`의 `supabase/migrations/` 목록과 대조. 운영 데이터 테이블 조회/DDL/DML/Role/ACL/repair·workflow dispatch·배포 수행 없음.
+
+## 40. 2026-10-20 S8 — 운영 원격/로컬 마이그레이션 이력 실제 읽기 전용 재확인
+
+- **조회 기준·범위:** 2026-10-19 최초 확인, 2026-10-20 재확인한 명하 연결된 Supabase `MyengHa`의 `list_migrations` 및 `supabase_migrations.schema_migrations` SELECT(쓰기 0), 현재 `main`의 `supabase/migrations/` 목록과 대조. 운영 데이터 테이블 조회/DDL/DML/Role/ACL/repair·workflow dispatch·배포 수행 없음.
 - **새로 확인된 현재 관측:** 운영 이력은 **195개**, 로컬 파일은 **194개**. `1520`~`1720`의 21개 버전은 **모두 원격 migration history에 존재**하며 로컬 파일도 전량 존재한다. 원격에만 있는 버전은 기존 원격-only `20261008090417` 단 1건이고, 최신 `20261018190000_seyeon_locked_first_zero_source_reveal_v1.sql`은 양쪽에 존재한다. 이전 로드맵의 ‘1520~1720 21개 미적용’은 **당시 역사적 스냅샷**이며, 현재 원격 이력 부재를 나타내지 않는다.
 - **실제 객체 최소 증거:** 읽기 전용 `pg_catalog.pg_proc` 조회에서 `public.cmd_mark_seyeon_chat_context_ready_pinned_v1` 1건과 기존 `public.cmd_mark_seyeon_chat_context_ready_runtime_v1` 1건이 각각 존재한다. 이는 이전 이슈의 1640 RPC 부재 상태가 **현재와 다름**을 보여 주지만 실제 ACL·호출 성공·정확한 정의·실제 API 경로 동작의 승인 증명은 아니다.
+- **2026-10-20 RPC 유효 권한 재확인:** 운영 `pg_catalog`의 `has_function_privilege` 읽기 전용 측정에서 `myeongha_api_executor`는 정확한 4인자 `cmd_mark_seyeon_chat_context_ready_pinned_v1` **EXECUTE=true**, 기존 3인자 `cmd_mark_seyeon_chat_context_ready_runtime_v1` **EXECUTE=false**이며 `anon`/`authenticated`는 해당 4인자 RPC 직접 실행 불가. 운영 API 실제 성공/보안 G3 송출 허가와는 구분한다.
 - **남은 정확한 차이:** 원격-only `20261008090417`의 기록을 임의 삭제/repair하지 않는다. 21개 이력 등록 ≠ 소스 SQL 전체 body, Owner, EXECUTE, RLS, 트리거·정책, 기존 데이터와 의존성의 동등성 검증; 현재 버전 기준 최신 암호화 백업→**동일 ID** 격리 복원·프라이버시 원장 재생·RPO/RTO 승인 또한 미완료. 과거 실행자 확인은 기존 Owner 위험 수용대로 **추가 개발 블로커로 재개하지 않는다**.
 - **후속 원칙:** #1887 Ops/DB는 **이력 미적용 21건 자동 배포**가 아니라 **현재 스키마/권한의 비파괴적 동등성 및 최신 DR 증거**를 판정해야 한다. 충분한 근거와 별도 범위 승인 전 `authorizedForProduction=false`, `drReady=false`; 세연 G0=PROPOSED, G1 양수/G2/G3/G4/G5/G6 HOLD, Projectors=[], 실 Provider/공개/유료 OFF, Production 쓰기 0 유지.
