@@ -327,3 +327,9 @@ S1에서 공통 잠금 함수 자체가 성공하더라도 **S2 전체 경로가
 
 - S2: 독립 구매 잠금 대기 이후 이미 완료된 C 회수보다 오래된 **다른 ID**의 취소 이벤트는 provider stale로 전체 롤백(추가 Event 0), 같은 취소 ID의 다른 증명 fingerprint는 replay conflict로 거부(원본 Event/Grant 변화 0)합니다. PG15·17 격리 검증으로 확인하고 전역 Commerce 정렬 인수로 과장하지 않습니다.
 - S4: 두 번째 S4 논리 복원 직후 합성 완료 Subject/Job/Outbox를 구성해, 구백업 원문 잔존 상태의 1190 완료 재호출 차단·원문 물리 재파기 후 실제 1190 멱등 응답·전부 ROLLBACK을 시험합니다. 운영용 완료 함수 및 Worker에 이 게이트를 연결하지 않았으며 개인정보 기술·법무 인수 전 S4 운영 적용은 HOLD입니다.
+
+
+### S2 원본 영수증 취소 ID 재사용 및 S4 복원 epoch·완료 인계 재시도 (2026-10-20)
+
+- S2: 이미 C 원본 Receipt를 회수한 검증 취소 ID를 같은 구매의 B 원본 Receipt로 재사용하면 정본 취소 Writer가 cross-receipt replay conflict로 거부하고, C 출처 이벤트/권리는 보존하며 B에 잘못된 출처 효과를 생성하지 않아야 합니다.
+- S4: 완료 Job의 오래된 백업 보호 행을 재삭제한 후에도 새로운 off-backup `required_epoch`가 발생하면 완료 재호출을 DENY, `reconciled_epoch`가 따라잡을 때 정본 1190 멱등 반환을 허용하는 **격리 DB** 계약을 추가했습니다. Worker 단위시험은 완료 포트 오류 중에도 DB Finalizer/호스팅 Auth를 반복하지 않고 재시도를 위한 persisted phase를 유지하는지를 확인합니다. 실제 Worker/복원 원장 운영 연동은 인수 전 HOLD입니다.

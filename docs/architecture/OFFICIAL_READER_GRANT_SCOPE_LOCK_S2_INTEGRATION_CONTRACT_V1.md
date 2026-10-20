@@ -114,3 +114,9 @@
 - 동일 C 영수증의 취소가 최신 이벤트로 이미 `revoked` 된 이후, **새 취소 ID를 가졌지만 더 오래된 제공자 시각**의 검증 이벤트를 별도 DB 연결에서 호출합니다. 독립 구매 advisory holder가 먼저 잠금을 점유하므로 실제 Lock 대기 후 출처 Grant `last_effective_at`과 대조해야 하며, 오래된 이벤트는 명시적 stale 오류·Provider Event 추가 0건·C Grant 수정 0건으로 종료해야 합니다.
 - 같은 기존 취소 ID를 **다른 증빙 fingerprint**로 재생하면 출처 검증 충돌이 발생해야 합니다. 이미 확정된 Provider Event와 연결된 Entitlement revoked Event는 각각 정확히 한 번만 유지되며, B 형제 Grant 역시 revoked 상태를 보존합니다.
 - 이번 시험은 검증된 DB 취소 Writer만 호출하며 실제 PortOne API, 운영 사용자, 모든 Commerce event 종류의 순서 정책을 새로 정의하지 않습니다.
+
+
+## 14. 같은 취소 ID의 다른 원본 영수증 유입 차단 (2026-10-20)
+
+- 이미 독립 C 영수증의 Verified 취소로 확정된 `b8-cancel-concurrent-c`를 **동일 구매의 B 영수증**에 재사용하는 합성 PortOne DB 취소를 실행합니다. 기존 정본 `cmd_apply_verified_portone_reader_full_cancellation_v1`가 Provider Event의 `resolved_receipt_id`를 C로 고정하고 `official_reader_portone_cancel_replay_conflict`를 반환해야 합니다.
+- 차단 이후에도 Provider Event의 원본 C 1건·출처 C Grant의 `revoked` Entitlement Event 1건이 유지되고, B Grant에 해당 Provider Event의 효과 0건을 검사합니다. 서로 다른 결제·영수증을 하나의 취소 이벤트로 합치지 못하도록 하는 검증이며 외부 실제 결제·환불 처리는 없습니다.

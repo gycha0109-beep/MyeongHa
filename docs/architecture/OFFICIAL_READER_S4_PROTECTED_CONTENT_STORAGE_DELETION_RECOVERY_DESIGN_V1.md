@@ -184,3 +184,10 @@ T1·S3·T2 각 검사가 동일 원본/Scope를 pin해야 한다. `Response`·`R
 - `test/db/official_reader_s4_completed_replay_restore_contract.sql`은 S4의 **두 번째 구백업 복원 직후**, PostgreSQL 테스트 전용 트랜잭션에 해당 회원의 `subjects.status='deleted'`, `data_deletion_jobs.status='completed'`, `outbox_events.status='processed'` 등 정본 1190의 완료 재호출 조건을 **합성**합니다. 이는 실제 Worker의 최종화를 수행한 것이 아닙니다.
 - 원문 후보 행이 복원되어 있으면 `attempt_guarded_completion_ack_v1`이 **기존 1190 완료 함수 호출 이전에 거부**하고, deleted Subject라면 읽기 후보도 0건입니다. 같은 트랜잭션 안에서 복원된 원문 후보를 물리 삭제한 후에는 정본 1190의 `completed=true,replayed=true` 경로로 위임해야 하며, Job 완료·Outbox 처리 시각을 변경해서는 안 됩니다.
 - 트랜잭션 전체를 ROLLBACK한 후에는 합성 완료 Job·Outbox·deleted 상태가 남지 않고 원래 구백업 보호 행이 다시 존재해 외부 tombstone으로 차단되는지 검사합니다. 운영 DB·실제 Worker·1190 함수·개인정보 복원 인수에는 변경이 없으며, **실제 완료된 계정과 PITR 데이터의 운용 차단 증명은 HOLD**입니다.
+
+
+## 19. 복원 원장 버전 경합과 Worker 완료 승인 단계 재시도 (2026-10-20)
+
+- 완료 상태의 Subject·Job·Outbox를 **ROLLBACK 전용 합성 트랜잭션**에 갖춘 상태에서 복원된 보호 원문을 다시 파기한 후에도, 외부 원장의 `required_epoch`을 증가시키고 `reconciled_epoch`를 뒤처지게 하면 보호 데이터 전용 완료 게이트가 정본 1190 완료 재호출을 거부해야 합니다. 대조 epoch까지 올라온 뒤에만 정본 함수의 `completed=true,replayed=true`에 위임하고 완료 시각·Outbox 처리 시각을 유지합니다.
+- `account-deletion-worker-orchestration.test.ts`는 `completion_ack_required`에서 보호 원문 재복원 또는 삭제 원장 대조 지연으로 완료 Port가 오류를 던지는 상황을 모의합니다. DB Finalizer·호스팅 Auth 재실행 없이 완료 상태를 보류하다가 차단 원인 해소 이후 ACK를 한 번 확정하고, 이미 `completed`이면 추가 부작용이 없음을 검사합니다.
+- 단위시험의 차단 Port는 **운영에 연결되지 않은 모형**이며, S4 전체 기술·법무 인수 전 실제 Worker·1190 실행 함수 수정, 외부 원장 배포, 유료 원문 복원·삭제는 모두 HOLD입니다. 이미 완료된 작업에서 보호 원문 재노출 방지는 별도 read-side tombstone/fence가 독립적으로 보장해야 합니다.
