@@ -89,6 +89,55 @@ $assert$;
 revoke all on function official_reader_s4_fixture.assert_forward_contract_v1(text,boolean)
  from public;
 
+-- Negative crash/failure rehearsal: a late SQL exception AFTER the
+-- child-first DELETE, but inside the same transaction/PLPGSQL subtransaction,
+-- MUST restore protected body and Reader parent together. A successful
+-- retry is then checked in the regular BEGIN/ROLLBACK specimen below.
+do $fault_injection$
+declare
+ body_id uuid := 'd4000000-0000-4000-8000-000000000001'::uuid;
+begin
+ if not exists(select 1 from official_reader_s4_fixture.protected_bodies b
+  where b.id=body_id) then
+   raise exception 'S4 fault rehearsal requires populated protected body';
+ end if;
+ begin
+  perform official_reader_s4_fixture.rehearse_account_delete_child_first_v1(
+   '11390000-0000-0000-0000-000000000001'::uuid
+  );
+  if exists(select 1 from official_reader_s4_fixture.protected_bodies b
+    where b.id=body_id) or
+    exists(select 1 from public.standard_reading_reader_access_grants
+     where purchase_intent_id='12192300-0000-0000-0000-000000000002'::uuid)
+  then
+   raise exception 'S4 child-first candidate incomplete before injected crash';
+  end if;
+  raise exception using
+   errcode='P4321',message='synthetic late account-deletion finalizer fault';
+ exception when sqlstate 'P4321' then
+  -- A PostgreSQL EXCEPTION block rolls back ALL mutations from that inner
+  -- block before this handler runs, even though DELETE already succeeded.
+  if not exists(select 1 from official_reader_s4_fixture.protected_bodies b
+     where b.id=body_id)
+     or not exists(select 1 from public.standard_reading_reader_access_grants
+     where purchase_intent_id='12192300-0000-0000-0000-000000000002'::uuid)
+  then
+    raise exception 'S4 crashed finalizer partially committed paid body or access';
+  end if;
+  raise notice 'PASS S4 injected late finalizer fault rolls back protected child and Reader parent';
+ end;
+end;
+$fault_injection$;
+select official_reader_s4_fixture.assert_forward_contract_v1(
+ 'fault rollback retains Commerce evidence and protected candidate',
+ exists(select 1 from official_reader_s4_fixture.protected_bodies)
+ and exists(select 1 from public.commerce_receipts cr
+  join public.entitlement_grants eg on eg.source_receipt_id=cr.id
+  where eg.subject_id='11390000-0000-0000-0000-000000000001'::uuid
+   and eg.grant_source_type='purchase')
+ and exists(select 1 from public.standard_reading_reader_access_grants
+  where purchase_intent_id='12192300-0000-0000-0000-000000000002'::uuid));
+
 -- The specimen is exercised inside an outer rollback. It must remove the
 -- child and actual Reader-access parent, not merely return a proposed plan.
 begin;

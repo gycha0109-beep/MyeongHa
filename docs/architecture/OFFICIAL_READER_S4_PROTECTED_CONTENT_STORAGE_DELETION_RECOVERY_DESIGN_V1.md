@@ -160,3 +160,8 @@ T1·S3·T2 각 검사가 동일 원본/Scope를 pin해야 한다. `Response`·`R
 - 향후 승인 후 신규 forward-only `internal_finalize_account_deletion_db_v1(uuid,uuid,text)` **동일 시그니처 재정의** 시 삽입해야 할 정확한 위치: `Subject FOR UPDATE → Job FOR UPDATE → 현재 Outbox lease FOR UPDATE → 최신 DB preflight 성공 → account-deletion trigger context 설정 → 기존 FK cycle break / 기타 개인 데이터 준비 → [새 protected child DELETE] → 기존 standard_reading_reader_access_grants DELETE → Reading / Chat / Profile 자식 삭제 → Commerce P5Y RETAIN → Subject deleted / deferred constraints immediate`. 이미 최종화된 replay는 원문 삭제 재수행/그랜트 재발급 없이 기존 멱등 반환을 유지해야 합니다.
 - 신규 Child DELETE는 **같은 DB 트랜잭션** 내부에서만 시행합니다. 실패/Worker crash/lease 상실 전 전체 롤백·즉시 비노출을 기본으로 하며, 계정별 삭제 tombstone과 복원 시 차단 여부는 별도 백업 외부 Privacy Ledger/현행 복구 계약에서 인수합니다. 단순 `DELETE` 계획으로 실제 Worker·호스팅 Auth 삭제 완료, 24시간 물리 삭제 SLA, KMS/키 파기, P30D 복원을 주장하지 않습니다.
 - 이 후보 함수는 실제 `internal_finalize...`의 소유권, SECURITY DEFINER, lease·Member 검사, 계정 삭제 Job 상태, 전체 FK 순환 삭제를 **수행하지 않습니다**. 테스트 schema 외에는 **실행 migration/운영 변경이 없으며**, 실제 SQL 함수 교체는 Privacy/Legal #2318 기술 인수와 운영 복구 승인 후 별도 검토 대상입니다.
+
+## 15. 계정 삭제 중간 장애의 보호 행·접근 결속 원자 롤백 (2026-10-20)
+
+- `test/db/official_reader_s4_finalizer_forward_contract.sql`에 **보호 자식 DELETE → Reader-access 부모 DELETE 실행 직후** 테스트 전용 SQLSTATE로 늦은 Worker 장애를 발생시키는 PL/pgSQL 예외 하위 거래를 추가합니다. 예외 처리 시 PostgreSQL이 양쪽 DELETE를 모두 롤백했는지, Commerce 증빙을 보존했는지 실데이터 구조 기반 합성행으로 검사한 다음, 동일 함수의 재시도를 BEGIN/ROLLBACK으로 성공 검증합니다.
+- 오류·강제 재시도 상황에서 **실제 계정 삭제 서비스 완료를 표시할 수 없음**을 인수 조건으로 유지합니다. 이 테스트는 일반 Worker lease/heartbeat, Supabase Auth 삭제, 비동기 장애 복구, 외부 Privacy Ledger 및 24시간·P30D 운영 인수가 아닙니다.

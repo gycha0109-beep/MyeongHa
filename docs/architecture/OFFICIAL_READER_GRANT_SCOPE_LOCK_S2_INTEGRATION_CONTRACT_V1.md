@@ -90,3 +90,8 @@
 
 - **DB 실경합 인수:** 구매 advisory만 가진 A가 Reader S1에 대기하는 동안 S1을 가진 B가 **Purchase Intent 행을 잠그고 커밋**해야 합니다. 두 연결 모두 20초 이내 정상 종료, SQLSTATE `40P01`/시간초과·형제 Grant 변경 0. 이 시험은 잠금 원시 순서를 재현하며 모든 원본 Writer 경로의 실서비스 안전성 입증은 아닙니다.
 - **잔여 S2 리스크:** 외부 Commerce 이벤트 디스패처/비Reader Grant 혼용, Receipt 이외의 잠금 행, 다중 Reading/Reader scope 재발견, 예약된/후속 T2 Writer, Auth·탈퇴 finalizer와 Grant/Birth 교차 대기는 아직 한 거래 안에서 전역 순서 인수 미완료입니다. 잠금 이후 재조회와 실제 DB 소유자별 교착 계측, 승인 경로 제한이 끝나기 전 S2 전체 완료 판정 금지.
+
+## 9. 다중 Reader 공동 잠금 및 독립 범위 비차단 (2026-10-20)
+
+- S2 원시 DB 2연결 시험에서 **서로 다른 두 Reader 잠금 키(A·Z)**를 같은 Subject×Reading에 대해 사용합니다. 첫 연결이 A를 선점한 동안 두 번째 연결에는 일부러 Z→A 순으로 대상을 전달하지만 정렬된 A→Z 순서로 획득하게 하여 실제 advisory 대기와 두 트랜잭션 정상 커밋을 확인합니다. 잠긴 Reader와 무관한 별도 Reader 키의 `lock_timeout=200ms` 트랜잭션은 기다림 없이 통과해야 합니다.
+- 이는 실제 Reader 제품 선택이나 복수 Reading/Reader 생성을 **모사하지 않는 advisory-only 경합**이며 실 영수증·Grant는 변경하지 않습니다. 모든 Legacy Commerce Writer와 다범위 결속/최종 T2의 전역 정렬 인수는 여전히 미완료입니다.

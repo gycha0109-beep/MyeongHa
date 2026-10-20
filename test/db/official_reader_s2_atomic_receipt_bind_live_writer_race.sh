@@ -1532,4 +1532,90 @@ writer_pid=""
  fail "S2 lock order cross-over mutated independent sibling Grants"
 pass "two-session purchase advisory->scope vs scope->purchase row finishes without deadlock"
 
+# Independent Reader S1 scopes MUST NOT deadlock when the owner-driven
+# list of affected Readers is discovered in opposite natural order: every
+# holder locks them in canonical reader order BEFORE touching Grant rows.
+# The synthetic second Reader ID is ONLY an advisory-lock key, not an
+# actual character, purchased product, or executable paid scope authority.
+p >"$tmpdir/b8-multiscope-holder.out" 2>&1 <<SQL &
+set application_name='rr_s2_multiscope_order_holder';
+set statement_timeout='20s';
+begin;
+select pg_catalog.set_config('myeongha.subject_id','$subject',true);
+select public.internal_acquire_official_reader_scope_lock_v1(
+ '$subject'::uuid,'$b8_reading'::uuid,'test-a-order-only'
+);
+select pg_sleep(3);
+select public.internal_acquire_official_reader_scope_lock_v1(
+ '$subject'::uuid,'$b8_reading'::uuid,'test-z-order-only'
+);
+commit;
+SQL
+holder_pid=$!
+wait_for "multi-scope holder owns first Reader key" "
+ select count(*) from pg_catalog.pg_stat_activity
+ where application_name='rr_s2_multiscope_order_holder'
+ and state='active' and wait_event_type='Timeout';
+"
+# A separate scope must remain available even while the first is held.
+p >"$tmpdir/b8-multiscope-unrelated.out" 2>&1 <<SQL || {
+ cat "$tmpdir/b8-multiscope-unrelated.out" >&2
+ fail "an unrelated Reader scope waited for the occupied Reader S1"
+}
+set statement_timeout='20s';
+begin;
+set local lock_timeout='200ms';
+select pg_catalog.set_config('myeongha.subject_id','$subject',true);
+select public.internal_acquire_official_reader_scope_lock_v1(
+ '$subject'::uuid,'$b8_reading'::uuid,'test-independent-order-only'
+);
+commit;
+SQL
+p >"$tmpdir/b8-multiscope-writer.out" 2>&1 <<SQL &
+set application_name='rr_s2_multiscope_order_writer';
+set statement_timeout='20s';
+begin;
+select pg_catalog.set_config('myeongha.subject_id','$subject',true);
+do \$ordered_readers\$
+declare
+ v_reader text;
+begin
+ -- Input enumeration deliberately Z,A; the acquisition is A,Z.
+ for v_reader in
+   select reader_character_id from (
+     values ('test-z-order-only'),('test-a-order-only')
+   ) selected(reader_character_id)
+   order by reader_character_id
+ loop
+   perform public.internal_acquire_official_reader_scope_lock_v1(
+     '$subject'::uuid,'$b8_reading'::uuid,v_reader
+   );
+ end loop;
+end
+\$ordered_readers\$;
+commit;
+SQL
+writer_pid=$!
+wait_for "second multi-scope Writer waits on canonical first Reader" "
+ select count(*) from pg_catalog.pg_stat_activity
+ where application_name='rr_s2_multiscope_order_writer'
+ and state='active' and wait_event_type='Lock'
+ and wait_event='advisory';
+"
+wait "$holder_pid" || {
+ cat "$tmpdir/b8-multiscope-holder.out" >&2
+ fail "first multi-scope owner failed"
+}
+holder_pid=""
+wait "$writer_pid" || {
+ cat "$tmpdir/b8-multiscope-writer.out" >&2
+ fail "sorted multi-scope Reader acquisition deadlocked"
+}
+writer_pid=""
+[[ "$(p -c "select count(*) from public.entitlement_grants
+ where id in ('$b8_grant_b'::uuid,'$b8_grant_c'::uuid)
+ and status='active';")" == 2 ]] ||
+ fail "multi-scope advisory-only rehearsal unexpectedly changed paid Grants"
+pass "opposite enumeration converges to globally sorted S1 keys; unrelated Reader S1 proceeds"
+
 echo "PASS: S2 instrumented two-direction PostgreSQL race; production integration HOLD"

@@ -305,3 +305,8 @@ S1에서 공통 잠금 함수 자체가 성공하더라도 **S2 전체 경로가
 
 - `tests/official-reader-s2-s4-lock-and-delete-contract.test.ts`는 실제 1870/1900의 **구매 advisory → 정렬된 Reader S1 → Receipt/Grant 행**과 1810 직접 Reader binder **S1 → Purchase/Grant/Birth 행**, 1770 verified event dispatch **전체 S1 정렬 → Grant** 순서 및 1520 Reader-access-first 삭제를 소스 드리프트 계약으로 검사합니다. CI PostgreSQL 15·17 실제 2연결에서는 **구매 advisory 대기 중 S1 보유자의 Purchase row FOR UPDATE**가 순환 대기로 바뀌지 않는지 검증합니다.
 - S4의 비운영 순방향 삭제 표본은 실제 1520 정의 검토와 별도 시험 SQL에서 **protected child → Reader-access parent** 순서를 성공시키고 rollback/Commerce 보존을 확인합니다. 실제 계정 삭제 함수·유료 본문·KMS·정식 개인정보 삭제 Worker·운영 DB에는 반영하지 않았으며 S2 완전 종료, S3/S4 기술 인수, S5~S8은 여전히 HOLD입니다.
+ 
+### 추가 S2/S4 복합 오류·잠금 경계 시험 (2026-10-20)
+
+- S2: 반대 순서 입력의 Reader A/Z 잠금이 정렬된 동일 A→Z 순서로 수렴하는지, 다른 Reader 범위는 독립 진행되는지 PostgreSQL 15·17 실제 2연결로 검증합니다. 실제 모든 Writer의 다범위 Source 결속 검증으로 간주하지 않습니다.
+- S4: 삭제 중간에 늦은 오류를 주입해 보호 자식과 Reader 접근 부모 삭제를 **원자 롤백**하고, Commerce P5Y 보존 및 재시도 성공을 시험합니다. 신규 실행 migration이나 실제 Worker/키 파기·복원 적용은 여전히 HOLD입니다.
