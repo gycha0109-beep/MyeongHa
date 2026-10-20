@@ -1399,7 +1399,7 @@ for replay in 1 2; do
     )->'revoke'->>'disposition'); commit;")" ||
     fail "verified zero-Grant D cancellation failed with sibling Reader already bound"
   [[ "$outcome" == cancelled_before_grant ]] ||
-    fail "verified zero-Grant D cancellation returned wrong disposition"
+    fail "verified zero-Grant D cancellation returned wrong disposition: [$outcome]"
 done
 [[ "$(p -c "select verification_status from public.commerce_receipts where id='$b8_receipt_d'::uuid;")" == revoked ]] ||
   fail "original zero-Grant D Receipt was not revoked"

@@ -179,7 +179,9 @@ case "$case_name" in
     else
       apply_standard_migrations
     fi
-    psql -X -v ON_ERROR_STOP=1 -f test/db/official_reader_s4_protected_storage_design.sql
+    # The rehearsal runs this same disposable fixture in pre-deletion mode,
+    # then restores bytes and finalizes the real Chat graph in its own session.
+    # The authority-core job retains the original complete S4 SQL test.
     bash test/db/official_reader_s4_logical_restore_deletion_rehearsal.sh
     # test-only schemas; catalog snapshot of deployed migrations intentionally unchanged
     ;;
