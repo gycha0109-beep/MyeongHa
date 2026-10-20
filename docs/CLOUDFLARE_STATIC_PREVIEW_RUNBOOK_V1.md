@@ -11,7 +11,7 @@
 3. `npm run build:cloudflare:static` — **기존** `npm run build:web` 그대로 실행 → `public/_headers` 생성 → 11 HTML, 파일 한도, 보안 헤더 검증.
 4. `npm run verify:deployment-config` — 기존 Vercel 배포 산출물 회귀 검증. `_headers`는 Cloudflare 용도로만 생성되므로 이 단계는 별도로 PASS 여부 판단.
 
-이 PR은 `wrangler` 패키지 또는 Vercel의 배포 설정을 추가/교체하지 않는다. 다음 단계에서 사용할 정확한 Wrangler v4 버전을 잠금 파일에 고정하고 실제 `wrangler dev`/Worker runtime smoke를 실행해야 한다. **현재 단계에서 진짜 Workers 런타임이 통과했다고 주장하지 않는다.**
+이 PR은 기존 Vercel 배포 설정이나 package-lock.json을 변경하지 않는다. CI에서 `npm exec --yes --package=wrangler@4.151.2 -- wrangler dev`로 버전을 정확히 지정하여 로컬 workerd 실행을 검증한다. 이 방식은 npm CI 호스트에서 해당 패키지를 동적으로 설치하며 **Cloudflare 계정에 배포하지 않는다**. 실제 검사 결과는 PR의 최신 GitHub Actions 로그에서 판단한다. 클라우드 프리뷰/운영 검증 PASS를 주장하지 않는다.
 
 ## 설계한 배포 경계
 
@@ -46,9 +46,9 @@
 
 ## 다음 실제 작업
 
-1. Node24 환경에서 `npm run test:cloudflare:static`과 `npm run build:cloudflare:static`을 실행하고 정확한 SHA의 CI 결과를 확인한다.
+1. Node24 환경에서 `npm run test:cloudflare:static`, `npm run build:cloudflare:static`, `npm run verify:cloudflare:local`을 실행하고 정확한 SHA의 CI 결과를 확인한다.
 2. 파일 용량/정적 라우팅 등의 출력 기록을 근거로 문제만 수정한다.
-3. Cloudflare 전용 Wrangler v4를 pinned dependency로 등록해 실제 `wrangler dev` local HTTP parity 검사.
+3. `npm run verify:cloudflare:local`로 핀 고정된 Wrangler 로컬 HTTP 테스트를 통과시키고, 오류가 있으면 해당 URL·응답 경계만 수정한다.
 4. 사용자에게 계정 내 전용 Worker 및 GitHub preview 연동에 관한 명시 승인 범위가 정해질 때에만 Cloudflare 리소스 생성·배포를 실행한다.
 5. 이후부터 기존 로드맵대로 health + router, Auth/DB, Saju/Face, AI/Commerce 독립 승인 단계를 밟는다.
 
