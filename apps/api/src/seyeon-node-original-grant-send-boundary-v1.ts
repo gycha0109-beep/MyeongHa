@@ -246,6 +246,11 @@ export async function sendSeyeonNodeOriginalGrantResponseV1(
       input.response.once('error', onError);
       controller.signal.addEventListener('abort', onAbort, { once: true });
     });
+    // Header setters and ServerResponse.end() may throw synchronously. The
+    // outer catch aborts the transaction, which rejects this pending promise;
+    // attach a handler now so that rejection cannot escape unobserved when
+    // the synchronous writer exception bypasses the later await.
+    void finished.catch(() => undefined);
     // Explicit one-shot, non-streaming body; these headers are server-owned.
     input.response.statusCode = payload.status;
     input.response.setHeader('Cache-Control', 'no-store');
