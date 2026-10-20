@@ -1976,13 +1976,40 @@ grep -q 'C_DISTINCT_REPLAY=official-reader-s2-unbound-grant-cancellation-v1' "$t
 pass "distinct B bound and C unbound verified events serialize and replay with no cross-Receipt effects"
 
 # Complement the previous refund-FIRST races with a verified Grant
-# ISSUANCE-FIRST race on an independent E Receipt of the same B8 purchase.
+# ISSUANCE-FIRST race on an independent E Receipt of the separately verified E purchase.
 # The legacy real Receipt/Grant writer is explicitly covered by shared
 # purchase advisory -> Reader S1 before its first mutation; the verified
 # PortOne cancellation must wait and then revoke only E.
 b8_receipt_e='12192000-0000-0000-0000-000000000012'
+b8_e_intent='12192300-0000-0000-0000-000000000013'
 if ! p >"$tmpdir/b8-e-verified-receipt-seed.out" 2>&1 <<SQL
 begin;
+-- The DB correctly forbids attaching a new payment attempt to an already
+-- verified/terminal Purchase. Clone a separate CREATED E purchase first,
+-- preserving the SAME Subject/Reader S1 but not bypassing Commerce DDL.
+insert into public.purchase_intents(
+ id,subject_id,product_offer_id,provider_account_link_id,
+ idempotency_key,request_hash,offer_snapshot_jsonb,offer_snapshot_hash,
+ status,created_at,updated_at,expected_amount_minor,expected_currency,
+ charge_terms_version,capability_set_id,capability_snapshot_jsonb,
+ capability_snapshot_hash
+)
+select '$b8_e_intent'::uuid,subject_id,product_offer_id,provider_account_link_id,
+ 'reader-b8-e-issued-first','sha256:test:reader-b8-e-issued-first',
+ offer_snapshot_jsonb,offer_snapshot_hash,'created',
+ clock_timestamp(),clock_timestamp(),expected_amount_minor,expected_currency,
+ charge_terms_version,capability_set_id,capability_snapshot_jsonb,
+ capability_snapshot_hash
+from public.purchase_intents where id='$b8_intent'::uuid;
+insert into public.purchase_intent_reader_selections(
+ purchase_intent_id,product_id,reader_character_id,reader_content_bundle_id,
+ selection_contract_version,selection_snapshot_jsonb,selection_hash,created_at
+)
+select '$b8_e_intent'::uuid,product_id,reader_character_id,
+ reader_content_bundle_id,selection_contract_version,
+ selection_snapshot_jsonb,'sha256:test:reader-b8-e-selection',clock_timestamp()
+from public.purchase_intent_reader_selections
+where purchase_intent_id='$b8_intent'::uuid;
 insert into public.commerce_payment_attempts(
  id,purchase_intent_id,subject_id,product_offer_id,attempt_no,
  provider,environment,idempotency_key,provider_request_id,
@@ -1993,14 +2020,17 @@ select '12197000-0000-0000-0000-000000000012'::uuid,
  'portone_v2','production','reader-b8-attempt-e',
  'b8-payment-e','tx-reader-b8-e',
  'response_received',clock_timestamp(),clock_timestamp()
-from public.purchase_intents pi where pi.id='$b8_intent'::uuid;
+from public.purchase_intents pi where pi.id='$b8_e_intent'::uuid;
+update public.purchase_intents
+ set status='verified',updated_at=clock_timestamp()
+ where id='$b8_e_intent'::uuid;
 insert into public.commerce_receipts(
  id,subject_id,purchase_intent_id,product_offer_id,platform,provider,
  external_transaction_id,receipt_fingerprint,verification_status,
  verified_payload_jsonb,verified_at,created_at,environment,
  verifier_revision,verified_amount_minor,verified_currency
 )
-select '$b8_receipt_e'::uuid,subject_id,'$b8_intent'::uuid,product_offer_id,
+select '$b8_receipt_e'::uuid,subject_id,'$b8_e_intent'::uuid,product_offer_id,
  platform,provider,'tx-reader-b8-e',
  'hmac-sha256:k1:9393939393939393939393939393939393939393939393939393939393939393',
  'verified',verified_payload_jsonb,clock_timestamp(),clock_timestamp(),
@@ -2022,7 +2052,7 @@ set statement_timeout='25s';
 begin;
 select pg_catalog.set_config('myeongha.subject_id','$subject',true);
 select pg_catalog.set_config('myeongha.reader_pending_reading_id','$b8_reading',true);
-select public.internal_acquire_official_reader_purchase_lock_v1('$b8_intent'::uuid);
+select public.internal_acquire_official_reader_purchase_lock_v1('$b8_e_intent'::uuid);
 select public.internal_acquire_official_reader_scope_lock_v1(
  '$subject'::uuid,'$b8_reading'::uuid,'test-standard-reader'
 );
@@ -2058,7 +2088,7 @@ select 'E_CANCEL='||
 commit;
 SQL
 writer_pid=$!
-wait_for "E provider refund waits on same purchase behind in-flight Grant issuance" "
+wait_for "E provider refund waits on E purchase behind in-flight Grant issuance" "
  select count(*) from pg_catalog.pg_stat_activity
  where application_name='rr_s2_e_cancel_after_issuance'
  and state='active' and wait_event_type='Lock' and wait_event='advisory';
