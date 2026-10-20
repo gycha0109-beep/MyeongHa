@@ -333,3 +333,9 @@ S1에서 공통 잠금 함수 자체가 성공하더라도 **S2 전체 경로가
 
 - S2: 이미 C 원본 Receipt를 회수한 검증 취소 ID를 같은 구매의 B 원본 Receipt로 재사용하면 정본 취소 Writer가 cross-receipt replay conflict로 거부하고, C 출처 이벤트/권리는 보존하며 B에 잘못된 출처 효과를 생성하지 않아야 합니다.
 - S4: 완료 Job의 오래된 백업 보호 행을 재삭제한 후에도 새로운 off-backup `required_epoch`가 발생하면 완료 재호출을 DENY, `reconciled_epoch`가 따라잡을 때 정본 1190 멱등 반환을 허용하는 **격리 DB** 계약을 추가했습니다. Worker 단위시험은 완료 포트 오류 중에도 DB Finalizer/호스팅 Auth를 반복하지 않고 재시도를 위한 persisted phase를 유지하는지를 확인합니다. 실제 Worker/복원 원장 운영 연동은 인수 전 HOLD입니다.
+
+
+### S2 다른 영수증의 동시에 실행되는 회수 재처리·S4 장애 후 완료 응답 유실 (2026-10-20)
+
+- S2: 결속 B·미결속 C의 **서로 다른 verified cancellation ID**를 두 연결에서 동시에 재처리해 공유 Purchase 잠금 대기/정상 커밋, B·C 이벤트 각 1개·Grant 출처별 효과 각 1개·교차 효과 0을 시험합니다. 이는 운영용 Commerce Writer 전부를 활성화한다는 의미가 아닙니다.
+- S4: 외부 복원 원장 조회 실패 시 완료 ACK 보류, 재시도 후 DB 완료가 커밋된 상태에서 응답 유실 시 새 worker-run의 persisted `completed` 수렴·중복 Auth/ACK 없음, 그리고 복원 대조를 마친 뒤에도 다른 Worker 소유자에 의한 completed replay를 정본 1190이 거절하는지 시험합니다. 실제 외부 Privacy Ledger·Worker 연결과 Production 복구는 계속 HOLD입니다.

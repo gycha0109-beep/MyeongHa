@@ -120,3 +120,10 @@
 
 - 이미 독립 C 영수증의 Verified 취소로 확정된 `b8-cancel-concurrent-c`를 **동일 구매의 B 영수증**에 재사용하는 합성 PortOne DB 취소를 실행합니다. 기존 정본 `cmd_apply_verified_portone_reader_full_cancellation_v1`가 Provider Event의 `resolved_receipt_id`를 C로 고정하고 `official_reader_portone_cancel_replay_conflict`를 반환해야 합니다.
 - 차단 이후에도 Provider Event의 원본 C 1건·출처 C Grant의 `revoked` Entitlement Event 1건이 유지되고, B Grant에 해당 Provider Event의 효과 0건을 검사합니다. 서로 다른 결제·영수증을 하나의 취소 이벤트로 합치지 못하도록 하는 검증이며 외부 실제 결제·환불 처리는 없습니다.
+
+
+## 15. 다른 원본 B/C의 실제 동시 회수 재처리 (2026-10-20)
+
+- 같은 Purchase의 **결속된 B Receipt**와 **미결속 C Receipt**에 대해 각각 이미 검증·확정된 서로 다른 PortOne 취소 ID를, 실제 `cmd_apply_verified_portone_reader_full_cancellation_v1`의 **독립 DB 연결 2개**에서 동시에 재생합니다. B 거래가 purchase advisory lock을 획득한 상태에서 커밋 전 지연되고, C 거래가 동일 구매 잠금에서 기다린 뒤 정상 종료해야 합니다.
+- 재생 완료 후 B/C Provider Event의 `resolved_receipt_id`가 서로 뒤바뀌지 않고 각 1건, 정확한 출처 Grant의 `entitlement_events`만 각 1건, 잘못된 형제 Grant와의 교차 효과 0건, 이미 회수된 B/C 권리 재활성화 0건을 검사합니다.
+- 이는 **기존 검증된 서로 다른 취소 이벤트의 동시 멱등 재처리**이며 서로 다른 새 유료 결제나 외부 PortOne API를 실행하지 않습니다. 외부 비Reader Writer·상대 서비스의 순서 및 운영 상태 기동은 S2 전체 종료 검증에 남아 있습니다.

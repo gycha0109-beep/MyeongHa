@@ -191,3 +191,10 @@ T1·S3·T2 각 검사가 동일 원본/Scope를 pin해야 한다. `Response`·`R
 - 완료 상태의 Subject·Job·Outbox를 **ROLLBACK 전용 합성 트랜잭션**에 갖춘 상태에서 복원된 보호 원문을 다시 파기한 후에도, 외부 원장의 `required_epoch`을 증가시키고 `reconciled_epoch`를 뒤처지게 하면 보호 데이터 전용 완료 게이트가 정본 1190 완료 재호출을 거부해야 합니다. 대조 epoch까지 올라온 뒤에만 정본 함수의 `completed=true,replayed=true`에 위임하고 완료 시각·Outbox 처리 시각을 유지합니다.
 - `account-deletion-worker-orchestration.test.ts`는 `completion_ack_required`에서 보호 원문 재복원 또는 삭제 원장 대조 지연으로 완료 Port가 오류를 던지는 상황을 모의합니다. DB Finalizer·호스팅 Auth 재실행 없이 완료 상태를 보류하다가 차단 원인 해소 이후 ACK를 한 번 확정하고, 이미 `completed`이면 추가 부작용이 없음을 검사합니다.
 - 단위시험의 차단 Port는 **운영에 연결되지 않은 모형**이며, S4 전체 기술·법무 인수 전 실제 Worker·1190 실행 함수 수정, 외부 원장 배포, 유료 원문 복원·삭제는 모두 HOLD입니다. 이미 완료된 작업에서 보호 원문 재노출 방지는 별도 read-side tombstone/fence가 독립적으로 보장해야 합니다.
+
+
+## 20. 복원 원장 네트워크 장애·완료 ACK 응답 유실·Worker 소유권 (2026-10-20)
+
+- 실제 오케스트레이터 `runClaimedAccountDeletionWorkerV1` 단위시험에서 외부 복원 원장의 조회가 실패하면 완료 ACK 포트가 예외를 던지고 기존 `completion_ack_required` 상태를 유지하도록 모의합니다. 조회가 회복된 다음 정본 1190 완료 거래는 **커밋했지만 네트워크 응답이 유실**된 상황을 재현하면 Worker 호출자는 즉시 성공을 추정하지 않고 오류를 반환해야 하며, 다음 재개는 DB에 저장된 `completed`를 읽어 완료 ACK·Auth 삭제·DB 최종화를 **재실행하지 않아야 합니다**.
+- 별도 PostgreSQL 테스트에서 구백업 원문을 물리 파기하고 외부 tombstone/epoch 대조를 완료한 뒤에도, **다른 Worker 소유자**로 정본 완료 재호출을 하면 `account deletion completion replay state is inconsistent` 거부가 나와야 합니다. 올바른 소유자만 정본 1190 멱등 반환을 받아 Job/Outbox 완료 시간을 보존합니다.
+- 둘 다 **실제 외부 원장 호출이나 운영 ACK 전환이 아닌 격리 계약**입니다. 원장 대조와 1190 승인 사이의 분산 원자성, lease 경쟁 및 이미 완료된 작업의 read-side 복원 차단은 기술·법무 인수와 운영 복구 설계에서 구현해야 합니다. 기존 User/Auth/Commerce 실서비스·Prod DB·삭제 Worker 구현은 이번 범위에서 바꾸지 않습니다.
