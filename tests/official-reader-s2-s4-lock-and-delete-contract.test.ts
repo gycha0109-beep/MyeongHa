@@ -59,12 +59,11 @@ describe('S2 Reader writer lock hierarchy / S4 approved deletion boundary', () =
     before(src, 'delete from public.standard_reading_reader_access_grants where subject_id = p_subject_id;', 'delete from public.conversation_messages where subject_id = p_subject_id;');
     expect(src).not.toContain('official_reader_s4_fixture');
     const candidate = readFileSync('test/db/official_reader_s4_finalizer_forward_contract.sql','utf8');
-    before(sliceAfter(candidate, 'as $candidate
-    expect(candidate).toContain('rollback;');
-    expect(candidate).toContain('revoke all on function official_reader_s4_fixture.rehearse_account_delete_child_first_v1');
-  });
-});
-), 'delete from official_reader_s4_fixture.protected_bodies b', 'delete from public.standard_reading_reader_access_grants');
+    before(
+      sliceAfter(candidate, 'create function official_reader_s4_fixture.rehearse_account_delete_child_first_v1('),
+      'delete from official_reader_s4_fixture.protected_bodies b',
+      'delete from public.standard_reading_reader_access_grants'
+    );
     expect(candidate).toContain('rollback;');
     expect(candidate).toContain('revoke all on function official_reader_s4_fixture.rehearse_account_delete_child_first_v1');
   });
