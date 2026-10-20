@@ -388,3 +388,11 @@ S8의 **비파괴/격리 검토는 S2~S7과 병렬 진행 가능**하며, S8 Pro
 - **구현:** 서비스에서 이미 사용하는 `readBoundedUpstreamJsonTextV1` 공통 제한 읽기 계약을 적용한다. Content-Length 조기 차단, 스트림 **읽기 도중** 최대 8192바이트 제한, AbortSignal로 응답 본문 무응답 시 종료, 정확한 `application/json` 및 매개변수만 허용한다. 실패 시 비용 DB 예약·모델 생성으로 진행하지 않으며 임의 토큰 추정·유료 Provider 재시도 없음.
 - **합성 테스트:** 4096+4097 바이트 분할 본문, Content-Length 과다 헤더, 본문 중간 정지/타임아웃, JSON 유사 MIME(`application/jsonp`)를 거부한다. 기존 정상 official count→reserve→model→receipt→settle 회귀 유지. 실제 외부 요청·유료 API 호출 없음.
 - **운영 제약:** 새 저가 모델의 실제 identifier/가격표·토큰 규격은 Owner 별도 승인 전에 변경하지 않음. 다른 모델/제공업체까지 검증됐다는 뜻 아님. G0 기술 및 D-04 미확정, Production G1 positive/G2/G3/G4/G5/G6 HOLD, `Projectors=[]`, `writeAdmission='DENY'`; Production DB SQL/ACL/배포·공개·유료 OFF 유지.
+
+
+## 45. 2026-10-20 S6/G4 — Count HTTP 헤더 미응답 절대 마감 시한 (비운영)
+
+- **실제 결손:** R29는 공식 Input Token Count 응답 본문을 읽는 동안 크기 및 AbortSignal을 검사하지만, HTTP 요청의 **헤더 이전** 단계에서는 `await send(...)`가 전송 계층의 AbortSignal 준수만 믿는다. 가짜/비정상 fetch가 abort를 무시하고 영원히 pending이거나 지연된 성공 응답을 반환하면 상한 시간 뒤에도 서버가 대기하거나 오래된 count ACK를 처리할 수 있었다.
+- **수정:** fetch Promise와 AbortSignal을 서버가 직접 경쟁시키는 응답 헤더 마감 계약을 추가한다. Abort를 무시한 Promise도 지정된 시간 내 거절하며 지연되어 도착한 성공 응답 본문을 폐기한다. 카운트 결과 반환 직전에도 deadline 경과 여부를 재확인한다. DB 예약/유료 Provider는 해당 count 성공 전 절대 호출되지 않는다.
+- **합성 회귀:** AbortSignal을 영원히 무시하는 fake transport에서도 `PRE_DISPATCH_REJECTED`, 비용 DB 0회/모델 0회 보장; 마감 이후 늦게 반환하는 정상 응답으로도 승격하지 않는다. 기존 정상 count→reserve→paid Provider→영수증→정산, R29 스트림 응답 제한 유지.
+- **불변:** 새 저가 모델 ID/가격표 선택 없음. 운영 공개/유료 호출 및 Production DB DDL/DML/ACL/마이그레이션 없음. G0/D-04 미확정, positive G1/G2/G3/G4/G5/G6 Production HOLD, Projectors=[], writeAdmission=DENY 유지.
