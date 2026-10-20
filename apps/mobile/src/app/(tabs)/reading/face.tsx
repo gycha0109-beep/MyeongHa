@@ -19,6 +19,7 @@ import { MobileReaderPicker } from '@/features/reading/MobileReaderPicker';
 import { FaceEditorialIntro } from '@/features/face/FaceEditorialIntro';
 import { findMobileReaderPresentationV1, type MobileReaderPresentationIdV1 } from '@/features/reading/mobile-reader-presentation';
 import { MobileScreen } from '@/ui/MobileScreen';
+import { useMobileUiLocale } from '@/ui/mobile-ui-locale';
 import { MobileUiText } from '@/ui/MobileUiText';
 import { mobileColors } from '@/ui/mobile-colors';
 import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
@@ -39,6 +40,7 @@ function sizeLabel(bytes: number | null): string {
 
 export default function FaceScreen() {
   const styles = useMobileThemedStyles(staticStyles);
+  const { t } = useMobileUiLocale();
   const { colors } = useMobileTheme();
   const [state, setState] = useState<FaceMediaStateV1>({ kind: 'idle' });
   const [frontCameraOpen, setFrontCameraOpen] = useState(false);
@@ -88,10 +90,10 @@ export default function FaceScreen() {
   return (
     <MobileScreen
       eyebrow="FACE READING"
-      title="관상"
+      title={t('관상')}
       refreshing={refreshing}
       onRefresh={() => void onRefresh()}
-      description="얼굴에 담긴 이야기를 만나기 위한 첫 단계, 사진부터 준비해 보세요."
+      description={t('얼굴에 담긴 이야기를 만나기 위한 첫 단계, 사진부터 준비해 보세요.')}
     >
       <ReadingSubnav />
       <FaceEditorialIntro readerId={presentationReader} />
