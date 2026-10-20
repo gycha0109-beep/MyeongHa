@@ -136,7 +136,13 @@ export async function handleSeyeonFirstZeroDirectNodeHttpV1(
   const { incoming, response } = input;
   const controller = new AbortController();
   const abortRequest = () => controller.abort();
+  // IncomingMessage 'aborted' only covers the request body. A peer may
+  // disconnect after the body completes while DB readiness is pending.
+  const abortOnEarlyResponseClose = () => {
+    if (!response.writableFinished) abortRequest();
+  };
   incoming.once('aborted', abortRequest);
+  response.once('close', abortOnEarlyResponseClose);
   try {
     // A genuine Node IncomingMessage and ServerResponse must be attached to
     // the SAME live local socket. In particular no Fetch Response object can
@@ -186,5 +192,6 @@ export async function handleSeyeonFirstZeroDirectNodeHttpV1(
     return 'reveal_held';
   } finally {
     incoming.off('aborted', abortRequest);
+    response.off('close', abortOnEarlyResponseClose);
   }
 }

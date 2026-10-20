@@ -47,6 +47,7 @@ function testDb(input: {
   ready?: boolean;
   rows?: readonly { assistantText: unknown }[];
   events?: string[];
+  onReadiness?: () => void;
 } = {}) {
   const events = input.events ?? [];
   let connects = 0;
@@ -65,6 +66,7 @@ function testDb(input: {
           }
           if (sql.includes('from pg_catalog.pg_proc p') && sql.includes('qry_seyeon_locked_first_zero_source_reveal_v1')) {
             events.push('readiness');
+            input.onReadiness?.();
             expect(sql).toContain("pg_get_userbyid(p.proowner)='postgres'");
             expect(sql).toContain("'row_security=off'=any(p.proconfig)");
             expect(sql).toContain("not pg_catalog.has_function_privilege('anon',p.oid,'EXECUTE')");
@@ -178,6 +180,20 @@ describe('first zero-source Node turn execution-to-DB-to-socket bridge', () => {
     }))).rejects.toMatchObject({ code: 'DB_NOT_READY' });
     expect(calls).toBe(0);
     expect(db.connects).toBe(1);
+    expect(response.body).toBe('');
+  });
+
+  it('does not invoke a paid model when the Node socket closes during DB readiness', async () => {
+    const response = new ResponseDouble();
+    const db = testDb({ onReadiness: () => response.destroy() });
+    let modelCalls = 0;
+    await expect(executeAndDeliverSeyeonFirstZeroNodeTurnV1(request({
+      db, response,
+      run: async () => { modelCalls++; return committedResult(); },
+    }))).rejects.toMatchObject({ code: 'INVALID_SCOPE' });
+    expect(db.events).toContain('readiness');
+    expect(db.connects).toBe(1);
+    expect(modelCalls).toBe(0);
     expect(response.body).toBe('');
   });
 
