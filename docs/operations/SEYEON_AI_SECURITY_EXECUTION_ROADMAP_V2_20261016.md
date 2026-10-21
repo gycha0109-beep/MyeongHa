@@ -4,7 +4,7 @@
 >
 > **현재 실행 기준선**: [AI 보안 종료 원장 #1866](https://github.com/gycha0109-beep/MyeongHa/issues/1866), [P0 Grant/Commit/Reveal #1843](https://github.com/gycha0109-beep/MyeongHa/issues/1843), [운영 DB/DR #1887](https://github.com/gycha0109-beep/MyeongHa/issues/1887), [G0~G6 계약](../security/SEYEON_AI_SECURITY_COMPLETION_GATES_V1.md).
 >
-> **2026-10-21 실행 기준**: [세연 Cloudflare 보안 경계 재설계](../security/SEYEON_CLOUDFLARE_WORKERS_BOUNDARY_REDESIGN_V1_20261020.md) [PR #2383](https://github.com/gycha0109-beep/MyeongHa/pull/2383)는 병합 완료. 오프라인 사전/최종 차단 [#2388](https://github.com/gycha0109-beep/MyeongHa/pull/2388), 공통 채팅 검증 [#2392](https://github.com/gycha0109-beep/MyeongHa/pull/2392), GPT Fetch 호환성 [#2394](https://github.com/gycha0109-beep/MyeongHa/pull/2394), History/Replay 경로 차단 [#2395](https://github.com/gycha0109-beep/MyeongHa/pull/2395)도 main 병합 완료. **그러나 모두 미마운트 또는 기존 503 유지, 실제 Cloudflare Workers 배포·G0-D04 기술 승인·긍정 응답 공개가 아니다.** [Ops 이관 PR #2381](https://github.com/gycha0109-beep/MyeongHa/pull/2381)의 Worker router/preview 선행 조건은 유지한다. **현재 단계/다음 실행은 §52를 우선한다. 기존 §51 R35 Provider Wire/Pin 이력은 보존한다.**
+> **2026-10-21 실행 기준**: [세연 Cloudflare 보안 경계 재설계](../security/SEYEON_CLOUDFLARE_WORKERS_BOUNDARY_REDESIGN_V1_20261020.md) [PR #2383](https://github.com/gycha0109-beep/MyeongHa/pull/2383)는 병합 완료. 오프라인 사전/최종 차단 [#2388](https://github.com/gycha0109-beep/MyeongHa/pull/2388), 공통 채팅 검증 [#2392](https://github.com/gycha0109-beep/MyeongHa/pull/2392), GPT Fetch 호환성 [#2394](https://github.com/gycha0109-beep/MyeongHa/pull/2394), History/Replay 경로 차단 [#2395](https://github.com/gycha0109-beep/MyeongHa/pull/2395)도 main 병합 완료. **그러나 모두 미마운트 또는 기존 503 유지, 실제 Cloudflare Workers 배포·G0-D04 기술 승인·긍정 응답 공개가 아니다.** [Ops 이관 PR #2381](https://github.com/gycha0109-beep/MyeongHa/pull/2381)의 Worker router/preview 선행 조건은 유지한다. **현재 보안 구현·다음 실행은 §53을 우선한다. 기존 §51 R35와 병합된 §52 Ops 라우터 오분류 방어 기록을 보존한다.**
 >
 > **개정 이유**: 10월 12일 사후복구 로드맵의 당시 HOLD 및 1730 미검증 서술을 **2026-10-16까지의 실증 결과로 갱신**하고, 역사적 로그 추적을 반복하지 않고 실제 개인정보 보호·서비스 통합·안전한 운영 적용으로 전진한다. 옛 문서의 과거 실행 기록은 보존한다. 2026-10-20에는 **기존 플랫폼 독립 권한·DB 로드맵을 유지한 채** Cloudflare Worker의 응답 전송 경계, 이관 트랙 의존성, 별도 완료 조건을 추가했다.
 
@@ -503,9 +503,17 @@ S8의 **비파괴/격리 검토는 S2~S7과 병렬 진행 가능**하며, S8 Pro
 - **기존 통합 시험:** R20의 기존 Named Disposable PG17 테스트에서 성공 시 R35의 실제 요청 serializer를 통과시키고, 같은 기존 mocked DB 회귀에서 실제 훅 호출/네트워크 0 및 모델/Body/Schema/Instruction/추가 필드 오염을 검증한다. 새 SQL/독립 DB/CI Workflow 없음.
 - **남는 승인:** R35는 본질적으로 **격리·합성·pre-dispatch deny-only**로, 실제 유료/운영 HTTP 송신, 운영 Grant·정본 SRC-25 Codec/Type, post-Preflight/Renderer/Reviewer/History/Reader/Worker의 전체 출처, G2 Production atomic Commit, G3 Reveal/Replay/D-04 최종 전송, G5/G6 및 #1887 DR을 해결하지 않는다. `G0=PROPOSED`, positive G1/G2/G3/G4/G5/G6 Production HOLD, `Projectors=[]`, `writeAdmission=DENY`, 공개·유료 Provider OFF, 운영 DB DDL/DML/Role/ACL/migrations 0.
 
-## 52. 2026-10-21 — Cloudflare 전환 전 세연 채팅 선행 코드 병합 및 남은 공개 차단
+## 52. 2026-10-21 S-CF2 진입 전 — Ops Worker Router 연계 구간의 보수적 라우트 결속 (비운영)
 
-> **최신 Security 현재 작업표.** 이 절은 §50의 2026-10-20 기준 이력을 삭제하지 않는다. Ops Cloudflare 이관 [#2381](https://github.com/gycha0109-beep/MyeongHa/pull/2381)에서 호스팅·라우터·프리뷰를 따로 실행하며, Security는 미마운트 경계 및 G0-D04/G1~G3 기술 소유권을 유지한다.
+- **실제 준비 상태:** `main`에는 Ops 소유 Worker `fetch` entrypoint/Wrangler/API dispatcher가 없고, `docs/ops/cloudflare-workers-migration-20261020` 브랜치는 Ops 단계 4 router 실행 설계 문서만 보유한다. 따라서 **S-CF2의 실제 Workers Router 마운트/실배포는 NOT_TESTED/HOLD**다. Security가 임의로 Ops Worker 프로젝트·라우터·DNS/도메인·DB/Provider 연동을 생성하지 않는다.
+- **남은 실질 결손:** S-CF1.6의 보호 chat 경로 분류/503 경계는 자체 OFFLINE 검증을 통과했지만, 향후 Ops router가 `/api/chat`을 일반 API 또는 Static Assets/HTML fallback으로 잘못 분류하면 외부 ingress/egress guard가 누락될 수 있다. `/api/readings`, `/api/memories`, `/api/life-record`, `/api/me` 등에는 세연 유래 데이터가 섞일 수 있어 Character/DB가 서명하지 않은 lineage를 nonprotected로 오인하면 안 된다.
+- **이번 코드 및 범위:** `apps/api/src/seyeon-cloudflare-ops-router-handoff-offline-v1.ts`는 **실제 Worker entrypoint가 아닌** Security 소유 함수 경계다. Ops가 서버 내부에서 결정해야 하는 `protected_chat / other_api / static_asset / unresolved_shared_lineage` 분류와 기존 chat route 분류를 교차 확인한다. 모든 chat/encoded alias는 Ops의 static/other 오분류에도 HOLD, 모든 `/api/*` static fallback 및 미확정 공동 lineage도 HOLD. 정상 `protected_chat`만 기존 first-turn preflight + 독립 final Fetch fence를 호출해 허용된 고정 4xx 또는 pre-Provider 503을 돌려준다. handler `next()`/asset/Provider callback을 전혀 받지 않으므로 positive path가 없다. 다른 명시적 API/정적 자산은 Security 소유가 아니므로 `null` 반환(**positive 권한 아님**).
+- **음성 시험:** `test/seyeon-cloudflare-ops-router-handoff-offline-v1.test.ts`에 CF-D01~05/08~10 관련 라우트 오분류·encoded chat alias·client marker·Reader/History 계통의 unresolved flag·오류 본문 차단·타 API 비간섭을 포함한다. 이 증거는 테스트에서 분류값을 주입한 **synthetic mock**이며 실제 Ops matcher/Worker 런타임의 lineage 정확성 증명이 아니다. WHATWG `Request.url` 정규화 이전의 raw dot-segment 검증은 Ops 소유 단계 4에 남는다.
+- **이어갈 순서/차단:** Ops 단계 4의 **실제** Worker API entrypoint·raw path/route matrix가 main에 등장하면, 정확한 `fetch` 반환 경계에 이 2중 fence를 끼우되 `/api/chat/:thread`는 여러 캐릭터 공유 경로이므로 DB Owner/현재 Participant 검증 없는 전역 마운트 금지. S-CF3 모델 전체 출처의 양수 고정은 실제 SRC-25 타입/코덱 및 DB Owner 승인 전 **HOLD**. `Projectors=[]`, `writeAdmission='DENY'`, first Reveal/Replay 503, G0/D-04 미서명, Provider outbound/운영 DB 쓰기·마이그레이션/Cloudflare 리소스 생성 0.
+
+## 53. 2026-10-21 — Cloudflare 전환 전 세연 채팅 선행 코드 병합 및 남은 공개 차단
+
+> **Cloudflare 사전 구현 상태 기록.** 이 절은 §50의 2026-10-20 기준 이력을 삭제하지 않는다. Ops Cloudflare 이관 [#2381](https://github.com/gycha0109-beep/MyeongHa/pull/2381)에서 호스팅·라우터·프리뷰를 따로 실행하며, Security는 미마운트 경계 및 G0-D04/G1~G3 기술 소유권을 유지한다.
 
 | 단계 | 실제 합쳐진 산출물 | PR exact HEAD / squash main | 검증과 한계 |
 | --- | --- | --- | --- |
