@@ -1508,3 +1508,44 @@ html[data-theme="dark"] body.chat-hub-page .conversation-hub-verified-empty {
     padding: 11px 13px;
   }
 }
+
+/* S4/S7 protected Reader record presentation within the same character room.
+   This card can only link to records; it never receives protected prose. */
+.character-room-v2 .conversation-paid-reader-marker {
+  display: grid;
+  gap: 9px;
+  margin-top: 8px;
+  padding: 16px 18px;
+  border: 1px solid rgba(163, 118, 61, .38);
+  border-radius: 12px;
+  background: rgba(241, 228, 207, .55);
+  color: var(--conversation-ink);
+}
+
+.character-room-v2 .conversation-paid-reader-marker-label {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--conversation-brass-dark);
+  letter-spacing: .04em;
+}
+
+.character-room-v2 .conversation-paid-reader-marker p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.65;
+  color: var(--conversation-muted);
+}
+
+.character-room-v2 .conversation-paid-reader-marker-link {
+  justify-self: start;
+  border-bottom: 1px solid currentColor;
+  color: var(--conversation-navy);
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.character-room-v2 .conversation-paid-reader-marker-link:focus-visible {
+  outline: 2px solid var(--conversation-brass);
+  outline-offset: 5px;
+}
