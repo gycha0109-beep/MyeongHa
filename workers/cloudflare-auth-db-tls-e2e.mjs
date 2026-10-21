@@ -149,9 +149,25 @@ export default {
       }
       return Response.json({pass:true,case:name,checks},{status:200,headers:hdr});
     }catch(e){
-      // Never print a DSN, PEM, password, SQL parameter, private subject or stack.
-      console.error('Isolated Auth/DB TLS worker negative gate failed');
-      return Response.json({pass:false,case:name},{status:503,headers:hdr});
+      // Error message/stack may include a DSN or password: never display them.
+      // Only reveal a narrow, allowlisted diagnostic category + error code.
+      const rawCode=typeof e?.code==='string'?e.code:
+        typeof e?.cause?.code==='string'?e.cause.code:'';
+      const safeCodes=new Set(['ENOTFOUND','EAI_AGAIN','ECONNREFUSED','ETIMEDOUT',
+        'CERT_HAS_EXPIRED','UNABLE_TO_VERIFY_LEAF_SIGNATURE',
+        'DEPTH_ZERO_SELF_SIGNED_CERT','SELF_SIGNED_CERT_IN_CHAIN',
+        'ERR_TLS_CERT_ALTNAME_INVALID','AUTH_REQUIRED',
+        'PRINCIPAL_MISMATCH','EXECUTION_ROLE_UNAVAILABLE','28P01','42501','28000']);
+      const code=safeCodes.has(rawCode)?rawCode:'UNCLASSIFIED';
+      const reason=typeof e?.message==='string'&&e.message.includes('Disposable TLS fixture binding invalid')
+        ?'ENV_BINDING':typeof e?.message==='string'&&e.message.includes('Cross-subject')
+        ?'RLS_CROSS_SUBJECT':typeof e?.message==='string'&&e.message.includes('authority role drift')
+        ?'ROLE_SHAPE':typeof e?.message==='string'&&e.message.includes('verified TLS')
+        ?'TLS_STATUS':typeof e?.message==='string'&&e.message.includes('Incorrect canonical')
+        ?'SUBJECT_MAPPING':'SOCKET_OR_QUERY';
+      console.error('Disposable TLS worker check rejected:',reason,code);
+      return Response.json({pass:false,case:name,diagnostic:{reason,code}},
+        {status:503,headers:hdr});
     }
   },
 };
