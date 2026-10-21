@@ -1,5 +1,6 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { useEffect } from 'react';
 
 import { nativeMobilePushServiceV1 } from '@/core/push/native-mobile-push-service';
@@ -16,15 +17,20 @@ function ThemedRootLayout() {
   return (
     <>
       <StatusBar style={theme === "dark" ? "light" : "dark"} />
-      <Stack
+      <SafeAreaProvider>
+        <SafeAreaView edges={['top', 'bottom']} style={{ flex: 1, backgroundColor: colors.canvas }}>
+          <Stack
         screenOptions={{
           headerShown: false,
           contentStyle: { backgroundColor: colors.canvas },
         }}
       >
-        <Stack.Screen name="(tabs)" />\n        <Stack.Screen name="birth" />
+        <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="birth" />
         <Stack.Screen name="auth/callback" />
-      </Stack>
+          </Stack>
+        </SafeAreaView>
+      </SafeAreaProvider>
     </>
   );
 }

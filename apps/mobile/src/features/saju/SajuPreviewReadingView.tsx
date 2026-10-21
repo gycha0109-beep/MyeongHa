@@ -13,6 +13,7 @@ import { mobileSajuPreviewServiceV1 } from './native-mobile-saju-preview-service
 import { mobileColors } from '@/ui/mobile-colors';
 import { MobileUiText } from '@/ui/MobileUiText';
 import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
+import { useMobileUiLocale } from '@/ui/mobile-ui-locale';
 
 type PreviewReadingTextV1 = Extract<
   MobileSajuTopicV1['availability'],
@@ -97,6 +98,7 @@ function errorCopy(error: unknown): Readonly<{ message: string; retryable: boole
 
 export function SajuPreviewReadingView({ onOpenPreview }: { onOpenPreview?: (topic: MobileSajuTopicV1) => void }) {
   const styles = useMobileThemedStyles(staticStyles);
+  const { t } = useMobileUiLocale();
   const [state, setState] = useState<PreviewStateV1>({ kind: 'idle' });
 
   async function load(
@@ -170,9 +172,9 @@ export function SajuPreviewReadingView({ onOpenPreview }: { onOpenPreview?: (top
       {MOBILE_SAJU_TOPIC_SECTIONS_V1.map((section) => (
         <View key={section.key} style={styles.topicSection}>
           <View style={styles.sectionHeading}>
-            <Text style={styles.sectionTitle}>{section.title}</Text>
+            <Text style={styles.sectionTitle}>{t(section.title)}</Text>
             {section.support ? (
-              <Text style={styles.sectionSupport}>{section.support}</Text>
+              <Text style={styles.sectionSupport}>{t(section.support)}</Text>
             ) : null}
           </View>
 
@@ -200,7 +202,7 @@ export function SajuPreviewReadingView({ onOpenPreview }: { onOpenPreview?: (top
 
                   <View style={styles.topicCopy}>
                     <View style={styles.topicTitleRow}>
-                      <Text style={styles.topicTitle}>{topic.label}</Text>
+                      <Text style={styles.topicTitle}>{t(topic.label)}</Text>
                       <View
                         style={[
                           styles.statusBadge,
@@ -217,11 +219,11 @@ export function SajuPreviewReadingView({ onOpenPreview }: { onOpenPreview?: (top
                               : styles.statusBadgeTextBlocked,
                           ]}
                         >
-                          {topic.availability.statusLabel}
+                          {t(topic.availability.statusLabel)}
                         </Text>
                       </View>
                     </View>
-                    <Text style={styles.topicDescription}>{topic.description}</Text>
+                    <Text style={styles.topicDescription}>{t(topic.description)}</Text>
                   </View>
 
                   <Text style={styles.chevron}>›</Text>
@@ -235,8 +237,8 @@ export function SajuPreviewReadingView({ onOpenPreview }: { onOpenPreview?: (top
       {state.kind === 'blocked' ? (
         <View style={styles.stateCard}>
           <MobileUiText style={styles.stateKicker}>현재 실행 범위</MobileUiText>
-          <Text style={styles.stateTitle}>{state.topic.label}</Text>
-          <Text style={styles.muted}>{state.message}</Text>
+          <Text style={styles.stateTitle}>{t(state.topic.label)}</Text>
+          <Text style={styles.muted}>{t(state.message)}</Text>
           <MobileUiText style={styles.authorityNote}>
             웹과 동일하게 권한이 열리기 전에는 다른 풀이를 대신 실행하지 않습니다.
           </MobileUiText>
@@ -246,14 +248,14 @@ export function SajuPreviewReadingView({ onOpenPreview }: { onOpenPreview?: (top
       {state.kind === 'loading' ? (
         <View style={styles.stateCard}>
           <ActivityIndicator color={mobileColors.navy} />
-          <Text style={styles.muted}>{state.topic.label} 프리뷰를 준비하고 있습니다…</Text>
+          <Text style={styles.muted}>{t('{topic} 프리뷰를 준비하고 있습니다…').replace('{topic}', t(state.topic.label))}</Text>
         </View>
       ) : null}
 
       {state.kind === 'not_delivered' ? (
         <View style={styles.stateCard}>
           <Text style={styles.stateTitle}>{state.topic.label}</Text>
-          <Text style={styles.muted}>{notDeliveredCopy(state.result.responseState)}</Text>
+          <Text style={styles.muted}>{t(notDeliveredCopy(state.result.responseState))}</Text>
           {state.result.responseState === 'temporarily_unavailable' ? (
             <Pressable
               accessibilityRole="button"

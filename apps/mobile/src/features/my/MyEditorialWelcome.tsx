@@ -34,7 +34,7 @@ export function MyEditorialWelcome({ account }: { account: MyAccountPresentation
       </View>
       <View style={styles.statusRow}>
         <View style={styles.statusDot} />
-        <Text style={styles.statusText}>{accountStatus}</Text>
+        <Text style={styles.statusText}>{t(accountStatus)}</Text>
       </View>
     </View>
   );
