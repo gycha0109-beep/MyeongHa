@@ -76,7 +76,10 @@ export function selectClaimNarrativeLocaleTemplateV1(input: Readonly<{
   if (!template || !template.text.trim()) {
     return Object.freeze({ state: 'unavailable', reason: 'template_missing' });
   }
-  // SELECT only. Mandatory qualifiers, method attribution, semantic preservation\n  // and release admission still belong to the existing authoritative renderer.\n  // Selection is not permission to publish.\n  // This function only SELECTS an exact, already approved authored template.
+  // SELECT only. Mandatory qualifiers, method attribution, semantic preservation
+  // and release admission still belong to the existing authoritative renderer.
+  // Selection is not permission to publish.
+  // This function only SELECTS an exact, already approved authored template.
   // It cannot interpolate user input, run an LLM, or change semantic provenance.
   return Object.freeze({
     state: 'selected',
