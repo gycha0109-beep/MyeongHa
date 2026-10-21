@@ -39,8 +39,7 @@ export default function HomeScreen() {
         <HomeContinuationCard card={view.continuation} />
         <HomeReadingTopics topics={view.readingTopics} />
       </ScrollView>
-    </View
-  );
+    </View>  );
 }
 
 const styles = StyleSheet.create({
