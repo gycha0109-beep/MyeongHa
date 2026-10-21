@@ -8,7 +8,6 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   FlatList,
   RefreshControl,
-  SafeAreaView,
   StyleSheet,
   Text,
   View,
@@ -129,7 +128,7 @@ export default function RecordsScreen() {
     : snapshots[tab].status === 'error' && snapshots[tab].items.length > 0;
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.canvas }]}>
+    <View style={[styles.safeArea, { backgroundColor: colors.canvas }]}>
       <FlatList
         data={items}
         refreshControl={(
@@ -188,7 +187,7 @@ export default function RecordsScreen() {
           />
         }
       />
-    </SafeAreaView>
+    </View
   );
 }
 
