@@ -22,6 +22,7 @@ import {
   type PostgresSubjectPoolV1,
 } from './postgres-subject-execution.js';
 import type {VerifiedSubjectIdentityEvidenceV1} from './subject-identity-resolver.js';
+import {validateSeyeonPostTurnAnalysisSnapshotV1} from './seyeon-post-turn-analysis-worker-v1.js';
 
 export const SEYEON_R23_OFFLINE_G2_COMMIT_V1=Object.freeze({
   database:'myeongha_seyeon_positive_pin_candidate_test',
@@ -165,11 +166,16 @@ export async function commitSeyeonR23OfflineAtomicV2V1(
       ||!PG_SHA.test(r.pgPayloadDigest)){
       throw new SeyeonR23OfflineG2CommitHoldV1();
     }
-    // Reject a forged yet format-valid post-turn digest BEFORE opening the
-    // disposable G2 transaction. This is not signed source authority.
-    const expectedPostTurnSnapshotHash='sha256:v1:'+
-      createHash('sha256').update(canonicalJson(input.postTurnSnapshot)).digest('hex');
-    if(input.postTurnSnapshotHash!==expectedPostTurnSnapshotHash)
+    // The existing official worker schema also rejects a self-consistently
+    // re-hashed but malformed or unrelated Post-turn Outbox snapshot.
+    // Its normalized envelope MUST equal the exact payload sent to R23.
+    // These checks are offline integrity only, never DB owner authority.
+    const checkedSnapshot=validateSeyeonPostTurnAnalysisSnapshotV1(
+      input.postTurnSnapshot,input.postTurnSnapshotHash,
+    );
+    if(checkedSnapshot.turnId!==input.turnId
+      ||checkedSnapshot.assistantMessageId!==input.assistantMessageId
+      ||canonicalJson(checkedSnapshot)!==canonicalJson(input.postTurnSnapshot))
       throw new SeyeonR23OfflineG2CommitHoldV1();
 
     const actual=await executePostgresSubjectTransactionV1({
