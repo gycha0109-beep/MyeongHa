@@ -200,6 +200,7 @@ export async function commitPrivateOfficialReaderPaidAnswerV1(input: {
           readerCharacterId: identity.readerCharacterId,
           readerContentBundleId: identity.readerContentBundleId,
           contentReleaseId: identity.contentReleaseId,
+          contentRevision: present.contentRevision,
           originatingGrantId,
           productId: identity.productId,
           productSpecVersion: present.productSpecVersion,
