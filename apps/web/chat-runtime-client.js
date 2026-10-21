@@ -175,7 +175,7 @@ function senderLabel(message, authoritativeCharacterId) {
 const PAID_READER_SAFE_MARKER_V1 = '유료 해설 기록이 있습니다.';
 
 function isPaidReaderSafeMarker(message) {
-  return message.senderType === 'character'
+  return message.senderType === 'system'
     && message.redacted === false
     && message.bodyText === PAID_READER_SAFE_MARKER_V1;
 }
@@ -199,7 +199,7 @@ function createStreamMessage(message, authoritativeCharacterId) {
   avatar.className = 'conversation-message-avatar';
   avatar.setAttribute('aria-hidden', 'true');
   avatar.dataset.character = message.senderType === 'character' ? 'runtime-character' : 'user';
-  avatar.textContent = message.senderType === 'user' ? '나' : '대';
+  avatar.textContent = message.senderType === 'user' ? '나' : message.senderType === 'system' ? '明' : '대';
 
   const body = document.createElement('div');
   body.className = 'conversation-message-body';
