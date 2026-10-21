@@ -25,7 +25,7 @@ export function MyProfileCard({
         <Text style={themedStyles.profileMarkText}>之</Text>
       </View>
       <View style={themedStyles.profileCopy}>
-        <Text style={themedStyles.profileName}>{profile.displayName}</Text>
+        <Text style={themedStyles.profileName}>{profile.displayName === '호칭 미설정' ? t(profile.displayName) : profile.displayName}</Text>
         <Text style={themedStyles.profileMeta}>{t(profile.subjectLabel)}</Text>
         <Text style={themedStyles.profileStatus}>{t(profile.statusLabel)}</Text>
       </View>
