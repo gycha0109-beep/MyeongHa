@@ -1,3 +1,4 @@
+import { resolveCharacterDisplayNameV1 } from './character-display-locale.js';
 import { READER_PRESENTATIONS, findReaderPresentation } from './reader-presentation-catalog.js';
 import { createDelegatePicker } from './reader-picker-dialog.js';
 import { formatStaticUi, getUiLocale, translateStaticUi } from './ui-i18n.js';
@@ -34,7 +35,7 @@ function resolveInitialReader() {
 let selectedReader = resolveInitialReader();
 function faceText(template) {
   const locale = getUiLocale();
-  return formatStaticUi(template, { reader: translateStaticUi(selectedReader.name, locale) }, locale);
+  return formatStaticUi(template, { reader: (resolveCharacterDisplayNameV1(selectedReader.key, locale) ?? selectedReader.name) }, locale);
 }
 
 function humanSize(bytes) {
@@ -52,7 +53,7 @@ function renderReader() {
   document.body.dataset.reader = selectedReader.key;
 
   for (const node of readerNameNodes) {
-    node.textContent = translateStaticUi(selectedReader.name, getUiLocale());
+    node.textContent = (resolveCharacterDisplayNameV1(selectedReader.key, getUiLocale()) ?? selectedReader.name);
   }
 
   if (readerPortrait instanceof HTMLImageElement) {

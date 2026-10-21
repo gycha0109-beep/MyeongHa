@@ -1,4 +1,5 @@
-import { resolveCanonicalCharacterPresentationV1 } from './character-presentation-identity.js';
+import { readerProvenanceLocaleLabelV1 } from './reader-provenance-locale.js';
+import { getUiLocale } from './ui-i18n.js';
 import { createRecordsRuntimeClient, RecordsRuntimeError } from './records-runtime-client.js';
 import { buildPersistedReadingHandoffUrlV1 } from './reading-history-handoff.js';
 
@@ -225,13 +226,14 @@ function isPersistedReadingOpenableState(value) {
   return value === 'delivered' || value === 'delivered_with_fallback';
 }
 
-function readerProvenanceLabel(readerCharacterIds) {
-  if (!Array.isArray(readerCharacterIds) || readerCharacterIds.length === 0) return 'Reader 기록 없음';
-  const names = readerCharacterIds.map((characterId) =>
-    resolveCanonicalCharacterPresentationV1(characterId)?.name ?? '대리자');
-  if (names.length === 1) return `${names[0]}에게`;
-  return `${names.join(' · ')}에게`;
-}
+const readerBadgeSources = new WeakMap();
+document.addEventListener('myeongha:localechange', () => {
+  // Repaint the names only: never refetch history or modify Reading authority.
+  for (const badge of document.querySelectorAll('.records-reading-badge')) {
+    const ids = readerBadgeSources.get(badge);
+    if (ids) badge.textContent = readerProvenanceLocaleLabelV1(ids, getUiLocale());
+  }
+});
 
 function appendReadingFooter(card, leftText, options = {}) {
   const footer = document.createElement('div');
@@ -262,7 +264,10 @@ function renderPersistedReading(target, reading) {
   const heading = document.createElement('div');
   const eyebrow = document.createElement('div');
   eyebrow.className = 'records-reading-eyebrow';
-  eyebrow.append(textElement('span', 'records-reading-badge', readerProvenanceLabel(reading.readerCharacterIds)));
+  const badge = textElement('span', 'records-reading-badge',
+    readerProvenanceLocaleLabelV1(reading.readerCharacterIds, getUiLocale()));
+  readerBadgeSources.set(badge, reading.readerCharacterIds);
+  eyebrow.append(badge);
   eyebrow.append(textElement('span', 'records-reading-period', productResponseStateLabel(reading.productResponseState)));
   heading.append(eyebrow, textElement('h3', 'records-reading-title', presentation.title));
   identity.append(heading);
