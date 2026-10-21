@@ -286,6 +286,11 @@ describe.skipIf(!enabled)('G2 original Grant actual-v2 two-session race, disposa
     const final=r23FinalSource(idShape);
     const id=await prepare(31,true,final.selection.selectedSourcesDigest);
     await stage(id,proof(id));
+    const postTurnSnapshot={
+      schemaVersion:'seyeon-post-turn-analysis-snapshot-v1',
+      turnId:id.turn,assistantMessageId:id.assistantMessage,
+      userMessageId:id.userMessage,
+    };
     const input={
       pool:r23Pool(),
       verifiedEvidence:{
@@ -295,12 +300,8 @@ describe.skipIf(!enabled)('G2 original Grant actual-v2 two-session race, disposa
       threadId:id.thread,turnId:id.turn,attemptId:id.attempt,
       assistantMessageId:id.assistantMessage,chatOutboxId:id.chatOutbox,
       postTurnOutboxId:id.postOutbox,
-      postTurnSnapshot:{
-        schemaVersion:'seyeon-post-turn-analysis-snapshot-v1',
-        turnId:id.turn,assistantMessageId:id.assistantMessage,
-        userMessageId:id.userMessage,
-      },
-      postTurnSnapshotHash:'sha256:v1:'+'c'.repeat(64),
+      postTurnSnapshot,
+      postTurnSnapshotHash:r23Hash(postTurnSnapshot),
       finalRetrievedMemories:final.retrievedMemories,
       finalModelContext:final.finalModelContext,
       sourceCandidates:final.sourceCandidates,
@@ -349,6 +350,19 @@ describe.skipIf(!enabled)('G2 original Grant actual-v2 two-session race, disposa
       messages:'0',outboxes:'0',admissions:'0',
       attempt_state:'validated',
     });
+    // Hash and post-turn analytical payload MUST describe the same object;
+    // reject mismatch before any Assistant, Outbox or admission can be written.
+    await expect(commitSeyeonR23OfflineAtomicV2V1({
+      ...input,postTurnSnapshotHash:'sha256:v1:'+'c'.repeat(64),
+    })).rejects.toBeInstanceOf(SeyeonR23OfflineG2CommitHoldV1);
+    await expect(commitSeyeonR23OfflineAtomicV2V1({
+      ...input,postTurnSnapshot:{...postTurnSnapshot,
+        unexpectedPrivatePayload:'unapproved derived data'},
+    })).rejects.toBeInstanceOf(SeyeonR23OfflineG2CommitHoldV1);
+    await expect(commitSeyeonR23OfflineAtomicV2V1({
+      ...input,postTurnSnapshot:{...postTurnSnapshot,
+        userMessageId:'d1000000-0000-4000-8000-000000000099'},
+    })).rejects.toBeInstanceOf(SeyeonR23OfflineG2CommitHoldV1);
     const result=await commitSeyeonR23OfflineAtomicV2V1(input);
     expect(result).toMatchObject({
       status:'disposable_atomic_v2_committed',

@@ -540,3 +540,10 @@ S8의 **비파괴/격리 검토는 S2~S7과 병렬 진행 가능**하며, S8 Pro
 - **이번 수정:** `apps/api/src/seyeon-g2-atomic-exact-final-source-commit-r23-candidate.ts`의 G2 선행 admission에 `finalModelContext`를 필수로 추가하고, 동일 최종 Memory 선택에서 서버가 생성한 **0 history / 0 relationship / preflight-not-run** 전체 Context와 정확한 정형값을 비교한다. R23의 격리 G1 후보 receipt에도 이 조립본의 `sha256:v1` 무키 digest를 요구하여 불일치 시 **DB transaction 전 HOLD**. 기존 DB Owner original Grant lock, 실제 v2 Commit, 독립 PG race 및 outbox 로직은 그대로 보존한다.
 - **검증:** 기존 명명된 폐기용 `myeongha_seyeon_positive_pin_candidate_test` PG17의 R23 테스트를 확장하여 후발 과거 대화, Disclosure, Preflight 속성, 불명 Context 추가 필드, 후보 receipt Context digest 변경을 금지한다. 거부 시 Assistant/Outbox/Admission 증가 0, 정상 합성 단일 Memory 경로만 기존 원자 Commit 성공. 새 SQL, DB clone, workflow, 외부 Provider 호출 없음.
 - **미해결:** 후보 receipt Context digest는 **DB 소유 서명/영속 positive Pin이 아니다**. R20 원본 Record/Grant/Projection Pin과 R23 `pin_and_context_ready_r4`가 운영에서 하나의 승인된 영속 출처 계약으로 연결된 것이 아니며, 정확한 SRC-25 type/codec, 전체 Preflight/Reader/History/Worker 유래, Production original Grant/Commit/Reveal, G0/D-04 Owner signed contract는 모두 HOLD. `Projectors=[]`, `writeAdmission='DENY'`, first HTTP 503, positive/paid Provider OFF, 운영 DB DDL/DML/ACL/migrations 0 유지.
+
+## 55. 2026-10-21 S4/G2 — 격리 원자적 Commit의 Post-turn Snapshot 해시 불일치 차단
+
+- **기존 결손:** R23의 `postTurnSnapshotHash`는 `sha256:v1` **문법**만 검사했으며 실제 `postTurnSnapshot` 본문과 비교하지 않았다. 이 결손은 §54의 모델 최종 Context 검증과 별개인 Post-turn Outbox 파생 데이터의 무결성이다.
+- **구현:** `canonicalJson` 및 SHA-256으로 실제 Snapshot을 해시하고 다른 값은 **DB 트랜잭션 전 HOLD**. 기존 원본 Grant lock, v2 Commit, Outbox 단일 트랜잭션 및 독립 두 세션 구조를 변경하지 않는다.
+- **기존 폐기용 DB 회귀:** 정상 Snapshot+실제 해시 Commit을 유지하고 가짜 형식상 정상 해시, 추가 비인가 Private Payload, 다른 UserMessage ID Snapshot은 Assistant/Outbox/Admission 처리 전에 거부. 신규 SQL, Workflow, DB, 외부 Provider 호출 없음.
+- **한계:** 격리·합성 후보 검증이며 운영 positive Pin/DB Owner 서명·SRC-25 실 Type/Codec·전체 파생 출처·G0-D04 전송 승인 대체 불가. `Projectors=[]`, `writeAdmission='DENY'`, first Reveal/History/Replay 503, public/paid OFF, Production DB DDL/DML/ACL/migration 0.
