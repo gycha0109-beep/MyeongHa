@@ -19,6 +19,12 @@ export function HomeBrandHeader({
   subheading: string;
 }) {
   const styles = useMobileThemedStyles(staticStyles);
+  const { t } = useMobileUiLocale();
+  const knownGreetings = ['좋은 아침이에요', '좋은 오후예요', '좋은 저녁이에요'];
+  const greetingPrefix = knownGreetings.find((prefix) => greeting.startsWith(`${prefix}, `));
+  const localizedGreeting = greetingPrefix === undefined
+    ? greeting
+    : `${t(greetingPrefix)}, ${greeting.slice(greetingPrefix.length + 2)}`;
   return (
     <View style={styles.brandSection}>
       <View style={styles.brandRow}>
@@ -31,8 +37,8 @@ export function HomeBrandHeader({
         </View>
       </View>
       <View style={styles.greetingBlock}>
-        <Text style={styles.greeting}>{greeting}</Text>
-        <Text style={styles.subheading}>{subheading}</Text>
+        <Text style={styles.greeting}>{localizedGreeting}</Text>
+        <Text style={styles.subheading}>{t(subheading)}</Text>
       </View>
     </View>
   );
