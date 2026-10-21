@@ -4,6 +4,7 @@ import {
   type PrivateOfficialReaderPaidAnswerKeyResolverV1,
 } from './official-reader-private-paid-answer-reread-v1.js';
 import type { PostgresSubjectPoolV1 } from './postgres-subject-execution.js';
+import type { OfficialReaderPrivatePrivacyLedgerPortV1 } from './official-reader-private-privacy-ledger-v1.js';
 
 export const OFFICIAL_READER_PAID_CHAT_MESSAGE_HTTP_V1 = Object.freeze({
   method: 'GET',
@@ -57,6 +58,7 @@ export interface HandleOfficialReaderPaidChatMessageHttpInputV1 {
   readonly identityEvidenceVerifier?: IdentityEvidenceVerificationPortV1;
   readonly pool?: PostgresSubjectPoolV1;
   readonly keyResolver?: PrivateOfficialReaderPaidAnswerKeyResolverV1;
+  readonly privacyLedgerPort?: OfficialReaderPrivatePrivacyLedgerPortV1;
 }
 
 /**
@@ -80,7 +82,8 @@ export async function handleOfficialReaderPaidChatMessageHttpV1(
   if (input.paidReadReleaseEnabled !== true) {
     return failure(503, 'CAPABILITY_UNAVAILABLE', 'reader.paid_unavailable', input.requestId);
   }
-  if (!input.identityEvidenceVerifier || !input.pool || !input.keyResolver) {
+  if (!input.identityEvidenceVerifier || !input.pool || !input.keyResolver
+      || !input.privacyLedgerPort) {
     return failure(503, 'CAPABILITY_UNAVAILABLE', 'reader.paid_unavailable', input.requestId);
   }
 
@@ -96,6 +99,7 @@ export async function handleOfficialReaderPaidChatMessageHttpV1(
       threadId: parsed.threadId,
       safeMessageId: parsed.safeMessageId,
       keyResolver: input.keyResolver,
+      privacyLedgerPort: input.privacyLedgerPort,
     });
     return Response.json({
       ok: true,
