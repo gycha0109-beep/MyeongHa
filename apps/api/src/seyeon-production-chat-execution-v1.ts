@@ -43,6 +43,7 @@ import {
   createSeyeonAttemptZeroPersonalProofV1,
 } from './seyeon-attempt-zero-personal-proof-v1.js';
 import type { SeyeonAttemptZeroPersonalProofV1 } from './seyeon-attempt-zero-personal-proof-v1.js';
+import type { SeyeonPositiveS0OwnerDbPortsV1 } from './postgres-seyeon-positive-memory-source-runtime-v1.js';
 import type {
   SeyeonExactModelPersonalSourceSelectionV1,
 } from './seyeon-exact-model-personal-source-selection-v1.js';
@@ -270,6 +271,8 @@ extends BaseProductionSliceInputV1 {
   readonly semanticReviewerProvider:
     RunSeyeonCharacterTurnV2Input['semanticReviewerProvider'];
   readonly persistencePort: SeyeonProductionChatPersistencePortV1;
+  /** Only the existing verified Subject runner may supply this Owner port. */
+  readonly positivePersonalSourcePort?: SeyeonPositiveS0OwnerDbPortsV1;
   readonly executionIdPort: SeyeonProductionChatExecutionIdPortV1;
   readonly relationshipSyncOutboxPort?:
     SeyeonProductionRelationshipSyncOutboxPortV1;
@@ -680,20 +683,6 @@ export async function runSeyeonProductionChatExecutionV1(
         activation,
         productionContext,
       }) => {
-        // Until exact-Grant atomic Commit is wired, do not invoke a model with
-        // any positively admitted personal Memory/Life Fact in its context.
-        assertSeyeonPersonalRecordsNotUsedBeforeUnprotectedCommitV1(
-          productionContext,
-        );
-        // Pin the server-observed EMPTY personal-record set to this exact
-        // attempt before model execution; persist it with Output Guard below.
-        const personalRecordProof = createSeyeonAttemptZeroPersonalProofV1({
-          subjectId,
-          threadId,
-          turnId: receivedTurn.turnId,
-          attemptId: attempt.attemptId,
-          context: productionContext,
-        });
         const historical = bindSeyeonProductionCharacterContextInputV1({
           base: input.baseContext,
           turnBinding,
@@ -705,9 +694,8 @@ export async function runSeyeonProductionChatExecutionV1(
           userText: receivedTurn.userText,
         });
 
-        // Exact final selection shares the runtime normalizer/sorter/cap.
-        // G1-B DB owner still must persist this set BEFORE Provider use.
-        // No personal record is authorized here: the earlier HOLD remains.
+        // Exact sorted/truncated source set used by the model, not an
+        // unbounded list from DB or an LLM-selected free-text sourceRef.
         const exactModelPersonalSources = selectSeyeonExactModelPersonalSourcesV1({
           retrievedMemories: contextInput.retrievedMemories,
           ...(contextInput.maxRetrievedMemories === undefined ? {} : {
@@ -715,23 +703,91 @@ export async function runSeyeonProductionChatExecutionV1(
           }),
           sourceCandidates: productionContext.personalRecordProjectionCandidates ?? [],
         });
-        if (exactModelPersonalSources.selectedPersonalRecordCount !== 0 ||
-            exactModelPersonalSources.permitsAtomicCommit !== false) {
-          throw new SeyeonProductionChatExecutionErrorV1(
-            'Se-yeon positive personal records require durable DB Pin and atomic Commit.',
-          );
-        }
 
-        // This is a DB durability boundary, not a Grant/Reveal approval.
-        // The owner RPC writes both exact zero markers and moves context_ready
-        // in ONE PostgreSQL transaction; a failure prevents all Providers.
-        await input.persistencePort.markContextReady({
-          subjectId,
-          turnId: receivedTurn.turnId,
-          attemptId: attempt.attemptId,
-          zeroPersonalProof: personalRecordProof,
-          exactModelSourceSelection: exactModelPersonalSources,
-        });
+        let personalRecordProof:
+          SeyeonAttemptZeroPersonalProofV1 | Readonly<Record<string, unknown>>;
+        let positiveModelCorrelation: Readonly<{
+          selectedSourcesDigest: string;
+          finalModelContextDigest: string;
+        }> | null = null;
+
+        if (exactModelPersonalSources.selectedPersonalRecordCount === 0) {
+          // Preserve every existing zero-source / unknown-derived HOLD,
+          // including candidate leftovers and unauthorized past messages.
+          assertSeyeonPersonalRecordsNotUsedBeforeUnprotectedCommitV1(
+            productionContext,
+          );
+          personalRecordProof = createSeyeonAttemptZeroPersonalProofV1({
+            subjectId,
+            threadId,
+            turnId: receivedTurn.turnId,
+            attemptId: attempt.attemptId,
+            context: productionContext,
+          });
+          await input.persistencePort.markContextReady({
+            subjectId,
+            turnId: receivedTurn.turnId,
+            attemptId: attempt.attemptId,
+            zeroPersonalProof: personalRecordProof,
+            exactModelSourceSelection: exactModelPersonalSources,
+          });
+        } else {
+          // Narrow initial G1/G2 implementation: exactly one user-approved
+          // Memory and NO untracked derived past or extra source candidate.
+          // SRC-25 approved type/projector registration is still required by
+          // the DB RPC; current registry is empty and this fails before model.
+          const source = exactModelPersonalSources.selectedSources[0];
+          const candidate = productionContext.personalRecordProjectionCandidates?.[0];
+          if (!input.positivePersonalSourcePort ||
+              exactModelPersonalSources.selectedPersonalRecordCount !== 1 ||
+              exactModelPersonalSources.selectedMemoryCount !== 1 ||
+              exactModelPersonalSources.selectedSources.length !== 1 ||
+              productionContext.personalRecordAdmissions.length !== 1 ||
+              productionContext.personalRecordAdmissions[0]?.reason !== 'ADMITTED' ||
+              productionContext.personalRecordProjectionCandidates?.length !== 1 ||
+              productionContext.retrievedMemories.length !== 1 ||
+              source?.recordKind !== 'memory' ||
+              source?.rawRecordPgDigest === undefined ||
+              source?.projectorVersion === undefined ||
+              candidate?.recordId !== source.recordId ||
+              candidate?.grantId !== source.grantId ||
+              candidate?.rawRecordPgDigest !== source.rawRecordPgDigest ||
+              candidate?.projectorVersion !== source.projectorVersion ||
+              productionContext.recentMessages.length !== 0 ||
+              productionContext.relationshipHistoryRecords.length !== 0 ||
+              productionContext.activeRelationshipEventCount !== 0 ||
+              productionContext.historyThroughRevision !== 0 ||
+              (productionContext.relationshipRevisionUsedForTurn ?? 0) !== 0) {
+            throw new SeyeonProductionChatExecutionErrorV1(
+              'Se-yeon positive memory must have one exact DB-owned original source.',
+            );
+          }
+
+          positiveModelCorrelation = Object.freeze({
+            selectedSourcesDigest: exactModelPersonalSources.selectedSourcesDigest,
+            finalModelContextDigest: sha256(contextInput),
+          });
+          // The PostgreSQL owner re-reads/locks the ORIGINAL Record+Grant,
+          // compares its raw PG-JSONB digest with the same DB-read snapshot,
+          // persists its own immutable proof and moves context_ready in one TX.
+          // If it is unavailable, no Interpreter/Renderer/Reviewer is called.
+          personalRecordProof =
+            await input.positivePersonalSourcePort.pinBeforeModel({
+              subjectId,
+              threadId,
+              turnId: receivedTurn.turnId,
+              attemptId: attempt.attemptId,
+              originalMemoryId: source.recordId,
+              originalGrantId: source.grantId,
+              recordType: source.recordType,
+              schemaVersion: source.schemaVersion,
+              projectorVersion: source.projectorVersion,
+              selectedSourcesDigest: positiveModelCorrelation.selectedSourcesDigest,
+              projectedMemoryDigest: source.projectedMemoryDigest,
+              finalModelContextDigest: positiveModelCorrelation.finalModelContextDigest,
+              expectedOriginalPgDigest: source.rawRecordPgDigest,
+            });
+        }
 
         const governance = await resolveTurnGovernance({
           execution: input,
@@ -745,6 +801,33 @@ export async function runSeyeonProductionChatExecutionV1(
         });
 
         const runtime = await runSeyeonCharacterTurnV2({
+          ...(positiveModelCorrelation === null ? {} : {
+            assertBeforeModelContext: (assembled: {
+              readonly retrievedMemories: readonly import('../../../packages/domain/src/seyeon-runtime-context-v2.js').SeyeonRetrievedMemoryV2[];
+              readonly disclosure: { readonly retrievedSources: readonly unknown[] };
+              readonly recentConversation: readonly unknown[];
+            }) => {
+              // Recompute from the FINAL assembled model context. This check
+              // runs after Preflight and before Interpreter's first Provider.
+              const actual = selectSeyeonExactModelPersonalSourcesV1({
+                retrievedMemories: assembled.retrievedMemories,
+                sourceCandidates:
+                  productionContext.personalRecordProjectionCandidates ?? [],
+              });
+              if (actual.selectedPersonalRecordCount !== 1 ||
+                  actual.selectedMemoryCount !== 1 ||
+                  actual.selectedSources.length !== 1 ||
+                  actual.selectedSourcesDigest !== positiveModelCorrelation?.selectedSourcesDigest ||
+                  assembled.retrievedMemories.length !== 1 ||
+                  assembled.disclosure.retrievedSources.length !== 0 ||
+                  assembled.recentConversation.length !== 0 ||
+                  sha256(contextInput) !== positiveModelCorrelation?.finalModelContextDigest) {
+                throw new SeyeonProductionChatExecutionErrorV1(
+                  'Se-yeon assembled model context differs from DB-pinned original Memory.',
+                );
+              }
+            },
+          }),
           assertBeforePrivateSourceDescriptorRead: assertSeyeonZeroPrivateDescriptorBeforeReadV1,
           assertBeforePrivateSourceRetrieval: assertSeyeonZeroPrivateRetrievalBeforeReadV1,
           assertGovernedPreflightSourceClosure: assertSeyeonPreflightZeroPrivateSourceClosureV1,
@@ -843,17 +926,33 @@ export async function runSeyeonProductionChatExecutionV1(
           groundingRefs: Object.freeze([]),
         });
 
-        const committed = await input.persistencePort.commitTurn({
-          subjectId,
-          threadId,
-          turnId: receivedTurn.turnId,
-          attemptId: attempt.attemptId,
-          assistantMessageId,
-          outboxEventId: input.executionIdPort.nextCommitOutboxEventId(),
-          postTurnOutboxEventId,
-          postTurnSnapshot: postTurnSnapshot.snapshot,
-          postTurnSnapshotHash: postTurnSnapshot.snapshotHash,
-        });
+        const chatOutboxEventId =
+          input.executionIdPort.nextCommitOutboxEventId();
+        const committed = positiveModelCorrelation === null
+          ? await input.persistencePort.commitTurn({
+              subjectId,
+              threadId,
+              turnId: receivedTurn.turnId,
+              attemptId: attempt.attemptId,
+              assistantMessageId,
+              outboxEventId: chatOutboxEventId,
+              postTurnOutboxEventId,
+              postTurnSnapshot: postTurnSnapshot.snapshot,
+              postTurnSnapshotHash: postTurnSnapshot.snapshotHash,
+            })
+          : await input.positivePersonalSourcePort!.commitAfterValidation({
+              subjectId,
+              threadId,
+              turnId: receivedTurn.turnId,
+              attemptId: attempt.attemptId,
+              assistantMessageId,
+              chatOutboxEventId,
+              postTurnOutboxEventId,
+              postTurnSnapshot: postTurnSnapshot.snapshot,
+              postTurnSnapshotHash: postTurnSnapshot.snapshotHash,
+              selectedSourcesDigest: positiveModelCorrelation.selectedSourcesDigest,
+              finalModelContextDigest: positiveModelCorrelation.finalModelContextDigest,
+            });
         commitState.value = committed;
 
         return Object.freeze({

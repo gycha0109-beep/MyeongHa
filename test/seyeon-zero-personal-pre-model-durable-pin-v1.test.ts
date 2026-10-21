@@ -6,12 +6,13 @@ describe('G1-B2 zero-only DB durability boundary', () => {
     const runtime = await readFile(new URL(
       '../apps/api/src/seyeon-production-chat-execution-v1.ts', import.meta.url,
     ), 'utf8');
-    const proof = runtime.indexOf('const personalRecordProof = createSeyeonAttemptZeroPersonalProofV1({');
+    const proof = runtime.indexOf('personalRecordProof = createSeyeonAttemptZeroPersonalProofV1({');
     const selection = runtime.indexOf('const exactModelPersonalSources = selectSeyeonExactModelPersonalSourcesV1({');
     const store = runtime.indexOf('await input.persistencePort.markContextReady({');
     const model = runtime.indexOf('const runtime = await runSeyeonCharacterTurnV2({');
     expect(proof).toBeGreaterThan(-1);
-    expect(selection).toBeGreaterThan(proof);
+    expect(selection).toBeGreaterThan(-1);
+    expect(proof).toBeGreaterThan(selection);
     expect(store).toBeGreaterThan(selection);
     expect(model).toBeGreaterThan(store);
     expect(runtime.slice(store, model)).toContain('zeroPersonalProof: personalRecordProof');
