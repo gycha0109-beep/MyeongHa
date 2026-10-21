@@ -80,13 +80,14 @@ export function ReadingHistoryCard({
 }) {
   const styles = useMobileThemedStyles(staticStyles);
   const openable = readingIsArchiveOpenableV1(item.productResponseState);
+  const { t } = useMobileUiLocale();
   const content = (
     <>
       <View style={styles.cardTop}>
         <Text style={styles.symbol}>命</Text>
         <Text style={styles.date}>{formatRecordDateV1(item.completedAt)}</Text>
       </View>
-      <Text style={styles.cardTitle}>{readingTitleV1(item.sajuDomain)}</Text>
+      <Text style={styles.cardTitle}>{t(readingTitleV1(item.sajuDomain))}</Text>
       <Text style={styles.cardBody}>{readingReaderLabelV1(item.readerCharacterIds)}</Text>
       <Text style={styles.state}>{readingStateLabelV1(item.productResponseState)}</Text>
       {openable && onOpen !== undefined ? (
