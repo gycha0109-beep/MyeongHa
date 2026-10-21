@@ -286,10 +286,23 @@ describe.skipIf(!enabled)('G2 original Grant actual-v2 two-session race, disposa
     const final=r23FinalSource(idShape);
     const id=await prepare(31,true,final.selection.selectedSourcesDigest);
     await stage(id,proof(id));
+    // Preserve the real producer/worker schema even for this disposable R23
+    // candidate; the simplified four-field fixture was not a valid Snapshot.
     const postTurnSnapshot={
       schemaVersion:'seyeon-post-turn-analysis-snapshot-v1',
+      mode:'OFF' as const,
       turnId:id.turn,assistantMessageId:id.assistantMessage,
       userMessageId:id.userMessage,
+      preparedAt:'2026-10-21T03:00:00.000Z',
+      productionAuthorityRef:'synthetic-r23-offline-only',
+      interpretation:{},envelope:{},eventAuthorityEvidence:{},
+      priorEvents:[],relationshipBefore:{},productionCausalBindings:[],
+      identity:{
+        experimentalEventId:id.attempt,
+        experimentalEventDedupeKey:'synthetic-r23-event',
+        productionEventId:id.chatOutbox,
+        relationshipSyncOutboxEventId:id.postOutbox,
+      },
     };
     const input={
       pool:r23Pool(),
@@ -363,6 +376,24 @@ describe.skipIf(!enabled)('G2 original Grant actual-v2 two-session race, disposa
       ...input,postTurnSnapshot:{...postTurnSnapshot,
         userMessageId:'d1000000-0000-4000-8000-000000000099'},
     })).rejects.toBeInstanceOf(SeyeonR23OfflineG2CommitHoldV1);
+    // A malicious caller can recompute SHA-256 over a substituted body.
+    // It is not thereby a valid Post-turn Snapshot or the same assistant.
+    for(const forgedSnapshot of [
+      {...postTurnSnapshot,turnId:'d1000000-0000-4000-8000-000000000099'},
+      {...postTurnSnapshot,assistantMessageId:'d1000000-0000-4000-8000-000000000098'},
+      {...postTurnSnapshot,unapprovedPrivateField:'not in the official worker schema'},
+      {...postTurnSnapshot,identity:{...postTurnSnapshot.identity,
+        unapprovedIdentity:'not admitted'}},
+      {...postTurnSnapshot,mode:'NONEXISTENT'},
+    ]){
+      await expect(commitSeyeonR23OfflineAtomicV2V1({
+        ...input,postTurnSnapshot:forgedSnapshot,
+        postTurnSnapshotHash:r23Hash(forgedSnapshot),
+      })).rejects.toBeInstanceOf(SeyeonR23OfflineG2CommitHoldV1);
+    }
+    expect(await saved(id)).toMatchObject({
+      messages:'0',outboxes:'0',admissions:'0',attempt_state:'validated',
+    });
     const result=await commitSeyeonR23OfflineAtomicV2V1(input);
     expect(result).toMatchObject({
       status:'disposable_atomic_v2_committed',

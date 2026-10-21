@@ -547,3 +547,10 @@ S8의 **비파괴/격리 검토는 S2~S7과 병렬 진행 가능**하며, S8 Pro
 - **구현:** `canonicalJson` 및 SHA-256으로 실제 Snapshot을 해시하고 다른 값은 **DB 트랜잭션 전 HOLD**. 기존 원본 Grant lock, v2 Commit, Outbox 단일 트랜잭션 및 독립 두 세션 구조를 변경하지 않는다.
 - **기존 폐기용 DB 회귀:** 정상 Snapshot+실제 해시 Commit을 유지하고 가짜 형식상 정상 해시, 추가 비인가 Private Payload, 다른 UserMessage ID Snapshot은 Assistant/Outbox/Admission 처리 전에 거부. 신규 SQL, Workflow, DB, 외부 Provider 호출 없음.
 - **한계:** 격리·합성 후보 검증이며 운영 positive Pin/DB Owner 서명·SRC-25 실 Type/Codec·전체 파생 출처·G0-D04 전송 승인 대체 불가. `Projectors=[]`, `writeAdmission='DENY'`, first Reveal/History/Replay 503, public/paid OFF, Production DB DDL/DML/ACL/migration 0.
+
+## 56. 2026-10-21 S4/G2 — G1→G2 격리 Post-turn Snapshot 형식·현재 메시지 결속
+
+- **실제 결손:** §55는 `postTurnSnapshotHash`와 JSON 본문 불일치만 차단했다. 호출자가 기존 공식 Post-turn 스키마와 다른 임의 분석 Snapshot을 만들고 스스로 SHA-256을 다시 계산하면, R23 격리 v2 Commit의 PostgreSQL 호출 전까지 **검증된 공식 Snapshot인지**, 그리고 **현재 Turn·Assistant 메시지에 연결된 것인지**를 구분하지 못했다.
+- **해결:** 현재 운영 Post-turn Worker가 이미 사용하는 `validateSeyeonPostTurnAnalysisSnapshotV1`을 R23 **오프라인** 선행 단계에서 재사용. 공식 schema/identity/typed metadata를 정형화하고 입력 본문 전체와 정확히 대조해 알 수 없는 최상위/Identity 필드를 거부한다. `turnId`와 `assistantMessageId`는 현재 원자 Commit 입력과 동일해야 한다. 공식 검증의 Snapshot hash 불일치도 **DB 접속 이전 HOLD**. 별도 승인 스키마·서명 구현 없음.
+- **격리 회귀:** 기존 R23 disposable PostgreSQL 테스트의 축약 Snapshot fixture를 **기존 Post-turn 공식 스키마** 합성 fixture로 바꾸고, 해시를 재계산한 다른 Turn·Assistant ID, 추가 최상위/Identity 데이터, 미등록 mode를 거부. 정상 기존 가짜 데이터 기반 단일 Memory 경로만 종전 v2 원자 Commit 유지. 새 SQL/migration/Workflow/DB/Provider 호출 없음.
+- **미해결/승인:** 이 검증은 `userMessageId`의 DB 원본과 모든 내부 분석/derived SourceSet 내용의 실제 소유권, Authoritative G1 Pin·G2 운영 Grant 경합·G0-D04 송출 서명을 입증하지 않는다. Character SRC-25 실제 타입/코덱, Security/API/DB 기술 Owner 승인 및 Ops Worker 실제 라우터는 여전히 HOLD. `Projectors=[]`, `writeAdmission='DENY'`, first Reveal/History/Replay 503, public/paid OFF, Production DB DDL/DML/ACL/migrations 0.
