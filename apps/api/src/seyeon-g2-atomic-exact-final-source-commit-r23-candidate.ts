@@ -165,6 +165,13 @@ export async function commitSeyeonR23OfflineAtomicV2V1(
       ||!PG_SHA.test(r.pgPayloadDigest)){
       throw new SeyeonR23OfflineG2CommitHoldV1();
     }
+    // Reject a forged yet format-valid post-turn digest BEFORE opening the
+    // disposable G2 transaction. This is not signed source authority.
+    const expectedPostTurnSnapshotHash='sha256:v1:'+
+      createHash('sha256').update(canonicalJson(input.postTurnSnapshot)).digest('hex');
+    if(input.postTurnSnapshotHash!==expectedPostTurnSnapshotHash)
+      throw new SeyeonR23OfflineG2CommitHoldV1();
+
     const actual=await executePostgresSubjectTransactionV1({
       pool:input.pool,
       verifiedEvidence:input.verifiedEvidence,
