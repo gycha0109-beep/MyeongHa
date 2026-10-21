@@ -7,6 +7,7 @@ const html = `${readFileSync(join(webRoot, 'records.html'), 'utf8')}\n${readFile
 const client = readFileSync(join(webRoot, 'records-runtime-client.js'), 'utf8');
 const page = readFileSync(join(webRoot, 'records-page.js'), 'utf8');
 const recordsLocale = readFileSync(join(webRoot, 'records-page-ui-locale.js'), 'utf8');
+const i18n = readFileSync(join(webRoot, 'ui-i18n.js'), 'utf8');
 const handoff = readFileSync(join(webRoot, 'reading-history-handoff.js'), 'utf8');
 
 describe('web records authority boundary', () => {
@@ -69,6 +70,9 @@ describe('web records authority boundary', () => {
     expect(page).toContain('textContent');
     expect(page).not.toContain('innerHTML');
     expect(page).not.toContain('insertAdjacentHTML');
+    expect(page).toContain("element.dataset.recordsSource = ''");
+    expect(page).toContain("nameNode.dataset.recordsSource = ''");
+    expect(i18n).toContain('[data-records-source]');
   });
 
   it('opens the Saju records tab for an explicit Reading completion handoff', () => {
