@@ -10,6 +10,10 @@ import { createProductionGuestBootstrapHttpRuntimeV1 } from '../apps/api/src/pro
 import { createProductionCurrentSubjectProfileRuntimeV1 } from '../apps/api/src/production-current-subject-profile-runtime.ts';
 import { createProductionBirthProfileReadRuntimeV1 } from '../apps/api/src/production-birth-profile-read-runtime.ts';
 import { createProductionBirthProfileCreateRuntimeV1 } from '../apps/api/src/production-birth-profile-create-runtime.ts';
+import { createProductionGuestPromotionRuntimeV1 } from '../apps/api/src/production-guest-promotion-runtime.ts';
+import { createProductionCurrentSubjectBirthProfileRuntimeV1 } from '../apps/api/src/production-current-subject-birth-profile-runtime.ts';
+import { handleSocialAuthStartRequestV1 } from '../apps/api/src/social-auth-start-http.ts';
+import { handleNaverOAuthBridgeRequestV1 } from '../apps/api/src/naver-oauth-bridge-http.ts';
 
 const EXACT_MODE = 'approved-auth-db-v1';
 const AUTH_ACTIONS = Object.freeze({
@@ -17,6 +21,13 @@ const AUTH_ACTIONS = Object.freeze({
   'api.auth.sign-up': 'sign-up',
   'api.auth.refresh': 'refresh',
   'api.auth.sign-out': 'sign-out',
+});
+
+const NAVER_ACTIONS = Object.freeze({
+  'rewrite.naver.authorize': 'authorize',
+  'rewrite.naver.callback': 'callback',
+  'rewrite.naver.token': 'token',
+  'rewrite.naver.userinfo': 'userinfo',
 });
 
 const SECURITY_HEADERS = Object.freeze({
@@ -84,19 +95,31 @@ export async function tryHandleCloudflareApprovedAuthV1(request, bindings, route
   const isMemberProfile = route?.id === 'api.me';
   const isBirthCreate = route?.id === 'api.birth-profiles';
   const isBirthRead = route?.id === 'rewrite.birth-profile.id';
-  if (action === null && !isGuestBootstrap && !isMemberProfile && !isBirthCreate && !isBirthRead) return null;
+  const isGuestPromotion = route?.id === 'api.auth.promote-guest';
+  const isCurrentBirth = route?.id === 'api.me.birth-profile';
+  const isSocialStart = route?.id === 'rewrite.social.start';
+  const naverAction = Object.hasOwn(NAVER_ACTIONS, route?.id) ? NAVER_ACTIONS[route.id] : null;
+  if (action === null && !isGuestBootstrap && !isMemberProfile && !isBirthCreate && !isBirthRead &&
+      !isGuestPromotion && !isCurrentBirth && !isSocialStart && naverAction === null) return null;
   const origin = selectedOrigin(request, bindings);
   if (origin === null) return null;
   const url = new URL(request.url);
-  if (url.search !== '') return denied();
-  const expectedMethod = (isMemberProfile || isBirthRead) ? 'GET' : 'POST';
+  // The Naver provider's authorize/callback requests legitimately contain query
+  // parameters; the existing bridge validates every required parameter/state.
+  // All other endpoints reject internal Vercel rewrite markers and query spoofing.
+  if (url.search !== '' && naverAction === null) return denied();
+  const expectedMethod = (isMemberProfile || isBirthRead || isCurrentBirth ||
+    (naverAction !== null && naverAction !== 'token')) ? 'GET' : 'POST';
   if (request.method !== expectedMethod) {
     return new Response(null, {
       status: 405,
       headers: { ...SECURITY_HEADERS, Allow: expectedMethod },
     });
   }
-  if (!sameOriginFormPost(request, origin)) return denied();
+  // OAuth GET callbacks originate at the provider. Only unsafe POST methods
+  // require browser same-origin provenance; the Naver callback validates
+  // its sealed state and PKCE in the existing handler.
+  if (request.method === 'POST' && !sameOriginFormPost(request, origin)) return denied();
 
   try {
     parseProductionUserDataRuntimeConfigV1(bindings);
@@ -137,6 +160,33 @@ export async function tryHandleCloudflareApprovedAuthV1(request, bindings, route
         request,
         requestId: crypto.randomUUID(),
         serverTime: new Date().toISOString(),
+      });
+    } else if (isGuestPromotion) {
+      runtime = createProductionGuestPromotionRuntimeV1({ env: bindings });
+      result = await runtime.handleRequest({
+        request,
+        requestId: crypto.randomUUID(),
+        serverTime: new Date().toISOString(),
+      });
+    } else if (isCurrentBirth) {
+      runtime = createProductionCurrentSubjectBirthProfileRuntimeV1({ env: bindings });
+      result = await runtime.handleRequest({
+        request,
+        requestId: crypto.randomUUID(),
+        serverTime: new Date().toISOString(),
+      });
+    } else if (isSocialStart) {
+      result = await handleSocialAuthStartRequestV1({
+        request,
+        env: bindings,
+        webOrigin: origin,
+      });
+    } else if (naverAction !== null) {
+      result = await handleNaverOAuthBridgeRequestV1({
+        request,
+        action: naverAction,
+        env: bindings,
+        webOrigin: origin,
       });
     } else if (action === 'sign-out') {
       result = await handleSupabaseAuthRequestV1({ request, env: bindings, action });
