@@ -170,6 +170,16 @@ function senderLabel(message, authoritativeCharacterId) {
   return '대화 기록';
 }
 
+// The only permitted ordinary-Chat body for an S4 paid interpretation is an
+// inert status marker. A protected response never arrives in this Chat read.
+const PAID_READER_SAFE_MARKER_V1 = '유료 해설 기록이 있습니다.';
+
+function isPaidReaderSafeMarker(message) {
+  return message.senderType === 'character'
+    && message.redacted === false
+    && message.bodyText === PAID_READER_SAFE_MARKER_V1;
+}
+
 function safeMessageText(message) {
   if (message.redacted === true) return '삭제된 메시지입니다.';
   if (typeof message.bodyText === 'string' && message.bodyText.trim().length > 0) return message.bodyText;
@@ -203,9 +213,28 @@ function createStreamMessage(message, authoritativeCharacterId) {
   if (typeof message.createdAt === 'string') time.dateTime = message.createdAt;
   heading.append(strong, time);
 
-  const paragraph = document.createElement('p');
-  paragraph.textContent = safeMessageText(message);
-  body.append(heading, paragraph);
+  if (isPaidReaderSafeMarker(message)) {
+    // The ordinary room displays no paid prose, source hash, purchase ID or
+    // unlock affordance. Records uses its own server-owned Reader access.
+    article.dataset.paidReaderMarker = 'true';
+    const marker = document.createElement('div');
+    marker.className = 'conversation-paid-reader-marker';
+    const badge = document.createElement('span');
+    badge.className = 'conversation-paid-reader-marker-label';
+    badge.textContent = '보호된 사주 해설';
+    const copy = document.createElement('p');
+    copy.textContent = '유료 사주 해설의 기록입니다. 현재 이용권이 확인되어야 내용을 볼 수 있습니다.';
+    const link = document.createElement('a');
+    link.className = 'conversation-paid-reader-marker-link';
+    link.href = 'records.html';
+    link.textContent = '내 기록 확인하기 →';
+    marker.append(badge, copy, link);
+    body.append(heading, marker);
+  } else {
+    const paragraph = document.createElement('p');
+    paragraph.textContent = safeMessageText(message);
+    body.append(heading, paragraph);
+  }
   article.append(avatar, body);
   return article;
 }
