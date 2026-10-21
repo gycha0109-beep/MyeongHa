@@ -64,3 +64,11 @@
 - **HOLD:** Workers→접근 가능한 실제 격리 DB TLS/RLS, preview OAuth/Web/모바일 콜백 등록, refresh cookie host 이동, positive `/api/auth/*`, `/api/me` 및 private `/api/readiness`.
 - **필요 승인:** 격리 DB 접속 target 및 비용·credential scope, 별도 정확한 HTTPS Auth origin, 공급자별 redirect/callback 허용 URL, Security/API/DB 기술 수락. **미정값은 미정으로 유지.**
 - **기존 운영 불변:** Vercel, Supabase production schema/credential, Naver/Google/Kakao provider 설정, Workers production routing, DNS, Saju, Seyeon AI, PortOne 결제는 변경하지 않는다.
+
+## 6. 테스트 전용 환경 결정 — 사용자 지시 (2026-10-21)
+
+- **테스트만을 위한 DB는 로컬 Docker Desktop/Linux Docker에서만 구성한다.** 새 클라우드 PostgreSQL, 외부에서 접근 가능한 테스트용 DB, Hyperdrive 리소스, OAuth용 새 공개 도메인·유료 리소스를 이 단계에서 **생성하지 않는다**. 사용자 테스트 환경을 이유로 Production 자격증명이나 DB를 재사용하지 않는다.
+- Windows/Linux 로컬 실행 준비: Node 24, 로컬 Docker 엔진, 사전 보유한 `postgres:15` 이미지, 프로젝트 `npm ci --ignore-scripts`. `npm run test:cloudflare:auth-db:docker-local`은 로컬 socket/npipe만 수락하고 `127.0.0.1` 임의 포트에만 일회용 PostgreSQL을 연다. 외부 이미지 자동 pull 없음.
+- 실행 중 ephemeral CA·SAN 인증서 및 비특권 DB 계정과 합성 Member A/B 데이터를 생성한다. 실제 TLS handshake, CA/hostname 부정 검사, `SET LOCAL ROLE`, canonical subject/RLS, rollback·교차 사용자 읽기 차단을 기존 E2E 테스트로 검증한다. **완료 시 고유 Docker 컨테이너/익명 데이터 볼륨/CA 볼륨/임시 인증서 파일을 제거**하며 다른 Docker 프로젝트는 건드리지 않는다.
+- 사용자 PC의 Docker Desktop은 이 GitHub 채팅 커넥터에서 직접 실행할 수 없다. **이 스크립트는 로컬 실행용으로 준비된 것이며 실제 사용자 PC 실행 PASS 증거는 아직 없다.** 기존 GitHub Actions 일회용 DB E2E의 PASS와 혼동하지 않는다.
+- Workers TCP는 localhost/private IP에 직접 접속할 수 없으므로 Docker 테스트 성공을 Cloudflare Workers→DB 연결 성공으로 승격하지 않는다. **이 단계의 목적은 로컬 Node/PostgreSQL 보안 정책 입증**이다. 원격 DB·OAuth가 꼭 필요한 후속 런타임/공개 단계는 별도 승인까지 HOLD하며 로컬 Docker로 공개 서비스 연결을 우회하지 않는다.

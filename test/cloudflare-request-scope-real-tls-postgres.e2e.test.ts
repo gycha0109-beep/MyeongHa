@@ -20,10 +20,16 @@ const SUBJECT_B = '8c320002-0000-4000-8000-000000000002';
 
 function requireIsolatedFixture() {
   const env = process.env;
-  if (env.CI !== 'true' || env.GITHUB_ACTIONS !== 'true' ||
-    env.MYEONGHA_CLOUDFLARE_DIRECT_TLS_CI_ENABLED !== '1' ||
-    env.PGHOST !== '127.0.0.1' || env.PGPORT !== '5432' ||
-    env.PGDATABASE !== 'myeongha_saju_local_verify' ||
+  const githubCi = env.CI === 'true' && env.GITHUB_ACTIONS === 'true' &&
+    env.MYEONGHA_CLOUDFLARE_DIRECT_TLS_CI_ENABLED === '1' &&
+    env.PGHOST === '127.0.0.1' && env.PGPORT === '5432' &&
+    env.PGDATABASE === 'myeongha_saju_local_verify';
+  const localDocker = env.MYEONGHA_CLOUDFLARE_DIRECT_TLS_LOCAL_DOCKER_ENABLED === '1' &&
+    typeof env.MYEONGHA_LOCAL_CLOUDFLARE_DB_PORT === 'string' &&
+    Number.isSafeInteger(Number(env.MYEONGHA_LOCAL_CLOUDFLARE_DB_PORT)) &&
+    Number(env.MYEONGHA_LOCAL_CLOUDFLARE_DB_PORT) >= 1 &&
+    Number(env.MYEONGHA_LOCAL_CLOUDFLARE_DB_PORT) <= 65535;
+  if (!(githubCi || localDocker) ||
     !env.MYEONGHA_LOCAL_TLS_SUBJECT_PASSWORD ||
     !env.MYEONGHA_LOCAL_TLS_SUBJECT_CA_FILE ||
     !env.MYEONGHA_LOCAL_TLS_SUBJECT_WRONG_CA_FILE ||
@@ -39,10 +45,16 @@ function requireIsolatedFixture() {
 }
 
 function options(fixture: ReturnType<typeof requireIsolatedFixture>): PoolConfig {
+  const local = process.env.MYEONGHA_CLOUDFLARE_DIRECT_TLS_LOCAL_DOCKER_ENABLED === '1';
   return {
-    host: TLS_HOST, port: 5444, database: TLS_DB, user: LOGIN,
+    host: local ? '127.0.0.1' : TLS_HOST,
+    port: local ? Number(process.env.MYEONGHA_LOCAL_CLOUDFLARE_DB_PORT) : 5444,
+    database: TLS_DB, user: LOGIN,
     password: fixture.password,
-    ssl: { ca: fixture.ca, rejectUnauthorized: true },
+    // Local Docker has no synthetic /etc/hosts entry: connect to loopback,
+    // but verify the exact governed test SAN with explicit TLS servername.
+    ssl: { ca: fixture.ca, rejectUnauthorized: true,
+      ...(local ? { servername: TLS_HOST } : {}) },
     max: 1, connectionTimeoutMillis: 5000, idleTimeoutMillis: 1000,
     statement_timeout: 5000,
   };
@@ -116,16 +128,24 @@ async function mustReject(config: PoolConfig) {
 }
 
 // Ordinary CI intentionally has no disposable PostgreSQL credentials.
-// Run ONLY from the isolated CI job that creates the real TLS fixture.
+// Only the isolated GitHub job or the dedicated local Docker runner enables this.
 const isIsolatedDbCi = process.env.MYEONGHA_CLOUDFLARE_DIRECT_TLS_CI_ENABLED === '1';
-describe.skipIf(!isIsolatedDbCi)(
+const isLocalDocker = process.env.MYEONGHA_CLOUDFLARE_DIRECT_TLS_LOCAL_DOCKER_ENABLED === '1';
+describe.skipIf(!(isIsolatedDbCi || isLocalDocker))(
   'Cloudflare Stage 5 request-scoped Node adapter to disposable REAL PostgreSQL TLS/RLS',()=>{
   // This is Node against a localhost fixture, NOT Worker TCP or Production.
   // It cannot satisfy the Worker outbound network or Production CA approvals.
   it('confirms CA fingerprint and an actual PostgreSQL TLS handshake before SET ROLE',async()=>{
     const fixture=requireIsolatedFixture();
-    expect(options(fixture).ssl).toEqual({ca:fixture.ca,rejectUnauthorized:true});
-    expect(options(fixture)).toMatchObject({host:TLS_HOST,port:5444,max:1});
+    expect(options(fixture).ssl).toEqual({
+      ca:fixture.ca,rejectUnauthorized:true,
+      ...(isLocalDocker ? { servername:TLS_HOST } : {}),
+    });
+    expect(options(fixture)).toMatchObject({
+      host:isLocalDocker?'127.0.0.1':TLS_HOST,
+      port:isLocalDocker?Number(process.env.MYEONGHA_LOCAL_CLOUDFLARE_DB_PORT):5444,
+      max:1,
+    });
     const pool=new Pool(options(fixture));
     try{
       const tls=(await pool.query<{ssl:boolean;version:string}>(
@@ -180,8 +200,13 @@ describe.skipIf(!isIsolatedDbCi)(
   it('rejects CA swap, TLS DNS SAN mismatch and cleartext Postgres',async()=>{
     const fixture=requireIsolatedFixture();
     const config=options(fixture);
-    await mustReject({...config,ssl:{ca:fixture.wrongCa,rejectUnauthorized:true}});
-    await mustReject({...config,host:WRONG_HOST});
+    await mustReject({...config,ssl:{
+      ca:fixture.wrongCa,rejectUnauthorized:true,
+      ...(isLocalDocker ? {servername:TLS_HOST} : {}),
+    }});
+    await mustReject(isLocalDocker
+      ? {...config,ssl:{ca:fixture.ca,rejectUnauthorized:true,servername:WRONG_HOST}}
+      : {...config,host:WRONG_HOST});
     await mustReject({...config,ssl:false});
   });
 

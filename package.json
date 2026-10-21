@@ -75,7 +75,8 @@
     "verify:cloudflare:local": "node scripts/verify-cloudflare-wrangler-local.mjs",
     "verify:cloudflare:auth-db:local": "node scripts/verify-cloudflare-auth-db-local.mjs",
     "test:cloudflare:scope": "node node_modules/vitest/vitest.mjs run test/cloudflare-request-subject-scope.test.ts",
-    "test:cloudflare:direct-db": "node node_modules/vitest/vitest.mjs run test/cloudflare-direct-postgres-candidate.test.ts"
+    "test:cloudflare:direct-db": "node node_modules/vitest/vitest.mjs run test/cloudflare-direct-postgres-candidate.test.ts",
+    "test:cloudflare:auth-db:docker-local": "node scripts/local/verify-cloudflare-auth-db-docker-local.mjs"
   },
   "dependencies": {
     "@vercel/oidc": "3.2.0",
