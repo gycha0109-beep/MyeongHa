@@ -335,7 +335,7 @@ describe.skipIf(!enabled)('G2 original Grant actual-v2 two-session race, disposa
       {...input.finalModelContext,
         disclosure:{decision:{kind:'unapproved'},retrievedSources:[]}},
       {...input.finalModelContext,unapprovedPrivateField:'not pinned'},
-    ]){
+    ] as unknown as (typeof input.finalModelContext)[]){
       await expect(commitSeyeonR23OfflineAtomicV2V1({
         ...input,finalModelContext,
       })).rejects.toBeInstanceOf(SeyeonR23OfflineG2CommitHoldV1);
