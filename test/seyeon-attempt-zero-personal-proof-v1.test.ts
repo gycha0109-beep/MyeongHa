@@ -124,16 +124,19 @@ describe('Se-yeon server-owned zero-record attempt provenance', () => {
       new URL('../apps/api/src/seyeon-production-chat-execution-v1.ts', import.meta.url),
       'utf8',
     );
-    const minted = runtime.indexOf('const personalRecordProof = createSeyeonAttemptZeroPersonalProofV1({');
+    const minted = runtime.indexOf('personalRecordProof = createSeyeonAttemptZeroPersonalProofV1({');
     const model = runtime.indexOf('const runtime = await runSeyeonCharacterTurnV2({');
     const validate = runtime.indexOf('await input.persistencePort.persistValidated({');
     const persist = runtime.indexOf('personalRecordProvenance: personalRecordProof,');
-    const commit = runtime.indexOf('const committed = await input.persistencePort.commitTurn({');
+    const commit = runtime.indexOf('const committed = positiveModelCorrelation === null');
     expect(minted).toBeGreaterThan(-1);
     expect(model).toBeGreaterThan(minted);
     expect(validate).toBeGreaterThan(model);
     expect(persist).toBeGreaterThan(validate);
     expect(commit).toBeGreaterThan(persist);
+    const positivePin = runtime.indexOf('await input.positivePersonalSourcePort.pinBeforeModel({');
+    expect(positivePin).toBeGreaterThan(minted);
+    expect(positivePin).toBeLessThan(model);
 
     const sql = await readFile(
       new URL('../supabase/migrations/0220_chat_attempt_commit_commands.sql', import.meta.url),
