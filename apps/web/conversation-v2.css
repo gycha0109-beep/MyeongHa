@@ -1549,3 +1549,55 @@ html[data-theme="dark"] body.chat-hub-page .conversation-hub-verified-empty {
   outline: 2px solid var(--conversation-brass);
   outline-offset: 5px;
 }
+
+/* S7: Paid Reader content stays inside an ephemeral, member-authorized
+   reveal. Never put the revealed text inside ordinary Chat message payloads. */
+.character-room-v2 .conversation-paid-reader-reveal-button {
+  justify-self: start;
+  min-height: 42px;
+  padding: 8px 15px;
+  border: 1px solid var(--conversation-brass);
+  border-radius: 8px;
+  background: var(--conversation-navy);
+  color: #fff8ef;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.character-room-v2 .conversation-paid-reader-reveal-button:disabled {
+  cursor: progress;
+  opacity: .65;
+}
+
+.character-room-v2 .conversation-paid-reader-reveal-button:focus-visible {
+  outline: 2px solid var(--conversation-brass);
+  outline-offset: 3px;
+}
+
+.character-room-v2 .conversation-paid-reader-reveal-status {
+  min-height: 0;
+  color: var(--conversation-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.character-room-v2 .conversation-paid-reader-revealed-body {
+  max-height: min(42vh, 400px);
+  overflow: auto;
+  padding: 14px 16px;
+  border: 1px solid rgba(163, 118, 61, .25);
+  border-radius: 10px;
+  background: var(--conversation-paper-soft);
+  color: var(--conversation-ink);
+  font-size: 15px;
+  line-height: 1.85;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+
+.character-room-v2 .conversation-paid-reader-revealed-body[hidden] {
+  display: none !important;
+}
