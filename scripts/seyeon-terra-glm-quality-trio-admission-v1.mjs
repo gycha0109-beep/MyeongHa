@@ -1,20 +1,20 @@
 import {execFileSync} from 'node:child_process';
 
 const REPO='gycha0109-beep/MyeongHa';
-const WORKFLOW='seyeon-terra-glm-visible-public-n01-one-shot-v1.yml';
+const WORKFLOW='seyeon-terra-glm-quality-trio-one-shot-v1.yml';
 const sha=/^[a-f0-9]{40}$/u;
 const runId=/^[1-9][0-9]*$/u;
 const BASELINE_SHA='d169ac46fcd67cc225ac7adc8f5c1d6b4f9941de';
 const GLM_SHA='1715c4968f56391c05df160984a396501b8be151';
 
-export const SEYEON_TERRA_GLM_PUBLIC_N01_PRIOR_RESERVED_MICRO_USD=976554;
-export const SEYEON_TERRA_GLM_PUBLIC_N01_TERRA_RESERVE_MICRO_USD=80000;
-export const SEYEON_TERRA_GLM_PUBLIC_N01_GLM_RESERVE_MICRO_USD=20000;
-export const SEYEON_TERRA_GLM_PUBLIC_N01_OWNER_BUDGET_KRW=5000;
-export const SEYEON_TERRA_GLM_PUBLIC_N01_FX_MAX=2500;
-export const SEYEON_TERRA_GLM_PUBLIC_N01_MAX_CALLS=8;
+export const SEYEON_TERRA_GLM_QUALITY_TRIO_PRIOR_RESERVED_MICRO_USD=976554;
+export const SEYEON_TERRA_GLM_QUALITY_TRIO_TERRA_RESERVE_MICRO_USD=50000;
+export const SEYEON_TERRA_GLM_QUALITY_TRIO_GLM_RESERVE_MICRO_USD=20000;
+export const SEYEON_TERRA_GLM_QUALITY_TRIO_OWNER_BUDGET_KRW=5000;
+export const SEYEON_TERRA_GLM_QUALITY_TRIO_FX_MAX=2500;
+export const SEYEON_TERRA_GLM_QUALITY_TRIO_MAX_CALLS=8;
 
-export function assertTerraGlmVisibleN01OneShotV1(env,history,terraPr,terraRun,glmPr,glmRun){
+export function assertTerraGlmQualityTrioOneShotV1(env,history,terraPr,terraRun,glmPr,glmRun){
  if(env?.GITHUB_REPOSITORY!==REPO||env.GITHUB_REF!=='refs/heads/main'||
     env.GITHUB_EVENT_NAME!=='push'||env.GITHUB_RUN_ATTEMPT!=='1'||
     !sha.test(env.GITHUB_SHA??'')||!runId.test(env.GITHUB_RUN_ID??'')||
@@ -28,26 +28,26 @@ export function assertTerraGlmVisibleN01OneShotV1(env,history,terraPr,terraRun,g
     glmRun?.id!==39560101607||glmRun.status!=='completed'||
     glmRun.conclusion!=='success'||glmRun.run_attempt!==1||
     glmRun.head_sha!==GLM_SHA)
-  throw Error('TERRA_GLM_VISIBLE_N01_ADMISSION_HOLD');
+  throw Error('TERRA_GLM_QUALITY_TRIO_ADMISSION_HOLD');
  const run=history.workflow_runs[0];
  if(String(run.id)!==env.GITHUB_RUN_ID||run.head_sha!==env.GITHUB_SHA||
     run.event!=='push'||run.head_branch!=='main'||run.run_attempt!==1)
-  throw Error('TERRA_GLM_VISIBLE_N01_DUPLICATE_OR_RETRY_HOLD');
- if((SEYEON_TERRA_GLM_PUBLIC_N01_PRIOR_RESERVED_MICRO_USD+
-      5*SEYEON_TERRA_GLM_PUBLIC_N01_TERRA_RESERVE_MICRO_USD+
-      3*SEYEON_TERRA_GLM_PUBLIC_N01_GLM_RESERVE_MICRO_USD)*
-      SEYEON_TERRA_GLM_PUBLIC_N01_FX_MAX/1e6>
-      SEYEON_TERRA_GLM_PUBLIC_N01_OWNER_BUDGET_KRW)
-   throw Error('TERRA_GLM_VISIBLE_N01_OWNER_BUDGET_HOLD');
+  throw Error('TERRA_GLM_QUALITY_TRIO_DUPLICATE_OR_RETRY_HOLD');
+ if((SEYEON_TERRA_GLM_QUALITY_TRIO_PRIOR_RESERVED_MICRO_USD+
+      15*SEYEON_TERRA_GLM_QUALITY_TRIO_TERRA_RESERVE_MICRO_USD+
+      9*SEYEON_TERRA_GLM_QUALITY_TRIO_GLM_RESERVE_MICRO_USD)*
+      SEYEON_TERRA_GLM_QUALITY_TRIO_FX_MAX/1e6>
+      SEYEON_TERRA_GLM_QUALITY_TRIO_OWNER_BUDGET_KRW)
+   throw Error('TERRA_GLM_QUALITY_TRIO_OWNER_BUDGET_HOLD');
  return Object.freeze({runId:env.GITHUB_RUN_ID,mainSha:env.GITHUB_SHA});
 }
 
-export function admitTerraGlmVisibleN01OneShotV1(env=process.env,exec=execFileSync){
- if(!env.GH_TOKEN)throw Error('TERRA_GLM_VISIBLE_N01_GH_TOKEN_HOLD');
+export function admitTerraGlmQualityTrioOneShotV1(env=process.env,exec=execFileSync){
+ if(!env.GH_TOKEN)throw Error('TERRA_GLM_QUALITY_TRIO_GH_TOKEN_HOLD');
  const get=p=>JSON.parse(exec('gh',['api',p],{
   env,encoding:'utf8',timeout:15000,maxBuffer:2000000,
  }));
- return assertTerraGlmVisibleN01OneShotV1(env,
+ return assertTerraGlmQualityTrioOneShotV1(env,
   get('repos/'+REPO+'/actions/workflows/'+WORKFLOW+'/runs?event=push&per_page=100'),
   get('repos/'+REPO+'/pulls/2355'),
   get('repos/'+REPO+'/actions/runs/39352712484'),
@@ -57,7 +57,7 @@ export function admitTerraGlmVisibleN01OneShotV1(env=process.env,exec=execFileSy
 
 // This explicitly accepts only guarded public synthetic N01. Not a general
 // user-message or character-content release primitive.
-export function requirePublicSyntheticN01UtteranceV1(envelope){
+export function requirePublicSyntheticQualityUtteranceV1(envelope){
  if(envelope?.revealLevel!=='public'||!Array.isArray(envelope.memoryRefsMentioned)||
     envelope.memoryRefsMentioned.length!==0||
     !Array.isArray(envelope.privateSourceRefsMentioned)||
@@ -69,6 +69,6 @@ export function requirePublicSyntheticN01UtteranceV1(envelope){
     envelope.utterance.length<1||envelope.utterance.length>500||
     !/[가-힣]/u.test(envelope.utterance)||
     /[\u0000-\u001f\u007f]/u.test(envelope.utterance))
-  throw Error('TERRA_GLM_VISIBLE_N01_OUTPUT_GUARD_HOLD');
+  throw Error('TERRA_GLM_QUALITY_TRIO_OUTPUT_GUARD_HOLD');
  return envelope.utterance;
 }

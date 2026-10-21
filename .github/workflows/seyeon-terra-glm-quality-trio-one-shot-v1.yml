@@ -1,15 +1,15 @@
-name: '[WT:character-memory] Terra versus GLM public N01 owner-visible dialogue'
+name: '[WT:character-memory] Terra versus GLM three public persona cases owner-visible dialogue'
 on:
   push:
     branches:
       - main
     paths:
-      - '.github/seyeon-terra-glm-visible-public-n01.trigger'
+      - '.github/seyeon-terra-glm-quality-trio.trigger'
 permissions:
   contents: read
   actions: read
 concurrency:
-  group: seyeon-terra-glm-visible-public-n01-lifetime-once
+  group: seyeon-terra-glm-quality-trio-lifetime-once
   cancel-in-progress: false
 jobs:
   evaluate:
@@ -32,9 +32,9 @@ jobs:
         run: |
           set -euo pipefail
           npm ci --ignore-scripts --no-audit --no-fund
-          npx vitest run test/seyeon-terra-glm-visible-public-n01-v1.test.mjs test/seyeon-live-dialogue-owner-key-first-pair-v1.test.mjs test/seyeon-openrouter-glm53flash-paid-preflight-v1.test.mjs test/openrouter-seyeon-evaluation-provider-v1.test.ts
+          npx vitest run test/seyeon-terra-glm-quality-trio-v1.test.mjs test/seyeon-live-dialogue-owner-key-first-pair-v1.test.mjs test/seyeon-openrouter-glm53flash-paid-preflight-v1.test.mjs test/openrouter-seyeon-evaluation-provider-v1.test.ts
           npm run build
-          node --check scripts/run-seyeon-terra-glm-visible-public-n01-v1.mjs
+          node --check scripts/run-seyeon-terra-glm-quality-trio-v1.mjs
       - name: One bounded pair with public-only guarded dialogue reveal
         env:
           GH_TOKEN: ${{ github.token }}
@@ -45,12 +45,12 @@ jobs:
           set +x
           test -n "$OPENAI_API_KEY"
           test -n "$OPENROUTER_API_KEY"
-          node scripts/run-seyeon-terra-glm-visible-public-n01-v1.mjs
+          node scripts/run-seyeon-terra-glm-quality-trio-v1.mjs
       - name: Upload numeric-only evidence excluding dialogue texts
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: seyeon-terra-glm-visible-public-n01-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/seyeon-terra-glm-visible-public-n01/
+          name: seyeon-terra-glm-quality-trio-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/seyeon-terra-glm-quality-trio/
           if-no-files-found: warn
           retention-days: 14
