@@ -2361,10 +2361,7 @@ f_grant="$(p -c "select g.id from public.entitlement_grants g where g.source_rec
 
 # Replay the same verified cancellation under the stored bound Reader S1.
 # Its idempotency must not produce a second provider or Grant revoke event.
-p >"$tmpdir/f-bound-refund-retry.out" 2>&1 <<SQL || {
- cat "$tmpdir/f-bound-refund-retry.out" >&2
- fail "F bound Reader refund retry failed"
-}
+if ! p >"$tmpdir/f-bound-refund-retry.out" 2>&1 <<SQL
 begin;
 set local role myeongha_commerce_internal_executor;
 select 'F_REFUND_RETRY='||(public.cmd_apply_verified_portone_reader_full_cancellation_v1(
@@ -2375,6 +2372,10 @@ select 'F_REFUND_RETRY='||(public.cmd_apply_verified_portone_reader_full_cancell
  )->'revoke'->>'contractVersion');
 commit;
 SQL
+then
+ cat "$tmpdir/f-bound-refund-retry.out" >&2
+ fail "F bound Reader refund replay failed"
+fi
 grep -q 'F_REFUND_RETRY=official-reader-s2-revoke-dispatch-v1' "$tmpdir/f-bound-refund-retry.out" ||
  fail "F bound refund replay did not preserve S1 revoke contract"
 [[ "$(p -c "select status from public.entitlement_grants where id='$f_grant'::uuid;")" == revoked ]] ||
