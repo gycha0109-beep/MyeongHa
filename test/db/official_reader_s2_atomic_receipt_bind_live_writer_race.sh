@@ -2740,4 +2740,223 @@ grep -qx "F3_DIRECT=$b8_reading|true" "$tmpdir/f3-direct-replay-after-refund.out
  fail "F3 refund-first replay changed sibling B/C/E/F lifecycle"
 pass "verified bound refund-first serializes direct Reader replay; immutable history survives without resurrecting rights"
 
+
+# Independent G/H additional-Reader Purchases have DIFFERENT purchase-advisory
+# identities but the SAME stored official Reading, Reader and Bundle. Both
+# real combined writers must serialize on S1. Verified refunds are receipt-
+# local: revoking G leaves H as one current Bundle; revoking H leaves none.
+g_intent='12192300-0000-0000-0000-000000000017'
+g_receipt='12192000-0000-0000-0000-000000000017'
+g_session='12193000-0000-0000-0000-000000000017'
+g_hash="sha256:v1:$(printf '17%.0s' {1..32})"
+h_intent='12192300-0000-0000-0000-000000000018'
+h_receipt='12192000-0000-0000-0000-000000000018'
+h_session='12193000-0000-0000-0000-000000000018'
+h_hash="sha256:v1:$(printf '18%.0s' {1..32})"
+[[ "$g_hash" =~ ^sha256:v1:[0-9a-f]{64}$ && "$h_hash" =~ ^sha256:v1:[0-9a-f]{64}$ ]] ||
+ fail "G/H synthetic combined purchase request hashes must satisfy production v2 format"
+if ! p >"$tmpdir/g-h-independent-bundle-seed.out" 2>&1 <<SQL
+begin;
+insert into public.purchase_intents(
+ id,subject_id,product_offer_id,provider_account_link_id,
+ idempotency_key,request_hash,offer_snapshot_jsonb,offer_snapshot_hash,
+ status,created_at,updated_at,expected_amount_minor,expected_currency,
+ charge_terms_version,capability_set_id,capability_snapshot_jsonb,
+ capability_snapshot_hash
+)
+select x.intent_id::uuid,pi.subject_id,pi.product_offer_id,pi.provider_account_link_id,
+ x.key,'sha256:test:'||x.key,pi.offer_snapshot_jsonb,pi.offer_snapshot_hash,
+ 'created',clock_timestamp(),clock_timestamp(),pi.expected_amount_minor,
+ pi.expected_currency,pi.charge_terms_version,pi.capability_set_id,
+ pi.capability_snapshot_jsonb,pi.capability_snapshot_hash
+from public.purchase_intents pi
+cross join (values
+ ('$g_intent','reader-g-independent-bundle'),
+ ('$h_intent','reader-h-independent-bundle')
+) as x(intent_id,key)
+where pi.id='$f_intent'::uuid;
+insert into public.purchase_intent_reader_selections(
+ purchase_intent_id,product_id,reader_character_id,reader_content_bundle_id,
+ selection_contract_version,selection_snapshot_jsonb,selection_hash,created_at
+)
+select x.intent_id::uuid,prs.product_id,prs.reader_character_id,
+ prs.reader_content_bundle_id,prs.selection_contract_version,
+ prs.selection_snapshot_jsonb,'sha256:test:'||x.key,clock_timestamp()
+from public.purchase_intent_reader_selections prs
+cross join (values
+ ('$g_intent','reader-g-selection'),
+ ('$h_intent','reader-h-selection')
+) as x(intent_id,key)
+where prs.purchase_intent_id='$f_intent'::uuid;
+insert into public.commerce_payment_attempts(
+ id,purchase_intent_id,subject_id,product_offer_id,attempt_no,
+ provider,environment,idempotency_key,provider_request_id,
+ provider_transaction_id,status,created_at,updated_at
+)
+select x.attempt_id::uuid,pi.id,pi.subject_id,pi.product_offer_id,1,
+ 'portone_v2','production',x.key,x.payment_id,x.transaction_id,
+ 'response_received',clock_timestamp(),clock_timestamp()
+from public.purchase_intents pi
+join (values
+ ('12197000-0000-0000-0000-000000000017','$g_intent','g-attempt','g-payment','tx-reader-g'),
+ ('12197000-0000-0000-0000-000000000018','$h_intent','h-attempt','h-payment','tx-reader-h')
+) as x(attempt_id,intent_id,key,payment_id,transaction_id) on pi.id=x.intent_id::uuid;
+update public.purchase_intents set status='verified',updated_at=clock_timestamp()
+where id in ('$g_intent'::uuid,'$h_intent'::uuid);
+insert into public.commerce_receipts(
+ id,subject_id,purchase_intent_id,product_offer_id,platform,provider,
+ external_transaction_id,receipt_fingerprint,verification_status,
+ verified_payload_jsonb,verified_at,created_at,environment,
+ verifier_revision,verified_amount_minor,verified_currency
+)
+select x.receipt_id::uuid,cr.subject_id,x.intent_id::uuid,cr.product_offer_id,
+ cr.platform,cr.provider,x.transaction_id,
+ 'hmac-sha256:k1:'||pg_catalog.repeat(x.fingerprint_pair,32),
+ 'verified',cr.verified_payload_jsonb,clock_timestamp(),clock_timestamp(),
+ cr.environment,cr.verifier_revision,cr.verified_amount_minor,cr.verified_currency
+from public.commerce_receipts cr
+cross join (values
+ ('$g_receipt','$g_intent','tx-reader-g','21'),
+ ('$h_receipt','$h_intent','tx-reader-h','22')
+) as x(receipt_id,intent_id,transaction_id,fingerprint_pair)
+where cr.id='$f_receipt'::uuid;
+commit;
+SQL
+then
+ cat "$tmpdir/g-h-independent-bundle-seed.out" >&2
+ fail "independent G/H verified additional Reader purchases could not be seeded"
+fi
+[[ "$(p -c "select count(*) from public.entitlement_grants
+ where source_receipt_id in ('$g_receipt'::uuid,'$h_receipt'::uuid);")" == 0 ]] ||
+ fail "G/H independent purchase fixtures already have unexpected Grants"
+
+g_h_combined_writer() {
+ local intent="$1" receipt="$2" session="$3" hash="$4" app="$5" hold="$6"
+ p <<SQL
+set application_name='$app';
+set statement_timeout='25s';
+begin;
+select pg_catalog.set_config('myeongha.subject_id','$subject',true);
+select 'COMBINED='||(public.internal_apply_verified_reader_purchase_under_scope_v1(
+ '$subject'::uuid,'$b8_reading'::uuid,'test-standard-reader',
+ '$receipt'::uuid,'$intent'::uuid,
+ array['test-reader-unit'],array[transaction_timestamp()],
+ array[transaction_timestamp()],array[null]::timestamptz[],
+ array[null]::text[],
+ '$session'::uuid,'$b8_reading'::uuid,
+ '$hash','standard-reading-access-bind-v2',
+ '{"schemaVersion":"standard-reading-access-bind-v2","purchaseIntentId":"$intent"}'::jsonb
+)->>'contractVersion');
+select pg_sleep($hold);
+commit;
+SQL
+}
+g_h_current_bundle() {
+ p -c "begin;
+ select pg_catalog.set_config('myeongha.subject_id','$subject',true);
+ select scope_state||'|'||active_bundle_count::text
+ from public.internal_qry_official_reader_locked_bundle_scope_v1(
+ '$subject'::uuid,'$b8_reading'::uuid,'test-standard-reader'
+ ); commit;" | grep -E '^(no_active_grant|one_current_bundle|ambiguous_bundles)[|]'
+}
+[[ "$(g_h_current_bundle)" == 'no_active_grant|0' ]] ||
+ fail "G/H scenario requires no existing active same Reader entitlement"
+g_h_combined_writer "$g_intent" "$g_receipt" "$g_session" "$g_hash" \
+ 'rr_s2_g_parallel_same_bundle' 4 >"$tmpdir/g-combined-holder.out" 2>&1 &
+holder_pid=$!
+wait_for "G first verified combined purchase holds shared Reader S1" "
+ select count(*) from pg_catalog.pg_stat_activity
+ where application_name='rr_s2_g_parallel_same_bundle'
+ and state='active' and wait_event_type='Timeout';
+"
+g_h_combined_writer "$h_intent" "$h_receipt" "$h_session" "$h_hash" \
+ 'rr_s2_h_parallel_same_bundle' 0 >"$tmpdir/h-combined-waiter.out" 2>&1 &
+writer_pid=$!
+wait_for "H independent purchase waits on G's Reader S1" "
+ select count(*) from pg_catalog.pg_stat_activity
+ where application_name='rr_s2_h_parallel_same_bundle'
+ and state='active' and wait_event_type='Lock' and wait_event='advisory';
+"
+wait "$holder_pid" || {
+ cat "$tmpdir/g-combined-holder.out" >&2
+ fail "G verified combined Reader purchase failed"
+}
+holder_pid=""
+wait "$writer_pid" || {
+ cat "$tmpdir/h-combined-waiter.out" >&2
+ fail "H different-purchase combined Writer failed after G commit"
+}
+writer_pid=""
+for output in "$tmpdir/g-combined-holder.out" "$tmpdir/h-combined-waiter.out"; do
+ grep -qx 'COMBINED=official-reader-s2-atomic-receipt-bind-v1' "$output" || {
+  cat "$output" >&2
+  fail "G/H independent purchases bypassed real atomic Writer"
+ }
+done
+[[ "$(p -c "select count(*)::text||'|'||count(distinct a.reader_content_bundle_id)::text
+ from public.standard_reading_reader_access_grants a
+ join public.entitlement_grants g on g.id=a.entitlement_grant_id
+ where a.purchase_intent_id in ('$g_intent'::uuid,'$h_intent'::uuid)
+ and a.official_reading_id='$b8_reading'::uuid
+ and a.reader_character_id='test-standard-reader'
+ and a.access_role='additional_reader'
+ and g.source_receipt_id in ('$g_receipt'::uuid,'$h_receipt'::uuid)
+ and g.status='active';")" == '2|1' ]] ||
+ fail "two independently verified active purchase Grants must bind ONE Reader Bundle"
+[[ "$(g_h_current_bundle)" == 'one_current_bundle|1' ]] ||
+ fail "two original purchase Grants for the same Bundle were marked ambiguous"
+
+g_h_refund() {
+ local payment="$1" tx="$2" event="$3" fp="$4"
+ local at
+ at="$(p -c "select pg_catalog.to_char(clock_timestamp() at time zone 'UTC','YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"');")"
+ p <<SQL
+begin;
+set local role myeongha_commerce_internal_executor;
+select 'REFUND='||(public.cmd_apply_verified_portone_reader_full_cancellation_v1(
+ '$payment','$tx','$event','$at'::timestamptz,$b8_amount,'KRW','production',
+ 'hmac-sha256:k1:'||pg_catalog.repeat('$fp',32),
+ 'synthetic-independent-same-bundle-refund-v1'
+)->'revoke'->>'contractVersion');
+commit;
+SQL
+}
+if ! g_h_refund 'g-payment' 'tx-reader-g' 'g-only-after-parallel-bind' '23' \
+ >"$tmpdir/g-exact-refund.out" 2>&1; then
+ cat "$tmpdir/g-exact-refund.out" >&2
+ fail "G exact original Receipt refund failed"
+fi
+grep -qx 'REFUND=official-reader-s2-revoke-dispatch-v1' "$tmpdir/g-exact-refund.out" ||
+ fail "G did not revoke through real bound Reader S1"
+[[ "$(p -c "select status from public.entitlement_grants
+ where source_receipt_id='$g_receipt'::uuid;")" == revoked ]] ||
+ fail "G exact refund left its own Grant active"
+[[ "$(p -c "select status from public.entitlement_grants
+ where source_receipt_id='$h_receipt'::uuid;")" == active ]] ||
+ fail "G refund incorrectly revoked independent H original Receipt Grant"
+[[ "$(g_h_current_bundle)" == 'one_current_bundle|1' ]] ||
+ fail "remaining independent H purchase no longer authorizes one current Bundle"
+
+if ! g_h_refund 'h-payment' 'tx-reader-h' 'h-after-g-refund' '24' \
+ >"$tmpdir/h-exact-refund.out" 2>&1; then
+ cat "$tmpdir/h-exact-refund.out" >&2
+ fail "H final original Receipt refund failed"
+fi
+grep -qx 'REFUND=official-reader-s2-revoke-dispatch-v1' "$tmpdir/h-exact-refund.out" ||
+ fail "H did not revoke through real bound Reader S1"
+[[ "$(g_h_current_bundle)" == 'no_active_grant|0' ]] ||
+ fail "second original Receipt refund still left currently entitled Reader Bundle"
+[[ "$(p -c "select count(*) from public.standard_reading_reader_access_grants
+ where purchase_intent_id in ('$g_intent'::uuid,'$h_intent'::uuid)
+ and official_reading_id='$b8_reading'::uuid;")" == 2 ]] ||
+ fail "G/H refund destroyed immutable historical Reader binding provenance"
+[[ "$(p -c "select count(*) from public.entitlement_events ee
+ join public.commerce_provider_events pe on pe.id=ee.source_provider_event_id
+ where (pe.external_event_id='myeongha:portone-v2:full-cancel:v1:g-only-after-parallel-bind'
+  and ee.grant_id=(select id from public.entitlement_grants where source_receipt_id='$g_receipt'::uuid))
+ or (pe.external_event_id='myeongha:portone-v2:full-cancel:v1:h-after-g-refund'
+  and ee.grant_id=(select id from public.entitlement_grants where source_receipt_id='$h_receipt'::uuid));")" == 2 ]] ||
+ fail "G/H verified original Receipt revoke provenance was missing or duplicated"
+pass "different additional Reader purchases serialize on S1; one Bundle survives only the first receipt-local refund"
+
 echo "PASS: S2 instrumented two-direction PostgreSQL race; production integration HOLD"
