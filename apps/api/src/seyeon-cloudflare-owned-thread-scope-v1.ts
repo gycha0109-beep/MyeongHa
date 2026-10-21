@@ -115,6 +115,7 @@ export async function scopeSeyeonCloudflareOwnedChatRequestV1(input: Readonly<{
     return { kind: 'denied', response: held(input.requestId) };
   }
 
+  const threadId = route.threadId;
   try {
     const evidence = await input.identityEvidenceVerifier.verifyRequestIdentity(input.request);
     if (evidence === null || evidence.kind !== 'member') {
@@ -126,7 +127,7 @@ export async function scopeSeyeonCloudflareOwnedChatRequestV1(input: Readonly<{
       execute: ({ resolvedSubject, client }) =>
         getChatThreadRuntimeBinding({
           resolvedSubjectId: resolvedSubject.subjectId,
-          threadId: route.threadId,
+          threadId,
           authorityPort: createPostgresChatThreadRuntimeBindingAuthorityPortV1(client),
         }),
     });
@@ -134,7 +135,7 @@ export async function scopeSeyeonCloudflareOwnedChatRequestV1(input: Readonly<{
     if (!binding.participantCharacterIds.includes('seyeon')) {
       return {
         kind: 'unrelated_thread_requires_ops_reauthorization',
-        threadId: route.threadId,
+        threadId,
       };
     }
 
@@ -145,7 +146,7 @@ export async function scopeSeyeonCloudflareOwnedChatRequestV1(input: Readonly<{
     });
     return {
       kind: 'seyeon_protected_held',
-      threadId: route.threadId,
+      threadId,
       response: enforceSeyeonCloudflareOfflineFetchEgressFenceV1(response, input.requestId),
     };
   } catch {
