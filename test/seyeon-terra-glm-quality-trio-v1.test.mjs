@@ -4,6 +4,7 @@ import {
  assertTerraGlmQualityTrioOneShotV1 as admission,
  requirePublicSyntheticQualityUtteranceV1 as reveal,
  SEYEON_TERRA_GLM_QUALITY_TRIO_PRIOR_RESERVED_MICRO_USD as PRIOR,
+ SEYEON_TERRA_GLM_QUALITY_TRIO_LUNA_RESERVE_MICRO_USD as LUNA,
  SEYEON_TERRA_GLM_QUALITY_TRIO_TERRA_RESERVE_MICRO_USD as TERRA,
  SEYEON_TERRA_GLM_QUALITY_TRIO_GLM_RESERVE_MICRO_USD as GLM,
 } from '../scripts/seyeon-terra-glm-quality-trio-admission-v1.mjs';
@@ -52,12 +53,13 @@ describe('Owner-visible PUBLIC synthetic persona trio Terra/GLM paired one-shot'
    {...good,privateSourceRefsMentioned:undefined},
   ])expect(()=>reveal(invalid)).toThrow();
  });
- it('limits three eight-POST public persona cases to the existing owner budget',()=>{
-  const max=PRIOR+15*TERRA+9*GLM;
+ it('limits three six-POST public persona cases to the existing owner budget',()=>{
+  const max=PRIOR+3*LUNA+6*TERRA+9*GLM;
   expect(PRIOR).toBe(976554);
+  expect(LUNA).toBe(20000);
   expect(TERRA).toBe(50000);
   expect(GLM).toBe(20000);
-  expect(max).toBe(1906554);
+  expect(max).toBe(1516554);
   expect(max*2500/1e6).toBeLessThan(5000);
   const samples=[
    ['N06','오늘은 네가 먼저 이야기해 줘.'],
@@ -99,11 +101,16 @@ describe('Owner-visible PUBLIC synthetic persona trio Terra/GLM paired one-shot'
   expect(src).toContain("id:'N10'");
   expect(src).toContain("id:'N21'");
   expect(src).toContain('preflight.funding?.availableMicroUsd<180000');
-  expect(src).toContain("model:'gpt-5.6-terra'");
+  expect(src).toContain("openAiProvider('gpt-5.6-luna','unified_preflight_shadow')");
+  expect(src).toContain("openAiProvider('gpt-5.6-terra','turn_interpret_render_shadow')");
+  expect(src).toContain("openAiProvider('gpt-5.6-terra','semantic_review')");
+  expect(src).toContain('request.model!==model');
+  expect(src).not.toContain('legacy_5_terra');
   expect(src).toContain("model:'z-ai/glm-5.3-flash'");
   expect(src).toContain('getPaidGlm53FlashAdmissionV1(glmKey)');
   expect(src).toContain('providerOnlyTag:selectedProvider');
-  expect(src).toContain('runSeyeonCharacterTurnV2');
+  expect(src).not.toContain('runSeyeonCharacterTurnV2');
+  expect(src).toContain("verifySeyeonDialoguePathStageTopologyV1('fast_3_luna_terra'");
   expect(src).toContain('runSeyeonCensusFirstThreeCallShadowV1');
   expect(src).toContain('createSeyeonQualityTrioSyntheticCensusV1(spec.id,ID)');
   expect(src).toContain('await ledger.sync()');
@@ -112,7 +119,9 @@ describe('Owner-visible PUBLIC synthetic persona trio Terra/GLM paired one-shot'
   expect(src).toContain("verdict='GUARD_TRIO_PASS'");
   expect(src).toContain('SEYEON_TERRA_GLM_QUALITY_TRIO_OWNER_VISIBLE');
   expect(src).toContain('characterVoiceQualityVerified:false,productionPromotionPermitted:false');
-  expect(src).toContain('metrics.terra.filter(x=>x.caseId===currentCase.id)');
+  expect(src).toContain('metrics.candidate.filter(x=>x.caseId===currentCase.id)');
+  expect(src).toContain('candidateCensus.readCount!==4');
+  expect(src).toContain('lunaCalls:reservation.luna,terraCalls:reservation.terra');
   expect(src).not.toContain('OPENAI_API_KEY2');
   expect(wf).toContain('OPENAI_API_KEY: $'+'{{ secrets.OPENAI_API_KEY }}');
   expect(wf).toContain('OPENROUTER_API_KEY: $'+'{{ secrets.OPENROUTER_API_KEY }}');
