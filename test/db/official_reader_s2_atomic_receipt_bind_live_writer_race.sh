@@ -2537,7 +2537,7 @@ if wait "$writer_pid"; then
  fail "F2 combined Reader purchase issued an entitlement after verified refund"
 fi
 writer_pid=""
-grep -q 'Verified Reader receipt, purchase and Reader selection unavailable' "$tmpdir/f2-combined-loser.out" || {
+grep -q 'production verified Receipt authority is unavailable' "$tmpdir/f2-combined-loser.out" || {
  cat "$tmpdir/f2-combined-loser.out" >&2
  fail "F2 cancelled additional Reader purchase failed for unexpected reason"
 }
