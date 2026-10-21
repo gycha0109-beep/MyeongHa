@@ -9,6 +9,7 @@ import type {
 import { mobileColors } from '@/ui/mobile-colors';
 import { MobileUiText } from '@/ui/MobileUiText';
 import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
+import { useMobileUiLocale } from '@/ui/mobile-ui-locale';
 
 export function HomeBrandHeader({
   greeting,
@@ -39,6 +40,7 @@ export function HomeBrandHeader({
 
 export function HomeTodayCard({ card }: { card: MobileHomeTodayCardV1 }) {
   const styles = useMobileThemedStyles(staticStyles);
+  const { t } = useMobileUiLocale();
   if (card.kind === 'loading') {
     return (
       <View style={styles.heroCard}>
@@ -79,7 +81,7 @@ export function HomeTodayCard({ card }: { card: MobileHomeTodayCardV1 }) {
       <View style={styles.heroCard}>
         <Text style={styles.sectionKicker}>TODAY</Text>
         <MobileUiText style={styles.heroTitle}>오늘의 흐름</MobileUiText>
-        <Text style={styles.body}>{copy}</Text>
+        <Text style={styles.body}>{t(copy)}</Text>
         <Pressable
           accessibilityRole="button"
           onPress={() => router.push('/reading')}
@@ -98,13 +100,13 @@ export function HomeTodayCard({ card }: { card: MobileHomeTodayCardV1 }) {
           <Text style={styles.sectionKicker}>TODAY</Text>
           <MobileUiText style={styles.heroTitle}>오늘의 흐름</MobileUiText>
         </View>
-        <Text style={styles.authorityChip}>{card.label}</Text>
+        <Text style={styles.authorityChip}>{t(card.label)}</Text>
       </View>
       <View style={styles.dayMasterRow}>
         <Text style={styles.dayMaster}>{card.dayMaster}</Text>
-        <Text style={styles.elementBadge}>{card.element}</Text>
+        <Text style={styles.elementBadge}>{t(card.element)}</Text>
       </View>
-      <Text style={styles.completeness}>{card.completeness}</Text>
+      <Text style={styles.completeness}>{t(card.completeness)}</Text>
       <MobileUiText style={styles.caption}>
         현재 출생정보를 기준으로 계산된 명식 사실만 보여줍니다.
       </MobileUiText>
@@ -146,9 +148,9 @@ export function HomeContinuationCard({
             <Text style={styles.recordSymbol}>命</Text>
             <Text style={styles.date}>{card.dateLabel}</Text>
           </View>
-          <Text style={styles.cardTitle}>{card.title}</Text>
+          <Text style={styles.cardTitle}>{t(card.title)}</Text>
           <MobileUiText style={styles.body}>가장 최근 저장된 공식 사주 풀이</MobileUiText>
-          <Text style={styles.stateText}>{card.status}</Text>
+          <Text style={styles.stateText}>{t(card.status)}</Text>
           <Pressable
             accessibilityRole="button"
             onPress={() => router.push('/records')}
@@ -196,6 +198,7 @@ export function HomeReadingTopics({
   topics: readonly HomeReadingTopicV1[];
 }) {
   const styles = useMobileThemedStyles(staticStyles);
+  const { t } = useMobileUiLocale();
   return (
     <View style={styles.section}>
       <View style={styles.sectionHeading}>
@@ -218,8 +221,8 @@ export function HomeReadingTopics({
             <Text style={styles.topicSymbol}>
               {topic.key === 'general' ? '命' : topic.key === 'career' ? '業' : topic.key === 'wealth' ? '財' : '緣'}
             </Text>
-            <Text style={styles.topicTitle}>{topic.title}</Text>
-            <Text style={styles.topicBody}>{topic.subtitle}</Text>
+            <Text style={styles.topicTitle}>{t(topic.title)}</Text>
+            <Text style={styles.topicBody}>{t(topic.subtitle)}</Text>
           </View>
         ))}
       </View>
