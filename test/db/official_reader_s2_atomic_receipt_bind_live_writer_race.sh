@@ -2295,7 +2295,7 @@ set application_name='rr_s2_f_direct_bind_replay';
 set statement_timeout='30s';
 begin;
 select pg_catalog.set_config('myeongha.subject_id','$subject',true);
-select 'F_DIRECT_BIND='||reading_id::text
+select 'F_DIRECT_BIND='||reading_id::text||'|'||replayed::text
 from public.cmd_bind_standard_reading_access_v2(
  '$subject'::uuid,'$f_intent'::uuid,
  '$f_session'::uuid,'$b8_reading'::uuid,
@@ -2344,7 +2344,7 @@ wait "$reader_pid" || {
  fail "three-way direct Reader bind retry deadlocked or failed"
 }
 reader_pid=""
-grep -q "F_DIRECT_BIND=$b8_reading" "$tmpdir/f-direct-binder.out" ||
+grep -qx "F_DIRECT_BIND=$b8_reading|true" "$tmpdir/f-direct-binder.out" ||
  { cat "$tmpdir/f-direct-binder.out" >&2; fail "three-way direct binder did not replay exact official Reading"; }
 wait "$writer_pid" || {
  cat "$tmpdir/f-cancel-transient.out" >&2
@@ -2358,6 +2358,24 @@ f_grant="$(p -c "select g.id from public.entitlement_grants g where g.source_rec
 [[ "$(p -c "select count(*) from public.standard_reading_reader_access_grants
  where entitlement_grant_id='$f_grant'::uuid and official_reading_id='$b8_reading'::uuid;")" == 1 ]] ||
  fail "F three-way lost immutable Reader access binding after retry"
+[[ "$(p -c "select count(*) from public.standard_reading_reader_access_grants a
+ join public.purchase_intent_reader_selections prs
+   on prs.purchase_intent_id=a.purchase_intent_id
+  and prs.reader_character_id=a.reader_character_id
+  and prs.reader_content_bundle_id=a.reader_content_bundle_id
+  and prs.selection_hash=a.reader_selection_hash
+ where a.purchase_intent_id='$f_intent'::uuid
+   and a.entitlement_grant_id='$f_grant'::uuid
+   and a.official_reading_id='$b8_reading'::uuid
+   and a.reader_character_id='test-standard-reader'
+   and a.access_role='additional_reader'
+   and a.request_hash='$f_hash'
+   and a.request_contract_version='standard-reading-access-bind-v2';")" == 1 ]] ||
+ fail "F verified additional Reader bind/replay lost exact immutable purchase and selection provenance"
+[[ "$(p -c "select count(*) from public.standard_reading_official_bindings
+ where reading_id='$b8_reading'::uuid
+   and generation_purchase_intent_id='$f_intent'::uuid;")" == 0 ]] ||
+ fail "F additional Reader purchase must reuse the original official Reading, not claim to generate it"
 
 # Replay the same verified cancellation under the stored bound Reader S1.
 # Its idempotency must not produce a second provider or Grant revoke event.
