@@ -156,6 +156,51 @@ jobs:
       - name: Verify Supabase deployment configuration
         run: npm run verify:supabase-deployment-config
 
+  cloudflare-auth-db-tls-local:
+    name: Cloudflare DB · disposable TLS/RLS workerd
+    needs: scope
+    if: needs.scope.outputs.web == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      PGHOST: 127.0.0.1
+      PGPORT: '5432'
+      PGDATABASE: myeongha_saju_local_verify
+      PGUSER: postgres
+      PGPASSWORD: synthetic-ci-only-unused-origin
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.candidate_head || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install dependencies for isolated Worker TLS/RLS
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Start disposable PostgreSQL with independent test CA and nonprivileged role
+        run: bash scripts/local/setup-saju-bridge-tls-subject-ci.sh
+      - name: Verify real TLS handshake and cross-subject RLS through local workerd
+        run: node scripts/verify-cloudflare-auth-db-tls-local.mjs
+      - name: Remove disposable DB, generated CA, and local Worker variables
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker rm -f myeongha-saju-tls-subject-ci >/dev/null 2>&1 || true
+          rm -rf -- "$RUNNER_TEMP/saju-bridge-subject-tls"
+          rm -f -- workers/.dev.vars .dev.vars
+          if docker container inspect myeongha-saju-tls-subject-ci >/dev/null 2>&1; then
+            echo "::error::Disposable PostgreSQL TLS fixture remains"
+            exit 1
+          fi
+          if test -e "$RUNNER_TEMP/saju-bridge-subject-tls" || test -e workers/.dev.vars || test -e .dev.vars; then
+            echo "::error::Disposable CA or Worker variable material remains"
+            exit 1
+          fi
+
   db-authority-core:
     needs: scope
     if: needs.scope.outputs.db == 'true'
@@ -289,6 +334,7 @@ jobs:
     needs:
       - scope
       - foundation
+      - cloudflare-auth-db-tls-local
       - db-authority-core
       - db-runtime
       - db-content
@@ -300,6 +346,8 @@ jobs:
         env:
           SCOPE_RESULT: ${{ needs.scope.result }}
           FOUNDATION_RESULT: ${{ needs.foundation.result }}
+          CLOUDFLARE_TLS_SELECTED: ${{ needs.scope.outputs.web }}
+          CLOUDFLARE_TLS_RESULT: ${{ needs.cloudflare-auth-db-tls-local.result }}
           DB_RESULT: ${{ needs.db-authority-core.result }}
           DB_SELECTED: ${{ needs.scope.outputs.db }}
           DB_SELECTED_0: ${{ contains(fromJSON(needs.scope.outputs.db_suites || '[]'), 'runtime') }}
@@ -317,6 +365,7 @@ jobs:
           set -euo pipefail
           test "$SCOPE_RESULT" = "success"
           test "$FOUNDATION_RESULT" = "success"
+          if [[ "$CLOUDFLARE_TLS_SELECTED" == "true" ]]; then test "$CLOUDFLARE_TLS_RESULT" = "success"; else test "$CLOUDFLARE_TLS_RESULT" = "skipped" || test "$CLOUDFLARE_TLS_RESULT" = "success"; fi
           if [[ "$DB_SELECTED" == "true" ]]; then test "$DB_RESULT" = "success"; else test "$DB_RESULT" = "skipped" || test "$DB_RESULT" = "success"; fi
           selected=("$DB_SELECTED_0" "$DB_SELECTED_1" "$DB_SELECTED_2" "$DB_SELECTED_3" "$DB_SELECTED_4")
           results=("$DB_TRACK_0" "$DB_TRACK_1" "$DB_TRACK_2" "$DB_TRACK_3" "$DB_TRACK_4")
