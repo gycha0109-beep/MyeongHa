@@ -4,7 +4,10 @@ import { afterAll, describe, expect, it } from 'vitest';
 import { Pool, type PoolClient } from 'pg';
 import {createHash} from 'node:crypto';
 import {canonicalJson} from '../packages/domain/src/index.js';
-import type {SeyeonRetrievedMemoryV2} from '../packages/domain/src/seyeon-runtime-context-v2.js';
+import {
+  assembleSeyeonRuntimeContextV2,
+  type SeyeonRetrievedMemoryV2,
+} from '../packages/domain/src/seyeon-runtime-context-v2.js';
 import type {SeyeonPersonalRecordProjectionCandidateV1} from '../apps/api/src/seyeon-production-context-v1.js';
 import {selectSeyeonExactModelPersonalSourcesV1} from '../apps/api/src/seyeon-exact-model-personal-source-selection-v1.js';
 import type {PostgresSubjectPoolV1} from '../apps/api/src/postgres-subject-execution.js';
@@ -245,7 +248,17 @@ function r23FinalSource(id:ReturnType<typeof ids>){
     readerDerivedSources:[],workerDerivedSources:[],
     externalToolPrivateSources:[],
   };
-  return {retrievedMemories,sourceCandidates:sources,selection,sourceEnvelope};
+  const finalModelContext=assembleSeyeonRuntimeContextV2({
+    relationship:null,relationshipSemantics:null,recentMessages:[],
+    retrievedMemories,integrityDecisions:[],
+    governedPreflightApplied:false,
+    disclosure:{decision:null,retrievedSources:[]},
+  });
+  const finalModelContextDigest=r23Hash(finalModelContext);
+  return {
+    retrievedMemories,sourceCandidates:sources,selection,sourceEnvelope,
+    finalModelContext,finalModelContextDigest,
+  };
 }
 function r23Pool():PostgresSubjectPoolV1{
   return {
@@ -289,12 +302,14 @@ describe.skipIf(!enabled)('G2 original Grant actual-v2 two-session race, disposa
       },
       postTurnSnapshotHash:'sha256:v1:'+'c'.repeat(64),
       finalRetrievedMemories:final.retrievedMemories,
+      finalModelContext:final.finalModelContext,
       sourceCandidates:final.sourceCandidates,
       sourceEnvelope:final.sourceEnvelope,
       preModelSelection:final.selection,
       g1Receipt:{
         turnId:id.turn,attemptId:id.attempt,
         selectedSourcesDigest:final.selection.selectedSourcesDigest,
+        finalModelContextDigest:final.finalModelContextDigest,
         recordId:id.memory,originalGrantId:id.grant,
         pgPayloadDigest:id.rawDigest,contextReady:true as const,
       },
@@ -308,6 +323,27 @@ describe.skipIf(!enabled)('G2 original Grant actual-v2 two-session race, disposa
     await expect(commitSeyeonR23OfflineAtomicV2V1({
       ...input,g1Receipt:{...input.g1Receipt,
         originalGrantId:'d6000000-0000-4000-8000-000000000099'},
+    })).rejects.toBeInstanceOf(SeyeonR23OfflineG2CommitHoldV1);
+    // The original G1 source set may remain identical while the FINAL
+    // interpreter packet adds historical or derived private content.
+    // Reject every mutation BEFORE opening a G2 database transaction.
+    for(const finalModelContext of [
+      {...input.finalModelContext,
+        recentMessages:[{role:'assistant',content:'unapproved historical text'}]},
+      {...input.finalModelContext,
+        governedPreflightApplied:true},
+      {...input.finalModelContext,
+        disclosure:{decision:{kind:'unapproved'},retrievedSources:[]}},
+      {...input.finalModelContext,unapprovedPrivateField:'not pinned'},
+    ] as unknown as (typeof input.finalModelContext)[]){
+      await expect(commitSeyeonR23OfflineAtomicV2V1({
+        ...input,finalModelContext,
+      })).rejects.toBeInstanceOf(SeyeonR23OfflineG2CommitHoldV1);
+    }
+    await expect(commitSeyeonR23OfflineAtomicV2V1({
+      ...input,
+      g1Receipt:{...input.g1Receipt,
+        finalModelContextDigest:'sha256:v1:'+'0'.repeat(64)},
     })).rejects.toBeInstanceOf(SeyeonR23OfflineG2CommitHoldV1);
     expect(await saved(id)).toMatchObject({
       messages:'0',outboxes:'0',admissions:'0',

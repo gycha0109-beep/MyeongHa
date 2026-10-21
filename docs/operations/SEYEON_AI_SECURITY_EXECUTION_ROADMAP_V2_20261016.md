@@ -531,4 +531,12 @@ S8의 **비파괴/격리 검토는 S2~S7과 병렬 진행 가능**하며, S8 Pro
 
 **불변 사항:** `Projectors=[]`, `writeAdmission='DENY'`, 기존 Vercel 최초 Reveal 503, public/paid OFF, Production DB write/DDL/ACL/migration 0, 신규 Cloudflare 배포/시크릿/도메인/과금 0. 코드 PR 병합·Full Integration은 G0/G1 positive/G2/G3/G5/G6 운영 승인이나 실제 Client 수신 증명이 아니다.
 
-**병합 후 별도 CI:** #2395 main `3664fd93f006c16f248e656b1049967419c1256d` [CI](https://github.com/gycha0109-beep/MyeongHa/actions/runs/39524528160)는 정확한 해당 실행 결과로만 인정한다. #2397 병합 후 main CI는 다시 확인한다. 
+**병합 후 별도 CI:** #2395 main `3664fd93f006c16f248e656b1049967419c1256d` [CI](https://github.com/gycha0109-beep/MyeongHa/actions/runs/39524528160)는 정확한 해당 실행 결과로만 인정한다. #2397 병합 후 main CI는 다시 확인한다.
+
+## 54. 2026-10-21 S3/G1→S4/G2 — 격리 원자적 Commit 진입의 최종 모델 Context 전체 결속
+
+- **로드맵 범위:** §3의 S3(G1 모델 전 실제 출처) → S4(G2 동일 트랜잭션 exact Grant/Record Commit) 순서. §53의 **G1/G2 병렬 필수** 의존 사항 중 오프라인·합성 단일 Memory 격리 후보의 입력 결속만 보완한다. Cloudflare Ops/라우터/Worker 배포 작업은 수행하지 않는다.
+- **정확한 결손:** R20/R34는 최종 조립 모델 Context 전체를 검증하지만, 별도로 존재하는 R23 격리 실제 v2 Commit 후보가 `preModelSelection`과 `finalRetrievedMemories`만 대조했다. 이 상태에서는 기존 선택 개인 Memory가 동일하더라도 최종 모델 Context에 과거 메시지·Disclosure·Integrity 또는 추가 필드가 들어간 사실을 R23의 PostgreSQL 접속 전에 검증하지 못한다.
+- **이번 수정:** `apps/api/src/seyeon-g2-atomic-exact-final-source-commit-r23-candidate.ts`의 G2 선행 admission에 `finalModelContext`를 필수로 추가하고, 동일 최종 Memory 선택에서 서버가 생성한 **0 history / 0 relationship / preflight-not-run** 전체 Context와 정확한 정형값을 비교한다. R23의 격리 G1 후보 receipt에도 이 조립본의 `sha256:v1` 무키 digest를 요구하여 불일치 시 **DB transaction 전 HOLD**. 기존 DB Owner original Grant lock, 실제 v2 Commit, 독립 PG race 및 outbox 로직은 그대로 보존한다.
+- **검증:** 기존 명명된 폐기용 `myeongha_seyeon_positive_pin_candidate_test` PG17의 R23 테스트를 확장하여 후발 과거 대화, Disclosure, Preflight 속성, 불명 Context 추가 필드, 후보 receipt Context digest 변경을 금지한다. 거부 시 Assistant/Outbox/Admission 증가 0, 정상 합성 단일 Memory 경로만 기존 원자 Commit 성공. 새 SQL, DB clone, workflow, 외부 Provider 호출 없음.
+- **미해결:** 후보 receipt Context digest는 **DB 소유 서명/영속 positive Pin이 아니다**. R20 원본 Record/Grant/Projection Pin과 R23 `pin_and_context_ready_r4`가 운영에서 하나의 승인된 영속 출처 계약으로 연결된 것이 아니며, 정확한 SRC-25 type/codec, 전체 Preflight/Reader/History/Worker 유래, Production original Grant/Commit/Reveal, G0/D-04 Owner signed contract는 모두 HOLD. `Projectors=[]`, `writeAdmission='DENY'`, first HTTP 503, positive/paid Provider OFF, 운영 DB DDL/DML/ACL/migrations 0 유지.
