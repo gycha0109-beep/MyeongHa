@@ -157,7 +157,7 @@ jobs:
         run: npm run verify:supabase-deployment-config
 
   cloudflare-auth-db-tls-local:
-    name: Cloudflare DB · disposable TLS/RLS workerd
+    name: Cloudflare DB · disposable TLS/RLS Node adapter
     needs: scope
     if: needs.scope.outputs.web == 'true'
     runs-on: ubuntu-latest
@@ -182,22 +182,23 @@ jobs:
         run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Start disposable PostgreSQL with independent test CA and nonprivileged role
         run: bash scripts/local/setup-saju-bridge-tls-subject-ci.sh
-      - name: Verify real TLS handshake and cross-subject RLS through local workerd
-        run: node scripts/verify-cloudflare-auth-db-tls-local.mjs
-      - name: Remove disposable DB, generated CA, and local Worker variables
+      - name: Verify real PostgreSQL TLS and cross-subject RLS with request-scoped Node adapter
+        env:
+          MYEONGHA_CLOUDFLARE_DIRECT_TLS_CI_ENABLED: '1'
+        run: npx vitest run test/cloudflare-request-scope-real-tls-postgres.e2e.test.ts
+      - name: Remove disposable PostgreSQL and generated CA
         if: always()
         shell: bash
         run: |
           set -euo pipefail
           docker rm -f myeongha-saju-tls-subject-ci >/dev/null 2>&1 || true
           rm -rf -- "$RUNNER_TEMP/saju-bridge-subject-tls"
-          rm -f -- workers/.dev.vars .dev.vars
           if docker container inspect myeongha-saju-tls-subject-ci >/dev/null 2>&1; then
             echo "::error::Disposable PostgreSQL TLS fixture remains"
             exit 1
           fi
-          if test -e "$RUNNER_TEMP/saju-bridge-subject-tls" || test -e workers/.dev.vars || test -e .dev.vars; then
-            echo "::error::Disposable CA or Worker variable material remains"
+          if test -e "$RUNNER_TEMP/saju-bridge-subject-tls"; then
+            echo "::error::Disposable CA material remains"
             exit 1
           fi
 
