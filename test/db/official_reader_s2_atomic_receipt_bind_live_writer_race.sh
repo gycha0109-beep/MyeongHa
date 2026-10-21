@@ -2997,4 +2997,162 @@ grep -qx 'REFUND=official-reader-s2-revoke-dispatch-v1' "$tmpdir/h-exact-refund.
  fail "G/H verified original Receipt revoke provenance was missing or duplicated"
 pass "different additional Reader purchases serialize on S1; one Bundle survives only the first receipt-local refund"
 
+
+# Distinct from E's explicitly purchase-locked legacy issuer: a direct 1090
+# Reader Receipt writer holds ONLY the required Reader S1 (and then Receipt
+# row), while a verified full-cancel Writer obtains the Purchase advisory and
+# must wait on that exact Receipt row. There is no cycle: the direct issuer
+# NEVER acquires Purchase advisory after locking the Receipt.
+i_intent='12192300-0000-0000-0000-000000000019'
+i_receipt='12192000-0000-0000-0000-000000000019'
+i_amount="$b8_amount"
+if ! p >"$tmpdir/i-direct-legacy-seed.out" 2>&1 <<SQL
+begin;
+insert into public.purchase_intents(
+ id,subject_id,product_offer_id,provider_account_link_id,
+ idempotency_key,request_hash,offer_snapshot_jsonb,offer_snapshot_hash,
+ status,created_at,updated_at,expected_amount_minor,expected_currency,
+ charge_terms_version,capability_set_id,capability_snapshot_jsonb,
+ capability_snapshot_hash
+)
+select '$i_intent'::uuid,subject_id,product_offer_id,provider_account_link_id,
+ 'reader-i-legacy-receipt-lock','sha256:test:reader-i-legacy-receipt-lock',
+ offer_snapshot_jsonb,offer_snapshot_hash,'created',
+ clock_timestamp(),clock_timestamp(),expected_amount_minor,expected_currency,
+ charge_terms_version,capability_set_id,capability_snapshot_jsonb,
+ capability_snapshot_hash
+from public.purchase_intents where id='$f_intent'::uuid;
+insert into public.purchase_intent_reader_selections(
+ purchase_intent_id,product_id,reader_character_id,reader_content_bundle_id,
+ selection_contract_version,selection_snapshot_jsonb,selection_hash,created_at
+)
+select '$i_intent'::uuid,product_id,reader_character_id,
+ reader_content_bundle_id,selection_contract_version,selection_snapshot_jsonb,
+ 'sha256:test:reader-i-selection',clock_timestamp()
+from public.purchase_intent_reader_selections where purchase_intent_id='$f_intent'::uuid;
+insert into public.commerce_payment_attempts(
+ id,purchase_intent_id,subject_id,product_offer_id,attempt_no,
+ provider,environment,idempotency_key,provider_request_id,
+ provider_transaction_id,status,created_at,updated_at
+)
+select '12197000-0000-0000-0000-000000000019'::uuid,
+ pi.id,pi.subject_id,pi.product_offer_id,1,
+ 'portone_v2','production','reader-i-legacy-attempt',
+ 'i-payment','tx-reader-i','response_received',
+ clock_timestamp(),clock_timestamp()
+from public.purchase_intents pi where pi.id='$i_intent'::uuid;
+update public.purchase_intents set status='verified',updated_at=clock_timestamp()
+where id='$i_intent'::uuid;
+insert into public.commerce_receipts(
+ id,subject_id,purchase_intent_id,product_offer_id,platform,provider,
+ external_transaction_id,receipt_fingerprint,verification_status,
+ verified_payload_jsonb,verified_at,created_at,environment,
+ verifier_revision,verified_amount_minor,verified_currency
+)
+select '$i_receipt'::uuid,subject_id,'$i_intent'::uuid,product_offer_id,
+ platform,provider,'tx-reader-i',
+ 'hmac-sha256:k1:2525252525252525252525252525252525252525252525252525252525252525',
+ 'verified',verified_payload_jsonb,clock_timestamp(),clock_timestamp(),
+ environment,verifier_revision,verified_amount_minor,verified_currency
+from public.commerce_receipts where id='$f_receipt'::uuid;
+commit;
+SQL
+then
+ cat "$tmpdir/i-direct-legacy-seed.out" >&2
+ fail "I original verified additional Reader Receipt seed failed"
+fi
+[[ "$(p -c "select count(*) from public.entitlement_grants
+ where source_receipt_id='$i_receipt'::uuid;")" == 0 ]] ||
+ fail "I direct-legacy Receipt unexpectedly pre-issued a Grant"
+
+p >"$tmpdir/i-direct-1090-issuer.out" 2>&1 <<SQL &
+set application_name='rr_s2_i_direct_receipt_issuer_holds_row';
+set statement_timeout='25s';
+begin;
+select pg_catalog.set_config('myeongha.subject_id','$subject',true);
+select public.internal_acquire_official_reader_scope_lock_v1(
+ '$subject'::uuid,'$b8_reading'::uuid,'test-standard-reader'
+);
+select 'I_ISSUED='||result_grant_id::text
+from public.internal_apply_verified_receipt_capability_effects_v1(
+ '$i_receipt'::uuid,array['test-reader-unit'],
+ array[transaction_timestamp()],array[transaction_timestamp()],
+ array[null]::timestamptz[],array[null]::text[]
+);
+select pg_sleep(4);
+commit;
+SQL
+holder_pid=$!
+wait_for "I direct 1090 Receipt issuer has inserted Grant and holds its Receipt lock" "
+ select count(*) from pg_catalog.pg_stat_activity
+ where application_name='rr_s2_i_direct_receipt_issuer_holds_row'
+ and state='active' and wait_event_type='Timeout';
+"
+i_cancel_at="$(p -c "select pg_catalog.to_char(clock_timestamp() at time zone 'UTC','YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"');")"
+p >"$tmpdir/i-verified-refund-waits-on-receipt.out" 2>&1 <<SQL &
+set application_name='rr_s2_i_verified_cancel_waits_receipt';
+set statement_timeout='25s';
+begin;
+set local role myeongha_commerce_internal_executor;
+select 'I_CANCEL='||(public.cmd_apply_verified_portone_reader_full_cancellation_v1(
+ 'i-payment','tx-reader-i','i-legacy-1090-issue-first-cancel',
+ '$i_cancel_at'::timestamptz,$i_amount,'KRW','production',
+ 'hmac-sha256:k1:2626262626262626262626262626262626262626262626262626262626262626',
+ 'synthetic-i-direct-receipt-cancellation-v1'
+)->'revoke'->>'disposition');
+commit;
+SQL
+writer_pid=$!
+wait_for "I verified refund waits on the legacy 1090 Receipt row rather than advisory" "
+ select count(*) from pg_catalog.pg_stat_activity
+ where application_name='rr_s2_i_verified_cancel_waits_receipt'
+ and state='active' and wait_event_type='Lock'
+ and wait_event<>'advisory';
+"
+wait "$holder_pid" || {
+ cat "$tmpdir/i-direct-1090-issuer.out" >&2
+ fail "I direct legacy verified Reader 1090 issuer failed"
+}
+holder_pid=""
+wait "$writer_pid" || {
+ cat "$tmpdir/i-verified-refund-waits-on-receipt.out" >&2
+ fail "I verified refund failed behind direct 1090 Receipt row"
+}
+writer_pid=""
+grep -q '^I_ISSUED=' "$tmpdir/i-direct-1090-issuer.out" || {
+ cat "$tmpdir/i-direct-1090-issuer.out" >&2
+ fail "I direct issuance returned no real purchase-backed Grant"
+}
+grep -qx 'I_CANCEL=cancelled_before_binding' "$tmpdir/i-verified-refund-waits-on-receipt.out" || {
+ cat "$tmpdir/i-verified-refund-waits-on-receipt.out" >&2
+ fail "I verified refund failed to rediscover the newly committed unbound Grant"
+}
+i_grant="$(p -c "select id from public.entitlement_grants
+ where source_receipt_id='$i_receipt'::uuid;")"
+[[ "$i_grant" =~ ^[0-9a-f-]{36}$ ]] ||
+ fail "I direct legacy issuance did not commit exactly one Grant id"
+[[ "$(p -c "select status from public.entitlement_grants
+ where id='$i_grant'::uuid;")" == revoked ]] ||
+ fail "I verified refund left an unbound direct-1090 Grant active"
+[[ "$(p -c "select verification_status from public.commerce_receipts
+ where id='$i_receipt'::uuid;")" == revoked ]] ||
+ fail "I verified cancellation did not revoke exactly its own Receipt"
+[[ "$(p -c "select count(*) from public.standard_reading_reader_access_grants
+ where purchase_intent_id='$i_intent'::uuid;")" == 0 ]] ||
+ fail "I independent legacy issuance invented official Reader Access"
+[[ "$(p -c "select count(*) from public.commerce_provider_events
+ where external_event_id='myeongha:portone-v2:full-cancel:v1:i-legacy-1090-issue-first-cancel'
+ and resolved_receipt_id='$i_receipt'::uuid;")" == 1 ]] ||
+ fail "I verified exact Receipt cancellation Provider Event missing or duplicated"
+[[ "$(p -c "select count(*) from public.entitlement_events ee
+ join public.commerce_provider_events pe on pe.id=ee.source_provider_event_id
+ where pe.external_event_id='myeongha:portone-v2:full-cancel:v1:i-legacy-1090-issue-first-cancel'
+ and ee.grant_id='$i_grant'::uuid and ee.event_type='revoked';")" == 1 ]] ||
+ fail "I verified legacy-issued Grant revoked Event missing or duplicated"
+[[ "$(p -c "select count(*) from public.entitlement_grants
+ where source_receipt_id in ('$g_receipt'::uuid,'$h_receipt'::uuid)
+ and status='revoked';")" == 2 ]] ||
+ fail "I legacy direct issue/refund corrupted independent G/H purchase history"
+pass "direct legacy 1090 S1→Receipt issuance-first serializes exact verified refund on Receipt row and revokes only I"
+
 echo "PASS: S2 instrumented two-direction PostgreSQL race; production integration HOLD"
