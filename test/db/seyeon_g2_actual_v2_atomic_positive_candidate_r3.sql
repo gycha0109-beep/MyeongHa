@@ -140,6 +140,8 @@ declare
   v_expected jsonb;
   v_commit record;
   v_digest text;
+  v_user_message_count bigint;
+  v_user_message_id text;
 begin
   perform public.assert_myeongha_subject_context_v1(p_subject);
   if p_subject is null or p_thread is null or p_turn is null
@@ -186,6 +188,24 @@ begin
     or v_attempt.seyeon_personal_source_pin_jsonb is not null then
     raise exception using errcode='23514',
       constraint='seyeon_offline_r3_attempt_not_positive_validated';
+  end if;
+
+  -- G2 DB authority: a self-rehashed official Post-turn Snapshot must still
+  -- name the actual persisted USER message of THIS Subject/Turn. Checking
+  -- only caller-supplied Turn/Assistant IDs cannot establish this ancestry.
+  -- The parent Thread/Turn/Attempt locks above remain held until COMMIT.
+  select count(*), min(m.id::text)
+    into v_user_message_count, v_user_message_id
+  from public.conversation_messages m
+  where m.turn_id=p_turn and m.subject_id=p_subject
+    and m.sender_type='user';
+  if v_user_message_count <> 1
+    or jsonb_typeof(p_snapshot) is distinct from 'object'
+    or p_snapshot ->> 'turnId' is distinct from p_turn::text
+    or p_snapshot ->> 'assistantMessageId' is distinct from p_message::text
+    or p_snapshot ->> 'userMessageId' is distinct from v_user_message_id then
+    raise exception using errcode='23514',
+      constraint='seyeon_offline_r3_snapshot_original_user_message_mismatch';
   end if;
 
   select * into v_pin from seyeon_positive_candidate.attempt_source_pins

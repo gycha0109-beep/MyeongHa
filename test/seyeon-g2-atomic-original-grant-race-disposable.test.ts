@@ -405,6 +405,19 @@ describe.skipIf(!enabled)('G2 original Grant actual-v2 two-session race, disposa
       messages:'0',outboxes:'0',admissions:'0',
       attempt_state:'validated',
     });
+    // A valid official Snapshot whose SHA was recomputed must still match
+    // the USER message actually persisted by the DB for this Turn. The
+    // DB-owned G2 wrapper enforces this, not the caller's Snapshot hash.
+    const forgedUserSnapshot={...postTurnSnapshot,
+      userMessageId:'d7100000-0000-4000-8000-000000000099'};
+    await expect(commitSeyeonR23OfflineAtomicV2V1({
+      ...input,postTurnSnapshot:forgedUserSnapshot,
+      postTurnSnapshotHash:r23Hash(forgedUserSnapshot),
+    })).rejects.toBeInstanceOf(SeyeonR23OfflineG2CommitHoldV1);
+    expect(await saved(id)).toMatchObject({
+      messages:'0',outboxes:'0',admissions:'0',
+      attempt_state:'validated',
+    });
     const result=await commitSeyeonR23OfflineAtomicV2V1(input);
     expect(result).toMatchObject({
       status:'disposable_atomic_v2_committed',

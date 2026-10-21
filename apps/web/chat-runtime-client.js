@@ -1,5 +1,5 @@
 import { resolveCharacterDisplayNameV1 } from './character-display-locale.js';
-import { getUiLocale, translateStaticUi } from './ui-i18n.js';
+import { getUiLocale, getUiLocaleRequestHeadersV1, translateStaticUi } from './ui-i18n.js';
 import { resolveCanonicalCharacterPresentationV1 } from './character-presentation-identity.js';
 import {
   ChatOpenClientErrorV1,
@@ -322,6 +322,7 @@ async function readChatPage(activeBearer, afterSequenceNo) {
     headers: {
       Accept: 'application/json',
           'Accept-Language': getUiLocale(),
+          ...getUiLocaleRequestHeadersV1(),
       Authorization: `Bearer ${activeBearer.token}`,
     },
   });
@@ -486,6 +487,7 @@ async function sendTurn(message) {
         headers: {
           Accept: 'application/json',
           'Accept-Language': getUiLocale(),
+          ...getUiLocaleRequestHeadersV1(),
           Authorization: `Bearer ${activeBearer.token}`,
           'Content-Type': 'application/json',
         },
