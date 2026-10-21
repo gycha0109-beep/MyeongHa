@@ -39,9 +39,21 @@ let roomReady = false;
 let queuedSubmission = false;
 let sendingTurn = false;
 let authoritativeCharacterId = null;
+let composeStatusSource = null;
+let roomLoadingSource = null;
+
+function uiText(source) {
+  return translateStaticUi(source, getUiLocale());
+}
 
 function setComposeStatus(message) {
-  if (composeStatus) composeStatus.textContent = message;
+  composeStatusSource = message;
+  if (composeStatus) composeStatus.textContent = uiText(message);
+}
+
+function setRoomLoadingStatus(message) {
+  roomLoadingSource = message;
+  if (roomLoading) roomLoading.textContent = uiText(message);
 }
 
 function setComposerBusy(busy) {
@@ -153,7 +165,7 @@ function chatOpenFailureMessage(error) {
 
 function formatTimestamp(value) {
   const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return '시간 정보 없음';
+  if (Number.isNaN(parsed.getTime())) return uiText('시간 정보 없음');
   return new Intl.DateTimeFormat(getUiLocale(), {
     month: 'numeric',
     day: 'numeric',
@@ -211,7 +223,17 @@ function createStreamMessage(message, authoritativeCharacterId) {
   heading.append(strong, time);
 
   const paragraph = document.createElement('p');
-  paragraph.textContent = safeMessageText(message);
+  const hasSourceBody = message.redacted !== true
+    && typeof message.bodyText === 'string'
+    && message.bodyText.trim().length > 0;
+  if (hasSourceBody) {
+    // Source-owned message text must not enter the static UI translation pipeline.
+    paragraph.dataset.chatBodySource = '';
+    paragraph.textContent = message.bodyText;
+  } else {
+    paragraph.dataset.chatUiPlaceholder = safeMessageText(message);
+    paragraph.textContent = uiText(safeMessageText(message));
+  }
   body.append(heading, paragraph);
   article.append(avatar, body);
   return article;
@@ -237,8 +259,12 @@ function renderConversation(messages, authoritativeCharacterId) {
 // transcripts, no server refetch, no reinterpretation or modification of bodyText.
 // If the session changes, the existing authority guard removes these nodes.
 document.addEventListener('myeongha:localechange', () => {
+  if (composeStatusSource !== null && composeStatus) composeStatus.textContent = uiText(composeStatusSource);
+  if (roomLoadingSource !== null && roomLoading) roomLoading.textContent = uiText(roomLoadingSource);
   if (!chatStream) return;
   for (const article of chatStream.querySelectorAll('.conversation-message')) {
+    const placeholder = article.querySelector('[data-chat-ui-placeholder]');
+    if (placeholder) placeholder.textContent = uiText(placeholder.dataset.chatUiPlaceholder);
     const senderType = article.dataset.sender;
     const characterId = article.dataset.messageCharacterId ?? null;
     const heading = article.querySelector('.conversation-message-heading strong');
@@ -416,10 +442,10 @@ function ensureRoomReady() {
     }
   })().then((ready) => {
     if (!ready) {
-      const message = composeStatus?.textContent || '대화를 불러오지 못했습니다.';
+      const message = composeStatusSource || '대화를 불러오지 못했습니다.';
       if (roomLoading) {
         roomLoading.hidden = false;
-        roomLoading.textContent = message;
+        setRoomLoadingStatus(message);
       }
       if (retryButton && !invalidThreadRoute) retryButton.hidden = false;
     } else if (roomLoading) {
@@ -561,7 +587,7 @@ function submitTurn(event) {
 
 document.addEventListener('myeongha:chat-submit', submitTurn);
 retryButton?.addEventListener('click', () => {
-  if (roomLoading) roomLoading.textContent = '대화 연결을 다시 확인하고 있습니다…';
+  if (roomLoading) setRoomLoadingStatus('대화 연결을 다시 확인하고 있습니다…');
   if (retryButton) retryButton.hidden = true;
   void ensureRoomReady();
 });
