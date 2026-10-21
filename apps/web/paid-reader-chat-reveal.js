@@ -137,7 +137,9 @@ export function appendProtectedReaderChatRevealV1(card, input) {
         status.textContent = '해설을 불러오지 못했습니다. 다시 시도해 주세요.';
       }
     } finally {
-      if (expanded === current) button.disabled = false;
+      button.disabled = false;
+      // An unavailable/denied read remains retryable on the next click.
+      if (expanded === current && body.hidden) expanded = null;
     }
   });
 
