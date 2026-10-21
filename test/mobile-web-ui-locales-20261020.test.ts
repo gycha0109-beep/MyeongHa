@@ -1,4 +1,5 @@
 import { readFile } from 'node:fs/promises';
+import { FORTUNE_COOKIE_MESSAGES_V1, displayFortuneCookieNoteV1 } from '../apps/mobile/src/features/home/mobile-fortune-cookie.js';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -135,4 +136,62 @@ describe('Mobile / Web UI localization parity', () => {
     expect(composer).toContain('SEYEON_HISTORY_REVEAL_HOLD');
   });
 
+  it('keeps Android status/navigation windows outside the scrollable app and tabs', async () => {
+    const [root, home, records, screen] = await Promise.all([
+      source('apps/mobile/src/app/_layout.tsx'),
+      source('apps/mobile/src/app/(tabs)/index.tsx'),
+      source('apps/mobile/src/app/(tabs)/records/index.tsx'),
+      source('apps/mobile/src/ui/MobileScreen.tsx'),
+    ]);
+    expect(root).toContain("SafeAreaProvider");
+    expect(root).toContain("edges={['top', 'bottom']}");
+    expect(root).toContain('<SafeAreaView');
+    for (const nested of [home, records, screen]) {
+      expect(nested).not.toContain('SafeAreaView');
+    }
+  });
+
+  it('does not leak photographed Korean-only fixed copy or fortune notes when Japanese/Chinese is selected', async () => {
+    const visibleCopy = [
+      '행운의 쪽지 열기', 'MY MYEONGHA · 나의 공간',
+      '계정, 출생정보와 명하에서 이어지는 길을 한곳에서 살펴보세요.',
+      '지나온 이야기에도', '나의 결이 남습니다.',
+      '아직 기록이 없습니다', '아직 현세록이 없습니다',
+      '아직 지난 읽기가 없습니다', '아직 기억이 없습니다',
+      '네 기둥 계산 완료', '좋은 아침이에요',
+      '이용 상태는 대화방에서 확인',
+    ];
+    for (const locale of ['ja-JP', 'zh-TW'] as const) {
+      for (const copy of visibleCopy) {
+        const translated = translateMobileUiCopy(copy, locale);
+        expect(translated, copy).not.toBe(copy);
+        expect(translated, copy).not.toMatch(/[가-힣]/u);
+      }
+      for (let index = 0; index < FORTUNE_COOKIE_MESSAGES_V1.length; index += 1) {
+        const note = displayFortuneCookieNoteV1(index, locale);
+        expect(note).not.toBe('');
+        expect(note).not.toMatch(/[가-힣]/u);
+      }
+    }
+    expect(displayFortuneCookieNoteV1(0, 'ko-KR')).toBe(FORTUNE_COOKIE_MESSAGES_V1[0]);
+    expect(displayFortuneCookieNoteV1(-1, 'ja-JP')).toBe('');
+    expect(displayFortuneCookieNoteV1(FORTUNE_COOKIE_MESSAGES_V1.length, 'zh-TW')).toBe('');
+  });
+
+  it('translates static catalog/empty states while retaining personal names and official reading output', async () => {
+    const [home, records, chat, saju, profile] = await Promise.all([
+      source('apps/mobile/src/features/home/HomeComponents.tsx'),
+      source('apps/mobile/src/features/records/RecordsComponents.tsx'),
+      source('apps/mobile/src/app/(tabs)/chat/index.tsx'),
+      source('apps/mobile/src/features/saju/SajuPreviewReadingView.tsx'),
+      source('apps/mobile/src/features/my/MyComponents.tsx'),
+    ]);
+    expect(home).toContain('t(topic.title)');
+    expect(home).toContain('t(topic.subtitle)');
+    expect(records).toContain('t(emptyByCategory[label]');
+    expect(chat).toContain('t(presentation.openingLine)');
+    expect(saju).toContain('t(topic.availability.statusLabel)');
+    expect(saju).toContain('{step.primary}');
+    expect(profile).toContain("profile.displayName === '호칭 미설정'");
+  });
 });
