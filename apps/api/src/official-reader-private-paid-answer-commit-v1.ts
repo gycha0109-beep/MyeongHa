@@ -61,7 +61,7 @@ export interface PrivateOfficialReaderPaidAnswerCommittedV1 {
   readonly turnId: string;
   readonly attemptId: string;
   readonly committedAt: string;
-  readonly replayed: false;
+  readonly replayed: boolean;
 }
 
 export class PrivateOfficialReaderPaidAnswerCommitErrorV1 extends Error {
@@ -229,7 +229,7 @@ export async function commitPrivateOfficialReaderPaidAnswerV1(input: {
             || result.bodyId !== bodyId || result.turnId !== turnId
             || result.attemptId !== attemptId
             || result.safeMessageId !== safeMessageId
-            || result.replayed !== false
+            || typeof result.replayed !== 'boolean'
             || typeof result.committedAt !== 'string'
             || !Number.isFinite(Date.parse(result.committedAt))) {
           return unavailable();
@@ -238,7 +238,7 @@ export async function commitPrivateOfficialReaderPaidAnswerV1(input: {
           contractVersion: OFFICIAL_READER_PRIVATE_PAID_COMMIT_VERSION_V1,
           bodyId, safeMessageId, turnId, attemptId,
           committedAt: result.committedAt,
-          replayed: false as const,
+          replayed: result.replayed,
         });
       },
     });
