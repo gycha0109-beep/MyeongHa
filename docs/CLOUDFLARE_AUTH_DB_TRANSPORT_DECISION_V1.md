@@ -67,3 +67,12 @@
 - CI `cloudflare-auth-db-tls-local` job은 이 일회용 Node E2E를 필수 통과 조건으로 삼는다. 테스트 fixture는 GitHub Actions 실행 환경 내에서만 생성되며 종료 시 DB Docker 컨테이너·CA 키·파일을 삭제한다.
 - **확인되지 않은 사항:** 원격 Cloudflare Workers→실제 DB TCP 연결, 운영 서버의 고정 SHA-256 CA 피어 핸드셰이크, Cloudflare Workers가 접근 가능한 승인된 스테이징 DB 호스트, Hyperdrive TLS trust delegation, OAuth/Auth E2E. Node CI 성공을 Workers 실네트워크의 성공이라고 표시하지 않는다.
 - 최종 원격 검증은 Security/API/DB 승인으로 지정된 격리 네트워크 경유의 **접속 가능한 DB 엔드포인트** 및 허용된 Worker Preview binding이 마련되어야 수행 가능하다. 루프백 제한을 보안 우회나 Production DB 접근으로 해결하지 않는다.
+
+## 7. 단계 5 일회용 DB 수락 결과와 잔여 승인 (2026-10-21)
+
+- [PR #2384 커밋 b91a259 CI](https://github.com/gycha0109-beep/MyeongHa/actions/runs/39530395189) **SUCCESS**. 별도 CI job **Cloudflare DB · disposable TLS/RLS Node adapter**와 db-authority-core, PostgreSQL 17 및 CI Verify도 각각 SUCCESS. Governance, Cloudflare Preview Remote Smoke, Mobile PR Bundle, Web PR Domain Gates, Web Auth Browser Regression까지 **총 6개 워크플로 성공**.
+- 이전 [커밋 ee34a7c CI](https://github.com/gycha0109-beep/MyeongHa/actions/runs/39526360704)는 전체 실패했지만 **일회용 TLS/RLS job 자체는 성공**한 사례다. 이후 일반 테스트 환경에서는 격리 PostgreSQL fixture가 없는 E2E를 `describe.skipIf`로 분리하는 조정이 진행됐고, 최신 커밋의 전체 CI가 통과했다.
+- 승인된 범위에서 확인한 사실: **Node 프로세스→일회용 PostgreSQL의 TLS peer/CA/DNS SAN handshake, non-superuser login, NOLOGIN execution role, 트랜잭션 단위 Member A/B RLS, unknown member·rollback·invalid TLS credential 거부**. 합성 데이터만 사용한다. 이 결과는 요청별 Pool 어댑터의 Node/pg 계층 수락 근거다.
+- 확인되지 않은 사실: **Cloudflare Workers→공개 접근 가능한 격리 PostgreSQL** 소켓 접속, 운영 고정 CA의 실제 피어 인증서 검증, 배포된 Workers의 real RLS 경로, OAuth redirect 및 host-only cookie 연동. Node E2E 성공과 Workers 네트워크 검증 성공은 다르다.
+- **Gate HOLD 유지:** Security/API/DB가 격리된 공인 네트워크 DB target, cloud secret scope, OAuth host/CSRF 정책, 네트워크 비용/연결 제한을 승인하기 전 **Worker positive Auth/DB API 404 유지**, `/api/readiness` 404 유지. PR은 Draft/미병합으로 유지하고 Vercel Production·DNS·결제·세연 AI를 건드리지 않는다.
+
