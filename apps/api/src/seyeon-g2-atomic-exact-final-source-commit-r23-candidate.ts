@@ -1,8 +1,13 @@
 // Watchtower-Track: security
 // R23 OFFLINE ONLY: exact G1 final-source manifest -> real v2 G2 Commit.
 // Never mounted into Production; no Provider, HTTP or positive projector.
+import {createHash} from 'node:crypto';
 import {canonicalJson} from '../../../packages/domain/src/index.js';
-import type {SeyeonRetrievedMemoryV2} from '../../../packages/domain/src/seyeon-runtime-context-v2.js';
+import {
+  assembleSeyeonRuntimeContextV2,
+  type SeyeonRetrievedMemoryV2,
+  type SeyeonRuntimeContextV2,
+} from '../../../packages/domain/src/seyeon-runtime-context-v2.js';
 import type {SeyeonPersonalRecordProjectionCandidateV1} from './seyeon-production-context-v1.js';
 import {
   selectSeyeonExactModelPersonalSourcesV1,
@@ -41,6 +46,8 @@ export interface SeyeonR23G1PinnedReceiptV1{
   readonly turnId:string;
   readonly attemptId:string;
   readonly selectedSourcesDigest:string;
+  /** Offline pre-model checked Context digest; not DB-signed G1 authority. */
+  readonly finalModelContextDigest:string;
   readonly recordId:string;
   readonly originalGrantId:string;
   readonly pgPayloadDigest:string;
@@ -59,6 +66,8 @@ export interface CommitSeyeonR23OfflineAtomicInputV1{
   readonly postTurnSnapshotHash:string;
   /** The same final model retrieval selection as at G1 before Provider. */
   readonly finalRetrievedMemories:readonly SeyeonRetrievedMemoryV2[];
+  /** Exact final assembled model packet from the SAME G1 pre-model selection. */
+  readonly finalModelContext:SeyeonRuntimeContextV2;
   readonly sourceCandidates:readonly SeyeonPersonalRecordProjectionCandidateV1[];
   readonly sourceEnvelope:SeyeonR21OfflineDerivedSourceEnvelopeV1;
   readonly preModelSelection:SeyeonExactModelPersonalSourceSelectionV1;
@@ -107,6 +116,26 @@ export async function commitSeyeonR23OfflineAtomicV2V1(
       retrievedMemories:input.finalRetrievedMemories,
       sourceCandidates:input.sourceCandidates,
     });
+    // G1→G2: close the otherwise unobserved final assembled packet gap.
+    // The same zero-derived/preflight-not-run envelope must describe the
+    // ENTIRE Context at G2, not only its retrieved personal-memory subset.
+    // A candidate R4 receipt is not a trusted DB signature of this packet.
+    const expectedModelContext=assembleSeyeonRuntimeContextV2({
+      relationship:null,
+      relationshipSemantics:null,
+      recentMessages:[],
+      retrievedMemories:input.finalRetrievedMemories,
+      integrityDecisions:[],
+      governedPreflightApplied:false,
+      disclosure:{decision:null,retrievedSources:[]},
+    });
+    if(!input.finalModelContext ||
+        canonicalJson(input.finalModelContext)!==canonicalJson(expectedModelContext)){
+      throw new SeyeonR23OfflineG2CommitHoldV1();
+    }
+    const finalModelContextDigest='sha256:v1:'+
+      createHash('sha256').update(canonicalJson(expectedModelContext)).digest('hex');
+
     const selection=selectSeyeonExactModelPersonalSourcesV1({
       retrievedMemories:input.finalRetrievedMemories,
       sourceCandidates:input.sourceCandidates,
@@ -130,6 +159,7 @@ export async function commitSeyeonR23OfflineAtomicV2V1(
     if(!r||r.contextReady!==true
       ||r.turnId!==input.turnId||r.attemptId!==input.attemptId
       ||r.selectedSourcesDigest!==selection.selectedSourcesDigest
+      ||r.finalModelContextDigest!==finalModelContextDigest
       ||r.recordId!==original.recordId
       ||r.originalGrantId!==original.grantId
       ||!PG_SHA.test(r.pgPayloadDigest)){
