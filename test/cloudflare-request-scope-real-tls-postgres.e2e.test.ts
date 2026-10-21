@@ -1,4 +1,4 @@
-import { X509Certificate } from 'node:crypto';
+import { randomBytes, X509Certificate } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { Pool, type PoolConfig } from 'pg';
 import { describe, expect, it } from 'vitest';
@@ -213,7 +213,7 @@ describe.skipIf(!(isIsolatedDbCi || isLocalDocker))(
   it('rejects incorrect local login password and superuser login cannot be used',async()=>{
     const fixture=requireIsolatedFixture();
     const config=options(fixture);
-    await mustReject({...config,password:'synthetic-invalid-password'});
+    await mustReject({...config,password:randomBytes(32).toString('hex')});
     await mustReject({...config,user:'postgres',password:fixture.password});
   });
 });
