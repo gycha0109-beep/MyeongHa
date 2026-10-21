@@ -124,7 +124,12 @@ export async function applyVerifiedReaderReceiptBindV1(
           || !UUID.test(access.purchase_intent_id)
           || typeof access.entitlement_grant_id !== 'string'
           || !UUID.test(access.entitlement_grant_id)
-          || access.reading_id !== expectedOfficialReadingId) {
+          || access.reading_id !== expectedOfficialReadingId
+          || access.replayed !== false
+          || (access.official_reading_created !== true
+              && access.official_reading_created !== false)
+          || (access.interpretation_created !== true
+              && access.interpretation_created !== false)) {
         // Throwing inside the Commerce transaction rolls back Grant AND bind.
         throw new Error('Verified Reader receipt bind returned an invalid atomic result.');
       }
