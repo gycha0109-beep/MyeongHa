@@ -99,7 +99,11 @@ describe('MyeongHa character-led Saju Reading v1', () => {
     expect(runtime).toContain('activatePreviewReading(preview);');
     expect(runtime).toContain("const PREVIEW_NOTICE_SECTION_TITLE = '프리뷰 안내';");
     expect(runtime).toContain("const STRUCTURE_PREFIX = '근거 구조:';");
-    expect(runtime).toContain("'이 해석의 사주 근거'");
+    const localeCopy = await readFile(
+      new URL('../apps/web/reading-detail-ui-locale.js', import.meta.url), 'utf8',
+    );
+    expect(runtime).toContain('readingSceneProgressV1(activeIndex, steps.length,');
+    expect(localeCopy).toContain("structure: '이 해석의 사주 근거'");
     expect(runtime).toContain('previewCommentForStep()');
     expect(runtime).toContain("root.dataset.previewReaderVoice = 'disabled';");
     expect(runtime).not.toContain('suffixByReader');
