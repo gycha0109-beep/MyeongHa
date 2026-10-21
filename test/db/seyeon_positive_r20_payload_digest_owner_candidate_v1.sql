@@ -39,6 +39,8 @@ begin
     and s.merged_into_subject_id is null
   for share;
   if not found then return null; end if;
+  -- Read-only original SourceSet inspection: R20 pre-model state or R23
+  -- post-validation, pre-Commit state; neither allows a new Pin or Reveal.
   perform 1
   from public.chat_turns t
   join public.chat_turn_attempts a
@@ -46,8 +48,9 @@ begin
   join public.conversation_threads th
     on th.id=t.thread_id and th.subject_id=t.subject_id
   where t.id=p_turn and t.subject_id=p_subject and t.thread_id=p_thread
-    and t.state='planned' and a.id=p_attempt
-    and a.state='running'
+    and a.id=p_attempt
+    and ((t.state='planned' and a.state='running')
+      or (t.state='validated' and a.state='validated'))
     and a.planner_version='seyeon-production-chat-planner-v1'
     and a.seyeon_personal_source_pin_jsonb is null
     and th.status='active'
