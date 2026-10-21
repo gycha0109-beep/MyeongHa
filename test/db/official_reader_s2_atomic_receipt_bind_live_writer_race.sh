@@ -2927,6 +2927,69 @@ select pg_sleep($hold);
 commit;
 SQL
 }
+# Same original verified G Receipt, TWO purchase capability Grants:
+# the real combined Writer bound only the first one; a second synthetic
+# unbound Grant must NOT be silently skipped by verified full cancellation.
+# This fixture is deleted after the negative check, before normal G/H refunds.
+g_mixed_unbound_grant='12198000-0000-0000-0000-000000000020'
+if ! p >"$tmpdir/g-mixed-original-receipt-seed.out" 2>&1 <<SQL
+begin;
+insert into public.entitlement_grants(
+ id,subject_id,entitlement_key,scope_key,grant_key,grant_source_type,
+ status,valid_from,valid_until,revision,last_effective_at,
+ last_provider_ordering_key,created_at,updated_at,source_receipt_id
+)
+select '$g_mixed_unbound_grant'::uuid,eg.subject_id,
+ 'test-reader-mixed-unbound-extra-capability',eg.scope_key,
+ eg.grant_key,eg.grant_source_type,eg.status,eg.valid_from,
+ eg.valid_until,eg.revision,eg.last_effective_at,
+ eg.last_provider_ordering_key,clock_timestamp(),clock_timestamp(),
+ eg.source_receipt_id
+from public.entitlement_grants eg
+where eg.source_receipt_id='$g_receipt'::uuid
+ and eg.status='active' and eg.grant_source_type='purchase';
+commit;
+SQL
+then
+ cat "$tmpdir/g-mixed-original-receipt-seed.out" >&2
+ fail "same original verified Reader Receipt mixed bound/unbound Grant fixture failed"
+fi
+[[ "$(p -c "select count(*)::text||'|'||
+  count(*) filter (where a.entitlement_grant_id is null)::text
+  from public.entitlement_grants eg
+  left join public.standard_reading_reader_access_grants a
+    on a.entitlement_grant_id=eg.id
+  where eg.source_receipt_id='$g_receipt'::uuid;")" == '2|1' ]] ||
+ fail "mixed G original Receipt must have exactly one unbound purchase Grant"
+if g_h_refund 'g-payment' 'tx-reader-g' 'g-mixed-unbound-denied' '25' \
+ 'rr_s2_g_mixed_full_cancel_deny' 0 >"$tmpdir/g-mixed-denied.out" 2>&1; then
+ fail "mixed bound/unbound original Reader Receipt incorrectly reported a full cancellation"
+fi
+grep -q 'Full Reader cancellation cannot skip unbound Grants of its exact Receipt' \
+ "$tmpdir/g-mixed-denied.out" || {
+ cat "$tmpdir/g-mixed-denied.out" >&2
+ fail "mixed original Reader Receipt rejected for an unexpected reason"
+}
+[[ "$(p -c "select verification_status from public.commerce_receipts
+ where id='$g_receipt'::uuid;")" == verified ]] ||
+ fail "mixed full cancellation unexpectedly committed a revoked G Receipt"
+[[ "$(p -c "select count(*) from public.entitlement_grants
+ where source_receipt_id='$g_receipt'::uuid and status='active';")" == 2 ]] ||
+ fail "mixed full cancellation partially revoked one of the G original Grants"
+[[ "$(p -c "select count(*) from public.commerce_provider_events
+ where external_event_id='myeongha:portone-v2:full-cancel:v1:g-mixed-unbound-denied';")" == 0 ]] ||
+ fail "mixed full cancellation persisted a Provider Event despite rollback"
+[[ "$(p -c "select status from public.entitlement_grants
+ where source_receipt_id='$h_receipt'::uuid;")" == active ]] ||
+ fail "mixed original G Receipt cancellation altered independent H purchase rights"
+p -c "delete from public.entitlement_grants
+ where id='$g_mixed_unbound_grant'::uuid;" >/dev/null ||
+ fail "cannot clean up isolated synthetic extra unbound Grant"
+[[ "$(p -c "select count(*) from public.entitlement_grants
+ where source_receipt_id='$g_receipt'::uuid;")" == 1 ]] ||
+ fail "mixed fixture cleanup altered authentic G receipt lineage"
+pass "same original Receipt mixed bound/unbound Grants cannot commit partial full-cancellation"
+
 g_h_refund 'g-payment' 'tx-reader-g' 'g-only-after-parallel-bind' '23' \
  'rr_s2_g_same_bundle_refund_holder' 4 >"$tmpdir/g-exact-refund.out" 2>&1 &
 holder_pid=$!
