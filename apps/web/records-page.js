@@ -1,5 +1,6 @@
 import { readerProvenanceLocaleLabelV1 } from './reader-provenance-locale.js';
-import { getUiLocale } from './ui-i18n.js';
+import { getUiLocale, translateStaticUi } from './ui-i18n.js';
+import { recordsBirthRevisionV1, recordsBirthUnavailableV1, recordsReadingSummaryV1, recordsTimestampV1 } from './records-page-ui-locale.js';
 import { createRecordsRuntimeClient, RecordsRuntimeError } from './records-runtime-client.js';
 import { buildPersistedReadingHandoffUrlV1 } from './reading-history-handoff.js';
 
@@ -37,8 +38,21 @@ function textElement(tagName, className, text) {
 }
 
 function formatTimestamp(value) {
-  if (typeof value !== 'string' || Number.isNaN(Date.parse(value))) return '—';
-  return new Intl.DateTimeFormat('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(value));
+  return recordsTimestampV1(value, getUiLocale());
+}
+
+function uiText(source) {
+  return translateStaticUi(source, getUiLocale());
+}
+
+function uiElement(tag, className, source) {
+  return textElement(tag, className, uiText(source));
+}
+
+function sourceElement(tag, className, value) {
+  const element = textElement(tag, className, value);
+  element.dataset.recordsSource = '';
+  return element;
 }
 
 function formatStoredValue(value) {
@@ -47,7 +61,7 @@ function formatStoredValue(value) {
   try {
     return JSON.stringify(value);
   } catch {
-    return '[표시할 수 없는 기록]';
+    return uiText('[표시할 수 없는 기록]');
   }
 }
 
@@ -118,16 +132,23 @@ function setupTabs() {
 
 function renderProfile(payload) {
   const name = payload?.profile?.displayName;
-  byId('records-display-name').textContent = typeof name === 'string' && name.trim().length > 0 ? name : '호칭 미설정';
+  const nameNode = byId('records-display-name');
+  if (typeof name === 'string' && name.trim().length > 0) {
+    nameNode.dataset.recordsSource = '';
+    nameNode.textContent = name;
+  } else {
+    delete nameNode.dataset.recordsSource;
+    nameNode.textContent = uiText('호칭 미설정');
+  }
   const kind = payload?.subjectKind === 'member' ? '회원 기록' : payload?.subjectKind === 'guest' ? '게스트 기록' : '현재 기록';
-  byId('records-subject-kind').textContent = kind;
+  byId('records-subject-kind').textContent = uiText(kind);
 }
 
-function renderBirthProfileUnavailable(message = '현재 출생 정보를 불러오지 못했습니다. 확인되지 않은 정보는 대신 보여드리지 않습니다.') {
+function renderBirthProfileUnavailable(message = recordsBirthUnavailableV1(getUiLocale())) {
   const target = byId('birth-records-list');
   clear(target);
   const card = textElement('article', 'panel side-card', '');
-  card.append(textElement('h3', '', '출생 정보 확인'));
+  card.append(uiElement('h3', '', '출생 정보 확인'));
   card.append(textElement('p', 'muted', message));
   target.append(card);
 }
@@ -143,9 +164,9 @@ function renderCurrentBirthProfile(birth) {
   if (profile === null) {
     clear(target);
     const card = textElement('article', 'panel side-card', '');
-    card.append(textElement('h3', '', '아직 등록된 출생 정보가 없습니다.'));
-    card.append(textElement('p', 'muted', '현재 계정의 본인 출생 정보가 저장되면 이곳에 표시됩니다.'));
-    const link = textElement('a', 'records-birth-link', '출생 정보 입력하기 →');
+    card.append(uiElement('h3', '', '아직 등록된 출생 정보가 없습니다.'));
+    card.append(uiElement('p', 'muted', '현재 계정의 본인 출생 정보가 저장되면 이곳에 표시됩니다.'));
+    const link = uiElement('a', 'records-birth-link', '출생 정보 입력하기 →');
     link.href = 'birth.html';
     card.append(link);
     target.append(card);
@@ -169,8 +190,8 @@ function renderCurrentBirthProfile(birth) {
 
   clear(target);
   const card = textElement('article', 'panel side-card records-birth-card', '');
-  card.append(textElement('h3', '', '현재 등록된 출생 정보'));
-  card.append(textElement('p', 'records-birth-description',
+  card.append(uiElement('h3', '', '현재 등록된 출생 정보'));
+  card.append(uiElement('p', 'records-birth-description',
     '서버가 확인한 현재 본인 출생 정보입니다. 과거 수정 이력이나 사주 풀이 결과가 아닙니다.'));
 
   const facts = document.createElement('dl');
@@ -182,11 +203,11 @@ function renderCurrentBirthProfile(birth) {
     ['성별 정보', sex],
   ]) {
     const row = document.createElement('div');
-    row.append(textElement('dt', '', title), textElement('dd', '', value));
+    row.append(uiElement('dt', '', title), textElement('dd', '', uiText(value)));
     facts.append(row);
   }
   card.append(facts);
-  card.append(textElement('span', 'records-birth-revision', `현재 입력 · revision ${revisionNo}`));
+  card.append(textElement('span', 'records-birth-revision', recordsBirthRevisionV1(revisionNo, getUiLocale())));
   target.append(card);
 }
 
@@ -195,7 +216,7 @@ function renderLifeFacts(payload) {
   clear(target);
   const facts = requireArray(payload, 'facts').filter((fact) => !isSampleSajuReadingFact(fact));
   if (facts.length === 0) {
-    target.append(textElement('p', 'muted records-empty', '아직 남아 있는 현세록이 없습니다.'));
+    target.append(uiElement('p', 'muted records-empty', '아직 남아 있는 현세록이 없습니다.'));
     return;
   }
   for (const fact of facts) {
@@ -203,11 +224,11 @@ function renderLifeFacts(payload) {
     row.className = 'ledger-row';
     row.append(textElement('div', '', formatTimestamp(fact.confirmedAt)));
     const detail = document.createElement('div');
-    detail.append(textElement('strong', '', String(fact.factType ?? '기록 항목')));
+    detail.append(sourceElement('strong', '', String(fact.factType ?? uiText('기록 항목'))));
     detail.append(document.createElement('br'));
-    detail.append(textElement('span', 'fine', formatStoredValue(fact.valueJsonb)));
+    detail.append(sourceElement('span', 'fine', formatStoredValue(fact.valueJsonb)));
     row.append(detail);
-    row.append(textElement('div', '', fact.revokedAt ? '철회됨' : '기록됨'));
+    row.append(textElement('div', '', uiText(fact.revokedAt ? '철회됨' : '기록됨')));
     target.append(row);
   }
 }
@@ -222,17 +243,26 @@ function productResponseStateLabel(value) {
   return '저장됨';
 }
 
+let displayedRecords = null;
+let recordsStatusSource = '기록을 불러오는 중입니다…';
+
 function isPersistedReadingOpenableState(value) {
   return value === 'delivered' || value === 'delivered_with_fallback';
 }
 
 const readerBadgeSources = new WeakMap();
 document.addEventListener('myeongha:localechange', () => {
-  // Repaint the names only: never refetch history or modify Reading authority.
+  // Repaint only browser-authored UI from an already loaded snapshot; never refetch history.
+  if (displayedRecords) {
+    renderLoadedRecords(displayedRecords);
+    return;
+  }
   for (const badge of document.querySelectorAll('.records-reading-badge')) {
     const ids = readerBadgeSources.get(badge);
     if (ids) badge.textContent = readerProvenanceLocaleLabelV1(ids, getUiLocale());
   }
+  const status = byId('records-status');
+  if (!status.hidden && recordsStatusSource) status.textContent = uiText(recordsStatusSource);
 });
 
 function appendReadingFooter(card, leftText, options = {}) {
@@ -240,13 +270,13 @@ function appendReadingFooter(card, leftText, options = {}) {
   footer.className = 'records-reading-footer';
   footer.append(textElement('span', 'fine', leftText));
   if (options.href === null) {
-    footer.append(textElement('span', 'fine', options.label ?? '현재 다시 열 수 없습니다.'));
+    footer.append(textElement('span', 'fine', uiText(options.label ?? '현재 다시 열 수 없습니다.')));
     card.append(footer);
     return;
   }
   const link = document.createElement('a');
   link.href = options.href ?? 'reading.html';
-  link.textContent = options.label ?? '사주 페이지에서 보기 →';
+  link.textContent = uiText(options.label ?? '사주 페이지에서 보기 →');
   footer.append(link);
   card.append(footer);
 }
@@ -268,8 +298,8 @@ function renderPersistedReading(target, reading) {
     readerProvenanceLocaleLabelV1(reading.readerCharacterIds, getUiLocale()));
   readerBadgeSources.set(badge, reading.readerCharacterIds);
   eyebrow.append(badge);
-  eyebrow.append(textElement('span', 'records-reading-period', productResponseStateLabel(reading.productResponseState)));
-  heading.append(eyebrow, textElement('h3', 'records-reading-title', presentation.title));
+  eyebrow.append(textElement('span', 'records-reading-period', uiText(productResponseStateLabel(reading.productResponseState))));
+  heading.append(eyebrow, textElement('h3', 'records-reading-title', uiText(presentation.title)));
   identity.append(heading);
   top.append(identity);
   top.append(textElement('span', 'records-reading-date', formatTimestamp(reading.completedAt)));
@@ -277,11 +307,12 @@ function renderPersistedReading(target, reading) {
 
   const openable = isPersistedReadingOpenableState(reading.productResponseState);
   card.append(textElement(
-    'p',
-    'records-reading-summary',
-    openable
-      ? `${formatTimestamp(reading.completedAt)}에 본 ${presentation.title} 기록입니다. 저장된 공식 풀이를 그대로 다시 열 수 있습니다.`
-      : `${formatTimestamp(reading.completedAt)}의 ${presentation.title} 기록입니다. 완료된 Official Reading만 다시 열 수 있습니다.`,
+    'p', 'records-reading-summary',
+    recordsReadingSummaryV1({
+      completedAt: reading.completedAt,
+      title: uiText(presentation.title),
+      openable,
+    }, getUiLocale()),
   ));
   if (openable) {
     const handoffUrl = buildPersistedReadingHandoffUrlV1({
@@ -307,8 +338,8 @@ function renderPersistedReading(target, reading) {
 function renderSajuReadingEmpty(target) {
   const empty = document.createElement('article');
   empty.className = 'records-reading-empty';
-  empty.append(textElement('h3', '', '아직 저장된 사주 풀이가 없습니다.'));
-  empty.append(textElement('p', 'muted', '완료된 사주 풀이가 저장되면 이곳에서 풀이 이력을 확인할 수 있습니다.'));
+  empty.append(uiElement('h3', '', '아직 저장된 사주 풀이가 없습니다.'));
+  empty.append(uiElement('p', 'muted', '완료된 사주 풀이가 저장되면 이곳에서 풀이 이력을 확인할 수 있습니다.'));
   target.append(empty);
 }
 
@@ -322,9 +353,9 @@ function renderSajuReadingSamples(target, lifeFactsPayload) {
 
   for (const fact of sampleFacts) {
     const value = fact.valueJsonb;
-    const title = asNonEmptyString(value.title) ?? '사주 풀이';
+    const title = asNonEmptyString(value.title) ?? uiText('사주 풀이');
     const period = asNonEmptyString(value.period);
-    const summary = asNonEmptyString(value.summary) ?? '샘플 풀이 요약이 없습니다.';
+    const summary = asNonEmptyString(value.summary) ?? uiText('샘플 풀이 요약이 없습니다.');
     const keywords = asStringArray(value.keywords);
     const highlights = asStringArray(value.highlights);
 
@@ -339,31 +370,31 @@ function renderSajuReadingSamples(target, lifeFactsPayload) {
     const heading = document.createElement('div');
     const eyebrow = document.createElement('div');
     eyebrow.className = 'records-reading-eyebrow';
-    eyebrow.append(textElement('span', 'records-reading-badge', '개발 샘플'));
-    if (period) eyebrow.append(textElement('span', 'records-reading-period', period));
-    heading.append(eyebrow, textElement('h3', 'records-reading-title', title));
+    eyebrow.append(textElement('span', 'records-reading-badge', uiText('개발 샘플')));
+    if (period) eyebrow.append(sourceElement('span', 'records-reading-period', period));
+    heading.append(eyebrow, sourceElement('h3', 'records-reading-title', title));
     identity.append(heading);
     top.append(identity);
     top.append(textElement('span', 'records-reading-date', formatTimestamp(fact.confirmedAt)));
     card.append(top);
 
-    card.append(textElement('p', 'records-reading-summary', summary));
+    card.append(sourceElement('p', 'records-reading-summary', summary));
 
     if (keywords.length > 0) {
       const chips = document.createElement('div');
       chips.className = 'records-reading-keywords';
-      for (const keyword of keywords) chips.append(textElement('span', 'records-reading-chip', keyword));
+      for (const keyword of keywords) chips.append(sourceElement('span', 'records-reading-chip', keyword));
       card.append(chips);
     }
 
     if (highlights.length > 0) {
       const list = document.createElement('ul');
       list.className = 'records-reading-highlights';
-      for (const highlight of highlights) list.append(textElement('li', '', highlight));
+      for (const highlight of highlights) list.append(sourceElement('li', '', highlight));
       card.append(list);
     }
 
-    appendReadingFooter(card, '실제 Reading이 없을 때만 보이는 UI fixture');
+    appendReadingFooter(card, uiText('실제 Reading이 없을 때만 보이는 UI fixture'));
     target.append(card);
   }
 }
@@ -402,8 +433,8 @@ function renderMemories(payload) {
 
     const copy = document.createElement('div');
     copy.className = 'records-memory-empty-copy';
-    copy.append(textElement('h3', '', '아직 저장된 기억이 없습니다.'));
-    copy.append(textElement('p', '', '대화와 기록이 쌓이면 이곳에서 다시 확인할 수 있습니다.'));
+    copy.append(uiElement('h3', '', '아직 저장된 기억이 없습니다.'));
+    copy.append(uiElement('p', '', '대화와 기록이 쌓이면 이곳에서 다시 확인할 수 있습니다.'));
 
     empty.append(rule, ornament, copy);
     target.append(empty);
@@ -412,10 +443,10 @@ function renderMemories(payload) {
   for (const memory of memories) {
     const item = document.createElement('div');
     item.className = 'timeline-item';
-    item.append(textElement('strong', '', String(memory.memoryType ?? '기억 항목')));
-    item.append(textElement('span', 'fine', formatStoredValue(memory.contentJsonb)));
+    item.append(sourceElement('strong', '', String(memory.memoryType ?? uiText('기억 항목'))));
+    item.append(sourceElement('span', 'fine', formatStoredValue(memory.contentJsonb)));
     const provenance = memory.createdByCharacterId ? `${memory.createdByCharacterId} · ${formatTimestamp(memory.createdAt)}` : formatTimestamp(memory.createdAt);
-    item.append(textElement('span', 'fine', provenance));
+    item.append(sourceElement('span', 'fine', provenance));
     target.append(item);
   }
 }
@@ -433,25 +464,31 @@ function setFailure(error) {
   status.hidden = false;
   status.setAttribute('role', 'status');
   if (error instanceof RecordsRuntimeError && error.code === 'WEB_RECORDS_SESSION_REQUIRED') {
-    status.textContent = '기록을 확인하려면 현재 세션이 필요합니다. 로그인하거나 게스트 세션을 다시 연결한 뒤 확인해 주세요.';
-    return;
+    recordsStatusSource = '기록을 확인하려면 현재 세션이 필요합니다. 로그인하거나 게스트 세션을 다시 연결한 뒤 확인해 주세요.';
+  } else {
+    recordsStatusSource = '현재 기록을 불러올 수 없습니다. 잠시 뒤 다시 확인해 주세요.';
   }
-  status.textContent = '현재 기록을 불러올 수 없습니다. 잠시 뒤 다시 확인해 주세요.';
+  status.textContent = uiText(recordsStatusSource);
+}
+
+function renderLoadedRecords(records) {
+  renderProfile(records.profile);
+  renderCurrentBirthProfile(records.birth);
+  renderLifeFacts(records.lifeFacts);
+  renderSajuReadings(records.readings, records.lifeFacts);
+  renderMemories(records.memories);
 }
 
 async function boot() {
   setupTabs();
   const status = byId('records-status');
   status.hidden = false;
-  status.textContent = '기록을 불러오는 중입니다…';
+  status.textContent = uiText(recordsStatusSource);
   byId('records-content').hidden = true;
   try {
     const records = await createRecordsRuntimeClient().readRecords();
-    renderProfile(records.profile);
-    renderCurrentBirthProfile(records.birth);
-    renderLifeFacts(records.lifeFacts);
-    renderSajuReadings(records.readings, records.lifeFacts);
-    renderMemories(records.memories);
+    renderLoadedRecords(records);
+    displayedRecords = records;
     setReady();
   } catch (error) {
     setFailure(error);
