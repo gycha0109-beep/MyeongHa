@@ -9,6 +9,7 @@ describe('Records Saju history surface', () => {
   const html = `${readWeb('records.html')}\n${readWeb('src/records/RecordsPage.tsx')}`;
   const page = readWeb('records-page.js');
   const client = readWeb('records-runtime-client.js');
+  const readerLocale = readWeb('reader-provenance-locale.js');
   const css = readWeb('records-v2.css');
 
   it('keeps Saju reading records separate from Life Facts and other record domains', () => {
@@ -36,9 +37,10 @@ describe('Records Saju history surface', () => {
     expect(page).toContain("requireArray(readingPayload, 'readings')");
     expect(page).toContain('if (readings.length > 0)');
     expect(page).toContain('for (const reading of readings) renderPersistedReading(target, reading);');
-    expect(page).toContain('resolveCanonicalCharacterPresentationV1(characterId)?.name');
+    expect(readerLocale).toContain('resolveCharacterDisplayNameV1(id, language)');
     expect(page).toContain("records-reading-card records-reading-card--persisted");
-    expect(page).toContain("records-reading-badge', readerProvenanceLabel(reading.readerCharacterIds)");
+    expect(page).toContain('readerProvenanceLocaleLabelV1(reading.readerCharacterIds, getUiLocale())');
+    expect(page).toContain('readerBadgeSources.set(badge, reading.readerCharacterIds)');
     expect(page).toContain('if (allowsDevelopmentSajuSamples())');
     expect(page).toContain('renderSajuReadingSamples(target, lifeFactsPayload)');
     expect(page).toContain('renderSajuReadingEmpty(target);');
