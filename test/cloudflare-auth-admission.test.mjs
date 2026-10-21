@@ -20,8 +20,15 @@ describe('Cloudflare Auth/DB admission is fail-closed until explicit host and se
       ['/api/auth/sign-up', 'POST'],
       ['/api/auth/refresh', 'POST'],
       ['/api/auth/sign-out', 'POST'],
+      ['/api/auth/promote-guest', 'POST'],
+      ['/api/auth/social/start', 'POST'],
+      ['/api/auth/social/naver/authorize', 'GET'],
+      ['/api/auth/social/naver/callback', 'GET'],
+      ['/api/auth/social/naver/token', 'POST'],
+      ['/api/auth/social/naver/userinfo', 'GET'],
       ['/api/session/bootstrap', 'POST'],
       ['/api/me', 'GET'],
+      ['/api/me/birth-profile', 'GET'],
       ['/api/birth-profiles', 'POST'],
       ['/api/birth-profiles/00000000-0000-4000-8000-000000000001', 'GET'],
     ]) {
@@ -71,6 +78,8 @@ describe('Cloudflare Auth/DB admission is fail-closed until explicit host and se
   it('restricts methods and preserves the independent Seyeon HOLD', async () => {
     expect((await get('/api/auth/sign-in', ENABLED)).status).toBe(405);
     expect((await get('/api/me', ENABLED, 'POST')).status).toBe(405);
+    expect((await get('/api/me/birth-profile', ENABLED, 'POST')).status).toBe(405);
+    expect((await get('/api/auth/social/naver/authorize', ENABLED, 'POST')).status).toBe(405);
     expect((await get('/api/birth-profiles', ENABLED, 'GET')).status).toBe(405);
     const seyeon = await get('/api/chat/synthetic-thread/turns', ENABLED, 'POST');
     expect(seyeon.status).toBe(503);
