@@ -104,10 +104,15 @@ export async function tryHandleCloudflareApprovedAuthV1(request, bindings, route
   const origin = selectedOrigin(request, bindings);
   if (origin === null) return null;
   const url = new URL(request.url);
-  // The Naver provider's authorize/callback requests legitimately contain query
-  // parameters; the existing bridge validates every required parameter/state.
-  // All other endpoints reject internal Vercel rewrite markers and query spoofing.
-  if (url.search !== '' && naverAction === null) return denied();
+  // Only the verified social-complete exchange and the provider's Naver
+  // endpoints may carry query parameters. No other rewrite marker is trusted.
+  const socialCompleteValues = url.searchParams.getAll('__myeongha_social_complete');
+  const isSocialComplete =
+    route?.id === 'api.auth.refresh' &&
+    socialCompleteValues.length === 1 &&
+    socialCompleteValues[0] === '1' &&
+    [...url.searchParams.keys()].every(key => key === '__myeongha_social_complete');
+  if (url.search !== '' && naverAction === null && !isSocialComplete) return denied();
   const expectedMethod = (isMemberProfile || isBirthRead || isCurrentBirth ||
     (naverAction !== null && naverAction !== 'token')) ? 'GET' : 'POST';
   if (request.method !== expectedMethod) {
@@ -201,7 +206,9 @@ export async function tryHandleCloudflareApprovedAuthV1(request, bindings, route
           webOrigin: origin,
         }),
       });
-      result = await runtime.handleRequest({ request, action });
+      result = await runtime.handleRequest(isSocialComplete
+        ? { request, action: 'refresh', authAction: 'social-complete' }
+        : { request, action });
     }
   } catch {
     result = unavailable();
