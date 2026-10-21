@@ -163,3 +163,21 @@
 | 기존 `1050`의 검증 PAID 재생 분기 | 기존 Receipt·Provider Event·Attempt·Intent를 정확히 대조하고 `replayed=true` 반환 | **미해결 위험:** 기존 함수는 정확한 PAID 재생에도 Receipt `verification_status='verified'`를 요구하지만 `1900` 취소는 `revoked`로 바꾼다. **취소 후 과거 PAID 재전달과 동일 검증 증빙이 실제로 제공되는 경우**의 idempotency 충돌 가능성은 코드에서 확인된다. 실제 webhook 수신/검증 가능성과 처리 의미는 검증되지 않았으며, Commerce Owner 계약 없이 과거 1050을 수정하거나 `revoked` Receipt를 부활시키지 않는다 |
 
 **남은 인수/차단:** S2의 장기 미완료는 외부 Commerce provider event 디스패치, 비Reader Grant 경로·다중 Reader 범위 재발견, 계정 삭제/복원 Worker 잠금 교차, 재생·취소 역순의 Commerce Owner 정책, S5 T2 최종 원자 저장이다. Saju 공식 출처 #2410, Privacy #2318 및 복구/법무 승인 없이는 어떤 합성 CI 성공도 운영 migration, 구매권/본문 활성화, 공개, PR 병합 권한을 만들지 않는다.
+
+## 20. 동일 영수증의 결속·미결속 혼합 Grant 전체 취소 차단과 미결 정책 (2026-10-21)
+
+**확정한 결함 경계:** 정본 `1770 internal_dispatch_verified_official_reader_revoke_event_v1`는 하나의 검증된 Receipt에 속한 purchase Grant 중 **불변 `standard_reading_reader_access_grants` 결속이 존재하는 행만** `1080` 회수 Writer에 전달한다. 이에 비해 호출자 `1900 cmd_apply_verified_portone_reader_full_cancellation_v1`는 디스패처가 양수 `grantCount`를 반환하면 **원본 Receipt 전체**를 `revoked`로 기록한다. 따라서 동일 Receipt의 일부 purchase Grant에 Reader 결속이 없다면 그 Grant는 active로 남을 수 있다. 다중 Capability Grant가 실제 운영 구성에서 나오는지, 해당 혼합 상태를 어떤 정산 단위로 회수해야 하는지는 **미확정**이다.
+
+**적용한 최소 교정:** 순방향 `1910_official_reader_mixed_receipt_grant_full_cancellation_guard_v1.sql`에서 기존 `1770` 디스패처의 **동일 함수 정의만 교체**한다. 실제 verified cancellation에서 Receipt의 결속 Reader S1 잠금을 먼저 정렬·획득한 후, **같은 원본 Receipt에 결속 없는 purchase Grant가 하나라도 있으면** `official_reader_s2_dispatch_mixed_grant_unbound_denied`로 전체 트랜잭션을 거부한다. 그 뒤에만 기존 `1080` 효과 Writer를 호출한다. 새 결제사 환불 호출·비Reader Commerce Writer 수정·S5 유료 본문·PUBLIC 실행권을 추가하지 않는다. 이는 **혼합 Grant 전체 회수 구현이 아니라 부분 성공을 금지하는 차단**이다.
+
+**실제 격리 시험:** 기존 G/H 독립 verified Reader 구매 시험에서 **G의 동일 원본 Receipt에 미결속 추가 purchase Grant를 합성**하고, G의 verified full cancellation이 실패하면서 **G Receipt verified·G 두 Grant active·신규 Provider Event 0·독립 H Grant active**를 보존하는지 확인한다. 추가 합성 Grant를 삭제한 뒤 기존 G/H **서로 다른 구매의 실제 동시 환불** 시험을 계속 수행한다. 운영 DB 데이터나 실제 PortOne 결제/취소를 사용하지 않는다.
+
+**CI 및 기준 관리:** 최초 통합 CI `#39555999851`에서는 신규 차단 시험 자체가 PostgreSQL 15·17에서 통과했으나, 변경된 함수 정의로 기존 스키마 카탈로그 SHA256이 달라져 다수 DB Suite가 실패했다. 커밋 `c6bec1a`에서 `test/db/catalog.expected.sha256`을 CI가 보고한 정본 해시 `a28028eed100b231662a4cbd45531b3c4dbb9c9dedfc4ca3ffda9295203c30a2`로 갱신했다. **통합 CI #39558030241, Governance #39558030140, Web PR Domain Gates #39558030128 모두 성공**. 이 결과는 혼합 상태의 **원자적 거부**를 입증할 뿐 실제 전체 환불 가능, 운영 소유자 승인 또는 S2 완결을 뜻하지 않는다.
+
+**남은 Commerce·DB Owner 인수 결정:** 
+- 동일 verified Receipt 내 **여러 Capability Grant의 결속 여부가 섞인 원본 구매**를 취소할 때, 각 Grant의 현재 권한·연관 Reader 범위·정산 단위·원본 이벤트 출처를 어디서 확정할지 먼저 합의해야 한다. 해당 합의 전에는 `1910`의 전체 거부를 유지하며 임의로 미결속 행을 제외하거나 영수증만 `revoked` 처리하지 않는다.
+- 기존 `1050 cmd_persist_verified_payment_evidence_v1`는 동일 PAID 증빙의 정확한 재생에서도 `verification_status='verified'`를 요구한다. 반면 verified full cancellation `1900`은 동일 Receipt를 `revoked`로 변경한다. **취소 후 과거 PAID 이벤트가 다시 정식 검증되고 `1050`까지 도달하는 경우** 멱등 충돌 위험이 소스에서 확인된다. 그 이벤트가 실제 경로에 재유입되는지, `replayed` 역사적 provenance를 어떻게 표현할지, 취소 이전 영수증을 재활성화하지 않는 정책은 Commerce Owner가 확정해야 한다.
+- 혼합 Receipt 환불 처리와 취소 후 PAID 재생 계약을 소유자와 합의하기 전에는 `1050` 또는 원래 `1770/1900` 이력을 **직접 변조하지 않는다**. 재생을 구매권 활성·복구로 승격하거나 결제사 응답을 추정하지 않는다. 독립 Owner 승인·실운영 event 흐름의 공동 잠금 검증·Privacy 삭제/복원 승인 이후에만 후속 순방향 이행을 검토한다.
+
+**계속 HOLD:** PR #2301 Draft·미병합. Saju Production Source #2410, Privacy #2318, 운영 이력·백업 복구 및 S5 최종 T2 원자 저장 승인 전까지 유료 발급·원문 저장·서비스 공개·운영 DB 적용 불가.
+
