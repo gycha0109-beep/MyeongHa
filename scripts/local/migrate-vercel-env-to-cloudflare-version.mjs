@@ -12,23 +12,27 @@ const WRANGLER_VERSION = '4.151.2';
 
 function usage() {
   return [
-    'Usage: node scripts/local/migrate-vercel-env-to-cloudflare-version.mjs --source .env.migration --keys NAME1,NAME2 [--apply]',
+    'Usage: node scripts/local/migrate-vercel-env-to-cloudflare-version.mjs (--from-process-env | --source .env.migration) --keys NAME1,NAME2 [--apply]',
     '',
     'Default is a dry run that prints KEY NAMES ONLY. --apply uploads selected keys',
     'to an UNDEPLOYED Worker version of myeongha; it never changes DNS or deploys.',
-    'Prepare the local file with: npx vercel env pull .env.migration --environment=production',
+    'Recommended: npx vercel env run -e production -- node scripts/local/migrate-vercel-env-to-cloudflare-version.mjs --from-process-env --keys NAME1,NAME2 --apply',
+    'Or prepare a local file with: npx vercel env pull .env.migration --environment=production',
     'Do not check this file into Git. Delete it after use.',
   ].join('\n');
 }
 
 function parseArgs(argv) {
   if (argv.length === 1 && (argv[0] === '--help' || argv[0] === '-h')) return null;
-  const options = { apply: false, source: '', keys: [] };
+  const options = { apply: false, source: '', fromProcessEnv: false, keys: [] };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (arg === '--apply') {
       if (options.apply) throw new Error('Duplicate --apply flag.');
       options.apply = true;
+    } else if (arg === '--from-process-env') {
+      if (options.fromProcessEnv) throw new Error('Duplicate --from-process-env.');
+      options.fromProcessEnv = true;
     } else if (arg === '--source' && argv[index + 1]) {
       if (options.source) throw new Error('Duplicate --source.');
       options.source = argv[++index];
@@ -39,7 +43,8 @@ function parseArgs(argv) {
       throw new Error('Invalid argument. Use --help for usage.');
     }
   }
-  if (!options.source || !options.keys.length || options.keys.length > 100 ||
+  if (Boolean(options.source) === options.fromProcessEnv ||
+      !options.keys.length || options.keys.length > 100 ||
       options.keys.some((key) => !/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) ||
       new Set(options.keys).size !== options.keys.length) {
     throw new Error('Provide a local --source and 1–100 distinct --keys.');
@@ -48,6 +53,16 @@ function parseArgs(argv) {
 }
 
 async function readSelectedSecrets(cwd, options) {
+  if (options.fromProcessEnv) {
+    const selected = Object.create(null);
+    for (const key of options.keys) {
+      if (!Object.hasOwn(process.env, key) || !process.env[key]) {
+        throw new Error('Missing selected process environment key.');
+      }
+      selected[key] = process.env[key];
+    }
+    return selected;
+  }
   const sourcePath = resolve(cwd, options.source);
   const outputDir = resolve(cwd, 'public');
   const relPublic = relative(outputDir, sourcePath);
