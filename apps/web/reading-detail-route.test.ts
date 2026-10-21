@@ -93,6 +93,7 @@ describe('Reading hub/detail fail-closed regression', () => {
   const hub = `${readWeb('reading.html')}\n${readWeb('src/reading/ReadingPage.tsx')}`;
   const detail = `${readWeb('reading-detail.html')}\n${readWeb('src/reading-detail/ReadingDetailPage.tsx')}`;
   const detailRuntime = readWeb('reading-character.js');
+  const detailLocale = readWeb('reading-detail-ui-locale.js');
 
   it('keeps every current hub product route explicit', () => {
     for (const href of [
@@ -120,7 +121,8 @@ describe('Reading hub/detail fail-closed regression', () => {
     expect(detailRuntime).toContain("const PREVIEW_READING_TEXTS = new Set(['전체 사주', '직업운', '재물운', '연애운', '사업운']);");
     expect(detailRuntime).toContain("? (previewEligible ? 'preview_loading' : 'blocked_by_authority')");
     expect(detailRuntime).toContain('void loadPreviewReading();');
-    expect(detailRuntime).toContain('다른 주제의 풀이로 대신 보여드리지 않습니다.');
+    expect(detailRuntime).toContain("readingRouteStateCopyV1(route, engineRequest, 'blocked'");
+    expect(detailLocale).toContain('다른 주제의 풀이로 대신 보여드리지 않습니다.');
   });
 
   it('removes the legacy implicit yearly default from the detail runtime', () => {
