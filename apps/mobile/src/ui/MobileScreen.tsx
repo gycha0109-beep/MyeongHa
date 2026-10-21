@@ -1,5 +1,5 @@
 import type { PropsWithChildren, ReactNode } from 'react';
-import { RefreshControl, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { mobileColors } from '@/ui/mobile-colors';
 import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
@@ -17,7 +17,7 @@ export function MobileScreen({ title, eyebrow, description, refreshing = false, 
   const styles = useMobileThemedStyles(staticStyles);
   const { colors } = useMobileTheme();
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.canvas }]}>
+    <View style={[styles.safeArea, { backgroundColor: colors.canvas }]}>
       <ScrollView
         contentContainerStyle={styles.content}
         refreshControl={onRefresh === undefined ? undefined : (
@@ -36,7 +36,7 @@ export function MobileScreen({ title, eyebrow, description, refreshing = false, 
         </View>
         {children}
       </ScrollView>
-    </SafeAreaView>
+    </View
   );
 }
 
