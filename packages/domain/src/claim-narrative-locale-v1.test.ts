@@ -18,7 +18,7 @@ const base = { profile, claimType: 'illustrative-claim', semanticKey: 'illustrat
 describe('ClaimNarrativeProfile locale template selector', () => {
   it('uses only a matching versioned source-owned template', () => {
     expect(selectClaimNarrativeLocaleTemplateV1({ ...base, locale: 'ja-JP' })).toEqual({
-      state: 'ready', profileId: 'sample-not-production', version: 'draft-v1',
+      state: 'selected', profileId: 'sample-not-production', version: 'draft-v1',
       semanticKey: 'illustrative-key', language: 'ja-JP', templateKey: 'main', text: '検証用の例文',
     });
   });
