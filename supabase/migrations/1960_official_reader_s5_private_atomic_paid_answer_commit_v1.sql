@@ -28,6 +28,7 @@ declare
   v_reading uuid;
   v_bundle uuid;
   v_release uuid;
+  v_content_revision bigint;
   v_grant uuid;
   v_product uuid;
   v_product_spec text;
@@ -70,7 +71,8 @@ begin
        where supplied.k <> all(array[
          'contractVersion','subjectId','threadId','turnId','attemptId',
          'bodyId','safeMessageId','officialReadingId','readerCharacterId',
-         'readerContentBundleId','contentReleaseId','originatingGrantId',
+         'readerContentBundleId','contentReleaseId','contentRevision',
+         'originatingGrantId',
          'productId','productSpecVersion','officialArtifactResponseHash',
          'sourceAttestationRef','sourceResponseHash','semanticGuardVersion',
          'outputGuardVersion','encryptionKeyRef'
@@ -91,6 +93,7 @@ begin
   v_reader:=p_request->>'readerCharacterId';
   v_bundle:=(p_request->>'readerContentBundleId')::uuid;
   v_release:=(p_request->>'contentReleaseId')::uuid;
+  v_content_revision:=(p_request->>'contentRevision')::bigint;
   v_grant:=(p_request->>'originatingGrantId')::uuid;
   v_product:=(p_request->>'productId')::uuid;
   v_product_spec:=p_request->>'productSpecVersion';
@@ -104,6 +107,7 @@ begin
   if v_subject is null or v_thread is null or v_turn is null
      or v_attempt is null or v_body is null or v_message is null
      or v_reading is null or v_bundle is null or v_release is null
+     or v_content_revision is null or v_content_revision<0
      or v_grant is null or v_product is null or v_reader is null
      or pg_catalog.btrim(v_reader)=''
      or v_product_spec is null or pg_catalog.btrim(v_product_spec)=''
@@ -191,9 +195,13 @@ begin
   -- Serialize the safe marker sequence against another Writer that takes
   -- this exact Thread row lock. The unique sequence constraint remains the
   -- ultimate conflict barrier: no partial payment content can commit.
-  perform 1 from public.conversation_threads ct
+  select ct.next_sequence_no into v_thread_sequence
+  from public.conversation_threads ct
   where ct.id=v_thread and ct.subject_id=v_subject
     and ct.thread_type='single_character' and ct.status='active'
+    and ct.active_content_release_id=v_release
+    and ct.active_content_bundle_id=v_bundle
+    and ct.content_revision=v_content_revision
   for update;
   if not found then
     raise exception using errcode='P0001',
@@ -242,9 +250,16 @@ begin
   -- no generated/validated plaintext staging in ordinary Chat is accepted.
   -- One marker and one protected row commit in the SAME PostgreSQL
   -- transaction. No paid body or private hash enters Chat/Outbox/Memory.
-  select coalesce(max(m.sequence_no),0)+1 into v_thread_sequence
-  from public.conversation_messages m where m.thread_id=v_thread;
   v_now:=pg_catalog.clock_timestamp();
+  update public.conversation_threads ct
+  set next_sequence_no=v_thread_sequence+1,updated_at=v_now
+  where ct.id=v_thread and ct.subject_id=v_subject
+    and ct.next_sequence_no=v_thread_sequence;
+  if not found then
+    raise exception using errcode='40001',
+      constraint='official_reader_s5_thread_sequence_changed',
+      message='Official Reader Chat Thread sequence moved during commit';
+  end if;
 
   update public.chat_turn_attempts
   set state='committed',finished_at=coalesce(finished_at,v_now),
