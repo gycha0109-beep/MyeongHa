@@ -218,12 +218,12 @@ begin
   where t.id=v_turn and t.thread_id=v_thread and t.subject_id=v_subject
   for update;
   if not found
-     or v_turn_row.state<>'validated'
+     or v_turn_row.state not in ('received','planned','context_ready')
      or v_turn_row.resolved_content_bundle_id is distinct from v_bundle
      or v_turn_row.resolved_content_release_id is distinct from v_release
      or v_turn_row.committed_attempt_id is not null then
     raise exception using errcode='P0001',
-      constraint='official_reader_s5_turn_not_validated',
+      constraint='official_reader_s5_turn_not_staged',
       message='Official Reader Chat Turn cannot be committed';
   end if;
 
@@ -231,12 +231,15 @@ begin
   from public.chat_turn_attempts a
   where a.id=v_attempt and a.turn_id=v_turn and a.subject_id=v_subject
   for update;
-  if not found or v_attempt_row.state<>'validated' then
+  if not found or v_attempt_row.state<>'running' then
     raise exception using errcode='P0001',
-      constraint='official_reader_s5_attempt_not_validated',
-      message='Official Reader generated Attempt is not validated';
+      constraint='official_reader_s5_attempt_not_private',
+      message='Official Reader private Attempt is not pending';
   end if;
 
+  -- Private generation and semantic/output judgment happened OUTSIDE the
+  -- DB. Only a staged Chat Turn and running Attempt may enter this T2;
+  -- no generated/validated plaintext staging in ordinary Chat is accepted.
   -- One marker and one protected row commit in the SAME PostgreSQL
   -- transaction. No paid body or private hash enters Chat/Outbox/Memory.
   select coalesce(max(m.sequence_no),0)+1 into v_thread_sequence
@@ -247,13 +250,13 @@ begin
   set state='committed',finished_at=coalesce(finished_at,v_now),
       output_guard_version=v_output_version
   where id=v_attempt and turn_id=v_turn and subject_id=v_subject
-    and state='validated';
+    and state='running';
 
   update public.chat_turns
   set state='committed',committed_attempt_id=v_attempt,
       committed_at=v_now,updated_at=v_now,revision=revision+1
   where id=v_turn and thread_id=v_thread and subject_id=v_subject
-    and state='validated';
+    and state in ('received','planned','context_ready');
 
   insert into public.conversation_messages(
     id,thread_id,subject_id,turn_id,sequence_no,sender_type,
