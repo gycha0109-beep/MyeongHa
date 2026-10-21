@@ -127,6 +127,7 @@ export function HomeContinuationCard({
   card: MobileHomeContinuationCardV1;
 }) {
   const styles = useMobileThemedStyles(staticStyles);
+  const { t } = useMobileUiLocale();
   return (
     <View style={styles.section}>
       <View style={styles.sectionHeading}>
