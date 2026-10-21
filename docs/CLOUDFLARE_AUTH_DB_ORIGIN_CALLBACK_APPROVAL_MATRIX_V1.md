@@ -1,0 +1,66 @@
+# Cloudflare Auth/DB 이관 — OAuth Origin·Callback 및 격리 DB 승인 매트릭스 v1
+
+> 트랙: ops / 로드맵 단계 5 (인증·세션·Supabase/PostgreSQL), 2026-10-21  
+> 대상: [Cloudflare 구현 Draft PR #2384](https://github.com/gycha0109-beep/MyeongHa/pull/2384)  
+> 상태: **승인 요청용 계약 정리. Cloudflare Auth/DB positive admission은 HOLD.**  
+> 근거: `apps/api/src/social-auth-start-http.ts`, `naver-oauth-bridge-http.ts`, `supabase-auth-http.ts`, `member-refresh-cookie.ts`, `production-user-data-runtime-config.ts`, `docs/CLOUDFLARE_AUTH_DB_TRANSPORT_DECISION_V1.md`.  
+> **이 문서는 OAuth provider·Supabase 프로젝트·Worker 변수/secret·DB credential·DNS를 수정하거나 신규 권한을 승인하지 않는다.**
+
+## 1. 현재 코드가 실제 허용하는 URL (기존 Vercel 계약)
+
+| 흐름 | 기존에 코드로 확인된 URL/형태 | 유지해야 할 보안 조건 | Cloudflare 상태 |
+|---|---|---|---|
+| Web 소셜 인증 시작 후 redirect | `https://myeongha.vercel.app/auth.html?social=callback` (서버가 `state` 추가) | **HTTPS, 정확한 origin/path, `social` 단일 키**, 추가 임의 query·userinfo·hash 불허, random state TTL 10분 | 이 주소를 Workers Preview 주소로 자동 치환 **금지** |
+| 모바일 소셜 인증 | `myeongha://auth/callback` (서버가 `state` 추가) | `myeongha:` 스킴, `auth` host, `/callback` path, 최초 redirect URI query·fragment 없음 | 기존 모바일 딥링크 **불변**, 신규 웹 origin과 혼합 금지 |
+| 소셜 provider start | `/api/auth/social/start` → 고정 Supabase `/auth/v1/authorize` | Google/Kakao/Naver provider flag 개별 gate, `redirect_to` exact 값, 요청 본문 한도 | **404**, Supabase로 전송하지 않음 |
+| 네이버 OAuth transport | `https://myeongha.vercel.app/api/auth/social/naver/authorize` 및 `/callback`, `/token`, `/userinfo` | 네이버 등록 callback은 **정확히** `https://myeongha.vercel.app/api/auth/social/naver/callback`; PKCE S256, 밀봉된 AES-GCM state, state TTL 10분, action/method 검증 | 전체 **404**, 새 등록 URL 미승인 |
+| 네이버↔Supabase bridge | 기존 상수 `MYEONGHA_PRODUCTION_SUPABASE_ORIGIN + /auth/v1/callback` | Supabase governed project origin 유지, code/verifier/state 바인딩, token credential 로그 금지 | 새 Worker → Supabase bridge 연결 **HOLD** |
+| Supabase 이메일 가입 확인 | 기존 `https://myeongha.vercel.app/auth.html?confirmed=1&next=...` | `next`는 기존 HTML allowlist: `hall.html`, `reading.html`, `reading-detail.html`, `chat-hub.html`, `chat.html`, `records.html`, `my.html`. 외부 origin은 hall fallback | Cloudflare signup redirect 교체 **HOLD** |
+| 브라우저 refresh 쿠키 | `myeongha_member_refresh_v1`; `Path=/api/auth; HttpOnly; Secure; SameSite=Strict`; **Domain 없음** | 호스트 전용 쿠키는 `myeongha.vercel.app`과 `*.workers.dev` 사이에 공유되지 않음. 로그인/갱신/로그아웃 별 속성 동일성 필요 | Workers 발급·읽기·삭제 **HOLD** |
+| 개인 API | `/api/me`, `/api/birth-profiles`, `/api/readiness` 등 | 검증된 인증 주체 → canonical subject → RLS·verify-full; `readiness`는 private TLS canary | **404**, 새 웹 호스트를 인증 근거로 사용 금지 |
+
+**주의:** 이 표는 URL·호스트 보안 계약을 정리한 것이며 실제 OAuth callback/state/CSRF E2E를 완료했다는 뜻이 아니다. 현재 명하 Preview URL은 **정적 프리뷰 전용**이며 OAuth/DB 승인된 호스트가 아니다.
+
+## 2. Cloudflare 전환에 필요한 정확한 허용 URL 결정란 (미승인)
+
+| 운영 결정 | 채워야 할 실제 승인값 또는 정책 | 현재 판정 |
+|---|---|---|
+| Auth 테스트 전용 HTTPS origin | 신규/기존 **정확한 FQDN 하나**와 소유권. `https://`, 포트 포함 여부, preview vs production 구분, rollback 호스트 | **UNSET / HOLD** |
+| Web social callback allowlist | 승인 origin 기준 **정확히** `/auth.html?social=callback`; state 추가·검증, 중복·오염 query 거부 | **UNSET / HOLD** |
+| Naver provider callback | 승인 origin 기준 정확히 `/api/auth/social/naver/callback`; 네이버 개발자 설정·Supabase bridge callback 양측 호환 승인 | **UNSET / HOLD** |
+| Supabase 웹 확인 redirect | 승인 origin 기준 `/auth.html?confirmed=1&next=...`; 공급자 allowlist·email confirmation 정책 검토 | **UNSET / HOLD** |
+| Mobile callback | 현행 `myeongha://auth/callback` 유지 또는 별도 모바일 담당 승인 | **현행 값 보존 / 새 변경 없음** |
+| Refresh cookie scope | 새 origin에서 host-only, `Path=/api/auth`, HttpOnly, Secure, SameSite=Strict; 기존 Vercel 세션을 새 호스트로 자동 복사하지 않는 전환·재로그인 정책 | **UNSET / HOLD** |
+| Callback/state/CSRF 검증 | Google/Kakao/Naver provider별 exact redirect, PKCE, state 발급·수신/일회성·TTL·재전송, login CSRF 및 host spoof 부정 검사 | **미실측 / HOLD** |
+| Worker Auth runtime secret | DB, Supabase, guest fingerprint, Naver bridge 등 **키 이름·격리된 binding namespace·소유자·rotation/폐기 계획만**. 값은 GitHub에 작성하지 않음 | **설정 미승인 / HOLD** |
+| Web/Worker 사이 CORS | 필요한 정확한 `Origin` 및 method/header/credentials 정책. wildcard+credentials 금지; 같은 origin 기준을 먼저 검토 | **UNSET / HOLD** |
+
+승인값이 없는 항목은 임의의 `workers.dev` 주소나 `myeongha.vercel.app`을 복사하여 **승인됨(PASS)**으로 승격시키지 않는다. `Host`, `X-Forwarded-Host`, query `redirect_uri`, 임의 사용자 입력을 승인 호스트의 대용으로 사용하지 않는다.
+
+## 3. Worker → 격리 PostgreSQL 실접속 선행 승인
+
+| 계약 | Security/API/DB에서 확인할 정확한 증거 | 현재 |
+|---|---|---|
+| 대상 DB 분리 | 운영 데이터가 없는 합성 전용 DB의 **공개 경로로 도달 가능한 DNS FQDN/port**와 소유자, 네트워크 제한. Cloudflare TCP는 loopback/private IP 대상 직접 연결 불가 | **UNSET** |
+| 비밀값 운영 | Cloudflare Worker용 **개별 secret binding 권한·rotation·폐기**, 운영 Vercel secret 재사용/자동 복사 불허 | **UNSET** |
+| TLS 인증서 | **verify-full**, CA trust root/SHA256 pin, DNS SAN/hostname 일치, 거부 시 fail-closed. 원문 인증서/DSN은 PR·로그 금지 | **UNSET** |
+| Postgres 역할 | 비특권 login principal, **NOLOGIN `myeongha_api_executor`**, `SET LOCAL ROLE`, transaction-bound member/guest resolver, RLS 및 다른 사용자 read/write 차단 | **Node·일회용 PostgreSQL 증명만 완료** |
+| 요청별 pool | max=1 후보, scope 종료 시 await close, 오류 시 rollback/discard, 요청 간 subject 오염·동시성·cancel/timeout 회귀 | **합성 + Node 일회용 DB만 완료** |
+| 성능/비용 | Workers 전용 handshake/connect/close 지연, 연결·CPU·subrequest 한도와 DB max connections, 비용/traffic owner | **UNSET** |
+| Hyperdrive 대안 | Direct TCP가 불가한 경우에만 **별도 승인**, 사용자/권한 SQL 쿼리 cache disabled, Custom CA + verify-full의 신뢰 주체 및 RLS 동등성 검증 | **생성·채택 HOLD** |
+
+현재 수락 근거: [일회용 PostgreSQL TLS/RLS Node CI #39530395189](https://github.com/gycha0109-beep/MyeongHa/actions/runs/39530395189). **Node TLS/RLS PASS ≠ 배포된 Workers에서 같은 DB 보안 경계 PASS**. 이 문서로 원격 endpoint가 생기거나 OAuth provider callback을 등록한 것으로 간주하지 않는다.
+
+## 4. 별도 승인 이후에만 할 실제 실행 순서
+
+1. Security/API/DB와 사용자 승인 범위를 exact OAuth origin, 격리 DB target, TLS/role/secret binding, 비용 상한, 즉시 차단/삭제 절차까지 **값을 숨긴 승인 기록**으로 고정.
+2. Cloudflare 기존 `myeongha` Preview에서만 **승인된 격리 네트워크 target**을 이용해 TLS root/hostname/role/member·guest/RLS/negative cases를 실측. 새 Cloudflare Production Worker·DNS 변경 금지.
+3. OAuth는 provider 등록 URL·Supabase redirect allowlist의 exact 허용값이 일치할 때, **합성 테스트 사용자만** 허용. state/CSRF/cookie/renew/logout/호스트 분리를 검증하고 기존 Vercel origin은 유지.
+4. 실패 시 해당 Auth/DB route 404, `/api/readiness` 404로 유지하고, 사용한 test credential 폐기·Preview 이전 버전 rollback. **단계 6 사주·관상으로 자동 진행하지 않음.**
+
+## 5. 현시점 판정과 승인 요청
+
+- **EVIDENCED:** Worker 정적 Preview 및 `/api/health`, API denial, 로컬 Worker Node import/쿠키 계약, 요청별 Pool 합성 테스트, Node↔일회용 PostgreSQL TLS/회원 RLS.
+- **HOLD:** Workers→접근 가능한 실제 격리 DB TLS/RLS, preview OAuth/Web/모바일 콜백 등록, refresh cookie host 이동, positive `/api/auth/*`, `/api/me` 및 private `/api/readiness`.
+- **필요 승인:** 격리 DB 접속 target 및 비용·credential scope, 별도 정확한 HTTPS Auth origin, 공급자별 redirect/callback 허용 URL, Security/API/DB 기술 수락. **미정값은 미정으로 유지.**
+- **기존 운영 불변:** Vercel, Supabase production schema/credential, Naver/Google/Kakao provider 설정, Workers production routing, DNS, Saju, Seyeon AI, PortOne 결제는 변경하지 않는다.
