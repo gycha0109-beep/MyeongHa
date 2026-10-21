@@ -1,5 +1,6 @@
 import { resolveCharacterDisplayNameV1 } from './character-display-locale.js';
 import { getUiLocale, translateStaticUi } from './ui-i18n.js';
+import { readingUiCopyV1, readingUiProgressV1, readingUiReaderLineV1 } from './reading-ui-locale.js';
 import { resolveReadingDetailRoute } from './reading-detail-route.js';
 import { resolveSajuButtonEngineRequest } from './reading-saju-engine-request.js';
 import { isBrowserSajuPreviewDeliveryV1 } from './saju-preview-response-admission.js';
@@ -464,7 +465,7 @@ function renderProgressDots(stepCount, activeIndex) {
 }
 
 function previewCommentForStep() {
-  return '좋고 나쁨으로 단정하기보다 실제 생활에서 이 흐름이 반복되는지 확인해 보세요.';
+  return readingUiCopyV1('좋고 나쁨으로 단정하기보다 실제 생활에서 이 흐름이 반복되는지 확인해 보세요.', getUiLocale());
 }
 
 function displayFactValue(fact) {
@@ -551,7 +552,7 @@ function activatePreviewReading(preview) {
       recordsLink.setAttribute('href', isStoredRecord ? 'records.html?tab=saju' : 'reading.html');
     }
     if (recordsLinkLabel) {
-      recordsLinkLabel.textContent = isStoredRecord ? '기록에서 사주 보기' : '다른 사주 읽기';
+      recordsLinkLabel.textContent = readingUiCopyV1(isStoredRecord ? '기록에서 사주 보기' : '다른 사주 읽기', getUiLocale());
     }
   }
 
@@ -569,32 +570,32 @@ function activatePreviewReading(preview) {
     if (!step) return;
     const structureParts = [...step.structure, ...step.supporting];
 
-    if (progressLabel) progressLabel.textContent = `읽기 ${activeIndex + 1} / ${steps.length}`;
+    if (progressLabel) progressLabel.textContent = readingUiProgressV1(activeIndex, steps.length, getUiLocale());
     if (stepTitle) stepTitle.textContent = step.title;
     if (stepBody) stepBody.textContent = step.primary;
     if (structureTitle) {
       structureTitle.textContent = step.structure.length > 0
-        ? '이 해석의 사주 근거'
+        ? readingUiCopyV1('이 해석의 사주 근거', getUiLocale())
         : step.supporting.length > 0
-          ? '함께 볼 포인트'
-          : '이 해석을 읽는 기준';
+          ? readingUiCopyV1('함께 볼 포인트', getUiLocale())
+          : readingUiCopyV1('이 해석을 읽는 기준', getUiLocale());
     }
     if (structureBody) {
       structureBody.textContent = structureParts.length > 0
         ? structureParts.join('\n\n')
-        : '원국에서 확인된 해석 축을 바탕으로 읽는 항목입니다.';
+        : readingUiCopyV1('원국에서 확인된 해석 축을 바탕으로 읽는 항목입니다.', getUiLocale());
     }
-    if (readerLine) readerLine.textContent = `${step.title} 항목을 확인합니다.`;
+    if (readerLine) readerLine.textContent = readingUiReaderLineV1(step.title, getUiLocale());
     if (readerComment) readerComment.textContent = previewCommentForStep();
     if (authorityNote) {
       authorityNote.textContent = isStoredRecord
-        ? '기록 · 당시 저장된 공식 사주 풀이를 그대로 다시 읽고 있습니다.'
-        : 'Preview · 현재 주제의 검증용 읽기이며 공식 기록에 저장되지 않습니다.';
+        ? readingUiCopyV1('기록 · 당시 저장된 공식 사주 풀이를 그대로 다시 읽고 있습니다.', getUiLocale())
+        : readingUiCopyV1('Preview · 현재 주제의 검증용 읽기이며 공식 기록에 저장되지 않습니다.', getUiLocale());
       if (preview.notice) authorityNote.title = preview.notice;
     }
     if (previousButton) previousButton.disabled = activeIndex === 0;
     if (nextButton) nextButton.disabled = false;
-    if (nextLabel) nextLabel.textContent = activeIndex >= steps.length - 1 ? '읽기 마치기' : '다음 읽기';
+    if (nextLabel) nextLabel.textContent = readingUiCopyV1(activeIndex >= steps.length - 1 ? '읽기 마치기' : '다음 읽기', getUiLocale());
     renderProgressDots(steps.length, activeIndex);
   }
 
@@ -621,21 +622,29 @@ function activatePreviewReading(preview) {
   else delete root.dataset.readingRecordMode;
   if (routeState) routeState.hidden = true;
   if (stage) stage.hidden = false;
-  if (completionCopy && !isStoredRecord) {
-    completionCopy.textContent =
-      '이 프리뷰는 공식 풀이 기록에 저장되지 않습니다. 다른 사주 읽기는 사주 페이지에서 선택할 수 있습니다.';
+  function renderCompletionLocale() {
+    if (recordsLinkLabel) {
+      recordsLinkLabel.textContent = readingUiCopyV1(isStoredRecord ? '기록에서 사주 보기' : '다른 사주 읽기', getUiLocale());
+    }
+    if (completionCopy) {
+      completionCopy.textContent = readingUiCopyV1(isStoredRecord
+        ? '이 결과는 기록에 저장된 Official Reading입니다. 대화를 시작하려면 대화 상대를 새로 선택해 주세요.'
+        : '이 프리뷰는 공식 풀이 기록에 저장되지 않습니다. 다른 사주 읽기는 사주 페이지에서 선택할 수 있습니다.', getUiLocale());
+    }
+    if (isStoredRecord && completionTitle) {
+      completionTitle.textContent = readingUiCopyV1('저장된 공식 사주 풀이를 끝까지 확인했습니다.', getUiLocale());
+    }
   }
+  document.addEventListener('myeongha:localechange', () => {
+    renderStep();
+    renderCompletionLocale();
+  });
+  renderCompletionLocale();
   if (isStoredRecord) {
     clearPersistedReadingPresentation();
     if (stage) stage.setAttribute('aria-label', '저장된 공식 사주 풀이');
     configurePersistedReadingNavigation();
-    if (completionTitle) {
-      completionTitle.textContent = '저장된 공식 사주 풀이를 끝까지 확인했습니다.';
-    }
-    if (completionCopy) {
-      completionCopy.textContent =
-        '이 결과는 기록에 저장된 Official Reading입니다. 대화를 시작하려면 대화 상대를 새로 선택해 주세요.';
-    }
+    // Stored official content is unchanged; only the surrounding UI is localized.
     if (productTitle) productTitle.textContent = '저장된 사주 풀이';
     document.title = '저장된 사주 풀이 · 명하';
   }
