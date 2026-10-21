@@ -12,10 +12,11 @@ const WRANGLER_VERSION = '4.151.2';
 
 function usage() {
   return [
-    'Usage: node scripts/local/migrate-vercel-env-to-cloudflare-version.mjs (--from-process-env | --source .env.migration) --keys NAME1,NAME2 [--apply]',
+    'Usage: node scripts/local/migrate-vercel-env-to-cloudflare-version.mjs (--from-process-env | --source .env.migration) --keys NAME1,NAME2 [--apply] [--preview-base]',
     '',
     'Default is a dry run that prints KEY NAMES ONLY. --apply uploads selected keys',
     'to an UNDEPLOYED Worker version of myeongha; it never changes DNS or deploys.',
+    '--preview-base targets Cloudflare Preview base secrets instead; these may affect existing preview deployments.',
     'Recommended: npx vercel env run -e production -- node scripts/local/migrate-vercel-env-to-cloudflare-version.mjs --from-process-env --keys NAME1,NAME2 --apply',
     'Or prepare a local file with: npx vercel env pull .env.migration --environment=production',
     'Do not check this file into Git. Delete it after use.',
@@ -24,12 +25,15 @@ function usage() {
 
 function parseArgs(argv) {
   if (argv.length === 1 && (argv[0] === '--help' || argv[0] === '-h')) return null;
-  const options = { apply: false, source: '', fromProcessEnv: false, keys: [] };
+  const options = { apply: false, source: '', fromProcessEnv: false, previewBase: false, keys: [] };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (arg === '--apply') {
       if (options.apply) throw new Error('Duplicate --apply flag.');
       options.apply = true;
+    } else if (arg === '--preview-base') {
+      if (options.previewBase) throw new Error('Duplicate --preview-base.');
+      options.previewBase = true;
     } else if (arg === '--from-process-env') {
       if (options.fromProcessEnv) throw new Error('Duplicate --from-process-env.');
       options.fromProcessEnv = true;
@@ -87,13 +91,13 @@ async function readSelectedSecrets(cwd, options) {
   return selected;
 }
 
-function uploadUndeployedVersion(cwd, values) {
+function uploadToCloudflare(cwd, values, previewBase) {
   return new Promise((resolveUpload, rejectUpload) => {
     const executable = process.platform === 'win32' ? 'npx.cmd' : 'npx';
-    const child = spawn(executable, [
-      '--yes', 'wrangler@' + WRANGLER_VERSION, 'versions', 'secret', 'bulk',
-      '--name', WORKER_NAME, '--config', 'wrangler.jsonc',
-    ], {
+    const args = previewBase
+      ? ['--yes', 'wrangler@' + WRANGLER_VERSION, 'preview', 'base-config', 'secret', 'bulk', '--worker-name', WORKER_NAME, '--config', 'wrangler.jsonc']
+      : ['--yes', 'wrangler@' + WRANGLER_VERSION, 'versions', 'secret', 'bulk', '--name', WORKER_NAME, '--config', 'wrangler.jsonc'];
+    const child = spawn(executable, args, {
       cwd,
       shell: process.platform === 'win32',
       stdio: ['pipe', 'ignore', 'ignore'], // Never print CLI output or secret values.
@@ -122,13 +126,15 @@ async function main() {
     throw new Error('This command is restricted to the existing myeongha preview Worker.');
   }
   const values = await readSelectedSecrets(cwd, options);
-  console.log('Worker: ' + WORKER_NAME + '; selected key names: ' + options.keys.join(', '));
+  console.log('Worker: ' + WORKER_NAME + '; target: ' + (options.previewBase ? 'preview-base' : 'undeployed-version') + '; selected key names: ' + options.keys.join(', '));
   if (!options.apply) {
     console.log('DRY RUN ONLY. No secret was sent. Use --apply to create an undeployed version.');
     return;
   }
-  await uploadUndeployedVersion(cwd, values);
-  console.log('Selected secrets uploaded to a NEW, UNDEPLOYED Worker version. No traffic was switched.');
+  await uploadToCloudflare(cwd, values, options.previewBase);
+  console.log(options.previewBase
+    ? 'Selected secrets uploaded to Preview base config. Existing preview deployments may use these bindings; Production DNS unchanged.'
+    : 'Selected secrets uploaded to a NEW, UNDEPLOYED Worker version. No traffic was switched.');
 }
 
 main().catch(() => {
