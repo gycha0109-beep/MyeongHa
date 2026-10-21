@@ -5,6 +5,7 @@ import {createHash} from 'node:crypto';
 import {
  admitTerraGlmQualityTrioOneShotV1,requirePublicSyntheticQualityUtteranceV1,
  SEYEON_TERRA_GLM_QUALITY_TRIO_PRIOR_RESERVED_MICRO_USD as PRIOR,
+ SEYEON_TERRA_GLM_QUALITY_TRIO_LUNA_RESERVE_MICRO_USD as LUNA_RESERVE,
  SEYEON_TERRA_GLM_QUALITY_TRIO_TERRA_RESERVE_MICRO_USD as TERRA_RESERVE,
  SEYEON_TERRA_GLM_QUALITY_TRIO_GLM_RESERVE_MICRO_USD as GLM_RESERVE,
  SEYEON_TERRA_GLM_QUALITY_TRIO_OWNER_BUDGET_KRW as OWNER_CAP,
@@ -16,8 +17,6 @@ import {createOpenAiSeyeonStructuredProviderV1}
  from '../dist/apps/api/src/openai-seyeon-structured-provider-v1.js';
 import {createOpenRouterSeyeonEvaluationProviderV1,lookupOpenRouterSeyeonGenerationChargeV1}
  from '../dist/apps/api/src/openrouter-seyeon-evaluation-provider-v1.js';
-import {runSeyeonCharacterTurnV2}
- from '../dist/apps/api/src/seyeon-character-runtime-v2.js';
 import {runSeyeonCensusFirstThreeCallShadowV1}
  from '../dist/apps/api/src/seyeon-census-first-three-call-shadow-v1.js';
 import {createIntegrityClassifier,createDisclosureClassifier}
@@ -55,34 +54,37 @@ await mkdir(dir,{recursive:true,mode:0o700});
 const ledger=await open(join(dir,'attempts.jsonl'),'wx',0o600);
 const record=async x=>{await ledger.appendFile(JSON.stringify(x)+'\n');await ledger.sync();};
 const started=performance.now();
-const metrics={terra:[],glm:[]};
-let counts={terra:{},glm:{}};
-let observedStages={terra:{},glm:{}};
+const metrics={candidate:[],glm:[]};
+let counts={candidate:{},glm:{}};
+let observedStages={candidate:{},glm:{}};
 const completePairs=[];
 let currentCase=null;
-const reservation={terra:0,glm:0};
+const reservation={luna:0,terra:0,glm:0};
 let verdict='HOLD',reason='NOT_COMPLETED';
 let availableCredit=null,selectedProvider=null,purchasedMicroUsd=null;
 let openRouterBefore=null,openRouterAfter=null;
-let terraText=null,glmText=null,terraElapsedMs=null,glmElapsedMs=null;
-const terraExpected=new Set(['integrity_classification','disclosure_classification',
- 'turn_interpretation','dialogue_render','semantic_review']);
-const glmStages=Object.freeze(['unified_preflight_shadow','turn_interpret_render_shadow','semantic_review']);
-const totalReserves=()=>PRIOR+reservation.terra*TERRA_RESERVE+reservation.glm*GLM_RESERVE;
-const budget=(next)=> {
- if((totalReserves()+next)*FX_MAX/1e6>OWNER_CAP)
-  throw Error('TERRA_GLM_QUALITY_TRIO_BUDGET_HOLD');
+let candidateText=null,glmText=null,candidateElapsedMs=null,glmElapsedMs=null;
+const candidateModels=Object.freeze({
+ unified_preflight_shadow:'gpt-5.6-luna',
+ turn_interpret_render_shadow:'gpt-5.6-terra',
+ semantic_review:'gpt-5.6-terra',
+});
+const glmStages=Object.freeze(Object.keys(candidateModels));
+const totalReserves=()=>PRIOR+reservation.luna*LUNA_RESERVE+
+ reservation.terra*TERRA_RESERVE+reservation.glm*GLM_RESERVE;
+const budget=next=>{
+ if((totalReserves()+next)*FX_MAX/1e6>OWNER_CAP)throw Error('TERRA_GLM_QUALITY_TRIO_BUDGET_HOLD');
 };
 const reserve=async(route,stage,bytes,limit,cap)=>{
- if(!Number.isInteger(bytes)||bytes<1||bytes>24576||
-    reservation[route]>=cap)throw Error('TERRA_GLM_QUALITY_TRIO_REQUEST_BOUNDS_HOLD');
+ if(!Number.isInteger(bytes)||bytes<1||bytes>24576||reservation[route]>=cap)
+  throw Error('TERRA_GLM_QUALITY_TRIO_REQUEST_BOUNDS_HOLD');
  budget(limit);
- // The ledger is durable before a potentially charged POST.
  await record({kind:'reserve',route,caseId:currentCase.id,stage,
   ordinal:reservation[route]+1,requestBytes:bytes,reservedMicroUsd:limit,runId:execution.runId});
  reservation[route]++;
- counts[route][stage]=(counts[route][stage]??0)+1;
- if(counts[route][stage]!==1)throw Error('TERRA_GLM_QUALITY_TRIO_STAGE_REPLAY_HOLD');
+ const type=route==='glm'?'glm':'candidate';
+ counts[type][stage]=(counts[type][stage]??0)+1;
+ if(counts[type][stage]!==1)throw Error('TERRA_GLM_QUALITY_TRIO_STAGE_REPLAY_HOLD');
 };
 const governance=provider=>({
  relationship:{gate:'PUBLIC',trustBand:'low',relevantSharedHistoryRefs:[]},
@@ -99,56 +101,64 @@ const governance=provider=>({
   retriever:{retrieve(){throw Error('SYNTHETIC_PRIVATE_RETRIEVAL_HOLD');}},
  },
 });
-const terraPrices=SEYEON_DIALOGUE_PATH_PRICES_V1['gpt-5.6-terra'];
-function terraProvider(){
+function openAiProvider(model,expectedStage){
+ if(candidateModels[expectedStage]!==model)throw Error('LUNA_TERRA_STAGE_MODEL_MISMATCH_HOLD');
+ const route=model==='gpt-5.6-luna'?'luna':'terra';
+ const limit=route==='luna'?LUNA_RESERVE:TERRA_RESERVE;
+ const cap=route==='luna'?3:6;
+ const prices=SEYEON_DIALOGUE_PATH_PRICES_V1[model];
  return createOpenAiSeyeonStructuredProviderV1({
-  apiKey:terraKey,model:'gpt-5.6-terra',
-  maxOutputTokens:1536,timeoutMs:30000,
+  apiKey:terraKey,model,maxOutputTokens:1536,timeoutMs:30000,
   fetchImpl:async(url,init)=>{
    const body=String(init?.body??'');
    const bytes=Buffer.byteLength(body,'utf8');
    let request;
-   try{request=JSON.parse(body);}catch{throw Error('TERRA_REQUEST_SHAPE_HOLD');}
+   try{request=JSON.parse(body);}catch{throw Error('LUNA_TERRA_REQUEST_SHAPE_HOLD');}
    const name=request?.text?.format?.name;
    const stage=typeof name==='string'&&name.startsWith('myeongha_')&&name.endsWith('_v2')
     ?name.slice(8,-3):null;
-   if(!terraExpected.has(stage)||url!=='https://api.openai.com/v1/responses'||
+   if(stage!==expectedStage||request.model!==model||
+      url!=='https://api.openai.com/v1/responses'||
+      !Number.isInteger(request.max_output_tokens)||
       request.max_output_tokens<1||request.max_output_tokens>1536)
-    throw Error('TERRA_STAGE_OR_MODEL_HOLD');
-   await reserve('terra',stage,bytes,TERRA_RESERVE,15);
+    throw Error('LUNA_TERRA_STAGE_OR_MODEL_HOLD');
+   await reserve(route,stage,bytes,limit,cap);
    const t=performance.now();
    const response=await fetch(url,init);
    const elapsedMs=Math.round(performance.now()-t);
    let tokens=null,cost=null;
    if(response.status===200){
     let parsed;
-    try{parsed=await response.clone().json();}catch{throw Error('TERRA_UNKNOWN_USAGE_HOLD');}
+    try{parsed=await response.clone().json();}catch{throw Error('LUNA_TERRA_UNKNOWN_USAGE_HOLD');}
     if(!parsed?.usage||!Number.isSafeInteger(parsed.usage.input_tokens)||
        !Number.isSafeInteger(parsed.usage.output_tokens)||
        parsed.usage.input_tokens<1||parsed.usage.output_tokens<1)
-     throw Error('TERRA_UNKNOWN_USAGE_HOLD');
-    tokens=estimateSeyeonDialoguePathCostV1(parsed.usage,terraPrices);
+     throw Error('LUNA_TERRA_UNKNOWN_USAGE_HOLD');
+    tokens=estimateSeyeonDialoguePathCostV1(parsed.usage,prices);
     cost=Math.ceil(tokens.usd*1e6);
-    if(cost>TERRA_RESERVE)throw Error('TERRA_OBSERVED_COST_OVER_RESERVE_HOLD');
+    if(cost>limit)throw Error('LUNA_TERRA_OBSERVED_COST_OVER_RESERVE_HOLD');
    }
-   const observed={caseId:currentCase.id,stage,httpStatus:response.status,elapsedMs,
+   const observed={caseId:currentCase.id,stage,model,httpStatus:response.status,elapsedMs,
     inputTokens:tokens?.input??null,outputTokens:tokens?.output??null,
     cachedTokens:tokens?.cached??null,usageEstimateMicroUsd:cost};
-   metrics.terra.push(observed);
-   observedStages.terra[stage]=(observedStages.terra[stage]??0)+1;
-   await record({kind:'observed',route:'terra',...observed});
-   if(response.status!==200)throw Error('TERRA_HTTP_FAILURE_HOLD');
+   metrics.candidate.push(observed);
+   observedStages.candidate[stage]=(observedStages.candidate[stage]??0)+1;
+   await record({kind:'observed',route,...observed});
+   if(response.status!==200)throw Error('LUNA_TERRA_HTTP_FAILURE_HOLD');
    return response;
   },
  });
 }
-const ensureTerraFinished=()=>{
- if(reservation.terra!==5*(completePairs.length+1)||
-    metrics.terra.filter(x=>x.caseId===currentCase.id).length!==5||
-    metrics.terra.some(x=>x.httpStatus!==200)||
-    !verifySeyeonDialoguePathStageTopologyV1('legacy_5_terra',counts.terra)||
-    !verifySeyeonDialoguePathStageTopologyV1('legacy_5_terra',observedStages.terra))
-  throw Error('TERRA_TOPOLOGY_HOLD');
+const ensureCandidateFinished=()=>{
+ const completed=completePairs.length+1;
+ const current=metrics.candidate.filter(x=>x.caseId===currentCase.id);
+ if(reservation.luna!==completed||reservation.terra!==2*completed||
+    current.length!==3||current.some(x=>x.httpStatus!==200)||
+    current.filter(x=>x.model==='gpt-5.6-luna').length!==1||
+    current.filter(x=>x.model==='gpt-5.6-terra').length!==2||
+    !verifySeyeonDialoguePathStageTopologyV1('fast_3_luna_terra',counts.candidate)||
+    !verifySeyeonDialoguePathStageTopologyV1('fast_3_luna_terra',observedStages.candidate))
+  throw Error('LUNA_TERRA_TOPOLOGY_HOLD');
 };
 const ensureGlmFinished=()=>{
  if(reservation.glm!==3*(completePairs.length+1)||
@@ -175,21 +185,25 @@ try{
   privacyEnforcement:'zdr_true_data_collection_deny'});
  for(const spec of QUALITY_CASES){
   currentCase=spec;
-  counts={terra:{},glm:{}};observedStages={terra:{},glm:{}};
-  terraText=null;glmText=null;
+  counts={candidate:{},glm:{}};observedStages={candidate:{},glm:{}};
+  candidateText=null;glmText=null;
   const ID='synthetic:'+spec.id,TEXT=spec.text;
- const terra=terraProvider();
- const t1=performance.now();
- const terraResult=await runSeyeonCharacterTurnV2({
-  userMessageRef:ID,userText:TEXT,contextInput:contextInput(spec,ID),
-  governance:governance(terra),
-  interpreterProvider:terra,rendererProvider:terra,
-  semanticReviewerProvider:terra,
- });
- terraElapsedMs=Math.round(performance.now()-t1);
- ensureTerraFinished();
- // Do not release the text yet: both independent server pipelines must pass.
- terraText=requirePublicSyntheticQualityUtteranceV1(terraResult.envelope);
+  const luna=openAiProvider('gpt-5.6-luna','unified_preflight_shadow');
+  const terraDialogue=openAiProvider('gpt-5.6-terra','turn_interpret_render_shadow');
+  const terraReviewer=openAiProvider('gpt-5.6-terra','semantic_review');
+  const candidateCensus=createSeyeonQualityTrioSyntheticCensusV1(spec.id,ID);
+  const t1=performance.now();
+  const candidateResult=await runSeyeonCensusFirstThreeCallShadowV1({
+   userMessageRef:ID,userText:TEXT,contextInput:contextInput(spec,ID),
+   governance:governance(luna),fullThreadCensus:candidateCensus.port,
+   unifiedPreflightProvider:luna,candidateDialogueProvider:terraDialogue,
+   independentSemanticReviewer:terraReviewer,
+  });
+  candidateElapsedMs=Math.round(performance.now()-t1);
+  ensureCandidateFinished();
+  if(candidateCensus.readCount!==4||candidateResult.scope!=='SHADOW_ONLY_NOT_PRODUCTION')
+   throw Error('LUNA_TERRA_CENSUS_OR_SCOPE_HOLD');
+  candidateText=requirePublicSyntheticQualityUtteranceV1(candidateResult.envelope);
 
  const glm=createOpenRouterSeyeonEvaluationProviderV1({
   apiKey:glmKey,model:'z-ai/glm-5.3-flash',
@@ -244,7 +258,7 @@ try{
   throw Error('GLM_CENSUS_OR_SCOPE_HOLD');
  glmText=requirePublicSyntheticQualityUtteranceV1(glmResult.envelope);
  completePairs.push({id:spec.id,dimension:spec.dimension,input:TEXT,
-  terraLegacy5:terraText,glmFlash3:glmText,terraElapsedMs,glmElapsedMs});
+  lunaTerra3:candidateText,glmFlash3:glmText,candidateElapsedMs,glmElapsedMs});
  }
  verdict='GUARD_TRIO_PASS';
  reason='THREE_PUBLIC_PERSONA_CASES_BOTH_GUARD_PATHS_PASS';
@@ -253,42 +267,45 @@ try{
  reason=typeof e?.code==='string'&&/^[A-Z0-9_]{1,64}$/.test(e.code)
   ?e.code : typeof e?.message==='string'&&/^[A-Z0-9_]{1,80}$/.test(e.message)
   ?e.message:'OPAQUE_PROVIDER_OR_GUARD_HOLD';
- terraText=null;glmText=null;
+ candidateText=null;glmText=null;
 }finally{
  openRouterAfter=await getOpenRouterAccountUsageV1(glmKey);
- const terraInput=metrics.terra.reduce((a,x)=>a+(x.inputTokens??0),0);
- const terraOutput=metrics.terra.reduce((a,x)=>a+(x.outputTokens??0),0);
+ const candidateInput=metrics.candidate.reduce((a,x)=>a+(x.inputTokens??0),0);
+ const candidateOutput=metrics.candidate.reduce((a,x)=>a+(x.outputTokens??0),0);
  const glmInput=metrics.glm.reduce((a,x)=>a+(x.inputTokens??0),0);
  const glmOutput=metrics.glm.reduce((a,x)=>a+(x.outputTokens??0),0);
- const terraCost=metrics.terra.length>0&&metrics.terra.every(x=>x.usageEstimateMicroUsd!==null)
-  ?metrics.terra.reduce((a,x)=>a+x.usageEstimateMicroUsd,0):null;
+ const candidateCost=metrics.candidate.length>0&&
+  metrics.candidate.every(x=>x.usageEstimateMicroUsd!==null)
+  ?metrics.candidate.reduce((a,x)=>a+x.usageEstimateMicroUsd,0):null;
  const glmCost=metrics.glm.length>0&&metrics.glm.every(x=>x.usageEstimateMicroUsd!==null)
   ?metrics.glm.reduce((a,x)=>a+x.usageEstimateMicroUsd,0):null;
  const cumulativeReservedKrw=Number((totalReserves()*FX_MAX/1e6).toFixed(3));
  const report={
-  schemaVersion:'seyeon-terra-glm-public-quality-trio-v1',
+  schemaVersion:'seyeon-luna-terra-glm-public-quality-trio-v1',
   caseIds:QUALITY_CASES.map(x=>x.id),completedPairIds:completePairs.map(x=>x.id),
    scope:'THREE_PUBLIC_SYNTHETIC_PERSONA_CASES_OWNER_VISIBLE_ONLY',
   verdict,reason,mainSha:execution.mainSha,runId:execution.runId,
-  modelPaths:{terra:'gpt-5.6-terra legacy5',glm:'z-ai/glm-5.3-flash fast3'},
+  modelPaths:{candidate:'gpt-5.6-luna x1 + gpt-5.6-terra x2 fast3',glm:'z-ai/glm-5.3-flash x3 fast3'},
   glmProvider:selectedProvider,purchasedCreditsMicroUsd:purchasedMicroUsd,
   glmAvailableCreditBeforeMicroUsd:availableCredit,
   glmAccountUsageBeforeMicroUsd:openRouterBefore,
   glmAccountUsageAfterMicroUsd:openRouterAfter,
   glmAccountUsageDeltaMicroUsd:openRouterBefore!==null&&openRouterAfter!==null
    ?openRouterAfter-openRouterBefore:null,
-  terra:{reservedMicroUsd:reservation.terra*TERRA_RESERVE,
-   observed:metrics.terra,attemptedCalls:reservation.terra,
-   inputTokens:terraInput,outputTokens:terraOutput,
-   estimatedMicroUsd:terraCost,elapsedMs:terraElapsedMs,
-   completedOutputLengths:completePairs.map(x=>({id:x.id,length:x.terraLegacy5.length}))},
+  candidate:{reservedMicroUsd:reservation.luna*LUNA_RESERVE+
+    reservation.terra*TERRA_RESERVE,
+   lunaCalls:reservation.luna,terraCalls:reservation.terra,
+   observed:metrics.candidate,attemptedCalls:reservation.luna+reservation.terra,
+   inputTokens:candidateInput,outputTokens:candidateOutput,
+   estimatedMicroUsd:candidateCost,elapsedMs:candidateElapsedMs,
+   completedOutputLengths:completePairs.map(x=>({id:x.id,length:x.lunaTerra3.length}))},
   glm:{reservedMicroUsd:reservation.glm*GLM_RESERVE,
    observed:metrics.glm,attemptedCalls:reservation.glm,
    inputTokens:glmInput,outputTokens:glmOutput,
    estimatedMicroUsd:glmCost,elapsedMs:glmElapsedMs,
    completedOutputLengths:completePairs.map(x=>({id:x.id,length:x.glmFlash3.length}))},
   cumulativeMaximumReservedKrw:cumulativeReservedKrw,ownerCapKrw:OWNER_CAP,
-  estimatedMicroUsd:terraCost!==null&&glmCost!==null?terraCost+glmCost:null,
+  estimatedMicroUsd:candidateCost!==null&&glmCost!==null?candidateCost+glmCost:null,
   actualProviderInvoiceReconciled:false,
   characterVoiceQualityVerified:false,productionPromotionPermitted:false,
   durationMs:Math.round(performance.now()-started),
