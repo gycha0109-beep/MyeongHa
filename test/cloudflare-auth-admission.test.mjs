@@ -63,7 +63,8 @@ describe('Cloudflare Auth/DB admission is fail-closed until explicit host and se
 
   it('rejects cross-origin and rewrite marker bypass before checking any secret', async () => {
     const origins = [
-      await get('/api/auth/refresh?__myeongha_social_complete=1', ENABLED, 'POST'),
+      await get('/api/auth/refresh?__myeongha_social_complete=1&__myeongha_social_complete=1', ENABLED, 'POST'),
+      await get('/api/auth/refresh?__myeongha_social_complete=1&extra=1', ENABLED, 'POST'),
       await get('/api/me?__myeongha_chat_open=1', ENABLED),
       await get('/api/auth/sign-in', ENABLED, 'POST', PRIVATE_ORIGIN, {
         Origin: 'https://attacker.example.test',
@@ -73,6 +74,12 @@ describe('Cloudflare Auth/DB admission is fail-closed until explicit host and se
       }),
     ];
     for (const response of origins) expect(response.status).toBe(404);
+  });
+
+  it('admits only the exact social-complete marker, then fails closed before token exchange', async () => {
+    const response = await get('/api/auth/refresh?__myeongha_social_complete=1', ENABLED, 'POST');
+    expect(response.status).toBe(503);
+    expect((await response.json()).error.code).toBe('AUTH_UPSTREAM_UNAVAILABLE');
   });
 
   it('restricts methods and preserves the independent Seyeon HOLD', async () => {
