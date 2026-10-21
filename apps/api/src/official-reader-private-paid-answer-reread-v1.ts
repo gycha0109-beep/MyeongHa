@@ -35,6 +35,10 @@ from public.internal_qry_official_reader_paid_answer_ciphertext_v1(
   $1::uuid, $2::uuid
 )
 `;
+const READ_CHAT_MARKER_SQL = READ_SQL.replace(
+  'from public.internal_qry_official_reader_paid_answer_ciphertext_v1(\n  $1::uuid, $2::uuid\n)',
+  'from public.internal_qry_official_reader_paid_chat_marker_ciphertext_v1(\n  $1::uuid, $2::uuid, $3::uuid\n)',
+);
 
 type CiphertextRow = Readonly<{
   bodyId: unknown;
@@ -109,13 +113,47 @@ function asBytes(value: unknown): Uint8Array {
  * this result. The backing SQL remains ungranted to application roles until
  * Privacy recovery ledger/erase and Saju proof receive Owner acceptance.
  */
-export async function readPrivateOfficialReaderPaidAnswerV1(input: {
-  readonly pool: PostgresSubjectPoolV1;
-  readonly verifiedEvidence: VerifiedSubjectIdentityEvidenceV1;
-  readonly bodyId: string;
-  readonly keyResolver: PrivateOfficialReaderPaidAnswerKeyResolverV1;
-}): Promise<PrivateOfficialReaderPaidAnswerReadV1> {
-  const bodyId = asUuid(input.bodyId);
+type ReaderPaidPrivateReadInputV1 = Readonly<{
+  pool: PostgresSubjectPoolV1;
+  verifiedEvidence: VerifiedSubjectIdentityEvidenceV1;
+  keyResolver: PrivateOfficialReaderPaidAnswerKeyResolverV1;
+}>;
+type ReaderPaidPrivateSelectorV1 =
+  | Readonly<{ kind: 'body'; bodyId: string }>
+  | Readonly<{ kind: 'chat_marker'; threadId: string; safeMessageId: string }>;
+
+export async function readPrivateOfficialReaderPaidAnswerV1(input:
+  ReaderPaidPrivateReadInputV1 & Readonly<{ bodyId: string }>,
+): Promise<PrivateOfficialReaderPaidAnswerReadV1> {
+  return readPrivateOfficialReaderPaidAnswerCoreV1(
+    input, { kind: 'body', bodyId: asUuid(input.bodyId) },
+  );
+}
+
+/**
+ * The public Chat gives the browser ONLY a safe message ID and a Thread ID.
+ * This server-only bridge resolves the stored paid body ID after binding both
+ * identifiers to the authenticated Subject and current Reader Grant.
+ */
+export async function readPrivateOfficialReaderPaidChatMessageV1(input:
+  ReaderPaidPrivateReadInputV1 & Readonly<{
+    threadId: string;
+    safeMessageId: string;
+  }>,
+): Promise<PrivateOfficialReaderPaidAnswerReadV1> {
+  return readPrivateOfficialReaderPaidAnswerCoreV1(
+    input, {
+      kind: 'chat_marker',
+      threadId: asUuid(input.threadId),
+      safeMessageId: asUuid(input.safeMessageId),
+    },
+  );
+}
+
+async function readPrivateOfficialReaderPaidAnswerCoreV1(
+  input: ReaderPaidPrivateReadInputV1,
+  selector: ReaderPaidPrivateSelectorV1,
+): Promise<PrivateOfficialReaderPaidAnswerReadV1> {
   try {
     return await executePostgresSubjectTransactionV1({
       pool: input.pool,
@@ -123,11 +161,20 @@ export async function readPrivateOfficialReaderPaidAnswerV1(input: {
       execute: async (scope) => {
         const subjectId = asUuid(scope.resolvedSubject.subjectId);
         const result = await scope.client.query<CiphertextRow>(
-          READ_SQL, [subjectId, bodyId],
+          selector.kind === 'body' ? READ_SQL : READ_CHAT_MARKER_SQL,
+          selector.kind === 'body'
+            ? [subjectId, selector.bodyId]
+            : [subjectId, selector.threadId, selector.safeMessageId],
         );
         const row = result.rows[0];
-        if (result.rows.length !== 1 || row === undefined
-            || asUuid(row.bodyId) !== bodyId) return unavailable();
+        if (result.rows.length !== 1 || row === undefined) return unavailable();
+        const bodyId = asUuid(row.bodyId);
+        if (selector.kind === 'body') {
+          if (bodyId !== selector.bodyId) return unavailable();
+        } else if (asUuid(row.threadId) !== selector.threadId
+            || asUuid(row.safeMessageId) !== selector.safeMessageId) {
+          return unavailable();
+        }
 
         const identity: OfficialReaderProtectedBodyIdentityV1 = {
           subjectId,
