@@ -152,12 +152,12 @@ describe('Se-yeon Production personal-record pre-model safety interlock', () => 
       'utf8',
     );
     const gate = runtime.indexOf(
-      'assertSeyeonPersonalRecordsNotUsedBeforeUnprotectedCommitV1(\n          productionContext,',
+      'assertSeyeonPersonalRecordsNotUsedBeforeUnprotectedCommitV1(\n            productionContext,',
     );
     const contextReady = runtime.indexOf('await input.persistencePort.markContextReady({');
     const model = runtime.indexOf('const runtime = await runSeyeonCharacterTurnV2({');
     const generated = runtime.indexOf('await input.persistencePort.persistGenerated({');
-    const committed = runtime.indexOf('const committed = await input.persistencePort.commitTurn({');
+    const committed = runtime.indexOf('const committed = positiveModelCorrelation === null');
     expect(gate).toBeGreaterThan(-1);
     expect(contextReady).toBeGreaterThan(gate);
     expect(model).toBeGreaterThan(contextReady);
