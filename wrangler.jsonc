@@ -3,6 +3,7 @@
   "name": "myeongha",
   "main": "./workers/cloudflare-static-preview.mjs",
   "compatibility_date": "2026-10-20",
+  "compatibility_flags": ["nodejs_compat"],
   "workers_dev": false,
   "preview_urls": true,
   "assets": {

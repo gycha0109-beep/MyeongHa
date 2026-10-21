@@ -202,11 +202,11 @@ function normalizeEmail(value: string): string | null {
   return email;
 }
 
-function normalizeAuthNext(value: unknown): string {
+function normalizeAuthNext(value: unknown, webOrigin: string = MYEONGHA_PRODUCTION_WEB_ORIGIN): string {
   if (typeof value !== 'string' || value.length === 0 || value.length > 2048) return 'hall.html';
   try {
-    const resolved = new URL(value, `${MYEONGHA_PRODUCTION_WEB_ORIGIN}/auth.html`);
-    if (resolved.origin !== MYEONGHA_PRODUCTION_WEB_ORIGIN) return 'hall.html';
+    const resolved = new URL(value, `${webOrigin}/auth.html`);
+    if (resolved.origin !== webOrigin) return 'hall.html';
     const page = resolved.pathname.split('/').pop() ?? '';
     if (!ALLOWED_AUTH_NEXT_PAGES.has(page)) return 'hall.html';
     return `${page}${resolved.search}${resolved.hash}`;
@@ -215,10 +215,10 @@ function normalizeAuthNext(value: unknown): string {
   }
 }
 
-function signupRedirectPath(body: Record<string, unknown>): string {
-  const redirect = new URL('/auth.html', MYEONGHA_PRODUCTION_WEB_ORIGIN);
+function signupRedirectPath(body: Record<string, unknown>, webOrigin: string = MYEONGHA_PRODUCTION_WEB_ORIGIN): string {
+  const redirect = new URL('/auth.html', webOrigin);
   redirect.searchParams.set('confirmed', '1');
-  redirect.searchParams.set('next', normalizeAuthNext(body.next));
+  redirect.searchParams.set('next', normalizeAuthNext(body.next, webOrigin));
   return `/auth/v1/signup?redirect_to=${encodeURIComponent(redirect.toString())}`;
 }
 
@@ -345,6 +345,8 @@ export async function handleSupabaseAuthRequestV1(input: {
   readonly env: ProductionUserDataRuntimeEnvV1;
   readonly action: SupabaseAuthActionV1;
   readonly passwordCompromiseGuard?: PasswordCompromiseGuardPortV1;
+  /** Caller-supplied approved exact Cloudflare origin; Vercel uses the established default. */
+  readonly webOrigin?: string;
 }): Promise<Response> {
   if (input.request.method !== 'POST') {
     return new Response(null, {
@@ -461,7 +463,7 @@ export async function handleSupabaseAuthRequestV1(input: {
 
     const path = input.action === 'sign-in'
       ? '/auth/v1/token?grant_type=password'
-      : signupRedirectPath(body);
+      : signupRedirectPath(body, input.webOrigin);
     const upstream = await callSupabase(config, path, {
       method: 'POST',
       body: JSON.stringify({ email, password }),
