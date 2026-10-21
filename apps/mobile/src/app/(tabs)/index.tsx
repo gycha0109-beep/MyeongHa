@@ -1,4 +1,4 @@
-import { RefreshControl, SafeAreaView, ScrollView, StyleSheet, View } from 'react-native';
+import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 
 import {
   HomeBrandHeader,
@@ -21,7 +21,7 @@ export default function HomeScreen() {
   const view = createMobileHomeViewModelV1(snapshot.state);
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.canvas }]}>
+    <View style={[styles.safeArea, { backgroundColor: colors.canvas }]}>
       <ScrollView
         contentContainerStyle={styles.content}
         refreshControl={
@@ -39,7 +39,7 @@ export default function HomeScreen() {
         <HomeContinuationCard card={view.continuation} />
         <HomeReadingTopics topics={view.readingTopics} />
       </ScrollView>
-    </SafeAreaView>
+    </View
   );
 }
 
