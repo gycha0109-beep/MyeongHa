@@ -1,6 +1,7 @@
 // Watchtower-Track: security
 // Offline S-CF2 contract. No Worker, real Provider, remote DB or deployment.
 import {describe,expect,it,vi} from 'vitest';
+import type {IdentityEvidenceVerificationPortV1} from '../apps/api/src/current-subject-profile-http.js';
 import {
   holdSeyeonCloudflareOpsRouterHandoffOfflineV1,
   SEYEON_CLOUDFLARE_OPS_ROUTER_HANDOFF_OFFLINE_V1,
@@ -22,7 +23,7 @@ const req=(path:string,method='GET',body?:unknown)=>new Request(HOST+path,{
     body:JSON.stringify(body),
   }),
 });
-const run=(request:Request,opsRouteDisposition:SeyeonCloudflareOpsRouteDispositionOfflineV1,verifier=auth())=>
+const run=(request:Request,opsRouteDisposition:SeyeonCloudflareOpsRouteDispositionOfflineV1,verifier:IdentityEvidenceVerificationPortV1=auth())=>
   holdSeyeonCloudflareOpsRouterHandoffOfflineV1({
     request,requestId:ID,opsRouteDisposition,
     identityEvidenceVerifier:verifier,
