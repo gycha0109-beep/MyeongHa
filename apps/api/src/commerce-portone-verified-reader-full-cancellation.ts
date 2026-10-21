@@ -12,6 +12,9 @@ select public.cmd_apply_verified_portone_reader_full_cancellation_v1(
 
 export type AppliedPortOneV2ReaderFullCancellationV1 =
   | Readonly<{ kind: 'unrelated_commerce' }>
+  | Readonly<{ kind: 'cancelled_before_grant'; receiptId: string;
+  readonly providerEventId: string;
+  grantCount: 0 }>
   | Readonly<{ kind: 'revoked'; receiptId: string;
   readonly providerEventId: string;
   grantCount: number }>;
@@ -59,14 +62,36 @@ export async function applyVerifiedPortOneV2ReaderFullCancellationV1(input: {
           || typeof revoke !== 'object' || revoke === null
           || Array.isArray(revoke)
           || !Number.isSafeInteger((revoke as Record<string,unknown>).grantCount)
-          || !((revoke as Record<string,unknown>).grantCount as number > 0)) {
+          || ((revoke as Record<string,unknown>).grantCount as number) < 0) {
+        throw new Error('Verified Reader cancellation result was not authoritative.');
+      }
+      const effect = revoke as Record<string,unknown>;
+      const grantCount = effect.grantCount as number;
+      if (grantCount === 0) {
+        // A verified full cancellation before Grant issuance still revokes
+        // the Receipt and persists one Provider Event. Refusing this valid
+        // 1900 result would ROLLBACK the cancellation and endlessly retry.
+        if (effect.contractVersion !== 'official-reader-s2-no-grant-cancellation-v1'
+            || effect.disposition !== 'cancelled_before_grant'
+            || effect.scopeCount !== 0) {
+          throw new Error('Verified Reader cancellation result was not authoritative.');
+        }
+        return Object.freeze({
+          kind: 'cancelled_before_grant' as const,
+          receiptId: result.receiptId,
+          providerEventId: result.providerEventId,
+          grantCount: 0 as const,
+        });
+      }
+      if (effect.contractVersion !== 'official-reader-s2-unbound-grant-cancellation-v1'
+          && effect.contractVersion !== 'official-reader-s2-revoke-dispatch-v1') {
         throw new Error('Verified Reader cancellation result was not authoritative.');
       }
       return Object.freeze({
         kind: 'revoked' as const,
-        receiptId:result.receiptId,
-        providerEventId:result.providerEventId,
-        grantCount:(revoke as Record<string,unknown>).grantCount as number,
+        receiptId: result.receiptId,
+        providerEventId: result.providerEventId,
+        grantCount,
       });
     },
   });
