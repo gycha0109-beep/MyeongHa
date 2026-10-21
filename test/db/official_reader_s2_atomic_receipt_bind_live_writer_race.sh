@@ -2425,10 +2425,7 @@ f2_receipt='12192000-0000-0000-0000-000000000015'
 f2_attempt='12197000-0000-0000-0000-000000000015'
 f2_session='12193000-0000-0000-0000-000000000015'
 f2_hash='sha256:v1:1515151515151515151515151515151515151515151515151515151515'
-p >"$tmpdir/f2-cancel-first-seed.out" 2>&1 <<SQL || {
-  cat "$tmpdir/f2-cancel-first-seed.out" >&2
-  fail "F2 verified additional-Reader purchase seed failed"
-}
+if ! p >"$tmpdir/f2-cancel-first-seed.out" 2>&1 <<SQL
 begin;
 insert into public.purchase_intents(
  id,subject_id,product_offer_id,provider_account_link_id,
@@ -2477,6 +2474,10 @@ select '$f2_receipt'::uuid,subject_id,'$f2_intent'::uuid,product_offer_id,
 from public.commerce_receipts where id='$f_receipt'::uuid;
 commit;
 SQL
+then
+  cat "$tmpdir/f2-cancel-first-seed.out" >&2
+  fail "F2 verified additional-Reader purchase seed failed"
+fi
 [[ "$(p -c "select count(*) from public.entitlement_grants
  where source_receipt_id='$f2_receipt'::uuid;")" == 0 ]] ||
  fail "F2 cancellation-first fixture unexpectedly contains an issued Grant"
