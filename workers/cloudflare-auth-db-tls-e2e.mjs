@@ -187,7 +187,7 @@ export default {
           env.MYEONGHA_LOCAL_TEST_CA_B64,env.MYEONGHA_LOCAL_TEST_WRONG_CA_B64]) {
         if(typeof secret==='string'&&secret.length>0)detail=detail.replaceAll(secret,'[redacted]');
       }
-      detail=detail.replace(/postgres(?:ql)?:\\/\\/\\S+/gi,'[redacted-DSN]')
+      detail=detail.replace(/postgres(?:ql)?:[^\\s]+/gi,'[redacted-DSN]')
         .replace(/[0-9a-f]{32,}/gi,'[redacted-hex]')
         .slice(0,180);
       console.error('Disposable TLS worker check rejected:',stage,reason,code);
