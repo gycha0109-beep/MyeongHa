@@ -84,7 +84,7 @@ export async function applyVerifiedReaderReceiptBindV1(
   const effectiveAts: string[] = [];
   const targetValidFroms: string[] = [];
   const targetValidUntils: (string | null)[] = [];
-  const reasonCodes: string[] = [];
+  const reasonCodes: (string | null)[] = [];
 
   for (const effect of input.effects) {
     if (!effect || typeof effect.capabilityItemKey !== 'string'
