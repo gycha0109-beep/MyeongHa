@@ -47,6 +47,8 @@ export interface PortOneV2WebhookPaymentCompletionConfigV1 {
   readonly environment: 'sandbox' | 'production';
   readonly webhookSecrets: readonly string[];
   readonly now?: () => Date;
+  /** Explicit, internal S2 Reader purchase fulfillment; default disabled. */
+  readonly privateReaderReceiptFulfillmentEnabled?: boolean;
 }
 
 type PortOneV2WebhookPaymentCompletionConfigSnapshotV1 = Readonly<{
@@ -535,6 +537,9 @@ export async function executePortOneV2WebhookPaymentCompletionV1(input: {
     ingress: Object.freeze({ providerWebhookId: decision.providerWebhookId }),
     authenticator: preauthenticatedIngressAuthenticator(decision.authenticatedIngress),
     verificationAdapter: input.verificationAdapter,
+    ...(input.config.privateReaderReceiptFulfillmentEnabled === true
+      ? { privateReaderReceiptFulfillmentEnabled: true }
+      : {}),
   });
 
   return Object.freeze({
