@@ -96,8 +96,9 @@ describe('S-CF2 unmounted Ops router handoff: no positive or HTML fallback',()=>
       verifyRequestIdentity:vi.fn(async()=>null),
     });
     expect(unauth?.status).toBe(401);
-    expect((await unauth?.text())).toContain('AUTH_REQUIRED');
-    expect((await unauth?.text().catch(()=>''))??'').not.toContain(CANARY);
+    const authBody=await unauth!.text();
+    expect(authBody).toContain('AUTH_REQUIRED');
+    expect(authBody).not.toContain(CANARY);
   });
 
   it.each([
