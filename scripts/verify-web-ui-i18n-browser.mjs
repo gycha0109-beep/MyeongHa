@@ -229,6 +229,8 @@ try {
   assert(!/[가-힣]/u.test(face.title+face.capture),'Japanese face UI mixes Korean: '+JSON.stringify(face));
   assert(face.overflow<=2,'Japanese face layout overflow');
   assert(!/[가-힣]/u.test(face.visibleText),'Japanese face page contains untranslated Hangul: '+face.visibleText.match(/.{0,30}[가-힣].{0,40}/gu)?.slice(0,12).join(' | '));
+  const jpPicker = await inspect("(() => { document.querySelector('[data-face-reader-change]').click(); return [...document.querySelectorAll('.reading-reader-option-heading strong')].slice(0,3).map(n=>n.textContent.trim()); })()");
+  assert(JSON.stringify(jpPicker)===JSON.stringify(['セヨン','ベクホン','ヨウル']),'Face Reader picker did not use Japanese Katakana names: '+JSON.stringify(jpPicker));
   await navigate(client,origin,'/chat-hub.html','.conversation-people');
   await sleep(450);
   const hub=await inspect("(() => ({cards:[...document.querySelectorAll('.chat-person-card')].slice(0,3).map(x=>x.textContent.trim()),overflow:document.documentElement.scrollWidth-innerWidth}))()");
@@ -278,7 +280,11 @@ try {
   await sleep(400);
   const twNames = await inspect("(() => [...document.querySelectorAll('.chat-person-card .chat-person-title-row h3')].slice(0,3).map(x=>x.textContent.trim()))()");
   assert(JSON.stringify(twNames)===JSON.stringify(['Seyeon','Baekheon','Yeoul']),'Taiwan temporary roman names must be stable: '+JSON.stringify(twNames));
-  console.log(JSON.stringify({status:'WEB_STATIC_I18N_BROWSER_PASS',ja,face,hub,zh,jpNames,twNames}));
+  await navigate(client,origin,'/face-reading.html','.face-reader-heading');
+  await sleep(300);
+  const twPicker = await inspect("(() => { document.querySelector('[data-face-reader-change]').click(); return [...document.querySelectorAll('.reading-reader-option-heading strong')].slice(0,3).map(n=>n.textContent.trim()); })()");
+  assert(JSON.stringify(twPicker)===JSON.stringify(['Seyeon','Baekheon','Yeoul']),'Face Reader picker did not use Taiwan Roman names: '+JSON.stringify(twPicker));
+  console.log(JSON.stringify({status:'WEB_STATIC_I18N_BROWSER_PASS',ja,face,hub,zh,jpNames,twNames,jpPicker,twPicker}));
 } catch(err) {
   if(client){try{await artifact(client,'-i18n-failure')}catch{}}
   throw err;
