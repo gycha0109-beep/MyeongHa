@@ -244,7 +244,10 @@ document.addEventListener('myeongha:localechange', () => {
     const heading = article.querySelector('.conversation-message-heading strong');
     if (heading) heading.textContent = senderLabel({ senderType, characterId }, authoritativeCharacterId);
     const time = article.querySelector('.conversation-message-heading time');
-    if (time) time.textContent = formatTimestamp(time.getAttribute('datetime'));
+    if (time) {
+      const timestamp = time.getAttribute('datetime');
+      time.textContent = formatTimestamp(timestamp === null ? undefined : timestamp);
+    }
     if (senderType === 'user') {
       const avatar = article.querySelector('.conversation-message-avatar');
       if (avatar) avatar.textContent = translateStaticUi('나', getUiLocale());
