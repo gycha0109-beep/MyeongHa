@@ -9,6 +9,10 @@ import {
   type PostgresSubjectPoolV1,
 } from './postgres-subject-execution.js';
 import type { VerifiedSubjectIdentityEvidenceV1 } from './subject-identity-resolver.js';
+import {
+  currentOfficialReaderPrivacyReadLeaseV1,
+  type OfficialReaderPrivatePrivacyLedgerPortV1,
+} from './official-reader-private-privacy-ledger-v1.js';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
 const READ_SQL = `
@@ -117,6 +121,8 @@ type ReaderPaidPrivateReadInputV1 = Readonly<{
   pool: PostgresSubjectPoolV1;
   verifiedEvidence: VerifiedSubjectIdentityEvidenceV1;
   keyResolver: PrivateOfficialReaderPaidAnswerKeyResolverV1;
+  /** Owner-supplied off-primary Privacy ledger, mandatory even for rerender. */
+  privacyLedgerPort: OfficialReaderPrivatePrivacyLedgerPortV1;
 }>;
 type ReaderPaidPrivateSelectorV1 =
   | Readonly<{ kind: 'body'; bodyId: string }>
@@ -155,11 +161,36 @@ async function readPrivateOfficialReaderPaidAnswerCoreV1(
   selector: ReaderPaidPrivateSelectorV1,
 ): Promise<PrivateOfficialReaderPaidAnswerReadV1> {
   try {
+    // Read Subject authority in a separate short transaction. Do not hold a
+    // PostgreSQL Reader scope lock while consulting the independent ledger.
+    const subjectId = await executePostgresSubjectTransactionV1({
+      pool: input.pool,
+      verifiedEvidence: input.verifiedEvidence,
+      execute: async ({ resolvedSubject }) => asUuid(resolvedSubject.subjectId),
+    });
+    const selectorKey = selector.kind === 'body'
+      ? `body:${selector.bodyId}`
+      : `chat:${selector.threadId}:${selector.safeMessageId}`;
+    if (!input.privacyLedgerPort
+        || typeof input.privacyLedgerPort.acquireReadLease !== 'function') {
+      return unavailable();
+    }
+    const lease = await input.privacyLedgerPort.acquireReadLease({
+      subjectId, selector: selectorKey,
+    });
+    if (!currentOfficialReaderPrivacyReadLeaseV1({
+      port: input.privacyLedgerPort, lease, subjectId, selector: selectorKey,
+    })) return unavailable();
+
     return await executePostgresSubjectTransactionV1({
       pool: input.pool,
       verifiedEvidence: input.verifiedEvidence,
       execute: async (scope) => {
-        const subjectId = asUuid(scope.resolvedSubject.subjectId);
+        const refreshedSubjectId = asUuid(scope.resolvedSubject.subjectId);
+        if (refreshedSubjectId !== subjectId) return unavailable();
+        if (!currentOfficialReaderPrivacyReadLeaseV1({
+          port: input.privacyLedgerPort, lease, subjectId, selector: selectorKey,
+        })) return unavailable();
         const result = await scope.client.query<CiphertextRow>(
           selector.kind === 'body' ? READ_SQL : READ_CHAT_MARKER_SQL,
           selector.kind === 'body'
@@ -216,6 +247,12 @@ async function readPrivateOfficialReaderPaidAnswerCoreV1(
         });
         const committedAt = asString(row.committedAt);
         if (!Number.isFinite(Date.parse(committedAt))) return unavailable();
+        // Final off-primary restore/deletion fence before decrypted text can
+        // leave the T2 S1-scoped Reader transaction. Never trust a DB backup's
+        // self-declared "restored" flag.
+        if (!currentOfficialReaderPrivacyReadLeaseV1({
+          port: input.privacyLedgerPort, lease, subjectId, selector: selectorKey,
+        })) return unavailable();
         return Object.freeze({
           bodyId,
           officialReadingId: identity.officialReadingId,
