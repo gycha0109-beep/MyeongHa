@@ -19,7 +19,8 @@ export function BirthSummaryCard({ summary }: { summary: string }) {
 
 export function SajuPillarGrid({ pillars }: Pick<MobileSajuViewModelV1, 'pillars'>) {
   const styles = useMobileThemedStyles(staticStyles);
-  const { t } = useMobileUiLocale();
+  const { t, locale } = useMobileUiLocale();
+  const japaneseBranches: Readonly<Record<string, string>> = { 子: 'ね', 丑: 'うし', 寅: 'とら', 卯: 'う', 辰: 'たつ', 巳: 'み', 午: 'うま', 未: 'ひつじ', 申: 'さる', 酉: 'とり', 戌: 'いぬ', 亥: 'い' };
   return (
     <View style={styles.section}>
       <MobileUiText style={styles.sectionTitle}>나의 명식</MobileUiText>
@@ -38,7 +39,11 @@ export function SajuPillarGrid({ pillars }: Pick<MobileSajuViewModelV1, 'pillars
             </Text>
             <Text style={styles.pillarHangul}>
               {pillar.status === 'resolved'
-                ? `${t(pillar.stemHangul)}${t(pillar.branchHangul)}`
+                ? locale === 'ko-KR'
+                  ? `${pillar.stemHangul}${pillar.branchHangul}`
+                  : locale === 'ja-JP'
+                    ? `${t(pillar.stemHangul)}${japaneseBranches[pillar.branchHanja] ?? pillar.branchHanja}`
+                    : `${pillar.stemHanja}${pillar.branchHanja}`
                 : pillar.status === 'ambiguous'
                   ? t('모호')
                   : t('미확정')}
