@@ -186,9 +186,9 @@ const FORTUNE_COOKIE_TRADITIONAL_CHINESE_UI_NOTES_V1 = Object.freeze([
 
 export function displayFortuneCookieNoteV1(index: number, locale: 'ko-KR' | 'ja-JP' | 'zh-TW'): string {
   if (!Number.isInteger(index) || index < 0 || index >= FORTUNE_COOKIE_MESSAGES_V1.length) return '';
-  if (locale === 'ko-KR') return FORTUNE_COOKIE_MESSAGES_V1[index];
+  if (locale === 'ko-KR') return FORTUNE_COOKIE_MESSAGES_V1[index] ?? '';
   const translatedNotes = locale === 'ja-JP'
     ? FORTUNE_COOKIE_JAPANESE_UI_NOTES_V1
     : FORTUNE_COOKIE_TRADITIONAL_CHINESE_UI_NOTES_V1;
-  return translatedNotes[index % translatedNotes.length];
+  return translatedNotes[index % translatedNotes.length] ?? '';
 }
