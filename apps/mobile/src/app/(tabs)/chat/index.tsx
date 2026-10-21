@@ -75,7 +75,7 @@ export default function ChatHubScreen() {
               accessibilityState={{ disabled }}
               disabled={disabled}
               onPress={() => void handleOpen(character.characterId)}
-              accessibilityLabel={`${character.displayName}, ${presentation.title}, ${featured ? 'AI 서비스 상태 확인 필요' : 'AI 답변 준비 중'}, ${canOpen ? '대화방 열기' : '로그인 필요'}`}
+              accessibilityLabel={`${character.displayName}, ${t(presentation.title)}, ${t(featured ? 'AI 서비스 상태 확인 필요' : 'AI 답변 준비 중')}, ${t(canOpen ? '대화방 열기' : '로그인 필요')}`}
               style={({ pressed }) => [
                 styles.characterCard,
                 featured && styles.featuredCard,
@@ -92,13 +92,13 @@ export default function ChatHubScreen() {
                       source={portrait}
                       style={styles.characterPortrait}
                       resizeMode="cover"
-                      accessibilityLabel={`${character.displayName} 대리자 초상화`}
+                      accessibilityLabel={`${character.displayName} ${t('대리자 초상화')}`}
                       accessible={false}
                     />
                   )}
                   <View pointerEvents="none" style={[styles.portraitShade, featured && styles.featuredShade]} />
                   <View pointerEvents="none" style={styles.portraitLabel}>
-                    <Text style={styles.portraitLabelText}>{featured ? 'FEATURED PERSON' : presentation.title}</Text>
+                    <Text style={styles.portraitLabelText}>{featured ? 'FEATURED PERSON' : t(presentation.title)}</Text>
                   </View>
                   {featured ? (
                     <View pointerEvents="none" style={styles.featuredImageCopy}>
@@ -110,17 +110,17 @@ export default function ChatHubScreen() {
                 <View style={[styles.characterCopy, featured && styles.featuredCopy]}>
                   <View style={styles.characterTitleRow}>
                     <Text style={[styles.characterName, featured && styles.featuredText]}>{character.displayName}</Text>
-                    <Text style={[styles.characterTitle, featured && styles.featuredMutedText]}>{presentation.title}</Text>
+                    <Text style={[styles.characterTitle, featured && styles.featuredMutedText]}>{t(presentation.title)}</Text>
                   </View>
                   <Text style={[styles.characterLine, featured && styles.featuredText]} numberOfLines={2}>
-                    {presentation.openingLine}
+                    {t(presentation.openingLine)}
                   </Text>
                   <Text style={[styles.characterStatus, featured && styles.featuredMutedText]}>
-                    {featured ? '이용 상태는 대화방에서 확인' : 'AI 답변 준비 중 · 기록 열람 가능'}
+                    {t(featured ? '이용 상태는 대화방에서 확인' : 'AI 답변 준비 중 · 기록 열람 가능')}
                   </Text>
                   <View style={[styles.characterActionWrap, featured && styles.featuredActionWrap]}>
                     <Text style={[styles.characterAction, featured && styles.featuredActionText, !canOpen && styles.actionUnavailable]}>
-                      {opening ? '여는 중…' : canOpen ? '대화방 열기  →' : '로그인 후 열기  →'}
+                      {t(opening ? '여는 중…' : canOpen ? '대화방 열기  →' : '로그인 후 열기  →')}
                     </Text>
                   </View>
                 </View>
@@ -145,7 +145,7 @@ export default function ChatHubScreen() {
               <View key={character.characterId} style={styles.pendingRow}>
                 <View style={styles.pendingMark}><Text style={styles.pendingMarkText}>◇</Text></View>
                 <View style={styles.pendingCopy}>
-                  <Text style={styles.pendingName}>{character.displayName} <Text style={styles.pendingRole}>· {presentation.title}</Text></Text>
+                  <Text style={styles.pendingName}>{character.displayName} <Text style={styles.pendingRole}>· {t(presentation.title)}</Text></Text>
                   <MobileUiText style={styles.note}>캐릭터 소개 준비 중</MobileUiText>
                 </View>
                 <MobileUiText style={styles.pendingPill}>등록 중</MobileUiText>
