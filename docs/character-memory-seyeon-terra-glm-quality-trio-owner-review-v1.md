@@ -1,4 +1,4 @@
-# 세연 Terra 5회 vs GLM 3회 — 공개 합성 캐릭터 품질 3장면 실제 원문 비교
+# 세연 Luna 1회 + Terra 2회 vs GLM 3회 — 공개 합성 캐릭터 품질 3장면 실제 원문 비교
 Watchtower-Track: character-memory
 
 ## 질문과 평가 의도
@@ -15,7 +15,7 @@ Watchtower-Track: character-memory
 
 ## 실제 모델 비교
 
-각 질문에 **실제 Terra 5회**: 2개 병렬 분류, Interpretation, Renderer, 독립 Semantic Review. **실제 GLM 3회**: 통합 사전검사, 해석+초안, 독립 Semantic Review. 기존 런타임 `runSeyeonCharacterTurnV2` 및 `runSeyeonCensusFirstThreeCallShadowV1`, 서버 Output Guard, 합성 전체 이력 Census 및 ZDR 공급자 핀 고정.
+각 질문에 **Luna 1회 + Terra 2회**: Luna가 통합 사전검사, Terra가 해석+대사 초안 및 독립 의미 검증을 각각 담당한다. **GLM 3회**: 동일한 세 역할을 GLM이 수행한다. 두 경로 모두 기존 `runSeyeonCensusFirstThreeCallShadowV1`과 서버 Output Guard, 4회 합성 전체 이력 Census를 유지하고 GLM은 ZDR 공급자를 고정한다. Terra 단독 5회 Legacy 경로는 이번 비교에서 사용하지 않는다. 비교 결과는 개별 모델 단독 성능이 아닌 경로 전체의 관찰이다.
 각 모델의 Output Guard가 PUBLIC·비공개 참조 없음으로 통과한 **최종 대사** 1개씩을 오너에게 공개하며, 3쌍 총 6개 원문을 보여준다. 중간 응답·생각 과정·비공개 데이터·인증키는 출력하지 않는다. 완성된 쌍은 2개 원문과 해당 공개 질문·차원·지연 시간을 CI 로그에 `SEYEON_TERRA_GLM_QUALITY_TRIO_OWNER_VISIBLE`로 남긴다. 비정상·미완성 쌍은 출력하지 않는다.
 
 동일한 실제 실행의 관찰이더라도 비블라인드 3사례는 공식 8-case C08-S 사람 평가를 대체하지 않는다. 출력에 대한 평가 루브릭: Character Bible의 밝고 편안한 존댓말과 실행성, 대화 추진력, 장난의 살아 있음, 관계의 경계 및 무근거 사실·사적 기억 암시 없음, 기계 Guard와 별도로 자연스러운 한국어 표현. 일단 사람에게 직접 보여준 후 관찰 의견을 낼 수 있으나 **사람 평가를 완료했다고 자동 주장하거나 운영 모델을 교체하지 않는다.**
@@ -23,10 +23,10 @@ Watchtower-Track: character-memory
 ## 비용과 실행 게이트
 
 - 이미 예약된 보수적 상한 **$0.976554 = 2,441.385원**.
-- 추가 Terra 15회 × $0.05 = $0.75 (1,875원), GLM 9회 × $0.02 = $0.18 (450원). 최대 **24회, 추가 $0.93 = 2,325원**.
-- 전체 보수적 누적 최대 **$1.906554 = 4,766.385원 / 승인 5,000원**, 정책 환율 $1=2,500원. 개별 호출 앞 fsync 예약, 30초 타임아웃, 각 출력 상한 1,536토큰, request body 24,576바이트 상한, 재시도/미허가 fallback 없음.
-- GLM 크레딧 **가용 최소 $0.18**·ZDR·same-tag response_format JSON 지원·고정 가격 상한 GET 확인 후 첫 Terra 유료 호출. Terra 전체 수행 후 같은 case GLM 호출; 한 사례라도 실패하면 나머지 요청 중단.
-- 실제 청구액은 별도로 확인되지 않았다. 모델 응답의 사용량 추정과 카드 청구·요금 정산을 혼동하지 않는다.
+- 추가 Luna 3회 × $0.02 = $0.06 (150원), Terra 6회 × $0.05 = $0.30 (750원), GLM 9회 × $0.02 = $0.18 (450원). 최대 **18회, 추가 $0.54 = 1,350원**.
+- 전체 보수적 누적 최대 **$1.516554 = 3,791.385원 / 승인 5,000원**, 정책 환율 $1=2,500원. 개별 호출 앞 fsync 예약, 30초 타임아웃, 각 출력 상한 1,536토큰, request body 24,576바이트 상한, 재시도/미허가 fallback 없음.
+- GLM 크레딧 **가용 최소 $0.18**·ZDR·same-tag response_format JSON 지원·고정 가격 상한 GET 확인 후 첫 Luna 유료 호출. Luna+Terra 3회 경로 완료 후 같은 case GLM 3회 호출; 한 사례라도 실패하면 나머지 요청 중단.
+- 기존 누적 보수적 예약 상한 $0.976554는 과거 실제 청구액을 뜻하지 않는다. 이번 비교의 신규 호출·지출은 워크플로 실행 전 0이다. 실제 청구액은 별도로 확인되지 않았다. 모델 응답의 사용량 추정과 카드 청구·요금 정산을 혼동하지 않는다.
 - GitHub Actions에서 합성 3사례 전용 새 main-push 단발 workflow, 고정 SHA, 최초 실행 attempt만 승인, 리플레이 금지. 과거 실험 workflow는 재호출하지 않는다. 정확한 PR head CI+Governance+Web+전체 통합 검사 성공 후에만 병합한다.
 
 운영 Production Chat/Canon/DB/사용자 기억/관계/Grant/ACL 및 기존 Gold 원본은 변경하지 않는다.
