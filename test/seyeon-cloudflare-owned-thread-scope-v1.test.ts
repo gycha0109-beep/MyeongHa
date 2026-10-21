@@ -75,9 +75,9 @@ describe('S-CF2 owned-thread scope — OFFLINE, no router mounted', () => {
     });
   });
 
-  it.each([['seyeon'], ['baekheon', 'seyeon']])(
-    'holds DB-participant SeYeon first send, history, mixed thread (%j)',
-    async participants => {
+  it.each([{ participants: ['seyeon'] }, { participants: ['baekheon', 'seyeon'] }])(
+    'holds DB-participant SeYeon first send, history, mixed thread ($participants)',
+    async ({ participants }) => {
       for (const [path, method, body] of [
         ['/api/chat/' + THREAD + '/turns', 'POST', { clientTurnId: TURN, text: PRIVATE }],
         ['/api/chat/' + THREAD + '?afterSequenceNo=0&pageSize=20', 'GET', undefined],
@@ -171,9 +171,9 @@ describe('S-CF2 owned-thread scope — OFFLINE, no router mounted', () => {
     expect(f.queries).toHaveLength(0);
   });
 
-  it.each([[], ['seyeon', 'seyeon'], ['baekheon', 7], null])(
-    'fails closed for missing/duplicated/invalid DB participants: %j',
-    async participants => {
+  it.each([{ participants: [] }, { participants: ['seyeon', 'seyeon'] }, { participants: ['baekheon', 7] }, { participants: null }])(
+    'fails closed for missing/duplicated/invalid DB participants: $participants',
+    async ({ participants }) => {
       const f = fixture(participants);
       const result = await scopeSeyeonCloudflareOwnedChatRequestV1({
         request: request('/api/chat/' + THREAD), requestId: ID,
@@ -187,10 +187,12 @@ describe('S-CF2 owned-thread scope — OFFLINE, no router mounted', () => {
 
   it('fails closed for DB read errors and does not return a generic-handler pass-through', async () => {
     const f = fixture(['baekheon']);
-    f.pool.connect = vi.fn(async () => { throw new Error(PRIVATE); });
+    const failingPool: PostgresSubjectPoolV1 = {
+      connect: vi.fn(async () => { throw new Error(PRIVATE); }),
+    };
     const result = await scopeSeyeonCloudflareOwnedChatRequestV1({
       request: request('/api/chat/' + THREAD), requestId: ID,
-      identityEvidenceVerifier: f.auth, pool: f.pool,
+      identityEvidenceVerifier: f.auth, pool: failingPool,
     });
     expect(result.kind).toBe('denied');
     if (result.kind === 'denied') await assertHeld(result.response);
