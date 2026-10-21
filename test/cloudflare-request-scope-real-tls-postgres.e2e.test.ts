@@ -97,7 +97,7 @@ async function member(
         const tls=(await client.query<{ssl:boolean;version:string}>(
           'select ssl,version from pg_stat_ssl where pid=pg_backend_pid()')).rows[0];
         expect(tls?.ssl).toBe(true);
-        expect(tls?.version).toMatch(/^TLSv1\\.[23]$/);
+        expect(tls?.version).toMatch(/^TLSv1\.[23]$/);
         const own=(await client.query<{id:string}>(
           'select id::text as id from public.subjects order by id')).rows;
         expect(own).toEqual([{id:subjectId}]);
