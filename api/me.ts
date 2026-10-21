@@ -1,4 +1,5 @@
 import { executeSecurityObservedRequestV1 } from '../apps/api/src/security-observability.js';
+import { canonicalizeRequestUiLocaleHeadersV1 } from '../apps/api/src/request-ui-locale-v1.js';
 import { createNodePostgresSubjectPoolV1 } from '../apps/api/src/node-postgres-subject-pool.js';
 import { createProductionChatReadRuntimeV1 } from '../apps/api/src/production-chat-read-runtime.js';
 import { createProductionSeyeonTurnSendRuntimeV1 } from '../apps/api/src/production-seyeon-turn-send-runtime-v1.js';
@@ -719,7 +720,7 @@ export function toCanonicalMeRequestForTestV1(
 
   return new Request(url, {
     method: request.method,
-    headers: request.headers,
+    headers: canonicalizeRequestUiLocaleHeadersV1(request),
     ...(body === undefined ? {} : { body, duplex: 'half' as const }),
   } as RequestInit & { duplex?: 'half' });
 }
