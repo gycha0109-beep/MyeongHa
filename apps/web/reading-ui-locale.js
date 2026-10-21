@@ -15,11 +15,11 @@ const COPY = new Map([
   ['이 프리뷰는 공식 풀이 기록에 저장되지 않습니다. 다른 사주 읽기는 사주 페이지에서 선택할 수 있습니다.', 'このプレビューは公式鑑定の記録には保存されません。別の鑑定は四柱推命ページから選択できます。', '本預覽不會儲存至正式解讀紀錄。您可以在八字頁面選擇其他解讀。'],
   ['저장된 공식 사주 풀이를 끝까지 확인했습니다.', '保存された公式鑑定を最後まで確認しました。', '您已完整查看儲存的正式八字解讀。'],
   ['이 결과는 기록에 저장된 Official Reading입니다. 대화를 시작하려면 대화 상대를 새로 선택해 주세요.', 'この結果は記録に保存された公式鑑定です。会話を始めるには、相手を新たに選択してください。', '這是紀錄中儲存的正式解讀。如要開始對話，請重新選擇對話對象。'],
-]);
+].map(([source, japanese, traditionalChinese]) => [source, [japanese, traditionalChinese]]));
 export function readingUiCopyV1(source, locale = 'ko-KR') {
   if (locale !== 'ja-JP' && locale !== 'zh-TW') return source;
   const row = COPY.get(source);
-  return row?.[locale === 'ja-JP' ? 1 : 2] ?? source;
+  return row?.[locale === 'ja-JP' ? 0 : 1] ?? source;
 }
 export function readingUiProgressV1(index, total, locale = 'ko-KR') {
   const label = locale === 'ja-JP' ? '鑑定' : locale === 'zh-TW' ? '解讀' : '읽기';
