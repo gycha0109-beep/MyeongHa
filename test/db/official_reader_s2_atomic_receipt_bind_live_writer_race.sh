@@ -2168,8 +2168,10 @@ select r.id,r.subject_id,'12104000-0000-0000-0000-000000000014'::uuid,
  '{"responseVersion":"myeonghwa-product-reading-response-v2","artifact":"official-source-current-revision"}'::jsonb,
  'sha256:test-official-reading-artifact-b7',clock_timestamp()
 from public.readings r
+join public.reading_sessions rs
+ on rs.id=r.reading_session_id and rs.subject_id=r.subject_id
 join public.birth_profile_revisions bpr
- on bpr.id=r.source_birth_revision_id
+ on bpr.id=rs.source_birth_revision_id and bpr.subject_id=r.subject_id
 where r.id='$b8_reading'::uuid and r.subject_id='$subject'::uuid;
 
 update public.readings
