@@ -160,7 +160,7 @@ describe('MyeongHa character-led Saju Reading v1', () => {
     expect(runtime).toContain("routeAction.textContent = '사주 기록으로 돌아가기 →'");
     expect(runtime).toContain('function renderPersistedReadingFailure');
     expect(runtime).toContain('configurePersistedReadingNavigation();');
-    expect(runtime).toContain("completionTitle.textContent = '저장된 공식 사주 풀이를 끝까지 확인했습니다.'");
+    expect(runtime).toContain("completionTitle.textContent = readingUiCopyV1('저장된 공식 사주 풀이를 끝까지 확인했습니다.', getUiLocale())");
     expect(runtime).toContain("'이 결과는 기록에 저장된 Official Reading입니다. 대화를 시작하려면 대화 상대를 새로 선택해 주세요.'");
     expect(runtime).not.toContain('renderPersistedReadingHandoffUnavailable');
     expect(handoff).toContain("PERSISTED_READING_HANDOFF_SOURCE_V1 = 'records'");
