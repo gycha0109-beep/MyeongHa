@@ -2906,11 +2906,16 @@ done
 [[ "$(g_h_current_bundle)" == 'one_current_bundle|1' ]] ||
  fail "two original purchase Grants for the same Bundle were marked ambiguous"
 
+# Two DIFFERENT Purchase advisories must not let two verified cancellations
+# of the SAME Reader S1 run through together. G takes S1 before its COMMIT,
+# while H waits for that S1 rather than only its independent Purchase lock.
 g_h_refund() {
- local payment="$1" tx="$2" event="$3" fp="$4"
+ local payment="$1" tx="$2" event="$3" fp="$4" app="$5" hold="$6"
  local at
  at="$(p -c "select pg_catalog.to_char(clock_timestamp() at time zone 'UTC','YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"');")"
  p <<SQL
+set application_name='$app';
+set statement_timeout='25s';
 begin;
 set local role myeongha_commerce_internal_executor;
 select 'REFUND='||(public.cmd_apply_verified_portone_reader_full_cancellation_v1(
@@ -2918,32 +2923,65 @@ select 'REFUND='||(public.cmd_apply_verified_portone_reader_full_cancellation_v1
  'hmac-sha256:k1:'||pg_catalog.repeat('$fp',32),
  'synthetic-independent-same-bundle-refund-v1'
 )->'revoke'->>'contractVersion');
+select pg_sleep($hold);
 commit;
 SQL
 }
-if ! g_h_refund 'g-payment' 'tx-reader-g' 'g-only-after-parallel-bind' '23' \
- >"$tmpdir/g-exact-refund.out" 2>&1; then
+g_h_refund 'g-payment' 'tx-reader-g' 'g-only-after-parallel-bind' '23' \
+ 'rr_s2_g_same_bundle_refund_holder' 4 >"$tmpdir/g-exact-refund.out" 2>&1 &
+holder_pid=$!
+wait_for "G verified refund has revoked its Grant but holds the shared S1" "
+ select count(*) from pg_catalog.pg_stat_activity
+ where application_name='rr_s2_g_same_bundle_refund_holder'
+ and state='active' and wait_event_type='Timeout';
+"
+g_h_refund 'h-payment' 'tx-reader-h' 'h-after-g-refund' '24' \
+ 'rr_s2_h_same_bundle_refund_waiter' 4 >"$tmpdir/h-exact-refund.out" 2>&1 &
+writer_pid=$!
+wait_for "H distinct verified Purchase refund waits behind G's Reader S1" "
+ select count(*) from pg_catalog.pg_stat_activity
+ where application_name='rr_s2_h_same_bundle_refund_waiter'
+ and state='active' and wait_event_type='Lock' and wait_event='advisory';
+"
+wait "$holder_pid" || {
  cat "$tmpdir/g-exact-refund.out" >&2
- fail "G exact original Receipt refund failed"
-fi
-grep -qx 'REFUND=official-reader-s2-revoke-dispatch-v1' "$tmpdir/g-exact-refund.out" ||
- fail "G did not revoke through real bound Reader S1"
+ fail "G verified original Receipt refund failed during H contention"
+}
+holder_pid=""
+grep -qx 'REFUND=official-reader-s2-revoke-dispatch-v1' "$tmpdir/g-exact-refund.out" || {
+ cat "$tmpdir/g-exact-refund.out" >&2
+ fail "G failed to revoke under the official bound Reader S1"
+}
+# H holds its own new refund transaction OPEN after G commits. A third DB
+# session sees G revoked / H still active: H's eventual write is invisible
+# until its own COMMIT. This raw lineage observation is NOT a paid T2 read.
+wait_for "H verified refund has obtained S1 and holds its uncommitted effect" "
+ select count(*) from pg_catalog.pg_stat_activity
+ where application_name='rr_s2_h_same_bundle_refund_waiter'
+ and state='active' and wait_event_type='Timeout';
+"
 [[ "$(p -c "select status from public.entitlement_grants
  where source_receipt_id='$g_receipt'::uuid;")" == revoked ]] ||
- fail "G exact refund left its own Grant active"
+ fail "G verified refund did not revoke its exact original Grant at commit"
 [[ "$(p -c "select status from public.entitlement_grants
  where source_receipt_id='$h_receipt'::uuid;")" == active ]] ||
- fail "G refund incorrectly revoked independent H original Receipt Grant"
-[[ "$(g_h_current_bundle)" == 'one_current_bundle|1' ]] ||
- fail "remaining independent H purchase no longer authorizes one current Bundle"
-
-if ! g_h_refund 'h-payment' 'tx-reader-h' 'h-after-g-refund' '24' \
- >"$tmpdir/h-exact-refund.out" 2>&1; then
+ fail "G committed refund improperly revoked still-uncommitted independent H Grant"
+[[ "$(p -c "select verification_status from public.commerce_receipts
+ where id='$h_receipt'::uuid;")" == verified ]] ||
+ fail "H original Receipt changed before its own verified refund committed"
+wait "$writer_pid" || {
  cat "$tmpdir/h-exact-refund.out" >&2
- fail "H final original Receipt refund failed"
-fi
-grep -qx 'REFUND=official-reader-s2-revoke-dispatch-v1' "$tmpdir/h-exact-refund.out" ||
- fail "H did not revoke through real bound Reader S1"
+ fail "H verified refund deadlocked or failed after G shared-S1 release"
+}
+writer_pid=""
+grep -qx 'REFUND=official-reader-s2-revoke-dispatch-v1' "$tmpdir/h-exact-refund.out" || {
+ cat "$tmpdir/h-exact-refund.out" >&2
+ fail "H failed to revoke under the official bound Reader S1"
+}
+[[ "$(p -c "select count(*) from public.entitlement_grants
+ where source_receipt_id in ('$g_receipt'::uuid,'$h_receipt'::uuid)
+ and status='revoked';")" == 2 ]] ||
+ fail "two independent refund transactions did not revoke exactly their original Grants"
 [[ "$(g_h_current_bundle)" == 'no_active_grant|0' ]] ||
  fail "second original Receipt refund still left currently entitled Reader Bundle"
 [[ "$(p -c "select count(*) from public.standard_reading_reader_access_grants
