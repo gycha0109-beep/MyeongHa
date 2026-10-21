@@ -15,7 +15,9 @@ export const CANONICAL_CHARACTER_IDS_V1 = Object.freeze(Object.keys(CHARACTER_PR
 export function resolveCanonicalCharacterPresentationV1(characterId) {
   if (typeof characterId !== 'string') return null;
   const normalized = characterId.trim().toLowerCase();
-  return CHARACTER_PRESENTATION_BY_ID_V1[normalized] ?? null;
+  return Object.hasOwn(CHARACTER_PRESENTATION_BY_ID_V1, normalized)
+    ? CHARACTER_PRESENTATION_BY_ID_V1[normalized]
+    : null;
 }
 
 export function resolveCanonicalCharacterPresentationKeyV1(characterId) {

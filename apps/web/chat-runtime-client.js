@@ -1,3 +1,5 @@
+import { resolveCharacterDisplayNameV1 } from './character-display-locale.js';
+import { getUiLocale } from './ui-i18n.js';
 import { resolveCanonicalCharacterPresentationV1 } from './character-presentation-identity.js';
 import {
   ChatOpenClientErrorV1,
@@ -152,7 +154,7 @@ function chatOpenFailureMessage(error) {
 function formatTimestamp(value) {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return '시간 정보 없음';
-  return new Intl.DateTimeFormat('ko-KR', {
+  return new Intl.DateTimeFormat(getUiLocale(), {
     month: 'numeric',
     day: 'numeric',
     hour: '2-digit',
@@ -164,8 +166,8 @@ function senderLabel(message, authoritativeCharacterId) {
   if (message.senderType === 'user') return '나';
   if (message.senderType === 'character') {
     const identity = resolveCanonicalCharacterPresentationV1(message.characterId);
-    if (message.characterId === authoritativeCharacterId) return identity?.name ?? '대리자';
-    return identity?.name ?? '다른 대리자';
+    if (message.characterId === authoritativeCharacterId) return resolveCharacterDisplayNameV1(message.characterId, getUiLocale()) ?? '대리자';
+    return resolveCharacterDisplayNameV1(message.characterId, getUiLocale()) ?? '다른 대리자';
   }
   return '대화 기록';
 }
@@ -266,6 +268,7 @@ async function readChatPage(activeBearer, afterSequenceNo) {
     cache: 'no-store',
     headers: {
       Accept: 'application/json',
+          'Accept-Language': getUiLocale(),
       Authorization: `Bearer ${activeBearer.token}`,
     },
   });
@@ -429,6 +432,7 @@ async function sendTurn(message) {
         cache: 'no-store',
         headers: {
           Accept: 'application/json',
+          'Accept-Language': getUiLocale(),
           Authorization: `Bearer ${activeBearer.token}`,
           'Content-Type': 'application/json',
         },

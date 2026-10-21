@@ -1,3 +1,5 @@
+import { resolveCharacterDisplayNameV1 } from './character-display-locale.js';
+import { getUiLocale, translateStaticUi } from './ui-i18n.js';
 import { resolveReadingDetailRoute } from './reading-detail-route.js';
 import { resolveSajuButtonEngineRequest } from './reading-saju-engine-request.js';
 import { isBrowserSajuPreviewDeliveryV1 } from './saju-preview-response-admission.js';
@@ -131,19 +133,21 @@ if (route.valid) {
   delete root.dataset.readingScopeKey;
 }
 
-document.querySelectorAll('[data-reader-name]').forEach((element) => { element.textContent = reader.name; });
-document.querySelectorAll('[data-reader-title]').forEach((element) => {
-  element.textContent = reader.title;
-  element.hidden = !reader.title;
-});
-document.querySelectorAll('[data-reader-intro]').forEach((element) => { element.textContent = reader.intro; });
-document.querySelectorAll('[data-reader-hanja]').forEach((element) => {
-  element.textContent = reader.hanja;
-  element.hidden = !reader.hanja;
-});
-
 const portrait = document.querySelector('[data-reader-portrait]');
-if (portrait) portrait.setAttribute('aria-label', `${reader.name} 사주 읽기 장면`);
+function renderReaderLocalePresentation() {
+  const locale = getUiLocale();
+  const label = resolveCharacterDisplayNameV1(readerKey, locale) ?? reader.name;
+  document.querySelectorAll('[data-reader-name]').forEach((element) => { element.textContent = label; });
+  document.querySelectorAll('[data-reader-title]').forEach((element) => { element.textContent = translateStaticUi(reader.title, locale); element.hidden = !reader.title; });
+  document.querySelectorAll('[data-reader-intro]').forEach((element) => { element.textContent = translateStaticUi(reader.intro, locale); });
+  document.querySelectorAll('[data-reader-hanja]').forEach((element) => {
+    element.textContent = locale === 'ko-KR' ? reader.hanja : '';
+    element.hidden = locale !== 'ko-KR' || !reader.hanja;
+  });
+  if (portrait) portrait.setAttribute('aria-label', `${label} ${translateStaticUi('사주',locale)}`);
+}
+renderReaderLocalePresentation();
+document.addEventListener('myeongha:localechange', renderReaderLocalePresentation);
 
 let activeReadingOwner = null;
 
@@ -681,6 +685,7 @@ async function loadPersistedReading() {
       method: 'GET',
       headers: {
         Accept: 'application/json',
+        'Accept-Language': getUiLocale(),
         Authorization: `Bearer ${activeBearer.token}`,
       },
       credentials: 'same-origin',
@@ -782,6 +787,7 @@ async function loadPreviewReading() {
       method: 'POST',
       headers: {
         Accept: 'application/json',
+        'Accept-Language': getUiLocale(),
         Authorization: `Bearer ${activeBearer.token}`,
         'Content-Type': 'application/json',
       },

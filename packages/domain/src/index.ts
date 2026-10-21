@@ -586,3 +586,11 @@ export {
   type CharacterSajuRuntimeContextWithGroundingV2,
 } from './character-saju-runtime-v2.js';
 export * from './rahyeon-runtime-turn-context-v1.js';
+
+export {
+  NARRATIVE_OUTPUT_LOCALES_V1,
+  selectClaimNarrativeLocaleTemplateV1,
+  type NarrativeOutputLocaleV1,
+  type ClaimNarrativeProfileV1,
+  type ClaimNarrativeLocaleDecisionV1,
+} from './claim-narrative-locale-v1.js';
