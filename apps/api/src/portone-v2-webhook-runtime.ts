@@ -17,6 +17,8 @@ export interface PortOneV2WebhookRuntimeConfigV1 {
   readonly paymentTimeoutMs?: number;
   readonly paymentFetchImpl?: PortOneV2PaymentHttpFetchV1;
   readonly now?: () => Date;
+  /** S2 internal Reader grant/bind is off until explicitly owned and enabled. */
+  readonly privateReaderReceiptFulfillmentEnabled?: boolean;
 }
 
 export interface CreatePortOneV2WebhookRuntimeInputV1 {
@@ -40,6 +42,7 @@ export function createPortOneV2WebhookRuntimeV1(
     timeoutMs: config.paymentTimeoutMs,
     fetchImpl: config.paymentFetchImpl,
     now: config.now,
+    privateReaderReceiptFulfillmentEnabled: config.privateReaderReceiptFulfillmentEnabled === true,
   });
 
   const verificationAdapter = createPortOneV2PaymentVerificationAdapterV1({
@@ -65,6 +68,9 @@ export function createPortOneV2WebhookRuntimeV1(
     environment: configSnapshot.environment,
     webhookSecrets: configSnapshot.webhookSecrets,
     ...(configSnapshot.now === undefined ? {} : { now: configSnapshot.now }),
+    ...(configSnapshot.privateReaderReceiptFulfillmentEnabled
+      ? { privateReaderReceiptFulfillmentEnabled: true }
+      : {}),
   });
   const pool = input.pool;
 
