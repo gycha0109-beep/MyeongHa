@@ -8,11 +8,12 @@ const BASELINE_SHA='d169ac46fcd67cc225ac7adc8f5c1d6b4f9941de';
 const GLM_SHA='1715c4968f56391c05df160984a396501b8be151';
 
 export const SEYEON_TERRA_GLM_QUALITY_TRIO_PRIOR_RESERVED_MICRO_USD=976554;
+export const SEYEON_TERRA_GLM_QUALITY_TRIO_LUNA_RESERVE_MICRO_USD=20000;
 export const SEYEON_TERRA_GLM_QUALITY_TRIO_TERRA_RESERVE_MICRO_USD=50000;
 export const SEYEON_TERRA_GLM_QUALITY_TRIO_GLM_RESERVE_MICRO_USD=20000;
 export const SEYEON_TERRA_GLM_QUALITY_TRIO_OWNER_BUDGET_KRW=5000;
 export const SEYEON_TERRA_GLM_QUALITY_TRIO_FX_MAX=2500;
-export const SEYEON_TERRA_GLM_QUALITY_TRIO_MAX_CALLS=24;
+export const SEYEON_TERRA_GLM_QUALITY_TRIO_MAX_CALLS=18;
 
 export function assertTerraGlmQualityTrioOneShotV1(env,history,terraPr,terraRun,glmPr,glmRun){
  if(env?.GITHUB_REPOSITORY!==REPO||env.GITHUB_REF!=='refs/heads/main'||
@@ -34,7 +35,8 @@ export function assertTerraGlmQualityTrioOneShotV1(env,history,terraPr,terraRun,
     run.event!=='push'||run.head_branch!=='main'||run.run_attempt!==1)
   throw Error('TERRA_GLM_QUALITY_TRIO_DUPLICATE_OR_RETRY_HOLD');
  if((SEYEON_TERRA_GLM_QUALITY_TRIO_PRIOR_RESERVED_MICRO_USD+
-      15*SEYEON_TERRA_GLM_QUALITY_TRIO_TERRA_RESERVE_MICRO_USD+
+      3*SEYEON_TERRA_GLM_QUALITY_TRIO_LUNA_RESERVE_MICRO_USD+
+      6*SEYEON_TERRA_GLM_QUALITY_TRIO_TERRA_RESERVE_MICRO_USD+
       9*SEYEON_TERRA_GLM_QUALITY_TRIO_GLM_RESERVE_MICRO_USD)*
       SEYEON_TERRA_GLM_QUALITY_TRIO_FX_MAX/1e6>
       SEYEON_TERRA_GLM_QUALITY_TRIO_OWNER_BUDGET_KRW)
@@ -55,7 +57,7 @@ export function admitTerraGlmQualityTrioOneShotV1(env=process.env,exec=execFileS
   get('repos/'+REPO+'/actions/runs/39560101607'));
 }
 
-// This explicitly accepts only guarded public synthetic N01. Not a general
+// This accepts only final guarded PUBLIC synthetic utterances for the fixed N06/N10/N21 trio. Not a general
 // user-message or character-content release primitive.
 export function requirePublicSyntheticQualityUtteranceV1(envelope){
  if(envelope?.revealLevel!=='public'||!Array.isArray(envelope.memoryRefsMentioned)||
