@@ -46,7 +46,7 @@ declare
   v_thread_sequence bigint;
   v_turn_row public.chat_turns%rowtype;
   v_attempt_row public.chat_turn_attempts%rowtype;
-  v_existing_body uuid;
+  v_existing_body public.official_reader_paid_answer_bodies%rowtype;
   v_now timestamptz;
 begin
   -- No access is granted to this private Writer while owner contracts are
@@ -219,6 +219,59 @@ begin
     raise exception using errcode='P0001',
       constraint='official_reader_s5_reader_thread_mismatch',
       message='Official Reader has no active participation in this Chat Thread';
+  end if;
+
+  -- Idempotent retry after a lost private commit acknowledgement. Retain
+  -- the ORIGINAL committed answer, marker and ciphertext. A new random IV
+  -- or regenerated draft cannot rewrite the prior paid response.
+  select b.* into v_existing_body
+  from public.official_reader_paid_answer_bodies b
+  join public.chat_turns t
+    on t.id=b.turn_id and t.subject_id=b.subject_id
+   and t.thread_id=b.thread_id and t.committed_attempt_id=b.attempt_id
+   and t.state in ('committed','delivered')
+  join public.chat_turn_attempts a
+    on a.id=b.attempt_id and a.turn_id=b.turn_id
+   and a.subject_id=b.subject_id and a.state='committed'
+  join public.conversation_messages m
+    on m.id=b.safe_message_id and m.turn_id=b.turn_id
+   and m.thread_id=b.thread_id and m.subject_id=b.subject_id
+   and m.sender_type='system' and m.redacted_at is null
+   and m.body_text='유료 해설 기록이 있습니다.'
+   and m.message_payload_jsonb is null
+  where b.subject_id=v_subject and b.turn_id=v_turn
+    and b.attempt_id=v_attempt;
+
+  if found then
+    if v_existing_body.id is distinct from v_body
+       or v_existing_body.safe_message_id is distinct from v_message
+       or v_existing_body.thread_id is distinct from v_thread
+       or v_existing_body.official_reading_id is distinct from v_reading
+       or v_existing_body.reader_character_id is distinct from v_reader
+       or v_existing_body.reader_content_bundle_id is distinct from v_bundle
+       or v_existing_body.content_release_id is distinct from v_release
+       or v_existing_body.originating_entitlement_grant_id is distinct from v_grant
+       or v_existing_body.product_id is distinct from v_product
+       or v_existing_body.product_spec_version is distinct from v_product_spec
+       or v_existing_body.official_artifact_response_hash is distinct from v_artifact_hash
+       or v_existing_body.source_attestation_ref is distinct from v_source_ref
+       or v_existing_body.source_response_hash is distinct from v_source_hash
+       or v_existing_body.semantic_guard_version is distinct from v_semantic_version
+       or v_existing_body.output_guard_version is distinct from v_output_version
+       or v_existing_body.encryption_key_ref is distinct from v_key_ref then
+      raise exception using errcode='23505',
+        constraint='official_reader_s5_committed_replay_scope_changed',
+        message='A committed Reader answer cannot be replaced by a different scope';
+    end if;
+    return pg_catalog.jsonb_build_object(
+      'contractVersion','official-reader-s5-protected-answer-commit-v1',
+      'bodyId',v_existing_body.id::text,
+      'safeMessageId',v_existing_body.safe_message_id::text,
+      'turnId',v_existing_body.turn_id::text,
+      'attemptId',v_existing_body.attempt_id::text,
+      'committedAt',v_existing_body.committed_at::text,
+      'replayed',true
+    );
   end if;
 
   select t.* into v_turn_row
