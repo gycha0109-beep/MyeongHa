@@ -1,0 +1,41 @@
+name: Cloudflare Preview Remote Smoke
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cloudflare-preview-remote-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  remote-preview:
+    name: Cloudflare Preview · Real HTTP + Chrome
+    if: github.event.pull_request.head.repo.full_name == 'gycha0109-beep/MyeongHa' && github.head_ref == 'feat/ops/cloudflare-static-preview-20261020'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      MYEONGHA_CLOUDFLARE_PREVIEW_URL: https://feat-ops-cloudflare-static-preview-20261020-myeongha.gycha0109.workers.dev
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Verify deployed HTTP headers, 11 HTML routes and all API HOLDs
+        run: node scripts/verify-cloudflare-preview-remote.mjs
+      - name: Install headless Chrome
+        id: chrome
+        uses: browser-actions/setup-chrome@48ad923757ca74d66703209fe939badbdf80f2f4
+        with:
+          chrome-version: stable
+          install-dependencies: true
+      - name: Verify 11 rendered pages in real Chrome
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
+        run: node scripts/verify-cloudflare-preview-browser.mjs

@@ -1,0 +1,18 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "myeongha",
+  "main": "./workers/cloudflare-static-preview.mjs",
+  "compatibility_date": "2026-10-20",
+  "workers_dev": false,
+  "preview_urls": true,
+  "assets": {
+    "directory": "./public",
+    "html_handling": "none",
+    "not_found_handling": "none",
+    "run_worker_first": [
+      "/api",
+      "/api/*"
+    ]
+  },
+  "previews": {}
+}

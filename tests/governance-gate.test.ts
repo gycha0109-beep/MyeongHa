@@ -43,7 +43,7 @@ describe('required CI DB results', () => {
   const ciScript = step.slice(step.indexOf('        run: |\n') + '        run: |\n'.length)
     .split('\n').map(line => line.replace(/^ {10}/u, '')).join('\n');
   function ciResult(overrides: Record<string, string>) {
-    const defaults: Record<string, string> = { SCOPE_RESULT: 'success', FOUNDATION_RESULT: 'success', DB_SELECTED: 'false', DB_RESULT: 'skipped' };
+    const defaults: Record<string, string> = { SCOPE_RESULT: 'success', FOUNDATION_RESULT: 'success', DB_SELECTED: 'false', DB_RESULT: 'skipped', CLOUDFLARE_TLS_SELECTED: 'false', CLOUDFLARE_TLS_RESULT: 'skipped' };
     for (let index = 0; index < 5; index++) {
       defaults[`DB_SELECTED_${index}`] = 'false';
       defaults[`DB_TRACK_${index}`] = 'skipped';
@@ -52,6 +52,12 @@ describe('required CI DB results', () => {
   }
   it('allows unselected DB suites to be skipped', () => {
     expect(ciResult({})).toBe(0);
+  });
+  it('requires real disposable TLS/RLS CI proof when Cloudflare web scope is selected', () => {
+    expect(ciResult({ CLOUDFLARE_TLS_SELECTED: 'true' })).toBe(1);
+    expect(ciResult({ CLOUDFLARE_TLS_SELECTED: 'true', CLOUDFLARE_TLS_RESULT: 'failure' })).toBe(1);
+    expect(ciResult({ CLOUDFLARE_TLS_SELECTED: 'true', CLOUDFLARE_TLS_RESULT: 'success' })).toBe(0);
+    expect(ciResult({ CLOUDFLARE_TLS_SELECTED: 'false', CLOUDFLARE_TLS_RESULT: 'success' })).toBe(0);
   });
   it('requires selected authority core and every selected suite to pass', () => {
     expect(ciResult({ DB_SELECTED: 'true' })).toBe(1);
