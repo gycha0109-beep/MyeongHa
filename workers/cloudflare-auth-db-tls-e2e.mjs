@@ -33,9 +33,11 @@ function testEnv(env) {
 }
 function pgOptions(env, cert, overrides={}) {
   return {
-    host:TLS_HOST,port:5444,database:TLS_DB,user:LOGIN,
+    // workerd local TCP connects to loopback; TLS peer name is checked
+    // independently against the fixture's DNS SAN, never disabled.
+    host:'127.0.0.1',port:5444,database:TLS_DB,user:LOGIN,
     password:env.MYEONGHA_LOCAL_TEST_PASSWORD,
-    ssl:{ca:cert,rejectUnauthorized:true},
+    ssl:{ca:cert,rejectUnauthorized:true,servername:TLS_HOST},
     max:1,connectionTimeoutMillis:5000,idleTimeoutMillis:1000,
     statement_timeout:5000,
     ...overrides,
@@ -120,8 +122,8 @@ async function missingMember(env,cert){
   }
 }
 async function deniedConnection(env,cert,name,wrong){
-  const overrides=name==='bad-ca'?{ssl:{ca:wrong,rejectUnauthorized:true}}:
-    name==='bad-host'?{host:TLS_WRONG_HOST}:
+  const overrides=name==='bad-ca'?{ssl:{ca:wrong,rejectUnauthorized:true,servername:TLS_HOST}}:
+    name==='bad-host'?{ssl:{ca:cert,rejectUnauthorized:true,servername:TLS_WRONG_HOST}}:
     name==='plaintext'?{ssl:false}:
     name==='bad-login'?{password:'synthetic-wrong-password-never-valid'}:{};
   const pool=new Pool(pgOptions(env,cert,overrides));
