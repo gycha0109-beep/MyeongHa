@@ -2561,4 +2561,183 @@ grep -q 'production verified Receipt authority is unavailable' "$tmpdir/f2-combi
  fail "F2 refund-first altered sibling B/C/E/F lifecycle"
 pass "verified additional Reader refund-first purchase lock blocks actual combined Grant issuance and bind"
 
+
+# Refund-first overlap after a REAL additional-Reader binding exists. The
+# refund owns purchase advisory -> bound S1 and revokes F3; a direct 1220
+# historical replay must wait on the same S1 before returning replayed=true.
+# A replay is immutable provenance, NEVER a renewed current paid right.
+f3_intent='12192300-0000-0000-0000-000000000016'
+f3_receipt='12192000-0000-0000-0000-000000000016'
+f3_attempt='12197000-0000-0000-0000-000000000016'
+f3_session='12193000-0000-0000-0000-000000000016'
+f3_hash='sha256:v1:1616161616161616161616161616161616161616161616161616161616161616'
+if ! p >"$tmpdir/f3-bound-refund-first-seed.out" 2>&1 <<SQL
+begin;
+insert into public.purchase_intents(
+ id,subject_id,product_offer_id,provider_account_link_id,
+ idempotency_key,request_hash,offer_snapshot_jsonb,offer_snapshot_hash,
+ status,created_at,updated_at,expected_amount_minor,expected_currency,
+ charge_terms_version,capability_set_id,capability_snapshot_jsonb,
+ capability_snapshot_hash
+)
+select '$f3_intent'::uuid,subject_id,product_offer_id,provider_account_link_id,
+ 'reader-f3-bound-refund-first','sha256:test:reader-f3-bound-refund-first',
+ offer_snapshot_jsonb,offer_snapshot_hash,'created',
+ clock_timestamp(),clock_timestamp(),expected_amount_minor,expected_currency,
+ charge_terms_version,capability_set_id,capability_snapshot_jsonb,
+ capability_snapshot_hash
+from public.purchase_intents where id='$f_intent'::uuid;
+insert into public.purchase_intent_reader_selections(
+ purchase_intent_id,product_id,reader_character_id,reader_content_bundle_id,
+ selection_contract_version,selection_snapshot_jsonb,selection_hash,created_at
+)
+select '$f3_intent'::uuid,product_id,reader_character_id,reader_content_bundle_id,
+ selection_contract_version,selection_snapshot_jsonb,
+ 'sha256:test:reader-f3-selection',clock_timestamp()
+from public.purchase_intent_reader_selections where purchase_intent_id='$f_intent'::uuid;
+insert into public.commerce_payment_attempts(
+ id,purchase_intent_id,subject_id,product_offer_id,attempt_no,
+ provider,environment,idempotency_key,provider_request_id,
+ provider_transaction_id,status,created_at,updated_at
+)
+select '$f3_attempt'::uuid,pi.id,pi.subject_id,pi.product_offer_id,1,
+ 'portone_v2','production','reader-f3-bound-refund-attempt',
+ 'f3-payment','tx-reader-f3','response_received',clock_timestamp(),clock_timestamp()
+from public.purchase_intents pi where pi.id='$f3_intent'::uuid;
+update public.purchase_intents set status='verified',updated_at=clock_timestamp()
+where id='$f3_intent'::uuid;
+insert into public.commerce_receipts(
+ id,subject_id,purchase_intent_id,product_offer_id,platform,provider,
+ external_transaction_id,receipt_fingerprint,verification_status,
+ verified_payload_jsonb,verified_at,created_at,environment,
+ verifier_revision,verified_amount_minor,verified_currency
+)
+select '$f3_receipt'::uuid,subject_id,'$f3_intent'::uuid,product_offer_id,
+ platform,provider,'tx-reader-f3',
+ 'hmac-sha256:k1:1919191919191919191919191919191919191919191919191919191919191919',
+ 'verified',verified_payload_jsonb,clock_timestamp(),clock_timestamp(),
+ environment,verifier_revision,verified_amount_minor,verified_currency
+from public.commerce_receipts where id='$f_receipt'::uuid;
+commit;
+SQL
+then
+ cat "$tmpdir/f3-bound-refund-first-seed.out" >&2
+ fail "F3 actual additional Reader purchase seed failed"
+fi
+
+if ! p >"$tmpdir/f3-combined-bind.out" 2>&1 <<SQL
+begin;
+select pg_catalog.set_config('myeongha.subject_id','$subject',true);
+select 'F3_COMBINED='||(public.internal_apply_verified_reader_purchase_under_scope_v1(
+ '$subject'::uuid,'$b8_reading'::uuid,'test-standard-reader',
+ '$f3_receipt'::uuid,'$f3_intent'::uuid,
+ array['test-reader-unit'],array[transaction_timestamp()],
+ array[transaction_timestamp()],array[null]::timestamptz[],
+ array[null]::text[],
+ '$f3_session'::uuid,'$b8_reading'::uuid,
+ '$f3_hash','standard-reading-access-bind-v2',
+ '{"schemaVersion":"standard-reading-access-bind-v2","purchaseIntentId":"$f3_intent"}'::jsonb
+)->>'contractVersion');
+commit;
+SQL
+then
+ cat "$tmpdir/f3-combined-bind.out" >&2
+ fail "F3 real additional Reader combined Grant/bind failed"
+fi
+grep -qx 'F3_COMBINED=official-reader-s2-atomic-receipt-bind-v1' "$tmpdir/f3-combined-bind.out" ||
+ fail "F3 did not issue and bind through real combined Writer"
+f3_grant="$(p -c "select id from public.entitlement_grants
+ where source_receipt_id='$f3_receipt'::uuid and status='active';")"
+[[ "$f3_grant" =~ ^[0-9a-f-]{36}$ ]] ||
+ fail "F3 must have one active grant before its refund-first overlap"
+[[ "$(p -c "select count(*) from public.standard_reading_reader_access_grants
+ where purchase_intent_id='$f3_intent'::uuid
+   and entitlement_grant_id='$f3_grant'::uuid
+   and official_reading_id='$b8_reading'::uuid
+   and access_role='additional_reader';")" == 1 ]] ||
+ fail "F3 must have one committed additional-Reader access before refund"
+f3_cancel_at="$(p -c "select pg_catalog.to_char(clock_timestamp() at time zone 'UTC','YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"');")"
+p >"$tmpdir/f3-refund-holder.out" 2>&1 <<SQL &
+set application_name='rr_s2_f3_verified_refund_first';
+set statement_timeout='25s';
+begin;
+set local role myeongha_commerce_internal_executor;
+select 'F3_REFUND='||(public.cmd_apply_verified_portone_reader_full_cancellation_v1(
+ 'f3-payment','tx-reader-f3','f3-cancel-before-direct-replay',
+ '$f3_cancel_at'::timestamptz,$b8_amount,'KRW','production',
+ 'hmac-sha256:k1:2020202020202020202020202020202020202020202020202020202020202020',
+ 'synthetic-f3-bound-refund-first-v1'
+)->'revoke'->>'contractVersion');
+select pg_sleep(4);
+commit;
+SQL
+holder_pid=$!
+wait_for "F3 verified bound refund holds S1 before direct replay" "
+ select count(*) from pg_catalog.pg_stat_activity
+ where application_name='rr_s2_f3_verified_refund_first'
+ and state='active' and wait_event_type='Timeout';
+"
+p >"$tmpdir/f3-direct-replay-after-refund.out" 2>&1 <<SQL &
+set application_name='rr_s2_f3_direct_replay_after_refund';
+set statement_timeout='25s';
+begin;
+select pg_catalog.set_config('myeongha.subject_id','$subject',true);
+select 'F3_DIRECT='||reading_id::text||'|'||replayed::text
+from public.cmd_bind_standard_reading_access_v2(
+ '$subject'::uuid,'$f3_intent'::uuid,
+ '$f3_session'::uuid,'$b8_reading'::uuid,
+ '$f3_hash','standard-reading-access-bind-v2',
+ '{"schemaVersion":"standard-reading-access-bind-v2","purchaseIntentId":"$f3_intent"}'::jsonb
+);
+commit;
+SQL
+reader_pid=$!
+wait_for "F3 direct Reader replay waits on refund-held real S1" "
+ select count(*) from pg_catalog.pg_stat_activity
+ where application_name='rr_s2_f3_direct_replay_after_refund'
+ and state='active' and wait_event_type='Lock' and wait_event='advisory';
+"
+wait "$holder_pid" || {
+ cat "$tmpdir/f3-refund-holder.out" >&2
+ fail "F3 verified refund-first Writer failed"
+}
+holder_pid=""
+grep -qx 'F3_REFUND=official-reader-s2-revoke-dispatch-v1' "$tmpdir/f3-refund-holder.out" || {
+ cat "$tmpdir/f3-refund-holder.out" >&2
+ fail "F3 verified refund-first missed bound S1 revoke"
+}
+wait "$reader_pid" || {
+ cat "$tmpdir/f3-direct-replay-after-refund.out" >&2
+ fail "F3 direct Reader replay failed after concurrent refund"
+}
+reader_pid=""
+grep -qx "F3_DIRECT=$b8_reading|true" "$tmpdir/f3-direct-replay-after-refund.out" || {
+ cat "$tmpdir/f3-direct-replay-after-refund.out" >&2
+ fail "F3 historical Reader access replayed with wrong provenance"
+}
+[[ "$(p -c "select status from public.entitlement_grants where id='$f3_grant'::uuid;")" == revoked ]] ||
+ fail "F3 replay resurrected paid Grant"
+[[ "$(p -c "select verification_status from public.commerce_receipts where id='$f3_receipt'::uuid;")" == revoked ]] ||
+ fail "F3 replay resurrected original paid Receipt"
+[[ "$(p -c "select count(*) from public.standard_reading_reader_access_grants
+ where purchase_intent_id='$f3_intent'::uuid
+ and entitlement_grant_id='$f3_grant'::uuid
+ and official_reading_id='$b8_reading'::uuid
+ and request_hash='$f3_hash';")" == 1 ]] ||
+ fail "F3 replay mutated or duplicated immutable historical Reader binding"
+[[ "$(p -c "select count(*) from public.commerce_provider_events
+ where external_event_id='myeongha:portone-v2:full-cancel:v1:f3-cancel-before-direct-replay'
+ and resolved_receipt_id='$f3_receipt'::uuid;")" == 1 ]] ||
+ fail "F3 refund-first Provider Event was lost or duplicated"
+[[ "$(p -c "select count(*) from public.entitlement_events ee
+ join public.commerce_provider_events pe on pe.id=ee.source_provider_event_id
+ where ee.grant_id='$f3_grant'::uuid and ee.event_type='revoked'
+ and pe.external_event_id='myeongha:portone-v2:full-cancel:v1:f3-cancel-before-direct-replay';")" == 1 ]] ||
+ fail "F3 refund-first revoke event was lost or duplicated"
+[[ "$(p -c "select count(*) from public.entitlement_grants
+ where id in ('$b8_grant_b'::uuid,'$b8_grant_c'::uuid,'$b8_grant_e'::uuid,'$f_grant'::uuid)
+ and status='revoked';")" == 4 ]] ||
+ fail "F3 refund-first replay changed sibling B/C/E/F lifecycle"
+pass "verified bound refund-first serializes direct Reader replay; immutable history survives without resurrecting rights"
+
 echo "PASS: S2 instrumented two-direction PostgreSQL race; production integration HOLD"
