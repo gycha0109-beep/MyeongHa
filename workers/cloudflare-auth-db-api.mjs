@@ -8,6 +8,8 @@ import { parseProductionMemberAuthRateLimitConfigV1 } from '../apps/api/src/prod
 import { handleSupabaseAuthRequestV1 } from '../apps/api/src/supabase-auth-http.ts';
 import { createProductionGuestBootstrapHttpRuntimeV1 } from '../apps/api/src/production-guest-bootstrap-http-runtime.ts';
 import { createProductionCurrentSubjectProfileRuntimeV1 } from '../apps/api/src/production-current-subject-profile-runtime.ts';
+import { createProductionBirthProfileReadRuntimeV1 } from '../apps/api/src/production-birth-profile-read-runtime.ts';
+import { createProductionBirthProfileCreateRuntimeV1 } from '../apps/api/src/production-birth-profile-create-runtime.ts';
 
 const EXACT_MODE = 'approved-auth-db-v1';
 const AUTH_ACTIONS = Object.freeze({
@@ -73,19 +75,21 @@ function selectedOrigin(request, bindings) {
   return raw;
 }
 
-// Direct Auth + Guest bootstrap + GET /api/me only. Every runtime is a
+// Direct Auth, Guest, profile, and birth-profile endpoints. Every runtime is a
 // per-fetch instance, never a module-global session or Postgres pool.
 /** @returns {Promise<Response|null>} null means keep the existing deny-first 404. */
 export async function tryHandleCloudflareApprovedAuthV1(request, bindings, route) {
   const action = Object.hasOwn(AUTH_ACTIONS, route?.id) ? AUTH_ACTIONS[route.id] : null;
   const isGuestBootstrap = route?.id === 'api.session.bootstrap';
   const isMemberProfile = route?.id === 'api.me';
-  if (action === null && !isGuestBootstrap && !isMemberProfile) return null;
+  const isBirthCreate = route?.id === 'api.birth-profiles';
+  const isBirthRead = route?.id === 'rewrite.birth-profile.id';
+  if (action === null && !isGuestBootstrap && !isMemberProfile && !isBirthCreate && !isBirthRead) return null;
   const origin = selectedOrigin(request, bindings);
   if (origin === null) return null;
   const url = new URL(request.url);
   if (url.search !== '') return denied();
-  const expectedMethod = isMemberProfile ? 'GET' : 'POST';
+  const expectedMethod = (isMemberProfile || isBirthRead) ? 'GET' : 'POST';
   if (request.method !== expectedMethod) {
     return new Response(null, {
       status: 405,
@@ -113,6 +117,22 @@ export async function tryHandleCloudflareApprovedAuthV1(request, bindings, route
       });
     } else if (isMemberProfile) {
       runtime = createProductionCurrentSubjectProfileRuntimeV1({ env: bindings });
+      result = await runtime.handleRequest({
+        request,
+        requestId: crypto.randomUUID(),
+        serverTime: new Date().toISOString(),
+      });
+    } else if (isBirthCreate) {
+      runtime = createProductionBirthProfileCreateRuntimeV1({ env: bindings });
+      result = await runtime.handleRequest({
+        request,
+        requestId: crypto.randomUUID(),
+        serverTime: new Date().toISOString(),
+      });
+    } else if (isBirthRead) {
+      // Existing HTTP handler accepts the public /api/birth-profiles/:id
+      // path directly; do not translate or trust Vercel rewrite markers.
+      runtime = createProductionBirthProfileReadRuntimeV1({ env: bindings });
       result = await runtime.handleRequest({
         request,
         requestId: crypto.randomUUID(),
