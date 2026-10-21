@@ -36,8 +36,7 @@ export function MobileScreen({ title, eyebrow, description, refreshing = false, 
         </View>
         {children}
       </ScrollView>
-    </View
-  );
+    </View>  );
 }
 
 export function FoundationCard({ title, body }: { title: string; body: string }) {
