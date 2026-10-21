@@ -394,6 +394,17 @@ describe.skipIf(!enabled)('G2 original Grant actual-v2 two-session race, disposa
     expect(await saved(id)).toMatchObject({
       messages:'0',outboxes:'0',admissions:'0',attempt_state:'validated',
     });
+    // G1 candidate receipt can claim any format-valid PostgreSQL digest.
+    // Exact DB Owner inspector readback must reject the forged value, and
+    // no assistant/outbox/admission may survive the rollback.
+    await expect(commitSeyeonR23OfflineAtomicV2V1({
+      ...input,g1Receipt:{...input.g1Receipt,
+        pgPayloadDigest:'sha256:pg-jsonb:v1:'+'0'.repeat(64)},
+    })).rejects.toBeInstanceOf(SeyeonR23OfflineG2CommitHoldV1);
+    expect(await saved(id)).toMatchObject({
+      messages:'0',outboxes:'0',admissions:'0',
+      attempt_state:'validated',
+    });
     const result=await commitSeyeonR23OfflineAtomicV2V1(input);
     expect(result).toMatchObject({
       status:'disposable_atomic_v2_committed',

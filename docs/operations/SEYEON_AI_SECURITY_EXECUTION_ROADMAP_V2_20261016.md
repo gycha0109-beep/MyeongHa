@@ -561,3 +561,10 @@ S8의 **비파괴/격리 검토는 S2~S7과 병렬 진행 가능**하며, S8 Pro
 - **구현:** 기존 R19 파일에서 원본 종류·Record/Grant 식별자·타입·스키마·원문·투영 digest가 포함된 순서 있는 전체 출처 목록의 `canonicalJson` SHA-256과 입력값을 **PostgreSQL 접속 이전** 정확히 대조한다. 각 출처에 미등록 필드가 붙은 경우도 거부한다. 정확한 원본 Grant/Record DB 잠금 및 Pin Commit, 출처 목록 자체의 타입 정책은 변경하지 않는다.
 - **기존 회귀:** 동일 R19 테스트에서 올바르게 계산한 digest로 기존 명명된 폐기용 PostgreSQL 원본 Pin을 유지한다. 문법만 올바른 허위 digest, 목록의 원본 digest 변경, 추가 미등록 출처 필드 및 그에 맞춘 재해시를 DB 연결 전에 거부한다. 새 SQL, DB, 독립 검증 체계, CI workflow 없음.
 - **한계:** 이미 승인된 사용자 제품 방향을 다시 묻지 않는다. 이는 **오프라인 합성 후보의 무결성 보완**이며 실제 타입·코덱 기술 담당 계약, Production G1 영속 Pin, G2 원자적 Grant Commit, G3 공개권한, 전송/철회 서명을 승인한 것이 아니다. Ops Worker 보류, `Projectors=[]`, `writeAdmission='DENY'`, first Reveal/Replay/History 503, public/paid OFF, Production DB DDL/DML/ACL/migration 0 유지.
+
+## 58. 2026-10-21 S3/G1→S4/G2 — 격리 DB 원본 Pin 실측값과 Commit 후보 영수증 결속
+
+- **실제 결손:** §54·§57의 G1 SourceSet 검사와 별도로 R23의 G2 Commit 전 검사에서는 G1 후보 영수증의 `pgPayloadDigest`를 **정규식 형식**으로만 확인했다. 실제 동일 Attempt·원본 Record/Grant가 G1 DB Parent/Edge에 영속 고정한 PostgreSQL 원본 digest와 다른 영수증도 G2 함수 호출 전에 배제하지 않았다.
+- **변경:** 기존 R20에서 이미 쓰는 DB Owner의 읽기 전용 `seyeon_positive_candidate.inspect_pinned_raw_source_r20(subject,thread,turn,attempt)`를 **기존 R23의 격리 PostgreSQL G2 트랜잭션 안**에서 재사용한다. Parent `selectedSourcesDigest`, sourceCount, Edge 순서·원본 Record/Grant·type/schema 및 원본 JSONB의 Node canonical SHA-256을 G1 최종 출처와 대조하고, DB가 반환한 `pgPayloadDigest`와 요청 후보 영수증 값을 정확히 비교한다. 하나라도 불일치하면 v2 Commit 실행 이전 HOLD 및 트랜잭션 rollback. 기존 DB 직접 테이블 권한 또는 신규 함수·DDL을 추가하지 않는다.
+- **회귀:** 기존 named disposable PG17 R23 성공 테스트에서 실제 DB Edge digest를 영수증으로 받아 정상 v2 Commit 1회 유지, 형식만 정상인 다른 PostgreSQL digest는 Assistant/Outbox/Admission 증가 0으로 차단한다. 기존 원본 Grant 재승인/철회 경합, 실패·replay 및 단일 트랜잭션 Commit 시험을 재사용한다.
+- **한계:** 이것은 **synthetic/isolated DB의 기존 inspector 값에 대한 재대조**이며 R20·R23의 영속 모델 Context 또는 Derived SourceSet에 대한 기술 Owner의 운영 승인/서명은 아니다. 실제 SRC-25 타입·코덱, 원격 DB ACL/DR, 운영 revoke race·Cloudflare G0-D04 송출 증명은 OPEN. `Projectors=[]`, `writeAdmission='DENY'`, first Reveal/History/Replay 503/no-store, public/paid OFF, Production DB DDL/DML/ACL/migration 0 유지.

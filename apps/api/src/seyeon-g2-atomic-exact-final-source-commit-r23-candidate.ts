@@ -192,6 +192,43 @@ export async function commitSeyeonR23OfflineAtomicV2V1(
           throw new SeyeonR23OfflineG2CommitHoldV1();
         await client.query("SET LOCAL lock_timeout = '2000ms'");
         await client.query("SET LOCAL statement_timeout = '7000ms'");
+        // Re-read the CURRENT immutable G1 Parent/Edge and original raw JSONB
+        // through the EXISTING R20 DB-owned inspector in the same isolated
+        // transaction that will execute G2. The caller's unsigned candidate
+        // receipt is never authority for its own pgPayloadDigest.
+        const inspected=await client.query<{original:unknown}>(`
+ select seyeon_positive_candidate.inspect_pinned_raw_source_r20(
+   $1::uuid,$2::uuid,$3::uuid,$4::uuid
+ ) as original
+`.trim(),[
+          resolvedSubject.subjectId,input.threadId,input.turnId,input.attemptId,
+        ]);
+        const proof=inspected.rows.length===1?inspected.rows[0]?.original:null;
+        if(!proof||typeof proof!=='object'||Array.isArray(proof))
+          throw new SeyeonR23OfflineG2CommitHoldV1();
+        const checked=proof as Record<string,unknown>;
+        if(checked.selectedSourcesDigest!==selection.selectedSourcesDigest
+          ||checked.sourceCount!==1||!Array.isArray(checked.sources)
+          ||checked.sources.length!==1)
+          throw new SeyeonR23OfflineG2CommitHoldV1();
+        const pinned=checked.sources[0];
+        if(!pinned||typeof pinned!=='object'||Array.isArray(pinned))
+          throw new SeyeonR23OfflineG2CommitHoldV1();
+        const row=pinned as Record<string,unknown>;
+        if(row.ordinal!==0||row.recordKind!=='memory'
+          ||row.recordId!==original.recordId||row.grantId!==original.grantId
+          ||row.recordType!==original.recordType
+          ||row.schemaVersion!==original.schemaVersion
+          ||row.pgPayloadDigest!==r.pgPayloadDigest)
+          throw new SeyeonR23OfflineG2CommitHoldV1();
+        const originalRawDigest='sha256:v1:'+
+          createHash('sha256').update(canonicalJson({
+            kind:row.recordKind,recordId:row.recordId,grantId:row.grantId,
+            recordType:row.recordType,schemaVersion:row.schemaVersion,
+            payload:row.payload,
+          })).digest('hex');
+        if(originalRawDigest!==original.rawRecordDigest)
+          throw new SeyeonR23OfflineG2CommitHoldV1();
         const result=await client.query<{receipt:unknown}>(`
 select seyeon_positive_candidate.commit_actual_v2_r3(
   $1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,
