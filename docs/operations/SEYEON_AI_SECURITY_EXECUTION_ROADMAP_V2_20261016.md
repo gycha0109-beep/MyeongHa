@@ -554,3 +554,10 @@ S8의 **비파괴/격리 검토는 S2~S7과 병렬 진행 가능**하며, S8 Pro
 - **해결:** 현재 운영 Post-turn Worker가 이미 사용하는 `validateSeyeonPostTurnAnalysisSnapshotV1`을 R23 **오프라인** 선행 단계에서 재사용. 공식 schema/identity/typed metadata를 정형화하고 입력 본문 전체와 정확히 대조해 알 수 없는 최상위/Identity 필드를 거부한다. `turnId`와 `assistantMessageId`는 현재 원자 Commit 입력과 동일해야 한다. 공식 검증의 Snapshot hash 불일치도 **DB 접속 이전 HOLD**. 별도 승인 스키마·서명 구현 없음.
 - **격리 회귀:** 기존 R23 disposable PostgreSQL 테스트의 축약 Snapshot fixture를 **기존 Post-turn 공식 스키마** 합성 fixture로 바꾸고, 해시를 재계산한 다른 Turn·Assistant ID, 추가 최상위/Identity 데이터, 미등록 mode를 거부. 정상 기존 가짜 데이터 기반 단일 Memory 경로만 종전 v2 원자 Commit 유지. 새 SQL/migration/Workflow/DB/Provider 호출 없음.
 - **미해결/승인:** 이 검증은 `userMessageId`의 DB 원본과 모든 내부 분석/derived SourceSet 내용의 실제 소유권, Authoritative G1 Pin·G2 운영 Grant 경합·G0-D04 송출 서명을 입증하지 않는다. Character SRC-25 실제 타입/코덱, Security/API/DB 기술 Owner 승인 및 Ops Worker 실제 라우터는 여전히 HOLD. `Projectors=[]`, `writeAdmission='DENY'`, first Reveal/History/Replay 503, public/paid OFF, Production DB DDL/DML/ACL/migrations 0.
+
+## 57. 2026-10-21 S3/G1 — 격리 원본 기억 목록과 검증값의 정확한 결속
+
+- **확인된 결손:** R19의 격리 양수 원본 Pin은 `selectedSourcesDigest`의 SHA-256 형식만 확인하고 실제 `selectedSources`로 재계산하지 않았다. 형식만 정상인 무관한 검증값을 불변 DB Parent에 저장할 수 있었다.
+- **구현:** 기존 R19 파일에서 원본 종류·Record/Grant 식별자·타입·스키마·원문·투영 digest가 포함된 순서 있는 전체 출처 목록의 `canonicalJson` SHA-256과 입력값을 **PostgreSQL 접속 이전** 정확히 대조한다. 각 출처에 미등록 필드가 붙은 경우도 거부한다. 정확한 원본 Grant/Record DB 잠금 및 Pin Commit, 출처 목록 자체의 타입 정책은 변경하지 않는다.
+- **기존 회귀:** 동일 R19 테스트에서 올바르게 계산한 digest로 기존 명명된 폐기용 PostgreSQL 원본 Pin을 유지한다. 문법만 올바른 허위 digest, 목록의 원본 digest 변경, 추가 미등록 출처 필드 및 그에 맞춘 재해시를 DB 연결 전에 거부한다. 새 SQL, DB, 독립 검증 체계, CI workflow 없음.
+- **한계:** 이미 승인된 사용자 제품 방향을 다시 묻지 않는다. 이는 **오프라인 합성 후보의 무결성 보완**이며 실제 타입·코덱 기술 담당 계약, Production G1 영속 Pin, G2 원자적 Grant Commit, G3 공개권한, 전송/철회 서명을 승인한 것이 아니다. Ops Worker 보류, `Projectors=[]`, `writeAdmission='DENY'`, first Reveal/Replay/History 503, public/paid OFF, Production DB DDL/DML/ACL/migration 0 유지.
