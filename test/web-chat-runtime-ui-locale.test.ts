@@ -34,6 +34,13 @@ describe('Chat Runtime authored UI locale boundary', () => {
     }
   });
 
+  it('localizes the shared theme toggle accessibility label reported by Web PR gate', () => {
+    for (const locale of ['ja-JP', 'zh-TW']) {
+      expect(translateStaticUi('밤 화면으로 전환', locale)).not.toMatch(/[가-힣]/u);
+      expect(translateStaticUi('낮 화면으로 전환', locale)).not.toMatch(/[가-힣]/u);
+    }
+  });
+
   it('repaints in-flight UI statuses on localechange without re-reading or resending', () => {
     expect(runtime).toContain('composeStatusSource = message;');
     expect(runtime).toContain('composeStatus.textContent = uiText(message);');
