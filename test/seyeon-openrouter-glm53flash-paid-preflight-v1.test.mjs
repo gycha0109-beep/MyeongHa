@@ -1,6 +1,6 @@
 import {describe,it,expect,vi} from 'vitest';
 import {selectGlm53FlashProviderV1,checkPaidCreditAdmissionV1,
- getPaidNemotronAdmissionV1,getOpenRouterAccountUsageV1,
+ getPaidGlm53FlashAdmissionV1,getOpenRouterAccountUsageV1,
  GLM53FLASH_MODEL_V1} from '../scripts/seyeon-openrouter-glm53flash-paid-preflight-v1.mjs';
 const row={model_id:GLM53FLASH_MODEL_V1,tag:'open-inference/fp4',status:0,
  pricing:{prompt:'0.000000047076',completion:'0.00000016',request:'0'},
@@ -39,12 +39,12 @@ describe('Paid GLM Flash strictly funded route',()=>{
    if(path==='/api/v1/credits')return Response.json({data:{total_credits:5,total_usage:.196407}});
    return Response.json({data:path==='/api/v1/endpoints/zdr'?[row]:model});
   });
-  const admitted=await getPaidNemotronAdmissionV1(key,getter);
+  const admitted=await getPaidGlm53FlashAdmissionV1(key,getter);
   expect(admitted).toMatchObject({ok:true,metadataGetCount:4,inferencePosts:0,
    funding:{availableMicroUsd:4803593},route:{providerTag:'open-inference/fp4'}});
   expect(getter).toHaveBeenCalledTimes(4);
   expect(JSON.stringify(admitted)).not.toContain('PRIVATE');
-  const hold=await getPaidNemotronAdmissionV1(key,vi.fn(async()=>Response.json({error:'PRIVATE'},{status:403})));
+  const hold=await getPaidGlm53FlashAdmissionV1(key,vi.fn(async()=>Response.json({error:'PRIVATE'},{status:403})));
   expect(hold).toMatchObject({ok:false,reason:'CREDIT_NOT_VERIFIED'});
  });
  it('reads aggregate account usage but never treats it as a verified individual invoice',async()=>{

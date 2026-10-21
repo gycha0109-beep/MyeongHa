@@ -81,7 +81,7 @@ export function checkPaidCreditAdmissionV1(keyInfo,creditInfo,required=MIN_AVAIL
   paymentInvoiceReconciled:false,
  });
 }
-export async function getPaidNemotronAdmissionV1(key,fetchImpl=fetch){
+export async function getPaidGlm53FlashAdmissionV1(key,fetchImpl=fetch){
  if(typeof key!=='string'||key.trim().length<20)return Object.freeze({ok:false,reason:'INVALID_KEY'});
  const [k,c,z,m]=await Promise.all(paths.map(p=>get(p,key.trim(),fetchImpl)));
  const statuses={keyStatus:k.status,creditsStatus:c.status,zdrStatus:z.status,modelEndpointsStatus:m.status};
