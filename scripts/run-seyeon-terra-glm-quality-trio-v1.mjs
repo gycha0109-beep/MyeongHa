@@ -258,9 +258,9 @@ try{
  const terraOutput=metrics.terra.reduce((a,x)=>a+(x.outputTokens??0),0);
  const glmInput=metrics.glm.reduce((a,x)=>a+(x.inputTokens??0),0);
  const glmOutput=metrics.glm.reduce((a,x)=>a+(x.outputTokens??0),0);
- const terraCost=metrics.terra.every(x=>x.usageEstimateMicroUsd!==null)
+ const terraCost=metrics.terra.length>0&&metrics.terra.every(x=>x.usageEstimateMicroUsd!==null)
   ?metrics.terra.reduce((a,x)=>a+x.usageEstimateMicroUsd,0):null;
- const glmCost=metrics.glm.every(x=>x.usageEstimateMicroUsd!==null)
+ const glmCost=metrics.glm.length>0&&metrics.glm.every(x=>x.usageEstimateMicroUsd!==null)
   ?metrics.glm.reduce((a,x)=>a+x.usageEstimateMicroUsd,0):null;
  const cumulativeReservedKrw=Number((totalReserves()*FX_MAX/1e6).toFixed(3));
  const report={
