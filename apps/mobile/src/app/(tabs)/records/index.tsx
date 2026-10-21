@@ -187,8 +187,7 @@ export default function RecordsScreen() {
           />
         }
       />
-    </View
-  );
+    </View>  );
 }
 
 const styles = StyleSheet.create({
