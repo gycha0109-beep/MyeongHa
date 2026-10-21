@@ -18,7 +18,7 @@ export interface VerifiedReaderReceiptBindEffectV1 {
   readonly effectiveAt: string;
   readonly targetValidFrom: string;
   readonly targetValidUntil: string | null;
-  readonly reasonCode: string;
+  readonly reasonCode: string | null;
 }
 
 export interface VerifiedReaderReceiptBindInputV1 {
@@ -40,6 +40,8 @@ export interface AppliedVerifiedReaderReceiptBindV1 {
   readonly officialReadingId: string;
   readonly readerCharacterId: string;
   readonly capabilityEffectCount: number;
+  /** Historical immutable binding replay is not a new entitlement grant. */
+  readonly kind: 'issued' | 'already_bound';
 }
 
 function requireUuid(value: string, label: string): string {
@@ -87,7 +89,8 @@ export async function applyVerifiedReaderReceiptBindV1(
   for (const effect of input.effects) {
     if (!effect || typeof effect.capabilityItemKey !== 'string'
         || effect.capabilityItemKey.length === 0
-        || typeof effect.reasonCode !== 'string' || effect.reasonCode.length === 0
+        || (effect.reasonCode !== null &&
+          (typeof effect.reasonCode !== 'string' || effect.reasonCode.length === 0))
         || typeof effect.effectiveAt !== 'string'
         || !Number.isFinite(Date.parse(effect.effectiveAt))
         || typeof effect.targetValidFrom !== 'string'
@@ -125,7 +128,7 @@ export async function applyVerifiedReaderReceiptBindV1(
           || typeof access.entitlement_grant_id !== 'string'
           || !UUID.test(access.entitlement_grant_id)
           || access.reading_id !== expectedOfficialReadingId
-          || access.replayed !== false
+          || typeof access.replayed !== 'boolean'
           || (access.official_reading_created !== true
               && access.official_reading_created !== false)
           || (access.interpretation_created !== true
@@ -134,6 +137,7 @@ export async function applyVerifiedReaderReceiptBindV1(
         throw new Error('Verified Reader receipt bind returned an invalid atomic result.');
       }
       return Object.freeze({
+        kind: access.replayed ? 'already_bound' as const : 'issued' as const,
         receiptId,
         purchaseIntentId: access.purchase_intent_id,
         entitlementGrantId: access.entitlement_grant_id,
