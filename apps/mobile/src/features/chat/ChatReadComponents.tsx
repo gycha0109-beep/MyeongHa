@@ -1,3 +1,4 @@
+import { Link } from 'expo-router';
 import type { MobileChatThreadSnapshotV1 } from '@/features/chat/mobile-chat-read-repository';
 import { createMobileChatMessageViewV1 } from '@/features/chat/chat-view-model';
 import { resolveMobileChatCharacterPresentationV1 } from '@/features/chat/chat-character-presentation';
@@ -129,7 +130,11 @@ export function ChatReadMessages({
                 {view.body}
               </Text>
               {view.isPaidReaderMarker && (
-                <Text style={styles.paidReaderHint}>내 기록에서 현재 이용권 확인</Text>
+                <Link href="/records" asChild>
+                  <Pressable accessibilityRole="link" accessibilityLabel="내 사주 기록에서 이용권 확인" style={styles.paidReaderLink}>
+                    <Text style={styles.paidReaderHint}>내 기록 확인하기 →</Text>
+                  </Pressable>
+                </Link>
               )}
               <Text style={styles.messageTime}>{view.timeLabel}</Text>
             </View>
@@ -299,6 +304,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(240, 226, 205, 0.55)',
   },
   paidReaderHint: { color: mobileColors.navy, fontSize: 12, fontWeight: '700' },
+  paidReaderLink: { alignSelf: 'flex-start', paddingVertical: 6 },
   messageLabel: { color: mobileColors.gold, fontSize: 10, fontWeight: '900', letterSpacing: 0.6 },
   messageBody: { color: mobileColors.ink, fontSize: 15, lineHeight: 22 },
   userMessageBody: { color: mobileColors.surface },
