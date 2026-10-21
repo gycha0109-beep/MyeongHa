@@ -1,4 +1,5 @@
 import { Link } from 'expo-router';
+import { MobilePaidReaderChatRevealV1 } from '@/features/chat/mobile-paid-reader-chat-reveal';
 import type { MobileChatThreadSnapshotV1 } from '@/features/chat/mobile-chat-read-repository';
 import { createMobileChatMessageViewV1 } from '@/features/chat/chat-view-model';
 import { resolveMobileChatCharacterPresentationV1 } from '@/features/chat/chat-character-presentation';
@@ -129,6 +130,12 @@ export function ChatReadMessages({
               <Text style={[styles.messageBody, user && styles.userMessageBody]}>
                 {view.body}
               </Text>
+              {view.isPaidReaderMarker && (
+                <MobilePaidReaderChatRevealV1
+                  threadId={snapshot.threadId}
+                  safeMessageId={view.id}
+                />
+              )}
               {view.isPaidReaderMarker && (
                 <Link href="/records" asChild>
                   <Pressable accessibilityRole="link" accessibilityLabel="내 사주 기록에서 이용권 확인" style={styles.paidReaderLink}>
