@@ -6,6 +6,8 @@ import { createProductionMemberAuthHttpRuntimeV1 } from '../apps/api/src/product
 import { parseProductionUserDataRuntimeConfigV1 } from '../apps/api/src/production-user-data-runtime-config.ts';
 import { parseProductionMemberAuthRateLimitConfigV1 } from '../apps/api/src/production-member-auth-rate-limit-config.ts';
 import { handleSupabaseAuthRequestV1 } from '../apps/api/src/supabase-auth-http.ts';
+import { createProductionGuestBootstrapHttpRuntimeV1 } from '../apps/api/src/production-guest-bootstrap-http-runtime.ts';
+import { createProductionCurrentSubjectProfileRuntimeV1 } from '../apps/api/src/production-current-subject-profile-runtime.ts';
 
 const EXACT_MODE = 'approved-auth-db-v1';
 const AUTH_ACTIONS = Object.freeze({
@@ -71,15 +73,25 @@ function selectedOrigin(request, bindings) {
   return raw;
 }
 
+// Direct Auth + Guest bootstrap + GET /api/me only. Every runtime is a
+// per-fetch instance, never a module-global session or Postgres pool.
 /** @returns {Promise<Response|null>} null means keep the existing deny-first 404. */
 export async function tryHandleCloudflareApprovedAuthV1(request, bindings, route) {
   const action = Object.hasOwn(AUTH_ACTIONS, route?.id) ? AUTH_ACTIONS[route.id] : null;
-  if (action === null) return null;
+  const isGuestBootstrap = route?.id === 'api.session.bootstrap';
+  const isMemberProfile = route?.id === 'api.me';
+  if (action === null && !isGuestBootstrap && !isMemberProfile) return null;
   const origin = selectedOrigin(request, bindings);
   if (origin === null) return null;
   const url = new URL(request.url);
   if (url.search !== '') return denied();
-  if (request.method !== 'POST') return methodNotAllowed();
+  const expectedMethod = isMemberProfile ? 'GET' : 'POST';
+  if (request.method !== expectedMethod) {
+    return new Response(null, {
+      status: 405,
+      headers: { ...SECURITY_HEADERS, Allow: expectedMethod },
+    });
+  }
   if (!sameOriginFormPost(request, origin)) return denied();
 
   try {
@@ -92,7 +104,21 @@ export async function tryHandleCloudflareApprovedAuthV1(request, bindings, route
   let runtime;
   let result;
   try {
-    if (action === 'sign-out') {
+    if (isGuestBootstrap) {
+      runtime = createProductionGuestBootstrapHttpRuntimeV1({ env: bindings });
+      result = await runtime.handleRequest({
+        request,
+        requestId: crypto.randomUUID(),
+        serverTime: new Date().toISOString(),
+      });
+    } else if (isMemberProfile) {
+      runtime = createProductionCurrentSubjectProfileRuntimeV1({ env: bindings });
+      result = await runtime.handleRequest({
+        request,
+        requestId: crypto.randomUUID(),
+        serverTime: new Date().toISOString(),
+      });
+    } else if (action === 'sign-out') {
       result = await handleSupabaseAuthRequestV1({ request, env: bindings, action });
     } else {
       // Strictly request-scoped: never cache the runtime or its PostgreSQL
