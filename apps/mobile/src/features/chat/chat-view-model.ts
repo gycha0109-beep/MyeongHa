@@ -25,7 +25,7 @@ export function createMobileChatMessageViewV1(
   message: ChatMessageV1,
 ): MobileChatMessageViewV1 {
   const role = message.senderType;
-  const isPaidReaderMarker = role === 'character'
+  const isPaidReaderMarker = role === 'system'
     && message.redacted === false
     && message.bodyText === '유료 해설 기록이 있습니다.';
   const label =
