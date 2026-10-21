@@ -49,6 +49,12 @@ function uiElement(tag, className, source) {
   return textElement(tag, className, uiText(source));
 }
 
+function sourceElement(tag, className, value) {
+  const element = textElement(tag, className, value);
+  element.dataset.recordsSource = '';
+  return element;
+}
+
 function formatStoredValue(value) {
   if (value === null) return '—';
   if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return String(value);
@@ -126,7 +132,14 @@ function setupTabs() {
 
 function renderProfile(payload) {
   const name = payload?.profile?.displayName;
-  byId('records-display-name').textContent = typeof name === 'string' && name.trim().length > 0 ? name : uiText('호칭 미설정');
+  const nameNode = byId('records-display-name');
+  if (typeof name === 'string' && name.trim().length > 0) {
+    nameNode.dataset.recordsSource = '';
+    nameNode.textContent = name;
+  } else {
+    delete nameNode.dataset.recordsSource;
+    nameNode.textContent = uiText('호칭 미설정');
+  }
   const kind = payload?.subjectKind === 'member' ? '회원 기록' : payload?.subjectKind === 'guest' ? '게스트 기록' : '현재 기록';
   byId('records-subject-kind').textContent = uiText(kind);
 }
@@ -211,9 +224,9 @@ function renderLifeFacts(payload) {
     row.className = 'ledger-row';
     row.append(textElement('div', '', formatTimestamp(fact.confirmedAt)));
     const detail = document.createElement('div');
-    detail.append(textElement('strong', '', String(fact.factType ?? uiText('기록 항목'))));
+    detail.append(sourceElement('strong', '', String(fact.factType ?? uiText('기록 항목'))));
     detail.append(document.createElement('br'));
-    detail.append(textElement('span', 'fine', formatStoredValue(fact.valueJsonb)));
+    detail.append(sourceElement('span', 'fine', formatStoredValue(fact.valueJsonb)));
     row.append(detail);
     row.append(textElement('div', '', uiText(fact.revokedAt ? '철회됨' : '기록됨')));
     target.append(row);
@@ -358,26 +371,26 @@ function renderSajuReadingSamples(target, lifeFactsPayload) {
     const eyebrow = document.createElement('div');
     eyebrow.className = 'records-reading-eyebrow';
     eyebrow.append(textElement('span', 'records-reading-badge', uiText('개발 샘플')));
-    if (period) eyebrow.append(textElement('span', 'records-reading-period', period));
-    heading.append(eyebrow, textElement('h3', 'records-reading-title', title));
+    if (period) eyebrow.append(sourceElement('span', 'records-reading-period', period));
+    heading.append(eyebrow, sourceElement('h3', 'records-reading-title', title));
     identity.append(heading);
     top.append(identity);
     top.append(textElement('span', 'records-reading-date', formatTimestamp(fact.confirmedAt)));
     card.append(top);
 
-    card.append(textElement('p', 'records-reading-summary', summary));
+    card.append(sourceElement('p', 'records-reading-summary', summary));
 
     if (keywords.length > 0) {
       const chips = document.createElement('div');
       chips.className = 'records-reading-keywords';
-      for (const keyword of keywords) chips.append(textElement('span', 'records-reading-chip', keyword));
+      for (const keyword of keywords) chips.append(sourceElement('span', 'records-reading-chip', keyword));
       card.append(chips);
     }
 
     if (highlights.length > 0) {
       const list = document.createElement('ul');
       list.className = 'records-reading-highlights';
-      for (const highlight of highlights) list.append(textElement('li', '', highlight));
+      for (const highlight of highlights) list.append(sourceElement('li', '', highlight));
       card.append(list);
     }
 
@@ -430,10 +443,10 @@ function renderMemories(payload) {
   for (const memory of memories) {
     const item = document.createElement('div');
     item.className = 'timeline-item';
-    item.append(textElement('strong', '', String(memory.memoryType ?? uiText('기억 항목'))));
-    item.append(textElement('span', 'fine', formatStoredValue(memory.contentJsonb)));
+    item.append(sourceElement('strong', '', String(memory.memoryType ?? uiText('기억 항목'))));
+    item.append(sourceElement('span', 'fine', formatStoredValue(memory.contentJsonb)));
     const provenance = memory.createdByCharacterId ? `${memory.createdByCharacterId} · ${formatTimestamp(memory.createdAt)}` : formatTimestamp(memory.createdAt);
-    item.append(textElement('span', 'fine', provenance));
+    item.append(sourceElement('span', 'fine', provenance));
     target.append(item);
   }
 }
