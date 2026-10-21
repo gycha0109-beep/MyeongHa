@@ -160,7 +160,8 @@ describe('S-CF1.6 sealed protected chat routes (offline only)', () => {
       requestId: PRIVATE,
       identityEvidenceVerifier: verifier(),
     });
+    const copy = held?.clone();
     await assertHeld(held);
-    expect((await held!.clone().text())).toContain('"requestId":"unavailable"');
+    expect((await copy?.text())).toContain('"requestId":"unavailable"');
   });
 });
