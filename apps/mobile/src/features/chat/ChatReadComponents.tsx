@@ -119,12 +119,18 @@ export function ChatReadMessages({
                 user && styles.userBubble,
                 system && styles.systemBubble,
                 view.redacted && styles.redactedBubble,
+                view.isPaidReaderMarker && styles.paidReaderBubble,
               ]}
             >
-              <Text style={styles.messageLabel}>{view.label}</Text>
+              <Text style={styles.messageLabel}>
+                {view.isPaidReaderMarker ? '보호된 사주 해설' : view.label}
+              </Text>
               <Text style={[styles.messageBody, user && styles.userMessageBody]}>
                 {view.body}
               </Text>
+              {view.isPaidReaderMarker && (
+                <Text style={styles.paidReaderHint}>내 기록에서 현재 이용권 확인</Text>
+              )}
               <Text style={styles.messageTime}>{view.timeLabel}</Text>
             </View>
           </View>
@@ -287,6 +293,12 @@ const styles = StyleSheet.create({
   userBubble: { backgroundColor: mobileColors.navy, borderColor: mobileColors.navy },
   systemBubble: { maxWidth: '94%', backgroundColor: mobileColors.canvas },
   redactedBubble: { opacity: 0.7 },
+  paidReaderBubble: {
+    maxWidth: '94%',
+    borderColor: mobileColors.gold,
+    backgroundColor: 'rgba(240, 226, 205, 0.55)',
+  },
+  paidReaderHint: { color: mobileColors.navy, fontSize: 12, fontWeight: '700' },
   messageLabel: { color: mobileColors.gold, fontSize: 10, fontWeight: '900', letterSpacing: 0.6 },
   messageBody: { color: mobileColors.ink, fontSize: 15, lineHeight: 22 },
   userMessageBody: { color: mobileColors.surface },
