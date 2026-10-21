@@ -94,10 +94,8 @@ async function member(
           role:'myeongha_api_executor',login:LOGIN,superuser:false,bypass:false,
           executorlogin:false,db:TLS_DB,
         });
-        const tls=(await client.query<{ssl:boolean;version:string}>(
-          'select ssl,version from pg_stat_ssl where pid=pg_backend_pid()')).rows[0];
-        expect(tls?.ssl).toBe(true);
-        expect(tls?.version).toMatch(/^TLSv1\.[23]$/);
+        // RLS role may not see session-level pg_stat_ssl; TLS was
+        // already checked under the nonprivileged login, before SET LOCAL ROLE.
         const own=(await client.query<{id:string}>(
           'select id::text as id from public.subjects order by id')).rows;
         expect(own).toEqual([{id:subjectId}]);
@@ -120,10 +118,19 @@ async function mustReject(config: PoolConfig) {
 describe('Cloudflare Stage 5 request-scoped Node adapter to disposable REAL PostgreSQL TLS/RLS',()=>{
   // This is Node against a localhost fixture, NOT Worker TCP or Production.
   // It cannot satisfy the Worker outbound network or Production CA approvals.
-  it('confirms CA fingerprint and TLS peer configuration from disposable fixtures',()=>{
+  it('confirms CA fingerprint and an actual PostgreSQL TLS handshake before SET ROLE',async()=>{
     const fixture=requireIsolatedFixture();
     expect(options(fixture).ssl).toEqual({ca:fixture.ca,rejectUnauthorized:true});
     expect(options(fixture)).toMatchObject({host:TLS_HOST,port:5444,max:1});
+    const pool=new Pool(options(fixture));
+    try{
+      const tls=(await pool.query<{ssl:boolean;version:string}>(
+        'select ssl,version from pg_stat_ssl where pid=pg_backend_pid()')).rows[0];
+      expect(tls?.ssl).toBe(true);
+      expect(tls?.version).toMatch(/^TLSv1\.[23]$/);
+    }finally{
+      await pool.end();
+    }
   });
 
   it('enforces distinct same-transaction subject RLS for concurrent Member A and B',async()=>{
