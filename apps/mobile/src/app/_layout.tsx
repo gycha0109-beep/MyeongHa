@@ -25,7 +25,8 @@ function ThemedRootLayout() {
           contentStyle: { backgroundColor: colors.canvas },
         }}
       >
-        <Stack.Screen name="(tabs)" />\n        <Stack.Screen name="birth" />
+        <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="birth" />
         <Stack.Screen name="auth/callback" />
           </Stack>
         </SafeAreaView>
