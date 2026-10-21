@@ -5,6 +5,10 @@ import {
   createChatOpenClientV1,
 } from './chat-open-client.js';
 import { applyCanonicalCharacterPresentationV1 } from './chat-character.js';
+import {
+  appendProtectedReaderChatRevealV1,
+  clearProtectedReaderChatRevealV1,
+} from './paid-reader-chat-reveal.js';
 import { parseChatRoomReadPayloadV1, parseChatThreadRouteV1 } from './chat-room-read-contract.js';
 import { getActiveBearer, invalidateGuestSession, invalidateMemberSession } from './product-auth.js';
 import { PRODUCT_AUTH_STORAGE_V1 } from './product-auth.js';
@@ -229,6 +233,12 @@ function createStreamMessage(message, authoritativeCharacterId) {
     link.href = 'records.html';
     link.textContent = '내 기록 확인하기 →';
     marker.append(badge, copy, link);
+    if (threadId) {
+      appendProtectedReaderChatRevealV1(marker, {
+        threadId,
+        safeMessageId: message.messageId,
+      });
+    }
     body.append(heading, marker);
   } else {
     const paragraph = document.createElement('p');
@@ -241,6 +251,7 @@ function createStreamMessage(message, authoritativeCharacterId) {
 
 function renderConversation(messages, authoritativeCharacterId) {
   if (!chatStream) return;
+  clearProtectedReaderChatRevealV1();
   const nodes = messages.map((message) => createStreamMessage(message, authoritativeCharacterId)).filter(Boolean);
   if (nodes.length === 0) {
     if (chatIntro) {
@@ -270,6 +281,7 @@ function renderRoomState(state) {
 }
 
 function clearOwnerScopedRoomStateForAuthorityChange() {
+  clearProtectedReaderChatRevealV1();
   chatStream?.replaceChildren();
   roomReady = false;
   if (contextPill) contextPill.hidden = true;
