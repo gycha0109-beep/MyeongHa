@@ -1,7 +1,7 @@
 # 공식 Reader 이용 권한 공동 잠금 — S2 소유 트랙 이행 계약 v1
 
 - 기준: `OFFICIAL_READER_PAID_CHAT_INTEGRATION_ROADMAP_20261012_V1.md`, #1827, #1884, 제품 소유자 2026-10-12 결정.
-- 구현 상태: **격리된 실제 PostgreSQL 양방향 경합 시험 작성 / 실제 Commerce 운영 Writer 참여는 미구현**.
+- 구현 상태: **S1 공동 잠금과 S2 순방향 비공개 Reader 발급·결속·회수 Writer 및 Commerce 취소 어댑터의 격리 구현·PG15/17 검증 통과**. 모든 Commerce 운영 Writer·외부 이벤트 경로의 잠금 참여 인수 및 운영 적용은 **미완료**.
 - 적용 제한: 결제·환불·새 구매권 발급·사주 결속·유료 답변 공개·운영 DB 적용은 전부 기존 차단 유지.
 - 기존 `#1983`의 S1 비공개 함수 `internal_acquire_official_reader_scope_lock_v1`를 바꾸지 않고 검증한다.
 
@@ -60,11 +60,11 @@
 
 ## 6. 현재 결정과 다음 실행
 
-**완료 구분:** S1 공통 잠금 원시 기능 및 통과한 자동 검사 #1983. S2는 테스트에 참여시킨 합성 구매권·회수 경로에서 직렬화의 동작을 검증하는 단계다.
+**완료 구분:** S1 비공개 잠금 #1983 및 격리 테스트 외에도 S2 순방향 `1870` 구매 advisory→Reader S1→Receipt/Grant→Reader 결속, `1900` 정확한 Receipt 단위 취소·회수, `1810/1860` 직접 결속, `1770` 검증 이벤트 회수의 일부 실제 Writer를 적용하고 PostgreSQL 15·17 격리 CI에서 확인했다. 이는 운영 Writer 전 경로의 승인과 별개다.
 
-**미완료 구분:** 실제 Commerce/DB 원본 Writer에 이행한 잠금 절차, 유료 해설의 최종 권한/원자 저장, 보호 본문 격리와 후속 조회.
+**미완료 구분:** 기존 Commerce 결제·비Reader Event·Grant·탈퇴 Writer **전 경로**의 잠금 및 교착 인수, `1050` 검증 결제 증빙의 취소 후 과거 PAID 재생 의미 확정, 유료 해설 최종 권한/원자 저장, 보호 본문 삭제·복원 및 후속 조회.
 
-**다음 작업:** 이 시험의 PostgreSQL 15/17 결과를 확인한 뒤 모든 변경 경로에 대한 잠금 선행 순서표를 코드 수준으로 작성하고 소유자 간 교착 위험을 해결한다. 개별 함수에 먼저 임의 잠금을 붙여 동작 범위를 넓히지 않는다.
+**다음 작업:** §8 잠금 순서표 및 §18~19 실행 증거를 기준으로 **아직 연결되지 않은 Commerce 결제 증빙 `1050`→Receipt/Grant 발급·비Reader 이벤트/삭제 Writer 경계**를 소유 계약과 대조한다. 잠금 없는 과거 PAID 재생이나 불명확한 multi-scope는 차단으로 유지한다. S3/S4 Owner 승인 전 T2/유료 공개 경로로 확대하지 않는다.
 
 
 ## 7. 비공개 현재 묶음 판정 함수 (S2 보조 구현)
@@ -141,3 +141,25 @@
 - 독립 신규 F **추가 Reader 해석** Purchase/Receipt를 기존의 정당한 추가 Reader Offer로 **정본 순서(created → Attempt → verified → Receipt)**로 생성합니다. 현재 출생정보 버전의 공식 Reading은 실제 생성 후 합성 Saju 성공 원본을 완료 상태로 등록하여 추가 해석이 재사용할 수 있게 합니다. 첫 DB 연결에서 `internal_apply_verified_reader_purchase_under_scope_v1`이 `Purchase advisory → S1 → Grant 발급 → 실제 Reader Access 결속`을 한 트랜잭션으로 처리하고 COMMIT 전 잠금을 유지합니다.
 - 두 번째 연결은 **실제 `cmd_bind_standard_reading_access_v2`**로 같은 F 결속의 멱등 재시도를 시도하며 S1 advisory에 대기합니다. 세 번째 연결은 **실제 검증된 PortOne F 취소 Writer**로 F Purchase advisory에 대기합니다. 1900 원본 함수는 **Purchase advisory 획득 후** Receipt의 Reader 결속 범위를 조회하므로 결속이 먼저 완료되면 이미 저장된 F Access를 재발견하고 정확한 **bound S1 회수 경로에서 정상 취소**해야 합니다. 이 경우 일부러 롤백시키거나 이전 상태를 본 것처럼 가장하지 않습니다. 별도 B7 경합에서는 Grant 행 잠금 대기 뒤 새 결속이 발견된 **진짜 unbound→bound 상태 전환**을 롤백하고 새 거래에서 안전하게 재시도합니다.
 - 정상 완료된 F 취소를 같은 증빙으로 재생해 F Receipt/Grant revoked, F Access 출처 보존, Provider Event 및 Grant revoked Event 각각 1회, 다른 B/C/E 출처 불변을 증명합니다. **세 연결 모두 실제 데이터베이스 함수**를 호출하지만 합성 결제·인증 정보로만 시험합니다. 운영 모든 Commerce Writer 인수, T2/S5 유료 노출은 여전히 HOLD입니다.
+
+## 18. 신규 실제 Writer 경합 증거 및 보장 범위 (2026-10-21)
+
+- 재현 스크립트: `test/db/official_reader_s2_atomic_receipt_bind_live_writer_race.sh`. **격리 DB의 합성 검증 영수증·실제 SQL 함수** 실행이며 실제 PSP·운영 계정·운영 migration/결제는 호출하지 않는다.
+- **F2 환불 선행:** 검증된 추가 Reader 원본 Receipt가 구매 advisory를 선점해 취소되면 후속 `1870 internal_apply_verified_reader_purchase_under_scope_v1`는 대기 후 신규 Grant/Reader Access를 만들지 못한다.
+- **F3 결속 완료 후 환불 선행:** 이미 결속된 검증 Receipt를 `1900` 실제 회수 Writer가 S1에서 회수하는 동안 별도 `1810/1860 cmd_bind_standard_reading_access_v2`는 동일 Reader S1 advisory에 대기한다. 과거 정확한 결속 해시 재생은 `replayed=true`인 **이력만** 돌려주며, Receipt·Grant는 revoked 상태를 유지하고 새로운 권한은 생기지 않는다. 재생값을 유료 공개 권한으로 사용하면 안 된다.
+- **G/H 서로 다른 구매 선행 발급:** Subject×Reading×Reader×Bundle은 같고 Purchase/Receipt가 다른 2개 실제 `1870` Writer가 서로 다른 purchase advisory를 갖더라도 **같은 S1**에서 순서대로 진행한다. 둘 다 active인 동안 정확한 Reader Bundle 종류는 **1개**이고, 각 Receipt·Grant/immutable Access 출처는 2개다.
+- **G/H 서로 다른 구매 동시 회수:** G와 H에 각각 다른 purchase advisory를 획득한 실제 `1900` verified cancellation 2개를 동시에 실행한다. H는 G가 점유한 Reader S1에서 대기한다. G만 커밋되고 H가 아직 미커밋인 제3 연결에는 G revoked·H active가 보이며, H도 커밋되면 두 Grant 모두 revoked·현재 Bundle 0개·역사적 Reader Access 2개가 유지된다. Provider→Entitlement 회수 출처 역시 각 원 영수증에만 귀속된다.
+- **I 기존 1090 직접 발급과 환불:** `internal_apply_verified_receipt_capability_effects_v1`에 구매 advisory를 임의 추가하지 않고 **원래 필요한 Reader S1만 선잠금**한 뒤 Receipt 행을 잡아 발급한다. 별도 `1900` 환불은 구매 advisory를 획득해도 대상 Receipt `FOR UPDATE`에서 대기하고, 발급 거래의 커밋 후 새 미결속 Grant를 재조회해 해당 Receipt/Grant만 회수한다. 이 시험은 구매 잠금을 추가로 가진 기존 E 시험과 구별된다.
+- 위 F2/F3/G/H/I 격리 시나리오를 포함한 커밋 `126fe8f`의 **통합 CI #39551868938 성공**은 테스트 대상 경합의 PostgreSQL 15·17 성공 증거다. **모든 운영 Commerce Writer나 S2 전체 수락**을 뜻하지 않는다.
+
+## 19. Commerce 웹훅과 원본 Reader 구매권 Writer 사이의 미인수 경계 (2026-10-21)
+
+| 경계 | 소스에 존재하는 실제 책임 | 현재 확정된 증거/제한 |
+| --- | --- | --- |
+| `1050 cmd_persist_verified_payment_evidence_v1` 및 `commerce-verified-payment-evidence-persistence.ts` | 결제사 검증 증빙·PaymentAttempt·PurchaseIntent·Receipt·ProviderEvent를 원자 기록 | **Grant 발급·Reader Access 결속을 하지 않음**. 결제 완료 webhook이 증빙을 기록했다는 사실은 현재 Reader 구매권 발급/유료 공개가 아님 |
+| `1870 internal_apply_verified_reader_purchase_under_scope_v1` | 검증된 Reader 원본 Receipt의 **구매 advisory→S1→Grant→결속** | 격리 DB 검증, private/no public execution. `1050`에서 이 함수로 안전하게 이행하는 **실운영 호출자·모든 Commerce Owner 경로**는 별도 인수 필요 |
+| `1900 cmd_apply_verified_portone_reader_full_cancellation_v1` | 검증된 원 PortOne Receipt 취소와 bound/unbound Reader 구매권 회수 | S1/Receipt/Grant 효과는 격리 검증. 실제 환불 API 요청/법적 취소 판정 또는 임의 비Reader Commerce Writer의 권한이 아님 |
+| `commerce-portone-verified-reader-full-cancellation.ts` | **`official-reader-s2-no-grant-cancellation-v1`, `cancelled_before_grant`, `grantCount=0`**인 정상 취소도 Receipt/Provider Event와 함께 커밋; 그 외 조작된 0건/계약 불일치는 롤백 | `5f4d851`의 반환계약 수정과 `126fe8f` 테스트·기존 webhook 회귀시험 결과는 CI #39551868938 통과. 결과를 권리 부여나 PSP 환불 호출로 오인 금지 |
+| 기존 `1050`의 검증 PAID 재생 분기 | 기존 Receipt·Provider Event·Attempt·Intent를 정확히 대조하고 `replayed=true` 반환 | **미해결 위험:** 기존 함수는 정확한 PAID 재생에도 Receipt `verification_status='verified'`를 요구하지만 `1900` 취소는 `revoked`로 바꾼다. **취소 후 과거 PAID 재전달과 동일 검증 증빙이 실제로 제공되는 경우**의 idempotency 충돌 가능성은 코드에서 확인된다. 실제 webhook 수신/검증 가능성과 처리 의미는 검증되지 않았으며, Commerce Owner 계약 없이 과거 1050을 수정하거나 `revoked` Receipt를 부활시키지 않는다 |
+
+**남은 인수/차단:** S2의 장기 미완료는 외부 Commerce provider event 디스패치, 비Reader Grant 경로·다중 Reader 범위 재발견, 계정 삭제/복원 Worker 잠금 교차, 재생·취소 역순의 Commerce Owner 정책, S5 T2 최종 원자 저장이다. Saju 공식 출처 #2410, Privacy #2318 및 복구/법무 승인 없이는 어떤 합성 CI 성공도 운영 migration, 구매권/본문 활성화, 공개, PR 병합 권한을 만들지 않는다.
