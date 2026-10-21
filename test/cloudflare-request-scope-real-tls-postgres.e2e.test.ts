@@ -115,7 +115,11 @@ async function mustReject(config: PoolConfig) {
   finally {await pool.end();}
 }
 
-describe('Cloudflare Stage 5 request-scoped Node adapter to disposable REAL PostgreSQL TLS/RLS',()=>{
+// Ordinary CI intentionally has no disposable PostgreSQL credentials.
+// Run ONLY from the isolated CI job that creates the real TLS fixture.
+const isIsolatedDbCi = process.env.MYEONGHA_CLOUDFLARE_DIRECT_TLS_CI_ENABLED === '1';
+describe.skipIf(!isIsolatedDbCi)(
+  'Cloudflare Stage 5 request-scoped Node adapter to disposable REAL PostgreSQL TLS/RLS',()=>{
   // This is Node against a localhost fixture, NOT Worker TCP or Production.
   // It cannot satisfy the Worker outbound network or Production CA approvals.
   it('confirms CA fingerprint and an actual PostgreSQL TLS handshake before SET ROLE',async()=>{
