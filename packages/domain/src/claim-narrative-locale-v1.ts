@@ -26,7 +26,7 @@ export interface ClaimNarrativeProfileV1 {
 
 export type ClaimNarrativeLocaleDecisionV1 =
   | Readonly<{
-    state: 'ready';
+    state: 'selected';
     profileId: string;
     version: string;
     semanticKey: string;
@@ -76,10 +76,10 @@ export function selectClaimNarrativeLocaleTemplateV1(input: Readonly<{
   if (!template || !template.text.trim()) {
     return Object.freeze({ state: 'unavailable', reason: 'template_missing' });
   }
-  // This function only SELECTS an exact, already approved authored template.
+  // SELECT only. Mandatory qualifiers, method attribution, semantic preservation\n  // and release admission still belong to the existing authoritative renderer.\n  // Selection is not permission to publish.\n  // This function only SELECTS an exact, already approved authored template.
   // It cannot interpolate user input, run an LLM, or change semantic provenance.
   return Object.freeze({
-    state: 'ready',
+    state: 'selected',
     profileId: profile.profileId,
     version: profile.version,
     semanticKey,
