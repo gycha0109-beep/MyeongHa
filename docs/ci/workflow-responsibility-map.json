@@ -505,6 +505,12 @@
       "prMode": "none",
       "mainMode": "one-shot-trigger",
       "workTrackAttribution": "commit-metadata"
+    },
+    "seyeon-openrouter-nemotron35-paid-three-call-n01-v1.yml": {
+      "responsibility": "character-memory-funded-low-cost-model-actual-3call-public-shadow",
+      "prMode": "none",
+      "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "commit-metadata"
     }
   }
 }
