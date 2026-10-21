@@ -511,6 +511,12 @@
       "prMode": "none",
       "mainMode": "one-shot-trigger",
       "workTrackAttribution": "commit-metadata"
+    },
+    "seyeon-openrouter-glm53flash-paid-three-call-n01-v1.yml": {
+      "responsibility": "character-memory-funded-new-model-actual-3call-public-shadow",
+      "prMode": "none",
+      "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "commit-metadata"
     }
   }
 }
