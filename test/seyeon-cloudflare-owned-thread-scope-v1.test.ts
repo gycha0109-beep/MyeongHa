@@ -197,4 +197,28 @@ describe('S-CF2 owned-thread scope — OFFLINE, no router mounted', () => {
     expect(result.kind).toBe('denied');
     if (result.kind === 'denied') await assertHeld(result.response);
   });
+  it.each([
+    { method: 'GET', path: '/api/chat' },
+    { method: 'HEAD', path: '/api/chat' },
+    { method: 'OPTIONS', path: '/api/chat' },
+    { method: 'POST', path: '/api/chat/' + THREAD },
+    { method: 'HEAD', path: '/api/chat/' + THREAD },
+    { method: 'POST', path: '/api/chat/' + THREAD + '?pageSize=20' },
+    { method: 'OPTIONS', path: '/api/chat/' + THREAD + '/turns' },
+    { method: 'GET', path: '/api/chat/' + THREAD + '/turns' },
+    { method: 'PUT', path: '/api/chat/' + THREAD + '/turns' },
+  ])('denies method/route mismatch before unrelated-thread DB scope: $method $path', async ({ method, path }) => {
+    const f = fixture(['baekheon']);
+    const result = await scopeSeyeonCloudflareOwnedChatRequestV1({
+      request: request(path, method),
+      requestId: ID,
+      identityEvidenceVerifier: f.auth,
+      pool: f.pool,
+    });
+    expect(result.kind).toBe('denied');
+    if (result.kind === 'denied') await assertHeld(result.response);
+    expect(f.auth.verifyRequestIdentity).not.toHaveBeenCalled();
+    expect(f.queries).toHaveLength(0);
+    expect(f.pool.connect).not.toHaveBeenCalled();
+  });
 });

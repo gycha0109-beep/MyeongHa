@@ -95,7 +95,14 @@ export async function scopeSeyeonCloudflareOwnedChatRequestV1(input: Readonly<{
     route = classifySeyeonCloudflareChatRouteV1(
       new Request(url.origin + url.pathname),
     );
+    // Validate route/method parity before verifying a subject or querying DB.
+    // An invalid method must never be classified as an unrelated-character
+    // pass-through; only the independent Ops handler may authorize one.
+    const allowedMethod = route.kind === 'chat_open' || route.kind === 'turn_send'
+      ? 'POST'
+      : route.kind === 'thread_read' ? 'GET' : null;
     if (route.kind === 'malformed_or_unknown_chat' ||
+        (allowedMethod !== null && input.request.method !== allowedMethod) ||
         (route.kind === 'thread_read' && !validReadQuery(url)) ||
         (route.kind !== 'thread_read' && url.search !== '')) {
       return { kind: 'denied', response: held(input.requestId) };
