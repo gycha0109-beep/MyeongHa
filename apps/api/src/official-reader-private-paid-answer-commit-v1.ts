@@ -8,6 +8,8 @@ import {
   type OfficialReaderProtectedBodyIdentityV1,
   type OfficialReaderProtectedBodyKeyV1,
 } from './official-reader-protected-body-crypto-v1.js';
+import { hashSajuHeldSourceProofRequestV1 } from './saju-held-source-proof-verifier-v1.js';
+import { preflightOfficialReaderS3FromAdmittedArtifactV1 } from './official-reader-s3-authoritative-artifact-coverage-v1.js';
 import {
   executePostgresSubjectTransactionV1,
   type PostgresSubjectExecutionScopeV1,
@@ -42,6 +44,12 @@ export interface PrivateOfficialReaderPaidAnswerStagedV1 {
   readonly originatingGrantId: string;
   /** Never send this generated text to ordinary Chat or an HTTP response. */
   readonly privateBody: string;
+  /**
+   * S3 coverage manifest produced for the private generation. It must match
+   * the CURRENT independently stored Official Reading units at T2. This does
+   * not replace Saju Owner Production source attestation.
+   */
+  readonly sourceCoverageCandidate: unknown;
   /**
    * Reserved for the Saju Owner's verified Production source assertion.
    * These field values alone cannot prove issuance: the S5 DB gate is HELD.
@@ -163,6 +171,23 @@ export async function commitPrivateOfficialReaderPaidAnswerV1(input: {
           return unavailable();
         }
         assertCurrentScope(original, current.scope);
+        const sourceDigest = hashSajuHeldSourceProofRequestV1(
+          current.source.responseSnapshotJsonb,
+        );
+        if (sourceResponseHash !== sourceDigest
+            && sourceResponseHash !== `sha256:v1:${sourceDigest}`) {
+          return unavailable();
+        }
+        const sourceCoverage = preflightOfficialReaderS3FromAdmittedArtifactV1({
+          scope: current.scope,
+          source: current.source,
+          candidate: staged.sourceCoverageCandidate,
+        });
+        if (sourceCoverage.state !== 'held'
+            || sourceCoverage.publicDisclosureAuthorized !== false
+            || sourceCoverage.sourceAuthority !== 'NOT_EVALUATED') {
+          return unavailable();
+        }
         consumeOfficialReadingReaderAdmissionV1({
           ticket: current.ticket, expectedScope: current.scope,
         });
