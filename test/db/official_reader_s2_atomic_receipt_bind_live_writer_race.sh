@@ -2196,8 +2196,9 @@ fi
 
 # Three real DB sessions: combined verified F issuance+Reader bind owns BOTH
 # purchase and Reader S1, direct legacy binder waits on S1 and PortOne full
-# refund waits on F purchase advisory. Refund's prelock view is unbound,
-# so after F becomes bound it MUST abort and retry via bound S1. No paid
+# refund waits on F purchase advisory. The refund discovers Reader scopes
+# AFTER that purchase lock, so it must see the committed binding and revoke
+# under the correct S1 lock without taking the stale unbound path. No paid
 # disclosure/operational activation is attempted by these synthetic writers.
 f_intent='12192300-0000-0000-0000-000000000014'
 f_receipt='12192000-0000-0000-0000-000000000014'
@@ -2345,24 +2346,21 @@ wait "$reader_pid" || {
 reader_pid=""
 grep -q "F_DIRECT_BIND=$b8_reading" "$tmpdir/f-direct-binder.out" ||
  { cat "$tmpdir/f-direct-binder.out" >&2; fail "three-way direct binder did not replay exact official Reading"; }
-if wait "$writer_pid"; then
- fail "three-way initial unbound refund illegally completed after F became bound"
-fi
+wait "$writer_pid" || {
+ cat "$tmpdir/f-cancel-transient.out" >&2
+ fail "three-way verified bound Reader refund failed"
+}
 writer_pid=""
-grep -q 'Reader binding completed during cancellation lock wait; retry under its bound scope' "$tmpdir/f-cancel-transient.out" ||
- { cat "$tmpdir/f-cancel-transient.out" >&2; fail "three-way verified refund failed for unexpected reason"; }
-[[ "$(p -c "select verification_status from public.commerce_receipts where id='$f_receipt'::uuid;")" == verified ]] ||
- fail "failed first refund mutated bound F Receipt"
-[[ "$(p -c "select count(*) from public.commerce_provider_events where external_event_id='myeongha:portone-v2:full-cancel:v1:f-cancel-exact-after-bind';")" == 0 ]] ||
- fail "failed first refund committed verified Provider Event"
+grep -q 'F_REFUND=official-reader-s2-revoke-dispatch-v1' "$tmpdir/f-cancel-transient.out" ||
+ { cat "$tmpdir/f-cancel-transient.out" >&2; fail "three-way verified refund bypassed its bound S1 revoke dispatch"; }
 f_grant="$(p -c "select g.id from public.entitlement_grants g where g.source_receipt_id='$f_receipt'::uuid;")"
 [[ "$f_grant" =~ ^[0-9a-f-]{36}$ ]] || fail "F combined writer failed to persist Grant"
 [[ "$(p -c "select count(*) from public.standard_reading_reader_access_grants
  where entitlement_grant_id='$f_grant'::uuid and official_reading_id='$b8_reading'::uuid;")" == 1 ]] ||
  fail "F three-way lost immutable Reader access binding after retry"
 
-# Retry re-discovers the stored Reader access and acquires the correct S1
-# BEFORE existing Receipt/Grant row locks. Exactly one verified full cancellation.
+# Replay the same verified cancellation under the stored bound Reader S1.
+# Its idempotency must not produce a second provider or Grant revoke event.
 p >"$tmpdir/f-bound-refund-retry.out" 2>&1 <<SQL || {
  cat "$tmpdir/f-bound-refund-retry.out" >&2
  fail "F bound Reader refund retry failed"
@@ -2378,7 +2376,7 @@ select 'F_REFUND_RETRY='||(public.cmd_apply_verified_portone_reader_full_cancell
 commit;
 SQL
 grep -q 'F_REFUND_RETRY=official-reader-s2-revoke-dispatch-v1' "$tmpdir/f-bound-refund-retry.out" ||
- fail "F refund retry did not switch to bound S1 revoke"
+ fail "F bound refund replay did not preserve S1 revoke contract"
 [[ "$(p -c "select status from public.entitlement_grants where id='$f_grant'::uuid;")" == revoked ]] ||
  fail "F combined paid Grant remained active after verified refund"
 [[ "$(p -c "select verification_status from public.commerce_receipts where id='$f_receipt'::uuid;")" == revoked ]] ||
@@ -2396,6 +2394,6 @@ grep -q 'F_REFUND_RETRY=official-reader-s2-revoke-dispatch-v1' "$tmpdir/f-bound-
  where id in ('$b8_grant_b'::uuid,'$b8_grant_c'::uuid,'$b8_grant_e'::uuid)
  and status='revoked';")" == 3 ]] ||
  fail "F combined three-way race changed sibling B/C/E rights"
-pass "three concurrent real issuance+bind, direct bind and verified refund serialize; retry revokes only F"
+pass "three real issuance+bind, direct bind and verified refund writers serialize; bound cancellation and replay revoke only F"
 
 echo "PASS: S2 instrumented two-direction PostgreSQL race; production integration HOLD"
