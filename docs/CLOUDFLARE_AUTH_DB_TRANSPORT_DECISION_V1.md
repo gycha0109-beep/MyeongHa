@@ -57,3 +57,13 @@
 | Production DNS/Vercel/PG/PortOne/세연 AI | **변경 금지·미변경** |
 
 다음 이관 재개 시 이 문서와 PR #2384 최신 GitHub Actions 결과를 읽고, 사용자 인증·실DB 연결 승인 없이 방어적 코드와 격리된 합성 E2E만 추가한다.
+
+## 6. 일회용 PostgreSQL 실측과 Workers 로컬 TCP 한계 (2026-10-21)
+
+- Cloudflare 공식 [TCP Sockets 문서](https://developers.cloudflare.com/workers/runtime-apis/tcp-sockets/#proxy-request-failed-cannot-connect-to-the-specified-address)에 따르면, **`localhost` 및 private IP는 Workers TCP 연결의 허용 대상이 아니다.** 따라서 GitHub Actions의 루프백 PostgreSQL을 `wrangler dev`의 Worker 코드에서 직접 접속시키는 방식으로는 운영 Workers Direct TCP 성공을 입증할 수 없다.
+- 실제 로컬 Worker에서의 디버깅: 격리 PG와 Worker 프로세스 기동 및 secrets binding 성공 → 멤버 요청의 **연결/사전검사 단계에서 internal error**. DNS 별칭을 127.0.0.1로 바꾸고 `nodejs_compat`을 넣어도 이를 Workers TLS/RLS 성공으로 수락할 수 없었다. **실패한 실험은 성공으로 기록하지 않으며**, 불가능한 루프백 TCP를 요구하는 CI 테스트 엔트리 3개를 제거했다.
+- 대신 `test/cloudflare-request-scope-real-tls-postgres.e2e.test.ts`에 **일회용 PostgreSQL 15를 사용하는 실제 노드 TCP·TLS·RLS E2E**를 구현했다. 기존 `scripts/local/setup-saju-bridge-tls-subject-ci.sh`의 Docker PG와 일회용 self-signed CA, **non-superuser `myeongha_runtime`** 로그인, 실제 명하 migration과 가상 회원 A/B를 재사용한다.
+- 테스트는 실제 네트워크 TLS handshake, CA PEM 검증·hostname SAN 검증, pg_stat_ssl TLS 활성, login `session_user`와 NOLOGIN `SET LOCAL ROLE myeongha_api_executor`, Member A/B 별 RLS 격리, 없는 Member 거부, rollback 후 다른 Member 재조회, 잘못된 CA/SAN/평문 연결/비밀번호 거부를 확인한다. 해당 검증은 **`withCloudflareRequestSubjectScopeV1` 및 기존 `executePostgresSubjectTransactionV1` 어댑터를 실제 PG에 연결하는 Node 프로세스 기반 실측**이다.
+- CI `cloudflare-auth-db-tls-local` job은 이 일회용 Node E2E를 필수 통과 조건으로 삼는다. 테스트 fixture는 GitHub Actions 실행 환경 내에서만 생성되며 종료 시 DB Docker 컨테이너·CA 키·파일을 삭제한다.
+- **확인되지 않은 사항:** 원격 Cloudflare Workers→실제 DB TCP 연결, 운영 서버의 고정 SHA-256 CA 피어 핸드셰이크, Cloudflare Workers가 접근 가능한 승인된 스테이징 DB 호스트, Hyperdrive TLS trust delegation, OAuth/Auth E2E. Node CI 성공을 Workers 실네트워크의 성공이라고 표시하지 않는다.
+- 최종 원격 검증은 Security/API/DB 승인으로 지정된 격리 네트워크 경유의 **접속 가능한 DB 엔드포인트** 및 허용된 Worker Preview binding이 마련되어야 수행 가능하다. 루프백 제한을 보안 우회나 Production DB 접근으로 해결하지 않는다.
