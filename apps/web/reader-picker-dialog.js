@@ -1,3 +1,5 @@
+import { resolveCharacterDisplayNameV1 } from './character-display-locale.js';
+import { getUiLocale, translateStaticUi } from './ui-i18n.js';
 import { READER_PRESENTATIONS } from './reader-presentation-catalog.js';
 
 // Shared presentation only. Product availability and any paid/server authority
@@ -56,20 +58,19 @@ export function createDelegatePicker({
   grid.className = 'reading-reader-picker-grid';
   grid.setAttribute('role', 'list');
 
+  const localePainters = [];
   for (const reader of READER_PRESENTATIONS) {
     const optionState = resolveOption(reader);
     const button = document.createElement('button');
     button.className = 'reading-reader-option';
     button.type = 'button';
     button.dataset.readerKey = reader.key;
-    button.dataset.readerSearch = [reader.name, reader.title, reader.tone]
-      .join(' ').toLocaleLowerCase('ko-KR');
+    // Reader names are presentation-only; search aliases are populated by paintLocale.
     if (optionState.stage) button.dataset.readerRolloutState = optionState.stage;
     button.disabled = optionState.selectable === false;
     if (button.disabled) button.classList.add('is-unavailable');
     button.setAttribute('role', 'listitem');
-    button.setAttribute('aria-label', optionState.ariaLabel ||
-      (button.disabled ? reader.name + ' 대리자 준비 중' : reader.name + ' 선택'));
+    // The label is localized with the name below, while availability is unchanged.
 
     const art = document.createElement('span');
     art.className = 'reading-reader-option-art';
@@ -100,6 +101,24 @@ export function createDelegatePicker({
     body.append(nameRow, tone, action);
     button.append(art, body);
     grid.append(button);
+    const paintLocale = () => {
+      const locale = getUiLocale();
+      const readerName = resolveCharacterDisplayNameV1(reader.key, locale) ?? reader.name;
+      const translatedTitle = translateStaticUi(optionState.title ?? reader.title, locale);
+      const translatedTone = translateStaticUi(optionState.tone ?? reader.tone, locale);
+      const translatedAction = translateStaticUi(optionState.action || '이 대리자와 보기 →', locale);
+      name.textContent = readerName;
+      subtitle.textContent = translatedTitle;
+      tone.textContent = translatedTone;
+      action.textContent = translatedAction;
+      button.dataset.readerSearch = [reader.name, readerName, reader.title,
+        translatedTitle, reader.tone, translatedTone].join(' ').toLocaleLowerCase(locale);
+      button.setAttribute('aria-label',
+        locale === 'ko-KR' && optionState.ariaLabel
+          ? optionState.ariaLabel : readerName + ' · ' + translatedAction);
+    };
+    paintLocale();
+    localePainters.push(paintLocale);
   }
 
   const empty = document.createElement('p');
@@ -127,6 +146,10 @@ export function createDelegatePicker({
     empty.hidden = count > 0;
   };
 
+  document.addEventListener('myeongha:localechange', () => {
+    for (const paintLocale of localePainters) paintLocale();
+    filter();
+  });
   search.addEventListener('input', filter);
   close.addEventListener('click', () => dialog.close('close'));
   dialog.addEventListener('click', (event) => {
