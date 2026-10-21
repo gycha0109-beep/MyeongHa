@@ -2851,6 +2851,161 @@ select pg_sleep($hold);
 commit;
 SQL
 }
+
+# Real S2 row-lock inversion protection: existing Commerce 1050 PAID replay
+# takes Attempt -> Purchase row -> Receipt row; 1870 used to hold Receipt
+# in 1090 while 1220 waited on the Commerce-held Purchase row, deadlocking.
+# Use an independent verified J purchase to exercise this exact 1050 row
+# order against the REAL combined 1870 Writer. This is a DB lock-order test,
+# not an actual provider GET/payment replay or an operator authorization.
+j_intent='12192300-0000-0000-0000-000000000021'
+j_receipt='12192000-0000-0000-0000-000000000021'
+j_attempt='12197000-0000-0000-0000-000000000021'
+j_session='12193000-0000-0000-0000-000000000021'
+j_hash="sha256:v1:$(printf '27%.0s' {1..32})"
+if ! p >"$tmpdir/j-payment-purchase-receipt-seed.out" 2>&1 <<SQL
+begin;
+insert into public.purchase_intents(
+ id,subject_id,product_offer_id,provider_account_link_id,
+ idempotency_key,request_hash,offer_snapshot_jsonb,offer_snapshot_hash,
+ status,created_at,updated_at,expected_amount_minor,expected_currency,
+ charge_terms_version,capability_set_id,capability_snapshot_jsonb,
+ capability_snapshot_hash
+)
+select '$j_intent'::uuid,subject_id,product_offer_id,provider_account_link_id,
+ 'reader-j-1050-row-order','sha256:test:reader-j-1050-row-order',
+ offer_snapshot_jsonb,offer_snapshot_hash,'created',clock_timestamp(),
+ clock_timestamp(),expected_amount_minor,expected_currency,
+ charge_terms_version,capability_set_id,capability_snapshot_jsonb,
+ capability_snapshot_hash
+from public.purchase_intents where id='$f_intent'::uuid;
+insert into public.purchase_intent_reader_selections(
+ purchase_intent_id,product_id,reader_character_id,reader_content_bundle_id,
+ selection_contract_version,selection_snapshot_jsonb,selection_hash,created_at
+)
+select '$j_intent'::uuid,product_id,reader_character_id,reader_content_bundle_id,
+ selection_contract_version,selection_snapshot_jsonb,
+ 'sha256:test:reader-j-1050-selection',clock_timestamp()
+from public.purchase_intent_reader_selections where purchase_intent_id='$f_intent'::uuid;
+insert into public.commerce_payment_attempts(
+ id,purchase_intent_id,subject_id,product_offer_id,attempt_no,
+ provider,environment,idempotency_key,provider_request_id,
+ provider_transaction_id,status,created_at,updated_at
+)
+select '$j_attempt'::uuid,pi.id,pi.subject_id,pi.product_offer_id,1,
+ 'portone_v2','production','reader-j-original-attempt',
+ 'j-payment','tx-reader-j','response_received',clock_timestamp(),clock_timestamp()
+from public.purchase_intents pi where pi.id='$j_intent'::uuid;
+update public.purchase_intents
+set status='verified',updated_at=clock_timestamp()
+where id='$j_intent'::uuid;
+insert into public.commerce_receipts(
+ id,subject_id,purchase_intent_id,product_offer_id,platform,provider,
+ external_transaction_id,receipt_fingerprint,verification_status,
+ verified_payload_jsonb,verified_at,created_at,environment,
+ verifier_revision,verified_amount_minor,verified_currency
+)
+select '$j_receipt'::uuid,subject_id,'$j_intent'::uuid,product_offer_id,
+ platform,provider,'tx-reader-j',
+ 'hmac-sha256:k1:'||pg_catalog.repeat('29',32),
+ 'verified',verified_payload_jsonb,clock_timestamp(),clock_timestamp(),
+ environment,verifier_revision,verified_amount_minor,verified_currency
+from public.commerce_receipts where id='$f_receipt'::uuid;
+commit;
+SQL
+then
+ cat "$tmpdir/j-payment-purchase-receipt-seed.out" >&2
+ fail "J verified additional Reader Purchase fixture failed"
+fi
+[[ "$(p -c "select count(*) from public.entitlement_grants
+ where source_receipt_id='$j_receipt'::uuid;")" == 0 ]] ||
+ fail "J must not have a Grant before the Commerce-purchase row lock race"
+p >"$tmpdir/j-1050-row-order-holder.out" 2>&1 <<SQL &
+set application_name='rr_s2_j_1050_attempt_purchase_before_receipt';
+set statement_timeout='25s';
+begin;
+select id from public.commerce_payment_attempts where id='$j_attempt'::uuid for update;
+select id from public.purchase_intents where id='$j_intent'::uuid for update;
+select pg_sleep(5);
+select id from public.commerce_receipts where id='$j_receipt'::uuid for update;
+commit;
+SQL
+holder_pid=$!
+wait_for "J 1050 row-order holder has Attempt and Purchase, but not Receipt" "
+ select count(*) from pg_catalog.pg_stat_activity
+ where application_name='rr_s2_j_1050_attempt_purchase_before_receipt'
+ and state='active' and wait_event_type='Timeout';
+"
+g_h_combined_writer "$j_intent" "$j_receipt" "$j_session" "$j_hash" \
+ 'rr_s2_j_combined_waits_purchase_before_receipt' 0 \
+ >"$tmpdir/j-combined-purchase-row-waiter.out" 2>&1 &
+writer_pid=$!
+wait_for "J real combined 1870 Writer waits for Purchase row before Receipt" "
+ select count(*) from pg_catalog.pg_stat_activity
+ where application_name='rr_s2_j_combined_waits_purchase_before_receipt'
+ and state='active' and wait_event_type='Lock'
+ and wait_event<>'advisory';
+"
+# If 1090 took J Receipt before 1220 tried Purchase, this NOWAIT would fail
+# and the 1050-order holder would deadlock trying to lock that Receipt.
+if ! p >"$tmpdir/j-receipt-available-before-purchase.out" 2>&1 <<SQL
+begin;
+select id from public.commerce_receipts
+where id='$j_receipt'::uuid for update nowait;
+rollback;
+SQL
+then
+ cat "$tmpdir/j-receipt-available-before-purchase.out" >&2
+ fail "combined Reader issuer locked Receipt before acquiring Purchase row"
+fi
+wait "$holder_pid" || {
+ cat "$tmpdir/j-1050-row-order-holder.out" >&2
+ fail "J 1050 Attempt->Purchase->Receipt holder could not commit"
+}
+holder_pid=""
+wait "$writer_pid" || {
+ cat "$tmpdir/j-combined-purchase-row-waiter.out" >&2
+ fail "J combined 1870 Writer deadlocked or failed behind 1050 row order"
+}
+writer_pid=""
+grep -qx 'COMBINED=official-reader-s2-atomic-receipt-bind-v1' \
+ "$tmpdir/j-combined-purchase-row-waiter.out" || {
+ cat "$tmpdir/j-combined-purchase-row-waiter.out" >&2
+ fail "J combined Writer did not issue and bind after 1050 holder released rows"
+}
+[[ "$(p -c "select count(*) from public.standard_reading_reader_access_grants a
+ join public.entitlement_grants eg on eg.id=a.entitlement_grant_id
+ where a.purchase_intent_id='$j_intent'::uuid
+ and eg.source_receipt_id='$j_receipt'::uuid
+ and eg.status='active' and a.official_reading_id='$b8_reading'::uuid;")" == 1 ]] ||
+ fail "J combined Writer lost original Receipt/Grant/Reader lineage"
+j_cancel_at="$(p -c "select pg_catalog.to_char(clock_timestamp() at time zone 'UTC','YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"');")"
+if ! p >"$tmpdir/j-original-receipt-cancel.out" 2>&1 <<SQL
+begin;
+set local role myeongha_commerce_internal_executor;
+select 'J_REFUND='||(public.cmd_apply_verified_portone_reader_full_cancellation_v1(
+ 'j-payment','tx-reader-j','j-1050-row-order-cleanup',
+ '$j_cancel_at'::timestamptz,$b8_amount,'KRW','production',
+ 'hmac-sha256:k1:'||pg_catalog.repeat('30',32),
+ 'synthetic-j-verified-refund-v1'
+)->'revoke'->>'contractVersion');
+commit;
+SQL
+then
+ cat "$tmpdir/j-original-receipt-cancel.out" >&2
+ fail "J independent verified original Receipt cleanup refund failed"
+fi
+grep -qx 'J_REFUND=official-reader-s2-revoke-dispatch-v1' \
+ "$tmpdir/j-original-receipt-cancel.out" ||
+ fail "J original Receipt was not revoked by verified Reader dispatch"
+[[ "$(p -c "select count(*) from public.entitlement_grants
+ where source_receipt_id='$j_receipt'::uuid and status='revoked';")" == 1 ]] ||
+ fail "J verified refund did not preserve and revoke its exact Grant"
+[[ "$(p -c "select verification_status from public.commerce_receipts
+ where id='$j_receipt'::uuid;")" == revoked ]] ||
+ fail "J original verified Receipt was not cancelled"
+pass "real combined 1870 holds S1 then Purchase row before Receipt; 1050 row order cannot deadlock"
+
 g_h_current_bundle() {
  p -c "begin;
  select pg_catalog.set_config('myeongha.subject_id','$subject',true);
