@@ -29,8 +29,13 @@ const VERCEL_WEB_SOCIAL_CALLBACK_URI = 'https://myeongha.vercel.app/auth.html?so
 function webSocialCallbackUri() {
   // The browser's current HTTPS host is the intended return host. The server
   // independently enforces its exact approved origin and provider allowlist.
-  // Local HTTP development retains the established Vercel callback.
-  if (location.protocol !== 'https:') return VERCEL_WEB_SOCIAL_CALLBACK_URI;
+  // Existing Vercel Preview and local development continue to use the
+  // production Vercel callback; only a non-Vercel HTTPS host selects itself.
+  if (location.protocol !== 'https:' ||
+      location.hostname === 'myeongha.vercel.app' ||
+      location.hostname.endsWith('.vercel.app')) {
+    return VERCEL_WEB_SOCIAL_CALLBACK_URI;
+  }
   const callback = new URL('/auth.html', location.origin);
   callback.searchParams.set('social', 'callback');
   return callback.toString();
