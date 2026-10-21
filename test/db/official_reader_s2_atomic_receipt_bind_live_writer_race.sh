@@ -2135,6 +2135,63 @@ b8_grant_e="$(p -c "select id from public.entitlement_grants
 pass "verified E issuance-first Grant Writer and later cancellation serialize by purchase and preserve B/C"
 
 
+# An additional Reader purchase can reuse the current-revision official B7
+# Reading only after its source result is committed. B7's preceding initial
+# bind created the official identity, but deliberately left execution pending.
+# Commit a synthetic Saju source record before testing the REAL additional
+# purchase. This is fixture-only, not a production Source attestation.
+if ! p >"$tmpdir/f-official-source-ready.out" 2>&1 <<SQL
+begin;
+insert into public.reading_execution_attempts(
+ id,reading_id,subject_id,execution_attempt_no,state,
+ transport_key,saju_engine_key,requested_engine_version,resolved_engine_version,
+ external_request_ref,started_at,finished_at,error_code
+)
+select '12104000-0000-0000-0000-000000000014'::uuid,
+ r.id,r.subject_id,1,'succeeded',
+ 'official-reader-f-synthetic','saju-test',null,'saju-test-v2',
+ null,clock_timestamp(),clock_timestamp(),null
+from public.readings r
+where r.id='$b8_reading'::uuid and r.subject_id='$subject'::uuid
+  and r.execution_status='pending';
+
+insert into public.reading_refs(
+ reading_id,subject_id,execution_attempt_id,saju_engine_key,
+ external_reading_ref,source_birth_input_hash,target_birth_input_hash,
+ saju_engine_version,reading_contract_version,product_response_state,
+ required_action_jsonb,clarifications_jsonb,calculation_ambiguity_jsonb,
+ response_snapshot_jsonb,response_hash,created_at
+)
+select r.id,r.subject_id,'12104000-0000-0000-0000-000000000014'::uuid,
+ 'saju-test',null,bpr.input_hash,null,'saju-test-v2',
+ 'product-reading-test-v2','delivered',null,null,null,
+ '{"responseVersion":"myeonghwa-product-reading-response-v2","artifact":"official-source-current-revision"}'::jsonb,
+ 'sha256:test-official-reading-artifact-b7',clock_timestamp()
+from public.readings r
+join public.birth_profile_revisions bpr
+ on bpr.id=r.source_birth_revision_id
+where r.id='$b8_reading'::uuid and r.subject_id='$subject'::uuid;
+
+update public.readings
+set execution_status='succeeded',
+ committed_execution_attempt_id='12104000-0000-0000-0000-000000000014'::uuid,
+ completed_at=clock_timestamp()
+where id='$b8_reading'::uuid and subject_id='$subject'::uuid
+  and execution_status='pending';
+commit;
+SQL
+then
+ cat "$tmpdir/f-official-source-ready.out" >&2
+ fail "current-revision official Reading source completion fixture failed"
+fi
+[[ "$(p -c "select count(*) from public.standard_reading_official_bindings o
+ join public.readings r on r.id=o.reading_id
+ join public.reading_refs rr on rr.reading_id=r.id
+  and rr.execution_attempt_id=r.committed_execution_attempt_id
+ where o.reading_id='$b8_reading'::uuid and o.subject_id='$subject'::uuid
+ and r.execution_status='succeeded' and r.completed_at is not null;")" == 1 ]] ||
+ fail "F additional Reader purchase requires one reusable committed official Reading"
+
 # Three real DB sessions: combined verified F issuance+Reader bind owns BOTH
 # purchase and Reader S1, direct legacy binder waits on S1 and PortOne full
 # refund waits on F purchase advisory. Refund's prelock view is unbound,
@@ -2160,7 +2217,10 @@ select '$f_intent'::uuid,subject_id,product_offer_id,provider_account_link_id,
  clock_timestamp(),clock_timestamp(),expected_amount_minor,expected_currency,
  charge_terms_version,capability_set_id,capability_snapshot_jsonb,
  capability_snapshot_hash
-from public.purchase_intents where id='$b8_e_intent'::uuid;
+-- Additional Reader purchases must use the offer's additional-reader role.
+-- Reuse the fixture's authorized additional offer, not E's initial offer.
+from public.purchase_intents
+where id='12102300-0000-0000-0000-000000000001'::uuid;
 insert into public.purchase_intent_reader_selections(
  purchase_intent_id,product_id,reader_character_id,reader_content_bundle_id,
  selection_contract_version,selection_snapshot_jsonb,selection_hash,created_at
@@ -2192,7 +2252,9 @@ select '$f_receipt'::uuid,subject_id,'$f_intent'::uuid,product_offer_id,
  'hmac-sha256:k1:1515151515151515151515151515151515151515151515151515151515151515',
  'verified',verified_payload_jsonb,clock_timestamp(),clock_timestamp(),
  environment,verifier_revision,verified_amount_minor,verified_currency
-from public.commerce_receipts where id='$b8_receipt_e'::uuid;
+-- Keep the verified Receipt product offer consistent with F's purchase.
+from public.commerce_receipts
+where id='12102000-0000-0000-0000-000000000002'::uuid;
 commit;
 SQL
 then
