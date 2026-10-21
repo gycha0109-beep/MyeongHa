@@ -23,11 +23,13 @@ import {runSeyeonCensusFirstThreeCallShadowV1}
 import {createIntegrityClassifier,createDisclosureClassifier}
  from '../dist/apps/api/src/seyeon-production-governance-v1.js';
 import {
- createSeyeonDialoguePathSyntheticCensusV1,
+
  estimateSeyeonDialoguePathCostV1,
  verifySeyeonDialoguePathStageTopologyV1,
  SEYEON_DIALOGUE_PATH_PRICES_V1,
 } from './seyeon-dialogue-path-eval-core-v1.mjs';
+import {createSeyeonQualityTrioSyntheticCensusV1}
+ from './seyeon-terra-glm-quality-trio-census-v1.mjs';
 import {SEYEON_MODEL_EVAL_CASES_V1}
  from './seyeon-model-eval-cases-v1.mjs';
 
@@ -228,7 +230,7 @@ try{
     throw Error('GLM_USAGE_UNKNOWN_OR_OVER_RESERVE_HOLD');
   },
  });
- const census=createSeyeonDialoguePathSyntheticCensusV1(spec.id,ID);
+ const census=createSeyeonQualityTrioSyntheticCensusV1(spec.id,ID);
  const t2=performance.now();
  const glmResult=await runSeyeonCensusFirstThreeCallShadowV1({
   userMessageRef:ID,userText:TEXT,contextInput:contextInput(spec,ID),

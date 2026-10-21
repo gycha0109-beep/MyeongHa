@@ -7,6 +7,8 @@ import {
  SEYEON_TERRA_GLM_QUALITY_TRIO_TERRA_RESERVE_MICRO_USD as TERRA,
  SEYEON_TERRA_GLM_QUALITY_TRIO_GLM_RESERVE_MICRO_USD as GLM,
 } from '../scripts/seyeon-terra-glm-quality-trio-admission-v1.mjs';
+import {createSeyeonQualityTrioSyntheticCensusV1}
+ from '../scripts/seyeon-terra-glm-quality-trio-census-v1.mjs';
 import {getPaidGlm53FlashAdmissionV1}
  from '../scripts/seyeon-openrouter-glm53flash-paid-preflight-v1.mjs';
 import {SEYEON_MODEL_EVAL_CASES_V1}
@@ -69,6 +71,25 @@ describe('Owner-visible PUBLIC synthetic persona trio Terra/GLM paired one-shot'
   }
   expect(typeof getPaidGlm53FlashAdmissionV1).toBe('function');
  });
+ it('accepts only the exact three existing synthetic cases with four guarded census reads',()=>{
+  for(const id of ['N06','N10','N21']){
+   const ref='synthetic:'+id;
+   const census=createSeyeonQualityTrioSyntheticCensusV1(id,ref);
+   const port=census.port;
+   for(let i=0;i<4;i++){
+    const row=port.readFullThreadCensus({
+     subjectId:port.subjectId,threadId:port.threadId,currentUserMessageId:ref,
+    });
+    expect(row).toMatchObject({messageCount:1,latestSenderType:'user',complete:true});
+   }
+   expect(census.readCount).toBe(4);
+   expect(()=>port.readFullThreadCensus({
+    subjectId:port.subjectId,threadId:port.threadId,currentUserMessageId:ref,
+   })).toThrow();
+  }
+  expect(()=>createSeyeonQualityTrioSyntheticCensusV1('N01','synthetic:N01')).toThrow();
+  expect(()=>createSeyeonQualityTrioSyntheticCensusV1('N21','synthetic:OTHER')).toThrow();
+ });
  it('checks strict provider options, existing runtime, fsync and ONLY final guarded utterance visible',()=>{
   const src=readFileSync(new URL('../scripts/run-seyeon-terra-glm-quality-trio-v1.mjs',import.meta.url),'utf8');
   const wf=readFileSync(new URL('../.github/workflows/seyeon-terra-glm-quality-trio-one-shot-v1.yml',import.meta.url),'utf8');
@@ -84,6 +105,7 @@ describe('Owner-visible PUBLIC synthetic persona trio Terra/GLM paired one-shot'
   expect(src).toContain('providerOnlyTag:selectedProvider');
   expect(src).toContain('runSeyeonCharacterTurnV2');
   expect(src).toContain('runSeyeonCensusFirstThreeCallShadowV1');
+  expect(src).toContain('createSeyeonQualityTrioSyntheticCensusV1(spec.id,ID)');
   expect(src).toContain('await ledger.sync()');
   expect(src).toContain('verifySeyeonDialoguePathStageTopologyV1');
   expect(src).toContain("if(completePairs.length>0)");
