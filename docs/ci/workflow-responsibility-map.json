@@ -523,6 +523,12 @@
       "prMode": "none",
       "mainMode": "one-shot-trigger",
       "workTrackAttribution": "commit-metadata"
+    },
+    "seyeon-terra-glm-visible-public-n01-one-shot-v1.yml": {
+      "responsibility": "character-memory-synthetic-n01-owner-visible-model-pair",
+      "prMode": "none",
+      "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "commit-metadata"
     }
   }
 }
