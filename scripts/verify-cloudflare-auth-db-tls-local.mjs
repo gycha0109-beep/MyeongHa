@@ -104,8 +104,18 @@ async function test(){
           ?details.diagnostic.reason.slice(0,35):'NO_REASON';
         const code=typeof details?.diagnostic?.code==='string'
           ?details.diagnostic.code.slice(0,45):'NO_CODE';
+        const stage=typeof details?.diagnostic?.stage==='string'
+          ?details.diagnostic.stage.slice(0,40):'NO_STAGE';
+        // Worker strips synthetic fixture values itself; repeat redaction
+        // using the CI-only values before any error reaches GitHub logs.
+        let detail=typeof details?.diagnostic?.detail==='string'
+          ?details.diagnostic.detail.slice(0,180):'NO_DETAIL';
+        for(const sensitive of [password,caB64,wrongB64]){
+          if(sensitive)detail=detail.replaceAll(sensitive,'[redacted]');
+        }
         throw Error('Isolated TLS/subject test failed: '+testCase+
-          ' HTTP '+response.status+' reason='+reason+' code='+code);
+          ' HTTP '+response.status+' stage='+stage+
+          ' reason='+reason+' code='+code+' detail='+detail);
       }
       assert(response.headers.get('cache-control')==='no-store','Sensitive test responses must not cache');
       assert(!response.headers.has('set-cookie')&&!response.headers.has('access-control-allow-origin'),
