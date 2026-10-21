@@ -88,8 +88,8 @@ export function ReadingHistoryCard({
         <Text style={styles.date}>{formatRecordDateV1(item.completedAt)}</Text>
       </View>
       <Text style={styles.cardTitle}>{t(readingTitleV1(item.sajuDomain))}</Text>
-      <Text style={styles.cardBody}>{readingReaderLabelV1(item.readerCharacterIds)}</Text>
-      <Text style={styles.state}>{readingStateLabelV1(item.productResponseState)}</Text>
+      <Text style={styles.cardBody}>{t(readingReaderLabelV1(item.readerCharacterIds))}</Text>
+      <Text style={styles.state}>{t(readingStateLabelV1(item.productResponseState))}</Text>
       {openable && onOpen !== undefined ? (
         <MobileUiText style={styles.openHint}>저장된 풀이 다시 읽기 →</MobileUiText>
       ) : null}
