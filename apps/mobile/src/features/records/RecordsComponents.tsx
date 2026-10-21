@@ -129,10 +129,17 @@ export function MemoryCard({ item }: { item: MemoryItemV1 }) {
 
 export function RecordsEmptyState({ label }: { label: string }) {
   const styles = useMobileThemedStyles(staticStyles);
+  const { t } = useMobileUiLocale();
+  const emptyByCategory: Readonly<Record<string, string>> = {
+    '기록': '아직 기록이 없습니다',
+    '현세록': '아직 현세록이 없습니다',
+    '지난 읽기': '아직 지난 읽기가 없습니다',
+    '기억': '아직 기억이 없습니다',
+  };
   return (
     <View style={styles.empty}>
       <Text style={styles.emptySymbol}>之</Text>
-      <Text style={styles.cardTitle}>아직 {label}이 없습니다</Text>
+      <Text style={styles.cardTitle}>{t(emptyByCategory[label] ?? '아직 기록이 없습니다')}</Text>
       <MobileUiText style={styles.cardBody}>확인된 기록이 생기면 이곳에 표시됩니다.</MobileUiText>
     </View>
   );
@@ -146,12 +153,13 @@ export function RecordsFailureBanner({
   onRetry: () => void;
 }) {
   const styles = useMobileThemedStyles(staticStyles);
+  const { t } = useMobileUiLocale();
   if (labels.length === 0) return null;
   return (
     <View style={styles.failure}>
       <View style={styles.failureCopy}>
         <MobileUiText style={styles.failureTitle}>일부 기록을 불러오지 못했습니다</MobileUiText>
-        <Text style={styles.cardBody}>{labels.join(' · ')}</Text>
+        <Text style={styles.cardBody}>{labels.map((label) => t(label)).join(' · ')}</Text>
       </View>
       <Pressable accessibilityRole="button" onPress={onRetry} style={styles.retryButton}>
         <MobileUiText style={styles.retryText}>다시 시도</MobileUiText>
