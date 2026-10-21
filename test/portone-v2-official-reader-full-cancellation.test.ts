@@ -83,7 +83,7 @@ function fakePool(sql: string[], values: unknown[][]) {
             return {rows:[{result:{
               contractVersion:'portone-reader-full-cancellation-v1',
               receiptId:RECEIPT,providerEventId:EVENT,
-              revoke:{grantCount:1},
+              revoke:{contractVersion:'official-reader-s2-revoke-dispatch-v1',grantCount:1},
             }}]};
           }
           return {rows:[]};

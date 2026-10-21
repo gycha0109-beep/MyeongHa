@@ -38,8 +38,7 @@ function mockCommercePool(dbResult: unknown) {
     throw new Error('Unexpected Commerce DB operation');
   });
   const release = vi.fn();
-  const pool = { connect: vi.fn(async () => ({ query, release })) }
-    as unknown as PostgresSubjectPoolV1;
+  const pool = { connect: vi.fn(async () => ({ query, release })) } as unknown as PostgresSubjectPoolV1;
   const statements = () => query.mock.calls.map(([sql]) => sql);
   return { pool, query, release, statements };
 }
