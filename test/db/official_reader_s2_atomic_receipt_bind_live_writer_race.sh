@@ -2415,4 +2415,149 @@ grep -q 'F_REFUND_RETRY=official-reader-s2-revoke-dispatch-v1' "$tmpdir/f-bound-
  fail "F combined three-way race changed sibling B/C/E rights"
 pass "three real issuance+bind, direct bind and verified refund writers serialize; bound cancellation and replay revoke only F"
 
+
+# Inverse of F's issuance-first triple overlap: a verified cancellation
+# commits before the actual combined writer may issue any additional-Reader
+# Grant. This uses the same legitimate additional-reader offer/official
+# Reading as F, rather than changing the production bind role contract.
+f2_intent='12192300-0000-0000-0000-000000000015'
+f2_receipt='12192000-0000-0000-0000-000000000015'
+f2_attempt='12197000-0000-0000-0000-000000000015'
+f2_session='12193000-0000-0000-0000-000000000015'
+f2_hash='sha256:v1:1515151515151515151515151515151515151515151515151515151515'
+p >"$tmpdir/f2-cancel-first-seed.out" 2>&1 <<SQL || {
+  cat "$tmpdir/f2-cancel-first-seed.out" >&2
+  fail "F2 verified additional-Reader purchase seed failed"
+}
+begin;
+insert into public.purchase_intents(
+ id,subject_id,product_offer_id,provider_account_link_id,
+ idempotency_key,request_hash,offer_snapshot_jsonb,offer_snapshot_hash,
+ status,created_at,updated_at,expected_amount_minor,expected_currency,
+ charge_terms_version,capability_set_id,capability_snapshot_jsonb,
+ capability_snapshot_hash
+)
+select '$f2_intent'::uuid,subject_id,product_offer_id,provider_account_link_id,
+ 'reader-f2-cancel-first','sha256:test:reader-f2-cancel-first',
+ offer_snapshot_jsonb,offer_snapshot_hash,'created',
+ clock_timestamp(),clock_timestamp(),expected_amount_minor,expected_currency,
+ charge_terms_version,capability_set_id,capability_snapshot_jsonb,
+ capability_snapshot_hash
+from public.purchase_intents where id='$f_intent'::uuid;
+insert into public.purchase_intent_reader_selections(
+ purchase_intent_id,product_id,reader_character_id,reader_content_bundle_id,
+ selection_contract_version,selection_snapshot_jsonb,selection_hash,created_at
+)
+select '$f2_intent'::uuid,product_id,reader_character_id,reader_content_bundle_id,
+ selection_contract_version,selection_snapshot_jsonb,
+ 'sha256:test:reader-f2-selection',clock_timestamp()
+from public.purchase_intent_reader_selections where purchase_intent_id='$f_intent'::uuid;
+insert into public.commerce_payment_attempts(
+ id,purchase_intent_id,subject_id,product_offer_id,attempt_no,
+ provider,environment,idempotency_key,provider_request_id,
+ provider_transaction_id,status,created_at,updated_at
+)
+select '$f2_attempt'::uuid,pi.id,pi.subject_id,pi.product_offer_id,1,
+ 'portone_v2','production','reader-f2-cancel-first-attempt',
+ 'f2-payment','tx-reader-f2','response_received',clock_timestamp(),clock_timestamp()
+from public.purchase_intents pi where pi.id='$f2_intent'::uuid;
+update public.purchase_intents set status='verified',updated_at=clock_timestamp()
+where id='$f2_intent'::uuid;
+insert into public.commerce_receipts(
+ id,subject_id,purchase_intent_id,product_offer_id,platform,provider,
+ external_transaction_id,receipt_fingerprint,verification_status,
+ verified_payload_jsonb,verified_at,created_at,environment,
+ verifier_revision,verified_amount_minor,verified_currency
+)
+select '$f2_receipt'::uuid,subject_id,'$f2_intent'::uuid,product_offer_id,
+ platform,provider,'tx-reader-f2',
+ 'hmac-sha256:k1:1717171717171717171717171717171717171717171717171717171717171717',
+ 'verified',verified_payload_jsonb,clock_timestamp(),clock_timestamp(),
+ environment,verifier_revision,verified_amount_minor,verified_currency
+from public.commerce_receipts where id='$f_receipt'::uuid;
+commit;
+SQL
+[[ "$(p -c "select count(*) from public.entitlement_grants
+ where source_receipt_id='$f2_receipt'::uuid;")" == 0 ]] ||
+ fail "F2 cancellation-first fixture unexpectedly contains an issued Grant"
+f2_cancel_at="$(p -c "select pg_catalog.to_char(clock_timestamp() at time zone 'UTC','YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"');")"
+p >"$tmpdir/f2-refund-holder.out" 2>&1 <<SQL &
+set application_name='rr_s2_f2_cancel_first_holder';
+set statement_timeout='25s';
+begin;
+set local role myeongha_commerce_internal_executor;
+select 'F2_REFUND='||(public.cmd_apply_verified_portone_reader_full_cancellation_v1(
+ 'f2-payment','tx-reader-f2','f2-cancel-before-additional-bind',
+ '$f2_cancel_at'::timestamptz,$b8_amount,'KRW','production',
+ 'hmac-sha256:k1:1818181818181818181818181818181818181818181818181818181818181818',
+ 'synthetic-f2-cancel-first-v1'
+)->'revoke'->>'disposition');
+select pg_sleep(4);
+commit;
+SQL
+holder_pid=$!
+wait_for "F2 verified cancellation holds purchase advisory before additional bind" "
+ select count(*) from pg_catalog.pg_stat_activity
+ where application_name='rr_s2_f2_cancel_first_holder'
+ and state='active' and wait_event_type='Timeout';
+"
+p >"$tmpdir/f2-combined-loser.out" 2>&1 <<SQL &
+set application_name='rr_s2_f2_combined_after_refund';
+set statement_timeout='25s';
+begin;
+select pg_catalog.set_config('myeongha.subject_id','$subject',true);
+select public.internal_apply_verified_reader_purchase_under_scope_v1(
+ '$subject'::uuid,'$b8_reading'::uuid,'test-standard-reader',
+ '$f2_receipt'::uuid,'$f2_intent'::uuid,
+ array['test-reader-unit'],array[transaction_timestamp()],
+ array[transaction_timestamp()],array[null]::timestamptz[],
+ array[null]::text[],
+ '$f2_session'::uuid,'$b8_reading'::uuid,
+ '$f2_hash','standard-reading-access-bind-v2',
+ '{"schemaVersion":"standard-reading-access-bind-v2","purchaseIntentId":"$f2_intent"}'::jsonb
+);
+commit;
+SQL
+writer_pid=$!
+wait_for "F2 actual additional Reader combined writer waits on cancellation purchase lock" "
+ select count(*) from pg_catalog.pg_stat_activity
+ where application_name='rr_s2_f2_combined_after_refund'
+ and state='active' and wait_event_type='Lock' and wait_event='advisory';
+"
+wait "$holder_pid" || {
+ cat "$tmpdir/f2-refund-holder.out" >&2
+ fail "F2 verified refund-first transaction did not commit"
+}
+holder_pid=""
+grep -qx 'F2_REFUND=cancelled_before_grant' "$tmpdir/f2-refund-holder.out" || {
+ cat "$tmpdir/f2-refund-holder.out" >&2
+ fail "F2 cancellation was not a verified zero-Grant cancellation"
+}
+if wait "$writer_pid"; then
+ fail "F2 combined Reader purchase issued an entitlement after verified refund"
+fi
+writer_pid=""
+grep -q 'Verified Reader receipt, purchase and Reader selection unavailable' "$tmpdir/f2-combined-loser.out" || {
+ cat "$tmpdir/f2-combined-loser.out" >&2
+ fail "F2 cancelled additional Reader purchase failed for unexpected reason"
+}
+[[ "$(p -c "select verification_status from public.commerce_receipts
+ where id='$f2_receipt'::uuid;")" == revoked ]] ||
+ fail "F2 refunded receipt was not revoked"
+[[ "$(p -c "select count(*) from public.entitlement_grants
+ where source_receipt_id='$f2_receipt'::uuid;")" == 0 ]] ||
+ fail "F2 cancelled receipt incorrectly issued an entitlement"
+[[ "$(p -c "select count(*) from public.standard_reading_reader_access_grants
+ where purchase_intent_id='$f2_intent'::uuid;")" == 0 ]] ||
+ fail "F2 cancelled purchase incorrectly bound additional Reader access"
+[[ "$(p -c "select count(*) from public.commerce_provider_events
+ where external_event_id='myeongha:portone-v2:full-cancel:v1:f2-cancel-before-additional-bind'
+ and resolved_receipt_id='$f2_receipt'::uuid;")" == 1 ]] ||
+ fail "F2 verified refund-first event missing or duplicated"
+[[ "$(p -c "select count(*) from public.entitlement_grants
+ where id in ('$b8_grant_b'::uuid,'$b8_grant_c'::uuid,'$b8_grant_e'::uuid,'$f_grant'::uuid)
+ and status='revoked';")" == 4 ]] ||
+ fail "F2 refund-first altered sibling B/C/E/F lifecycle"
+pass "verified additional Reader refund-first purchase lock blocks actual combined Grant issuance and bind"
+
 echo "PASS: S2 instrumented two-direction PostgreSQL race; production integration HOLD"
