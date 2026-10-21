@@ -1,6 +1,8 @@
 // Watchtower-Track: security
 // R19: ONLY the named disposable G1-B positive-source candidate database.
 // Production positive Projectors, Provider access, G2 Commit and G3 Reveal HOLD.
+import {createHash} from 'node:crypto';
+import {canonicalJson} from '../../../packages/domain/src/index.js';
 import {
   executePostgresSubjectTransactionV1,
   type PostgresSubjectPoolV1,
@@ -45,16 +47,24 @@ function requireSelection(
       selection.selectedPersonalRecordCount > 2 ||
       selection.selectedMemoryCount !== selection.selectedPersonalRecordCount ||
       !Array.isArray(selection.selectedSources) ||
-      selection.selectedSources.length !== selection.selectedPersonalRecordCount) {
+      selection.selectedSources.length !== selection.selectedPersonalRecordCount ||
+      selection.selectedSourcesDigest !== 'sha256:v1:' +
+        createHash('sha256').update(canonicalJson(selection.selectedSources))
+          .digest('hex')) {
     throw new SeyeonR19OfflinePositivePinHoldV1();
   }
 
+  // Reject forged format-valid digests before connecting to PostgreSQL.
+  // The immutable Parent digest must represent the ACTUAL ordered source
+  // manifest, including both projected and raw evidence digests.
   // Deliberately bound to the *synthetic* R1 fixture: not an SRC-25
   // recordType approval, not permission to use positive production memory.
   const recordIds = new Set<string>();
   const grantIds = new Set<string>();
   return Object.freeze(selection.selectedSources.map(source => {
-    if (!source || source.recordKind !== 'memory' ||
+    if (!source || typeof source !== 'object' ||
+        Object.keys(source).length !== 7 ||
+        source.recordKind !== 'memory' ||
         source.recordType !== 'shared_detail' ||
         source.schemaVersion !== 'memory-v1' ||
         !UUID.test(source.recordId) || !UUID.test(source.grantId) ||
