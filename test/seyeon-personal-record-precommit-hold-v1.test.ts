@@ -146,6 +146,26 @@ describe('Se-yeon Production personal-record pre-model safety interlock', () => 
     }
   });
 
+  it('retains the DB-owned original UserMessage barrier ahead of positive G2 Commit',async()=>{
+    const migration=await readFile(new URL(
+      '../supabase/migrations/20261021181000_seyeon_positive_same_transaction_commit_v1.sql',
+      import.meta.url,
+    ),'utf8');
+    const originalLock=migration.indexOf('for share of m');
+    const guard=migration.indexOf(
+      "constraint='seyeon_positive_g2_snapshot_original_user_message_mismatch'",
+    );
+    const commit=migration.indexOf(
+      'from public.cmd_commit_seyeon_chat_turn_runtime_v2(',
+    );
+    expect(migration).toContain("m.sender_type='user'");
+    expect(migration).toContain("p_post_turn_snapshot_jsonb ->> 'userMessageId'");
+    expect(migration).toContain('v_original_user_message_count <> 1');
+    expect(originalLock).toBeGreaterThan(-1);
+    expect(guard).toBeGreaterThan(originalLock);
+    expect(commit).toBeGreaterThan(guard);
+  });
+
   it('runs the interlock before context-ready persistence and every model call in Production Chat', async () => {
     const runtime = await readFile(
       new URL('../apps/api/src/seyeon-production-chat-execution-v1.ts', import.meta.url),

@@ -83,7 +83,7 @@ apply_pg17_migrations_through_seyeon_production_frontier() {
             20261021180000_seyeon_positive_pre_model_source_pin_v1.sql)
               reviewed_positive_sha1='e884f2b65dc7b30117188ceb460eab975561345f' ;;
             20261021181000_seyeon_positive_same_transaction_commit_v1.sql)
-              reviewed_positive_sha1='b6fe5892157f6edceaa610ddfa5cf0d06816fa93' ;;
+              reviewed_positive_sha1='8a2d5a59ec16c24fb391fe9280b2081c64ff2d6e' ;;
           esac
           if command -v git >/dev/null 2>&1; then
             positive_sha1="$(git hash-object "$migration")"
