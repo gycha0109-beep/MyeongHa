@@ -98,7 +98,15 @@ async function test(){
       const response=await probe('/__offline/subject-tls',{
         headers:{...HDR,'X-Myeongha-Offline-Case':testCase},
       });
-      assert(response.status===200,'Isolated TLS/subject test failed: '+testCase+' HTTP '+response.status);
+      if(response.status!==200){
+        const details=await response.json().catch(()=>null);
+        const reason=typeof details?.diagnostic?.reason==='string'
+          ?details.diagnostic.reason.slice(0,35):'NO_REASON';
+        const code=typeof details?.diagnostic?.code==='string'
+          ?details.diagnostic.code.slice(0,45):'NO_CODE';
+        throw Error('Isolated TLS/subject test failed: '+testCase+
+          ' HTTP '+response.status+' reason='+reason+' code='+code);
+      }
       assert(response.headers.get('cache-control')==='no-store','Sensitive test responses must not cache');
       assert(!response.headers.has('set-cookie')&&!response.headers.has('access-control-allow-origin'),
         'Isolated test leaked cookie/CORS');
