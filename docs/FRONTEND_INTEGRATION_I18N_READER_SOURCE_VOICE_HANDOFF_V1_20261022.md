@@ -191,6 +191,14 @@
 - `test/mobile-reader-picker-i18n.test.ts`, `test/mobile-official-reader-entry-i18n.test.ts` 및 기존 Reader picker/rollout 테스트에서 Saju·Face 화면 상태·미공개 상태·서버 source 불변·3개 UI 로케일 경계를 다룬다. Node 전용 소스 검사는 루트 `test/`에 배치했다.
 - **한계/후속:** Character owner가 인물성 충돌과 locale-specific 화법을 승인하기 전 실제 다국어 캐릭터 대사 생성은 HOLD. I18N-07의 공개 도장은 원래 feature/release owner가 주는 것이며 이번 UI 구현만으로 배포/판매 승인이 아니다.
 
+### 7.9 I18N-07 부분 집합 — 모바일 대화 입력 영역의 차단·준비 상태 UI 로케일
+
+- `apps/mobile/src/features/chat/mobile-chat-compose-ui-locale-v1.ts`는 **클라이언트가 작성한** 입력창 placeholder와 현재 상태에 따른 3종 입력 불가 안내만 `ko-KR`/`ja-JP`/`zh-TW` UI로 제공한다. 지원되지 않거나 미선택된 locale는 한국어로 되돌린다. 이 파일은 Reader/Chat 응답 본문 번역기나 권한 계산기가 아니다.
+- 실제 `apps/mobile/src/features/chat/ChatReadComponents.tsx`에서 기존 `snapshot.characterId`, `snapshot.status`로 계산하는 `allowed = ready && seyeon`와 보호된 `isSeyeonHistoryRevealHoldV1(snapshot)` 분기를 **그대로 유지**한다. 허용되지 않은 경우에만 `checking_character`, `waiting_history`, `character_not_ready` 상태의 제목과 안내문을 새 고정 UI 사전에서 표시한다. 입력창이 허용된 경우에는 placeholder만 UI 현지화한다.
+- 실제 서버 메시지 `message.body`, Character 원문 소개 `greeting.openingLine`, 저장된 대화·메시지 식별자·전송 payload, 서버 제공 전송 상태 `status`는 그대로다. 사용자 locale에 따라 대화 접근권을 부여하거나 서버 응답의 출력 언어를 요청하지 않는다. 기존 `projectMobileSourceLanguageNoticeV1`는 비한국어 UI에서 원문 보존을 계속 안내한다.
+- `test/mobile-chat-compose-ui-locale-v1.test.ts`에서 3개 상태 × 3개 명시 UI locale, 한국어 fallback, 기존 송신/History HOLD gate·원문/공식 상태 불변을 회귀 고정한다. Node 파일 검사는 모바일 TypeScript source tree 외부 루트 `test/`에 둔다.
+- **남은 승인/실행:** 세연 이외 인물의 AI 채팅과 JA/ZH-TW 생성형 Reader 응답 공개는 Character·Reader·Security·Release owner 승인 전 HOLD. UI 상태가 현지화돼도 별도 서버 권한·출력 보호 조건을 통과했다는 뜻이 아니다.
+
 ## 8. 다음 구현 작업 및 승인 위치
 
 1. **캐릭터 설계 owner:** 위 6명 차이를 실제 Bible/typed Runtime 간에 해결하고 authoritative source/version을 확정. 이 I18N 트랙은 제안·인계만, 원본 수정 금지.
