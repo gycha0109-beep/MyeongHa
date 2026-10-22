@@ -161,6 +161,14 @@
 - `apps/web/src/reader-scene/ReaderSceneBoundPanel.test.tsx`는 비활성 클라이언트, owner 입장 없음, 렌더 중 미요청, 클라이언트·세션 revision·기록 ID 변경 시 이전 문장 비노출, public Chat/Reading 라우트와 분리를 고정한다.
 - **남은 계약:** 운영 Reader Scene의 서버 입장/세션 변경 이벤트와 실제 라우트 binding은 Reader/UX 소유자가 검증한 진입 구조가 제시된 경우에만 수용한다. Records handoff에 Thread ID/Reader 선택 권한을 덧붙이지 않는다. I18N 자체에는 Character voice 승인, JA/ZH-TW 생성, 과거 공식 기록 언어 변경 또는 일반 운영 공개 권한이 없다.
 
+### 7.5 I18N-07 허가된 부분 집합 — 모바일 공식 풀이 원문 재열람 화면의 UI 현지화
+
+- `apps/mobile/src/ui/mobile-official-reading-shell-locale-v1.ts`에서 **이미 열람 권한을 확인한** 저장된 Official Reading 화면의 UI 저자 문구(뒤로 가기, 로딩, 재시도, 오류/권한 한계, Reading 단계, 기록과 Reader의 관계 안내)를 명시 선택된 `ko-KR`/`ja-JP`/`zh-TW`에 맞춰 제공한다. 미지원 locale는 한국어 기본값이며, 이 문구는 `readingLocale`/`responseVoiceLocale` 선언이나 번역 출력의 승인 근거가 아니다.
+- `apps/mobile/src/app/reading/[readingId].tsx`는 기존 서버 `readOfficialReading(readingId)`, 계정 변경 epoch 무효화 및 별도 Reader Entry 권한 경계를 그대로 유지한다. `record.display.steps[].title/primary/structure/supporting`, `record.display.notices`, 공식 식별자/계산/날짜는 **서버 원문 그대로** 표시하며, UI 전용 카테고리 이름·Reader 연결 인원 숫자·상태/주의 문구만 새 사전 및 기존 `t()`로 현지화한다.
+- `officialReadingArchiveFailureCopyV1`는 이 화면에서 **클라이언트가 작성한 4종 UI 오류 문구**만 번역한다. 외부/임의 오류나 서버 본문은 절대 번역 소스로 사용하지 않고 기존 일반 실패 안내로 수렴한다. 열람 권한을 변경하거나 실패한 아카이브를 가상 번역으로 대체하지 않는다.
+- `apps/mobile/src/ui/mobile-official-reading-shell-locale-v1.test.ts`는 세 locale, 미지원/누락 locale 한국어 fallback, 4종 오류, UI 전용 Reader 인원 표시, 실제 Archive 소비 화면과 원문 불변 필드 및 공식 Reader Entry 보호를 고정한다.
+- **중요:** 이는 기존 한국어 저장된 공식 Reading을 원문으로 다시 읽는 화면의 국제화 UI 수용만 의미한다. 정책 ②의 **과거 한국어 Official artifact를 JA/ZH-TW 언어로 다시 생성/번역하여 열람**하는 것은 여전히 HOLD다. 구매/Grant/Reader 생성/새 외국어 사주 해석 공개는 범위 외다.
+
 ## 8. 다음 구현 작업 및 승인 위치
 
 1. **캐릭터 설계 owner:** 위 6명 차이를 실제 Bible/typed Runtime 간에 해결하고 authoritative source/version을 확정. 이 I18N 트랙은 제안·인계만, 원본 수정 금지.
