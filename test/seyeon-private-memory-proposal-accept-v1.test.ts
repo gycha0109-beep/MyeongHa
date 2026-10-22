@@ -23,7 +23,7 @@ const validReceipt = Object.freeze({ memoryItemId, grantCount: 0, replayed: fals
 
 describe('original Memory proposal -> private-only DB write boundary', () => {
   function db(first: unknown[] = [validProposal], second: unknown[] = [validReceipt]) {
-    const query = vi.fn(async (sql: string) => ({
+    const query = vi.fn(async (sql: string, _params?: readonly unknown[]) => ({
       rows: sql.includes('from public.memory_proposals') ? first : second,
     }));
     return { query, client: { query } as unknown as PostgresTransactionQueryV1 };
@@ -53,7 +53,7 @@ describe('original Memory proposal -> private-only DB write boundary', () => {
     ]) {
       const { client, query } = db();
       await expect(acceptSeyeonPrivateConversationRecallProposalV1(
-        client, candidate as typeof input,
+        client, candidate as unknown as typeof input,
       )).rejects.toThrow(SeyeonPrivateMemoryProposalAcceptHoldV1);
       expect(query).not.toHaveBeenCalled();
     }
