@@ -2,7 +2,7 @@ import {
   constants, existsSync, lstatSync, readFileSync,
 } from 'node:fs';
 import {
-  lstat, open, unlink, realpath,
+  lstat, open, unlink, realpath, readdir,
 } from 'node:fs/promises';
 import {
   createCipheriv, createDecipheriv, createHmac,
@@ -47,9 +47,16 @@ export interface OfficialReaderOffPrimaryKeyStoreV1
   issueUniqueKey(): Promise<OfficialReaderProtectedBodyKeyV1>;
 }
 
+export interface OfficialReaderOffPrimaryRestoreCatalogV1 {
+  /** Off-primary durable deletion proof survives a restored PostgreSQL backup. */
+  listAccountDeletionFences(): Promise<readonly OfficialReaderDurableDeletionFenceV1[]>;
+  isSubjectTombstoned(subjectId: string): Promise<boolean>;
+}
+
 export interface OfficialReaderOffPrimaryStoreV1 {
   readonly ledger: OfficialReaderAccountDeletionLedgerPortV1;
   readonly keys: OfficialReaderOffPrimaryKeyStoreV1;
+  readonly restoreCatalog: OfficialReaderOffPrimaryRestoreCatalogV1;
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
@@ -258,6 +265,9 @@ export function createOfficialReaderNodeOffPrimaryStoreV1(
   function ackName(subjectId: string, deletionJobId: string): string {
     return recordFilename(ledgerSeal, 'account-keys-erased', subjectId, deletionJobId);
   }
+  function subjectDenyName(subjectId: string): string {
+    return recordFilename(ledgerSeal, 'account-subject-deny', subjectId);
+  }
   function keyName(keyRef: string): string {
     return recordFilename(keySeal, 'dek', keyRef);
   }
@@ -292,6 +302,21 @@ export function createOfficialReaderNodeOffPrimaryStoreV1(
       const subjectId = uuid(input.subjectId);
       const deletionJobId = uuid(input.deletionJobId);
       const { ids, keys } = sortedManifest(input.bodyIds, input.keyRefs);
+      // Persist a subject-level denial BEFORE any DB deletion. Even when
+      // the main DB is restored to an older ACTIVE state, this off-primary
+      // tombstone prevents a paid-answer read without enumerating SQL rows.
+      const denyName = subjectDenyName(subjectId);
+      await writeSealedOnce(ledgerRoot, denyName, ledgerSeal, denyName, {
+        type: 'account-subject-deny-v1', subjectId, deletionJobId,
+      });
+      const deniedSubject = await readSealed(
+        ledgerRoot, denyName, ledgerSeal, denyName,
+      ) as Record<string, unknown> | null;
+      if (!deniedSubject
+          || deniedSubject.type !== 'account-subject-deny-v1'
+          || deniedSubject.subjectId !== subjectId
+          || deniedSubject.deletionJobId !== deletionJobId) return denied();
+
       const name = fenceName(subjectId, deletionJobId);
       const record: OfficialReaderDurableDeletionFenceV1 = {
         version: 'official-reader-account-deletion-fence-v1',
@@ -333,6 +358,48 @@ export function createOfficialReaderNodeOffPrimaryStoreV1(
         && (ack as Record<string, unknown>).subjectId === subjectId
         && (ack as Record<string, unknown>).deletionJobId === deletionJobId
         && (ack as Record<string, unknown>).fenceId === fence.fenceId;
+    },
+  });
+
+  const restoreCatalog: OfficialReaderOffPrimaryRestoreCatalogV1 = Object.freeze({
+    async listAccountDeletionFences() {
+      await checkRoot(ledgerRoot);
+      const entries = await readdir(ledgerRoot);
+      const names = entries.filter((name) =>
+        /^account-fence-[0-9a-f]{64}\.json$/u.test(name)).sort();
+      if (names.length > MAX_MANIFEST_ITEMS) return denied();
+      const seen = new Set<string>();
+      const fences: OfficialReaderDurableDeletionFenceV1[] = [];
+      for (const name of names) {
+        const raw = await readSealed(ledgerRoot, name, ledgerSeal, name);
+        if (raw === null || typeof raw !== 'object') return denied();
+        const record = raw as Record<string, unknown>;
+        const subjectId = uuid(record.subjectId);
+        const deletionJobId = uuid(record.deletionJobId);
+        if (fenceName(subjectId, deletionJobId) !== name) return denied();
+        const exact = validateFence(raw, subjectId, deletionJobId);
+        const identity = subjectId + ':' + deletionJobId;
+        if (seen.has(identity)) return denied();
+        seen.add(identity);
+        const deniedSubject = await this.isSubjectTombstoned(subjectId);
+        if (!deniedSubject) return denied();
+        fences.push(exact);
+      }
+      return Object.freeze(fences);
+    },
+    async isSubjectTombstoned(subjectId) {
+      const canonical = uuid(subjectId);
+      const name = subjectDenyName(canonical);
+      const raw = await readSealed(ledgerRoot, name, ledgerSeal, name);
+      if (raw === null) return false;
+      if (!raw || typeof raw !== 'object'
+          || (raw as Record<string, unknown>).type !== 'account-subject-deny-v1'
+          || (raw as Record<string, unknown>).subjectId !== canonical
+          || typeof (raw as Record<string, unknown>).deletionJobId !== 'string') {
+        return denied();
+      }
+      uuid((raw as Record<string, unknown>).deletionJobId);
+      return true;
     },
   });
 
@@ -423,5 +490,5 @@ export function createOfficialReaderNodeOffPrimaryStoreV1(
     },
   });
 
-  return Object.freeze({ ledger, keys });
+  return Object.freeze({ ledger, keys, restoreCatalog });
 }
