@@ -70,7 +70,25 @@
 - **Birth / timezone / region**: 언어 전환만으로 출생시간대·절기·사주 계산 규칙·두 사람 입력·적용 시기를 바꾸지 않는다.
 - **Saju source identity**: 기존 Saju `CanonicalReadingSemanticBundleV1.semanticHash`는 의미 재계산·재생성을 막는 기준이지만 실제 MyeongHa official artifact 필드와 동일하다고 가정하지 않는다. MyeongHa의 `officialArtifactResponseHash`와 둘을 잇는 기존 Bridge 근거가 있어야 한다.
 
-## 4. 실제 웹 Reader Scene 소비 지점과 UI 로케일 분리
+## 4. I18N-06a/b/c 공통 화법·로케일 프로필 조합 — A안
+
+구현: `packages/character-content/src/reader-voice-locale-composition-v1.ts` 및 단위 테스트.
+
+`prepareReaderVoiceLocaleCompositionV1({selectedCharacterId,voiceAuthority,requestedVoiceLocale})`는 **운영에서 이미 확인된 published voice**를 전제로 세 개의 기존 contract 함수를 실제로 조합한다.
+
+1. I18N의 `prepareReaderLanguageNeutralVoiceHandoffV1`로 9인 identity + source/contentVersion + 정본 speech/communication 참조를 먼저 고정한다.
+2. I18N-06a의 `resolveCharacterVoiceLocaleV1`로 `ko-KR`은 정확히 기존 한국어 voice만 반환한다. 임의 국가 코드나 `Accept-Language`, `X-MyeongHa-UI-Locale`가 Reader response locale로 자동 승격되는 경로는 **새로 만들지 않는다**.
+3. `ja-JP` 또는 `zh-TW`는 I18N-06b `inspectCharacterVoiceCommonConventionsV1`에서 **공통 authoring 규칙**을 참조한다.
+4. I18N-06c `prepareCharacterVoiceSparseLocaleV1`에서 버전·인물·source-owner 승인·중복 검사된 소량 예외를 확인한다. **등록된 예외가 없는 캐릭터에는 빈 예외 프로필을 억지로 생성하지 않는다(A안)**. 공통 rulebook은 조회 가능하되 `common_rules_only / release: hold`.
+5. 등록된 승인값이 나중에 생기면 그 entry를 I18N-06a로 다시 대조하고 `approved_delta_prepared / release: hold`만 반환할 수 있다. 반환값은 **승인된 참조 식별자**이며 말투 문장·프롬프트·실행 허가가 아니다. 애초에 source authority 없는 입력은 HOLD.
+
+**실제 등록값 0개 유지:** `APPROVED_CHARACTER_VOICE_LOCALE_EXCEPTIONS_V1 = []`. 일본어 `俺`/`僕`/`あたし` 등의 사례를 특정 인물에게 배정하지 않는다. 번체 중국어의 특정 호칭도 미등록. **KO 기존 경로만 유지**하며 비한국어 Reader 출력과 공식 사주 재언어화는 HOLD.
+
+현재 다른 PR들이 `main`에 미병합된 상태이므로 #2431(06a), #2432(06b), #2435(06c)의 이미 작성된 **동일 소스 모듈을 내용 변경 없이 이 작업 PR에 포함**하여 직접 import 테스트를 가능하게 했다. 원래 PR/Auto-merge는 유지한다. 각 PR이 `main`에 반영되면 파일 추가 diff가 GitHub 병합 기준에 따라 중복 반영되는지 확인하고, 구성 요소들의 authoring authority는 각 기존 PR에서 계속 추적한다. 공개 시점에는 단일 모듈 경로만 사용한다.
+
+**호출 소유권 경계:** `requestedVoiceLocale`는 *현재 UI locale 값이 아니라* 미래의 서버 소유 Reader 출력 로케일 입력이다. 웹 Reader Scene은 기존 `uiLocale` snapshot/원문 보존 기능만 사용한다. 외국어 Reader 실제 문장 생성·Guard admission·대화/기록/구매 공개는 각 운영 소유 트랙에 남긴다.
+
+## 5. 실제 웹 Reader Scene 소비 지점과 UI 로케일 분리
 
 구현: `apps/web/reader-scene-locale-presentation-v1.js`, `reader-scene-controller.js`, 각 `.d.ts`, 단위 테스트.
 
@@ -81,7 +99,7 @@
 - `protected_fallback`은 표시 문구 때문에 보통 `ready`로 승격되지 않는다. 기존 Reader transport feature enabled/config, 세션·권한·기록·외국어 출력 상태는 그대로.
 - UI 헤더는 사용자 표시 선호를 보내는 기존 `reader-runtime-client.js` 경로를 유지하며, 외국어 생성 필드를 Reader 요청 body에 신규 추가하지 않는다.
 
-## 4. 다음 구현 작업 및 승인 위치
+## 6. 다음 구현 작업 및 승인 위치
 
 1. **캐릭터 설계 owner:** 위 6명 차이를 실제 Bible/typed Runtime 간에 해결하고 authoritative source/version을 확정. 이 I18N 트랙은 제안·인계만, 원본 수정 금지.
 2. **I18N (현재 담당):** #2430/31/32/35 기존 PR Auto-merge 유지. 9인 중립 화법 projection과 Source 인계 계약을 Reader·UX 소비 경계에 **허가된 방식으로** 연결. 이후 `ja-JP`/`zh-TW` 관습 및 소량 예외 후보는 이 트랙이 작성하여 사용자에게 제시, 사용자 승인 전 프로필 실제 값 등록 금지.
