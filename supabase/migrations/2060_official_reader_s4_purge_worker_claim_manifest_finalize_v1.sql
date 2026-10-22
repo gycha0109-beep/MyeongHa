@@ -150,7 +150,8 @@ end
 $reader_purge_manifest$;
 
 create or replace function public.internal_commit_official_reader_paid_answer_purge_v1(
-  p_job_id uuid,p_worker text,p_external_fence_id text,p_body_ids uuid[]
+  p_job_id uuid,p_worker text,p_external_fence_id text,
+  p_body_ids uuid[],p_key_refs text[]
 )
 returns bigint
 language plpgsql volatile security definer
@@ -169,7 +170,12 @@ begin
      or p_body_ids is null
      or pg_catalog.array_ndims(p_body_ids) is distinct from 1
      or pg_catalog.array_length(p_body_ids,1) not between 1 and 50000
-     or pg_catalog.array_position(p_body_ids,null) is not null then
+     or pg_catalog.array_position(p_body_ids,null) is not null
+     or p_key_refs is null
+     or pg_catalog.array_ndims(p_key_refs) is distinct from 1
+     or pg_catalog.array_length(p_key_refs,1) is distinct from
+        pg_catalog.array_length(p_body_ids,1)
+     or pg_catalog.array_position(p_key_refs,null) is not null then
     raise exception using errcode='23514',
       constraint='reader_paid_purge_commit_invalid',
       message='Protected Reader cleanup commit is invalid';
@@ -209,7 +215,13 @@ begin
        where b.subject_id=j.subject_id
          and b.official_reading_id=j.official_reading_id
          and b.reader_character_id=j.reader_character_id
-         and not (b.id=any(p_body_ids))
+         and not exists (
+           select 1
+           from pg_catalog.unnest(p_body_ids,p_key_refs)
+             as supplied(body_id,key_ref)
+           where supplied.body_id=b.id
+             and supplied.key_ref=b.encryption_key_ref
+         )
      ) then
     raise exception using errcode='40001',
       constraint='reader_paid_purge_manifest_changed',
@@ -293,13 +305,13 @@ $reader_purge_release$;
 revoke all on function public.internal_list_official_reader_paid_answer_purge_jobs_v1(integer) from public;
 revoke all on function public.internal_claim_official_reader_paid_answer_purge_v1(uuid,text) from public;
 revoke all on function public.internal_qry_official_reader_paid_answer_purge_manifest_v1(uuid,text) from public;
-revoke all on function public.internal_commit_official_reader_paid_answer_purge_v1(uuid,text,text,uuid[]) from public;
+revoke all on function public.internal_commit_official_reader_paid_answer_purge_v1(uuid,text,text,uuid[],text[]) from public;
 revoke all on function public.internal_finish_official_reader_paid_answer_purge_v1(uuid,text,text) from public;
 revoke all on function public.internal_release_official_reader_paid_answer_purge_v1(uuid,text) from public;
 
 grant execute on function public.internal_list_official_reader_paid_answer_purge_jobs_v1(integer) to myeongha_system_executor;
 grant execute on function public.internal_claim_official_reader_paid_answer_purge_v1(uuid,text) to myeongha_system_executor;
 grant execute on function public.internal_qry_official_reader_paid_answer_purge_manifest_v1(uuid,text) to myeongha_system_executor;
-grant execute on function public.internal_commit_official_reader_paid_answer_purge_v1(uuid,text,text,uuid[]) to myeongha_system_executor;
+grant execute on function public.internal_commit_official_reader_paid_answer_purge_v1(uuid,text,text,uuid[],text[]) to myeongha_system_executor;
 grant execute on function public.internal_finish_official_reader_paid_answer_purge_v1(uuid,text,text) to myeongha_system_executor;
 grant execute on function public.internal_release_official_reader_paid_answer_purge_v1(uuid,text) to myeongha_system_executor;
