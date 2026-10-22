@@ -12,6 +12,7 @@ import type {
 import type {
   PostgresSubjectPoolV1,
   PostgresSubjectConnectionV1,
+  PostgresQueryResultV1,
 } from '../apps/api/src/postgres-subject-execution.js';
 
 const AUTH = 'd0000000-0000-4000-8000-000000000001';
@@ -48,16 +49,19 @@ function syntheticDb(): {
 } {
   const statements: string[] = [];
   const client: PostgresSubjectConnectionV1 = {
-    async query(text: string) {
+    async query<Row = Record<string, unknown>>(
+      text: string,
+      _values: readonly unknown[] = [],
+    ): Promise<PostgresQueryResultV1<Row>> {
       statements.push(text);
       if (text.includes('public.begin_member_subject_context_v1')) {
-        return {rows: [{subjectId: SUBJECT, subjectKind: 'member'}]};
+        return {rows: [{subjectId: SUBJECT, subjectKind: 'member'}] as unknown as readonly Row[]};
       }
       if (text.includes('to_regprocedure(')) {
-        return {rows: [{ready: true}]};
+        return {rows: [{ready: true}] as unknown as readonly Row[]};
       }
       if (text.includes('from public.qry_seyeon_positive_first_memory_locked_reveal_v1(')) {
-        return {rows: [{assistantText: CANARY}]};
+        return {rows: [{assistantText: CANARY}] as unknown as readonly Row[]};
       }
       return {rows: []};
     },
@@ -67,32 +71,36 @@ function syntheticDb(): {
 }
 
 function syntheticResponse() {
-  const events = new EventEmitter();
-  let destroyed = false;
-  let statusCode = 0;
-  const response = Object.assign(events, {
-    headersSent: false,
-    writableEnded: false,
-    destroyed: false,
-    socket: {},
-    setHeader(_name: string, _value: string) {},
-    end(_payload: Buffer) {
-      response.headersSent = true;
-      response.writableEnded = true;
-      response.emit('finish');
-    },
-    destroy() {
-      destroyed = true;
-      response.destroyed = true;
-      response.emit('close');
-    },
-  }) as unknown as ServerResponse;
-  Object.defineProperty(response, 'statusCode', {
-    get: () => statusCode,
-    set: (value: number) => { statusCode = value; },
-    configurable: true,
-  });
-  return {response, get destroyed() { return destroyed; }, get statusCode() { return statusCode; }};
+  const reply = new EventEmitter() as EventEmitter & {
+    headersSent: boolean;
+    writableEnded: boolean;
+    destroyed: boolean;
+    socket: object;
+    statusCode: number;
+    setHeader(name: string, value: string): void;
+    end(payload: Buffer): void;
+    destroy(): void;
+  };
+  reply.headersSent = false;
+  reply.writableEnded = false;
+  reply.destroyed = false;
+  reply.socket = {};
+  reply.statusCode = 0;
+  reply.setHeader = () => {};
+  reply.end = (_payload: Buffer) => {
+    reply.headersSent = true;
+    reply.writableEnded = true;
+    reply.emit('finish');
+  };
+  reply.destroy = () => {
+    reply.destroyed = true;
+    reply.emit('close');
+  };
+  return {
+    response: reply as unknown as ServerResponse,
+    get destroyed() { return reply.destroyed; },
+    get statusCode() { return reply.statusCode; },
+  };
 }
 
 describe('G3 exact current request ↔ executed DB user message binding', () => {
