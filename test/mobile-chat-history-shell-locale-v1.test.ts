@@ -15,7 +15,8 @@ describe('I18N-07 mobile Chat read-state and privacy HOLD UI', () => {
       expect(shell.uiLocale).toBe(locale);
       for (const key of ['loading', 'holdTitle', 'holdDescription', 'holdComposerTitle',
         'holdComposerDescription', 'errorTitle', 'errorDescription', 'errorCodeLabel',
-        'empty', 'retry', 'end', 'next', 'profile'] as const) {
+        'empty', 'retry', 'end', 'next', 'profile', 'headerUnknownParticipant',
+        'headerVerifiedRoom', 'headerHistoryLabel', 'headerPortrait'] as const) {
         expect(shell[key].trim().length).toBeGreaterThan(0);
       }
       expect(shell.translatedMessageBody).toBe(false);
@@ -63,7 +64,8 @@ describe('I18N-07 mobile Chat read-state and privacy HOLD UI', () => {
     expect(component).toContain('if (isSeyeonHistoryRevealHoldV1(snapshot)) return null;');
     for (const field of ['loading', 'holdTitle', 'holdDescription', 'holdComposerTitle',
       'holdComposerDescription', 'errorTitle', 'errorDescription', 'errorCodeLabel',
-      'empty', 'retry', 'end', 'next', 'profile']) {
+      'empty', 'retry', 'end', 'next', 'profile', 'headerUnknownParticipant',
+        'headerVerifiedRoom', 'headerHistoryLabel', 'headerPortrait']) {
       expect(component).toContain('shell.' + field);
     }
     expect(component).toContain('SEYEON_HISTORY_REVEAL_HOLD');
