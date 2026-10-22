@@ -153,10 +153,11 @@ export function fenceCloudflareStaticPreviewAssetResponseV1(candidate, request) 
     if (expectedHtml) {
       for (const [key, value] of Object.entries(BASE_HEADERS)) headers.set(key, value);
     } else {
-      // Preserve existing static-cache semantics for JS/CSS/media; never
-      // weaken cross-resource sniffing or allow indexing via a bad ASSETS header.
-      headers.set('X-Content-Type-Options', BASE_HEADERS['X-Content-Type-Options']);
-      headers.set('X-Robots-Tag', BASE_HEADERS['X-Robots-Tag']);
+      // Preserve existing static-cache semantics for JS/CSS/media, while
+      // forcing the same CSP/anti-sniffing/anti-indexing response policy.
+      for (const [key, value] of Object.entries(BASE_HEADERS)) {
+        if (key !== 'Cache-Control') headers.set(key, value);
+      }
     }
     return new Response(candidate.body, {
       status: candidate.status, statusText: candidate.statusText, headers,
