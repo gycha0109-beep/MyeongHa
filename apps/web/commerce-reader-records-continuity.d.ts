@@ -19,9 +19,22 @@ export declare function buildVerifiedReaderRecordsEntryUrlV1(
 export declare function parseVerifiedReaderRecordsEntryV1(search: string | URLSearchParams):
   | Readonly<{state: 'none' | 'invalid'}>
   | Readonly<{state: 'ready'; readingId: string; readerCharacterId: string}>;
+export type ReaderCurrentPurchaseStateV1 =
+  'current_verified_purchase' | 'verified_full_cancellation' | 'not_confirmed';
 export type CurrentReaderRecordsContinuityV1 =
-  | Readonly<{state: 'existing_thread_candidate'; readingId: string; readerCharacterId: string; threadId: string}>
-  | Readonly<{state: 'not_available'; readingId: string; readerCharacterId: string}>;
+  | Readonly<{
+      state: 'existing_thread_candidate';
+      readingId: string;
+      readerCharacterId: string;
+      threadId: string;
+      purchaseState: 'current_verified_purchase';
+    }>
+  | Readonly<{
+      state: 'not_available';
+      readingId: string;
+      readerCharacterId: string;
+      purchaseState: ReaderCurrentPurchaseStateV1;
+    }>;
 export declare function parseCurrentReaderRecordContinuityV1(
   envelope: unknown, expected: {readonly readingId: string; readonly readerCharacterId: string},
 ): CurrentReaderRecordsContinuityV1;
