@@ -98,7 +98,8 @@ export async function prepareCharacterStandardReadingThreadRuntimeV1(
     accessAuthorityPort: input.accessAuthorityPort,
     artifactAuthorityPort: input.artifactAuthorityPort,
     contextInput: input.contextInput,
-    currentVerifiedPurchaseAuthorityPort: input.currentVerifiedPurchaseAuthorityPort,
+    ...(input.currentVerifiedPurchaseAuthorityPort === undefined
+      ? {} : { currentVerifiedPurchaseAuthorityPort: input.currentVerifiedPurchaseAuthorityPort }),
   });
 
   const context = await assemblePreparedCharacterStandardReadingRuntimeContextV1(plan);
