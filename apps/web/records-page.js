@@ -464,6 +464,13 @@ function renderSajuReadings(readingPayload, lifeFactsPayload) {
     }
     return;
   }
+  const entry = parseVerifiedReaderRecordsEntryV1(window.location.search);
+  if (entry.state === 'ready') {
+    target.append(textElement('p', 'records-reader-entry-note',
+      '요청하신 공식 사주 기록이 아직 이 계정의 기록 목록에서 확인되지 않습니다. 영수증·URL만으로 보고서 생성이나 유료 해설 제공 완료를 인정하지 않습니다.'));
+    renderSajuReadingEmpty(target);
+    return;
+  }
   if (allowsDevelopmentSajuSamples()) {
     renderSajuReadingSamples(target, lifeFactsPayload);
     return;
