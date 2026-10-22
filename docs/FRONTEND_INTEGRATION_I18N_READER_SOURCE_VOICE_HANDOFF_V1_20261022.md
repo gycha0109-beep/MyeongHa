@@ -99,7 +99,25 @@
 - `protected_fallback`은 표시 문구 때문에 보통 `ready`로 승격되지 않는다. 기존 Reader transport feature enabled/config, 세션·권한·기록·외국어 출력 상태는 그대로.
 - UI 헤더는 사용자 표시 선호를 보내는 기존 `reader-runtime-client.js` 경로를 유지하며, 외국어 생성 필드를 Reader 요청 body에 신규 추가하지 않는다.
 
-## 6. 다음 구현 작업 및 승인 위치
+## 6. I18N-06d 출력 보호 **인계 계약** — 최종 출력 승인 아님
+
+구현: `packages/domain/src/reader-voice-locale-output-boundary-v1.ts` 및 단위 테스트.
+
+`inspectReaderVoiceLocaleOutputBoundaryV1(...)`는 기존 소유 트랙이 **서버에서 검증한 자료**를 전달한다는 전제에서 다음 항목을 엄격히 비교한다.
+
+- Character source: published 9인 바이블 기반의 `characterId`, `sourceContentVersion`, general/Saju/Face surface가 지정된 voice authority와 동일해야 한다. 기존 `validateCharacterVoiceContinuityV1`의 구조화된 사실/무대지시/사주 고유 화법 금지 검사를 함께 사용한다.
+- Output locale: 실제 Reader 응답의 **서버 소유 locale**과 `responseLocale`가 일치해야 한다. **UI locale 헤더를 본 함수의 응답 로케일로 사용하지 않는다.**
+- 캐릭터별 표현: `appliedStyleRefs`는 현재 approved sparse profile에 실제 존재하는 참조만 사용한다. A안에 따라 미등록 프로필은 새로운 1인칭/애칭/반말 등을 임의로 작성할 수 없으며 추가 참조가 있으면 HOLD.
+- Official Saju에만 `compareReaderOfficialLocaleContinuityV1`를 호출하여 원본 `readingRef`/hash/선택 unit과 필수 Qualifier·Condition·Ambiguity·Disclosure ref 집합의 변화·누락·추가를 HOLD. 비사주에서 사주 witness를 내세우거나 사주인데 근거가 없으면 HOLD.
+- `ko-KR`의 정상 결과는 `korean_existing_unchanged / existing_owner_guards_only`로 **기존 보호·권한 검사를 계속 사용해야 한다는 의미**이며 새로운 Reader 출력 권한이 아니다.
+- `ja-JP`, `zh-TW`는 증빙이 전부 일치하더라도 무조건 `non_korean_release_not_admitted` HOLD. `zh-CN`·미지원 언어도 HOLD. 캐릭터별 실제 1인칭·호칭 승인값 0개 유지.
+
+**한계 명시:** 이 계약은 텍스트 자체의 번역 품질·의미 동등성을 분석하거나 비한국어 확정 인용을 검출하는 언어 모델이 아니다. 특히 메타데이터 parity와 structured voice evidence는 사용자·브라우저·LLM의 자유로운 self-report를 신뢰해서는 안 된다. Saju/Face source renderer/semantic guard, RR-06 final Output Guard, 최신 DB/소비자 권한/상태 재확인, Character owner의 persona 승인 및 운영 publication/reveal은 **기존 각 소유 트랙의 필수 작업**이다. 이 함수를 통과했다는 이유로 실제 대사 생성·저장·판매·번역 공개를 수행하면 안 된다.
+
+- 테스트 범위: 9인 × general/Saju/Face KO 기존 경로, 9인 × JA/ZH-TW HOLD, 본문 밖 새 style ref/현실 사실/행동 지시, 캐릭터·버전·surface 불일치, 공식 Reading 필수 epistemic 조건·보호 문구 누락·변조, 미지원 locale.
+- **실제 Reader 런타임에는 직접 부착하지 않음:** 해당 생성/전송/저장/커밋은 Reader/Memory owner 책임이며 이 트랙이 동작을 임의 변경하지 않는다.
+
+## 7. 다음 구현 작업 및 승인 위치
 
 1. **캐릭터 설계 owner:** 위 6명 차이를 실제 Bible/typed Runtime 간에 해결하고 authoritative source/version을 확정. 이 I18N 트랙은 제안·인계만, 원본 수정 금지.
 2. **I18N (현재 담당):** #2430/31/32/35 기존 PR Auto-merge 유지. 9인 중립 화법 projection과 Source 인계 계약을 Reader·UX 소비 경계에 **허가된 방식으로** 연결. 이후 `ja-JP`/`zh-TW` 관습 및 소량 예외 후보는 이 트랙이 작성하여 사용자에게 제시, 사용자 승인 전 프로필 실제 값 등록 금지.
