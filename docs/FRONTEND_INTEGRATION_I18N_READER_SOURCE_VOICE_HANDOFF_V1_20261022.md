@@ -144,6 +144,15 @@
 - `test/mobile-i18n-source-text-notice.test.ts`는 실제 소비 화면 결속, 원문 텍스트 비번역, 웹 안내 문구 동일성 및 미지원 locale 한국어 fallback을 고정한다.
 - **구분:** 모바일 Preview 연출은 공식 Reader Scene 생성 출력과 동일하지 않다. 웹 독립 `createReaderSceneControllerV1`는 서버 입증된 `threadId` 및 `officialReadingId`로 호출해야 하고, 운영에서 검증된 실제 Reader Scene 화면 진입 경로는 아직 연결되지 않았다. 이를 임의의 기록→Reader 진입 또는 프리뷰의 UI reader hint로 대신 연결하지 않는다. 실제 생성형 외국어 Reader 출력·기록 재번역·Production 게이트는 HOLD.
 
+### 7.3 후속 구현 — Reader Scene 원문 보존 표시 컴포넌트(미연결)
+
+- `apps/web/src/reader-scene/ReaderScenePanel.tsx` 및 `ReaderScenePanel.css`는 **기존 `createReaderSceneControllerV1`에서 검증·투영한 상태의 UI 소비 컴포넌트**만 제공한다. 웹 앱의 공개 라우트, Reading Detail, Chat에 자동 부착하지 않고 새로운 요청/구매/권한 허용 버튼도 생성하지 않는다.
+- `ready`에서는 서버 인증 후 도착한 `segments[].text`를 순서대로 React 텍스트로만 렌더한다. `data-reading-content`를 사용해 기존 전역 UI 정적 번역 사전이 소스 문장을 덮어쓰지 않도록 하며, React 텍스트 escape로 HTML 주입을 실행하지 않는다. `readerCharacterId`는 서버 반환 계약을 유지하고 캐릭터 이름은 이미 허가된 **표시 전용** locale mapping만 적용한다.
+- `sourceLanguageNotice`는 **요청 시작 시점**의 `state.uiLocale` snapshot에서 받은 UI 저자 문구를 그대로 표시하며, 현재 화면 설정이 이후 바뀌더라도 기존 응답을 재번역하지 않는다. `contentLanguage=source_unasserted`, `localizedReaderOutput=false`를 DOM 상태에도 명시한다.
+- `protected_fallback`은 해석 본문을 표시하지 않는다. `feature_unavailable`/`auth_required`/`access_denied` 등은 안전한 UI 상태만 표시하고, `retryable_error` + 기존 controller `canRetry` + 명시적으로 전달된 재시도 콜백이 모두 있을 때만 재시도 버튼이 나온다. Error/loading 문구의 언어 선택은 **UI 상태 한정**이다.
+- `ReaderScenePanel.test.tsx`는 3개 지원 UI locale, 원문/출처 보존, HTML escape, protected fallback, 접근 거부 시 무재시도, **공개 화면 미연결** 상태를 회귀로 보호한다.
+- **출시 상태 불변:** 이것은 장차 권한이 확인된 화면에서 호출할 수 있는 inert 소비 부품이다. 기존 `threadId`·`officialReadingId` 확인/Reader feature gate/entitlement/production release는 전적으로 기존 소유자 경계이며, JA/ZH-TW Reader 생성 및 과거 Official 번역 재열람은 HOLD를 유지한다.
+
 ## 8. 다음 구현 작업 및 승인 위치
 
 1. **캐릭터 설계 owner:** 위 6명 차이를 실제 Bible/typed Runtime 간에 해결하고 authoritative source/version을 확정. 이 I18N 트랙은 제안·인계만, 원본 수정 금지.
