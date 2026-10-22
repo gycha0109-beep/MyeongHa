@@ -197,6 +197,9 @@ export async function deliverSeyeonCommittedFirstPositiveMemoryNodeTurnV1(
       input.result?.threadBinding?.threadId!==input.expectedThreadId ||
       input.result?.execution?.disposition!=='executed' ||
       input.result?.execution?.receivedTurn?.turnId!==receipt?.turnId ||
+      input.result?.execution?.receivedTurn?.threadCharacterId!=='seyeon' ||
+      input.result?.execution?.attempt?.replayed!==false ||
+      input.result?.execution?.attempt?.attemptId!==receipt?.attemptId ||
       !receipt || receipt.replayed!==false ||
       ![input.result.subjectId,receipt.turnId,receipt.attemptId,
         receipt.assistantMessageId].every(s=>UUID.test(s))) {
@@ -295,6 +298,16 @@ export async function executeAndDeliverSeyeonFirstPositiveMemoryNodeTurnV1(
   } catch (error) {
     input.response.destroy();
     throw error;
+  }
+  // The runtime may have resolved/replayed a different DB user message
+  // despite being invoked with this request. A committed result is not
+  // authorization to disclose a reply to a different message. Require
+  // byte-exact agreement with the normalized text sent to runtime.run()
+  // before fetching ANY original-Grant-protected assistant response.
+  if (result?.execution?.disposition !== 'executed' ||
+      result.execution.receivedTurn?.userText !== input.text.trim()) {
+    input.response.destroy();
+    throw new SeyeonG3FirstPositiveNodeUnavailableV1('INVALID_COMMIT');
   }
   return deliverSeyeonCommittedFirstPositiveMemoryNodeTurnV1({
     response:input.response,

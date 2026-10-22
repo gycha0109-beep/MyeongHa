@@ -416,6 +416,12 @@
       "mainMode": "one-shot-trigger",
       "workTrackAttribution": "commit-metadata"
     },
+    "seyeon-n06-sub500-second-one-shot-v1.yml": {
+      "responsibility": "character-memory-user-approved-n06-second-paid-one-shot-corrected-18789-byte-terra-and-sub-krw500",
+      "prMode": "none",
+      "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "commit-metadata"
+    },
     "seyeon-openrouter-429-readonly-diagnosis-v1.yml": {
       "responsibility": "character-memory-openrouter-429-account-readonly-diagnosis",
       "prMode": "none",
