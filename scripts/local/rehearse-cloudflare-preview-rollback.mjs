@@ -101,7 +101,7 @@ async function run(executable, args, cwd, env = process.env) {
   });
 }
 
-async function publishSnapshot(root, revision) {
+async function publishSnapshot(root, revision, beforeDeploy = () => {}) {
   const folder = await mkdtemp(join(tmpdir(), 'myeongha-cf-preview-rehearsal-'));
   let checkedOut = false;
   try {
@@ -114,6 +114,10 @@ async function publishSnapshot(root, revision) {
     const config = JSON.parse(await readFile(join(folder, 'wrangler.jsonc'), 'utf8'));
     if (config.name !== CF_PREVIEW_DRILL_V1.worker || config.workers_dev !== false ||
         config.preview_urls !== true) throw Error('Rollback snapshot Worker policy drift');
+    // The CLI may return a transport error AFTER Cloudflare has accepted a
+    // deployment. Mark the attempt before invoking it so restore is never
+    // skipped on an ambiguous result.
+    beforeDeploy();
     await run(process.platform === 'win32' ? 'npx.cmd' : 'npx',
       ['--yes', 'wrangler@' + CF_PREVIEW_DRILL_V1.cliVersion, 'preview',
        '--name', CF_PREVIEW_DRILL_V1.preview,
@@ -158,15 +162,14 @@ async function main() {
   if (!plan.apply) return; // No Network, CLI build, Secrets or Cloudflare mutations.
   await receipt(plan.restore);
   await smokeCurrent(root, plan.restore);
-  let rollbackPublished = false;
+  let rollbackMayHavePublished = false;
   try {
-    await publishSnapshot(root, plan.rollback);
-    rollbackPublished = true;
+    await publishSnapshot(root, plan.rollback, () => { rollbackMayHavePublished = true; });
     await awaitReceipt(plan.rollback);
     await smokeCurrent(root, plan.rollback);
   } finally {
-    if (rollbackPublished) {
-      // Even when rollback smoke fails, attempt to restore the current PR HEAD.
+    if (rollbackMayHavePublished) {
+      // Even on ambiguous CLI return, attempt to restore the current PR HEAD.
       await publishSnapshot(root, plan.restore);
       await awaitReceipt(plan.restore);
       await smokeCurrent(root, plan.restore);

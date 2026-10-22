@@ -38,5 +38,7 @@ describe('Cloudflare Preview rollback rehearsal safe-by-default', () => {
     expect(contents).not.toContain("'deploy',");
     expect(contents).not.toContain("'secret',");
     expect(contents).not.toContain("versions upload");
+    expect(contents).toContain('rollbackMayHavePublished = true');
+    expect(contents).toContain('await publishSnapshot(root, plan.restore)');
   });
 });
