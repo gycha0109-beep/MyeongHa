@@ -30,13 +30,17 @@ export interface HandlePaymentAttemptServerVerificationRequestInputV1 {
   readonly identityEvidenceVerifier: IdentityEvidenceVerificationPortV1;
   readonly pool: PostgresSubjectPoolV1;
   readonly verificationAdapter: CommercePaymentVerificationAdapterV1;
+  /** Server-injected private S2, never sourced from the request payload. */
+  readonly privateReaderReceiptFulfillmentEnabled?: boolean;
 }
 
 type PaymentAttemptServerVerificationResponseV1 = Readonly<
   Pick<
     SubjectOwnedCommercePaymentCompletionV1,
     'paymentAttemptId' | 'receiptId' | 'replayed'
-  >
+  > & {
+    readonly readerContinuation?: SubjectOwnedCommercePaymentCompletionV1['readerContinuation'];
+  }
 >;
 
 function requireNonEmptyString(name: string, value: unknown): string {
@@ -109,6 +113,8 @@ function successResponse(
     paymentAttemptId: result.paymentAttemptId,
     receiptId: result.receiptId,
     replayed: result.replayed,
+    ...(result.readerContinuation === undefined
+      ? {} : { readerContinuation: result.readerContinuation }),
   });
 
   return Response.json(
@@ -255,6 +261,10 @@ export async function handlePaymentAttemptServerVerificationRequestV1(
       verifiedEvidence,
       paymentAttemptId: requestBody.paymentAttemptId,
       verificationAdapter: input.verificationAdapter,
+      // A browser Payment Attempt cannot enable this. Default false and
+      // the current production payment verification route remains unmounted.
+      privateReaderReceiptFulfillmentEnabled:
+        input.privateReaderReceiptFulfillmentEnabled === true,
     });
     return successResponse(result, requestId, serverTime);
   } catch (error) {
