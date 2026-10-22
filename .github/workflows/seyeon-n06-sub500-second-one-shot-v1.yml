@@ -32,7 +32,7 @@ jobs:
         run: |
           set -euo pipefail
           npm ci --ignore-scripts --no-audit --no-fund
-          npx vitest run test/seyeon-n06-sub500-second-one-shot-admission-v1.test.mjs test/seyeon-n06-terra-predispatch-offline-investigation-v1.test.mjs test/seyeon-terra-glm-quality-cap500-admission-v1.test.mjs test/seyeon-terra-glm-quality-trio-v1.test.mjs test/seyeon-live-dialogue-owner-key-first-pair-v1.test.mjs test/seyeon-openrouter-glm53flash-paid-preflight-v1.test.mjs test/openrouter-seyeon-evaluation-provider-v1.test.ts
+          npx vitest run test/seyeon-n06-second-trial-all-six-stage-offline-v1.test.mjs test/seyeon-n06-sub500-second-one-shot-admission-v1.test.mjs test/seyeon-n06-terra-predispatch-offline-investigation-v1.test.mjs test/seyeon-terra-glm-quality-cap500-admission-v1.test.mjs test/seyeon-terra-glm-quality-trio-v1.test.mjs test/seyeon-live-dialogue-owner-key-first-pair-v1.test.mjs test/seyeon-openrouter-glm53flash-paid-preflight-v1.test.mjs test/openrouter-seyeon-evaluation-provider-v1.test.ts
           npm run build
           node --check scripts/run-seyeon-n06-sub500-second-one-shot-v1.mjs
       - name: Execute approved single N06 pair - Luna1 Terra2 GLM3 strict less than KRW500
