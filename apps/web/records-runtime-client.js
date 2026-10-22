@@ -1,3 +1,6 @@
+import {
+  parseCurrentReaderRecordContinuityV1,
+} from './commerce-reader-records-continuity.js';
 import { parseReadingHistoryPayloadV1, ReadingHistoryContractErrorV1 } from './reading-history-contract.js';
 import { unwrapApiSuccessEnvelope, WebApiEnvelopeError } from './api-envelope.js';
 import { assertBirthProfile } from './my-runtime-client.js';
@@ -127,6 +130,61 @@ async function readJson(fetchImpl, endpoint, bearer) {
     throw error;
   }
 }
+const READER_CONTINUITY_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
+const READER_CONTINUITY_ID = /^[a-z][a-z0-9_-]{0,63}$/u;
+
+async function readCurrentReaderContinuity(fetchImpl, bearer, input) {
+  const readingId = typeof input?.readingId === 'string' && READER_CONTINUITY_UUID.test(input.readingId)
+    ? input.readingId.toLowerCase() : null;
+  const readerCharacterId = typeof input?.readerCharacterId === 'string'
+    && READER_CONTINUITY_ID.test(input.readerCharacterId)
+    ? input.readerCharacterId : null;
+  if (readingId === null || readerCharacterId === null) {
+    throw new RecordsRuntimeError('WEB_RECORDS_READER_CONTINUITY_INVALID', 'Reader identity is invalid.');
+  }
+  const endpoint = '/api/readings/' + encodeURIComponent(readingId)
+    + '/reader-continuity?readerCharacterId=' + encodeURIComponent(readerCharacterId);
+
+  let response;
+  try {
+    response = await fetchImpl(endpoint, {
+      method: 'GET',
+      headers: {
+        Accept: 'application/json',
+        Authorization: 'Bearer ' + bearer.token,
+      },
+      credentials: 'same-origin',
+      cache: 'no-store',
+    });
+  } catch {
+    throw new RecordsRuntimeError('WEB_RECORDS_READER_CONTINUITY_UNAVAILABLE',
+      'Reader permission lookup is unavailable.');
+  }
+  if (response.status === 401) {
+    invalidateRejectedBearer(bearer);
+    throw new RecordsRuntimeError('WEB_RECORDS_SESSION_REQUIRED', 'Current session is required.');
+  }
+  if (response.status === 503) {
+    // Feature/Privacy/Production hold is NOT a refund or denied purchase.
+    return Object.freeze({ state: 'held' });
+  }
+  if (response.status === 403 || response.status === 404) {
+    // Never infer a legal refund from a 404 or a cancelled HTTP request.
+    return Object.freeze({ state: 'not_confirmed' });
+  }
+  if (!response.ok) {
+    throw new RecordsRuntimeError('WEB_RECORDS_READER_CONTINUITY_UNAVAILABLE',
+      'Reader permission lookup failed.');
+  }
+  try {
+    const envelope = await response.json();
+    return parseCurrentReaderRecordContinuityV1(envelope, { readingId, readerCharacterId });
+  } catch {
+    throw new RecordsRuntimeError('WEB_RECORDS_READER_CONTINUITY_INVALID',
+      'Reader permission response was invalid.');
+  }
+}
+
 async function readOptionalCurrentBirthProfile(fetchImpl, endpoint, bearer) {
   try {
     const payload = await readJson(fetchImpl, endpoint, bearer);
@@ -270,6 +328,9 @@ export function createRecordsRuntimeClient(options = {}) {
 
   return Object.freeze({
     readProfile: () => readEndpoint(endpoints.profile),
+    /** Current Reader state is independent of historical record provenance. */
+    readReaderContinuity: (input) =>
+      readStable((bearer) => readCurrentReaderContinuity(fetchImpl, bearer, input)),
     readLifeFacts: () => readStable((bearer) =>
       readPagedCollection(fetchImpl, endpoints.lifeFacts, bearer, 'facts')),
     readReadings: () => readStable(async (bearer) =>
