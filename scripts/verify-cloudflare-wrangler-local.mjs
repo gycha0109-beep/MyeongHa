@@ -72,6 +72,25 @@ async function probe() {
   assert(health.headers.get('cache-control') === 'no-store', 'Public liveness must never be cached');
   assert(health.headers.get('content-security-policy') === csp, 'Health response CSP mismatch');
   assert(JSON.stringify(await health.json()) === '{"status":"ok"}', 'Health must return only a constant status');
+  // S-CF2: forged cache validators cannot change the only positive API
+  // liveness response or turn approved HTML into an arbitrary 304. The
+  // stronger 304 ETag/date/body binding is tested with synthetic ASSETS in
+  // the Worker fetch regression; this is real local workerd HTTP routing.
+  for (const [assetPath, validator] of [
+    ['/api/health', '"synthetic-nonmatching-health-validator"'],
+    ['/index.html', 'W/"synthetic-nonmatching-html-validator"'],
+  ]) {
+    const unaffected = await assertHttpStatus(assetPath, 200, {
+      headers: { 'If-None-Match': validator },
+    });
+    assert(unaffected.headers.get('cache-control') === 'no-store',
+      assetPath + ': HTML/liveness revalidation must remain no-store');
+    assert(unaffected.headers.get('content-security-policy') === csp,
+      assetPath + ': conditional requests lost CSP');
+    assert(unaffected.headers.get('location') === null,
+      assetPath + ': conditional request redirected');
+  }
+
   for (const method of ['POST', 'OPTIONS', 'HEAD']) {
     const denied = await assertHttpStatus('/api/health', 405, { method });
     assert(denied.headers.get('allow') === 'GET', 'Health method restriction drift');
