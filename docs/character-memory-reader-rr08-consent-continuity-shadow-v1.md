@@ -11,6 +11,12 @@ Watchtower-Track: character-memory
 - 다른 Reader만 허용된 기억은 제외한다. 동일 Reader의 중복 Grant, 충돌한 메모리, 읽기 오류, 비활성 Thread, 현재 관계 부재는 HOLD한다.
 - Thread 및 Relationship을 다시 읽고, 후보 Memory의 해당 Reader Grant도 다시 읽어 확인한 뒤 후보 스냅샷을 만든다. 중간에 발견된 삭제/철회/Reader 전환은 HOLD하나, **세 읽기가 원자 트랜잭션이나 G1 DB source pin을 대체하지 않는다**.
 
+## RR-05/08 의도 조건부 연결 (비공개 내부 후보)
+
+`prepareReaderOrdinaryContinuityPlanV1`은 기존 병합 PR #2440의 `classifyReaderConversationIntentV1`과 위 RR-08 출처 후보를 결합한다. `ordinary/support`이면서 의도 분류의 위험·공격 신호가 없는 경우에만 관계·동의 기억 출처 메타데이터를 조회한다. 공식 사주 요약·후속 질문은 기존 RR-05/06 Official Reader 경로로 남겨 두며 이 함수가 동의 기억이나 공식 문장을 읽지 않는다. 위험 신호가 있으면 기존 Security Gate 판단 전까지 HOLD한다.
+
+반환 결과의 `approvedMemoryContent`는 항상 `null`이고 `modelContextPinned/permitsModelInjection/permitsCommit/permitsHttpReveal` 모두 `false`다. 따라서 실제 Reader 모델 프롬프트나 사용자 응답에 기억 내용을 주입하지 않는다. 새로운 상담 모드나 모델 호출이 아니고, 단지 기존 관계/기억 증거를 올바른 대화 의도에만 결합하는 서버 내부 준비 단계다.
+
 ## 결과물 계약
 
 `prepareReaderConversationConsentContinuityShadowV1`은 다음 성질의 **비권한 후보**를 반환한다.
