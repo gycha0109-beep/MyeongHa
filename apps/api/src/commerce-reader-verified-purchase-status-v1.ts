@@ -63,7 +63,9 @@ export function createPostgresCommerceReaderVerifiedPurchaseStatusPortV1(
 ): CommerceReaderVerifiedPurchaseStatusAuthorityPortV1 {
   if (!client || typeof client.query !== 'function') return fail();
   return Object.freeze({
-    async readExactCurrentPurchase(input): Promise<CommerceReaderVerifiedPurchaseStatusV1> {
+    async readExactCurrentPurchase(
+      input: Parameters<CommerceReaderVerifiedPurchaseStatusAuthorityPortV1['readExactCurrentPurchase']>[0],
+    ): Promise<CommerceReaderVerifiedPurchaseStatusV1> {
       try {
         const subjectId = requireUuid(input.subjectId);
         const readingId = requireUuid(input.readingId);
