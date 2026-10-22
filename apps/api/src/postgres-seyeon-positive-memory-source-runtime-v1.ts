@@ -108,11 +108,29 @@ select public.cmd_mark_seyeon_positive_context_ready_pinned_v1(
       if(receipt===null||typeof receipt!=='object'||Array.isArray(receipt))
         throw Error('Se-yeon G1 owner Pin receipt missing');
       const proof=receipt as Record<string,unknown>;
-      if(proof.schemaVersion!=='seyeon-positive-original-memory-source-pin-v1'
+      // The DB owner defines exactly one original Memory / original Grant
+      // proof. Do not promote a partial receipt or a mismatched type/projector
+      // to model authority even when the IDs and digest strings happen to fit.
+      const expectedKeys=[
+        'schemaVersion','subjectId','threadId','turnId','attemptId',
+        'characterId','recordKind','recordId','originalGrantId',
+        'originalGrantedAt','recordType','recordSchemaVersion',
+        'projectorVersion','selectedSourcesDigest','projectedMemoryDigest',
+        'originalPgJsonbDigest','finalModelContextDigest',
+      ] as const;
+      if(Object.keys(proof).length!==expectedKeys.length
+        ||expectedKeys.some(key=>!Object.prototype.hasOwnProperty.call(proof,key))
+        ||proof.schemaVersion!=='seyeon-positive-original-memory-source-pin-v1'
         ||proof.subjectId!==input.subjectId||proof.threadId!==input.threadId
         ||proof.turnId!==input.turnId||proof.attemptId!==input.attemptId
+        ||proof.characterId!=='seyeon'||proof.recordKind!=='memory'
         ||proof.originalGrantId!==input.originalGrantId
         ||proof.recordId!==input.originalMemoryId
+        ||proof.recordType!==input.recordType
+        ||proof.recordSchemaVersion!==input.schemaVersion
+        ||proof.projectorVersion!==input.projectorVersion
+        ||typeof proof.originalGrantedAt!=='string'
+        ||!Number.isFinite(Date.parse(proof.originalGrantedAt))
         ||proof.selectedSourcesDigest!==input.selectedSourcesDigest
         ||proof.projectedMemoryDigest!==input.projectedMemoryDigest
         ||proof.finalModelContextDigest!==input.finalModelContextDigest
