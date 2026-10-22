@@ -117,7 +117,19 @@
 - 테스트 범위: 9인 × general/Saju/Face KO 기존 경로, 9인 × JA/ZH-TW HOLD, 본문 밖 새 style ref/현실 사실/행동 지시, 캐릭터·버전·surface 불일치, 공식 Reading 필수 epistemic 조건·보호 문구 누락·변조, 미지원 locale.
 - **실제 Reader 런타임에는 직접 부착하지 않음:** 해당 생성/전송/저장/커밋은 Reader/Memory owner 책임이며 이 트랙이 동작을 임의 변경하지 않는다.
 
-## 7. 다음 구현 작업 및 승인 위치
+## 7. I18N-06e 부분 수용 — 웹 대화 원문 안내 및 Scene 요청 경계
+
+**현장 적용:** `apps/web/src/chat/ChatPage.tsx`에 화면 전용 안내 슬롯을 연결하고, `apps/web/chat-runtime-client.js`에서 기존 locale-change 이벤트에 따라 안내만 갱신한다. `apps/web/chat-output-language-notice-v1.js`가 고정된 한국어/일본어/대만 번체 UI 안내 상태를 제공한다.
+
+- 화면 `ko-KR`: 별도 안내 숨김. `ja-JP`·`zh-TW`: **화면 언어만 바뀌며 대화 내용은 서버 원문으로 표시되고 자동 번역되지 않음**을 해당 언어의 고정 UI 문구로 표시. 미지원 언어는 KO 표시 정책 유지.
+- 안내 요소는 `data-chat-source-language-notice`로 채팅 메시지 스트림 외부에 위치한다. **기존 `message.bodyText`·메시지 ID·발신자·시간·전송/재시도·기록을 변경하지 않는다**. Source Text를 임의의 `translateStaticUi`에 전달하지 않는다.
+- 로케일 변경 이벤트는 동일 DOM 안내 문구만 갱신한다. 새 LLM·번역 엔진·Reader response-locale header/body·사용자 언어별 대사 모드 추가 없음. 실제 Reader 응답은 여전히 미승인 비한국어 출력 HOLD.
+- 별도 `test/web-chat-output-language-notice.test.ts`는 지원/미지원 로케일, 원문 보존 및 실제 DOM 결속을 다룬다.
+- `test/web-reader-scene-locale-presentation.test.ts`에는 **retry 시 새 UI 로케일 snapshot**, **이전 in-flight 응답이 새 UI 로케일 상태를 덮어쓰지 않음**을 추가했다. `officialReadingId`와 전송 경로의 읽기 식별자는 변하지 않으며, Source Unit/본문을 재번역하지 않는다.
+
+**수용 범위의 한계:** 위 사항은 **웹 Chat UI와 Reader Scene presentation controller의 표시 계약**이다. 실제 브라우저의 유료 Reader Chat 생성/내부 장문 Records 재언어화 출시, 모바일 parity, 개별 화법 프로필 공개, 법적 공개 허가는 포함하지 않는다. Reviewer 및 운영자에게 KO/JA/ZH-TW 인터페이스 지원과 다국어 Character 생성 지원을 동등하게 표시하지 않는다.
+
+## 8. 다음 구현 작업 및 승인 위치
 
 1. **캐릭터 설계 owner:** 위 6명 차이를 실제 Bible/typed Runtime 간에 해결하고 authoritative source/version을 확정. 이 I18N 트랙은 제안·인계만, 원본 수정 금지.
 2. **I18N (현재 담당):** #2430/31/32/35 기존 PR Auto-merge 유지. 9인 중립 화법 projection과 Source 인계 계약을 Reader·UX 소비 경계에 **허가된 방식으로** 연결. 이후 `ja-JP`/`zh-TW` 관습 및 소량 예외 후보는 이 트랙이 작성하여 사용자에게 제시, 사용자 승인 전 프로필 실제 값 등록 금지.
