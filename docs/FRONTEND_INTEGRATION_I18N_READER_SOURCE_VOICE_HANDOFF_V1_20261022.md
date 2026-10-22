@@ -137,6 +137,13 @@
 - 관련 회귀: `test/web-reader-runtime-client.test.ts`, `test/web-reader-scene-locale-presentation.test.ts`, `apps/web/src/reading-detail-ui-locale.test.ts`.
 - **변경 없는 HOLD:** 독립 Reader Scene의 실제 화면 소비/실제 생성형 `ja-JP`·`zh-TW` 답변, 이전 Official Reading의 번역 재열람 ②, 모바일 사용자 노출 및 Production/Sale 공개는 이 변경에서 활성화하지 않았다. Reading Detail 원문 안내는 현재 Saju Preview/기록 표시 경계이며 Reader 생성 엔진 연결로 해석하지 않는다.
 
+### 7.2 후속 구현 — 실제 모바일 Chat·Reading 화면의 원문 안내
+
+- `apps/mobile/src/ui/mobile-source-language-notice-v1.ts`는 기존 웹에서 승인 없이 사용해 온 것과 같은 **고정 UI 안내 문구**만 반환한다. `ko-KR`에서는 숨기고, 명시적으로 선택된 `ja-JP`·`zh-TW`에서는 대화 및 사주 Reading 원문이 자동 번역되지 않는다고 알린다. 지원 범위 밖 locale는 한국어 기본값으로 처리한다. 실제 응답 언어를 판단하거나 생성·저장하지 않는다.
+- 소비 중인 모바일 화면: `apps/mobile/src/app/(tabs)/chat/[threadId].tsx` (원문 대화 메시지), `apps/mobile/src/app/reading/scene.tsx` (기존 세연 사주 Preview Reader 연출), `apps/mobile/src/features/saju/SajuPreviewReadingView.tsx` (사주 Preview 결과), `apps/mobile/src/app/reading/[readingId].tsx` (저장된 Official Reading 원문). 채팅과 Reading의 데이터·권한·세션/재시도 로직에 변경 없음.
+- `test/mobile-i18n-source-text-notice.test.ts`는 실제 소비 화면 결속, 원문 텍스트 비번역, 웹 안내 문구 동일성 및 미지원 locale 한국어 fallback을 고정한다.
+- **구분:** 모바일 Preview 연출은 공식 Reader Scene 생성 출력과 동일하지 않다. 웹 독립 `createReaderSceneControllerV1`는 서버 입증된 `threadId` 및 `officialReadingId`로 호출해야 하고, 운영에서 검증된 실제 Reader Scene 화면 진입 경로는 아직 연결되지 않았다. 이를 임의의 기록→Reader 진입 또는 프리뷰의 UI reader hint로 대신 연결하지 않는다. 실제 생성형 외국어 Reader 출력·기록 재번역·Production 게이트는 HOLD.
+
 ## 8. 다음 구현 작업 및 승인 위치
 
 1. **캐릭터 설계 owner:** 위 6명 차이를 실제 Bible/typed Runtime 간에 해결하고 authoritative source/version을 확정. 이 I18N 트랙은 제안·인계만, 원본 수정 금지.
