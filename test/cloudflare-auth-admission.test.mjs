@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import worker, { cloudflareEmergencyHoldEnabledV1 } from '../workers/cloudflare-static-preview.mjs';
 import {
   approvedCloudflareSameOriginPostV1,
+  approvedCloudflareStage5HandoffV1,
   allowedCloudflareNaverQueryV1,
   fenceCloudflareApprovedAuthResponseV1,
 } from '../workers/cloudflare-auth-db-api.mjs';
@@ -12,6 +13,8 @@ const PRIVATE_ORIGIN = 'https://auth.myeongha.example.test';
 const ENABLED = Object.freeze({
   MYEONGHA_CLOUDFLARE_AUTH_DB_MODE: 'approved-auth-db-v1',
   MYEONGHA_CLOUDFLARE_AUTH_ORIGIN: PRIVATE_ORIGIN,
+  MYEONGHA_CLOUDFLARE_DB_TLS_RLS_APPROVAL: 'approved-isolated-tls-rls-v1',
+  MYEONGHA_CLOUDFLARE_OAUTH_CALLBACK_ORIGIN: PRIVATE_ORIGIN,
 });
 
 async function get(path, bindings, method = 'GET', base = PRIVATE_ORIGIN, headers = {}) {
@@ -54,6 +57,52 @@ describe('Cloudflare Auth/DB admission is fail-closed until explicit host and se
       }, 'POST', origin);
       expect(response.status).toBe(404);
     }
+  });
+
+  it('requires independent DB TLS/RLS and OAuth callback owner admissions before secrets', async () => {
+    expect(approvedCloudflareStage5HandoffV1(ENABLED, PRIVATE_ORIGIN, true)).toBe(true);
+    for (const dbApproval of [undefined, 'true', 'approved-nonisolated-v1']) {
+      const env = { ...ENABLED, MYEONGHA_CLOUDFLARE_DB_TLS_RLS_APPROVAL: dbApproval };
+      for (const [path, method] of [
+        ['/api/auth/sign-in', 'POST'],
+        ['/api/me', 'GET'],
+        ['/api/auth/social/start', 'POST'],
+        ['/api/auth/social/naver/callback', 'GET'],
+      ]) {
+        const denied = await get(path, env, method);
+        expect(denied.status).toBe(404);
+        expect(await denied.text()).toBe('');
+      }
+    }
+    for (const callback of [undefined, 'https://myeongha.vercel.app',
+      PRIVATE_ORIGIN + '/', 'https://callback.example.test']) {
+      const env = { ...ENABLED, MYEONGHA_CLOUDFLARE_OAUTH_CALLBACK_ORIGIN: callback };
+      for (const [path, method] of [
+        ['/api/auth/social/start', 'POST'],
+        ['/api/auth/social/naver/authorize', 'GET'],
+        ['/api/auth/social/naver/callback', 'GET'],
+        ['/api/auth/refresh?__myeongha_social_complete=1', 'POST'],
+      ]) {
+        const denied = await get(path, env, method);
+        expect(denied.status).toBe(404);
+      }
+      // Ordinary Member access is not silently granted by callback approval:
+      // it still requires its own DB TLS/RLS gate and source credentials.
+      const member = await get('/api/me', env);
+      expect(member.status).toBe(503);
+    }
+    const secretsPoison = new Proxy({
+      MYEONGHA_CLOUDFLARE_EMERGENCY_HOLD: 'false',
+      MYEONGHA_CLOUDFLARE_AUTH_DB_MODE: 'approved-auth-db-v1',
+      MYEONGHA_CLOUDFLARE_AUTH_ORIGIN: PRIVATE_ORIGIN,
+      MYEONGHA_CLOUDFLARE_DB_TLS_RLS_APPROVAL: undefined,
+    }, {
+      get(target, name) {
+        if (!(name in target)) throw new Error('SYNTHETIC_PROTECTED_SECRET_WAS_READ');
+        return target[name];
+      },
+    });
+    expect((await get('/api/me', secretsPoison)).status).toBe(404);
   });
 
   it('does not reach an upstream when approved host lacks DB/auth secrets', async () => {
