@@ -212,8 +212,8 @@ export function approvedCloudflareDbHostV1(value) {
   // A governed Worker TCP destination must be a DNS FQDN, not a literal
   // private/public IP, localhost alias, synthetic reserved domain or socket.
   return typeof value === 'string' &&
-    /^(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\\.)+[a-z][a-z0-9-]{1,62}$/.test(value) &&
-    !/\\.(?:localhost|local|internal|invalid|test|example)$/.test(value);
+    /^(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z][a-z0-9-]{1,62}$/.test(value) &&
+    !/\.(?:localhost|local|internal|invalid|test|example)$/.test(value);
 }
 
 export function approvedCloudflarePostgresTargetV1(config, bindings) {
