@@ -42,7 +42,7 @@ select public.internal_commit_official_reader_paid_answer_purge_v1(
 `;
 const FINISH_SQL = `
 select public.internal_finish_official_reader_paid_answer_purge_v1(
-  $1::uuid,$2::text,$3::text
+  $1::uuid,$2::text,$3::text,$4::uuid[]
 ) as "done"
 `;
 const EMPTY_SQL = `
@@ -219,7 +219,9 @@ async function finishDbErased(input: {
   }
   await store.scopeLedger.acknowledgeScopeKeyErasure(jobId,fence.fenceId);
   const marked=await single<{done:unknown}>(
-    input.pool,FINISH_SQL,[jobId,input.worker,fence.fenceId],
+    input.pool,FINISH_SQL,[
+      jobId,input.worker,fence.fenceId,[...fence.bodyIds],
+    ],
   );
   boolean(marked.done);
   return keysDestroyed;
