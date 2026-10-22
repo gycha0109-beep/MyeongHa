@@ -246,10 +246,11 @@ export async function prepareReaderConversationConsentContinuityShadowV1(
       })).grants;
       const matching = grants.filter(g => g.characterId === readerCharacterId);
       const prior = selectedGrants.get(ref.memoryItemId);
-      if (matching.length !== 1 || matching[0]?.grantId !== ref.grantId ||
-          !prior ||
-          matching[0].grantReason !== prior.grantReason ||
-          matching[0].grantedAt !== prior.grantedAt) {
+      const current = matching[0];
+      if (matching.length !== 1 || !current ||
+          current.grantId !== ref.grantId || !prior ||
+          current.grantReason !== prior.grantReason ||
+          current.grantedAt !== prior.grantedAt) {
         return hold('SOURCE_CHANGED');
       }
     }
