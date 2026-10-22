@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { HTML_ENTRIES } from '../scripts/verify-cloudflare-static.mjs';
 import {
   buildCloudflarePreviewSmokeEvidenceV1,
   writeCloudflarePreviewSmokeEvidenceV1,
@@ -22,7 +23,9 @@ const stopGate=assessCloudflarePreviewOpsStopGateV1({
 });
 const make=(updates={})=>buildCloudflarePreviewSmokeEvidenceV1({
   target:'current',expectedCommit:SHA,attestedCommit:SHA,
-  metrics,stopGate,...updates,
+  metrics,stopGate,
+  htmlSha256:Object.fromEntries(HTML_ENTRIES.map(x=>[x,'c'.repeat(64)])),
+  ...updates,
 });
 
 describe('Stage 9 immutable, scrubbed CI evidence artifact',()=>{
@@ -43,6 +46,8 @@ describe('Stage 9 immutable, scrubbed CI evidence artifact',()=>{
     });
     expect(result.counters.expectedHolds503).toBe(1);
     expect(result.byRoute['rewrite.chat.turns'].n).toBe(1);
+    expect(Object.keys(result.publicHtmlSha256).sort()).toEqual([...HTML_ENTRIES].sort());
+    expect(result.publicHtmlSha256['index.html']).toBe('c'.repeat(64));
     const serial=JSON.stringify(result);
     expect(serial).not.toContain('PRIVATE_SECRET');
     expect(serial).not.toContain('SECRET-THREAD-ID');
@@ -60,6 +65,10 @@ describe('Stage 9 immutable, scrubbed CI evidence artifact',()=>{
       {stopGate:{...stopGate,reasons:['PRIVATE_SECRET']}},
       {stopGate:{...stopGate,productionCutover:'GO'}},
       {stopGate:{...stopGate,automaticProductionMutation:true}},
+      {htmlSha256:Object.fromEntries(HTML_ENTRIES.slice(1).map(x=>[x,'a'.repeat(64)]))},
+      {htmlSha256:{...Object.fromEntries(HTML_ENTRIES.map(x=>[x,'a'.repeat(64)])),
+        'api/secret.json':'a'.repeat(64)}},
+      {htmlSha256:Object.fromEntries(HTML_ENTRIES.map(x=>[x,'SECRET-HTML-CONTENT']))},
     ]) expect(()=>make(overrides)).toThrow();
   });
 

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { mkdtemp, mkdir, readFile, rm, writeFile, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { HTML_ENTRIES } from '../scripts/verify-cloudflare-static.mjs';
 import {
   acceptCloudflareStage9EvidencePairV1,
   readCloudflareStage9EvidencePairV1,
@@ -30,6 +31,7 @@ const make= (target,sha)=>{
   return buildCloudflarePreviewSmokeEvidenceV1({
     target,expectedCommit:sha,attestedCommit:sha,metrics,stopGate,
     githubRunId:RUN,githubRunAttempt:ATTEMPT,
+    htmlSha256:Object.fromEntries(HTML_ENTRIES.map(x=>[x,'d'.repeat(64)])),
   });
 };
 const current=make('current',HEAD);
@@ -72,6 +74,11 @@ describe('Cloudflare Stage 9 exact-SHA CI evidence pair acceptance',()=>{
       {current:{...current,decision:{...current.decision,preview:'STOP_REHEARSAL'}}},
       {current:{...current,decision:{...current.decision,billing:'ACCOUNT_READ_CONFIRMED'}}},
       {current:{...current,notMeasured:[]}},
+      {current:{...current,publicHtmlSha256:{}}},
+      {current:{...current,publicHtmlSha256:{...current.publicHtmlSha256,
+        'auth.html':'INVALID-DIGEST'}}},
+      {recovery:{...recovery,publicHtmlSha256:{...recovery.publicHtmlSha256,
+        'new-private.html':'f'.repeat(64)}}},
       {current:{...current,counters:{...current.counters,expectedHolds503:0}}},
       {current:{...current,counters:{...current.counters,http429:1}}},
       {current:{...current,groups:{...current.groups,

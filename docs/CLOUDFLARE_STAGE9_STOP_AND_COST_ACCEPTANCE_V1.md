@@ -61,3 +61,9 @@ scripts/cloudflare-preview-ops-stop-gate.mjs에서 실행되는 읽기 전용 �
 - `Cloudflare Preview Remote Smoke`의 **11개 Chrome 화면/기존 Vercel standby 검사 뒤**에 위 쌍을 확인하는 필수 단계를 추가하고, 아티팩트 업로드는 파일 없을 때 `error`로 중단한다. 실패 시에도 안전한 증거 파일이 존재하면 기존 `if: always()` 업로드는 수행하며, CI 성공으로 승격하지 않는다. `#2384` Stage 4 legacy 동작은 바꾸지 않는다.
 - 수락 판정은 `ALLOW_DENY_ONLY_PREVIEW`만 의미한다. CPU·메모리·계정 청구 자료가 없다는 사실을 명시하고, 두 증거가 모두 PASS해도 `Production=HOLD`, `Cost=COST_OR_LIMIT_EVIDENCE_HOLD`, 실제 rollback/restore 미실행 상태를 유지한다. **과거 immutable 배포 HTTP 수락이 곧 mutable Preview를 실제 되돌려 복구했다는 뜻은 아니다.**
 - 합성 회귀 `test/cloudflare-stage9-evidence-pair.test.mjs`를 기존 Cloudflare 테스트 명령에 추가했다. 파일 수·보존·승인 근거는 해당 GitHub Actions run의 artifacts API에서 다시 확인해야 하며, 7일 만료 후에는 과거 증거를 현재 PASS로 재사용하지 않는다.
+
+### 2026-10-23 — Preview 실배포 공개 HTML 11개 SHA-256 증거
+
+- 기존 Cloudflare Remote Smoke가 이미 읽는 **11개 공개 HTML**(index/hall/auth/birth/chat-hub/chat/my/reading/face-reading/reading-detail/records)의 HTTP body text를 Node SHA-256으로 해시한다. 새 HTTP 요청, 본문/쿠키/개인정보 로그 및 추가 Cloudflare 리소스를 만들지 않는다.
+- 각 SHA와 복구 후보 SHA를 별도 `publicHtmlSha256`의 **허용된 파일 이름→64자리 소문자 digest**로 JSON에 기록한다. 해시가 하나라도 누락되거나 새 경로·잘못된 digest가 추가되면 `scripts/cloudflare-preview-smoke-evidence.mjs` 생성 단계 또는 `scripts/accept-cloudflare-stage9-evidence-pair.mjs` 쌍 수락 단계에서 **CI 실패**한다. 테스트에는 합성 문자열만 사용한다.
+- 이 증거는 **Git SHA와 결합된 원격 공개 HTML 체크섬**이지 전체 Worker JS 번들 크기/해시, CSS/JS 파일 전체, CDN 캐시의 모든 시점, 사용자 개인정보 화면 렌더링이나 Cloudflare 청구/CPU 실측까지 증명하지 않는다. 과거 SHA와 최신 SHA의 HTML 바이트 일치를 강요하지 않는다.

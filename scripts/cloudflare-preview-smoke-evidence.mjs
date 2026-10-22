@@ -72,7 +72,7 @@ function boundedStats(stat) {
 
 export function buildCloudflarePreviewSmokeEvidenceV1({
   target, expectedCommit, attestedCommit, metrics, stopGate,
-  githubRunId, githubRunAttempt,
+  githubRunId, githubRunAttempt, htmlSha256,
 }) {
   if (!ALLOWED_TARGETS.includes(target) ||
       typeof expectedCommit !== 'string' ||
@@ -99,6 +99,14 @@ export function buildCloudflarePreviewSmokeEvidenceV1({
   )) {
     throw Error('Invalid synthetic evidence CI run provenance');
   }
+  const htmlNames=Object.keys(htmlSha256 ?? {}).sort();
+  if (JSON.stringify(htmlNames)!==JSON.stringify([...HTML_ENTRIES].sort()) ||
+      !htmlNames.every(name=>typeof htmlSha256[name]==='string' &&
+        /^[a-f0-9]{64}$/.test(htmlSha256[name]))) {
+    throw Error('Invalid public HTML SHA-256 evidence (contents redacted)');
+  }
+  const publicHtmlChecksums=Object.fromEntries(
+    HTML_ENTRIES.map(name=>[name,htmlSha256[name]]));
   const counters = Object.fromEntries(COUNTERS.map(k => [k, boundedCounter(metrics[k])]));
   const groups = Object.fromEntries(CLASSES.map(k => [k, boundedStats(metrics.groups?.[k])]));
   if (!metrics.byRoute || typeof metrics.byRoute !== 'object' ||
@@ -121,6 +129,7 @@ export function buildCloudflarePreviewSmokeEvidenceV1({
     ...(hasRun ? { githubRun: { id: githubRunId, attempt: githubRunAttempt } } : {}),
     syntheticRequestCount: counters.requestAttempts,
     counters, groups, byRoute: routes,
+    publicHtmlSha256:publicHtmlChecksums,
     decision: {
       preview: stopGate.previewDecision,
       production: 'HOLD',

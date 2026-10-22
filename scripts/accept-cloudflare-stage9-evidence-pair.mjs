@@ -21,7 +21,7 @@ const COUNTERS=Object.freeze([
 const ROOT_FIELDS=Object.freeze([
   'schema','evidenceSource','target','expectedCommit','attestedCommit',
   'githubRun','syntheticRequestCount','counters','groups','byRoute',
-  'decision','notMeasured',
+  'publicHtmlSha256','decision','notMeasured',
 ]);
 const STAT_FIELDS=Object.freeze(['n','p50Ms','p95Ms','maxMs']);
 const DECISION_FIELDS=Object.freeze([
@@ -92,6 +92,14 @@ function checkOne(record,target,expectedSha,runId,attempt) {
   assert(classTotal===EXPECTED_PROBES&&
     record.groups['protected-hold'].n===EXPECTED_PROTECTED_HOLDS);
 
+  // Current and pinned recovery versions may have different HTML bytes.
+  // Each version must nevertheless attest all eleven public HTML files,
+  // using the same exact SHA-256 naming and no arbitrary paths.
+  assert(exactKeys(record.publicHtmlSha256,HTML_ENTRIES));
+  for(const name of HTML_ENTRIES) {
+    const digest=record.publicHtmlSha256[name];
+    assert(typeof digest==='string'&&/^[a-f0-9]{64}$/.test(digest));
+  }
   assert(isRecord(record.byRoute));
   const keys=Object.keys(record.byRoute);
   assert(keys.length>0&&keys.length<=KNOWN_ROUTE_IDS.size&&

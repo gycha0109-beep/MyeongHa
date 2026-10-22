@@ -2,6 +2,7 @@
 // Read-only synthetic requests; never touch a user account or production origin.
 // Watchtower-Track: ops
 import { readFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { HTML_ENTRIES } from './verify-cloudflare-static.mjs';
@@ -42,6 +43,7 @@ assert(baseline.size === expected.length && expected.every(h=>baseline.has(h)), 
 
 const failures = [];
 const timingSamples = [];
+const publicHtmlSha256 = Object.create(null);
 let requests = 0;
 async function check(path, status, options = {}) {
   const target = new URL(path, parsed);
@@ -156,6 +158,11 @@ async function main() {
     if (!response.headers.get('content-type')?.includes('text/html')) failures.push({path:page,reason:'html-mime'});
     const text = await response.text();
     if (!/<html[\s>]/i.test(text) || !text.includes('</html>')) failures.push({path:page,reason:'invalid-html'});
+    // Hash only the already-read, public HTML; no extra fetch, user data,
+    // request headers, cookies, or raw page bytes in CI artifacts.
+    if (scf2 && response.ok) {
+      publicHtmlSha256[page] = createHash('sha256').update(text,'utf8').digest('hex');
+    }
   }
   response = await check('/api/health',200);
   if (response) {
@@ -265,6 +272,7 @@ async function main() {
       target:process.env.MYEONGHA_CLOUDFLARE_EVIDENCE_KIND,
       expectedCommit:expectedHead,attestedCommit,
       metrics:opsMetrics,stopGate:opsStopGate,
+      htmlSha256:publicHtmlSha256,
       githubRunId:process.env.GITHUB_RUN_ID,
       githubRunAttempt:process.env.GITHUB_RUN_ATTEMPT,
     });
