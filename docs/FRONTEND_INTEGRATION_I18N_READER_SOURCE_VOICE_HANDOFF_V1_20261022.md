@@ -157,7 +157,7 @@
 
 - `apps/web/src/reader-scene/ReaderSceneBoundPanel.tsx`는 이미 작성된 `createReaderSceneControllerV1`과 `ReaderScenePanel`을 하나의 UI 생명주기로 연결하는 **공개 미연결 컴포넌트**다. 독자적으로 Reader 런타임을 켜거나 `enabled:true` 클라이언트를 생성하지 않는다. 승인된 소비 owner가 **기존 서버 소유 Thread + Official Reading 입장 조건에 따라** `ownerBinding`을 전달해야만 활성화된 클라이언트의 기존 preview 엔드포인트를 호출한다. 서버는 각 요청의 권한을 독립적으로 재확인해야 한다.
 - `ownerBinding=null`이면 idle, `client.enabled=false`이면 feature unavailable을 표시하며 요청하지 않는다. 확인된 owner가 현재 계정/세션/권한 범위에 맞게 갱신하는 `displayScopeRevision`은 **UI 캐시 무효화 토큰**일 뿐 entitlement/source 증거가 아니다. 인물/사주 출력 권한은 생성하지 않는다.
-- `client + displayScopeRevision + threadId + officialReadingId`가 바뀌는 즉시 이전 응답을 **렌더 단계에서 가리고**, Effect cleanup에서 기존 요청을 `cancel()`한다. 최신 Effect에 속하지 않은 응답은 콜백에서 버린다. 사용자 재시도 버튼은 기존 `controller.retry()`를 호출할 뿐 새 요청 언어·Reader ID·읽기 ID를 임의로 구성하지 않는다.
+- `client + displayScopeRevision + threadId + officialReadingId`가 바뀌는 즉시 이전 응답을 **렌더 단계에서 가리고**, Effect cleanup에서 기존 요청을 `cancel()`한다. 최신 Effect에 속하지 않은 응답은 콜백에서 버린다. 사용자 재시도 버튼은 기존 `controller.retry()`를 호출할 뿐 새 요청 언어·Reader ID·읽기 ID를 임의로 구성하지 않는다. `myeongha:localechange`는 UI-authored loading/error 안내만 다시 그리며, 이미 도착한 Reader 응답의 요청 시점 locale snapshot이나 원문은 다시 선택·번역하지 않는다. 화면이 다시 그려졌다는 이유만으로 별도의 Reader 요청을 재발행하지 않는다.
 - `apps/web/src/reader-scene/ReaderSceneBoundPanel.test.tsx`는 비활성 클라이언트, owner 입장 없음, 렌더 중 미요청, 클라이언트·세션 revision·기록 ID 변경 시 이전 문장 비노출, public Chat/Reading 라우트와 분리를 고정한다.
 - **남은 계약:** 운영 Reader Scene의 서버 입장/세션 변경 이벤트와 실제 라우트 binding은 Reader/UX 소유자가 검증한 진입 구조가 제시된 경우에만 수용한다. Records handoff에 Thread ID/Reader 선택 권한을 덧붙이지 않는다. I18N 자체에는 Character voice 승인, JA/ZH-TW 생성, 과거 공식 기록 언어 변경 또는 일반 운영 공개 권한이 없다.
 
