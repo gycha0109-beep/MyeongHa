@@ -1877,6 +1877,80 @@ describe('A3-eta server-anchored follow-up evidence selection (public OFF)', () 
     expect(JSON.stringify(result)).not.toContain('PRIVATE_GUARDED_OFFICIAL_TEXT');
   });
 
+  it('RR-08 refuses to bypass missing actual Reader transcript authority despite valid server-minted sources', async () => {
+    const base = previewGrounding();
+    const {groundingHash: _old, ...material} = base;
+    const bounded = {...material, units: [material.units[0]!]};
+    const question = '그 부분을 더 설명해 주세요.';
+    const f = await setup({
+      ...bounded, groundingHash: hashCharacterSajuGroundingBundleMaterialV1(bounded),
+    }, question);
+    const result = await prepareReaderConversationResponseCandidateV1({
+      userText: question, admittedDomain: 'career',
+      official: {
+        preflight: f.input.preflight,
+        grounded: f.input.grounded,
+        anchorAuthorityPort: f.input.anchorAuthorityPort,
+        rendererDraft: cosmetics(),
+      },
+    });
+    expect(result).toMatchObject({
+      mode: 'hold',
+      reason: 'official_latest_anchor_not_admitted',
+      publicDisclosureAuthorized: false,
+      addedModelCalls: 0,
+    });
+    expect(f.readLatestValidatedAnchor).not.toHaveBeenCalled();
+  });
+
+  it('RR-08 aborts when Reader transcript metadata changes during validated Anchor selection', async () => {
+    const base = previewGrounding();
+    const {groundingHash: _old, ...material} = base;
+    const bounded = {...material, units: [material.units[0]!]};
+    const question = '그 부분을 더 설명해 주세요.';
+    const f = await setup({
+      ...bounded, groundingHash: hashCharacterSajuGroundingBundleMaterialV1(bounded),
+    }, question);
+    let reads = 0;
+    const readRecentMessages = vi.fn(async () => {
+      reads += 1;
+      return [
+        {
+          messageId: 'current-user-request',
+          sequenceNo: reads === 1 ? 18 : 19,
+          senderType: 'user', characterId: null,
+          text: question, createdAt: '2026-10-22T05:01:00.000Z',
+        },
+        {
+          messageId: f.anchor.assistantMessageId,
+          sequenceNo: 17,
+          senderType: 'character', characterId: 'baekheon',
+          text: 'PRIVATE_OFFICIAL_ANSWER',
+          createdAt: '2026-10-22T05:00:00.000Z',
+        },
+      ];
+    });
+    const result = await prepareReaderConversationResponseCandidateV1({
+      userText: question, admittedDomain: 'career',
+      official: {
+        preflight: f.input.preflight,
+        grounded: f.input.grounded,
+        anchorAuthorityPort: f.input.anchorAuthorityPort,
+        recentMessageAuthorityPort: { readRecentMessages },
+        rendererDraft: cosmetics(),
+      },
+    });
+    expect(result).toMatchObject({
+      mode: 'hold',
+      reason: 'official_latest_anchor_not_admitted',
+      publicDisclosureAuthorized: false,
+      addedModelCalls: 0,
+    });
+    expect(readRecentMessages).toHaveBeenCalledTimes(2);
+    expect(f.readLatestValidatedAnchor).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(result)).not.toContain('PRIVATE_OFFICIAL_ANSWER');
+  });
+
   it('RR-08 refuses older Official Anchor after another real Reader answer, even with valid RR-05 source', async () => {
     const base = previewGrounding();
     const {groundingHash: _old, ...material} = base;
