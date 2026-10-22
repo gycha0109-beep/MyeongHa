@@ -122,7 +122,9 @@ export function createOfficialReaderPrivateCurrentPurchaseAuthorityPortV1(
       || scope.resolvedSubject.subjectKind !== 'member') return deny();
   const canonicalSubjectId = uuid(scope.resolvedSubject.subjectId);
   return Object.freeze({
-    async assertCurrentVerifiedPurchase(input): Promise<void> {
+    async assertCurrentVerifiedPurchase(
+      input: Parameters<OfficialReaderPrivateCurrentPurchaseAuthorityPortV1['assertCurrentVerifiedPurchase']>[0],
+    ): Promise<void> {
       if (!input || uuid(input.subjectId) !== canonicalSubjectId) return deny();
       await assertOfficialReaderPrivateCurrentVerifiedPurchaseScopeV1({
         scope,
