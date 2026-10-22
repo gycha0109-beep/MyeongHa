@@ -3,6 +3,9 @@ import {
   type CommerceReaderRecordContinuityV1,
 } from './commerce-reader-product-continuity-v1.js';
 import { createPostgresOfficialReadingRecordAuthorityPortV1 } from './official-reading-record-http.js';
+import {
+  createPostgresCommerceReaderVerifiedPurchaseStatusPortV1,
+} from './commerce-reader-verified-purchase-status-v1.js';
 import { createPostgresCharacterStandardReadingKnowledgePortsV1 } from './postgres-character-standard-reading-knowledge.js';
 import { createPostgresOfficialReaderThreadLocatorAuthorityPortV1 } from './postgres-official-reader-thread-locator-v1.js';
 import { createPostgresChatThreadRuntimeBindingAuthorityPortV1 } from './postgres-chat-thread-runtime-binding.js';
@@ -76,6 +79,10 @@ export async function resolvePostgresCommerceReaderRecordContinuityV1(
         readerCharacterId: input.readerCharacterId,
         effectiveAt,
         recordAuthorityPort: createPostgresOfficialReadingRecordAuthorityPortV1(client),
+        // Fail closed if the privately held S1/status function has not
+        // been Owner-applied or the DB role lacks its explicit permission.
+        verifiedPurchaseStatusAuthorityPort:
+          createPostgresCommerceReaderVerifiedPurchaseStatusPortV1(client),
         readerAuthorities: {
           accessAuthorityPort:
             createPostgresCharacterStandardReadingKnowledgePortsV1(client).accessAuthorityPort,
