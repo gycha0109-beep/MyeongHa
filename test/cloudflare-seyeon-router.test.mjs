@@ -773,6 +773,82 @@ describe('S-CF2 actual Worker fetch boundary and no HTML fallback', () => {
     }
   });
 
+  it('rejects Static Assets navigation, browser-state and user-scoped cache response headers', async () => {
+    const forbidden = [
+      { Refresh: '0;url=https://attacker.example.test/redirect' },
+      { 'Clear-Site-Data': '"cookies", "storage"' },
+      { Link: '<https://attacker.example.test/collect>; rel=preload' },
+      { 'Content-Location': '/api/chat/private' },
+      { 'Content-Disposition': 'attachment; filename="private.txt"' },
+      { 'WWW-Authenticate': 'Basic realm="secret"' },
+      { 'Proxy-Authenticate': 'Basic realm="secret"' },
+      { 'X-Accel-Redirect': '/api/chat/private' },
+      { 'X-Sendfile': '/private/file' },
+      { 'Access-Control-Allow-Origin': '*' },
+      { Location: '/api/me' },
+      { 'Set-Cookie': 'session=secret' },
+      { Vary: 'Cookie' },
+      { Vary: 'Accept-Encoding, Authorization' },
+      { Vary: '*' },
+      { Vary: 'Accept-Encoding, ' },
+    ];
+    for (const injected of forbidden) {
+      const response = await worker.fetch(
+        new Request(ROOT + '/assets/app.js'),
+        { ASSETS: { fetch: () => new Response('PUBLIC', {
+          status: 200, headers: {
+            'Content-Type': 'text/javascript',
+            'Cache-Control': 'public,max-age=300',
+            ...injected,
+          },
+        }) } },
+      );
+      expect(response.status, JSON.stringify(injected)).toBe(404);
+      expect(response.headers.get('cache-control')).toBe('no-store');
+      expect(response.headers.get('set-cookie')).toBeNull();
+      expect(response.headers.get('location')).toBeNull();
+      expect(response.headers.get('refresh')).toBeNull();
+      expect(response.headers.get('clear-site-data')).toBeNull();
+      expect(await response.text()).toBe('');
+    }
+  });
+
+  it('forwards only public representation metadata, not ASSETS debug or internal headers', async () => {
+    const privateValue = 'SYNTHETIC_ASSET_HEADER_PRIVATE_VALUE';
+    const response = await worker.fetch(
+      new Request(ROOT + '/assets/app.js'),
+      { ASSETS: { fetch: () => new Response('PUBLIC', {
+        status: 200,
+        headers: {
+          'Content-Type': 'text/javascript',
+          'Cache-Control': 'public,max-age=3600',
+          'Content-Encoding': 'identity',
+          'Content-Language': 'ko',
+          ETag: '"public-static"',
+          Vary: 'Accept-Encoding, Accept-Language',
+          'X-Internal-Trace': privateValue,
+          'Server-Timing': 'private;desc="' + privateValue + '"',
+          'Report-To': privateValue,
+          'Content-Security-Policy-Report-Only': 'report-uri https://attacker.example.test/',
+          'Content-Security-Policy': 'default-src *',
+        },
+      }) } },
+    );
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe('PUBLIC');
+    expect(response.headers.get('cache-control')).toBe('public,max-age=3600');
+    expect(response.headers.get('etag')).toBe('"public-static"');
+    expect(response.headers.get('vary')).toBe('Accept-Encoding, Accept-Language');
+    expect(response.headers.get('content-language')).toBe('ko');
+    expect(response.headers.get('content-encoding')).toBe('identity');
+    expect(response.headers.get('content-security-policy')).toContain("default-src 'self'");
+    for (const name of [
+      'x-internal-trace', 'server-timing', 'report-to',
+      'content-security-policy-report-only',
+    ]) expect(response.headers.get(name)).toBeNull();
+    expect([...response.headers].flat().join(' ')).not.toContain(privateValue);
+  });
+
   it('preserves approved HTML security headers and non-HTML cache behavior', async () => {
     const publicHtml = await worker.fetch(new Request(ROOT + '/index.html'), {
       ASSETS: { fetch: () => new Response('<html>public</html>', {
