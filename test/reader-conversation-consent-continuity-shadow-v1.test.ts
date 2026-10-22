@@ -118,6 +118,8 @@ describe('RR-08 Reader consent continuity metadata only; no positive provider or
       .toHaveBeenCalledTimes(2);
     expect(input.memoryGrantsAuthorityPort.readActiveGrants)
       .toHaveBeenCalledTimes(2);
+    expect(input.memoryItemsAuthorityPort.readCurrentItems)
+      .toHaveBeenCalledTimes(2);
   });
 
   it('returns an empty consent set with only other Reader grants, keeping relationship continuity', async () => {
@@ -155,6 +157,30 @@ describe('RR-08 Reader consent continuity metadata only; no positive provider or
     input.memoryGrantsAuthorityPort.readActiveGrants =
       vi.fn(async () => ++count === 1 ? [grant] : []);
     await holdCode(input, 'SOURCE_CHANGED');
+  });
+
+  it('detects Memory content mutations or deletion between initial Grant and continuity candidate', async () => {
+    const changed = fixture();
+    let n = 0;
+    changed.memoryItemsAuthorityPort.readCurrentItems = vi.fn(async () =>
+      ++n === 1 ? [memory] : [{...memory, contentJsonb: {summary: 'MUTATED_AFTER_GRANT'}}]);
+    await holdCode(changed, 'SOURCE_CHANGED');
+
+    const removed = fixture();
+    let calls = 0;
+    removed.memoryItemsAuthorityPort.readCurrentItems = vi.fn(async () =>
+      ++calls === 1 ? [memory] : []);
+    await holdCode(removed, 'SOURCE_CHANGED');
+  });
+
+  it('detects changed current consent Grant metadata even when grant ID is reused', async () => {
+    const updated = fixture();
+    let calls = 0;
+    updated.memoryGrantsAuthorityPort.readActiveGrants = vi.fn(async () =>
+      ++calls === 1 ? [grant] : [{
+        ...grant, grantReason: 'CHANGED', grantedAt: '2026-10-21T12:02:00Z',
+      }]);
+    await holdCode(updated, 'SOURCE_CHANGED');
   });
 
   it('detects invalid multiple same-Reader current Grants and reused Grant IDs', async () => {
