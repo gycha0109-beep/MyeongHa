@@ -104,10 +104,13 @@ function isExplicitChatRoute(route, pathname) {
 
 function createDefaultSubjectScope(bindings) {
   const config = parseProductionUserDataRuntimeConfigV1(bindings);
+  // Create the verifier BEFORE the PostgreSQL lease. If its configuration
+  // fails, no pool has been allocated and nothing can remain unclosed.
+  const identityEvidenceVerifier = createProductionRequestIdentityVerifierV1({ config });
   const poolLease = createProductionPostgresSubjectPoolLeaseV1({ config });
   return {
     pool: poolLease.pool,
-    identityEvidenceVerifier: createProductionRequestIdentityVerifierV1({ config }),
+    identityEvidenceVerifier,
     close: () => poolLease.close(),
   };
 }
