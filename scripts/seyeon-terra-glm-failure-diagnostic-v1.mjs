@@ -4,6 +4,7 @@
  * headers, credentials, URLs, free-form provider strings or subject identifiers.
  */
 export const SEYEON_TERRA_GLM_FAILURE_PHASE_REASONS_V1=Object.freeze({
+ provider_origin:'LUNA_TERRA_PROVIDER_ORIGIN_HOLD',
  transport:'LUNA_TERRA_TRANSPORT_FAILURE_HOLD',
  http_status:'LUNA_TERRA_HTTP_STATUS_HOLD',
  response_parse:'LUNA_TERRA_RESPONSE_PARSE_FAILURE_HOLD',
