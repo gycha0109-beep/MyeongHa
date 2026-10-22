@@ -457,6 +457,38 @@ describe('Character Output Guard', () => {
     }
   });
 
+  it.each([
+    ['zero-width space', '정상\u200b위조'],
+    ['zero-width left-to-right mark', '정상\u200e위조'],
+    ['bidirectional override', '정상\u202e위조'],
+    ['bidirectional isolate', '정상\u2066위조'],
+    ['hidden word joiner', '정상\u2060위조'],
+    ['NUL character', '정상\u0000위조'],
+    ['embedded BOM', '정상\ufeff위조'],
+  ])('refuses provider framing with %s, preserving source-only material', (_name, framing) => {
+    for (const context of [runtimeContext(false), runtimeContext(true)]) {
+      expect(() => guardCharacterRendererOutput({
+        rawOutput: { ...validDraft(), framingAfter: framing },
+        context,
+        allowedSuggestedActionKeys: ['open_records'],
+      })).toThrow(/unsafe invisible control characters/u);
+    }
+  });
+
+  it.each([
+    '대화에서 줄바꿈\n두 번째 줄을 허용해요.',
+    '이모지 가족: 👨‍👩‍👧‍👦',
+    '서식에 쓰이는\t탭은 허용해요.',
+  ])('retains ordinary multiline and emoji chat without injecting Saju', framing => {
+    const envelope = guardCharacterRendererOutput({
+      rawOutput: { ...validDraft(), framingBefore: framing },
+      context: runtimeContext(false),
+      allowedSuggestedActionKeys: ['open_records'],
+    });
+    expect(envelope.framingBefore).toBe(framing);
+    expect(envelope.protectedSajuSegments).toEqual([]);
+  });
+
   it('also refuses unsupported Saju certainty beside otherwise protected source', () => {
     expect(() => guardCharacterRendererOutput({
       rawOutput: {

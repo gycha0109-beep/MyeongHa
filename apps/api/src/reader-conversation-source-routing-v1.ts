@@ -1,8 +1,14 @@
 import {
   classifyCharacterStandardFollowupLexicalIntentV1,
   classifyExactOfficialReadingSummaryReferenceV1,
-  classifyCharacterStandardFollowupQuestionScopeV1,
+  inspectCharacterStandardFollowupSignalsV1,
 } from './character-standard-reading-chat-question-scope-v1.js';
+import {
+  prepareReaderLatestAnchorContinuityV1,
+} from './reader-conversation-latest-anchor-continuity-v1.js';
+import type {
+  ReaderContextNonMemoryReadAuthorityPortV1,
+} from './reader-context-non-memory-read.js';
 import {
   assertServerPreparedStandardChatPreflightV2,
   type CharacterStandardReadingChatTurnPreflightV2,
@@ -87,8 +93,8 @@ export type ReaderConversationResponseCandidateV1 =
       intent: ReaderConversationIntentDecisionV1;
       reason: 'clarification_required' | 'unavailable_official_source' |
         'source_mismatch' | 'source_closure_required' |
-        'official_question_not_admitted' | 'existing_guard_rejected' |
-        'security_gate_pending';
+        'official_question_not_admitted' | 'official_latest_anchor_not_admitted' |
+        'existing_guard_rejected' | 'security_gate_pending';
       addedModelCalls: 0;
       publicDisclosureAuthorized: false;
     }>;
@@ -195,6 +201,8 @@ export interface PrepareReaderConversationResponseCandidateInputV1 {
     preflight: CharacterStandardReadingChatTurnPreflightV2;
     grounded: CharacterStandardChatGroundingV2;
     anchorAuthorityPort?: ValidatedStandardFollowupAnchorAuthorityPortV1;
+    /** DB-origin actual Reader message order; needed for pronoun follow-ups. */
+    recentMessageAuthorityPort?: Pick<ReaderContextNonMemoryReadAuthorityPortV1, 'readRecentMessages'>;
     guardedScene?: ReaderInterpretationPreviewEnvelopeV1;
     rendererDraft?: unknown;
   }>;
@@ -235,6 +243,18 @@ export async function prepareReaderConversationResponseCandidateV1(
 
   if (intent.primaryIntent === 'clarification') {
     return hold(intent, 'clarification_required');
+  }
+
+  // RR-05 independent instruction-override observations are negative-only:
+  // catch disguised system/developer role instructions the conversational
+  // hint regex missed. No provider, Official source, Memory or policy bypass.
+  // Known risk candidates above still defer to the existing Security Gate.
+  const inspected = inspectCharacterStandardFollowupSignalsV1(
+    input.userText, input.admittedDomain ?? '',
+  );
+  if (inspected.securitySignals.includes('instruction_override_attempt') ||
+      inspected.securitySignals.includes('invalid_input')) {
+    return hold(intent, 'existing_guard_rejected');
   }
 
   // Ordinary chat and support NEVER consume even a supplied Official snapshot.
@@ -352,16 +372,26 @@ export async function prepareReaderConversationResponseCandidateV1(
     });
   }
 
-  if (!input.official.anchorAuthorityPort) {
-    return hold(intent, 'unavailable_official_source');
+  if (!input.official.anchorAuthorityPort ||
+      !input.official.recentMessageAuthorityPort) {
+    // A DB-validated Saju Anchor alone does not prove it is the Reader's
+    // most recent actual answer. No fallback to the old shortcut is allowed.
+    return hold(intent, 'official_latest_anchor_not_admitted');
   }
   try {
-    const question = await classifyCharacterStandardFollowupQuestionScopeV1({
-      preflight, grounded, anchorAuthorityPort: input.official.anchorAuthorityPort,
+    const continuity = await prepareReaderLatestAnchorContinuityV1({
+      preflight,
+      grounded,
+      anchorAuthorityPort: input.official.anchorAuthorityPort,
+      recentMessageAuthorityPort: input.official.recentMessageAuthorityPort,
     });
-    if (question.mode === 'hold') {
-      return hold(intent, 'official_question_not_admitted');
+    if (continuity.mode === 'hold') {
+      return hold(intent, 'official_latest_anchor_not_admitted');
     }
+    // The existing RR-05 classifier already minted and checked questionScope
+    // while RR-08 confirmed exact latest Reader message ID and stable order.
+    // Reusing it avoids a second DB Anchor lookup and any new model stage.
+    const question = continuity.questionScope;
     const candidate = prepareCharacterStandardReaderBoundedCandidateV1({
       grounded, questionScope: question,
     });
