@@ -39,7 +39,24 @@ function response() {
         blocks: [{ type: 'paragraph', text: '확인된 구조적 맥락만 설명합니다.' }],
       }],
       disclosures: [{ type: 'scope_limitation', text: '미래 사건은 확정할 수 없습니다.' }],
-      calculationSummary: { ambiguity: [] },
+      brand: { brandId: 'myeonghwa', displayName: '명화' },
+      subject: {
+        birthInputDisplay: {
+          calendarType: 'solar', date: '2024-03-10',
+          timeKnown: true, time: '12:00',
+        },
+        calculationState: 'resolved',
+      },
+      calculationSummary: {
+        pillars: {
+          year: { label: '연주', status: 'resolved', value: '갑진' },
+          month: { label: '월주', status: 'resolved', value: '정묘' },
+          day: { label: '일주', status: 'resolved', value: '경진' },
+          hour: { label: '시주', status: 'resolved', value: '임오' },
+        },
+        ambiguity: [] as { title: string; summary: string }[],
+      },
+      generatedAt: '2026-10-22T08:00:00.000Z',
     },
   };
 }
@@ -416,15 +433,20 @@ describe('full ProductReadingResponse v2 parity with only native/DB Reading ID d
         generatedAt: '2026-10-23T00:00:00.000Z',
       } },
       { ...response(), reading: { ...response().reading,
-        subject: { displayLabel: 'other subject' },
+        subject: { ...response().reading.subject, birthInputDisplay: {
+          ...response().reading.subject.birthInputDisplay,
+          date: '2025-04-11',
+        } },
       } },
       { ...response(), coverage: {
         state: 'partial', hasAvailableEvidence: true, missingRequirementCount: 1,
       } },
     ];
     for (const stored of alternativeStates) {
-      const readerAdmission = structuredClone(base);
-      readerAdmission.source.responseSnapshotJsonb = stored;
+      const readerAdmission: PreparedOfficialReadingReaderAdmissionV1 = {
+        ...base,
+        source: { ...base.source, responseSnapshotJsonb: stored },
+      };
       // Records needs exactly the same independent DB response as Reader.
       const db = await record({ responseSnapshotJsonb: stored });
       expect(inspectSajuDbReadingIdOnlyResponseParityV1({
