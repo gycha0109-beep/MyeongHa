@@ -32,6 +32,9 @@ import type {
 export type PrepareCharacterStandardReadingChatTurnPreflightInputV2 =
   PrepareCharacterStandardReadingChatTurnPreflightInputV1 & Readonly<{
     resolvedSubjectId: string;
+    /** Current exact purchase check is required at A2, A3 and protected projection. */
+    currentVerifiedPurchaseAuthorityPort?:
+      import('./official-reader-private-exact-verified-purchase-guard-v1.js').OfficialReaderPrivateCurrentPurchaseAuthorityPortV1;
   }>;
 
 export interface CharacterStandardReadingChatTurnPreflightV2 {
