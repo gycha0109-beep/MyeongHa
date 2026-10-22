@@ -140,6 +140,29 @@ describe('S-CF2 actual Worker fetch boundary and no HTML fallback', () => {
       expect(result.headers.get('access-control-allow-origin')).toBeNull();
     }
   });
+  it('holds percent-encoded and double-encoded chat aliases at the actual Worker fetch entrypoint', async () => {
+    for (const path of [
+      '/api/%63hat/' + THREAD + '/turns',
+      '/api/%2563hat/' + THREAD + '/turns',
+      '/api%2Fchat/' + THREAD + '/turns',
+      '/api/chat%2F' + THREAD + '/turns',
+      '/api/chat%252F' + THREAD + '/turns',
+      '/api/CHAT/' + THREAD + '/turns',
+      '/api/chat%00/' + THREAD,
+      '/api/chat%GG/' + THREAD,
+    ]) {
+      const response = await worker.fetch(new Request(ROOT + path, { method: 'POST' }), bindings);
+      await expectHeld(response);
+      expect(response.headers.get('location')).toBeNull();
+      expect(response.headers.get('access-control-allow-origin')).toBeNull();
+      expect(response.headers.get('content-type')).not.toContain('text/html');
+    }
+    // The deny-only classifier must not hijack unrelated generic APIs.
+    const generic = await worker.fetch(new Request(ROOT + '/api/chatty'), {});
+    expect(generic.status).toBe(404);
+    expect(await generic.text()).toBe('');
+  });
+
   it('does not confuse an unported other-Character chat open with approved SeYeon Reveal', async () => {
     const response = await worker.fetch(new Request(ROOT + '/api/chat', { method: 'POST' }), {});
     expect(response.status).toBe(404);
