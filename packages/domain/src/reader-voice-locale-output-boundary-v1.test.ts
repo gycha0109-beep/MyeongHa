@@ -48,6 +48,7 @@ function makeFixture(
     surface,
     responseLocale: locale,
     appliedStyleRefs: [],
+    activeContextRuleRefs: [],
     introducedRealityFactKeys: [],
     authorizedRealityFactKeys: [],
     proseStageDirections: [],
@@ -119,6 +120,25 @@ describe('I18N-06d Reader voice/locale/source output evidence boundary', () => {
       ...makeFixture(),
       evidence: { ...makeFixture().evidence, appliedStyleRefs: ['unapproved-ko-style'] },
     })).toMatchObject({ state: 'hold', reason: 'unapproved_style_reference' });
+  });
+
+  it('rejects a guessed situation condition and cannot activate style by assertion', () => {
+    const input = makeFixture('rahyeon', 'general_chat', 'ja-JP');
+    expect(inspectReaderVoiceLocaleOutputBoundaryV1({
+      ...input,
+      evidence: {
+        ...input.evidence,
+        activeContextRuleRefs: ['unapproved.relationship.familiar'],
+      },
+    })).toMatchObject({ state: 'hold', reason: 'unapproved_context_condition' });
+    expect(inspectReaderVoiceLocaleOutputBoundaryV1({
+      ...input,
+      evidence: {
+        ...input.evidence,
+        activeContextRuleRefs: ['unapproved.relationship.familiar'],
+        appliedStyleRefs: ['ja.styled-familiar'],
+      },
+    })).toMatchObject({ state: 'hold', reason: 'unapproved_context_condition' });
   });
 
   it('holds forged Character ID, stale Bible and a different product voice surface', () => {
@@ -203,6 +223,9 @@ describe('I18N-06d Reader voice/locale/source output evidence boundary', () => {
     const input = makeFixture();
     for (const evidence of [
       { appliedStyleRefs: ['duplicate', 'duplicate'] },
+      { activeContextRuleRefs: ['same', 'same'] },
+      { activeContextRuleRefs: undefined },
+      { unauthorizedRelease: true },
       { authorizedRealityFactKeys: ['duplicate', 'duplicate'] },
       { responseLocale: '' },
       { appliedStyleRefs: 'claimed-by-browser' },
