@@ -131,11 +131,15 @@ function integer(value: unknown): number {
  * The source transaction wrapper MUST propagate this sentinel after
  * rollback; if it ever begins committing instead, deny by default.
  */
+type ReaderRollbackPreflightStageV1 = Readonly<{
+  query: string;
+  args: readonly unknown[];
+  remainingColumn: 'remainingSubjectRowCount' | 'remainingTombstonedRowCount';
+}>;
+
 async function assertRollbackOnlyReaderRestorePreflightV1(input: {
   readonly pool: PostgresSubjectPoolV1;
-  readonly query: string;
-  readonly args: readonly unknown[];
-  readonly remainingColumn: 'remainingSubjectRowCount' | 'remainingTombstonedRowCount';
+  readonly stages: readonly ReaderRollbackPreflightStageV1[];
 }): Promise<void> {
   const rollbackSentinel = Object.freeze({
     contract: 'official-reader-s4-rollback-only-preflight-v1',
@@ -147,17 +151,25 @@ async function assertRollbackOnlyReaderRestorePreflightV1(input: {
         await client.query(
           "select pg_catalog.set_config('myeongha.reader_restore_quarantine','on',true)",
         );
-        const result = await client.query<Record<string, unknown>>(
-          input.query,
-          input.args,
-        );
-        if (result.rows.length !== 1 || !result.rows[0]
-            || integer(result.rows[0][input.remainingColumn]) !== 0) {
-          return fail();
+
+        // Simulate the same order as the real replay, including its writes:
+        // refund tombstones FIRST, full account tombstones LAST. A later
+        // account manifest may legitimately omit a body erased earlier by
+        // a refunded fence. An isolated per-fence preflight would falsely
+        // reject that scenario, so the entire ordered simulation must share
+        // one rolled-back transaction.
+        for (const stage of input.stages) {
+          const result = await client.query<Record<string, unknown>>(
+            stage.query, stage.args,
+          );
+          if (result.rows.length !== 1 || !result.rows[0]
+              || integer(result.rows[0][stage.remainingColumn]) !== 0) {
+            return fail();
+          }
         }
-        // The Worker wrapper must ROLLBACK before it rethrows this opaque
-        // sentinel; neither ciphertext changes nor derived-data mutations
-        // may survive the preflight pass.
+
+        // No simulated deletes or DB changes may commit. The Worker
+        // transaction wrapper rolls back, then propagates this sentinel.
         throw rollbackSentinel;
       },
     });
@@ -259,9 +271,9 @@ export async function reconcileOfficialReaderProtectedBodiesAfterRestoreV1(input
   // succeed under the actual private SQL + categorical S4 quarantine gate.
   // This preserves previously erased keys and their external tombstones,
   // while preventing a late dirty Subject from becoming a partial new replay.
+  const preflightStages: ReaderRollbackPreflightStageV1[] = [];
   for (const fence of refundFences) {
-    await assertRollbackOnlyReaderRestorePreflightV1({
-      pool: input.pool,
+    preflightStages.push({
       query: REFUND_RESTORE_SQL,
       args: [
         fence.jobId, fence.subjectId, fence.officialReadingId,
@@ -271,8 +283,7 @@ export async function reconcileOfficialReaderProtectedBodiesAfterRestoreV1(input
     });
   }
   for (const fence of fences) {
-    await assertRollbackOnlyReaderRestorePreflightV1({
-      pool: input.pool,
+    preflightStages.push({
       query: RESTORE_SQL,
       args: [
         fence.subjectId, fence.deletionJobId, fence.fenceId,
@@ -281,6 +292,10 @@ export async function reconcileOfficialReaderProtectedBodiesAfterRestoreV1(input
       remainingColumn: 'remainingSubjectRowCount',
     });
   }
+  await assertRollbackOnlyReaderRestorePreflightV1({
+    pool: input.pool,
+    stages: preflightStages,
+  });
 
   let refundDeleted = 0;
   let refundKeysDestroyed = 0;
