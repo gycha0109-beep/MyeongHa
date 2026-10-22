@@ -13,6 +13,11 @@ import {
   currentOfficialReaderPrivacyReadLeaseV1,
   type OfficialReaderPrivatePrivacyLedgerPortV1,
 } from './official-reader-private-privacy-ledger-v1.js';
+import {
+  prepareOfficialReaderPrivateDeliveryV1,
+  type OfficialReaderPrivateDeliveryPreparedV1,
+  type OfficialReaderPrivateDeliveryReservationV1,
+} from './official-reader-private-delivery-journal-v1.js';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
 const READ_SQL = `
@@ -72,6 +77,8 @@ export interface PrivateOfficialReaderPaidAnswerReadV1 {
   readonly committedAt: string;
   /** Protected private value: NEVER pass to ordinary Chat/Memory/log/HTTP. */
   readonly body: string;
+  /** Prepared != delivered. No client ACK is implied by this field. */
+  readonly delivery?: OfficialReaderPrivateDeliveryPreparedV1;
 }
 
 /**
@@ -123,6 +130,8 @@ type ReaderPaidPrivateReadInputV1 = Readonly<{
   keyResolver: PrivateOfficialReaderPaidAnswerKeyResolverV1;
   /** Owner-supplied off-primary Privacy ledger, mandatory even for rerender. */
   privacyLedgerPort: OfficialReaderPrivatePrivacyLedgerPortV1;
+  /** Private-only S7, never accepted as a browser-authored release flag. */
+  deliveryReservation?: OfficialReaderPrivateDeliveryReservationV1;
 }>;
 type ReaderPaidPrivateSelectorV1 =
   | Readonly<{ kind: 'body'; bodyId: string }>
@@ -253,12 +262,33 @@ async function readPrivateOfficialReaderPaidAnswerCoreV1(
         if (!currentOfficialReaderPrivacyReadLeaseV1({
           port: input.privacyLedgerPort, lease, subjectId, selector: selectorKey,
         })) return unavailable();
+
+        // S7 response preparation is written under the SAME S1 current-right
+        // lock, but is distinct from the S5 immutable answer commit and from
+        // a client delivery acknowledgment. A SQL error rolls the receipt
+        // back; it cannot rewrite the ciphertext or safe Chat message.
+        const delivery=input.deliveryReservation === undefined
+          ? undefined
+          : await prepareOfficialReaderPrivateDeliveryV1({
+              scope,subjectId,
+              threadId:identity.threadId,
+              safeMessageId:identity.safeMessageId,
+              bodyId,
+              reservation:input.deliveryReservation,
+            });
+        // The independent outside-backup erasure ledger can change while
+        // waiting for SQL; deny plaintext and ROLLBACK prepared receipts if
+        // the subject was tombstoned during that interval.
+        if (!currentOfficialReaderPrivacyReadLeaseV1({
+          port: input.privacyLedgerPort, lease, subjectId, selector: selectorKey,
+        })) return unavailable();
         return Object.freeze({
           bodyId,
           officialReadingId: identity.officialReadingId,
           readerCharacterId: identity.readerCharacterId,
           committedAt,
           body,
+          ...(delivery === undefined ? {} : { delivery }),
         });
       },
     });
