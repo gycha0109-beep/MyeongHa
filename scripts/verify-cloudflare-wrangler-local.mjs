@@ -68,6 +68,20 @@ async function probe() {
     assert(response.headers.get('content-type')?.includes('text/html'), `${page}: HTML MIME mismatch`);
   }
 
+  // CF-D05: the local Worker-first Static Assets path must keep HEAD
+  // metadata equivalent to public GET without streaming a representation.
+  // Raw workerd HTTP is exercised here; no remote deployment is performed.
+  for (const path of ['/', '/index.html', '/chat.html']) {
+    const response = await assertHttpStatus(path, 200, { method: 'HEAD' });
+    assert(response.headers.get('content-type')?.includes('text/html'),
+      path + ': HEAD lost HTML MIME');
+    assert(response.headers.get('cache-control') === 'no-store',
+      path + ': HEAD must not cache HTML');
+    assert(response.headers.get('content-security-policy') === csp,
+      path + ': HEAD must preserve CSP');
+    assert(await response.text() === '', path + ': HEAD returned an unexpected body');
+  }
+
   const health = await assertHttpStatus('/api/health', 200);
   assert(health.headers.get('cache-control') === 'no-store', 'Public liveness must never be cached');
   assert(health.headers.get('content-security-policy') === csp, 'Health response CSP mismatch');
