@@ -76,7 +76,9 @@ describe('I18N-07 authorized subset: mobile archived Official Reading shell', ()
     expect(screen).toContain('{sourceNotice.text}');
     expect(screen).toContain('>{step.title}</Text>');
     expect(screen).toContain('>{step.primary}</Text>');
-    expect(screen).toContain('>{text}');
+    expect(screen).toContain('step.structure.map((text, itemIndex) => (');
+    expect(screen).toContain('step.supporting.map((text, itemIndex) => (');
+    expect(screen).toContain('{text}');
     expect(screen).toContain('{notice}');
     expect(screen).not.toContain('shell.translateReading');
     expect(screen).not.toContain('translateMobileUiCopy(step.primary');
