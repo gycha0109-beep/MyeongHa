@@ -21,12 +21,14 @@ const [
   offPrimaryConfig,
   offPrimaryStore,
   reconciliation,
+  quarantineState,
 ] = await Promise.all([
   import('../../dist/apps/api/src/production-account-deletion-worker-db-config.js'),
   import('../../dist/apps/api/src/node-postgres-account-deletion-worker-pool.js'),
   import('../../dist/apps/api/src/official-reader-offprimary-worker-config-v1.js'),
   import('../../dist/apps/api/src/official-reader-node-offprimary-privacy-store-v1.js'),
   import('../../dist/apps/api/src/official-reader-private-restore-reconciliation-v1.js'),
+  import('../../dist/apps/api/src/official-reader-private-restore-quarantine-state-v1.js'),
 ]);
 
 const databaseConfig = workerDbConfig.parseProductionAccountDeletionWorkerDbConfigV1(
@@ -48,7 +50,10 @@ try {
   if (result.publicReaderServiceEnabled !== false
       || result.ordinaryDerivedRestoreQuarantineGuardInstalled !== true
       || result.ordinaryDerivedRecordsReadFenceInstalled !== true
-      || result.ordinaryDerivedOutboxReadFenceInstalled !== true) blocked();
+      || result.ordinaryDerivedOutboxReadFenceInstalled !== true
+      || result.restoreState !== 'protected_body_tombstone_replay_only'
+      || result.restoreCompletionApproved !== false
+      || result.ordinaryRestoreConsumersEnabled !== false) blocked();
   // No Subject IDs, DEK references, ciphertext or raw tombstones in logs.
   process.stdout.write(JSON.stringify({
     schemaVersion: result.schemaVersion,
@@ -61,9 +66,21 @@ try {
     ordinaryDerivedRestoreQuarantineGuardInstalled: true,
     ordinaryDerivedRecordsReadFenceInstalled: true,
     ordinaryDerivedOutboxReadFenceInstalled: true,
+    restoreState: result.restoreState,
+    restoreCompletionApproved: false,
+    ordinaryRestoreConsumersEnabled: false,
     publicReaderServiceEnabled: false,
-    next: 'Keep ALL Reader paid-read and ordinary Memory/Search/Summary restore consumers OFF until the complete privacy reconciliation and restore owner acceptance.',
+    next: 'Only the exact off-primary protected-body tombstones were replayed. Complete the existing Privacy/DB Owner remediation and broader disaster-recovery acceptance before releasing any service.',
   }) + '\n');
+} catch (error) {
+  // Never display source/Subject/receipt/DEK IDs, a raw SQL error message,
+  // stack trace, private ledger or restored Memory text in operator logs.
+  // A known S4 marker-derived SQL constraint becomes only a category.
+  // Unknown failures remain blocked_unclassified, not an invented cleanup.
+  process.stdout.write(JSON.stringify(
+    quarantineState.officialReaderRestoreFailureReportV1(error),
+  ) + '\n');
+  process.exitCode = 1;
 } finally {
   await pool.close();
 }
