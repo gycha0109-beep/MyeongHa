@@ -427,7 +427,7 @@ try {
   }))()`);
   assert(invalidThreadChat.character === '' && invalidThreadChat.authority === 'thread_identity_invalid', `Invalid thread route fell back to presentation Character authority: ${JSON.stringify(invalidThreadChat)}`);
   assert(invalidThreadChat.name === '대화 상대', `Invalid thread route leaked a presentation Character: ${JSON.stringify(invalidThreadChat)}`);
-  assert(invalidThreadChat.status === '대화 주소가 올바르지 않습니다. 대리자를 다시 선택해 주세요.'
+  assert(invalidThreadChat.status === '대화 주소가 올바르지 않습니다. 연결자를 다시 선택해 주세요.'
     && invalidThreadChat.loading === invalidThreadChat.status
     && invalidThreadChat.introHidden && invalidThreadChat.retryHidden,
     `Invalid thread route did not fail closed visibly: ${JSON.stringify(invalidThreadChat)}`);

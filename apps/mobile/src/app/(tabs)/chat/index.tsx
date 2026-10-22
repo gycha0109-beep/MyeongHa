@@ -32,18 +32,18 @@ export default function ChatHubScreen() {
     <MobileScreen
       eyebrow="MEET THE CHARACTERS"
       title={t('대화')}
-      description={t('저마다 다른 목소리로, 당신의 이야기를 들어줄 대리자들을 만나보세요.')}
+      description={t('저마다 다른 목소리로, 당신의 이야기를 들어줄 연결자들을 만나보세요.')}
       refreshing={refreshing}
       onRefresh={() => void onRefresh()}
     >
       <View style={styles.intro}>
         <View style={styles.introHeading}>
           <Text style={styles.kicker}>THE PEOPLE OF MYEONGHA</Text>
-          <Text style={styles.introCounter}>{t('대리자 {count}명').replace('{count}', String(MOBILE_CHAT_LAUNCH_ROSTER_V1.length))}</Text>
+          <Text style={styles.introCounter}>{t('연결자 {count}명').replace('{count}', String(MOBILE_CHAT_LAUNCH_ROSTER_V1.length))}</Text>
         </View>
         <MobileUiText style={styles.title}>당신은 누구와 이야기하고 싶으신가요?</MobileUiText>
         <MobileUiText style={styles.body}>
-          마음이 가는 인물을 고르세요. 각 대리자의 이야기와 분위기가 다릅니다.
+          마음이 가는 인물을 고르세요. 각 연결자의 이야기와 분위기가 다릅니다.
         </MobileUiText>
         <MobileUiText style={styles.note}>대화 열기는 회원 로그인 후 가능합니다. 일부 AI 답변과 기존 기록은 현재 이용이 제한될 수 있습니다.</MobileUiText>
         {state.access === 'checking' ? (
@@ -92,7 +92,7 @@ export default function ChatHubScreen() {
                       source={portrait}
                       style={styles.characterPortrait}
                       resizeMode="cover"
-                      accessibilityLabel={`${character.displayName} ${t('대리자 초상화')}`}
+                      accessibilityLabel={`${character.displayName} ${t('연결자 초상화')}`}
                       accessible={false}
                     />
                   )}
@@ -103,7 +103,7 @@ export default function ChatHubScreen() {
                   {featured ? (
                     <View pointerEvents="none" style={styles.featuredImageCopy}>
                       <MobileUiText style={styles.featuredCharacterName}>세연</MobileUiText>
-                      <MobileUiText style={styles.featuredImageLine}>오늘의 이야기를 함께할 대리자</MobileUiText>
+                      <MobileUiText style={styles.featuredImageLine}>오늘의 이야기를 함께할 연결자</MobileUiText>
                     </View>
                   ) : null}
                 </View>
@@ -136,7 +136,7 @@ export default function ChatHubScreen() {
 
       <View style={styles.pendingSection}>
         <Text style={styles.kicker}>COMING SOON</Text>
-        <MobileUiText style={styles.pendingTitle}>대리자 등록 중</MobileUiText>
+        <MobileUiText style={styles.pendingTitle}>연결자 등록 중</MobileUiText>
         <MobileUiText style={styles.note}>조금 더 준비가 필요한 인물들입니다. 현재 대화는 열 수 없습니다.</MobileUiText>
         <View style={styles.pendingList}>
           {MOBILE_CHAT_PENDING_ROSTER_V1.map((character) => {

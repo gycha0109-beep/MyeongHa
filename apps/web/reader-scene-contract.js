@@ -212,7 +212,7 @@ export function parseReaderSceneEnvelopeV1(payload) {
 
 function genericPresentation() {
   return Object.freeze({
-    name: '대리자',
+    name: '연결자',
     title: '',
     intro: '',
     generic: true,

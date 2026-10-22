@@ -64,8 +64,8 @@ export function readingTitleV1(value: string): string {
 
 export function readingReaderLabelV1(ids: readonly string[]): string {
   if (ids.length === 0) return 'Reader 기록 없음';
-  if (ids.length === 1) return '대리자와 본 풀이';
-  return `대리자 ${ids.length}명과 본 풀이`;
+  if (ids.length === 1) return '연결자와 본 풀이';
+  return `연결자 ${ids.length}명과 본 풀이`;
 }
 
 export function buildAllRecordTimelineV1(

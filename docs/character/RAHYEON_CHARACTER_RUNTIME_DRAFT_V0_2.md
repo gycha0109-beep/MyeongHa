@@ -165,7 +165,7 @@ vs
 ## R2.6 Calling, Reader and Cross-Surface Authority
 
 - Bible L의 Origin 《삭제된 사람》, 서약, 은영은 승인된 Canon. `照`는 이미 허용된 자료의 관계·구조를 잠시 부각할 수 있을 뿐 새 사실·숨겨진 개인정보·예언을 생성하지 않는다.
-- 재단 일과 자발적인 명하관 Reader 업무는 분리한다. 대리자라는 사실만으로 공식 Reading 권한이나 다른 사람의 기록 열람권이 생기지 않는다.
+- 재단 일과 자발적인 명하관 Reader 업무는 분리한다. 연결자라는 사실만으로 공식 Reading 권한이나 다른 사람의 기록 열람권이 생기지 않는다.
 - Saju/Face에서 Character가 바꿀 수 있는 것은 **공인된 자료에 대한 질문 우선순위·전달 방식·개인적 목소리**뿐이다. 계산·소스 증거·민감정보·권한은 해당 제품의 상위 authority를 따른다.
 - 별도 `character-specific saju voice` / `face voice` 를 만들지 않는다. 공개된 Character content voice authority와 일치해야 한다.
 - 가족관계·직업·생활·연애사·서약은 Bible 소유, 세계 지명은 World 소유, 관계 사건은 Event Ledger 소유. Runtime은 검증된 facts를 선택해 표현하는 실행 계층이다.

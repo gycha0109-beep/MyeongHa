@@ -26,6 +26,9 @@ import {
   type OfficialReaderS6CiphertextIdentityWitnessV1,
   type OfficialReaderS7PreparedBindingWitnessV1,
 } from './official-reader-s6-ciphertext-s7-identity-v1.js';
+import {
+  inspectOfficialReaderS5S7ImmutableReplayV1,
+} from './official-reader-s5-s7-immutable-replay-v1.js';
 
 const SUBJECT = '66666666-6666-4666-8666-666666666666';
 const READING = '44444444-4444-4444-8444-444444444444';
@@ -602,5 +605,157 @@ describe('S6 encrypted identity witness pins Saju source to S5 and S7 exact mess
       s7PreparedBinding: delivery,
     });
     expect(forged).toMatchObject({ state: 'blocked', canPersist: false });
+  });
+});
+
+describe('S5 and S7 immutable replay of the same protected Official Reading', () => {
+  async function replayCase() {
+    const baseline = await input();
+    const originalS5Commit = baseline.s5Commit;
+    const originalS6Read = baseline.s6Read;
+    return {
+      readerAdmission: baseline.readerAdmission,
+      recordAuthorityPort: port(baseline.record, []),
+      sajuHandoff: handoff(baseline.readerAdmission),
+      s6CiphertextIdentity: ciphertextIdentity(
+        baseline.readerAdmission, originalS5Commit,
+      ),
+      originalS5Commit,
+      replayS5Commit: { ...originalS5Commit, replayed: true },
+      originalS6Read,
+      replayS6Read: {
+        ...originalS6Read,
+        delivery: { ...originalS6Read.delivery!, replayed: true },
+      },
+      originalS7Binding: deliveryBinding(
+        baseline.readerAdmission, originalS5Commit, originalS6Read,
+      ),
+      replayS7Binding: deliveryBinding(
+        baseline.readerAdmission, originalS5Commit, originalS6Read,
+      ),
+    };
+  }
+
+  it('recognizes a single immutable protected body, prepared delivery and client ACK replays without authorizing reuse', async () => {
+    const input = await replayCase();
+    const calls: string[] = [];
+    const result = await inspectOfficialReaderS5S7ImmutableReplayV1({
+      ...input,
+      recordAuthorityPort: port(await record(), calls),
+      originalS7Acknowledged: acknowledged(),
+      replayS7Acknowledged: { ...acknowledged(), replayed: true },
+    });
+    expect(result).toMatchObject({
+      state: 'held',
+      evidenceStage: 'S7_CLIENT_ACKNOWLEDGED_NOT_HUMAN_READ',
+      sourceAuthority: 'NOT_EVALUATED',
+      canPersist: false, canDisclose: false,
+      canPublish: false, canSell: false,
+    });
+    expect(calls).toEqual([SUBJECT + '/' + READING]);
+    expect(Object.isFrozen(result)).toBe(true);
+    const json = JSON.stringify(result);
+    for (const privateValue of [
+      SUBJECT, READING, BODY, DELIVERY_ATTEMPT, 'sha256:v1:', '확인된 구조적',
+    ]) expect(json).not.toContain(privateValue);
+
+    const pendingAck = await inspectOfficialReaderS5S7ImmutableReplayV1(input);
+    expect(pendingAck).toMatchObject({
+      state: 'held', evidenceStage: 'S7_RESPONSE_PREPARED',
+      canDisclose: false,
+    });
+  });
+
+  it('refuses altered S5 replay identity and mismatched immutable original commit timestamps', async () => {
+    const baseline = await replayCase();
+    const altered = [
+      { ...baseline.replayS5Commit, replayed: false },
+      { ...baseline.replayS5Commit, bodyId: '23232323-2323-4232-8232-232323232323' },
+      { ...baseline.replayS5Commit, safeMessageId: '23232323-2323-4232-8232-232323232323' },
+      { ...baseline.replayS5Commit, turnId: '23232323-2323-4232-8232-232323232323' },
+      { ...baseline.replayS5Commit, attemptId: '23232323-2323-4232-8232-232323232323' },
+      { ...baseline.replayS5Commit, committedAt: '2026-10-22T01:09:00Z' },
+    ];
+    for (const replayS5Commit of altered) {
+      const calls: string[] = [];
+      expect(await inspectOfficialReaderS5S7ImmutableReplayV1({
+        ...baseline,
+        recordAuthorityPort: port(await record(), calls),
+        replayS5Commit,
+      })).toMatchObject({ state: 'blocked', canPersist: false, canDisclose: false });
+      expect(calls).toHaveLength(0);
+    }
+  });
+
+  it('blocks a second delivery request, attempt, timestamp or a body/Reader swap even if the ACK appears correct', async () => {
+    const baseline = await replayCase();
+    const original = baseline.replayS6Read;
+    const prepared = original.delivery!;
+    const altered = [
+      { ...original, bodyId: '23232323-2323-4232-8232-232323232323' },
+      { ...original, officialReadingId: '23232323-2323-4232-8232-232323232323' },
+      { ...original, readerCharacterId: 'baekheon' },
+      { ...original, committedAt: '2026-10-22T01:05:00.000Z' },
+      { ...original, delivery: { ...prepared, replayed: false } },
+      { ...original, delivery: { ...prepared, deliveryRequestId: '23232323-2323-4232-8232-232323232323' } },
+      { ...original, delivery: { ...prepared, deliveryAttemptId: '23232323-2323-4232-8232-232323232323' } },
+      { ...original, delivery: { ...prepared, responsePreparedAt: '2026-10-22T01:05:00.000Z' } },
+    ];
+    for (const replayS6Read of altered) {
+      expect(await inspectOfficialReaderS5S7ImmutableReplayV1({
+        ...baseline,
+        replayS6Read,
+      })).toMatchObject({ state: 'blocked', canDisclose: false });
+    }
+    const bindingDrift = {
+      ...baseline.replayS7Binding,
+      deliveryRequestId: '23232323-2323-4232-8232-232323232323',
+    };
+    expect(await inspectOfficialReaderS5S7ImmutableReplayV1({
+      ...baseline, replayS7Binding: bindingDrift,
+    })).toMatchObject({ state: 'blocked', canDisclose: false });
+  });
+
+  it('does not equate a new ACK event with a replayed ACK and refuses changed replay acknowledgement', async () => {
+    const baseline = await replayCase();
+    const originalAck = acknowledged();
+    const cases = [
+      { originalS7Acknowledged: originalAck },
+      { replayS7Acknowledged: { ...originalAck, replayed: true } },
+      { originalS7Acknowledged: originalAck, replayS7Acknowledged: {
+        ...originalAck, replayed: false,
+      } },
+      { originalS7Acknowledged: originalAck, replayS7Acknowledged: {
+        ...originalAck, replayed: true, deliveryAttemptId: '23232323-2323-4232-8232-232323232323',
+      } },
+      { originalS7Acknowledged: originalAck, replayS7Acknowledged: {
+        ...originalAck, replayed: true, clientAcknowledgedAt: '2026-10-22T01:09:00Z',
+      } },
+    ];
+    for (const ack of cases) {
+      expect(await inspectOfficialReaderS5S7ImmutableReplayV1({
+        ...baseline, ...ack,
+      })).toMatchObject({ state: 'blocked', canDisclose: false });
+    }
+  });
+
+  it('fails closed after Records access revocation, forged S3 source or accidental inclusion of private body', async () => {
+    const baseline = await replayCase();
+    expect(await inspectOfficialReaderS5S7ImmutableReplayV1({
+      ...baseline,
+      recordAuthorityPort: { readRecord: async () => null },
+    })).toMatchObject({ state: 'blocked', canDisclose: false });
+    expect(await inspectOfficialReaderS5S7ImmutableReplayV1({
+      ...baseline,
+      sajuHandoff: { ...baseline.sajuHandoff, sourceAuthority: 'PRODUCTION_APPROVED' },
+    })).toMatchObject({ state: 'blocked', canDisclose: false });
+    const privateBodyLeak = {
+      ...baseline.replayS6Read,
+      body: 'protected body must not cross the boundary',
+    };
+    expect(await inspectOfficialReaderS5S7ImmutableReplayV1({
+      ...baseline,
+      replayS6Read: privateBodyLeak,
+    })).toMatchObject({ state: 'blocked', canDisclose: false });
   });
 });

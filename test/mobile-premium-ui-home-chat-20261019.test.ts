@@ -49,7 +49,7 @@ describe('premium mobile Home and character roster', () => {
     expect(hub).toContain("state.access === 'guest'");
     expect(hub).toContain("router.push('/my')");
     expect(hub).toContain('MOBILE_CHAT_PENDING_ROSTER_V1.map');
-    expect(hub).toContain('대리자 등록 중');
+    expect(hub).toContain('연결자 등록 중');
     expect(MOBILE_CHAT_PENDING_ROSTER_V1.map(x => x.characterId)).toEqual([
       'doyun', 'seorin', 'mira',
     ]);

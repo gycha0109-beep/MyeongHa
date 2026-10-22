@@ -40,6 +40,74 @@ async function withNodeSocket(
 }
 
 describe('R11 Node-owned bounded original Grant disclosure transport candidate', () => {
+  it.each([
+    {label: 'too short deadline', deadlineMs: 99},
+    {label: 'unbounded deadline', deadlineMs: 10_001},
+    {label: 'fractional deadline', deadlineMs: 150.5},
+    {label: 'non-finite deadline', deadlineMs: Number.POSITIVE_INFINITY},
+  ])('closes Node socket on $label before invoking DB authority', async ({deadlineMs}) => {
+    let destroyed = false;
+    let reads = 0;
+    const response = {
+      headersSent: false,
+      writableEnded: false,
+      destroyed: false,
+      destroy() { destroyed = true; },
+    } as unknown as ServerResponse;
+    await expect(sendSeyeonNodeOriginalGrantResponseV1({
+      response,
+      requestSignal: new AbortController().signal,
+      deadlineMs,
+      withLockedOriginalGrant: async () => { reads++; },
+    })).rejects.toThrow(/Invalid bounded send deadline/u);
+    expect(destroyed).toBe(true);
+    expect(reads).toBe(0);
+  });
+
+  it('closes Node socket on malformed server receipt metadata before DB authorization', async () => {
+    let destroyed = false;
+    let reads = 0;
+    const response = {
+      headersSent: false,
+      writableEnded: false,
+      destroyed: false,
+      destroy() { destroyed = true; },
+    } as unknown as ServerResponse;
+    await expect(sendSeyeonNodeOriginalGrantResponseV1({
+      response,
+      requestSignal: new AbortController().signal,
+      chatResponseMetadata: {
+        turnId: 'invalid',
+        assistantMessageId: '66666666-6666-4666-8666-666666666666',
+        sequenceNo: 2,
+        replayed: false,
+        requestId: 'g3-malformed-receipt',
+        serverTime: '2026-10-22T00:00:00.000Z',
+      },
+      withLockedOriginalGrant: async () => { reads++; },
+    })).rejects.toThrow(/canonical server-owned identifiers/u);
+    expect(destroyed).toBe(true);
+    expect(reads).toBe(0);
+  });
+
+  it('destroys an already-started response without a second protected send', async () => {
+    let destroyed = false;
+    let reads = 0;
+    const response = {
+      headersSent: true,
+      writableEnded: false,
+      destroyed: false,
+      destroy() { destroyed = true; },
+    } as unknown as ServerResponse;
+    await expect(sendSeyeonNodeOriginalGrantResponseV1({
+      response,
+      requestSignal: new AbortController().signal,
+      withLockedOriginalGrant: async () => { reads++; },
+    })).rejects.toThrow(/already started/u);
+    expect(destroyed).toBe(true);
+    expect(reads).toBe(0);
+  });
+
   it('authorized: transfers one non-streaming JSON body before releasing the lock callback', async () => {
     const events: string[] = [];
     await withNodeSocket(async response => {
