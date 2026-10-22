@@ -11,6 +11,12 @@ import type {
 export const OFFICIAL_READER_RESTORE_RECONCILIATION_VERSION_V1 =
   'official-reader-offprimary-restore-reconciliation-v1' as const;
 
+const ORDINARY_DERIVED_QUARANTINE_GUARD_INSTALLED_SQL = `
+select pg_catalog.to_regprocedure(
+  'public.internal_assert_official_reader_restored_ordinary_derivations_absent_v1(uuid)'
+) is not null as "installed"
+`;
+
 const REFUND_RESTORE_SQL = `
 select
   erased_row_count::text as "erasedRowCount",
@@ -37,6 +43,9 @@ export interface OfficialReaderOffPrimaryRestoreReconciliationResultV1 {
   readonly refundScopeKeysConfirmedDestroyed: number;
   readonly protectedRowsPhysicallyDeleted: number;
   readonly keysConfirmedDestroyed: number;
+  /** Refuse even to start tombstone replay on old DB migrations that lack
+   * the S4 ordinary Memory/Outbox restore quarantine fence. */
+  readonly ordinaryDerivedRestoreQuarantineGuardInstalled: true;
   /** This operation does NOT release broader P30D/S8 read serviceability. */
   readonly publicReaderServiceEnabled: false;
 }
@@ -76,6 +85,22 @@ export async function reconcileOfficialReaderProtectedBodiesAfterRestoreV1(input
       || !input.pool || !input.offPrimary
       || !input.offPrimary.restoreCatalog || !input.offPrimary.ledger
       || !input.offPrimary.scopeLedger || !input.offPrimary.keys) return fail();
+
+  // Abort BEFORE any DB erasure or off-primary DEK destruction when restored
+  // PostgreSQL lacks the forward-only S4 ordinary-derived quarantine guard.
+  // The 2200 migration atomically replaces both existing restore functions
+  // to invoke this same check within each exact Subject deletion transaction.
+  const guardInstalled=await executePostgresAccountDeletionWorkerTransactionV1({
+    pool:input.pool,
+    execute:async(client)=>{
+      const result=await client.query<{installed:unknown}>(
+        ORDINARY_DERIVED_QUARANTINE_GUARD_INSTALLED_SQL,
+      );
+      if(result.rows.length!==1 || result.rows[0]?.installed!==true) return fail();
+      return true as const;
+    },
+  });
+  if(guardInstalled!==true) return fail();
 
   // Replay refund-scope historical deletions FIRST. A later account delete
   // may cover OTHER paid rows; account tombstone physical erasure is the
@@ -192,6 +217,7 @@ export async function reconcileOfficialReaderProtectedBodiesAfterRestoreV1(input
     refundScopeTombstonesReplayed: refundFences.length,
     refundScopeRowsDeleted: refundDeleted,
     refundScopeKeysConfirmedDestroyed: refundKeysDestroyed,
+    ordinaryDerivedRestoreQuarantineGuardInstalled: true as const,
     publicReaderServiceEnabled: false as const,
   });
 }
