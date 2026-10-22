@@ -380,7 +380,7 @@ describe('Official Reading -> Reader Chat context composition', () => {
       );
 
       const context =
-        assemblePreparedCharacterStandardReadingRuntimeContextV1(plan);
+        await assemblePreparedCharacterStandardReadingRuntimeContextV1(plan);
       expect(context.characterId).toBe('baekheon');
       expect(context.saju?.readingRef).toBe(READING_ID);
       expect(context.saju?.protectedSegments.map((segment) => segment.text)).toEqual([
