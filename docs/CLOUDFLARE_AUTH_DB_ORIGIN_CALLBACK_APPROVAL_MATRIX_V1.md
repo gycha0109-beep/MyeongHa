@@ -95,3 +95,16 @@
 - 별도 사주 계산-only 응답 경계에서 JSON 외 응답, HTML/SSE MIME, 미승인 3xx Location, Set-Cookie, 2xx 빈 응답을 거부한다. 허용된 JSON 응답은 no-store와 보안 헤더를 강제하고 CORS 응답 헤더를 제거한다. 사주 계산을 정식 해석으로 승격하지 않는다.
 - Cloudflare static test 묶음에 기존 Auth admission 부정 테스트를 편입하고, 가짜 예외 및 부정 Saju 응답 테스트를 추가한다. 운영 호스트, Provider 등록, DB/OAuth/Secret, 유료 리소스, 결제, 세연 첫 Reveal을 활성화하지 않는다.
 - 로컬 코드·CI 증거와 실제 Cloudflare Workers TLS/RLS·OAuth/Preview HTTP E2E는 별개이며, 후자는 연결 환경 및 owner 기술 인수가 성립하기 전까지 HOLD.
+
+## 9. Stage 5 OAuth 콜백·TLS/RLS 독립 허용 조건 구현 (2026-10-22)
+
+- 기존 Ops Draft PR #2420의 `workers/cloudflare-auth-db-api.mjs`에서 **인증 Origin 승인**, **Worker→DB TLS/RLS 기술 승인**, **OAuth 공급자 콜백 등록 승인**을 각각 독립 확인한다. 세 값은 임의의 HTTP Host, `X-Forwarded-Host`, 브라우저 쿼리 또는 다른 트랙의 설정으로 유추하지 않는다.
+- 클라우드 Auth 공통 전제: `MYEONGHA_CLOUDFLARE_AUTH_DB_MODE=approved-auth-db-v1`과 `MYEONGHA_CLOUDFLARE_AUTH_ORIGIN=<승인된 정확한 HTTPS origin>`. 값은 실제 소유 FQDN이어야 하고, `*.workers.dev` / `*.vercel.app`을 긍정 인증 호스트로 승격시키지 않는다.
+- DB 별도 기술 수락: `MYEONGHA_CLOUDFLARE_DB_TLS_RLS_APPROVAL=approved-isolated-tls-rls-v1`. 빠지거나 다르면 모든 Stage 5 보호 API가 원래의 404 HOLD를 유지한다. 이 값은 DB 자격증명·네트워크 허용 또는 RLS 승인 자체를 생성하지 않으며, 실제 Cloudflare→격리 DB E2E 근거가 있어야만 운영자가 설정할 수 있다.
+- OAuth 콜백 소유자 별도 수락: `MYEONGHA_CLOUDFLARE_OAUTH_CALLBACK_ORIGIN=<승인된 정확한 HTTPS origin>`은 Auth origin과 **문자열 완전 동일**해야 한다. `/api/auth/social/start`, 네이버 authorize/callback/token/userinfo 및 social-complete 갱신 전 모두 확인한다. 실제 Provider/Supabase 리다이렉트 허용목록이 일치한다는 소유자 확인 전에는 설정하면 안 된다. 모바일 `myeongha://auth/callback`은 기존 계약 불변.
+- Naver authorize egress 302는 `https://nid.naver.com/oauth2.0/authorize`로만 보내며 `response_type=code`, `client_id`, `state`, `redirect_uri=<승인 origin>/api/auth/social/naver/callback` **네 가지 필드만** 허용한다. callback 302는 기존 Supabase `/auth/v1/callback`에서 `state`와 밀봉된 `code` **또는** `error=access_denied`만 허용한다. 중복 키·새 필드·잘못된 상태·다른 URL은 503/no-store로 봉인하고 OAuth 302에는 `Referrer-Policy: no-referrer`를 강제한다.
+- refresh 응답 `Set-Cookie`는 기존 `myeongha_member_refresh_v1` 하나만, `Path=/api/auth; HttpOnly; Secure; SameSite=Strict`이며 **Domain 없음**. 다른 Provider cookie, Host 이동 시 기존 Vercel 쿠키 자동 이전, 다중 쿠키, 완화된 SameSite는 거부한다. 수신 쿠키가 있다는 것만으로 로그인·DB·주체 소유권 승인으로 보지 않는다.
+- 실제 Auth/OAuth/DB 실행 전 `parseProductionUserDataRuntimeConfigV1`, 기존 비특권 DB 역할·rate-limit 설정과 `buildProductionNodePostgresPoolConfigV1`의 **고정 CA 지문·호스트 검증·verify-full/max=1 구성**을 네트워크 없이 미리 확인한다. 실패 시 고정 Auth 503, Secret/DSN/CA/호스트 오류 본문 노출 금지. 요청 처리용 pg Pool은 기존 실행 코드의 요청 스코프에서 닫으며, 별도 실제 Workers handshake 및 사용자 A/B RLS 실증을 완료한 것으로 취급하지 않는다.
+- `test/cloudflare-auth-admission.test.mjs`에서는 가짜 승인 Origin, 분리된 승인 변수 제거/오염, 원본 OAuth handler의 AES-GCM·PKCE authorize→callback **합성 체인**, Host spoof·callback query 오염, refresh cookie Domain/보안 속성 약화 거부를 검증한다. 외부 Naver/Supabase/PG 요청이나 사용자 데이터는 사용하지 않는다.
+
+**현행 HOLD:** Cloudflare Preview Worker에 이 새 승인 변수를 추가하거나 OAuth 공급자·Supabase callback·시크릿·운영 DB·Cloudflare DNS/유료 리소스를 변경하지 않았다. 테스트용 DB는 기존 지시대로 일회용 로컬 Docker/GitHub 러너에서만 유지하므로, 원격 Workers→직접 DB TLS/RLS 실제 연결에는 별도의 **접근 가능한 적법한 격리 DB target·Security/API/DB owner 기술 인수·호스트 소유 및 공급자 콜백 승인**이 필요하다. 이 미확정 항목을 임의의 공개 DB나 Production credential로 메우지 않는다.
