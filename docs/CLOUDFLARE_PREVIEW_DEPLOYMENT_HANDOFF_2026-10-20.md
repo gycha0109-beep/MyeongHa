@@ -98,3 +98,11 @@
 - `scripts/verify-cloudflare-vercel-standby.mjs`: 기존 `https://myeongha.vercel.app`의 **정확한 11개 정적 HTML 경로만** HTTPS GET, 200/HTML 형태, `vercel.json`의 5종 보안 헤더, 리다이렉트 및 응답 쿠키 부재를 검사한다. Cookie/Authorization/실사용자/DB/Reader/PortOne API 요청 없음. 실제 HTML 및 오류 원문은 수집·출력하지 않는다.
 - 기존 Cloudflare Preview 검사 Workflows에서 #2420 브랜치에 한해 현재 SHA, 이전 고유 Preview, Vercel 원본 정적 페이지의 **세 경로를 별도로 확인**한다. `test/cloudflare-vercel-standby.test.mjs`로 요청 범위와 인증정보 무전송, CSP/redirect/MIME/transport 실패를 격리된 모의 fetch로 검사한다.
 - 스테이징 Preview 이전 버전의 읽기 전용 검사와 Vercel 정적 서비스 응답은 **실제 Cloudflare mutable branch Preview rollback/redeploy나 운영 DNS failback 실행을 뜻하지 않는다**. Auth/DB·OAuth·Saju/Face/AI·결제 실서비스 연동은 계속 HOLD. 운영 인프라/Secret/비용 변경 없음.
+
+
+## 2026-10-22 단계 9 — 기존 Preview 이름에서만 실행 가능한 되돌림/재복원 스크립트
+
+- `scripts/local/rehearse-cloudflare-preview-rollback.mjs`를 추가. 기본 동작은 **DRY RUN**: 지정된 이전/복원 40자리 Git SHA, 기존 Ops Preview 전용 브랜치·Worker `myeongha`·`workers_dev=false`, clean worktree, 선조(ancestor) 커밋을 확인할 뿐 네트워크/Cloudflare를 변경하지 않는다. PR branch/ref 보존.
+- 명시적으로 `--apply --confirm-preview-only`인 경우에만 기존 프리뷰 `feat/ops/cloudflare-authdb-clean-snapshot-20261021` 이름으로 `wrangler@4.151.2 preview`를 이용해 *과거 소스 임시 worktree 빌드 → Preview 버전 재게시 → 정확한 SHA+58건 HTTP 계약 검증 → 최신 소스 임시 worktree 빌드·재게시 → SHA+HTTP 재검증* 순서를 수행하도록 구현. `wrangler deploy`/Production URL/운영 DNS/API 키 이관/유료 리소스 생성은 사용하지 않는다. 예외 발생 시 이전 프리뷰 게시가 완료된 경우에는 우선 복귀를 시도하며, 복귀 검증 실패를 절대로 PASS로 기록하지 않는다.
+- `test/cloudflare-preview-rollback.test.mjs`에 dry-run 기본값, 정확한 SHA 및 이중 확인 요구, 명령 범위 축소 회귀를 추가. **현재 세션에서는 이 스크립트의 --apply를 실행하지 않았으며 실제 mutable Preview 롤백/복귀는 미증명**. 실제 사용에는 인증된 로컬 Wrangler/기존 Preview 권한, 기동 가능한 Node24/git checkout 및 배포 중 다른 Cloudflare Builds 갱신 충돌 없음이 필요하다.
+- 이 스크립트는 인증·DB positive 활성화를 뜻하지 않으며 세연 첫/History/Replay 503, Commerce/PortOne HOLD, Vercel Production/DNS 변경 금지와 독립이다.
