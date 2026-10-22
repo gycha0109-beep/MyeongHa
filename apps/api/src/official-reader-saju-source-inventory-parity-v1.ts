@@ -1,6 +1,10 @@
 import { hashProtectedSajuTextV1 } from '../../../packages/domain/src/index.js';
 import type { PreparedOfficialReadingReaderAdmissionV1 } from './official-reading-reader-admission-v1.js';
-import type { OfficialReadingRecordV1 } from './official-reading-record-read.js';
+import {
+  getOfficialReadingRecord,
+  type OfficialReadingRecordReadAuthorityPortV1,
+  type OfficialReadingRecordV1,
+} from './official-reading-record-read.js';
 import { projectOfficialStandardReadingToProtectedCharacterSajuContextV1 } from './character-standard-reading-protected-context.js';
 import { compareOfficialReaderRecordsSourceV1 } from './official-reader-records-source-consistency-v1.js';
 import { hashSajuHeldSourceProofRequestV1 } from './saju-held-source-proof-verifier-v1.js';
@@ -175,6 +179,42 @@ export function preflightSajuReaderRecordsSourceInventoryParityV1(input: Readonl
     if (source.inventoryHash !== expectedInventoryHash) return BLOCKED;
 
     return decision(true);
+  } catch {
+    return BLOCKED;
+  }
+}
+
+
+/**
+ * Invoke the EXISTING Records owner-scoped DB read for the exact Reading
+ * already admitted by the Reader. No new query/GRANT/route is introduced.
+ * Caller must supply the currently authorized server-side Reader admission
+ * and existing Records authority port, not any browser-authored objects.
+ *
+ * Saju issuer and operational approvals are still missing, so success is HELD.
+ * Failure returns no Reading identity, raw source bytes or private body.
+ */
+export async function preflightSajuReaderAgainstCurrentRecordsV1(input: Readonly<{
+  readerAdmission: PreparedOfficialReadingReaderAdmissionV1;
+  recordAuthorityPort: OfficialReadingRecordReadAuthorityPortV1;
+  sajuHandoff: unknown;
+}>): Promise<OfficialReaderSajuSourceInventoryParityV1> {
+  try {
+    const scope = input.readerAdmission.scope;
+    const source = input.readerAdmission.source;
+    if (!scope || !source || !scope.subjectId
+      || scope.subjectId !== source.subjectId
+      || scope.readingId !== source.readingId) return BLOCKED;
+    const record = await getOfficialReadingRecord({
+      resolvedSubjectId: scope.subjectId,
+      readingId: scope.readingId,
+      authorityPort: input.recordAuthorityPort,
+    });
+    return preflightSajuReaderRecordsSourceInventoryParityV1({
+      readerAdmission: input.readerAdmission,
+      record,
+      sajuHandoff: input.sajuHandoff,
+    });
   } catch {
     return BLOCKED;
   }
