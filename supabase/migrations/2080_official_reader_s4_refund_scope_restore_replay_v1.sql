@@ -17,8 +17,9 @@ returns table (erased_row_count bigint,remaining_scope_row_count bigint)
 language plpgsql volatile security definer
 set search_path=pg_catalog,public
 as $reader_refund_restore$
-declare v_erased bigint;
-declare v_left bigint;
+declare
+  v_erased bigint;
+  v_left bigint;
 begin
   if p_job_id is null or p_subject_id is null or p_official_reading_id is null
      or p_external_fence_id is null or p_reader_character_id is null
