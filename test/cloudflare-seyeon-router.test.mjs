@@ -170,6 +170,10 @@ describe('S-CF2 actual Worker fetch boundary and no HTML fallback', () => {
       ['/api/memories?__myeongha_chat_open=1', 'GET'],
       ['/api/health?__MYEONGHA_CHAT_OPEN=1', 'GET'],
       ['/api/me?%5F_myeongha_chat_open=1', 'GET'],
+      ['/api/me?%255F_myeongha_chat_open=1', 'GET'],
+      ['/api/me?%25255F_myeongha_chat_open=1', 'GET'],
+      ['/api/auth/refresh?%255F%255Fmyeongha_chat_open=1', 'POST'],
+      ['/api/health?%25255F%25255Fmyeongha_chat_open=1', 'GET'],
       ['/index.html?__myeongha_chat_open=1', 'GET'],
       ['/api/auth/refresh?__myeongha_chat_thread_id=' + THREAD, 'POST'],
     ]) {
