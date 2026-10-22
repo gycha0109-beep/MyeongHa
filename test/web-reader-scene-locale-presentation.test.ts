@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { ReaderRuntimeClientErrorV1 } from '../apps/web/reader-runtime-client.js';
 import {
   projectReaderSceneLocalePresentationV1,
 } from '../apps/web/reader-scene-locale-presentation-v1.js';
@@ -97,6 +98,78 @@ describe('I18N-06 Reader Scene UI vs source language handoff', () => {
     ]);
     expect(client.readReaderScene).toHaveBeenCalledTimes(1);
     expect(states[0]?.state).toBe('loading');
+  });
+
+  it('takes a fresh UI-only locale snapshot on retry without modifying the original Reader source', async () => {
+    let uiLocale = 'ja-JP';
+    const client = {
+      readReaderScene: vi.fn()
+        .mockRejectedValueOnce(
+          new ReaderRuntimeClientErrorV1('READER_SERVICE_UNAVAILABLE', 'temporary', true),
+        )
+        .mockResolvedValueOnce(parseReaderSceneEnvelopeV1(source)),
+    };
+    const controller = createReaderSceneControllerV1({
+      client,
+      getUiLocale: () => uiLocale,
+      onState: vi.fn(),
+    });
+    const input = {
+      threadId: 'thread-same',
+      officialReadingId: source.officialReadingId,
+    };
+
+    expect((await controller.load(input)).state).toBe('retryable_error');
+    uiLocale = 'zh-TW';
+    const retried = await controller.retry();
+    expect(retried.state).toBe('ready');
+    if (retried.state !== 'ready') throw new Error('Expected original Reader response');
+    expect(retried.uiLocale).toBe('zh-TW');
+    expect(retried.localizedReaderOutput).toBe(false);
+    expect(retried.segments.map(segment => segment.text)).toEqual([
+      '원문 명리 해석입니다.', '확정적 결론이 아닙니다.',
+    ]);
+    expect(client.readReaderScene).toHaveBeenCalledTimes(2);
+    expect(client.readReaderScene.mock.calls[0]?.[0]).toMatchObject(input);
+    expect(client.readReaderScene.mock.calls[1]?.[0]).toMatchObject(input);
+    expect(client.readReaderScene.mock.calls[1]?.[0]).not.toHaveProperty('readerLocale');
+    expect(client.readReaderScene.mock.calls[1]?.[0]).not.toHaveProperty('readingLocale');
+  });
+
+  it('never replaces newer locale presentation with an older in-flight response', async () => {
+    let resolveOld!: (value: ReturnType<typeof parseReaderSceneEnvelopeV1>) => void;
+    const oldResponse = new Promise<ReturnType<typeof parseReaderSceneEnvelopeV1>>(
+      resolve => { resolveOld = resolve; },
+    );
+    let uiLocale = 'ja-JP';
+    const client = {
+      readReaderScene: vi.fn()
+        .mockReturnValueOnce(oldResponse)
+        .mockResolvedValueOnce(parseReaderSceneEnvelopeV1(source)),
+    };
+    const controller = createReaderSceneControllerV1({
+      client,
+      getUiLocale: () => uiLocale,
+      onState: vi.fn(),
+    });
+    const input = {
+      threadId: 'thread-same',
+      officialReadingId: source.officialReadingId,
+    };
+    const old = controller.load(input);
+    uiLocale = 'zh-TW';
+    const recent = await controller.load(input);
+    expect(recent.state).toBe('ready');
+    if (recent.state !== 'ready') throw new Error('Expected recent Reader response');
+    expect(recent.uiLocale).toBe('zh-TW');
+    resolveOld(parseReaderSceneEnvelopeV1(source));
+    const settledOld = await old;
+    expect(settledOld).toBe(recent);
+    expect(controller.getState()).toBe(recent);
+    expect(recent.segments.map(segment => segment.text)).toEqual([
+      '원문 명리 해석입니다.', '확정적 결론이 아닙니다.',
+    ]);
+    expect(client.readReaderScene).toHaveBeenCalledTimes(2);
   });
 
   it('does not treat UI locale or character display hints as output-language authorization', async () => {
