@@ -509,6 +509,99 @@ describe('S-CF2 actual Worker fetch boundary and no HTML fallback', () => {
     }
   });
 
+  it('never emits a body from Static Assets for HEAD, even if ASSETS supplies one', async () => {
+    const requests = [
+      ['/index.html', 'text/html'],
+      ['/assets/app.js', 'text/javascript'],
+      ['/assets/photo.png', 'image/png'],
+    ];
+    for (const [path, mime] of requests) {
+      const upstream = vi.fn(() => new Response(SECRET, {
+        status: 200,
+        headers: {
+          'Content-Type': mime,
+          'Content-Length': String(SECRET.length),
+          'Cache-Control': 'public, max-age=60',
+        },
+      }));
+      const request = new Request(ROOT + path, { method: 'HEAD' });
+      const held = await worker.fetch(request, { ASSETS: { fetch: upstream } });
+      expect(upstream).toHaveBeenCalledTimes(1);
+      expect(upstream.mock.calls[0][0].method).toBe('HEAD');
+      expect(held.status).toBe(200);
+      expect(held.body).toBeNull();
+      expect(await held.text()).toBe('');
+      expect(held.headers.get('content-type')).toBe(mime);
+      expect(held.headers.get('content-security-policy')).toContain("default-src 'self'");
+      expect(held.headers.get('x-content-type-options')).toBe('nosniff');
+      if (path === '/index.html') {
+        expect(held.headers.get('cache-control')).toBe('no-store');
+      } else {
+        expect(held.headers.get('cache-control')).toBe('public, max-age=60');
+      }
+    }
+  });
+
+  it('rejects invalid 200 Content-Range and HEAD 206 partial asset metadata', async () => {
+    for (const [method, status, headers] of [
+      ['GET', 200, {
+        'Content-Type': 'text/javascript', 'Content-Range': 'bytes 0-5/200',
+      }],
+      ['HEAD', 200, {
+        'Content-Type': 'text/javascript', 'Content-Range': 'bytes 0-5/200',
+      }],
+      ['HEAD', 206, {
+        'Content-Type': 'text/javascript', 'Content-Range': 'bytes 0-5/200',
+      }],
+    ]) {
+      const request = new Request(ROOT + '/assets/app.js', {
+        method, headers: { Range: 'bytes=0-5' },
+      });
+      const result = await worker.fetch(request, {
+        ASSETS: { fetch: () => new Response(SECRET, { status, headers }) },
+      });
+      expect(result.status, method + ' ' + status).toBe(404);
+      expect(result.headers.get('cache-control')).toBe('no-store');
+      expect(result.headers.get('location')).toBeNull();
+      expect(result.body).toBeNull();
+      expect(await result.text()).toBe('');
+    }
+  });
+
+  it('keeps conditional HEAD 304 empty and blocks HEAD API-to-assets fallthrough', async () => {
+    const validator = '"synthetic-cache-validator"';
+    const cached = await worker.fetch(
+      new Request(ROOT + '/assets/app.js', {
+        method: 'HEAD', headers: { 'If-None-Match': validator },
+      }),
+      { ASSETS: { fetch: () => new Response(null, {
+        status: 304, headers: {
+          ETag: validator, 'Cache-Control': 'public,max-age=180',
+        },
+      }) } },
+    );
+    expect(cached.status).toBe(304);
+    expect(cached.body).toBeNull();
+    expect(await cached.text()).toBe('');
+    expect(cached.headers.get('cache-control')).toBe('public,max-age=180');
+
+    const assets = vi.fn(() => new Response(SECRET, {
+      headers: { 'Content-Type': 'text/plain' },
+    }));
+    for (const path of [
+      '/api/health', '/api/me', '/api/chat/' + THREAD,
+      '/%61pi/chat/' + THREAD, '/api%2Fchat/' + THREAD,
+    ]) {
+      const response = await worker.fetch(new Request(ROOT + path, {
+        method: 'HEAD',
+      }), { ASSETS: { fetch: assets } });
+      expect([404, 405, 503]).toContain(response.status);
+      expect(response.headers.get('cache-control')).toBe('no-store');
+      expect(response.headers.get('location')).toBeNull();
+    }
+    expect(assets).not.toHaveBeenCalled();
+  });
+
   it('preserves approved HTML security headers and non-HTML cache behavior', async () => {
     const publicHtml = await worker.fetch(new Request(ROOT + '/index.html'), {
       ASSETS: { fetch: () => new Response('<html>public</html>', {
