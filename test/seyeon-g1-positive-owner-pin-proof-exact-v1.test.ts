@@ -120,7 +120,8 @@ describe('S3/G1 exact DB owner original Memory Pin receipt',()=>{
       return {...input,selectedSources:sources,selectedSourcesDigest:selectedDigest(sources)};
     }],
     ['missing original raw JSONB digest with recomputed hash',()=>{
-      const sources=[{...selectedSources[0]!,rawRecordPgDigest:undefined}];
+      const {rawRecordPgDigest: _excluded, ...withoutPgDigest}=selectedSources[0]!;
+      const sources=[withoutPgDigest];
       return {...input,selectedSources:sources,selectedSourcesDigest:selectedDigest(sources)};
     }],
     ['forged different projector with recomputed selection hash',()=>{
