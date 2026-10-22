@@ -97,7 +97,9 @@ export interface OfficialReaderOffPrimaryRestoreReconciliationResultV1 {
   readonly ordinaryDerivedOutboxReadFenceInstalled: true;
   /** Only the protected-body tombstone replay for listed, exact S4 fences
    * completed. It is NEVER an owner-approved full restore or service release. */
-  readonly restoreState: 'protected_body_tombstone_replay_only';
+  readonly restoreState:
+    | 'protected_body_tombstone_replay_only'
+    | 'no_protected_body_tombstones';
   readonly restoreCompletionApproved: false;
   readonly ordinaryRestoreConsumersEnabled: false;
   /** This operation does NOT release broader P30D/S8 read serviceability. */
@@ -394,7 +396,9 @@ export async function reconcileOfficialReaderProtectedBodiesAfterRestoreV1(input
     ordinaryDerivedRestoreQuarantineGuardInstalled: true as const,
     ordinaryDerivedRecordsReadFenceInstalled: true as const,
     ordinaryDerivedOutboxReadFenceInstalled: true as const,
-    restoreState: 'protected_body_tombstone_replay_only' as const,
+    restoreState: refundFences.length + fences.length > 0
+      ? 'protected_body_tombstone_replay_only' as const
+      : 'no_protected_body_tombstones' as const,
     restoreCompletionApproved: false as const,
     ordinaryRestoreConsumersEnabled: false as const,
     publicReaderServiceEnabled: false as const,
