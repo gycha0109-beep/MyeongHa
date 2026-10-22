@@ -17,6 +17,7 @@ export function ReadingDetailPage() {
       </section>
 
       <section className="reading-stage" data-reading-stage hidden aria-label="캐릭터와 함께 읽는 사주">
+        <p className="reading-source-language-notice" data-reading-source-language-notice role="note" aria-live="polite" hidden />
         <div className="reader-scene" data-reader-portrait role="img" aria-label="세연 사주 읽기 장면">
           <div className="reader-scene-art" aria-hidden="true">
             <span className="reader-orbit" />
@@ -63,8 +64,8 @@ export function ReadingDetailPage() {
             <section className="reading-block reading-block-primary">
               <span className="reading-block-icon" aria-hidden="true">✿</span>
               <div>
-                <h2 data-reading-step-title>지금 읽히는 흐름</h2>
-                <p data-reading-step-body>검증된 Product Reading 응답이 연결된 뒤 이 영역에 표시됩니다.</p>
+                <h2 data-reading-step-title data-reading-content>지금 읽히는 흐름</h2>
+                <p data-reading-step-body data-reading-content>검증된 Product Reading 응답이 연결된 뒤 이 영역에 표시됩니다.</p>
               </div>
             </section>
 
@@ -72,7 +73,7 @@ export function ReadingDetailPage() {
               <span className="reading-block-icon" aria-hidden="true">✿</span>
               <div>
                 <h2 data-reading-structure-title>이 흐름을 만드는 구조</h2>
-                <p data-reading-structure-body>확정된 구조적 근거와 적용 범위만 표시합니다.</p>
+                <p data-reading-structure-body data-reading-content>확정된 구조적 근거와 적용 범위만 표시합니다.</p>
               </div>
             </section>
 
