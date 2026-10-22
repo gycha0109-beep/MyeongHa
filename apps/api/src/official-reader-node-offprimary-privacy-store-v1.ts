@@ -385,6 +385,22 @@ export function createOfficialReaderNodeOffPrimaryStoreV1(
         if (!deniedSubject) return denied();
         fences.push(exact);
       }
+      // A crash can occur after the irreversible Subject deny tombstone is
+      // persisted but before its full body/key manifest is committed. That
+      // incomplete external write MUST block restore reconciliation rather
+      // than producing a false "all tombstones replayed" success.
+      const denyNames = entries.filter((name) =>
+        /^account-subject-deny-[0-9a-f]{64}\.json$/u.test(name));
+      for (const name of denyNames) {
+        const raw = await readSealed(ledgerRoot, name, ledgerSeal, name);
+        if (!raw || typeof raw !== 'object') return denied();
+        const record = raw as Record<string, unknown>;
+        if (record.type !== 'account-subject-deny-v1') return denied();
+        const subjectId = uuid(record.subjectId);
+        const deletionJobId = uuid(record.deletionJobId);
+        if (subjectDenyName(subjectId) !== name
+            || !seen.has(subjectId + ':' + deletionJobId)) return denied();
+      }
       return Object.freeze(fences);
     },
     async isSubjectTombstoned(subjectId) {
