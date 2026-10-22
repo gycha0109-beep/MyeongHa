@@ -281,6 +281,37 @@ export function isCloudflareStaticNotModifiedBoundV1(request, response) {
   }
 }
 
+// Only representation negotiation and cache/range validators may cross from
+// a browser to the internal public ASSETS binding. Credentials, user-specific
+// metadata and arbitrary query strings are never required to resolve static
+// files and must not become part of an ASSETS cache key or diagnostic record.
+const CLOUDFLARE_PUBLIC_ASSET_REQUEST_HEADERS_V1 = Object.freeze([
+  'accept', 'accept-encoding', 'accept-language',
+  'range', 'if-range', 'if-none-match', 'if-modified-since',
+]);
+
+export function publicCloudflareStaticAssetRequestV1(request) {
+  if (request.method !== 'GET' && request.method !== 'HEAD') {
+    throw new TypeError('Public Static Assets require GET or HEAD');
+  }
+  const url = new URL(request.url);
+  url.search = '';
+  url.hash = '';
+  const headers = new Headers();
+  for (const key of CLOUDFLARE_PUBLIC_ASSET_REQUEST_HEADERS_V1) {
+    const value = request.headers.get(key);
+    if (value !== null) headers.set(key, value);
+  }
+  // Preserve abort propagation. Manual redirect policy avoids following a
+  // forged ASSETS redirection before the final egress fence can deny it.
+  return new Request(url.href, {
+    method: request.method,
+    headers,
+    redirect: 'manual',
+    signal: request.signal,
+  });
+}
+
 export function fenceCloudflareStaticPreviewAssetResponseV1(candidate, request) {
   const denied = () => new Response(null, { status: 404, headers: BASE_HEADERS });
   try {
@@ -401,7 +432,8 @@ export default {
           return new Response(null, { status: 404, headers: BASE_HEADERS });
         }
         return fenceCloudflareStaticPreviewAssetResponseV1(
-          await bindings.ASSETS.fetch(request), request,
+          await bindings.ASSETS.fetch(publicCloudflareStaticAssetRequestV1(request)),
+          request,
         );
       } catch {
         return new Response(null, { status: 404, headers: BASE_HEADERS });
