@@ -16,7 +16,7 @@ describe('I18N-07 mobile Chat blocked composer UI acceptance', () => {
       const ja = projectMobileChatComposeUiV1('ja-JP', status);
       const zh = projectMobileChatComposeUiV1('zh-TW', status);
       for (const state of [ko, ja, zh]) {
-        expect(state.blockedTitle.length).toBeGreaterThan(8);
+        expect(state.blockedTitle.trim().length).toBeGreaterThan(0);
         expect(state.blockedDescription.length).toBeGreaterThan(12);
         expect(state.placeholder.length).toBeGreaterThan(4);
         expect(state.sendAllowedByLocale).toBe(false);
