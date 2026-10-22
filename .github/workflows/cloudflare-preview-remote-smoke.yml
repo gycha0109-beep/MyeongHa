@@ -56,3 +56,6 @@ jobs:
           CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
           MYEONGHA_CLOUDFLARE_PREVIEW_URL: https://59a14b13-myeongha.gycha0109.workers.dev
         run: node scripts/verify-cloudflare-preview-browser.mjs
+      - name: Verify existing Vercel Production static standby (GET only)
+        if: github.head_ref == 'feat/ops/cloudflare-authdb-clean-snapshot-20261021'
+        run: node scripts/verify-cloudflare-vercel-standby.mjs
