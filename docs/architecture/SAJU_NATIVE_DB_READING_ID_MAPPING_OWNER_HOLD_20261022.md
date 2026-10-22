@@ -38,3 +38,19 @@ Saju native Reading ID를 DB UUID로 바꿔 기록하거나 `responseBodyHash`�
 - 원문/명의·Subject 계산 데이터, 제공 범위, 원본 `generatedAt`, 추가 필드나 disclosure, fallback 상태, 출처 hash 중 어느 하나라도 다르면 BLOCKED. 일치하면 `reason=only_reading_id_payload_change_unattested`로 HELD만 반환한다.
 - **원래 Saju 응답이 Production 발급자에게서 왔다는 증거는 이 함수가 갖고 있지 않다.** 그러므로 source signature + normalized request/birth revision + DB transform의 Owner 승인·인가 영수증이 없으면 `canMapReadingId=false`, `canPersist/canDisclose/canPublish/canSell=false`가 변하지 않는다. 단지 내용 차이가 한 필드뿐이라는 사실로 Reader/Records 공식 권한을 열거나 S3 strict-ID 검사를 완화하지 않는다.
 - 원본 Response·해시·Subject 값은 서버 내부 입력 전용이다. 검사의 출력에는 민감한 식별자, 전문, SourceUnit, hash, 인증 서명이나 Reader 구매권을 포함하지 않는다.
+
+## S3 Preview 서명 전송 증명과 native-ID 전체 원본 결속 · 2026-10-22
+
+`apps/api/src/saju-held-transport-db-reading-handoff-v1.ts`는 **이미 있던** `verifySajuHeldSourceProofV1`의 HMAC·요청 정규화 digest·서버가 보관한 caller nonce·issuer/audience/keyId·유효 시간·공유 nonce 1회 선점 결과와, 위 `inspectSajuDbReadingIdOnlyResponseParityV1`를 동일 서버 내부 호출에서 결속한다.
+
+1. 인증된 서버에서 보관한 `expectedRequestBody`와 `expectedNonce`, 기존 신뢰 설정 및 **원래 Saju Preview proof envelope**를 그대로 입력한다. 사용자·브라우저가 전달한 `sajuHandoff`·nonce·sourceEnvelope를 인증 입력으로 직접 취급하지 않는다.
+2. HMAC/issuer/nonce/TTL 검증이 실패하면 Records SQL 조회 전에 즉시 `BLOCKED`. 성공 후에도 `verifiedSource`와 in-process SourceUnit handoff의 `snapshotId`, `interpretationRunId`, `registrySnapshotId`, `executionId`, `preparationId`, `selectionId`, `profileRef(id/version/contentHash)`, `evidenceBundleHash`, `readingId`, `responseId`, `responseBodyHash` 일치를 요구한다. 원래 Proof material은 변경하거나 재서명하지 않는다.
+3. 정확한 DB Reader의 Subject/Reading 범위로 기존 Records Owner `getOfficialReadingRecord`를 **한 번만** 실행한다. 그 결과를 native Saju 서명 envelope의 **실제 전체 응답 객체**와 비교하여 DB UUID를 native ID로 표시했을 때 다른 필드는 전부 동일한 경우만 `HELD`로 남긴다.
+4. 동일 nonce 두 번째 소비, 다른 요청/대상/서명, 프로필/Registry/Response ID 교환, DB 기록 접근 거부나 데이터 변조는 `BLOCKED`로 끝나며, 개인정보 본문·서명·nonce·해시·Reading ID는 결과 객체에 포함하지 않는다.
+5. `transportIntegrity=VERIFIED`는 **Preview 서버 간 메시지의 진위·무결성만** 의미한다. Production Source 의미/출시 권한이나 Saju native ID↔DB UUID 변환 인가는 절대 아니다. 결과 `sourceAuthority/mappingAuthority/privacyApproval/currentAccessAuthority=NOT_EVALUATED`, `canMapReadingId/canPersist/canDisclose/canPublish/canSell=false`, `s5AtomicStorage/s7Delivery=DB_OWNER_REQUIRED`를 고정한다.
+
+### 미완료 Owner 인수
+
+- Saju #2410 Production Source issuer 및 실 인증/키 정책·실행 권한·규칙 Registry, DB/Privacy #2301 Draft의 Subject/Birth Revision/저장 Response 변환 영수증·서버 비공개 nonce 저장·실 T2 보호 저장이 선행 조건이다.
+- 기존 #2456·#2459·#2461의 S5→S6→S7 연속성/재전송 검사와 본 함수의 결과를 사용자 화면이나 Commerce 증빙으로 공개하지 않는다. Reader/Records의 접근 권한 및 S7 ACK 유효성은 매 요청 별도 DB Owner 정본 검증에 의존한다.
+- 이 모듈은 운영 배포·새 HTTP/DB API·Production 발급·매핑 승인·실제 유료 원문 저장/재전송을 수행하지 않는다.
