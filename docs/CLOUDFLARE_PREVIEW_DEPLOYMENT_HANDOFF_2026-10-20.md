@@ -92,3 +92,9 @@
 - 구현은 기존 `.github/workflows/cloudflare-preview-remote-smoke.yml`에 분기된 **이전 배포 Preview smoke 2단계**를 추가한 것이다. 현재 Preview URL·기존 #2384 Stage 4 테스트·운영 Worker·DNS/DB/Auth 설정 변경 없음. **실제 Preview 롤백·복귀는 수행하지 않았다.** 이 작업은 복구 가능한 구 버전의 동작 증빙(READ-ONLY candidate rehearsal)이며, 실제 rollback 복구 성공과 구별해 별도 수락할 것.
 - 사용법: 새 SHA로 변경된 PR의 CI에서는 **현재 Preview 최신 SHA 검사**를 먼저 수행한 후, 위 과거 고유 배포 URL을 pinned SHA로 검사한다. 두 회귀 중 하나라도 실패하면 rollback readiness를 FAIL로 판단한다. 향후 고유 URL이 만료·삭제되면 임의 대체값을 추측하지 말고 Cloudflare 배포 메타데이터로 새 검증 후보를 확정한 뒤 명시적으로 변경할 것.
 - 비상 전환 기준: OAuth/DB TLS/권한 오류, 사고성 민감 본문, 예상 외 redirect/cookie, AI/결제 재실행 위험 발생 시 우선 해당 보호 라우트를 HOLD. 이후 Security/API/DB·운영 수락 범위를 좁혀 **Cloudflare Preview만** 승인된 이전 버전으로 재배포하고, 원래 버전 재배포까지 연속해서 검증한다. GitHub/Cloudflare mutation 승인·적절한 버전 아티팩트와 owner 인수 없이는 실제 배포 조작하지 않는다.
+
+## 2026-10-22 단계 9 — 원본 Vercel 정적 복구 경로 별도 실측
+
+- `scripts/verify-cloudflare-vercel-standby.mjs`: 기존 `https://myeongha.vercel.app`의 **정확한 11개 정적 HTML 경로만** HTTPS GET, 200/HTML 형태, `vercel.json`의 5종 보안 헤더, 리다이렉트 및 응답 쿠키 부재를 검사한다. Cookie/Authorization/실사용자/DB/Reader/PortOne API 요청 없음. 실제 HTML 및 오류 원문은 수집·출력하지 않는다.
+- 기존 Cloudflare Preview 검사 Workflows에서 #2420 브랜치에 한해 현재 SHA, 이전 고유 Preview, Vercel 원본 정적 페이지의 **세 경로를 별도로 확인**한다. `test/cloudflare-vercel-standby.test.mjs`로 요청 범위와 인증정보 무전송, CSP/redirect/MIME/transport 실패를 격리된 모의 fetch로 검사한다.
+- 스테이징 Preview 이전 버전의 읽기 전용 검사와 Vercel 정적 서비스 응답은 **실제 Cloudflare mutable branch Preview rollback/redeploy나 운영 DNS failback 실행을 뜻하지 않는다**. Auth/DB·OAuth·Saju/Face/AI·결제 실서비스 연동은 계속 HOLD. 운영 인프라/Secret/비용 변경 없음.
