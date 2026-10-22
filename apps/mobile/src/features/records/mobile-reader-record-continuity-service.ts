@@ -5,7 +5,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-
 const READER = /^[a-z][a-z0-9_-]{0,63}$/u;
 
 export type MobileReaderRecordContinuityStateV1 =
-  | Readonly<{ kind: 'held' | 'not_confirmed' }>
+  | Readonly<{ kind: 'held' | 'not_confirmed' | 'auth_required' }>
   | Readonly<{ kind: 'not_available' }>
   | Readonly<{ kind: 'existing_thread_candidate'; threadId: string }>;
 
@@ -47,6 +47,7 @@ export async function readMobileReaderRecordContinuityV1(input: Readonly<{
       },
       signal: input.signal,
     });
+    if (response.status === 401) return Object.freeze({ kind: 'auth_required' as const });
     if (response.status === 503) return Object.freeze({ kind: 'held' as const });
     if (response.status === 403 || response.status === 404) {
       return Object.freeze({ kind: 'not_confirmed' as const });
