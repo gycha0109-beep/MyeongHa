@@ -95,21 +95,27 @@ export function appendProtectedReaderChatRevealV1(card, input) {
       const deliveryRequestId = crypto.randomUUID();
       const readerPath = '/api/chat/' + encodeURIComponent(input.threadId)
         + '/paid-readings/' + encodeURIComponent(input.safeMessageId);
-      const response = await fetch(
-        '/api/chat/' + encodeURIComponent(input.threadId)
-          + '/paid-readings/' + encodeURIComponent(input.safeMessageId),
-        {
-          method: 'GET',
-          credentials: 'same-origin',
-          cache: 'no-store',
-          headers: {
-            Accept: 'application/json',
-            Authorization: 'Bearer ' + bearer.token,
-            'X-Reader-Delivery-Request-Id': deliveryRequestId,
-          },
-          signal: controller.signal,
-        },
-      );
+      let response;
+      for (let networkAttempt = 0; networkAttempt < 2; networkAttempt += 1) {
+        try {
+          response = await fetch(readerPath, {
+            method: 'GET',
+            credentials: 'same-origin',
+            cache: 'no-store',
+            headers: {
+              Accept: 'application/json',
+              Authorization: 'Bearer ' + bearer.token,
+              'X-Reader-Delivery-Request-Id': deliveryRequestId,
+            },
+            signal: controller.signal,
+          });
+          break;
+        } catch (error) {
+          if (controller.signal.aborted || networkAttempt === 1) throw error;
+          // A lost HTTP response may already have prepared an S7 record.
+          // Retrying with the SAME ID gets the original token/timestamp.
+        }
+      }
       if (expanded !== current || !card.isConnected) return;
       if (response.status === 401) invalidateMemberSession(bearer.token);
 
