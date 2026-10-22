@@ -4,6 +4,7 @@ import {describe,expect,it,vi} from 'vitest';
 import type {IdentityEvidenceVerificationPortV1} from '../apps/api/src/current-subject-profile-http.js';
 import {
   holdSeyeonCloudflareOpsRouterHandoffOfflineV1,
+  isSeyeonCloudflareProtectedIngressAliasV1,
   SEYEON_CLOUDFLARE_OPS_ROUTER_HANDOFF_OFFLINE_V1,
   type SeyeonCloudflareOpsRouteDispositionOfflineV1,
 } from '../apps/api/src/seyeon-cloudflare-ops-router-handoff-offline-v1.js';
@@ -42,6 +43,38 @@ async function sealed(response:Response|null):Promise<void>{
 }
 
 describe('S-CF2 unmounted Ops router handoff: no positive or HTML fallback',()=>{
+  it.each([
+    '/api/chat',
+    '/api/chat/'+T,
+    '/api/%63hat/'+T+'/turns',
+    '/api/%2563hat/'+T+'/turns',
+    '/api%2Fchat/'+T+'/turns',
+    '/api/CHAT/'+T+'/turns',
+    '/api/chat%2F'+T+'/turns',
+    '/api/chat%252F'+T+'/turns',
+    '/api/chat%00/'+T,
+    '/api/chat%GG/'+T,
+  ])('flags encoded protected Chat alias BEFORE the Worker API/asset router: %s',async path=>{
+    const v=auth();
+    const request=req(path);
+    expect(isSeyeonCloudflareProtectedIngressAliasV1(request)).toBe(true);
+    for(const disposition of ['other_api','static_asset'] as const){
+      await sealed(await run(request,disposition,v));
+    }
+    expect(v.verifyRequestIdentity).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    '/api/health',
+    '/api/auth/sign-in',
+    '/api/readings',
+    '/api/chatty',
+    '/api/characters',
+    '/index.html',
+  ])('never classifies an unrelated API or asset as a protected Chat alias: %s',path=>{
+    expect(isSeyeonCloudflareProtectedIngressAliasV1(req(path))).toBe(false);
+  });
+
   it('preserves Ops ownership and all release holds',()=>{
     expect(SEYEON_CLOUDFLARE_OPS_ROUTER_HANDOFF_OFFLINE_V1).toMatchObject({
       publicRouteMounted:false,opsWorkerRouterPresent:false,
