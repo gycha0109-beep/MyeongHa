@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
+import { projectMobileChatHistoryShellV1 } from '../apps/mobile/src/features/chat/mobile-chat-history-shell-locale-v1.js';
 
 async function source(path: string) {
   return readFile(new URL(`../${path}`, import.meta.url), 'utf8');
@@ -33,7 +34,15 @@ describe('mobile premium chat and Saju presentation', () => {
     expect(ui).toContain("theme === 'dark' ? styles.seyeonBubbleDark : styles.seyeonBubble");
     expect(ui).toContain('isSeyeonHistoryRevealHoldV1(snapshot)');
     expect(ui).toContain('SEYEON_HISTORY_REVEAL_HOLD');
-    expect(ui).toContain('개인정보 보호를 위한 서버 확인이 끝나지 않아');
+    expect(ui).toContain('{shell.holdDescription}');
+    expect(ui).toContain('isSeyeonHistoryRevealHoldV1(snapshot)');
+    expect(projectMobileChatHistoryShellV1('ko-KR').holdDescription)
+      .toContain('개인정보 보호를 위한 서버 확인이 끝나지 않아');
+    for (const locale of ['ja-JP', 'zh-TW'] as const) {
+      const copy = projectMobileChatHistoryShellV1(locale);
+      expect(copy.holdDescription.length).toBeGreaterThan(0);
+      expect(copy.privacyHoldBypassed).toBe(false);
+    }
     expect(ui).not.toContain('실시간 대화');
   });
 
