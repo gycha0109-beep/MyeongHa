@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import {
   handleCloudflareStaticPreviewRequest,
   isCloudflareStaticPreviewApiPath,
+  CLOUDFLARE_PUBLIC_HTML_PATHS_V1,
 } from '../workers/cloudflare-static-preview.mjs';
 import {
   tryHandleCloudflareApprovedSajuCalculationV1,
@@ -102,6 +103,14 @@ describe('Cloudflare static-only deployment boundary', () => {
       cwd: folder, expectedCommitSha: sha,
     });
     expect(cleared.entryCount).toBe(11);
+  });
+
+  it('keeps the Worker-first HTML allowlist pinned to the built 11-page inventory', () => {
+    expect([...CLOUDFLARE_PUBLIC_HTML_PATHS_V1].sort()).toEqual(
+      ['/', ...HTML_ENTRIES.map(entry => '/' + entry)].sort(),
+    );
+    expect(CLOUDFLARE_PUBLIC_HTML_PATHS_V1).not.toContain('/api');
+    expect(CLOUDFLARE_PUBLIC_HTML_PATHS_V1).not.toContain('/api/chat');
   });
 
   it('never returns a successful or streaming response for unported APIs', async () => {
