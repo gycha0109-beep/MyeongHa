@@ -259,10 +259,13 @@ export function approvedCloudflareAuthOriginV1(request, bindings) {
 }
 
 // Release both independently-owned resources even if the first close fails.
-export async function closeCloudflareAuthResourcesV1(runtime, memberRateLimitPool) {
+export async function closeCloudflareAuthResourcesV1(
+  runtime, memberRateLimitPool, subjectPool,
+) {
   let ok = true;
   try { await runtime?.close(); } catch { ok = false; }
   try { await memberRateLimitPool?.close(); } catch { ok = false; }
+  try { await subjectPool?.close(); } catch { ok = false; }
   return ok;
 }
 
@@ -313,6 +316,7 @@ export async function tryHandleCloudflareApprovedAuthV1(request, bindings, route
   // its sealed state and PKCE in the existing handler.
   if (request.method === 'POST' && !approvedCloudflareSameOriginPostV1(request, origin)) return denied();
 
+  let approvedDbConfig;
   try {
     // No socket opened: require the governed CA fingerprint, TLS verify-full
     // hostname target and request-scoped single-connection candidate BEFORE
@@ -327,6 +331,7 @@ export async function tryHandleCloudflareApprovedAuthV1(request, bindings, route
         tls.ssl === null || tls.ssl.rejectUnauthorized !== true) {
       return unavailable();
     }
+    approvedDbConfig = config;
   } catch {
     // Include neither CA, connection URL nor upstream exception in HTTP.
     return unavailable();
@@ -334,7 +339,17 @@ export async function tryHandleCloudflareApprovedAuthV1(request, bindings, route
 
   let runtime;
   let memberRateLimitPool;
+  let subjectPool;
   let result;
+  // Existing profile/birth runtimes already support server-owned pool
+  // injection. Cloudflare uses one request-owned connection cap instead of
+  // their Vercel default max=4, without changing the producer runtimes.
+  function createSubjectPool() {
+    subjectPool = createNodePostgresSubjectPoolV1(
+      approvedDbConfig, CLOUDFLARE_DIRECT_POSTGRES_CANDIDATE_LIMITS_V1,
+    );
+    return subjectPool;
+  }
   try {
     if (isGuestBootstrap) {
       runtime = createProductionGuestBootstrapHttpRuntimeV1({ env: bindings });
@@ -344,14 +359,18 @@ export async function tryHandleCloudflareApprovedAuthV1(request, bindings, route
         serverTime: new Date().toISOString(),
       });
     } else if (isMemberProfile) {
-      runtime = createProductionCurrentSubjectProfileRuntimeV1({ env: bindings });
+      runtime = createProductionCurrentSubjectProfileRuntimeV1({
+        env: bindings, pool: createSubjectPool(),
+      });
       result = await runtime.handleRequest({
         request,
         requestId: crypto.randomUUID(),
         serverTime: new Date().toISOString(),
       });
     } else if (isBirthCreate) {
-      runtime = createProductionBirthProfileCreateRuntimeV1({ env: bindings });
+      runtime = createProductionBirthProfileCreateRuntimeV1({
+        env: bindings, pool: createSubjectPool(),
+      });
       result = await runtime.handleRequest({
         request,
         requestId: crypto.randomUUID(),
@@ -360,7 +379,9 @@ export async function tryHandleCloudflareApprovedAuthV1(request, bindings, route
     } else if (isBirthRead) {
       // Existing HTTP handler accepts the public /api/birth-profiles/:id
       // path directly; do not translate or trust Vercel rewrite markers.
-      runtime = createProductionBirthProfileReadRuntimeV1({ env: bindings });
+      runtime = createProductionBirthProfileReadRuntimeV1({
+        env: bindings, pool: createSubjectPool(),
+      });
       result = await runtime.handleRequest({
         request,
         requestId: crypto.randomUUID(),
@@ -421,7 +442,9 @@ export async function tryHandleCloudflareApprovedAuthV1(request, bindings, route
   } catch {
     result = unavailable();
   }
-  if (!await closeCloudflareAuthResourcesV1(runtime, memberRateLimitPool)) return unavailable();
+  if (!await closeCloudflareAuthResourcesV1(
+    runtime, memberRateLimitPool, subjectPool,
+  )) return unavailable();
 
   // Final boundary applies to all approved Auth, Guest, Naver and profile
   // responses. Never forward an unexpected HTML 500, stream or redirect.
