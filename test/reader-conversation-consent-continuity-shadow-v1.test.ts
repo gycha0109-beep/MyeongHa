@@ -4,6 +4,9 @@ import {
   prepareReaderConversationConsentContinuityShadowV1 as prepare,
   ReaderConversationConsentContinuityHoldV1,
 } from '../apps/api/src/reader-conversation-consent-continuity-shadow-v1.js';
+import {
+  prepareReaderOrdinaryContinuityPlanV1 as preparePlan,
+} from '../apps/api/src/reader-conversation-ordinary-continuity-plan-v1.js';
 import type {
   ChatThreadRuntimeBindingReadAuthorityPortV1,
 } from '../apps/api/src/chat-thread-runtime-binding-read.js';
@@ -202,5 +205,94 @@ describe('RR-08 Reader consent continuity metadata only; no positive provider or
     expect(source).not.toContain('memory.contentJsonb.summary');
     expect(source).toContain('modelContextPinned: false');
     expect(source).toContain('permitsHttpReveal: false');
+  });
+});
+
+describe('RR-08 intent-conditioned Reader continuity plan (no fourth model)', () => {
+  it('routes ordinary conversation to current Reader consent metadata without Official Saju data', async () => {
+    const input = fixture();
+    const plan = await preparePlan({
+      userText: '오늘 있었던 얘기를 나누고 싶어.',
+      admittedDomain: 'wealth',
+      sourceAuthority: input,
+    });
+    expect(plan.mode).toBe('ordinary_source_candidate');
+    if (plan.mode !== 'ordinary_source_candidate') return;
+    expect(plan.intent.primaryIntent).toBe('ordinary');
+    expect(plan.source.consentMemoryRefs).toHaveLength(1);
+    expect(plan.officialReadingSourceRefs).toEqual([]);
+    expect(plan.approvedMemoryContent).toBeNull();
+    expect(plan.permitsModelInjection).toBe(false);
+    expect(plan.modelContextPinned).toBe(false);
+    expect(plan.permitsCommit).toBe(false);
+    expect(plan.permitsHttpReveal).toBe(false);
+    expect(plan.addedModelCalls).toBe(0);
+  });
+
+  it('routes concern to ordinary supportive source candidate without forced report narration', async () => {
+    const plan = await preparePlan({
+      userText: '요즘 일이 너무 힘들어서 이야기를 하고 싶어.',
+      admittedDomain: 'wealth',
+      sourceAuthority: fixture(),
+    });
+    expect(plan.mode).toBe('support_source_candidate');
+    expect(JSON.stringify(plan)).not.toContain(memory.contentJsonb.summary);
+  });
+
+  it('never reads personal sources for Official Reading or ambiguous questions', async () => {
+    const authority = fixture();
+    authority.threadBindingAuthorityPort.readRuntimeBinding = vi.fn(async () => {
+      throw Error('Official turn must not enter ordinary source collector.');
+    });
+    const official = await preparePlan({
+      userText: '방금 본 재물 해석을 짧게 요약해 주세요.',
+      admittedDomain: 'wealth',
+      sourceAuthority: authority,
+    });
+    expect(official).toMatchObject({
+      mode: 'hold', reason: 'OFFICIAL_READER_PATH_REQUIRED',
+    });
+    const uncertain = await preparePlan({
+      userText: '내년 재물운도 계산해 줘.',
+      admittedDomain: 'wealth',
+      sourceAuthority: authority,
+    });
+    expect(uncertain).toMatchObject({
+      mode: 'hold', reason: 'QUESTION_CLARIFICATION_REQUIRED',
+    });
+    expect(authority.threadBindingAuthorityPort.readRuntimeBinding).not.toHaveBeenCalled();
+  });
+
+  it('holds when risk flags coexist with ordinary/support intent; only existing Security gate may decide', async () => {
+    const authority = fixture();
+    authority.threadBindingAuthorityPort.readRuntimeBinding = vi.fn(async () => {
+      throw Error('Security gate must run before personal data access.');
+    });
+    const risky = await preparePlan({
+      userText: '요즘 우울해. 죽고 싶다는 생각이 들어.',
+      admittedDomain: 'wealth',
+      sourceAuthority: authority,
+    });
+    expect(risky).toMatchObject({
+      mode: 'hold', reason: 'SECURITY_GATE_PENDING',
+      intent: {primaryIntent: 'support'},
+    });
+    expect(authority.threadBindingAuthorityPort.readRuntimeBinding).not.toHaveBeenCalled();
+  });
+
+  it('fails closed if the current Reader is unavailable or a Grant is revoked', async () => {
+    const authority = fixture();
+    authority.memoryItemsAuthorityPort.readCurrentItems = vi.fn(async () => {
+      throw Error('PRIVATE_CONTENT_MUST_NOT_LEAK');
+    });
+    const result = await preparePlan({
+      userText: '오늘 있었던 일 얘기해줄게.',
+      admittedDomain: 'wealth',
+      sourceAuthority: authority,
+    });
+    expect(result).toMatchObject({
+      mode: 'hold', reason: 'CONSENT_SOURCE_UNAVAILABLE',
+    });
+    expect(JSON.stringify(result)).not.toContain('PRIVATE_CONTENT_MUST_NOT_LEAK');
   });
 });
