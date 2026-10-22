@@ -27,6 +27,21 @@ const NOT_RELEASED: ReaderSceneControllerStateV1 = Object.freeze({
 });
 
 /**
+ * Render-time gate. This is a visual stale-data barrier, NOT authorization.
+ * The transport and the server still validate every live Reader request.
+ */
+export function selectReaderSceneDisplayStateV1(
+  client: ReaderRuntimeClientV1,
+  key: string | null,
+  snapshot: DisplaySnapshot | null,
+): ReaderSceneControllerStateV1 {
+  if (!client.enabled) return NOT_RELEASED;
+  if (key === null) return IDLE;
+  if (snapshot?.client === client && snapshot.key === key) return snapshot.state;
+  return { state: 'loading', canRetry: false, generation: 0 };
+}
+
+/**
  * Integration seam for a future owner-approved Reader Scene entry.
  *
  * ownerBinding must be obtained through the existing server-owned Thread /
@@ -95,13 +110,7 @@ export function ReaderSceneBoundPanel({
 
   // Render-time masking is essential: effect cleanup is asynchronous relative
   // to a new React render, so a prior person's source must not flash even once.
-  const state: ReaderSceneControllerStateV1 = !client.enabled
-    ? NOT_RELEASED
-    : key === null
-      ? IDLE
-      : snapshot?.client === client && snapshot.key === key
-        ? snapshot.state
-        : { state: 'loading', canRetry: false, generation: 0 };
+  const state = selectReaderSceneDisplayStateV1(client, key, snapshot);
 
   return (
     <ReaderScenePanel
