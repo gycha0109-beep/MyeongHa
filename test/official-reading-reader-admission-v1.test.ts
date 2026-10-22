@@ -161,6 +161,9 @@ function fixtures(options: {
       CharacterStandardReadingArtifactAuthorityPortV1,
     productReaderEligibilityAuthorityPort: { readApprovedRule } satisfies
       ProductReaderEligibilityAuthorityPortV1,
+    currentVerifiedPurchaseAuthorityPort: {
+      assertCurrentVerifiedPurchase: vi.fn(async () => undefined),
+    },
   };
   return { input, events, readRuntimeBinding, readAccessibleReadings,
     readApprovedRule, readArtifactSource };
