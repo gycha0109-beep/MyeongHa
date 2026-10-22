@@ -26,6 +26,33 @@ function unavailable() {
   }, { status: 503, headers: SECURITY_HEADERS });
 }
 
+// Calculation-only egress must not transport Reading, HTML, redirects,
+// streaming event MIME or session mutations from a defective API handler.
+export function fenceCloudflareApprovedSajuResponseV1(candidate) {
+  if (!(candidate instanceof Response)) return unavailable();
+  if (candidate.status >= 300 && candidate.status < 400) return unavailable();
+  if (candidate.headers.has('location') || candidate.headers.has('set-cookie')) return unavailable();
+  if (candidate.status >= 200 && candidate.status < 300 && candidate.body === null) return unavailable();
+
+  if (candidate.body !== null) {
+    const contentType = candidate.headers.get('content-type')?.split(';')[0]?.trim().toLowerCase() ?? '';
+    const isJson = contentType === 'application/json' ||
+      (contentType.startsWith('application/') && contentType.endsWith('+json'));
+    if (!isJson) return unavailable();
+  }
+
+  const headers = new Headers(candidate.headers);
+  for (const key of [...headers.keys()]) {
+    if (key.toLowerCase().startsWith('access-control-')) headers.delete(key);
+  }
+  for (const [key, value] of Object.entries(SECURITY_HEADERS)) headers.set(key, value);
+  return new Response(candidate.body, {
+    status: candidate.status,
+    statusText: candidate.statusText,
+    headers,
+  });
+}
+
 async function bodyPresenceBoundRequest(request) {
   // The existing calculation ingress accepts no caller-selected calculation
   // payload. Its Vercel route similarly passes only a body-presence marker,
@@ -88,11 +115,5 @@ export async function tryHandleCloudflareApprovedSajuCalculationV1(request, bind
     return unavailable();
   }
 
-  const headers = new Headers(result.headers);
-  for (const [key, value] of Object.entries(SECURITY_HEADERS)) headers.set(key, value);
-  return new Response(result.body, {
-    status: result.status,
-    statusText: result.statusText,
-    headers,
-  });
+  return fenceCloudflareApprovedSajuResponseV1(result);
 }

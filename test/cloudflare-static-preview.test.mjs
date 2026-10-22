@@ -8,7 +8,10 @@ import {
   handleCloudflareStaticPreviewRequest,
   isCloudflareStaticPreviewApiPath,
 } from '../workers/cloudflare-static-preview.mjs';
-import { tryHandleCloudflareApprovedSajuCalculationV1 } from '../workers/cloudflare-saju-calculation.mjs';
+import {
+  tryHandleCloudflareApprovedSajuCalculationV1,
+  fenceCloudflareApprovedSajuResponseV1,
+} from '../workers/cloudflare-saju-calculation.mjs';
 import {
   renderCloudflareStaticHeaders,
   writeCloudflareStaticHeaders,
@@ -115,6 +118,46 @@ describe('Cloudflare static-only deployment boundary', () => {
     await writeFile(join(publicDir, '_headers'), '/*\n  X-Frame-Options: DENY\n');
     await expect(verifyCloudflareStaticArtifact({ cwd: folder })).rejects.toThrow();
   });
+  it('rejects Saju HTML, SSE, redirects, cookies and cross-origin response headers', async () => {
+    const good = fenceCloudflareApprovedSajuResponseV1(Response.json(
+      { ok: true, calculationOnly: true },
+      { headers: {
+        'Cache-Control': 'public, max-age=3600',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Credentials': 'true',
+      } },
+    ));
+    expect(good.status).toBe(200);
+    expect(await good.json()).toEqual({ ok: true, calculationOnly: true });
+    expect(good.headers.get('cache-control')).toBe('no-store');
+    expect(good.headers.get('access-control-allow-origin')).toBeNull();
+    expect(good.headers.get('access-control-allow-credentials')).toBeNull();
+
+    for (const candidate of [
+      new Response('<html>PRIVATE_DATA</html>', { headers: { 'Content-Type': 'text/html' } }),
+      new Response('data: PRIVATE_DATA', { headers: { 'Content-Type': 'text/event-stream' } }),
+      new Response('PRIVATE_DATA', { headers: { 'Content-Type': 'text/plain' } }),
+      new Response(null, { status: 302, headers: { Location: 'https://other.example.test' } }),
+      Response.json({ ok: true }, { headers: { 'Set-Cookie': 'test=private' } }),
+      Response.json({ ok: true }, { headers: { Location: '/login' } }),
+      new Response(null, { status: 204 }),
+    ]) {
+      const denied = fenceCloudflareApprovedSajuResponseV1(candidate);
+      expect(denied.status).toBe(503);
+      expect(denied.headers.get('cache-control')).toBe('no-store');
+      expect(denied.headers.get('location')).toBeNull();
+      expect(denied.headers.get('set-cookie')).toBeNull();
+      const body = await denied.text();
+      expect(body).not.toContain('PRIVATE_DATA');
+      expect(JSON.parse(body).error.code).toBe('SAJU_SERVICE_UNAVAILABLE');
+    }
+    const error = fenceCloudflareApprovedSajuResponseV1(Response.json(
+      { ok: false, error: { code: 'EXISTING_VALIDATION_ERROR' } }, { status: 422 },
+    ));
+    expect(error.status).toBe(422);
+    expect((await error.json()).error.code).toBe('EXISTING_VALIDATION_ERROR');
+  });
+
   it('requires independent Auth/DB and calculation-only approval before routing Saju', async () => {
     const route = { id: 'api.me.saju.calculation' };
     const origin = 'https://myeongha-cf.example.test';

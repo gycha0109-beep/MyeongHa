@@ -87,3 +87,11 @@
 - 네이버 authorize/callback은 기존 등록된 쿼리 필드만 허용하고 중복된 키, 임의의 rewrite marker, 성공(code)+실패(error) 혼합을 인증서·Secret 접근 전에 404로 거부한다. token/userinfo 엔드포인트는 query를 허용하지 않는다.
 - 기존 Naver 응답의 `Referrer-Policy: no-referrer`를 Worker 일반 헤더(`strict-origin-when-cross-origin`)보다 우선 보존하여 callback/state가 참조 URL로 누출될 가능성을 키우지 않는다.
 - 검사 내용은 URL의 형태만 판단한다. PKCE·AES-GCM 밀봉 state·OAuth provider 출처 검증의 기존 정본을 교체하지 않는다.
+
+
+## 8. 기존 단계 5/6 — Worker API 예외·사주 계산 응답 방벽 (2026-10-22)
+
+- 기존 세연 503 경계를 건드리지 않고, Cloudflare Worker의 Auth/DB/Saju 어댑터 예외가 최상위 fetch까지 새어나오더라도 고정 JSON 503/no-store로 봉인한다. 플랫폼 HTML 500 및 예외 본문 전달 금지.
+- 별도 사주 계산-only 응답 경계에서 JSON 외 응답, HTML/SSE MIME, 미승인 3xx Location, Set-Cookie, 2xx 빈 응답을 거부한다. 허용된 JSON 응답은 no-store와 보안 헤더를 강제하고 CORS 응답 헤더를 제거한다. 사주 계산을 정식 해석으로 승격하지 않는다.
+- Cloudflare static test 묶음에 기존 Auth admission 부정 테스트를 편입하고, 가짜 예외 및 부정 Saju 응답 테스트를 추가한다. 운영 호스트, Provider 등록, DB/OAuth/Secret, 유료 리소스, 결제, 세연 첫 Reveal을 활성화하지 않는다.
+- 로컬 코드·CI 증거와 실제 Cloudflare Workers TLS/RLS·OAuth/Preview HTTP E2E는 별개이며, 후자는 연결 환경 및 owner 기술 인수가 성립하기 전까지 HOLD.
