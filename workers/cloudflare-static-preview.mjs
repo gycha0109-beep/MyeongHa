@@ -170,6 +170,28 @@ export function isCloudflareStaticSingleByteRangeBoundV1(request, response) {
       return false;
     }
     if (start !== expectedStart || end !== expectedEnd) return false;
+    // If-Range only permits a partial response for the exact representation
+    // the client already has. Weak ETags never qualify as strong validators.
+    // A date qualifies only when Last-Modified is demonstrably strong: no
+    // ETag, an identical Last-Modified timestamp, and Date >= 60s later.
+    const ifRange = request.headers.get('if-range');
+    if (ifRange !== null) {
+      const responseTag = response.headers.get('etag');
+      if (ifRange.length > 4096) return false;
+      if (CLOUDFLARE_ENTITY_TAG_PATTERN_V1.test(ifRange)) {
+        if (ifRange.startsWith('W/') || responseTag !== ifRange) return false;
+      } else {
+        const requestedTime = parseCloudflareHttpDateV1(ifRange);
+        const lastModified = parseCloudflareHttpDateV1(
+          response.headers.get('last-modified'),
+        );
+        const responseDate = parseCloudflareHttpDateV1(response.headers.get('date'));
+        if (requestedTime === null || lastModified === null ||
+            responseDate === null || responseTag !== null ||
+            requestedTime !== lastModified ||
+            responseDate - lastModified < 60_000) return false;
+      }
+    }
     // A Content-Length mismatch can make a partial asset appear complete.
     const length = response.headers.get('content-length');
     if (length !== null) {
