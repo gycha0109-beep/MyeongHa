@@ -79,12 +79,34 @@ async function probe() {
     assert(denied.headers.get('access-control-allow-origin') === null, 'Health CORS accidentally enabled');
   }
 
-  for (const missing of ['/missing-page.html', '/api', '/api/readiness', '/api/readings', '/api/unknown', '/api/health?__myeongha_chat_open=1']) {
+  for (const missing of ['/missing-page.html', '/api', '/api/readiness', '/api/readings', '/api/unknown']) {
     const response = await assertHttpStatus(missing, 404);
     assert(response.headers.get('cache-control') === 'no-store', `${missing}: 404 must not be cached`);
     assert(response.headers.get('content-security-policy') === csp, `${missing}: deny CSP mismatch`);
     const body = await response.text();
     assert(!body.includes('<!doctype html>') && !body.includes('<html'), `${missing}: leaked SPA HTML`);
+  }
+
+  // S-CF2: actual workerd must intercept legacy Vercel Chat rewrite keys
+  // BEFORE Health/Auth/Records API dispatch, even on unrelated canonical paths.
+  // These are not trusted route selectors or permission to expose old data.
+  for (const path of [
+    '/api/health?__myeongha_chat_open=1',
+    '/api/me?__myeongha_chat_turn_send=1',
+    '/api/me?__myeongha_chat_thread_id=123e4567-e89b-42d3-a456-426614174000',
+    '/api/auth/refresh?__myeongha_chat_open=1',
+  ]) {
+    const denied = await assertHttpStatus(path, 503);
+    assert(denied.headers.get('cache-control') === 'no-store',
+      path + ': protected hold must not be cached');
+    assert(denied.headers.get('access-control-allow-origin') === null,
+      path + ': protected hold must not admit cross-origin requests');
+    assert(denied.headers.get('content-security-policy') === csp,
+      path + ': protected hold lost CSP');
+    const payload = await denied.json();
+    assert(payload?.ok === false &&
+      payload?.error?.code === 'SEYEON_FIRST_REVEAL_AUTHORITY_UNAVAILABLE',
+      path + ': forged Chat marker escaped fixed protected 503');
   }
 
   const malformed = await assertHttpStatus('/api/auth/sign-in', 404, {
