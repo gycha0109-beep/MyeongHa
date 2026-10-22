@@ -945,6 +945,7 @@ export async function runSeyeonProductionChatExecutionV1(
               threadId,
               turnId: receivedTurn.turnId,
               attemptId: attempt.attemptId,
+              userMessageId: receivedTurn.userMessageId,
               assistantMessageId,
               chatOutboxEventId,
               postTurnOutboxEventId,
