@@ -37,7 +37,7 @@ export function LandingPage() {
 
           <nav className="landing-nav" aria-label="대문 주요 메뉴">
             <a href="#world">세계관</a>
-            <a href="chat-hub.html">대리자들</a>
+            <a href="chat-hub.html">연결자들</a>
             <a href="#record-method">기록의 방식</a>
             <a href="#experience">이용 안내</a>
             <a href="my.html">로그인</a>
@@ -55,7 +55,7 @@ export function LandingPage() {
             <h1 className="landing-hero-title" id="landing-title">
               태어난 순간부터<br />
               적혀 있던 기록을,<br />
-              <em>대리자와 함께 읽습니다.</em>
+              <em>연결자와 함께 읽습니다.</em>
             </h1>
 
             <p className="landing-description">
@@ -67,7 +67,7 @@ export function LandingPage() {
               <a className="landing-secondary-cta" href="#experience"><span>세계관 둘러보기</span><span className="landing-play-icon" aria-hidden="true">▶</span></a>
             </div>
 
-            <div className="landing-ambassadors" aria-label="명하의 대리자 안내">
+            <div className="landing-ambassadors" aria-label="명하의 연결자 안내">
               <div className="landing-avatar-stack" aria-hidden="true">
                 <span className="landing-avatar landing-avatar-1">미</span>
                 <span className="landing-avatar landing-avatar-2">세</span>
@@ -75,7 +75,7 @@ export function LandingPage() {
                 <span className="landing-avatar landing-avatar-4">백</span>
                 <span className="landing-avatar landing-avatar-5">+</span>
               </div>
-              <p><strong>7명의 신의 대리자가</strong><br />당신의 이야기를 기다리고 있습니다.</p>
+              <p><strong>7명의 신의 연결자가</strong><br />당신의 이야기를 기다리고 있습니다.</p>
             </div>
           </div>
 
@@ -102,17 +102,17 @@ export function LandingPage() {
 
             <article className="landing-experience-card" id="record-method">
               <div className="landing-experience-icon" aria-hidden="true"><svg viewBox="0 0 48 48" role="img"><circle cx="12" cy="35" r="3" /><circle cx="23" cy="24" r="3" /><circle cx="36" cy="11" r="3" /><path d="m14 33 7-7m4-4 9-9" /></svg></div>
-              <div><h3>여러 관점으로 읽기</h3><p>다양한 분야의 대리자들이 각자의 관점으로 당신을 읽어줍니다.</p></div>
+              <div><h3>여러 관점으로 읽기</h3><p>다양한 분야의 연결자들이 각자의 관점으로 당신을 읽어줍니다.</p></div>
             </article>
 
             <article className="landing-experience-card">
               <div className="landing-experience-icon" aria-hidden="true"><svg viewBox="0 0 48 48" role="img"><path d="M7 11h25a7 7 0 0 1 7 7v8a7 7 0 0 1-7 7H19l-8 7v-7H7V11Z" /><path d="M14 21h1m7 0h1m7 0h1" /></svg></div>
-              <div><h3>대리자와 대화하기</h3><p>질문하고, 듣고, 더 깊이 이야기하며 당신만의 해석을 완성합니다.</p></div>
+              <div><h3>연결자와 대화하기</h3><p>질문하고, 듣고, 더 깊이 이야기하며 당신만의 해석을 완성합니다.</p></div>
             </article>
 
             <article className="landing-experience-card">
               <div className="landing-experience-icon" aria-hidden="true"><svg viewBox="0 0 48 48" role="img"><path d="M24 40c-3-8-3-16 0-29 3 13 3 21 0 29Z" /><path d="M23 39C15 35 10 30 7 21c9 3 14 8 17 16m1 2c8-4 13-9 16-18-9 3-14 8-17 16M22 40c-7 0-13-2-18-7 7-2 13-1 18 4m4 3c7 0 13-2 18-7-7-2-13-1-18 4" /></svg></div>
-              <div><h3>관계와 기록이 쌓이기</h3><p>대화와 기록이 쌓이며 당신과 대리자의 관계가 깊어집니다.</p></div>
+              <div><h3>관계와 기록이 쌓이기</h3><p>대화와 기록이 쌓이며 당신과 연결자의 관계가 깊어집니다.</p></div>
             </article>
           </div>
         </section>

@@ -44,31 +44,31 @@ const readerCatalog = {
   rahyeon: {
     name: '라현',
     hanja: '',
-    title: '대리자',
+    title: '연결자',
     intro: '표면적인 답보다, 당신이 실제로 흔들리는 지점부터 읽어보죠.',
   },
   mira: {
     name: '미라',
     hanja: '',
-    title: '대리자',
+    title: '연결자',
     intro: '과하게 의미 붙이지 말고, 지금 쓸 수 있는 정보부터 보죠.',
   },
   taegyeom: {
     name: '태겸',
     hanja: '',
-    title: '대리자',
+    title: '연결자',
     intro: '근거 없는 낙관은 빼겠습니다. 확인되는 구조부터 보죠.',
   },
   yunho: {
     name: '윤호',
     hanja: '',
-    title: '대리자',
+    title: '연결자',
     intro: '급하게 결론부터 내리지 않고, 구조와 시기를 차례대로 읽어보겠습니다.',
   },
   doyun: {
     name: '도윤',
     hanja: '',
-    title: '대리자',
+    title: '연결자',
     intro: '일단 재미없는 설명부터 길게 하진 않을게요. 지금 걸리는 부분부터 보죠.',
   },
 };

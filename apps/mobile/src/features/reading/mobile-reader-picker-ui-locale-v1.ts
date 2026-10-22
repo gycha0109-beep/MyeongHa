@@ -8,7 +8,7 @@ import { normalizeMobileUiLocale } from '../../ui/mobile-ui-copy.js';
 const COPY = Object.freeze({
   'ko-KR': Object.freeze({
     kicker: 'READER · 세연 프리뷰 장면',
-    portrait: '대리자 초상화',
+    portrait: '연결자 초상화',
     select: 'Reader 선택',
     close: '닫기',
     change: '변경',

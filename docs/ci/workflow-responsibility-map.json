@@ -344,14 +344,20 @@
       "mainMode": "one-shot-trigger",
       "workTrackAttribution": "commit-metadata"
     },
-    "seyeon-c08v-offline-once-pilot-v1.yml": {
-      "responsibility": "character-memory-offline-first-batch-mock-rehearsal",
+    "seyeon-c08-key2-pinned-recovery-real-v2.yml": {
+      "responsibility": "character-memory-bounded-real-model-evaluation",
       "prMode": "none",
       "mainMode": "one-shot-trigger",
       "workTrackAttribution": "commit-metadata"
     },
     "seyeon-c08u-eval-project-key-readiness-v1.yml": {
       "responsibility": "character-memory-eval-key-read-only-preflight",
+      "prMode": "none",
+      "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "commit-metadata"
+    },
+    "seyeon-c08v-offline-once-pilot-v1.yml": {
+      "responsibility": "character-memory-offline-first-batch-mock-rehearsal",
       "prMode": "none",
       "mainMode": "one-shot-trigger",
       "workTrackAttribution": "commit-metadata"
@@ -386,14 +392,128 @@
       "mainMode": "manual",
       "workTrackAttribution": "commit-metadata"
     },
+    "seyeon-live-dialogue-key2-first-pair-recovery-v2.yml": {
+      "responsibility": "character-memory-bounded-real-dialogue-e2e",
+      "prMode": "none",
+      "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "commit-metadata"
+    },
+    "seyeon-live-dialogue-key2-first-pair-v1.yml": {
+      "responsibility": "character-memory-bounded-real-dialogue-e2e",
+      "prMode": "none",
+      "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "commit-metadata"
+    },
+    "seyeon-live-dialogue-owner-key-first-pair-v1.yml": {
+      "responsibility": "character-memory-bounded-real-dialogue-e2e",
+      "prMode": "none",
+      "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "commit-metadata"
+    },
     "seyeon-model-eval-v1.yml": {
       "responsibility": "production-character-model-evaluation",
       "prMode": "none",
       "mainMode": "one-shot-trigger",
       "workTrackAttribution": "commit-metadata"
     },
+    "seyeon-n06-sub500-second-one-shot-v1.yml": {
+      "responsibility": "character-memory-user-approved-n06-second-paid-one-shot-corrected-18789-byte-terra-and-sub-krw500",
+      "prMode": "none",
+      "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "commit-metadata"
+    },
+    "seyeon-openrouter-429-readonly-diagnosis-v1.yml": {
+      "responsibility": "character-memory-openrouter-429-account-readonly-diagnosis",
+      "prMode": "none",
+      "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "commit-metadata"
+    },
+    "seyeon-openrouter-billing-readonly-v1.yml": {
+      "responsibility": "character-memory-readonly-external-usage-audit",
+      "prMode": "none",
+      "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "commit-metadata"
+    },
+    "seyeon-openrouter-glm53flash-paid-repair-three-call-n01-v1.yml": {
+      "responsibility": "character-memory-funded-glm53flash-repaired-import-one-shot-public-n01",
+      "prMode": "none",
+      "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "commit-metadata"
+    },
+    "seyeon-openrouter-glm53flash-paid-three-call-n01-v1.yml": {
+      "responsibility": "character-memory-funded-new-model-actual-3call-public-shadow",
+      "prMode": "none",
+      "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "commit-metadata"
+    },
+    "seyeon-openrouter-gptoss120b-three-call-n01-v1.yml": {
+      "responsibility": "character-memory-bounded-real-model-evaluation",
+      "prMode": "none",
+      "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "commit-metadata"
+    },
+    "seyeon-openrouter-nemotron-free-three-call-n01-v1.yml": {
+      "responsibility": "character-memory-bounded-free-model-public-shadow-evaluation",
+      "prMode": "none",
+      "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "commit-metadata"
+    },
+    "seyeon-openrouter-nemotron35-paid-three-call-n01-v1.yml": {
+      "responsibility": "character-memory-funded-low-cost-model-actual-3call-public-shadow",
+      "prMode": "none",
+      "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "commit-metadata"
+    },
+    "seyeon-openrouter-real-one-call-v1.yml": {
+      "responsibility": "character-memory-bounded-real-model-evaluation",
+      "prMode": "none",
+      "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "commit-metadata"
+    },
+    "seyeon-openrouter-three-call-first-turn-v1.yml": {
+      "responsibility": "character-memory-bounded-real-dialogue-e2e",
+      "prMode": "none",
+      "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "commit-metadata"
+    },
+    "seyeon-openrouter-three-call-n01-v1.yml": {
+      "responsibility": "character-memory-bounded-real-dialogue-e2e",
+      "prMode": "none",
+      "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "commit-metadata"
+    },
+    "seyeon-openrouter-xing-free-three-call-n01-v1.yml": {
+      "responsibility": "character-memory-free-model-exact-zdr-json-public-only-shadow",
+      "prMode": "none",
+      "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "commit-metadata"
+    },
+    "seyeon-openrouter-zdr-json-catalog-v1.yml": {
+      "responsibility": "character-memory-openrouter-zdr-json-public-provider-metadata-only",
+      "prMode": "none",
+      "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "commit-metadata"
+    },
     "seyeon-production-publication-v1.yml": {
       "responsibility": "production-character-publication",
+      "prMode": "none",
+      "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "commit-metadata"
+    },
+    "seyeon-terra-glm-quality-cap500-v1.yml": {
+      "responsibility": "character-memory-owner-approved-n06-real-model-quality-pair-luna1-terra2-vs-glm3-under-krw500",
+      "prMode": "none",
+      "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "commit-metadata"
+    },
+    "seyeon-terra-glm-quality-trio-one-shot-v1.yml": {
+      "responsibility": "character-memory-three-public-persona-synthetic-cases-terra-glm-owner-visible-comparison",
+      "prMode": "none",
+      "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "commit-metadata"
+    },
+    "seyeon-terra-glm-quality-trio-retry-v1.yml": {
+      "responsibility": "character-memory-approved-single-retry-after-zero-charge-pre-dispatch-failure",
       "prMode": "none",
       "mainMode": "one-shot-trigger",
       "workTrackAttribution": "commit-metadata"
@@ -427,114 +547,6 @@
       "prMode": "required-router",
       "mainMode": "none",
       "workTrackAttribution": "pr-metadata"
-    },
-    "seyeon-c08-key2-pinned-recovery-real-v2.yml": {
-      "responsibility": "character-memory-bounded-real-model-evaluation",
-      "prMode": "none",
-      "mainMode": "one-shot-trigger",
-      "workTrackAttribution": "commit-metadata"
-    },
-    "seyeon-live-dialogue-key2-first-pair-v1.yml": {
-      "responsibility": "character-memory-bounded-real-dialogue-e2e",
-      "prMode": "none",
-      "mainMode": "one-shot-trigger",
-      "workTrackAttribution": "commit-metadata"
-    },
-    "seyeon-live-dialogue-key2-first-pair-recovery-v2.yml": {
-      "responsibility": "character-memory-bounded-real-dialogue-e2e",
-      "prMode": "none",
-      "mainMode": "one-shot-trigger",
-      "workTrackAttribution": "commit-metadata"
-    },
-    "seyeon-live-dialogue-owner-key-first-pair-v1.yml": {
-      "responsibility": "character-memory-bounded-real-dialogue-e2e",
-      "prMode": "none",
-      "mainMode": "one-shot-trigger",
-      "workTrackAttribution": "commit-metadata"
-    },
-    "seyeon-openrouter-real-one-call-v1.yml": {
-      "responsibility": "character-memory-bounded-real-model-evaluation",
-      "prMode": "none",
-      "mainMode": "one-shot-trigger",
-      "workTrackAttribution": "commit-metadata"
-    },
-    "seyeon-openrouter-three-call-first-turn-v1.yml": {
-      "responsibility": "character-memory-bounded-real-dialogue-e2e",
-      "prMode": "none",
-      "mainMode": "one-shot-trigger",
-      "workTrackAttribution": "commit-metadata"
-    },
-    "seyeon-openrouter-three-call-n01-v1.yml": {
-      "responsibility": "character-memory-bounded-real-dialogue-e2e",
-      "prMode": "none",
-      "mainMode": "one-shot-trigger",
-      "workTrackAttribution": "commit-metadata"
-    },
-    "seyeon-openrouter-billing-readonly-v1.yml": {
-      "responsibility": "character-memory-readonly-external-usage-audit",
-      "prMode": "none",
-      "mainMode": "one-shot-trigger",
-      "workTrackAttribution": "commit-metadata"
-    },
-    "seyeon-openrouter-gptoss120b-three-call-n01-v1.yml": {
-      "responsibility": "character-memory-bounded-real-model-evaluation",
-      "prMode": "none",
-      "mainMode": "one-shot-trigger",
-      "workTrackAttribution": "commit-metadata"
-    },
-    "seyeon-openrouter-429-readonly-diagnosis-v1.yml": {
-      "responsibility": "character-memory-openrouter-429-account-readonly-diagnosis",
-      "prMode": "none",
-      "mainMode": "one-shot-trigger",
-      "workTrackAttribution": "commit-metadata"
-    },
-    "seyeon-openrouter-nemotron-free-three-call-n01-v1.yml": {
-      "responsibility": "character-memory-bounded-free-model-public-shadow-evaluation",
-      "prMode": "none",
-      "mainMode": "one-shot-trigger",
-      "workTrackAttribution": "commit-metadata"
-    },
-    "seyeon-openrouter-zdr-json-catalog-v1.yml": {
-      "responsibility": "character-memory-openrouter-zdr-json-public-provider-metadata-only",
-      "prMode": "none",
-      "mainMode": "one-shot-trigger",
-      "workTrackAttribution": "commit-metadata"
-    },
-    "seyeon-openrouter-xing-free-three-call-n01-v1.yml": {
-      "responsibility": "character-memory-free-model-exact-zdr-json-public-only-shadow",
-      "prMode": "none",
-      "mainMode": "one-shot-trigger",
-      "workTrackAttribution": "commit-metadata"
-    },
-    "seyeon-openrouter-nemotron35-paid-three-call-n01-v1.yml": {
-      "responsibility": "character-memory-funded-low-cost-model-actual-3call-public-shadow",
-      "prMode": "none",
-      "mainMode": "one-shot-trigger",
-      "workTrackAttribution": "commit-metadata"
-    },
-    "seyeon-openrouter-glm53flash-paid-three-call-n01-v1.yml": {
-      "responsibility": "character-memory-funded-new-model-actual-3call-public-shadow",
-      "prMode": "none",
-      "mainMode": "one-shot-trigger",
-      "workTrackAttribution": "commit-metadata"
-    },
-    "seyeon-openrouter-glm53flash-paid-repair-three-call-n01-v1.yml": {
-      "responsibility": "character-memory-funded-glm53flash-repaired-import-one-shot-public-n01",
-      "prMode": "none",
-      "mainMode": "one-shot-trigger",
-      "workTrackAttribution": "commit-metadata"
-    },
-    "seyeon-terra-glm-quality-trio-one-shot-v1.yml": {
-      "responsibility": "character-memory-three-public-persona-synthetic-cases-terra-glm-owner-visible-comparison",
-      "prMode": "none",
-      "mainMode": "one-shot-trigger",
-      "workTrackAttribution": "commit-metadata"
-    },
-    "seyeon-terra-glm-quality-trio-retry-v1.yml": {
-      "responsibility": "character-memory-approved-single-retry-after-zero-charge-pre-dispatch-failure",
-      "prMode": "none",
-      "mainMode": "one-shot-trigger",
-      "workTrackAttribution": "commit-metadata"
     }
   }
 }

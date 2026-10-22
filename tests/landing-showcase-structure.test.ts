@@ -14,10 +14,10 @@ describe('landing showcase structure', () => {
     const source = `${html}\n${page}`;
 
     expect(source).toContain('태어난 순간부터');
-    expect(source).toContain('대리자와 함께 읽습니다.');
+    expect(source).toContain('연결자와 함께 읽습니다.');
     expect(source).toContain('세계관 둘러보기');
     expect(source).toContain('landing-ambassadors');
-    expect(source).toContain('7명의 신의 대리자가');
+    expect(source).toContain('7명의 신의 연결자가');
     expect(source).toContain('landing-reading-preview');
     expect(source).toContain('명식은 하나,');
     expect(source).toContain('읽는 관계는 여러 갈래.');
@@ -25,7 +25,7 @@ describe('landing showcase structure', () => {
     expect(source).toContain('명하에서는 이런 경험을 할 수 있습니다');
     expect(source).toContain('나의 기록 열기');
     expect(source).toContain('여러 관점으로 읽기');
-    expect(source).toContain('대리자와 대화하기');
+    expect(source).toContain('연결자와 대화하기');
     expect(source).toContain('관계와 기록이 쌓이기');
   });
 
@@ -37,7 +37,7 @@ describe('landing showcase structure', () => {
     ]);
     const source = `${html}\n${page}`;
 
-    for (const label of ['세계관', '대리자들', '기록의 방식', '이용 안내', '로그인', '명하에 들어가기']) {
+    for (const label of ['세계관', '연결자들', '기록의 방식', '이용 안내', '로그인', '명하에 들어가기']) {
       expect(source).toContain(label);
     }
 
