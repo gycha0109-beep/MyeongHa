@@ -263,6 +263,7 @@ function appendCurrentReaderAccessControl(card, reading, readerCharacterId, auto
   const name = resolveCanonicalCharacterPresentationV1(readerCharacterId)?.name ?? '이 대리자';
   const controls = document.createElement('section');
   controls.className = 'records-reader-current-access';
+  controls.dataset.readerCharacterId = readerCharacterId;
   controls.setAttribute('aria-label', name + '의 현재 유료 해설·대화 접근 확인');
 
   const button = textElement('button', 'records-reader-current-action', name + ' 대화 권한 확인');
@@ -349,7 +350,9 @@ function renderPersistedReading(target, reading) {
       { href: handoffUrl, label: '저장된 풀이 열기 →' },
     );
     // Historical Reader provenance does not imply a current entitlement.
-    // Require an explicit server-side check per actual purchased Reader.
+    // Require an explicit server-side check per historically associated Reader.
+    card.append(textElement('p', 'records-reading-provenance-note',
+      '위 대리자 정보는 해설 이력이며 현재 이용권을 의미하지 않습니다.'));
     for (const readerId of new Set(reading.readerCharacterIds ?? [])) {
       appendCurrentReaderAccessControl(card, reading, readerId);
     }
@@ -443,13 +446,19 @@ function renderSajuReadings(readingPayload, lifeFactsPayload) {
         if (highlight) {
           highlight.classList.add('records-reading-card--purchase-entry');
           const note = textElement('p', 'records-reading-purchase-note',
-            '구매 후 연결된 공식 Reading 기록입니다. 유료 Reader 요약·대화 권한은 별도로 확인해야 합니다.');
+            '요청하신 공식 사주 기록입니다. 진입 링크의 구매 정보는 이용권이 아니며, Reader 대화 권한은 서버가 다시 확인합니다.');
           highlight.prepend(note);
-          appendCurrentReaderAccessControl(highlight, selected, entry.readerCharacterId, true);
+          const existing = [...highlight.querySelectorAll('.records-reader-current-access')]
+            .find(section => section.dataset.readerCharacterId === entry.readerCharacterId);
+          if (existing) {
+            existing.querySelector('button')?.click();
+          } else {
+            appendCurrentReaderAccessControl(highlight, selected, entry.readerCharacterId, true);
+          }
         }
       } else {
         const info = textElement('p', 'records-reader-entry-note',
-          '구매 후 요청한 공식 Reading이 현재 계정의 기록에서 확인되지 않습니다. 결제 완료 화면만으로 보고서나 Reader 이용권을 확정하지 않습니다.');
+          '요청하신 공식 Reading이 현재 계정의 기록에서 확인되지 않습니다. 진입 링크만으로 보고서 소유권이나 Reader 이용권을 확정하지 않습니다.');
         target.prepend(info);
       }
     }
