@@ -27,10 +27,10 @@ if "--scan" in __import__("sys").argv:
     head = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
     tree = subprocess.check_output(["git", "rev-parse", "HEAD^{tree}"], text=True).strip()
     modes = {}
-    for record in subprocess.check_output(["git", "ls-files", "-s", "-z"]).split(b"\\0"):
+    for record in subprocess.check_output(["git", "ls-files", "-s", "-z"]).split(b"\0"):
         if not record:
             continue
-        metadata, raw_path = record.split(b"\\t", 1)
+        metadata, raw_path = record.split(b"\t", 1)
         modes[os.fsdecode(raw_path)] = metadata.decode().split(" ", 1)[0]
     print("TERM_HEAD|" + head, flush=True)
     print("TERM_TREE|" + tree, flush=True)
@@ -47,7 +47,7 @@ if "--scan" in __import__("sys").argv:
         n = data.count(old_bytes)
         if not n:
             continue
-        if b"\\0" in data or data.startswith((b"\\xff\\xfe", b"\\xfe\\xff")):
+        if b"\0" in data or data.startswith((b"\xff\xfe", b"\xfe\xff")):
             print("TERM_BINARY|" + json.dumps(name, ensure_ascii=True), flush=True)
             counts["binary"] += 1
             continue
