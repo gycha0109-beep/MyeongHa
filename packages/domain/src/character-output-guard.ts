@@ -243,6 +243,26 @@ function assertReadingPublicTrustLanguage(
 }
 
 /**
+ * Provider-generated framing is not an official Saju source.
+ * Reject only explicit, high-certainty fortune claims here; broader semantic
+ * preservation still belongs to the source-backed Saju guard.
+ */
+function assertNoUnauthoritativeSajuCertainty(
+  framing: string | null,
+  path: string,
+): void {
+  if (framing === null) return;
+  const text = framing.normalize('NFKC');
+  const positiveSajuAssertion =
+    /(?:사주|명식|팔자|운세|대운|세운)(?:가|는|에서|상|에\s*따르면|를\s*보면)[^.!?\n]{0,100}(?:확정(?:했(?:습니다|어요|다)|합(?:니다)?|된(?:다|다고)|됐(?:다|습니다))|보장(?:합(?:니다)?|해요|됩(?:니다|다))|반드시\s*(?:성공|실패|합격|결혼|부자)|100\s*%\s*(?:성공|실패|합격|보장))/u;
+  if (positiveSajuAssertion.test(text)) {
+    throw new CharacterOutputGuardError(
+      path + ' asserts unsupported authoritative Saju certainty outside protected source.',
+    );
+  }
+}
+
+/**
  * The same bounded Character cosmetic-output policy applies to official Reader
  * V2, but only with a server-minted, source-attested Grounding V2 context.
  *
@@ -286,6 +306,9 @@ export function guardCharacterRendererOutput(input: {
 
   const framingBefore = optionalBoundedText(input.rawOutput.framingBefore, 'framingBefore');
   const framingAfter = optionalBoundedText(input.rawOutput.framingAfter, 'framingAfter');
+
+  assertNoUnauthoritativeSajuCertainty(framingBefore, 'framingBefore');
+  assertNoUnauthoritativeSajuCertainty(framingAfter, 'framingAfter');
 
   if (input.context.saju !== null) {
     assertReadingPublicTrustLanguage(framingBefore, 'framingBefore');
