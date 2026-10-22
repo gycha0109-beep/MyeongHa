@@ -16,6 +16,8 @@ import {
 } from './official-reader-private-s3-source-binding-v1.js';
 import {
   assertOfficialReaderPrivateCurrentVerifiedPurchaseV1,
+  createOfficialReaderPrivateCurrentPurchaseAuthorityPortV1,
+  type OfficialReaderPrivateCurrentPurchaseAuthorityPortV1,
 } from './official-reader-private-exact-verified-purchase-guard-v1.js';
 import {
   executePostgresSubjectTransactionV1,
@@ -151,6 +153,7 @@ export async function commitPrivateOfficialReaderPaidAnswerV1(input: {
   readonly prepareFreshAdmission: (
     scope: PostgresSubjectExecutionScopeV1,
     effectiveAt: string,
+    currentVerifiedPurchaseAuthorityPort: OfficialReaderPrivateCurrentPurchaseAuthorityPortV1,
   ) => Promise<PreparedOfficialReadingReaderAdmissionV1>;
 }): Promise<PrivateOfficialReaderPaidAnswerCommittedV1> {
   try {
@@ -177,7 +180,10 @@ export async function commitPrivateOfficialReaderPaidAnswerV1(input: {
       verifiedEvidence: input.verifiedEvidence,
       execute: async (scope) => {
         const effectiveAt = await databaseClock(scope);
-        const current = await input.prepareFreshAdmission(scope, effectiveAt);
+        const current = await input.prepareFreshAdmission(
+          scope,effectiveAt,
+          createOfficialReaderPrivateCurrentPurchaseAuthorityPortV1(scope),
+        );
         if (current.scope.subjectId !== scope.resolvedSubject.subjectId
             || current.scope.effectiveAt !== effectiveAt
             || original.subjectId !== scope.resolvedSubject.subjectId) {
