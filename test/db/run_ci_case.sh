@@ -83,7 +83,7 @@ apply_pg17_migrations_through_seyeon_production_frontier() {
             20261021180000_seyeon_positive_pre_model_source_pin_v1.sql)
               reviewed_positive_sha1='6494daf8d0d76ff8994098a873b63dbec7e7a393' ;;
             20261021181000_seyeon_positive_same_transaction_commit_v1.sql)
-              reviewed_positive_sha1='b6fe5892157f6edceaa610ddfa5cf0d06816fa93' ;;
+              reviewed_positive_sha1='6a9c348cc3e64c45a169fa5ea4107dbb5d477c05' ;;
             20261021182000_seyeon_private_conversation_recall_proposal_accept_v1.sql)
               reviewed_positive_sha1='2c0a52b61daf27723da3012df0cf58313b4d652d' ;;
             20261021183000_seyeon_positive_first_memory_locked_reveal_v1.sql)
