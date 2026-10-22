@@ -29,6 +29,8 @@ export function ChatReadHeader({
 }) {
   const styles = useMobileThemedStyles(staticStyles);
   const { theme } = useMobileTheme();
+  const { locale } = useMobileUiLocale();
+  const shell = projectMobileChatHistoryShellV1(locale);
   const character = snapshot.characterId === null
     ? null
     : MOBILE_CHAT_KNOWN_CHARACTERS_V1.find(
@@ -37,12 +39,12 @@ export function ChatReadHeader({
   const presentation = character === null
     ? null
     : resolveMobileChatCharacterPresentationV1(character.characterId);
-  const displayName = character?.displayName ?? '대화 상대';
+  const displayName = character?.displayName ?? shell.headerUnknownParticipant;
   const portrait = resolveMobileChatPortraitV1(snapshot.characterId);
   const isSeyeonTheme = snapshot.characterId === 'seyeon';
   const meta = presentation === null
-    ? '서버가 확인한 대화방'
-    : `${presentation.title} · 대화 기록`;
+    ? shell.headerVerifiedRoom
+    : `${presentation.title} · ${shell.headerHistoryLabel}`;
 
   return (
     <View style={[styles.headerCard, isSeyeonTheme && (theme === 'dark' ? styles.seyeonSurfaceDark : styles.seyeonSurface)]}>
@@ -56,7 +58,7 @@ export function ChatReadHeader({
             source={portrait}
             style={styles.avatarPortrait}
             resizeMode="cover"
-            accessibilityLabel={`${displayName} 연결자 초상화`}
+            accessibilityLabel={`${displayName} ${shell.headerPortrait}`}
           />
         )}
       </View>
