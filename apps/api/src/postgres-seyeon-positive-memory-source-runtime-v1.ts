@@ -80,7 +80,7 @@ function receiptText(value:unknown):string{
 }
 function receiptNumber(value:unknown):number{
   const n=typeof value==='number'?value:typeof value==='string'?Number(value):NaN;
-  if(!Number.isSafeInteger(n)||n<0)throw Error('Se-yeon DB Commit sequence malformed');
+  if(!Number.isSafeInteger(n)||n<1)throw Error('Se-yeon DB Commit sequence malformed');
   return n;
 }
 
