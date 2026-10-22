@@ -5,6 +5,7 @@ import {
   MOBILE_READER_PRESENTATIONS_V1,
   findMobileReaderPresentationV1,
 } from '../apps/mobile/src/features/reading/mobile-reader-presentation.js';
+import { projectMobileReaderPickerUiV1 } from '../apps/mobile/src/features/reading/mobile-reader-picker-ui-locale-v1.js';
 
 const source = (p: string) =>
   readFile(new URL('../' + p, import.meta.url), 'utf8');
@@ -44,10 +45,12 @@ describe('mobile Saju and Face Reader presentation parity', () => {
     expect(face).toContain('<MobileReaderPicker');
     expect(face).toContain('vertical="face"');
     expect(face).toContain('disabled\n        style={styles.primaryDisabled}');
-    expect(picker).toContain('해석 근거와 내용은 변경되지 않습니다.');
-    expect(picker).toContain('사진 분석과 Reader 풀이는 아직 열리지 않았습니다.');
+    expect(picker).toContain("vertical === 'saju' ? ui.saju : ui.face");
+    expect(projectMobileReaderPickerUiV1('ko-KR').saju).toContain('해석 근거와 내용은 변경되지 않습니다.');
+    expect(projectMobileReaderPickerUiV1('ko-KR').face).toContain('사진 분석과 Reader 풀이는 아직 열리지 않았습니다.');
     expect(picker).toContain('disabled={!available}');
-    expect(picker).toContain('현재 세연만 프리뷰 장면을 선택할 수 있으며');
+    expect(picker).toContain('{ui.selectionLimit}');
+    expect(projectMobileReaderPickerUiV1('ko-KR').selectionLimit).toContain('현재 세연만 프리뷰 장면을 선택할 수 있으며');
   });
 
   it('does not promote a Reader pick into an artificial server identity', async () => {
