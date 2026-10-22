@@ -165,24 +165,35 @@ export function appendProtectedReaderChatRevealV1(card, input) {
 
       let acknowledged = false;
       try {
-        const ackResponse = await fetch(readerPath + '/ack', {
-          method: 'POST',
-          credentials: 'same-origin',
-          cache: 'no-store',
-          headers: {
-            Accept: 'application/json',
-            'Content-Type': 'application/json',
-            Authorization: 'Bearer ' + bearer.token,
-            'X-Reader-Delivery-Ack': '1',
-          },
-          body: JSON.stringify({
-            schemaVersion: DELIVERY_CONTRACT,
-            deliveryRequestId,
-            deliveryAttemptId: data.delivery.deliveryAttemptId,
-            acknowledgementToken: data.delivery.acknowledgementToken,
-          }),
-          signal: controller.signal,
+        let ackResponse;
+        const acknowledgementBody = JSON.stringify({
+          schemaVersion: DELIVERY_CONTRACT,
+          deliveryRequestId,
+          deliveryAttemptId: data.delivery.deliveryAttemptId,
+          acknowledgementToken: data.delivery.acknowledgementToken,
         });
+        for (let networkAttempt = 0; networkAttempt < 2; networkAttempt += 1) {
+          try {
+            ackResponse = await fetch(readerPath + '/ack', {
+              method: 'POST',
+              credentials: 'same-origin',
+              cache: 'no-store',
+              headers: {
+                Accept: 'application/json',
+                'Content-Type': 'application/json',
+                Authorization: 'Bearer ' + bearer.token,
+                'X-Reader-Delivery-Ack': '1',
+              },
+              body: acknowledgementBody,
+              signal: controller.signal,
+            });
+            break;
+          } catch (error) {
+            if (controller.signal.aborted || networkAttempt === 1) throw error;
+            // ACK response loss is ambiguous. Replaying exactly the same
+            // token cannot rewrite the original client-acknowledged time.
+          }
+        }
         if (ackResponse.status === 401) invalidateMemberSession(bearer.token);
         const ackEnvelope = ackResponse.ok ? await ackResponse.json() : null;
         acknowledged = ackResponse.ok
