@@ -11,6 +11,10 @@ import {
 import { hashSajuHeldSourceProofRequestV1 } from './saju-held-source-proof-verifier-v1.js';
 import { preflightOfficialReaderS3FromAdmittedArtifactV1 } from './official-reader-s3-authoritative-artifact-coverage-v1.js';
 import {
+  consumeOfficialReaderS3BoundPreviewSourceV1,
+  type OfficialReaderS3BoundPreviewSourceV1,
+} from './official-reader-private-s3-source-binding-v1.js';
+import {
   executePostgresSubjectTransactionV1,
   type PostgresSubjectExecutionScopeV1,
   type PostgresSubjectPoolV1,
@@ -50,6 +54,12 @@ export interface PrivateOfficialReaderPaidAnswerStagedV1 {
    * not replace Saju Owner Production source attestation.
    */
   readonly sourceCoverageCandidate: unknown;
+  /**
+   * One-use private T1 receipt from Saju's independently signed PREVIEW
+   * transport, after exact source-unit coverage and DB-admitted snapshot.
+   * This does NOT supply Production source authority or allow persistence.
+   */
+  readonly boundSignedPreviewSource: OfficialReaderS3BoundPreviewSourceV1;
   /**
    * Reserved for the Saju Owner's verified Production source assertion.
    * These field values alone cannot prove issuance: the S5 DB gate is HELD.
@@ -171,11 +181,19 @@ export async function commitPrivateOfficialReaderPaidAnswerV1(input: {
           return unavailable();
         }
         assertCurrentScope(original, current.scope);
+        // The signed PREVIEW envelope is verified in T1, outside S1/DB
+        // locks. This one-use receipt binds those authenticated bytes to
+        // exactly this fresh T2 DB-admitted artifact without Saju I/O here.
+        const signedPreview = consumeOfficialReaderS3BoundPreviewSourceV1({
+          token: staged.boundSignedPreviewSource,
+          freshAdmission: current,
+        });
         const sourceDigest = hashSajuHeldSourceProofRequestV1(
           current.source.responseSnapshotJsonb,
         );
-        if (sourceResponseHash !== sourceDigest
-            && sourceResponseHash !== `sha256:v1:${sourceDigest}`) {
+        if (signedPreview.storedResponseDigest !== sourceDigest
+            || (sourceResponseHash !== sourceDigest
+              && sourceResponseHash !== `sha256:v1:${sourceDigest}`)) {
           return unavailable();
         }
         const sourceCoverage = preflightOfficialReaderS3FromAdmittedArtifactV1({
