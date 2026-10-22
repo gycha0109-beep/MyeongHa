@@ -54,6 +54,7 @@ export function MobileOfficialReadingReaderEntry({
       <View style={styles.introduction} accessibilityLiveRegion="polite">
         <Text style={styles.introductionTitle}>{selectedReader.name} · {selectedReader.title}</Text>
         <Text style={styles.copy}>{selectedReader.tone}</Text>
+        {ui.sourceNotice ? <Text style={styles.copy}>{ui.sourceNotice}</Text> : null}
         <Text style={styles.copy}>{ui.selectionBoundary}</Text>
       </View>
       <Text style={styles.name}>{ui.statusTitle}</Text>
