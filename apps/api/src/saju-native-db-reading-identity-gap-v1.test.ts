@@ -242,12 +242,7 @@ describe('Saju Native Reading vs MyeongHa DB Official UUID mapping OWNER HOLD', 
         readerAdmission, record: await record(), sajuHandoff: changed,
       });
       expect(gap).toMatchObject({ canMapReadingId: false, canDisclose: false });
-      if (changed === c) {
-        // Unknown fields do not confer authority; the gate remains HELD at most.
-        expect(gap.state).not.toBe('approved');
-      } else {
-        expect(gap.state).toBe('blocked');
-      }
+      expect(gap.state).toBe('blocked');
     }
   });
 
