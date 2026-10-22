@@ -49,7 +49,7 @@ export function assertN06SecondOneShotV1(env,history,failedRun,correctionPr) {
      failedRun?.head_sha!==FAILED_RUN_HEAD ||
      failedRun?.status!=='completed' || failedRun?.conclusion!=='failure' ||
      failedRun?.run_attempt!==1 || failedRun?.event!=='push' ||
-     failedRun?.path!==`gycha0109-beep/MyeongHa/.github/workflows/${FAILED_EXPERIMENT_WORKFLOW}@refs/heads/main` ||
+     failedRun?.path!==`.github/workflows/${FAILED_EXPERIMENT_WORKFLOW}` ||
      correctionPr?.number!==CORRECTION_PR ||
      correctionPr?.merged!==true ||
      correctionPr?.merge_commit_sha!==CORRECTION_MERGE_SHA)
