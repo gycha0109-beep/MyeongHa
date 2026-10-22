@@ -279,6 +279,7 @@ describe('A3-beta: verified official standard Saju runtime, no fake Capability',
     const prepared = await prepareOfficialReadingReaderAdmissionV1(b.input);
     const proof = await issueCharacterSajuOfficialStandardEligibilityV2({
       prepared, currentScope: prepared.scope, productAuthorityPort: b.productAuthorityPort,
+      currentVerifiedPurchaseAuthorityPort: b.input.currentVerifiedPurchaseAuthorityPort,
     });
     await expect(assembleOfficialStandardReaderRuntimeV2({
       proof: { ...proof }, currentScope: prepared.scope,
