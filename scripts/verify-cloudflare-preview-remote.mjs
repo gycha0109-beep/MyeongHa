@@ -12,6 +12,10 @@ import {
 import { CLOUDFLARE_DIRECT_API_ROUTES, CLOUDFLARE_REWRITE_ROUTES } from '../workers/cloudflare-api-router.mjs';
 import { summarizeCloudflarePreviewProbeMetricsV1 } from './cloudflare-preview-smoke-metrics.mjs';
 import { assessCloudflarePreviewOpsStopGateV1 } from './cloudflare-preview-ops-stop-gate.mjs';
+import {
+  buildCloudflarePreviewSmokeEvidenceV1,
+  writeCloudflarePreviewSmokeEvidenceV1,
+} from './cloudflare-preview-smoke-evidence.mjs';
 
 const URL_FROM_CLOUDFLARE = 'https://feat-ops-cloudflare-static-preview-20261020-myeongha.gycha0109.workers.dev';
 const origin = process.env.MYEONGHA_CLOUDFLARE_PREVIEW_URL || URL_FROM_CLOUDFLARE;
@@ -256,6 +260,16 @@ async function main() {
     failures,
   };
   console.log(JSON.stringify(result,null,2));
+  if (scf2 && process.env.MYEONGHA_CLOUDFLARE_EVIDENCE_KIND) {
+    const evidence=buildCloudflarePreviewSmokeEvidenceV1({
+      target:process.env.MYEONGHA_CLOUDFLARE_EVIDENCE_KIND,
+      expectedCommit:expectedHead,attestedCommit,
+      metrics:opsMetrics,stopGate:opsStopGate,
+    });
+    await writeCloudflarePreviewSmokeEvidenceV1(evidence.target,evidence);
+    console.log('Cloudflare Stage 9 read-only evidence:',evidence.target,
+      evidence.expectedCommit,evidence.decision.preview);
+  }
   assert(!failures.length,'Cloudflare live preview HTTP parity/safety failure');
 }
 

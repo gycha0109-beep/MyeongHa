@@ -46,3 +46,10 @@ scripts/cloudflare-preview-ops-stop-gate.mjs에서 실행되는 읽기 전용 �
 실제 Workers CPU·메모리·UTC 일별 호출량, route별 실제 오류/부하 분포, 계정 청구 API 접근 권한, Auth/DB TLS·RLS 및 OAuth 공급자 등록, 운영 예산·DNS 전환 승인이 필요합니다. 특정 다른 트랙의 브라우저 CI가 실패하면 원인 없이 무시하거나 Cloudflare 전체 병합을 완료로 선언하지 않습니다.
 
 **결론:** Cloudflare Static/deny-only Preview 및 기존 복구 리허설 증거만 사용합니다. 운영 전환, 유료 기능, 계정 변경, 생산 데이터 접근은 HOLD입니다.
+
+### 2026-10-22 — 현재·과거 Preview 원격 실측 증거를 JSON으로 보존
+
+- 기존 원격 Smoke (동일 58개 synthetic 요청)에 `MYEONGHA_CLOUDFLARE_EVIDENCE_KIND=current/recovery`만 주입하여 현재 Preview와 이전 pinned immutable 복구 후보의 **각각 다른 증거 파일**을 생성한다. `scripts/cloudflare-preview-smoke-evidence.mjs`의 고정 필드 allowlist로 full SHA, aggregate route ID, 지연 n/p50/p95/max, 의도된 503/429/오류, Free/청구 관측 경계를 담는다.
+- 로컬 산출물 경로는 `artifacts/cloudflare-preview-stage9/current.json` 및 `recovery.json` 둘로 고정하며, 덮어쓰기를 거부한다. 실제 raw API 경로/쿼리/쿠키/요청/응답 본문, provider state, 개인 ID, 토큰, DB 원문 또는 빌드 로그는 JSON으로 복제하지 않는다. 도메인/비밀 문자열을 추가하는 필드나 임의 route ID는 거절하는 격리 단위 테스트를 포함한다.
+- 기존 `Cloudflare Preview Remote Smoke`는 성공/실패 시 `actions/upload-artifact`의 **고정 SHA**를 사용해 `cloudflare-preview-stage9-evidence` 파일 하나에 두 JSON을 최대 **7일**만 보관한다. Artifact가 없으면 결과를 조작해 PASS로 만들지 않는다. `#2384` Stage 4 legacy에는 주입하지 않는다.
+- 인수 파일은 Worker CPU/메모리/실청구/실사용자 p95를 기록하지 않고 `notMeasured`로 명시한다. 운영 계정 비용 API 403 상태를 수용하며 Production/DNS/시크릿/유료 리소스 변경 없음. 만료된 증거 파일만으로 향후 수락하지 않는다.
