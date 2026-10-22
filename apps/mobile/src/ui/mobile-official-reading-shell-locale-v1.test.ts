@@ -19,6 +19,9 @@ describe('I18N-07 authorized subset: mobile archived Official Reading shell', ()
       expect(copy.readerCount(2)).toContain('2');
       expect(copy.readerCount(0)).toContain('0');
       expect(copy.noReader.length).toBeGreaterThan(5);
+      expect(copy.readerLabel(0).length).toBeGreaterThan(5);
+      expect(copy.readerLabel(1).length).toBeGreaterThan(5);
+      expect(copy.readerLabel(3)).toContain('3');
       expect(copy.stepPrefix.length).toBeGreaterThan(0);
       expect(Object.isFrozen(copy)).toBe(true);
       expect(copy.readerBoundary).toMatch(locale === 'ko-KR' ? /권한/u : locale === 'ja-JP' ? /権限/u : /權限/u);
@@ -66,6 +69,8 @@ describe('I18N-07 authorized subset: mobile archived Official Reading shell', ()
     expect(screen).toContain('{shell.readerBoundary}');
     expect(screen).toContain('{shell.stepPrefix} {index + 1}');
     expect(screen).toContain('shell.readerCount(state.record.readerCharacterIds.length)');
+    expect(screen).toContain('shell.readerLabel(state.record.readerCharacterIds.length)');
+    expect(screen).toContain('t(readingTitleV1(state.record.sajuDomain))');
     expect(screen).toContain('shell.noReader');
     expect(screen).toContain('sourceNotice.visible ? (');
     expect(screen).toContain('{sourceNotice.text}');
