@@ -95,6 +95,52 @@ describe('web Reader runtime client', () => {
     });
   });
 
+  it('keeps the UI-only locale header pinned while bearer resolution is pending', async () => {
+    let resolveBearer!: (bearer: { kind: 'member'; token: string }) => void;
+    const bearer = new Promise<{ kind: 'member'; token: string }>(resolve => {
+      resolveBearer = resolve;
+    });
+    const fetchImpl = vi.fn().mockResolvedValue(successResponse());
+    const client = createReaderRuntimeClientV1({
+      enabled: true,
+      fetchImpl,
+      resolveBearer: () => bearer,
+    });
+    const input = {
+      threadId: '33333333-3333-4333-8333-333333333333',
+      officialReadingId: '44444444-4444-4444-8444-444444444444',
+      uiLocale: 'ja-JP',
+    };
+    const pending = client.readReaderScene(input);
+    expect(fetchImpl).not.toHaveBeenCalled();
+    // Mutating caller state after request start cannot relabel the in-flight header.
+    input.uiLocale = 'zh-TW';
+    resolveBearer({ kind: 'member', token: 'member-token' });
+    await pending;
+    const [, request] = fetchImpl.mock.calls[0]!;
+    expect(request.headers['X-MyeongHa-UI-Locale']).toBe('ja-JP');
+    expect(JSON.parse(request.body)).toEqual({
+      threadId: '33333333-3333-4333-8333-333333333333',
+      officialReadingId: '44444444-4444-4444-8444-444444444444',
+    });
+    expect(request.headers).not.toHaveProperty('X-MyeongHa-Reader-Locale');
+  });
+
+  it('falls back to Korean UI preference for an unsupported explicit locale', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(successResponse());
+    const client = createReaderRuntimeClientV1({
+      enabled: true,
+      fetchImpl,
+      resolveBearer: vi.fn().mockResolvedValue({ kind: 'member', token: 'member-token' }),
+    });
+    await client.readReaderScene({
+      threadId: '33333333-3333-4333-8333-333333333333',
+      officialReadingId: '44444444-4444-4444-8444-444444444444',
+      uiLocale: 'zh-CN',
+    });
+    expect(fetchImpl.mock.calls[0]?.[1].headers['X-MyeongHa-UI-Locale']).toBe('ko-KR');
+  });
+
   it('rejects malformed Reader request identities before transport', async () => {
     const fetchImpl = vi.fn();
     const client = createReaderRuntimeClientV1({
