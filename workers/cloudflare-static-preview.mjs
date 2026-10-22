@@ -162,7 +162,8 @@ export function fenceCloudflareStaticPreviewAssetResponseV1(candidate, request) 
     const isHtml = media === 'text/html' || media === 'application/xhtml+xml';
     // No HTML or SSE/streaming response may be smuggled as a non-HTML asset.
     // A missing/unknown media type is not a grant to serve an arbitrary body.
-    const safeStaticMedia = media === 'text/javascript' ||
+    const safeStaticMedia = candidate.status === 304 && media === '' ||
+      media === 'text/javascript' ||
       media === 'application/javascript' || media === 'text/css' ||
       media === 'application/json' || media === 'text/plain' ||
       media === 'application/wasm' || media === 'application/octet-stream' ||
