@@ -169,6 +169,12 @@
 - `apps/mobile/src/ui/mobile-official-reading-shell-locale-v1.test.ts`는 세 locale, 미지원/누락 locale 한국어 fallback, 4종 오류, UI 전용 Reader 인원 표시, 실제 Archive 소비 화면과 원문 불변 필드 및 공식 Reader Entry 보호를 고정한다.
 - **중요:** 이는 기존 한국어 저장된 공식 Reading을 원문으로 다시 읽는 화면의 국제화 UI 수용만 의미한다. 정책 ②의 **과거 한국어 Official artifact를 JA/ZH-TW 언어로 다시 생성/번역하여 열람**하는 것은 여전히 HOLD다. 구매/Grant/Reader 생성/새 외국어 사주 해석 공개는 범위 외다.
 
+### 7.6 I18N-07 부분 집합 — 모바일 Saju Preview 단계·주제 UI 언어 표시
+
+- `apps/mobile/src/features/saju/SajuPreviewReadingView.tsx`와 `apps/mobile/src/app/reading/scene.tsx`의 **클라이언트에서 이미 작성된** 프리뷰 주제명과 읽기 단계 번호만 기존 `useMobileUiLocale().t()`에 연결했다. 선택된 주제/진입 권한/원래 Preview 요청/버튼 행동은 변경하지 않았다.
+- `step.title`, `step.primary`, `step.structure`, `step.supporting`, `result.notices`, `currentStep.*` 등 서버가 반환한 사주 원문은 **어느 로케일에서도 번역·재생성하지 않는다**. 미승인 비한국어 Saju/Reader output 호출 및 official 기록 생성 없음.
+- `apps/mobile/src/ui/mobile-saju-preview-labels-i18n.test.ts`는 기존 UI 사전의 단계 표시 언어와 두 실제 Preview 경로에서 UI labels만 현지화하는 경계를 고정한다. 이 변경은 Saju source approval, Character voice locale approval, Official Reading 재열람 정책 ②의 해제가 아니다.
+
 ## 8. 다음 구현 작업 및 승인 위치
 
 1. **캐릭터 설계 owner:** 위 6명 차이를 실제 Bible/typed Runtime 간에 해결하고 authoritative source/version을 확정. 이 I18N 트랙은 제안·인계만, 원본 수정 금지.
