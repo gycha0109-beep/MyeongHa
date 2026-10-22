@@ -97,13 +97,21 @@ function fakeNodeResponse(){
   fake.destroy=()=>{ fake.destroyed=true;fake.emit('close'); };
   return {response:fake as unknown as ServerResponse,outbound,closed:()=>fake.destroyed};
 }
-function forgedCommit(subjectId=SUBJECT):RunProductionSeyeonChatResultV1{
+function forgedCommit(
+  subjectId=SUBJECT,
+  override:Readonly<{
+    receivedReplay?:boolean;
+    attemptReplay?:boolean;
+    attemptId?:string;
+  }>={},
+):RunProductionSeyeonChatResultV1{
   return {
     subjectId,
     threadBinding:{threadId:THREAD},
     execution:{
       disposition:'executed',
-      receivedTurn:{turnId:TURN},
+      receivedTurn:{turnId:TURN,replayed:override.receivedReplay??false},
+      attempt:{attemptId:override.attemptId??ATTEMPT,replayed:override.attemptReplay??false},
       committedTurn:{
         turnId:TURN,attemptId:ATTEMPT,assistantMessageId:ASSISTANT,
         sequenceNo:2,replayed:false,
@@ -241,6 +249,53 @@ describe('Se-yeon G3 Node-only original-Grant current Subject fence',()=>{
       'from public.qry_seyeon_positive_first_memory_locked_reveal_v1(',
     ))).toBe(false);
     expect(queries(db).at(-1)).toBe('COMMIT');
+  });
+
+  it('rejects replayed receive, replayed attempt and mixed attempt locators before DB G3',async()=>{
+    for(const altered of [
+      {receivedReplay:true},
+      {attemptReplay:true},
+      {attemptId:OTHER},
+    ]){
+      const db=new FakeG3Connection(SUBJECT);
+      const pool=new FakeG3Pool(db);
+      const node=fakeNodeResponse();
+      await expect(deliverSeyeonCommittedFirstPositiveMemoryNodeTurnV1({
+        response:node.response,
+        requestSignal:new AbortController().signal,
+        pool,
+        verifiedEvidence:EVIDENCE,
+        result:forgedCommit(SUBJECT,altered),
+        expectedThreadId:THREAD,
+        requestId:'g3-mixed-attempt',
+        serverTime:'2026-10-22T04:15:00.000Z',
+      })).rejects.toMatchObject({code:'INVALID_COMMIT'});
+      expect(node.outbound).toEqual([]);
+      expect(node.closed()).toBe(true);
+      expect(pool.connects).toBe(0);
+    }
+  });
+
+  it('binds a fresh non-replay attempt to the original DB body under the Node callback',async()=>{
+    const db=new FakeG3Connection(SUBJECT);
+    const pool=new FakeG3Pool(db);
+    const node=fakeNodeResponse();
+    const outcome=await deliverSeyeonCommittedFirstPositiveMemoryNodeTurnV1({
+      response:node.response,
+      requestSignal:new AbortController().signal,
+      pool,
+      verifiedEvidence:EVIDENCE,
+      result:forgedCommit(),
+      expectedThreadId:THREAD,
+      requestId:'g3-new-attempt',
+      serverTime:'2026-10-22T04:15:00.000Z',
+    });
+    expect(outcome).toBe('assistant_sent');
+    expect(queries(db).at(-1)).toBe('COMMIT');
+    expect(node.outbound).toHaveLength(1);
+    expect(JSON.parse(node.outbound[0]!)).toMatchObject({
+      ok:true,data:{assistantText:CANARY,replayed:false,turnId:TURN,assistantMessageId:ASSISTANT},
+    });
   });
 
   it('rejects an invalid send deadline without leaving the direct Node socket open',async()=>{
