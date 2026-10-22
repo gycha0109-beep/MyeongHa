@@ -58,7 +58,7 @@ function unavailable(): never {
 }
 
 function recordFrom(admission: PreparedOfficialReadingReaderAdmissionV1):
-  Omit<BoundRecord, 'used'> {
+  Omit<BoundRecord, 'used' | 'candidateDigest'> {
   const { scope, source } = admission;
   if (source.subjectId !== scope.subjectId
       || source.readingId !== scope.readingId
@@ -85,9 +85,6 @@ function recordFrom(admission: PreparedOfficialReadingReaderAdmissionV1):
     storedResponseDigest: hashSajuHeldSourceProofRequestV1(
       source.responseSnapshotJsonb,
     ),
-    // This digest is attached to the ticket only at T1 after signed
-    // preview reconciliation; it must not be inferred from the artifact.
-    candidateDigest: '',
   };
 }
 
