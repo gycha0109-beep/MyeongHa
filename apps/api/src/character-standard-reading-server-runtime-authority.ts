@@ -268,6 +268,9 @@ export async function prepareCharacterStandardReadingServerBaseContextV2(
 export async function prepareCharacterStandardReadingServerRuntimeV1(
   input: PrepareCharacterStandardReadingServerRuntimeInputV1,
 ): Promise<CharacterStandardReadingThreadRuntimeV1> {
+  // Reject client-injected private/derived context before invoking any
+  // Thread, purchase, official Saju or mutable owner authority.
+  assertNoCallerContentAuthorityFields(input.contextInput);
   // Legacy V1 also assembles exact Official Saju text, so it may NOT
   // fetch relationship/Memory context or protected Reading under a
   // refunded purchase. V2's base-only (no Saju) helper is unchanged.
