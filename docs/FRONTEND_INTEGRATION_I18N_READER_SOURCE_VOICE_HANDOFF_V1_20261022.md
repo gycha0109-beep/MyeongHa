@@ -199,6 +199,14 @@
 - `test/mobile-chat-compose-ui-locale-v1.test.ts`에서 3개 상태 × 3개 명시 UI locale, 한국어 fallback, 기존 송신/History HOLD gate·원문/공식 상태 불변을 회귀 고정한다. Node 파일 검사는 모바일 TypeScript source tree 외부 루트 `test/`에 둔다.
 - **남은 승인/실행:** 세연 이외 인물의 AI 채팅과 JA/ZH-TW 생성형 Reader 응답 공개는 Character·Reader·Security·Release owner 승인 전 HOLD. UI 상태가 현지화돼도 별도 서버 권한·출력 보호 조건을 통과했다는 뜻이 아니다.
 
+### 7.10 I18N-07 부분 집합 — 모바일 Chat 기록·보호 HOLD의 UI 상태 현지화
+
+- `apps/mobile/src/features/chat/mobile-chat-history-shell-locale-v1.ts`는 기존 대화방 읽기 화면의 **클라이언트 작성 UI 문구만** 명시적 `ko-KR`/`ja-JP`/`zh-TW`에 맞춘다. `loading_initial`/idle, 일반 조회 오류, 빈 기록, 끝·다음 페이지·재시도, 에러 코드 앞의 안내 라벨과 초상화 접근성의 `프로필` 문구가 대상이다. 미지원 locale는 한국어로 돌아간다.
+- 기존 `isSeyeonHistoryRevealHoldV1(snapshot)` 분기는 **읽기·더 보기·입력(Composer) 모두 그대로 유지**한다. 개인정보 조회 권한 서버 확인 전에는 기록을 표시할 수 없고, 반복 조회/앱 재설치로 제한을 해제하지 못한다는 원래 주의 문구를 UI 사전에서 각 언어로 정확하게 표시한다. 진단 코드 `SEYEON_HISTORY_REVEAL_HOLD` 및 서버 제공 `snapshot.errorCode`는 번역·변경하지 않는다.
+- `ChatReadComponents.tsx`의 사용자/캐릭터 `message.body`, 검증된 빈 방의 `greeting.openingLine`, `group.label`/메시지 식별자·시간·redaction과 원래 `const allowed = ready && seyeon` 입력 권한 조건은 변경하지 않는다. UI 언어로 권한이 추가되거나 재시도가 승격되지 않고, 새 LLM/Reader 응답 언어 요청도 발생하지 않는다.
+- `test/mobile-chat-history-shell-locale-v1.test.ts`는 3개 UI 로케일·미지원 언어 한국어 fallback·HOLD 문구의 해제 불가 의미·실제 메시지 원문 및 UI 소비 지점을 고정한다. 기존 `test/mobile-seyeon-history-hold-ux.test.ts`, `test/mobile-applizing-chat-reader-fortune-20261016.test.ts`는 원래 한국어 안전 문구를 보존하면서 UI 사전 참조를 검사하도록 정렬했다.
+- **남은 승인:** 캐릭터 음성/대사 현지화, Saju/Face 공식 원문 재언어화, 개인정보 기록 공개 및 Reader 상용화는 각 원래 소유자의 서버 증빙과 별도 승인 전 HOLD.
+
 ## 8. 다음 구현 작업 및 승인 위치
 
 1. **캐릭터 설계 owner:** 위 6명 차이를 실제 Bible/typed Runtime 간에 해결하고 authoritative source/version을 확정. 이 I18N 트랙은 제안·인계만, 원본 수정 금지.
