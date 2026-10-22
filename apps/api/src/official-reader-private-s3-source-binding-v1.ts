@@ -41,6 +41,7 @@ type BoundRecord = Readonly<{
   readingContractVersion: string;
   officialArtifactResponseHash: string;
   storedResponseDigest: string;
+  candidateDigest: string;
 }> & { used: boolean };
 
 const issued = new WeakMap<object, BoundRecord>();
@@ -127,7 +128,11 @@ export async function prepareOfficialReaderS3BoundPreviewSourceV1(input: Readonl
       canPersist: false,
       canDisclose: false,
     });
-    issued.set(token, { ...binding, used: false });
+    issued.set(token, {
+      ...binding,
+      candidateDigest: hashSajuHeldSourceProofRequestV1(input.sourceCoverageCandidate),
+      used: false,
+    });
     return token;
   } catch {
     return unavailable();
@@ -143,6 +148,7 @@ export async function prepareOfficialReaderS3BoundPreviewSourceV1(input: Readonl
 export function consumeOfficialReaderS3BoundPreviewSourceV1(input: Readonly<{
   token: OfficialReaderS3BoundPreviewSourceV1;
   freshAdmission: PreparedOfficialReadingReaderAdmissionV1;
+  sourceCoverageCandidate: unknown;
 }>): Readonly<{ storedResponseDigest: string }> {
   if (!input?.token || typeof input.token !== 'object'
       || input.token.version !== OFFICIAL_READER_S3_BOUND_PREVIEW_VERSION_V1
@@ -156,7 +162,9 @@ export function consumeOfficialReaderS3BoundPreviewSourceV1(input: Readonly<{
 
   try {
     const fresh = recordFrom(input.freshAdmission);
-    const fields: readonly (keyof Omit<BoundRecord, 'used'>)[] = [
+    if (hashSajuHeldSourceProofRequestV1(input.sourceCoverageCandidate)
+        !== original.candidateDigest) return unavailable();
+    const fields: readonly (keyof Omit<BoundRecord, 'used' | 'candidateDigest'>)[] = [
       'subjectId','readingId','threadId','readerCharacterId',
       'bundleId','releaseId','contentRevision',
       'productId','productSpecVersion','readingContractVersion',
