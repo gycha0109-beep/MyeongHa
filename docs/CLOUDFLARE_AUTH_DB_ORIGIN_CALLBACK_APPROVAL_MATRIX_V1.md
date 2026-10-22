@@ -108,3 +108,9 @@
 - `test/cloudflare-auth-admission.test.mjs`에서는 가짜 승인 Origin, 분리된 승인 변수 제거/오염, 원본 OAuth handler의 AES-GCM·PKCE authorize→callback **합성 체인**, Host spoof·callback query 오염, refresh cookie Domain/보안 속성 약화 거부를 검증한다. 외부 Naver/Supabase/PG 요청이나 사용자 데이터는 사용하지 않는다.
 
 **현행 HOLD:** Cloudflare Preview Worker에 이 새 승인 변수를 추가하거나 OAuth 공급자·Supabase callback·시크릿·운영 DB·Cloudflare DNS/유료 리소스를 변경하지 않았다. 테스트용 DB는 기존 지시대로 일회용 로컬 Docker/GitHub 러너에서만 유지하므로, 원격 Workers→직접 DB TLS/RLS 실제 연결에는 별도의 **접근 가능한 적법한 격리 DB target·Security/API/DB owner 기술 인수·호스트 소유 및 공급자 콜백 승인**이 필요하다. 이 미확정 항목을 임의의 공개 DB나 Production credential로 메우지 않는다.
+
+### 요청별 Member Auth DB rate-limit Pool 수명주기
+
+- Cloudflare `sign-in/sign-up/refresh`의 기존 `createProductionMemberAuthHttpRuntimeV1`에 별도 `PostgresMemberAuthRateLimitAdmissionPortV1`을 주입한다. 이 Port는 운영 Vercel 런타임의 기본 최대 연결 4개와 달리, **기존 Cloudflare Direct TCP 후보 정책(max=1, connect 5초, idle 1초, statement 5초)**을 쓰는 별도 Pool에서 생성된다. 다른 트랙의 기존 Vercel 합성/운영 런타임은 수정하지 않았다.
+- Auth 처리 성공·실패 모두에서 Worker는 인증 runtime과 독립된 rate-limit Pool을 각각 종료하고, 어느 하나의 종료 실패도 사용자 성공 응답으로 승격하지 않는다. 클라이언트에는 고정 503/no-store만 전송한다. `test/cloudflare-auth-admission.test.mjs`는 종료 순서 및 첫 번째 종료 실패 시 두 번째 종료 보장을 가짜 Pool로 입증한다.
+- Guest/bootstrap/개인 프로필/출생 정보 runtime은 기존 Production source의 요청 단위 생성·close 계약을 그대로 사용하며 **모든 PG pool이 max=1로 바뀌었다고 주장하지 않는다**. 해당 경로의 실측 네트워크/시간초과/연결 개수·RLS는 여전히 Security/API/DB 인수 전 HOLD.
