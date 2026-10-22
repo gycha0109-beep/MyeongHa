@@ -74,7 +74,7 @@ export function ReaderScenePanel({ state, onRetry, uiLocale = 'ko-KR' }: ReaderS
     return (
       <section
         className="reader-scene-panel"
-        data-reader-scene-presentation
+        data-reader-scene-presentation=""
         data-reader-scene-state={state.state}
         data-reader-output-language="source_unasserted"
         data-reader-output-localized="false"
@@ -84,24 +84,24 @@ export function ReaderScenePanel({ state, onRetry, uiLocale = 'ko-KR' }: ReaderS
           <span>{copy.preview}</span>
           <h2>{displayName}</h2>
         </header>
-        <p className="reader-scene-panel-source-notice" data-reader-scene-source-language-notice role="note">
+        <p className="reader-scene-panel-source-notice" data-reader-scene-source-language-notice="" role="note">
           {state.sourceLanguageNotice}
         </p>
         {state.state === 'ready' ? (
-          <div className="reader-scene-panel-segments" data-reader-scene-segments>
+          <div className="reader-scene-panel-segments" data-reader-scene-segments="">
             {state.segments.map((segment, index) => (
               <p
                 key={index}
                 className="reader-scene-panel-segment"
                 data-reader-scene-source-segment={segment.kind}
-                data-reading-content
+                data-reading-content=""
               >
                 {segment.text}
               </p>
             ))}
           </div>
         ) : (
-          <p className="reader-scene-panel-status" data-reader-scene-protected-fallback role="status">
+          <p className="reader-scene-panel-status" data-reader-scene-protected-fallback="" role="status">
             {copy.protected_fallback}
           </p>
         )}
@@ -114,7 +114,7 @@ export function ReaderScenePanel({ state, onRetry, uiLocale = 'ko-KR' }: ReaderS
   const copy = SCENE_UI_COPY[normalizeUiLocale(uiLocale)];
   const status = state.state;
   return (
-    <section className="reader-scene-panel" data-reader-scene-presentation data-reader-scene-state={status} aria-label={copy.title}>
+    <section className="reader-scene-panel" data-reader-scene-presentation="" data-reader-scene-state={status} aria-label={copy.title}>
       <p className="reader-scene-panel-status" role="status">{copy[status]}</p>
       {status === 'retryable_error' && state.canRetry && onRetry ? (
         <button type="button" className="reader-scene-panel-retry" onClick={onRetry}>
