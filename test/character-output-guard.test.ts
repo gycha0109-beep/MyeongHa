@@ -434,4 +434,38 @@ describe('Character Output Guard', () => {
     expect(envelope.protectedSajuDisclosures).toEqual([]);
     expect(envelope.calculationAmbiguity).toEqual([]);
   });
+  it.each([
+    ['사주가 사업 실패를 확정했습니다.', true],
+    ['운세가 당신의 결혼을 보장합니다.', true],
+    ['명식에서 당신은 반드시 합격할 겁니다.', true],
+    ['사용자가 취업에 실패했다고 말했습니다.', false],
+    ['사주는 미래를 보장하지 않습니다.', false],
+    ['오늘 어떤 일이 가장 마음에 걸리세요?', false],
+  ] as const)('treats unsupported Saju certainty as non-authoritative: %s', (framing, blocked) => {
+    const invoke = () => guardCharacterRendererOutput({
+      rawOutput: {
+        ...validDraft(),
+        framingBefore: framing,
+      },
+      context: runtimeContext(false),
+      allowedSuggestedActionKeys: ['open_records'],
+    });
+    if (blocked) {
+      expect(invoke).toThrow(/unsupported authoritative Saju certainty/u);
+    } else {
+      expect(invoke().framingBefore).toBe(framing);
+    }
+  });
+
+  it('also refuses unsupported Saju certainty beside otherwise protected source', () => {
+    expect(() => guardCharacterRendererOutput({
+      rawOutput: {
+        ...validDraft(),
+        framingAfter: '사주가 당신의 재물 성공을 확정합니다.',
+      },
+      context: runtimeContext(true),
+      allowedSuggestedActionKeys: ['open_records'],
+    })).toThrow(/unsupported authoritative Saju certainty/u);
+  });
+
 });
