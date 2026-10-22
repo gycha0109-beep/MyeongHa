@@ -63,12 +63,11 @@ export function createAccountDeletionWorkerRuntimeV1(input: {
         dbFinalizerPort: input.ports.dbFinalizerPort,
         authDeletionPort: input.authDeletionPort,
         completionPort: input.ports.completionPort,
+        // A missing Privacy provider cannot skip a pending key-erasure job.
+        // Legacy databases without Reader tables return an empty manifest.
+        readerPrivacyStatePort: input.ports.readerPrivacyStatePort,
         ...(input.readerPrivacyDeletionPort === undefined
-          ? {}
-          : {
-              readerPrivacyDeletionPort: input.readerPrivacyDeletionPort,
-              readerPrivacyStatePort: input.ports.readerPrivacyStatePort,
-            }),
+          ? {} : { readerPrivacyDeletionPort: input.readerPrivacyDeletionPort }),
       });
 
       return Object.freeze({ claim, worker });
