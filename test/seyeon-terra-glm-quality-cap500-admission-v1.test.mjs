@@ -5,6 +5,8 @@ import {
   assertN06Cap500ReservationV1,
   N06_MAX_RESERVED_KRW,N06_RESERVED_MICRO_USD,
   N06_CAP500_OWNER_KRW,N06_MAX_CALLS,N06_MAX_REQUEST_BODY_BYTES,
+  N06_TERRA_RESERVE_MICRO_USD,N06_TERRA_WORST_CASE_MICRO_USD,
+  N06_ORIGINAL_FAILED_REQUEST_BODY_CAP,
 } from '../scripts/seyeon-terra-glm-quality-cap500-admission-v1.mjs';
 
 const repo='gycha0109-beep/MyeongHa';
@@ -20,8 +22,8 @@ const history={total_count:1,workflow_runs:[{
 }]};
 const steps=[
   {route:'luna',limit:20000},
-  {route:'terra',limit:50000},
-  {route:'terra',limit:50000},
+  {route:'terra',limit:57000},
+  {route:'terra',limit:57000},
   {route:'glm',limit:20000},
   {route:'glm',limit:20000},
   {route:'glm',limit:20000},
@@ -48,8 +50,13 @@ describe('single budgeted N06 Luna+Terra x3 / GLM x3 quality pair',()=>{
 
   it('caps six dispatch reservations below 500 KRW, including prior legacy global budget',()=>{
     expect(N06_MAX_CALLS).toBe(6);
-    expect(N06_RESERVED_MICRO_USD).toBe(180000);
-    expect(N06_MAX_RESERVED_KRW).toBe(450);
+    expect(N06_RESERVED_MICRO_USD).toBe(194000);
+    expect(N06_MAX_RESERVED_KRW).toBe(485);
+    expect(N06_TERRA_RESERVE_MICRO_USD).toBe(57000);
+    expect(N06_TERRA_WORST_CASE_MICRO_USD).toBe(56832);
+    expect(N06_TERRA_WORST_CASE_MICRO_USD).toBeLessThanOrEqual(N06_TERRA_RESERVE_MICRO_USD);
+    expect(N06_ORIGINAL_FAILED_REQUEST_BODY_CAP).toBe(15680);
+    expect(N06_MAX_REQUEST_BODY_BYTES).toBe(19200);
     expect(N06_MAX_RESERVED_KRW).toBeLessThan(N06_CAP500_OWNER_KRW);
     const counts=zero();
     for(const {route,limit} of steps){
@@ -70,10 +77,10 @@ describe('single budgeted N06 Luna+Terra x3 / GLM x3 quality pair',()=>{
         all,stage.limit,stage.route,512,1536,
       )).toThrow();
     }
-    expect(()=>assertN06Cap500ReservationV1(zero(),20000,'luna',15681,1536)).toThrow();
-    expect(()=>assertN06Cap500ReservationV1(zero(),20000,'luna',15680,1537)).toThrow();
-    expect(()=>assertN06Cap500ReservationV1(zero(),19999,'luna',15680,1536)).toThrow();
-    expect(()=>assertN06Cap500ReservationV1(zero(),50000,'terra',15680,1536)).not.toThrow();
+    expect(()=>assertN06Cap500ReservationV1(zero(),20000,'luna',19201,1536)).toThrow();
+    expect(()=>assertN06Cap500ReservationV1(zero(),20000,'luna',19200,1537)).toThrow();
+    expect(()=>assertN06Cap500ReservationV1(zero(),19999,'luna',19200,1536)).toThrow();
+    expect(()=>assertN06Cap500ReservationV1(zero(),57000,'terra',19200,1536)).not.toThrow();
     expect(()=>assertN06Cap500ReservationV1(zero(),50000,'wrong',512,1536)).toThrow();
   });
 

@@ -6,7 +6,6 @@ import {
  requireSeyeonTrioOpenAiStageV1,
  requirePublicSyntheticQualityUtteranceV1,
  SEYEON_TERRA_GLM_QUALITY_TRIO_LUNA_RESERVE_MICRO_USD as LUNA_RESERVE,
- SEYEON_TERRA_GLM_QUALITY_TRIO_TERRA_RESERVE_MICRO_USD as TERRA_RESERVE,
  SEYEON_TERRA_GLM_QUALITY_TRIO_GLM_RESERVE_MICRO_USD as GLM_RESERVE,
  SEYEON_TERRA_GLM_QUALITY_TRIO_FX_MAX as FX_MAX,
 } from './seyeon-terra-glm-quality-trio-admission-v1.mjs';
@@ -14,6 +13,7 @@ import {
  admitN06Cap500OneShotV1,assertN06Cap500ReservationV1,
  N06_MAX_RESERVED_KRW,N06_CAP500_OWNER_KRW as OWNER_CAP,
  N06_RESERVED_MICRO_USD,
+ N06_TERRA_RESERVE_MICRO_USD as TERRA_RESERVE,
 } from './seyeon-terra-glm-quality-cap500-admission-v1.mjs';
 import {getPaidGlm53FlashAdmissionV1,getOpenRouterAccountUsageV1}
  from './seyeon-openrouter-glm53flash-paid-preflight-v1.mjs';
