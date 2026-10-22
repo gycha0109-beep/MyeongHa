@@ -258,26 +258,32 @@ export async function executeAndDeliverSeyeonFirstPositiveMemoryNodeTurnV1(
   }
   // Check all exact real DB owner RPCs before runtime.run can send paid
   // Interpreter/Renderer requests or persist any personal context.
-  await assertSeyeonFirstPositiveNodeDbReadyV1(input);
-  if (!responseWritable(input.response,input.requestSignal)) {
-    input.response.destroy();
-    throw new SeyeonG3FirstPositiveNodeUnavailableV1('INVALID_SCOPE');
+  try {
+    await assertSeyeonFirstPositiveNodeDbReadyV1(input);
+    if (!responseWritable(input.response,input.requestSignal)) {
+      throw new SeyeonG3FirstPositiveNodeUnavailableV1('INVALID_SCOPE');
+    }
+    const result=await input.runtime.run({
+      verifiedEvidence:input.verifiedEvidence,
+      threadId:input.threadId,
+      clientTurnId:input.clientTurnId,
+      text:input.text.trim(),
+    });
+    return await deliverSeyeonCommittedFirstPositiveMemoryNodeTurnV1({
+      response:input.response,
+      requestSignal:input.requestSignal,
+      pool:input.pool,
+      verifiedEvidence:input.verifiedEvidence,
+      result,
+      expectedThreadId:input.threadId,
+      requestId:input.requestId,
+      serverTime:input.serverTime,
+      ...(input.deadlineMs===undefined?{}:{deadlineMs:input.deadlineMs}),
+    });
+  } catch (error) {
+    // No runtime failure may leave a live socket to an unmounted fallback
+    // handler that might disclose stale or caller-supplied personal content.
+    if (!input.response.destroyed) input.response.destroy();
+    throw error;
   }
-  const result=await input.runtime.run({
-    verifiedEvidence:input.verifiedEvidence,
-    threadId:input.threadId,
-    clientTurnId:input.clientTurnId,
-    text:input.text.trim(),
-  });
-  return deliverSeyeonCommittedFirstPositiveMemoryNodeTurnV1({
-    response:input.response,
-    requestSignal:input.requestSignal,
-    pool:input.pool,
-    verifiedEvidence:input.verifiedEvidence,
-    result,
-    expectedThreadId:input.threadId,
-    requestId:input.requestId,
-    serverTime:input.serverTime,
-    ...(input.deadlineMs===undefined?{}:{deadlineMs:input.deadlineMs}),
-  });
 }
