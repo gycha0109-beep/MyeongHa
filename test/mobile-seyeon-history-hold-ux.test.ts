@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { readFile } from 'node:fs/promises';
 import { isSeyeonHistoryRevealHoldV1 } from '../apps/mobile/src/features/chat/seyeon-history-hold-state.js';
+import { projectMobileChatHistoryShellV1 } from '../apps/mobile/src/features/chat/mobile-chat-history-shell-locale-v1.js';
 
 describe('Se-yeon history Reveal HOLD on mobile', () => {
   it('recognizes only the server authority HOLD error, not transient read failures', () => {
@@ -20,10 +21,15 @@ describe('Se-yeon history Reveal HOLD on mobile', () => {
     const ui = await readFile(new URL('../apps/mobile/src/features/chat/ChatReadComponents.tsx', import.meta.url), 'utf8');
     const server = await readFile(new URL('../apps/api/src/chat-read-http.ts', import.meta.url), 'utf8');
     expect(ui).toContain('isSeyeonHistoryRevealHoldV1(snapshot)');
-    expect(ui).toContain('개인정보 보호를 위한 서버 확인이 끝나지 않아');
+    expect(ui).toContain('{shell.holdDescription}');
+    expect(projectMobileChatHistoryShellV1('ko-KR').holdDescription)
+      .toContain('개인정보 보호를 위한 서버 확인이 끝나지 않아');
     expect(ui).toContain('SEYEON_HISTORY_REVEAL_HOLD');
     expect(ui).toContain('if (isSeyeonHistoryRevealHoldV1(snapshot)) return null;');
-    expect(ui).toContain('세연 대화는 서버의 보호 조치로 잠시 중단되었습니다');
+    expect(ui).toContain('{shell.holdComposerTitle}');
+    expect(ui).toContain('{shell.holdComposerDescription}');
+    expect(projectMobileChatHistoryShellV1('ko-KR').holdComposerTitle)
+      .toBe('세연 대화는 서버의 보호 조치로 잠시 중단되었습니다');
     expect(server).toContain("throw new SeyeonChatHistoryRevealHoldV1()");
     expect(server).toContain("'SEYEON_HISTORY_REVEAL_HOLD'");
     expect(server).toContain("binding.participantCharacterIds.includes('seyeon')");
