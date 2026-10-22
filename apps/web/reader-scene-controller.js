@@ -1,5 +1,7 @@
 import { ReaderRuntimeClientErrorV1 } from './reader-runtime-client.js';
 import { projectReaderSceneViewModelV1 } from './reader-scene-contract.js';
+import { projectReaderSceneLocalePresentationV1 } from './reader-scene-locale-presentation-v1.js';
+import { getUiLocale } from './ui-i18n.js';
 
 function projectErrorState(error) {
   if (!(error instanceof ReaderRuntimeClientErrorV1)) {
@@ -59,6 +61,11 @@ export function createReaderSceneControllerV1(options) {
     throw new TypeError('Reader Scene controller requires an onState callback.');
   }
 
+  const resolveUiLocale = options.getUiLocale ?? getUiLocale;
+  if (typeof resolveUiLocale !== 'function') {
+    throw new TypeError('Reader Scene UI locale resolver must be a function.');
+  }
+
   let generation = 0;
   let activeController = null;
   let lastInput = null;
@@ -71,6 +78,9 @@ export function createReaderSceneControllerV1(options) {
   }
 
   async function load(input) {
+    // Capture the presentation preference when this request begins. Do not
+    // relabel an in-flight source response if the user changes UI language.
+    const requestedUiLocale = resolveUiLocale();
     const requestGeneration = ++generation;
     if (activeController !== null) activeController.abort();
     activeController = new AbortController();
@@ -93,7 +103,9 @@ export function createReaderSceneControllerV1(options) {
       });
       if (requestGeneration !== generation) return currentState;
 
-      return emit(projectReaderSceneViewModelV1(scene));
+      return emit(projectReaderSceneLocalePresentationV1(
+        projectReaderSceneViewModelV1(scene), requestedUiLocale,
+      ));
     } catch (error) {
       if (requestGeneration !== generation) return currentState;
       const projected = projectErrorState(error);
