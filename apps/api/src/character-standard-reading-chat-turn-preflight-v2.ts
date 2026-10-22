@@ -201,7 +201,7 @@ export async function prepareCharacterStandardReadingChatTurnPreflightV2(
       productAuthorityPort: input.productReaderEligibilityAuthorityPort,
     });
     const baseContext = assembleCharacterRuntimeContext(base.contextInput);
-    runtime = assembleOfficialStandardReaderRuntimeV2({
+    runtime = await assembleOfficialStandardReaderRuntimeV2({
       proof,
       currentScope: scope,
       source: current.source,
