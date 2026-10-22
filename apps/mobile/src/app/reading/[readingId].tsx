@@ -25,6 +25,8 @@ import {
 } from '@/features/records/records-view-model';
 import { mobileColors } from '@/ui/mobile-colors';
 import { MobileUiText } from '@/ui/MobileUiText';
+import { useMobileUiLocale } from '@/ui/mobile-ui-locale';
+import { projectMobileSourceLanguageNoticeV1 } from '@/ui/mobile-source-language-notice-v1';
 import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
 import { useMobilePullRefreshV1 } from '@/ui/use-mobile-pull-refresh';
 
@@ -79,6 +81,8 @@ function errorState(error: unknown): Extract<DetailStateV1, { kind: 'error' }> {
 
 export default function OfficialReadingDetailScreen() {
   const styles = useMobileThemedStyles(staticStyles);
+  const { locale } = useMobileUiLocale();
+  const sourceNotice = projectMobileSourceLanguageNoticeV1(locale, 'reading');
   const params = useLocalSearchParams<{ readingId?: string | string[] }>();
   const readingId = typeof params.readingId === 'string' ? params.readingId : '';
   const [state, setState] = useState<DetailStateV1>({ kind: 'loading' });
@@ -176,6 +180,10 @@ export default function OfficialReadingDetailScreen() {
               </MobileUiText>
             </View>
 
+            {sourceNotice.visible ? (
+              <Text style={styles.sourceLanguageNotice}>{sourceNotice.text}</Text>
+            ) : null}
+
             <View style={styles.readerCard}>
               <MobileUiText style={styles.readerCardTitle}>이 공식 Reading과 Reader</MobileUiText>
               <Text style={styles.readerCardText}>
@@ -263,6 +271,7 @@ const styles = StyleSheet.create({
   title: { color: mobileColors.ink, fontSize: 27, fontWeight: '800' },
   meta: { color: mobileColors.muted, fontSize: 13, lineHeight: 19 },
   authority: { color: mobileColors.navy, fontSize: 12, lineHeight: 18, fontWeight: '700' },
+  sourceLanguageNotice: { fontSize: 12, lineHeight: 19, color: mobileColors.muted, backgroundColor: mobileColors.surface, borderWidth: 1, borderColor: mobileColors.border, padding: 12, borderRadius: 10 },
   muted: { color: mobileColors.muted, fontSize: 14, lineHeight: 21 },
   error: { color: mobileColors.seal, fontSize: 14, lineHeight: 20 },
   retryButton: {
