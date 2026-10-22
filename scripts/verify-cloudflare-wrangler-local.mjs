@@ -140,6 +140,10 @@ async function probe() {
 
   for (const path of [
     '/api/chat/123e4567-e89b-42d3-a456-426614174000',
+    '/%61pi/chat/123e4567-e89b-42d3-a456-426614174000',
+    '/%2561pi/chat/123e4567-e89b-42d3-a456-426614174000',
+    '/api%2F%63hat/123e4567-e89b-42d3-a456-426614174000',
+    '/api%252F%2563hat/123e4567-e89b-42d3-a456-426614174000',
     '/api/chat/123e4567-e89b-42d3-a456-426614174000?afterSequenceNo=0&afterSequenceNo=2',
     '/api/chat/123e4567-e89b-42d3-a456-426614174000/replay',
     '/api/chat/123e4567-e89b-42d3-a456-426614174000/turns?replay=1',
