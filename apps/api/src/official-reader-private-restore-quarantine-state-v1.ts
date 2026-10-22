@@ -27,7 +27,7 @@ export type OfficialReaderRestoreOperatorReportV1 = Readonly<{
    * access; it does NOT remove the historical row inspected by S4/2230.
    */
   automaticCleanupPerformed: false;
-  readonlyOwnerRoute: 'existing_privacy_db_owner_disposition' | null;
+  existingPrivacyOwnerDispositionRoute: 'existing_privacy_db_owner_disposition' | null;
   resumeRequirement:
     | 'owner_reconcile_then_rerun_same_isolated_restore'
     | 'investigate_unknown_blocker_in_quarantine';
@@ -90,7 +90,7 @@ export function officialReaderRestoreFailureReportV1(
     derivedCategory: category,
     existingPrivacyOwnerCleanupRequired: true,
     automaticCleanupPerformed: false,
-    readonlyOwnerRoute: category ? 'existing_privacy_db_owner_disposition' : null,
+    existingPrivacyOwnerDispositionRoute: category ? 'existing_privacy_db_owner_disposition' : null,
     resumeRequirement: category
       ? 'owner_reconcile_then_rerun_same_isolated_restore'
       : 'investigate_unknown_blocker_in_quarantine',
