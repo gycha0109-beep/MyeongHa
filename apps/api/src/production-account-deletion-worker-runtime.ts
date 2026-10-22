@@ -153,7 +153,7 @@ export function createProductionAccountDeletionWorkerRuntimeV1(input: {
       ...(readerPrivacyDeletionPort === undefined
         ? {} : { readerPrivacyDeletionPort }),
     }),
-    runReaderRevocationPurgeBatch(purgeInput) {
+    runReaderRevocationPurgeBatch(purgeInput: Parameters<ProductionAccountDeletionWorkerRuntimeLeaseV1['runReaderRevocationPurgeBatch']>[0]) {
       if (offPrimary === null) {
         throw new Error('Reader revocation Privacy store is unavailable.');
       }
@@ -196,7 +196,7 @@ export function createProductionReaderPrivacyMaintenanceRuntimeV1(input: {
   const offPrimary = createOfficialReaderNodeOffPrimaryStoreV1(offPrimaryConfig);
   const pool = createNodePostgresAccountDeletionWorkerPoolV1(input.databaseConfig);
   return Object.freeze({
-    runReaderRevocationPurgeBatch(purgeInput) {
+    runReaderRevocationPurgeBatch(purgeInput: Parameters<ProductionAccountDeletionWorkerRuntimeLeaseV1['runReaderRevocationPurgeBatch']>[0]) {
       return runOfficialReaderPrivateRevocationPurgeBatchV1({
         pool,
         store: offPrimary,
