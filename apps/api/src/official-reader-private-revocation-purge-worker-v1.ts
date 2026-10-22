@@ -40,6 +40,11 @@ select public.internal_commit_official_reader_paid_answer_purge_v1(
   $1::uuid,$2::text,$3::text,$4::uuid[],$5::text[]
 )::text as "deletedCount"
 `;
+const RENEW_SQL = `
+select public.internal_renew_official_reader_paid_answer_purge_lease_v1(
+  $1::uuid,$2::text
+) as "renewed"
+`;
 const FINISH_SQL = `
 select public.internal_finish_official_reader_paid_answer_purge_v1(
   $1::uuid,$2::text,$3::text,$4::uuid[]
@@ -199,6 +204,17 @@ async function single<T>(pool: PostgresSubjectPoolV1,sql:string,
   return rows[0];
 }
 
+async function requireLiveLease(
+  pool: PostgresSubjectPoolV1,
+  jobId: string,
+  owner: string,
+): Promise<void> {
+  const renewed=await single<{renewed:unknown}>(
+    pool,RENEW_SQL,[jobId,owner],
+  );
+  boolean(renewed.renewed);
+}
+
 async function finishDbErased(input: {
   readonly pool: PostgresSubjectPoolV1;
   readonly store: OfficialReaderOffPrimaryStoreV1;
@@ -208,15 +224,24 @@ async function finishDbErased(input: {
   readonly fence: OfficialReaderScopeDeletionFenceV1;
 }): Promise<number> {
   const {store,fence,jobId}=input;
+  await requireLiveLease(input.pool,jobId,input.worker);
   await store.scopeLedger.acknowledgeScopeDatabaseErasure(jobId,fence.fenceId);
   let keysDestroyed=0;
-  for (const ref of fence.keyRefs) {
+  for (let index=0;index<fence.keyRefs.length;index++) {
+    // The database lease is bounded. Renew it periodically while performing
+    // irreversible filesystem erasure OUTSIDE PostgreSQL transactions.
+    // A restarted Worker has a NEW ownership token; any stale caller stops.
+    if(index%100===0) {
+      await requireLiveLease(input.pool,jobId,input.worker);
+    }
+    const ref=fence.keyRefs[index]!;
     if (!(await store.keys.isKeyDestroyed(ref))) {
       await store.keys.destroyKey(ref);
+      keysDestroyed++;
     }
     if (!(await store.keys.isKeyDestroyed(ref))) return fail();
-    keysDestroyed++;
   }
+  await requireLiveLease(input.pool,jobId,input.worker);
   await store.scopeLedger.acknowledgeScopeKeyErasure(jobId,fence.fenceId);
   const marked=await single<{done:unknown}>(
     input.pool,FINISH_SQL,[
