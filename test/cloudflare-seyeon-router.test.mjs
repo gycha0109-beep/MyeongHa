@@ -344,11 +344,116 @@ describe('S-CF2 actual Worker fetch boundary and no HTML fallback', () => {
       new Request(ROOT + '/assets/report.js', {
         headers: { 'If-None-Match': '"synthetic-tag"' },
       }),
-      { ASSETS: { fetch: () => new Response(null, { status: 304 }) } },
+      { ASSETS: { fetch: () => new Response(null, {
+        status: 304, headers: { ETag: '"synthetic-tag"' },
+      }) } },
     );
     expect(conditional.status).toBe(304);
     expect(await conditional.text()).toBe('');
     expect(conditional.headers.get('x-content-type-options')).toBe('nosniff');
+  });
+
+  it('rejects forged, malformed or unbound 304 ETag and Last-Modified responses', async () => {
+    const path = ROOT + '/assets/cache.js';
+    const timestamp = 'Wed, 21 Oct 2015 07:28:00 GMT';
+    const earlier = 'Wed, 21 Oct 2015 07:27:00 GMT';
+    const later = 'Wed, 21 Oct 2015 07:29:00 GMT';
+    const cases = [
+      [{ 'If-None-Match': '"client"' }, { ETag: '"server"' }],
+      [{ 'If-None-Match': '"client"' }, {}],
+      [{ 'If-None-Match': 'W/"client", "another"' }, { ETag: '"server"' }],
+      [{ 'If-None-Match': '"client", ' }, { ETag: '"client"' }],
+      [{ 'If-None-Match': '"client", *' }, { ETag: '"client"' }],
+      [{ 'If-None-Match': 'W/"unterminated' }, { ETag: '"client"' }],
+      [{ 'If-None-Match': 'weak' }, { ETag: '"client"' }],
+      [{ 'If-None-Match': '"client"' }, { ETag: 'client' }],
+      [{ 'If-None-Match': '"client"' }, { ETag: '"client", "another"' }],
+      [{ 'If-None-Match': '"client"', 'If-Modified-Since': later }, {
+        ETag: '"server"', 'Last-Modified': timestamp,
+      }], // ETag must take precedence over timestamp.
+      [{ 'If-Modified-Since': earlier }, { 'Last-Modified': timestamp }],
+      [{ 'If-Modified-Since': later }, {}],
+      [{ 'If-Modified-Since': 'not-a-date' }, { 'Last-Modified': timestamp }],
+      [{ 'If-Modified-Since': later }, { 'Last-Modified': 'Wed, 35 Oct 2015 07:28:00 GMT' }],
+      [{ 'If-Modified-Since': later }, { 'Last-Modified': timestamp, Date: 'yesterday' }],
+      [{ 'If-None-Match': '"client"' }, { ETag: '"client"', 'Content-Range': 'bytes 0-5/200' }],
+      [{ 'If-None-Match': '"client"' }, { ETag: '"client"', 'Content-Length': '0' }],
+      [{ 'If-None-Match': '"client"' }, { ETag: '"client"', 'Transfer-Encoding': 'chunked' }],
+      [{ 'If-None-Match': '"client"', 'If-Range': '"client"' }, { ETag: '"client"' }],
+      [{ 'If-None-Match': '"client"', 'If-Match': '"client"' }, { ETag: '"client"' }],
+    ];
+    for (const [requestHeaders, responseHeaders] of cases) {
+      const result = await worker.fetch(
+        new Request(path, { headers: requestHeaders }),
+        { ASSETS: { fetch: () => new Response(null, {
+          status: 304, headers: responseHeaders,
+        }) } },
+      );
+      expect(result.status, JSON.stringify([requestHeaders, responseHeaders])).toBe(404);
+      expect(result.headers.get('cache-control')).toBe('no-store');
+      expect(result.headers.get('set-cookie')).toBeNull();
+      expect(result.headers.get('location')).toBeNull();
+      expect(await result.text()).toBe('');
+    }
+  });
+
+  it('accepts only matched 304 cached non-HTML variants without body or cache breakage', async () => {
+    const path = ROOT + '/assets/cache.js';
+    const timestamp = 'Wed, 21 Oct 2015 07:28:00 GMT';
+    const later = 'Wed, 21 Oct 2015 07:29:00 GMT';
+    const cases = [
+      [{ 'If-None-Match': '"same"' }, { ETag: '"same"' }],
+      [{ 'If-None-Match': 'W/"same"' }, { ETag: '"same"' }],
+      [{ 'If-None-Match': '"other", W/"same"' }, { ETag: 'W/"same"' }],
+      [{ 'If-None-Match': '"with,comma"' }, { ETag: 'W/"with,comma"' }],
+      [{ 'If-None-Match': '*' }, { ETag: '"same"' }],
+      [{ 'If-Modified-Since': timestamp }, { 'Last-Modified': timestamp }],
+      [{ 'If-Modified-Since': later }, { 'Last-Modified': timestamp }],
+      [{ 'If-None-Match': '"same"', 'If-Modified-Since': 'not-a-date' }, { ETag: '"same"' }],
+    ];
+    for (const [requestHeaders, responseHeaders] of cases) {
+      const candidate = { ...responseHeaders, 'Cache-Control': 'public,max-age=300', Date: timestamp };
+      const response = await worker.fetch(
+        new Request(path, { headers: requestHeaders }),
+        { ASSETS: { fetch: () => new Response(null, { status: 304, headers: candidate }) } },
+      );
+      expect(response.status, JSON.stringify([requestHeaders, responseHeaders])).toBe(304);
+      expect(response.body).toBeNull();
+      expect(await response.text()).toBe('');
+      expect(response.headers.get('cache-control')).toBe('public,max-age=300');
+      expect(response.headers.get('content-security-policy')).toContain("default-src 'self'");
+      expect(response.headers.get('x-content-type-options')).toBe('nosniff');
+      expect(response.headers.get('x-robots-tag')).toContain('noindex');
+    }
+    // Protected HTML is never eligible for a revalidation 304, even with
+    // syntactically valid ETags; the exact HTML allowlist still requires 200.
+    const html = await worker.fetch(
+      new Request(ROOT + '/index.html', { headers: { 'If-None-Match': '"same"' } }),
+      { ASSETS: { fetch: () => new Response(null, {
+        status: 304, headers: { ETag: '"same"' },
+      }) } },
+    );
+    expect(html.status).toBe(404);
+    expect(await html.text()).toBe('');
+  });
+
+  it('rejects a synthetic 304 Response subclass carrying a hidden stream body', async () => {
+    class Forged304 extends Response {
+      get body() {
+        return new ReadableStream({ start(controller) {
+          controller.enqueue(new TextEncoder().encode(SECRET));
+          controller.close();
+        } });
+      }
+    }
+    const leaked = await worker.fetch(
+      new Request(ROOT + '/assets/cache.js', { headers: { 'If-None-Match': '"same"' } }),
+      { ASSETS: { fetch: () => new Forged304(null, {
+        status: 304, headers: { ETag: '"same"' },
+      }) } },
+    );
+    expect(leaked.status).toBe(404);
+    expect(await leaked.text()).toBe('');
   });
 
   it('binds every ASSETS 206 interval to the exact single client byte Range', async () => {
