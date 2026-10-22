@@ -4,7 +4,9 @@ import {describe,expect,it} from 'vitest';
 import {
   assertSeyeonFirstPositiveNodeDbReadyV1,
   createSeyeonFirstPositiveMemoryLockedReadV1,
+  executeAndDeliverSeyeonFirstPositiveMemoryNodeTurnV1,
 } from '../apps/api/src/seyeon-first-positive-memory-node-delivery-v1.js';
+import type { ServerResponse } from 'node:http';
 import type {
   PostgresQueryResultV1,
   PostgresSubjectConnectionV1,
@@ -131,6 +133,77 @@ describe('Se-yeon G3 Node-only original-Grant current Subject fence',()=>{
       deliver:async()=>{throw Error('must not repeat');},
     })).rejects.toMatchObject({code:'INVALID_SCOPE'});
     expect(pool.connects).toBe(1);
+  });
+
+  it('closes an open first-reply socket on DB_NOT_READY before any runtime/provider call', async () => {
+    const connection = new FakeG3Connection(SUBJECT, CANARY, false);
+    const pool = new FakeG3Pool(connection);
+    let destroyed = false;
+    let runtimeCalls = 0;
+    const response = {
+      headersSent: false,
+      writableEnded: false,
+      destroyed: false,
+      socket: {},
+      destroy() { destroyed = true; },
+    } as unknown as ServerResponse;
+    await expect(executeAndDeliverSeyeonFirstPositiveMemoryNodeTurnV1({
+      response,
+      requestSignal: new AbortController().signal,
+      pool,
+      verifiedEvidence: EVIDENCE,
+      threadId: THREAD,
+      clientTurnId: TURN,
+      text: '안녕하세요',
+      requestId: 'g3-test-readiness',
+      serverTime: '2026-10-22T00:00:00.000Z',
+      runtime: {
+        async run(): Promise<never> {
+          runtimeCalls += 1;
+          throw Error('Provider path must not start');
+        },
+      },
+    })).rejects.toMatchObject({code: 'DB_NOT_READY'});
+    expect(destroyed).toBe(true);
+    expect(runtimeCalls).toBe(0);
+    expect(pool.connects).toBe(1);
+    expect(queries(connection)).not.toContainEqual(
+      expect.stringContaining('from public.qry_seyeon_positive_first_memory_locked_reveal_v1('),
+    );
+  });
+
+  it('closes an open socket on a failed DB readiness transaction without provider dispatch', async () => {
+    const pool: PostgresSubjectPoolV1 = {
+      connect() { throw Error('Database unavailable'); },
+    };
+    let destroyed = false;
+    let runtimeCalls = 0;
+    const response = {
+      headersSent: false,
+      writableEnded: false,
+      destroyed: false,
+      socket: {},
+      destroy() { destroyed = true; },
+    } as unknown as ServerResponse;
+    await expect(executeAndDeliverSeyeonFirstPositiveMemoryNodeTurnV1({
+      response,
+      requestSignal: new AbortController().signal,
+      pool,
+      verifiedEvidence: EVIDENCE,
+      threadId: THREAD,
+      clientTurnId: TURN,
+      text: '상담 시작',
+      requestId: 'g3-test-db-error',
+      serverTime: '2026-10-22T00:00:00.000Z',
+      runtime: {
+        async run(): Promise<never> {
+          runtimeCalls += 1;
+          throw Error('Provider path must not start');
+        },
+      },
+    })).rejects.toThrow(/Database unavailable/u);
+    expect(destroyed).toBe(true);
+    expect(runtimeCalls).toBe(0);
   });
 
   it('keeps absent G1/G2/G3 owner RPC and EXECUTE privileges before Provider at DB_NOT_READY',async()=>{
