@@ -127,7 +127,8 @@ export async function prepareCharacterStandardReadingChatTurnPreflightV2(
     accessAuthorityPort: input.accessAuthorityPort,
     artifactAuthorityPort: input.artifactAuthorityPort,
     productReaderEligibilityAuthorityPort: input.productReaderEligibilityAuthorityPort,
-    currentVerifiedPurchaseAuthorityPort: input.currentVerifiedPurchaseAuthorityPort,
+    ...(input.currentVerifiedPurchaseAuthorityPort === undefined
+      ? {} : { currentVerifiedPurchaseAuthorityPort: input.currentVerifiedPurchaseAuthorityPort }),
   };
 
   let first;
@@ -200,7 +201,8 @@ export async function prepareCharacterStandardReadingChatTurnPreflightV2(
       prepared: first,
       currentScope: scope,
       productAuthorityPort: input.productReaderEligibilityAuthorityPort,
-      currentVerifiedPurchaseAuthorityPort: input.currentVerifiedPurchaseAuthorityPort,
+      ...(input.currentVerifiedPurchaseAuthorityPort === undefined
+      ? {} : { currentVerifiedPurchaseAuthorityPort: input.currentVerifiedPurchaseAuthorityPort }),
     });
     const baseContext = assembleCharacterRuntimeContext(base.contextInput);
     runtime = await assembleOfficialStandardReaderRuntimeV2({
@@ -208,7 +210,8 @@ export async function prepareCharacterStandardReadingChatTurnPreflightV2(
       currentScope: scope,
       source: current.source,
       baseContext,
-      currentVerifiedPurchaseAuthorityPort: input.currentVerifiedPurchaseAuthorityPort,
+      ...(input.currentVerifiedPurchaseAuthorityPort === undefined
+      ? {} : { currentVerifiedPurchaseAuthorityPort: input.currentVerifiedPurchaseAuthorityPort }),
     });
   } catch {
     return deny('ACCESS_DENIED');
