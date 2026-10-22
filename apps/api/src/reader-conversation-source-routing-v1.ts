@@ -1,6 +1,7 @@
 import {
   classifyCharacterStandardFollowupLexicalIntentV1,
   classifyExactOfficialReadingSummaryReferenceV1,
+  inspectCharacterStandardFollowupSignalsV1,
 } from './character-standard-reading-chat-question-scope-v1.js';
 import {
   prepareReaderLatestAnchorContinuityV1,
@@ -242,6 +243,18 @@ export async function prepareReaderConversationResponseCandidateV1(
 
   if (intent.primaryIntent === 'clarification') {
     return hold(intent, 'clarification_required');
+  }
+
+  // RR-05 independent instruction-override observations are negative-only:
+  // catch disguised system/developer role instructions the conversational
+  // hint regex missed. No provider, Official source, Memory or policy bypass.
+  // Known risk candidates above still defer to the existing Security Gate.
+  const inspected = inspectCharacterStandardFollowupSignalsV1(
+    input.userText, input.admittedDomain ?? '',
+  );
+  if (inspected.securitySignals.includes('instruction_override_attempt') ||
+      inspected.securitySignals.includes('invalid_input')) {
+    return hold(intent, 'existing_guard_rejected');
   }
 
   // Ordinary chat and support NEVER consume even a supplied Official snapshot.
