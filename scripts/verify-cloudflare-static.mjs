@@ -26,6 +26,34 @@ export const HTML_ENTRIES = Object.freeze([
   'records.html',
 ]);
 
+/**
+ * A public asset must not be addressable at the API root after intermediaries
+ * case-fold or decode one or more layers of URI escapes. Only the first path
+ * segment is authoritative; a nested "assets/api" directory is not /api.
+ * This is a build-time denial, not evidence of raw Edge request routing.
+ */
+export function isCloudflareApiStaticAliasV1(relativeArtifactPath) {
+  if (typeof relativeArtifactPath !== 'string' ||
+      relativeArtifactPath.length === 0) return true;
+  let candidate = relativeArtifactPath.replaceAll('\\', '/');
+  for (let depth = 0; depth < 8; depth += 1) {
+    if (/^api(?:$|\/)/iu.test(candidate.replace(/^\/+/u, ''))) return true;
+    if (!candidate.includes('%')) return false;
+    let decoded;
+    try {
+      decoded = decodeURIComponent(candidate);
+    } catch {
+      // Malformed root API aliases do not become approved static names.
+      return /^api/iu.test(candidate.replace(/^\/+/u, ''));
+    }
+    if (decoded === candidate) return false;
+    candidate = decoded.replaceAll('\\', '/');
+  }
+  // A residual, unbounded decoding chain is not a public asset grant.
+  return candidate.includes('%') ||
+    /^api(?:$|\/)/iu.test(candidate.replace(/^\/+/u, ''));
+}
+
 export async function verifyCloudflareStaticArtifact(options = {}) {
   const cwd = options.cwd ?? process.cwd();
   const outputRoot = resolve(
@@ -91,11 +119,14 @@ export async function verifyCloudflareStaticArtifact(options = {}) {
         throw new Error('Symlink must not be deployed: ' + filename);
       }
       if (entry.isDirectory()) {
-        if (relative(outputRoot, filename).split(sep)[0] === 'api') {
-          throw new Error('Static artifact cannot contain an API directory.');
+        if (isCloudflareApiStaticAliasV1(relative(outputRoot, filename).split(sep).join('/'))) {
+          throw new Error('Static artifact cannot contain an API alias directory.');
         }
         stack.push(filename);
       } else if (entry.isFile()) {
+        if (isCloudflareApiStaticAliasV1(relative(outputRoot, filename).split(sep).join('/'))) {
+          throw new Error('Static artifact cannot contain an API alias file.');
+        }
         const stat = await lstat(filename);
         fileCount += 1;
         totalAssetBytes += stat.size;
