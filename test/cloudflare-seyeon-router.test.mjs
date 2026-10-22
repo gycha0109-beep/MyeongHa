@@ -188,6 +188,62 @@ describe('S-CF2 actual Worker fetch boundary and no HTML fallback', () => {
     expect(await health.json()).toEqual({ status: 'ok' });
   });
 
+  it('intercepts all static requests before ASSETS and denies encoded API alias or query-marker bypass', async () => {
+    const calls = vi.fn(async request =>
+      new Response('<!doctype html><html>public fixture</html>', {
+        status: 200,
+        headers: {
+          'content-type': 'text/html; charset=utf-8',
+          'cache-control': 'no-store',
+        },
+      }),
+    );
+    const env = { ASSETS: { fetch: calls } };
+
+    for (const path of [
+      '/index.html?__myeongha_chat_open=1',
+      '/?__myeongha_chat_turn_send=1',
+      '/hall.html?%255F_myeongha_chat_open=1',
+      '/api%2Fhealth',
+      '/%61pi%252Fme',
+      '/API/health',
+      '/api%2Fchat/' + THREAD,
+    ]) {
+      const held = await worker.fetch(new Request(ROOT + path), env);
+      if (path.startsWith('/api') || path.startsWith('/%61pi') ||
+          path.startsWith('/API')) {
+        // Encoded/noncanonical API selectors must never be Static Assets.
+        expect([404, 503]).toContain(held.status);
+        expect(held.headers.get('cache-control')).toBe('no-store');
+      } else {
+        await expectHeld(held);
+      }
+      expect(held.headers.get('location')).toBeNull();
+    }
+    expect(calls).not.toHaveBeenCalled();
+
+    for (const path of ['/index.html', '/', '/assets/logo.png']) {
+      const response = await worker.fetch(new Request(ROOT + path), env);
+      expect(response.status).toBe(200);
+      expect(await response.text()).toContain('public fixture');
+    }
+    expect(calls).toHaveBeenCalledTimes(3);
+
+    const rejectedPost = await worker.fetch(new Request(ROOT + '/index.html', {
+      method: 'POST',
+    }), env);
+    expect(rejectedPost.status).toBe(404);
+    expect(calls).toHaveBeenCalledTimes(3);
+
+    const missingAssetBinding = await worker.fetch(new Request(ROOT + '/index.html'), {});
+    expect(missingAssetBinding.status).toBe(404);
+    const failingAssets = await worker.fetch(new Request(ROOT + '/index.html'), {
+      ASSETS: { fetch() { throw Error('SYNTHETIC_ASSET_FAILURE'); } },
+    });
+    expect(failingAssets.status).toBe(404);
+    expect(await failingAssets.text()).toBe('');
+  });
+
   it('does not confuse an unported other-Character chat open with approved SeYeon Reveal', async () => {
     const response = await worker.fetch(new Request(ROOT + '/api/chat', { method: 'POST' }), {});
     expect(response.status).toBe(404);
