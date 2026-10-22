@@ -70,8 +70,7 @@ function apiOrChatAlias(request: Request): Readonly<{
 }> {
   try {
     const path = new URL(request.url).pathname;
-    const api = /^\/api(?:$|\/)/iu.test(path) ||
-      /^\/%61pi(?:$|\/)/iu.test(path);
+    const api = /^\/api(?:$|\/)/iu.test(path);
     // Alias classification remains independent of route disposition: the
     // caller's Ops "other_api"/"static_asset" label cannot bypass a HOLD.
     return { api, chatAlias: isSeyeonCloudflareProtectedIngressAliasV1(request) };
