@@ -10,6 +10,7 @@ import { MobileUiText } from '@/ui/MobileUiText';
 import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
 import { useMobileTheme } from '@/ui/mobile-theme';
 import { useMobileUiLocale } from '@/ui/mobile-ui-locale';
+import { projectMobileChatComposeUiV1 } from '@/features/chat/mobile-chat-compose-ui-locale-v1';
 import {
   ActivityIndicator,
   Image,
@@ -281,7 +282,9 @@ export function ChatComposer({
 }) {
   const styles = useMobileThemedStyles(staticStyles);
   const { theme } = useMobileTheme();
-  const { t } = useMobileUiLocale();
+  const { t, locale } = useMobileUiLocale();
+  const composeUi = projectMobileChatComposeUiV1(locale,
+    snapshot.characterId === null ? 'checking_character' : snapshot.characterId === 'seyeon' ? 'waiting_history' : 'character_not_ready');
   if (isSeyeonHistoryRevealHoldV1(snapshot)) {
     return (
       <View style={[styles.pendingCard, theme === 'dark' ? styles.seyeonSurfaceDark : styles.seyeonSurface]}>
@@ -300,18 +303,8 @@ export function ChatComposer({
   if (!allowed) {
     return (
       <View style={styles.pendingCard}>
-        <Text style={styles.pendingTitle}>
-          {snapshot.characterId === null
-            ? '대화 상대를 확인하고 있습니다'
-            : seyeon
-              ? '대화 기록을 확인한 뒤 메시지를 보낼 수 있습니다'
-              : '이 캐릭터의 AI 대화는 준비 중입니다'}
-        </Text>
-        <Text style={styles.stateText}>
-          {seyeon
-            ? '대화방 기록을 불러오지 못한 경우 다시 입장해 주세요.'
-            : '캐릭터 대화방과 기록은 이용할 수 있으며, AI 답변 기능은 추후 열립니다.'}
-        </Text>
+        <Text style={styles.pendingTitle}>{composeUi.blockedTitle}</Text>
+        <Text style={styles.stateText}>{composeUi.blockedDescription}</Text>
       </View>
     );
   }
@@ -325,7 +318,7 @@ export function ChatComposer({
           value={draft}
           onChangeText={onChangeDraft}
           editable={!sending}
-          placeholder="세연에게 하고 싶은 말을 적어주세요"
+          placeholder={composeUi.placeholder}
           placeholderTextColor={mobileColors.muted}
           style={styles.composerInput}
         />
