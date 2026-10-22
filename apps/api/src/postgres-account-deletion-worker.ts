@@ -347,7 +347,7 @@ export function createPostgresAccountDeletionWorkerPortsV1(input: {
   });
 
   const readerPrivacyStatePort: AccountDeletionReaderPrivacyStatePortV1 = Object.freeze({
-    async readProtectedManifest(identity) {
+    async readProtectedManifest(identity: Parameters<AccountDeletionReaderPrivacyStatePortV1['readProtectedManifest']>[0]) {
       return executePostgresAccountDeletionWorkerTransactionV1({
         pool: input.pool,
         execute: async (client) => {
@@ -372,7 +372,7 @@ export function createPostgresAccountDeletionWorkerPortsV1(input: {
         },
       });
     },
-    async hasPendingKeyErasure(identity) {
+    async hasPendingKeyErasure(identity: Parameters<AccountDeletionReaderPrivacyStatePortV1['hasPendingKeyErasure']>[0]) {
       return executePostgresAccountDeletionWorkerTransactionV1({
         pool: input.pool,
         execute: async (client) => {
@@ -390,7 +390,7 @@ export function createPostgresAccountDeletionWorkerPortsV1(input: {
         },
       });
     },
-    async markKeysErased(identity) {
+    async markKeysErased(identity: Parameters<AccountDeletionReaderPrivacyStatePortV1['markKeysErased']>[0]) {
       return executePostgresAccountDeletionWorkerTransactionV1({
         pool: input.pool,
         execute: async (client) => {
