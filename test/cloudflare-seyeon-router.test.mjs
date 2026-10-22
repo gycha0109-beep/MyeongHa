@@ -351,6 +351,59 @@ describe('S-CF2 actual Worker fetch boundary and no HTML fallback', () => {
     expect(conditional.headers.get('x-content-type-options')).toBe('nosniff');
   });
 
+  it('binds every ASSETS 206 interval to the exact single client byte Range', async () => {
+    const path = ROOT + '/assets/chunk.js';
+    const cases = [
+      ['bytes=0-5', 'bytes 1-6/200', undefined],
+      ['bytes=0-5', 'bytes 0-4/200', undefined],
+      ['bytes=0-5', 'bytes 0-5/5', undefined],
+      ['bytes=0-5', 'bytes 0-5/200', '4'],
+      ['bytes=0-5', 'bytes 0-5/200', 'bogus'],
+      ['bytes=0-5,10-15', 'bytes 0-5/200', undefined],
+      ['bytes=-0', 'bytes 0-5/200', undefined],
+      ['bytes=-5', 'bytes 0-4/200', undefined],
+      ['bytes=6-5', 'bytes 6-5/200', undefined],
+      ['bytes=0-9007199254740993', 'bytes 0-5/200', undefined],
+      ['bytes=0-', 'bytes 0-5/200', undefined],
+      ['bytes=200-', 'bytes 200-205/300', undefined],
+      ['items=0-5', 'bytes 0-5/200', undefined],
+      ['bytes=00-05', 'bytes 0-5/200', undefined],
+    ];
+    for (const [range, contentRange, contentLength] of cases) {
+      const response = await worker.fetch(new Request(path, { headers: { Range: range } }), {
+        ASSETS: { fetch: () => new Response('PUBLIC', {
+          status: 206,
+          headers: {
+            'Content-Type': 'text/javascript',
+            'Content-Range': contentRange,
+            ...(contentLength === undefined ? {} : { 'Content-Length': contentLength }),
+          },
+        }) },
+      });
+      expect(response.status, range + ' => ' + contentRange).toBe(404);
+      expect(response.headers.get('cache-control')).toBe('no-store');
+      expect(await response.text()).toBe('');
+    }
+
+    for (const [range, contentRange] of [
+      ['bytes=0-5', 'bytes 0-5/200'],
+      ['bytes=10-', 'bytes 10-199/200'],
+      ['bytes=-4', 'bytes 196-199/200'],
+      ['bytes=190-300', 'bytes 190-199/200'],
+    ]) {
+      const response = await worker.fetch(new Request(path, { headers: { Range: range } }), {
+        ASSETS: { fetch: () => new Response('PUBLIC', {
+          status: 206, headers: {
+            'Content-Type': 'text/javascript',
+            'Content-Range': contentRange,
+          },
+        }) },
+      });
+      expect(response.status, range + ' => ' + contentRange).toBe(206);
+      expect(await response.text()).toBe('PUBLIC');
+    }
+  });
+
   it('preserves approved HTML security headers and non-HTML cache behavior', async () => {
     const publicHtml = await worker.fetch(new Request(ROOT + '/index.html'), {
       ASSETS: { fetch: () => new Response('<html>public</html>', {
