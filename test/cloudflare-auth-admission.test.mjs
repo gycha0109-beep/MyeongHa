@@ -460,6 +460,21 @@ describe('Cloudflare Auth/DB Worker response and cookie-origin fence', () => {
       async close() { throw Error('SYNTHETIC_SECRET'); },
     })).toBe(false);
     expect(await closeCloudflareAuthResourcesV1(undefined, undefined)).toBe(true);
+    observed.length = 0;
+    const subjectPool = { async close() { observed.push('subject'); } };
+    expect(await closeCloudflareAuthResourcesV1(runtime, pool, subjectPool)).toBe(true);
+    expect(observed).toEqual(['runtime', 'pool', 'subject']);
+    observed.length = 0;
+    expect(await closeCloudflareAuthResourcesV1(broken, pool, subjectPool)).toBe(false);
+    expect(observed).toEqual(['runtime-failed', 'pool', 'subject']);
+    observed.length = 0;
+    expect(await closeCloudflareAuthResourcesV1(runtime, {
+      async close() { observed.push('rate-limit-failed'); throw Error('SYNTHETIC_SECRET'); },
+    }, subjectPool)).toBe(false);
+    expect(observed).toEqual(['runtime', 'rate-limit-failed', 'subject']);
+    expect(await closeCloudflareAuthResourcesV1(runtime, pool, {
+      async close() { throw Error('SYNTHETIC_SECRET'); },
+    })).toBe(false);
   });
 
   it('keeps Google/Kakao web callback and existing mobile deeplink exact', async () => {
