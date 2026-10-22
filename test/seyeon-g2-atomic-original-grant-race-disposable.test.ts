@@ -4,7 +4,10 @@ import { afterAll, describe, expect, it } from 'vitest';
 import { Pool, type PoolClient } from 'pg';
 import {createHash} from 'node:crypto';
 import {canonicalJson} from '../packages/domain/src/index.js';
-import type {SeyeonRetrievedMemoryV2} from '../packages/domain/src/seyeon-runtime-context-v2.js';
+import {
+  assembleSeyeonRuntimeContextV2,
+  type SeyeonRetrievedMemoryV2,
+} from '../packages/domain/src/seyeon-runtime-context-v2.js';
 import type {SeyeonPersonalRecordProjectionCandidateV1} from '../apps/api/src/seyeon-production-context-v1.js';
 import {selectSeyeonExactModelPersonalSourcesV1} from '../apps/api/src/seyeon-exact-model-personal-source-selection-v1.js';
 import type {PostgresSubjectPoolV1} from '../apps/api/src/postgres-subject-execution.js';
@@ -245,7 +248,17 @@ function r23FinalSource(id:ReturnType<typeof ids>){
     readerDerivedSources:[],workerDerivedSources:[],
     externalToolPrivateSources:[],
   };
-  return {retrievedMemories,sourceCandidates:sources,selection,sourceEnvelope};
+  const finalModelContext=assembleSeyeonRuntimeContextV2({
+    relationship:null,relationshipSemantics:null,recentMessages:[],
+    retrievedMemories,integrityDecisions:[],
+    governedPreflightApplied:false,
+    disclosure:{decision:null,retrievedSources:[]},
+  });
+  const finalModelContextDigest=r23Hash(finalModelContext);
+  return {
+    retrievedMemories,sourceCandidates:sources,selection,sourceEnvelope,
+    finalModelContext,finalModelContextDigest,
+  };
 }
 function r23Pool():PostgresSubjectPoolV1{
   return {
@@ -273,6 +286,24 @@ describe.skipIf(!enabled)('G2 original Grant actual-v2 two-session race, disposa
     const final=r23FinalSource(idShape);
     const id=await prepare(31,true,final.selection.selectedSourcesDigest);
     await stage(id,proof(id));
+    // Preserve the real producer/worker schema even for this disposable R23
+    // candidate; the simplified four-field fixture was not a valid Snapshot.
+    const postTurnSnapshot={
+      schemaVersion:'seyeon-post-turn-analysis-snapshot-v1',
+      mode:'OFF' as const,
+      turnId:id.turn,assistantMessageId:id.assistantMessage,
+      userMessageId:id.userMessage,
+      preparedAt:'2026-10-21T03:00:00.000Z',
+      productionAuthorityRef:'synthetic-r23-offline-only',
+      interpretation:{},envelope:{},eventAuthorityEvidence:{},
+      priorEvents:[],relationshipBefore:{},productionCausalBindings:[],
+      identity:{
+        experimentalEventId:id.attempt,
+        experimentalEventDedupeKey:'synthetic-r23-event',
+        productionEventId:id.chatOutbox,
+        relationshipSyncOutboxEventId:id.postOutbox,
+      },
+    };
     const input={
       pool:r23Pool(),
       verifiedEvidence:{
@@ -282,19 +313,17 @@ describe.skipIf(!enabled)('G2 original Grant actual-v2 two-session race, disposa
       threadId:id.thread,turnId:id.turn,attemptId:id.attempt,
       assistantMessageId:id.assistantMessage,chatOutboxId:id.chatOutbox,
       postTurnOutboxId:id.postOutbox,
-      postTurnSnapshot:{
-        schemaVersion:'seyeon-post-turn-analysis-snapshot-v1',
-        turnId:id.turn,assistantMessageId:id.assistantMessage,
-        userMessageId:id.userMessage,
-      },
-      postTurnSnapshotHash:'sha256:v1:'+'c'.repeat(64),
+      postTurnSnapshot,
+      postTurnSnapshotHash:r23Hash(postTurnSnapshot),
       finalRetrievedMemories:final.retrievedMemories,
+      finalModelContext:final.finalModelContext,
       sourceCandidates:final.sourceCandidates,
       sourceEnvelope:final.sourceEnvelope,
       preModelSelection:final.selection,
       g1Receipt:{
         turnId:id.turn,attemptId:id.attempt,
         selectedSourcesDigest:final.selection.selectedSourcesDigest,
+        finalModelContextDigest:final.finalModelContextDigest,
         recordId:id.memory,originalGrantId:id.grant,
         pgPayloadDigest:id.rawDigest,contextReady:true as const,
       },
@@ -308,6 +337,82 @@ describe.skipIf(!enabled)('G2 original Grant actual-v2 two-session race, disposa
     await expect(commitSeyeonR23OfflineAtomicV2V1({
       ...input,g1Receipt:{...input.g1Receipt,
         originalGrantId:'d6000000-0000-4000-8000-000000000099'},
+    })).rejects.toBeInstanceOf(SeyeonR23OfflineG2CommitHoldV1);
+    // The original G1 source set may remain identical while the FINAL
+    // interpreter packet adds historical or derived private content.
+    // Reject every mutation BEFORE opening a G2 database transaction.
+    for(const finalModelContext of [
+      {...input.finalModelContext,
+        recentMessages:[{role:'assistant',content:'unapproved historical text'}]},
+      {...input.finalModelContext,
+        governedPreflightApplied:true},
+      {...input.finalModelContext,
+        disclosure:{decision:{kind:'unapproved'},retrievedSources:[]}},
+      {...input.finalModelContext,unapprovedPrivateField:'not pinned'},
+    ] as unknown as (typeof input.finalModelContext)[]){
+      await expect(commitSeyeonR23OfflineAtomicV2V1({
+        ...input,finalModelContext,
+      })).rejects.toBeInstanceOf(SeyeonR23OfflineG2CommitHoldV1);
+    }
+    await expect(commitSeyeonR23OfflineAtomicV2V1({
+      ...input,
+      g1Receipt:{...input.g1Receipt,
+        finalModelContextDigest:'sha256:v1:'+'0'.repeat(64)},
+    })).rejects.toBeInstanceOf(SeyeonR23OfflineG2CommitHoldV1);
+    expect(await saved(id)).toMatchObject({
+      messages:'0',outboxes:'0',admissions:'0',
+      attempt_state:'validated',
+    });
+    // Hash and post-turn analytical payload MUST describe the same object;
+    // reject mismatch before any Assistant, Outbox or admission can be written.
+    await expect(commitSeyeonR23OfflineAtomicV2V1({
+      ...input,postTurnSnapshotHash:'sha256:v1:'+'c'.repeat(64),
+    })).rejects.toBeInstanceOf(SeyeonR23OfflineG2CommitHoldV1);
+    await expect(commitSeyeonR23OfflineAtomicV2V1({
+      ...input,postTurnSnapshot:{...postTurnSnapshot,
+        unexpectedPrivatePayload:'unapproved derived data'},
+    })).rejects.toBeInstanceOf(SeyeonR23OfflineG2CommitHoldV1);
+    await expect(commitSeyeonR23OfflineAtomicV2V1({
+      ...input,postTurnSnapshot:{...postTurnSnapshot,
+        userMessageId:'d1000000-0000-4000-8000-000000000099'},
+    })).rejects.toBeInstanceOf(SeyeonR23OfflineG2CommitHoldV1);
+    // A malicious caller can recompute SHA-256 over a substituted body.
+    // It is not thereby a valid Post-turn Snapshot or the same assistant.
+    for(const forgedSnapshot of [
+      {...postTurnSnapshot,turnId:'d1000000-0000-4000-8000-000000000099'},
+      {...postTurnSnapshot,assistantMessageId:'d1000000-0000-4000-8000-000000000098'},
+      {...postTurnSnapshot,unapprovedPrivateField:'not in the official worker schema'},
+      {...postTurnSnapshot,identity:{...postTurnSnapshot.identity,
+        unapprovedIdentity:'not admitted'}},
+      {...postTurnSnapshot,mode:'NONEXISTENT'},
+    ]){
+      await expect(commitSeyeonR23OfflineAtomicV2V1({
+        ...input,postTurnSnapshot:forgedSnapshot,
+        postTurnSnapshotHash:r23Hash(forgedSnapshot),
+      })).rejects.toBeInstanceOf(SeyeonR23OfflineG2CommitHoldV1);
+    }
+    expect(await saved(id)).toMatchObject({
+      messages:'0',outboxes:'0',admissions:'0',attempt_state:'validated',
+    });
+    // G1 candidate receipt can claim any format-valid PostgreSQL digest.
+    // Exact DB Owner inspector readback must reject the forged value, and
+    // no assistant/outbox/admission may survive the rollback.
+    await expect(commitSeyeonR23OfflineAtomicV2V1({
+      ...input,g1Receipt:{...input.g1Receipt,
+        pgPayloadDigest:'sha256:pg-jsonb:v1:'+'0'.repeat(64)},
+    })).rejects.toBeInstanceOf(SeyeonR23OfflineG2CommitHoldV1);
+    expect(await saved(id)).toMatchObject({
+      messages:'0',outboxes:'0',admissions:'0',
+      attempt_state:'validated',
+    });
+    // A valid official Snapshot whose SHA was recomputed must still match
+    // the USER message actually persisted by the DB for this Turn. The
+    // DB-owned G2 wrapper enforces this, not the caller's Snapshot hash.
+    const forgedUserSnapshot={...postTurnSnapshot,
+      userMessageId:'d7100000-0000-4000-8000-000000000099'};
+    await expect(commitSeyeonR23OfflineAtomicV2V1({
+      ...input,postTurnSnapshot:forgedUserSnapshot,
+      postTurnSnapshotHash:r23Hash(forgedUserSnapshot),
     })).rejects.toBeInstanceOf(SeyeonR23OfflineG2CommitHoldV1);
     expect(await saved(id)).toMatchObject({
       messages:'0',outboxes:'0',admissions:'0',

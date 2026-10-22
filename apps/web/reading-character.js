@@ -1,3 +1,6 @@
+import { resolveCharacterDisplayNameV1 } from './character-display-locale.js';
+import { getUiLocale, translateStaticUi } from './ui-i18n.js';
+import { readingScopeLabelV1, readingSceneProgressV1, readingRouteStateCopyV1 } from './reading-detail-ui-locale.js';
 import { resolveReadingDetailRoute } from './reading-detail-route.js';
 import { resolveSajuButtonEngineRequest } from './reading-saju-engine-request.js';
 import { isBrowserSajuPreviewDeliveryV1 } from './saju-preview-response-admission.js';
@@ -131,19 +134,21 @@ if (route.valid) {
   delete root.dataset.readingScopeKey;
 }
 
-document.querySelectorAll('[data-reader-name]').forEach((element) => { element.textContent = reader.name; });
-document.querySelectorAll('[data-reader-title]').forEach((element) => {
-  element.textContent = reader.title;
-  element.hidden = !reader.title;
-});
-document.querySelectorAll('[data-reader-intro]').forEach((element) => { element.textContent = reader.intro; });
-document.querySelectorAll('[data-reader-hanja]').forEach((element) => {
-  element.textContent = reader.hanja;
-  element.hidden = !reader.hanja;
-});
-
 const portrait = document.querySelector('[data-reader-portrait]');
-if (portrait) portrait.setAttribute('aria-label', `${reader.name} 사주 읽기 장면`);
+function renderReaderLocalePresentation() {
+  const locale = getUiLocale();
+  const label = resolveCharacterDisplayNameV1(readerKey, locale) ?? reader.name;
+  document.querySelectorAll('[data-reader-name]').forEach((element) => { element.textContent = label; });
+  document.querySelectorAll('[data-reader-title]').forEach((element) => { element.textContent = translateStaticUi(reader.title, locale); element.hidden = !reader.title; });
+  document.querySelectorAll('[data-reader-intro]').forEach((element) => { element.textContent = translateStaticUi(reader.intro, locale); });
+  document.querySelectorAll('[data-reader-hanja]').forEach((element) => {
+    element.textContent = locale === 'ko-KR' ? reader.hanja : '';
+    element.hidden = locale !== 'ko-KR' || !reader.hanja;
+  });
+  if (portrait) portrait.setAttribute('aria-label', `${label} ${translateStaticUi('사주',locale)}`);
+}
+renderReaderLocalePresentation();
+document.addEventListener('myeongha:localechange', renderReaderLocalePresentation);
 
 let activeReadingOwner = null;
 
@@ -210,9 +215,7 @@ window.addEventListener('storage', (event) => {
 });
 
 function scopeDisplay(scope) {
-  if (scope === 'year') return `${currentYear}년 · 올해`;
-  if (scope === 'month') return '이번 달';
-  return '원국';
+  return readingScopeLabelV1(scope, currentYear, getUiLocale());
 }
 
 function renderInvalidRoute() {
@@ -284,35 +287,27 @@ function renderPersistedReadingFailure(title, copy, state = 'persisted_record_un
 }
 
 function renderAuthorityBlockedRoute() {
-  const scope = scopeDisplay(route.scope);
-  if (productTitle) productTitle.textContent = route.topic === 'general' ? scope : `${route.label} · ${scope}`;
-  if (stateTitle) stateTitle.textContent = `${route.label} 읽기는 아직 준비 중입니다.`;
-  if (stateCopy) {
-    if (engineRequest?.state === 'requires_input') {
-      const inputCopy = {
-        family_scope: '가족 읽기는 부모운 또는 자녀운을 먼저 선택해야 합니다.',
-        target_person: '궁합은 상대의 명식 참조가 먼저 필요합니다.',
-        question: '고민 읽기는 실제 질문을 먼저 입력해야 합니다.',
-      };
-      stateCopy.textContent = `${inputCopy[engineRequest.input] ?? '추가 입력이 필요합니다.'} 현재 Preview 실행 범위에 포함되지 않은 요청은 전송하지 않습니다.`;
-    } else if (engineRequest?.state === 'ready') {
-      stateCopy.textContent = `이 버튼은 Saju Engine의 ${engineRequest.adapterVersion} 요청 문법까지 정확히 매핑되어 있습니다. 다만 현재 가승인된 Preview 범위에는 포함되지 않아 실제 해석 요청은 전송하지 않습니다. 다른 주제의 풀이로 대신 보여드리지 않습니다.`;
-    } else {
-      stateCopy.textContent = '현재 제공 가능한 검증된 사주 읽기 범위가 열리지 않아 이 결과를 실행하지 않습니다. 다른 주제의 풀이로 대신 보여드리지 않습니다.';
-    }
-  }
-  document.querySelectorAll('[data-reading-scope]').forEach((element) => { element.textContent = scope; });
-  document.title = `${route.label} · 사주 해석 · 명하`;
+  const copy = readingRouteStateCopyV1(route, engineRequest, 'blocked', currentYear, getUiLocale());
+  if (productTitle) productTitle.textContent = copy.productTitle;
+  if (stateTitle) stateTitle.textContent = copy.stateTitle;
+  if (stateCopy) stateCopy.textContent = copy.stateCopy;
+  document.querySelectorAll('[data-reading-scope]').forEach((element) => { element.textContent = copy.scope; });
+  document.title = copy.documentTitle;
 }
 
 function renderPreviewLoading() {
-  const scope = scopeDisplay(route.scope);
-  if (productTitle) productTitle.textContent = route.topic === 'general' ? scope : `${route.label} · ${scope}`;
-  if (stateTitle) stateTitle.textContent = `${route.label} 프리뷰를 준비하고 있습니다.`;
-  if (stateCopy) stateCopy.textContent = '현재 Birth Profile과 검증된 Saju Preview Reading을 연결하고 있습니다.';
-  document.querySelectorAll('[data-reading-scope]').forEach((element) => { element.textContent = scope; });
-  document.title = `${route.label} · 사주 프리뷰 · 명하`;
+  const copy = readingRouteStateCopyV1(route, engineRequest, 'preview_loading', currentYear, getUiLocale());
+  if (productTitle) productTitle.textContent = copy.productTitle;
+  if (stateTitle) stateTitle.textContent = copy.stateTitle;
+  if (stateCopy) stateCopy.textContent = copy.stateCopy;
+  document.querySelectorAll('[data-reading-scope]').forEach((element) => { element.textContent = copy.scope; });
+  document.title = copy.documentTitle;
 }
+
+document.addEventListener('myeongha:localechange', () => {
+  if (root.dataset.readingRouteState === 'blocked_by_authority') renderAuthorityBlockedRoute();
+  if (root.dataset.readingRouteState === 'preview_loading') renderPreviewLoading();
+});
 
 function renderPreviewFailure(title, copy, state = 'preview_unavailable') {
   root.dataset.readingRouteState = state;
@@ -547,7 +542,9 @@ function activatePreviewReading(preview) {
       recordsLink.setAttribute('href', isStoredRecord ? 'records.html?tab=saju' : 'reading.html');
     }
     if (recordsLinkLabel) {
-      recordsLinkLabel.textContent = isStoredRecord ? '기록에서 사주 보기' : '다른 사주 읽기';
+      recordsLinkLabel.textContent = readingSceneProgressV1(activeIndex, steps.length, {
+        hasStructure: false, hasSupporting: false,
+      }, isStoredRecord, getUiLocale()).recordsLinkLabel;
     }
   }
 
@@ -565,16 +562,14 @@ function activatePreviewReading(preview) {
     if (!step) return;
     const structureParts = [...step.structure, ...step.supporting];
 
-    if (progressLabel) progressLabel.textContent = `읽기 ${activeIndex + 1} / ${steps.length}`;
+    const ui = readingSceneProgressV1(activeIndex, steps.length, {
+      hasStructure: step.structure.length > 0,
+      hasSupporting: step.supporting.length > 0,
+    }, isStoredRecord, getUiLocale());
+    if (progressLabel) progressLabel.textContent = ui.progress;
     if (stepTitle) stepTitle.textContent = step.title;
     if (stepBody) stepBody.textContent = step.primary;
-    if (structureTitle) {
-      structureTitle.textContent = step.structure.length > 0
-        ? '이 해석의 사주 근거'
-        : step.supporting.length > 0
-          ? '함께 볼 포인트'
-          : '이 해석을 읽는 기준';
-    }
+    if (structureTitle) structureTitle.textContent = ui.structureTitle;
     if (structureBody) {
       structureBody.textContent = structureParts.length > 0
         ? structureParts.join('\n\n')
@@ -583,14 +578,12 @@ function activatePreviewReading(preview) {
     if (readerLine) readerLine.textContent = `${step.title} 항목을 확인합니다.`;
     if (readerComment) readerComment.textContent = previewCommentForStep();
     if (authorityNote) {
-      authorityNote.textContent = isStoredRecord
-        ? '기록 · 당시 저장된 공식 사주 풀이를 그대로 다시 읽고 있습니다.'
-        : 'Preview · 현재 주제의 검증용 읽기이며 공식 기록에 저장되지 않습니다.';
+      authorityNote.textContent = ui.authorityNote;
       if (preview.notice) authorityNote.title = preview.notice;
     }
     if (previousButton) previousButton.disabled = activeIndex === 0;
     if (nextButton) nextButton.disabled = false;
-    if (nextLabel) nextLabel.textContent = activeIndex >= steps.length - 1 ? '읽기 마치기' : '다음 읽기';
+    if (nextLabel) nextLabel.textContent = ui.nextLabel;
     renderProgressDots(steps.length, activeIndex);
   }
 
@@ -609,6 +602,10 @@ function activatePreviewReading(preview) {
     renderStep();
   });
   replayButton?.addEventListener('click', replayReadingExperience);
+  document.addEventListener('myeongha:localechange', () => {
+    renderStep();
+    if (completed) completeReadingExperience();
+  });
 
   root.dataset.readingRouteState = isStoredRecord ? 'persisted_record' : 'preview';
   root.dataset.previewReaderVoice = 'disabled';
@@ -681,6 +678,7 @@ async function loadPersistedReading() {
       method: 'GET',
       headers: {
         Accept: 'application/json',
+        'Accept-Language': getUiLocale(),
         Authorization: `Bearer ${activeBearer.token}`,
       },
       credentials: 'same-origin',
@@ -782,6 +780,7 @@ async function loadPreviewReading() {
       method: 'POST',
       headers: {
         Accept: 'application/json',
+        'Accept-Language': getUiLocale(),
         Authorization: `Bearer ${activeBearer.token}`,
         'Content-Type': 'application/json',
       },

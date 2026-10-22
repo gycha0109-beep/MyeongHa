@@ -17,6 +17,7 @@ export interface SeyeonProductionPersonalRecordAuthorityRowV1 {
   readonly recordType: string;
   readonly schemaVersion: string;
   readonly payload: unknown;
+  readonly rawRecordPgDigest?: string;
   readonly grantId: string;
   readonly grantReason: string;
   readonly grantedAt: string;

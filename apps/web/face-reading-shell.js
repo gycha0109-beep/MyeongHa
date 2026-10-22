@@ -1,6 +1,8 @@
+import { resolveCharacterDisplayNameV1 } from './character-display-locale.js';
 import { READER_PRESENTATIONS, findReaderPresentation } from './reader-presentation-catalog.js';
 import { createDelegatePicker } from './reader-picker-dialog.js';
-import { formatStaticUi, getUiLocale, translateStaticUi } from './ui-i18n.js';
+import { faceReadingUiStateV1 } from './face-reading-ui-locale.js';
+import { getUiLocale, translateStaticUi } from './ui-i18n.js';
 
 const camera = document.querySelector('[data-face-camera]');
 const gallery = document.querySelector('[data-face-gallery]');
@@ -25,6 +27,7 @@ const statusCopy = document.querySelector('[data-face-status-copy]');
 
 let selectionRevision = 0;
 let selectedFile = null;
+let previewPhase = 'idle';
 
 function resolveInitialReader() {
   const readerKey = new URL(window.location.href).searchParams.get('reader');
@@ -32,16 +35,6 @@ function resolveInitialReader() {
 }
 
 let selectedReader = resolveInitialReader();
-function faceText(template) {
-  const locale = getUiLocale();
-  return formatStaticUi(template, { reader: translateStaticUi(selectedReader.name, locale) }, locale);
-}
-
-function humanSize(bytes) {
-  if (bytes < 1024 * 1024) return Math.max(1, Math.round(bytes / 1024)) + 'KB';
-  return (bytes / 1024 / 1024).toFixed(1) + 'MB';
-}
-
 function updateReaderUrl(readerKey) {
   const url = new URL(window.location.href);
   url.searchParams.set('reader', readerKey);
@@ -52,7 +45,7 @@ function renderReader() {
   document.body.dataset.reader = selectedReader.key;
 
   for (const node of readerNameNodes) {
-    node.textContent = translateStaticUi(selectedReader.name, getUiLocale());
+    node.textContent = (resolveCharacterDisplayNameV1(selectedReader.key, getUiLocale()) ?? selectedReader.name);
   }
 
   if (readerPortrait instanceof HTMLImageElement) {
@@ -63,29 +56,27 @@ function renderReader() {
   if (readerTitle) readerTitle.textContent = translateStaticUi(selectedReader.title, getUiLocale());
   if (readerTone) readerTone.textContent = translateStaticUi(selectedReader.tone, getUiLocale());
 
+  const ui = faceReadingUiStateV1({
+    readerKey: selectedReader.key,
+    readerFallback: selectedReader.name,
+    phase: previewPhase,
+    fileName: selectedFile?.name,
+    fileSize: selectedFile?.size,
+  }, getUiLocale());
+
+  if (description) description.textContent = ui.description;
+  if (analyzeLabel) analyzeLabel.textContent = ui.analyzeLabel;
+  if (statusTitle) statusTitle.textContent = ui.statusTitle;
+  if (statusCopy) statusCopy.textContent = ui.statusCopy;
   if (selectedFile) {
-    if (description) {
-      description.textContent = faceText('사진이 준비되었습니다. {reader}과 함께 얼굴 구조 확인부터 이어갈 준비가 되었습니다.');
-    }
-    if (analyzeLabel) analyzeLabel.textContent = faceText('{reader}에게 보여주기 준비 중');
-    if (statusTitle) statusTitle.textContent = faceText('{reader}과 관상 보기 준비됨');
-    if (statusCopy) {
-      statusCopy.textContent = '사진 준비를 마쳤습니다. 얼굴 구조 확인 기능이 연결되면 선택한 대리자의 풀이로 이어집니다.';
-    }
-  } else {
-    if (description) {
-      description.textContent = faceText('정면에서 얼굴이 잘 보이는 사진을 준비해주세요. {reader}과 함께 얼굴 구조 확인부터 시작합니다.');
-    }
-    if (analyzeLabel) analyzeLabel.textContent = '사진을 먼저 준비해주세요';
-    if (statusTitle) statusTitle.textContent = faceText('{reader}과 관상 보기');
-    if (statusCopy) {
-      statusCopy.textContent = '사진을 준비하면 얼굴 구조를 확인한 뒤 선택한 대리자의 풀이로 이어집니다.';
-    }
+    if (fileName) fileName.textContent = ui.fileName;
+    if (fileMeta) fileMeta.textContent = ui.fileMeta;
   }
 }
 
 function setIdlePreview() {
   selectedFile = null;
+  previewPhase = 'idle';
   image.onload = null;
   image.onerror = null;
   image.hidden = true;
@@ -104,18 +95,18 @@ function resetPreview() {
   gallery.value = '';
 }
 
-function rejectPreview(message) {
+function rejectPreview(phase) {
   resetPreview();
-  description.textContent = message;
+  previewPhase = phase;
+  renderReader();
 }
 
 function showSelectedFile(file) {
   selectedFile = file;
+  previewPhase = 'ready';
   placeholder.hidden = true;
   corners.hidden = false;
   fileCard.hidden = false;
-  fileName.textContent = file.name || '선택한 사진';
-  fileMeta.textContent = humanSize(file.size) + ' · 브라우저 미리보기 준비됨';
   analyze.disabled = true;
   renderReader();
 }
@@ -125,19 +116,20 @@ function choose(file) {
 
   const allowed = new Set(['image/jpeg', 'image/png', 'image/webp']);
   if (!allowed.has(file.type) || file.size <= 0 || file.size > 16 * 1024 * 1024) {
-    rejectPreview('JPEG, PNG 또는 WebP 형식의 16MB 이하 사진을 선택해주세요.');
+    rejectPreview('invalid-file');
     return;
   }
 
   const revision = ++selectionRevision;
   setIdlePreview();
-  description.textContent = '사진을 불러오고 있습니다.';
+  previewPhase = 'loading';
+  renderReader();
 
   const reader = new FileReader();
 
   reader.onerror = () => {
     if (revision !== selectionRevision) return;
-    rejectPreview('사진을 불러오지 못했습니다. 다른 사진을 선택해주세요.');
+    rejectPreview('read-error');
   };
 
   reader.onload = () => {
@@ -145,7 +137,7 @@ function choose(file) {
 
     const source = typeof reader.result === 'string' ? reader.result : '';
     if (!source.startsWith('data:image/')) {
-      rejectPreview('사진을 표시할 수 없습니다. 다른 사진을 선택해주세요.');
+      rejectPreview('invalid-image');
       return;
     }
 
@@ -159,7 +151,7 @@ function choose(file) {
 
     image.onerror = () => {
       if (revision !== selectionRevision) return;
-      rejectPreview('사진을 표시할 수 없습니다. 손상되지 않은 JPEG, PNG 또는 WebP 사진을 선택해주세요.');
+      rejectPreview('image-error');
     };
 
     image.src = source;

@@ -64,6 +64,10 @@ export interface OpenRouterSeyeonEvaluationConfigV1 {
   readonly apiKey: string;
   readonly model: string;
   readonly maxCompletionTokens: number;
+  /** Only allowlisted PUBLIC SYNTHETIC free models with a one-shot admission. */
+  readonly approvedSyntheticFreeVariant?: boolean;
+  /** Exact public endpoint tag from ZDR+schema intersection; no provider fallback. */
+  readonly providerOnlyTag?: string;
   readonly timeoutMs?: number;
   /** Must be explicitly injected; no hidden network transport. */
   readonly fetchImpl: (url: string, init: RequestInit) => Promise<Response>;
@@ -115,7 +119,14 @@ export function createOpenRouterSeyeonEvaluationProviderV1(
       config.apiKey.trim().length < 20 ||
       typeof config.model !== 'string' ||
       !/^[A-Za-z0-9][A-Za-z0-9._-]*\/[A-Za-z0-9][A-Za-z0-9._:-]*$/u.test(config.model) ||
-      config.model.length > 128 || config.model.endsWith(':free') ||
+      config.model.length > 128 ||
+      (config.model.endsWith(':free') &&
+        !(config.approvedSyntheticFreeVariant === true &&
+          ['nvidia/nemotron-3-super-120b-a12b:free',
+           'xingchen-agi/xing4.0-29b-a4b:free'].includes(config.model))) ||
+      (config.providerOnlyTag !== undefined &&
+        (typeof config.providerOnlyTag !== 'string' ||
+         !/^[a-z0-9][a-z0-9_-]*(?:\/[a-z0-9][a-z0-9_-]*)?$/u.test(config.providerOnlyTag))) ||
       !boundedInteger(config.maxCompletionTokens, 1, 1536) ||
       !boundedInteger(config.timeoutMs ?? 30_000, 1, 30_000) ||
       typeof config.beforeDispatch !== 'function' ||
@@ -157,6 +168,7 @@ export function createOpenRouterSeyeonEvaluationProviderV1(
           },
         },
         provider: {
+          ...(config.providerOnlyTag ? { only: [config.providerOnlyTag] } : {}),
           require_parameters: true,
           allow_fallbacks: false,
           zdr: true,

@@ -4,19 +4,23 @@ import type { MobileSajuViewModelV1 } from './saju-view-model';
 import { mobileColors } from '@/ui/mobile-colors';
 import { MobileUiText } from '@/ui/MobileUiText';
 import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
+import { useMobileUiLocale } from '@/ui/mobile-ui-locale';
 
 export function BirthSummaryCard({ summary }: { summary: string }) {
   const styles = useMobileThemedStyles(staticStyles);
+  const { t } = useMobileUiLocale();
   return (
     <View style={styles.card}>
       <Text style={styles.eyebrow}>CURRENT BIRTH</Text>
-      <Text style={styles.summary}>{summary}</Text>
+      <Text style={styles.summary}>{summary.split(' · ').map((part) => t(part)).join(' · ')}</Text>
     </View>
   );
 }
 
 export function SajuPillarGrid({ pillars }: Pick<MobileSajuViewModelV1, 'pillars'>) {
   const styles = useMobileThemedStyles(staticStyles);
+  const { t, locale } = useMobileUiLocale();
+  const japaneseBranches: Readonly<Record<string, string>> = { 子: 'ね', 丑: 'うし', 寅: 'とら', 卯: 'う', 辰: 'たつ', 巳: 'み', 午: 'うま', 未: 'ひつじ', 申: 'さる', 酉: 'とり', 戌: 'いぬ', 亥: 'い' };
   return (
     <View style={styles.section}>
       <MobileUiText style={styles.sectionTitle}>나의 명식</MobileUiText>
@@ -26,7 +30,7 @@ export function SajuPillarGrid({ pillars }: Pick<MobileSajuViewModelV1, 'pillars
             key={pillar.key}
             style={[styles.pillarCard, pillar.emphasis && styles.pillarCardEmphasis]}
           >
-            <Text style={styles.pillarLabel}>{pillar.label}</Text>
+            <Text style={styles.pillarLabel}>{t(pillar.label)}</Text>
             <Text style={[styles.hanja, pillar.emphasis && styles.hanjaEmphasis]}>
               {pillar.stemHanja}
             </Text>
@@ -35,10 +39,14 @@ export function SajuPillarGrid({ pillars }: Pick<MobileSajuViewModelV1, 'pillars
             </Text>
             <Text style={styles.pillarHangul}>
               {pillar.status === 'resolved'
-                ? `${pillar.stemHangul}${pillar.branchHangul}`
+                ? locale === 'ko-KR'
+                  ? `${pillar.stemHangul}${pillar.branchHangul}`
+                  : locale === 'ja-JP'
+                    ? `${t(pillar.stemHangul)}${japaneseBranches[pillar.branchHanja] ?? pillar.branchHanja}`
+                    : `${pillar.stemHanja}${pillar.branchHanja}`
                 : pillar.status === 'ambiguous'
-                  ? '모호'
-                  : '미확정'}
+                  ? t('모호')
+                  : t('미확정')}
             </Text>
           </View>
         ))}
@@ -49,13 +57,14 @@ export function SajuPillarGrid({ pillars }: Pick<MobileSajuViewModelV1, 'pillars
 
 export function DayMasterCard({ dayMaster }: Pick<MobileSajuViewModelV1, 'dayMaster'>) {
   const styles = useMobileThemedStyles(staticStyles);
+  const { t } = useMobileUiLocale();
   return (
     <View style={styles.card}>
       <MobileUiText style={styles.sectionTitle}>나의 일간</MobileUiText>
       <Text style={styles.dayMasterHanja}>{dayMaster.hanja}</Text>
-      <Text style={styles.dayMasterHangul}>{dayMaster.hangul}</Text>
+      <Text style={styles.dayMasterHangul}>{t(dayMaster.hangul)}</Text>
       {dayMaster.status === 'resolved' ? (
-        <Text style={styles.muted}>{dayMaster.element} · {dayMaster.yinYang}</Text>
+        <Text style={styles.muted}>{t(dayMaster.element ?? '')} · {t(dayMaster.yinYang ?? '')}</Text>
       ) : (
         <MobileUiText style={styles.muted}>일주가 확정되면 일간을 표시합니다.</MobileUiText>
       )}
@@ -65,6 +74,7 @@ export function DayMasterCard({ dayMaster }: Pick<MobileSajuViewModelV1, 'dayMas
 
 export function ElementBalance({ elementBalance }: Pick<MobileSajuViewModelV1, 'elementBalance'>) {
   const styles = useMobileThemedStyles(staticStyles);
+  const { t } = useMobileUiLocale();
   const maximum = Math.max(1, ...elementBalance.map((item) => item.count));
   return (
     <View style={styles.card}>
@@ -72,7 +82,7 @@ export function ElementBalance({ elementBalance }: Pick<MobileSajuViewModelV1, '
       <MobileUiText style={styles.caption}>확정된 기둥의 천간·지지만 집계합니다.</MobileUiText>
       {elementBalance.map((item) => (
         <View key={item.element} style={styles.balanceRow}>
-          <Text style={styles.elementLabel}>{item.element}</Text>
+          <Text style={styles.elementLabel}>{t(item.element)}</Text>
           <View style={styles.track}>
             <View
               style={[
@@ -93,11 +103,12 @@ export function CalculationCompleteness({
   completeness,
 }: Pick<MobileSajuViewModelV1, 'completeness'>) {
   const styles = useMobileThemedStyles(staticStyles);
+  const { t } = useMobileUiLocale();
   return (
     <View style={styles.card}>
       <MobileUiText style={styles.sectionTitle}>계산 상태</MobileUiText>
-      <Text style={styles.completenessHeadline}>{completeness.headline}</Text>
-      <Text style={styles.muted}>{completeness.detail}</Text>
+      <Text style={styles.completenessHeadline}>{completeness.fullyResolved ? t(completeness.headline) : t('{count}/4 기둥 확정').replace('{count}', String(completeness.resolvedPillarCount))}</Text>
+      <Text style={styles.muted}>{t(completeness.detail)}</Text>
       <MobileUiText style={styles.caption}>이 화면은 계산 사실만 표시하며 해석을 생성하지 않습니다.</MobileUiText>
     </View>
   );

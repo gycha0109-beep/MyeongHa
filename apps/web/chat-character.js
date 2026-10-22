@@ -1,3 +1,5 @@
+import { resolveCharacterDisplayNameV1 } from './character-display-locale.js';
+import { getUiLocale } from './ui-i18n.js';
 import { resolveCanonicalCharacterPresentationV1 } from './character-presentation-identity.js';
 import { parseChatThreadRouteV1 } from './chat-room-read-contract.js';
 const characters = {
@@ -84,10 +86,10 @@ if (characterKey) {
     ? 'thread_identity_pending'
     : 'thread_identity_invalid';
 }
-document.title = `${character.name} · 대화 · 명하`;
+document.title = `${characterKey ? resolveCharacterDisplayNameV1(characterKey, getUiLocale()) : character.name} · 대화 · 명하`;
 
 document.querySelectorAll('[data-character-name], [data-dialogue-name]').forEach((node) => {
-  node.textContent = character.name;
+  node.textContent = characterKey ? resolveCharacterDisplayNameV1(characterKey, getUiLocale()) : character.name;
 });
 
 document.querySelectorAll('[data-character-title]').forEach((node) => {
@@ -97,7 +99,7 @@ document.querySelectorAll('[data-character-title]').forEach((node) => {
 document.querySelectorAll('[data-character-avatar]').forEach((node) => {
   if (characterKey) node.dataset.character = characterKey;
   else delete node.dataset.character;
-  node.textContent = character.name.slice(0, 1);
+  node.textContent = (characterKey ? resolveCharacterDisplayNameV1(characterKey, getUiLocale()) : character.name).slice(0, 1);
 });
 
 const scene = document.querySelector('[data-character-scene]');
@@ -125,17 +127,17 @@ export function applyCanonicalCharacterPresentationV1(characterId) {
 
   root.dataset.character = identity.presentationKey;
   root.dataset.characterAuthority = 'canonical_character_id';
-  document.title = `${next.name} · 대화 · 명하`;
+  document.title = `${resolveCharacterDisplayNameV1(identity.presentationKey, getUiLocale())} · 대화 · 명하`;
 
   document.querySelectorAll('[data-character-name], [data-dialogue-name]').forEach((node) => {
-    node.textContent = next.name;
+    node.textContent = resolveCharacterDisplayNameV1(identity.presentationKey, getUiLocale());
   });
   document.querySelectorAll('[data-character-title]').forEach((node) => {
     node.textContent = next.title;
   });
   document.querySelectorAll('[data-character-avatar]').forEach((node) => {
     node.dataset.character = identity.presentationKey;
-    node.textContent = next.name.slice(0, 1);
+    node.textContent = resolveCharacterDisplayNameV1(identity.presentationKey, getUiLocale()).slice(0, 1);
   });
   setDialogueLines(next.intro);
   if (scene) scene.setAttribute('aria-label', next.sceneLabel);
@@ -190,4 +192,16 @@ composer?.addEventListener('submit', (event) => {
   if (!handled && composeStatus) {
     composeStatus.textContent = '현재 이 대화는 서버 연결이 준비되지 않았습니다. 입력한 내용은 보내지지 않았습니다.';
   }
+});
+
+document.addEventListener('myeongha:localechange', () => {
+  const authoritative = root.dataset.characterAuthority === 'canonical_character_id' ? root.dataset.character : null;
+  if (authoritative) {
+    applyCanonicalCharacterPresentationV1(authoritative);
+    return;
+  }
+  const label = characterKey ? resolveCharacterDisplayNameV1(characterKey, getUiLocale()) : character.name;
+  document.title = `${label} · 대화 · 명하`;
+  document.querySelectorAll('[data-character-name], [data-dialogue-name]').forEach(node => { node.textContent = label; });
+  document.querySelectorAll('[data-character-avatar]').forEach(node => { node.textContent = label.slice(0, 1); });
 });

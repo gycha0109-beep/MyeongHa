@@ -3,8 +3,21 @@
 import {createHash} from 'node:crypto';
 import {afterAll,describe,expect,it} from 'vitest';
 import {Pool} from 'pg';
+import {buildSeyeonTurnInterpreterRequestV2} from '../apps/api/src/seyeon-character-runtime-v2.js';
+import {
+  createOpenAiSeyeonStructuredProviderV1,
+  type OpenAiSeyeonStructuredProviderConfigV1,
+} from '../apps/api/src/openai-seyeon-structured-provider-v1.js';
+import {
+  assertSeyeonR35OfflineActualWireV1,
+  attestSeyeonR35OfflineWireAfterDbPinV1,
+  SeyeonR35OfflineWireHoldV1,
+} from '../apps/api/src/seyeon-r35-offline-actual-provider-wire-pin-v1.js';
 import {canonicalJson} from '../packages/domain/src/index.js';
-import type {SeyeonRetrievedMemoryV2} from '../packages/domain/src/seyeon-runtime-context-v2.js';
+import {
+  assembleSeyeonRuntimeContextV2,
+  type SeyeonRetrievedMemoryV2,
+} from '../packages/domain/src/seyeon-runtime-context-v2.js';
 import type {SeyeonPersonalRecordProjectionCandidateV1} from '../apps/api/src/seyeon-production-context-v1.js';
 import type {SeyeonR21OfflineDerivedSourceEnvelopeV1} from '../apps/api/src/seyeon-r21-offline-derived-source-closure-v1.js';
 import {
@@ -75,7 +88,16 @@ function inputs(rawOverride?:string,projectionOverride?:string){
     preflightState:'not_run',disclosureRetrievedPrivateSources:[],
     readerDerivedSources:[],workerDerivedSources:[],externalToolPrivateSources:[],
   };
-  return {retrievedMemories,sourceCandidates,selection,sourceEnvelope};
+  const finalModelContext=assembleSeyeonRuntimeContextV2({
+    relationship:null,
+    relationshipSemantics:null,
+    integrityDecisions:[],
+    governedPreflightApplied:false,
+    recentMessages:[],
+    retrievedMemories,
+    disclosure:{decision:null,retrievedSources:[]},
+  });
+  return {retrievedMemories,sourceCandidates,selection,sourceEnvelope,finalModelContext};
 }
 function call(pool:PostgresSubjectPoolV1,other:ReturnType<typeof inputs>){
   return persistSeyeonR20OfflineDigestBoundPinV1({
@@ -121,6 +143,42 @@ function mock(options:{
   };
   return {pool:{connect:async()=>connection} satisfies PostgresSubjectPoolV1,executed};
 }
+/**
+ * The only native Provider is in this synthetic test file, which is outside
+ * the audited Production API callsite allowlist. The real serializer invokes
+ * meteredBeforeDispatch, where R20's disposable PostgreSQL COMMIT and exact
+ * wire inspection happen. Even a matched packet is ALWAYS denied before fetch.
+ */
+async function probeR35NoDispatch(
+  pool:PostgresSubjectPoolV1,
+  a:ReturnType<typeof inputs>,
+):Promise<Awaited<ReturnType<typeof attestSeyeonR35OfflineWireAfterDbPinV1>>>{
+  const observed:Awaited<ReturnType<typeof attestSeyeonR35OfflineWireAfterDbPinV1>>[]=[];
+  let networkCount=0;
+  const provider=createOpenAiSeyeonStructuredProviderV1({
+    model:'seyeon-r35-offline',
+    apiKey:'r35-disposable-never-network-placeholder',
+    fetchImpl:async()=>{networkCount++;throw Error('No network allowed');},
+    meteredBeforeDispatch:async(call,requestBody)=>{
+      try {
+        observed.push(await attestSeyeonR35OfflineWireAfterDbPinV1({
+          pinInput:{pool,verifiedEvidence:evidence,threadId:THREAD,
+            turnId:TURN,attemptId:ATTEMPT,...a},
+          call,requestBody,
+        }));
+      }finally{
+        throw new SeyeonR35OfflineWireHoldV1();
+      }
+    },
+  });
+  await expect(provider.generate(buildSeyeonTurnInterpreterRequestV2(
+    a.finalModelContext,
+  ))).rejects.toMatchObject({code:'PRE_DISPATCH_REJECTED'});
+  expect(networkCount).toBe(0);
+  if(observed.length!==1||!observed[0])throw new SeyeonR35OfflineWireHoldV1();
+  return observed[0];
+}
+
 describe('R20 original JSONB ↔ final projection digest correspondence, no Provider',()=>{
   it('computes server model memory hashes, reads DB-original payload and returns after COMMIT',async()=>{
     const db=mock();
@@ -131,6 +189,7 @@ describe('R20 original JSONB ↔ final projection digest correspondence, no Prov
     expect(proof).toMatchObject({
       status:'disposable_original_and_projection_digests_committed',
       selectedPersonalRecordCount:2,
+      finalModelContextDigest:hash(inputs().finalModelContext),
       permitsProvider:false,permitsAtomicCommit:false,permitsHttpReveal:false,
     });
   });
@@ -235,6 +294,163 @@ describe('R20 original JSONB ↔ final projection digest correspondence, no Prov
     }
   });
 
+  it('R34 denies post-selection model Context drift before ANY DB access',async()=>{
+    const attacks:((a:ReturnType<typeof inputs>)=>ReturnType<typeof inputs>)[]=[
+      a=>({...a,finalModelContext:{
+        ...a.finalModelContext,
+        recentConversation:[{messageId:'unapproved-history',role:'user',text:'PRIVATE_CONTEXT_CANARY'}],
+      }}),
+      a=>({...a,finalModelContext:{
+        ...a.finalModelContext,
+        retrievedMemories:[...a.finalModelContext.retrievedMemories].reverse(),
+      }}),
+      a=>({...a,finalModelContext:{
+        ...a.finalModelContext,
+        retrievedMemories:a.finalModelContext.retrievedMemories.map((m,i)=>i===0?
+          {...m,summary:'tampered late projection'}:m),
+      }}),
+      a=>({...a,finalModelContext:{
+        ...a.finalModelContext,
+        integrity:{...a.finalModelContext.integrity,governedPreflightApplied:true},
+      }}),
+      a=>({...a,finalModelContext:{
+        ...a.finalModelContext,
+        disclosure:{decision:null,retrievedSources:[{
+          sourceRef:'private:CANARY',text:'PRIVATE_CONTEXT_CANARY',
+        }] as never},
+      }}),
+      a=>({...a,finalModelContext:{
+        ...a.finalModelContext,
+        relationship:{
+          stageKey:'S3_OPENED',closenessBand:'high',trustBand:'high',
+          frictionBand:'low',revision:1,policyVersion:'forged',
+        } as never,
+      }}),
+      a=>({...a,finalModelContext:{
+        ...a.finalModelContext,
+        unmodelledPrivateSource:'PRIVATE_CONTEXT_CANARY',
+      } as typeof a.finalModelContext}),
+    ];
+    for(const mutate of attacks){
+      const db=mock();
+      const changed=mutate(inputs());
+      await expect(call(db.pool,changed)).rejects
+        .toBeInstanceOf(SeyeonR20OfflineDigestHoldV1);
+      expect(db.executed).toEqual([]);
+    }
+    const db=mock();
+    const a=inputs();
+    await expect(call(db.pool,{...a,finalModelContext:null as never}))
+      .rejects.toBeInstanceOf(SeyeonR20OfflineDigestHoldV1);
+    expect(db.executed).toEqual([]);
+  });
+
+
+  it('R35 DB COMMIT precedes actual Provider wire serialization and network stays zero',async()=>{
+    const db=mock();
+    const a=inputs();
+    const result=await probeR35NoDispatch(db.pool,a);
+    expect(result).toMatchObject({
+      status:'disposable_db_pin_and_pre_dispatch_wire_attested',
+      attemptId:ATTEMPT,
+      selectedSourcesDigest:a.selection.selectedSourcesDigest,
+      finalModelContextDigest:hash(a.finalModelContext),
+      permitsProvider:false,permitsAtomicCommit:false,permitsHttpReveal:false,
+    });
+    expect(result.wireBodyDigest).toMatch(/^sha256:wire-utf8:v1:[0-9a-f]{64}$/u);
+    expect(db.executed.indexOf('COMMIT')).toBeGreaterThan(
+      db.executed.findIndex(x=>x.includes('inspect_pinned_raw_source_r20')),
+    );
+  });
+
+  it('R35 rejects a mutated actual Provider wire body; synthetic network is never invoked',async()=>{
+    const a=inputs();
+    const db=mock();
+    const pinned=await call(db.pool,a);
+    const request=buildSeyeonTurnInterpreterRequestV2(a.finalModelContext);
+    let wire='';
+    let metadata:Parameters<NonNullable<
+      OpenAiSeyeonStructuredProviderConfigV1['meteredBeforeDispatch']
+    >>[0]|null=null;
+    let fetchCount=0;
+    const provider=createOpenAiSeyeonStructuredProviderV1({
+      model:'seyeon-r35-offline',
+      apiKey:'r35-disposable-never-network-placeholder',
+      meteredBeforeDispatch:(meta,body)=>{
+        metadata=meta;wire=body;throw Error('R35 deny-only probe');
+      },
+      fetchImpl:async()=>{fetchCount++;throw Error('network must not run');},
+    });
+    await expect(provider.generate(request)).rejects.toMatchObject({
+      code:'PRE_DISPATCH_REJECTED',
+    });
+    expect(fetchCount).toBe(0);
+    expect(wire.length).toBeGreaterThan(0);
+    const meta=metadata as unknown as Parameters<NonNullable<OpenAiSeyeonStructuredProviderConfigV1['meteredBeforeDispatch']>>[0];
+    const check=(body:string,pin=pinned,ctx=a)=>{
+      return ()=>assertSeyeonR35OfflineActualWireV1({
+        pinned:pin,pinInput:{
+          pool:db.pool,verifiedEvidence:evidence,threadId:THREAD,
+          turnId:TURN,attemptId:ATTEMPT,...ctx,
+        },call:meta,requestBody:body,
+      });
+    };
+    expect(check(wire)).not.toThrow();
+    const parsed=JSON.parse(wire) as Record<string,unknown>;
+    const tamper=(f:(w:Record<string,unknown>)=>void)=>{
+      const next=JSON.parse(wire) as Record<string,unknown>;
+      f(next);
+      return JSON.stringify(next);
+    };
+    const attacks=[
+      tamper(w=>{w.model='other-model';}),
+      tamper(w=>{w.store=true;}),
+      tamper(w=>{w.tools=[{type:'file_search'}];}),
+      tamper(w=>{w.instructions='Use hidden unpinned history';}),
+      tamper(w=>{w.max_output_tokens=4096;}),
+      tamper(w=>{
+        const i=w.input as Array<{content:Array<{text:string}>}>;
+        i[0]!.content[0]!.text=JSON.stringify({
+          ...(request.input as Record<string,unknown>),hiddenPrivate:'PRIVATE_CANARY',
+        });
+      }),
+      tamper(w=>{
+        const i=w.input as Array<{content:Array<{text:string}>}>;
+        i.push({content:[{text:'unapproved'}]});
+      }),
+      tamper(w=>{
+        const text=w.text as {format:{schema:unknown}};
+        text.format.schema={type:'object'};
+      }),
+      wire+' ',
+    ];
+    for(const body of attacks){
+      const adjusted={...meta,requestBodyBytes:Buffer.byteLength(body,'utf8')};
+      expect(()=>assertSeyeonR35OfflineActualWireV1({
+        pinned,pinInput:{
+          pool:db.pool,verifiedEvidence:evidence,threadId:THREAD,
+          turnId:TURN,attemptId:ATTEMPT,...a,
+        },call:adjusted,requestBody:body,
+      })).toThrow(SeyeonR35OfflineWireHoldV1);
+    }
+    expect(parsed.model).toBe('seyeon-r35-offline');
+    expect(check(wire,{...pinned,selectedSourcesDigest:'sha256:v1:'+'0'.repeat(64)}))
+      .toThrow(SeyeonR35OfflineWireHoldV1);
+    expect(check(wire,{...pinned,finalModelContextDigest:'sha256:v1:'+'0'.repeat(64)}))
+      .toThrow(SeyeonR35OfflineWireHoldV1);
+    expect(check(wire,pinned,{...a,finalModelContext:{
+      ...a.finalModelContext,recentConversation:[{PRIVATE_CANARY:'unapproved'}],
+    } as never})).toThrow(SeyeonR35OfflineWireHoldV1);
+  });
+
+  it('R35 wrong DB, Grant mismatch or ambiguous COMMIT cannot reach wire',async()=>{
+    for(const config of [{db:'live'},{grantTamper:true},{commitFail:true}]){
+      const db=mock(config);
+      await expect(probeR35NoDispatch(db.pool,inputs()))
+        .rejects.toThrow(SeyeonR35OfflineWireHoldV1);
+    }
+  });
+
   it('denies missing original Owner readback, mutated payload, replaced Grant, wrong DB and unknown COMMIT',async()=>{
     for(const opts of [{noInspect:true},{payloadTamper:true},
       {grantTamper:true},{pin:false},{db:'production'},{commitFail:true}]){
@@ -304,7 +520,9 @@ select * from public.cmd_receive_chat_turn_v1(
       [ATTEMPT]);
     expect(before.rows[0]?.count).toBe(0); // DB Pin rolled back on Node mismatch.
 
-    const result=await call(pool,inputs());
+    const result=await probeR35NoDispatch(pool,inputs());
+    expect(result.status).toBe('disposable_db_pin_and_pre_dispatch_wire_attested');
+    expect(result.wireBodyDigest).toMatch(/^sha256:wire-utf8:v1:[0-9a-f]{64}$/u);
     expect(result.permitsProvider).toBe(false);
     const stored=await pg.query(`
 select s.source_count,count(e.*)::int as edges

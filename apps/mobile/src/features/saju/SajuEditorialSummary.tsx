@@ -3,6 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import type { MobileSajuViewModelV1 } from '@/features/saju/saju-view-model';
 import { useMobileTheme } from '@/ui/mobile-theme';
 import { MobileUiText } from '@/ui/MobileUiText';
+import { useMobileUiLocale } from '@/ui/mobile-ui-locale';
 
 /**
  * Editorial treatment of server-calculated birth-chart evidence.
@@ -10,6 +11,7 @@ import { MobileUiText } from '@/ui/MobileUiText';
  */
 export function SajuEditorialSummary({ viewModel }: { viewModel: MobileSajuViewModelV1 }) {
   const { theme } = useMobileTheme();
+  const { t } = useMobileUiLocale();
   const day = viewModel.dayMaster;
   const dayConfirmed = day.status === 'resolved';
 
@@ -28,15 +30,15 @@ export function SajuEditorialSummary({ viewModel }: { viewModel: MobileSajuViewM
         </View>
         <View style={styles.factCopy}>
           <MobileUiText style={styles.factLabel}>나의 일간</MobileUiText>
-          <Text style={styles.factPrimary}>{dayConfirmed ? day.hangul : '계산 상태 확인 필요'}</Text>
+          <Text style={styles.factPrimary}>{t(dayConfirmed ? day.hangul : '계산 상태 확인 필요')}</Text>
           <Text style={styles.factSecondary}>
-            {dayConfirmed ? [day.element, day.yinYang].filter(Boolean).join(' · ') : '확정된 기둥만 표시합니다.'}
+            {dayConfirmed ? [day.element, day.yinYang].filter(Boolean).map((part) => t(part ?? '')).join(' · ') : t('확정된 기둥만 표시합니다.')}
           </Text>
         </View>
       </View>
       <View style={styles.stateRow}>
         <View style={styles.stateMark} />
-        <Text style={styles.stateLabel}>{viewModel.completeness.headline}</Text>
+        <Text style={styles.stateLabel}>{viewModel.completeness.fullyResolved ? t(viewModel.completeness.headline) : t('{count}/4 기둥 확정').replace('{count}', String(viewModel.completeness.resolvedPillarCount))}</Text>
       </View>
       <MobileUiText style={styles.disclaimer}>이 정보는 검증된 명식 계산 결과입니다. 하루 운세나 미래를 예측한 내용이 아닙니다.</MobileUiText>
     </View>

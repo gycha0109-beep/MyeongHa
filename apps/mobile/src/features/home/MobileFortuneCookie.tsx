@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { FORTUNE_COOKIE_MESSAGES_V1, pickFortuneCookieIndexV1 } from '@/features/home/mobile-fortune-cookie';
+import { displayFortuneCookieNoteV1, pickFortuneCookieIndexV1 } from '@/features/home/mobile-fortune-cookie';
 import { mobileColors } from '@/ui/mobile-colors';
 import { MobileUiText } from '@/ui/MobileUiText';
 import { useMobileUiLocale } from '@/ui/mobile-ui-locale';
@@ -10,7 +10,7 @@ import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
 /** Recreational random notes, not a birth-based or AI-generated Saju prediction. */
 export function MobileFortuneCookie() {
   const styles = useMobileThemedStyles(staticStyles);
-  const { t } = useMobileUiLocale();
+  const { locale, t } = useMobileUiLocale();
   const [revealed, setRevealed] = useState(false);
   const [index, setIndex] = useState(-1);
 
@@ -52,7 +52,7 @@ export function MobileFortuneCookie() {
             <MobileUiText style={styles.dialogTitle}>오늘의 쪽지</MobileUiText>
             <Text style={styles.ornament}>✦</Text>
             <Text style={styles.message}>
-              {index < 0 ? '' : FORTUNE_COOKIE_MESSAGES_V1[index]}
+              {displayFortuneCookieNoteV1(index, locale)}
             </Text>
             <Text style={styles.ornament}>◇</Text>
           </View>

@@ -1,8 +1,13 @@
 // Watchtower-Track: security
 // R23 OFFLINE ONLY: exact G1 final-source manifest -> real v2 G2 Commit.
 // Never mounted into Production; no Provider, HTTP or positive projector.
+import {createHash} from 'node:crypto';
 import {canonicalJson} from '../../../packages/domain/src/index.js';
-import type {SeyeonRetrievedMemoryV2} from '../../../packages/domain/src/seyeon-runtime-context-v2.js';
+import {
+  assembleSeyeonRuntimeContextV2,
+  type SeyeonRetrievedMemoryV2,
+  type SeyeonRuntimeContextV2,
+} from '../../../packages/domain/src/seyeon-runtime-context-v2.js';
 import type {SeyeonPersonalRecordProjectionCandidateV1} from './seyeon-production-context-v1.js';
 import {
   selectSeyeonExactModelPersonalSourcesV1,
@@ -17,6 +22,7 @@ import {
   type PostgresSubjectPoolV1,
 } from './postgres-subject-execution.js';
 import type {VerifiedSubjectIdentityEvidenceV1} from './subject-identity-resolver.js';
+import {validateSeyeonPostTurnAnalysisSnapshotV1} from './seyeon-post-turn-analysis-worker-v1.js';
 
 export const SEYEON_R23_OFFLINE_G2_COMMIT_V1=Object.freeze({
   database:'myeongha_seyeon_positive_pin_candidate_test',
@@ -41,6 +47,8 @@ export interface SeyeonR23G1PinnedReceiptV1{
   readonly turnId:string;
   readonly attemptId:string;
   readonly selectedSourcesDigest:string;
+  /** Offline pre-model checked Context digest; not DB-signed G1 authority. */
+  readonly finalModelContextDigest:string;
   readonly recordId:string;
   readonly originalGrantId:string;
   readonly pgPayloadDigest:string;
@@ -59,6 +67,8 @@ export interface CommitSeyeonR23OfflineAtomicInputV1{
   readonly postTurnSnapshotHash:string;
   /** The same final model retrieval selection as at G1 before Provider. */
   readonly finalRetrievedMemories:readonly SeyeonRetrievedMemoryV2[];
+  /** Exact final assembled model packet from the SAME G1 pre-model selection. */
+  readonly finalModelContext:SeyeonRuntimeContextV2;
   readonly sourceCandidates:readonly SeyeonPersonalRecordProjectionCandidateV1[];
   readonly sourceEnvelope:SeyeonR21OfflineDerivedSourceEnvelopeV1;
   readonly preModelSelection:SeyeonExactModelPersonalSourceSelectionV1;
@@ -107,6 +117,26 @@ export async function commitSeyeonR23OfflineAtomicV2V1(
       retrievedMemories:input.finalRetrievedMemories,
       sourceCandidates:input.sourceCandidates,
     });
+    // G1→G2: close the otherwise unobserved final assembled packet gap.
+    // The same zero-derived/preflight-not-run envelope must describe the
+    // ENTIRE Context at G2, not only its retrieved personal-memory subset.
+    // A candidate R4 receipt is not a trusted DB signature of this packet.
+    const expectedModelContext=assembleSeyeonRuntimeContextV2({
+      relationship:null,
+      relationshipSemantics:null,
+      recentMessages:[],
+      retrievedMemories:input.finalRetrievedMemories,
+      integrityDecisions:[],
+      governedPreflightApplied:false,
+      disclosure:{decision:null,retrievedSources:[]},
+    });
+    if(!input.finalModelContext ||
+        canonicalJson(input.finalModelContext)!==canonicalJson(expectedModelContext)){
+      throw new SeyeonR23OfflineG2CommitHoldV1();
+    }
+    const finalModelContextDigest='sha256:v1:'+
+      createHash('sha256').update(canonicalJson(expectedModelContext)).digest('hex');
+
     const selection=selectSeyeonExactModelPersonalSourcesV1({
       retrievedMemories:input.finalRetrievedMemories,
       sourceCandidates:input.sourceCandidates,
@@ -130,11 +160,24 @@ export async function commitSeyeonR23OfflineAtomicV2V1(
     if(!r||r.contextReady!==true
       ||r.turnId!==input.turnId||r.attemptId!==input.attemptId
       ||r.selectedSourcesDigest!==selection.selectedSourcesDigest
+      ||r.finalModelContextDigest!==finalModelContextDigest
       ||r.recordId!==original.recordId
       ||r.originalGrantId!==original.grantId
       ||!PG_SHA.test(r.pgPayloadDigest)){
       throw new SeyeonR23OfflineG2CommitHoldV1();
     }
+    // The existing official worker schema also rejects a self-consistently
+    // re-hashed but malformed or unrelated Post-turn Outbox snapshot.
+    // Its normalized envelope MUST equal the exact payload sent to R23.
+    // These checks are offline integrity only, never DB owner authority.
+    const checkedSnapshot=validateSeyeonPostTurnAnalysisSnapshotV1(
+      input.postTurnSnapshot,input.postTurnSnapshotHash,
+    );
+    if(checkedSnapshot.turnId!==input.turnId
+      ||checkedSnapshot.assistantMessageId!==input.assistantMessageId
+      ||canonicalJson(checkedSnapshot)!==canonicalJson(input.postTurnSnapshot))
+      throw new SeyeonR23OfflineG2CommitHoldV1();
+
     const actual=await executePostgresSubjectTransactionV1({
       pool:input.pool,
       verifiedEvidence:input.verifiedEvidence,
@@ -149,6 +192,43 @@ export async function commitSeyeonR23OfflineAtomicV2V1(
           throw new SeyeonR23OfflineG2CommitHoldV1();
         await client.query("SET LOCAL lock_timeout = '2000ms'");
         await client.query("SET LOCAL statement_timeout = '7000ms'");
+        // Re-read the CURRENT immutable G1 Parent/Edge and original raw JSONB
+        // through the EXISTING R20 DB-owned inspector in the same isolated
+        // transaction that will execute G2. The caller's unsigned candidate
+        // receipt is never authority for its own pgPayloadDigest.
+        const inspected=await client.query<{original:unknown}>(`
+ select seyeon_positive_candidate.inspect_pinned_raw_source_r20(
+   $1::uuid,$2::uuid,$3::uuid,$4::uuid
+ ) as original
+`.trim(),[
+          resolvedSubject.subjectId,input.threadId,input.turnId,input.attemptId,
+        ]);
+        const proof=inspected.rows.length===1?inspected.rows[0]?.original:null;
+        if(!proof||typeof proof!=='object'||Array.isArray(proof))
+          throw new SeyeonR23OfflineG2CommitHoldV1();
+        const checked=proof as Record<string,unknown>;
+        if(checked.selectedSourcesDigest!==selection.selectedSourcesDigest
+          ||checked.sourceCount!==1||!Array.isArray(checked.sources)
+          ||checked.sources.length!==1)
+          throw new SeyeonR23OfflineG2CommitHoldV1();
+        const pinned=checked.sources[0];
+        if(!pinned||typeof pinned!=='object'||Array.isArray(pinned))
+          throw new SeyeonR23OfflineG2CommitHoldV1();
+        const row=pinned as Record<string,unknown>;
+        if(row.ordinal!==0||row.recordKind!=='memory'
+          ||row.recordId!==original.recordId||row.grantId!==original.grantId
+          ||row.recordType!==original.recordType
+          ||row.schemaVersion!==original.schemaVersion
+          ||row.pgPayloadDigest!==r.pgPayloadDigest)
+          throw new SeyeonR23OfflineG2CommitHoldV1();
+        const originalRawDigest='sha256:v1:'+
+          createHash('sha256').update(canonicalJson({
+            kind:row.recordKind,recordId:row.recordId,grantId:row.grantId,
+            recordType:row.recordType,schemaVersion:row.schemaVersion,
+            payload:row.payload,
+          })).digest('hex');
+        if(originalRawDigest!==original.rawRecordDigest)
+          throw new SeyeonR23OfflineG2CommitHoldV1();
         const result=await client.query<{receipt:unknown}>(`
 select seyeon_positive_candidate.commit_actual_v2_r3(
   $1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,

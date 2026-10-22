@@ -126,6 +126,13 @@ export interface RunSeyeonCharacterTurnV2Input {
   readonly assertGovernedPreflightSourceClosure?: (
     preflight: CharacterGovernedPreflightResultV1,
   ) => unknown;
+  /** Last model-input source seal after Preflight and canonical Context assembly.
+   * Failure aborts BEFORE Interpreter, Renderer and Semantic Reviewer.
+   * Provider/HTTP permission is still separately governed.
+   */
+  readonly assertBeforeModelContext?: (
+    context: SeyeonRuntimeContextV2,
+  ) => unknown | Promise<unknown>;
   readonly userMessageRef: string;
   readonly userText: string;
   readonly contextInput: Omit<
@@ -645,6 +652,14 @@ export async function runSeyeonCharacterTurnV2(
       error instanceof Error ? error.message : 'Se-yeon context assembly failed.',
       error,
     );
+  }
+
+  // The pre-Prefight G1 Pin seals the input candidates; the final
+  // assembled prompt MUST still carry exactly that DB-authorized source set.
+  // The Production callback checks the assembled model context, not merely
+  // the input supplied to the assembler. A failed seal cannot reach Provider.
+  if (input.assertBeforeModelContext !== undefined) {
+    await input.assertBeforeModelContext(context);
   }
 
   const rawInterpretation = await generate(

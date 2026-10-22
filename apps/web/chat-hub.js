@@ -1,3 +1,5 @@
+import { resolveCharacterDisplayNameV1 } from './character-display-locale.js';
+import { getUiLocale } from './ui-i18n.js';
 import { parseChatThreadIdV1 } from './chat-room-read-contract.js';
 
 const people = Object.freeze([
@@ -145,7 +147,7 @@ function createPersonCard(person, { pending = false } = {}) {
   if (!portrait) {
     const initial = document.createElement('span');
     initial.className = 'chat-person-initial';
-    initial.textContent = person.name;
+    initial.textContent = resolveCharacterDisplayNameV1(person.key, getUiLocale()) ?? person.name;
     art.append(initial);
   }
 
@@ -167,7 +169,7 @@ function createPersonCard(person, { pending = false } = {}) {
   titleRow.className = 'chat-person-title-row';
 
   const name = document.createElement('h3');
-  name.textContent = person.name;
+  name.textContent = resolveCharacterDisplayNameV1(person.key, getUiLocale()) ?? person.name;
 
   const title = document.createElement('span');
   title.textContent = person.title;
@@ -207,7 +209,7 @@ function createPersonCard(person, { pending = false } = {}) {
 }
 
 function normalizedSearchText(person) {
-  return [person.name, person.title, person.line, ...person.tags].join(' ').toLowerCase();
+  return [person.name, resolveCharacterDisplayNameV1(person.key, getUiLocale()), person.title, person.line, ...person.tags].join(' ').toLowerCase();
 }
 
 function filteredPeople() {
@@ -428,3 +430,9 @@ setContinuation(null);
 setRecent([]);
 setIncoming([]);
 setHubPresentationState('unavailable');
+
+// UI-only redraw: canonical character keys and server thread identity stay fixed.
+document.addEventListener('myeongha:localechange', () => {
+  renderPeople();
+  if (pendingPeopleGrid) pendingPeopleGrid.replaceChildren(...pendingPeople.map(person => createPersonCard(person, { pending: true })));
+});

@@ -1,5 +1,7 @@
 // Watchtower-Track: security
 import {describe,expect,it,afterAll} from 'vitest';
+import {createHash} from 'node:crypto';
+import {canonicalJson} from '../packages/domain/src/index.js';
 import {Pool} from 'pg';
 import type {
   PostgresSubjectPoolV1,PostgresSubjectConnectionV1,PostgresQueryResultV1,
@@ -21,21 +23,24 @@ const MEMORY2='d5000000-0000-4000-8000-000000000002';
 const GRANT1='d6000000-0000-4000-8000-000000000001';
 const GRANT2='d6000000-0000-4000-8000-000000000002';
 const SHA='sha256:v1:'+'a'.repeat(64);
+const digest=(v:unknown)=>'sha256:v1:'+
+  createHash('sha256').update(canonicalJson(v)).digest('hex');
 const evidence={kind:'member' as const,verifiedAuthUserId:AUTH};
 function selection():SeyeonExactModelPersonalSourceSelectionV1 {
+  const selectedSources:SeyeonExactModelPersonalSourceSelectionV1['selectedSources']=[
+    {recordKind:'memory',recordId:MEMORY1,grantId:GRANT1,
+      recordType:'shared_detail',schemaVersion:'memory-v1',
+      rawRecordDigest:SHA,projectedMemoryDigest:SHA},
+    {recordKind:'memory',recordId:MEMORY2,grantId:GRANT2,
+      recordType:'shared_detail',schemaVersion:'memory-v1',
+      rawRecordDigest:SHA,projectedMemoryDigest:SHA},
+  ];
   return {
     version:'seyeon-exact-model-personal-source-selection-v1',
     selectedMemoryCount:2,
     selectedPersonalRecordCount:2,
-    selectedSources:[
-      {recordKind:'memory',recordId:MEMORY1,grantId:GRANT1,
-        recordType:'shared_detail',schemaVersion:'memory-v1',
-        rawRecordDigest:SHA,projectedMemoryDigest:SHA},
-      {recordKind:'memory',recordId:MEMORY2,grantId:GRANT2,
-        recordType:'shared_detail',schemaVersion:'memory-v1',
-        rawRecordDigest:SHA,projectedMemoryDigest:SHA},
-    ],
-    selectedSourcesDigest:SHA,
+    selectedSources,
+    selectedSourcesDigest:digest(selectedSources),
     persistedBeforeModel:false,permitsAtomicCommit:false,permitsHttpReveal:false,
   };
 }
@@ -75,11 +80,11 @@ describe('R19 offline G1 positive original Grant pre-model pin boundary',()=>{
     const receipt=await candidate(db.pool);
     expect(db.args).toEqual([SUBJECT,THREAD,TURN,ATTEMPT,
       JSON.stringify([{recordId:MEMORY1,grantId:GRANT1},
-        {recordId:MEMORY2,grantId:GRANT2}]),SHA]);
+        {recordId:MEMORY2,grantId:GRANT2}]),selection().selectedSourcesDigest]);
     expect(db.steps.indexOf('COMMIT')).toBeGreaterThan(db.steps.findIndex(x=>x.includes('pin_source_set_r1')));
     expect(receipt).toEqual({status:'disposable_source_set_committed',
       attemptId:ATTEMPT,selectedPersonalRecordCount:2,
-      selectedSourcesDigest:SHA,permitsProvider:false,
+      selectedSourcesDigest:selection().selectedSourcesDigest,permitsProvider:false,
       permitsAtomicCommit:false,permitsHttpReveal:false});
   });
 
@@ -90,6 +95,19 @@ describe('R19 offline G1 positive original Grant pre-model pin boundary',()=>{
       {...original,selectedPersonalRecordCount:0},
       {...original,selectedMemoryCount:3},
       {...original,selectedSourcesDigest:'forged'},
+      {...original,selectedSourcesDigest:SHA}, // valid syntax, WRONG manifest digest
+      {...original,selectedSources:[
+        {...original.selectedSources[0]!,rawRecordDigest:'sha256:v1:'+'f'.repeat(64)},
+        original.selectedSources[1]!,
+      ]}, // manifest changed but digest stayed the same
+      {...original,selectedSources:[
+        {...original.selectedSources[0]!,secretUnpinnedSource:'hidden'} as unknown as
+          SeyeonExactModelPersonalSourceSelectionV1['selectedSources'][number],
+        original.selectedSources[1]!,
+      ],selectedSourcesDigest:digest([
+        {...original.selectedSources[0]!,secretUnpinnedSource:'hidden'},
+        original.selectedSources[1]!,
+      ])}, // extra source metadata must not reach database silently
       {...original,selectedSources:[original.selectedSources[0]!,original.selectedSources[0]!]},
       {...original,selectedSources:[{...original.selectedSources[0]!,recordKind:'life_fact'},original.selectedSources[1]!] },
       {...original,selectedSources:[{...original.selectedSources[0]!,recordType:'unapproved'},original.selectedSources[1]!] },
@@ -184,7 +202,7 @@ join seyeon_positive_candidate.source_edges_r1 e on e.attempt_id=s.attempt_id
 where s.attempt_id=$1 group by s.source_count,s.selected_sources_digest
 `,[ATTEMPT]);
     expect(persisted.rows).toEqual([{source_count:2,
-      selected_sources_digest:SHA,edges:2}]);
+      selected_sources_digest:selection().selectedSourcesDigest,edges:2}]);
     await expect(candidate(realPool,{
       ...selection(),selectedSourcesDigest:'sha256:v1:'+'b'.repeat(64),
     })).rejects.toBeInstanceOf(SeyeonR19OfflinePositivePinHoldV1);

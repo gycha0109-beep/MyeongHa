@@ -1,3 +1,5 @@
+import { resolveCharacterDisplayNameV1 } from './character-display-locale.js';
+import { getUiLocale, getUiLocaleRequestHeadersV1, translateStaticUi } from './ui-i18n.js';
 import { resolveCanonicalCharacterPresentationV1 } from './character-presentation-identity.js';
 import {
   ChatOpenClientErrorV1,
@@ -37,9 +39,21 @@ let roomReady = false;
 let queuedSubmission = false;
 let sendingTurn = false;
 let authoritativeCharacterId = null;
+let composeStatusSource = null;
+let roomLoadingSource = null;
+
+function uiText(source) {
+  return translateStaticUi(source, getUiLocale());
+}
 
 function setComposeStatus(message) {
-  if (composeStatus) composeStatus.textContent = message;
+  composeStatusSource = message;
+  if (composeStatus) composeStatus.textContent = uiText(message);
+}
+
+function setRoomLoadingStatus(message) {
+  roomLoadingSource = message;
+  if (roomLoading) roomLoading.textContent = uiText(message);
 }
 
 function setComposerBusy(busy) {
@@ -151,8 +165,8 @@ function chatOpenFailureMessage(error) {
 
 function formatTimestamp(value) {
   const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return '시간 정보 없음';
-  return new Intl.DateTimeFormat('ko-KR', {
+  if (Number.isNaN(parsed.getTime())) return uiText('시간 정보 없음');
+  return new Intl.DateTimeFormat(getUiLocale(), {
     month: 'numeric',
     day: 'numeric',
     hour: '2-digit',
@@ -161,13 +175,14 @@ function formatTimestamp(value) {
 }
 
 function senderLabel(message, authoritativeCharacterId) {
-  if (message.senderType === 'user') return '나';
+  const locale = getUiLocale();
+  if (message.senderType === 'user') return translateStaticUi('나', locale);
   if (message.senderType === 'character') {
-    const identity = resolveCanonicalCharacterPresentationV1(message.characterId);
-    if (message.characterId === authoritativeCharacterId) return identity?.name ?? '대리자';
-    return identity?.name ?? '다른 대리자';
+    const name = resolveCharacterDisplayNameV1(message.characterId, locale);
+    if (message.characterId === authoritativeCharacterId) return name ?? translateStaticUi('대리자', locale);
+    return name ?? translateStaticUi('다른 대리자', locale);
   }
-  return '대화 기록';
+  return translateStaticUi('대화 기록', locale);
 }
 
 function safeMessageText(message) {
@@ -184,12 +199,16 @@ function createStreamMessage(message, authoritativeCharacterId) {
   article.className = 'conversation-message';
   article.dataset.sender = message.senderType;
   article.dataset.redacted = String(message.redacted === true);
+  if (message.senderType === 'character') {
+    const canonical = resolveCanonicalCharacterPresentationV1(message.characterId);
+    if (canonical) article.dataset.messageCharacterId = canonical.presentationKey;
+  }
 
   const avatar = document.createElement('span');
   avatar.className = 'conversation-message-avatar';
   avatar.setAttribute('aria-hidden', 'true');
   avatar.dataset.character = message.senderType === 'character' ? 'runtime-character' : 'user';
-  avatar.textContent = message.senderType === 'user' ? '나' : '대';
+  avatar.textContent = message.senderType === 'user' ? translateStaticUi('나', getUiLocale()) : '대';
 
   const body = document.createElement('div');
   body.className = 'conversation-message-body';
@@ -204,7 +223,17 @@ function createStreamMessage(message, authoritativeCharacterId) {
   heading.append(strong, time);
 
   const paragraph = document.createElement('p');
-  paragraph.textContent = safeMessageText(message);
+  const hasSourceBody = message.redacted !== true
+    && typeof message.bodyText === 'string'
+    && message.bodyText.trim().length > 0;
+  if (hasSourceBody) {
+    // Source-owned message text must not enter the static UI translation pipeline.
+    paragraph.dataset.chatBodySource = '';
+    paragraph.textContent = message.bodyText;
+  } else {
+    paragraph.dataset.chatUiPlaceholder = safeMessageText(message);
+    paragraph.textContent = uiText(safeMessageText(message));
+  }
   body.append(heading, paragraph);
   article.append(avatar, body);
   return article;
@@ -225,6 +254,32 @@ function renderConversation(messages, authoritativeCharacterId) {
   chatStream.replaceChildren(...nodes);
   chatStream.scrollTop = chatStream.scrollHeight;
 }
+
+// Repaint only metadata already present on owner-scoped DOM nodes. No cached
+// transcripts, no server refetch, no reinterpretation or modification of bodyText.
+// If the session changes, the existing authority guard removes these nodes.
+document.addEventListener('myeongha:localechange', () => {
+  if (composeStatusSource !== null && composeStatus) composeStatus.textContent = uiText(composeStatusSource);
+  if (roomLoadingSource !== null && roomLoading) roomLoading.textContent = uiText(roomLoadingSource);
+  if (!chatStream) return;
+  for (const article of chatStream.querySelectorAll('.conversation-message')) {
+    const placeholder = article.querySelector('[data-chat-ui-placeholder]');
+    if (placeholder) placeholder.textContent = uiText(placeholder.dataset.chatUiPlaceholder);
+    const senderType = article.dataset.sender;
+    const characterId = article.dataset.messageCharacterId ?? null;
+    const heading = article.querySelector('.conversation-message-heading strong');
+    if (heading) heading.textContent = senderLabel({ senderType, characterId }, authoritativeCharacterId);
+    const time = article.querySelector('.conversation-message-heading time');
+    if (time) {
+      const timestamp = time.getAttribute('datetime');
+      time.textContent = formatTimestamp(timestamp === null ? undefined : timestamp);
+    }
+    if (senderType === 'user') {
+      const avatar = article.querySelector('.conversation-message-avatar');
+      if (avatar) avatar.textContent = translateStaticUi('나', getUiLocale());
+    }
+  }
+});
 
 function renderRoomState(state) {
   renderConversation(state.messages, state.characterId);
@@ -266,6 +321,8 @@ async function readChatPage(activeBearer, afterSequenceNo) {
     cache: 'no-store',
     headers: {
       Accept: 'application/json',
+          'Accept-Language': getUiLocale(),
+          ...getUiLocaleRequestHeadersV1(),
       Authorization: `Bearer ${activeBearer.token}`,
     },
   });
@@ -386,10 +443,10 @@ function ensureRoomReady() {
     }
   })().then((ready) => {
     if (!ready) {
-      const message = composeStatus?.textContent || '대화를 불러오지 못했습니다.';
+      const message = composeStatusSource || '대화를 불러오지 못했습니다.';
       if (roomLoading) {
         roomLoading.hidden = false;
-        roomLoading.textContent = message;
+        setRoomLoadingStatus(message);
       }
       if (retryButton && !invalidThreadRoute) retryButton.hidden = false;
     } else if (roomLoading) {
@@ -429,6 +486,8 @@ async function sendTurn(message) {
         cache: 'no-store',
         headers: {
           Accept: 'application/json',
+          'Accept-Language': getUiLocale(),
+          ...getUiLocaleRequestHeadersV1(),
           Authorization: `Bearer ${activeBearer.token}`,
           'Content-Type': 'application/json',
         },
@@ -530,7 +589,7 @@ function submitTurn(event) {
 
 document.addEventListener('myeongha:chat-submit', submitTurn);
 retryButton?.addEventListener('click', () => {
-  if (roomLoading) roomLoading.textContent = '대화 연결을 다시 확인하고 있습니다…';
+  if (roomLoading) setRoomLoadingStatus('대화 연결을 다시 확인하고 있습니다…');
   if (retryButton) retryButton.hidden = true;
   void ensureRoomReady();
 });

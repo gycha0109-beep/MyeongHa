@@ -18,15 +18,16 @@ export function MyProfileCard({
   profile: MobileMyProfileViewV1;
 }) {
   const themedStyles = useMobileThemedStyles(styles);
+  const { t } = useMobileUiLocale();
   return (
     <View style={themedStyles.profileCard}>
       <View style={themedStyles.profileMark}>
         <Text style={themedStyles.profileMarkText}>之</Text>
       </View>
       <View style={themedStyles.profileCopy}>
-        <Text style={themedStyles.profileName}>{profile.displayName}</Text>
-        <Text style={themedStyles.profileMeta}>{profile.subjectLabel}</Text>
-        <Text style={themedStyles.profileStatus}>{profile.statusLabel}</Text>
+        <Text style={themedStyles.profileName}>{profile.displayName === '호칭 미설정' ? t(profile.displayName) : profile.displayName}</Text>
+        <Text style={themedStyles.profileMeta}>{t(profile.subjectLabel)}</Text>
+        <Text style={themedStyles.profileStatus}>{t(profile.statusLabel)}</Text>
       </View>
     </View>
   );
@@ -416,6 +417,7 @@ function MyLocaleSelector() {
 
 function MyThemeSelector() {
   const themedStyles = useMobileThemedStyles(styles);
+  const { t } = useMobileUiLocale();
   const { theme, setTheme, colors } = useMobileTheme();
   return (
     <View style={themedStyles.themeSection}>
@@ -426,7 +428,7 @@ function MyThemeSelector() {
             key={option}
             accessibilityRole="radio"
             accessibilityState={{ selected: theme === option }}
-            accessibilityLabel={option === 'light' ? '라이트 모드' : '다크 모드'}
+            accessibilityLabel={t(option === 'light' ? '라이트 모드' : '다크 모드')}
             onPress={() => setTheme(option)}
             style={{
               flex: 1, minHeight: 48, alignItems: 'center', justifyContent: 'center',
@@ -436,7 +438,7 @@ function MyThemeSelector() {
             }}
           >
             <Text style={{ color: theme === option ? colors.canvas : colors.ink, fontWeight: '700' }}>
-              {option === 'light' ? '☀ 라이트' : '☾ 다크'}
+              {t(option === 'light' ? '☀ 라이트' : '☾ 다크')}
             </Text>
           </Pressable>
         ))}

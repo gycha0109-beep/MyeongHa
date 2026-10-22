@@ -131,7 +131,12 @@ describe('General Natal 2A: existing route → browser guarded Preview integrati
     );
 
     expect(runtime).toContain("isStoredRecord ? 'records.html?tab=saju' : 'reading.html'");
-    expect(runtime).toContain("isStoredRecord ? '기록에서 사주 보기' : '다른 사주 읽기'");
+    const sceneCopy = readFileSync(
+      new URL('../apps/web/reading-detail-ui-locale.js', import.meta.url), 'utf8',
+    );
+    expect(runtime).toContain('readingSceneProgressV1(activeIndex, steps.length,');
+    expect(sceneCopy).toContain("recordLink: '기록에서 사주 보기'");
+    expect(sceneCopy).toContain("otherLink: '다른 사주 읽기'");
     expect(runtime).toContain('이 프리뷰는 공식 풀이 기록에 저장되지 않습니다.');
     expect(runtime).not.toContain("handoffUrl('records.html?tab=saju')");
     expect(page).toContain('data-reading-completion-secondary-label');

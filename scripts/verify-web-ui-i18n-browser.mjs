@@ -229,10 +229,14 @@ try {
   assert(!/[가-힣]/u.test(face.title+face.capture),'Japanese face UI mixes Korean: '+JSON.stringify(face));
   assert(face.overflow<=2,'Japanese face layout overflow');
   assert(!/[가-힣]/u.test(face.visibleText),'Japanese face page contains untranslated Hangul: '+face.visibleText.match(/.{0,30}[가-힣].{0,40}/gu)?.slice(0,12).join(' | '));
+  const jpPicker = await inspect("(() => { document.querySelector('[data-face-reader-change]').click(); return [...document.querySelectorAll('.reading-reader-option-heading strong')].slice(0,3).map(n=>n.textContent.trim()); })()");
+  assert(JSON.stringify(jpPicker)===JSON.stringify(['セヨン','ベクホン','ヨウル']),'Face Reader picker did not use Japanese Katakana names: '+JSON.stringify(jpPicker));
   await navigate(client,origin,'/chat-hub.html','.conversation-people');
   await sleep(450);
   const hub=await inspect("(() => ({cards:[...document.querySelectorAll('.chat-person-card')].slice(0,3).map(x=>x.textContent.trim()),overflow:document.documentElement.scrollWidth-innerWidth}))()");
   assert(hub.cards.length>0,'Character card list missing');
+  const jpNames = await inspect("(() => [...document.querySelectorAll('.chat-person-card .chat-person-title-row h3')].slice(0,3).map(x=>x.textContent.trim()))()");
+  assert(JSON.stringify(jpNames)===JSON.stringify(['セヨン','ベクホン','ヨウル']),'Japan temporary Katakana names must be stable: '+JSON.stringify(jpNames));
   assert(hub.cards.every(x=>!/[가-힣]/u.test(x)),'Japanese character directory mixes Korean: '+JSON.stringify(hub));
   assert(hub.overflow<=2,'Japanese directory layout overflow');
   await navigate(client,origin,'/auth.html','.ui-locale-select');
@@ -272,7 +276,15 @@ try {
   const zh=await inspect("(() => ({lang:document.documentElement.lang, heading:document.querySelector('.gm-page-title')?.textContent.trim(),options:[...document.querySelectorAll('#saju-birth-sex option')].map(x=>x.textContent.trim())}))()");
   assert(zh.lang==='zh-TW' && zh.heading==='八字命理','Traditional Chinese header not translated');
   assert(JSON.stringify(zh.options)===JSON.stringify(['不選擇','男性','女性','未指定']),'Traditional Chinese options remain Korean: '+JSON.stringify(zh));
-  console.log(JSON.stringify({status:'WEB_STATIC_I18N_BROWSER_PASS',ja,face,hub,zh}));
+  await navigate(client,origin,'/chat-hub.html','.conversation-people');
+  await sleep(400);
+  const twNames = await inspect("(() => [...document.querySelectorAll('.chat-person-card .chat-person-title-row h3')].slice(0,3).map(x=>x.textContent.trim()))()");
+  assert(JSON.stringify(twNames)===JSON.stringify(['Seyeon','Baekheon','Yeoul']),'Taiwan temporary roman names must be stable: '+JSON.stringify(twNames));
+  await navigate(client,origin,'/face-reading.html','.face-reader-heading');
+  await sleep(300);
+  const twPicker = await inspect("(() => { document.querySelector('[data-face-reader-change]').click(); return [...document.querySelectorAll('.reading-reader-option-heading strong')].slice(0,3).map(n=>n.textContent.trim()); })()");
+  assert(JSON.stringify(twPicker)===JSON.stringify(['Seyeon','Baekheon','Yeoul']),'Face Reader picker did not use Taiwan Roman names: '+JSON.stringify(twPicker));
+  console.log(JSON.stringify({status:'WEB_STATIC_I18N_BROWSER_PASS',ja,face,hub,zh,jpNames,twNames,jpPicker,twPicker}));
 } catch(err) {
   if(client){try{await artifact(client,'-i18n-failure')}catch{}}
   throw err;

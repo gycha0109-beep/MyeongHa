@@ -1,3 +1,4 @@
+import { getUiLocaleRequestHeadersV1 } from './ui-i18n.js';
 import {
   WebApiEnvelopeError,
   readApiErrorCode,
@@ -220,6 +221,7 @@ export function createChatOpenClientV1(options = {}) {
         method: 'POST',
         headers: {
           Accept: 'application/json',
+          ...getUiLocaleRequestHeadersV1(),
           Authorization: 'Bearer ' + bearer.token,
           'Content-Type': 'application/json',
         },

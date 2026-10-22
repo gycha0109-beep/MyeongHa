@@ -80,15 +80,16 @@ export function ReadingHistoryCard({
 }) {
   const styles = useMobileThemedStyles(staticStyles);
   const openable = readingIsArchiveOpenableV1(item.productResponseState);
+  const { t } = useMobileUiLocale();
   const content = (
     <>
       <View style={styles.cardTop}>
         <Text style={styles.symbol}>命</Text>
         <Text style={styles.date}>{formatRecordDateV1(item.completedAt)}</Text>
       </View>
-      <Text style={styles.cardTitle}>{readingTitleV1(item.sajuDomain)}</Text>
-      <Text style={styles.cardBody}>{readingReaderLabelV1(item.readerCharacterIds)}</Text>
-      <Text style={styles.state}>{readingStateLabelV1(item.productResponseState)}</Text>
+      <Text style={styles.cardTitle}>{t(readingTitleV1(item.sajuDomain))}</Text>
+      <Text style={styles.cardBody}>{t(readingReaderLabelV1(item.readerCharacterIds))}</Text>
+      <Text style={styles.state}>{t(readingStateLabelV1(item.productResponseState))}</Text>
       {openable && onOpen !== undefined ? (
         <MobileUiText style={styles.openHint}>저장된 풀이 다시 읽기 →</MobileUiText>
       ) : null}
@@ -129,10 +130,17 @@ export function MemoryCard({ item }: { item: MemoryItemV1 }) {
 
 export function RecordsEmptyState({ label }: { label: string }) {
   const styles = useMobileThemedStyles(staticStyles);
+  const { t } = useMobileUiLocale();
+  const emptyByCategory: Readonly<Record<string, string>> = {
+    '기록': '아직 기록이 없습니다',
+    '현세록': '아직 현세록이 없습니다',
+    '지난 읽기': '아직 지난 읽기가 없습니다',
+    '기억': '아직 기억이 없습니다',
+  };
   return (
     <View style={styles.empty}>
       <Text style={styles.emptySymbol}>之</Text>
-      <Text style={styles.cardTitle}>아직 {label}이 없습니다</Text>
+      <Text style={styles.cardTitle}>{t(emptyByCategory[label] ?? '아직 기록이 없습니다')}</Text>
       <MobileUiText style={styles.cardBody}>확인된 기록이 생기면 이곳에 표시됩니다.</MobileUiText>
     </View>
   );
@@ -146,12 +154,13 @@ export function RecordsFailureBanner({
   onRetry: () => void;
 }) {
   const styles = useMobileThemedStyles(staticStyles);
+  const { t } = useMobileUiLocale();
   if (labels.length === 0) return null;
   return (
     <View style={styles.failure}>
       <View style={styles.failureCopy}>
         <MobileUiText style={styles.failureTitle}>일부 기록을 불러오지 못했습니다</MobileUiText>
-        <Text style={styles.cardBody}>{labels.join(' · ')}</Text>
+        <Text style={styles.cardBody}>{labels.map((label) => t(label)).join(' · ')}</Text>
       </View>
       <Pressable accessibilityRole="button" onPress={onRetry} style={styles.retryButton}>
         <MobileUiText style={styles.retryText}>다시 시도</MobileUiText>
