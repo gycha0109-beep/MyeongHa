@@ -176,11 +176,15 @@ export async function runThreadBoundReaderInterpretationPreviewV2(
     const proof = await issueCharacterSajuOfficialStandardEligibilityV2({
       prepared: first, currentScope: current.scope,
       productAuthorityPort: input.productReaderEligibilityAuthorityPort,
+      currentVerifiedPurchaseAuthorityPort:
+        input.currentVerifiedPurchaseAuthorityPort,
     });
     const noSajuContext = assembleCharacterRuntimeContext(base.contextInput);
-    context = assembleOfficialStandardReaderRuntimeV2({
+    context = await assembleOfficialStandardReaderRuntimeV2({
       proof, currentScope: current.scope,
       source: current.source, baseContext: noSajuContext,
+      currentVerifiedPurchaseAuthorityPort:
+        input.currentVerifiedPurchaseAuthorityPort,
     });
   } catch {
     deny('ACCESS_DENIED');
