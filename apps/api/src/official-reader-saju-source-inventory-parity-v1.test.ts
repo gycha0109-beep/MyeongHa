@@ -295,6 +295,19 @@ describe('Saju v2 SourceUnit / DB-admitted Reader / Records exact-reference pari
     });
     expect(accesses).toEqual([SUBJECT + '/' + READING]);
 
+    // The archived JSON can match perfectly while the DB Records row has
+    // diverged from the Reader's independently stored official response hash.
+    const mismatchedHash = await preflightSajuReaderAgainstCurrentRecordsV1({
+      readerAdmission,
+      recordAuthorityPort: { readRecord: async () => ({
+        ...row, responseHash: 'sha256:changed-records-row',
+      }) },
+      sajuHandoff: handoff(readerAdmission),
+    });
+    expect(mismatchedHash).toMatchObject({
+      state: 'blocked', canPersist: false, canDisclose: false,
+    });
+
     const missing = await preflightSajuReaderAgainstCurrentRecordsV1({
       readerAdmission,
       recordAuthorityPort: { readRecord: async () => null },

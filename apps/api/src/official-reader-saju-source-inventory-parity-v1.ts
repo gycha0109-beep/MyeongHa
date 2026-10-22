@@ -208,6 +208,7 @@ export async function preflightSajuReaderAgainstCurrentRecordsV1(input: Readonly
     const record = await getOfficialReadingRecord({
       resolvedSubjectId: scope.subjectId,
       readingId: scope.readingId,
+      expectedResponseHash: scope.officialArtifactResponseHash,
       authorityPort: input.recordAuthorityPort,
     });
     return preflightSajuReaderRecordsSourceInventoryParityV1({
