@@ -196,6 +196,10 @@ async function main() {
       '/?__myeongha_chat_turn_send=1',
       '/hall.html?%255F_myeongha_chat_open=1',
       '/api%2Fchat%2Fsynthetic-thread-id',
+      '/%61pi/chat/synthetic-thread-id',
+      '/%2561pi/chat/synthetic-thread-id',
+      '/api%2F%63hat/synthetic-thread-id',
+      '/api%252F%2563hat/synthetic-thread-id',
       '/%61pi%252Fchat%252Fsynthetic-thread-id',
     ]) {
       response = await check(path, 503);
