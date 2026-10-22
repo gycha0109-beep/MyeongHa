@@ -72,7 +72,7 @@ join protected_reader_triggers a on a.name=p.proname
 where n.nspname='public'
   and (
     not p.prosecdef or p.pronargs<>0
-    or p.prolang <> 'pg_catalog.plpgsql'::pg_catalog.regproc
+    or p.prolang <> (select l.oid from pg_catalog.pg_language l where l.lanname='plpgsql')
     or not exists (
       select 1 from pg_catalog.unnest(coalesce(p.proconfig, array[]::text[])) cfg
       where pg_catalog.replace(cfg,' ','')='search_path=pg_catalog,public'
