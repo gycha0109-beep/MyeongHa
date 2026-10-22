@@ -137,6 +137,19 @@ export function fenceCloudflareStaticPreviewAssetResponseV1(candidate, request) 
   try {
     if (!(candidate instanceof Response)) return denied();
     if (![200, 206, 304].includes(candidate.status)) return denied();
+    // Partial and not-modified representations require a client-side range or
+    // conditional request respectively; neither is a generic 200 fallback.
+    // Never trust a 206 body without its bounded Content-Range metadata.
+    if (candidate.status === 206 &&
+        (!request.headers.has('range') ||
+         !/^bytes [0-9]+-[0-9]+\/[0-9]+$/u.test(candidate.headers.get('content-range') ?? ''))) {
+      return denied();
+    }
+    if (candidate.status === 304 &&
+        (!request.headers.has('if-none-match') &&
+         !request.headers.has('if-modified-since'))) {
+      return denied();
+    }
     const headers = new Headers(candidate.headers);
     if (headers.has('set-cookie') || headers.has('location')) return denied();
     for (const key of headers.keys()) {
@@ -147,7 +160,17 @@ export function fenceCloudflareStaticPreviewAssetResponseV1(candidate, request) 
     const expectedHtml = CLOUDFLARE_PUBLIC_HTML_PATHS_V1.includes(path);
     const media = (headers.get('content-type') ?? '').split(';')[0].trim().toLowerCase();
     const isHtml = media === 'text/html' || media === 'application/xhtml+xml';
-    if (expectedHtml !== isHtml || (expectedHtml && candidate.status !== 200)) {
+    // No HTML or SSE/streaming response may be smuggled as a non-HTML asset.
+    // A missing/unknown media type is not a grant to serve an arbitrary body.
+    const safeStaticMedia = media === 'text/javascript' ||
+      media === 'application/javascript' || media === 'text/css' ||
+      media === 'application/json' || media === 'text/plain' ||
+      media === 'application/wasm' || media === 'application/octet-stream' ||
+      media === 'application/pdf' || media.startsWith('image/') ||
+      media.startsWith('font/') || media.startsWith('audio/') ||
+      media.startsWith('video/');
+    if (expectedHtml !== isHtml || (expectedHtml && candidate.status !== 200) ||
+        (!expectedHtml && !safeStaticMedia)) {
       return denied();
     }
     if (expectedHtml) {
