@@ -1,0 +1,31 @@
+name: '[WT:character-memory] nonbillable Luna connection and authentication diagnosis'
+on:
+  pull_request:
+    types: [opened, synchronize]
+    paths:
+      - '.github/workflows/seyeon-luna-nonbillable-transport-diagnostic-v1.yml'
+      - 'scripts/seyeon-luna-nonbillable-transport-diagnostic-v1.mjs'
+permissions:
+  contents: read
+jobs:
+  diagnose:
+    if: ${{ github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'diagnose/character-memory/luna-failure-no-paid-20261022' }}
+    environment: production
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '24'
+      - name: Prohibit all generation POSTs and run read-only model diagnostic
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "${OPENAI_API_KEY:-}"
+          node --check scripts/seyeon-luna-nonbillable-transport-diagnostic-v1.mjs
+          node scripts/seyeon-luna-nonbillable-transport-diagnostic-v1.mjs
