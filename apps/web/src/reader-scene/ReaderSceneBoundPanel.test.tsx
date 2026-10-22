@@ -99,6 +99,25 @@ describe('I18N-06e Reader Scene controller→panel integration seam', () => {
     expect(selectReaderSceneDisplayStateV1(disabled, key, oldView).state).toBe('feature_unavailable');
   });
 
+  it('repaints UI-only shell locale without relabeling or repeating a source request', async () => {
+    const component = await readFile(new URL('./ReaderSceneBoundPanel.tsx', import.meta.url), 'utf8');
+    expect(component).toContain("document.addEventListener('myeongha:localechange', updateShellLocale)");
+    expect(component).toContain("document.removeEventListener('myeongha:localechange', updateShellLocale)");
+    expect(component).toContain('setShellLocale(safeReadShellLocale(resolveUiLocaleRef.current))');
+    expect(component).toContain('getUiLocale: () => resolveUiLocaleRef.current()');
+    expect(component).toContain('uiLocale={shellLocale}');
+    expect(component).toContain('}, [client, key, threadId, officialReadingId]);');
+    expect(component).not.toContain('void controller.load({ threadId, officialReadingId, uiLocale: shellLocale })');
+
+    const html = renderToStaticMarkup(createElement(ReaderSceneBoundPanel, {
+      client: readerClient(false),
+      ownerBinding: null,
+      displayScopeRevision: 'session-default',
+    }));
+    expect(html).toContain('data-reader-scene-state="feature_unavailable"');
+    expect(html).toContain('현재 이 대리자 풀이는 제공되지 않습니다.');
+  });
+
   it('keeps public Chat and Reading routes disconnected and uses only the owner-supplied ids', async () => {
     const [bound, panel, chat, reading] = await Promise.all([
       readFile(new URL('./ReaderSceneBoundPanel.tsx', import.meta.url), 'utf8'),
