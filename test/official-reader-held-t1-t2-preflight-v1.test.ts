@@ -99,6 +99,9 @@ function fixture(options: {
       resolvedSubjectId: scope.resolvedSubject.subjectId,
       threadId: THREAD, readingId: READING, effectiveAt,
       contentEntry,
+      currentVerifiedPurchaseAuthorityPort: {
+        assertCurrentVerifiedPurchase: vi.fn(async () => undefined),
+      },
       threadBindingAuthorityPort: { readRuntimeBinding },
       accessAuthorityPort: { readAccessibleReadings: async () =>
         phase === 2 && options.revokedAtT2 ? [] : [{
