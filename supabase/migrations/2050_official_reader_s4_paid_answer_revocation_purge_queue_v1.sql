@@ -57,7 +57,8 @@ as $reader_paid_purge_enqueue$
 declare v_scope record;
 begin
   if new.event_type not in ('revoked','expired')
-     or new.source_type not in ('provider_event','system','admin')
+     or new.target_status not in ('revoked','expired')
+     or new.source_type not in ('receipt','provider_event')
      or new.grant_id is null then
     return new;
   end if;
@@ -67,15 +68,27 @@ begin
   for v_scope in
     select distinct a.subject_id,a.official_reading_id,a.reader_character_id
     from public.entitlement_grants g
-    join public.standard_reading_reader_access_grants a
-      on a.entitlement_grant_id=g.id and a.subject_id=g.subject_id
+    cross join lateral (
+      -- Current Reader access may already have been unbound by cancellation.
+      -- The retained paid answer's immutable originating Grant captures
+      -- that older scope without restoring access or trusting client data.
+      select bound.subject_id,bound.official_reading_id,bound.reader_character_id
+      from public.standard_reading_reader_access_grants bound
+      where bound.entitlement_grant_id=g.id and bound.subject_id=g.subject_id
+      union
+      select historical.subject_id,historical.official_reading_id,
+             historical.reader_character_id
+      from public.official_reader_paid_answer_bodies historical
+      where historical.originating_entitlement_grant_id=g.id
+        and historical.subject_id=g.subject_id
+    ) a
     where g.id=new.grant_id and g.subject_id=new.subject_id
       and g.grant_source_type='purchase'
       and exists (
-        select 1 from public.official_reader_paid_answer_bodies b
-        where b.subject_id=a.subject_id
-          and b.official_reading_id=a.official_reading_id
-          and b.reader_character_id=a.reader_character_id
+        select 1 from public.official_reader_paid_answer_bodies body
+        where body.subject_id=a.subject_id
+          and body.official_reading_id=a.official_reading_id
+          and body.reader_character_id=a.reader_character_id
       )
     order by a.subject_id,a.official_reading_id,a.reader_character_id
   loop
