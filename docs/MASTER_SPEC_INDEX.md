@@ -8,6 +8,10 @@
 
 ---
 
+## GPT 작업트랙 총괄 실행 로드맵 (2026-10-22)
+
+**[GPT 14개 대화방 ↔ 실제 개발 트랙·제품 결과 인계 로드맵](roadmaps/MYEONGHA_GPT_TRACK_MASTER_ROADMAP_20261022.md)**을 현재 크로스 트랙 진행표로 사용합니다. 이 문서는 12개 사주 메뉴, 구매 요약/Reader 대화/기록, DB·Commerce·Memory·Security·Client·Ops 선후관계를 정리한 **비권위 실행 보조 문서**입니다. 본 Master Specification의 각 Source Authority, [P0 Decision Register](P0_DECISION_REGISTER.md), 소유 트랙별 기술 로드맵을 대체하거나 운영 권한을 승인하지 않습니다.
+
 ## 공식 Reader 유료 해설 개인정보 정책 정본 (2026-10-19)
 
 **`P0-PR-02` [개인정보 처리 제품 책임자 결정](OFFICIAL_READER_S4_PRIVACY_POLICY_DECISION_V1.md)**을 이 기본 브랜치에서 확인합니다. 보호 본문 별도 저장, 유료 권한 소멸 시 새 서버 조회·AI 주입 즉시 차단, 본 DB 24시간 삭제 내부 목표, 일반 로그 90일 상한, 기존 Commerce P5Y·백업 P30D는 유지. 제품 정책은 승인됐으나 신규 테이블·법무·복원 인수·원문 영속 저장·운영 공개는 별도 HOLD입니다. **PR 댓글이나 대화 기억 대신 이 정본과 [P0 결정 원장](P0_DECISION_REGISTER.md)을 참조합니다.**
