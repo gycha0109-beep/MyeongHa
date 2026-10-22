@@ -189,15 +189,19 @@ describe('S-CF2 actual Worker fetch boundary and no HTML fallback', () => {
   });
 
   it('intercepts all static requests before ASSETS and denies encoded API alias or query-marker bypass', async () => {
-    const calls = vi.fn(async request =>
-      new Response('<!doctype html><html>public fixture</html>', {
+    const calls = vi.fn(async request => {
+      const html = new URL(request.url).pathname === '/' ||
+        new URL(request.url).pathname.endsWith('.html');
+      return new Response(html
+        ? '<!doctype html><html>public fixture</html>'
+        : 'public fixture image bytes', {
         status: 200,
         headers: {
-          'content-type': 'text/html; charset=utf-8',
-          'cache-control': 'no-store',
+          'content-type': html ? 'text/html; charset=utf-8' : 'image/png',
+          'cache-control': html ? 'no-store' : 'public, max-age=300',
         },
-      }),
-    );
+      });
+    });
     const env = { ASSETS: { fetch: calls } };
 
     for (const path of [
@@ -242,6 +246,85 @@ describe('S-CF2 actual Worker fetch boundary and no HTML fallback', () => {
     });
     expect(failingAssets.status).toBe(404);
     expect(await failingAssets.text()).toBe('');
+  });
+
+  it('seals malformed, redirecting, CORS or private ASSETS responses and rejects HTML fallback', async () => {
+    const rejections = [
+      Response.json({ secret: SECRET }, { status: 500 }),
+      Response.json({ secret: SECRET }, { status: 403 }),
+      new Response(null, { status: 302, headers: { Location: 'https://unsafe.example.test/' } }),
+      new Response('secret', { headers: { 'Content-Type': 'text/html', 'Set-Cookie': 'session=unsafe' } }),
+      new Response('secret', { headers: { 'Content-Type': 'text/html', 'Access-Control-Allow-Origin': '*' } }),
+      new Response('secret', { headers: { 'Content-Type': 'text/html', 'Location': '/fallback' } }),
+      new Response('secret', { headers: { 'Content-Type': 'text/html', 'Access-Control-Expose-Headers': '*' } }),
+      new Response('secret', { headers: { 'Content-Type': 'text/html', 'Cache-Control': 'public,max-age=9999' } }),
+    ];
+    for (const candidate of rejections) {
+      const response = await worker.fetch(new Request(ROOT + '/missing-private.html'), {
+        ASSETS: { fetch: () => candidate },
+      });
+      expect(response.status).toBe(404);
+      expect(response.headers.get('cache-control')).toBe('no-store');
+      expect(response.headers.get('location')).toBeNull();
+      expect(response.headers.get('set-cookie')).toBeNull();
+      expect(response.headers.get('access-control-allow-origin')).toBeNull();
+      expect(await response.text()).toBe('');
+    }
+
+    // The exact HTML allowlist cannot be bypassed by an unexpected 200
+    // asset or a generic text/html SPA fallback on unrelated static paths.
+    for (const [path, mime] of [
+      ['/index.html', 'application/json'],
+      ['/assets/bundle.js', 'text/html'],
+      ['/missing.html', 'text/html'],
+      ['/', 'text/plain'],
+    ]) {
+      const response = await worker.fetch(new Request(ROOT + path), {
+        ASSETS: { fetch: () => new Response(SECRET, {
+          status: 200, headers: { 'Content-Type': mime },
+        }) },
+      });
+      expect(response.status).toBe(404);
+      expect(await response.text()).toBe('');
+    }
+    const noCandidate = await worker.fetch(new Request(ROOT + '/index.html'), {
+      ASSETS: { fetch: () => null },
+    });
+    expect(noCandidate.status).toBe(404);
+    expect(await noCandidate.text()).toBe('');
+  });
+
+  it('preserves approved HTML security headers and non-HTML cache behavior', async () => {
+    const publicHtml = await worker.fetch(new Request(ROOT + '/index.html'), {
+      ASSETS: { fetch: () => new Response('<html>public</html>', {
+        status: 200,
+        headers: {
+          'Content-Type': 'text/html',
+          'Cache-Control': 'public,max-age=3600',
+          'Content-Security-Policy': 'default-src *',
+        },
+      }) },
+    });
+    expect(publicHtml.status).toBe(200);
+    expect(publicHtml.headers.get('cache-control')).toBe('no-store');
+    expect(publicHtml.headers.get('content-security-policy')).toContain("default-src 'self'");
+    expect(publicHtml.headers.get('x-content-type-options')).toBe('nosniff');
+    expect(await publicHtml.text()).toContain('public');
+
+    const publicAsset = await worker.fetch(new Request(ROOT + '/assets/app.js'), {
+      ASSETS: { fetch: () => new Response('export default 1;', {
+        status: 200, headers: {
+          'Content-Type': 'text/javascript',
+          'Cache-Control': 'public,max-age=3600',
+          'Content-Security-Policy': 'default-src *',
+        },
+      }) },
+    });
+    expect(publicAsset.status).toBe(200);
+    expect(publicAsset.headers.get('cache-control')).toBe('public,max-age=3600');
+    expect(publicAsset.headers.get('content-security-policy')).toContain("default-src 'self'");
+    expect(publicAsset.headers.get('x-content-type-options')).toBe('nosniff');
+    expect(await publicAsset.text()).toBe('export default 1;');
   });
 
   it('does not confuse an unported other-Character chat open with approved SeYeon Reveal', async () => {
