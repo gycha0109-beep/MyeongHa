@@ -5,6 +5,8 @@ import {
 
 const ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 const CONTRACT = 'official-reader-paid-chat-message-v1';
+const DELIVERY_CONTRACT = 'official-reader-s7-private-delivery-v1';
+const DELIVERY_TOKEN = /^[A-Za-z0-9_-]{43}$/u;
 let expanded = null;
 
 function closeExpanded() {
@@ -88,6 +90,11 @@ export function appendProtectedReaderChatRevealV1(card, input) {
         return;
       }
 
+      // A fresh, browser-owned request identity is reused if the same GET
+      // is retried. It is NEVER reused across unrelated Reading/Reader scope.
+      const deliveryRequestId = crypto.randomUUID();
+      const readerPath = '/api/chat/' + encodeURIComponent(input.threadId)
+        + '/paid-readings/' + encodeURIComponent(input.safeMessageId);
       const response = await fetch(
         '/api/chat/' + encodeURIComponent(input.threadId)
           + '/paid-readings/' + encodeURIComponent(input.safeMessageId),
@@ -98,6 +105,7 @@ export function appendProtectedReaderChatRevealV1(card, input) {
           headers: {
             Accept: 'application/json',
             Authorization: 'Bearer ' + bearer.token,
+            'X-Reader-Delivery-Request-Id': deliveryRequestId,
           },
           signal: controller.signal,
         },
@@ -122,7 +130,16 @@ export function appendProtectedReaderChatRevealV1(card, input) {
           || typeof data.committedAt !== 'string'
           || !Number.isFinite(Date.parse(data.committedAt))
           || typeof data.body !== 'string'
-          || data.body.length === 0 || data.body.length > 262144) {
+          || data.body.length === 0 || data.body.length > 262144
+          || !data.delivery
+          || data.delivery.deliveryRequestId !== deliveryRequestId
+          || typeof data.delivery.deliveryAttemptId !== 'string'
+          || !ID.test(data.delivery.deliveryAttemptId)
+          || typeof data.delivery.responsePreparedAt !== 'string'
+          || !Number.isFinite(Date.parse(data.delivery.responsePreparedAt))
+          || typeof data.delivery.acknowledgementToken !== 'string'
+          || !DELIVERY_TOKEN.test(data.delivery.acknowledgementToken)
+          || typeof data.delivery.replayed !== 'boolean') {
         status.textContent = '서버에서 확인된 해설 정보를 표시할 수 없습니다.';
         return;
       }
@@ -131,7 +148,52 @@ export function appendProtectedReaderChatRevealV1(card, input) {
       body.hidden = false;
       button.textContent = '해설 닫기';
       button.setAttribute('aria-expanded', 'true');
-      status.textContent = '현재 구매권으로 확인한 해설입니다.';
+      // Do not claim delivery when the server merely built its HTTP
+      // Response. Wait until the protected answer is inserted into the DOM,
+      // then send a separate client acknowledgment. This proves a client
+      // callback, not that the user personally read or understood it.
+      status.textContent = '현재 구매권으로 확인한 해설입니다. 수신 확인 중…';
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+      if (expanded !== current || !card.isConnected
+          || body.hidden || controller.signal.aborted) return;
+
+      let acknowledged = false;
+      try {
+        const ackResponse = await fetch(readerPath + '/ack', {
+          method: 'POST',
+          credentials: 'same-origin',
+          cache: 'no-store',
+          headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+            Authorization: 'Bearer ' + bearer.token,
+            'X-Reader-Delivery-Ack': '1',
+          },
+          body: JSON.stringify({
+            schemaVersion: DELIVERY_CONTRACT,
+            deliveryRequestId,
+            deliveryAttemptId: data.delivery.deliveryAttemptId,
+            acknowledgementToken: data.delivery.acknowledgementToken,
+          }),
+          signal: controller.signal,
+        });
+        if (ackResponse.status === 401) invalidateMemberSession(bearer.token);
+        const ackEnvelope = ackResponse.ok ? await ackResponse.json() : null;
+        acknowledged = ackResponse.ok
+          && ackEnvelope?.ok === true
+          && ackEnvelope.data?.schemaVersion === DELIVERY_CONTRACT
+          && ackEnvelope.data?.deliveryAttemptId === data.delivery.deliveryAttemptId
+          && typeof ackEnvelope.data?.clientAcknowledgedAt === 'string'
+          && Number.isFinite(Date.parse(ackEnvelope.data.clientAcknowledgedAt));
+      } catch {
+        // A lost acknowledgment never means that a response was delivered.
+        // The original S5 answer and its safe Chat marker are untouched.
+      }
+      if (expanded === current && !body.hidden) {
+        status.textContent = acknowledged
+          ? '현재 구매권으로 확인한 해설입니다. 기기 수신 확인이 기록되었습니다.'
+          : '해설이 표시되었으나 기기 수신 확인은 기록되지 않았습니다.';
+      }
     } catch (error) {
       if (expanded === current && error?.name !== 'AbortError') {
         status.textContent = '해설을 불러오지 못했습니다. 다시 시도해 주세요.';
