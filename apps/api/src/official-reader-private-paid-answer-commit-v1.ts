@@ -187,13 +187,13 @@ export async function commitPrivateOfficialReaderPaidAnswerV1(input: {
         const signedPreview = consumeOfficialReaderS3BoundPreviewSourceV1({
           token: staged.boundSignedPreviewSource,
           freshAdmission: current,
+          sourceCoverageCandidate: staged.sourceCoverageCandidate,
         });
         const sourceDigest = hashSajuHeldSourceProofRequestV1(
           current.source.responseSnapshotJsonb,
         );
         if (signedPreview.storedResponseDigest !== sourceDigest
-            || (sourceResponseHash !== sourceDigest
-              && sourceResponseHash !== `sha256:v1:${sourceDigest}`)) {
+            || sourceResponseHash !== `sha256:v1:${sourceDigest}`) {
           return unavailable();
         }
         const sourceCoverage = preflightOfficialReaderS3FromAdmittedArtifactV1({
