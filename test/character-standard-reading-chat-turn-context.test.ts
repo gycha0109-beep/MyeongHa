@@ -21,6 +21,7 @@ import {
   assertServerPreparedStandardFollowupQuestionScopeV1,
 } from '../apps/api/src/character-standard-reading-chat-question-scope-v1.js';
 import { runThreadBoundReaderInterpretationPreviewV2 } from '../apps/api/src/reader-interpretation-preview-runtime-v2.js';
+import { prepareReaderConversationResponseCandidateV1 } from '../apps/api/src/reader-conversation-source-routing-v1.js';
 import { assertServerGuardedReaderInterpretationSceneV2 } from '../apps/api/src/reader-interpretation-preview-runtime-v2.js';
 import {
   prepareCharacterStandardReaderSceneSourceHandoffV1,
@@ -1812,6 +1813,114 @@ describe('A3-eta server-anchored follow-up evidence selection (public OFF)', () 
       suggestedActions: [],
     };
   }
+
+  function syntheticRecentThread(answerId: string) {
+    return [
+      {
+        messageId: 'current-user-query', sequenceNo: 13,
+        senderType: 'user', characterId: null,
+        text: 'PRIVATE_QUESTION_NOT_LOGGED', createdAt: '2026-10-22T10:01:00Z',
+      },
+      {
+        messageId: answerId, sequenceNo: 12,
+        senderType: 'character', characterId: 'baekheon',
+        text: 'PRIVATE_READER_ANSWER_NOT_LOGGED', createdAt: '2026-10-22T10:00:00Z',
+      },
+    ];
+  }
+
+  it('RR-08 actual bounded Reader follow-up reuses latest matching DB anchor and output guard exactly once', async () => {
+    const { f } = await oneUnitSemanticCandidate();
+    const readRecentMessages = vi.fn(async () =>
+      syntheticRecentThread(f.anchor.assistantMessageId));
+    const result = await prepareReaderConversationResponseCandidateV1({
+      userText: f.input.preflight.receivePlan.normalizedRequest.text,
+      admittedDomain: f.input.grounded.scope.sajuDomain,
+      official: {
+        ...f.input,
+        recentMessageAuthorityPort: {readRecentMessages},
+        rendererDraft: cosmetics(),
+      },
+    });
+    expect(result.mode).toBe('official_followup_output_hold');
+    if (result.mode !== 'official_followup_output_hold') return;
+    expect(result.lastValidatedAssistantMessageId).toBe(f.anchor.assistantMessageId);
+    expect(result.lastTurnMetadataDigest).toMatch(/^sha256:v1:[0-9a-f]{64}$/u);
+    expect(result.outputHold).toMatchObject({
+      mode: 'output_guarded_hold',
+      assistantAnchorMessageId: f.anchor.assistantMessageId,
+      publicDisclosureAuthorized: false,
+    });
+    expect(result.selectedSourceUnitRefs).toEqual([f.ids[0]]);
+    expect(f.readLatestValidatedAnchor).toHaveBeenCalledTimes(1);
+    expect(readRecentMessages).toHaveBeenCalledTimes(2);
+    expect(readRecentMessages).toHaveBeenNthCalledWith(1, {
+      subjectId: SUBJECT_ID, threadId: THREAD_ID, limit: 32,
+    });
+    expect(JSON.stringify(result)).not.toContain('PRIVATE_READER_ANSWER_NOT_LOGGED');
+    expect(result.publicDisclosureAuthorized).toBe(false);
+    expect(result.addedModelCalls).toBe(0);
+  });
+
+  it('RR-08 denies prior official Answer after a later everyday Reader message', async () => {
+    const { f } = await oneUnitSemanticCandidate();
+    const readRecentMessages = vi.fn(async () =>
+      syntheticRecentThread('newer-ordinary-reader-reply'));
+    const result = await prepareReaderConversationResponseCandidateV1({
+      userText: f.input.preflight.receivePlan.normalizedRequest.text,
+      admittedDomain: f.input.grounded.scope.sajuDomain,
+      official: {
+        ...f.input,
+        recentMessageAuthorityPort: {readRecentMessages},
+        rendererDraft: cosmetics(),
+      },
+    });
+    expect(result).toMatchObject({
+      mode: 'hold',reason: 'latest_anchor_not_current',
+      publicDisclosureAuthorized: false,addedModelCalls: 0,
+    });
+    expect(readRecentMessages).toHaveBeenCalledTimes(1);
+    expect(f.readLatestValidatedAnchor).toHaveBeenCalledTimes(1);
+  });
+
+  it('RR-08 denies observed transcript drift before the output guard', async () => {
+    const { f } = await oneUnitSemanticCandidate();
+    const readRecentMessages = vi.fn()
+      .mockResolvedValueOnce(syntheticRecentThread(f.anchor.assistantMessageId))
+      .mockResolvedValueOnce(syntheticRecentThread('changed-reader-reply'));
+    const result = await prepareReaderConversationResponseCandidateV1({
+      userText: f.input.preflight.receivePlan.normalizedRequest.text,
+      admittedDomain: f.input.grounded.scope.sajuDomain,
+      official: {
+        ...f.input,
+        recentMessageAuthorityPort: {readRecentMessages},
+        rendererDraft: cosmetics(),
+      },
+    });
+    expect(result).toMatchObject({
+      mode: 'hold',reason: 'latest_anchor_not_current',
+      publicDisclosureAuthorized: false, addedModelCalls: 0,
+    });
+    expect(readRecentMessages).toHaveBeenCalledTimes(2);
+    expect(f.readLatestValidatedAnchor).toHaveBeenCalledTimes(1);
+  });
+
+  it('RR-08 refuses a missing recent-message authority without touching the Anchor', async () => {
+    const { f } = await oneUnitSemanticCandidate();
+    const result = await prepareReaderConversationResponseCandidateV1({
+      userText: f.input.preflight.receivePlan.normalizedRequest.text,
+      admittedDomain: f.input.grounded.scope.sajuDomain,
+      official: {
+        ...f.input,
+        rendererDraft: cosmetics(),
+      },
+    });
+    expect(result).toMatchObject({
+      mode: 'hold',reason: 'unavailable_official_source',
+      publicDisclosureAuthorized: false, addedModelCalls: 0,
+    });
+    expect(f.readLatestValidatedAnchor).not.toHaveBeenCalled();
+  });
 
   it('RR-06 Output Guard seals the exact prior Assistant anchor and Unit/Reading hashes only as HOLD', async () => {
     const { f, questionScope, candidate } = await oneUnitSemanticCandidate();
