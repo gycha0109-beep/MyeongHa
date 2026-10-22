@@ -1,5 +1,5 @@
 name: Official Reader S4 Privacy Synthetic E2E
-run-name: "[WT:db-authority-core] Reader S4 privacy deletion + restore E2E"
+run-name: "Reader S4 synthetic privacy deletion + restore E2E"
 
 on:
   pull_request:
