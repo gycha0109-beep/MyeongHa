@@ -5,6 +5,10 @@ import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { HTML_ENTRIES } from './verify-cloudflare-static.mjs';
+import {
+  CLOUDFLARE_PREVIEW_RECEIPT_ASSET_V1,
+  CLOUDFLARE_PREVIEW_RECEIPT_SCHEMA_V1,
+} from './prepare-cloudflare-static.mjs';
 import { CLOUDFLARE_DIRECT_API_ROUTES, CLOUDFLARE_REWRITE_ROUTES } from '../workers/cloudflare-api-router.mjs';
 
 const URL_FROM_CLOUDFLARE = 'https://feat-ops-cloudflare-static-preview-20261020-myeongha.gycha0109.workers.dev';
@@ -12,6 +16,10 @@ const origin = process.env.MYEONGHA_CLOUDFLARE_PREVIEW_URL || URL_FROM_CLOUDFLAR
 const contract = process.env.MYEONGHA_CLOUDFLARE_SMOKE_CONTRACT || 'stage4-legacy';
 if (!['stage4-legacy', 'scf2-stage5'].includes(contract)) throw Error('Unrecognized Cloudflare Preview smoke contract.');
 const scf2 = contract === 'scf2-stage5';
+const expectedHead = process.env.MYEONGHA_CLOUDFLARE_EXPECTED_HEAD;
+if (scf2 && (typeof expectedHead !== 'string' || !/^[a-f0-9]{40}$/.test(expectedHead))) {
+  throw Error('S-CF2 Preview requires the exact GitHub PR head SHA.');
+}
 const parsed = new URL(origin);
 if (
   parsed.protocol !== 'https:' ||
@@ -85,8 +93,46 @@ async function waitForHealthDeployment() {
   throw Error('Cloudflare Preview GET /api/health never became ready within '+maxWaitMs+'ms');
 }
 
+async function waitForExactPreviewBuild() {
+  if (!scf2) return; // Preserve the existing PR #2384 Stage 4 contract.
+  const receiptUrl = new URL('/' + CLOUDFLARE_PREVIEW_RECEIPT_ASSET_V1, parsed);
+  const deadline = Date.now() + 420_000;
+  let latest = 'not deployed';
+  while (Date.now() < deadline) {
+    try {
+      const response = await fetch(receiptUrl, {
+        redirect: 'manual',
+        cache: 'no-store',
+        signal: AbortSignal.timeout(10_000),
+      });
+      if (response.status === 200 &&
+          response.headers.get('content-type')?.includes('application/json') &&
+          response.headers.get('cache-control')?.includes('no-store') &&
+          !response.headers.has('set-cookie') && !response.headers.has('location')) {
+        const text = await response.text();
+        const receipt = JSON.parse(text);
+        if (receipt?.schema === CLOUDFLARE_PREVIEW_RECEIPT_SCHEMA_V1 &&
+            receipt?.commit === expectedHead) {
+          console.log('Cloudflare Preview exact-commit asset receipt:', receipt.commit);
+          return;
+        }
+        latest = typeof receipt?.commit === 'string' && /^[a-f0-9]{40}$/.test(receipt.commit)
+          ? receipt.commit : 'malformed';
+      } else {
+        latest = 'HTTP ' + response.status;
+      }
+    } catch {
+      latest = 'transport/unreadable';
+    }
+    await new Promise(resolve => setTimeout(resolve, 10_000));
+  }
+  throw Error('Cloudflare Preview did not deploy exact expected commit; expected=' +
+    expectedHead + ', observed=' + latest);
+}
+
 async function main() {
   await waitForHealthDeployment();
+  await waitForExactPreviewBuild();
   let response = await check('/',200);
   if (response) {
     const text = await response.text();
@@ -189,6 +235,7 @@ async function main() {
   }
   const result = {
     status:failures.length ? 'FAIL' : 'PASS',origin:parsed.origin,contract,
+    ...(scf2 ? { attestedCommit: expectedHead } : {}),
     testedHtml:HTML_ENTRIES.length,requests,liveness:'GET 200; other methods 405',readiness:'404 HOLD',seyeon:'503 HOLD',failures,
   };
   console.log(JSON.stringify(result,null,2));

@@ -15,10 +15,11 @@ jobs:
     name: Cloudflare Preview · Real HTTP + Chrome
     if: github.event.pull_request.head.repo.full_name == 'gycha0109-beep/MyeongHa' && (github.head_ref == 'feat/ops/cloudflare-static-preview-20261020' || github.head_ref == 'feat/ops/cloudflare-authdb-clean-snapshot-20261021')
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 16
     env:
       MYEONGHA_CLOUDFLARE_PREVIEW_URL: ${{ github.head_ref == 'feat/ops/cloudflare-static-preview-20261020' && 'https://feat-ops-cloudflare-static-preview-20261020-myeongha.gycha0109.workers.dev' || 'https://feat-ops-cloudflare-authdb-clean-snapshot-20261021-myeongha.gycha0109.workers.dev' }}
       MYEONGHA_CLOUDFLARE_SMOKE_CONTRACT: ${{ github.head_ref == 'feat/ops/cloudflare-static-preview-20261020' && 'stage4-legacy' || 'scf2-stage5' }}
+      MYEONGHA_CLOUDFLARE_EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

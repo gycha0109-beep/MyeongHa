@@ -68,3 +68,11 @@
 - cloudflare-preview-remote-smoke.yml의 해당 두 PR 브랜치만 원격 HTTP + Chrome 실행 대상으로 설정. 외부 임의 포크/브랜치의 Preview URL을 신뢰하지 않는다. Stage 4는 Chat GET 404, Stage 5/S-CF2는 Protected History/turns/replay GET 503 및 generic chat open 404를 각각 구별한다. 어느 경우도 세연 개인정보/Provider positive 호출은 없음.
 - 원격 검사에 출처 SHA를 나타내는 응답이 없으므로, HTTP/Chrome 성공만으로 **정확한 HEAD SHA가 실제 배포된 증거라고 주장하지 않는다**. 별도 Cloudflare 배포 메타데이터의 commit tag와 CI 검사 SHA가 일치하는지 확인해야 한다. 배포 지연 중 이전 Worker로 검사되면 실배포 수락 HOLD.
 - 운영 workers.dev disabled, preview enabled, Vercel Production 및 DNS, DB/OAuth/AI/Commerce/Secret 변경 없음. 프리뷰 검사는 오직 읽기/합성 음성 HTTP 테스트이며, 실제 운영 E2E가 아니다.
+
+
+## 2026-10-22 단계 9 — 빌드 커밋 일치 원격 수락 게이트
+
+- 기존 HTTP/Chrome 체크가 **이전 프리뷰 배포본**에서 성공해도 최신 PR HEAD 성공으로 인정하지 않도록 Cloudflare 전용 빌드 스탬프 `public/_myeongha-preview-build.json` 생성. `npm run build:cloudflare:static`의 정적 후처리 단계에서 git checkout의 정확한 40자리 HEAD만 기록하며, 기존 `npm run build:web`·Vercel Production에는 산출하지 않는다. 일반 공개 Git 커밋 SHA 외 Secret/환경변수/토큰은 기록하지 않는다.
+- `verify-cloudflare-static.mjs`가 번들 배포 전에 산출물의 커밋과 현재 checkout을 비교하고, 해당 JSON 응답에는 `Cache-Control: no-store` 및 기존 Vercel 보안 헤더를 추가한다. Static Assets의 HTML/fallback/API 라우팅은 변경하지 않는다.
+- 보안 Draft #2420의 기존 원격 HTTP/Chrome workflow는 checkout PR head SHA를 `MYEONGHA_CLOUDFLARE_EXPECTED_HEAD`로 주입. 별도 원격 Worker URL의 빌드 영수증이 동일한 SHA를 반환할 때까지 제한된 배포 지연을 허용하고, 끝까지 불일치하면 workflow **FAIL** 처리하여 이전 버전 PASS를 허용하지 않는다. #2384 Stage4 legacy smoke는 기존 계약 유지.
+- 이 증거는 코드 버전/정적 배포의 동일성이지 실제 Supabase OAuth/DB TLS/RLS, 세연 Reveal, 사주 Product Reading, PortOne 실운영 승인/성공 증거가 아니다. DNS/Worker Production/유료 리소스/Secret 전환 없음.

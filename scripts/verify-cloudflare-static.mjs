@@ -4,7 +4,13 @@
 import { lstat, readFile, readdir } from 'node:fs/promises';
 import { resolve, join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { CLOUDFLARE_ROOT_REWRITE, renderCloudflareStaticHeaders } from './prepare-cloudflare-static.mjs';
+import {
+  CLOUDFLARE_ROOT_REWRITE,
+  CLOUDFLARE_PREVIEW_RECEIPT_ASSET_V1,
+  renderCloudflarePreviewReceiptV1,
+  gitCloudflareBuildCommitV1,
+  renderCloudflareStaticHeaders,
+} from './prepare-cloudflare-static.mjs';
 
 export const HTML_ENTRIES = Object.freeze([
   'index.html',
@@ -57,6 +63,14 @@ export async function verifyCloudflareStaticArtifact(options = {}) {
   const redirects = await readFile(join(outputRoot, '_redirects'), 'utf8');
   if (redirects !== CLOUDFLARE_ROOT_REWRITE) {
     throw new Error('Unexpected Cloudflare static redirect: only / -> /index.html 200 is allowed.');
+  }
+
+  // This manifest is generated only after build:web, never copied into
+  // Vercel Production. Reject a stale or tampered commit stamp.
+  const expectedCommit = options.expectedCommitSha ?? gitCloudflareBuildCommitV1(cwd);
+  const attested = await readFile(join(outputRoot, CLOUDFLARE_PREVIEW_RECEIPT_ASSET_V1), 'utf8');
+  if (attested !== renderCloudflarePreviewReceiptV1(expectedCommit)) {
+    throw new Error('Cloudflare Preview build receipt does not match the checked-out Git commit.');
   }
 
   for (const entry of HTML_ENTRIES) {

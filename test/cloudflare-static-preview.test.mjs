@@ -15,6 +15,8 @@ import {
 import {
   renderCloudflareStaticHeaders,
   writeCloudflareStaticHeaders,
+  CLOUDFLARE_PREVIEW_RECEIPT_ASSET_V1,
+  renderCloudflarePreviewReceiptV1,
 } from '../scripts/prepare-cloudflare-static.mjs';
 import {
   HTML_ENTRIES,
@@ -100,6 +102,7 @@ describe('Cloudflare static-only deployment boundary', () => {
       expect(output).toContain(`  ${header.key}: ${header.value}`);
     }
     expect(output).toContain('/*.html\n  Cache-Control: no-store');
+    expect(output).toContain('/_myeongha-preview-build.json\n  Cache-Control: no-store');
     expect(output).toContain('/\n  Cache-Control: no-store');
     const changed = structuredClone(vercel);
     changed.headers[0].headers = changed.headers[0].headers.filter(
@@ -110,13 +113,26 @@ describe('Cloudflare static-only deployment boundary', () => {
 
   it('verifies an isolated artifact and rejects stripped security headers', async () => {
     const { folder, publicDir } = await createFixture();
-    await writeCloudflareStaticHeaders({ cwd: folder });
-    const verified = await verifyCloudflareStaticArtifact({ cwd: folder });
+    const syntheticCommit = 'a'.repeat(40);
+    await writeCloudflareStaticHeaders({ cwd: folder, commitSha: syntheticCommit });
+    const verified = await verifyCloudflareStaticArtifact({
+      cwd: folder,
+      expectedCommitSha: syntheticCommit,
+    });
     expect(verified.entryCount).toBe(11);
-    expect(verified.fileCount).toBe(13);
+    expect(verified.fileCount).toBe(14);
+    expect(await readFile(join(publicDir, CLOUDFLARE_PREVIEW_RECEIPT_ASSET_V1), 'utf8'))
+      .toBe(renderCloudflarePreviewReceiptV1(syntheticCommit));
+    await expect(verifyCloudflareStaticArtifact({
+      cwd: folder,
+      expectedCommitSha: 'b'.repeat(40),
+    })).rejects.toThrow('receipt does not match');
     expect(await readFile(join(publicDir, '_redirects'), 'utf8')).toBe('/ /index.html 200\n');
     await writeFile(join(publicDir, '_headers'), '/*\n  X-Frame-Options: DENY\n');
-    await expect(verifyCloudflareStaticArtifact({ cwd: folder })).rejects.toThrow();
+    await expect(verifyCloudflareStaticArtifact({
+      cwd: folder,
+      expectedCommitSha: syntheticCommit,
+    })).rejects.toThrow();
   });
   it('rejects Saju HTML, SSE, redirects, cookies and cross-origin response headers', async () => {
     const good = fenceCloudflareApprovedSajuResponseV1(Response.json(
@@ -156,6 +172,12 @@ describe('Cloudflare static-only deployment boundary', () => {
     ));
     expect(error.status).toBe(422);
     expect((await error.json()).error.code).toBe('EXISTING_VALIDATION_ERROR');
+  });
+
+  it('rejects forged, truncated or non-hex Cloudflare build receipt commit', () => {
+    for (const bad of ['not-a-sha', 'A'.repeat(40), 'f'.repeat(39), 'g'.repeat(40)]) {
+      expect(() => renderCloudflarePreviewReceiptV1(bad)).toThrow();
+    }
   });
 
   it('requires independent Auth/DB and calculation-only approval before routing Saju', async () => {
