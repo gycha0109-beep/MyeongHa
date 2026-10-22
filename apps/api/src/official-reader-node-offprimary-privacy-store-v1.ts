@@ -375,7 +375,7 @@ export function createOfficialReaderNodeOffPrimaryStoreV1(
   }
 
   const ledger: OfficialReaderAccountDeletionLedgerPortV1 = Object.freeze({
-    async recordAccountDeletionFence(input) {
+    async recordAccountDeletionFence(input: Parameters<OfficialReaderAccountDeletionLedgerPortV1['recordAccountDeletionFence']>[0]) {
       const subjectId = uuid(input.subjectId);
       const deletionJobId = uuid(input.deletionJobId);
       const { ids, keys } = sortedManifest(input.bodyIds, input.keyRefs);
@@ -412,11 +412,11 @@ export function createOfficialReaderNodeOffPrimaryStoreV1(
       return saved;
     },
 
-    async readAccountDeletionFence(input) {
+    async readAccountDeletionFence(input: Parameters<OfficialReaderAccountDeletionLedgerPortV1['readAccountDeletionFence']>[0]) {
       return readFence(uuid(input.subjectId), uuid(input.deletionJobId));
     },
 
-    async acknowledgeAccountKeyErasure(input) {
+    async acknowledgeAccountKeyErasure(input: Parameters<OfficialReaderAccountDeletionLedgerPortV1['acknowledgeAccountKeyErasure']>[0]) {
       const subjectId = uuid(input.subjectId);
       const deletionJobId = uuid(input.deletionJobId);
       const fence = await readFence(subjectId, deletionJobId);
@@ -439,7 +439,7 @@ export function createOfficialReaderNodeOffPrimaryStoreV1(
   });
 
   const scopeLedger: OfficialReaderScopeDeletionLedgerPortV1 = Object.freeze({
-    async recordScopeDeletionFence(input) {
+    async recordScopeDeletionFence(input: Parameters<OfficialReaderScopeDeletionLedgerPortV1['recordScopeDeletionFence']>[0]) {
       const jobId=uuid(input.jobId);
       const subjectId=uuid(input.subjectId);
       const officialReadingId=uuid(input.officialReadingId);
@@ -461,8 +461,8 @@ export function createOfficialReaderNodeOffPrimaryStoreV1(
           || saved.keyRefs.some((key,i)=>key!==manifest.keys[i])) return denied();
       return saved;
     },
-    readScopeDeletionFence(jobId) { return readScopeFence(uuid(jobId)); },
-    async acknowledgeScopeDatabaseErasure(jobId,fenceId) {
+    readScopeDeletionFence(jobId: string) { return readScopeFence(uuid(jobId)); },
+    async acknowledgeScopeDatabaseErasure(jobId: string,fenceId: string) {
       const id=uuid(jobId),fence=uuid(fenceId);
       const saved=await readScopeFence(id);
       if (!saved || saved.fenceId!==fence) return denied();
@@ -472,7 +472,7 @@ export function createOfficialReaderNodeOffPrimaryStoreV1(
       });
       if (await readScopeAck(id,'scope-db-erased')!==fence) return denied();
     },
-    async acknowledgeScopeKeyErasure(jobId,fenceId) {
+    async acknowledgeScopeKeyErasure(jobId: string,fenceId: string) {
       const id=uuid(jobId),fence=uuid(fenceId);
       const saved=await readScopeFence(id);
       if (!saved || saved.fenceId!==fence
@@ -560,7 +560,7 @@ export function createOfficialReaderNodeOffPrimaryStoreV1(
       }
       return Object.freeze(fences);
     },
-    async isSubjectTombstoned(subjectId) {
+    async isSubjectTombstoned(subjectId: string) {
       const canonical = uuid(subjectId);
       const name = subjectDenyName(canonical);
       const raw = await readSealed(ledgerRoot, name, ledgerSeal, name);
@@ -599,7 +599,7 @@ export function createOfficialReaderNodeOffPrimaryStoreV1(
       }
     },
 
-    async destroyKey(keyRef) {
+    async destroyKey(keyRef: string) {
       if (!KEY_REF.test(keyRef)) return denied();
       const name = keyTombstoneName(keyRef);
       await writeSealedOnce(keyRoot, name, keySeal, name, {
@@ -616,12 +616,12 @@ export function createOfficialReaderNodeOffPrimaryStoreV1(
       }
     },
 
-    async isKeyDestroyed(keyRef) {
+    async isKeyDestroyed(keyRef: string) {
       if (!KEY_REF.test(keyRef)) return denied();
       return keyDestroyed(keyRef);
     },
 
-    resolveCachedKey(keyRef) {
+    resolveCachedKey(keyRef: string) {
       if (!KEY_REF.test(keyRef)) return null;
       assertRoot(keyRoot);
       // Synchronous local durable-mount read: NO network or PostgreSQL access
