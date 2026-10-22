@@ -1,9 +1,14 @@
 // Watchtower-Track: security
 // Offline contract for G3 Node-only; no Production DB, HTTP mount or Provider.
 import {describe,expect,it} from 'vitest';
+import { EventEmitter } from 'node:events';
+import type { ServerResponse } from 'node:http';
+import type { RunProductionSeyeonChatResultV1 } from '../apps/api/src/production-seyeon-chat-runtime-v1.js';
 import {
   assertSeyeonFirstPositiveNodeDbReadyV1,
   createSeyeonFirstPositiveMemoryLockedReadV1,
+  deliverSeyeonCommittedFirstPositiveMemoryNodeTurnV1,
+  executeAndDeliverSeyeonFirstPositiveMemoryNodeTurnV1,
 } from '../apps/api/src/seyeon-first-positive-memory-node-delivery-v1.js';
 import type {
   PostgresQueryResultV1,
@@ -17,6 +22,8 @@ const OTHER='d1000000-0000-4000-8000-000000000002';
 const THREAD='d2000000-0000-4000-8000-000000000003';
 const TURN='d3000000-0000-4000-8000-000000000004';
 const ATTEMPT='d4000000-0000-4000-8000-000000000005';
+const ASSISTANT='d5000000-0000-4000-8000-000000000006';
+const CLIENT_TURN='d6000000-0000-4000-8000-000000000007';
 const CANARY='G3_OFFLINE_CURRENT_ORIGINAL_MEMORY';
 const EVIDENCE={kind:'member' as const,verifiedAuthUserId:AUTH};
 type Call={text:string;values:readonly unknown[]};
@@ -62,6 +69,48 @@ function read(pool:PostgresSubjectPoolV1,expectedSubjectId=SUBJECT){
   });
 }
 function queries(db:FakeG3Connection){return db.calls.map(q=>q.text);}
+
+type FakeNodeResponse = EventEmitter & {
+  headersSent:boolean;
+  writableEnded:boolean;
+  destroyed:boolean;
+  socket:object;
+  statusCode:number;
+  setHeader:(name:string,value:string)=>void;
+  end:(data?:Buffer)=>void;
+  destroy:()=>void;
+};
+function fakeNodeResponse(){
+  const outbound:string[]=[];
+  const fake=new EventEmitter() as FakeNodeResponse;
+  fake.headersSent=false;
+  fake.writableEnded=false;
+  fake.destroyed=false;
+  fake.socket={};
+  fake.statusCode=200;
+  fake.setHeader=()=>{};
+  fake.end=(data?:Buffer)=>{
+    if(data) outbound.push(data.toString('utf8'));
+    fake.writableEnded=true;
+    fake.emit('finish');
+  };
+  fake.destroy=()=>{ fake.destroyed=true;fake.emit('close'); };
+  return {response:fake as unknown as ServerResponse,outbound,closed:()=>fake.destroyed};
+}
+function forgedCommit(subjectId=SUBJECT):RunProductionSeyeonChatResultV1{
+  return {
+    subjectId,
+    threadBinding:{threadId:THREAD},
+    execution:{
+      disposition:'executed',
+      receivedTurn:{turnId:TURN},
+      committedTurn:{
+        turnId:TURN,attemptId:ATTEMPT,assistantMessageId:ASSISTANT,
+        sequenceNo:2,replayed:false,
+      },
+    },
+  } as unknown as RunProductionSeyeonChatResultV1;
+}
 
 describe('Se-yeon G3 Node-only original-Grant current Subject fence',()=>{
   it('binds DB-resolved Subject and locks original Grant through delivery before COMMIT',async()=>{
@@ -143,4 +192,66 @@ describe('Se-yeon G3 Node-only original-Grant current Subject fence',()=>{
       expect.stringContaining('from public.qry_seyeon_positive_first_memory_locked_reveal_v1('),
     );
   });
+  it('rejects a mixed-subject executed Commit before Grant read or any HTTP body',async()=>{
+    const db=new FakeG3Connection(OTHER);
+    const pool=new FakeG3Pool(db);
+    const node=fakeNodeResponse();
+    await expect(deliverSeyeonCommittedFirstPositiveMemoryNodeTurnV1({
+      response:node.response,
+      requestSignal:new AbortController().signal,
+      pool,
+      verifiedEvidence:EVIDENCE,
+      result:forgedCommit(SUBJECT),
+      expectedThreadId:THREAD,
+      requestId:'g3-cross-subject',
+      serverTime:'2026-10-22T04:15:00.000Z',
+    })).rejects.toMatchObject({code:'INVALID_SCOPE'});
+    expect(queries(db)).toEqual([
+      'BEGIN','SET LOCAL ROLE myeongha_api_executor',
+      expect.stringContaining('public.begin_member_subject_context_v1'),
+      expect.stringContaining('public.assert_myeongha_subject_context_v1'),
+      'ROLLBACK',
+    ]);
+    expect(node.outbound).toEqual([]);
+    expect(node.closed()).toBe(true);
+    expect(db.releases).toEqual([undefined]);
+  });
+
+  it('closes the Node socket and never invokes a provider when G1/G2/G3 RPCs are not ready',async()=>{
+    const db=new FakeG3Connection(SUBJECT,CANARY,false);
+    const pool=new FakeG3Pool(db);
+    const node=fakeNodeResponse();
+    let providerCalls=0;
+    await expect(executeAndDeliverSeyeonFirstPositiveMemoryNodeTurnV1({
+      response:node.response,
+      requestSignal:new AbortController().signal,
+      pool,
+      verifiedEvidence:EVIDENCE,
+      threadId:THREAD,
+      clientTurnId:CLIENT_TURN,
+      text:'offline only',
+      requestId:'g3-before-provider',
+      serverTime:'2026-10-22T04:15:00.000Z',
+      runtime:{run:async()=>{providerCalls++;throw Error('provider must not run');}},
+    })).rejects.toMatchObject({code:'DB_NOT_READY'});
+    expect(providerCalls).toBe(0);
+    expect(node.outbound).toEqual([]);
+    expect(node.closed()).toBe(true);
+    expect(queries(db).some(q=>q.includes(
+      'from public.qry_seyeon_positive_first_memory_locked_reveal_v1(',
+    ))).toBe(false);
+    expect(queries(db).at(-1)).toBe('COMMIT');
+  });
+
+  it('rolls back current original Grant locks if the transport callback fails',async()=>{
+    const db=new FakeG3Connection(SUBJECT);
+    const port=read(new FakeG3Pool(db));
+    await expect(port({
+      signal:new AbortController().signal,
+      deliver:async()=>{ throw Error('simulated socket failure'); },
+    })).rejects.toThrow('simulated socket failure');
+    expect(queries(db).at(-1)).toBe('ROLLBACK');
+    expect(queries(db)).not.toContain('COMMIT');
+  });
+
 });
