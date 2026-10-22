@@ -201,6 +201,10 @@ export async function deliverSeyeonCommittedFirstPositiveMemoryNodeTurnV1(
       input.result?.execution?.disposition!=='executed' ||
       input.result?.execution?.receivedTurn?.turnId!==receipt?.turnId ||
       input.result?.execution?.receivedTurn?.threadCharacterId!=='seyeon' ||
+      // A newly executed attempt does not erase a prior receive replay or
+      // grant fresh first-Reveal rights to a previously committed user Turn.
+      input.result?.execution?.receivedTurn?.replayed!==false ||
+      input.result?.execution?.receivedTurn?.committedTurn!==null ||
       input.result?.execution?.attempt?.replayed!==false ||
       input.result?.execution?.attempt?.attemptId!==receipt?.attemptId ||
       !receipt || receipt.replayed!==false ||
