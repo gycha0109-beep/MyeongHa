@@ -86,6 +86,12 @@ function assertOnlyKeys(
   }
 }
 
+// Provider-authored text must not carry invisible formatting instructions that
+// conceal a claim, spoof a message boundary or reverse rendered reading order.
+// Preserve normal CR/LF/TAB, Arabic shaping and emoji ZWJ sequences.
+const UNSAFE_PROVIDER_TEXT_CONTROLS =
+  /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f\u200b\u200e\u200f\u202a-\u202e\u2060\u2066-\u2069\ufeff]/u;
+
 function boundedText(
   value: unknown,
   path: string,
@@ -93,6 +99,9 @@ function boundedText(
 ): string {
   if (typeof value !== 'string' || value.trim().length === 0 || value.length > maxLength) {
     throw new CharacterOutputGuardError(`${path} must be non-empty text within ${maxLength} characters.`);
+  }
+  if (UNSAFE_PROVIDER_TEXT_CONTROLS.test(value)) {
+    throw new CharacterOutputGuardError(`${path} contains unsafe invisible control characters.`);
   }
   return value;
 }
