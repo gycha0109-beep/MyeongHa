@@ -11,6 +11,7 @@ import {
 } from './prepare-cloudflare-static.mjs';
 import { CLOUDFLARE_DIRECT_API_ROUTES, CLOUDFLARE_REWRITE_ROUTES } from '../workers/cloudflare-api-router.mjs';
 import { summarizeCloudflarePreviewProbeMetricsV1 } from './cloudflare-preview-smoke-metrics.mjs';
+import { assessCloudflarePreviewOpsStopGateV1 } from './cloudflare-preview-ops-stop-gate.mjs';
 
 const URL_FROM_CLOUDFLARE = 'https://feat-ops-cloudflare-static-preview-20261020-myeongha.gycha0109.workers.dev';
 const origin = process.env.MYEONGHA_CLOUDFLARE_PREVIEW_URL || URL_FROM_CLOUDFLARE;
@@ -121,7 +122,7 @@ async function waitForExactPreviewBuild() {
         if (receipt?.schema === CLOUDFLARE_PREVIEW_RECEIPT_SCHEMA_V1 &&
             receipt?.commit === expectedHead) {
           console.log('Cloudflare Preview exact-commit asset receipt:', receipt.commit);
-          return;
+          return receipt.commit;
         }
         latest = typeof receipt?.commit === 'string' && /^[a-f0-9]{40}$/.test(receipt.commit)
           ? receipt.commit : 'malformed';
@@ -139,7 +140,7 @@ async function waitForExactPreviewBuild() {
 
 async function main() {
   await waitForHealthDeployment();
-  await waitForExactPreviewBuild();
+  const attestedCommit = await waitForExactPreviewBuild();
   let response = await check('/',200);
   if (response) {
     const text = await response.text();
@@ -240,11 +241,18 @@ async function main() {
       failures.push({path:'/api/me/saju/calculation',reason:'calculation-authority-bypass'});
     }
   }
+  const opsMetrics = scf2 ? summarizeCloudflarePreviewProbeMetricsV1(timingSamples) : null;
+  const opsStopGate = scf2 ? assessCloudflarePreviewOpsStopGateV1({
+    metrics:opsMetrics,expectedCommit:expectedHead,attestedCommit,
+  }) : null;
+  if (opsStopGate?.previewDecision === 'STOP_REHEARSAL') {
+    failures.push({reason:'ops-stop-gate',codes:opsStopGate.reasons});
+  }
   const result = {
     status:failures.length ? 'FAIL' : 'PASS',origin:parsed.origin,contract,
     ...(scf2 ? { attestedCommit: expectedHead } : {}),
     testedHtml:HTML_ENTRIES.length,requests,liveness:'GET 200; other methods 405',readiness:'404 HOLD',seyeon:'503 HOLD',
-    ...(scf2 ? { opsProbeMetrics:summarizeCloudflarePreviewProbeMetricsV1(timingSamples) } : {}),
+    ...(scf2 ? { opsProbeMetrics:opsMetrics, opsStopGate } : {}),
     failures,
   };
   console.log(JSON.stringify(result,null,2));

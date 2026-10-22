@@ -126,3 +126,12 @@
 - 기존 `verifyCloudflareStaticArtifact()`가 이미 **Static Assets 파일 수 20,000개·개별 파일 25MiB 상한**을 초과할 때 빌드를 중단하도록 구현되어 있으므로 별도 중복 한도 검사는 만들지 않았다.
 - 이번 변경은 동일한 파일 순회에서 추가 I/O 없이 `totalAssetBytes`를 합산하고 `fileCount`, `largestFileSize`와 함께 CI에 출력한다. 이 값은 Cloudflare Static Assets에 실제 포함된 파일 **논리 바이트 합계**이며, **Workers JS 번들 크기·메모리·실제 전송량·과금 금액은 아니다.**
 - Preview 원격 합성 probe 지연과 정적 파일 논리 크기를 함께 관측하되 이 수치만으로 Worker Free CPU/요청 제한이나 Cloudflare 청구 비용 수락을 선언하지 않는다.
+
+## 2026-10-22 단계 9 — 계측 증거 기반 Preview 중단과 비용 HOLD 결정
+
+- `scripts/cloudflare-preview-ops-stop-gate.mjs`를 도입. **이미 실행되는** `Cloudflare Preview Remote Smoke`의 정확한 배포 commit 영수증, fixed route별 synthetic HTTP 지표, 기존 404·503 차단 결과에서 중단/계속을 결정한다. 새 API·로그인·부하/Provider 요청 없음. 승인된 별도 자료가 없는 Workers CPU/메모리/실제 트래픽·과금은 `INSUFFICIENT`, **Production cutover는 항상 HOLD**.
+- **즉시 Preview 리허설 중단 신호**: 배포 SHA 불일치, 정적/health/API-denial/세연 503 중 한 유형 누락, synthetic HTTP 계약과 다른 상태, transport 오류, 429, 의도하지 않은 5xx, 세연 503 차단 확인 부재. 위 경우 기존 CI가 실패하며 **운영 Traffic·DNS·Vercel 자동 변경 없음**.
+- **Cloudflare Free 상한에 대한 별도 실제 관측치가 확보된 경우에만** 추가 안전 판정: UTC 일일 Worker 요청 100,000, 단일 호출 CPU 10ms, 메모리 128MB, 외부 subrequest 50 및 월 Builds 한도 소진. 정확히 상한에 도달해 새 요청에 headroom이 없으면 **유료 업그레이드하지 않고 Preview 리허설 중단 판정**. 근거는 [Cloudflare Workers 공식 Limits](https://developers.cloudflare.com/workers/platform/limits/) 및 [Free subrequests](https://developers.cloudflare.com/changelog/post/2026-02-11-subrequests-limit/)이고 2026-10-22 조회. HTTP 응답 지연 p95를 CPU 10ms와 비교하는 오판을 금지한다.
+- 별도 owner가 **시크릿 회전 실패, OAuth callback 실패, DB TLS/RLS 불일치, 권한 없는 민감 응답 노출, AI timeout, 결제 replay 위험, 청구 호출 급증**을 확인하면 모두 STOP 신호다. 단, 현재 이들 이벤트는 실서비스 사용 금지 상태이고 관측·입증되지 않았으므로 **미검출=통과**라고 표기하지 않는다.
+- 중단 시 대응은 **현재 Vercel 운영 유지 → 보호 API 404·세연 503 유지 → 해당 Preview 작업 중지 → 승인된 기존 immutable recovery candidate/실제 Preview rollback 증거로 범위를 확인 → owner 판단 후만 별도 수동 조치**. 이 판단 함수는 어떤 Rollback·DNS·시크릿·Cloudflare Paid·DB 작업도 실행하지 않는다.
+- 비용 확인 권한 403으로 `Cloudflare 실제 billable usage` 증거가 없으므로 `COST_OR_LIMIT_EVIDENCE_HOLD` 유지. 원격 smoke가 완전히 PASS하더라도 `productionCutover='HOLD'` 출력하고 #2420 PR Draft/운영 미병합 정책 불변. `test/cloudflare-preview-ops-stop-gate.test.mjs`에 분리된 성공/중단/예산 미계측/가짜 검증 문자열 회귀를 추가.
