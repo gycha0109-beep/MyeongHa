@@ -122,6 +122,53 @@ function integer(value: unknown): number {
 }
 
 /**
+ * Preflight by invoking ONLY the already authorized S4 account/refund replay
+ * SQL inside the existing Worker transaction, then deliberately ROLLBACK.
+ * Unlike checking separate SQL snippets, this exercises the exact
+ * tombstone/Subject/sibling-body/derived-data contract that will govern
+ * execution. Nothing reaches a database COMMIT or an off-primary key store.
+ *
+ * The source transaction wrapper MUST propagate this sentinel after
+ * rollback; if it ever begins committing instead, deny by default.
+ */
+async function assertRollbackOnlyReaderRestorePreflightV1(input: {
+  readonly pool: PostgresSubjectPoolV1;
+  readonly query: string;
+  readonly args: readonly unknown[];
+  readonly remainingColumn: 'remainingSubjectRowCount' | 'remainingTombstonedRowCount';
+}): Promise<void> {
+  const rollbackSentinel = Object.freeze({
+    contract: 'official-reader-s4-rollback-only-preflight-v1',
+  });
+  try {
+    await executePostgresAccountDeletionWorkerTransactionV1({
+      pool: input.pool,
+      execute: async (client) => {
+        await client.query(
+          "select pg_catalog.set_config('myeongha.reader_restore_quarantine','on',true)",
+        );
+        const result = await client.query<Record<string, unknown>>(
+          input.query,
+          input.args,
+        );
+        if (result.rows.length !== 1 || !result.rows[0]
+            || integer(result.rows[0][input.remainingColumn]) !== 0) {
+          return fail();
+        }
+        // The Worker wrapper must ROLLBACK before it rethrows this opaque
+        // sentinel; neither ciphertext changes nor derived-data mutations
+        // may survive the preflight pass.
+        throw rollbackSentinel;
+      },
+    });
+    return fail();
+  } catch (error) {
+    if (error === rollbackSentinel) return;
+    rethrowQuarantineOrFailure(error);
+  }
+}
+
+/**
  * OFFLINE ONLY. Run with ALL public paid-read routes and all protected-key
  * serving disabled after a physical PostgreSQL restore.
  *
@@ -205,6 +252,34 @@ export async function reconcileOfficialReaderProtectedBodiesAfterRestoreV1(input
         || !(await input.offPrimary.restoreCatalog.isSubjectTombstoned(fence.subjectId))) {
       return fail();
     }
+  }
+
+  // All backup-independent manifests are authenticated. Before any
+  // irreversible DEK destruction, establish that EVERY exact replay would
+  // succeed under the actual private SQL + categorical S4 quarantine gate.
+  // This preserves previously erased keys and their external tombstones,
+  // while preventing a late dirty Subject from becoming a partial new replay.
+  for (const fence of refundFences) {
+    await assertRollbackOnlyReaderRestorePreflightV1({
+      pool: input.pool,
+      query: REFUND_RESTORE_SQL,
+      args: [
+        fence.jobId, fence.subjectId, fence.officialReadingId,
+        fence.readerCharacterId, fence.fenceId, [...fence.bodyIds],
+      ],
+      remainingColumn: 'remainingTombstonedRowCount',
+    });
+  }
+  for (const fence of fences) {
+    await assertRollbackOnlyReaderRestorePreflightV1({
+      pool: input.pool,
+      query: RESTORE_SQL,
+      args: [
+        fence.subjectId, fence.deletionJobId, fence.fenceId,
+        [...fence.bodyIds],
+      ],
+      remainingColumn: 'remainingSubjectRowCount',
+    });
   }
 
   let refundDeleted = 0;
