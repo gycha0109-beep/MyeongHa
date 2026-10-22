@@ -163,6 +163,27 @@ describe('S-CF2 actual Worker fetch boundary and no HTML fallback', () => {
     expect(await generic.text()).toBe('');
   });
 
+  it('rejects legacy Vercel chat rewrite markers at Worker fetch before Auth/Saju/Health/Static', async () => {
+    for (const [path, method] of [
+      ['/api/me?__myeongha_chat_turn_send=1', 'GET'],
+      ['/api/me?__myeongha_chat_thread_id=' + THREAD, 'GET'],
+      ['/api/memories?__myeongha_chat_open=1', 'GET'],
+      ['/api/health?__MYEONGHA_CHAT_OPEN=1', 'GET'],
+      ['/api/me?%5F_myeongha_chat_open=1', 'GET'],
+      ['/index.html?__myeongha_chat_open=1', 'GET'],
+      ['/api/auth/refresh?__myeongha_chat_thread_id=' + THREAD, 'POST'],
+    ]) {
+      const response = await worker.fetch(new Request(ROOT + path, { method }), bindings);
+      await expectHeld(response);
+      expect(response.headers.get('location')).toBeNull();
+      expect(response.headers.get('access-control-allow-origin')).toBeNull();
+    }
+    // Existing health path remains a constant 200 without a forged marker.
+    const health = await worker.fetch(new Request(ROOT + '/api/health'), bindings);
+    expect(health.status).toBe(200);
+    expect(await health.json()).toEqual({ status: 'ok' });
+  });
+
   it('does not confuse an unported other-Character chat open with approved SeYeon Reveal', async () => {
     const response = await worker.fetch(new Request(ROOT + '/api/chat', { method: 'POST' }), {});
     expect(response.status).toBe(404);
