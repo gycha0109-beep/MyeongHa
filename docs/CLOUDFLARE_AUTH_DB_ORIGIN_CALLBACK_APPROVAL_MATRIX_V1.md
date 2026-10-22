@@ -128,3 +128,10 @@
 - Worker는 runtime/Member Auth rate-limit Pool/subject Pool 세 개의 각 독립 `close()`를 모두 시도한다. 한 단계가 실패해도 나머지 소유 리소스 반환을 생략하지 않으며 사용자에게는 고정 503/no-store를 반환한다. CI 합성 테스트는 순서·실패 시 나머지 리소스 종료를 확인한다.
 - `Guest bootstrap`, `Guest promotion`, `Current Subject Birth Profile`에는 현재 동일한 `pool` 주입 포인트가 없으므로 위 max=1 주입 완료 범위에 포함하지 않는다. 해당 런타임은 기존 호출 단위 생성/종료가 유지되며, 실환경 Workers TCP/한도·기술 인수 전까지 Auth/DB positive 404 HOLD를 해제하지 않는다.
 - DB 호스트·포트·TLS 승인·OAuth Callback owner binding은 아직 **실제 Cloudflare Preview에 설정되지 않았다**. 이것은 Docker/CI의 합성 요청별 수명주기 구현 증거이며 실제 Workers→PostgreSQL TLS/RLS 핸드셰이크 완료를 의미하지 않는다.
+
+### Cloudflare Guest/Current Birth 요청별 max=1 Pool 주입 (2026-10-22)
+
+- **대상**: `Guest Bootstrap`, `Guest Promotion`, `Current Subject Birth Profile` 기존 Production Factory에 `pool?: PostgresSubjectPoolV1` 서버 전용 선택형 인자를 추가하고, 기존 공통 `createProductionPostgresSubjectPoolLeaseV1`로 소유권을 결정한다. 미주입 Vercel 호출에서는 기존 Node PostgreSQL Pool을 생성하고 동일하게 직접 close한다. Cloudflare에서만 전달되는 Pool은 Runtime에서 종료하지 않는 **borrowed** 관계다.
+- Worker `workers/cloudflare-auth-db-api.mjs`에서 해당 3개 경로에도 `createSubjectPool()`을 주입한다. 2026-10-22 선행 구현된 프로필/출생조회·생성 3개 경로를 포함해 보호된 Guest/Profile/Birth 경로들은 개별 HTTP 요청 단위 **최대 1 연결** 옵션을 사용한다. 실행 후 Worker가 Runtime/Member rate-limit/Subject Pool 전부 각각 종료하며 중간 오류도 후속 종료를 생략하지 않는다.
+- `test/cloudflare-runtime-pool-injection.test.ts`는 3개 생산자에게 가짜 Pool을 넘겨 외부 DB/Provider 없이 생성·종료 시 연결/강제종료가 없는지, Guest Promotion 비정상 Method에서 DB 접근 없이 405가 유지되는지 확인한다. **소스 프로듀서의 도메인 동작 및 Vercel 기존 pool 설정값은 변경하지 않는다.**
+- Cloudflare에서 실제 TLS handshake 또는 Member A/B RLS가 성공했다는 증거는 아니며, 격리 원격 DB/승인 Auth 호스트·OAuth 콜백 등록 및 Security/API/DB 기술 수락은 계속 HOLD. Production DNS·DB·시크릿·세연·결제 변경 금지.
