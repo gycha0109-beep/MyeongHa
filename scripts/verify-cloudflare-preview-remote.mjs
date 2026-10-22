@@ -170,6 +170,7 @@ async function main() {
   // the old stage's original empty 404 contract when scf2 is not active.
   for (const path of [
     '/api/health?__myeongha_chat_open=1',
+    '/api/health?%25255F%25255Fmyeongha_chat_open=1',
     '/api/me?__myeongha_chat_turn_send=1',
     '/api/auth/refresh?__myeongha_chat_open=1',
   ]) {
