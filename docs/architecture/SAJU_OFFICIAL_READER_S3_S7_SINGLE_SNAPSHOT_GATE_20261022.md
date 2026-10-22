@@ -31,3 +31,11 @@
 3. S7 Owner: 동일 safeMessageId×bodyId×deliveryRequestId의 replay·환불 권한 회수·단절/재접속 시각 인계. 읽기 여부를 ACK로 추정하지 않으며 실제 공개 기능은 별도 승인.
 
 이 문서는 새 트랙을 만들지 않고 기존 S3→S5→S7 기술 인수 계약만 구체화한다.
+
+## 2026-10-22 S6 암호문 Identity / S7 준비 영수증의 정확한 결속
+
+- 기존 Saju·DB 원본 인수와 S5→S7 동일성 검사 위에 `apps/api/src/official-reader-s6-ciphertext-s7-identity-v1.ts`를 추가한다. 별도 DB 변경 없이 **DB Owner #2301 Draft의 기존 `OfficialReaderProtectedBodyIdentityV1` AAD 12개 필드**를 수신하는 비공개 witness 계약이다.
+- `subjectId`, `threadId`, `turnId`, `attemptId`, `safeMessageId`, `officialReadingId`, `readerCharacterId`, `readerContentBundleId`, `contentReleaseId`, `originatingEntitlementGrantId`, `productId`, `sourceResponseHash`를 Reader scope·S5 commit·S6 재조회와 대조한다. `sourceResponseHash`는 Saju deterministic response hash를 `sha256:v1:` 접두사로 감싼 **기존 DB Owner S5 형식**과만 비교한다. DB Records의 별도 `officialArtifactResponseHash` 표현을 Saju hash와 같다고 추정하지 않는다.
+- S7 준비가 있을 때는 SQL Owner가 실제 인증된 Subject×Thread×SafeMessage×Body×DeliveryRequest×Attempt에 묶은 `s7PreparedBinding`을 추가로 요구한다. 현재 S6 반환 객체에는 민감한 AAD 전체가 **포함돼 있지 않으므로**, 이 witness를 일반 클라이언트 또는 응답 객체에서 만들어 쓰면 안 된다. #2301의 기존 S1 보호 읽기 SQL·키/Privacy Owner가 서버 내부에서 검증된 원본 메타데이터만 인계해야 이후 실 연결 가능하다.
+- `inspectOfficialReaderS6CiphertextS7IdentityV1`는 위 사전 결속 후 **기존 단일 Records 조회 게이트를 정확히 한 번** 실행한다. 사용자 응답은 HELD/BLOCKED 및 S5/S7 단계 이름뿐이며 SourceUnit·ciphertext·DEK·원문·Subject/Body/Token을 노출하지 않는다. 구매권, 삭제/환불/재전송, ACK의 발행 여부 및 실제 사용자 열람을 결정하지 않는다.
+- `S7_CLIENT_ACKNOWLEDGED_NOT_HUMAN_READ`은 준비·인증 ACK의 메타데이터 일치만 뜻한다. 별도 승인 전 `canPersist/canDisclose/canPublish/canSell=false`, `sourceAuthority/Privacy/currentAccessAuthority=NOT_EVALUATED`, `s5AtomicStorage/s7Delivery=DB_OWNER_REQUIRED`은 불변이다.
