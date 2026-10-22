@@ -749,9 +749,13 @@ describe('S5 and S7 immutable replay of the same protected Official Reading', ()
       ...baseline,
       sajuHandoff: { ...baseline.sajuHandoff, sourceAuthority: 'PRODUCTION_APPROVED' },
     })).toMatchObject({ state: 'blocked', canDisclose: false });
+    const privateBodyLeak = {
+      ...baseline.replayS6Read,
+      body: 'protected body must not cross the boundary',
+    };
     expect(await inspectOfficialReaderS5S7ImmutableReplayV1({
       ...baseline,
-      replayS6Read: { ...baseline.replayS6Read, body: 'protected body must not cross the boundary' },
+      replayS6Read: privateBodyLeak,
     })).toMatchObject({ state: 'blocked', canDisclose: false });
   });
 });
