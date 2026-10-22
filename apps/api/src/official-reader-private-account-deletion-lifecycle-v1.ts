@@ -76,7 +76,7 @@ export interface OfficialReaderAccountPrivacyDeletionPortV1 {
   finishAfterDatabaseDeletion(input: Readonly<{
     subjectId: string;
     deletionJobId: string;
-  }>): Promise<void>;
+  }>): Promise<OfficialReaderDurableDeletionFenceV1 | null>;
 }
 
 function failed(): never {
@@ -190,7 +190,7 @@ export function createOfficialReaderAccountPrivacyDeletionPortV1(input: {
       // No manifest was ever required for a legacy account that has never
       // stored protected Reader material. The DB finalizer separately refuses
       // to erase a protected row without its explicit external fence.
-      if (fence === null) return;
+      if (fence === null) return null;
       const saved = requireFence(fence, subjectId, deletionJobId);
 
       for (const keyRef of saved.keyRefs) {
@@ -203,6 +203,7 @@ export function createOfficialReaderAccountPrivacyDeletionPortV1(input: {
       if (await input.ledger.acknowledgeAccountKeyErasure({
         subjectId, deletionJobId, fenceId: saved.fenceId,
       }) !== true) return failed();
+      return saved;
     },
   });
 }
