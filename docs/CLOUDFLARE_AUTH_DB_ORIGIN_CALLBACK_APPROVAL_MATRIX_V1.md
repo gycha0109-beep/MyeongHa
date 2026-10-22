@@ -114,3 +114,9 @@
 - Cloudflare `sign-in/sign-up/refresh`의 기존 `createProductionMemberAuthHttpRuntimeV1`에 별도 `PostgresMemberAuthRateLimitAdmissionPortV1`을 주입한다. 이 Port는 운영 Vercel 런타임의 기본 최대 연결 4개와 달리, **기존 Cloudflare Direct TCP 후보 정책(max=1, connect 5초, idle 1초, statement 5초)**을 쓰는 별도 Pool에서 생성된다. 다른 트랙의 기존 Vercel 합성/운영 런타임은 수정하지 않았다.
 - Auth 처리 성공·실패 모두에서 Worker는 인증 runtime과 독립된 rate-limit Pool을 각각 종료하고, 어느 하나의 종료 실패도 사용자 성공 응답으로 승격하지 않는다. 클라이언트에는 고정 503/no-store만 전송한다. `test/cloudflare-auth-admission.test.mjs`는 종료 순서 및 첫 번째 종료 실패 시 두 번째 종료 보장을 가짜 Pool로 입증한다.
 - Guest/bootstrap/개인 프로필/출생 정보 runtime은 기존 Production source의 요청 단위 생성·close 계약을 그대로 사용하며 **모든 PG pool이 max=1로 바뀌었다고 주장하지 않는다**. 해당 경로의 실측 네트워크/시간초과/연결 개수·RLS는 여전히 Security/API/DB 인수 전 HOLD.
+
+### 승인 DB 목적지 고정 (호스트·포트)
+
+- 독립 DB 기술 수락 문자열 외에도 `MYEONGHA_CLOUDFLARE_DB_APPROVED_HOST`와 `MYEONGHA_CLOUDFLARE_DB_APPROVED_PORT` 두 값을 **정확한 비공개 승인 기록**과 동일하게 요구한다. 접속 전 `MYEONGHA_DATABASE_URL`의 실제 hostname/port와 문자열 일치가 아니면 503/no-store로 종료하고 Pool/Provider 네트워크를 열지 않는다. 포트가 생략된 DSN도 임의로 5432라고 추측하지 않고 거절한다.
+- 승인 호스트는 공인 DNS FQDN 형식만 허용하며 `localhost`, IP 리터럴, `.internal/.local/.invalid/.test/.example` 등 사설·합성 주소를 Workers TCP 실연동 대상으로 허용하지 않는다. **이 정책이 새 외부 테스트 DB 생성을 승인한 것은 아니다.** 사용자 지시대로 일회용 PostgreSQL 검증은 기존 GitHub CI/local Docker에 한정되고, Cloudflare 실네트워크에는 승인된 대상이 없으므로 404 HOLD를 유지한다.
+- 이 호스트·포트는 승인된 별도 Worker binding 이름이다. DB DSN, TLS CA 원문, 비밀번호, 실제 Callback 소유 호스트 값은 GitHub PR/문서/로그에 등록하지 않는다. 기술 owner 인수에 실제 값·권한·비용 경계가 모두 성립할 때만 별도 조치 대상이 된다.
