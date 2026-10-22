@@ -21,6 +21,7 @@ import {
 import {
   HTML_ENTRIES,
   verifyCloudflareStaticArtifact,
+  isCloudflareApiStaticAliasV1,
 } from '../scripts/verify-cloudflare-static.mjs';
 
 const vercelUrl = new URL('../vercel.json', import.meta.url);
@@ -57,6 +58,50 @@ describe('Cloudflare static-only deployment boundary', () => {
     expect(isCloudflareStaticPreviewApiPath('/api/health')).toBe(true);
     expect(isCloudflareStaticPreviewApiPath('/api')).toBe(true);
     expect(isCloudflareStaticPreviewApiPath('/apixel')).toBe(false);
+  });
+
+  it('rejects encoded or case-folded API namespace names from Static Assets', async () => {
+    for (const artifact of [
+      'API/chat.html',
+      'api/chat.html',
+      'api',
+      '%61pi/chat.html',
+      'api%2Fchat.html',
+      'api%252Fchat.html',
+      '%2Fapi%2Fchat.html',
+      'api\\\\turns.json',
+    ]) {
+      expect(isCloudflareApiStaticAliasV1(artifact), artifact).toBe(true);
+    }
+    for (const artifact of [
+      'api-client.js',
+      'api.json',
+      'apixel/icons.svg',
+      'assets/api/history.png',
+      'index.html',
+    ]) {
+      expect(isCloudflareApiStaticAliasV1(artifact), artifact).toBe(false);
+    }
+
+    const { folder, publicDir } = await createFixture();
+    const sha = 'a'.repeat(40);
+    await writeCloudflareStaticHeaders({ cwd: folder, commitSha: sha });
+    for (const entry of ['API', '%61pi', 'api%2Fchat.html', 'api%252Fchat.html']) {
+      const path = join(publicDir, entry);
+      if (entry === 'API' || entry === '%61pi') {
+        await mkdir(path);
+      } else {
+        await writeFile(path, 'PROTECTED_FIXTURE_MUST_NOT_DEPLOY');
+      }
+      await expect(verifyCloudflareStaticArtifact({
+        cwd: folder, expectedCommitSha: sha,
+      })).rejects.toThrow('API namespace must not be packaged as Static Assets');
+      await rm(path, { recursive: true, force: true });
+    }
+    const cleared = await verifyCloudflareStaticArtifact({
+      cwd: folder, expectedCommitSha: sha,
+    });
+    expect(cleared.entryCount).toBe(11);
   });
 
   it('never returns a successful or streaming response for unported APIs', async () => {
