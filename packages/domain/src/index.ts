@@ -12,9 +12,12 @@ export {
 
 export {
   evaluateCapabilityGate,
+  evaluateCapabilitySecuritySignalsV1,
   type CapabilityGateInput,
   type CapabilityGateResult,
   type CapabilityDenialReason,
+  type CapabilitySecuritySignalV1,
+  type CapabilitySecurityVetoV1,
 } from './capability-gate.js';
 
 export {
