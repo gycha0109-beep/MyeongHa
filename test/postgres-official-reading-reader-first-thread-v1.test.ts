@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { readFile } from 'node:fs/promises';
+import { projectMobileOfficialReaderEntryUiV1 } from '../apps/mobile/src/features/reading/mobile-official-reader-entry-locale-v1.js';
 import {
   openPostgresOfficialReadingReaderFirstThreadV1,
 } from '../apps/api/src/postgres-official-reading-reader-first-thread-v1.js';
@@ -311,7 +312,13 @@ describe('D-05-C dormant first Thread open/reuse, no public activation', () => {
     expect(server).toContain('resolveOfficialReadingReaderThreadV1');
     expect(server).toContain('createProductReaderPolicyAuthorityPort');
     expect(server).not.toContain('export async function handle');
-    expect(mobile).toContain('Reader 해설 진입 비활성');
+    // The access-disabled label is now authored per UI locale; verify both
+    // the canonical KO safety copy and the real disabled view binding.
+    expect(projectMobileOfficialReaderEntryUiV1('ko-KR', 'public_route_off').disabledAccessibilityLabel)
+      .toBe('Reader 해설 진입 비활성');
+    expect(mobile).toContain('accessibilityLabel={ui.disabledAccessibilityLabel}');
+    expect(mobile).toContain('projectMobileOfficialReaderEntryUiV1(locale, entry.status)');
+    expect(mobile).toContain('style={styles.disabled}');
     expect(generalOpen).not.toContain('officialReadingId');
   });
 });
