@@ -70,6 +70,17 @@
 - **Birth / timezone / region**: 언어 전환만으로 출생시간대·절기·사주 계산 규칙·두 사람 입력·적용 시기를 바꾸지 않는다.
 - **Saju source identity**: 기존 Saju `CanonicalReadingSemanticBundleV1.semanticHash`는 의미 재계산·재생성을 막는 기준이지만 실제 MyeongHa official artifact 필드와 동일하다고 가정하지 않는다. MyeongHa의 `officialArtifactResponseHash`와 둘을 잇는 기존 Bridge 근거가 있어야 한다.
 
+## 4. 실제 웹 Reader Scene 소비 지점과 UI 로케일 분리
+
+구현: `apps/web/reader-scene-locale-presentation-v1.js`, `reader-scene-controller.js`, 각 `.d.ts`, 단위 테스트.
+
+- 기존 `createReaderSceneControllerV1`의 `load()`는 **요청 시작 시점**의 UI 로케일(`getUiLocale()`)만 캡처한다. 재시도나 다음 요청에서는 그때의 UI 로케일을 다시 캡처한다. 늦게 도착한 동일 응답에 최신 UI 선택을 뒤섞지 않는다.
+- 기존 `projectReaderSceneViewModelV1`로 검증·투영된 `ReaderScene`만 `projectReaderSceneLocalePresentationV1`에 전달. `segments`의 문장·`officialReadingId`·`interpretationHash`·실제 서버 `readerCharacterId`를 그대로 유지한다.
+- `uiLocale`, `sourceLanguageNotice`는 **UI 저자 문구 전용 메타데이터**다. 현행 브라우저 DTO는 source output locale을 담지 않으므로 `contentLanguage='source_unasserted'`, `localizedReaderOutput=false` 고정. 서버의 언어 승인 정보가 없는 상태에서 '일본어/번체 Reader 본문'이라고 주장하지 않는다.
+- 원문 보존/언어 변경 안내 문구는 `ko-KR`, `ja-JP`, `zh-TW` UI 표현만 작성. 이 문구를 실제 DOM에 표시하려면 기존 Reader 화면의 UI 바인딩이 필요하며 **화면에서 노출 완료로 주장하지 않는다**.
+- `protected_fallback`은 표시 문구 때문에 보통 `ready`로 승격되지 않는다. 기존 Reader transport feature enabled/config, 세션·권한·기록·외국어 출력 상태는 그대로.
+- UI 헤더는 사용자 표시 선호를 보내는 기존 `reader-runtime-client.js` 경로를 유지하며, 외국어 생성 필드를 Reader 요청 body에 신규 추가하지 않는다.
+
 ## 4. 다음 구현 작업 및 승인 위치
 
 1. **캐릭터 설계 owner:** 위 6명 차이를 실제 Bible/typed Runtime 간에 해결하고 authoritative source/version을 확정. 이 I18N 트랙은 제안·인계만, 원본 수정 금지.
