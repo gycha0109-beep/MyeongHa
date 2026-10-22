@@ -207,6 +207,13 @@
 - `test/mobile-chat-history-shell-locale-v1.test.ts`는 3개 UI 로케일·미지원 언어 한국어 fallback·HOLD 문구의 해제 불가 의미·실제 메시지 원문 및 UI 소비 지점을 고정한다. 기존 `test/mobile-seyeon-history-hold-ux.test.ts`, `test/mobile-applizing-chat-reader-fortune-20261016.test.ts`는 원래 한국어 안전 문구를 보존하면서 UI 사전 참조를 검사하도록 정렬했다.
 - **남은 승인:** 캐릭터 음성/대사 현지화, Saju/Face 공식 원문 재언어화, 개인정보 기록 공개 및 Reader 상용화는 각 원래 소유자의 서버 증빙과 별도 승인 전 HOLD.
 
+### 7.11 I18N-07 부분 집합 — 모바일 Chat 검증된 대화방 Header UI 문구
+
+- `apps/mobile/src/features/chat/ChatReadComponents.tsx`의 기존 `ChatReadHeader`는 서버가 결정한 `snapshot.characterId`에 대응하는 Character ID/표시 이름과 `resolveMobileChatCharacterPresentationV1`의 `presentation.title`을 **그대로 유지**한다. `apps/mobile/src/features/chat/mobile-chat-history-shell-locale-v1.ts`의 UI 사전에 대화 상대 미확인 대체 표시, 서버 확인 대화방 안내, 기록 섹션 명칭, 초상화 접근성 라벨만 `ko-KR`/`ja-JP`/`zh-TW`로 작성해 연결했다.
+- 텍스트 표시에 따른 승인 혼동을 막기 위해 Character 고유명, 고유 직함, `openingLine`, `message.body`, `group.label`, 전송 권한, 개인정보 기록 HOLD, 세션/Thread/Reader ID는 재해석·번역하지 않는다. 특히 `presentation.title`은 `t()` 대상이 아닌 기존 Character 소유 데이터로 취급한다.
+- `test/mobile-chat-header-ui-locale-v1.test.ts`는 3개 UI 언어, 원본 캐릭터 목록과 표시 정보 보존 및 실제 화면 소비 지점을 회귀 고정한다. 기존 Chat 기록 UI 회귀 `test/mobile-chat-history-shell-locale-v1.test.ts`에도 새 UI 라벨을 포함했다. 모든 Node 소스 확인 테스트는 루트 `test/`에 둔다.
+- 미승인 JA/ZH-TW 생성형 Character 대화, 개별 화법, 공식 Reading 재언어화와 공개 Reader Scene 연계는 여전히 별도 소유자 승인 전 HOLD다.
+
 ## 8. 다음 구현 작업 및 승인 위치
 
 1. **캐릭터 설계 owner:** 위 6명 차이를 실제 Bible/typed Runtime 간에 해결하고 authoritative source/version을 확정. 이 I18N 트랙은 제안·인계만, 원본 수정 금지.
