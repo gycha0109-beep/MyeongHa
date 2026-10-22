@@ -1,0 +1,306 @@
+{
+  "schema": "myeongha-official-reader-private-transitive-subject-fk-overlay-v1",
+  "graphAuthority": "SCHEMA_DISCOVERED_POLICY_NEUTRAL",
+  "policyAuthority": "NONE_PENDING_PRIVACY_OWNER",
+  "publicReleaseAuthorized": false,
+  "executionAuthorized": false,
+  "source": "CI 39769753818 migrated PG15 schema exact missing FK edges",
+  "edges": [
+    {
+      "minDepth": 1,
+      "parentTable": "subjects",
+      "childTable": "official_reader_account_deletion_privacy_status_v1",
+      "constraintName": "official_reader_account_deletion_privacy_status_subject_id_fkey",
+      "childColumns": [
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id"
+      ],
+      "disposition": "UNDECIDED",
+      "executionAuthorized": false,
+      "scope": "OFFICIAL_READER_PRIVATE"
+    },
+    {
+      "minDepth": 1,
+      "parentTable": "subjects",
+      "childTable": "official_reader_paid_answer_bodies",
+      "constraintName": "official_reader_paid_answer_subject_fk",
+      "childColumns": [
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id"
+      ],
+      "disposition": "UNDECIDED",
+      "executionAuthorized": false,
+      "scope": "OFFICIAL_READER_PRIVATE"
+    },
+    {
+      "minDepth": 1,
+      "parentTable": "subjects",
+      "childTable": "official_reader_paid_answer_purge_jobs_v1",
+      "constraintName": "reader_paid_answer_purge_job_subject_fk",
+      "childColumns": [
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id"
+      ],
+      "disposition": "UNDECIDED",
+      "executionAuthorized": false,
+      "scope": "OFFICIAL_READER_PRIVATE"
+    },
+    {
+      "minDepth": 1,
+      "parentTable": "subjects",
+      "childTable": "official_reader_paid_delivery_attempts_v1",
+      "constraintName": "official_reader_s7_subject_fk",
+      "childColumns": [
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id"
+      ],
+      "disposition": "UNDECIDED",
+      "executionAuthorized": false,
+      "scope": "OFFICIAL_READER_PRIVATE"
+    },
+    {
+      "minDepth": 1,
+      "parentTable": "subjects",
+      "childTable": "official_reader_s3_source_authority_receipts_v1",
+      "constraintName": "reader_s3_source_subject_fk",
+      "childColumns": [
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id"
+      ],
+      "disposition": "UNDECIDED",
+      "executionAuthorized": false,
+      "scope": "OFFICIAL_READER_PRIVATE"
+    },
+    {
+      "minDepth": 2,
+      "parentTable": "conversation_threads",
+      "childTable": "official_reader_paid_answer_bodies",
+      "constraintName": "official_reader_paid_answer_thread_fk",
+      "childColumns": [
+        "thread_id",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id",
+        "subject_id"
+      ],
+      "disposition": "UNDECIDED",
+      "executionAuthorized": false,
+      "scope": "OFFICIAL_READER_PRIVATE"
+    },
+    {
+      "minDepth": 2,
+      "parentTable": "data_deletion_jobs",
+      "childTable": "official_reader_account_deletion_privacy_status_v1",
+      "constraintName": "official_reader_account_deletion_privacy_s_deletion_job_id_fkey",
+      "childColumns": [
+        "deletion_job_id"
+      ],
+      "parentColumns": [
+        "id"
+      ],
+      "disposition": "UNDECIDED",
+      "executionAuthorized": false,
+      "scope": "OFFICIAL_READER_PRIVATE"
+    },
+    {
+      "minDepth": 2,
+      "parentTable": "entitlement_grants",
+      "childTable": "official_reader_paid_answer_bodies",
+      "constraintName": "official_reader_paid_answer_retained_origin_grant_fk",
+      "childColumns": [
+        "originating_entitlement_grant_id"
+      ],
+      "parentColumns": [
+        "id"
+      ],
+      "disposition": "UNDECIDED",
+      "executionAuthorized": false,
+      "scope": "OFFICIAL_READER_PRIVATE"
+    },
+    {
+      "minDepth": 2,
+      "parentTable": "official_reader_paid_answer_bodies",
+      "childTable": "official_reader_paid_delivery_attempts_v1",
+      "constraintName": "official_reader_s7_body_fk",
+      "childColumns": [
+        "body_id"
+      ],
+      "parentColumns": [
+        "id"
+      ],
+      "disposition": "UNDECIDED",
+      "executionAuthorized": false,
+      "scope": "OFFICIAL_READER_PRIVATE"
+    },
+    {
+      "minDepth": 3,
+      "parentTable": "chat_turn_attempts",
+      "childTable": "official_reader_paid_answer_bodies",
+      "constraintName": "official_reader_paid_answer_attempt_fk",
+      "childColumns": [
+        "attempt_id",
+        "turn_id",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id",
+        "turn_id",
+        "subject_id"
+      ],
+      "disposition": "UNDECIDED",
+      "executionAuthorized": false,
+      "scope": "OFFICIAL_READER_PRIVATE"
+    },
+    {
+      "minDepth": 3,
+      "parentTable": "chat_turns",
+      "childTable": "official_reader_paid_answer_bodies",
+      "constraintName": "official_reader_paid_answer_turn_fk",
+      "childColumns": [
+        "turn_id",
+        "thread_id",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id",
+        "thread_id",
+        "subject_id"
+      ],
+      "disposition": "UNDECIDED",
+      "executionAuthorized": false,
+      "scope": "OFFICIAL_READER_PRIVATE"
+    },
+    {
+      "minDepth": 3,
+      "parentTable": "conversation_messages",
+      "childTable": "official_reader_paid_answer_bodies",
+      "constraintName": "official_reader_paid_answer_marker_fk",
+      "childColumns": [
+        "safe_message_id",
+        "turn_id",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id",
+        "turn_id",
+        "subject_id"
+      ],
+      "disposition": "UNDECIDED",
+      "executionAuthorized": false,
+      "scope": "OFFICIAL_READER_PRIVATE"
+    },
+    {
+      "minDepth": 3,
+      "parentTable": "conversation_thread_characters",
+      "childTable": "official_reader_paid_answer_bodies",
+      "constraintName": "official_reader_paid_answer_participation_fk",
+      "childColumns": [
+        "thread_character_id",
+        "thread_id",
+        "reader_content_bundle_id"
+      ],
+      "parentColumns": [
+        "id",
+        "thread_id",
+        "content_bundle_id"
+      ],
+      "disposition": "UNDECIDED",
+      "executionAuthorized": false,
+      "scope": "OFFICIAL_READER_PRIVATE"
+    },
+    {
+      "minDepth": 3,
+      "parentTable": "entitlement_events",
+      "childTable": "official_reader_paid_answer_purge_jobs_v1",
+      "constraintName": "reader_paid_answer_purge_job_event_fk",
+      "childColumns": [
+        "last_event_id"
+      ],
+      "parentColumns": [
+        "id"
+      ],
+      "disposition": "UNDECIDED",
+      "executionAuthorized": false,
+      "scope": "OFFICIAL_READER_PRIVATE"
+    },
+    {
+      "minDepth": 3,
+      "parentTable": "standard_reading_official_bindings",
+      "childTable": "official_reader_paid_answer_bodies",
+      "constraintName": "official_reader_paid_answer_official_fk",
+      "childColumns": [
+        "official_reading_id",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "reading_id",
+        "subject_id"
+      ],
+      "disposition": "UNDECIDED",
+      "executionAuthorized": false,
+      "scope": "OFFICIAL_READER_PRIVATE"
+    },
+    {
+      "minDepth": 3,
+      "parentTable": "standard_reading_official_bindings",
+      "childTable": "official_reader_paid_answer_purge_jobs_v1",
+      "constraintName": "reader_paid_answer_purge_job_reading_fk",
+      "childColumns": [
+        "official_reading_id",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "reading_id",
+        "subject_id"
+      ],
+      "disposition": "UNDECIDED",
+      "executionAuthorized": false,
+      "scope": "OFFICIAL_READER_PRIVATE"
+    },
+    {
+      "minDepth": 3,
+      "parentTable": "standard_reading_official_bindings",
+      "childTable": "official_reader_s3_source_authority_receipts_v1",
+      "constraintName": "reader_s3_source_official_fk",
+      "childColumns": [
+        "official_reading_id",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "reading_id",
+        "subject_id"
+      ],
+      "disposition": "UNDECIDED",
+      "executionAuthorized": false,
+      "scope": "OFFICIAL_READER_PRIVATE"
+    },
+    {
+      "minDepth": 4,
+      "parentTable": "standard_reading_reader_interpretations",
+      "childTable": "official_reader_paid_answer_bodies",
+      "constraintName": "official_reader_paid_answer_interpretation_fk",
+      "childColumns": [
+        "official_reading_id",
+        "reader_character_id"
+      ],
+      "parentColumns": [
+        "official_reading_id",
+        "reader_character_id"
+      ],
+      "disposition": "UNDECIDED",
+      "executionAuthorized": false,
+      "scope": "OFFICIAL_READER_PRIVATE"
+    }
+  ]
+}
