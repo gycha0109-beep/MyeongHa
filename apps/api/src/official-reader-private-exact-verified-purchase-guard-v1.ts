@@ -26,7 +26,7 @@ const READER = /^[a-z][a-z0-9_-]{0,63}$/u;
 const VERIFY_SQL = `
 select public.internal_assert_official_reader_current_verified_purchase_bundle_v1(
   $1::uuid,$2::uuid,$3::text,$4::uuid
-) as "allowed"
+) as "guardExecuted"
 `;
 
 export class OfficialReaderCurrentVerifiedPurchaseDeniedV1 extends Error {
@@ -58,22 +58,22 @@ export async function assertOfficialReaderPrivateCurrentVerifiedPurchaseV1(
     const subjectId = uuid(scope.resolvedSubject.subjectId);
     if (scope.resolvedSubject.subjectKind !== 'member'
         || uuid(present.subjectId) !== subjectId
-        || uuid(present.readingId) === null
         || !READER.test(present.readerCharacterId)
         || !UUID.test(present.readerContentBundleId)
         || !UUID.test(present.threadId)
         || !Number.isFinite(Date.parse(present.effectiveAt))) return deny();
 
-    const response = await scope.client.query<{allowed: unknown}>(VERIFY_SQL, [
+    const response = await scope.client.query<{guardExecuted: unknown}>(VERIFY_SQL, [
       subjectId,
       uuid(present.readingId),
       present.readerCharacterId,
       uuid(present.readerContentBundleId),
     ]);
-    // Function returns VOID, mapped to NULL. One result proves the private
-    // SQL completed all S1/Receipt/Grant checks without throwing, not that
-    // an HTTP app can issue a positive entitlement.
-    if (response.rows.length !== 1 || response.rows[0]?.allowed !== null) {
+    // Function returns PostgreSQL VOID (driver codecs may map that to
+    // null or an empty string). One exactly shaped result proves the private
+    // SQL ran to completion without throwing; it is not a public Grant.
+    if (response.rows.length !== 1 || !response.rows[0]
+        || !Object.hasOwn(response.rows[0], 'guardExecuted')) {
       return deny();
     }
   } catch {
