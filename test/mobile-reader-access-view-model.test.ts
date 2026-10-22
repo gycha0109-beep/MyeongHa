@@ -9,6 +9,7 @@ import {
   MOBILE_READER_PRESENTATIONS_V1,
 } from '../apps/mobile/src/features/reading/mobile-reader-presentation.js';
 import { projectMobileOfficialReadingShellV1 } from '../apps/mobile/src/ui/mobile-official-reading-shell-locale-v1.js';
+import { projectMobileReaderPickerUiV1 } from '../apps/mobile/src/features/reading/mobile-reader-picker-ui-locale-v1.js';
 
 describe('mobile Reader availability projection is not an admission grant', () => {
   it('preserves the nine approved presentation IDs and Seyeon-only preview', () => {
@@ -47,8 +48,11 @@ describe('mobile Reader availability projection is not an admission grant', () =
     ]);
     expect(picker).toContain('createMobileReaderAccessViewStateV1(option.key)');
     expect(picker).toContain('disabled={!available}');
-    expect(picker).toContain('컨셉 준비 중');
-    expect(picker).toContain('상품 지원, 구매 접근권, 공개 승인');
+    expect(picker).toContain('ui.conceptPending');
+    expect(projectMobileReaderPickerUiV1('ko-KR').conceptPending).toBe('컨셉 준비 중');
+    expect(picker).toContain('{ui.authorityBoundary}');
+    expect(projectMobileReaderPickerUiV1('ko-KR').authorityBoundary)
+      .toContain('상품 지원, 구매 접근권, 공개 승인');
     // The authored disclosure moved to the UI-locale catalogue. Verify the
     // original Korean warning still exists and the archive renders that
     // disclosure, rather than requiring literals embedded in the JSX.
