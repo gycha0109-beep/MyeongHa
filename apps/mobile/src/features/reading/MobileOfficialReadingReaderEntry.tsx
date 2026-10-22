@@ -10,7 +10,8 @@ import {
   type MobileReaderPresentationIdV1,
 } from '@/features/reading/mobile-reader-presentation';
 import { mobileColors } from '@/ui/mobile-colors';
-import { MobileUiText } from '@/ui/MobileUiText';
+import { useMobileUiLocale } from '@/ui/mobile-ui-locale';
+import { projectMobileOfficialReaderEntryUiV1 } from '@/features/reading/mobile-official-reader-entry-locale-v1';
 
 export function MobileOfficialReadingReaderEntry({
   record,
@@ -19,19 +20,21 @@ export function MobileOfficialReadingReaderEntry({
   const [selectedReaderId, setSelectedReaderId] = useState<MobileReaderPresentationIdV1>('seyeon');
   const selectedReader = findMobileReaderPresentationV1(selectedReaderId);
   const entry = projectMobileOfficialReadingReaderEntryV1(record, selectedReaderId);
+  const { locale } = useMobileUiLocale();
+  const ui = projectMobileOfficialReaderEntryUiV1(locale, entry.status);
 
   return (
     <View style={styles.panel}>
-      <MobileUiText style={styles.eyebrow}>READER · 준비 중</MobileUiText>
-      <MobileUiText style={styles.title}>이 공식 사주를 읽어줄 인물</MobileUiText>
-      <MobileUiText style={styles.copy}>공식 Reading 기반의 Reader 소개입니다. 해설 실행 및 후속 대화는 제공되지 않습니다.</MobileUiText>
+      <Text style={styles.eyebrow}>{ui.eyebrow}</Text>
+      <Text style={styles.title}>{ui.title}</Text>
+      <Text style={styles.copy}>{ui.description}</Text>
       <View style={styles.grid}>
         {MOBILE_READER_PRESENTATIONS_V1.map((reader) => (
           <Pressable
             key={reader.key}
             accessibilityRole="button"
-            accessibilityLabel={`${reader.name} 소개 보기`}
-            accessibilityHint="인물 소개만 변경하며 유료 해설은 실행하지 않습니다."
+            accessibilityLabel={`${reader.name} ${ui.viewIntroduction}`}
+            accessibilityHint={ui.viewIntroductionHint}
             accessibilityState={{ selected: selectedReaderId === reader.key }}
             onPress={() => setSelectedReaderId(reader.key)}
             style={[
@@ -43,7 +46,7 @@ export function MobileOfficialReadingReaderEntry({
             <Text style={styles.name}>{reader.name}</Text>
             <Text style={styles.sub}>{reader.title}</Text>
             <Text style={styles.sub}>
-              {isMobileReaderPreviewSelectableV1(reader.key) ? '프리뷰 소개' : '컨셉 준비 중'}
+              {isMobileReaderPreviewSelectableV1(reader.key) ? ui.preview : ui.conceptPending}
             </Text>
           </Pressable>
         ))}
@@ -51,18 +54,14 @@ export function MobileOfficialReadingReaderEntry({
       <View style={styles.introduction} accessibilityLiveRegion="polite">
         <Text style={styles.introductionTitle}>{selectedReader.name} · {selectedReader.title}</Text>
         <Text style={styles.copy}>{selectedReader.tone}</Text>
-        <MobileUiText style={styles.copy}>
-          현재 선택은 인물 소개를 보기 위한 것입니다. 이 Reader의 구매 접근권, 공식 Reading 열람 또는 전용 Thread가 생성되지 않습니다.
-        </MobileUiText>
+        <Text style={styles.copy}>{ui.selectionBoundary}</Text>
       </View>
-      <MobileUiText style={styles.name}>해설 진입 상태</MobileUiText>
-      <Text style={styles.copy}>{entry.statusMessage}</Text>
-      <View accessible accessibilityLabel="Reader 해설 진입 비활성" style={styles.disabled}>
-        <MobileUiText style={styles.disabledText}>해설 서비스 준비 중</MobileUiText>
+      <Text style={styles.name}>{ui.statusTitle}</Text>
+      <Text style={styles.copy}>{ui.statusMessage}</Text>
+      <View accessible accessibilityLabel={ui.disabledAccessibilityLabel} style={styles.disabled}>
+        <Text style={styles.disabledText}>{ui.disabledLabel}</Text>
       </View>
-      <MobileUiText style={styles.copy}>
-        Reader 소개 및 기록 연결은 상품 적격성, 구매 접근권, 공개 승인, 공식 Reading 접근 허가의 증명이 아닙니다.
-      </MobileUiText>
+      <Text style={styles.copy}>{ui.authorityBoundary}</Text>
     </View>
   );
 }
