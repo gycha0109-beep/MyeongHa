@@ -12,7 +12,10 @@ create table public.seyeon_positive_source_type_registry_v1 (
   record_type text not null check (length(record_type) between 1 and 100),
   schema_version text not null check (length(schema_version) between 1 and 100),
   projector_version text not null check (length(projector_version) between 1 and 100),
+  -- Independent gates. Approving private persistence must NEVER enable
+  -- retrieval/AI inference. No rows or permissions are enabled by this DDL.
   enabled boolean not null default false,
+  writable_enabled boolean not null default false,
   primary key(record_kind,record_type,schema_version,projector_version)
 );
 alter table public.seyeon_positive_source_type_registry_v1
