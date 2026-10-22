@@ -158,7 +158,7 @@ export function createOfficialReaderAccountPrivacyDeletionPortV1(input: {
   if (!input.ledger || !input.keys) return failed();
 
   return Object.freeze({
-    async fenceBeforeDatabaseDeletion(preparation) {
+    async fenceBeforeDatabaseDeletion(preparation: Parameters<OfficialReaderAccountPrivacyDeletionPortV1['fenceBeforeDatabaseDeletion']>[0]) {
       const subjectId = normalizedUuid(preparation.subjectId);
       const deletionJobId = normalizedUuid(preparation.deletionJobId);
       const manifest = normalizeManifest(preparation.manifest);
@@ -185,7 +185,7 @@ export function createOfficialReaderAccountPrivacyDeletionPortV1(input: {
       return reread;
     },
 
-    async finishAfterDatabaseDeletion(continuation) {
+    async finishAfterDatabaseDeletion(continuation: Parameters<OfficialReaderAccountPrivacyDeletionPortV1['finishAfterDatabaseDeletion']>[0]) {
       const subjectId = normalizedUuid(continuation.subjectId);
       const deletionJobId = normalizedUuid(continuation.deletionJobId);
       const fence = await input.ledger.readAccountDeletionFence({
