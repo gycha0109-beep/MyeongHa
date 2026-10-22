@@ -1,0 +1,48 @@
+# Cloudflare Stage 9 — Preview 중단·비용·복구 운영 기준 (2026-10-22)
+
+Watchtower-Track: ops. 기준: [Cloudflare 이관 로드맵](https://github.com/gycha0109-beep/MyeongHa/pull/2381) / [기존 Draft 구현 PR](https://github.com/gycha0109-beep/MyeongHa/pull/2420). 이 문서는 Preview 통제 규칙이며, 운영/과금/DB/시크릿 변경 승인이 아닙니다.
+
+## 1. 적용 범위
+
+기존 단일 Worker myeongha의 Preview만 대상으로 합니다. 운영용 workers.dev는 비활성, Preview URLs만 활성입니다. 기존 운영 Vercel https://myeongha.vercel.app 은 변경하지 않습니다.
+
+- mutable 대상: https://feat-ops-cloudflare-authdb-clean-snapshot-20261021-myeongha.gycha0109.workers.dev
+- 읽기 전용 고정 복구 후보: https://59a14b13-myeongha.gycha0109.workers.dev — 이전 검증 커밋 d4f7cebb3d9be6b4ad9e526c53e3f5b8585cc9c0
+- 실제 기존 Preview 과거 버전 복원→최신 버전 재배포 이력: [Cloudflare 원격 복원 검증 #39741192373](https://github.com/gycha0109-beep/MyeongHa/actions/runs/39741192373). 이 검증은 운영 Worker/DNS/DB failback을 의미하지 않습니다.
+
+## 2. 판정 로직
+
+scripts/cloudflare-preview-ops-stop-gate.mjs에서 실행되는 읽기 전용 판정입니다. 기존 Cloudflare Preview Remote Smoke의 정확한 배포 SHA 영수증, 합성 HTTP 응답, 라우트 분류와 별도로 검토한 실제 Worker 사용량만 받아들입니다.
+
+| 관측 | Preview | Production |
+|---|---|---|
+| SHA 일치·HTTP 성공·4분류의 합성 검사 존재·세연 503 유지 | ALLOW_DENY_ONLY_PREVIEW | HOLD |
+| SHA 불일치·HTTP 오류·429·미승인 5xx·전송 오류·보호 503 누락 | STOP_REHEARSAL, 해당 CI FAIL | HOLD |
+| 별도 owner 입증: 시크릿 회전 실패·OAuth callback 실패·DB TLS/RLS 오류·개인정보 응답·AI timeout·결제 재실행 위험·급격한 과금 | STOP_REHEARSAL | HOLD |
+| 실제 Cloudflare Free 상한 근접/도달 및 빌드 분수 소진 | STOP_REHEARSAL; Paid 자동변경 금지 | HOLD |
+| CPU·메모리·실사용량·계정 청구 증거 없음 | 기존 deny-only Preview는 유지 가능 | HOLD |
+
+세연 의도된 503은 비정상 서버 5xx 카운트가 아니라 expectedHolds503로 기록합니다. Chrome과 HTTP CI 성공은 실제 인증/DB 로그인·AI·결제 승인이나 Production 운영 전환이 아닙니다.
+
+## 3. Free 한도/측정 근거
+
+[공식 Workers 한도](https://developers.cloudflare.com/workers/platform/limits/), [2026-02-11 subrequest 변경](https://developers.cloudflare.com/changelog/post/2026-02-11-subrequests-limit/) 확인 기준:
+- Worker 호출 일 100,000건(UTC 기준), CPU 요청당 10ms, 메모리 128MB, 외부 subrequest 50건, 정적 파일 최대 20,000개 및 개별 최대 25MiB.
+- 실제 승인된 Worker 사용량 계측에 한해서만 이 한도와 비교하며, 한도에 도달하면 새 트래픽 여유가 없으므로 보수적으로 STOP합니다.
+- 기존 synthetic HTTP p50/p95/max는 **클라이언트→Preview 응답헤더까지 시간**입니다. Worker CPU, 메모리, 실제 유입량 또는 청구 비용과 동등하지 않습니다.
+- 빌드 한도 소진 boolean만 읽기 가능했습니다. 계정 billable-usage/billing-usage API는 403이므로 청구액은 **미확정**입니다. 0원·Free 적합성을 추측하거나 Vercel/Cloudflare 요금제를 전환하지 않습니다.
+- Supabase, OpenAI, PortOne 청구액은 별도로 owner가 수락해야 합니다.
+
+## 4. 중단 후 조치
+
+1. Protected Auth/DB API의 404, 세연 최초/History/Replay 503, Reader/Commerce/PortOne/AI positive HOLD를 유지합니다.
+2. 기존 Preview의 정확한 Git SHA 및 원격 영수증을 대조합니다. 성공한 immutable 후보 검사를 mutable Preview 복원과 동일시하지 않습니다.
+3. 승인된 기존 Preview가 손상됐다면 이전 pinned SHA로 Preview만 수동 재배포한 뒤 58건 HTTP, Chrome 11화면, 정확한 영수증을 확인합니다. 이어 원래 최신 SHA를 다시 게시하고 같은 검사를 반복합니다. 자동 Worker Production 롤백/요금제 변경은 없습니다.
+4. Vercel은 이미 Production이므로 현재 Preview 사건에서 DNS failback이 필요하다고 단정하지 않습니다. Stage 10 DNS 이전은 별도 사용자 승인입니다.
+5. 실제 URL, OAuth 공급자 callback allowlist, 격리 DB verify-full 및 A/B RLS, Security/API/DB G0-D04, AI/결제 권한, 실제 비용 한도는 각각 해당 owner의 독립 인수를 받기 전까지 HOLD입니다.
+
+## 5. 미확정 증거
+
+실제 Workers CPU·메모리·UTC 일별 호출량, route별 실제 오류/부하 분포, 계정 청구 API 접근 권한, Auth/DB TLS·RLS 및 OAuth 공급자 등록, 운영 예산·DNS 전환 승인이 필요합니다. 특정 다른 트랙의 브라우저 CI가 실패하면 원인 없이 무시하거나 Cloudflare 전체 병합을 완료로 선언하지 않습니다.
+
+**결론:** Cloudflare Static/deny-only Preview 및 기존 복구 리허설 증거만 사용합니다. 운영 전환, 유료 기능, 계정 변경, 생산 데이터 접근은 HOLD입니다.
