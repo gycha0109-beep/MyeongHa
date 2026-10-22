@@ -12,11 +12,14 @@ const fetchBoundaryRoutes = new Map([
   ['api/auth/sign-in.ts', 'api.auth.sign-in'],
   ['api/auth/sign-out.ts', 'api.auth.sign-out'],
   ['api/auth/sign-up.ts', 'api.auth.sign-up'],
+  ['api/chat/[threadId]/paid-readings/[safeMessageId].ts', 'api.chat.paid_reader_message.held'],
+  ['api/chat/[threadId]/paid-readings/[safeMessageId]/ack.ts', 'api.chat.paid_reader_delivery_ack.held'],
   ['api/health.ts', 'api.health'],
   ['api/me.ts', 'api.me.dispatch'],
   ['api/me/birth-profile.ts', 'api.me.birth-profile'],
   ['api/me/saju/calculation.ts', 'api.me.saju.calculation'],
   ['api/readiness.ts', 'api.readiness'],
+  ['api/readings/[readingId]/reader-continuity.ts', 'api.readings.reader_continuity.held'],
   ['api/session/bootstrap.ts', 'api.session.bootstrap'],
 ]);
 
