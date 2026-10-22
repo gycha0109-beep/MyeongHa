@@ -20,6 +20,15 @@ select
 from public.internal_resolve_verified_reader_receipt_fulfillment_v1($1::uuid)
 `;
 
+export type VerifiedReaderPurchaseRoleV1 =
+  | 'initial_reading'
+  | 'additional_reader_interpretation';
+
+export type FulfilledVerifiedReaderReceiptV1 = AppliedVerifiedReaderReceiptBindV1 & Readonly<{
+  /** Immutable Purchase Intent / Offer-role fact, not inferred from UI. */
+  purchaseRole: VerifiedReaderPurchaseRoleV1;
+}>;
+
 type FulfillmentAuthorityRow = Readonly<{
   purchaseIntentId: unknown;
   existingOfficialReadingId: unknown;
@@ -60,7 +69,7 @@ function requirePreparationTime(value: unknown): string {
 export async function fulfillVerifiedReaderReceiptV1(input: {
   readonly pool: PostgresSubjectPoolV1;
   readonly receiptId: string;
-}): Promise<AppliedVerifiedReaderReceiptBindV1 | null> {
+}): Promise<FulfilledVerifiedReaderReceiptV1 | null> {
   const receiptId = requireUuid(input.receiptId, 'Receipt ID');
   const rows = await executePostgresCommerceInternalTransactionV1({
     pool: input.pool,
@@ -115,7 +124,7 @@ export async function fulfillVerifiedReaderReceiptV1(input: {
     .digest('hex')}`;
   const effectiveAt = requirePreparationTime(row.preparedAt);
 
-  return applyVerifiedReaderReceiptBindV1({
+  const result = await applyVerifiedReaderReceiptBindV1({
     pool: input.pool,
     receiptId,
     expectedOfficialReadingId,
@@ -129,5 +138,16 @@ export async function fulfillVerifiedReaderReceiptV1(input: {
       targetValidUntil: null,
       reasonCode: null,
     }]),
+  });
+  // A second Reader is an independently bought interpretation of the
+  // EXISTING official Reading, never a second Saju Source Truth. The DB
+  // supplied this role from an immutable Offer, not the browser.
+  if (row.purchaseRole === 'additional_reader_interpretation'
+      && result.officialReadingId !== existingReadingId) {
+    throw new Error('Additional Reader fulfillment changed official Reading identity.');
+  }
+  return Object.freeze({
+    ...result,
+    purchaseRole: row.purchaseRole,
   });
 }
