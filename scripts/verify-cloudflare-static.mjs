@@ -41,8 +41,9 @@ export async function verifyCloudflareStaticArtifact(options = {}) {
     workerConfig?.assets?.directory !== './public' ||
     workerConfig?.assets?.html_handling !== 'none' ||
     workerConfig?.assets?.not_found_handling !== 'none' ||
-    JSON.stringify(workerConfig?.assets?.run_worker_first) !==
-      JSON.stringify(['/api', '/api/*'])
+    // S-CF2 requires every Static Asset request to hit the Worker first,
+    // including HTML paths with legacy chat rewrite query markers.
+    workerConfig?.assets?.run_worker_first !== true
   ) {
     throw new Error('Cloudflare preview routing or isolation policy has changed.');
   }
