@@ -5,21 +5,21 @@ export const READER_PRESENTATIONS = Object.freeze([
   Object.freeze({
     key: 'seyeon',
     name: '세연',
-    title: '무녀',
+    title: '명하의 안내인',
     tone: '부드럽게 흐름을 풀어 설명합니다.',
     portrait: 'assets/characters/seyeon-portrait-v2.webp',
   }),
   Object.freeze({
     key: 'baekheon',
     name: '백헌',
-    title: '충추원의 장',
+    title: '베테랑 조정자',
     tone: '구조와 선택을 단정하게 짚습니다.',
     portrait: 'assets/characters/baekheon-portrait-v2.webp',
   }),
   Object.freeze({
     key: 'yeoul',
     name: '여울',
-    title: '설계관 기록관',
+    title: '운영관리팀 사원',
     tone: '돌려 말하지 않고 필요한 지점부터 봅니다.',
     portrait: 'assets/characters/yeoul-portrait-uploaded.svg',
   }),
@@ -33,7 +33,7 @@ export const READER_PRESENTATIONS = Object.freeze([
   Object.freeze({
     key: 'rahyeon',
     name: '라현',
-    title: '연결자',
+    title: '전시 기획자',
     tone: '겉보다 실제로 흔들리는 지점을 읽습니다.',
     portrait: 'assets/characters/rahyeon-portrait-v2.webp',
   }),
@@ -47,7 +47,7 @@ export const READER_PRESENTATIONS = Object.freeze([
   Object.freeze({
     key: 'taegyeom',
     name: '태겸',
-    title: '연결자',
+    title: '프로 격구 선수',
     tone: '낙관보다 확인되는 구조와 행동을 봅니다.',
     portrait: 'assets/characters/taegyeom-portrait-v2.webp',
   }),
