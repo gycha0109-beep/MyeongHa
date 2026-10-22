@@ -38,7 +38,7 @@
 
 ## 4. 기존 승인 자료와의 관계
 
-기존 `CHARACTER_IMMUTABLE_IDENTITY_VISUAL_PROPOSAL_V1.md` 및 그 승인 문서에는 백헌을 **`deity_gyeon` / 견의 대리자**로 기술하는 legacy authoring이 존재한다. 현재 상위 World Root는 이치·명·대리자 체계이며, 인간형 인격신을 기본 실재로 두지 않는다.
+기존 `CHARACTER_IMMUTABLE_IDENTITY_VISUAL_PROPOSAL_V1.md` 및 그 승인 문서에는 백헌을 **`deity_gyeon` / 견의 연결자**로 기술하는 legacy authoring이 존재한다. 현재 상위 World Root는 이치·명·연결자 체계이며, 인간형 인격신을 기본 실재로 두지 않는다.
 
 이번 결정은 백헌 개인의 **명 = 任**을 명시적으로 확정한다. 기존 문서의 `deity_gyeon` 표기를 **任의 다른 이름**이라고 자동 등치하지 않고, 공통 로스터의 deity legacy 스키마를 이번 PR에서 전역 변경하지 않는다. 백헌 Bible·후속 콘텐츠 통합 시 기존 필드와 이번 Character-scoped Canon의 관계를 World/Character Authority에 맞춰 정합화해야 한다.
 

@@ -108,7 +108,7 @@ describe('Mobile / Web UI localization parity', () => {
   it('translates audited native-only screen guidance and accessible controls without touching private data', async () => {
     for (const sourceText of [
       '얼굴에 담긴 이야기를 만나기 위한 첫 단계, 사진부터 준비해 보세요.',
-      '저마다 다른 목소리로, 당신의 이야기를 들어줄 대리자들을 만나보세요.',
+      '저마다 다른 목소리로, 당신의 이야기를 들어줄 연결자들을 만나보세요.',
       '나의 계정과 이야기, 설정을 살펴보세요.',
       '태어난 순간의 이야기를 바탕으로 나의 명식을 알아보세요.',
       '달력 닫기',

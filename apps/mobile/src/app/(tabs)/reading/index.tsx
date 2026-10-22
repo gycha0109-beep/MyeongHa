@@ -119,7 +119,7 @@ export default function SajuScreen() {
             })}
             style={styles.primaryButton}
           >
-            <MobileUiText style={styles.primaryButtonText}>선택한 대리자로 사주 읽기 시작 →</MobileUiText>
+            <MobileUiText style={styles.primaryButtonText}>선택한 연결자로 사주 읽기 시작 →</MobileUiText>
           </Pressable>
           <SajuPreviewReadingView
             onOpenPreview={(topic) => router.push({

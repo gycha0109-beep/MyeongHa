@@ -179,8 +179,8 @@ function senderLabel(message, authoritativeCharacterId) {
   if (message.senderType === 'user') return translateStaticUi('나', locale);
   if (message.senderType === 'character') {
     const name = resolveCharacterDisplayNameV1(message.characterId, locale);
-    if (message.characterId === authoritativeCharacterId) return name ?? translateStaticUi('대리자', locale);
-    return name ?? translateStaticUi('다른 대리자', locale);
+    if (message.characterId === authoritativeCharacterId) return name ?? translateStaticUi('연결자', locale);
+    return name ?? translateStaticUi('다른 연결자', locale);
   }
   return translateStaticUi('대화 기록', locale);
 }
@@ -414,7 +414,7 @@ function ensureRoomReady() {
 
   roomBootPromise = (async () => {
     if (invalidThreadRoute) {
-      setComposeStatus('대화 주소가 올바르지 않습니다. 대리자를 다시 선택해 주세요.');
+      setComposeStatus('대화 주소가 올바르지 않습니다. 연결자를 다시 선택해 주세요.');
       return false;
     }
     try {

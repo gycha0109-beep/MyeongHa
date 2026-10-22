@@ -54,7 +54,7 @@ export function ChatReadHeader({
             source={portrait}
             style={styles.avatarPortrait}
             resizeMode="cover"
-            accessibilityLabel={`${displayName} 대리자 초상화`}
+            accessibilityLabel={`${displayName} 연결자 초상화`}
           />
         )}
       </View>

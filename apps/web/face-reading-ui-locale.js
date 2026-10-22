@@ -33,8 +33,8 @@ export function faceReadingUiStateV1({
     analyzeLabel: ready ? phrase('{reader}에게 보여주기 준비 중') : text('사진을 먼저 준비해주세요'),
     statusTitle: ready ? phrase('{reader}과 관상 보기 준비됨') : phrase('{reader}과 관상 보기'),
     statusCopy: ready
-      ? text('사진 준비를 마쳤습니다. 얼굴 구조 확인 기능이 연결되면 선택한 대리자의 풀이로 이어집니다.')
-      : text('사진을 준비하면 얼굴 구조를 확인한 뒤 선택한 대리자의 풀이로 이어집니다.'),
+      ? text('사진 준비를 마쳤습니다. 얼굴 구조 확인 기능이 연결되면 선택한 연결자의 풀이로 이어집니다.')
+      : text('사진을 준비하면 얼굴 구조를 확인한 뒤 선택한 연결자의 풀이로 이어집니다.'),
     fileName: fileName || text('선택한 사진'),
     fileMeta: ready ? humanSize(fileSize) + ' · ' + text('미리보기 준비됨') : '',
   };
