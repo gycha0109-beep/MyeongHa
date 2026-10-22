@@ -69,6 +69,30 @@ select
 from public.internal_account_deletion_resume_state_v1($1::uuid, $2::uuid, $3::text)
 `.trim();
 
+const READER_PRIVACY_SCHEMA_SQL = `
+select
+  pg_catalog.to_regclass('public.official_reader_paid_answer_bodies')::text as "bodyTable",
+  pg_catalog.to_regprocedure(
+    'public.internal_qry_official_reader_account_deletion_manifest_v1(uuid,uuid,text)'
+  )::text as "manifestFunction",
+  pg_catalog.to_regclass('public.official_reader_account_deletion_privacy_status_v1')::text as "statusTable",
+  pg_catalog.to_regprocedure(
+    'public.internal_qry_official_reader_account_privacy_pending_v1(uuid,uuid,text)'
+  )::text as "pendingFunction"
+`.trim();
+
+type ReaderPrivacySchemaV1 = Readonly<{
+  bodyTable: string | null;
+  manifestFunction: string | null;
+  statusTable: string | null;
+  pendingFunction: string | null;
+}>;
+
+async function readerPrivacySchemaV1(client: PostgresTransactionQueryV1): Promise<ReaderPrivacySchemaV1> {
+  const result = await client.query<ReaderPrivacySchemaV1>(READER_PRIVACY_SCHEMA_SQL);
+  return oneRow(result.rows, 'Reader Privacy schema');
+}
+
 const READER_PRIVACY_MANIFEST_SQL = `
 select body_id::text as "bodyId",
        encryption_key_ref as "encryptionKeyRef"
@@ -327,6 +351,13 @@ export function createPostgresAccountDeletionWorkerPortsV1(input: {
       return executePostgresAccountDeletionWorkerTransactionV1({
         pool: input.pool,
         execute: async (client) => {
+          const schema = await readerPrivacySchemaV1(client);
+          if (schema.bodyTable === null && schema.manifestFunction === null) {
+            return Object.freeze({ entries: Object.freeze([]) });
+          }
+          if (schema.bodyTable === null || schema.manifestFunction === null) {
+            throw new Error('Protected Reader deletion needs the complete manifest migration.');
+          }
           const result = await client.query<{
             bodyId: unknown;
             encryptionKeyRef: unknown;
@@ -345,6 +376,12 @@ export function createPostgresAccountDeletionWorkerPortsV1(input: {
       return executePostgresAccountDeletionWorkerTransactionV1({
         pool: input.pool,
         execute: async (client) => {
+          const schema = await readerPrivacySchemaV1(client);
+          if (schema.bodyTable === null && schema.statusTable === null
+              && schema.pendingFunction === null) return false;
+          if (schema.statusTable === null || schema.pendingFunction === null) {
+            throw new Error('Protected Reader deletion status authority is unavailable.');
+          }
           const result = await client.query<{ pending: unknown }>(
             READER_PRIVACY_PENDING_SQL,
             [identity.subjectId, identity.deletionJobId, identity.lockOwner],
