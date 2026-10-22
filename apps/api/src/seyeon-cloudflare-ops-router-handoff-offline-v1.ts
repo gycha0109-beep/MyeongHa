@@ -71,7 +71,11 @@ export function isSeyeonCloudflareProtectedIngressAliasV1(
     // Account for percent-encoded route segment aliases and one intermediary
     // re-encoding a literal '%' (e.g. /api/%2563hat). Decode for DENY only;
     // never use this decoded path to call a downstream handler.
-    for (let depth = 0; depth < 4; depth++) {
+    // The API root itself may be encoded (/%61pi/chat), not just the Chat
+    // segment. Match after each bounded decode before Ops/static dispatch.
+    // The same 12-pass bound is used for legacy marker keys; never use the
+    // decoded spelling to grant a route or identity.
+    for (let depth = 0; depth < 12; depth++) {
       if (/^\/api\/chat(?:$|[\/\\.;\u0000%])/iu.test(path)) return true;
       if (!path.includes('%')) return false;
       const decoded = decodeURIComponent(path);
