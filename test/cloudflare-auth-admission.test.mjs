@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import worker from '../workers/cloudflare-static-preview.mjs';
 import {
   approvedCloudflareSameOriginPostV1,
+  allowedCloudflareNaverQueryV1,
   fenceCloudflareApprovedAuthResponseV1,
 } from '../workers/cloudflare-auth-db-api.mjs';
 
@@ -158,6 +159,40 @@ describe('Cloudflare Auth/DB Worker response and cookie-origin fence', () => {
       { id: 'rewrite.naver.authorize' },
     );
     expect(unexpected.status).toBe(503);
+  });
+
+  it('rejects unknown, duplicate and contradictory Naver OAuth query controls before secrets', async () => {
+    for (const [path, method] of [
+      ['/api/auth/social/naver/token?x=1', 'POST'],
+      ['/api/auth/social/naver/userinfo?__myeongha_naver_oauth_bridge=token', 'GET'],
+      ['/api/auth/social/naver/authorize?state=a&state=b', 'GET'],
+      ['/api/auth/social/naver/authorize?extra=1', 'GET'],
+      ['/api/auth/social/naver/callback?state=a&code=c&error=access_denied', 'GET'],
+      ['/api/auth/social/naver/callback?state=a&state=b', 'GET'],
+      ['/api/auth/social/naver/callback?state=a&untrusted=1', 'GET'],
+    ]) {
+      const response = await get(path, ENABLED, method);
+      expect(response.status).toBe(404);
+      expect(response.headers.get('cache-control')).toBe('no-store');
+    }
+    const legitAuthorize = new URL(PRIVATE_ORIGIN + '/api/auth/social/naver/authorize?state=a&code_challenge=b');
+    expect(allowedCloudflareNaverQueryV1(legitAuthorize, 'authorize')).toBe(true);
+    const legitCallback = new URL(PRIVATE_ORIGIN + '/api/auth/social/naver/callback?state=a&code=c');
+    expect(allowedCloudflareNaverQueryV1(legitCallback, 'callback')).toBe(true);
+  });
+
+  it('retains Naver OAuth no-referrer on approved redirect', () => {
+    const response = fenceCloudflareApprovedAuthResponseV1(
+      new Response(null, {
+        status: 302,
+        headers: {
+          Location: 'https://nid.naver.com/oauth2.0/authorize?state=synthetic',
+          'Referrer-Policy': 'no-referrer',
+        },
+      }), { id: 'rewrite.naver.authorize' },
+    );
+    expect(response.status).toBe(302);
+    expect(response.headers.get('referrer-policy')).toBe('no-referrer');
   });
 
   it('rejects cookie-authenticated POST without a valid same-origin signal', async () => {

@@ -81,3 +81,9 @@
 - Cookie를 포함한 브라우저 POST는 Origin 또는 Fetch Metadata의 **실제 동일 출처 신호**가 없는 경우 DB·Auth 생성 이전 404로 거부한다. Credential 없는 API/서버 간 요청의 기존 정책 및 Vercel 런타임은 바꾸지 않는다.
 - `test/cloudflare-auth-admission.test.mjs`의 오프라인 방어 회귀로 검증한다. **실제 Worker↔Supabase Auth/DB, OAuth 등록, 공개 테스트 호스트, Secret 또는 실제 세션은 연결하지 않았다**. 인증·DB positive 가동 승인과 테스트용 로컬 Docker only 정책을 유지한다.
 - Saju Calculation-only, 세연 private first/History/Replay 503, Reader 공식 근거, PortOne 공개/실결제 차단과 Vercel Production·DNS는 불변이다.
+
+### 추가 차단: 네이버 OAuth 쿼리와 Referrer-Policy
+
+- 네이버 authorize/callback은 기존 등록된 쿼리 필드만 허용하고 중복된 키, 임의의 rewrite marker, 성공(code)+실패(error) 혼합을 인증서·Secret 접근 전에 404로 거부한다. token/userinfo 엔드포인트는 query를 허용하지 않는다.
+- 기존 Naver 응답의 `Referrer-Policy: no-referrer`를 Worker 일반 헤더(`strict-origin-when-cross-origin`)보다 우선 보존하여 callback/state가 참조 URL로 누출될 가능성을 키우지 않는다.
+- 검사 내용은 URL의 형태만 판단한다. PKCE·AES-GCM 밀봉 state·OAuth provider 출처 검증의 기존 정본을 교체하지 않는다.

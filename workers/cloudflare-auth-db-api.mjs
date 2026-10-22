@@ -87,6 +87,11 @@ export function fenceCloudflareApprovedAuthResponseV1(candidate, route) {
   for (const [key, value] of Object.entries(CLOUDFLARE_APPROVED_RESPONSE_HEADERS_V1)) {
     headers.set(key, value);
   }
+  // Naver's established OAuth policy is stricter than the generic web
+  // referrer baseline. Never weaken it while copying platform headers.
+  if (isRedirect && candidate.headers.get('referrer-policy') === 'no-referrer') {
+    headers.set('Referrer-Policy', 'no-referrer');
+  }
   return new Response(candidate.body, {
     status: candidate.status,
     statusText: candidate.statusText,
@@ -117,6 +122,25 @@ export function approvedCloudflareSameOriginPostV1(request, origin) {
     // provenance, not an arbitrary header on a cross-site form.
     if (requestOrigin !== origin && fetchSite !== 'same-origin') return false;
   }
+  return true;
+}
+
+// Shape-only OAuth ingress filter. The existing provider handler remains
+// authority for state/PKCE, redirect target, token and callback validation.
+// Reject ambiguous selectors before reading any secret or opening a DB lease.
+export function allowedCloudflareNaverQueryV1(url, action) {
+  const allowed = action === 'authorize'
+    ? new Set(['client_id', 'redirect_uri', 'response_type', 'state', 'code_challenge', 'code_challenge_method'])
+    : action === 'callback'
+      ? new Set(['state', 'code', 'error', 'error_description'])
+      : new Set();
+  const seen = new Set();
+  for (const [key, value] of url.searchParams) {
+    if (!allowed.has(key) || seen.has(key) || value.length > 8192) return false;
+    seen.add(key);
+  }
+  // A callback cannot be both provider success and provider error.
+  if (action === 'callback' && seen.has('code') && seen.has('error')) return false;
   return true;
 }
 
@@ -165,6 +189,8 @@ export async function tryHandleCloudflareApprovedAuthV1(request, bindings, route
     socialCompleteValues.length === 1 &&
     socialCompleteValues[0] === '1' &&
     [...url.searchParams.keys()].every(key => key === '__myeongha_social_complete');
+  if (url.hash !== '') return denied();
+  if (naverAction !== null && !allowedCloudflareNaverQueryV1(url, naverAction)) return denied();
   if (url.search !== '' && naverAction === null && !isSocialComplete) return denied();
   const expectedMethod = (isMemberProfile || isBirthRead || isCurrentBirth ||
     (naverAction !== null && naverAction !== 'token')) ? 'GET' : 'POST';
