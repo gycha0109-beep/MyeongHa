@@ -52,7 +52,7 @@ describe('Cloudflare static-only deployment boundary', () => {
     expect(config.assets.directory).toBe('./public');
     expect(config.assets.html_handling).toBe('none');
     expect(config.assets.not_found_handling).toBe('none');
-    expect(config.assets.run_worker_first).toEqual(['/api', '/api/*']);
+    expect(config.assets.run_worker_first).toBe(true);
     expect(config.workers_dev).toBe(false);
     expect(isCloudflareStaticPreviewApiPath('/api/health')).toBe(true);
     expect(isCloudflareStaticPreviewApiPath('/api')).toBe(true);
@@ -123,6 +123,21 @@ describe('Cloudflare static-only deployment boundary', () => {
     expect(verified.fileCount).toBe(14);
     expect(verified.totalAssetBytes).toBeGreaterThanOrEqual(verified.largestFileSize);
     expect(verified.totalAssetBytes).toBeGreaterThan(0);
+    // No stale route-scoped Worker-first list can bypass Chat marker checks
+    // on /index.html or / when Cloudflare ASSETS would otherwise run first.
+    const configFile = join(folder, 'wrangler.jsonc');
+    const fixtureConfig = JSON.parse(await readFile(configFile, 'utf8'));
+    for (const legacy of [['/api', '/api/*'], false]) {
+      await writeFile(configFile, JSON.stringify({
+        ...fixtureConfig,
+        assets: { ...fixtureConfig.assets, run_worker_first: legacy },
+      }));
+      await expect(verifyCloudflareStaticArtifact({
+        cwd: folder,
+        expectedCommitSha: syntheticCommit,
+      })).rejects.toThrow('routing or isolation policy');
+    }
+    await writeFile(configFile, JSON.stringify(fixtureConfig));
     expect(await readFile(join(publicDir, CLOUDFLARE_PREVIEW_RECEIPT_ASSET_V1), 'utf8'))
       .toBe(renderCloudflarePreviewReceiptV1(syntheticCommit));
     await expect(verifyCloudflareStaticArtifact({
