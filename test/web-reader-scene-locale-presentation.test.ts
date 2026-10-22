@@ -31,11 +31,14 @@ const source = {
 describe('I18N-06 Reader Scene UI vs source language handoff', () => {
   it('projects authored locale metadata but leaves source text and provenance unchanged', () => {
     const scene = parseReaderSceneEnvelopeV1(source);
+    if (scene.mode !== 'reader_interpretation') {
+      throw new Error('Expected source-owned Reader interpretation');
+    }
     const view = projectReaderSceneViewModelV1(scene);
     for (const [requested, expected] of [
       ['ko-KR', 'ko-KR'], ['ja-JP', 'ja-JP'],
       ['zh-TW', 'zh-TW'], ['zh-CN', 'ko-KR'],
-    ]) {
+    ] as const) {
       const projected = projectReaderSceneLocalePresentationV1(view, requested);
       expect(projected.uiLocale).toBe(expected);
       expect(projected.contentLanguage).toBe('source_unasserted');
