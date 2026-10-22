@@ -1,7 +1,6 @@
 import {
   classifyCharacterStandardFollowupLexicalIntentV1,
   classifyExactOfficialReadingSummaryReferenceV1,
-  classifyCharacterStandardFollowupQuestionScopeV1,
 } from './character-standard-reading-chat-question-scope-v1.js';
 import {
   assertServerPreparedStandardChatPreflightV2,
@@ -27,6 +26,8 @@ import type {
 import {
   closeCharacterStandardReaderSourceFocusV1,
 } from './character-standard-reading-chat-source-closure-v1.js';
+import { prepareReaderLatestAnchorContinuityV1 } from './reader-conversation-latest-anchor-continuity-v1.js';
+import type { ReaderContextNonMemoryReadAuthorityPortV1 } from './reader-context-non-memory-read.js';
 
 export const READER_CONVERSATION_SOURCE_ROUTING_VERSION_V1 =
   'reader-conversation-source-routing-v1' as const;
@@ -79,6 +80,8 @@ export type ReaderConversationResponseCandidateV1 =
       intent: ReaderConversationIntentDecisionV1;
       selectedSourceUnitRefs: readonly string[];
       outputHold: ReturnType<typeof guardCharacterStandardReaderFinalOutputV1>;
+      lastValidatedAssistantMessageId: string;
+      lastTurnMetadataDigest: string;
       addedModelCalls: 0;
       publicDisclosureAuthorized: false;
     }>
@@ -88,7 +91,7 @@ export type ReaderConversationResponseCandidateV1 =
       reason: 'clarification_required' | 'unavailable_official_source' |
         'source_mismatch' | 'source_closure_required' |
         'official_question_not_admitted' | 'existing_guard_rejected' |
-        'security_gate_pending';
+        'security_gate_pending' | 'latest_anchor_not_current';
       addedModelCalls: 0;
       publicDisclosureAuthorized: false;
     }>;
@@ -195,6 +198,7 @@ export interface PrepareReaderConversationResponseCandidateInputV1 {
     preflight: CharacterStandardReadingChatTurnPreflightV2;
     grounded: CharacterStandardChatGroundingV2;
     anchorAuthorityPort?: ValidatedStandardFollowupAnchorAuthorityPortV1;
+    recentMessageAuthorityPort?: Pick<ReaderContextNonMemoryReadAuthorityPortV1, 'readRecentMessages'>;
     guardedScene?: ReaderInterpretationPreviewEnvelopeV1;
     rendererDraft?: unknown;
   }>;
@@ -352,20 +356,34 @@ export async function prepareReaderConversationResponseCandidateV1(
     });
   }
 
-  if (!input.official.anchorAuthorityPort) {
+  // RR-08: the latest DB-verified official answer must also be the last
+  // actual Reader assistant message, otherwise "그 부분" is stale. Neither
+  // port can be omitted or replaced with client-provided source IDs.
+  if (!input.official.anchorAuthorityPort ||
+      !input.official.recentMessageAuthorityPort) {
     return hold(intent, 'unavailable_official_source');
   }
   try {
-    const question = await classifyCharacterStandardFollowupQuestionScopeV1({
-      preflight, grounded, anchorAuthorityPort: input.official.anchorAuthorityPort,
+    const continuity = await prepareReaderLatestAnchorContinuityV1({
+      preflight, grounded,
+      anchorAuthorityPort: input.official.anchorAuthorityPort,
+      recentMessageAuthorityPort: input.official.recentMessageAuthorityPort,
     });
-    if (question.mode === 'hold') {
-      return hold(intent, 'official_question_not_admitted');
+    if (continuity.mode === 'hold') {
+      return hold(intent,
+        continuity.reason === 'FOLLOWUP_SCOPE_REJECTED'
+          ? 'official_question_not_admitted' : 'latest_anchor_not_current');
     }
+    // This question scope is minted by existing RR-05/06; do not classify a
+    // second time or re-read another (possibly changed) official anchor.
+    const question = continuity.questionScope;
     const candidate = prepareCharacterStandardReaderBoundedCandidateV1({
       grounded, questionScope: question,
     });
-    if (candidate.mode !== 'semantic_guarded_candidate') {
+    if (candidate.mode !== 'semantic_guarded_candidate' ||
+        candidate.sourceUnitRefs.length !== continuity.selectedSourceUnitIds.length ||
+        candidate.sourceUnitRefs.some((ref, i) =>
+          ref !== continuity.selectedSourceUnitIds[i])) {
       return hold(intent, 'existing_guard_rejected');
     }
     if (input.official.rendererDraft === undefined) {
@@ -375,9 +393,14 @@ export async function prepareReaderConversationResponseCandidateV1(
       grounded, questionScope: question, candidate,
       rendererDraft: input.official.rendererDraft,
     });
+    if (outputHold.assistantAnchorMessageId !== continuity.assistantMessageId) {
+      return hold(intent, 'latest_anchor_not_current');
+    }
     return Object.freeze({
       mode: 'official_followup_output_hold' as const, intent,
       selectedSourceUnitRefs: Object.freeze([...candidate.sourceUnitRefs]),
+      lastValidatedAssistantMessageId: continuity.assistantMessageId,
+      lastTurnMetadataDigest: continuity.lastTurnMetadataDigest,
       outputHold,
       addedModelCalls: 0 as const,
       publicDisclosureAuthorized: false as const,
