@@ -144,6 +144,11 @@ describe('S-CF2 actual Worker fetch boundary and no HTML fallback', () => {
     for (const path of [
       '/api/%63hat/' + THREAD + '/turns',
       '/api/%2563hat/' + THREAD + '/turns',
+      '/%61pi/chat/' + THREAD + '/turns',
+      '/%2561pi/chat/' + THREAD + '/turns',
+      '/api%2F%63hat/' + THREAD + '/turns',
+      '/api%252F%2563hat/' + THREAD + '/turns',
+      '/%2525252561pi%252525252Fchat/' + THREAD + '/turns',
       '/api%2Fchat/' + THREAD + '/turns',
       '/api/chat%2F' + THREAD + '/turns',
       '/api/chat%252F' + THREAD + '/turns',
@@ -158,9 +163,11 @@ describe('S-CF2 actual Worker fetch boundary and no HTML fallback', () => {
       expect(response.headers.get('content-type')).not.toContain('text/html');
     }
     // The deny-only classifier must not hijack unrelated generic APIs.
-    const generic = await worker.fetch(new Request(ROOT + '/api/chatty'), {});
-    expect(generic.status).toBe(404);
-    expect(await generic.text()).toBe('');
+    for (const path of ['/api/chatty', '/api%2Fchatty', '/%61pi/health']) {
+      const generic = await worker.fetch(new Request(ROOT + path), {});
+      expect(generic.status).toBe(404);
+      expect(await generic.text()).toBe('');
+    }
   });
 
   it('rejects legacy Vercel chat rewrite markers at Worker fetch before Auth/Saju/Health/Static', async () => {
@@ -212,6 +219,10 @@ describe('S-CF2 actual Worker fetch boundary and no HTML fallback', () => {
       '/%61pi%252Fme',
       '/API/health',
       '/api%2Fchat/' + THREAD,
+      '/%61pi/chat/' + THREAD,
+      '/%2561pi/chat/' + THREAD,
+      '/api%2F%63hat/' + THREAD,
+      '/api%252F%2563hat/' + THREAD,
     ]) {
       const held = await worker.fetch(new Request(ROOT + path), env);
       if (path.startsWith('/api') || path.startsWith('/%61pi') ||
