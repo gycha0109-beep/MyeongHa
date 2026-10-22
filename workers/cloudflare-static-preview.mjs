@@ -58,7 +58,22 @@ export function sealCloudflareUnexpectedApiFailureV1(route) {
 }
 
 export function isCloudflareStaticPreviewApiPath(pathname) {
-  return pathname === '/api' || pathname.startsWith('/api/');
+  if (typeof pathname !== 'string') return true;
+  let path = pathname;
+  // Classification is deny-only: decode aliases to keep a forged API path
+  // away from Static Assets. Never dispatch a decoded path as an approved API.
+  for (let depth = 0; depth < 12; depth += 1) {
+    if (/^\/api(?:$|[\/\\.;\u0000%])/iu.test(path)) return true;
+    if (!path.includes('%')) return false;
+    try {
+      const next = decodeURIComponent(path);
+      if (next === path) return false;
+      path = next;
+    } catch {
+      return /^\/api/iu.test(path);
+    }
+  }
+  return path.includes('%') || /^\/api(?:$|[\/\\.;\u0000%])/iu.test(path);
 }
 
 export function isSeyeonTurnSendPath(pathname) {
