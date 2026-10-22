@@ -4,6 +4,8 @@
 // scheduler to drain persisted 2050 Entitlement-revocation purge jobs.
 // No automatic public service activation, refund mutation or CI execution.
 
+import { randomUUID } from 'node:crypto';
+
 const CONFIRM = 'RUN_PRIVATE_READER_REVOCATION_PURGE';
 
 function unavailable() {
@@ -34,6 +36,10 @@ const workerId = process.env.MYEONGHA_READER_PRIVACY_PURGE_WORKER_ID;
 if (typeof workerId !== 'string' || !/^[a-zA-Z0-9_.:-]{8,128}$/u.test(workerId)) {
   unavailable();
 }
+// Each process incarnation must have a distinct claim owner. Otherwise a
+// previous hung process can still finalize a lease reclaimed by a new process
+// with the same configured stable Worker name.
+const executionWorkerId = workerId + ':' + randomUUID();
 
 // Reuse the existing account-deletion Worker DB identity and private
 // off-primary storage factory. No separate Postgres configuration, elevated
@@ -59,7 +65,7 @@ process.on('SIGINT', requestStop);
 
 async function runOnce() {
   const report = await runtime.runReaderRevocationPurgeBatch({
-    workerId, limit,
+    workerId: executionWorkerId, limit,
   });
   if (report.publicPaidReadEnabled !== false) unavailable();
   // Only totals, never Subject/Reader/Reading/Receipt/key/body identities.
