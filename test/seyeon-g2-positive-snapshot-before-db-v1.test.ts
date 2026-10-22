@@ -46,6 +46,7 @@ function snapshot(){
 function input(value:unknown=snapshot()):SeyeonPositiveS0AtomicCommitInputV1{
   return {
     subjectId:SUBJECT, threadId:THREAD, turnId:TURN, attemptId:ATTEMPT,
+    userMessageId:USER,
     assistantMessageId:ASSISTANT, chatOutboxEventId:OUTBOX,
     postTurnOutboxEventId:ANALYSIS,
     postTurnSnapshot:value,postTurnSnapshotHash:checksum(value),
@@ -78,6 +79,13 @@ describe('S4/G2 positive original Grant adapter admits only verified official Po
       const value={...snapshot(),assistantMessageId:U(0)};
       return input(value);
     }],
+    ['different original user message rehashed',()=>{
+      const value={...snapshot(),userMessageId:U(0)};
+      return input(value);
+    }],
+    ['input original user message does not match snapshot',()=>{
+      return {...input(),userMessageId:U(0)};
+    }],
     ['unrecognized top-level field rehashed',()=>{
       const value={...snapshot(),injected:'extra'};
       return input(value);
@@ -93,6 +101,9 @@ describe('S4/G2 positive original Grant adapter admits only verified official Po
     ['missing official identity rehashed',()=>{
       const value={...snapshot(),identity:null};
       return input(value);
+    }],
+    ['invalid original user identity',()=>{
+      return {...input(),userMessageId:'not-a-uuid'};
     }],
   ] as const)('holds %s before any DB owner Commit call',async(_name,make)=>{
     const {statements,port}=fakeClient();
