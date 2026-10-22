@@ -131,7 +131,8 @@ export async function prepareCharacterStandardReadingChatContextV1(
 ): Promise<CharacterStandardReadingChatContextPlanV1> {
   assertNoCallerSajuContext(input.contextInput);
   const purchaseScope = verifiedPurchaseScope({
-    resolvedSubjectId: input.resolvedSubjectId,
+    ...(input.resolvedSubjectId === undefined
+      ? {} : { resolvedSubjectId: input.resolvedSubjectId }),
     readingId: input.readingId,
     readerCharacterId: input.readerCharacterId,
     contentBundleId: input.contextInput.contentBundleId,
