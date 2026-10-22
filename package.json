@@ -17,6 +17,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit && npm run typecheck -w @myeongha/api-client && npm run typecheck -w @myeongha/web && npm run typecheck -w @myeongha/mobile",
     "test": "vitest run",
     "build": "tsc -p tsconfig.build.json",
+    "worker:reader-privacy-purge": "node scripts/operations/run-official-reader-privacy-purge-worker.mjs",
     "build:web": "node scripts/build-web-static.mjs && npm run build -w @myeongha/web",
     "verify:deployment-config": "node scripts/verify-web-deployment.mjs",
     "verify:supabase-deployment-config": "node scripts/verify-supabase-deployment.mjs",
