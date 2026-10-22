@@ -29,6 +29,18 @@ export interface SeyeonNodeChatResponseMetadataV1 {
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 const API_CONTRACT_VERSION = 'v0.9' as const;
 
+function isCanonicalSeyeonNodeRequestMetadataV1(value: Readonly<{
+  requestId: unknown;
+  serverTime: unknown;
+}>): boolean {
+  return typeof value.requestId === 'string' &&
+    /^[a-zA-Z0-9_-]{1,128}$/u.test(value.requestId) &&
+    typeof value.serverTime === 'string' &&
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/u.test(value.serverTime) &&
+    Number.isFinite(Date.parse(value.serverTime)) &&
+    new Date(value.serverTime).toISOString() === value.serverTime;
+}
+
 export function assertSeyeonNodeChatResponseMetadataV1(
   value: SeyeonNodeChatResponseMetadataV1,
 ): void {
@@ -38,12 +50,7 @@ export function assertSeyeonNodeChatResponseMetadataV1(
       !UUID.test(value.assistantMessageId) ||
       !Number.isSafeInteger(value.sequenceNo) || value.sequenceNo < 0 ||
       typeof value.replayed !== 'boolean' ||
-      typeof value.requestId !== 'string' ||
-      !/^[a-zA-Z0-9_-]{1,128}$/u.test(value.requestId) ||
-      typeof value.serverTime !== 'string' ||
-      !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/u.test(value.serverTime) ||
-      !Number.isFinite(Date.parse(value.serverTime)) ||
-      new Date(value.serverTime).toISOString() !== value.serverTime) {
+      !isCanonicalSeyeonNodeRequestMetadataV1(value)) {
     throw new SeyeonNodeOriginalGrantSendBoundaryErrorV1(
       'Node Chat response metadata must be canonical server-owned identifiers.',
     );
@@ -98,6 +105,26 @@ function deadlineValue(input: number | undefined): number {
     throw new SeyeonNodeOriginalGrantSendBoundaryErrorV1('Invalid bounded send deadline.');
   }
   return chosen;
+}
+
+/**
+ * Reject malformed server-owned request metadata and invalid send bounds
+ * BEFORE runtime.run() can dispatch an AI/provider request. The final
+ * receipt still undergoes the independent full metadata/Grant validation.
+ * This is an offline negative admission, never a publication permission.
+ */
+export function assertSeyeonNodeFirstSendAdmissionV1(input: Readonly<{
+  requestId: string;
+  serverTime: string;
+  deadlineMs?: number;
+}>): void {
+  if (!input || typeof input !== 'object' ||
+      !isCanonicalSeyeonNodeRequestMetadataV1(input)) {
+    throw new SeyeonNodeOriginalGrantSendBoundaryErrorV1(
+      'Node Chat request metadata must be canonical server-owned identifiers.',
+    );
+  }
+  deadlineValue(input.deadlineMs);
 }
 
 function responseBytes(
