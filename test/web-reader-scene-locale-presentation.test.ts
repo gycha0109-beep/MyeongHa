@@ -97,6 +97,7 @@ describe('I18N-06 Reader Scene UI vs source language handoff', () => {
       '원문 명리 해석입니다.', '확정적 결론이 아닙니다.',
     ]);
     expect(client.readReaderScene).toHaveBeenCalledTimes(1);
+    expect(client.readReaderScene.mock.calls[0]?.[0].uiLocale).toBe('ja-JP');
     expect(states[0]?.state).toBe('loading');
   });
 
@@ -132,6 +133,8 @@ describe('I18N-06 Reader Scene UI vs source language handoff', () => {
     expect(client.readReaderScene).toHaveBeenCalledTimes(2);
     expect(client.readReaderScene.mock.calls[0]?.[0]).toMatchObject(input);
     expect(client.readReaderScene.mock.calls[1]?.[0]).toMatchObject(input);
+    expect(client.readReaderScene.mock.calls[0]?.[0].uiLocale).toBe('ja-JP');
+    expect(client.readReaderScene.mock.calls[1]?.[0].uiLocale).toBe('zh-TW');
     expect(client.readReaderScene.mock.calls[1]?.[0]).not.toHaveProperty('readerLocale');
     expect(client.readReaderScene.mock.calls[1]?.[0]).not.toHaveProperty('readingLocale');
   });
@@ -170,6 +173,8 @@ describe('I18N-06 Reader Scene UI vs source language handoff', () => {
       '원문 명리 해석입니다.', '확정적 결론이 아닙니다.',
     ]);
     expect(client.readReaderScene).toHaveBeenCalledTimes(2);
+    expect(client.readReaderScene.mock.calls[0]?.[0].uiLocale).toBe('ja-JP');
+    expect(client.readReaderScene.mock.calls[1]?.[0].uiLocale).toBe('zh-TW');
   });
 
   it('does not treat UI locale or character display hints as output-language authorization', async () => {
