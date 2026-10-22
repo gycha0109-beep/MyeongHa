@@ -34,27 +34,47 @@ export type SeyeonCloudflareOpsRouteDispositionOfflineV1 =
   | 'static_asset'
   | 'unresolved_shared_lineage';
 
+/**
+ * S-CF2 Worker ingress interlock for an Ops-owned fetch entrypoint.
+ * Evaluate BEFORE API dispatch or Static Assets fallback. This is a
+ * reject-only signal, never a positive route/identity/Grant admission.
+ *
+ * The Worker must also reject raw dot-segments before WHATWG URL resolution:
+ * Request.url has already lost that original path spelling.
+ */
+export function isSeyeonCloudflareProtectedIngressAliasV1(
+  request: Request,
+): boolean {
+  try {
+    let path = new URL(request.url).pathname;
+    // Account for percent-encoded route segment aliases and one intermediary
+    // re-encoding a literal '%' (e.g. /api/%2563hat). Decode for DENY only;
+    // never use this decoded path to call a downstream handler.
+    for (let depth = 0; depth < 4; depth++) {
+      if (/^\/api\/chat(?:$|[\/\\.;\u0000%])/iu.test(path)) return true;
+      if (!path.includes('%')) return false;
+      const decoded = decodeURIComponent(path);
+      if (decoded === path) return false;
+      path = decoded;
+    }
+    return /^\/api\/chat(?:$|[\/\\.;\u0000%])/iu.test(path);
+  } catch {
+    // A malformed URL or percent escape cannot be routed as a trusted API.
+    return true;
+  }
+}
+
 function apiOrChatAlias(request: Request): Readonly<{
   api: boolean;
   chatAlias: boolean;
 }> {
   try {
-    const { pathname } = new URL(request.url);
-    const api = pathname === '/api' || pathname.startsWith('/api/');
-    if (!api) return { api: false, chatAlias: false };
-    const segment = pathname.split('/')[2] ?? '';
-    // Exact chat classifier handles canonical /api/chat*. This closes
-    // percent-encoded path-segment aliases BEFORE a mock Ops asset fallback.
-    // WHATWG URL normalization may ALREADY have erased raw dot-segments;
-    // Ops must reject those at the actual ingress boundary separately.
-    let decoded: string;
-    try { decoded = decodeURIComponent(segment); }
-    catch { return { api: true, chatAlias: true }; }
-    const folded = decoded.toLowerCase();
-    return {
-      api: true,
-      chatAlias: /^chat(?:$|[\/\\.;\u0000])/u.test(folded),
-    };
+    const path = new URL(request.url).pathname;
+    const api = /^\/api(?:$|\/)/iu.test(path) ||
+      /^\/%61pi(?:$|\/)/iu.test(path);
+    // Alias classification remains independent of route disposition: the
+    // caller's Ops "other_api"/"static_asset" label cannot bypass a HOLD.
+    return { api, chatAlias: isSeyeonCloudflareProtectedIngressAliasV1(request) };
   } catch {
     return { api: true, chatAlias: true };
   }
