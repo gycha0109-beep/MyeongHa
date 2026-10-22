@@ -142,11 +142,19 @@ export async function handleOfficialReaderPaidDeliveryAckHttpV1(
     return failed(503,'CAPABILITY_UNAVAILABLE',input.requestId);
   }
 
-  // Cookie-authenticated write: require exact same-origin request AND a
-  // non-simple custom header to prevent cross-site form or credentialed
-  // simple-request CSRF. No opt-in CORS response is emitted.
+  // Web: exact same-origin + non-simple custom header prevents cross-site
+  // cookie-authenticated writes. Native apps do not reliably send Origin;
+  // permit the native shape ONLY with a JWT-shaped explicit Bearer and NO
+  // ambient Cookie. A foreign non-null Origin is always rejected. No CORS
+  // response is emitted, and Subject identity is verified below.
   const expectedOrigin=new URL(input.request.url).origin;
-  if(input.request.headers.get('Origin')!==expectedOrigin
+  const origin=input.request.headers.get('Origin');
+  const bearer=input.request.headers.get('Authorization');
+  const nativeBearerOnly=origin===null
+    && input.request.headers.get('Cookie')===null
+    && typeof bearer==='string'
+    && /^Bearer [A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+$/u.test(bearer);
+  if((origin!==expectedOrigin && !nativeBearerOnly)
       || input.request.headers.get('X-Reader-Delivery-Ack')!=='1') {
     return failed(403,'ACCESS_DENIED',input.requestId);
   }
