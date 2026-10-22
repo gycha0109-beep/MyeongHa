@@ -1,0 +1,54 @@
+/* Inert Reader interpretation UI: intentionally not attached to a public route. */
+.reader-scene-panel {
+  display: grid;
+  gap: 1rem;
+  border: 1px solid var(--line, #d8d2c8);
+  border-radius: 1rem;
+  padding: 1.25rem;
+  background: var(--surface, #fffaf2);
+  color: var(--ink, #242a36);
+}
+.reader-scene-panel-header {
+  display: grid;
+  gap: 0.3rem;
+}
+.reader-scene-panel-header span {
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  opacity: 0.8;
+}
+.reader-scene-panel-header h2 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+.reader-scene-panel-source-notice,
+.reader-scene-panel-status {
+  margin: 0;
+  line-height: 1.6;
+  font-size: 0.9rem;
+}
+.reader-scene-panel-source-notice {
+  border-radius: 0.6rem;
+  background: var(--canvas, #f7f3ec);
+  padding: 0.75rem;
+}
+.reader-scene-panel-segments {
+  display: grid;
+  gap: 0.75rem;
+}
+.reader-scene-panel-segment {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  margin: 0;
+  line-height: 1.7;
+}
+.reader-scene-panel-retry {
+  justify-self: start;
+  cursor: pointer;
+  font: inherit;
+  border: 1px solid currentColor;
+  border-radius: 0.6rem;
+  background: transparent;
+  color: inherit;
+  padding: 0.6rem 1rem;
+}
