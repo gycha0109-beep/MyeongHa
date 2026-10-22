@@ -53,7 +53,7 @@ describe('Cloudflare static-only deployment boundary', () => {
     expect(config.assets.directory).toBe('./public');
     expect(config.assets.html_handling).toBe('none');
     expect(config.assets.not_found_handling).toBe('none');
-    expect(config.assets.run_worker_first).toEqual(['/api', '/api/*']);
+    expect(config.assets.run_worker_first).toBe(true);
     expect(config.workers_dev).toBe(false);
     expect(isCloudflareStaticPreviewApiPath('/api/health')).toBe(true);
     expect(isCloudflareStaticPreviewApiPath('/api')).toBe(true);
