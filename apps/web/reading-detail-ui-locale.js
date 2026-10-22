@@ -12,6 +12,7 @@ const SCENE_COPY = Object.freeze({
     next: '다음 읽기',
     finish: '읽기 마치기',
     recordNote: '기록 · 당시 저장된 공식 사주 풀이를 그대로 다시 읽고 있습니다.',
+    sourceNotice: '',
     previewNote: 'Preview · 현재 주제의 검증용 읽기이며 공식 기록에 저장되지 않습니다.',
     recordLink: '기록에서 사주 보기',
     otherLink: '다른 사주 읽기',
@@ -40,6 +41,7 @@ const SCENE_COPY = Object.freeze({
     next: '次の項目',
     finish: '鑑定を終了',
     recordNote: '記録 · 保存当時の公式鑑定を変更せずに表示しています。',
+    sourceNotice: '切り替わるのは画面の表示言語のみです。鑑定本文は原文のまま表示され、自動翻訳されません。',
     previewNote: 'Preview · 検証用の鑑定であり、公式記録には保存されません。',
     recordLink: '記録で鑑定を見る',
     otherLink: '別の鑑定を見る',
@@ -68,6 +70,7 @@ const SCENE_COPY = Object.freeze({
     next: '下一段解讀',
     finish: '完成解讀',
     recordNote: '紀錄 · 正在原樣顯示當時儲存的正式八字解讀。',
+    sourceNotice: '僅切換介面顯示語言；命理解讀正文會保留原文，不會自動翻譯。',
     previewNote: 'Preview · 目前為已驗證範圍內的預覽解讀，不會儲存至正式紀錄。',
     recordLink: '從紀錄查看八字解讀',
     otherLink: '查看其他八字解讀',
@@ -90,6 +93,18 @@ const SCENE_COPY = Object.freeze({
 
 function sceneCopy(locale) {
   return SCENE_COPY[normalizeUiLocale(locale)];
+}
+
+// UI-authored notice; neither official nor preview source blocks are translated.
+export function readingSourceLanguageNoticeV1(locale = 'ko-KR') {
+  const uiLocale = normalizeUiLocale(locale);
+  return Object.freeze({
+    uiLocale,
+    visible: uiLocale !== 'ko-KR',
+    sourceTextPreserved: true,
+    translatedReading: false,
+    text: SCENE_COPY[uiLocale].sourceNotice,
+  });
 }
 
 export function readingScopeLabelV1(scope, year, locale = 'ko-KR') {
