@@ -117,7 +117,7 @@ select public.cmd_mark_seyeon_positive_context_ready_pinned_v1(
         'originalPgJsonbDigest','finalModelContextDigest',
       ] as const;
       if(Object.keys(proof).length!==expectedKeys.length
-        ||expectedKeys.some(key=>!Object.hasOwn(proof,key))
+        ||expectedKeys.some(key=>!Object.prototype.hasOwnProperty.call(proof,key))
         ||proof.schemaVersion!=='seyeon-positive-original-memory-source-pin-v1'
         ||proof.subjectId!==input.subjectId||proof.threadId!==input.threadId
         ||proof.turnId!==input.turnId||proof.attemptId!==input.attemptId
