@@ -17,7 +17,7 @@ export default {
   fetch(request: Request): Promise<Response> {
     return executeSecurityObservedRequestV1({
       request,
-      routeId:'api.chat.paid_reader_delivery_ack.held',
+      routeId: 'api.chat.paid_reader_delivery_ack.held',
       execute:({requestId,serverTime})=>
         handleOfficialReaderPaidDeliveryAckHttpV1({
           request,requestId,serverTime,
