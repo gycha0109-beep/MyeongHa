@@ -36,6 +36,7 @@ export interface SeyeonPositiveS0AtomicCommitInputV1 {
   readonly threadId:string;
   readonly turnId:string;
   readonly attemptId:string;
+  readonly userMessageId:string;
   readonly assistantMessageId:string;
   readonly chatOutboxEventId:string;
   readonly postTurnOutboxEventId:string;
@@ -124,7 +125,7 @@ select public.cmd_mark_seyeon_positive_context_ready_pinned_v1(
       input:SeyeonPositiveS0AtomicCommitInputV1,
     ):Promise<SeyeonProductionChatCommitReceiptV1>{
       if(![input.subjectId,input.threadId,input.turnId,input.attemptId,
-          input.assistantMessageId,input.chatOutboxEventId,
+          input.userMessageId,input.assistantMessageId,input.chatOutboxEventId,
           input.postTurnOutboxEventId].every(exactId)
         ||![input.postTurnSnapshotHash,input.selectedSourcesDigest,
              input.finalModelContextDigest].every(digest)
@@ -146,6 +147,7 @@ select public.cmd_mark_seyeon_positive_context_ready_pinned_v1(
         throw Error('Se-yeon positive G2 Post-turn Snapshot unverified');
       }
       if(verifiedSnapshot.turnId!==input.turnId
+        ||verifiedSnapshot.userMessageId!==input.userMessageId
         ||verifiedSnapshot.assistantMessageId!==input.assistantMessageId
         ||canonicalJson(verifiedSnapshot)!==canonicalJson(input.postTurnSnapshot)){
         throw Error('Se-yeon positive G2 Post-turn Snapshot identity mismatched');
