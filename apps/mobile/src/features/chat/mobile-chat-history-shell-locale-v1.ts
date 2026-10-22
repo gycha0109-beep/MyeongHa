@@ -21,6 +21,10 @@ const COPY = Object.freeze({
     end: '현재 확인할 수 있는 기록의 끝입니다.',
     next: '다음 메시지 불러오기',
     profile: '프로필',
+    headerUnknownParticipant: '대화 상대',
+    headerVerifiedRoom: '서버가 확인한 대화방',
+    headerHistoryLabel: '대화 기록',
+    headerPortrait: '연결자 초상화',
   }),
   'ja-JP': Object.freeze({
     loading: '会話履歴を読み込んでいます…',
@@ -36,6 +40,10 @@ const COPY = Object.freeze({
     end: '現在確認できる履歴はここまでです。',
     next: '次のメッセージを読み込む',
     profile: 'プロフィール',
+    headerUnknownParticipant: '会話相手',
+    headerVerifiedRoom: 'サーバー確認済みの会話ルーム',
+    headerHistoryLabel: '会話履歴',
+    headerPortrait: '案内人の肖像',
   }),
   'zh-TW': Object.freeze({
     loading: '正在載入對話紀錄…',
@@ -51,6 +59,10 @@ const COPY = Object.freeze({
     end: '目前可確認的對話紀錄已全部顯示。',
     next: '載入更多訊息',
     profile: '個人檔案',
+    headerUnknownParticipant: '對話對象',
+    headerVerifiedRoom: '伺服器已確認的對話室',
+    headerHistoryLabel: '對話紀錄',
+    headerPortrait: '引路人肖像',
   }),
 } as const);
 
