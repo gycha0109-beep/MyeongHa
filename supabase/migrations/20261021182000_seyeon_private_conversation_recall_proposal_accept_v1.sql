@@ -54,7 +54,6 @@ set search_path=pg_catalog, public
 as $accept$
 declare
   v_proposal record;
-  v_subject_member boolean;
   v_digest text;
   v_summary text;
   v_created_at timestamptz;
@@ -113,6 +112,23 @@ begin
     raise exception using errcode='23514',
       constraint='seyeon_private_memory_accept_proposal_not_pending',
       message='Original Se-yeon Memory Proposal is not pending';
+  end if;
+
+  -- Only a durable finished source Turn may authorize a long-term
+  -- Character Memory proposal. A failed, uncommitted or cross-Subject
+  -- Turn must not become user-approved persistent recall via acceptance.
+  perform 1
+  from public.chat_turns t
+  join public.conversation_threads th
+    on th.id=t.thread_id and th.subject_id=t.subject_id
+  where t.id=v_proposal.source_turn_id and t.subject_id=p_subject_id
+    and t.state in ('committed','delivered')
+    and th.status in ('active','archived')
+  for share of t;
+  if not found then
+    raise exception using errcode='23514',
+      constraint='seyeon_private_memory_accept_source_turn_uncommitted',
+      message='Original Memory proposal source Turn has not committed';
   end if;
 
   v_digest:='sha256:pg-jsonb:v1:'||
