@@ -1,0 +1,81 @@
+# I18N-06 — 9인 공통 화법·Official Reading 원문 의미 보존 인계 v1
+
+> Track owner: `frontend-integration` — 화면 로케일, 언어 중립 화법 참조, 언어별 표현 계약
+>
+> 상태: **I18N 계약 구현 및 교차 트랙 인계 / actual Reader generation & public release HOLD**.
+>
+> 이어받은 소유 로드맵: [I18N v2 작업 브랜치(PR #2430)](https://github.com/gycha0109-beep/MyeongHa/blob/frontend-integration/i18n-reader-voice-roadmap-v2-20261022/docs/FRONTEND_INTEGRATION_I18N_CONTINUATION_ROADMAP_V2_20261022.md). 통합 진행 참고: [14개 GPT 통합 로드맵 작업 브랜치(PR #2437)](https://github.com/gycha0109-beep/MyeongHa/blob/docs/master-track-roadmap-gpt14-20261022/docs/roadmaps/MYEONGHA_GPT_TRACK_MASTER_ROADMAP_20261022.md). Saju 참고: [12메뉴 로드맵 작업 브랜치(PR #2679)](https://github.com/gycha0109-beep/Saju/blob/docs/myeongha-roadmap-alignment-20261022/docs/ROADMAP.md). 이 문서는 이 소유자들을 대체하거나 새 permission/LLM/source authority를 만들지 않는다.
+
+## 1. 전제: 현재까지 유지한 작업
+
+- I18N-01~03: `ko-KR` 기본, 명시적 `ja-JP`/`zh-TW` 화면 선택과 `X-MyeongHa-UI-Locale` 수용; `Accept-Language`/profile.locale로 외국어 자동 선택 금지. 기존 UI 설정과 기록 원문 불변.
+- PR #2430: 9인 언어 중립 화법 비교, 실제 source 간 차이·승인 상태. **기존 Bible 인물 정본 생성/수정이 아닌 source-annotated 작업표.**
+- PR #2431: Reader `responseVoiceLocale` 준비 및 미승인 외국어 출력 차단.
+- PR #2432: `ja-JP`/`zh-TW` **언어 공통 표현 원칙**, character-specific pronoun/호칭 미확정.
+- PR #2435: 소량의 character×locale delta를 등록할 빈 승인 레지스트리. 실제 캐릭터별 예외값 0개.
+- 모두 기존 실행 PR과 Auto-merge를 유지한다. 이번 변경은 새 소스·LLM 호출, Reader/DB runtime 활성화, Master 로드맵 재작성 작업이 아니다.
+
+## 2. 이번 구현: 정본 화법 참조와 차이 관리
+
+구현: `packages/character-content/src/reader-language-neutral-voice-handoff-v1.ts` 및 단위 테스트.
+
+`prepareReaderLanguageNeutralVoiceHandoffV1({selectedCharacterId,voiceAuthority})`
+
+- canonical Character ID는 기존 9인 approved roster에서만 수용.
+- `source='published_character_content'`, 같은 선택 인물의 `characterId`, 실제 `contentVersion`, `speech`와 `persona.communication`의 필수 필드가 없으면 `hold`.
+- 결과는 정확히 **입력된 published voice 객체를 그대로 참조**한다. `general_chat` / `saju_product` / `face_product`에서 다른 인격·말투 정본을 만들지 않는다.
+- 차이 진단은 자료 취합용 **비권위 상태**이며 인물의 속성에 자동 적용되지 않는다. `foreignLanguageRelease='hold'`, `localeStyle='not_authored'` 고정. 어떤 `ja-JP`·`zh-TW` 인칭도 생성하거나 선택하지 않는다.
+- 보완 필요(캐릭터 소유자 판단): **세연·여울·서린·미라·도윤·백헌**. 현재 자료에서 큰 불일치가 표시되지 않은 인물: **라현·태겸·윤호**. 이는 Production 승인이나 A~K 바이블 완결 판정이 아니다.
+
+### 캐릭터 설계 트랙 인계 — source 충돌의 처리 순서
+
+| 인물 | 상충하는 근거/음성 | 요구되는 결정(캐릭터 설계 owner) |
+|---|---|---|
+| **세연** | 상세 초기 semantic proposal의 기억·시간 지향과 최신 세연 Bible Draft / Runtime의 행동 주도형 밝은 동행자 | 동일 인물의 기본 행동축 vs 과거 승인 방향을 구분해 source 우선순위 확정 |
+| **여울** | Bible Draft E의 살짝 새침한 존댓말·건조한 태클 vs typed Runtime의 부드러운 정서 관찰자 | 기본 경어·장난/감정 관찰을 어느 상황에서 쓰는지 저자 결정 |
+| **서린** | 승인 상세 proposal의 기억·개인의 변화에 대한 관심 vs typed Runtime의 냉정한 구조 분석 | 기억을 대하는 태도가 실제 질문·답변 리듬에서 어떻게 나타나는지 결정 |
+| **미라** | 승인된 생활형 무심다정/Friends-to-Lovers vs typed Runtime의 상징적·시적 경계 안내자 | **가장 우선** 기본 인물성·화법 정합화. I18N이 임의로 의미를 선택하지 않음 |
+| **도윤** | 승인 관계 방향의 능글·공범감·실험/우회 vs typed Runtime의 빠른 실행 결정 코치 | 능글함과 행동 촉진의 비중·상황별 전환을 결정 |
+| **백헌** | 저자 승인 Bible Draft E의 여유·능청스러운 사적 유머 vs typed Runtime의 엄숙·거의 무유머 | 기본/친밀/갈등 상황에 따른 여유·유머 노출 조건 결정 |
+
+출처: `docs/FRONTEND_INTEGRATION_READER_LANGUAGE_NEUTRAL_VOICE_MATRIX_V1_20261022.md` (PR #2430), `docs/character/CHARACTER_BIBLE_STANDARD_V1.md`, `docs/character/CHARACTER_DETAILED_AUTHORING_PO_DECISION_GATE_V1.md`, `docs/character/CHARACTER_RUNTIME_AUTHORING_PO_DECISION_GATE_V1.md`, `packages/character-content/src/runtime-authoring-v1.ts` 및 각각의 최신 개별 Bible Draft. 이 표의 상충 판단은 Character Bible 자체를 변경하는 권한이 아니다.
+
+## 3. Official Saju → UX / Reader / 기록: 하나의 source 의미만 전달
+
+구현: `packages/domain/src/reader-official-locale-continuity-v1.ts` 및 단위 테스트.
+
+`compareReaderOfficialLocaleContinuityV1({channel,requestedLocale,officialSource,presentedSource})`
+
+- 대상 기존 채널: `purchase_summary`(구매 직후 짧은 Reader 전달), `reader_follow_up`(필요할 때 Official Reading 조회), `record_detail`(기존 Official 장문 기록).
+- 양쪽은 **서버 검증된 동일 공식 원본의 식별자 증빙을 기존 소유자로부터 받아야 한다**. 웹/모바일·LLM·캐시에서 가져온 임의 `witness`를 Source Truth로 간주하면 안 된다.
+- `readingRef`, `officialArtifactResponseHash`, 있는 경우 `sourceSemanticHash`가 같아야 한다.
+- 이미 선택된 `scopedSourceUnitRefs`의 전체 집합이 같아야 한다. 사용자에게 보여주는 문장 분량·읽기 화면이 짧아지는 것 자체가 Source Unit을 새로 선택/생성하도록 허가하지 않는다. **요약용 Unit 선택과 grounding scope 결정은 기존 Reader/Source 소유자**가 수행한다.
+- 기존 Source의 필수 `requiredQualifierRefs`(가능성/불확실성), `requiredConditionRefs`(기간·적용 조건), `requiredAmbiguityRefs`(미결정 의미), `requiredDisclosureRefs`(한계/방법론/주의) 전체가 일치해야 한다.
+- 누락·교체·추가·중복은 명시적 `hold`. 일치해도 `metadata_aligned_hold`이며 **실제 일본어/번체 문장의 의미 동등성, 표현 품질, 소비자 안전, entitlement, 공개 승인을 인증하지 않는다**. LLM 호출·문장 생성·DB 저장 없음.
+- 이 인터페이스는 새로운 Saju Claim schema가 아니다. `required*Refs`는 **이미 Source에서 요구한 보호 조건의 참조**만 담는다. Source에 없는 qualifier·기간·결론을 여기서 만들어 넣으면 안 된다.
+
+### 기존 3개 제품 경로별 인수
+
+| 경로 | Source/DB/Reader 측 기존 계약(이 트랙에서 수정 금지) | I18N가 전달하는 조건 |
+|---|---|---|
+| 구매 직후 요약 | 공식 `ProductReadingResponse` / immutable Reading / verified Receipt→Grant→Reader bind, sourceUnit 범위는 Reader Scene·Semantic Guard가 통제 | 구매 요약은 장문을 새 해석으로 재생성하지 않고 승인된 근거/조건만 전달. 새 로케일이 미승인이면 요약도 비한국어 공개 HOLD |
+| Reader 후속 대화 | `OfficialReadingReaderAdmissionScopeV1`, `CharacterStandardChatGroundingV2`, RR-03/04 anchor 및 A2/A3/final DB 정책, 동의한 기억·관계는 별도 권위 | 사주가 필요한 질문에서만 정식 source Unit 참조. 일반 대화 모든 턴에 RAG 강제 금지. 현재 grant/철회/민감 데이터 보호가 우선 |
+| 기록 열람 | `OfficialReadingRecordReadAuthorityPortV1` 등 원래 artifact/responseHash/원본 본문 보존 계약 | UI 저자 문구만 언어 선택을 따름. **기존 저장 Reading의 새 언어 재열람 정책(미승인 ②)을 열지 않음**. 원문 덮어쓰기·선택 언어로 새 Official 만들기 금지 |
+
+### 로케일·Source 권한 분리
+
+- **화면 `uiLocale`**: 사용자 명시 선택만 `ko-KR` / `ja-JP` / `zh-TW`. `X-MyeongHa-UI-Locale`는 표시 preference이지 공식 Reading 생성 허가가 아니다.
+- **공식 Reading `readingLocale`**: Saju E의 내부 우선순위/On-Demand Renderer 계약은 Saju 소유; language catalog는 공개 허가가 아니다. E-1/E-2의 `internal_preview_only`는 MyeongHa `ProductReadingResponse`로 바로 유통 불가.
+- **Reader response locale**: Character Bible/published voice·승인된 character×locale value·언어 보호·Semantic Guard·release flag의 독립 gate. 현재 KO만 기존 경로, `ja-JP`/`zh-TW` 출력 보류.
+- **Birth / timezone / region**: 언어 전환만으로 출생시간대·절기·사주 계산 규칙·두 사람 입력·적용 시기를 바꾸지 않는다.
+- **Saju source identity**: 기존 Saju `CanonicalReadingSemanticBundleV1.semanticHash`는 의미 재계산·재생성을 막는 기준이지만 실제 MyeongHa official artifact 필드와 동일하다고 가정하지 않는다. MyeongHa의 `officialArtifactResponseHash`와 둘을 잇는 기존 Bridge 근거가 있어야 한다.
+
+## 4. 다음 구현 작업 및 승인 위치
+
+1. **캐릭터 설계 owner:** 위 6명 차이를 실제 Bible/typed Runtime 간에 해결하고 authoritative source/version을 확정. 이 I18N 트랙은 제안·인계만, 원본 수정 금지.
+2. **I18N (현재 담당):** #2430/31/32/35 기존 PR Auto-merge 유지. 9인 중립 화법 projection과 Source 인계 계약을 Reader·UX 소비 경계에 **허가된 방식으로** 연결. 이후 `ja-JP`/`zh-TW` 관습 및 소량 예외 후보는 이 트랙이 작성하여 사용자에게 제시, 사용자 승인 전 프로필 실제 값 등록 금지.
+3. **Saju / Bridge / DB:** 각 Official 소스 범위/Qualifier/Condition/semanticHash·artifactHash/provenance·정확한 Reader Grant를 기존 scope에서 서버 인수; 기존 12메뉴 A/B/C/D+E를 병렬 유지. 새 해석 문장은 이 I18N 트랙에서 생산하지 않는다.
+4. **Reader/Memory/Security:** 지금은 등록된 출처 정보만 기존 guard의 인수 자료로 제공. 후속 실제 장문/요약/채팅의 보호된 자연어 검토는 원래 owner, 새 LLM 호출이나 권한 변경 없이 진행.
+5. **Ops/Commerce:** public/paid/source readiness, 캐시·생성 시점, 저장/삭제/환불 권한은 소유자 승인 및 실제 production evidence 전 HOLD.
+
+**정확한 완료 표기:** 이번 PR은 read-only projection + metadata parity boundary + 테스트 + 인계 계약의 구현이다. 캐릭터 개인 바이블 확정, 일본어/번체 Reader 실제 응답, 공식 Reading 재번역/저장, 새 유료 판매/서비스 운영은 완료하지 않았다.
