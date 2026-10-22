@@ -85,6 +85,9 @@ function recordFrom(admission: PreparedOfficialReadingReaderAdmissionV1):
     storedResponseDigest: hashSajuHeldSourceProofRequestV1(
       source.responseSnapshotJsonb,
     ),
+    // This digest is attached to the ticket only at T1 after signed
+    // preview reconciliation; it must not be inferred from the artifact.
+    candidateDigest: '',
   };
 }
 
