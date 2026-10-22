@@ -160,10 +160,31 @@ async function main() {
     }
   }
   for (const path of ['/missing-page.html','/api','/api/readiness','/api/readings','/api/me',
-      '/api/unknown','/api/health?__myeongha_chat_open=1']) {
+      '/api/unknown']) {
     response = await check(path,404);
     if (!response) continue;
     if ((await response.text()).trim() !== '') failures.push({path,reason:'deny-body-not-empty'});
+  }
+  // S-CF2 Worker entrypoint (not the old Stage 4 static-only preview)
+  // must hold forged legacy Chat rewrite keys on unrelated API paths. Retain
+  // the old stage's original empty 404 contract when scf2 is not active.
+  for (const path of [
+    '/api/health?__myeongha_chat_open=1',
+    '/api/me?__myeongha_chat_turn_send=1',
+    '/api/auth/refresh?__myeongha_chat_open=1',
+  ]) {
+    response = await check(path,scf2 ? 503 : 404);
+    if (!response) continue;
+    if (scf2) {
+      const payload = await response.json().catch(()=>null);
+      if (payload?.ok !== false ||
+          payload?.error?.code !== 'SEYEON_FIRST_REVEAL_AUTHORITY_UNAVAILABLE' ||
+          response.headers.get('access-control-allow-origin') !== null) {
+        failures.push({path,reason:'legacy-chat-rewrite-marker-fence-missing'});
+      }
+    } else if ((await response.text()).trim() !== '') {
+      failures.push({path,reason:'stage4-legacy-marker-deny-body'});
+    }
   }
   // Every non-health Vercel endpoint remains deny-only. On S-CF2 the
   // protected Chat routes deliberately return 503, not the legacy 404.
