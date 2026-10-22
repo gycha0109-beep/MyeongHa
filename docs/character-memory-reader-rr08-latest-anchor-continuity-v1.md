@@ -14,6 +14,7 @@ Watchtower-Track: character-memory
 - 이미 존재하는 `ReaderContextNonMemoryReadAuthorityPortV1.readRecentMessages`로 실제 소유 Thread의 메시지들을 읽어, **sequenceNo 기준 가장 최근 Character Assistant 메시지 ID**를 구한다.
 - RR-05가 자체 검증한 `evidence.assistantMessageId`와 정확히 같아야만 내부 연속성 후보를 발행한다. 최신 Character 응답이 일반 대화·고민 안내였다면 이전 Official Anchor에 끼워 맞추지 않고 HOLD한다.
 - 전후 두 차례 조회의 메시지 ID/sequence/role/Reader 메타데이터가 바뀌거나 cross-Reader, 중복, 유효하지 않은 sequence가 있으면 HOLD한다.
+- RR-05 기존 어휘/공격 신호 검사에서 허용되지 않은 질문은 개인 대화방 이력 조회 **이전**에 HOLD한다. 이는 거절용 1차 필터일 뿐 긍정적인 안전 승인이나 새 Security 엔진이 아니다.
 - 대화 본문 `text`는 절대 후보·Digest·로그에 넣지 않는다. 판정에 사용하는 것은 서버 읽기의 메타데이터와 기존 Guarded Official Anchor뿐이다.
 - 출력은 `last_validated_official_answer_candidate`라는 **비권한 후보**다. `permitsModelInjection:false`, `permitsCommit:false`, `permitsHttpReveal:false`, `addedModelCalls:0`. 실제 개인정보 Pin, 사주 의미 재서술, 새로운 LLM 호출, 공개 Chat/Route는 없다.
 
