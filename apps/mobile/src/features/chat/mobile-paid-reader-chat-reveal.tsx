@@ -3,6 +3,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { subscribeMobileSubjectCredentialChangesV1 } from '@/core/session/mobile-subject-credential-changes';
+import { MobileMemberSessionErrorV1 } from '@/core/session/mobile-member-session';
+import { MyeongHaApiClientErrorV1 } from '@myeongha/api-client';
 import {
   acknowledgeMobilePaidReaderChatDeliveryV1,
   readMobilePaidReaderChatMessageV1,
@@ -117,9 +119,13 @@ export function MobilePaidReaderChatRevealV1({
       setAckFailed(false);
       setBody(result.answer.body);
       setStatus('현재 구매권으로 확인한 해설입니다. 기기 수신 확인 중…');
-    } catch {
+    } catch (error) {
       if (currentRequest.current === controller && !controller.signal.aborted) {
-        setStatus('해설을 불러오지 못했습니다. 다시 시도해 주세요.');
+        const needsLogin=error instanceof MobileMemberSessionErrorV1
+          || (error instanceof MyeongHaApiClientErrorV1 && error.status === 401);
+        setStatus(needsLogin
+          ? '해설 열람에는 회원 로그인이 필요합니다.'
+          : '해설을 불러오지 못했습니다. 다시 시도해 주세요.');
       }
     } finally {
       if (currentRequest.current === controller) {
