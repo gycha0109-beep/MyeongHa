@@ -4,6 +4,7 @@ import { handleNaverOAuthBridgeRequestV1 } from '../apps/api/src/naver-oauth-bri
 import { handleSocialAuthStartRequestV1 } from '../apps/api/src/social-auth-start-http.ts';
 import worker, { cloudflareEmergencyHoldEnabledV1 } from '../workers/cloudflare-static-preview.mjs';
 import {
+  approvedCloudflareAuthHostnameV1,
   approvedCloudflareSameOriginPostV1,
   approvedCloudflareStage5HandoffV1,
   approvedCloudflareDbHostV1,
@@ -17,7 +18,8 @@ import {
 
 // These tests never connect to a database, Supabase or a real Auth origin.
 // Positive paths are only activated on a separately approved exact host.
-const PRIVATE_ORIGIN = 'https://auth.myeongha.example.test';
+// Synthetic host uses a DNS-shaped .dev domain; it never resolves in tests.
+const PRIVATE_ORIGIN = 'https://auth.synthetic-myeongha.dev';
 const ENABLED = Object.freeze({
   MYEONGHA_CLOUDFLARE_AUTH_DB_MODE: 'approved-auth-db-v1',
   MYEONGHA_CLOUDFLARE_AUTH_ORIGIN: PRIVATE_ORIGIN,
@@ -56,10 +58,20 @@ describe('Cloudflare Auth/DB admission is fail-closed until explicit host and se
     }
   });
 
-  it('rejects Workers Preview and Vercel hosts even if a mode binding is supplied', async () => {
+  it('rejects Workers/Vercel, localhost/IP, reserved domains and non-443 OAuth origins', async () => {
+    expect(approvedCloudflareAuthHostnameV1('auth.synthetic-myeongha.dev')).toBe(true);
     for (const origin of [
       'https://trial.example.workers.dev',
       'https://myeongha.vercel.app',
+      'https://localhost',
+      'https://127.0.0.1',
+      'https://[::1]',
+      'https://10.10.0.2',
+      'https://auth.local',
+      'https://auth.internal',
+      'https://auth.example.test',
+      'https://auth.example.com',
+      'https://auth.synthetic-myeongha.dev:8443',
     ]) {
       const response = await get('/api/auth/sign-in', {
         ...ENABLED,

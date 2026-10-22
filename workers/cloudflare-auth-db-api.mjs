@@ -239,6 +239,18 @@ export function approvedCloudflareStage5HandoffV1(bindings, origin, needsOAuth) 
   return true;
 }
 
+// An approval string is not a substitute for a registered custom HTTPS host.
+// Refuse localhost/IP, reserved test zones, Workers/Vercel preview hosts and
+// implicit nonstandard ports before any provider state or database secret.
+export function approvedCloudflareAuthHostnameV1(hostname) {
+  return approvedCloudflareDbHostV1(hostname) &&
+    !hostname.endsWith('.workers.dev') &&
+    !hostname.endsWith('.vercel.app') &&
+    !['example.com', 'example.net', 'example.org'].some(
+      reserved => hostname === reserved || hostname.endsWith('.' + reserved)
+    );
+}
+
 export function approvedCloudflareAuthOriginV1(request, bindings) {
   if (bindings?.MYEONGHA_CLOUDFLARE_AUTH_DB_MODE !== EXACT_MODE) return null;
   const raw = bindings.MYEONGHA_CLOUDFLARE_AUTH_ORIGIN;
@@ -250,10 +262,10 @@ export function approvedCloudflareAuthOriginV1(request, bindings) {
     return null;
   }
   if (origin.protocol !== 'https:' || origin.username !== '' ||
-      origin.password !== '' || origin.pathname !== '/' ||
-      origin.search !== '' || origin.hash !== '' || origin.origin !== raw ||
-      origin.hostname.endsWith('.workers.dev') ||
-      origin.hostname.endsWith('.vercel.app')) return null;
+      origin.password !== '' || origin.port !== '' ||
+      origin.pathname !== '/' || origin.search !== '' ||
+      origin.hash !== '' || origin.origin !== raw ||
+      !approvedCloudflareAuthHostnameV1(origin.hostname)) return null;
   if (new URL(request.url).origin !== raw) return null;
   return raw;
 }
