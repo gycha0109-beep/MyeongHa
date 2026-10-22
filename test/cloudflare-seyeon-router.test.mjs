@@ -673,6 +673,106 @@ describe('S-CF2 actual Worker fetch boundary and no HTML fallback', () => {
     expect(await unconditional.text()).toBe('PUBLIC');
   });
 
+  it('keeps browser credentials and query secrets out of internal public ASSETS', async () => {
+    const controller = new AbortController();
+    const secret = 'SYNTHETIC_STATIC_REQUEST_SECRET';
+    const received = [];
+    const assets = vi.fn(request => {
+      received.push(request);
+      return new Response('PUBLIC', {
+        headers: { 'Content-Type': 'text/javascript', 'Cache-Control': 'public,max-age=60' },
+      });
+    });
+    const original = new Request(ROOT + '/assets/app.js?cache=1&session=' + secret, {
+      signal: controller.signal,
+      headers: {
+        Accept: 'text/javascript',
+        'Accept-Encoding': 'gzip, br',
+        'Accept-Language': 'ko-KR',
+        Cookie: 'session=' + secret,
+        Authorization: 'Bearer ' + secret,
+        Referer: ROOT + '/account/private',
+        Origin: ROOT,
+        'X-Api-Key': secret,
+        'X-Forwarded-Authorization': secret,
+        'CF-Connecting-IP': '192.0.2.100',
+      },
+    });
+    const response = await worker.fetch(original, { ASSETS: { fetch: assets } });
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe('PUBLIC');
+    expect(assets).toHaveBeenCalledTimes(1);
+    expect(received).toHaveLength(1);
+    const sent = received[0];
+    expect(sent.method).toBe('GET');
+    expect(sent.url).toBe(ROOT + '/assets/app.js');
+    expect(sent.redirect).toBe('manual');
+    expect(sent.headers.get('accept')).toBe('text/javascript');
+    expect(sent.headers.get('accept-encoding')).toBe('gzip, br');
+    expect(sent.headers.get('accept-language')).toBe('ko-KR');
+    for (const name of [
+      'cookie', 'authorization', 'referer', 'origin', 'x-api-key',
+      'x-forwarded-authorization', 'cf-connecting-ip', 'sec-fetch-site',
+    ]) {
+      expect(sent.headers.get(name)).toBeNull();
+    }
+    expect([...sent.headers].flat().join(' ')).not.toContain(secret);
+    expect(original.headers.get('authorization')).toBe('Bearer ' + secret);
+    controller.abort();
+    expect(sent.signal.aborted).toBe(true);
+  });
+
+  it('forwards only conditional and range validators required for legal static 304/206', async () => {
+    const requestSecret = 'SYNTHETIC_PRIVATE_COOKIE';
+    const cases = [
+      {
+        request: new Request(ROOT + '/assets/app.js?session=' + requestSecret, {
+          headers: {
+            Cookie: 'sid=' + requestSecret,
+            'If-None-Match': '"public-tag"',
+            'If-Modified-Since': 'Wed, 21 Oct 2015 07:28:00 GMT',
+          },
+        }),
+        response: new Response(null, { status: 304, headers: { ETag: '"public-tag"' } }),
+        status: 304,
+      },
+      {
+        request: new Request(ROOT + '/assets/app.js?download=1', {
+          headers: {
+            Authorization: 'Bearer ' + requestSecret,
+            Range: 'bytes=0-5',
+            'If-Range': '"public-tag"',
+          },
+        }),
+        response: new Response('PUBLIC', { status: 206, headers: {
+          ETag: '"public-tag"',
+          'Content-Type': 'text/javascript',
+          'Content-Range': 'bytes 0-5/200',
+          'Content-Length': '6',
+        } }),
+        status: 206,
+      },
+    ];
+    for (const scenario of cases) {
+      const upstream = vi.fn(() => scenario.response);
+      const result = await worker.fetch(scenario.request, {
+        ASSETS: { fetch: upstream },
+      });
+      expect(result.status).toBe(scenario.status);
+      const sent = upstream.mock.calls[0][0];
+      expect(new URL(sent.url).search).toBe('');
+      expect(sent.headers.get('cookie')).toBeNull();
+      expect(sent.headers.get('authorization')).toBeNull();
+      expect(sent.headers.get('range')).toBe(scenario.request.headers.get('range'));
+      expect(sent.headers.get('if-range')).toBe(scenario.request.headers.get('if-range'));
+      expect(sent.headers.get('if-none-match')).toBe(scenario.request.headers.get('if-none-match'));
+      expect(sent.headers.get('if-modified-since')).toBe(
+        scenario.request.headers.get('if-modified-since'),
+      );
+      expect(await result.text()).toBe(scenario.status === 206 ? 'PUBLIC' : '');
+    }
+  });
+
   it('preserves approved HTML security headers and non-HTML cache behavior', async () => {
     const publicHtml = await worker.fetch(new Request(ROOT + '/index.html'), {
       ASSETS: { fetch: () => new Response('<html>public</html>', {
