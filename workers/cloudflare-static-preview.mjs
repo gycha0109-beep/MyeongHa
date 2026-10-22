@@ -1,4 +1,5 @@
 import { matchCloudflareApiRoute } from './cloudflare-api-router.mjs';
+import { tryHandleCloudflareSeyeonSecurityV1 } from './cloudflare-seyeon-security.mjs';
 import { tryHandleCloudflareApprovedAuthV1 } from './cloudflare-auth-db-api.mjs';
 import { tryHandleCloudflareApprovedSajuCalculationV1 } from './cloudflare-saju-calculation.mjs';
 
@@ -75,6 +76,10 @@ export default {
   async fetch(request, bindings) {
     const url = new URL(request.url);
     const route = matchCloudflareApiRoute(url.pathname);
+    // S-CF2: protected Chat ingress is intercepted before every positive
+    // adapter, then sealed by the independent Security-owned egress fence.
+    const chatResponse = await tryHandleCloudflareSeyeonSecurityV1(request, bindings, route);
+    if (chatResponse !== null) return chatResponse;
     const approvedAuthResponse = await tryHandleCloudflareApprovedAuthV1(request, bindings, route);
     if (approvedAuthResponse !== null) return approvedAuthResponse;
     const approvedCalculationResponse = await tryHandleCloudflareApprovedSajuCalculationV1(request, bindings, route);

@@ -1,0 +1,159 @@
+// Ops stage 4 / S-CF2: mount existing Security-owned fail-closed boundaries.
+// Server-owned DB participant scope is mandatory before distinguishing SeYeon
+// from other Characters. Never authorize a positive protected response here.
+// No Provider, protected DB Commit, replay or history runtime is connected.
+// Watchtower-Track: ops
+import {
+  approvedCloudflareAuthOriginV1,
+  CLOUDFLARE_APPROVED_RESPONSE_HEADERS_V1,
+} from './cloudflare-auth-db-api.mjs';
+import {
+  classifySeyeonCloudflareChatRouteV1,
+} from '../apps/api/src/seyeon-cloudflare-protected-chat-route-guard-v1.ts';
+import {
+  scopeSeyeonCloudflareOwnedChatRequestV1,
+} from '../apps/api/src/seyeon-cloudflare-owned-thread-scope-v1.ts';
+import {
+  denySeyeonCloudflareFirstRevealBeforeProviderV1,
+  enforceSeyeonCloudflareOfflineFetchEgressFenceV1,
+} from '../apps/api/src/seyeon-cloudflare-offline-reveal-fence-v1.ts';
+import { parseProductionUserDataRuntimeConfigV1 } from '../apps/api/src/production-user-data-runtime-config.ts';
+import { createProductionRequestIdentityVerifierV1 } from '../apps/api/src/production-request-identity-verifier.ts';
+import { createProductionPostgresSubjectPoolLeaseV1 } from '../apps/api/src/production-postgres-subject-pool-lease.ts';
+
+export const CLOUDFLARE_SEYEON_EGRESS_STAGES_V1 = Object.freeze([
+  'first_reveal', 'committed_replay', 'history',
+]);
+
+/** The public request cannot distinguish first-send from committed replay.
+ * Only a future DB-authoritative server operation may make that distinction. */
+export function classifyCloudflareChatIngressV1(request) {
+  let url;
+  try { url = new URL(request.url); } catch { return null; }
+  const path = url.pathname;
+  if (path !== '/api/chat' && !path.startsWith('/api/chat/')) return null;
+  const route = classifySeyeonCloudflareChatRouteV1(
+    new Request(url.origin + path),
+  );
+  if (route.kind === 'turn_send') return Object.freeze({
+    kind: 'first_post_or_committed_replay', threadId: route.threadId,
+  });
+  if (route.kind === 'thread_read') return Object.freeze({
+    kind: 'history', threadId: route.threadId,
+  });
+  if (route.kind === 'chat_open') return Object.freeze({ kind: 'chat_open' });
+  return Object.freeze({ kind: 'malformed_or_unknown_chat' });
+}
+
+/** Security ingress hook. Does not accept a next()/Provider continuation. */
+export function holdCloudflareSeyeonBeforeProviderV1(requestId) {
+  return denySeyeonCloudflareFirstRevealBeforeProviderV1(requestId);
+}
+
+/** Security egress hook. Rejects unregistered 4xx, successful JSON, SSE,
+ * redirects, forged 503, and protected Replay/History from any caller. */
+export function fenceCloudflareSeyeonBeforeFetchReturnV1(candidate, requestId) {
+  return enforceSeyeonCloudflareOfflineFetchEgressFenceV1(candidate, requestId);
+}
+
+function enforceHeaders(response) {
+  const headers = new Headers(response.headers);
+  for (const [key, value] of Object.entries(CLOUDFLARE_APPROVED_RESPONSE_HEADERS_V1)) {
+    headers.set(key, value);
+  }
+  headers.delete('Access-Control-Allow-Origin');
+  headers.delete('Access-Control-Allow-Credentials');
+  return new Response(response.body, {
+    status: response.status, statusText: response.statusText, headers,
+  });
+}
+
+function held(requestId) {
+  return enforceHeaders(fenceCloudflareSeyeonBeforeFetchReturnV1(null, requestId));
+}
+
+function isExplicitChatRoute(route, pathname) {
+  return route?.id === 'rewrite.chat.open' ||
+    route?.id === 'rewrite.chat.thread' ||
+    route?.id === 'rewrite.chat.turns' ||
+    pathname === '/api/chat' || pathname.startsWith('/api/chat/');
+}
+
+function createDefaultSubjectScope(bindings) {
+  const config = parseProductionUserDataRuntimeConfigV1(bindings);
+  const poolLease = createProductionPostgresSubjectPoolLeaseV1({ config });
+  return {
+    pool: poolLease.pool,
+    identityEvidenceVerifier: createProductionRequestIdentityVerifierV1({ config }),
+    close: () => poolLease.close(),
+  };
+}
+
+/**
+ * @returns {Promise<Response|null>}
+ * null only for a non-chat API or a DB-confirmed unrelated Character thread.
+ * Such a thread receives NO reply or admission token from this adapter. The
+ * independent generic Chat handler must reauthorize it; today's fallback is 404.
+ *
+ * Dependencies are server-side only (used by isolated offline regression
+ * tests). Client headers, body, query markers and Worker env cannot supply a
+ * scope verdict or grant protected response authority.
+ */
+export async function tryHandleCloudflareSeyeonSecurityV1(
+  request, bindings, route, dependencies = {},
+) {
+  const url = new URL(request.url);
+  if (!isExplicitChatRoute(route, url.pathname)) return null;
+  const ingress = classifyCloudflareChatIngressV1(request);
+  const requestId = crypto.randomUUID();
+  if (ingress === null) return held(requestId);
+
+  // Malformed, unsupported and method-confused /api/chat requests must never
+  // touch DB, Auth, Provider or Static Assets. No client rewrite markers.
+  const expectedMethod = ingress.kind === 'history' ? 'GET' : 'POST';
+  if (ingress.kind === 'malformed_or_unknown_chat' ||
+      request.method !== expectedMethod ||
+      (ingress.kind !== 'history' && url.search !== '')) {
+    return held(requestId);
+  }
+
+  // Chat open contains a client characterId, not a trusted DB participant.
+  // It stays in the independent generic Chat boundary, which is still HOLD.
+  if (ingress.kind === 'chat_open') return null;
+
+  const origin = approvedCloudflareAuthOriginV1(request, bindings);
+  if (origin === null) return held(requestId);
+  // Never interpret request-supplied Character/Grant/replay/permission flags.
+  let resources;
+  let verdict;
+  try {
+    resources = (dependencies.createSubjectScope ?? createDefaultSubjectScope)(bindings);
+    verdict = await (dependencies.scope ?? scopeSeyeonCloudflareOwnedChatRequestV1)({
+      request,
+      requestId,
+      identityEvidenceVerifier: resources.identityEvidenceVerifier,
+      pool: resources.pool,
+    });
+  } catch {
+    return held(requestId);
+  } finally {
+    // Never cache a DB pool/verifier/scope verdict across Worker requests.
+    try {
+      await resources?.close();
+    } catch {
+      return held(requestId);
+    }
+  }
+  if (verdict?.kind === 'unrelated_thread_requires_ops_reauthorization' &&
+      verdict.threadId === ingress.threadId) {
+    return null;
+  }
+  // Own/mixed SeYeon and any uncertain/unrecognized verdict remain held.
+  // Even a malicious injected success or forged 4xx cannot cross this fence.
+  return enforceHeaders(fenceCloudflareSeyeonBeforeFetchReturnV1(
+    verdict?.kind === 'seyeon_protected_held' || verdict?.kind === 'denied'
+      ? verdict.response
+      : null,
+    requestId,
+  ));
+}
