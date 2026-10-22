@@ -54,3 +54,15 @@ Saju native Reading ID를 DB UUID로 바꿔 기록하거나 `responseBodyHash`�
 - Saju #2410 Production Source issuer 및 실 인증/키 정책·실행 권한·규칙 Registry, DB/Privacy #2301 Draft의 Subject/Birth Revision/저장 Response 변환 영수증·서버 비공개 nonce 저장·실 T2 보호 저장이 선행 조건이다.
 - 기존 #2456·#2459·#2461의 S5→S6→S7 연속성/재전송 검사와 본 함수의 결과를 사용자 화면이나 Commerce 증빙으로 공개하지 않는다. Reader/Records의 접근 권한 및 S7 ACK 유효성은 매 요청 별도 DB Owner 정본 검증에 의존한다.
 - 이 모듈은 운영 배포·새 HTTP/DB API·Production 발급·매핑 승인·실제 유료 원문 저장/재전송을 수행하지 않는다.
+
+## S3 서명 원본부터 S5 보호 저장/S7 영수증까지 한 DB Records 조회로 결속
+
+`apps/api/src/saju-held-source-db-s5-s7-evidence-v1.ts`는 **#2473의 Saju Preview HMAC 전송 검증·native-ID↔DB-UUID 전체 응답 비교**와 **#2448의 S5/S6/S7 같은 Reading 보호 본문 메타데이터 검증**을 하나의 서버 내부 호출로 연결한다. 기존 두 검사 함수가 DB Records Owner의 같은 Subject·Reading을 조회할 때 **호출 범위에 한한 인가된 Raw Records 결과를 1회만 가져와** 그 결과를 다시 재사용한다. 세션 사이 캐시나 새로운 SQL/GRANT는 없다.
+
+- S6의 보호 암호문 `OfficialReaderProtectedBodyIdentityV1`는 **명하 DB에 저장된 v2 Response**의 `sha256:v1:<canonical hash>`에 결속된다. 반면 Saju signed Preview의 `responseBodyHash`는 **native Reading ID가 담긴 Saju 원본 v2 응답의 hash**이다. 두 ID가 다르면 전체 응답 해시도 달라야 정상이며, 이 둘을 억지로 같다고 두거나 서로 복사해 매핑 승인으로 사용하지 않는다.
+- DB Reader scope의 `Subject/Thread/Turn/Attempt/SafeMessage/OfficialReading/Reader/Bundle/Release/Product`와 S5 commit, 기존 S6 재조회 metadata, DB 보호 암호문 AAD witness가 정확히 같아야 한다. `originatingEntitlementGrantId`는 구조만 확인하고 실제 현재 Grant/환불/Privacy Lease 승인이라고 주장하지 않는다. 이것은 DB/Privacy Owner #2301의 **기존 S1 잠금·T2 트랜잭션**에서 별도 검사해야 한다.
+- S7 준비가 없다면 ACK를 허용하지 않는다. 준비가 있으면 `subjectId / threadId / safeMessageId / bodyId / deliveryRequestId / deliveryAttemptId / responsePreparedAt`가 기존 S7 DB Owner metadata와 같아야 하며, 인증 ACK의 시각은 S7 준비 이후여야 한다. 재전송/환불·반복 ACK는 기존 #2461 및 DB Owner의 별도 정책 검사를 따른다.
+- Preview HMAC/issuer/keyId/nonce/정규화 요청·원본 Response 검증 실패는 DB 기록 조회 전에 종료한다. Saju 실행 지문 또는 DB source-unit/full-response, 본문 ID/Reader/ACK가 다르면 BLOCKED. 결과는 `transportIntegrity` 및 `evidenceStage` 라벨 외 식별자·영수증·암호문·원문·nonce/서명을 절대 포함하지 않는다.
+- 성공해도 **`HELD`, `sourceAuthority/mappingAuthority/privacyApproval/currentAccessAuthority=NOT_EVALUATED`, `canMapReadingId/canPersist/canDisclose/canPublish/canSell=false`**이다. Saju #2410 Production Source 발급·DB Owner #2301 승인 영수증이 나오기 전에는 기존 strict-ID S3 gate를 완화하거나 실제 유료 저장/송신/재열람을 연결하지 않는다.
+
+이 구현은 새 Source issuer 또는 DB 권한을 발급하지 않는다. 운영 연결 시 서버가 **이미 DB Owner S6 보호 행에서 인증한 AAD witness**만 전달해야 하며, 브라우저가 구성한 가상 witness나 과거 S6/ACK 결과를 현재 권한으로 삼을 수 없다.
