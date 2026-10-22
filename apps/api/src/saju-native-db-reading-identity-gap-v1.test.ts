@@ -487,7 +487,7 @@ describe('full ProductReadingResponse v2 parity with only native/DB Reading ID d
   });
 });
 
-const TRANSPORT_DOMAIN = 'myeongha/saju/source-transport-proof/v1\\0';
+const TRANSPORT_DOMAIN = 'myeongha/saju/source-transport-proof/v1\0';
 const TRANSPORT_NONCE = 'Q'.repeat(24);
 const TRANSPORT_NOW = 1_800_000_000_000;
 const TRANSPORT_KEY = Buffer.alloc(32, 73);
