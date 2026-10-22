@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { createHash, randomBytes } from 'node:crypto';
 import { handleNaverOAuthBridgeRequestV1 } from '../apps/api/src/naver-oauth-bridge-http.ts';
+import { handleSocialAuthStartRequestV1 } from '../apps/api/src/social-auth-start-http.ts';
 import worker, { cloudflareEmergencyHoldEnabledV1 } from '../workers/cloudflare-static-preview.mjs';
 import {
   approvedCloudflareSameOriginPostV1,
   approvedCloudflareStage5HandoffV1,
   approvedCloudflareNaverRedirectV1,
   approvedCloudflareAuthCookieV1,
+  closeCloudflareAuthResourcesV1,
   allowedCloudflareNaverQueryV1,
   fenceCloudflareApprovedAuthResponseV1,
 } from '../workers/cloudflare-auth-db-api.mjs';
@@ -132,8 +134,7 @@ describe('Cloudflare Auth/DB admission is fail-closed until explicit host and se
       }),
     ];
     for (const response of origins) expect(response.status).toBe(404);
-    // S-CF2: a private Chat rewrite marker on a generic API path is never
-    // authorized by the Auth adapter; the Worker returns protected 503.
+    // Worker S-CF2 protection takes precedence over normal Auth's empty 404.
     const spoofedChat = await get('/api/me?__myeongha_chat_open=1', ENABLED);
     expect(spoofedChat.status).toBe(503);
     expect(spoofedChat.headers.get('cache-control')).toBe('no-store');
@@ -404,6 +405,78 @@ describe('Cloudflare Auth/DB Worker response and cookie-origin fence', () => {
       action: 'callback', env, webOrigin: PRIVATE_ORIGIN,
     });
     expect(replayOnWrongOrigin.status).toBe(400);
+  });
+
+  it('closes Member Auth pool independently even when runtime shutdown fails', async () => {
+    const observed = [];
+    const runtime = { async close() { observed.push('runtime'); } };
+    const pool = { async close() { observed.push('pool'); } };
+    expect(await closeCloudflareAuthResourcesV1(runtime, pool)).toBe(true);
+    expect(observed).toEqual(['runtime', 'pool']);
+    observed.length = 0;
+    const broken = { async close() { observed.push('runtime-failed'); throw Error('SYNTHETIC_SECRET'); } };
+    expect(await closeCloudflareAuthResourcesV1(broken, pool)).toBe(false);
+    expect(observed).toEqual(['runtime-failed', 'pool']);
+    expect(await closeCloudflareAuthResourcesV1(undefined, {
+      async close() { throw Error('SYNTHETIC_SECRET'); },
+    })).toBe(false);
+    expect(await closeCloudflareAuthResourcesV1(undefined, undefined)).toBe(true);
+  });
+
+  it('keeps Google/Kakao web callback and existing mobile deeplink exact', async () => {
+    const enabled = {
+      MYEONGHA_SOCIAL_AUTH_GOOGLE_ENABLED: 'true',
+      MYEONGHA_SOCIAL_AUTH_KAKAO_ENABLED: 'true',
+    };
+    const start = (provider, redirectUri, env = enabled) =>
+      handleSocialAuthStartRequestV1({
+        request: new Request(PRIVATE_ORIGIN + '/api/auth/social/start', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ provider, redirectUri }),
+        }),
+        env, webOrigin: PRIVATE_ORIGIN, nowEpochMs: () => 1730000000000,
+      });
+    for (const [provider, target] of [
+      ['google', PRIVATE_ORIGIN + '/auth.html?social=callback'],
+      ['kakao', 'myeongha://auth/callback'],
+    ]) {
+      const response = await start(provider, target);
+      expect(response.status).toBe(200);
+      const { data } = await response.json();
+      const auth = new URL(data.authorizationUrl);
+      expect(auth.origin).toBe('https://cnsfpcdiyofqvhpcegfc.supabase.co');
+      expect(auth.pathname).toBe('/auth/v1/authorize');
+      expect(auth.searchParams.get('provider')).toBe(provider);
+      const redirectTo = new URL(auth.searchParams.get('redirect_to'));
+      expect(redirectTo.searchParams.get('state')).toBe(data.state);
+      expect(data.state).toMatch(/^[0-9a-f]{32}$/);
+      expect(redirectTo.origin === PRIVATE_ORIGIN ||
+        redirectTo.href.startsWith('myeongha://auth/callback?state=')).toBe(true);
+      if (provider === 'google') {
+        expect(redirectTo.origin).toBe(PRIVATE_ORIGIN);
+        expect(redirectTo.pathname).toBe('/auth.html');
+        expect(redirectTo.searchParams.getAll('social')).toEqual(['callback']);
+      } else {
+        expect(redirectTo.protocol).toBe('myeongha:');
+        expect(redirectTo.host).toBe('auth');
+        expect(redirectTo.pathname).toBe('/callback');
+      }
+    }
+    for (const redirectUri of [
+      'https://myeongha.vercel.app/auth.html?social=callback',
+      PRIVATE_ORIGIN + '/auth.html?social=callback&social=callback',
+      PRIVATE_ORIGIN + '/auth.html?social=callback&next=https://attacker.example.test',
+      PRIVATE_ORIGIN + '/auth.html?social=callback#leak',
+      'myeongha://other/callback',
+      'myeongha://auth/callback?state=forged',
+      'https://attacker.example.test/auth.html?social=callback',
+    ]) {
+      expect((await start('google', redirectUri)).status).toBe(400);
+    }
+    expect((await start('google', PRIVATE_ORIGIN + '/auth.html?social=callback', {
+      MYEONGHA_SOCIAL_AUTH_GOOGLE_ENABLED: 'false',
+    })).status).toBe(503);
   });
 
   it('seals unexpected Auth/DB and calculation exceptions before platform HTML', async () => {
