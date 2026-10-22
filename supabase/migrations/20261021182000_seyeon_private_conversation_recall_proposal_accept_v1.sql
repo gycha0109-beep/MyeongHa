@@ -40,8 +40,7 @@ grant create on schema public to myeongha_seyeon_chat_runtime_owner;
 create function public.cmd_accept_seyeon_private_conversation_recall_proposal_v1(
   p_subject_id uuid,
   p_proposal_id uuid,
-  p_memory_item_id uuid,
-  p_original_proposal_pg_digest text
+  p_memory_item_id uuid
 )
 returns table (
   memory_item_id uuid,
@@ -54,14 +53,13 @@ set search_path=pg_catalog, public
 as $accept$
 declare
   v_proposal record;
-  v_digest text;
+  v_source_turn_id uuid;
   v_summary text;
   v_created_at timestamptz;
 begin
   perform public.assert_myeongha_subject_context_v1(p_subject_id);
   if p_subject_id is null or p_proposal_id is null
-     or p_memory_item_id is null or p_original_proposal_pg_digest is null
-     or p_original_proposal_pg_digest !~ '^sha256:pg-jsonb:v1:[a-f0-9]{64}$'
+     or p_memory_item_id is null
   then
     raise exception using errcode='23514',
       constraint='seyeon_private_memory_accept_invalid_input',
@@ -82,8 +80,10 @@ begin
       message='Conversation Memory type has not been approved for persistence';
   end if;
 
-  -- Subject -> original Proposal. The lock is retained until both
-  -- Memory insertion and terminal Proposal transition COMMIT.
+  -- Canonical order: Subject -> committed source Turn -> original Proposal.
+  -- A first read of source_turn_id is not authority: it only selects the
+  -- lock to acquire. The locked Proposal must still reference exactly
+  -- that same Turn, so mutation/races never authorize a different origin.
   perform 1 from public.subjects s
   where s.id=p_subject_id and s.kind='member' and s.status='active'
     and s.merged_into_subject_id is null
@@ -94,12 +94,51 @@ begin
       message='Private Memory acceptance requires canonical active Member';
   end if;
 
+  select p.source_turn_id into v_source_turn_id
+  from public.memory_proposals p
+  where p.id=p_proposal_id and p.subject_id=p_subject_id;
+  if v_source_turn_id is null then
+    raise exception using errcode='23514',
+      constraint='seyeon_private_memory_accept_source_missing',
+      message='Original Memory Proposal source Turn is unavailable';
+  end if;
+
+  -- Only an actually completed original single-Character Se-yeon Turn
+  -- may be promoted into a durable approved conversation recall.
+  perform 1
+  from public.chat_turns t
+  join public.conversation_threads th
+    on th.id=t.thread_id and th.subject_id=t.subject_id
+  where t.id=v_source_turn_id and t.subject_id=p_subject_id
+    and t.state in ('committed','delivered')
+    and t.committed_at is not null
+    and th.thread_type='single_character'
+    and th.status in ('active','archived')
+    and exists (
+      select 1 from public.conversation_thread_characters tc
+      where tc.thread_id=t.thread_id
+        and tc.character_id='seyeon'
+        and tc.role='primary'
+        and tc.joined_at<=t.committed_at
+        and (tc.left_at is null or tc.left_at>=t.committed_at)
+    )
+  for share of t;
+  if not found then
+    raise exception using errcode='23514',
+      constraint='seyeon_private_memory_accept_source_turn_uncommitted',
+      message='Original Se-yeon source Turn is not durably committed';
+  end if;
+
+  -- The only authoritative payload and schema read is inside this DB Owner.
+  -- No caller/raw API SELECT and no caller-provided digest. FOR UPDATE
+  -- holds the original Proposal against double acceptance and edits.
   select p.character_id,p.proposal_kind,p.record_type,p.schema_version,
          p.proposed_value_jsonb,p.source_turn_id,p.source_message_id,
          p.status,p.accepted_memory_item_id
     into v_proposal
   from public.memory_proposals p
   where p.id=p_proposal_id and p.subject_id=p_subject_id
+    and p.source_turn_id=v_source_turn_id
   for update;
   if not found
      or v_proposal.character_id is distinct from 'seyeon'
@@ -107,36 +146,10 @@ begin
      or v_proposal.record_type is distinct from 'conversation_recall'
      or v_proposal.schema_version is distinct from 'v1'
      or v_proposal.status is distinct from 'pending'
-     or v_proposal.accepted_memory_item_id is not null
-     or v_proposal.source_turn_id is null then
+     or v_proposal.accepted_memory_item_id is not null then
     raise exception using errcode='23514',
       constraint='seyeon_private_memory_accept_proposal_not_pending',
       message='Original Se-yeon Memory Proposal is not pending';
-  end if;
-
-  -- Only a durable finished source Turn may authorize a long-term
-  -- Character Memory proposal. A failed, uncommitted or cross-Subject
-  -- Turn must not become user-approved persistent recall via acceptance.
-  perform 1
-  from public.chat_turns t
-  join public.conversation_threads th
-    on th.id=t.thread_id and th.subject_id=t.subject_id
-  where t.id=v_proposal.source_turn_id and t.subject_id=p_subject_id
-    and t.state in ('committed','delivered')
-    and th.status in ('active','archived')
-  for share of t;
-  if not found then
-    raise exception using errcode='23514',
-      constraint='seyeon_private_memory_accept_source_turn_uncommitted',
-      message='Original Memory proposal source Turn has not committed';
-  end if;
-
-  v_digest:='sha256:pg-jsonb:v1:'||
-    encode(sha256(convert_to(v_proposal.proposed_value_jsonb::text,'UTF8')),'hex');
-  if v_digest is distinct from p_original_proposal_pg_digest then
-    raise exception using errcode='23514',
-      constraint='seyeon_private_memory_accept_proposal_changed',
-      message='Proposal changed between locked source read and acceptance';
   end if;
 
   -- Explicit, versioned v1 codec: exactly one JSON string field. Do not
@@ -191,12 +204,12 @@ end
 $accept$;
 
 alter function public.cmd_accept_seyeon_private_conversation_recall_proposal_v1(
-  uuid,uuid,uuid,text
+  uuid,uuid,uuid
 ) owner to myeongha_seyeon_chat_runtime_owner;
 revoke create on schema public from myeongha_seyeon_chat_runtime_owner;
 revoke myeongha_seyeon_chat_runtime_owner from current_user;
 revoke all on function public.cmd_accept_seyeon_private_conversation_recall_proposal_v1(
-  uuid,uuid,uuid,text
+  uuid,uuid,uuid
 ) from public,anon,authenticated,service_role;
 
 -- No GRANT EXECUTE to myeongha_api_executor, no HTTP registration, no
