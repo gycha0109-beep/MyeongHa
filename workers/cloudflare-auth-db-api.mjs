@@ -234,6 +234,14 @@ export function approvedCloudflareAuthOriginV1(request, bindings) {
   return raw;
 }
 
+// Release both independently-owned resources even if the first close fails.
+export async function closeCloudflareAuthResourcesV1(runtime, memberRateLimitPool) {
+  let ok = true;
+  try { await runtime?.close(); } catch { ok = false; }
+  try { await memberRateLimitPool?.close(); } catch { ok = false; }
+  return ok;
+}
+
 // Direct Auth, Guest, profile, and birth-profile endpoints. Every runtime is a
 // per-fetch instance, never a module-global session or Postgres pool.
 /** @returns {Promise<Response|null>} null means keep the existing deny-first 404. */
@@ -388,18 +396,7 @@ export async function tryHandleCloudflareApprovedAuthV1(request, bindings, route
   } catch {
     result = unavailable();
   }
-  let cleanupFailed = false;
-  try {
-    await runtime?.close();
-  } catch {
-    cleanupFailed = true;
-  }
-  try {
-    await memberRateLimitPool?.close();
-  } catch {
-    cleanupFailed = true;
-  }
-  if (cleanupFailed) return unavailable();
+  if (!await closeCloudflareAuthResourcesV1(runtime, memberRateLimitPool)) return unavailable();
 
   // Final boundary applies to all approved Auth, Guest, Naver and profile
   // responses. Never forward an unexpected HTML 500, stream or redirect.
