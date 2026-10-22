@@ -9,6 +9,10 @@ describe('Reader conversation and consensual memory source split — RR-05/06/08
   it.each([
     ['방금 본 재물 해석을 짧게 요약해 주세요.', 'wealth', 'official_summary'],
     ['구매한 사주를 간단히 요약해 줘.', 'wealth', 'official_summary'],
+    ['방금 본 금전 해석을 간단히 요약해 주세요.', 'wealth', 'official_summary'],
+    ['방금 본 직업 해석을 요약해 주세요.', 'wealth', 'clarification'],
+    ['방금 본 재물 해석을 짧게 요약해 주세요.', 'career', 'clarification'],
+    ['사주 보고서를 대충 요약해 주세요.', 'wealth', 'clarification'],
     ['그 부분을 더 설명해 주세요.', 'wealth', 'official_followup'],
     ['방금 본 직업 해석을 더 설명해 주세요.', 'career', 'official_followup'],
     ['오늘 저녁에 무엇을 먹을까?', 'wealth', 'ordinary'],
@@ -55,6 +59,24 @@ describe('Reader conversation and consensual memory source split — RR-05/06/08
         expect(result.intent.memorySourcePolicy).toBe('EXISTING_CONSENT_GRANT_AND_PIN_ONLY');
       }
     }
+  });
+
+  it('holds cross-domain Official summaries before inspecting a supplied guarded scene', async () => {
+    let officialReads = 0;
+    const result = await prepareReaderConversationResponseCandidateV1({
+      userText: '방금 본 직업 해석을 요약해 주세요.',
+      admittedDomain: 'wealth',
+      get official(): never {
+        officialReads += 1;
+        throw Error('A wealth source cannot serve a career summary.');
+      },
+    });
+    expect(result.mode).toBe('hold');
+    if (result.mode === 'hold') {
+      expect(result.reason).toBe('clarification_required');
+      expect(result.intent.clarificationReason).toBe('unapproved_saju_scope');
+    }
+    expect(officialReads).toBe(0);
   });
 
   it('does not use client-supplied faux Reading or memory authority for official summary', async () => {
