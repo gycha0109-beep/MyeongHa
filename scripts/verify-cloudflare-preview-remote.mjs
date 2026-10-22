@@ -265,6 +265,8 @@ async function main() {
       target:process.env.MYEONGHA_CLOUDFLARE_EVIDENCE_KIND,
       expectedCommit:expectedHead,attestedCommit,
       metrics:opsMetrics,stopGate:opsStopGate,
+      githubRunId:process.env.GITHUB_RUN_ID,
+      githubRunAttempt:process.env.GITHUB_RUN_ATTEMPT,
     });
     await writeCloudflarePreviewSmokeEvidenceV1(evidence.target,evidence);
     console.log('Cloudflare Stage 9 read-only evidence:',evidence.target,
