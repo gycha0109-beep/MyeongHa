@@ -6,7 +6,7 @@ import {createOpenAiSeyeonStructuredProviderV1}
 import {createSeyeonQualityTrioSyntheticCensusV1}
   from '../scripts/seyeon-terra-glm-quality-trio-census-v1.mjs';
 import {assertN06Cap500ReservationV1,N06_MAX_REQUEST_BODY_BYTES,
-  N06_ORIGINAL_FAILED_REQUEST_BODY_CAP}
+  N06_ORIGINAL_FAILED_REQUEST_BODY_CAP,N06_TERRA_RESERVE_MICRO_USD}
   from '../scripts/seyeon-terra-glm-quality-cap500-admission-v1.mjs';
 import {requireSeyeonTrioOpenAiStageV1}
   from '../scripts/seyeon-terra-glm-quality-trio-admission-v1.mjs';
@@ -63,7 +63,7 @@ describe('N06 2026-10-22 real run #39751436405: reproduce Terra pre-dispatch wit
         }catch{record.stageMatch=false}
         try{
           assertN06Cap500ReservationV1(
-            {luna:1,terra:0,glm:0},50000,'terra',meta.requestBodyBytes,1536,
+            {luna:1,terra:0,glm:0},N06_TERRA_RESERVE_MICRO_USD,'terra',meta.requestBodyBytes,1536,
           );
           record.reservationOutcome='ADMITTED';
         }catch(err){
