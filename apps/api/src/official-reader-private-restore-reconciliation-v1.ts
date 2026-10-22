@@ -102,6 +102,14 @@ export interface OfficialReaderOffPrimaryRestoreReconciliationResultV1 {
     | 'no_protected_body_tombstones';
   readonly restoreCompletionApproved: false;
   readonly ordinaryRestoreConsumersEnabled: false;
+  /** A SECOND complete S4 rollback-only inspection after protected-body
+   * replays and key erasure. Its scope is only the exact external manifests. */
+  readonly postReplayQuarantineRecheck:
+    | 'passed_for_replay_manifests'
+    | 'not_applicable_no_manifests';
+  /** Existing policy owner/DB restore acceptance is NOT inferred from
+   * successful technical S4 tombstone replay. */
+  readonly existingPrivacyOwnerAcceptancePending: true;
   /** This operation does NOT release broader P30D/S8 read serviceability. */
   readonly publicReaderServiceEnabled: false;
 }
@@ -385,6 +393,19 @@ export async function reconcileOfficialReaderProtectedBodiesAfterRestoreV1(input
     }) !== true) return fail();
   }
 
+  // Owner remediation may have completed since an earlier failed attempt,
+  // but its absence is never inferred from a previous in-memory 'green'.
+  // Rerun ALL authoritative exact-scope S4 predicates against restored
+  // PostgreSQL after tombstone/DEK work before emitting even a bounded
+  // technical replay result. The simulation is rolled back in full.
+  // This is not full P30D Privacy ledger replay or a service release gate.
+  if (preflightStages.length > 0) {
+    await assertRollbackOnlyReaderRestorePreflightV1({
+      pool: input.pool,
+      stages: preflightStages,
+    });
+  }
+
   return Object.freeze({
     schemaVersion: OFFICIAL_READER_RESTORE_RECONCILIATION_VERSION_V1,
     tombstonesReplayed: fences.length,
@@ -401,6 +422,10 @@ export async function reconcileOfficialReaderProtectedBodiesAfterRestoreV1(input
       : 'no_protected_body_tombstones' as const,
     restoreCompletionApproved: false as const,
     ordinaryRestoreConsumersEnabled: false as const,
+    postReplayQuarantineRecheck: preflightStages.length > 0
+      ? 'passed_for_replay_manifests' as const
+      : 'not_applicable_no_manifests' as const,
+    existingPrivacyOwnerAcceptancePending: true as const,
     publicReaderServiceEnabled: false as const,
   });
 }
