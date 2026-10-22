@@ -129,7 +129,8 @@ function requireFence(
       || value.version !== 'official-reader-account-deletion-fence-v1'
       || value.subjectId !== subjectId || value.deletionJobId !== deletionJobId
       || typeof value.fenceId !== 'string'
-      || value.fenceId.trim() === ''
+      || value.fenceId.trim() !== value.fenceId
+      || value.fenceId.length === 0 || value.fenceId.length > 256
       || !Array.isArray(value.bodyIds)
       || !Array.isArray(value.keyRefs)
       || value.bodyIds.length !== value.keyRefs.length
@@ -144,7 +145,10 @@ function requireFence(
 }
 
 function sameValues(a: readonly string[], b: readonly string[]): boolean {
-  return a.length === b.length && [...a].sort().every((x, i) => x === [...b].sort()[i]);
+  if (a.length !== b.length) return false;
+  const expected = [...a].sort();
+  const actual = [...b].sort();
+  return expected.every((value, index) => value === actual[index]);
 }
 
 export function createOfficialReaderAccountPrivacyDeletionPortV1(input: {
