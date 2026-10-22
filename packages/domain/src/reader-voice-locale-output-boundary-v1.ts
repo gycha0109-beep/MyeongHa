@@ -163,7 +163,9 @@ export function inspectReaderVoiceLocaleOutputBoundaryV1(input: Readonly<{
     voiceAuthorityCharacterId: input.voiceAuthority.characterId,
     voiceAuthorityContentVersion: input.voiceAuthority.contentVersion,
     surface: evidence.surface,
-    sajuVoiceOverrideRequested: evidence.sajuVoiceOverrideRequested,
+    ...(evidence.sajuVoiceOverrideRequested === undefined
+      ? {}
+      : { sajuVoiceOverrideRequested: evidence.sajuVoiceOverrideRequested }),
     introducedRealityFactKeys: evidence.introducedRealityFactKeys,
     authorizedRealityFactKeys: evidence.authorizedRealityFactKeys,
     proseStageDirections: evidence.proseStageDirections,
