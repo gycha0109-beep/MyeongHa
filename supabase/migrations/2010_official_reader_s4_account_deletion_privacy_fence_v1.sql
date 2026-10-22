@@ -631,3 +631,45 @@ from public;
 create trigger official_reader_account_privacy_completion_guard_v1
 before update on public.outbox_events
 for each row execute function public.internal_guard_official_reader_account_privacy_completion_v1();
+
+-- Called by the same leased Worker on restart. It does NOT release any
+-- protected content and returns only a pending boolean, not key references.
+create or replace function public.internal_qry_official_reader_account_privacy_pending_v1(
+  p_subject_id uuid,
+  p_deletion_job_id uuid,
+  p_lock_owner text
+)
+returns boolean
+language plpgsql
+volatile
+security definer
+set search_path=pg_catalog,public
+as $reader_privacy_pending$
+begin
+  if p_subject_id is null or p_deletion_job_id is null
+     or p_lock_owner is null or pg_catalog.btrim(p_lock_owner)=''
+     or not exists (
+       select 1 from public.outbox_events oe
+       where oe.aggregate_type='data_deletion_job'
+         and oe.aggregate_id=p_deletion_job_id::text
+         and oe.event_type='ACCOUNT_DELETION_STARTED'
+         and oe.status='processing'
+         and oe.lock_owner=pg_catalog.btrim(p_lock_owner)
+         and oe.lease_expires_at>pg_catalog.clock_timestamp()
+     ) then
+    raise exception using errcode='23514',
+      constraint='reader_account_privacy_pending_lease_invalid',
+      message='Reader privacy continuation requires a claimed Worker lease';
+  end if;
+  return exists (
+    select 1 from public.official_reader_account_deletion_privacy_status_v1 p
+    where p.subject_id=p_subject_id and p.deletion_job_id=p_deletion_job_id
+      and p.keys_erased_at is null
+  );
+end
+$reader_privacy_pending$;
+
+revoke all on function public.internal_qry_official_reader_account_privacy_pending_v1(uuid,uuid,text)
+from public;
+grant execute on function public.internal_qry_official_reader_account_privacy_pending_v1(uuid,uuid,text)
+to myeongha_system_executor;
