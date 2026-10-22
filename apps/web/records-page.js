@@ -294,7 +294,7 @@ function appendCurrentReaderAccessControl(card, reading, readerCharacterId, auto
       } else if (result.state === 'not_available'
           && result.purchaseState === 'verified_full_cancellation') {
         controls.dataset.currentAccess = 'cancelled';
-        status.textContent = '검증된 원거래 전액취소와 해당 Reader 구매권 회수가 확인되었습니다. 유료 해설 생성·재열람·기억 재주입 및 후속 대화 접근은 차단되며, 기존 공식 사주 보고서는 별도 보존 정책을 따릅니다.';
+        status.textContent = '검증된 원거래 전액취소와 해당 Reader 구매권 회수가 확인되었습니다. 이 구매권으로 유료 해설을 생성·재열람하거나 원문을 기억에 재주입할 수 없습니다. 일반 캐릭터 채팅과 기존 공식 사주 보고서는 별도 접근 정책을 따릅니다.';
       } else if (result.state === 'not_available'
           && result.purchaseState === 'current_verified_purchase') {
         controls.dataset.currentAccess = 'reader-unavailable';
