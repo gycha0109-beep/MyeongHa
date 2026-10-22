@@ -80,3 +80,16 @@ html[data-theme="dark"] body.records-page .records-reading-badge{color:#d9a8b9;b
 .records-birth-revision{display:block;color:var(--mh-ink-muted);font-size:10px}
 .records-birth-link{display:inline-flex;margin-top:12px;color:var(--mh-brass-strong);font-weight:700}
 @media(max-width:420px){.records-birth-facts{grid-template-columns:1fr}}
+
+/* S2/S6 product-continuity UI. Historical Reader provenance is NOT Grant. */
+.records-reading-card--purchase-entry{outline:2px solid var(--mh-brass-strong);outline-offset:2px}
+.records-reading-purchase-note,.records-reader-entry-note{margin:0 0 12px;padding:11px 13px;border:1px solid var(--records-line-strong);border-radius:10px;background:var(--records-paper-soft);color:var(--mh-ink-strong);font-size:12px;line-height:1.7}
+.records-reader-entry-note{grid-column:1/-1}
+.records-reading-provenance-note{margin:10px 0 0;color:var(--mh-ink-muted);font-size:11px;line-height:1.6}
+.records-reader-current-access{margin-top:12px;padding:12px 13px;border:1px solid var(--records-line);border-radius:11px;background:var(--records-paper-soft)}
+.records-reader-current-action{min-height:40px;padding:8px 13px;border:1px solid var(--records-line-strong);border-radius:8px;color:var(--mh-ink-strong);background:var(--records-paper);font-size:12px;font-weight:700;cursor:pointer}
+.records-reader-current-action:focus-visible,.records-reader-current-thread:focus-visible{outline:2px solid var(--mh-brass-strong);outline-offset:3px}
+.records-reader-current-action:disabled{opacity:.6;cursor:progress}
+.records-reader-current-status{margin:8px 0 0;color:var(--mh-ink-muted);font-size:12px;line-height:1.75}
+.records-reader-current-status:empty{display:none}
+.records-reader-current-thread{display:inline-block;color:var(--mh-brass-strong);font-weight:700;text-decoration:underline;text-underline-offset:3px}
