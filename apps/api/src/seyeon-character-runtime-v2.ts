@@ -135,6 +135,12 @@ export interface RunSeyeonCharacterTurnV2Input {
   ) => unknown | Promise<unknown>;
   readonly userMessageRef: string;
   readonly userText: string;
+  /**
+   * Server-resolved Reader response-language request; NOT the UI header.
+   * Until I18N-06d admission, all non-Korean output is held before provider use.
+   * Missing value preserves the existing Korean runtime.
+   */
+  readonly responseVoiceLocale?: string;
   readonly contextInput: Omit<
     AssembleSeyeonRuntimeContextV2Input,
     | 'integrityDecisions'
@@ -563,9 +569,29 @@ function assertGovernedRelationshipConsistent(input: {
   }
 }
 
+/**
+ * I18N-06a execution boundary: no UI locale or unapproved profile may turn
+ * the existing Korean Se-yeon provider into an unguarded foreign renderer.
+ * Locale authoring lives in character-voice-locale-v1; release requires future
+ * persona, semantic and output guard admission.
+ */
+export function assertSeyeonResponseVoiceLocaleV1(
+  locale: string,
+): 'ko-KR' {
+  if (locale !== 'ko-KR') {
+    throw new SeyeonCharacterRuntimeErrorV2(
+      'render',
+      'Non-Korean Se-yeon Reader response is not released.',
+    );
+  }
+  return 'ko-KR';
+}
+
 export async function runSeyeonCharacterTurnV2(
   input: RunSeyeonCharacterTurnV2Input,
 ): Promise<RunSeyeonCharacterTurnV2Result> {
+  // Guard before governed preflight and every model/provider invocation.
+  assertSeyeonResponseVoiceLocaleV1(input.responseVoiceLocale ?? 'ko-KR');
   const currentUserMessage = requireGovernedCurrentUserMessage({
     userMessageRef: input.userMessageRef,
     userText: input.userText,
