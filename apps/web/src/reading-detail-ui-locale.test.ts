@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 import {
   readingScopeLabelV1, readingSceneProgressV1, readingRouteStateCopyV1, readingSourceLanguageNoticeV1,
@@ -30,6 +31,23 @@ describe('authored Reading scene locale presentation', () => {
       expect(notice.text.length).toBeGreaterThan(20);
     }
     expect(readingSourceLanguageNoticeV1('zh-CN')).toEqual(ko);
+  });
+
+  it('wires the notice into the existing Reading UI while protecting source-owned text', async () => {
+    const [page, runtime] = await Promise.all([
+      readFile(new URL('./reading-detail/ReadingDetailPage.tsx', import.meta.url), 'utf8'),
+      readFile(new URL('../reading-character.js', import.meta.url), 'utf8'),
+    ]);
+    expect(page).toContain('data-reading-source-language-notice');
+    expect(page).toContain('role="note"');
+    expect(page).toContain('data-reading-step-title data-reading-content');
+    expect(page).toContain('data-reading-step-body data-reading-content');
+    expect(page).toContain('data-reading-structure-body data-reading-content');
+    expect(runtime).toContain("document.addEventListener('myeongha:localechange', renderSourceLanguageNotice)");
+    expect(runtime).toContain('sourceLanguageNotice.textContent = presentation.text;');
+    expect(runtime).toContain('sourceLanguageNotice.hidden = !presentation.visible;');
+    expect(runtime).toContain('if (stepBody) stepBody.textContent = step.primary;');
+    expect(runtime).toContain('if (stepTitle) stepTitle.textContent = step.title;');
   });
 
   it('keeps unsupported reading requests blocked in every locale', () => {
