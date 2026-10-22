@@ -79,12 +79,12 @@ begin
       -- S5 persists the paid answer only in its private ciphertext table.
       -- This system marker remains visible in the normal Chat stream but
       -- NEVER becomes an LLM, Memory, summary, retrieval, or search input.
-      -- Match the immutable S5 marker sender + exact safe-marker hash, not
-      -- arbitrary words in user-authored Chat.
+      -- Query only existing API-granted sender/body columns. The S5 fixed
+      -- message is a SYSTEM-only text; user-authored identical prose stays
+      -- in ordinary context. Do not widen content_hash SELECT privileges.
       and not (
         m.sender_type='system'
-        and m.content_hash=
-          'sha256:v1:c04638eb883ebf25b14a9f8ce0c5bb0ae0e0bae7aaa69ea91f33f22172abbf63'
+        and m.body_text='유료 해설 기록이 있습니다.'
       )
     order by m.sequence_no desc
     limit p_limit
