@@ -10,6 +10,7 @@ import {
 } from './official-reading-reader-admission-v1.js';
 import {
   inspectOfficialReaderS5S7ContinuityV1,
+  inspectOfficialReaderS5S7WithCurrentRecordsV1,
   type S5CommittedReferenceV1,
   type S6PrivateReadReferenceV1,
   type S7AcknowledgedReferenceV1,
@@ -277,6 +278,83 @@ describe('Official S5→S6→S7 exact Reading continuity, never approval', () =>
       },
       s7Acknowledged: acknowledged(),
     })).toMatchObject({ state: 'blocked', canDisclose: false });
+  });
+
+  it('enforces commit not earlier than the admitted Reading and current Reader scope', async () => {
+    const data = await input();
+    expect(inspectOfficialReaderS5S7ContinuityV1({
+      ...data,
+      s5Commit: {
+        ...data.s5Commit,
+        committedAt: '2026-10-20T01:00:00.000Z',
+      },
+      s6Read: {
+        ...data.s6Read,
+        committedAt: '2026-10-20T01:00:00.000Z',
+      },
+    })).toMatchObject({ state: 'blocked', canDisclose: false });
+  });
+
+  it('uses existing Records subject-authorized lookup and blocks missing/revoked archive before continuity', async () => {
+    const data = await input();
+    const calls: string[] = [];
+    const port = {
+      readRecord: async ({ subjectId, readingId }: { subjectId: string; readingId: string }) => {
+        calls.push(subjectId + '/' + readingId);
+        const row: OfficialReadingRecordAuthorityRowV1 = {
+          readingId: READING,
+          readingSessionId: SESSION,
+          sajuDomain: 'career',
+          readingContractVersion: CONTRACT,
+          productResponseState: 'delivered',
+          responseSnapshotJsonb: response(),
+          responseHash: 'sha256:authorized-response',
+          readerCharacterIds: ['seyeon'],
+          completedAt: COMPLETED_AT,
+        };
+        return row;
+      },
+    };
+    const verified = await inspectOfficialReaderS5S7WithCurrentRecordsV1({
+      readerAdmission: data.readerAdmission,
+      recordAuthorityPort: port,
+      s5Commit: data.s5Commit,
+      s6Read: data.s6Read,
+      s7Acknowledged: acknowledged(),
+    });
+    expect(verified).toMatchObject({
+      state: 'held',
+      evidenceStage: 'S7_CLIENT_ACKNOWLEDGED_NOT_HUMAN_READ',
+      canDisclose: false, canPersist: false,
+    });
+    expect(calls).toEqual([SUBJECT + '/' + READING]);
+
+    const revoked = await inspectOfficialReaderS5S7WithCurrentRecordsV1({
+      readerAdmission: data.readerAdmission,
+      recordAuthorityPort: { readRecord: async () => null },
+      s5Commit: data.s5Commit,
+      s6Read: data.s6Read,
+      s7Acknowledged: acknowledged(),
+    });
+    expect(revoked).toMatchObject({ state: 'blocked', canDisclose: false });
+
+    let invoked = false;
+    const crossed = await inspectOfficialReaderS5S7WithCurrentRecordsV1({
+      readerAdmission: {
+        ...data.readerAdmission,
+        scope: { ...data.readerAdmission.scope, subjectId: 'another-subject' },
+      },
+      recordAuthorityPort: {
+        readRecord: async () => {
+          invoked = true;
+          throw new Error('incorrect cross-subject read');
+        },
+      },
+      s5Commit: data.s5Commit,
+      s6Read: data.s6Read,
+    });
+    expect(invoked).toBe(false);
+    expect(crossed).toMatchObject({ state: 'blocked', canDisclose: false });
   });
 
   it('accepts replayed immutable metadata but never turns replay into another delivery authorization', async () => {
