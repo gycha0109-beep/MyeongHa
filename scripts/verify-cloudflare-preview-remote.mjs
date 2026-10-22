@@ -187,6 +187,27 @@ async function main() {
       failures.push({path,reason:'stage4-legacy-marker-deny-body'});
     }
   }
+  // Stage 5 Worker-first Assets contract: a forged Chat marker on HTML
+  // or the root rewrite MUST hit the Worker and return the same 503 fence.
+  // Stage 4 uses its legacy Assets-first route and has no such expectation.
+  if (scf2) {
+    for (const path of [
+      '/index.html?__myeongha_chat_open=1',
+      '/?__myeongha_chat_turn_send=1',
+      '/hall.html?%255F_myeongha_chat_open=1',
+      '/api%2Fchat%2Fsynthetic-thread-id',
+      '/%61pi%252Fchat%252Fsynthetic-thread-id',
+    ]) {
+      response = await check(path, 503);
+      if (!response) continue;
+      const payload = await response.json().catch(()=>null);
+      if (payload?.error?.code !== 'SEYEON_FIRST_REVEAL_AUTHORITY_UNAVAILABLE' ||
+          payload?.ok !== false ||
+          response.headers.get('access-control-allow-origin') !== null) {
+        failures.push({path,reason:'worker-first-static-chat-route-fence-missing'});
+      }
+    }
+  }
   // Every non-health Vercel endpoint remains deny-only. On S-CF2 the
   // protected Chat routes deliberately return 503, not the legacy 404.
   // Never read a protected body as a success or confuse this with Reveal.
