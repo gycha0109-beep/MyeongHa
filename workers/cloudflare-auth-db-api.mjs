@@ -88,8 +88,33 @@ export function approvedCloudflareNaverRedirectV1(destination, route, approvedOr
     destination.searchParams.get('error') === 'access_denied';
 }
 
+// Only the original host-only member refresh cookie is allowed through
+// Auth egress. An upstream/domain-scoped provider cookie must never be set
+// on the newly approved web origin.
+export function approvedCloudflareAuthCookieV1(candidate, route) {
+  if (!candidate.headers.has('set-cookie')) return true;
+  if (!['api.auth.sign-in', 'api.auth.sign-up', 'api.auth.refresh',
+        'api.auth.sign-out', 'api.auth.promote-guest'].includes(route?.id)) return false;
+  const cookies = candidate.headers.getSetCookie?.() ??
+    [candidate.headers.get('set-cookie')];
+  if (cookies.length !== 1 || typeof cookies[0] !== 'string' ||
+      cookies[0].length > 5000) return false;
+  const parts = cookies[0].split('; ');
+  if (parts.length !== 5 && parts.length !== 6) return false;
+  if (parts.slice(1, 5).join('; ') !==
+      'Path=/api/auth; HttpOnly; Secure; SameSite=Strict') return false;
+  const prefix = 'myeongha_member_refresh_v1=';
+  if (!parts[0].startsWith(prefix)) return false;
+  const value = parts[0].slice(prefix.length);
+  if (!/^(?:[A-Za-z0-9._~!()*'-]|%[A-Fa-f0-9]{2})*$/.test(value)) return false;
+  if (parts.length === 6 &&
+      (parts[5] !== 'Max-Age=0' || value !== '')) return false;
+  return parts.length === 6 || value.length > 0;
+}
+
 export function fenceCloudflareApprovedAuthResponseV1(candidate, route, approvedOrigin) {
   if (!(candidate instanceof Response)) return unavailable();
+  if (!approvedCloudflareAuthCookieV1(candidate, route)) return unavailable();
 
   const location = candidate.headers.get('location');
   const isRedirect = candidate.status >= 300 && candidate.status < 400;
