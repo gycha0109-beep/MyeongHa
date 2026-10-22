@@ -41,7 +41,7 @@ export function createMobileChatMessageViewV1(
     body: message.redacted
       ? '가려진 메시지'
       : isPaidReaderMarker
-        ? '유료 사주 해설의 기록입니다. 현재 이용권을 확인한 후 내 기록에서 확인할 수 있습니다.'
+        ? '유료 사주 해설의 기록입니다. 현재 이용권이 확인되면 이 채팅방에서 해설을 열람할 수 있습니다.'
         : message.bodyText ?? '표시할 수 있는 텍스트가 없는 메시지',
     redacted: message.redacted,
     isPaidReaderMarker,
