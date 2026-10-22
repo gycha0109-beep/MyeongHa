@@ -129,6 +129,14 @@
 
 **수용 범위의 한계:** 위 사항은 **웹 Chat UI와 Reader Scene presentation controller의 표시 계약**이다. 실제 브라우저의 유료 Reader Chat 생성/내부 장문 Records 재언어화 출시, 모바일 parity, 개별 화법 프로필 공개, 법적 공개 허가는 포함하지 않는다. Reviewer 및 운영자에게 KO/JA/ZH-TW 인터페이스 지원과 다국어 Character 생성 지원을 동등하게 표시하지 않는다.
 
+### 7.1 후속 구현 — Reader Scene UI 헤더 snapshot 및 실제 사주 Reading 원문 안내
+
+- `apps/web/reader-scene-controller.js`의 요청 시작 시점 `uiLocale`를 기존 `reader-runtime-client.js`의 `X-MyeongHa-UI-Locale` **표시 선호 헤더**와 함께 고정한다. 인증 bearer 확인 도중 UI 로케일이 바뀌어도 현재 요청의 헤더·화면 presentation에 서로 다른 snapshot을 사용하지 않는다. Retry는 기존 controller에서 새 요청으로 취급되어 그 시점의 UI locale를 사용한다. Reader 출력 언어를 선택하거나 승인하는 새 header/body는 추가하지 않는다.
+- 기존 `apps/web/src/reading-detail/ReadingDetailPage.tsx`의 프리뷰 및 저장된 Official Reading 화면에 `data-reading-source-language-notice` 슬롯을 추가했다. `apps/web/reading-detail-ui-locale.js`의 고정 UI 저자 문구만 `myeongha:localechange` 시 교체한다. `ko-KR`에서는 안내를 숨기며 `ja-JP`/`zh-TW`에서는 **원문이 자동 번역되지 않음**을 표시한다. 기존 문장·공식 record·Reader 관계/권한을 변경하지 않는다.
+- `data-reading-step-title`, `data-reading-step-body`, `data-reading-structure-body`에 `data-reading-content`를 적용하여 기존 정적 UI 사전 재도색이 Source-owned 읽기 문장으로 침범하지 않도록 했다. Source-owned 텍스트는 기존 `reading-character.js`에서 원문을 그대로 `textContent`로 표시한다.
+- 관련 회귀: `test/web-reader-runtime-client.test.ts`, `test/web-reader-scene-locale-presentation.test.ts`, `apps/web/src/reading-detail-ui-locale.test.ts`.
+- **변경 없는 HOLD:** 독립 Reader Scene의 실제 화면 소비/실제 생성형 `ja-JP`·`zh-TW` 답변, 이전 Official Reading의 번역 재열람 ②, 모바일 사용자 노출 및 Production/Sale 공개는 이 변경에서 활성화하지 않았다. Reading Detail 원문 안내는 현재 Saju Preview/기록 표시 경계이며 Reader 생성 엔진 연결로 해석하지 않는다.
+
 ## 8. 다음 구현 작업 및 승인 위치
 
 1. **캐릭터 설계 owner:** 위 6명 차이를 실제 Bible/typed Runtime 간에 해결하고 authoritative source/version을 확정. 이 I18N 트랙은 제안·인계만, 원본 수정 금지.
