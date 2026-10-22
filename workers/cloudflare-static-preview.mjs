@@ -132,6 +132,57 @@ export const CLOUDFLARE_PUBLIC_HTML_PATHS_V1 = Object.freeze([
  * CORS grant or error body. No buffering or reading asset body content.
  * This does NOT authorize any API path to reach Static Assets.
  */
+/**
+ * RFC 9110 single-range egress consistency (deny-only). A 206 must match
+ * the caller's single requested byte interval and the advertised resource
+ * size. No multipart or non-byte range is admitted, and no body is read.
+ */
+export function isCloudflareStaticSingleByteRangeBoundV1(request, response) {
+  try {
+    const incoming = request.headers.get('range');
+    const outgoing = response.headers.get('content-range');
+    if (!incoming || !outgoing) return false;
+    const stated = /^bytes (0|[1-9][0-9]*)-(0|[1-9][0-9]*)\/([1-9][0-9]*)$/u.exec(outgoing);
+    if (!stated) return false;
+    const start = Number(stated[1]);
+    const end = Number(stated[2]);
+    const total = Number(stated[3]);
+    if (![start, end, total].every(Number.isSafeInteger) ||
+        start > end || end >= total) return false;
+
+    const explicit = /^bytes=(0|[1-9][0-9]*)-(0|[1-9][0-9]*)?$/u.exec(incoming);
+    const suffix = /^bytes=-(0|[1-9][0-9]*)$/u.exec(incoming);
+    let expectedStart;
+    let expectedEnd;
+    if (explicit) {
+      const first = Number(explicit[1]);
+      const last = explicit[2] === undefined ? total - 1 : Number(explicit[2]);
+      if (!Number.isSafeInteger(first) || !Number.isSafeInteger(last) ||
+          first >= total || last < first) return false;
+      expectedStart = first;
+      expectedEnd = Math.min(last, total - 1);
+    } else if (suffix) {
+      const count = Number(suffix[1]);
+      if (!Number.isSafeInteger(count) || count === 0) return false;
+      expectedStart = Math.max(0, total - count);
+      expectedEnd = total - 1;
+    } else {
+      return false;
+    }
+    if (start !== expectedStart || end !== expectedEnd) return false;
+    // A Content-Length mismatch can make a partial asset appear complete.
+    const length = response.headers.get('content-length');
+    if (length !== null) {
+      if (!/^(0|[1-9][0-9]*)$/u.test(length) ||
+          !Number.isSafeInteger(Number(length)) ||
+          Number(length) !== end - start + 1) return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function fenceCloudflareStaticPreviewAssetResponseV1(candidate, request) {
   const denied = () => new Response(null, { status: 404, headers: BASE_HEADERS });
   try {
@@ -141,8 +192,7 @@ export function fenceCloudflareStaticPreviewAssetResponseV1(candidate, request) 
     // conditional request respectively; neither is a generic 200 fallback.
     // Never trust a 206 body without its bounded Content-Range metadata.
     if (candidate.status === 206 &&
-        (!request.headers.has('range') ||
-         !/^bytes [0-9]+-[0-9]+\/[0-9]+$/u.test(candidate.headers.get('content-range') ?? ''))) {
+        !isCloudflareStaticSingleByteRangeBoundV1(request, candidate)) {
       return denied();
     }
     if (candidate.status === 304 &&
