@@ -11,6 +11,15 @@ import type {
 export const OFFICIAL_READER_RESTORE_RECONCILIATION_VERSION_V1 =
   'official-reader-offprimary-restore-reconciliation-v1' as const;
 
+const REFUND_RESTORE_SQL = `
+select
+  erased_row_count::text as "erasedRowCount",
+  remaining_tombstoned_row_count::text as "remainingTombstonedRowCount"
+from public.internal_replay_offprimary_reader_refund_purge_v1(
+  $1::uuid,$2::uuid,$3::uuid,$4::text,$5::uuid,$6::uuid[]
+)
+`;
+
 const RESTORE_SQL = `
 select
   erased_row_count::text as "erasedRowCount",
@@ -23,6 +32,9 @@ from public.internal_replay_offprimary_reader_account_deletion_v1(
 export interface OfficialReaderOffPrimaryRestoreReconciliationResultV1 {
   readonly schemaVersion: typeof OFFICIAL_READER_RESTORE_RECONCILIATION_VERSION_V1;
   readonly tombstonesReplayed: number;
+  readonly refundScopeTombstonesReplayed: number;
+  readonly refundScopeRowsDeleted: number;
+  readonly refundScopeKeysConfirmedDestroyed: number;
   readonly protectedRowsPhysicallyDeleted: number;
   readonly keysConfirmedDestroyed: number;
   /** This operation does NOT release broader P30D/S8 read serviceability. */
@@ -63,7 +75,59 @@ export async function reconcileOfficialReaderProtectedBodiesAfterRestoreV1(input
   if (input.executionBoundary !== 'isolated-restoration-only'
       || !input.pool || !input.offPrimary
       || !input.offPrimary.restoreCatalog || !input.offPrimary.ledger
-      || !input.offPrimary.keys) return fail();
+      || !input.offPrimary.scopeLedger || !input.offPrimary.keys) return fail();
+
+  // Replay refund-scope historical deletions FIRST. A later account delete
+  // may cover OTHER paid rows; account tombstone physical erasure is the
+  // final all-subject operation. Each refund uses the exact pre-erased IDs,
+  // retaining any later independent paid Reader answer in that same scope.
+  const refundFences =
+    await input.offPrimary.restoreCatalog.listConfirmedScopeDeletionFences();
+  let refundDeleted = 0;
+  let refundKeysDestroyed = 0;
+
+  for (const fence of refundFences) {
+    const exact=await input.offPrimary.scopeLedger.readScopeDeletionFence(fence.jobId);
+    if (!exact || exact.fenceId!==fence.fenceId
+        || exact.subjectId!==fence.subjectId
+        || exact.officialReadingId!==fence.officialReadingId
+        || exact.readerCharacterId!==fence.readerCharacterId
+        || exact.bodyIds.length!==fence.bodyIds.length
+        || exact.keyRefs.length!==fence.keyRefs.length
+        || exact.bodyIds.some((id,index)=>id!==fence.bodyIds[index])
+        || exact.keyRefs.some((ref,index)=>ref!==fence.keyRefs[index])) return fail();
+
+    const removed=await executePostgresAccountDeletionWorkerTransactionV1({
+      pool:input.pool,
+      execute:async(client)=>{
+        await client.query(
+          "select pg_catalog.set_config('myeongha.reader_restore_quarantine','on',true)",
+        );
+        const result=await client.query<{
+          erasedRowCount:unknown;
+          remainingTombstonedRowCount:unknown;
+        }>(REFUND_RESTORE_SQL,[
+          fence.jobId,fence.subjectId,fence.officialReadingId,
+          fence.readerCharacterId,fence.fenceId,[...fence.bodyIds],
+        ]);
+        const row=result.rows[0];
+        if(result.rows.length!==1 || !row
+            || integer(row.remainingTombstonedRowCount)!==0) return fail();
+        return integer(row.erasedRowCount);
+      },
+    });
+    refundDeleted+=removed;
+    for(const keyRef of fence.keyRefs) {
+      if(!(await input.offPrimary.keys.isKeyDestroyed(keyRef))) {
+        await input.offPrimary.keys.destroyKey(keyRef);
+      }
+      if(!(await input.offPrimary.keys.isKeyDestroyed(keyRef))) return fail();
+      refundKeysDestroyed++;
+    }
+    await input.offPrimary.scopeLedger.acknowledgeScopeKeyErasure(
+      fence.jobId,fence.fenceId,
+    );
+  }
 
   const fences = await input.offPrimary.restoreCatalog.listAccountDeletionFences();
   let deleted = 0;
@@ -125,6 +189,9 @@ export async function reconcileOfficialReaderProtectedBodiesAfterRestoreV1(input
     tombstonesReplayed: fences.length,
     protectedRowsPhysicallyDeleted: deleted,
     keysConfirmedDestroyed: destroyedKeys,
+    refundScopeTombstonesReplayed: refundFences.length,
+    refundScopeRowsDeleted: refundDeleted,
+    refundScopeKeysConfirmedDestroyed: refundKeysDestroyed,
     publicReaderServiceEnabled: false as const,
   });
 }
