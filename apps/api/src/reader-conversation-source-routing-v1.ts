@@ -1,5 +1,6 @@
 import {
   classifyCharacterStandardFollowupLexicalIntentV1,
+  classifyExactOfficialReadingSummaryReferenceV1,
   classifyCharacterStandardFollowupQuestionScopeV1,
 } from './character-standard-reading-chat-question-scope-v1.js';
 import {
@@ -86,7 +87,8 @@ export type ReaderConversationResponseCandidateV1 =
       intent: ReaderConversationIntentDecisionV1;
       reason: 'clarification_required' | 'unavailable_official_source' |
         'source_mismatch' | 'source_closure_required' |
-        'official_question_not_admitted' | 'existing_guard_rejected';
+        'official_question_not_admitted' | 'existing_guard_rejected' |
+        'security_gate_pending';
       addedModelCalls: 0;
       publicDisclosureAuthorized: false;
     }>;
@@ -165,7 +167,17 @@ export function classifyReaderConversationIntentV1(
     }
     if (explicitOfficial && SUMMARY.test(text) &&
         !/(?:다시\s*계산|새\s*계산|내년|다음\s*달)/u.test(text)) {
-      return decide('official_summary', signals);
+      // Preserve the independent intent and risk axes for the Security Gate,
+      // but never treat a broad summary phrase as purchase/domain authority.
+      // Actual source access is held earlier when any risk signal exists.
+      if (signals.length !== 0) return decide('official_summary', signals);
+      const summaryRef = classifyExactOfficialReadingSummaryReferenceV1(
+        text, admittedDomain,
+      );
+      if (summaryRef === 'admitted') return decide('official_summary', signals);
+      return decide('clarification', signals,
+        summaryRef === 'new_authority_required'
+          ? 'unapproved_saju_scope' : 'ambiguous_reference');
     }
     if (lex === 'admitted') return decide('official_followup', signals);
     return decide('clarification', signals, 'ambiguous_reference');
@@ -210,6 +222,16 @@ export async function prepareReaderConversationResponseCandidateV1(
   const intent = classifyReaderConversationIntentV1(
     input.userText, input.admittedDomain ?? null,
   );
+
+  // This routing helper is NOT a Security authority. Even an otherwise
+  // eligible Official Reading summary or ordinary/support request may carry
+  // a security/prompt-injection/distress signal. Defer to the existing gate
+  // BEFORE touching official sources, private memories or renderer drafts.
+  // The gate must be run outside this helper; no positive security decision
+  // or extra model call is created here.
+  if (intent.securitySignals.length !== 0) {
+    return hold(intent, 'security_gate_pending');
+  }
 
   if (intent.primaryIntent === 'clarification') {
     return hold(intent, 'clarification_required');
