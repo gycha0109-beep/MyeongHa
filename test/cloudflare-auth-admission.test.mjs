@@ -195,6 +195,42 @@ describe('Cloudflare Auth/DB Worker response and cookie-origin fence', () => {
     expect(response.headers.get('referrer-policy')).toBe('no-referrer');
   });
 
+  it('seals unexpected Auth/DB and calculation exceptions before platform HTML', async () => {
+    const secret = 'SYNTHETIC_CONFIGURATION_SECRET_NOT_FOR_CLIENTS';
+    const explodingBindings = new Proxy({}, {
+      get(_target, key) {
+        if (key === 'MYEONGHA_CLOUDFLARE_AUTH_DB_MODE') throw new Error(secret);
+        return undefined;
+      },
+    });
+    for (const [path, method, code] of [
+      ['/api/auth/sign-in', 'POST', 'AUTH_UPSTREAM_UNAVAILABLE'],
+      ['/api/me', 'GET', 'AUTH_UPSTREAM_UNAVAILABLE'],
+      ['/api/me/saju/calculation', 'POST', 'SAJU_SERVICE_UNAVAILABLE'],
+    ]) {
+      const response = await worker.fetch(
+        new Request(PRIVATE_ORIGIN + path, { method }), explodingBindings,
+      );
+      expect(response.status).toBe(503);
+      expect(response.headers.get('cache-control')).toBe('no-store');
+      expect(response.headers.get('x-content-type-options')).toBe('nosniff');
+      expect(response.headers.get('location')).toBeNull();
+      expect(response.headers.get('set-cookie')).toBeNull();
+      expect(response.headers.get('access-control-allow-origin')).toBeNull();
+      expect(response.headers.get('content-type')).toContain('application/json');
+      const body = await response.text();
+      expect(body).not.toContain(secret);
+      expect(body).not.toContain('<html');
+      expect(JSON.parse(body).error.code).toBe(code);
+    }
+    const health = await worker.fetch(new Request(PRIVATE_ORIGIN + '/api/health'), explodingBindings);
+    expect(health.status).toBe(200);
+    expect(await health.json()).toEqual({ status: 'ok' });
+    const otherApi = await worker.fetch(new Request(PRIVATE_ORIGIN + '/api/unknown'), explodingBindings);
+    expect(otherApi.status).toBe(404);
+    expect(await otherApi.text()).toBe('');
+  });
+
   it('rejects cookie-authenticated POST without a valid same-origin signal', async () => {
     for (const headers of [
       { Cookie: 'myeongha_member_refresh_v1=synthetic' },

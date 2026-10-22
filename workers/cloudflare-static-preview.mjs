@@ -30,6 +30,17 @@ const FIRST_REVEAL_ERROR = Object.freeze({
   meta: { apiContractVersion: 'v0.9' },
 });
 
+// Adapter exceptions must never reach the Cloudflare HTML 500 fallback.
+export function sealCloudflareUnexpectedApiFailureV1(route) {
+  const isSaju = route?.id === 'api.me.saju.calculation';
+  return Response.json({
+    ok: false,
+    error: isSaju
+      ? { code: 'SAJU_SERVICE_UNAVAILABLE', messageKey: 'saju.service_unavailable', retryable: true }
+      : { code: 'AUTH_UPSTREAM_UNAVAILABLE', messageKey: 'auth.auth_upstream_unavailable', retryable: true },
+  }, { status: 503, headers: BASE_HEADERS });
+}
+
 export function isCloudflareStaticPreviewApiPath(pathname) {
   return pathname === '/api' || pathname.startsWith('/api/');
 }
@@ -101,10 +112,16 @@ export default {
         return new Response(sealed.body, { status: sealed.status, headers });
       }
     }
-    const approvedAuthResponse = await tryHandleCloudflareApprovedAuthV1(request, bindings, route);
-    if (approvedAuthResponse !== null) return approvedAuthResponse;
-    const approvedCalculationResponse = await tryHandleCloudflareApprovedSajuCalculationV1(request, bindings, route);
-    if (approvedCalculationResponse !== null) return approvedCalculationResponse;
-    return handleCloudflareStaticPreviewRequest(request);
+    try {
+      const approvedAuthResponse = await tryHandleCloudflareApprovedAuthV1(request, bindings, route);
+      if (approvedAuthResponse !== null) return approvedAuthResponse;
+      const approvedCalculationResponse = await tryHandleCloudflareApprovedSajuCalculationV1(request, bindings, route);
+      if (approvedCalculationResponse !== null) return approvedCalculationResponse;
+      return handleCloudflareStaticPreviewRequest(request);
+    } catch {
+      // Auth/DB or calculation adapters can fail outside their own try/catch.
+      // Keep a fixed no-store error code; never emit platform HTML/errors.
+      return sealCloudflareUnexpectedApiFailureV1(route);
+    }
   },
 };
