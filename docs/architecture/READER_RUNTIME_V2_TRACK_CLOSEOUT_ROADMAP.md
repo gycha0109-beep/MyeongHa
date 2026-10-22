@@ -5,6 +5,19 @@
 - 기준: 2026-10-10, 기존 병합 경계 PR #1849 / #1853 / #1860. 진행 시 항상 latest main / CI / 운영 상태를 다시 확인한다.
 - 추적 규칙: 각 실행 PR 본문에는 `Watchtower-Track: reader-runtime` 정확히 한 번. 모든 작업은 구현 → 권한·위조 부정 검증 → basic CI → integration CI → 병합 → postmerge main CI와 해당 Production SHA 확인. 녹색 CI는 공개 Chat 승인 아님.
 
+## 2026-10-22 제품·GPT 트랙 인계 동기화 (RR-01~15 순서·권한 불변)
+
+상위 인계표: [GPT 14개 트랙 통합 실행 로드맵](../roadmaps/MYEONGHA_GPT_TRACK_MASTER_ROADMAP_20261022.md). **이 절은 사용자의 '사주 요약 → Reader 대화 → 기록 상세' 경험에 기존 RR 작업을 대응시킨 설명**이며, 새 RR 단계·새 모델 호출·상담 기능 승인·PUBLIC ON을 추가하지 않는다.
+
+- **공식 의미·보고서 본문:** Saju Owner가 통제한다. Saju의 `detailed` 5 natal 표현 지원은 운영 semantic authority/판매 준비 완료와 별개다. Reader/LLM은 기록을 참조하되 새 명리 판단을 생성하지 않는다.
+- **구매 후 요약/Reader Scene:** 현재 정확한 Reading/Reader/Grant/Source closure가 붙은 의미에 한해 캐릭터 화법으로 전달한다. 기존 UI 분기를 재설계하지 않고 RR-01/02·RR-06의 검증된 Scene/Handoff를 재사용한다.
+- **후속 질문/대화:** RR-05의 질문 scope(후속 설명/모호한 지시/새 영역/복합 요청)를 바탕으로 공식 Reading 관련 여부를 판단한다. '일상·고민 상담'을 모두 공식 보고서 RAG 답변으로 강제하지 않는다. 그러나 새로운 범위의 사주 주장, 자유로운 semantic paraphrase, 근거 없는 타인·기간 확대는 기존 Gate/Guard에서 차단한다.
+- **안전/공격·권한 분리:** 질문이 사주 또는 일상이라는 의도와, 위험 신호·prompt injection·권한 없음이라는 제한은 동시에 성립할 수 있다. 기존 안전 Preflight/Capability/Output Guard가 권한을 결정한다. 새로운 분류 전용 LLM 호출이나 3→2 호출 감소를 이 로드맵에서 확정하지 않는다. 현행 세연 C08 3-call Shadow 평가와 Reader Production 경로도 혼합하지 않는다.
+- **기억:** 사용자 동의 Life Fact·Memory/관계 이력은 별도 원본·Grant·권한 경계를 유지한다. 공식 Saju Unit/해석을 사용자 기억으로 복사해 독립 진실로 승격 금지. RR-08의 합법적인 멀티턴 연결은 RR-03/04/09와 동시 소유 검증에 의존한다.
+- **공식 기록:** Records는 Official Reading 한 개와 Reader별 Interpretation/권한/후속 Thread를 구별한다. S4 보호 유료 본문·RR-09/10 원자 확정·RR-11/12 안전 조회가 연결되기 전 공개 성공으로 표기하지 않는다.
+
+현재 실행 우선순위는 **RR-03/04 DB provenance/Anchor 및 RR-06/08의 기존 제한 대화 기능을 병렬로 연결 → RR-09/10의 최종 저장·철회 경합 → RR-11/12의 실제 사용자 입출력 → RR-13/14 공개 인수 → RR-15 종료** 순서이며, 다른 독립 콘텐츠/클라이언트 작업은 계속 진행한다. 해당 단계·정확한 합격 기준은 아래 표가 우선한다.
+
 ## 0. 실제 발견된 경계와 설계 결정
 
 1. 기존 `apps/api/src/reader-interpretation-preview-runtime-v2.ts`는 Saju-owned Grounding으로 생성·Semantic Guard 통과한 Reader 해설을 **Preview** 형태로 반환한다. 내부 세그먼트에는 `sourceUnitRefs`가 있다. 그러나 `reader-interpretation-preview-http.ts`는 UI에 `kind/text`만 노출하여 provenance를 전달하지 않는다.
