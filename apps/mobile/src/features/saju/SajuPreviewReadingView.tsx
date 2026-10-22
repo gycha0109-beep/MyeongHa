@@ -256,7 +256,7 @@ export function SajuPreviewReadingView({ onOpenPreview }: { onOpenPreview?: (top
 
       {state.kind === 'not_delivered' ? (
         <View style={styles.stateCard}>
-          <Text style={styles.stateTitle}>{state.topic.label}</Text>
+          <Text style={styles.stateTitle}>{t(state.topic.label)}</Text>
           <Text style={styles.muted}>{t(notDeliveredCopy(state.result.responseState))}</Text>
           {state.result.responseState === 'temporarily_unavailable' ? (
             <Pressable
@@ -272,7 +272,7 @@ export function SajuPreviewReadingView({ onOpenPreview }: { onOpenPreview?: (top
 
       {state.kind === 'error' ? (
         <View style={styles.stateCard}>
-          <Text style={styles.stateTitle}>{state.topic.label}</Text>
+          <Text style={styles.stateTitle}>{t(state.topic.label)}</Text>
           <Text style={styles.error}>{state.message}</Text>
           {state.retryable ? (
             <Pressable
@@ -292,7 +292,7 @@ export function SajuPreviewReadingView({ onOpenPreview }: { onOpenPreview?: (top
             <Text style={styles.sourceLanguageNotice}>{sourceNotice.text}</Text>
           ) : null}
           <View style={styles.resultHeading}>
-            <Text style={styles.resultTitle}>{state.topic.label}</Text>
+            <Text style={styles.resultTitle}>{t(state.topic.label)}</Text>
             <MobileUiText style={styles.authorityNote}>
               Preview · 연구 검증 중인 원국 해석이며 확정적 미래 예측은 포함하지 않습니다.
             </MobileUiText>
@@ -311,7 +311,7 @@ export function SajuPreviewReadingView({ onOpenPreview }: { onOpenPreview?: (top
 
           {state.result.steps.map((step, index) => (
             <View key={`${String(index)}:${step.title}`} style={styles.readingCard}>
-              <Text style={styles.stepIndex}>읽기 {index + 1}</Text>
+              <Text style={styles.stepIndex}>{t('읽기')} {index + 1}</Text>
               <Text style={styles.stepTitle}>{step.title}</Text>
               <Text style={styles.primaryText}>{step.primary}</Text>
 
