@@ -16,6 +16,7 @@ import { handleSocialAuthStartRequestV1 } from '../apps/api/src/social-auth-star
 import { handleNaverOAuthBridgeRequestV1 } from '../apps/api/src/naver-oauth-bridge-http.ts';
 
 const EXACT_MODE = 'approved-auth-db-v1';
+const EXACT_DB_TLS_RLS_APPROVAL = 'approved-isolated-tls-rls-v1';
 const AUTH_ACTIONS = Object.freeze({
   'api.auth.sign-in': 'sign-in',
   'api.auth.sign-up': 'sign-up',
@@ -144,6 +145,15 @@ export function allowedCloudflareNaverQueryV1(url, action) {
   return true;
 }
 
+// DB TLS/RLS owner and OAuth callback registration are separate authorities.
+// Absent or mismatched admission must not read a DB credential or contact a provider.
+export function approvedCloudflareStage5HandoffV1(bindings, origin, needsOAuth) {
+  if (bindings?.MYEONGHA_CLOUDFLARE_DB_TLS_RLS_APPROVAL !== EXACT_DB_TLS_RLS_APPROVAL) return false;
+  if (needsOAuth &&
+      bindings?.MYEONGHA_CLOUDFLARE_OAUTH_CALLBACK_ORIGIN !== origin) return false;
+  return true;
+}
+
 export function approvedCloudflareAuthOriginV1(request, bindings) {
   if (bindings?.MYEONGHA_CLOUDFLARE_AUTH_DB_MODE !== EXACT_MODE) return null;
   const raw = bindings.MYEONGHA_CLOUDFLARE_AUTH_ORIGIN;
@@ -192,6 +202,11 @@ export async function tryHandleCloudflareApprovedAuthV1(request, bindings, route
   if (url.hash !== '') return denied();
   if (naverAction !== null && !allowedCloudflareNaverQueryV1(url, naverAction)) return denied();
   if (url.search !== '' && naverAction === null && !isSocialComplete) return denied();
+  // Provider callback registration and Worker→DB TLS/RLS acceptance are
+  // separately signed, not inferred from the Auth host or provider flags.
+  if (!approvedCloudflareStage5HandoffV1(
+    bindings, origin, isSocialStart || isSocialComplete || naverAction !== null,
+  )) return null;
   const expectedMethod = (isMemberProfile || isBirthRead || isCurrentBirth ||
     (naverAction !== null && naverAction !== 'token')) ? 'GET' : 'POST';
   if (request.method !== expectedMethod) {
