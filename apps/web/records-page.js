@@ -1,6 +1,8 @@
 import { resolveCanonicalCharacterPresentationV1 } from './character-presentation-identity.js';
 import { createRecordsRuntimeClient, RecordsRuntimeError } from './records-runtime-client.js';
 import { buildPersistedReadingHandoffUrlV1 } from './reading-history-handoff.js';
+import { buildChatThreadUrlV1 } from './chat-open-client.js';
+import { parseVerifiedReaderRecordsEntryV1 } from './commerce-reader-records-continuity.js';
 
 const SAMPLE_SAJU_FACT_TYPE = 'sample_saju_reading_result';
 const SAMPLE_SAJU_SCHEMA_VERSION = 'sample.v1';
@@ -106,7 +108,9 @@ function setupTabs() {
   const params = new URLSearchParams(window.location.search);
   const requestedTab = params.get('tab');
   const fromReading = params.get('from') === 'reading';
-  if (requestedTab === 'saju' || fromReading) {
+  const verifiedReaderEntry = parseVerifiedReaderRecordsEntryV1(params);
+  if (requestedTab === 'saju' || fromReading
+      || verifiedReaderEntry.state === 'ready') {
     const sajuTab = tabs.find((tab) => tab.id === 'saju-records-tab');
     if (sajuTab) {
       activate(sajuTab);
@@ -249,6 +253,61 @@ function appendReadingFooter(card, leftText, options = {}) {
   card.append(footer);
 }
 
+const READER_CONTINUITY_HINT = /^[a-z][a-z0-9_-]{0,63}$/u;
+
+function appendCurrentReaderAccessControl(card, reading, readerCharacterId, autoCheck = false) {
+  if (typeof reading?.readingId !== 'string'
+      || typeof readerCharacterId !== 'string'
+      || !READER_CONTINUITY_HINT.test(readerCharacterId)) return;
+
+  const name = resolveCanonicalCharacterPresentationV1(readerCharacterId)?.name ?? '이 대리자';
+  const controls = document.createElement('section');
+  controls.className = 'records-reader-current-access';
+  controls.setAttribute('aria-label', name + '의 현재 유료 해설·대화 접근 확인');
+
+  const button = textElement('button', 'records-reader-current-action', name + ' 대화 권한 확인');
+  button.type = 'button';
+  const status = textElement('p', 'records-reader-current-status', '');
+  status.setAttribute('role', 'status');
+  status.setAttribute('aria-live', 'polite');
+  controls.append(button, status);
+  card.append(controls);
+
+  let generation = 0;
+  button.addEventListener('click', async () => {
+    const ownRequest = ++generation;
+    button.disabled = true;
+    status.replaceChildren();
+    status.textContent = '현재 Reader 구매권과 대화방을 확인하고 있습니다…';
+    try {
+      const result = await createRecordsRuntimeClient().readReaderContinuity({
+        readingId: reading.readingId,
+        readerCharacterId,
+      });
+      if (!controls.isConnected || generation !== ownRequest) return;
+      if (result.state === 'held') {
+        status.textContent = '유료 Reader 대화 연결은 준비 중입니다. 저장된 공식 사주 보고서의 열람과는 별개입니다.';
+      } else if (result.state === 'not_confirmed') {
+        status.textContent = '현재 계정에서 이 Reader의 접근을 확인할 수 없습니다. 과거 구매·대리자 기록은 현재 이용권이 아닙니다.';
+      } else if (result.state === 'not_available') {
+        status.textContent = '현재 이 Reader의 유료 해설·후속 대화 권한이나 연결할 대화방이 확인되지 않았습니다. 환불·권한 회수·만료 여부를 임의로 단정하지 않습니다.';
+      } else if (result.state === 'existing_thread_candidate') {
+        status.textContent = '현재 확인된 대화방입니다. 이동 후 서버에서 Reader 구매권을 다시 확인합니다. ';
+        const link = textElement('a', 'records-reader-current-thread', '기존 대화방으로 이동 →');
+        link.href = buildChatThreadUrlV1(result.threadId);
+        status.append(link);
+      }
+    } catch {
+      if (controls.isConnected && generation === ownRequest) {
+        status.textContent = 'Reader 권한 상태를 불러오지 못했습니다. 다시 확인할 수 있습니다.';
+      }
+    } finally {
+      if (controls.isConnected && generation === ownRequest) button.disabled = false;
+    }
+  });
+  if (autoCheck) button.click();
+}
+
 function renderPersistedReading(target, reading) {
   const presentation = readingPresentation(reading.sajuDomain);
   const card = document.createElement('article');
@@ -289,6 +348,11 @@ function renderPersistedReading(target, reading) {
       `Reading contract · ${String(reading.readingContractVersion ?? '—')}`,
       { href: handoffUrl, label: '저장된 풀이 열기 →' },
     );
+    // Historical Reader provenance does not imply a current entitlement.
+    // Require an explicit server-side check per actual purchased Reader.
+    for (const readerId of new Set(reading.readerCharacterIds ?? [])) {
+      appendCurrentReaderAccessControl(card, reading, readerId);
+    }
   } else {
     appendReadingFooter(
       card,
@@ -296,6 +360,7 @@ function renderPersistedReading(target, reading) {
       { href: null, label: '완료 후 다시 열 수 있습니다.' },
     );
   }
+  card.dataset.officialReadingId = String(reading.readingId);
   target.append(card);
 }
 
@@ -369,6 +434,25 @@ function renderSajuReadings(readingPayload, lifeFactsPayload) {
   const readings = requireArray(readingPayload, 'readings');
   if (readings.length > 0) {
     for (const reading of readings) renderPersistedReading(target, reading);
+    const entry = parseVerifiedReaderRecordsEntryV1(window.location.search);
+    if (entry.state === 'ready') {
+      const selected = readings.find(reading => reading.readingId === entry.readingId);
+      if (selected) {
+        const highlight = [...target.children].find(card =>
+          card.dataset.officialReadingId === entry.readingId);
+        if (highlight) {
+          highlight.classList.add('records-reading-card--purchase-entry');
+          const note = textElement('p', 'records-reading-purchase-note',
+            '구매 후 연결된 공식 Reading 기록입니다. 유료 Reader 요약·대화 권한은 별도로 확인해야 합니다.');
+          highlight.prepend(note);
+          appendCurrentReaderAccessControl(highlight, selected, entry.readerCharacterId, true);
+        }
+      } else {
+        const info = textElement('p', 'records-reader-entry-note',
+          '구매 후 요청한 공식 Reading이 현재 계정의 기록에서 확인되지 않습니다. 결제 완료 화면만으로 보고서나 Reader 이용권을 확정하지 않습니다.');
+        target.prepend(info);
+      }
+    }
     return;
   }
   if (allowsDevelopmentSajuSamples()) {
