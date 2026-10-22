@@ -13,7 +13,7 @@ create or replace function public.internal_replay_offprimary_reader_refund_purge
   p_external_fence_id uuid,
   p_original_body_ids uuid[]
 )
-returns table (erased_row_count bigint,remaining_scope_row_count bigint)
+returns table (erased_row_count bigint,remaining_tombstoned_row_count bigint)
 language plpgsql volatile security definer
 set search_path=pg_catalog,public
 as $reader_refund_restore$
@@ -48,18 +48,20 @@ begin
   -- body MUST stay erased, even if the restored purchase looks active.
   perform 1 from public.subjects s where s.id=p_subject_id for update;
 
-  -- The external fence must cover every restored body in this exact scope.
-  -- An unknown body rejects the whole restore; never perform partial purge.
+  -- A later independent purchase can have new content in the SAME scope.
+  -- Replay only the exact historical erased body IDs, not every body
+  -- currently belonging to that scope. Reject an ID remapped to a different
+  -- Subject/Reading/Reader: the external manifest is immutable.
   if exists (
     select 1 from public.official_reader_paid_answer_bodies b
-    where b.subject_id=p_subject_id
-      and b.official_reading_id=p_official_reading_id
-      and b.reader_character_id=p_reader_character_id
-      and not (b.id=any(p_original_body_ids))
+    where b.id=any(p_original_body_ids)
+      and (b.subject_id is distinct from p_subject_id
+        or b.official_reading_id is distinct from p_official_reading_id
+        or b.reader_character_id is distinct from p_reader_character_id)
   ) then
     raise exception using errcode='23514',
-      constraint='reader_refund_restore_unlisted_body',
-      message='Restored Reader body is not covered by the external scope tombstone';
+      constraint='reader_refund_restore_wrong_scope_body',
+      message='Reader refund tombstone must not erase another scope';
   end if;
 
   delete from public.official_reader_paid_answer_bodies b
@@ -71,13 +73,11 @@ begin
 
   select pg_catalog.count(*) into v_left
   from public.official_reader_paid_answer_bodies b
-  where b.subject_id=p_subject_id
-    and b.official_reading_id=p_official_reading_id
-    and b.reader_character_id=p_reader_character_id;
+  where b.id=any(p_original_body_ids);
   if v_left<>0 then
     raise exception using errcode='23514',
       constraint='reader_refund_restore_scope_leftover',
-      message='Reader refund restore left protected ciphertext';
+      message='Reader refund restore left tombstoned protected ciphertext';
   end if;
   return query select v_erased,v_left;
 end
