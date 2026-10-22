@@ -411,8 +411,8 @@ describe('Official Reading -> Reader Chat context composition', () => {
       contextInput: plan.contextInput,
     });
 
-    expect(() =>
+    await expect(
       assemblePreparedCharacterStandardReadingRuntimeContextV1(forgedPlan),
-    ).toThrow(/was not minted by server authority/u);
+    ).rejects.toThrow(/was not minted by server authority/u);
   });
 });
