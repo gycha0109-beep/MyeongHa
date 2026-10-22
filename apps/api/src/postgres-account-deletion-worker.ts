@@ -3,6 +3,7 @@ import type {
   AccountDeletionWorkerDbFinalizerPortV1,
   AccountDeletionWorkerResumeStatePortV1,
   AccountDeletionWorkerResumeStateV1,
+  AccountDeletionReaderPrivacyStatePortV1,
 } from './account-deletion-worker-orchestration.js';
 import type {
   PostgresSubjectPoolV1,
@@ -40,6 +41,7 @@ export interface PostgresAccountDeletionWorkerPortsV1 {
   readonly resumeStatePort: AccountDeletionWorkerResumeStatePortV1;
   readonly dbFinalizerPort: AccountDeletionWorkerDbFinalizerPortV1;
   readonly completionPort: AccountDeletionWorkerCompletionPortV1;
+  readonly readerPrivacyStatePort: AccountDeletionReaderPrivacyStatePortV1;
 }
 
 const BEGIN_SQL = 'BEGIN';
@@ -65,6 +67,26 @@ select
   outbox_event_id::text as "outboxEventId",
   outbox_status as "outboxStatus"
 from public.internal_account_deletion_resume_state_v1($1::uuid, $2::uuid, $3::text)
+`.trim();
+
+const READER_PRIVACY_MANIFEST_SQL = `
+select body_id::text as "bodyId",
+       encryption_key_ref as "encryptionKeyRef"
+from public.internal_qry_official_reader_account_deletion_manifest_v1(
+  $1::uuid,$2::uuid,$3::text
+)
+`.trim();
+
+const READER_PRIVACY_PENDING_SQL = `
+select public.internal_qry_official_reader_account_privacy_pending_v1(
+  $1::uuid,$2::uuid,$3::text
+) as "pending"
+`.trim();
+
+const READER_PRIVACY_ACK_SQL = `
+select public.internal_ack_official_reader_account_key_erasure_v1(
+  $1::uuid,$2::uuid,$3::text,$4::text
+) as "acknowledged"
 `.trim();
 
 const FINALIZE_SQL = `
@@ -222,10 +244,32 @@ export function createPostgresAccountDeletionWorkerPortsV1(input: {
       readonly subjectId: string;
       readonly deletionJobId: string;
       readonly lockOwner: string;
+      readonly privacyFenceId?: string;
     }) {
       return executePostgresAccountDeletionWorkerTransactionV1({
         pool: input.pool,
         execute: async (client) => {
+          // Transaction-local authority originates from a durable external
+          // ledger receipt, never from a browser or provider payload.
+          if (finalizeInput.privacyFenceId !== undefined) {
+            const receipt = finalizeInput.privacyFenceId;
+            if (typeof receipt !== 'string' || receipt.trim() !== receipt
+                || receipt.length === 0 || receipt.length > 256) {
+              throw new Error('Protected Reader external privacy fence is invalid.');
+            }
+            await client.query(
+              "select pg_catalog.set_config('myeongha.reader_privacy_fence_subject_id',$1::text,true)",
+              [finalizeInput.subjectId],
+            );
+            await client.query(
+              "select pg_catalog.set_config('myeongha.reader_privacy_fence_deletion_job_id',$1::text,true)",
+              [finalizeInput.deletionJobId],
+            );
+            await client.query(
+              "select pg_catalog.set_config('myeongha.reader_privacy_fence_receipt_id',$1::text,true)",
+              [receipt],
+            );
+          }
           const result = await client.query<{
             finalized: unknown;
             replayed: unknown;
@@ -278,10 +322,59 @@ export function createPostgresAccountDeletionWorkerPortsV1(input: {
     },
   });
 
+  const readerPrivacyStatePort: AccountDeletionReaderPrivacyStatePortV1 = Object.freeze({
+    async readProtectedManifest(identity) {
+      return executePostgresAccountDeletionWorkerTransactionV1({
+        pool: input.pool,
+        execute: async (client) => {
+          const result = await client.query<{
+            bodyId: unknown;
+            encryptionKeyRef: unknown;
+          }>(READER_PRIVACY_MANIFEST_SQL, [
+            identity.subjectId, identity.deletionJobId, identity.lockOwner,
+          ]);
+          const rows = result.rows.map((row) => Object.freeze({
+            bodyId: requireString(row.bodyId, 'protected Reader body identity'),
+            encryptionKeyRef: requireString(row.encryptionKeyRef, 'protected Reader key identity'),
+          }));
+          return Object.freeze({ entries: Object.freeze(rows) });
+        },
+      });
+    },
+    async hasPendingKeyErasure(identity) {
+      return executePostgresAccountDeletionWorkerTransactionV1({
+        pool: input.pool,
+        execute: async (client) => {
+          const result = await client.query<{ pending: unknown }>(
+            READER_PRIVACY_PENDING_SQL,
+            [identity.subjectId, identity.deletionJobId, identity.lockOwner],
+          );
+          return requireBoolean(oneRow(result.rows, 'protected key erasure pending').pending, 'key erasure pending');
+        },
+      });
+    },
+    async markKeysErased(identity) {
+      return executePostgresAccountDeletionWorkerTransactionV1({
+        pool: input.pool,
+        execute: async (client) => {
+          const result = await client.query<{ acknowledged: unknown }>(
+            READER_PRIVACY_ACK_SQL,
+            [
+              identity.subjectId, identity.deletionJobId, identity.lockOwner,
+              identity.privacyFenceId,
+            ],
+          );
+          return requireBoolean(oneRow(result.rows, 'protected key erasure acknowledgment').acknowledged, 'key erasure acknowledgment');
+        },
+      });
+    },
+  });
+
   return Object.freeze({
     claimPort,
     resumeStatePort,
     dbFinalizerPort,
     completionPort,
+    readerPrivacyStatePort,
   });
 }
