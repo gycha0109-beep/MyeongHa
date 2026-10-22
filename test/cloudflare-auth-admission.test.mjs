@@ -6,6 +6,8 @@ import worker, { cloudflareEmergencyHoldEnabledV1 } from '../workers/cloudflare-
 import {
   approvedCloudflareSameOriginPostV1,
   approvedCloudflareStage5HandoffV1,
+  approvedCloudflareDbHostV1,
+  approvedCloudflarePostgresTargetV1,
   approvedCloudflareNaverRedirectV1,
   approvedCloudflareAuthCookieV1,
   closeCloudflareAuthResourcesV1,
@@ -21,6 +23,8 @@ const ENABLED = Object.freeze({
   MYEONGHA_CLOUDFLARE_AUTH_ORIGIN: PRIVATE_ORIGIN,
   MYEONGHA_CLOUDFLARE_DB_TLS_RLS_APPROVAL: 'approved-isolated-tls-rls-v1',
   MYEONGHA_CLOUDFLARE_OAUTH_CALLBACK_ORIGIN: PRIVATE_ORIGIN,
+  MYEONGHA_CLOUDFLARE_DB_APPROVED_HOST: 'db.synthetic.example.com',
+  MYEONGHA_CLOUDFLARE_DB_APPROVED_PORT: '5432',
 });
 
 async function get(path, bindings, method = 'GET', base = PRIVATE_ORIGIN, headers = {}) {
@@ -109,6 +113,41 @@ describe('Cloudflare Auth/DB admission is fail-closed until explicit host and se
       },
     });
     expect((await get('/api/me', secretsPoison)).status).toBe(404);
+  });
+
+  it('requires an exact approved FQDN and PostgreSQL port before credentials', async () => {
+    expect(approvedCloudflareDbHostV1('db.synthetic.example.com')).toBe(true);
+    for (const host of [
+      undefined, '', 'localhost', '127.0.0.1', '10.10.0.3',
+      'db.internal', 'db.local', 'db.invalid', 'db.example.test',
+      'DB.SYNTHETIC.EXAMPLE.COM', 'db.synthetic.example.com.',
+      'https://db.synthetic.example.com', '[::1]',
+    ]) {
+      expect(approvedCloudflareDbHostV1(host)).toBe(false);
+      const held = await get('/api/me', {
+        ...ENABLED, MYEONGHA_CLOUDFLARE_DB_APPROVED_HOST: host,
+      });
+      expect(held.status).toBe(404);
+      expect(await held.text()).toBe('');
+    }
+    for (const port of [undefined, '', '0', '65536', '5432/tcp', '0005432']) {
+      const held = await get('/api/auth/sign-in', {
+        ...ENABLED, MYEONGHA_CLOUDFLARE_DB_APPROVED_PORT: port,
+      }, 'POST');
+      expect(held.status).toBe(404);
+    }
+    const target = {
+      databaseUrl: 'postgresql://synthetic-user:synthetic-secret@db.synthetic.example.com:5432/isolated?sslmode=verify-full',
+    };
+    expect(approvedCloudflarePostgresTargetV1(target, ENABLED)).toBe(true);
+    for (const url of [
+      'postgresql://synthetic-user:synthetic-secret@db.synthetic.example.com/isolated?sslmode=verify-full',
+      'postgresql://synthetic-user:synthetic-secret@other.example.com:5432/isolated?sslmode=verify-full',
+      'postgresql://synthetic-user:synthetic-secret@db.synthetic.example.com:5433/isolated?sslmode=verify-full',
+      'postgresql://synthetic-user:synthetic-secret@127.0.0.1:5432/isolated?sslmode=verify-full',
+    ]) {
+      expect(approvedCloudflarePostgresTargetV1({ databaseUrl: url }, ENABLED)).toBe(false);
+    }
   });
 
   it('does not reach an upstream when approved host lacks DB/auth secrets', async () => {
