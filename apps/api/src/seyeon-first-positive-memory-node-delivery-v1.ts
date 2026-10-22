@@ -271,12 +271,21 @@ export async function executeAndDeliverSeyeonFirstPositiveMemoryNodeTurnV1(
     input.response.destroy();
     throw new SeyeonG3FirstPositiveNodeUnavailableV1('INVALID_SCOPE');
   }
-  const result=await input.runtime.run({
-    verifiedEvidence:input.verifiedEvidence,
-    threadId:input.threadId,
-    clientTurnId:input.clientTurnId,
-    text:input.text.trim(),
-  });
+  // A governed runtime/provider failure must not leave a writable Node
+  // response that an outer catch/fallback can turn into an unauthorized
+  // success or an error containing private model text.
+  let result: RunProductionSeyeonChatResultV1;
+  try {
+    result=await input.runtime.run({
+      verifiedEvidence:input.verifiedEvidence,
+      threadId:input.threadId,
+      clientTurnId:input.clientTurnId,
+      text:input.text.trim(),
+    });
+  } catch (error) {
+    input.response.destroy();
+    throw error;
+  }
   return deliverSeyeonCommittedFirstPositiveMemoryNodeTurnV1({
     response:input.response,
     requestSignal:input.requestSignal,

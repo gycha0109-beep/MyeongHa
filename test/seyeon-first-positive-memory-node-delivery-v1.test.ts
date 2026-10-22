@@ -206,6 +206,44 @@ describe('Se-yeon G3 Node-only original-Grant current Subject fence',()=>{
     expect(runtimeCalls).toBe(0);
   });
 
+  it('closes the Node socket when a ready DB is followed by a failed runtime run', async () => {
+    const db = new FakeG3Connection(SUBJECT, CANARY, true);
+    const pool = new FakeG3Pool(db);
+    let destroyed = false;
+    let runtimeCalls = 0;
+    const response = {
+      headersSent: false,
+      writableEnded: false,
+      destroyed: false,
+      socket: {},
+      destroy() { destroyed = true; },
+    } as unknown as ServerResponse;
+    await expect(executeAndDeliverSeyeonFirstPositiveMemoryNodeTurnV1({
+      response,
+      requestSignal: new AbortController().signal,
+      pool,
+      verifiedEvidence: EVIDENCE,
+      threadId: THREAD,
+      clientTurnId: TURN,
+      text: '안녕하세요',
+      requestId: 'g3-test-runtime-failure',
+      serverTime: '2026-10-22T00:00:00.000Z',
+      runtime: {
+        async run(): Promise<never> {
+          runtimeCalls++;
+          throw Error('synthetic governed runtime failure');
+        },
+      },
+    })).rejects.toThrow(/synthetic governed runtime failure/u);
+    expect(destroyed).toBe(true);
+    expect(runtimeCalls).toBe(1);
+    expect(pool.connects).toBe(1);
+    expect(queries(db).some(q => q.includes('has_function_privilege'))).toBe(true);
+    expect(queries(db)).not.toContainEqual(
+      expect.stringContaining('from public.qry_seyeon_positive_first_memory_locked_reveal_v1('),
+    );
+  });
+
   it('keeps absent G1/G2/G3 owner RPC and EXECUTE privileges before Provider at DB_NOT_READY',async()=>{
     const db=new FakeG3Connection(SUBJECT,CANARY,false);
     await expect(assertSeyeonFirstPositiveNodeDbReadyV1({
