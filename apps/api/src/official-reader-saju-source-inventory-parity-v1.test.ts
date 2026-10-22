@@ -13,6 +13,7 @@ import { hashProtectedSajuTextV1 } from '../../../packages/domain/src/index.js';
 import { hashSajuHeldSourceProofRequestV1 } from './saju-held-source-proof-verifier-v1.js';
 import {
   preflightSajuReaderRecordsSourceInventoryParityV1,
+  preflightSajuReaderAgainstCurrentRecordsV1,
 } from './official-reader-saju-source-inventory-parity-v1.js';
 
 const SUBJECT = '66666666-6666-4666-8666-666666666666';
@@ -261,6 +262,61 @@ describe('Saju v2 SourceUnit / DB-admitted Reader / Records exact-reference pari
         sajuHandoff: { ...baseline, ...change },
       })).toMatchObject({ state: 'blocked', canPublish: false });
     }
+  });
+
+  it('reuses the exact current Records DB owner-scoped read without minting Reader or archive permission', async () => {
+    const readerAdmission = admission();
+    const current = await record();
+    const row: OfficialReadingRecordAuthorityRowV1 = {
+      readingId: current.readingId,
+      readingSessionId: current.readingSessionId,
+      sajuDomain: current.sajuDomain,
+      readingContractVersion: current.readingContractVersion,
+      productResponseState: current.productResponseState,
+      readerCharacterIds: current.readerCharacterIds,
+      completedAt: current.completedAt,
+      responseSnapshotJsonb: current.reading,
+      responseHash: 'sha256:stored-original',
+    };
+    const accesses: string[] = [];
+    const authorityPort = {
+      readRecord: async ({ subjectId, readingId }: { subjectId: string; readingId: string }) => {
+        accesses.push(subjectId + '/' + readingId);
+        return row;
+      },
+    };
+    const allowed = await preflightSajuReaderAgainstCurrentRecordsV1({
+      readerAdmission,
+      recordAuthorityPort: authorityPort,
+      sajuHandoff: handoff(readerAdmission),
+    });
+    expect(allowed).toMatchObject({
+      state: 'held', canPersist: false, canDisclose: false,
+    });
+    expect(accesses).toEqual([SUBJECT + '/' + READING]);
+
+    const missing = await preflightSajuReaderAgainstCurrentRecordsV1({
+      readerAdmission,
+      recordAuthorityPort: { readRecord: async () => null },
+      sajuHandoff: handoff(readerAdmission),
+    });
+    expect(missing).toMatchObject({
+      state: 'blocked', canPersist: false, canDisclose: false,
+    });
+
+    const wrongSubject = await preflightSajuReaderAgainstCurrentRecordsV1({
+      readerAdmission: {
+        ...readerAdmission,
+        scope: { ...readerAdmission.scope, subjectId: 'other-user' },
+      },
+      recordAuthorityPort: {
+        readRecord: async () => { throw new Error('must never query another subject'); },
+      },
+      sajuHandoff: handoff(readerAdmission),
+    });
+    expect(wrongSubject).toMatchObject({
+      state: 'blocked', canPersist: false, canDisclose: false,
+    });
   });
 
   it('blocks mismatched independent Records admission, fallback and changed Reader text', async () => {
