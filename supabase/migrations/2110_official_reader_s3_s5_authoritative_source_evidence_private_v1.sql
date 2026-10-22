@@ -43,7 +43,8 @@ create table public.official_reader_s3_source_authority_receipts_v1 (
       references public.subjects(id) on delete cascade,
   constraint reader_s3_source_official_fk
     foreign key(official_reading_id,subject_id)
-      references public.standard_reading_official_bindings(reading_id,subject_id),
+      references public.standard_reading_official_bindings(reading_id,subject_id)
+      on delete cascade,
   constraint reader_s3_source_catalog_fk
     foreign key(reader_character_id,reader_content_bundle_id)
       references public.character_runtime_catalog(character_id,content_bundle_id),
