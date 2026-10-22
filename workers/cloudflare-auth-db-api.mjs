@@ -14,7 +14,12 @@ import { createProductionGuestPromotionRuntimeV1 } from '../apps/api/src/product
 import { createProductionCurrentSubjectBirthProfileRuntimeV1 } from '../apps/api/src/production-current-subject-birth-profile-runtime.ts';
 import { handleSocialAuthStartRequestV1 } from '../apps/api/src/social-auth-start-http.ts';
 import { handleNaverOAuthBridgeRequestV1 } from '../apps/api/src/naver-oauth-bridge-http.ts';
-import { buildProductionNodePostgresPoolConfigV1 } from '../apps/api/src/node-postgres-subject-pool.ts';
+import {
+  buildProductionNodePostgresPoolConfigV1,
+  createNodePostgresSubjectPoolV1,
+} from '../apps/api/src/node-postgres-subject-pool.ts';
+import { PostgresMemberAuthRateLimitAdmissionPortV1 } from '../apps/api/src/postgres-member-auth-rate-limit.ts';
+import { CLOUDFLARE_DIRECT_POSTGRES_CANDIDATE_LIMITS_V1 } from '../apps/api/src/cloudflare-direct-postgres-candidate.ts';
 
 const EXACT_MODE = 'approved-auth-db-v1';
 const EXACT_DB_TLS_RLS_APPROVAL = 'approved-isolated-tls-rls-v1';
@@ -282,12 +287,9 @@ export async function tryHandleCloudflareApprovedAuthV1(request, bindings, route
     // Auth, Supabase, Naver redirect or PostgreSQL runtime acquisition.
     const config = parseProductionUserDataRuntimeConfigV1(bindings);
     parseProductionMemberAuthRateLimitConfigV1(bindings);
-    const tls = buildProductionNodePostgresPoolConfigV1(config, {
-      maxConnectionsPerRuntime: 1,
-      connectionTimeoutMs: 5_000,
-      idleTimeoutMs: 1_000,
-      statementTimeoutMs: 5_000,
-    });
+    const tls = buildProductionNodePostgresPoolConfigV1(
+      config, CLOUDFLARE_DIRECT_POSTGRES_CANDIDATE_LIMITS_V1,
+    );
     if (tls.max !== 1 || typeof tls.ssl !== 'object' ||
         tls.ssl === null || tls.ssl.rejectUnauthorized !== true) {
       return unavailable();
@@ -298,6 +300,7 @@ export async function tryHandleCloudflareApprovedAuthV1(request, bindings, route
   }
 
   let runtime;
+  let memberRateLimitPool;
   let result;
   try {
     if (isGuestBootstrap) {
@@ -363,8 +366,16 @@ export async function tryHandleCloudflareApprovedAuthV1(request, bindings, route
       // Strictly request-scoped: never cache the runtime or its PostgreSQL
       // pool across Workers fetch events. Existing rate-limit DB authority,
       // nonprivileged TLS pool, and subject boundaries remain authoritative.
+      // The Vercel source defaults to max=4 and must remain unchanged.
+      // Cloudflare injects a distinct request-owned pool with max=1, then
+      // closes it on every success/error path after the Auth runtime settles.
+      const rateLimitConfig = parseProductionMemberAuthRateLimitConfigV1(bindings);
+      memberRateLimitPool = createNodePostgresSubjectPoolV1(
+        rateLimitConfig, CLOUDFLARE_DIRECT_POSTGRES_CANDIDATE_LIMITS_V1,
+      );
       runtime = createProductionMemberAuthHttpRuntimeV1({
         env: bindings,
+        admissionPort: new PostgresMemberAuthRateLimitAdmissionPortV1(memberRateLimitPool),
         authHandler: (input) => handleSupabaseAuthRequestV1({
           ...input,
           webOrigin: origin,
@@ -377,11 +388,18 @@ export async function tryHandleCloudflareApprovedAuthV1(request, bindings, route
   } catch {
     result = unavailable();
   }
+  let cleanupFailed = false;
   try {
     await runtime?.close();
   } catch {
-    return unavailable();
+    cleanupFailed = true;
   }
+  try {
+    await memberRateLimitPool?.close();
+  } catch {
+    cleanupFailed = true;
+  }
+  if (cleanupFailed) return unavailable();
 
   // Final boundary applies to all approved Auth, Guest, Naver and profile
   // responses. Never forward an unexpected HTML 500, stream or redirect.
