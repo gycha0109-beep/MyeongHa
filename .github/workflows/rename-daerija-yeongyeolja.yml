@@ -1,0 +1,26 @@
+name: Rename Korean connector terminology (one-off)
+on:
+  push:
+    branches:
+      - refactor/rename-daerija-yeongyeolja-20261022
+permissions:
+  contents: write
+jobs:
+  replace:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Rewrite all tracked files
+        run: python3 .github/scripts/rename_daerija_to_yeongyeolja.py
+      - name: Commit changes back to branch
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git diff --cached --stat
+          git diff --cached --quiet && exit 1
+          git commit -m 'refactor: replace every 대리자 with 연결자 across repository'
+          git push origin HEAD:${{ github.ref_name }}
