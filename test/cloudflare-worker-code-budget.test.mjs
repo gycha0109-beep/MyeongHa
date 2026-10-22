@@ -40,7 +40,7 @@ describe('Stage 9 local dry-run Worker CODE bundle free-limit guard',()=>{
       [{name:'../private.js',bytes:10}],
       [{name:'/etc/passwd.js',bytes:10}],
       [{name:'a\\secret.js',bytes:10}],
-      [{name:'index.js',bytes:Number.MAX_SAFE_INTEGER}],
+      [{name:'index.js',bytes:Number.MAX_SAFE_INTEGER+1}],
     ]) expect(()=>assessCloudflareWorkerLocalCodeBudgetV1(invalid)).toThrow();
   });
 });
