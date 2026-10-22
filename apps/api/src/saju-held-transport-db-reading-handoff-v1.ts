@@ -148,6 +148,7 @@ export async function inspectSajuHeldTransportDbReadingHandoffV1(input: Readonly
     const dbRecord = await getOfficialReadingRecord({
       resolvedSubjectId: scope.subjectId,
       readingId: scope.readingId,
+      expectedResponseHash: scope.officialArtifactResponseHash,
       authorityPort: input.recordAuthorityPort,
     });
     const parity = inspectSajuDbReadingIdOnlyResponseParityV1({

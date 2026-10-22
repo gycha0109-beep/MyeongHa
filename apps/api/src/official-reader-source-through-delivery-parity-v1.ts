@@ -95,6 +95,7 @@ export async function inspectOfficialReaderSourceThroughDeliveryParityV1(
     const record = await getOfficialReadingRecord({
       resolvedSubjectId: scope.subjectId,
       readingId: scope.readingId,
+      expectedResponseHash: scope.officialArtifactResponseHash,
       authorityPort: input.recordAuthorityPort,
     });
 

@@ -227,6 +227,7 @@ export async function inspectOfficialReaderS5S7WithCurrentRecordsV1(input: Reado
     const record = await getOfficialReadingRecord({
       resolvedSubjectId: scope.subjectId,
       readingId: scope.readingId,
+      expectedResponseHash: scope.officialArtifactResponseHash,
       authorityPort: input.recordAuthorityPort,
     });
     return inspectOfficialReaderS5S7ContinuityV1({

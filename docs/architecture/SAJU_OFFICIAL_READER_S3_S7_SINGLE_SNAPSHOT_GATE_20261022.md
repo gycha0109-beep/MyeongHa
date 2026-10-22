@@ -47,3 +47,9 @@
 - 동일 S7 `deliveryRequestId / deliveryAttemptId / responsePreparedAt`와 DB Owner의 Subject×Thread×SafeMessage×Body 준비 바인딩을 유지하고, 재시도 준비 `replayed=true`를 요구한다. 임의 새로운 deliveryRequestId를 기존 요청의 재시도라고 주장하는 경우 차단한다.
 - **ACK는 별도 클라이언트 사건이다.** 원래 ACK가 존재했으면 재시도 ACK는 같은 deliveryAttemptId/원본 timestamp로 `replayed=true`여야 한다. 원래 ACK가 없고 뒤늦게 최초 ACK를 받은 경우, 기존 S7 Owner의 인증 ACK SQL로 새 사건을 별도 검증해야 하며 이 재시도 비교에서는 HOLD/BLOCKED다. HTTP 전송 준비·ACK는 사람이 읽었다는 증거가 아니다.
 - 정합성 검사 전에 **#2459 S6 암호문 AAD + #2456 동일 Saju 출처와 현재 Records Owner DB 조회**를 그대로 재사용한다. 이 계약 성공에도 `HELD` / `canPersist/canDisclose/canPublish/canSell=false` 고정. Reader 구매권·환불·Privacy Lease·키 삭제/복원·실제 전송 조건은 **매 요청마다 #2301 DB/Privacy Owner 정본**이 별도 검증해야 하며 과거 재시도 결과는 현재 접근 허가가 아니다.
+
+## 2026-10-22 Reader ↔ Records 저장 해시 인수 보강
+
+기존 `getOfficialReadingRecord`는 DB가 승인한 공식 Reading을 반환하면서 비공개 `response_hash`를 사용자 Records 응답에 싣지 않는다. 사주 브릿지의 기존 S3 SourceUnit / S5–S7 단일 DB 조회에서는 별도 승인된 Reader Admission의 `scope.officialArtifactResponseHash`를 서버 전용 `expectedResponseHash`로 전달하여 **동일 DB Records 행의 저장 해시**까지 대조한다. 다른 해시면 기존 `BLOCKED` 경계에서 멈춘다. public Records payload·SQL·Grant·Writer·issuer·Source ID 매핑은 변경하지 않는다.
+
+이 대조는 **DB Reader ↔ DB Records 저장 출처의 동일성**만 검사한다. Saju Native Reading 전체 해시와 DB UUID Reading 전체 해시는 식별자가 다르므로 동치로 취급하지 않으며, Production Source 발행과 Native ID 매핑(#2410), DB/Privacy 보호 저장·재조회·전달(#2301/#2318)은 계속 Owner 승인 대상이다. 동일 해시가 현재 구매권 또는 S7 인도/열람 허가를 뜻하지 않는다.
