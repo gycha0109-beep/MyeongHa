@@ -16,6 +16,18 @@ import { preflightSajuReaderRecordsSourceInventoryParityV1 } from './official-re
 import { preflightSajuNativeDbReadingIdentityGapV1 } from './saju-native-db-reading-identity-gap-v1.js';
 import { inspectSajuDbReadingIdOnlyResponseParityV1 } from './saju-db-reading-id-only-response-parity-v1.js';
 import {
+  inspectSajuHeldSourceDbS5S7EvidenceV1,
+} from './saju-held-source-db-s5-s7-evidence-v1.js';
+import type {
+  S5CommittedReferenceV1,
+  S6PrivateReadReferenceV1,
+  S7AcknowledgedReferenceV1,
+} from './official-reader-s5-s7-reading-continuity-v1.js';
+import type {
+  OfficialReaderS6CiphertextIdentityWitnessV1,
+  OfficialReaderS7PreparedBindingWitnessV1,
+} from './official-reader-s6-ciphertext-s7-identity-v1.js';
+import {
   inspectSajuHeldTransportDbReadingHandoffV1,
 } from './saju-held-transport-db-reading-handoff-v1.js';
 import type {
@@ -727,5 +739,256 @@ describe('Preview Saju signed transport / native ID / DB Official Reading single
       sajuHandoff:source,sourceEnvelope:envelope,
       trust:transportTrust().trust,context:transportContext(),
     })).toMatchObject({state:'blocked',canPersist:false});
+  });
+});
+
+const DB_PRODUCT = '12121212-1212-4121-8121-121212121212';
+const S5_BODY = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+const S5_MESSAGE = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+const S5_TURN = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+const S5_ATTEMPT = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+const S7_REQUEST = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
+const S7_ATTEMPT = 'ffffffff-ffff-4fff-8fff-ffffffffffff';
+const S5_TIME = '2026-10-22T05:00:00.000Z';
+const S7_TIME = '2026-10-22T05:00:02.000Z';
+const ACK_TIME = '2026-10-22T05:00:03.000Z';
+
+function authorizedDbProduct(): PreparedOfficialReadingReaderAdmissionV1 {
+  const original = admission();
+  return {
+    ...original,
+    source: {...original.source, productId: DB_PRODUCT},
+    scope: {...original.scope, productId: DB_PRODUCT},
+  };
+}
+function committedReceipt(): S5CommittedReferenceV1 {
+  return {
+    contractVersion: 'official-reader-s5-protected-answer-commit-v1',
+    bodyId: S5_BODY,
+    safeMessageId: S5_MESSAGE,
+    turnId: S5_TURN,
+    attemptId: S5_ATTEMPT,
+    committedAt: S5_TIME,
+    replayed: false,
+  };
+}
+function rereadReceipt(): S6PrivateReadReferenceV1 {
+  return {
+    bodyId: S5_BODY,
+    officialReadingId: READING,
+    readerCharacterId: 'seyeon',
+    committedAt: S5_TIME,
+    delivery: {
+      contractVersion: 'official-reader-s7-private-delivery-v1',
+      deliveryRequestId: S7_REQUEST,
+      deliveryAttemptId: S7_ATTEMPT,
+      responsePreparedAt: S7_TIME,
+      replayed: false,
+    },
+  };
+}
+function acknowledgement(): S7AcknowledgedReferenceV1 {
+  return {
+    contractVersion: 'official-reader-s7-private-delivery-v1',
+    deliveryAttemptId: S7_ATTEMPT,
+    clientAcknowledgedAt: ACK_TIME,
+    replayed: false,
+  };
+}
+function ciphertextWitness(
+  reader: PreparedOfficialReadingReaderAdmissionV1,
+): OfficialReaderS6CiphertextIdentityWitnessV1 {
+  return {
+    subjectId: reader.scope.subjectId,
+    threadId: reader.scope.threadId,
+    turnId: S5_TURN,
+    attemptId: S5_ATTEMPT,
+    safeMessageId: S5_MESSAGE,
+    officialReadingId: READING,
+    readerCharacterId: reader.scope.readerCharacterId,
+    readerContentBundleId: reader.scope.readerContentBundleId,
+    contentReleaseId: reader.scope.contentReleaseId,
+    originatingEntitlementGrantId: '10101010-1010-4010-8010-101010101010',
+    productId: reader.scope.productId,
+    sourceResponseHash: 'sha256:v1:' +
+      hashSajuHeldSourceProofRequestV1(reader.source.responseSnapshotJsonb),
+  };
+}
+function preparedBinding(
+  reader: PreparedOfficialReadingReaderAdmissionV1,
+): OfficialReaderS7PreparedBindingWitnessV1 {
+  return {
+    subjectId: reader.scope.subjectId,
+    threadId: reader.scope.threadId,
+    safeMessageId: S5_MESSAGE,
+    bodyId: S5_BODY,
+    deliveryRequestId: S7_REQUEST,
+    deliveryAttemptId: S7_ATTEMPT,
+    responsePreparedAt: S7_TIME,
+  };
+}
+async function signedS5S7Case(calls: string[]) {
+  const readerAdmission = authorizedDbProduct();
+  const {source, envelope} = signedEnvelope(readerAdmission);
+  return {
+    readerAdmission,
+    recordAuthorityPort: await currentRecordsPort(calls),
+    sajuHandoff: source,
+    sourceEnvelope: envelope,
+    trust: transportTrust().trust,
+    context: transportContext(),
+    s5Commit: committedReceipt(),
+    s6Read: rereadReceipt(),
+    s6CiphertextIdentity: ciphertextWitness(readerAdmission),
+    s7PreparedBinding: preparedBinding(readerAdmission),
+  };
+}
+
+describe('signed native S3 source → one DB Reading row → S5 protected body → S7 ACK', () => {
+  it('uses ONE Records authority fetch for both signed Source proof and protected S5-S7 history', async () => {
+    const calls: string[] = [];
+    const example = await signedS5S7Case(calls);
+    const nativeHash = (example.sajuHandoff as ReturnType<typeof handoff>).source.responseBodyHash;
+    expect(example.s6CiphertextIdentity.sourceResponseHash)
+      .not.toBe('sha256:v1:' + nativeHash);
+
+    const result = await inspectSajuHeldSourceDbS5S7EvidenceV1({
+      ...example,
+      s7Acknowledged: acknowledgement(),
+    });
+    expect(result).toEqual({
+      contractVersion: 'saju-held-source-db-s5-s7-evidence-v1',
+      state: 'held',
+      evidenceStage: 'S7_CLIENT_ACKNOWLEDGED_NOT_HUMAN_READ',
+      transportIntegrity: 'VERIFIED',
+      sourceAuthority: 'NOT_EVALUATED',
+      mappingAuthority: 'NOT_EVALUATED',
+      currentAccessAuthority: 'NOT_EVALUATED',
+      privacyApproval: 'NOT_EVALUATED',
+      s5AtomicStorage: 'DB_OWNER_REQUIRED',
+      s7Delivery: 'DB_OWNER_REQUIRED',
+      canMapReadingId: false,
+      canPersist: false,
+      canDisclose: false,
+      canPublish: false,
+      canSell: false,
+    });
+    expect(calls).toEqual([SUBJECT + '/' + READING]);
+    expect(Object.isFrozen(result)).toBe(true);
+    const json = JSON.stringify(result);
+    for(const hidden of [
+      READING, NATIVE_READING, SUBJECT, S5_BODY, S7_REQUEST,
+      nativeHash, '확인된 구조적',
+    ]) expect(json).not.toContain(hidden);
+  });
+
+  it('reports S5 committed and S7 prepared as distinct states without inventing a delivery or ACK', async () => {
+    const calls: string[] = [];
+    const base = await signedS5S7Case(calls);
+    const withoutDelivery: S6PrivateReadReferenceV1 = {
+      bodyId: base.s6Read.bodyId,
+      officialReadingId: base.s6Read.officialReadingId,
+      readerCharacterId: base.s6Read.readerCharacterId,
+      committedAt: base.s6Read.committedAt,
+    };
+    const committed = await inspectSajuHeldSourceDbS5S7EvidenceV1({
+      ...base,
+      s6Read: withoutDelivery,
+      s7PreparedBinding: undefined,
+    });
+    expect(committed).toMatchObject({
+      state: 'held', evidenceStage: 'S5_COMMITTED_REFERENCE',
+      canDisclose: false,
+    });
+    const prepared = await inspectSajuHeldSourceDbS5S7EvidenceV1({
+      ...base, trust: transportTrust().trust,
+    });
+    expect(prepared).toMatchObject({
+      state: 'held', evidenceStage: 'S7_RESPONSE_PREPARED',
+      canDisclose: false,
+    });
+    expect(calls).toHaveLength(2);
+  });
+
+  it('rejects changed S6 encrypted AAD (DB hash not native hash), S5 body, Reader and S7 request BEFORE nonce claim', async () => {
+    const base = await signedS5S7Case([]);
+    const nativeHash = (base.sajuHandoff as ReturnType<typeof handoff>).source.responseBodyHash;
+    const changed = [
+      {s6CiphertextIdentity: {...base.s6CiphertextIdentity,
+        sourceResponseHash: 'sha256:v1:' + nativeHash}},
+      {s6CiphertextIdentity: {...base.s6CiphertextIdentity,
+        safeMessageId: 'abababab-abab-4aba-8aba-abababababab'}},
+      {s6CiphertextIdentity: {...base.s6CiphertextIdentity,
+        readerCharacterId: 'baekheon'}},
+      {s6Read: {...base.s6Read, bodyId: 'abababab-abab-4aba-8aba-abababababab'}},
+      {s7PreparedBinding: {...base.s7PreparedBinding,
+        deliveryRequestId: 'abababab-abab-4aba-8aba-abababababab'}},
+      {s7PreparedBinding: {...base.s7PreparedBinding,
+        deliveryAttemptId: 'abababab-abab-4aba-8aba-abababababab'}},
+      {s7PreparedBinding: {...base.s7PreparedBinding,
+        responsePreparedAt: '2026-10-22T05:10:00.000Z'}},
+    ];
+    for(const change of changed){
+      const calls: string[] = [];
+      const trust = transportTrust();
+      const result = await inspectSajuHeldSourceDbS5S7EvidenceV1({
+        ...base, ...change,
+        recordAuthorityPort: await currentRecordsPort(calls),
+        trust: trust.trust,
+      });
+      expect(result).toMatchObject({
+        state: 'blocked', transportIntegrity: 'NOT_VERIFIED',
+        canMapReadingId: false, canDisclose: false,
+      });
+      expect(trust.getClaims()).toBe(0);
+      expect(calls).toHaveLength(0);
+    }
+  });
+
+  it('fails closed for a forged Saju signature without reading DB, and for revoked Records after one authorized read', async () => {
+    const base = await signedS5S7Case([]);
+    const changed = structuredClone(base.sourceEnvelope);
+    changed.response.reading.sections[0]!.title = '다른 명식 설명';
+    const calls: string[] = [];
+    expect(await inspectSajuHeldSourceDbS5S7EvidenceV1({
+      ...base,
+      sourceEnvelope: changed,
+      recordAuthorityPort: await currentRecordsPort(calls),
+      trust: transportTrust().trust,
+    })).toMatchObject({state:'blocked',canDisclose:false});
+    expect(calls).toHaveLength(0);
+
+    let hits = 0;
+    const revoked = await inspectSajuHeldSourceDbS5S7EvidenceV1({
+      ...base,
+      recordAuthorityPort: {readRecord: async () => {hits++;return null;}},
+      trust: transportTrust().trust,
+    });
+    expect(revoked).toMatchObject({state:'blocked',canPersist:false});
+    expect(hits).toBe(1);
+  });
+
+  it('blocks missing S7 original binding, counterfeit ACK and out-of-order timestamps without granting access', async () => {
+    const base = await signedS5S7Case([]);
+    const variants = [
+      {s7PreparedBinding: undefined},
+      {s7Acknowledged: {...acknowledgement(),
+        deliveryAttemptId: 'abababab-abab-4aba-8aba-abababababab'}},
+      {s7Acknowledged: {...acknowledgement(),
+        clientAcknowledgedAt: '2026-10-21T05:00:00.000Z'}},
+      {s5Commit: {...base.s5Commit,
+        committedAt: '2026-10-20T05:00:00.000Z'}},
+      {s6Read: {...base.s6Read,
+        committedAt: '2026-10-22T06:00:00.000Z'}},
+    ];
+    for(const change of variants){
+      const verdict = await inspectSajuHeldSourceDbS5S7EvidenceV1({
+        ...base, ...change,
+        trust: transportTrust().trust,
+      });
+      expect(verdict).toMatchObject({
+        state:'blocked',canDisclose:false,canMapReadingId:false,
+      });
+    }
   });
 });
