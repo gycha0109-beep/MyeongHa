@@ -28,3 +28,13 @@ Saju native Reading ID를 DB UUID로 바꿔 기록하거나 `responseBodyHash`�
 2. **명하 DB/Privacy Owner [#2301 Draft](https://github.com/gycha0109-beep/MyeongHa/pull/2301):** DB Official Reading UUID·Subject/Birth Revision·Product/Spec/Release·실제 저장 Response Hash의 원본 보존 또는 Owner가 승인한 변환 영수증, Privacy 삭제·복원·보호 저장/권한 경계 증명.
 3. **통합 인수:** 양쪽에서 독립적으로 검증된 발행/저장 영수증이 정확히 같은 문구뿐 아니라 **같은 공식 Reading 정체성**을 묶는 경우에만 기존 `preflightSajuReaderRecordsSourceInventoryParityV1`의 ID 불일치 차단 정책을 Owner 승인 하에 별도 변경한다. 이번 PR은 이를 변경하지 않는다.
 4. **S5/S7 실제 저장/전달:** 승인 후에도 매 요청 최신 Grant·환불·Privacy Lease 검증 및 T2 동일 범위 S1 lock은 DB Owner의 기존 진입점이 책임진다. ACK는 사람의 실제 독서 증거가 아니다.
+
+## 전체 원본 Response ID-only Diff 인수 추가
+
+`apps/api/src/saju-db-reading-id-only-response-parity-v1.ts`는 **Saju 원본 ProductReadingResponse v2의 실제 전체 응답 객체**를 서버 내부에서 받아 DB Reader/Records의 원본과 비교한다. 기존 SourceUnit 동등성 검사만으로 확인할 수 없는 Subject/Birth 표기, 명식 계산 요약, 생성 시각, 섹션 제목·상태, Disclosure 외 metadata의 유출·변조 여부도 검출한다.
+
+- 사전 조건: 위 native-ID vs DB-UUID `HELD` 정합성 + 기존 DB가 별도로 인가한 Reader/Records 원본. Saju native 응답은 정상 `delivered` v2이고 `reading.readingId`는 Saju handoff의 native ID와 정확하게 같아야 한다.
+- Saju 원본 전체 응답 `sha256`이 handoff `source.responseBodyHash`와 동일해야 한다. DB 저장 응답을 **복사한 비교용 임시 객체의 `reading.readingId` 한 곳만 native ID로 표시**한 뒤 같은 정규화 해시 함수를 적용했을 때 전체 해시가 원본과 같아야 한다. 실제 DB JSONB나 Saju 응답은 수정·재발행하지 않는다.
+- 원문/명의·Subject 계산 데이터, 제공 범위, 원본 `generatedAt`, 추가 필드나 disclosure, fallback 상태, 출처 hash 중 어느 하나라도 다르면 BLOCKED. 일치하면 `reason=only_reading_id_payload_change_unattested`로 HELD만 반환한다.
+- **원래 Saju 응답이 Production 발급자에게서 왔다는 증거는 이 함수가 갖고 있지 않다.** 그러므로 source signature + normalized request/birth revision + DB transform의 Owner 승인·인가 영수증이 없으면 `canMapReadingId=false`, `canPersist/canDisclose/canPublish/canSell=false`가 변하지 않는다. 단지 내용 차이가 한 필드뿐이라는 사실로 Reader/Records 공식 권한을 열거나 S3 strict-ID 검사를 완화하지 않는다.
+- 원본 Response·해시·Subject 값은 서버 내부 입력 전용이다. 검사의 출력에는 민감한 식별자, 전문, SourceUnit, hash, 인증 서명이나 Reader 구매권을 포함하지 않는다.
