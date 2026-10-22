@@ -47,7 +47,8 @@ try {
   });
   if (result.publicReaderServiceEnabled !== false
       || result.ordinaryDerivedRestoreQuarantineGuardInstalled !== true
-      || result.ordinaryDerivedRecordsReadFenceInstalled !== true) blocked();
+      || result.ordinaryDerivedRecordsReadFenceInstalled !== true
+      || result.ordinaryDerivedOutboxReadFenceInstalled !== true) blocked();
   // No Subject IDs, DEK references, ciphertext or raw tombstones in logs.
   process.stdout.write(JSON.stringify({
     schemaVersion: result.schemaVersion,
@@ -59,6 +60,7 @@ try {
     refundScopeKeysConfirmedDestroyed: result.refundScopeKeysConfirmedDestroyed,
     ordinaryDerivedRestoreQuarantineGuardInstalled: true,
     ordinaryDerivedRecordsReadFenceInstalled: true,
+    ordinaryDerivedOutboxReadFenceInstalled: true,
     publicReaderServiceEnabled: false,
     next: 'Keep ALL Reader paid-read and ordinary Memory/Search/Summary restore consumers OFF until the complete privacy reconciliation and restore owner acceptance.',
   }) + '\n');
