@@ -1,8 +1,12 @@
 import { describe, expect, it } from 'vitest';
+import { createHash, randomBytes } from 'node:crypto';
+import { handleNaverOAuthBridgeRequestV1 } from '../apps/api/src/naver-oauth-bridge-http.ts';
 import worker, { cloudflareEmergencyHoldEnabledV1 } from '../workers/cloudflare-static-preview.mjs';
 import {
   approvedCloudflareSameOriginPostV1,
   approvedCloudflareStage5HandoffV1,
+  approvedCloudflareNaverRedirectV1,
+  approvedCloudflareAuthCookieV1,
   allowedCloudflareNaverQueryV1,
   fenceCloudflareApprovedAuthResponseV1,
 } from '../workers/cloudflare-auth-db-api.mjs';
@@ -239,24 +243,51 @@ describe('Cloudflare Auth/DB Worker response and cookie-origin fence', () => {
     }
   });
 
-  it('permits only the existing Naver and Supabase OAuth handoff destinations', () => {
-    const accepted = [
-      ['rewrite.naver.authorize', 'https://nid.naver.com/oauth2.0/authorize?state=synthetic'],
-      ['rewrite.naver.callback', 'https://cnsfpcdiyofqvhpcegfc.supabase.co/auth/v1/callback?code=synthetic'],
-    ];
-    for (const [id, destination] of accepted) {
+  it('allows only exact Naver-to-Worker and Worker-to-Supabase callback handoff', () => {
+    const sealed = 'a'.repeat(64);
+    const naver = new URL('https://nid.naver.com/oauth2.0/authorize');
+    naver.search = new URLSearchParams({
+      response_type: 'code', client_id: 'synthetic-client',
+      redirect_uri: PRIVATE_ORIGIN + '/api/auth/social/naver/callback', state: sealed,
+    }).toString();
+    const callback = new URL('https://cnsfpcdiyofqvhpcegfc.supabase.co/auth/v1/callback');
+    callback.search = new URLSearchParams({ state: 'synthetic-oauth-state', code: sealed }).toString();
+    const denial = new URL(callback);
+    denial.search = new URLSearchParams({ state: 'synthetic-oauth-state', error: 'access_denied' }).toString();
+    for (const [id, destination] of [
+      ['rewrite.naver.authorize', naver.href],
+      ['rewrite.naver.callback', callback.href],
+      ['rewrite.naver.callback', denial.href],
+    ]) {
       const response = fenceCloudflareApprovedAuthResponseV1(
-        new Response(null, { status: 302, headers: { Location: destination } }), { id },
+        new Response(null, { status: 302, headers: { Location: destination } }),
+        { id }, PRIVATE_ORIGIN,
       );
       expect(response.status).toBe(302);
       expect(response.headers.get('location')).toBe(destination);
       expect(response.headers.get('cache-control')).toBe('no-store');
+      expect(response.headers.get('referrer-policy')).toBe('no-referrer');
     }
-    const unexpected = fenceCloudflareApprovedAuthResponseV1(
-      new Response(null, { status: 302, headers: { Location: 'https://nid.naver.com.evil.test/oauth2.0/authorize' } }),
-      { id: 'rewrite.naver.authorize' },
-    );
-    expect(unexpected.status).toBe(503);
+    for (const [id, destination] of [
+      ['rewrite.naver.authorize', 'https://nid.naver.com.evil.test/oauth2.0/authorize'],
+      ['rewrite.naver.authorize', naver.href + '&extra=1'],
+      ['rewrite.naver.authorize', naver.href + '&state=b'],
+      ['rewrite.naver.authorize', naver.href.replace('code&client_id=', 'token&client_id=')],
+      ['rewrite.naver.authorize', naver.href.replace(encodeURIComponent(PRIVATE_ORIGIN), encodeURIComponent('https://attacker.example.test'))],
+      ['rewrite.naver.callback', callback.href + '&redirect_uri=https://attacker.example.test'],
+      ['rewrite.naver.callback', callback.href + '&error=access_denied'],
+      ['rewrite.naver.callback', callback.href.replace(sealed, 'plaintext')],
+      ['rewrite.naver.callback', denial.href.replace('access_denied', 'arbitrary_error')],
+    ]) {
+      const response = fenceCloudflareApprovedAuthResponseV1(
+        new Response(null, { status: 302, headers: { Location: destination } }),
+        { id }, PRIVATE_ORIGIN,
+      );
+      expect(response.status).toBe(503);
+      expect(response.headers.get('location')).toBeNull();
+    }
+    expect(approvedCloudflareNaverRedirectV1(naver, { id: 'rewrite.naver.authorize' }, PRIVATE_ORIGIN)).toBe(true);
+    expect(approvedCloudflareNaverRedirectV1(naver, { id: 'rewrite.naver.authorize' }, undefined)).toBe(false);
   });
 
   it('rejects unknown, duplicate and contradictory Naver OAuth query controls before secrets', async () => {
@@ -279,18 +310,91 @@ describe('Cloudflare Auth/DB Worker response and cookie-origin fence', () => {
     expect(allowedCloudflareNaverQueryV1(legitCallback, 'callback')).toBe(true);
   });
 
-  it('retains Naver OAuth no-referrer on approved redirect', () => {
+  it('does not weaken Naver no-referrer even when upstream omits it', () => {
+    const authorize = new URL('https://nid.naver.com/oauth2.0/authorize');
+    authorize.search = new URLSearchParams({
+      response_type: 'code', client_id: 'synthetic-client',
+      redirect_uri: PRIVATE_ORIGIN + '/api/auth/social/naver/callback',
+      state: 'a'.repeat(64),
+    }).toString();
     const response = fenceCloudflareApprovedAuthResponseV1(
-      new Response(null, {
-        status: 302,
-        headers: {
-          Location: 'https://nid.naver.com/oauth2.0/authorize?state=synthetic',
-          'Referrer-Policy': 'no-referrer',
-        },
-      }), { id: 'rewrite.naver.authorize' },
+      new Response(null, { status: 302, headers: { Location: authorize.href } }),
+      { id: 'rewrite.naver.authorize' }, PRIVATE_ORIGIN,
     );
     expect(response.status).toBe(302);
     expect(response.headers.get('referrer-policy')).toBe('no-referrer');
+  });
+
+  it('fences refresh cookie to one host-only Secure/HttpOnly/Strict binding', () => {
+    const base = 'myeongha_member_refresh_v1=synthetic; Path=/api/auth; HttpOnly; Secure; SameSite=Strict';
+    for (const [route, cookie, valid] of [
+      ['api.auth.refresh', base, true],
+      ['api.auth.sign-out', 'myeongha_member_refresh_v1=; Path=/api/auth; HttpOnly; Secure; SameSite=Strict; Max-Age=0', true],
+      ['api.me', base, false],
+      ['api.auth.refresh', base + '; Domain=.myeongha.example.test', false],
+      ['api.auth.refresh', base.replace('SameSite=Strict', 'SameSite=None'), false],
+      ['api.auth.refresh', base.replace('HttpOnly; ', ''), false],
+      ['api.auth.refresh', base.replace('; Secure', ''), false],
+      ['api.auth.refresh', base.replace('myeongha_member_refresh_v1', 'provider_session'), false],
+      ['api.auth.refresh', base + ', provider_session=secret', false],
+      ['api.auth.refresh', base + '; Max-Age=0', false],
+    ]) {
+      const candidate = Response.json({ ok: true }, { headers: { 'Set-Cookie': cookie } });
+      expect(approvedCloudflareAuthCookieV1(candidate, { id: route })).toBe(valid);
+      expect(fenceCloudflareApprovedAuthResponseV1(candidate, { id: route }).status)
+        .toBe(valid ? 200 : 503);
+    }
+  });
+
+  it('completes synthetic Naver PKCE authorization and callback without network', async () => {
+    const env = {
+      MYEONGHA_NAVER_OAUTH_BRIDGE_ENABLED: 'true',
+      MYEONGHA_NAVER_CLIENT_ID: 'synthetic-client',
+      MYEONGHA_NAVER_OAUTH_BRIDGE_KEY: randomBytes(32).toString('base64url'),
+    };
+    const verifier = 'a'.repeat(43);
+    const challenge = createHash('sha256').update(verifier).digest('base64url');
+    const nonce = 'synthetic-supabase-state';
+    const requestUrl = new URL(PRIVATE_ORIGIN + '/api/auth/social/naver/authorize');
+    requestUrl.search = new URLSearchParams({
+      client_id: env.MYEONGHA_NAVER_CLIENT_ID,
+      redirect_uri: 'https://cnsfpcdiyofqvhpcegfc.supabase.co/auth/v1/callback',
+      response_type: 'code', state: nonce, code_challenge: challenge,
+      code_challenge_method: 'S256',
+    }).toString();
+    const first = await handleNaverOAuthBridgeRequestV1({
+      request: new Request(requestUrl), action: 'authorize', env, webOrigin: PRIVATE_ORIGIN,
+    });
+    const out = fenceCloudflareApprovedAuthResponseV1(
+      first, { id: 'rewrite.naver.authorize' }, PRIVATE_ORIGIN,
+    );
+    expect(out.status).toBe(302);
+    const naver = new URL(out.headers.get('location'));
+    expect(naver.origin).toBe('https://nid.naver.com');
+    expect(naver.searchParams.get('redirect_uri'))
+      .toBe(PRIVATE_ORIGIN + '/api/auth/social/naver/callback');
+    const state = naver.searchParams.get('state');
+    expect(state).not.toBe(nonce);
+    const callbackUrl = new URL(PRIVATE_ORIGIN + '/api/auth/social/naver/callback');
+    callbackUrl.search = new URLSearchParams({ state, code: 'synthetic-provider-code' }).toString();
+    const second = await handleNaverOAuthBridgeRequestV1({
+      request: new Request(callbackUrl), action: 'callback', env, webOrigin: PRIVATE_ORIGIN,
+    });
+    const result = fenceCloudflareApprovedAuthResponseV1(
+      second, { id: 'rewrite.naver.callback' }, PRIVATE_ORIGIN,
+    );
+    expect(result.status).toBe(302);
+    const bridge = new URL(result.headers.get('location'));
+    expect(bridge.origin).toBe('https://cnsfpcdiyofqvhpcegfc.supabase.co');
+    expect(bridge.pathname).toBe('/auth/v1/callback');
+    expect(bridge.searchParams.get('state')).toBe(nonce);
+    expect(bridge.searchParams.get('code')).not.toBe('synthetic-provider-code');
+    expect(result.headers.get('referrer-policy')).toBe('no-referrer');
+    const replayOnWrongOrigin = await handleNaverOAuthBridgeRequestV1({
+      request: new Request(callbackUrl.href.replace(PRIVATE_ORIGIN, 'https://attacker.example.test')),
+      action: 'callback', env, webOrigin: PRIVATE_ORIGIN,
+    });
+    expect(replayOnWrongOrigin.status).toBe(400);
   });
 
   it('seals unexpected Auth/DB and calculation exceptions before platform HTML', async () => {
