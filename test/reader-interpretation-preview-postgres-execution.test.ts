@@ -105,7 +105,8 @@ describe('Reader Interpretation Preview PostgreSQL execution', () => {
     );
     expect(database.query).toHaveBeenCalledWith('ROLLBACK');
     expect(database.release).toHaveBeenCalledTimes(1);
-    expect(createContextAuthorityPort).toHaveBeenCalledTimes(1);
+    // Forged request is rejected before protected Reader authority construction.
+    expect(createContextAuthorityPort).not.toHaveBeenCalled();
     expect(contextAuthorityPort.resolveContext).not.toHaveBeenCalled();
   });
 
