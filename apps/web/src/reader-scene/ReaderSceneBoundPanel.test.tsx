@@ -29,18 +29,18 @@ const scene = parseReaderSceneEnvelopeV1({
 });
 const ready = projectReaderSceneLocalePresentationV1(projectReaderSceneViewModelV1(scene), 'ja-JP');
 
-function readerClient(enabled: boolean) {
+function readerClient(enabled: boolean, fetchImpl = vi.fn()) {
   return createReaderRuntimeClientV1({
     enabled,
-    fetchImpl: vi.fn(),
+    fetchImpl,
     resolveBearer: vi.fn().mockResolvedValue({ kind: 'member', token: 'not-used' }),
   });
 }
 
 describe('I18N-06e Reader Scene controller→panel integration seam', () => {
   it('starts in an inert state without owner admission and makes no Reader request', () => {
-    const client = readerClient(true);
-    const read = vi.spyOn(client, 'readReaderScene');
+    const fetchImpl = vi.fn();
+    const client = readerClient(true, fetchImpl);
     const html = renderToStaticMarkup(createElement(ReaderSceneBoundPanel, {
       client,
       ownerBinding: null,
@@ -50,7 +50,7 @@ describe('I18N-06e Reader Scene controller→panel integration seam', () => {
     expect(html).toContain('data-reader-scene-state="idle"');
     expect(html).toContain('表示できる案内人');
     expect(html).not.toContain('data-reader-scene-segments');
-    expect(read).not.toHaveBeenCalled();
+    expect(fetchImpl).not.toHaveBeenCalled();
   });
 
   it('never activates a disabled Reader transport even if someone supplies an owner binding', () => {
@@ -68,8 +68,8 @@ describe('I18N-06e Reader Scene controller→panel integration seam', () => {
   });
 
   it('does not make requests during rendering, even for enabled transport plus owner binding', () => {
-    const client = readerClient(true);
-    const read = vi.spyOn(client, 'readReaderScene');
+    const fetchImpl = vi.fn();
+    const client = readerClient(true, fetchImpl);
     const html = renderToStaticMarkup(createElement(ReaderSceneBoundPanel, {
       client,
       ownerBinding: { threadId, officialReadingId },
@@ -78,7 +78,7 @@ describe('I18N-06e Reader Scene controller→panel integration seam', () => {
     }));
     expect(html).toContain('data-reader-scene-state="loading"');
     expect(html).not.toContain('과거 원문');
-    expect(read).not.toHaveBeenCalled();
+    expect(fetchImpl).not.toHaveBeenCalled();
   });
 
   it('masks stale source synchronously when the owner scope, client or permission changes', () => {
