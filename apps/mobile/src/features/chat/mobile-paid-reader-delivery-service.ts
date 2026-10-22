@@ -1,3 +1,4 @@
+import { MyeongHaApiClientErrorV1 } from '@myeongha/api-client';
 import { nativeMobileRuntimeV1 } from '@/core/runtime/native-mobile-runtime';
 import { resolveMobileApiOriginV1 } from '@/core/config/mobile-runtime-config';
 import { createMobileChatTurnIdV1 } from '@/features/chat/mobile-chat-turn-id';
@@ -138,6 +139,14 @@ export async function readMobilePaidReaderChatMessageV1(input: Readonly<{
       },
       signal: input.signal,
     }), input.signal);
+    if (response.status === 401) {
+      // Preserve the existing Member coordinator's authoritative 401-based
+      // refresh-once/clear-stale-session behavior. This response is NOT an
+      // ordinary "purchase unavailable" outcome.
+      throw new MyeongHaApiClientErrorV1(
+        'http', 'AUTH_REQUIRED', 'Protected Reader Member session expired.', 401,
+      );
+    }
     if (!response.ok) {
       return Object.freeze({ kind: 'unavailable' as const, status: response.status });
     }
@@ -181,13 +190,20 @@ export async function acknowledgeMobilePaidReaderChatDeliveryV1(input: Readonly<
         Accept: 'application/json',
         'Content-Type': 'application/json',
         Authorization: 'Bearer ' + bearer,
-        Origin: apiOrigin,
+        // Native uses verified Bearer only, no ambient Cookie or synthetic
+        // Origin. The server's S7 ACK handler explicitly supports that
+        // non-browser CSRF-safe request shape.
         'X-Reader-Delivery-Ack': '1',
         'Cache-Control': 'no-store',
       },
       body: payload,
       signal: input.signal,
     }), input.signal);
+    if (response.status === 401) {
+      throw new MyeongHaApiClientErrorV1(
+        'http', 'AUTH_REQUIRED', 'Protected Reader Member session expired.', 401,
+      );
+    }
     if (!response.ok) return Object.freeze({ kind: 'unavailable' as const });
     let envelope: unknown;
     try { envelope = await response.json(); } catch { return Object.freeze({ kind: 'unavailable' as const }); }
