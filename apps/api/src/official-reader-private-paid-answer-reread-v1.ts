@@ -18,6 +18,9 @@ import {
   type OfficialReaderPrivateDeliveryPreparedV1,
   type OfficialReaderPrivateDeliveryReservationV1,
 } from './official-reader-private-delivery-journal-v1.js';
+import {
+  assertOfficialReaderPrivateCurrentVerifiedPurchaseScopeV1,
+} from './official-reader-private-exact-verified-purchase-guard-v1.js';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 const READ_SQL = `
@@ -230,6 +233,18 @@ async function readPrivateOfficialReaderPaidAnswerCoreV1(
           productId: asUuid(row.productId),
           sourceResponseHash: asString(row.sourceResponseHash),
         };
+        // Independently require the exact S2 production verified Receipt,
+        // pinned Reader and Bundle before resolving the DEK. The private
+        // S6 SQL already checks current entitlements/Source proof, but one
+        // consistent S1-locked cross-surface purchase guard ensures refunded
+        // lineage cannot leak via the direct-body or Chat marker selector.
+        await assertOfficialReaderPrivateCurrentVerifiedPurchaseScopeV1({
+          scope,
+          readingId: identity.officialReadingId,
+          readerCharacterId: identity.readerCharacterId,
+          readerContentBundleId: identity.readerContentBundleId,
+        });
+
         const keyRef = asString(row.encryptionKeyRef);
         if (row.encryptionSchemeVersion !== OFFICIAL_READER_PROTECTED_CIPHER_VERSION_V1
             || !input.keyResolver
