@@ -92,6 +92,8 @@ async function probe() {
   // These are not trusted route selectors or permission to expose old data.
   for (const path of [
     '/api/health?__myeongha_chat_open=1',
+    '/api/health?%25255F%25255Fmyeongha_chat_open=1',
+    '/api/me?%255F_myeongha_chat_open=1',
     '/api/me?__myeongha_chat_turn_send=1',
     '/api/me?__myeongha_chat_thread_id=123e4567-e89b-42d3-a456-426614174000',
     '/api/auth/refresh?__myeongha_chat_open=1',
