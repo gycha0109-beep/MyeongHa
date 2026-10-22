@@ -39,3 +39,5 @@
 - 원래 MyeongHa `character-standard-reading-protected-context.ts` projector를 **새로 구현하지 않고 그대로 재사용**하여 각 `sourceRef`, 텍스트 SHA-256, `disclosures`, `ambiguityHashes`와 정확한 순서/개수까지 비교한다. 빠진 Disclosure/단위·본문 변조·ID 교환·대체 Reader 원본을 차단한다.
 - 중요: Saju 엔진의 `official_reading_<digest>` 식별자와 MyeongHa DB `reading_id UUID`는 서로 다를 수 있다. **발행자 인가 매핑 영수증이 없는 현행 계약에서는 일치하지 않을 때 BLOCKED**이고, MyeongHa가 임의로 ID를 치환하거나 해시를 재발행하지 않는다. Saju #2410 Source Owner·DB Owner가 공식 발행/매핑 범위와 원본 바이트 책임을 합의한 후에만 이후 S5/S7 단계에서 사용한다.
 - 출력은 `state='held'|'blocked'`, `sourceAuthority='NOT_EVALUATED'`, `s5AtomicStorage/s7Delivery='DB_OWNER_REQUIRED'`, `canPersist/canDisclose/canPublish/canSell=false`만 반환한다. DB 원본/원문/해시/SourceUnit/Subject 식별자·Saju attestation·권한을 반환하지 않는다. 이는 기존 S3 후보 검증을 대체하거나 미승인 실 DB Writer, Reader/Records 공개 경로를 열지 않는다.
+
+- `preflightSajuReaderAgainstCurrentRecordsV1`는 이미 인증된 Reader admission의 `scope.subjectId/readingId`로 **기존 Records Owner `getOfficialReadingRecord` 조회를 실제 호출**한 다음 위 SourceUnit 대조를 수행한다. 누락·현재 열람 불가·다른 Subject/Reading은 그 자리에서 `BLOCKED`로 반환하며, 새로운 SQL/조회 권한/HTTP 진입점을 만들지 않는다. 기존 Records의 archive read 정책과 Reader의 구매권 판단을 하나의 새 권한으로 합치지 않는다.
