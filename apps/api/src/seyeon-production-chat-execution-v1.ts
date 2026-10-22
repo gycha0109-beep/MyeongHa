@@ -810,8 +810,8 @@ export async function runSeyeonProductionChatExecutionV1(
               // Unpinned Preflight/derived sources HOLD before Provider.
               assertSeyeonPositiveG1FinalModelContextSealV1({
                 pinnedContextInput:contextInput,
-                pinnedContextInputDigest:positiveModelCorrelation.finalModelContextDigest,
-                selectedSourcesDigest:positiveModelCorrelation.selectedSourcesDigest,
+                pinnedContextInputDigest:positiveModelCorrelation?.finalModelContextDigest ?? '',
+                selectedSourcesDigest:positiveModelCorrelation?.selectedSourcesDigest ?? '',
                 sourceCandidates:
                   productionContext.personalRecordProjectionCandidates ?? [],
                 assembledContext:assembled,
