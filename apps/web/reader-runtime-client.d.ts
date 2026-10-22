@@ -35,6 +35,8 @@ export type ReaderRuntimeBearerV1 = Readonly<{
 export interface ReaderRuntimeReadInputV1 {
   readonly threadId: string;
   readonly officialReadingId: string;
+  /** UI request header snapshot only; never authorizes a Reader response language. */
+  readonly uiLocale?: string;
   readonly signal?: AbortSignal;
   readonly [key: string]: unknown;
 }
