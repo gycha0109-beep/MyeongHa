@@ -1,4 +1,5 @@
 import { nativeMobileRuntimeV1 } from '@/core/runtime/native-mobile-runtime';
+import { resolveMobileApiOriginV1 } from '@/core/config/mobile-runtime-config';
 import { createMobileChatTurnIdV1 } from '@/features/chat/mobile-chat-turn-id';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
@@ -47,15 +48,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 function origin(): string {
-  const url = new URL(nativeMobileRuntimeV1.config.apiOrigin);
-  if (url.protocol !== 'https:' && url.hostname !== 'localhost'
-      && url.hostname !== '127.0.0.1') {
-    throw new Error('Paid Reader transport requires HTTPS.');
-  }
-  if (url.pathname !== '/' || url.search !== '' || url.hash !== '') {
-    throw new Error('Paid Reader API origin is invalid.');
-  }
-  return url.origin;
+  // Exactly the existing native runtime API-origin security contract:
+  // HTTPS in production, local/private IPv4 permitted only for development.
+  // Never infer another host, path, or public Reader release URL.
+  return resolveMobileApiOriginV1(nativeMobileRuntimeV1.config.apiOrigin);
 }
 function route(originUrl: string, threadId: string, safeMessageId: string): string {
   if (!UUID.test(threadId) || !UUID.test(safeMessageId)) {
