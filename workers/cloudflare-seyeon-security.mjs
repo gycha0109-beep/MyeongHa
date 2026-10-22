@@ -72,6 +72,28 @@ function held(requestId) {
   return enforceHeaders(fenceCloudflareSeyeonBeforeFetchReturnV1(null, requestId));
 }
 
+// Reject-only shape check before even constructing a PostgreSQL lease.
+ // Security-owned scope repeats the authoritative query admission inside its
+ // verified identity+thread-bound transaction. This check grants nothing.
+function validHistoryQueryShape(url) {
+  for (const key of url.searchParams.keys()) {
+    if (key !== 'afterSequenceNo' && key !== 'pageSize') return false;
+  }
+  const cursors = url.searchParams.getAll('afterSequenceNo');
+  const sizes = url.searchParams.getAll('pageSize');
+  if (cursors.length > 1 || sizes.length > 1) return false;
+  if (cursors.length === 1) {
+    const s = cursors[0];
+    if (!/^(0|[1-9][0-9]*)$/.test(s) || !Number.isSafeInteger(Number(s))) return false;
+  }
+  if (sizes.length === 1) {
+    const s = sizes[0];
+    if (!/^[1-9][0-9]*$/.test(s) ||
+        !Number.isSafeInteger(Number(s)) || Number(s) > 50) return false;
+  }
+  return true;
+}
+
 function isExplicitChatRoute(route, pathname) {
   return route?.id === 'rewrite.chat.open' ||
     route?.id === 'rewrite.chat.thread' ||
@@ -113,7 +135,8 @@ export async function tryHandleCloudflareSeyeonSecurityV1(
   const expectedMethod = ingress.kind === 'history' ? 'GET' : 'POST';
   if (ingress.kind === 'malformed_or_unknown_chat' ||
       request.method !== expectedMethod ||
-      (ingress.kind !== 'history' && url.search !== '')) {
+      (ingress.kind !== 'history' && url.search !== '') ||
+      (ingress.kind === 'history' && !validHistoryQueryShape(url))) {
     return held(requestId);
   }
 
