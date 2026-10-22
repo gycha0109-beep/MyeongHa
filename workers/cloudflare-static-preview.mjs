@@ -117,6 +117,55 @@ export function handleCloudflareStaticPreviewRequest(request) {
   });
 }
 
+// Eleven explicit public HTML entries are the only valid HTML assets in
+// this Preview. A generic 200 HTML fallback is never a static route grant.
+// Keep this inventory in sync with verify-cloudflare-static.mjs.
+export const CLOUDFLARE_PUBLIC_HTML_PATHS_V1 = Object.freeze([
+  '/', '/index.html', '/hall.html', '/auth.html', '/birth.html',
+  '/chat-hub.html', '/chat.html', '/my.html', '/reading.html',
+  '/face-reading.html', '/reading-detail.html', '/records.html',
+]);
+
+/**
+ * S-CF2 final Static Assets boundary, independent of Chat ingress.
+ * ASSETS must never supply an unexpected HTML fallback, redirect, cookie,
+ * CORS grant or error body. No buffering or reading asset body content.
+ * This does NOT authorize any API path to reach Static Assets.
+ */
+export function fenceCloudflareStaticPreviewAssetResponseV1(candidate, request) {
+  const denied = () => new Response(null, { status: 404, headers: BASE_HEADERS });
+  try {
+    if (!(candidate instanceof Response)) return denied();
+    if (![200, 206, 304].includes(candidate.status)) return denied();
+    const headers = new Headers(candidate.headers);
+    if (headers.has('set-cookie') || headers.has('location')) return denied();
+    for (const key of headers.keys()) {
+      if (key.toLowerCase().startsWith('access-control-')) return denied();
+    }
+
+    const path = new URL(request.url).pathname;
+    const expectedHtml = CLOUDFLARE_PUBLIC_HTML_PATHS_V1.includes(path);
+    const media = (headers.get('content-type') ?? '').split(';')[0].trim().toLowerCase();
+    const isHtml = media === 'text/html' || media === 'application/xhtml+xml';
+    if (expectedHtml !== isHtml || (expectedHtml && candidate.status !== 200)) {
+      return denied();
+    }
+    if (expectedHtml) {
+      for (const [key, value] of Object.entries(BASE_HEADERS)) headers.set(key, value);
+    } else {
+      // Preserve existing static-cache semantics for JS/CSS/media; never
+      // weaken cross-resource sniffing or allow indexing via a bad ASSETS header.
+      headers.set('X-Content-Type-Options', BASE_HEADERS['X-Content-Type-Options']);
+      headers.set('X-Robots-Tag', BASE_HEADERS['X-Robots-Tag']);
+    }
+    return new Response(candidate.body, {
+      status: candidate.status, statusText: candidate.statusText, headers,
+    });
+  } catch {
+    return denied();
+  }
+}
+
 export default {
   async fetch(request, bindings) {
     const url = new URL(request.url);
@@ -170,7 +219,9 @@ export default {
         if (typeof bindings?.ASSETS?.fetch !== 'function') {
           return new Response(null, { status: 404, headers: BASE_HEADERS });
         }
-        return await bindings.ASSETS.fetch(request);
+        return fenceCloudflareStaticPreviewAssetResponseV1(
+          await bindings.ASSETS.fetch(request), request,
+        );
       } catch {
         return new Response(null, { status: 404, headers: BASE_HEADERS });
       }
