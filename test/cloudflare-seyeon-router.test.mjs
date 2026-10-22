@@ -6,6 +6,7 @@ import {
   tryHandleCloudflareSeyeonSecurityV1,
 } from '../workers/cloudflare-seyeon-security.mjs';
 import { matchCloudflareApiRoute } from '../workers/cloudflare-api-router.mjs';
+import worker from '../workers/cloudflare-static-preview.mjs';
 
 const ROOT = 'https://myeongha-cf.example.test';
 const THREAD = '123e4567-e89b-42d3-a456-426614174000';
@@ -102,5 +103,38 @@ describe('S-CF2 mounted Worker /api/chat deny and independent hooks', () => {
       new Response('data: ' + SECRET, { headers: { 'Content-Type': 'text/event-stream' } }),
       new Response(null, { status: 302, headers: { Location: '/index.html' } }),
     ]) await expectHeld(fenceCloudflareSeyeonBeforeFetchReturnV1(candidate, uuid));
+  });
+});
+
+
+describe('S-CF2 actual Worker fetch boundary and no HTML fallback', () => {
+  it('intercepts chat before Auth/Saju and never emits HTML, success or redirects', async () => {
+    for (const [path, method] of [
+      ['/api/chat/' + THREAD + '/turns', 'POST'],
+      ['/api/chat/' + THREAD + '/turns?replay=1', 'POST'],
+      ['/api/chat/' + THREAD + '?pageSize=20', 'GET'],
+      ['/api/chat/' + THREAD + '/replay', 'POST'],
+      ['/api/chat/' + THREAD, 'OPTIONS'],
+    ]) {
+      const result = await worker.fetch(new Request(ROOT + path, { method }), {});
+      await expectHeld(result);
+      expect(result.headers.get('location')).toBeNull();
+      expect(result.headers.get('content-type')).not.toContain('text/html');
+      expect(result.headers.get('access-control-allow-origin')).toBeNull();
+    }
+  });
+  it('preserves non-chat router state independently, with Static Assets unavailable to APIs', async () => {
+    for (const path of ['/api/me', '/api/readings', '/api/memories', '/api/chat-unknown', '/api/unknown']) {
+      const result = await worker.fetch(new Request(ROOT + path), {});
+      expect(result.status).toBe(404);
+      expect(result.headers.get('cache-control')).toBe('no-store');
+      expect(await result.text()).toBe('');
+    }
+    const health = await worker.fetch(new Request(ROOT + '/api/health'), {});
+    expect(health.status).toBe(200);
+    expect(await health.json()).toEqual({ status: 'ok' });
+    const unknown = await worker.fetch(new Request(ROOT + '/no-such-page.html'), {});
+    expect(unknown.status).toBe(404);
+    expect(await unknown.text()).toBe('');
   });
 });
