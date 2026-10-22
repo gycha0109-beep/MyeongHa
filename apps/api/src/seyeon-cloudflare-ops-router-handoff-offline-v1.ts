@@ -46,7 +46,14 @@ export function isSeyeonCloudflareProtectedIngressAliasV1(
   request: Request,
 ): boolean {
   try {
-    let path = new URL(request.url).pathname;
+    const url = new URL(request.url);
+    // Legacy Vercel rewrite markers are NEVER authenticated Worker routes.
+    // Query-key decoding is for denial only; it cannot grant or dispatch.
+    // Preserve independent Auth/Saju/Health queries without chat markers.
+    for (const key of url.searchParams.keys()) {
+      if (key.toLowerCase().startsWith('__myeongha_chat_')) return true;
+    }
+    let path = url.pathname;
     // Account for percent-encoded route segment aliases and one intermediary
     // re-encoding a literal '%' (e.g. /api/%2563hat). Decode for DENY only;
     // never use this decoded path to call a downstream handler.

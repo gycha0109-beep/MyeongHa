@@ -65,6 +65,29 @@ describe('S-CF2 unmounted Ops router handoff: no positive or HTML fallback',()=>
   });
 
   it.each([
+    '/api/me?__myeongha_chat_turn_send=1',
+    '/api/me?__myeongha_chat_thread_id='+T,
+    '/api/memories?__myeongha_chat_open=1',
+    '/api/health?__MYEONGHA_CHAT_OPEN=1',
+    '/api/me?%5F_myeongha_chat_open=1',
+    '/index.html?__myeongha_chat_turn_send=1',
+  ])('holds legacy Vercel chat markers on unrelated routes before API dispatch: %s',async path=>{
+    const v=auth();
+    const request=req(path);
+    expect(isSeyeonCloudflareProtectedIngressAliasV1(request)).toBe(true);
+    await sealed(await run(request,'other_api',v));
+    expect(v.verifyRequestIdentity).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    '/api/health?probe=1',
+    '/api/auth/refresh?__myeongha_social_complete=1',
+    '/api/me?__myeongha_records_read=memories',
+  ])('does not promote unrelated query markers to a chat alias: %s',path=>{
+    expect(isSeyeonCloudflareProtectedIngressAliasV1(req(path))).toBe(false);
+  });
+
+  it.each([
     '/api/health',
     '/api/auth/sign-in',
     '/api/readings',
