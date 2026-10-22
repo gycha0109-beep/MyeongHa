@@ -595,3 +595,4 @@ export {
   type ClaimNarrativeLocaleDecisionV1,
 } from './claim-narrative-locale-v1.js';
 export * from './reader-official-locale-continuity-v1.js';
+export * from './reader-voice-locale-output-boundary-v1.js';
