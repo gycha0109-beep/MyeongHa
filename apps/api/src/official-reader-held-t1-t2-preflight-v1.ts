@@ -1,4 +1,8 @@
 import {
+  createOfficialReaderPrivateCurrentPurchaseAuthorityPortV1,
+  type OfficialReaderPrivateCurrentPurchaseAuthorityPortV1,
+} from './official-reader-private-exact-verified-purchase-guard-v1.js';
+import {
   consumeOfficialReadingReaderAdmissionV1,
   type OfficialReadingReaderAdmissionScopeV1,
   type PreparedOfficialReadingReaderAdmissionV1,
@@ -34,6 +38,7 @@ export interface OfficialReaderHeldPreflightInputV1 {
   readonly prepareAdmission: (
     scope: PostgresSubjectExecutionScopeV1,
     dbEffectiveAt: string,
+    currentVerifiedPurchaseAuthorityPort: OfficialReaderPrivateCurrentPurchaseAuthorityPortV1,
   ) => Promise<PreparedOfficialReadingReaderAdmissionV1>;
   /**
    * Receives only the T1-admitted private Official Source.
@@ -171,7 +176,10 @@ export async function runOfficialReaderHeldT1T2PreflightV1(
       verifiedEvidence: input.verifiedEvidence,
       execute: async (scope) => {
         const effectiveAt = await readDbEffectiveAt(scope);
-        const prepared = await input.prepareAdmission(scope, effectiveAt);
+        const prepared = await input.prepareAdmission(
+          scope,effectiveAt,
+          createOfficialReaderPrivateCurrentPurchaseAuthorityPortV1(scope),
+        );
         assertOwnScope(scope, prepared, effectiveAt);
         return prepared;
       },
@@ -189,7 +197,10 @@ export async function runOfficialReaderHeldT1T2PreflightV1(
       verifiedEvidence: input.verifiedEvidence,
       execute: async (scope) => {
         const effectiveAt = await readDbEffectiveAt(scope);
-        const current = await input.prepareAdmission(scope, effectiveAt);
+        const current = await input.prepareAdmission(
+          scope,effectiveAt,
+          createOfficialReaderPrivateCurrentPurchaseAuthorityPortV1(scope),
+        );
         assertOwnScope(scope, current, effectiveAt);
         assertNoDrift(first.scope, current.scope);
         consumeOfficialReadingReaderAdmissionV1({
