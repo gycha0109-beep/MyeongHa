@@ -329,6 +329,7 @@ export async function runOfficialReaderPrivateRevocationPurgeBatchV1(input: {
       );
       if (fence.fenceId!==manifest.externalFenceId) return fail();
     } else {
+      if (manifest.state !== 'eligible') return fail();
       const entries=manifest.entries;
       fence=validateFence(
         await input.store.scopeLedger.recordScopeDeletionFence({
