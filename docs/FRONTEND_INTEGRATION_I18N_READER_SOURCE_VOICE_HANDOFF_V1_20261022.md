@@ -183,6 +183,14 @@
 - `test/mobile-official-reader-entry-i18n.test.ts`와 기존 `test/mobile-official-reading-reader-entry.test.ts`를 실제 UI 속성·기존 closed-state 계약에 맞게 연결했다. Node 전용 정적 소스 확인 테스트는 모바일 앱 `src/`가 아닌 루트 `test/`에 유지한다.
 - **남은 소유권:** 캐릭터별 의미 충돌 6명과 개별 voice delta 등록은 Character owner 의사결정 전 HOLD. 공개 Reader Scene/paid interpretation, ② 이전 Official Reading 재언어화는 별도 승인 전 불허.
 
+### 7.8 I18N-07 부분 집합 — 모바일 Saju/Face Reader 선택 UI의 3개 로케일
+
+- `apps/mobile/src/features/reading/mobile-reader-picker-ui-locale-v1.ts`에서 실제 사주·관상 화면의 공용 `MobileReaderPicker`가 이미 제공하는 **UI 전용** 선택·닫기/변경·접근성·프리뷰만/준비 중·미공개/권한 안내를 명시 선택 `ko-KR`/`ja-JP`/`zh-TW`로 작성했다. 미지원 locale는 한국어로 돌아간다.
+- 원래 `MOBILE_READER_PRESENTATIONS_V1`의 9인 canonical key/name/title/tone과 `isMobileReaderPreviewSelectableV1`의 세연 1인 Preview는 변하지 않는다. 화면 로케일로 새로운 Reader를 선택 가능하게 만들거나 Face 분석/유료 Reader 해설을 열지 않으며, 기존 문구의 `sourceNotice`는 비한국어 UI에서 **캐릭터별 소개 원문이 번역되지 않음**만 안내한다.
+- 공식 아카이브의 `MobileOfficialReadingReaderEntry`에도 같은 원문 보존 안내를 연결했다. 일본어/번체 UI가 제공되더라도 기존 캐릭터 소개 문구/톤은 한국어 정본의 표시이며 일본어/번체 음성 프로필, 상품/출력 승인으로 간주하지 않는다.
+- `test/mobile-reader-picker-i18n.test.ts`, `test/mobile-official-reader-entry-i18n.test.ts` 및 기존 Reader picker/rollout 테스트에서 Saju·Face 화면 상태·미공개 상태·서버 source 불변·3개 UI 로케일 경계를 다룬다. Node 전용 소스 검사는 루트 `test/`에 배치했다.
+- **한계/후속:** Character owner가 인물성 충돌과 locale-specific 화법을 승인하기 전 실제 다국어 캐릭터 대사 생성은 HOLD. I18N-07의 공개 도장은 원래 feature/release owner가 주는 것이며 이번 UI 구현만으로 배포/판매 승인이 아니다.
+
 ## 8. 다음 구현 작업 및 승인 위치
 
 1. **캐릭터 설계 owner:** 위 6명 차이를 실제 Bible/typed Runtime 간에 해결하고 authoritative source/version을 확정. 이 I18N 트랙은 제안·인계만, 원본 수정 금지.
