@@ -110,8 +110,8 @@ select
   has_function_privilege('myeongha_system_executor','public.internal_complete_account_deletion_v1(uuid,uuid,text)','EXECUTE')::int;")"
 [[ "$worker_grants" == "1|1|1|1" ]] || fail "worker lifecycle grants mismatch: $worker_grants"
 
-# Four core deletion capabilities plus exactly fourteen private S4 Reader
-# purge/privacy/replay operations explicitly granted in migrations 2010,
+# Four core deletion capabilities plus exactly fourteen private S4/S7 Reader
+# purge/privacy/replay/prune operations explicitly granted in migrations 2010,
 # 2040 and 2060..2100. All other functions remain unavailable. A count
 # check alone could conceal a swapped or newly exposed privileged function.
 system_function_contract="$("${psql_base[@]}" -At -F '|' -c "
@@ -129,7 +129,7 @@ with expected(signature) as (
     ('public.internal_claim_official_reader_paid_answer_purge_v1(uuid,text)'),
     ('public.internal_qry_official_reader_paid_answer_purge_manifest_v1(uuid,text)'),
     ('public.internal_commit_official_reader_paid_answer_purge_v1(uuid,text,text,uuid[],text[])'),
-    ('public.internal_finish_official_reader_paid_answer_purge_v1(uuid,text,text)'),
+    ('public.internal_prune_official_reader_paid_delivery_v1(integer)'),
     ('public.internal_release_official_reader_paid_answer_purge_v1(uuid,text)'),
     ('public.internal_finish_empty_official_reader_paid_answer_purge_v1(uuid,text)'),
     ('public.internal_replay_offprimary_reader_refund_purge_v1(uuid,uuid,uuid,text,uuid,uuid[])'),
@@ -160,7 +160,7 @@ select
 ;")"
 [[ "$system_function_contract" == "18|18|0|0|18" ]] ||
   fail "system executor exact 18-function allowlist drifted: $system_function_contract"
-pass "system executor grants only 4 deletion plus 14 explicitly scoped private S4 Reader functions"
+pass "system executor grants only 4 deletion plus 14 explicitly scoped private S4/S7 Reader functions"
 
 for role in myeongha_api_executor myeongha_runtime myeongha_worker_runtime anon authenticated service_role; do
   worker_exec_count="$("${psql_base[@]}" -Atc "
