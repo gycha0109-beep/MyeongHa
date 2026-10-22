@@ -1,4 +1,8 @@
-import { getUiLocaleRequestHeadersV1 } from './ui-i18n.js';
+import {
+  getUiLocaleRequestHeadersV1,
+  normalizeUiLocale,
+  UI_LOCALE_REQUEST_HEADER_V1,
+} from './ui-i18n.js';
 import {
   WebApiEnvelopeError,
   readApiErrorCode,
@@ -181,6 +185,11 @@ export function createReaderRuntimeClientV1(options = {}) {
         input?.officialReadingId,
         'officialReadingId',
       );
+      // Capture the UI-only request preference before asynchronous bearer
+      // resolution. Retry gets a fresh snapshot from its controller.
+      const uiLocaleHeaders = input?.uiLocale === undefined
+        ? getUiLocaleRequestHeadersV1()
+        : { [UI_LOCALE_REQUEST_HEADER_V1]: normalizeUiLocale(input.uiLocale) };
 
       let bearer;
       try {
@@ -211,7 +220,7 @@ export function createReaderRuntimeClientV1(options = {}) {
           method: 'POST',
           headers: {
             Accept: 'application/json',
-            ...getUiLocaleRequestHeadersV1(),
+            ...uiLocaleHeaders,
             Authorization: 'Bearer ' + bearer.token,
             'Content-Type': 'application/json',
           },
