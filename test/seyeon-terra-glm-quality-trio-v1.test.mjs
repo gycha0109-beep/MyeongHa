@@ -2,6 +2,8 @@ import {describe,it,expect} from 'vitest';
 import {readFileSync} from 'node:fs';
 import {
  assertTerraGlmQualityTrioOneShotV1 as admission,
+ assertTerraGlmQualityTrioRetryOneShotV1 as retryAdmission,
+ requireSeyeonTrioOpenAiStageV1 as stage,
  requirePublicSyntheticQualityUtteranceV1 as reveal,
  SEYEON_TERRA_GLM_QUALITY_TRIO_PRIOR_RESERVED_MICRO_USD as PRIOR,
  SEYEON_TERRA_GLM_QUALITY_TRIO_LUNA_RESERVE_MICRO_USD as LUNA,
@@ -26,6 +28,11 @@ const terraRun={id:39352712484,status:'completed',conclusion:'success',run_attem
 const glmPR={number:2418,merged:true,merge_commit_sha:'1715c4968f56391c05df160984a396501b8be151'};
 const glmRun={id:39560101607,status:'completed',conclusion:'success',run_attempt:1,
  head_sha:'1715c4968f56391c05df160984a396501b8be151'};
+const failedFirstRun={id:39705998598,
+ head_sha:'0a85ca73516f653f1d0dcb8afcb654f4a63ac771',
+ event:'push',run_attempt:1,status:'completed',conclusion:'failure'};
+const retryEnv={...env,GITHUB_WORKFLOW_REF:
+ 'gycha0109-beep/MyeongHa/.github/workflows/seyeon-terra-glm-quality-trio-retry-v1.yml@refs/heads/main'};
 const good={revealLevel:'public',memoryRefsMentioned:[],
  privateSourceRefsMentioned:[],disclosureSliceIds:[],
  utterance:'안녕하세요! 반가워요. 지금 뭐부터 해볼까요?'};
@@ -38,6 +45,23 @@ describe('Owner-visible PUBLIC synthetic persona trio Terra/GLM paired one-shot'
   expect(()=>admission(env,history,terraPR,terraRun,glmPR,{...glmRun,conclusion:'failure'})).toThrow();
   expect(()=>admission(env,history,{...terraPR,merged:false},terraRun,glmPR,glmRun)).toThrow();
   expect(()=>admission({...env,GITHUB_REF:'refs/heads/feature'},history,terraPR,terraRun,glmPR,glmRun)).toThrow();
+ });
+ it('pins the zero-reservation failed predecessor and admits one new dedicated run only',()=>{
+  expect(retryAdmission(retryEnv,history,failedFirstRun,terraPR,terraRun,glmPR,glmRun))
+   .toEqual({runId:id,mainSha:sha});
+  expect(()=>retryAdmission(env,history,failedFirstRun,terraPR,terraRun,glmPR,glmRun)).toThrow();
+  expect(()=>retryAdmission(retryEnv,history,{...failedFirstRun,conclusion:'success'},terraPR,terraRun,glmPR,glmRun)).toThrow();
+  expect(()=>retryAdmission(retryEnv,history,{...failedFirstRun,head_sha:sha},terraPR,terraRun,glmPR,glmRun)).toThrow();
+  expect(()=>retryAdmission(retryEnv,{...history,total_count:2},failedFirstRun,terraPR,terraRun,glmPR,glmRun)).toThrow();
+  expect(()=>retryAdmission({...retryEnv,GITHUB_RUN_ATTEMPT:'2'},history,failedFirstRun,terraPR,terraRun,glmPR,glmRun)).toThrow();
+ });
+ it('requires the exact nine-character myeongha_ prefix for each paid OpenAI stage',()=>{
+  for(const purpose of ['unified_preflight_shadow','turn_interpret_render_shadow','semantic_review']){
+   expect(stage(`myeongha_${purpose}_v2`,purpose)).toBe(purpose);
+   expect(()=>stage(`myeongha__${purpose}_v2`,purpose)).toThrow();
+   expect(()=>stage(`myeongha_${purpose}_v2`,'disclosure_classification')).toThrow();
+  }
+  expect(()=>stage('myeongha_unified_preflight_shadow_v1','unified_preflight_shadow')).toThrow();
  });
  it('reveals the final utterance only after explicit public, no-memory, no-disclosure approval',()=>{
   expect(reveal(good)).toBe(good.utterance);
@@ -94,8 +118,11 @@ describe('Owner-visible PUBLIC synthetic persona trio Terra/GLM paired one-shot'
  });
  it('checks strict provider options, existing runtime, fsync and ONLY final guarded utterance visible',()=>{
   const src=readFileSync(new URL('../scripts/run-seyeon-terra-glm-quality-trio-v1.mjs',import.meta.url),'utf8');
-  const wf=readFileSync(new URL('../.github/workflows/seyeon-terra-glm-quality-trio-one-shot-v1.yml',import.meta.url),'utf8');
-  expect(src).toContain('const execution=admitTerraGlmQualityTrioOneShotV1()');
+  const wf=readFileSync(new URL('../.github/workflows/seyeon-terra-glm-quality-trio-retry-v1.yml',import.meta.url),'utf8');
+  expect(src).toContain('const execution=admitTerraGlmQualityTrioRetryOneShotV1()');
+  expect(src).toContain('meteredBeforeDispatch:async(metadata,body)');
+  expect(src).toContain('requireSeyeonTrioOpenAiStageV1(');
+  expect(src).not.toContain('name.slice(8,-3)');
   expect(src).toContain('const QUALITY_CASES=Object.freeze([');
   expect(src).toContain("id:'N06'");
   expect(src).toContain("id:'N10'");
@@ -128,5 +155,6 @@ describe('Owner-visible PUBLIC synthetic persona trio Terra/GLM paired one-shot'
   expect(wf).toContain('environment: production');
   expect(wf).toContain('ref: $'+'{{ github.sha }}');
   expect(wf).not.toContain('workflow_dispatch:');
+  expect(wf).toContain("'.github/seyeon-terra-glm-quality-trio-retry.trigger'");
  });
 });
