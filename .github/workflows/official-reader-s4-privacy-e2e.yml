@@ -113,6 +113,7 @@ jobs:
             echo '### Privacy #2318 — synthetic S4 E2E passed'
             echo ''
             echo '- PostgreSQL ${{ matrix.postgres }}: isolated migrations, revoke/last-right, ciphertext purge, stale-backup resurrection, independent tombstone and restore epoch, native completion denial.'
+            echo '- Restored-derived quarantine: real 2230 SQL independently denies old-backup Memory Items, Memory Proposals, Life Facts and Chat Outbox in rollback-only disposable transactions.'
             echo '- Reader context: exact safe SYSTEM marker excluded before model input; ordinary user prose preserved; revoked T2 never reveals paid text.'
             echo '- **Not proved:** production personal-data deletion within 24h, P30D real backup/PITR, actual off-primary ledger/KMS durability, external AI/log sinks, or final legal sign-off.'
             echo '- Status: Privacy #2318 OPEN; paid/public OFF; no production database, vendor, or storage changes.'
