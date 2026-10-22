@@ -51,7 +51,10 @@ try {
       || result.ordinaryDerivedRestoreQuarantineGuardInstalled !== true
       || result.ordinaryDerivedRecordsReadFenceInstalled !== true
       || result.ordinaryDerivedOutboxReadFenceInstalled !== true
-      || result.restoreState !== 'protected_body_tombstone_replay_only'
+      || ![
+        'protected_body_tombstone_replay_only',
+        'no_protected_body_tombstones',
+      ].includes(result.restoreState)
       || result.restoreCompletionApproved !== false
       || result.ordinaryRestoreConsumersEnabled !== false) blocked();
   // No Subject IDs, DEK references, ciphertext or raw tombstones in logs.
