@@ -20,6 +20,10 @@ import {
 import {
   parseOfficialReaderOffPrimaryWorkerConfigV1,
 } from './official-reader-offprimary-worker-config-v1.js';
+import {
+  runOfficialReaderPrivateRevocationPurgeBatchV1,
+  type OfficialReaderPrivateRevocationPurgeBatchResultV1,
+} from './official-reader-private-revocation-purge-worker-v1.js';
 import type { ProductionAccountDeletionAuthAdminConfigV1 } from './production-account-deletion-auth-admin-config.js';
 import type { ProductionAccountDeletionWorkerDbConfigV1 } from './production-account-deletion-worker-db-config.js';
 import {
@@ -99,6 +103,14 @@ export function createAccountDeletionWorkerRuntimeFromPoolV1(input: {
 
 export interface ProductionAccountDeletionWorkerRuntimeLeaseV1 {
   readonly runtime: AccountDeletionWorkerRuntimeV1;
+  /**
+   * Uses the EXACT same governed Worker DB pool and independently mounted
+   * private Privacy store as account deletion. No browser/Commerce authority.
+   */
+  runReaderRevocationPurgeBatch(input: Readonly<{
+    workerId: string;
+    limit: number;
+  }>): Promise<OfficialReaderPrivateRevocationPurgeBatchResultV1>;
   close(): Promise<void>;
 }
 
@@ -141,8 +153,57 @@ export function createProductionAccountDeletionWorkerRuntimeV1(input: {
       ...(readerPrivacyDeletionPort === undefined
         ? {} : { readerPrivacyDeletionPort }),
     }),
+    runReaderRevocationPurgeBatch(purgeInput) {
+      if (offPrimary === null) {
+        throw new Error('Reader revocation Privacy store is unavailable.');
+      }
+      return runOfficialReaderPrivateRevocationPurgeBatchV1({
+        pool,
+        store: offPrimary,
+        workerId: purgeInput.workerId,
+        limit: purgeInput.limit,
+      });
+    },
     close() {
       return pool.close();
     },
+  });
+}
+
+/**
+ * Standalone runtime for the SAME private production Worker execution
+ * identity without an unnecessary hosted Auth-admin secret. It shares
+ * DB principal, TLS enforcement, off-primary configuration and S4 job
+ * processor with createProductionAccountDeletionWorkerRuntimeV1.
+ */
+export interface ProductionReaderPrivacyMaintenanceRuntimeLeaseV1 {
+  runReaderRevocationPurgeBatch(input: Readonly<{
+    workerId: string;
+    limit: number;
+  }>): Promise<OfficialReaderPrivateRevocationPurgeBatchResultV1>;
+  close(): Promise<void>;
+}
+
+export function createProductionReaderPrivacyMaintenanceRuntimeV1(input: {
+  readonly databaseConfig: ProductionAccountDeletionWorkerDbConfigV1;
+  readonly readerOffPrimaryStoreConfig?: OfficialReaderOffPrimaryStoreConfigV1;
+}): ProductionReaderPrivacyMaintenanceRuntimeLeaseV1 {
+  const offPrimaryConfig = input.readerOffPrimaryStoreConfig
+    ?? parseOfficialReaderOffPrimaryWorkerConfigV1(process.env);
+  if (offPrimaryConfig === null) {
+    throw new Error('Reader revocation Privacy store is unavailable.');
+  }
+  const offPrimary = createOfficialReaderNodeOffPrimaryStoreV1(offPrimaryConfig);
+  const pool = createNodePostgresAccountDeletionWorkerPoolV1(input.databaseConfig);
+  return Object.freeze({
+    runReaderRevocationPurgeBatch(purgeInput) {
+      return runOfficialReaderPrivateRevocationPurgeBatchV1({
+        pool,
+        store: offPrimary,
+        workerId: purgeInput.workerId,
+        limit: purgeInput.limit,
+      });
+    },
+    close() { return pool.close(); },
   });
 }
