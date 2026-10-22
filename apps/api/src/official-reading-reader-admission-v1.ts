@@ -1,4 +1,7 @@
 import type { SajuDomain } from '../../../packages/contracts/src/index.js';
+import type {
+  OfficialReaderPrivateCurrentPurchaseAuthorityPortV1,
+} from './official-reader-private-exact-verified-purchase-guard-v1.js';
 import type { ContentReleaseRuntimeEntry } from '../../../packages/world-content/src/index.js';
 import {
   getChatThreadRuntimeBinding,
@@ -59,6 +62,10 @@ export interface PrepareOfficialReadingReaderAdmissionInputV1 {
   readonly artifactAuthorityPort: CharacterStandardReadingArtifactAuthorityPortV1;
   /** Product/Commerce-owned approved policy resolver; not a test fallback in production. */
   readonly productReaderEligibilityAuthorityPort: ProductReaderEligibilityAuthorityPortV1;
+  /** Exact current Receipt x Grant x Reader x Bundle authority, required
+   * even to inspect protected Saju Source at A2. */
+  readonly currentVerifiedPurchaseAuthorityPort?:
+    OfficialReaderPrivateCurrentPurchaseAuthorityPortV1;
 }
 
 export interface PreparedOfficialReadingReaderAdmissionV1 {
@@ -144,6 +151,22 @@ export async function prepareOfficialReadingReaderAdmissionV1(
     authorityPort: input.threadBindingAuthorityPort,
   });
   const readerCharacterId = assertPinned(thread, input.contentEntry);
+  // D-05 Metadata may still report an active Grant after its original
+  // provider Receipt was revoked. A2 cannot even fetch the protected
+  // official source without independent current Commerce verification.
+  const purchaseAuthority = input.currentVerifiedPurchaseAuthorityPort;
+  if (!purchaseAuthority
+      || typeof input.resolvedSubjectId !== 'string'
+      || typeof input.readingId !== 'string') return deny('ACCESS_DENIED');
+  const exactPurchase = Object.freeze({
+    subjectId: input.resolvedSubjectId,
+    readingId: input.readingId,
+    readerCharacterId,
+    readerContentBundleId: thread.activeContentBundleId,
+  });
+  try {
+    await purchaseAuthority.assertCurrentVerifiedPurchase(exactPurchase);
+  } catch { return deny('ACCESS_DENIED'); }
 
   let access;
   try {
@@ -173,6 +196,12 @@ export async function prepareOfficialReadingReaderAdmissionV1(
   if (eligibility.status !== 'eligible') {
     return deny('POLICY_HOLD');
   }
+
+  // Commerce / Product policy queries may race the provider cancellation.
+  // Repeat the S1-locked verified Receipt check before reading raw Saju.
+  try {
+    await purchaseAuthority.assertCurrentVerifiedPurchase(exactPurchase);
+  } catch { return deny('ACCESS_DENIED'); }
 
   let source: CharacterStandardReadingKnowledgeSourceV1;
   try {
@@ -218,6 +247,12 @@ export async function prepareOfficialReadingReaderAdmissionV1(
       latestEligibility.approvedPolicyRevision !== eligibility.approvedPolicyRevision) {
     return deny('POLICY_HOLD');
   }
+
+  // A returned A2 admission ticket is not a lasting purchase permission.
+  // Recheck once more after all source and policy reads at issue time.
+  try {
+    await purchaseAuthority.assertCurrentVerifiedPurchase(exactPurchase);
+  } catch { return deny('ACCESS_DENIED'); }
 
   const scope = Object.freeze({
     subjectId: access.subjectId,
