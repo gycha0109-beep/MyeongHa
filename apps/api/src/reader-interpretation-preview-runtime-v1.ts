@@ -622,6 +622,8 @@ export async function runThreadBoundReaderInterpretationPreviewV1(
       accessAuthorityPort: input.accessAuthorityPort,
       artifactAuthorityPort: input.artifactAuthorityPort,
       productReaderEligibilityAuthorityPort: input.productReaderEligibilityAuthorityPort,
+      currentVerifiedPurchaseAuthorityPort:
+        input.currentVerifiedPurchaseAuthorityPort,
     });
   } catch (error) {
     if (error instanceof OfficialReadingReaderAdmissionErrorV1) {
