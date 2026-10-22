@@ -142,6 +142,7 @@ set search_path=pg_catalog, public
 as $g2$
 declare
   v_positive jsonb;
+  v_validated_provenance jsonb;
   v_commit record;
   v_original_user_message_id text;
   v_original_user_count bigint;
@@ -214,17 +215,34 @@ begin
       message='Positive G2 Snapshot is not bound to the DB-original User message';
   end if;
 
-  select a.seyeon_personal_source_pin_jsonb -> 'positiveProof'
-    into v_positive
+  -- The Attempt's immutable G1 Pin must be precisely the one validated
+  -- by its model/renderer stage. A source hash alone does not bind a G1
+  -- original Grant, Record, Character, or current Attempt to this Commit.
+  -- Keep the Attempt FOR UPDATE held through the v2 Commit/Outbox.
+  select a.seyeon_personal_source_pin_jsonb -> 'positiveProof',
+         a.validation_result_jsonb -> 'personalRecordProvenance'
+    into v_positive, v_validated_provenance
   from public.chat_turn_attempts a
   where a.id=p_attempt_id and a.subject_id=p_subject_id
     and a.turn_id=p_turn_id and a.state='validated'
     and a.planner_version='seyeon-production-chat-planner-v1'
-    and a.seyeon_personal_source_pin_jsonb ? 'positiveProof'
+    and a.seyeon_personal_source_pinned_at is not null
+    and a.seyeon_personal_source_pin_jsonb
+      = jsonb_build_object(
+          'positiveProof',
+          a.seyeon_personal_source_pin_jsonb -> 'positiveProof'
+        )
   for update;
-  if not found or v_positive ->> 'subjectId'
-       is distinct from p_subject_id::text
+  if not found or jsonb_typeof(v_positive) is distinct from 'object'
+     or v_validated_provenance is distinct from v_positive
+     or v_positive ->> 'schemaVersion' is distinct from
+       'seyeon-positive-original-memory-source-pin-v1'
+     or v_positive ->> 'subjectId' is distinct from p_subject_id::text
      or v_positive ->> 'threadId' is distinct from p_thread_id::text
+     or v_positive ->> 'turnId' is distinct from p_turn_id::text
+     or v_positive ->> 'attemptId' is distinct from p_attempt_id::text
+     or v_positive ->> 'characterId' is distinct from 'seyeon'
+     or v_positive ->> 'recordKind' is distinct from 'memory'
      or v_positive ->> 'selectedSourcesDigest'
        is distinct from p_selected_sources_digest
      or v_positive ->> 'finalModelContextDigest'
@@ -246,6 +264,20 @@ begin
     raise exception using errcode='23514',
       constraint='seyeon_positive_g2_replay_unauthorized',
       message='No historical Positive Commit may be reauthorized';
+  end if;
+  -- A successful v2 call is not a license to return a Commit receipt from
+  -- another Turn, Attempt, Assistant or post-turn Outbox. A mismatch rolls
+  -- back the assistant and both Outbox writes in this SAME transaction.
+  if v_commit.turn_id is distinct from p_turn_id
+     or v_commit.attempt_id is distinct from p_attempt_id
+     or v_commit.assistant_message_id is distinct from p_message_id
+     or v_commit.post_turn_outbox_event_id
+          is distinct from p_post_turn_outbox_event_id
+     or v_commit.sequence_no is null or v_commit.sequence_no < 1
+     or v_commit.committed_at is null then
+    raise exception using errcode='23514',
+      constraint='seyeon_positive_g2_commit_receipt_mismatch',
+      message='Positive G2 DB Commit receipt lost the pinned source identity';
   end if;
   return query select v_commit.turn_id,v_commit.attempt_id,
     v_commit.assistant_message_id,v_commit.sequence_no,
