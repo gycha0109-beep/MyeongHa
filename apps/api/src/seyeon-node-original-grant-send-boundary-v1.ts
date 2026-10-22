@@ -169,15 +169,24 @@ function responseBytes(
 export async function sendSeyeonNodeOriginalGrantResponseV1(
   input: SendSeyeonNodeOriginalGrantResponseInputV1,
 ): Promise<SeyeonNodeOriginalGrantSendOutcomeV1> {
-  const deadlineMs = deadlineValue(input.deadlineMs);
-  if (input.chatResponseMetadata !== undefined) {
-    assertSeyeonNodeChatResponseMetadataV1(input.chatResponseMetadata);
-  }
-  if (input.response.headersSent || input.response.writableEnded ||
-      input.response.destroyed) {
-    throw new SeyeonNodeOriginalGrantSendBoundaryErrorV1(
-      'Node response already started; cannot authorize a protected send.',
-    );
+  // A rejected deadline/receipt or an already-started response cannot
+  // leave a writable protected socket for an outer fallback writer.
+  // No DB authority callback runs until this ingress boundary is complete.
+  let deadlineMs: number;
+  try {
+    deadlineMs = deadlineValue(input.deadlineMs);
+    if (input.chatResponseMetadata !== undefined) {
+      assertSeyeonNodeChatResponseMetadataV1(input.chatResponseMetadata);
+    }
+    if (input.response.headersSent || input.response.writableEnded ||
+        input.response.destroyed) {
+      throw new SeyeonNodeOriginalGrantSendBoundaryErrorV1(
+        'Node response already started; cannot authorize a protected send.',
+      );
+    }
+  } catch (error) {
+    if (!input.response.destroyed) input.response.destroy();
+    throw error;
   }
   if (input.requestSignal.aborted) {
     input.response.destroy();
