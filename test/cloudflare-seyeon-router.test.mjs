@@ -294,6 +294,52 @@ describe('S-CF2 actual Worker fetch boundary and no HTML fallback', () => {
     expect(await noCandidate.text()).toBe('');
   });
 
+  it('blocks streaming and ungrounded 206/304 Static Assets, permits bound partial and conditional responses', async () => {
+    const invalid = [
+      [new Request(ROOT + '/assets/report.js'),
+        new Response(SECRET, { status: 200, headers: { 'Content-Type': 'text/event-stream' } })],
+      [new Request(ROOT + '/assets/report.js'),
+        new Response(SECRET, { status: 200, headers: { 'Content-Type': 'application/x-ndjson' } })],
+      [new Request(ROOT + '/assets/report.js'),
+        new Response(SECRET, { status: 200 })],
+      [new Request(ROOT + '/assets/report.js'),
+        new Response(SECRET, { status: 206, headers: {
+          'Content-Type': 'text/javascript', 'Content-Range': 'bytes 0-5/50',
+        } })],
+      [new Request(ROOT + '/assets/report.js', { headers: { Range: 'bytes=0-5' } }),
+        new Response(SECRET, { status: 206, headers: { 'Content-Type': 'text/javascript' } })],
+      [new Request(ROOT + '/assets/report.js'),
+        new Response(null, { status: 304 })],
+    ];
+    for (const [request, candidate] of invalid) {
+      const response = await worker.fetch(request, { ASSETS: { fetch: () => candidate } });
+      expect(response.status).toBe(404);
+      expect(response.headers.get('cache-control')).toBe('no-store');
+      expect(await response.text()).toBe('');
+    }
+
+    const partial = await worker.fetch(
+      new Request(ROOT + '/assets/report.js', { headers: { Range: 'bytes=0-5' } }),
+      { ASSETS: { fetch: () => new Response('PUBLIC', {
+        status: 206, headers: {
+          'Content-Type': 'text/javascript',
+          'Content-Range': 'bytes 0-5/200',
+        },
+      }) },
+    );
+    expect(partial.status).toBe(206);
+    expect(await partial.text()).toBe('PUBLIC');
+    const conditional = await worker.fetch(
+      new Request(ROOT + '/assets/report.js', {
+        headers: { 'If-None-Match': '"synthetic-tag"' },
+      }),
+      { ASSETS: { fetch: () => new Response(null, { status: 304 }) } },
+    );
+    expect(conditional.status).toBe(304);
+    expect(await conditional.text()).toBe('');
+    expect(conditional.headers.get('x-content-type-options')).toBe('nosniff');
+  });
+
   it('preserves approved HTML security headers and non-HTML cache behavior', async () => {
     const publicHtml = await worker.fetch(new Request(ROOT + '/index.html'), {
       ASSETS: { fetch: () => new Response('<html>public</html>', {
