@@ -7,6 +7,10 @@ import {
 import type {
   PostgresSubjectPoolV1,
 } from './postgres-subject-execution.js';
+import {
+  OfficialReaderRestoreQuarantinedV1,
+  safeOfficialReaderRestoreQuarantineCategoryV1,
+} from './official-reader-private-restore-quarantine-state-v1.js';
 
 export const OFFICIAL_READER_RESTORE_RECONCILIATION_VERSION_V1 =
   'official-reader-offprimary-restore-reconciliation-v1' as const;
@@ -91,12 +95,23 @@ export interface OfficialReaderOffPrimaryRestoreReconciliationResultV1 {
   /** Se-yeon's existing analytics Outbox consumer must also exclude S5
    * protected turns on both claim/read and update/complete. */
   readonly ordinaryDerivedOutboxReadFenceInstalled: true;
+  /** Only the protected-body tombstone replay for listed, exact S4 fences
+   * completed. It is NEVER an owner-approved full restore or service release. */
+  readonly restoreState: 'protected_body_tombstone_replay_only';
+  readonly restoreCompletionApproved: false;
+  readonly ordinaryRestoreConsumersEnabled: false;
   /** This operation does NOT release broader P30D/S8 read serviceability. */
   readonly publicReaderServiceEnabled: false;
 }
 
 function fail(): never {
   throw new Error('Official Reader restored privacy state is unavailable.');
+}
+
+function rethrowQuarantineOrFailure(error: unknown): never {
+  const category = safeOfficialReaderRestoreQuarantineCategoryV1(error);
+  if (category) throw new OfficialReaderRestoreQuarantinedV1(category);
+  throw error;
 }
 
 function integer(value: unknown): number {
@@ -157,12 +172,15 @@ export async function reconcileOfficialReaderProtectedBodiesAfterRestoreV1(input
   // retaining any later independent paid Reader answer in that same scope.
   const refundFences =
     await input.offPrimary.restoreCatalog.listConfirmedScopeDeletionFences();
-  let refundDeleted = 0;
-  let refundKeysDestroyed = 0;
+  const fences = await input.offPrimary.restoreCatalog.listAccountDeletionFences();
 
+  // Inspect ALL backup-independent durable manifests before touching any
+  // database body or off-primary key. Otherwise a corrupt later manifest
+  // could be found after irreversible erasure of an earlier fence.
   for (const fence of refundFences) {
     const exact=await input.offPrimary.scopeLedger.readScopeDeletionFence(fence.jobId);
-    if (!exact || exact.fenceId!==fence.fenceId
+    if (!exact || exact.jobId!==fence.jobId
+        || exact.fenceId!==fence.fenceId
         || exact.subjectId!==fence.subjectId
         || exact.officialReadingId!==fence.officialReadingId
         || exact.readerCharacterId!==fence.readerCharacterId
@@ -170,8 +188,31 @@ export async function reconcileOfficialReaderProtectedBodiesAfterRestoreV1(input
         || exact.keyRefs.length!==fence.keyRefs.length
         || exact.bodyIds.some((id,index)=>id!==fence.bodyIds[index])
         || exact.keyRefs.some((ref,index)=>ref!==fence.keyRefs[index])) return fail();
+  }
 
-    const removed=await executePostgresAccountDeletionWorkerTransactionV1({
+  for (const fence of fences) {
+    const exact = await input.offPrimary.ledger.readAccountDeletionFence({
+      subjectId: fence.subjectId,
+      deletionJobId: fence.deletionJobId,
+    });
+    if (!exact || exact.subjectId !== fence.subjectId
+        || exact.deletionJobId !== fence.deletionJobId
+        || exact.fenceId !== fence.fenceId
+        || exact.bodyIds.length !== fence.bodyIds.length
+        || exact.bodyIds.some((id, index) => id !== fence.bodyIds[index])
+        || exact.keyRefs.length !== fence.keyRefs.length
+        || exact.keyRefs.some((key, index) => key !== fence.keyRefs[index])
+        || !(await input.offPrimary.restoreCatalog.isSubjectTombstoned(fence.subjectId))) {
+      return fail();
+    }
+  }
+
+  let refundDeleted = 0;
+  let refundKeysDestroyed = 0;
+  for (const fence of refundFences) {
+    let removed: number;
+    try {
+      removed=await executePostgresAccountDeletionWorkerTransactionV1({
       pool:input.pool,
       execute:async(client)=>{
         await client.query(
@@ -189,7 +230,10 @@ export async function reconcileOfficialReaderProtectedBodiesAfterRestoreV1(input
             || integer(row.remainingTombstonedRowCount)!==0) return fail();
         return integer(row.erasedRowCount);
       },
-    });
+      });
+    } catch (error) {
+      rethrowQuarantineOrFailure(error);
+    }
     refundDeleted+=removed;
     for(const keyRef of fence.keyRefs) {
       if(!(await input.offPrimary.keys.isKeyDestroyed(keyRef))) {
@@ -203,26 +247,14 @@ export async function reconcileOfficialReaderProtectedBodiesAfterRestoreV1(input
     );
   }
 
-  const fences = await input.offPrimary.restoreCatalog.listAccountDeletionFences();
   let deleted = 0;
   let destroyedKeys = 0;
 
   for (const fence of fences) {
-    const exact = await input.offPrimary.ledger.readAccountDeletionFence({
-      subjectId: fence.subjectId,
-      deletionJobId: fence.deletionJobId,
-    });
-    if (!exact || exact.fenceId !== fence.fenceId
-        || exact.bodyIds.length !== fence.bodyIds.length
-        || exact.bodyIds.some((id, index) => id !== fence.bodyIds[index])
-        || exact.keyRefs.length !== fence.keyRefs.length
-        || exact.keyRefs.some((key, index) => key !== fence.keyRefs[index])
-        || !(await input.offPrimary.restoreCatalog.isSubjectTombstoned(fence.subjectId))) {
-      return fail();
-    }
-
     // No key operations or off-primary network I/O inside this transaction.
-    const rows = await executePostgresAccountDeletionWorkerTransactionV1({
+    let rows: number;
+    try {
+      rows = await executePostgresAccountDeletionWorkerTransactionV1({
       pool: input.pool,
       execute: async (client) => {
         await client.query(
@@ -241,7 +273,10 @@ export async function reconcileOfficialReaderProtectedBodiesAfterRestoreV1(input
         }
         return integer(row.erasedRowCount);
       },
-    });
+      });
+    } catch (error) {
+      rethrowQuarantineOrFailure(error);
+    }
     deleted += rows;
 
     for (const keyRef of fence.keyRefs) {
@@ -269,6 +304,9 @@ export async function reconcileOfficialReaderProtectedBodiesAfterRestoreV1(input
     ordinaryDerivedRestoreQuarantineGuardInstalled: true as const,
     ordinaryDerivedRecordsReadFenceInstalled: true as const,
     ordinaryDerivedOutboxReadFenceInstalled: true as const,
+    restoreState: 'protected_body_tombstone_replay_only' as const,
+    restoreCompletionApproved: false as const,
+    ordinaryRestoreConsumersEnabled: false as const,
     publicReaderServiceEnabled: false as const,
   });
 }
