@@ -2,7 +2,7 @@ import {
   constants, existsSync, lstatSync, readFileSync,
 } from 'node:fs';
 import {
-  lstat, open, unlink, realpath, readdir,
+  lstat, open, unlink, realpath, readdir, link,
 } from 'node:fs/promises';
 import {
   createCipheriv, createDecipheriv, createHmac,
@@ -214,28 +214,42 @@ async function writeSealedOnce(
   await checkRoot(dir);
   const bytes = sealedBytes(secret, label, value);
   const target = join(dir, filename);
+  // Stage a new complete, fsynced record under the SAME durable mount.
+  // Atomic hardlink publication guarantees no concurrent process or crash
+  // can expose a partial tombstone/fence. A repeat never overwrites history.
+  const staging = join(dir, '.' + filename + '.stage-' + randomUUID());
   let handle;
+  let stagingCreated = false;
   try {
     handle = await open(
-      target, constants.O_WRONLY | constants.O_CREAT
+      staging, constants.O_WRONLY | constants.O_CREAT
         | constants.O_EXCL | constants.O_NOFOLLOW, 0o600,
     );
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'EEXIST') {
-      bytes.fill(0);
-      return;
-    }
-    bytes.fill(0);
-    throw error;
-  }
-  try {
+    stagingCreated = true;
     await handle.writeFile(bytes);
     await handle.sync();
+    await handle.close();
+    handle = undefined;
+    try {
+      await link(staging, target);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+      // Concurrent or prior successful attempt owns the immutable name.
+      // The caller must re-read and compare the entire sealed record.
+    }
+    await syncDirectory(dir);
   } finally {
     bytes.fill(0);
-    await handle.close();
+    if (handle !== undefined) await handle.close();
+    if (stagingCreated) {
+      try {
+        await unlink(staging);
+        await syncDirectory(dir);
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+      }
+    }
   }
-  await syncDirectory(dir);
 }
 
 function sortedManifest(bodyIds: readonly string[], keyRefs: readonly string[]) {
