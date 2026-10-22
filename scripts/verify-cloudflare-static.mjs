@@ -40,7 +40,8 @@ export function hashCloudflareStaticTreeV1(entries) {
   const sha = createHash('sha256');
   for (const entry of [...entries].sort((a,b) => a.path.localeCompare(b.path,'en'))) {
     if (typeof entry?.path !== 'string' ||
-        !/^[A-Za-z0-9_.\\/-]{1,512}$/.test(entry.path) ||
+        (entry.path.length < 1 || entry.path.length > 512 ||
+        /[\u0000-\u001f\u007f\\]/u.test(entry.path)) ||
         entry.path.startsWith('/') || entry.path.includes('\\') ||
         entry.path.split('/').some(x => !x || x === '..' || x === '.') ||
         seen.has(entry.path) ||
