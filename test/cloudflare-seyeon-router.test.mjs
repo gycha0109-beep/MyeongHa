@@ -8,7 +8,9 @@ import {
 import { matchCloudflareApiRoute } from '../workers/cloudflare-api-router.mjs';
 import worker from '../workers/cloudflare-static-preview.mjs';
 
-const ROOT = 'https://myeongha-cf.example.test';
+// An intentionally synthetic, never-resolved FQDN that passes the exact
+// custom Auth host shape gate; .test is intentionally rejected by the Worker.
+const ROOT = 'https://auth.synthetic-myeongha.dev';
 const THREAD = '123e4567-e89b-42d3-a456-426614174000';
 const SECRET = 'PRIVATE_ASSISTANT_CONTENT_MUST_NOT_LEAK';
 const bindings = {

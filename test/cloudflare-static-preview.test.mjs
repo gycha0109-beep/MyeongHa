@@ -182,7 +182,8 @@ describe('Cloudflare static-only deployment boundary', () => {
 
   it('requires independent Auth/DB and calculation-only approval before routing Saju', async () => {
     const route = { id: 'api.me.saju.calculation' };
-    const origin = 'https://myeongha-cf.example.test';
+    // Accepted synthetic host shape; the Worker must still reject *.example.test.
+    const origin = 'https://auth.synthetic-myeongha.dev';
     const request = new Request(origin + '/api/me/saju/calculation', { method: 'POST' });
     const approvedAuth = {
       MYEONGHA_CLOUDFLARE_AUTH_DB_MODE: 'approved-auth-db-v1',
