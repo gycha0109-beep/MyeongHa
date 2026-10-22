@@ -125,6 +125,8 @@ export async function runThreadBoundReaderInterpretationPreviewV2(
     accessAuthorityPort: input.accessAuthorityPort,
     artifactAuthorityPort: input.artifactAuthorityPort,
     productReaderEligibilityAuthorityPort: input.productReaderEligibilityAuthorityPort,
+    currentVerifiedPurchaseAuthorityPort:
+      input.currentVerifiedPurchaseAuthorityPort,
   };
   let first;
   try { first = await prepareOfficialReadingReaderAdmissionV1(admissionInput); }
