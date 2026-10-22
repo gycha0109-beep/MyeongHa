@@ -14,6 +14,7 @@ import { mobileColors } from '@/ui/mobile-colors';
 import { MobileUiText } from '@/ui/MobileUiText';
 import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
 import { useMobileUiLocale } from '@/ui/mobile-ui-locale';
+import { projectMobileSourceLanguageNoticeV1 } from '@/ui/mobile-source-language-notice-v1';
 
 type PreviewReadingTextV1 = Extract<
   MobileSajuTopicV1['availability'],
@@ -98,7 +99,8 @@ function errorCopy(error: unknown): Readonly<{ message: string; retryable: boole
 
 export function SajuPreviewReadingView({ onOpenPreview }: { onOpenPreview?: (topic: MobileSajuTopicV1) => void }) {
   const styles = useMobileThemedStyles(staticStyles);
-  const { t } = useMobileUiLocale();
+  const { t, locale } = useMobileUiLocale();
+  const sourceNotice = projectMobileSourceLanguageNoticeV1(locale, 'reading');
   const [state, setState] = useState<PreviewStateV1>({ kind: 'idle' });
 
   async function load(
@@ -286,6 +288,9 @@ export function SajuPreviewReadingView({ onOpenPreview }: { onOpenPreview?: (top
 
       {state.kind === 'ready' ? (
         <>
+          {sourceNotice.visible ? (
+            <Text style={styles.sourceLanguageNotice}>{sourceNotice.text}</Text>
+          ) : null}
           <View style={styles.resultHeading}>
             <Text style={styles.resultTitle}>{state.topic.label}</Text>
             <MobileUiText style={styles.authorityNote}>
@@ -358,6 +363,7 @@ const styles = StyleSheet.create({
   title: { color: mobileColors.ink, fontSize: 24, fontWeight: '900', letterSpacing: -0.4 },
   body: { color: mobileColors.muted, fontSize: 14, lineHeight: 21 },
   authorityNote: { color: mobileColors.muted, fontSize: 11, lineHeight: 17 },
+  sourceLanguageNotice: { fontSize: 12, lineHeight: 19, color: mobileColors.muted, backgroundColor: mobileColors.surface, borderWidth: 1, borderColor: mobileColors.border, padding: 12, borderRadius: 10 },
   topicSection: { gap: 10 },
   sectionHeading: { gap: 3, paddingHorizontal: 2 },
   sectionTitle: { color: mobileColors.ink, fontSize: 19, fontWeight: '800' },
