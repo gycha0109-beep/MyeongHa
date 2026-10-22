@@ -105,8 +105,24 @@ async function probe() {
   assert(turn.headers.get('cache-control') === 'no-store', 'Seyeon denial may be cached');
   assert(turn.headers.get('content-security-policy') === csp, 'Seyeon denial CSP mismatch');
 
-  const unauthorizedGet = await assertHttpStatus('/api/chat/thread-synthetic/turns', 404);
-  assert((await unauthorizedGet.text()) === '', 'Unexpected chat turn GET body');
+  // The mounted Security router holds ALL malformed or ambiguous Chat
+  // requests, including GET on the POST-only endpoint, before any DB work.
+  const unauthorizedGet = await assertHttpStatus('/api/chat/thread-synthetic/turns', 503);
+  assert((await unauthorizedGet.json()).error?.code ===
+    'SEYEON_FIRST_REVEAL_AUTHORITY_UNAVAILABLE', 'Unsafe Chat GET escaped the security fence');
+
+  for (const path of [
+    '/api/chat/123e4567-e89b-42d3-a456-426614174000',
+    '/api/chat/123e4567-e89b-42d3-a456-426614174000?afterSequenceNo=0&afterSequenceNo=2',
+    '/api/chat/123e4567-e89b-42d3-a456-426614174000/replay',
+    '/api/chat/123e4567-e89b-42d3-a456-426614174000/turns?replay=1',
+  ]) {
+    const denied = await assertHttpStatus(path, 503);
+    assert((await denied.json()).error?.code ===
+      'SEYEON_FIRST_REVEAL_AUTHORITY_UNAVAILABLE', path + ': held Chat route escaped');
+  }
+  const chatOpen = await assertHttpStatus('/api/chat', 404, { method: 'POST' });
+  assert((await chatOpen.text()) === '', 'Unported other-Character Chat open was exposed');
 
   return {
     runtime: 'wrangler dev (workerd), local only',

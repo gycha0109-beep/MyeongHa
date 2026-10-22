@@ -123,6 +123,24 @@ describe('S-CF2 actual Worker fetch boundary and no HTML fallback', () => {
       expect(result.headers.get('access-control-allow-origin')).toBeNull();
     }
   });
+  it('does not confuse an unported other-Character chat open with approved SeYeon Reveal', async () => {
+    const response = await worker.fetch(new Request(ROOT + '/api/chat', { method: 'POST' }), {});
+    expect(response.status).toBe(404);
+    expect(await response.text()).toBe('');
+    expect(response.headers.get('cache-control')).toBe('no-store');
+  });
+  it('keeps every ambiguous history, replay and malformed selector inside the security boundary', async () => {
+    for (const [path, method] of [
+      ['/api/chat/' + THREAD + '?afterSequenceNo=0&afterSequenceNo=1', 'GET'],
+      ['/api/chat/' + THREAD + '?pageSize=0', 'GET'],
+      ['/api/chat/' + THREAD + '/turns?__myeongha_chat_turn_send=1', 'POST'],
+      ['/api/chat/' + THREAD + '/turns', 'GET'],
+      ['/api/chat/' + THREAD + '/replay', 'GET'],
+    ]) {
+      const response = await worker.fetch(new Request(ROOT + path, { method }), {});
+      await expectHeld(response);
+    }
+  });
   it('preserves non-chat router state independently, with Static Assets unavailable to APIs', async () => {
     for (const path of ['/api/me', '/api/readings', '/api/memories', '/api/chat-unknown', '/api/unknown']) {
       const result = await worker.fetch(new Request(ROOT + path), {});

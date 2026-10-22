@@ -1,5 +1,8 @@
 import { matchCloudflareApiRoute } from './cloudflare-api-router.mjs';
-import { tryHandleCloudflareSeyeonSecurityV1 } from './cloudflare-seyeon-security.mjs';
+import {
+  tryHandleCloudflareSeyeonSecurityV1,
+  fenceCloudflareSeyeonBeforeFetchReturnV1,
+} from './cloudflare-seyeon-security.mjs';
 import { tryHandleCloudflareApprovedAuthV1 } from './cloudflare-auth-db-api.mjs';
 import { tryHandleCloudflareApprovedSajuCalculationV1 } from './cloudflare-saju-calculation.mjs';
 
@@ -76,10 +79,28 @@ export default {
   async fetch(request, bindings) {
     const url = new URL(request.url);
     const route = matchCloudflareApiRoute(url.pathname);
-    // S-CF2: protected Chat ingress is intercepted before every positive
-    // adapter, then sealed by the independent Security-owned egress fence.
-    const chatResponse = await tryHandleCloudflareSeyeonSecurityV1(request, bindings, route);
-    if (chatResponse !== null) return chatResponse;
+    // S-CF2: every /api/chat request is consumed here, before any other API
+    // adapter. Neither another Character nor an unknown thread can accidentally
+    // fall through to a future positive handler, HTML or Vercel rewrites.
+    if (url.pathname === '/api/chat' || url.pathname.startsWith('/api/chat/')) {
+      try {
+        const chatResponse = await tryHandleCloudflareSeyeonSecurityV1(request, bindings, route);
+        if (chatResponse !== null) return chatResponse;
+        // A DB-confirmed non-SeYeon thread is NOT an admission token: the
+        // separately authorized generic Chat API is not ported. Deny-first.
+        return new Response(null, { status: 404, headers: BASE_HEADERS });
+      } catch {
+        // Independent final boundary in the actual Worker fetch handler.
+        // Do not let a runtime/cleanup/serialization exception return a
+        // platform-generated HTML 500 or surface a protected body.
+        const sealed = fenceCloudflareSeyeonBeforeFetchReturnV1(
+          null, crypto.randomUUID(),
+        );
+        const headers = new Headers(sealed.headers);
+        for (const [key, value] of Object.entries(BASE_HEADERS)) headers.set(key, value);
+        return new Response(sealed.body, { status: sealed.status, headers });
+      }
+    }
     const approvedAuthResponse = await tryHandleCloudflareApprovedAuthV1(request, bindings, route);
     if (approvedAuthResponse !== null) return approvedAuthResponse;
     const approvedCalculationResponse = await tryHandleCloudflareApprovedSajuCalculationV1(request, bindings, route);
