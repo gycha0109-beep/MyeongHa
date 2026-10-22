@@ -602,6 +602,75 @@ describe('S-CF2 actual Worker fetch boundary and no HTML fallback', () => {
     expect(assets).not.toHaveBeenCalled();
   });
 
+  it('never serves If-Range 206 from a different or weak cache representation', async () => {
+    const path = ROOT + '/assets/chunk.js';
+    const earlier = 'Wed, 21 Oct 2015 07:28:00 GMT';
+    const later = 'Wed, 21 Oct 2015 07:29:00 GMT';
+    const early = 'Wed, 21 Oct 2015 07:28:30 GMT';
+    const cases = [
+      ['"current"', { ETag: '"current"' }, 206],
+      ['"stale"', { ETag: '"current"' }, 404],
+      ['"current"', {}, 404],
+      ['W/"current"', { ETag: '"current"' }, 404],
+      ['"current"', { ETag: 'W/"current"' }, 404],
+      ['"current", "stale"', { ETag: '"current"' }, 404],
+      ['bad-validator', { ETag: '"current"' }, 404],
+      [earlier, { 'Last-Modified': earlier, Date: later }, 206],
+      [earlier, { 'Last-Modified': earlier, Date: early }, 404],
+      [earlier, { 'Last-Modified': earlier }, 404],
+      [earlier, { 'Last-Modified': later, Date: later }, 404],
+      [earlier, { 'Last-Modified': earlier, Date: later, ETag: '"current"' }, 404],
+      [earlier, { Date: later }, 404],
+      [later, { 'Last-Modified': earlier, Date: later }, 404],
+      ['Wed, 35 Oct 2015 07:28:00 GMT', { 'Last-Modified': earlier, Date: later }, 404],
+    ];
+    for (const [ifRange, validators, expected] of cases) {
+      const response = await worker.fetch(
+        new Request(path, {
+          headers: { Range: 'bytes=0-5', 'If-Range': ifRange },
+        }),
+        {
+          ASSETS: {
+            fetch: () => new Response('PUBLIC', {
+              status: 206,
+              headers: {
+                'Content-Type': 'text/javascript',
+                'Content-Range': 'bytes 0-5/200',
+                'Content-Length': '6',
+                ...validators,
+              },
+            }),
+          },
+        },
+      );
+      expect(response.status, 'If-Range=' + ifRange).toBe(expected);
+      expect(response.headers.get('x-content-type-options')).toBe('nosniff');
+      if (expected === 404) {
+        expect(response.headers.get('cache-control')).toBe('no-store');
+        expect(response.headers.get('set-cookie')).toBeNull();
+        expect(await response.text()).toBe('');
+      } else {
+        expect(await response.text()).toBe('PUBLIC');
+      }
+    }
+    const unconditional = await worker.fetch(
+      new Request(path, { headers: { Range: 'bytes=0-5' } }),
+      {
+        ASSETS: {
+          fetch: () => new Response('PUBLIC', {
+            status: 206,
+            headers: {
+              'Content-Type': 'text/javascript',
+              'Content-Range': 'bytes 0-5/200',
+            },
+          }),
+        },
+      },
+    );
+    expect(unconditional.status).toBe(206);
+    expect(await unconditional.text()).toBe('PUBLIC');
+  });
+
   it('preserves approved HTML security headers and non-HTML cache behavior', async () => {
     const publicHtml = await worker.fetch(new Request(ROOT + '/index.html'), {
       ASSETS: { fetch: () => new Response('<html>public</html>', {
