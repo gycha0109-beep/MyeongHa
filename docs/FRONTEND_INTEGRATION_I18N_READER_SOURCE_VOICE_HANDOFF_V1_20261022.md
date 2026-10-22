@@ -107,7 +107,7 @@
 
 - Character source: published 9인 바이블 기반의 `characterId`, `sourceContentVersion`, general/Saju/Face surface가 지정된 voice authority와 동일해야 한다. 기존 `validateCharacterVoiceContinuityV1`의 구조화된 사실/무대지시/사주 고유 화법 금지 검사를 함께 사용한다.
 - Output locale: 실제 Reader 응답의 **서버 소유 locale**과 `responseLocale`가 일치해야 한다. **UI locale 헤더를 본 함수의 응답 로케일로 사용하지 않는다.**
-- 캐릭터별 표현: `appliedStyleRefs`는 현재 approved sparse profile에 실제 존재하는 참조만 사용한다. A안에 따라 미등록 프로필은 새로운 1인칭/애칭/반말 등을 임의로 작성할 수 없으며 추가 참조가 있으면 HOLD.
+- 캐릭터별 표현: `appliedStyleRefs`는 현재 approved sparse profile에 실제 존재하는 참조만 사용한다. **상황별** `contextRules`에서 정한 표현은 기존 관계·상황 owner가 현재 조건을 확인한 `activeContextRuleRefs`와 일치하는 경우에만 사용할 수 있으며, 임의 조건·중복·미등록 표현은 HOLD. A안에 따라 미등록 프로필은 새로운 1인칭/애칭/반말 등을 임의로 작성할 수 없다.
 - Official Saju에만 `compareReaderOfficialLocaleContinuityV1`를 호출하여 원본 `readingRef`/hash/선택 unit과 필수 Qualifier·Condition·Ambiguity·Disclosure ref 집합의 변화·누락·추가를 HOLD. 비사주에서 사주 witness를 내세우거나 사주인데 근거가 없으면 HOLD.
 - `ko-KR`의 정상 결과는 `korean_existing_unchanged / existing_owner_guards_only`로 **기존 보호·권한 검사를 계속 사용해야 한다는 의미**이며 새로운 Reader 출력 권한이 아니다.
 - `ja-JP`, `zh-TW`는 증빙이 전부 일치하더라도 무조건 `non_korean_release_not_admitted` HOLD. `zh-CN`·미지원 언어도 HOLD. 캐릭터별 실제 1인칭·호칭 승인값 0개 유지.
