@@ -21,6 +21,11 @@ import { hashSajuHeldSourceProofRequestV1 } from './saju-held-source-proof-verif
 import {
   inspectOfficialReaderSourceThroughDeliveryParityV1,
 } from './official-reader-source-through-delivery-parity-v1.js';
+import {
+  inspectOfficialReaderS6CiphertextS7IdentityV1,
+  type OfficialReaderS6CiphertextIdentityWitnessV1,
+  type OfficialReaderS7PreparedBindingWitnessV1,
+} from './official-reader-s6-ciphertext-s7-identity-v1.js';
 
 const SUBJECT = '66666666-6666-4666-8666-666666666666';
 const READING = '44444444-4444-4444-8444-444444444444';
@@ -64,7 +69,7 @@ function admission(): PreparedOfficialReadingReaderAdmissionV1 {
       subjectId: SUBJECT,
       readingId: READING,
       readingSessionId: SESSION,
-      productId: 'prod-saju',
+      productId: '12121212-1212-4121-8121-121212121212',
       readerCharacterId: 'seyeon',
       readerContentBundleId: BUNDLE,
       topicKey: 'career',
@@ -90,7 +95,7 @@ function admission(): PreparedOfficialReadingReaderAdmissionV1 {
       readerContentBundleId: BUNDLE,
       contentReleaseId: RELEASE,
       effectiveAt: '2026-10-22T00:55:00.000Z',
-      productId: 'prod-saju',
+      productId: '12121212-1212-4121-8121-121212121212',
       productSpecVersion: 'spec-v1',
       sajuDomain: 'career',
       readingContractVersion: CONTRACT,
@@ -386,5 +391,216 @@ describe('S3 signed-source inventory through S5, S6, S7 single-snapshot continui
       s5Commit: baseline.s5Commit,
       s6Read: baseline.s6Read,
     })).toMatchObject({ state: 'blocked', canDisclose: false });
+  });
+});
+
+function ciphertextIdentity(
+  reader: PreparedOfficialReadingReaderAdmissionV1,
+  commit: S5CommittedReferenceV1,
+): OfficialReaderS6CiphertextIdentityWitnessV1 {
+  return {
+    subjectId: reader.scope.subjectId,
+    threadId: reader.scope.threadId,
+    turnId: commit.turnId,
+    attemptId: commit.attemptId,
+    safeMessageId: commit.safeMessageId,
+    officialReadingId: reader.scope.readingId,
+    readerCharacterId: reader.scope.readerCharacterId,
+    readerContentBundleId: reader.scope.readerContentBundleId,
+    contentReleaseId: reader.scope.contentReleaseId,
+    originatingEntitlementGrantId: '10101010-1010-4010-8010-101010101010',
+    productId: reader.scope.productId,
+    sourceResponseHash: 'sha256:v1:' +
+      hashSajuHeldSourceProofRequestV1(reader.source.responseSnapshotJsonb),
+  };
+}
+
+function deliveryBinding(
+  reader: PreparedOfficialReadingReaderAdmissionV1,
+  commit: S5CommittedReferenceV1,
+  privateRead: S6PrivateReadReferenceV1,
+): OfficialReaderS7PreparedBindingWitnessV1 {
+  const prepared = privateRead.delivery;
+  if (!prepared) throw new Error('Missing private S7 preparation.');
+  return {
+    subjectId: reader.scope.subjectId,
+    threadId: reader.scope.threadId,
+    safeMessageId: commit.safeMessageId,
+    bodyId: commit.bodyId,
+    deliveryRequestId: prepared.deliveryRequestId,
+    deliveryAttemptId: prepared.deliveryAttemptId,
+    responsePreparedAt: prepared.responsePreparedAt,
+  };
+}
+
+describe('S6 encrypted identity witness pins Saju source to S5 and S7 exact message', () => {
+  it('checks the same source text and encrypted-body AAD with ONE existing Records lookup, without granting access', async () => {
+    const baseline = await input();
+    const calls: string[] = [];
+    const result = await inspectOfficialReaderS6CiphertextS7IdentityV1({
+      readerAdmission: baseline.readerAdmission,
+      recordAuthorityPort: port(baseline.record, calls),
+      sajuHandoff: handoff(baseline.readerAdmission),
+      s5Commit: baseline.s5Commit,
+      s6Read: baseline.s6Read,
+      s6CiphertextIdentity: ciphertextIdentity(baseline.readerAdmission, baseline.s5Commit),
+      s7PreparedBinding: deliveryBinding(
+        baseline.readerAdmission, baseline.s5Commit, baseline.s6Read,
+      ),
+      s7Acknowledged: acknowledged(),
+    });
+    expect(result).toMatchObject({
+      state: 'held',
+      evidenceStage: 'S7_CLIENT_ACKNOWLEDGED_NOT_HUMAN_READ',
+      sourceAuthority: 'NOT_EVALUATED',
+      canPersist: false,
+      canDisclose: false,
+      canPublish: false,
+      canSell: false,
+    });
+    expect(calls).toEqual([SUBJECT + '/' + READING]);
+    const serialized = JSON.stringify(result);
+    for (const value of [
+      BODY, READING, SUBJECT, DELIVERY_REQUEST, 'sha256:v1:', '확인된 구조적',
+    ]) expect(serialized).not.toContain(value);
+  });
+
+  it('rejects tampered S6 ciphertext source hash, S5 attempt, Reader scope and private message identity', async () => {
+    const baseline = await input();
+    const source = handoff(baseline.readerAdmission);
+    const valid = ciphertextIdentity(baseline.readerAdmission, baseline.s5Commit);
+    const validDelivery = deliveryBinding(
+      baseline.readerAdmission, baseline.s5Commit, baseline.s6Read,
+    );
+    const variations: OfficialReaderS6CiphertextIdentityWitnessV1[] = [
+      { ...valid, subjectId: '23232323-2323-4232-8232-232323232323' },
+      { ...valid, threadId: '23232323-2323-4232-8232-232323232323' },
+      { ...valid, turnId: '23232323-2323-4232-8232-232323232323' },
+      { ...valid, attemptId: '23232323-2323-4232-8232-232323232323' },
+      { ...valid, safeMessageId: '23232323-2323-4232-8232-232323232323' },
+      { ...valid, officialReadingId: '23232323-2323-4232-8232-232323232323' },
+      { ...valid, readerCharacterId: 'baekheon' },
+      { ...valid, readerContentBundleId: '23232323-2323-4232-8232-232323232323' },
+      { ...valid, contentReleaseId: '23232323-2323-4232-8232-232323232323' },
+      { ...valid, productId: '23232323-2323-4232-8232-232323232323' },
+      { ...valid, sourceResponseHash: 'sha256:v1:' + 'a'.repeat(64) },
+      { ...valid, originatingEntitlementGrantId: 'revoked-grant' },
+    ];
+    for (const s6CiphertextIdentity of variations) {
+      const calls: string[] = [];
+      const verdict = await inspectOfficialReaderS6CiphertextS7IdentityV1({
+        readerAdmission: baseline.readerAdmission,
+        recordAuthorityPort: port(baseline.record, calls),
+        sajuHandoff: source,
+        s5Commit: baseline.s5Commit,
+        s6Read: baseline.s6Read,
+        s6CiphertextIdentity,
+        s7PreparedBinding: validDelivery,
+      });
+      expect(verdict).toMatchObject({ state: 'blocked', canDisclose: false });
+      expect(calls).toHaveLength(0);
+    }
+  });
+
+  it('requires the precise S7 Subject × thread × safe message × body × request × attempt tuple', async () => {
+    const baseline = await input();
+    const identity = ciphertextIdentity(baseline.readerAdmission, baseline.s5Commit);
+    const prepared = deliveryBinding(
+      baseline.readerAdmission, baseline.s5Commit, baseline.s6Read,
+    );
+    const wrongs: OfficialReaderS7PreparedBindingWitnessV1[] = [
+      { ...prepared, subjectId: '23232323-2323-4232-8232-232323232323' },
+      { ...prepared, threadId: '23232323-2323-4232-8232-232323232323' },
+      { ...prepared, safeMessageId: '23232323-2323-4232-8232-232323232323' },
+      { ...prepared, bodyId: '23232323-2323-4232-8232-232323232323' },
+      { ...prepared, deliveryRequestId: '23232323-2323-4232-8232-232323232323' },
+      { ...prepared, deliveryAttemptId: '23232323-2323-4232-8232-232323232323' },
+      { ...prepared, responsePreparedAt: '2026-10-22T01:05:00.000Z' },
+    ];
+    for (const s7PreparedBinding of wrongs) {
+      expect(await inspectOfficialReaderS6CiphertextS7IdentityV1({
+        readerAdmission: baseline.readerAdmission,
+        recordAuthorityPort: port(baseline.record, []),
+        sajuHandoff: handoff(baseline.readerAdmission),
+        s5Commit: baseline.s5Commit,
+        s6Read: baseline.s6Read,
+        s6CiphertextIdentity: identity,
+        s7PreparedBinding,
+        s7Acknowledged: acknowledged(),
+      })).toMatchObject({ state: 'blocked', canDisclose: false });
+    }
+    expect(await inspectOfficialReaderS6CiphertextS7IdentityV1({
+      readerAdmission: baseline.readerAdmission,
+      recordAuthorityPort: port(baseline.record, []),
+      sajuHandoff: handoff(baseline.readerAdmission),
+      s5Commit: baseline.s5Commit,
+      s6Read: baseline.s6Read,
+      s6CiphertextIdentity: identity,
+      s7Acknowledged: acknowledged(),
+    })).toMatchObject({ state: 'blocked', canDisclose: false });
+  });
+
+  it('accepts an S5-only continuity stage without inventing a prepared delivery or ACK', async () => {
+    const baseline = await input();
+    const privateRead: S6PrivateReadReferenceV1 = {
+      bodyId: baseline.s6Read.bodyId,
+      officialReadingId: baseline.s6Read.officialReadingId,
+      readerCharacterId: baseline.s6Read.readerCharacterId,
+      committedAt: baseline.s6Read.committedAt,
+    };
+    const source = handoff(baseline.readerAdmission);
+    const ciphertext = ciphertextIdentity(baseline.readerAdmission, baseline.s5Commit);
+    expect(await inspectOfficialReaderS6CiphertextS7IdentityV1({
+      readerAdmission: baseline.readerAdmission,
+      recordAuthorityPort: port(baseline.record, []),
+      sajuHandoff: source,
+      s5Commit: baseline.s5Commit,
+      s6Read: privateRead,
+      s6CiphertextIdentity: ciphertext,
+    })).toMatchObject({
+      state: 'held',
+      evidenceStage: 'S5_COMMITTED_REFERENCE',
+      canDisclose: false,
+    });
+    expect(await inspectOfficialReaderS6CiphertextS7IdentityV1({
+      readerAdmission: baseline.readerAdmission,
+      recordAuthorityPort: port(baseline.record, []),
+      sajuHandoff: source,
+      s5Commit: baseline.s5Commit,
+      s6Read: privateRead,
+      s6CiphertextIdentity: ciphertext,
+      s7PreparedBinding: deliveryBinding(
+        baseline.readerAdmission, baseline.s5Commit, baseline.s6Read,
+      ),
+    })).toMatchObject({ state: 'blocked', canDisclose: false });
+  });
+
+  it('does not resurrect a revoked Records archive or elevate a Preview Source to Official', async () => {
+    const baseline = await input();
+    const identity = ciphertextIdentity(baseline.readerAdmission, baseline.s5Commit);
+    const delivery = deliveryBinding(
+      baseline.readerAdmission, baseline.s5Commit, baseline.s6Read,
+    );
+    const source = handoff(baseline.readerAdmission);
+    const revoked = await inspectOfficialReaderS6CiphertextS7IdentityV1({
+      readerAdmission: baseline.readerAdmission,
+      recordAuthorityPort: { readRecord: async () => null },
+      sajuHandoff: source,
+      s5Commit: baseline.s5Commit,
+      s6Read: baseline.s6Read,
+      s6CiphertextIdentity: identity,
+      s7PreparedBinding: delivery,
+    });
+    expect(revoked).toMatchObject({ state: 'blocked', canDisclose: false });
+    const forged = await inspectOfficialReaderS6CiphertextS7IdentityV1({
+      readerAdmission: baseline.readerAdmission,
+      recordAuthorityPort: port(baseline.record, []),
+      sajuHandoff: { ...source, sourceAuthority: 'PRODUCTION_VERIFIED' },
+      s5Commit: baseline.s5Commit,
+      s6Read: baseline.s6Read,
+      s6CiphertextIdentity: identity,
+      s7PreparedBinding: delivery,
+    });
+    expect(forged).toMatchObject({ state: 'blocked', canPersist: false });
   });
 });
