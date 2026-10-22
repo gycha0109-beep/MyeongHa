@@ -168,6 +168,7 @@ async function authorize(reader: string, domain: SajuDomain) {
   const context = await assembleOfficialStandardReaderRuntimeV2({
     proof, currentScope: prepared.scope,
     source: prepared.source, baseContext: f.baseContext,
+    currentVerifiedPurchaseAuthorityPort: f.input.currentVerifiedPurchaseAuthorityPort,
   });
   return { ...f, prepared, proof, context };
 }
@@ -272,6 +273,7 @@ describe('A3-beta: verified official standard Saju runtime, no fake Capability',
     await expect(assembleOfficialStandardReaderRuntimeV2({
       proof: a.proof, currentScope: a.prepared.scope,
       source: a.prepared.source, baseContext: a.baseContext,
+    currentVerifiedPurchaseAuthorityPort: a.input.currentVerifiedPurchaseAuthorityPort,
     })).rejects.toThrow();
     const b = fixture('seyeon', 'general');
     const prepared = await prepareOfficialReadingReaderAdmissionV1(b.input);
@@ -281,10 +283,12 @@ describe('A3-beta: verified official standard Saju runtime, no fake Capability',
     await expect(assembleOfficialStandardReaderRuntimeV2({
       proof: { ...proof }, currentScope: prepared.scope,
       source: prepared.source, baseContext: b.baseContext,
+      currentVerifiedPurchaseAuthorityPort: b.input.currentVerifiedPurchaseAuthorityPort,
     })).rejects.toThrow();
     await expect(assembleOfficialStandardReaderRuntimeV2({
       proof, currentScope: { ...prepared.scope, contentReleaseId: 'revoked-release' },
       source: prepared.source, baseContext: b.baseContext,
+      currentVerifiedPurchaseAuthorityPort: b.input.currentVerifiedPurchaseAuthorityPort,
     })).rejects.toThrow();
   });
 
