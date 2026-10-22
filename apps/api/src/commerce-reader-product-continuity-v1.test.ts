@@ -10,6 +10,9 @@ import type {
   OfficialReadingRecordReadAuthorityPortV1,
 } from './official-reading-record-read.js';
 import type {
+  CommerceReaderVerifiedPurchaseStateV1,
+} from './commerce-reader-verified-purchase-status-v1.js';
+import type {
   ResolveOfficialReadingReaderThreadInputV1,
 } from './official-reading-reader-thread-resolution-v1.js';
 
@@ -122,6 +125,7 @@ function authorities(
 function recordInput(
   readerAuthorities: ReaderAuthorities = authorities(),
   resolvedSubjectKind: 'member' | 'guest' = 'member',
+  purchaseState: CommerceReaderVerifiedPurchaseStateV1 = 'current_verified_purchase',
 ) {
   return {
     resolvedSubjectId: SUBJECT,
@@ -131,6 +135,13 @@ function recordInput(
     effectiveAt: NOW,
     recordAuthorityPort: RECORD,
     readerAuthorities,
+    verifiedPurchaseStatusAuthorityPort: {
+      readExactCurrentPurchase: async () => ({
+        state: purchaseState,
+        currentVerifiedPurchaseGrantCount:
+          purchaseState === 'current_verified_purchase' ? 1 : 0,
+      }),
+    },
   } as const;
 }
 
@@ -169,6 +180,7 @@ describe('Commerce verified purchase -> Reader -> Official Records continuity', 
       readerCharacterId: 'seyeon',
       officialRecord: { readingId: READING },
       summary: 'held_pending_authorized_reader_delivery',
+      purchaseState: 'current_verified_purchase',
       readerFollowup: {
         state: 'existing_thread_candidate',
         threadId: THREAD,
@@ -184,8 +196,11 @@ describe('Commerce verified purchase -> Reader -> Official Records continuity', 
   });
 
   it('keeps owned official Records available after a Reader-specific refund while closing followup', async () => {
-    const result = await resolveCommerceReaderRecordContinuityV1(recordInput(authorities([])));
+    const result = await resolveCommerceReaderRecordContinuityV1(
+      recordInput(authorities([]), 'member', 'verified_full_cancellation'),
+    );
     expect(result.officialRecord.readingId).toBe(READING);
+    expect(result.purchaseState).toBe('verified_full_cancellation');
     expect(result.readerFollowup).toEqual({
       state: 'not_available',
       requiresFreshGateAtUse: true,
@@ -207,4 +222,56 @@ describe('Commerce verified purchase -> Reader -> Official Records continuity', 
       readingId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
     })).rejects.toThrow('different Reading identity');
   });
+  it('blocks a previously resolved Reader thread after confirmed PortOne refund and last Grant revoke', async () => {
+    let locatorCalls = 0;
+    const existing = authorities();
+    const result = await resolveCommerceReaderRecordContinuityV1(recordInput({
+      ...existing,
+      threadLocatorAuthorityPort: {
+        readActiveMemberSingleCharacterThreads: async () => {
+          locatorCalls += 1;
+          return [{ threadId: THREAD }];
+        },
+      },
+    }, 'member', 'verified_full_cancellation'));
+    expect(result.purchaseState).toBe('verified_full_cancellation');
+    expect(result.readerFollowup).toEqual({
+      state: 'not_available',
+      requiresFreshGateAtUse: true,
+    });
+    expect(locatorCalls).toBe(0);
+    expect(result.canInjectPaidReadingIntoMemory).toBe(false);
+  });
+
+  it('does not infer a refund or expose cached Reader Chat when Commerce status is not confirmed', async () => {
+    const result = await resolveCommerceReaderRecordContinuityV1(
+      recordInput(authorities(), 'member', 'not_confirmed'),
+    );
+    expect(result.purchaseState).toBe('not_confirmed');
+    expect(result.readerFollowup.state).toBe('not_available');
+  });
+
+  it('keeps Reader navigation eligible after one refund if another exact verified sibling purchase survives', async () => {
+    const result = await resolveCommerceReaderRecordContinuityV1(
+      recordInput(authorities(), 'member', 'current_verified_purchase'),
+    );
+    expect(result.purchaseState).toBe('current_verified_purchase');
+    expect(result.readerFollowup).toMatchObject({
+      state: 'existing_thread_candidate', threadId: THREAD,
+      requiresFreshGateAtUse: true,
+    });
+  });
+
+  it('rejects contradictory current-Grant evidence even with a valid archived Reading and Reader binding', async () => {
+    await expect(resolveCommerceReaderRecordContinuityV1({
+      ...recordInput(),
+      verifiedPurchaseStatusAuthorityPort: {
+        readExactCurrentPurchase: async () => ({
+          state: 'verified_full_cancellation' as const,
+          currentVerifiedPurchaseGrantCount: 1,
+        }),
+      },
+    })).rejects.toThrow('purchase continuity is unavailable');
+  });
+
 });
