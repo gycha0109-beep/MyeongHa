@@ -112,3 +112,11 @@
 - 원격 Preview smoke Workflow에 **클라우드 CI 러너의 복원 DRY RUN**을 추가. 이전 고정된 40자리 Git SHA `d4f7cebb3d9be6b4ad9e526c53e3f5b8585cc9c0`와 실행 시점의 정확한 PR head를 비교하고, 두 버전의 원본 `wrangler.jsonc`, 부모-선조 관계 및 기존 Ops Preview 이름이 맞는지 확인한다. `--apply` 옵션 없이 실행되며 **클라우드 배포·시크릿·DNS·운영 Worker에 쓰기 작업이 전혀 없다**.
 - PR #2384 구형 Stage 4는 기존의 1-커밋 checkout 및 smoke 계약을 그대로 유지한다. #2420은 제한된 Git 히스토리를 다운로드하고 PR head의 로컬 브랜치를 구성해 위 사전 점검을 수행한다. **사용자 Windows 데스크탑에 접근할 이유가 없고, 명하 Ops GitHub CI만 사용한다.**
 - 실제 이전 Preview로 변경하고 최신 Preview로 복원하는 **mutating rehearsal은 여전히 별개 미실행**. 원격 CI의 준비성 PASS를 실제 rollback 완료라고 기록하지 않는다. Wrangler 배포 권한이 있는 적법한 CI 환경 또는 Cloudflare 전용 배포 실행 경로가 확보된 시점에만 `--apply`를 사용한다.
+
+## 2026-10-22 단계 9 — 기존 Preview Smoke에 무자격 증명·무과금 실측 타이밍 집계
+
+- 기존 `scripts/verify-cloudflare-preview-remote.mjs`의 **이미 수행하는 합성 HTTP probe의 응답 헤더 수신 시각**만 `performance.now()`로 재서 `opsProbeMetrics` 출력에 추가했다. **추가 네트워크 호출 없음**, 실제 사용자 계정/세션/메시지/결제 요청 없음.
+- `scripts/cloudflare-preview-smoke-metrics.mjs`는 `static / health / api-denial / protected-hold` 별 n/p50/p95/max(밀리초), 원본 router의 **고정 route ID별** n/p50/p95/max 및 429·예상 밖 5xx·전송 실패·명세와 다른 HTTP 결과를 집계한다. 민감한 실제 URL, query, thread ID, 본문, 쿠키, 토큰, DSN을 로그에 쓰지 않는다. **세연 의도된 503 HOLD**는 오류율 분자에 넣지 않고 별도 `expectedHolds503`으로 집계한다.
+- 수치는 **GitHub Runner→Cloudflare HTTPS 응답 헤더까지의 단일 합성 검사 지연**이다. Worker 실제 CPU 시간·메모리·실제 사용자 트래픽 분포·Cloudflare billable invocation·Workers Builds 사용 분수·청구 비용을 대신하지 않는다. 각 라우트에 표본이 1개일 수 있으므로 p50/p95가 운영 성능을 통계적으로 입증하지 않는다.
+- Cloudflare 연결의 **빌드 한도 소진 boolean은 읽기 전용 조회 가능**, 실제 billed usage / billing usage API에는 현재 권한 403. **청구 0원, 특정 비용 수치 또는 CPU 예산 PASS를 추측하지 않는다.** 비용/CPU/라우트별 실제 p95 실측은 해당 메트릭 조회 승인/접근과 실서비스에서 정식 부하 자료 확보 전까지 Stage 9 부분 HOLD다.
+- 테스트 `test/cloudflare-preview-smoke-metrics.test.mjs`에서 percentile·route ID redaction·429·의도된 503 처리·미확정 CPU/비용 표기·비정상 샘플 거부를 합성 검증한다. 기존 S-CF2 원격 smoke와 고정 이전 배포 검사에도 함께 적용되며 #2384 Stage 4 결과 계약은 유지한다.

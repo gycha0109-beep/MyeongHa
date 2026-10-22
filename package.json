@@ -20,7 +20,7 @@
     "build:web": "node scripts/build-web-static.mjs && npm run build -w @myeongha/web",
     "build:cloudflare:static": "npm run build:web && node scripts/prepare-cloudflare-static.mjs && node scripts/verify-cloudflare-static.mjs",
     "verify:cloudflare:static": "node scripts/verify-cloudflare-static.mjs",
-    "test:cloudflare:static": "node node_modules/vitest/vitest.mjs run test/cloudflare-static-preview.test.mjs test/cloudflare-api-router.test.mjs test/cloudflare-auth-admission.test.mjs test/cloudflare-seyeon-router.test.mjs test/cloudflare-vercel-standby.test.mjs test/cloudflare-preview-rollback.test.mjs test/cloudflare-runtime-pool-injection.test.ts test/cloudflare-auth-binding-inventory.test.mjs",
+    "test:cloudflare:static": "node node_modules/vitest/vitest.mjs run test/cloudflare-static-preview.test.mjs test/cloudflare-api-router.test.mjs test/cloudflare-auth-admission.test.mjs test/cloudflare-seyeon-router.test.mjs test/cloudflare-vercel-standby.test.mjs test/cloudflare-preview-rollback.test.mjs test/cloudflare-runtime-pool-injection.test.ts test/cloudflare-auth-binding-inventory.test.mjs test/cloudflare-preview-smoke-metrics.test.mjs",
     "verify:deployment-config": "node scripts/verify-web-deployment.mjs",
     "verify:supabase-deployment-config": "node scripts/verify-supabase-deployment.mjs",
     "verify:production-guest-bootstrap-ttl-binding": "node scripts/verify-production-guest-bootstrap-ttl-binding.mjs",

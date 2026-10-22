@@ -10,6 +10,7 @@ import {
   CLOUDFLARE_PREVIEW_RECEIPT_SCHEMA_V1,
 } from './prepare-cloudflare-static.mjs';
 import { CLOUDFLARE_DIRECT_API_ROUTES, CLOUDFLARE_REWRITE_ROUTES } from '../workers/cloudflare-api-router.mjs';
+import { summarizeCloudflarePreviewProbeMetricsV1 } from './cloudflare-preview-smoke-metrics.mjs';
 
 const URL_FROM_CLOUDFLARE = 'https://feat-ops-cloudflare-static-preview-20261020-myeongha.gycha0109.workers.dev';
 const origin = process.env.MYEONGHA_CLOUDFLARE_PREVIEW_URL || URL_FROM_CLOUDFLARE;
@@ -35,16 +36,22 @@ const expected = ['content-security-policy','referrer-policy','x-content-type-op
 assert(baseline.size === expected.length && expected.every(h=>baseline.has(h)), 'Vercel baseline changed');
 
 const failures = [];
+const timingSamples = [];
 let requests = 0;
 async function check(path, status, options = {}) {
   const target = new URL(path, parsed);
   assert(target.origin === parsed.origin, 'Cross-origin test prohibited');
   const request = {...options, redirect:'manual', signal:AbortSignal.timeout(15_000)};
   let response;
+  const started = performance.now();
   try {
     response = await fetch(target, request);
     requests++;
+    timingSamples.push({path,expectedStatus:status,
+      actualStatus:response.status,elapsedMs:performance.now()-started});
   } catch (error) {
+    timingSamples.push({path,expectedStatus:status,
+      actualStatus:null,elapsedMs:performance.now()-started});
     failures.push({method:request.method ?? 'GET',path,reason:'transport',message:String(error)});
     return null;
   }
@@ -236,7 +243,9 @@ async function main() {
   const result = {
     status:failures.length ? 'FAIL' : 'PASS',origin:parsed.origin,contract,
     ...(scf2 ? { attestedCommit: expectedHead } : {}),
-    testedHtml:HTML_ENTRIES.length,requests,liveness:'GET 200; other methods 405',readiness:'404 HOLD',seyeon:'503 HOLD',failures,
+    testedHtml:HTML_ENTRIES.length,requests,liveness:'GET 200; other methods 405',readiness:'404 HOLD',seyeon:'503 HOLD',
+    ...(scf2 ? { opsProbeMetrics:summarizeCloudflarePreviewProbeMetricsV1(timingSamples) } : {}),
+    failures,
   };
   console.log(JSON.stringify(result,null,2));
   assert(!failures.length,'Cloudflare live preview HTTP parity/safety failure');
