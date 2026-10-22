@@ -382,6 +382,9 @@ function authorities(
     accessAuthorityPort,
     artifactAuthorityPort,
     productReaderEligibilityAuthorityPort,
+    currentVerifiedPurchaseAuthorityPort: {
+      assertCurrentVerifiedPurchase: vi.fn(async () => undefined),
+    },
     relationshipAuthorityPort,
     memoryItemsAuthorityPort,
     memoryGrantsAuthorityPort,
