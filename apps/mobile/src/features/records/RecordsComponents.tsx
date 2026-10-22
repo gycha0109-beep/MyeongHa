@@ -14,6 +14,7 @@ import {
   type RecordsTabV1,
 } from '@/features/records/records-view-model';
 import { mobileColors } from '@/ui/mobile-colors';
+import { MobileReaderRecordContinuity } from '@/features/records/MobileReaderRecordContinuity';
 
 export const RECORDS_TABS_V1 = Object.freeze([
   { key: 'all', label: '전체' },
@@ -91,17 +92,29 @@ export function ReadingHistoryCard({
     </>
   );
 
-  if (!openable || onOpen === undefined) {
-    return <View style={styles.card}>{content}</View>;
-  }
+  const archiveCard = !openable || onOpen === undefined
+    ? <View style={styles.card}>{content}</View>
+    : (
+      <Pressable
+        accessibilityRole="button"
+        onPress={onOpen}
+        style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
+      >
+        {content}
+      </Pressable>
+    );
+  // Keep official Records open/read separate from any Reader entitlement
+  // probe. Do not nest the purchase/right button inside an archive Pressable.
   return (
-    <Pressable
-      accessibilityRole="button"
-      onPress={onOpen}
-      style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
-    >
-      {content}
-    </Pressable>
+    <View style={styles.readingStack}>
+      {archiveCard}
+      {openable && item.readerCharacterIds.length > 0 ? (
+        <MobileReaderRecordContinuity
+          readingId={item.readingId}
+          readerCharacterIds={item.readerCharacterIds}
+        />
+      ) : null}
+    </View>
   );
 }
 
@@ -191,6 +204,7 @@ const styles = StyleSheet.create({
   tabSelected: { backgroundColor: mobileColors.navy, borderColor: mobileColors.navy },
   tabText: { color: mobileColors.muted, fontSize: 12, fontWeight: '800' },
   tabTextSelected: { color: mobileColors.surface },
+  readingStack: { gap: 10 },
   card: {
     borderWidth: 1,
     borderColor: mobileColors.border,
