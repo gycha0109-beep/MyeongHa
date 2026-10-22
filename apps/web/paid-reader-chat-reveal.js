@@ -14,6 +14,8 @@ function closeExpanded() {
   const previous = expanded;
   expanded = null;
   previous.abort();
+  previous.retry.hidden = true;
+  previous.retry.onclick = null;
   previous.body.textContent = '';
   previous.body.hidden = true;
   previous.button.textContent = '구매권 확인 후 해설 열기';
@@ -61,6 +63,14 @@ export function appendProtectedReaderChatRevealV1(card, input) {
   status.setAttribute('role', 'status');
   status.setAttribute('aria-live', 'polite');
 
+  // Keep the original S7 receipt available only while this protected card
+  // remains expanded. A lost ACK can be replayed without a new paid GET.
+  const retry = document.createElement('button');
+  retry.className = 'conversation-paid-reader-reveal-button conversation-paid-reader-reveal-retry-button';
+  retry.type = 'button';
+  retry.textContent = '기기 수신 확인 다시 시도';
+  retry.hidden = true;
+
   const body = document.createElement('div');
   body.className = 'conversation-paid-reader-revealed-body';
   body.hidden = true;
@@ -75,7 +85,7 @@ export function appendProtectedReaderChatRevealV1(card, input) {
 
     const controller = new AbortController();
     const current = {
-      button, status, body,
+      button, status, body, retry,
       abort: () => controller.abort(),
     };
     expanded = current;
@@ -163,54 +173,78 @@ export function appendProtectedReaderChatRevealV1(card, input) {
       if (expanded !== current || !card.isConnected
           || body.hidden || controller.signal.aborted) return;
 
-      let acknowledged = false;
-      try {
-        let ackResponse;
-        const acknowledgementBody = JSON.stringify({
-          schemaVersion: DELIVERY_CONTRACT,
-          deliveryRequestId,
-          deliveryAttemptId: data.delivery.deliveryAttemptId,
-          acknowledgementToken: data.delivery.acknowledgementToken,
-        });
-        for (let networkAttempt = 0; networkAttempt < 2; networkAttempt += 1) {
-          try {
-            ackResponse = await fetch(readerPath + '/ack', {
-              method: 'POST',
-              credentials: 'same-origin',
-              cache: 'no-store',
-              headers: {
-                Accept: 'application/json',
-                'Content-Type': 'application/json',
-                Authorization: 'Bearer ' + bearer.token,
-                'X-Reader-Delivery-Ack': '1',
-              },
-              body: acknowledgementBody,
-              signal: controller.signal,
-            });
-            break;
-          } catch (error) {
-            if (controller.signal.aborted || networkAttempt === 1) throw error;
-            // ACK response loss is ambiguous. Replaying exactly the same
-            // token cannot rewrite the original client-acknowledged time.
+      // Reuse the exact client request/attempt/token for a failed ACK. A
+      // fresh GET would create another delivery attempt and lose the status
+      // of the original one. Nothing is persisted in browser storage.
+      const acknowledgementBody = JSON.stringify({
+        schemaVersion: DELIVERY_CONTRACT,
+        deliveryRequestId,
+        deliveryAttemptId: data.delivery.deliveryAttemptId,
+        acknowledgementToken: data.delivery.acknowledgementToken,
+      });
+      async function recordClientReceipt() {
+        if (expanded !== current || !card.isConnected || body.hidden
+            || controller.signal.aborted) return;
+        retry.disabled = true;
+        retry.hidden = true;
+        let acknowledged = false;
+        try {
+          // Never replay a delivery proof under a changed login. The server
+          // independently binds its original attempt to the owning Subject.
+          const activeBearer = await getActiveBearer();
+          if (!activeBearer || activeBearer.kind !== 'member'
+              || activeBearer.token !== bearer.token) {
+            closeExpanded();
+            return;
           }
+          let ackResponse;
+          for (let networkAttempt = 0; networkAttempt < 2; networkAttempt += 1) {
+            try {
+              ackResponse = await fetch(readerPath + '/ack', {
+                method: 'POST',
+                credentials: 'same-origin',
+                cache: 'no-store',
+                headers: {
+                  Accept: 'application/json',
+                  'Content-Type': 'application/json',
+                  Authorization: 'Bearer ' + activeBearer.token,
+                  'X-Reader-Delivery-Ack': '1',
+                },
+                body: acknowledgementBody,
+                signal: controller.signal,
+              });
+              break;
+            } catch (error) {
+              if (controller.signal.aborted || networkAttempt === 1) throw error;
+              // A missing response is ambiguous; retry the SAME S7 receipt.
+            }
+          }
+          if (ackResponse.status === 401) invalidateMemberSession(activeBearer.token);
+          const ackEnvelope = ackResponse.ok ? await ackResponse.json() : null;
+          acknowledged = ackResponse.ok
+            && ackEnvelope?.ok === true
+            && ackEnvelope.data?.schemaVersion === DELIVERY_CONTRACT
+            && ackEnvelope.data?.deliveryAttemptId === data.delivery.deliveryAttemptId
+            && typeof ackEnvelope.data?.clientAcknowledgedAt === 'string'
+            && Number.isFinite(Date.parse(ackEnvelope.data.clientAcknowledgedAt));
+        } catch {
+          // Do not claim receipt from a client display or missing ACK response.
         }
-        if (ackResponse.status === 401) invalidateMemberSession(bearer.token);
-        const ackEnvelope = ackResponse.ok ? await ackResponse.json() : null;
-        acknowledged = ackResponse.ok
-          && ackEnvelope?.ok === true
-          && ackEnvelope.data?.schemaVersion === DELIVERY_CONTRACT
-          && ackEnvelope.data?.deliveryAttemptId === data.delivery.deliveryAttemptId
-          && typeof ackEnvelope.data?.clientAcknowledgedAt === 'string'
-          && Number.isFinite(Date.parse(ackEnvelope.data.clientAcknowledgedAt));
-      } catch {
-        // A lost acknowledgment never means that a response was delivered.
-        // The original S5 answer and its safe Chat marker are untouched.
+        if (expanded === current && !body.hidden && !controller.signal.aborted) {
+          status.textContent = acknowledged
+            ? '현재 구매권으로 확인한 해설입니다. 기기 수신 확인이 기록되었습니다.'
+            : '해설이 표시되었으나 기기 수신 확인은 기록되지 않았습니다.';
+          retry.hidden = acknowledged;
+          retry.disabled = false;
+          if (acknowledged) retry.onclick = null;
+        }
       }
-      if (expanded === current && !body.hidden) {
-        status.textContent = acknowledged
-          ? '현재 구매권으로 확인한 해설입니다. 기기 수신 확인이 기록되었습니다.'
-          : '해설이 표시되었으나 기기 수신 확인은 기록되지 않았습니다.';
-      }
+      retry.onclick = () => {
+        if (expanded !== current || controller.signal.aborted || retry.disabled) return;
+        status.textContent = '기기 수신 확인을 다시 요청하고 있습니다…';
+        void recordClientReceipt();
+      };
+      await recordClientReceipt();
     } catch (error) {
       if (expanded === current && error?.name !== 'AbortError') {
         status.textContent = '해설을 불러오지 못했습니다. 다시 시도해 주세요.';
@@ -222,7 +256,7 @@ export function appendProtectedReaderChatRevealV1(card, input) {
     }
   });
 
-  card.append(button, status, body);
+  card.append(button, status, retry, body);
 }
 
 document.addEventListener('visibilitychange', () => {
