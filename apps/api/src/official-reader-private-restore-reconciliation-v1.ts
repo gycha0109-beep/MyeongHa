@@ -12,9 +12,29 @@ export const OFFICIAL_READER_RESTORE_RECONCILIATION_VERSION_V1 =
   'official-reader-offprimary-restore-reconciliation-v1' as const;
 
 const ORDINARY_DERIVED_QUARANTINE_GUARD_INSTALLED_SQL = `
-select pg_catalog.to_regprocedure(
-  'public.internal_assert_official_reader_restored_ordinary_derivations_absent_v1(uuid)'
-) is not null as "installed"
+select
+  pg_catalog.to_regprocedure(
+    'public.internal_assert_official_reader_restored_ordinary_derivations_absent_v1(uuid)'
+  ) is not null as "installed",
+  pg_catalog.to_regprocedure(
+    'public.internal_is_official_reader_s4_protected_derivation_v1(uuid,uuid,uuid)'
+  ) is not null
+  and exists (
+    select 1 from pg_catalog.pg_policies p
+    where p.schemaname='public'
+      and p.tablename='memory_items'
+      and p.policyname='memory_items_api_current_select_v1'
+      and p.cmd='SELECT'
+      and p.qual like '%internal_is_official_reader_s4_protected_derivation_v1%'
+  )
+  and exists (
+    select 1 from pg_catalog.pg_policies p
+    where p.schemaname='public'
+      and p.tablename='life_facts'
+      and p.policyname='life_facts_api_current_select_v1'
+      and p.cmd='SELECT'
+      and p.qual like '%internal_is_official_reader_s4_protected_derivation_v1%'
+  ) as "readFenceInstalled"
 `;
 
 const REFUND_RESTORE_SQL = `
@@ -46,6 +66,9 @@ export interface OfficialReaderOffPrimaryRestoreReconciliationResultV1 {
   /** Refuse even to start tombstone replay on old DB migrations that lack
    * the S4 ordinary Memory/Outbox restore quarantine fence. */
   readonly ordinaryDerivedRestoreQuarantineGuardInstalled: true;
+  /** API owner-scoped Memory, Life Fact, Reader, Se-yeon and Search/Summary
+   * reads must already filter resurrected S5-derived provenance. */
+  readonly ordinaryDerivedRecordsReadFenceInstalled: true;
   /** This operation does NOT release broader P30D/S8 read serviceability. */
   readonly publicReaderServiceEnabled: false;
 }
@@ -93,10 +116,12 @@ export async function reconcileOfficialReaderProtectedBodiesAfterRestoreV1(input
   const guardInstalled=await executePostgresAccountDeletionWorkerTransactionV1({
     pool:input.pool,
     execute:async(client)=>{
-      const result=await client.query<{installed:unknown}>(
-        ORDINARY_DERIVED_QUARANTINE_GUARD_INSTALLED_SQL,
-      );
-      if(result.rows.length!==1 || result.rows[0]?.installed!==true) return fail();
+      const result=await client.query<{
+        installed:unknown;
+        readFenceInstalled:unknown;
+      }>(ORDINARY_DERIVED_QUARANTINE_GUARD_INSTALLED_SQL);
+      if(result.rows.length!==1 || result.rows[0]?.installed!==true
+          || result.rows[0]?.readFenceInstalled!==true) return fail();
       return true as const;
     },
   });
@@ -218,6 +243,7 @@ export async function reconcileOfficialReaderProtectedBodiesAfterRestoreV1(input
     refundScopeRowsDeleted: refundDeleted,
     refundScopeKeysConfirmedDestroyed: refundKeysDestroyed,
     ordinaryDerivedRestoreQuarantineGuardInstalled: true as const,
+    ordinaryDerivedRecordsReadFenceInstalled: true as const,
     publicReaderServiceEnabled: false as const,
   });
 }
