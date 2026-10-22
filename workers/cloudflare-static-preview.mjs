@@ -1,4 +1,5 @@
 import { matchCloudflareApiRoute } from './cloudflare-api-router.mjs';
+import { isSeyeonCloudflareProtectedIngressAliasV1 } from '../apps/api/src/seyeon-cloudflare-ops-router-handoff-offline-v1.ts';
 import {
   tryHandleCloudflareSeyeonSecurityV1,
   fenceCloudflareSeyeonBeforeFetchReturnV1,
@@ -111,9 +112,14 @@ export default {
     // S-CF2: every /api/chat request is consumed here, before any other API
     // adapter. Neither another Character nor an unknown thread can accidentally
     // fall through to a future positive handler, HTML or Vercel rewrites.
-    if (url.pathname === '/api/chat' || url.pathname.startsWith('/api/chat/')) {
+    if (isSeyeonCloudflareProtectedIngressAliasV1(request)) {
       try {
-        if (emergencyHold) {
+        // WHATWG URL normalization leaves encoded route aliases outside the
+        // exact Ops router. Never let them reach Auth/Saju/API or Static Assets:
+        // all such aliases return the SAME sealed protected 503, no DB.
+        const canonicalChatPath = url.pathname === '/api/chat' ||
+          url.pathname.startsWith('/api/chat/');
+        if (emergencyHold || !canonicalChatPath) {
           const sealed = fenceCloudflareSeyeonBeforeFetchReturnV1(null, crypto.randomUUID());
           const headers = new Headers(sealed.headers);
           for (const [key, value] of Object.entries(BASE_HEADERS)) headers.set(key, value);
