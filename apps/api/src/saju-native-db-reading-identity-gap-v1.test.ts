@@ -891,10 +891,11 @@ describe('signed native S3 source → one DB Reading row → S5 protected body �
       readerCharacterId: base.s6Read.readerCharacterId,
       committedAt: base.s6Read.committedAt,
     };
+    const {s7PreparedBinding: ignoredPreparedBinding, ...withoutPreparedBinding} = base;
+    void ignoredPreparedBinding;
     const committed = await inspectSajuHeldSourceDbS5S7EvidenceV1({
-      ...base,
+      ...withoutPreparedBinding,
       s6Read: withoutDelivery,
-      s7PreparedBinding: undefined,
     });
     expect(committed).toMatchObject({
       state: 'held', evidenceStage: 'S5_COMMITTED_REFERENCE',
@@ -970,8 +971,13 @@ describe('signed native S3 source → one DB Reading row → S5 protected body �
 
   it('blocks missing S7 original binding, counterfeit ACK and out-of-order timestamps without granting access', async () => {
     const base = await signedS5S7Case([]);
+    const {s7PreparedBinding: removedBinding, ...withoutBinding} = base;
+    void removedBinding;
+    expect(await inspectSajuHeldSourceDbS5S7EvidenceV1({
+      ...withoutBinding,
+      trust: transportTrust().trust,
+    })).toMatchObject({state:'blocked',canDisclose:false});
     const variants = [
-      {s7PreparedBinding: undefined},
       {s7Acknowledged: {...acknowledgement(),
         deliveryAttemptId: 'abababab-abab-4aba-8aba-abababababab'}},
       {s7Acknowledged: {...acknowledgement(),
