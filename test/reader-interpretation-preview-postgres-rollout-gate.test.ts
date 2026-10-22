@@ -23,7 +23,8 @@ import {
 
 const httpPreviewStub = vi.hoisted(() => vi.fn());
 
-vi.mock('../apps/api/src/reader-interpretation-preview-http.js', () => ({
+vi.mock('../apps/api/src/reader-interpretation-preview-http.js', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../apps/api/src/reader-interpretation-preview-http.js')>(),
   runReaderInterpretationPreviewHttpV1: httpPreviewStub,
 }));
 
@@ -54,6 +55,17 @@ function transactionFixture(): {
   release: ReturnType<typeof vi.fn>;
 } {
   const query = vi.fn(async (sql: string) => {
+    if (sql.includes('qry_chat_thread_runtime_binding_v1')) {
+      return { rows: [{
+        threadId: THREAD_ID, status: 'active',
+        activeContentReleaseId: '66666666-6666-4666-8666-666666666666',
+        activeContentBundleId: '77777777-7777-4777-8777-777777777777',
+        contentRevision: 1, participantCharacterIds: ['seyeon'],
+      }] };
+    }
+    if (sql.includes('internal_assert_official_reader_current_verified_purchase_bundle_v1')) {
+      return { rows: [{ guardExecuted: null }] };
+    }
     if (sql.includes('begin_member_subject_context_v1')) {
       return {
         rows: [{ subjectId: SUBJECT_ID, subjectKind: 'member' }],
