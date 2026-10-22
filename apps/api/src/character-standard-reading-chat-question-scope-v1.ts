@@ -175,6 +175,51 @@ export function classifyCharacterStandardFollowupLexicalIntentV1(
 }
 
 /**
+ * RR-05 request intent and Security signals are independent axes.
+ * These deterministic observations do not replace the Content Policy gate,
+ * classify all risky questions, or authorize a Reader/Reading/Unit.
+ * No model call or provider-owned instruction is accepted here.
+ */
+export type CharacterStandardFollowupSecuritySignalV1 =
+  | 'instruction_override_attempt'
+  | 'new_source_authority'
+  | 'invalid_input';
+
+export interface CharacterStandardFollowupSignalAssessmentV1 {
+  readonly intent: CharacterStandardFollowupLexicalIntentV1;
+  readonly securitySignals: readonly CharacterStandardFollowupSecuritySignalV1[];
+}
+
+const INSTRUCTION_OVERRIDE_ATTEMPT =
+  /(?:이전|상위|시스템|개발자)\s*(?:지침|규칙|명령|메시지)[^.!?]{0,80}(?:무시|변경|덮어|따르지)|(?:ignore|override)\s+(?:all\s+)?(?:previous|system|developer)\s+(?:instructions|rules)|<\|im_start\|>|\[\s*system\s*\]|(?:^|\n)\s*(?:system|developer)\s*:/iu;
+
+export function inspectCharacterStandardFollowupSignalsV1(
+  text: unknown,
+  admittedDomain: string,
+): CharacterStandardFollowupSignalAssessmentV1 {
+  const intent = classifyCharacterStandardFollowupLexicalIntentV1(text, admittedDomain);
+  const signals: CharacterStandardFollowupSecuritySignalV1[] = [];
+  if (typeof text !== 'string' || text.length > 240 ||
+      /[\u0000-\u001f\u007f\u200b-\u200f\u202a-\u202e\u2060-\u206f]/u.test(text)) {
+    signals.push('invalid_input');
+  }
+  if (typeof text === 'string') {
+    const normalized = text.normalize('NFKC');
+    if (INSTRUCTION_OVERRIDE_ATTEMPT.test(normalized)) {
+      signals.push('instruction_override_attempt');
+    }
+    if (SOURCE_CHANGE_REQUEST.test(normalized) ||
+        intent === 'new_authority_required') {
+      signals.push('new_source_authority');
+    }
+  }
+  return Object.freeze({
+    intent,
+    securitySignals: Object.freeze(signals),
+  });
+}
+
+/**
  * A3-iota: conservative language admission for a follow-up to the last committed
  * semantic-guard-passed assistant answer.
  *
@@ -197,10 +242,14 @@ export async function classifyCharacterStandardFollowupQuestionScopeV1(input: Re
   const questionText = input.preflight.receivePlan.normalizedRequest.text;
   if (typeof questionText !== 'string') return hold('unsupported_question');
 
-  const kind = classifyCharacterStandardFollowupLexicalIntentV1(
+  const assessment = inspectCharacterStandardFollowupSignalsV1(
     questionText, input.grounded.scope.sajuDomain,
   );
-  if (kind !== 'admitted') return hold(kind);
+  if (assessment.securitySignals.includes('instruction_override_attempt') ||
+      assessment.securitySignals.includes('invalid_input')) {
+    return hold('unsupported_question');
+  }
+  if (assessment.intent !== 'admitted') return hold(assessment.intent);
 
   const evidence = await selectCharacterStandardFollowupEvidenceV1(input);
   if (evidence.mode === 'hold') return hold(evidence.reason);
