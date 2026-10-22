@@ -175,6 +175,14 @@
 - `step.title`, `step.primary`, `step.structure`, `step.supporting`, `result.notices`, `currentStep.*` 등 서버가 반환한 사주 원문은 **어느 로케일에서도 번역·재생성하지 않는다**. 미승인 비한국어 Saju/Reader output 호출 및 official 기록 생성 없음.
 - `test/mobile-saju-preview-labels-i18n.test.ts`는 기존 UI 사전의 단계 표시 언어와 두 실제 Preview 경로에서 UI labels만 현지화하는 경계를 고정한다. 이 변경은 Saju source approval, Character voice locale approval, Official Reading 재열람 정책 ②의 해제가 아니다.
 
+### 7.7 I18N-07 부분 집합 — 모바일 공식 기록의 Reader 소개·차단 상태 UI 현지화
+
+- `apps/mobile/src/features/reading/mobile-official-reader-entry-locale-v1.ts`는 **UI가 작성한 설명 문구만** `ko-KR`/`ja-JP`/`zh-TW`에서 제공한다. `MobileOfficialReadingReaderEntry`의 인물 선택 안내, 공식 Reading과의 관계, 접근 거부/일시 오류/판매·공개 미승인 등 기존 10가지 **이미 닫힌 해설 상태**를 같은 상태 코드로 표시하며 미지원 UI locale는 기존 한국어로 수렴한다.
+- 상태 원천은 그대로 `projectMobileOfficialReadingReaderEntryV1(record, selectedReaderId)`이다. 새로운 Reader release/entitlement/official Reading admission 진입을 생성하지 않는다. UI projection은 `interpretationReleased=false`, `readerOutputLocalized=false`만 나타내고 어떤 Reader response locale도 선언하지 않는다.
+- 각 캐릭터의 `name`, `title`, `tone`은 기존 mobile presentation source 그대로 사용한다. 임의 JA/ZH-TW 인칭·캐릭터 화법/소개 번역이나 character-specific delta를 작성하지 않는다. 국문 본문과 source가 섞여 보일 수 있어도 이 UI 적용만으로 Reader 다국어 화법을 지원한다고 안내하지 않는다.
+- `test/mobile-official-reader-entry-i18n.test.ts`와 기존 `test/mobile-official-reading-reader-entry.test.ts`를 실제 UI 속성·기존 closed-state 계약에 맞게 연결했다. Node 전용 정적 소스 확인 테스트는 모바일 앱 `src/`가 아닌 루트 `test/`에 유지한다.
+- **남은 소유권:** 캐릭터별 의미 충돌 6명과 개별 voice delta 등록은 Character owner 의사결정 전 HOLD. 공개 Reader Scene/paid interpretation, ② 이전 Official Reading 재언어화는 별도 승인 전 불허.
+
 ## 8. 다음 구현 작업 및 승인 위치
 
 1. **캐릭터 설계 owner:** 위 6명 차이를 실제 Bible/typed Runtime 간에 해결하고 authoritative source/version을 확정. 이 I18N 트랙은 제안·인계만, 원본 수정 금지.
