@@ -185,7 +185,7 @@ export function isCloudflareStaticSingleByteRangeBoundV1(request, response) {
 
 // RFC 9110 entity tags: opaque, case-sensitive bytes; commas inside quotes
 // are part of a tag, not list separators. Parsing is deny-only and bounded.
-const CLOUDFLARE_ENTITY_TAG_PATTERN_V1 = /^(?:W\\/)?"[\\x21\\x23-\\x7E]*"$/u;
+const CLOUDFLARE_ENTITY_TAG_PATTERN_V1 = /^(?:W\/)?"[\x21\x23-\x7E]*"$/u;
 
 function parseCloudflareIfNoneMatchV1(value) {
   if (typeof value !== 'string' || value.length === 0 || value.length > 4096) return null;
