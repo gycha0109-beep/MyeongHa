@@ -20,6 +20,10 @@ create table public.official_reader_paid_answer_purge_jobs_v1 (
   external_fence_id text,
   body_count integer,
   keys_erased_at timestamptz,
+  -- A second distinct provider/Receipt revocation may arrive while this
+  -- scope is already deleting ciphertext and destroying keys. Queue a fresh
+  -- job ID AFTER completion so the new event is not silently swallowed.
+  requeue_after_completion boolean not null default false,
   constraint reader_paid_answer_purge_job_scope_unique
     unique(subject_id,official_reading_id,reader_character_id),
   constraint reader_paid_answer_purge_job_subject_fk
@@ -100,6 +104,16 @@ begin
     )
     on conflict on constraint reader_paid_answer_purge_job_scope_unique
     do update set
+      requeue_after_completion=case
+        when public.official_reader_paid_answer_purge_jobs_v1.status='completed'
+          then false
+        when public.official_reader_paid_answer_purge_jobs_v1.status
+          in ('claimed','db_erased')
+          and public.official_reader_paid_answer_purge_jobs_v1.last_event_id
+            is distinct from excluded.last_event_id
+          then true
+        else public.official_reader_paid_answer_purge_jobs_v1.requeue_after_completion
+      end,
       last_event_id=excluded.last_event_id,
       updated_at=pg_catalog.clock_timestamp(),
       available_at=case
