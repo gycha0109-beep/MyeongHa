@@ -82,7 +82,7 @@ function ReaderStatusAction({
         setMessage('현재 이용권을 확인할 수 없습니다. 이전 대리자 기록은 현재 구매권이 아닙니다.');
       } else if (state.kind === 'not_available'
           && state.purchaseState === 'verified_full_cancellation') {
-        setMessage('검증된 결제 전액취소와 Reader 구매권 회수가 확인되었습니다. 유료 해설·후속 대화 및 기억 재주입이 차단됩니다. 공식 사주 보고서는 별도 보존 정책을 따릅니다.');
+        setMessage('검증된 원거래 전액취소와 Reader 구매권 회수가 확인되었습니다. 이 구매권으로 유료 해설을 다시 열거나 원문을 기억에 재주입할 수 없습니다. 일반 캐릭터 채팅과 공식 사주 보고서는 별도 권한을 따릅니다.');
       } else if (state.kind === 'not_available'
           && state.purchaseState === 'current_verified_purchase') {
         setMessage('정상 구매권은 확인되었지만 Reader 대화방 또는 정책 승인이 확인되지 않았습니다. 유료 해설 접근은 차단됩니다.');
