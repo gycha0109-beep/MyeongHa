@@ -103,6 +103,60 @@ describe('Reader conversation and consensual memory source split — RR-05/06/08
     expect(JSON.stringify(result)).not.toContain('사주가 성공을 확정');
   });
 
+  it('blocks Official followup when the recent-message read port is absent before touching DB Anchor', async () => {
+    let anchorReads = 0;
+    const result = await prepareReaderConversationResponseCandidateV1({
+      userText: '그 부분을 더 설명해 주세요.',
+      admittedDomain: 'wealth',
+      official: {
+        preflight: {} as never,
+        grounded: {} as never,
+        anchorAuthorityPort: {
+          readLatestValidatedAnchor: async () => {
+            anchorReads += 1;
+            throw Error('No latest Reader message evidence');
+          },
+        },
+      },
+    });
+    expect(result.mode).toBe('hold');
+    if (result.mode === 'hold') {
+      // The untrusted preflight is denied even before the port check.
+      expect(result.reason).toBe('unavailable_official_source');
+    }
+    expect(anchorReads).toBe(0);
+  });
+
+  it('denies forgery before reading the latest real Reader message or official anchor', async () => {
+    let actualReads = 0;
+    let anchorReads = 0;
+    const result = await prepareReaderConversationResponseCandidateV1({
+      userText: '그 부분을 더 설명해 주세요.',
+      admittedDomain: 'wealth',
+      official: {
+        preflight: {scope: {readingId: 'FORGED'}} as never,
+        grounded: {scope: {readingId: 'FORGED'}} as never,
+        anchorAuthorityPort: {
+          readLatestValidatedAnchor: async () => {
+            anchorReads += 1;
+            throw Error('FORGED ANCHOR');
+          },
+        },
+        recentMessageAuthorityPort: {
+          readRecentMessages: async () => {
+            actualReads += 1;
+            throw Error('FORGED TRANSCRIPT');
+          },
+        },
+        rendererDraft: {unknown:'FORGED'},
+      },
+    });
+    expect(result.mode).toBe('hold');
+    expect(actualReads).toBe(0);
+    expect(anchorReads).toBe(0);
+    expect(JSON.stringify(result)).not.toContain('FORGED');
+  });
+
   it('requires DB-validated latest anchor, server preflight and RR-06 guards before official follow-up', async () => {
     const withoutSource = await prepareReaderConversationResponseCandidateV1({
       userText: '그 부분을 더 설명해 주세요.',
@@ -218,7 +272,10 @@ describe('Reader conversation and consensual memory source split — RR-05/06/08
       import.meta.url,
     ), 'utf8');
     expect(src).toContain('classifyCharacterStandardFollowupLexicalIntentV1');
-    expect(src).toContain('classifyCharacterStandardFollowupQuestionScopeV1');
+    expect(src).toContain('prepareReaderLatestAnchorContinuityV1');
+    expect(src).toContain('const question = continuity.questionScope');
+    expect(src).toContain('!input.official.recentMessageAuthorityPort');
+    expect(src).toContain("return hold(intent, 'official_latest_anchor_not_admitted')");
     expect(src).toContain('closeCharacterStandardReaderSourceFocusV1');
     expect(src).toContain('prepareCharacterStandardReaderBoundedCandidateV1');
     expect(src).toContain('guardCharacterStandardReaderFinalOutputV1');
