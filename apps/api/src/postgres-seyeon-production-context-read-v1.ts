@@ -1,3 +1,6 @@
+import {
+  excludeOfficialReaderS5SafeMarkersFromOrdinaryContextV1,
+} from './official-reader-s4-ordinary-context-isolation-v1.js';
 import type { PostgresTransactionQueryV1 } from './postgres-subject-execution.js';
 import {
   SeyeonProductionContextReadAuthorityPortErrorV1,
@@ -195,14 +198,15 @@ implements SeyeonProductionContextReadAuthorityPortV1 {
         input.threadId,
         input.limit,
       ]);
-      return Object.freeze(result.rows.map((row) => Object.freeze({
+      const messages = result.rows.map((row) => Object.freeze({
         messageId: str('recent message id', row.messageId),
         sequenceNo: int('recent message sequence', row.sequenceNo),
         senderType: str('recent message sender type', row.senderType),
         characterId: nullableString('recent message Character id', row.characterId),
         text: str('recent message text', row.text),
         createdAt: timestamp('recent message timestamp', row.createdAt),
-      })));
+      }));
+      return excludeOfficialReaderS5SafeMarkersFromOrdinaryContextV1(messages);
     } catch (error) {
       return mapPostgresError(error);
     }
