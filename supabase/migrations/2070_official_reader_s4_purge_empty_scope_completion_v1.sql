@@ -18,11 +18,12 @@ begin
       constraint='reader_empty_purge_read_committed_required',
       message='Reader purge completion requires READ COMMITTED';
   end if;
+  -- Read scope first, without a row lock. The provider lifecycle trigger
+  -- already takes Reader S1 BEFORE updating this queue row.
   select * into j
   from public.official_reader_paid_answer_purge_jobs_v1
   where id=p_job_id and status='claimed' and lock_owner=p_worker
-    and lease_expires_at>pg_catalog.clock_timestamp()
-  for update;
+    and lease_expires_at>pg_catalog.clock_timestamp();
   if not found then
     raise exception using errcode='P0001',
       constraint='reader_empty_purge_claim_missing',
@@ -34,6 +35,18 @@ begin
   from public.internal_qry_official_reader_locked_bundle_scope_v1(
     j.subject_id,j.official_reading_id,j.reader_character_id
   ) q;
+  perform 1 from public.official_reader_paid_answer_purge_jobs_v1 live
+  where live.id=p_job_id and live.subject_id=j.subject_id
+    and live.official_reading_id=j.official_reading_id
+    and live.reader_character_id=j.reader_character_id
+    and live.lock_owner=p_worker and live.status='claimed'
+    and live.lease_expires_at>pg_catalog.clock_timestamp()
+  for update;
+  if not found then
+    raise exception using errcode='40001',
+      constraint='reader_empty_purge_claim_changed_after_s1',
+      message='Reader cleanup claim changed under S1';
+  end if;
   if v_state is distinct from 'no_active_grant'
      or exists (
        select 1 from public.official_reader_paid_answer_bodies b
