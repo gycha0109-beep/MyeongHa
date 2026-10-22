@@ -68,10 +68,65 @@ async function probe() {
     assert(response.headers.get('content-type')?.includes('text/html'), `${page}: HTML MIME mismatch`);
   }
 
+  // CF-D05: the local Worker-first Static Assets path must keep HEAD
+  // metadata equivalent to public GET without streaming a representation.
+  // Raw workerd HTTP is exercised here; no remote deployment is performed.
+  for (const path of ['/', '/index.html', '/chat.html']) {
+    const response = await assertHttpStatus(path, 200, { method: 'HEAD' });
+    assert(response.headers.get('content-type')?.includes('text/html'),
+      path + ': HEAD lost HTML MIME');
+    assert(response.headers.get('cache-control') === 'no-store',
+      path + ': HEAD must not cache HTML');
+    assert(response.headers.get('content-security-policy') === csp,
+      path + ': HEAD must preserve CSP');
+    assert(await response.text() === '', path + ': HEAD returned an unexpected body');
+  }
+
+  // CF-D05/D08: a public Static Asset must not become a credential-aware
+  // route merely because the browser sends an Authorization/Cookie header
+  // or a query token. Unit Worker tests inspect the actual ASSETS Request.
+  const staticSecret = 'SYNTHETIC_PUBLIC_ASSET_SECRET';
+  const withCredentials = await assertHttpStatus(
+    '/index.html?session=' + staticSecret, 200, {
+      headers: {
+        Authorization: 'Bearer ' + staticSecret,
+        Cookie: 'session=' + staticSecret,
+        'X-Api-Key': staticSecret,
+      },
+    },
+  );
+  assert(withCredentials.headers.get('cache-control') === 'no-store',
+    'Static HTML with browser credentials must not become cacheable');
+  assert(withCredentials.headers.get('content-security-policy') === csp,
+    'Static HTML with browser credentials must retain CSP');
+  assert((await withCredentials.text()).includes('<html'),
+    'Static HTML with browser credentials stopped rendering');
+  assert(!withCredentials.headers.has('set-cookie'),
+    'Static HTML cannot return a session cookie');
+
   const health = await assertHttpStatus('/api/health', 200);
   assert(health.headers.get('cache-control') === 'no-store', 'Public liveness must never be cached');
   assert(health.headers.get('content-security-policy') === csp, 'Health response CSP mismatch');
   assert(JSON.stringify(await health.json()) === '{"status":"ok"}', 'Health must return only a constant status');
+  // S-CF2: forged cache validators cannot change the only positive API
+  // liveness response or turn approved HTML into an arbitrary 304. The
+  // stronger 304 ETag/date/body binding is tested with synthetic ASSETS in
+  // the Worker fetch regression; this is real local workerd HTTP routing.
+  for (const [assetPath, validator] of [
+    ['/api/health', '"synthetic-nonmatching-health-validator"'],
+    ['/index.html', 'W/"synthetic-nonmatching-html-validator"'],
+  ]) {
+    const unaffected = await assertHttpStatus(assetPath, 200, {
+      headers: { 'If-None-Match': validator },
+    });
+    assert(unaffected.headers.get('cache-control') === 'no-store',
+      assetPath + ': HTML/liveness revalidation must remain no-store');
+    assert(unaffected.headers.get('content-security-policy') === csp,
+      assetPath + ': conditional requests lost CSP');
+    assert(unaffected.headers.get('location') === null,
+      assetPath + ': conditional request redirected');
+  }
+
   for (const method of ['POST', 'OPTIONS', 'HEAD']) {
     const denied = await assertHttpStatus('/api/health', 405, { method });
     assert(denied.headers.get('allow') === 'GET', 'Health method restriction drift');
@@ -79,12 +134,39 @@ async function probe() {
     assert(denied.headers.get('access-control-allow-origin') === null, 'Health CORS accidentally enabled');
   }
 
-  for (const missing of ['/missing-page.html', '/api', '/api/readiness', '/api/readings', '/api/unknown', '/api/health?__myeongha_chat_open=1']) {
+  for (const missing of ['/missing-page.html', '/api', '/api/readiness', '/api/readings', '/api/unknown']) {
     const response = await assertHttpStatus(missing, 404);
     assert(response.headers.get('cache-control') === 'no-store', `${missing}: 404 must not be cached`);
     assert(response.headers.get('content-security-policy') === csp, `${missing}: deny CSP mismatch`);
     const body = await response.text();
     assert(!body.includes('<!doctype html>') && !body.includes('<html'), `${missing}: leaked SPA HTML`);
+  }
+
+  // S-CF2: actual workerd must intercept legacy Vercel Chat rewrite keys
+  // BEFORE Health/Auth/Records API dispatch, even on unrelated canonical paths.
+  // These are not trusted route selectors or permission to expose old data.
+  for (const path of [
+    '/api/health?__myeongha_chat_open=1',
+    '/index.html?__myeongha_chat_open=1',
+    '/?__myeongha_chat_turn_send=1',
+    '/hall.html?%255F_myeongha_chat_open=1',
+    '/api/health?%25255F%25255Fmyeongha_chat_open=1',
+    '/api/me?%255F_myeongha_chat_open=1',
+    '/api/me?__myeongha_chat_turn_send=1',
+    '/api/me?__myeongha_chat_thread_id=123e4567-e89b-42d3-a456-426614174000',
+    '/api/auth/refresh?__myeongha_chat_open=1',
+  ]) {
+    const denied = await assertHttpStatus(path, 503);
+    assert(denied.headers.get('cache-control') === 'no-store',
+      path + ': protected hold must not be cached');
+    assert(denied.headers.get('access-control-allow-origin') === null,
+      path + ': protected hold must not admit cross-origin requests');
+    assert(denied.headers.get('content-security-policy') === csp,
+      path + ': protected hold lost CSP');
+    const payload = await denied.json();
+    assert(payload?.ok === false &&
+      payload?.error?.code === 'SEYEON_FIRST_REVEAL_AUTHORITY_UNAVAILABLE',
+      path + ': forged Chat marker escaped fixed protected 503');
   }
 
   const malformed = await assertHttpStatus('/api/auth/sign-in', 404, {
@@ -113,6 +195,10 @@ async function probe() {
 
   for (const path of [
     '/api/chat/123e4567-e89b-42d3-a456-426614174000',
+    '/%61pi/chat/123e4567-e89b-42d3-a456-426614174000',
+    '/%2561pi/chat/123e4567-e89b-42d3-a456-426614174000',
+    '/api%2F%63hat/123e4567-e89b-42d3-a456-426614174000',
+    '/api%252F%2563hat/123e4567-e89b-42d3-a456-426614174000',
     '/api/chat/123e4567-e89b-42d3-a456-426614174000?afterSequenceNo=0&afterSequenceNo=2',
     '/api/chat/123e4567-e89b-42d3-a456-426614174000/replay',
     '/api/chat/123e4567-e89b-42d3-a456-426614174000/turns?replay=1',

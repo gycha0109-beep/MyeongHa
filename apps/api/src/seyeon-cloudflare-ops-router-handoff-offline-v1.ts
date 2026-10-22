@@ -34,27 +34,71 @@ export type SeyeonCloudflareOpsRouteDispositionOfflineV1 =
   | 'static_asset'
   | 'unresolved_shared_lineage';
 
+/**
+ * S-CF2 Worker ingress interlock for an Ops-owned fetch entrypoint.
+ * Evaluate BEFORE API dispatch or Static Assets fallback. This is a
+ * reject-only signal, never a positive route/identity/Grant admission.
+ *
+ * The Worker must also reject raw dot-segments before WHATWG URL resolution:
+ * Request.url has already lost that original path spelling.
+ */
+export function isSeyeonCloudflareProtectedIngressAliasV1(
+  request: Request,
+): boolean {
+  try {
+    const url = new URL(request.url);
+    // Legacy Vercel rewrite markers are NEVER authenticated Worker routes.
+    // URLSearchParams decodes only once, so repeatedly decode keys only for
+    // conservative rejection. No decoded value is used for API dispatch.
+    for (const key of url.searchParams.keys()) {
+      let candidate = key;
+      for (let depth = 0; depth < 12; depth++) {
+        if (candidate.toLowerCase().startsWith('__myeongha_chat_')) return true;
+        if (!candidate.includes('%')) break;
+        try {
+          const decoded = decodeURIComponent(candidate);
+          if (decoded === candidate) break;
+          candidate = decoded;
+        } catch {
+          break;
+        }
+      }
+      // A residual, over-encoded reserved key may never become an API
+      // permission simply because the bounded decoding budget was exhausted.
+      if (candidate.toLowerCase().includes('myeongha_chat_')) return true;
+    }
+    let path = url.pathname;
+    // Account for percent-encoded route segment aliases and one intermediary
+    // re-encoding a literal '%' (e.g. /api/%2563hat). Decode for DENY only;
+    // never use this decoded path to call a downstream handler.
+    // The API root itself may be encoded (/%61pi/chat), not just the Chat
+    // segment. Match after each bounded decode before Ops/static dispatch.
+    // The same 12-pass bound is used for legacy marker keys; never use the
+    // decoded spelling to grant a route or identity.
+    for (let depth = 0; depth < 12; depth++) {
+      if (/^\/api\/chat(?:$|[\/\\.;\u0000%])/iu.test(path)) return true;
+      if (!path.includes('%')) return false;
+      const decoded = decodeURIComponent(path);
+      if (decoded === path) return false;
+      path = decoded;
+    }
+    return /^\/api\/chat(?:$|[\/\\.;\u0000%])/iu.test(path);
+  } catch {
+    // A malformed URL or percent escape cannot be routed as a trusted API.
+    return true;
+  }
+}
+
 function apiOrChatAlias(request: Request): Readonly<{
   api: boolean;
   chatAlias: boolean;
 }> {
   try {
-    const { pathname } = new URL(request.url);
-    const api = pathname === '/api' || pathname.startsWith('/api/');
-    if (!api) return { api: false, chatAlias: false };
-    const segment = pathname.split('/')[2] ?? '';
-    // Exact chat classifier handles canonical /api/chat*. This closes
-    // percent-encoded path-segment aliases BEFORE a mock Ops asset fallback.
-    // WHATWG URL normalization may ALREADY have erased raw dot-segments;
-    // Ops must reject those at the actual ingress boundary separately.
-    let decoded: string;
-    try { decoded = decodeURIComponent(segment); }
-    catch { return { api: true, chatAlias: true }; }
-    const folded = decoded.toLowerCase();
-    return {
-      api: true,
-      chatAlias: /^chat(?:$|[\/\\.;\u0000])/u.test(folded),
-    };
+    const path = new URL(request.url).pathname;
+    const api = /^\/api(?:$|\/)/iu.test(path);
+    // Alias classification remains independent of route disposition: the
+    // caller's Ops "other_api"/"static_asset" label cannot bypass a HOLD.
+    return { api, chatAlias: isSeyeonCloudflareProtectedIngressAliasV1(request) };
   } catch {
     return { api: true, chatAlias: true };
   }
