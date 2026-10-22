@@ -17,6 +17,8 @@ import { mobileColors } from '@/ui/mobile-colors';
 import { MobileUiText } from '@/ui/MobileUiText';
 import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
 import { useMobileTheme } from '@/ui/mobile-theme';
+import { useMobileUiLocale } from '@/ui/mobile-ui-locale';
+import { projectMobileSourceLanguageNoticeV1 } from '@/ui/mobile-source-language-notice-v1';
 import { useMobilePullRefreshV1 } from '@/ui/use-mobile-pull-refresh';
 
 const SEYEON_CHAT_THEME_BACKGROUND = require('../../../../assets/characters/chat-themes/seyeon-chat-theme-mobile-v1.webp');
@@ -33,6 +35,8 @@ function resolveThreadId(value: string | string[] | undefined): string | null {
 function ValidChatThread({ threadId }: { threadId: string }) {
   const styles = useMobileThemedStyles(staticStyles);
   const { theme, colors } = useMobileTheme();
+  const { locale } = useMobileUiLocale();
+  const sourceNotice = projectMobileSourceLanguageNoticeV1(locale, 'chat');
   const { snapshot, refresh, loadMore, draft, setDraft, sending, sendStatus, send } =
     useMobileChatThreadV1(threadId);
   const { refreshing, onRefresh } = useMobilePullRefreshV1(refresh);
@@ -66,6 +70,9 @@ function ValidChatThread({ threadId }: { threadId: string }) {
           <MobileUiText style={styles.backText}>‹ 대화로 돌아가기</MobileUiText>
         </Pressable>
         <ChatReadHeader snapshot={snapshot} />
+        {sourceNotice.visible ? (
+          <Text style={styles.sourceLanguageNotice}>{sourceNotice.text}</Text>
+        ) : null}
         <ChatReadMessages snapshot={snapshot} />
         <ChatReadMore snapshot={snapshot} onLoadMore={() => void loadMore()} onRetry={() => void refresh()} />
       </ScrollView>
@@ -130,6 +137,7 @@ const styles = StyleSheet.create({
   seyeonThemeWashDark: { backgroundColor: 'rgba(7, 15, 25, 0.66)' },
   content: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 23, gap: 20 },
   back: { alignSelf: 'flex-start', minHeight: 48, justifyContent: 'center', paddingHorizontal: 4 },
+  sourceLanguageNotice: { color: mobileColors.muted, backgroundColor: mobileColors.surface, fontSize: 12, lineHeight: 19, borderRadius: 10, borderWidth: 1, borderColor: mobileColors.border, padding: 12 },
   backText: { color: mobileColors.navy, fontSize: 14, fontWeight: '800' },
   invalidContent: {
     flex: 1,
