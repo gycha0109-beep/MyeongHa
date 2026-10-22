@@ -153,7 +153,7 @@ export async function handleOfficialReaderPaidDeliveryAckHttpV1(
   const nativeBearerOnly=origin===null
     && input.request.headers.get('Cookie')===null
     && typeof bearer==='string'
-    && /^Bearer [A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+$/u.test(bearer);
+    && /^Bearer [A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/u.test(bearer);
   if((origin!==expectedOrigin && !nativeBearerOnly)
       || input.request.headers.get('X-Reader-Delivery-Ack')!=='1') {
     return failed(403,'ACCESS_DENIED',input.requestId);
