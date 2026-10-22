@@ -13,7 +13,7 @@ import {
   getChatThreadRuntimeBinding,
 } from './chat-thread-runtime-binding-read.js';
 import {
-  assertOfficialReaderPrivateCurrentVerifiedPurchaseScopeV1,
+  createOfficialReaderPrivateCurrentPurchaseAuthorityPortV1,
 } from './official-reader-private-exact-verified-purchase-guard-v1.js';
 import type { ProductReaderEligibilityAuthorityPortV1 } from './product-reader-eligibility-policy-v1.js';
 import { createPostgresCharacterRelationshipReadAuthorityPortV1 } from './postgres-character-relationship-read.js';
@@ -108,8 +108,10 @@ export function executeReaderInterpretationPreviewPostgresV1(
       }
       const readerCharacterId = currentThread.participantCharacterIds[0];
       assertReaderRuntimeInternalPreviewCandidateV1(readerCharacterId);
-      await assertOfficialReaderPrivateCurrentVerifiedPurchaseScopeV1({
-        scope,
+      const currentVerifiedPurchaseAuthorityPort =
+        createOfficialReaderPrivateCurrentPurchaseAuthorityPortV1(scope);
+      await currentVerifiedPurchaseAuthorityPort.assertCurrentVerifiedPurchase({
+        subjectId: resolvedSubject.subjectId,
         readingId: request.officialReadingId,
         readerCharacterId,
         readerContentBundleId: currentThread.activeContentBundleId,
@@ -136,6 +138,7 @@ export function executeReaderInterpretationPreviewPostgresV1(
         nonMemoryContextAuthorityPort:
           createPostgresReaderContextNonMemoryReadAuthorityPortV1(client),
         groundingProjectionPort: input.groundingProjectionPort,
+        currentVerifiedPurchaseAuthorityPort,
         ...(input.createProductReaderEligibilityAuthorityPort
           ? { productReaderEligibilityAuthorityPort:
               input.createProductReaderEligibilityAuthorityPort(client) }
