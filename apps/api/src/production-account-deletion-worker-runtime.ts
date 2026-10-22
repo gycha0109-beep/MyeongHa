@@ -17,6 +17,9 @@ import {
   createOfficialReaderNodeOffPrimaryStoreV1,
   type OfficialReaderOffPrimaryStoreConfigV1,
 } from './official-reader-node-offprimary-privacy-store-v1.js';
+import {
+  parseOfficialReaderOffPrimaryWorkerConfigV1,
+} from './official-reader-offprimary-worker-config-v1.js';
 import type { ProductionAccountDeletionAuthAdminConfigV1 } from './production-account-deletion-auth-admin-config.js';
 import type { ProductionAccountDeletionWorkerDbConfigV1 } from './production-account-deletion-worker-db-config.js';
 import {
@@ -114,9 +117,11 @@ export function createProductionAccountDeletionWorkerRuntimeV1(input: {
   // Construct off-primary ports only when durable, owner-provisioned mount
   // configuration was passed. Missing/wrong roots refuse to start; there is
   // deliberately no /tmp or backed-up DB fallback.
-  const offPrimary = input.readerOffPrimaryStoreConfig === undefined
+  const offPrimaryConfig = input.readerOffPrimaryStoreConfig
+    ?? parseOfficialReaderOffPrimaryWorkerConfigV1(process.env);
+  const offPrimary = offPrimaryConfig === null
     ? null
-    : createOfficialReaderNodeOffPrimaryStoreV1(input.readerOffPrimaryStoreConfig);
+    : createOfficialReaderNodeOffPrimaryStoreV1(offPrimaryConfig);
   const readerPrivacyDeletionPort = input.readerPrivacyDeletionPort
     ?? (offPrimary === null ? undefined
       : createOfficialReaderAccountPrivacyDeletionPortV1({
