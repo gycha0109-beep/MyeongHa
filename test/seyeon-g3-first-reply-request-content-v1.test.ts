@@ -27,7 +27,7 @@ const CANARY = 'SYNTHETIC_DB_AUTHORIZED_G3_ANSWER';
 function fakeRuntimeResult(userText: unknown): RunProductionSeyeonChatResultV1 {
   return {
     subjectId: SUBJECT,
-    threadBinding: {threadId: THREAD},
+    threadBinding: {threadId: THREAD, participantCharacterIds: ['seyeon']},
     execution: {
       disposition: 'executed',
       receivedTurn: {turnId: TURN, userText, threadCharacterId: 'seyeon'},
