@@ -10,6 +10,7 @@ import {
 } from './character-standard-reading-chat-grounding-v2.js';
 import {
   classifyCharacterStandardFollowupQuestionScopeV1,
+  inspectCharacterStandardFollowupSignalsV1,
   assertServerPreparedStandardFollowupQuestionScopeV1,
   type CharacterStandardFollowupQuestionScopeDecisionV1,
 } from './character-standard-reading-chat-question-scope-v1.js';
@@ -173,6 +174,17 @@ export async function prepareReaderLatestAnchorContinuityV1(input: Readonly<{
       input.preflight.scope.officialArtifactResponseHash!==scope.officialArtifactResponseHash ||
       input.preflight.receivePlan.normalizedRequest.threadId!==scope.threadId) {
     return hold('SOURCE_UNAVAILABLE');
+  }
+
+  // Existing RR-05 syntax and security-signal inspection is only a negative
+  // prefilter. Do not read a private transcript for novel Saju scope,
+  // prompt injection or unsupported questions.
+  const assessment=inspectCharacterStandardFollowupSignalsV1(
+    input.preflight.receivePlan.normalizedRequest.text,
+    scope.sajuDomain,
+  );
+  if (assessment.intent!=='admitted' || assessment.securitySignals.length!==0) {
+    return hold('FOLLOWUP_SCOPE_REJECTED');
   }
 
   const read=async ():Promise<ReaderLatestAssistantObservationV1>=>{
