@@ -7,6 +7,10 @@ import {
   type OfficialReadingRecordReadAuthorityPortV1,
   type OfficialReadingRecordV1,
 } from './official-reading-record-read.js';
+import type {
+  CommerceReaderVerifiedPurchaseStatusAuthorityPortV1,
+  CommerceReaderVerifiedPurchaseStateV1,
+} from './commerce-reader-verified-purchase-status-v1.js';
 import {
   resolveOfficialReadingReaderThreadV1,
   OfficialReadingReaderThreadResolutionErrorV1,
@@ -53,6 +57,12 @@ export interface CommerceReaderRecordContinuityV1 {
   /** ONE Reader-independent official report, never a per-Reader copy. */
   readonly officialRecord: OfficialReadingRecordV1;
   readonly summary: 'held_pending_authorized_reader_delivery';
+  /**
+   * Exact current purchase and verified provider cancellation are read
+   * independently of historical Records/Reader provenance. Neither status
+   * is a new Grant, refund payout promise or permission to reveal paid text.
+   */
+  readonly purchaseState: CommerceReaderVerifiedPurchaseStateV1;
   readonly readerFollowup:
     | Readonly<{
         readonly state: 'existing_thread_candidate';
@@ -149,6 +159,8 @@ export async function resolveCommerceReaderRecordContinuityV1(input: {
   readonly effectiveAt: string;
   readonly recordAuthorityPort: OfficialReadingRecordReadAuthorityPortV1;
   readonly readerAuthorities: ReaderThreadAuthorityV1;
+  readonly verifiedPurchaseStatusAuthorityPort:
+    CommerceReaderVerifiedPurchaseStatusAuthorityPortV1;
 }): Promise<CommerceReaderRecordContinuityV1> {
   const subjectId = uuid(input.resolvedSubjectId);
   const readingId = uuid(input.readingId);
@@ -169,7 +181,33 @@ export async function resolveCommerceReaderRecordContinuityV1(input: {
 
   let followup: CommerceReaderRecordContinuityV1['readerFollowup'] =
     Object.freeze({ state: 'not_available', requiresFreshGateAtUse: true });
-  if (input.resolvedSubjectKind === 'member') {
+
+  // A historically bound or even active Grant can outlive its original
+  // receipt's verification_status. Reader D-05 does not itself recheck that
+  // Receipt. A private S1-locked verification against the CURRENT Receipt,
+  // including surviving sibling purchases, is therefore mandatory BEFORE
+  // exposing even a candidate navigation thread.
+  const purchase = input.resolvedSubjectKind === 'member'
+    ? await input.verifiedPurchaseStatusAuthorityPort.readExactCurrentPurchase({
+        subjectId,
+        readingId,
+        readerCharacterId,
+      })
+    : Object.freeze({
+        state: 'not_confirmed' as const,
+        currentVerifiedPurchaseGrantCount: 0,
+      });
+  if (!purchase ||
+      !Number.isSafeInteger(purchase.currentVerifiedPurchaseGrantCount) ||
+      purchase.currentVerifiedPurchaseGrantCount < 0 ||
+      (purchase.state === 'current_verified_purchase'
+        ? purchase.currentVerifiedPurchaseGrantCount === 0
+        : (purchase.state !== 'verified_full_cancellation'
+           && purchase.state !== 'not_confirmed') ||
+          purchase.currentVerifiedPurchaseGrantCount !== 0)) return unavailable();
+
+  if (input.resolvedSubjectKind === 'member'
+      && purchase.state === 'current_verified_purchase') {
     try {
       const result = await resolveOfficialReadingReaderThreadV1({
         resolvedSubjectId: subjectId,
@@ -207,6 +245,7 @@ export async function resolveCommerceReaderRecordContinuityV1(input: {
     readerCharacterId,
     officialRecord,
     summary: 'held_pending_authorized_reader_delivery',
+    purchaseState: purchase.state,
     readerFollowup: followup,
     readerInterpretation: 'private_current_entitlement_only',
     canBypassS5OrS6: false,
