@@ -64,8 +64,19 @@ begin
   end if;
 
   update public.official_reader_paid_answer_purge_jobs_v1
-  set status='completed',
-      keys_erased_at=pg_catalog.clock_timestamp(),
+  set status=case when j.requeue_after_completion then 'pending'
+                  else 'completed' end,
+      id=case when j.requeue_after_completion
+              then pg_catalog.gen_random_uuid() else id end,
+      available_at=case when j.requeue_after_completion
+                        then pg_catalog.clock_timestamp() else available_at end,
+      external_fence_id=case when j.requeue_after_completion
+                            then null else external_fence_id end,
+      body_count=case when j.requeue_after_completion
+                      then null else body_count end,
+      keys_erased_at=case when j.requeue_after_completion
+                          then null else pg_catalog.clock_timestamp() end,
+      requeue_after_completion=false,
       lock_owner=null, lease_expires_at=null,
       updated_at=pg_catalog.clock_timestamp()
   where id=p_job_id and status='db_erased'
