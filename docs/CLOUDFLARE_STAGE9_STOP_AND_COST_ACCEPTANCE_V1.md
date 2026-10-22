@@ -53,3 +53,11 @@ scripts/cloudflare-preview-ops-stop-gate.mjs에서 실행되는 읽기 전용 �
 - 로컬 산출물 경로는 `artifacts/cloudflare-preview-stage9/current.json` 및 `recovery.json` 둘로 고정하며, 덮어쓰기를 거부한다. 실제 raw API 경로/쿼리/쿠키/요청/응답 본문, provider state, 개인 ID, 토큰, DB 원문 또는 빌드 로그는 JSON으로 복제하지 않는다. 도메인/비밀 문자열을 추가하는 필드나 임의 route ID는 거절하는 격리 단위 테스트를 포함한다.
 - 기존 `Cloudflare Preview Remote Smoke`는 성공/실패 시 `actions/upload-artifact`의 **고정 SHA**를 사용해 `cloudflare-preview-stage9-evidence` 파일 하나에 두 JSON을 최대 **7일**만 보관한다. Artifact가 없으면 결과를 조작해 PASS로 만들지 않는다. `#2384` Stage 4 legacy에는 주입하지 않는다.
 - 인수 파일은 Worker CPU/메모리/실청구/실사용자 p95를 기록하지 않고 `notMeasured`로 명시한다. 운영 계정 비용 API 403 상태를 수용하며 Production/DNS/시크릿/유료 리소스 변경 없음. 만료된 증거 파일만으로 향후 수락하지 않는다.
+
+### 2026-10-22 — 동일 GitHub 실행의 현재·복구 증거 2종 필수 수락
+
+- 기존 원격 Smoke에 기록되는 `githubRun.id`와 `githubRun.attempt`를 GitHub Actions 런타임의 **동일 실행 ID·시도 번호**에서만 읽는다. 현재 Preview 파일은 PR의 최신 `head.sha`, 복구 후보 파일은 고정 `d4f7cebb3d9be6b4ad9e526c53e3f5b8585cc9c0`를 증명해야 한다.
+- `scripts/accept-cloudflare-stage9-evidence-pair.mjs`가 두 파일 **정확히 2개**를 별도 수락한다. 누락·중복·심볼릭 링크·지원하지 않는 키, 다른 GitHub 시도, 서로 다른 라우트 분류/표본 수, 원격 영수증 SHA 이탈, 기존 58개 합성 probe 및 의도된 세연 503 6건 미충족, 예상 밖 429·5xx·전송 오류/차단 이탈은 **CI FAIL**로 판정한다. 승인되지 않은 실제 URL·쿼리·개인정보·시크릿·호스트가 섞인 JSON 필드도 허용하지 않는다.
+- `Cloudflare Preview Remote Smoke`의 **11개 Chrome 화면/기존 Vercel standby 검사 뒤**에 위 쌍을 확인하는 필수 단계를 추가하고, 아티팩트 업로드는 파일 없을 때 `error`로 중단한다. 실패 시에도 안전한 증거 파일이 존재하면 기존 `if: always()` 업로드는 수행하며, CI 성공으로 승격하지 않는다. `#2384` Stage 4 legacy 동작은 바꾸지 않는다.
+- 수락 판정은 `ALLOW_DENY_ONLY_PREVIEW`만 의미한다. CPU·메모리·계정 청구 자료가 없다는 사실을 명시하고, 두 증거가 모두 PASS해도 `Production=HOLD`, `Cost=COST_OR_LIMIT_EVIDENCE_HOLD`, 실제 rollback/restore 미실행 상태를 유지한다. **과거 immutable 배포 HTTP 수락이 곧 mutable Preview를 실제 되돌려 복구했다는 뜻은 아니다.**
+- 합성 회귀 `test/cloudflare-stage9-evidence-pair.test.mjs`를 기존 Cloudflare 테스트 명령에 추가했다. 파일 수·보존·승인 근거는 해당 GitHub Actions run의 artifacts API에서 다시 확인해야 하며, 7일 만료 후에는 과거 증거를 현재 PASS로 재사용하지 않는다.

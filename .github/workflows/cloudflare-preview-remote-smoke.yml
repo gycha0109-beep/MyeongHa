@@ -72,11 +72,17 @@ jobs:
         if: github.head_ref == 'feat/ops/cloudflare-authdb-clean-snapshot-20261021'
         run: node scripts/verify-cloudflare-vercel-standby.mjs
 
+      - name: Accept matching Stage 9 current and pinned recovery evidence
+        if: always() && !cancelled() && github.head_ref == 'feat/ops/cloudflare-authdb-clean-snapshot-20261021'
+        env:
+          MYEONGHA_CLOUDFLARE_EVIDENCE_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: node scripts/accept-cloudflare-stage9-evidence-pair.mjs
+
       - name: Upload Stage 9 sanitized Preview evidence (current and pinned recovery)
         if: always() && github.head_ref == 'feat/ops/cloudflare-authdb-clean-snapshot-20261021'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: cloudflare-preview-stage9-evidence
           path: artifacts/cloudflare-preview-stage9/*.json
-          if-no-files-found: ignore
+          if-no-files-found: error
           retention-days: 7
