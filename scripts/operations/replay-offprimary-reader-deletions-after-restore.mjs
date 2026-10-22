@@ -56,7 +56,12 @@ try {
         'no_protected_body_tombstones',
       ].includes(result.restoreState)
       || result.restoreCompletionApproved !== false
-      || result.ordinaryRestoreConsumersEnabled !== false) blocked();
+      || result.ordinaryRestoreConsumersEnabled !== false
+      || result.existingPrivacyOwnerAcceptancePending !== true
+      || ![
+        'passed_for_replay_manifests',
+        'not_applicable_no_manifests',
+      ].includes(result.postReplayQuarantineRecheck)) blocked();
   // No Subject IDs, DEK references, ciphertext or raw tombstones in logs.
   process.stdout.write(JSON.stringify({
     schemaVersion: result.schemaVersion,
@@ -72,6 +77,8 @@ try {
     restoreState: result.restoreState,
     restoreCompletionApproved: false,
     ordinaryRestoreConsumersEnabled: false,
+    postReplayQuarantineRecheck: result.postReplayQuarantineRecheck,
+    existingPrivacyOwnerAcceptancePending: true,
     publicReaderServiceEnabled: false,
     next: 'Only the exact off-primary protected-body tombstones were replayed. Complete the existing Privacy/DB Owner remediation and broader disaster-recovery acceptance before releasing any service.',
   }) + '\n');
