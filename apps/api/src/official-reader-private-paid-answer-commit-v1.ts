@@ -15,6 +15,9 @@ import {
   type OfficialReaderS3BoundPreviewSourceV1,
 } from './official-reader-private-s3-source-binding-v1.js';
 import {
+  assertOfficialReaderPrivateCurrentVerifiedPurchaseV1,
+} from './official-reader-private-exact-verified-purchase-guard-v1.js';
+import {
   executePostgresSubjectTransactionV1,
   type PostgresSubjectExecutionScopeV1,
   type PostgresSubjectPoolV1,
@@ -181,6 +184,15 @@ export async function commitPrivateOfficialReaderPaidAnswerV1(input: {
           return unavailable();
         }
         assertCurrentScope(original, current.scope);
+        // Preserve Commerce refund as the authority. This locks the
+        // exact official Reader scope with S1 and rechecks a currently
+        // verified production Receipt for the pinned Bundle, before any
+        // expensive private encryption or attempt at the atomic S5 Writer.
+        // Calling the S5 commit directly cannot bypass this additional
+        // current-purchase gate.
+        await assertOfficialReaderPrivateCurrentVerifiedPurchaseV1({
+          scope, admission: current,
+        });
         // The signed PREVIEW envelope is verified in T1, outside S1/DB
         // locks. This one-use receipt binds those authenticated bytes to
         // exactly this fresh T2 DB-admitted artifact without Saju I/O here.
