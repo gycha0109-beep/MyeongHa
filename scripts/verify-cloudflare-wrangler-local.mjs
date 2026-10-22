@@ -152,47 +152,84 @@ async function waitReady(child, getLogs) {
   throw new Error('Timed out starting local Wrangler. Diagnostics: ' + getLogs());
 }
 
+async function stopLocalWrangler(child) {
+  if (child.exitCode !== null) return;
+  try {
+    if (process.platform !== 'win32') process.kill(-child.pid, 'SIGTERM');
+    else child.kill('SIGTERM');
+  } catch {
+    child.kill('SIGTERM');
+  }
+  // Wait for process-group cleanup so a later startup never probes a stale port.
+  await new Promise((resolveDone) => {
+    if (child.exitCode !== null) return resolveDone();
+    const grace = setTimeout(() => {
+      try {
+        if (process.platform !== 'win32') process.kill(-child.pid, 'SIGKILL');
+        else child.kill('SIGKILL');
+      } catch { /* child already exited */ }
+      resolveDone();
+    }, 2_000);
+    child.once('exit', () => {
+      clearTimeout(grace);
+      resolveDone();
+    });
+  });
+}
+
 async function main() {
   await readFile(resolve('public', '_headers'));
   await readFile(resolve('public', '_redirects'));
   const executable = process.platform === 'win32' ? 'npm.cmd' : 'npm';
-  const child = spawn(
-    executable,
-    ['exec', '--yes', `--package=wrangler@${WRANGLER_PIN}`, '--', 'wrangler', 'dev',
-      '--config', 'wrangler.jsonc', '--ip', '127.0.0.1', '--port', '8787'],
-    {
-      cwd: resolve('.'),
-      env: { ...process.env, WRANGLER_SEND_METRICS: 'false', NO_COLOR: '1' },
-      stdio: ['ignore', 'pipe', 'pipe'],
-      detached: process.platform !== 'win32',
-    },
-  );
 
-  let diagnostic = '';
-  const collect = (part) => {
-    diagnostic = (diagnostic + part.toString()).slice(-8000);
-  };
-  child.stdout.on('data', collect);
-  child.stderr.on('data', collect);
-  let exitReason;
-  child.on('error', (error) => { exitReason = error; });
+  // Only retry local CLI startup once. A successfully started Worker with
+  // failing HTTP/authorization contracts must NEVER be retried into PASS.
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    const child = spawn(
+      executable,
+      ['exec', '--yes', '--package=' + 'wrangler@' + WRANGLER_PIN, '--', 'wrangler', 'dev',
+        '--config', 'wrangler.jsonc', '--ip', '127.0.0.1', '--port', '8787'],
+      {
+        cwd: resolve('.'),
+        env: {
+          ...process.env,
+          WRANGLER_SEND_METRICS: 'false',
+          NO_COLOR: '1',
+          npm_config_fetch_retries: '1',
+          npm_config_fetch_timeout: '45000',
+          ...(attempt === 2 ? { npm_config_prefer_offline: 'true' } : {}),
+        },
+        stdio: ['ignore', 'pipe', 'pipe'],
+        detached: process.platform !== 'win32',
+      },
+    );
+    let diagnostic = '';
+    const collect = (part) => { diagnostic = (diagnostic + part.toString()).slice(-8000); };
+    child.stdout.on('data', collect);
+    child.stderr.on('data', collect);
+    let exitReason;
+    child.on('error', (error) => { exitReason = error; });
 
-  try {
-    await waitReady(child, () => diagnostic);
-    if (exitReason) throw exitReason;
-    console.log('Cloudflare local Worker HTTP smoke:', await probe());
-  } catch (error) {
-    console.error('Cloudflare local Worker failed:', error);
-    console.error('Last local Wrangler diagnostics:', diagnostic.slice(-2600));
-    process.exitCode = 1;
-  } finally {
-    if (child.exitCode === null) {
-      try {
-        if (process.platform !== 'win32') process.kill(-child.pid, 'SIGTERM');
-        else child.kill('SIGTERM');
-      } catch {
-        child.kill('SIGTERM');
+    let ready = false;
+    try {
+      await waitReady(child, () => diagnostic);
+      ready = true;
+      if (exitReason) throw exitReason;
+      console.log('Cloudflare local Worker HTTP smoke:', await probe());
+      return;
+    } catch (error) {
+      if (ready || attempt === 2) {
+        console.error('Cloudflare local Worker failed:', error);
+        console.error('Last local Wrangler diagnostics:', diagnostic.slice(-2600));
+        process.exitCode = 1;
+        return;
       }
+      // Startup failures can be npm registry/workerd bootstrap transients.
+      // Stop ALL children, then give the cached install one final opportunity.
+      console.warn('Local Wrangler startup failed; retrying once from npm cache.');
+      console.warn('Startup diagnostics:', diagnostic.slice(-1000));
+    } finally {
+      await stopLocalWrangler(child);
     }
   }
 }
