@@ -295,6 +295,55 @@ describe('Se-yeon G3 Node-only original-Grant current Subject fence',()=>{
     expect(dbConnections).toBe(0);
   });
 
+  it.each([
+    ['no participants', []],
+    ['wrong Character only', ['other-character']],
+    ['mixed Character thread', ['seyeon', 'other-character']],
+    ['duplicated Se-yeon participants', ['seyeon', 'seyeon']],
+    ['missing participant list', undefined],
+  ] as const)('holds an ineligible G3 Thread: %s before original Grant lookup', async (_name, participants) => {
+    let destroyed = false;
+    let dbConnections = 0;
+    const pool: PostgresSubjectPoolV1 = {
+      connect() {
+        dbConnections++;
+        throw Error('Wrong Thread must not reach G3 DB lookup');
+      },
+    };
+    const response = {
+      headersSent: false, writableEnded: false, destroyed: false,
+      socket: {}, destroy() { destroyed = true; },
+    } as unknown as ServerResponse;
+    const result = {
+      subjectId: SUBJECT,
+      threadBinding: {threadId: THREAD, participantCharacterIds: participants},
+      execution: {
+        disposition: 'executed',
+        receivedTurn: {turnId: TURN, threadCharacterId: 'seyeon'},
+        attempt: {attemptId: ATTEMPT, replayed: false},
+        committedTurn: {
+          turnId: TURN,
+          attemptId: ATTEMPT,
+          assistantMessageId: 'd5000000-0000-4000-8000-000000000006',
+          sequenceNo: 1,
+          replayed: false,
+        },
+      },
+    } as unknown as RunProductionSeyeonChatResultV1;
+    await expect(deliverSeyeonCommittedFirstPositiveMemoryNodeTurnV1({
+      response,
+      requestSignal: new AbortController().signal,
+      pool,
+      verifiedEvidence: EVIDENCE,
+      result,
+      expectedThreadId: THREAD,
+      requestId: 'g3-thread-single-character',
+      serverTime: '2026-10-22T00:00:00.000Z',
+    })).rejects.toMatchObject({code: 'INVALID_COMMIT'});
+    expect(destroyed).toBe(true);
+    expect(dbConnections).toBe(0);
+  });
+
   it('keeps absent G1/G2/G3 owner RPC and EXECUTE privileges before Provider at DB_NOT_READY',async()=>{
     const db=new FakeG3Connection(SUBJECT,CANARY,false);
     await expect(assertSeyeonFirstPositiveNodeDbReadyV1({

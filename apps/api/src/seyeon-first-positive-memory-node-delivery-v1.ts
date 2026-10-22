@@ -195,6 +195,9 @@ export async function deliverSeyeonCommittedFirstPositiveMemoryNodeTurnV1(
       !UUID.test(input.expectedThreadId) ||
       !responseWritable(input.response,input.requestSignal) ||
       input.result?.threadBinding?.threadId!==input.expectedThreadId ||
+      !Array.isArray(input.result?.threadBinding?.participantCharacterIds) ||
+      input.result.threadBinding.participantCharacterIds.length!==1 ||
+      input.result.threadBinding.participantCharacterIds[0]!=='seyeon' ||
       input.result?.execution?.disposition!=='executed' ||
       input.result?.execution?.receivedTurn?.turnId!==receipt?.turnId ||
       input.result?.execution?.receivedTurn?.threadCharacterId!=='seyeon' ||
