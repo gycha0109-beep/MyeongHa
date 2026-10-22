@@ -312,6 +312,51 @@ export function publicCloudflareStaticAssetRequestV1(request) {
   });
 }
 
+// Static Assets are public bytes, not an origin response-header authority.
+// Preserve representation/cache metadata only. An upstream asset must not
+// plant navigation/state-mutating response headers or user-scoped Vary keys.
+const CLOUDFLARE_PUBLIC_ASSET_RESPONSE_HEADERS_V1 = Object.freeze([
+  'content-type', 'content-length', 'content-encoding', 'content-language',
+  'content-range', 'accept-ranges', 'etag', 'last-modified',
+  'cache-control', 'expires', 'date', 'age', 'vary',
+]);
+const CLOUDFLARE_FORBIDDEN_ASSET_RESPONSE_HEADERS_V1 = Object.freeze([
+  'refresh', 'clear-site-data', 'content-location', 'content-disposition',
+  'link', 'www-authenticate', 'proxy-authenticate',
+  'x-accel-redirect', 'x-sendfile', 'x-lighttpd-send-file',
+]);
+const CLOUDFLARE_PUBLIC_ASSET_VARY_HEADERS_V1 = Object.freeze([
+  'accept', 'accept-encoding', 'accept-language',
+]);
+
+export function admittedCloudflareStaticAssetHeadersV1(source) {
+  try {
+    if (!(source instanceof Headers)) return null;
+    for (const field of CLOUDFLARE_FORBIDDEN_ASSET_RESPONSE_HEADERS_V1) {
+      if (source.has(field)) return null;
+    }
+    for (const field of source.keys()) {
+      if (field.toLowerCase().startsWith('access-control-') ||
+          field.toLowerCase() === 'set-cookie' ||
+          field.toLowerCase() === 'location') return null;
+    }
+    const vary = source.get('vary');
+    if (vary !== null &&
+        (!vary.split(',').every(field =>
+          CLOUDFLARE_PUBLIC_ASSET_VARY_HEADERS_V1.includes(
+            field.trim().toLowerCase(),
+          )) || vary.length > 256)) return null;
+    const kept = new Headers();
+    for (const field of CLOUDFLARE_PUBLIC_ASSET_RESPONSE_HEADERS_V1) {
+      const value = source.get(field);
+      if (value !== null) kept.set(field, value);
+    }
+    return kept;
+  } catch {
+    return null;
+  }
+}
+
 export function fenceCloudflareStaticPreviewAssetResponseV1(candidate, request) {
   const denied = () => new Response(null, { status: 404, headers: BASE_HEADERS });
   try {
@@ -334,11 +379,8 @@ export function fenceCloudflareStaticPreviewAssetResponseV1(candidate, request) 
         !isCloudflareStaticNotModifiedBoundV1(request, candidate)) {
       return denied();
     }
-    const headers = new Headers(candidate.headers);
-    if (headers.has('set-cookie') || headers.has('location')) return denied();
-    for (const key of headers.keys()) {
-      if (key.toLowerCase().startsWith('access-control-')) return denied();
-    }
+    const headers = admittedCloudflareStaticAssetHeadersV1(candidate.headers);
+    if (headers === null) return denied();
 
     const path = new URL(request.url).pathname;
     const expectedHtml = CLOUDFLARE_PUBLIC_HTML_PATHS_V1.includes(path);
