@@ -161,7 +161,7 @@ async function authorize(reader: string, domain: SajuDomain) {
     prepared, currentScope: prepared.scope,
     productAuthorityPort: f.productAuthorityPort,
   });
-  const context = assembleOfficialStandardReaderRuntimeV2({
+  const context = await assembleOfficialStandardReaderRuntimeV2({
     proof, currentScope: prepared.scope,
     source: prepared.source, baseContext: f.baseContext,
   });
@@ -237,7 +237,7 @@ describe('A3-beta: verified official standard Saju runtime, no fake Capability',
     expect(() => guard({
       ...admitted, saju: { ...admitted.saju, readingRef: 'other-reading' },
     })).toThrow(CharacterSajuRuntimeAdmissionErrorV2);
-    expect(() => guard(a.context as typeof admitted))
+    expect(() => guard(a.context as unknown as typeof admitted))
       .toThrow(CharacterSajuRuntimeAdmissionErrorV2);
   });
 
@@ -265,23 +265,23 @@ describe('A3-beta: verified official standard Saju runtime, no fake Capability',
 
   it('blocks forged, cloned, reused and scope-swapped proofs', async () => {
     const a = await authorize('seyeon', 'general');
-    expect(() => assembleOfficialStandardReaderRuntimeV2({
+    await expect(assembleOfficialStandardReaderRuntimeV2({
       proof: a.proof, currentScope: a.prepared.scope,
       source: a.prepared.source, baseContext: a.baseContext,
-    })).toThrow();
+    })).rejects.toThrow();
     const b = fixture('seyeon', 'general');
     const prepared = await prepareOfficialReadingReaderAdmissionV1(b.input);
     const proof = await issueCharacterSajuOfficialStandardEligibilityV2({
       prepared, currentScope: prepared.scope, productAuthorityPort: b.productAuthorityPort,
     });
-    expect(() => assembleOfficialStandardReaderRuntimeV2({
+    await expect(assembleOfficialStandardReaderRuntimeV2({
       proof: { ...proof }, currentScope: prepared.scope,
       source: prepared.source, baseContext: b.baseContext,
-    })).toThrow();
-    expect(() => assembleOfficialStandardReaderRuntimeV2({
+    })).rejects.toThrow();
+    await expect(assembleOfficialStandardReaderRuntimeV2({
       proof, currentScope: { ...prepared.scope, contentReleaseId: 'revoked-release' },
       source: prepared.source, baseContext: b.baseContext,
-    })).toThrow();
+    })).rejects.toThrow();
   });
 
   it('rejects wrong Reader, reading hash drift and caller-cloned grounded context', async () => {
