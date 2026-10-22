@@ -325,7 +325,7 @@ describe('S-CF2 actual Worker fetch boundary and no HTML fallback', () => {
           'Content-Type': 'text/javascript',
           'Content-Range': 'bytes 0-5/200',
         },
-      }) },
+      }) } },
     );
     expect(partial.status).toBe(206);
     expect(await partial.text()).toBe('PUBLIC');
