@@ -4,6 +4,7 @@ import { handleNaverOAuthBridgeRequestV1 } from '../apps/api/src/naver-oauth-bri
 import { handleSocialAuthStartRequestV1 } from '../apps/api/src/social-auth-start-http.ts';
 import worker, { cloudflareEmergencyHoldEnabledV1 } from '../workers/cloudflare-static-preview.mjs';
 import {
+  approvedCloudflareAuthHostnameV1,
   approvedCloudflareSameOriginPostV1,
   approvedCloudflareStage5HandoffV1,
   approvedCloudflareDbHostV1,
@@ -17,14 +18,15 @@ import {
 
 // These tests never connect to a database, Supabase or a real Auth origin.
 // Positive paths are only activated on a separately approved exact host.
-const PRIVATE_ORIGIN = 'https://auth.myeongha.example.test';
+// Synthetic host uses a DNS-shaped .dev domain; it never resolves in tests.
+const PRIVATE_ORIGIN = 'https://auth.synthetic-myeongha.dev';
 const ENABLED = Object.freeze({
   MYEONGHA_CLOUDFLARE_AUTH_DB_MODE: 'approved-auth-db-v1',
   MYEONGHA_CLOUDFLARE_AUTH_ORIGIN: PRIVATE_ORIGIN,
   MYEONGHA_CLOUDFLARE_DB_TLS_RLS_APPROVAL: 'approved-isolated-tls-rls-v1',
-  MYEONGHA_CLOUDFLARE_OAUTH_CALLBACK_ORIGIN: PRIVATE_ORIGIN,
   MYEONGHA_CLOUDFLARE_DB_APPROVED_HOST: 'db.synthetic.example.com',
   MYEONGHA_CLOUDFLARE_DB_APPROVED_PORT: '5432',
+  MYEONGHA_CLOUDFLARE_OAUTH_CALLBACK_ORIGIN: PRIVATE_ORIGIN,
 });
 
 async function get(path, bindings, method = 'GET', base = PRIVATE_ORIGIN, headers = {}) {
@@ -56,10 +58,20 @@ describe('Cloudflare Auth/DB admission is fail-closed until explicit host and se
     }
   });
 
-  it('rejects Workers Preview and Vercel hosts even if a mode binding is supplied', async () => {
+  it('rejects Workers/Vercel, localhost/IP, reserved domains and non-443 OAuth origins', async () => {
+    expect(approvedCloudflareAuthHostnameV1('auth.synthetic-myeongha.dev')).toBe(true);
     for (const origin of [
       'https://trial.example.workers.dev',
       'https://myeongha.vercel.app',
+      'https://localhost',
+      'https://127.0.0.1',
+      'https://[::1]',
+      'https://10.10.0.2',
+      'https://auth.local',
+      'https://auth.internal',
+      'https://auth.example.test',
+      'https://auth.example.com',
+      'https://auth.synthetic-myeongha.dev:8443',
     ]) {
       const response = await get('/api/auth/sign-in', {
         ...ENABLED,
@@ -164,7 +176,6 @@ describe('Cloudflare Auth/DB admission is fail-closed until explicit host and se
     const origins = [
       await get('/api/auth/refresh?__myeongha_social_complete=1&__myeongha_social_complete=1', ENABLED, 'POST'),
       await get('/api/auth/refresh?__myeongha_social_complete=1&extra=1', ENABLED, 'POST'),
-
       await get('/api/auth/sign-in', ENABLED, 'POST', PRIVATE_ORIGIN, {
         Origin: 'https://attacker.example.test',
       }),
@@ -173,7 +184,8 @@ describe('Cloudflare Auth/DB admission is fail-closed until explicit host and se
       }),
     ];
     for (const response of origins) expect(response.status).toBe(404);
-    // Worker S-CF2 protection takes precedence over normal Auth's empty 404.
+    // The mounted S-CF2 Worker rejects forged Chat markers independently
+    // of Auth/DB origin admission, with the fixed 503/no-store contract.
     const spoofedChat = await get('/api/me?__myeongha_chat_open=1', ENABLED);
     expect(spoofedChat.status).toBe(503);
     expect(spoofedChat.headers.get('cache-control')).toBe('no-store');
