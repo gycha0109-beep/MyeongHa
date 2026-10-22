@@ -30,6 +30,7 @@ function envelope(readerFollowup: unknown, overrides: Record<string, unknown> = 
       readerCharacterId: 'baekheon',
       record: { state: 'owned_official_reading', completedAt: '2026-10-22T01:00:00.000Z' },
       readerFollowup,
+      purchaseState: 'current_verified_purchase',
       protectedAnswer: 'requires_separate_current_entitlement_and_saju_source',
       summary: 'not_confirmed_delivered',
       saleActivated: false,
@@ -88,6 +89,7 @@ describe('Commerce verified Reader purchase -> single Official Records entry -> 
     expect(current).toEqual({
       state: 'existing_thread_candidate',
       readingId: READING, readerCharacterId: 'baekheon', threadId: THREAD,
+      purchaseState: 'current_verified_purchase',
     });
     expect(current).not.toHaveProperty('grantId');
     expect(current).not.toHaveProperty('report');
@@ -102,6 +104,7 @@ describe('Commerce verified Reader purchase -> single Official Records entry -> 
     );
     expect(current).toEqual({
       state: 'not_available', readingId: READING, readerCharacterId: 'baekheon',
+      purchaseState: 'current_verified_purchase',
     });
   });
 
@@ -127,4 +130,43 @@ describe('Commerce verified Reader purchase -> single Official Records entry -> 
       { readingId: READING, readerCharacterId: 'baekheon' },
     )).toThrow();
   });
+  it('surfaces only persisted verified PortOne full cancellation, without a refund payout promise or reusable thread', () => {
+    const result = parseCurrentReaderRecordContinuityV1(
+      envelope(
+        { state: 'not_available', requiresFreshGateAtUse: true },
+        { purchaseState: 'verified_full_cancellation' },
+      ),
+      { readingId: READING, readerCharacterId: 'baekheon' },
+    );
+    expect(result).toEqual({
+      state: 'not_available', readingId: READING, readerCharacterId: 'baekheon',
+      purchaseState: 'verified_full_cancellation',
+    });
+    expect(result).not.toHaveProperty('threadId');
+    expect(result).not.toHaveProperty('receiptId');
+    expect(result).not.toHaveProperty('refundAmount');
+  });
+
+  it('rejects an available Reader thread when current verified Receipt or Grant was revoked', () => {
+    expect(() => parseCurrentReaderRecordContinuityV1(
+      envelope({
+        state: 'existing_thread_candidate',
+        threadId: THREAD,
+        requiresFreshGateAtUse: true,
+      }, { purchaseState: 'verified_full_cancellation' }),
+      { readingId: READING, readerCharacterId: 'baekheon' },
+    )).toThrow();
+  });
+
+  it('does not infer provider cancellation from no current Reader access', () => {
+    const result = parseCurrentReaderRecordContinuityV1(
+      envelope(
+        { state: 'not_available', requiresFreshGateAtUse: true },
+        { purchaseState: 'not_confirmed' },
+      ),
+      { readingId: READING, readerCharacterId: 'baekheon' },
+    );
+    expect(result.purchaseState).toBe('not_confirmed');
+  });
+
 });
