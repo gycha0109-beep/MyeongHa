@@ -72,6 +72,7 @@ function boundedStats(stat) {
 
 export function buildCloudflarePreviewSmokeEvidenceV1({
   target, expectedCommit, attestedCommit, metrics, stopGate,
+  githubRunId, githubRunAttempt,
 }) {
   if (!ALLOWED_TARGETS.includes(target) ||
       typeof expectedCommit !== 'string' ||
@@ -88,6 +89,15 @@ export function buildCloudflarePreviewSmokeEvidenceV1({
       !Array.isArray(stopGate.reasons) ||
       stopGate.reasons.some(x => !STOP_CODES.has(x))) {
     throw Error('Invalid Stage 9 read-only evidence boundary');
+  }
+  const hasRun = githubRunId !== undefined || githubRunAttempt !== undefined;
+  if (hasRun && (
+    typeof githubRunId !== 'string' ||
+    !/^[1-9][0-9]{0,19}$/.test(githubRunId) ||
+    typeof githubRunAttempt !== 'string' ||
+    !/^[1-9][0-9]{0,9}$/.test(githubRunAttempt)
+  )) {
+    throw Error('Invalid synthetic evidence CI run provenance');
   }
   const counters = Object.fromEntries(COUNTERS.map(k => [k, boundedCounter(metrics[k])]));
   const groups = Object.fromEntries(CLASSES.map(k => [k, boundedStats(metrics.groups?.[k])]));
@@ -108,6 +118,7 @@ export function buildCloudflarePreviewSmokeEvidenceV1({
     schema: 'myeongha-cloudflare-stage9-ci-evidence-v1',
     evidenceSource: 'GITHUB_ACTIONS_SYNTHETIC_PREVIEW_HTTP',
     target, expectedCommit, attestedCommit,
+    ...(hasRun ? { githubRun: { id: githubRunId, attempt: githubRunAttempt } } : {}),
     syntheticRequestCount: counters.requestAttempts,
     counters, groups, byRoute: routes,
     decision: {
