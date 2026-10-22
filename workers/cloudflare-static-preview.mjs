@@ -263,7 +263,13 @@ export function fenceCloudflareStaticPreviewAssetResponseV1(candidate, request) 
   const denied = () => new Response(null, { status: 404, headers: BASE_HEADERS });
   try {
     if (!(candidate instanceof Response)) return denied();
+    if (request.method !== 'GET' && request.method !== 'HEAD') return denied();
     if (![200, 206, 304].includes(candidate.status)) return denied();
+    // A byte-range 206 applies only to GET. HEAD never transfers a range.
+    // Content-Range on a full 200 is not a valid asset representation.
+    if (candidate.status === 206 && request.method !== 'GET') return denied();
+    if (candidate.status === 200 &&
+        candidate.headers.has('content-range')) return denied();
     // Partial and not-modified representations require a client-side range or
     // conditional request respectively; neither is a generic 200 fallback.
     // Never trust a 206 body without its bounded Content-Range metadata.
@@ -308,7 +314,10 @@ export function fenceCloudflareStaticPreviewAssetResponseV1(candidate, request) 
         if (key !== 'Cache-Control') headers.set(key, value);
       }
     }
-    return new Response(candidate.body, {
+    // HTTP HEAD must never carry a response body, even if an unexpected
+    // ASSETS implementation supplies one. Preserve headers/status and leave
+    // the existing GET body stream untouched (no user data buffering).
+    return new Response(request.method === 'HEAD' ? null : candidate.body, {
       status: candidate.status, statusText: candidate.statusText, headers,
     });
   } catch {
