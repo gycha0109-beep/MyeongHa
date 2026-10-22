@@ -1,6 +1,7 @@
 import type {
-  AppliedVerifiedReaderReceiptBindV1,
-} from './commerce-verified-reader-receipt-bind.js';
+  FulfilledVerifiedReaderReceiptV1,
+  VerifiedReaderPurchaseRoleV1,
+} from './commerce-verified-reader-fulfillment.js';
 import {
   getOfficialReadingRecord,
   type OfficialReadingRecordReadAuthorityPortV1,
@@ -36,6 +37,7 @@ export interface CommerceReaderReceiptContinuationV1 {
   readonly officialReadingId: string;
   readonly readerCharacterId: string;
   readonly receiptBinding: 'issued' | 'historical_replay';
+  readonly purchaseRole: VerifiedReaderPurchaseRoleV1;
   /** This describes the product sequence, not a request to produce content. */
   readonly summary: 'requires_authorized_saju_source_and_reader_delivery';
   readonly readerFollowup: 'requires_fresh_exact_grant_and_existing_thread';
@@ -96,9 +98,11 @@ function reader(value: unknown): string {
  * replayed=true NEVER means current access, delivery, or a new purchase.
  */
 export function continuationFromVerifiedReaderBindV1(
-  bind: AppliedVerifiedReaderReceiptBindV1,
+  bind: FulfilledVerifiedReaderReceiptV1,
 ): CommerceReaderReceiptContinuationV1 {
   if (!bind || (bind.kind !== 'issued' && bind.kind !== 'already_bound')
+      || (bind.purchaseRole !== 'initial_reading'
+        && bind.purchaseRole !== 'additional_reader_interpretation')
       || !Number.isSafeInteger(bind.capabilityEffectCount)
       || bind.capabilityEffectCount < 1
       || !UUID.test(bind.receiptId)
@@ -109,6 +113,7 @@ export function continuationFromVerifiedReaderBindV1(
     officialReadingId: uuid(bind.officialReadingId),
     readerCharacterId: reader(bind.readerCharacterId),
     receiptBinding: bind.kind === 'issued' ? 'issued' : 'historical_replay',
+    purchaseRole: bind.purchaseRole,
     summary: 'requires_authorized_saju_source_and_reader_delivery',
     readerFollowup: 'requires_fresh_exact_grant_and_existing_thread',
     recordDetail: 'requires_current_subject_owned_read',
