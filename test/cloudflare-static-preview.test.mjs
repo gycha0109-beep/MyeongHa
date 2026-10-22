@@ -8,6 +8,7 @@ import {
   handleCloudflareStaticPreviewRequest,
   isCloudflareStaticPreviewApiPath,
 } from '../workers/cloudflare-static-preview.mjs';
+import { tryHandleCloudflareApprovedSajuCalculationV1 } from '../workers/cloudflare-saju-calculation.mjs';
 import {
   renderCloudflareStaticHeaders,
   writeCloudflareStaticHeaders,
@@ -114,4 +115,30 @@ describe('Cloudflare static-only deployment boundary', () => {
     await writeFile(join(publicDir, '_headers'), '/*\n  X-Frame-Options: DENY\n');
     await expect(verifyCloudflareStaticArtifact({ cwd: folder })).rejects.toThrow();
   });
+  it('requires independent Auth/DB and calculation-only approval before routing Saju', async () => {
+    const route = { id: 'api.me.saju.calculation' };
+    const origin = 'https://myeongha-cf.example.test';
+    const request = new Request(origin + '/api/me/saju/calculation', { method: 'POST' });
+    const approvedAuth = {
+      MYEONGHA_CLOUDFLARE_AUTH_DB_MODE: 'approved-auth-db-v1',
+      MYEONGHA_CLOUDFLARE_AUTH_ORIGIN: origin,
+    };
+    expect(await tryHandleCloudflareApprovedSajuCalculationV1(request, {}, route)).toBeNull();
+    expect(await tryHandleCloudflareApprovedSajuCalculationV1(request, approvedAuth, route)).toBeNull();
+    const approvedCalculation = { ...approvedAuth, MYEONGHA_CLOUDFLARE_SAJU_MODE: 'approved-calculation-only-v1' };
+    const wrongQuery = new Request(origin + '/api/me/saju/calculation?debug=1', { method: 'POST' });
+    const rejected = await tryHandleCloudflareApprovedSajuCalculationV1(wrongQuery, approvedCalculation, route);
+    expect(rejected.status).toBe(404);
+    expect(rejected.headers.get('cache-control')).toBe('no-store');
+    expect(await rejected.text()).toBe('');
+    const wrongMethod = await tryHandleCloudflareApprovedSajuCalculationV1(
+      new Request(origin + '/api/me/saju/calculation', { method: 'GET' }),
+      approvedCalculation,
+      route,
+    );
+    expect(wrongMethod.status).toBe(405);
+    expect(wrongMethod.headers.get('allow')).toBe('POST');
+    expect(await tryHandleCloudflareApprovedSajuCalculationV1(request, approvedCalculation, { id: 'api.me' })).toBeNull();
+  });
+
 });

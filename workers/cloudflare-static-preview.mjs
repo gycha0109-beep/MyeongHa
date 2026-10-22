@@ -1,5 +1,6 @@
 import { matchCloudflareApiRoute } from './cloudflare-api-router.mjs';
 import { tryHandleCloudflareApprovedAuthV1 } from './cloudflare-auth-db-api.mjs';
+import { tryHandleCloudflareApprovedSajuCalculationV1 } from './cloudflare-saju-calculation.mjs';
 
 // Cloudflare static preview: explicitly NOT the production API runtime.
 // Every /api request goes through this deny-only Worker; Static Assets serve
@@ -76,6 +77,8 @@ export default {
     const route = matchCloudflareApiRoute(url.pathname);
     const approvedAuthResponse = await tryHandleCloudflareApprovedAuthV1(request, bindings, route);
     if (approvedAuthResponse !== null) return approvedAuthResponse;
+    const approvedCalculationResponse = await tryHandleCloudflareApprovedSajuCalculationV1(request, bindings, route);
+    if (approvedCalculationResponse !== null) return approvedCalculationResponse;
     return handleCloudflareStaticPreviewRequest(request);
   },
 };

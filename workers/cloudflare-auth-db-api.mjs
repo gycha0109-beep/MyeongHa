@@ -30,7 +30,7 @@ const NAVER_ACTIONS = Object.freeze({
   'rewrite.naver.userinfo': 'userinfo',
 });
 
-const SECURITY_HEADERS = Object.freeze({
+export const CLOUDFLARE_APPROVED_RESPONSE_HEADERS_V1 = Object.freeze({
   'Cache-Control': 'no-store',
   'Content-Security-Policy': "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; img-src 'self' data:; font-src 'self'; style-src 'self'; script-src 'self'; connect-src 'self'",
   'X-Content-Type-Options': 'nosniff',
@@ -43,18 +43,18 @@ function unavailable() {
   return Response.json({
     ok: false,
     error: { code: 'AUTH_UPSTREAM_UNAVAILABLE', messageKey: 'auth.auth_upstream_unavailable', retryable: true },
-  }, { status: 503, headers: SECURITY_HEADERS });
+  }, { status: 503, headers: CLOUDFLARE_APPROVED_RESPONSE_HEADERS_V1 });
 }
 
 function methodNotAllowed() {
-  return new Response(null, { status: 405, headers: { ...SECURITY_HEADERS, Allow: 'POST' } });
+  return new Response(null, { status: 405, headers: { ...CLOUDFLARE_APPROVED_RESPONSE_HEADERS_V1, Allow: 'POST' } });
 }
 
 function denied() {
-  return new Response(null, { status: 404, headers: SECURITY_HEADERS });
+  return new Response(null, { status: 404, headers: CLOUDFLARE_APPROVED_RESPONSE_HEADERS_V1 });
 }
 
-function sameOriginFormPost(request, origin) {
+export function approvedCloudflareSameOriginPostV1(request, origin) {
   const requestOrigin = request.headers.get('origin');
   if (requestOrigin !== null && requestOrigin !== origin) return false;
   const fetchSite = request.headers.get('sec-fetch-site');
@@ -67,7 +67,7 @@ function sameOriginFormPost(request, origin) {
   return true;
 }
 
-function selectedOrigin(request, bindings) {
+export function approvedCloudflareAuthOriginV1(request, bindings) {
   if (bindings?.MYEONGHA_CLOUDFLARE_AUTH_DB_MODE !== EXACT_MODE) return null;
   const raw = bindings.MYEONGHA_CLOUDFLARE_AUTH_ORIGIN;
   if (typeof raw !== 'string') return null;
@@ -101,7 +101,7 @@ export async function tryHandleCloudflareApprovedAuthV1(request, bindings, route
   const naverAction = Object.hasOwn(NAVER_ACTIONS, route?.id) ? NAVER_ACTIONS[route.id] : null;
   if (action === null && !isGuestBootstrap && !isMemberProfile && !isBirthCreate && !isBirthRead &&
       !isGuestPromotion && !isCurrentBirth && !isSocialStart && naverAction === null) return null;
-  const origin = selectedOrigin(request, bindings);
+  const origin = approvedCloudflareAuthOriginV1(request, bindings);
   if (origin === null) return null;
   const url = new URL(request.url);
   // Only the verified social-complete exchange and the provider's Naver
@@ -118,13 +118,13 @@ export async function tryHandleCloudflareApprovedAuthV1(request, bindings, route
   if (request.method !== expectedMethod) {
     return new Response(null, {
       status: 405,
-      headers: { ...SECURITY_HEADERS, Allow: expectedMethod },
+      headers: { ...CLOUDFLARE_APPROVED_RESPONSE_HEADERS_V1, Allow: expectedMethod },
     });
   }
   // OAuth GET callbacks originate at the provider. Only unsafe POST methods
   // require browser same-origin provenance; the Naver callback validates
   // its sealed state and PKCE in the existing handler.
-  if (request.method === 'POST' && !sameOriginFormPost(request, origin)) return denied();
+  if (request.method === 'POST' && !approvedCloudflareSameOriginPostV1(request, origin)) return denied();
 
   try {
     parseProductionUserDataRuntimeConfigV1(bindings);
@@ -222,6 +222,6 @@ export async function tryHandleCloudflareApprovedAuthV1(request, bindings, route
   // No CORS, redirects or access-control overrides. Preserve Set-Cookie,
   // status and body while requiring all HTTPS preview security headers.
   const headers = new Headers(result.headers);
-  for (const [key, value] of Object.entries(SECURITY_HEADERS)) headers.set(key, value);
+  for (const [key, value] of Object.entries(CLOUDFLARE_APPROVED_RESPONSE_HEADERS_V1)) headers.set(key, value);
   return new Response(result.body, { status: result.status, statusText: result.statusText, headers });
 }
