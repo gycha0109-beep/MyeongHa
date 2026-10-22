@@ -1886,6 +1886,7 @@ describe('A3-eta server-anchored follow-up evidence selection (public OFF)', () 
       accessAuthorityPort: f.authority.accessAuthorityPort,
       artifactAuthorityPort: f.authority.artifactAuthorityPort,
       productReaderEligibilityAuthorityPort: f.authority.productReaderEligibilityAuthorityPort,
+      currentVerifiedPurchaseAuthorityPort: f.authority.currentVerifiedPurchaseAuthorityPort,
     };
     return { f, outputHold, args };
   }
