@@ -121,6 +121,8 @@ describe('Cloudflare static-only deployment boundary', () => {
     });
     expect(verified.entryCount).toBe(11);
     expect(verified.fileCount).toBe(14);
+    expect(verified.totalAssetBytes).toBeGreaterThanOrEqual(verified.largestFileSize);
+    expect(verified.totalAssetBytes).toBeGreaterThan(0);
     expect(await readFile(join(publicDir, CLOUDFLARE_PREVIEW_RECEIPT_ASSET_V1), 'utf8'))
       .toBe(renderCloudflarePreviewReceiptV1(syntheticCommit));
     await expect(verifyCloudflareStaticArtifact({

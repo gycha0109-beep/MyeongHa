@@ -79,6 +79,7 @@ export async function verifyCloudflareStaticArtifact(options = {}) {
 
   const stack = [outputRoot];
   let fileCount = 0;
+  let totalAssetBytes = 0;
   let largestFileSize = 0;
   while (stack.length > 0) {
     const directory = stack.pop();
@@ -96,6 +97,7 @@ export async function verifyCloudflareStaticArtifact(options = {}) {
       } else if (entry.isFile()) {
         const stat = await lstat(filename);
         fileCount += 1;
+        totalAssetBytes += stat.size;
         largestFileSize = Math.max(largestFileSize, stat.size);
         if (stat.size > 25 * 1024 * 1024) {
           throw new Error('Static file exceeds Workers Free 25MiB: ' + filename);
@@ -110,7 +112,11 @@ export async function verifyCloudflareStaticArtifact(options = {}) {
     throw new Error('Static file count exceeds Workers Free limit.');
   }
 
-  return Object.freeze({ entryCount: HTML_ENTRIES.length, fileCount, largestFileSize });
+  // Static Assets bytes, NOT Wrangler Worker bundle bytes, billable
+  // transfer, memory or CPU. These are different Cloudflare budgets.
+  return Object.freeze({
+    entryCount: HTML_ENTRIES.length, fileCount, totalAssetBytes, largestFileSize,
+  });
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

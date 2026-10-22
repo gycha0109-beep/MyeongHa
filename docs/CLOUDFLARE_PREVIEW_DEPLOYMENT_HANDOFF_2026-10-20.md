@@ -120,3 +120,9 @@
 - 수치는 **GitHub Runner→Cloudflare HTTPS 응답 헤더까지의 단일 합성 검사 지연**이다. Worker 실제 CPU 시간·메모리·실제 사용자 트래픽 분포·Cloudflare billable invocation·Workers Builds 사용 분수·청구 비용을 대신하지 않는다. 각 라우트에 표본이 1개일 수 있으므로 p50/p95가 운영 성능을 통계적으로 입증하지 않는다.
 - Cloudflare 연결의 **빌드 한도 소진 boolean은 읽기 전용 조회 가능**, 실제 billed usage / billing usage API에는 현재 권한 403. **청구 0원, 특정 비용 수치 또는 CPU 예산 PASS를 추측하지 않는다.** 비용/CPU/라우트별 실제 p95 실측은 해당 메트릭 조회 승인/접근과 실서비스에서 정식 부하 자료 확보 전까지 Stage 9 부분 HOLD다.
 - 테스트 `test/cloudflare-preview-smoke-metrics.test.mjs`에서 percentile·route ID redaction·429·의도된 503 처리·미확정 CPU/비용 표기·비정상 샘플 거부를 합성 검증한다. 기존 S-CF2 원격 smoke와 고정 이전 배포 검사에도 함께 적용되며 #2384 Stage 4 결과 계약은 유지한다.
+
+### 단계 9 — 정적 배포 파일 바이트 실측 (2026-10-22)
+
+- 기존 `verifyCloudflareStaticArtifact()`가 이미 **Static Assets 파일 수 20,000개·개별 파일 25MiB 상한**을 초과할 때 빌드를 중단하도록 구현되어 있으므로 별도 중복 한도 검사는 만들지 않았다.
+- 이번 변경은 동일한 파일 순회에서 추가 I/O 없이 `totalAssetBytes`를 합산하고 `fileCount`, `largestFileSize`와 함께 CI에 출력한다. 이 값은 Cloudflare Static Assets에 실제 포함된 파일 **논리 바이트 합계**이며, **Workers JS 번들 크기·메모리·실제 전송량·과금 금액은 아니다.**
+- Preview 원격 합성 probe 지연과 정적 파일 논리 크기를 함께 관측하되 이 수치만으로 Worker Free CPU/요청 제한이나 Cloudflare 청구 비용 수락을 선언하지 않는다.
