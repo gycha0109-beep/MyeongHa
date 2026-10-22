@@ -123,6 +123,7 @@ export function preflightSajuNativeDbReadingIdentityGapV1(input: Readonly<{
       || handoff.s5AtomicStorage !== 'DB_OWNER_REQUIRED'
       || handoff.s7Delivery !== 'DB_OWNER_REQUIRED'
       || handoff.mayIssueS3OfficialCoverageCandidate !== false
+      || handoff.canMapReadingId !== undefined
       || handoff.canPersist !== false || handoff.canDisclose !== false
       || handoff.canPublish !== false || handoff.canSell !== false
       || !obj(handoff.source) || !obj(handoff.inventory)) return BLOCKED;
