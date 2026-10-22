@@ -15,6 +15,7 @@ import type {
 import {
   sendSeyeonNodeOriginalGrantResponseV1,
   assertSeyeonNodeChatResponseMetadataV1,
+  assertSeyeonNodeFirstSendAdmissionV1,
   type SeyeonNodeChatResponseMetadataV1,
   type SeyeonNodeOriginalGrantSendOutcomeV1,
   type SeyeonOriginalGrantLockedReadV1,
@@ -253,6 +254,15 @@ export async function executeAndDeliverSeyeonFirstPositiveMemoryNodeTurnV1(
       typeof input.text!=='string'||input.text.trim().length===0 ||
       input.text.length>8_000 ||
       !responseWritable(input.response,input.requestSignal)) {
+    input.response.destroy();
+    throw new SeyeonG3FirstPositiveNodeUnavailableV1('INVALID_SCOPE');
+  }
+  // Even an unmounted direct Node candidate must reject invalid server
+  // receipt metadata and deadline before G1/G2/G3 readiness or paid model
+  // dispatch. Validation after runtime.run() would be too late.
+  try {
+    assertSeyeonNodeFirstSendAdmissionV1(input);
+  } catch {
     input.response.destroy();
     throw new SeyeonG3FirstPositiveNodeUnavailableV1('INVALID_SCOPE');
   }
