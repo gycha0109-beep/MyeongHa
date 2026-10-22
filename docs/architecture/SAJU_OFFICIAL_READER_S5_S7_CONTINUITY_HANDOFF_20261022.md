@@ -17,6 +17,8 @@
 
 - DB Official Reading UUID, 세션, 사주 영역, Reader/Bundle/Product/Spec/contractVersion, 원본 `responseSnapshotJsonb` 및 공개 기록의 정확한 바이트 지문 동일성을 요구한다. Saju 계산 `readingId`를 DB UUID라고 추정·자동 변환하지 않는다.
 - S5 `bodyId`/safeMessageId/turnId/attemptId/commit timestamp와 S6 최신 보호 재조회 `bodyId`/같은 `officialReadingId`/Reader/timestamp를 대조한다. **S5 commit 결과 자체에는 DB 원본 Reading ID가 없으므로 S6의 별도 DB 재조회 증명 없이는 연결 성공으로 판단하지 않는다.**
+- S5 `committedAt`은 기존 DB 공식 Reading 생성 완료 `completedAt` 및 Reader admission의 `effectiveAt` 이전일 수 없으며, S6 재조회에서 얻은 `committedAt`과 정확히 일치해야 한다.
+- `inspectOfficialReaderS5S7WithCurrentRecordsV1`은 **현재 Subject/Reading ID**로 기존 Records DB Owner의 `getOfficialReadingRecord`를 재호출한 뒤 같은 Source/ID/버전/시각 검사를 수행한다. 현재 Records 접근 불가/환불에 따른 기록 거부/다른 Subject는 차단한다. 이는 **현재 S6 Reader Grant나 Privacy Lease 재인가를 대신하지 않으며** 사용자 공개 허용 여부를 결정하지 않는다.
 - S6에 결속된 S7 response preparation만 검사한다. client ACK가 존재할 때는 동일 deliveryAttemptId 및 준비 시각 이후의 clientAcknowledgedAt이 요구된다. 재요청 `replayed` 메타데이터는 시각이 같을 때 수용하지만 **다시 보낼 권한이나 별도 수신을 발급하지 않는다**.
 - 결과는 `HELD/BLOCKED`, 단계 메타데이터 `S5_COMMITTED_REFERENCE` / `S7_RESPONSE_PREPARED` / `S7_CLIENT_ACKNOWLEDGED_NOT_HUMAN_READ`, 고정 `NOT_EVALUATED`와 `canPersist/canDisclose/canPublish/canSell=false`만 포함한다. `bodyId`, Reading/Subject ID, 구매권, 전문, SourceUnit, 해시, ACK bearer token은 반환하지 않는다.
 - #2301 Draft의 S5·S6·S7 타입과 메타데이터 형상만 별도 인터페이스로 묶으며 **아직 main에 없는 Draft를 코드가 import하지 않는다**. PR #2301 병합 후 해당 Owner의 실제 runtime/output에 연결될 때만 현재 권한/Privacy/DB 트랜잭션 검사가 유효하다.
