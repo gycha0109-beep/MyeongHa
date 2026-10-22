@@ -1,3 +1,4 @@
+import { createHmac } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import {
   getOfficialReadingRecord,
@@ -14,6 +15,12 @@ import { hashSajuHeldSourceProofRequestV1 } from './saju-held-source-proof-verif
 import { preflightSajuReaderRecordsSourceInventoryParityV1 } from './official-reader-saju-source-inventory-parity-v1.js';
 import { preflightSajuNativeDbReadingIdentityGapV1 } from './saju-native-db-reading-identity-gap-v1.js';
 import { inspectSajuDbReadingIdOnlyResponseParityV1 } from './saju-db-reading-id-only-response-parity-v1.js';
+import {
+  inspectSajuHeldTransportDbReadingHandoffV1,
+} from './saju-held-transport-db-reading-handoff-v1.js';
+import type {
+  OfficialReadingRecordReadAuthorityPortV1,
+} from './official-reading-record-read.js';
 
 const SUBJECT = '66666666-6666-4666-8666-666666666666';
 const READING = '44444444-4444-4444-8444-444444444444';
@@ -477,5 +484,248 @@ describe('full ProductReadingResponse v2 parity with only native/DB Reading ID d
         ...input, ...pair,
       })).toMatchObject({ state: 'blocked', canMapReadingId: false });
     }
+  });
+});
+
+const TRANSPORT_DOMAIN = 'myeongha/saju/source-transport-proof/v1\\0';
+const TRANSPORT_NONCE = 'Q'.repeat(24);
+const TRANSPORT_NOW = 1_800_000_000_000;
+const TRANSPORT_KEY = Buffer.alloc(32, 73);
+const TRANSPORT_REQUEST = {
+  birth: { calendarType: 'solar', date: '2024-03-10', time: '12:00' },
+  reading: { text: '원국' },
+};
+function signedEnvelope(reader: PreparedOfficialReadingReaderAdmissionV1) {
+  const { source, native } = mappingWithExactOriginal(reader);
+  const material = {
+    snapshotId: source.source.snapshotId,
+    interpretationRunId: source.source.interpretationRunId,
+    registrySnapshotId: source.source.registrySnapshotId,
+    executionId: source.source.executionId,
+    preparationId: source.source.preparationId,
+    selectionId: source.source.selectionId,
+    profileRef: source.source.profileRef,
+    evidenceBundleHash: source.source.evidenceBundleHash,
+    readingId: source.source.readingId,
+    responseId: source.source.responseId,
+    responseBodyHash: source.source.responseBodyHash,
+  };
+  const payload = {
+    version: 'myeonghwa-source-reading-transport-proof-v1',
+    lifecycle: 'preview',
+    issuer: 'saju-preview-service',
+    audience: 'myeongha-api-service',
+    keyId: 'preview-key-v1',
+    nonce: TRANSPORT_NONCE,
+    issuedAtMs: TRANSPORT_NOW,
+    expiresAtMs: TRANSPORT_NOW + 60_000,
+    requestBodyHash: hashSajuHeldSourceProofRequestV1(TRANSPORT_REQUEST),
+    responseBodyHash: hashSajuHeldSourceProofRequestV1(native),
+    material,
+    productionInterpretationAuthority: 'NOT_EVALUATED',
+    releaseAuthorization: 'NOT_EVALUATED',
+    canExecute: false,
+    canPublish: false,
+    canSell: false,
+  };
+  const signatureHex = createHmac('sha256', TRANSPORT_KEY)
+    .update(TRANSPORT_DOMAIN)
+    .update(hashSajuHeldSourceProofRequestV1(payload))
+    .digest('hex');
+  return {
+    source,
+    envelope: {
+      schemaVersion: 'myeonghwa-source-reading-proof-http-v1',
+      lifecycle: 'preview',
+      state: 'held',
+      response: native,
+      proof: { payload, signatureHex },
+      productionInterpretationAuthority: 'NOT_EVALUATED',
+      releaseAuthorization: 'NOT_EVALUATED',
+      canExecute: false,
+      canPublish: false,
+      canSell: false,
+    },
+  };
+}
+function transportTrust() {
+  const claimed = new Set<string>();
+  let claims = 0;
+  return {
+    trust: {
+      trustedIssuer: 'saju-preview-service',
+      expectedAudience: 'myeongha-api-service',
+      trustedKeyId: 'preview-key-v1',
+      keyBytes: TRANSPORT_KEY,
+      claimNonceOnce: async (key: string) => {
+        claims++;
+        if (claimed.has(key)) return false;
+        claimed.add(key);
+        return true;
+      },
+    },
+    getClaims: () => claims,
+  };
+}
+function transportContext() {
+  return {
+    expectedNonce: TRANSPORT_NONCE,
+    expectedRequestBody: TRANSPORT_REQUEST,
+    nowMs: TRANSPORT_NOW + 1_000,
+  };
+}
+async function currentRecordsPort(calls: string[]):
+  Promise<OfficialReadingRecordReadAuthorityPortV1> {
+  const current = await record();
+  return {
+    readRecord: async ({subjectId, readingId}) => {
+      calls.push(subjectId + '/' + readingId);
+      return {
+        readingId: current.readingId,
+        readingSessionId: current.readingSessionId,
+        sajuDomain: current.sajuDomain,
+        readingContractVersion: current.readingContractVersion,
+        productResponseState: current.productResponseState,
+        responseSnapshotJsonb: current.reading,
+        responseHash: 'sha256:stored-original',
+        readerCharacterIds: current.readerCharacterIds,
+        completedAt: current.completedAt,
+      };
+    },
+  };
+}
+
+describe('Preview Saju signed transport / native ID / DB Official Reading single handoff', () => {
+  it('claims the verified nonce ONCE, reads the authorized Records source ONCE and remains HELD', async () => {
+    const readerAdmission = admission();
+    const { source, envelope } = signedEnvelope(readerAdmission);
+    const { trust, getClaims } = transportTrust();
+    const calls: string[] = [];
+    const input = {
+      readerAdmission,
+      recordAuthorityPort: await currentRecordsPort(calls),
+      sajuHandoff: source,
+      sourceEnvelope: envelope,
+      trust,
+      context: transportContext(),
+    };
+    const response = await inspectSajuHeldTransportDbReadingHandoffV1(input);
+    expect(response).toEqual({
+      contractVersion: 'saju-held-transport-db-reading-handoff-v1',
+      state: 'held',
+      reason: 'preview_transport_and_db_response_match_only',
+      transportIntegrity: 'VERIFIED',
+      sourceAuthority: 'NOT_EVALUATED',
+      mappingAuthority: 'NOT_EVALUATED',
+      currentAccessAuthority: 'NOT_EVALUATED',
+      privacyApproval: 'NOT_EVALUATED',
+      s5AtomicStorage: 'DB_OWNER_REQUIRED',
+      s7Delivery: 'DB_OWNER_REQUIRED',
+      canMapReadingId: false, canPersist: false,
+      canDisclose: false, canPublish: false, canSell: false,
+    });
+    expect(calls).toEqual([SUBJECT + '/' + READING]);
+    expect(getClaims()).toBe(1);
+    expect(Object.isFrozen(response)).toBe(true);
+    for(const hidden of [READING,NATIVE_READING,SUBJECT,source.source.responseBodyHash,'확인된 구조적']){
+      expect(JSON.stringify(response)).not.toContain(hidden);
+    }
+    expect(await inspectSajuHeldTransportDbReadingHandoffV1(input)).toMatchObject({
+      state: 'blocked', transportIntegrity: 'NOT_VERIFIED', canDisclose: false,
+    });
+    expect(getClaims()).toBe(2);
+    expect(calls).toHaveLength(1);
+  });
+
+  it('rejects changed nonce, request, signature, issuer and expiry BEFORE any DB Records lookup', async () => {
+    const readerAdmission = admission();
+    const original = signedEnvelope(readerAdmission);
+    const changes = [
+      { envelope: {...original.envelope, proof: {...original.envelope.proof,
+        signatureHex: '0'.repeat(64)}}, context: transportContext() },
+      { envelope: original.envelope, context: {...transportContext(),
+        expectedNonce: 'X'.repeat(24)} },
+      { envelope: original.envelope, context: {...transportContext(),
+        expectedRequestBody: {birth:{calendarType:'solar',date:'2023-01-01'}}} },
+      { envelope: original.envelope, context: {...transportContext(),
+        nowMs: TRANSPORT_NOW + 70_000} },
+    ];
+    for(const changed of changes){
+      const t = transportTrust();
+      const calls: string[] = [];
+      const actual = await inspectSajuHeldTransportDbReadingHandoffV1({
+        readerAdmission, recordAuthorityPort: await currentRecordsPort(calls),
+        sajuHandoff: original.source, sourceEnvelope: changed.envelope,
+        trust: t.trust, context: changed.context,
+      });
+      expect(actual).toMatchObject({
+        state: 'blocked', canMapReadingId: false, canDisclose: false,
+      });
+      expect(calls).toHaveLength(0);
+      expect(t.getClaims()).toBe(0);
+    }
+  });
+
+  it('requires signed material to identify the SAME source inventory execution/profile even with valid HMAC', async () => {
+    const readerAdmission = admission();
+    const {source,envelope} = signedEnvelope(readerAdmission);
+    const badSources: ReturnType<typeof handoff>[] = [];
+    const changedProfile = structuredClone(source);
+    changedProfile.source.profileRef.contentHash = '0'.repeat(64);
+    rehash(changedProfile);
+    badSources.push(changedProfile);
+    const changedRun = structuredClone(source);
+    changedRun.source.executionId = 'other-execution';
+    rehash(changedRun);
+    badSources.push(changedRun);
+    const changedRegistry = structuredClone(source);
+    changedRegistry.source.registrySnapshotId = 'other-registry';
+    rehash(changedRegistry);
+    badSources.push(changedRegistry);
+    for(const sajuHandoff of badSources){
+      const calls: string[] = [];
+      const t=transportTrust();
+      const actual=await inspectSajuHeldTransportDbReadingHandoffV1({
+        readerAdmission, recordAuthorityPort: await currentRecordsPort(calls),
+        sajuHandoff, sourceEnvelope: envelope,
+        trust:t.trust,context:transportContext(),
+      });
+      expect(actual).toMatchObject({state:'blocked',canDisclose:false});
+      expect(calls).toHaveLength(0);
+      expect(t.getClaims()).toBe(1);
+    }
+  });
+
+  it('blocks forgery of native response, unrelated official UUID and Records access revocation', async () => {
+    const readerAdmission = admission();
+    const { source, envelope } = signedEnvelope(readerAdmission);
+    const changed = structuredClone(envelope);
+    changed.response.reading.sections[0]!.title = '다른 풀이';
+    const calls: string[] = [];
+    expect(await inspectSajuHeldTransportDbReadingHandoffV1({
+      readerAdmission,
+      recordAuthorityPort: await currentRecordsPort(calls),
+      sajuHandoff: source,
+      sourceEnvelope: changed,
+      trust: transportTrust().trust,
+      context: transportContext(),
+    })).toMatchObject({state:'blocked',canMapReadingId:false});
+    expect(calls).toHaveLength(0);
+
+    expect(await inspectSajuHeldTransportDbReadingHandoffV1({
+      readerAdmission: {...readerAdmission, scope: {...readerAdmission.scope,
+        subjectId:'different-subject'}},
+      recordAuthorityPort: await currentRecordsPort(calls),
+      sajuHandoff:source,sourceEnvelope:envelope,
+      trust:transportTrust().trust,context:transportContext(),
+    })).toMatchObject({state:'blocked',canDisclose:false});
+    expect(calls).toHaveLength(0);
+
+    expect(await inspectSajuHeldTransportDbReadingHandoffV1({
+      readerAdmission,
+      recordAuthorityPort: {readRecord: async () => null},
+      sajuHandoff:source,sourceEnvelope:envelope,
+      trust:transportTrust().trust,context:transportContext(),
+    })).toMatchObject({state:'blocked',canPersist:false});
   });
 });
