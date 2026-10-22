@@ -113,7 +113,8 @@ export async function prepareCharacterStandardReadingChatTurnPreflightV1(
     accessAuthorityPort: input.accessAuthorityPort,
     artifactAuthorityPort: input.artifactAuthorityPort,
     productReaderEligibilityAuthorityPort: input.productReaderEligibilityAuthorityPort,
-    currentVerifiedPurchaseAuthorityPort: input.currentVerifiedPurchaseAuthorityPort,
+    ...(input.currentVerifiedPurchaseAuthorityPort === undefined
+      ? {} : { currentVerifiedPurchaseAuthorityPort: input.currentVerifiedPurchaseAuthorityPort }),
     });
   } catch {
     throw new CharacterStandardReadingChatTurnPreflightErrorV1(
@@ -142,7 +143,8 @@ export async function prepareCharacterStandardReadingChatTurnPreflightV1(
       memoryGrantsAuthorityPort: input.memoryGrantsAuthorityPort,
       nonMemoryContextAuthorityPort: input.nonMemoryContextAuthorityPort,
       contextInput: input.contextInput,
-      currentVerifiedPurchaseAuthorityPort: input.currentVerifiedPurchaseAuthorityPort,
+      ...(input.currentVerifiedPurchaseAuthorityPort === undefined
+      ? {} : { currentVerifiedPurchaseAuthorityPort: input.currentVerifiedPurchaseAuthorityPort }),
     });
   } catch (error) {
     if (error instanceof CharacterStandardReadingServerRuntimeAuthorityErrorV1) {
