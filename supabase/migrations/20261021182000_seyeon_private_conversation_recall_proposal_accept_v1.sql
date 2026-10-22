@@ -73,7 +73,7 @@ begin
     and reg.record_type='conversation_recall'
     and reg.schema_version='v1'
     and reg.projector_version='seyeon-conversation-recall-projector-v1'
-    and reg.enabled;
+    and reg.writable_enabled;
   if not found then
     raise exception using errcode='23514',
       constraint='seyeon_private_memory_accept_type_unapproved',
@@ -150,6 +150,28 @@ begin
     raise exception using errcode='23514',
       constraint='seyeon_private_memory_accept_proposal_not_pending',
       message='Original Se-yeon Memory Proposal is not pending';
+  end if;
+
+  -- A specified origin Message must still exist in this exact committed
+  -- Turn and must not already have been redacted. Character messages must
+  -- belong to Se-yeon; a user message can legitimately be the source.
+  if v_proposal.source_message_id is not null then
+    perform 1
+    from public.conversation_messages m
+    left join public.conversation_thread_characters tc
+      on tc.id=m.thread_character_id and tc.thread_id=m.thread_id
+    where m.id=v_proposal.source_message_id
+      and m.subject_id=p_subject_id
+      and m.turn_id=v_source_turn_id
+      and m.redacted_at is null
+      and (m.sender_type='user'
+           or (m.sender_type='character' and tc.character_id='seyeon'))
+    for share of m;
+    if not found then
+      raise exception using errcode='23514',
+        constraint='seyeon_private_memory_accept_source_message_invalid',
+        message='Original Memory source Message is unavailable or redacted';
+    end if;
   end if;
 
   -- Explicit, versioned v1 codec: exactly one JSON string field. Do not
