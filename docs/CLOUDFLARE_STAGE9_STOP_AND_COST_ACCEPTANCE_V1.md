@@ -67,3 +67,9 @@ scripts/cloudflare-preview-ops-stop-gate.mjs에서 실행되는 읽기 전용 �
 - 기존 Cloudflare Remote Smoke가 이미 읽는 **11개 공개 HTML**(index/hall/auth/birth/chat-hub/chat/my/reading/face-reading/reading-detail/records)의 HTTP body text를 Node SHA-256으로 해시한다. 새 HTTP 요청, 본문/쿠키/개인정보 로그 및 추가 Cloudflare 리소스를 만들지 않는다.
 - 각 SHA와 복구 후보 SHA를 별도 `publicHtmlSha256`의 **허용된 파일 이름→64자리 소문자 digest**로 JSON에 기록한다. 해시가 하나라도 누락되거나 새 경로·잘못된 digest가 추가되면 `scripts/cloudflare-preview-smoke-evidence.mjs` 생성 단계 또는 `scripts/accept-cloudflare-stage9-evidence-pair.mjs` 쌍 수락 단계에서 **CI 실패**한다. 테스트에는 합성 문자열만 사용한다.
 - 이 증거는 **Git SHA와 결합된 원격 공개 HTML 체크섬**이지 전체 Worker JS 번들 크기/해시, CSS/JS 파일 전체, CDN 캐시의 모든 시점, 사용자 개인정보 화면 렌더링이나 Cloudflare 청구/CPU 실측까지 증명하지 않는다. 과거 SHA와 최신 SHA의 HTML 바이트 일치를 강요하지 않는다.
+
+### 2026-10-23 — Worker 코드 번들 Free 상한의 로컬 Dry-run 증거
+
+- 기존 Cloudflare CI의 Ops 작업에서만 **동일 고정 버전 Wrangler 4.151.2**로 `wrangler deploy --dry-run --config wrangler.jsonc --outdir <임시경로>`를 호출한다. `--dry-run`을 필수로 고정하므로 **실제 Worker 업로드·라우트 배포·유료 기능 생성·계정 접근은 하지 않는다**. CLI에 제공하는 환경에서도 Cloudflare/API/provider credential을 전달하지 않는다.
+- 생성된 로컬 `.js/.mjs/.cjs/.wasm` 코드 파일만 합산해 **공식 Worker 64MiB 용량 경계**와 비교한다. 코드 파일 수·총 바이트·읽기 전용 SHA-256·local bundling wall time을 CI에 출력하며, 코드/지도 파일 원문은 로그에 출력하지 않고 임시 디렉터리는 삭제한다.
+- 이 수치는 **Wrangler 로컬 코드 번들 근사값**으로 Static Assets 파일 총 용량과 분리된다. 압축 후 실제 업로드 크기·Cloudflare 서버 수락 결과·Free CPU 10ms/메모리/청구 금액을 검증한 것으로 표시하지 않는다. 불확실하거나 dry-run 실패 시 CI 실패로 처리한다. 기존 Vercel Production과 Worker Preview 설정은 수정하지 않는다.
