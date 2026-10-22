@@ -344,6 +344,61 @@ describe('Se-yeon G3 Node-only original-Grant current Subject fence',()=>{
     expect(dbConnections).toBe(0);
   });
 
+  it.each([
+    ['replayed existing User Turn', {replayed:true,committedTurn:null}],
+    ['previous committed User Turn', {replayed:false,committedTurn:{
+      attemptId:ATTEMPT,
+      assistantMessageId:'d5000000-0000-4000-8000-000000000006',
+      assistantText:'OLD_PRIVATE_ANSWER',
+      sequenceNo:1,
+      committedAt:'2026-10-22T00:00:00.000Z',
+    }}],
+    ['missing received replay evidence', {replayed:undefined,committedTurn:null}],
+    ['missing prior-commit evidence', {replayed:false,committedTurn:undefined}],
+  ] as const)('prevents first G3 Reveal after %s with zero original Grant queries',async (_label,receiveState)=>{
+    let destroyed=false;
+    let connections=0;
+    const pool:PostgresSubjectPoolV1={
+      connect(){
+        connections++;
+        throw Error('Replayed or previously committed receive must never reach DB');
+      },
+    };
+    const response={
+      headersSent:false,writableEnded:false,destroyed:false,
+      socket:{},destroy(){destroyed=true;},
+    } as unknown as ServerResponse;
+    const result={
+      subjectId:SUBJECT,
+      threadBinding:{threadId:THREAD,participantCharacterIds:['seyeon']},
+      execution:{
+        disposition:'executed',
+        receivedTurn:{
+          turnId:TURN,threadCharacterId:'seyeon',
+          userText:'안녕하세요',
+          ...receiveState,
+        },
+        attempt:{attemptId:ATTEMPT,replayed:false},
+        committedTurn:{
+          turnId:TURN,attemptId:ATTEMPT,
+          assistantMessageId:'d5000000-0000-4000-8000-000000000006',
+          sequenceNo:1,replayed:false,
+        },
+      },
+    } as unknown as RunProductionSeyeonChatResultV1;
+    await expect(deliverSeyeonCommittedFirstPositiveMemoryNodeTurnV1({
+      response,
+      requestSignal:new AbortController().signal,
+      pool,
+      verifiedEvidence:EVIDENCE,
+      result,expectedThreadId:THREAD,
+      requestId:'g3-no-replay-regrant',
+      serverTime:'2026-10-22T00:00:00.000Z',
+    })).rejects.toMatchObject({code:'INVALID_COMMIT'});
+    expect(destroyed).toBe(true);
+    expect(connections).toBe(0);
+  });
+
   it('keeps absent G1/G2/G3 owner RPC and EXECUTE privileges before Provider at DB_NOT_READY',async()=>{
     const db=new FakeG3Connection(SUBJECT,CANARY,false);
     await expect(assertSeyeonFirstPositiveNodeDbReadyV1({
