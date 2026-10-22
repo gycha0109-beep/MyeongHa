@@ -47,7 +47,7 @@ describe('I18N-06e inert Reader Scene panel consumer', () => {
     expect(html).toContain('data-reader-scene-source-segment="protected_disclosure"');
     expect(html).toContain('data-reading-content');
     expect(html).toContain('テギョム'); // approved temporary display-only name, not Reader identity
-    expect(html).toContain('自動翻訳');
+    expect(html).toContain('翻訳されません');
     expect(html).toContain('서버가 제공한 원문입니다. &lt;script&gt;alert(1)&lt;/script&gt;');
     expect(html).toContain('반드시 이루어진다는 의미는 아닙니다.');
     expect(html).not.toContain('<script>');
