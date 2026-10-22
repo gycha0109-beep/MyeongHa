@@ -2,7 +2,7 @@ import {
   constants, existsSync, lstatSync, readFileSync,
 } from 'node:fs';
 import {
-  lstat, open, readFile, unlink, realpath,
+  lstat, open, unlink, realpath,
 } from 'node:fs/promises';
 import {
   createCipheriv, createDecipheriv, createHmac,
@@ -193,7 +193,11 @@ async function writeSealedOnce(
         | constants.O_EXCL | constants.O_NOFOLLOW, 0o600,
     );
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'EEXIST') return;
+    if ((error as NodeJS.ErrnoException).code === 'EEXIST') {
+      bytes.fill(0);
+      return;
+    }
+    bytes.fill(0);
     throw error;
   }
   try {
@@ -345,7 +349,10 @@ export function createOfficialReaderNodeOffPrimaryStoreV1(
         });
         const persisted = await readSealed(keyRoot, name, keySeal, name);
         if (!persisted || typeof persisted !== 'object'
-            || (persisted as Record<string, unknown>).keyRef !== keyRef) return denied();
+            || (persisted as Record<string, unknown>).keyRef !== keyRef
+            || (persisted as Record<string, unknown>).keyBytes !== keyBytes.toString('base64url')) {
+          return denied();
+        }
         return Object.freeze({ keyRef, keyBytes: Uint8Array.from(keyBytes) });
       } finally {
         keyBytes.fill(0);
