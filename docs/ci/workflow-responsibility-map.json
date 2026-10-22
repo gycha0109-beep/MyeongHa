@@ -529,6 +529,12 @@
       "prMode": "none",
       "mainMode": "one-shot-trigger",
       "workTrackAttribution": "commit-metadata"
+    },
+    "seyeon-terra-glm-quality-trio-retry-v1.yml": {
+      "responsibility": "character-memory-approved-single-retry-after-zero-charge-pre-dispatch-failure",
+      "prMode": "none",
+      "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "commit-metadata"
     }
   }
 }

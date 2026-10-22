@@ -3,7 +3,8 @@ import {join} from 'node:path';
 import {performance} from 'node:perf_hooks';
 import {createHash} from 'node:crypto';
 import {
- admitTerraGlmQualityTrioOneShotV1,requirePublicSyntheticQualityUtteranceV1,
+ admitTerraGlmQualityTrioRetryOneShotV1,requireSeyeonTrioOpenAiStageV1,
+ requirePublicSyntheticQualityUtteranceV1,
  SEYEON_TERRA_GLM_QUALITY_TRIO_PRIOR_RESERVED_MICRO_USD as PRIOR,
  SEYEON_TERRA_GLM_QUALITY_TRIO_LUNA_RESERVE_MICRO_USD as LUNA_RESERVE,
  SEYEON_TERRA_GLM_QUALITY_TRIO_TERRA_RESERVE_MICRO_USD as TERRA_RESERVE,
@@ -32,7 +33,7 @@ import {createSeyeonQualityTrioSyntheticCensusV1}
 import {SEYEON_MODEL_EVAL_CASES_V1}
  from './seyeon-model-eval-cases-v1.mjs';
 
-const execution=admitTerraGlmQualityTrioOneShotV1();
+const execution=admitTerraGlmQualityTrioRetryOneShotV1();
 const terraKey=process.env.OPENAI_API_KEY?.trim();
 const glmKey=process.env.OPENROUTER_API_KEY?.trim();
 if(!terraKey||terraKey.length<20||!glmKey||glmKey.length<20||
@@ -109,20 +110,22 @@ function openAiProvider(model,expectedStage){
  const prices=SEYEON_DIALOGUE_PATH_PRICES_V1[model];
  return createOpenAiSeyeonStructuredProviderV1({
   apiKey:terraKey,model,maxOutputTokens:1536,timeoutMs:30000,
-  fetchImpl:async(url,init)=>{
-   const body=String(init?.body??'');
-   const bytes=Buffer.byteLength(body,'utf8');
+  meteredBeforeDispatch:async(metadata,body)=>{
    let request;
    try{request=JSON.parse(body);}catch{throw Error('LUNA_TERRA_REQUEST_SHAPE_HOLD');}
-   const name=request?.text?.format?.name;
-   const stage=typeof name==='string'&&name.startsWith('myeongha_')&&name.endsWith('_v2')
-    ?name.slice(8,-3):null;
-   if(stage!==expectedStage||request.model!==model||
-      url!=='https://api.openai.com/v1/responses'||
+   const stage=requireSeyeonTrioOpenAiStageV1(
+    request?.text?.format?.name,expectedStage);
+   if(metadata.purpose!==expectedStage||metadata.modelKey!==model||
+      metadata.requestBodyBytes!==Buffer.byteLength(body,'utf8')||
+      request.model!==model||
       !Number.isInteger(request.max_output_tokens)||
       request.max_output_tokens<1||request.max_output_tokens>1536)
     throw Error('LUNA_TERRA_STAGE_OR_MODEL_HOLD');
-   await reserve(route,stage,bytes,limit,cap);
+   await reserve(route,stage,metadata.requestBodyBytes,limit,cap);
+  },
+  fetchImpl:async(url,init)=>{
+   if(url!=='https://api.openai.com/v1/responses')
+    throw Error('LUNA_TERRA_PROVIDER_ORIGIN_HOLD');
    const t=performance.now();
    const response=await fetch(url,init);
    const elapsedMs=Math.round(performance.now()-t);
