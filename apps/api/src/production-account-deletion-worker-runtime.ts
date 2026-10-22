@@ -9,6 +9,9 @@ import {
 } from './postgres-account-deletion-worker.js';
 import { createNodePostgresAccountDeletionWorkerPoolV1 } from './node-postgres-account-deletion-worker-pool.js';
 import type { PostgresSubjectPoolV1 } from './postgres-subject-execution.js';
+import type {
+  OfficialReaderAccountPrivacyDeletionPortV1,
+} from './official-reader-private-account-deletion-lifecycle-v1.js';
 import type { ProductionAccountDeletionAuthAdminConfigV1 } from './production-account-deletion-auth-admin-config.js';
 import type { ProductionAccountDeletionWorkerDbConfigV1 } from './production-account-deletion-worker-db-config.js';
 import {
@@ -45,6 +48,8 @@ export interface AccountDeletionWorkerRuntimeV1 {
 export function createAccountDeletionWorkerRuntimeV1(input: {
   readonly ports: PostgresAccountDeletionWorkerPortsV1;
   readonly authDeletionPort: SupabaseAuthAdminUserDeletionPortV1;
+  /** Only an installed off-primary ledger + key owner may enable the S4 branch. */
+  readonly readerPrivacyDeletionPort?: OfficialReaderAccountPrivacyDeletionPortV1;
 }): AccountDeletionWorkerRuntimeV1 {
   return Object.freeze({
     async run(runInput: RunAccountDeletionOutboxEventInputV1) {
@@ -58,6 +63,12 @@ export function createAccountDeletionWorkerRuntimeV1(input: {
         dbFinalizerPort: input.ports.dbFinalizerPort,
         authDeletionPort: input.authDeletionPort,
         completionPort: input.ports.completionPort,
+        ...(input.readerPrivacyDeletionPort === undefined
+          ? {}
+          : {
+              readerPrivacyDeletionPort: input.readerPrivacyDeletionPort,
+              readerPrivacyStatePort: input.ports.readerPrivacyStatePort,
+            }),
       });
 
       return Object.freeze({ claim, worker });
@@ -68,10 +79,14 @@ export function createAccountDeletionWorkerRuntimeV1(input: {
 export function createAccountDeletionWorkerRuntimeFromPoolV1(input: {
   readonly pool: PostgresSubjectPoolV1;
   readonly authDeletionPort: SupabaseAuthAdminUserDeletionPortV1;
+  readonly readerPrivacyDeletionPort?: OfficialReaderAccountPrivacyDeletionPortV1;
 }): AccountDeletionWorkerRuntimeV1 {
   return createAccountDeletionWorkerRuntimeV1({
     ports: createPostgresAccountDeletionWorkerPortsV1({ pool: input.pool }),
     authDeletionPort: input.authDeletionPort,
+    ...(input.readerPrivacyDeletionPort === undefined
+      ? {}
+      : { readerPrivacyDeletionPort: input.readerPrivacyDeletionPort }),
   });
 }
 
@@ -83,6 +98,8 @@ export interface ProductionAccountDeletionWorkerRuntimeLeaseV1 {
 export function createProductionAccountDeletionWorkerRuntimeV1(input: {
   readonly databaseConfig: ProductionAccountDeletionWorkerDbConfigV1;
   readonly authAdminConfig: ProductionAccountDeletionAuthAdminConfigV1;
+  /** Not supplied until an independently durable Privacy ledger is installed. */
+  readonly readerPrivacyDeletionPort?: OfficialReaderAccountPrivacyDeletionPortV1;
 }): ProductionAccountDeletionWorkerRuntimeLeaseV1 {
   const pool = createNodePostgresAccountDeletionWorkerPoolV1(input.databaseConfig);
   const authDeletionPort = createSupabaseAuthAdminUserDeletionAdapterV1({
@@ -94,6 +111,9 @@ export function createProductionAccountDeletionWorkerRuntimeV1(input: {
     runtime: createAccountDeletionWorkerRuntimeFromPoolV1({
       pool,
       authDeletionPort,
+      ...(input.readerPrivacyDeletionPort === undefined
+        ? {}
+        : { readerPrivacyDeletionPort: input.readerPrivacyDeletionPort }),
     }),
     close() {
       return pool.close();
