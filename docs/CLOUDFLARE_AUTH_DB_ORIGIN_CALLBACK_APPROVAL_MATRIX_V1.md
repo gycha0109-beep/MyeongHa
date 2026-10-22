@@ -120,3 +120,11 @@
 - 독립 DB 기술 수락 문자열 외에도 `MYEONGHA_CLOUDFLARE_DB_APPROVED_HOST`와 `MYEONGHA_CLOUDFLARE_DB_APPROVED_PORT` 두 값을 **정확한 비공개 승인 기록**과 동일하게 요구한다. 접속 전 `MYEONGHA_DATABASE_URL`의 실제 hostname/port와 문자열 일치가 아니면 503/no-store로 종료하고 Pool/Provider 네트워크를 열지 않는다. 포트가 생략된 DSN도 임의로 5432라고 추측하지 않고 거절한다.
 - 승인 호스트는 공인 DNS FQDN 형식만 허용하며 `localhost`, IP 리터럴, `.internal/.local/.invalid/.test/.example` 등 사설·합성 주소를 Workers TCP 실연동 대상으로 허용하지 않는다. **이 정책이 새 외부 테스트 DB 생성을 승인한 것은 아니다.** 사용자 지시대로 일회용 PostgreSQL 검증은 기존 GitHub CI/local Docker에 한정되고, Cloudflare 실네트워크에는 승인된 대상이 없으므로 404 HOLD를 유지한다.
 - 이 호스트·포트는 승인된 별도 Worker binding 이름이다. DB DSN, TLS CA 원문, 비밀번호, 실제 Callback 소유 호스트 값은 GitHub PR/문서/로그에 등록하지 않는다. 기술 owner 인수에 실제 값·권한·비용 경계가 모두 성립할 때만 별도 조치 대상이 된다.
+
+
+### Cloudflare 요청별 프로필·출생정보 Pool 분리 (2026-10-22)
+
+- 기존 `createProductionCurrentSubjectProfileRuntimeV1`, `createProductionBirthProfileReadRuntimeV1`, `createProductionBirthProfileCreateRuntimeV1`의 **기존 서버 전용 `pool` 주입 포인트**를 사용한다. Cloudflare Worker에서만 `createNodePostgresSubjectPoolV1(approvedDbConfig, CLOUDFLARE_DIRECT_POSTGRES_CANDIDATE_LIMITS_V1)`로 요청당 최대 1개의 subject Pool을 구성하고 주입한다. 기존 Vercel 런타임·SQL·신뢰 주체 정책은 변경하지 않는다.
+- Worker는 runtime/Member Auth rate-limit Pool/subject Pool 세 개의 각 독립 `close()`를 모두 시도한다. 한 단계가 실패해도 나머지 소유 리소스 반환을 생략하지 않으며 사용자에게는 고정 503/no-store를 반환한다. CI 합성 테스트는 순서·실패 시 나머지 리소스 종료를 확인한다.
+- `Guest bootstrap`, `Guest promotion`, `Current Subject Birth Profile`에는 현재 동일한 `pool` 주입 포인트가 없으므로 위 max=1 주입 완료 범위에 포함하지 않는다. 해당 런타임은 기존 호출 단위 생성/종료가 유지되며, 실환경 Workers TCP/한도·기술 인수 전까지 Auth/DB positive 404 HOLD를 해제하지 않는다.
+- DB 호스트·포트·TLS 승인·OAuth Callback owner binding은 아직 **실제 Cloudflare Preview에 설정되지 않았다**. 이것은 Docker/CI의 합성 요청별 수명주기 구현 증거이며 실제 Workers→PostgreSQL TLS/RLS 핸드셰이크 완료를 의미하지 않는다.
