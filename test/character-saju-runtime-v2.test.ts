@@ -89,6 +89,9 @@ function fixture(reader: string, domain: SajuDomain) {
       completedAt: '2026-10-09T07:30:00.000Z',
     }]) },
     productReaderEligibilityAuthorityPort: productAuthorityPort,
+    currentVerifiedPurchaseAuthorityPort: {
+      assertCurrentVerifiedPurchase: vi.fn(async () => undefined),
+    },
   };
   const speech = {
     register: 'respectful', sentenceRhythm: 'short', directness: 'medium',
