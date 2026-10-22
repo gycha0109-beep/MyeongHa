@@ -1,5 +1,6 @@
 import {
   classifyCharacterStandardFollowupLexicalIntentV1,
+  classifyExactOfficialReadingSummaryReferenceV1,
   classifyCharacterStandardFollowupQuestionScopeV1,
 } from './character-standard-reading-chat-question-scope-v1.js';
 import {
@@ -166,7 +167,17 @@ export function classifyReaderConversationIntentV1(
     }
     if (explicitOfficial && SUMMARY.test(text) &&
         !/(?:다시\s*계산|새\s*계산|내년|다음\s*달)/u.test(text)) {
-      return decide('official_summary', signals);
+      // Preserve the independent intent and risk axes for the Security Gate,
+      // but never treat a broad summary phrase as purchase/domain authority.
+      // Actual source access is held earlier when any risk signal exists.
+      if (signals.length !== 0) return decide('official_summary', signals);
+      const summaryRef = classifyExactOfficialReadingSummaryReferenceV1(
+        text, admittedDomain,
+      );
+      if (summaryRef === 'admitted') return decide('official_summary', signals);
+      return decide('clarification', signals,
+        summaryRef === 'new_authority_required'
+          ? 'unapproved_saju_scope' : 'ambiguous_reference');
     }
     if (lex === 'admitted') return decide('official_followup', signals);
     return decide('clarification', signals, 'ambiguous_reference');
