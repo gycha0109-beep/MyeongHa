@@ -60,9 +60,24 @@ begin
   end if;
 
   update public.official_reader_paid_answer_purge_jobs_v1
-  set status='completed',lock_owner=null,lease_expires_at=null,
+  set status=case when j.requeue_after_completion then 'pending'
+                  else 'completed' end,
+      id=case when j.requeue_after_completion
+              then pg_catalog.gen_random_uuid() else id end,
+      available_at=case when j.requeue_after_completion
+                        then pg_catalog.clock_timestamp() else available_at end,
+      requeue_after_completion=false,
+      lock_owner=null,lease_expires_at=null,
       updated_at=pg_catalog.clock_timestamp()
-  where id=p_job_id;
+  where id=p_job_id
+    and status='claimed'
+    and lock_owner=p_worker
+    and lease_expires_at>pg_catalog.clock_timestamp();
+  if not found then
+    raise exception using errcode='40001',
+      constraint='reader_empty_purge_completion_claim_lost',
+      message='Reader empty purge lost its claimed lease before completion';
+  end if;
   return true;
 end
 $reader_empty_purge_finish$;
