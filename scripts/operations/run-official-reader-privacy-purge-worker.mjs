@@ -24,32 +24,26 @@ if (typeof workerId !== 'string' || !/^[a-zA-Z0-9_.:-]{8,128}$/u.test(workerId))
   unavailable();
 }
 
-const [dbConfig,workerPool,privacyConfig,privateStore,purgeWorker] =
-  await Promise.all([
-    import('../../dist/apps/api/src/production-account-deletion-worker-db-config.js'),
-    import('../../dist/apps/api/src/node-postgres-account-deletion-worker-pool.js'),
-    import('../../dist/apps/api/src/official-reader-offprimary-worker-config-v1.js'),
-    import('../../dist/apps/api/src/official-reader-node-offprimary-privacy-store-v1.js'),
-    import('../../dist/apps/api/src/official-reader-private-revocation-purge-worker-v1.js'),
-  ]);
+// Reuse the existing account-deletion Worker DB identity and private
+// off-primary storage factory. No separate Postgres configuration, elevated
+// Commerce role or new key storage is introduced.
+const [dbConfig, workerRuntime] = await Promise.all([
+  import('../../dist/apps/api/src/production-account-deletion-worker-db-config.js'),
+  import('../../dist/apps/api/src/production-account-deletion-worker-runtime.js'),
+]);
+const databaseConfig =
+  dbConfig.parseProductionAccountDeletionWorkerDbConfigV1(process.env);
+const runtime = workerRuntime.createProductionReaderPrivacyMaintenanceRuntimeV1({
+  databaseConfig,
+});
 
-const databaseConfig = dbConfig.parseProductionAccountDeletionWorkerDbConfigV1(
-  process.env,
-);
-const sealedStoreConfig = privacyConfig.parseOfficialReaderOffPrimaryWorkerConfigV1(
-  process.env,
-);
-if (sealedStoreConfig === null) unavailable();
-
-const store = privateStore.createOfficialReaderNodeOffPrimaryStoreV1(sealedStoreConfig);
-const pool = workerPool.createNodePostgresAccountDeletionWorkerPoolV1(databaseConfig);
 try {
-  const report = await purgeWorker.runOfficialReaderPrivateRevocationPurgeBatchV1({
-    pool,store,workerId,limit,
+  const report = await runtime.runReaderRevocationPurgeBatch({
+    workerId, limit,
   });
   if (report.publicPaidReadEnabled !== false) unavailable();
   // Only totals, never Subject/Reader/Reading/Receipt/key/body identities.
   process.stdout.write(JSON.stringify(report) + '\n');
 } finally {
-  await pool.close();
+  await runtime.close();
 }
