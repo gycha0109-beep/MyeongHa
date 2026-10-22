@@ -39,3 +39,11 @@
 - S7 준비가 있을 때는 SQL Owner가 실제 인증된 Subject×Thread×SafeMessage×Body×DeliveryRequest×Attempt에 묶은 `s7PreparedBinding`을 추가로 요구한다. 현재 S6 반환 객체에는 민감한 AAD 전체가 **포함돼 있지 않으므로**, 이 witness를 일반 클라이언트 또는 응답 객체에서 만들어 쓰면 안 된다. #2301의 기존 S1 보호 읽기 SQL·키/Privacy Owner가 서버 내부에서 검증된 원본 메타데이터만 인계해야 이후 실 연결 가능하다.
 - `inspectOfficialReaderS6CiphertextS7IdentityV1`는 위 사전 결속 후 **기존 단일 Records 조회 게이트를 정확히 한 번** 실행한다. 사용자 응답은 HELD/BLOCKED 및 S5/S7 단계 이름뿐이며 SourceUnit·ciphertext·DEK·원문·Subject/Body/Token을 노출하지 않는다. 구매권, 삭제/환불/재전송, ACK의 발행 여부 및 실제 사용자 열람을 결정하지 않는다.
 - `S7_CLIENT_ACKNOWLEDGED_NOT_HUMAN_READ`은 준비·인증 ACK의 메타데이터 일치만 뜻한다. 별도 승인 전 `canPersist/canDisclose/canPublish/canSell=false`, `sourceAuthority/Privacy/currentAccessAuthority=NOT_EVALUATED`, `s5AtomicStorage/s7Delivery=DB_OWNER_REQUIRED`은 불변이다.
+
+## 2026-10-22 S5·S7 같은 요청 재시도 / 환불 경계
+
+- `official-reader-s5-s7-immutable-replay-v1.ts`는 **기존** #2301 DB Owner의 S5 `replayed` commit과 S7 동일 deliveryRequestId 준비·ACK 재시도를 비교하는 **서버 비공개 원본 증거 일치성** 계약이다. 새 delivery 요청·새 답변 발행·결제·환불·송신을 실행하지 않는다.
+- 최초 S5 `bodyId / safeMessageId / turnId / attemptId / committedAt`와 재시도 S5 결과가 완전히 동일해야 하며, 재시도 `replayed=true`를 요구한다. 최초/재시도 S6는 같은 Official Reading·Reader·bodyId·committedAt을 가리켜야 한다. 신규 원문을 S6 메타데이터에 끼워 넣으면 차단한다.
+- 동일 S7 `deliveryRequestId / deliveryAttemptId / responsePreparedAt`와 DB Owner의 Subject×Thread×SafeMessage×Body 준비 바인딩을 유지하고, 재시도 준비 `replayed=true`를 요구한다. 임의 새로운 deliveryRequestId를 기존 요청의 재시도라고 주장하는 경우 차단한다.
+- **ACK는 별도 클라이언트 사건이다.** 원래 ACK가 존재했으면 재시도 ACK는 같은 deliveryAttemptId/원본 timestamp로 `replayed=true`여야 한다. 원래 ACK가 없고 뒤늦게 최초 ACK를 받은 경우, 기존 S7 Owner의 인증 ACK SQL로 새 사건을 별도 검증해야 하며 이 재시도 비교에서는 HOLD/BLOCKED다. HTTP 전송 준비·ACK는 사람이 읽었다는 증거가 아니다.
+- 정합성 검사 전에 **#2459 S6 암호문 AAD + #2456 동일 Saju 출처와 현재 Records Owner DB 조회**를 그대로 재사용한다. 이 계약 성공에도 `HELD` / `canPersist/canDisclose/canPublish/canSell=false` 고정. Reader 구매권·환불·Privacy Lease·키 삭제/복원·실제 전송 조건은 **매 요청마다 #2301 DB/Privacy Owner 정본**이 별도 검증해야 하며 과거 재시도 결과는 현재 접근 허가가 아니다.
