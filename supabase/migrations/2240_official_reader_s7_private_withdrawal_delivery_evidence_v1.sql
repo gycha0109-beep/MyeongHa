@@ -1,7 +1,8 @@
 -- S7 -> Commerce/Legal PRIVATE READ-ONLY withdrawal evidence bridge.
 -- An exact original Receipt->Grant->paid body is ONE purchased content unit.
--- A verified current Receipt is independently re-read under the SAME S1
--- scope lock before using the historical answer and any delivery attempts.
+-- An original verified Receipt remains eligible for historical evidence
+-- AFTER full cancellation only when its exact Grant revocation is backed by
+-- a verified PortOne provider event. Both states are read under the S1 lock.
 --
 -- S5 commit, HTTP response preparation and authenticated CLIENT ACK are
 -- three different events. None on its own proves legal consumer delivery.
@@ -94,8 +95,37 @@ begin
     on receipt.id=grant_row.source_receipt_id
    and receipt.subject_id=grant_row.subject_id
    and receipt.purchase_intent_id=p_purchase_intent_id
-   and receipt.verification_status='verified'
    and receipt.environment='production'
+   and (
+     receipt.verification_status='verified'
+     or (
+       receipt.verification_status='revoked'
+       and grant_row.status='revoked'
+       and exists (
+         select 1
+         from public.entitlement_events revoked
+         join public.commerce_provider_events cancelled
+           on cancelled.id=revoked.source_provider_event_id
+          and cancelled.resolved_subject_id=revoked.subject_id
+          and cancelled.resolved_receipt_id=receipt.id
+          and cancelled.provider=receipt.provider
+          and cancelled.environment=receipt.environment
+         where revoked.grant_id=grant_row.id
+           and revoked.subject_id=b.subject_id
+           and revoked.event_type='revoked'
+           and revoked.source_type='provider_event'
+           and cancelled.provider='portone_v2'
+           and cancelled.environment='production'
+           and cancelled.status in ('verified','processed')
+           and cancelled.resolution_source_type='receipt'
+           and cancelled.event_type='Transaction.Cancelled'
+           and cancelled.provider_occurred_at is not null
+           and cancelled.provider_occurred_at<=pg_catalog.clock_timestamp()
+           and (cancelled.external_transaction_id is null
+                or cancelled.external_transaction_id=receipt.external_transaction_id)
+       )
+     )
+   )
   cross join lateral (
     select
       min(d.response_prepared_at) as response_prepared_at,
@@ -141,4 +171,4 @@ $reader_withdrawal_evidence_acl$;
 
 comment on function public.internal_qry_official_reader_withdrawal_delivery_evidence_v1(
   uuid,uuid,uuid,uuid
-) is 'Private single-unit verified Production Receipt+originating Grant+S5 body and S7 retained receipt timeline, rechecked under shared S1 lock. No consumer delivery proof, refund authorization or runtime EXECUTE. Holds Saju/Privacy/Legal/Commerce release.';
+) is 'Private exact originating Receipt and Grant evidence under S1 lock. A revoked Receipt requires verified PortOne full-cancellation plus applied original Grant revocation, not a browser/refund hint. Only retained S5 body and S7 timestamps are reportable. No consumer delivery proof, refund authorization or runtime EXECUTE. Holds Saju/Privacy/Legal/Commerce release.';
