@@ -29,7 +29,7 @@ import type {
 export const OFFICIAL_READER_PRIVATE_PAID_COMMIT_VERSION_V1 =
   'official-reader-s5-protected-answer-commit-v1' as const;
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 const CURRENT_CLOCK_SQL = 'select clock_timestamp()::text as "effectiveAt"';
 const COMMIT_SQL = `
   select public.internal_commit_official_reader_paid_answer_v1(
