@@ -152,17 +152,27 @@ export function MobilePaidReaderChatRevealV1({
           || AppState.currentState !== 'active') return;
       void (async () => {
         let acknowledged = false;
+        let accessDenied = false;
         try {
           const result = await acknowledgeMobilePaidReaderChatDeliveryV1({
             threadId, safeMessageId, receipt, signal: controller.signal,
           });
           acknowledged = result.kind === 'acknowledged';
-        } catch {
-          // The ACK may have been received even if its response was lost;
-          // a manual retry replays the SAME token and original timestamp.
+          accessDenied = result.kind === 'access_denied';
+        } catch (error) {
+          accessDenied = error instanceof MobileMemberSessionErrorV1
+            || (error instanceof MyeongHaApiClientErrorV1 && error.status === 401);
+          // Transient ACK failure is not a delivery receipt. An expired
+          // session is different: clear any already-rendered paid plaintext.
         }
         if (currentRequest.current !== controller || controller.signal.aborted
             || !isFocused.current || AppState.currentState !== 'active') return;
+        if (accessDenied) {
+          // Revoked/unknown S7 receipt or expired Member session: close this
+          // private card. No refund determination is inferred from the ACK.
+          clearProtected();
+          return;
+        }
         if (acknowledged) {
           pendingReceipt.current = null;
           setAckFailed(false);
