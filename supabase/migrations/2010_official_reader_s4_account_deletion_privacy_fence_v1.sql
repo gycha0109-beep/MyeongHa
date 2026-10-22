@@ -4,6 +4,31 @@
 -- No Production deployment or public paid content activation here.
 -- Watchtower-Track: db-authority-core
 
+-- Prevent one decryption key from being shared between different protected
+-- answers, accounts or independently erasable Content scopes.
+create unique index official_reader_paid_answer_encryption_key_ref_unique_v1
+  on public.official_reader_paid_answer_bodies(encryption_key_ref);
+
+-- Retained non-content worker state. This is NOT the independent Privacy
+-- Ledger: backups may contain this row and its flag never authorizes a read.
+create table public.official_reader_account_deletion_privacy_status_v1 (
+  deletion_job_id uuid primary key
+    references public.data_deletion_jobs(id),
+  subject_id uuid not null references public.subjects(id),
+  external_fence_id text not null,
+  protected_row_count bigint not null check (protected_row_count>0),
+  fenced_at timestamptz not null default pg_catalog.clock_timestamp(),
+  keys_erased_at timestamptz,
+  constraint official_reader_account_privacy_fence_id_bounded
+    check (pg_catalog.length(external_fence_id) between 1 and 256)
+);
+alter table public.official_reader_account_deletion_privacy_status_v1
+  enable row level security;
+alter table public.official_reader_account_deletion_privacy_status_v1
+  force row level security;
+revoke all on table public.official_reader_account_deletion_privacy_status_v1
+  from public;
+
 -- S4 privileged account-deletion key manifest: release no protected
 -- ciphertext or plaintext. Only the claimed account-deletion system role is
 -- allowed to see per-answer key references BEFORE DB finalization.
@@ -99,6 +124,8 @@ declare
   v_policy_version text;
   v_db_finalized_at timestamptz;
   v_ready boolean;
+  v_reader_protected_count bigint;
+  v_reader_external_fence_id text;
   v_now timestamptz := clock_timestamp();
 begin
   if p_subject_id is null or p_deletion_job_id is null then
@@ -266,10 +293,22 @@ begin
   -- Thread or official Reading parent. A cascading FK is NOT a substitute:
   -- keep this graph edge explicit and inside the existing claimed lease TX.
   -- This does not claim backup/KMS key purge or external Privacy Ledger ACK.
-  if exists (
-    select 1 from public.official_reader_paid_answer_bodies b
-    where b.subject_id = p_subject_id
-  ) and (
+  select pg_catalog.count(*) into v_reader_protected_count
+  from public.official_reader_paid_answer_bodies b
+  where b.subject_id=p_subject_id;
+
+  if v_reader_protected_count>0 then
+    v_reader_external_fence_id :=
+      pg_catalog.current_setting('myeongha.reader_privacy_fence_receipt_id',true);
+    if v_reader_external_fence_id is null
+       or pg_catalog.length(v_reader_external_fence_id) not between 1 and 256 then
+      raise exception using errcode='23514',
+        constraint='account_deletion_reader_durable_receipt_required',
+        message='Protected Reader deletion requires an external ledger receipt';
+    end if;
+  end if;
+
+  if v_reader_protected_count>0 and (
     pg_catalog.current_setting('myeongha.reader_privacy_fence_subject_id', true)
       is distinct from p_subject_id::text
     or pg_catalog.current_setting('myeongha.reader_privacy_fence_deletion_job_id', true)
@@ -278,6 +317,30 @@ begin
     raise exception using errcode='23514',
       constraint='account_deletion_reader_external_privacy_fence_required',
       message='Protected Reader deletion requires a durable off-primary tombstone before physical deletion';
+  end if;
+
+  if v_reader_protected_count>0 then
+    insert into public.official_reader_account_deletion_privacy_status_v1(
+      deletion_job_id,subject_id,external_fence_id,protected_row_count
+    ) values (
+      p_deletion_job_id,p_subject_id,v_reader_external_fence_id,
+      v_reader_protected_count
+    )
+    on conflict (deletion_job_id) do nothing;
+
+    if not exists (
+      select 1
+      from public.official_reader_account_deletion_privacy_status_v1 p
+      where p.deletion_job_id=p_deletion_job_id
+        and p.subject_id=p_subject_id
+        and p.external_fence_id=v_reader_external_fence_id
+        and p.protected_row_count=v_reader_protected_count
+        and p.keys_erased_at is null
+    ) then
+      raise exception using errcode='23514',
+        constraint='account_deletion_reader_durable_fence_conflict',
+        message='Protected Reader deletion manifest changed during account finalization';
+    end if;
   end if;
 
   delete from public.official_reader_paid_answer_bodies b
@@ -461,3 +524,110 @@ BEGIN
   END LOOP;
 END
 $$;
+
+-- The worker can mark keys erased ONLY after the outside-backup ledger
+-- confirms all original key references were actually destroyed.
+-- This DB flag is a completion gate, not evidence of off-primary erasure.
+create or replace function public.internal_ack_official_reader_account_key_erasure_v1(
+  p_subject_id uuid,
+  p_deletion_job_id uuid,
+  p_lock_owner text,
+  p_external_fence_id text
+)
+returns boolean
+language plpgsql
+volatile
+security definer
+set search_path=pg_catalog,public
+as $reader_key_erasure_ack$
+declare v_row public.official_reader_account_deletion_privacy_status_v1%rowtype;
+begin
+  if p_subject_id is null or p_deletion_job_id is null
+     or p_lock_owner is null or pg_catalog.btrim(p_lock_owner)=''
+     or p_external_fence_id is null or pg_catalog.btrim(p_external_fence_id)='' then
+    raise exception using errcode='23514',
+      constraint='reader_key_erase_ack_scope_invalid',
+      message='Reader key erasure acknowledgment requires a claimed account job';
+  end if;
+  perform 1
+  from public.outbox_events oe
+  where oe.aggregate_type='data_deletion_job'
+    and oe.aggregate_id=p_deletion_job_id::text
+    and oe.event_type='ACCOUNT_DELETION_STARTED'
+    and oe.status='processing'
+    and oe.lock_owner=pg_catalog.btrim(p_lock_owner)
+    and oe.lease_expires_at>pg_catalog.clock_timestamp()
+  for update;
+  if not found then
+    raise exception using errcode='23514',
+      constraint='reader_key_erase_ack_lease_missing',
+      message='Reader key erasure acknowledgment requires the current Worker lease';
+  end if;
+
+  select p.* into v_row
+  from public.official_reader_account_deletion_privacy_status_v1 p
+  where p.deletion_job_id=p_deletion_job_id and p.subject_id=p_subject_id
+  for update;
+  if not found or v_row.external_fence_id is distinct from p_external_fence_id
+     or exists (
+       select 1 from public.official_reader_paid_answer_bodies b
+       where b.subject_id=p_subject_id
+     ) or not exists (
+       select 1 from public.data_deletion_jobs dj
+       where dj.id=p_deletion_job_id and dj.subject_id=p_subject_id
+         and dj.db_finalized_at is not null
+     ) then
+    raise exception using errcode='23514',
+      constraint='reader_key_erase_ack_incomplete',
+      message='Reader key erasure cannot be marked before final DB deletion';
+  end if;
+
+  if v_row.keys_erased_at is null then
+    update public.official_reader_account_deletion_privacy_status_v1 p
+    set keys_erased_at=pg_catalog.clock_timestamp()
+    where p.deletion_job_id=p_deletion_job_id and p.subject_id=p_subject_id
+      and p.keys_erased_at is null;
+  end if;
+  return true;
+end
+$reader_key_erasure_ack$;
+
+revoke all on function public.internal_ack_official_reader_account_key_erasure_v1(uuid,uuid,text,text)
+from public;
+grant execute on function public.internal_ack_official_reader_account_key_erasure_v1(uuid,uuid,text,text)
+to myeongha_system_executor;
+
+-- Existing account job completion remains unchanged for legacy accounts.
+-- A protected account can NEVER become 'processed' while its key manifest
+-- is waiting for irreversible key-owner deletion and external ledger ACK.
+create or replace function public.internal_guard_official_reader_account_privacy_completion_v1()
+returns trigger
+language plpgsql
+volatile
+security definer
+set search_path=pg_catalog,public
+as $reader_account_privacy_completion$
+begin
+  if new.aggregate_type='data_deletion_job'
+     and new.event_type='ACCOUNT_DELETION_STARTED'
+     and new.status='processed'
+     and old.status is distinct from new.status
+     and exists (
+       select 1 from public.official_reader_account_deletion_privacy_status_v1 p
+       where p.deletion_job_id::text=new.aggregate_id
+         and p.keys_erased_at is null
+     ) then
+    raise exception using errcode='23514',
+      constraint='reader_account_privacy_keys_not_erased',
+      message='Account deletion cannot complete before protected Reader keys are erased';
+  end if;
+  return new;
+end
+$reader_account_privacy_completion$;
+
+revoke all on function public.internal_guard_official_reader_account_privacy_completion_v1()
+from public;
+
+create trigger official_reader_account_privacy_completion_guard_v1
+before update on public.outbox_events
+for each row execute function public.internal_guard_official_reader_account_privacy_completion_v1();
