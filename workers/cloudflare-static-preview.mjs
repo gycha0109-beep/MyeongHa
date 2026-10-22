@@ -183,6 +183,82 @@ export function isCloudflareStaticSingleByteRangeBoundV1(request, response) {
   }
 }
 
+// RFC 9110 entity tags: opaque, case-sensitive bytes; commas inside quotes
+// are part of a tag, not list separators. Parsing is deny-only and bounded.
+const CLOUDFLARE_ENTITY_TAG_PATTERN_V1 = /^(?:W\\/)?"[\\x21\\x23-\\x7E]*"$/u;
+
+function parseCloudflareIfNoneMatchV1(value) {
+  if (typeof value !== 'string' || value.length === 0 || value.length > 4096) return null;
+  if (value.trim() === '*') return ['*'];
+  const tags = [];
+  let quoted = false;
+  let from = 0;
+  for (let i = 0; i < value.length; i += 1) {
+    if (value[i] === '"') quoted = !quoted;
+    if (value[i] !== ',' || quoted) continue;
+    tags.push(value.slice(from, i).trim());
+    if (tags.length > 32) return null;
+    from = i + 1;
+  }
+  if (quoted) return null;
+  tags.push(value.slice(from).trim());
+  if (tags.length > 32 ||
+      !tags.every(tag => CLOUDFLARE_ENTITY_TAG_PATTERN_V1.test(tag))) return null;
+  return tags;
+}
+
+function parseCloudflareHttpDateV1(value) {
+  if (typeof value !== 'string' ||
+      !/^(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun), [0-3][0-9] (?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) [0-9]{4} [0-2][0-9]:[0-5][0-9]:[0-5][0-9] GMT$/u.test(value)) {
+    return null;
+  }
+  const time = Date.parse(value);
+  if (!Number.isFinite(time) || new Date(time).toUTCString() !== value) return null;
+  return time;
+}
+
+/**
+ * A 304 is only meaningful for a previously cached *non-HTML* representation
+ * that matches a bounded conditional validator from this same request.
+ * An ETag takes precedence over If-Modified-Since (RFC 9110 §13.1.3).
+ * We intentionally reject validator-free 304, missing response validators,
+ * synthetic bodies and transfer/range metadata; never grant an asset path.
+ */
+export function isCloudflareStaticNotModifiedBoundV1(request, response) {
+  try {
+    if (!(response instanceof Response) || response.status !== 304 ||
+        response.body !== null) return false;
+    if (response.headers.has('content-range') ||
+        response.headers.has('content-length') ||
+        response.headers.has('transfer-encoding') ||
+        request.headers.has('if-match') ||
+        request.headers.has('if-unmodified-since') ||
+        request.headers.has('if-range')) return false;
+
+    for (const field of ['date', 'last-modified']) {
+      const raw = response.headers.get(field);
+      if (raw !== null && parseCloudflareHttpDateV1(raw) === null) return false;
+    }
+    const requestedTags = request.headers.get('if-none-match');
+    if (requestedTags !== null) {
+      const tags = parseCloudflareIfNoneMatchV1(requestedTags);
+      const responseTag = response.headers.get('etag');
+      if (!tags || responseTag === null ||
+          !CLOUDFLARE_ENTITY_TAG_PATTERN_V1.test(responseTag)) return false;
+      // GET/HEAD If-None-Match uses weak entity-tag comparison.
+      const opaque = responseTag.startsWith('W/') ? responseTag.slice(2) : responseTag;
+      return tags.some(tag => tag === '*' ||
+        (tag.startsWith('W/') ? tag.slice(2) : tag) === opaque);
+    }
+
+    const condition = parseCloudflareHttpDateV1(request.headers.get('if-modified-since'));
+    const modified = parseCloudflareHttpDateV1(response.headers.get('last-modified'));
+    return condition !== null && modified !== null && modified <= condition;
+  } catch {
+    return false;
+  }
+}
+
 export function fenceCloudflareStaticPreviewAssetResponseV1(candidate, request) {
   const denied = () => new Response(null, { status: 404, headers: BASE_HEADERS });
   try {
@@ -196,8 +272,7 @@ export function fenceCloudflareStaticPreviewAssetResponseV1(candidate, request) 
       return denied();
     }
     if (candidate.status === 304 &&
-        (!request.headers.has('if-none-match') &&
-         !request.headers.has('if-modified-since'))) {
+        !isCloudflareStaticNotModifiedBoundV1(request, candidate)) {
       return denied();
     }
     const headers = new Headers(candidate.headers);
