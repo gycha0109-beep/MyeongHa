@@ -38,6 +38,12 @@
       "mainMode": "required",
       "workTrackAttribution": "pr-metadata"
     },
+    "cloudflare-preview-remote-smoke.yml": {
+      "responsibility": "cloudflare-preview-remote-http-and-browser-verification",
+      "prMode": "narrow",
+      "mainMode": "none",
+      "workTrackAttribution": "pr-metadata"
+    },
     "db-commerce-entitlement-suite.yml": {
       "responsibility": "commerce-entitlement-verification",
       "prMode": "routed-via-ci",
