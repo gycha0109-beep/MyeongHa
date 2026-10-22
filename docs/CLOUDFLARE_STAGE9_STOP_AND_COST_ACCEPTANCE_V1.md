@@ -73,3 +73,9 @@ scripts/cloudflare-preview-ops-stop-gate.mjs에서 실행되는 읽기 전용 �
 - 기존 Cloudflare CI의 Ops 작업에서만 **동일 고정 버전 Wrangler 4.151.2**로 `wrangler deploy --dry-run --config wrangler.jsonc --outdir <임시경로>`를 호출한다. `--dry-run`을 필수로 고정하므로 **실제 Worker 업로드·라우트 배포·유료 기능 생성·계정 접근은 하지 않는다**. CLI에 제공하는 환경에서도 Cloudflare/API/provider credential을 전달하지 않는다.
 - 생성된 로컬 `.js/.mjs/.cjs/.wasm` 코드 파일만 합산해 **공식 Worker 64MiB 용량 경계**와 비교한다. 코드 파일 수·총 바이트·읽기 전용 SHA-256·local bundling wall time을 CI에 출력하며, 코드/지도 파일 원문은 로그에 출력하지 않고 임시 디렉터리는 삭제한다.
 - 이 수치는 **Wrangler 로컬 코드 번들 근사값**으로 Static Assets 파일 총 용량과 분리된다. 압축 후 실제 업로드 크기·Cloudflare 서버 수락 결과·Free CPU 10ms/메모리/청구 금액을 검증한 것으로 표시하지 않는다. 불확실하거나 dry-run 실패 시 CI 실패로 처리한다. 기존 Vercel Production과 Worker Preview 설정은 수정하지 않는다.
+
+### 2026-10-23 — 전체 정적 배포 자산 트리의 로컬 SHA-256
+
+- 기존 `verifyCloudflareStaticArtifact()`가 **이미 파일 크기·개수·숨김 Secret·맵 파일·심볼릭 링크·API 디렉터리**를 확인하는 동일 정적 파일 순회에서, 25MiB 이내 허용된 실제 배포 파일 전체의 바이트 SHA-256을 스트리밍으로 측정한다.
+- 정렬된 공개 상대 파일 경로 + 정확한 바이트 수 + 파일 SHA-256을 결합하여 하나의 `staticAssetTreeSha256`(64자리)를 기존 CI 출력에 추가한다. 파일별 내용/경로 목록·Secret·JWT·사용자 원본을 로그/Artifact로 내보내지 않는다. 순회 순서가 바뀌어도 동일한 파일 트리는 같은 체크섬을 생성하며, 한 바이트라도 바뀌면 다른 SHA가 된다.
+- **적용 범위 `LOCAL_STATIC_ARTIFACT_ONLY`**: 전체 Static Assets **로컬 빌드 출력**의 무결성 증거이며, 원격 Worker bundle/CDN POP 수신본·이미지 사용자 입력·CPU/실청구/개별 asset의 HTTP 배포까지 증명하지 않는다. 원격 실배포에서 실제 바이트를 읽는 체크섬은 기존 11개 공개 HTML의 `publicHtmlSha256` 별도 증거로 유지한다.

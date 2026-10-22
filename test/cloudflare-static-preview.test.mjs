@@ -21,6 +21,7 @@ import {
 import {
   HTML_ENTRIES,
   verifyCloudflareStaticArtifact,
+  hashCloudflareStaticTreeV1,
 } from '../scripts/verify-cloudflare-static.mjs';
 
 const vercelUrl = new URL('../vercel.json', import.meta.url);
@@ -123,6 +124,20 @@ describe('Cloudflare static-only deployment boundary', () => {
     expect(verified.fileCount).toBe(14);
     expect(verified.totalAssetBytes).toBeGreaterThanOrEqual(verified.largestFileSize);
     expect(verified.totalAssetBytes).toBeGreaterThan(0);
+    expect(verified.staticAssetTreeSha256).toMatch(/^[a-f0-9]{64}$/);
+    expect(verified.checksumScope).toBe('LOCAL_STATIC_ARTIFACT_ONLY');
+    // Identical bytes and paths produce exactly the same tree fingerprint.
+    const again = await verifyCloudflareStaticArtifact({
+      cwd: folder, expectedCommitSha: syntheticCommit,
+    });
+    expect(again.staticAssetTreeSha256).toBe(verified.staticAssetTreeSha256);
+    // A changed public HTML byte changes the whole static asset checksum.
+    await writeFile(join(publicDir, 'hall.html'),
+      '<!doctype html><title>changed public fixture</title>');
+    const changed = await verifyCloudflareStaticArtifact({
+      cwd: folder, expectedCommitSha: syntheticCommit,
+    });
+    expect(changed.staticAssetTreeSha256).not.toBe(verified.staticAssetTreeSha256);
     expect(await readFile(join(publicDir, CLOUDFLARE_PREVIEW_RECEIPT_ASSET_V1), 'utf8'))
       .toBe(renderCloudflarePreviewReceiptV1(syntheticCommit));
     await expect(verifyCloudflareStaticArtifact({
@@ -174,6 +189,22 @@ describe('Cloudflare static-only deployment boundary', () => {
     ));
     expect(error.status).toBe(422);
     expect((await error.json()).error.code).toBe('EXISTING_VALIDATION_ERROR');
+  });
+
+  it('uses stable manifest hashing and rejects traversal or duplicate file metadata', () => {
+    const a = { path:'index.html',bytes:4,sha256:'a'.repeat(64) };
+    const b = { path:'assets/app.js',bytes:5,sha256:'b'.repeat(64) };
+    const before=hashCloudflareStaticTreeV1([a,b]);
+    expect(before).toMatch(/^[a-f0-9]{64}$/);
+    expect(hashCloudflareStaticTreeV1([b,a])).toBe(before);
+    expect(hashCloudflareStaticTreeV1([a,{...b,bytes:6}])).not.toBe(before);
+    expect(hashCloudflareStaticTreeV1([a,{...b,sha256:'c'.repeat(64)}])).not.toBe(before);
+    for (const entries of [
+      [],null,[a,a],[{...a,path:'../secret.env'}],
+      [{...a,path:'/private.js'}],[{...a,path:'a\\private.js'}],
+      [{...a,sha256:'INVALID'}],[{...a,bytes:-1}],
+      [{...a,bytes:Number.MAX_SAFE_INTEGER+1}],
+    ]) expect(() => hashCloudflareStaticTreeV1(entries)).toThrow();
   });
 
   it('rejects forged, truncated or non-hex Cloudflare build receipt commit', () => {
