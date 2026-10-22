@@ -272,18 +272,49 @@ export async function prepareReaderConversationResponseCandidateV1(
       return hold(intent, 'source_mismatch');
     }
     const first = scene.utterance.segments.find(s => s.kind === 'semantic_realization');
-    if (!first || first.sourceUnitRefs.length !== 1 ||
-        first.text.length > 280 || first.text.length === 0) {
+    if (!first || first.sourceUnitRefs.length !== 1) {
       return hold(intent, 'source_closure_required');
     }
-    const source = closeCharacterStandardReaderSourceFocusV1({
-      grounded, rootUnitId: first.sourceUnitRefs[0]!,
-    });
+    let source: ReturnType<typeof closeCharacterStandardReaderSourceFocusV1>;
+    try {
+      source = closeCharacterStandardReaderSourceFocusV1({
+        grounded, rootUnitId: first.sourceUnitRefs[0]!,
+      });
+    } catch {
+      return hold(intent, 'source_closure_required');
+    }
     if (source.mode !== 'closed' || source.protectedOnly ||
         source.requiredAmbiguityRefs.length > 0 ||
-        source.selectedUnitIds.length !== 1 ||
-        source.selectedUnitIds[0] !== first.sourceUnitRefs[0] ||
-        source.requiredDisclosureRefs.length !== 0) {
+        source.selectedUnitIds.length === 0 ||
+        source.selectedUnitIds.length > 3) {
+      return hold(intent, 'source_closure_required');
+    }
+    // An excerpt can only use verbatim already guard-approved segments. A
+    // required Saju companion/disclosure must appear exactly once; otherwise
+    // do not manufacture a short paraphrase or silently drop qualifications.
+    const portions: string[] = [];
+    for (const ref of source.selectedUnitIds) {
+      const segments = scene.utterance.segments.filter(
+        segment => segment.kind === 'semantic_realization' &&
+          segment.sourceUnitRefs.length === 1 && segment.sourceUnitRefs[0] === ref,
+      );
+      if (segments.length !== 1 || !segments[0]?.text.trim()) {
+        return hold(intent, 'source_closure_required');
+      }
+      portions.push(segments[0].text);
+    }
+    for (const ref of source.requiredDisclosureRefs) {
+      const segments = scene.utterance.segments.filter(
+        segment => segment.kind === 'protected_disclosure' &&
+          segment.disclosureRef === ref,
+      );
+      if (segments.length !== 1 || !segments[0]?.text.trim()) {
+        return hold(intent, 'source_closure_required');
+      }
+      portions.push(segments[0].text);
+    }
+    const excerpt = portions.join(' ');
+    if (excerpt.length < 1 || excerpt.length > 280 || CONTROL.test(excerpt)) {
       return hold(intent, 'source_closure_required');
     }
     return Object.freeze({
@@ -293,7 +324,7 @@ export async function prepareReaderConversationResponseCandidateV1(
       officialArtifactResponseHash: scope.officialArtifactResponseHash,
       sourceUnitRefs: Object.freeze([...source.selectedUnitIds]),
       requiredDisclosureRefs: Object.freeze([...source.requiredDisclosureRefs]),
-      excerpt: first.text, isCompleteOfficialReading: false as const,
+      excerpt, isCompleteOfficialReading: false as const,
       addedModelCalls: 0 as const,
       publicDisclosureAuthorized: false as const,
     });
