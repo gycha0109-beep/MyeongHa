@@ -208,8 +208,32 @@ export function allowedCloudflareNaverQueryV1(url, action) {
 
 // DB TLS/RLS owner and OAuth callback registration are separate authorities.
 // Absent or mismatched admission must not read a DB credential or contact a provider.
+export function approvedCloudflareDbHostV1(value) {
+  // A governed Worker TCP destination must be a DNS FQDN, not a literal
+  // private/public IP, localhost alias, synthetic reserved domain or socket.
+  return typeof value === 'string' &&
+    /^(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\\.)+[a-z][a-z0-9-]{1,62}$/.test(value) &&
+    !/\\.(?:localhost|local|internal|invalid|test|example)$/.test(value);
+}
+
+export function approvedCloudflarePostgresTargetV1(config, bindings) {
+  try {
+    const url = new URL(config.databaseUrl);
+    return approvedCloudflareDbHostV1(bindings?.MYEONGHA_CLOUDFLARE_DB_APPROVED_HOST) &&
+      url.hostname === bindings.MYEONGHA_CLOUDFLARE_DB_APPROVED_HOST &&
+      url.port !== '' &&
+      url.port === bindings.MYEONGHA_CLOUDFLARE_DB_APPROVED_PORT;
+  } catch {
+    return false;
+  }
+}
+
 export function approvedCloudflareStage5HandoffV1(bindings, origin, needsOAuth) {
   if (bindings?.MYEONGHA_CLOUDFLARE_DB_TLS_RLS_APPROVAL !== EXACT_DB_TLS_RLS_APPROVAL) return false;
+  if (!approvedCloudflareDbHostV1(bindings?.MYEONGHA_CLOUDFLARE_DB_APPROVED_HOST)) return false;
+  const port = bindings?.MYEONGHA_CLOUDFLARE_DB_APPROVED_PORT;
+  if (typeof port !== 'string' || !/^[1-9][0-9]{0,4}$/.test(port) ||
+      Number(port) > 65535) return false;
   if (needsOAuth &&
       bindings?.MYEONGHA_CLOUDFLARE_OAUTH_CALLBACK_ORIGIN !== origin) return false;
   return true;
@@ -295,6 +319,7 @@ export async function tryHandleCloudflareApprovedAuthV1(request, bindings, route
     // Auth, Supabase, Naver redirect or PostgreSQL runtime acquisition.
     const config = parseProductionUserDataRuntimeConfigV1(bindings);
     parseProductionMemberAuthRateLimitConfigV1(bindings);
+    if (!approvedCloudflarePostgresTargetV1(config, bindings)) return unavailable();
     const tls = buildProductionNodePostgresPoolConfigV1(
       config, CLOUDFLARE_DIRECT_POSTGRES_CANDIDATE_LIMITS_V1,
     );
