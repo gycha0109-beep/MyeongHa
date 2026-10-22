@@ -21,6 +21,7 @@ import {
 import {
   HTML_ENTRIES,
   verifyCloudflareStaticArtifact,
+  isCloudflareApiStaticAliasV1,
 } from '../scripts/verify-cloudflare-static.mjs';
 
 const vercelUrl = new URL('../vercel.json', import.meta.url);
@@ -57,6 +58,54 @@ describe('Cloudflare static-only deployment boundary', () => {
     expect(isCloudflareStaticPreviewApiPath('/api/health')).toBe(true);
     expect(isCloudflareStaticPreviewApiPath('/api')).toBe(true);
     expect(isCloudflareStaticPreviewApiPath('/apixel')).toBe(false);
+  });
+
+  it('rejects root API names after case folding and bounded percent decoding', () => {
+    for (const path of [
+      'api', 'API', 'Api/private.json', '%61pi', '%2561pi',
+      'api%2Fchat', 'api%252Fchat', 'Api%5Cprivate',
+      'api%bad', 'api%25252Fchat', 'api%252525252fchat',
+    ]) expect(isCloudflareApiStaticAliasV1(path), path).toBe(true);
+    for (const path of [
+      'api-metrics.js', 'api.html', 'assets/api/index.js',
+      'assets/API/index.js', 'media/%61pi/report.js',
+    ]) expect(isCloudflareApiStaticAliasV1(path), path).toBe(false);
+  });
+
+  it('denies root API aliases as files AND directories without losing Ops byte totals', async () => {
+    const { folder, publicDir } = await createFixture();
+    const syntheticCommit = 'a'.repeat(40);
+    await writeCloudflareStaticHeaders({ cwd: folder, commitSha: syntheticCommit });
+    const approve = () => verifyCloudflareStaticArtifact({
+      cwd: folder, expectedCommitSha: syntheticCommit,
+    });
+    const baseline = await approve();
+    for (const name of [
+      'api', 'API', '%61pi', '%2561pi',
+      'api%2Fchat', 'api%252Fchat', 'api%bad',
+    ]) {
+      const artifact = join(publicDir, name);
+      await writeFile(artifact, 'PUBLIC');
+      await expect(approve(), 'file ' + name).rejects.toThrow('API alias file');
+      await rm(artifact, { force: true });
+    }
+    for (const name of [
+      'api', 'API', '%61pi', '%2561pi',
+      'api%2Fchat', 'api%252Fchat',
+    ]) {
+      const directory = join(publicDir, name);
+      await mkdir(directory);
+      await expect(approve(), 'directory ' + name).rejects.toThrow('API alias directory');
+      await rm(directory, { recursive: true, force: true });
+    }
+    // A nested directory named api does not occupy the HTTP /api root.
+    const nested = join(publicDir, 'assets', 'api');
+    await mkdir(nested, { recursive: true });
+    await writeFile(join(nested, 'public.js'), 'export default true;');
+    const permitted = await approve();
+    expect(permitted.fileCount).toBe(baseline.fileCount + 1);
+    expect(permitted.totalAssetBytes).toBeGreaterThan(baseline.totalAssetBytes);
+    expect(permitted.largestFileSize).toBeGreaterThan(0);
   });
 
   it('never returns a successful or streaming response for unported APIs', async () => {
