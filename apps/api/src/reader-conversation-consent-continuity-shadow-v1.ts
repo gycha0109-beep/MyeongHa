@@ -156,6 +156,23 @@ export async function prepareReaderConversationConsentContinuityShadowV1(
     return hold('SOURCE_UNAVAILABLE');
   }
 
+  // Captures exact metadata and JSONB contents solely for stale-source
+  // detection; never returns/logs plaintext or a "model-safe" memory.
+  const memoryFingerprint = (row: typeof items[number]): string =>
+    createHash('sha256').update(canonicalJson({
+      memoryItemId: row.memoryItemId,
+      memoryType: row.memoryType,
+      schemaVersion: row.schemaVersion,
+      contentJsonb: row.contentJsonb,
+      createdByCharacterId: row.createdByCharacterId,
+      createdAt: row.createdAt,
+    })).digest('hex');
+  const beforeItems = new Map(items.map(row => [
+    row.memoryItemId, memoryFingerprint(row),
+  ]));
+  const selectedGrants = new Map<string, {
+    grantReason: string; grantedAt: string;
+  }>();
   const selected: ReaderConversationConsentContinuityMemoryRefV1[] = [];
   const seenMemoryIds = new Set<string>();
   const seenGrantIds = new Set<string>();
@@ -183,6 +200,9 @@ export async function prepareReaderConversationConsentContinuityShadowV1(
     }
     seenGrantIds.add(grant.grantId);
     if (selected.length >= 8) continue;
+    selectedGrants.set(memory.memoryItemId, {
+      grantReason: grant.grantReason, grantedAt: grant.grantedAt,
+    });
     selected.push(Object.freeze({
       memoryItemId: memory.memoryItemId, grantId: grant.grantId,
       memoryType: memory.memoryType, schemaVersion: memory.schemaVersion,
@@ -200,6 +220,15 @@ export async function prepareReaderConversationConsentContinuityShadowV1(
       authorityPort: input.threadBindingAuthorityPort,
     });
     if (!sameThread(first, next)) return hold('SOURCE_CHANGED');
+    const latestItems = (await getMemoryItems({
+      resolvedSubjectId: subjectId,
+      authorityPort: input.memoryItemsAuthorityPort,
+    })).memories;
+    if (latestItems.length !== beforeItems.size ||
+        latestItems.some(row =>
+          beforeItems.get(row.memoryItemId) !== memoryFingerprint(row))) {
+      return hold('SOURCE_CHANGED');
+    }
     const recent = (await getCharacterRelationship({
       resolvedSubjectId: subjectId, characterId: readerCharacterId,
       authorityPort: input.relationshipAuthorityPort,
@@ -216,7 +245,11 @@ export async function prepareReaderConversationConsentContinuityShadowV1(
         authorityPort: input.memoryGrantsAuthorityPort,
       })).grants;
       const matching = grants.filter(g => g.characterId === readerCharacterId);
-      if (matching.length !== 1 || matching[0]?.grantId !== ref.grantId) {
+      const prior = selectedGrants.get(ref.memoryItemId);
+      if (matching.length !== 1 || matching[0]?.grantId !== ref.grantId ||
+          !prior ||
+          matching[0].grantReason !== prior.grantReason ||
+          matching[0].grantedAt !== prior.grantedAt) {
         return hold('SOURCE_CHANGED');
       }
     }
