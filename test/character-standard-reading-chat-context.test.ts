@@ -79,7 +79,12 @@ function ports() {
       },
     ]),
   };
-  return { accessAuthorityPort, artifactAuthorityPort };
+  return {
+    accessAuthorityPort, artifactAuthorityPort,
+    currentVerifiedPurchaseAuthorityPort: {
+      assertCurrentVerifiedPurchase: vi.fn(async () => undefined),
+    },
+  };
 }
 
 function authoredCharacter(characterId = 'baekheon'): CharacterContentDefinition {
