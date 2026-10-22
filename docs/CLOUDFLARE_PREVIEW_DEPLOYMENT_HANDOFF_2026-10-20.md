@@ -60,3 +60,11 @@
 4. 새 Worker를 만들거나 `main`에 프리뷰 구현을 병합해 운영 배포하지 않는다.
 
 참고: [Workers Builds](https://developers.cloudflare.com/workers/ci-cd/builds/) · [Previews](https://developers.cloudflare.com/workers/previews/) · [Workers.dev 프리뷰 noindex](https://developers.cloudflare.com/workers/previews/custom-domains/#protect-preview-content).
+
+
+## 2026-10-22 단계 9 — PR별 Cloudflare 원격 Preview 검사 연결
+
+- Cloudflare 계정에서 단일 Worker myeongha 아래 두 **기존 Preview**를 읽기 전용으로 확인. 기존 #2384 프리뷰 URL은 그대로 유지하며, #2420 프리뷰도 feat-ops-cloudflare-authdb-clean-snapshot-20261021-myeongha.gycha0109.workers.dev 형태로 이미 존재함. 새 Worker/Cloudflare 리소스 생성 없음.
+- cloudflare-preview-remote-smoke.yml의 해당 두 PR 브랜치만 원격 HTTP + Chrome 실행 대상으로 설정. 외부 임의 포크/브랜치의 Preview URL을 신뢰하지 않는다. Stage 4는 Chat GET 404, Stage 5/S-CF2는 Protected History/turns/replay GET 503 및 generic chat open 404를 각각 구별한다. 어느 경우도 세연 개인정보/Provider positive 호출은 없음.
+- 원격 검사에 출처 SHA를 나타내는 응답이 없으므로, HTTP/Chrome 성공만으로 **정확한 HEAD SHA가 실제 배포된 증거라고 주장하지 않는다**. 별도 Cloudflare 배포 메타데이터의 commit tag와 CI 검사 SHA가 일치하는지 확인해야 한다. 배포 지연 중 이전 Worker로 검사되면 실배포 수락 HOLD.
+- 운영 workers.dev disabled, preview enabled, Vercel Production 및 DNS, DB/OAuth/AI/Commerce/Secret 변경 없음. 프리뷰 검사는 오직 읽기/합성 음성 HTTP 테스트이며, 실제 운영 E2E가 아니다.

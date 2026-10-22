@@ -9,6 +9,9 @@ import { CLOUDFLARE_DIRECT_API_ROUTES, CLOUDFLARE_REWRITE_ROUTES } from '../work
 
 const URL_FROM_CLOUDFLARE = 'https://feat-ops-cloudflare-static-preview-20261020-myeongha.gycha0109.workers.dev';
 const origin = process.env.MYEONGHA_CLOUDFLARE_PREVIEW_URL || URL_FROM_CLOUDFLARE;
+const contract = process.env.MYEONGHA_CLOUDFLARE_SMOKE_CONTRACT || 'stage4-legacy';
+if (!['stage4-legacy', 'scf2-stage5'].includes(contract)) throw Error('Unrecognized Cloudflare Preview smoke contract.');
+const scf2 = contract === 'scf2-stage5';
 const parsed = new URL(origin);
 if (
   parsed.protocol !== 'https:' ||
@@ -116,8 +119,9 @@ async function main() {
     if (!response) continue;
     if ((await response.text()).trim() !== '') failures.push({path,reason:'deny-body-not-empty'});
   }
-  // Every non-health Vercel endpoint must remain 404 in the Cloudflare
-  // preview, regardless of its internal rewrite marker or synthetic ID.
+  // Every non-health Vercel endpoint remains deny-only. On S-CF2 the
+  // protected Chat routes deliberately return 503, not the legacy 404.
+  // Never read a protected body as a success or confuse this with Reveal.
   for (const route of CLOUDFLARE_DIRECT_API_ROUTES.filter(x=>x.id!=='api.health')) {
     response = await check(route.path,404);
     if (response && (await response.text()).trim() !== '') {
@@ -126,8 +130,16 @@ async function main() {
   }
   for (const route of CLOUDFLARE_REWRITE_ROUTES) {
     const url = route.source.replace(/:([A-Za-z]+)/g,'synthetic-id');
-    response = await check(url,404);
-    if (response && (await response.text()).trim() !== '') {
+    const chatFence = scf2 && route.id.startsWith('rewrite.chat.');
+    response = await check(url,chatFence ? 503 : 404);
+    if (!response) continue;
+    if (chatFence) {
+      const payload = await response.json().catch(()=>null);
+      if (payload?.error?.code !== 'SEYEON_FIRST_REVEAL_AUTHORITY_UNAVAILABLE' ||
+          payload?.ok !== false) {
+        failures.push({path:url,reason:'seyeon-protected-chat-escaped'});
+      }
+    } else if ((await response.text()).trim() !== '') {
       failures.push({path:url,reason:'rewrite-deny-body'});
     }
   }
@@ -150,10 +162,33 @@ async function main() {
       failures.push({path:'/api/chat/:id/turns',reason:'seyeon-hold-contract',actual:json});
     }
   }
-  response = await check('/api/chat/synthetic-thread-id/turns',404);
-  if (response && (await response.text()).trim() !== '') failures.push({path:'/api/chat/:id/turns GET',reason:'unexpected-body'});
+  response = await check('/api/chat/synthetic-thread-id/turns',scf2 ? 503 : 404);
+  if (response) {
+    if (scf2) {
+      const json = await response.json().catch(()=>null);
+      if (json?.error?.code !== 'SEYEON_FIRST_REVEAL_AUTHORITY_UNAVAILABLE' ||
+          json?.ok !== false) failures.push({path:'/api/chat/:id/turns GET',reason:'seyeon-fence-missing'});
+    } else if ((await response.text()).trim() !== '') {
+      failures.push({path:'/api/chat/:id/turns GET',reason:'unexpected-body'});
+    }
+  }
+  if (scf2) {
+    response = await check('/api/chat',404,{method:'POST'});
+    if (response && (await response.text()).trim() !== '') {
+      failures.push({path:'/api/chat POST',reason:'unported-chat-open-exposed'});
+    }
+    response = await check('/api/chat/synthetic-thread-id/turns?replay=1',503,{method:'POST'});
+    if (response && (await response.json().catch(()=>null))?.error?.code !==
+        'SEYEON_FIRST_REVEAL_AUTHORITY_UNAVAILABLE') {
+      failures.push({path:'/api/chat/:id/turns replay',reason:'replay-hold-escaped'});
+    }
+    response = await check('/api/me/saju/calculation',404,{method:'POST'});
+    if (response && (await response.text()).trim() !== '') {
+      failures.push({path:'/api/me/saju/calculation',reason:'calculation-authority-bypass'});
+    }
+  }
   const result = {
-    status:failures.length ? 'FAIL' : 'PASS',origin:parsed.origin,
+    status:failures.length ? 'FAIL' : 'PASS',origin:parsed.origin,contract,
     testedHtml:HTML_ENTRIES.length,requests,liveness:'GET 200; other methods 405',readiness:'404 HOLD',seyeon:'503 HOLD',failures,
   };
   console.log(JSON.stringify(result,null,2));
