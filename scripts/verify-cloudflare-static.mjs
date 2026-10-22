@@ -26,6 +26,36 @@ export const HTML_ENTRIES = Object.freeze([
   'records.html',
 ]);
 
+/**
+ * Static Assets must never carry a file/directory addressable as /api or
+ * /api/* under path case folding, percent decoding or intermediary re-encoding.
+ * Cloudflare's run_worker_first only covers the exact declared API routes;
+ * this is an independent build-time gate, not proof of raw-request routing.
+ * Only the first path segment is authoritative: nested asset directories
+ * named "api" are not served at the site /api root.
+ */
+export function isCloudflareApiStaticAliasV1(relativeArtifactPath) {
+  if (typeof relativeArtifactPath !== 'string' || relativeArtifactPath.length === 0) {
+    return true;
+  }
+  let candidate = relativeArtifactPath.replaceAll('\\', '/');
+  for (let depth = 0; depth < 8; depth += 1) {
+    if (/^\\/*api(?:$|\\/)/iu.test(candidate)) return true;
+    if (!candidate.includes('%')) return false;
+    let decoded;
+    try {
+      decoded = decodeURIComponent(candidate);
+    } catch {
+      // An ambiguous escape at the API root must never become a static asset.
+      return /^\\/*api/iu.test(candidate);
+    }
+    if (decoded === candidate) return false;
+    candidate = decoded.replaceAll('\\', '/');
+  }
+  // No static artifact gets an unbounded decode chain into the API namespace.
+  return candidate.includes('%') || /^\\/*api(?:$|\\/)/iu.test(candidate);
+}
+
 export async function verifyCloudflareStaticArtifact(options = {}) {
   const cwd = options.cwd ?? process.cwd();
   const outputRoot = resolve(
@@ -85,6 +115,9 @@ export async function verifyCloudflareStaticArtifact(options = {}) {
     const children = await readdir(directory, { withFileTypes: true });
     for (const entry of children) {
       const filename = join(directory, entry.name);
+      if (isCloudflareApiStaticAliasV1(relative(outputRoot, filename))) {
+        throw new Error('API namespace must not be packaged as Static Assets: ' + filename);
+      }
       if (entry.isSymbolicLink()) {
         throw new Error('Symlink must not be deployed: ' + filename);
       }
