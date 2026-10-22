@@ -57,6 +57,51 @@ export function admitTerraGlmQualityTrioOneShotV1(env=process.env,exec=execFileS
   get('repos/'+REPO+'/actions/runs/39560101607'));
 }
 
+
+const RETRY_WORKFLOW='seyeon-terra-glm-quality-trio-retry-v1.yml';
+const FAILED_FIRST_TRIO_RUN=39705998598;
+const FAILED_FIRST_TRIO_SHA='0a85ca73516f653f1d0dcb8afcb654f4a63ac771';
+const ALLOWED_TRIO_OPENAI_STAGES=new Set([
+ 'unified_preflight_shadow','turn_interpret_render_shadow','semantic_review',
+]);
+
+export function requireSeyeonTrioOpenAiStageV1(schemaName,expectedStage){
+ if(!ALLOWED_TRIO_OPENAI_STAGES.has(expectedStage)||
+    schemaName!==`myeongha_${expectedStage}_v2`)
+  throw Error('LUNA_TERRA_STAGE_OR_MODEL_HOLD');
+ return expectedStage;
+}
+
+export function assertTerraGlmQualityTrioRetryOneShotV1(
+ env,history,failedFirstRun,terraPr,terraRun,glmPr,glmRun
+){
+ if(env?.GITHUB_WORKFLOW_REF!==`${REPO}/.github/workflows/${RETRY_WORKFLOW}@refs/heads/main`||
+    failedFirstRun?.id!==FAILED_FIRST_TRIO_RUN||
+    failedFirstRun?.head_sha!==FAILED_FIRST_TRIO_SHA||
+    failedFirstRun?.event!=='push'||
+    failedFirstRun?.run_attempt!==1||
+    failedFirstRun?.status!=='completed'||
+    failedFirstRun?.conclusion!=='failure')
+  throw Error('TERRA_GLM_QUALITY_TRIO_RETRY_ADMISSION_HOLD');
+ return assertTerraGlmQualityTrioOneShotV1(
+  env,history,terraPr,terraRun,glmPr,glmRun
+ );
+}
+
+export function admitTerraGlmQualityTrioRetryOneShotV1(env=process.env,exec=execFileSync){
+ if(!env.GH_TOKEN)throw Error('TERRA_GLM_QUALITY_TRIO_GH_TOKEN_HOLD');
+ const get=p=>JSON.parse(exec('gh',['api',p],{
+  env,encoding:'utf8',timeout:15000,maxBuffer:2000000,
+ }));
+ return assertTerraGlmQualityTrioRetryOneShotV1(env,
+  get('repos/'+REPO+'/actions/workflows/'+RETRY_WORKFLOW+'/runs?event=push&per_page=100'),
+  get('repos/'+REPO+'/actions/runs/'+FAILED_FIRST_TRIO_RUN),
+  get('repos/'+REPO+'/pulls/2355'),
+  get('repos/'+REPO+'/actions/runs/39352712484'),
+  get('repos/'+REPO+'/pulls/2418'),
+  get('repos/'+REPO+'/actions/runs/39560101607'));
+}
+
 // This accepts only final guarded PUBLIC synthetic utterances for the fixed N06/N10/N21 trio. Not a general
 // user-message or character-content release primitive.
 export function requirePublicSyntheticQualityUtteranceV1(envelope){
