@@ -73,7 +73,7 @@ apply_pg17_migrations_through_seyeon_production_frontier() {
           }
           continue
           ;;
-        20261021180000_seyeon_positive_pre_model_source_pin_v1.sql|20261021181000_seyeon_positive_same_transaction_commit_v1.sql|20261021182000_seyeon_private_conversation_recall_proposal_accept_v1.sql)
+        20261021180000_seyeon_positive_pre_model_source_pin_v1.sql|20261021181000_seyeon_positive_same_transaction_commit_v1.sql|20261021182000_seyeon_private_conversation_recall_proposal_accept_v1.sql|20261021183000_seyeon_positive_first_memory_locked_reveal_v1.sql)
           # Post-frontier G1/G2 migrations MUST NOT be executed when
           # reconstructing the historical 1510 catalog or DR boundary.
           # Recognize only the exact reviewed Git blobs; all changed or
@@ -86,6 +86,8 @@ apply_pg17_migrations_through_seyeon_production_frontier() {
               reviewed_positive_sha1='b6fe5892157f6edceaa610ddfa5cf0d06816fa93' ;;
             20261021182000_seyeon_private_conversation_recall_proposal_accept_v1.sql)
               reviewed_positive_sha1='2c0a52b61daf27723da3012df0cf58313b4d652d' ;;
+            20261021183000_seyeon_positive_first_memory_locked_reveal_v1.sql)
+              reviewed_positive_sha1='0660026151378ceeaf195b78b1ca8f568ec5e8aa' ;;
           esac
           if command -v git >/dev/null 2>&1; then
             positive_sha1="$(git hash-object "$migration")"
