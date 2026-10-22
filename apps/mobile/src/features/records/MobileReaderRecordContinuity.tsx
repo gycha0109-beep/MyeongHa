@@ -76,6 +76,8 @@ function ReaderStatusAction({
       setResult(state);
       if (state.kind === 'held') {
         setMessage('유료 Reader 연결은 준비 중입니다. 공식 사주 기록 열람과는 별개입니다.');
+      } else if (state.kind === 'auth_required') {
+        setMessage('Reader 이용권을 확인하려면 회원 로그인이 필요합니다.');
       } else if (state.kind === 'not_confirmed') {
         setMessage('현재 이용권을 확인할 수 없습니다. 이전 대리자 기록은 현재 구매권이 아닙니다.');
       } else if (state.kind === 'not_available') {
