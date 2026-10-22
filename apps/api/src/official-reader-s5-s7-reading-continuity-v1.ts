@@ -1,6 +1,10 @@
 import type { PreparedOfficialReadingReaderAdmissionV1 } from
   './official-reading-reader-admission-v1.js';
-import type { OfficialReadingRecordV1 } from './official-reading-record-read.js';
+import {
+  getOfficialReadingRecord,
+  type OfficialReadingRecordReadAuthorityPortV1,
+  type OfficialReadingRecordV1,
+} from './official-reading-record-read.js';
 import { hashSajuHeldSourceProofRequestV1 } from './saju-held-source-proof-verifier-v1.js';
 
 /**
@@ -166,6 +170,10 @@ export function inspectOfficialReaderS5S7ContinuityV1(input: Readonly<{
       || s6Read.officialReadingId !== scope.readingId
       || s6Read.readerCharacterId !== scope.readerCharacterId
       || dateMillis(s5Commit.committedAt) === null
+      || (dateMillis(s5Commit.committedAt) ?? 0)
+        < (dateMillis(scope.effectiveAt) ?? Number.POSITIVE_INFINITY)
+      || (dateMillis(s5Commit.committedAt) ?? 0)
+        < (dateMillis(source.completedAt) ?? Number.POSITIVE_INFINITY)
       || s5Commit.committedAt !== s6Read.committedAt) return BLOCKED;
 
     const prepared = s6Read.delivery;
@@ -192,6 +200,44 @@ export function inspectOfficialReaderS5S7ContinuityV1(input: Readonly<{
       return BLOCKED;
     }
     return decision('S7_CLIENT_ACKNOWLEDGED_NOT_HUMAN_READ');
+  } catch {
+    return BLOCKED;
+  }
+}
+
+
+/**
+ * Re-read Records via its EXISTING subject-scoped DB authority port for the
+ * exact Reader-admitted Official Reading before examining S5/S7 metadata.
+ * Caller must independently ensure current S6 Grant/Privacy Lease; this check
+ * never revalidates or resurrects a purchase, refund, key or ACK token.
+ */
+export async function inspectOfficialReaderS5S7WithCurrentRecordsV1(input: Readonly<{
+  readerAdmission: PreparedOfficialReadingReaderAdmissionV1;
+  recordAuthorityPort: OfficialReadingRecordReadAuthorityPortV1;
+  s5Commit: S5CommittedReferenceV1;
+  s6Read: S6PrivateReadReferenceV1;
+  s7Acknowledged?: S7AcknowledgedReferenceV1;
+}>): Promise<OfficialReaderS5S7ContinuityResultV1> {
+  try {
+    const { scope, source } = input.readerAdmission;
+    if (!scope || !source || !scope.subjectId
+      || scope.subjectId !== source.subjectId
+      || scope.readingId !== source.readingId) return BLOCKED;
+    const record = await getOfficialReadingRecord({
+      resolvedSubjectId: scope.subjectId,
+      readingId: scope.readingId,
+      authorityPort: input.recordAuthorityPort,
+    });
+    return inspectOfficialReaderS5S7ContinuityV1({
+      readerAdmission: input.readerAdmission,
+      record,
+      s5Commit: input.s5Commit,
+      s6Read: input.s6Read,
+      ...(input.s7Acknowledged === undefined
+        ? {}
+        : { s7Acknowledged: input.s7Acknowledged }),
+    });
   } catch {
     return BLOCKED;
   }
