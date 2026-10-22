@@ -40,20 +40,20 @@ export function isCloudflareApiStaticAliasV1(relativeArtifactPath) {
   }
   let candidate = relativeArtifactPath.replaceAll('\\', '/');
   for (let depth = 0; depth < 8; depth += 1) {
-    if (/^\\/*api(?:$|\\/)/iu.test(candidate)) return true;
+    if (/^api(?:$|\/)/iu.test(candidate.replace(/^\/+/u, ''))) return true;
     if (!candidate.includes('%')) return false;
     let decoded;
     try {
       decoded = decodeURIComponent(candidate);
     } catch {
       // An ambiguous escape at the API root must never become a static asset.
-      return /^\\/*api/iu.test(candidate);
+      return /^api/iu.test(candidate.replace(/^\/+/u, ''));
     }
     if (decoded === candidate) return false;
     candidate = decoded.replaceAll('\\', '/');
   }
   // No static artifact gets an unbounded decode chain into the API namespace.
-  return candidate.includes('%') || /^\\/*api(?:$|\\/)/iu.test(candidate);
+  return candidate.includes('%') || /^api(?:$|\/)/iu.test(candidate.replace(/^\/+/u, ''));
 }
 
 export async function verifyCloudflareStaticArtifact(options = {}) {
