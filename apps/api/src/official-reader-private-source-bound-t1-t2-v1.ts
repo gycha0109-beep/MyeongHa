@@ -6,6 +6,10 @@ import {
   prepareOfficialReaderS3BoundPreviewSourceV1,
 } from './official-reader-private-s3-source-binding-v1.js';
 import {
+  createOfficialReaderPrivateCurrentPurchaseAuthorityPortV1,
+  type OfficialReaderPrivateCurrentPurchaseAuthorityPortV1,
+} from './official-reader-private-exact-verified-purchase-guard-v1.js';
+import {
   assertOfficialReaderPrivateCurrentVerifiedPurchaseV1,
 } from './official-reader-private-exact-verified-purchase-guard-v1.js';
 import type {
@@ -58,6 +62,7 @@ export interface OfficialReaderSourceBoundT1T2InputV1 {
   readonly prepareAdmission: (
     scope: PostgresSubjectExecutionScopeV1,
     effectiveAt: string,
+    currentVerifiedPurchaseAuthorityPort: OfficialReaderPrivateCurrentPurchaseAuthorityPortV1,
   ) => Promise<PreparedOfficialReadingReaderAdmissionV1>;
 
   /**
@@ -109,7 +114,10 @@ export async function runOfficialReaderPrivateSourceBoundT1T2V1(
       verifiedEvidence: input.verifiedEvidence,
       execute: async (scope) => {
         const effectiveAt = await clock(scope);
-        const admission = await input.prepareAdmission(scope, effectiveAt);
+        const admission = await input.prepareAdmission(
+          scope,effectiveAt,
+          createOfficialReaderPrivateCurrentPurchaseAuthorityPortV1(scope),
+        );
         if (admission.scope.subjectId !== scope.resolvedSubject.subjectId
             || admission.scope.effectiveAt !== effectiveAt) return unavailable();
         // A2's active Grant is insufficient: a verified provider refund
@@ -156,8 +164,8 @@ export async function runOfficialReaderPrivateSourceBoundT1T2V1(
       verifiedEvidence: input.verifiedEvidence,
       staged,
       key: input.key,
-      prepareFreshAdmission: async (scope, effectiveAt) =>
-        input.prepareAdmission(scope, effectiveAt),
+      prepareFreshAdmission: async (scope, effectiveAt, purchaseAuthorityPort) =>
+        input.prepareAdmission(scope,effectiveAt,purchaseAuthorityPort),
     });
   } catch {
     return unavailable();
