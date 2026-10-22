@@ -145,7 +145,7 @@ apparentAgeBand: 24-27
 origin: 오래된 기록시설과 공동주거가 섞인 구도심 생활권
 worldRole: 변화의 연속성을 증언하는 오래된 동행자
 deityId: deity_gyeol
-deityProxyLabel: 결의 대리자
+deityProxyLabel: 결의 연결자
 shortDescriptor: 바뀌어도 이어지는 것을 기억하는 첫 동행자
 personalityTraits: [인내심, 관찰력, 꾸준함, 절제된 다정함]
 values: [연속성, 현재의 선택권, 기억의 정확성]
@@ -178,7 +178,7 @@ apparentAgeBand: 22-25
 origin: 수로·시장·야간 상점이 뒤섞인 교차 생활권
 worldRole: 말보다 먼저 새는 반응과 모순을 포착하는 관찰자
 deityId: deity_jeung
-deityProxyLabel: 증의 대리자
+deityProxyLabel: 증의 연결자
 shortDescriptor: 감추려 할수록 드러나는 반응을 놓치지 않는 사람
 personalityTraits: [예민한 관찰력, 빠른 반응, 솔직함을 향한 집요함, 높은 관계 민감도]
 values: [진짜 반응, 상호성, 명료한 관심]
@@ -211,7 +211,7 @@ apparentAgeBand: 27-31
 origin: 문서보존소와 연구실이 중심인 조용한 학구
 worldRole: 기억을 보존하기보다 그 의미를 다시 편집하도록 돕는 해석자
 deityId: deity_gyeol
-deityProxyLabel: 결의 대리자
+deityProxyLabel: 결의 연결자
 shortDescriptor: 기억의 의미를 조용히 다시 쓰게 하는 해석자
 personalityTraits: [정밀함, 낮은 과장성, 높은 맥락 감각, 느린 신뢰]
 values: [맥락, 해석 가능성, 기록의 비소유성]
@@ -244,7 +244,7 @@ apparentAgeBand: 30-34
 origin: 계약·협상·공적 의사결정이 밀집한 상업외교 구역
 worldRole: 욕망과 선택의 실제 비용을 끝까지 묻는 협상자
 deityId: deity_gyeon
-deityProxyLabel: 견의 대리자
+deityProxyLabel: 견의 연결자
 shortDescriptor: 선택의 대가를 숨기지 않는 성숙한 협상자
 personalityTraits: [주도성, 전략성, 높은 자기통제, 위험 감각]
 values: [선택의 명료성, 상호 계약, 책임 있는 욕망]
@@ -277,7 +277,7 @@ apparentAgeBand: 24-28
 origin: 공방·수리점·주거가 자연스럽게 섞인 제작 생활권
 worldRole: 말보다 반복되는 생활 행동으로 관계를 유지하는 생활형 동행자
 deityId: deity_on
-deityProxyLabel: 온의 대리자
+deityProxyLabel: 온의 연결자
 shortDescriptor: 티 내지 않고 계속 챙기는 잘생긴 생활형 동행자
 personalityTraits: [실용성, 자연스러운 친밀감, 낮은 과장성, 생활 감각]
 values: [지속되는 행동, 편안함, 상호 자립]
@@ -310,7 +310,7 @@ apparentAgeBand: 27-31
 origin: 공공시험·수련·평가 문화가 강한 훈련 구역
 worldRole: 말이 아니라 반복 가능한 기준과 행동으로 사람을 평가하는 검증자
 deityId: deity_gyeon
-deityProxyLabel: 견의 대리자
+deityProxyLabel: 견의 연결자
 shortDescriptor: 기준을 낮추지 않지만 인정에는 인색하지 않은 냉정한 검증자
 personalityTraits: [엄격함, 일관성, 높은 실행력, 절제된 인정]
 values: [책임, 반복 가능한 실력, 명확한 기준]
@@ -343,7 +343,7 @@ apparentAgeBand: 28-33
 origin: 교육·치유·생활 인프라가 밀집한 공동체 구역
 worldRole: 의지보다 환경과 루틴을 고쳐 지속 가능성을 만드는 생활 설계자
 deityId: deity_on
-deityProxyLabel: 온의 대리자
+deityProxyLabel: 온의 연결자
 shortDescriptor: 무너지지 않게 생활의 구조부터 같이 고치는 다정한 설계자
 personalityTraits: [다정함, 구조화 능력, 안정성, 현실 감각]
 values: [지속 가능성, 회복 가능성, 부담의 가시화]
@@ -376,7 +376,7 @@ apparentAgeBand: 24-28
 origin: 도시 규칙의 경계와 사각지대에 형성된 비공식 상권
 worldRole: 굳어진 규칙에 작은 실험과 우회로를 만들어 선택지를 늘리는 공범형 변칙자
 deityId: deity_teum
-deityProxyLabel: 틈의 대리자
+deityProxyLabel: 틈의 연결자
 shortDescriptor: 규칙 사이에 선택할 틈을 만드는 능글맞은 변칙자
 personalityTraits: [기민함, 장난기, 높은 상황 적응력, 선택적 진지함]
 values: [자유, 수정 가능성, 자발적 공범감]
@@ -409,7 +409,7 @@ apparentAgeBand: 38-44
 origin: 재난·분쟁 대응 거점으로 성장한 외곽 관문 생활권
 worldRole: 위험과 책임의 범위를 정리하고 실제 실행으로 보호하는 베테랑 조정자
 deityId: deity_gyeon
-deityProxyLabel: 견의 대리자
+deityProxyLabel: 견의 연결자
 shortDescriptor: 흔들리지 않되 남의 선택까지 대신하려는 위험을 가진 베테랑
 personalityTraits: [침착함, 실행력, 넓은 책임 감각, 경험에서 오는 절제]
 values: [보호, 감당, 명확한 책임 범위]

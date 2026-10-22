@@ -122,7 +122,7 @@ export function MemoryCard({ item }: { item: MemoryItemV1 }) {
       <Text style={styles.cardTitle}>{item.memoryType}</Text>
       <MobileUiText style={styles.cardBody}>저장된 기억</MobileUiText>
       <Text style={styles.caption}>
-        기록 형식 {item.schemaVersion}{item.createdByCharacterId === null ? '' : ' · 대리자 기록'}
+        기록 형식 {item.schemaVersion}{item.createdByCharacterId === null ? '' : ' · 연결자 기록'}
       </Text>
     </View>
   );

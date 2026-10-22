@@ -37,7 +37,7 @@ export function MobileReaderPicker({ selected, onChange, vertical }: MobileReade
             source={selectedPortrait}
             style={styles.selectedPortrait}
             resizeMode="cover"
-            accessibilityLabel={`${reader.name} 대리자 초상화`}
+            accessibilityLabel={`${reader.name} 연결자 초상화`}
           />
         ) : null}
         <View style={styles.headingCopy}>
@@ -77,7 +77,7 @@ export function MobileReaderPicker({ selected, onChange, vertical }: MobileReade
             >
               {portrait !== null ? (
                 <Image source={portrait} style={styles.optionPortrait} resizeMode="cover"
-                  accessibilityLabel={`${option.name} 대리자 초상화`} />
+                  accessibilityLabel={`${option.name} 연결자 초상화`} />
               ) : null}
               <Text style={[styles.optionName, effectiveSelected === option.key && styles.selectedText]}>
                 {option.name}

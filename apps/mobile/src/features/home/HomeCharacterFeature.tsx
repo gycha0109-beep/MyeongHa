@@ -32,7 +32,7 @@ export function HomeCharacterFeature() {
         <View style={styles.heroContent}>
           <MobileUiText style={styles.heroEyebrow}>MEET SEYEON · 세연</MobileUiText>
           <MobileUiText style={styles.heroTitle}>오늘은 어떤 이야기를 나눠볼까요?</MobileUiText>
-          <MobileUiText style={styles.heroDescription}>여섯 대리자의 이야기를 만나보세요.</MobileUiText>
+          <MobileUiText style={styles.heroDescription}>여섯 연결자의 이야기를 만나보세요.</MobileUiText>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={t('캐릭터 선택 화면으로 이동')}

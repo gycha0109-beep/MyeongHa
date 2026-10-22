@@ -34,35 +34,35 @@ const people = Object.freeze([
   {
     key: 'rahyeon',
     name: '라현',
-    title: '대리자',
+    title: '연결자',
     line: '말해봐요. 어디서부터 시작할지는 당신이 정해요.',
     tags: ['성숙한', '긴장감', '주도적인'],
   },
   {
     key: 'mira',
     name: '미라',
-    title: '대리자',
+    title: '연결자',
     line: '편하게 말해요. 듣고 있을게요.',
     tags: ['무심다정', '친구 같은', '담백한'],
   },
   {
     key: 'taegyeom',
     name: '태겸',
-    title: '대리자',
+    title: '연결자',
     line: '핵심부터 말해보죠. 무엇이 가장 걸립니까?',
     tags: ['차가운', '까다로운', '핵심부터'],
   },
   {
     key: 'yunho',
     name: '윤호',
-    title: '대리자',
+    title: '연결자',
     line: '천천히 말씀하셔도 됩니다. 어떤 이야기부터 시작할까요?',
     tags: ['따뜻한', '안정적인', '지적인'],
   },
   {
     key: 'doyun',
     name: '도윤',
-    title: '대리자',
+    title: '연결자',
     line: '자, 무슨 얘기부터 해볼까요? 편하게 말해요.',
     tags: ['자유로운', '능청스러운', '가벼운'],
   },
@@ -177,7 +177,7 @@ function createPersonCard(person, { pending = false } = {}) {
 
   const line = document.createElement('p');
   line.className = 'chat-person-line';
-  line.textContent = pending ? '이 대리자는 현재 등록을 준비 중입니다.' : person.line;
+  line.textContent = pending ? '이 연결자는 현재 등록을 준비 중입니다.' : person.line;
 
   const tags = document.createElement('div');
   tags.className = 'chat-person-tags';

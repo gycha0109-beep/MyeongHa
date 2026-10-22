@@ -83,13 +83,13 @@ Conceptual UI:
 
 [공식 보고서 보기]
 
-이 사주를 본 대리자
+이 사주를 본 연결자
 세연 ✓
 백헌 ✓
 여울 +
 ```
 
-Per Reader, Records may expose “해석 다시 보기 / 대화하기”. A Reader without access may expose an “이 대리자에게도 들어보기” CTA only after an authorized Offer exists.
+Per Reader, Records may expose “해석 다시 보기 / 대화하기”. A Reader without access may expose an “이 연결자에게도 들어보기” CTA only after an authorized Offer exists.
 
 ## 6. Official Reading vs Reader Interpretation
 

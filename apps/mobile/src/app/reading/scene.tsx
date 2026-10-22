@@ -133,7 +133,7 @@ export default function SajuReaderSceneScreen() {
           <View style={styles.sceneWash}>
             <Animated.Image
               source={SEYEON_ART}
-              accessibilityLabel={t('세연 대리자')}
+              accessibilityLabel={t('세연 연결자')}
               resizeMode="cover"
               style={[styles.portrait, { opacity: frameProgress, transform: [{ translateY: portraitTranslate }] }]}
             />

@@ -14,7 +14,7 @@ describe('MyeongHa React landing', () => {
     expect(html).toContain('id="landing-react-root"');
     expect(html).toContain('src="/src/landing/main.tsx"');
     expect(page).toContain('태어난 순간부터');
-    expect(page).toContain('대리자와 함께 읽습니다.');
+    expect(page).toContain('연결자와 함께 읽습니다.');
     expect(page).toContain('href="hall.html?mode=guest"');
     expect(page).toContain('href="birth.html?from=landing"');
     expect(page.match(/className="landing-experience-card"/gu)).toHaveLength(4);
