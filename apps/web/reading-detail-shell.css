@@ -122,3 +122,17 @@
     font-size: 13px;
   }
 }
+
+/* Reader/Official Reading source text remains untranslated when UI locale changes. */
+.reading-source-language-notice:not([hidden]) {
+  display: block;
+  margin: 8px auto 16px;
+  padding: 10px 14px;
+  max-width: 920px;
+  border: 1px solid rgba(126, 108, 78, .26);
+  border-radius: 8px;
+  color: inherit;
+  background: rgba(137, 109, 68, .07);
+  font-size: .85rem;
+  line-height: 1.6;
+}
