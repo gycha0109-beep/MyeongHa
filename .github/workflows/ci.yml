@@ -144,6 +144,9 @@ jobs:
       - name: Check isolated Cloudflare Auth DB workerd compatibility (no credentials)
         if: needs.scope.outputs.web == 'true'
         run: npm run verify:cloudflare:auth-db:local
+      - name: Guard Cloudflare Stage 5 secret-free binding inventory (no deploy)
+        if: needs.scope.outputs.web == 'true'
+        run: npm run verify:cloudflare:auth-binding-inventory
       - name: Verify Cloudflare DB request-scope and subject transaction cleanup (synthetic)
         if: needs.scope.outputs.web == 'true'
         run: npm run test:cloudflare:scope
