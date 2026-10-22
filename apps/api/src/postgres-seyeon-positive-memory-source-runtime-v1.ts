@@ -3,6 +3,8 @@
 // active zero-only Chat runtime; no positive Provider/HTTP capability is given.
 import type {PostgresTransactionQueryV1} from './postgres-subject-execution.js';
 import type {SeyeonProductionChatCommitReceiptV1} from './seyeon-production-chat-execution-v1.js';
+import {canonicalJson} from '../../../packages/domain/src/index.js';
+import {validateSeyeonPostTurnAnalysisSnapshotV1} from './seyeon-post-turn-analysis-worker-v1.js';
 
 export const SEYEON_POSITIVE_G1_SOURCE_PIN_SQL_V1 =
   'public.cmd_mark_seyeon_positive_context_ready_pinned_v1' as const;
@@ -130,6 +132,23 @@ select public.cmd_mark_seyeon_positive_context_ready_pinned_v1(
         ||typeof input.postTurnSnapshot!=='object'
         ||Array.isArray(input.postTurnSnapshot)) {
         throw Error('Se-yeon positive G2 requires exact validated source');
+      }
+      // Positive G2 may only commit the actual official post-turn snapshot
+      // for this server turn and assistant. A checksum-shaped string or
+      // self-rehashed ad hoc object is not a validated worker projection.
+      // Deny before entering the DB owner commit transaction.
+      let verifiedSnapshot: ReturnType<typeof validateSeyeonPostTurnAnalysisSnapshotV1>;
+      try {
+        verifiedSnapshot=validateSeyeonPostTurnAnalysisSnapshotV1(
+          input.postTurnSnapshot,input.postTurnSnapshotHash,
+        );
+      } catch {
+        throw Error('Se-yeon positive G2 Post-turn Snapshot unverified');
+      }
+      if(verifiedSnapshot.turnId!==input.turnId
+        ||verifiedSnapshot.assistantMessageId!==input.assistantMessageId
+        ||canonicalJson(verifiedSnapshot)!==canonicalJson(input.postTurnSnapshot)){
+        throw Error('Se-yeon positive G2 Post-turn Snapshot identity mismatched');
       }
       const result=await client.query<Record<string,unknown>>(`
 select turn_id::text as "turnId",
