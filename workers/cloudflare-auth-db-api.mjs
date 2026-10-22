@@ -3,7 +3,7 @@
 // Never proxy to Vercel or promote Seyeon, Commerce, or records.
 // Watchtower-Track: ops
 import { createProductionMemberAuthHttpRuntimeV1 } from '../apps/api/src/production-member-auth-http-runtime.ts';
-import { parseProductionUserDataRuntimeConfigV1 } from '../apps/api/src/production-user-data-runtime-config.ts';
+import { MYEONGHA_PRODUCTION_SUPABASE_ORIGIN, parseProductionUserDataRuntimeConfigV1 } from '../apps/api/src/production-user-data-runtime-config.ts';
 import { parseProductionMemberAuthRateLimitConfigV1 } from '../apps/api/src/production-member-auth-rate-limit-config.ts';
 import { handleSupabaseAuthRequestV1 } from '../apps/api/src/supabase-auth-http.ts';
 import { createProductionGuestBootstrapHttpRuntimeV1 } from '../apps/api/src/production-guest-bootstrap-http-runtime.ts';
@@ -46,6 +46,54 @@ function unavailable() {
   }, { status: 503, headers: CLOUDFLARE_APPROVED_RESPONSE_HEADERS_V1 });
 }
 
+/**
+ * Stage 5 Auth/OAuth egress is closed even if a trusted handler regresses:
+ * no HTML/streaming payloads, accidental open redirects, CORS or caching.
+ * Only the original Naver authorization and Supabase callback redirects are
+ * allowed; host matching is exact and comes from governed source constants.
+ */
+export function fenceCloudflareApprovedAuthResponseV1(candidate, route) {
+  if (!(candidate instanceof Response)) return unavailable();
+
+  const location = candidate.headers.get('location');
+  const isRedirect = candidate.status >= 300 && candidate.status < 400;
+  if (isRedirect || location !== null) {
+    if (candidate.status !== 302 || location === null ||
+        candidate.headers.has('set-cookie')) return unavailable();
+    let destination;
+    try { destination = new URL(location); } catch { return unavailable(); }
+    if (destination.username !== '' || destination.password !== '' ||
+        destination.protocol !== 'https:' || destination.hash !== '') return unavailable();
+    const authorize = route?.id === 'rewrite.naver.authorize' &&
+      destination.origin === 'https://nid.naver.com' &&
+      destination.pathname === '/oauth2.0/authorize';
+    const callback = route?.id === 'rewrite.naver.callback' &&
+      destination.origin === MYEONGHA_PRODUCTION_SUPABASE_ORIGIN &&
+      destination.pathname === '/auth/v1/callback';
+    if (!authorize && !callback) return unavailable();
+    if (candidate.body !== null) return unavailable();
+  } else if (candidate.body !== null) {
+    const contentType = candidate.headers.get('content-type')?.split(';')[0]?.trim().toLowerCase() ?? '';
+    // Permit JSON and structured +json only; block HTML, plain text and SSE.
+    const jsonMedia = contentType === 'application/json' ||
+      (contentType.startsWith('application/') && contentType.endsWith('+json'));
+    if (!jsonMedia) return unavailable();
+  }
+
+  const headers = new Headers(candidate.headers);
+  for (const key of [...headers.keys()]) {
+    if (key.toLowerCase().startsWith('access-control-')) headers.delete(key);
+  }
+  for (const [key, value] of Object.entries(CLOUDFLARE_APPROVED_RESPONSE_HEADERS_V1)) {
+    headers.set(key, value);
+  }
+  return new Response(candidate.body, {
+    status: candidate.status,
+    statusText: candidate.statusText,
+    headers,
+  });
+}
+
 function methodNotAllowed() {
   return new Response(null, { status: 405, headers: { ...CLOUDFLARE_APPROVED_RESPONSE_HEADERS_V1, Allow: 'POST' } });
 }
@@ -59,6 +107,11 @@ export function approvedCloudflareSameOriginPostV1(request, origin) {
   if (requestOrigin !== null && requestOrigin !== origin) return false;
   const fetchSite = request.headers.get('sec-fetch-site');
   if (fetchSite !== null && fetchSite !== 'same-origin' && fetchSite !== 'none') return false;
+  // Unsafe requests carrying host-only browser cookies must present a real
+  // same-origin signal; an absent Origin plus absent Fetch Metadata is not
+  // enough to authorize a cookie-authenticated mutation.
+  if (request.headers.has('cookie') &&
+      requestOrigin !== origin && fetchSite !== 'same-origin') return false;
   if (request.headers.get('x-myeongha-auth-transport') === 'web-cookie-v1') {
     // Cookies are host-only and SameSite Strict; require same-origin browser
     // provenance, not an arbitrary header on a cross-site form.
@@ -219,9 +272,7 @@ export async function tryHandleCloudflareApprovedAuthV1(request, bindings, route
     return unavailable();
   }
 
-  // No CORS, redirects or access-control overrides. Preserve Set-Cookie,
-  // status and body while requiring all HTTPS preview security headers.
-  const headers = new Headers(result.headers);
-  for (const [key, value] of Object.entries(CLOUDFLARE_APPROVED_RESPONSE_HEADERS_V1)) headers.set(key, value);
-  return new Response(result.body, { status: result.status, statusText: result.statusText, headers });
+  // Final boundary applies to all approved Auth, Guest, Naver and profile
+  // responses. Never forward an unexpected HTML 500, stream or redirect.
+  return fenceCloudflareApprovedAuthResponseV1(result, route);
 }

@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import worker from '../workers/cloudflare-static-preview.mjs';
+import {
+  approvedCloudflareSameOriginPostV1,
+  fenceCloudflareApprovedAuthResponseV1,
+} from '../workers/cloudflare-auth-db-api.mjs';
 
 // These tests never connect to a database, Supabase or a real Auth origin.
 // Positive paths are only activated on a separately approved exact host.
@@ -91,5 +95,87 @@ describe('Cloudflare Auth/DB admission is fail-closed until explicit host and se
     const seyeon = await get('/api/chat/synthetic-thread/turns', ENABLED, 'POST');
     expect(seyeon.status).toBe(503);
     expect((await seyeon.json()).error.code).toBe('SEYEON_FIRST_REVEAL_AUTHORITY_UNAVAILABLE');
+  });
+});
+
+describe('Cloudflare Auth/DB Worker response and cookie-origin fence', () => {
+  it('preserves a valid JSON response and host-only cookie but removes CORS and caching', async () => {
+    const response = fenceCloudflareApprovedAuthResponseV1(Response.json({ ok: true }, {
+      headers: {
+        'Set-Cookie': 'myeongha_member_refresh_v1=synthetic; Path=/api/auth; HttpOnly; Secure; SameSite=Strict',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Credentials': 'true',
+        'Access-Control-Allow-Headers': 'authorization',
+        'Cache-Control': 'public, max-age=600',
+      },
+    }), { id: 'api.auth.sign-in' });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ ok: true });
+    expect(response.headers.get('set-cookie')).toContain('HttpOnly');
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    expect(response.headers.get('access-control-allow-origin')).toBeNull();
+    expect(response.headers.get('access-control-allow-credentials')).toBeNull();
+    expect(response.headers.get('access-control-allow-headers')).toBeNull();
+    expect(response.headers.get('x-content-type-options')).toBe('nosniff');
+  });
+
+  it('blocks HTML/SSE/plain-text responses and unexpected redirects', async () => {
+    const inputs = [
+      [new Response('<html>secret</html>', { status: 200, headers: { 'Content-Type': 'text/html' } }), 'api.auth.sign-in'],
+      [new Response('data: secret', { headers: { 'Content-Type': 'text/event-stream' } }), 'api.auth.refresh'],
+      [new Response('secret', { headers: { 'Content-Type': 'text/plain' } }), 'api.me'],
+      [new Response(null, { status: 302, headers: { Location: 'https://attacker.example.test' } }), 'api.auth.sign-in'],
+      [new Response(null, { status: 302, headers: { Location: 'https://nid.naver.com/oauth2.0/authorize' } }), 'api.auth.sign-in'],
+      [new Response(null, { status: 302, headers: { Location: '/auth.html' } }), 'rewrite.naver.authorize'],
+      [new Response(null, { status: 307, headers: { Location: 'https://nid.naver.com/oauth2.0/authorize' } }), 'rewrite.naver.authorize'],
+      [new Response(null, { status: 302, headers: { Location: 'https://nid.naver.com/oauth2.0/authorize', 'Set-Cookie': 's=synthetic' } }), 'rewrite.naver.authorize'],
+    ];
+    for (const [candidate, id] of inputs) {
+      const response = fenceCloudflareApprovedAuthResponseV1(candidate, { id });
+      expect(response.status).toBe(503);
+      expect(response.headers.get('location')).toBeNull();
+      expect(response.headers.get('set-cookie')).toBeNull();
+      expect(response.headers.get('cache-control')).toBe('no-store');
+      expect(await response.text()).not.toContain('secret');
+    }
+  });
+
+  it('permits only the existing Naver and Supabase OAuth handoff destinations', () => {
+    const accepted = [
+      ['rewrite.naver.authorize', 'https://nid.naver.com/oauth2.0/authorize?state=synthetic'],
+      ['rewrite.naver.callback', 'https://cnsfpcdiyofqvhpcegfc.supabase.co/auth/v1/callback?code=synthetic'],
+    ];
+    for (const [id, destination] of accepted) {
+      const response = fenceCloudflareApprovedAuthResponseV1(
+        new Response(null, { status: 302, headers: { Location: destination } }), { id },
+      );
+      expect(response.status).toBe(302);
+      expect(response.headers.get('location')).toBe(destination);
+      expect(response.headers.get('cache-control')).toBe('no-store');
+    }
+    const unexpected = fenceCloudflareApprovedAuthResponseV1(
+      new Response(null, { status: 302, headers: { Location: 'https://nid.naver.com.evil.test/oauth2.0/authorize' } }),
+      { id: 'rewrite.naver.authorize' },
+    );
+    expect(unexpected.status).toBe(503);
+  });
+
+  it('rejects cookie-authenticated POST without a valid same-origin signal', async () => {
+    for (const headers of [
+      { Cookie: 'myeongha_member_refresh_v1=synthetic' },
+      { Cookie: 'myeongha_member_refresh_v1=synthetic', 'Sec-Fetch-Site': 'none' },
+      { Cookie: 'myeongha_member_refresh_v1=synthetic', 'Sec-Fetch-Site': 'same-site' },
+      { Cookie: 'myeongha_member_refresh_v1=synthetic', Origin: 'https://attacker.example.test' },
+    ]) {
+      const request = new Request(PRIVATE_ORIGIN + '/api/auth/refresh', { method: 'POST', headers });
+      expect(approvedCloudflareSameOriginPostV1(request, PRIVATE_ORIGIN)).toBe(false);
+      const response = await worker.fetch(request, ENABLED);
+      expect(response.status).toBe(404);
+    }
+    expect(approvedCloudflareSameOriginPostV1(
+      new Request(PRIVATE_ORIGIN + '/api/auth/refresh', {
+        method: 'POST', headers: { Cookie: 'myeongha_member_refresh_v1=synthetic', Origin: PRIVATE_ORIGIN },
+      }), PRIVATE_ORIGIN,
+    )).toBe(true);
   });
 });

@@ -72,3 +72,12 @@
 - 실행 중 ephemeral CA·SAN 인증서 및 비특권 DB 계정과 합성 Member A/B 데이터를 생성한다. 실제 TLS handshake, CA/hostname 부정 검사, `SET LOCAL ROLE`, canonical subject/RLS, rollback·교차 사용자 읽기 차단을 기존 E2E 테스트로 검증한다. **완료 시 고유 Docker 컨테이너/익명 데이터 볼륨/CA 볼륨/임시 인증서 파일을 제거**하며 다른 Docker 프로젝트는 건드리지 않는다.
 - 사용자 PC의 Docker Desktop은 이 GitHub 채팅 커넥터에서 직접 실행할 수 없다. **이 스크립트는 로컬 실행용으로 준비된 것이며 실제 사용자 PC 실행 PASS 증거는 아직 없다.** 기존 GitHub Actions 일회용 DB E2E의 PASS와 혼동하지 않는다.
 - Workers TCP는 localhost/private IP에 직접 접속할 수 없으므로 Docker 테스트 성공을 Cloudflare Workers→DB 연결 성공으로 승격하지 않는다. **이 단계의 목적은 로컬 Node/PostgreSQL 보안 정책 입증**이다. 원격 DB·OAuth가 꼭 필요한 후속 런타임/공개 단계는 별도 승인까지 HOLD하며 로컬 Docker로 공개 서비스 연결을 우회하지 않는다.
+
+## 7. 단계 5 후속 구현 — Worker Auth 응답·쿠키 경계 (2026-10-22)
+
+- 근거: 통합 로드맵 PR #2437(기존 트랙 현재 구현 우선), Cloudflare 단계별 계획 PR #2381, 구현 Draft PR #2420.
+- 기존 Worker 단계 5 Auth/Guest/프로필 후보를 재구현하지 않고 `workers/cloudflare-auth-db-api.mjs`의 **최종 응답 경계**를 보강했다. 허용된 JSON/host-only refresh cookie만 그대로 전달하고 no-store/CSP/기타 보안 헤더를 강제한다. 실수로 나온 HTML, SSE, plain-text 또는 일반 3xx는 고정 503으로 차단하고 CORS 응답 헤더는 제거한다.
+- 네이버 OAuth의 기존 GET authorize → `https://nid.naver.com/oauth2.0/authorize`, GET callback → 기존 Supabase 프로젝트의 정확한 `/auth/v1/callback` **두 302 대상만** 예외로 유지한다. 다른 host/path, 임의 응답의 Location, redirect-set-cookie는 거부한다.
+- Cookie를 포함한 브라우저 POST는 Origin 또는 Fetch Metadata의 **실제 동일 출처 신호**가 없는 경우 DB·Auth 생성 이전 404로 거부한다. Credential 없는 API/서버 간 요청의 기존 정책 및 Vercel 런타임은 바꾸지 않는다.
+- `test/cloudflare-auth-admission.test.mjs`의 오프라인 방어 회귀로 검증한다. **실제 Worker↔Supabase Auth/DB, OAuth 등록, 공개 테스트 호스트, Secret 또는 실제 세션은 연결하지 않았다**. 인증·DB positive 가동 승인과 테스트용 로컬 Docker only 정책을 유지한다.
+- Saju Calculation-only, 세연 private first/History/Replay 503, Reader 공식 근거, PortOne 공개/실결제 차단과 Vercel Production·DNS는 불변이다.
