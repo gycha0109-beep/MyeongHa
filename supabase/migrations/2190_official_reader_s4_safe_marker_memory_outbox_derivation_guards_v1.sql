@@ -108,12 +108,16 @@ begin
 
   -- Corrective revocation/rejection of already existing rows must remain
   -- possible without approving a new derived text/value.
-  if tg_op='UPDATE' then
-    if tg_table_name='memory_proposals'
-       and new.status in ('rejected','expired')
-       and (new.proposed_value_jsonb is not distinct from old.proposed_value_jsonb)
-       and (new.source_message_id is not distinct from old.source_message_id)
-       and (new.source_turn_id is not distinct from old.source_turn_id) then
+  if tg_op='UPDATE' and tg_table_name='memory_proposals' then
+    -- Other records (memory_items/life_facts) do not have proposal-only
+    -- fields. Inspect the JSONB record only inside this specific branch.
+    if v_record->>'status' in ('rejected','expired')
+       and (v_record->'proposed_value_jsonb') is not distinct from
+           (pg_catalog.to_jsonb(old)->'proposed_value_jsonb')
+       and (v_record->>'source_message_id') is not distinct from
+           (pg_catalog.to_jsonb(old)->>'source_message_id')
+       and (v_record->>'source_turn_id') is not distinct from
+           (pg_catalog.to_jsonb(old)->>'source_turn_id') then
       return new;
     end if;
   end if;
