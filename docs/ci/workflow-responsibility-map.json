@@ -523,6 +523,12 @@
       "prMode": "none",
       "mainMode": "one-shot-trigger",
       "workTrackAttribution": "commit-metadata"
+    },
+    "seyeon-terra-glm-quality-trio-one-shot-v1.yml": {
+      "responsibility": "character-memory-three-public-persona-synthetic-cases-terra-glm-owner-visible-comparison",
+      "prMode": "none",
+      "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "commit-metadata"
     }
   }
 }
