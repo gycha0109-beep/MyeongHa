@@ -9,9 +9,14 @@ import {
 } from './postgres-account-deletion-worker.js';
 import { createNodePostgresAccountDeletionWorkerPoolV1 } from './node-postgres-account-deletion-worker-pool.js';
 import type { PostgresSubjectPoolV1 } from './postgres-subject-execution.js';
-import type {
-  OfficialReaderAccountPrivacyDeletionPortV1,
+import {
+  createOfficialReaderAccountPrivacyDeletionPortV1,
+  type OfficialReaderAccountPrivacyDeletionPortV1,
 } from './official-reader-private-account-deletion-lifecycle-v1.js';
+import {
+  createOfficialReaderNodeOffPrimaryStoreV1,
+  type OfficialReaderOffPrimaryStoreConfigV1,
+} from './official-reader-node-offprimary-privacy-store-v1.js';
 import type { ProductionAccountDeletionAuthAdminConfigV1 } from './production-account-deletion-auth-admin-config.js';
 import type { ProductionAccountDeletionWorkerDbConfigV1 } from './production-account-deletion-worker-db-config.js';
 import {
@@ -97,9 +102,27 @@ export interface ProductionAccountDeletionWorkerRuntimeLeaseV1 {
 export function createProductionAccountDeletionWorkerRuntimeV1(input: {
   readonly databaseConfig: ProductionAccountDeletionWorkerDbConfigV1;
   readonly authAdminConfig: ProductionAccountDeletionAuthAdminConfigV1;
-  /** Not supplied until an independently durable Privacy ledger is installed. */
+  /** Explicit dedicated mount inputs; never default to temp or Postgres. */
+  readonly readerOffPrimaryStoreConfig?: OfficialReaderOffPrimaryStoreConfigV1;
+  /** Optional owner-injected independent deletion provider (not combined with filesystem mode). */
   readonly readerPrivacyDeletionPort?: OfficialReaderAccountPrivacyDeletionPortV1;
 }): ProductionAccountDeletionWorkerRuntimeLeaseV1 {
+  if (input.readerPrivacyDeletionPort !== undefined
+      && input.readerOffPrimaryStoreConfig !== undefined) {
+    throw new Error('Protected Reader deletion can use only one Privacy provider.');
+  }
+  // Construct off-primary ports only when durable, owner-provisioned mount
+  // configuration was passed. Missing/wrong roots refuse to start; there is
+  // deliberately no /tmp or backed-up DB fallback.
+  const offPrimary = input.readerOffPrimaryStoreConfig === undefined
+    ? null
+    : createOfficialReaderNodeOffPrimaryStoreV1(input.readerOffPrimaryStoreConfig);
+  const readerPrivacyDeletionPort = input.readerPrivacyDeletionPort
+    ?? (offPrimary === null ? undefined
+      : createOfficialReaderAccountPrivacyDeletionPortV1({
+          ledger: offPrimary.ledger,
+          keys: offPrimary.keys,
+        }));
   const pool = createNodePostgresAccountDeletionWorkerPoolV1(input.databaseConfig);
   const authDeletionPort = createSupabaseAuthAdminUserDeletionAdapterV1({
     supabaseOrigin: input.authAdminConfig.supabaseOrigin,
@@ -110,9 +133,8 @@ export function createProductionAccountDeletionWorkerRuntimeV1(input: {
     runtime: createAccountDeletionWorkerRuntimeFromPoolV1({
       pool,
       authDeletionPort,
-      ...(input.readerPrivacyDeletionPort === undefined
-        ? {}
-        : { readerPrivacyDeletionPort: input.readerPrivacyDeletionPort }),
+      ...(readerPrivacyDeletionPort === undefined
+        ? {} : { readerPrivacyDeletionPort }),
     }),
     close() {
       return pool.close();
