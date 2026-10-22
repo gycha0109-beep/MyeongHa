@@ -28,12 +28,21 @@ as $reader_safe_marker_immutability$
 declare
   v_safe_hash constant text :=
     'sha256:v1:c04638eb883ebf25b14a9f8ce0c5bb0ae0e0bae7aaa69ea91f33f22172abbf63';
+  v_marker_write boolean:=false;
 begin
+  -- NEW is available on INSERT/UPDATE, but OLD is not assigned on INSERT.
+  -- Keep the distinction explicit to avoid touching a missing OLD record.
+  if tg_op='INSERT' then
+    v_marker_write:=(new.content_hash=v_safe_hash);
+  elsif tg_op='UPDATE' then
+    v_marker_write:=(
+      old.content_hash=v_safe_hash or new.content_hash=v_safe_hash
+    );
+  end if;
+
   -- Never treat a normal user sentence as S5 provenance. Only an exact
   -- S5-derived system marker with the authoritative fixed marker hash.
-  if (tg_op='INSERT' and new.content_hash=v_safe_hash)
-     or (tg_op='UPDATE' and
-       (old.content_hash=v_safe_hash or new.content_hash=v_safe_hash)) then
+  if v_marker_write then
 
     if new.content_hash is distinct from v_safe_hash
        or new.sender_type is distinct from 'system'
@@ -221,3 +230,67 @@ comment on function public.internal_reject_official_reader_derivation_source_v1(
 is 'S4 fail-closed on exact S5 protected Chat turn/message provenance for Memory Items, Memory Proposals and Life Facts, while allowing ordinary Chat and privacy revocation. No text fingerprint guesses.';
 comment on function public.internal_reject_official_reader_chat_outbox_v1()
 is 'S4 prohibits generic Chat-turn/Message Outbox events whose source is the exact S5 protected paid Reader safe marker. No new Search, notification or Memory delivery authority.';
+
+
+-- S5 writes the safe marker after the Chat Turn has been staged. Prevent a
+-- TOCTOU reverse-order escape where an ordinary Memory/Analysis derivation
+-- already refers to that turn BEFORE the protected marker is inserted.
+-- All such S5 writes fail atomically rather than leaving an ordinary
+-- derived copy; existing non-paid Chat writes are untouched.
+create or replace function public.internal_guard_official_reader_prior_ordinary_derivation_v1()
+returns trigger
+language plpgsql
+volatile security definer
+set search_path=pg_catalog,public
+as $reader_prior_derivation$
+begin
+  if new.sender_type='system'
+     and new.content_hash=
+       'sha256:v1:c04638eb883ebf25b14a9f8ce0c5bb0ae0e0bae7aaa69ea91f33f22172abbf63'
+     and (
+       exists (
+         select 1 from public.memory_items item
+         where item.subject_id=new.subject_id
+           and item.revoked_at is null
+           and (item.source_turn_id=new.turn_id or item.source_message_id=new.id)
+       )
+       or exists (
+         select 1 from public.memory_proposals proposal
+         where proposal.subject_id=new.subject_id
+           and proposal.status in ('pending','accepted')
+           and (proposal.source_turn_id=new.turn_id or proposal.source_message_id=new.id)
+       )
+       or exists (
+         select 1 from public.life_facts fact
+         where fact.subject_id=new.subject_id
+           and fact.revoked_at is null
+           and fact.source_message_id=new.id
+       )
+       or exists (
+         select 1 from public.outbox_events event
+         where (
+           (event.aggregate_type='chat_turn' and event.aggregate_id=new.turn_id::text)
+           or (event.aggregate_type='conversation_message'
+             and event.aggregate_id=new.id::text)
+         )
+       )
+     )
+  then
+    raise exception using errcode='23514',
+      constraint='official_reader_s4_safe_marker_prior_derivation_exists',
+      message='Protected Reader commit cannot follow ordinary Memory/Outbox derivation';
+  end if;
+  return new;
+end
+$reader_prior_derivation$;
+
+revoke all on function public.internal_guard_official_reader_prior_ordinary_derivation_v1()
+  from public;
+
+create trigger official_reader_s4_safe_marker_prior_derivation_guard_v1
+after insert on public.conversation_messages
+for each row execute function
+  public.internal_guard_official_reader_prior_ordinary_derivation_v1();
+
+comment on function public.internal_guard_official_reader_prior_ordinary_derivation_v1()
+is 'S4 reverse-order fence at S5 safe marker insertion. Abort the paid-answer transaction if a committed ordinary Memory/Proposal/Life Fact or Chat Outbox already depends on its turn. Safe marker does not authorize search, summary or AI Memory derivation.';
