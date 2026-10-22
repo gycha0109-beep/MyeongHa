@@ -53,8 +53,68 @@ function unavailable() {
  * Only the original Naver authorization and Supabase callback redirects are
  * allowed; host matching is exact and comes from governed source constants.
  */
-export function fenceCloudflareApprovedAuthResponseV1(candidate, route) {
+// Provider egress is limited to the exact two Naver bridge redirect forms.
+// Neither arbitrary query fields nor a second callback URL may be released.
+// Existing Naver AES-GCM and PKCE handler remains authoritative for state.
+export function approvedCloudflareNaverRedirectV1(destination, route, approvedOrigin) {
+  if (typeof approvedOrigin !== 'string' || !approvedOrigin.startsWith('https://')) return false;
+  const naver = route?.id === 'rewrite.naver.authorize' &&
+    destination.origin === 'https://nid.naver.com' &&
+    destination.pathname === '/oauth2.0/authorize';
+  const supabase = route?.id === 'rewrite.naver.callback' &&
+    destination.origin === MYEONGHA_PRODUCTION_SUPABASE_ORIGIN &&
+    destination.pathname === '/auth/v1/callback';
+  if (!naver && !supabase) return false;
+  const seen = new Set();
+  for (const [key, value] of destination.searchParams) {
+    if (seen.has(key) || value.length === 0 || value.length > 8192) return false;
+    seen.add(key);
+  }
+  if (naver) {
+    return seen.size === 4 &&
+      ['response_type', 'client_id', 'redirect_uri', 'state'].every(k => seen.has(k)) &&
+      destination.searchParams.get('response_type') === 'code' &&
+      destination.searchParams.get('redirect_uri') ===
+        approvedOrigin + '/api/auth/social/naver/callback' &&
+      destination.searchParams.get('client_id').length <= 128 &&
+      /^[A-Za-z0-9_-]{40,8192}$/.test(destination.searchParams.get('state'));
+  }
+  if (!seen.has('state')) return false;
+  if (seen.has('code')) {
+    return seen.size === 2 &&
+      /^[A-Za-z0-9_-]{40,8192}$/.test(destination.searchParams.get('code'));
+  }
+  return seen.size === 2 && seen.has('error') &&
+    destination.searchParams.get('error') === 'access_denied';
+}
+
+// Only the original host-only member refresh cookie is allowed through
+// Auth egress. An upstream/domain-scoped provider cookie must never be set
+// on the newly approved web origin.
+export function approvedCloudflareAuthCookieV1(candidate, route) {
+  if (!candidate.headers.has('set-cookie')) return true;
+  if (!['api.auth.sign-in', 'api.auth.sign-up', 'api.auth.refresh',
+        'api.auth.sign-out', 'api.auth.promote-guest'].includes(route?.id)) return false;
+  const cookies = candidate.headers.getSetCookie?.() ??
+    [candidate.headers.get('set-cookie')];
+  if (cookies.length !== 1 || typeof cookies[0] !== 'string' ||
+      cookies[0].length > 5000) return false;
+  const parts = cookies[0].split('; ');
+  if (parts.length !== 5 && parts.length !== 6) return false;
+  if (parts.slice(1, 5).join('; ') !==
+      'Path=/api/auth; HttpOnly; Secure; SameSite=Strict') return false;
+  const prefix = 'myeongha_member_refresh_v1=';
+  if (!parts[0].startsWith(prefix)) return false;
+  const value = parts[0].slice(prefix.length);
+  if (!/^(?:[A-Za-z0-9._~!()*'-]|%[A-Fa-f0-9]{2})*$/.test(value)) return false;
+  if (parts.length === 6 &&
+      (parts[5] !== 'Max-Age=0' || value !== '')) return false;
+  return parts.length === 6 || value.length > 0;
+}
+
+export function fenceCloudflareApprovedAuthResponseV1(candidate, route, approvedOrigin) {
   if (!(candidate instanceof Response)) return unavailable();
+  if (!approvedCloudflareAuthCookieV1(candidate, route)) return unavailable();
 
   const location = candidate.headers.get('location');
   const isRedirect = candidate.status >= 300 && candidate.status < 400;
@@ -65,13 +125,7 @@ export function fenceCloudflareApprovedAuthResponseV1(candidate, route) {
     try { destination = new URL(location); } catch { return unavailable(); }
     if (destination.username !== '' || destination.password !== '' ||
         destination.protocol !== 'https:' || destination.hash !== '') return unavailable();
-    const authorize = route?.id === 'rewrite.naver.authorize' &&
-      destination.origin === 'https://nid.naver.com' &&
-      destination.pathname === '/oauth2.0/authorize';
-    const callback = route?.id === 'rewrite.naver.callback' &&
-      destination.origin === MYEONGHA_PRODUCTION_SUPABASE_ORIGIN &&
-      destination.pathname === '/auth/v1/callback';
-    if (!authorize && !callback) return unavailable();
+    if (!approvedCloudflareNaverRedirectV1(destination, route, approvedOrigin)) return unavailable();
     if (candidate.body !== null) return unavailable();
   } else if (candidate.body !== null) {
     const contentType = candidate.headers.get('content-type')?.split(';')[0]?.trim().toLowerCase() ?? '';
@@ -90,7 +144,8 @@ export function fenceCloudflareApprovedAuthResponseV1(candidate, route) {
   }
   // Naver's established OAuth policy is stricter than the generic web
   // referrer baseline. Never weaken it while copying platform headers.
-  if (isRedirect && candidate.headers.get('referrer-policy') === 'no-referrer') {
+  if (isRedirect) {
+    // Both redirect forms carry state or sealed codes, never downgrade this.
     headers.set('Referrer-Policy', 'no-referrer');
   }
   return new Response(candidate.body, {
@@ -315,5 +370,5 @@ export async function tryHandleCloudflareApprovedAuthV1(request, bindings, route
 
   // Final boundary applies to all approved Auth, Guest, Naver and profile
   // responses. Never forward an unexpected HTML 500, stream or redirect.
-  return fenceCloudflareApprovedAuthResponseV1(result, route);
+  return fenceCloudflareApprovedAuthResponseV1(result, route, origin);
 }
