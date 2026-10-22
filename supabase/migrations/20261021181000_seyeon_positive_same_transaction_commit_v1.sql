@@ -138,6 +138,8 @@ as $g2$
 declare
   v_positive jsonb;
   v_commit record;
+  v_original_user_message_id text;
+  v_original_user_count bigint;
 begin
   perform public.assert_myeongha_subject_context_v1(p_subject_id);
   if p_thread_id is null or p_turn_id is null or p_attempt_id is null
@@ -173,6 +175,40 @@ begin
       constraint='seyeon_positive_g2_turn_invalid',
       message='Positive G2 requires original validated Turn';
   end if;
+
+  -- The Post-turn Snapshot must belong to THIS DB-original User message,
+  -- not another message with an attacker-recalculated snapshot SHA.
+  -- The parent Turn FOR UPDATE above serializes child inserts. SHARE-lock
+  -- the surviving original User row so its identity cannot change during
+  -- the positive G2 Commit/Outbox transition.
+  select msg.id::text into v_original_user_message_id
+  from public.conversation_messages msg
+  where msg.subject_id=p_subject_id and msg.thread_id=p_thread_id
+    and msg.turn_id=p_turn_id and msg.sender_type='user'
+    and msg.redacted_at is null
+  for share;
+  if not found then
+    raise exception using errcode='23514',
+      constraint='seyeon_positive_g2_original_user_message_mismatch',
+      message='Positive G2 requires the DB-original User message';
+  end if;
+  select count(*) into v_original_user_count
+  from public.conversation_messages msg
+  where msg.subject_id=p_subject_id and msg.thread_id=p_thread_id
+    and msg.turn_id=p_turn_id and msg.sender_type='user'
+    and msg.redacted_at is null;
+  if v_original_user_count <> 1
+     or jsonb_typeof(p_post_turn_snapshot_jsonb) is distinct from 'object'
+     or p_post_turn_snapshot_jsonb->>'turnId' is distinct from p_turn_id::text
+     or p_post_turn_snapshot_jsonb->>'assistantMessageId'
+         is distinct from p_message_id::text
+     or p_post_turn_snapshot_jsonb->>'userMessageId'
+         is distinct from v_original_user_message_id then
+    raise exception using errcode='23514',
+      constraint='seyeon_positive_g2_original_user_message_mismatch',
+      message='Positive G2 Snapshot is not bound to the DB-original User message';
+  end if;
+
   select a.seyeon_personal_source_pin_jsonb -> 'positiveProof'
     into v_positive
   from public.chat_turn_attempts a
