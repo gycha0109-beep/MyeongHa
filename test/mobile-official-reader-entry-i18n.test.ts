@@ -40,6 +40,11 @@ describe('I18N-07 Official Reading Reader introductions: UI text only', () => {
       expect(ja.statusMessage).not.toBe(ko.statusMessage);
       expect(zh.statusMessage).not.toBe(ko.statusMessage);
     }
+    expect(projectMobileOfficialReaderEntryUiV1('ko-KR', 'public_route_off').sourceNotice).toBe('');
+    expect(projectMobileOfficialReaderEntryUiV1('ja-JP', 'public_route_off').sourceNotice)
+      .toContain('翻訳されません');
+    expect(projectMobileOfficialReaderEntryUiV1('zh-TW', 'public_route_off').sourceNotice)
+      .toContain('保留原文');
     expect(projectMobileOfficialReaderEntryUiV1('ko-KR', 'public_route_off').statusMessage)
       .toBe('공식 Reader 해설은 아직 공개되지 않았습니다.');
   });
@@ -88,6 +93,7 @@ describe('I18N-07 Official Reading Reader introductions: UI text only', () => {
     expect(view).toContain('{ui.disabledLabel}');
     expect(view).toContain('accessibilityLabel={ui.disabledAccessibilityLabel}');
     expect(view).toContain('{selectedReader.tone}');
+    expect(view).toContain('{ui.sourceNotice}');
     expect(view).toContain('{reader.title}');
     expect(view).toContain('MOBILE_READER_PRESENTATIONS_V1.map');
     expect(view).not.toContain('router.push(');
