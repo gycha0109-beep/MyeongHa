@@ -100,3 +100,36 @@ export async function assertOfficialReaderPrivateCurrentVerifiedPurchaseV1(
     return deny();
   }
 }
+
+/**
+ * Existing Reader protected-context authority port. It is bound to the
+ * canonical Subject transaction and refuses cross-Subject requests.
+ * It is NOT an entitlement mint or a new database role.
+ */
+export interface OfficialReaderPrivateCurrentPurchaseAuthorityPortV1 {
+  assertCurrentVerifiedPurchase(input: Readonly<{
+    subjectId: string;
+    readingId: string;
+    readerCharacterId: string;
+    readerContentBundleId: string;
+  }>): Promise<void>;
+}
+
+export function createOfficialReaderPrivateCurrentPurchaseAuthorityPortV1(
+  scope: PostgresSubjectExecutionScopeV1,
+): OfficialReaderPrivateCurrentPurchaseAuthorityPortV1 {
+  if (!scope?.client || !scope.resolvedSubject?.subjectId
+      || scope.resolvedSubject.subjectKind !== 'member') return deny();
+  const canonicalSubjectId = uuid(scope.resolvedSubject.subjectId);
+  return Object.freeze({
+    async assertCurrentVerifiedPurchase(input): Promise<void> {
+      if (!input || uuid(input.subjectId) !== canonicalSubjectId) return deny();
+      await assertOfficialReaderPrivateCurrentVerifiedPurchaseScopeV1({
+        scope,
+        readingId: input.readingId,
+        readerCharacterId: input.readerCharacterId,
+        readerContentBundleId: input.readerContentBundleId,
+      });
+    },
+  });
+}
