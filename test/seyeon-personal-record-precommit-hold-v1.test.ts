@@ -171,17 +171,35 @@ describe('Se-yeon Production personal-record pre-model safety interlock', () => 
       new URL('../apps/api/src/seyeon-production-chat-execution-v1.ts', import.meta.url),
       'utf8',
     );
-    const gate = runtime.indexOf(
-      'assertSeyeonPersonalRecordsNotUsedBeforeUnprotectedCommitV1(\n          productionContext,',
+    // Locate the actual zero-branch guard, not the import or a fragile
+    // whitespace-specific source string. Guard MUST precede the DB Pin.
+    const zeroBranch = runtime.indexOf(
+      'if (exactModelPersonalSources.selectedPersonalRecordCount === 0)',
     );
+    const gate = runtime.indexOf(
+      'assertSeyeonPersonalRecordsNotUsedBeforeUnprotectedCommitV1(',
+      zeroBranch,
+    );
+    expect(zeroBranch).toBeGreaterThan(-1);
+    expect(gate).toBeGreaterThan(zeroBranch);
     const contextReady = runtime.indexOf('await input.persistencePort.markContextReady({');
     const model = runtime.indexOf('const runtime = await runSeyeonCharacterTurnV2({');
     const generated = runtime.indexOf('await input.persistencePort.persistGenerated({');
-    const committed = runtime.indexOf('const committed = await input.persistencePort.commitTurn({');
+    const positivePin = runtime.indexOf(
+      'await input.positivePersonalSourcePort.pinBeforeModel({',
+    );
+    const positiveG2 = runtime.indexOf(
+      'await input.positivePersonalSourcePort!.commitAfterValidation({',
+    );
+    const committed = runtime.indexOf(
+      'const committed = positiveModelCorrelation === null',
+    );
     expect(gate).toBeGreaterThan(-1);
     expect(contextReady).toBeGreaterThan(gate);
-    expect(model).toBeGreaterThan(contextReady);
+    expect(positivePin).toBeGreaterThan(contextReady);
+    expect(model).toBeGreaterThan(positivePin);
     expect(generated).toBeGreaterThan(model);
     expect(committed).toBeGreaterThan(generated);
+    expect(positiveG2).toBeGreaterThan(committed);
   });
 });

@@ -501,6 +501,7 @@ export function createProductionSeyeonChatRuntimeV1(
           rendererProvider: meteredRenderer,
           semanticReviewerProvider: meteredReviewer,
           persistencePort: meteredChatPersistence,
+          positivePersonalSourcePort: ports.positivePersonalSource,
           executionIdPort: idPort,
           postTurn: Object.freeze({
             ledger,
