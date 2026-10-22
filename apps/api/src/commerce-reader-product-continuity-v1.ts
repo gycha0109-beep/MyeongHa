@@ -58,7 +58,6 @@ export interface CommerceReaderRecordContinuityV1 {
         readonly contentBundleId: string;
         readonly contentReleaseId: string;
         readonly contentRevision: number;
-        readonly sourceResponseHash: string;
         readonly productRuleVersion: string;
         readonly approvedPolicyRevision: string;
         readonly requiresFreshGateAtUse: true;
@@ -184,7 +183,6 @@ export async function resolveCommerceReaderRecordContinuityV1(input: {
         contentBundleId: uuid(result.activeContentBundleId),
         contentReleaseId: uuid(result.activeContentReleaseId),
         contentRevision: result.contentRevision,
-        sourceResponseHash: result.sourceResponseHash,
         productRuleVersion: result.productRuleVersion,
         approvedPolicyRevision: result.approvedPolicyRevision,
         requiresFreshGateAtUse: true,
