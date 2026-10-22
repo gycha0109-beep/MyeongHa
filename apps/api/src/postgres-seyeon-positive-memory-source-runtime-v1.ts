@@ -3,7 +3,9 @@
 // active zero-only Chat runtime; no positive Provider/HTTP capability is given.
 import type {PostgresTransactionQueryV1} from './postgres-subject-execution.js';
 import type {SeyeonProductionChatCommitReceiptV1} from './seyeon-production-chat-execution-v1.js';
+import {createHash} from 'node:crypto';
 import {canonicalJson} from '../../../packages/domain/src/index.js';
+import type {SeyeonExactSelectedPersonalSourceV1} from './seyeon-exact-model-personal-source-selection-v1.js';
 import {validateSeyeonPostTurnAnalysisSnapshotV1} from './seyeon-post-turn-analysis-worker-v1.js';
 
 export const SEYEON_POSITIVE_G1_SOURCE_PIN_SQL_V1 =
@@ -25,6 +27,8 @@ export interface SeyeonPositiveS0SourcePinInputV1 {
   readonly recordType:string;
   readonly schemaVersion:string;
   readonly projectorVersion:string;
+  /** Same complete, ordered model selection used to derive selectedSourcesDigest. */
+  readonly selectedSources:readonly SeyeonExactSelectedPersonalSourceV1[];
   readonly selectedSourcesDigest:string;
   readonly projectedMemoryDigest:string;
   readonly finalModelContextDigest:string;
@@ -92,6 +96,34 @@ export function createSeyeonPositiveS0OwnerDbPortsV1(
             input.finalModelContextDigest].every(digest)
         || !PG_SHA.test(input.expectedOriginalPgDigest)) {
         throw Error('Se-yeon positive G1 requires exact server-created source');
+      }
+      // §57/§60: bind the immutable DB G1 Pin digest to the SAME actual
+      // one-source model selection. A syntactically valid digest is never
+      // proof that a matching original Memory/Grant was selected.
+      const selected=input.selectedSources;
+      const source=Array.isArray(selected)&&selected.length===1?selected[0]:null;
+      const sourceKeys=[
+        'recordKind','recordId','grantId','recordType','schemaVersion',
+        'rawRecordDigest','projectedMemoryDigest','rawRecordPgDigest',
+        'projectorVersion',
+      ] as const;
+      if(!source||typeof source!=='object'||Array.isArray(source)
+        ||Object.keys(source).length!==sourceKeys.length
+        ||sourceKeys.some(key=>!Object.prototype.hasOwnProperty.call(source,key))
+        ||source.recordKind!=='memory'
+        ||source.recordId!==input.originalMemoryId
+        ||source.grantId!==input.originalGrantId
+        ||source.recordType!==input.recordType
+        ||source.schemaVersion!==input.schemaVersion
+        ||source.projectorVersion!==input.projectorVersion
+        ||source.projectedMemoryDigest!==input.projectedMemoryDigest
+        ||source.rawRecordPgDigest!==input.expectedOriginalPgDigest
+        ||!SHA.test(source.rawRecordDigest)
+        ||!SHA.test(source.projectedMemoryDigest)
+        ||!PG_SHA.test(source.rawRecordPgDigest)
+        ||'sha256:v1:'+createHash('sha256')
+          .update(canonicalJson(selected)).digest('hex')!==input.selectedSourcesDigest) {
+        throw Error('Se-yeon positive G1 selected source digest mismatch');
       }
       const rows=await client.query<{receipt:unknown}>(`
 select public.cmd_mark_seyeon_positive_context_ready_pinned_v1(

@@ -1,5 +1,7 @@
 // Watchtower-Track: security
 // Positive G1 SQL owner receipt shape: synthetic-only, no production deployment.
+import {createHash} from 'node:crypto';
+import {canonicalJson} from '../packages/domain/src/index.js';
 import {describe, expect, it} from 'vitest';
 import {
   createSeyeonPositiveS0OwnerDbPortsV1,
@@ -12,6 +14,16 @@ import type {
 const UUID=(n:number)=>`d${n}000000-0000-4000-8000-000000000001`;
 const DIGEST=(value:string)=>'sha256:v1:'+value.repeat(64);
 const PG_DIGEST='sha256:pg-jsonb:v1:'+'e'.repeat(64);
+const selectedSources=[Object.freeze({
+  recordKind:'memory' as const,
+  recordId:UUID(5),grantId:UUID(6),
+  recordType:'shared_detail',schemaVersion:'memory-v1',
+  rawRecordDigest:DIGEST('d'),projectedMemoryDigest:DIGEST('b'),
+  rawRecordPgDigest:PG_DIGEST,projectorVersion:'seyeon-memory-projector-v1',
+})];
+function selectedDigest(source:unknown):string{
+  return 'sha256:v1:'+createHash('sha256').update(canonicalJson(source)).digest('hex');
+}
 
 const input:SeyeonPositiveS0SourcePinInputV1={
   subjectId:UUID(1),
@@ -23,7 +35,8 @@ const input:SeyeonPositiveS0SourcePinInputV1={
   recordType:'shared_detail',
   schemaVersion:'memory-v1',
   projectorVersion:'seyeon-memory-projector-v1',
-  selectedSourcesDigest:DIGEST('a'),
+  selectedSources,
+  selectedSourcesDigest:selectedDigest(selectedSources),
   projectedMemoryDigest:DIGEST('b'),
   finalModelContextDigest:DIGEST('c'),
   expectedOriginalPgDigest:PG_DIGEST,
@@ -86,6 +99,39 @@ describe('S3/G1 exact DB owner original Memory Pin receipt',()=>{
     const {port,sql}=fakeOwner({...actualDbProof(),...patch});
     await expect(port.pinBeforeModel(input)).rejects.toThrow(/Pin receipt mismatch/u);
     expect(sql).toHaveLength(1);
+  });
+
+  it.each([
+    ['syntax-valid but unrelated selection digest',()=>({...input,selectedSourcesDigest:DIGEST('a')})],
+    ['changed original grant with recomputed selection hash',()=>{
+      const sources=[{...selectedSources[0]!,grantId:UUID(7)}];
+      return {...input,selectedSources:sources,selectedSourcesDigest:selectedDigest(sources)};
+    }],
+    ['changed projected source text hash with recomputed selection hash',()=>{
+      const sources=[{...selectedSources[0]!,projectedMemoryDigest:DIGEST('f')}];
+      return {...input,selectedSources:sources,selectedSourcesDigest:selectedDigest(sources)};
+    }],
+    ['unapproved added SourceSet field and recomputed hash',()=>{
+      const sources=[{...selectedSources[0]!,untrustedAuthority:'provider'}];
+      return {...input,selectedSources:sources,selectedSourcesDigest:selectedDigest(sources)};
+    }],
+    ['unregistered second source with recomputed full digest',()=>{
+      const sources=[selectedSources[0]!,{...selectedSources[0]!,recordId:UUID(7)}];
+      return {...input,selectedSources:sources,selectedSourcesDigest:selectedDigest(sources)};
+    }],
+    ['missing original raw JSONB digest with recomputed hash',()=>{
+      const {rawRecordPgDigest: _excluded, ...withoutPgDigest}=selectedSources[0]!;
+      const sources=[withoutPgDigest];
+      return {...input,selectedSources:sources,selectedSourcesDigest:selectedDigest(sources)};
+    }],
+    ['forged different projector with recomputed selection hash',()=>{
+      const sources=[{...selectedSources[0]!,projectorVersion:'other-projector'}];
+      return {...input,selectedSources:sources,selectedSourcesDigest:selectedDigest(sources)};
+    }],
+  ] as const)('denies %s before opening original G1 DB owner RPC',async(_name,make)=>{
+    const {port,sql}=fakeOwner(actualDbProof());
+    await expect(port.pinBeforeModel(make())).rejects.toThrow(/G1 selected source digest mismatch/u);
+    expect(sql).toHaveLength(0);
   });
 
   it('rejects truncated object proof without inferring absent authority',async()=>{

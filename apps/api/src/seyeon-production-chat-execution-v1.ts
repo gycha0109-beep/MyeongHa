@@ -782,6 +782,7 @@ export async function runSeyeonProductionChatExecutionV1(
               recordType: source.recordType,
               schemaVersion: source.schemaVersion,
               projectorVersion: source.projectorVersion,
+              selectedSources: exactModelPersonalSources.selectedSources,
               selectedSourcesDigest: positiveModelCorrelation.selectedSourcesDigest,
               projectedMemoryDigest: source.projectedMemoryDigest,
               finalModelContextDigest: positiveModelCorrelation.finalModelContextDigest,
