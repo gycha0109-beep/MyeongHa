@@ -276,7 +276,9 @@ export async function prepareCharacterStandardReadingServerRuntimeV1(
     threadId: input.threadId,
     authorityPort: input.threadBindingAuthorityPort,
   });
-  if (pinnedThread.participantCharacterIds.length !== 1
+  if (typeof input.resolvedSubjectId !== 'string'
+      || typeof input.readingId !== 'string'
+      || pinnedThread.participantCharacterIds.length !== 1
       || !pinnedThread.participantCharacterIds[0]
       || pinnedThread.activeContentBundleId !== input.contentEntry.release.bundleId
       || pinnedThread.activeContentReleaseId !== input.contentEntry.release.releaseId
@@ -288,7 +290,7 @@ export async function prepareCharacterStandardReadingServerRuntimeV1(
   try {
     await input.currentVerifiedPurchaseAuthorityPort.assertCurrentVerifiedPurchase({
       subjectId: input.resolvedSubjectId!,
-      readingId: String(input.readingId),
+      readingId: input.readingId,
       readerCharacterId: pinnedThread.participantCharacterIds[0],
       readerContentBundleId: pinnedThread.activeContentBundleId,
     });
