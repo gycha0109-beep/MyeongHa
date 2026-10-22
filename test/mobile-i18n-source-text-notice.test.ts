@@ -48,7 +48,8 @@ describe('I18N-06e mobile original-content notices', () => {
     expect(scene).toContain('{currentStep.primary}');
     expect(preview).toContain('>{step.primary}</Text>');
     expect(archive).toContain('>{step.primary}</Text>');
-    expect(archive).toContain('>{notice}');
+    expect(archive).toContain('state.record.display.notices.map((notice, index) => (');
+    expect(archive).toContain('{notice}');
     expect(chat).not.toContain('sourceNotice.text + message.body');
   });
 });
