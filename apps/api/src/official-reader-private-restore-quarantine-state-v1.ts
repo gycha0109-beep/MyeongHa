@@ -22,6 +22,16 @@ export type OfficialReaderRestoreOperatorReportV1 = Readonly<{
   restoreState: 'quarantined_derived_data' | 'blocked_unclassified';
   derivedCategory: OfficialReaderRestoreDerivedCategoryV1 | null;
   existingPrivacyOwnerCleanupRequired: true;
+  /**
+   * No implicit physical deletion. Memory revoke merely prevents future
+   * access; it does NOT remove the historical row inspected by S4/2230.
+   */
+  automaticCleanupPerformed: false;
+  readonlyOwnerRoute: 'existing_privacy_db_owner_disposition' | null;
+  resumeRequirement:
+    | 'owner_reconcile_then_rerun_same_isolated_restore'
+    | 'investigate_unknown_blocker_in_quarantine';
+  restoreRetryAuthorizedByThisReport: false;
   restoreCompletionApproved: false;
   paidReaderServiceEnabled: false;
   ordinaryRestoreConsumersEnabled: false;
@@ -79,6 +89,12 @@ export function officialReaderRestoreFailureReportV1(
     restoreState: category ? 'quarantined_derived_data' : 'blocked_unclassified',
     derivedCategory: category,
     existingPrivacyOwnerCleanupRequired: true,
+    automaticCleanupPerformed: false,
+    readonlyOwnerRoute: category ? 'existing_privacy_db_owner_disposition' : null,
+    resumeRequirement: category
+      ? 'owner_reconcile_then_rerun_same_isolated_restore'
+      : 'investigate_unknown_blocker_in_quarantine',
+    restoreRetryAuthorizedByThisReport: false,
     restoreCompletionApproved: false,
     paidReaderServiceEnabled: false,
     ordinaryRestoreConsumersEnabled: false,
