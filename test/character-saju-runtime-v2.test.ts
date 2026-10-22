@@ -163,6 +163,7 @@ async function authorize(reader: string, domain: SajuDomain) {
   const proof = await issueCharacterSajuOfficialStandardEligibilityV2({
     prepared, currentScope: prepared.scope,
     productAuthorityPort: f.productAuthorityPort,
+    currentVerifiedPurchaseAuthorityPort: f.input.currentVerifiedPurchaseAuthorityPort,
   });
   const context = await assembleOfficialStandardReaderRuntimeV2({
     proof, currentScope: prepared.scope,
