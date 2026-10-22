@@ -18,6 +18,7 @@ const LOCKED_HEADERS = {
   'Cache-Control': 'private, no-store, max-age=0',
   'Pragma': 'no-cache',
   'X-Robots-Tag': 'noindex, nofollow, noarchive',
+  Vary: 'Cookie, Authorization',
 } as const;
 
 function failure(
@@ -59,6 +60,8 @@ export interface HandleOfficialReaderPaidChatMessageHttpInputV1 {
   readonly pool?: PostgresSubjectPoolV1;
   readonly keyResolver?: PrivateOfficialReaderPaidAnswerKeyResolverV1;
   readonly privacyLedgerPort?: OfficialReaderPrivatePrivacyLedgerPortV1;
+  /** Server-only S7 HMAC secret; never submitted by the caller. */
+  readonly deliveryTokenSecret?: Uint8Array;
 }
 
 /**
@@ -83,8 +86,16 @@ export async function handleOfficialReaderPaidChatMessageHttpV1(
     return failure(503, 'CAPABILITY_UNAVAILABLE', 'reader.paid_unavailable', input.requestId);
   }
   if (!input.identityEvidenceVerifier || !input.pool || !input.keyResolver
-      || !input.privacyLedgerPort) {
+      || !input.privacyLedgerPort
+      || !(input.deliveryTokenSecret instanceof Uint8Array)
+      || input.deliveryTokenSecret.byteLength !== 32) {
     return failure(503, 'CAPABILITY_UNAVAILABLE', 'reader.paid_unavailable', input.requestId);
+  }
+  // A client-generated UUID persists across GET retries. S7 HMAC binding
+  // prevents another Subject/Reading/marker from replaying the receipt.
+  const deliveryRequestId=input.request.headers.get('X-Reader-Delivery-Request-Id');
+  if (deliveryRequestId === null || !UUID.test(deliveryRequestId)) {
+    return failure(400, 'INVALID_REQUEST', 'reader.paid_unavailable', input.requestId);
   }
 
   try {
@@ -100,7 +111,14 @@ export async function handleOfficialReaderPaidChatMessageHttpV1(
       safeMessageId: parsed.safeMessageId,
       keyResolver: input.keyResolver,
       privacyLedgerPort: input.privacyLedgerPort,
+      deliveryReservation: {
+        deliveryRequestId: deliveryRequestId.toLowerCase(),
+        secret: input.deliveryTokenSecret,
+      },
     });
+    if (read.delivery === undefined) {
+      return failure(503, 'CAPABILITY_UNAVAILABLE', 'reader.paid_unavailable', input.requestId);
+    }
     return Response.json({
       ok: true,
       data: {
@@ -110,6 +128,15 @@ export async function handleOfficialReaderPaidChatMessageHttpV1(
         officialReadingId: read.officialReadingId,
         readerCharacterId: read.readerCharacterId,
         committedAt: read.committedAt,
+        // S7 prepared != committed != client-acknowledged. The frontend
+        // POSTs the token only AFTER receiving/rendering this response.
+        delivery: {
+          deliveryRequestId: read.delivery.deliveryRequestId,
+          deliveryAttemptId: read.delivery.deliveryAttemptId,
+          responsePreparedAt: read.delivery.responsePreparedAt,
+          acknowledgementToken: read.delivery.acknowledgementToken,
+          replayed: read.delivery.replayed,
+        },
         body: read.body,
       },
       meta: { apiContractVersion: 'v0.9', requestId: input.requestId, serverTime: input.serverTime },
