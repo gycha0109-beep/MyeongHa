@@ -16,6 +16,8 @@ export const CF_PREVIEW_DRILL_V1 = Object.freeze({
 });
 const SHA = /^[a-f0-9]{40}$/u;
 const RECEIPT_PATH = '/_myeongha-preview-build.json';
+export const CF_PREVIEW_APPROVED_RECOVERY_COMMIT_V1 =
+  'd4f7cebb3d9be6b4ad9e526c53e3f5b8585cc9c0';
 
 export function parseCloudflarePreviewRehearsalV1(argv) {
   if (argv.length === 1 && argv[0] === '--help') return null;
@@ -30,6 +32,9 @@ export function parseCloudflarePreviewRehearsalV1(argv) {
   }
   if (!SHA.test(out.rollback) || !SHA.test(out.restore) || out.rollback === out.restore) {
     throw Error('Provide distinct exact 40-character --rollback and --restore commits');
+  }
+  if (out.rollback !== CF_PREVIEW_APPROVED_RECOVERY_COMMIT_V1) {
+    throw Error('Rollback target is not the pinned previously verified Preview version');
   }
   if (out.apply && !out.previewOnly) {
     throw Error('Applying a Preview rehearsal requires --confirm-preview-only');
@@ -58,14 +63,18 @@ function assertLocalCheckout(cwd, plan) {
   if (git(cwd, 'merge-base', plan.rollback, plan.restore) !== plan.rollback) {
     throw Error('Rollback commit must be an ancestor of restore commit');
   }
-  const config = JSON.parse(execFileSync('git', ['-C', cwd, 'show', plan.restore + ':wrangler.jsonc'], {
-    encoding: 'utf8', timeout: 20_000, stdio: ['ignore','pipe','ignore'],
-  }));
-  if (config.name !== CF_PREVIEW_DRILL_V1.worker || config.workers_dev !== false ||
-      config.preview_urls !== true || config.main !== './workers/cloudflare-static-preview.mjs' ||
-      config.assets?.html_handling !== 'none' ||
-      JSON.stringify(config.assets?.run_worker_first) !== JSON.stringify(['/api','/api/*'])) {
-    throw Error('Worker configuration is not restricted to the approved Preview');
+  for (const revision of [plan.rollback, plan.restore]) {
+    const config = JSON.parse(execFileSync('git', ['-C', cwd, 'show', revision + ':wrangler.jsonc'], {
+      encoding: 'utf8', timeout: 20_000, stdio: ['ignore','pipe','ignore'],
+    }));
+    if (config.name !== CF_PREVIEW_DRILL_V1.worker || config.workers_dev !== false ||
+        config.preview_urls !== true || config.main !== './workers/cloudflare-static-preview.mjs' ||
+        config.assets?.directory !== './public' ||
+        config.assets?.html_handling !== 'none' ||
+        config.assets?.not_found_handling !== 'none' ||
+        JSON.stringify(config.assets?.run_worker_first) !== JSON.stringify(['/api','/api/*'])) {
+      throw Error('Worker configuration is not restricted to the approved Preview');
+    }
   }
 }
 
@@ -113,7 +122,13 @@ async function publishSnapshot(root, revision, beforeDeploy = () => {}) {
       ['run','build:cloudflare:static'], folder);
     const config = JSON.parse(await readFile(join(folder, 'wrangler.jsonc'), 'utf8'));
     if (config.name !== CF_PREVIEW_DRILL_V1.worker || config.workers_dev !== false ||
-        config.preview_urls !== true) throw Error('Rollback snapshot Worker policy drift');
+        config.preview_urls !== true || config.main !== './workers/cloudflare-static-preview.mjs' ||
+        config.assets?.directory !== './public' ||
+        config.assets?.html_handling !== 'none' ||
+        config.assets?.not_found_handling !== 'none' ||
+        JSON.stringify(config.assets?.run_worker_first) !== JSON.stringify(['/api','/api/*'])) {
+      throw Error('Rollback snapshot Worker policy drift');
+    }
     // The CLI may return a transport error AFTER Cloudflare has accepted a
     // deployment. Mark the attempt before invoking it so restore is never
     // skipped on an ambiguous result.

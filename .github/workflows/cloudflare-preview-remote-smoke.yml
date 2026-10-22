@@ -24,11 +24,20 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha }}
+          # Only Ops needs local ancestry for the bounded, no-write recovery dry-run.
+          fetch-depth: ${{ github.head_ref == 'feat/ops/cloudflare-authdb-clean-snapshot-20261021' && 80 || 1 }}
           persist-credentials: false
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '24'
           package-manager-cache: false
+      - name: Preflight pinned Preview rollback and restore plan (dry-run only)
+        if: github.head_ref == 'feat/ops/cloudflare-authdb-clean-snapshot-20261021'
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          git switch -c feat/ops/cloudflare-authdb-clean-snapshot-20261021
+          node scripts/local/rehearse-cloudflare-preview-rollback.mjs --rollback d4f7cebb3d9be6b4ad9e526c53e3f5b8585cc9c0 --restore "$EXPECTED_HEAD"
       - name: Verify deployed HTTP headers, 11 HTML routes and all API HOLDs
         run: node scripts/verify-cloudflare-preview-remote.mjs
       - name: Verify immutable earlier Preview recovery candidate

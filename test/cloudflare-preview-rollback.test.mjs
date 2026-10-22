@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { readFile } from 'node:fs/promises';
 import {
   CF_PREVIEW_DRILL_V1,
+  CF_PREVIEW_APPROVED_RECOVERY_COMMIT_V1,
   parseCloudflarePreviewRehearsalV1,
 } from '../scripts/local/rehearse-cloudflare-preview-rollback.mjs';
 
@@ -13,6 +14,7 @@ describe('Cloudflare Preview rollback rehearsal safe-by-default', () => {
     expect(parseCloudflarePreviewRehearsalV1([
       '--rollback', OLD, '--restore', CURRENT,
     ])).toEqual({ rollback: OLD, restore: CURRENT, apply: false, previewOnly: false });
+    expect(CF_PREVIEW_APPROVED_RECOVERY_COMMIT_V1).toBe(OLD);
     expect(CF_PREVIEW_DRILL_V1).toMatchObject({
       worker: 'myeongha', preview: 'feat/ops/cloudflare-authdb-clean-snapshot-20261021',
     });
@@ -22,6 +24,7 @@ describe('Cloudflare Preview rollback rehearsal safe-by-default', () => {
       ['--rollback', OLD, '--restore', CURRENT, '--apply'],
       ['--rollback', OLD, '--restore', OLD, '--apply', '--confirm-preview-only'],
       ['--rollback', 'bad', '--restore', CURRENT],
+      ['--rollback', 'b'.repeat(40), '--restore', CURRENT],
       ['--rollback', OLD, '--restore', CURRENT, '--deploy'],
       ['--rollback', OLD, '--restore', CURRENT, '--apply', '--apply', '--confirm-preview-only'],
     ]) expect(() => parseCloudflarePreviewRehearsalV1(args)).toThrow();
@@ -40,5 +43,6 @@ describe('Cloudflare Preview rollback rehearsal safe-by-default', () => {
     expect(contents).not.toContain("versions upload");
     expect(contents).toContain('rollbackMayHavePublished = true');
     expect(contents).toContain('await publishSnapshot(root, plan.restore)');
+    expect(contents).toContain('for (const revision of [plan.rollback, plan.restore])');
   });
 });

@@ -106,3 +106,9 @@
 - 명시적으로 `--apply --confirm-preview-only`인 경우에만 기존 프리뷰 `feat/ops/cloudflare-authdb-clean-snapshot-20261021` 이름으로 `wrangler@4.151.2 preview`를 이용해 *과거 소스 임시 worktree 빌드 → Preview 버전 재게시 → 정확한 SHA+58건 HTTP 계약 검증 → 최신 소스 임시 worktree 빌드·재게시 → SHA+HTTP 재검증* 순서를 수행하도록 구현. `wrangler deploy`/Production URL/운영 DNS/API 키 이관/유료 리소스 생성은 사용하지 않는다. 예외 발생 시 이전 프리뷰 게시가 완료된 경우에는 우선 복귀를 시도하며, 복귀 검증 실패를 절대로 PASS로 기록하지 않는다.
 - `test/cloudflare-preview-rollback.test.mjs`에 dry-run 기본값, 정확한 SHA 및 이중 확인 요구, 명령 범위 축소 회귀를 추가. **현재 세션에서는 이 스크립트의 --apply를 실행하지 않았으며 실제 mutable Preview 롤백/복귀는 미증명**. 실제 사용에는 인증된 로컬 Wrangler/기존 Preview 권한, 기동 가능한 Node24/git checkout 및 배포 중 다른 Cloudflare Builds 갱신 충돌 없음이 필요하다.
 - 이 스크립트는 인증·DB positive 활성화를 뜻하지 않으며 세연 첫/History/Replay 503, Commerce/PortOne HOLD, Vercel Production/DNS 변경 금지와 독립이다.
+
+## 2026-10-22 — GitHub Actions에서 Preview 복원 사전 점검 실행
+
+- 원격 Preview smoke Workflow에 **클라우드 CI 러너의 복원 DRY RUN**을 추가. 이전 고정된 40자리 Git SHA `d4f7cebb3d9be6b4ad9e526c53e3f5b8585cc9c0`와 실행 시점의 정확한 PR head를 비교하고, 두 버전의 원본 `wrangler.jsonc`, 부모-선조 관계 및 기존 Ops Preview 이름이 맞는지 확인한다. `--apply` 옵션 없이 실행되며 **클라우드 배포·시크릿·DNS·운영 Worker에 쓰기 작업이 전혀 없다**.
+- PR #2384 구형 Stage 4는 기존의 1-커밋 checkout 및 smoke 계약을 그대로 유지한다. #2420은 제한된 Git 히스토리를 다운로드하고 PR head의 로컬 브랜치를 구성해 위 사전 점검을 수행한다. **사용자 Windows 데스크탑에 접근할 이유가 없고, 명하 Ops GitHub CI만 사용한다.**
+- 실제 이전 Preview로 변경하고 최신 Preview로 복원하는 **mutating rehearsal은 여전히 별개 미실행**. 원격 CI의 준비성 PASS를 실제 rollback 완료라고 기록하지 않는다. Wrangler 배포 권한이 있는 적법한 CI 환경 또는 Cloudflare 전용 배포 실행 경로가 확보된 시점에만 `--apply`를 사용한다.
