@@ -45,7 +45,39 @@ function uuid(value: unknown): string {
   return value.toLowerCase();
 }
 
-/** The caller must not hold an old DB snapshot or a cached Reader ticket. */
+/**
+ * Only callable with server-owned, canonical Subject transaction and exact
+ * Reader scope found from that Subject's authoritative Thread/Reading.
+ * An old 'allowed' status/owned Record cannot be replayed to pass this check.
+ */
+export async function assertOfficialReaderPrivateCurrentVerifiedPurchaseScopeV1(
+  input: Readonly<{
+    scope: PostgresSubjectExecutionScopeV1;
+    readingId: string;
+    readerCharacterId: string;
+    readerContentBundleId: string;
+  }>,
+): Promise<void> {
+  try {
+    const {scope}=input;
+    const subjectId=uuid(scope.resolvedSubject.subjectId);
+    const readingId=uuid(input.readingId);
+    const bundleId=uuid(input.readerContentBundleId);
+    if (scope.resolvedSubject.subjectKind!=='member'
+        || !READER.test(input.readerCharacterId)) return deny();
+    const response=await scope.client.query<{guardExecuted:unknown}>(VERIFY_SQL,[
+      subjectId,readingId,input.readerCharacterId,bundleId,
+    ]);
+    // PostgreSQL VOID may decode to null or an empty string. Exactly one
+    // result is required, and any SQL exception must remain a hard denial.
+    if (response.rows.length!==1 || !response.rows[0]
+        || !Object.hasOwn(response.rows[0],'guardExecuted')) return deny();
+  } catch {
+    return deny();
+  }
+}
+
+/** T1 and T2 adapter for the just-issued fresh server admission. */
 export async function assertOfficialReaderPrivateCurrentVerifiedPurchaseV1(
   input: Readonly<{
     scope: PostgresSubjectExecutionScopeV1;
@@ -53,32 +85,18 @@ export async function assertOfficialReaderPrivateCurrentVerifiedPurchaseV1(
   }>,
 ): Promise<void> {
   try {
-    const { scope, admission } = input;
-    const present = admission.scope;
-    const subjectId = uuid(scope.resolvedSubject.subjectId);
-    if (scope.resolvedSubject.subjectKind !== 'member'
-        || uuid(present.subjectId) !== subjectId
-        || !READER.test(present.readerCharacterId)
-        || !UUID.test(present.readerContentBundleId)
+    const {scope,admission}=input;
+    const present=admission.scope;
+    if (uuid(present.subjectId)!==uuid(scope.resolvedSubject.subjectId)
         || !UUID.test(present.threadId)
         || !Number.isFinite(Date.parse(present.effectiveAt))) return deny();
-
-    const response = await scope.client.query<{guardExecuted: unknown}>(VERIFY_SQL, [
-      subjectId,
-      uuid(present.readingId),
-      present.readerCharacterId,
-      uuid(present.readerContentBundleId),
-    ]);
-    // Function returns PostgreSQL VOID (driver codecs may map that to
-    // null or an empty string). One exactly shaped result proves the private
-    // SQL ran to completion without throwing; it is not a public Grant.
-    if (response.rows.length !== 1 || !response.rows[0]
-        || !Object.hasOwn(response.rows[0], 'guardExecuted')) {
-      return deny();
-    }
+    return await assertOfficialReaderPrivateCurrentVerifiedPurchaseScopeV1({
+      scope,
+      readingId:present.readingId,
+      readerCharacterId:present.readerCharacterId,
+      readerContentBundleId:present.readerContentBundleId,
+    });
   } catch {
-    // No DB messages, Receipt status, original Subject or Grant identity may
-    // leak into the private generator, the public paid reader or ordinary Chat.
     return deny();
   }
 }
