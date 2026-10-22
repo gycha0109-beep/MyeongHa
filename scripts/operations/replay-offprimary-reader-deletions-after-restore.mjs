@@ -52,6 +52,9 @@ try {
     tombstonesReplayed: result.tombstonesReplayed,
     protectedRowsPhysicallyDeleted: result.protectedRowsPhysicallyDeleted,
     keysConfirmedDestroyed: result.keysConfirmedDestroyed,
+    refundScopeTombstonesReplayed: result.refundScopeTombstonesReplayed,
+    refundScopeRowsDeleted: result.refundScopeRowsDeleted,
+    refundScopeKeysConfirmedDestroyed: result.refundScopeKeysConfirmedDestroyed,
     publicReaderServiceEnabled: false,
     next: 'Keep Reader paid-read OFF until the complete PostgreSQL privacy reconciliation and restore owner acceptance.',
   }) + '\n');
