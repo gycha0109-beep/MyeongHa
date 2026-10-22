@@ -89,8 +89,13 @@ export function parseCurrentReaderRecordContinuityV1(envelope, expected) {
   const data = envelope.data;
   if (!exactKeys(data,[
     'contractVersion','readingId','readerCharacterId','record',
-    'readerFollowup','protectedAnswer','summary','saleActivated',
-  ]) || data.contractVersion !== COMMERCE_READER_RECORD_CONTINUITY_V1
+    'readerFollowup','purchaseState','protectedAnswer','summary','saleActivated',
+  ]) || ![
+    'current_verified_purchase',
+    'verified_full_cancellation',
+    'not_confirmed',
+  ].includes(data.purchaseState)
+      || data.contractVersion !== COMMERCE_READER_RECORD_CONTINUITY_V1
       || uuid(data.readingId) !== expectedReading
       || data.readerCharacterId !== expectedReader
       || !exactKeys(data.record,['state','completedAt'])
@@ -107,6 +112,7 @@ export function parseCurrentReaderRecordContinuityV1(envelope, expected) {
     throw new TypeError('Reader Records follow-up state is invalid.');
   }
   if (followup.state === 'existing_thread_candidate'
+      && data.purchaseState === 'current_verified_purchase'
       && exactKeys(followup,['state','threadId','requiresFreshGateAtUse'])
       && uuid(followup.threadId)) {
     return Object.freeze({
@@ -114,6 +120,7 @@ export function parseCurrentReaderRecordContinuityV1(envelope, expected) {
       readingId: expectedReading,
       readerCharacterId: expectedReader,
       threadId: uuid(followup.threadId),
+      purchaseState: 'current_verified_purchase',
     });
   }
   if (followup.state === 'not_available'
@@ -122,6 +129,7 @@ export function parseCurrentReaderRecordContinuityV1(envelope, expected) {
       state: 'not_available',
       readingId: expectedReading,
       readerCharacterId: expectedReader,
+      purchaseState: data.purchaseState,
     });
   }
   throw new TypeError('Reader Records follow-up state is invalid.');
