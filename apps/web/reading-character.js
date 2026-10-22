@@ -20,19 +20,19 @@ const readerCatalog = {
   baekheon: {
     name: '백헌',
     hanja: '白憲',
-    title: '충추원의 장',
+    title: '베테랑 조정자',
     intro: '당신의 사주를 바탕으로 지금의 흐름부터 하나씩 살펴보겠습니다.',
   },
   seyeon: {
     name: '세연',
     hanja: '',
-    title: '무녀',
+    title: '명하의 안내인',
     intro: '복잡하게 시작하지 않을게요. 지금 가장 크게 읽히는 흐름부터 같이 봐요.',
   },
   yeoul: {
     name: '여울',
     hanja: '',
-    title: '설계관 기록관',
+    title: '운영관리팀 사원',
     intro: '돌려 말하지 않을게요. 지금 필요한 흐름부터 바로 짚겠습니다.',
   },
   seorin: {
@@ -44,7 +44,7 @@ const readerCatalog = {
   rahyeon: {
     name: '라현',
     hanja: '',
-    title: '연결자',
+    title: '전시 기획자',
     intro: '표면적인 답보다, 당신이 실제로 흔들리는 지점부터 읽어보죠.',
   },
   mira: {
@@ -56,7 +56,7 @@ const readerCatalog = {
   taegyeom: {
     name: '태겸',
     hanja: '',
-    title: '연결자',
+    title: '프로 격구 선수',
     intro: '근거 없는 낙관은 빼겠습니다. 확인되는 구조부터 보죠.',
   },
   yunho: {
