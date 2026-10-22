@@ -5,7 +5,9 @@ import {
   assertSeyeonFirstPositiveNodeDbReadyV1,
   createSeyeonFirstPositiveMemoryLockedReadV1,
   executeAndDeliverSeyeonFirstPositiveMemoryNodeTurnV1,
+  deliverSeyeonCommittedFirstPositiveMemoryNodeTurnV1,
 } from '../apps/api/src/seyeon-first-positive-memory-node-delivery-v1.js';
+import type { RunProductionSeyeonChatResultV1 } from '../apps/api/src/production-seyeon-chat-runtime-v1.js';
 import type { ServerResponse } from 'node:http';
 import type {
   PostgresQueryResultV1,
@@ -242,6 +244,55 @@ describe('Se-yeon G3 Node-only original-Grant current Subject fence',()=>{
     expect(queries(db)).not.toContainEqual(
       expect.stringContaining('from public.qry_seyeon_positive_first_memory_locked_reveal_v1('),
     );
+  });
+
+  it.each([
+    ['Commit belongs to another attempt', { attemptId: ATTEMPT, receiptAttemptId: OTHER, attemptReplayed: false, characterId: 'seyeon' }],
+    ['executed attempt was actually an in-flight replay', { attemptId: ATTEMPT, receiptAttemptId: ATTEMPT, attemptReplayed: true, characterId: 'seyeon' }],
+    ['committed turn was attributed to another Character', { attemptId: ATTEMPT, receiptAttemptId: ATTEMPT, attemptReplayed: false, characterId: 'other-character' }],
+    ['attempt receipt is missing', { attemptId: undefined, receiptAttemptId: ATTEMPT, attemptReplayed: false, characterId: 'seyeon' }],
+  ])('blocks mismatched G3 executed lineage: %s before original Grant lookup', async (_name, mismatch) => {
+    let destroyed = false;
+    let dbConnections = 0;
+    const pool: PostgresSubjectPoolV1 = {
+      connect() {
+        dbConnections++;
+        throw Error('Wrong attempt must never reach original Grant DB lookup');
+      },
+    };
+    const response = {
+      headersSent: false, writableEnded: false, destroyed: false,
+      socket: {}, destroy() { destroyed = true; },
+    } as unknown as ServerResponse;
+    const committedTurn = {
+      turnId: TURN,
+      attemptId: mismatch.receiptAttemptId,
+      assistantMessageId: 'd5000000-0000-4000-8000-000000000006',
+      sequenceNo: 1,
+      replayed: false,
+    };
+    const result = {
+      subjectId: SUBJECT,
+      threadBinding: {threadId: THREAD},
+      execution: {
+        disposition: 'executed',
+        receivedTurn: {turnId: TURN, threadCharacterId: mismatch.characterId},
+        attempt: {attemptId: mismatch.attemptId, replayed: mismatch.attemptReplayed},
+        committedTurn,
+      },
+    } as unknown as RunProductionSeyeonChatResultV1;
+    await expect(deliverSeyeonCommittedFirstPositiveMemoryNodeTurnV1({
+      response,
+      requestSignal: new AbortController().signal,
+      pool,
+      verifiedEvidence: EVIDENCE,
+      result,
+      expectedThreadId: THREAD,
+      requestId: 'g3-exact-attempt',
+      serverTime: '2026-10-22T00:00:00.000Z',
+    })).rejects.toMatchObject({code: 'INVALID_COMMIT'});
+    expect(destroyed).toBe(true);
+    expect(dbConnections).toBe(0);
   });
 
   it('keeps absent G1/G2/G3 owner RPC and EXECUTE privileges before Provider at DB_NOT_READY',async()=>{
