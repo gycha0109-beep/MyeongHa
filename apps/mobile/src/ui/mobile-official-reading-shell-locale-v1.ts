@@ -17,6 +17,7 @@ const SHELL = Object.freeze({
     readerHeading: '이 공식 Reading과 Reader',
     readerCount: (count: number) => `공식 기록에 연결된 Reader 정보: ${count}명`,
     noReader: '이 공식 기록에 연결된 Reader 정보가 없습니다.',
+    readerLabel: (count: number) => count === 0 ? 'Reader 기록 없음' : count === 1 ? '대리자와 본 풀이' : `대리자 ${count}명과 본 풀이`,
     readerBoundary:
       'Reader 연결 정보는 해설 구매·열람 권한 또는 해설 완료의 증명이 아닙니다. Reader별 해설 다시 보기와 후속 대화는 별도의 서버 권한·기록 계약이 승인된 뒤 제공됩니다.',
     noticesTitle: '읽기 범위 안내',
@@ -32,6 +33,7 @@ const SHELL = Object.freeze({
     readerHeading: 'この公式鑑定と案内人',
     readerCount: (count: number) => `公式記録に関連づけられた案内人情報：${count}人`,
     noReader: 'この公式記録に関連づけられた案内人情報はありません。',
+    readerLabel: (count: number) => count === 0 ? '案内人の記録なし' : count === 1 ? '案内人と読んだ鑑定' : `案内人${count}人と読んだ鑑定`,
     readerBoundary:
       '案内人との関連づけは、解説の購入・閲覧権限や解説完了を意味しません。案内人別の解説の再閲覧や後続の会話は、サーバー側の権限・記録に関する契約が承認されてから提供されます。',
     noticesTitle: '鑑定範囲のご案内',
@@ -47,6 +49,7 @@ const SHELL = Object.freeze({
     readerHeading: '此正式解讀與引路人',
     readerCount: (count: number) => `正式紀錄關聯的引路人資訊：${count}位`,
     noReader: '此正式紀錄沒有關聯的引路人資訊。',
+    readerLabel: (count: number) => count === 0 ? '沒有引路人紀錄' : count === 1 ? '與引路人一同查看的解讀' : `與${count}位引路人一同查看的解讀`,
     readerBoundary:
       '引路人的關聯資訊不代表已購買解說、擁有閱覽權限或解說已完成。再次查看個別引路人的解說及後續對話，須待伺服器權限與紀錄規範另行核准後才會提供。',
     noticesTitle: '解讀範圍說明',
@@ -98,6 +101,7 @@ export function projectMobileOfficialReadingShellV1(locale: unknown): Readonly<{
   readerHeading: string;
   readerCount: (count: number) => string;
   noReader: string;
+  readerLabel: (count: number) => string;
   readerBoundary: string;
   noticesTitle: string;
   stepPrefix: string;
