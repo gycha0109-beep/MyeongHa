@@ -5,7 +5,8 @@ import {createOpenAiSeyeonStructuredProviderV1}
   from '../apps/api/src/openai-seyeon-structured-provider-v1.js';
 import {createSeyeonQualityTrioSyntheticCensusV1}
   from '../scripts/seyeon-terra-glm-quality-trio-census-v1.mjs';
-import {assertN06Cap500ReservationV1,N06_MAX_REQUEST_BODY_BYTES}
+import {assertN06Cap500ReservationV1,N06_MAX_REQUEST_BODY_BYTES,
+  N06_ORIGINAL_FAILED_REQUEST_BODY_CAP}
   from '../scripts/seyeon-terra-glm-quality-cap500-admission-v1.mjs';
 import {requireSeyeonTrioOpenAiStageV1}
   from '../scripts/seyeon-terra-glm-quality-trio-admission-v1.mjs';
@@ -102,14 +103,22 @@ describe('N06 2026-10-22 real run #39751436405: reproduce Terra pre-dispatch wit
     expect(record.actualRequestBytes).toBe(record.reportedRequestBytes);
     expect(record.stageMatch).toBe(true);
     expect(record.actualRequestBytes).toBeGreaterThan(0);
+    // Original failure reproduces exactly at 15,680 bytes; the revised
+    // 19,200-byte guard admits the same real Terra request while price reserve
+    // is rebalanced to the unchanged sub-500 KRW owner threshold.
+    expect(record.actualRequestBytes).toBeGreaterThan(N06_ORIGINAL_FAILED_REQUEST_BODY_CAP);
+    expect(record.actualRequestBytes).toBeLessThanOrEqual(N06_MAX_REQUEST_BODY_BYTES);
+    expect(record.reservationOutcome).toBe('ADMITTED');
     // Safe numeric output; NO full body, prompt, character canon, secrets.
     console.info('SEYEON_N06_TERRA_OFFLINE_ADMISSION_DIAGNOSTIC '+JSON.stringify({
       code:'PRE_DISPATCH_REJECTED',
       actualRequestBytes:record.actualRequestBytes,
+      originalFailedByteCap:N06_ORIGINAL_FAILED_REQUEST_BODY_CAP,
       configuredMaxRequestBytes:N06_MAX_REQUEST_BODY_BYTES,
       schemaNameExact:record.stageMatch,
       reservationOutcome:record.reservationOutcome,
-      exceededRequestByteCap:record.actualRequestBytes>N06_MAX_REQUEST_BODY_BYTES,
+      originalFailedByteCapExceeded:record.actualRequestBytes>N06_ORIGINAL_FAILED_REQUEST_BODY_CAP,
+      correctedByteCapExceeded:record.actualRequestBytes>N06_MAX_REQUEST_BODY_BYTES,
       networkDispatches:record.networkDispatches,
       paidCalls:0,
       privateSourcesRead:false,
