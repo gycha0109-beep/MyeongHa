@@ -70,7 +70,6 @@ describe('Cloudflare Auth/DB admission is fail-closed until explicit host and se
     const origins = [
       await get('/api/auth/refresh?__myeongha_social_complete=1&__myeongha_social_complete=1', ENABLED, 'POST'),
       await get('/api/auth/refresh?__myeongha_social_complete=1&extra=1', ENABLED, 'POST'),
-      await get('/api/me?__myeongha_chat_open=1', ENABLED),
       await get('/api/auth/sign-in', ENABLED, 'POST', PRIVATE_ORIGIN, {
         Origin: 'https://attacker.example.test',
       }),
@@ -79,6 +78,16 @@ describe('Cloudflare Auth/DB admission is fail-closed until explicit host and se
       }),
     ];
     for (const response of origins) expect(response.status).toBe(404);
+    // S-CF2 Worker intercepts forged legacy Chat rewrite markers BEFORE
+    // the generic Auth API and static dispatcher. This is the independently
+    // sealed protected-chat 503, not an Auth API 404 or approved rewrite.
+    const spoofedChat = await get('/api/me?__myeongha_chat_open=1', ENABLED);
+    expect(spoofedChat.status).toBe(503);
+    expect(spoofedChat.headers.get('cache-control')).toBe('no-store');
+    expect(spoofedChat.headers.get('location')).toBeNull();
+    expect(spoofedChat.headers.get('access-control-allow-origin')).toBeNull();
+    expect((await spoofedChat.json()).error.code)
+      .toBe('SEYEON_FIRST_REVEAL_AUTHORITY_UNAVAILABLE');
   });
 
   it('admits only the exact social-complete marker, then fails closed before token exchange', async () => {
