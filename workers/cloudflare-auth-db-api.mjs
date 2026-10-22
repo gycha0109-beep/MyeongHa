@@ -14,6 +14,7 @@ import { createProductionGuestPromotionRuntimeV1 } from '../apps/api/src/product
 import { createProductionCurrentSubjectBirthProfileRuntimeV1 } from '../apps/api/src/production-current-subject-birth-profile-runtime.ts';
 import { handleSocialAuthStartRequestV1 } from '../apps/api/src/social-auth-start-http.ts';
 import { handleNaverOAuthBridgeRequestV1 } from '../apps/api/src/naver-oauth-bridge-http.ts';
+import { buildProductionNodePostgresPoolConfigV1 } from '../apps/api/src/node-postgres-subject-pool.ts';
 
 const EXACT_MODE = 'approved-auth-db-v1';
 const EXACT_DB_TLS_RLS_APPROVAL = 'approved-isolated-tls-rls-v1';
@@ -276,9 +277,23 @@ export async function tryHandleCloudflareApprovedAuthV1(request, bindings, route
   if (request.method === 'POST' && !approvedCloudflareSameOriginPostV1(request, origin)) return denied();
 
   try {
-    parseProductionUserDataRuntimeConfigV1(bindings);
+    // No socket opened: require the governed CA fingerprint, TLS verify-full
+    // hostname target and request-scoped single-connection candidate BEFORE
+    // Auth, Supabase, Naver redirect or PostgreSQL runtime acquisition.
+    const config = parseProductionUserDataRuntimeConfigV1(bindings);
     parseProductionMemberAuthRateLimitConfigV1(bindings);
+    const tls = buildProductionNodePostgresPoolConfigV1(config, {
+      maxConnectionsPerRuntime: 1,
+      connectionTimeoutMs: 5_000,
+      idleTimeoutMs: 1_000,
+      statementTimeoutMs: 5_000,
+    });
+    if (tls.max !== 1 || typeof tls.ssl !== 'object' ||
+        tls.ssl === null || tls.ssl.rejectUnauthorized !== true) {
+      return unavailable();
+    }
   } catch {
+    // Include neither CA, connection URL nor upstream exception in HTTP.
     return unavailable();
   }
 
