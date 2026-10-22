@@ -1,5 +1,9 @@
 import { fulfillVerifiedReaderReceiptV1 } from './commerce-verified-reader-fulfillment.js';
 import {
+  continuationFromVerifiedReaderBindV1,
+  type CommerceReaderReceiptContinuationV1,
+} from './commerce-reader-product-continuity-v1.js';
+import {
   loadCommercePaymentVerificationContextV1,
 } from './commerce-payment-verification-context-read.js';
 import {
@@ -30,6 +34,11 @@ export interface SubjectOwnedCommercePaymentCompletionV1 {
   readonly providerEventId: string;
   readonly replayed: boolean;
   readonly readerFulfillment?: 'issued' | 'already_bound' | 'not_reader';
+  /**
+   * Safe product navigation ONLY, not live entitlement or an interpretation.
+   * Absent for ordinary Commerce purchases / disabled private S2.
+   */
+  readonly readerContinuation?: CommerceReaderReceiptContinuationV1;
 }
 
 /**
@@ -93,5 +102,8 @@ export async function executeSubjectOwnedCommercePaymentCompletionV1(input: {
     ...(input.privateReaderReceiptFulfillmentEnabled === true
       ? { readerFulfillment: readerFulfillment?.kind ?? 'not_reader' as const }
       : {}),
+    ...(readerFulfillment === undefined || readerFulfillment === null
+      ? {}
+      : { readerContinuation: continuationFromVerifiedReaderBindV1(readerFulfillment) }),
   });
 }
