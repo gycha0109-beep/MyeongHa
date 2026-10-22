@@ -341,9 +341,9 @@ export async function tryHandleCloudflareApprovedAuthV1(request, bindings, route
   let memberRateLimitPool;
   let subjectPool;
   let result;
-  // Existing profile/birth runtimes already support server-owned pool
-  // injection. Cloudflare uses one request-owned connection cap instead of
-  // their Vercel default max=4, without changing the producer runtimes.
+  // All Cloudflare protected DB producer runtimes accept server-owned
+  // pool injection. A Worker HTTP fetch owns a max-one-connection pool;
+  // legacy Vercel calls without the option keep their unchanged defaults.
   function createSubjectPool() {
     subjectPool = createNodePostgresSubjectPoolV1(
       approvedDbConfig, CLOUDFLARE_DIRECT_POSTGRES_CANDIDATE_LIMITS_V1,
@@ -352,7 +352,9 @@ export async function tryHandleCloudflareApprovedAuthV1(request, bindings, route
   }
   try {
     if (isGuestBootstrap) {
-      runtime = createProductionGuestBootstrapHttpRuntimeV1({ env: bindings });
+      runtime = createProductionGuestBootstrapHttpRuntimeV1({
+        env: bindings, pool: createSubjectPool(),
+      });
       result = await runtime.handleRequest({
         request,
         requestId: crypto.randomUUID(),
@@ -388,14 +390,18 @@ export async function tryHandleCloudflareApprovedAuthV1(request, bindings, route
         serverTime: new Date().toISOString(),
       });
     } else if (isGuestPromotion) {
-      runtime = createProductionGuestPromotionRuntimeV1({ env: bindings });
+      runtime = createProductionGuestPromotionRuntimeV1({
+        env: bindings, pool: createSubjectPool(),
+      });
       result = await runtime.handleRequest({
         request,
         requestId: crypto.randomUUID(),
         serverTime: new Date().toISOString(),
       });
     } else if (isCurrentBirth) {
-      runtime = createProductionCurrentSubjectBirthProfileRuntimeV1({ env: bindings });
+      runtime = createProductionCurrentSubjectBirthProfileRuntimeV1({
+        env: bindings, pool: createSubjectPool(),
+      });
       result = await runtime.handleRequest({
         request,
         requestId: crypto.randomUUID(),
