@@ -82,3 +82,10 @@
 - 테스트 명령: `npm run test:cloudflare:scope`. GitHub CI의 `Verify Cloudflare DB request-scope and subject transaction cleanup (synthetic)`으로 필수화했다.
 - 이 코드는 **`wrangler.jsonc`의 정식 Cloudflare Worker에 import하지 않는다**. OAuth/DB secret을 만들거나 복사하지 않고, `/api/me`, `/api/auth/*`, `/api/readiness` 공개 경로는 기존 404를 유지한다.
 - **실연동 미완료:** 공급할 Pool factory의 Direct TCP 또는 Hyperdrive 결정을 포함하여 명하 실제 CA 지문 verify-full, DB principal/NOLOGIN role, RLS, 동시/장애/취소·timeout 및 인증 도메인 정책은 여전히 Security/API/DB 승인과 E2E가 필요하다. 이 합성 검증을 실제 DB 보안 수락으로 승격하지 않는다.
+
+## 8. Stage 5 Preview 시크릿 이름·회전 인수 및 미승인 활성화 감시 (2026-10-22)
+
+- `scripts/verify-cloudflare-auth-binding-inventory.mjs`의 `CLOUDFLARE_STAGE5_BINDING_CATALOG_V1`을 **비밀값 없는 코드 기반 권한/이름 인벤토리**로 추가. 실제 Stage 5 코드에서 참조하는 Auth Origin·OAuth Callback·DB TLS/RLS·정확한 DB hostname/port·emergency HOLD·Supabase/PG/게스트/출생 HMAC·Naver/Google/Kakao 플래그 및 credential **23개 이름**을 출처 파일과 함께 추적한다.
+- 분류 `secret`은 비밀값을 실제로 가져오거나 출력하지 않고, 별도 Cloudflare 환경의 **Secret 바인딩**으로만 소유자 인수가 가능하다는 의미다. `configuration`/ `control`/ `approval`도 기존 Auth/DB E2E·Security/API/DB 기술 수락 전에는 Preview에 설정하지 않는다. 코드는 요구 **검토 조직**만 나타내며 특정 인물의 승인·공급자 콜백 등록을 받았다는 뜻이 아니다.
+- 변경 전 **회전·폐기 인수**: (1) Security/API/DB가 도메인/DB·provider별 기술 승인과 접근 범위를 기록 (2) Cloudflare와 Vercel credential 수명·회전은 별도 owner 승인, Vercel 자동 복사 금지 (3) 새 Secret은 값을 PR/CI/로그에 남기지 않고 제한된 Cloudflare scope에 등록 (4) 정확한 Cloudflare Preview SHA, 안전한 Synthetic Auth/OAuth·실제 격리 DB TLS/RLS 확인 후에만 route admission 결론 검토 (5) 회전 실패 즉시 `MYEONGHA_CLOUDFLARE_EMERGENCY_HOLD`와 검증된 Preview rollback, Vercel 정상 운영 유지. **현재는 인수 승인·Secret 이관·회전/폐기 실행 모두 없음.**
+- CI `Guard Cloudflare Stage 5 secret-free binding inventory`는 `wrangler.jsonc`에서 임의 `vars`(빈 객체 포함), secret/unsafe 선언, route, Hyperdrive/D1/KV/R2/Queue 등 **미승인 binding/config 추가가 있으면 실패**한다. 추가로 인벤토리 각 이름이 실제 canonical 소스에서 발견되는지 확인하고, 이름·범주 개수·PASS/FAIL만 기록. 새 `test/cloudflare-auth-binding-inventory.test.mjs`가 plaintext/route/Worker drift를 합성 회귀로 확인한다. **Cloudflare API, 실제 시크릿, 운영 네트워크를 호출하지 않음.**

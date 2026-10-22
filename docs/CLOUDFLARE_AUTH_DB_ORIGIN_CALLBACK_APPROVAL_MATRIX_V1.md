@@ -135,3 +135,9 @@
 - Worker `workers/cloudflare-auth-db-api.mjs`에서 해당 3개 경로에도 `createSubjectPool()`을 주입한다. 2026-10-22 선행 구현된 프로필/출생조회·생성 3개 경로를 포함해 보호된 Guest/Profile/Birth 경로들은 개별 HTTP 요청 단위 **최대 1 연결** 옵션을 사용한다. 실행 후 Worker가 Runtime/Member rate-limit/Subject Pool 전부 각각 종료하며 중간 오류도 후속 종료를 생략하지 않는다.
 - `test/cloudflare-runtime-pool-injection.test.ts`는 3개 생산자에게 가짜 Pool을 넘겨 외부 DB/Provider 없이 생성·종료 시 연결/강제종료가 없는지, Guest Promotion 비정상 Method에서 DB 접근 없이 405가 유지되는지 확인한다. **소스 프로듀서의 도메인 동작 및 Vercel 기존 pool 설정값은 변경하지 않는다.**
 - Cloudflare에서 실제 TLS handshake 또는 Member A/B RLS가 성공했다는 증거는 아니며, 격리 원격 DB/승인 Auth 호스트·OAuth 콜백 등록 및 Security/API/DB 기술 수락은 계속 HOLD. Production DNS·DB·시크릿·세연·결제 변경 금지.
+
+### Stage 5 OAuth/Auth 커스텀 호스트 기동 조건 보강 (2026-10-22)
+
+- Cloudflare Auth 모드 활성화 문자열만으로 임의 로컬 주소를 승인할 수 없도록 `approvedCloudflareAuthHostnameV1`을 구현했다. 임시 `*.workers.dev`, `*.vercel.app`, localhost/IPv4/IPv6 리터럴, `.local/.internal/.test/.example/.invalid`, `example.com/.net/.org` 합성 루트, HTTPS 기본 443 외 포트 모두 요청 처리 전에 **404로 거부**한다.
+- 별도 등록된 실소유 커스텀 HTTPS FQDN/443, 원본 Auth origin exact match와 Security/API/DB 및 공급자 callback-owner 승인은 이전과 동일하게 필요하다. synthetic `.dev` 도메인을 쓰는 테스트는 DNS/Network 호출이 없으며 **도메인이 실제 소유·승인됐다는 증거가 아니다**.
+- Host 계약 변경은 Supabase/Naver/Google/Kakao 실제 콜백 등록이나 Vercel Production/DB·Cloudflare binding 수정이 아니고, 유효한 원격 격리 DB·OAuth 실환경 E2E는 HOLD다.
