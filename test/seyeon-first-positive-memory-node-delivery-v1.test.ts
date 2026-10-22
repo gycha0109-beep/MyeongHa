@@ -243,6 +243,49 @@ describe('Se-yeon G3 Node-only original-Grant current Subject fence',()=>{
     expect(queries(db).at(-1)).toBe('COMMIT');
   });
 
+  it('rejects an invalid send deadline without leaving the direct Node socket open',async()=>{
+    const db=new FakeG3Connection(SUBJECT);
+    const pool=new FakeG3Pool(db);
+    const node=fakeNodeResponse();
+    await expect(deliverSeyeonCommittedFirstPositiveMemoryNodeTurnV1({
+      response:node.response,
+      requestSignal:new AbortController().signal,
+      pool,
+      verifiedEvidence:EVIDENCE,
+      result:forgedCommit(),
+      expectedThreadId:THREAD,
+      requestId:'g3-invalid-deadline',
+      serverTime:'2026-10-22T04:15:00.000Z',
+      deadlineMs:1,
+    })).rejects.toThrow('Invalid bounded send deadline');
+    expect(node.outbound).toEqual([]);
+    expect(node.closed()).toBe(true);
+    expect(pool.connects).toBe(0);
+  });
+
+  it('closes the Node socket when the pre-model gate succeeds but the runtime throws',async()=>{
+    const db=new FakeG3Connection(SUBJECT,CANARY,true);
+    const pool=new FakeG3Pool(db);
+    const node=fakeNodeResponse();
+    let calls=0;
+    await expect(executeAndDeliverSeyeonFirstPositiveMemoryNodeTurnV1({
+      response:node.response,
+      requestSignal:new AbortController().signal,
+      pool,
+      verifiedEvidence:EVIDENCE,
+      threadId:THREAD,
+      clientTurnId:CLIENT_TURN,
+      text:'offline only',
+      requestId:'g3-runtime-error',
+      serverTime:'2026-10-22T04:15:00.000Z',
+      runtime:{run:async()=>{calls++;throw Error('synthetic runtime failure');}},
+    })).rejects.toThrow('synthetic runtime failure');
+    expect(calls).toBe(1);
+    expect(node.outbound).toEqual([]);
+    expect(node.closed()).toBe(true);
+    expect(queries(db).some(q=>q.includes('from public.qry_seyeon_positive_first_memory_locked_reveal_v1('))).toBe(false);
+  });
+
   it('rolls back current original Grant locks if the transport callback fails',async()=>{
     const db=new FakeG3Connection(SUBJECT);
     const port=read(new FakeG3Pool(db));
