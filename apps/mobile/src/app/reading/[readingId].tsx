@@ -20,7 +20,6 @@ import { subscribeMobileSubjectCredentialChangesV1 } from '@/core/session/mobile
 import { mobileRecordsServiceV1 } from '@/features/records/native-mobile-records-service';
 import {
   formatRecordDateV1,
-  readingReaderLabelV1,
   readingTitleV1,
 } from '@/features/records/records-view-model';
 import { mobileColors } from '@/ui/mobile-colors';
@@ -84,7 +83,7 @@ function errorState(error: unknown): Extract<DetailStateV1, { kind: 'error' }> {
 
 export default function OfficialReadingDetailScreen() {
   const styles = useMobileThemedStyles(staticStyles);
-  const { locale } = useMobileUiLocale();
+  const { locale, t } = useMobileUiLocale();
   const sourceNotice = projectMobileSourceLanguageNoticeV1(locale, 'reading');
   const shell = projectMobileOfficialReadingShellV1(locale);
   const params = useLocalSearchParams<{ readingId?: string | string[] }>();
@@ -175,9 +174,9 @@ export default function OfficialReadingDetailScreen() {
           <>
             <View style={styles.headerCard}>
               <Text style={styles.eyebrow}>OFFICIAL READING ARCHIVE</Text>
-              <Text style={styles.title}>{readingTitleV1(state.record.sajuDomain)}</Text>
+              <Text style={styles.title}>{t(readingTitleV1(state.record.sajuDomain))}</Text>
               <Text style={styles.meta}>
-                {formatRecordDateV1(state.record.completedAt)} · {readingReaderLabelV1(state.record.readerCharacterIds)}
+                {formatRecordDateV1(state.record.completedAt)} · {shell.readerLabel(state.record.readerCharacterIds.length)}
               </Text>
               <Text style={styles.authority}>{shell.original}</Text>
             </View>
