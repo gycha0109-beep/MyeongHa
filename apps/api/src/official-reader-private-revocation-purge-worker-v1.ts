@@ -19,6 +19,16 @@ import type {
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 const REF = /^reader-dek-v1:[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 
+const DELIVERY_PRUNE_AVAILABLE_SQL = `
+select pg_catalog.to_regprocedure(
+  'public.internal_prune_official_reader_paid_delivery_v1(integer)'
+) is not null as "installed"
+`;
+const DELIVERY_PRUNE_SQL = `
+select public.internal_prune_official_reader_paid_delivery_v1(
+  $1::integer
+)::text as "deletedCount"
+`;
 const LIST_SQL = `
 select job_id::text as "jobId"
 from public.internal_list_official_reader_paid_answer_purge_jobs_v1($1::integer)
@@ -70,6 +80,8 @@ export interface OfficialReaderPrivateRevocationPurgeBatchResultV1 {
   readonly empty: number;
   readonly keysDestroyed: number;
   readonly rowsDeleted: number;
+  /** No-content S7 delivery preparation/ACK receipts past 90 days. */
+  readonly deliveryReceiptsPruned: number;
   readonly publicPaidReadEnabled: false;
 }
 
@@ -363,6 +375,24 @@ export async function runOfficialReaderPrivateRevocationPurgeBatchV1(input: {
   if (jobs.length>0 && failed===jobs.length) {
     return fail();
   }
+
+  // S7 receipt retention is independent of refund/S4 deletion. Existing
+  // Workers without migration 2140 may still finish paid-body erasure; if
+  // S7 is installed, its expired receipts MUST be pruned within the same
+  // governed private system-Worker execution role (never by a client).
+  const schema=await single<{installed:unknown}>(
+    input.pool,DELIVERY_PRUNE_AVAILABLE_SQL,[],
+  );
+  if (typeof schema.installed!=='boolean') return fail();
+  let deliveryReceiptsPruned=0;
+  if (schema.installed) {
+    const pruned=await single<{deletedCount:unknown}>(
+      input.pool,DELIVERY_PRUNE_SQL,[500],
+    );
+    const value=Number(pruned.deletedCount);
+    if (!Number.isSafeInteger(value) || value<0 || value>500) return fail();
+    deliveryReceiptsPruned=value;
+  }
   return Object.freeze({
     schemaVersion:'official-reader-s4-revocation-purge-batch-v1' as const,
     discovered:jobs.length,
@@ -372,6 +402,7 @@ export async function runOfficialReaderPrivateRevocationPurgeBatchV1(input: {
     empty,
     keysDestroyed,
     rowsDeleted,
+    deliveryReceiptsPruned,
     publicPaidReadEnabled:false as const,
   });
 }
