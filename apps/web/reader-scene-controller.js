@@ -99,6 +99,8 @@ export function createReaderSceneControllerV1(options) {
       const scene = await options.client.readReaderScene({
         threadId: lastInput.threadId,
         officialReadingId: lastInput.officialReadingId,
+        // Display preference only: never use this as Reader output approval.
+        uiLocale: requestedUiLocale,
         signal: activeController.signal,
       });
       if (requestGeneration !== generation) return currentState;
