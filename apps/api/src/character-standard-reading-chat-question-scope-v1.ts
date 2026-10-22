@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { canonicalJson } from '../../../packages/domain/src/index.js';
+import { canonicalJson, evaluateCapabilitySecuritySignalsV1 } from '../../../packages/domain/src/index.js';
 import {
   assertServerPreparedStandardChatPreflightV2,
   type CharacterStandardReadingChatTurnPreflightV2,
@@ -245,11 +245,16 @@ export async function classifyCharacterStandardFollowupQuestionScopeV1(input: Re
   const assessment = inspectCharacterStandardFollowupSignalsV1(
     questionText, input.grounded.scope.sajuDomain,
   );
-  if (assessment.securitySignals.includes('instruction_override_attempt') ||
-      assessment.securitySignals.includes('invalid_input')) {
+  const securityVeto = evaluateCapabilitySecuritySignalsV1(assessment.securitySignals);
+  if (securityVeto === 'SECURITY_INPUT_INVALID' ||
+      securityVeto === 'SECURITY_INSTRUCTION_OVERRIDE_DENIED' ||
+      securityVeto === 'SECURITY_SIGNAL_INVALID') {
     return hold('unsupported_question');
   }
+  // Preserve the lexical scope result (including multiple_intents) rather
+  // than converting a mixed question into a new policy/permission.
   if (assessment.intent !== 'admitted') return hold(assessment.intent);
+  if (securityVeto !== null) return hold('new_authority_required');
 
   const evidence = await selectCharacterStandardFollowupEvidenceV1(input);
   if (evidence.mode === 'hold') return hold(evidence.reason);
