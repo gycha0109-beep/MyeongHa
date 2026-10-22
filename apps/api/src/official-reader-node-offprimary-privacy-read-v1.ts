@@ -1,6 +1,6 @@
 import {
   constants, existsSync, lstatSync, openSync, closeSync,
-  readFileSync,
+  readFileSync, fstatSync,
 } from 'node:fs';
 import {
   createHmac, createPublicKey, verify as verifySignature,
@@ -73,9 +73,10 @@ function safeReadCertificate(dir: string): unknown {
       join(dir, CERTIFICATE_FILENAME),
       constants.O_RDONLY | constants.O_NOFOLLOW,
     );
-    return JSON.parse(readFileSync(handle, { encoding: 'utf8' }).slice(
-      0, MAX_CERTIFICATE_BYTES + 1,
-    ));
+    const stat = fstatSync(handle);
+    if (!stat.isFile() || stat.size===0 || stat.size>MAX_CERTIFICATE_BYTES
+        || (stat.mode & 0o077)!==0) return null;
+    return JSON.parse(readFileSync(handle, { encoding: 'utf8' }));
   } catch {
     return null;
   } finally {
