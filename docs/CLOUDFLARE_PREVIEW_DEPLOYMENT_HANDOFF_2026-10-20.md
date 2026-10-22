@@ -84,3 +84,11 @@
 - 활성 시 인증·OAuth·게스트·개인정보·사주 계산 API는 DB·Supabase·Producer 접근 이전 404/no-store; 세연 Chat 첫 요청·History·Replay는 원래 정적 503 보안 방벽 유지, 공개 `GET /api/health`만 200 유지. 건강 상태만 공개하는 것이 DB readiness/로그인 성공을 의미하지 않음.
 - `test/cloudflare-auth-admission.test.mjs`에 비정상/접근 불가 바인딩, 위험한 데이터 풀 탐색 우회 방지, 영구 차단 이후 Health·세연 격리를 명시. 운영 Vercel/DNS/DB/Secret/OAuth/Cloudflare Paid/PortOne/세연 positive Release는 변경하지 않음.
 - 실제 Preview 또는 운영 Worker에서 이 스위치를 사용하려면 Cloudflare Worker 설정 접근 권한이 필요하며, 테스트의 단순 바인딩 합성값은 실제 on/off 동작 증명과 구분한다.
+
+## 2026-10-22 단계 9 — 무변경 Preview 복구 후보 사전 리허설
+
+- 최신 S-CF2 Preview 원격 검사는 [실행 #39731076575](https://github.com/gycha0109-beep/MyeongHa/actions/runs/39731076575)에서 **정확한 Git SHA `d4f7cebb3d9be6b4ad9e526c53e3f5b8585cc9c0` 스탬프, HTTP 58건 및 Chrome 11화면 PASS**를 기록했고 [동일 SHA의 전체 CI #39731076716](https://github.com/gycha0109-beep/MyeongHa/actions/runs/39731076716)도 PASS했다.
+- Cloudflare Preview deployment API의 **기존 고유 배포 URL** `https://59a14b13-myeongha.gycha0109.workers.dev`을 이전 안전 버전으로 고정. 해당 URL의 Cloudflare 배포 메타데이터는 `d4f7ceb` 태그/2026-10-22T06:04:44Z를 반환한다. 고유 배포 URL을 조회해 **이전 버전의 40자리 빌드 SHA `d4f7cebb3d9be6b4ad9e526c53e3f5b8585cc9c0` 일치 및 읽기 전용 HTTP 58개/API 404·503/11개 HTML, Chrome 11개 페이지 렌더링**을 검사하는 새 CI 단계를 작성했다.
+- 구현은 기존 `.github/workflows/cloudflare-preview-remote-smoke.yml`에 분기된 **이전 배포 Preview smoke 2단계**를 추가한 것이다. 현재 Preview URL·기존 #2384 Stage 4 테스트·운영 Worker·DNS/DB/Auth 설정 변경 없음. **실제 Preview 롤백·복귀는 수행하지 않았다.** 이 작업은 복구 가능한 구 버전의 동작 증빙(READ-ONLY candidate rehearsal)이며, 실제 rollback 복구 성공과 구별해 별도 수락할 것.
+- 사용법: 새 SHA로 변경된 PR의 CI에서는 **현재 Preview 최신 SHA 검사**를 먼저 수행한 후, 위 과거 고유 배포 URL을 pinned SHA로 검사한다. 두 회귀 중 하나라도 실패하면 rollback readiness를 FAIL로 판단한다. 향후 고유 URL이 만료·삭제되면 임의 대체값을 추측하지 말고 Cloudflare 배포 메타데이터로 새 검증 후보를 확정한 뒤 명시적으로 변경할 것.
+- 비상 전환 기준: OAuth/DB TLS/권한 오류, 사고성 민감 본문, 예상 외 redirect/cookie, AI/결제 재실행 위험 발생 시 우선 해당 보호 라우트를 HOLD. 이후 Security/API/DB·운영 수락 범위를 좁혀 **Cloudflare Preview만** 승인된 이전 버전으로 재배포하고, 원래 버전 재배포까지 연속해서 검증한다. GitHub/Cloudflare mutation 승인·적절한 버전 아티팩트와 owner 인수 없이는 실제 배포 조작하지 않는다.
