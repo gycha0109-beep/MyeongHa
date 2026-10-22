@@ -35,6 +35,11 @@
 
 ## 2. 사용자 승인 기록과 미확정 항목 (2026-10-22)
 
+**I18N-06 공통 바이블 기반 9인 화법 초안 작성 (2026-10-22)**
+- `docs/FRONTEND_INTEGRATION_READER_LANGUAGE_NEUTRAL_VOICE_MATRIX_V1_20261022.md`에 9인 승인 semantic baseline, typed Runtime 화법, 기존 개별 Bible Draft E/인물 정체성의 현재 관계와 상태를 함께 작성했다. **새 인물 정본 또는 Production release approval이 아니다.**
+- 기존 출처 간 충돌/방향 차이(특히 **여울/미라/도윤** 외에도 세연/서린/백헌)를 임의 정리하지 않고 Character 소유자 선택 대상으로 표시한다. 바뀌는 것은 이 I18N projection뿐이다.
+- 다음 단계는 우선 해당 공통 인물 화법의 source 정합성 채택이며, 그 후 국가/언어별 캐릭터 화법 후보를 만들고 사용자 승인 후에만 sparse exception registry에 등록한다. `ja-JP`/`zh-TW` 실제 캐릭터별 표현값은 여전히 미등록.
+
 **추가 승인 — 바이블 먼저, 언어·국가별 특성 나중 (2026-10-22)**
 - 사용자 승인: **공통 캐릭터 바이블의 언어 중립 인물성·화법 기준부터 정리**하고, 언어/국가별 화법 값과 캐릭터별 예외 후보는 그다음에 설계·제안한다. 기존 **A안(필요한 예외만 등록)**은 유지한다.
 - `docs/FRONTEND_INTEGRATION_READER_SHARED_BIBLE_BASELINE_V1_20261022.md`를 I18N-06의 첫 작성 기준으로 삼는다. 기존 승인 Bible/published Character Content가 person-level authority이며 별도 새 Canon을 만들지 않는다.
