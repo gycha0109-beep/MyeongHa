@@ -20,3 +20,4 @@ export * from './seyeon-authored-projection-v2.js';
 export * from './seyeon-fact-authority-v1.js';
 export * from './rahyeon-fact-authority-v1.js';
 export * from './reader-language-neutral-voice-handoff-v1.js';
+export * from './reader-voice-locale-composition-v1.js';
