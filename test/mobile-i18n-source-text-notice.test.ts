@@ -11,8 +11,10 @@ describe('I18N-06e mobile original-content notices', () => {
     for (const locale of ['ko-KR', 'ja-JP', 'zh-TW', 'zh-CN', 'en-US', '', undefined] as const) {
       const chat = projectMobileSourceLanguageNoticeV1(locale, 'chat');
       const reading = projectMobileSourceLanguageNoticeV1(locale, 'reading');
-      const webChat = projectChatOutputLanguageNoticeV1(locale);
-      const webReading = readingSourceLanguageNoticeV1(locale);
+      // Web helpers accept a concrete locale string; normalize untrusted
+      // inputs through the mobile UI-only projector before parity checks.
+      const webChat = projectChatOutputLanguageNoticeV1(chat.uiLocale);
+      const webReading = readingSourceLanguageNoticeV1(reading.uiLocale);
       expect(chat.uiLocale).toBe(webChat.uiLocale);
       expect(chat.visible).toBe(webChat.visible);
       expect(chat.text).toBe(webChat.text);
