@@ -136,12 +136,14 @@ export async function assertSeyeonFirstPositiveNodeDbReadyV1(input: Readonly<{
 export function createSeyeonFirstPositiveMemoryLockedReadV1(input: Readonly<{
   pool: PostgresSubjectPoolV1;
   verifiedEvidence: VerifiedSubjectIdentityEvidenceV1;
+  expectedSubjectId: string;
   threadId: string;
   turnId: string;
   attemptId: string;
 }>): SeyeonOriginalGrantLockedReadV1 {
   if (!member(input.verifiedEvidence) ||
-      ![input.threadId,input.turnId,input.attemptId].every(value=>UUID.test(value))) {
+      ![input.expectedSubjectId,input.threadId,input.turnId,
+        input.attemptId].every(value=>UUID.test(value))) {
     throw new SeyeonG3FirstPositiveNodeUnavailableV1('INVALID_SCOPE');
   }
   let used=false;
@@ -154,7 +156,9 @@ export function createSeyeonFirstPositiveMemoryLockedReadV1(input: Readonly<{
       pool:input.pool,
       verifiedEvidence:input.verifiedEvidence,
       execute:async ({client,resolvedSubject})=>{
-        if (resolvedSubject.subjectKind!=='member'||signal.aborted) {
+        if (resolvedSubject.subjectKind!=='member' ||
+            resolvedSubject.subjectId!==input.expectedSubjectId ||
+            signal.aborted) {
           throw new SeyeonG3FirstPositiveNodeUnavailableV1('INVALID_SCOPE');
         }
         const result=await client.query<{assistantText:unknown}>(LOCKED_G3_SQL,[
@@ -218,6 +222,7 @@ export async function deliverSeyeonCommittedFirstPositiveMemoryNodeTurnV1(
     withLockedOriginalGrant:createSeyeonFirstPositiveMemoryLockedReadV1({
       pool:input.pool,
       verifiedEvidence:input.verifiedEvidence,
+      expectedSubjectId:input.result.subjectId,
       threadId:input.expectedThreadId,
       turnId:receipt.turnId,
       attemptId:receipt.attemptId,
