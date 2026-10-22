@@ -90,11 +90,13 @@ declare
   v_count bigint;
   v_manifest jsonb;
 begin
+  -- Read the scope WITHOUT a row lock. Commerce provider revoke already
+  -- owns S1 before its entitlement-event trigger updates this job. The
+  -- Worker MUST take S1 first to avoid the inverse job-row -> S1 deadlock.
   select * into j from public.official_reader_paid_answer_purge_jobs_v1
   where id=p_job_id and lock_owner=p_worker
     and lease_expires_at>pg_catalog.clock_timestamp()
-    and status in ('claimed','db_erased')
-  for update;
+    and status in ('claimed','db_erased');
   if not found then
     raise exception using errcode='P0001',
       constraint='reader_paid_purge_claim_missing',
@@ -114,6 +116,20 @@ begin
   from public.internal_qry_official_reader_locked_bundle_scope_v1(
     j.subject_id,j.official_reading_id,j.reader_character_id
   ) q;
+  -- Now lock the queue row AFTER S1 and re-confirm the claimed identity.
+  perform 1 from public.official_reader_paid_answer_purge_jobs_v1 live
+  where live.id=p_job_id and live.subject_id=j.subject_id
+    and live.official_reading_id=j.official_reading_id
+    and live.reader_character_id=j.reader_character_id
+    and live.lock_owner=p_worker
+    and live.lease_expires_at>pg_catalog.clock_timestamp()
+    and live.status='claimed'
+  for update;
+  if not found then
+    raise exception using errcode='40001',
+      constraint='reader_paid_purge_claim_changed_after_s1',
+      message='Reader cleanup claim changed during current-Grant locking';
+  end if;
   if v_state is distinct from 'no_active_grant' then
     return pg_catalog.jsonb_build_object(
       'state','sibling_right_present','subjectId',j.subject_id::text,
@@ -180,10 +196,10 @@ begin
       constraint='reader_paid_purge_commit_invalid',
       message='Protected Reader cleanup commit is invalid';
   end if;
+  -- Scope lookup has no row lock. Recheck the claimed job AFTER S1.
   select * into j from public.official_reader_paid_answer_purge_jobs_v1
   where id=p_job_id and lock_owner=p_worker
-    and lease_expires_at>pg_catalog.clock_timestamp() and status='claimed'
-  for update;
+    and lease_expires_at>pg_catalog.clock_timestamp() and status='claimed';
   if not found then
     raise exception using errcode='P0001',
       constraint='reader_paid_purge_commit_claim_missing',
@@ -195,6 +211,19 @@ begin
   from public.internal_qry_official_reader_locked_bundle_scope_v1(
     j.subject_id,j.official_reading_id,j.reader_character_id
   ) q;
+  perform 1 from public.official_reader_paid_answer_purge_jobs_v1 live
+  where live.id=p_job_id and live.subject_id=j.subject_id
+    and live.official_reading_id=j.official_reading_id
+    and live.reader_character_id=j.reader_character_id
+    and live.lock_owner=p_worker
+    and live.lease_expires_at>pg_catalog.clock_timestamp()
+    and live.status='claimed'
+  for update;
+  if not found then
+    raise exception using errcode='40001',
+      constraint='reader_paid_purge_commit_claim_changed_after_s1',
+      message='Reader cleanup claim changed after scope locking';
+  end if;
   if v_state is distinct from 'no_active_grant' then
     raise exception using errcode='P0001',
       constraint='reader_paid_purge_sibling_right_survives',
