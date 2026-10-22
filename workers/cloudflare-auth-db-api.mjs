@@ -14,6 +14,12 @@ import { createProductionGuestPromotionRuntimeV1 } from '../apps/api/src/product
 import { createProductionCurrentSubjectBirthProfileRuntimeV1 } from '../apps/api/src/production-current-subject-birth-profile-runtime.ts';
 import { handleSocialAuthStartRequestV1 } from '../apps/api/src/social-auth-start-http.ts';
 import { handleNaverOAuthBridgeRequestV1 } from '../apps/api/src/naver-oauth-bridge-http.ts';
+import {
+  buildProductionNodePostgresPoolConfigV1,
+  createNodePostgresSubjectPoolV1,
+} from '../apps/api/src/node-postgres-subject-pool.ts';
+import { PostgresMemberAuthRateLimitAdmissionPortV1 } from '../apps/api/src/postgres-member-auth-rate-limit.ts';
+import { CLOUDFLARE_DIRECT_POSTGRES_CANDIDATE_LIMITS_V1 } from '../apps/api/src/cloudflare-direct-postgres-candidate.ts';
 
 const EXACT_MODE = 'approved-auth-db-v1';
 const EXACT_DB_TLS_RLS_APPROVAL = 'approved-isolated-tls-rls-v1';
@@ -228,6 +234,14 @@ export function approvedCloudflareAuthOriginV1(request, bindings) {
   return raw;
 }
 
+// Release both independently-owned resources even if the first close fails.
+export async function closeCloudflareAuthResourcesV1(runtime, memberRateLimitPool) {
+  let ok = true;
+  try { await runtime?.close(); } catch { ok = false; }
+  try { await memberRateLimitPool?.close(); } catch { ok = false; }
+  return ok;
+}
+
 // Direct Auth, Guest, profile, and birth-profile endpoints. Every runtime is a
 // per-fetch instance, never a module-global session or Postgres pool.
 /** @returns {Promise<Response|null>} null means keep the existing deny-first 404. */
@@ -276,13 +290,25 @@ export async function tryHandleCloudflareApprovedAuthV1(request, bindings, route
   if (request.method === 'POST' && !approvedCloudflareSameOriginPostV1(request, origin)) return denied();
 
   try {
-    parseProductionUserDataRuntimeConfigV1(bindings);
+    // No socket opened: require the governed CA fingerprint, TLS verify-full
+    // hostname target and request-scoped single-connection candidate BEFORE
+    // Auth, Supabase, Naver redirect or PostgreSQL runtime acquisition.
+    const config = parseProductionUserDataRuntimeConfigV1(bindings);
     parseProductionMemberAuthRateLimitConfigV1(bindings);
+    const tls = buildProductionNodePostgresPoolConfigV1(
+      config, CLOUDFLARE_DIRECT_POSTGRES_CANDIDATE_LIMITS_V1,
+    );
+    if (tls.max !== 1 || typeof tls.ssl !== 'object' ||
+        tls.ssl === null || tls.ssl.rejectUnauthorized !== true) {
+      return unavailable();
+    }
   } catch {
+    // Include neither CA, connection URL nor upstream exception in HTTP.
     return unavailable();
   }
 
   let runtime;
+  let memberRateLimitPool;
   let result;
   try {
     if (isGuestBootstrap) {
@@ -348,8 +374,16 @@ export async function tryHandleCloudflareApprovedAuthV1(request, bindings, route
       // Strictly request-scoped: never cache the runtime or its PostgreSQL
       // pool across Workers fetch events. Existing rate-limit DB authority,
       // nonprivileged TLS pool, and subject boundaries remain authoritative.
+      // The Vercel source defaults to max=4 and must remain unchanged.
+      // Cloudflare injects a distinct request-owned pool with max=1, then
+      // closes it on every success/error path after the Auth runtime settles.
+      const rateLimitConfig = parseProductionMemberAuthRateLimitConfigV1(bindings);
+      memberRateLimitPool = createNodePostgresSubjectPoolV1(
+        rateLimitConfig, CLOUDFLARE_DIRECT_POSTGRES_CANDIDATE_LIMITS_V1,
+      );
       runtime = createProductionMemberAuthHttpRuntimeV1({
         env: bindings,
+        admissionPort: new PostgresMemberAuthRateLimitAdmissionPortV1(memberRateLimitPool),
         authHandler: (input) => handleSupabaseAuthRequestV1({
           ...input,
           webOrigin: origin,
@@ -362,11 +396,7 @@ export async function tryHandleCloudflareApprovedAuthV1(request, bindings, route
   } catch {
     result = unavailable();
   }
-  try {
-    await runtime?.close();
-  } catch {
-    return unavailable();
-  }
+  if (!await closeCloudflareAuthResourcesV1(runtime, memberRateLimitPool)) return unavailable();
 
   // Final boundary applies to all approved Auth, Guest, Naver and profile
   // responses. Never forward an unexpected HTML 500, stream or redirect.
