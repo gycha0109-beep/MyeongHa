@@ -178,15 +178,15 @@ begin
 
   -- The Post-turn Snapshot must belong to THIS DB-original User message,
   -- not another message with an attacker-recalculated snapshot SHA.
-  -- The parent Turn FOR UPDATE above serializes child inserts. SHARE-lock
-  -- the surviving original User row so its identity cannot change during
-  -- the positive G2 Commit/Outbox transition.
+  -- The parent Turn FOR UPDATE above serializes dependent inserts.
+  -- This owner intentionally has SELECT but no UPDATE privilege on
+  -- conversation_messages; do not expand ACL just to read the original ID.
+  -- Existing DB receiver/Commit functions own that Message's lifecycle.
   select msg.id::text into v_original_user_message_id
   from public.conversation_messages msg
   where msg.subject_id=p_subject_id and msg.thread_id=p_thread_id
     and msg.turn_id=p_turn_id and msg.sender_type='user'
-    and msg.redacted_at is null
-  for share;
+    and msg.redacted_at is null;
   if not found then
     raise exception using errcode='23514',
       constraint='seyeon_positive_g2_original_user_message_mismatch',
