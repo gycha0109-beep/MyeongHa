@@ -7,6 +7,7 @@ import {
   approvedCloudflareStage5HandoffV1,
   approvedCloudflareNaverRedirectV1,
   approvedCloudflareAuthCookieV1,
+  closeCloudflareAuthResourcesV1,
   allowedCloudflareNaverQueryV1,
   fenceCloudflareApprovedAuthResponseV1,
 } from '../workers/cloudflare-auth-db-api.mjs';
@@ -395,6 +396,22 @@ describe('Cloudflare Auth/DB Worker response and cookie-origin fence', () => {
       action: 'callback', env, webOrigin: PRIVATE_ORIGIN,
     });
     expect(replayOnWrongOrigin.status).toBe(400);
+  });
+
+  it('closes Member Auth pool independently even when runtime shutdown fails', async () => {
+    const observed = [];
+    const runtime = { async close() { observed.push('runtime'); } };
+    const pool = { async close() { observed.push('pool'); } };
+    expect(await closeCloudflareAuthResourcesV1(runtime, pool)).toBe(true);
+    expect(observed).toEqual(['runtime', 'pool']);
+    observed.length = 0;
+    const broken = { async close() { observed.push('runtime-failed'); throw Error('SYNTHETIC_SECRET'); } };
+    expect(await closeCloudflareAuthResourcesV1(broken, pool)).toBe(false);
+    expect(observed).toEqual(['runtime-failed', 'pool']);
+    expect(await closeCloudflareAuthResourcesV1(undefined, {
+      async close() { throw Error('SYNTHETIC_SECRET'); },
+    })).toBe(false);
+    expect(await closeCloudflareAuthResourcesV1(undefined, undefined)).toBe(true);
   });
 
   it('seals unexpected Auth/DB and calculation exceptions before platform HTML', async () => {
