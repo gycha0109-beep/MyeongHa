@@ -86,7 +86,8 @@ export type ReaderConversationResponseCandidateV1 =
       intent: ReaderConversationIntentDecisionV1;
       reason: 'clarification_required' | 'unavailable_official_source' |
         'source_mismatch' | 'source_closure_required' |
-        'official_question_not_admitted' | 'existing_guard_rejected';
+        'official_question_not_admitted' | 'existing_guard_rejected' |
+        'security_gate_pending';
       addedModelCalls: 0;
       publicDisclosureAuthorized: false;
     }>;
@@ -210,6 +211,16 @@ export async function prepareReaderConversationResponseCandidateV1(
   const intent = classifyReaderConversationIntentV1(
     input.userText, input.admittedDomain ?? null,
   );
+
+  // This routing helper is NOT a Security authority. Even an otherwise
+  // eligible Official Reading summary or ordinary/support request may carry
+  // a security/prompt-injection/distress signal. Defer to the existing gate
+  // BEFORE touching official sources, private memories or renderer drafts.
+  // The gate must be run outside this helper; no positive security decision
+  // or extra model call is created here.
+  if (intent.securitySignals.length !== 0) {
+    return hold(intent, 'security_gate_pending');
+  }
 
   if (intent.primaryIntent === 'clarification') {
     return hold(intent, 'clarification_required');
