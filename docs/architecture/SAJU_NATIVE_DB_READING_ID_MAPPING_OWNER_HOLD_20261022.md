@@ -38,3 +38,15 @@ Saju native Reading ID를 DB UUID로 바꿔 기록하거나 `responseBodyHash`�
 - 원문/명의·Subject 계산 데이터, 제공 범위, 원본 `generatedAt`, 추가 필드나 disclosure, fallback 상태, 출처 hash 중 어느 하나라도 다르면 BLOCKED. 일치하면 `reason=only_reading_id_payload_change_unattested`로 HELD만 반환한다.
 - **원래 Saju 응답이 Production 발급자에게서 왔다는 증거는 이 함수가 갖고 있지 않다.** 그러므로 source signature + normalized request/birth revision + DB transform의 Owner 승인·인가 영수증이 없으면 `canMapReadingId=false`, `canPersist/canDisclose/canPublish/canSell=false`가 변하지 않는다. 단지 내용 차이가 한 필드뿐이라는 사실로 Reader/Records 공식 권한을 열거나 S3 strict-ID 검사를 완화하지 않는다.
 - 원본 Response·해시·Subject 값은 서버 내부 입력 전용이다. 검사의 출력에는 민감한 식별자, 전문, SourceUnit, hash, 인증 서명이나 Reader 구매권을 포함하지 않는다.
+
+## 동일 native Reading의 서명된 Preview 원본과 DB ID-only 응답 인수 추가
+
+`apps/api/src/saju-signed-db-reading-id-only-handoff-v1.ts`는 **기존** `verifySajuHeldSourceProofV1`의 HMAC/정규화 요청/짧은 TTL/전역 nonce replay 검증을 전체 원본 응답 비교와 함께 적용한다.
+
+- 기존 독립 DB Reader Admission·Records, Saju #2683 내부 인벤토리, 실제 서버 간 `previewEnvelope.response`를 입력받는다. **별도 임의 `nativeSajuResponse`를 두지 않고 기존 전송 봉투 안의 응답을 그대로 검증**한다.
+- 현재 HELD SourceUnit/전체 v2 응답의 DB ID-only 차이 검사를 **nonce 소진 이전**에 수행한다. 이 검사는 서명의 유효성을 주장하지 않으며, 출처 본문·범위가 이미 불일치할 때 유효한 요청 nonce를 불필요하게 소진하지 않게 한다.
+- 이어서 Saju의 기존 서버 간 Preview 서명 검증기로 서명자/대상/키 ID/실행 요청 digest·caller nonce·TTL/전역 중복 사용 저장소와 **원본 전체 응답 hash**를 판정한다. 검증된 `readingId`, `responseId`, `snapshotId`, `registrySnapshotId`, `profileRef`, `evidenceBundleHash`, `responseBodyHash` 외에도 **실제 서명된 payload의** `interpretationRunId`, `executionId`, `preparationId`, `selectionId`까지 Saju handoff와 정확히 맞춘다.
+- 입력 전송 봉투는 검증 전 서버 내 스냅샷을 만들어 비동기 nonce claim 중 응답 객체가 바뀌는 문제를 회피한다. 인수 결과는 **Preview 전송 무결성만 `VERIFIED`**하고 `sourceAuthority/mappingAuthority/privacyApproval=NOT_EVALUATED`, `canMapReadingId/canPersist/canDisclose/canPublish/canSell=false`를 고정한다.
+- 이 검사가 성공해도 Saju #2410의 **Production Source 발행자 증명/정규화 Birth Revision 및 실제 Semantic·Output Guard**, 명하 DB Owner #2301의 **공식 Reading UUID 전환 영수증/보호 저장·Refund/Privacy/Grant**, S7 운영 수신/재전송·ACK 정책을 대체하지 않는다. 따라서 현재 S3 strict-ID gate 또는 실 S5/S7 Runtime을 변경하거나 활성화해서는 안 된다.
+
+테스트: 정확한 v2 응답·출처 계보 서명 시에도 HELD, 일회용 nonce 재사용 BLOCKED, 잘못된 MAC/키/요청/시간, 다른 profile·registry·execution material, SourceUnit/본문·DB 기록 불일치 및 Preview→Production 위조 차단. 클라이언트로 인증 원문·내부 ID·hash/서명/nonce를 반환하지 않는다.
