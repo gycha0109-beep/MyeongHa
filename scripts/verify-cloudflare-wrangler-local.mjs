@@ -82,6 +82,28 @@ async function probe() {
     assert(await response.text() === '', path + ': HEAD returned an unexpected body');
   }
 
+  // CF-D05/D08: a public Static Asset must not become a credential-aware
+  // route merely because the browser sends an Authorization/Cookie header
+  // or a query token. Unit Worker tests inspect the actual ASSETS Request.
+  const staticSecret = 'SYNTHETIC_PUBLIC_ASSET_SECRET';
+  const withCredentials = await assertHttpStatus(
+    '/index.html?session=' + staticSecret, 200, {
+      headers: {
+        Authorization: 'Bearer ' + staticSecret,
+        Cookie: 'session=' + staticSecret,
+        'X-Api-Key': staticSecret,
+      },
+    },
+  );
+  assert(withCredentials.headers.get('cache-control') === 'no-store',
+    'Static HTML with browser credentials must not become cacheable');
+  assert(withCredentials.headers.get('content-security-policy') === csp,
+    'Static HTML with browser credentials must retain CSP');
+  assert((await withCredentials.text()).includes('<html'),
+    'Static HTML with browser credentials stopped rendering');
+  assert(!withCredentials.headers.has('set-cookie'),
+    'Static HTML cannot return a session cookie');
+
   const health = await assertHttpStatus('/api/health', 200);
   assert(health.headers.get('cache-control') === 'no-store', 'Public liveness must never be cached');
   assert(health.headers.get('content-security-policy') === csp, 'Health response CSP mismatch');
