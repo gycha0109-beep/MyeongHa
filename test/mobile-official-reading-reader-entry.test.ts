@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { createMobileReaderAccessViewStateV1 } from '../apps/mobile/src/features/reading/mobile-reader-access-view-model.js';
 import { projectMobileOfficialReadingReaderEntryV1 } from '../apps/mobile/src/features/reading/mobile-official-reading-reader-entry-view-model.js';
 import { MOBILE_READER_PRESENTATIONS_V1 } from '../apps/mobile/src/features/reading/mobile-reader-presentation.js';
+import { projectMobileOfficialReaderEntryUiV1 } from '../apps/mobile/src/features/reading/mobile-official-reader-entry-locale-v1.js';
 
 const official = { readingId: '11111111-1111-4111-8111-111111111111' };
 type Access = ReturnType<typeof createMobileReaderAccessViewStateV1>;
@@ -79,7 +80,9 @@ describe('mobile M3-alpha Official Reading Reader entry', () => {
     expect(screen).toContain('<MobileOfficialReadingReaderEntry record={state.record} />');
     expect(screen).toContain('state.record.display.steps.map');
     expect(view).toContain('MOBILE_READER_PRESENTATIONS_V1.map');
-    expect(view).toContain('해설 서비스 준비 중');
+    expect(view).toContain('{ui.disabledLabel}');
+    expect(projectMobileOfficialReaderEntryUiV1('ko-KR', 'public_route_off').disabledLabel)
+      .toBe('해설 서비스 준비 중');
     // All nine Reader introductions are now explorable without a network call,
     // purchasing a Reader, creating a Thread or lifting the public OFF gate.
     expect(view).toContain('useState<MobileReaderPresentationIdV1>');
@@ -88,7 +91,9 @@ describe('mobile M3-alpha Official Reading Reader entry', () => {
     expect(view).toContain('findMobileReaderPresentationV1(selectedReaderId)');
     expect(view).toContain('projectMobileOfficialReadingReaderEntryV1(record, selectedReaderId)');
     expect(view).toContain('{selectedReader.tone}');
-    expect(view).toContain('해설 서비스 준비 중');
+    expect(view).toContain('{ui.disabledLabel}');
+    expect(projectMobileOfficialReaderEntryUiV1('ko-KR', 'public_route_off').disabledLabel)
+      .toBe('해설 서비스 준비 중');
     expect(view).not.toContain('fetch(');
     expect(view).not.toContain('router.push(');
     expect(view).not.toContain('router.navigate(');
