@@ -39,6 +39,8 @@ jobs:
           git switch -c feat/ops/cloudflare-authdb-clean-snapshot-20261021
           node scripts/local/rehearse-cloudflare-preview-rollback.mjs --rollback d4f7cebb3d9be6b4ad9e526c53e3f5b8585cc9c0 --restore "$EXPECTED_HEAD"
       - name: Verify deployed HTTP headers, 11 HTML routes and all API HOLDs
+        env:
+          MYEONGHA_CLOUDFLARE_EVIDENCE_KIND: ${{ github.head_ref == 'feat/ops/cloudflare-authdb-clean-snapshot-20261021' && 'current' || '' }}
         run: node scripts/verify-cloudflare-preview-remote.mjs
       - name: Verify immutable earlier Preview recovery candidate
         if: github.head_ref == 'feat/ops/cloudflare-authdb-clean-snapshot-20261021'
@@ -48,6 +50,7 @@ jobs:
           # the mutable branch Preview back or updates routes/production.
           MYEONGHA_CLOUDFLARE_PREVIEW_URL: https://59a14b13-myeongha.gycha0109.workers.dev
           MYEONGHA_CLOUDFLARE_EXPECTED_HEAD: d4f7cebb3d9be6b4ad9e526c53e3f5b8585cc9c0
+          MYEONGHA_CLOUDFLARE_EVIDENCE_KIND: recovery
         run: node scripts/verify-cloudflare-preview-remote.mjs
       - name: Install headless Chrome
         id: chrome
@@ -68,3 +71,12 @@ jobs:
       - name: Verify existing Vercel Production static standby (GET only)
         if: github.head_ref == 'feat/ops/cloudflare-authdb-clean-snapshot-20261021'
         run: node scripts/verify-cloudflare-vercel-standby.mjs
+
+      - name: Upload Stage 9 sanitized Preview evidence (current and pinned recovery)
+        if: always() && github.head_ref == 'feat/ops/cloudflare-authdb-clean-snapshot-20261021'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: cloudflare-preview-stage9-evidence
+          path: artifacts/cloudflare-preview-stage9/*.json
+          if-no-files-found: ignore
+          retention-days: 7
