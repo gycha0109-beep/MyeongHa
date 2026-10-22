@@ -40,7 +40,8 @@ export type MobilePaidReaderReadOutcomeV1 =
 
 export type MobilePaidReaderAckOutcomeV1 =
   | Readonly<{ kind: 'acknowledged'; acknowledgedAt: string; replayed: boolean }>
-  | Readonly<{ kind: 'unavailable' }>;
+  | Readonly<{ kind: 'unavailable' }>
+  | Readonly<{ kind: 'access_denied' }>;
 
 function validDate(value: unknown): value is string {
   return typeof value === 'string' && Number.isFinite(Date.parse(value));
@@ -203,6 +204,11 @@ export async function acknowledgeMobilePaidReaderChatDeliveryV1(input: Readonly<
       throw new MyeongHaApiClientErrorV1(
         'http', 'AUTH_REQUIRED', 'Protected Reader Member session expired.', 401,
       );
+    }
+    if (response.status === 403 || response.status === 404) {
+      // No assertion about refunds: the S7 acknowledgment was explicitly
+      // rejected, so the protected card must clear and require a fresh S6 GET.
+      return Object.freeze({ kind: 'access_denied' as const });
     }
     if (!response.ok) return Object.freeze({ kind: 'unavailable' as const });
     let envelope: unknown;
