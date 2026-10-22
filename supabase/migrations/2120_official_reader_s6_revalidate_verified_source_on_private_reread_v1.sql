@@ -134,6 +134,25 @@ begin
    and src.production_interpretation_authority='verified'
    and src.source_coverage_authority='complete'
    and src.revoked_at is null
+  -- A signed historical receipt by itself does not prove that the CURRENT
+  -- Official Reading still points to the exact original committed Saju
+  -- execution. Refuse re-read after artifact replacement or product drift.
+  join public.standard_reading_official_bindings official
+    on official.reading_id=b.official_reading_id
+   and official.subject_id=b.subject_id
+   and official.product_id=b.product_id
+   and official.product_spec_version=b.product_spec_version
+  join public.readings reading
+    on reading.id=official.reading_id
+   and reading.subject_id=official.subject_id
+   and reading.reading_session_id=official.reading_session_id
+   and reading.execution_status='succeeded'
+   and reading.committed_execution_attempt_id is not null
+  join public.reading_refs source
+    on source.reading_id=reading.id
+   and source.subject_id=reading.subject_id
+   and source.execution_attempt_id=reading.committed_execution_attempt_id
+   and source.response_hash=b.official_artifact_response_hash
   join public.subjects s
     on s.id=b.subject_id and s.status='active'
    and s.merged_into_subject_id is null
