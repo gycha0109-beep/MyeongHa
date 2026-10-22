@@ -7,7 +7,7 @@ import {
   type ReaderSceneControllerV1,
 } from '../../reader-scene-controller.js';
 import type { ReaderRuntimeClientV1 } from '../../reader-runtime-client.js';
-import { getUiLocale } from '../../ui-i18n.js';
+import { getUiLocale, normalizeUiLocale } from '../../ui-i18n.js';
 import { ReaderScenePanel } from './ReaderScenePanel.js';
 
 type DisplaySnapshot = Readonly<{
@@ -59,6 +59,13 @@ export interface ReaderSceneBoundPanelProps {
   readonly getUiLocale?: () => string;
 }
 
+function safeReadShellLocale(getCurrentUiLocale: () => string) {
+  // The panel can be server-rendered as an inert shell; browser preference
+  // storage is not available on the server.
+  try { return normalizeUiLocale(getCurrentUiLocale()); }
+  catch { return 'ko-KR'; }
+}
+
 export function ReaderSceneBoundPanel({
   client,
   ownerBinding,
@@ -66,7 +73,20 @@ export function ReaderSceneBoundPanel({
   getUiLocale: resolveUiLocale = getUiLocale,
 }: ReaderSceneBoundPanelProps) {
   const controllerRef = useRef<ReaderSceneControllerV1 | null>(null);
+  const resolveUiLocaleRef = useRef(resolveUiLocale);
+  resolveUiLocaleRef.current = resolveUiLocale;
   const [snapshot, setSnapshot] = useState<DisplaySnapshot | null>(null);
+  const [shellLocale, setShellLocale] = useState(() => safeReadShellLocale(resolveUiLocale));
+
+  useEffect(() => {
+    // Locale changes repaint only authored loading/error shell labels.
+    // A ready result remains pinned to its request-start source snapshot.
+    if (typeof document === 'undefined') return;
+    const updateShellLocale = () => setShellLocale(safeReadShellLocale(resolveUiLocaleRef.current));
+    document.addEventListener('myeongha:localechange', updateShellLocale);
+    updateShellLocale();
+    return () => document.removeEventListener('myeongha:localechange', updateShellLocale);
+  }, []);
 
   const threadId = ownerBinding?.threadId ?? null;
   const officialReadingId = ownerBinding?.officialReadingId ?? null;
@@ -84,7 +104,7 @@ export function ReaderSceneBoundPanel({
     let active = true;
     const controller = createReaderSceneControllerV1({
       client,
-      getUiLocale: resolveUiLocale,
+      getUiLocale: () => resolveUiLocaleRef.current(),
       onState: state => {
         if (active) setSnapshot({ client, key, state });
       },
@@ -99,7 +119,7 @@ export function ReaderSceneBoundPanel({
       if (controllerRef.current === controller) controllerRef.current = null;
       controller.cancel();
     };
-  }, [client, key, threadId, officialReadingId, resolveUiLocale]);
+  }, [client, key, threadId, officialReadingId]);
 
   const retry = useCallback(() => {
     if (client.enabled && key !== null) {
@@ -115,7 +135,7 @@ export function ReaderSceneBoundPanel({
   return (
     <ReaderScenePanel
       state={state}
-      uiLocale={resolveUiLocale()}
+      uiLocale={shellLocale}
       onRetry={retry}
     />
   );
