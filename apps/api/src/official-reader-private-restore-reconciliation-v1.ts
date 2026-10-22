@@ -34,7 +34,26 @@ select
       and p.policyname='life_facts_api_current_select_v1'
       and p.cmd='SELECT'
       and p.qual like '%internal_is_official_reader_s4_protected_derivation_v1%'
-  ) as "readFenceInstalled"
+  ) as "readFenceInstalled",
+  exists (
+    select 1 from pg_catalog.pg_policies p
+    where p.schemaname='public'
+      and p.tablename='outbox_events'
+      and p.policyname='outbox_events_seyeon_s4_paid_marker_read_fence_v1'
+      and p.cmd='SELECT'
+      and p.permissive='RESTRICTIVE'
+      and p.qual like '%c04638eb883ebf25b14a9f8ce0c5bb0ae0e0bae7aaa69ea91f33f22172abbf63%'
+  )
+  and exists (
+    select 1 from pg_catalog.pg_policies p
+    where p.schemaname='public'
+      and p.tablename='outbox_events'
+      and p.policyname='outbox_events_seyeon_s4_paid_marker_update_fence_v1'
+      and p.cmd='UPDATE'
+      and p.permissive='RESTRICTIVE'
+      and p.qual like '%c04638eb883ebf25b14a9f8ce0c5bb0ae0e0bae7aaa69ea91f33f22172abbf63%'
+      and p.with_check like '%c04638eb883ebf25b14a9f8ce0c5bb0ae0e0bae7aaa69ea91f33f22172abbf63%'
+  ) as "outboxFenceInstalled"
 `;
 
 const REFUND_RESTORE_SQL = `
@@ -69,6 +88,9 @@ export interface OfficialReaderOffPrimaryRestoreReconciliationResultV1 {
   /** API owner-scoped Memory, Life Fact, Reader, Se-yeon and Search/Summary
    * reads must already filter resurrected S5-derived provenance. */
   readonly ordinaryDerivedRecordsReadFenceInstalled: true;
+  /** Se-yeon's existing analytics Outbox consumer must also exclude S5
+   * protected turns on both claim/read and update/complete. */
+  readonly ordinaryDerivedOutboxReadFenceInstalled: true;
   /** This operation does NOT release broader P30D/S8 read serviceability. */
   readonly publicReaderServiceEnabled: false;
 }
@@ -119,9 +141,11 @@ export async function reconcileOfficialReaderProtectedBodiesAfterRestoreV1(input
       const result=await client.query<{
         installed:unknown;
         readFenceInstalled:unknown;
+        outboxFenceInstalled:unknown;
       }>(ORDINARY_DERIVED_QUARANTINE_GUARD_INSTALLED_SQL);
       if(result.rows.length!==1 || result.rows[0]?.installed!==true
-          || result.rows[0]?.readFenceInstalled!==true) return fail();
+          || result.rows[0]?.readFenceInstalled!==true
+          || result.rows[0]?.outboxFenceInstalled!==true) return fail();
       return true as const;
     },
   });
@@ -244,6 +268,7 @@ export async function reconcileOfficialReaderProtectedBodiesAfterRestoreV1(input
     refundScopeKeysConfirmedDestroyed: refundKeysDestroyed,
     ordinaryDerivedRestoreQuarantineGuardInstalled: true as const,
     ordinaryDerivedRecordsReadFenceInstalled: true as const,
+    ordinaryDerivedOutboxReadFenceInstalled: true as const,
     publicReaderServiceEnabled: false as const,
   });
 }
