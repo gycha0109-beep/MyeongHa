@@ -142,6 +142,24 @@ export default {
         return new Response(sealed.body, { status: sealed.status, headers });
       }
     }
+    // Worker-first Static Assets are necessary to apply the same deny-only
+    // Chat marker/encoded alias guard to /index.html, / and other non-API
+    // paths. Only after that security check may a real Static Asset be served.
+    // Never forward any API path or unsafe method to ASSETS, and never proxy
+    // to Vercel or a dynamic upstream. Absence/error is a fixed empty 404.
+    if (!isCloudflareStaticPreviewApiPath(url.pathname)) {
+      if (request.method !== 'GET' && request.method !== 'HEAD') {
+        return new Response(null, { status: 404, headers: BASE_HEADERS });
+      }
+      try {
+        if (typeof bindings?.ASSETS?.fetch !== 'function') {
+          return new Response(null, { status: 404, headers: BASE_HEADERS });
+        }
+        return await bindings.ASSETS.fetch(request);
+      } catch {
+        return new Response(null, { status: 404, headers: BASE_HEADERS });
+      }
+    }
     if (emergencyHold) {
       // Health 200 survives; protected API routes fall back to the existing
       // 404/503 deny-only dispatcher. No Worker API becomes HTML.
