@@ -5,6 +5,7 @@
 // Watchtower-Track: ops
 import {
   approvedCloudflareAuthOriginV1,
+  approvedCloudflareSameOriginPostV1,
   CLOUDFLARE_APPROVED_RESPONSE_HEADERS_V1,
 } from './cloudflare-auth-db-api.mjs';
 import {
@@ -146,6 +147,13 @@ export async function tryHandleCloudflareSeyeonSecurityV1(
 
   const origin = approvedCloudflareAuthOriginV1(request, bindings);
   if (origin === null) return held(requestId);
+  // An eventually approved Cookie/Bearer Chat POST must pass the same
+  // browser-origin admission as the existing Auth/DB adapter. Fail closed
+  // before verifying identity or touching the owner-scoped PostgreSQL pool.
+  if (request.method === 'POST' &&
+      !approvedCloudflareSameOriginPostV1(request, origin)) {
+    return held(requestId);
+  }
   // Never interpret request-supplied Character/Grant/replay/permission flags.
   let resources;
   let verdict;

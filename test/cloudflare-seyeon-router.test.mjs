@@ -66,6 +66,23 @@ describe('S-CF2 mounted Worker /api/chat deny and independent hooks', () => {
     }
     expect(spy).not.toHaveBeenCalled();
   });
+  it('stops cross-origin POST and browser-cookie provenance before DB/Auth', async () => {
+    const count = vi.fn();
+    const route = matchCloudflareApiRoute('/api/chat/' + THREAD + '/turns');
+    for (const headers of [
+      { Origin: 'https://attacker.example.test' },
+      { 'Sec-Fetch-Site': 'cross-site' },
+      { 'X-Myeongha-Auth-Transport': 'web-cookie-v1' },
+      { Origin: 'https://attacker.example.test', 'Sec-Fetch-Site': 'same-origin' },
+    ]) {
+      const response = await tryHandleCloudflareSeyeonSecurityV1(
+        new Request(ROOT + '/api/chat/' + THREAD + '/turns', { method: 'POST', headers }),
+        bindings, route, { createSubjectScope: count },
+      );
+      await expectHeld(response);
+    }
+    expect(count).not.toHaveBeenCalled();
+  });
   it('accepts only independently reauthorized unrelated Character handoff, never a positive payload', async () => {
     const close = vi.fn(async () => {});
     const create = vi.fn(() => ({
