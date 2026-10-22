@@ -92,6 +92,40 @@ const REFERENCES_TO_PRIOR_ANSWER = Object.freeze([
 const EXACT_READING_REFERENCE =
   /^방금 본 (.+) 해석을 (?:조금 )?더 (?:쉽게 )?설명해 ?주세요[.!?]?$/u;
 
+const EXACT_OWNED_READING_SUMMARY =
+  /^구매한 사주를 (?:(?:간단히|짧게|핵심만|한 줄로) )?(?:요약|정리)해 ?(?:주세요|줘)[.!?]?$/u;
+const EXACT_DOMAIN_READING_SUMMARY =
+  /^방금 본 (.+) 해석을 (?:(?:간단히|짧게|핵심만|한 줄로) )?(?:요약|정리)해 ?(?:주세요|줘)[.!?]?$/u;
+
+/**
+ * RR-05 lexical-only domain boundary for short Official Reading summaries.
+ * The permitted aliases come from the SAME existing domain registry as
+ * exact follow-up explanation; this never establishes purchase entitlement,
+ * Saju source evidence, Reader access or public reply authorization.
+ */
+export function classifyExactOfficialReadingSummaryReferenceV1(
+  text: unknown,
+  admittedDomain: string,
+): 'admitted' | 'unsupported_question' | 'new_authority_required' {
+  if (typeof text !== 'string' || text.length > 240 ||
+      /[\u0000-\u001f\u007f\u200b-\u200f\u202a-\u202e\u2060-\u206f]/u.test(text)) {
+    return 'unsupported_question';
+  }
+  const normalized = text.normalize('NFKC').trim().replace(/ +/gu, ' ');
+  if (normalized.length === 0 || normalized.length > 160) {
+    return 'unsupported_question';
+  }
+  if (SOURCE_CHANGE_REQUEST.test(normalized)) {
+    return 'new_authority_required';
+  }
+  if (EXACT_OWNED_READING_SUMMARY.test(normalized)) return 'admitted';
+  const match = EXACT_DOMAIN_READING_SUMMARY.exec(normalized);
+  if (!match) return 'unsupported_question';
+  return DOMAIN_NAMES[admittedDomain]?.includes(match[1] ?? '') === true
+    ? 'admitted' : 'new_authority_required';
+}
+
+
 /**
  * Lexical check only. Does not select a Unit or prove an Official Reading grant.
  * Unlike follow-up pronouns, initial entry must refer explicitly to the
