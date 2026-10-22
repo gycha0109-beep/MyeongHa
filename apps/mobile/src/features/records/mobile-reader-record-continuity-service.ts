@@ -6,8 +6,15 @@ const READER = /^[a-z][a-z0-9_-]{0,63}$/u;
 
 export type MobileReaderRecordContinuityStateV1 =
   | Readonly<{ kind: 'held' | 'not_confirmed' | 'auth_required' }>
-  | Readonly<{ kind: 'not_available' }>
-  | Readonly<{ kind: 'existing_thread_candidate'; threadId: string }>;
+  | Readonly<{
+      kind: 'not_available';
+      purchaseState: 'current_verified_purchase' | 'verified_full_cancellation' | 'not_confirmed';
+    }>
+  | Readonly<{
+      kind: 'existing_thread_candidate';
+      threadId: string;
+      purchaseState: 'current_verified_purchase';
+    }>;
 
 function record(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -60,9 +67,14 @@ export async function readMobileReaderRecordContinuityV1(input: Readonly<{
         || payload.meta.apiContractVersion !== 'v0.9'
         || !exact(payload.data,[
           'contractVersion','readingId','readerCharacterId','record',
-          'readerFollowup','protectedAnswer','summary','saleActivated',
+          'readerFollowup','purchaseState','protectedAnswer','summary','saleActivated',
         ])
         || payload.data.contractVersion !== 'commerce-reader-record-continuity-v1'
+        || ![
+          'current_verified_purchase',
+          'verified_full_cancellation',
+          'not_confirmed',
+        ].includes(payload.data.purchaseState as string)
         || payload.data.readingId !== input.readingId
         || payload.data.readerCharacterId !== input.readerCharacterId
         || !exact(payload.data.record,['state','completedAt'])
@@ -79,15 +91,22 @@ export async function readMobileReaderRecordContinuityV1(input: Readonly<{
     if (exact(followup,['state','requiresFreshGateAtUse'])
         && followup.state === 'not_available'
         && followup.requiresFreshGateAtUse === true) {
-      return Object.freeze({ kind: 'not_available' as const });
+      return Object.freeze({
+        kind: 'not_available' as const,
+        purchaseState: payload.data.purchaseState as (
+          'current_verified_purchase' | 'verified_full_cancellation' | 'not_confirmed'
+        ),
+      });
     }
     if (exact(followup,['state','threadId','requiresFreshGateAtUse'])
         && followup.state === 'existing_thread_candidate'
         && followup.requiresFreshGateAtUse === true
+        && payload.data.purchaseState === 'current_verified_purchase'
         && typeof followup.threadId === 'string' && UUID.test(followup.threadId)) {
       return Object.freeze({
         kind: 'existing_thread_candidate' as const,
         threadId: followup.threadId.toLowerCase(),
+        purchaseState: 'current_verified_purchase' as const,
       });
     }
     throw new Error('Reader current entitlement status invalid.');
