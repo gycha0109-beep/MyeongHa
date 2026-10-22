@@ -88,19 +88,34 @@ function sleepForInterval(seconds) {
 }
 
 try {
+  let consecutiveFailures = 0;
   do {
     // One batch at a time. A Worker crash leaves its DB lease reclaimable
-    // after 15 minutes, and the off-primary immutable fence remains durable.
-    await runOnce();
+    // after 15 minutes; its independent tombstone remains immutable.
+    try {
+      await runOnce();
+      consecutiveFailures = 0;
+    } catch {
+      // No SQL, Subject, Receipt, key reference, or private message contents.
+      process.stderr.write(
+        'Reader private purge failed; queued work remains retryable.\n',
+      );
+      consecutiveFailures++;
+      if (intervalSeconds === null) {
+        process.exitCode = 1;
+        break;
+      }
+    }
     if (intervalSeconds !== null && !stopRequested) {
-      await sleepForInterval(intervalSeconds);
+      const backoff = consecutiveFailures === 0
+        ? intervalSeconds
+        : Math.min(
+            3600,
+            intervalSeconds * (2 ** Math.min(consecutiveFailures, 5)),
+          );
+      await sleepForInterval(backoff);
     }
   } while (intervalSeconds !== null && !stopRequested);
-} catch {
-  // Error messages may contain DB details; do not emit raw SQL parameters,
-  // Subject IDs, key references or protected ciphertext in scheduler logs.
-  process.stderr.write('Reader private purge failed; pending jobs remain retryable.\n');
-  process.exitCode = 1;
 } finally {
   process.off('SIGTERM', requestStop);
   process.off('SIGINT', requestStop);
