@@ -71,8 +71,7 @@ export async function verifyCloudflareStaticArtifact(options = {}) {
     workerConfig?.assets?.directory !== './public' ||
     workerConfig?.assets?.html_handling !== 'none' ||
     workerConfig?.assets?.not_found_handling !== 'none' ||
-    JSON.stringify(workerConfig?.assets?.run_worker_first) !==
-      JSON.stringify(['/api', '/api/*'])
+    workerConfig?.assets?.run_worker_first !== true
   ) {
     throw new Error('Cloudflare preview routing or isolation policy has changed.');
   }
