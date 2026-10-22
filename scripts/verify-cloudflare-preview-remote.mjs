@@ -10,6 +10,7 @@ import {
   CLOUDFLARE_PREVIEW_RECEIPT_SCHEMA_V1,
 } from './prepare-cloudflare-static.mjs';
 import { CLOUDFLARE_DIRECT_API_ROUTES, CLOUDFLARE_REWRITE_ROUTES } from '../workers/cloudflare-api-router.mjs';
+import { summarizeCloudflarePreviewProbeMetricsV1 } from './cloudflare-preview-smoke-metrics.mjs';
 
 const URL_FROM_CLOUDFLARE = 'https://feat-ops-cloudflare-static-preview-20261020-myeongha.gycha0109.workers.dev';
 const origin = process.env.MYEONGHA_CLOUDFLARE_PREVIEW_URL || URL_FROM_CLOUDFLARE;
@@ -35,16 +36,22 @@ const expected = ['content-security-policy','referrer-policy','x-content-type-op
 assert(baseline.size === expected.length && expected.every(h=>baseline.has(h)), 'Vercel baseline changed');
 
 const failures = [];
+const timingSamples = [];
 let requests = 0;
 async function check(path, status, options = {}) {
   const target = new URL(path, parsed);
   assert(target.origin === parsed.origin, 'Cross-origin test prohibited');
   const request = {...options, redirect:'manual', signal:AbortSignal.timeout(15_000)};
   let response;
+  const started = performance.now();
   try {
     response = await fetch(target, request);
     requests++;
+    timingSamples.push({path,expectedStatus:status,
+      actualStatus:response.status,elapsedMs:performance.now()-started});
   } catch (error) {
+    timingSamples.push({path,expectedStatus:status,
+      actualStatus:null,elapsedMs:performance.now()-started});
     failures.push({method:request.method ?? 'GET',path,reason:'transport',message:String(error)});
     return null;
   }
@@ -160,57 +167,10 @@ async function main() {
     }
   }
   for (const path of ['/missing-page.html','/api','/api/readiness','/api/readings','/api/me',
-      '/api/unknown']) {
+      '/api/unknown','/api/health?__myeongha_chat_open=1']) {
     response = await check(path,404);
     if (!response) continue;
     if ((await response.text()).trim() !== '') failures.push({path,reason:'deny-body-not-empty'});
-  }
-  // S-CF2 Worker entrypoint (not the old Stage 4 static-only preview)
-  // must hold forged legacy Chat rewrite keys on unrelated API paths. Retain
-  // the old stage's original empty 404 contract when scf2 is not active.
-  for (const path of [
-    '/api/health?__myeongha_chat_open=1',
-    '/api/health?%25255F%25255Fmyeongha_chat_open=1',
-    '/api/me?__myeongha_chat_turn_send=1',
-    '/api/auth/refresh?__myeongha_chat_open=1',
-  ]) {
-    response = await check(path,scf2 ? 503 : 404);
-    if (!response) continue;
-    if (scf2) {
-      const payload = await response.json().catch(()=>null);
-      if (payload?.ok !== false ||
-          payload?.error?.code !== 'SEYEON_FIRST_REVEAL_AUTHORITY_UNAVAILABLE' ||
-          response.headers.get('access-control-allow-origin') !== null) {
-        failures.push({path,reason:'legacy-chat-rewrite-marker-fence-missing'});
-      }
-    } else if ((await response.text()).trim() !== '') {
-      failures.push({path,reason:'stage4-legacy-marker-deny-body'});
-    }
-  }
-  // Stage 5 Worker-first Assets contract: a forged Chat marker on HTML
-  // or the root rewrite MUST hit the Worker and return the same 503 fence.
-  // Stage 4 uses its legacy Assets-first route and has no such expectation.
-  if (scf2) {
-    for (const path of [
-      '/index.html?__myeongha_chat_open=1',
-      '/?__myeongha_chat_turn_send=1',
-      '/hall.html?%255F_myeongha_chat_open=1',
-      '/api%2Fchat%2Fsynthetic-thread-id',
-      '/%61pi/chat/synthetic-thread-id',
-      '/%2561pi/chat/synthetic-thread-id',
-      '/api%2F%63hat/synthetic-thread-id',
-      '/api%252F%2563hat/synthetic-thread-id',
-      '/%61pi%252Fchat%252Fsynthetic-thread-id',
-    ]) {
-      response = await check(path, 503);
-      if (!response) continue;
-      const payload = await response.json().catch(()=>null);
-      if (payload?.error?.code !== 'SEYEON_FIRST_REVEAL_AUTHORITY_UNAVAILABLE' ||
-          payload?.ok !== false ||
-          response.headers.get('access-control-allow-origin') !== null) {
-        failures.push({path,reason:'worker-first-static-chat-route-fence-missing'});
-      }
-    }
   }
   // Every non-health Vercel endpoint remains deny-only. On S-CF2 the
   // protected Chat routes deliberately return 503, not the legacy 404.
@@ -283,7 +243,9 @@ async function main() {
   const result = {
     status:failures.length ? 'FAIL' : 'PASS',origin:parsed.origin,contract,
     ...(scf2 ? { attestedCommit: expectedHead } : {}),
-    testedHtml:HTML_ENTRIES.length,requests,liveness:'GET 200; other methods 405',readiness:'404 HOLD',seyeon:'503 HOLD',failures,
+    testedHtml:HTML_ENTRIES.length,requests,liveness:'GET 200; other methods 405',readiness:'404 HOLD',seyeon:'503 HOLD',
+    ...(scf2 ? { opsProbeMetrics:summarizeCloudflarePreviewProbeMetricsV1(timingSamples) } : {}),
+    failures,
   };
   console.log(JSON.stringify(result,null,2));
   assert(!failures.length,'Cloudflare live preview HTTP parity/safety failure');

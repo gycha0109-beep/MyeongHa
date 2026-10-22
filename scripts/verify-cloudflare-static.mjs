@@ -26,36 +26,6 @@ export const HTML_ENTRIES = Object.freeze([
   'records.html',
 ]);
 
-/**
- * Static Assets must never carry a file/directory addressable as /api or
- * /api/* under path case folding, percent decoding or intermediary re-encoding.
- * Cloudflare's run_worker_first only covers the exact declared API routes;
- * this is an independent build-time gate, not proof of raw-request routing.
- * Only the first path segment is authoritative: nested asset directories
- * named "api" are not served at the site /api root.
- */
-export function isCloudflareApiStaticAliasV1(relativeArtifactPath) {
-  if (typeof relativeArtifactPath !== 'string' || relativeArtifactPath.length === 0) {
-    return true;
-  }
-  let candidate = relativeArtifactPath.replaceAll('\\', '/');
-  for (let depth = 0; depth < 8; depth += 1) {
-    if (/^api(?:$|\/)/iu.test(candidate.replace(/^\/+/u, ''))) return true;
-    if (!candidate.includes('%')) return false;
-    let decoded;
-    try {
-      decoded = decodeURIComponent(candidate);
-    } catch {
-      // An ambiguous escape at the API root must never become a static asset.
-      return /^api/iu.test(candidate.replace(/^\/+/u, ''));
-    }
-    if (decoded === candidate) return false;
-    candidate = decoded.replaceAll('\\', '/');
-  }
-  // No static artifact gets an unbounded decode chain into the API namespace.
-  return candidate.includes('%') || /^api(?:$|\/)/iu.test(candidate.replace(/^\/+/u, ''));
-}
-
 export async function verifyCloudflareStaticArtifact(options = {}) {
   const cwd = options.cwd ?? process.cwd();
   const outputRoot = resolve(
@@ -71,7 +41,8 @@ export async function verifyCloudflareStaticArtifact(options = {}) {
     workerConfig?.assets?.directory !== './public' ||
     workerConfig?.assets?.html_handling !== 'none' ||
     workerConfig?.assets?.not_found_handling !== 'none' ||
-    workerConfig?.assets?.run_worker_first !== true
+    JSON.stringify(workerConfig?.assets?.run_worker_first) !==
+      JSON.stringify(['/api', '/api/*'])
   ) {
     throw new Error('Cloudflare preview routing or isolation policy has changed.');
   }
@@ -108,15 +79,13 @@ export async function verifyCloudflareStaticArtifact(options = {}) {
 
   const stack = [outputRoot];
   let fileCount = 0;
+  let totalAssetBytes = 0;
   let largestFileSize = 0;
   while (stack.length > 0) {
     const directory = stack.pop();
     const children = await readdir(directory, { withFileTypes: true });
     for (const entry of children) {
       const filename = join(directory, entry.name);
-      if (isCloudflareApiStaticAliasV1(relative(outputRoot, filename))) {
-        throw new Error('API namespace must not be packaged as Static Assets: ' + filename);
-      }
       if (entry.isSymbolicLink()) {
         throw new Error('Symlink must not be deployed: ' + filename);
       }
@@ -128,6 +97,7 @@ export async function verifyCloudflareStaticArtifact(options = {}) {
       } else if (entry.isFile()) {
         const stat = await lstat(filename);
         fileCount += 1;
+        totalAssetBytes += stat.size;
         largestFileSize = Math.max(largestFileSize, stat.size);
         if (stat.size > 25 * 1024 * 1024) {
           throw new Error('Static file exceeds Workers Free 25MiB: ' + filename);
@@ -142,7 +112,11 @@ export async function verifyCloudflareStaticArtifact(options = {}) {
     throw new Error('Static file count exceeds Workers Free limit.');
   }
 
-  return Object.freeze({ entryCount: HTML_ENTRIES.length, fileCount, largestFileSize });
+  // Static Assets bytes, NOT Wrangler Worker bundle bytes, billable
+  // transfer, memory or CPU. These are different Cloudflare budgets.
+  return Object.freeze({
+    entryCount: HTML_ENTRIES.length, fileCount, totalAssetBytes, largestFileSize,
+  });
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

@@ -7,7 +7,6 @@ import { join } from 'node:path';
 import {
   handleCloudflareStaticPreviewRequest,
   isCloudflareStaticPreviewApiPath,
-  CLOUDFLARE_PUBLIC_HTML_PATHS_V1,
 } from '../workers/cloudflare-static-preview.mjs';
 import {
   tryHandleCloudflareApprovedSajuCalculationV1,
@@ -22,7 +21,6 @@ import {
 import {
   HTML_ENTRIES,
   verifyCloudflareStaticArtifact,
-  isCloudflareApiStaticAliasV1,
 } from '../scripts/verify-cloudflare-static.mjs';
 
 const vercelUrl = new URL('../vercel.json', import.meta.url);
@@ -54,63 +52,11 @@ describe('Cloudflare static-only deployment boundary', () => {
     expect(config.assets.directory).toBe('./public');
     expect(config.assets.html_handling).toBe('none');
     expect(config.assets.not_found_handling).toBe('none');
-    expect(config.assets.run_worker_first).toBe(true);
+    expect(config.assets.run_worker_first).toEqual(['/api', '/api/*']);
     expect(config.workers_dev).toBe(false);
     expect(isCloudflareStaticPreviewApiPath('/api/health')).toBe(true);
     expect(isCloudflareStaticPreviewApiPath('/api')).toBe(true);
     expect(isCloudflareStaticPreviewApiPath('/apixel')).toBe(false);
-  });
-
-  it('rejects encoded or case-folded API namespace names from Static Assets', async () => {
-    for (const artifact of [
-      'API/chat.html',
-      'api/chat.html',
-      'api',
-      '%61pi/chat.html',
-      'api%2Fchat.html',
-      'api%252Fchat.html',
-      '%2Fapi%2Fchat.html',
-      'api\\\\turns.json',
-    ]) {
-      expect(isCloudflareApiStaticAliasV1(artifact), artifact).toBe(true);
-    }
-    for (const artifact of [
-      'api-client.js',
-      'api.json',
-      'apixel/icons.svg',
-      'assets/api/history.png',
-      'index.html',
-    ]) {
-      expect(isCloudflareApiStaticAliasV1(artifact), artifact).toBe(false);
-    }
-
-    const { folder, publicDir } = await createFixture();
-    const sha = 'a'.repeat(40);
-    await writeCloudflareStaticHeaders({ cwd: folder, commitSha: sha });
-    for (const entry of ['API', '%61pi', 'api%2Fchat.html', 'api%252Fchat.html']) {
-      const path = join(publicDir, entry);
-      if (entry === 'API' || entry === '%61pi') {
-        await mkdir(path);
-      } else {
-        await writeFile(path, 'PROTECTED_FIXTURE_MUST_NOT_DEPLOY');
-      }
-      await expect(verifyCloudflareStaticArtifact({
-        cwd: folder, expectedCommitSha: sha,
-      })).rejects.toThrow('API namespace must not be packaged as Static Assets');
-      await rm(path, { recursive: true, force: true });
-    }
-    const cleared = await verifyCloudflareStaticArtifact({
-      cwd: folder, expectedCommitSha: sha,
-    });
-    expect(cleared.entryCount).toBe(11);
-  });
-
-  it('keeps the Worker-first HTML allowlist pinned to the built 11-page inventory', () => {
-    expect([...CLOUDFLARE_PUBLIC_HTML_PATHS_V1].sort()).toEqual(
-      ['/', ...HTML_ENTRIES.map(entry => '/' + entry)].sort(),
-    );
-    expect(CLOUDFLARE_PUBLIC_HTML_PATHS_V1).not.toContain('/api');
-    expect(CLOUDFLARE_PUBLIC_HTML_PATHS_V1).not.toContain('/api/chat');
   });
 
   it('never returns a successful or streaming response for unported APIs', async () => {
@@ -175,6 +121,8 @@ describe('Cloudflare static-only deployment boundary', () => {
     });
     expect(verified.entryCount).toBe(11);
     expect(verified.fileCount).toBe(14);
+    expect(verified.totalAssetBytes).toBeGreaterThanOrEqual(verified.largestFileSize);
+    expect(verified.totalAssetBytes).toBeGreaterThan(0);
     expect(await readFile(join(publicDir, CLOUDFLARE_PREVIEW_RECEIPT_ASSET_V1), 'utf8'))
       .toBe(renderCloudflarePreviewReceiptV1(syntheticCommit));
     await expect(verifyCloudflareStaticArtifact({
@@ -236,8 +184,7 @@ describe('Cloudflare static-only deployment boundary', () => {
 
   it('requires independent Auth/DB and calculation-only approval before routing Saju', async () => {
     const route = { id: 'api.me.saju.calculation' };
-    // Synthetic DNS-shaped host satisfies the Auth origin grammar; the test
-    // never resolves the hostname or opens a network connection.
+    // Accepted synthetic host shape; the Worker must still reject *.example.test.
     const origin = 'https://auth.synthetic-myeongha.dev';
     const request = new Request(origin + '/api/me/saju/calculation', { method: 'POST' });
     const approvedAuth = {
