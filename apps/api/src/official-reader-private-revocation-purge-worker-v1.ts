@@ -65,6 +65,7 @@ export interface OfficialReaderPrivateRevocationPurgeBatchResultV1 {
   readonly schemaVersion: 'official-reader-s4-revocation-purge-batch-v1';
   readonly discovered: number;
   readonly completed: number;
+  readonly failed: number;
   readonly deferredForSiblingRight: number;
   readonly empty: number;
   readonly keysDestroyed: number;
@@ -264,9 +265,10 @@ export async function runOfficialReaderPrivateRevocationPurgeBatchV1(input: {
       || input.limit<1 || input.limit>50) return fail();
 
   const jobs = await transaction<{jobId:unknown}>(input.pool,LIST_SQL,[input.limit]);
-  let completed=0,empty=0,deferredForSiblingRight=0,rowsDeleted=0,keysDestroyed=0;
+  let completed=0,failed=0,empty=0,deferredForSiblingRight=0,rowsDeleted=0,keysDestroyed=0;
 
   for (const row of jobs) {
+    try {
     const jobId=uuid(row.jobId);
     const claimed=await transaction<{
       subjectId:unknown;
@@ -350,12 +352,22 @@ export async function runOfficialReaderPrivateRevocationPurgeBatchV1(input: {
       pool:input.pool,store:input.store,jobId,worker,claim,fence,
     });
     completed++;
+    } catch {
+      // An independently broken/refunded scope cannot starve the rest of
+      // this batch. The claimed row is left for lease expiry and future
+      // idempotent resumption; do not log Subject/key/Receipt identifiers.
+      failed++;
+    }
   }
 
+  if (jobs.length>0 && failed===jobs.length) {
+    return fail();
+  }
   return Object.freeze({
     schemaVersion:'official-reader-s4-revocation-purge-batch-v1' as const,
     discovered:jobs.length,
     completed,
+    failed,
     deferredForSiblingRight,
     empty,
     keysDestroyed,
