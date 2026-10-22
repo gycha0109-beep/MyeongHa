@@ -48,6 +48,15 @@ p -v s4_restore_rehearsal=1 -f test/db/official_reader_s4_protected_storage_desi
   tail -60 "$tmpdir/setup.log" >&2
   die "fixture failed"
 }
+# Privacy #2318: evaluate all four 2230 derived-source categories against
+# synthetic OLD-backup rows, bypassing only the new-write trigger INSIDE the
+# disposable superuser transaction. Each injection is rolled back, and normal
+# 2190 triggers are re-enabled before the actual restore check.
+p -f test/db/official_reader_s4_restored_derived_quarantine.sql >"$tmpdir/derived-quarantine.log" 2>&1 || {
+  tail -75 "$tmpdir/derived-quarantine.log" >&2
+  die "restore derived-data quarantine E2E failed"
+}
+echo "PASS S4 restore: actual 2230 categorical Memory/Proposal/Life Fact/Outbox quarantine"
 p -f test/db/official_reader_s4_finalizer_forward_contract.sql >"$tmpdir/forward-contract.log" 2>&1 || {
  tail -65 "$tmpdir/forward-contract.log" >&2
  die "forward-only finalizer ordering contract failed"
