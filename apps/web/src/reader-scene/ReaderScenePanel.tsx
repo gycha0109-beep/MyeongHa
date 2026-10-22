@@ -1,5 +1,6 @@
 import type { ReaderSceneControllerStateV1 } from '../../reader-scene-controller.js';
 import { resolveCharacterDisplayNameV1 } from '../../character-display-locale.js';
+import { normalizeUiLocale } from '../../ui-i18n.js';
 
 import './ReaderScenePanel.css';
 
@@ -54,6 +55,8 @@ const SCENE_UI_COPY = {
 export interface ReaderScenePanelProps {
   readonly state: ReaderSceneControllerStateV1;
   readonly onRetry?: () => void;
+  /** UI-only shell locale for loading/error states; not Reader output locale. */
+  readonly uiLocale?: string;
 }
 
 /**
@@ -61,7 +64,7 @@ export interface ReaderScenePanelProps {
  * controller after server response parsing and authorization. No button opens
  * a Thread, purchases an entitlement, or selects a Reader from a UI hint.
  */
-export function ReaderScenePanel({ state, onRetry }: ReaderScenePanelProps) {
+export function ReaderScenePanel({ state, onRetry, uiLocale = 'ko-KR' }: ReaderScenePanelProps) {
   if (state.state === 'ready' || state.state === 'protected_fallback') {
     // UI copy is pegged to the original request's locale snapshot.
     const copy = SCENE_UI_COPY[state.uiLocale];
@@ -108,7 +111,7 @@ export function ReaderScenePanel({ state, onRetry }: ReaderScenePanelProps) {
 
   // Non-ready states are authored UI status only: never reuse a previous
   // reader identity or response when access/session changes.
-  const copy = SCENE_UI_COPY['ko-KR'];
+  const copy = SCENE_UI_COPY[normalizeUiLocale(uiLocale)];
   const status = state.state;
   return (
     <section className="reader-scene-panel" data-reader-scene-presentation data-reader-scene-state={status} aria-label={copy.title}>
