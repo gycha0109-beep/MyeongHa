@@ -195,7 +195,7 @@ export default function SajuReaderSceneScreen() {
           </View>
         ) : currentStep !== undefined ? (
           <View style={styles.block}>
-            <Text style={styles.eyebrow}>{admission.topic.label} · {t('읽기')} {index + 1} / {state.result.steps.length}</Text>
+            <Text style={styles.eyebrow}>{t(admission.topic.label)} · {t('읽기')} {index + 1} / {state.result.steps.length}</Text>
             <Text style={styles.title}>{currentStep.title}</Text>
             <Text style={styles.body}>{currentStep.primary}</Text>
             <Pressable accessibilityRole="button" onPress={() => setDetailsOpen(v => !v)} style={styles.detailButton}>
