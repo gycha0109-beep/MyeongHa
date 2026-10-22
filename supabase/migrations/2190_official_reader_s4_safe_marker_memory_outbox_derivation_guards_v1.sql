@@ -33,10 +33,18 @@ begin
   -- NEW is available on INSERT/UPDATE, but OLD is not assigned on INSERT.
   -- Keep the distinction explicit to avoid touching a missing OLD record.
   if tg_op='INSERT' then
-    v_marker_write:=(new.content_hash=v_safe_hash);
-  elsif tg_op='UPDATE' then
+    -- A customer can independently type these same words. This guard
+    -- concerns S5 SYSTEM-origin markers only, never a user's own sentence
+    -- that happens to hash to the marker constant.
     v_marker_write:=(
-      old.content_hash=v_safe_hash or new.content_hash=v_safe_hash
+      new.sender_type='system' and new.content_hash=v_safe_hash
+    );
+  elsif tg_op='UPDATE' then
+    -- Keep an already protected system marker immutable even when someone
+    -- attempts to rewrite its sender/hash into ordinary user content.
+    v_marker_write:=(
+      (old.sender_type='system' and old.content_hash=v_safe_hash)
+      or (new.sender_type='system' and new.content_hash=v_safe_hash)
     );
   end if;
 
