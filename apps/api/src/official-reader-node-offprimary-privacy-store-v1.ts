@@ -47,9 +47,29 @@ export interface OfficialReaderOffPrimaryKeyStoreV1
   issueUniqueKey(): Promise<OfficialReaderProtectedBodyKeyV1>;
 }
 
+export interface OfficialReaderScopeDeletionFenceV1 {
+  readonly version: 'official-reader-scope-deletion-fence-v1';
+  readonly jobId: string;
+  readonly subjectId: string;
+  readonly officialReadingId: string;
+  readonly readerCharacterId: string;
+  readonly fenceId: string;
+  readonly bodyIds: readonly string[];
+  readonly keyRefs: readonly string[];
+}
+
+export interface OfficialReaderScopeDeletionLedgerPortV1 {
+  recordScopeDeletionFence(input: Omit<OfficialReaderScopeDeletionFenceV1,
+    'version' | 'fenceId'>): Promise<OfficialReaderScopeDeletionFenceV1>;
+  readScopeDeletionFence(jobId: string): Promise<OfficialReaderScopeDeletionFenceV1 | null>;
+  acknowledgeScopeDatabaseErasure(jobId: string, fenceId: string): Promise<void>;
+  acknowledgeScopeKeyErasure(jobId: string, fenceId: string): Promise<void>;
+}
+
 export interface OfficialReaderOffPrimaryRestoreCatalogV1 {
   /** Off-primary durable deletion proof survives a restored PostgreSQL backup. */
   listAccountDeletionFences(): Promise<readonly OfficialReaderDurableDeletionFenceV1[]>;
+  listConfirmedScopeDeletionFences(): Promise<readonly OfficialReaderScopeDeletionFenceV1[]>;
   isSubjectTombstoned(subjectId: string): Promise<boolean>;
 }
 
@@ -57,6 +77,7 @@ export interface OfficialReaderOffPrimaryStoreV1 {
   readonly ledger: OfficialReaderAccountDeletionLedgerPortV1;
   readonly keys: OfficialReaderOffPrimaryKeyStoreV1;
   readonly restoreCatalog: OfficialReaderOffPrimaryRestoreCatalogV1;
+  readonly scopeLedger: OfficialReaderScopeDeletionLedgerPortV1;
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
@@ -268,6 +289,48 @@ export function createOfficialReaderNodeOffPrimaryStoreV1(
   function subjectDenyName(subjectId: string): string {
     return recordFilename(ledgerSeal, 'account-subject-deny', subjectId);
   }
+  function scopeFenceName(jobId: string): string {
+    return recordFilename(ledgerSeal, 'scope-fence', uuid(jobId));
+  }
+  function scopeDbErasedName(jobId: string): string {
+    return recordFilename(ledgerSeal, 'scope-db-erased', uuid(jobId));
+  }
+  function scopeKeyErasedName(jobId: string): string {
+    return recordFilename(ledgerSeal, 'scope-keys-erased', uuid(jobId));
+  }
+  async function readScopeFence(jobId: string): Promise<OfficialReaderScopeDeletionFenceV1 | null> {
+    const name = scopeFenceName(jobId);
+    const original = await readSealed(ledgerRoot, name, ledgerSeal, name);
+    if (original === null) return null;
+    if (!original || typeof original !== 'object') return denied();
+    const v = original as Record<string, unknown>;
+    if (v.version !== 'official-reader-scope-deletion-fence-v1'
+        || v.jobId !== jobId || !UUID.test(v.subjectId as string)
+        || !UUID.test(v.officialReadingId as string)
+        || typeof v.readerCharacterId !== 'string'
+        || !v.readerCharacterId.trim()
+        || typeof v.fenceId !== 'string' || !UUID.test(v.fenceId)) return denied();
+    const sorted = sortedManifest(v.bodyIds as readonly string[],v.keyRefs as readonly string[]);
+    if (sorted.keys.some((key) => !KEY_REF.test(key))) return denied();
+    return Object.freeze({
+      version: 'official-reader-scope-deletion-fence-v1' as const,
+      jobId, subjectId:uuid(v.subjectId),officialReadingId:uuid(v.officialReadingId),
+      readerCharacterId:nonEmpty(v.readerCharacterId),fenceId:uuid(v.fenceId),
+      bodyIds:Object.freeze(sorted.ids),keyRefs:Object.freeze(sorted.keys),
+    });
+  }
+  async function readScopeAck(jobId: string,type: 'scope-db-erased'|'scope-keys-erased'):
+    Promise<string | null> {
+    const name = type==='scope-db-erased'?scopeDbErasedName(jobId):scopeKeyErasedName(jobId);
+    const row = await readSealed(ledgerRoot,name,ledgerSeal,name);
+    if (row === null) return null;
+    if (!row || typeof row !== 'object') return denied();
+    const obj = row as Record<string, unknown>;
+    if (obj.type!==type || obj.jobId!==jobId || !UUID.test(obj.fenceId as string)) {
+      return denied();
+    }
+    return uuid(obj.fenceId);
+  }
   function keyName(keyRef: string): string {
     return recordFilename(keySeal, 'dek', keyRef);
   }
@@ -361,7 +424,87 @@ export function createOfficialReaderNodeOffPrimaryStoreV1(
     },
   });
 
+  const scopeLedger: OfficialReaderScopeDeletionLedgerPortV1 = Object.freeze({
+    async recordScopeDeletionFence(input) {
+      const jobId=uuid(input.jobId);
+      const subjectId=uuid(input.subjectId);
+      const officialReadingId=uuid(input.officialReadingId);
+      const readerCharacterId=nonEmpty(input.readerCharacterId,128);
+      const manifest=sortedManifest(input.bodyIds,input.keyRefs);
+      if (manifest.keys.some((key)=>!KEY_REF.test(key))) return denied();
+      const name=scopeFenceName(jobId);
+      await writeSealedOnce(ledgerRoot,name,ledgerSeal,name,{
+        version:'official-reader-scope-deletion-fence-v1',
+        jobId,subjectId,officialReadingId,readerCharacterId,
+        fenceId:randomUUID(),bodyIds:manifest.ids,keyRefs:manifest.keys,
+      });
+      const saved=await readScopeFence(jobId);
+      if (!saved || saved.subjectId!==subjectId || saved.officialReadingId!==officialReadingId
+          || saved.readerCharacterId!==readerCharacterId
+          || saved.bodyIds.length!==manifest.ids.length
+          || saved.keyRefs.length!==manifest.keys.length
+          || saved.bodyIds.some((id,i)=>id!==manifest.ids[i])
+          || saved.keyRefs.some((key,i)=>key!==manifest.keys[i])) return denied();
+      return saved;
+    },
+    readScopeDeletionFence(jobId) { return readScopeFence(uuid(jobId)); },
+    async acknowledgeScopeDatabaseErasure(jobId,fenceId) {
+      const id=uuid(jobId),fence=uuid(fenceId);
+      const saved=await readScopeFence(id);
+      if (!saved || saved.fenceId!==fence) return denied();
+      const name=scopeDbErasedName(id);
+      await writeSealedOnce(ledgerRoot,name,ledgerSeal,name,{
+        type:'scope-db-erased',jobId:id,fenceId:fence,
+      });
+      if (await readScopeAck(id,'scope-db-erased')!==fence) return denied();
+    },
+    async acknowledgeScopeKeyErasure(jobId,fenceId) {
+      const id=uuid(jobId),fence=uuid(fenceId);
+      const saved=await readScopeFence(id);
+      if (!saved || saved.fenceId!==fence
+          || await readScopeAck(id,'scope-db-erased')!==fence) return denied();
+      for(const key of saved.keyRefs) {
+        if (!(await keyDestroyed(key))) return denied();
+      }
+      const name=scopeKeyErasedName(id);
+      await writeSealedOnce(ledgerRoot,name,ledgerSeal,name,{
+        type:'scope-keys-erased',jobId:id,fenceId:fence,
+      });
+      if (await readScopeAck(id,'scope-keys-erased')!==fence) return denied();
+    },
+  });
+
   const restoreCatalog: OfficialReaderOffPrimaryRestoreCatalogV1 = Object.freeze({
+    async listConfirmedScopeDeletionFences() {
+      await checkRoot(ledgerRoot);
+      const entries=await readdir(ledgerRoot);
+      const names=entries.filter((name)=>/^scope-fence-[0-9a-f]{64}\.json$/u.test(name));
+      if(names.length>MAX_MANIFEST_ITEMS) return denied();
+      const fences:OfficialReaderScopeDeletionFenceV1[]=[];
+      for(const name of names) {
+        const record=await readSealed(ledgerRoot,name,ledgerSeal,name);
+        if(!record||typeof record!=='object') return denied();
+        const jobId=uuid((record as Record<string,unknown>).jobId);
+        if(scopeFenceName(jobId)!==name) return denied();
+        const saved=await readScopeFence(jobId);
+        if(!saved) return denied();
+        // A crash between off-primary fence and DB delete is a hard restore
+        // quarantine, never a silently ignored deletion window.
+        if(await readScopeAck(jobId,'scope-db-erased')!==saved.fenceId) return denied();
+        fences.push(saved);
+      }
+      for(const name of entries.filter((value)=>/^scope-db-erased-[0-9a-f]{64}\.json$/u.test(value)
+        || /^scope-keys-erased-[0-9a-f]{64}\.json$/u.test(value))) {
+        const record=await readSealed(ledgerRoot,name,ledgerSeal,name);
+        if(!record||typeof record!=='object') return denied();
+        const jobId=uuid((record as Record<string,unknown>).jobId);
+        const type=(record as Record<string,unknown>).type;
+        const expectedName=type==='scope-db-erased'?scopeDbErasedName(jobId)
+          :type==='scope-keys-erased'?scopeKeyErasedName(jobId):null;
+        if(expectedName!==name || !fences.some((f)=>f.jobId===jobId)) return denied();
+      }
+      return Object.freeze(fences);
+    },
     async listAccountDeletionFences() {
       await checkRoot(ledgerRoot);
       const entries = await readdir(ledgerRoot);
@@ -506,5 +649,5 @@ export function createOfficialReaderNodeOffPrimaryStoreV1(
     },
   });
 
-  return Object.freeze({ ledger, keys, restoreCatalog });
+  return Object.freeze({ ledger, keys, restoreCatalog, scopeLedger });
 }
