@@ -272,7 +272,8 @@ export async function prepareCharacterStandardReadingServerRuntimeV1(
   // fetch relationship/Memory context or protected Reading under a
   // refunded purchase. V2's base-only (no Saju) helper is unchanged.
   const pinnedThread = await getChatThreadRuntimeBinding({
-    resolvedSubjectId: input.resolvedSubjectId,
+    ...(input.resolvedSubjectId === undefined
+      ? {} : { resolvedSubjectId: input.resolvedSubjectId }),
     threadId: input.threadId,
     authorityPort: input.threadBindingAuthorityPort,
   });
