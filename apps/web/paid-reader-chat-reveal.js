@@ -219,7 +219,18 @@ export function appendProtectedReaderChatRevealV1(card, input) {
               // A missing response is ambiguous; retry the SAME S7 receipt.
             }
           }
-          if (ackResponse.status === 401) invalidateMemberSession(activeBearer.token);
+          if (ackResponse.status === 401) {
+            invalidateMemberSession(activeBearer.token);
+            closeExpanded();
+            return;
+          }
+          if (ackResponse.status === 403 || ackResponse.status === 404) {
+            // A denied/vanished S7 receipt cannot justify keeping private
+            // text open. Reopening must make a fresh, currently entitled GET;
+            // do not label this outcome as a refund without Commerce proof.
+            closeExpanded();
+            return;
+          }
           const ackEnvelope = ackResponse.ok ? await ackResponse.json() : null;
           acknowledged = ackResponse.ok
             && ackEnvelope?.ok === true
