@@ -5,6 +5,9 @@ import type {
 import {
   prepareOfficialReaderS3BoundPreviewSourceV1,
 } from './official-reader-private-s3-source-binding-v1.js';
+import {
+  assertOfficialReaderPrivateCurrentVerifiedPurchaseV1,
+} from './official-reader-private-exact-verified-purchase-guard-v1.js';
 import type {
   SajuHeldSourceProofVerifierContextV1,
   SajuHeldSourceProofVerifierTrustV1,
@@ -109,6 +112,13 @@ export async function runOfficialReaderPrivateSourceBoundT1T2V1(
         const admission = await input.prepareAdmission(scope, effectiveAt);
         if (admission.scope.subjectId !== scope.resolvedSubject.subjectId
             || admission.scope.effectiveAt !== effectiveAt) return unavailable();
+        // A2's active Grant is insufficient: a verified provider refund
+        // can revoke the original Receipt independently. Acquire S1 and
+        // require a surviving verified exact Reader+Reading+Bundle purchase
+        // BEFORE any private Saju network/source proof or generator call.
+        await assertOfficialReaderPrivateCurrentVerifiedPurchaseV1({
+          scope, admission,
+        });
         return admission;
       },
     });
