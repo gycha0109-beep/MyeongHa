@@ -121,6 +121,7 @@ export async function handleCommerceReaderRecordContinuityHttpV1(
               state: 'not_available',
               requiresFreshGateAtUse: true,
             },
+        purchaseState: result.purchaseState,
         protectedAnswer: 'requires_separate_current_entitlement_and_saju_source',
         summary: 'not_confirmed_delivered',
         saleActivated: false,
