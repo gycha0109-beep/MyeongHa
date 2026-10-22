@@ -299,6 +299,16 @@ export async function executeAndDeliverSeyeonFirstPositiveMemoryNodeTurnV1(
     input.response.destroy();
     throw error;
   }
+  // The runtime may have resolved/replayed a different DB user message
+  // despite being invoked with this request. A committed result is not
+  // authorization to disclose a reply to a different message. Require
+  // byte-exact agreement with the normalized text sent to runtime.run()
+  // before fetching ANY original-Grant-protected assistant response.
+  if (result?.execution?.disposition !== 'executed' ||
+      result.execution.receivedTurn?.userText !== input.text.trim()) {
+    input.response.destroy();
+    throw new SeyeonG3FirstPositiveNodeUnavailableV1('INVALID_COMMIT');
+  }
   return deliverSeyeonCommittedFirstPositiveMemoryNodeTurnV1({
     response:input.response,
     requestSignal:input.requestSignal,
