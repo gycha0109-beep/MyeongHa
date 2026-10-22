@@ -163,7 +163,12 @@ describe('Official S5→S6→S7 exact Reading continuity, never approval', () =>
     const data = await input();
     const first = inspectOfficialReaderS5S7ContinuityV1({
       ...data,
-      s6Read: { ...data.s6Read, delivery: undefined },
+      s6Read: {
+        bodyId: BODY,
+        officialReadingId: READING,
+        readerCharacterId: 'seyeon',
+        committedAt: COMMITTED_AT,
+      },
     });
     expect(first).toMatchObject({
       state: 'held', evidenceStage: 'S5_COMMITTED_REFERENCE',
@@ -264,7 +269,12 @@ describe('Official S5→S6→S7 exact Reading continuity, never approval', () =>
     }
     expect(inspectOfficialReaderS5S7ContinuityV1({
       ...data,
-      s6Read: { ...data.s6Read, delivery: undefined },
+      s6Read: {
+        bodyId: BODY,
+        officialReadingId: READING,
+        readerCharacterId: 'seyeon',
+        committedAt: COMMITTED_AT,
+      },
       s7Acknowledged: acknowledged(),
     })).toMatchObject({ state: 'blocked', canDisclose: false });
   });
