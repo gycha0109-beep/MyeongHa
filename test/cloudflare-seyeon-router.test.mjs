@@ -301,7 +301,7 @@ describe('S-CF2 actual Worker fetch boundary and no HTML fallback', () => {
       [new Request(ROOT + '/assets/report.js'),
         new Response(SECRET, { status: 200, headers: { 'Content-Type': 'application/x-ndjson' } })],
       [new Request(ROOT + '/assets/report.js'),
-        new Response(SECRET, { status: 200 })],
+        new Response(new Uint8Array([0x50, 0x52, 0x49, 0x56]), { status: 200 })],
       [new Request(ROOT + '/assets/report.js'),
         new Response(SECRET, { status: 206, headers: {
           'Content-Type': 'text/javascript', 'Content-Range': 'bytes 0-5/50',
