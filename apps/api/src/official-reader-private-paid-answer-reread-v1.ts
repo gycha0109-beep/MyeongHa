@@ -19,7 +19,7 @@ import {
   type OfficialReaderPrivateDeliveryReservationV1,
 } from './official-reader-private-delivery-journal-v1.js';
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 const READ_SQL = `
 select
   body_id::text as "bodyId",
