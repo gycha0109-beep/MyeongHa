@@ -31,6 +31,21 @@ const FIRST_REVEAL_ERROR = Object.freeze({
 });
 
 // Adapter exceptions must never reach the Cloudflare HTML 500 fallback.
+/**
+ * Emergency HOLD is the request-path fail-safe for an Auth/DB/OAuth outage
+ * or a Preview stop. Absence means existing admission rules apply; any
+ * explicitly supplied non-"false" value blocks positive protected APIs.
+ * Never read credentials or instantiate a DB pool while HOLD is active.
+ */
+export function cloudflareEmergencyHoldEnabledV1(bindings) {
+  try {
+    const value = bindings?.MYEONGHA_CLOUDFLARE_EMERGENCY_HOLD;
+    return value !== undefined && value !== 'false';
+  } catch {
+    return true; // A malformed/inaccessible binding must also fail closed.
+  }
+}
+
 export function sealCloudflareUnexpectedApiFailureV1(route) {
   const isSaju = route?.id === 'api.me.saju.calculation';
   return Response.json({
@@ -90,11 +105,20 @@ export default {
   async fetch(request, bindings) {
     const url = new URL(request.url);
     const route = matchCloudflareApiRoute(url.pathname);
+    // One emergency flag disables Auth/DB/Saju without contacting a provider
+    // or acquiring a connection. Chat stays behind its independent 503 fence.
+    const emergencyHold = cloudflareEmergencyHoldEnabledV1(bindings);
     // S-CF2: every /api/chat request is consumed here, before any other API
     // adapter. Neither another Character nor an unknown thread can accidentally
     // fall through to a future positive handler, HTML or Vercel rewrites.
     if (url.pathname === '/api/chat' || url.pathname.startsWith('/api/chat/')) {
       try {
+        if (emergencyHold) {
+          const sealed = fenceCloudflareSeyeonBeforeFetchReturnV1(null, crypto.randomUUID());
+          const headers = new Headers(sealed.headers);
+          for (const [key, value] of Object.entries(BASE_HEADERS)) headers.set(key, value);
+          return new Response(sealed.body, { status: sealed.status, headers });
+        }
         const chatResponse = await tryHandleCloudflareSeyeonSecurityV1(request, bindings, route);
         if (chatResponse !== null) return chatResponse;
         // A DB-confirmed non-SeYeon thread is NOT an admission token: the
@@ -111,6 +135,11 @@ export default {
         for (const [key, value] of Object.entries(BASE_HEADERS)) headers.set(key, value);
         return new Response(sealed.body, { status: sealed.status, headers });
       }
+    }
+    if (emergencyHold) {
+      // Health 200 survives; protected API routes fall back to the existing
+      // 404/503 deny-only dispatcher. No Worker API becomes HTML.
+      return handleCloudflareStaticPreviewRequest(request);
     }
     try {
       const approvedAuthResponse = await tryHandleCloudflareApprovedAuthV1(request, bindings, route);

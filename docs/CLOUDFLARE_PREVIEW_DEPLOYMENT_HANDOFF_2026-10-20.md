@@ -76,3 +76,11 @@
 - `verify-cloudflare-static.mjs`가 번들 배포 전에 산출물의 커밋과 현재 checkout을 비교하고, 해당 JSON 응답에는 `Cache-Control: no-store` 및 기존 Vercel 보안 헤더를 추가한다. Static Assets의 HTML/fallback/API 라우팅은 변경하지 않는다.
 - 보안 Draft #2420의 기존 원격 HTTP/Chrome workflow는 checkout PR head SHA를 `MYEONGHA_CLOUDFLARE_EXPECTED_HEAD`로 주입. 별도 원격 Worker URL의 빌드 영수증이 동일한 SHA를 반환할 때까지 제한된 배포 지연을 허용하고, 끝까지 불일치하면 workflow **FAIL** 처리하여 이전 버전 PASS를 허용하지 않는다. #2384 Stage4 legacy smoke는 기존 계약 유지.
 - 이 증거는 코드 버전/정적 배포의 동일성이지 실제 Supabase OAuth/DB TLS/RLS, 세연 Reveal, 사주 Product Reading, PortOne 실운영 승인/성공 증거가 아니다. DNS/Worker Production/유료 리소스/Secret 전환 없음.
+
+
+## 2026-10-22 단계 9 — Cloudflare Auth·DB 긴급 차단 스위치
+
+- 신규 선택적 Worker 바인딩 이름 `MYEONGHA_CLOUDFLARE_EMERGENCY_HOLD`: 미설정 또는 문자열 `false`이면 기존 승인 및 fail-closed 정책 유지, 문자열 `true` 또는 그 밖의 설정값/읽기 실패는 즉시 보호 API 강제 HOLD. `wrangler.jsonc`에 변수를 넣거나 기존 배포에 실설정 변경을 하지 않았다.
+- 활성 시 인증·OAuth·게스트·개인정보·사주 계산 API는 DB·Supabase·Producer 접근 이전 404/no-store; 세연 Chat 첫 요청·History·Replay는 원래 정적 503 보안 방벽 유지, 공개 `GET /api/health`만 200 유지. 건강 상태만 공개하는 것이 DB readiness/로그인 성공을 의미하지 않음.
+- `test/cloudflare-auth-admission.test.mjs`에 비정상/접근 불가 바인딩, 위험한 데이터 풀 탐색 우회 방지, 영구 차단 이후 Health·세연 격리를 명시. 운영 Vercel/DNS/DB/Secret/OAuth/Cloudflare Paid/PortOne/세연 positive Release는 변경하지 않음.
+- 실제 Preview 또는 운영 Worker에서 이 스위치를 사용하려면 Cloudflare Worker 설정 접근 권한이 필요하며, 테스트의 단순 바인딩 합성값은 실제 on/off 동작 증명과 구분한다.

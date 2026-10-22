@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import worker from '../workers/cloudflare-static-preview.mjs';
+import worker, { cloudflareEmergencyHoldEnabledV1 } from '../workers/cloudflare-static-preview.mjs';
 import {
   approvedCloudflareSameOriginPostV1,
   allowedCloudflareNaverQueryV1,
@@ -96,6 +96,55 @@ describe('Cloudflare Auth/DB admission is fail-closed until explicit host and se
     const seyeon = await get('/api/chat/synthetic-thread/turns', ENABLED, 'POST');
     expect(seyeon.status).toBe(503);
     expect((await seyeon.json()).error.code).toBe('SEYEON_FIRST_REVEAL_AUTHORITY_UNAVAILABLE');
+  });
+});
+
+describe('Cloudflare emergency HOLD for Auth/DB and Saju', () => {
+  it('closes all positive protected APIs while retaining Health and Seyeon fence', async () => {
+    const paused = { ...ENABLED, MYEONGHA_CLOUDFLARE_EMERGENCY_HOLD: 'true' };
+    for (const [method, path] of [
+      ['POST', '/api/auth/sign-in'],
+      ['POST', '/api/auth/social/start'],
+      ['GET', '/api/auth/social/naver/authorize'],
+      ['POST', '/api/session/bootstrap'],
+      ['GET', '/api/me'],
+      ['GET', '/api/me/birth-profile'],
+      ['GET', '/api/birth-profiles/00000000-0000-4000-8000-000000000001'],
+      ['POST', '/api/me/saju/calculation'],
+    ]) {
+      const response = await worker.fetch(new Request(PRIVATE_ORIGIN + path, { method }), paused);
+      expect(response.status).toBe(404);
+      expect(await response.text()).toBe('');
+      expect(response.headers.get('cache-control')).toBe('no-store');
+    }
+    const health = await worker.fetch(new Request(PRIVATE_ORIGIN + '/api/health'), paused);
+    expect(health.status).toBe(200);
+    expect(await health.json()).toEqual({ status: 'ok' });
+    for (const [method, path] of [
+      ['POST', '/api/chat/123e4567-e89b-42d3-a456-426614174000/turns'],
+      ['GET', '/api/chat/123e4567-e89b-42d3-a456-426614174000'],
+    ]) {
+      const response = await worker.fetch(new Request(PRIVATE_ORIGIN + path, { method }), paused);
+      expect(response.status).toBe(503);
+      expect((await response.json()).error.code).toBe('SEYEON_FIRST_REVEAL_AUTHORITY_UNAVAILABLE');
+    }
+  });
+  it('fails closed for invalid/inaccessible HOLD bindings before touching mode or DB', async () => {
+    expect(cloudflareEmergencyHoldEnabledV1(undefined)).toBe(false);
+    expect(cloudflareEmergencyHoldEnabledV1({ MYEONGHA_CLOUDFLARE_EMERGENCY_HOLD: 'false' })).toBe(false);
+    expect(cloudflareEmergencyHoldEnabledV1({ MYEONGHA_CLOUDFLARE_EMERGENCY_HOLD: 'unexpected' })).toBe(true);
+    const poison = new Proxy({ MYEONGHA_CLOUDFLARE_EMERGENCY_HOLD: 'true' }, {
+      get(target, property) {
+        if (property !== 'MYEONGHA_CLOUDFLARE_EMERGENCY_HOLD') throw new Error('DB_BINDING_MUST_NOT_BE_READ');
+        return target[property];
+      },
+    });
+    const response = await worker.fetch(new Request(PRIVATE_ORIGIN + '/api/auth/sign-in', { method: 'POST' }), poison);
+    expect(response.status).toBe(404);
+    expect(await response.text()).toBe('');
+    const unreadable = new Proxy({}, { get() { throw new Error('UNREADABLE_HOLD'); } });
+    const sealed = await worker.fetch(new Request(PRIVATE_ORIGIN + '/api/me'), unreadable);
+    expect(sealed.status).toBe(404);
   });
 });
 
