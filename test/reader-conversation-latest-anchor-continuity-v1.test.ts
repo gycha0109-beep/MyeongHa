@@ -115,6 +115,7 @@ describe('RR-08 latest guarded Assistant source cannot be confused with old ordi
       'assertServerPreparedStandardChatPreflightV2',
       'assertServerPreparedStandardChatGroundingV2',
       'classifyCharacterStandardFollowupQuestionScopeV1',
+      'inspectCharacterStandardFollowupSignalsV1',
       'assertServerPreparedStandardFollowupQuestionScopeV1',
       'readRecentMessages',
       "before.assistantMessageId!==evidence.assistantMessageId",
