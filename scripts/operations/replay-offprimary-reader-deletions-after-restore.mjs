@@ -45,7 +45,8 @@ try {
     offPrimary: store,
     executionBoundary: 'isolated-restoration-only',
   });
-  if (result.publicReaderServiceEnabled !== false) blocked();
+  if (result.publicReaderServiceEnabled !== false
+      || result.ordinaryDerivedRestoreQuarantineGuardInstalled !== true) blocked();
   // No Subject IDs, DEK references, ciphertext or raw tombstones in logs.
   process.stdout.write(JSON.stringify({
     schemaVersion: result.schemaVersion,
@@ -55,8 +56,9 @@ try {
     refundScopeTombstonesReplayed: result.refundScopeTombstonesReplayed,
     refundScopeRowsDeleted: result.refundScopeRowsDeleted,
     refundScopeKeysConfirmedDestroyed: result.refundScopeKeysConfirmedDestroyed,
+    ordinaryDerivedRestoreQuarantineGuardInstalled: true,
     publicReaderServiceEnabled: false,
-    next: 'Keep Reader paid-read OFF until the complete PostgreSQL privacy reconciliation and restore owner acceptance.',
+    next: 'Keep ALL Reader paid-read and ordinary Memory/Search/Summary restore consumers OFF until the complete privacy reconciliation and restore owner acceptance.',
   }) + '\n');
 } finally {
   await pool.close();
