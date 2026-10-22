@@ -30,7 +30,7 @@ function fakeRuntimeResult(userText: unknown): RunProductionSeyeonChatResultV1 {
     threadBinding: {threadId: THREAD, participantCharacterIds: ['seyeon']},
     execution: {
       disposition: 'executed',
-      receivedTurn: {turnId: TURN, userText, threadCharacterId: 'seyeon'},
+      receivedTurn: {turnId: TURN, userText, threadCharacterId: 'seyeon', replayed: false, committedTurn: null},
       attempt: {attemptId: ATTEMPT, replayed: false},
       committedTurn: {
         turnId: TURN,
