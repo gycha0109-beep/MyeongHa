@@ -179,7 +179,7 @@ describe('Commerce verified purchase -> Reader -> Official Records continuity', 
       canBypassS5OrS6: false,
       canInjectPaidReadingIntoMemory: false,
     });
-    expect(result.officialRecord.reading.reading).toBeUndefined();
+    expect(result.officialRecord.reading).toMatchObject({ state: 'delivered' });
     expect(JSON.stringify(result.readerFollowup)).not.toContain('responseHash');
   });
 
