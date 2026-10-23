@@ -7,6 +7,7 @@ import { tryHandleCloudflareApprovedAuthV1 } from './cloudflare-auth-db-api.mjs'
 import { tryHandleCloudflareApprovedSajuCalculationV1 } from './cloudflare-saju-calculation.mjs';
 import { tryHandleCloudflareApprovedSajuPreviewReadingV1 } from './cloudflare-saju-preview-reading.mjs';
 import { tryHandleCloudflareApprovedRecordsV1 } from './cloudflare-records-api.mjs';
+import { tryHandleCloudflareApprovedTargetPersonReadV1 } from './cloudflare-target-person-read.mjs';
 
 // Cloudflare static preview: explicitly NOT the production API runtime.
 // Every /api request goes through this deny-only Worker; Static Assets serve
@@ -155,6 +156,8 @@ export default {
       if (approvedPreviewReadingResponse !== null) return approvedPreviewReadingResponse;
       const recordsResponse = await tryHandleCloudflareApprovedRecordsV1(request, bindings, route);
       if (recordsResponse !== null) return recordsResponse;
+      const targetPersonReadResponse = await tryHandleCloudflareApprovedTargetPersonReadV1(request, bindings, route);
+      if (targetPersonReadResponse !== null) return targetPersonReadResponse;
       return handleCloudflareStaticPreviewRequest(request);
     } catch {
       // Auth/DB or calculation adapters can fail outside their own try/catch.
