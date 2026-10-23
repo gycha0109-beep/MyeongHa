@@ -157,7 +157,7 @@ begin
   instant-interval '2 minutes',instant+interval '1 hour',null,instant+interval '1 day'),
  ('f7090000-0000-4000-8000-000000000002',s,body,t,m,
   'f70a0000-0000-4000-8000-000000000002',
-  'sha256:v1:2222222222222222222222222222222222222222222222222222222222',
+  'sha256:v1:2222222222222222222222222222222222222222222222222222222222222222',
   instant-interval '1 minute',instant+interval '1 hour',
   instant-interval '10 seconds',instant+interval '1 day');
 end
