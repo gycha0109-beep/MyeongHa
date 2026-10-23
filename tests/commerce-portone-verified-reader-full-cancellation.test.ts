@@ -72,7 +72,15 @@ describe('verified PortOne Reader full cancellation DB result normalization', ()
     'official-reader-s2-unbound-grant-cancellation-v1',
     'official-reader-s2-revoke-dispatch-v1',
   ])('preserves actual Grant revoke outcome for %s', async (contractVersion) => {
-    const db = mockCommercePool(result({ contractVersion, grantCount: 1 }));
+    const db = mockCommercePool(result({
+      contractVersion,
+      grantCount: 1,
+      scopeCount: contractVersion === 'official-reader-s2-revoke-dispatch-v1' ? 1 : 0,
+      effects: [{ verifiedApplied: true }],
+      ...(contractVersion === 'official-reader-s2-revoke-dispatch-v1'
+        ? { providerEventId: EVENT }
+        : { disposition: 'cancelled_before_binding' }),
+    }));
     await expect(applyVerifiedPortOneV2ReaderFullCancellationV1({
       pool: db.pool, evidence,
     })).resolves.toEqual({
@@ -90,6 +98,13 @@ describe('verified PortOne Reader full cancellation DB result normalization', ()
     { contractVersion: 'official-reader-s2-no-grant-cancellation-v1', grantCount: 0, scopeCount: 1, disposition: 'cancelled_before_grant' },
     { contractVersion: 'official-reader-s2-no-grant-cancellation-v1', grantCount: 0, scopeCount: 0, disposition: 'wrong_outcome' },
     { contractVersion: 'official-reader-s2-no-grant-cancellation-v1', grantCount: 1, scopeCount: 0, disposition: 'cancelled_before_grant' },
+    { contractVersion: 'official-reader-s2-unbound-grant-cancellation-v1', grantCount: 1, scopeCount: 0, effects: [], disposition: 'cancelled_before_binding' },
+    { contractVersion: 'official-reader-s2-unbound-grant-cancellation-v1', grantCount: 1, scopeCount: 1, effects: [{}], disposition: 'cancelled_before_binding' },
+    { contractVersion: 'official-reader-s2-unbound-grant-cancellation-v1', grantCount: 1, scopeCount: 0, effects: [{}], disposition: 'wrong_outcome' },
+    { contractVersion: 'official-reader-s2-revoke-dispatch-v1', grantCount: 1, scopeCount: 0, effects: [{}], providerEventId: EVENT },
+    { contractVersion: 'official-reader-s2-revoke-dispatch-v1', grantCount: 1, scopeCount: 1, effects: [{}], providerEventId: RECEIPT },
+    { contractVersion: 'official-reader-s2-revoke-dispatch-v1', grantCount: 2, scopeCount: 1, effects: [{}], providerEventId: EVENT },
+    { contractVersion: 'official-reader-s2-revoke-dispatch-v1', grantCount: 1, scopeCount: 2, effects: [{}], providerEventId: EVENT },
   ])('ROLLS BACK inconsistent/no-authority cancellation effect %#', async (effect) => {
     const db = mockCommercePool(result(effect));
     await expect(applyVerifiedPortOneV2ReaderFullCancellationV1({
