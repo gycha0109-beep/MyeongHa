@@ -1,0 +1,107 @@
+name: Face Preview Handoff Acceptance
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/verify-face-preview-handoff-fe025.mjs'
+      - 'docs/face-engine/fe025-face-preview-handoff-acceptance.md'
+      - '.github/workflows/face-preview-handoff-acceptance.yml'
+  workflow_dispatch:
+    inputs:
+      saju_run_id:
+        description: Successful Saju FE024 workflow run ID
+        required: true
+        type: string
+      expected_saju_head_sha:
+        description: Exact 40-character Saju source HEAD SHA expected in the FE024 manifest
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  verify-fe025-contract:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Verify FE025 verifier syntax
+        run: node --check scripts/verify-face-preview-handoff-fe025.mjs
+      - name: Verify FE025 workflow boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -F "FE024 Digest-Bound Consumer Handoff CI" .github/workflows/face-preview-handoff-acceptance.yml
+          grep -F "openDigestBoundProductPreviewSessionFE023" scripts/verify-face-preview-handoff-fe025.mjs
+          grep -F "wasmDigestVerifiedByEngine === false" scripts/verify-face-preview-handoff-fe025.mjs
+
+  accept-fe024-handoff:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      GH_TOKEN: ${{ secrets.SAJU_HANDOFF_READ_TOKEN || github.token }}
+      SAJU_RUN_ID: ${{ inputs.saju_run_id }}
+      EXPECTED_SAJU_HEAD_SHA: ${{ inputs.expected_saju_head_sha }}
+      ARTIFACT_NAME: fe024-digest-bound-preview-consumer-handoff
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Validate pinned source inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$SAJU_RUN_ID" =~ ^[0-9]+$ ]]
+          [[ "$EXPECTED_SAJU_HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]
+      - name: Verify Saju FE024 run provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api "/repos/gycha0109-beep/Saju/actions/runs/$SAJU_RUN_ID" > "$RUNNER_TEMP/saju-run.json"
+          node --input-type=module - "$RUNNER_TEMP/saju-run.json" "$EXPECTED_SAJU_HEAD_SHA" <<'NODE'
+          import { readFileSync } from 'node:fs';
+          const run = JSON.parse(readFileSync(process.argv[2], 'utf8'));
+          const expected = process.argv[3];
+          if (
+            run.name !== 'FE024 Digest-Bound Consumer Handoff CI' ||
+            run.status !== 'completed' ||
+            run.conclusion !== 'success' ||
+            run.head_sha !== expected
+          ) {
+            throw new Error('Pinned Saju FE024 workflow provenance mismatch.');
+          }
+          NODE
+      - name: Download exact FE024 artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api "/repos/gycha0109-beep/Saju/actions/runs/$SAJU_RUN_ID/artifacts" > "$RUNNER_TEMP/artifacts.json"
+          ARTIFACT_ID="$(
+            node --input-type=module - "$RUNNER_TEMP/artifacts.json" "$ARTIFACT_NAME" "$EXPECTED_SAJU_HEAD_SHA" <<'NODE'
+          import { readFileSync } from 'node:fs';
+          const payload = JSON.parse(readFileSync(process.argv[2], 'utf8'));
+          const name = process.argv[3];
+          const expected = process.argv[4];
+          const matches = (payload.artifacts ?? []).filter((artifact) =>
+            artifact.name === name &&
+            artifact.expired === false &&
+            artifact.workflow_run?.head_sha === expected
+          );
+          if (matches.length !== 1) throw new Error('Expected exactly one pinned FE024 artifact.');
+          process.stdout.write(String(matches[0].id));
+          NODE
+          )"
+          mkdir -p "$RUNNER_TEMP/fe024-handoff"
+          gh api "/repos/gycha0109-beep/Saju/actions/artifacts/$ARTIFACT_ID/zip" > "$RUNNER_TEMP/fe024.zip"
+          unzip -q "$RUNNER_TEMP/fe024.zip" -d "$RUNNER_TEMP/fe024-handoff"
+      - name: Accept FE024 handoff
+        run: node scripts/verify-face-preview-handoff-fe025.mjs "$RUNNER_TEMP/fe024-handoff" "$EXPECTED_SAJU_HEAD_SHA"
