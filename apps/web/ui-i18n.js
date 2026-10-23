@@ -138,7 +138,7 @@ function createLanguagePicker(locale, onChange) {
   }
   // Planned candidates must remain unselectable while their UI catalogues
   // and privacy/original-source notices are incomplete.
-  for (const [value, label] of [['en-US', 'English (준비 중)'], ['zh-CN', '简体中文 (准备中)']]) {
+  for (const [value, label] of [['en-US', 'English (not available yet)'], ['zh-CN', '简体中文 (准备中)']]) {
     if (!PLANNED_UI_LOCALES.includes(value)) continue;
     const option = document.createElement('option');
     option.value = value;
