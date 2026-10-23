@@ -13,8 +13,7 @@ cd "$root"
    "$(printenv GITHUB_REPOSITORY || true)" == gycha0109-beep/MyeongHa &&
    "$(printenv GITHUB_REF || true)" == refs/heads/main ]] ||
   hold 'Protected main GitHub Actions runner required'
-[[ "$(printenv READER_S4_SCOPE_CONFIRMATION || true)" ==
-   APPLY_OFFICIAL_READER_1740_2290_ONLY ]] ||
+[[ "$(printenv READER_S4_SCOPE_CONFIRMATION || true)" == APPLY_OFFICIAL_READER_1740_2290_ONLY ]] ||
   hold 'Exact manual Reader deployment confirmation required'
 [[ "$(printenv SUPABASE_PROJECT_ID || true)" == cnsfpcdiyofqvhpcegfc ]] ||
   hold 'Unexpected project'
