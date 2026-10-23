@@ -534,7 +534,7 @@ try {
   assert(invalidReading.copy.includes('자동 대체하지 않았습니다.'), 'Invalid Reading did not disclose fallback refusal');
 
   await client.evaluate(`(() => { localStorage.setItem('myeongha.productTheme.v1', 'dark'); return true; })()`);
-  const darkHome = await verifyDarkPage(client, origin, '/hall.html', '.gm-home-hero', { artifactSuffix: '-dark-home' });
+  const darkHome = await verifyDarkPage(client, origin, '/hall.html', '.mhx-hero', { artifactSuffix: '-dark-home' });
 
   const toggleState = await client.evaluate(`(() => {
     const button = document.querySelector('.product-theme-toggle');
@@ -555,7 +555,7 @@ try {
   const darkMy = await verifyDarkPage(client, origin, '/my.html', '.my-main');
 
   await client.send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
-  const darkMobileHome = await verifyDarkPage(client, origin, '/hall.html', '.gm-home-hero', { artifactSuffix: '-dark-home-mobile' });
+  const darkMobileHome = await verifyDarkPage(client, origin, '/hall.html', '.mhx-hero', { artifactSuffix: '-dark-home-mobile' });
   const darkMobileSaju = await verifyDarkPage(client, origin, '/reading.html', '#saju-empty', { artifactSuffix: '-dark-saju-mobile' });
   const darkMobileChat = await verifyDarkPage(client, origin, '/chat.html', '.conversation-chat-panel', { toggle: false, artifactSuffix: '-dark-chat-room-mobile' });
   const mobileChatState = await client.evaluate(`(() => ({
