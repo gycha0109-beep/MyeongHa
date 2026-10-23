@@ -90,9 +90,9 @@ export function ReadingPage() {
       <section id="saju-hub" hidden aria-label="계산된 내 사주">
         <article className="gm-saju-hero" aria-labelledby="gm-saju-profile-title">
           <div className="gm-saju-hero-copy">
-            <h2 className="gm-saju-title" id="gm-saju-profile-title">나의 명식</h2>
+            <h2 className="gm-saju-title" id="gm-saju-profile-title">무료 기본 명식</h2>
             <p className="gm-saju-summary" id="saju-birth-summary">현재 자기 Birth Profile과 연결된 계산 결과입니다.</p>
-            <details className="gm-chart-details">
+            <details className="gm-chart-details" open>
               <summary>기본 정보 보기 →</summary>
               <div className="gm-chart-panel">
                 <div className="saju-pillar-grid" id="saju-pillar-grid" aria-label="사주 네 기둥" />
@@ -118,6 +118,31 @@ export function ReadingPage() {
           </div>
           <blockquote className="gm-saju-quote">“지금의 내가,<br />더 좋은 내일을 만듭니다.”</blockquote>
         </article>
+
+        <section className="saju-free-preview-panel gm-card" aria-labelledby="saju-free-preview-title">
+          <div className="saju-free-preview-intro">
+            <span className="saju-preview-kicker">FREE · PREVIEW</span>
+            <h2 id="saju-free-preview-title">정식 읽기 구성 미리보기</h2>
+            <p>무료 기본 명식은 위의 서버 계산 결과입니다. 아래 내용은 실제 개인별 유료 해석이 아닌, 승인된 상품 주제와 다루는 범위에 대한 안내입니다.</p>
+          </div>
+          <div className="saju-free-preview-body">
+            <div className="saju-preview-product">
+              <strong>연애·관계 정식 읽기</strong>
+              <span>판매 준비 중 · 아직 구매할 수 없습니다</span>
+            </div>
+            <h3>상품에서 다루는 범위</h3>
+            <ol className="saju-preview-outline">
+              <li>관계에 들어가는 방식과 애정 표현</li>
+              <li>상대에게 기대하는 점과 친밀감의 변화</li>
+              <li>갈등 대응과 반복되는 관계 패턴</li>
+            </ol>
+            <p className="saju-preview-disclaimer">구성 안내 예시이며 확정된 결과물 목차가 아닙니다. 개인화된 본문이나 유료 Reading 데이터는 내려받지 않습니다.</p>
+            <div className="saju-preview-actions">
+              <a href="reading-detail.html?topic=love">무료 연애·관계 프리뷰 확인 <span aria-hidden="true">→</span></a>
+              <span aria-label="유료 상품 구매 준비 중">정식 읽기 구매 준비 중</span>
+            </div>
+          </div>
+        </section>
 
         <section className="gm-section" aria-labelledby="gm-reading-title">
           <div className="gm-section-head">
