@@ -79,6 +79,8 @@ describe('Private Commerce original Receipt -> S5 commit -> S7 -> withdrawal evi
       authenticatedClientAcknowledgedAt: ACK_AT,
       retainedDeliveryAttempts: 1,
       retainedAcknowledgedAttempts: 1,
+      retainedUnacknowledgedAttempts: 0,
+      retainedDeliveryEvidenceState: 'client_ack_recorded_delivery_unproven',
       consumerDeliveryProven: false,
       legallyProvenDeliveredAt: null,
     });
@@ -125,6 +127,65 @@ describe('Private Commerce original Receipt -> S5 commit -> S7 -> withdrawal evi
       expect(result.review.classification).toBe('not_proven_delivered');
       expect(result.timeline.legallyProvenDeliveredAt).toBeNull();
     }
+  });
+
+  it.each([
+    {
+      title: 'no retained records (including expired or Privacy-erased receipts)',
+      overrides: {
+        responsePreparedAt: null, clientAcknowledgedAt: null,
+        deliveryAttemptCount: '0', acknowledgedAttemptCount: '0',
+      },
+      retainedDeliveryEvidenceState: 'no_retained_delivery_receipts',
+      retainedUnacknowledgedAttempts: 0,
+    },
+    {
+      title: 'a prepared response without any authenticated acknowledgement',
+      overrides: { clientAcknowledgedAt: null, acknowledgedAttemptCount: '0' },
+      retainedDeliveryEvidenceState: 'response_prepared_no_retained_ack',
+      retainedUnacknowledgedAttempts: 1,
+    },
+    {
+      title: 'three independent response preparations but only one retained ACK',
+      overrides: { deliveryAttemptCount: '3', acknowledgedAttemptCount: '1' },
+      retainedDeliveryEvidenceState: 'client_ack_recorded_delivery_unproven',
+      retainedUnacknowledgedAttempts: 2,
+    },
+    {
+      title: 'repeated or duplicate network retries without any ACK',
+      overrides: {
+        deliveryAttemptCount: '4', acknowledgedAttemptCount: '0',
+        clientAcknowledgedAt: null,
+      },
+      retainedDeliveryEvidenceState: 'response_prepared_no_retained_ack',
+      retainedUnacknowledgedAttempts: 4,
+    },
+  ])('describes S7 $title without claiming a legal delivery or a network error', async row => {
+    const { makeInput } = fixture(row.overrides);
+    const result = await reviewOfficialReaderPrivateWithdrawalEvidenceV1(makeInput());
+    expect(result.timeline.retainedDeliveryEvidenceState).toBe(row.retainedDeliveryEvidenceState);
+    expect(result.timeline.retainedUnacknowledgedAttempts).toBe(row.retainedUnacknowledgedAttempts);
+    expect(result.timeline.consumerDeliveryProven).toBe(false);
+    expect(result.timeline.legallyProvenDeliveredAt).toBeNull();
+    expect(result.review.classification).toBe('not_proven_delivered');
+    expect(result.review.automaticDenialAuthorized).toBe(false);
+    expect(result.review.providerRefundAuthorized).toBe(false);
+    expect(result.entitlementMutationAuthorized).toBe(false);
+  });
+
+  it('does not borrow a surviving sibling right to turn a revoked original receipt ACK into delivery proof', async () => {
+    const { makeInput } = fixture({
+      originalReceiptStatus: 'revoked',
+      deliveryAttemptCount: '4',
+      acknowledgedAttemptCount: '2',
+    });
+    const result = await reviewOfficialReaderPrivateWithdrawalEvidenceV1(makeInput());
+    expect(result.timeline.originalReceiptStatus).toBe('revoked');
+    expect(result.timeline.retainedUnacknowledgedAttempts).toBe(2);
+    expect(result.timeline.retainedDeliveryEvidenceState).toBe('client_ack_recorded_delivery_unproven');
+    expect(result.timeline.consumerDeliveryProven).toBe(false);
+    expect(result.review.classification).toBe('evidence_review_required');
+    expect(result.refundAuthorized).toBe(false);
   });
 
   it('preserves statutory-complaint and separable-part priority over any ACK', async () => {
