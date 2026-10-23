@@ -57,12 +57,29 @@ describe('Cloudflare Target Person read-only Vercel parity', () => {
       expect((await worker.fetch(request(path),ENV)).status).toBe(404);
     }
   });
-  it('preserves read-only method contract and emergency HOLD', async () => {
-    const wrong=await worker.fetch(request('/api/target-persons','POST'),ENV);
-    expect(wrong.status).toBe(405);
-    expect(wrong.headers.get('allow')).toBe('GET');
-    expect((await worker.fetch(request('/api/target-persons'),
-      {...ENV,MYEONGHA_CLOUDFLARE_EMERGENCY_HOLD:'true'})).status).toBe(404);
+  it('preserves list GET/POST and detail GET while gated by Auth/DB and HMAC credentials', async () => {
+    const listPost = await worker.fetch(request('/api/target-persons','POST'), ENV);
+    expect(listPost.status).toBe(503);
+    expect((await listPost.json()).error.code).toBe('AUTH_UPSTREAM_UNAVAILABLE');
+    const detailPost = await worker.fetch(request('/api/target-persons/' + UUID,'POST'), ENV);
+    expect(detailPost.status).toBe(405);
+    expect(detailPost.headers.get('allow')).toBe('GET');
+    const listHead = await worker.fetch(request('/api/target-persons','HEAD'), ENV);
+    expect(listHead.status).toBe(405);
+    expect(listHead.headers.get('allow')).toBe('GET, POST');
+    const blocked = await worker.fetch(request('/api/target-persons','POST'), {
+      ...ENV,MYEONGHA_CLOUDFLARE_EMERGENCY_HOLD:'true',
+    });
+    expect(blocked.status).toBe(404);
+  });
+  it('rejects cross-site target-person mutations before any DB socket', async () => {
+    const cross = await worker.fetch(new Request(HOST + '/api/target-persons', {
+      method:'POST',
+      headers:{origin:'https://attacker.example.com','content-type':'application/json'},
+      body:'{}',
+    }), ENV);
+    expect(cross.status).toBe(404);
+    expect(cross.headers.get('location')).toBeNull();
   });
   it('seals redirects, cookies, HTML, SSE, and empty-success output', async () => {
     for (const candidate of [

@@ -5,9 +5,11 @@ import {
   approvedCloudflareAuthOriginV1,
   approvedCloudflareStage5HandoffV1,
   approvedCloudflarePostgresTargetV1,
+  approvedCloudflareSameOriginPostV1,
   CLOUDFLARE_APPROVED_RESPONSE_HEADERS_V1,
 } from './cloudflare-auth-db-api.mjs';
 import { createProductionTargetPersonReadRuntimeV1 } from '../apps/api/src/production-target-person-read-runtime.ts';
+import { createProductionTargetPersonCreateRuntimeV1 } from '../apps/api/src/production-target-person-create-runtime.ts';
 import { parseProductionUserDataRuntimeConfigV1 } from '../apps/api/src/production-user-data-runtime-config.ts';
 import {
   buildProductionNodePostgresPoolConfigV1,
@@ -59,9 +61,14 @@ export async function tryHandleCloudflareApprovedTargetPersonReadV1(request, bin
   const origin = approvedCloudflareAuthOriginV1(request, bindings);
   if (origin === null || !approvedCloudflareStage5HandoffV1(bindings, origin, false)) return null;
   if (!allowedCloudflareTargetPersonReadPathV1(route, new URL(request.url))) return deny();
-  if (request.method !== 'GET') {
-    return new Response(null, { status: 405, headers: { ...HEADERS, Allow: 'GET' } });
+  const isCreate = route.id === 'rewrite.target-persons' && request.method === 'POST';
+  if (request.method !== 'GET' && !isCreate) {
+    return new Response(null, {
+      status: 405,
+      headers: { ...HEADERS, Allow: route.id === 'rewrite.target-persons' ? 'GET, POST' : 'GET' },
+    });
   }
+  if (isCreate && !approvedCloudflareSameOriginPostV1(request, origin)) return deny();
   let config;
   try {
     config = parseProductionUserDataRuntimeConfigV1(bindings);
@@ -75,7 +82,9 @@ export async function tryHandleCloudflareApprovedTargetPersonReadV1(request, bin
   let pool, runtime, result;
   try {
     pool = createNodePostgresSubjectPoolV1(config, CLOUDFLARE_DIRECT_POSTGRES_CANDIDATE_LIMITS_V1);
-    runtime = createProductionTargetPersonReadRuntimeV1({ env: bindings, pool });
+    runtime = isCreate
+      ? createProductionTargetPersonCreateRuntimeV1({ env: bindings, pool })
+      : createProductionTargetPersonReadRuntimeV1({ env: bindings, pool });
     result = await runtime.handleRequest({
       request, requestId: crypto.randomUUID(), serverTime: new Date().toISOString(),
     });
