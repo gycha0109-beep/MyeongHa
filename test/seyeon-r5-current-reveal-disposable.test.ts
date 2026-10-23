@@ -955,6 +955,57 @@ describe.skipIf(!enabled)('R5 disposable actual-v2 current-rights first/replay/h
     expect((await saved(id)).outboxes).toBe('2');
   });
 
+  it('R25 REAL PG revoke-first blocks Node first send before private bytes and preserves unused Turn',async()=>{
+    const id=await committed(95);
+    let readStarted!:()=>void;
+    const started=new Promise<void>(resolve=>{readStarted=resolve;});
+
+    await clientAction(async revoker=>{
+      await revoker.query('BEGIN');
+      try{
+        const revoke=await revoker.query<{revoked_grant_count:number}>(
+          'select revoked_grant_count from public.cmd_revoke_memory_character_grant_v1($1::uuid,$2::uuid,$3::text)',
+          [subject,id.memory,'seyeon'],
+        );
+        expect(revoke.rows[0]?.revoked_grant_count).toBe(1);
+
+        await withR9Loopback(async(request,response)=>{
+          await r9ReadBody(request);
+          const outcome=await sendSeyeonNodeOriginalGrantResponseV1({
+            response,requestSignal:new AbortController().signal,
+            deadlineMs:9_000,
+            withLockedOriginalGrant:async({deliver})=>transaction(async reader=>{
+              await reader.query("set local application_name='seyeon-r25-revoke-first'");
+              readStarted();
+              const reply=await firstOnceR25(reader,id);
+              expect(reply).toBeNull();
+              await deliver(null);
+            },true),
+          });
+          expect(outcome).toBe('reveal_held');
+        },async origin=>{
+          const pending=fetch(origin+'/r25-revoke-first',{
+            method:'POST',body:'disposable R25 revocation race only',
+          });
+          await started;
+          await waitForLock('seyeon-r25-revoke-first');
+          await revoker.query('COMMIT');
+          const response=await pending;
+          const wire=await response.text();
+          expect(response.status).toBe(503);
+          expect(response.headers.get('cache-control')).toBe('no-store');
+          expect(wire).not.toContain(body);
+          expect(wire).toContain('SEYEON_FIRST_REVEAL_AUTHORITY_UNAVAILABLE');
+        });
+      }finally{
+        await revoker.query('ROLLBACK').catch(()=>undefined);
+      }
+    });
+    expect((await saved(id)).turn_state).toBe('committed');
+    expect(await transaction(c=>firstOnceR25(c,id),true)).toBeNull();
+    expect((await saved(id)).messages).toBe('1');
+  });
+
   it('R25 failed send rolls back consumed Turn so a later original first send can retry once',async()=>{
     const id=await committed(94);
     await expect(transaction(async c=>{
