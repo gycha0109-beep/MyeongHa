@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 import {
   handlePortOneV2IdentityIssueRequestV1,
@@ -58,9 +59,21 @@ function context(activation: boolean, readPending = true, canConsume = true) {
 }
 
 describe('LEGAL PortOne V2 identity HTTP source boundary', () => {
-  it('has no registered route, stays OFF, and makes zero DB/provider calls', async () => {
+  it('registers both Vercel entrypoints without provider secrets or activation', () => {
+    for (const [name, handler] of [
+      ['attempts', 'handlePortOneV2IdentityIssueRequestV1'],
+      ['complete', 'handlePortOneV2IdentityCompleteRequestV1'],
+    ] as const) {
+      const source = readFileSync(new URL(`../api/identity-verifications/${name}.ts`, import.meta.url), 'utf8');
+      expect(source).toContain(handler);
+      expect(source).not.toContain('testOnlyActivation');
+      expect(source).not.toContain('PORTONE_API_SECRET');
+    }
+  });
+
+  it('registers inert routes, stays OFF, and makes zero DB/provider calls', async () => {
     expect(PORTONE_V2_IDENTITY_HTTP_BINDINGS_V1).toMatchObject({
-      routeRegistered: false, active: false,
+      routeRegistered: true, active: false,
     });
     const t = context(false);
     const issue = await handlePortOneV2IdentityIssueRequestV1({

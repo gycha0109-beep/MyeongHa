@@ -12,17 +12,18 @@ export const PORTONE_V2_IDENTITY_HTTP_BINDINGS_V1 = Object.freeze({
   issueRoute: '/api/identity-verifications/attempts',
   completeRoute: '/api/identity-verifications/complete',
   method: 'POST',
-  routeRegistered: false,
+  routeRegistered: true,
   active: false,
 } as const);
 
 export interface PortOneV2IdentityHttpInputV1 {
   readonly request: Request;
   readonly requestId: string;
-  readonly serverTime: string;
-  readonly identityEvidenceVerifier: IdentityEvidenceVerificationPortV1;
-  readonly pool: PostgresSubjectPoolV1;
-  readonly lookup: PortOneV2IdentityLookupAdapterV1;
+  /** These dependencies are supplied only by a future approved production composition. */
+  readonly serverTime?: string;
+  readonly identityEvidenceVerifier?: IdentityEvidenceVerificationPortV1;
+  readonly pool?: PostgresSubjectPoolV1;
+  readonly lookup?: PortOneV2IdentityLookupAdapterV1;
   /** Internal tests only. No production route supplies this flag. */
   readonly testOnlyActivation?: true;
 }
@@ -43,8 +44,12 @@ function onlyId(value: unknown): value is { identityVerificationId: string } {
     /^iv_[a-f0-9]{32}$/u.test(obj.identityVerificationId);
 }
 async function handle(input: PortOneV2IdentityHttpInputV1, action: 'issue' | 'complete'): Promise<Response> {
-  // Explicit OFF. No Vercel route / SDK / API secret is registered here.
+  // Public routes are registered in OFF mode only. Production callers never
+  // provide the internal test activation flag; do not open DB or call PortOne.
   if (input.testOnlyActivation !== true) return failure(503, 'IDENTITY_VERIFICATION_DISABLED', input.requestId);
+  if (!input.identityEvidenceVerifier || !input.pool || !input.lookup || !input.serverTime) {
+    return failure(503, 'IDENTITY_VERIFICATION_UNAVAILABLE', input.requestId);
+  }
   const route = action === 'issue'
     ? PORTONE_V2_IDENTITY_HTTP_BINDINGS_V1.issueRoute
     : PORTONE_V2_IDENTITY_HTTP_BINDINGS_V1.completeRoute;
