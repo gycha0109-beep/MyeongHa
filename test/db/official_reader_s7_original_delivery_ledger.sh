@@ -149,7 +149,16 @@ delivery_id='f7090000-0000-4000-8000-000000000002'
 request_id='f70a0000-0000-4000-8000-000000000002'
 thread_id='f7010000-0000-4000-8000-000000000001'
 marker_id='f7050000-0000-4000-8000-000000000001'
-ack_hash='sha256:v1:2222222222222222222222222222222222222222222222222222222222'
+# Use the actual retained, S7-validated digest instead of duplicating
+# the fixture's SHA-256 literal: the first retry accidentally supplied 58 hex
+# characters after the fixture was corrected to 64.
+ack_hash="$(p -c "select acknowledgement_token_hash
+ from public.official_reader_paid_delivery_attempts_v1
+ where id='$delivery_id'::uuid and body_id='$body'::uuid
+ and subject_id='$subject'::uuid and thread_id='$thread_id'::uuid
+ and safe_message_id='$marker_id'::uuid and delivery_request_id='$request_id'::uuid;")"
+[[ "$ack_hash" =~ ^sha256:v1:[a-f0-9]{64}$ ]] ||
+  fail "original retained ACK digest missing or malformed"
 ack_before="$(p -c "select client_acknowledged_at
  from public.official_reader_paid_delivery_attempts_v1
  where id='$delivery_id'::uuid and body_id='$body'::uuid;")"
