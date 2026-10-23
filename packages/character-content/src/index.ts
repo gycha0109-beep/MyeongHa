@@ -9,6 +9,7 @@ export * from './runtime-authoring-v1.js';
 export * from './runtime-authority-lane-v1.js';
 export * from './reading-public-trust-language-policy-v1.js';
 export * from './character-voice-continuity-v1.js';
+export * from './character-voice-locale-v1.js';
 export * from './immutable-authoring-v1.js';
 export * from './content-candidate-assembler-v1.js';
 export * from './publication-readiness-v1.js';
