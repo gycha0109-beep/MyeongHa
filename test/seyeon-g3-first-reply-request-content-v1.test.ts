@@ -64,7 +64,7 @@ function syntheticDb(): {
       if (text.includes('to_regprocedure(')) {
         return {rows: [{ready: true}] as unknown as readonly Row[]};
       }
-      if (text.includes('from public.qry_seyeon_positive_first_memory_locked_reveal_v1(')) {
+      if (text.includes('from public.qry_seyeon_positive_first_memory_locked_reveal_v2(')) {
         return {rows: [{assistantText: CANARY}] as unknown as readonly Row[]};
       }
       return {rows: []};
@@ -138,7 +138,7 @@ describe('G3 exact current request ↔ executed DB user message binding', () => 
     expect(runtimeCalls).toBe(1);
     expect(statements.some(s => s.includes('to_regprocedure('))).toBe(true);
     expect(statements.some(s =>
-      s.includes('from public.qry_seyeon_positive_first_memory_locked_reveal_v1('),
+      s.includes('from public.qry_seyeon_positive_first_memory_locked_reveal_v2('),
     )).toBe(false);
     expect(socket.statusCode).toBe(0);
   });
@@ -164,7 +164,7 @@ describe('G3 exact current request ↔ executed DB user message binding', () => 
     expect(socket.destroyed).toBe(false);
     expect(socket.statusCode).toBe(200);
     expect(statements.some(s =>
-      s.includes('from public.qry_seyeon_positive_first_memory_locked_reveal_v1('),
+      s.includes('from public.qry_seyeon_positive_first_memory_locked_reveal_v2('),
     )).toBe(true);
   });
 });
