@@ -1009,6 +1009,15 @@ describe.skipIf(!enabled)('R5 disposable actual-v2 current-rights first/replay/h
 
   it('R25 failed send rolls back consumed Turn so a later original first send can retry once',async()=>{
     const id=await committed(94);
+    // Same real Turn/Attempt/Assistant but forged G2 original receipt locator:
+    // do not consume a legitimate first Reply on false G2 evidence.
+    expect(await transaction(c=>firstOnceR25(c,{
+      ...id,userMessage:ids(96).userMessage,
+    }),true)).toBeNull();
+    expect(await transaction(c=>firstOnceR25(c,{
+      ...id,postOutbox:ids(96).postOutbox,
+    }),true)).toBeNull();
+    expect((await saved(id)).turn_state).toBe('committed');
     await expect(transaction(async c=>{
       expect(await firstOnceR25(c,id)).toBe(body);
       // Synthetic socket failure before finish: DB delivery transition
