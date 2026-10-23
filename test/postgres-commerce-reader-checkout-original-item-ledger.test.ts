@@ -25,6 +25,8 @@ const enabled = process.env.CI === 'true' &&
 const SUBJECT = 'f7720000-0000-4000-8000-000000000001';
 const PURCHASE = 'f7760000-0000-4000-8000-000000000001';
 const RECEIPT = 'f7780000-0000-4000-8000-000000000001';
+const SIBLING_PURCHASE = 'f7760000-0000-4000-8000-000000000002';
+const SIBLING_RECEIPT = 'f7780000-0000-4000-8000-000000000002';
 const BODY = 'f7790000-0000-4000-8000-000000000001';
 const DIFFERENT = 'f7790000-0000-4000-8000-000000000002';
 
@@ -48,13 +50,13 @@ describe.runIf(enabled)('S7 actual PG original Receipt -> Grant -> pinned Checko
   });
   afterAll(() => pg.end());
 
-  async function originalGrant(): Promise<string> {
+  async function originalGrant(receipt=RECEIPT): Promise<string> {
     const res = await pg.query<{ id: string }>(
       `select g.id::text as id
        from public.entitlement_grants g
        join public.commerce_receipts r on r.id=g.source_receipt_id
        where r.id=$1::uuid and g.grant_key='receipt:' || r.id::text`,
-      [RECEIPT],
+      [receipt],
     );
     expect(res.rows).toHaveLength(1);
     return res.rows[0]!.id;
@@ -87,7 +89,7 @@ describe.runIf(enabled)('S7 actual PG original Receipt -> Grant -> pinned Checko
       'select count(*)::text as count from public.commerce_payment_attempts where purchase_intent_id=$1::uuid',
       [PURCHASE],
     );
-    expect(count.rows[0]?.count).toBe('1');
+    expect(count.rows[0]?.count).toBe('2');
   });
 
   it('denies foreign Subject, other Purchase Intent, other Grant and untrusted body selectors', async () => {
@@ -97,6 +99,47 @@ describe.runIf(enabled)('S7 actual PG original Receipt -> Grant -> pinned Checko
     expect(await read(SUBJECT, PURCHASE, DIFFERENT)).toEqual([]);
     expect(await read(SUBJECT, PURCHASE, grant, DIFFERENT)).toEqual([]);
     expect(await read(SUBJECT, PURCHASE, grant)).toHaveLength(1);
+  });
+
+  it('keeps two independently verified sibling purchases isolated under the same member and Item', async () => {
+    const original=await originalGrant();
+    const sibling=await originalGrant(SIBLING_RECEIPT);
+    expect(sibling).not.toBe(original);
+
+    // Both purchases legitimately bind the same immutable product, but a
+    // notice from one Purchase Intent must NEVER be borrowed by the other.
+    expect(await read(SUBJECT,PURCHASE,original)).toHaveLength(1);
+    const siblingRows=await read(SUBJECT,SIBLING_PURCHASE,sibling);
+    expect(siblingRows).toHaveLength(1);
+    expect(siblingRows[0]).toMatchObject({
+      purchaseIntentId:SIBLING_PURCHASE,
+      originatingGrantId:sibling,
+      pinnedCapabilityItemKey:'original-reader-item',
+    });
+    expect(Date.parse(siblingRows[0]!.originalPaymentAttemptCreatedAt))
+      .toBe(Date.parse('2026-09-01T00:02:45Z'));
+    expect(await read(SUBJECT,PURCHASE,sibling)).toEqual([]);
+    expect(await read(SUBJECT,SIBLING_PURCHASE,original)).toEqual([]);
+    expect(await read(DIFFERENT,SIBLING_PURCHASE,sibling)).toEqual([]);
+  });
+
+  it('keeps the ORIGINAL attempt timestamp across same-intent payment retries', async () => {
+    const original=await originalGrant();
+    const attempts=await pg.query<{attemptNo:number;createdAt:string}>(
+      `select attempt_no as "attemptNo",created_at::text as "createdAt"
+       from public.commerce_payment_attempts where purchase_intent_id=$1::uuid
+       order by attempt_no`,
+      [PURCHASE],
+    );
+    expect(attempts.rows.map(x=>x.attemptNo)).toEqual([1,2]);
+    expect(Date.parse(attempts.rows[0]!.createdAt))
+      .toBeLessThan(Date.parse(attempts.rows[1]!.createdAt));
+    const originalRows=await read(SUBJECT,PURCHASE,original);
+    expect(originalRows).toHaveLength(1);
+    expect(Date.parse(originalRows[0]!.originalPaymentAttemptCreatedAt))
+      .toBe(Date.parse(attempts.rows[0]!.createdAt));
+    expect(Date.parse(originalRows[0]!.originalPaymentAttemptCreatedAt))
+      .not.toBe(Date.parse(attempts.rows[1]!.createdAt));
   });
 
   it('does NOT bypass the real S7 protected-body/S1 gate when no paid answer was committed', async () => {
