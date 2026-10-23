@@ -53,6 +53,7 @@ function fixture(options: {
     originatingGrantId:GRANT,
     pinnedCapabilityItemKey:ITEM,
     originalPaymentAttemptCreatedAt:'2026-10-23T00:01:00.000Z',
+    originalPurchaseIntentCreatedAt:'2026-10-22T23:59:00.000Z',
     s5CommittedAt:'2026-10-23T00:05:00.000Z',
   };
   const query=vi.fn(async (sql:string,params?:readonly unknown[])=>{
@@ -95,6 +96,7 @@ describe('S7 private Postgres original Checkout notice authority',()=>{
       pinnedCapabilityItemKey:ITEM,
       originalGrantItemBinding:'original_receipt_purchase_intent_capability_item',
       originalPaymentAttemptCreatedAt:'2026-10-23T00:01:00.000Z',
+      originalPurchaseIntentCreatedAt:'2026-10-22T23:59:00.000Z',
     });
     expect(f.storeRead).toHaveBeenCalledExactlyOnceWith({
       purchaseIntentId:PURCHASE,pinnedCapabilityItemKey:ITEM,productSpecVersion:VERSION,
