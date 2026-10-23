@@ -89,7 +89,7 @@ const SCENE_COPY = Object.freeze({
 });
 
 function sceneCopy(locale) {
-  return SCENE_COPY[normalizeUiLocale(locale)];
+  return SCENE_COPY[normalizeUiLocale(locale)] ?? SCENE_COPY['ko-KR'];
 }
 
 export function readingScopeLabelV1(scope, year, locale = 'ko-KR') {

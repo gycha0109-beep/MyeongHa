@@ -41,5 +41,13 @@ describe('authored Reading scene locale presentation', () => {
     expect(loading.stateCopy).toContain('出生資料');
     expect(readingSceneProgressV1(0, 1, { hasStructure: false, hasSupporting: false }, false, 'unknown').progress)
       .toBe('읽기 1 / 1');
+    for (const locale of ['en-US', 'zh-CN']) {
+      expect(readingScopeLabelV1('year', 2026, locale)).toBe('2026년 · 올해');
+      expect(readingSceneProgressV1(0, 1, { hasStructure: false, hasSupporting: false }, true, locale).authorityNote)
+        .toContain('공식 사주 풀이');
+      const fallback = readingRouteStateCopyV1(route, request, 'blocked', 2026, locale);
+      expect(fallback.stateCopy).toContain('adapter-v1');
+      expect(fallback.stateCopy).toContain('전송하지 않습니다');
+    }
   });
 });

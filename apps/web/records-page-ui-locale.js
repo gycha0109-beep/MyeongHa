@@ -23,7 +23,7 @@ const COPY = Object.freeze({
 });
 
 function copy(locale) {
-  return COPY[normalizeUiLocale(locale)];
+  return COPY[normalizeUiLocale(locale)] ?? COPY['ko-KR'];
 }
 
 export function recordsTimestampV1(value, locale = 'ko-KR') {

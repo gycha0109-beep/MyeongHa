@@ -19,7 +19,10 @@ describe('Records authored presentation', () => {
       expect(recordsBirthRevisionV1(17, locale)).toContain('revision 17');
       expect(recordsBirthRevisionV1(17, locale)).not.toMatch(/[가-힣]/u);
     }
-    expect(recordsBirthUnavailableV1('zh-CN')).toBe(recordsBirthUnavailableV1('ko-KR'));
+    for (const locale of ['en-US', 'zh-CN']) {
+      expect(recordsBirthUnavailableV1(locale)).toBe(recordsBirthUnavailableV1('ko-KR'));
+      expect(recordsBirthRevisionV1(17, locale)).toBe(recordsBirthRevisionV1(17, 'ko-KR'));
+    }
   });
 
   it('preserves availability and identity when repainting an official history card', () => {
@@ -36,6 +39,11 @@ describe('Records authored presentation', () => {
         expect(delivered).not.toMatch(/[가-힣]/u);
         expect(blocked).not.toMatch(/[가-힣]/u);
       }
+    }
+    for (const locale of ['en-US', 'zh-CN']) {
+      expect(recordsReadingSummaryV1(source, locale)).toContain(source.title);
+      expect(recordsReadingSummaryV1(pending, locale)).toContain(source.title);
+      expect(recordsReadingSummaryV1(pending, locale)).toContain('Official Reading');
     }
     expect(source.openable).toBe(true);
   });
