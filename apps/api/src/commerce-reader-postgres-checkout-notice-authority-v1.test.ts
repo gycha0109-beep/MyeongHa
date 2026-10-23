@@ -150,6 +150,86 @@ describe('S7 private Postgres original Checkout notice authority',()=>{
     expect(f.query.mock.calls[0]?.[1]).toEqual(f.query.mock.calls[1]?.[1]);
   });
 
+  it('retains a revoked original Receipt ACK as history only across the complete S2/S7 Commerce bridge',async()=>{
+    const f=fixture({evidence:[{
+      purchaseIntentId:PURCHASE,
+      unitId:GRANT,
+      productSpecVersion:VERSION,
+      originalReceiptStatus:'revoked',
+      s5CommittedAt:'2026-10-23T00:05:00.000Z',
+      responsePreparedAt:'2026-10-23T00:05:01.000Z',
+      clientAcknowledgedAt:'2026-10-23T00:05:03.000Z',
+      deliveryAttemptCount:'2',
+      acknowledgedAttemptCount:'1',
+    }]});
+    const result=await reviewOfficialReaderWithdrawalFromOriginalLedgerV1({
+      scope:f.scope,
+      purchaseIntentId:PURCHASE,originatingGrantId:GRANT,bodyId:BODY,
+      claim:{purchaseIntentId:PURCHASE,unitId:GRANT,reason:'change_of_mind'},
+      immutableCheckoutNoticeStore:{readOriginalNotice:async ()=>snapshot},
+    });
+    // The original S7 evidence and the separately attested prepayment
+    // Checkout notice survive as historical records. Neither revives the
+    // revoked purchase nor turns a client ACK into legal delivery proof.
+    expect(result.timeline).toMatchObject({
+      originalReceiptStatus:'revoked',
+      retainedDeliveryAttempts:2,
+      retainedAcknowledgedAttempts:1,
+      retainedUnacknowledgedAttempts:1,
+      retainedDeliveryEvidenceState:'client_ack_recorded_delivery_unproven',
+      consumerDeliveryProven:false,
+      legallyProvenDeliveredAt:null,
+    });
+    expect(result.checkoutNoticeEvidenceState).toBe('attested_original_checkout_notice');
+    expect(result.review).toMatchObject({
+      classification:'evidence_review_required',
+      reason:'INVALID_OR_MISSING_SERVER_EVIDENCE',
+      automaticDenialAuthorized:false,
+      providerRefundAuthorized:false,
+      entitlementMutationAuthorized:false,
+    });
+    expect(result.refundAuthorized).toBe(false);
+    expect(result.entitlementMutationAuthorized).toBe(false);
+    expect(f.query).toHaveBeenCalledTimes(2);
+    expect(f.query.mock.calls[0]?.[1]).toEqual(f.query.mock.calls[1]?.[1]);
+    expect(f.storeRead).not.toHaveBeenCalled();
+  });
+
+  it('does not upgrade a prepared-only revoked original Receipt when ACK and Checkout store are missing',async()=>{
+    const f=fixture({evidence:[{
+      purchaseIntentId:PURCHASE,
+      unitId:GRANT,
+      productSpecVersion:VERSION,
+      originalReceiptStatus:'revoked',
+      s5CommittedAt:'2026-10-23T00:05:00.000Z',
+      responsePreparedAt:'2026-10-23T00:05:01.000Z',
+      clientAcknowledgedAt:null,
+      deliveryAttemptCount:'3',
+      acknowledgedAttemptCount:'0',
+    }]});
+    const result=await reviewOfficialReaderWithdrawalFromOriginalLedgerV1({
+      scope:f.scope,
+      purchaseIntentId:PURCHASE,originatingGrantId:GRANT,bodyId:BODY,
+      claim:{purchaseIntentId:PURCHASE,unitId:GRANT,reason:'change_of_mind'},
+    });
+    expect(result.timeline).toMatchObject({
+      originalReceiptStatus:'revoked',
+      retainedDeliveryEvidenceState:'response_prepared_no_retained_ack',
+      retainedUnacknowledgedAttempts:3,
+      consumerDeliveryProven:false,
+      legallyProvenDeliveredAt:null,
+    });
+    expect(result.checkoutNoticeEvidenceState).toBe('missing_or_unverifiable');
+    expect(result.review.classification).toBe('evidence_review_required');
+    expect(result.review.automaticDenialAuthorized).toBe(false);
+    expect(result.refundAuthorized).toBe(false);
+    expect(result.entitlementMutationAuthorized).toBe(false);
+    // The exact original protected-body proof is still checked; absent
+    // approved Checkout store never creates a second, weaker DB read.
+    expect(f.query).toHaveBeenCalledTimes(1);
+    expect(f.storeRead).not.toHaveBeenCalled();
+  });
+
   it('without approved Checkout Owner store still reports safe manual-only delivery review',async()=>{
     const f=fixture();
     const result=await reviewOfficialReaderWithdrawalFromOriginalLedgerV1({

@@ -14,6 +14,8 @@ const TX = 'provider-transaction-original';
 const CANCEL = 'cancel-confirmed-1';
 const RECEIPT = '11111111-1111-4111-8111-111111111111';
 const EVENT = '22222222-2222-4222-8222-222222222222';
+const GRANT = '33333333-3333-4333-8333-333333333333';
+const ENTITLEMENT_EVENT = '44444444-4444-4444-8444-444444444444';
 const WEBHOOK_SECRET = Buffer.from('w'.repeat(32),'utf8');
 const WEBHOOK_NOW = new Date('2026-10-18T12:00:00.000Z');
 const HMAC_SECRET = 'local-verifier-hmac-secret-at-least-32-bytes';
@@ -86,7 +88,11 @@ function fakePool(sql: string[], values: unknown[][]) {
               revoke:{
                 contractVersion:'official-reader-s2-revoke-dispatch-v1',
                 providerEventId:EVENT,scopeCount:1,grantCount:1,
-                effects:[{verifiedApplied:true}],
+                effects:[{
+                  contractVersion:'official-reader-s2-provider-revoke-v1',
+                  scopeCount:1,grantId:GRANT,
+                  entitlementEventId:ENTITLEMENT_EVENT,replayed:false,
+                }],
               },
             }}]};
           }

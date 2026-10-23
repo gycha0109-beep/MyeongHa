@@ -20,6 +20,68 @@ export type AppliedPortOneV2ReaderFullCancellationV1 =
   grantCount: number }>;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
 
+
+/**
+ * Inspect the actual 1900/1910 DB effect contracts, not merely their counts.
+ * A positive grantCount with an empty/malformed/duplicated effect must never
+ * commit as a successful Reader revoke. Replayed effects identify the exact
+ * existing Entitlement Event; an already-revoked Grant may instead legitimately
+ * produce the 1080 no-material-change result with no new Event or Outbox.
+ */
+function hasAuthoritativeGrantEffects(
+  effects: readonly unknown[],
+  contractVersion: unknown,
+): boolean {
+  const grantIds = new Set<string>();
+  const entitlementEventIds = new Set<string>();
+  for (const effect of effects) {
+    if (typeof effect !== 'object' || effect === null || Array.isArray(effect)) {
+      return false;
+    }
+    const entry = effect as Record<string, unknown>;
+    let grantId: unknown;
+    let eventId: unknown;
+    if (contractVersion === 'official-reader-s2-revoke-dispatch-v1') {
+      // 1910 dispatch returns one 1770 scoped-provider-revoke result per Grant.
+      if (entry.contractVersion !== 'official-reader-s2-provider-revoke-v1' ||
+          !Number.isSafeInteger(entry.scopeCount) ||
+          (entry.scopeCount as number) < 1 ||
+          typeof entry.replayed !== 'boolean') return false;
+      grantId = entry.grantId;
+      eventId = entry.entitlementEventId;
+    } else if (contractVersion === 'official-reader-s2-unbound-grant-cancellation-v1') {
+      // 1900 directly serializes the original 1080 effect row to JSON.
+      if (typeof entry.result_replayed !== 'boolean') return false;
+      grantId = entry.result_grant_id;
+      eventId = entry.result_entitlement_event_id;
+    } else {
+      return false;
+    }
+    // Existing Commerce 1080 can return a legitimate no-material-change
+    // outcome when this Grant was ALREADY revoked by a different verified
+    // lifecycle event. It has no new Entitlement Event, no projection change
+    // and no Outbox event. The original Receipt is still revoked by 1900.
+    // A replay of THIS event, by contrast, has its original Event ID.
+    if (typeof grantId !== 'string' || !UUID.test(grantId) ||
+        grantIds.has(grantId.toLowerCase())) return false;
+    if (eventId === null) {
+      const noOp = contractVersion === 'official-reader-s2-revoke-dispatch-v1'
+        ? entry.replayed === false && entry.projectionChanged === false &&
+          entry.outboxEventId === null
+        : entry.result_replayed === false &&
+          entry.result_projection_changed === false &&
+          entry.result_outbox_event_id === null;
+      if (!noOp) return false;
+    } else {
+      if (typeof eventId !== 'string' || !UUID.test(eventId) ||
+          entitlementEventIds.has(eventId.toLowerCase())) return false;
+      entitlementEventIds.add(eventId.toLowerCase());
+    }
+    grantIds.add(grantId.toLowerCase());
+  }
+  return true;
+}
+
 /**
  * Internal Commerce transaction only. No caller-supplied Subject/Reader/Grant,
  * no public route and no PSP refund request. The DB command resolves the
@@ -89,6 +151,7 @@ export async function applyVerifiedPortOneV2ReaderFullCancellationV1(input: {
       // result INSIDE the transaction so Receipt/Event/Grant all roll back.
       if (!Array.isArray(effect.effects)
           || effect.effects.length !== grantCount
+          || !hasAuthoritativeGrantEffects(effect.effects, effect.contractVersion)
           || !Number.isSafeInteger(effect.scopeCount)
           || (effect.scopeCount as number) < 0) {
         throw new Error('Verified Reader cancellation result was not authoritative.');
