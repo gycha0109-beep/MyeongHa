@@ -10,7 +10,9 @@ Cloudflare 감사 로그의 `script_on_subdomain` 항목에서 다음이 확인�
 - 2026-10-24 01:26, 01:34, 01:55 KST 부근의 Wrangler 배포 뒤 `workers.dev disabled, previews enabled`.
 - Ops의 2026-10-24 01:19, 02:16 KST 배포에서는 `workers.dev enabled, previews enabled`.
 - 장애 때 `/`, `/auth.html`, `/api/health`가 Cloudflare 기본 404 페이지로 표시됐다.
-- 다른 출발지에서 같은 Worker `myeongha`를 갱신하는 충돌은 확인됐지만, 어느 개발 트랙의 프로세스가 설정을 해제했는지는 감사 로그만으로 특정할 수 없다.
+- 다른 출발지에서 같은 Worker `myeongha`를 갱신하는 충돌은 확인됐다. 감사 로그만으로 개별 개발 트랙은 특정할 수 없지만, Cloudflare Workers Builds 설정에서 공용 `main` 브랜치의 `production_settings.deploy_command = npx wrangler deploy`와 `wrangler.jsonc`의 `name: myeongha`, `workers_dev: false`가 직접적인 설정 충돌 원인임을 확인했다.
+- 2026-10-24 응급 조치: 기존 Worker `myeongha`에 연결된 Workers Builds production deploy 명령을 안전한 출력 전용 `echo SKIP`으로 변경했다. Git 자동 빌드는 유지되지만 이 이름으로는 더 이상 배포하지 않는다.
+- [PR #2531](https://github.com/gycha0109-beep/MyeongHa/pull/2531): 공용 미리보기 Worker를 `myeongha-static-preview`로 분리한다. CI/병합 후 별도 Worker 이름으로 Preview CD 복원 가능.
 - Worker의 시크릿이나 Supabase 역할이 사라진 것은 아니다. `subdomain.enabled=false`가 직접적인 화면 장애 원인이었다.
 
 ## 배포 규칙
@@ -23,7 +25,7 @@ Cloudflare 감사 로그의 `script_on_subdomain` 항목에서 다음이 확인�
 
 ## 적용 한계
 
-이 규칙은 저장소 내의 Ops 배포를 보호한다. 다른 앱이나 개발 세션이 Cloudflare API를 직접 호출해 `myeongha`를 `workers_dev=false`로 재배포하는 행위까지 기술적으로 차단하지는 못한다. 해당 호출의 소유자가 다른 Worker 이름을 사용하도록 분리해야 한다.
+이 규칙은 저장소 내의 Ops 배포와 알려진 공용 main 자동 배포 충돌을 보호한다. 기존 공용 Preview CD 자동 배포는 독립 Worker로 이관할 때까지 일시 중지된 상태다. 다른 앱이나 개발 세션이 Cloudflare API를 직접 호출해 `myeongha`를 `workers_dev=false`로 재배포하는 행위까지 기술적으로 차단하지는 못한다. 해당 호출의 소유자가 다른 Worker 이름을 사용하도록 분리해야 한다.
 
 ## 관련 증거
 
