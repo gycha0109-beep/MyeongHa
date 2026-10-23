@@ -68,7 +68,7 @@ function assertLocalCheckout(cwd, plan) {
     throw Error('Rollback commit must be an ancestor of restore commit');
   }
   for (const revision of [plan.rollback, plan.restore]) {
-    const config = JSON.parse(execFileSync('git', ['-C', cwd, 'show', revision + ':wrangler.jsonc'], {
+    const config = JSON.parse(execFileSync('git', ['-C', cwd, 'show', revision + ':' + (revision === CF_PREVIEW_APPROVED_RECOVERY_COMMIT_V1 ? 'wrangler.jsonc' : 'wrangler.ops.jsonc')], {
       encoding: 'utf8', timeout: 20_000, stdio: ['ignore','pipe','ignore'],
     }));
     if (config.name !== CF_PREVIEW_DRILL_V1.worker || config.workers_dev !== approvedWorkersDevForRehearsalRevisionV1(revision) ||
@@ -124,8 +124,8 @@ async function publishSnapshot(root, revision, beforeDeploy = () => {}) {
       ['ci', '--ignore-scripts', '--no-audit', '--no-fund'], folder);
     await run(process.platform === 'win32' ? 'npm.cmd' : 'npm',
       ['run','build:cloudflare:static'], folder);
-    const config = JSON.parse(await readFile(join(folder, 'wrangler.jsonc'), 'utf8'));
-    if (config.name !== CF_PREVIEW_DRILL_V1.worker || config.workers_dev !== false ||
+    const config = JSON.parse(await readFile(join(folder, revision === CF_PREVIEW_APPROVED_RECOVERY_COMMIT_V1 ? 'wrangler.jsonc' : 'wrangler.ops.jsonc'), 'utf8'));
+    if (config.name !== CF_PREVIEW_DRILL_V1.worker || config.workers_dev !== approvedWorkersDevForRehearsalRevisionV1(revision) ||
         config.preview_urls !== true || config.main !== './workers/cloudflare-static-preview.mjs' ||
         config.assets?.directory !== './public' ||
         config.assets?.html_handling !== 'none' ||
@@ -140,7 +140,7 @@ async function publishSnapshot(root, revision, beforeDeploy = () => {}) {
     await run(process.platform === 'win32' ? 'npx.cmd' : 'npx',
       ['--yes', 'wrangler@' + CF_PREVIEW_DRILL_V1.cliVersion, 'preview',
        '--name', CF_PREVIEW_DRILL_V1.preview,
-       '--worker-name', CF_PREVIEW_DRILL_V1.worker, '--config', 'wrangler.jsonc'], folder);
+       '--worker-name', CF_PREVIEW_DRILL_V1.worker, '--config', revision === CF_PREVIEW_APPROVED_RECOVERY_COMMIT_V1 ? 'wrangler.jsonc' : 'wrangler.ops.jsonc'], folder);
   } finally {
     if (checkedOut) {
       try { await run('git', ['-C', root, 'worktree', 'remove', '--force', folder], root); } catch {}

@@ -38,6 +38,12 @@
       "mainMode": "required",
       "workTrackAttribution": "pr-metadata"
     },
+    "cloudflare-preview-remote-smoke.yml": {
+      "responsibility": "cloudflare-preview-exact-sha-remote-smoke",
+      "prMode": "narrow",
+      "mainMode": "none",
+      "workTrackAttribution": "pr-metadata"
+    },
     "db-commerce-entitlement-suite.yml": {
       "responsibility": "commerce-entitlement-verification",
       "prMode": "routed-via-ci",
@@ -350,6 +356,18 @@
       "mainMode": "one-shot-trigger",
       "workTrackAttribution": "commit-metadata"
     },
+    "seyeon-c08-provider-get-shape-diagnostic-once-v1.yml": {
+      "responsibility": "character-memory-one-shot-official-provider-get-structure-diagnosis-only",
+      "prMode": "none",
+      "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "commit-metadata"
+    },
+    "seyeon-c08-provider-metadata-readonly-once-v1.yml": {
+      "responsibility": "character-memory-one-shot-public-provider-metadata-get-only",
+      "prMode": "none",
+      "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "commit-metadata"
+    },
     "seyeon-c08u-eval-project-key-readiness-v1.yml": {
       "responsibility": "character-memory-eval-key-read-only-preflight",
       "prMode": "none",
@@ -484,18 +502,6 @@
     },
     "seyeon-openrouter-xing-free-three-call-n01-v1.yml": {
       "responsibility": "character-memory-free-model-exact-zdr-json-public-only-shadow",
-      "prMode": "none",
-      "mainMode": "one-shot-trigger",
-      "workTrackAttribution": "commit-metadata"
-    },
-    "seyeon-c08-provider-get-shape-diagnostic-once-v1.yml": {
-      "responsibility": "character-memory-one-shot-official-provider-get-structure-diagnosis-only",
-      "prMode": "none",
-      "mainMode": "one-shot-trigger",
-      "workTrackAttribution": "commit-metadata"
-    },
-    "seyeon-c08-provider-metadata-readonly-once-v1.yml": {
-      "responsibility": "character-memory-one-shot-public-provider-metadata-get-only",
       "prMode": "none",
       "mainMode": "one-shot-trigger",
       "workTrackAttribution": "commit-metadata"
