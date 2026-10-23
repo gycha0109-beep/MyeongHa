@@ -7,6 +7,7 @@ on:
       - '.github/workflows/official-reader-s4-privacy-e2e.yml'
       - 'test/db/official_reader_s4_**'
       - 'test/official-reader-s4-privacy-context.e2e.test.ts'
+      - 'test/official-reader-s4-revocation-purge-retry.e2e.test.ts'
       - 'test/official-reader-held-t1-t2-preflight-v1.test.ts'
       - 'apps/api/src/official-reader-s4-ordinary-context-isolation-v1.ts'
       - 'apps/api/src/official-reader-held-t1-t2-preflight-v1.ts'
@@ -19,6 +20,7 @@ on:
       - '.github/workflows/official-reader-s4-privacy-e2e.yml'
       - 'test/db/official_reader_s4_**'
       - 'test/official-reader-s4-privacy-context.e2e.test.ts'
+      - 'test/official-reader-s4-revocation-purge-retry.e2e.test.ts'
       - 'test/official-reader-held-t1-t2-preflight-v1.test.ts'
       - 'apps/api/src/official-reader-s4-ordinary-context-isolation-v1.ts'
       - 'apps/api/src/official-reader-held-t1-t2-preflight-v1.ts'
@@ -103,7 +105,8 @@ jobs:
         run: |
           npx vitest run \
             test/official-reader-held-t1-t2-preflight-v1.test.ts \
-            test/official-reader-s4-privacy-context.e2e.test.ts
+            test/official-reader-s4-privacy-context.e2e.test.ts \
+            test/official-reader-s4-revocation-purge-retry.e2e.test.ts
 
       - name: Print non-identifying acceptance scope
         if: success()
@@ -114,6 +117,7 @@ jobs:
             echo ''
             echo '- PostgreSQL ${{ matrix.postgres }}: isolated migrations, revoke/last-right, ciphertext purge, stale-backup resurrection, independent tombstone and restore epoch, native completion denial.'
             echo '- Restored-derived quarantine: real 2230 SQL independently denies old-backup Memory Items, Memory Proposals, Life Facts and Chat Outbox in rollback-only disposable transactions.'
+            echo '- Purge worker: exact S1/DB erasure before key destruction, failure without premature ACK, DB-erased retry without duplicate deletion, sibling-right deferral.'
             echo '- Reader context: exact safe SYSTEM marker excluded before model input; ordinary user prose preserved; revoked T2 never reveals paid text.'
             echo '- **Not proved:** production personal-data deletion within 24h, P30D real backup/PITR, actual off-primary ledger/KMS durability, external AI/log sinks, or final legal sign-off.'
             echo '- Status: Privacy #2318 OPEN; paid/public OFF; no production database, vendor, or storage changes.'
