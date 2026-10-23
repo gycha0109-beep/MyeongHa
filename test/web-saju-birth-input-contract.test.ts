@@ -21,7 +21,8 @@ describe('Saju birth input web contract', () => {
 
   it('does not reopen the create form after a registered profile hits a calculation outage', async () => {
     const script = (await readFile(new URL('../apps/web/saju-hub.js', import.meta.url), 'utf8')).replaceAll('\r\n', '\n');
-    expect(script).toContain("setState('error', '출생정보는 등록되어 있지만 현재 사주 계산 서비스를 사용할 수 없습니다.");
+    expect(script).toContain("setState('error', '출생정보는 저장되어 있습니다. 다시 입력하지 말고 계산 재시도 버튼으로 결과를 확인해 주세요.");
+    expect(script).toContain("byId('saju-calculation-retry').addEventListener('click', () => void loadExistingSaju())");
     expect(script).toContain("if (profileCreated && error?.operation === 'saju-calculation')");
     expect(script).toContain("clearBirthSession();\n      setState('empty', '이전 세션의 생년월일 형식이 올바르지 않아 입력 상태를 초기화했습니다.");
   });
