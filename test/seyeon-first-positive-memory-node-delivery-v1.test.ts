@@ -454,7 +454,7 @@ describe('Se-yeon G3 Node-only original-Grant current Subject fence',()=>{
     })).rejects.toMatchObject({code:'DB_NOT_READY'});
     const readiness=queries(db).find(q=>q.includes('has_function_privilege'));
     expect(readiness).toContain(
-      'qry_seyeon_positive_first_memory_locked_reveal_v3(uuid,uuid,uuid,uuid,uuid,uuid,uuid)',
+      'qry_seyeon_positive_first_memory_locked_reveal_v3(uuid,uuid,uuid,uuid,uuid,uuid,uuid,text)',
     );
     expect(readiness).not.toContain('qry_seyeon_positive_first_memory_locked_reveal_v1');
     expect(queries(db)).not.toContainEqual(
