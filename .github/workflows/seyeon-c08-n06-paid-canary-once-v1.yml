@@ -1,0 +1,57 @@
+name: '[WT:character-memory] C08 N06 actual paid JSON ZDR one-call canary'
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/seyeon-c08-n06-paid-canary-once.trigger'
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: seyeon-c08-n06-paid-canary-lifetime-once
+  cancel-in-progress: false
+
+jobs:
+  canary:
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && github.run_attempt == 1 }}
+    runs-on: ubuntu-24.04
+    environment: production
+    timeout-minutes: 8
+    steps:
+      - name: Checkout exact protected main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.sha }}
+      - name: Setup Node 24
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Verify actual paid canary with mocks before any POST
+        run: |
+          set -euo pipefail
+          npm ci --ignore-scripts --no-audit --no-fund
+          npx vitest run test/seyeon-c08-n06-actual-paid-canary-once-v1.test.mjs
+          node --check scripts/seyeon-c08-n06-actual-paid-canary-once-v1.mjs
+      - name: Exactly one owner-preapproved N06 paid JSON research canary
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          EXPECTED_HEAD_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          set +x
+          test -n "$OPENROUTER_API_KEY"
+          node scripts/seyeon-c08-n06-actual-paid-canary-once-v1.mjs
+      - name: Retain numeric-only actual paid observation
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: seyeon-c08-n06-actual-paid-canary-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/c08-n06-actual-paid-canary-once/
+          if-no-files-found: warn
+          retention-days: 14

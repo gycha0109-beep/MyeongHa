@@ -440,6 +440,12 @@
       "mainMode": "one-shot-trigger",
       "workTrackAttribution": "commit-metadata"
     },
+    "seyeon-c08-n06-paid-canary-once-v1.yml": {
+      "responsibility": "character-memory-owner-preapproved-public-n06-one-chargeable-post-json-canary",
+      "prMode": "none",
+      "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "commit-metadata"
+    },
     "seyeon-openrouter-glm53flash-paid-three-call-n01-v1.yml": {
       "responsibility": "character-memory-funded-new-model-actual-3call-public-shadow",
       "prMode": "none",
