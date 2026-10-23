@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   createCommerceReaderPostgresCheckoutNoticeAuthorityV1,
+  reviewOfficialReaderWithdrawalFromOriginalLedgerV1,
   type CommerceReaderImmutableCheckoutNoticeStoreV1,
 } from './commerce-reader-postgres-checkout-notice-authority-v1.js';
 import {
@@ -118,6 +119,71 @@ describe('S7 private Postgres original Checkout notice authority',()=>{
     expect(result.refundAuthorized).toBe(false);
     expect(result.entitlementMutationAuthorized).toBe(false);
     expect(f.query).toHaveBeenCalledTimes(2);
+  });
+
+  it('composes original Receipt/Grant delivery and precheckout notice from ONE trusted DB scope',async()=>{
+    const f=fixture();
+    const result=await reviewOfficialReaderWithdrawalFromOriginalLedgerV1({
+      scope:f.scope,
+      bodyId:BODY,
+      purchaseIntentId:PURCHASE,
+      originatingGrantId:GRANT,
+      claim:{purchaseIntentId:PURCHASE,unitId:GRANT,reason:'change_of_mind'},
+      immutableCheckoutNoticeStore:{
+        readOriginalNotice:async input=>{
+          expect(input).toEqual({
+            purchaseIntentId:PURCHASE,
+            pinnedCapabilityItemKey:ITEM,
+            productSpecVersion:VERSION,
+          });
+          return snapshot;
+        },
+      },
+    });
+    expect(result.checkoutNoticeEvidenceState).toBe('attested_original_checkout_notice');
+    expect(result.timeline.retainedDeliveryEvidenceState).toBe('no_retained_delivery_receipts');
+    expect(result.review.classification).toBe('not_proven_delivered');
+    expect(result.timeline.consumerDeliveryProven).toBe(false);
+    expect(result.refundAuthorized).toBe(false);
+    expect(result.entitlementMutationAuthorized).toBe(false);
+    expect(f.query).toHaveBeenCalledTimes(2);
+    expect(f.query.mock.calls[0]?.[1]).toEqual(f.query.mock.calls[1]?.[1]);
+  });
+
+  it('without approved Checkout Owner store still reports safe manual-only delivery review',async()=>{
+    const f=fixture();
+    const result=await reviewOfficialReaderWithdrawalFromOriginalLedgerV1({
+      scope:f.scope,
+      bodyId:BODY,
+      purchaseIntentId:PURCHASE,
+      originatingGrantId:GRANT,
+      claim:{purchaseIntentId:PURCHASE,unitId:GRANT,reason:'change_of_mind'},
+    });
+    expect(result.checkoutNoticeEvidenceState).toBe('missing_or_unverifiable');
+    expect(result.review.classification).toBe('not_proven_delivered');
+    expect(result.review.automaticDenialAuthorized).toBe(false);
+    expect(result.review.providerRefundAuthorized).toBe(false);
+    expect(f.query).toHaveBeenCalledTimes(1);
+    expect(f.storeRead).not.toHaveBeenCalled();
+  });
+
+  it('does not query an unrelated Checkout original if S7 exact protected body proof is absent',async()=>{
+    const f=fixture({evidence:[]});
+    await expect(reviewOfficialReaderWithdrawalFromOriginalLedgerV1({
+      scope:f.scope,
+      bodyId:BODY,
+      purchaseIntentId:PURCHASE,
+      originatingGrantId:GRANT,
+      claim:{purchaseIntentId:PURCHASE,unitId:GRANT,reason:'change_of_mind'},
+      immutableCheckoutNoticeStore:{
+        readOriginalNotice:async input=>{
+          await f.storeRead(input);
+          return snapshot;
+        },
+      },
+    })).rejects.toThrow('Private Reader purchase/delivery evidence is unavailable.');
+    expect(f.query).toHaveBeenCalledTimes(1);
+    expect(f.storeRead).not.toHaveBeenCalled();
   });
 
   it('without approved persisted store never queries the Purchase or fabricates a notice',async()=>{
