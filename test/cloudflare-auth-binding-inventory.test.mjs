@@ -9,7 +9,7 @@ import {
 const config = JSON.parse(await readFile(new URL('../wrangler.jsonc', import.meta.url), 'utf8'));
 
 describe('Stage 5 Cloudflare Auth/DB binding registry and deploy HOLD', () => {
-  it('passes only the current Preview-only config without binding material', () => {
+  it('passes only the approved workers.dev config without binding material', () => {
     const report = inspectCloudflareStage5BindingInventoryV1(config);
     expect(report.status).toBe('PASS');
     expect(report.bindingNames).toBe(CLOUDFLARE_STAGE5_BINDING_CATALOG_V1.length);
@@ -32,9 +32,9 @@ describe('Stage 5 Cloudflare Auth/DB binding registry and deploy HOLD', () => {
     }
   });
 
-  it('rejects Production workers_dev and Worker entrypoint drift', () => {
+  it('rejects disabled workers.dev and Worker entrypoint drift', () => {
     for (const changed of [
-      { workers_dev: true },
+      { workers_dev: false },
       { preview_urls: false },
       { main: './workers/auth-production.mjs' },
       { name: 'myeongha-production' },

@@ -48,8 +48,8 @@ export function inspectCloudflareStage5BindingInventoryV1(
   const reasons = [];
   if (config?.name !== 'myeongha' ||
       config?.main !== './workers/cloudflare-static-preview.mjs' ||
-      config?.workers_dev !== false || config?.preview_urls !== true) {
-    reasons.push('Worker deployment identity is not Preview-only');
+      config?.workers_dev !== true || config?.preview_urls !== true) {
+    reasons.push('Worker deployment identity or approved workers.dev routing drift');
   }
   for (const name of SENSITIVE_CONFIG_SECTIONS) {
     if (Object.hasOwn(config ?? {}, name)) {
