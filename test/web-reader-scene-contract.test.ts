@@ -136,7 +136,7 @@ describe('web Reader Scene contract', () => {
       readerCharacterId: 'taegyeom',
       presentation: {
         name: '태겸',
-        title: '연결자',
+        title: '프로 격구 선수',
         intro: '',
         generic: false,
       },
