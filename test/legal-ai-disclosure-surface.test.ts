@@ -20,4 +20,19 @@ describe('LEGAL L5: visible generative-AI disclosures', () => {
     expect(notice?.[1]).toContain('사실과 다를 수');
     expect(chat.indexOf('data-legal-ai-generation-label')).toBeLessThan(chat.indexOf('data-composer'));
   });
+
+  it('localizes both legal notices in Japanese and Traditional Chinese', async () => {
+    const { translateStaticUi } = await import('../apps/web/ui-i18n.js');
+    const notices = [
+      '명하의 캐릭터 대화는 생성형 인공지능을 이용합니다. 캐릭터는 실제 사람이 아니며, 대화 답변은 AI가 생성합니다.',
+      '이 대화의 캐릭터 답변은 생성형 AI가 작성합니다. 캐릭터는 실제 사람이 아니며, 답변은 사실과 다를 수 있습니다.',
+    ];
+    for (const source of notices) {
+      for (const locale of ['ja-JP', 'zh-TW']) {
+        const translated = translateStaticUi(source, locale);
+        expect(translated).not.toBe(source);
+        expect(translated).not.toMatch(/[가-힣]/u);
+      }
+    }
+  });
 });
