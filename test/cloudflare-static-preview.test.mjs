@@ -25,7 +25,7 @@ import {
 } from '../scripts/verify-cloudflare-static.mjs';
 
 const vercelUrl = new URL('../vercel.json', import.meta.url);
-const wranglerUrl = new URL('../wrangler.jsonc', import.meta.url);
+const wranglerUrl = new URL('../wrangler.ops.jsonc', import.meta.url);
 const temporaryDirectories = [];
 afterEach(async () => {
   await Promise.all(temporaryDirectories.splice(0).map((d) => rm(d, {
@@ -43,7 +43,7 @@ async function createFixture() {
     await writeFile(join(publicDir, html), '<!doctype html><title>safe fixture</title>');
   }
   await writeFile(join(folder, 'vercel.json'), await readFile(vercelUrl));
-  await writeFile(join(folder, 'wrangler.jsonc'), await readFile(wranglerUrl));
+  await writeFile(join(folder, 'wrangler.ops.jsonc'), await readFile(wranglerUrl));
   return { folder, publicDir };
 }
 

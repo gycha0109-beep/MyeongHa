@@ -66,7 +66,7 @@ export async function verifyCloudflareStaticArtifact(options = {}) {
     options.outputDirectory ?? process.env.MYEONGHA_WEB_OUTPUT_DIR ?? 'public',
   );
   const workerConfig = JSON.parse(
-    await readFile(resolve(cwd, 'wrangler.jsonc'), 'utf8'),
+    await readFile(resolve(cwd, 'wrangler.ops.jsonc'), 'utf8'),
   );
   if (
     workerConfig?.main !== './workers/cloudflare-static-preview.mjs' ||

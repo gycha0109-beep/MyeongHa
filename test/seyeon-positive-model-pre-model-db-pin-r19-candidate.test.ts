@@ -41,6 +41,10 @@ function selection():SeyeonExactModelPersonalSourceSelectionV1 {
     selectedPersonalRecordCount:2,
     selectedSources,
     selectedSourcesDigest:digest(selectedSources),
+    selectedUnpinnedDerivedSources:[],
+    selectedModelSourceCensusDigest:digest({
+      originalPersonalSources:selectedSources,unpinnedDerivedSources:[],
+    }),
     persistedBeforeModel:false,permitsAtomicCommit:false,permitsHttpReveal:false,
   };
 }
@@ -96,6 +100,12 @@ describe('R19 offline G1 positive original Grant pre-model pin boundary',()=>{
       {...original,selectedMemoryCount:3},
       {...original,selectedSourcesDigest:'forged'},
       {...original,selectedSourcesDigest:SHA}, // valid syntax, WRONG manifest digest
+      {...original,selectedModelSourceCensusDigest:SHA}, // forged whole census
+      {...original,selectedUnpinnedDerivedSources:[{
+        kind:'relationship_event',memoryId:'relationship-event:old',
+        sourceRef:'relationship-event:old',
+        selectedModelMemoryDigest:SHA,originalGrantVerified:false,
+      }]}, // unpinned derived source cannot enter original-only R19 DB Pin
       {...original,selectedSources:[
         {...original.selectedSources[0]!,rawRecordDigest:'sha256:v1:'+'f'.repeat(64)},
         original.selectedSources[1]!,

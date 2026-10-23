@@ -3,7 +3,8 @@ import {join} from 'node:path';
 import {performance} from 'node:perf_hooks';
 import {createHash} from 'node:crypto';
 import {
- admitTerraGlmQualityTrioOneShotV1,requirePublicSyntheticQualityUtteranceV1,
+ admitTerraGlmQualityTrioRetryOneShotV1,requireSeyeonTrioOpenAiStageV1,
+ requirePublicSyntheticQualityUtteranceV1,
  SEYEON_TERRA_GLM_QUALITY_TRIO_PRIOR_RESERVED_MICRO_USD as PRIOR,
  SEYEON_TERRA_GLM_QUALITY_TRIO_LUNA_RESERVE_MICRO_USD as LUNA_RESERVE,
  SEYEON_TERRA_GLM_QUALITY_TRIO_TERRA_RESERVE_MICRO_USD as TERRA_RESERVE,
@@ -31,8 +32,10 @@ import {createSeyeonQualityTrioSyntheticCensusV1}
  from './seyeon-terra-glm-quality-trio-census-v1.mjs';
 import {SEYEON_MODEL_EVAL_CASES_V1}
  from './seyeon-model-eval-cases-v1.mjs';
+import {buildSeyeonTerraGlmFailureDiagnosticV1}
+ from './seyeon-terra-glm-failure-diagnostic-v1.mjs';
 
-const execution=admitTerraGlmQualityTrioOneShotV1();
+const execution=admitTerraGlmQualityTrioRetryOneShotV1();
 const terraKey=process.env.OPENAI_API_KEY?.trim();
 const glmKey=process.env.OPENROUTER_API_KEY?.trim();
 if(!terraKey||terraKey.length<20||!glmKey||glmKey.length<20||
@@ -61,6 +64,7 @@ const completePairs=[];
 let currentCase=null;
 const reservation={luna:0,terra:0,glm:0};
 let verdict='HOLD',reason='NOT_COMPLETED';
+let failureDiagnostic=null;
 let availableCredit=null,selectedProvider=null,purchasedMicroUsd=null;
 let openRouterBefore=null,openRouterAfter=null;
 let candidateText=null,glmText=null,candidateElapsedMs=null,glmElapsedMs=null;
@@ -107,44 +111,92 @@ function openAiProvider(model,expectedStage){
  const limit=route==='luna'?LUNA_RESERVE:TERRA_RESERVE;
  const cap=route==='luna'?3:6;
  const prices=SEYEON_DIALOGUE_PATH_PRICES_V1[model];
+ const noteFailure=async(phase,httpStatus,error=null)=>{
+  const diagnostic=buildSeyeonTerraGlmFailureDiagnosticV1({
+   phase,httpStatus,error,caseId:currentCase.id,stage:expectedStage,model,route,
+  });
+  failureDiagnostic=diagnostic;
+  // Fixed vocabulary only. Never log messages, stacks, URLs, prompts,
+  // request/response bodies, credentials or personal identifiers.
+  console.error('SEYEON_TERRA_GLM_QUALITY_TRIO_FAILURE '+JSON.stringify(diagnostic));
+  try{
+   await record({kind:'provider_failure',runId:execution.runId,...diagnostic});
+  }catch{
+   console.error('SEYEON_TERRA_GLM_QUALITY_TRIO_FAILURE_PERSIST_HOLD');
+  }
+ };
  return createOpenAiSeyeonStructuredProviderV1({
   apiKey:terraKey,model,maxOutputTokens:1536,timeoutMs:30000,
-  fetchImpl:async(url,init)=>{
-   const body=String(init?.body??'');
-   const bytes=Buffer.byteLength(body,'utf8');
+  meteredBeforeDispatch:async(metadata,body)=>{
    let request;
    try{request=JSON.parse(body);}catch{throw Error('LUNA_TERRA_REQUEST_SHAPE_HOLD');}
-   const name=request?.text?.format?.name;
-   const stage=typeof name==='string'&&name.startsWith('myeongha_')&&name.endsWith('_v2')
-    ?name.slice(8,-3):null;
-   if(stage!==expectedStage||request.model!==model||
-      url!=='https://api.openai.com/v1/responses'||
+   const stage=requireSeyeonTrioOpenAiStageV1(
+    request?.text?.format?.name,expectedStage);
+   if(metadata.purpose!==expectedStage||metadata.modelKey!==model||
+      metadata.requestBodyBytes!==Buffer.byteLength(body,'utf8')||
+      request.model!==model||
       !Number.isInteger(request.max_output_tokens)||
       request.max_output_tokens<1||request.max_output_tokens>1536)
     throw Error('LUNA_TERRA_STAGE_OR_MODEL_HOLD');
-   await reserve(route,stage,bytes,limit,cap);
+   await reserve(route,stage,metadata.requestBodyBytes,limit,cap);
+  },
+  fetchImpl:async(url,init)=>{
+   if(url!=='https://api.openai.com/v1/responses'){
+    await noteFailure('provider_origin',null);
+    throw Error('LUNA_TERRA_PROVIDER_ORIGIN_HOLD');
+   }
    const t=performance.now();
-   const response=await fetch(url,init);
+   let response;
+   try{
+    response=await fetch(url,init);
+   }catch(error){
+    await noteFailure('transport',null,error);
+    throw Error('LUNA_TERRA_TRANSPORT_FAILURE_HOLD');
+   }
    const elapsedMs=Math.round(performance.now()-t);
-   let tokens=null,cost=null;
-   if(response.status===200){
-    let parsed;
-    try{parsed=await response.clone().json();}catch{throw Error('LUNA_TERRA_UNKNOWN_USAGE_HOLD');}
-    if(!parsed?.usage||!Number.isSafeInteger(parsed.usage.input_tokens)||
-       !Number.isSafeInteger(parsed.usage.output_tokens)||
-       parsed.usage.input_tokens<1||parsed.usage.output_tokens<1)
-     throw Error('LUNA_TERRA_UNKNOWN_USAGE_HOLD');
+   if(response.status!==200){
+    await noteFailure('http_status',response.status);
+    throw Error('LUNA_TERRA_HTTP_STATUS_HOLD');
+   }
+   let parsed;
+   try{
+    parsed=await response.clone().json();
+   }catch(error){
+    await noteFailure('response_parse',response.status,error);
+    throw Error('LUNA_TERRA_RESPONSE_PARSE_FAILURE_HOLD');
+   }
+   if(!parsed?.usage||!Number.isSafeInteger(parsed.usage.input_tokens)||
+      !Number.isSafeInteger(parsed.usage.output_tokens)||
+      parsed.usage.input_tokens<1||parsed.usage.output_tokens<1){
+    await noteFailure('usage_validation',response.status);
+    throw Error('LUNA_TERRA_USAGE_INVALID_HOLD');
+   }
+   let tokens,cost;
+   try{
     tokens=estimateSeyeonDialoguePathCostV1(parsed.usage,prices);
     cost=Math.ceil(tokens.usd*1e6);
-    if(cost>limit)throw Error('LUNA_TERRA_OBSERVED_COST_OVER_RESERVE_HOLD');
+   }catch(error){
+    await noteFailure('usage_validation',response.status,error);
+    throw Error('LUNA_TERRA_USAGE_INVALID_HOLD');
    }
-   const observed={caseId:currentCase.id,stage,model,httpStatus:response.status,elapsedMs,
-    inputTokens:tokens?.input??null,outputTokens:tokens?.output??null,
-    cachedTokens:tokens?.cached??null,usageEstimateMicroUsd:cost};
+   if(!Number.isSafeInteger(cost)||cost<0||cost>limit){
+    await noteFailure('cost_validation',response.status);
+    throw Error('LUNA_TERRA_COST_LIMIT_HOLD');
+   }
+   // 'stage' was local to meteredBeforeDispatch, not visible here.
+   // Use the immutable allowlisted expectedStage in observed metrics.
+   const observed={caseId:currentCase.id,stage:expectedStage,model,
+    httpStatus:response.status,elapsedMs,inputTokens:tokens.input,
+    outputTokens:tokens.output,cachedTokens:tokens.cached,
+    usageEstimateMicroUsd:cost};
+   try{
+    await record({kind:'observed',route,...observed});
+   }catch(error){
+    await noteFailure('observation_write',response.status,error);
+    throw Error('LUNA_TERRA_OBSERVATION_WRITE_HOLD');
+   }
    metrics.candidate.push(observed);
-   observedStages.candidate[stage]=(observedStages.candidate[stage]??0)+1;
-   await record({kind:'observed',route,...observed});
-   if(response.status!==200)throw Error('LUNA_TERRA_HTTP_FAILURE_HOLD');
+   observedStages.candidate[expectedStage]=(observedStages.candidate[expectedStage]??0)+1;
    return response;
   },
  });
@@ -264,9 +316,11 @@ try{
  reason='THREE_PUBLIC_PERSONA_CASES_BOTH_GUARD_PATHS_PASS';
 }catch(e){
  // No assistant utterance is revealed on any failed path.
- reason=typeof e?.code==='string'&&/^[A-Z0-9_]{1,64}$/.test(e.code)
+ // Prefer trusted fixed-vocabulary phase evidence over generic NETWORK_FAILURE.
+ reason=failureDiagnostic?.reason??(
+  typeof e?.code==='string'&&/^[A-Z0-9_]{1,64}$/.test(e.code)
   ?e.code : typeof e?.message==='string'&&/^[A-Z0-9_]{1,80}$/.test(e.message)
-  ?e.message:'OPAQUE_PROVIDER_OR_GUARD_HOLD';
+  ?e.message:'OPAQUE_PROVIDER_OR_GUARD_HOLD');
  candidateText=null;glmText=null;
 }finally{
  openRouterAfter=await getOpenRouterAccountUsageV1(glmKey);
@@ -284,7 +338,7 @@ try{
   schemaVersion:'seyeon-luna-terra-glm-public-quality-trio-v1',
   caseIds:QUALITY_CASES.map(x=>x.id),completedPairIds:completePairs.map(x=>x.id),
    scope:'THREE_PUBLIC_SYNTHETIC_PERSONA_CASES_OWNER_VISIBLE_ONLY',
-  verdict,reason,mainSha:execution.mainSha,runId:execution.runId,
+  verdict,reason,failureDiagnostic,mainSha:execution.mainSha,runId:execution.runId,
   modelPaths:{candidate:'gpt-5.6-luna x1 + gpt-5.6-terra x2 fast3',glm:'z-ai/glm-5.3-flash x3 fast3'},
   glmProvider:selectedProvider,purchasedCreditsMicroUsd:purchasedMicroUsd,
   glmAvailableCreditBeforeMicroUsd:availableCredit,

@@ -4,6 +4,7 @@ import { MYEONGHA_PRODUCTION_SUPABASE_ORIGIN } from './production-user-data-runt
 
 // OAuth transport only. Supabase still issues sessions and owns provider identities.
 const ORIGIN = 'https://myeongha.vercel.app';
+const CALLBACK = `${ORIGIN}/api/auth/social/naver/callback`;
 const SUPABASE_CALLBACK = `${MYEONGHA_PRODUCTION_SUPABASE_ORIGIN}/auth/v1/callback`;
 const PATH = '/api/auth/social/naver/';
 const STATE_TTL = 10 * 60_000;
@@ -136,7 +137,6 @@ export async function handleNaverOAuthBridgeRequestV1(input: {
   readonly env: NaverOAuthBridgeEnvV1;
   readonly fetchImpl?: NaverOAuthBridgeFetchV1;
   readonly nowEpochMs?: () => number;
-  /** Exact server-approved Cloudflare host; leave unset on Vercel. */
   readonly webOrigin?: string;
 }): Promise<Response> {
   const expectedMethod = input.action === 'token' ? 'POST' : 'GET';
@@ -149,9 +149,15 @@ export async function handleNaverOAuthBridgeRequestV1(input: {
   const now = input.nowEpochMs?.() ?? Date.now();
   const fetcher = input.fetchImpl ?? fetch;
   const url = new URL(input.request.url);
-  const origin = input.webOrigin ?? ORIGIN;
-  const callback = `${origin}/api/auth/social/naver/callback`;
-  if (url.origin !== origin || (url.pathname !== `${PATH}${input.action}` && url.pathname !== '/api/auth/sign-in')) return error();
+  const approvedWebOrigin = input.webOrigin ?? ORIGIN;
+  let host: URL;
+  try { host = new URL(approvedWebOrigin); }
+  catch { return error(); }
+  if (host.origin !== approvedWebOrigin || host.protocol !== 'https:' ||
+      host.username !== '' || host.password !== '' || host.search !== '' ||
+      host.hash !== '') return error();
+  const callback = approvedWebOrigin + '/api/auth/social/naver/callback';
+  if (url.origin !== approvedWebOrigin || (url.pathname !== `${PATH}${input.action}` && url.pathname !== '/api/auth/sign-in')) return error();
   try {
     if (input.action === 'authorize') {
       const state = unique(url, 'state');

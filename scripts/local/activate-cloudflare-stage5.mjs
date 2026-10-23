@@ -118,7 +118,7 @@ async function verifyDatabase(password,pem) {
 async function main(){
   if(process.platform!=='win32') throw Error('Run this setup on the authorized Windows development PC');
   // An interrupted or outdated checkout must not write live Worker bindings.
-  const repoManifest=JSON.parse(await readFile(resolve('wrangler.jsonc'),'utf8'));
+  const repoManifest=JSON.parse(await readFile(resolve('wrangler.ops.jsonc'),'utf8'));
   if(repoManifest.name!=='myeongha' ||
      repoManifest.main!=='./workers/cloudflare-static-preview.mjs'){
     throw Error('Run from the approved MyeongHa Ops repository root');
@@ -185,12 +185,12 @@ ALTER ROLE ${ROLE} WITH LOGIN PASSWORD '${scramVerifier}' VALID UNTIL '${end}';`
     MYEONGHA_CLOUDFLARE_AUTH_DB_MODE:'approved-auth-db-v1',
     MYEONGHA_CLOUDFLARE_DB_TLS_RLS_APPROVAL:'approved-isolated-tls-rls-v1',
   };
-  await wrangler(['secret','bulk','--name','myeongha','--config','wrangler.jsonc'],
+  await wrangler(['secret','bulk','--name','myeongha','--config','wrangler.ops.jsonc'],
     JSON.stringify(updates));
   console.log('Cloudflare Stage 5 credentials installed; restoring Worker static assets...');
   // Wrangler secret writes can temporarily remove static asset routing;
   // always redeploy the exact checked-out source, keeping unrelated vars.
-  await wrangler(['deploy','--config','wrangler.jsonc','--keep-vars']);
+  await wrangler(['deploy','--config','wrangler.ops.jsonc','--keep-vars']);
   const health=await fetch(DESTINATION+'/api/health',{cache:'no-store'});
   const auth=await fetch(DESTINATION+'/auth.html',{cache:'no-store'});
   if(health.status!==200||auth.status!==200)

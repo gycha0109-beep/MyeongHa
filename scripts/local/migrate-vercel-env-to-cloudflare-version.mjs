@@ -124,10 +124,10 @@ function uploadToCloudflare(cwd, values, options) {
   return new Promise((resolveUpload, rejectUpload) => {
     const executable = process.platform === 'win32' ? 'npx.cmd' : 'npx';
     const args = options.previewBase
-      ? ['--yes', 'wrangler@' + WRANGLER_VERSION, 'preview', 'base-config', 'secret', 'bulk', '--worker-name', WORKER_NAME, '--config', 'wrangler.jsonc']
+      ? ['--yes', 'wrangler@' + WRANGLER_VERSION, 'preview', 'base-config', 'secret', 'bulk', '--worker-name', WORKER_NAME, '--config', 'wrangler.ops.jsonc']
       : options.previewName
-        ? ['--yes', 'wrangler@' + WRANGLER_VERSION, 'preview', 'secret', 'bulk', '--name', options.previewName, '--worker-name', WORKER_NAME, '--config', 'wrangler.jsonc']
-        : ['--yes', 'wrangler@' + WRANGLER_VERSION, 'versions', 'secret', 'bulk', '--name', WORKER_NAME, '--config', 'wrangler.jsonc'];
+        ? ['--yes', 'wrangler@' + WRANGLER_VERSION, 'preview', 'secret', 'bulk', '--name', options.previewName, '--worker-name', WORKER_NAME, '--config', 'wrangler.ops.jsonc']
+        : ['--yes', 'wrangler@' + WRANGLER_VERSION, 'versions', 'secret', 'bulk', '--name', WORKER_NAME, '--config', 'wrangler.ops.jsonc'];
     const child = spawn(executable, args, {
       cwd,
       shell: process.platform === 'win32',
@@ -151,7 +151,7 @@ async function main() {
     return;
   }
   const cwd = process.cwd();
-  const config = JSON.parse(await readFile(resolve(cwd, 'wrangler.jsonc'), 'utf8'));
+  const config = JSON.parse(await readFile(resolve(cwd, 'wrangler.ops.jsonc'), 'utf8'));
   if (config.name !== WORKER_NAME || config.workers_dev !== true ||
       config.main !== './workers/cloudflare-static-preview.mjs') {
     throw new Error('This command is restricted to the existing approved myeongha Worker.');

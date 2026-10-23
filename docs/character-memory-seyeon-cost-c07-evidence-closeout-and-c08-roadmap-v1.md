@@ -169,3 +169,40 @@ Watchtower-Track: character-memory
 - `test/seyeon-c08b-gold-paired-preflight-offline-v1.test.ts`에서 매 Case 기존 분류 Provider 2회 / 후보 Unified Provider 1회, 기존 서버 분류 Guard, 권한 MISSING Resolver, Gold Scorer, 공개 문답의 private retrieval 0회 및 민감 질문에서 Source Descriptor **이전 G0 HOLD**를 두 경로 동일하게 검증한다. 24개 무주장/12개 주장, 18개 민감 Topic/18개 비민감 Topic 불변 조건도 고정한다.
 - 새 합성 시험은 **36개 Case × 2 경로 = 72개 무료 Guard 실행**이지 원래 평가의 `original/compact` **실모델 72 슬롯이 아니다**. 유료 관측은 그대로 **6/72**, 나머지 **66 미검증**, `modelQualityVerified=false`. 실제 응답 자연스러움, 장기 Memory, Grant/Commit/Revoke/Reveal 검증 아님.
 - Production Chat·Provider 연결·개인 DB/ACL·Canon·예산·G0~G6 변경 없음. 정확 HEAD 기본 CI / Full Integration 검증 전 PASS 주장 금지.
+
+---
+
+## 7. 2026-10-23 — N06 실측 이후 비용·지연 최적화 우선 로드맵
+
+> **사용자 결정:** 새 모델을 먼저 유료 비교하기보다 **현재 3회 모델 호출의 단계·프롬프트·출력 계약을 먼저 최적화**한다. 목표는 **대화 1건당 모델 총비용 최대 10원**, **일반 대화 최종 대사 표시까지 약 5초**다. 목표는 합격 판정이나 추가 유료 호출 승인이 아니다. 기존 C07 Gold/C08 보호 경계·Reader 보류 상태는 그대로 유지한다.
+
+### 7.1 변경 전 확정 기준점 — N06 공개 합성 1건
+
+- [PR #2478](https://github.com/gycha0109-beep/MyeongHa/pull/2478) 병합 `e9afcf959eaac4a0fadaf35ca8894d43c7c5f287`; [전체 통합 CI #39771960016](https://github.com/gycha0109-beep/MyeongHa/actions/runs/39771960016) SUCCESS. [1회성 실모델 워크플로 #39772769916](https://github.com/gycha0109-beep/MyeongHa/actions/runs/39772769916): attempt 1 SUCCESS, N06 입력 “오늘은 네가 먼저 이야기해 줘.”, Luna 1 + Terra 2 및 GLM 3회 모두 HTTP 200, 최종 Guard PASS.
+- **Luna+Terra:** 입력 7,880 / 출력 865 토큰, 3회 총 **12,704 ms**, 사용량 기반 추정 22,854 microUSD(보수적 2,500원/USD 환산 약 **57.14원**).
+- **GLM 5.3 Flash:** 입력 8,565 / 출력 2,618 토큰(추론 토큰 **2,096**), 3회 총 **23,893 ms**, 사용량 기반 추정 565 microUSD(약 **1.41원**). 단계별 **사전 분류 4,417ms / 해석·대사 9,282ms / 독립 의미 검토 8,697ms**.
+- 두 경로 합계 추정 약 58.55원. **실제 공급자 청구 미정산**, GLM generation 조회 404 / 계정 사용량 delta 0. 모델 품질의 통계적 우열, 장기 대화, 5초 달성은 미검증. 기존 실패 실행 #39751436405와 이번 실측은 별개이며 일회성 유료 실행 **재시도 금지**.
+
+### 7.2 목표·불변 조건
+
+| 항목 | 목표 / 필수 조건 |
+| --- | --- |
+| 턴당 비용 | **10원 이하**를 평균이 아닌 **턴별 상한 목표**로 적용. 현재 실험의 스트레스 환율 2,500원/USD를 적용하면 모델 전체 요청의 **예약 한도 4,000 microUSD/턴**. 사전 분류·대사·검토·유료 실패·재시도·fallback 비용을 모두 포함해야 하며, 공급자 청구 원장 및 hard cap 미확인 상태에서 실청구 10원 보장이라고 주장하지 않는다. |
+| 지연 | 일반 공개 대화 **최종 Guard 통과 대사 표시까지 약 5초**. 첫 토큰 표시(TTFT)와 구분. 실제 다회 측정 후 p50/p95·timeout/실패율을 각각 평가. |
+| 안전·의미 | 기존 Integrity/Disclosure, Canon, Source/Grant/ACL, C07 Gold, Census, Guard/Fail-Closed **완화 금지**. 독립 의미 검토를 제거하는 경우에는 이를 대신할 **독립적 동등 검증 증거**가 없으면 후보 불합격. |
+| 실행 권한 | 이번 로드맵 수정은 문서 작업. **새 유료 호출 0회**, 유료 실험 재승인 전 HOLD. Production/Reader routing 변경 금지. |
+
+### 7.3 순서대로 진행할 실행 작업 (전부 아직 미완료)
+
+1. **무료 구조·프롬프트 감사:** 현재 `runSeyeonCensusFirstThreeCallShadowV1`에서 ① 통합 Integrity+Disclosure 사전 분류, ② 이미 **단일 호출**인 interpretation+draft, ③ 독립 semantic review의 실제 프롬프트 중복·스키마·바이트·토큰 상한·직렬 의존성을 분해한다. 3회 호출을 3회 그대로 유지하는 경량 프롬프트 후보와 그 의미 동등성 판단 근거를 먼저 문서화한다.
+2. **무료 Shadow 경량 후보 구현:** 기존 3회 경로는 그대로 보존한다. **후보 A: 3회 유지 + 중복 지시·구조화 출력 경량화. 후보 B: 공개 첫 턴에 한정된 로컬 적격성 판단 + 생성 1회 + 독립 검토 1회**로 조건부 2회 경로를 설계한다. 사용자 주장/민감 주제 분류를 로컬로 안전하게 대체할 근거가 없으면 3회 경로 또는 Fail-Closed. **1회 경로는 연구 후보만**, 독립 검토 동등성 미확인 시 채택 금지.
+3. **무료 기존 Guard 쌍대 검증:** C07 원본 36 Gold와 고위험/혼합 공격, N06 공개 첫 턴, 잘못된 공유기억·관계 주장, 민감 Source Descriptor 이전 차단, 출력 실패 후 Reveal 0, 기존 Shadow의 **Census 4회**와 경합, malformed JSON, 비용 예약 초과 시 Fail-Closed를 기준 경로와 후보에 동일 적용한다. Gold/Canon/권한 조정 금지. 합성 테스트 PASS는 실모델 품질/실지연 입증이 아니다.
+4. **무료 비용·시간 예산 판정:** 전체 모델 호출 수 및 각 단계별 입력/출력·추론 제한을 정리하고 **예약 최악값 10원 이내**인지 검증한다. GLM 대사 생성 단독 실측이 이미 **9.282초**이므로 단순히 사전 분류만 제거해도 5초를 증명할 수 없다. 5초 목표가 가능하다는 가정은 새 실측 전까지 **미검증**으로 표기한다.
+5. **별도 사용자 승인 후 제한적 실모델 쌍대 시험:** 무료 계약 통과 후에만 후보, 공개 합성 사례, 정확 호출 수, 실험 전체 비용 예약 상한, 모델·Provider ZDR/strict JSON, timeout/실패 정책을 **새로 승인**받는다. GLM 기존 3회 vs 개선 경로를 비교해 대사 품질(사람 블라인드 평가), 최종 E2E 지연, p50/p95, 추론량·비용을 기록한다. 실패 재시도 금지. 실제 청구 미정산과 예약 상한을 구분한다.
+6. **조건부 차순위: 다른 모델 검토:** 구조 최적화 후에도 5초 목표가 불가능하거나 품질이 저하될 경우에만 Qwen/Gemini/gpt-oss/GPT Nano 등 **제공 경로별** 공개 정보·가격·속도·ZDR/JSON Schema를 무료 재검증하고 새 실모델 비교는 별도 승인받는다. 기존 후보 선정은 현재 운영 적격성의 증거가 아니다.
+
+### 7.4 경계·종료 규칙
+
+- 이 작업은 **character-memory 비용·성능 실험 Shadow 트랙**에 한정. Reader RR-03/04·RR-09/10·RR-11/12, G0~G6/G1, Production Chat·DB/ACL·Canon·개인 Memory·결제·공개 기능을 바꾸지 않는다.
+- 완료는 각 작업의 실제 구현, 기존 Guard 음성/양성 테스트, 정확 PR HEAD 기본 CI + Full Integration으로만 판단. **문서 갱신은 구현 완료가 아니다.**
+- 최종 채택 전까지 현재 3회 Shadow 경로를 기준점으로 보존한다. 보호 경계 동등성, 턴당 예약 10원 한도, 실제 반복 지연 측정과 사람 품질 평가가 하나라도 불충분하면 **HOLD**. Production 승격은 별도 승인 대상.

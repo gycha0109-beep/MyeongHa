@@ -29,7 +29,7 @@ async function request(path, options = {}) {
 }
 
 async function checkConfig() {
-  const active = await readJson('wrangler.jsonc');
+  const active = await readJson('wrangler.ops.jsonc');
   const isolated = await readJson('workers/cloudflare-auth-db-compat.local.jsonc');
   assert(active.name === 'myeongha', 'Production preview Worker name unexpectedly changed');
   assert(active.main === './workers/cloudflare-static-preview.mjs',

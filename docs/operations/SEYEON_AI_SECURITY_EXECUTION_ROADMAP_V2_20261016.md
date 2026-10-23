@@ -49,6 +49,42 @@
 | **S8 DB 이력/배포/복구** | P3 Ops+DB | 2026-10-19 기준 1520~1720 원격 이력 21/21과 로컬 파일의 **실제 DDL/Owner/ACL/정책 동등성**을 대조. 원격-only `20261008090417` 보존, 새 `20261018190000` 포함 최신 스키마 기준 재해복구 증거·잠금·재시도·forward-only 절차 검토. 임의 repair·재실행 금지 | 버전별 manifest/diff·권한/함수 실측·운영 dry-run 근거, 최신 배포 스키마와 **같은 백업의** 격리 복원·digest·RPO/RTO 승인. **과거 actor 신원 재조사 불필요** | **이력 21/21 확인, 동등성/DR HOLD** |
 | **S9 G6 제한적 운영** | P4 Integration Owner | G0~G5 증거/DR·보안 로그·알림·되돌리기 기준 승인 후, 내부 synthetic smoke→제한적 공개/유료 판단 | 범위, Owner, SHA, run URL, 사고 중단·권한 회수·비용 상한. 전단계 승인 없는 PUBLIC/PAYMENT 불가 | HOLD |
 
+### 2026-10-23 보안 로드맵 현황 — 확인된 개발 상태와 운영 허가 분리
+
+> **읽는 순서:** 먼저 **완료한 구현**, 다음 **현재 구현 중**, 마지막 **운영 허가가 필요한 조건**을 확인한다. `완료`는 해당 단계의 **개발 검증 완료**만 뜻하고, `진행`은 일부 서버·격리 SQL 구현, `대기`는 별도의 기술 실증·Owner 승인 필요를 뜻한다. 임의의 퍼센트, 50% 길이 막대, 승인 없는 GREEN은 사용하지 않는다.
+
+**현재 결론: S1 개발 검증 완료 / S2~S6 개발·격리 검증 진행 / S7·S9 운영 종합 대기 / S8 병렬 DB·DR 검증 진행. Positive Memory 서비스는 여전히 OFF.**
+
+#### ① 개발 구현: 무엇이 작동하고, 무엇이 아직 안 되는가
+
+| 단계 | 개발 상태 | **실제로 구현·확인된 것** | **아직 안 된 것 / 다음 관문** |
+| --- | --- | --- | --- |
+| **S1 · 0건 출처** | **완료** | #2186 보안 검증·병합; 양수·불명 출처를 0건으로 오판하는 경로 차단 | 양수 개인기록 사용 허가를 뜻하지 않음 |
+| **S2 · G0 권한·철회** | **진행** | exact Grant·철회·재부여 및 파생 출처 거부 정책·테스트 후보 | Security+DB+Character 기술 Owner 공동 승인 |
+| **S3 · G1 원본 Pin** | **진행** | 단일 Memory G1 소스·원본 Grant/PG Digest·최종 모델 입력 결속 서버 경로 | #2422 SQL **Draft 미배포**, SRC-25 승인 타입/Codec·실 Owner 권한 |
+| **S4 · G2 원자 Commit** | **진행** | #2489 서버 영수증 및 Outbox 원자 결속 검증·main 반영 | 실제 G2 DB Owner SQL 적용·PostgreSQL 원본 Grant 철회 경합 |
+| **S5 · G3 최초 공개** | **진행** | #2490·#2491·#2492·#2495·#2497 코드를 통합 CI 검증 후 main 반영. 새 received/양수 sequence/원본 User·Assistant·Outbox·ClientTurn 결속 | G3 v3 SQL은 #2422 Draft만 존재; 실 DB 잠금→마지막 전송 경합·G0-D04 ACK |
+| **S6 · G4 비용·모델** | **진행** | 비용 원장/Governor의 격리 검증 일부 존재 | 실제 유료 Provider/Worker 연결 및 과금 증명·승인 OFF |
+
+#### ② 운영·인프라: 왜 아직 출시할 수 없는가
+
+| 단계 | 운영 상태 | **보류 이유 / 필요한 실제 증거** |
+| --- | --- | --- |
+| **S7 · G5 종합 보안** | **대기** | 실 Cloudflare Preview, 양수 PG17 원본 철회 경합, 엔드투엔드 접근/송출 검증 |
+| **S8 · DB·DR** | **진행** | 원격 1520~1720 등록 21/21 읽기 확인; 전량 DDL·Owner·ACL 동등성, 동일 백업 격리 복원·RPO/RTO 미증명 |
+| **S9 · G6 제한 운영** | **대기** | G0~G5·G0-D04·DR 승인 전 공개/유료/데이터 이관 금지 |
+| **Cloudflare (S-CF1/2)** | **일부 완료** | 오프라인 차단은 main. 실제 Ops Router 연결·Worker Preview 검증 별도 미완료 |
+| **Cloudflare (S-CF5 / G0-D04)** | **대기** | Node `finish` ≠ Edge/Proxy/브라우저 ACK. 실제 R/V/S/ACK 및 권한 철회-최종 바이트 경합 기술 증명·서명 필요 |
+
+#### ③ 이번 작업 단위: 확인된 PR·CI
+
+| 작업 | 구현 | 기본 CI | 전체 통합 CI | 현재 결과 |
+| --- | --- | --- | --- | --- |
+| [#2497](https://github.com/gycha0109-beep/MyeongHa/pull/2497) — G3 새 received Turn만 최초 공개 | **완료** | [#39896551733](https://github.com/gycha0109-beep/MyeongHa/actions/runs/39896551733) 통과 | [#39897844513](https://github.com/gycha0109-beep/MyeongHa/actions/runs/39897844513) 통과 | **main 병합 완료** |
+| [#2422](https://github.com/gycha0109-beep/MyeongHa/pull/2422) — G1/G2/G3 실제 SQL 후보, v3 소스 계약 테스트 3종 | **격리 Draft** | [#39898095583](https://github.com/gycha0109-beep/MyeongHa/actions/runs/39898095583) 통과 | **병합·운영 적용 대상 아님** | PG17 실제 경합·Owner 승인 **대기** |
+
+**절대 보류:** `Projectors=[]`, `writeAdmission=DENY`, positive SRC-25 Registry 0, 새 G1/G2/G3 positive Owner RPC API EXECUTE 0, 최초 Reveal/History/Replay 503, paid/public OFF, Production DB DDL/DML/ACL/migration 변경 0. 이 표의 CI GREEN을 운영 보안 승인으로 해석하지 않는다.
+
 ### S1 세부 수락 기준 (가장 먼저 실행)
 
 1. 서버가 조립한 출처 스냅샷에 `personalRecordProjectionCandidates`가 `[]` 또는 지원된 레거시 생략 상태이면 현재 0건 계약을 유지한다.
@@ -584,3 +620,13 @@ S8의 **비파괴/격리 검토는 S2~S7과 병렬 진행 가능**하며, S8 Pro
 - **private 승인 저장 서버 후보:** [PR #2429](https://github.com/gycha0109-beep/MyeongHa/pull/2429)에서 원본 `memory_proposals`의 Subject·ID·PG JSONB digest와 `pending/memory/seyeon` 정합성을 확인하고, **명시적 `grantChoice.mode=private`만** DB 단일 트랜잭션 원자 저장 함수에 전달하는 서버 포트·인증 Member HTTP 핸들러·Production verifier/pool 구성 코드를 추가. 이 API는 **미마운트**이고 `approvedDbWriteAdmission`을 전달하지 않아 기본 503/no-store이며, `character_only/current_characters`와 공개 Memory는 활성화하지 않는다. CI/Full Integration은 아직 완료 근거가 없다.
 - **SQL 소유 경계:** [Draft PR #2422](https://github.com/gycha0109-beep/MyeongHa/pull/2422)에만 실제 운영 스키마용 세 가지 **미적용** migration 코드를 보관한다. G1 원본 Pin, G2 original Grant/Record 재잠금 Commit, 새로운 private 원본 Proposal 잠금→Memory 1건 INSERT→Proposal `accepted` 전이는 모두 DB Owner 접근 경로로 설계. 원본 source Turn은 `committed/delivered` 조건을 요구한다. DB 검증·운영 DDL/ACL 적용·SRC-25 writable registry 등록은 아직 완료되지 않았다.
 - **명시적 HOLD:** 승인된 양수 Memory 타입 registry 0건, 일반 API Executor 신규 RPC EXECUTE 0건, 최초 Reply/History/Replay 503/no-store, public/paid Provider OFF, Production DB DDL/DML/migration history 변경 0. Ops Worker 실제 Router/Preview, G0-D04 `R/V/S/ACK` 계약·2세션 철회/송출 및 DR은 별도 필수 조건으로 유지. CI green 또는 서버 코드 main 병합만으로 G0~G6 승인·실사용 가능 판정을 내리지 않는다.
+
+
+## 61. 2026-10-22 S5/G3 — 실제 양수 원본 Grant 첫 Node Reveal 경계 (운영 OFF)
+
+- **선행 완료 근거:** [#2429](https://github.com/gycha0109-beep/MyeongHa/pull/2429) private Memory proposal 서버 포트·인증 HTTP 미마운트 경계는 [Full Integration #39707192131](https://github.com/gycha0109-beep/MyeongHa/actions/runs/39707192131) SUCCESS 후 main `ea2de84ac4eb14fc2a2d1a9faac3e088b47f8008` 반영. 개인정보 원문은 일반 API Role이 직접 SELECT하지 않으며, Owner RPC의 저장 허가는 여전히 비활성화다.
+- **G1/G2 Draft 상태:** [#2422](https://github.com/gycha0109-beep/MyeongHa/pull/2422)의 G1 원본 DB Pin, G2 단일 트랜잭션 v2 Commit, private Memory Proposal 저장 함수는 현재 **미병합·운영 미적용**이다. `writable_enabled`와 모델 사용 `enabled`는 독립이며 Registry 0행, API EXECUTE 0건. `0c71e356281537def7be491ebfd70002258140e8` HEAD 기본 CI는 SUCCESS지만, 이 사실은 운영 DB 변경을 허용하지 않는다.
+- **이번 S5/G3 실제 SQL:** 같은 SQL Draft 안의 `20261021183000_seyeon_positive_first_memory_locked_reveal_v1.sql`은 **단일 원본 Memory 1건**의 첫 committed Turn만 허용하는 SECURITY DEFINER 조회를 정의한다. canonical Member·single Character Se-yeon·원본 Turn/Attempt 검증 후 G1 immutable positiveProof 및 validation provenance를 확인하고, **동일 원본 Grant ID와 현재 Record**를 SHARE 잠금·철회·변경·원문 PG JSONB digest로 확인한다. Thread/Subject parent UPDATE 잠금을 통해 부가 메시지/참여자 삽입과 격리되지 않은 derived history를 거부한다. 신규 Storage/Subject 연결 테이블 없음, API EXECUTE/등록된 공개 라우트 없음.
+- **이번 S5/G3 서버 코드:** [#2434](https://github.com/gycha0109-beep/MyeongHa/pull/2434)의 `seyeon-first-positive-memory-node-delivery-v1.ts`는 DB의 G1/G2/G3 원본 RPC 및 ACL readiness를 **모델 호출 전에** 확인한다. 이후 newly executed 비-replay 원본 Commit locators만 받아 동일 canonical Subject DB 트랜잭션 안의 잠금 조회를 기존 **direct Node `ServerResponse` sender**에 연결한다. 캐시된 assistant 텍스트, 요청 JSON, 대체 Grant/Record로 송출 불가. 이 PR은 서버 코드 전용이며 자동 병합 후보일 뿐 운영 positive 기능 ON이 아니다.
+- **§61 후속 Subject 결속:** Node-only G3 호출에는 서버 Commit 결과의 `result.subjectId`와 **현재 verified Member 신원으로 트랜잭션 내부에서 새로 해석한 canonical DB Subject**가 동일해야 한다는 조건을 더한다. 서로 다른 Subject의 Commit locators를 섞어도 G3 원본 `qry_seyeon_positive_first_memory_locked_reveal_v1` 호출 전에 INVALID_SCOPE/ROLLBACK, 본문/Provider/HTTP 0. 정상 동일 Subject도 단일 호출만 허용하고 DB 조회·Node 송출 함수의 `deliver()`가 완료된 후에야 DB COMMIT. 테스트는 합성 Postgres 포트/가짜 전송 callback이며 실제 Worker/Cloudflare S/ACK 또는 Production Grant 실측 증거가 아니다.
+- **G0/D-04 기술 HOLD 불변:** Node socket `finish`는 OS 버퍼 인계이고 Vercel/Cloudflare proxy/클라이언트 ACK의 V/R/S/ACK 증거가 아니다. Ops Worker Router/last-hop 계약, 최초 positive 등록·타입 정책, 임의 파생 출처의 최종 Model/Provider 바이트 고정, 송출·철회 2세션 선형화 및 소유자 기술 서명 전에는 **public/paid/Reader/History/Replay 503**, `Projectors=[]`, Production DB DDL/DML/ACL/migration 0을 유지한다.

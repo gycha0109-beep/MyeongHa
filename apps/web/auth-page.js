@@ -24,22 +24,7 @@ const CONFIRMATION_GUEST_HANDOFF_ENTRY_PREFIX = 'myeongha.pendingGuestConfirmati
 const CONFIRMATION_GUEST_HANDOFF_TTL_MS = 24 * 60 * 60 * 1000;
 // Keep the same mixed-version namespace used by product-auth.js so promotion cannot cross a newer Member mutation.
 const MEMBER_MUTATION_LOCK_NAME = 'myeongha.memberSession.v1.refresh.lock';
-const VERCEL_WEB_SOCIAL_CALLBACK_URI = 'https://myeongha.vercel.app/auth.html?social=callback';
-
-function webSocialCallbackUri() {
-  // The browser's current HTTPS host is the intended return host. The server
-  // independently enforces its exact approved origin and provider allowlist.
-  // Existing Vercel Preview and local development continue to use the
-  // production Vercel callback; only a non-Vercel HTTPS host selects itself.
-  if (location.protocol !== 'https:' ||
-      location.hostname === 'myeongha.vercel.app' ||
-      location.hostname.endsWith('.vercel.app')) {
-    return VERCEL_WEB_SOCIAL_CALLBACK_URI;
-  }
-  const callback = new URL('/auth.html', location.origin);
-  callback.searchParams.set('social', 'callback');
-  return callback.toString();
-}
+const WEB_SOCIAL_AUTH_CALLBACK_URI = 'https://myeongha.vercel.app/auth.html?social=callback';
 const WEB_SOCIAL_AUTH_PROVIDERS = new Set(['google', 'kakao', 'naver']);
 const ALLOWED_NEXT = new Set([
   'hall.html',
@@ -125,7 +110,7 @@ async function startSocialAuth(provider) {
         cache: 'no-store',
         body: JSON.stringify({
           provider,
-          redirectUri: webSocialCallbackUri(),
+          redirectUri: WEB_SOCIAL_AUTH_CALLBACK_URI,
         }),
       });
     } catch (error) {

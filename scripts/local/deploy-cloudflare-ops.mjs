@@ -23,7 +23,7 @@ function command(bin, args) {
 }
 
 async function assertDeployOwnership() {
-  const config=JSON.parse(await readFile(resolve('wrangler.jsonc'),'utf8'));
+  const config=JSON.parse(await readFile(resolve('wrangler.ops.jsonc'),'utf8'));
   if(config.name!==WORKER ||
      config.main!=='./workers/cloudflare-static-preview.mjs' ||
      config.workers_dev!==true || config.preview_urls!==true ||
@@ -66,9 +66,9 @@ async function main() {
   // with workers_dev=false will disable this hostname for everyone.
   if(process.platform==='win32') {
     await command('cmd.exe',['/d','/s','/c',
-      'npx.cmd --yes wrangler@4.151.2 deploy --config wrangler.jsonc --keep-vars']);
+      'npx.cmd --yes wrangler@4.151.2 deploy --config wrangler.ops.jsonc --keep-vars']);
   } else {
-    await command('npx',['--yes','wrangler@4.151.2','deploy','--config','wrangler.jsonc','--keep-vars']);
+    await command('npx',['--yes','wrangler@4.151.2','deploy','--config','wrangler.ops.jsonc','--keep-vars']);
   }
   await verifyPublicRoutes();
   console.log('Cloudflare Ops published; workers.dev HTML + health HTTP 200 PASS');

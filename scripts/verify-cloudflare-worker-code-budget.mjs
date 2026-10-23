@@ -69,7 +69,7 @@ async function collectCode(root,directory,out,hash) {
 
 async function main() {
   if(process.platform!=='linux')throw Error('Stage 9 bundle guard is Linux CI-only');
-  const cfg=JSON.parse(await readFile(resolve('wrangler.jsonc'),'utf8'));
+  const cfg=JSON.parse(await readFile(resolve('wrangler.ops.jsonc'),'utf8'));
   if(cfg.name!=='myeongha'||cfg.main!=='./workers/cloudflare-static-preview.mjs'||
     cfg.workers_dev!==true||cfg.preview_urls!==true||
     cfg.assets?.directory!=='./public') {
@@ -84,7 +84,7 @@ async function main() {
     // environment to avoid inheriting GitHub/Cloudflare/Provider credentials.
     execFileSync('npm',[
       'exec','--yes','--package=wrangler@'+WORKER_DRY_RUN_WRANGLER_V1,
-      '--','wrangler','deploy','--dry-run','--config','wrangler.jsonc',
+      '--','wrangler','deploy','--dry-run','--config','wrangler.ops.jsonc',
       '--outdir',outdir,
     ],{
       cwd:process.cwd(),timeout:120_000,

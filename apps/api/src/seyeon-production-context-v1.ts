@@ -316,8 +316,17 @@ function recentMessages(input: {
       );
     }
     seen.add(row.messageId);
-    if (row.messageId === input.currentUserMessageRef) continue;
+    // The DB-owned source census must classify EVERY returned row before
+    // omitting the current User turn. Otherwise a Character/system message
+    // reusing currentUserMessageRef, or an unknown sender type, disappears
+    // and may be falsely attested as a zero-derived-source model input.
     if (row.senderType === 'user') {
+      if (row.characterId !== null) {
+        throw new SeyeonProductionContextErrorV1(
+          'Production recent-message User row has unexpected Character authority.',
+        );
+      }
+      if (row.messageId === input.currentUserMessageRef) continue;
       result.push(Object.freeze({
         messageId: row.messageId,
         role: 'user' as const,
@@ -331,12 +340,23 @@ function recentMessages(input: {
           'Production recent-message context contains another Character.',
         );
       }
+      if (row.messageId === input.currentUserMessageRef) {
+        throw new SeyeonProductionContextErrorV1(
+          'Production current User message identity belongs to a Character.',
+        );
+      }
       result.push(Object.freeze({
         messageId: row.messageId,
         role: 'assistant' as const,
         text: row.text,
       }));
+      continue;
     }
+    // No System/unknown row is silently dropped from a model-source census:
+    // its authority and derivative lineage must be specified before G1 Pin.
+    throw new SeyeonProductionContextErrorV1(
+      'Production recent-message source sender type is not authorized.',
+    );
   }
   return Object.freeze(result.slice(-input.max));
 }

@@ -12,7 +12,10 @@ import {
   SeyeonProductionChatExecutionErrorV1,
 } from './seyeon-production-chat-execution-v1.js';
 import { SeyeonProductionPinMigrationRequiredV1 } from './production-seyeon-chat-runtime-v1.js';
-import { registerSeyeonStaticPreflightDenialV1 } from './seyeon-vercel-fetch-reveal-fence-v1.js';
+import {
+  createSeyeonVercelEmptyPreflightDenialV1,
+  createSeyeonVercelStaticPreflightDenialV1,
+} from './seyeon-vercel-fetch-reveal-fence-v1.js';
 import { preflightSeyeonChatTurnSendCoreV1 } from './seyeon-chat-turn-send-preflight-core-v1.js';
 import {
   assertSeyeonFirstHttpRevealAuthorizedV1,
@@ -48,7 +51,10 @@ function jsonError(input: {
   retryable: boolean;
   requestId: string;
 }): Response {
-  const response = Response.json({
+  if (input.status >= 400 && input.status <= 499) {
+    return createSeyeonVercelStaticPreflightDenialV1(input);
+  }
+  return Response.json({
     ok: false,
     error: {
       code: input.code,
@@ -57,9 +63,6 @@ function jsonError(input: {
     },
     meta: { apiContractVersion: API_CONTRACT_VERSION, requestId: input.requestId },
   }, { status: input.status, headers: { 'Cache-Control': NO_STORE } });
-  return input.status >= 400 && input.status <= 499
-    ? registerSeyeonStaticPreflightDenialV1(response)
-    : response;
 }
 
 function success(
@@ -75,10 +78,7 @@ function success(
 }
 
 function methodNotAllowed(): Response {
-  return registerSeyeonStaticPreflightDenialV1(new Response(null, {
-    status: 405,
-    headers: { Allow: POST_METHOD, 'Cache-Control': NO_STORE },
-  }));
+  return createSeyeonVercelEmptyPreflightDenialV1('method_not_allowed');
 }
 
 function projectResult(result: RunProductionSeyeonChatResultV1) {
@@ -255,9 +255,7 @@ export async function preflightSeyeonChatTurnSendRequestV1(input: Readonly<{
 
   switch (parsed.reason) {
     case 'not_found':
-      return { kind: 'denied', response: registerSeyeonStaticPreflightDenialV1(
-        new Response(null, { status: 404, headers: { 'Cache-Control': NO_STORE } }),
-      ) };
+      return { kind: 'denied', response: createSeyeonVercelEmptyPreflightDenialV1('not_found') };
     case 'method_not_allowed':
       return { kind: 'denied', response: methodNotAllowed() };
     case 'auth_required':

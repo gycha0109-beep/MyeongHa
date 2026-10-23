@@ -28,7 +28,7 @@ describe('MyeongHa conversation hub relationship-first IA', () => {
     expect(myConversations).toBeGreaterThan(primary);
     expect(incoming).toBeGreaterThan(myConversations);
     expect(discoverySection).toBeGreaterThan(incoming);
-    expect(source).toContain('이곳에서 마음이 가는 대리자를 만나보세요.');
+    expect(source).toContain('이곳에서 마음이 가는 연결자를 만나보세요.');
     expect(source).toContain('누구와 이야기를 시작해볼까요?');
     expect(source).toContain('data-chat-hub-state="unavailable"');
     expect(source).toContain('data-relationship-section hidden');
@@ -223,7 +223,9 @@ describe('MyeongHa conversation hub relationship-first IA', () => {
     expect(room).not.toContain('conversation-room-header');
     expect(room).not.toContain('대화로 돌아가기');
     expect(home).toContain('href="chat-hub.html">대화</a>');
-    expect(home).toContain('href="chat-hub.html">대화로 가기 →</a>');
+    expect(home).toContain('href="chat-hub.html">인물 둘러보기');
+    expect(home).toContain('href="chat-hub.html">대화 보러 가기');
+    expect(home).not.toContain('href="chat.html?character=');
     expect(reading).toContain('href="chat-hub.html">대화</a>');
     expect(records).toContain('href="chat-hub.html">대화</a>');
   });

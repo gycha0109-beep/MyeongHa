@@ -92,7 +92,7 @@ export function inspectCloudflareStage5SourceReferencesV1(catalog, sourceContent
 }
 
 async function main() {
-  const config = JSON.parse(await readFile(resolve('wrangler.jsonc'), 'utf8'));
+  const config = JSON.parse(await readFile(resolve('wrangler.ops.jsonc'), 'utf8'));
   const sources = new Map();
   for (const row of CLOUDFLARE_STAGE5_BINDING_CATALOG_V1) {
     if (!sources.has(row.source)) {

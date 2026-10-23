@@ -188,7 +188,7 @@ async function main() {
     const child = spawn(
       executable,
       ['exec', '--yes', '--package=' + 'wrangler@' + WRANGLER_PIN, '--', 'wrangler', 'dev',
-        '--config', 'wrangler.jsonc', '--ip', '127.0.0.1', '--port', '8787'],
+        '--config', 'wrangler.ops.jsonc', '--ip', '127.0.0.1', '--port', '8787'],
       {
         cwd: resolve('.'),
         env: {

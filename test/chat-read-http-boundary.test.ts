@@ -248,6 +248,48 @@ describe('owner Chat read HTTP boundary', () => {
     expect(callTexts(f.connection).at(-1)).toBe('ROLLBACK');
   });
 
+  it('holds an old Se-yeon speaker even when current DB participants exclude Se-yeon', async () => {
+    const f = fixture(`https://myeongha.test/api/chat/${THREAD_ID}?afterSequenceNo=0&pageSize=1`);
+    f.connection.participantCharacterIds = [PRIMARY_CHARACTER_ID, OTHER_CHARACTER_ID];
+    f.connection.streamRows = [
+      {
+        messageId: '96000000-0000-4000-8000-000000000001',
+        sequenceNo: 4,
+        senderType: 'character',
+        characterId: PRIMARY_CHARACTER_ID,
+        bodyText: 'current-character-text',
+        messagePayloadJsonb: {},
+        messageSchemaVersion: 'v1',
+        createdAt: new Date('2026-09-05T15:00:00.000Z'),
+        redacted: false,
+        redactedAt: null,
+      },
+      {
+        messageId: '96000000-0000-4000-8000-000000000002',
+        sequenceNo: 5,
+        senderType: 'character',
+        characterId: 'seyeon',
+        bodyText: 'HISTORICAL_SEYEON_PRIVATE_CANARY',
+        messagePayloadJsonb: { secret: 'HISTORICAL_SEYEON_PAYLOAD' },
+        messageSchemaVersion: 'v1',
+        createdAt: new Date('2026-09-05T15:01:00.000Z'),
+        redacted: false,
+        redactedAt: null,
+      },
+    ];
+
+    const response = await handleChatReadRequestV1(f.input);
+    const body = await response.text();
+    expect(response.status).toBe(503);
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    expect(body).toContain('SEYEON_HISTORY_REVEAL_HOLD');
+    expect(body).not.toContain('HISTORICAL_SEYEON_PRIVATE_CANARY');
+    expect(body).not.toContain('HISTORICAL_SEYEON_PAYLOAD');
+    expect(callTexts(f.connection).some(q => q.includes('qry_chat_thread_stream_v2'))).toBe(true);
+    expect(callTexts(f.connection).some(q => q.includes('qry_character_relationship_v1'))).toBe(false);
+    expect(callTexts(f.connection).at(-1)).toBe('ROLLBACK');
+  });
+
   it('does not block other Characters just because a client asks to impersonate Se-yeon', async () => {
     const f = fixture();
     const result = await handleChatReadRequestV1(f.input);

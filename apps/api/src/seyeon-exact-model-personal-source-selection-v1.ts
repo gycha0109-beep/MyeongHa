@@ -31,12 +31,28 @@ export interface SeyeonExactSelectedPersonalSourceV1 {
   readonly projectorVersion?: string;
 }
 
+/**
+ * Source-census evidence for a relationship-derived model memory.
+ * An event's sourceRef is NOT an original Memory/Grant authorization.
+ */
+export interface SeyeonSelectedUnpinnedDerivedSourceV1 {
+  readonly kind: 'relationship_event';
+  readonly memoryId: string;
+  readonly sourceRef: string;
+  readonly selectedModelMemoryDigest: string;
+  readonly originalGrantVerified: false;
+}
+
 export interface SeyeonExactModelPersonalSourceSelectionV1 {
   readonly version: typeof SEYEON_EXACT_MODEL_PERSONAL_SOURCE_SELECTION_VERSION_V1;
   readonly selectedMemoryCount: number;
   readonly selectedPersonalRecordCount: number;
   readonly selectedSources: readonly SeyeonExactSelectedPersonalSourceV1[];
   readonly selectedSourcesDigest: string;
+  /** Selection-time manifest of actual model-selected derived sources. */
+  readonly selectedUnpinnedDerivedSources: readonly SeyeonSelectedUnpinnedDerivedSourceV1[];
+  /** Whole selected-model source census, not a DB Pin or an active Grant. */
+  readonly selectedModelSourceCensusDigest: string;
   /** A computed model input set is NOT an immutable Postgres pin. */
   readonly persistedBeforeModel: false;
   readonly permitsAtomicCommit: false;
@@ -53,6 +69,19 @@ function hash(value: unknown): string {
 }
 
 function validCandidate(c: SeyeonPersonalRecordProjectionCandidateV1): boolean {
+  // Unknown lineage fields must never disappear when selected sources are
+  // canonicalized for G1. Reject rather than silently strip future claims.
+  const requiredKeys = [
+    'recordKind', 'recordId', 'grantId', 'recordType', 'schemaVersion',
+    'projectedMemoryId', 'rawRecordDigest', 'projectedMemoryDigest',
+    'permitsAtomicCommit', 'permitsHttpReveal',
+  ];
+  const permittedKeys = [
+    ...requiredKeys, 'rawRecordPgDigest', 'projectorVersion',
+  ];
+  const candidateKeys = Object.keys(c);
+  if (requiredKeys.some(key => !Object.prototype.hasOwnProperty.call(c, key)) ||
+      candidateKeys.some(key => !permittedKeys.includes(key))) return false;
   return (c.recordKind === 'memory' || c.recordKind === 'life_fact') &&
     UUID.test(c.recordId) && UUID.test(c.grantId) &&
     typeof c.recordType === 'string' && c.recordType.trim() === c.recordType &&
@@ -132,8 +161,25 @@ export function selectSeyeonExactModelPersonalSourcesV1(input: {
   }
 
   const selectedSources: SeyeonExactSelectedPersonalSourceV1[] = [];
+  const selectedUnpinnedDerivedSources: SeyeonSelectedUnpinnedDerivedSourceV1[] = [];
   for (const m of selected) {
-    if (m.kind === 'relationship_event') continue;
+    if (m.kind === 'relationship_event') {
+      // A sourceRef to an Event has no exact original Grant/Record lineage.
+      // Record its actual selected projection; do not fabricate permission.
+      if (typeof m.memoryId !== 'string' ||
+          typeof m.sourceRef !== 'string' ||
+          m.memoryId.length === 0 || m.sourceRef.length === 0) {
+        throw new SeyeonExactModelPersonalSourceSelectionHoldV1();
+      }
+      selectedUnpinnedDerivedSources.push(Object.freeze({
+        kind: 'relationship_event' as const,
+        memoryId: m.memoryId,
+        sourceRef: m.sourceRef,
+        selectedModelMemoryDigest: hash(m),
+        originalGrantVerified: false as const,
+      }));
+      continue;
+    }
     const c = byId.get(m.memoryId);
     if (!c || hash(m) !== c.projectedMemoryDigest) {
       throw new SeyeonExactModelPersonalSourceSelectionHoldV1();
@@ -157,6 +203,11 @@ export function selectSeyeonExactModelPersonalSourcesV1(input: {
     selectedPersonalRecordCount: selectedSources.length,
     selectedSources: Object.freeze(selectedSources),
     selectedSourcesDigest: hash(selectedSources),
+    selectedUnpinnedDerivedSources: Object.freeze(selectedUnpinnedDerivedSources),
+    selectedModelSourceCensusDigest: hash({
+      originalPersonalSources: selectedSources,
+      unpinnedDerivedSources: selectedUnpinnedDerivedSources,
+    }),
     persistedBeforeModel: false as const,
     permitsAtomicCommit: false as const,
     permitsHttpReveal: false as const,

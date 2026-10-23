@@ -6,7 +6,7 @@ import {
   inspectCloudflareStage5SourceReferencesV1,
 } from '../scripts/verify-cloudflare-auth-binding-inventory.mjs';
 
-const config = JSON.parse(await readFile(new URL('../wrangler.jsonc', import.meta.url), 'utf8'));
+const config = JSON.parse(await readFile(new URL('../wrangler.ops.jsonc', import.meta.url), 'utf8'));
 
 describe('Stage 5 Cloudflare Auth/DB binding registry and deploy HOLD', () => {
   it('passes only the approved workers.dev config without binding material', () => {

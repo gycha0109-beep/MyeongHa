@@ -1,6 +1,5 @@
 import { handleGuestBootstrapRequestV1 } from './guest-bootstrap-http.js';
-import type { PostgresSubjectPoolV1 } from './postgres-subject-execution.js';
-import { createProductionPostgresSubjectPoolLeaseV1 } from './production-postgres-subject-pool-lease.js';
+import { createNodePostgresSubjectPoolV1 } from './node-postgres-subject-pool.js';
 import {
   createProductionGuestBootstrapCredentialIssuerPortV1,
   parseProductionGuestBootstrapActivationConfigV1,
@@ -25,8 +24,6 @@ export interface ProductionGuestBootstrapHttpRuntimeV1 {
 
 export interface CreateProductionGuestBootstrapHttpRuntimeInputV1 {
   readonly env: ProductionUserDataRuntimeEnvV1;
-  /** Server-owned request pool injection; defaults to existing Vercel ownership. */
-  readonly pool?: PostgresSubjectPoolV1;
   /** Server-side test/runtime injection only. Never derived from the client request. */
   readonly memberFetchImpl?: SupabaseMemberVerifierFetchV1;
 }
@@ -55,11 +52,7 @@ export function createProductionGuestBootstrapHttpRuntimeV1(
 ): ProductionGuestBootstrapHttpRuntimeV1 {
   const config = parseProductionUserDataRuntimeConfigV1(input.env);
   const activationConfig = parseProductionGuestBootstrapActivationConfigV1(input.env);
-  const poolLease = createProductionPostgresSubjectPoolLeaseV1({
-    config,
-    ...(input.pool === undefined ? {} : { pool: input.pool }),
-  });
-  const pool = poolLease.pool;
+  const pool = createNodePostgresSubjectPoolV1(config);
   const credentialIssuerPort = createProductionGuestBootstrapCredentialIssuerPortV1({
     config: activationConfig,
   });
@@ -91,7 +84,7 @@ export function createProductionGuestBootstrapHttpRuntimeV1(
       return response;
     },
     close() {
-      return poolLease.close();
+      return pool.close();
     },
   });
 }

@@ -11,15 +11,7 @@ const refreshRoute = readFileSync(resolve(root, 'api/auth/refresh.ts'), 'utf8');
 describe('web social auth live flow', () => {
   it('starts provider OAuth instead of rendering placeholder-only buttons', () => {
     expect(authPage).toContain("fetch('/api/auth/social/start'");
-    // The Cloudflare-ready login page resolves the callback from the browser
-    // origin, while retaining the governed Vercel callback for legacy hosts.
-    expect(authPage).toContain("const VERCEL_WEB_SOCIAL_CALLBACK_URI = 'https://myeongha.vercel.app/auth.html?social=callback'");
-    expect(authPage).toContain('function webSocialCallbackUri()');
-    expect(authPage).toContain("location.hostname.endsWith('.vercel.app')");
-    expect(authPage).toContain('return VERCEL_WEB_SOCIAL_CALLBACK_URI');
-    expect(authPage).toContain("const callback = new URL('/auth.html', location.origin)");
-    expect(authPage).toContain("callback.searchParams.set('social', 'callback')");
-    expect(authPage).toContain('redirectUri: webSocialCallbackUri()');
+    expect(authPage).toContain('WEB_SOCIAL_AUTH_CALLBACK_URI');
     expect(authPage).toContain('location.assign(authorizationUrl.toString())');
     expect(authPage).toContain('startSocial: startSocialAuth');
   });
