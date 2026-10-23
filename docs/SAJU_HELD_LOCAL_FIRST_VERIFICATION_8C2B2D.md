@@ -11,6 +11,10 @@ Watchtower-Track: saju-bridge
 
 기존 Production Supabase `cnsfpcdiyofqvhpcegfc`에 접근하거나 설정을 변경하지 않는다. 이 작업에는 유료 인프라·실환경 Secret/키 생성·DB GRANT·Supabase 신규 프로젝트가 필요 없다.
 
+## Windows Docker Desktop 통합 기반 (2026-10-12 작업 중)
+
+[Windows Docker 폐기형 환경 설계·로드맵 v1](./SAJU_BRIDGE_WINDOWS_DOCKER_DISPOSABLE_ARCHITECTURE_V1.md)에 Auth DB+실제 GoTrue+Subject/Nonce/Admission 독립 DB와 단일 실행기·정리 게이트를 정의했다. 초기 명령은 `node scripts/local/verify-saju-bridge-docker-local.mjs`이며 **1차 GoTrue/DB 기반 스모크만** 수행한다. 아래 기존 Permit V2 PG15/17 및 Saju HTTP·독립 TLS 검증을 대체하거나 완료로 승격하지 않는다. GitHub 호출 전용 `verify-saju-bridge-full.mjs`와 혼동 금지.
+
 ## 1. 준비
 
 - GitHub 저장소 `gycha0109-beep/MyeongHa` 최신 `main`을 로컬에 내려받는다.

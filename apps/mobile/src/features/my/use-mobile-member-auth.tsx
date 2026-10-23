@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
-import { Linking } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { AppState, Linking } from 'react-native';
 
 import {
   MyeongHaApiClientErrorV1,
@@ -10,6 +10,8 @@ import {
   MobileSocialAuthErrorV1,
 } from '@/core/auth/mobile-social-auth';
 import { nativeMobileSocialAuthServiceV1 } from '@/core/auth/native-mobile-social-auth';
+import { MobileSocialAuthReturnGateV1 } from '@/core/auth/mobile-social-auth-return-gate';
+import { describeMobileAuthDiagnosticV1 } from '@/features/my/mobile-auth-error-diagnostics';
 import { nativeMobilePushServiceV1 } from '@/core/push/native-mobile-push-service';
 import { nativeMobileRuntimeV1 } from '@/core/runtime/native-mobile-runtime';
 import {
@@ -45,6 +47,9 @@ function messageFor(error: unknown): string {
     }
     if (error.code === 'MOBILE_SOCIAL_AUTH_PENDING_EXPIRED') {
       return '소셜 로그인 요청 시간이 만료되었습니다. 다시 시도해 주세요.';
+    }
+    if (error.code === 'MOBILE_SOCIAL_AUTH_CALLBACK_IN_FLIGHT') {
+      return '다른 소셜 로그인 응답을 확인 중입니다. 잠시 후 다시 시도해 주세요.';
     }
     return '로그인을 시작한 게스트 세션이 변경되어 계정을 안전하게 연결할 수 없습니다.';
   }
@@ -90,7 +95,7 @@ function messageFor(error: unknown): string {
       return '계정 서버에 연결하지 못했습니다.';
     }
   }
-  return '계정 작업을 완료하지 못했습니다.';
+  return describeMobileAuthDiagnosticV1(error) ?? '계정 작업을 완료하지 못했습니다. [UNEXPECTED_AUTH_ERROR]';
 }
 
 const VERIFICATION_MESSAGE =
@@ -101,6 +106,59 @@ export function useMobileMemberAuthV1() {
     Object.freeze({ kind: 'idle', message: null }),
   );
   const [authRevision, setAuthRevision] = useState(0);
+  const socialReturnGate = useRef(new MobileSocialAuthReturnGateV1());
+  const socialCallbackInFlight = useRef(false);
+  const resumeCancelTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearResumeCancelTimer = useCallback(() => {
+    if (resumeCancelTimer.current !== null) {
+      clearTimeout(resumeCancelTimer.current);
+      resumeCancelTimer.current = null;
+    }
+  }, []);
+
+  const scheduleResumeCancel = useCallback(() => {
+    const attempt = socialReturnGate.current.returnedWithoutCallback();
+    if (attempt === null) return;
+    clearResumeCancelTimer();
+    // Allow the native callback/link listener to win if it arrives after
+    // Android AppState.focus/active on returning from the browser.
+    resumeCancelTimer.current = setTimeout(() => {
+      resumeCancelTimer.current = null;
+      if (!socialReturnGate.current.mayCancelOnReturn(attempt)) return;
+      socialReturnGate.current.finish();
+      setState(Object.freeze({ kind: 'submitting', message: null }));
+      void nativeMobileSocialAuthServiceV1.cancelPending()
+        .then(() => {
+          setState(Object.freeze({ kind: 'idle', message: null }));
+        })
+        .catch(() => {
+          setState(Object.freeze({
+            kind: 'error',
+            message: '취소한 소셜 로그인 상태를 정리하지 못했습니다. 다시 취소해 주세요.',
+          }));
+        });
+    }, 900);
+  }, [clearResumeCancelTimer]);
+
+  useEffect(() => {
+    const onAppState = (next: string) => {
+      if (next === 'background') socialReturnGate.current.leaveApp();
+      if (next === 'active') scheduleResumeCancel();
+    };
+    const changeSubscription = AppState.addEventListener('change', onAppState);
+    // Android Chrome/custom tabs can emit blur/focus without a background transition.
+    const blurSubscription = AppState.addEventListener('blur', () => {
+      socialReturnGate.current.leaveApp();
+    });
+    const focusSubscription = AppState.addEventListener('focus', scheduleResumeCancel);
+    return () => {
+      changeSubscription.remove();
+      blurSubscription.remove();
+      focusSubscription.remove();
+      clearResumeCancelTimer();
+    };
+  }, [clearResumeCancelTimer, scheduleResumeCancel]);
 
   useEffect(() => {
     let active = true;
@@ -124,14 +182,28 @@ export function useMobileMemberAuthV1() {
 
 
   const handleSocialCallback = useCallback(async (url: string) => {
+    const isSocialCallback = /^myeongha:\/\/auth\/callback(?:\?|$)/u.test(url);
+    if (isSocialCallback) {
+      // Mark before the async pending-store lookup: AppState.focus may race it.
+      socialReturnGate.current.callback();
+      clearResumeCancelTimer();
+    }
     let canComplete = false;
     try {
       canComplete = await nativeMobileSocialAuthServiceV1.canComplete(url);
     } catch {
+      if (isSocialCallback) socialReturnGate.current.callbackRejected();
       return;
     }
-    if (!canComplete) return;
+    if (!canComplete) {
+      if (isSocialCallback) socialReturnGate.current.callbackRejected();
+      return;
+    }
 
+    // Both initialURL and URL events can pass the async state check.
+    // Only one may mutate Push ownership and the Member session.
+    if (socialCallbackInFlight.current) return;
+    socialCallbackInFlight.current = true;
     setState(Object.freeze({ kind: 'submitting', message: null }));
     let pushPrepared = false;
     try {
@@ -160,8 +232,12 @@ export function useMobileMemberAuthV1() {
         void nativeMobilePushServiceV1.syncEnabledNoPrompt().catch(() => undefined);
       }
       setState(Object.freeze({ kind: 'error', message: messageFor(error) }));
+    } finally {
+      socialReturnGate.current.finish();
+      clearResumeCancelTimer();
+      socialCallbackInFlight.current = false;
     }
-  }, []);
+  }, [clearResumeCancelTimer]);
 
   useEffect(() => {
     let active = true;
@@ -181,28 +257,44 @@ export function useMobileMemberAuthV1() {
   }, [handleSocialCallback]);
 
   const signInWithSocial = useCallback(async (provider: SocialAuthProviderV1) => {
+    clearResumeCancelTimer();
+    const attempt = socialReturnGate.current.begin();
     setState(Object.freeze({ kind: 'submitting', message: null }));
     try {
       await nativeMobileSocialAuthServiceV1.start(provider);
-      setState(Object.freeze({
-        kind: 'social_pending' as const,
-        provider,
-        message: '외부 로그인 확인을 마치면 자동으로 명하로 돌아옵니다.',
-      }));
+      if (socialReturnGate.current.mayEnterPending(attempt)) {
+        setState(Object.freeze({
+          kind: 'social_pending' as const,
+          provider,
+          message: '외부 로그인 확인을 마치면 자동으로 명하로 돌아옵니다.',
+        }));
+        // Handles an exceptionally fast external-browser back action where
+        // focus returned before Linking.openURL's promise settled.
+        scheduleResumeCancel();
+      }
       return true;
     } catch (error) {
-      setState(Object.freeze({ kind: 'error', message: messageFor(error) }));
+      if (socialReturnGate.current.mayEnterPending(attempt)) {
+        socialReturnGate.current.finish();
+        setState(Object.freeze({ kind: 'error', message: messageFor(error) }));
+      }
       return false;
     }
-  }, []);
+  }, [clearResumeCancelTimer, scheduleResumeCancel]);
 
   const cancelSocialSignIn = useCallback(async () => {
+    clearResumeCancelTimer();
+    socialReturnGate.current.finish();
     try {
       await nativeMobileSocialAuthServiceV1.cancelPending();
-    } finally {
       setState(Object.freeze({ kind: 'idle', message: null }));
+    } catch {
+      setState(Object.freeze({
+        kind: 'error',
+        message: '소셜 로그인 취소 정보를 정리하지 못했습니다. 다시 시도해 주세요.',
+      }));
     }
-  }, []);
+  }, [clearResumeCancelTimer]);
 
   const signIn = useCallback(async (email: string, password: string) => {
     setState(Object.freeze({ kind: 'submitting', message: null }));

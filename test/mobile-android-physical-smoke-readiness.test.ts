@@ -1,3 +1,5 @@
+import { readFile } from 'node:fs/promises';
+
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -84,6 +86,34 @@ describe('Mobile Android physical smoke build readiness', () => {
     expect(report.violations).toContain(
       'physical-smoke Android build must use :app:assembleRelease.',
     );
+  });
+
+  it('blocks stale GitHub workflow reruns before requesting a new EAS build', async () => {
+    const workflow = await readFile(
+      new URL('../.github/workflows/mobile-android-physical-smoke-build.yml', import.meta.url),
+      'utf8',
+    );
+    const staleGuardAt = workflow.indexOf('git ls-remote --exit-code origin refs/heads/main');
+    const easBuildAt = workflow.indexOf('eas build \\');
+    expect(staleGuardAt).toBeGreaterThan(0);
+    expect(easBuildAt).toBeGreaterThan(staleGuardAt);
+    expect(workflow).toContain('test "$checked_out_sha" = "$GITHUB_SHA"');
+    expect(workflow).toContain('if [[ "$checked_out_sha" != "$current_main_sha" ]]');
+  });
+
+  it('checks actual standalone APK bytes before uploading an installation artifact', async () => {
+    const workflow = await readFile(
+      new URL('../.github/workflows/mobile-android-physical-smoke-build.yml', import.meta.url),
+      'utf8',
+    );
+    const extractAt = workflow.indexOf('unzip -p "$apk" assets/index.android.bundle');
+    const publishAt = workflow.indexOf('- name: Upload verified physical-smoke APK');
+    expect(extractAt).toBeGreaterThan(0);
+    expect(publishAt).toBeGreaterThan(extractAt);
+    expect(workflow).toContain('bundle_bytes <= 1024');
+    expect(workflow).toContain("grep -Eq '^application-debuggable($|[[:space:]])'");
+    expect(workflow).toContain('echo "source_commit=$GITHUB_SHA"');
+    expect(workflow).toContain('echo "android_debuggable=false"');
   });
 
   it('rejects project identity drift and submit authority', () => {

@@ -28,6 +28,17 @@ function jobBody(workflow, job) {
 }
 
 describe('Se-yeon paid model evaluation hold', () => {
+  it('locks the prior eight-call exception after three paid requests',()=>{
+    const src=readFileSync(fileURLToPath(new URL('seyeon-model-eval-v1.yml',root)),'utf8');
+    const body=jobBody('seyeon-model-eval-v1.yml','compare');
+    expect(body).toContain('if: $'+'{{ false }}');
+    expect(src).toContain('Run #38845185681 consumed 3 paid calls');
+    expect(src).not.toMatch(/^\s+push:\s*$/m);
+    expect(src).toContain('secrets.OPENAI_API_KEY2');
+    expect(src).not.toContain('secrets.OPENAI_API_KEY }}');
+    expect(src).toContain('run-seyeon-cost-c06-eight-call-v1.mjs');
+    expect(src).not.toContain('run-seyeon-model-eval-v1.mjs');
+  });
   for (const [workflow, jobs] of Object.entries(paidJobs)) {
     for (const job of jobs) {
       it(`denies ${workflow}:${job} even if triggered manually or on push`, () => {

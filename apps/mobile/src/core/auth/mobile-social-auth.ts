@@ -35,7 +35,8 @@ export type MobileSocialAuthCompletionV1 =
 export type MobileSocialAuthErrorCodeV1 =
   | 'MOBILE_SOCIAL_AUTH_GUEST_CHANGED'
   | 'MOBILE_SOCIAL_AUTH_PENDING_EXPIRED'
-  | 'MOBILE_SOCIAL_AUTH_OPEN_FAILED';
+  | 'MOBILE_SOCIAL_AUTH_OPEN_FAILED'
+  | 'MOBILE_SOCIAL_AUTH_CALLBACK_IN_FLIGHT';
 
 export class MobileSocialAuthErrorV1 extends Error {
   constructor(
@@ -68,6 +69,12 @@ export function createMobileSocialAuthServiceV1(input: {
   readonly nowEpochMs?: () => number;
 }): MobileSocialAuthServiceV1 {
   const nowEpochMs = input.nowEpochMs ?? Date.now;
+  // A native callback may arrive via both the URL event and initial URL.
+  // Keep the raw URL only in memory while settling; never log or persist it.
+  let completionInFlight: Readonly<{
+    url: string;
+    promise: Promise<MobileSocialAuthCompletionV1>;
+  }> | null = null;
 
   async function start(provider: SocialAuthProviderV1): Promise<void> {
     const guest = await input.subjectSession.acquireGuestCredential();
@@ -118,7 +125,7 @@ export function createMobileSocialAuthServiceV1(input: {
     }
   }
 
-  async function complete(url: string): Promise<MobileSocialAuthCompletionV1> {
+  async function completeOnce(url: string): Promise<MobileSocialAuthCompletionV1> {
     const pending = await input.pendingStore.read();
     if (pending === null) {
       throw new MobileSocialAuthErrorV1(
@@ -198,6 +205,32 @@ export function createMobileSocialAuthServiceV1(input: {
       provider: pending.provider,
       accountState,
     });
+  }
+
+  function complete(url: string): Promise<MobileSocialAuthCompletionV1> {
+    if (completionInFlight !== null) {
+      // Never let a different callback piggyback on a verified state/session.
+      if (completionInFlight.url !== url) {
+        return Promise.reject(new MobileSocialAuthErrorV1(
+          'MOBILE_SOCIAL_AUTH_CALLBACK_IN_FLIGHT',
+          '다른 소셜 로그인 응답을 처리하고 있습니다.',
+        ));
+      }
+      return completionInFlight.promise;
+    }
+
+    const promise = completeOnce(url);
+    completionInFlight = Object.freeze({ url, promise });
+    // Release the lock after success or failure; retain no callback tokens.
+    void promise.then(
+      () => {
+        if (completionInFlight?.promise === promise) completionInFlight = null;
+      },
+      () => {
+        if (completionInFlight?.promise === promise) completionInFlight = null;
+      },
+    );
+    return promise;
   }
 
   async function cancelPending(): Promise<void> {

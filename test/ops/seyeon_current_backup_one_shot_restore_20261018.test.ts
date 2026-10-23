@@ -1,0 +1,32 @@
+import { readFileSync } from 'node:fs';
+import { describe, expect, it } from 'vitest';
+
+const workflow = readFileSync('.github/workflows/postgres-isolated-restore-drill.yml', 'utf8');
+const marker = readFileSync('.github/ops/postgres-restore-backup-39067271230-20261018.once', 'utf8');
+const verifier = readFileSync('scripts/verify-postgres-isolated-restore-drill-workflow.mjs', 'utf8');
+
+describe('owner-approved single-use current-frontier backup restore', () => {
+  it('binds one existing encrypted backup, exact reviewed main commit and 4-hour expiry', () => {
+    expect(marker.trim()).toBe('POSTGRES-RESTORE-BACKUP-39067271230-20261018-V1');
+    expect(workflow).toContain("'ops(dr): one-shot restore backup 39067271230'");
+    expect(workflow).toContain("subject=\"$(git show -s --format=%s HEAD)\"");
+    expect(workflow).toContain("[[ \"$GITHUB_REF\" == 'refs/heads/main' ]]");
+    expect(workflow).toContain('[[ "$(git rev-parse HEAD)" == "$GITHUB_SHA" ]]');
+    expect(workflow).toContain('backup_run_id=39067271230');
+    expect(workflow).toContain('incident_reference_utc=2026-10-18T08:00:00Z');
+    expect(workflow).toContain('now - point <= 14400');
+    expect(verifier).toContain('triggerMarkers.length !== 2');
+  });
+
+  it('retains the manual interface and isolates restoration from production SQL', () => {
+    expect(workflow).toContain('workflow_dispatch:');
+    expect(workflow).toContain('environment: production');
+    expect(workflow).toContain('MYEONGHA_BACKUP_ENCRYPTION_PASSPHRASE');
+    expect(workflow).toContain('ghcr.io/supabase/postgres@sha256:');
+    expect(workflow).toContain('127.0.0.1');
+    expect(workflow).not.toContain('SUPABASE_DB_PASSWORD');
+    expect(workflow).not.toContain('SUPABASE_PRODUCTION_SESSION_POOLER_HOST');
+    expect(workflow).toContain("echo 'dr_ready=false'");
+    expect(workflow).toContain('SCOPED_RESTORE_PROOF_ONLY: backup 39067271230; no Production SQL or privacy canary');
+  });
+});

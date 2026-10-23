@@ -3,5 +3,5 @@ import { createMobileChatReadServiceV1 } from '@/features/chat/mobile-chat-read-
 
 export const mobileChatReadServiceV1 = createMobileChatReadServiceV1({
   client: nativeMobileRuntimeV1.apiClient,
-  session: nativeMobileRuntimeV1.subjectSession,
+  session: nativeMobileRuntimeV1.memberSession,
 });

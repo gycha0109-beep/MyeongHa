@@ -22,12 +22,13 @@ describe('mobile M6-B Chat read UI structure', () => {
 
   it('keeps recent discovery blocked while consuming the separate source-approved Launch roster', async () => {
     const hub = await readRepoFile('apps/mobile/src/app/(tabs)/chat/index.tsx');
-    expect(hub).toContain('최근 대화 목록은 아직 서버에서 제공하지 않아');
+    expect(hub).not.toContain('recentThreads');
+    expect(hub).not.toContain('최근 대화 목록은 아직 서버에서 제공하지 않아');
     expect(hub).toContain('MOBILE_CHAT_LAUNCH_ROSTER_V1');
     for (const name of ['백헌', '세연', '여울', '서린', '라현', '미라', '태겸', '윤호', '도윤']) {
       expect(hub).not.toContain(`displayName: '${name}'`);
     }
-    expect(hub).not.toContain('portrait');
+    expect(hub).toContain('resolveMobileChatPortraitV1');
     expect(hub).not.toContain('recommend');
   });
 
@@ -35,6 +36,11 @@ describe('mobile M6-B Chat read UI structure', () => {
     const components = await readRepoFile('apps/mobile/src/features/chat/ChatReadComponents.tsx');
     expect(components).not.toContain('messagePayloadJsonb');
     expect(components).not.toContain('bodyText');
-    expect(components).toContain('createMobileChatMessageViewV1');
+    expect(components).toContain('groupMobileChatMessagesV1');
+    expect(components).toContain('resolveMobileChatPortraitV1(group.characterId)');
+    expect(components).toContain('styles.messageGroupName');
+    expect(components).toContain('last && group.timeLabel');
+    const model = await readRepoFile('apps/mobile/src/features/chat/chat-view-model.ts');
+    expect(model).toContain('createMobileChatMessageViewV1(message, verifiedCharacterDisplayName)');
   });
 });

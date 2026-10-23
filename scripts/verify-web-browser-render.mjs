@@ -345,6 +345,12 @@ try {
     return true;
   })()`);
   await waitForPage(client, '/reading-detail.html', '.reading-route-state');
+  // The Reading scene loads after React mounts; wait for the runtime contract, not just the shell.
+  for (let index = 0; index < 80; index += 1) {
+    const ready = await client.evaluate("document.body.dataset.readerSelection === 'explicit' && document.body.dataset.readerPresentation === 'reading-scene-v1'");
+    if (ready) break;
+    await new Promise(done => setTimeout(done, 50));
+  }
   const selectedReaderRoute = await client.evaluate(`(() => {
     const params = new URLSearchParams(location.search);
     return {
@@ -421,7 +427,7 @@ try {
   }))()`);
   assert(invalidThreadChat.character === '' && invalidThreadChat.authority === 'thread_identity_invalid', `Invalid thread route fell back to presentation Character authority: ${JSON.stringify(invalidThreadChat)}`);
   assert(invalidThreadChat.name === '대화 상대', `Invalid thread route leaked a presentation Character: ${JSON.stringify(invalidThreadChat)}`);
-  assert(invalidThreadChat.status === '대화 주소가 올바르지 않습니다. 대리자를 다시 선택해 주세요.'
+  assert(invalidThreadChat.status === '대화 주소가 올바르지 않습니다. 연결자를 다시 선택해 주세요.'
     && invalidThreadChat.loading === invalidThreadChat.status
     && invalidThreadChat.introHidden && invalidThreadChat.retryHidden,
     `Invalid thread route did not fail closed visibly: ${JSON.stringify(invalidThreadChat)}`);

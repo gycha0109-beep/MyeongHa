@@ -15,6 +15,32 @@ describe('provider failure diagnostic privacy', () => {
       expect(await readSeyeonProviderFailureDiagnosticV1(response)).toEqual({ reason: 'UNKNOWN', errorCode: null, errorType: null });
     }
   });
+  it('recognizes safe diagnostic codes across split UTF-8 stream chunks without Node Buffer', async () => {
+    const json = JSON.stringify({ error: {
+      code: 'model_not_allowed',
+      type: 'permission_error',
+      message: '한글 경고: free tier credits do not support this model. PRIVATE_SECRET',
+    } });
+    const bytes = new TextEncoder().encode(json);
+    const utf8Lead = bytes.findIndex(byte => byte >= 0xe0);
+    expect(utf8Lead).toBeGreaterThan(0);
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(bytes.slice(0, utf8Lead + 1));
+        controller.enqueue(bytes.slice(utf8Lead + 1, utf8Lead + 2));
+        controller.enqueue(bytes.slice(utf8Lead + 2));
+        controller.close();
+      },
+    });
+    const result = await readSeyeonProviderFailureDiagnosticV1(new Response(stream, { status: 403 }));
+    expect(result).toEqual({
+      reason: 'MODEL_FREE_TIER_RESTRICTED',
+      errorCode: 'model_not_allowed',
+      errorType: 'permission_error',
+    });
+    expect(JSON.stringify(result)).not.toContain('PRIVATE_SECRET');
+  });
+
   it('bounds oversized and stalled provider bodies', async () => {
     expect(await readSeyeonProviderFailureDiagnosticV1(new Response('x'.repeat(16_385)))).toEqual({ reason: 'UNKNOWN', errorCode: null, errorType: null });
     const result = await readSeyeonProviderFailureDiagnosticV1(new Response(new ReadableStream({ start() {} })));

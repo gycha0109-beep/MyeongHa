@@ -318,4 +318,77 @@ describe('production Guest bootstrap runtime', () => {
     ).rejects.toBeInstanceOf(AggregateError);
     expect(connection.releases).toEqual([rollbackFailure]);
   });
+  it('normalizes PostgreSQL timestamptz text to ISO UTC for Android on fresh Guest creation', async () => {
+    const connection = new FakeConnection();
+    connection.createRows = [{
+      subjectId: GUEST_SUBJECT_ID,
+      guestSessionId: GUEST_SESSION_ID,
+      expiresAt: '2099-01-01 09:00:00+09',
+      replayed: false,
+    }];
+    const port = new PostgresGuestBootstrapAuthorityPortV1(new FakePool(connection));
+
+    const rows = await port.createGuestSession({
+      subjectId: GUEST_SUBJECT_ID,
+      guestSessionId: GUEST_SESSION_ID,
+      tokenHash: GUEST_HASH,
+      expiresAt: EXPIRES_AT,
+    });
+
+    expect(rows).toEqual([{
+      subjectId: GUEST_SUBJECT_ID,
+      guestSessionId: GUEST_SESSION_ID,
+      expiresAt: '2099-01-01T00:00:00.000Z',
+      replayed: false,
+    }]);
+    expect(connection.calls[2]?.values).toEqual([
+      GUEST_SUBJECT_ID,
+      GUEST_SESSION_ID,
+      GUEST_HASH,
+      EXPIRES_AT,
+    ]);
+  });
+
+  it('normalizes the same database timestamp on reused Guest session responses', async () => {
+    const verifier = new FakeVerifier();
+    verifier.result = { kind: 'guest', verifiedGuestTokenHash: GUEST_HASH };
+    const connection = new FakeConnection();
+    connection.currentGuestRows = [{
+      subjectId: GUEST_SUBJECT_ID,
+      guestSessionId: GUEST_SESSION_ID,
+      expiresAt: '2099-01-01 09:00:00+09',
+    }];
+    const resolver = createProductionGuestBootstrapIdentityResolverPortV1({
+      request: request('Bearer opaque-existing-guest-credential-value'),
+      identityVerifier: verifier,
+      pool: new FakePool(connection),
+    });
+
+    await expect(resolver.resolveExistingBootstrapIdentity()).resolves.toEqual({
+      kind: 'guest',
+      subjectId: GUEST_SUBJECT_ID,
+      guestSessionId: GUEST_SESSION_ID,
+      expiresAt: '2099-01-01T00:00:00.000Z',
+    });
+  });
+
+  it('rejects invalid PostgreSQL timestamps instead of inventing a Guest expiry', async () => {
+    const connection = new FakeConnection();
+    connection.createRows = [{
+      subjectId: GUEST_SUBJECT_ID,
+      guestSessionId: GUEST_SESSION_ID,
+      expiresAt: 'not-a-valid-postgres-timestamp',
+      replayed: false,
+    }];
+    const port = new PostgresGuestBootstrapAuthorityPortV1(new FakePool(connection));
+    await expect(port.createGuestSession({
+      subjectId: GUEST_SUBJECT_ID,
+      guestSessionId: GUEST_SESSION_ID,
+      tokenHash: GUEST_HASH,
+      expiresAt: EXPIRES_AT,
+    })).rejects.toThrow('not a timestamp');
+    expect(texts(connection)).not.toContain('COMMIT');
+    expect(texts(connection).at(-1)).toBe('ROLLBACK');
+  });
+
 });

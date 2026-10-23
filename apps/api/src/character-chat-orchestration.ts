@@ -2,6 +2,9 @@ import { createHash } from 'node:crypto';
 import type { ChatTurnState } from '../../../packages/contracts/src/index.js';
 import {
   assembleCharacterRuntimeContext,
+  composeRahyeonTurnContextV1,
+  type RahyeonTurnSelectionV1,
+  type RahyeonTurnContextV1,
   canonicalJson,
   evaluateCapabilityGate,
   guardCharacterRendererOutput,
@@ -22,6 +25,7 @@ export interface CharacterRendererProviderInputV1 {
   readonly turnId: string;
   readonly attemptId: string;
   readonly context: CharacterRuntimeContextV1;
+  readonly rahyeonRuntime: RahyeonTurnContextV1 | null;
 }
 
 /**
@@ -171,6 +175,8 @@ export interface RunMockCharacterChatTurnInputV1 {
   readonly contextInput: CharacterRuntimeContextAssemblyInputV1;
   readonly allowedSuggestedActionKeys: readonly string[];
   readonly renderer: CharacterRendererProviderPortV1;
+  /** Trusted turn classifier after authorization; never raw client-provided facts. */
+  readonly rahyeonTurn?: RahyeonTurnSelectionV1;
   readonly commitPort: CharacterChatCommitPortV1;
 }
 
@@ -292,12 +298,31 @@ export function runMockCharacterChatTurn(
     );
   }
 
+  let rahyeonRuntime: RahyeonTurnContextV1 | null = null;
+  try {
+    if (context.characterId === 'rahyeon') {
+      rahyeonRuntime = composeRahyeonTurnContextV1(context, input.rahyeonTurn ?? {
+        kind: context.saju === null ? 'ordinary' : 'saju',
+        requestedFactKeys: [],
+      });
+    } else if (input.rahyeonTurn !== undefined) {
+      throw new TypeError('Rahyeon-specific context cannot attach to another Character.');
+    }
+  } catch (error) {
+    throw new CharacterChatTurnOrchestrationError(
+      'context',
+      state,
+      error instanceof Error ? error.message : 'Rahyeon context assembly failed.',
+      error,
+    );
+  }
+
   state = transitionChatTurn(state, 'context_ready');
   stateTrace.push(state);
 
   let rawOutput: unknown;
   try {
-    rawOutput = input.renderer.render({ turnId, attemptId, context });
+    rawOutput = input.renderer.render({ turnId, attemptId, context, rahyeonRuntime });
   } catch (error) {
     throw new CharacterChatTurnOrchestrationError(
       'render',

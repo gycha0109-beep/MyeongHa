@@ -9,6 +9,8 @@ describe('Records Saju history surface', () => {
   const html = `${readWeb('records.html')}\n${readWeb('src/records/RecordsPage.tsx')}`;
   const page = readWeb('records-page.js');
   const client = readWeb('records-runtime-client.js');
+  const readerLocale = readWeb('reader-provenance-locale.js');
+  const recordsUiLocale = readWeb('records-page-ui-locale.js');
   const css = readWeb('records-v2.css');
 
   it('keeps Saju reading records separate from Life Facts and other record domains', () => {
@@ -36,9 +38,10 @@ describe('Records Saju history surface', () => {
     expect(page).toContain("requireArray(readingPayload, 'readings')");
     expect(page).toContain('if (readings.length > 0)');
     expect(page).toContain('for (const reading of readings) renderPersistedReading(target, reading);');
-    expect(page).toContain('resolveCanonicalCharacterPresentationV1(characterId)?.name');
+    expect(readerLocale).toContain('resolveCharacterDisplayNameV1(id, language)');
     expect(page).toContain("records-reading-card records-reading-card--persisted");
-    expect(page).toContain("records-reading-badge', readerProvenanceLabel(reading.readerCharacterIds)");
+    expect(page).toContain('readerProvenanceLocaleLabelV1(reading.readerCharacterIds, getUiLocale())');
+    expect(page).toContain('readerBadgeSources.set(badge, reading.readerCharacterIds)');
     expect(page).toContain('if (allowsDevelopmentSajuSamples())');
     expect(page).toContain('renderSajuReadingSamples(target, lifeFactsPayload)');
     expect(page).toContain('renderSajuReadingEmpty(target);');
@@ -74,7 +77,8 @@ describe('Records Saju history surface', () => {
     expect(page).toContain('if (openable) {');
     expect(page).toContain("{ href: handoffUrl, label: '저장된 풀이 열기 →' }");
     expect(page).toContain("{ href: null, label: '완료 후 다시 열 수 있습니다.' }");
-    expect(page).toContain('완료된 Official Reading만 다시 열 수 있습니다.');
+    expect(page).toContain('recordsReadingSummaryV1({');
+    expect(recordsUiLocale).toContain('완료된 Official Reading만 다시 열 수 있습니다.');
   });
 
   it('recognizes only the explicit sample fixture contract and removes it from the Life Fact ledger', () => {
@@ -94,7 +98,7 @@ describe('Records Saju history surface', () => {
 
   it('keeps the fallback honest and never invents snapshot semantics or a score', () => {
     expect(page).toContain("records-reading-card records-reading-card--sample");
-    expect(page).toContain("records-reading-badge', '개발 샘플'");
+    expect(page).toContain("records-reading-badge', uiText('개발 샘플')");
     expect(page).toContain('실제 Reading이 없을 때만 보이는 UI fixture');
     expect(page).toContain("empty.className = 'records-reading-empty'");
     expect(page).toContain('아직 저장된 사주 풀이가 없습니다.');

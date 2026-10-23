@@ -39,7 +39,7 @@ packages/character-content/
 
 ## 2.1 Principle-Calling ontology migration note
 
-World Root Canon은 기존 Deity ontology를 이치(理) → 명(命) → 대리자 구조로 교체했다.
+World Root Canon은 기존 Deity ontology를 이치(理) → 명(命) → 연결자 구조로 교체했다.
 
 따라서 이 문서에서 새로 정의하는 authoring 의미는 principle/calling 기준을 따른다.
 
@@ -91,9 +91,9 @@ UC-24는 조건부 Character content에 `unlock 조건` 개념이 존재할 수 
 
 **결함 없는 모범 답안형 캐릭터를 기본값으로 만들지 않는다.**
 
-## 5. 명을 받은 대리자 규칙
+## 5. 명을 받은 연결자 규칙
 
-대리자는 이치 자체의 personification이 아니며 전지전능하지 않다. 대리자는 특정 인간에게 닿은 명을 받아들이고 서약한 인간이다.
+연결자는 이치 자체의 personification이 아니며 전지전능하지 않다. 연결자는 특정 인간에게 닿은 명을 받아들이고 서약한 인간이다.
 
 세계관상 최소 경계:
 

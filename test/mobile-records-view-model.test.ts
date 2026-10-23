@@ -68,7 +68,7 @@ describe('mobile Records view model', () => {
     expect(readingTitleV1('unknown-domain')).toBe('사주 풀이');
     expect(readingStateLabelV1('delivered_with_fallback')).toBe('완료');
     expect(readingStateLabelV1('clarification_required')).toBe('추가 확인 필요');
-    expect(readingReaderLabelV1(['character-a'])).toBe('대리자와 본 풀이');
-    expect(readingReaderLabelV1(['character-a', 'character-b'])).toBe('대리자 2명과 본 풀이');
+    expect(readingReaderLabelV1(['character-a'])).toBe('연결자와 본 풀이');
+    expect(readingReaderLabelV1(['character-a', 'character-b'])).toBe('연결자 2명과 본 풀이');
   });
 });

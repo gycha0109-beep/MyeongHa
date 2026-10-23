@@ -1,5 +1,6 @@
-import type {
-  SeyeonProductionContextSnapshotV1,
+import {
+  SEYEON_PRODUCTION_CONTEXT_VERSION_V1,
+  type SeyeonProductionContextSnapshotV1,
 } from './seyeon-production-context-v1.js';
 
 /**
@@ -24,7 +25,10 @@ export class SeyeonPersonalRecordPrecommitHoldV1 extends Error {
 
 type PersonalRecordContextV1 = Pick<
   SeyeonProductionContextSnapshotV1,
-  'retrievedMemories' | 'personalRecordAdmissions'
+  'version' | 'recentMessages' | 'retrievedMemories' |
+  'personalRecordAdmissions' | 'personalRecordProjectionCandidates' |
+  'relationshipHistoryRecords' | 'activeRelationshipEventCount' |
+  'historyThroughRevision' | 'relationshipRevisionUsedForTurn'
 >;
 
 export function assertSeyeonPersonalRecordsNotUsedBeforeUnprotectedCommitV1(
@@ -38,8 +42,22 @@ export function assertSeyeonPersonalRecordsNotUsedBeforeUnprotectedCommitV1(
 }> {
   if (
     context === null || typeof context !== 'object' ||
+    context.version !== SEYEON_PRODUCTION_CONTEXT_VERSION_V1 ||
     !Array.isArray(context.retrievedMemories) ||
-    !Array.isArray(context.personalRecordAdmissions)
+    !Array.isArray(context.personalRecordAdmissions) ||
+    !Array.isArray(context.recentMessages) ||
+    !Array.isArray(context.relationshipHistoryRecords) ||
+    !Number.isSafeInteger(context.activeRelationshipEventCount) ||
+    context.activeRelationshipEventCount < 0 ||
+    !Number.isSafeInteger(context.historyThroughRevision) ||
+    context.historyThroughRevision < 0 ||
+    (context.relationshipRevisionUsedForTurn !== null &&
+     (!Number.isSafeInteger(context.relationshipRevisionUsedForTurn) ||
+      context.relationshipRevisionUsedForTurn < 0)) ||
+    context.historyThroughRevision !== (context.relationshipRevisionUsedForTurn ?? 0) ||
+    (context.personalRecordProjectionCandidates !== undefined &&
+     (!Array.isArray(context.personalRecordProjectionCandidates) ||
+      context.personalRecordProjectionCandidates.length !== 0))
   ) {
     throw new SeyeonPersonalRecordPrecommitHoldV1();
   }
@@ -65,7 +83,20 @@ export function assertSeyeonPersonalRecordsNotUsedBeforeUnprotectedCommitV1(
       admission.reason !== 'UNSUPPORTED_SCHEMA',
   );
 
-  if (modelUsedPersonalRecord || unsafeMemoryKind || admittedOrUnknown) {
+  // G0-derived lineage is not yet approved: an old user/assistant message,
+  // a relationship event, or even a nonzero historical revision without
+  // remaining event text cannot be safely promoted to a "zero source" turn.
+  // Fail BEFORE context_ready persistence and ANY Provider/Preflight call.
+  const unverifiedDerivedSource = context.recentMessages.length !== 0 ||
+    context.relationshipHistoryRecords.length !== 0 ||
+    context.activeRelationshipEventCount !== 0 ||
+    context.historyThroughRevision !== 0 ||
+    context.retrievedMemories.some(memory =>
+      memory !== null && typeof memory === 'object' &&
+      memory.kind === 'relationship_event');
+
+  if (modelUsedPersonalRecord || unsafeMemoryKind || admittedOrUnknown ||
+      unverifiedDerivedSource) {
     throw new SeyeonPersonalRecordPrecommitHoldV1();
   }
 

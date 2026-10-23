@@ -1,0 +1,52 @@
+name: '[WT:character-memory] KEY2 live 5-vs-3 dialogue one paired first turn'
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/seyeon-live-dialogue-key2-first-pair.trigger'
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: seyeon-live-dialogue-key2-first-pair-lifetime-once
+  cancel-in-progress: false
+jobs:
+  evaluate:
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && github.run_attempt == 1 }}
+    environment: production
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Checkout immutable evaluated commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.sha }}
+      - name: Node 24
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install audited dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Verify pinned paid sample budget and first-run gate
+        run: npx vitest run test/seyeon-live-dialogue-key2-first-pair-v1.test.mjs test/seyeon-dialogue-path-eval-core-v1.test.mjs
+      - name: Build pinned runtime
+        run: npm run build
+      - name: Real E2E one paired public first-contact sample with KEY2
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OPENAI_API_KEY2: ${{ secrets.OPENAI_API_KEY2 }}
+        run: |
+          set -euo pipefail
+          test -n "${OPENAI_API_KEY2:-}"
+          node scripts/run-seyeon-live-dialogue-key2-first-pair-v1.mjs
+      - name: Retain numeric-only, no user data
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: seyeon-live-dialogue-first-pair-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/seyeon-live-first-pair/
+          if-no-files-found: warn
+          retention-days: 14

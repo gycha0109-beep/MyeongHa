@@ -1,3 +1,6 @@
+import { resolveCharacterDisplayNameV1 } from './character-display-locale.js';
+import { getUiLocale, translateStaticUi } from './ui-i18n.js';
+import { readingScopeLabelV1, readingSceneProgressV1, readingRouteStateCopyV1 } from './reading-detail-ui-locale.js';
 import { resolveReadingDetailRoute } from './reading-detail-route.js';
 import { resolveSajuButtonEngineRequest } from './reading-saju-engine-request.js';
 import { isBrowserSajuPreviewDeliveryV1 } from './saju-preview-response-admission.js';
@@ -17,19 +20,19 @@ const readerCatalog = {
   baekheon: {
     name: '백헌',
     hanja: '白憲',
-    title: '충추원의 장',
+    title: '베테랑 조정자',
     intro: '당신의 사주를 바탕으로 지금의 흐름부터 하나씩 살펴보겠습니다.',
   },
   seyeon: {
     name: '세연',
     hanja: '',
-    title: '무녀',
+    title: '명하의 안내인',
     intro: '복잡하게 시작하지 않을게요. 지금 가장 크게 읽히는 흐름부터 같이 봐요.',
   },
   yeoul: {
     name: '여울',
     hanja: '',
-    title: '설계관 기록관',
+    title: '운영관리팀 사원',
     intro: '돌려 말하지 않을게요. 지금 필요한 흐름부터 바로 짚겠습니다.',
   },
   seorin: {
@@ -41,31 +44,31 @@ const readerCatalog = {
   rahyeon: {
     name: '라현',
     hanja: '',
-    title: '대리자',
+    title: '전시 기획자',
     intro: '표면적인 답보다, 당신이 실제로 흔들리는 지점부터 읽어보죠.',
   },
   mira: {
     name: '미라',
     hanja: '',
-    title: '대리자',
+    title: '연결자',
     intro: '과하게 의미 붙이지 말고, 지금 쓸 수 있는 정보부터 보죠.',
   },
   taegyeom: {
     name: '태겸',
     hanja: '',
-    title: '대리자',
+    title: '프로 격구 선수',
     intro: '근거 없는 낙관은 빼겠습니다. 확인되는 구조부터 보죠.',
   },
   yunho: {
     name: '윤호',
     hanja: '',
-    title: '대리자',
+    title: '연결자',
     intro: '급하게 결론부터 내리지 않고, 구조와 시기를 차례대로 읽어보겠습니다.',
   },
   doyun: {
     name: '도윤',
     hanja: '',
-    title: '대리자',
+    title: '연결자',
     intro: '일단 재미없는 설명부터 길게 하진 않을게요. 지금 걸리는 부분부터 보죠.',
   },
 };
@@ -131,19 +134,21 @@ if (route.valid) {
   delete root.dataset.readingScopeKey;
 }
 
-document.querySelectorAll('[data-reader-name]').forEach((element) => { element.textContent = reader.name; });
-document.querySelectorAll('[data-reader-title]').forEach((element) => {
-  element.textContent = reader.title;
-  element.hidden = !reader.title;
-});
-document.querySelectorAll('[data-reader-intro]').forEach((element) => { element.textContent = reader.intro; });
-document.querySelectorAll('[data-reader-hanja]').forEach((element) => {
-  element.textContent = reader.hanja;
-  element.hidden = !reader.hanja;
-});
-
 const portrait = document.querySelector('[data-reader-portrait]');
-if (portrait) portrait.setAttribute('aria-label', `${reader.name} 사주 읽기 장면`);
+function renderReaderLocalePresentation() {
+  const locale = getUiLocale();
+  const label = resolveCharacterDisplayNameV1(readerKey, locale) ?? reader.name;
+  document.querySelectorAll('[data-reader-name]').forEach((element) => { element.textContent = label; });
+  document.querySelectorAll('[data-reader-title]').forEach((element) => { element.textContent = translateStaticUi(reader.title, locale); element.hidden = !reader.title; });
+  document.querySelectorAll('[data-reader-intro]').forEach((element) => { element.textContent = translateStaticUi(reader.intro, locale); });
+  document.querySelectorAll('[data-reader-hanja]').forEach((element) => {
+    element.textContent = locale === 'ko-KR' ? reader.hanja : '';
+    element.hidden = locale !== 'ko-KR' || !reader.hanja;
+  });
+  if (portrait) portrait.setAttribute('aria-label', `${label} ${translateStaticUi('사주',locale)}`);
+}
+renderReaderLocalePresentation();
+document.addEventListener('myeongha:localechange', renderReaderLocalePresentation);
 
 let activeReadingOwner = null;
 
@@ -210,9 +215,7 @@ window.addEventListener('storage', (event) => {
 });
 
 function scopeDisplay(scope) {
-  if (scope === 'year') return `${currentYear}년 · 올해`;
-  if (scope === 'month') return '이번 달';
-  return '원국';
+  return readingScopeLabelV1(scope, currentYear, getUiLocale());
 }
 
 function renderInvalidRoute() {
@@ -284,35 +287,27 @@ function renderPersistedReadingFailure(title, copy, state = 'persisted_record_un
 }
 
 function renderAuthorityBlockedRoute() {
-  const scope = scopeDisplay(route.scope);
-  if (productTitle) productTitle.textContent = route.topic === 'general' ? scope : `${route.label} · ${scope}`;
-  if (stateTitle) stateTitle.textContent = `${route.label} 읽기는 아직 준비 중입니다.`;
-  if (stateCopy) {
-    if (engineRequest?.state === 'requires_input') {
-      const inputCopy = {
-        family_scope: '가족 읽기는 부모운 또는 자녀운을 먼저 선택해야 합니다.',
-        target_person: '궁합은 상대의 명식 참조가 먼저 필요합니다.',
-        question: '고민 읽기는 실제 질문을 먼저 입력해야 합니다.',
-      };
-      stateCopy.textContent = `${inputCopy[engineRequest.input] ?? '추가 입력이 필요합니다.'} 현재 Preview 실행 범위에 포함되지 않은 요청은 전송하지 않습니다.`;
-    } else if (engineRequest?.state === 'ready') {
-      stateCopy.textContent = `이 버튼은 Saju Engine의 ${engineRequest.adapterVersion} 요청 문법까지 정확히 매핑되어 있습니다. 다만 현재 가승인된 Preview 범위에는 포함되지 않아 실제 해석 요청은 전송하지 않습니다. 다른 주제의 풀이로 대신 보여드리지 않습니다.`;
-    } else {
-      stateCopy.textContent = '현재 제공 가능한 검증된 사주 읽기 범위가 열리지 않아 이 결과를 실행하지 않습니다. 다른 주제의 풀이로 대신 보여드리지 않습니다.';
-    }
-  }
-  document.querySelectorAll('[data-reading-scope]').forEach((element) => { element.textContent = scope; });
-  document.title = `${route.label} · 사주 해석 · 명하`;
+  const copy = readingRouteStateCopyV1(route, engineRequest, 'blocked', currentYear, getUiLocale());
+  if (productTitle) productTitle.textContent = copy.productTitle;
+  if (stateTitle) stateTitle.textContent = copy.stateTitle;
+  if (stateCopy) stateCopy.textContent = copy.stateCopy;
+  document.querySelectorAll('[data-reading-scope]').forEach((element) => { element.textContent = copy.scope; });
+  document.title = copy.documentTitle;
 }
 
 function renderPreviewLoading() {
-  const scope = scopeDisplay(route.scope);
-  if (productTitle) productTitle.textContent = route.topic === 'general' ? scope : `${route.label} · ${scope}`;
-  if (stateTitle) stateTitle.textContent = `${route.label} 프리뷰를 준비하고 있습니다.`;
-  if (stateCopy) stateCopy.textContent = '현재 Birth Profile과 검증된 Saju Preview Reading을 연결하고 있습니다.';
-  document.querySelectorAll('[data-reading-scope]').forEach((element) => { element.textContent = scope; });
-  document.title = `${route.label} · 사주 프리뷰 · 명하`;
+  const copy = readingRouteStateCopyV1(route, engineRequest, 'preview_loading', currentYear, getUiLocale());
+  if (productTitle) productTitle.textContent = copy.productTitle;
+  if (stateTitle) stateTitle.textContent = copy.stateTitle;
+  if (stateCopy) stateCopy.textContent = copy.stateCopy;
+  document.querySelectorAll('[data-reading-scope]').forEach((element) => { element.textContent = copy.scope; });
+  document.title = copy.documentTitle;
 }
+
+document.addEventListener('myeongha:localechange', () => {
+  if (root.dataset.readingRouteState === 'blocked_by_authority') renderAuthorityBlockedRoute();
+  if (root.dataset.readingRouteState === 'preview_loading') renderPreviewLoading();
+});
 
 function renderPreviewFailure(title, copy, state = 'preview_unavailable') {
   root.dataset.readingRouteState = state;
@@ -529,16 +524,9 @@ function activatePreviewReading(preview) {
   const completionCopy = document.querySelector('[data-reading-completion-copy]');
   const chatLink = document.querySelector('[data-reading-chat-link]');
   const recordsLink = document.querySelector('[data-reading-records-link]');
+  const recordsLinkLabel = document.querySelector('[data-reading-completion-secondary-label]');
   const replayButton = document.querySelector('[data-reading-replay]');
   let completed = false;
-
-  function handoffUrl(path) {
-    const next = new URL(path, window.location.href);
-    next.searchParams.set('from', 'reading');
-    next.searchParams.set('topic', route.topic);
-    next.searchParams.set('scope', route.scope);
-    return `${next.pathname.replace(/^\//, '')}${next.search}`;
-  }
 
   function completeReadingExperience() {
     completed = true;
@@ -550,10 +538,13 @@ function activatePreviewReading(preview) {
     // Reading-to-Chat continuation claim. General Chat remains independently selectable.
     if (chatLink) chatLink.setAttribute('href', 'chat-hub.html');
     if (recordsLink) {
-      recordsLink.setAttribute(
-        'href',
-        isStoredRecord ? 'records.html?tab=saju' : handoffUrl('records.html?tab=saju'),
-      );
+      // A live Preview does not create a persisted Official Reading.
+      recordsLink.setAttribute('href', isStoredRecord ? 'records.html?tab=saju' : 'reading.html');
+    }
+    if (recordsLinkLabel) {
+      recordsLinkLabel.textContent = readingSceneProgressV1(activeIndex, steps.length, {
+        hasStructure: false, hasSupporting: false,
+      }, isStoredRecord, getUiLocale()).recordsLinkLabel;
     }
   }
 
@@ -571,16 +562,14 @@ function activatePreviewReading(preview) {
     if (!step) return;
     const structureParts = [...step.structure, ...step.supporting];
 
-    if (progressLabel) progressLabel.textContent = `읽기 ${activeIndex + 1} / ${steps.length}`;
+    const ui = readingSceneProgressV1(activeIndex, steps.length, {
+      hasStructure: step.structure.length > 0,
+      hasSupporting: step.supporting.length > 0,
+    }, isStoredRecord, getUiLocale());
+    if (progressLabel) progressLabel.textContent = ui.progress;
     if (stepTitle) stepTitle.textContent = step.title;
     if (stepBody) stepBody.textContent = step.primary;
-    if (structureTitle) {
-      structureTitle.textContent = step.structure.length > 0
-        ? '이 해석의 사주 근거'
-        : step.supporting.length > 0
-          ? '함께 볼 포인트'
-          : '이 해석을 읽는 기준';
-    }
+    if (structureTitle) structureTitle.textContent = ui.structureTitle;
     if (structureBody) {
       structureBody.textContent = structureParts.length > 0
         ? structureParts.join('\n\n')
@@ -589,14 +578,12 @@ function activatePreviewReading(preview) {
     if (readerLine) readerLine.textContent = `${step.title} 항목을 확인합니다.`;
     if (readerComment) readerComment.textContent = previewCommentForStep();
     if (authorityNote) {
-      authorityNote.textContent = isStoredRecord
-        ? '기록 · 당시 저장된 공식 사주 풀이를 그대로 다시 읽고 있습니다.'
-        : 'Preview · 연구 검증 중인 원국 해석이며 확정적 미래 예측은 포함하지 않습니다.';
+      authorityNote.textContent = ui.authorityNote;
       if (preview.notice) authorityNote.title = preview.notice;
     }
     if (previousButton) previousButton.disabled = activeIndex === 0;
     if (nextButton) nextButton.disabled = false;
-    if (nextLabel) nextLabel.textContent = activeIndex >= steps.length - 1 ? '읽기 마치기' : '다음 읽기';
+    if (nextLabel) nextLabel.textContent = ui.nextLabel;
     renderProgressDots(steps.length, activeIndex);
   }
 
@@ -615,6 +602,10 @@ function activatePreviewReading(preview) {
     renderStep();
   });
   replayButton?.addEventListener('click', replayReadingExperience);
+  document.addEventListener('myeongha:localechange', () => {
+    renderStep();
+    if (completed) completeReadingExperience();
+  });
 
   root.dataset.readingRouteState = isStoredRecord ? 'persisted_record' : 'preview';
   root.dataset.previewReaderVoice = 'disabled';
@@ -623,6 +614,10 @@ function activatePreviewReading(preview) {
   else delete root.dataset.readingRecordMode;
   if (routeState) routeState.hidden = true;
   if (stage) stage.hidden = false;
+  if (completionCopy && !isStoredRecord) {
+    completionCopy.textContent =
+      '이 프리뷰는 공식 풀이 기록에 저장되지 않습니다. 다른 사주 읽기는 사주 페이지에서 선택할 수 있습니다.';
+  }
   if (isStoredRecord) {
     clearPersistedReadingPresentation();
     if (stage) stage.setAttribute('aria-label', '저장된 공식 사주 풀이');
@@ -683,6 +678,7 @@ async function loadPersistedReading() {
       method: 'GET',
       headers: {
         Accept: 'application/json',
+        'Accept-Language': getUiLocale(),
         Authorization: `Bearer ${activeBearer.token}`,
       },
       credentials: 'same-origin',
@@ -784,6 +780,7 @@ async function loadPreviewReading() {
       method: 'POST',
       headers: {
         Accept: 'application/json',
+        'Accept-Language': getUiLocale(),
         Authorization: `Bearer ${activeBearer.token}`,
         'Content-Type': 'application/json',
       },

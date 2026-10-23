@@ -1,5 +1,8 @@
 # PR feedback and pre-merge integration
 
+> **2026-10-16 병렬 트랙 운영 규칙:** [PR 헤드 고정·통합 CI 중복 방지 프로토콜](./parallel-track-frozen-head-protocol-20261016.md)이 현재 운영 기준이다. main 보호 ruleset은 현재 `strict_required_status_checks_policy=false`이다. **다른 트랙이 main을 변경했다고 PR 브랜치를 재베이스하지 않는다.** 본문의 2026-10-01 staged-mode strict 활성화 절차는 역사적/미활성화 계획이며 현재 병렬 개발 운영 지침을 대체하지 않는다. 실제 PR head가 바뀌거나 충돌/공유 의존 영향이 있을 때만 새 후보 테스트를 실시한다. `request-integration.mjs`는 동일 PR/HEAD의 대기·실행·성공 CI가 있으면 재라벨하지 않는다.
+
+
 ## Branch validation (2026-10-01)
 
 - Targeted admission/actual Git assembly/selection regressions: 31 tests passed.
@@ -30,8 +33,11 @@ the default branch. Submit through the local command below. It adds the dedicate
 ci-integration-ready label to trigger pull_request:labeled. It pins both the
 head and current default-branch SHA, checks attribution before allocating the
 full regression, merges that base into the checked-out head in isolated runners,
-runs the existing CI as a reusable workflow, and rechecks head/base before
-`CI Integration Verify` succeeds. A conflict or changed SHA fails closed.
+runs the existing CI as a reusable workflow, and rechecks the **PR head** before
+`CI Integration Verify` succeeds. Submitted base remains the tested snapshot;
+advancing default-branch HEAD alone is allowed by the currently configured loose
+freshness policy and is not grounds for rewriting the PR branch. An actual PR
+head change or a conflicting candidate fails closed.
 No branch is pushed and no PR is merged by these scripts.
 
 From an authenticated local checkout:
@@ -53,10 +59,10 @@ The whole integration workflow queues one regression at a time with
 `queue: max` and `cancel-in-progress: false`. Up to 100 pending runs are supported;
 a full queue cancels additional requests. Waiting runs do not hold a runner.
 This is repository-scoped. It does not reserve a runner or enforce a shared
-account-wide limit across producers. Stale requests fail admission and must be
-resubmitted against a fresh head/base; arbitrary inflight deployments are not
-cancelled. A duplicate manual request is still another run, so operators should
-not repeatedly submit the same candidate.
+account-wide limit across producers. Requests whose **PR head actually changed** fail admission and require a new candidate.
+Advancing `main` alone is not a stale-head failure under current loose freshness.
+The request helper prevents duplicate submissions for the same PR/head while a run
+is pending/running or already successful. Arbitrary inflight deployments are not cancelled.
 
 ## Activation and rollback
 
@@ -70,15 +76,20 @@ See [GitHub required-check event restrictions](https://docs.github.com/en/pull-r
 2. Confirm its eligible PR-event check appears in PR checks and the ruleset, not main or
    another commit; verify successful, intentionally failed, conflicting and
    stale candidates and multiple queued requests in GitHub.
-3. Add `CI Integration Verify` bound to GitHub Actions (App ID 15368) to main's
-   existing required checks, retaining all current contexts. Require strict
-   up-to-date checks; this is necessary to prevent a passed old-base candidate
-   remaining mergeable after main advances. It may require PR branch updates.
+3. **Historical staged activation plan only (not an instruction to change the current ruleset):**
+   maintain `CI Integration Verify` bound to GitHub Actions App ID 15368 alongside
+   existing required checks. The live production ruleset currently uses
+   `strict_required_status_checks_policy=false` to permit stable-head parallel work.
+   Enabling strict freshness or changing required contexts is a separate Owner/governance
+   decision and is incompatible with the frozen-head workflow without redesign.
 4. Verify open PRs have current required evidence, then enable
    `CI_STAGED_VERIFICATION=true`. The PR workflow rejects this mode unless both
    the integration requirement and strict policy are visible through GitHub.
-5. Before every merge, verify the exact current head/base, all required checks
-   and mergeability. Require BLOCKED before integration and CLEAN after a successful
+5. Before every merge, verify the **unchanged PR head**, the latest main SHA,
+   GitHub mergeability and all required checks. The submitted base is the tested
+   snapshot, not necessarily the current default-branch tip. If new main changes
+   alter shared/security-sensitive contracts, do not claim the old combination
+   was tested; obtain a new integration result. Require BLOCKED before integration and CLEAN after a successful
    integration with all other checks current. Existing main and deployment verification remain.
 
 Rollback: disable the variable first to restore full PR regression where

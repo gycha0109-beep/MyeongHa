@@ -10,6 +10,8 @@ const authoritativePrivacyRunnerPath =
   'scripts/operations/run-restored-postgres-authoritative-privacy-replay.sh';
 const evidenceRunnerPath = 'scripts/operations/build-postgres-restore-evidence.sh';
 const harnessPath = 'scripts/run-postgres-isolated-restore-drill.sh';
+const relationshipProofPath = 'scripts/operations/seyeon-relationship-isolated-restore-proof.sql';
+const creatorDefaultAclPath = 'scripts/operations/prepare-postgres-isolated-restore-function-defaults.sql';
 const portableReplayPath = 'scripts/build-postgres-portable-data-replay.mjs';
 const privacySyntheticPath = 'scripts/run-postgres-privacy-reconciliation-synthetic-drill.sh';
 const runbookPath = 'docs/operations/POSTGRES_BACKUP_RESTORE_RUNBOOK_V1.md';
@@ -37,6 +39,8 @@ const [
   portableReplay,
   privacySynthetic,
   runbook,
+  relationshipProof,
+  creatorDefaultAcl,
 ] = await Promise.all([
   readFile(workflowPath, 'utf8'),
   readFile(sourceResolverPath, 'utf8'),
@@ -48,6 +52,8 @@ const [
   readFile(portableReplayPath, 'utf8'),
   readFile(privacySyntheticPath, 'utf8'),
   readFile(runbookPath, 'utf8'),
+  readFile(relationshipProofPath, 'utf8'),
+  readFile(creatorDefaultAclPath, 'utf8'),
 ]);
 
 function requireFragment(text, fragment, source) {
@@ -97,6 +103,8 @@ for (const fragment of [
   'artifact-ids: ${{ steps.privacy-source.outputs.ledger_artifact_id }}',
   'artifact-ids: ${{ steps.privacy-source.outputs.canary_artifact_id }}',
   'run: bash scripts/operations/run-restored-postgres-authoritative-privacy-replay.sh',
+  'seyeon_early_history_restore_proof=\\(.seyeon_early_history_restore_proof)',
+  'seyeon_early_functions_restore_proof=\\(.seyeon_early_functions_restore_proof)',
   '${{ runner.temp }}/restore-evidence/*.json',
   'retention-days: 30',
   "echo 'authoritative_privacy_reconciliation=production_nonzero_captured_window_replay_proven'",
@@ -135,8 +143,15 @@ if (onSection.includes('push:')) {
   const seyeonIncident = onSection.includes(
     "'.github/ops/postgres-restore-seyeon-20261008090417.once'",
   );
-  if (legacy1310 === seyeonIncident) {
-    throw new Error('Restore one-shot push must have exactly one governed source marker.');
+  const latestOwnerApproved = onSection.includes(
+    "'.github/ops/postgres-restore-backup-39067271230-20261018.once'",
+  );
+  if (legacy1310 || !seyeonIncident || !latestOwnerApproved) {
+    throw new Error('Restore one-shot push must have only the two reviewed historical/current source markers.');
+  }
+  const triggerMarkers = onSection.split('\n').filter((line) => line.includes('.github/ops/') && line.includes('.once\''));
+  if (triggerMarkers.length !== 2) {
+    throw new Error('Restore one-shot push allows exactly two pinned marker paths.');
   }
   for (const fragment of ['branches:', '- main']) {
     requireFragment(onSection, fragment, workflowPath);
@@ -149,6 +164,10 @@ if (onSection.includes('push:')) {
     'Gate one-shot Se-yeon current-frontier restore marker',
     'POSTGRES-RESTORE-SEYEON-20261008090417-V1',
     "ops(dr): one-shot restore backup 38088591661 (#1947)",
+    "ops(dr): one-shot restore backup 39067271230",
+    'POSTGRES-RESTORE-BACKUP-39067271230-20261018-V1',
+    'backup_run_id=39067271230',
+    'incident_reference_utc=2026-10-18T08:00:00Z',
     'now - point <= 14400',
     'backup_run_id=38088591661',
     'incident_reference_utc=2026-10-10T21:44:36Z',
@@ -206,12 +225,74 @@ for (const fragment of [
   'target-copy-catalog.json',
   'node scripts/build-postgres-portable-data-replay.mjs',
   'auth.users',
+  'prepare-postgres-isolated-restore-function-defaults.sql',
+  'PASS_SEYEON_ISOLATED_CREATOR_FUNCTION_DEFAULT_ACL',
+  'HOLD_SEYEON_RESTORE: exact scoped relationship restore proof failed.',
+  'seyeon-relationship-isolated-restore-proof.sql',
+  'seyeon_early_history_restore_proof: $seyeon_early_history_restore_proof',
+  'seyeon_early_functions_restore_proof: $seyeon_early_functions_restore_proof',
+  'supabase_managed_migration_ledger_fully_restored: false',
+  'not_captured_in_source_backup',
+  'restored_scoped_version_name_snapshot_6_pass',
+  'restored_public_function_catalog_11_and_rls_6_pass',
   'subject_auth_user_referential_integrity: "pass"',
   'restore_target: "github-actions-loopback-supabase-postgres"',
   'dr_ready: false',
 ]) {
   requireFragment(harness, fragment, harnessPath);
 }
+
+// The isolated principal's function ACL defaults must be normalized *before*
+// schema creation; neither Production nor already-created RPC ACL is touched.
+for (const fragment of [
+  'ALTER DEFAULT PRIVILEGES REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC',
+  'ALTER DEFAULT PRIVILEGES IN SCHEMA public',
+  'REVOKE EXECUTE ON FUNCTIONS FROM anon, authenticated',
+  'ALTER DEFAULT PRIVILEGES REVOKE ALL PRIVILEGES ON TABLES FROM PUBLIC',
+  'REVOKE ALL PRIVILEGES ON TABLES FROM anon, authenticated',
+  'HOLD_SEYEON_RESTORE: creator retains PUBLIC/anon/authenticated default table privileges',
+  'HOLD_SEYEON_RESTORE: creator retains PUBLIC/anon/authenticated default function EXECUTE',
+  'PASS_SEYEON_ISOLATED_CREATOR_FUNCTION_DEFAULT_ACL',
+]) {
+  requireFragment(creatorDefaultAcl, fragment, creatorDefaultAclPath);
+}
+for (const forbidden of [
+  'REVOKE ALL ON FUNCTION',
+  'GRANT EXECUTE ON FUNCTION',
+  'ALTER FUNCTION',
+  'REVOKE ALL PRIVILEGES ON TABLE public.relationship_history_entries',
+  'supabase_migrations.schema_migrations',
+]) {
+  forbidFragment(creatorDefaultAcl, forbidden, creatorDefaultAclPath);
+}
+if (!(harness.indexOf('prepare-postgres-isolated-restore-function-defaults.sql')
+  < harness.indexOf('--file "$work_dir/schema.sql"'))) {
+  throw new Error('Creator default ACL must be guarded before schema replay.');
+}
+for (const fragment of [
+  "has_table_privilege('anon',c.oid,'SELECT,INSERT,UPDATE,DELETE')",
+  "has_table_privilege('authenticated',c.oid,'SELECT,INSERT,UPDATE,DELETE')",
+  'c.relrowsecurity AS rls_enabled',
+]) {
+  requireFragment(harness, fragment, harnessPath);
+}
+
+// The scoped proof must query the actual restored pg_proc/RLS catalog, not
+// invent a full provider-managed migration ledger from the source frontier.
+for (const fragment of [
+  "CREATE TEMP TABLE seyeon_restored_early_history",
+  "jsonb_to_recordset(:'seyeon_history_json'::jsonb)",
+  "pg_catalog.pg_proc",
+  "pg_catalog.pg_class",
+  "HOLD_SEYEON_RESTORE: restored function catalog missing or overloaded",
+  "HOLD_SEYEON_RESTORE: relationship RLS or browser table ACL mismatch",
+  "PASS_SEYEON_RESTORED_EARLY_HISTORY_SNAPSHOT_6_FUNCTIONS_11_RLS_6",
+  "ROLLBACK;",
+]) {
+  requireFragment(relationshipProof, fragment, relationshipProofPath);
+}
+forbidFragment(relationshipProof, 'INSERT INTO supabase_migrations.schema_migrations', relationshipProofPath);
+forbidFragment(relationshipProof, 'ALTER ROLE', relationshipProofPath);
 
 for (const fragment of [
   'myeongha-postgres-portable-data-replay-v2',

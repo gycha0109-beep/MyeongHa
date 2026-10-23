@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "seyeon-r2-g-protected-metadata-v1",
+  "source": "2026-10-14-production-readonly",
+  "snapshot": {
+    "schemaVersion": "seyeon-r2-g-manifest-rpc-parity-v1",
+    "postgresMajor": 17,
+    "functionCount": 1,
+    "ownerSha256": "a942b37ccfaf5a813b1432caa209a43b9d144e47ad0de1549c289c253e556cd5",
+    "ddlSha256": "9ee20f7c1e25664b22518e200c0a81d003150da795da7f0912a31f0479dcda82",
+    "rawAclSha256": "9e4317343b272ea87c09d736a75a9183e021b5b0cf82b27436d7e3903f32e93d",
+    "canonicalGrantsSha256": "87c96523cf69d4787b74054ee4e58f5ced9893a08af0bc16f2d9681c2e6a5926",
+    "grantEdges": 2,
+    "securityInvoker": true,
+    "apiExecutorExecute": true,
+    "serviceRoleExecute": false,
+    "anonExecute": false,
+    "authenticatedExecute": false,
+    "originEstablished": false,
+    "authorizedForProduction": false,
+    "drReady": false
+  },
+  "approval": "HOLD_OWNER_PRIVATE_SOURCE_AUDIT"
+}
