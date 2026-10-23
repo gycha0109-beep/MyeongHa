@@ -511,6 +511,10 @@ async function submitBirthProfile(event) {
     const calculation = await calculateSaju(token);
     const profile = await readBirthProfile(token, receipt.birthProfileId);
     renderCalculation(calculation, profile);
+    // The first successful Birth -> Canonical calculation now opens the real
+    // admitted General Natal Preview, rather than stopping at chart facts.
+    // The destination obtains fresh server-side identity and Birth authority.
+    window.location.assign('reading-detail.html?topic=temperament&scope=original');
   } catch (error) {
     if (error?.status === 401) {
       handleUnauthorized(activeBearer);
@@ -537,7 +541,7 @@ async function submitBirthProfile(event) {
     setFormError('사주 입력을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.');
   } finally {
     button.disabled = false;
-    label.textContent = '내 사주 만들기';
+    label.textContent = '사주 만들고 풀이 보기';
   }
 }
 

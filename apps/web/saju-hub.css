@@ -377,3 +377,12 @@
   .saju-pillar { min-height: 118px; }
   .saju-pillar-value strong { font-size: 25px; }
 }
+
+/* The current birth profile has a direct, non-paid General Natal Preview entry. */
+.gm-saju-start-reading {
+  width: fit-content;
+  max-width: 100%;
+  padding: 0 18px;
+  margin: 14px 0;
+  text-decoration: none;
+}

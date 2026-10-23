@@ -80,7 +80,7 @@ export function ReadingPage() {
 
             <div className="saju-form-error" id="saju-form-error" hidden role="alert" />
             <button className="saju-primary-button" id="saju-create-button" type="submit">
-              <span>내 사주 만들기</span><span aria-hidden="true">→</span>
+              <span>사주 만들고 풀이 보기</span><span aria-hidden="true">→</span>
             </button>
             <p className="saju-guest-note"><span aria-hidden="true">◇</span> 게스트로 먼저 볼 수 있으며, 저장·동기화가 필요할 때 계정 연결을 사용합니다.</p>
           </form>
@@ -92,6 +92,9 @@ export function ReadingPage() {
           <div className="gm-saju-hero-copy">
             <h2 className="gm-saju-title" id="gm-saju-profile-title">나의 명식</h2>
             <p className="gm-saju-summary" id="saju-birth-summary">현재 자기 Birth Profile과 연결된 계산 결과입니다.</p>
+            <a className="saju-primary-button gm-saju-start-reading" href="reading-detail.html?topic=temperament&scope=original">
+              <span>전체 사주 풀이 바로 보기</span><span aria-hidden="true">→</span>
+            </a>
             <details className="gm-chart-details">
               <summary>기본 정보 보기 →</summary>
               <div className="gm-chart-panel">
