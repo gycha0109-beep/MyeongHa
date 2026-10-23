@@ -214,6 +214,14 @@
 - `test/mobile-chat-header-ui-locale-v1.test.ts`는 3개 UI 언어, 원본 캐릭터 목록과 표시 정보 보존 및 실제 화면 소비 지점을 회귀 고정한다. 기존 Chat 기록 UI 회귀 `test/mobile-chat-history-shell-locale-v1.test.ts`에도 새 UI 라벨을 포함했다. 모든 Node 소스 확인 테스트는 루트 `test/`에 둔다.
 - 미승인 JA/ZH-TW 생성형 Character 대화, 개별 화법, 공식 Reading 재언어화와 공개 Reader Scene 연계는 여전히 별도 소유자 승인 전 HOLD다.
 
+### 7.12 I18N-07 / EN-UI-A / CN-UI-A 1차 구현 — 영어·간체 비활성 언어 선택 준비
+
+- 사용자 승인 로드맵 v2.2 (PR #2430)는 `en-US`, `zh-CN`을 **신규 5개 목표 UI 언어의 추가 2개**로 정의한다. 그러나 기존 웹/모바일 UI authored 사전 및 API 실제 수용은 아직 `ko-KR`, `ja-JP`, `zh-TW` 3개뿐이다. 미작성 문자열을 영어·간체로 잘못 주장하지 않도록 **첫 구현 단위에서 후보만 UI에 등록하고 실제 선택·저장·요청은 열지 않았다.**
+- `apps/web/ui-i18n.js`의 `PLANNED_UI_LOCALES` 및 `apps/mobile/src/ui/mobile-ui-copy.ts`의 `PLANNED_MOBILE_UI_LOCALES`에 정확히 `en-US`/`zh-CN`을 등록한다. 웹 `createLanguagePicker`에는 비활성 `option.disabled = true`를, 모바일 `MyLocaleSelector`에는 `disabled`/accessibility disabled 상태를 표시한다. 기존 3개 언어 선택, storage key, locale normalize, API `X-MyeongHa-UI-Locale` allowlist, Korean-first fallback은 그대로 보존한다.
+- `apps/web/ui-i18n.d.ts`에 비활성 후보 타입을 선언한다. `test/i18n-en-us-zh-cn-ui-stage-gates.test.ts`에서 웹/모바일 목표 목록 동등, 신규 후보에서 실제 normalize·API 헤더가 한국어로 닫히는지, 기존 3개 UI 계약 및 Chat/공식 Reader Source·HOLD·출력 미승인을 회귀 고정한다.
+- **후속 실제 구현(로드맵 EN-UI-A/B/C, CN-UI-A/B/C):** 영어·간체의 독립 저자 UI 사전, 웹·모바일 각 화면별 문구·접근성 및 오류·HOLD, API 헤더 허용, 저장·재시작 복원, 혼합 원문/진행 중 전환/재시도 회귀를 묶어 실제 선택을 활성화한다. 비활성 후보 등록만으로 영어·간체 언어가 지원되었다고 보고할 수 없다.
+- **기존 승인 경계:** Reader `responseVoiceLocale`, Character speech/delta, 공식 Saju/Face 출력·소급 번역 ②, 결제·판매/중국 본토 운영 등은 **각 Source/Character/Reader/Ops 소유자 승인 전 HOLD**이며 이 작업에서 전혀 활성화하지 않는다.
+
 ## 8. 다음 구현 작업 및 승인 위치
 
 1. **캐릭터 설계 owner:** 위 6명 차이를 실제 Bible/typed Runtime 간에 해결하고 authoritative source/version을 확정. 이 I18N 트랙은 제안·인계만, 원본 수정 금지.
