@@ -1,4 +1,5 @@
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
+import { plannedMobileUiPreviewLocaleV1, previewMobileAuthoredUiLabelV1 } from '@/ui/mobile-planned-ui-screen-preview-v1';
 import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { resolveMobileChatCharacterPresentationV1 } from '@/features/chat/chat-character-presentation';
@@ -18,6 +19,9 @@ import { useMobilePullRefreshV1 } from '@/ui/use-mobile-pull-refresh';
 export default function ChatHubScreen() {
   const styles = useMobileThemedStyles(staticStyles);
   const { t } = useMobileUiLocale();
+  const { uiPreview } = useLocalSearchParams<{ uiPreview?: string | string[] }>();
+  const previewLocale = plannedMobileUiPreviewLocaleV1(uiPreview, __DEV__);
+  const previewText = (source: string) => previewMobileAuthoredUiLabelV1(source, previewLocale, t);
   const { state, openCharacter, refreshAccess } = useMobileChatOpenV1();
   const { refreshing, onRefresh } = useMobilePullRefreshV1(refreshAccess);
 
@@ -31,7 +35,7 @@ export default function ChatHubScreen() {
   return (
     <MobileScreen
       eyebrow="MEET THE CHARACTERS"
-      title={t('대화')}
+      title={previewText('대화')}
       description={t('저마다 다른 목소리로, 당신의 이야기를 들어줄 연결자들을 만나보세요.')}
       refreshing={refreshing}
       onRefresh={() => void onRefresh()}
@@ -41,19 +45,19 @@ export default function ChatHubScreen() {
           <Text style={styles.kicker}>THE PEOPLE OF MYEONGHA</Text>
           <Text style={styles.introCounter}>{t('연결자 {count}명').replace('{count}', String(MOBILE_CHAT_LAUNCH_ROSTER_V1.length))}</Text>
         </View>
-        <MobileUiText style={styles.title}>당신은 누구와 이야기하고 싶으신가요?</MobileUiText>
+        <MobileUiText style={styles.title}>{previewText("당신은 누구와 이야기하고 싶으신가요?")}</MobileUiText>
         <MobileUiText style={styles.body}>
-          마음이 가는 인물을 고르세요. 각 연결자의 이야기와 분위기가 다릅니다.
+          {previewText("마음이 가는 인물을 고르세요. 각 연결자의 이야기와 분위기가 다릅니다.")}
         </MobileUiText>
         <MobileUiText style={styles.note}>대화 열기는 회원 로그인 후 가능합니다. 일부 AI 답변과 기존 기록은 현재 이용이 제한될 수 있습니다.</MobileUiText>
         {state.access === 'checking' ? (
           <View style={styles.centerState}>
             <ActivityIndicator color={mobileColors.navy} />
-            <MobileUiText style={styles.note}>회원 상태를 확인하는 중입니다…</MobileUiText>
+            <MobileUiText style={styles.note}>{previewText("회원 상태를 확인하는 중입니다…")}</MobileUiText>
           </View>
         ) : state.access === 'guest' ? (
           <Pressable accessibilityRole="button" onPress={() => router.push('/my')} style={styles.loginAction}>
-            <MobileUiText style={styles.loginActionText}>로그인 후 대화하기  →</MobileUiText>
+            <MobileUiText style={styles.loginActionText}>{previewText("로그인 후 대화하기  →")}</MobileUiText>
           </Pressable>
         ) : state.access === 'error' ? (
           <Text style={styles.errorText}>{state.errorMessage}</Text>
@@ -75,7 +79,7 @@ export default function ChatHubScreen() {
               accessibilityState={{ disabled }}
               disabled={disabled}
               onPress={() => void handleOpen(character.characterId)}
-              accessibilityLabel={`${character.displayName}, ${t(presentation.title)}, ${t(featured ? 'AI 서비스 상태 확인 필요' : 'AI 답변 준비 중')}, ${t(canOpen ? '대화방 열기' : '로그인 필요')}`}
+              accessibilityLabel={`${character.displayName}, ${t(presentation.title)}, ${previewText(featured ? 'AI 서비스 상태 확인 필요' : 'AI 답변 준비 중')}, ${previewText(canOpen ? '대화방 열기' : '로그인 필요')}`}
               style={({ pressed }) => [
                 styles.characterCard,
                 featured && styles.featuredCard,
@@ -103,7 +107,7 @@ export default function ChatHubScreen() {
                   {featured ? (
                     <View pointerEvents="none" style={styles.featuredImageCopy}>
                       <MobileUiText style={styles.featuredCharacterName}>세연</MobileUiText>
-                      <MobileUiText style={styles.featuredImageLine}>오늘의 이야기를 함께할 연결자</MobileUiText>
+                      <MobileUiText style={styles.featuredImageLine}>{previewText("오늘의 이야기를 함께할 연결자")}</MobileUiText>
                     </View>
                   ) : null}
                 </View>
@@ -116,11 +120,11 @@ export default function ChatHubScreen() {
                     {t(presentation.openingLine)}
                   </Text>
                   <Text style={[styles.characterStatus, featured && styles.featuredMutedText]}>
-                    {t(featured ? '이용 상태는 대화방에서 확인' : 'AI 답변 준비 중 · 기록 열람 가능')}
+                    {previewText(featured ? '이용 상태는 대화방에서 확인' : 'AI 답변 준비 중 · 기록 열람 가능')}
                   </Text>
                   <View style={[styles.characterActionWrap, featured && styles.featuredActionWrap]}>
                     <Text style={[styles.characterAction, featured && styles.featuredActionText, !canOpen && styles.actionUnavailable]}>
-                      {t(opening ? '여는 중…' : canOpen ? '대화방 열기  →' : '로그인 후 열기  →')}
+                      {previewText(opening ? '여는 중…' : canOpen ? '대화방 열기  →' : '로그인 후 열기  →')}
                     </Text>
                   </View>
                 </View>
@@ -136,8 +140,8 @@ export default function ChatHubScreen() {
 
       <View style={styles.pendingSection}>
         <Text style={styles.kicker}>COMING SOON</Text>
-        <MobileUiText style={styles.pendingTitle}>연결자 등록 중</MobileUiText>
-        <MobileUiText style={styles.note}>조금 더 준비가 필요한 인물들입니다. 현재 대화는 열 수 없습니다.</MobileUiText>
+        <MobileUiText style={styles.pendingTitle}>{previewText("연결자 등록 중")}</MobileUiText>
+        <MobileUiText style={styles.note}>{previewText("조금 더 준비가 필요한 인물들입니다. 현재 대화는 열 수 없습니다.")}</MobileUiText>
         <View style={styles.pendingList}>
           {MOBILE_CHAT_PENDING_ROSTER_V1.map((character) => {
             const presentation = resolveMobileChatCharacterPresentationV1(character.characterId);
@@ -146,7 +150,7 @@ export default function ChatHubScreen() {
                 <View style={styles.pendingMark}><Text style={styles.pendingMarkText}>◇</Text></View>
                 <View style={styles.pendingCopy}>
                   <Text style={styles.pendingName}>{character.displayName} <Text style={styles.pendingRole}>· {t(presentation.title)}</Text></Text>
-                  <MobileUiText style={styles.note}>캐릭터 소개 준비 중</MobileUiText>
+                  <MobileUiText style={styles.note}>{previewText("캐릭터 소개 준비 중")}</MobileUiText>
                 </View>
                 <MobileUiText style={styles.pendingPill}>등록 중</MobileUiText>
               </View>

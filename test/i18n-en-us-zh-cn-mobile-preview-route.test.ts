@@ -46,4 +46,34 @@ describe('I18N-07 Expo developer-only Saju UI preview boundary', () => {
     expect(source).not.toContain('setLocale(');
     expect(source).not.toContain('X-MyeongHa-UI-Locale');
   });
+  it('keeps Face and Chat Hub route previews strictly development-only and static', async () => {
+    const [faceRoute, chatRoute] = await Promise.all([
+      readFile(new URL('../apps/mobile/src/app/(tabs)/reading/face.tsx', import.meta.url), 'utf8'),
+      readFile(new URL('../apps/mobile/src/app/(tabs)/chat/index.tsx', import.meta.url), 'utf8'),
+    ]);
+    for (const source of [faceRoute, chatRoute]) {
+      expect(source).toContain('plannedMobileUiPreviewLocaleV1(uiPreview, __DEV__)');
+      expect(source).not.toContain('setLocale(');
+      expect(source).not.toContain('X-MyeongHa-UI-Locale');
+    }
+    expect(faceRoute).toContain('previewText(\'관상\')');
+    expect(faceRoute).toContain('previewText("사진을 준비해 주세요")');
+    expect(faceRoute).toContain('previewText("전면 카메라로 정면 사진 촬영")');
+    expect(faceRoute).toContain("source={{ uri: ready.uri }}");
+    expect(faceRoute).toContain("message: result.reason");
+    expect(faceRoute).toContain('pickMobileFaceMediaFromLibraryV1');
+    expect(chatRoute).toContain('previewText(\'대화\')');
+    expect(chatRoute).toContain('previewText("로그인 후 대화하기  →")');
+    expect(chatRoute).toContain('MOBILE_CHAT_LAUNCH_ROSTER_V1.map');
+    expect(chatRoute).toContain('character.displayName');
+    expect(chatRoute).toContain('state.errorMessage');
+    expect(chatRoute).toContain('openCharacter(characterId)');
+    const tr = (source: string) => 'active:' + source;
+    expect(previewMobileAuthoredUiLabelV1('관상', 'en-US', tr)).toBe('Face reading');
+    expect(previewMobileAuthoredUiLabelV1('사진을 준비해 주세요', 'zh-CN', tr)).toBe('请准备照片');
+    expect(previewMobileAuthoredUiLabelV1('대화', 'en-US', tr)).toBe('Chat');
+    expect(previewMobileAuthoredUiLabelV1('로그인 후 대화하기  →', 'zh-CN', tr)).toBe('登录后对话 →');
+    expect(previewMobileAuthoredUiLabelV1('관상', null, tr)).toBe('active:관상');
+  });
+
 });

@@ -342,3 +342,9 @@
 
 - 모바일 `(tabs)/reading/index.tsx`에서 Expo 개발 모드와 단일 `uiPreview` 파라미터가 일치할 때에만 기존 비활성 영어·간체 사전의 **6개 정적 안내/상태/버튼 UI 라벨**을 사용한다. 운영에서는 이전 `useMobileUiLocale().t`와 `MobileUiText`가 지원하던 3개 로케일을 유지한다. 미등록 문구는 기존 활성 로케일 번역으로 유지하며 조작/권한/출처를 새로 만들지 않는다.
 - 새 순수 함수 `mobile-planned-ui-screen-preview-v1.ts` 및 `test/i18n-en-us-zh-cn-mobile-preview-route.test.ts`가 개발-only 게이트, 사전/fallback, 읽기 계산·라우팅 코드의 불변성을 검증한다. 실제 Android/iOS 앱 스크린샷·접근성·새 언어의 공개 승인은 포함하지 않는다.
+
+### 7.31 EN/CN-UI-C — 모바일 관상 사진 준비·캐릭터 탐색 개발용 미리보기 (2026-10-23)
+
+- 기존 `mobile-planned-ui-screen-preview-v1.ts`의 Expo 개발 전용 단일 `uiPreview` 파라미터를 `(tabs)/reading/face.tsx`와 `(tabs)/chat/index.tsx`에도 연결했다. 인증·사용 권한·출력 헤더·지원 3개 로케일은 변경하지 않고, 화면에 실제 작성된 일반 정적 UI 제목·버튼·접근성 문구만 staged 영어/간체 사전으로 렌더한다.
+- 관상 사진의 실제 URI·메타데이터·권한 요청·카메라/앨범 기능·에러 원문과 캐릭터 ID/이름·사용자 대화/접근 상태·공식 Reading 원문은 번역하거나 변조하지 않는다. 아직 번역이 미확정인 관상 안내 문장은 기존 한국어/활성 UI 언어 표현이 남는다.
+- `test/i18n-en-us-zh-cn-mobile-preview-route.test.ts`에 두 실제 Expo 화면의 개발 전용 gate, 원문/상태·권한 처리 불변과 웹·모바일 사전과 동일한 선택 고정 UI의 영어/간체 출력 확인을 추가했다. 실제 iOS/Android 레이아웃·접근성·로케일 전환·출시는 여전히 미완료다.
