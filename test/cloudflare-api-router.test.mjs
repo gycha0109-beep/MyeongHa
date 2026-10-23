@@ -16,7 +16,7 @@ function request(path, method = 'GET', headers = {}) {
 }
 
 describe('Cloudflare Phase 4 strict API dispatcher', () => {
-  it('matches all 12 real Vercel API entries and 17 rewrites with no widening', async () => {
+  it('matches all 12 real Vercel API entries and 19 rewrites with no widening', async () => {
     const vercel = JSON.parse(await readFile(new URL('../vercel.json', import.meta.url)));
     const direct = [
       '/api/health', '/api/readiness', '/api/session/bootstrap',
@@ -28,9 +28,9 @@ describe('Cloudflare Phase 4 strict API dispatcher', () => {
     expect(CLOUDFLARE_DIRECT_API_ROUTES.map(route => route.path)).toEqual(direct);
     expect(CLOUDFLARE_REWRITE_ROUTES.map(({ source, destination })=>({ source, destination })))
       .toEqual(vercel.rewrites);
-    expect(CLOUDFLARE_REWRITE_ROUTES).toHaveLength(17);
+    expect(CLOUDFLARE_REWRITE_ROUTES).toHaveLength(19);
     expect(new Set(CLOUDFLARE_DIRECT_API_ROUTES.map(route => route.id)).size).toBe(12);
-    expect(new Set(CLOUDFLARE_REWRITE_ROUTES.map(route => route.id)).size).toBe(17);
+    expect(new Set(CLOUDFLARE_REWRITE_ROUTES.map(route => route.id)).size).toBe(19);
     for (const route of CLOUDFLARE_DIRECT_API_ROUTES) {
       const match = matchCloudflareApiRoute(route.path);
       expect(match).toMatchObject({ id: route.id, kind: 'direct' });
@@ -104,6 +104,8 @@ describe('Cloudflare Phase 4 strict API dispatcher', () => {
       ['/api/chat','POST'], ['/api/chat/synthetic-id','GET'],
       ['/api/life-record','GET'], ['/api/readings','GET'], ['/api/memories','GET'],
       ['/api/birth-profiles/synthetic-id','GET'],
+      ['/api/memories/synthetic-id/grants/seyeon','GET'],
+      ['/api/memories/synthetic-id/grants/seyeon/revoke','POST'],
       ['/api/device-installations/register','POST'],
       ['/api/device-installations/synthetic-id/revoke','POST'],
       ['/api/target-persons','GET'], ['/api/target-persons/synthetic-id','GET'],
