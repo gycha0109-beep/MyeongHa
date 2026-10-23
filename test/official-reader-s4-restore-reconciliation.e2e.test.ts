@@ -35,6 +35,10 @@ function fixture(opt:{
   corruptManifest?:boolean;
   noTombstone?:boolean;
   noFences?:boolean;
+  duplicateScope?:boolean;
+  duplicateAccount?:boolean;
+  crossFenceBody?:boolean;
+  crossFenceKey?:boolean;
 }={}) {
   const events:string[]=[];
   let committed=new Set([BODY_A,BODY_B]);
@@ -46,11 +50,20 @@ function fixture(opt:{
     events.push('read-refund');
     return opt.corruptManifest?{...refund,keyRefs:['reader-dek-v1:tampered']}:refund;
   });
-  const accountRead=vi.fn(async()=>{events.push('read-account');return account;});
+  const accountManifest=opt.crossFenceBody
+    ? {...account,bodyIds:[BODY_A]}
+    : opt.crossFenceKey
+      ? {...account,keyRefs:[KEY_A]}
+      : account;
+  const accountRead=vi.fn(async()=>{
+    events.push('read-account');return accountManifest;
+  });
   const store={
     restoreCatalog:{
-      listConfirmedScopeDeletionFences:async()=>opt.noFences?[]:[refund],
-      listAccountDeletionFences:async()=>opt.noFences?[]:[account],
+      listConfirmedScopeDeletionFences:async()=>opt.noFences
+        ? [] : opt.duplicateScope ? [refund,refund] : [refund],
+      listAccountDeletionFences:async()=>opt.noFences
+        ? [] : opt.duplicateAccount ? [accountManifest,accountManifest] : [accountManifest],
       isSubjectTombstoned:async()=>!opt.noTombstone,
     },
     scopeLedger:{readScopeDeletionFence:refundRead,acknowledgeScopeKeyErasure:refundAck},
@@ -195,6 +208,33 @@ describe('Privacy #2318 isolated restore runner rollback and privacy authority',
     expect(x.bodies()).toHaveLength(2);
     expect(x.destroyKey).not.toHaveBeenCalled();
     expect(x.refundAck).not.toHaveBeenCalled();
+  });
+  it('rejects overlapping refund/account body or DEK manifests before DB replay',async()=>{
+    for(const options of [{crossFenceBody:true},{crossFenceKey:true}]) {
+      const x=fixture(options);
+      await expect(x.run()).rejects.toThrow(
+        'Official Reader restored privacy state is unavailable.',
+      );
+      expect(x.events).not.toContain('refund-replay');
+      expect(x.events).not.toContain('account-replay');
+      expect(x.destroyKey).not.toHaveBeenCalled();
+      expect(x.refundAck).not.toHaveBeenCalled();
+      expect(x.accountAck).not.toHaveBeenCalled();
+      expect(x.bodies()).toHaveLength(2);
+    }
+  });
+  it('rejects duplicate external jobs before protected-body deletion',async()=>{
+    for(const options of [{duplicateScope:true},{duplicateAccount:true}]) {
+      const x=fixture(options);
+      await expect(x.run()).rejects.toThrow(
+        'Official Reader restored privacy state is unavailable.',
+      );
+      expect(x.events).not.toContain('refund-replay');
+      expect(x.destroyKey).not.toHaveBeenCalled();
+      expect(x.refundAck).not.toHaveBeenCalled();
+      expect(x.accountAck).not.toHaveBeenCalled();
+      expect(x.bodies()).toHaveLength(2);
+    }
   });
   it('keeps every service off when there are no deleted scopes',async()=>{
     const x=fixture({noFences:true});

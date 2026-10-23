@@ -15,6 +15,8 @@ import {
 export const OFFICIAL_READER_RESTORE_RECONCILIATION_VERSION_V1 =
   'official-reader-offprimary-restore-reconciliation-v1' as const;
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
+
 const ORDINARY_DERIVED_QUARANTINE_GUARD_INSTALLED_SQL = `
 select
   pg_catalog.to_regprocedure(
@@ -273,6 +275,45 @@ export async function reconcileOfficialReaderProtectedBodiesAfterRestoreV1(input
         || exact.keyRefs.some((key, index) => key !== fence.keyRefs[index])
         || !(await input.offPrimary.restoreCatalog.isSubjectTombstoned(fence.subjectId))) {
       return fail();
+    }
+  }
+
+  // All manifests have been individually matched against the independent
+  // ledger. Validate their COMBINED deletion graph before any irreversible
+  // database or key operation. A body/key belongs to one original protected
+  // answer; it must not be replayed by two refund/account fences. Nor may a
+  // duplicated job silently double-ACK or mask an incomplete restore.
+  // The real sealed catalog applies the same per-file bounds; also enforce
+  // the aggregate limit at this injected restore-port boundary.
+  if (refundFences.length + fences.length > 50_000) return fail();
+  const seenJobs = new Set<string>();
+  const seenBodies = new Set<string>();
+  const seenKeys = new Set<string>();
+  for (const item of [
+    ...refundFences.map(fence => ({
+      identity: 'scope:' + fence.jobId,
+      bodyIds: fence.bodyIds,
+      keyRefs: fence.keyRefs,
+    })),
+    ...fences.map(fence => ({
+      identity: 'account:' + fence.subjectId + ':' + fence.deletionJobId,
+      bodyIds: fence.bodyIds,
+      keyRefs: fence.keyRefs,
+    })),
+  ]) {
+    if (seenJobs.has(item.identity) || item.bodyIds.length > 50_000
+        || item.bodyIds.length !== item.keyRefs.length) return fail();
+    seenJobs.add(item.identity);
+    for (const id of item.bodyIds) {
+      if (typeof id !== 'string' || !UUID.test(id)
+          || seenBodies.has(id.toLowerCase())) return fail();
+      seenBodies.add(id.toLowerCase());
+    }
+    for (const ref of item.keyRefs) {
+      if (typeof ref !== 'string' || !ref.startsWith('reader-dek-v1:')
+          || !UUID.test(ref.slice('reader-dek-v1:'.length))
+          || seenKeys.has(ref.toLowerCase())) return fail();
+      seenKeys.add(ref.toLowerCase());
     }
   }
 
