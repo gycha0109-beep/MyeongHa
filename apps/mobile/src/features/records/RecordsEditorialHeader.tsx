@@ -4,6 +4,7 @@ import type { RecordsTabV1 } from '@/features/records/records-view-model';
 import { useMobileTheme } from '@/ui/mobile-theme';
 import { MobileUiText } from '@/ui/MobileUiText';
 import { useMobileUiLocale } from '@/ui/mobile-ui-locale';
+import { previewMobileAuthoredUiLabelV1, type MobilePlannedUiPreviewLocaleV1 } from '@/ui/mobile-planned-ui-screen-preview-v1';
 
 const tabLabels: Readonly<Record<RecordsTabV1, string>> = Object.freeze({
   all: '전체', life: '현세록', readings: '지난 읽기', memories: '기억',
@@ -16,12 +17,15 @@ const tabLabels: Readonly<Record<RecordsTabV1, string>> = Object.freeze({
 export function RecordsEditorialHeader({
   selected,
   itemCount,
+  previewLocale = null,
 }: {
   selected: RecordsTabV1;
   itemCount: number | null;
+  previewLocale?: MobilePlannedUiPreviewLocaleV1 | null;
 }) {
   const { theme } = useMobileTheme();
   const { locale, t } = useMobileUiLocale();
+  const previewText = (source: string) => previewMobileAuthoredUiLabelV1(source, previewLocale, t);
   return (
     <View style={[styles.hero, theme === 'dark' && styles.heroDark]}>
       <View pointerEvents="none" style={styles.innerFrame} />
@@ -29,8 +33,8 @@ export function RecordsEditorialHeader({
         <Text style={styles.stampText}>錄</Text>
       </View>
       <View style={styles.copy}>
-        <MobileUiText style={styles.eyebrow}>MY ARCHIVE · 명하</MobileUiText>
-        <Text style={styles.title}>{t('지나온 이야기에도')}{'\n'}{t('나의 결이 남습니다.')}</Text>
+        <MobileUiText style={styles.eyebrow}>{previewText('MY ARCHIVE · 명하')}</MobileUiText>
+        <Text style={styles.title}>{previewText('지나온 이야기에도')}{'\n'}{previewText('나의 결이 남습니다.')}</Text>
         <MobileUiText style={styles.description}>
           지금 확인할 수 있는 삶의 기록과 사주 풀이를 차분히 살펴보세요.
         </MobileUiText>

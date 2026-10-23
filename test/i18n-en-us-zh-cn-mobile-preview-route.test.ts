@@ -116,4 +116,42 @@ describe('I18N-07 Expo developer-only Saju UI preview boundary', () => {
     expect(plannedMobileUiPreviewLocaleV1('en-US', false)).toBeNull();
   });
 
+  it('previews authored birth and records text in Expo only without touching source data', async () => {
+    const [birthRoute, recordsRoute, recordsHeader] = await Promise.all([
+      readFile(new URL('../apps/mobile/src/app/birth/index.tsx', import.meta.url), 'utf8'),
+      readFile(new URL('../apps/mobile/src/app/(tabs)/records/index.tsx', import.meta.url), 'utf8'),
+      readFile(new URL('../apps/mobile/src/features/records/RecordsEditorialHeader.tsx', import.meta.url), 'utf8'),
+    ]);
+    for (const source of [birthRoute, recordsRoute]) {
+      expect(source).toContain('plannedMobileUiPreviewLocaleV1(uiPreview, __DEV__)');
+      expect(source).not.toContain('X-MyeongHa-UI-Locale');
+      expect(source).not.toContain('setLocale(');
+    }
+    expect(birthRoute).toContain('previewText("‹ 사주로 돌아가기")');
+    expect(birthRoute).toContain('previewText("연도 → 월 → 날짜 순서로 선택할 수 있습니다.")');
+    expect(birthRoute).toContain('buildMobileBirthProfileCreateRequestV1({');
+    expect(birthRoute).toContain('mobileBirthServiceV1.create(request)');
+    expect(birthRoute).toContain('calendarType,');
+    expect(birthRoute).toContain('birthTime,');
+    expect(birthRoute).toContain('sex,');
+    expect(birthRoute).toContain('setTimeKnown(!unknown)');
+    expect(birthRoute).toContain('onPress={() => void submit()}');
+    expect(recordsRoute).toContain("previewText('기록')");
+    expect(recordsRoute).toContain('previewLocale={previewLocale}');
+    expect(recordsRoute).toContain('visibleItems(tab, snapshots)');
+    expect(recordsRoute).toContain('itemCount={initialLoading ? null : items.length}');
+    expect(recordsRoute).toContain('openReading(item.source.readingId)');
+    expect(recordsRoute).toContain('loadMore(tab)');
+    expect(recordsHeader).toContain("previewText('지나온 이야기에도')");
+    expect(recordsHeader).toContain("previewText('나의 결이 남습니다.')");
+    expect(recordsHeader).toContain('t(tabLabels[selected])');
+    expect(recordsHeader).toContain("t('기록을 확인하는 중')");
+    const active = (source: string) => 'active:' + source;
+    expect(previewMobileAuthoredUiLabelV1('출생정보', 'en-US', active)).toBe('Birth details');
+    expect(previewMobileAuthoredUiLabelV1('기록을 불러오는 중입니다…', 'zh-CN', active)).toBe('正在加载记录…');
+    expect(previewMobileAuthoredUiLabelV1('MY ARCHIVE · 명하', 'en-US', active)).toBe('MY ARCHIVE · MyeongHa');
+    expect(previewMobileAuthoredUiLabelV1('나의 결이 남습니다.', null, active))
+      .toBe('active:나의 결이 남습니다.');
+  });
+
 });

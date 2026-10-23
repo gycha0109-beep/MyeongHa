@@ -1,5 +1,6 @@
 import { MyeongHaApiClientErrorV1, type BirthCalendarTypeV1, type BirthSexV1 } from '@myeongha/api-client';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
+import { plannedMobileUiPreviewLocaleV1, previewMobileAuthoredUiLabelV1 } from '@/ui/mobile-planned-ui-screen-preview-v1';
 import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
@@ -40,6 +41,9 @@ const sexOptions = [
 export default function BirthInputScreen() {
   const styles = useMobileThemedStyles(staticStyles);
   const { t } = useMobileUiLocale();
+  const { uiPreview } = useLocalSearchParams<{ uiPreview?: string | string[] }>();
+  const previewLocale = plannedMobileUiPreviewLocaleV1(uiPreview, __DEV__);
+  const previewText = (source: string) => previewMobileAuthoredUiLabelV1(source, previewLocale, t);
   const [calendarType, setCalendarType] = useState<BirthCalendarTypeV1>('solar');
   const [year, setYear] = useState('');
   const [month, setMonth] = useState('');
@@ -153,19 +157,19 @@ export default function BirthInputScreen() {
         )}
       >
         <Pressable accessibilityRole="button" onPress={() => router.back()}>
-          <MobileUiText style={styles.back}>‹ 사주로 돌아가기</MobileUiText>
+          <MobileUiText style={styles.back}>{previewText("‹ 사주로 돌아가기")}</MobileUiText>
         </Pressable>
 
         <View style={styles.header}>
           <Text style={styles.eyebrow}>BIRTH PROFILE</Text>
-          <MobileUiText style={styles.title}>출생정보</MobileUiText>
+          <MobileUiText style={styles.title}>{previewText("출생정보")}</MobileUiText>
           <MobileUiText style={styles.description}>
-            명식을 계산하기 위한 현재 자기 출생정보를 등록합니다.
+            {previewText("명식을 계산하기 위한 현재 자기 출생정보를 등록합니다.")}
           </MobileUiText>
         </View>
 
         <View style={styles.section}>
-          <MobileUiText style={styles.label}>달력</MobileUiText>
+          <MobileUiText style={styles.label}>{previewText("달력")}</MobileUiText>
           <View style={styles.segmentRow}>
             {(['solar', 'lunar'] as const).map((value) => (
               <Pressable
@@ -176,7 +180,7 @@ export default function BirthInputScreen() {
                 style={[styles.segment, calendarType === value && styles.segmentSelected]}
               >
                 <Text style={[styles.segmentText, calendarType === value && styles.segmentTextSelected]}>
-                  {value === 'solar' ? '양력' : '음력'}
+                  {previewText(value === 'solar' ? '양력' : '음력')}
                 </Text>
               </Pressable>
             ))}
@@ -184,10 +188,10 @@ export default function BirthInputScreen() {
         </View>
 
         <View style={styles.section}>
-          <MobileUiText style={styles.label}>생년월일</MobileUiText>
+          <MobileUiText style={styles.label}>{previewText("생년월일")}</MobileUiText>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={t('출생 생년월일 달력 열기')}
+            accessibilityLabel={previewText('출생 생년월일 달력 열기')}
             onPress={() => setDatePickerVisible(true)}
             style={({ pressed }) => [styles.dateButton, pressed && styles.pressed]}
           >
@@ -195,7 +199,7 @@ export default function BirthInputScreen() {
               <Text style={styles.dateIconText}>▦</Text>
             </View>
             <View style={styles.dateCopy}>
-              <Text style={styles.dateHint}>{t(calendarType === 'solar' ? '양력 생년월일' : '음력 생년월일')}</Text>
+              <Text style={styles.dateHint}>{previewText(calendarType === 'solar' ? '양력 생년월일' : '음력 생년월일')}</Text>
               <Text style={[styles.dateValue, !year && styles.datePlaceholder]}>
                 {year && month && day
                   ? year + '년 ' + Number(month) + '월 ' + Number(day) + '일'
@@ -205,7 +209,7 @@ export default function BirthInputScreen() {
             <Text style={styles.dateChevron}>›</Text>
           </Pressable>
           <MobileUiText style={styles.helper}>
-            연도 → 월 → 날짜 순서로 선택할 수 있습니다.
+            {previewText("연도 → 월 → 날짜 순서로 선택할 수 있습니다.")}
           </MobileUiText>
           <BirthDateCalendar
             visible={datePickerVisible}
@@ -223,9 +227,9 @@ export default function BirthInputScreen() {
 
         <View style={styles.section}>
           <View style={styles.rowBetween}>
-            <MobileUiText style={styles.label}>출생시간</MobileUiText>
+            <MobileUiText style={styles.label}>{previewText("출생시간")}</MobileUiText>
             <View style={styles.inlineSwitch}>
-              <MobileUiText style={styles.switchLabel}>시간 모름</MobileUiText>
+              <MobileUiText style={styles.switchLabel}>{previewText("시간 모름")}</MobileUiText>
               <Switch
                 value={!timeKnown}
                 onValueChange={(unknown) => {
@@ -253,15 +257,15 @@ export default function BirthInputScreen() {
         {calendarType === 'lunar' ? (
           <View style={[styles.section, styles.rowBetween]}>
             <View>
-              <MobileUiText style={styles.label}>윤달</MobileUiText>
-              <MobileUiText style={styles.helper}>윤달로 태어난 경우에만 켜 주세요.</MobileUiText>
+              <MobileUiText style={styles.label}>{previewText("윤달")}</MobileUiText>
+              <MobileUiText style={styles.helper}>{previewText("윤달로 태어난 경우에만 켜 주세요.")}</MobileUiText>
             </View>
             <Switch value={isLeapMonth} onValueChange={setIsLeapMonth} />
           </View>
         ) : null}
 
         <View style={styles.section}>
-          <MobileUiText style={styles.label}>성별</MobileUiText>
+          <MobileUiText style={styles.label}>{previewText("성별")}</MobileUiText>
           <View style={styles.segmentRow}>
             {sexOptions.map((option) => (
               <Pressable
@@ -272,7 +276,7 @@ export default function BirthInputScreen() {
                 style={[styles.segment, sex === option.value && styles.segmentSelected]}
               >
                 <Text style={[styles.segmentText, sex === option.value && styles.segmentTextSelected]}>
-                  {option.label}
+                  {previewText(option.label)}
                 </Text>
               </Pressable>
             ))}
@@ -290,7 +294,7 @@ export default function BirthInputScreen() {
           {submitting ? (
             <ActivityIndicator color={mobileColors.surface} />
           ) : (
-            <MobileUiText style={styles.primaryButtonText}>내 사주 보기</MobileUiText>
+            <MobileUiText style={styles.primaryButtonText}>{previewText("내 사주 보기")}</MobileUiText>
           )}
         </Pressable>
       </ScrollView>

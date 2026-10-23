@@ -4,6 +4,8 @@ import type {
   ReadingHistoryItemV1,
 } from '@myeongha/api-client';
 import { router, useLocalSearchParams } from 'expo-router';
+import { plannedMobileUiPreviewLocaleV1, previewMobileAuthoredUiLabelV1 } from '@/ui/mobile-planned-ui-screen-preview-v1';
+import { useMobileUiLocale } from '@/ui/mobile-ui-locale';
 import { useEffect, useMemo, useState } from 'react';
 import {
   FlatList,
@@ -106,7 +108,10 @@ function initialLoadingForTab(tab: RecordsTabV1, snapshots: ReturnType<typeof us
 export default function RecordsScreen() {
   const styles = useMobileThemedStyles(staticStyles);
   const { colors } = useMobileTheme();
-  const { tab: routeTab } = useLocalSearchParams<{ tab?: string }>();
+  const { t } = useMobileUiLocale();
+  const { tab: routeTab, uiPreview } = useLocalSearchParams<{ tab?: string; uiPreview?: string | string[] }>();
+  const previewLocale = plannedMobileUiPreviewLocaleV1(uiPreview, __DEV__);
+  const previewText = (source: string) => previewMobileAuthoredUiLabelV1(source, previewLocale, t);
   const requestedTab: RecordsTabV1 = routeTab === 'readings' ? 'readings' : 'all';
   const [tab, setTab] = useState<RecordsTabV1>(requestedTab);
   useEffect(() => { setTab(requestedTab); }, [requestedTab]);
@@ -153,12 +158,12 @@ export default function RecordsScreen() {
           <View style={styles.headerStack}>
             <View style={styles.header}>
               <Text style={[styles.eyebrow, { color: colors.gold }]}>MY RECORDS</Text>
-              <MobileUiText style={[styles.title, { color: colors.ink }]}>기록</MobileUiText>
+              <MobileUiText style={[styles.title, { color: colors.ink }]}>{previewText('기록')}</MobileUiText>
               <MobileUiText style={[styles.description, { color: colors.muted }]}>
                 삶의 사실과 지난 풀이, 저장된 기억을 차분히 찾아보세요.
               </MobileUiText>
             </View>
-            <RecordsEditorialHeader selected={tab} itemCount={initialLoading ? null : items.length} />
+            <RecordsEditorialHeader selected={tab} itemCount={initialLoading ? null : items.length} previewLocale={previewLocale} />
             <RecordsTabs selected={tab} onSelect={setTab} />
             <RecordsFailureBanner
               labels={failedLabels}
@@ -166,7 +171,7 @@ export default function RecordsScreen() {
             />
             {initialLoading ? (
               <View style={styles.loadingCard}>
-                <MobileUiText style={styles.loadingText}>기록을 불러오는 중입니다…</MobileUiText>
+                <MobileUiText style={styles.loadingText}>{previewText('기록을 불러오는 중입니다…')}</MobileUiText>
               </View>
             ) : null}
           </View>
