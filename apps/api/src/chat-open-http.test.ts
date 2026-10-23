@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { CHAT_LAUNCH_CHARACTER_IDS_V1, handleChatOpenRequestV1 } from './chat-open-http.js';
 import type { IdentityEvidenceVerificationPortV1 } from './current-subject-profile-http.js';
+import type { PortOneVerifiedAgeAdmissionPortV1 } from './portone-v2-verified-age-admission-v1.js';
 import type {
   PostgresSubjectConnectionV1,
   PostgresSubjectPoolV1,
@@ -106,6 +107,7 @@ async function invoke(input: {
   evidence?: VerifiedSubjectIdentityEvidenceV1 | null;
   pool?: PostgresSubjectPoolV1;
   createUuid?: () => string;
+  ageAdmissionPort?: Pick<PortOneVerifiedAgeAdmissionPortV1, 'admitFreePersonalization'>;
 } = {}): Promise<Response> {
   return handleChatOpenRequestV1({
     request: input.request ?? post({ characterId: CHARACTER_ID }),
@@ -118,10 +120,31 @@ async function invoke(input: {
     ),
     pool: input.pool ?? fakePool(),
     createUuid: input.createUuid ?? uuidFactory(),
+    ...(input.ageAdmissionPort === undefined ? {} : { ageAdmissionPort: input.ageAdmissionPort }),
   });
 }
 
 describe('Member single-Character thread open HTTP adapter', () => {
+  it('honors injected verified-age admission before writing a chat thread', async () => {
+    let created = false;
+    const pool = fakePool({ onCommand: () => { created = true; } });
+    const denied = await invoke({
+      pool,
+      ageAdmissionPort: { admitFreePersonalization: async () => false },
+    });
+    expect(denied.status).toBe(403);
+    expect((await denied.json() as { error: { code: string } }).error.code).toBe('AGE_VERIFICATION_REQUIRED');
+    expect(created).toBe(false);
+
+    const allowed = await invoke({
+      pool,
+      ageAdmissionPort: { admitFreePersonalization: async () => true },
+    });
+    expect(allowed.status).toBe(200);
+    expect(created).toBe(true);
+  });
+
+
   it('pins the SRC-36 exact-nine Launch roster', () => {
     expect(CHAT_LAUNCH_CHARACTER_IDS_V1).toEqual([
       'seyeon',
