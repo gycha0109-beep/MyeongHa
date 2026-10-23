@@ -373,7 +373,7 @@ const localeChoices = [
   { value: 'zh-TW', label: '繁體中文' },
 ] as const;
 const plannedLocaleChoices = [
-  { value: 'en-US', label: 'English · 준비 중' },
+  { value: 'en-US', label: 'English · Not available yet' },
   { value: 'zh-CN', label: '简体中文 · 准备中' },
 ] as const;
 
