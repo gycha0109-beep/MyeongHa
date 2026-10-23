@@ -169,6 +169,32 @@ begin
   return v_band;
 end $verified_age$;
 
+-- Account deletion anonymizes the Subject row instead of deleting it.
+-- ON DELETE CASCADE alone would therefore leave verified-age evidence behind.
+-- This OFF-era proposal revokes both records at the first non-active/merged
+-- Subject transition, in the same DB transaction as deletion or merge.
+create function public.internal_purge_legal_portone_age_on_subject_change_v1()
+returns trigger
+language plpgsql security definer
+set search_path = pg_catalog, public, pg_temp
+as $purge$
+begin
+  if new.status <> 'active' or new.merged_into_subject_id is not null then
+    delete from public.legal_portone_identity_attempts_v1 where subject_id=new.id;
+    delete from public.legal_portone_verified_age_v1 where subject_id=new.id;
+  end if;
+  return new;
+end $purge$;
+
+create trigger legal_portone_purge_on_subject_state_change_v1
+after update of status, merged_into_subject_id on public.subjects
+for each row
+when (new.status <> 'active' or new.merged_into_subject_id is not null)
+execute function public.internal_purge_legal_portone_age_on_subject_change_v1();
+
+revoke all on function public.internal_purge_legal_portone_age_on_subject_change_v1()
+  from public, anon, authenticated, myeongha_api_executor;
+
 revoke all on function public.cmd_issue_legal_portone_identity_v1(uuid) from public, anon, authenticated;
 revoke all on function public.qry_pending_legal_portone_identity_v1(uuid,text) from public, anon, authenticated;
 revoke all on function public.cmd_consume_legal_portone_identity_v1(uuid,text,text) from public, anon, authenticated;
