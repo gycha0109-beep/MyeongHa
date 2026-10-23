@@ -37,7 +37,7 @@ type AccountState =
   | { kind: 'ready'; payload: ProfilePayload }
   | { kind: 'unavailable'; message: string; login: boolean; hasStoredMemberSession: boolean };
 
-type SettingsPanel = 'account' | 'help' | null;
+type SettingsPanel = 'account' | 'privacy' | 'help' | null;
 
 type BirthState =
   | { kind: 'loading' }
@@ -352,6 +352,25 @@ function SettingsSection({ account, openPanel, setOpenPanel }: {
               <p className="my-setting-caveat">현재 저장된 계정 정보를 조회하는 화면입니다. 프로필 변경 및 회원 탈퇴 요청은 검증된 서버 절차가 연결되기 전까지 이 화면에서 실행하지 않습니다.</p>
             </>
           ) : null}
+        </div>
+
+        <button
+          className="my-setting-row my-setting-trigger"
+          type="button"
+          id="my-privacy-panel-trigger"
+          aria-expanded={openPanel === 'privacy'}
+          aria-controls="my-privacy-panel"
+          onClick={() => toggle('privacy')}
+        >
+          <span className="my-setting-icon" aria-hidden="true">◇</span>
+          <strong>개인정보 확인 · 권리 안내</strong>
+          <span className="my-setting-chevron" aria-hidden="true">{openPanel === 'privacy' ? '⌃' : '⌄'}</span>
+        </button>
+        <div className="my-setting-detail" id="my-privacy-panel" role="region" aria-labelledby="my-privacy-panel-trigger" hidden={openPanel !== 'privacy'} data-legal-privacy-rights-information>
+          <p>현재 확인 가능한 계정·출생 정보와 저장된 기록은 각각의 화면에서 확인할 수 있습니다.</p>
+          <a className="my-setting-inline-link" href="birth.html">출생 정보 화면으로 이동 →</a>
+          <a className="my-setting-inline-link" href="records.html">내 기록 화면으로 이동 →</a>
+          <p className="my-setting-caveat" data-legal-privacy-rights-intake-hold>개인정보 열람·정정·삭제·처리정지 신청과 공식 문의 접수는 아직 연결되지 않았습니다. 이 안내를 여는 것만으로 신청이 접수되거나 정보가 삭제되지는 않습니다.</p>
         </div>
 
         <button
