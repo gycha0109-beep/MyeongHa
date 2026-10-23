@@ -89,6 +89,18 @@ export interface CommerceReaderPrivateWithdrawalEvidenceV1 {
     readonly authenticatedClientAcknowledgedAt: string | null;
     readonly retainedDeliveryAttempts: number;
     readonly retainedAcknowledgedAttempts: number;
+    /** Prepared responses lacking a retained authenticated client ACK.
+     * Not proof of network failure, non-delivery or a refund decision. */
+    readonly retainedUnacknowledgedAttempts: number;
+    /**
+     * No retained receipt does NOT mean a receipt never existed: S7 journals
+     * expire at 90 days or can be erased during Privacy cleanup.
+     * A retained ACK is not statutory consumer delivery proof.
+     */
+    readonly retainedDeliveryEvidenceState:
+      | 'no_retained_delivery_receipts'
+      | 'response_prepared_no_retained_ack'
+      | 'client_ack_recorded_delivery_unproven';
     /** This S7 record is NEVER sufficient to prove actual content delivery. */
     readonly consumerDeliveryProven: false;
     readonly legallyProvenDeliveredAt: null;
@@ -193,6 +205,18 @@ export async function reviewOfficialReaderPrivateWithdrawalEvidenceV1(input: Rea
       return fail();
     }
 
+    // S7 receipts are retention-bounded, and a prepared server response may
+    // never arrive at the client. Keep these counts and states strictly
+    // descriptive; never imply that no receipt means no historic delivery.
+    const retainedUnacknowledgedAttempts =
+      retainedDeliveryAttempts - retainedAcknowledgedAttempts;
+    const retainedDeliveryEvidenceState =
+      retainedDeliveryAttempts === 0
+        ? 'no_retained_delivery_receipts' as const
+        : retainedAcknowledgedAttempts === 0
+          ? 'response_prepared_no_retained_ack' as const
+          : 'client_ack_recorded_delivery_unproven' as const;
+
     // An independent Checkout Owner read happens AFTER the DB evidence read.
     // A missing/mismatched notice NEVER becomes a manufactured acknowledgement.
     const originalCheckoutRecord =
@@ -225,6 +249,8 @@ export async function reviewOfficialReaderPrivateWithdrawalEvidenceV1(input: Rea
         authenticatedClientAcknowledgedAt,
         retainedDeliveryAttempts,
         retainedAcknowledgedAttempts,
+        retainedUnacknowledgedAttempts,
+        retainedDeliveryEvidenceState,
         consumerDeliveryProven: false,
         legallyProvenDeliveredAt: null,
       }),
