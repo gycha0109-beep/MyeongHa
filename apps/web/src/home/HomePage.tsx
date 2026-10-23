@@ -128,7 +128,7 @@ export function HomePage() {
         <div className="mhx-recent-card">
           <span className="mhx-recent-seal" aria-hidden="true">明</span>
           <div>
-            <strong>당신의 이야기를 기다리고 있어요</strong>
+            <strong>최근 대화 연결 안내</strong>
             <p>최근 대화 기록은 아직 홈에 연결되지 않았습니다. 실제 대화와 기록은 대화 화면에서 확인해 주세요.</p>
           </div>
           <a className="mhx-primary-link mhx-recent-link" href="chat-hub.html">대화 보러 가기 <span aria-hidden="true">→</span></a>
