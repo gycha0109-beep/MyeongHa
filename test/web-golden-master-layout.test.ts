@@ -18,37 +18,42 @@ function expectInOrder(source: string, labels: readonly string[]) {
 }
 
 describe('Web Golden Master', () => {
-  it('pins the approved Home hierarchy and four-card Saju row', async () => {
-    const [html, page] = await Promise.all([
+  it('pins the topic-first Home hierarchy, approved preview links, and real asset discovery', async () => {
+    const [html, page, css] = await Promise.all([
       readWebFile('hall.html'),
       readWebFile('src/home/HomePage.tsx'),
+      readWebFile('home-moonlight.css'),
     ]);
     const home = `${html}\n${page}`;
 
     expect(home).toContain('class="product-page gm-page"');
     expect(home).toContain('href="golden-master.css"');
-    expect(home).toContain('id="home-greeting-name"');
-    expect(home).toContain('id="home-current-date"');
-
-    expectInOrder(home, [
-      '좋은 저녁이에요',
-      '오늘 이야기할 사람',
-      '이번 달 사주 읽기',
-      '사주 읽기 주제',
-      '최근 이야기',
+    expect(home).toContain('href="home-moonlight.css"');
+    expect(home).toContain('id="mhx-hero-title"');
+    expectInOrder(page.slice(page.indexOf('return (')), [
+      'mhx-hero', 'mhx-topics', 'mhx-characters', 'mhx-content-grid', 'mhx-recent',
     ]);
 
-    const productSection = home.match(/<div className="gm-home-products">([\s\S]*?)<\/div>\s*<\/section>/u)?.[1] ?? '';
-    expect(productSection.match(/gm-product-card/gu)).toHaveLength(4);
-    expectInOrder(productSection, ['전체 사주', '직업 · 커리어', '재물', '연애 · 관계']);
+    const topicCatalog = page.match(/const readingTopics = \[([\s\S]*?)\] as const;/u)?.[1] ?? '';
+    expect(topicCatalog.match(/motif:/gu)).toHaveLength(4);
+    expectInOrder(topicCatalog, ['전체 사주', '직업 · 커리어', '재물', '연애 · 관계']);
+    for (const href of [
+      'reading-detail.html?topic=temperament&scope=original',
+      'reading-detail.html?topic=career',
+      'reading-detail.html?topic=money',
+      'reading-detail.html?topic=love',
+    ]) expect(topicCatalog).toContain(href);
 
-    expect(home).toContain('href="chat-hub.html">대화로 가기 →</a>');
-    expect(home).toContain('지금은 저장된 사실을 이야기로 추측해 이어 붙이지 않습니다.');
-    expect(home).not.toContain('연화');
-    expect(home).not.toContain('세연');
-    expect(home).not.toContain('chat.html?character=');
-    expect(home).not.toContain('이직 고민');
-    expect(home).not.toContain('3일 전');
+    expect(home).toContain('href="chat-hub.html"');
+    expect(page).toContain("findReaderPresentation(key)");
+    expect(page).toContain('reader.portrait');
+    expect(page).toContain('최근 대화 기록은 아직 홈에 연결되지 않았습니다.');
+    expect(page).not.toContain('chat.html?character=');
+    expect(page).not.toContain('퇴사를 고민했던 이야기');
+    expect(page).not.toContain('3일 전');
+    expect(page).not.toContain('인연 120');
+    expect(css).toMatch(/\.mhx-topics\s*\{[\s\S]*?grid-template-columns:\s*repeat\(4,/u);
+    expect(css).toContain('@media (max-width: 580px)');
     expect(home).not.toContain('home-sidebar');
     expect(home).not.toContain('gm-sidebar');
   });
