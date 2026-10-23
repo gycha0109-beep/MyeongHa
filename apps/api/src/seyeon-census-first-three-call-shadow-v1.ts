@@ -104,7 +104,7 @@ export async function runSeyeonCensusFirstThreeCallShadowV1(input: Readonly<{
     candidateProvider: input.candidateDialogueProvider,
     reviewerProvider: input.independentSemanticReviewer,
     fullThreadCensus: input.fullThreadCensus,
-    promptProfile: input.promptProfile,
+    ...(input.promptProfile === undefined ? {} : { promptProfile: input.promptProfile }),
   }).evaluate(context);
   return Object.freeze({
     version: SEYEON_CENSUS_FIRST_THREE_CALL_SHADOW_VERSION_V1,
