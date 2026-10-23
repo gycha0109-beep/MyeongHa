@@ -43,6 +43,8 @@ export async function runSeyeonCensusFirstThreeCallShadowV1(input: Readonly<{
   unifiedPreflightProvider: SeyeonStructuredProviderPortV2;
   candidateDialogueProvider: SeyeonStructuredProviderPortV2;
   independentSemanticReviewer: SeyeonStructuredProviderPortV2;
+  /** Optional evaluation-only compact instructions; never selected by default. */
+  promptProfile?: 'baseline' | 'compact_v1';
 }>) {
   const messages = input.contextInput?.recentMessages;
   const current = Array.isArray(messages) && messages.length === 1
@@ -102,6 +104,7 @@ export async function runSeyeonCensusFirstThreeCallShadowV1(input: Readonly<{
     candidateProvider: input.candidateDialogueProvider,
     reviewerProvider: input.independentSemanticReviewer,
     fullThreadCensus: input.fullThreadCensus,
+    promptProfile: input.promptProfile,
   }).evaluate(context);
   return Object.freeze({
     version: SEYEON_CENSUS_FIRST_THREE_CALL_SHADOW_VERSION_V1,
