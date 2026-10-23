@@ -84,6 +84,10 @@
       "destination": "/api/me?__myeongha_records_read=readings"
     },
     {
+      "source": "/api/memories/:memoryItemId/grants/seyeon",
+      "destination": "/api/memory-grants?__myeongha_seyeon_memory_grant_status_id=:memoryItemId"
+    },
+    {
       "source": "/api/memories",
       "destination": "/api/me?__myeongha_records_read=memories"
     },
