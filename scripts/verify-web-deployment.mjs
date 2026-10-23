@@ -267,6 +267,39 @@ await assertMissing(
   'Bracket Chat read function must not coexist with the static dispatcher rewrite.',
 );
 
+const heldReaderRewrites = Object.freeze([
+  Object.freeze({
+    source: '/api/chat/:threadId/paid-readings/:safeMessageId/ack',
+    destination: '/api/me?__myeongha_held_reader_route=ack&__myeongha_held_reader_thread_id=:threadId&__myeongha_held_reader_message_id=:safeMessageId',
+    retiredFunction: 'api/chat/[threadId]/paid-readings/[safeMessageId]/ack.ts',
+  }),
+  Object.freeze({
+    source: '/api/chat/:threadId/paid-readings/:safeMessageId',
+    destination: '/api/me?__myeongha_held_reader_route=message&__myeongha_held_reader_thread_id=:threadId&__myeongha_held_reader_message_id=:safeMessageId',
+    retiredFunction: 'api/chat/[threadId]/paid-readings/[safeMessageId].ts',
+  }),
+  Object.freeze({
+    source: '/api/readings/:readingId/reader-continuity',
+    destination: '/api/me?__myeongha_held_reader_route=continuity&__myeongha_held_reader_reading_id=:readingId',
+    retiredFunction: 'api/readings/[readingId]/reader-continuity.ts',
+  }),
+]);
+for (const expected of heldReaderRewrites) {
+  const matches = (vercelConfig.rewrites ?? []).filter(
+    (entry) => entry.source === expected.source,
+  );
+  if (matches.length !== 1 || matches[0]?.destination !== expected.destination) {
+    throw new Error(
+      `Held Reader route ${expected.source} must use exactly one private /api/me rewrite.`,
+    );
+  }
+  await assertMissing(
+    resolve(expected.retiredFunction),
+    `Held Reader route ${expected.source} must not add a 13th Vercel function.`,
+  );
+}
+
+
 const globalHeaders = (vercelConfig.headers ?? []).find(
   (entry) => entry.source === '/(.*)',
 )?.headers ?? [];
