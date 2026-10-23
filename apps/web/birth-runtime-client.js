@@ -193,6 +193,12 @@ export function createBirthRuntimeClient(options = {}) {
       if (!response.ok) {
         const payload = await readErrorPayload(response);
         const publicCode = readApiErrorCode(payload);
+        if (publicCode === 'AGE_RESTRICTED') {
+          throw new BirthRuntimeError('WEB_BIRTH_AGE_RESTRICTED', '만 14세 미만은 보호자 동의 확인 기능이 준비되기 전까지 이용할 수 없습니다.');
+        }
+        if (publicCode === 'AGE_VERIFICATION_REQUIRED') {
+          throw new BirthRuntimeError('WEB_BIRTH_AGE_VERIFICATION_REQUIRED', '음력 생일로 이용 연령을 확정할 수 없습니다. 현재는 명식록 생성을 진행할 수 없습니다.');
+        }
         if (publicCode === 'INVALID_REQUEST') {
           throw new BirthRuntimeError('WEB_BIRTH_INVALID_REQUEST', 'Birth Profile input was rejected.');
         }
