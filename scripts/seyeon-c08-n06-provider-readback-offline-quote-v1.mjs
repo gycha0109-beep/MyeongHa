@@ -93,6 +93,7 @@ export function quoteSeyeonC08N06FromReadbackOfflineV1({
   const withinCaps=scenario.tenKrwPerTurnUnderMetadataScenario===true&&
     scenario.twentyKrwTwoTurnEnvelopeUnderMetadataScenario===true;
   return Object.freeze({
+    ...deny('NO_AUTHORIZATION_FROM_PRICE_OR_METADATA'),
     disposition:withinCaps?'MATH_SCENARIO_UNDER_BUDGET_NOT_AUTHORIZED':
       'TEN_KRW_PER_TURN_STRESS_OVER_BUDGET_HOLD',
     model:fixed.model,providerTag:fixed.providerTag,
@@ -106,7 +107,6 @@ export function quoteSeyeonC08N06FromReadbackOfflineV1({
     scenarioOnlyUnderAdvertisedEndpointMetadata:true,
     exactRouteBytesCapturedWithMockProvider:true,
     actualProviderResponseObserved:false,
-    ...deny('NO_AUTHORIZATION_FROM_PRICE_OR_METADATA'),
   });
 }
 
