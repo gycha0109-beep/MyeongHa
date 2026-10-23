@@ -16,6 +16,8 @@ declare
  body constant uuid:='f7080000-0000-4000-8000-000000000001';
  release_id uuid;
  original_grant uuid;
+ original_spec_version text;
+ original_artifact_hash text;
  instant timestamptz:=clock_timestamp();
 begin
  -- The original B2/B3 entitlement fixture intentionally has no Chat release.
@@ -32,10 +34,25 @@ begin
  select id into release_id from public.content_releases
  where id='f70b0000-0000-4000-8000-000000000001'::uuid
    and content_bundle_id=b;
+ -- Exact source/provenance pins must come from the existing canonical
+ -- Reading and product ledger; never copy synthetic caller-provided values.
+ select o.product_spec_version into original_spec_version
+ from public.standard_reading_official_bindings o
+ where o.reading_id=r and o.subject_id=s;
+ select rr.response_hash into original_artifact_hash
+ from public.readings reading
+ join public.reading_refs rr
+   on rr.reading_id=reading.id
+  and rr.subject_id=reading.subject_id
+  and rr.execution_attempt_id=reading.committed_execution_attempt_id
+ where reading.id=r and reading.subject_id=s
+   and reading.execution_status='succeeded';
  select id into original_grant from public.entitlement_grants
  where source_receipt_id='12192000-0000-0000-0000-000000000002'::uuid
    and grant_source_type='purchase' order by id limit 1;
- if release_id is null or original_grant is null or not exists (
+ if release_id is null or original_grant is null
+   or original_spec_version is null or original_artifact_hash is null
+   or not exists (
    select 1 from public.standard_reading_reader_access_grants x
    where x.entitlement_grant_id=original_grant and x.subject_id=s
      and x.official_reading_id=r and x.reader_character_id='test-unlockable-reader'
@@ -117,7 +134,7 @@ begin
    'f70c0000-0000-4000-8000-000000000001'::uuid,
    s,r,'test-unlockable-reader',b,release_id,
    '11392000-0000-0000-0000-000000000001'::uuid,
-   'fixture-only-s7','fixture-only-artifact-response-hash',
+   original_spec_version,original_artifact_hash,
    'sha256:v1:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
    'fixture:no-saju-authority','ci-isolated-fixture','fixture-only-key',
    'sha256:v1:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
@@ -138,7 +155,7 @@ begin
   encryption_key_ref,encryption_iv,encryption_auth_tag,encrypted_body,committed_at
  ) values(body,s,t,u,a,m,c,r,'test-unlockable-reader',b,release_id,
   original_grant,'11392000-0000-0000-0000-000000000001'::uuid,
-  'fixture-only-s7','fixture-only-artifact-response-hash',
+  original_spec_version,original_artifact_hash,
   'fixture:no-saju-authority',
   'sha256:v1:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
   'fixture-no-approval','fixture-no-approval','aes-256-gcm-v1','fixture-no-key',
