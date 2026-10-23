@@ -256,11 +256,18 @@ function sortedManifest(bodyIds: readonly string[], keyRefs: readonly string[]) 
   if (!Array.isArray(bodyIds) || !Array.isArray(keyRefs)
       || bodyIds.length !== keyRefs.length
       || bodyIds.length === 0 || bodyIds.length > MAX_MANIFEST_ITEMS) return denied();
-  const ids = bodyIds.map(uuid).sort();
-  const keys = keyRefs.map((ref) => nonEmpty(ref)).sort();
-  if (new Set(ids).size !== ids.length
-      || new Set(keys).size !== keys.length) return denied();
-  return { ids, keys };
+  // Body identity and encryption key form ONE immutable deletion obligation.
+  // Sorting these arrays independently loses the original DB row binding.
+  const pairs = bodyIds.map((bodyId, index) => ({
+    id: uuid(bodyId),
+    key: nonEmpty(keyRefs[index]),
+  })).sort((a, b) => a.id.localeCompare(b.id));
+  if (new Set(pairs.map(pair => pair.id)).size !== pairs.length
+      || new Set(pairs.map(pair => pair.key)).size !== pairs.length) return denied();
+  return {
+    ids: pairs.map(pair => pair.id),
+    keys: pairs.map(pair => pair.key),
+  };
 }
 
 function validateFence(value: unknown, subjectId: string, deletionJobId: string):

@@ -374,10 +374,15 @@ export async function runOfficialReaderPrivateRevocationPurgeBatchV1(input: {
       );
       const expectedBodyIds=[...entries.map(e=>e.bodyId)];
       const expectedKeys=[...entries.map(e=>e.encryptionKeyRef)];
-      if (fence.bodyIds.length!==expectedBodyIds.length
-          || fence.keyRefs.length!==expectedKeys.length
-          || !expectedBodyIds.every(id=>fence.bodyIds.includes(id))
-          || !expectedKeys.every(id=>fence.keyRefs.includes(id))) {
+      const persistedPairs=new Map(
+        fence.bodyIds.map((id,index)=>[id,fence.keyRefs[index]] as const),
+      );
+      if (fence.bodyIds.length!==entries.length
+          || fence.keyRefs.length!==entries.length
+          || !entries.every(entry=>
+            persistedPairs.get(entry.bodyId)===entry.encryptionKeyRef)) {
+        // A swapped key set is NOT the same deletion manifest, even if
+        // each ID/key exists somewhere in the sealed fence.
         return fail();
       }
 
