@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { createElement } from 'react';
 import { HomePage } from '../home/HomePage.js';
 import { ChatHubPage } from '../chat-hub/ChatHubPage.js';
+import { RecordsPage } from '../records/RecordsPage.js';
 import {
   resolveDevPlannedUiPreviewLocaleV1,
   previewReviewedUiTextV1,
@@ -51,5 +52,23 @@ describe('I18N-07 developer-only rendered EN/ZH UI preview', () => {
     expect(korean).toContain('대화 목록 연결 상태');
     expect(korean).not.toContain('data-planned-ui-preview=');
     expect(chinese).toContain('href="#people"');
+  });  it('renders Records UI and privacy notices in EN/CN while preserving record sockets', () => {
+    const english = renderToStaticMarkup(createElement(RecordsPage, { previewLocale: 'en-US' }));
+    const chinese = renderToStaticMarkup(createElement(RecordsPage, { previewLocale: 'zh-CN' }));
+    const korean = renderToStaticMarkup(createElement(RecordsPage));
+    expect(english).toContain('data-planned-ui-preview="en-US"');
+    expect(english).toContain('aria-label="Current record owner"');
+    expect(english).toContain('Loading records…');
+    expect(english).toContain('Review completed, saved Saju readings separately from life facts.');
+    expect(chinese).toContain('aria-label="当前记录主体"');
+    expect(chinese).toContain('删除角色后保留的记忆范围可能有所不同。');
+    for (const markup of [english, chinese, korean]) {
+      for (const id of ['records-content','life-records-list','saju-records-list','birth-records-list','memory-records-list']) {
+        expect(markup).toContain('id="' + id + '"');
+      }
+      expect(markup).toContain('href="my.html"');
+    }
+    expect(korean).toContain('캐릭터가 삭제된 후 남는 기억 범위는 서로 다를 수 있습니다.');
+    expect(korean).not.toContain('data-planned-ui-preview=');
   });
 });

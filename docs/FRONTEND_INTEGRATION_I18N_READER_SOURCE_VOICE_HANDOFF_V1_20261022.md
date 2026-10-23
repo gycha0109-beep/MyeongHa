@@ -326,3 +326,8 @@
 - `apps/web/src/home/HomePage.tsx`와 `apps/web/src/chat-hub/ChatHubPage.tsx`에 **개발용 미리보기 입력**을 연결하고, 검토한 정적 UI 저자 라벨만 `lookupPlannedStaticUiCopyV1` 기반 영어·간체로 렌더한다. Home과 Chat Hub의 구체적인 헤더·버튼·보호 안내·접근성 라벨을 포함하며, 동적 대화/저장 기록·Reader 답변·생년월일·캐릭터 이름 및 출처를 번역하지 않는다.
 - 개발 서버에서만 `?ui-preview=en-US` 또는 `?ui-preview=zh-CN`을 명시한 경우 JSX preview props를 전달한다. 비개발 빌드에서는 항상 `null`이며 기존 한국어/일본어/번체 선택기, 로케일 저장/복원, API `X-MyeongHa-UI-Locale`, 공식 해석/Reader voice 허용 범위는 변경하지 않는다. 미번역 영역(예: 포춘쿠키 원문·동적 월 표기)은 그대로 남아 있어 **서비스에서 영어·간체를 지원한다고 표시하지 않는다**.
 - `apps/web/src/ui/planned-ui-screen-preview-v1.test.tsx`는 두 실제 React 화면의 SSR 출력, 한국어 기본, 영어·간체 문구, 탐색 및 데이터 대상 DOM 보존, 개발 환경에만 허용되는 명시적 QA query를 검증한다. 이 작업은 **부분 화면 QA**이며 전 라우트 번역, 스크린샷/접근성 실제 브라우저 및 새 언어 운영 출시 승인은 EN/CN-UI-A/C의 미완료 항목이다.
+
+### 7.28 EN/CN-UI-C — 기록 화면 개발용 영어·간체 미리보기 (2026-10-23)
+
+- `RecordsPage`의 기록 내비게이션·상태·개인정보 고지와 접근성 속성을 개발 환경의 명시적 `ui-preview` query에서만 영어/간체 JSX로 렌더한다. 운영 UI/헤더/저장/Reader locale 허용은 변경하지 않는다.
+- SSR 회귀는 기존 기록 렌더 socket ID와 탐색 경로, 한국어 기본 출력의 보존을 확인한다. 사람별 개인 기록/공식 Reading은 변경하거나 번역하지 않는다. 일부 출처 승인 미완료 문자열은 한국어 그대로 남고 릴리스 허가는 HOLD다.
