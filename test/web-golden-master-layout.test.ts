@@ -78,7 +78,7 @@ describe('Web Golden Master', () => {
       '삶의 단계',
     ]);
     expectInOrder(page.slice(page.indexOf('return (')), [
-      '나의 명식',
+      '무료 기본 명식',
       '나를 읽기',
       '지금의 흐름',
       '올해',
