@@ -3,9 +3,13 @@ import type {
 } from './postgres-subject-execution.js';
 import {
   assessDigitalReadingWithdrawalReviewV1,
-  type DigitalReadingCheckoutNoticeV1,
   type DigitalReadingWithdrawalReviewV1,
 } from './commerce-digital-reading-withdrawal-review-v1.js';
+import {
+  linkOriginalCheckoutNoticeToReaderGrantV1,
+  type CommerceReaderCheckoutNoticeEvidenceStateV1,
+  type CommerceReaderOriginalCheckoutNoticeRecordV1,
+} from './commerce-reader-checkout-notice-proof-v1.js';
 
 /**
  * PRIVATE S7 -> Commerce withdrawal-review handoff.
@@ -61,14 +65,17 @@ type PurchasedUnit = Readonly<{
 }>;
 
 /**
- * Checkout notice MUST come from independently stored, original server-side
- * item-scoped checkout evidence. Caller/browser flags are not an authority.
- * Until a real checkout snapshot owner adapter is approved, return null.
+ * Checkout notice MUST be sourced from immutable Purchase Intent + pinned
+ * Capability Item evidence recorded BEFORE the original payment attempt.
+ * The Commerce Owner must independently join that original item through its
+ * Receipt to this post-checkout Grant. A Grant ID did not exist at checkout.
+ * Caller/browser flags and a fabricated server_checkout_snapshot tag are not
+ * authority. Until the owner-backed store/adapter is approved, return null.
  */
 export interface CommerceReaderCheckoutNoticeAuthorityPortV1 {
   readExactServerCheckoutNotice(
     unit: PurchasedUnit,
-  ): Promise<DigitalReadingCheckoutNoticeV1 | null>;
+  ): Promise<CommerceReaderOriginalCheckoutNoticeRecordV1 | null>;
 }
 
 export interface CommerceReaderPrivateWithdrawalEvidenceV1 {
@@ -86,6 +93,8 @@ export interface CommerceReaderPrivateWithdrawalEvidenceV1 {
     readonly consumerDeliveryProven: false;
     readonly legallyProvenDeliveredAt: null;
   }>;
+  /** Source-backed original checkout notice, NOT proof of legal delivery. */
+  readonly checkoutNoticeEvidenceState: CommerceReaderCheckoutNoticeEvidenceStateV1;
   readonly review: DigitalReadingWithdrawalReviewV1;
   readonly refundAuthorized: false;
   readonly entitlementMutationAuthorized: false;
@@ -186,15 +195,18 @@ export async function reviewOfficialReaderPrivateWithdrawalEvidenceV1(input: Rea
 
     // An independent Checkout Owner read happens AFTER the DB evidence read.
     // A missing/mismatched notice NEVER becomes a manufactured acknowledgement.
-    const checkoutNotice =
+    const originalCheckoutRecord =
       await input.checkoutNoticeAuthority.readExactServerCheckoutNotice(purchasedUnit);
+    const checkoutProof = linkOriginalCheckoutNoticeToReaderGrantV1({
+      record: originalCheckoutRecord, unit: purchasedUnit, s5CommittedAt,
+    });
 
     const review = assessDigitalReadingWithdrawalReviewV1({
       // A previously verified Receipt can later be revoked by the provider.
       // Never manufacture a currently verified purchase for legal triage.
       purchase: { ...purchasedUnit, status: originalReceiptStatus },
       claim: input.claim,
-      notice: checkoutNotice,
+      notice: checkoutProof.notice,
       delivery: {
         ...purchasedUnit,
         authority: 'server_delivery_record',
@@ -216,6 +228,7 @@ export async function reviewOfficialReaderPrivateWithdrawalEvidenceV1(input: Rea
         consumerDeliveryProven: false,
         legallyProvenDeliveredAt: null,
       }),
+      checkoutNoticeEvidenceState: checkoutProof.evidenceState,
       review,
       refundAuthorized: false,
       entitlementMutationAuthorized: false,
