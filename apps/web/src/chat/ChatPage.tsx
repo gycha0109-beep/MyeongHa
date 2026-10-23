@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { CreditRechargeDialog } from '../commerce/CreditRechargeDialog.js';
 
 export function ChatPage() {
   useEffect(() => {
@@ -47,6 +48,7 @@ export function ChatPage() {
                 <span data-character-title>서버 확인 중</span>
               </div>
             </div>
+            <button type="button" className="chat-credit-entry" onClick={() => document.dispatchEvent(new Event('myeongha:credit-menu'))}>크레딧·충전 안내</button>
           </header>
 
           <div className="conversation-thread-bar" data-thread-bar hidden>
@@ -78,7 +80,7 @@ export function ChatPage() {
           <button className="character-room-retry" data-room-retry type="button" hidden>대화 다시 연결하기 →</button>
         </section>
       </main>
-
+      <CreditRechargeDialog />
     </>
   );
 }
