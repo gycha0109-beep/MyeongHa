@@ -138,6 +138,8 @@ as $g2$
 declare
   v_positive jsonb;
   v_commit record;
+  v_original_user_message_count bigint;
+  v_original_user_message_id text;
 begin
   perform public.assert_myeongha_subject_context_v1(p_subject_id);
   if p_thread_id is null or p_turn_id is null or p_attempt_id is null
@@ -191,6 +193,31 @@ begin
     raise exception using errcode='23514',
       constraint='seyeon_positive_g2_model_source_mismatch',
       message='Positive G2 cannot change original exact model sources';
+  end if;
+
+  -- Original UserMessage must be DB-authoritative, even if a caller has
+  -- recomputed a syntactically valid Post-turn Snapshot SHA (§59).
+  -- Keep the original message locked through the real v2 Commit below.
+  select count(*), min(original_message.id::text)
+    into v_original_user_message_count, v_original_user_message_id
+  from (
+    select m.id from public.conversation_messages m
+    where m.turn_id=p_turn_id and m.subject_id=p_subject_id
+      and m.sender_type='user'
+    for share of m
+  ) as original_message;
+  if v_original_user_message_count <> 1
+    or jsonb_typeof(p_post_turn_snapshot_jsonb) is distinct from 'object'
+    or p_post_turn_snapshot_jsonb ->> 'turnId'
+         is distinct from p_turn_id::text
+    or p_post_turn_snapshot_jsonb ->> 'assistantMessageId'
+         is distinct from p_message_id::text
+    or p_post_turn_snapshot_jsonb ->> 'userMessageId'
+         is distinct from v_original_user_message_id
+  then
+    raise exception using errcode='23514',
+      constraint='seyeon_positive_g2_snapshot_original_user_message_mismatch',
+      message='Post-turn Snapshot must name the actual original UserMessage';
   end if;
 
   -- Existing v2 Commit performs the assistant and both Outbox writes in
