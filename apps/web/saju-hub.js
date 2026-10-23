@@ -522,6 +522,14 @@ async function submitBirthProfile(event) {
       return;
     }
 
+    if (error?.operation === 'birth-create' && error?.code === 'AGE_RESTRICTED') {
+      setFormError('만 14세 미만은 보호자 동의 확인 기능이 준비되기 전까지 명식록을 만들 수 없습니다.');
+      return;
+    }
+    if (error?.operation === 'birth-create' && error?.code === 'AGE_VERIFICATION_REQUIRED') {
+      setFormError('음력 생일로 이용 연령을 확정할 수 없어 현재 명식록 생성을 진행할 수 없습니다.');
+      return;
+    }
     if (error?.operation === 'birth-create' && error?.code === 'INVALID_REQUEST') {
       setFormError('입력값을 처리하지 못했습니다. 생년월일·출생시간을 확인하고, 이미 등록한 적이 있다면 새로고침해 주세요.');
       return;
