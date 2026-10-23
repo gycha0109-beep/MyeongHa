@@ -24,7 +24,7 @@ const source = (path: string) => readFile(new URL('../' + path, import.meta.url)
 
 describe('I18N-07 staged EN-US and ZH-CN authored UI copy', () => {
   it('authors both UI target variants for navigation, account, Saju input and chat read-state without missing parity', () => {
-    expect(PLANNED_STATIC_UI_COPY_V1.size).toBe(315);
+    expect(PLANNED_STATIC_UI_COPY_V1.size).toBe(402);
     expect([...PLANNED_MOBILE_STATIC_UI_COPY_V1]).toEqual([...PLANNED_STATIC_UI_COPY_V1]);
     for (const [ko, pair] of PLANNED_STATIC_UI_COPY_V1) {
       expect(ko.trim().length).toBeGreaterThan(0);
@@ -64,6 +64,28 @@ describe('I18N-07 staged EN-US and ZH-CN authored UI copy', () => {
       expect(lookupPlannedStaticUiCopyV1(source, 'zh-CN')).toBe(chinese);
       expect(lookupPlannedMobileStaticUiCopyV1(source, 'en-US')).toBe(english);
       expect(lookupPlannedMobileStaticUiCopyV1(source, 'zh-CN')).toBe(chinese);
+    }
+    expect(normalizeUiLocale('en-US')).toBe('ko-KR');
+    expect(normalizeMobileUiLocale('zh-CN')).toBe('ko-KR');
+    expect(lookupPlannedStaticUiCopyV1('message.body', 'en-US')).toBeNull();
+  });
+
+  it('protects active output while staging account, accessibility and source-status UI labels', () => {
+    const examples = [
+      ['메시지를 입력하세요…', 'Type a message…', '请输入消息…'],
+      ['회원가입', 'Sign up', '注册'],
+      ['출생 정보 수정 준비 중', 'Birth detail editing coming soon', '出生信息修改功能即将推出'],
+      ['사진을 준비해 주세요', 'Please prepare a photo', '请准备照片'],
+      ['이 화면은 계산 사실만 표시하며 해석을 생성하지 않습니다.',
+       'This screen shows calculated facts only and does not generate interpretations.',
+       '此页面仅显示计算事实，不生成解读。'],
+      ['AI 답변 준비 중', 'AI replies coming soon', 'AI 回复功能准备中'],
+    ] as const;
+    for (const [source, en, zh] of examples) {
+      expect(lookupPlannedStaticUiCopyV1(source, 'en-US')).toBe(en);
+      expect(lookupPlannedStaticUiCopyV1(source, 'zh-CN')).toBe(zh);
+      expect(lookupPlannedMobileStaticUiCopyV1(source, 'en-US')).toBe(en);
+      expect(lookupPlannedMobileStaticUiCopyV1(source, 'zh-CN')).toBe(zh);
     }
     expect(normalizeUiLocale('en-US')).toBe('ko-KR');
     expect(normalizeMobileUiLocale('zh-CN')).toBe('ko-KR');
