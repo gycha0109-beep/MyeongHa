@@ -237,6 +237,12 @@ export async function deliverSeyeonCommittedFirstPositiveMemoryNodeTurnV1(
       // must never inherit this exact original Grant's first-send authority.
       (input.result?.execution?.postTurnAnalysis?.status!=='processed' &&
        input.result?.execution?.postTurnAnalysis?.status!=='deferred') ||
+      // BOTH inline-processed and deferred post-turn outcomes must belong
+      // to this exact G2 durable Outbox. A processed foreign job cannot
+      // inherit the first original-Memory send right.
+      (input.result?.execution?.postTurnAnalysis?.status==='processed' &&
+       input.result.execution.postTurnAnalysis.result.outboxEventId!==
+         receipt.postTurnOutboxEventId) ||
       (input.result?.execution?.postTurnAnalysis?.status==='deferred' &&
        input.result.execution.postTurnAnalysis.outboxEventId!==
          receipt.postTurnOutboxEventId) ||

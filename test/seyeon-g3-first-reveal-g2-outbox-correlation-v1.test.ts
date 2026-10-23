@@ -41,7 +41,7 @@ function result():RunProductionSeyeonChatResultV1 {
 type MutableResult={
   execution:{
     committedTurn:{postTurnOutboxEventId?:string;sequenceNo:number};
-    postTurnAnalysis?:{status:string;outboxEventId?:string};
+    postTurnAnalysis?:{status:string;outboxEventId?:string;result?:{outboxEventId:string}};
     receivedTurn:{userMessageId?:string;turnState:string};
   };
 };
@@ -68,6 +68,9 @@ describe('S5/G3 first private Reply requires original G2 durable post-turn Outbo
     }],
     ['malformed original G2 Outbox',(r:MutableResult)=>{
       r.execution.committedTurn.postTurnOutboxEventId='not-a-uuid';
+    }],
+    ['different processed worker Outbox',(r:MutableResult)=>{
+      r.execution.postTurnAnalysis={status:'processed',result:{outboxEventId:OTHER}};
     }],
     ['different deferred worker Outbox',(r:MutableResult)=>{
       r.execution.postTurnAnalysis!.outboxEventId=OTHER;
