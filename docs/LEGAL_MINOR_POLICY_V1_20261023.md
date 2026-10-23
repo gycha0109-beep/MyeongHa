@@ -24,7 +24,7 @@ Watchtower-Track: legal-compliance
 
 - `apps/api/src/legal-minor-age-policy-v1.ts`: 한국 시간 기준 **서버 시계**로 자기 Birth Profile의 신고 생일을 분류. 양력 만 14세 생일 당일에는 무료만 허용하며 19세부터 성인 분류. 음력 기준 **만 14세 경계 출생연도**는 정확한 양력 변환 권위가 검증되지 않아 임의 계산 없이 보류.
 - `apps/api/src/birth-profile-create-http.ts`: `POST /api/birth-profiles`에서 **PostgreSQL 연결·HMAC 계산·저장 전에** 만 14세 미만/연령 경계 불명 요청을 HTTP 403으로 차단하고 고정 오류코드 `AGE_RESTRICTED` / `AGE_VERIFICATION_REQUIRED`를 반환. 데이터 원문·태어난 날짜를 오류 응답 및 로그에 넣지 않는다.
-- `apps/web/src/birth/BirthPage.tsx`, `apps/web/src/reading/ReadingPage.tsx`: 정책 고지와 서버 거부 표시. `apps/web/src/auth/AuthPage.tsx`: 신규 이메일 가입 및 소셜 인증 시작에서 **14세 이상 본인 선언**을 확인. **이 선언은 연령·본인 확인/법정대리인 동의 확인이 아니다.**
+- `apps/web/src/birth/BirthPage.tsx`, `apps/web/src/reading/ReadingPage.tsx`: 정책 고지와 서버 거부 표시. `apps/web/src/auth/AuthPage.tsx`: 신규 이메일 가입 및 소셜 인증 시작에서 **14세 이상 본인 선언**을 확인. `apps/web/src/chat/ChatPage.tsx` 및 `apps/web/chat-runtime-client.js`: 메시지 전송 전 동일 자기 선언 체크 여부 확인. **이 선언은 연령·본인 확인/법정대리인 동의 확인이 아니며 직접 API 호출을 차단하지 못한다.**
 - 결제 SDK·공개 Offer·PG 연동은 기존대로 OFF. 직접 구매는 **19세 이상 성인 자격이 신뢰할 수 있는 서버 권위로 확인된 이후에만** 별도 활성화 판단할 수 있다. 자기 Birth Profile 생년월일로 결제 자격을 증명하지 않는다.
 - 기존 고객 데이터/기존 계정의 연령 소급검증·일괄 삭제는 진행하지 않는다. 개인정보 파기·복원은 Privacy/DB 책임 영역.
 
