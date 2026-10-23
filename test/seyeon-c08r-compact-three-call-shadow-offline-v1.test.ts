@@ -1,8 +1,9 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {createOpenRouterSeyeonEvaluationProviderV1}
   from '../apps/api/src/openrouter-seyeon-evaluation-provider-v1.js';
 import {runSeyeonCensusFirstThreeCallShadowV1}
   from '../apps/api/src/seyeon-census-first-three-call-shadow-v1.js';
+// @ts-expect-error: Versioned offline synthetic MJS module has no TS declarations.
 import {createSeyeonQualityTrioSyntheticCensusV1}
   from '../scripts/seyeon-terra-glm-quality-trio-census-v1.mjs';
 import {SEYEON_COMPACT_SHADOW_PROMPT_VERSION_V1}
