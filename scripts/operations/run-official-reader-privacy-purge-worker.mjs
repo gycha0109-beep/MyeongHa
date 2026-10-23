@@ -7,6 +7,9 @@
 import { randomUUID } from 'node:crypto';
 
 const CONFIRM = 'RUN_PRIVATE_READER_REVOCATION_PURGE';
+// A permanently failing private purge must become a supervisor-visible
+// failure, not an indefinitely healthy process while the 24h clock expires.
+const MAX_CONSECUTIVE_FAILED_POLLS = 3;
 
 function unavailable() {
   throw new Error('Official Reader protected cleanup Worker is unavailable.');
@@ -70,6 +73,10 @@ async function runOnce() {
   if (report.publicPaidReadEnabled !== false) unavailable();
   // Only totals, never Subject/Reader/Reading/Receipt/key/body identities.
   process.stdout.write(JSON.stringify(report) + '\n');
+  // A batch can complete some jobs while another remains unpurged. This is
+  // still a failed maintenance poll: never reset the retry counter merely
+  // because the worker returned aggregate counters instead of throwing.
+  if (report.failed > 0) unavailable();
 }
 
 function sleepForInterval(seconds) {
@@ -101,7 +108,11 @@ try {
         'Reader private purge failed; queued work remains retryable.\n',
       );
       consecutiveFailures++;
-      if (intervalSeconds === null) {
+      if (intervalSeconds === null
+          || consecutiveFailures >= MAX_CONSECUTIVE_FAILED_POLLS) {
+        // Fail the managed process so the existing host supervisor/alerting
+        // sees the persistent unprocessed deletion obligation. The DB lease
+        // and durable tombstone remain intact for an idempotent restart.
         process.exitCode = 1;
         break;
       }
