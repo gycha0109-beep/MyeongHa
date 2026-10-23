@@ -53,6 +53,7 @@ function fixture(options: {
     originatingGrantId:GRANT,
     pinnedCapabilityItemKey:ITEM,
     originalPaymentAttemptCreatedAt:'2026-10-23T00:01:00.000Z',
+    s5CommittedAt:'2026-10-23T00:05:00.000Z',
   };
   const query=vi.fn(async (sql:string,params?:readonly unknown[])=>{
     expect(params).toEqual([SUBJECT,PURCHASE,GRANT,BODY]);
@@ -165,6 +166,26 @@ describe('S7 private Postgres original Checkout notice authority',()=>{
     outage.query.mockRejectedValueOnce(new Error('private database failure'));
     expect(await outage.authority.readExactServerCheckoutNotice(unit)).toBeNull();
     expect(outage.storeRead).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { acknowledgedAt:'2026-10-23T00:02:00.000Z' },
+    { acknowledgedAt:'2026-10-23T00:00:01.000Z', noticePresentedAt:'2026-10-23T00:00:02.000Z' },
+    { snapshotRecordedAt:'2026-10-23T00:00:03.000Z' },
+  ])('rejects late, reversed or postpayment consent at the Checkout authority itself %#',async change=>{
+    const f=fixture({snapshot:{...snapshot,...change}});
+    expect(await f.authority.readExactServerCheckoutNotice(unit)).toBeNull();
+    expect(f.storeRead).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects a first payment attempt after S5 commit',async()=>{
+    const f=fixture({lineage:[{
+      purchaseIntentId:PURCHASE,originatingGrantId:GRANT,pinnedCapabilityItemKey:ITEM,
+      originalPaymentAttemptCreatedAt:'2026-10-23T00:06:00.000Z',
+      s5CommittedAt:'2026-10-23T00:05:00.000Z',
+    }]});
+    expect(await f.authority.readExactServerCheckoutNotice(unit)).toBeNull();
+    expect(f.storeRead).toHaveBeenCalledTimes(1);
   });
 
   it('does not treat late checkout consent as early consent even with a trusted store',async()=>{
