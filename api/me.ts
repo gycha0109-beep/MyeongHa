@@ -1,4 +1,5 @@
 import { executeSecurityObservedRequestV1 } from '../apps/api/src/security-observability.js';
+import { tryDispatchHeldOfficialReaderV1 } from '../apps/api/src/official-reader-held-vercel-dispatch-v1.js';
 import { createNodePostgresSubjectPoolV1 } from '../apps/api/src/node-postgres-subject-pool.js';
 import { createProductionChatReadRuntimeV1 } from '../apps/api/src/production-chat-read-runtime.js';
 import { createProductionSeyeonTurnSendRuntimeV1 } from '../apps/api/src/production-seyeon-turn-send-runtime-v1.js';
@@ -753,6 +754,10 @@ export default {
       request,
       routeId: 'api.me.dispatch',
       execute: ({ requestId, serverTime }) => {
+        // Former S6/S7/Records production route adapters are still hard OFF.
+        // They share this function only to satisfy the exact 12-function cap.
+        const held = tryDispatchHeldOfficialReaderV1({ request, requestId, serverTime });
+        if (held !== null) return held;
         const target = resolveDispatchTarget(request);
         if (target === null) {
           cancelUnusedRequestBodyBestEffort(request);
