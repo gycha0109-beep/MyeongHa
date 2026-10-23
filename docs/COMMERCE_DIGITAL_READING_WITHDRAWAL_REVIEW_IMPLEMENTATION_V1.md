@@ -21,6 +21,14 @@
 - 정확한 상품 가분 범위, 개별 취소 요청 경로, notice revision/acknowledgment, 실제 인도 기록의 개인정보 보존기간/접근권 승인 후에만 실행 시스템에 연결한다.
 - 환불이 실제 승인된 뒤 Provider 검증 이벤트가 현재 Grant 상태에 반영되는 거래와, T2 사용자 결과 공개 직렬화는 #1827에서 독립 구현·검증한다. 이 함수가 환불을 수행하거나 권한을 막지 않는다.
 
+## S7 구매 전 고지 증빙 원본 결속 — 비공개 구현 (2026-10-23)
+
+- `commerce-reader-checkout-notice-proof-v1.ts`는 구매 **전** 저장된 Purchase Intent × 고정 Capability Item 키를 기준으로 고지 revision·안내/예시 revision·서버 기록 표시/확인 시각과 최초 결제 시도 시각을 비교한다. **발급된 Grant ID는 결제 전 존재하지 않으므로 구매 전 고지 기록의 원래 키로 사용하지 않는다.**
+- 내부 Commerce Checkout Owner 포트는 결제 이후 해당 Purchase Intent의 **원본 Receipt → 원본 Grant → 고정 Capability Item**을 독립적으로 대조해 하나의 구매 단위에만 고지 기록을 연결해야 한다. 단순 구조적 `authority` 태그, 브라우저 체크·시각, 다른 영수증 또는 형제 Grant는 증거가 아니다.
+- S7 비공개 환불 검토 `commerce-reader-private-withdrawal-evidence-v1.ts`는 원본 구매·고지 레코드가 정확히 결속되고 `snapshotRecordedAt <= noticePresentedAt <= acknowledgedAt < originalPaymentAttemptCreatedAt <= S5 committedAt`일 때에만 **Checkout Owner 제공 원본 레코드가 형식·순서상 부합**했다고 표시한다. 그렇지 않으면 `missing_or_unverifiable`로 보류한다.
+- 위 확인은 디지털 콘텐츠가 소비자에게 실제 제공됐다는 증명이 아니다. S7 제공 준비/클라이언트 ACK만으로 `DELIVERED_PROVABLE`을 합성하지 않고, 자동 청약철회 거절·결제 취소·Grant 변경·공개 응답은 계속 금지한다.
+- **아직 미구현·승인 대기:** 실제 불변 Checkout 고지 스냅샷 저장소·원본 Capability Item↔Grant 영속 결속 조회 어댑터, 최소 보존 기간·접근 권한, Legal 고지 방식 승인. 이 코드 변경은 운영 테이블·권한·상업 결제 페이지를 생성하거나 승인하지 않는다. 미승인 어댑터는 `null`을 반환하며 고지 증거를 만들 수 없다.
+
 ## 다음 수락 게이트
 
 1. Commerce/Legal이 실제 상품 단위와 법정 기간·고지/미리보기·취소 경로를 승인.
