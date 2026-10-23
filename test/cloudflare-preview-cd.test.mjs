@@ -102,6 +102,10 @@ describe('Cloudflare preview Git-based CD', () => {
     const method = await previewWorker.fetch(new Request(url), env);
     expect(method.status).toBe(405);
     expect(method.headers.get('Allow')).toBe('POST');
+    expect(method.headers.get('X-Content-Type-Options')).toBe('nosniff');
+    expect(method.headers.get('X-Frame-Options')).toBe('DENY');
+    expect(method.headers.get('Content-Security-Policy')).toContain("default-src 'self'");
+    expect(method.headers.get('X-Robots-Tag')).toContain('noindex');
     expect(await method.text()).toBe('');
 
     const unauthenticated = await previewWorker.fetch(new Request(url, {
@@ -113,6 +117,8 @@ describe('Cloudflare preview Git-based CD', () => {
       }),
     }), env);
     expect(unauthenticated.status).toBe(401);
+    expect(unauthenticated.headers.get('X-Content-Type-Options')).toBe('nosniff');
+    expect(unauthenticated.headers.get('Cache-Control')).toBe('no-store');
     expect((await unauthenticated.json()).error.code).toBe('AUTH_REQUIRED');
 
     const verifiedUserId = '123e4567-e89b-42d3-a456-426614174002';
@@ -137,6 +143,8 @@ describe('Cloudflare preview Git-based CD', () => {
       expect(upstream).toHaveBeenCalledTimes(1);
       expect(authenticated.status).toBe(503);
       expect(authenticated.headers.get('Cache-Control')).toBe('no-store');
+      expect(authenticated.headers.get('X-Frame-Options')).toBe('DENY');
+      expect(authenticated.headers.get('Referrer-Policy')).toBe('strict-origin-when-cross-origin');
       expect((await authenticated.json()).error.code)
         .toBe('SEYEON_FIRST_REVEAL_AUTHORITY_UNAVAILABLE');
       expect(asset).not.toHaveBeenCalled();
@@ -147,6 +155,8 @@ describe('Cloudflare preview Git-based CD', () => {
     const missingAuthEnv = { ASSETS: { fetch: asset } };
     const missing = await previewWorker.fetch(new Request(url), missingAuthEnv);
     expect(missing.status).toBe(503);
+    expect(missing.headers.get('Content-Security-Policy')).toContain("default-src 'self'");
+    expect(missing.headers.get('Cache-Control')).toBe('no-store');
     expect((await missing.json()).error.code)
       .toBe('SEYEON_FIRST_REVEAL_AUTHORITY_UNAVAILABLE');
     expect(asset).not.toHaveBeenCalled();

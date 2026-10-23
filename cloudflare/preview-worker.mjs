@@ -28,6 +28,21 @@ function protectedHeaders(extra = {}) {
   return { ...SECURITY_HEADERS, ...extra };
 }
 
+// Keep the Worker-owned security headers on every sealed chat response,
+// including trusted 401/405 preflight and an absent Auth binding. The last
+// Se-yeon egress fence must run BEFORE wrapping the final response.
+function sealProtectedHttpResponse(response) {
+  const headers = new Headers(response.headers);
+  for (const [key, value] of Object.entries(SECURITY_HEADERS)) {
+    headers.set(key, value);
+  }
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
+
 export default {
   async fetch(request, env) {
     const pathname = new URL(request.url).pathname;
@@ -37,9 +52,11 @@ export default {
     // database or static HTML fallback before G0-D04 is authorized.
     if (pathLower === '/api/chat' || pathLower.startsWith('/api/chat/')) {
       const requestId = crypto.randomUUID();
-      const sealed = () => enforceSeyeonCloudflareOfflineFetchEgressFenceV1(
-        denySeyeonCloudflareFirstRevealBeforeProviderV1(requestId),
-        requestId,
+      const sealed = () => sealProtectedHttpResponse(
+        enforceSeyeonCloudflareOfflineFetchEgressFenceV1(
+          denySeyeonCloudflareFirstRevealBeforeProviderV1(requestId),
+          requestId,
+        ),
       );
       // A preview with no approved Auth binding remains completely offline.
       // Reuse the existing Member verifier; never accept a client-supplied
@@ -61,8 +78,10 @@ export default {
         });
         // The last Fetch fence is unconditional even after trusted 4xx
         // preflight. Successful Member verification only reaches 503.
-        return enforceSeyeonCloudflareOfflineFetchEgressFenceV1(
-          guarded, requestId,
+        return sealProtectedHttpResponse(
+          enforceSeyeonCloudflareOfflineFetchEgressFenceV1(
+            guarded, requestId,
+          ),
         );
       } catch {
         return sealed();
