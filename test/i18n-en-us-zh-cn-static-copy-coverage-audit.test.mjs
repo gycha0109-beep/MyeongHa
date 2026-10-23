@@ -48,7 +48,8 @@ describe('I18N-07 non-authorizing English and Simplified Chinese UI gap audit', 
     expect(status.authoredKeys).toBeGreaterThan(100);
     expect(status.stagedKeysWithinAuthoredCatalog).toBeGreaterThan(0);
     expect(status.unclassifiedOrUnauthoredKeys.length).toBeGreaterThan(0);
-    expect(status.unclassifiedOrUnauthoredKeys).toContain('세계관 둘러보기');
+    expect(status.unclassifiedOrUnauthoredKeys).not.toContain('세계관 둘러보기');
+    expect(status.unclassifiedOrUnauthoredKeys).toContain('연결자와 함께 읽습니다.');
     expect(status.unclassifiedOrUnauthoredKeys).not.toContain('홈');
     expect(status.authoredKeys).toBe(
       status.stagedKeysWithinAuthoredCatalog + status.unclassifiedOrUnauthoredKeys.length,
