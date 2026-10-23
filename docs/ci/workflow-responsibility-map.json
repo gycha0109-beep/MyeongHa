@@ -488,6 +488,12 @@
       "mainMode": "one-shot-trigger",
       "workTrackAttribution": "commit-metadata"
     },
+    "seyeon-c08-provider-metadata-readonly-once-v1.yml": {
+      "responsibility": "character-memory-one-shot-public-provider-metadata-get-only",
+      "prMode": "none",
+      "mainMode": "manual-one-shot",
+      "workTrackAttribution": "commit-metadata"
+    },
     "seyeon-openrouter-zdr-json-catalog-v1.yml": {
       "responsibility": "character-memory-openrouter-zdr-json-public-provider-metadata-only",
       "prMode": "none",

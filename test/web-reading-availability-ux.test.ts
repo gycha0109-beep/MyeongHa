@@ -58,8 +58,8 @@ describe('Web Saju Product discovery: honest route availability', () => {
   it('sends the Home month feature to an existing preview, never unsupported monthly advice', async () => {
     const home = await load('src/home/HomePage.tsx');
     expect(home).toContain('이번 달 사주 읽기');
-    expect(home).toContain('현재 월간 해석은 준비 중입니다.');
-    expect(home).toContain('이달에는 전체 사주 프리뷰부터 시작해 보세요.');
+    expect(home).toContain('월간 해석은 준비 중입니다.');
+    expect(home).toContain('전체 사주 프리뷰를 먼저 확인해 보세요.');
     expect(home).toContain('href="reading-detail.html?topic=temperament&scope=original"');
     expect(home).not.toContain('href="reading-detail.html?scope=month"');
     expect(home).not.toContain('이번 달 운세를 확인했습니다');

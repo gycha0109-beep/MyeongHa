@@ -41,7 +41,7 @@ try{
   const evaluate=async expression=>{const value=await send('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true});if(value.exceptionDetails)throw Error(value.exceptionDetails.text);return value.result?.value;};
   await Promise.all([send('Runtime.enable'),send('Page.enable')]);
   await send('Emulation.setDeviceMetricsOverride',{width:1440,height:1000,deviceScaleFactor:1,mobile:false});
-  const pages=[['index.html','.landing-header'],['hall.html','.gm-home-hero'],['reading.html','#saju-birth-form'],['face-reading.html','[data-face-camera]'],['chat-hub.html','.chat-hub-shell'],['chat.html','.conversation-chat-panel'],['auth.html','.auth-layout'],['birth.html','#birth-status'],['my.html','.my-page-shell'],['records.html','.records-shell'],['reading-detail.html','.reading-route-state']];
+  const pages=[['index.html','.landing-header'],['hall.html','.mhx-hero'],['reading.html','#saju-birth-form'],['face-reading.html','[data-face-camera]'],['chat-hub.html','.chat-hub-shell'],['chat.html','.conversation-chat-panel'],['auth.html','.auth-layout'],['birth.html','#birth-status'],['my.html','.my-page-shell'],['records.html','.records-shell'],['reading-detail.html','.reading-route-state']];
   async function navigate(page,selector){
     const r=await send('Page.navigate',{url:origin+'/'+page});assert(!r.errorText,'Navigation failed '+page);
     let ready=false;

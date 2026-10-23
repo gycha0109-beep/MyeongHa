@@ -9,6 +9,8 @@ import {SEYEON_COMPACT_SHADOW_PROMPT_VERSION_V1}
   from '../apps/api/src/seyeon-shadow-compact-prompts-v1.js';
 // @ts-expect-error: Offline reservation scenario MJS has no TypeScript declaration.
 import {quoteSeyeonThreeCallTenKrwShadowV1} from '../scripts/seyeon-c08r3-10krw-reserve-scenario-v1.mjs';
+// @ts-expect-error: Offline N06 paired plan MJS has no TypeScript declarations.
+import {planSeyeonC08N06PairedOfflineV1} from '../scripts/seyeon-c08-n06-paired-paid-research-plan-offline-v1.mjs';
 import type {RunSeyeonCharacterTurnV2Input}
   from '../apps/api/src/seyeon-character-runtime-v2.js';
 
@@ -55,7 +57,12 @@ function governance():RunSeyeonCharacterTurnV2Input['governance']{
 }
 type Profile='baseline'|'compact_v1';
 type Fault='none'|'invalid-draft'|'invalid-review'|'stale-census';
-function harness(profile:Profile,fault:Fault='none'){
+function harness(
+  profile:Profile,fault:Fault='none',
+  route:Readonly<{model:string;tag:string}>={
+    model:'z-ai/glm-5.3-flash',tag:'open-inference/fp4',
+  },
+){
   const seen:{stage:string;bytes:number;instructionBytes:number;schemaBytes:number;inputBytes:number}[]=[];
   const census=createSeyeonQualityTrioSyntheticCensusV1('N06',ID);
   let reads=0;
@@ -70,10 +77,10 @@ function harness(profile:Profile,fault:Fault='none'){
   };
   const provider=createOpenRouterSeyeonEvaluationProviderV1({
     apiKey:'sk-or-synthetic-offline-test-key-no-network-000000000000',
-    model:'z-ai/glm-5.3-flash',maxCompletionTokens:1536,
-    providerOnlyTag:'open-inference/fp4',timeoutMs:30000,
+    model:route.model,maxCompletionTokens:1536,
+    providerOnlyTag:route.tag,timeoutMs:30000,
     beforeDispatch:async metadata=>{
-      expect(metadata.modelKey).toBe('z-ai/glm-5.3-flash');
+      expect(metadata.modelKey).toBe(route.model);
       expect(STAGES).toContain(metadata.purpose);
     },
     afterOutcome:async outcome=>{
@@ -84,10 +91,10 @@ function harness(profile:Profile,fault:Fault='none'){
       const wire=JSON.parse(String(init.body));
       const stage=wire.response_format.json_schema.name.slice('myeongha_'.length,-3);
       const bytes=Buffer.byteLength(String(init.body),'utf8');
-      expect(wire.model).toBe('z-ai/glm-5.3-flash');
+      expect(wire.model).toBe(route.model);
       expect(wire.stream).toBe(false);
       expect(wire.provider).toMatchObject({
-        only:['open-inference/fp4'],zdr:true,data_collection:'deny',
+        only:[route.tag],zdr:true,data_collection:'deny',
         allow_fallbacks:false,require_parameters:true,
       });
       seen.push({
@@ -110,7 +117,7 @@ function harness(profile:Profile,fault:Fault='none'){
           failureCodes:[],evidence:[]};
       else throw Error('UNAPPROVED_STAGE');
       return Response.json({
-        model:'z-ai/glm-5.3-flash',
+        model:route.model,
         choices:[{index:0,finish_reason:'stop',message:{
           role:'assistant',content:JSON.stringify(payload),
         }}],
@@ -181,6 +188,70 @@ describe('C08-R public synthetic compact 3-call Shadow (NO external provider)',(
       baseline:baseline.seen,compact:compact.seen,...totals,
       actualModelCalls:0,modelQualityVerified:false,latencyVerified:false,
       invoiceReconciled:false,productionPromotionPermitted:false,
+    }));
+  });
+
+
+  it('replays EXACT adapter-serialized N06 public wire for a hypothetical pinned gpt-oss provider',async()=>{
+    // Price/Provider metadata is MOCKED. Wire is built by the real adapter and
+    // guard topology, not derived from fixture prose or hand-guessed lengths.
+    const model='openai/gpt-oss-120b',tag='openai';
+    const base=harness('baseline','none',{model,tag});
+    const compact=harness('compact_v1','none',{model,tag});
+    const [a,b]=await Promise.all([base.run(),compact.run()]);
+    expect(a.scope).toBe('SHADOW_ONLY_NOT_PRODUCTION');
+    expect(b.scope).toBe('SHADOW_ONLY_NOT_PRODUCTION');
+    expect(a.envelope.utterance).toBe(b.envelope.utterance);
+    expect(base.reads).toBe(4);
+    expect(compact.reads).toBe(4);
+    expect(base.seen.map(x=>x.stage)).toEqual(STAGES);
+    expect(compact.seen.map(x=>x.stage)).toEqual(STAGES);
+    expect(base.seen[0]).toEqual(compact.seen[0]);
+    for(let i=1;i<3;i++){
+      expect(compact.seen[i]!.bytes).toBeLessThan(base.seen[i]!.bytes);
+    }
+    const metadata={
+      schema:'seyeon-c08-provider-metadata-once-v1',
+      completeMetadataRead:true,metadataGetCount:4,inferencePostCount:0,
+      commitSha:'a'.repeat(40),
+      modelStatuses:[
+        {model,status:200},
+        {model:'qwen/qwen3.5-flash-02-23',status:200},
+        {model:'google/gemini-3.1-flash-lite',status:200},
+      ],
+      models:[
+        {model,providers:[{
+          providerTag:tag,inputUsdPerMillion:0.03,
+          outputUsdPerMillion:0.17,disposition:'METADATA_MATH_ONLY_HOLD',
+          paidInferenceAuthorized:false,productionRouteAuthorized:false,
+        }]},
+        {model:'qwen/qwen3.5-flash-02-23',providers:[]},
+        {model:'google/gemini-3.1-flash-lite',providers:[]},
+      ],
+    };
+    const plan=planSeyeonC08N06PairedOfflineV1({
+      text:TEXT,model,providerTag:tag,readback:metadata,
+      baselineRequestBytes:base.seen.map(x=>x.bytes),
+      compactRequestBytes:compact.seen.map(x=>x.bytes),
+    });
+    expect(plan.plannedCalls).toBe(6);
+    expect(plan.authoritativeCensusReadsPerArm).toBe(4);
+    expect(plan.keepIndependentSemanticReview).toBe(true);
+    expect(plan.paidDispatchAuthorized).toBe(false);
+    expect(plan.strictJsonSchemaRuntimeVerified).toBe(false);
+    expect(plan.providerHardTurnBillCapVerified).toBe(false);
+    expect(plan.arms[0]!.stages.map((s:{requestBodyBytes:number})=>s.requestBodyBytes))
+      .toEqual(base.seen.map(x=>x.bytes));
+    expect(plan.arms[1]!.stages.map((s:{requestBodyBytes:number})=>s.requestBodyBytes))
+      .toEqual(compact.seen.map(x=>x.bytes));
+    expect(plan.arms[1]!.reservedMicroUsd).toBeLessThan(plan.arms[0]!.reservedMicroUsd);
+    console.log('SEYEON_C08_N06_ADAPTER_WIRE_PAIR_OFFLINE',JSON.stringify({
+      model,providerTag:tag,
+      baselineBytes:base.seen.map(x=>x.bytes),
+      compactBytes:compact.seen.map(x=>x.bytes),
+      reservedScenarioMicroUsd:plan.totalReservedMicroUsd,
+      stagedQuoteOnly:true,paidCalls:0,providerMetadataMocked:true,
+      providerInvoiceReconciled:false,productionAuthorized:false,
     }));
   });
 
