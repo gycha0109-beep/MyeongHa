@@ -163,8 +163,12 @@ describe('Private Commerce original Receipt -> S5 commit -> S7 -> withdrawal evi
   });
 
   it.each([
+    { authority: 'server_checkout_snapshot' },
     { purchaseIntentId: BODY },
     { originatingGrantId: BODY },
+    { productSpecVersion: 'another-reading-v2' },
+    { snapshotRecordedAt: 'not-a-date' },
+    { noticePresentedAt: '2026-10-20T08:56:00+09:00' },
     { originalGrantItemBinding: 'browser_claimed_receipt' },
     { pinnedCapabilityItemKey: '' },
     { noticeRevision: '' },
