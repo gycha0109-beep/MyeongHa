@@ -51,11 +51,16 @@ describe('I18N-07 EN-US and ZH-CN staged protected interface shells', () => {
       for (const key of REQUIRED_READER_KEYS) {
         expect(ui.reader[key].trim().length).toBeGreaterThan(0);
       }
+      // The Reader's nested statusMessages object is checked separately.
+      // Do not replace it with an empty-string sentinel: that creates a false
+      // missing-translation error rather than checking authored Reader text.
+      const { statusMessages, ...readerCopy } = ui.reader;
       for (const [name, collection] of Object.entries({
-        chat: ui.chat, composer: ui.composer,
+        chat: ui.chat,
+        composer: ui.composer,
         originalTextNotices: ui.originalTextNotices,
-        reader: { ...ui.reader, statusMessages: '' },
-        readerStatuses: ui.reader.statusMessages,
+        reader: readerCopy,
+        readerStatuses: statusMessages,
       })) {
         for (const [key, value] of Object.entries(collection)) {
           expect(value.trim().length, `${locale}:${name}:${key}`).toBeGreaterThan(0);
