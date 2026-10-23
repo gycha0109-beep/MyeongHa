@@ -54,11 +54,11 @@ export function createPostgresPortOneVerifiedAgeAdmissionPortV1(
   pool: PostgresSubjectPoolV1,
 ): PortOneVerifiedAgeAdmissionPortV1 {
   return Object.freeze({
-    async admitFreePersonalization(evidence) {
+    async admitFreePersonalization(evidence: VerifiedSubjectIdentityEvidenceV1) {
       const band = await readBand(pool, evidence);
       return band === 'adult' || band === 'free_minor';
     },
-    async admitAdultDirectPurchase(evidence) {
+    async admitAdultDirectPurchase(evidence: VerifiedSubjectIdentityEvidenceV1) {
       return await readBand(pool, evidence) === 'adult';
     },
   });
