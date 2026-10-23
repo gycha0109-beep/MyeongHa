@@ -152,9 +152,9 @@ async function main() {
   }
   const cwd = process.cwd();
   const config = JSON.parse(await readFile(resolve(cwd, 'wrangler.jsonc'), 'utf8'));
-  if (config.name !== WORKER_NAME || config.workers_dev !== false ||
+  if (config.name !== WORKER_NAME || config.workers_dev !== true ||
       config.main !== './workers/cloudflare-static-preview.mjs') {
-    throw new Error('This command is restricted to the existing myeongha preview Worker.');
+    throw new Error('This command is restricted to the existing approved myeongha Worker.');
   }
   const values = await readSelectedSecrets(cwd, options);
   const target = options.previewBase ? 'preview-base(new previews only)' :

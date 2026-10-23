@@ -4,10 +4,18 @@ import {
   CF_PREVIEW_DRILL_V1,
   CF_PREVIEW_APPROVED_RECOVERY_COMMIT_V1,
   parseCloudflarePreviewRehearsalV1,
+  approvedWorkersDevForRehearsalRevisionV1,
 } from '../scripts/local/rehearse-cloudflare-preview-rollback.mjs';
 
 const OLD = 'd4f7cebb3d9be6b4ad9e526c53e3f5b8585cc9c0';
 const CURRENT = '52aa940f566b5282335d775100c139b5259f154a';
+
+describe('Mixed historical Workers.dev rollback policy', () => {
+  it('accepts disabled historical Preview and enabled current public host', () => {
+    expect(approvedWorkersDevForRehearsalRevisionV1('d4f7cebb3d9be6b4ad9e526c53e3f5b8585cc9c0')).toBe(false);
+    expect(approvedWorkersDevForRehearsalRevisionV1('f24cbfb15923bc8b9ce2e200078b118b28d2cafe')).toBe(true);
+  });
+});
 
 describe('Cloudflare Preview rollback rehearsal safe-by-default', () => {
   it('accepts exact committed rollback and restore IDs as dry run only', () => {

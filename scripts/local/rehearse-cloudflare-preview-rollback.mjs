@@ -19,6 +19,10 @@ const RECEIPT_PATH = '/_myeongha-preview-build.json';
 export const CF_PREVIEW_APPROVED_RECOVERY_COMMIT_V1 =
   'd4f7cebb3d9be6b4ad9e526c53e3f5b8585cc9c0';
 
+export function approvedWorkersDevForRehearsalRevisionV1(revision) {
+  return revision !== CF_PREVIEW_APPROVED_RECOVERY_COMMIT_V1;
+}
+
 export function parseCloudflarePreviewRehearsalV1(argv) {
   if (argv.length === 1 && argv[0] === '--help') return null;
   const out = { rollback: '', restore: '', apply: false, previewOnly: false };
@@ -67,7 +71,7 @@ function assertLocalCheckout(cwd, plan) {
     const config = JSON.parse(execFileSync('git', ['-C', cwd, 'show', revision + ':wrangler.jsonc'], {
       encoding: 'utf8', timeout: 20_000, stdio: ['ignore','pipe','ignore'],
     }));
-    if (config.name !== CF_PREVIEW_DRILL_V1.worker || config.workers_dev !== false ||
+    if (config.name !== CF_PREVIEW_DRILL_V1.worker || config.workers_dev !== approvedWorkersDevForRehearsalRevisionV1(revision) ||
         config.preview_urls !== true || config.main !== './workers/cloudflare-static-preview.mjs' ||
         config.assets?.directory !== './public' ||
         config.assets?.html_handling !== 'none' ||

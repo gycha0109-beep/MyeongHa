@@ -71,9 +71,9 @@ async function main() {
   if(process.platform!=='linux')throw Error('Stage 9 bundle guard is Linux CI-only');
   const cfg=JSON.parse(await readFile(resolve('wrangler.jsonc'),'utf8'));
   if(cfg.name!=='myeongha'||cfg.main!=='./workers/cloudflare-static-preview.mjs'||
-    cfg.workers_dev!==false||cfg.preview_urls!==true||
+    cfg.workers_dev!==true||cfg.preview_urls!==true||
     cfg.assets?.directory!=='./public') {
-    throw Error('Preview-only Worker configuration changed');
+    throw Error('Approved workers.dev Worker configuration changed');
   }
   await stat(resolve('public','index.html'));
   const root=await mkdtemp(join(tmpdir(),'myeongha-wrangler-dry-run-'));
