@@ -112,7 +112,7 @@ function createDefaultSubjectScope(bindings) {
   // fails, no pool has been allocated and nothing can remain unclosed.
   if(!approvedCloudflarePostgresTargetV1(config,bindings)) throw Error('Unapproved scoped chat DB host');
   const strict=buildProductionNodePostgresPoolConfigV1(
-    config,bindings, CLOUDFLARE_DIRECT_POSTGRES_CANDIDATE_LIMITS_V1,
+    config,CLOUDFLARE_DIRECT_POSTGRES_CANDIDATE_LIMITS_V1,
   );
   if(strict.max!==1||typeof strict.ssl!=='object'||strict.ssl===null||
      strict.ssl.rejectUnauthorized!==true) throw Error('Unapproved scoped chat TLS');

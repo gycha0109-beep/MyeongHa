@@ -102,7 +102,7 @@ export async function tryHandleCloudflareApprovedSajuCalculationV1(request, bind
     config = parseProductionUserDataRuntimeConfigV1(bindings);
     if (!approvedCloudflarePostgresTargetV1(config, bindings)) return unavailable();
     const tls = buildProductionNodePostgresPoolConfigV1(
-      config, bindings, CLOUDFLARE_DIRECT_POSTGRES_CANDIDATE_LIMITS_V1,
+      config, CLOUDFLARE_DIRECT_POSTGRES_CANDIDATE_LIMITS_V1,
     );
     if (tls.max !== 1 || !tls.ssl ||
         typeof tls.ssl !== 'object' || tls.ssl.rejectUnauthorized !== true) {

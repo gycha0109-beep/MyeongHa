@@ -467,7 +467,7 @@ export async function tryHandleCloudflareApprovedAuthV1(request, bindings, route
       // closes it on every success/error path after the Auth runtime settles.
       const rateLimitConfig = parseProductionMemberAuthRateLimitConfigV1(bindings);
       memberRateLimitPool = createCloudflareSubjectPoolV1(
-        rateLimitConfig, CLOUDFLARE_DIRECT_POSTGRES_CANDIDATE_LIMITS_V1,
+        rateLimitConfig, bindings, CLOUDFLARE_DIRECT_POSTGRES_CANDIDATE_LIMITS_V1,
       );
       runtime = createProductionMemberAuthHttpRuntimeV1({
         env: bindings,
