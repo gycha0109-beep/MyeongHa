@@ -934,9 +934,33 @@ describe.skipIf(!enabled)('R5 disposable actual-v2 current-rights first/replay/h
             const competing=firstOnceR25(other,id);
             await waitForLock('seyeon-r25-second-first-send');
             expect(events).toEqual([]);
-            allowNodeFinish();
-            expect(await competing).toBeNull();
-            await other.query('COMMIT');
+            // A THIRD independent PostgreSQL session now tries the real
+            // original Memory revoke while A holds the send authority.
+            // It must not COMMIT revocation before A's Node 'finish'.
+            await clientAction(async revoker=>{
+              await revoker.query('BEGIN');
+              try{
+                await revoker.query("set local application_name='seyeon-r25-revoke-after-first-send'");
+                const revoking=revoker.query<{revoked_grant_count:number}>(
+                  'select revoked_grant_count from public.cmd_revoke_memory_character_grant_v1($1::uuid,$2::uuid,$3::text)',
+                  [subject,id.memory,'seyeon'],
+                );
+                await waitForLock('seyeon-r25-revoke-after-first-send');
+                expect(events).toEqual([]);
+                allowNodeFinish();
+                // B was already queued on the exclusive Turn lock. After
+                // A commits delivered, B can only read NULL and releases its
+                // Subject SHARE, allowing revoke to finish afterwards.
+                expect(await competing).toBeNull();
+                await other.query('COMMIT');
+                const revoked=await revoking;
+                expect(revoked.rows[0]?.revoked_grant_count).toBe(1);
+                await revoker.query('COMMIT');
+                events.push('revoke-committed');
+              }finally{
+                await revoker.query('ROLLBACK').catch(()=>undefined);
+              }
+            });
           }finally{
             await other.query('ROLLBACK').catch(()=>undefined);
           }
@@ -945,7 +969,7 @@ describe.skipIf(!enabled)('R5 disposable actual-v2 current-rights first/replay/h
         expect(response.status).toBe(200);
         expect(response.headers.get('cache-control')).toBe('no-store');
         expect(await response.text()).toContain(body);
-        expect(events).toEqual(['first-node-finish','first-db-commit']);
+        expect(events).toEqual(['first-node-finish','first-db-commit','revoke-committed']);
       }finally{
         allowNodeFinish();
       }
@@ -954,6 +978,9 @@ describe.skipIf(!enabled)('R5 disposable actual-v2 current-rights first/replay/h
     expect(await transaction(c=>firstOnceR25(c,id),true)).toBeNull();
     expect((await saved(id)).messages).toBe('1');
     expect((await saved(id)).outboxes).toBe('2');
+    // A future use of that once-valid Memory Grant is revoked and cannot
+    // create another independent positive response after delivery.
+    expect(await http(id)).toBeNull();
   });
 
   it('R25 REAL PG revoke-first blocks Node first send before private bytes and preserves unused Turn',async()=>{
