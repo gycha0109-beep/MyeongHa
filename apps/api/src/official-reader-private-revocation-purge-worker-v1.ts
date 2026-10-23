@@ -193,6 +193,16 @@ function validateFence(
       || !Array.isArray(fence.bodyIds) || !Array.isArray(fence.keyRefs)
       || fence.bodyIds.length===0
       || fence.bodyIds.length!==fence.keyRefs.length) return fail();
+  // On DB-erased replay, a corrupt ledger must never supply arbitrary key
+  // references to an irreversible destruction port.
+  const bodyIds=fence.bodyIds.map(uuid);
+  const keyRefs=fence.keyRefs.map(ref => {
+    const value=nonEmpty(ref);
+    if(!REF.test(value)) return fail();
+    return value;
+  });
+  if(new Set(bodyIds).size!==bodyIds.length
+      || new Set(keyRefs).size!==keyRefs.length) return fail();
   return fence;
 }
 
@@ -303,6 +313,12 @@ export async function runOfficialReaderPrivateRevocationPurgeBatchV1(input: {
       input.pool,MANIFEST_SQL,[jobId,worker],
     );
     const manifest=parseManifest(snapshot.result,claim);
+    // DB and manifest must agree on the irreversible erasure transition.
+    // Never replay a physical delete or take the empty/sibling path on
+    // a previously DB-erased job with inconsistent restored authority.
+    if ((claim.jobStatus==='db_erased') !== (manifest.state==='db_erased')) {
+      return fail();
+    }
 
     if (manifest.state==='sibling_right_present') {
       const released=await single<{released:unknown}>(
