@@ -35,7 +35,7 @@ Watchtower-Track: legal-compliance
 - **공식 서버 API:** `GET https://api.portone.io/identity-verifications/{identityVerificationId}`; 비밀 키는 서버에서만 사용. 결과의 `status === 'VERIFIED'` + `id` 일치 + `verifiedCustomer.birthDate`로 **한국 시간 기준 만 14/19세 밴드** 평가. 본인확인 수단은 다날·KCP 휴대폰 또는 이니시스 통합인증 등 *PortOne V2에서 허용된 계약 채널*로만 구성.
 - **구현:** `apps/api/src/portone-v2-identity-verification-contract-v1.ts`는 서버 조회 응답을 평가하는 **읽기 전용, 오프라인 판정 함수**. 서버가 발행한 Subject 연결 인증 시도 ID와 미소비 상태 검증, 미확인/잘못된 인증/14세 미만은 거절하고 `free_minor` 또는 `adult` 밴드만 반환. 전화번호·이름·CI·DI·원문 생년월일 등은 반환하지 않음. `test/legal-portone-v2-identity-verification-contract.test.ts`에서 성공·미성년·거짓 응답·타인 인증 ID·소비된 시도 거부를 검증.
 - **이번 구현 확장:** `apps/api/src/portone-v2-identity-verification-lookup-v1.ts`에 **서버 전용 PortOne V2 GET 조회 어댑터**를 추가했다. 비밀키 기반 `Authorization: PortOne ...`, 고정 `https://api.portone.io` URL, 리다이렉트 금지, 전체 요청/응답 타임아웃 및 16KiB 응답 상한, HTTP 상태·JSON·검증 결과 불일치시 Fail Closed, 원시 이름·전화번호·CI·DI·생년월일 반환 금지를 검증한다. `apps/api/src/portone-v2-identity-age-finalization-v1.ts`는 인증 시도 소유 Subject 조회 → 서버 단건조회 → *원자적 1회 소비 및 연령 밴드 저장이 가능한 권위 포트*를 순서대로 실행하는 오케스트레이션 계약이다. 관련 `test/legal-portone-v2-identity-lookup-v1.test.ts`, `test/legal-portone-v2-identity-age-finalization-v1.test.ts` 추가. 현재 오프라인 가짜 응답 기반 테스트만 수행하며 **실제 운영 API 요청·DB 쓰기 경로는 없음**.
-- **아직 구현되지 않음:** 인증 시도 DB 영속 권위 및 만료 검사, 서버 소유 일회성 식별자 발급·저장, Subject와 연결된 원자적 소비·연령 밴드 저장 포트의 **실제 DB 구현**, 환경 비밀값·채널 설정/SDK 및 실제 인증 라우트, 계정 Subject 영구 연결 및 변경·삭제/보존, 한국 외 인증·개명/명의 변경 처리, 운영 계약·성공 비용. 해당 전제 미완성으로 SDK/공개 API/실계약 전송은 **전부 OFF**.
+- **구현/운영 구분:** 서버 ID 발급·만료·원자적 소비 SQL **제안 및 TypeScript 어댑터**, 인증 HTTP **비등록 처리기**, 삭제 트리거 **제안**은 작성했다. 하지만 실제 DB migration/SDK/라우트, 계정 Subject 인증 권한 영속화 실증, 환경 비밀키·인증 채널 설정, 한국 외 인증·개명 처리 및 운영 계약·요금은 **미완료**. 실제 인증과 공개 API는 계속 OFF.
 - **개인정보 최소화:** 인증업체에 건네는 값과 인증 후 저장할 최소 필드/처리 목적/보존기간/제3자 제공·위탁은 실제 계약과 개인정보 처리방침 확정 후 명시. CI/DI·전화번호·이름 수집을 기능적으로 자동 승인하지 않음.
 - **공식 근거:** https://developers.portone.io/opi/ko/extra/identity-verification/readme-v2 / https://developers.portone.io/api/rest-v2/identityVerification
 
@@ -47,6 +47,14 @@ Watchtower-Track: legal-compliance
 - `apps/api/src/postgres-portone-identity-age-authority-v1.ts`는 기존 Subject 권위 트랜잭션으로 Issue/Read/Consume SQL을 호출하며, 인증 대상 Subject가 인증된 Subject와 다르면 DB 명령 전에 거절. **외부 PortOne HTTP 요청 중에는 DB 트랜잭션을 유지하지 않음.**
 - `test/legal-postgres-portone-identity-age-authority-v1.test.ts`는 모의 PostgreSQL에서 트랜잭션 분리, 다른 Subject 차단, 잘못된 DB 결과 거절, SQL 정책을 확인. 실제 PostgreSQL17에 제안 SQL을 실행한 동시성·ACL·삭제/복원 E2E 통과 근거는 **없음**.
 - **후속 필수:** DB Authority에 제안 SQL을 인계해 계정 삭제 35 DELETE / 4 ANONYMIZE / 9 RETAIN P5Y 및 백업 P30D 정책에 새 테이블을 반영하고, Guest→Member 승격·만료 증빙·자격 갱신을 검증한 뒤 migration 적용. 인증 제공자 계약·키·SDK·공개 API는 모두 OFF.
+
+
+### 2.3 본인확인 발급·완료 HTTP 및 삭제 트리거 제안 (2026-10-24)
+
+- `apps/api/src/portone-v2-identity-http-v1.ts`: `POST /api/identity-verifications/attempts`와 `POST /api/identity-verifications/complete`를 위한 **비등록된 서버 HTTP 처리기**를 작성. Auth/Guest 인증 증거로 Subject를 DB에서 다시 확인하며, 발급 요청은 빈 JSON만 허용해 클라이언트 지정 인증 ID·Subject를 받지 않음. 완료 요청은 서버가 발급한 형식의 인증 ID 1개만 받고, PortOne 서버 재조회와 DB 1회 소비가 모두 성공한 경우에만 최소 연령 구간을 응답. 실패 시 PII/비밀값/DB 상세 노출 금지. **기본 OFF, Vercel 공개 라우트 없음, 테스트 전용 활성화 주입 외에는 실행 불가**.
+- `supabase/proposals/1740_portone_identity_age_authority_v1.proposed.sql`에 Subject가 `deletion_pending`/`deleted`/`merged` 등 비활성 상태로 전환하면 본인확인 시도와 연령 증빙을 트랜잭션 내 삭제하는 trigger 함수 제안. 기존 계정 삭제 정책은 Subject 행을 `ANONYMIZE`하므로, `ON DELETE CASCADE`만으로 삭제 완료로 판단하지 않음. DB/Privacy의 정식 삭제·백업 P30D·P5Y 보존 계약 변경 없음.
+- 소규모 `test/legal-portone-v2-identity-http-v1.test.ts`로 라우트 OFF·서버 ID 발급·검증 후 1회 기록·재사용 차단만 확인. 실제 DB 마이그레이션, 트리거 실증, SDK·PortOne 인증 채널 계약은 미진행.
+- **다음:** DB Authority/Privacy 정본의 삭제 처분 목록에 두 제안 테이블을 `DELETE` 후보로 편입하고 PG17에서 트리거·권한을 확인한 후, 안전하게 운영 라우트·연령 권한 강제를 연결할 수 있는지 판단. 기존 승인된 `46 DELETE / 4 ANONYMIZE / 9 RETAIN` 등의 기준 집계와 지문은 임의 변경하지 않음.
 
 ## 3. 출시 전에 반드시 남은 항목
 
