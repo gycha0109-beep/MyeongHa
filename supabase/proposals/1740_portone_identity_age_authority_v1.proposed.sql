@@ -31,6 +31,10 @@ create unique index legal_portone_one_pending_per_subject
 create index legal_portone_attempt_subject_expiry
   on public.legal_portone_identity_attempts_v1(subject_id, expires_at);
 
+-- Global expiry scan for a bounded, system-worker-only physical purge.
+create index legal_portone_attempt_expiry_purge_v1
+  on public.legal_portone_identity_attempts_v1(expires_at, identity_verification_id);
+
 create table public.legal_portone_verified_age_v1 (
   subject_id uuid primary key references public.subjects(id) on delete cascade,
   age_band text not null check (age_band in ('free_minor','adult')),
@@ -217,5 +221,58 @@ grant execute on function public.qry_pending_legal_portone_identity_v1(uuid,text
 grant execute on function public.cmd_consume_legal_portone_identity_v1(uuid,text,text) to myeongha_api_executor;
 revoke all on function public.qry_verified_legal_portone_age_v1(uuid) from public, anon, authenticated;
 grant execute on function public.qry_verified_legal_portone_age_v1(uuid) to myeongha_api_executor;
+
+
+-- Physical cleanup is *eligible* at the already-defined ten-minute TTL.
+-- This selects no new retention policy or automatic cadence; the operator
+-- worker is NOT scheduled or connected while this remains a proposal.
+-- Do not clear verified-age authority here: it belongs to the active Subject.
+create function public.internal_purge_expired_legal_portone_attempts_v1(
+  p_limit integer
+)
+returns integer
+language plpgsql security definer
+set search_path = pg_catalog, public, pg_temp
+as $purge_expired$
+declare
+  v_removed integer;
+begin
+  if p_limit is null or p_limit < 1 or p_limit > 250 then
+    raise exception using
+      errcode='23514',
+      constraint='legal_portone_purge_batch_invalid',
+      message='PortOne cleanup limit must be between 1 and 250';
+  end if;
+  with eligible as (
+    select a.identity_verification_id
+    from public.legal_portone_identity_attempts_v1 a
+    where a.expires_at <= clock_timestamp()
+    order by a.expires_at, a.identity_verification_id
+    limit p_limit
+    for update skip locked
+  )
+  delete from public.legal_portone_identity_attempts_v1 a
+  using eligible e
+  where a.identity_verification_id = e.identity_verification_id
+    and a.expires_at <= clock_timestamp();
+  get diagnostics v_removed = row_count;
+  return v_removed;
+end $purge_expired$;
+
+-- Existing isolated worker role; no generic API/PostgREST invocation.
+revoke all on function public.internal_purge_expired_legal_portone_attempts_v1(integer)
+  from public, anon, authenticated, myeongha_api_executor;
+do $purge_acl$
+begin
+  if exists (select 1 from pg_catalog.pg_roles where rolname='service_role') then
+    revoke all on function public.internal_purge_expired_legal_portone_attempts_v1(integer)
+      from service_role;
+  end if;
+  if not exists (select 1 from pg_catalog.pg_roles where rolname='myeongha_system_executor') then
+    raise exception 'PortOne purge requires established myeongha_system_executor role';
+  end if;
+end $purge_acl$;
+grant execute on function public.internal_purge_expired_legal_portone_attempts_v1(integer)
+  to myeongha_system_executor;
 
 commit;
