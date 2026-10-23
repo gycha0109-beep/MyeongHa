@@ -98,6 +98,23 @@ describe('S4 resumed refund purge fence must be valid before key erasure', () =>
   });
 
   it.each([
+    ['no_content', { empty: 1, deferredForSiblingRight: 0 }],
+    ['sibling_right_present', { empty: 0, deferredForSiblingRight: 1 }],
+  ] as const)('preserves safe claimed-job %s path without key destruction',
+    async (manifest, expected) => {
+      const { run, destroyKey, isKeyDestroyed, ackDb, ackKeys } =
+        fixture({}, { claim: 'claimed', manifest });
+      expect(await run()).toMatchObject({
+        discovered: 1, completed: 0, failed: 0, ...expected,
+        publicPaidReadEnabled: false,
+      });
+      expect(destroyKey).not.toHaveBeenCalled();
+      expect(isKeyDestroyed).not.toHaveBeenCalled();
+      expect(ackDb).not.toHaveBeenCalled();
+      expect(ackKeys).not.toHaveBeenCalled();
+    });
+
+  it.each([
     ['db_erased claim with active sibling decision', 'db_erased', 'sibling_right_present'],
     ['db_erased claim with no-content decision', 'db_erased', 'no_content'],
     ['fresh claim with historical db-erased fence', 'claimed', 'db_erased'],
