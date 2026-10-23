@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { createElement } from 'react';
 import { HomePage } from '../home/HomePage.js';
 import { ChatHubPage } from '../chat-hub/ChatHubPage.js';
 import { RecordsPage } from '../records/RecordsPage.js';
@@ -25,8 +24,8 @@ describe('I18N-07 developer-only rendered EN/ZH UI preview', () => {
   });
 
   it('renders actual Home JSX UI labels in English while leaving preview/source data unchanged', () => {
-    const english = renderToStaticMarkup(createElement(HomePage, { previewLocale: 'en-US' }));
-    const korean = renderToStaticMarkup(createElement(HomePage));
+    const english = renderToStaticMarkup(<HomePage previewLocale="en-US" />);
+    const korean = renderToStaticMarkup(<HomePage />);
     expect(english).toContain('data-planned-ui-preview="en-US"');
     expect(english).toContain('Who would you like to talk to?');
     expect(english).toContain('Monthly readings are not yet available.');
@@ -41,8 +40,8 @@ describe('I18N-07 developer-only rendered EN/ZH UI preview', () => {
   });
 
   it('renders Chat Hub UI and accessibility source labels in Simplified Chinese without touching data sockets', () => {
-    const chinese = renderToStaticMarkup(createElement(ChatHubPage, { previewLocale: 'zh-CN' }));
-    const korean = renderToStaticMarkup(createElement(ChatHubPage));
+    const chinese = renderToStaticMarkup(<ChatHubPage previewLocale="zh-CN" />);
+    const korean = renderToStaticMarkup(<ChatHubPage />);
     expect(chinese).toContain('data-planned-ui-preview="zh-CN"');
     expect(chinese).toContain('对话');
     expect(chinese).toContain('请选择一位您感兴趣的人');
@@ -56,9 +55,9 @@ describe('I18N-07 developer-only rendered EN/ZH UI preview', () => {
   });
 
   it('renders Records UI and privacy notices in EN/CN while preserving record sockets', () => {
-    const english = renderToStaticMarkup(createElement(RecordsPage, { previewLocale: 'en-US' }));
-    const chinese = renderToStaticMarkup(createElement(RecordsPage, { previewLocale: 'zh-CN' }));
-    const korean = renderToStaticMarkup(createElement(RecordsPage));
+    const english = renderToStaticMarkup(<RecordsPage previewLocale="en-US" />);
+    const chinese = renderToStaticMarkup(<RecordsPage previewLocale="zh-CN" />);
+    const korean = renderToStaticMarkup(<RecordsPage />);
     expect(english).toContain('data-planned-ui-preview="en-US"');
     expect(english).toContain('aria-label="Current record owner"');
     expect(english).toContain('Loading records…');
