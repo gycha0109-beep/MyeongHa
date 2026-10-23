@@ -49,27 +49,41 @@
 | **S8 DB 이력/배포/복구** | P3 Ops+DB | 2026-10-19 기준 1520~1720 원격 이력 21/21과 로컬 파일의 **실제 DDL/Owner/ACL/정책 동등성**을 대조. 원격-only `20261008090417` 보존, 새 `20261018190000` 포함 최신 스키마 기준 재해복구 증거·잠금·재시도·forward-only 절차 검토. 임의 repair·재실행 금지 | 버전별 manifest/diff·권한/함수 실측·운영 dry-run 근거, 최신 배포 스키마와 **같은 백업의** 격리 복원·digest·RPO/RTO 승인. **과거 actor 신원 재조사 불필요** | **이력 21/21 확인, 동등성/DR HOLD** |
 | **S9 G6 제한적 운영** | P4 Integration Owner | G0~G5 증거/DR·보안 로그·알림·되돌리기 기준 승인 후, 내부 synthetic smoke→제한적 공개/유료 판단 | 범위, Owner, SHA, run URL, 사고 중단·권한 회수·비용 상한. 전단계 승인 없는 PUBLIC/PAYMENT 불가 | HOLD |
 
-### 2026-10-23 구현 진척도 상태판 — 사실 기반, 승인 상태와 별개
+### 2026-10-23 보안 로드맵 현황 — 확인된 개발 상태와 운영 허가 분리
 
-> **표시 규칙:** `■` = 검증된 개발 구현 완료(운영 PASS 뜻 아님), `◧` = 개발 후보/일부 증거만 확인, `□` = 필수 조건 미충족 또는 별도 승인 HOLD. **단계별 완료율·전체 퍼센트는 산정하지 않는다.** 서로 다른 기술 승인·CI·배포 조건을 임의로 합산하지 않는다. 상세 실행 의존성은 §4와 G0~G6 원장이 기준이다.
+> **읽는 순서:** 먼저 **완료한 구현**, 다음 **현재 구현 중**, 마지막 **운영 허가가 필요한 조건**을 확인한다. `완료`는 해당 단계의 **개발 검증 완료**만 뜻하고, `진행`은 일부 서버·격리 SQL 구현, `대기`는 별도의 기술 실증·Owner 승인 필요를 뜻한다. 임의의 퍼센트, 50% 길이 막대, 승인 없는 GREEN은 사용하지 않는다.
 
-| 로드맵 단계 | 구현 진척도 | 확인 가능한 증거 / 남은 완료 조건 |
+**현재 결론: S1 개발 검증 완료 / S2~S6 개발·격리 검증 진행 / S7·S9 운영 종합 대기 / S8 병렬 DB·DR 검증 진행. Positive Memory 서비스는 여전히 OFF.**
+
+#### ① 개발 구현: 무엇이 작동하고, 무엇이 아직 안 되는가
+
+| 단계 | 개발 상태 | **실제로 구현·확인된 것** | **아직 안 된 것 / 다음 관문** |
+| --- | --- | --- | --- |
+| **S1 · 0건 출처** | **완료** | #2186 보안 검증·병합; 양수·불명 출처를 0건으로 오판하는 경로 차단 | 양수 개인기록 사용 허가를 뜻하지 않음 |
+| **S2 · G0 권한·철회** | **진행** | exact Grant·철회·재부여 및 파생 출처 거부 정책·테스트 후보 | Security+DB+Character 기술 Owner 공동 승인 |
+| **S3 · G1 원본 Pin** | **진행** | 단일 Memory G1 소스·원본 Grant/PG Digest·최종 모델 입력 결속 서버 경로 | #2422 SQL **Draft 미배포**, SRC-25 승인 타입/Codec·실 Owner 권한 |
+| **S4 · G2 원자 Commit** | **진행** | #2489 서버 영수증 및 Outbox 원자 결속 검증·main 반영 | 실제 G2 DB Owner SQL 적용·PostgreSQL 원본 Grant 철회 경합 |
+| **S5 · G3 최초 공개** | **진행** | #2490·#2491·#2492·#2495·#2497 코드를 통합 CI 검증 후 main 반영. 새 received/양수 sequence/원본 User·Assistant·Outbox·ClientTurn 결속 | G3 v3 SQL은 #2422 Draft만 존재; 실 DB 잠금→마지막 전송 경합·G0-D04 ACK |
+| **S6 · G4 비용·모델** | **진행** | 비용 원장/Governor의 격리 검증 일부 존재 | 실제 유료 Provider/Worker 연결 및 과금 증명·승인 OFF |
+
+#### ② 운영·인프라: 왜 아직 출시할 수 없는가
+
+| 단계 | 운영 상태 | **보류 이유 / 필요한 실제 증거** |
 | --- | --- | --- |
-| **S1** 0건 출처 무결성 | **■ 개발 완료** | #2186 검증·병합. **양수 Memory 모델 사용 승인과 무관** |
-| **S2 / G0** 접근·철회 정책 | **◧ 개발 후보 · □ 공동 승인** | exact Grant·취소·재부여/파생 출처 negative 경계 후보 존재; Security+DB+Character 기술 Owner 공동 승인 OPEN |
-| **S3 / G1** 모델 이전 양수 원본 Pin | **◧ 서버 코드/합성 PG · □ 운영 적용** | 정확한 단일 Memory SourceSet·원본 Grant/PG Digest·최종 모델 입력 결속 코드 main. SRC-25 registry 0, SQL #2422 Draft, DB EXECUTE 0; 실 타입·Codec·Owner 검증 필수 |
-| **S4 / G2** 원자 Commit | **◧ 서버·DB 격리 후보 · □ 운영 적용** | #2489 [전체 통합 #39880146016](https://github.com/gycha0109-beep/MyeongHa/actions/runs/39880146016) SUCCESS 및 main 반영; 1-based Commit receipt, 원본 User/Post-turn/G1 결속 SQL은 #2422 **격리 Draft**, 실제 운영 DB 2세션 revoke/ACL 증명 OPEN |
-| **S5 / G3** 최초 공개·Replay/History | **◧ Node 차단·출처 결속 · □ 공개/ACK** | #2490 [전체 통합 #39884092612](https://github.com/gycha0109-beep/MyeongHa/actions/runs/39884092612) SUCCESS 및 main 반영. #2491은 기본 CI green/7인자 G3 원본 User·Assistant·Outbox 연결, [전체 통합 #39889293678](https://github.com/gycha0109-beep/MyeongHa/actions/runs/39889293678) 결과 대기. #2492는 0번 sequence 허용 결함 수정 후보. **first Reveal/History/Replay 503** |
-| **S-CF1/2** Worker 차단 | **◧ 오프라인 차단 완료 · □ 실 Router/Preview** | #2383/#2388/#2392/#2394/#2395의 비운영 차단 코드 main; Ops Router 실장/실 Worker Preview 검증은 미완료 |
-| **S-CF5 / G0-D04** last-hop 권한 | **□ 기술 승인·실증 HOLD** | Node `finish` ≠ Edge/Proxy/브라우저 ACK. 현재 배포 런타임의 R/V/S/ACK·2세션 원본 Grant 철회/송출·Owner 기술 서명 필요 |
-| **S6 / G4** 모델·비용 | **◧ 비용 하부 보호 · □ 실 종단/유료** | 격리 비용 원장·Governor 검증 일부 main. 실제 유료 Provider/Worker 연결은 별도 Owner 승인 전 OFF |
-| **S7 / G5** 보안 종합 | **□ 운영 종단 HOLD** | 실제 Cloudflare Preview, PG 철회 경합, S0~S6 증거 및 비공개 송출 전수 매트릭스 미완료 |
-| **S8** DB/DR | **◧ 원격 이력 확인 · □ 동등성/DR** | 1520~1720 원격 마이그레이션 21/21 등록은 읽기 전용 확인. DDL/Owner/ACL 전량 동등성 및 동일 백업 격리 복원/RPO/RTO 보류 |
-| **S9 / G6** 제한 운영 | **□ 승인 HOLD** | G0~G5·G0-D04·DR 종합 승인 전 공개/과금/데이터 이관 금지 |
+| **S7 · G5 종합 보안** | **대기** | 실 Cloudflare Preview, 양수 PG17 원본 철회 경합, 엔드투엔드 접근/송출 검증 |
+| **S8 · DB·DR** | **진행** | 원격 1520~1720 등록 21/21 읽기 확인; 전량 DDL·Owner·ACL 동등성, 동일 백업 격리 복원·RPO/RTO 미증명 |
+| **S9 · G6 제한 운영** | **대기** | G0~G5·G0-D04·DR 승인 전 공개/유료/데이터 이관 금지 |
+| **Cloudflare (S-CF1/2)** | **일부 완료** | 오프라인 차단은 main. 실제 Ops Router 연결·Worker Preview 검증 별도 미완료 |
+| **Cloudflare (S-CF5 / G0-D04)** | **대기** | Node `finish` ≠ Edge/Proxy/브라우저 ACK. 실제 R/V/S/ACK 및 권한 철회-최종 바이트 경합 기술 증명·서명 필요 |
 
-**이번 작업 단위 시각화 (S5/G3):**
-`#2490 [■ 통합 통과·main] → #2491 [■ 기본 CI 통과 | ◧ 통합 실행 | □ 병합 확인] → #2492 [◧ 기본 CI 실행 | □ 통합 | □ 병합]`.
-위 PR/실행 상태는 기록 시점의 조회 결과일 뿐, 미래 CI 성공을 예고하지 않는다. **#2422는 Draft·미병합·미적용**이며 SQL 후보가 검증 또는 배포됐다는 뜻이 아니다.
+#### ③ 이번 작업 단위: 확인된 PR·CI
+
+| 작업 | 구현 | 기본 CI | 전체 통합 CI | 현재 결과 |
+| --- | --- | --- | --- | --- |
+| [#2497](https://github.com/gycha0109-beep/MyeongHa/pull/2497) — G3 새 received Turn만 최초 공개 | **완료** | [#39896551733](https://github.com/gycha0109-beep/MyeongHa/actions/runs/39896551733) 통과 | [#39897844513](https://github.com/gycha0109-beep/MyeongHa/actions/runs/39897844513) 통과 | **main 병합 완료** |
+| [#2422](https://github.com/gycha0109-beep/MyeongHa/pull/2422) — G1/G2/G3 실제 SQL 후보, v3 소스 계약 테스트 3종 | **격리 Draft** | [#39898095583](https://github.com/gycha0109-beep/MyeongHa/actions/runs/39898095583) 통과 | **병합·운영 적용 대상 아님** | PG17 실제 경합·Owner 승인 **대기** |
+
+**절대 보류:** `Projectors=[]`, `writeAdmission=DENY`, positive SRC-25 Registry 0, 새 G1/G2/G3 positive Owner RPC API EXECUTE 0, 최초 Reveal/History/Replay 503, paid/public OFF, Production DB DDL/DML/ACL/migration 변경 0. 이 표의 CI GREEN을 운영 보안 승인으로 해석하지 않는다.
 
 ### S1 세부 수락 기준 (가장 먼저 실행)
 
