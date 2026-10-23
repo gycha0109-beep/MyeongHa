@@ -85,6 +85,16 @@ describe('S5/G3 Node protected first-send metadata before model or original Gran
       requestId: ID,
       serverTime: TIME,
     })).not.toThrow();
+    for (const invalidSequence of [0, -1, 1.5, Number.NaN, Number.POSITIVE_INFINITY]) {
+      expect(() => assertSeyeonNodeChatResponseMetadataV1({
+        turnId: TURN,
+        assistantMessageId: 'd4000000-0000-4000-8000-000000000005',
+        sequenceNo: invalidSequence,
+        replayed: false,
+        requestId: ID,
+        serverTime: TIME,
+      })).toThrow();
+    }
     for (const bad of [
       {requestId: 'with spaces', serverTime: TIME},
       {requestId: ID, serverTime: '2026-02-30T00:00:00.000Z'},
