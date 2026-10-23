@@ -1,0 +1,49 @@
+import { describe, expect, it } from 'vitest';
+import { readFile } from 'node:fs/promises';
+import {
+  plannedMobileUiPreviewLocaleV1,
+  previewMobileAuthoredUiLabelV1,
+} from '../apps/mobile/src/ui/mobile-planned-ui-screen-preview-v1.js';
+
+describe('I18N-07 Expo developer-only Saju UI preview boundary', () => {
+  it('admits only one exact EN/CN preview param when development is true', () => {
+    expect(plannedMobileUiPreviewLocaleV1('en-US', true)).toBe('en-US');
+    expect(plannedMobileUiPreviewLocaleV1('zh-CN', true)).toBe('zh-CN');
+    for (const input of [null, undefined, 'ko-KR', 'ja-JP', 'zh-TW',
+      'en-GB', 'zh', ['en-US'], ['en-US','zh-CN']]) {
+      expect(plannedMobileUiPreviewLocaleV1(input, true)).toBeNull();
+    }
+    expect(plannedMobileUiPreviewLocaleV1('en-US', false)).toBeNull();
+    expect(plannedMobileUiPreviewLocaleV1('zh-CN', false)).toBeNull();
+  });
+
+  it('previews only already authored static labels and preserves fallback', () => {
+    const activeTranslate = (literal: string) => 'active:' + literal;
+    expect(previewMobileAuthoredUiLabelV1('사주', null, activeTranslate)).toBe('active:사주');
+    expect(previewMobileAuthoredUiLabelV1('사주', 'en-US', activeTranslate)).toBe('Saju');
+    expect(previewMobileAuthoredUiLabelV1('출생정보가 필요합니다', 'zh-CN', activeTranslate))
+      .toBe('需要出生信息');
+    expect(previewMobileAuthoredUiLabelV1('다시 시도', 'en-US', activeTranslate)).toBe('Try again');
+    expect(previewMobileAuthoredUiLabelV1('USER_PRIVATE_MESSAGE', 'en-US', activeTranslate))
+      .toBe('active:USER_PRIVATE_MESSAGE');
+    expect(previewMobileAuthoredUiLabelV1('official.source.claim', 'zh-CN', activeTranslate))
+      .toBe('active:official.source.claim');
+  });
+
+  it('keeps the actual Expo Saju route scoped to __DEV__ and authored labels', async () => {
+    const source = await readFile(
+      new URL('../apps/mobile/src/app/(tabs)/reading/index.tsx', import.meta.url), 'utf8',
+    );
+    expect(source).toContain('plannedMobileUiPreviewLocaleV1(uiPreview, __DEV__)');
+    expect(source).toContain("previewText('사주')");
+    expect(source).toContain('previewText("출생정보가 필요합니다")');
+    expect(source).toContain('previewText("현재 출생정보와 명식을 확인하는 중입니다…")');
+    expect(source).toContain('loadMobileCurrentSajuV1({');
+    expect(source).toContain('mobileSajuServiceV1');
+    expect(source).toContain('createMobileSajuViewModelV1({');
+    expect(source).toContain('SajuPillarGrid pillars={viewModel.pillars}');
+    expect(source).toContain('router.push(\'/birth\')');
+    expect(source).not.toContain('setLocale(');
+    expect(source).not.toContain('X-MyeongHa-UI-Locale');
+  });
+});

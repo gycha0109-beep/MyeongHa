@@ -337,3 +337,8 @@
 - `ReadingPage`의 40개 고정 한국어 UI 저자 문구와 7개 aria 라벨, 사주 주제의 기존 정적 제목·설명에 비활성 EN/CN 사전 조회를 적용한다. 실제 사주 계산값·출생정보 저장·공식 해석·Reader 응답·캐릭터 발화는 변환하지 않는다.
 - `reading/main.tsx`는 `import.meta.env.DEV` 및 단일 `ui-preview` 요청에서만 JSX 미리보기를 허용한다. 기존 지원 3개 UI 언어, 저장/복원/API 헤더 계약, 출시 금지 게이트는 그대로 유지한다.
 - SSR 회귀에 한국어/영어/간체 고정 UI, 계산 결과 삽입 DOM 소켓, 폼 입력값 및 링크 불변 조건을 추가한다. 실제 브라우저·접근성·모든 화면 검증은 별도 미완료.
+
+### 7.30 EN/CN-UI-C — 모바일 사주 개발용 라벨 미리보기 (2026-10-23)
+
+- 모바일 `(tabs)/reading/index.tsx`에서 Expo 개발 모드와 단일 `uiPreview` 파라미터가 일치할 때에만 기존 비활성 영어·간체 사전의 **6개 정적 안내/상태/버튼 UI 라벨**을 사용한다. 운영에서는 이전 `useMobileUiLocale().t`와 `MobileUiText`가 지원하던 3개 로케일을 유지한다. 미등록 문구는 기존 활성 로케일 번역으로 유지하며 조작/권한/출처를 새로 만들지 않는다.
+- 새 순수 함수 `mobile-planned-ui-screen-preview-v1.ts` 및 `test/i18n-en-us-zh-cn-mobile-preview-route.test.ts`가 개발-only 게이트, 사전/fallback, 읽기 계산·라우팅 코드의 불변성을 검증한다. 실제 Android/iOS 앱 스크린샷·접근성·새 언어의 공개 승인은 포함하지 않는다.
