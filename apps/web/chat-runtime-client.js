@@ -243,13 +243,16 @@ function createStreamMessage(message, authoritativeCharacterId) {
     marker.className = 'conversation-paid-reader-marker';
     const badge = document.createElement('span');
     badge.className = 'conversation-paid-reader-marker-label';
-    badge.textContent = '보호된 사주 해설';
+    badge.dataset.paidReaderUiSource = '보호된 사주 해설';
+    badge.textContent = uiText('보호된 사주 해설');
     const copy = document.createElement('p');
-    copy.textContent = '유료 사주 해설의 기록입니다. 현재 이용권이 확인되어야 내용을 볼 수 있습니다.';
+    copy.dataset.paidReaderUiSource = '유료 사주 해설의 기록입니다. 현재 이용권이 확인되어야 내용을 볼 수 있습니다.';
+    copy.textContent = uiText('유료 사주 해설의 기록입니다. 현재 이용권이 확인되어야 내용을 볼 수 있습니다.');
     const link = document.createElement('a');
     link.className = 'conversation-paid-reader-marker-link';
     link.href = 'records.html';
-    link.textContent = '내 기록 확인하기 →';
+    link.dataset.paidReaderUiSource = '내 기록 확인하기 →';
+    link.textContent = uiText('내 기록 확인하기 →');
     marker.append(badge, copy, link);
     if (threadId) {
       appendProtectedReaderChatRevealV1(marker, {
@@ -301,6 +304,9 @@ document.addEventListener('myeongha:localechange', () => {
   if (composeStatusSource !== null && composeStatus) composeStatus.textContent = uiText(composeStatusSource);
   if (roomLoadingSource !== null && roomLoading) roomLoading.textContent = uiText(roomLoadingSource);
   if (!chatStream) return;
+  for (const node of chatStream.querySelectorAll('[data-paid-reader-ui-source]')) {
+    node.textContent = uiText(node.dataset.paidReaderUiSource);
+  }
   for (const article of chatStream.querySelectorAll('.conversation-message')) {
     const placeholder = article.querySelector('[data-chat-ui-placeholder]');
     if (placeholder) placeholder.textContent = uiText(placeholder.dataset.chatUiPlaceholder);
