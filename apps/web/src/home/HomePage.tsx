@@ -1,3 +1,4 @@
+import { WebPlannedUiQaSwitcherV1 } from '../ui/WebPlannedUiQaSwitcherV1.js';
 import { previewReviewedUiTextV1 } from '../ui/planned-ui-screen-preview-v1.js';
 import type { PlannedUiPreviewLocaleV1 } from '../ui/planned-ui-screen-preview-v1.js';
 import { resolveReadingAvailabilityV1 } from '../reading/reading-availability.js';
@@ -15,6 +16,7 @@ export function HomePage({ previewLocale = null }: { previewLocale?: PlannedUiPr
   const t = (source: string) => previewReviewedUiTextV1(source, previewLocale);
   return (
     <div className="gm-shell" data-planned-ui-preview={previewLocale ?? undefined}>
+      <WebPlannedUiQaSwitcherV1 previewLocale={previewLocale} development={import.meta.env.DEV} />
       <header className="gm-home-head">
         <h1 className="gm-greeting">좋은 저녁이에요, <span className="gm-highlight" id="home-greeting-name">당신</span></h1>
         <p className="gm-lede">오늘도 명하에 이야기가 쌓이고 있어요.</p>

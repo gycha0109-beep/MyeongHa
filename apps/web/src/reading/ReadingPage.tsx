@@ -1,3 +1,4 @@
+import { WebPlannedUiQaSwitcherV1 } from '../ui/WebPlannedUiQaSwitcherV1.js';
 import { previewReviewedUiTextV1 } from '../ui/planned-ui-screen-preview-v1.js';
 import type { PlannedUiPreviewLocaleV1 } from '../ui/planned-ui-screen-preview-v1.js';
 import { resolveReadingAvailabilityV1 } from './reading-availability.js';
@@ -26,6 +27,7 @@ export function ReadingPage({ previewLocale = null }: { previewLocale?: PlannedU
 
   return (
     <div className="gm-shell" data-planned-ui-preview={previewLocale ?? undefined}>
+      <WebPlannedUiQaSwitcherV1 previewLocale={previewLocale} development={import.meta.env.DEV} />
       <header className="gm-saju-head">
         <h1 className="gm-page-title">{t("사주")}</h1>
         <p className="gm-lede">{t("내 명식과 사주 읽기 주제를 한곳에 모아봤어요.")}</p>

@@ -1,4 +1,4 @@
-import { resolveDevPlannedUiPreviewLocaleV1 } from '../ui/planned-ui-screen-preview-v1.js';
+import { resolveDevPlannedUiPreviewWithSessionV1, readDevPlannedUiPreviewSessionV1 } from '../ui/planned-ui-screen-preview-v1.js';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { HomePage } from './HomePage.js';
@@ -11,6 +11,6 @@ if (!(homeRoot instanceof HTMLElement)) {
 
 createRoot(homeRoot).render(
   <StrictMode>
-    <HomePage previewLocale={resolveDevPlannedUiPreviewLocaleV1(window.location.search, import.meta.env.DEV)} />
+    <HomePage previewLocale={resolveDevPlannedUiPreviewWithSessionV1(window.location.search, import.meta.env.DEV, readDevPlannedUiPreviewSessionV1(import.meta.env.DEV))} />
   </StrictMode>,
 );

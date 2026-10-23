@@ -24,3 +24,32 @@ export function previewReviewedUiTextV1(
 ): string {
   return locale === null ? source : lookupPlannedStaticUiCopyV1(source, locale) ?? source;
 }
+
+/** Session-scoped QA preference, deliberately separate from production UI locale storage. */
+export const DEV_PLANNED_UI_PREVIEW_SESSION_KEY_V1 = 'myeongha.dev.ui-preview.v1';
+
+/**
+ * An explicitly supplied URL parameter wins (including invalid parameters,
+ * which must fail closed). Session preferences are read only in development.
+ */
+export function resolveDevPlannedUiPreviewWithSessionV1(
+  search: string,
+  development: boolean,
+  saved: unknown,
+): PlannedUiPreviewLocaleV1 | null {
+  if (!development) return null;
+  if (new URLSearchParams(search).has('ui-preview')) {
+    return resolveDevPlannedUiPreviewLocaleV1(search, development);
+  }
+  return saved === 'en-US' || saved === 'zh-CN' ? saved : null;
+}
+
+/** May be invoked only from development entrypoints (not from app/Reader data). */
+export function readDevPlannedUiPreviewSessionV1(development: boolean): string | null {
+  if (!development || typeof window === 'undefined') return null;
+  try {
+    return window.sessionStorage.getItem(DEV_PLANNED_UI_PREVIEW_SESSION_KEY_V1);
+  } catch {
+    return null;
+  }
+}

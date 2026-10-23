@@ -1,3 +1,4 @@
+import { WebPlannedUiQaSwitcherV1 } from '../ui/WebPlannedUiQaSwitcherV1.js';
 import { previewReviewedUiTextV1 } from '../ui/planned-ui-screen-preview-v1.js';
 import type { PlannedUiPreviewLocaleV1 } from '../ui/planned-ui-screen-preview-v1.js';
 import { useEffect } from 'react';
@@ -10,6 +11,7 @@ export function RecordsPage({ previewLocale = null }: { previewLocale?: PlannedU
 
   return (
     <div className="product-shell records-shell" data-planned-ui-preview={previewLocale ?? undefined}>
+      <WebPlannedUiQaSwitcherV1 previewLocale={previewLocale} development={import.meta.env.DEV} />
       <header className="records-head">
         <div className="records-head-title">
           <div className="records-kicker">MY RECORDS</div>

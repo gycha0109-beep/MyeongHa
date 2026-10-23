@@ -1,3 +1,4 @@
+import { WebPlannedUiQaSwitcherV1 } from '../ui/WebPlannedUiQaSwitcherV1.js';
 import { previewReviewedUiTextV1 } from '../ui/planned-ui-screen-preview-v1.js';
 import type { PlannedUiPreviewLocaleV1 } from '../ui/planned-ui-screen-preview-v1.js';
 import { useEffect } from 'react';
@@ -10,6 +11,7 @@ export function ChatHubPage({ previewLocale = null }: { previewLocale?: PlannedU
 
   return (
     <div className="product-shell chat-hub-shell" data-chat-hub-state="unavailable" data-planned-ui-preview={previewLocale ?? undefined}>
+      <WebPlannedUiQaSwitcherV1 previewLocale={previewLocale} development={import.meta.env.DEV} />
       <section className="chat-hub-intro conversation-hub-intro" aria-labelledby="chat-hub-title">
         <div>
           <span className="chat-hub-eyebrow">CONVERSATION</span>

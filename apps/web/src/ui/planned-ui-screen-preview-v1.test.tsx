@@ -7,9 +7,45 @@ import { ReadingPage } from '../reading/ReadingPage.js';
 import {
   resolveDevPlannedUiPreviewLocaleV1,
   previewReviewedUiTextV1,
+  resolveDevPlannedUiPreviewWithSessionV1,
 } from './planned-ui-screen-preview-v1.js';
+import { WebPlannedUiQaSwitcherV1 } from './WebPlannedUiQaSwitcherV1.js';
 
 describe('I18N-07 developer-only rendered EN/ZH UI preview', () => {
+
+  it('retains staged preview only within a developer tab across React page entrypoints', async () => {
+    expect(resolveDevPlannedUiPreviewWithSessionV1('', true, 'en-US')).toBe('en-US');
+    expect(resolveDevPlannedUiPreviewWithSessionV1('?ui-preview=zh-CN', true, 'en-US')).toBe('zh-CN');
+    expect(resolveDevPlannedUiPreviewWithSessionV1('?ui-preview=bad', true, 'en-US')).toBeNull();
+    expect(resolveDevPlannedUiPreviewWithSessionV1('?ui-preview=en-US&ui-preview=zh-CN', true, 'zh-CN')).toBeNull();
+    for (const saved of ['ja-JP', 'zh-TW', 'en-GB', 'zh-Hans', null, undefined]) {
+      expect(resolveDevPlannedUiPreviewWithSessionV1('', true, saved)).toBeNull();
+    }
+    expect(resolveDevPlannedUiPreviewWithSessionV1('', false, 'en-US')).toBeNull();
+    const [switcherSource, ...entrypoints] = await Promise.all([
+      '../ui/WebPlannedUiQaSwitcherV1.tsx',
+      '../home/main.tsx',
+      '../chat-hub/main.tsx',
+      '../records/main.tsx',
+      '../reading/main.tsx',
+    ].map((path) => import('node:fs/promises').then(({ readFile }) =>
+      readFile(new URL(path, import.meta.url), 'utf8'))));
+    for (const entrypoint of entrypoints) {
+      expect(entrypoint).toContain('resolveDevPlannedUiPreviewWithSessionV1(');
+      expect(entrypoint).toContain('readDevPlannedUiPreviewSessionV1(import.meta.env.DEV)');
+    }
+    expect(switcherSource).toContain('if (!development) return null');
+    expect(switcherSource).toContain('DEV_PLANNED_UI_PREVIEW_SESSION_KEY_V1');
+    expect(switcherSource).not.toContain('X-MyeongHa-UI-Locale');
+    expect(switcherSource).not.toContain('ReaderLocale');
+    const buttons = renderToStaticMarkup(<WebPlannedUiQaSwitcherV1 previewLocale="zh-CN" development={true} />);
+    expect(buttons).toContain('Developer UI copy preview');
+    expect(buttons).toContain('English');
+    expect(buttons).toContain('简体中文');
+    expect(buttons).toContain('aria-pressed="true"');
+    expect(renderToStaticMarkup(<WebPlannedUiQaSwitcherV1 previewLocale={null} development={false} />)).toBe('');
+  });
+
   it('requires exact development-only locale selection, never persisted or header input', () => {
     expect(resolveDevPlannedUiPreviewLocaleV1('?ui-preview=en-US', true)).toBe('en-US');
     expect(resolveDevPlannedUiPreviewLocaleV1('?ui-preview=zh-CN', true)).toBe('zh-CN');

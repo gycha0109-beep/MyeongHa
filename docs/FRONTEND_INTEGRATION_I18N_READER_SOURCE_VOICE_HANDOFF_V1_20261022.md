@@ -401,3 +401,9 @@
 - Expo 앱 루트에 `MobilePlannedUiPreviewProviderV1`를 추가하고, 사주·관상·대화·마이·기록·출생정보 여섯 라우트에서 같은 **일시적인 QA 언어 선택 상태**를 사용한다. 한 화면에서 고른 영어/간체/기존 UI가 다른 개발용 화면으로 이동해도 유지된다. 최초 명시적 `uiPreview` query는 기존처럼 허용하되, 이후 직접 선택한 값이 우선한다. `Current UI`를 선택하면 다른 화면에서도 활성 지원 언어로 복귀한다.
 - provider의 `select`는 `__DEV__` 외부에서 무조건 no-op이며 화면 resolver는 운영 빌드에서 항상 `null`로 닫힌다. SecureStore/localStorage·실제 `MobileUiLocaleProvider`/유저 선호/HTTP 헤더·Reader/공식 해석/캐릭터 데이터/계정 주체/기록을 변경하거나 저장하지 않는다. 실제 언어 5개 운영 릴리스는 계속 HOLD다.
 - 통합 계약 테스트에서 6개 라우트 모두 shared 상태 사용, 앱 루트 provider, route query/사용자 명시 선택 우선순위/기존 UI 복원, 비개발 빌드 차단 및 저장·네트워크 기능 미호출을 검사한다. 이는 UI 개발 QA의 흐름 보정이지 실기기 자동화/운영 출시 검증을 대체하지 않는다.
+
+### 7.41 EN/CN-UI-C — 웹 4개 React 화면 개발용 UI 언어 전환·탭 내 유지 (2026-10-24)
+
+- 기존 React UI 미리보기(홈·대화 허브·기록·사주)에 하나의 `WebPlannedUiQaSwitcherV1`를 삽입했다. 개발 환경에 한해 버튼의 **Current UI / English / 简体中文**을 선택하면 현재 URL의 `ui-preview`와 **별도의 개발용 sessionStorage 키**만 갱신하고 새로고침한다. 다른 3개 React 개발 화면으로 이동할 때 sessionStorage fallback으로 같은 QA 표시를 유지한다. URL이 명시적으로 지정되면 우선하며 유효하지 않은 query는 저장 선택보다 우선하여 fail closed한다.
+- `development=false`이면 컨트롤은 `null`, session 키 조회는 `null`; 기존 UI 언어 저장·복원/서버 요청 헤더·공식 Saju/Face/Reader 출력·캐릭터 메시지/구매 권한에는 영향을 주지 않는다. QA 상태는 **브라우저 탭 범위에 한정**된 비출시 도구이며 en-US/zh-CN 사용자 선택 활성화 또는 운영 번역 승인과 무관하다.
+- pure resolver의 중복/지원 외 query 차단과 네 React 진입점·dev-only 전환 컨트롤의 SSR 출력 및 운영 비노출 회귀를 추가했다. 추가 화면·실제 브라우저/실기기 검증과 운영 언어 런칭은 HOLD다.
