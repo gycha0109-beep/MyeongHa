@@ -11,6 +11,8 @@ const reading = read('apps/web/src/reading/ReadingPage.tsx');
 const birthClient = read('apps/web/birth-runtime-client.js');
 const sajuClient = read('apps/web/saju-hub.js');
 const server = read('apps/api/src/birth-profile-create-http.ts');
+const chat = read('apps/web/src/chat/ChatPage.tsx');
+const chatClient = read('apps/web/chat-runtime-client.js');
 
 describe('LEGAL L2: minimum-age disclosure and actual birth write gate', () => {
   it('shows under-14 policy ahead of both self Birth Profile submit actions', () => {
@@ -44,12 +46,26 @@ describe('LEGAL L2: minimum-age disclosure and actual birth write gate', () => {
     });
   });
 
+  it('holds Web chat message transmission until the 14+ user declaration is checked', () => {
+    const label = chat.indexOf('data-legal-age-chat-attestation-label');
+    const composer = chat.indexOf('data-composer');
+    expect(label).toBeGreaterThan(-1);
+    expect(label).toBeLessThan(composer);
+    expect(chat).toContain('data-legal-age-chat-attestation');
+    expect(chatClient).toContain("document.querySelector('[data-legal-age-chat-attestation]')");
+    const guard = chatClient.indexOf("if (!(ageCheckbox instanceof HTMLInputElement) || !ageCheckbox.checked)");
+    expect(guard).toBeGreaterThan(-1);
+    expect(guard).toBeLessThan(chatClient.indexOf('const pendingTurn = getOrCreatePendingTurn(message)'));
+  });
+
   it('keeps new static notices translated consistently without changing user-authored data', () => {
     const authored = [
       '명하의 개인화 서비스는 만 14세 이상 이용할 수 있습니다. 만 14세 미만은 보호자 동의 확인 기능이 준비되기 전까지 명식록을 만들 수 없습니다.',
       '저는 만 14세 이상입니다. 만 14세 미만은 보호자 동의 확인 기능이 준비되기 전까지 가입하거나 개인화 서비스를 이용할 수 없습니다.',
       '만 14세 이상 이용 가능 여부를 먼저 확인해 주세요.',
       '유료 해설 구매는 만 19세 이상만 가능합니다. 현재 공개 결제는 제공하지 않습니다.',
+      '저는 만 14세 이상이며, 개인화 대화가 AI 답변 생성에 사용될 수 있음을 확인했습니다.',
+      '만 14세 이상임을 확인한 후 대화를 시작할 수 있습니다.',
     ];
     for (const source of authored) {
       for (const locale of ['ja-JP', 'zh-TW'] as const) {
