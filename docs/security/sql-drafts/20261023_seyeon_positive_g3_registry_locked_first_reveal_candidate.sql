@@ -38,6 +38,7 @@ declare
   v_original record;
   v_message text;
   v_memory_digest text;
+  v_current_post_turn_outbox uuid;
 begin
   if p_subject_id is null or p_thread_id is null
      or p_turn_id is null or p_attempt_id is null then
@@ -188,6 +189,98 @@ begin
       where r.subject_id=p_subject_id and r.character_id='seyeon'
     )
   then return; end if;
+
+  -- G2's v2 Commit MUST have emitted exactly one durable post-turn Outbox
+  -- for this current Subject/Turn/Attempt/Assistant and its original User
+  -- message. The Node request/DTO cannot substitute a claimed Outbox UUID.
+  -- SHARE-lock the actual row until the direct Node handoff completes, so
+  -- a competing retry/rewrite cannot replace this provenance mid-send.
+  select oe.id into v_current_post_turn_outbox
+  from public.outbox_events oe
+  join public.conversation_messages original_user
+    on original_user.id::text=oe.payload_jsonb->>'userMessageId'
+   and original_user.subject_id=p_subject_id
+   and original_user.thread_id=p_thread_id
+   and original_user.turn_id=p_turn_id
+   and original_user.sender_type='user'
+   and original_user.redacted_at is null
+  join public.chat_turn_attempts original_attempt
+    on original_attempt.id=p_attempt_id
+   and original_attempt.subject_id=p_subject_id
+   and original_attempt.turn_id=p_turn_id
+   and original_attempt.committed_message_id::text
+       = oe.payload_jsonb->>'assistantMessageId'
+  where oe.aggregate_type='chat_turn'
+    and oe.aggregate_id=p_turn_id::text
+    and oe.event_type='SEYEON_POST_TURN_ANALYSIS_REQUESTED'
+    and oe.event_schema_version='v1'
+    and oe.dedupe_key='seyeon-post-turn-v1'
+    and oe.payload_jsonb->>'schemaVersion'
+        = 'seyeon-post-turn-analysis-request-v1'
+    and oe.payload_jsonb->>'subjectId'=p_subject_id::text
+    and oe.payload_jsonb->>'characterId'='seyeon'
+    and oe.payload_jsonb->>'turnId'=p_turn_id::text
+    and oe.payload_jsonb->>'attemptId'=p_attempt_id::text
+    and oe.payload_jsonb->'snapshot'->>'schemaVersion'
+        = 'seyeon-post-turn-analysis-snapshot-v1'
+    and oe.payload_jsonb->'snapshot'->>'turnId'=p_turn_id::text
+    and oe.payload_jsonb->'snapshot'->>'userMessageId'
+        = original_user.id::text
+    and oe.payload_jsonb->'snapshot'->>'assistantMessageId'
+        = original_attempt.committed_message_id::text
+    and oe.payload_jsonb->>'snapshotHash'
+        ~ '^sha256:v1:[a-f0-9]{64}
+    on msg.id=a.committed_message_id
+   and msg.subject_id=a.subject_id and msg.turn_id=a.turn_id
+  where a.id=p_attempt_id and a.turn_id=p_turn_id
+    and a.subject_id=p_subject_id and a.state='committed'
+    and msg.thread_id=p_thread_id and msg.sender_type='character'
+    and msg.redacted_at is null
+    and msg.body_text is not null and length(btrim(msg.body_text))>0
+    and msg.body_text=a.generated_body_text
+  for share of a,msg;
+  if not found or v_message is null then return; end if;
+
+  return query select v_message;
+end
+$positive_reveal$;
+
+-- Restrict to the function owner only. No PUBLIC, authenticated, service,
+-- or myeongha_api_executor EXECUTE and NO route registration.
+revoke all on function public.qry_seyeon_positive_first_memory_locked_reveal_v1(
+  uuid,uuid,uuid,uuid
+) from public;
+do $revoke_direct$
+declare v_role text;
+begin
+  for v_role in select rolname from pg_catalog.pg_roles
+      where rolname in ('anon','authenticated','service_role') loop
+    execute format(
+      'revoke all on function public.qry_seyeon_positive_first_memory_locked_reveal_v1(uuid,uuid,uuid,uuid) from %I',
+      v_role
+    );
+  end loop;
+end
+$revoke_direct$;
+
+comment on function public.qry_seyeon_positive_first_memory_locked_reveal_v1(
+  uuid,uuid,uuid,uuid
+) is 'G3 first single-Memory original-rights locked positive Reveal SOURCE ONLY; no API EXECUTE, no route or external proxy ACK approval';
+
+commit;
+
+  for share of oe,original_user,original_attempt;
+  if not found or v_current_post_turn_outbox is null then return; end if;
+
+  -- Even with duplicate poisoned Outbox rows, the first private response
+  -- requires exactly ONE immutable v2 post-turn record for its Turn.
+  if (select count(*) from public.outbox_events other_post
+      where other_post.aggregate_type='chat_turn'
+        and other_post.aggregate_id=p_turn_id::text
+        and other_post.event_type='SEYEON_POST_TURN_ANALYSIS_REQUESTED'
+        and other_post.dedupe_key='seyeon-post-turn-v1')<>1 then
+    return;
+  end if;
 
   select msg.body_text into v_message
   from public.chat_turn_attempts a
