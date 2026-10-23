@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { resolveMobilePlannedUiPreviewSelectionV1 } from '../apps/mobile/src/ui/mobile-planned-ui-preview-context-v1.js';
 import { readFile } from 'node:fs/promises';
 import {
   plannedMobileUiPreviewLocaleV1,
@@ -234,6 +235,7 @@ describe('I18N-07 Expo developer-only Saju UI preview boundary', () => {
     expect(switcher).toContain('if (!__DEV__) return null');
     expect(switcher).toContain('plannedMobileUiPreviewLocaleV1(uiPreview, __DEV__)');
     expect(switcher).toContain('router.setParams({ uiPreview: option.value })');
+    expect(switcher).toContain('selection.select(option.value)');
     expect(switcher).toContain("value: 'en-US'");
     expect(switcher).toContain("value: 'zh-CN'");
     expect(switcher).toContain("value: ''");
@@ -276,6 +278,44 @@ describe('I18N-07 Expo developer-only Saju UI preview boundary', () => {
       .toBe('active:reader.message.body');
     expect(previewMobileAuthoredUiLabelV1('선택한 연결자로 사주 읽기 시작 →', null, active))
       .toBe('active:선택한 연결자로 사주 읽기 시작 →');
+  });
+
+  it('shares developer UI previews across Expo routes without persisting or releasing locales', async () => {
+    const [contextSource, rootSource, switcher, ...screens] = await Promise.all([
+      '../apps/mobile/src/ui/mobile-planned-ui-preview-context-v1.tsx',
+      '../apps/mobile/src/app/_layout.tsx',
+      '../apps/mobile/src/ui/MobilePlannedUiQaSwitcherV1.tsx',
+      '../apps/mobile/src/app/(tabs)/reading/index.tsx',
+      '../apps/mobile/src/app/(tabs)/reading/face.tsx',
+      '../apps/mobile/src/app/(tabs)/chat/index.tsx',
+      '../apps/mobile/src/app/(tabs)/my/index.tsx',
+      '../apps/mobile/src/app/(tabs)/records/index.tsx',
+      '../apps/mobile/src/app/birth/index.tsx',
+    ].map((path) => readFile(new URL(path, import.meta.url), 'utf8')));
+    expect(rootSource).toContain('<MobilePlannedUiPreviewProviderV1><ThemedRootLayout /></MobilePlannedUiPreviewProviderV1>');
+    expect(contextSource).toContain('if (!__DEV__) return');
+    expect(contextSource).not.toContain('SecureStore');
+    expect(contextSource).not.toContain('AsyncStorage');
+    expect(contextSource).not.toContain('fetch(');
+    expect(contextSource).not.toContain('X-MyeongHa-UI-Locale');
+    expect(switcher).toContain('selection.select(option.value)');
+    expect(switcher).toContain('router.setParams({ uiPreview: option.value })');
+    for (const screen of screens) {
+      expect(screen).toContain('useMobilePlannedUiPreviewSelectionV1()');
+      expect(screen).toContain('resolveMobilePlannedUiPreviewSelectionV1(');
+      expect(screen).toContain('plannedMobileUiPreviewLocaleV1(uiPreview, __DEV__)');
+    }
+    const untouched = { chosen: false, locale: null } as const;
+    const en = { chosen: true, locale: 'en-US' } as const;
+    const zh = { chosen: true, locale: 'zh-CN' } as const;
+    const restored = { chosen: true, locale: null } as const;
+    expect(resolveMobilePlannedUiPreviewSelectionV1('zh-CN', untouched, true)).toBe('zh-CN');
+    expect(resolveMobilePlannedUiPreviewSelectionV1('en-US', zh, true)).toBe('zh-CN');
+    expect(resolveMobilePlannedUiPreviewSelectionV1(null, en, true)).toBe('en-US');
+    expect(resolveMobilePlannedUiPreviewSelectionV1('en-US', restored, true)).toBeNull();
+    for (const selection of [untouched, en, zh, restored]) {
+      expect(resolveMobilePlannedUiPreviewSelectionV1('en-US', selection, false)).toBeNull();
+    }
   });
 
 });

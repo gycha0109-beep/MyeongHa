@@ -6,6 +6,7 @@ import { useEffect } from 'react';
 import { nativeMobilePushServiceV1 } from '@/core/push/native-mobile-push-service';
 import { MobileThemeProvider, useMobileTheme } from '@/ui/mobile-theme';
 import { MobileUiLocaleProvider } from '@/ui/mobile-ui-locale';
+import { MobilePlannedUiPreviewProviderV1 } from '@/ui/mobile-planned-ui-preview-context-v1';
 
 function ThemedRootLayout() {
   const { theme, colors } = useMobileTheme();
@@ -36,5 +37,5 @@ function ThemedRootLayout() {
 }
 
 export default function RootLayout() {
-  return <MobileThemeProvider><MobileUiLocaleProvider><ThemedRootLayout /></MobileUiLocaleProvider></MobileThemeProvider>;
+  return <MobileThemeProvider><MobileUiLocaleProvider><MobilePlannedUiPreviewProviderV1><ThemedRootLayout /></MobilePlannedUiPreviewProviderV1></MobileUiLocaleProvider></MobileThemeProvider>;
 }

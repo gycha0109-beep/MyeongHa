@@ -1,4 +1,5 @@
 import { MobilePlannedUiQaSwitcherV1 } from '@/ui/MobilePlannedUiQaSwitcherV1';
+import { useMobilePlannedUiPreviewSelectionV1, resolveMobilePlannedUiPreviewSelectionV1 } from '@/ui/mobile-planned-ui-preview-context-v1';
 import type {
   LifeRecordFactV1,
   MemoryItemV1,
@@ -117,7 +118,10 @@ export default function RecordsScreen() {
   const { colors } = useMobileTheme();
   const { t } = useMobileUiLocale();
   const { tab: routeTab, uiPreview } = useLocalSearchParams<{ tab?: string; uiPreview?: string | string[] }>();
-  const previewLocale = plannedMobileUiPreviewLocaleV1(uiPreview, __DEV__);
+  const sharedPreviewSelection = useMobilePlannedUiPreviewSelectionV1();
+  const previewLocale = resolveMobilePlannedUiPreviewSelectionV1(
+    plannedMobileUiPreviewLocaleV1(uiPreview, __DEV__), sharedPreviewSelection, __DEV__,
+  );
   const previewText = (source: string) => previewMobileAuthoredUiLabelV1(source, previewLocale, t);
   const requestedTab: RecordsTabV1 = routeTab === 'readings' ? 'readings' : 'all';
   const [tab, setTab] = useState<RecordsTabV1>(requestedTab);

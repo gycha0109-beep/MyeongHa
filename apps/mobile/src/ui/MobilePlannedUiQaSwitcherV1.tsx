@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { mobileColors } from './mobile-colors.js';
 import { plannedMobileUiPreviewLocaleV1 } from './mobile-planned-ui-screen-preview-v1.js';
+import { useMobilePlannedUiPreviewSelectionV1, resolveMobilePlannedUiPreviewSelectionV1 } from './mobile-planned-ui-preview-context-v1.js';
 
 /**
  * Developer QA only: changes the CURRENT ROUTE'S transient query parameter.
@@ -10,7 +11,8 @@ import { plannedMobileUiPreviewLocaleV1 } from './mobile-planned-ui-screen-previ
  */
 export function MobilePlannedUiQaSwitcherV1() {
   const { uiPreview } = useLocalSearchParams<{ uiPreview?: string | string[] }>();
-  const active = plannedMobileUiPreviewLocaleV1(uiPreview, __DEV__);
+  const selection = useMobilePlannedUiPreviewSelectionV1();
+  const active = resolveMobilePlannedUiPreviewSelectionV1(uiPreview, selection, __DEV__);
   if (!__DEV__) return null;
 
   const options = [
@@ -31,7 +33,10 @@ export function MobilePlannedUiQaSwitcherV1() {
               accessibilityRole="button"
               accessibilityLabel={option.label}
               accessibilityState={{ selected }}
-              onPress={() => router.setParams({ uiPreview: option.value })}
+              onPress={() => {
+                selection.select(option.value);
+                router.setParams({ uiPreview: option.value });
+              }}
               style={[styles.button, selected && styles.selected]}
             >
               <Text style={[styles.label, selected && styles.selectedLabel]}>{option.label}</Text>

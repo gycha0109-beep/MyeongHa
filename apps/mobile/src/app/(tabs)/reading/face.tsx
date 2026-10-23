@@ -1,4 +1,5 @@
 import { MobilePlannedUiQaSwitcherV1 } from '@/ui/MobilePlannedUiQaSwitcherV1';
+import { useMobilePlannedUiPreviewSelectionV1, resolveMobilePlannedUiPreviewSelectionV1 } from '@/ui/mobile-planned-ui-preview-context-v1';
 import { useLocalSearchParams } from 'expo-router';
 import { plannedMobileUiPreviewLocaleV1, previewMobileAuthoredUiLabelV1 } from '@/ui/mobile-planned-ui-screen-preview-v1';
 import { useState } from 'react';
@@ -45,7 +46,10 @@ export default function FaceScreen() {
   const styles = useMobileThemedStyles(staticStyles);
   const { t } = useMobileUiLocale();
   const { uiPreview } = useLocalSearchParams<{ uiPreview?: string | string[] }>();
-  const previewLocale = plannedMobileUiPreviewLocaleV1(uiPreview, __DEV__);
+  const sharedPreviewSelection = useMobilePlannedUiPreviewSelectionV1();
+  const previewLocale = resolveMobilePlannedUiPreviewSelectionV1(
+    plannedMobileUiPreviewLocaleV1(uiPreview, __DEV__), sharedPreviewSelection, __DEV__,
+  );
   const previewText = (source: string) => previewMobileAuthoredUiLabelV1(source, previewLocale, t);
   const { colors } = useMobileTheme();
   const [state, setState] = useState<FaceMediaStateV1>({ kind: 'idle' });
