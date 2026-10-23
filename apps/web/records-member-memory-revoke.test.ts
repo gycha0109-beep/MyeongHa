@@ -17,7 +17,7 @@ const ACK = {
 
 describe('member Se-yeon original memory grant revocation from Records', () => {
   it('sends exactly one bodyless POST with Member bearer and accepts only committed ACK', async () => {
-    const fetchImpl = vi.fn(async () => Response.json(ACK));
+    const fetchImpl = vi.fn(async (_endpoint: string, _init?: RequestInit) => Response.json(ACK));
     const client = createRecordsRuntimeClient({
       fetchImpl,
       resolveBearer: () => ({ kind: 'member', token: 'member-token' }),
@@ -35,7 +35,7 @@ describe('member Se-yeon original memory grant revocation from Records', () => {
   });
 
   it('does not retry a 503 or accept a mismatched/ambiguous success', async () => {
-    const fetchImpl = vi.fn(async () => new Response(null, { status: 503 }));
+    const fetchImpl = vi.fn(async (_endpoint: string, _init?: RequestInit) => new Response(null, { status: 503 }));
     const client = createRecordsRuntimeClient({
       fetchImpl,
       resolveBearer: () => ({ kind: 'member', token: 'member-token' }),
