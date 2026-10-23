@@ -172,7 +172,11 @@ export async function inspectSeyeonC08ProviderMetadataReadOnlyV1({
     modelStatuses:SEYEON_C08_PROVIDER_MODELS_V1.map((model,i)=>Object.freeze({
       model,status:results[i+1].status,
     })),
-    completeMetadataRead:results.every(r=>r.status===200&&r.data!==null),
+    completeMetadataRead:results[0].status===200&&
+      Array.isArray(results[0].data)&&
+      results.slice(1).every((r,i)=>r.status===200&&
+        isObject(r.data)&&r.data.id===SEYEON_C08_PROVIDER_MODELS_V1[i]&&
+        Array.isArray(r.data.endpoints)),
     ...HOLD_FIELDS,
   });
 }
