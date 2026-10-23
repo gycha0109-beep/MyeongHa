@@ -743,6 +743,9 @@ export async function runSeyeonProductionChatExecutionV1(
               exactModelPersonalSources.selectedPersonalRecordCount !== 1 ||
               exactModelPersonalSources.selectedMemoryCount !== 1 ||
               exactModelPersonalSources.selectedSources.length !== 1 ||
+              // A relationship-derived source has no Owner-verified original
+              // Grant; the positive one-Memory DB Pin cannot cover it.
+              exactModelPersonalSources.selectedUnpinnedDerivedSources.length !== 0 ||
               productionContext.personalRecordAdmissions.length !== 1 ||
               productionContext.personalRecordAdmissions[0]?.reason !== 'ADMITTED' ||
               productionContext.personalRecordProjectionCandidates?.length !== 1 ||

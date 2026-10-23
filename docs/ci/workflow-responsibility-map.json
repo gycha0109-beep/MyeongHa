@@ -488,10 +488,16 @@
       "mainMode": "one-shot-trigger",
       "workTrackAttribution": "commit-metadata"
     },
+    "seyeon-c08-provider-get-shape-diagnostic-once-v1.yml": {
+      "responsibility": "character-memory-one-shot-official-provider-get-structure-diagnosis-only",
+      "prMode": "none",
+      "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "commit-metadata"
+    },
     "seyeon-c08-provider-metadata-readonly-once-v1.yml": {
       "responsibility": "character-memory-one-shot-public-provider-metadata-get-only",
       "prMode": "none",
-      "mainMode": "manual-one-shot",
+      "mainMode": "one-shot-trigger",
       "workTrackAttribution": "commit-metadata"
     },
     "seyeon-openrouter-zdr-json-catalog-v1.yml": {

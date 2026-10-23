@@ -4,6 +4,7 @@ import {
   assertSeyeonC08ProviderInventoryOnceV1 as admit,
   sanitizeSeyeonC08ProviderReadbackV1 as sanitize,
   C08_PROVIDER_INVENTORY_WORKFLOW_V1 as WORKFLOW,
+  C08_PROVIDER_ONCE_TRIGGER_MARKER_V1 as MARKER,
 } from '../scripts/seyeon-c08-provider-metadata-readonly-once-v1.mjs';
 
 const sha='a'.repeat(40);
@@ -51,7 +52,6 @@ describe('C08 exact main SHA GET-only provider inventory admission',()=>{
     });
   });
   it.each([
-    [{...env,GITHUB_EVENT_NAME:'push'},history],
     [{...env,GITHUB_REF:'refs/heads/feature'},history],
     [{...env,GITHUB_RUN_ATTEMPT:'2'},history],
     [{...env,EXPECTED_HEAD_SHA:'b'.repeat(40)},history],
@@ -64,6 +64,29 @@ describe('C08 exact main SHA GET-only provider inventory admission',()=>{
     [env,{total_count:1,workflow_runs:[{...history.workflow_runs[0],event:'push'}]}],
   ])('rejects stale, replay, wrong ref, wrong workflow or duplicate run', (e,h)=>{
     expect(()=>admit(e,h)).toThrow(/C08_PROVIDER_ONCE_.*_HOLD/);
+  });
+  it('admits exactly one protected-main push only when commit added the pinned trigger file',()=>{
+    const pushed={...env,GITHUB_EVENT_NAME:'push'};
+    const current={sha,files:[{filename:MARKER,status:'added'}]};
+    const pushedHistory={total_count:1,workflow_runs:[{
+      ...history.workflow_runs[0],event:'push',
+    }]};
+    expect(admit(pushed,pushedHistory,current)).toEqual({
+      commitSha:sha,workflowRunId:env.GITHUB_RUN_ID,
+    });
+    for(const commit of [
+      null,{}, {sha:'b'.repeat(40),files:current.files},
+      {sha,files:[]}, {sha,files:[{filename:MARKER,status:'modified'}]},
+      {sha,files:[{filename:'.github/other-file',status:'added'}]},
+      {sha,files:[...current.files,...current.files]},
+    ]){
+      expect(()=>admit(pushed,pushedHistory,commit))
+        .toThrow(/C08_PROVIDER_ONCE_MARKER_HOLD/);
+    }
+    expect(()=>admit(pushed,history,current))
+      .toThrow('C08_PROVIDER_ONCE_REPLAY_HOLD');
+    expect(()=>admit(pushed,{total_count:2,workflow_runs:pushedHistory.workflow_runs},current))
+      .toThrow('C08_PROVIDER_ONCE_ADMISSION_HOLD');
   });
   it('whitelists public price/tag only, never copies input secret or upgrades metadata',()=>{
     const o=sanitize({admitted:admit(env,history),snapshot});
@@ -94,10 +117,13 @@ describe('C08 exact main SHA GET-only provider inventory admission',()=>{
         .toThrow('C08_PROVIDER_READBACK_INVALID_HOLD');
     }
   });
-  it('has no automatic trigger, no inference POST, no write permission, and one-run guard',()=>{
+  it('has only protected-main marker-push plus explicit manual trigger, GET-only, and read permissions',()=>{
     const text=readFileSync(new URL('../.github/workflows/'+WORKFLOW,import.meta.url),'utf8');
     expect(text).toContain('workflow_dispatch:');
-    expect(text).not.toMatch(/\n\s*push:/u);
+    expect(text).toContain('push:');
+    expect(text).toContain('branches:');
+    expect(text).toContain('- main');
+    expect(text).toContain(MARKER);
     expect(text).not.toContain('pull_request:');
     expect(text).toContain('expected_head_sha');
     expect(text).toContain('environment: production');

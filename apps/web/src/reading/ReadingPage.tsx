@@ -121,6 +121,23 @@ export function ReadingPage() {
           <blockquote className="gm-saju-quote">“지금의 내가,<br />더 좋은 내일을 만듭니다.”</blockquote>
         </article>
 
+        <section id="saju-overview-preview" className="gm-section saju-overview-preview" aria-labelledby="saju-overview-title" hidden>
+          <div className="gm-section-head">
+            <div>
+              <span className="saju-section-kicker">SAJU READING</span>
+              <h2 id="saju-overview-title" className="gm-section-title">나의 전체 사주 해석</h2>
+              <p className="gm-section-support">실제 Saju 서비스의 검증된 전체 사주 프리뷰를 보여드립니다.</p>
+            </div>
+            <a id="saju-overview-full" className="gm-inline-link" href="reading-detail.html?topic=temperament&scope=original" hidden>자세히 읽기 →</a>
+          </div>
+          <div className="gm-card saju-overview-card">
+            <p id="saju-overview-status" role="status" aria-live="polite">사주 해석을 불러오는 중입니다…</p>
+            <div id="saju-overview-result" className="saju-overview-result" aria-live="polite" />
+            <button id="saju-overview-retry" className="saju-primary-button saju-overview-retry" type="button" hidden>해석 다시 불러오기</button>
+            <p className="saju-authority-note">프리뷰 결과이며 유료 해설·공식 구매권 또는 저장된 해설을 의미하지 않습니다.</p>
+          </div>
+        </section>
+
         <section className="gm-section" aria-labelledby="gm-reading-title">
           <div className="gm-section-head">
             <div><h2 className="gm-section-title" id="gm-reading-title">나를 읽기 <span className="gm-section-support">나를 더 깊이 이해하는 시간</span></h2></div>
