@@ -26,7 +26,7 @@ function result():RunProductionSeyeonChatResultV1 {
       disposition:'executed',
       receivedTurn:{
         turnId:TURN,userMessageId:USER,userText:'원본 합성 메시지',
-        threadCharacterId:'seyeon',replayed:false,committedTurn:null,
+        threadCharacterId:'seyeon',turnState:'received',replayed:false,committedTurn:null,
       },
       attempt:{attemptId:ATTEMPT,replayed:false},
       committedTurn:{
@@ -42,12 +42,21 @@ type MutableResult={
   execution:{
     committedTurn:{postTurnOutboxEventId?:string};
     postTurnAnalysis?:{status:string;outboxEventId?:string};
-    receivedTurn:{userMessageId?:string};
+    receivedTurn:{userMessageId?:string;turnState:string};
   };
 };
 
 describe('S5/G3 first private Reply requires original G2 durable post-turn Outbox',()=>{
   it.each([
+    ['already committed original receive',(r:MutableResult)=>{
+      r.execution.receivedTurn.turnState='committed';
+    }],
+    ['already delivered original receive',(r:MutableResult)=>{
+      r.execution.receivedTurn.turnState='delivered';
+    }],
+    ['failed-retryable prior receive',(r:MutableResult)=>{
+      r.execution.receivedTurn.turnState='failed_retryable';
+    }],
     ['missing original G2 Outbox',(r:MutableResult)=>{
       delete r.execution.committedTurn.postTurnOutboxEventId;
     }],
