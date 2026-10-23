@@ -29,6 +29,14 @@
 - 위 확인은 디지털 콘텐츠가 소비자에게 실제 제공됐다는 증명이 아니다. S7 제공 준비/클라이언트 ACK만으로 `DELIVERED_PROVABLE`을 합성하지 않고, 자동 청약철회 거절·결제 취소·Grant 변경·공개 응답은 계속 금지한다.
 - **아직 미구현·승인 대기:** 실제 불변 Checkout 고지 스냅샷 저장소·원본 Capability Item↔Grant 영속 결속 조회 어댑터, 최소 보존 기간·접근 권한, Legal 고지 방식 승인. 이 코드 변경은 운영 테이블·권한·상업 결제 페이지를 생성하거나 승인하지 않는다. 미승인 어댑터는 `null`을 반환하며 고지 증거를 만들 수 없다.
 
+## S7 기존 Commerce 원장 기반 Checkout 고지 조회 어댑터 (2026-10-23)
+
+- `apps/api/src/commerce-reader-postgres-checkout-notice-authority-v1.ts`를 추가했다. 기존 비공개 `internal_qry_official_reader_withdrawal_delivery_state_v2`를 먼저 호출하여 **S1 범위 잠금과 원본 Receipt·Grant·보호 본문 검증**을 재사용한다. 취소된 영수증이라면 원래 함수의 검증된 Provider 회수 사건 요구도 그대로 따른다.
+- 같은 비공개 DB 트랜잭션에서 Purchase Intent에 고정된 Capability Set의 **유일한 Item**을 원본 Grant의 `entitlement_key/scope_key_norm`과 결속한다. 해당 Receipt의 `grant_key`, 최초 결제 시도 `attempt_no=1`·provider·environment·시각을 별도로 확인한다. 다른 Receipt/Grant/상품 항목·모호한 Item 수·결제 시도 누락 시 Checkout 고지 사실은 **불인정**한다.
+- **고지의 진실 공급자는 Checkout Owner가 소유한 독립 불변 저장소**다. 소유자 어댑터는 Purchase Intent × 고정 Item × 상품 revision별 실제 기록 고지/표시/확인 시각을 조회하고, 레코드의 동일 항목 정합성을 다시 증명해야 한다. DB 원장의 존재 또는 `authority` 문자열 자체로 고지 확인을 합성하지 않는다.
+- `CommerceReaderImmutableCheckoutNoticeStoreV1`가 없으면 DB 조회도 수행하지 않고 `null`을 반환한다. Store/DB 오류, 잘못된 회원·범위, 다중 결과 또는 후행 고지는 `missing_or_unverifiable` 상태다. 단위·통합 모의 DB 시험은 `commerce-reader-postgres-checkout-notice-authority-v1.test.ts`에 포함한다.
+- **저장소·보존기간·실제 운영 연결은 미승인:** 새 Checkout 증빙 테이블, 실행 권한, 개인정보 처리/파기 정책, 운영 결제 페이지, 공개 API/자동 환불 판단을 만들거나 활성화하지 않았다. Commerce·Privacy·Legal Owner의 원본 스냅샷 저장 및 보존 범위 승인 후에만 실제 저장소를 연결한다. 이 비공개 어댑터의 구조 및 합성 테스트는 실제 PostgreSQL 원장 자료 검증이나 법률상 콘텐츠 제공 증명이 아니다.
+
 ## 다음 수락 게이트
 
 1. Commerce/Legal이 실제 상품 단위와 법정 기간·고지/미리보기·취소 경로를 승인.
