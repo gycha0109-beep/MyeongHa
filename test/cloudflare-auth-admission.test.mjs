@@ -81,6 +81,27 @@ describe('Cloudflare Auth/DB admission is fail-closed until explicit host and se
     }
   });
 
+  it('allows only the explicitly admitted canonical workers.dev host', async () => {
+    const canonical = 'https://myeongha.gycha0109.workers.dev';
+    const bind = {
+      ...ENABLED,
+      MYEONGHA_CLOUDFLARE_AUTH_ORIGIN: canonical,
+      MYEONGHA_CLOUDFLARE_WORKERS_DEV_ORIGIN: canonical,
+    };
+    const enabled = await get('/api/me', bind, 'GET', canonical);
+    expect(enabled.status).toBe(503); // No DB secrets: never open a session.
+    const mismatched = await get('/api/me', {
+      ...bind, MYEONGHA_CLOUDFLARE_WORKERS_DEV_ORIGIN: 'https://other.gycha0109.workers.dev',
+    }, 'GET', canonical);
+    expect(mismatched.status).toBe(404);
+    const sibling = await get('/api/me', {
+      ...bind, MYEONGHA_CLOUDFLARE_AUTH_ORIGIN: 'https://other.gycha0109.workers.dev',
+      MYEONGHA_CLOUDFLARE_WORKERS_DEV_ORIGIN: 'https://other.gycha0109.workers.dev',
+    }, 'GET', 'https://other.gycha0109.workers.dev');
+    expect(sibling.status).toBe(404);
+    expect(approvedCloudflareAuthHostnameV1('myeongha.gycha0109.workers.dev')).toBe(false);
+  });
+
   it('requires independent DB TLS/RLS and OAuth callback owner admissions before secrets', async () => {
     expect(approvedCloudflareStage5HandoffV1(ENABLED, PRIVATE_ORIGIN, true)).toBe(true);
     for (const dbApproval of [undefined, 'true', 'approved-nonisolated-v1']) {

@@ -265,7 +265,9 @@ export function approvedCloudflareAuthOriginV1(request, bindings) {
       origin.password !== '' || origin.port !== '' ||
       origin.pathname !== '/' || origin.search !== '' ||
       origin.hash !== '' || origin.origin !== raw ||
-      !approvedCloudflareAuthHostnameV1(origin.hostname)) return null;
+      !(approvedCloudflareAuthHostnameV1(origin.hostname) ||
+        (origin.hostname === 'myeongha.gycha0109.workers.dev' &&
+         bindings.MYEONGHA_CLOUDFLARE_WORKERS_DEV_ORIGIN === raw))) return null;
   if (new URL(request.url).origin !== raw) return null;
   return raw;
 }
