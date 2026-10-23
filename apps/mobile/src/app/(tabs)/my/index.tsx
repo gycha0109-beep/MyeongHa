@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { plannedMobileUiPreviewLocaleV1, previewMobileAuthoredUiLabelV1 } from '@/ui/mobile-planned-ui-screen-preview-v1';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
 import {
@@ -30,6 +31,9 @@ import { useMobilePullRefreshV1 } from '@/ui/use-mobile-pull-refresh';
 export default function MyScreen() {
   const styles = useMobileThemedStyles(staticStyles);
   const { t } = useMobileUiLocale();
+  const { uiPreview } = useLocalSearchParams<{ uiPreview?: string | string[] }>();
+  const previewLocale = plannedMobileUiPreviewLocaleV1(uiPreview, __DEV__);
+  const previewText = (source: string) => previewMobileAuthoredUiLabelV1(source, previewLocale, t);
   const { colors } = useMobileTheme();
   const {
     state,
@@ -128,13 +132,14 @@ export default function MyScreen() {
   return (
     <MobileScreen
       eyebrow="MY MYEONGHA"
-      title={t('마이')}
+      title={previewText('마이')}
       refreshing={refreshing}
       onRefresh={() => void onRefresh()}
-      description={t('나의 계정과 이야기, 설정을 살펴보세요.')}
+      description={previewText('나의 계정과 이야기, 설정을 살펴보세요.')}
     >
-      <MyEditorialWelcome account={currentAccount} />
+      <MyEditorialWelcome account={currentAccount} previewLocale={previewLocale} />
       <MyMemberAuthCard
+          previewLocale={previewLocale}
           subjectKind={state.profile.kind === 'ready'
             ? state.profile.profile.subjectKind
             : memberSessionPresent === true ? 'member' : 'guest'}
@@ -179,7 +184,7 @@ export default function MyScreen() {
       {state.profile.kind === 'loading' ? (
         <View style={styles.loadingCard}>
           <ActivityIndicator color={colors.navy} />
-          <MobileUiText style={styles.loadingText}>내 정보를 불러오는 중입니다…</MobileUiText>
+          <MobileUiText style={styles.loadingText}>{previewText('내 정보를 불러오는 중입니다…')}</MobileUiText>
         </View>
       ) : state.profile.kind === 'error' ? (
         <MySectionError

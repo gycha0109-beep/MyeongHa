@@ -76,4 +76,44 @@ describe('I18N-07 Expo developer-only Saju UI preview boundary', () => {
     expect(previewMobileAuthoredUiLabelV1('관상', null, tr)).toBe('active:관상');
   });
 
+  it('previews authored My account UI only in Expo development and retains credentials unchanged', async () => {
+    const [myRoute, editorial, myComponents] = await Promise.all([
+      readFile(new URL('../apps/mobile/src/app/(tabs)/my/index.tsx', import.meta.url), 'utf8'),
+      readFile(new URL('../apps/mobile/src/features/my/MyEditorialWelcome.tsx', import.meta.url), 'utf8'),
+      readFile(new URL('../apps/mobile/src/features/my/MyComponents.tsx', import.meta.url), 'utf8'),
+    ]);
+    expect(myRoute).toContain('plannedMobileUiPreviewLocaleV1(uiPreview, __DEV__)');
+    expect(myRoute).toContain("title={previewText('마이')}");
+    expect(myRoute).toContain('previewLocale={previewLocale}');
+    expect(editorial).toContain("previewText('나의 이야기를')");
+    expect(editorial).toContain('previewText(accountStatus)');
+    expect(myComponents).toContain("previewText('이메일')");
+    expect(myComponents).toContain("previewText('비밀번호')");
+    expect(myComponents).toContain('previewText(socialPendingProvider === provider ?');
+    expect(myComponents).toContain('previewText(pending ?');
+    expect(myRoute).toContain('memberAuth.signIn(email, password)');
+    expect(myRoute).toContain('memberAuth.signUp(email, password)');
+    expect(myRoute).toContain('memberAuth.completeSignUp(');
+    expect(myRoute).toContain('nativeMobileRuntimeV1.memberSession.read()');
+    expect(myRoute).toContain('errorMessage={');
+    expect(myComponents).toContain('value={password}');
+    expect(myComponents).toContain('value={email}');
+    expect(myComponents).toContain('>{errorMessage}</Text>');
+    expect(myComponents).toContain('{verificationRequired.email}');
+    expect(myComponents).toContain('{verificationRequired.message}');
+    expect(myComponents).toContain('onPress={onSignOut}');
+    expect(myComponents).toContain('<MyLocaleSelector />');
+    for (const source of [myRoute, editorial, myComponents]) {
+      expect(source).not.toContain('X-MyeongHa-UI-Locale');
+    }
+    const active = (source: string) => 'active:' + source;
+    expect(previewMobileAuthoredUiLabelV1('마이', 'en-US', active)).toBe('My Page');
+    expect(previewMobileAuthoredUiLabelV1('계정으로 이어가기', 'zh-CN', active)).toBe('使用账户继续');
+    expect(previewMobileAuthoredUiLabelV1('이 기기에서는 회원 세션을 우선 사용합니다.', 'en-US', active))
+      .toBe('The member session takes precedence on this device.');
+    expect(previewMobileAuthoredUiLabelV1('나의 이야기를', 'en-US', active)).toBe('My story');
+    expect(previewMobileAuthoredUiLabelV1('마이', null, active)).toBe('active:마이');
+    expect(plannedMobileUiPreviewLocaleV1('en-US', false)).toBeNull();
+  });
+
 });
