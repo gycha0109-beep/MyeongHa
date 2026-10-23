@@ -70,14 +70,14 @@ export async function verifyCloudflareStaticArtifact(options = {}) {
   );
   if (
     workerConfig?.main !== './workers/cloudflare-static-preview.mjs' ||
-    workerConfig?.workers_dev !== false ||
+    workerConfig?.workers_dev !== true ||
     workerConfig?.assets?.directory !== './public' ||
     workerConfig?.assets?.html_handling !== 'none' ||
     workerConfig?.assets?.not_found_handling !== 'none' ||
     JSON.stringify(workerConfig?.assets?.run_worker_first) !==
       JSON.stringify(['/api', '/api/*'])
   ) {
-    throw new Error('Cloudflare preview routing or isolation policy has changed.');
+    throw new Error('Cloudflare workers.dev routing or API isolation policy has changed.');
   }
 
   if (outputRoot !== resolve(cwd, workerConfig.assets.directory)) {
