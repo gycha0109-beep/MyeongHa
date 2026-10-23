@@ -288,7 +288,7 @@ try {
     });
     await navigate(client, origin, '/hall.html', '.mhx-hero');
     await sleep(160);
-    const layout = await client.evaluate(`(() => {
+    const layout = await client.evaluate(`(async () => {
       const cards = [...document.querySelectorAll('.mhx-topic')];
       const portraits = [...document.querySelectorAll('.mhx-character-art img')];
       const list = document.querySelector('.mhx-character-list');
@@ -298,7 +298,7 @@ try {
         topicCount: cards.length,
         topicColumns: new Set(cards.map(el => Math.round(el.getBoundingClientRect().left))).size,
         characterCount: portraits.length,
-        portraitsLoaded: portraits.every(img => img.complete && img.naturalWidth > 0),
+        portraitsLoaded: (await Promise.all(portraits.map(img => img.decode().then(() => img.naturalWidth > 0).catch(() => false)))).every(Boolean),
         characterScroll: list && getComputedStyle(list).overflowX === 'auto',
         recentNotice: document.body.innerText.includes('최근 대화 연결 안내'),
       };
