@@ -79,7 +79,9 @@ export function createPostgresPortOneIdentityAgeAuthorityV1(input: Readonly<{
         },
       });
     },
-    async readPendingOwnedAttempt(request): Promise<PortOneV2IdentityOwnedAttemptV1 | null> {
+    async readPendingOwnedAttempt(
+      request: Parameters<PortOneV2IdentityAgeAuthorityPortV1['readPendingOwnedAttempt']>[0],
+    ): Promise<PortOneV2IdentityOwnedAttemptV1 | null> {
       return executePostgresSubjectTransactionV1({
         pool: input.pool,
         verifiedEvidence: input.verifiedEvidence,
@@ -109,7 +111,9 @@ export function createPostgresPortOneIdentityAgeAuthorityV1(input: Readonly<{
         },
       });
     },
-    async consumeAndRecordAgeBand(request) {
+    async consumeAndRecordAgeBand(
+      request: Parameters<PortOneV2IdentityAgeAuthorityPortV1['consumeAndRecordAgeBand']>[0],
+    ) {
       return executePostgresSubjectTransactionV1({
         pool: input.pool,
         verifiedEvidence: input.verifiedEvidence,
