@@ -155,7 +155,7 @@ describe('G3 exact current request ↔ executed DB user message binding', () => 
       requestSignal:new AbortController().signal,
       pool,verifiedEvidence:{kind:'member',verifiedAuthUserId:AUTH},
       threadId:THREAD,
-      clientTurnId:'another-request-idempotency-key',
+      clientTurnId:'d3000000-0000-4000-8000-000000000099',
       text:INPUT,
       requestId:'same-text-wrong-original-key',
       serverTime:'2026-10-22T00:00:00.000Z',
