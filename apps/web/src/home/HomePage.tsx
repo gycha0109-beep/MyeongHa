@@ -1,94 +1,139 @@
+import { findReaderPresentation } from '../../reader-presentation-catalog.js';
 import { resolveReadingAvailabilityV1 } from '../reading/reading-availability.js';
 import { FortuneCookie } from './FortuneCookie.js';
-function currentMonthLabel(now: Date): string {
-  const formatted = new Intl.DateTimeFormat('ko-KR', {
-    year: 'numeric',
-    month: 'long',
-  }).format(now);
 
-  return `${formatted} · 사주 시작하기`;
-}
+const readingTopics = [
+  {
+    title: '전체 사주',
+    description: '나라는 사람을 더 깊이 이해하고 싶을 때',
+    glyph: '✦',
+    href: 'reading-detail.html?topic=temperament&scope=original',
+    motif: 'all',
+  },
+  {
+    title: '직업 · 커리어',
+    description: '일과 선택의 길이 궁금할 때',
+    glyph: '⌁',
+    href: 'reading-detail.html?topic=career',
+    motif: 'career',
+  },
+  {
+    title: '재물',
+    description: '재물과 자원의 흐름을 알고 싶을 때',
+    glyph: '財',
+    href: 'reading-detail.html?topic=money',
+    motif: 'wealth',
+  },
+  {
+    title: '연애 · 관계',
+    description: '관계의 흐름과 인연이 궁금할 때',
+    glyph: '緣',
+    href: 'reading-detail.html?topic=love',
+    motif: 'love',
+  },
+] as const;
+
+// The existing browser presentation catalog supplies names and art only.
+// It does not grant Character publication or conversation access.
+const featuredReaders = ['seyeon', 'baekheon', 'yeoul']
+  .map((key) => findReaderPresentation(key))
+  .filter((reader): reader is NonNullable<typeof reader> => reader !== null);
 
 export function HomePage() {
   return (
-    <div className="gm-shell">
-      <header className="gm-home-head">
-        <h1 className="gm-greeting">좋은 저녁이에요, <span className="gm-highlight" id="home-greeting-name">당신</span></h1>
-        <p className="gm-lede">오늘도 명하에 이야기가 쌓이고 있어요.</p>
-      </header>
-
-      <section className="gm-home-hero" aria-labelledby="home-character-title">
-        <div className="gm-hero-copy">
-          <span className="gm-hero-label">오늘 이야기할 사람 · 캐릭터 선택</span>
-          <h2 className="gm-hero-title" id="home-character-title">누구와 이야기를 시작해 볼까요?</h2>
-          <p>마음에 맞는 사람을 고른 뒤, 지금 가장 마음에 걸리는 이야기를 편하게 꺼내보세요.</p>
-          <a className="gm-primary-button" href="chat-hub.html">대화로 가기 →</a>
-        </div>
-        <blockquote className="gm-hero-quote">“당신에게 맞는 거리와 말투의 사람을 골라보세요.”</blockquote>
-      </section>
-
-      <section className="gm-section" aria-labelledby="home-month-title">
-        <div className="gm-section-head">
-          <h2 className="gm-section-title" id="home-month-title">이번 달 사주 읽기</h2>
-          <a className="gm-inline-link" href="reading-detail.html?topic=temperament&scope=original">제공 상태 확인 <span aria-hidden="true">›</span></a>
-        </div>
-
-        <a className="gm-card gm-month-card" href="reading-detail.html?topic=temperament&scope=original">
-          <span className="gm-month-art" aria-hidden="true"></span>
-          <span className="gm-month-copy">
-            <span className="gm-month-eyebrow" id="home-current-date">{currentMonthLabel(new Date())}</span>
-            <strong className="gm-card-title">이달에는 전체 사주 프리뷰부터 시작해 보세요.</strong>
-            <span className="gm-month-support">현재 월간 해석은 준비 중입니다. 검증된 전체 사주 프리뷰의 제공 상태를 상세 화면에서 확인할 수 있습니다.</span>
-            <span className="gm-inline-link">읽기 확인 <span aria-hidden="true">›</span></span>
-          </span>
-        </a>
-      </section>
-
-      <section className="gm-section" aria-labelledby="home-products-title">
-        <div className="gm-section-head">
-          <h2 className="gm-section-title" id="home-products-title">사주 읽기 주제</h2>
-          <a className="gm-inline-link" href="reading.html">전체 주제 보기 <span aria-hidden="true">›</span></a>
-        </div>
-
-        <div className="gm-home-products">
-          <a className="gm-card gm-product-card" href="reading-detail.html?topic=temperament&scope=original">
-            <span className="gm-icon" aria-hidden="true">✦</span>
-            <span><strong>전체 사주</strong><small>나라는 사람을 더 깊이</small><small className="reading-topic-availability is-preview">{resolveReadingAvailabilityV1('reading-detail.html?topic=temperament&scope=original').label}</small></span>
-            <span className="gm-chevron" aria-hidden="true">›</span>
-          </a>
-          <a className="gm-card gm-product-card" href="reading-detail.html?topic=career">
-            <span className="gm-icon" aria-hidden="true">⌁</span>
-            <span><strong>직업 · 커리어</strong><small>일과 선택을 더 깊이</small><small className="reading-topic-availability is-preview">{resolveReadingAvailabilityV1('reading-detail.html?topic=career').label}</small></span>
-            <span className="gm-chevron" aria-hidden="true">›</span>
-          </a>
-          <a className="gm-card gm-product-card" href="reading-detail.html?topic=money">
-            <span className="gm-icon" aria-hidden="true">財</span>
-            <span><strong>재물</strong><small>재물과 자원의 흐름</small><small className="reading-topic-availability is-preview">{resolveReadingAvailabilityV1('reading-detail.html?topic=money').label}</small></span>
-            <span className="gm-chevron" aria-hidden="true">›</span>
-          </a>
-          <a className="gm-card gm-product-card" href="reading-detail.html?topic=love">
-            <span className="gm-icon is-rose" aria-hidden="true">緣</span>
-            <span><strong>연애 · 관계</strong><small>관계에서 반복되는 방식</small><small className="reading-topic-availability is-preview">{resolveReadingAvailabilityV1('reading-detail.html?topic=love').label}</small></span>
-            <span className="gm-chevron" aria-hidden="true">›</span>
-          </a>
-        </div>
-      </section>
-
-      <section className="gm-section" aria-labelledby="home-recent-title">
-        <div className="gm-section-head">
-          <h2 className="gm-section-title" id="home-recent-title">최근 이야기</h2>
-          <a className="gm-inline-link" href="chat-hub.html">전체보기 <span aria-hidden="true">›</span></a>
-        </div>
-
-        <article className="gm-card gm-recent-card">
-          <span className="gm-recent-avatar" aria-hidden="true">明</span>
-          <div className="gm-recent-copy">
-            <div className="gm-recent-title-row"><strong>이어갈 대화</strong><span className="gm-chip">대화 기록</span></div>
-            <p>지금은 저장된 사실을 이야기로 추측해 이어 붙이지 않습니다.</p>
+    <div className="mhx-home">
+      <section className="mhx-hero" aria-labelledby="mhx-hero-title">
+        <div className="mhx-hero-art" aria-hidden="true"><span className="mhx-moon" /></div>
+        <div className="mhx-hero-inner">
+          <p className="mhx-eyebrow">흐르는 시간을, 더 나은 이야기로</p>
+          <h1 id="mhx-hero-title" className="mhx-hero-heading">
+            요즘, 무엇이 가장 <em>궁금하세요?</em>
+          </h1>
+          <p className="mhx-hero-subtitle">궁금한 주제를 선택하면, 명하가 당신의 이야기를 시작합니다.</p>
+          <div className="mhx-topics" aria-label="사주 관심 주제">
+            {readingTopics.map((topic) => (
+              <a key={topic.motif} className="mhx-topic" data-motif={topic.motif} href={topic.href}
+                aria-label={`${topic.title} — ${resolveReadingAvailabilityV1(topic.href).label}`}>
+                <span className="mhx-topic-icon" aria-hidden="true">{topic.glyph}</span>
+                <span className="mhx-topic-copy">
+                  <strong>{topic.title}</strong>
+                  <small>{topic.description}</small>
+                  <small className="mhx-topic-status">{resolveReadingAvailabilityV1(topic.href).label}</small>
+                </span>
+                <span className="mhx-topic-arrow" aria-hidden="true">›</span>
+              </a>
+            ))}
           </div>
-          <span className="gm-recent-time">아직 없음</span>
-          <a className="gm-recent-button" href="chat-hub.html"><span>대화 보기</span><span aria-hidden="true">→</span></a>
-        </article>
+          <div className="mhx-hero-actions">
+            <a className="mhx-primary-link" href="reading-detail.html?topic=temperament&scope=original">
+              사주 프리뷰 보기 <span aria-hidden="true">→</span>
+            </a>
+            <p>간단한 정보로 지금, 당신의 사주를 미리 만나보세요.<small>정식 읽기 제공 여부는 상세 화면에서 확인할 수 있습니다.</small></p>
+          </div>
+        </div>
+        <p className="mhx-hero-quote">“당신의 하루에도,<br />좋은 이야기가 함께하길.”</p>
+      </section>
+
+      <section className="mhx-characters" aria-labelledby="mhx-characters-title">
+        <div className="mhx-characters-intro">
+          <span className="mhx-small-label">✧ 명하의 이야기 동행자</span>
+          <h2 id="mhx-characters-title">당신의 이야기를<br />들어줄 사람이 있어요</h2>
+          <p>각기 다른 시선으로, 당신의 고민에 귀 기울이는 명하의 캐릭터를 만나보세요.</p>
+          <a className="mhx-primary-link mhx-compact-link" href="chat-hub.html">인물 둘러보기 <span aria-hidden="true">→</span></a>
+        </div>
+        <div className="mhx-character-list">
+          {featuredReaders.map((reader) => (
+            <article className="mhx-character" key={reader.key}>
+              <div className="mhx-character-art">
+                <img src={reader.portrait} alt={`${reader.name} 캐릭터 소개 이미지`} loading="lazy" decoding="async" />
+                <div className="mhx-character-caption">
+                  <h3>{reader.name}</h3>
+                  <span>{reader.title}</span>
+                </div>
+              </div>
+              <div className="mhx-character-footer">
+                <p>{reader.tone}</p>
+                <a href="chat-hub.html" aria-label={`${reader.name} — 대화 화면에서 제공 상태 확인`}>대화 살펴보기 <span aria-hidden="true">→</span></a>
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="mhx-section" aria-labelledby="mhx-today-title">
+        <h2 id="mhx-today-title" className="mhx-section-title">지금, 확인해 보세요</h2>
+        <div className="mhx-content-grid">
+          <button type="button" className="mhx-content-card" onClick={() => document.dispatchEvent(new Event('myeongha:open-fortune-cookie'))}>
+            <span className="mhx-content-icon" data-tone="sun" aria-hidden="true">☼</span>
+            <span className="mhx-content-copy"><strong>오늘의 포춘쿠키</strong><small>가벼운 한마디를 뽑아보세요. 공식 사주 운세와는 별개입니다.</small></span>
+            <span className="mhx-content-arrow" aria-hidden="true">›</span>
+          </button>
+          <a className="mhx-content-card" href="reading-detail.html?topic=temperament&scope=original">
+            <span className="mhx-content-icon" data-tone="month" aria-hidden="true">▦</span>
+            <span className="mhx-content-copy"><strong>이번 달 사주 읽기</strong><small>월간 해석은 준비 중입니다. 전체 사주 프리뷰를 먼저 확인해 보세요.</small></span>
+            <span className="mhx-content-arrow" aria-hidden="true">›</span>
+          </a>
+          <a className="mhx-content-card" href="birth.html">
+            <span className="mhx-content-icon" data-tone="profile" aria-hidden="true">♙</span>
+            <span className="mhx-content-copy"><strong>나의 사주</strong><small>내 출생 정보를 확인하고 사주를 시작해 보세요.</small></span>
+            <span className="mhx-content-arrow" aria-hidden="true">›</span>
+          </a>
+        </div>
+      </section>
+
+      <section className="mhx-section mhx-recent" aria-labelledby="mhx-recent-title">
+        <div className="mhx-section-head">
+          <h2 id="mhx-recent-title" className="mhx-section-title">최근 이야기</h2>
+          <a href="chat-hub.html">전체보기 <span aria-hidden="true">›</span></a>
+        </div>
+        <div className="mhx-recent-card">
+          <span className="mhx-recent-seal" aria-hidden="true">明</span>
+          <div>
+            <strong>당신의 이야기를 기다리고 있어요</strong>
+            <p>최근 대화 기록은 아직 홈에 연결되지 않았습니다. 실제 대화와 기록은 대화 화면에서 확인해 주세요.</p>
+          </div>
+          <a className="mhx-primary-link mhx-recent-link" href="chat-hub.html">대화 보러 가기 <span aria-hidden="true">→</span></a>
+        </div>
       </section>
       <FortuneCookie />
     </div>
