@@ -122,6 +122,19 @@ export function assessCloudflarePreviewOpsStopGateV1({
         limits.externalSubrequestsPerInvocation) {
     stops.add('FREE_EXTERNAL_SUBREQUEST_BUDGET_UNSAFE');
   }
+  // Script-wide GraphQL counts are only a LOWER bound on account traffic.
+  // Crossing the account Free ceiling is grounds to stop; a lower count
+  // does not establish that the account is within its total daily quota.
+  const scriptCalls = readNonnegative(usage, 'scriptRequestsTodayUtc', true);
+  if (scriptCalls !== null && scriptCalls >= limits.requestsPerUtcDay) {
+    stops.add('FREE_DAILY_REQUEST_BUDGET_EXHAUSTED');
+  }
+  // Observed p95 above the CPU ceiling is unsafe. A lower p95 is not
+  // evidence of a safe invocation maximum or per-route CPU acceptance.
+  const cpuP95 = readNonnegative(usage, 'workerCpuP95Ms');
+  if (cpuP95 !== null && cpuP95 >= limits.cpuTimePerInvocationMs) {
+    stops.add('FREE_CPU_BUDGET_UNSAFE');
+  }
   if (usage?.buildMinutesExhausted === true) stops.add('BUILD_MINUTES_EXHAUSTED');
   else if (usage?.buildMinutesExhausted !== undefined &&
            usage?.buildMinutesExhausted !== null &&
