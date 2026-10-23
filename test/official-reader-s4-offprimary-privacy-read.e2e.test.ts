@@ -35,12 +35,13 @@ function fixture() {
   const issuedAtEpochMs=Date.now()-500;
   function writeAcceptance(options:{
     restoreEpoch?:string; signed?:boolean; expiresAtEpochMs?:number;
+    reconciliationDigest?:string;
   }={}) {
     const restoreEpoch=options.restoreEpoch??EPOCH;
     const content={
       restoreEpoch,
       ledgerCheckpoint:CHECKPOINT,
-      reconciliationDigest:'sha256:'+'a'.repeat(64),
+      reconciliationDigest: options.reconciliationDigest ?? 'sha256:'+'a'.repeat(64),
       issuedAtEpochMs,
       validUntilEpochMs:options.expiresAtEpochMs??Date.now()+15_000,
     };
@@ -157,6 +158,28 @@ describe('Privacy #2318 off-primary S4 restore lease and Subject denial',()=>{
         subjectId:SUBJECT,selector:SELECTOR,
       })).resolves.toBeNull();
     }
+  });
+  it('invalidates an active lease when the signed reconciliation is replaced without changing the restore epoch',async()=>{
+    const x=fixture();
+    const lease=await x.port.acquireReadLease({subjectId:SUBJECT,selector:SELECTOR});
+    if(!lease)throw Error('expected synthetic lease');
+    expect(lease.acceptanceProofDigest).toMatch(/^[a-f0-9]{64}$/u);
+    expect(x.port.isLeaseCurrent({
+      lease,subjectId:SUBJECT,selector:SELECTOR,currentEpochMs:Date.now(),
+    })).toBe(true);
+    // Still-valid certificate, same epoch/checkpoint, different signed
+    // reconciliation. An old paid-read should not proceed after rotation.
+    x.writeAcceptance({reconciliationDigest:'sha256:'+'b'.repeat(64)});
+    expect(x.port.isLeaseCurrent({
+      lease,subjectId:SUBJECT,selector:SELECTOR,currentEpochMs:Date.now(),
+    })).toBe(false);
+    const replacement=await x.port.acquireReadLease({subjectId:SUBJECT,selector:SELECTOR});
+    expect(replacement).not.toBeNull();
+    if(!replacement)throw Error('expected new signed lease');
+    expect(replacement.acceptanceProofDigest).not.toBe(lease.acceptanceProofDigest);
+    expect(x.port.isLeaseCurrent({
+      lease:replacement,subjectId:SUBJECT,selector:SELECTOR,currentEpochMs:Date.now(),
+    })).toBe(true);
   });
   it('fails closed when the independent ledger directory becomes unsafe',async()=>{
     const x=fixture();

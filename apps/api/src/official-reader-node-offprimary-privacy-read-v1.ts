@@ -3,7 +3,7 @@ import {
   readFileSync, fstatSync,
 } from 'node:fs';
 import {
-  createHmac, createPublicKey, verify as verifySignature,
+  createHash, createHmac, createPublicKey, verify as verifySignature,
 } from 'node:crypto';
 import { isAbsolute, join, resolve } from 'node:path';
 
@@ -210,6 +210,10 @@ export function createOfficialReaderNodeOffPrimaryPrivacyReadPortV1(
         subjectId, selector,
         ledgerCheckpoint: cert.ledgerCheckpoint,
         restoreEpoch: cert.restoreEpoch,
+        // A new signed reconciliation (even at the SAME restore epoch and
+        // checkpoint) supersedes the old permit immediately.
+        acceptanceProofDigest: createHash('sha256')
+          .update(cert.signatureBase64Url, 'utf8').digest('hex'),
         expiresAtEpochMs: Math.min(now + MAX_LEASE_MS, cert.validUntilEpochMs),
       });
     };
@@ -225,6 +229,11 @@ export function createOfficialReaderNodeOffPrimaryPrivacyReadPortV1(
       return cert !== null
         && cert.ledgerCheckpoint === lease.ledgerCheckpoint
         && cert.restoreEpoch === lease.restoreEpoch
+        && typeof lease.acceptanceProofDigest === 'string'
+        && cert.signatureBase64Url.length > 0
+        && createHash('sha256')
+          .update(cert.signatureBase64Url, 'utf8').digest('hex')
+          === lease.acceptanceProofDigest
         && !tombstoned(subjectId);
     };
 
