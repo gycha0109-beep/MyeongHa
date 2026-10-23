@@ -24,7 +24,7 @@ const source = (path: string) => readFile(new URL('../' + path, import.meta.url)
 
 describe('I18N-07 staged EN-US and ZH-CN authored UI copy', () => {
   it('authors both UI target variants for navigation, account, Saju input and chat read-state without missing parity', () => {
-    expect(PLANNED_STATIC_UI_COPY_V1.size).toBe(464);
+    expect(PLANNED_STATIC_UI_COPY_V1.size).toBe(472);
     expect([...PLANNED_MOBILE_STATIC_UI_COPY_V1]).toEqual([...PLANNED_STATIC_UI_COPY_V1]);
     for (const [ko, pair] of PLANNED_STATIC_UI_COPY_V1) {
       expect(ko.trim().length).toBeGreaterThan(0);
@@ -118,6 +118,17 @@ describe('I18N-07 staged EN-US and ZH-CN authored UI copy', () => {
     }
     expect(normalizeUiLocale('zh-CN')).toBe('ko-KR');
     expect(normalizeMobileUiLocale('en-US')).toBe('ko-KR');
+  });
+
+  it('stages the exact member-account warnings and signed-in/guest narrative', () => {
+    for (const [source, english, chinese] of [["나의 이야기를","My story","我的故事"],["이어가는 공간","continues here","在这里延续"],["MY MYEONGHA · 나의 공간","MY MYEONGHA · My space","MY MYEONGHA · 我的空间"],["계정, 출생정보와 명하에서 이어지는 길을 한곳에서 살펴보세요.","View your account, birth details and your journey in MyeongHa in one place.","在这里统一查看账户、出生信息和您在命河中的旅程。"],["이 기기에서는 회원 세션을 우선 사용합니다.","The member session takes precedence on this device.","在此设备上优先使用会员会话。"],["기존 계정으로 로그인하거나, 현재 게스트 기록을 그대로 이어받는 새 계정을 만들 수 있습니다.","Sign in with an existing account, or create a new one that retains your current guest records.","登录现有账户，或创建新账户以保留当前访客记录。"],["새 계정은 현재 게스트 주체를 그대로 회원으로 승격합니다. 기존 회원 계정과의 게스트 기록 병합은 아직 지원하지 않습니다.","A new account upgrades your current guest identity to a member. Merging guest records into an existing member account is not supported yet.","创建新账户会将当前访客身份升级为会员。暂不支持将访客记录合并到已有会员账户。"],["확인 링크는 현재 Web 확인 화면으로 열립니다. 이메일 확인을 마친 뒤 앱으로 돌아와 비밀번호를 다시 입력해 주세요.","The verification link currently opens a web confirmation page. After verifying your email, return to the app and enter your password again.","验证链接目前会打开网页版确认页面。完成邮箱验证后，请返回应用并再次输入密码。"]] as const) {
+      expect(lookupPlannedStaticUiCopyV1(source, 'en-US')).toBe(english);
+      expect(lookupPlannedStaticUiCopyV1(source, 'zh-CN')).toBe(chinese);
+      expect(lookupPlannedMobileStaticUiCopyV1(source, 'en-US')).toBe(english);
+      expect(lookupPlannedMobileStaticUiCopyV1(source, 'zh-CN')).toBe(chinese);
+    }
+    expect(normalizeUiLocale('en-US')).toBe('ko-KR');
+    expect(normalizeMobileUiLocale('zh-CN')).toBe('ko-KR');
   });
 
   it('fails closed for unsupported input and for source, private messages or unknown copy', () => {
