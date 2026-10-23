@@ -23,6 +23,23 @@ on:
         description: 'Must be APPLY_RELATIONSHIP_1400_1450_ONLY'
         required: false
         type: string
+      reader_s4_scoped_apply:
+        description: 'Opt in to exact 1740..2290 only; no ordinary db push'
+        required: false
+        type: boolean
+        default: false
+      reader_s4_backup_run_id:
+        description: 'Current main governed backup run (<= 4h)'
+        required: false
+        type: string
+      reader_s4_restore_run_id:
+        description: 'Successful paired current main isolated restore run'
+        required: false
+        type: string
+      reader_s4_confirmation:
+        description: 'Must be APPLY_OFFICIAL_READER_1740_2290_ONLY'
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -56,11 +73,16 @@ jobs:
           BEFORE_SHA: ${{ github.event.before }}
           CURRENT_SHA: ${{ github.sha }}
           SCOPED_BACKFILL: ${{ inputs.relationship_backfill_1400_1450 }}
+          READER_S4_SCOPED: ${{ inputs.reader_s4_scoped_apply }}
         run: |
           set -euo pipefail
 
           requires_deploy=false
           reason='no governed Production DB deployment-surface change detected'
+          if [[ "$EVENT_NAME" == 'workflow_dispatch' && "${SCOPED_BACKFILL:-}" == 'true' && "${READER_S4_SCOPED:-}" == 'true' ]]; then
+            echo 'HOLD_CONFLICTING_SCOPED_PRODUCTION_ACTIONS' >&2
+            exit 1
+          fi
 
           if [[ "$EVENT_NAME" == 'push' && "$(git show -s --format=%s "$CURRENT_SHA")" == 'ops(seyeon): apply one-shot 1400-1450 38088591661 38090483306' ]]; then
             [[ "$BEFORE_SHA" =~ ^[0-9a-f]{40}$ ]] && git cat-file -e "${BEFORE_SHA}^{commit}" ||
@@ -79,6 +101,9 @@ jobs:
           elif [[ "$EVENT_NAME" == 'workflow_dispatch' && "${SCOPED_BACKFILL:-}" == 'true' ]]; then
             requires_deploy=false
             reason='manual scoped Se-yeon backfill must never invoke ordinary db push'
+          elif [[ "$EVENT_NAME" == 'workflow_dispatch' && "${READER_S4_SCOPED:-}" == 'true' ]]; then
+            requires_deploy=false
+            reason='manually scoped Reader 1740..2290 must never invoke ordinary db push'
           elif [[ "$EVENT_NAME" == 'workflow_dispatch' ]]; then
             requires_deploy=true
             reason='workflow_dispatch forces governed Production verification'
@@ -92,7 +117,141 @@ jobs:
             changed_files="$(git diff --name-only "$BEFORE_SHA" "$CURRENT_SHA")"
             printf '%s\n' "$changed_files"
 
-            if grep -Eq '^(supabase/migrations/|[.]github/workflows/supabase-production[.]yml$|scripts/run-production-platform-integrity-postdeploy-verify[.]sh$|scripts/run-production-platform-integrity-read-audit[.]sh$|scripts/run-production-platform-integrity-data-api-surface-audit[.]sh$|scripts/operations/run-supabase-production-migrations[.]sh$)' <<<"$changed_files"; then
+            # Changing ONLY the separate manual Reader 1740..2290 route
+            # must never start the ordinary --include-all production job.
+            # A migration SQL or other deployment script in the same push
+            # is NOT whitelisted and retains its original governed gate.
+            non_reader_scope="$(printf '%s\n' "$changed_files" | grep -Ev '^([.]github/workflows/supabase-production[.]yml|scripts/operations/(apply-official-reader-s4-scoped-production-migrations[.]sh|stage-official-reader-s4-production-migrations[.]py|official-reader-s4-scoped-migration-(pre|post)[.]sql))          fi
+
+          promotion_repair_only=false
+          if [[ "$EVENT_NAME" == 'push' && "$requires_deploy" == 'true' ]]; then
+            migration_changes="$(printf '%s\n' "${changed_files:-}" | grep '^supabase/migrations/' || true)"
+            if [[ "$migration_changes" == 'supabase/migrations/20261007150457_guest_promotion_auth_fk_validation.sql' ]]; then
+              promotion_repair_only=true
+            fi
+          fi
+          seyeon_manifest_repair_only=false
+          if [[ "$EVENT_NAME" == 'push' && "$requires_deploy" == 'true' ]]; then
+            migration_changes="$(printf '%s\n' "${changed_files:-}" | grep '^supabase/migrations/' || true)"
+            if [[ "$migration_changes" == 'supabase/migrations/20261008043000_seyeon_manifest_acl_restore.sql' ]]; then
+              seyeon_manifest_repair_only=true
+            fi
+          fi
+          echo "requires_deploy=$requires_deploy" >> "$GITHUB_OUTPUT"
+          echo "promotion_repair_only=$promotion_repair_only" >> "$GITHUB_OUTPUT"
+          echo "seyeon_manifest_repair_only=$seyeon_manifest_repair_only" >> "$GITHUB_OUTPUT"
+          {
+            echo '### Supabase Production change gate'
+            echo
+            echo "- event: $EVENT_NAME"
+            echo "- current_sha: $CURRENT_SHA"
+            echo "- before_sha: ${BEFORE_SHA:-absent}"
+            echo "- requires_deploy: $requires_deploy"
+            echo "- promotion_repair_only: $promotion_repair_only"
+            echo "- seyeon_manifest_repair_only: $seyeon_manifest_repair_only"
+            echo "- reason: $reason"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  deploy:
+    name: deploy-migrations
+    needs: change-gate
+    if: ${{ needs.change-gate.outputs.requires_deploy == 'true' }}
+    runs-on: ubuntu-24.04
+    environment: production
+    env:
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PRODUCTION_SESSION_POOLER_HOST: ${{ secrets.SUPABASE_PRODUCTION_SESSION_POOLER_HOST }}
+      SUPABASE_PROMOTION_REPAIR_ONLY: ${{ needs.change-gate.outputs.promotion_repair_only }}
+      SUPABASE_SEYEON_MANIFEST_ACL_REPAIR_ONLY: ${{ needs.change-gate.outputs.seyeon_manifest_repair_only }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@46f7f98c7f948ad727d22c1e67fab04c223a0520 # v3.0.0
+        with:
+          version: 2.116.0
+
+      - name: Install PostgreSQL client for read-only post-deploy verification
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Deploy governed production migrations
+        shell: bash
+        run: bash scripts/operations/run-supabase-production-migrations.sh
+
+      - name: Verify production platform integrity after deploy
+        shell: bash
+        run: bash scripts/run-production-platform-integrity-postdeploy-verify.sh
+
+      - name: Upload post-deploy platform integrity evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: myeongha-production-postdeploy-platform-integrity-${{ github.run_id }}
+          path: ${{ runner.temp }}/myeongha-platform-integrity-catalog
+          if-no-files-found: warn
+          retention-days: 14
+
+
+  relationship-backfill-1400-1450:
+    name: governed-seyeon-relationship-backfill-1400-1450
+    if: "${{ (github.event_name == 'workflow_dispatch' && inputs.relationship_backfill_1400_1450 == true) || (github.event_name == 'push' && startsWith(github.event.head_commit.message, 'ops(seyeon): apply one-shot 1400-1450 38088591661 38090483306')) }}"
+    needs: change-gate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    environment: production
+    permissions:
+      contents: read
+      actions: read
+    env:
+      CI: 'true'
+      GH_TOKEN: ${{ github.token }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PRODUCTION_SESSION_POOLER_HOST: ${{ secrets.SUPABASE_PRODUCTION_SESSION_POOLER_HOST }}
+      SUPABASE_PRODUCTION_SERVER_ROOT_CERT_PEM: ${{ secrets.SUPABASE_PRODUCTION_SERVER_ROOT_CERT_PEM }}
+      SEYEON_BACKUP_RUN_ID: ${{ github.event_name == 'push' && '38088591661' || inputs.backup_run_id }}
+      SEYEON_RESTORE_RUN_ID: ${{ github.event_name == 'push' && '38090483306' || inputs.restore_run_id }}
+      SEYEON_SCOPE_CONFIRMATION: ${{ github.event_name == 'push' && 'APPLY_RELATIONSHIP_1400_1450_ONLY' || inputs.scoped_confirmation }}
+    steps:
+      - name: Checkout immutable main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Verify reviewed one-shot Production backfill authorization
+        if: ${{ github.event_name == 'push' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_REF" == 'refs/heads/main' ]]
+          [[ "$(git rev-parse HEAD)" == "$GITHUB_SHA" ]]
+          [[ "$(git show -s --format=%s HEAD)" == 'ops(seyeon): apply one-shot 1400-1450 38088591661 38090483306' ]]
+          [[ "$(cat '.github/ops/seyeon-relationship-1400-1450-restore-38090483306.once')" == 'SEYEON-SCOPED-BACKFILL-1400-1450-38088591661-38090483306-V1' ]]
+          echo 'SCOPED_ONE_SHOT_ADMISSION_PASS: review, fixed backup and restore; no unrestricted db push'
+      - name: Install PostgreSQL client and jq
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client jq >/dev/null
+      - name: Require fresh backup and matching restore before scoped atomic SQL
+        shell: bash
+        run: bash scripts/operations/seyeon-production-relationship-backfill-guarded.sh
+ || true)"
+            # A bundled Privacy branch merge also changes TS/tests. Its new
+            # manual-only deploy route is not a Production schema change.
+            # Retain the deploy gate for ANY migration or ordinary DB script.
+            if grep -Fxq 'scripts/operations/apply-official-reader-s4-scoped-production-migrations.sh' <<<"$changed_files" && ! grep -Eq '^(supabase/migrations/|scripts/operations/run-supabase-production-migrations[.]sh$|scripts/run-production-platform-integrity-postdeploy-verify[.]sh$|scripts/run-production-platform-integrity-read-audit[.]sh$|scripts/run-production-platform-integrity-data-api-surface-audit[.]sh$)' <<<"$changed_files"; then
+              requires_deploy=false
+              reason='Reader scoped deployment tool added; manual only; no generic db push'
+            elif [[ -z "$non_reader_scope" && -n "$changed_files" ]]; then
+              requires_deploy=false
+              reason='only manual Reader S4 workflow and dedicated scripts changed'
+            elif grep -Eq '^(supabase/migrations/|[.]github/workflows/supabase-production[.]yml$|scripts/run-production-platform-integrity-postdeploy-verify[.]sh$|scripts/run-production-platform-integrity-read-audit[.]sh$|scripts/run-production-platform-integrity-data-api-surface-audit[.]sh$|scripts/operations/run-supabase-production-migrations[.]sh$)' <<<"$changed_files"; then
               requires_deploy=true
               reason='governed Production DB deployment-surface change detected'
             fi
@@ -216,3 +375,36 @@ jobs:
       - name: Require fresh backup and matching restore before scoped atomic SQL
         shell: bash
         run: bash scripts/operations/seyeon-production-relationship-backfill-guarded.sh
+
+  official-reader-scoped-1740-2290:
+    name: Manual Official Reader 1740..2290 (guarded, no paid activation)
+    if: "${{ github.event_name == 'workflow_dispatch' && inputs.reader_s4_scoped_apply == true && inputs.relationship_backfill_1400_1450 != true }}"
+    needs: change-gate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    environment: production
+    permissions:
+      contents: read
+      actions: read
+    env:
+      CI: 'true'
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PRODUCTION_SESSION_POOLER_HOST: ${{ secrets.SUPABASE_PRODUCTION_SESSION_POOLER_HOST }}
+      SUPABASE_PRODUCTION_SERVER_ROOT_CERT_PEM: ${{ secrets.SUPABASE_PRODUCTION_SERVER_ROOT_CERT_PEM }}
+      GH_TOKEN: ${{ github.token }}
+      READER_S4_BACKUP_RUN_ID: ${{ inputs.reader_s4_backup_run_id }}
+      READER_S4_RESTORE_RUN_ID: ${{ inputs.reader_s4_restore_run_id }}
+      READER_S4_SCOPE_CONFIRMATION: ${{ inputs.reader_s4_confirmation }}
+    steps:
+      - name: Checkout immutable main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install PostgreSQL client and jq
+        shell: bash
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client jq >/dev/null
+      - name: Atomically apply exact Reader 56-file scope after current backup + restore
+        shell: bash
+        run: bash scripts/operations/apply-official-reader-s4-scoped-production-migrations.sh
