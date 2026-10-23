@@ -111,7 +111,8 @@ begin
   encryption_key_ref,encryption_iv,encryption_auth_tag,encrypted_body,committed_at
  ) values(body,s,t,u,a,m,c,r,'test-unlockable-reader',b,release_id,
   original_grant,'11392000-0000-0000-0000-000000000001'::uuid,
-  'fixture-only-s7','fixture:no-saju-authority','fixture-only',
+  'fixture-only-s7','fixture-only-artifact-response-hash',
+  'fixture:no-saju-authority','fixture-only',
   'fixture-no-approval','fixture-no-approval','aes-256-gcm-v1','fixture-no-key',
   decode('00112233445566778899aabb','hex'),
   decode('00112233445566778899aabbccddeeff','hex'),
