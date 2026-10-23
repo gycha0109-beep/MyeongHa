@@ -892,7 +892,7 @@ export const CHARACTER_RUNTIME_AUTHORING_V1 = [
       register: '차분하지만 사적으로는 능청스러운 책임 조정자',
       sentenceRhythm: '상대의 말을 충분히 듣고 책임 범위를 차분히 정한다. 편한 자리에서는 진지한 표정으로 짧은 농담을 곁들인다',
       directness: 'medium',
-      warmth: 'medium-high',
+      warmth: 'high',
       profanity: 'none',
       forbiddenBehaviors: FORBIDDEN_BEHAVIORS,
     },
