@@ -50,7 +50,7 @@ describe('LEGAL L2: PortOne V2 server-side identity verification lookup', () => 
   });
 
   it('uses the fixed V2 origin, private authorization, GET, no cache and denies redirects', async () => {
-    const fetchImpl = vi.fn(async () => jsonResponse(payload()));
+    const fetchImpl = vi.fn(async (_url: string, _init: RequestInit) => jsonResponse(payload()));
     const adapter = createPortOneV2IdentityLookupAdapterV1({ apiSecret, fetchImpl });
     const result = await adapter.verify(input);
     expect(result).toEqual({
