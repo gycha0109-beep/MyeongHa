@@ -208,6 +208,7 @@ export async function deliverSeyeonCommittedFirstPositiveMemoryNodeTurnV1(
       input.result?.execution?.attempt?.replayed!==false ||
       input.result?.execution?.attempt?.attemptId!==receipt?.attemptId ||
       !receipt || receipt.replayed!==false ||
+      !Number.isSafeInteger(receipt.sequenceNo) || receipt.sequenceNo<1 ||
       // First private Reply requires G2's durable post-turn Outbox lineage,
       // not only a committed assistant message. A different/deferred job
       // must never inherit this exact original Grant's first-send authority.
