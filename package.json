@@ -53,6 +53,7 @@
     "verify:account-deletion-finalization-preflight": "node scripts/verify-account-deletion-finalization-preflight.mjs",
     "verify:account-deletion-db-finalizer": "node scripts/verify-account-deletion-db-finalizer.mjs",
     "verify:portone-identity-privacy-candidate": "node scripts/verify-portone-identity-privacy-release-candidate.mjs",
+    "maintenance:portone-identity-purge-once": "node scripts/run-portone-identity-attempt-purge.mjs",
     "verify:account-deletion-worker-completion": "node scripts/verify-account-deletion-worker-completion.mjs",
     "verify:account-deletion-worker-execution-identity": "node scripts/verify-account-deletion-worker-execution-identity.mjs",
     "verify:account-deletion-worker-runtime": "node scripts/verify-account-deletion-worker-runtime.mjs",
