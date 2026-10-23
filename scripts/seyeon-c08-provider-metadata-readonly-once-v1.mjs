@@ -1,6 +1,8 @@
 /**
  * C08 §7.3-6: single authorized GET-only provider snapshot, no inference.
- * Manual workflow on main only, first attempt/first run ever. This CLI has no
+ * First-ever manual or marker-push workflow on protected main only.
+ * A marker-push requires a NEW exact trigger file in the GH commit diff.
+ * This CLI has no
  * chat-completions POST path, no retry and no model/production routing changes.
  */
 import {execFileSync} from 'node:child_process';
@@ -12,12 +14,25 @@ import {inspectSeyeonC08ProviderMetadataReadOnlyV1} from
 export const C08_PROVIDER_INVENTORY_REPO_V1='gycha0109-beep/MyeongHa';
 export const C08_PROVIDER_INVENTORY_WORKFLOW_V1=
   'seyeon-c08-provider-metadata-readonly-once-v1.yml';
+export const C08_PROVIDER_ONCE_TRIGGER_MARKER_V1=
+  '.github/seyeon-c08-provider-metadata-readonly-once.trigger';
 const commitRe=/^[a-f0-9]{40}$/u;
 const isObject=v=>v!==null&&typeof v==='object'&&!Array.isArray(v);
-export function assertSeyeonC08ProviderInventoryOnceV1(env,history){
+export function assertSeyeonC08ProviderInventoryOnceV1(env,history,commit=null){
+  const event=env?.GITHUB_EVENT_NAME;
+  const push=event==='push',manual=event==='workflow_dispatch';
+  if(!push&&!manual)throw new TypeError('C08_PROVIDER_ONCE_ADMISSION_HOLD');
+  // A new file can only enter main through this reviewed merge; a later
+  // modification or a different main push is not an authorization.
+  if(push&&(!isObject(commit)||commit.sha!==env.GITHUB_SHA||
+    !Array.isArray(commit.files)||
+    commit.files.filter(f=>isObject(f)&&
+      f.filename===C08_PROVIDER_ONCE_TRIGGER_MARKER_V1&&
+      f.status==='added').length!==1)){
+    throw new TypeError('C08_PROVIDER_ONCE_MARKER_HOLD');
+  }
   if(env?.GITHUB_REPOSITORY!==C08_PROVIDER_INVENTORY_REPO_V1||
-     env.GITHUB_EVENT_NAME!=='workflow_dispatch'||
-     env.GITHUB_REF!=='refs/heads/main'||
+          env.GITHUB_REF!=='refs/heads/main'||
      env.GITHUB_RUN_ATTEMPT!=='1'||
      !commitRe.test(env.GITHUB_SHA??'')||
      env.EXPECTED_HEAD_SHA!==env.GITHUB_SHA||
@@ -29,7 +44,7 @@ export function assertSeyeonC08ProviderInventoryOnceV1(env,history){
   const r=history.workflow_runs[0];
   if(!isObject(r)||String(r.id)!==env.GITHUB_RUN_ID||
      r.head_sha!==env.GITHUB_SHA||r.head_branch!=='main'||
-     r.event!=='workflow_dispatch'||r.run_attempt!==1){
+     r.event!==event||r.run_attempt!==1){
     throw new TypeError('C08_PROVIDER_ONCE_REPLAY_HOLD');
   }
   return Object.freeze({commitSha:env.GITHUB_SHA,workflowRunId:env.GITHUB_RUN_ID});
@@ -99,13 +114,16 @@ async function main(){
   const env=process.env;
   if(!env.GH_TOKEN||!env.RUNNER_TEMP||!env.OPENROUTER_API_KEY)
     throw new TypeError('C08_PROVIDER_ONCE_RUNTIME_AUTH_HOLD');
-  const history=JSON.parse(execFileSync('gh',[
-    'api',
+  const call=route=>JSON.parse(execFileSync('gh',['api',route],
+    {encoding:'utf8',env,timeout:15000,maxBuffer:2000000}));
+  const history=call(
     'repos/'+C08_PROVIDER_INVENTORY_REPO_V1+
     '/actions/workflows/'+C08_PROVIDER_INVENTORY_WORKFLOW_V1+
-    '/runs?event=workflow_dispatch&per_page=100',
-  ],{encoding:'utf8',env,timeout:15000,maxBuffer:2000000}));
-  const admitted=assertSeyeonC08ProviderInventoryOnceV1(env,history);
+    '/runs?per_page=100');
+  const commit=env.GITHUB_EVENT_NAME==='push'?call(
+    'repos/'+C08_PROVIDER_INVENTORY_REPO_V1+'/commits/'+env.GITHUB_SHA
+  ):null;
+  const admitted=assertSeyeonC08ProviderInventoryOnceV1(env,history,commit);
   const snapshot=await inspectSeyeonC08ProviderMetadataReadOnlyV1({
     apiKey:env.OPENROUTER_API_KEY,fetchImpl:fetch,
   });
