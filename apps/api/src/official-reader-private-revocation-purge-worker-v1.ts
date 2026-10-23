@@ -314,6 +314,14 @@ export async function runOfficialReaderPrivateRevocationPurgeBatchV1(input: {
     );
     const manifest=parseManifest(snapshot.result,claim);
 
+    // A resumed post-erasure job can only finish destroying the keys from
+    // its already committed, externally sealed deletion fence. Conversely
+    // a newly claimed job cannot reuse a post-erasure fence to skip the
+    // exact current-Grant and ciphertext manifest checks.
+    if ((claim.jobStatus==='db_erased') !== (manifest.state==='db_erased')) {
+      return fail();
+    }
+
     if (manifest.state==='sibling_right_present') {
       const released=await single<{released:unknown}>(
         input.pool,RELEASE_SQL,[jobId,worker],
