@@ -18,8 +18,20 @@ declare
  original_grant uuid;
  instant timestamptz:=clock_timestamp();
 begin
+ -- The original B2/B3 entitlement fixture intentionally has no Chat release.
+ -- Create ONE synthetic active non-default release for the existing published
+ -- B2 content bundle. This is isolated test data, NOT an S5/public release.
+ insert into public.content_releases(
+   id,release_key,content_bundle_id,status,is_default,
+   rollout_policy_version,rollout_seed,activated_at,created_at
+ ) values (
+   'f70b0000-0000-4000-8000-000000000001'::uuid,
+   'official-reader-s7-original-ledger-fixture-only',
+   b,'active',false,'s7-isolated-fixture-v1','s7-test-only',instant,instant
+ );
  select id into release_id from public.content_releases
- where content_bundle_id=b order by id limit 1;
+ where id='f70b0000-0000-4000-8000-000000000001'::uuid
+   and content_bundle_id=b;
  select id into original_grant from public.entitlement_grants
  where source_receipt_id='12192000-0000-0000-0000-000000000002'::uuid
    and grant_source_type='purchase' order by id limit 1;
