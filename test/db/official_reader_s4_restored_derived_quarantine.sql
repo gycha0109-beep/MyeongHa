@@ -5,15 +5,18 @@
 -- ONLY on ephemeral synthetic PG15/17. No real subjects, keys or backups.
 -- Every deliberately resurrected row is rolled back in the same session.
 
--- The existing disposable S4 fixture uses a synthetic marker hash. Change
--- only its synthetic SYSTEM marker to the genuine immutable S5 marker hash
--- so the real production SQL helper sees the actual marker provenance.
+-- The genuine S5 SYSTEM marker is immutable by the live 2190 trigger.
+-- Rehydrate its OLD-backup provenance only inside this disposable, rollback-
+-- only transaction. Do not weaken or rewrite the live trigger/fixture.
+begin;
+set local session_replication_role=replica;
 update public.conversation_messages
 set content_hash =
  'sha256:v1:c04638eb883ebf25b14a9f8ce0c5bb0ae0e0bae7aaa69ea91f33f22172abbf63'
 where id='d4500000-0000-4000-8000-000000000001'::uuid
   and sender_type='system'
   and body_text='유료 해설 기록이 있습니다.';
+set local session_replication_role=origin;
 
 do $fixture$
 begin
@@ -55,7 +58,7 @@ $missing_quarantine$;
 
 -- Case A: resurrected Memory Item. Ordinary user-approved Memory is a
 -- plausible old backup artifact even though the 2190 trigger now blocks it.
-begin;
+savepoint memory_item;
 set local session_replication_role=replica;
 insert into public.memory_items (
   id, subject_id, memory_type, schema_version, content_jsonb,
@@ -84,11 +87,12 @@ begin
   end;
 end
 $memory_item$;
-rollback;
+rollback to savepoint memory_item;
+release savepoint memory_item;
 \echo 'PASS S4 restored Memory Item stays quarantined'
 
 -- Case B: resurrected Memory Proposal (including unaccepted candidates).
-begin;
+savepoint memory_proposal;
 set local session_replication_role=replica;
 insert into public.memory_proposals (
   id, subject_id, character_id, proposal_kind, record_type,
@@ -121,11 +125,12 @@ begin
   end;
 end
 $memory_proposal$;
-rollback;
+rollback to savepoint memory_proposal;
+release savepoint memory_proposal;
 \echo 'PASS S4 restored Memory Proposal stays quarantined'
 
 -- Case C: resurrected Life Fact.
-begin;
+savepoint life_fact;
 set local session_replication_role=replica;
 insert into public.life_facts (
   id, subject_id, fact_type, schema_version, value_jsonb, source_kind,
@@ -155,11 +160,12 @@ begin
   end;
 end
 $life_fact$;
-rollback;
+rollback to savepoint life_fact;
+release savepoint life_fact;
 \echo 'PASS S4 restored Life Fact stays quarantined'
 
 -- Case D: resurrected Chat Outbox / background processing event.
-begin;
+savepoint outbox;
 set local session_replication_role=replica;
 insert into public.outbox_events (
   id, aggregate_type, aggregate_id, event_type, event_schema_version,
@@ -189,12 +195,13 @@ begin
   end;
 end
 $outbox$;
-rollback;
+rollback to savepoint outbox;
+release savepoint outbox;
 \echo 'PASS S4 restored Chat Outbox stays quarantined'
 
--- Every injection has been rolled back. A clean fixture has no derivative;
--- real paid Reader and ordinary-context release remain separately disabled.
-begin;
+-- Each restored derivative is rolled back to its savepoint. The genuine S5
+-- synthetic marker remains only in the outer transaction until final ROLLBACK.
+-- No fixture, user data or 2190 guard is changed after the test finishes.
 select pg_catalog.set_config('myeongha.reader_restore_quarantine','on',true);
 select public.internal_assert_official_reader_restored_ordinary_derivations_absent_v1(
   '11390000-0000-0000-0000-000000000001'::uuid
