@@ -7,7 +7,27 @@ const NO_STORE = 'no-store' as const;
 // A caller-controlled 4xx status/Cache-Control header is NOT enough to prove
 // that the response body is a safe preflight denial. Only the tightly scoped
 // chat-turn handler's own static error constructors register the exact object.
-const trustedDenials = new WeakSet<Response>();
+interface TrustedPreflightSnapshotV1 {
+  readonly status: number;
+  readonly headers: readonly (readonly [string, string])[];
+}
+const trustedDenials = new WeakMap<Response, TrustedPreflightSnapshotV1>();
+
+function unchangedTrustedDenial(response: Response): boolean {
+  const snapshot = trustedDenials.get(response);
+  if (snapshot === undefined ||
+      response.status !== snapshot.status ||
+      response.status < 400 || response.status > 499 ||
+      response.headers.get('cache-control') !== NO_STORE ||
+      response.bodyUsed || response.body?.locked === true) {
+    return false;
+  }
+  const entries = [...response.headers.entries()];
+  return entries.length === snapshot.headers.length &&
+    entries.every(([key, value], index) =>
+      snapshot.headers[index]?.[0] === key &&
+      snapshot.headers[index]?.[1] === value);
+}
 
 export function registerSeyeonStaticPreflightDenialV1(
   response: Response,
@@ -20,7 +40,13 @@ export function registerSeyeonStaticPreflightDenialV1(
   ) {
     throw new Error('Untrusted Se-yeon preflight denial cannot be registered.');
   }
-  trustedDenials.add(response);
+  if (response.bodyUsed || response.body?.locked === true) {
+    throw new Error('Consumed Se-yeon preflight denial cannot be registered.');
+  }
+  trustedDenials.set(response, {
+    status: response.status,
+    headers: [...response.headers.entries()],
+  });
   return response;
 }
 
@@ -48,15 +74,10 @@ export function enforceSeyeonVercelFetchRevealFenceV1(
   candidate: Response,
   requestId: string,
 ): Response {
-  const contentType = candidate.headers.get('content-type')?.toLowerCase() ?? '';
-  const isPreflightDenial =
-    trustedDenials.has(candidate) &&
-    candidate.status >= 400 &&
-    candidate.status <= 499 &&
-    candidate.headers.get('cache-control') === NO_STORE &&
-    !contentType.includes('text/event-stream');
-
-  if (isPreflightDenial) return candidate;
+  // A registered 4xx must remain the exact, unread HTTP response
+  // constructed by the server's preflight handler. A later header rewrite
+  // or premature body consumption cannot silently become Reveal authority.
+  if (unchangedTrustedDenial(candidate)) return candidate;
 
   // Explicitly dispose of the old response without reading or copying a
   // possible protected body, even when it was a 503 error.
