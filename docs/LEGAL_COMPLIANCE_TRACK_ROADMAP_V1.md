@@ -71,3 +71,10 @@
 - **검증:** `test/legal-minor-age-policy-v1.test.ts`, `test/legal-minor-policy-surfaces.test.ts`, `test/birth-profile-create-http.test.ts`의 최소·성년·KST 자정·음력 경계·DB 진입 차단 테스트. Web/Mobile 정적 UI 번역 사전 동기화.
 - **중요한 한계:** Birth Profile 생일 값이나 14세 이상 자기 선언은 신뢰할 수 있는 **연령/법정대리인 인증이 아니다**. 서버 회원가입/소셜·게스트·기존 계정·대화에 공통 연령 권위가 없으므로 **전 서비스의 14세 미만 이용·개인정보 수집 차단을 입증하지 못함**. P0-AGE-01 캐릭터 콘텐츠 표현 정책은 OPEN. 유료 구매 19+는 향후 Commerce 권위에서 확인 필요.
 - **최종 상태:** L2 전체 완료 아님, 생산 운영/법정 동의 대체 아님, 출시 HOLD 유지. 기존 Privacy·DB·Commerce 권한 변경 없음.
+
+## 9. L2-P: PortOne V2 본인확인 제공자 확정 (2026-10-23)
+
+- 사용자 최종 선택으로 **PortOne V2**를 명하의 본인확인 제공자로 고정했다. `docs/P0_DECISION_REGISTER.md`에 `P0-AGE-02 = DECIDED`를 추가했으며 기존 결제 결정 `P0-CM-02`는 변경하지 않는다.
+- V2 공식 SDK `requestIdentityVerification` 및 서버 단건조회 `GET /identity-verifications/{id}` 계약을 정본으로 한다. 브라우저 success 쿼리·콜백만으로 연령을 승인하지 않고, 서버 조회의 `VERIFIED` + 소유 Subject의 미소비 인증 시도 + 검증된 `verifiedCustomer.birthDate`를 판정한다.
+- `apps/api/src/portone-v2-identity-verification-contract-v1.ts`에 **실제 PortOne 호출·DB 쓰기·공개 endpoint 없는 오프라인 검증 계약** 구현. ID 교체·재사용, 상태 오류, 형식 오류, 미성년은 거절하고 최소한의 연령 밴드만 반환. `test/legal-portone-v2-identity-verification-contract.test.ts` 회귀 검사 추가.
+- **L2/출시 HOLD:** 인증업체 계약/요금제와 채널키 미확정, 실제 서버 조회 HTTP adapter, 인증 시도 원장/원자적 소비/회원·게스트·소셜 공통 권위, 연령 확인정보 보존·삭제·처리방침, 운영 합성/실제 E2E 검증 모두 미완료. `PORTONE_V2_IDENTITY_VERIFICATION_LAUNCH_HOLD_V1`는 SDK·라이브 채널·공개 인증 API 모두 OFF. 별도 승인 없이 계약·실결제·실인증 활성화 금지.
