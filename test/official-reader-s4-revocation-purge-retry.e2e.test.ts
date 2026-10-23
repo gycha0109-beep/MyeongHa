@@ -26,6 +26,7 @@ function fixture(options: {
   loseLeaseOnce?: boolean;
   invalidRecoveredKey?: boolean;
   regressManifestAfterErase?: boolean;
+  prematureDbErasedManifest?: boolean;
   loseLeaseBeforeLedger?: boolean;
   sqlFailureAt?: 'list' | 'delivery-schema' | 'delivery-prune';
   holdFirstKeyDestroy?: boolean;
@@ -91,6 +92,9 @@ function fixture(options: {
           return result([{result:options.siblingRight ? {
             state:'sibling_right_present',subjectId:SUBJECT,
             readingId:READING,readerCharacterId:READER,
+          } : !dbErased && options.prematureDbErasedManifest === true ? {
+            state:'db_erased',subjectId:SUBJECT,readingId:READING,
+            readerCharacterId:READER,externalFenceId:FENCE,
           } : dbErased && options.regressManifestAfterErase === true ? {
             state:'eligible',subjectId:SUBJECT,readingId:READING,
             readerCharacterId:READER,
@@ -370,6 +374,18 @@ describe('Privacy #2318 official Reader protected purge Worker retry seam', () =
     expect(x.events.filter(e=>e==='ack-key')).toHaveLength(1);
     expect(x.scopeLedger.recordScopeDeletionFence).toHaveBeenCalledTimes(1);
     expect(x.current()).toEqual({dbErased:true,keyDestroyed:true,finished:true});
+  });
+
+  it('denies a forged DB-erased manifest when the claim is still pending deletion', async () => {
+    const x=fixture({prematureDbErasedManifest:true});
+    await expect(x.run('synthetic-worker')).rejects.toThrow(
+      'Protected Reader revocation cleanup is unavailable.',
+    );
+    expect(x.scopeLedger.readScopeDeletionFence).not.toHaveBeenCalled();
+    expect(x.scopeLedger.recordScopeDeletionFence).not.toHaveBeenCalled();
+    expect(x.events).not.toContain('db-delete');
+    expect(x.destroyKey).not.toHaveBeenCalled();
+    expect(x.current()).toEqual({dbErased:false,keyDestroyed:false,finished:false});
   });
 
 });
