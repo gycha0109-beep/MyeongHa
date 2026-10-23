@@ -26,6 +26,8 @@ function fixture(options: {
   loseLeaseOnce?: boolean;
   invalidRecoveredKey?: boolean;
   regressManifestAfterErase?: boolean;
+  loseLeaseBeforeLedger?: boolean;
+  sqlFailureAt?: 'list' | 'delivery-schema' | 'delivery-prune';
 } = {}) {
   const events: string[]=[];
   let dbErased=false;
@@ -35,6 +37,7 @@ function fixture(options: {
   let transactionOpen=false;
   let crashAt=options.crashAt;
   let loseLeaseOnce=options.loseLeaseOnce === true;
+  let loseLeaseBeforeLedger=options.loseLeaseBeforeLedger === true;
   let pendingCommit: 'db-commit' | 'finish-commit' | undefined;
   function interrupt(point: CrashPoint) {
     if(crashAt===point) {
@@ -64,7 +67,11 @@ function fixture(options: {
         if(sql.startsWith('SET LOCAL ROLE ')) return {rows:[]};
         const result=(rows: unknown[])=>({rows:rows as T[]});
         if(sql.includes('internal_list_official_reader_paid_answer_purge_jobs_v1')) {
-          events.push('list'); return result(finished ? [] : [{jobId:JOB}]);
+          events.push('list');
+          if(options.sqlFailureAt==='list') {
+            throw new Error('synthetic SQL failed: subject=' + SUBJECT + ', key=' + KEY);
+          }
+          return result(finished ? [] : [{jobId:JOB}]);
         }
         if(sql.includes('internal_claim_official_reader_paid_answer_purge_v1')) {
           events.push('claim');
@@ -96,7 +103,11 @@ function fixture(options: {
         }
         if(sql.includes('internal_renew_official_reader_paid_answer_purge_lease_v1')) {
           events.push('lease');
-          if(loseLeaseOnce) {
+          if(loseLeaseBeforeLedger) {
+            loseLeaseBeforeLedger=false;
+            return result([{renewed:false}]);
+          }
+          if(loseLeaseOnce && dbErased) {
             loseLeaseOnce=false;
             return result([{renewed:false}]);
           }
@@ -112,7 +123,16 @@ function fixture(options: {
           events.push('sibling-release'); return result([{released:true}]);
         }
         if(sql.includes('internal_prune_official_reader_paid_delivery_v1(integer)')) {
-          return result([{installed:false}]);
+          if(options.sqlFailureAt==='delivery-schema') {
+            throw new Error('synthetic SQL schema failed: receipt=' + SUBJECT + ', key=' + KEY);
+          }
+          return result([{installed:options.sqlFailureAt==='delivery-prune'}]);
+        }
+        if(sql.includes('internal_prune_official_reader_paid_delivery_v1(')) {
+          if(options.sqlFailureAt==='delivery-prune') {
+            throw new Error('synthetic SQL pruning failed: receipt=' + SUBJECT + ', key=' + KEY);
+          }
+          return result([{deletedCount:'0'}]);
         }
         throw Error('unexpected SQL binding');
       },
@@ -286,5 +306,32 @@ describe('Privacy #2318 official Reader protected purge Worker retry seam', () =
     expect(x.destroyKey).toHaveBeenCalledTimes(1);
     expect(x.current()).toEqual({dbErased:true,keyDestroyed:false,finished:false});
   });
+
+  it('does not publish an independent deletion tombstone after losing ownership', async () => {
+    const x=fixture({loseLeaseBeforeLedger:true});
+    await expect(x.run('stale-worker')).rejects.toThrow(
+      'Protected Reader revocation cleanup is unavailable.',
+    );
+    expect(x.scopeLedger.recordScopeDeletionFence).not.toHaveBeenCalled();
+    expect(x.events).not.toContain('db-delete');
+    expect(x.destroyKey).not.toHaveBeenCalled();
+    await expect(x.run('reclaimed-worker')).resolves.toMatchObject({
+      completed:1,rowsDeleted:1,keysDestroyed:1,
+    });
+  });
+
+  for (const point of ['list','delivery-schema','delivery-prune'] as const) {
+    it(`redacts raw ${point} DB failures from exported Worker errors`, async () => {
+      const x=fixture({sqlFailureAt:point});
+      const outcome=await x.run('synthetic-worker').catch(error=>error);
+      expect(outcome).toBeInstanceOf(Error);
+      expect(outcome.message).toBe(
+        'Protected Reader revocation cleanup is unavailable.',
+      );
+      expect(String(outcome)).not.toContain(SUBJECT);
+      expect(String(outcome)).not.toContain(KEY);
+      expect(String(outcome)).not.toContain('receipt=');
+    });
+  }
 
 });

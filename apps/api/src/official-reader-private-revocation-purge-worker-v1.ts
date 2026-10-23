@@ -211,13 +211,20 @@ async function transaction<T>(
   sql: string,
   params: readonly unknown[],
 ): Promise<readonly T[]> {
-  return executePostgresAccountDeletionWorkerTransactionV1({
-    pool,
-    execute: async (client) => {
-      const result = await client.query<T>(sql,params);
-      return result.rows;
-    },
-  });
+  try {
+    return await executePostgresAccountDeletionWorkerTransactionV1({
+      pool,
+      execute: async (client) => {
+        const result = await client.query<T>(sql,params);
+        return result.rows;
+      },
+    });
+  } catch {
+    // The discovery and receipt-pruning queries execute outside the per-job
+    // retry handler. Sanitize DB/driver failures here as well: raw SQL errors
+    // may contain Subject, Receipt, DEK or protected-body identifiers.
+    return fail();
+  }
 }
 
 async function single<T>(pool: PostgresSubjectPoolV1,sql:string,
@@ -340,6 +347,9 @@ export async function runOfficialReaderPrivateRevocationPurgeBatchV1(input: {
 
     let fence:OfficialReaderScopeDeletionFenceV1;
     if (manifest.state==='db_erased') {
+      // Never access the independent erasure ledger on an expired claim.
+      // The worker that reacquires the live lease owns any resume attempt.
+      await requireLiveLease(input.pool,jobId,worker);
       fence=validateFence(
         await input.store.scopeLedger.readScopeDeletionFence(jobId),jobId,claim,
       );
@@ -347,6 +357,9 @@ export async function runOfficialReaderPrivateRevocationPurgeBatchV1(input: {
     } else {
       if (manifest.state !== 'eligible') return fail();
       const entries=manifest.entries;
+      // Manifest selection is not a lease renewal. Check current ownership
+      // again before publishing the immutable off-primary deletion fence.
+      await requireLiveLease(input.pool,jobId,worker);
       fence=validateFence(
         await input.store.scopeLedger.recordScopeDeletionFence({
           jobId,
