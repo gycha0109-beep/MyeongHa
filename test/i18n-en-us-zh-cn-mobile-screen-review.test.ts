@@ -17,7 +17,7 @@ describe('I18N-07 EN/CN curated mobile screen source review', () => {
     expect(REVIEWED_MOBILE_SCREEN_STATIC_UI_KEYS_V1.map(s => s.screen))
       .toEqual(['my','saju','face','records','chat','birth']);
     expect(REVIEWED_MOBILE_SCREEN_STATIC_UI_KEYS_V1.reduce((n,s) => n + s.keys.length, 0))
-      .toBe(37);
+      .toBe(64);
     for (const screen of REVIEWED_MOBILE_SCREEN_STATIC_UI_KEYS_V1) {
       for (const key of screen.keys) {
         expect(PLANNED_MOBILE_STATIC_UI_COPY_V1.has(key), screen.screen + ':' + key).toBe(true);
@@ -30,6 +30,10 @@ describe('I18N-07 EN/CN curated mobile screen source review', () => {
       expect(screen.readyForRelease).toBe(false);
     }
     expect(report.privateDynamicDataInspected).toBe(false);
+    expect(REVIEWED_MOBILE_SCREEN_STATIC_UI_KEYS_V1.find(s => s.screen === 'face')?.keys)
+      .toContain('사진 준비');
+    expect(REVIEWED_MOBILE_SCREEN_STATIC_UI_KEYS_V1.find(s => s.screen === 'chat')?.keys)
+      .toContain('로그인 후 열기  →');
     expect(report.pageRouteClassificationComplete).toBe(false);
     expect(report.readyForRelease).toBe(false);
   });
