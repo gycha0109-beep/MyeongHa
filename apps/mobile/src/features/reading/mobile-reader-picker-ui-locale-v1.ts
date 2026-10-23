@@ -1,4 +1,4 @@
-import { normalizeMobileUiLocale } from '../../ui/mobile-ui-copy.js';
+import { normalizeMobileLegacySourceUiLocale } from '../../ui/mobile-ui-copy.js';
 
 /**
  * Native Saju/Face Reader chooser: authored UI labels only.
@@ -51,7 +51,7 @@ const COPY = Object.freeze({
 } as const);
 
 export function projectMobileReaderPickerUiV1(requestedLocale: unknown) {
-  const uiLocale = normalizeMobileUiLocale(requestedLocale);
+  const uiLocale = normalizeMobileLegacySourceUiLocale(requestedLocale);
   return Object.freeze({
     uiLocale,
     ...COPY[uiLocale],

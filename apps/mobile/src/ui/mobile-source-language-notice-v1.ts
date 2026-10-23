@@ -1,4 +1,4 @@
-import { normalizeMobileUiLocale, type MobileUiLocale } from './mobile-ui-copy.js';
+import { normalizeMobileLegacySourceUiLocale, type MobileUiLocale } from './mobile-ui-copy.js';
 
 /**
  * UI-only disclosure for existing source-owned Chat / Saju Reading text.
@@ -34,7 +34,7 @@ export function projectMobileSourceLanguageNoticeV1(
   if (surface !== 'chat' && surface !== 'reading') {
     throw new TypeError('Unsupported original-text notice surface.');
   }
-  const uiLocale = normalizeMobileUiLocale(requestedUiLocale);
+  const uiLocale = normalizeMobileLegacySourceUiLocale(requestedUiLocale);
   return Object.freeze({
     uiLocale,
     surface,

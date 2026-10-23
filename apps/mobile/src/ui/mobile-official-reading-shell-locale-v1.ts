@@ -1,4 +1,4 @@
-import { normalizeMobileUiLocale, type MobileUiLocale } from './mobile-ui-copy.js';
+import { normalizeMobileLegacySourceUiLocale, type MobileUiLocale } from './mobile-ui-copy.js';
 
 /**
  * I18N-07 admitted subset: authored mobile archive shell text ONLY.
@@ -84,7 +84,7 @@ const FAILURE_COPY = Object.freeze({
 
 /** Unknown errors never become invented source readings; display a generic UI failure. */
 export function officialReadingArchiveFailureCopyV1(message: unknown, locale: unknown): string {
-  const normalized = normalizeMobileUiLocale(locale);
+  const normalized = normalizeMobileLegacySourceUiLocale(locale);
   if (typeof message !== 'string') return FAILURE_COPY['저장된 풀이를 불러오지 못했습니다.'][normalized];
   if (Object.prototype.hasOwnProperty.call(FAILURE_COPY, message)) {
     return FAILURE_COPY[message as keyof typeof FAILURE_COPY][normalized];
@@ -108,6 +108,6 @@ export function projectMobileOfficialReadingShellV1(locale: unknown): Readonly<{
   structureTitle: string;
   supportingTitle: string;
 }> {
-  const uiLocale = normalizeMobileUiLocale(locale);
+  const uiLocale = normalizeMobileLegacySourceUiLocale(locale);
   return Object.freeze({ uiLocale, ...SHELL[uiLocale] });
 }

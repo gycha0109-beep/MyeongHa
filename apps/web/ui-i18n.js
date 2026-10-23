@@ -1,8 +1,9 @@
+import { PLANNED_STATIC_UI_COPY_V1, lookupPlannedStaticUiCopyV1 } from './ui-i18n-planned-copy-v1.js';
+
 // Fixed, authored web UI copy only. Chat messages, birth data, and official readings are intentionally excluded.
 // Korean is the source locale; this dictionary is not a translation service.
-export const SUPPORTED_UI_LOCALES = Object.freeze(['ko-KR', 'ja-JP', 'zh-TW']);
-// Target locales are intentionally NOT admitted until their authored UI copy
-// and read/Reader HOLD surfaces pass I18N-07. This does not change API headers.
+export const SUPPORTED_UI_LOCALES = Object.freeze(['ko-KR', 'ja-JP', 'zh-TW', 'en-US', 'zh-CN']);
+// Authored EN/CN UI is enabled; official Reading/Reader output remains governed separately.
 export const PLANNED_UI_LOCALES = Object.freeze(['en-US', 'zh-CN']);
 export const UI_LOCALE_STORAGE_KEY = 'myeongha.ui.locale.v1';
 export const UI_LOCALE_REQUEST_HEADER_V1 = 'X-MyeongHa-UI-Locale';
@@ -14,6 +15,7 @@ export function normalizeUiLocale(value) {
 
 export function translateStaticUi(source, locale) {
   if (locale === 'ko-KR') return source;
+  if (locale === 'en-US' || locale === 'zh-CN') return lookupPlannedStaticUiCopyV1(source, locale) ?? source;
   const row = COPY.get(source);
   return row?.[locale === 'ja-JP' ? 0 : locale === 'zh-TW' ? 1 : -1] ?? source;
 }
@@ -21,7 +23,8 @@ export function getUiLocale() {
   return typeof window === 'undefined' ? 'ko-KR' : storedLocale();
 }
 export function getUiLocaleRequestHeadersV1() {
-  return { [UI_LOCALE_REQUEST_HEADER_V1]: getUiLocale() };
+  const locale = getUiLocale();
+  return { [UI_LOCALE_REQUEST_HEADER_V1]: locale === 'en-US' || locale === 'zh-CN' ? 'ko-KR' : locale };
 }
 export function formatStaticUi(source, params, locale = getUiLocale()) {
   const template = translateStaticUi(source, locale);
@@ -50,7 +53,7 @@ function repaintText(textNode, locale) {
   const current = textNode.nodeValue ?? '';
   const trimmed = current.trim();
   let korean = trackedText.get(textNode);
-  if (COPY.has(trimmed)) {
+  if (COPY.has(trimmed) || PLANNED_STATIC_UI_COPY_V1.has(trimmed)) {
     korean = trimmed;
     trackedText.set(textNode, korean);
   } else if (!korean) {
@@ -59,7 +62,9 @@ function repaintText(textNode, locale) {
     // text: user names, account data and chat messages may also contain Korean.
     return;
   } else if (trimmed !== korean && trimmed !== translateStaticUi(korean, 'ja-JP')
-    && trimmed !== translateStaticUi(korean, 'zh-TW')) {
+    && trimmed !== translateStaticUi(korean, 'zh-TW')
+    && trimmed !== translateStaticUi(korean, 'en-US')
+    && trimmed !== translateStaticUi(korean, 'zh-CN')) {
     trackedText.delete(textNode);
     return;
   }
@@ -75,10 +80,12 @@ function repaintAttributes(element, locale) {
     const current = element.getAttribute(attr);
     if (current === null) continue;
     let korean = tracked.get(attr);
-    if (COPY.has(current)) { korean = current; tracked.set(attr, current); }
+    if (COPY.has(current) || PLANNED_STATIC_UI_COPY_V1.has(current)) { korean = current; tracked.set(attr, current); }
     else if (!korean) continue;
     else if (current !== korean && current !== translateStaticUi(korean, 'ja-JP')
-      && current !== translateStaticUi(korean, 'zh-TW')) {
+      && current !== translateStaticUi(korean, 'zh-TW')
+      && current !== translateStaticUi(korean, 'en-US')
+      && current !== translateStaticUi(korean, 'zh-CN')) {
       tracked.delete(attr);
       continue;
     }
@@ -102,7 +109,7 @@ function paintMonth(locale) {
   if (month) {
     const date = new Date();
     const label = new Intl.DateTimeFormat(locale, { year: 'numeric', month: 'long' }).format(date);
-    const suffix = locale === 'ja-JP' ? '四柱推命を始める' : locale === 'zh-TW' ? '開始八字解讀' : '사주 시작하기';
+    const suffix = locale === 'ja-JP' ? '四柱推命を始める' : locale === 'zh-TW' ? '開始八字解讀' : locale === 'en-US' ? 'Start Saju' : locale === 'zh-CN' ? '开始八字解读' : '사주 시작하기';
     const next = label + ' · ' + suffix;
     if (month.textContent !== next) month.textContent = next;
   }
@@ -130,20 +137,12 @@ function createLanguagePicker(locale, onChange) {
     ['ko-KR', '한국어'],
     ['ja-JP', '日本語'],
     ['zh-TW', '繁體中文'],
+    ['en-US', 'English'],
+    ['zh-CN', '简体中文'],
   ];
   for (const [value, label] of choices) {
     const option = document.createElement('option');
     option.value = value; option.textContent = label;
-    select.appendChild(option);
-  }
-  // Planned candidates must remain unselectable while their UI catalogues
-  // and privacy/original-source notices are incomplete.
-  for (const [value, label] of [['en-US', 'English (not available yet)'], ['zh-CN', '简体中文 (准备中)']]) {
-    if (!PLANNED_UI_LOCALES.includes(value)) continue;
-    const option = document.createElement('option');
-    option.value = value;
-    option.textContent = label;
-    option.disabled = true;
     select.appendChild(option);
   }
   select.value = locale;

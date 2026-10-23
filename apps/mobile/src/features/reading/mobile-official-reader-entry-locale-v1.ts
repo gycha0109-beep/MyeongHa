@@ -1,4 +1,4 @@
-import { normalizeMobileUiLocale } from '../../ui/mobile-ui-copy.js';
+import { normalizeMobileLegacySourceUiLocale } from '../../ui/mobile-ui-copy.js';
 import type { MobileOfficialReadingReaderEntryStatusV1 } from './mobile-official-reading-reader-entry-view-model.js';
 
 /**
@@ -94,7 +94,7 @@ export function projectMobileOfficialReaderEntryUiV1(
   requestedLocale: unknown,
   status: MobileOfficialReadingReaderEntryStatusV1,
 ) {
-  const uiLocale = normalizeMobileUiLocale(requestedLocale);
+  const uiLocale = normalizeMobileLegacySourceUiLocale(requestedLocale);
   const authored = COPY[uiLocale];
   // An unexpected status never implies admission, a translation or release.
   const statusMessage: string = Object.prototype.hasOwnProperty.call(authored.statusMessages, status)

@@ -11,7 +11,6 @@ import { MobileUiText } from '@/ui/MobileUiText';
 import { useMobileTheme } from '@/ui/mobile-theme';
 import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
 import { useMobileUiLocale } from '@/ui/mobile-ui-locale';
-import { PLANNED_MOBILE_UI_LOCALES } from '@/ui/mobile-ui-copy';
 import { previewMobileAuthoredUiLabelV1, type MobilePlannedUiPreviewLocaleV1 } from '@/ui/mobile-planned-ui-screen-preview-v1';
 
 export function MyProfileCard({
@@ -375,10 +374,8 @@ const localeChoices = [
   { value: 'ko-KR', label: '한국어' },
   { value: 'ja-JP', label: '日本語' },
   { value: 'zh-TW', label: '繁體中文' },
-] as const;
-const plannedLocaleChoices = [
-  { value: 'en-US', label: 'English · Not available yet' },
-  { value: 'zh-CN', label: '简体中文 · 准备中' },
+  { value: 'en-US', label: 'English' },
+  { value: 'zh-CN', label: '简体中文' },
 ] as const;
 
 function MyLocaleSelector() {
@@ -413,26 +410,17 @@ function MyLocaleSelector() {
           );
         })}
       </View>
-      <View style={themedStyles.localeChoices}>
-        {plannedLocaleChoices.filter((choice) => PLANNED_MOBILE_UI_LOCALES.includes(choice.value)).map((choice) => (
-          <Pressable
-            key={choice.value}
-            accessibilityRole="radio"
-            accessibilityState={{ selected: false, disabled: true }}
-            accessibilityLabel={choice.label}
-            disabled
-            style={[themedStyles.localeChoice, { backgroundColor: colors.surface, borderColor: colors.border, opacity: 0.58 }]}
-          >
-            <Text style={{ color: colors.muted, fontSize: 12, fontWeight: '700' }}>{choice.label}</Text>
-          </Pressable>
-        ))}
-      </View>
+
       <Text style={themedStyles.caption}>
         {locale === 'ja-JP'
           ? '画面の固定ラベルのみを翻訳します。会話・個人情報・公式鑑定は変更しません。'
           : locale === 'zh-TW'
             ? '只翻譯介面的固定文字，不改動對話、個人資料或正式解讀。'
-            : '화면에 고정된 안내 문구만 번역합니다. 대화·개인정보·공식 해석은 변경하지 않습니다.'}
+            : locale === 'en-US'
+              ? 'Only fixed UI text is translated. Chats, personal data and official readings remain unchanged.'
+              : locale === 'zh-CN'
+                ? '仅翻译固定界面文案。聊天、个人信息与正式解读保持原文。'
+                : '화면에 고정된 안내 문구만 번역합니다. 대화·개인정보·공식 해석은 변경하지 않습니다.'}
       </Text>
     </View>
   );

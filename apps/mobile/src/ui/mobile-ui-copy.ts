@@ -1,12 +1,13 @@
 import { MOBILE_UI_NATIVE_COPY } from './mobile-ui-native-copy.js';
+import { lookupPlannedMobileStaticUiCopyV1 } from './mobile-planned-ui-copy-v1.js';
 
 /** Shared text values copied from apps/web/ui-i18n.js on this branch.
  * Static authored UI copy ONLY. Do not translate private chats, member-provided
  * content, official reading artifacts, factual values or server errors.
  * Source locale is Korean, matching the web exactly.
  */
-export const SUPPORTED_MOBILE_UI_LOCALES = ['ko-KR','ja-JP','zh-TW'] as const;
-/** Roadmapped UI locales, not yet enabled for persistence, rendering or server UI headers. */
+export const SUPPORTED_MOBILE_UI_LOCALES = ['ko-KR','ja-JP','zh-TW','en-US','zh-CN'] as const;
+/** Newly enabled fixed UI locales only; not server output or official Reader language. */
 export const PLANNED_MOBILE_UI_LOCALES = ['en-US', 'zh-CN'] as const;
 export type MobileUiLocale = typeof SUPPORTED_MOBILE_UI_LOCALES[number];
 export const MOBILE_UI_LOCALE_STORAGE_KEY = 'myeongha.mobile.ui.locale.v1';
@@ -18,11 +19,18 @@ const COPY = new Map<string, readonly [string,string]>(
 );
 
 export function normalizeMobileUiLocale(value: unknown): MobileUiLocale {
-  return value === 'ko-KR' || value === 'ja-JP' || value === 'zh-TW' ? value : 'ko-KR';
+  return SUPPORTED_MOBILE_UI_LOCALES.some(locale => locale === value) ? value as MobileUiLocale : 'ko-KR';
+}
+
+export function normalizeMobileLegacySourceUiLocale(value: unknown): 'ko-KR' | 'ja-JP' | 'zh-TW' {
+  return value === 'ja-JP' || value === 'zh-TW' ? value : 'ko-KR';
 }
 
 export function translateMobileUiCopy(source: string, locale: MobileUiLocale): string {
   if (locale === 'ko-KR') return source;
+  if (locale === 'en-US' || locale === 'zh-CN') {
+    return lookupPlannedMobileStaticUiCopyV1(source, locale) ?? source;
+  }
   const row = COPY.get(source) ?? MOBILE_UI_NATIVE_COPY.get(source);
   return row?.[locale === 'ja-JP' ? 0 : 1] ?? source;
 }

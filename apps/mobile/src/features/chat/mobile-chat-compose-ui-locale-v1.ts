@@ -1,4 +1,4 @@
-import { normalizeMobileUiLocale } from '../../ui/mobile-ui-copy.js';
+import { normalizeMobileLegacySourceUiLocale } from '../../ui/mobile-ui-copy.js';
 
 /**
  * I18N-07 allowed presentation subset: authored Chat composer messages only.
@@ -39,7 +39,7 @@ export type MobileChatComposeUiStatusV1 = 'checking_character' | 'waiting_histor
  * the projection never claims permission to send or advances readiness.
  */
 export function projectMobileChatComposeUiV1(requestedUiLocale: unknown, blockedStatus: MobileChatComposeUiStatusV1) {
-  const uiLocale = normalizeMobileUiLocale(requestedUiLocale);
+  const uiLocale = normalizeMobileLegacySourceUiLocale(requestedUiLocale);
   const copy = COPY[uiLocale];
   const blockedTitle = blockedStatus === 'checking_character'
     ? copy.checkingCharacter

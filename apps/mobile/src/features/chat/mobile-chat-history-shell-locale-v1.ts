@@ -1,4 +1,4 @@
-import { normalizeMobileUiLocale } from '../../ui/mobile-ui-copy.js';
+import { normalizeMobileLegacySourceUiLocale } from '../../ui/mobile-ui-copy.js';
 
 /**
  * I18N-07 authorized UI shell only: pre-existing Chat read states and
@@ -67,7 +67,7 @@ const COPY = Object.freeze({
 } as const);
 
 export function projectMobileChatHistoryShellV1(requestedUiLocale: unknown) {
-  const uiLocale = normalizeMobileUiLocale(requestedUiLocale);
+  const uiLocale = normalizeMobileLegacySourceUiLocale(requestedUiLocale);
   return Object.freeze({
     uiLocale,
     ...COPY[uiLocale],
