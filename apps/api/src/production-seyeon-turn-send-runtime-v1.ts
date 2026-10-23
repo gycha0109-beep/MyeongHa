@@ -4,6 +4,7 @@ import type {
   CharacterClientCompatibilityProfileV1,
 } from '../../../packages/domain/src/index.js';
 import type { IdentityEvidenceVerificationPortV1 } from './current-subject-profile-http.js';
+import type { PortOneVerifiedAgeAdmissionPortV1 } from './portone-v2-verified-age-admission-v1.js';
 import {
   handleSeyeonChatTurnSendRequestV1,
 } from './chat-turn-send-http.js';
@@ -172,6 +173,8 @@ export interface CreateProductionSeyeonTurnSendRuntimeInputV1 {
   readonly pool?: PostgresSubjectPoolV1;
   readonly memberFetchImpl?: SupabaseMemberVerifierFetchV1;
   readonly identityEvidenceVerifier?: IdentityEvidenceVerificationPortV1;
+  /** Explicit server-side age gate. Unset until PortOne proposal deployment. */
+  readonly ageAdmissionPort?: Pick<PortOneVerifiedAgeAdmissionPortV1, 'admitFreePersonalization'>;
   readonly createUuid?: () => string;
   /** Test seam for request-context OIDC only. */
   readonly oidcTokenProvider?: ProductionSeyeonOidcTokenProviderV1;
@@ -207,6 +210,7 @@ export function createProductionSeyeonTurnSendRuntimeV1(
         requestId: requestInput.requestId,
         serverTime: requestInput.serverTime,
         identityEvidenceVerifier,
+        ...(input.ageAdmissionPort === undefined ? {} : { ageAdmissionPort: input.ageAdmissionPort }),
         runtime: Object.freeze({
           run: async (runInput) => {
             const providerConfig =
