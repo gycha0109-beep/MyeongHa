@@ -100,6 +100,9 @@ async function readBoundedJsonResponse(response: Response): Promise<unknown> {
       }
       chunks.push(part.value);
     }
+  } catch (error) {
+    void reader.cancel().catch(() => undefined);
+    throw error;
   } finally {
     reader.releaseLock();
   }
