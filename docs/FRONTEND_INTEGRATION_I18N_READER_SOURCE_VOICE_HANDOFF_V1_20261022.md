@@ -407,3 +407,9 @@
 - 기존 React UI 미리보기(홈·대화 허브·기록·사주)에 하나의 `WebPlannedUiQaSwitcherV1`를 삽입했다. 개발 환경에 한해 버튼의 **Current UI / English / 简体中文**을 선택하면 현재 URL의 `ui-preview`와 **별도의 개발용 sessionStorage 키**만 갱신하고 새로고침한다. 다른 3개 React 개발 화면으로 이동할 때 sessionStorage fallback으로 같은 QA 표시를 유지한다. URL이 명시적으로 지정되면 우선하며 유효하지 않은 query는 저장 선택보다 우선하여 fail closed한다.
 - `development=false`이면 컨트롤은 `null`, session 키 조회는 `null`; 기존 UI 언어 저장·복원/서버 요청 헤더·공식 Saju/Face/Reader 출력·캐릭터 메시지/구매 권한에는 영향을 주지 않는다. QA 상태는 **브라우저 탭 범위에 한정**된 비출시 도구이며 en-US/zh-CN 사용자 선택 활성화 또는 운영 번역 승인과 무관하다.
 - pure resolver의 중복/지원 외 query 차단과 네 React 진입점·dev-only 전환 컨트롤의 SSR 출력 및 운영 비노출 회귀를 추가했다. 추가 화면·실제 브라우저/실기기 검증과 운영 언어 런칭은 HOLD다.
+
+### 7.42 I18N-07 운영 UI 언어 활성화 — EN-US / ZH-CN (2026-10-24)
+
+- 사용자 명시 지시에 따라 **고정 UI 표시 언어 5개**(`ko-KR`, `ja-JP`, `zh-TW`, `en-US`, `zh-CN`)를 웹 locale picker와 모바일 My radio에서 선택할 수 있게 변경했다. 웹 localStorage, Expo SecureStore의 기존 명시적 설정 저장·복원과 기존 482개 영어/간체 정적 UI 사전을 재사용하며, 미등록 정적 문구는 한국어 원문 fallback으로 남는다.
+- 서버 API UI 헤더는 기존 3개만 허용하며 웹에서 영어/간체 선택 시 한국어 헤더로 수렴시킨다. 모바일의 독립 보호 Chat/Reader/Official archive projector는 기존 승인된 3개 source 범위로 유지한다. 공식 Reading/Reader 출력, 사용자 입력, 개인 기록, 채팅 본문, AI 답변, 캐릭터 의미와 구매·권한에는 새 언어 승인이나 변형을 주지 않는다.
+- 기존 영어/간체 PREVIEW와 정식 UI 선택을 구분한다. 운영 코드 선택 기능은 PR에 구현했으나 메인 병합·사이트 배포/스토어 배포 성공은 CI 이후 별도 확인해야 한다. **전체 화면 100% 번역·공식 외국어 풀이 출시를 의미하지 않는다.**

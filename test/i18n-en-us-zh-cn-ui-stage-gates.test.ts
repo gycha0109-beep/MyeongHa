@@ -21,14 +21,14 @@ import {
 const source = (path: string) => readFile(new URL('../' + path, import.meta.url), 'utf8');
 
 describe('I18N-07 en-US/zh-CN UI-only staged selection acceptance', () => {
-  it('registers both roadmap targets without widening current UI or API admission', () => {
+  it('registers both UI locales while leaving API and Reader scope unchanged', () => {
     expect(PLANNED_UI_LOCALES).toEqual(['en-US', 'zh-CN']);
     expect(PLANNED_MOBILE_UI_LOCALES).toEqual(PLANNED_UI_LOCALES);
-    expect(SUPPORTED_UI_LOCALES).toEqual(['ko-KR', 'ja-JP', 'zh-TW']);
+    expect(SUPPORTED_UI_LOCALES).toEqual(['ko-KR', 'ja-JP', 'zh-TW', 'en-US', 'zh-CN']);
     expect(SUPPORTED_MOBILE_UI_LOCALES).toEqual(SUPPORTED_UI_LOCALES);
     for (const pending of PLANNED_UI_LOCALES) {
-      expect(normalizeUiLocale(pending)).toBe('ko-KR');
-      expect(normalizeMobileUiLocale(pending)).toBe('ko-KR');
+      expect(normalizeUiLocale(pending)).toBe(pending);
+      expect(normalizeMobileUiLocale(pending)).toBe(pending);
       const request = new Request('https://myeongha.internal/api/me', {
         headers: { [REQUEST_UI_LOCALE_HEADER_V1]: pending },
       });
@@ -53,7 +53,7 @@ describe('I18N-07 en-US/zh-CN UI-only staged selection acceptance', () => {
     vi.unstubAllGlobals();
   });
 
-  it('displays the two planned choices as disabled on web and mobile without new selection actions', async () => {
+  it('allows the two UI choices on web and mobile without admitting API interpretation', async () => {
     const [web, mobile, provider, uiCopy, api] = await Promise.all([
       source('apps/web/ui-i18n.js'),
       source('apps/mobile/src/features/my/MyComponents.tsx'),
@@ -61,21 +61,18 @@ describe('I18N-07 en-US/zh-CN UI-only staged selection acceptance', () => {
       source('apps/mobile/src/ui/mobile-ui-copy.ts'),
       source('apps/api/src/request-ui-locale-v1.ts'),
     ]);
-    expect(web).toContain("['en-US', 'English (not available yet)']");
-    expect(web).toContain("['zh-CN', '简体中文 (准备中)']");
-    expect(web).toContain('option.disabled = true;');
-    expect(web).toContain('if (!PLANNED_UI_LOCALES.includes(value)) continue;');
-    expect(mobile).toContain("value: 'en-US', label: 'English · Not available yet'");
-    expect(mobile).toContain("value: 'zh-CN', label: '简体中文 · 准备中'");
-    expect(mobile).toContain('PLANNED_MOBILE_UI_LOCALES.includes(choice.value)');
-    expect(mobile).toContain('accessibilityState={{ selected: false, disabled: true }}');
-    expect(mobile).toContain('disabled\n');
+    expect(web).toContain("['en-US', 'English']");
+    expect(web).toContain("['zh-CN', '简体中文']");
+    expect(web).not.toContain('option.disabled = true;');
+    expect(mobile).toContain("value: 'en-US', label: 'English'");
+    expect(mobile).toContain("value: 'zh-CN', label: '简体中文'");
     expect(mobile).toContain('onPress={() => setLocale(choice.value)}');
+    expect(mobile).not.toContain('plannedLocaleChoices');
     expect(provider).toContain("useState<MobileUiLocale>('ko-KR')");
     expect(provider).toContain('SecureStore.setItemAsync(MOBILE_UI_LOCALE_STORAGE_KEY, normalized)');
-    expect(uiCopy).toContain("return value === 'ko-KR' || value === 'ja-JP' || value === 'zh-TW' ? value : 'ko-KR'");
-    expect(api).toContain("selected === 'ko-KR' || selected === 'ja-JP' || selected === 'zh-TW'");
-    expect(web).not.toContain("option.disabled = false;");
+    expect(uiCopy).toContain("lookupPlannedMobileStaticUiCopyV1(source, locale)");
+    expect(api).not.toContain("selected === 'en-US'");
+    expect(api).not.toContain("selected === 'zh-CN'");
   });
 
   it('retains source and authority boundaries until authored translations have acceptance', async () => {

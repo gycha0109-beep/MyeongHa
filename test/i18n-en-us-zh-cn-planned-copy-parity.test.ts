@@ -65,8 +65,8 @@ describe('I18N-07 staged EN-US and ZH-CN authored UI copy', () => {
       expect(lookupPlannedMobileStaticUiCopyV1(source, 'en-US')).toBe(english);
       expect(lookupPlannedMobileStaticUiCopyV1(source, 'zh-CN')).toBe(chinese);
     }
-    expect(normalizeUiLocale('en-US')).toBe('ko-KR');
-    expect(normalizeMobileUiLocale('zh-CN')).toBe('ko-KR');
+    expect(normalizeUiLocale('en-US')).toBe('en-US');
+    expect(normalizeMobileUiLocale('zh-CN')).toBe('zh-CN');
     expect(lookupPlannedStaticUiCopyV1('message.body', 'en-US')).toBeNull();
   });
 
@@ -87,8 +87,8 @@ describe('I18N-07 staged EN-US and ZH-CN authored UI copy', () => {
       expect(lookupPlannedMobileStaticUiCopyV1(source, 'en-US')).toBe(en);
       expect(lookupPlannedMobileStaticUiCopyV1(source, 'zh-CN')).toBe(zh);
     }
-    expect(normalizeUiLocale('en-US')).toBe('ko-KR');
-    expect(normalizeMobileUiLocale('zh-CN')).toBe('ko-KR');
+    expect(normalizeUiLocale('en-US')).toBe('en-US');
+    expect(normalizeMobileUiLocale('zh-CN')).toBe('zh-CN');
     expect(lookupPlannedStaticUiCopyV1('message.body', 'en-US')).toBeNull();
   });
 
@@ -116,8 +116,8 @@ describe('I18N-07 staged EN-US and ZH-CN authored UI copy', () => {
       expect(lookupPlannedMobileStaticUiCopyV1(source, 'en-US')).toBe(en);
       expect(lookupPlannedMobileStaticUiCopyV1(source, 'zh-CN')).toBe(zh);
     }
-    expect(normalizeUiLocale('zh-CN')).toBe('ko-KR');
-    expect(normalizeMobileUiLocale('en-US')).toBe('ko-KR');
+    expect(normalizeUiLocale('zh-CN')).toBe('zh-CN');
+    expect(normalizeMobileUiLocale('en-US')).toBe('en-US');
   });
 
   it('stages the exact member-account warnings and signed-in/guest narrative', () => {
@@ -127,8 +127,8 @@ describe('I18N-07 staged EN-US and ZH-CN authored UI copy', () => {
       expect(lookupPlannedMobileStaticUiCopyV1(source, 'en-US')).toBe(english);
       expect(lookupPlannedMobileStaticUiCopyV1(source, 'zh-CN')).toBe(chinese);
     }
-    expect(normalizeUiLocale('en-US')).toBe('ko-KR');
-    expect(normalizeMobileUiLocale('zh-CN')).toBe('ko-KR');
+    expect(normalizeUiLocale('en-US')).toBe('en-US');
+    expect(normalizeMobileUiLocale('zh-CN')).toBe('zh-CN');
   });
 
   it('stages birth-input and archive headings without interpreting record contents', () => {
@@ -150,8 +150,8 @@ describe('I18N-07 staged EN-US and ZH-CN authored UI copy', () => {
       expect(lookupPlannedMobileStaticUiCopyV1(ko, 'en-US')).toBe(en);
       expect(lookupPlannedMobileStaticUiCopyV1(ko, 'zh-CN')).toBe(zh);
     }
-    expect(normalizeMobileUiLocale('en-US')).toBe('ko-KR');
-    expect(normalizeMobileUiLocale('zh-CN')).toBe('ko-KR');
+    expect(normalizeMobileUiLocale('en-US')).toBe('en-US');
+    expect(normalizeMobileUiLocale('zh-CN')).toBe('zh-CN');
   });
 
   it('fails closed for unsupported input and for source, private messages or unknown copy', () => {

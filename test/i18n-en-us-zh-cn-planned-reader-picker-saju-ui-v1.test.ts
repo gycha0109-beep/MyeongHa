@@ -108,7 +108,7 @@ describe('I18N-07 staged EN-US/ZH-CN Reader picker and Saju preview UI', () => {
 
   it('keeps live KO/JA/ZH-TW UI and Reader/Saju admission unchanged', async () => {
     for (const locale of ['en-US', 'zh-CN']) {
-      expect(normalizeMobileUiLocale(locale)).toBe('ko-KR');
+      expect(normalizeMobileUiLocale(locale)).toBe(locale);
       expect(projectMobileReaderPickerUiV1(locale)).toEqual(projectMobileReaderPickerUiV1('ko-KR'));
     }
     for (const invalid of [null, undefined, 'zh', 'zh-Hans', 'en-GB', 'en', 'JA-JP']) {

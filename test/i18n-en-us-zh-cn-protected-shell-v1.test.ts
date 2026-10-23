@@ -118,7 +118,7 @@ describe('I18N-07 EN-US and ZH-CN staged protected interface shells', () => {
       source('apps/mobile/src/ui/mobile-source-language-notice-v1.ts'),
     ]);
     for (const locale of PLANNED_PROTECTED_UI_LOCALES_V1) {
-      expect(normalizeMobileUiLocale(locale)).toBe('ko-KR');
+      expect(normalizeMobileUiLocale(locale)).toBe(locale);
       expect(projectMobileChatHistoryShellV1(locale)).toEqual(projectMobileChatHistoryShellV1('ko-KR'));
       expect(projectMobileChatComposeUiV1(locale, 'waiting_history')).toEqual(projectMobileChatComposeUiV1('ko-KR', 'waiting_history'));
       expect(projectMobileOfficialReaderEntryUiV1(locale, 'public_route_off')).toEqual(projectMobileOfficialReaderEntryUiV1('ko-KR', 'public_route_off'));
