@@ -18,7 +18,6 @@ const FUNCTION_POLICY = Object.freeze({
   'api/auth/sign-up.ts': 'continue_to_terminal_outcome',
   'api/birth-profiles.ts': 'continue_to_terminal_outcome',
   'api/health.ts': 'cancel_on_disconnect',
-  'api/memory-grants.ts': 'not_yet_authorized_for_cancellation',
   'api/me.ts': 'continue_to_terminal_outcome',
   'api/me/birth-profile.ts': 'not_yet_authorized_for_cancellation',
   'api/me/saju/calculation.ts': 'not_yet_authorized_for_cancellation',
