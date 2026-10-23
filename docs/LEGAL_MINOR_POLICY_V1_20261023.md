@@ -28,6 +28,16 @@ Watchtower-Track: legal-compliance
 - 결제 SDK·공개 Offer·PG 연동은 기존대로 OFF. 직접 구매는 **19세 이상 성인 자격이 신뢰할 수 있는 서버 권위로 확인된 이후에만** 별도 활성화 판단할 수 있다. 자기 Birth Profile 생년월일로 결제 자격을 증명하지 않는다.
 - 기존 고객 데이터/기존 계정의 연령 소급검증·일괄 삭제는 진행하지 않는다. 개인정보 파기·복원은 Privacy/DB 책임 영역.
 
+## 2.1 2026-10-23 본인확인 제공자 추가 결정
+
+- **제공자 확정:** PortOne V2. 기존 결제 PSP 결정 `P0-CM-02`와 같으나 **인증 채널/검증 저장/권한 발급/거래 ID는 결제와 별도**. `P0-AGE-02 = DECIDED`.
+- **공식 브라우저 API:** `PortOne.requestIdentityVerification({ storeId, identityVerificationId, channelKey })`; 모바일 redirect 쿼리는 서버 신뢰 증거가 아니다.
+- **공식 서버 API:** `GET https://api.portone.io/identity-verifications/{identityVerificationId}`; 비밀 키는 서버에서만 사용. 결과의 `status === 'VERIFIED'` + `id` 일치 + `verifiedCustomer.birthDate`로 **한국 시간 기준 만 14/19세 밴드** 평가. 본인확인 수단은 다날·KCP 휴대폰 또는 이니시스 통합인증 등 *PortOne V2에서 허용된 계약 채널*로만 구성.
+- **구현:** `apps/api/src/portone-v2-identity-verification-contract-v1.ts`는 서버 조회 응답을 평가하는 **읽기 전용, 오프라인 판정 함수**. 서버가 발행한 Subject 연결 인증 시도 ID와 미소비 상태 검증, 미확인/잘못된 인증/14세 미만은 거절하고 `free_minor` 또는 `adult` 밴드만 반환. 전화번호·이름·CI·DI·원문 생년월일 등은 반환하지 않음. `test/legal-portone-v2-identity-verification-contract.test.ts`에서 성공·미성년·거짓 응답·타인 인증 ID·소비된 시도 거부를 검증.
+- **아직 구현되지 않음:** 인증 시도 DB 영속 권위, 서버 소유 일회성 식별자 발급·만료·consume 트랜잭션, PortOne API 호출용 timeout/응답 크기·키 관리/채널 설정, 실제 SDK/redirect/API 경로, 계정 Subject 영구 연결 및 변경·삭제/보존, 한국 외 인증·개명/명의 변경 처리, 운영 계약·성공 비용. 해당 전제 미완성으로 SDK/공개 API/실계약 전송은 **전부 OFF**.
+- **개인정보 최소화:** 인증업체에 건네는 값과 인증 후 저장할 최소 필드/처리 목적/보존기간/제3자 제공·위탁은 실제 계약과 개인정보 처리방침 확정 후 명시. CI/DI·전화번호·이름 수집을 기능적으로 자동 승인하지 않음.
+- **공식 근거:** https://developers.portone.io/opi/ko/extra/identity-verification/readme-v2 / https://developers.portone.io/api/rest-v2/identityVerification
+
 ## 3. 출시 전에 반드시 남은 항목
 
 - [ ] **A1 가입 경계:** 서버 회원가입, 소셜 가입·콜백, 게스트 발급에서 **회피할 수 없는 신뢰 가능한 연령 증명/거절**. 현재 브라우저의 체크박스만으로는 API 직접 호출, 기존 계정 사용, 소셜 우회가 가능하다. 만 14세 미만 서비스 일괄 차단 완료 주장은 금지한다.
