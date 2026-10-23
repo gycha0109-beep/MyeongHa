@@ -248,6 +248,17 @@ async function reveal(id:Fixture):Promise<string|null>{
  ),true);
  return r.rows[0]?.answer??null;
 }
+// R25 uses the real R5 original-rights owner proof, then consumes the
+// original Turn under FOR UPDATE before Node socket finish/Tx COMMIT.
+async function firstOnceR25(c:PoolClient,id:Fixture) {
+  const q=await c.query<{answer:string|null}>(
+    'select seyeon_positive_candidate.reveal_first_once_r25($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6::uuid,$7::uuid,$8::text) as answer',
+    [subject,id.thread,id.turn,id.attempt,id.assistantMessage,
+     id.userMessage,id.postOutbox,'g2-real-v2-'+Number(id.turn.slice(-12))],
+  );
+  return q.rows[0]?.answer??null;
+}
+
 async function http(id:Fixture,override?:Partial<Fixture>):Promise<string|null>{
  const loc={...id,...override};
  const r=await transaction(c=>c.query<{answer:string|null}>(
@@ -879,6 +890,171 @@ describe.skipIf(!enabled)('R5 disposable actual-v2 current-rights first/replay/h
       constraint: 'seyeon_offline_r5_page_held',
     });
     expect((await saved(id)).messages).toBe('1');
+  });
+
+
+  it('R25 REAL PG two senders: first original Node socket consumes Turn once; second waits and cannot reveal',async()=>{
+    const id=await committed(93);
+    let firstLocked!:()=>void;
+    let allowNodeFinish!:()=>void;
+    const firstHasDbRights=new Promise<void>(resolve=>{firstLocked=resolve;});
+    const allowSend=new Promise<void>(resolve=>{allowNodeFinish=resolve;});
+    const events:string[]=[];
+    await withR9Loopback(async(request,response)=>{
+      await r9ReadBody(request);
+      const outcome=await sendSeyeonNodeOriginalGrantResponseV1({
+        response,requestSignal:new AbortController().signal,
+        deadlineMs:9_000,
+        withLockedOriginalGrant:async({signal,deliver})=>{
+          await transaction(async c=>{
+            const text=await firstOnceR25(c,id);
+            expect(text).toBe(body);
+            firstLocked();
+            await allowSend;
+            if(signal.aborted)throw Error('R25 first sender aborted');
+            await deliver(text);
+            events.push('first-node-finish');
+            if(signal.aborted)throw Error('R25 first sender aborted after finish');
+          },true);
+          events.push('first-db-commit');
+        },
+      });
+      expect(outcome).toBe('assistant_sent');
+    },async origin=>{
+      const pending=fetch(origin+'/r25-first-one-shot',{
+        method:'POST',body:'disposable R25 private Memory only',
+      });
+      try{
+        await firstHasDbRights;
+        await clientAction(async other=>{
+          await other.query('BEGIN');
+          try{
+            await executor(other);
+            await other.query("set local application_name='seyeon-r25-second-first-send'");
+            const competing=firstOnceR25(other,id);
+            await waitForLock('seyeon-r25-second-first-send');
+            expect(events).toEqual([]);
+            // A THIRD independent PostgreSQL session now tries the real
+            // original Memory revoke while A holds the send authority.
+            // It must not COMMIT revocation before A's Node 'finish'.
+            await clientAction(async revoker=>{
+              await revoker.query('BEGIN');
+              try{
+                await revoker.query("set local application_name='seyeon-r25-revoke-after-first-send'");
+                const revoking=revoker.query<{revoked_grant_count:number}>(
+                  'select revoked_grant_count from public.cmd_revoke_memory_character_grant_v1($1::uuid,$2::uuid,$3::text)',
+                  [subject,id.memory,'seyeon'],
+                );
+                await waitForLock('seyeon-r25-revoke-after-first-send');
+                expect(events).toEqual([]);
+                allowNodeFinish();
+                // B was already queued on the exclusive Turn lock. After
+                // A commits delivered, B can only read NULL and releases its
+                // Subject SHARE, allowing revoke to finish afterwards.
+                expect(await competing).toBeNull();
+                await other.query('COMMIT');
+                const revoked=await revoking;
+                expect(revoked.rows[0]?.revoked_grant_count).toBe(1);
+                await revoker.query('COMMIT');
+                events.push('revoke-committed');
+              }finally{
+                await revoker.query('ROLLBACK').catch(()=>undefined);
+              }
+            });
+          }finally{
+            await other.query('ROLLBACK').catch(()=>undefined);
+          }
+        });
+        const response=await pending;
+        expect(response.status).toBe(200);
+        expect(response.headers.get('cache-control')).toBe('no-store');
+        expect(await response.text()).toContain(body);
+        expect(events).toEqual(['first-node-finish','first-db-commit','revoke-committed']);
+      }finally{
+        allowNodeFinish();
+      }
+    });
+    expect((await saved(id)).turn_state).toBe('delivered');
+    expect(await transaction(c=>firstOnceR25(c,id),true)).toBeNull();
+    expect((await saved(id)).messages).toBe('1');
+    expect((await saved(id)).outboxes).toBe('2');
+    // A future use of that once-valid Memory Grant is revoked and cannot
+    // create another independent positive response after delivery.
+    expect(await http(id)).toBeNull();
+  });
+
+  it('R25 REAL PG revoke-first blocks Node first send before private bytes and preserves unused Turn',async()=>{
+    const id=await committed(95);
+    let readStarted!:()=>void;
+    const started=new Promise<void>(resolve=>{readStarted=resolve;});
+
+    await clientAction(async revoker=>{
+      await revoker.query('BEGIN');
+      try{
+        const revoke=await revoker.query<{revoked_grant_count:number}>(
+          'select revoked_grant_count from public.cmd_revoke_memory_character_grant_v1($1::uuid,$2::uuid,$3::text)',
+          [subject,id.memory,'seyeon'],
+        );
+        expect(revoke.rows[0]?.revoked_grant_count).toBe(1);
+
+        await withR9Loopback(async(request,response)=>{
+          await r9ReadBody(request);
+          const outcome=await sendSeyeonNodeOriginalGrantResponseV1({
+            response,requestSignal:new AbortController().signal,
+            deadlineMs:9_000,
+            withLockedOriginalGrant:async({deliver})=>transaction(async reader=>{
+              await reader.query("set local application_name='seyeon-r25-revoke-first'");
+              readStarted();
+              const reply=await firstOnceR25(reader,id);
+              expect(reply).toBeNull();
+              await deliver(null);
+            },true),
+          });
+          expect(outcome).toBe('reveal_held');
+        },async origin=>{
+          const pending=fetch(origin+'/r25-revoke-first',{
+            method:'POST',body:'disposable R25 revocation race only',
+          });
+          await started;
+          await waitForLock('seyeon-r25-revoke-first');
+          await revoker.query('COMMIT');
+          const response=await pending;
+          const wire=await response.text();
+          expect(response.status).toBe(503);
+          expect(response.headers.get('cache-control')).toBe('no-store');
+          expect(wire).not.toContain(body);
+          expect(wire).toContain('SEYEON_FIRST_REVEAL_AUTHORITY_UNAVAILABLE');
+        });
+      }finally{
+        await revoker.query('ROLLBACK').catch(()=>undefined);
+      }
+    });
+    expect((await saved(id)).turn_state).toBe('committed');
+    expect(await transaction(c=>firstOnceR25(c,id),true)).toBeNull();
+    expect((await saved(id)).messages).toBe('1');
+  });
+
+  it('R25 failed send rolls back consumed Turn so a later original first send can retry once',async()=>{
+    const id=await committed(94);
+    // Same real Turn/Attempt/Assistant but forged G2 original receipt locator:
+    // do not consume a legitimate first Reply on false G2 evidence.
+    expect(await transaction(c=>firstOnceR25(c,{
+      ...id,userMessage:ids(96).userMessage,
+    }),true)).toBeNull();
+    expect(await transaction(c=>firstOnceR25(c,{
+      ...id,postOutbox:ids(96).postOutbox,
+    }),true)).toBeNull();
+    expect((await saved(id)).turn_state).toBe('committed');
+    await expect(transaction(async c=>{
+      expect(await firstOnceR25(c,id)).toBe(body);
+      // Synthetic socket failure before finish: DB delivery transition
+      // must not survive an uncommitted/rolled-back original-rights Tx.
+      throw Error('R25 simulated socket disconnect before Node finish');
+    },true)).rejects.toThrow('R25 simulated socket disconnect');
+    expect((await saved(id)).turn_state).toBe('committed');
+    expect(await transaction(c=>firstOnceR25(c,id),true)).toBe(body);
+    expect((await saved(id)).turn_state).toBe('delivered');
+    expect(await transaction(c=>firstOnceR25(c,id),true)).toBeNull();
   });
 
 });

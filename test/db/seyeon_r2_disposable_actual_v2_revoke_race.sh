@@ -43,10 +43,13 @@ SEYEON_POSITIVE_GRANT_REAL_PG=1 ./node_modules/.bin/vitest run \
 # resolves; this confirms current 503/no-store HOLD and demonstrates why DB
 # read COMMIT alone cannot authorize delayed wire bytes.
 psql -X -v ON_ERROR_STOP=1 -f test/db/seyeon_r5_disposable_reveal_current_rights.sql
+# R25 extends the ACTUAL R5 current-rights Owner with exclusive one-shot Turn
+# consumption in the SAME disposable PG transaction held until Node finish.
+psql -X -v ON_ERROR_STOP=1 -f test/db/seyeon_r25_disposable_first_once_g3.sql
 SEYEON_POSITIVE_GRANT_REAL_PG=1 ./node_modules/.bin/vitest run \
   test/seyeon-r5-current-reveal-disposable.test.ts --maxWorkers=1
 # R21: TWO exact original Grants and REAL ContextReady in the SAME scratch PG transaction.
 # Only a disposable G1 candidate: no Provider, actual G2 or G3 Reveal authority.
 psql -X -v ON_ERROR_STOP=1 -f test/db/seyeon_g1_r21_two_originals_context_ready_candidate_v1.sql
 SEYEON_POSITIVE_GRANT_REAL_PG=1 ./node_modules/.bin/vitest run test/seyeon-positive-r21-two-source-context-ready-disposable.test.ts --maxWorkers=1
-echo 'PASS offline R2/R5 G2 v2 plus G3 SQL current-rights races; Production G0/G2/G3 HOLD'
+echo 'PASS offline R2/R5/R25 real G2 + first-once G3 delivery/rollback races; Production G0/G2/G3 HOLD'
