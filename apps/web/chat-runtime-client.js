@@ -520,6 +520,13 @@ async function sendTurn(message) {
         throw new Error('IDEMPOTENCY_CONFLICT');
       }
       if (code === 'AI_TEMPORARILY_UNAVAILABLE') throw new Error('AI_TEMPORARILY_UNAVAILABLE');
+      if (code === 'INSUFFICIENT_CREDITS' || code === 'CREDIT_INSUFFICIENT') {
+        // Act only on an explicit server denial; retain the draft and idempotency key.
+        document.dispatchEvent(new CustomEvent('myeongha:credit-shortage', {
+          detail: { turnId: pendingTurn.clientTurnId },
+        }));
+        throw new Error('CREDIT_SHORTAGE');
+      }
       if (response.status === 403) throw new Error('MEMBER_REQUIRED');
       throw new Error('TURN_SEND_FAILED');
     }
@@ -547,6 +554,7 @@ async function sendTurn(message) {
       AI_TEMPORARILY_UNAVAILABLE: '세연의 답변 생성이 잠시 지연되고 있습니다. 다시 시도해 주세요.',
       INVALID_RESPONSE: '대화 서버 응답을 확인할 수 없습니다.',
       TURN_SEND_FAILED: '메시지를 보내지 못했습니다. 입력한 내용은 그대로 남아 있습니다.',
+      CREDIT_SHORTAGE: '크레딧 안내를 확인해 주세요. 입력한 내용은 그대로 남아 있습니다.',
       AUTHORITATIVE_REREAD_FAILED: '전송 결과를 다시 확인하지 못했습니다. 같은 문장으로 다시 보내면 중복 생성 없이 확인을 이어갑니다.',
     };
     setComposeStatus(
