@@ -15,7 +15,7 @@ const published = CHARACTER_RUNTIME_AUTHORING_V1.map(authoring => ({
 }));
 
 describe('I18N-06 nine-Character language-neutral Reader voice handoff', () => {
-  it('uses exactly nine source profiles without manufacturing a second Bible', () => {
+  it('keeps nine legacy source identities but admits only source-backed voice decisions', () => {
     expect(published).toHaveLength(9);
     expect(Object.keys(READER_VOICE_ALIGNMENT_DIAGNOSTICS_V1)).toEqual(
       published.map(entry => entry.characterId),
@@ -27,6 +27,14 @@ describe('I18N-06 nine-Character language-neutral Reader voice handoff', () => {
           selectedCharacterId: character.characterId,
           voiceAuthority: source,
         });
+        if (character.characterId === 'seorin' || character.characterId === 'mira') {
+          expect(result).toEqual({ state: 'hold', reason: 'character_voice_cleared' });
+          continue;
+        }
+        if (character.characterId === 'doyun') {
+          expect(result).toEqual({ state: 'hold', reason: 'bible_source_not_available' });
+          continue;
+        }
         expect(result.state).toBe('prepared');
         if (result.state !== 'prepared') throw new Error('Expected source-backed handoff');
         expect(result.schemaVersion).toBe(READER_LANGUAGE_NEUTRAL_VOICE_HANDOFF_VERSION_V1);
@@ -44,12 +52,18 @@ describe('I18N-06 nine-Character language-neutral Reader voice handoff', () => {
     }
   });
 
-  it('tracks unresolved Bible/runtime differences without silently replacing either', () => {
+  it('tracks the user decision instead of preserving stale reconciliation blockers', () => {
     expect(
       Object.entries(READER_VOICE_ALIGNMENT_DIAGNOSTICS_V1)
-        .filter(([, state]) => state === 'character_owner_reconciliation_required')
+        .filter(([, state]) => state === 'bible_aligned')
         .map(([id]) => id),
-    ).toEqual(['seyeon', 'yeoul', 'seorin', 'mira', 'doyun', 'baekheon']);
+    ).toEqual(['seyeon', 'yeoul', 'baekheon']);
+    expect(
+      Object.entries(READER_VOICE_ALIGNMENT_DIAGNOSTICS_V1)
+        .filter(([, state]) => state === 'settings_cleared')
+        .map(([id]) => id),
+    ).toEqual(['seorin', 'mira']);
+    expect(READER_VOICE_ALIGNMENT_DIAGNOSTICS_V1.doyun).toBe('bible_only');
     expect(
       Object.entries(READER_VOICE_ALIGNMENT_DIAGNOSTICS_V1)
         .filter(([, state]) => state === 'no_material_difference_flagged')

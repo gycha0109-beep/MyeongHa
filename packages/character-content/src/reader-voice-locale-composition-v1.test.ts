@@ -34,6 +34,10 @@ describe('I18N-06 approved-only Reader voice locale composition', () => {
           voiceAuthority: authority,
           requestedVoiceLocale: 'ko-KR',
         });
+        if (published.characterId === 'seorin' || published.characterId === 'mira' || published.characterId === 'doyun') {
+          expect(decision).toEqual({ state: 'hold', reason: 'invalid_neutral_voice' });
+          continue;
+        }
         expect(decision).toEqual({
           state: 'korean_existing',
           schemaVersion: READER_VOICE_LOCALE_COMPOSITION_VERSION_V1,
@@ -64,6 +68,10 @@ describe('I18N-06 approved-only Reader voice locale composition', () => {
           voiceAuthority: authority,
           requestedVoiceLocale: locale,
         });
+        if (published.characterId === 'seorin' || published.characterId === 'mira' || published.characterId === 'doyun') {
+          expect(decision).toEqual({ state: 'hold', reason: 'invalid_neutral_voice' });
+          continue;
+        }
         expect(decision).toEqual({
           state: 'common_rules_only',
           schemaVersion: READER_VOICE_LOCALE_COMPOSITION_VERSION_V1,
