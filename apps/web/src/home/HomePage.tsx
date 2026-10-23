@@ -85,7 +85,7 @@ export function HomePage() {
           {featuredReaders.map((reader) => (
             <article className="mhx-character" key={reader.key}>
               <div className="mhx-character-art">
-                <img src={reader.portrait} alt={`${reader.name} 캐릭터 소개 이미지`} loading="lazy" decoding="async" />
+                <img src={reader.portrait} alt={reader.name} loading="lazy" decoding="async" />
                 <div className="mhx-character-caption">
                   <h3>{reader.name}</h3>
                   <span>{reader.title}</span>
@@ -93,7 +93,7 @@ export function HomePage() {
               </div>
               <div className="mhx-character-footer">
                 <p>{reader.tone}</p>
-                <a href="chat-hub.html" aria-label={`${reader.name} — 대화 화면에서 제공 상태 확인`}>대화 살펴보기 <span aria-hidden="true">→</span></a>
+                <a href="chat-hub.html">대화 살펴보기 <span aria-hidden="true">→</span></a>
               </div>
             </article>
           ))}
