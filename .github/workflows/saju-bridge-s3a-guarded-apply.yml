@@ -1,0 +1,119 @@
+name: Saju Bridge S3A Guarded Dormant Objects
+run-name: "[WT:saju-bridge] S3A exact one-shot private objects (manual only)"
+
+# No push, schedule, workflow_run, generic migration or repository dispatch.
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: Type APPLY_SAJU_BRIDGE_S3A_DORMANT_1730_ONLY
+        required: true
+        type: string
+      backup_run_id:
+        description: Latest SUCCESS governed Production PostgreSQL logical backup
+        required: true
+        type: string
+      restore_run_id:
+        description: SUCCESS isolated PG17 restore of the SAME backup
+        required: true
+        type: string
+      execution_window_end_utc:
+        description: Explicit operator stop time YYYY-MM-DDTHH:MM:SSZ within 30 minutes
+        required: true
+        type: string
+      stop_owner:
+        description: Responsible stop authority; exact GitHub Owner login
+        required: true
+        type: string
+      watchtower_track:
+        description: Must equal saju-bridge
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: saju-bridge-s3a-production-ddl-once
+  cancel-in-progress: false
+
+jobs:
+  s3a-guarded:
+    name: S3A single transaction only; reject stale backup or missing strict TLS
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      github.repository == 'gycha0109-beep/MyeongHa' &&
+      github.ref == 'refs/heads/main' &&
+      github.actor == 'gycha0109-beep' &&
+      github.triggering_actor == github.actor &&
+      github.run_attempt == 1 &&
+      inputs.stop_owner == github.actor
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: production
+    env:
+      SUPABASE_PROJECT_ID: cnsfpcdiyofqvhpcegfc
+      MYEONGHA_WATCHTOWER_TRACK: ${{ inputs.watchtower_track }}
+      S3A_CONFIRM: ${{ inputs.confirm }}
+      S3A_BACKUP_RUN_ID: ${{ inputs.backup_run_id }}
+      S3A_RESTORE_RUN_ID: ${{ inputs.restore_run_id }}
+      S3A_WINDOW_END_UTC: ${{ inputs.execution_window_end_utc }}
+      S3A_STOP_OWNER: ${{ inputs.stop_owner }}
+      GH_TOKEN: ${{ github.token }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PRODUCTION_SESSION_POOLER_HOST: ${{ secrets.SUPABASE_PRODUCTION_SESSION_POOLER_HOST }}
+      SUPABASE_PRODUCTION_SERVER_ROOT_CERT_PEM: ${{ secrets.SUPABASE_PRODUCTION_SERVER_ROOT_CERT_PEM }}
+    steps:
+      - name: Checkout exact main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Setup pinned Node runtime
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '24'
+          package-manager-cache: false
+
+      - name: Verify Owner scope, current main, latest backup, and fresh restore provenance
+        id: source
+        run: node scripts/operations/saju-bridge-s3a-provenance.mjs source
+
+      - name: Download only the bounded existing restore evidence JSON artifact
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ inputs.restore_run_id }}
+          artifact-ids: ${{ steps.source.outputs.restore_artifact_id }}
+          merge-multiple: true
+          path: ${{ runner.temp }}/saju-s3a-restore-evidence
+
+      - name: Validate exact restore evidence envelope without accessing user records
+        env:
+          S3A_RESTORE_EVIDENCE_DIR: ${{ runner.temp }}/saju-s3a-restore-evidence
+        run: node scripts/operations/saju-bridge-s3a-provenance.mjs verify
+
+      - name: Install PostgreSQL client
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+          psql --version
+
+      - name: Strict pinned-CA verify-full and guarded single-transaction S3A
+        env:
+          S3A_RESTORE_EVIDENCE_DIR: ${{ runner.temp }}/saju-s3a-restore-evidence
+        run: bash scripts/operations/run-saju-bridge-s3a-guarded-apply.sh
+
+      - name: Record HOLD boundary; do not activate any consumer
+        run: |
+          set -euo pipefail
+          echo 's3a_object_install=success'
+          echo 's3a_login_created=false'
+          echo 's3a_permit_issued=false'
+          echo 's3a_operational_admission=HOLD'
+          echo 's3a_can_execute=false'
+          echo 's3a_can_publish=false'
+          echo 's3a_can_sell=false'

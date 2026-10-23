@@ -3,22 +3,25 @@ import { readFile } from 'node:fs/promises';
 import {
   CHAT_LAUNCH_CHARACTER_IDS_V1,
 } from '../packages/api-client/src/index.js';
-import { MOBILE_CHAT_LAUNCH_ROSTER_V1 } from '../apps/mobile/src/features/chat/chat-launch-roster.js';
+import { MOBILE_CHAT_KNOWN_CHARACTERS_V1, MOBILE_CHAT_LAUNCH_ROSTER_V1 } from '../apps/mobile/src/features/chat/chat-launch-roster.js';
 
 async function source(path: string) {
   return readFile(new URL(`../${path}`, import.meta.url), 'utf8');
 }
 
-describe('mobile Chat mirrors web nine-character entry with server-owned send', () => {
-  it('presents all nine canonical Characters for room open/reuse', async () => {
-    expect(MOBILE_CHAT_LAUNCH_ROSTER_V1.map((entry) => entry.characterId))
+describe('mobile Chat has six visible characters with nine historical server identities', () => {
+  it('shows six mobile launch Characters and preserves nine canonical server IDs', async () => {
+    expect(MOBILE_CHAT_KNOWN_CHARACTERS_V1.map((entry) => entry.characterId))
       .toEqual([...CHAT_LAUNCH_CHARACTER_IDS_V1]);
+    expect(MOBILE_CHAT_LAUNCH_ROSTER_V1.map((entry) => entry.characterId))
+      .toEqual(['seyeon', 'yeoul', 'rahyeon', 'taegyeom', 'yunho', 'baekheon']);
     const hub = await source('apps/mobile/src/app/(tabs)/chat/index.tsx');
     expect(hub).toContain('MOBILE_CHAT_LAUNCH_ROSTER_V1.map');
     expect(hub).toContain('handleOpen(character.characterId)');
     const hook = await source('apps/mobile/src/features/chat/use-mobile-chat-open.tsx');
     expect(hook).toContain('mobileChatOpenServiceV1.open(characterId)');
-    expect(hub).toContain('세연은 실제 AI 대화가 가능');
+    expect(hub).toContain('일부 AI 답변과 기존 기록은 현재 이용이 제한될 수 있습니다.');
+    expect(hub).not.toContain('세연은 회원 로그인 후 AI 대화가 가능');
   });
 
   it('shares a reusable composer but does not offer eight unsupported AI backends', async () => {

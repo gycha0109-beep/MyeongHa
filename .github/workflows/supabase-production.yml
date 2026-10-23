@@ -84,7 +84,35 @@ jobs:
             exit 1
           fi
 
-          if [[ "$EVENT_NAME" == 'push' && "$(git show -s --format=%s "$CURRENT_SHA")" == 'ops(seyeon): apply one-shot 1400-1450 38088591661 38090483306' ]]; then
+          # Exact one-shot staging, not a Production DB deployment. The new
+          # locked Reveal function is unmounted; invoking unrestricted db push
+          # for this single security PR could unexpectedly replay historical SQL.
+          # Only this exact squash subject, six-path change set and pinned SQL
+          # may skip the dangerous ordinary deployment path.
+          if [[ "$EVENT_NAME" == 'push' && "$(git show -s --format=%s "$CURRENT_SHA")" == 'feat(security): stage first-zero Seyeon locked Reveal without Production activation' ]]; then
+            [[ "$BEFORE_SHA" =~ ^[0-9a-f]{40}$ ]] && git cat-file -e "${BEFORE_SHA}^{commit}" || {
+              echo 'HOLD_FIRST_ZERO_REVEAL_STAGING_PREDECESSOR_MISSING' >&2
+              exit 1
+            }
+            changed_files="$(git diff --name-only "$BEFORE_SHA" "$CURRENT_SHA")"
+            expected_staging_files="$(printf '%s\n' \
+              '.github/workflows/supabase-production.yml' \
+              'apps/api/src/seyeon-locked-first-zero-node-reveal-v1.ts' \
+              'supabase/migrations/20261018190000_seyeon_locked_first_zero_source_reveal_v1.sql' \
+              'test/db/catalog.expected.sha256' \
+              'test/db/run_ci_case.sh' \
+              'test/seyeon-locked-first-zero-node-reveal-v1.test.ts')"
+            [[ "$changed_files" == "$expected_staging_files" ]] || {
+              echo 'HOLD_FIRST_ZERO_REVEAL_STAGING_CHANGE_SCOPE_DRIFT' >&2
+              exit 1
+            }
+            [[ "$(git hash-object supabase/migrations/20261018190000_seyeon_locked_first_zero_source_reveal_v1.sql)" == '002da74911ee6c9f2d0d31b56ca69391b0c3d5c6' ]] || {
+              echo 'HOLD_FIRST_ZERO_REVEAL_STAGING_SQL_DRIFT' >&2
+              exit 1
+            }
+            requires_deploy=false
+            reason='locked first-zero Reveal code staged only; no automatic historical migration replay or public route activation'
+          elif [[ "$EVENT_NAME" == 'push' && "$(git show -s --format=%s "$CURRENT_SHA")" == 'ops(seyeon): apply one-shot 1400-1450 38088591661 38090483306' ]]; then
             [[ "$BEFORE_SHA" =~ ^[0-9a-f]{40}$ ]] && git cat-file -e "${BEFORE_SHA}^{commit}" ||
               { echo 'HOLD_ONE_SHOT_BACKFILL: missing reviewed predecessor'; exit 1; }
             changed_files="$(git diff --name-only "$BEFORE_SHA" "$CURRENT_SHA")"

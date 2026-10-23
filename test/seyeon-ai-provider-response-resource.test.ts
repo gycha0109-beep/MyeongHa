@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   OPENAI_SEYEON_STRUCTURED_PROVIDER_MAX_RESPONSE_BYTES_V1,
   createOpenAiSeyeonStructuredProviderV1,
@@ -87,6 +87,48 @@ describe('Se-yeon structured provider response resource containment', () => {
       .rejects.toMatchObject({ code: 'TIMEOUT' });
     expect(cancelled).toBe(true);
     expect(body.locked).toBe(false);
+  });
+
+  it('rejects ignored fetch abort at the paid Provider header deadline and records timeout once', async () => {
+    let observedSignal: AbortSignal | undefined;
+    const observeMetric = vi.fn();
+    const fetchImpl = vi.fn((_url: string, init: RequestInit) => {
+      observedSignal = init.signal as AbortSignal;
+      return new Promise<Response>(() => undefined);
+    });
+    const client = createOpenAiSeyeonStructuredProviderV1({
+      apiKey: 'sk-test-fake-resource-canary-1234567890',
+      model: 'gpt-5.6-terra',
+      timeoutMs: 40,
+      fetchImpl,
+      observeMetric,
+    });
+    await expect(client.generate(request)).rejects.toMatchObject({ code: 'TIMEOUT' });
+    expect(observedSignal?.aborted).toBe(true);
+    expect(fetchImpl).toHaveBeenCalledOnce();
+    expect(observeMetric).toHaveBeenCalledOnce();
+    expect(observeMetric.mock.calls[0]?.[0]).toMatchObject({ outcome: 'timeout' });
+  });
+
+  it('discards successful Provider headers arriving after the governed deadline', async () => {
+    let release: ((response: Response) => void) | undefined;
+    let cancelled = false;
+    const fetchImpl = vi.fn((_url: string, _init: RequestInit) =>
+      new Promise<Response>(resolve => { release = resolve; })
+    );
+    const call = provider(fetchImpl, 40).generate(request);
+    await expect(call).rejects.toMatchObject({ code: 'TIMEOUT' });
+    expect(release).toBeDefined();
+    release?.(new Response(new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode(JSON.stringify(successfulBody())));
+      },
+      cancel() { cancelled = true; },
+    }), { headers: { 'content-type': 'application/json' } }));
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(cancelled).toBe(true);
+    expect(fetchImpl).toHaveBeenCalledOnce();
   });
 
   it('rejects malformed under-limit JSON with a governed error code', async () => {

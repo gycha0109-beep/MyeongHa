@@ -959,3 +959,25 @@ html[data-theme="dark"] body.chat-hub-page .chat-person-tag {
     font-size: 24px;
   }
 }
+
+
+/* Inactive/registration-only identities are visible at the very bottom, never clickable. */
+.chat-pending-section {
+  margin-top: 26px;
+  padding: clamp(18px, 2.5vw, 28px);
+  border: 1px solid var(--chat-line);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--mh-paper-raised) 66%, transparent);
+}
+.chat-pending-heading { display: flex; align-items: flex-end; justify-content: space-between; flex-wrap: wrap; gap: 8px 22px; margin-bottom: 18px; }
+.chat-pending-heading h2 { margin: 6px 0 0; color: var(--mh-ink); font-family: var(--mh-serif); font-size: 23px; }
+.chat-pending-heading p { margin: 0; color: var(--mh-ink-muted); font-size: 12px; line-height: 1.65; }
+.chat-pending-section .chat-person-card.is-pending { min-height: 185px; opacity: .82; background: color-mix(in srgb, var(--mh-paper-muted) 55%, transparent); }
+.chat-pending-section .chat-person-card.is-pending:hover { transform: none; box-shadow: none; border-color: rgba(128, 92, 55, .2); }
+.chat-pending-section .chat-person-card.is-pending .chat-person-art-image { filter: grayscale(.85); opacity: .67; }
+.chat-pending-section .chat-person-card.is-pending .chat-person-copy { display: flex; flex-direction: column; }
+.chat-pending-section .chat-person-pending-label { display: inline-flex; margin-top: auto; gap: 9px; color: var(--mh-ink-muted); cursor: default; text-decoration: none; }
+@media (max-width: 767px) {
+  .chat-pending-section { margin-top: 17px; padding: 18px 14px; }
+  .chat-pending-section .chat-person-card.is-pending { min-height: 165px; }
+}

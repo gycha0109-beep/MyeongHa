@@ -29,7 +29,7 @@ describe('mobile M5-B Home UI structure', () => {
     const components = await readRepoFile('apps/mobile/src/features/home/HomeComponents.tsx');
     const characterBlock = components.slice(
       components.indexOf('export function HomeCharacterPending'),
-      components.indexOf('const styles'),
+      components.indexOf('const styles = StyleSheet.create'),
     );
     expect(characterBlock).toContain('준비 중');
     expect(characterBlock).not.toContain('<Pressable');

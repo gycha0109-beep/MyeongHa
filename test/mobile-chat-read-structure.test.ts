@@ -17,6 +17,7 @@ describe('mobile M6-A Chat read authority boundary', () => {
   it('keeps the Chat Hub from fabricating recent-thread discovery after Member open is added', async () => {
     const hub = await readRepoFile('apps/mobile/src/app/(tabs)/chat/index.tsx');
     expect(hub).not.toContain('/api/chat');
-    expect(hub).toContain('최근 대화 목록은 아직 서버에서 제공하지 않아');
+    expect(hub).not.toContain('recentThreads');
+    expect(hub).not.toContain('최근 대화 목록은 아직 서버에서 제공하지 않아');
   });
 });

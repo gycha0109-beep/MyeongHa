@@ -40,6 +40,44 @@ function cancelBodyNonBlocking(body: ReadableStream<Uint8Array> | null): void {
   }
 }
 
+/**
+ * Header deadline independent of abort-cooperative fetch. Late results must
+ * never be admitted and their response bodies are cancelled non-blockingly.
+ */
+export function awaitBoundedUpstreamJsonResponseHeadersV1(
+  pending: Promise<Response>,
+  signal: AbortSignal,
+): Promise<Response> {
+  return new Promise<Response>((resolve, reject) => {
+    let finished = false;
+    const onAbort = (): void => {
+      if (finished) return;
+      finished = true;
+      signal.removeEventListener('abort', onAbort);
+      reject(signal.reason ?? new DOMException('Aborted', 'AbortError'));
+    };
+    signal.addEventListener('abort', onAbort, { once: true });
+    if (signal.aborted) onAbort();
+    void pending.then(
+      response => {
+        if (finished || signal.aborted) {
+          cancelBodyNonBlocking(response.body ?? null);
+          return;
+        }
+        finished = true;
+        signal.removeEventListener('abort', onAbort);
+        resolve(response);
+      },
+      error => {
+        if (finished) return;
+        finished = true;
+        signal.removeEventListener('abort', onAbort);
+        reject(error);
+      },
+    );
+  });
+}
+
 function contentLengthExceedsLimit(
   response: UpstreamJsonResponseReadableV1,
   maximumBodyBytes: number,

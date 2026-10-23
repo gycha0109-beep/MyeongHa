@@ -15,6 +15,9 @@ import {
 } from '@/features/records/records-view-model';
 import { mobileColors } from '@/ui/mobile-colors';
 import { MobileReaderRecordContinuity } from '@/features/records/MobileReaderRecordContinuity';
+import { MobileUiText } from '@/ui/MobileUiText';
+import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
+import { useMobileUiLocale } from '@/ui/mobile-ui-locale';
 
 export const RECORDS_TABS_V1 = Object.freeze([
   { key: 'all', label: '전체' },
@@ -30,6 +33,8 @@ export function RecordsTabs({
   selected: RecordsTabV1;
   onSelect: (tab: RecordsTabV1) => void;
 }) {
+  const styles = useMobileThemedStyles(staticStyles);
+  const { t } = useMobileUiLocale();
   return (
     <View style={styles.tabs}>
       {RECORDS_TABS_V1.map((tab) => (
@@ -41,7 +46,7 @@ export function RecordsTabs({
           style={[styles.tab, selected === tab.key && styles.tabSelected]}
         >
           <Text style={[styles.tabText, selected === tab.key && styles.tabTextSelected]}>
-            {tab.label}
+            {t(tab.label)}
           </Text>
         </Pressable>
       ))}
@@ -50,6 +55,7 @@ export function RecordsTabs({
 }
 
 export function LifeFactCard({ item }: { item: LifeRecordFactV1 }) {
+  const styles = useMobileThemedStyles(staticStyles);
   const revoked = item.revokedAt !== null;
   return (
     <View style={[styles.card, revoked && styles.cardMuted]}>
@@ -58,9 +64,7 @@ export function LifeFactCard({ item }: { item: LifeRecordFactV1 }) {
         <Text style={styles.date}>{formatRecordDateV1(item.confirmedAt)}</Text>
       </View>
       <Text style={styles.cardTitle}>{item.factType}</Text>
-      <Text style={styles.cardBody}>
-        {item.schemaVersion} · {item.sourceKind}
-      </Text>
+      <Text style={styles.caption}>기록 형식 {item.schemaVersion} · 출처 {item.sourceKind}</Text>
       <Text style={[styles.state, revoked && styles.revoked]}>
         {revoked ? '철회됨' : '기록됨'}
       </Text>
@@ -75,20 +79,22 @@ export function ReadingHistoryCard({
   item: ReadingHistoryItemV1;
   onOpen?: () => void;
 }) {
+  const styles = useMobileThemedStyles(staticStyles);
   const openable = readingIsArchiveOpenableV1(item.productResponseState);
+  const { t } = useMobileUiLocale();
   const content = (
     <>
       <View style={styles.cardTop}>
         <Text style={styles.symbol}>命</Text>
         <Text style={styles.date}>{formatRecordDateV1(item.completedAt)}</Text>
       </View>
-      <Text style={styles.cardTitle}>{readingTitleV1(item.sajuDomain)}</Text>
-      <Text style={styles.cardBody}>{readingReaderLabelV1(item.readerCharacterIds)}</Text>
-      <Text style={styles.state}>{readingStateLabelV1(item.productResponseState)}</Text>
+      <Text style={styles.cardTitle}>{t(readingTitleV1(item.sajuDomain))}</Text>
+      <Text style={styles.cardBody}>{t(readingReaderLabelV1(item.readerCharacterIds))}</Text>
+      <Text style={styles.state}>{t(readingStateLabelV1(item.productResponseState))}</Text>
       {openable && onOpen !== undefined ? (
-        <Text style={styles.openHint}>저장된 풀이 다시 읽기 →</Text>
+        <MobileUiText style={styles.openHint}>저장된 풀이 다시 읽기 →</MobileUiText>
       ) : null}
-      <Text style={styles.caption}>Reading contract · {item.readingContractVersion}</Text>
+      <Text style={styles.caption}>풀이 기록 형식 · {item.readingContractVersion}</Text>
     </>
   );
 
@@ -119,6 +125,7 @@ export function ReadingHistoryCard({
 }
 
 export function MemoryCard({ item }: { item: MemoryItemV1 }) {
+  const styles = useMobileThemedStyles(staticStyles);
   return (
     <View style={styles.card}>
       <View style={styles.cardTop}>
@@ -126,20 +133,28 @@ export function MemoryCard({ item }: { item: MemoryItemV1 }) {
         <Text style={styles.date}>{formatRecordDateV1(item.createdAt)}</Text>
       </View>
       <Text style={styles.cardTitle}>{item.memoryType}</Text>
-      <Text style={styles.cardBody}>저장된 기억</Text>
+      <MobileUiText style={styles.cardBody}>저장된 기억</MobileUiText>
       <Text style={styles.caption}>
-        {item.schemaVersion}{item.createdByCharacterId === null ? '' : ' · 대리자 기록'}
+        기록 형식 {item.schemaVersion}{item.createdByCharacterId === null ? '' : ' · 연결자 기록'}
       </Text>
     </View>
   );
 }
 
 export function RecordsEmptyState({ label }: { label: string }) {
+  const styles = useMobileThemedStyles(staticStyles);
+  const { t } = useMobileUiLocale();
+  const emptyByCategory: Readonly<Record<string, string>> = {
+    '기록': '아직 기록이 없습니다',
+    '현세록': '아직 현세록이 없습니다',
+    '지난 읽기': '아직 지난 읽기가 없습니다',
+    '기억': '아직 기억이 없습니다',
+  };
   return (
     <View style={styles.empty}>
       <Text style={styles.emptySymbol}>之</Text>
-      <Text style={styles.cardTitle}>아직 {label}이 없습니다</Text>
-      <Text style={styles.cardBody}>확인된 기록이 생기면 이곳에 표시됩니다.</Text>
+      <Text style={styles.cardTitle}>{t(emptyByCategory[label] ?? '아직 기록이 없습니다')}</Text>
+      <MobileUiText style={styles.cardBody}>확인된 기록이 생기면 이곳에 표시됩니다.</MobileUiText>
     </View>
   );
 }
@@ -151,15 +166,17 @@ export function RecordsFailureBanner({
   labels: readonly string[];
   onRetry: () => void;
 }) {
+  const styles = useMobileThemedStyles(staticStyles);
+  const { t } = useMobileUiLocale();
   if (labels.length === 0) return null;
   return (
     <View style={styles.failure}>
       <View style={styles.failureCopy}>
-        <Text style={styles.failureTitle}>일부 기록을 불러오지 못했습니다</Text>
-        <Text style={styles.cardBody}>{labels.join(' · ')}</Text>
+        <MobileUiText style={styles.failureTitle}>일부 기록을 불러오지 못했습니다</MobileUiText>
+        <Text style={styles.cardBody}>{labels.map((label) => t(label)).join(' · ')}</Text>
       </View>
       <Pressable accessibilityRole="button" onPress={onRetry} style={styles.retryButton}>
-        <Text style={styles.retryText}>다시 시도</Text>
+        <MobileUiText style={styles.retryText}>다시 시도</MobileUiText>
       </Pressable>
     </View>
   );
@@ -176,13 +193,14 @@ export function RecordsListFooter({
   error: boolean;
   onRetry: () => void;
 }) {
+  const styles = useMobileThemedStyles(staticStyles);
   if (loading) {
     return <ActivityIndicator color={mobileColors.navy} style={styles.footer} />;
   }
   if (error && hasMore) {
     return (
       <Pressable accessibilityRole="button" onPress={onRetry} style={styles.footerButton}>
-        <Text style={styles.retryText}>더 불러오기 다시 시도</Text>
+        <MobileUiText style={styles.retryText}>더 불러오기 다시 시도</MobileUiText>
       </Pressable>
     );
   }
@@ -190,10 +208,10 @@ export function RecordsListFooter({
 }
 
 const styles = StyleSheet.create({
-  tabs: { flexDirection: 'row', gap: 7, paddingVertical: 4 },
+  tabs: { flexDirection: 'row', gap: 7, paddingVertical: 3 },
   tab: {
     flex: 1,
-    minHeight: 40,
+    minHeight: 48,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 999,
@@ -202,38 +220,39 @@ const styles = StyleSheet.create({
     backgroundColor: mobileColors.surface,
   },
   tabSelected: { backgroundColor: mobileColors.navy, borderColor: mobileColors.navy },
-  tabText: { color: mobileColors.muted, fontSize: 12, fontWeight: '800' },
+  tabText: { color: mobileColors.muted, fontSize: 12, fontWeight: '800', letterSpacing: -0.3 },
   tabTextSelected: { color: mobileColors.surface },
   readingStack: { gap: 10 },
   card: {
     borderWidth: 1,
     borderColor: mobileColors.border,
-    borderRadius: 18,
+    borderRadius: 20,
     backgroundColor: mobileColors.surface,
-    padding: 18,
-    gap: 7,
+    padding: 20,
+    gap: 10,
   },
   cardMuted: { opacity: 0.7 },
   cardPressed: { opacity: 0.82 },
-  cardTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  symbol: { color: mobileColors.gold, fontSize: 20, fontWeight: '800' },
+  cardTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
+  symbol: { color: mobileColors.gold, fontSize: 23, fontWeight: '900' },
   date: { color: mobileColors.muted, fontSize: 12, fontWeight: '600' },
-  cardTitle: { color: mobileColors.ink, fontSize: 18, fontWeight: '800' },
-  cardBody: { color: mobileColors.muted, fontSize: 14, lineHeight: 20 },
-  state: { color: mobileColors.navy, fontSize: 13, fontWeight: '800' },
-  openHint: { color: mobileColors.navy, fontSize: 12, fontWeight: '800' },
+  cardTitle: { color: mobileColors.ink, fontSize: 19, fontWeight: '900', letterSpacing: -0.35 },
+  cardBody: { color: mobileColors.muted, fontSize: 14, lineHeight: 22 },
+  state: { color: mobileColors.navy, fontSize: 13, fontWeight: '900' },
+  openHint: { color: mobileColors.navy, fontSize: 13, fontWeight: '900', paddingTop: 6 },
   revoked: { color: mobileColors.seal },
-  caption: { color: mobileColors.muted, fontSize: 11, lineHeight: 17 },
+  caption: { color: mobileColors.muted, fontSize: 11, lineHeight: 18 },
   empty: {
     alignItems: 'center',
     borderWidth: 1,
     borderColor: mobileColors.border,
-    borderRadius: 18,
+    borderRadius: 20,
     backgroundColor: mobileColors.surface,
-    padding: 28,
-    gap: 8,
+    paddingHorizontal: 24,
+    paddingVertical: 38,
+    gap: 10,
   },
-  emptySymbol: { color: mobileColors.gold, fontSize: 30, fontWeight: '800' },
+  emptySymbol: { color: mobileColors.gold, fontSize: 34, fontWeight: '800' },
   failure: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -246,9 +265,10 @@ const styles = StyleSheet.create({
   },
   failureCopy: { flex: 1, gap: 3 },
   failureTitle: { color: mobileColors.seal, fontSize: 14, fontWeight: '800' },
-  retryButton: { paddingHorizontal: 12, paddingVertical: 9 },
+  retryButton: { minHeight: 48, paddingHorizontal: 12, justifyContent: 'center' },
   retryText: { color: mobileColors.navy, fontSize: 13, fontWeight: '800' },
   footer: { paddingVertical: 24 },
-  footerButton: { alignItems: 'center', paddingVertical: 20 },
+  footerButton: { minHeight: 48, alignItems: 'center', justifyContent: 'center', paddingVertical: 14 },
   footerSpacer: { height: 24 },
 });
+const staticStyles = styles;

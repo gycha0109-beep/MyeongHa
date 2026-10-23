@@ -116,6 +116,39 @@ internal_backup_migration_frontier="$(jq -r '.migration_frontier // empty' "$wor
 [[ "$internal_backup_migration_frontier" == "$backup_migration_frontier" ]]
 [[ "$(jq -c '.ephemeral_data_exclusions // []' "$work_dir/manifest.json")" == "$backup_ephemeral_data_exclusions_json" ]]
 
+# The portable dump deliberately excludes provider-managed supabase_migrations.
+# A new-format backup captures only six immutable, non-sensitive version/name
+# pairs. Older encrypted archives stay restorable but cannot earn this proof.
+seyeon_history_proof='not_captured_in_source_backup'
+seyeon_functions_proof='not_evidenced'
+source_history_sha="$(jq -r '.seyeon_early_relationship_migration_history_sha256 // empty' "$work_dir/manifest.json")"
+public_history_sha="$(jq -r '.seyeon_early_relationship_migration_history_sha256 // empty' "$manifest")"
+history_json=''
+if [[ -n "$source_history_sha" || -n "$public_history_sha" ]]; then
+  [[ "$source_history_sha" =~ ^[0-9a-f]{64}$ && "$source_history_sha" == "$public_history_sha" ]] || {
+    echo 'HOLD_SEYEON_RESTORE: source/public scoped history digest mismatch.' >&2
+    exit 1
+  }
+  history_json="$(jq -ce '.seyeon_early_relationship_migration_history' "$work_dir/manifest.json")"
+  jq -e '
+    . == [
+      {"version":"1400","name":"relationship_apply_context_v1"},
+      {"version":"1410","name":"relationship_event_apply_command_v1"},
+      {"version":"1420","name":"relationship_reliability_context_v1"},
+      {"version":"1430","name":"relationship_adjustment_commands_v1"},
+      {"version":"1440","name":"relationship_projection_rebuild_v1"},
+      {"version":"1450","name":"relationship_snapshot_runtime_v1"}
+    ]
+  ' <<<"$history_json" >/dev/null || {
+    echo 'HOLD_SEYEON_RESTORE: source scoped history version/name contract mismatch.' >&2
+    exit 1
+  }
+  [[ "$(printf '%s' "$history_json" | sha256sum | awk '{print $1}')" == "$source_history_sha" ]] || {
+    echo 'HOLD_SEYEON_RESTORE: encrypted migration-history snapshot digest invalid.' >&2
+    exit 1
+  }
+fi
+
 restore_started_at="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
 restore_started_epoch="$(date -u +%s)"
 
@@ -225,6 +258,21 @@ if [[ ${#provider_managed_roles_absent[@]} -gt 0 ]]; then
   printf 'Provider-managed roles absent from isolated target and not fabricated: %s\n' "${provider_managed_roles_absent[*]}"
 fi
 
+# The dump was authored under Production postgres defaults (no browser
+# function EXECUTE). The isolated Supabase image restores the DDL as
+# supabase_admin, whose global/public defaults can otherwise introduce an
+# unintended browser grant at function creation. Align only the disposable
+# restoring principal *before* DDL replay; retain the subsequent 11-function
+# explicit EXECUTE fail-closed test.
+isolated_function_acl_defaults="$(psql "$RESTORE_ADMIN_DATABASE_URL" -X -qAt \
+  --set ON_ERROR_STOP=1 \
+  -f scripts/operations/prepare-postgres-isolated-restore-function-defaults.sql)"
+[[ "$isolated_function_acl_defaults" == 'PASS_SEYEON_ISOLATED_CREATOR_FUNCTION_DEFAULT_ACL' ]] || {
+  echo 'HOLD_SEYEON_RESTORE: creator function default ACL preflight invalid.' >&2
+  exit 1
+}
+echo 'PASS_SEYEON_RESTORE: isolated creator default ACL is browser-restricted'
+
 psql "$RESTORE_ADMIN_DATABASE_URL" --single-transaction --set ON_ERROR_STOP=1 --file "$work_dir/schema.sql"
 
 target_copy_catalog="$work_dir/target-copy-catalog.json"
@@ -300,6 +348,71 @@ done
   "select r.rolname from pg_proc p join pg_roles r on r.oid = p.proowner where p.oid = to_regprocedure('public.cmd_activate_content_release_v1(uuid,boolean)');")" == 'myeongha_content_publication_owner' ]]
 [[ "$(psql "$RESTORE_DATABASE_URL" -At --set ON_ERROR_STOP=1 -c \
   "select count(*) from public.subjects s left join auth.users u on u.id = s.auth_user_id where s.auth_user_id is not null and u.id is null;")" == '0' ]]
+
+# Exactly after schema+data replay, query the *isolated target's* real
+# pg_proc and RLS/ACL catalogs. Version/name history is restored only as a
+# transaction-local six-row source snapshot (the full provider ledger is NOT
+# restored). The SQL fails closed on missing/overloaded functions or ACL drift.
+if [[ -n "$history_json" ]]; then
+  proof_output="$(psql "$RESTORE_DATABASE_URL" -X -qAt --set ON_ERROR_STOP=1 \
+    -v seyeon_history_json="$history_json" \
+    -f scripts/operations/seyeon-relationship-isolated-restore-proof.sql)" || {
+    # Diagnose the exact untrusted ACL, but do not mutate any restored
+    # function to turn this HOLD into a false PASS. Only fixed function names
+    # and PostgreSQL catalog ACLs are emitted, never user rows or SQL bodies.
+    psql "$RESTORE_DATABASE_URL" -X -qAt --set ON_ERROR_STOP=1 -c "
+      SELECT p.proname,
+             pg_get_userbyid(p.proowner) AS owner,
+             coalesce(p.proacl::text, '<default>') AS acl,
+             has_function_privilege('anon',p.oid,'EXECUTE') AS anon_exec,
+             has_function_privilege('authenticated',p.oid,'EXECUTE') AS auth_exec
+      FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+      WHERE n.nspname='public' AND p.proname IN (
+        'relationship_event_json_v1',
+        'cmd_lock_relationship_apply_context_v1',
+        'cmd_apply_relationship_event_runtime_v1',
+        'cmd_lock_relationship_history_context_v1',
+        'relationship_assert_adjustment_slot_v1',
+        'cmd_append_relationship_retraction_runtime_v1',
+        'cmd_append_relationship_correction_runtime_v1',
+        'cmd_commit_relationship_replay_projection_v1',
+        'cmd_rebuild_relationship_projection_runtime_v1',
+        'cmd_write_relationship_snapshot_runtime_v1',
+        'qry_latest_valid_relationship_snapshot_v1'
+      ) ORDER BY p.proname;
+    " >&2 || true
+    # Relationship table catalog only: no record contents, grants untouched.
+    # On fail-closed RLS/ACL drift, identify the exact restored object.
+    psql "$RESTORE_DATABASE_URL" -X -qAt --set ON_ERROR_STOP=1 -c "
+      SELECT c.relname,
+             pg_get_userbyid(c.relowner) AS owner,
+             c.relrowsecurity AS rls_enabled,
+             coalesce(c.relacl::text, '<default>') AS acl,
+             has_table_privilege('anon',c.oid,'SELECT,INSERT,UPDATE,DELETE') AS anon_dml,
+             has_table_privilege('authenticated',c.oid,'SELECT,INSERT,UPDATE,DELETE') AS auth_dml
+      FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+      WHERE n.nspname='public' AND c.relname IN (
+        'relationship_history_entries',
+        'relationship_event_records',
+        'relationship_event_adjustments',
+        'relationship_event_links',
+        'relationship_event_provenance_refs',
+        'relationship_state_snapshots'
+      ) ORDER BY c.relname;
+    " >&2 || true
+    echo 'HOLD_SEYEON_RESTORE: exact scoped relationship restore proof failed.' >&2
+    exit 1
+  }
+  [[ "$proof_output" == 'PASS_SEYEON_RESTORED_EARLY_HISTORY_SNAPSHOT_6_FUNCTIONS_11_RLS_6' ]] || {
+    echo 'HOLD_SEYEON_RESTORE: unexpected scoped relationship proof verdict.' >&2
+    exit 1
+  }
+  seyeon_history_proof='restored_scoped_version_name_snapshot_6_pass'
+  seyeon_functions_proof='restored_public_function_catalog_11_and_rls_6_pass'
+  echo 'PASS_SEYEON_RESTORE: snapshot 6/6, real restored pg_proc 11/11, RLS/ACL 6/6'
+else
+  echo 'HOLD_SEYEON_RESTORE_PROOF: legacy backup excludes scoped migration-history snapshot'
+fi
 
 member_auth_rate_limit_schema_restore='not_applicable'
 member_auth_rate_limit_unlogged='not_applicable'
@@ -379,6 +492,8 @@ jq -n \
   --argjson provider_managed_data_full_restore "$provider_managed_data_full_restore" \
   --argjson backup_migration_frontier "$backup_migration_frontier_json" \
   --argjson backup_ephemeral_data_exclusions "$backup_ephemeral_data_exclusions_json" \
+  --arg seyeon_early_history_restore_proof "$seyeon_history_proof" \
+  --arg seyeon_early_functions_restore_proof "$seyeon_functions_proof" \
   --arg member_auth_rate_limit_schema_restore "$member_auth_rate_limit_schema_restore" \
   --arg member_auth_rate_limit_unlogged "$member_auth_rate_limit_unlogged" \
   --arg member_auth_rate_limit_ephemeral_data_restore "$member_auth_rate_limit_ephemeral_data_restore" \
@@ -412,6 +527,9 @@ jq -n \
     provider_managed_data_skips: $provider_managed_data_skips,
     provider_managed_data_full_restore: $provider_managed_data_full_restore,
     backup_migration_frontier: $backup_migration_frontier,
+    seyeon_early_history_restore_proof: $seyeon_early_history_restore_proof,
+    seyeon_early_functions_restore_proof: $seyeon_early_functions_restore_proof,
+    supabase_managed_migration_ledger_fully_restored: false,
     backup_ephemeral_data_exclusions: $backup_ephemeral_data_exclusions,
     member_auth_rate_limit_schema_restore: $member_auth_rate_limit_schema_restore,
     member_auth_rate_limit_unlogged: $member_auth_rate_limit_unlogged,

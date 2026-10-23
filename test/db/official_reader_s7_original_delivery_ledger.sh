@@ -18,16 +18,26 @@ p -f test/db/official_standard_reading_reader_interpretation.sql \
 p -f test/db/official_reader_s7_original_delivery_ledger_fixture.sql \
   >"$tmp/ledger.out" 2>"$tmp/ledger.err" ||
   { tail -70 "$tmp/ledger.err" >&2; fail "actual S4/S7 schema fixture"; }
+p -f test/db/official_reader_s6_same_bundle_independent_purchase.sql \
+  >"$tmp/b4.out" 2>"$tmp/b4.err" ||
+  { tail -70 "$tmp/b4.err" >&2; fail "real B4 independent same-bundle purchase/Reader bind fixture"; }
 subject='11390000-0000-0000-0000-000000000001'
 intent='12192300-0000-0000-0000-000000000002'
 receipt='12192000-0000-0000-0000-000000000002'
 other_intent='12192300-0000-0000-0000-000000000003'
 other_receipt='12192000-0000-0000-0000-000000000003'
+same_bundle_receipt='f7150000-0000-4000-8000-000000000001'
 body='f7080000-0000-4000-8000-000000000001'
 grant="$(p -c "select id from public.entitlement_grants
  where source_receipt_id='$receipt'::uuid and grant_source_type='purchase';")"
 sibling="$(p -c "select id from public.entitlement_grants
  where source_receipt_id='$other_receipt'::uuid and grant_source_type='purchase';")"
+same_bundle_grant="$(p -c "select id from public.entitlement_grants
+ where source_receipt_id='$same_bundle_receipt'::uuid
+ and grant_source_type='purchase';")"
+[[ "$same_bundle_grant" =~ ^[a-f0-9-]{36}$ &&
+ "$same_bundle_grant" != "$grant" && "$same_bundle_grant" != "$sibling" ]] ||
+ fail "B4 must be a third distinct verified Receipt-backed Grant"
 [[ "$grant" =~ ^[a-f0-9-]{36}$ && "$sibling" =~ ^[a-f0-9-]{36}$ &&
  "$grant" != "$sibling" ]] || fail "independent Receipt Grants missing"
 read_evidence() {
@@ -42,14 +52,80 @@ from public.internal_qry_official_reader_withdrawal_delivery_state_v2(
 commit;
 SQL
 }
+# Actual S6 function must re-evaluate the Current Grant + exact Official Reading
+# and Saju Proof after S1 lock. No ciphertext leaves this isolated DB; only
+# count(*) is returned to the test harness. This is NOT a paid reveal test.
+s6_count() {
+  p <<SQL
+begin;
+set local myeongha.subject_id='$1';
+select count(*) from public.internal_qry_official_reader_paid_answer_ciphertext_v1(
+ '$1'::uuid,'$body'::uuid
+);
+commit;
+SQL
+}
+spec="$(p -c "select product_spec_version
+ from public.standard_reading_official_bindings
+ where reading_id='12103100-0000-0000-0000-000000000001'::uuid
+ and subject_id='$subject'::uuid;")"
+[[ -n "$spec" ]] || fail "original Official Reading product version missing"
 before="$(read_evidence "$intent" "$grant")"
-[[ "$before" == 'verified|2|1|fixture-only-s7' ]] ||
+[[ "$before" == "verified|2|1|$spec" ]] ||
  fail "real 2240/2250 pre-cancel proof incorrect: $before"
 [[ -z "$(read_evidence "$other_intent" "$grant")" ]] ||
  fail "S7 substituted another Purchase Intent"
 [[ -z "$(read_evidence "$intent" "$sibling")" ]] ||
  fail "S7 substituted another Grant"
 echo 'PASS original verified Receipt/Grant and actual 2-prepared/1-ACK private S7 evidence'
+# The existing purchase fixture has independently verified B2/B3 Grants.
+# B3 is for a DIFFERENT published bundle: never arbitrarily choose B2 for
+# a paid answer while both remain active.
+[[ "$(s6_count "$subject")" == 0 ]] ||
+  fail "S6 exposed paid ciphertext under ambiguous cross-bundle purchase rights"
+
+# Isolated fixture-only Grant changes: retire B3 temporarily to leave
+# exactly one current B2 Bundle, backed by TWO independent B2+B4 payments.
+# Restore B3 before actual refund to re-exercise the bundle conflict.
+p -c "update public.entitlement_grants set status='revoked',revision=revision+1,
+ last_effective_at=clock_timestamp(),updated_at=clock_timestamp()
+ where id='$sibling'::uuid and status='active';" >/dev/null
+[[ "$(s6_count "$subject")" == 1 ]] ||
+  fail "S6 did not find exact B2 protected ciphertext with two same-bundle Grants"
+[[ "$(p -c "select count(*) from public.entitlement_grants
+ where id in ('$grant'::uuid,'$same_bundle_grant'::uuid)
+ and status='active';")" == 2 ]] ||
+ fail "S6 positive test did not hold two independent same-bundle Grants"
+
+# A revoked Saju Source Owner receipt must deny protected re-read even with
+# an intact B2 Grant. Transaction ROLLBACK is fixture-only; this is NEVER
+# an approval for Production issuance.
+source_revoke_only="$(p <<SQL
+begin;
+set local myeongha.subject_id='$subject';
+update public.official_reader_s3_source_authority_receipts_v1
+set revoked_at=clock_timestamp()
+where source_attestation_ref='fixture:no-saju-authority'
+ and subject_id='$subject'::uuid and revoked_at is null;
+select count(*) from public.internal_qry_official_reader_paid_answer_ciphertext_v1(
+ '$subject'::uuid,'$body'::uuid
+);
+rollback;
+SQL
+)"
+[[ "$source_revoke_only" == 0 ]] ||
+  fail "S6 returned paid ciphertext with withdrawn Saju source receipt"
+[[ "$(s6_count '11390000-0000-0000-0000-000000000099')" == 0 ]] ||
+  fail "S6 returned protected ciphertext for a different member"
+
+p -c "update public.entitlement_grants set status='active',revision=revision+1,
+ last_effective_at=clock_timestamp()-interval '5 minutes',
+ updated_at=clock_timestamp()
+ where id='$sibling'::uuid and status='revoked';" >/dev/null
+[[ "$(s6_count "$subject")" == 0 ]] ||
+  fail "S6 incorrectly chose B2 after B3 cross-bundle reactivation"
+echo 'PASS S6 exact-current Grant/read source check, cross-bundle/owner denial and revoked-Saju-proof denial'
+
 
 # Exact verified PortOne original payment: revoke B2, NOT independently paid B3.
 cancel="$(p -c "select public.cmd_apply_verified_portone_reader_full_cancellation_v1(
@@ -61,7 +137,33 @@ cancel="$(p -c "select public.cmd_apply_verified_portone_reader_full_cancellatio
  from public.commerce_receipts cr where cr.id='$receipt'::uuid;")"
 [[ "$cancel" == 1 ]] || fail "verified original PortOne cancel did not process one Grant: $cancel"
 after="$(read_evidence "$intent" "$grant")"
-[[ "$after" == 'revoked|2|1|fixture-only-s7' ]] ||
+[[ "$(s6_count "$subject")" == 0 ]] ||
+  fail "S6 retained paid ciphertext access after verified B2 refund with B3 different bundle"
+echo 'PASS S6 denies post-refund re-read while a conflicting B3 Bundle stays active'
+# B4 is an independent valid purchase of the ORIGINAL B2 Bundle. Its current
+# entitlement permits the historical encrypted B2 body when no other Bundle
+# conflicts, even though the original B2 Receipt/Grant was refunded.
+p -c "update public.entitlement_grants
+ set status='revoked',revision=revision+1,last_effective_at=clock_timestamp(),
+ updated_at=clock_timestamp()
+ where id='$sibling'::uuid and status='active';" >/dev/null
+[[ "$(s6_count "$subject")" == 1 ]] ||
+ fail "S6 denied historical B2 body despite independent current same-bundle B4 purchase"
+[[ "$(p -c "select status from public.entitlement_grants
+ where id='$same_bundle_grant'::uuid;")" == active ]] ||
+ fail "independent same-bundle B4 Grant no longer active"
+[[ "$(p -c "select verification_status from public.commerce_receipts
+ where id='$same_bundle_receipt'::uuid;")" == verified ]] ||
+ fail "independent same-bundle B4 Receipt no longer verified"
+p -c "update public.entitlement_grants
+ set status='active',revision=revision+1,
+ last_effective_at=clock_timestamp()-interval '5 minutes',
+ updated_at=clock_timestamp()
+ where id='$sibling'::uuid and status='revoked';" >/dev/null
+[[ "$(s6_count "$subject")" == 0 ]] ||
+ fail "S6 failed to re-deny after cross-bundle B3 restoration"
+echo 'PASS post-refund S6 permits independent same-bundle verified B4 only; conflicts remain denied'
+[[ "$after" == "revoked|2|1|$spec" ]] ||
  fail "real S7 revoked-Receipt history lost/reclassified: $after"
 [[ -z "$(read_evidence "$other_intent" "$grant")" ]] ||
  fail "post-refund S7 used sibling Purchase Intent"

@@ -1,6 +1,26 @@
 # 사주 브릿지 최종 완료 실행 계획 — 8C-2B-2D (2026-10-10)
 
+> **2026-10-16 사주 브릿지 제품 연결 경로 수정:** Owner 지시에 따라 [EXISTING_AUTHORITIES_V2](./SAJU_BRIDGE_EXISTING_AUTHORITIES_NO_NEW_ROLES_V2_20261016.md)를 제품 통합의 **활성 경로**로 채택한다. **신규 Supabase DB 계정/역할 0개**, 새 Permit 스키마/테이블/issuer 0개. 명하의 기존 회원 Auth → `myeongha_runtime` → `SET LOCAL ROLE myeongha_api_executor` → 현재 Birth 조회 → 기존 사주 HTTPS 어댑터를 재사용한다. 이전 S3A/1730 역할 생성 절차는 **제품 기능의 선행조건에서 제외된 중단된 부가 운영 프로브**이다. 아래 S3A 자동 ADMIN 장애 기록은 그대로 사실이지만 제품 연결을 차단하는 필수 게이트로 **더는 적용하지 않는다**. 실제 사주 서비스 endpoint·preview 외부 라우트·제품 출시/결제/격리 스테이징은 여전히 별도 검증·승인 대상이며 `canRunOnce/canExecute/canPublish/canSell=false`, R01–R14 `NOT_VERIFIED` 유지.
+
+
+> **2026-10-17 V2 제품 연결 검증 추가 (고격리 3-04 단계와 별도):** `main`에는 `/api/me/saju/preview-reading` → `vercel.json` rewrite → `api/me.ts` 디스패처 → 기존 Preview Runtime 코드 연결이 존재한다. 기존 V2 문서의 `EXTERNAL_PREVIEW_ROUTE=NOT_MOUNTED` 상태 기술은 최신 소스와 맞지 않아 교정했다. V2 합성 E2E에 source-admitted Preview 200 정상 전달과 admission/lifecycle/envelope 실패 503 차단 회귀를 추가한다. **실제 Saju HTTPS 서비스 배포·운영 Secret·운영 DB 함수 적용 여부는 미검증**이며, 본 검증은 3-04-02/03B/04, R01–R14, 2D-4 및 출시·판매 권한을 변경하지 않는다.
+
+> **2026-10-17 제품 V2 소스 연결 상태·증거 유효기간 확인 (고격리 3-04와 별도):** [V2 소스만 점검하는 검증 도구/과거 운영 증거 검토](./SAJU_BRIDGE_V2_CONNECTION_EVIDENCE_GAP_20261017.md)를 추가한다. 명하 공개 계산 엔트리포인트와 Preview rewrite/디스패처 및 기존 Member/Subject/Birth, Saju HTTPS/Bearer **소스 연결**만 검증한다. 2026-09-16 계산 운영 Smoke 성공은 당시 SHA에서 **Preview/Guest 검증을 수행하지 않았음**을 확인했고, 2026-09-21 Saju Cloud Run 배포 성공은 현재 실행 버전·실제 Vercel 바인딩 증거가 아니다. 해당 실제 서비스/권한/운영 증빙은 현재 NOT_VERIFIED. R01–R14 및 3-04-02/03B/04, 2D-4, 출시/판매 HOLD를 변경하지 않는다.
+
 Watchtower-Track: saju-bridge
+
+> **2026-10-18 비용 정책 확정:** Owner가 **추가 비용 0원**으로 명시하여 신규 유료 Staging/Pro/KMS/OpenBao 호스팅·별도 서버/DB·과금 가능 CI 초과 사용을 추진하지 않는다. 기존 Docker·GoTrue·TLS/PG·TypeScript 검증과 기존 공개 저장소의 표준 무료 GitHub-hosted Actions CI만 재사용하고 Artifacts/Cache 초과 과금·large runner는 사용하지 않는다. 이전 문서의 P2 신규 클라우드/견적 경로는 *장기 보류된 설계 참조*로만 남고 실제 작업 대기열·승인 요청에서 제외한다. [SO-3 제로 비용 한계/가능 범위](./SAJU_SO3_FRAMEWORK_ADOPTION_BLUEPRINT_V0_1_20261018.md#6-owner-결정-반영--추가-비용-0원만-허용-유료-토폴로지-장기-중단) 참조. R01–R14 실제 독립 증빙은 미확보/HOLD로 남기되 일반 Product V2 경로 작업을 막지 않는다. 이 비용 제약을 바꾸기 전까지 신규 유료 대안 추천·승인 요청을 재개하지 않는다.
+
+> **2026-10-18 SO-3 도구별 세부 구상 P0:** [SO-3 프레임워크 조합 상세 설계](./SAJU_SO3_FRAMEWORK_ADOPTION_BLUEPRINT_V0_1_20261018.md)에 기존 Docker·CI 재사용, OpenTofu/OpenBao/OPA/InSpec 적합성, R01–R14 공급자·원본 증빙 매핑, 3개 신규 격리 Supabase 후보/견적 산식과 P2 승인·폐기 게이트를 정리한다. **신규 클라우드·키·권한·Runner는 생성하지 않으며** Product Member E2E와 SO-3 운영 HOLD를 혼합하지 않는다.
+
+> **2026-10-17 검증 범위 분리:** [V2 Production 최신 증빙/Guest·SO-3 분리표](./SAJU_BRIDGE_V2_CONNECTION_EVIDENCE_GAP_20261017.md#2026-10-17-post-audit-addendum--product-memberguest-vs-separate-high-isolation-staging)에서 Member-only Production E2E [#39034130032](https://github.com/gycha0109-beep/MyeongHa/actions/runs/39034130032)의 Calculation 200×2/Preview 200 `delivered`를 **해당 실행 SHA에서만 VERIFIED**로 갱신한다. Guest 양성 운영 검증은 Production Guest/Birth 생성 때문에 별도 명시 승인 전 HOLD. SO-3 독립 Root·3DB·R01–R14, Target Authority V2, 2D-4는 Member 성공과 무관하게 **여전히 NOT_VERIFIED/HOLD**이다. `EXISTING_AUTHORITIES_V2` 일반 제품 연결에 폐기된 S3A Permit 설치를 다시 필수화하지 않는다. 무승인 자동 Guest fixture 생성을 방지하는 워크플로 경계는 같은 변경에서 별도로 강화한다.
+
+
+> **2026-10-16 단일 Supabase S3A 운영 적용 BLOCKED/HOLD (로드맵 현행 게이트):** [PR #2156](https://github.com/gycha0109-beep/MyeongHa/pull/2156)이 `929c304813aac60b30a528183835ea2e8b774cd8`로 병합됐고 [고정 HEAD 통합 CI #38847796203](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38847796203)의 11개 Job이 모두 성공했다. 하지만 실제 [운영 적용 #38846217625](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38846217625)는 PostgreSQL 17 비슈퍼유저 `CREATEROLE`의 자동 bootstrap ADMIN 멤버십과 **승인된 1730 SQL의 멤버십 0건 계약**이 충돌해 단일 트랜잭션 ROLLBACK됐다. 병합된 사전 검사는 객체 생성 전에 같은 불일치를 차단한다. **현행 운영 계정으로 S3A 수동 워크플로 재실행 금지.** 원본 1730 SHA256/Git blob 및 최종 zero-membership 검사는 불변. 다음 미완료 단계는 코드 추가가 아니라 **새 DB 역할 권한 계약·실행 경로에 대한 명시적 Owner 검토/승인**이다. 상세 [S3A 운영 런북](./SAJU_BRIDGE_S3A_GUARDED_MANUAL_APPLY_RUNBOOK_20261016.md), [이슈 #1871](https://github.com/gycha0109-beep/MyeongHa/issues/1871) 참조. 단일 프로젝트 S3A 차단과 기존 고격리 SO-3/R01–R14 미검증은 **서로 다른 HOLD**이며, 합성 CI 성공으로 어느 쪽도 승인되지 않는다.
+
+> **2026-10-15 기존 명하 Supabase 단일 프로젝트 대안 설계:** [통합 설계 v1](./SAJU_BRIDGE_SINGLE_SUPABASE_INTEGRATION_DESIGN_V1.md). 새 프로젝트·Neon 없이 **기존 Production Auth/Subject/Reading + 비공개 Bridge schema·제한 역할**을 이용하는 *제품 통합 대안*이다. 이는 아래 고격리 staging/독립 3DB·Root/R01–R14/2D-4 종료 조건의 달성이 아니며, **Owner의 단일 DB 실패 도메인 위험 수용과 별도 제품 배포 게이트가 필요한 미승인 설계**다. 실제 Supabase DDL/GRANT/Secret/배포는 미실행.
+
+> **2026-10-15 개발·로컬 검증 범위 종료:** [사주 브릿지 개발/Windows Docker 인수 종료 기록](./SAJU_BRIDGE_DEVELOPMENT_LOCAL_CLOSEOUT_20261015.md) — `SAJU_BRIDGE_DEV_LOCAL_CLOSED_OPS_HOLD`. 개발·합성/폐기형 CI·Windows Phase 5 인수 완료, 다음 Docker 전체 재검증/임의 Phase 신설 중단. **별도의 "배포" 트랙은 만들지 않으며**, 기존 [Issue #1871](https://github.com/gycha0109-beep/MyeongHa/issues/1871)에서 실제 스테이징 운영 승인/증빙 R01–R14를 **미완료·OPEN/HOLD**로 유지한다. 개발 종료는 이 문서의 **브릿지 최종 완료(운영)** 또는 **서비스 출시**가 아니다.
 
 > **1인 운영 전환 설계:** [1인 Owner·분리된 보안 권한 설계 v0.1](./MYEONGHA_SOLO_OWNER_SEGREGATED_AUTHORITY_ARCHITECTURE_V0_1.md). 기존 본문의 사람 2명 승인·이중 확인은 **기존 구상**이며 단일 Owner·행위별 재인증·보안 계정/키/서비스 신원 분리 설계로 교체한다. 실제 관리 평면의 강제 정책·복구·증빙이 검증되기 전 운영 허가는 그대로 HOLD. 서비스 ID가 2개라도 인간 2인 검토로 주장하지 않는다.
 
@@ -76,6 +96,33 @@ Watchtower-Track: saju-bridge
 
 1인 Owner 운영 정책 SO-2의 폐기형 검증을 `apps/api/src/saju-held-staging-registry-floor-v1.ts` 및 PostgreSQL 격리 CI에 추가한다. 서명/Root pin과 floor 변경 결속·role ACL·원자적 고수위·복원 역행·revocation/동시성 테스트가 목표다. **검증된 별도 운영 Root custody/KMS·관리 평면·외부 high-water anchor·실환경 R01–R14를 입증하지 않는다.** 자세한 보안 한계는 [SO-2 검증 경계](./SAJU_SOLO_OWNER_SO2_REGISTRY_FLOOR_SYNTHETIC.md) 참고. `NOT_VERIFIED/HOLD` 및 실행/판매 false 유지.
 
+## 2G. Windows Phase 5 Acceptance 및 Phase 4A–4H 상태 인수 (2026-10-15)
+
+- **최종 완료 코드 단계:** Phase 4H [PR #2092](https://github.com/gycha0109-beep/MyeongHa/pull/2092), HEAD `2be8c6e5de3d8fa8d7378e752b86200e6485fc75`, squash `939626e5597fd8d0970784e141da493f0f7ec24a`; [Docker CI #38539255532](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38539255532) SUCCESS, [통합 CI #38540349736](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38540349736) **11/11 SUCCESS**. Phase 4A–4H 전부 병합·검증 완료; Phase 4I는 없다.
+- **사용자 Windows 실기기 전체 증빙 인수:** `saju-phase5.log` (SHA-256 `6f9a42d407897f89a26a9d0be31f1bbb722bd7d2058d5b9cd7dbb651a4b500e6`)의 **Phase 1–4H 15개 PASS**, 동작 중 DB crash/network partition fail-closed, 해당 프로젝트 컨테이너·네트워크·볼륨 전체 제거, 사용자 보고 종료 코드 `0`. 원본 파일은 로컬·대화 제공이며 Git에 비밀/전체 로그를 넣지 않는다.
+- **사용자 제출 호스트 메타데이터:** MyeongHa `main @ 2ddb1d4fe3f7101244ee3a628b2d1a6a7f6bc1f5`, 추적 코드 수정 없음(미추적 `saju-phase5.log`만 존재); 검증 전용 Saju `cd0acf9abd447826ccaefba56112d046e560ee04`, working tree clean. Node `v24.20.0`, Docker `29.8.2`, Compose `v5.5.1`. 정확한 Windows OS 빌드·Docker Desktop GUI 버전, 호스트가 서명한 로그-코드 결속 증명은 수집하지 않았다.
+- **Windows Phase 5 상태: `USER_SUBMITTED_LOCAL_ACCEPTANCE_PASS` (A 완료).** 별도의 OS/GUI 버전 공백은 명시하고 운영 권한의 독립 증명으로 확대하지 않는다. 로컬 전체 폐기형 테스트를 메타데이터만을 위해 재실행할 필요 없음. 상세 증빙 표: [Windows Phase 5 Acceptance](./SAJU_BRIDGE_WINDOWS_DOCKER_DISPOSABLE_ARCHITECTURE_V1.md#4a-phase-5--windows-실기기-사용자-제출-증빙-인수-pass-2026-10-15).
+- **운영 완료와 독립:** 3-04-02 실제 Root/Key custody, 3-04-03B 실제 R01–R14, 3-04-04 제한 Target Authority V2, 2D-4 승인 단일 격리 실행은 모두 미검증/HOLD. 1인 Owner 강인증·키/서비스·관리 평면 분리와 비용 승인 선행. 두 서비스 ID는 두 명의 독립 인간 승인자가 아니다.
+- **운영 종료 판정 C:** 운영 외부 인가/증빙 대기. `stagingAdmission=HOLD`, `stagingConnection=NOT_VERIFIED`, `operationalEvidence=NOT_VERIFIED`, `canRunOnce/canExecute/canPublish/canSell=false`, `automaticRetry/automaticCompensation=false`.
+
+## 2H. SO-3 실제 운영 준비 진입 (2026-10-15)
+
+- **선행 인수 종료:** Windows Phase 5 로컬 검증은 [#2103](https://github.com/gycha0109-beep/MyeongHa/pull/2103) 병합 / `main@2503a28bc7fee9e4ac89ff9372e2ea30e4debfef`, 11/11 통합 CI 성공. 다시 로컬 합성 Phase를 만들지 않는다.
+- **현재 첫 미완료 게이트:** 기존 Solo Owner 아키텍처의 **SO-3 운영 관리 평면 준비 / 3-04-02(D) 독립 Root custody와 R01–R04 실제 증빙**. 합성 SO-1/SO-2나 3-04-02(A/B/C)는 실제 키 보관·독립 Root pin, durable floor/ledger·재해 복구 증거가 아니다.
+- **진입 상태 = `SO3_PREPARATION_STARTED_P0`**. [3-04-01 런북 §2A](./SAJU_HELD_STAGING_OPERATIONAL_EVIDENCE_RUNBOOK_8C2B2D30401.md#2a-2026-10-15-so-3-운영-준비-진입--무권한-결정-게이트)에 S01–S06 결정표를 등록. **설계 차원의 Supabase-first 공급자 방향은 기존 SO-4에서 채택되어 있다.** 다만 별도 스테이징 프로젝트·보안 계정·Root/KMS·권한·예산·R01–R14 실증은 없으며 이들을 이미 선택/승인했다고 기록하지 않는다.
+- **외부 사용자 결정 이전 P0 범위:** 현재 코드/CI·통제 설계·무권한 read-only *공개 코드* 감사/제안만 수행. 읽기 전용이라도 **최초 운영 계정 연결에는 별도 Owner 승인**이 필요하다. 클라우드/KMS/감사 저장소/스테이징 프로젝트 생성, Root/Operator/Attestor 키 생성·회전·노출, Secret·DB GRANT, 네트워크/probe, Runner·결제/배포/판매 전부 보류.
+- **실제 전진 순서:** S01–S05의 공급자·계정 분리·비용 상한·Owner 행위별 재인증 확정 → 별도 승인으로 R01–R04 실증 → R05–R14 승인된 실제 관측 → Target Authority V2의 fail-closed 검증 → 별도 승인 2D-4. 빠진 게이트를 Windows PASS나 채팅의 진행 지시로 채우지 않는다.
+- **종료 판정:** SO-3 준비 P0 진입 A, 3-04-02(D) 운영 증빙 C(외부 결정/승인 대기), 운영 `NOT_VERIFIED/HOLD`. Phase 4I 등의 신규 합성 단계는 만들지 않는다.
+
+## 2I. 신규 서버 없는 Docker 재사용 인수와 실제 외부 의존성 (2026-10-15)
+
+- **사용자 환경 제약:** 별도 격리 스테이징 서버 및 운영 보안/백업 서버 없음. 이 때문에 Windows Phase 5까지 무료 일회용 Docker로 검증한 것이다. 새로운 서버 구매나 무료 인프라가 존재한다고 가정하지 않는다.
+- **재활용 가능한 검증은 이미 인수:** Phase 1–4H 15개 PASS, 실제 테스트용 PostgreSQL SIGKILL/격리 네트워크 분리/3DB 부분 커밋·일회 소비·fail-closed HOLD와 Docker 완전 폐기, 사용자 보고 exit 0. 로컬 테스트를 반복해도 실제 R01–R14 운영 증거가 발생하지 않는다.
+- **기존 SO-4 설계 재사용:** [SO-4 Supabase-first P0](./SAJU_SO4_SUPABASE_ISOLATION_P0.md) §2에서 Supabase 우선 설계와 'Production/Refund 재사용 금지' 이미 결정. 당시 조회된 프로젝트 인벤토리는 2026-10-12 시점만 보증하며 현재의 운영 자원 존재/무료 한도/가격을 확증하지 않는다.
+- **검증 격차를 명시적으로 인수:** [SO-4 §4A](./SAJU_SO4_SUPABASE_ISOLATION_P0.md#4a-2026-10-15-로컬-docker-재사용-우선--실환경-미보유-확인-및-r01r14-격차-인수) R01–R14 행별로 (a) 로컬 테스트/합성 계약 결과와 (b) 실제 관리 평면에만 존재하는 미확보 출처를 분리. **운영은 14개 모두 NOT_VERIFIED**, 한 건도 local PASS를 operational PASS로 자동 승격하지 않는다.
+- **기존 T01–T40 중복 방지:** [SO-3B 출처·검증 추적표](./SAJU_SOLO_OWNER_SO3B_R_T_COVERAGE_MATRIX.md)에는 **SO-3B 자체의** T01–T27 구현/합성 테스트 및 T28–T40 실환경 미래 요구가 이미 정의되어 있다. 이것을 전체 프로젝트 공통 T01–T40 정식 인수표와 동일하다고 오인하지 않으며 새 번호를 발명하지 않는다. 기존 전체 최종 인수 대응표는 별도 식별자/범위 정합성 확인이 남는다.
+- **다음 실행 조건:** 실환경 R01–R04는 독립 신뢰 Root/원장·감사 계정, R05–R14는 별도 Auth·3DB·Proof·배포·복구를 필요로 한다. 신규 리소스·KMS·DB GRANT·실접속은 사용자 별도 범위/비용·행위별 승인 전 HOLD. **지금은 P0 로컬 결과 인수/설계 재사용까지 완료, 실제 운영 증빙은 외부 의존성 대기**다. 새 4I나 중복 Docker 검증 코드는 추가하지 않는다.
+
 ## 3. 코드·운영 병렬화와 범위 제한
 
 - 3-04-02의 **명세/테스트 포트**는 실환경 운영 권한 없이 미리 검토 가능하다. Root/KMS/저장소 생성·권한 부여는 별도 운영 결정 후 진행.
@@ -88,11 +135,14 @@ Watchtower-Track: saju-bridge
 
 | 인수 축 | 근거 | 상태 |
 |---|---|---|
+| 개발·로컬 검증 종료 선언 | [범위 종료 기록](./SAJU_BRIDGE_DEVELOPMENT_LOCAL_CLOSEOUT_20261015.md), Windows #2103 및 P0 #2106/#2109 | **개발/폐기형 로컬 acceptance 종료** / 실환경 운영 항목 #1871 OPEN/HOLD |
 | 서명/정적 신뢰 평가 | #1850 #1851 #1862 | 코드 완료 / 운영 비인증 |
 | 운영 증빙 목록 및 중단 절차 | #1856, R01–R14 | 문서 완료 / 운영 미검증 |
-| 개별 부정 시험 T01–T40 | 기존 합성 테스트 분산 | **개별 대응표 미완료** |
-| 독립 Root 및 durable revision/challenge | 3-04-02 | 합성 저장소 검증 #1925 병합 / 운영 미검증 |
+| 개별 부정 시험 T01–T40 | [SO-3B 고유 T01–T40 계획](./SAJU_SOLO_OWNER_SO3B_R_T_COVERAGE_MATRIX.md): T01–T27 합성 구현·T28–T40 운영 의존 | **SO-3B 하위 매핑 존재** / 전체 프로젝트 최종 인수 ID·coverage와 동일성 미확인, 운영 14건 미검증 |
+| Windows Docker Phase 5 Acceptance | Phase 1–4H 폐기형 CI·[#2092](https://github.com/gycha0109-beep/MyeongHa/pull/2092), 사용자 Windows 전체 실행 로그 SHA-256 고정 및 양쪽 HEAD·환경 버전·exit 0·cleanup 제출 | **사용자 제출 로컬 인수 PASS**; Windows OS 빌드·Desktop GUI 버전 별도 미제출, 실환경 운영 승인은 무관 |
+| 독립 Root 및 durable revision/challenge | 3-04-02 / SO-3 | 합성 저장소 검증 #1925 병합; SO-3 P0 공급자·승인 결정표 진입(§2H) / R01–R04 운영 미검증 |
 | 실환경 Auth·DB 3종·Saju Proof | 로컬 2A–2I 합성/실소켓 검증, Admission 38 PASS·병합 #1913; 3-04-03A 인덱스 계약 / 03B 실제 probe | 3 DB 동일 검증 흐름(2J) 합성 완료, R05–R14 독립 운영 관찰 미완료 |
+| 단일 Supabase S3A 비활성 객체 적용 | #2156 병합 / 통합 CI #38847796203 PASS; 운영 #38846217625 PG17 자동 ADMIN 충돌 / 원자 ROLLBACK | **BLOCKED/HOLD: 신규 Owner DB 권한 모델 승인 필요**. 현행 실행 계정 재시도 금지, 원문 1730·zero-membership 검사 불변. 고격리 R01–R14와 별도 게이트 |
 | Target Authority V2 + Runner | 3-04-04 | 미연결 |
 | 실제 격리 스테이징 1회 | 2D-4 | 미실행 |
 | Production/Commerce | 별도 authority | 미승인 |

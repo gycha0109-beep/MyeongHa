@@ -80,6 +80,15 @@ export function useMobileChatThreadV1(threadId: string) {
     }, [controller, threadId]),
   );
 
+  const refresh = useCallback(async () => {
+    if (sendingRef.current) return;
+    // Re-read only the authoritative transcript; keep any unsent draft and
+    // preserved pending turn ID untouched for idempotent retry.
+    const pending = controller.loadInitial();
+    setSnapshot(controller.getSnapshot());
+    setSnapshot(await pending);
+  }, [controller]);
+
   const loadMore = useCallback(async () => {
     const pending = controller.loadMore();
     setSnapshot(controller.getSnapshot());
@@ -153,5 +162,5 @@ export function useMobileChatThreadV1(threadId: string) {
     }
   }, [controller, draft, threadId]);
 
-  return Object.freeze({ snapshot, loadMore, draft, setDraft, sending, sendStatus, send });
+  return Object.freeze({ snapshot, refresh, loadMore, draft, setDraft, sending, sendStatus, send });
 }

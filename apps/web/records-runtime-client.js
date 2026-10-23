@@ -1,3 +1,4 @@
+import { getUiLocaleRequestHeadersV1 } from './ui-i18n.js';
 import {
   parseCurrentReaderRecordContinuityV1,
 } from './commerce-reader-records-continuity.js';
@@ -94,6 +95,7 @@ async function readJson(fetchImpl, endpoint, bearer) {
       method: 'GET',
       headers: {
         Accept: 'application/json',
+        ...getUiLocaleRequestHeadersV1(),
         Authorization: `Bearer ${bearer.token}`,
       },
       credentials: 'same-origin',

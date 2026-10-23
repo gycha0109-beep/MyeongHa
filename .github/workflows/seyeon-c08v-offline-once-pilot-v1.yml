@@ -1,0 +1,51 @@
+name: "[WT:character-memory] C08-V offline one-shot first-batch rehearsal"
+
+on:
+  workflow_dispatch:
+    inputs:
+      watchtower_track:
+        description: CI Watchtower Track Key
+        required: false
+        type: string
+        default: character-memory
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: seyeon-c08v-offline-first-batch-one-shot-v1
+  cancel-in-progress: false
+
+jobs:
+  rehearse:
+    if: ${{ github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout pinned main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Set up Node 24
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: '24'
+      - name: Verify unique first manual run and latest main via GitHub readback
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/seyeon-cost-c08v-offline-once-pilot-v1.mjs admit
+          echo "SEYEON_C08V_ADMITTED_RUN_ID=$GITHUB_RUN_ID" >> "$GITHUB_ENV"
+      - name: Simulate six Gold classifier slots and journal reservations
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SEYEON_C08V_MOCK_JOURNAL: ${{ runner.temp }}/c08v-mock-journal.jsonl
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/seyeon-cost-c08v-offline-once-pilot-v1.mjs mock
+
+# Deliberately no OPENAI_EVAL_API_KEY, POST, billing, Production or DB privileges.

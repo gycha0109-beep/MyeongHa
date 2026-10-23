@@ -17,6 +17,7 @@ import {
 import type {
   PostgresQueryResultV1, PostgresSubjectPoolV1,
 } from '../apps/api/src/postgres-subject-execution.js';
+import { createSajuSourceProofPostgresNonceClaimV1 } from '../apps/api/src/saju-source-proof-nonce-postgres-claim-v1.js';
 
 const enabled = process.env.MYEONGHA_LOCAL_TLS_ADMISSION_ENABLED === '1';
 const db = 'myeongha_saju_admission_tls_verify';
@@ -306,4 +307,54 @@ describe.skipIf(!enabled)('independent Admission PostgreSQL TLS and signed Permi
     expect(await unavailable.consumeAuthorizedAttemptOnce()).toBe(false);
     expect(await status(f.permit.permitId)).toBe('ISSUED');
   });
+  it('keeps independent Nonce and Admission commits divergent without an unsafe implicit retry', async () => {
+    // Three independently provisioned TLS clusters are required. No staging Runner is invoked.
+    const nonceConfig: PoolConfig = {
+      host: 'nonce.saju-bridge-ci.invalid', port: 5443,
+      database: 'myeongha_saju_nonce_tls_verify',
+      user: 'myeongha_tls_nonce_ci_login',
+      password: process.env.MYEONGHA_LOCAL_TLS_NONCE_PASSWORD,
+      ssl: { ca: nonceCa, rejectUnauthorized: true },
+      max: 2, connectionTimeoutMillis: 4000,
+    };
+    const nonce = new Pool(nonceConfig);
+    const closedAdmission = new Pool(clientOptions);
+    const closedNonce = new Pool(nonceConfig);
+    await Promise.all([closedAdmission.end(), closedNonce.end()]);
+    try {
+      const claim = createSajuSourceProofPostgresNonceClaimV1({ pool: port(nonce) });
+      const expiry = Date.now() + 90_000;
+      const replayKey = 'test:' + randomUUID() + ':' + randomUUID();
+      const firstPermit = signedCase();
+      await seed(firstPermit);
+
+      // Nonce DB COMMIT succeeds; Admission connection fails before Permit consumption.
+      expect(await claim(replayKey, expiry)).toBe(true);
+      const unavailableAdmission = createSajuHeldStagingPostgresAdmissionPortV2({
+        ...firstPermit.options, pool: port(closedAdmission),
+      });
+      expect(await unavailableAdmission.consumeAuthorizedAttemptOnce()).toBe(false);
+      expect(await status(firstPermit.permit.permitId)).toBe('ISSUED');
+      // Neither a reconnect nor a second consumer may reuse a committed Nonce.
+      expect(await claim(replayKey, expiry)).toBe(false);
+      expect(await unavailableAdmission.consumeAuthorizedAttemptOnce()).toBe(false);
+
+      // Reverse divergence: Admission COMMIT succeeds, Nonce DB rejects the operation.
+      const secondPermit = signedCase();
+      await seed(secondPermit);
+      const permitted = createSajuHeldStagingPostgresAdmissionPortV2(secondPermit.options);
+      expect(await permitted.consumeAuthorizedAttemptOnce()).toBe(true);
+      const deniedNonceClaim = createSajuSourceProofPostgresNonceClaimV1({
+        pool: port(closedNonce),
+      });
+      const unusedReplay = 'test:' + randomUUID() + ':' + randomUUID();
+      expect(await deniedNonceClaim(unusedReplay, expiry)).toBe(false);
+      expect(await status(secondPermit.permit.permitId)).toBe('CONSUMED');
+      expect(await createSajuHeldStagingPostgresAdmissionPortV2(secondPermit.options)
+        .consumeAuthorizedAttemptOnce()).toBe(false);
+    } finally {
+      await nonce.end();
+    }
+  });
+
 });

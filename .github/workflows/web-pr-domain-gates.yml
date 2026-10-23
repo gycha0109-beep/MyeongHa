@@ -51,6 +51,11 @@ jobs:
         env:
           CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
         run: node scripts/ci/run-web-pr-checks.mjs "$RUNNER_TEMP/myeongha-pr-changed-files.txt"
+      - name: Verify Korean Japanese Chinese fixed UI in Chrome
+        if: steps.route.outputs.browser == 'true'
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
+        run: node scripts/verify-web-ui-i18n-browser.mjs
       - name: Upload selected browser diagnostics
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a

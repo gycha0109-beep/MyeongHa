@@ -40,6 +40,7 @@ export interface SeyeonProductionPersonalRecordProjectorV1 {
   readonly recordKind: SeyeonProductionPersonalRecordKindV1;
   readonly recordType: string;
   readonly schemaVersion: string;
+  readonly projectorVersion?: string;
   project(input: Readonly<{
     recordId: string;
     payload: unknown;
@@ -75,6 +76,8 @@ export interface SeyeonPersonalRecordProjectionCandidateV1 {
   readonly projectedMemoryId: string;
   readonly rawRecordDigest: string;
   readonly projectedMemoryDigest: string;
+  readonly rawRecordPgDigest?: string;
+  readonly projectorVersion?: string;
   readonly permitsAtomicCommit: false;
   readonly permitsHttpReveal: false;
 }
@@ -249,6 +252,8 @@ function personalMemories(input: {
           payload: row.payload,
         })),
         projectedMemoryDigest: candidateDigest(selected),
+        ...(row.rawRecordPgDigest === undefined ? {} : {rawRecordPgDigest: row.rawRecordPgDigest}),
+        ...(projector.projectorVersion === undefined ? {} : {projectorVersion: projector.projectorVersion}),
         permitsAtomicCommit: false as const,
         permitsHttpReveal: false as const,
       }));

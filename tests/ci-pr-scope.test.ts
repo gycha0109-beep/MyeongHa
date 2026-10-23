@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect, it } from 'vitest';
 import { resolveDbPrRouting } from '../scripts/ci/db-pr-router.mjs';
+import { resolvePrGates } from '../scripts/ci/pr-gate-router.mjs';
 
 it('does not schedule Commerce added only to the base while Character work advances', () => {
   const directory = mkdtempSync(join(tmpdir(), 'myeongha-pr-scope-'));
@@ -30,4 +31,12 @@ it('does not schedule Commerce added only to the base while Character work advan
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
+});
+
+it('routes SeYeon original-Grant revoke-to-socket regressions to actual PostgreSQL, not just unit tests', () => {
+  const changed = ['test/seyeon-r5-current-reveal-disposable.test.ts'];
+  expect(resolveDbPrRouting(changed).suites).toEqual(['postgres17']);
+  expect(resolvePrGates(changed).db).toBe(true);
+  expect(resolveDbPrRouting(['docs/security/SEYEON_D04_REVOKE_ACK_HTTP_SEND_CONTRACT_CANDIDATE_V1.md']).suites)
+    .toEqual([]);
 });

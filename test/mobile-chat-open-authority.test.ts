@@ -4,7 +4,7 @@ import { CHAT_LAUNCH_CHARACTER_IDS_V1 } from '../packages/api-client/src/index.j
 import { MOBILE_CHAT_LAUNCH_ROSTER_V1 } from '../apps/mobile/src/features/chat/chat-launch-roster.js';
 
 describe('mobile M8-A Chat-open authority', () => {
-  it('uses exactly the approved Launch nine canonical ids and official display names', () => {
+  it('preserves nine server-valid identities while showing only six in the mobile launch menu', () => {
     expect(CHAT_LAUNCH_CHARACTER_IDS_V1).toEqual([
       'seyeon',
       'yeoul',
@@ -19,12 +19,9 @@ describe('mobile M8-A Chat-open authority', () => {
     expect(MOBILE_CHAT_LAUNCH_ROSTER_V1).toEqual([
       { characterId: 'seyeon', displayName: '세연' },
       { characterId: 'yeoul', displayName: '여울' },
-      { characterId: 'seorin', displayName: '서린' },
       { characterId: 'rahyeon', displayName: '라현' },
-      { characterId: 'mira', displayName: '미라' },
       { characterId: 'taegyeom', displayName: '태겸' },
       { characterId: 'yunho', displayName: '윤호' },
-      { characterId: 'doyun', displayName: '도윤' },
       { characterId: 'baekheon', displayName: '백헌' },
     ]);
   });

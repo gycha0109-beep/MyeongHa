@@ -20,6 +20,7 @@ import {
   classifyCharacterStandardFollowupQuestionScopeV1,
   assertServerPreparedStandardFollowupQuestionScopeV1,
 } from '../apps/api/src/character-standard-reading-chat-question-scope-v1.js';
+import { prepareReaderConversationResponseCandidateV1 } from '../apps/api/src/reader-conversation-source-routing-v1.js';
 import { runThreadBoundReaderInterpretationPreviewV2 } from '../apps/api/src/reader-interpretation-preview-runtime-v2.js';
 import { assertServerGuardedReaderInterpretationSceneV2 } from '../apps/api/src/reader-interpretation-preview-runtime-v2.js';
 import {
@@ -1818,6 +1819,192 @@ describe('A3-eta server-anchored follow-up evidence selection (public OFF)', () 
       suggestedActions: [],
     };
   }
+
+  it('RR-08 connects latest real Reader Assistant and Guarded Official anchor into existing RR-06 Output HOLD', async () => {
+    const base = previewGrounding();
+    const {groundingHash: _old, ...material} = base;
+    const bounded = {...material, units: [material.units[0]!]};
+    const question = '그 부분을 더 설명해 주세요.';
+    const f = await setup({
+      ...bounded,
+      groundingHash: hashCharacterSajuGroundingBundleMaterialV1(bounded),
+    }, question);
+    const rows = [
+      {
+        messageId: 'current-user-request',
+        sequenceNo: 18,
+        senderType: 'user',
+        characterId: null,
+        text: question,
+        createdAt: '2026-10-22T05:00:00.000Z',
+      },
+      {
+        messageId: f.anchor.assistantMessageId,
+        sequenceNo: 17,
+        senderType: 'character',
+        characterId: 'baekheon',
+        text: 'PRIVATE_GUARDED_OFFICIAL_TEXT',
+        createdAt: '2026-10-22T04:59:00.000Z',
+      },
+    ];
+    const readRecentMessages = vi.fn(async () => rows);
+    const result = await prepareReaderConversationResponseCandidateV1({
+      userText: question, admittedDomain: 'career',
+      official: {
+        preflight: f.input.preflight,
+        grounded: f.input.grounded,
+        anchorAuthorityPort: f.input.anchorAuthorityPort,
+        recentMessageAuthorityPort: { readRecentMessages },
+        rendererDraft: cosmetics(),
+      },
+    });
+    expect(result.mode).toBe('official_followup_output_hold');
+    if (result.mode !== 'official_followup_output_hold') return;
+    expect(result.intent.primaryIntent).toBe('official_followup');
+    expect(result.outputHold).toMatchObject({
+      mode: 'output_guarded_hold',
+      assistantAnchorMessageId: f.anchor.assistantMessageId,
+      subjectId: SUBJECT_ID,
+      threadId: THREAD_ID,
+      readingRef: READING_ID,
+      readerCharacterId: 'baekheon',
+      sourceUnitRefs: [f.ids[0]],
+      publicDisclosureAuthorized: false,
+      reason: 'DB_PROVENANCE_AND_FINAL_DISCLOSURE_PENDING',
+    });
+    expect(result.selectedSourceUnitRefs).toEqual([f.ids[0]]);
+    expect(result.publicDisclosureAuthorized).toBe(false);
+    expect(result.addedModelCalls).toBe(0);
+    expect(f.readLatestValidatedAnchor).toHaveBeenCalledTimes(1);
+    expect(readRecentMessages).toHaveBeenCalledTimes(2);
+    expect(readRecentMessages).toHaveBeenCalledWith({
+      subjectId: SUBJECT_ID, threadId: THREAD_ID, limit: 32,
+    });
+    expect(JSON.stringify(result)).not.toContain('PRIVATE_GUARDED_OFFICIAL_TEXT');
+  });
+
+  it('RR-08 refuses to bypass missing actual Reader transcript authority despite valid server-minted sources', async () => {
+    const base = previewGrounding();
+    const {groundingHash: _old, ...material} = base;
+    const bounded = {...material, units: [material.units[0]!]};
+    const question = '그 부분을 더 설명해 주세요.';
+    const f = await setup({
+      ...bounded, groundingHash: hashCharacterSajuGroundingBundleMaterialV1(bounded),
+    }, question);
+    const result = await prepareReaderConversationResponseCandidateV1({
+      userText: question, admittedDomain: 'career',
+      official: {
+        preflight: f.input.preflight,
+        grounded: f.input.grounded,
+        anchorAuthorityPort: f.input.anchorAuthorityPort,
+        rendererDraft: cosmetics(),
+      },
+    });
+    expect(result).toMatchObject({
+      mode: 'hold',
+      reason: 'official_latest_anchor_not_admitted',
+      publicDisclosureAuthorized: false,
+      addedModelCalls: 0,
+    });
+    expect(f.readLatestValidatedAnchor).not.toHaveBeenCalled();
+  });
+
+  it('RR-08 aborts when Reader transcript metadata changes during validated Anchor selection', async () => {
+    const base = previewGrounding();
+    const {groundingHash: _old, ...material} = base;
+    const bounded = {...material, units: [material.units[0]!]};
+    const question = '그 부분을 더 설명해 주세요.';
+    const f = await setup({
+      ...bounded, groundingHash: hashCharacterSajuGroundingBundleMaterialV1(bounded),
+    }, question);
+    let reads = 0;
+    const readRecentMessages = vi.fn(async () => {
+      reads += 1;
+      return [
+        {
+          messageId: 'current-user-request',
+          sequenceNo: reads === 1 ? 18 : 19,
+          senderType: 'user', characterId: null,
+          text: question, createdAt: '2026-10-22T05:01:00.000Z',
+        },
+        {
+          messageId: f.anchor.assistantMessageId,
+          sequenceNo: 17,
+          senderType: 'character', characterId: 'baekheon',
+          text: 'PRIVATE_OFFICIAL_ANSWER',
+          createdAt: '2026-10-22T05:00:00.000Z',
+        },
+      ];
+    });
+    const result = await prepareReaderConversationResponseCandidateV1({
+      userText: question, admittedDomain: 'career',
+      official: {
+        preflight: f.input.preflight,
+        grounded: f.input.grounded,
+        anchorAuthorityPort: f.input.anchorAuthorityPort,
+        recentMessageAuthorityPort: { readRecentMessages },
+        rendererDraft: cosmetics(),
+      },
+    });
+    expect(result).toMatchObject({
+      mode: 'hold',
+      reason: 'official_latest_anchor_not_admitted',
+      publicDisclosureAuthorized: false,
+      addedModelCalls: 0,
+    });
+    expect(readRecentMessages).toHaveBeenCalledTimes(2);
+    expect(f.readLatestValidatedAnchor).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(result)).not.toContain('PRIVATE_OFFICIAL_ANSWER');
+  });
+
+  it('RR-08 refuses older Official Anchor after another real Reader answer, even with valid RR-05 source', async () => {
+    const base = previewGrounding();
+    const {groundingHash: _old, ...material} = base;
+    const bounded = {...material, units: [material.units[0]!]};
+    const question = '그 부분을 더 설명해 주세요.';
+    const f = await setup({
+      ...bounded,
+      groundingHash: hashCharacterSajuGroundingBundleMaterialV1(bounded),
+    }, question);
+    const readRecentMessages = vi.fn(async () => [
+      {
+        messageId: 'current-user-request', sequenceNo: 21,
+        senderType: 'user', characterId: null, text: question,
+        createdAt: '2026-10-22T05:20:00.000Z',
+      },
+      {
+        messageId: 'intervening-ordinary-reader-answer', sequenceNo: 20,
+        senderType: 'character', characterId: 'baekheon',
+        text: '일상 고민은 다른 대화였어요.',
+        createdAt: '2026-10-22T05:19:00.000Z',
+      },
+      {
+        messageId: f.anchor.assistantMessageId, sequenceNo: 17,
+        senderType: 'character', characterId: 'baekheon',
+        text: 'PRIVATE_OLD_OFFICIAL_ANSWER',
+        createdAt: '2026-10-22T04:59:00.000Z',
+      },
+    ]);
+    const result = await prepareReaderConversationResponseCandidateV1({
+      userText: question, admittedDomain: 'career',
+      official: {
+        preflight: f.input.preflight,
+        grounded: f.input.grounded,
+        anchorAuthorityPort: f.input.anchorAuthorityPort,
+        recentMessageAuthorityPort: { readRecentMessages },
+        rendererDraft: cosmetics(),
+      },
+    });
+    expect(result.mode).toBe('hold');
+    if (result.mode === 'hold') {
+      expect(result.reason).toBe('official_latest_anchor_not_admitted');
+    }
+    expect(result.publicDisclosureAuthorized).toBe(false);
+    expect(result.addedModelCalls).toBe(0);
+    expect(f.readLatestValidatedAnchor).toHaveBeenCalledTimes(1);
+    expect(readRecentMessages).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(result)).not.toContain('PRIVATE_OLD_OFFICIAL_ANSWER');
+  });
 
   it('RR-06 Output Guard seals the exact prior Assistant anchor and Unit/Reading hashes only as HOLD', async () => {
     const { f, questionScope, candidate } = await oneUnitSemanticCandidate();

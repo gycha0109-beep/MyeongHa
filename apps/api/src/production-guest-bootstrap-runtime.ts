@@ -86,10 +86,14 @@ function requireDbText(name: string, value: unknown): string {
 
 function requireDbTimestamp(name: string, value: unknown): string {
   const text = requireDbText(name, value);
-  if (!Number.isFinite(Date.parse(text))) {
+  const epochMs = Date.parse(text);
+  if (!Number.isFinite(epochMs)) {
     throw new Error(`Production Guest bootstrap PostgreSQL ${name} is not a timestamp.`);
   }
-  return text;
+  // PostgreSQL timestamptz::text uses a space and a numeric timezone offset.
+  // Hermes on Android must receive strict RFC 3339/ISO 8601 for Date.parse.
+  // Normalize on the trusted server boundary without changing the instant.
+  return new Date(epochMs).toISOString();
 }
 
 function requireAuthorityRows(

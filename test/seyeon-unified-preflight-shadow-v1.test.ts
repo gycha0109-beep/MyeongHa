@@ -49,6 +49,40 @@ describe('Seyeon unified preflight shadow-only contract', () => {
     expect(request.instructions).toContain('existing server disclosure and integrity authorities remain final');
   });
 
+  it('pins paid F01 interrogative vs assertion contract without claiming live model is fixed', async () => {
+    const { classifier, generate } = shadow({
+      claims: [], topicKey: 'family_emotional_history',
+      questionContext: 'casual_curiosity',
+    });
+    const result = await classifier.classify({
+      characterId: 'seyeon', userText: '세연아, 부모님과의 관계는 지금 어때?',
+    });
+    const request = generate.mock.calls[0]?.[0] as {
+      readonly instructions: string;
+      readonly input: { readonly userText: string };
+    };
+    expect(request.instructions).toContain('Classify claims and disclosure topics INDEPENDENTLY');
+    expect(request.instructions).toContain('claims [] and topicKey family_emotional_history');
+    expect(request.instructions).toContain('do not invent CHARACTER_FACT_CLAIM');
+    expect(request.instructions).toContain('우리 작년에 제주도 갔잖아?');
+    expect(request.input.userText).toBe('세연아, 부모님과의 관계는 지금 어때?');
+    expect(result.integrity.claims).toEqual([]);
+    expect(result.disclosure.topicKey).toBe('family_emotional_history');
+  });
+
+  it('does NOT erase a provider-invented fact claim; F01 still requires review HOLD', async () => {
+    const { classifier } = shadow({
+      claims: [{claimId:'f01',kind:'CHARACTER_FACT_CLAIM',
+        statement:'세연에게 부모님과의 관계가 있다.'}],
+      topicKey:'family_emotional_history',questionContext:'casual_curiosity',
+    });
+    const result = await classifier.classify({
+      characterId:'seyeon',userText:'세연아, 부모님과의 관계는 지금 어때?',
+    });
+    expect(result.integrity.claims).toHaveLength(1);
+    expect(result.integrity.claims[0]?.kind).toBe('CHARACTER_FACT_CLAIM');
+  });
+
   it('fails closed on unknown sensitive topics or claim kinds', async () => {
     const badTopic = shadow({ claims: [], topicKey: 'injected-secret', questionContext: 'casual_curiosity' });
     await expect(badTopic.classifier.classify({ characterId: 'seyeon', userText: '가족?' }))

@@ -1,5 +1,5 @@
 import type { MobileChatThreadSnapshotV1 } from './mobile-chat-read-repository.js';
-import { MOBILE_CHAT_LAUNCH_ROSTER_V1 } from './chat-launch-roster.js';
+import { MOBILE_CHAT_KNOWN_CHARACTERS_V1 } from './chat-launch-roster.js';
 import { resolveMobileChatCharacterPresentationV1 } from './chat-character-presentation.js';
 
 export type MobileChatEmptyGreetingInputV1 = Pick<
@@ -17,7 +17,7 @@ export type MobileChatEmptyGreetingInputV1 = Pick<
 export function projectMobileChatEmptyGreetingV1(
   snapshot: MobileChatEmptyGreetingInputV1,
 ): Readonly<{
-  characterId: (typeof MOBILE_CHAT_LAUNCH_ROSTER_V1)[number]['characterId'];
+  characterId: (typeof MOBILE_CHAT_KNOWN_CHARACTERS_V1)[number]['characterId'];
   displayName: string;
   openingLine: string;
 }> | null {
@@ -28,7 +28,7 @@ export function projectMobileChatEmptyGreetingV1(
     return null;
   }
 
-  const character = MOBILE_CHAT_LAUNCH_ROSTER_V1.find(
+  const character = MOBILE_CHAT_KNOWN_CHARACTERS_V1.find(
     (entry) => entry.characterId === snapshot.characterId,
   );
   if (!character) return null;

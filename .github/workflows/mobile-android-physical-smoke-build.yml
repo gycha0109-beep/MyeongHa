@@ -30,7 +30,7 @@ concurrency:
 jobs:
   build-android-physical-smoke:
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: 90
     environment: production
     env:
       EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
@@ -62,6 +62,19 @@ jobs:
 
           test -n "${EXPO_TOKEN:-}"
 
+      - name: Reject historical workflow reruns before EAS build
+        shell: bash
+        run: |
+          set -euo pipefail
+          checked_out_sha="$(git rev-parse HEAD)"
+          current_main_sha="$(git ls-remote --exit-code origin refs/heads/main | cut -f1)"
+          test -n "$current_main_sha"
+          test "$checked_out_sha" = "$GITHUB_SHA"
+          if [[ "$checked_out_sha" != "$current_main_sha" ]]; then
+            echo "::error::Stale Android smoke workflow commit. Use a fresh main workflow run instead of re-running an old job." >&2
+            exit 1
+          fi
+
       - name: Install workspace dependencies
         run: npm ci --ignore-scripts --no-audit --no-fund
 
@@ -71,128 +84,62 @@ jobs:
           npm run verify:mobile-release-readiness
           npm run verify:mobile-android-physical-smoke-readiness
 
-      - name: Inspect latest failed EAS physical-smoke build
+      - name: Configure GitHub-hosted local Android toolchain
         shell: bash
         run: |
           set -euo pipefail
-          pushd apps/mobile >/dev/null
+          test -d "${JAVA_HOME_17_X64:-}"
+          test -d "${ANDROID_HOME:-}"
+          echo "JAVA_HOME=$JAVA_HOME_17_X64" >> "$GITHUB_ENV"
+          echo "$JAVA_HOME_17_X64/bin" >> "$GITHUB_PATH"
+          echo "Local Android SDK and Java 17 selected; no production signing credentials."
 
-          failed_list="$RUNNER_TEMP/myeongha-android-physical-smoke-failed-list.json"
-          failed_view="$RUNNER_TEMP/myeongha-latest-failed-build-view.json"
-
-          npm exec --yes --package=eas-cli@24.10.0 -- \
-            eas build:list \
-              --platform android \
-              --profile physical-smoke \
-              --status errored \
-              --limit 1 \
-              --json \
-              --non-interactive \
-              > "$failed_list"
-
-          failed_build_id="$(jq -r 'if type == "array" and length > 0 then (.[0].id // empty) else empty end' "$failed_list")"
-
-          if [[ -n "$failed_build_id" ]]; then
-            npm exec --yes --package=eas-cli@24.10.0 -- \
-              eas build:view "$failed_build_id" --json \
-              > "$failed_view"
-
-            echo "최근 실패 빌드 진단:"
-            jq '{
-              id: (.id // null),
-              status: (.status // null),
-              platform: (.platform // null),
-              buildProfile: (.buildProfile // null),
-              createdAt: (.createdAt // null),
-              updatedAt: (.updatedAt // null),
-              error: (
-                if .error then {
-                  errorCode: (.error.errorCode // .error.code // null),
-                  message: (.error.message // null),
-                  phase: (.error.phase // null)
-                } else null end
-              )
-            }' "$failed_view"
-          else
-            echo "이전 실패 빌드 없음"
-          fi
-
-          popd >/dev/null
-
-      - name: Build Android standalone smoke APK without EAS signing credentials
+      # The Expo hosted Free Android quota is exhausted. Use local EAS on
+      # the GitHub-hosted runner; preserve the validated physical-smoke profile.
+      - name: Build Android standalone APK locally (no EAS cloud quota)
         id: eas_build
         shell: bash
         run: |
-          set -uo pipefail
+          set -euo pipefail
+          apk="$RUNNER_TEMP/myeongha-android-physical-smoke-local.apk"
+
+          # eas-cli@24.10.0 invokes local-build-plugin@24.9.0 through npx.
+          # On npm 11 the implicit npx executable resolution fails (exit 127).
+          # Preinstall exactly that version and use EAS CLI's supported path
+          # override; never pass the EAS job payload on the command line.
+          local_plugin_root="$RUNNER_TEMP/myeongha-eas-local-plugin"
+          mkdir -p "$local_plugin_root"
+          npm install \
+            --prefix "$local_plugin_root" \
+            --no-save --no-package-lock --ignore-scripts \
+            --no-audit --no-fund \
+            eas-cli-local-build-plugin@24.9.0
+          local_plugin_bin="$local_plugin_root/node_modules/.bin/eas-cli-local-build-plugin"
+          test -x "$local_plugin_bin"
+          test "$(node -p "require('$local_plugin_root/node_modules/eas-cli-local-build-plugin/package.json').version")" = "24.9.0"
+          export EAS_LOCAL_BUILD_PLUGIN_PATH="$local_plugin_bin"
+
           pushd apps/mobile >/dev/null
 
-          build_json="$RUNNER_TEMP/myeongha-android-physical-smoke-build.json"
-          build_stderr="$RUNNER_TEMP/myeongha-android-physical-smoke-build.stderr.log"
-
-          set +e
           npm exec --yes --package=eas-cli@24.10.0 -- \
             eas build \
               --platform android \
               --profile physical-smoke \
+              --local \
               --non-interactive \
               --freeze-credentials \
-              --wait \
-              --json \
-              > "$build_json" \
-              2> >(tee "$build_stderr" >&2)
-          build_rc=$?
-          set -e
-
-          if [[ "$build_rc" -ne 0 ]]; then
-            failed_build_id="$(grep -Eo '/builds/[0-9a-f-]{36}' "$build_stderr" | tail -1 | cut -d/ -f3 || true)"
-            if [[ -n "$failed_build_id" ]]; then
-              failed_view="$RUNNER_TEMP/myeongha-failed-build-view.json"
-              npm exec --yes --package=eas-cli@24.10.0 -- \
-                eas build:view "$failed_build_id" --json \
-                > "$failed_view" || true
-
-              if [[ -s "$failed_view" ]]; then
-                echo "실패 빌드 진단:" >&2
-                jq '{
-                  id: (.id // null),
-                  status: (.status // null),
-                  platform: (.platform // null),
-                  buildProfile: (.buildProfile // null),
-                  createdAt: (.createdAt // null),
-                  updatedAt: (.updatedAt // null),
-                  error: (
-                    if .error then {
-                      errorCode: (.error.errorCode // .error.code // null),
-                      message: (.error.message // null),
-                      phase: (.error.phase // null)
-                    } else null end
-                  )
-                }' "$failed_view" >&2 || true
-              fi
-            fi
-
-            popd >/dev/null
-            exit "$build_rc"
-          fi
+              --output "$apk"
 
           popd >/dev/null
+          test -s "$apk"
+          echo "build_id=local-$GITHUB_RUN_ID" >> "$GITHUB_OUTPUT"
+          echo "apk_path=$apk" >> "$GITHUB_OUTPUT"
 
-          build_id="$(jq -r 'if type == "array" then (.[0].id // empty) else (.id // empty) end' "$build_json")"
-          build_status="$(jq -r 'if type == "array" then (.[0].status // empty) else (.status // empty) end' "$build_json")"
-          artifact_url="$(jq -r 'if type == "array" then (.[0].artifacts.buildUrl // .[0].artifacts.applicationArchiveUrl // empty) else (.artifacts.buildUrl // .artifacts.applicationArchiveUrl // empty) end' "$build_json")"
-
-          test -n "$build_id"
-          test "${build_status^^}" = "FINISHED"
-          [[ "$artifact_url" =~ ^https:// ]]
-
-          echo "build_id=$build_id" >> "$GITHUB_OUTPUT"
-          echo "artifact_url=$artifact_url" >> "$GITHUB_OUTPUT"
-
-      - name: Download and verify standalone physical-smoke APK
+      - name: Verify standalone local physical-smoke APK
         id: verify_apk
         shell: bash
         env:
-          EAS_ARTIFACT_URL: ${{ steps.eas_build.outputs.artifact_url }}
+          LOCAL_APK_PATH: ${{ steps.eas_build.outputs.apk_path }}
           EAS_BUILD_ID: ${{ steps.eas_build.outputs.build_id }}
         run: |
           set -euo pipefail
@@ -200,12 +147,9 @@ jobs:
           apk="$RUNNER_TEMP/myeongha-android-physical-smoke.apk"
           evidence="$RUNNER_TEMP/myeongha-android-physical-smoke-evidence.txt"
 
-          test -n "$EAS_ARTIFACT_URL"
           test -n "$EAS_BUILD_ID"
-
-          curl --fail --location --retry 3 --retry-all-errors \
-            "$EAS_ARTIFACT_URL" \
-            --output "$apk"
+          test -s "$LOCAL_APK_PATH"
+          cp "$LOCAL_APK_PATH" "$apk"
           test -s "$apk"
 
           sdk_root="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
@@ -221,15 +165,29 @@ jobs:
 
           "$aapt" dump badging "$apk" | tee "$RUNNER_TEMP/aapt-badging.txt"
           grep -F "package: name='com.myeongha.app'" "$RUNNER_TEMP/aapt-badging.txt"
+          if grep -Eq '^application-debuggable($|[[:space:]])' "$RUNNER_TEMP/aapt-badging.txt"; then
+            echo "::error::Refusing to publish a debuggable/Metro-dependent Android APK." >&2
+            exit 1
+          fi
 
+          unzip -t "$apk" > "$RUNNER_TEMP/apk-zip-integrity.txt"
           unzip -l "$apk" | tee "$RUNNER_TEMP/apk-contents.txt"
           grep -F "assets/index.android.bundle" "$RUNNER_TEMP/apk-contents.txt"
+          bundle_bytes="$(unzip -p "$apk" assets/index.android.bundle | wc -c | tr -d '[:space:]')"
+          if ! [[ "$bundle_bytes" =~ ^[0-9]+$ ]] || (( bundle_bytes <= 1024 )); then
+            echo "::error::Android standalone APK has no substantial embedded JS bundle." >&2
+            exit 1
+          fi
 
           apk_sha256="$(sha256sum "$apk" | awk '{print $1}')"
           {
             echo "eas_build_id=$EAS_BUILD_ID"
+            echo "eas_build_mode=github_hosted_local"
             echo "android_package=com.myeongha.app"
+            echo "source_commit=$GITHUB_SHA"
             echo "gradle_command=:app:assembleRelease"
+            echo "android_debuggable=false"
+            echo "embedded_js_bundle_bytes=$bundle_bytes"
             echo "certificate_boundary=android_debug"
             echo "embedded_js_bundle=true"
             echo "production_signing_used=false"
@@ -260,7 +218,9 @@ jobs:
           test -n "$EAS_BUILD_ID"
           {
             echo "android_physical_smoke_build=pass"
+            echo "source_commit=$GITHUB_SHA"
             echo "eas_build_id=$EAS_BUILD_ID"
+            echo "eas_build_mode=github_hosted_local"
             echo "eas_profile=physical-smoke"
             echo "android_gradle_command=:app:assembleRelease"
             echo "eas_credentials_mutation=false"
@@ -268,5 +228,5 @@ jobs:
             echo "embedded_js_bundle=true"
             echo "github_artifact=myeongha-android-physical-smoke-$EAS_BUILD_ID"
             echo "store_submission=false"
-            echo "eas_build_page=https://expo.dev/accounts/johnny0109/projects/myeongha-mobile/builds/$EAS_BUILD_ID"
+            echo "github_build_page=https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
           } >> "$GITHUB_STEP_SUMMARY"

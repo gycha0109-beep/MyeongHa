@@ -97,14 +97,14 @@ export function ReadingDetailPage() {
           <section className="reading-completion" data-reading-completion hidden aria-live="polite">
             <span className="reading-completion-kicker">READING COMPLETE</span>
             <h2 data-reading-completion-title><span data-reader-name>세연</span>이 이번 사주 읽기를 마쳤습니다.</h2>
-            <p data-reading-completion-copy>읽은 내용은 기록에서 다시 확인할 수 있습니다. 대화를 시작하려면 대화 상대를 새로 선택해 주세요.</p>
+            <p data-reading-completion-copy>이 프리뷰는 공식 풀이 기록에 저장되지 않습니다. 다른 사주 읽기는 사주 페이지에서 선택할 수 있습니다.</p>
             <div className="reading-completion-actions">
               <a className="reading-completion-primary" data-reading-chat-link href="chat-hub.html">
                 대화 상대 선택
                 <span aria-hidden="true">→</span>
               </a>
-              <a className="reading-completion-secondary" data-reading-records-link href="records.html">
-                기록에서 사주 보기
+              <a className="reading-completion-secondary" data-reading-records-link href="reading.html">
+                <span data-reading-completion-secondary-label>다른 사주 읽기</span>
                 <span aria-hidden="true">↗</span>
               </a>
             </div>
