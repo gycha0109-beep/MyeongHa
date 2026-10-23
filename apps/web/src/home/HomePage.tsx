@@ -52,8 +52,7 @@ export function HomePage() {
           <p className="mhx-hero-subtitle">궁금한 주제를 선택하면, 명하가 당신의 이야기를 시작합니다.</p>
           <div className="mhx-topics" aria-label="사주 관심 주제">
             {readingTopics.map((topic) => (
-              <a key={topic.motif} className="mhx-topic" data-motif={topic.motif} href={topic.href}
-                aria-label={`${topic.title} — ${resolveReadingAvailabilityV1(topic.href).label}`}>
+              <a key={topic.motif} className="mhx-topic" data-motif={topic.motif} href={topic.href}>
                 <span className="mhx-topic-icon" aria-hidden="true">{topic.glyph}</span>
                 <span className="mhx-topic-copy">
                   <strong>{topic.title}</strong>
