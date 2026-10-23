@@ -5,7 +5,7 @@ import {
   type MyeongHaApiClientV1,
 } from '@myeongha/api-client';
 
-import type { MobileSubjectSessionCoordinatorV1 } from '@/core/session/mobile-subject-session';
+import type { MobileMemberSessionCoordinatorV1 } from '@/core/session/mobile-member-session';
 
 export interface MobileChatReadServiceV1 {
   readThreadPage(
@@ -16,11 +16,11 @@ export interface MobileChatReadServiceV1 {
 
 export function createMobileChatReadServiceV1(input: {
   readonly client: MyeongHaApiClientV1;
-  readonly session: Pick<MobileSubjectSessionCoordinatorV1, 'withActiveBearer'>;
+  readonly session: Pick<MobileMemberSessionCoordinatorV1, 'withMemberBearer'>;
 }): MobileChatReadServiceV1 {
   return Object.freeze({
     readThreadPage(threadId: string, options: ChatReadPageOptionsV1 = {}) {
-      return input.session.withActiveBearer((bearer) =>
+      return input.session.withMemberBearer((bearer) =>
         readChatThreadPageV1(input.client, bearer, threadId, options),
       );
     },

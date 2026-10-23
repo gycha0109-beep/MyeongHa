@@ -1,0 +1,53 @@
+name: Seyeon First-Zero Locked Function One-Shot
+run-name: "[WT:security] Seyeon first-zero SQL function-only"
+
+on:
+  workflow_dispatch:
+    inputs:
+      reviewed_main_sha:
+        description: 'Exact reviewed main commit SHA (40 hex), no moving ref'
+        type: string
+        required: true
+      scoped_confirmation:
+        description: 'Enter INSTALL_SEYEON_FIRST_ZERO_FUNCTION_ONLY'
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+# Shared with the governed Production migration workflow; no overlapping DDL.
+concurrency:
+  group: supabase-production-migrations
+  cancel-in-progress: false
+
+jobs:
+  function-only:
+    name: exact first-zero DB-owner function (no chat activation)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: production
+    env:
+      SUPABASE_PROJECT_ID: cnsfpcdiyofqvhpcegfc
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PRODUCTION_SESSION_POOLER_HOST: ${{ secrets.SUPABASE_PRODUCTION_SESSION_POOLER_HOST }}
+      REVIEWED_MAIN_SHA: ${{ inputs.reviewed_main_sha }}
+      SCOPED_CONFIRMATION: ${{ inputs.scoped_confirmation }}
+    steps:
+      - name: Checkout exact review target
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install pinned Supabase CLI
+        uses: supabase/setup-cli@46f7f98c7f948ad727d22c1e67fab04c223a0520 # v3.0.0
+        with:
+          version: 2.116.0
+      - name: Install PostgreSQL client
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client >/dev/null
+      - name: Verify and install ONLY the locked first-zero source function
+        shell: bash
+        run: bash scripts/operations/install-seyeon-first-zero-sql-one-shot.sh

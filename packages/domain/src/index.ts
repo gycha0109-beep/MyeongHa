@@ -12,9 +12,12 @@ export {
 
 export {
   evaluateCapabilityGate,
+  evaluateCapabilitySecuritySignalsV1,
   type CapabilityGateInput,
   type CapabilityGateResult,
   type CapabilityDenialReason,
+  type CapabilitySecuritySignalV1,
+  type CapabilitySecurityVetoV1,
 } from './capability-gate.js';
 
 export {
@@ -585,3 +588,12 @@ export {
   type CharacterSajuRuntimeContextV2,
   type CharacterSajuRuntimeContextWithGroundingV2,
 } from './character-saju-runtime-v2.js';
+export * from './rahyeon-runtime-turn-context-v1.js';
+
+export {
+  NARRATIVE_OUTPUT_LOCALES_V1,
+  selectClaimNarrativeLocaleTemplateV1,
+  type NarrativeOutputLocaleV1,
+  type ClaimNarrativeProfileV1,
+  type ClaimNarrativeLocaleDecisionV1,
+} from './claim-narrative-locale-v1.js';

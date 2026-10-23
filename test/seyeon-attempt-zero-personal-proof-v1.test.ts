@@ -72,6 +72,26 @@ describe('Se-yeon server-owned zero-record attempt provenance', () => {
     expect(JSON.stringify(proof)).not.toContain('memory');
   });
 
+  it('rejects inconsistent candidate-only personal source evidence instead of minting an empty proof', () => {
+    const noRecords = context();
+    expect(mint({ context: { ...noRecords, personalRecordProjectionCandidates: [] } }))
+      .toEqual(mint());
+    for (const candidates of [
+      [{ recordId: 'unexpected-memory', grantId: 'unexpected-grant' }],
+      null, {}, 'not-an-array',
+    ]) {
+      const snapshot = {
+        ...noRecords, personalRecordProjectionCandidates: candidates,
+      } as unknown as SourceContext;
+      expect(() => mint({ context: snapshot }))
+        .toThrow(SeyeonAttemptZeroPersonalProofHoldV1);
+    }
+    expect(() => mint({ context: {
+      ...context([], [{ recordId: 'unsupported', reason: 'UNSUPPORTED_SCHEMA' }]),
+      personalRecordProjectionCandidates: [{ recordId: 'inconsistent' }],
+    } as unknown as SourceContext })).toThrow(SeyeonAttemptZeroPersonalProofHoldV1);
+  });
+
   it('fails closed on any admitted memory, life fact, malformed or absent source evidence', () => {
     for (const value of [
       context([{ kind: 'memory' }], []),
@@ -104,16 +124,19 @@ describe('Se-yeon server-owned zero-record attempt provenance', () => {
       new URL('../apps/api/src/seyeon-production-chat-execution-v1.ts', import.meta.url),
       'utf8',
     );
-    const minted = runtime.indexOf('const personalRecordProof = createSeyeonAttemptZeroPersonalProofV1({');
+    const minted = runtime.indexOf('personalRecordProof = createSeyeonAttemptZeroPersonalProofV1({');
     const model = runtime.indexOf('const runtime = await runSeyeonCharacterTurnV2({');
     const validate = runtime.indexOf('await input.persistencePort.persistValidated({');
     const persist = runtime.indexOf('personalRecordProvenance: personalRecordProof,');
-    const commit = runtime.indexOf('const committed = await input.persistencePort.commitTurn({');
+    const commit = runtime.indexOf('const committed = positiveModelCorrelation === null');
     expect(minted).toBeGreaterThan(-1);
     expect(model).toBeGreaterThan(minted);
     expect(validate).toBeGreaterThan(model);
     expect(persist).toBeGreaterThan(validate);
     expect(commit).toBeGreaterThan(persist);
+    const positivePin = runtime.indexOf('await input.positivePersonalSourcePort.pinBeforeModel({');
+    expect(positivePin).toBeGreaterThan(minted);
+    expect(positivePin).toBeLessThan(model);
 
     const sql = await readFile(
       new URL('../supabase/migrations/0220_chat_attempt_commit_commands.sql', import.meta.url),

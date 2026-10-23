@@ -36,6 +36,14 @@ export function assertStagedPolicy(rules) {
   }
 }
 
+export function assertParallelTrackLoosePolicy(rules) {
+  const statusRules = rules.filter(rule => rule.type === 'required_status_checks');
+  if (statusRules.length !== 1
+    || statusRules[0].parameters?.strict_required_status_checks_policy !== false) {
+    throw new Error('Frozen-head parallel-track integration requires explicit loose main-freshness policy; do not bypass strict protection');
+  }
+}
+
 export function assertPrerequisites(required, checks, statuses) {
   for (const { context: name, integration_id: app } of required) {
     if (name === integrationContext) continue;
@@ -92,6 +100,9 @@ export function checkCandidate(candidate, repo) {
   const current = currentCandidate(repo, candidate.pr);
   validateCandidate(candidate, current);
   if (process.env.GITHUB_EVENT_NAME === 'pull_request') assertRepositoryPrerequisites(repo, current);
+  if (current.defaultSha !== candidate.base) {
+    process.stdout.write('Default branch advanced during frozen-head CI; original head remains unchanged. No automatic PR branch rewrite or restart.\\n');
+  }
   return current;
 }
 

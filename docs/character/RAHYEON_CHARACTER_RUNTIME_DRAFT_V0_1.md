@@ -2,7 +2,8 @@
 
 # R0. INSTANCE HEADER
 
-> Status: RUNTIME DESIGN DRAFT
+> Status: SUPERSEDED HISTORICAL DRAFT — not current Rahyeon Runtime authority
+> Superseded By: `RAHYEON_CHARACTER_RUNTIME_DRAFT_V0_2.md` (approved Biography synchronized)
 > Document Type: CHARACTER RUNTIME INSTANCE
 > Character: 라현
 > Runtime Standard: Character Runtime Standard v1

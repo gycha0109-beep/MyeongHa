@@ -4,7 +4,7 @@ import {
   type ChatOpenResultV1,
 } from '@myeongha/api-client';
 import { useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 
 import {
   MobileMemberSessionErrorV1,
@@ -50,37 +50,45 @@ export function useMobileChatOpenV1() {
     }),
   );
 
+  const focused = useRef(false);
+  const requestEpoch = useRef(0);
+
+  const refreshAccess = useCallback(async () => {
+    const epoch = ++requestEpoch.current;
+    setState((current) => Object.freeze({
+      ...current,
+      access: 'checking' as const,
+      errorMessage: null,
+    }));
+    try {
+      const session = await nativeMobileRuntimeV1.memberSession.read();
+      if (focused.current && epoch === requestEpoch.current) {
+        setState(Object.freeze({
+          access: session === null ? 'guest' : 'member',
+          openingCharacterId: null,
+          errorMessage: null,
+        }));
+      }
+    } catch {
+      if (focused.current && epoch === requestEpoch.current) {
+        setState(Object.freeze({
+          access: 'error',
+          openingCharacterId: null,
+          errorMessage: '회원 상태를 확인하지 못했습니다.',
+        }));
+      }
+    }
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
-      let active = true;
-      setState((current) => Object.freeze({
-        ...current,
-        access: 'checking' as const,
-        errorMessage: null,
-      }));
-
-      void nativeMobileRuntimeV1.memberSession.read()
-        .then((session) => {
-          if (!active) return;
-          setState(Object.freeze({
-            access: session === null ? 'guest' : 'member',
-            openingCharacterId: null,
-            errorMessage: null,
-          }));
-        })
-        .catch(() => {
-          if (!active) return;
-          setState(Object.freeze({
-            access: 'error',
-            openingCharacterId: null,
-            errorMessage: '회원 상태를 확인하지 못했습니다.',
-          }));
-        });
-
+      focused.current = true;
+      void refreshAccess();
       return () => {
-        active = false;
+        focused.current = false;
+        requestEpoch.current += 1;
       };
-    }, []),
+    }, [refreshAccess]),
   );
 
   const openCharacter = useCallback(async (
@@ -117,5 +125,5 @@ export function useMobileChatOpenV1() {
     }
   }, []);
 
-  return Object.freeze({ state, openCharacter });
+  return Object.freeze({ state, openCharacter, refreshAccess });
 }

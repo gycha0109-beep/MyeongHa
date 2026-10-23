@@ -2,7 +2,7 @@ import { parseChatThreadIdV1 } from '@myeongha/api-client';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useRef } from 'react';
 import {
-  ImageBackground, KeyboardAvoidingView, Platform, Pressable,
+  ImageBackground, KeyboardAvoidingView, Platform, Pressable, RefreshControl,
   SafeAreaView, ScrollView, StyleSheet, Text, View,
 } from 'react-native';
 
@@ -14,6 +14,10 @@ import {
 } from '@/features/chat/ChatReadComponents';
 import { useMobileChatThreadV1 } from '@/features/chat/use-mobile-chat-thread';
 import { mobileColors } from '@/ui/mobile-colors';
+import { MobileUiText } from '@/ui/MobileUiText';
+import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
+import { useMobileTheme } from '@/ui/mobile-theme';
+import { useMobilePullRefreshV1 } from '@/ui/use-mobile-pull-refresh';
 
 const SEYEON_CHAT_THEME_BACKGROUND = require('../../../../assets/characters/chat-themes/seyeon-chat-theme-mobile-v1.webp');
 
@@ -27,8 +31,11 @@ function resolveThreadId(value: string | string[] | undefined): string | null {
 }
 
 function ValidChatThread({ threadId }: { threadId: string }) {
-  const { snapshot, loadMore, draft, setDraft, sending, sendStatus, send } =
+  const styles = useMobileThemedStyles(staticStyles);
+  const { theme, colors } = useMobileTheme();
+  const { snapshot, refresh, loadMore, draft, setDraft, sending, sendStatus, send } =
     useMobileChatThreadV1(threadId);
+  const { refreshing, onRefresh } = useMobilePullRefreshV1(refresh);
   const scrollRef = useRef<ScrollView>(null);
   const isSeyeonTheme = snapshot.characterId === 'seyeon';
 
@@ -42,16 +49,25 @@ function ValidChatThread({ threadId }: { threadId: string }) {
         style={styles.stream}
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
+        refreshControl={(
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => void onRefresh()}
+            enabled={!sending}
+            tintColor={colors.navy}
+            colors={[colors.navy]}
+          />
+        )}
         onContentSizeChange={() => {
           if (!snapshot.hasMore) scrollRef.current?.scrollToEnd({ animated: true });
         }}
       >
         <Pressable accessibilityRole="button" onPress={() => router.back()} style={styles.back}>
-          <Text style={styles.backText}>‹ 대화로 돌아가기</Text>
+          <MobileUiText style={styles.backText}>‹ 대화로 돌아가기</MobileUiText>
         </Pressable>
         <ChatReadHeader snapshot={snapshot} />
         <ChatReadMessages snapshot={snapshot} />
-        <ChatReadMore snapshot={snapshot} onLoadMore={() => void loadMore()} />
+        <ChatReadMore snapshot={snapshot} onLoadMore={() => void loadMore()} onRetry={() => void refresh()} />
       </ScrollView>
       <ChatComposer
         snapshot={snapshot}
@@ -73,7 +89,7 @@ function ValidChatThread({ threadId }: { threadId: string }) {
           style={styles.seyeonThemeBackground}
           imageStyle={styles.seyeonThemeImage}
         >
-          <View style={styles.seyeonThemeWash}>{threadContent}</View>
+          <View style={[styles.seyeonThemeWash, theme === 'dark' && styles.seyeonThemeWashDark]}>{threadContent}</View>
         </ImageBackground>
       ) : threadContent}
     </SafeAreaView>
@@ -81,6 +97,7 @@ function ValidChatThread({ threadId }: { threadId: string }) {
 }
 
 export default function ChatThreadScreen() {
+  const styles = useMobileThemedStyles(staticStyles);
   const { threadId: routeThreadId } = useLocalSearchParams<{ threadId?: string | string[] }>();
   const threadId = resolveThreadId(routeThreadId);
 
@@ -89,14 +106,14 @@ export default function ChatThreadScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.invalidContent}>
-        <Text style={styles.invalidTitle}>대화 링크를 확인할 수 없습니다</Text>
-        <Text style={styles.invalidBody}>올바른 기존 대화 링크로 다시 들어와 주세요.</Text>
+        <MobileUiText style={styles.invalidTitle}>대화 링크를 확인할 수 없습니다</MobileUiText>
+        <MobileUiText style={styles.invalidBody}>올바른 기존 대화 링크로 다시 들어와 주세요.</MobileUiText>
         <Pressable
           accessibilityRole="button"
           onPress={() => router.replace('/chat')}
           style={styles.invalidAction}
         >
-          <Text style={styles.invalidActionText}>대화로 돌아가기</Text>
+          <MobileUiText style={styles.invalidActionText}>대화로 돌아가기</MobileUiText>
         </Pressable>
       </View>
     </SafeAreaView>
@@ -109,9 +126,10 @@ const styles = StyleSheet.create({
   stream: { flex: 1 },
   seyeonThemeBackground: { flex: 1 },
   seyeonThemeImage: { opacity: 0.98 },
-  seyeonThemeWash: { flex: 1, backgroundColor: 'rgba(255, 249, 240, 0.18)' },
-  content: { paddingHorizontal: 20, paddingTop: 18, paddingBottom: 18, gap: 18 },
-  back: { alignSelf: 'flex-start', paddingVertical: 6 },
+  seyeonThemeWash: { flex: 1, backgroundColor: 'rgba(255, 249, 240, 0.25)' },
+  seyeonThemeWashDark: { backgroundColor: 'rgba(7, 15, 25, 0.66)' },
+  content: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 23, gap: 20 },
+  back: { alignSelf: 'flex-start', minHeight: 48, justifyContent: 'center', paddingHorizontal: 4 },
   backText: { color: mobileColors.navy, fontSize: 14, fontWeight: '800' },
   invalidContent: {
     flex: 1,
@@ -132,3 +150,4 @@ const styles = StyleSheet.create({
   },
   invalidActionText: { color: mobileColors.surface, fontSize: 14, fontWeight: '800' },
 });
+const staticStyles = styles;

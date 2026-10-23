@@ -1,4 +1,5 @@
 import { resolveReadingAvailabilityV1 } from '../reading/reading-availability.js';
+import { FortuneCookie } from './FortuneCookie.js';
 function currentMonthLabel(now: Date): string {
   const formatted = new Intl.DateTimeFormat('ko-KR', {
     year: 'numeric',
@@ -89,6 +90,7 @@ export function HomePage() {
           <a className="gm-recent-button" href="chat-hub.html"><span>대화 보기</span><span aria-hidden="true">→</span></a>
         </article>
       </section>
+      <FortuneCookie />
     </div>
   );
 }

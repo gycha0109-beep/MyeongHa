@@ -102,6 +102,27 @@ describe('Supabase Auth upstream deadline', () => {
     expect(observedSignal?.aborted).toBe(true);
   });
 
+  it('ends a stalled authentication fetch even when its transport ignores AbortSignal', async () => {
+    vi.useFakeTimers();
+    let signal: AbortSignal | undefined;
+    const fetchImpl = vi.fn((_input: string | URL | Request, init?: RequestInit) => {
+      signal = init?.signal ?? undefined;
+      return new Promise<Response>(() => undefined);
+    });
+    const pending = fetchSupabaseAuthWithDeadlineV1(
+      fetchImpl,
+      'https://example.supabase.co/auth/v1/user',
+      { method: 'GET' },
+      25,
+    );
+    const denied = expect(pending).rejects.toMatchObject({ name: 'AbortError' });
+
+    await vi.advanceTimersByTimeAsync(25);
+    await denied;
+    expect(signal?.aborted).toBe(true);
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
   it('rejects an invalid timeout before starting an upstream request', async () => {
     const fetchImpl = vi.fn();
 

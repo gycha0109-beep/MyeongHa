@@ -1,0 +1,107 @@
+name: Saju Bridge S3A Guard Tests
+run-name: "Saju Bridge S3A guarded executor PR tests (disposable only)"
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/saju-bridge-s3a-guarded-apply.yml'
+      - '.github/workflows/saju-bridge-s3a-guard-ci.yml'
+      - 'scripts/operations/saju-bridge-s3a-*'
+      - 'scripts/operations/run-saju-bridge-s3a-guarded-apply.sh'
+      - 'test/operations/saju_bridge_s3a_*'
+      - 'docs/SAJU_BRIDGE_S3A_GUARDED_MANUAL_APPLY_RUNBOOK_20261016.md'
+      - 'supabase/proposals/1730_saju_bridge_single_project_operator_permit_v1.sql'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  s3a-static-and-disposable-pg17:
+    name: S3A provenance deny cases and precommit rollback / disposable PG17
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17.6
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: s3a-test-only
+          POSTGRES_DB: myeongha_s3a_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d myeongha_s3a_ci"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+    env:
+      PGHOST: localhost
+      PGPORT: '5432'
+      PGUSER: postgres
+      PGPASSWORD: s3a-test-only
+      PGDATABASE: myeongha_s3a_ci
+    steps:
+      - name: Checkout exact repository PR
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Node 24
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Guard shell syntax and immutable SQL
+        run: |
+          set -euo pipefail
+          bash -n scripts/operations/run-saju-bridge-s3a-guarded-apply.sh
+          bash -n test/operations/saju_bridge_s3a_atomic_pg17.sh
+          bash -n test/operations/saju_bridge_s3a_nonsuper_pg17_guard.sh
+          bash -n test/operations/saju_bridge_s3a_privileged_pg17_control.sh
+          test "$(sha256sum supabase/proposals/1730_saju_bridge_single_project_operator_permit_v1.sql | awk '{print $1}')" = '900e0771915776b4a7c2a8b3cf60e24b83c79fcec14f27cf6356b44685b385e2'
+          test "$(git hash-object supabase/proposals/1730_saju_bridge_single_project_operator_permit_v1.sql)" = '42e076799d627bc9e19fe28e1ad25b4548e05e61'
+      - name: Validate provenance and actual libpq client TLS denial cases
+        run: node --test test/operations/saju_bridge_s3a_provenance.node-check.mjs test/operations/saju_bridge_s3a_client_tls.node-check.mjs
+      - name: Install PostgreSQL client
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+      - name: Exercise exact S3A bundle as PG17 superuser, then rollback every bridge object
+        env:
+          PGDATABASE: postgres
+        run: bash test/operations/saju_bridge_s3a_privileged_pg17_control.sh
+      - name: Apply only to disposable PG17 and verify failing ACL assertion rolls back
+        run: bash test/operations/saju_bridge_s3a_atomic_pg17.sh
+
+  s3a-postgres17-nonsuperuser-auto-admin:
+    name: S3A non-superuser CREATEROLE auto-ADMIN and pre-DDL HOLD / disposable PG17
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17.6
+        env:
+          POSTGRES_USER: ci_root
+          POSTGRES_HOST_AUTH_METHOD: trust
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U ci_root -d postgres"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+    env:
+      PGHOST: localhost
+      PGPORT: '5432'
+      PGUSER: ci_root
+      PGDATABASE: postgres
+    steps:
+      - name: Checkout exact repository PR
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: PostgreSQL client
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+      - name: Reproduce bootstrap automatic ADMIN grant and prove fail-before-DDL
+        run: bash test/operations/saju_bridge_s3a_nonsuper_pg17_guard.sh

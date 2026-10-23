@@ -47,11 +47,13 @@ import {
 import {
   createSeyeonProductionGovernanceV1,
 } from './seyeon-production-governance-v1.js';
+import { assertSeyeonPositiveProjectorsNotEnabledV1 } from './seyeon-positive-projector-admission-hold-v1.js';
 import {
   createSeyeonProductionRuntimeIdPortV1,
 } from './seyeon-production-runtime-ids-v1.js';
 import {
   createSeyeonProductionSubjectTransactionRunnerV1,
+  type SeyeonProductionSubjectTransactionRunnerV1,
 } from './seyeon-production-subject-transaction-v1.js';
 import {
   createSeyeonGovernedCostTransactionRunnerV1,
@@ -73,6 +75,44 @@ import {
 import type {
   VerifiedSubjectIdentityEvidenceV1,
 } from './subject-identity-resolver.js';
+
+/** Missing immutable pre-model Pin must never fall back to legacy context-ready. */
+export class SeyeonProductionPinMigrationRequiredV1 extends Error {
+  readonly code = 'SEYEON_PIN_MIGRATION_REQUIRED' as const;
+  constructor() {
+    super('Required secure Se-yeon Chat Pin migration is unavailable in this database.');
+    this.name = 'SeyeonProductionPinMigrationRequiredV1';
+  }
+}
+
+/** Owner/ACL readiness under the existing canonical Member Subject transaction. */
+export async function assertSeyeonProductionPinReadinessV1(
+  runner: SeyeonProductionSubjectTransactionRunnerV1,
+  canonicalSubjectId: string,
+): Promise<void> {
+  const result = await runner.run(canonicalSubjectId, (client) =>
+    client.query<{ ready: boolean }>(`
+      select
+        to_regprocedure(
+          'public.cmd_mark_seyeon_chat_context_ready_pinned_v1(uuid,uuid,uuid,jsonb)'
+        ) is not null
+        and coalesce((
+          select has_function_privilege(
+            'myeongha_api_executor',
+            p.oid,
+            'EXECUTE'
+          )
+          from pg_catalog.pg_proc p
+          where p.oid = to_regprocedure(
+            'public.cmd_mark_seyeon_chat_context_ready_pinned_v1(uuid,uuid,uuid,jsonb)'
+          )
+        ),false) as "ready"
+    `),
+  );
+  if (result.rows.length !== 1 || result.rows[0]?.ready !== true) {
+    throw new SeyeonProductionPinMigrationRequiredV1();
+  }
+}
 
 export const PRODUCTION_SEYEON_CHAT_RUNTIME_VERSION_V1 =
   'production-seyeon-chat-runtime-v1' as const;
@@ -205,6 +245,15 @@ async function runSeyeonTurnRuntimePhaseV1<T>(
     const sqlState = typeof rawCode === 'string' && /^[A-Z0-9]{5}$/u.test(rawCode)
       ? rawCode
       : null;
+    // PostgreSQL constraint is server-defined; emit only narrowly shaped
+    // identifiers. Never log raw exception text, SQL detail, or user Chat content.
+    const rawConstraint =
+      typeof error === 'object' && error !== null && 'constraint' in error
+        ? (error as { constraint?: unknown }).constraint : null;
+    const sqlConstraint =
+      typeof rawConstraint === 'string' &&
+      /^(?:cmd_|seyeon_)[a-z0-9_]{1,95}$/u.test(rawConstraint)
+        ? rawConstraint : null;
     const runtimeStage =
       error instanceof SeyeonCharacterRuntimeErrorV2 ? error.stage : null;
     const providerCause =
@@ -219,6 +268,7 @@ async function runSeyeonTurnRuntimePhaseV1<T>(
         stage,
         errorName: error instanceof Error ? error.name : 'UnknownError',
         sqlState,
+        sqlConstraint,
         runtimeStage,
         providerFailureCode: providerCause?.code ?? null,
         providerHttpStatus: providerCause?.httpStatus ?? null,
@@ -238,6 +288,9 @@ async function runSeyeonTurnRuntimePhaseV1<T>(
 export function createProductionSeyeonChatRuntimeV1(
   input: CreateProductionSeyeonChatRuntimeInputV1,
 ): ProductionSeyeonChatRuntimeV1 {
+  // Never initialize a Production Provider/DB runtime with a positive
+  // Projector while G0/G1/SRC-25 and atomic Commit are unapproved.
+  assertSeyeonPositiveProjectorsNotEnabledV1();
   if (input.costGovernorForRole !== undefined &&
       input.provider !== undefined) {
     throw new Error('Governed chat requires native, fully metered Provider config.');
@@ -283,6 +336,9 @@ export function createProductionSeyeonChatRuntimeV1(
     async run(
       runInput: RunProductionSeyeonChatInputV1,
     ): Promise<RunProductionSeyeonChatResultV1> {
+      // Recheck before Subject resolution: no new positive projector can
+      // silently ride an existing Production runtime instance.
+      assertSeyeonPositiveProjectorsNotEnabledV1();
       const threadId = text(runInput.threadId, 'threadId', 256);
       const clientTurnId = text(
         runInput.clientTurnId,
@@ -300,6 +356,9 @@ export function createProductionSeyeonChatRuntimeV1(
         'subject_resolution',
         () => runner.resolveSubject(),
       );
+      // Prior to durable receive/attempt creation: fail closed when Production
+      // has not applied the 1640 immutable zero-source Pin and executor ACL.
+      await assertSeyeonProductionPinReadinessV1(runner, resolvedSubject.subjectId);
       // The main Subject Runner remains responsible for Chat/Outbox writes.
       // Governed Start and Settle use a different DB LOGIN + role only.
       const costRunner = costPoolLease === null
@@ -442,6 +501,7 @@ export function createProductionSeyeonChatRuntimeV1(
           rendererProvider: meteredRenderer,
           semanticReviewerProvider: meteredReviewer,
           persistencePort: meteredChatPersistence,
+          positivePersonalSourcePort: ports.positivePersonalSource,
           executionIdPort: idPort,
           postTurn: Object.freeze({
             ledger,

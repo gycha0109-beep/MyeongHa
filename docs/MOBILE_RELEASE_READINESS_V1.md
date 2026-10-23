@@ -1,7 +1,7 @@
 # Mobile Release Readiness v1
 
 > Track: `applizing`  
-> Status: **M11-A4 IMPLEMENTED / ANDROID PHYSICAL-SMOKE BUILD VERIFIED / SIGNING EXTERNAL**  
+> Status: **M11-A4 IMPLEMENTED / DEBUG APK HISTORY VERIFIED / STANDALONE PHYSICAL DEVICE ACCEPTANCE PENDING / SIGNING EXTERNAL**  
 > Date: **2026-10-03**
 
 ## Production API origin guard
@@ -87,14 +87,27 @@ Credentials      withoutCredentials=true
 Store submit     false
 ```
 
-The build completed successfully and produced an installable Android application
-archive. This proves the repository can reach a native Android artifact without
-opening production keystore or store-submission authority.
+That 2026-10-03 artifact was an **assembleDebug** historical build, not an
+offline-installable standalone release APK. A historical Actions job rerun on
+2026-10-14 checked out stale commit `9013fe48` and built another debug APK.
+The Android physical-device report on 2026-10-15 shows
+`Unable to load script / LoadJSBundleFromAssets` (Metro unavailable or JS
+bundle absent). Neither the old build PASS nor a GitHub rerun proves a
+standalone, embedded-bundle APK works on a real phone.
+
+The current `main` EAS `physical-smoke` profile already pins
+`:app:assembleRelease`. The follow-up fix rejects stale job reruns before
+EAS submission; it verifies non-debuggable APK metadata, ZIP integrity and
+a nonempty embedded `assets/index.android.bundle` **before** upload, and
+records the exact Git SHA and APK digest. A new workflow on current main,
+NOT a rerun of the old successful job, is mandatory. The merge-triggered
+fresh workflow's APK validation and actual on-phone launch must both pass
+before standalone acceptance may be recorded.
 
 The remaining release-readiness evidence is physical-device smoke:
 
 1. install the successful Android artifact on a physical device;
-2. launch the app with its debug runtime requirements satisfied;
+2. launch the newly verified release-variant APK with Metro, USB and PC all disconnected;
 3. explicitly enable Push from My;
 4. verify Device Installation registration;
 5. relaunch and verify no-prompt refresh;

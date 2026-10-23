@@ -1,10 +1,12 @@
+import { resolveCharacterDisplayNameV1 } from './character-display-locale.js';
+import { getUiLocale, translateStaticUi } from './ui-i18n.js';
 import { READER_PRESENTATIONS } from './reader-presentation-catalog.js';
 
 // Shared presentation only. Product availability and any paid/server authority
 // remain owned by each caller; this component cannot grant Reader access.
 export function createDelegatePicker({
   titleId,
-  titleText = '어떤 대리자와 함께 볼까요?',
+  titleText = '어떤 연결자와 함께 볼까요?',
   description,
   targetLabel,
   note,
@@ -20,7 +22,7 @@ export function createDelegatePicker({
   const close = document.createElement('button');
   close.className = 'reading-reader-picker-close';
   close.type = 'button';
-  close.setAttribute('aria-label', '대리자 선택 닫기');
+  close.setAttribute('aria-label', '연결자 선택 닫기');
   close.textContent = '×';
 
   const intro = document.createElement('div');
@@ -28,7 +30,7 @@ export function createDelegatePicker({
 
   const kicker = document.createElement('span');
   kicker.className = 'reading-reader-picker-kicker';
-  kicker.textContent = '대리자';
+  kicker.textContent = '연결자';
 
   const heading = document.createElement('h2');
   heading.id = titleId;
@@ -48,28 +50,27 @@ export function createDelegatePicker({
   const search = document.createElement('input');
   search.className = 'reading-reader-picker-search';
   search.type = 'search';
-  search.setAttribute('aria-label', '대리자 검색');
-  search.placeholder = '이름이나 설명으로 대리자 찾기';
+  search.setAttribute('aria-label', '연결자 검색');
+  search.placeholder = '이름이나 설명으로 연결자 찾기';
   tools.append(search);
 
   const grid = document.createElement('div');
   grid.className = 'reading-reader-picker-grid';
   grid.setAttribute('role', 'list');
 
+  const localePainters = [];
   for (const reader of READER_PRESENTATIONS) {
     const optionState = resolveOption(reader);
     const button = document.createElement('button');
     button.className = 'reading-reader-option';
     button.type = 'button';
     button.dataset.readerKey = reader.key;
-    button.dataset.readerSearch = [reader.name, reader.title, reader.tone]
-      .join(' ').toLocaleLowerCase('ko-KR');
+    // Reader names are presentation-only; search aliases are populated by paintLocale.
     if (optionState.stage) button.dataset.readerRolloutState = optionState.stage;
     button.disabled = optionState.selectable === false;
     if (button.disabled) button.classList.add('is-unavailable');
     button.setAttribute('role', 'listitem');
-    button.setAttribute('aria-label', optionState.ariaLabel ||
-      (button.disabled ? reader.name + ' 대리자 준비 중' : reader.name + ' 선택'));
+    // The label is localized with the name below, while availability is unchanged.
 
     const art = document.createElement('span');
     art.className = 'reading-reader-option-art';
@@ -96,16 +97,34 @@ export function createDelegatePicker({
 
     const action = document.createElement('span');
     action.className = 'reading-reader-option-action';
-    action.textContent = optionState.action || '이 대리자와 보기 →';
+    action.textContent = optionState.action || '이 연결자와 보기 →';
     body.append(nameRow, tone, action);
     button.append(art, body);
     grid.append(button);
+    const paintLocale = () => {
+      const locale = getUiLocale();
+      const readerName = resolveCharacterDisplayNameV1(reader.key, locale) ?? reader.name;
+      const translatedTitle = translateStaticUi(optionState.title ?? reader.title, locale);
+      const translatedTone = translateStaticUi(optionState.tone ?? reader.tone, locale);
+      const translatedAction = translateStaticUi(optionState.action || '이 연결자와 보기 →', locale);
+      name.textContent = readerName;
+      subtitle.textContent = translatedTitle;
+      tone.textContent = translatedTone;
+      action.textContent = translatedAction;
+      button.dataset.readerSearch = [reader.name, readerName, reader.title,
+        translatedTitle, reader.tone, translatedTone].join(' ').toLocaleLowerCase(locale);
+      button.setAttribute('aria-label',
+        locale === 'ko-KR' && optionState.ariaLabel
+          ? optionState.ariaLabel : readerName + ' · ' + translatedAction);
+    };
+    paintLocale();
+    localePainters.push(paintLocale);
   }
 
   const empty = document.createElement('p');
   empty.className = 'reading-reader-picker-empty';
   empty.hidden = true;
-  empty.textContent = '검색과 일치하는 대리자가 없습니다.';
+  empty.textContent = '검색과 일치하는 연결자가 없습니다.';
 
   const footnote = document.createElement('p');
   footnote.className = 'reading-reader-picker-note';
@@ -127,6 +146,10 @@ export function createDelegatePicker({
     empty.hidden = count > 0;
   };
 
+  document.addEventListener('myeongha:localechange', () => {
+    for (const paintLocale of localePainters) paintLocale();
+    filter();
+  });
   search.addEventListener('input', filter);
   close.addEventListener('click', () => dialog.close('close'));
   dialog.addEventListener('click', (event) => {

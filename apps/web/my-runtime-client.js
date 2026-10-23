@@ -1,3 +1,4 @@
+import { getUiLocaleRequestHeadersV1 } from './ui-i18n.js';
 import { unwrapApiSuccessEnvelope, WebApiEnvelopeError } from './api-envelope.js';
 import { getActiveBearer, invalidateGuestSession, invalidateMemberSession } from './product-auth.js';
 
@@ -132,6 +133,7 @@ async function readAuthorizedJson({
       method: 'GET',
       headers: {
         Accept: 'application/json',
+        ...getUiLocaleRequestHeadersV1(),
         Authorization: `Bearer ${activeBearer.token}`,
       },
       credentials: 'same-origin',

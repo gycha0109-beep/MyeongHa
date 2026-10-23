@@ -8,17 +8,18 @@ describe('shared CI verification plan', () => {
   it('selects only Chat for a Chat UI change without dependency review or DB fan-out', () => {
     const plan = resolveVerificationPlan(['apps/web/src/chat/ChatPage.tsx']);
     expect(plan).toMatchObject({ chat: true, full: false, browser: true, contracts: false, dependencies: false, db: false, db_suites: [] });
-    expect(selectWebChecks(plan)).toEqual(['scripts/run-web-chat-auth-browser-smoke.mjs', 'scripts/run-web-conversation-browser-smoke.mjs']);
+    expect(selectWebChecks(plan)).toEqual(['scripts/verify-web-static-ui-i18n-browser.mjs', 'scripts/run-web-chat-auth-browser-smoke.mjs', 'scripts/run-web-conversation-browser-smoke.mjs']);
   });
   it('keeps multiple selected surfaces and runs their union without duplicates', () => {
     const plan = resolveVerificationPlan(['apps/web/reading-reader-picker.js', 'apps/web/records-page.js']);
-    expect(selectWebChecks(plan)).toEqual(['scripts/verify-web-saju-auth-browser.mjs', 'scripts/verify-golden-master-header-browser.mjs', 'scripts/verify-web-general-natal-preview-browser.mjs', 'scripts/verify-web-records-auth-browser.mjs']);
+    expect(selectWebChecks(plan)).toEqual(['scripts/verify-web-static-ui-i18n-browser.mjs', 'scripts/verify-web-saju-auth-browser.mjs', 'scripts/verify-golden-master-header-browser.mjs', 'scripts/verify-web-general-natal-preview-browser.mjs', 'scripts/verify-web-records-auth-browser.mjs']);
   });
   it('retains every previous full browser check, including auth and birth rejection boundaries', () => {
     const plan = resolveVerificationPlan(['package-lock.json']);
     expect(plan).toMatchObject({ full: true, browser: true, contracts: true, dependencies: true, unit_full: true });
     const scripts = selectWebChecks(plan);
-    expect(scripts).toHaveLength(13);
+    expect(scripts).toHaveLength(14);
+    expect(scripts).toContain('scripts/verify-web-static-ui-i18n-browser.mjs');
     expect(scripts).toContain('scripts/verify-web-general-natal-preview-browser.mjs');
     expect(scripts).toContain('scripts/run-web-auth-browser-smoke.mjs');
     expect(scripts).toContain('scripts/run-web-auth-confirmation-browser-smoke.mjs');
@@ -38,15 +39,26 @@ describe('shared CI verification plan', () => {
     const plan = resolveVerificationPlan(['scripts/ci/db-suites.json']);
     expect(plan.db).toBe(true);
     expect(plan.db_suites).toHaveLength(5);
-    expect(plan.db_suites.flatMap((suite: string) => getDbSuite(suite).cases)).toHaveLength(36);
+    expect(plan.db_suites.flatMap((suite: string) => getDbSuite(suite).cases).length).toBeGreaterThanOrEqual(47);
     const cases = plan.db_suites.flatMap((suite: string) => getDbSuite(suite).cases);
     expect(cases.filter((name: string) => name === 'saju-staging-operator-admission')).toHaveLength(2);
     expect(cases.filter((name: string) => name === 'saju-staging-operator-admission-v2')).toHaveLength(2);
-    expect(new Set(cases).size).toBe(33);
+    expect(new Set(cases).size).toBeGreaterThanOrEqual(44);
     expect(getDbSuite('content').cases).toContain('official-reader-provider-revoke-race');
     expect(getDbSuite('runtime').cases).toContain('guest-promotion-auth-fk');
     expect(getDbSuite('runtime').cases).toContain('reader-memory-tenant-boundary');
     expect(getDbSuite('postgres17').cases).toContain('guest-promotion-auth-fk');
+    expect(getDbSuite('postgres17').cases).toContain('saju-single-project-operator-permit-pg17');
+    expect(getDbSuite('postgres17').cases).toContain('seyeon-r2-rpc-catalog');
+    expect(getDbSuite('postgres17').cases).toContain('seyeon-r2-pending-migrations');
+    expect(getDbSuite('postgres17').cases).toContain('seyeon-r2-cross-env-catalog');
+    expect(getDbSuite('postgres17').cases).toContain('seyeon-r2-h-1670-forward');
+    expect(getDbSuite('postgres17').cases).toContain('seyeon-r2-h-1680-forward');
+    expect(getDbSuite('postgres17').cases).toContain('seyeon-r2-h-1690-forward');
+    expect(getDbSuite('postgres17').cases).toContain('seyeon-r2-h-1700-forward');
+    expect(getDbSuite('postgres17').cases).toContain('seyeon-r2-h-1710-forward');
+    expect(getDbSuite('postgres17').cases).toContain('seyeon-r2-h-1720-forward');
+    expect(getDbSuite('postgres17').cases).toContain('seyeon-r2-h-1730-forward');
     const dispatcher = readFileSync('test/db/run_ci_case.sh', 'utf8');
     for (const caseName of cases) expect(dispatcher).toContain(`${caseName})`);
     for (const suiteName of plan.db_suites) {

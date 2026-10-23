@@ -1,3 +1,5 @@
+> **2026-10-16 실행 우선순위:** [개정 로드맵 v2](../operations/SEYEON_AI_SECURITY_EXECUTION_ROADMAP_V2_20261016.md). 이 문서는 G0~G6 판정·권한 계약의 정본이며, 로드맵은 S1 개인정보 0건 후보 방어부터 G1/G2/G3 실제 서비스 연결을 진행한다. R2-G 역사 실행자 조사는 위험 수용으로 종료했지만, 운영 배포·DR·paid/public 승인은 별개다.
+
 # 명하 세연 AI 보안 트랙 — 완료 판정·증거 계약 v1
 
 Watchtower-Track: security
@@ -25,6 +27,8 @@ AI 경량 보안 정책 평가: [#1816](https://github.com/gycha0109-beep/Myeong
 | G4 AI Governor | 서버 승인 비용/모델/역할 계약, 레거시 DB EXECUTE·Provider 우회 제거 | 독립 DB 세션 예산 경합, 중복 정산·크래시·direct RPC 차단·운영 정책 | Character + DB + Security | **IN PROGRESS / HOLD** |
 | G5 통합 검증 | 실제 DB·HTTP·AI 제어 경로, 정확한 HEAD CI·Governance·전체 Integration | 권한/유출/무단 유료 호출 핵심 0, PostgreSQL 2세션 race 모두 PASS | Security + QA | **HOLD** |
 | G6 운영 승인 | 제한적 synthetic + 내부 smoke, privacy-safe 관측·경보·복구·권한/배포 승인 | 승인자·범위·증거 URL·본번 main sha·rollback 기준·잔여 위험 명시 | Integration Owner | **HOLD** |
+
+> **S2 G0 정책 초안**: [동의 취소·재승인·과거 대화 출처·Reveal 선형화 후보 v1](SEYEON_G0_REVOKE_REGRANT_REVEAL_POLICY_CANDIDATE_V1.md). Shadow-only 검증은 결함 재현 및 설계 증거이며 G0 승인/G2 원자 Commit/G3 HTTP 공개 PASS가 아니다.
 
 ## G0 결정이 필요한 구체적 권한 계약
 

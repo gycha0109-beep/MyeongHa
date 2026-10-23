@@ -434,4 +434,70 @@ describe('Character Output Guard', () => {
     expect(envelope.protectedSajuDisclosures).toEqual([]);
     expect(envelope.calculationAmbiguity).toEqual([]);
   });
+  it.each([
+    ['사주가 사업 실패를 확정했습니다.', true],
+    ['운세가 당신의 결혼을 보장합니다.', true],
+    ['명식에서 당신은 반드시 합격할 겁니다.', true],
+    ['사용자가 취업에 실패했다고 말했습니다.', false],
+    ['사주는 미래를 보장하지 않습니다.', false],
+    ['오늘 어떤 일이 가장 마음에 걸리세요?', false],
+  ] as const)('treats unsupported Saju certainty as non-authoritative: %s', (framing, blocked) => {
+    const invoke = () => guardCharacterRendererOutput({
+      rawOutput: {
+        ...validDraft(),
+        framingBefore: framing,
+      },
+      context: runtimeContext(false),
+      allowedSuggestedActionKeys: ['open_records'],
+    });
+    if (blocked) {
+      expect(invoke).toThrow(/unsupported authoritative Saju certainty/u);
+    } else {
+      expect(invoke().framingBefore).toBe(framing);
+    }
+  });
+
+  it.each([
+    ['zero-width space', '정상\u200b위조'],
+    ['zero-width left-to-right mark', '정상\u200e위조'],
+    ['bidirectional override', '정상\u202e위조'],
+    ['bidirectional isolate', '정상\u2066위조'],
+    ['hidden word joiner', '정상\u2060위조'],
+    ['NUL character', '정상\u0000위조'],
+    ['embedded BOM', '정상\ufeff위조'],
+  ])('refuses provider framing with %s, preserving source-only material', (_name, framing) => {
+    for (const context of [runtimeContext(false), runtimeContext(true)]) {
+      expect(() => guardCharacterRendererOutput({
+        rawOutput: { ...validDraft(), framingAfter: framing },
+        context,
+        allowedSuggestedActionKeys: ['open_records'],
+      })).toThrow(/unsafe invisible control characters/u);
+    }
+  });
+
+  it.each([
+    '대화에서 줄바꿈\n두 번째 줄을 허용해요.',
+    '이모지 가족: 👨‍👩‍👧‍👦',
+    '서식에 쓰이는\t탭은 허용해요.',
+  ])('retains ordinary multiline and emoji chat without injecting Saju', framing => {
+    const envelope = guardCharacterRendererOutput({
+      rawOutput: { ...validDraft(), framingBefore: framing },
+      context: runtimeContext(false),
+      allowedSuggestedActionKeys: ['open_records'],
+    });
+    expect(envelope.framingBefore).toBe(framing);
+    expect(envelope.protectedSajuSegments).toEqual([]);
+  });
+
+  it('also refuses unsupported Saju certainty beside otherwise protected source', () => {
+    expect(() => guardCharacterRendererOutput({
+      rawOutput: {
+        ...validDraft(),
+        framingAfter: '사주가 당신의 재물 성공을 확정합니다.',
+      },
+      context: runtimeContext(true),
+      allowedSuggestedActionKeys: ['open_records'],
+    })).toThrow(/unsupported authoritative Saju certainty/u);
+  });
+
 });

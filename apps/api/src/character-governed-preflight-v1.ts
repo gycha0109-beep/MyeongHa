@@ -14,6 +14,7 @@ import {
   runCharacterDisclosurePreflightV2,
   type CharacterDisclosureFactAuthorityResolverPortV2,
   type CharacterDisclosurePreflightResultV2,
+  type CharacterDisclosureTopicClassificationV2,
   type CharacterDisclosureSourceDescriptorPortV2,
   type CharacterDisclosureTopicClassifierPortV2,
   type CharacterPrivateSourceRetrieverPortV2,
@@ -34,6 +35,14 @@ export async function runCharacterGovernedPreflightV1(input: {
   readonly userMessageRef: string;
   readonly userText: string;
   readonly relationship: CharacterDisclosureRelationshipEvidenceV2;
+  /** Production-only check before sensitive source descriptor and fact lookup. */
+  readonly beforeSourceDescriptorRead?: (
+    classification: CharacterDisclosureTopicClassificationV2,
+  ) => unknown;
+  /** Production-only zero-authority check before a private DB/Content read. */
+  readonly beforePrivateSourceRetrieval?: (
+    preflight: CharacterDisclosurePreflightResultV2,
+  ) => unknown;
   readonly integrity: Readonly<{
     readonly classifier: CharacterIntegrityClaimClassifierPortV1;
     readonly authorityResolver: CharacterIntegrityAuthorityResolverPortV1;
@@ -62,8 +71,15 @@ export async function runCharacterGovernedPreflightV1(input: {
     classifier: input.disclosure.classifier,
     sourceDescriptor: input.disclosure.sourceDescriptor,
     factAuthorityResolver: input.disclosure.factAuthorityResolver,
+    ...(input.beforeSourceDescriptorRead === undefined
+      ? {}
+      : { beforeSourceDescriptorRead: input.beforeSourceDescriptorRead }),
   }),
   ]);
+
+  if (input.beforePrivateSourceRetrieval !== undefined) {
+    await input.beforePrivateSourceRetrieval(disclosure);
+  }
 
   const retrievedPrivateSources = await retrieveAllowedCharacterDisclosureSourcesV2({
     preflight: disclosure,

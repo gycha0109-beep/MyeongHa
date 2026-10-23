@@ -1,3 +1,6 @@
+import { SEYEON_C08S_ORDINARY_GOLD_IDS_V1 as REVIEW_IDS }
+ from './seyeon-c08s-blinded-first-turn-evaluation-v1.mjs';
+
 /**
  * Synthetic benchmark accounting only. No content, memory, identity, or prompts
  * are accepted into the evidence schema. A PASS means server guards admitted
@@ -5,7 +8,7 @@
  */
 export const SEYEON_DIALOGUE_PATH_CASE_IDS_V1 = Object.freeze([
   'N01', 'N02', 'N03', 'N04', 'N05', 'N06', 'N09', 'N10',
-  'N19', 'N22', 'X01', 'X02', 'X03', 'X04', 'X05', 'X06',
+  'N14', 'N16', 'N17', 'N18', 'X01', 'X02', 'X03', 'X04',
 ]);
 /** These are fictional, no-claim, first-contact prompts. They do not join the 100-case classifier gold set. */
 export const SEYEON_DIALOGUE_PATH_ADDITIONAL_CASES_V1 = Object.freeze([
@@ -33,7 +36,8 @@ export function selectSeyeonDialoguePathCasesV1(allCases) {
   const result = SEYEON_DIALOGUE_PATH_CASE_IDS_V1.map((id) => {
     const matches = available.filter((value) => value.id === id);
     if (matches.length !== 1 ||
-      matches[0].topic !== null || matches[0].noClaims !== true ||
+      matches[0].topic !== null ||
+      (matches[0].noClaims !== true && !REVIEW_IDS.includes(id)) ||
       typeof matches[0].text !== 'string' || matches[0].text.length > 160) {
       throw new TypeError('Fixture not eligible or changed: ' + id);
     }
@@ -62,7 +66,44 @@ export function percentileSeyeonDialoguePathV1(values, fraction) {
   return sorted[Math.ceil(sorted.length * fraction) - 1];
 }
 
-export function summarizeSeyeonDialoguePathV1(rows, totalCases) {
+/**
+ * Hard prerequisite for counting a completed 5→3 end-to-end sample.
+ * An equal number of provider requests is insufficient: the real
+ * server stages must each execute exactly once, with no unclassified
+ * or duplicate/fallback model dispatch.
+ */
+export const SEYEON_DIALOGUE_PATH_EXPECTED_STAGE_COUNTS_V1 = Object.freeze({
+  legacy_5_terra: Object.freeze({
+    integrity_classification: 1,
+    disclosure_classification: 1,
+    turn_interpretation: 1,
+    dialogue_render: 1,
+    semantic_review: 1,
+  }),
+  fast_3_luna_terra: Object.freeze({
+    unified_preflight_shadow: 1,
+    turn_interpret_render_shadow: 1,
+    semantic_review: 1,
+  }),
+});
+
+export function verifySeyeonDialoguePathStageTopologyV1(route, counts) {
+  const expected = SEYEON_DIALOGUE_PATH_EXPECTED_STAGE_COUNTS_V1[route];
+  if (!expected || !counts || typeof counts !== 'object' ||
+      Array.isArray(counts)) return false;
+  const keys = Object.keys(counts);
+  return keys.length === Object.keys(expected).length &&
+    keys.every(key => Object.hasOwn(expected, key) && counts[key] === expected[key]);
+}
+
+export function summarizeSeyeonDialoguePathV1(rows, expectedCaseIds) {
+  if (!Array.isArray(rows) || !Array.isArray(expectedCaseIds) ||
+      expectedCaseIds.length === 0 ||
+      expectedCaseIds.some(id => typeof id !== 'string' || id.length === 0) ||
+      new Set(expectedCaseIds).size !== expectedCaseIds.length) {
+    throw new TypeError('Invalid expected paired case IDs.');
+  }
+  const expectedIds = new Set(expectedCaseIds);
   const routes = Object.fromEntries(SEYEON_DIALOGUE_PATH_ROUTES_V1.map(route => {
     const items = rows.filter(row => row.route === route);
     const success = items.filter(row => row.outcome === 'admitted');
@@ -73,7 +114,14 @@ export function summarizeSeyeonDialoguePathV1(rows, totalCases) {
       code: row.errorCode,
     }));
     const expectedCalls = route === 'legacy_5_terra' ? 5 : 3;
-    const gateVerdict = items.length === totalCases && success.length === totalCases &&
+    // Counts alone could mark a duplicate case as PASS while omitting another.
+    // Both routes must cover the exact, unique, preselected case identities.
+    const actualIds = items.map(row => row.id);
+    const exactCoverage = items.length === expectedCaseIds.length &&
+      new Set(actualIds).size === expectedCaseIds.length &&
+      actualIds.every(id => expectedIds.has(id));
+    const gateVerdict = exactCoverage &&
+      success.length === expectedCaseIds.length &&
       items.every(row => row.calls === expectedCalls) ? 'GUARD_SAMPLE_PASS' : 'HOLD';
     return [route, {
       gateVerdict,
@@ -87,7 +135,9 @@ export function summarizeSeyeonDialoguePathV1(rows, totalCases) {
       failureCases: errorIds,
     }];
   }));
-  const complete = SEYEON_DIALOGUE_PATH_ROUTES_V1.every(route =>
+  const noUnaccountedRoutes = rows.length ===
+    expectedCaseIds.length * SEYEON_DIALOGUE_PATH_ROUTES_V1.length;
+  const complete = noUnaccountedRoutes && SEYEON_DIALOGUE_PATH_ROUTES_V1.every(route =>
     routes[route].gateVerdict === 'GUARD_SAMPLE_PASS');
   return Object.freeze({
     scope: 'SYNTHETIC_PUBLIC_FIRST_CONTACT_GUARD_ACCEPTANCE_ONLY',
@@ -95,5 +145,38 @@ export function summarizeSeyeonDialoguePathV1(rows, totalCases) {
     characterVoiceQualityVerified: false,
     verdict: complete ? 'GUARD_SAMPLE_PASS' : 'HOLD',
     routes,
+  });
+}
+
+/**
+ * C08-B synthetic-only first-turn census for the actual 5-vs-3 benchmark.
+ * This never queries PostgreSQL and is not a real first-turn authority.
+ * The candidate must read once before unified preflight and three more times
+ * around dialogue/semantic review, including the final post-review read.
+ */
+export function createSeyeonDialoguePathSyntheticCensusV1(caseId, userMessageId) {
+  if (!SEYEON_DIALOGUE_PATH_CASE_IDS_V1.includes(caseId) ||
+      userMessageId !== 'synthetic:' + caseId)
+    throw new TypeError('Synthetic census restricted to fixed first-contact cases.');
+  let readCount = 0;
+  const subjectId = 'synthetic-subject:' + caseId;
+  const threadId = 'synthetic-thread:' + caseId;
+  return Object.freeze({
+    port: Object.freeze({
+      subjectId, threadId,
+      readFullThreadCensus(input) {
+        if (input?.subjectId !== subjectId ||
+            input?.threadId !== threadId ||
+            input?.currentUserMessageId !== userMessageId || readCount >= 4)
+          throw new TypeError('Synthetic first-turn identity/census mismatch.');
+        readCount++;
+        return Object.freeze({
+          schemaVersion: 'seyeon-first-turn-census-shadow-v1',
+          subjectId, threadId, currentUserMessageId: userMessageId,
+          messageCount: 1, latestSenderType: 'user', complete: true,
+        });
+      },
+    }),
+    get readCount() { return readCount; },
   });
 }

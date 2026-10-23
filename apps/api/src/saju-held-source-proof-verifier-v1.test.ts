@@ -178,6 +178,48 @@ describe('2B-3C-3 MyeongHa source proof verification, Preview HOLD only', () => 
 });
 
 
+describe('2B-3C-3 Saju Owner v2 replay principal/key contract', () => {
+  it('uses the exact tuple digest and separates colon-colliding principals and key rotations', async () => {
+    const seen = new Set<string>();
+    const claimNonceOnce = vi.fn(async (key: string) => {
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+    const principalCombos = [
+      { issuer: 'saju:one', audience: 'api', keyId: 'preview-key-v1' },
+      { issuer: 'saju', audience: 'one:api', keyId: 'preview-key-v1' },
+      { issuer: 'saju:one', audience: 'api', keyId: 'preview-key-v2' },
+    ];
+    for (const item of principalCombos) {
+      const signed = envelope();
+      signed.proof.payload.issuer = item.issuer;
+      signed.proof.payload.audience = item.audience;
+      signed.proof.payload.keyId = item.keyId;
+      signed.proof.signatureHex = createHmac('sha256', keyBytes)
+        .update(DOMAIN).update(hash(signed.proof.payload)).digest('hex');
+      const verifierTrust: SajuHeldSourceProofVerifierTrustV1 = {
+        ...trust(),
+        trustedIssuer: item.issuer,
+        expectedAudience: item.audience,
+        trustedKeyId: item.keyId,
+        claimNonceOnce,
+      };
+      const result = await verifySajuHeldSourceProofV1(signed, verifierTrust, context());
+      expect(result).toMatchObject({ state: 'held', transportIntegrity: 'VERIFIED', canSell: false });
+      expect(claimNonceOnce).toHaveBeenLastCalledWith(
+        'saju-proof-v2:' + hash([item.issuer, item.audience, item.keyId, nonce]),
+        issuedAtMs + 60_000,
+      );
+      expect(await verifySajuHeldSourceProofV1(signed, verifierTrust, context()))
+        .toMatchObject({ state: 'blocked', transportIntegrity: 'NOT_VERIFIED' });
+    }
+    expect(seen.size).toBe(principalCombos.length);
+    expect([...seen].every(key => /^saju-proof-v2:[a-f0-9]{64}$/u.test(key))).toBe(true);
+  });
+});
+
+
 describe('2B-3C-5 independent signed Saju slot transport vectors', () => {
   it('verifies Natal and Relationship separately, but rejects crossed signed intent or nonce', async () => {
     const natal = envelope();

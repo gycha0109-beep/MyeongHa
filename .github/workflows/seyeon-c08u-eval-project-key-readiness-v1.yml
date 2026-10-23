@@ -1,0 +1,45 @@
+name: "[WT:character-memory] C08-U evaluation-only key read-only model preflight"
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/seyeon-c08u-eval-project-key-readiness-v1.yml'
+      - 'scripts/seyeon-cost-c08u-eval-project-key-readiness-v1.mjs'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: seyeon-c08u-read-only-credential-check-v1
+  cancel-in-progress: false
+
+jobs:
+  check:
+    # No paid inference, no user data, no Production side effect.
+    if: ${{ github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') }}
+    name: Check dedicated evaluation key with model GET only
+    runs-on: ubuntu-24.04
+    # Required by repository secret-consuming Actions trust boundary.
+    # Environment selection alone does not grant Production write access.
+    environment: production
+    timeout-minutes: 4
+    steps:
+      - name: Checkout pinned main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Node 24
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: '24'
+      - name: Verify isolated project key and pinned model via non-billable GET
+        env:
+          OPENAI_EVAL_API_KEY: ${{ secrets.OPENAI_EVAL_API_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${OPENAI_EVAL_API_KEY:-}"
+          node scripts/seyeon-cost-c08u-eval-project-key-readiness-v1.mjs
