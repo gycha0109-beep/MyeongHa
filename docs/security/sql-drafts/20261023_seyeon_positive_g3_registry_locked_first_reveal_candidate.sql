@@ -91,6 +91,9 @@ begin
     -- A delivered Turn has ALREADY crossed the first-Reveal boundary.
     -- Never turn an old delivery into a second original-Grant disclosure.
     and t.state='committed'
+    -- A synthetic state flip without a durable Commit timestamp is not
+    -- G2 original-transaction evidence for a private first disclosure.
+    and t.committed_at is not null
     and t.committed_attempt_id=p_attempt_id
     and a.id=p_attempt_id and a.state='committed'
     and a.planner_version='seyeon-production-chat-planner-v1'
