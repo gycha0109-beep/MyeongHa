@@ -24,8 +24,9 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
 /**
  * Inspect the actual 1900/1910 DB effect contracts, not merely their counts.
  * A positive grantCount with an empty/malformed/duplicated effect must never
- * commit as a successful Reader revoke. Replayed effects are legitimate, but
- * still identify the exact previously recorded Grant and Entitlement Event.
+ * commit as a successful Reader revoke. Replayed effects identify the exact
+ * existing Entitlement Event; an already-revoked Grant may instead legitimately
+ * produce the 1080 no-material-change result with no new Event or Outbox.
  */
 function hasAuthoritativeGrantEffects(
   effects: readonly unknown[],
@@ -56,12 +57,27 @@ function hasAuthoritativeGrantEffects(
     } else {
       return false;
     }
+    // Existing Commerce 1080 can return a legitimate no-material-change
+    // outcome when this Grant was ALREADY revoked by a different verified
+    // lifecycle event. It has no new Entitlement Event, no projection change
+    // and no Outbox event. The original Receipt is still revoked by 1900.
+    // A replay of THIS event, by contrast, has its original Event ID.
     if (typeof grantId !== 'string' || !UUID.test(grantId) ||
-        typeof eventId !== 'string' || !UUID.test(eventId) ||
-        grantIds.has(grantId.toLowerCase()) ||
-        entitlementEventIds.has(eventId.toLowerCase())) return false;
+        grantIds.has(grantId.toLowerCase())) return false;
+    if (eventId === null) {
+      const noOp = contractVersion === 'official-reader-s2-revoke-dispatch-v1'
+        ? entry.replayed === false && entry.projectionChanged === false &&
+          entry.outboxEventId === null
+        : entry.result_replayed === false &&
+          entry.result_projection_changed === false &&
+          entry.result_outbox_event_id === null;
+      if (!noOp) return false;
+    } else {
+      if (typeof eventId !== 'string' || !UUID.test(eventId) ||
+          entitlementEventIds.has(eventId.toLowerCase())) return false;
+      entitlementEventIds.add(eventId.toLowerCase());
+    }
     grantIds.add(grantId.toLowerCase());
-    entitlementEventIds.add(eventId.toLowerCase());
   }
   return true;
 }

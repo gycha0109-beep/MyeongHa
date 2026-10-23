@@ -131,6 +131,104 @@ describe('verified PortOne Reader full cancellation DB result normalization', ()
 
   it.each([
     {
+      label:'bound Reader Grant already revoked before this verified cancellation',
+      contractVersion:'official-reader-s2-revoke-dispatch-v1',
+      bound:true,
+      effect:{
+        contractVersion:'official-reader-s2-provider-revoke-v1',
+        scopeCount:1,grantId:GRANT,entitlementEventId:null,
+        projectionChanged:false,outboxEventId:null,replayed:false,
+      },
+    },
+    {
+      label:'unbound Reader Grant already revoked before this verified cancellation',
+      contractVersion:'official-reader-s2-unbound-grant-cancellation-v1',
+      bound:false,
+      effect:{
+        result_grant_id:GRANT,result_entitlement_event_id:null,
+        result_projection_changed:false,result_outbox_event_id:null,
+        result_replayed:false,
+      },
+    },
+    {
+      label:'replay of the exact previously applied bound cancellation',
+      contractVersion:'official-reader-s2-revoke-dispatch-v1',
+      bound:true,
+      effect:{
+        contractVersion:'official-reader-s2-provider-revoke-v1',
+        scopeCount:1,grantId:GRANT,entitlementEventId:ENTITLEMENT_EVENT,
+        projectionChanged:false,outboxEventId:null,replayed:true,
+      },
+    },
+    {
+      label:'replay of the exact previously applied unbound cancellation',
+      contractVersion:'official-reader-s2-unbound-grant-cancellation-v1',
+      bound:false,
+      effect:{
+        result_grant_id:GRANT,result_entitlement_event_id:ENTITLEMENT_EVENT,
+        result_projection_changed:false,result_outbox_event_id:null,
+        result_replayed:true,
+      },
+    },
+  ])('commits $label without fabricating another Entitlement Event',
+    async ({contractVersion,bound,effect}) => {
+      const db=mockCommercePool(result({
+        contractVersion,grantCount:1,scopeCount:bound?1:0,
+        effects:[effect],
+        ...(bound?{providerEventId:EVENT}:{disposition:'cancelled_before_binding'}),
+      }));
+      await expect(applyVerifiedPortOneV2ReaderFullCancellationV1({pool:db.pool,evidence}))
+        .resolves.toEqual({
+          kind:'revoked',receiptId:RECEIPT,providerEventId:EVENT,grantCount:1,
+        });
+      expect(db.statements().at(-1)).toBe('COMMIT');
+    });
+
+  it.each([
+    {
+      label:'bound missing Event but missing explicit no-op result',
+      contractVersion:'official-reader-s2-revoke-dispatch-v1',
+      bound:true,
+      effect:{contractVersion:'official-reader-s2-provider-revoke-v1',
+        scopeCount:1,grantId:GRANT,entitlementEventId:null,replayed:false},
+    },
+    {
+      label:'bound replay with no original Event',
+      contractVersion:'official-reader-s2-revoke-dispatch-v1',
+      bound:true,
+      effect:{contractVersion:'official-reader-s2-provider-revoke-v1',
+        scopeCount:1,grantId:GRANT,entitlementEventId:null,
+        projectionChanged:false,outboxEventId:null,replayed:true},
+    },
+    {
+      label:'unbound no-op with a fabricated Outbox event',
+      contractVersion:'official-reader-s2-unbound-grant-cancellation-v1',
+      bound:false,
+      effect:{result_grant_id:GRANT,result_entitlement_event_id:null,
+        result_projection_changed:false,result_outbox_event_id:EVENT,
+        result_replayed:false},
+    },
+    {
+      label:'unbound no-op claiming a changed projection',
+      contractVersion:'official-reader-s2-unbound-grant-cancellation-v1',
+      bound:false,
+      effect:{result_grant_id:GRANT,result_entitlement_event_id:null,
+        result_projection_changed:true,result_outbox_event_id:null,
+        result_replayed:false},
+    },
+  ])('rolls back $label before the original Receipt cancellation commits',
+    async ({contractVersion,bound,effect}) => {
+      const db=mockCommercePool(result({
+        contractVersion,grantCount:1,scopeCount:bound?1:0,effects:[effect],
+        ...(bound?{providerEventId:EVENT}:{disposition:'cancelled_before_binding'}),
+      }));
+      await expect(applyVerifiedPortOneV2ReaderFullCancellationV1({pool:db.pool,evidence}))
+        .rejects.toThrow('Verified Reader cancellation result was not authoritative.');
+      expect(db.statements().at(-1)).toBe('ROLLBACK');
+    });
+
+  it.each([
+    {
       label:'scoped dispatch missing its original Entitlement Event',
       contractVersion:'official-reader-s2-revoke-dispatch-v1',
       effect:{contractVersion:'official-reader-s2-provider-revoke-v1',
