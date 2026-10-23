@@ -42,6 +42,20 @@ create table public.legal_portone_verified_age_v1 (
 create unique index legal_portone_verified_identity_single_use
   on public.legal_portone_verified_age_v1(verification_id);
 
+-- Default PostgREST and inherited role permissions must not expose identity
+-- state through a direct table endpoint. The SECURITY DEFINER command owner
+-- deliberately uses the table-owner bypass; no user-facing RLS policy exists.
+alter table public.legal_portone_identity_attempts_v1 enable row level security;
+alter table public.legal_portone_verified_age_v1 enable row level security;
+
+do $acl$
+begin
+  if exists (select 1 from pg_catalog.pg_roles where rolname='service_role') then
+    revoke all on public.legal_portone_identity_attempts_v1 from service_role;
+    revoke all on public.legal_portone_verified_age_v1 from service_role;
+  end if;
+end $acl$;
+
 revoke all on public.legal_portone_identity_attempts_v1 from public, anon, authenticated;
 revoke all on public.legal_portone_verified_age_v1 from public, anon, authenticated;
 -- The API executor has EXECUTE on narrow functions only, no direct table access.
