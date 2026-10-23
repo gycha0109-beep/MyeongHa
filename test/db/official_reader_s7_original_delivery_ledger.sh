@@ -91,5 +91,96 @@ after="$(read_evidence "$intent" "$grant")"
  'public.internal_qry_official_reader_withdrawal_delivery_state_v2(uuid,uuid,uuid,uuid)',
  'EXECUTE');")" == 0 ]] ||
  fail "private S7 evidence leaked runtime EXECUTE"
+# Duplicate provider delivery must be a genuine 1900/1910 replay of the
+# ORIGINAL Cancellation event (not a new cancellation ID, Receipt or Grant).
+# The source timestamp comes from persisted verified Provider evidence:
+# changing it or the HMAC on replay is a conflict, not a new refund.
+cancel_id='s7-real-ledger-full-cancel'
+event_key="myeongha:portone-v2:full-cancel:v1:$cancel_id"
+event_id="$(p -c "select id from public.commerce_provider_events
+ where provider='portone_v2' and external_event_id='$event_key';")"
+[[ "$event_id" =~ ^[0-9a-f-]{36}$ ]] ||
+  fail "exact originating PortOne cancellation Event not recorded"
+replay="$(p -c "select
+ public.cmd_apply_verified_portone_reader_full_cancellation_v1(
+ 'synthetic-portone-reader-b2-payment','tx-official-reader-b2',
+ '$cancel_id',pe.provider_occurred_at,
+ cr.verified_amount_minor,cr.verified_currency,'production',
+ 'hmac-sha256:k1:abababababababababababababababababababababababababababababababab',
+ 's7-real-ledger-fixture-v1')->'revoke'->>'grantCount'
+ from public.commerce_receipts cr
+ join public.commerce_provider_events pe on pe.resolved_receipt_id=cr.id
+ where cr.id='$receipt'::uuid and pe.id='$event_id'::uuid;")"
+[[ "$replay" == 1 ]] ||
+  fail "verified PortOne redelivery was not idempotent: $replay"
+[[ "$(p -c "select count(*) from public.commerce_provider_events
+ where provider='portone_v2' and external_event_id='$event_key';")" == 1 ]] ||
+  fail "duplicate original PortOne Provider Event recorded"
+[[ "$(p -c "select count(*) from public.entitlement_events
+ where grant_id='$grant'::uuid
+ and source_provider_event_id='$event_id'::uuid and event_type='revoked';")" == 1 ]] ||
+  fail "duplicate original Grant revocation Event recorded"
+[[ "$(read_evidence "$intent" "$grant")" == "$after" ]] ||
+  fail "duplicated cancellation rewrote the original S7 delivery timeline"
+
+# A re-delivered Cancellation ID with a forged new verifier fingerprint
+# MUST be rejected without changing the original Receipt/Grant/ACK history.
+set +e
+conflict="$(p -c "select public.cmd_apply_verified_portone_reader_full_cancellation_v1(
+ 'synthetic-portone-reader-b2-payment','tx-official-reader-b2',
+ '$cancel_id',pe.provider_occurred_at,
+ cr.verified_amount_minor,cr.verified_currency,'production',
+ 'hmac-sha256:k1:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc',
+ 's7-real-ledger-fixture-v1')
+ from public.commerce_receipts cr
+ join public.commerce_provider_events pe on pe.resolved_receipt_id=cr.id
+ where cr.id='$receipt'::uuid and pe.id='$event_id'::uuid;" 2>&1)"
+conflict_status=$?
+set -e
+[[ "$conflict_status" -ne 0 && "$conflict" == *'PortOne full cancellation replay conflicts with persisted evidence'* ]] ||
+  fail "conflicting PortOne evidence must fail closed: $conflict"
+[[ "$(read_evidence "$intent" "$grant")" == "$after" ]] ||
+  fail "rejected provider replay changed S7 original history"
+
+# Client retransmits the ORIGINAL acknowledgement after the provider refund.
+# Actual 2140 ACK function must return only the previously persisted receipt,
+# never create a second ACK, reveal ciphertext, or prove legal delivery.
+delivery_id='f7090000-0000-4000-8000-000000000002'
+request_id='f70a0000-0000-4000-8000-000000000002'
+thread_id='f7010000-0000-4000-8000-000000000001'
+marker_id='f7050000-0000-4000-8000-000000000001'
+# Use the actual retained, S7-validated digest instead of duplicating
+# the fixture's SHA-256 literal: the first retry accidentally supplied 58 hex
+# characters after the fixture was corrected to 64.
+ack_hash="$(p -c "select acknowledgement_token_hash
+ from public.official_reader_paid_delivery_attempts_v1
+ where id='$delivery_id'::uuid and body_id='$body'::uuid
+ and subject_id='$subject'::uuid and thread_id='$thread_id'::uuid
+ and safe_message_id='$marker_id'::uuid and delivery_request_id='$request_id'::uuid;")"
+[[ "$ack_hash" =~ ^sha256:v1:[a-f0-9]{64}$ ]] ||
+  fail "original retained ACK digest missing or malformed"
+ack_before="$(p -c "select client_acknowledged_at
+ from public.official_reader_paid_delivery_attempts_v1
+ where id='$delivery_id'::uuid and body_id='$body'::uuid;")"
+ack_replay="$(p <<SQL
+begin;
+set local myeongha.subject_id='$subject';
+select replayed::text
+from public.internal_ack_official_reader_paid_delivery_v1(
+ '$subject'::uuid,'$thread_id'::uuid,'$marker_id'::uuid,
+ '$delivery_id'::uuid,'$request_id'::uuid,'$ack_hash');
+commit;
+SQL
+)"
+[[ "$ack_replay" == 'true' ]] ||
+  fail "verified historical client ACK replay not returned as replayed"
+[[ "$(p -c "select client_acknowledged_at
+ from public.official_reader_paid_delivery_attempts_v1
+ where id='$delivery_id'::uuid;")" == "$ack_before" ]] ||
+  fail "client acknowledgement was rewritten on replay"
+[[ "$(read_evidence "$intent" "$grant")" == "$after" ]] ||
+  fail "client ACK replay changed retained historical delivery evidence"
+echo 'PASS duplicate verified PortOne cancellation and client ACK are replay-safe; forged cancellation rejected'
+
 echo 'PASS real S2 verified PortOne full cancel retains historical S7 ACK ledger and sibling right'
 echo 'PASS S7 evidence remains private, not proof of statutory delivery or refund authorization'
