@@ -26,7 +26,10 @@ const BASE: OfficialReaderScopeDeletionFenceV1 = {
   keyRefs: [K1, K2],
 };
 
-function fixture(overrides: Partial<OfficialReaderScopeDeletionFenceV1> = {}) {
+function fixture(
+  overrides: Partial<OfficialReaderScopeDeletionFenceV1> = {},
+  phase: { claim?: 'claimed' | 'db_erased'; manifest?: 'eligible' | 'no_content' | 'sibling_right_present' | 'db_erased' } = {},
+) {
   const fence = { ...BASE, ...overrides };
   const query = vi.fn(async (sql: string) => {
     if (sql === 'BEGIN' || sql === 'COMMIT' || sql === 'ROLLBACK'
@@ -37,20 +40,24 @@ function fixture(overrides: Partial<OfficialReaderScopeDeletionFenceV1> = {}) {
     if (sql.includes('internal_claim_official_reader_paid_answer_purge_v1')) {
       return { rows: [{
         subjectId: SUBJECT, readingId: READING,
-        readerCharacterId: 'reader_a', jobStatus: 'db_erased',
+        readerCharacterId: 'reader_a', jobStatus: phase.claim ?? 'db_erased',
       }] };
     }
     if (sql.includes('internal_qry_official_reader_paid_answer_purge_manifest_v1')) {
       return { rows: [{ result: {
-        state: 'db_erased', subjectId: SUBJECT, readingId: READING,
+        state: phase.manifest ?? 'db_erased', subjectId: SUBJECT, readingId: READING,
         readerCharacterId: 'reader_a', externalFenceId: FENCE,
       } }] };
     }
     if (sql.includes('internal_renew_official_reader_paid_answer_purge_lease_v1')) {
       return { rows: [{ renewed: true }] };
     }
-    if (sql.includes('internal_finish_official_reader_paid_answer_purge_v1')) {
+    if (sql.includes('internal_finish_official_reader_paid_answer_purge_v1')
+        || sql.includes('internal_finish_empty_official_reader_paid_answer_purge_v1')) {
       return { rows: [{ done: true }] };
+    }
+    if (sql.includes('internal_release_official_reader_paid_answer_purge_v1')) {
+      return { rows: [{ released: true }] };
     }
     if (sql.includes('to_regprocedure')) return { rows: [{ installed: false }] };
     throw new Error('Unexpected worker SQL');
@@ -89,6 +96,31 @@ describe('S4 resumed refund purge fence must be valid before key erasure', () =>
     expect(ackKeys).toHaveBeenCalledWith(JOB, FENCE);
     expect(destroyKey).not.toHaveBeenCalled();
   });
+
+  it.each([
+    ['db_erased claim with active sibling decision', 'db_erased', 'sibling_right_present'],
+    ['db_erased claim with no-content decision', 'db_erased', 'no_content'],
+    ['fresh claim with historical db-erased fence', 'claimed', 'db_erased'],
+  ] as const)('rejects purge claim / journal phase contradictions: %s',
+    async (_label, claim, manifest) => {
+      const { run, destroyKey, isKeyDestroyed, ackDb, ackKeys, query } =
+        fixture({}, { claim, manifest });
+      await expect(run()).rejects.toThrow(
+        'Protected Reader revocation cleanup is unavailable.',
+      );
+      expect(destroyKey).not.toHaveBeenCalled();
+      expect(isKeyDestroyed).not.toHaveBeenCalled();
+      expect(ackDb).not.toHaveBeenCalled();
+      expect(ackKeys).not.toHaveBeenCalled();
+      expect(query.mock.calls.some(([sql]) =>
+        typeof sql === 'string'
+        && (
+          sql.includes('internal_release_official_reader_paid_answer_purge_v1')
+          || sql.includes('internal_finish_official_reader_paid_answer_purge_v1')
+          || sql.includes('internal_finish_empty_official_reader_paid_answer_purge_v1')
+        ),
+      )).toBe(false);
+    });
 
   it.each([
     ['duplicate body', { bodyIds: [B1, B1] }],
