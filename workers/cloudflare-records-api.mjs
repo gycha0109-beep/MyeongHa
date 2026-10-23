@@ -37,11 +37,20 @@ function unavailable() {
 export function allowedCloudflareRecordsReadQueryV1(route,url) {
   if (!RECORD_IDS.has(route?.id)) return false;
   if (url.hash!=='') return false;
-  if (route.id!=='rewrite.readings') return url.search==='';
   if (url.search==='') return true;
-  return url.searchParams.getAll('readingId').length===1 &&
-    [...url.searchParams.keys()].every(x=>x==='readingId') &&
-    UUID.test(url.searchParams.get('readingId')??'');
+  const keys=[...url.searchParams.keys()];
+  if (new Set(keys).size!==keys.length || keys.some(key=>
+    !['cursor','pageSize',...(route.id==='rewrite.readings'?['readingId']:[])].includes(key))) return false;
+  const values=[...url.searchParams.values()];
+  if (values.some(value=>value.length===0||value.length>2048)) return false;
+  const recordId=url.searchParams.get('readingId');
+  if (recordId!==null) return keys.length===1 && UUID.test(recordId);
+  const pageSize=url.searchParams.get('pageSize');
+  if (pageSize!==null &&
+      (!/^[1-9][0-9]*$/.test(pageSize)||Number(pageSize)>50)) return false;
+  // The existing collection runtime remains authoritative for opaque cursor
+  // decoding, owner scope, expiry and precise error mapping.
+  return true;
 }
 
 export function fenceCloudflareRecordsResponseV1(candidate) {

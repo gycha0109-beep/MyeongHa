@@ -67,8 +67,18 @@ describe('Cloudflare protected records API migration',()=>{
     const id='11111111-1111-4111-8111-111111111111';
     expect(allow('/api/readings')).toBe(true);
     expect(allow('/api/readings?readingId='+id)).toBe(true);
-    for(const p of ['/api/readings?cursor=x','/api/readings?pageSize=10',
+    expect(allow('/api/readings?cursor=x')).toBe(true);
+    expect(allow('/api/readings?pageSize=10')).toBe(true);
+    expect(allow('/api/readings?cursor=x&pageSize=10')).toBe(true);
+    expect(allowedCloudflareRecordsReadQueryV1(
+      matchCloudflareApiRoute('/api/life-record'),new URL(ORIGIN+'/api/life-record?pageSize=10')
+    )).toBe(true);
+    expect(allowedCloudflareRecordsReadQueryV1(
+      matchCloudflareApiRoute('/api/memories'),new URL(ORIGIN+'/api/memories?cursor=opaque')
+    )).toBe(true);
+    for(const p of ['/api/readings?pageSize=51','/api/readings?cursor=x&cursor=y',
       '/api/readings?readingId=x','/api/readings?readingId='+id+'&readingId='+id,
+      '/api/readings?readingId='+id+'&pageSize=10',
       '/api/readings?__myeongha_records_read=readings']){
       expect(allow(p)).toBe(false);
       expect((await worker.fetch(request(p),admitted)).status).toBe(404);
