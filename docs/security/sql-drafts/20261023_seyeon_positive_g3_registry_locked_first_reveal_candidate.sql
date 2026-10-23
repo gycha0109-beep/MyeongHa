@@ -275,7 +275,7 @@ begin
   for v_role in select rolname from pg_catalog.pg_roles
       where rolname in ('anon','authenticated','service_role') loop
     execute format(
-      'revoke all on function public.qry_seyeon_positive_first_memory_locked_reveal_v2(uuid,uuid,uuid,uuid) from %I',
+      'revoke all on function public.qry_seyeon_positive_first_memory_locked_reveal_v2(uuid,uuid,uuid,uuid,uuid,uuid,uuid) from %I',
       v_role
     );
   end loop;
