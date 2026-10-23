@@ -61,9 +61,13 @@ consumed by both PR and main execution; the old YAML matrix parser is removed.
 There is no duplicate case registry. The shared DB authority core
 remains required for schema and DB-authority changes.
 
-The required check names remain `CI Verify`, `Governance Verify`, and
-`Web PR Verify`. The final CI result also requires every selected DB suite and
-authority core to succeed; only unselected jobs may be skipped.
+The original PR routing checks remain `CI Verify`, `Governance Verify`, and
+`Web PR Verify`. The live main ruleset also requires `CI Integration Verify`
+from the labeled PR-event integration workflow (Actions App ID 15368).
+The final CI result requires every selected DB suite and authority core to
+succeed; only unselected jobs may be skipped. See
+[full-ci-audit-20261017.md](full-ci-audit-20261017.md) for the complete
+65-workflow inventory, production-operation boundaries and live queue evidence.
 Production workflows are unchanged.
 Grouping cases reduces runner allocations; it does not guarantee a hosted
 runner start time or a specific total duration.

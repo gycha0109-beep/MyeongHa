@@ -1,0 +1,106 @@
+{
+  "schemaVersion": "seyeon-c07-real-six-call-sanitized-v1",
+  "source": {
+    "repository": "gycha0109-beep/MyeongHa",
+    "runId": 38859692050,
+    "runAttempt": 1,
+    "runBranch": "main",
+    "headSha": "f399339c5d2c52c23a19a3702c7be04fdc7ffdc3",
+    "artifactId": 12028787181,
+    "artifactZipSha256": "1e9d2916859dfecc47af1576eee75b32302052743b31e8dc7b1d0c1b45a967ae",
+    "model": "gpt-5.6-luna",
+    "status": "completed",
+    "conclusion": "success"
+  },
+  "historical": {
+    "runIds": [
+      38845185681,
+      38854937049
+    ],
+    "attemptedCalls": 5,
+    "estimatedCostMicroUsd": 1622,
+    "reservedMicroUsd": 16385
+  },
+  "results": [
+    {
+      "caseId": "F02",
+      "variant": "original",
+      "topicKey": "family_emotional_history",
+      "claimKinds": [],
+      "inputTokens": 1040,
+      "outputTokens": 96,
+      "estimatedCostMicroUsd": 376,
+      "elapsedMs": 3301
+    },
+    {
+      "caseId": "F02",
+      "variant": "compact",
+      "topicKey": "family_emotional_history",
+      "claimKinds": [],
+      "inputTokens": 769,
+      "outputTokens": 87,
+      "estimatedCostMicroUsd": 297,
+      "elapsedMs": 3079
+    },
+    {
+      "caseId": "R01",
+      "variant": "original",
+      "topicKey": "past_romance_surface",
+      "claimKinds": [],
+      "inputTokens": 1041,
+      "outputTokens": 84,
+      "estimatedCostMicroUsd": 362,
+      "elapsedMs": 2278
+    },
+    {
+      "caseId": "R01",
+      "variant": "compact",
+      "topicKey": "past_romance_surface",
+      "claimKinds": [],
+      "inputTokens": 770,
+      "outputTokens": 88,
+      "estimatedCostMicroUsd": 299,
+      "elapsedMs": 1900
+    },
+    {
+      "caseId": "H02",
+      "variant": "original",
+      "topicKey": null,
+      "claimKinds": [
+        "SHARED_EVENT_CLAIM"
+      ],
+      "inputTokens": 1049,
+      "outputTokens": 145,
+      "estimatedCostMicroUsd": 437,
+      "elapsedMs": 2653
+    },
+    {
+      "caseId": "H02",
+      "variant": "compact",
+      "topicKey": null,
+      "claimKinds": [
+        "SHARED_EVENT_CLAIM"
+      ],
+      "inputTokens": 778,
+      "outputTokens": 152,
+      "estimatedCostMicroUsd": 377,
+      "elapsedMs": 2382
+    }
+  ],
+  "budget": {
+    "newAttemptedCalls": 6,
+    "newObservedCalls": 6,
+    "newReservedMicroUsd": 19662,
+    "cumulativeReservedMicroUsd": 36047,
+    "cumulativeEstimatedCostMicroUsd": 3770,
+    "ownerLifetimeBudgetKrw": 100,
+    "stressFxKrwPerUsd": 2500,
+    "stressReservedKrw": 90.1175,
+    "actualBilledKrw": null,
+    "invoiceReconciled": false,
+    "providerHardLimitVerified": false
+  },
+  "stopReason": null,
+  "modelQualityVerified": false,
+  "productionPromotionPermitted": false
+}

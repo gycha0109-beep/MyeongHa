@@ -1,0 +1,15 @@
+{
+  "schemaVersion":"seyeon-c06-real-paid-evidence-replay-v1",
+  "sourceRunId":38845185681,
+  "sourceSha":"705857cc42e2b6e0d3bd9d5ecf7e975ed9122e28",
+  "sourceArtifactId":12023195606,
+  "providerInvoiceReconciled":false,
+  "actualBilledUsd":null,
+  "stopReason":"CLASSIFIER_SCREEN_HOLD",
+  "fullEightRequestScreenPassed":false,
+  "attempts":[
+    {"caseId":"N14","variant":"original","topicKey":null,"claimKinds":[],"inputTokens":810,"outputTokens":130,"estimatedCostMicroUsd":359},
+    {"caseId":"N14","variant":"compact","topicKey":null,"claimKinds":[],"inputTokens":673,"outputTokens":34,"estimatedCostMicroUsd":210},
+    {"caseId":"F01","variant":"original","topicKey":"family_emotional_history","claimKinds":["CHARACTER_FACT_CLAIM"],"inputTokens":806,"outputTokens":221,"estimatedCostMicroUsd":467}
+  ]
+}

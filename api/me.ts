@@ -1,8 +1,10 @@
 import { executeSecurityObservedRequestV1 } from '../apps/api/src/security-observability.js';
 import { tryDispatchHeldOfficialReaderV1 } from '../apps/api/src/official-reader-held-vercel-dispatch-v1.js';
+import { canonicalizeRequestUiLocaleHeadersV1 } from '../apps/api/src/request-ui-locale-v1.js';
 import { createNodePostgresSubjectPoolV1 } from '../apps/api/src/node-postgres-subject-pool.js';
 import { createProductionChatReadRuntimeV1 } from '../apps/api/src/production-chat-read-runtime.js';
 import { createProductionSeyeonTurnSendRuntimeV1 } from '../apps/api/src/production-seyeon-turn-send-runtime-v1.js';
+import { enforceSeyeonVercelFetchRevealFenceV1 } from '../apps/api/src/seyeon-vercel-fetch-reveal-fence-v1.js';
 import { createProductionCurrentSubjectProfileRuntimeV1 } from '../apps/api/src/production-current-subject-profile-runtime.js';
 import { createProductionCurrentSubjectSajuPreviewReadingRuntimeV1 } from '../apps/api/src/production-current-subject-saju-preview-reading-runtime.js';
 import { createProductionDeviceInstallationRuntimeV1 } from '../apps/api/src/production-device-installation-runtime.js';
@@ -37,6 +39,7 @@ const CHAT_THREAD_PARAM = '__myeongha_chat_thread_id' as const;
 const CHAT_TURN_SEND_PARAM = '__myeongha_chat_turn_send' as const;
 const VERCEL_DYNAMIC_CHAT_THREAD_PARAM = 'threadId' as const;
 const CHAT_CURSOR_PARAM = 'afterSequenceNo' as const;
+const CHAT_PAGE_SIZE_PARAM = 'pageSize' as const;
 const TARGET_PERSON_READ_PARAM = '__myeongha_target_person_read' as const;
 const TARGET_PERSON_ID_PARAM = '__myeongha_target_person_id' as const;
 const DEVICE_INSTALLATION_ACTION_PARAM = '__myeongha_device_installation_action' as const;
@@ -174,7 +177,7 @@ type DispatchTarget =
       readonly readingId?: string;
     }
   | { readonly kind: 'chat-open'; readonly route: typeof CHAT_OPEN_ROUTE }
-  | { readonly kind: 'chat-read'; readonly route: string; readonly afterSequenceNo?: string }
+  | { readonly kind: 'chat-read'; readonly route: string; readonly afterSequenceNo?: string; readonly pageSize?: string }
   | { readonly kind: 'chat-turn-send'; readonly route: string; readonly threadId: string }
   | {
       readonly kind: 'target-person-list';
@@ -328,6 +331,7 @@ function resolveDispatchTarget(request: Request): DispatchTarget | null {
     CHAT_TURN_SEND_PARAM,
     VERCEL_DYNAMIC_CHAT_THREAD_PARAM,
     CHAT_CURSOR_PARAM,
+    CHAT_PAGE_SIZE_PARAM,
     TARGET_PERSON_READ_PARAM,
     TARGET_PERSON_ID_PARAM,
     DEVICE_INSTALLATION_ACTION_PARAM,
@@ -371,6 +375,18 @@ function resolveDispatchTarget(request: Request): DispatchTarget | null {
   if (vercelDynamicThreadId === null) return null;
   const afterSequenceNo = getSingleNonEmptyParam(url.searchParams, CHAT_CURSOR_PARAM);
   if (afterSequenceNo === null) return null;
+  const pageSize = getSingleNonEmptyParam(url.searchParams, CHAT_PAGE_SIZE_PARAM);
+  if (pageSize === null) return null;
+  // Page size belongs only to an authenticated owner-scoped Chat read.
+  // Reject unknown/mixed pagination instead of silently stripping it.
+  if (pageSize !== undefined && (
+    request.method !== 'GET' ||
+    chatThreadId === undefined ||
+    chatTurnSend !== undefined ||
+    !/^[1-9][0-9]*$/u.test(pageSize) ||
+    !Number.isSafeInteger(Number(pageSize)) ||
+    Number(pageSize) > 50
+  )) return null;
 
   const sajuPreviewReading = getSingleNonEmptyParam(
     url.searchParams,
@@ -670,6 +686,7 @@ function resolveDispatchTarget(request: Request): DispatchTarget | null {
     kind: 'chat-read',
     route: `${CHAT_ROUTE_PREFIX}${chatThreadId}`,
     ...(afterSequenceNo === undefined ? {} : { afterSequenceNo }),
+    ...(pageSize === undefined ? {} : { pageSize }),
   };
 }
 
@@ -686,8 +703,13 @@ export function toCanonicalMeRequestForTestV1(
   if (target === null) throw new Error('Cannot canonicalize an unresolved /api/me dispatch target.');
 
   const url = new URL(`https://myeongha.internal${target.route}`);
-  if (target.kind === 'chat-read' && target.afterSequenceNo !== undefined) {
-    url.searchParams.set(CHAT_CURSOR_PARAM, target.afterSequenceNo);
+  if (target.kind === 'chat-read') {
+    if (target.afterSequenceNo !== undefined) {
+      url.searchParams.set(CHAT_CURSOR_PARAM, target.afterSequenceNo);
+    }
+    if (target.pageSize !== undefined) {
+      url.searchParams.set(CHAT_PAGE_SIZE_PARAM, target.pageSize);
+    }
   }
   if (target.kind === 'records' && target.route === READINGS_ROUTE && target.readingId !== undefined) {
     url.searchParams.set(READING_RECORD_ID_PARAM, target.readingId);
@@ -699,7 +721,7 @@ export function toCanonicalMeRequestForTestV1(
 
   return new Request(url, {
     method: request.method,
-    headers: request.headers,
+    headers: canonicalizeRequestUiLocaleHeadersV1(request),
     ...(body === undefined ? {} : { body, duplex: 'half' as const }),
   } as RequestInit & { duplex?: 'half' });
 }
@@ -753,9 +775,8 @@ export default {
     return executeSecurityObservedRequestV1({
       request,
       routeId: 'api.me.dispatch',
-      execute: ({ requestId, serverTime }) => {
-        // Former S6/S7/Records production route adapters are still hard OFF.
-        // They share this function only to satisfy the exact 12-function cap.
+      execute: async ({ requestId, serverTime }) => {
+        // Held Reader routes remain gated; production paid reveal is not enabled.
         const held = tryDispatchHeldOfficialReaderV1({ request, requestId, serverTime });
         if (held !== null) return held;
         const target = resolveDispatchTarget(request);
@@ -764,11 +785,19 @@ export default {
           return routeNotFound();
         }
 
-        return runtimeForTarget(target).handleRequest({
+        const result = await runtimeForTarget(target).handleRequest({
           request: toCanonicalMeRequestForTestV1(request, target),
           requestId,
           serverTime,
         });
+
+        // Last Vercel Fetch dispatch defense: a refactor removing the earlier
+        // pre-Provider G3 HOLD must NOT turn a generated assistant answer into
+        // a publicly serialized Response. Only the explicit original-Grant
+        // Node send boundary may eventually carry protected positive output.
+        return target.kind === 'chat-turn-send'
+          ? enforceSeyeonVercelFetchRevealFenceV1(result, requestId)
+          : result;
       },
     });
   },

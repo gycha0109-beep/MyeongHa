@@ -1,0 +1,114 @@
+// Watchtower-Track: security
+// S3/G1 -> Interpreter offline-only complete model Context closure.
+import {createHash} from 'node:crypto';
+import {describe, expect, it} from 'vitest';
+import {canonicalJson} from '../packages/domain/src/index.js';
+import {
+  assembleSeyeonRuntimeContextV2,
+  type SeyeonRetrievedMemoryV2,
+  type SeyeonRuntimeContextV2,
+} from '../packages/domain/src/seyeon-runtime-context-v2.js';
+import type {RunSeyeonCharacterTurnV2Input} from '../apps/api/src/seyeon-character-runtime-v2.js';
+import type {SeyeonPersonalRecordProjectionCandidateV1} from '../apps/api/src/seyeon-production-context-v1.js';
+import {selectSeyeonExactModelPersonalSourcesV1} from '../apps/api/src/seyeon-exact-model-personal-source-selection-v1.js';
+import {
+  assertSeyeonPositiveG1FinalModelContextSealV1,
+  SeyeonPositiveG1FinalModelContextHoldV1,
+} from '../apps/api/src/seyeon-positive-g1-final-model-context-seal-v1.js';
+
+const RID='11111111-1111-4111-8111-111111111111';
+const GID='22222222-2222-4222-8222-222222222222';
+const hash=(value:unknown)=>'sha256:v1:'+
+  createHash('sha256').update(canonicalJson(value)).digest('hex');
+const memory:SeyeonRetrievedMemoryV2={
+  kind:'memory',memoryId:'memory:'+RID,claimKind:'fact',
+  summary:'Synthetic one-memory context for offline G1 source seal',
+  sourceRef:'memory:'+RID+':grant:'+GID,relevance:0.8,salience:0.5,
+};
+const candidate:SeyeonPersonalRecordProjectionCandidateV1={
+  recordKind:'memory',recordId:RID,grantId:GID,
+  recordType:'shared_detail',schemaVersion:'memory-v1',
+  projectedMemoryId:memory.memoryId,rawRecordDigest:'sha256:v1:'+'a'.repeat(64),
+  projectedMemoryDigest:hash(memory),
+  rawRecordPgDigest:'sha256:pg-jsonb:v1:'+'b'.repeat(64),
+  projectorVersion:'seyeon-memory-projector-v1',
+  permitsAtomicCommit:false,permitsHttpReveal:false,
+};
+const contextInput:RunSeyeonCharacterTurnV2Input['contextInput']={
+  relationship:null,recentMessages:[],retrievedMemories:[memory],
+};
+const original=assembleSeyeonRuntimeContextV2({
+  ...contextInput,relationshipSemantics:null,integrityDecisions:[],
+  governedPreflightApplied:true,
+  disclosure:{decision:null,retrievedSources:[]},
+});
+const selected=selectSeyeonExactModelPersonalSourcesV1({
+  retrievedMemories:contextInput.retrievedMemories,sourceCandidates:[candidate],
+});
+const base={
+  pinnedContextInput:contextInput,
+  pinnedContextInputDigest:hash(contextInput),
+  selectedSourcesDigest:selected.selectedSourcesDigest,
+  sourceCandidates:[candidate],
+  assembledContext:original,
+};
+
+describe('S3/G1 original Memory final Interpreter packet seal (offline)',()=>{
+  it('keeps the same complete deterministic one-Memory model Context',()=>{
+    expect(()=>assertSeyeonPositiveG1FinalModelContextSealV1(base)).not.toThrow();
+  });
+
+  it('rejects rehashed selection of another original Grant before Provider',()=>{
+    const alt={...candidate,grantId:RID};
+    expect(()=>assertSeyeonPositiveG1FinalModelContextSealV1({
+      ...base,sourceCandidates:[alt],
+    })).toThrow(SeyeonPositiveG1FinalModelContextHoldV1);
+  });
+
+  it('rejects a changed pinned Context after G1 even if final output looks valid',()=>{
+    expect(()=>assertSeyeonPositiveG1FinalModelContextSealV1({
+      ...base,pinnedContextInput:{...contextInput,focuses:['memory']},
+    })).toThrow(SeyeonPositiveG1FinalModelContextHoldV1);
+  });
+
+  it('rejects added derived/preflight/relationship/disclosure and Bible material',()=>{
+    const changed:unknown[]=[
+      {...original,integrity:{
+        ...original.integrity,decisions:[{kind:'unverified',text:'injected'}],
+      }},
+      {...original,integrity:{
+        ...original.integrity,governedPreflightApplied:false,
+      }},
+      {...original,relationshipSemantics:{hiddenPrivateEvent:'injected'}},
+      {...original,relationship:{untrackedHistory:'private'}},
+      {...original,disclosure:{
+        ...original.disclosure,retrievedSources:[{sourceRef:'hidden',text:'private'}],
+      }},
+      {...original,disclosure:{...original.disclosure,decision:{characterId:'seyeon'}}},
+      {...original,bibleSlices:[]},
+      {...original,retrievalPolicy:{...original.retrievalPolicy,assistantOutputNeverAuthority:false}},
+      {...original,retrievedMemories:[{...memory,summary:'forged private text'}]},
+      {...original,retrievedMemories:[memory,memory]},
+      {...original,recentConversation:[{messageRef:'old-private'}]},
+    ];
+    for(const assembled of changed){
+      expect(()=>assertSeyeonPositiveG1FinalModelContextSealV1({
+        ...base,assembledContext:assembled as SeyeonRuntimeContextV2,
+      })).toThrow(SeyeonPositiveG1FinalModelContextHoldV1);
+    }
+  });
+
+  it('holds when the model source digest changes without changing selected Memory',()=>{
+    expect(()=>assertSeyeonPositiveG1FinalModelContextSealV1({
+      ...base,selectedSourcesDigest:'sha256:v1:'+'f'.repeat(64),
+    })).toThrow(SeyeonPositiveG1FinalModelContextHoldV1);
+  });
+
+  it('cannot turn an empty or second source candidate into a G1 grant',()=>{
+    for(const sourceCandidates of [[],[candidate,candidate]]){
+      expect(()=>assertSeyeonPositiveG1FinalModelContextSealV1({
+        ...base,sourceCandidates,
+      })).toThrow(SeyeonPositiveG1FinalModelContextHoldV1);
+    }
+  });
+});

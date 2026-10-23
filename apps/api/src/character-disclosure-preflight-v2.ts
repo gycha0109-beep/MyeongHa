@@ -131,6 +131,10 @@ export async function runCharacterDisclosurePreflightV2(input: {
   readonly userQuestion: string;
   readonly relationship: CharacterDisclosureRelationshipEvidenceV2;
   readonly classifier: CharacterDisclosureTopicClassifierPortV2;
+  /** Optional Production-only zero-authority guard before descriptor/fact lookup. */
+  readonly beforeSourceDescriptorRead?: (
+    classification: CharacterDisclosureTopicClassificationV2,
+  ) => unknown;
   readonly sourceDescriptor: CharacterDisclosureSourceDescriptorPortV2;
   readonly factAuthorityResolver: CharacterDisclosureFactAuthorityResolverPortV2;
 }): Promise<CharacterDisclosurePreflightResultV2> {
@@ -151,6 +155,11 @@ export async function runCharacterDisclosurePreflightV2(input: {
       factAuthority: null,
       decision: null,
     });
+  }
+
+  // G0-unapproved sensitive metadata must never be fetched before this guard.
+  if (input.beforeSourceDescriptorRead !== undefined) {
+    await input.beforeSourceDescriptorRead(classification);
   }
 
   const source = await input.sourceDescriptor.readDescriptor({

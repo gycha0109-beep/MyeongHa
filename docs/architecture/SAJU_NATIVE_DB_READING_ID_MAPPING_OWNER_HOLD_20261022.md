@@ -1,0 +1,68 @@
+# Saju native Reading ID ↔ MyeongHa DB Official UUID 인수 · S3 Owner HOLD (2026-10-22)
+
+> 기술 인수 담당: 공식 Reading 원본·버전·범위가 DB/Reader/Records에서 동일한지 확인. 출처 발급/키/서명/DB 변환 권한은 별도 Saju Source Owner / DB Owner.
+>
+> 로드맵: [MyeongHa 통합 로드맵 PR #2437 미병합 작업 브랜치](https://github.com/gycha0109-beep/MyeongHa/blob/docs/master-track-roadmap-gpt14-20261022/docs/roadmaps/MYEONGHA_GPT_TRACK_MASTER_ROADMAP_20261022.md), [Saju 12메뉴 PR #2679 미병합 작업 브랜치](https://github.com/gycha0109-beep/Saju/blob/docs/myeongha-roadmap-alignment-20261022/docs/ROADMAP.md). 실제 실행 기준은 각 Owner의 최신 main 및 소유 PR.
+>
+> 기존 구현: Saju #2683(원본/SourceUnit 인수, 병합), MyeongHa #2442(Reader/Records 정합성, 병합), #2456(S3→S7 동일 DB 원본, 병합), #2459(S6 AAD→S7 메시지, 병합), #2461(동일 S5/S7 재시도 확인, 별도 진행).
+
+## 실제 부족한 권한/매핑
+
+Saju `source-reading-reader-records-handoff.ts`는 내부 `readingId`와 응답 원본 `responseBodyHash`를 생산한다. MyeongHa `character-standard-reading-knowledge.ts`의 DB 공식 Reading은 **별도의 UUID**로 소유한다. 기존 `official-reader-saju-source-inventory-parity-v1.ts`는 Saju `source.readingId`가 DB UUID와 같을 때만 통과한다. 원래 서로 다르면 BLOCKED가 올바른 기본 동작이다.
+
+Saju native Reading ID를 DB UUID로 바꿔 기록하거나 `responseBodyHash`를 새 값으로 계산하는 행위는 **Saju/DB Owner가 승인한 버전·원본 변환 및 Production 출처 인증이 없는 한 금지**한다. 사용자 해석 문구가 같다는 이유만으로 두 Reading이 법적/상업적/의미적으로 동일하다고 단정해서도 안 된다.
+
+## 이번 구현의 범위
+
+`apps/api/src/saju-native-db-reading-identity-gap-v1.ts`:
+- 기존 `compareOfficialReaderRecordsSourceV1`가 독립 DB Reader Admission과 Subject 인가 Records 조회에서 **같은 DB 공식 Reading UUID·Reader/Spec/Session·원문**을 확인한 경우에만 진행한다.
+- 입력 Saju handoff는 **Preview / HELD / NOT_EVALUATED / canPersist·canDisclose=false** 형상만 수용한다. `canMapReadingId` 같은 미승인 신규 권한을 넣은 요청은 BLOCKED.
+- **서로 다른 Saju native Reading ID와 DB UUID**를 정확하게 보존한 채 `responseVersion/responseId` 및 Saju 인벤토리 self-hash 형식, 원문 `sourceRef`·SHA-256, 필수 Disclosure 및 ambiguity 지문을 기존 DB Reader projector 결과와 비교한다. 필드 교환·누락·다른 텍스트를 차단한다.
+- `state='held'`, `reason='issuer_and_db_mapping_required'`는 SourceUnit 차원에서 인수 준비 자료가 서로 맞는다는 뜻이지 **Saju 출처 서명 검증, 원본 BodyHash 검증, ID 변환의 정당성/현재 Grant 인정**을 의미하지 않는다. 이 함수에는 **원래 Saju Response 전체와 Production issuer 증명이 없으므로** 임의로 작성된 정합적인 `responseBodyHash`조차 진위 판정할 수 없다.
+- 결과는 고정된 비공개 상태 `HELD/BLOCKED`와 `mappingAuthority/sourceAuthority/privacyApproval=NOT_EVALUATED`, `canMapReadingId/canPersist/canDisclose/canPublish/canSell=false`만 반환한다. 어떠한 ID·원문·hash·비용·구매권도 출력하지 않는다.
+- 기존 S3 strict-ID parity, S5 Writer, S6 최신 구매권·Privacy, S7 전달·ACK/환불 경계를 **완화·수정·호출하지 않는다**. 새 SQL/HTTP/암호 키/LLM/공개 권한이 없다.
+
+## 승인된 Owner 인수를 기다리는 다음 단계
+
+1. **Saju Source Owner [#2410](https://github.com/gycha0109-beep/Saju/issues/2410):** Production issuer 서명·키 수명·nonce/요청 digest, 선별/동반 SourceUnit, Disclosure/ambiguity/semantic/output 증명, 원래 Reading ID/원본 응답 바이트 확인.
+2. **명하 DB/Privacy Owner [#2301 Draft](https://github.com/gycha0109-beep/MyeongHa/pull/2301):** DB Official Reading UUID·Subject/Birth Revision·Product/Spec/Release·실제 저장 Response Hash의 원본 보존 또는 Owner가 승인한 변환 영수증, Privacy 삭제·복원·보호 저장/권한 경계 증명.
+3. **통합 인수:** 양쪽에서 독립적으로 검증된 발행/저장 영수증이 정확히 같은 문구뿐 아니라 **같은 공식 Reading 정체성**을 묶는 경우에만 기존 `preflightSajuReaderRecordsSourceInventoryParityV1`의 ID 불일치 차단 정책을 Owner 승인 하에 별도 변경한다. 이번 PR은 이를 변경하지 않는다.
+4. **S5/S7 실제 저장/전달:** 승인 후에도 매 요청 최신 Grant·환불·Privacy Lease 검증 및 T2 동일 범위 S1 lock은 DB Owner의 기존 진입점이 책임진다. ACK는 사람의 실제 독서 증거가 아니다.
+
+## 전체 원본 Response ID-only Diff 인수 추가
+
+`apps/api/src/saju-db-reading-id-only-response-parity-v1.ts`는 **Saju 원본 ProductReadingResponse v2의 실제 전체 응답 객체**를 서버 내부에서 받아 DB Reader/Records의 원본과 비교한다. 기존 SourceUnit 동등성 검사만으로 확인할 수 없는 Subject/Birth 표기, 명식 계산 요약, 생성 시각, 섹션 제목·상태, Disclosure 외 metadata의 유출·변조 여부도 검출한다.
+
+- 사전 조건: 위 native-ID vs DB-UUID `HELD` 정합성 + 기존 DB가 별도로 인가한 Reader/Records 원본. Saju native 응답은 정상 `delivered` v2이고 `reading.readingId`는 Saju handoff의 native ID와 정확하게 같아야 한다.
+- Saju 원본 전체 응답 `sha256`이 handoff `source.responseBodyHash`와 동일해야 한다. DB 저장 응답을 **복사한 비교용 임시 객체의 `reading.readingId` 한 곳만 native ID로 표시**한 뒤 같은 정규화 해시 함수를 적용했을 때 전체 해시가 원본과 같아야 한다. 실제 DB JSONB나 Saju 응답은 수정·재발행하지 않는다.
+- 원문/명의·Subject 계산 데이터, 제공 범위, 원본 `generatedAt`, 추가 필드나 disclosure, fallback 상태, 출처 hash 중 어느 하나라도 다르면 BLOCKED. 일치하면 `reason=only_reading_id_payload_change_unattested`로 HELD만 반환한다.
+- **원래 Saju 응답이 Production 발급자에게서 왔다는 증거는 이 함수가 갖고 있지 않다.** 그러므로 source signature + normalized request/birth revision + DB transform의 Owner 승인·인가 영수증이 없으면 `canMapReadingId=false`, `canPersist/canDisclose/canPublish/canSell=false`가 변하지 않는다. 단지 내용 차이가 한 필드뿐이라는 사실로 Reader/Records 공식 권한을 열거나 S3 strict-ID 검사를 완화하지 않는다.
+- 원본 Response·해시·Subject 값은 서버 내부 입력 전용이다. 검사의 출력에는 민감한 식별자, 전문, SourceUnit, hash, 인증 서명이나 Reader 구매권을 포함하지 않는다.
+
+## S3 Preview 서명 전송 증명과 native-ID 전체 원본 결속 · 2026-10-22
+
+`apps/api/src/saju-held-transport-db-reading-handoff-v1.ts`는 **이미 있던** `verifySajuHeldSourceProofV1`의 HMAC·요청 정규화 digest·서버가 보관한 caller nonce·issuer/audience/keyId·유효 시간·공유 nonce 1회 선점 결과와, 위 `inspectSajuDbReadingIdOnlyResponseParityV1`를 동일 서버 내부 호출에서 결속한다.
+
+1. 인증된 서버에서 보관한 `expectedRequestBody`와 `expectedNonce`, 기존 신뢰 설정 및 **원래 Saju Preview proof envelope**를 그대로 입력한다. 사용자·브라우저가 전달한 `sajuHandoff`·nonce·sourceEnvelope를 인증 입력으로 직접 취급하지 않는다.
+2. HMAC/issuer/nonce/TTL 검증이 실패하면 Records SQL 조회 전에 즉시 `BLOCKED`. 성공 후에도 `verifiedSource`와 in-process SourceUnit handoff의 `snapshotId`, `interpretationRunId`, `registrySnapshotId`, `executionId`, `preparationId`, `selectionId`, `profileRef(id/version/contentHash)`, `evidenceBundleHash`, `readingId`, `responseId`, `responseBodyHash` 일치를 요구한다. 원래 Proof material은 변경하거나 재서명하지 않는다.
+3. 정확한 DB Reader의 Subject/Reading 범위로 기존 Records Owner `getOfficialReadingRecord`를 **한 번만** 실행한다. 그 결과를 native Saju 서명 envelope의 **실제 전체 응답 객체**와 비교하여 DB UUID를 native ID로 표시했을 때 다른 필드는 전부 동일한 경우만 `HELD`로 남긴다.
+4. 동일 nonce 두 번째 소비, 다른 요청/대상/서명, 프로필/Registry/Response ID 교환, DB 기록 접근 거부나 데이터 변조는 `BLOCKED`로 끝나며, 개인정보 본문·서명·nonce·해시·Reading ID는 결과 객체에 포함하지 않는다.
+5. `transportIntegrity=VERIFIED`는 **Preview 서버 간 메시지의 진위·무결성만** 의미한다. Production Source 의미/출시 권한이나 Saju native ID↔DB UUID 변환 인가는 절대 아니다. 결과 `sourceAuthority/mappingAuthority/privacyApproval/currentAccessAuthority=NOT_EVALUATED`, `canMapReadingId/canPersist/canDisclose/canPublish/canSell=false`, `s5AtomicStorage/s7Delivery=DB_OWNER_REQUIRED`를 고정한다.
+
+### 미완료 Owner 인수
+
+- Saju #2410 Production Source issuer 및 실 인증/키 정책·실행 권한·규칙 Registry, DB/Privacy #2301 Draft의 Subject/Birth Revision/저장 Response 변환 영수증·서버 비공개 nonce 저장·실 T2 보호 저장이 선행 조건이다.
+- 기존 #2456·#2459·#2461의 S5→S6→S7 연속성/재전송 검사와 본 함수의 결과를 사용자 화면이나 Commerce 증빙으로 공개하지 않는다. Reader/Records의 접근 권한 및 S7 ACK 유효성은 매 요청 별도 DB Owner 정본 검증에 의존한다.
+- 이 모듈은 운영 배포·새 HTTP/DB API·Production 발급·매핑 승인·실제 유료 원문 저장/재전송을 수행하지 않는다.
+
+## S3 서명 원본부터 S5 보호 저장/S7 영수증까지 한 DB Records 조회로 결속
+
+`apps/api/src/saju-held-source-db-s5-s7-evidence-v1.ts`는 **#2473의 Saju Preview HMAC 전송 검증·native-ID↔DB-UUID 전체 응답 비교**와 **#2448의 S5/S6/S7 같은 Reading 보호 본문 메타데이터 검증**을 하나의 서버 내부 호출로 연결한다. 기존 두 검사 함수가 DB Records Owner의 같은 Subject·Reading을 조회할 때 **호출 범위에 한한 인가된 Raw Records 결과를 1회만 가져와** 그 결과를 다시 재사용한다. 세션 사이 캐시나 새로운 SQL/GRANT는 없다.
+
+- S6의 보호 암호문 `OfficialReaderProtectedBodyIdentityV1`는 **명하 DB에 저장된 v2 Response**의 `sha256:v1:<canonical hash>`에 결속된다. 반면 Saju signed Preview의 `responseBodyHash`는 **native Reading ID가 담긴 Saju 원본 v2 응답의 hash**이다. 두 ID가 다르면 전체 응답 해시도 달라야 정상이며, 이 둘을 억지로 같다고 두거나 서로 복사해 매핑 승인으로 사용하지 않는다.
+- DB Reader scope의 `Subject/Thread/Turn/Attempt/SafeMessage/OfficialReading/Reader/Bundle/Release/Product`와 S5 commit, 기존 S6 재조회 metadata, DB 보호 암호문 AAD witness가 정확히 같아야 한다. `originatingEntitlementGrantId`는 구조만 확인하고 실제 현재 Grant/환불/Privacy Lease 승인이라고 주장하지 않는다. 이것은 DB/Privacy Owner #2301의 **기존 S1 잠금·T2 트랜잭션**에서 별도 검사해야 한다.
+- S7 준비가 없다면 ACK를 허용하지 않는다. 준비가 있으면 `subjectId / threadId / safeMessageId / bodyId / deliveryRequestId / deliveryAttemptId / responsePreparedAt`가 기존 S7 DB Owner metadata와 같아야 하며, 인증 ACK의 시각은 S7 준비 이후여야 한다. 재전송/환불·반복 ACK는 기존 #2461 및 DB Owner의 별도 정책 검사를 따른다.
+- Preview HMAC/issuer/keyId/nonce/정규화 요청·원본 Response 검증 실패는 DB 기록 조회 전에 종료한다. Saju 실행 지문 또는 DB source-unit/full-response, 본문 ID/Reader/ACK가 다르면 BLOCKED. 결과는 `transportIntegrity` 및 `evidenceStage` 라벨 외 식별자·영수증·암호문·원문·nonce/서명을 절대 포함하지 않는다.
+- 성공해도 **`HELD`, `sourceAuthority/mappingAuthority/privacyApproval/currentAccessAuthority=NOT_EVALUATED`, `canMapReadingId/canPersist/canDisclose/canPublish/canSell=false`**이다. Saju #2410 Production Source 발급·DB Owner #2301 승인 영수증이 나오기 전에는 기존 strict-ID S3 gate를 완화하거나 실제 유료 저장/송신/재열람을 연결하지 않는다.
+
+이 구현은 새 Source issuer 또는 DB 권한을 발급하지 않는다. 운영 연결 시 서버가 **이미 DB Owner S6 보호 행에서 인증한 AAD witness**만 전달해야 하며, 브라우저가 구성한 가상 witness나 과거 S6/ACK 결과를 현재 권한으로 삼을 수 없다.

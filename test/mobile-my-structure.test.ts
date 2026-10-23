@@ -13,7 +13,9 @@ describe('mobile M4-C My structure', () => {
     expect(screen).not.toContain('Authorization');
     expect(screen).toContain('useMobileMyV1');
     expect(screen).toContain('useMobileMemberAuthV1');
-    expect(screen).toContain('MyTargetPersonsSection');
+    expect(screen).toContain('MyMemberAuthCard');
+    expect(screen).not.toContain('MyTargetPersonsSection');
+    expect(screen).not.toContain('MyTargetPersonCreateCard');
   });
 
   it('exposes Member login without moving credentials into the screen layer', async () => {
@@ -41,7 +43,7 @@ describe('mobile M4-C My structure', () => {
     expect(service).not.toContain('merge-guest');
   });
 
-  it('opens Target Person create only while keeping later mutations closed', async () => {
+  it('preserves Target Person service for future Compatibility without displaying Add Person in My', async () => {
     const screen = await readRepoFile('apps/mobile/src/app/(tabs)/my/index.tsx');
     const component = await readRepoFile(
       'apps/mobile/src/features/my/MyTargetPersons.tsx',
@@ -58,6 +60,9 @@ describe('mobile M4-C My structure', () => {
     expect(component).not.toContain('수정하기');
     expect(component).not.toContain('삭제하기');
     expect(component).not.toContain('궁합 보기');
+    expect(screen).not.toContain('MyTargetPersonCreateCard');
+    expect(screen).not.toContain('MyTargetPersonsEmpty');
+    expect(screen).not.toContain('MyTargetPersonsSection');
     expect(screen).not.toContain('/api/target-persons');
     expect(screen).not.toContain('fetch(');
   });

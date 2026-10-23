@@ -1,0 +1,57 @@
+name: '[WT:character-memory] KEY2 first six real Gold screens once'
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/seyeon-c08-key2-first-six-real.trigger'
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: seyeon-c08-key2-first-six-real-lifetime-once
+  cancel-in-progress: false
+
+jobs:
+  evaluate:
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && github.run_attempt == 1 }}
+    name: Six bounded original/compact synthetic real-model calls
+    runs-on: ubuntu-24.04
+    environment: production
+    timeout-minutes: 14
+    steps:
+      - name: Checkout main revision without reusable Git credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Node 24
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install audited dependency lockfile
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Verify unique-run gate and fixed six-call Gold before dispatch
+        run: npx vitest run test/seyeon-c08-key2-first-run-admission-v1.test.mjs test/seyeon-cost-c08t-owner-budget-pilot-v1.test.mjs
+      - name: Build exact revision
+        run: npm run build
+      - name: Execute one paid six-call synthetic Gold screen with KEY2
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OPENAI_API_KEY2: ${{ secrets.OPENAI_API_KEY2 }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${OPENAI_API_KEY2:-}"
+          node scripts/run-seyeon-c08-key2-first-six-real-v1.mjs
+      - name: Retain numeric-only evidence for final review
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: seyeon-c08-key2-first-six-real-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/seyeon-c08-key2-first-six/
+          if-no-files-found: warn
+          retention-days: 14

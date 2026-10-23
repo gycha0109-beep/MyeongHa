@@ -51,6 +51,19 @@ describe('DB PR router', () => {
     });
   });
 
+  it('routes C08 two-session fixture changes to the real PG17 suite without Commerce fan-out', () => {
+    for (const fixturePath of [
+      'test/db/seyeon_c08_first_turn_local_pg17.sh',
+      'test/db/seyeon_c08_two_session_census_race_pg17.sh',
+      'test/db/seyeon_c08k_receive_rpc_two_session_pg17.sh',
+    ]) {
+      const result = route([fixturePath]);
+      expect(result.suites).toEqual(['postgres17']);
+      expect(result.pg17Cases).toContain('seyeon-c08-first-turn-local-pg17');
+      expect(result.pg15Cases).toEqual([]);
+    }
+  });
+
   it('routes Character/Chat migrations to content and PostgreSQL 17 without Commerce fan-out', () => {
     const result = route([
       'supabase/migrations/1308_chat_turn_execution_runtime_authority.sql',

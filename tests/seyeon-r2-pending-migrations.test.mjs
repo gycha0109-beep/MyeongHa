@@ -1,0 +1,192 @@
+import { describe, expect, it } from 'vitest';
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, copyFileSync, rmSync, unlinkSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { gitBlobSha, validateR2PendingInventory } from '../scripts/operations/verify-seyeon-r2-pending-migrations.mjs';
+
+const repoRoot = resolve(fileURLToPath(new URL('..', import.meta.url)));
+const inventory = JSON.parse(readFileSync(
+  join(repoRoot, 'scripts/operations/seyeon-r2-pending-migration-inventory.json'), 'utf8'));
+
+function withFixture(run) {
+  const root = mkdtempSync(join(tmpdir(), 'seyeon-r2-pending-'));
+  const migrationDir = join(root, 'supabase', 'migrations');
+  mkdirSync(migrationDir, { recursive: true });
+  for (const row of inventory.migrations) {
+    copyFileSync(join(repoRoot, 'supabase', 'migrations', row.file), join(migrationDir, row.file));
+  }
+  const manifest = structuredClone(inventory);
+  try { return run(root, migrationDir, manifest); }
+  finally { rmSync(root, { recursive: true, force: true }); }
+}
+
+describe('R2 held 1520..1720 pending migration dependency inventory', () => {
+  it('pins exactly 21 source files and nine ordered non-executable Owner review units', () => {
+    withFixture((root, dir, manifest) => {
+      const result = validateR2PendingInventory(root, manifest);
+      expect(result).toMatchObject({ migrationCount: 21, reviewUnitCount: 9,
+        readOnly: true, drReady: false, authorizedForProduction: false,
+        status: 'HOLD_OWNER_RECONCILIATION_REQUIRED' });
+      expect(result.reviewUnits.every(unit => unit.approval === 'HOLD_OWNER_REVIEW' && unit.executable === false)).toBe(true);
+    });
+  });
+  it('fails closed on modified migration SQL', () => {
+    withFixture((root, dir, manifest) => {
+      const file = join(dir, manifest.migrations[4].file);
+      writeFileSync(file, readFileSync(file, 'utf8') + '\n-- mutation\n');
+      expect(() => validateR2PendingInventory(root, manifest)).toThrow('HOLD_R2_SQL_CONTENT_DRIFT_1560');
+    });
+  });
+  it('rejects missing files, unexpected duplicates and remote-only versions', () => {
+    withFixture((root, dir, manifest) => {
+      unlinkSync(join(dir, manifest.migrations[1].file));
+      expect(() => validateR2PendingInventory(root, manifest)).toThrow('HOLD_R2_MIGRATION_DIRECTORY_DRIFT');
+    });
+    withFixture((root, dir, manifest) => {
+      writeFileSync(join(dir, '1560_injected_shadow.sql'), 'select 1;');
+      expect(() => validateR2PendingInventory(root, manifest)).toThrow('HOLD_R2_MIGRATION_DIRECTORY_DRIFT');
+    });
+    withFixture((root, dir, manifest) => {
+      writeFileSync(join(dir, '20261008090417_remote_only.sql'), 'select 1;');
+      expect(() => validateR2PendingInventory(root, manifest)).toThrow('HOLD_R2_REMOTE_ONLY_VERSION_CHECKED_IN');
+    });
+  });
+  it('rejects future dependency, duplicate prerequisite and version swaps', () => {
+    withFixture((root, dir, manifest) => {
+      manifest.migrations[6].requires = ['1710'];
+      expect(() => validateR2PendingInventory(root, manifest)).toThrow('HOLD_R2_NON_FORWARD_DEPENDENCY');
+    });
+    withFixture((root, dir, manifest) => {
+      manifest.migrations[6].requires = ['1550', '1550'];
+      expect(() => validateR2PendingInventory(root, manifest)).toThrow('HOLD_R2_NON_FORWARD_DEPENDENCY');
+    });
+    withFixture((root, dir, manifest) => {
+      manifest.migrations[1].version = '1540';
+      expect(() => validateR2PendingInventory(root, manifest)).toThrow('HOLD_R2_VERSION_OR_FILENAME_DRIFT');
+    });
+  });
+  it('rejects implicit Production authorization and altered Owner approval', () => {
+    withFixture((root, dir, manifest) => {
+      manifest.authorizedForProduction = true;
+      expect(() => validateR2PendingInventory(root, manifest)).toThrow('HOLD_R2_UNAUTHORIZED_PROMOTION');
+    });
+    withFixture((root, dir, manifest) => {
+      manifest.migrations[0].approval = 'APPROVED';
+      expect(() => validateR2PendingInventory(root, manifest)).toThrow('HOLD_R2_APPROVAL_OR_OWNER_DRIFT');
+    });
+  });
+  it('rejects omitted 1560 runtime dependency of 1570 observability', () => {
+    withFixture((root, dir, manifest) => {
+      manifest.migrations.find(row => row.version === '1570').requires = ['1550'];
+      expect(() => validateR2PendingInventory(root, manifest))
+        .toThrow('HOLD_R2_1570_MISSING_LIFECYCLE_DEPENDENCY');
+    });
+  });
+  it('rejects omitted 1630 executor dependency of 1670 governed Guest lock', () => {
+    withFixture((root, dir, manifest) => {
+      manifest.migrations.find(row => row.version === '1670').requires = [];
+      expect(() => validateR2PendingInventory(root, manifest))
+        .toThrow('HOLD_R2_1670_MISSING_GOVERNED_EXECUTOR_DEPENDENCY');
+    });
+  });
+  it('rejects omitted 1630 executor dependency of 1690 detached worker', () => {
+    withFixture((root, dir, manifest) => {
+      manifest.migrations.find(row => row.version === '1690').requires = ['1590', '1610'];
+      expect(() => validateR2PendingInventory(root, manifest))
+        .toThrow('HOLD_R2_1690_MISSING_GOVERNED_EXECUTOR_DEPENDENCY');
+    });
+  });
+  it('rejects mutated 1690 role or commit fence even if blob is re-pinned', () => {
+    withFixture((root, dir, manifest) => {
+      const row = manifest.migrations.find(x => x.version === '1690');
+      const file = join(dir, row.file);
+      const modified = readFileSync(file, 'utf8').replace(/^commit;$/m, 'select 1;');
+      writeFileSync(file, modified);
+      row.blobSha = gitBlobSha(Buffer.from(modified));
+      expect(() => validateR2PendingInventory(root, manifest))
+        .toThrow('HOLD_R2_1690_ROLE_TRANSACTION_BOUNDARY_DRIFT');
+    });
+  });
+  it('rejects unsafe 1670 transaction-boundary source even if digest is re-pinned', () => {
+    withFixture((root, dir, manifest) => {
+      const row = manifest.migrations.find(x => x.version === '1670');
+      const file = join(dir, row.file);
+      const modified = readFileSync(file, 'utf8').replace(/^commit;$/m, 'select 1;');
+      writeFileSync(file, modified);
+      row.blobSha = gitBlobSha(Buffer.from(modified));
+      expect(() => validateR2PendingInventory(root, manifest))
+        .toThrow('HOLD_R2_1670_TRANSACTION_BOUNDARY_OR_ROLE_DRIFT');
+    });
+  });
+  it('rejects missing 1580 Governor rate/ledger dependency of 1700', () => {
+    withFixture((root, dir, manifest) => {
+      manifest.migrations.find(row => row.version === '1700').requires = ['1550'];
+      expect(() => validateR2PendingInventory(root, manifest))
+        .toThrow('HOLD_R2_1700_MISSING_GOVERNOR_RATE_DEPENDENCY');
+    });
+  });
+  it('rejects changed receipt trigger source even when blob is re-pinned', () => {
+    withFixture((root, dir, manifest) => {
+      const row = manifest.migrations.find(x => x.version === '1700');
+      const file = join(dir,row.file);
+      const altered = readFileSync(file, 'utf8')
+        .replace('create trigger pin_seyeon_governed_reservation_receipt_v1',
+          'create trigger unexpected_receipt_pin');
+      writeFileSync(file,altered);
+      row.blobSha = gitBlobSha(Buffer.from(altered));
+      expect(() => validateR2PendingInventory(root, manifest))
+        .toThrow('HOLD_R2_1700_RECEIPT_TRIGGER_SOURCE_DRIFT');
+    });
+  });
+  it('rejects missing 1690 worker and 1700 pinned-receipt dependencies for 1710', () => {
+    withFixture((root, dir, manifest) => {
+      manifest.migrations.find(row => row.version === '1710').requires = ['1550','1580','1630'];
+      expect(() => validateR2PendingInventory(root, manifest))
+        .toThrow('HOLD_R2_1710_MISSING_GOVERNOR_RECEIPT_WORKER_DEPENDENCY');
+    });
+  });
+  it('rejects altered 1710 worker ACL source even if blob is re-pinned', () => {
+    withFixture((root, dir, manifest) => {
+      const row = manifest.migrations.find(x => x.version === '1710');
+      const file = join(dir,row.file);
+      const altered = readFileSync(file, 'utf8')
+        .replace('myeongha_seyeon_settlement_worker','fake_worker_role');
+      writeFileSync(file,altered);
+      row.blobSha = gitBlobSha(Buffer.from(altered));
+      expect(() => validateR2PendingInventory(root, manifest))
+        .toThrow('HOLD_R2_1710_RPC_OWNER_ROLE_SOURCE_DRIFT');
+    });
+  });
+  it('rejects altered 1720 pseudo-PUBLIC assertion even when SQL blob is re-pinned', () => {
+    withFixture((root, dir, manifest) => {
+      const row = manifest.migrations.find(x=>x.version==='1720');
+      const file = join(dir,row.file);
+      const altered = readFileSync(file, 'utf8').replace(
+        "pg_catalog.has_function_privilege(\n      'public',",
+        "pg_catalog.has_function_privilege(\n      'authenticated',");
+      writeFileSync(file,altered);
+      row.blobSha = gitBlobSha(Buffer.from(altered));
+      expect(() => validateR2PendingInventory(root, manifest))
+        .toThrow('HOLD_R2_1720_PUBLIC_ROLE_CHECK_OR_SCOPE_SOURCE_DRIFT');
+    });
+  });
+  it('rejects changed review-unit order or count', () => {
+    withFixture((root, dir, manifest) => {
+      manifest.migrations[5].unit = 'deletion';
+      expect(() => validateR2PendingInventory(root, manifest)).toThrow('HOLD_R2_REVIEW_UNIT_ORDER');
+    });
+  });
+  it('rejects missing proof even when new SQL blob is intentionally re-pinned', () => {
+    withFixture((root, dir, manifest) => {
+      const row = manifest.migrations[0];
+      const file = join(dir, row.file);
+      const replaced = readFileSync(file, 'utf8').replace(/create\s+or\s+replace\s+function\s+public\.internal_finalize_account_deletion_db_v1/iu,
+        'create or replace function public.fake_account_deletion_finalizer');
+      expect(replaced).not.toBe(readFileSync(file, 'utf8'));
+      writeFileSync(file, replaced);
+      row.blobSha = gitBlobSha(Buffer.from(replaced));
+      expect(() => validateR2PendingInventory(root, manifest)).toThrow('HOLD_R2_PROOF_OBJECT_MISSING_1520');
+    });
+  });
+});

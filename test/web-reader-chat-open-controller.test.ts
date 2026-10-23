@@ -11,7 +11,7 @@ function readyScene(readerCharacterId = 'taegyeom') {
     readerCharacterId,
     officialReadingId: 'reading-1',
     presentation: Object.freeze({
-      name: '대리자',
+      name: '연결자',
       title: '',
       intro: '',
       generic: true,

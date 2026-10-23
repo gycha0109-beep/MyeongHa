@@ -82,6 +82,17 @@ export function useMobileRecordsV1() {
     }, []),
   );
 
+  const refreshAll = useCallback(async () => {
+    // A manual refresh must bypass per-subject cache but never replay prior
+    // owner rows after a credential change or a screen blur.
+    if (!focused.current) return;
+    const epoch = focusEpoch.current;
+    const pending = mobileRecordsControllerV1.loadInitialAll({ force: true });
+    setSnapshots(sync());
+    const result = await pending;
+    if (focused.current && epoch === focusEpoch.current) setSnapshots(result);
+  }, []);
+
   const retryFailed = useCallback(async (tab: RecordsTabV1) => {
     const keys: readonly MobileRecordsCollectionKeyV1[] = tab === 'all'
       ? ['life', 'readings', 'memories']
@@ -106,6 +117,7 @@ export function useMobileRecordsV1() {
     snapshots,
     retryFailed,
     loadMore,
+    refreshAll,
   });
 }
 

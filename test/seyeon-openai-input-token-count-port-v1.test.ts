@@ -161,6 +161,112 @@ describe('PR-04D2 OpenAI exact input-token counter (offline, no API calls)',()=>
     }
   });
 
+
+  it('bounds count response streams before memory allocation and blocks oversized headers',async()=>{
+    const body=JSON.stringify({
+      model:policy.modelKey,store:false,max_output_tokens:800,
+      instructions:'hello',input:[{role:'user',content:[{type:'input_text',text:'x'}]}],
+      text:{format:{type:'json_schema',schema:request.responseSchema}},
+    });
+    const countBodyBytes=new TextEncoder().encode(body).byteLength;
+    for(const makeResponse of [
+      () => new Response(new ReadableStream<Uint8Array>({
+        start(controller){
+          controller.enqueue(new Uint8Array(4096));
+          controller.enqueue(new Uint8Array(4097));
+          controller.close();
+        },
+      }),{headers:{'content-type':'application/json'}}),
+      () => new Response('{"object":"response.input_tokens","input_tokens":100}',{
+        headers:{'content-type':'application/json','content-length':'999999999'},
+      }),
+    ]) {
+      const countFetch=vi.fn(async()=>makeResponse());
+      const governor=createSeyeonOpenAiInputTokenCountAdmissionV1(makeConfig(countFetch));
+      await expect(governor.certifiedInputTokenUpperBound(
+        request,countBodyBytes,body,
+      )).rejects.toThrow('Input token count response was oversized.');
+      expect(countFetch).toHaveBeenCalledOnce();
+    }
+  });
+
+  it('aborts a count response whose body stalls and rejects JSON lookalike content types',async()=>{
+    const body=JSON.stringify({
+      model:policy.modelKey,store:false,max_output_tokens:800,
+      instructions:'hello',input:[{role:'user',content:[{type:'input_text',text:'x'}]}],
+      text:{format:{type:'json_schema',schema:request.responseSchema}},
+    });
+    const countBodyBytes=new TextEncoder().encode(body).byteLength;
+    const stalled=vi.fn(async()=>new Response(new ReadableStream<Uint8Array>({
+      start(controller){ controller.enqueue(new TextEncoder().encode('{"object":')); },
+    }),{headers:{'content-type':'application/json'}}));
+    const governor=createSeyeonOpenAiInputTokenCountAdmissionV1({
+      ...makeConfig(stalled),timeoutMs:20,
+    });
+    await expect(governor.certifiedInputTokenUpperBound(
+      request,countBodyBytes,body,
+    )).rejects.toThrow('Input token count response body failed or timed out.');
+    expect(stalled).toHaveBeenCalledOnce();
+    const forged=vi.fn(async()=>new Response(
+      '{"object":"response.input_tokens","input_tokens":100}',
+      {headers:{'content-type':'application/jsonp'}},
+    ));
+    await expect(createSeyeonOpenAiInputTokenCountAdmissionV1(
+      makeConfig(forged),
+    ).certifiedInputTokenUpperBound(request,countBodyBytes,body))
+      .rejects.toThrow('unknown format');
+    expect(forged).toHaveBeenCalledOnce();
+  });
+
+
+  it('fails closed when token-count transport ignores abort before headers',async()=>{
+    let expired:AbortSignal|undefined;
+    const stalled=vi.fn((_url:string,init:RequestInit)=>{
+      expired=init.signal as AbortSignal;
+      // Simulate a fetch adapter that never handles AbortSignal at all.
+      return new Promise<Response>(()=>undefined);
+    });
+    const generate=vi.fn(async()=>modelReply());
+    const db=vi.fn();
+    const provider=createPersistingSeyeonAiProviderV1({
+      config:{apiKey:serverKey,model:policy.modelKey,maxOutputTokens:800,
+        priceQuote:policy.priceQuote,fetchImpl:generate},
+      runner:runner(db),getBinding:()=>binding,
+      governor:createSeyeonOpenAiInputTokenCountAdmissionV1({
+        ...makeConfig(stalled),timeoutMs:25,
+      }),
+    });
+    await expect(provider.generate(request)).rejects.toMatchObject({
+      code:'PRE_DISPATCH_REJECTED',
+    });
+    expect(expired?.aborted).toBe(true);
+    expect(stalled).toHaveBeenCalledOnce();
+    expect(db).not.toHaveBeenCalled();
+    expect(generate).not.toHaveBeenCalled();
+  });
+
+  it('never accepts a late token-count receipt after its header deadline',async()=>{
+    let resolveLate:((response:Response)=>void)|undefined;
+    const late=vi.fn((_url:string,_init:RequestInit)=>new Promise<Response>(
+      resolve=>{resolveLate=resolve;},
+    ));
+    const governor=createSeyeonOpenAiInputTokenCountAdmissionV1({
+      ...makeConfig(late),timeoutMs:25,
+    });
+    const body=JSON.stringify({
+      model:policy.modelKey,store:false,max_output_tokens:800,
+      instructions:'hello',input:[{role:'user',content:[{type:'input_text',text:'x'}]}],
+      text:{format:{type:'json_schema',schema:request.responseSchema}},
+    });
+    await expect(governor.certifiedInputTokenUpperBound(
+      request,new TextEncoder().encode(body).byteLength,body,
+    )).rejects.toThrow('Input token count request failed or exceeded its deadline.');
+    expect(resolveLate).toBeDefined();
+    resolveLate?.(Response.json({object:'response.input_tokens',input_tokens:100}));
+    // Late successful headers cannot revive a rejected authorization.
+    expect(late).toHaveBeenCalledOnce();
+  });
+
   it('rejects forbidden framing, divergent body bytes, invalid policy, and network errors',async()=>{
     const count=vi.fn(async()=>Response.json({
       object:'response.input_tokens',input_tokens:100,

@@ -10,6 +10,7 @@ import {
   type MobileReaderPresentationIdV1,
 } from '@/features/reading/mobile-reader-presentation';
 import { mobileColors } from '@/ui/mobile-colors';
+import { MobileUiText } from '@/ui/MobileUiText';
 
 export function MobileOfficialReadingReaderEntry({
   record,
@@ -21,9 +22,9 @@ export function MobileOfficialReadingReaderEntry({
 
   return (
     <View style={styles.panel}>
-      <Text style={styles.eyebrow}>READER · 준비 중</Text>
-      <Text style={styles.title}>이 공식 사주를 읽어줄 인물</Text>
-      <Text style={styles.copy}>공식 Reading 기반의 Reader 소개입니다. 해설 실행 및 후속 대화는 제공되지 않습니다.</Text>
+      <MobileUiText style={styles.eyebrow}>READER · 준비 중</MobileUiText>
+      <MobileUiText style={styles.title}>이 공식 사주를 읽어줄 인물</MobileUiText>
+      <MobileUiText style={styles.copy}>공식 Reading 기반의 Reader 소개입니다. 해설 실행 및 후속 대화는 제공되지 않습니다.</MobileUiText>
       <View style={styles.grid}>
         {MOBILE_READER_PRESENTATIONS_V1.map((reader) => (
           <Pressable
@@ -50,18 +51,18 @@ export function MobileOfficialReadingReaderEntry({
       <View style={styles.introduction} accessibilityLiveRegion="polite">
         <Text style={styles.introductionTitle}>{selectedReader.name} · {selectedReader.title}</Text>
         <Text style={styles.copy}>{selectedReader.tone}</Text>
-        <Text style={styles.copy}>
+        <MobileUiText style={styles.copy}>
           현재 선택은 인물 소개를 보기 위한 것입니다. 이 Reader의 구매 접근권, 공식 Reading 열람 또는 전용 Thread가 생성되지 않습니다.
-        </Text>
+        </MobileUiText>
       </View>
-      <Text style={styles.name}>해설 진입 상태</Text>
+      <MobileUiText style={styles.name}>해설 진입 상태</MobileUiText>
       <Text style={styles.copy}>{entry.statusMessage}</Text>
       <View accessible accessibilityLabel="Reader 해설 진입 비활성" style={styles.disabled}>
-        <Text style={styles.disabledText}>해설 서비스 준비 중</Text>
+        <MobileUiText style={styles.disabledText}>해설 서비스 준비 중</MobileUiText>
       </View>
-      <Text style={styles.copy}>
+      <MobileUiText style={styles.copy}>
         Reader 소개 및 기록 연결은 상품 적격성, 구매 접근권, 공개 승인, 공식 Reading 접근 허가의 증명이 아닙니다.
-      </Text>
+      </MobileUiText>
     </View>
   );
 }

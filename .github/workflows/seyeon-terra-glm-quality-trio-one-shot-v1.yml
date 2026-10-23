@@ -1,0 +1,56 @@
+name: '[WT:character-memory] Luna+Terra versus GLM three public persona cases owner-visible dialogue'
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/seyeon-terra-glm-quality-trio.trigger'
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: seyeon-terra-glm-quality-trio-lifetime-once
+  cancel-in-progress: false
+jobs:
+  evaluate:
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && github.run_attempt == 1 }}
+    environment: production
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Checkout exact main SHA
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.sha }}
+      - name: Setup Node 24
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Verify existing guards and once-only public comparison
+        run: |
+          set -euo pipefail
+          npm ci --ignore-scripts --no-audit --no-fund
+          npx vitest run test/seyeon-terra-glm-quality-trio-v1.test.mjs test/seyeon-live-dialogue-owner-key-first-pair-v1.test.mjs test/seyeon-openrouter-glm53flash-paid-preflight-v1.test.mjs test/openrouter-seyeon-evaluation-provider-v1.test.ts
+          npm run build
+          node --check scripts/run-seyeon-terra-glm-quality-trio-v1.mjs
+      - name: One bounded pair with public-only guarded dialogue reveal
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        run: |
+          set -euo pipefail
+          set +x
+          test -n "$OPENAI_API_KEY"
+          test -n "$OPENROUTER_API_KEY"
+          node scripts/run-seyeon-terra-glm-quality-trio-v1.mjs
+      - name: Upload numeric-only evidence excluding dialogue texts
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: seyeon-terra-glm-quality-trio-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/seyeon-terra-glm-quality-trio/
+          if-no-files-found: warn
+          retention-days: 14

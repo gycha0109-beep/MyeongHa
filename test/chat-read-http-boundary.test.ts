@@ -46,6 +46,7 @@ class FakeConnection implements PostgresSubjectConnectionV1 {
   readonly releases: unknown[] = [];
   bindingError: unknown;
   streamRows: readonly Record<string, unknown>[] | undefined;
+  participantCharacterIds: readonly string[] = [PRIMARY_CHARACTER_ID, OTHER_CHARACTER_ID];
 
   async query<Row = Record<string, unknown>>(
     text: string,
@@ -67,7 +68,7 @@ class FakeConnection implements PostgresSubjectConnectionV1 {
           activeContentReleaseId: RELEASE_ID,
           activeContentBundleId: BUNDLE_ID,
           contentRevision: 7,
-          participantCharacterIds: [PRIMARY_CHARACTER_ID, OTHER_CHARACTER_ID],
+          participantCharacterIds: this.participantCharacterIds,
         }] as unknown as readonly Row[],
       };
     }
@@ -211,6 +212,89 @@ describe('owner Chat read HTTP boundary', () => {
     expect(f.connection.calls[4]?.values).toEqual([SUBJECT_ID, THREAD_ID]);
     expect(f.connection.calls[5]?.values).toEqual([SUBJECT_ID, THREAD_ID, 0, 50]);
     expect(f.connection.calls[6]?.values).toEqual([SUBJECT_ID, PRIMARY_CHARACTER_ID]);
+  });
+
+  it.each([
+    ['primary', ['seyeon', OTHER_CHARACTER_ID]],
+    ['secondary', [PRIMARY_CHARACTER_ID, 'seyeon']],
+  ] as const)('holds Se-yeon %s Chat GET before any stream or relationship read', async (_position, participants) => {
+    const f = fixture();
+    f.connection.participantCharacterIds = participants;
+    f.connection.streamRows = [{
+      messageId: '96000000-0000-4000-8000-000000000001',
+      sequenceNo: 4,
+      senderType: 'character',
+      characterId: 'seyeon',
+      bodyText: 'PRIVATE_HISTORY_CANARY_NEVER_REVEAL',
+      messagePayloadJsonb: { canary: 'PRIVATE_PAYLOAD_CANARY' },
+      messageSchemaVersion: 'v1',
+      createdAt: new Date('2026-09-05T15:00:00.000Z'),
+      redacted: false,
+      redactedAt: null,
+    }];
+
+    const response = await handleChatReadRequestV1(f.input);
+    const body = await response.text();
+    expect(response.status).toBe(503);
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    expect(JSON.parse(body)).toMatchObject({
+      ok: false,
+      error: { code: 'SEYEON_HISTORY_REVEAL_HOLD', retryable: false },
+    });
+    expect(body).not.toContain('PRIVATE_HISTORY_CANARY_NEVER_REVEAL');
+    expect(body).not.toContain('PRIVATE_PAYLOAD_CANARY');
+    expect(callTexts(f.connection).some(x => x.includes('qry_chat_thread_stream_v2'))).toBe(false);
+    expect(callTexts(f.connection).some(x => x.includes('qry_character_relationship_v1'))).toBe(false);
+    expect(callTexts(f.connection).at(-1)).toBe('ROLLBACK');
+  });
+
+  it('holds an old Se-yeon speaker even when current DB participants exclude Se-yeon', async () => {
+    const f = fixture(`https://myeongha.test/api/chat/${THREAD_ID}?afterSequenceNo=0&pageSize=1`);
+    f.connection.participantCharacterIds = [PRIMARY_CHARACTER_ID, OTHER_CHARACTER_ID];
+    f.connection.streamRows = [
+      {
+        messageId: '96000000-0000-4000-8000-000000000001',
+        sequenceNo: 4,
+        senderType: 'character',
+        characterId: PRIMARY_CHARACTER_ID,
+        bodyText: 'current-character-text',
+        messagePayloadJsonb: {},
+        messageSchemaVersion: 'v1',
+        createdAt: new Date('2026-09-05T15:00:00.000Z'),
+        redacted: false,
+        redactedAt: null,
+      },
+      {
+        messageId: '96000000-0000-4000-8000-000000000002',
+        sequenceNo: 5,
+        senderType: 'character',
+        characterId: 'seyeon',
+        bodyText: 'HISTORICAL_SEYEON_PRIVATE_CANARY',
+        messagePayloadJsonb: { secret: 'HISTORICAL_SEYEON_PAYLOAD' },
+        messageSchemaVersion: 'v1',
+        createdAt: new Date('2026-09-05T15:01:00.000Z'),
+        redacted: false,
+        redactedAt: null,
+      },
+    ];
+
+    const response = await handleChatReadRequestV1(f.input);
+    const body = await response.text();
+    expect(response.status).toBe(503);
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    expect(body).toContain('SEYEON_HISTORY_REVEAL_HOLD');
+    expect(body).not.toContain('HISTORICAL_SEYEON_PRIVATE_CANARY');
+    expect(body).not.toContain('HISTORICAL_SEYEON_PAYLOAD');
+    expect(callTexts(f.connection).some(q => q.includes('qry_chat_thread_stream_v2'))).toBe(true);
+    expect(callTexts(f.connection).some(q => q.includes('qry_character_relationship_v1'))).toBe(false);
+    expect(callTexts(f.connection).at(-1)).toBe('ROLLBACK');
+  });
+
+  it('does not block other Characters just because a client asks to impersonate Se-yeon', async () => {
+    const f = fixture();
+    const result = await handleChatReadRequestV1(f.input);
+    expect(result.status).toBe(200);
+    expect(callTexts(f.connection).some(x => x.includes('qry_chat_thread_stream_v2'))).toBe(true);
   });
 
   it('uses pageSize + 1 rows to derive a bounded next sequence cursor', async () => {

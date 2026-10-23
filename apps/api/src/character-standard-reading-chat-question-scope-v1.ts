@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { canonicalJson } from '../../../packages/domain/src/index.js';
+import { canonicalJson, evaluateCapabilitySecuritySignalsV1 } from '../../../packages/domain/src/index.js';
 import {
   assertServerPreparedStandardChatPreflightV2,
   type CharacterStandardReadingChatTurnPreflightV2,
@@ -92,6 +92,40 @@ const REFERENCES_TO_PRIOR_ANSWER = Object.freeze([
 const EXACT_READING_REFERENCE =
   /^방금 본 (.+) 해석을 (?:조금 )?더 (?:쉽게 )?설명해 ?주세요[.!?]?$/u;
 
+const EXACT_OWNED_READING_SUMMARY =
+  /^구매한 사주를 (?:(?:간단히|짧게|핵심만|한 줄로) )?(?:요약|정리)해 ?(?:주세요|줘)[.!?]?$/u;
+const EXACT_DOMAIN_READING_SUMMARY =
+  /^방금 본 (.+) 해석을 (?:(?:간단히|짧게|핵심만|한 줄로) )?(?:요약|정리)해 ?(?:주세요|줘)[.!?]?$/u;
+
+/**
+ * RR-05 lexical-only domain boundary for short Official Reading summaries.
+ * The permitted aliases come from the SAME existing domain registry as
+ * exact follow-up explanation; this never establishes purchase entitlement,
+ * Saju source evidence, Reader access or public reply authorization.
+ */
+export function classifyExactOfficialReadingSummaryReferenceV1(
+  text: unknown,
+  admittedDomain: string,
+): 'admitted' | 'unsupported_question' | 'new_authority_required' {
+  if (typeof text !== 'string' || text.length > 240 ||
+      /[\u0000-\u001f\u007f\u200b-\u200f\u202a-\u202e\u2060-\u206f]/u.test(text)) {
+    return 'unsupported_question';
+  }
+  const normalized = text.normalize('NFKC').trim().replace(/ +/gu, ' ');
+  if (normalized.length === 0 || normalized.length > 160) {
+    return 'unsupported_question';
+  }
+  if (SOURCE_CHANGE_REQUEST.test(normalized)) {
+    return 'new_authority_required';
+  }
+  if (EXACT_OWNED_READING_SUMMARY.test(normalized)) return 'admitted';
+  const match = EXACT_DOMAIN_READING_SUMMARY.exec(normalized);
+  if (!match) return 'unsupported_question';
+  return DOMAIN_NAMES[admittedDomain]?.includes(match[1] ?? '') === true
+    ? 'admitted' : 'new_authority_required';
+}
+
+
 /**
  * Lexical check only. Does not select a Unit or prove an Official Reading grant.
  * Unlike follow-up pronouns, initial entry must refer explicitly to the
@@ -175,6 +209,51 @@ export function classifyCharacterStandardFollowupLexicalIntentV1(
 }
 
 /**
+ * RR-05 request intent and Security signals are independent axes.
+ * These deterministic observations do not replace the Content Policy gate,
+ * classify all risky questions, or authorize a Reader/Reading/Unit.
+ * No model call or provider-owned instruction is accepted here.
+ */
+export type CharacterStandardFollowupSecuritySignalV1 =
+  | 'instruction_override_attempt'
+  | 'new_source_authority'
+  | 'invalid_input';
+
+export interface CharacterStandardFollowupSignalAssessmentV1 {
+  readonly intent: CharacterStandardFollowupLexicalIntentV1;
+  readonly securitySignals: readonly CharacterStandardFollowupSecuritySignalV1[];
+}
+
+const INSTRUCTION_OVERRIDE_ATTEMPT =
+  /(?:이전|상위|시스템|개발자)\s*(?:지침|규칙|명령|메시지)[^.!?]{0,80}(?:무시|변경|덮어|따르지)|(?:ignore|override)\s+(?:all\s+)?(?:previous|system|developer)\s+(?:instructions|rules)|<\|im_start\|>|\[\s*system\s*\]|(?:^|\n)\s*(?:system|developer)\s*:/iu;
+
+export function inspectCharacterStandardFollowupSignalsV1(
+  text: unknown,
+  admittedDomain: string,
+): CharacterStandardFollowupSignalAssessmentV1 {
+  const intent = classifyCharacterStandardFollowupLexicalIntentV1(text, admittedDomain);
+  const signals: CharacterStandardFollowupSecuritySignalV1[] = [];
+  if (typeof text !== 'string' || text.length > 240 ||
+      /[\u0000-\u001f\u007f\u200b-\u200f\u202a-\u202e\u2060-\u206f]/u.test(text)) {
+    signals.push('invalid_input');
+  }
+  if (typeof text === 'string') {
+    const normalized = text.normalize('NFKC');
+    if (INSTRUCTION_OVERRIDE_ATTEMPT.test(normalized)) {
+      signals.push('instruction_override_attempt');
+    }
+    if (SOURCE_CHANGE_REQUEST.test(normalized) ||
+        intent === 'new_authority_required') {
+      signals.push('new_source_authority');
+    }
+  }
+  return Object.freeze({
+    intent,
+    securitySignals: Object.freeze(signals),
+  });
+}
+
+/**
  * A3-iota: conservative language admission for a follow-up to the last committed
  * semantic-guard-passed assistant answer.
  *
@@ -197,10 +276,19 @@ export async function classifyCharacterStandardFollowupQuestionScopeV1(input: Re
   const questionText = input.preflight.receivePlan.normalizedRequest.text;
   if (typeof questionText !== 'string') return hold('unsupported_question');
 
-  const kind = classifyCharacterStandardFollowupLexicalIntentV1(
+  const assessment = inspectCharacterStandardFollowupSignalsV1(
     questionText, input.grounded.scope.sajuDomain,
   );
-  if (kind !== 'admitted') return hold(kind);
+  const securityVeto = evaluateCapabilitySecuritySignalsV1(assessment.securitySignals);
+  if (securityVeto === 'SECURITY_INPUT_INVALID' ||
+      securityVeto === 'SECURITY_INSTRUCTION_OVERRIDE_DENIED' ||
+      securityVeto === 'SECURITY_SIGNAL_INVALID') {
+    return hold('unsupported_question');
+  }
+  // Preserve the lexical scope result (including multiple_intents) rather
+  // than converting a mixed question into a new policy/permission.
+  if (assessment.intent !== 'admitted') return hold(assessment.intent);
+  if (securityVeto !== null) return hold('new_authority_required');
 
   const evidence = await selectCharacterStandardFollowupEvidenceV1(input);
   if (evidence.mode === 'hold') return hold(evidence.reason);

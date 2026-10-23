@@ -1,4 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
+import {syntheticFirstTurnCensusShadowV1} from './fixtures/seyeon-first-turn-census-shadow-v1.js';
+
 import {
   createSeyeonFastDialogueShadowV1,
   SEYEON_FAST_DIALOGUE_SHADOW_RESPONSE_SCHEMA_V1,
@@ -6,16 +8,14 @@ import {
 import { assembleSeyeonRuntimeContextV2, type SeyeonRuntimeContextV2 } from '../packages/domain/src/index.js';
 
 function publicContext(): SeyeonRuntimeContextV2 {
-  return {
-    character: { characterId: 'seyeon' },
-    integrity: { governedPreflightApplied: true, decisions: [] },
-    disclosure: { decision: null, retrievedSources: [] },
+  return assembleSeyeonRuntimeContextV2({
+    relationship: null,
+    recentMessages: [{ messageId: 'u1', role: 'user', text: '안녕, 세연아.' }],
     retrievedMemories: [],
-    relationship: null, relationshipSemantics: null,
-    recentConversation: [], actionPolicy: {
-      allowedActionKeys: ['approach'], allowedExpressionStates: ['baseline'],
-    },
-  } as unknown as SeyeonRuntimeContextV2;
+    integrityDecisions: [],
+    governedPreflightApplied: true,
+    disclosure: { decision: null, retrievedSources: [] },
+  });
 }
 
 describe('Seyeon low-risk combined dialogue Shadow', () => {
@@ -61,6 +61,7 @@ describe('Seyeon low-risk combined dialogue Shadow', () => {
     const shadow = createSeyeonFastDialogueShadowV1({
       candidateProvider: { providerKey: 'test', modelKey: 'test', generate },
       reviewerProvider: { providerKey: 'test', modelKey: 'test', generate: reviewer },
+    fullThreadCensus: syntheticFirstTurnCensusShadowV1(),
     });
     const result = await shadow.evaluate(context);
     expect(result.scope).toBe('SHADOW_ONLY_NOT_PRODUCTION');
@@ -77,6 +78,7 @@ describe('Seyeon low-risk combined dialogue Shadow', () => {
     const shadow = createSeyeonFastDialogueShadowV1({
       candidateProvider: { providerKey: 'test', modelKey: 'test', generate },
       reviewerProvider: { providerKey: 'test', modelKey: 'test', generate: review },
+    fullThreadCensus: syntheticFirstTurnCensusShadowV1(),
     });
     await expect(shadow.evaluate(publicContext())).rejects.toMatchObject({
       code: 'FAST_INTERPRETATION_GUARD_REJECTED',
@@ -95,6 +97,7 @@ describe('Seyeon low-risk combined dialogue Shadow', () => {
     const shadow = createSeyeonFastDialogueShadowV1({
       candidateProvider: { providerKey: 'test', modelKey: 'test', generate },
       reviewerProvider: { providerKey: 'test', modelKey: 'test', generate },
+    fullThreadCensus: syntheticFirstTurnCensusShadowV1(),
     });
     const base = publicContext();
     const inputs = [
@@ -118,6 +121,7 @@ describe('Seyeon low-risk combined dialogue Shadow', () => {
     const shadow = createSeyeonFastDialogueShadowV1({
       candidateProvider: { providerKey: 'test', modelKey: 'test', generate },
       reviewerProvider: { providerKey: 'test', modelKey: 'test', generate: reviewer },
+    fullThreadCensus: syntheticFirstTurnCensusShadowV1(),
     });
     await expect(shadow.evaluate(publicContext())).rejects.toThrow('invalid outer response');
     expect(reviewer).not.toHaveBeenCalled();

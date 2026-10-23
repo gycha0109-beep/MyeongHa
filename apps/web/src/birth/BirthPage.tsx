@@ -25,8 +25,8 @@ function requestFromForm(form: HTMLFormElement) {
   if (!birthDate) {
     throw new BirthRuntimeError('WEB_BIRTH_INVALID_REQUEST', '생년월일을 입력해 주세요.');
   }
-  if (timeKnown && !birthTime) {
-    throw new BirthRuntimeError('WEB_BIRTH_INVALID_REQUEST', '태어난 시각을 입력하거나 시각 모름을 선택해 주세요.');
+  if (timeKnown && !/^(?:[01][0-9]|2[0-3]):[0-5][0-9]$/u.test(birthTime ?? '')) {
+    throw new BirthRuntimeError('WEB_BIRTH_INVALID_REQUEST', '태어난 시각을 HH:mm 형식(00:00~23:59)으로 입력해 주세요.');
   }
 
   return Object.freeze({
@@ -98,7 +98,7 @@ function CreateForm({ view, busy, onSubmit }: { view: BirthView; busy: boolean; 
   return (
     <form className="panel birth-panel" id="birth-form" noValidate hidden={!visible} onSubmit={onSubmit}>
       <div className="form-row"><label className="form-label" htmlFor="birth-date">생년월일</label><div><input className="input" id="birth-date" name="birthDate" type="date" required /><div className="fine">선택한 달력 기준의 날짜를 입력합니다.</div></div></div>
-      <div className="form-row"><label className="form-label" htmlFor="birth-time">태어난 시각</label><div><div className="field-grid two"><input className="input" id="birth-time" name="birthTime" type="time" step="60" required={!timeUnknown} disabled={timeUnknown} /><label style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-soft)' }}><input id="birth-time-unknown" name="timeUnknown" type="checkbox" onChange={(event) => setTimeUnknown(event.currentTarget.checked)} /> 시각 모름</label></div><div className="fine">시각을 모르면 별도 추정값을 만들지 않고 null로 저장합니다.</div></div></div>
+      <div className="form-row"><label className="form-label" htmlFor="birth-time">태어난 시각</label><div><div className="field-grid two"><input className="input" id="birth-time" name="birthTime" type="text" inputMode="numeric" autoComplete="off" placeholder="HH:mm" maxLength={5} pattern="(?:[01][0-9]|2[0-3]):[0-5][0-9]" aria-label="태어난 시각 (24시간제 HH:mm)" required={!timeUnknown} disabled={timeUnknown} /><label style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-soft)' }}><input id="birth-time-unknown" name="timeUnknown" type="checkbox" onChange={(event) => setTimeUnknown(event.currentTarget.checked)} /> 시각 모름</label></div><div className="fine">시각을 모르면 별도 추정값을 만들지 않고 null로 저장합니다.</div></div></div>
       <div className="form-row"><span className="form-label">달력 기준</span><div><div className="choice-line"><label><input type="radio" name="calendar" value="solar" defaultChecked onChange={() => setCalendar('solar')} /> 양력 (Solar)</label><label><input type="radio" name="calendar" value="lunar" onChange={() => setCalendar('lunar')} /> 음력 (Lunar)</label></div><label id="birth-leap-wrap" style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12, color: 'var(--text-soft)' }} hidden={calendar !== 'lunar'}><input id="birth-leap-month" name="isLeapMonth" type="checkbox" disabled={calendar !== 'lunar'} /> 윤달</label></div></div>
       <div className="form-row"><label className="form-label" htmlFor="birth-sex">성별 입력</label><div><select className="select" id="birth-sex" name="sex"><option value="">선택하지 않음</option><option value="male">남성</option><option value="female">여성</option><option value="unspecified">미지정</option></select><div className="fine">선택하지 않으면 null로 전송합니다.</div></div></div>
       <div className="birth-submit"><button className="button button-primary" id="birth-submit-button" type="submit" disabled={busy}>{busy ? '확인 중…' : '명식록 저장하기 →'}</button></div>

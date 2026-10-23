@@ -1,4 +1,10 @@
 import { ensureActiveBearer, getActiveBearer, invalidateGuestSession, invalidateMemberSession } from './product-auth.js';
+import { getUiLocale } from './ui-i18n.js';
+import {
+  sajuPillarLabelV1, sajuElementLabelV1, sajuYinYangLabelV1,
+  projectSajuPillarDisplayV1, sajuCompletenessLabelV1,
+  sajuCurrentYearLabelV1, localizeSajuCopyV1,
+} from './saju-calculation-locale.js';
 
 const BIRTH_PROFILE_ID_KEY = 'myeongha.guestBirthProfileId.v1';
 const BIRTH_PROFILE_ENDPOINT = '/api/birth-profiles';
@@ -231,7 +237,7 @@ function buildBirthRequest() {
   const birthTime = timeKnown ? byId('saju-birth-time').value : null;
   const sexValue = byId('saju-birth-sex').value;
 
-  if (timeKnown && !birthTime) throw new Error('출생시간을 입력하거나 시간 모름을 선택해 주세요.');
+  if (timeKnown && !/^(?:[01][0-9]|2[0-3]):[0-5][0-9]$/u.test(birthTime ?? '')) throw new Error('출생시간을 HH:mm 형식(00:00~23:59)으로 입력해 주세요.');
 
   return Object.freeze({
     label: null,
@@ -268,19 +274,8 @@ function resolvedPillar(state) {
     : null;
 }
 
-function pillarDisplay(state) {
-  const resolved = resolvedPillar(state);
-  if (resolved) {
-    const stem = resolved.stem;
-    const branch = resolved.branch;
-    return {
-      characters: `${stem?.hanja || stem?.value || ''}${branch?.hanja || branch?.value || ''}` || '—',
-      text: `${stem?.value || ''}${branch?.value || ''}` || '확정',
-      meta: [stem?.element, branch?.element].filter(Boolean).join(' · ') || '계산 완료',
-    };
-  }
-  if (state?.status === 'ambiguous') return { characters: '◇', text: '복수 후보', meta: '경계 시각 확인 필요' };
-  return { characters: '—', text: '확인 불가', meta: state?.reasonCode || '계산 정보 없음' };
+function pillarDisplay(state, locale = getUiLocale()) {
+  return projectSajuPillarDisplayV1(state, locale);
 }
 
 function renderPillars(snapshot) {
@@ -292,22 +287,32 @@ function renderPillars(snapshot) {
     const display = pillarDisplay(state);
     const card = document.createElement('div');
     card.className = `saju-pillar${key === 'day' ? ' is-day' : ''}`;
+    card.dataset.sajuPillarKey = key;
+    // Keep source display facts on the already-authorized UI nodes to permit
+    // locale switches without recalculating or making a new network request.
 
     const cardLabel = document.createElement('span');
     cardLabel.className = 'saju-pillar-label';
-    cardLabel.textContent = label;
+    cardLabel.textContent = sajuPillarLabelV1(key, getUiLocale()) ?? label;
 
     const value = document.createElement('div');
     value.className = 'saju-pillar-value';
     const strong = document.createElement('strong');
     strong.textContent = display.characters;
+    strong.dataset.sajuSourceCharacters = display.characters;
     const text = document.createElement('span');
     text.textContent = display.text;
+    text.dataset.sajuKo = pillarDisplay(state, 'ko-KR').text;
+    text.dataset.sajuJa = pillarDisplay(state, 'ja-JP').text;
+    text.dataset.sajuZh = pillarDisplay(state, 'zh-TW').text;
     value.append(strong, text);
 
     const meta = document.createElement('span');
     meta.className = 'saju-pillar-meta';
     meta.textContent = display.meta;
+    meta.dataset.sajuKo = pillarDisplay(state, 'ko-KR').meta;
+    meta.dataset.sajuJa = pillarDisplay(state, 'ja-JP').meta;
+    meta.dataset.sajuZh = pillarDisplay(state, 'zh-TW').meta;
     card.append(cardLabel, value, meta);
     grid.append(card);
   }
@@ -335,7 +340,8 @@ function renderElements(snapshot) {
     const item = document.createElement('span');
     item.className = 'saju-element';
     const label = document.createElement('b');
-    label.textContent = element;
+    label.textContent = sajuElementLabelV1(element, getUiLocale());
+    label.dataset.sajuElementKey = element;
     const bar = document.createElement('i');
     bar.style.setProperty('--element-fill', `${Math.round((counts[element] / max) * 100)}%`);
     const value = document.createElement('small');
@@ -345,14 +351,51 @@ function renderElements(snapshot) {
   }
 }
 
-function formatBirthSummary(profile) {
+function formatBirthSummary(profile, locale = 'ko-KR') {
   const input = profile?.currentRevision?.input;
-  if (!input || typeof input !== 'object') return '현재 자기 Birth Profile과 연결된 계산 결과입니다.';
+  if (!input || typeof input !== 'object') return localizeSajuCopyV1('현재 자기 Birth Profile과 연결된 계산 결과입니다.',locale);
   const date = typeof input.birthDate === 'string' ? input.birthDate.replaceAll('-', '.') : null;
-  const time = input.timeKnown && typeof input.birthTime === 'string' ? input.birthTime.slice(0, 5) : '시간 모름';
-  const calendar = input.calendarType === 'lunar' ? '음력' : input.calendarType === 'solar' ? '양력' : null;
-  return [date, time, calendar].filter(Boolean).join(' · ') || '현재 자기 Birth Profile과 연결된 계산 결과입니다.';
+  const time = input.timeKnown && typeof input.birthTime === 'string' ? input.birthTime.slice(0, 5) : localizeSajuCopyV1('시간 모름',locale);
+  const calendar = input.calendarType === 'lunar' ? localizeSajuCopyV1('음력',locale) : input.calendarType === 'solar' ? localizeSajuCopyV1('양력',locale) : null;
+  return [date, time, calendar].filter(Boolean).join(' · ') || localizeSajuCopyV1('현재 자기 Birth Profile과 연결된 계산 결과입니다.',locale);
 }
+
+function retranslateCalculatedSaju() {
+  const hub = document.getElementById('saju-hub');
+  if (!hub || hub.hidden) return;
+  const locale = getUiLocale();
+  const suffix = locale === 'ja-JP' ? 'Ja' : locale === 'zh-TW' ? 'Zh' : 'Ko';
+  for (const card of hub.querySelectorAll('[data-saju-pillar-key]')) {
+    const key = card.dataset.sajuPillarKey;
+    const label = card.querySelector('.saju-pillar-label');
+    if (label) label.textContent = sajuPillarLabelV1(key,locale) ?? label.textContent;
+    const text = card.querySelector('.saju-pillar-value span');
+    if (text) text.textContent = text.dataset['saju' + suffix] ?? text.textContent;
+    const meta = card.querySelector('.saju-pillar-meta');
+    if (meta) meta.textContent = meta.dataset['saju' + suffix] ?? meta.textContent;
+  }
+  for (const label of hub.querySelectorAll('[data-saju-element-key]')) {
+    label.textContent = sajuElementLabelV1(label.dataset.sajuElementKey,locale);
+  }
+  const dayMaster = byId('saju-day-master');
+  dayMaster.textContent = locale === 'ko-KR' ? dayMaster.dataset.sajuKo : dayMaster.dataset.sajuIntl;
+  const meta = byId('saju-day-master-meta');
+  meta.textContent = meta.dataset.sajuElement
+    ? `${sajuElementLabelV1(meta.dataset.sajuElement,locale)} · ${sajuYinYangLabelV1(meta.dataset.sajuYinYang || '음양 미확인',locale)}`
+    : localizeSajuCopyV1('일주가 확정될 때 표시됩니다.',locale);
+  const completeness = byId('saju-completeness-title');
+  completeness.textContent = sajuCompletenessLabelV1(Number(completeness.dataset.sajuResolvedCount),completeness.dataset.sajuComplete === 'true',locale);
+  byId('saju-completeness-copy').textContent = localizeSajuCopyV1(
+    byId('saju-completeness-copy').dataset.sajuTimeKnown === 'false'
+      ? '출생시간을 모르는 입력으로 계산되어 시주 등 일부 사실이 제한될 수 있습니다.'
+      : '현재 Birth Profile revision에 결속된 계산 결과입니다.',
+    locale,
+  );
+  const birthSummary = byId('saju-birth-summary');
+  birthSummary.textContent = birthSummary.dataset['saju' + suffix] ?? birthSummary.textContent;
+  byId('saju-flow-year').textContent = sajuCurrentYearLabelV1(new Date().getFullYear(),locale);
+}
+document.addEventListener('myeongha:localechange', retranslateCalculatedSaju);
 
 function renderCalculation(calculation, profile) {
   const snapshot = calculation?.snapshot;
@@ -362,21 +405,27 @@ function renderCalculation(calculation, profile) {
 
   const day = resolvedPillar(snapshot.pillars?.day);
   const dayStem = day?.stem;
-  byId('saju-day-master').textContent = dayStem ? `${dayStem.hanja || ''}${dayStem.value || ''}` || '—' : '—';
-  byId('saju-day-master-meta').textContent = dayStem
-    ? `${dayStem.element || '오행 미확인'} · ${dayStem.yinYang || '음양 미확인'}`
-    : '일주가 확정될 때 표시됩니다.';
+  const dayMaster = byId('saju-day-master');
+  const dayMasterMeta = byId('saju-day-master-meta');
+  dayMaster.dataset.sajuKo = dayStem ? `${dayStem.hanja || ''}${dayStem.value || ''}` || '—' : '—';
+  dayMaster.dataset.sajuIntl = dayStem ? dayStem.hanja || '—' : '—';
+  dayMasterMeta.dataset.sajuElement = dayStem?.element ?? '';
+  dayMasterMeta.dataset.sajuYinYang = dayStem?.yinYang ?? '';
 
   const completeness = snapshot.completeness;
   const resolvedCount = PILLARS.filter(([key]) => resolvedPillar(snapshot.pillars?.[key])).length;
-  byId('saju-completeness-title').textContent = completeness?.fullyResolved ? '네 기둥 계산 완료' : `${resolvedCount}/4 기둥 확정`;
-  byId('saju-completeness-copy').textContent = completeness?.birthTimeKnown === false
-    ? '출생시간을 모르는 입력으로 계산되어 시주 등 일부 사실이 제한될 수 있습니다.'
-    : '현재 Birth Profile revision에 결속된 계산 결과입니다.';
+  byId('saju-completeness-title').dataset.sajuResolvedCount = String(resolvedCount);
+  byId('saju-completeness-title').dataset.sajuComplete = completeness?.fullyResolved ? 'true' : 'false';
+  byId('saju-completeness-copy').dataset.sajuTimeKnown = completeness?.birthTimeKnown === false ? 'false' : 'true';
 
-  byId('saju-birth-summary').textContent = formatBirthSummary(profile);
-  byId('saju-flow-year').textContent = `${new Date().getFullYear()}년 · 올해의 흐름`;
+  const birthSummary = byId('saju-birth-summary');
+  birthSummary.textContent = formatBirthSummary(profile);
+  birthSummary.dataset.sajuKo = birthSummary.textContent;
+  // The date and time remain identical; only calendar/unknown-time labels change.
+  birthSummary.dataset.sajuJa = formatBirthSummary(profile, 'ja-JP');
+  birthSummary.dataset.sajuZh = formatBirthSummary(profile, 'zh-TW');
   setState('ready');
+  retranslateCalculatedSaju();
 }
 
 function storedProfileHasSupportedBirthDate(profile) {

@@ -1,5 +1,6 @@
 import { handleCurrentSubjectSajuCalculationRequestV1 } from './current-subject-saju-calculation-http.js';
-import { createNodePostgresSubjectPoolV1 } from './node-postgres-subject-pool.js';
+import type { PostgresSubjectPoolV1 } from './postgres-subject-execution.js';
+import { createProductionPostgresSubjectPoolLeaseV1 } from './production-postgres-subject-pool-lease.js';
 import { createProductionRequestIdentityVerifierV1 } from './production-request-identity-verifier.js';
 import {
   parseProductionSajuRuntimeConfigV1,
@@ -31,6 +32,8 @@ export interface ProductionCurrentSubjectSajuCalculationRuntimeV1 {
 
 export interface CreateProductionCurrentSubjectSajuCalculationRuntimeInputV1 {
   readonly env: ProductionSajuRuntimeEnvV1;
+  /** Reuse the existing restricted Member/Subject pool in a composed bridge. */
+  readonly pool?: PostgresSubjectPoolV1;
   /** Server-side test/runtime injection only. Never derived from the client request. */
   readonly memberFetchImpl?: SupabaseMemberVerifierFetchV1;
   /** Server-side test/runtime injection only. Never derived from the client request. */
@@ -66,7 +69,10 @@ export function createProductionCurrentSubjectSajuCalculationRuntimeV1(
 ): ProductionCurrentSubjectSajuCalculationRuntimeV1 {
   const userDataConfig = parseProductionUserDataRuntimeConfigV1(input.env);
   const sajuConfig = parseProductionSajuRuntimeConfigV1(input.env);
-  const pool = createNodePostgresSubjectPoolV1(userDataConfig);
+  const poolLease = createProductionPostgresSubjectPoolLeaseV1({
+    config: userDataConfig,
+    ...(input.pool === undefined ? {} : { pool: input.pool }),
+  });
   const identityEvidenceVerifier = createProductionRequestIdentityVerifierV1({
     config: userDataConfig,
     ...(input.memberFetchImpl === undefined
@@ -96,7 +102,7 @@ export function createProductionCurrentSubjectSajuCalculationRuntimeV1(
         requestId: requestInput.requestId,
         serverTime: requestInput.serverTime,
         identityEvidenceVerifier: observedIdentityEvidenceVerifier,
-        pool,
+        pool: poolLease.pool,
         sajuAdapter,
       });
 
@@ -116,7 +122,7 @@ export function createProductionCurrentSubjectSajuCalculationRuntimeV1(
       return response;
     },
     close() {
-      return pool.close();
+      return poolLease.close();
     },
   });
 }

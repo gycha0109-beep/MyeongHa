@@ -1,0 +1,155 @@
+# Phase 2 overlay. Loaded ONLY with --http <pinned local Saju checkout>.
+# Dependency preparation uses a disposable egress network. A scrubbed source
+# snapshot is copied into per-run writable volumes (never mutate host checkout).
+# Actual HTTP/HMAC verification is internal-only and mounts snapshots read-only.
+services:
+  saju-deps-myeongha:
+    image: node:24-bookworm-slim
+    working_dir: /myeongha
+    entrypoint: ["/bin/sh", "-eu", "-c"]
+    command:
+      - >-
+        tar -C /checkout -cf -
+        --exclude=.git --exclude=node_modules --exclude=.env --exclude='.env.*'
+        --exclude='*/.git' --exclude='*/node_modules'
+        --exclude='*/.env' --exclude='*/.env.*'
+        --exclude='.next' --exclude='.vercel' --exclude='coverage'
+        --exclude='*/.next' --exclude='*/.vercel' --exclude='*/coverage'
+        . | tar -C /myeongha -xf - &&
+        npm ci --ignore-scripts --no-audit --no-fund
+    volumes:
+      - type: bind
+        source: ${SAJU_BRIDGE_LOCAL_MYEONGHA_DIR:?repository-checkout-required}
+        target: /checkout
+        read_only: true
+      - type: volume
+        source: myeongha-workspace
+        target: /myeongha
+    networks: [npm-egress]
+
+  saju-deps-engine:
+    image: node:24-bookworm-slim
+    working_dir: /saju
+    entrypoint: ["/bin/sh", "-eu", "-c"]
+    command:
+      - >-
+        tar -C /checkout -cf -
+        --exclude=.git --exclude=node_modules --exclude=.env --exclude='.env.*'
+        --exclude='*/.git' --exclude='*/node_modules'
+        --exclude='*/.env' --exclude='*/.env.*'
+        --exclude='dist' --exclude='*/dist'
+        . | tar -C /saju -xf - &&
+        npm ci --ignore-scripts --no-audit --no-fund &&
+        npm run build &&
+        test -s dist/source-reading-proof-server.js
+    volumes:
+      - type: bind
+        source: ${SAJU_BRIDGE_LOCAL_SAJU_DIR:?pinned-saju-checkout-required}
+        target: /checkout
+        read_only: true
+      - type: volume
+        source: saju-workspace
+        target: /saju
+    networks: [npm-egress]
+
+  saju-http-verifier:
+    image: node:24-bookworm-slim
+    working_dir: /myeongha
+    entrypoint: ["node", "scripts/local/verify-saju-bridge-http.mjs", "/saju"]
+    volumes:
+      - type: volume
+        source: myeongha-workspace
+        target: /myeongha
+        # Vitest writes .vite-temp under node_modules; only the disposable
+        # snapshot is writable, never the host source bind mount.
+      - type: volume
+        source: saju-workspace
+        target: /saju
+        read_only: true
+    environment:
+      NODE_ENV: test
+    networks: [disposable]
+
+
+  saju-bootstrap-subject:
+    image: postgres:15
+    working_dir: /myeongha
+    entrypoint: ["/bin/sh", "-euc"]
+    command:
+      - |
+        test "$(psql -X -Atqc 'select current_database()')" = 'myeongha_saju_subject_local_verify'
+        psql -X -v ON_ERROR_STOP=1 -f test/db/bootstrap_supabase_auth_stub.sql
+        for migration in supabase/migrations/*.sql; do
+          psql -X -v ON_ERROR_STOP=1 -f "$$migration" >/dev/null
+        done
+        psql -X -v ON_ERROR_STOP=1 -f test/db/fixtures/saju_local_subject_birth_proof_e2e.sql
+        psql -X -v ON_ERROR_STOP=1 -v "subject_password=$$SAJU_BRIDGE_LOCAL_SUBJECT_LOGIN_PASSWORD" -f scripts/local/saju-bridge-subject-local-login.sql
+    environment:
+      PGHOST: subject-db
+      PGPORT: "5432"
+      PGUSER: postgres
+      PGDATABASE: myeongha_saju_subject_local_verify
+      PGPASSWORD: ${SAJU_BRIDGE_LOCAL_SUBJECT_DB_PASSWORD:?disposable-secret-required}
+      SAJU_BRIDGE_LOCAL_SUBJECT_LOGIN_PASSWORD: ${SAJU_BRIDGE_LOCAL_SUBJECT_LOGIN_PASSWORD:?disposable-secret-required}
+    volumes:
+      - type: volume
+        source: myeongha-workspace
+        target: /myeongha
+        read_only: true
+    networks: [disposable]
+
+  saju-bootstrap-nonce:
+    image: postgres:15
+    working_dir: /myeongha
+    entrypoint: ["/bin/sh", "-euc"]
+    command:
+      - |
+        test "$(psql -X -Atqc 'select current_database()')" = 'myeongha_saju_nonce_local_verify'
+        psql -X -v ON_ERROR_STOP=1 -f supabase/migrations/1540_saju_source_proof_nonce_claim_authority_v1.sql
+        psql -X -v ON_ERROR_STOP=1 -v "nonce_password=$$SAJU_BRIDGE_LOCAL_NONCE_LOGIN_PASSWORD" -f scripts/local/saju-bridge-nonce-local-login.sql
+    environment:
+      PGHOST: nonce-db
+      PGPORT: "5432"
+      PGUSER: postgres
+      PGDATABASE: myeongha_saju_nonce_local_verify
+      PGPASSWORD: ${SAJU_BRIDGE_LOCAL_NONCE_DB_PASSWORD:?disposable-secret-required}
+      SAJU_BRIDGE_LOCAL_NONCE_LOGIN_PASSWORD: ${SAJU_BRIDGE_LOCAL_NONCE_LOGIN_PASSWORD:?disposable-secret-required}
+    volumes:
+      - type: volume
+        source: myeongha-workspace
+        target: /myeongha
+        read_only: true
+    networks: [disposable]
+
+  saju-binding-verifier:
+    image: node:24-bookworm-slim
+    working_dir: /myeongha
+    entrypoint: ["node", "scripts/local/verify-saju-bridge-docker-binding.mjs", "/saju"]
+    volumes:
+      - type: volume
+        source: myeongha-workspace
+        target: /myeongha
+      - type: volume
+        source: saju-workspace
+        target: /saju
+        read_only: true
+    environment:
+      NODE_ENV: test
+      MYEONGHA_DOCKER_SAJU_BINDING: "1"
+      SAJU_BRIDGE_LOCAL_AUTH_URL: http://gotrue:9999
+      SAJU_BRIDGE_LOCAL_SUBJECT_HOST: subject-db
+      SAJU_BRIDGE_LOCAL_SUBJECT_DB: myeongha_saju_subject_local_verify
+      SAJU_BRIDGE_LOCAL_NONCE_HOST: nonce-db
+      SAJU_BRIDGE_LOCAL_NONCE_DB: myeongha_saju_nonce_local_verify
+      SAJU_BRIDGE_LOCAL_SUBJECT_DB_PASSWORD: ${SAJU_BRIDGE_LOCAL_SUBJECT_DB_PASSWORD:?disposable-secret-required}
+      SAJU_BRIDGE_LOCAL_SUBJECT_LOGIN_PASSWORD: ${SAJU_BRIDGE_LOCAL_SUBJECT_LOGIN_PASSWORD:?disposable-secret-required}
+      SAJU_BRIDGE_LOCAL_NONCE_LOGIN_PASSWORD: ${SAJU_BRIDGE_LOCAL_NONCE_LOGIN_PASSWORD:?disposable-secret-required}
+    networks: [disposable]
+
+networks:
+  npm-egress:
+    internal: false
+
+volumes:
+  myeongha-workspace:
+  saju-workspace:

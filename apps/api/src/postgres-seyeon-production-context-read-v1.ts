@@ -26,7 +26,8 @@ const PERSONAL_SQL = [
   ' record_kind as "recordKind", record_id::text as "recordId",',
   ' record_type as "recordType", schema_version as "schemaVersion",',
   ' record_payload_jsonb as "payload", grant_id::text as "grantId",',
-  ' grant_reason as "grantReason", granted_at::text as "grantedAt"',
+  ' grant_reason as "grantReason", granted_at::text as "grantedAt",',
+  " 'sha256:pg-jsonb:v1:' || encode(sha256(convert_to(record_payload_jsonb::text,'UTF8')),'hex') as \"rawRecordPgDigest\"",
   'from public.qry_seyeon_production_personal_record_context_v1($1::uuid,$2::text)',
 ].join('\n');
 
@@ -156,6 +157,9 @@ implements SeyeonProductionContextReadAuthorityPortV1 {
         recordType: str('personal record type', row.recordType),
         schemaVersion: str('personal record schema version', row.schemaVersion),
         payload: row.payload,
+        ...(row.rawRecordPgDigest === undefined ? {} : {
+          rawRecordPgDigest: str('original Pg JSONB digest', row.rawRecordPgDigest),
+        }),
         grantId: str('personal record grant id', row.grantId),
         grantReason: str('personal record grant reason', row.grantReason),
         grantedAt: timestamp('personal record granted timestamp', row.grantedAt),

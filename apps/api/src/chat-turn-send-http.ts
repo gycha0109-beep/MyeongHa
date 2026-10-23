@@ -1,13 +1,6 @@
 import { ApiCommandError } from './api-error.js';
-import {
-  AuthenticatedJsonRequestBodyTooLargeV1,
-  readAuthenticatedJsonRequestBodyV1,
-} from './authenticated-json-request-resource.js';
 import type { IdentityEvidenceVerificationPortV1 } from './current-subject-profile-http.js';
-import {
-  createIngressRequestBodyCompletionDeadlineLeaseV1,
-  IngressRequestBodyCompletionDeadlineExceededV1,
-} from './ingress-request-body-deadline.js';
+import type { VerifiedSubjectIdentityEvidenceV1 } from './subject-identity-resolver.js';
 import {
   OpenAiSeyeonStructuredProviderErrorV1,
 } from './openai-seyeon-structured-provider-v1.js';
@@ -18,10 +11,15 @@ import type {
 import {
   SeyeonProductionChatExecutionErrorV1,
 } from './seyeon-production-chat-execution-v1.js';
+import { SeyeonProductionPinMigrationRequiredV1 } from './production-seyeon-chat-runtime-v1.js';
+import { registerSeyeonStaticPreflightDenialV1 } from './seyeon-vercel-fetch-reveal-fence-v1.js';
+import { preflightSeyeonChatTurnSendCoreV1 } from './seyeon-chat-turn-send-preflight-core-v1.js';
+import {
+  assertSeyeonFirstHttpRevealAuthorizedV1,
+  SeyeonFirstHttpRevealHoldV1,
+} from './seyeon-first-http-reveal-hold-v1.js';
 
 const POST_METHOD = 'POST' as const;
-const ROUTE_PREFIX = '/api/chat/' as const;
-const ROUTE_SUFFIX = '/turns' as const;
 const API_CONTRACT_VERSION = 'v0.9' as const;
 const NO_STORE = 'no-store' as const;
 
@@ -43,41 +41,6 @@ export interface HandleSeyeonChatTurnSendRequestInputV1 {
   readonly runtime: Pick<ProductionSeyeonChatRuntimeV1, 'run'>;
 }
 
-type ParsedRouteV1 = Readonly<{ threadId: string }>;
-type ParsedBodyV1 = Readonly<{ clientTurnId: string; text: string }>;
-
-function isUuid(value: string): boolean {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(value);
-}
-
-function parseRoute(request: Request): ParsedRouteV1 | null {
-  const url = new URL(request.url);
-  if (url.search !== '' || url.hash !== '') return null;
-  if (!url.pathname.startsWith(ROUTE_PREFIX) || !url.pathname.endsWith(ROUTE_SUFFIX)) {
-    return null;
-  }
-  const raw = url.pathname.slice(ROUTE_PREFIX.length, -ROUTE_SUFFIX.length);
-  if (raw.length === 0 || raw.includes('/')) return null;
-  try {
-    const threadId = decodeURIComponent(raw);
-    return isUuid(threadId) ? Object.freeze({ threadId }) : null;
-  } catch {
-    return null;
-  }
-}
-
-function parseBody(value: unknown): ParsedBodyV1 | null {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
-  const record = value as Record<string, unknown>;
-  const keys = Object.keys(record).sort();
-  if (keys.length !== 2 || keys[0] !== 'clientTurnId' || keys[1] !== 'text') return null;
-  if (typeof record.clientTurnId !== 'string' || !isUuid(record.clientTurnId)) return null;
-  if (typeof record.text !== 'string') return null;
-  const text = record.text.trim();
-  if (text.length === 0 || text.length > 8000) return null;
-  return Object.freeze({ clientTurnId: record.clientTurnId, text });
-}
-
 function jsonError(input: {
   status: number;
   code: string;
@@ -85,7 +48,7 @@ function jsonError(input: {
   retryable: boolean;
   requestId: string;
 }): Response {
-  return Response.json({
+  const response = Response.json({
     ok: false,
     error: {
       code: input.code,
@@ -94,6 +57,9 @@ function jsonError(input: {
     },
     meta: { apiContractVersion: API_CONTRACT_VERSION, requestId: input.requestId },
   }, { status: input.status, headers: { 'Cache-Control': NO_STORE } });
+  return input.status >= 400 && input.status <= 499
+    ? registerSeyeonStaticPreflightDenialV1(response)
+    : response;
 }
 
 function success(
@@ -109,10 +75,10 @@ function success(
 }
 
 function methodNotAllowed(): Response {
-  return new Response(null, {
+  return registerSeyeonStaticPreflightDenialV1(new Response(null, {
     status: 405,
     headers: { Allow: POST_METHOD, 'Cache-Control': NO_STORE },
-  });
+  }));
 }
 
 function projectResult(result: RunProductionSeyeonChatResultV1) {
@@ -138,6 +104,24 @@ function postgresConstraint(error: unknown): string | null {
 }
 
 function mapExecutionError(error: unknown, requestId: string): Response | null {
+  if (error instanceof SeyeonFirstHttpRevealHoldV1) {
+    return jsonError({
+      status: 503,
+      code: error.code,
+      messageKey: 'chat.secure_reveal_unavailable',
+      retryable: false,
+      requestId,
+    });
+  }
+  if (error instanceof SeyeonProductionPinMigrationRequiredV1) {
+    return jsonError({
+      status: 503,
+      code: 'CAPABILITY_UNAVAILABLE',
+      messageKey: 'chat.secure_runtime_migration_required',
+      retryable: true,
+      requestId,
+    });
+  }
   if (error instanceof ApiCommandError) {
     switch (error.code) {
       case 'AUTH_REQUIRED':
@@ -199,6 +183,18 @@ function mapExecutionError(error: unknown, requestId: string): Response | null {
 
   const constraint = postgresConstraint(error);
   if (constraint === null) return null;
+  // A prior failed_retryable logical turn blocks a DIFFERENT clientTurnId.
+  // Keep the original Member turn/idempotency authority; do not abandon it.
+  if (constraint === 'cmd_chat_receive_turn_in_flight' ||
+      constraint === 'seyeon_chat_runtime_turn_in_flight') {
+    return jsonError({
+      status: 409,
+      code: 'TURN_IN_FLIGHT',
+      messageKey: 'chat.pending_turn_must_be_retried',
+      retryable: true,
+      requestId,
+    });
+  }
   if (constraint.includes('idempotency')) {
     return jsonError({
       status: 409,
@@ -233,56 +229,84 @@ function mapExecutionError(error: unknown, requestId: string): Response | null {
   return null;
 }
 
-async function readBody(request: Request): Promise<unknown> {
-  const deadline = createIngressRequestBodyCompletionDeadlineLeaseV1();
-  try {
-    return await readAuthenticatedJsonRequestBodyV1(request, {
-      waitForRead: (pending) => deadline.waitFor(pending),
-    });
-  } finally {
-    deadline.release();
+// All route/member/bounded-body decisions are shared with the Cloudflare
+// deny-only adapter. This Vercel wrapper maps the exact reason into the
+// existing registered-static 4xx envelope, retaining old HTTP behavior.
+export type SeyeonChatTurnSendPreflightResultV1 =
+  | Readonly<{ kind: 'denied'; response: Response }>
+  | Readonly<{
+      kind: 'admitted';
+      verifiedEvidence: Extract<VerifiedSubjectIdentityEvidenceV1, { kind: 'member' }>;
+      threadId: string;
+      clientTurnId: string;
+      text: string;
+    }>;
+
+export async function preflightSeyeonChatTurnSendRequestV1(input: Readonly<{
+  request: Request;
+  requestId: string;
+  identityEvidenceVerifier: IdentityEvidenceVerificationPortV1;
+}>): Promise<SeyeonChatTurnSendPreflightResultV1> {
+  const parsed = await preflightSeyeonChatTurnSendCoreV1({
+    request: input.request,
+    identityEvidenceVerifier: input.identityEvidenceVerifier,
+  });
+  if (parsed.kind === 'admitted') return parsed;
+
+  switch (parsed.reason) {
+    case 'not_found':
+      return { kind: 'denied', response: registerSeyeonStaticPreflightDenialV1(
+        new Response(null, { status: 404, headers: { 'Cache-Control': NO_STORE } }),
+      ) };
+    case 'method_not_allowed':
+      return { kind: 'denied', response: methodNotAllowed() };
+    case 'auth_required':
+      return { kind: 'denied', response: jsonError({
+        status: 401, code: 'AUTH_REQUIRED', messageKey: 'auth.required',
+        retryable: false, requestId: input.requestId,
+      }) };
+    case 'forbidden':
+      return { kind: 'denied', response: jsonError({
+        status: 403, code: 'FORBIDDEN', messageKey: 'chat.member_required',
+        retryable: false, requestId: input.requestId,
+      }) };
+    case 'request_too_large':
+      return { kind: 'denied', response: jsonError({
+        status: 413, code: 'REQUEST_TOO_LARGE', messageKey: 'request.too_large',
+        retryable: false, requestId: input.requestId,
+      }) };
+    case 'request_body_timeout':
+      return { kind: 'denied', response: jsonError({
+        status: 408, code: 'REQUEST_BODY_TIMEOUT', messageKey: 'auth.request_body_timeout',
+        retryable: false, requestId: input.requestId,
+      }) };
+    case 'invalid_request':
+      return { kind: 'denied', response: jsonError({
+        status: 400, code: 'INVALID_REQUEST', messageKey: 'request.invalid',
+        retryable: false, requestId: input.requestId,
+      }) };
   }
 }
 
 export async function handleSeyeonChatTurnSendRequestV1(
   input: HandleSeyeonChatTurnSendRequestInputV1,
 ): Promise<Response> {
-  const parsedRoute = parseRoute(input.request);
-  if (parsedRoute === null) return new Response(null, { status: 404, headers: { 'Cache-Control': NO_STORE } });
-  if (input.request.method !== POST_METHOD) return methodNotAllowed();
-
-  const verifiedEvidence = await input.identityEvidenceVerifier.verifyRequestIdentity(input.request);
-  if (verifiedEvidence === null) {
-    return jsonError({ status: 401, code: 'AUTH_REQUIRED', messageKey: 'auth.required', retryable: false, requestId: input.requestId });
-  }
-  if (verifiedEvidence.kind !== 'member') {
-    return jsonError({ status: 403, code: 'FORBIDDEN', messageKey: 'chat.member_required', retryable: false, requestId: input.requestId });
-  }
-
-  let rawBody: unknown;
-  try {
-    rawBody = await readBody(input.request);
-  } catch (error) {
-    if (error instanceof AuthenticatedJsonRequestBodyTooLargeV1) {
-      return jsonError({ status: 413, code: 'REQUEST_TOO_LARGE', messageKey: 'request.too_large', retryable: false, requestId: input.requestId });
-    }
-    if (error instanceof IngressRequestBodyCompletionDeadlineExceededV1) {
-      return jsonError({ status: 408, code: 'REQUEST_BODY_TIMEOUT', messageKey: 'auth.request_body_timeout', retryable: false, requestId: input.requestId });
-    }
-    return jsonError({ status: 400, code: 'INVALID_REQUEST', messageKey: 'request.invalid', retryable: false, requestId: input.requestId });
-  }
-
-  const body = parseBody(rawBody);
-  if (body === null) {
-    return jsonError({ status: 400, code: 'INVALID_REQUEST', messageKey: 'request.invalid', retryable: false, requestId: input.requestId });
-  }
+  const preflight = await preflightSeyeonChatTurnSendRequestV1({
+    request: input.request,
+    requestId: input.requestId,
+    identityEvidenceVerifier: input.identityEvidenceVerifier,
+  });
+  if (preflight.kind === 'denied') return preflight.response;
 
   try {
+    // G0/G3 current-rights Reveal has no DB-owned linearization seam yet.
+    // Block before costly runtime/provider calls or any response serialization.
+    assertSeyeonFirstHttpRevealAuthorizedV1();
     const result = await input.runtime.run({
-      verifiedEvidence,
-      threadId: parsedRoute.threadId,
-      clientTurnId: body.clientTurnId,
-      text: body.text,
+      verifiedEvidence: preflight.verifiedEvidence,
+      threadId: preflight.threadId,
+      clientTurnId: preflight.clientTurnId,
+      text: preflight.text,
     });
     return success(projectResult(result), input.requestId, input.serverTime);
   } catch (error) {

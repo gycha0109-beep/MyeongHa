@@ -138,7 +138,11 @@ describe('G1-B exact personal record runtime source selection, no DB authorizati
     const exact = runtime.indexOf('const exactModelPersonalSources = selectSeyeonExactModelPersonalSourcesV1({');
     const governance = runtime.indexOf('const governance = await resolveTurnGovernance({');
     const provider = runtime.indexOf('const runtime = await runSeyeonCharacterTurnV2({');
-    expect(exact).toBeGreaterThan(interlock);
+    expect(exact).toBeGreaterThan(-1);
+    expect(interlock).toBeGreaterThan(exact);
+    const positivePin = runtime.indexOf('await input.positivePersonalSourcePort.pinBeforeModel({');
+    expect(positivePin).toBeGreaterThan(interlock);
+    expect(positivePin).toBeLessThan(governance);
     expect(governance).toBeGreaterThan(exact);
     expect(provider).toBeGreaterThan(governance);
     const assembler = await readFile(

@@ -45,7 +45,9 @@ describe('web Birth Profile create authority boundary', () => {
   });
 
   it('preserves unknown birth time as null instead of inventing a time', () => {
-    expect(page).toContain('id="birth-time" name="birthTime" type="time"');
+    expect(page).toContain('id="birth-time" name="birthTime" type="text"');
+    expect(page).toContain('placeholder="HH:mm"');
+    expect(page).toContain('/^(?:[01][0-9]|2[0-3]):[0-5][0-9]$/u.test(birthTime');
     expect(page).toContain('id="birth-time-unknown" name="timeUnknown"');
     expect(page).toContain("const timeKnown = !data.has('timeUnknown')");
     expect(page).toContain("const birthTime = timeKnown ? String(data.get('birthTime') ?? '') : null");
