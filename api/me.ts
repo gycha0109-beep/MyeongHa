@@ -3,6 +3,8 @@ import { canonicalizeRequestUiLocaleHeadersV1 } from '../apps/api/src/request-ui
 import { createNodePostgresSubjectPoolV1 } from '../apps/api/src/node-postgres-subject-pool.js';
 import { createProductionChatReadRuntimeV1 } from '../apps/api/src/production-chat-read-runtime.js';
 import { createProductionSeyeonTurnSendRuntimeV1 } from '../apps/api/src/production-seyeon-turn-send-runtime-v1.js';
+import { createProductionRequestIdentityVerifierV1 } from '../apps/api/src/production-request-identity-verifier.js';
+import { handleSeyeonMemberMemoryGrantStatusRequestV1 } from '../apps/api/src/seyeon-member-memory-grant-status-http-v1.js';
 import { enforceSeyeonVercelFetchRevealFenceV1 } from '../apps/api/src/seyeon-vercel-fetch-reveal-fence-v1.js';
 import { createProductionCurrentSubjectProfileRuntimeV1 } from '../apps/api/src/production-current-subject-profile-runtime.js';
 import { createProductionCurrentSubjectSajuPreviewReadingRuntimeV1 } from '../apps/api/src/production-current-subject-saju-preview-reading-runtime.js';
@@ -22,6 +24,7 @@ const PROFILE_ROUTE = '/api/me' as const;
 const LIFE_RECORD_ROUTE = '/api/life-record' as const;
 const READINGS_ROUTE = '/api/readings' as const;
 const MEMORIES_ROUTE = '/api/memories' as const;
+const SEYEON_GRANT_STATUS_PARAM = '__myeongha_seyeon_memory_grant_status_id' as const;
 const CHAT_OPEN_ROUTE = '/api/chat' as const;
 const CHAT_ROUTE_PREFIX = '/api/chat/' as const;
 const CHAT_TURN_SEND_SUFFIX = '/turns' as const;
@@ -66,6 +69,9 @@ let chatRuntime:
   | undefined;
 let seyeonTurnSendRuntime:
   | ReturnType<typeof createProductionSeyeonTurnSendRuntimeV1>
+  | undefined;
+let seyeonMemoryGrantVerifier:
+  | ReturnType<typeof createProductionRequestIdentityVerifierV1>
   | undefined;
 let targetPersonRuntime:
   | ReturnType<typeof createProductionTargetPersonReadRuntimeV1>
@@ -127,6 +133,22 @@ function getChatRuntime(): ReturnType<typeof createProductionChatReadRuntimeV1> 
   return chatRuntime;
 }
 
+function getSeyeonMemoryGrantStatusRuntime() {
+  seyeonMemoryGrantVerifier ??= createProductionRequestIdentityVerifierV1({
+    config: parseProductionUserDataRuntimeConfigV1(process.env),
+  });
+  const identityEvidenceVerifier = seyeonMemoryGrantVerifier;
+  return Object.freeze({
+    handleRequest(input: { readonly request: Request; readonly requestId: string; readonly serverTime: string }) {
+      return handleSeyeonMemberMemoryGrantStatusRequestV1({
+        ...input,
+        identityEvidenceVerifier,
+        pool: getSharedPostgresPool(),
+      });
+    },
+  });
+}
+
 function getSeyeonTurnSendRuntime(): ReturnType<typeof createProductionSeyeonTurnSendRuntimeV1> {
   seyeonTurnSendRuntime ??= createProductionSeyeonTurnSendRuntimeV1({
     env: process.env,
@@ -175,6 +197,7 @@ type DispatchTarget =
       readonly route: typeof LIFE_RECORD_ROUTE | typeof READINGS_ROUTE | typeof MEMORIES_ROUTE;
       readonly readingId?: string;
     }
+  | { readonly kind: 'seyeon-memory-grant-status'; readonly route: string }
   | { readonly kind: 'chat-open'; readonly route: typeof CHAT_OPEN_ROUTE }
   | { readonly kind: 'chat-read'; readonly route: string; readonly afterSequenceNo?: string; readonly pageSize?: string }
   | { readonly kind: 'chat-turn-send'; readonly route: string; readonly threadId: string }
@@ -324,6 +347,7 @@ function resolveDispatchTarget(request: Request): DispatchTarget | null {
   const keys = [...new Set(url.searchParams.keys())];
   const knownKeys = new Set<string>([
     RECORDS_ROUTE_PARAM,
+    SEYEON_GRANT_STATUS_PARAM,
     READING_RECORD_ID_PARAM,
     CHAT_OPEN_PARAM,
     CHAT_THREAD_PARAM,
@@ -343,6 +367,15 @@ function resolveDispatchTarget(request: Request): DispatchTarget | null {
 
   const shareValue = getSingleNonEmptyParam(url.searchParams, VERCEL_SHARE_PARAM);
   if (shareValue === null) return null;
+
+  const grantStatusId = getSingleNonEmptyParam(url.searchParams, SEYEON_GRANT_STATUS_PARAM);
+  if (grantStatusId === null) return null;
+  if (grantStatusId !== undefined) {
+    if (url.pathname !== PROFILE_ROUTE || !isUuid(grantStatusId) ||
+        keys.some(key => key !== SEYEON_GRANT_STATUS_PARAM && key !== VERCEL_SHARE_PARAM)) return null;
+    return { kind: 'seyeon-memory-grant-status',
+      route: `${MEMORIES_ROUTE}/${grantStatusId}/grants/seyeon` };
+  }
 
   const recordsRoute = getSingleNonEmptyParam(url.searchParams, RECORDS_ROUTE_PARAM);
   if (recordsRoute === null) return null;
@@ -756,6 +789,8 @@ function runtimeForTarget(target: DispatchTarget) {
     case 'chat-open':
     case 'chat-read':
       return getChatRuntime();
+    case 'seyeon-memory-grant-status':
+      return getSeyeonMemoryGrantStatusRuntime();
     case 'chat-turn-send':
       return getSeyeonTurnSendRuntime();
     case 'target-person-list':
