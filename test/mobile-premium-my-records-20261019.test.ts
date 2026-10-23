@@ -10,7 +10,10 @@ describe('mobile premium My and Records presentation', () => {
     expect(screen).toContain('useMobileMyV1');
     expect(screen).toContain('useMobileMemberAuthV1');
     expect(screen).toContain('<MyMemberAuthCard');
-    expect(screen).toContain('<MyEditorialWelcome account={currentAccount} />');
+    expect(screen).toContain('<MyEditorialWelcome account={currentAccount} previewLocale={previewLocale} />');
+    expect(screen).toContain('plannedMobileUiPreviewLocaleV1(uiPreview, __DEV__)');
+    expect(screen).toContain('previewLocale={previewLocale}');
+    expect(welcome).toContain('previewMobileAuthoredUiLabelV1(source, previewLocale, t)');
     expect(screen).toContain("state.profile.kind === 'ready'");
     expect(welcome).toContain("account === 'member'");
     expect(welcome).toContain("account === 'guest'");
