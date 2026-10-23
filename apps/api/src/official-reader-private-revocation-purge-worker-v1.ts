@@ -191,8 +191,18 @@ function validateFence(
       || fence.readerCharacterId!==claim.readerCharacterId
       || !UUID.test(fence.fenceId)
       || !Array.isArray(fence.bodyIds) || !Array.isArray(fence.keyRefs)
-      || fence.bodyIds.length===0
+      || fence.bodyIds.length===0 || fence.bodyIds.length>50000
       || fence.bodyIds.length!==fence.keyRefs.length) return fail();
+  // A db_erased retry trusts this backup-independent fence to choose
+  // irreversible DEK destruction. Re-check EVERY element and uniqueness,
+  // even though a newly recorded eligible manifest was already validated.
+  // An invalid/duplicated key must never enter the erasure loop.
+  if (fence.bodyIds.some(id => typeof id!=='string' || !UUID.test(id))
+      || fence.keyRefs.some(ref => typeof ref!=='string' || !REF.test(ref))
+      || new Set(fence.bodyIds.map(id => id.toLowerCase())).size!==fence.bodyIds.length
+      || new Set(fence.keyRefs.map(ref => ref.toLowerCase())).size!==fence.keyRefs.length) {
+    return fail();
+  }
   return fence;
 }
 
