@@ -40,7 +40,13 @@ async function assertDeployOwnership() {
 
 async function verifyPublicRoutes() {
   for (const path of ['/','/auth.html','/api/health']) {
-    const response=await fetch(BASE+path,{redirect:'manual',signal:AbortSignal.timeout(12000)});
+    let response=await fetch(BASE+path,{redirect:'manual',signal:AbortSignal.timeout(12000)});
+    if(response.status!==200) {
+      // Cloudflare route propagation can briefly lag a successful deployment.
+      // One bounded retry avoids reporting a successful publish as a failure.
+      await new Promise(resolveDelay=>setTimeout(resolveDelay,2500));
+      response=await fetch(BASE+path,{redirect:'manual',signal:AbortSignal.timeout(12000)});
+    }
     if(response.status!==200){
       throw Error('Cloudflare route '+path+' returned '+response.status+
         '. Check Worker subdomain.enabled: false/other deployments.');
