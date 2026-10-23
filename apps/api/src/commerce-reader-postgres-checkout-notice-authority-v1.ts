@@ -1,8 +1,10 @@
 import type {
   PostgresSubjectExecutionScopeV1,
 } from './postgres-subject-execution.js';
-import type {
-  CommerceReaderCheckoutNoticeAuthorityPortV1,
+import {
+  reviewOfficialReaderPrivateWithdrawalEvidenceV1,
+  type CommerceReaderPrivateWithdrawalEvidenceV1,
+  type CommerceReaderCheckoutNoticeAuthorityPortV1,
 } from './commerce-reader-private-withdrawal-evidence-v1.js';
 import {
   linkOriginalCheckoutNoticeToReaderGrantV1,
@@ -222,5 +224,39 @@ export function createCommerceReaderPostgresCheckoutNoticeAuthorityV1(input: Rea
         return null;
       }
     },
+  });
+}
+
+/**
+ * S7 single-transaction Commerce/Reader handoff: the original Receipt/Grant
+ * evidence and the precheckout item lineage MUST be evaluated using exactly
+ * the same previously authenticated, member-scoped READ COMMITTED client.
+ * Never resolve Subject, Grant or S5 body from the consumer refund claim.
+ *
+ * An absent/unapproved immutable Checkout Owner store remains a manual-only
+ * "missing_or_unverifiable" notice, not a fabricated affirmative consent.
+ * This interface neither grants execute rights nor exposes an HTTP route.
+ */
+export async function reviewOfficialReaderWithdrawalFromOriginalLedgerV1(input: Readonly<{
+  scope: PostgresSubjectExecutionScopeV1;
+  purchaseIntentId: string;
+  originatingGrantId: string;
+  bodyId: string;
+  claim: unknown;
+  immutableCheckoutNoticeStore?: CommerceReaderImmutableCheckoutNoticeStoreV1;
+}>): Promise<CommerceReaderPrivateWithdrawalEvidenceV1> {
+  const authority = createCommerceReaderPostgresCheckoutNoticeAuthorityV1({
+    scope: input.scope,
+    bodyId: input.bodyId,
+    ...(input.immutableCheckoutNoticeStore === undefined
+      ? {} : { immutableCheckoutNoticeStore: input.immutableCheckoutNoticeStore }),
+  });
+  return reviewOfficialReaderPrivateWithdrawalEvidenceV1({
+    scope: input.scope,
+    purchaseIntentId: input.purchaseIntentId,
+    originatingGrantId: input.originatingGrantId,
+    bodyId: input.bodyId,
+    claim: input.claim,
+    checkoutNoticeAuthority: authority,
   });
 }
