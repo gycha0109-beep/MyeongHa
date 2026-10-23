@@ -271,6 +271,60 @@ function requireSeyeonGrantStatus(payload, memoryItemId) {
   });
 }
 
+// Revocation is a non-idempotent write attempt: never automatically retry an
+// ambiguous network/COMMIT outcome. An HTTP 503 is NOT proof of revocation.
+async function postSeyeonGrantRevoke(fetchImpl, endpoint, bearer, memoryItemId) {
+  let response;
+  try {
+    response = await fetchImpl(endpoint, {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        ...getUiLocaleRequestHeadersV1(),
+        Authorization: `Bearer ${bearer.token}`,
+      },
+      credentials: 'same-origin',
+      cache: 'no-store',
+    });
+  } catch (error) {
+    throw new RecordsRuntimeError(
+      'WEB_RECORDS_REVOKE_UNCONFIRMED',
+      'Memory access revocation could not be confirmed.',
+      error,
+    );
+  }
+
+  if (response.status === 401) {
+    invalidateRejectedBearer(bearer);
+    throw new RecordsRuntimeError('WEB_RECORDS_SESSION_REQUIRED', 'A current Member session is required.');
+  }
+  if (response.status === 403) {
+    throw new RecordsRuntimeError('WEB_RECORDS_MEMBER_REQUIRED', 'Member identity is required.');
+  }
+  if (response.status === 503) {
+    throw new RecordsRuntimeError('WEB_RECORDS_REVOKE_UNAVAILABLE', 'Memory access revocation is not available.');
+  }
+  if (!response.ok) {
+    throw new RecordsRuntimeError('WEB_RECORDS_REVOKE_UNCONFIRMED', 'Memory revocation has no confirmed outcome.');
+  }
+  let payload;
+  try {
+    payload = assertJsonObject(unwrapApiSuccessEnvelope(await response.json()), endpoint);
+  } catch (error) {
+    throw new RecordsRuntimeError('WEB_RECORDS_REVOKE_UNCONFIRMED', 'Memory revocation response is not trustworthy.', error);
+  }
+  if (payload.status !== 'committed' || payload.memoryItemId !== memoryItemId ||
+      payload.characterId !== 'seyeon' || !Number.isSafeInteger(payload.revokedGrantCount) ||
+      payload.revokedGrantCount < 0 ||
+      payload.replayed !== (payload.revokedGrantCount === 0)) {
+    throw new RecordsRuntimeError('WEB_RECORDS_REVOKE_UNCONFIRMED', 'Memory revocation was not committed.');
+  }
+  return Object.freeze({
+    memoryItemId, characterId: 'seyeon',
+    revokedGrantCount: payload.revokedGrantCount, replayed: payload.replayed,
+  });
+}
+
 export function createRecordsRuntimeClient(options = {}) {
   const fetchImpl = requireFetch(options.fetchImpl ?? globalThis.fetch);
   const resolveBearer = options.resolveBearer ?? ensureActiveBearer;
@@ -300,6 +354,21 @@ export function createRecordsRuntimeClient(options = {}) {
       )),
     readMemories: () => readStable((bearer) =>
       readPagedCollection(fetchImpl, endpoints.memories, bearer, 'memories')),
+    async revokeSeyeonMemoryGrant(memoryItemId) {
+      if (typeof memoryItemId !== 'string' || !MEMORY_UUID_V1.test(memoryItemId)) {
+        throw new RecordsRuntimeError('WEB_RECORDS_INVALID_MEMORY_ID', 'A valid memory identity is required.');
+      }
+      const bearer = await resolveAuthorizedBearer(resolveBearer);
+      if (bearer.kind !== 'member') {
+        throw new RecordsRuntimeError('WEB_RECORDS_MEMBER_REQUIRED', 'Member identity is required for Memory revocation.');
+      }
+      const endpoint = `${endpoints.memories}/${encodeURIComponent(memoryItemId)}/grants/seyeon/revoke`;
+      // Exactly one write attempt; never retry after a lost response.
+      const result = await postSeyeonGrantRevoke(fetchImpl, endpoint, bearer, memoryItemId);
+      const latest = await resolveAuthorizedBearer(resolveBearer);
+      if (!sameAuthorizedBearer(latest, bearer)) throw sessionChangedFailure();
+      return result;
+    },
     readSeyeonMemoryGrantStatus(memoryItemId) {
       if (typeof memoryItemId !== 'string' || !MEMORY_UUID_V1.test(memoryItemId)) {
         throw new RecordsRuntimeError('WEB_RECORDS_INVALID_MEMORY_ID', 'A valid memory identity is required.');
