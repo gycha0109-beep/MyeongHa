@@ -4,10 +4,18 @@
 // Watchtower-Track: ops
 import {
   approvedCloudflareAuthOriginV1,
+  approvedCloudflareStage5HandoffV1,
+  approvedCloudflarePostgresTargetV1,
   approvedCloudflareSameOriginPostV1,
   CLOUDFLARE_APPROVED_RESPONSE_HEADERS_V1,
 } from './cloudflare-auth-db-api.mjs';
 import { createProductionCurrentSubjectSajuCalculationRuntimeV1 } from '../apps/api/src/production-current-subject-saju-calculation-runtime.ts';
+import { parseProductionUserDataRuntimeConfigV1 } from '../apps/api/src/production-user-data-runtime-config.ts';
+import {
+  buildProductionNodePostgresPoolConfigV1,
+  createNodePostgresSubjectPoolV1,
+} from '../apps/api/src/node-postgres-subject-pool.ts';
+import { CLOUDFLARE_DIRECT_POSTGRES_CANDIDATE_LIMITS_V1 } from '../apps/api/src/cloudflare-direct-postgres-candidate.ts';
 import { CURRENT_SUBJECT_SAJU_CALCULATION_HTTP_BINDINGS_V1 } from '../apps/api/src/current-subject-saju-calculation-http.ts';
 import { hasRequestBodyWithoutDrainingV1 } from '../apps/api/src/request-body-presence-probe.ts';
 import { IngressRequestBodyCompletionDeadlineExceededV1 } from '../apps/api/src/ingress-request-body-deadline.ts';
@@ -76,14 +84,37 @@ export async function tryHandleCloudflareApprovedSajuCalculationV1(request, bind
   if (origin === null || bindings?.MYEONGHA_CLOUDFLARE_SAJU_MODE !== APPROVED_CALCULATION_MODE) {
     return null;
   }
+  // Calculation is a subject-owned DB read. Its own mode alone is not a
+  // replacement for the Stage 5 strict-TLS/RLS host admission.
+  // No credentials or network access before both independent approvals.
+  if (!approvedCloudflareStage5HandoffV1(bindings, origin, false)) return null;
   if (new URL(request.url).search !== '') return denied();
   if (request.method !== 'POST') {
     return new Response(null, { status: 405, headers: { ...SECURITY_HEADERS, Allow: 'POST' } });
   }
   if (!approvedCloudflareSameOriginPostV1(request, origin)) return denied();
 
+  // Match the already-approved Auth/DB Worker DB transport: exact host,
+  // governed CA/verify-full, one connection per HTTP request, no global pool.
+  // Missing/invalid credentials produce the fixed 503, never a Vercel proxy.
+  let config;
+  try {
+    config = parseProductionUserDataRuntimeConfigV1(bindings);
+    if (!approvedCloudflarePostgresTargetV1(config, bindings)) return unavailable();
+    const tls = buildProductionNodePostgresPoolConfigV1(
+      config, CLOUDFLARE_DIRECT_POSTGRES_CANDIDATE_LIMITS_V1,
+    );
+    if (tls.max !== 1 || !tls.ssl ||
+        typeof tls.ssl !== 'object' || tls.ssl.rejectUnauthorized !== true) {
+      return unavailable();
+    }
+  } catch {
+    return unavailable();
+  }
+
   const requestId = crypto.randomUUID();
   let runtime;
+  let subjectPool;
   let result;
   try {
     const canonicalRequest = await bodyPresenceBoundRequest(request);
@@ -91,7 +122,12 @@ export async function tryHandleCloudflareApprovedSajuCalculationV1(request, bind
     // canonical Birth revision selection, restricted Postgres and the
     // calculation-only HTTPS producer. Per-request lifetime prevents
     // cross-request pg connection reuse on Workers.
-    runtime = createProductionCurrentSubjectSajuCalculationRuntimeV1({ env: bindings });
+    subjectPool = createNodePostgresSubjectPoolV1(
+      config, CLOUDFLARE_DIRECT_POSTGRES_CANDIDATE_LIMITS_V1,
+    );
+    runtime = createProductionCurrentSubjectSajuCalculationRuntimeV1({
+      env: bindings, pool: subjectPool,
+    });
     result = await runtime.handleRequest({
       request: canonicalRequest,
       requestId,
@@ -109,11 +145,13 @@ export async function tryHandleCloudflareApprovedSajuCalculationV1(request, bind
         }, { status: 408, headers: SECURITY_HEADERS })
       : unavailable();
   }
-  try {
-    await runtime?.close();
-  } catch {
-    return unavailable();
-  }
+  // The injected subject pool is not owned by the production runtime lease.
+  // Always dispose it even if runtime cleanup fails; do not release a success
+  // response if either cleanup path fails.
+  let closed = true;
+  try { await runtime?.close(); } catch { closed = false; }
+  try { await subjectPool?.close(); } catch { closed = false; }
+  if (!closed) return unavailable();
 
   return fenceCloudflareApprovedSajuResponseV1(result);
 }
