@@ -3,7 +3,7 @@
 // Never proxy to Vercel or promote Seyeon, Commerce, or records.
 // Watchtower-Track: ops
 import { createProductionMemberAuthHttpRuntimeV1 } from '../apps/api/src/production-member-auth-http-runtime.ts';
-import { MYEONGHA_PRODUCTION_SUPABASE_ORIGIN, parseProductionUserDataRuntimeConfigV1 } from '../apps/api/src/production-user-data-runtime-config.ts';
+import { MYEONGHA_PRODUCTION_SUPABASE_ORIGIN, MYEONGHA_PRODUCTION_SUPABASE_PROJECT_REF, parseProductionUserDataRuntimeConfigV1 } from '../apps/api/src/production-user-data-runtime-config.ts';
 import { parseProductionMemberAuthRateLimitConfigV1 } from '../apps/api/src/production-member-auth-rate-limit-config.ts';
 import { handleSupabaseAuthRequestV1 } from '../apps/api/src/supabase-auth-http.ts';
 import { createProductionGuestBootstrapHttpRuntimeV1 } from '../apps/api/src/production-guest-bootstrap-http-runtime.ts';
@@ -219,10 +219,28 @@ export function approvedCloudflareDbHostV1(value) {
 export function approvedCloudflarePostgresTargetV1(config, bindings) {
   try {
     const url = new URL(config.databaseUrl);
-    return approvedCloudflareDbHostV1(bindings?.MYEONGHA_CLOUDFLARE_DB_APPROVED_HOST) &&
-      url.hostname === bindings.MYEONGHA_CLOUDFLARE_DB_APPROVED_HOST &&
-      url.port !== '' &&
-      url.port === bindings.MYEONGHA_CLOUDFLARE_DB_APPROVED_PORT;
+    const targetHost = bindings?.MYEONGHA_CLOUDFLARE_DB_APPROVED_HOST;
+    if (!approvedCloudflareDbHostV1(targetHost) ||
+        url.hostname !== targetHost || url.port === '' ||
+        url.port !== bindings.MYEONGHA_CLOUDFLARE_DB_APPROVED_PORT ||
+        (url.protocol !== 'postgres:' && url.protocol !== 'postgresql:')) return false;
+
+    // Supavisor authenticates as <role>.<tenant-ref>; PostgreSQL exposes
+    // current_user as the plain role. Do not confuse that required suffix
+    // with the dedicated NO-BYPASSRLS execution identity.
+    const principal = config.databasePrincipal;
+    if (typeof principal !== 'string' ||
+        !/^[a-z_][a-z0-9_]{0,62}$/.test(principal)) return false;
+    const expectedLogin = targetHost.endsWith('.pooler.supabase.com')
+      ? principal + '.' + MYEONGHA_PRODUCTION_SUPABASE_PROJECT_REF
+      : principal;
+    if (decodeURIComponent(url.username) !== expectedLogin ||
+        url.password === '') return false;
+    // Reject connecting to a different tenant's database even if a
+    // misconfigured permission grant happens to let the socket connect.
+    if (targetHost.endsWith('.pooler.supabase.com') &&
+        url.pathname !== '/postgres') return false;
+    return true;
   } catch {
     return false;
   }

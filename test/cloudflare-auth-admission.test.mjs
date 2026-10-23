@@ -171,8 +171,32 @@ describe('Cloudflare Auth/DB admission is fail-closed until explicit host and se
     }
     const target = {
       databaseUrl: 'postgresql://synthetic-user:synthetic-secret@db.synthetic.example.com:5432/isolated?sslmode=verify-full',
+      databasePrincipal: 'synthetic-user',
     };
     expect(approvedCloudflarePostgresTargetV1(target, ENABLED)).toBe(true);
+    const poolerHost = 'aws-0-ap-southeast-1.pooler.supabase.com';
+    const poolerBindings = { ...ENABLED,
+      MYEONGHA_CLOUDFLARE_DB_APPROVED_HOST: poolerHost,
+    };
+    const dedicated = { databasePrincipal: 'myeongha_cf_api_login',
+      databaseUrl: 'postgresql://myeongha_cf_api_login.cnsfpcdiyofqvhpcegfc:synthetic-secret@' +
+        poolerHost + ':5432/postgres?sslmode=verify-full',
+    };
+    expect(approvedCloudflarePostgresTargetV1(dedicated, poolerBindings)).toBe(true);
+    for (const wrong of [
+      { ...dedicated, databaseUrl: dedicated.databaseUrl.replace(
+        'myeongha_cf_api_login.cnsfpcdiyofqvhpcegfc:', 'myeongha_cf_api_login:') },
+      { ...dedicated, databaseUrl: dedicated.databaseUrl.replace(
+        'myeongha_cf_api_login.cnsfpcdiyofqvhpcegfc:', 'postgres.cnsfpcdiyofqvhpcegfc:') },
+      { ...dedicated, databaseUrl: dedicated.databaseUrl.replace(
+        'myeongha_cf_api_login.cnsfpcdiyofqvhpcegfc:', 'myeongha_cf_api_login.otherprojectref:') },
+      { ...dedicated, databaseUrl: dedicated.databaseUrl.replace('/postgres?', '/other?') },
+      { ...dedicated, databasePrincipal: 'postgres' },
+    ]) expect(approvedCloudflarePostgresTargetV1(wrong, poolerBindings)).toBe(false);
+    expect(approvedCloudflarePostgresTargetV1(
+      { ...target, databasePrincipal: 'someone-else' }, ENABLED,
+    )).toBe(false);
+
     for (const url of [
       'postgresql://synthetic-user:synthetic-secret@db.synthetic.example.com/isolated?sslmode=verify-full',
       'postgresql://synthetic-user:synthetic-secret@other.example.com:5432/isolated?sslmode=verify-full',
