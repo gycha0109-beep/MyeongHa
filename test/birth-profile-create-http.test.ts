@@ -358,4 +358,40 @@ describe('production Birth Profile create HTTP foundation', () => {
     ).toBe(false);
   });
 
+  it.each([
+    ['2012-10-24', 'solar', 'AGE_RESTRICTED'],
+    ['2012-01-01', 'lunar', 'AGE_VERIFICATION_REQUIRED'],
+  ] as const)('denies underage or ambiguous self Birth Profile %s without touching Postgres', async (birthDate, calendarType, code) => {
+    const { input, pool, fingerprintPort } = makeInput({
+      request: jsonRequest({
+        ...validRequestBody(),
+        input: { ...((validRequestBody() as { input: object }).input), birthDate, calendarType },
+      }),
+      serverTime: '2026-10-23T06:00:00.000Z',
+    });
+    const response = await handleBirthProfileCreateRequestV1(input);
+    expect(response.status).toBe(403);
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    expect(await response.json()).toMatchObject({
+      ok: false,
+      error: { code, retryable: false },
+    });
+    expect(pool.connectCalls).toBe(0);
+    expect(fingerprintPort.calls).toBe(0);
+  });
+
+  it('accepts an exactly 14-year-old solar self Birthday on the server Korean calendar day', async () => {
+    const { input, pool } = makeInput({
+      request: jsonRequest({
+        ...validRequestBody(),
+        input: { ...((validRequestBody() as { input: object }).input), birthDate: '2012-10-23' },
+      }),
+      serverTime: '2026-10-23T06:00:00.000Z',
+    });
+    const response = await handleBirthProfileCreateRequestV1(input);
+    expect(response.status).toBe(201);
+    expect(pool.connectCalls).toBe(1);
+  });
+
+
 });
