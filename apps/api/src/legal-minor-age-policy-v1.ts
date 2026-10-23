@@ -21,14 +21,14 @@ function leap(year: number): boolean {
   return year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
 }
 
-function validDate(value: string): { year: number; month: number; day: number } | null {
+function validDate(value: string, lunar = false): { year: number; month: number; day: number } | null {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/u.exec(value);
   if (!match) return null;
   const year = Number(match[1]);
   const month = Number(match[2]);
   const day = Number(match[3]);
   const monthDays = [31, leap(year) ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-  return year >= 1 && month >= 1 && month <= 12 && day >= 1 && day <= monthDays[month - 1]!
+  return year >= 1 && month >= 1 && month <= 12 && day >= 1 && day <= (lunar ? 30 : monthDays[month - 1]!)
     ? { year, month, day }
     : null;
 }
@@ -46,7 +46,7 @@ export function resolveSelfBirthAgeAdmissionV1(input: Readonly<{
 }>): LegalAgeAdmissionV1 {
   if (typeof input.birthDate !== 'string' || !Number.isFinite(Date.parse(input.serverTime))) return 'invalid';
   if (input.calendarType !== 'solar' && input.calendarType !== 'lunar') return 'invalid';
-  const birth = validDate(input.birthDate);
+  const birth = validDate(input.birthDate, input.calendarType === 'lunar');
   // The service policy uses the calendar day in Korea; this is NOT the user's device clock.
   const current = validDate(new Date(Date.parse(input.serverTime) + 9 * 60 * 60 * 1000).toISOString().slice(0, 10));
   if (!birth || !current || birth.year > current.year) return 'invalid';
