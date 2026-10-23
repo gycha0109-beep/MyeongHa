@@ -49,6 +49,10 @@ export function ChatPage() {
             </div>
           </header>
 
+          <p className="character-ai-disclosure" data-legal-ai-generation-label>
+            이 대화의 캐릭터 답변은 생성형 AI가 작성합니다. 캐릭터는 실제 사람이 아니며, 답변은 사실과 다를 수 있습니다.
+          </p>
+
           <div className="conversation-thread-bar" data-thread-bar hidden>
             <span aria-hidden="true">◇</span>
             <span>이어진 이야기</span>
