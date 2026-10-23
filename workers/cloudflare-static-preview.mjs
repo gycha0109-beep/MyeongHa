@@ -10,6 +10,7 @@ import { tryHandleCloudflareApprovedRecordsV1 } from './cloudflare-records-api.m
 import { tryHandleCloudflareApprovedTargetPersonReadV1 } from './cloudflare-target-person-read.mjs';
 import { tryHandleCloudflareApprovedDeviceInstallationsV1 } from './cloudflare-device-installations.mjs';
 import { tryHandleCloudflareReadinessV1 } from './cloudflare-readiness.mjs';
+import { tryHandleCloudflareGenericChatReadV1 } from './cloudflare-chat-read.mjs';
 
 // Cloudflare static preview: explicitly NOT the production API runtime.
 // Every /api request goes through this deny-only Worker; Static Assets serve
@@ -129,8 +130,11 @@ export default {
         }
         const chatResponse = await tryHandleCloudflareSeyeonSecurityV1(request, bindings, route);
         if (chatResponse !== null) return chatResponse;
-        // A DB-confirmed non-SeYeon thread is NOT an admission token: the
-        // separately authorized generic Chat API is not ported. Deny-first.
+        // Security grants no permissions to a generic read/open. The distinct
+        // chat runtime repeats verified owner and DB checks independently.
+        const genericChatResponse = await tryHandleCloudflareGenericChatReadV1(request, bindings, route);
+        if (genericChatResponse !== null) return genericChatResponse;
+        // First Se-yeon Reveal and unported chat-turn writes remain held.
         return new Response(null, { status: 404, headers: BASE_HEADERS });
       } catch {
         // Independent final boundary in the actual Worker fetch handler.

@@ -6,6 +6,8 @@
 import {
   approvedCloudflareAuthOriginV1,
   approvedCloudflareSameOriginPostV1,
+  approvedCloudflareStage5HandoffV1,
+  approvedCloudflarePostgresTargetV1,
   CLOUDFLARE_APPROVED_RESPONSE_HEADERS_V1,
 } from './cloudflare-auth-db-api.mjs';
 import {
@@ -20,7 +22,8 @@ import {
 } from '../apps/api/src/seyeon-cloudflare-offline-reveal-fence-v1.ts';
 import { parseProductionUserDataRuntimeConfigV1 } from '../apps/api/src/production-user-data-runtime-config.ts';
 import { createProductionRequestIdentityVerifierV1 } from '../apps/api/src/production-request-identity-verifier.ts';
-import { createProductionPostgresSubjectPoolLeaseV1 } from '../apps/api/src/production-postgres-subject-pool-lease.ts';
+import { buildProductionNodePostgresPoolConfigV1, createNodePostgresSubjectPoolV1 } from '../apps/api/src/node-postgres-subject-pool.ts';
+import { CLOUDFLARE_DIRECT_POSTGRES_CANDIDATE_LIMITS_V1 } from '../apps/api/src/cloudflare-direct-postgres-candidate.ts';
 
 export const CLOUDFLARE_SEYEON_EGRESS_STAGES_V1 = Object.freeze([
   'first_reveal', 'committed_replay', 'history',
@@ -106,13 +109,15 @@ function createDefaultSubjectScope(bindings) {
   const config = parseProductionUserDataRuntimeConfigV1(bindings);
   // Create the verifier BEFORE the PostgreSQL lease. If its configuration
   // fails, no pool has been allocated and nothing can remain unclosed.
+  if(!approvedCloudflarePostgresTargetV1(config,bindings)) throw Error('Unapproved scoped chat DB host');
+  const strict=buildProductionNodePostgresPoolConfigV1(
+    config,CLOUDFLARE_DIRECT_POSTGRES_CANDIDATE_LIMITS_V1,
+  );
+  if(strict.max!==1||typeof strict.ssl!=='object'||strict.ssl===null||
+     strict.ssl.rejectUnauthorized!==true) throw Error('Unapproved scoped chat TLS');
   const identityEvidenceVerifier = createProductionRequestIdentityVerifierV1({ config });
-  const poolLease = createProductionPostgresSubjectPoolLeaseV1({ config });
-  return {
-    pool: poolLease.pool,
-    identityEvidenceVerifier,
-    close: () => poolLease.close(),
-  };
+  const pool=createNodePostgresSubjectPoolV1(config,CLOUDFLARE_DIRECT_POSTGRES_CANDIDATE_LIMITS_V1);
+  return { pool, identityEvidenceVerifier, close: () => pool.close() };
 }
 
 /**
@@ -149,7 +154,8 @@ export async function tryHandleCloudflareSeyeonSecurityV1(
   if (ingress.kind === 'chat_open') return null;
 
   const origin = approvedCloudflareAuthOriginV1(request, bindings);
-  if (origin === null) return held(requestId);
+  if (origin === null ||
+      !approvedCloudflareStage5HandoffV1(bindings,origin,false)) return held(requestId);
   // An eventually approved Cookie/Bearer Chat POST must pass the same
   // browser-origin admission as the existing Auth/DB adapter. Fail closed
   // before verifying identity or touching the owner-scoped PostgreSQL pool.

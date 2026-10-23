@@ -16,6 +16,9 @@ const SECRET = 'PRIVATE_ASSISTANT_CONTENT_MUST_NOT_LEAK';
 const bindings = {
   MYEONGHA_CLOUDFLARE_AUTH_DB_MODE: 'approved-auth-db-v1',
   MYEONGHA_CLOUDFLARE_AUTH_ORIGIN: ROOT,
+  MYEONGHA_CLOUDFLARE_DB_TLS_RLS_APPROVAL: 'approved-isolated-tls-rls-v1',
+  MYEONGHA_CLOUDFLARE_DB_APPROVED_HOST: 'db.synthetic.example.com',
+  MYEONGHA_CLOUDFLARE_DB_APPROVED_PORT: '5432',
 };
 
 function invoke(path, method = 'GET', env = {}, dependencies) {
