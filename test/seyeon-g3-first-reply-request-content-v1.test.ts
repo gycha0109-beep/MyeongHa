@@ -64,7 +64,11 @@ function syntheticDb(): {
       if (text.includes('to_regprocedure(')) {
         return {rows: [{ready: true}] as unknown as readonly Row[]};
       }
-      if (text.includes('from public.qry_seyeon_positive_first_memory_locked_reveal_v2(')) {
+      if (text.includes('from public.qry_seyeon_positive_first_memory_locked_reveal_v3(')) {
+        // A matching body is never proof of the current original request.
+        if (_values.length!==8 || _values[7]!==TURN) {
+          return {rows:[{assistantText:null}] as unknown as readonly Row[]};
+        }
         return {rows: [{assistantText: CANARY}] as unknown as readonly Row[]};
       }
       return {rows: []};
@@ -138,9 +142,30 @@ describe('G3 exact current request ↔ executed DB user message binding', () => 
     expect(runtimeCalls).toBe(1);
     expect(statements.some(s => s.includes('to_regprocedure('))).toBe(true);
     expect(statements.some(s =>
-      s.includes('from public.qry_seyeon_positive_first_memory_locked_reveal_v2('),
+      s.includes('from public.qry_seyeon_positive_first_memory_locked_reveal_v3('),
     )).toBe(false);
     expect(socket.statusCode).toBe(0);
+  });
+
+  it('keeps same-text other clientTurnId held under DB-owned original request key',async()=>{
+    const {pool,statements}=syntheticDb();
+    const socket=syntheticResponse();
+    const outcome=await executeAndDeliverSeyeonFirstPositiveMemoryNodeTurnV1({
+      response:socket.response,
+      requestSignal:new AbortController().signal,
+      pool,verifiedEvidence:{kind:'member',verifiedAuthUserId:AUTH},
+      threadId:THREAD,
+      clientTurnId:'another-request-idempotency-key',
+      text:INPUT,
+      requestId:'same-text-wrong-original-key',
+      serverTime:'2026-10-22T00:00:00.000Z',
+      runtime:{async run(){return fakeRuntimeResult(INPUT);}},
+    });
+    expect(outcome).toBe('reveal_held');
+    expect(socket.statusCode).toBe(503);
+    expect(statements.some(q=>
+      q.includes('from public.qry_seyeon_positive_first_memory_locked_reveal_v3('),
+    )).toBe(true);
   });
 
   it('preserves exact-message synthetic candidate, but still requires original DB Grant read', async () => {
@@ -164,7 +189,7 @@ describe('G3 exact current request ↔ executed DB user message binding', () => 
     expect(socket.destroyed).toBe(false);
     expect(socket.statusCode).toBe(200);
     expect(statements.some(s =>
-      s.includes('from public.qry_seyeon_positive_first_memory_locked_reveal_v2('),
+      s.includes('from public.qry_seyeon_positive_first_memory_locked_reveal_v3('),
     )).toBe(true);
   });
 });
