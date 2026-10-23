@@ -14,7 +14,7 @@ describe('I18N-07 English and Simplified Chinese web screen subset', () => {
     expect(result.selectedLiteralsAligned).toBe(true);
     expect(REVIEWED_WEB_SCREEN_STATIC_UI_KEYS_V1.reduce(
       (count, screen) => count + screen.keys.length, 0,
-    )).toBe(101);
+    )).toBe(125);
     expect(new Set(REVIEWED_WEB_SCREEN_STATIC_UI_KEYS_V1.map(x => x.path)).size).toBe(7);
     for (const screen of result.screens) {
       expect(screen.sourceMissingKeys).toEqual([]);
@@ -24,6 +24,12 @@ describe('I18N-07 English and Simplified Chinese web screen subset', () => {
     }
     expect(REVIEWED_WEB_SCREEN_STATIC_UI_KEYS_V1.map(r => r.screen))
       .toEqual(['home','auth','chat-hub','chat','my','reading','records']);
+    // Source-owned privacy and Preview disclaimers must remain explicit
+    // reviewed UI strings, not inferred from page names.
+    expect(REVIEWED_WEB_SCREEN_STATIC_UI_KEYS_V1.find(s => s.screen === 'reading')?.keys)
+      .toContain('프리뷰 확인은 현재 제공 가능한 검증용 읽기이며, 정식 Reader 해석과는 다릅니다. 준비 중인 주제는 상세 화면에서 제공 상태를 확인할 수 있습니다.');
+    expect(REVIEWED_WEB_SCREEN_STATIC_UI_KEYS_V1.find(s => s.screen === 'my')?.keys)
+      .toContain('현재 저장된 계정 정보를 조회하는 화면입니다. 프로필 변경 및 회원 탈퇴 요청은 검증된 서버 절차가 연결되기 전까지 이 화면에서 실행하지 않습니다.');
     expect(result.pageRouteClassificationComplete).toBe(false);
     expect(result.privateDynamicDataInspected).toBe(false);
     expect(result.readyForRelease).toBe(false);
