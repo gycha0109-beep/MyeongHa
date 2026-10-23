@@ -44,6 +44,12 @@
 - 해당 합성 CTE는 **진짜 S7 비공개 Reader 권한 획득을 시험하는 것이 아니다.** 정본 S7 보호 본문/실제 사용자 ACK, Privacy 복원 게이트, 법정 소비자 공급 증빙 또는 결제 전 고지의 실존을 만들지 않는다. 실제 2250 S1 잠금·Owner 승인·재검사 조건은 별도로 남아 있다.
 - `test/db/run_authority_core.sh`는 새 시험을 기존 격리 템플릿의 복제 DB에서 실행하며, 비CI 및 localhost 외 DB를 거부한다. 테스트용 거래 자료는 격리 DB 종료와 함께 폐기한다. 실제 불변 Checkout 고지 저장·복원·보존·접근 제어는 여전히 Commerce·Privacy·Legal 승인 대기이고 Public/Offer/유료 응답은 **OFF**다.
 
+## S7 원본 고지 시각·S5 및 실제 잠금 관문 음성 검증 (2026-10-23)
+
+- Checkout 원장 조회 어댑터는 `2250` S1 잠금 관문에서 읽은 **정확한 S5 committed_at**을 원본 Receipt/Grant/Item/최초 Payment Attempt와 함께 가져오고, `snapshotRecordedAt <= noticePresentedAt <= acknowledgedAt < firstPaymentAttemptCreatedAt <= S5 committedAt`을 **저장소 어댑터 자체에서도** 검사한다. 사후 표시·사후 확인·역순 시각 또는 결제보다 이른 S5 확정은 `null`이며, 환불 분류기로 전달될 인증된 고지처럼 보이는 레코드를 만들지 않는다.
+- 격리 PostgreSQL 실거래 표본에 `internal_qry_official_reader_withdrawal_delivery_state_v2`를 **치환하지 않고 직접 실행하는 음성 시험**을 더했다. 원본 Receipt/Grant가 있어도 S5 보호 본문·Reader 범위 승인 증거가 없으면 행이 0이며, 외부 고지 저장소를 조회하지 않는다. Subject 문맥 없는 직접 SQL 역시 거부된다.
+- 기존 구매 Item 양성 결속 시험의 `authorized_original` CTE 치환은 오직 관계형 JOIN 검증용으로 유지한다. 이번 추가 음성 시험은 S5 실제 보호 본문 **양성 제공 권한이나 법정 인도 증명이 아니다**. Saju Production·Privacy 삭제/복원·Commerce/Legal Checkout 저장·고지·보존 승인, S8 공개 전부 HOLD.
+
 ## 다음 수락 게이트
 
 1. Commerce/Legal이 실제 상품 단위와 법정 기간·고지/미리보기·취소 경로를 승인.
