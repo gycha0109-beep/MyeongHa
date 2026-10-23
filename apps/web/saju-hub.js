@@ -402,6 +402,36 @@ document.addEventListener('myeongha:localechange', retranslateCalculatedSaju);
 // Free, source-admitted Preview. This is not a paid/official Reading,
 // a new interpretation engine or a persisted Reading in Records.
 let inlinePreviewSequence = 0;
+const INLINE_PREVIEW_TOPICS = Object.freeze([
+  ['전체 사주', '전체'],
+  ['직업운', '직업'],
+  ['재물운', '재물'],
+  ['연애운', '연애'],
+  ['사업운', '사업'],
+]);
+
+function appendInlinePreviewTopics(root, selectedReadingText) {
+  const selector = document.createElement('nav');
+  selector.className = 'saju-inline-preview-topics';
+  selector.setAttribute('aria-label', '사주 해석 주제');
+  for (const [readingText, label] of INLINE_PREVIEW_TOPICS) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = label;
+    button.setAttribute('aria-pressed', String(readingText === selectedReadingText));
+    button.disabled = readingText === selectedReadingText;
+    button.addEventListener('click', async () => {
+      const credential = await getActiveBearer().catch(() => null);
+      if (credential) void loadInlineSajuPreview(credential, readingText);
+    });
+    selector.append(button);
+  }
+  root.append(selector);
+}
+
+function inlinePreviewTopicTitle(readingText) {
+  return readingText === '전체 사주' ? '내 전체 사주 해석' : '내 ' + readingText + ' 해석';
+}
 
 function inlinePreviewSurface() {
   let root = document.getElementById('saju-inline-preview');
@@ -422,11 +452,12 @@ function inlinePreviewText(source, tag = 'p') {
   return node;
 }
 
-function showInlinePreviewStatus(message, retry = false) {
+function showInlinePreviewStatus(message, retry = false, readingText = '전체 사주') {
   const root = inlinePreviewSurface();
   root.replaceChildren();
   root.dataset.previewState = retry ? 'unavailable' : 'loading';
-  root.append(inlinePreviewText('내 전체 사주 해석', 'h2'));
+  root.append(inlinePreviewText(inlinePreviewTopicTitle(readingText), 'h2'));
+  appendInlinePreviewTopics(root, readingText);
   root.append(inlinePreviewText(message));
   if (retry) {
     const actions = document.createElement('div');
@@ -436,7 +467,7 @@ function showInlinePreviewStatus(message, retry = false) {
     reload.textContent = '해석 다시 불러오기';
     reload.addEventListener('click', async () => {
       const credential = await getActiveBearer().catch(() => null);
-      if (credential) void loadInlineSajuPreview(credential);
+      if (credential) void loadInlineSajuPreview(credential, readingText);
     });
     const details = document.createElement('a');
     details.href = 'reading-detail.html?topic=temperament&scope=original';
@@ -475,7 +506,7 @@ function appendInlineReadingBlock(target, block) {
   }
 }
 
-function renderInlineSajuPreview(payload) {
+function renderInlineSajuPreview(payload, readingText) {
   if (!isBrowserSajuPreviewDeliveryV1(payload)) return false;
   const reading = payload.data.reading.reading;
   const meaningful = reading.sections.filter(section =>
@@ -485,7 +516,8 @@ function renderInlineSajuPreview(payload) {
   const root = inlinePreviewSurface();
   root.replaceChildren();
   root.dataset.previewState = 'delivered';
-  root.append(inlinePreviewText('내 전체 사주 해석', 'h2'));
+  root.append(inlinePreviewText(inlinePreviewTopicTitle(readingText), 'h2'));
+  appendInlinePreviewTopics(root, readingText);
   root.append(inlinePreviewText('사주 엔진이 확인한 무료 해석 프리뷰입니다. 공식 유료 풀이 기록에 저장되지 않습니다.', 'p'));
   for (const section of meaningful) {
     const article = document.createElement('article');
@@ -509,9 +541,9 @@ function renderInlineSajuPreview(payload) {
   return true;
 }
 
-async function loadInlineSajuPreview(activeBearer) {
+async function loadInlineSajuPreview(activeBearer, readingText = '전체 사주') {
   const sequence = ++inlinePreviewSequence;
-  showInlinePreviewStatus('사주 엔진에서 전체 사주 해석을 불러오는 중입니다…');
+  showInlinePreviewStatus('사주 엔진에서 해석을 불러오는 중입니다…', false, readingText);
   try {
     const response = await fetch(SAJU_PREVIEW_READING_ENDPOINT, {
       method: 'POST',
@@ -523,7 +555,7 @@ async function loadInlineSajuPreview(activeBearer) {
       },
       credentials: 'same-origin',
       cache: 'no-store',
-      body: JSON.stringify({ readingText: '전체 사주' }),
+      body: JSON.stringify({ readingText }),
     });
     const payload = await readJson(response);
     const current = await getActiveBearer();
@@ -542,13 +574,13 @@ async function loadInlineSajuPreview(activeBearer) {
       inlinePreviewSurface().replaceChildren();
       return;
     }
-    if (response.ok && renderInlineSajuPreview(payload)) return;
+    if (response.ok && renderInlineSajuPreview(payload, readingText)) return;
     showInlinePreviewStatus(response.ok
       ? '사주 엔진이 현재 표시 가능한 해석을 제공하지 않았습니다. 확인되지 않은 운세를 임의로 만들지 않습니다.'
-      : '사주 계산은 완료됐지만 해석 서비스에 연결하지 못했습니다. 명식은 그대로 확인할 수 있습니다.', true);
+      : '사주 계산은 완료됐지만 해석 서비스에 연결하지 못했습니다. 명식은 그대로 확인할 수 있습니다.', true, readingText);
   } catch {
     if (sequence === inlinePreviewSequence) {
-      showInlinePreviewStatus('명식 계산은 완료됐습니다. 해석 결과를 불러오지 못했으니 다시 요청해 주세요.', true);
+      showInlinePreviewStatus('명식 계산은 완료됐습니다. 해석 결과를 불러오지 못했으니 다시 요청해 주세요.', true, readingText);
     }
   }
 }
