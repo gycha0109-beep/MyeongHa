@@ -33,3 +33,23 @@
 - `docs/operations/ACCOUNT_DELETION_FINALIZATION_PREFLIGHT_V1.md`
 
 **판정:** 정적 코드 기반 외부 처리 경로 1차 확인, 위탁/제3자 제공/국외 이전 **법적 항목은 아직 승인 불가**.
+
+## 2026-10-23 L3-A 실제 코드·연결 계정 추가 검증
+
+> 다음은 **전송 코드의 허용 경로와 전송 후보 데이터 계약**의 증거이며, 운영에서 개별 이용자 요청이 실제 발생했다는 패킷 증명이 아니다. 운영 비밀값·프롬프트 원문을 수집하지 않았다.
+
+| 상대방 | 이번에 확인된 사실 | 추가로 필요한 실증 |
+| --- | --- | --- |
+| **Supabase** | 명하 연결 프로젝트 `MyengHa`는 `ap-southeast-1`(싱가포르), `ACTIVE_HEALTHY`, PostgreSQL 17. 다른 `Refund_management` 프로젝트는 별도 서울 리전이며 **명하의 국내 저장 근거가 아님** | 데이터별 실제 수집·저장 항목, 계약 적용·이전 목적 및 기간, 처리방침의 이전 국가·위탁자 정보. Supabase 공식 리전 FAQ에 따르면 DB/Auth/Storage/백업의 지정 리전과 로깅·지원·CDN의 처리 지역이 다를 수 있음 |
+| **OpenAI / Vercel AI Gateway** | `production-seyeon-turn-send-runtime-v1.ts`: 서버의 `OPENAI_API_KEY`가 존재하면 OpenAI 직접 경로, 없으면 Vercel OIDC + `ai-gateway.vercel.sh` 경로. `openai-seyeon-structured-provider-v1.ts`: Responses API 요청에 `store: false`와 `JSON.stringify(request.input)` 전송 | 어떤 경로가 실제 배포에서 선택되는지, 약관·DPA·국가별 실제 전송·보관/재사용 정책, 요청/응답/모니터링 로그·삭제 지원. `store: false`는 **모든 서비스 로그 보존 0**을 보증하지 않음 |
+| **AI 요청 데이터 항목** | `seyeon-character-runtime-v2.ts`의 `buildSeyeonTurnInterpreterRequestV2`는 `context`를 전송. `seyeon-runtime-context-v2.ts`의 `recentConversation[].text`(최근 사용자/AI 대화), `retrievedMemories[].summary`(승인된 삶의 기록/기억/관계 이벤트 요약), 관계·결속·사전검증 정보 및 캐릭터 운영 정책 등이 포함될 수 있음. 동일 코드의 Renderer/Review도 관련 packet/초안을 입력으로 사용 | 실서비스 시점의 **어떤 정보가 승인·필터되어 요청에 포함되는지**와 각 단계의 캡처/중복 전송/로그를 값 제외한 스키마·통계로 검증. 생년월일이 고정 필드로 매번 포함된다고 단정 불가하며 자유대화·기억에 민감정보가 섞일 위험은 존재 |
+| **Vercel** | 연결 팀 `johnny-self` / 프로젝트 `myeongha` 존재 확인. 이번 API의 응답만으로 요금제·DPA 적용·모든 처리 리전은 확정 불가 | **2026-10-13 Hobby 증거 최신 재확인**. 현재도 Hobby라면 Vercel 공식 약관 제4조의 비상업적 이용 한도 문제를 영리 출시 전 해소. 유료 플랜 변경·배포는 별도 승인 없이는 수행하지 않음 |
+| **PortOne / PG** | 현재 Payment V2 연동 코드·내부 환불 검증 존재, 공개 판매 HOLD | 실제 PG 계약/수탁·제공 구조, 결제 주체·고지·보관 항목. 운영 결제 사용 중이라고 확정하지 않음 |
+
+### 현행 국내법 연결 및 확인 조건
+
+- 개인정보 보호법 **제28조의8제1항·제2항**: 국외 **보관·위탁도 국외 이전 범위**, 적법 근거와 필요한 정보(항목, 국가·시기·방법, 수령자/연락처, 목적·기간, 거부방법·효과) 검증. 계약 이행에 필요한 위탁·보관과 처리방침 게시 등의 조건을 충족하는 예외가 있으므로 **국외 이전=일률 위법/무조건 별도 동의**는 금지.
+- 개인정보 보호법 **제26조·제30조**: 실제 위탁자·수탁자 및 목적, 처리방침 최신 내용 확인. DPA 자체가 국내 처리방침 고지·적법 근거를 대체하지 않음.
+- 공식 근거: https://www.law.go.kr/LSW/lsLinkCommonInfo.do?chrClsCd=010202&lsJoLnkSeq=1029334953 · https://www.law.go.kr/LSW/lsLinkCommonInfo.do?chrClsCd=010202&lsJoLnkSeq=1034292881 · https://supabase.com/legal/privacy-resources/data-residency-and-transfers-faq · https://vercel.com/legal/terms
+
+**L3 판정:** 국외 저장 리전과 AI 송신 후보 필드는 확인. 하지만 운영 송신 구성·실제 위탁 계약/법적 근거/고지의 교차 증명이 없으므로 **출시 적법성 미확정**, 미승인 신규 유료 원문 외부 전송 계속 금지. `P0-PR-02` 제품 정책은 변경하지 않는다.
