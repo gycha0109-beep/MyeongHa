@@ -77,4 +77,11 @@
 - 사용자 최종 선택으로 **PortOne V2**를 명하의 본인확인 제공자로 고정했다. `docs/P0_DECISION_REGISTER.md`에 `P0-AGE-02 = DECIDED`를 추가했으며 기존 결제 결정 `P0-CM-02`는 변경하지 않는다.
 - V2 공식 SDK `requestIdentityVerification` 및 서버 단건조회 `GET /identity-verifications/{id}` 계약을 정본으로 한다. 브라우저 success 쿼리·콜백만으로 연령을 승인하지 않고, 서버 조회의 `VERIFIED` + 소유 Subject의 미소비 인증 시도 + 검증된 `verifiedCustomer.birthDate`를 판정한다.
 - `apps/api/src/portone-v2-identity-verification-contract-v1.ts`에 **실제 PortOne 호출·DB 쓰기·공개 endpoint 없는 오프라인 검증 계약** 구현. ID 교체·재사용, 상태 오류, 형식 오류, 미성년은 거절하고 최소한의 연령 밴드만 반환. `test/legal-portone-v2-identity-verification-contract.test.ts` 회귀 검사 추가.
-- **L2/출시 HOLD:** 인증업체 계약/요금제와 채널키 미확정, 실제 서버 조회 HTTP adapter, 인증 시도 원장/원자적 소비/회원·게스트·소셜 공통 권위, 연령 확인정보 보존·삭제·처리방침, 운영 합성/실제 E2E 검증 모두 미완료. `PORTONE_V2_IDENTITY_VERIFICATION_LAUNCH_HOLD_V1`는 SDK·라이브 채널·공개 인증 API 모두 OFF. 별도 승인 없이 계약·실결제·실인증 활성화 금지.
+- **L2/출시 HOLD:** 인증업체 계약/요금제와 채널키 미확정, **서버 조회 HTTP 어댑터·오프라인 평가·권위 포트 오케스트레이션 구현**, 하지만 인증 시도 DB 원장·만료·원자적 소비의 실제 저장 권위, 회원·게스트·소셜 공통 인증 강제, 연령 확인정보 보존·삭제·처리방침, 운영 실증은 미완료. `PORTONE_V2_IDENTITY_VERIFICATION_LAUNCH_HOLD_V1`는 SDK·라이브 채널·공개 인증 API 모두 OFF. 별도 승인 없이 계약·실결제·실인증 활성화 금지.
+
+## 10. L2-P 서버 단건조회·연령 판정 오케스트레이션 (2026-10-23)
+
+- **실제 코드:** `apps/api/src/portone-v2-identity-verification-lookup-v1.ts`는 서버 전용 GET 요청 및 응답 파싱을 구현. PortOne 서버 재조회 `GET https://api.portone.io/identity-verifications/{id}`; 5초 기본/30초 최대 전체 deadline; JSON·HTTP 200 확인; 16KiB 최대 읽기/스트림 취소; redirect 차단; 오류에 비밀키/개인정보 원문 비포함. 인증 시도 ID와 소유 Subject 불일치/소비됨은 **네트워크 요청 전에 거절**.
+- **저장 경계:** `apps/api/src/portone-v2-identity-age-finalization-v1.ts`에 저장소가 제공해야 하는 `readPendingOwnedAttempt`와 `consumeAndRecordAgeBand` 포트 계약 구현. Subject 소유·미사용 인증 시도 → 서버 조회 인증 성공 → 원자적 1회 소비 및 최소 연령 밴드 기록이 가능한 순서로 구성했다. **DB 실구현·발급/TTL/자동 마이그레이션을 제공하거나 호출하지 않음**.
+- **검증:** `test/legal-portone-v2-identity-lookup-v1.test.ts`, `test/legal-portone-v2-identity-age-finalization-v1.test.ts`로 HTTP 인증 헤더/고정 URL/한정된 리소스/타임아웃, 14·19세 경계/본인 소유·미사용, 재사용·불일치, 개인정보 원문 비반환을 합성 검증.
+- **다음 실제 구현:** 기존 DB/Privacy Authority 소유 트랙의 저장 모델 검토 후, 인증 시도 ID 발급·연결·만료 및 정확히 한 번 소비하는 DB 저장 권위를 연결. 그 뒤 Auth/Guest/Social/Chat API에서 같은 검증 상태를 참조하고 사용자가 실제 PortOne 채널과 API 키 계약을 준비한 때에만 SDK/공개 API를 활성화. 현재 모든 출시 게이트 HOLD.
