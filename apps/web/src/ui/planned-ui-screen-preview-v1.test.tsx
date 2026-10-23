@@ -1,0 +1,55 @@
+import { describe, expect, it } from 'vitest';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { createElement } from 'react';
+import { HomePage } from '../home/HomePage.js';
+import { ChatHubPage } from '../chat-hub/ChatHubPage.js';
+import {
+  resolveDevPlannedUiPreviewLocaleV1,
+  previewReviewedUiTextV1,
+} from './planned-ui-screen-preview-v1.js';
+
+describe('I18N-07 developer-only rendered EN/ZH UI preview', () => {
+  it('requires exact development-only locale selection, never persisted or header input', () => {
+    expect(resolveDevPlannedUiPreviewLocaleV1('?ui-preview=en-US', true)).toBe('en-US');
+    expect(resolveDevPlannedUiPreviewLocaleV1('?ui-preview=zh-CN', true)).toBe('zh-CN');
+    expect(resolveDevPlannedUiPreviewLocaleV1('?ui-preview=en-US', false)).toBeNull();
+    for (const invalid of [
+      '?ui-preview=ja-JP', '?ui-preview=zh', '?ui-preview=zh-TW',
+      '?ui-preview=en-GB', '?ui-preview=ko-KR', '?ui-preview=en-US&ui-preview=zh-CN', '',
+    ]) expect(resolveDevPlannedUiPreviewLocaleV1(invalid, true)).toBeNull();
+    expect(previewReviewedUiTextV1('당사자의 개인 메시지')).toBe('당사자의 개인 메시지');
+    expect(previewReviewedUiTextV1('당사자의 개인 메시지', 'en-US')).toBe('당사자의 개인 메시지');
+    expect(previewReviewedUiTextV1('누구와 이야기를 시작해 볼까요?', 'en-US'))
+      .toBe('Who would you like to talk to?');
+  });
+
+  it('renders actual Home JSX UI labels in English while leaving preview/source data unchanged', () => {
+    const english = renderToStaticMarkup(createElement(HomePage, { previewLocale: 'en-US' }));
+    const korean = renderToStaticMarkup(createElement(HomePage));
+    expect(english).toContain('data-planned-ui-preview="en-US"');
+    expect(english).toContain('Who would you like to talk to?');
+    expect(english).toContain('Monthly readings are not yet available.');
+    expect(english).toContain('Saved facts are not currently joined into a story through guesswork.');
+    expect(english).toContain('href="reading-detail.html?topic=temperament&amp;scope=original"');
+    expect(english).toContain('id="home-character-title"');
+    expect(korean).toContain('누구와 이야기를 시작해 볼까요?');
+    expect(korean).not.toContain('data-planned-ui-preview=');
+    // Entertainment fortune draws and dynamic Source/Reader output remain outside the preview.
+    expect(english).toContain('aria-label="오늘의 포춘쿠키"');
+  });
+
+  it('renders Chat Hub UI and accessibility source labels in Simplified Chinese without touching data sockets', () => {
+    const chinese = renderToStaticMarkup(createElement(ChatHubPage, { previewLocale: 'zh-CN' }));
+    const korean = renderToStaticMarkup(createElement(ChatHubPage));
+    expect(chinese).toContain('data-planned-ui-preview="zh-CN"');
+    expect(chinese).toContain('对话');
+    expect(chinese).toContain('请选择一位您感兴趣的人');
+    expect(chinese).toContain('aria-label="对话列表连接状态"');
+    expect(chinese).toContain('data-continuation-context=""');
+    expect(chinese).toContain('data-recent-list=""');
+    expect(chinese).toContain('data-people-grid=""');
+    expect(korean).toContain('대화 목록 연결 상태');
+    expect(korean).not.toContain('data-planned-ui-preview=');
+    expect(chinese).toContain('href="#people"');
+  });
+});
