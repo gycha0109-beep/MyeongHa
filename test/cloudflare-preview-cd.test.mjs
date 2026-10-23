@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import previewWorker from '../cloudflare/preview-worker.mjs';
 import {
   CLOUDFLARE_PREVIEW_CD_V1,
   assertCloudflarePreviewConfiguration,
@@ -56,5 +57,38 @@ describe('Cloudflare preview Git-based CD', () => {
     expect(() => assertCloudflarePreviewConfiguration({ ...previewConfig, workers_dev: true })).toThrow(/production workers.dev route disabled/u);
     expect(() => assertCloudflarePreviewConfiguration({ ...previewConfig, assets: { ...previewConfig.assets, run_worker_first: false } })).toThrow(/static assets isolated/u);
     expect(() => assertCloudflarePreviewConfiguration({ ...previewConfig, route: 'example.com/*' })).toThrow(/static assets isolated/u);
+  });
+  it('routes real Preview chat traffic through the existing sealed Se-yeon Fetch fence', async () => {
+    let assetFetches = 0;
+    const env = {
+      ASSETS: {
+        async fetch() {
+          assetFetches += 1;
+          return new Response('<html>private fallback must never run</html>');
+        },
+      },
+    };
+    const protectedRequests = [
+      new Request('https://preview.example/api/chat'),
+      new Request('https://preview.example/api/chat/123e4567-e89b-42d3-a456-426614174000'),
+      new Request('https://preview.example/api/chat/123e4567-e89b-42d3-a456-426614174000/turns', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ clientTurnId: '123e4567-e89b-42d3-a456-426614174001', text: 'hello' }),
+      }),
+    ];
+    for (const request of protectedRequests) {
+      const response = await previewWorker.fetch(request, env);
+      expect(response.status).toBe(503);
+      expect(response.headers.get('cache-control')).toBe('no-store');
+      expect(response.headers.get('content-type')).toContain('application/json');
+      const payload = await response.json();
+      expect(payload.ok).toBe(false);
+      expect(payload.error.code).toBe('SEYEON_FIRST_REVEAL_AUTHORITY_UNAVAILABLE');
+      expect(payload).not.toHaveProperty('assistantText');
+    }
+    const aliased = await previewWorker.fetch(new Request('https://preview.example/%61pi/chat'), env);
+    expect(aliased.status).toBe(503);
+    expect(assetFetches).toBe(0);
   });
 });
