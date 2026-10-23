@@ -46,7 +46,7 @@ class FakeG3Connection implements PostgresSubjectConnectionV1 {
     if(text.includes('to_regprocedure(')){
       return {rows:[{ready:this.ready}] as unknown as readonly Row[]};
     }
-    if(text.includes('from public.qry_seyeon_positive_first_memory_locked_reveal_v2(')){
+    if(text.includes('from public.qry_seyeon_positive_first_memory_locked_reveal_v3(')){
       return {rows:[{assistantText:this.authorizedText}] as unknown as readonly Row[]};
     }
     return {rows:[]};
@@ -69,6 +69,7 @@ function read(pool:PostgresSubjectPoolV1,expectedSubjectId=SUBJECT){
     originalUserMessageId:USER,
     committedAssistantMessageId:ASSISTANT,
     postTurnOutboxEventId:POST_TURN_OUTBOX,
+    currentClientTurnId:TURN,
   });
 }
 function queries(db:FakeG3Connection){return db.calls.map(q=>q.text);}
@@ -83,7 +84,7 @@ describe('Se-yeon G3 Node-only original-Grant current Subject fence',()=>{
       deliver:async body=>{
         expect(body).toBe(CANARY);
         expect(queries(db).at(-1)).toContain(
-          'from public.qry_seyeon_positive_first_memory_locked_reveal_v2(',
+          'from public.qry_seyeon_positive_first_memory_locked_reveal_v3(',
         );
         expect(queries(db)).not.toContain('COMMIT');
         events.push('delivered-under-lock');
@@ -94,11 +95,11 @@ describe('Se-yeon G3 Node-only original-Grant current Subject fence',()=>{
       'BEGIN','SET LOCAL ROLE myeongha_api_executor',
       expect.stringContaining('public.begin_member_subject_context_v1'),
       expect.stringContaining('public.assert_myeongha_subject_context_v1'),
-      expect.stringContaining('from public.qry_seyeon_positive_first_memory_locked_reveal_v2('),
+      expect.stringContaining('from public.qry_seyeon_positive_first_memory_locked_reveal_v3('),
       'COMMIT',
     ]);
     expect(db.calls[4]?.values).toEqual([
-      SUBJECT,THREAD,TURN,ATTEMPT,USER,ASSISTANT,POST_TURN_OUTBOX,
+      SUBJECT,THREAD,TURN,ATTEMPT,USER,ASSISTANT,POST_TURN_OUTBOX,TURN,
     ]);
     expect(db.releases).toEqual([undefined]);
   });
@@ -117,9 +118,27 @@ describe('Se-yeon G3 Node-only original-Grant current Subject fence',()=>{
       originalUserMessageId:user as string,
       committedAssistantMessageId:assistant as string,
       postTurnOutboxEventId:outbox as string,
+      currentClientTurnId:TURN,
     })).toThrowError();
     expect(pool.connects).toBe(0);
   });
+
+  it.each(['', ' leading', 'trailing ', 'x'.repeat(257)])(
+    'refuses malformed current client Turn key %s before any DB connection',
+    key=>{
+      const db=new FakeG3Connection(SUBJECT,CANARY,true);
+      const pool=new FakeG3Pool(db);
+      expect(()=>createSeyeonFirstPositiveMemoryLockedReadV1({
+        pool,verifiedEvidence:EVIDENCE,expectedSubjectId:SUBJECT,
+        threadId:THREAD,turnId:TURN,attemptId:ATTEMPT,
+        originalUserMessageId:USER,
+        committedAssistantMessageId:ASSISTANT,
+        postTurnOutboxEventId:POST_TURN_OUTBOX,
+        currentClientTurnId:key,
+      })).toThrow();
+      expect(pool.connects).toBe(0);
+    },
+  );
 
   it('refuses a different DB-authenticated Subject before any G3 Grant or message read',async()=>{
     const db=new FakeG3Connection(OTHER);
@@ -131,7 +150,7 @@ describe('Se-yeon G3 Node-only original-Grant current Subject fence',()=>{
     })).rejects.toMatchObject({code:'INVALID_SCOPE'});
     expect(delivered).toBe(false);
     expect(queries(db).some(q=>q.includes(
-      'from public.qry_seyeon_positive_first_memory_locked_reveal_v2(',
+      'from public.qry_seyeon_positive_first_memory_locked_reveal_v3(',
     ))).toBe(false);
     expect(queries(db).at(-1)).toBe('ROLLBACK');
     expect(queries(db)).not.toContain('COMMIT');
@@ -196,7 +215,7 @@ describe('Se-yeon G3 Node-only original-Grant current Subject fence',()=>{
     expect(runtimeCalls).toBe(0);
     expect(pool.connects).toBe(1);
     expect(queries(connection)).not.toContainEqual(
-      expect.stringContaining('from public.qry_seyeon_positive_first_memory_locked_reveal_v2('),
+      expect.stringContaining('from public.qry_seyeon_positive_first_memory_locked_reveal_v3('),
     );
   });
 
@@ -268,7 +287,7 @@ describe('Se-yeon G3 Node-only original-Grant current Subject fence',()=>{
     expect(pool.connects).toBe(1);
     expect(queries(db).some(q => q.includes('has_function_privilege'))).toBe(true);
     expect(queries(db)).not.toContainEqual(
-      expect.stringContaining('from public.qry_seyeon_positive_first_memory_locked_reveal_v2('),
+      expect.stringContaining('from public.qry_seyeon_positive_first_memory_locked_reveal_v3('),
     );
   });
 
@@ -314,6 +333,7 @@ describe('Se-yeon G3 Node-only original-Grant current Subject fence',()=>{
       verifiedEvidence: EVIDENCE,
       result,
       expectedThreadId: THREAD,
+      expectedClientTurnId:TURN,
       requestId: 'g3-exact-attempt',
       serverTime: '2026-10-22T00:00:00.000Z',
     })).rejects.toMatchObject({code: 'INVALID_COMMIT'});
@@ -363,6 +383,7 @@ describe('Se-yeon G3 Node-only original-Grant current Subject fence',()=>{
       verifiedEvidence: EVIDENCE,
       result,
       expectedThreadId: THREAD,
+      expectedClientTurnId:TURN,
       requestId: 'g3-thread-single-character',
       serverTime: '2026-10-22T00:00:00.000Z',
     })).rejects.toMatchObject({code: 'INVALID_COMMIT'});
@@ -418,6 +439,7 @@ describe('Se-yeon G3 Node-only original-Grant current Subject fence',()=>{
       pool,
       verifiedEvidence:EVIDENCE,
       result,expectedThreadId:THREAD,
+      expectedClientTurnId:TURN,
       requestId:'g3-no-replay-regrant',
       serverTime:'2026-10-22T00:00:00.000Z',
     })).rejects.toMatchObject({code:'INVALID_COMMIT'});
@@ -432,11 +454,11 @@ describe('Se-yeon G3 Node-only original-Grant current Subject fence',()=>{
     })).rejects.toMatchObject({code:'DB_NOT_READY'});
     const readiness=queries(db).find(q=>q.includes('has_function_privilege'));
     expect(readiness).toContain(
-      'qry_seyeon_positive_first_memory_locked_reveal_v2(uuid,uuid,uuid,uuid,uuid,uuid,uuid)',
+      'qry_seyeon_positive_first_memory_locked_reveal_v3(uuid,uuid,uuid,uuid,uuid,uuid,uuid,text)',
     );
     expect(readiness).not.toContain('qry_seyeon_positive_first_memory_locked_reveal_v1');
     expect(queries(db)).not.toContainEqual(
-      expect.stringContaining('from public.qry_seyeon_positive_first_memory_locked_reveal_v2('),
+      expect.stringContaining('from public.qry_seyeon_positive_first_memory_locked_reveal_v3('),
     );
   });
 });

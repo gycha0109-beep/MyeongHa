@@ -95,6 +95,7 @@ describe('S5/G3 first private Reply requires original G2 durable post-turn Outbo
       pool,verifiedEvidence:{kind:'member',verifiedAuthUserId:AUTH},
       result:value as unknown as RunProductionSeyeonChatResultV1,
       expectedThreadId:THREAD,
+      expectedClientTurnId:TURN,
       requestId:'g3-outbox-original-lineage',
       serverTime:'2026-10-23T00:00:00.000Z',
     })).rejects.toMatchObject({code:'INVALID_COMMIT'});

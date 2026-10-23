@@ -23,7 +23,7 @@ import {
 
 export const SEYEON_G3_FIRST_POSITIVE_MEMORY_NODE_V1 = Object.freeze({
   version: 'seyeon-g3-first-positive-memory-node-v1',
-  dbAuthority: 'public.qry_seyeon_positive_first_memory_locked_reveal_v2',
+  dbAuthority: 'public.qry_seyeon_positive_first_memory_locked_reveal_v3',
   transport: 'node:http.ServerResponse',
   publicRouteMounted: false,
   availableForProduction: false,
@@ -38,9 +38,9 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-
 
 const LOCKED_G3_SQL = `
 select assistant_text as "assistantText"
-from public.qry_seyeon_positive_first_memory_locked_reveal_v2(
+from public.qry_seyeon_positive_first_memory_locked_reveal_v3(
   $1::uuid,$2::uuid,$3::uuid,$4::uuid,
-  $5::uuid,$6::uuid,$7::uuid
+  $5::uuid,$6::uuid,$7::uuid,$8::text
 )
 `.trim();
 
@@ -56,7 +56,7 @@ select
     'public.cmd_commit_seyeon_positive_chat_turn_v1(uuid,uuid,uuid,uuid,uuid,uuid,uuid,jsonb,text,text,text)'
   ) is not null
   and to_regprocedure(
-    'public.qry_seyeon_positive_first_memory_locked_reveal_v2(uuid,uuid,uuid,uuid,uuid,uuid,uuid)'
+    'public.qry_seyeon_positive_first_memory_locked_reveal_v3(uuid,uuid,uuid,uuid,uuid,uuid,uuid,text)'
   ) is not null
   and (
     select count(*)
@@ -69,7 +69,7 @@ select
         'public.cmd_commit_seyeon_positive_chat_turn_v1(uuid,uuid,uuid,uuid,uuid,uuid,uuid,uuid,jsonb,text,text,text)'
       ),
       to_regprocedure(
-        'public.qry_seyeon_positive_first_memory_locked_reveal_v2(uuid,uuid,uuid,uuid,uuid,uuid,uuid)'
+        'public.qry_seyeon_positive_first_memory_locked_reveal_v3(uuid,uuid,uuid,uuid,uuid,uuid,uuid,text)'
       )
     )
       and p.prosecdef
@@ -78,11 +78,11 @@ select
       and not pg_catalog.has_function_privilege('authenticated',p.oid,'EXECUTE')
       and not pg_catalog.has_function_privilege('service_role',p.oid,'EXECUTE')
       and (
-        (p.proname='qry_seyeon_positive_first_memory_locked_reveal_v2'
+        (p.proname='qry_seyeon_positive_first_memory_locked_reveal_v3'
          and pg_catalog.pg_get_userbyid(p.proowner)='postgres'
          and 'row_security=off'=any(p.proconfig))
         or
-        (p.proname<>'qry_seyeon_positive_first_memory_locked_reveal_v2'
+        (p.proname<>'qry_seyeon_positive_first_memory_locked_reveal_v3'
          and pg_catalog.pg_get_userbyid(p.proowner)=
            'myeongha_seyeon_chat_runtime_owner')
       )
@@ -146,12 +146,17 @@ export function createSeyeonFirstPositiveMemoryLockedReadV1(input: Readonly<{
   originalUserMessageId: string;
   committedAssistantMessageId: string;
   postTurnOutboxEventId: string;
+  currentClientTurnId: string;
 }>): SeyeonOriginalGrantLockedReadV1 {
   if (!member(input.verifiedEvidence) ||
       ![input.expectedSubjectId,input.threadId,input.turnId,
         input.attemptId,input.originalUserMessageId,
         input.committedAssistantMessageId,input.postTurnOutboxEventId]
-        .every(value=>typeof value==='string'&&UUID.test(value))) {
+        .every(value=>typeof value==='string'&&UUID.test(value)) ||
+      typeof input.currentClientTurnId!=='string' ||
+      input.currentClientTurnId.length<1 ||
+      input.currentClientTurnId.length>256 ||
+      input.currentClientTurnId.trim()!==input.currentClientTurnId) {
     throw new SeyeonG3FirstPositiveNodeUnavailableV1('INVALID_SCOPE');
   }
   let used=false;
@@ -172,7 +177,7 @@ export function createSeyeonFirstPositiveMemoryLockedReadV1(input: Readonly<{
         const result=await client.query<{assistantText:unknown}>(LOCKED_G3_SQL,[
           resolvedSubject.subjectId,input.threadId,input.turnId,input.attemptId,
           input.originalUserMessageId,input.committedAssistantMessageId,
-          input.postTurnOutboxEventId,
+          input.postTurnOutboxEventId,input.currentClientTurnId,
         ]);
         const value=result.rows.length===1 ? result.rows[0]?.assistantText : null;
         const body=typeof value==='string'&&value.trim().length>0&&
@@ -193,6 +198,7 @@ export async function deliverSeyeonCommittedFirstPositiveMemoryNodeTurnV1(
     verifiedEvidence:VerifiedSubjectIdentityEvidenceV1;
     result:RunProductionSeyeonChatResultV1;
     expectedThreadId:string;
+    expectedClientTurnId:string;
     requestId:string;
     serverTime:string;
     deadlineMs?:number;
@@ -203,6 +209,10 @@ export async function deliverSeyeonCommittedFirstPositiveMemoryNodeTurnV1(
   // An old committed Replay must not inherit the first-send admission.
   if (!member(input.verifiedEvidence) ||
       !UUID.test(input.expectedThreadId) ||
+      typeof input.expectedClientTurnId!=='string' ||
+      input.expectedClientTurnId.length<1 ||
+      input.expectedClientTurnId.length>256 ||
+      input.expectedClientTurnId.trim()!==input.expectedClientTurnId ||
       !responseWritable(input.response,input.requestSignal) ||
       input.result?.threadBinding?.threadId!==input.expectedThreadId ||
       !Array.isArray(input.result?.threadBinding?.participantCharacterIds) ||
@@ -262,6 +272,7 @@ export async function deliverSeyeonCommittedFirstPositiveMemoryNodeTurnV1(
       originalUserMessageId:input.result.execution.receivedTurn.userMessageId,
       committedAssistantMessageId:receipt.assistantMessageId,
       postTurnOutboxEventId:originalPostTurnOutboxId,
+      currentClientTurnId:input.expectedClientTurnId,
     }),
     chatResponseMetadata:metadata,
     ...(input.deadlineMs===undefined?{}:{deadlineMs:input.deadlineMs}),
@@ -348,6 +359,7 @@ export async function executeAndDeliverSeyeonFirstPositiveMemoryNodeTurnV1(
     verifiedEvidence:input.verifiedEvidence,
     result,
     expectedThreadId:input.threadId,
+    expectedClientTurnId:input.clientTurnId,
     requestId:input.requestId,
     serverTime:input.serverTime,
     ...(input.deadlineMs===undefined?{}:{deadlineMs:input.deadlineMs}),
