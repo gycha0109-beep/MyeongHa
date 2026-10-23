@@ -63,13 +63,19 @@ function makeFixture(
 }
 
 describe('I18N-06d Reader voice/locale/source output evidence boundary', () => {
-  it('preserves existing Korean pipeline for nine Characters on every product surface', () => {
+  it('preserves Korean handoff only for admitted voices while retaining nine canonical identities', () => {
     expect(CHARACTER_RUNTIME_AUTHORING_V1).toHaveLength(9);
     for (const character of CHARACTER_RUNTIME_AUTHORING_V1) {
       for (const surface of [
         'general_chat', 'saju_product', 'face_product',
       ] as const) {
         const input = makeFixture(character.characterId, surface);
+        if (['seorin', 'mira', 'doyun'].includes(character.characterId)) {
+          expect(inspectReaderVoiceLocaleOutputBoundaryV1(input)).toEqual({
+            state: 'hold', reason: 'neutral_voice_unavailable', foreignRelease: 'hold',
+          });
+          continue;
+        }
         expect(inspectReaderVoiceLocaleOutputBoundaryV1(input)).toEqual({
           state: 'korean_existing_unchanged',
           schemaVersion: 'reader-voice-locale-output-boundary-v1',
@@ -90,7 +96,9 @@ describe('I18N-06d Reader voice/locale/source output evidence boundary', () => {
         );
         expect(decision).toEqual({
           state: 'hold',
-          reason: 'non_korean_release_not_admitted',
+          reason: ['seorin', 'mira', 'doyun'].includes(character.characterId)
+            ? 'neutral_voice_unavailable'
+            : 'non_korean_release_not_admitted',
           foreignRelease: 'hold',
         });
         expect('text' in decision).toBe(false);
@@ -174,7 +182,7 @@ describe('I18N-06d Reader voice/locale/source output evidence boundary', () => {
   });
 
   it('refuses new reality facts, invented stage directions, and product-voice overrides', () => {
-    const input = makeFixture('doyun', 'saju_product');
+    const input = makeFixture('seyeon', 'saju_product');
     for (const evidence of [
       { introducedRealityFactKeys: ['invented-house'], authorizedRealityFactKeys: [] },
       { proseStageDirections: ['*grabs user*'] },
