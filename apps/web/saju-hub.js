@@ -267,6 +267,8 @@ function buildBirthRequest() {
 
 function setState(state, message = '') {
   const status = byId('saju-status');
+  const retry = byId('saju-calculation-retry');
+  retry.hidden = state !== 'error';
   const empty = byId('saju-empty');
   const hub = byId('saju-hub');
   status.hidden = state !== 'loading' && !message;
@@ -447,7 +449,7 @@ function storedProfileHasSupportedBirthDate(profile) {
 }
 
 function showCalculationUnavailable() {
-  setState('error', '출생정보는 등록되어 있지만 현재 사주 계산 서비스를 사용할 수 없습니다. 입력을 다시 등록하지 말고 잠시 후 새로고침해 주세요.');
+  setState('error', '출생정보는 저장되어 있습니다. 다시 입력하지 말고 계산 재시도 버튼으로 결과를 확인해 주세요.');
 }
 
 async function loadExistingSaju() {
@@ -562,6 +564,7 @@ for (const input of document.querySelectorAll('input[name="saju-calendar"]')) {
   input.addEventListener('change', syncBirthControls);
 }
 byId('saju-birth-form').addEventListener('submit', submitBirthProfile);
+byId('saju-calculation-retry').addEventListener('click', () => void loadExistingSaju());
 
 syncBirthControls();
 void loadExistingSaju();
