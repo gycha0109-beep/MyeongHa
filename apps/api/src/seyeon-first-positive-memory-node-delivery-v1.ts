@@ -199,6 +199,7 @@ export async function deliverSeyeonCommittedFirstPositiveMemoryNodeTurnV1(
   }>,
 ):Promise<SeyeonNodeOriginalGrantSendOutcomeV1>{
   const receipt=input.result?.execution?.committedTurn;
+  const originalPostTurnOutboxId=receipt?.postTurnOutboxEventId;
   // An old committed Replay must not inherit the first-send admission.
   if (!member(input.verifiedEvidence) ||
       !UUID.test(input.expectedThreadId) ||
@@ -225,10 +226,11 @@ export async function deliverSeyeonCommittedFirstPositiveMemoryNodeTurnV1(
       (input.result?.execution?.postTurnAnalysis?.status==='deferred' &&
        input.result.execution.postTurnAnalysis.outboxEventId!==
          receipt.postTurnOutboxEventId) ||
+      typeof originalPostTurnOutboxId!=='string' ||
+      !UUID.test(originalPostTurnOutboxId) ||
       ![input.result.subjectId,receipt.turnId,receipt.attemptId,
         input.result?.execution?.receivedTurn?.userMessageId,
-        receipt.assistantMessageId,
-        receipt.postTurnOutboxEventId].every(s=>typeof s==='string'&&UUID.test(s))) {
+        receipt.assistantMessageId].every(s=>typeof s==='string'&&UUID.test(s))) {
     input.response.destroy();
     throw new SeyeonG3FirstPositiveNodeUnavailableV1('INVALID_COMMIT');
   }
@@ -258,7 +260,7 @@ export async function deliverSeyeonCommittedFirstPositiveMemoryNodeTurnV1(
       attemptId:receipt.attemptId,
       originalUserMessageId:input.result.execution.receivedTurn.userMessageId,
       committedAssistantMessageId:receipt.assistantMessageId,
-      postTurnOutboxEventId:receipt.postTurnOutboxEventId,
+      postTurnOutboxEventId:originalPostTurnOutboxId,
     }),
     chatResponseMetadata:metadata,
     ...(input.deadlineMs===undefined?{}:{deadlineMs:input.deadlineMs}),
