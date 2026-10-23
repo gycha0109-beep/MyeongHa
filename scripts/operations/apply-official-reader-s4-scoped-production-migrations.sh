@@ -99,7 +99,9 @@ current_frontier="$(PGOPTIONS='-c default_transaction_read_only=on' \
   hold 'Cannot read production migration frontier'
 backup_frontier="$(jq -er '.backup_migration_frontier | tostring' "$envelope")" ||
   hold 'Backup frontier evidence missing'
-[[ -n "$current_frontier" && "$current_frontier" == "$backup_frontier" ]] ||
+[[ "$current_frontier" =~ ^[0-9]+$ &&
+   "$backup_frontier" =~ ^[0-9]+$ &&
+   "$current_frontier" == "$backup_frontier" ]] ||
   hold 'Production migration frontier changed since backup'
 
 python3 scripts/operations/stage-official-reader-s4-production-migrations.py \
@@ -117,7 +119,11 @@ args+=(-f "$scratch/stage/history.sql")
 args+=(-f "$root/scripts/operations/official-reader-s4-scoped-migration-post.sql")
 
 echo 'SCOPED_READER_S4_BEGIN: only 1740..2290, paid/public OFF'
-psql -X -q --single-transaction -v ON_ERROR_STOP=1 ${args[@]} ||
+# The same backup frontier is re-checked inside the migration transaction,
+# closing the gap between the read-only evidence probe and destructive DDL.
+# Quoted array expansion preserves every exact, approved migration path.
+psql -X -q --single-transaction -v ON_ERROR_STOP=1 \
+  -v "expected_frontier=$backup_frontier" "${args[@]}" ||
   hold 'Atomic scoped migration failed; no successful transaction confirmed'
 post="$(PGOPTIONS='-c default_transaction_read_only=on' \
  psql -X -qAt -v ON_ERROR_STOP=1 -c "

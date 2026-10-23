@@ -1,6 +1,11 @@
 -- Exclusive, forward-only 1740..2290 Official Reader boundary admission.
 -- Executes INSIDE the same --single-transaction as all subsequent DDL.
 -- No bypass for the historical remote-only 20261008090417 bundle.
+-- Supplied by protected-main execution after validating the paired backup.
+-- This value is checked AGAIN within the same transaction as all 56 DDLs.
+select pg_catalog.set_config(
+  'myeongha.reader_s4.expected_frontier', :'expected_frontier',true
+);
 do $reader_s4_admission$
 declare
   v_missing_predecessor integer;
@@ -20,6 +25,12 @@ begin
   );
   if v_missing_predecessor<>0 then
     raise exception 'S4 scoped admission blocked: predecessor history incomplete';
+  end if;
+  if (select max(version) from supabase_migrations.schema_migrations)
+      is distinct from pg_catalog.current_setting(
+        'myeongha.reader_s4.expected_frontier',true
+      ) then
+    raise exception 'S4 scoped admission blocked: backup frontier changed during deployment';
   end if;
   select count(*) into v_present_reader
     from supabase_migrations.schema_migrations m
