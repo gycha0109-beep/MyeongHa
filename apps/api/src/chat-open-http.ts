@@ -1,4 +1,5 @@
 import { ApiCommandError } from './api-error.js';
+import type { PortOneVerifiedAgeAdmissionPortV1 } from './portone-v2-verified-age-admission-v1.js';
 import { AuthenticatedJsonRequestBodyTooLargeV1 } from './authenticated-json-request-resource.js';
 import { readChatOpenJsonRequestBodyV1 } from './chat-open-request-body.js';
 import type { IdentityEvidenceVerificationPortV1 } from './current-subject-profile-http.js';
@@ -44,6 +45,8 @@ export interface HandleChatOpenRequestInputV1 {
   readonly identityEvidenceVerifier: IdentityEvidenceVerificationPortV1;
   readonly pool: PostgresSubjectPoolV1;
   readonly createUuid: () => string;
+  /** Server-only injection; OFF until PortOne DB policy is deployed. */
+  readonly ageAdmissionPort?: Pick<PortOneVerifiedAgeAdmissionPortV1, 'admitFreePersonalization'>;
 }
 
 type ChatOpenCommandRowV1 = Readonly<{
@@ -348,6 +351,24 @@ export async function handleChatOpenRequestV1(
       retryable: false,
       requestId,
     });
+  }
+
+  if (verifiedEvidence.kind === 'member' && input.ageAdmissionPort !== undefined) {
+    let admitted = false;
+    try {
+      admitted = await input.ageAdmissionPort.admitFreePersonalization(verifiedEvidence);
+    } catch {
+      return jsonError({
+        status: 503, code: 'AGE_VERIFICATION_UNAVAILABLE',
+        messageKey: 'age.verification_unavailable', retryable: true, requestId,
+      });
+    }
+    if (!admitted) {
+      return jsonError({
+        status: 403, code: 'AGE_VERIFICATION_REQUIRED',
+        messageKey: 'age.verification_required', retryable: false, requestId,
+      });
+    }
   }
 
   const candidateThreadId = requireUuid('candidate thread id', input.createUuid());
