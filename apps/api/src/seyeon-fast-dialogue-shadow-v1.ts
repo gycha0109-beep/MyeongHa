@@ -4,7 +4,10 @@ import {
   RENDERER_RESPONSE_SCHEMA_V2,
   TURN_INTERPRETATION_RESPONSE_SCHEMA_V2,
   type SeyeonStructuredProviderPortV2,
+  type SeyeonStructuredProviderRequestV2,
 } from './seyeon-character-runtime-v2.js';
+import { compactSeyeonShadowRequestV1 }
+  from './seyeon-shadow-compact-prompts-v1.js';
 import {
   admitSeyeonRendererDraftV2,
   buildSeyeonRendererPacketV2,
@@ -126,7 +129,13 @@ export function createSeyeonFastDialogueShadowV1(input: {
   readonly candidateProvider: SeyeonStructuredProviderPortV2;
   readonly reviewerProvider: SeyeonStructuredProviderPortV2;
   readonly fullThreadCensus?: SeyeonFullThreadCensusShadowPortV1;
+  /** Explicit evaluation only. The default/production-facing Shadow contract is unchanged. */
+  readonly promptProfile?: 'baseline' | 'compact_v1';
 }) {
+  if (input.promptProfile !== undefined &&
+      input.promptProfile !== 'baseline' && input.promptProfile !== 'compact_v1') {
+    throw new TypeError('FAST_SHADOW_PROMPT_PROFILE_HOLD');
+  }
   return Object.freeze({
     async evaluate(context: SeyeonRuntimeContextV2) {
       // Eligibility is intentionally stricter than future general-chat routing.
@@ -150,7 +159,7 @@ export function createSeyeonFastDialogueShadowV1(input: {
         currentUserMessageId: context.recentConversation[0]!.messageId,
       });
       const request = buildSeyeonTurnInterpreterRequestV2(context);
-      const raw: unknown = await input.candidateProvider.generate({
+      const proposal: SeyeonStructuredProviderRequestV2 = {
         contractVersion: 'seyeon-structured-provider-v2',
         purpose: 'turn_interpret_render_shadow',
         instructions: [
@@ -171,7 +180,11 @@ export function createSeyeonFastDialogueShadowV1(input: {
         ].join('\n'),
         input: request.input,
         responseSchema: SEYEON_FAST_DIALOGUE_SHADOW_RESPONSE_SCHEMA_V1,
-      });
+      };
+      const raw: unknown = await input.candidateProvider.generate(
+        input.promptProfile === 'compact_v1'
+          ? compactSeyeonShadowRequestV1(proposal) : proposal,
+      );
       if (typeof raw !== 'object' || raw === null || Array.isArray(raw) ||
           Object.keys(raw).length !== 2 ||
           !Object.hasOwn(raw, 'interpretation') || !Object.hasOwn(raw, 'draft')) {
@@ -207,12 +220,14 @@ export function createSeyeonFastDialogueShadowV1(input: {
         port: input.fullThreadCensus,
         currentUserMessageId: context.recentConversation[0]!.messageId,
       });
+      const semanticRequest = buildSeyeonSemanticReviewRequestV2({
+        packet,
+        rendererDraft: draft,
+        utteranceHash: hashSeyeonRendererUtteranceV2(draft.utterance),
+      });
       const review: unknown = await input.reviewerProvider.generate(
-        buildSeyeonSemanticReviewRequestV2({
-          packet,
-          rendererDraft: draft,
-          utteranceHash: hashSeyeonRendererUtteranceV2(draft.utterance),
-        }),
+        input.promptProfile === 'compact_v1'
+          ? compactSeyeonShadowRequestV1(semanticRequest) : semanticRequest,
       );
       const envelope = admitStage('FAST_SEMANTIC_OUTPUT_REJECTED', () =>
         guardSeyeonRendererOutputV2({
