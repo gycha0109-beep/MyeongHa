@@ -362,6 +362,24 @@ html[data-theme="dark"] .mhx-characters {
   .mhx-content-grid { grid-template-columns: 1fr; }
   .mhx-content-card { min-height: 84px; }
 }
+/* Tablet portrait: keep image-centered character cards readable rather than squeezing into three narrow columns. */
+@media (min-width: 581px) and (max-width: 760px) {
+  .mhx-character-list {
+    display: flex;
+    gap: 12px;
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+    padding: 4px 2px 12px;
+    scrollbar-gutter: stable;
+  }
+  .mhx-character {
+    flex: 0 0 min(43vw, 282px);
+    scroll-snap-align: start;
+  }
+  .mhx-character-art { height: 202px; }
+  .mhx-character-footer { flex-wrap: wrap; align-content: center; }
+  .mhx-character-footer a { min-height: 40px; }
+}
 @media (max-width: 580px) {
   body.gm-page[data-page="home"] .gm-home-main { padding-bottom: 110px; }
   .mhx-home { width: calc(100% - 28px); }
