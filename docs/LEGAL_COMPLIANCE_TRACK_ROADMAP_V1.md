@@ -19,7 +19,7 @@
 
 ## 2. 중복 없이 끝내는 실행 순서 및 완료 기준
 
-1. **L5-A (이번 PR):** 기존 공개 첫 진입과 대화 화면에 '생성형 AI 기반/실제 사람 아님/생성 결과' 고지. 회귀 테스트에서 문구 존재·노출 위치 확인. UI가 실제 배포됐다는 주장 금지. **상태: 구현, 검증 대기**.
+1. **L5-A (이번 PR):** 공개 첫 진입·대화 허브·대화방에 '생성형 AI 기반/실제 사람 아님/생성 결과' 고지. 회귀 테스트에서 사전 노출 순서·웹/모바일 번역 사전 일치 확인. **상태: 코드 구현; 실제 배포 사용자 시각 검증 대기**. 각 PR SHA별 CI/Workers Preview의 결과는 별도 확인하며 이전 GREEN으로 최신 SHA의 배포 성공을 추정하지 않는다.
 2. **L3-A:** 기존 공급자 감사 문서와 실제 활성 endpoint/설정(비밀값 수집 금지), 국가·항목·목적·계약·보존/학습/삭제를 교차 대조. `확인됨/미확인/미사용` 구분; 미확인 송신 비활성. 실제 계약과 개인정보 처리방침 항목 일치 시 완료.
 3. **L2-A:** 실제 사주·자유대화 입력 및 AI 로그 흐름 확인. 불필요한 민감정보의 영속화·외부전송 0, 필요한 예외의 적법한 근거 및 별도 동의 조건 확인. 만 14세 미만 처리 여부와 검증된 정책/진입차단 또는 법정대리인 동의 검증까지 완료.
 4. **L1-A:** #2318/#2488 산출물에 법적 수락 조건과 운영 실증 결과만 결합. 실제 복원 후 삭제/회수 원문 재노출 0, 일반/보호 원문 분리, 본 DB 파기 지표, 권리행사 동선 증명. DB 구현 중복 금지.
@@ -29,8 +29,8 @@
 
 ## 3. 이번 PR 소유 변경 및 인계
 
-- 직접 수정: `apps/web/src/landing/LandingPage.tsx`, `apps/web/src/chat/ChatPage.tsx`, `test/legal-ai-disclosure-surface.test.ts`. 캐릭터 생성 방식·모델·결제·DB·기존 일반 채팅 저장 정책 변경 없음.
-- **한계:** 텍스트는 소스의 공개/대화 화면에 삽입했으며 실제 배포·모바일·SSR 접근성·다른 AI 출력 진입점 전수 확인은 미완료. `LEGAL_003_AI_DISCLOSURE_DRAFT_KO.md`는 여전히 초안. 법정 표시 방법의 예외·세부 요건도 제공 형태별 별도 검토.
+- 직접 수정: `apps/web/src/landing/LandingPage.tsx`, `apps/web/src/chat-hub/ChatHubPage.tsx`, `apps/web/src/chat/ChatPage.tsx`, `apps/web/ui-i18n.js`, `apps/mobile/src/ui/mobile-ui-copy.ts`, `test/legal-ai-disclosure-surface.test.ts`, `test/legal-external-ai-egress-contract.test.ts`, `test/legal-commerce-public-checkout-hold.test.ts`, `docs/LEGAL_002_EXTERNAL_DATA_PROCESSING_AUDIT_KO.md`. 캐릭터 생성 방식·모델·결제·DB·기존 일반 채팅 저장 정책 변경 없음.
+- **한계:** 텍스트는 소스의 공개/허브/대화 화면에 삽입했으며 실제 배포의 사용자 시각 확인·Native UI 직접 노출·SSR 접근성·다른 AI 출력 진입점 전수 확인은 미완료. `LEGAL_003_AI_DISCLOSURE_DRAFT_KO.md`는 여전히 초안. 법정 표시 방법의 예외·세부 요건도 제공 형태별 별도 검토.
 - UX/Chat 인계: 읽기 결과/후속 대화/기타 AI 출력에서 '생성 결과' 고지의 실제 시각 노출 확인. Commerce/S7 인계: **유료 결제 전** 디지털 콘텐츠 계약 범위·환불 법정 예외·AI 활용의 정확한 고지. DB/Privacy는 #2318 계속 소유.
 
 ## 4. 공식 법령(2026-10-23 시행본 확인)
@@ -40,3 +40,11 @@
 - 인공지능기본법(2026-07-21 시행) §31 생성형 AI 사전 고지·결과 표시: https://www.law.go.kr/법령/인공지능발전과신뢰기반조성등에관한기본법
 
 **제품 출시 가능 판정: 현재 증거로는 불가.** 공개/유료 활성화를 뜻하는 커밋, UI 약관 초안 게시, DB·결제 운영 변경을 본 트랙에서 실행하지 않는다.
+
+## 5. 추가 검증·미완료 정책 증거 (2026-10-23)
+
+- **L3:** Supabase 명하 프로젝트 Singapore 리전, Vercel 팀 현재 Hobby, AI 제공자 선택 코드에서 OpenAI 직접/AI Gateway 대체 경로, 전송 후보의 최근 대화·기억 요약 확인. 연결된 Vercel 프로젝트 환경변수 *이름* 조회는 **403 Forbidden**으로 거절되어 실제 선택되는 AI 전송 경로 및 DPA/재위탁·로그는 **미확정**. 운영 설정 접근 권한을 임의로 우회하거나 비밀값을 수집하지 않는다.
+- **L2:** `P0-AGE-01` 미확정. 만 14세 미만 서비스 미제공을 임의로 선언하지 않고, 법정대리인 동의 구현을 승인 없이 추가하지 않는다. 회원가입·게스트·출생정보·자유 채팅·민감정보 입력/외부 전송/보존 경계는 정책 확정 뒤 관련 UX/API/Privacy 트랙 인수 검증 필요.
+- **L1:** #2318 및 Draft #2488(합성 삭제/복원), Draft #2301(DB Authority) 현행 OPEN. 본 DB/백업 **운영 실증을 완료한 것으로 인정하지 않는다**. 권리행사 화면은 MyPage에서 공식 접수처 미연결 상태를 표시하고 있으며, LEGAL-002 초안은 게시되지 않았다.
+- **L4:** `PORTONE_V2_BROWSER_CHECKOUT_PREPARATION_V1`, `PORTONE_V2_BROWSER_REQUEST_COMPOSER_V1`, `PORTONE_V2_BROWSER_SDK_EXECUTION_GUARD_V1`의 `active:false`/SDK OFF/공개 route 없음에 대한 Legal 회귀 테스트를 추가. *판매 비활성 증명*일 뿐 사전 환불 고지·인도·환급 구현 완료로 계산하지 않는다. 디지털 콘텐츠 환불 수동 분류기는 별도 Commerce 소유로 유지.
+- **L5 게시:** 사업자 상호·연락처, 최종 실제 데이터 처리방침과 국외 이전 항목, 미성년자 범위가 검증되지 않아 LEGAL-001/002/003 초안의 사용자 공개는 계속 보류. 대화 AI 사전 고지 구현은 이 보류를 해제하지 않는다.
