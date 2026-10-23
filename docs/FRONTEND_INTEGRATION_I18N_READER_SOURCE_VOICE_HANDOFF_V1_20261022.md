@@ -237,6 +237,13 @@
 - Reader 접근 상태 키는 기존 `MobileOfficialReadingReaderEntryStatusV1` 전체에 **컴파일 시점 전수 체크**를 적용한다. `test/i18n-en-us-zh-cn-protected-shell-v1.test.ts`는 필수 UI 필드·각 locale의 문구·개인정보 보호 반복 조회/재설치 해제 불가·source 원문 보존·미승인 언어 fallback·출력/권한 비승격을 회귀 고정한다. 실제 클라이언트 사용 경로에는 아직 연결하지 않는다.
 - **다음 단계:** EN-UI-B/CN-UI-B 각 화면의 나머지 일반 UI·접근성·공식 아카이브 안내 등 누락 없는 자산 작성과 회귀 후, EN-UI-A/CN-UI-A의 웹/모바일/API 동시 명시 선택·저장·재시작 테스트 및 I18N-07 UI-only 수용. Source/Character/Reader의 새 언어 생성·원래 Official artifact 재언어화/운영 공개는 별도 승인 전 HOLD다.
 
+### 7.15 I18N-07 / EN-UI-B / CN-UI-B — 공식 Reading 기록 재열람 보호 UI 준비
+
+- `apps/mobile/src/ui/mobile-planned-official-archive-shell-v1.ts`에 영어 `en-US`·간체 `zh-CN` 각각 저장된 공식 Reading 기록 재열람 화면의 **11개 고정 안내 문구**, 연결 Reader 수/단수·복수 표시, 기존 **4개 오류 유형**별 저자 문구를 작성했다. `projectPlannedOfficialArchiveUiV1` 및 `projectPlannedArchiveFailureV1`는 미승인 로케일에서 `null`로 닫히고, 알 수 없는 서버/보호 오류는 원문을 노출하지 않고 일반 실패 UI로 수렴한다.
+- 이 새 문구는 **실제 앱 화면에 아직 연결하지 않은 후보 자산**이다. 기존 `projectMobileOfficialReadingShellV1`, `officialReadingArchiveFailureCopyV1`의 3개 언어 동작 및 서버 검증된 Official artifact/response hash/source unit·기록 조회 경로는 그대로 보존한다. 독립 Reader grant, 원본 풀이 언어 변경, 과거 기록 번역·재발급을 허가하지 않는다.
+- `test/i18n-en-us-zh-cn-planned-archive-shell-v1.test.ts`는 EN/ZH-CN 고정 라벨·Reader 수 표시·오류·원문 불변·HOLD 및 기존 실행 화면 미연결을 확인한다.
+- 다음 I18N-07 부분 수용 단계는 화면별 영어·간체 고정 UI 키의 누락 및 접근성/상태 보존 테스트를 완료한 뒤 웹/모바일/API 사용자 명시 선택을 함께 활성화하는 것이다. 생성형 Reader 및 공식 Saju/Face 출력, 저장 공식 풀이 재언어화 정책 ②는 여전히 source/owner 승인 전 HOLD다.
+
 ## 8. 다음 구현 작업 및 승인 위치
 
 1. **캐릭터 설계 owner:** 위 6명 차이를 실제 Bible/typed Runtime 간에 해결하고 authoritative source/version을 확정. 이 I18N 트랙은 제안·인계만, 원본 수정 금지.
