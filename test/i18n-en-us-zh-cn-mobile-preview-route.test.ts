@@ -160,8 +160,8 @@ describe('I18N-07 Expo developer-only Saju UI preview boundary', () => {
       readFile(new URL('../apps/mobile/src/features/birth/BirthDateCalendar.tsx', import.meta.url), 'utf8'),
       readFile(new URL('../apps/mobile/src/features/birth/BirthTime12HourField.tsx', import.meta.url), 'utf8'),
     ]);
-    expect(route).toContain('<BirthDateCalendar\\n            previewLocale={previewLocale}');
-    expect(route).toContain('<BirthTime12HourField\\n            previewLocale={previewLocale}');
+    expect(route).toContain('<BirthDateCalendar\n            previewLocale={previewLocale}');
+    expect(route).toContain('<BirthTime12HourField\n            previewLocale={previewLocale}');
     for (const source of [calendar, time]) {
       expect(source).toContain('previewMobileAuthoredUiLabelV1(source, previewLocale, t)');
       expect(source).toContain('previewLocale = null');
