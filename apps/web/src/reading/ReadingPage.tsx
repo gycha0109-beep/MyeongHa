@@ -1,4 +1,5 @@
 import { resolveReadingAvailabilityV1 } from './reading-availability.js';
+import { resumePreviewHrefV1 } from '../../reading-preview-continuation.js';
 import { useEffect } from 'react';
 
 const readingTopics = [
@@ -17,6 +18,7 @@ const relationshipTopics = [
 ] as const;
 
 export function ReadingPage() {
+  const resumedPreview = typeof window === 'undefined' ? null : resumePreviewHrefV1(window.location.search);
   useEffect(() => {
     void import('../../saju-hub.js');
   }, []);
@@ -88,6 +90,15 @@ export function ReadingPage() {
       </section>
 
       <section id="saju-hub" hidden aria-label="계산된 내 사주">
+        <div className="saju-preview-entry">
+          <div>
+            <strong>명식 계산이 완료되면 사주 프리뷰를 확인할 수 있어요</strong>
+            <p>정식 유료 해석과는 별개로, 서버에서 제공되는 무료 프리뷰를 바로 열어보세요.</p>
+          </div>
+          <a className="saju-primary-button saju-preview-open" href={resumedPreview ?? 'reading-detail.html?topic=temperament&scope=original'}>
+            사주 프리뷰 결과 보기 <span aria-hidden="true">→</span>
+          </a>
+        </div>
         <article className="gm-saju-hero" aria-labelledby="gm-saju-profile-title">
           <div className="gm-saju-hero-copy">
             <h2 className="gm-saju-title" id="gm-saju-profile-title">무료 기본 명식</h2>
