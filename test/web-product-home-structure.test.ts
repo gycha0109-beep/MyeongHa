@@ -87,7 +87,7 @@ describe('MyeongHa product Home — Golden Master', () => {
 
     expect(homeSource).toContain('href="reading.html"');
     expect(homeSource).toContain('href="records.html"');
-    expect(homeSource).toContain('href="chat-hub.html">대화로 가기 →</a>');
+    expect(homeSource).toContain('href="chat-hub.html">{t("대화로 가기 →")}</a>');
     expect(homeSource).toContain('오늘 이야기할 사람');
     expect(homeSource).toContain('캐릭터 선택');
     expect(homeSource).not.toContain('href="chat.html?character=');

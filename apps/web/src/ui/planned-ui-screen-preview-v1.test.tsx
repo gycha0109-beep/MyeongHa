@@ -34,6 +34,7 @@ describe('I18N-07 developer-only rendered EN/ZH UI preview', () => {
     expect(english).toContain('href="reading-detail.html?topic=temperament&amp;scope=original"');
     expect(english).toContain('id="home-character-title"');
     expect(korean).toContain('누구와 이야기를 시작해 볼까요?');
+    expect(korean).toContain('href="chat-hub.html">대화로 가기 →</a>');
     expect(korean).not.toContain('data-planned-ui-preview=');
     // Entertainment fortune draws and dynamic Source/Reader output remain outside the preview.
     expect(english).toContain('aria-label="오늘의 포춘쿠키"');
@@ -46,13 +47,15 @@ describe('I18N-07 developer-only rendered EN/ZH UI preview', () => {
     expect(chinese).toContain('对话');
     expect(chinese).toContain('请选择一位您感兴趣的人');
     expect(chinese).toContain('aria-label="对话列表连接状态"');
-    expect(chinese).toContain('data-continuation-context=""');
-    expect(chinese).toContain('data-recent-list=""');
-    expect(chinese).toContain('data-people-grid=""');
+    expect(chinese).toContain('data-continuation-context="true"');
+    expect(chinese).toContain('data-recent-list="true"');
+    expect(chinese).toContain('data-people-grid="true"');
     expect(korean).toContain('대화 목록 연결 상태');
     expect(korean).not.toContain('data-planned-ui-preview=');
     expect(chinese).toContain('href="#people"');
-  });  it('renders Records UI and privacy notices in EN/CN while preserving record sockets', () => {
+  });
+
+  it('renders Records UI and privacy notices in EN/CN while preserving record sockets', () => {
     const english = renderToStaticMarkup(createElement(RecordsPage, { previewLocale: 'en-US' }));
     const chinese = renderToStaticMarkup(createElement(RecordsPage, { previewLocale: 'zh-CN' }));
     const korean = renderToStaticMarkup(createElement(RecordsPage));
@@ -69,6 +72,7 @@ describe('I18N-07 developer-only rendered EN/ZH UI preview', () => {
       expect(markup).toContain('href="my.html"');
     }
     expect(korean).toContain('캐릭터가 삭제된 후 남는 기억 범위는 서로 다를 수 있습니다.');
+    expect(korean).toContain('>사주 기록</button>');
     expect(korean).not.toContain('data-planned-ui-preview=');
   });
 });

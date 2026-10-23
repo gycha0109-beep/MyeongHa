@@ -16,10 +16,10 @@ describe('Records Saju history surface', () => {
   it('keeps Saju reading records separate from Life Facts and other record domains', () => {
     expect(html).toContain('aria-controls="saju-records"');
     expect(html).toContain('id="saju-records-list"');
-    expect(html).toContain('>사주 기록<');
+    expect(html).toContain('>{t("사주 기록")}<');
     expect(html).toContain('완료되어 저장된 사주 풀이 이력을 삶의 사실과 분리해 확인합니다.');
-    expect(html).toContain('>현세록<');
-    expect(html).toContain('>명식록<');
+    expect(html).toContain('>{t("현세록")}<');
+    expect(html).toContain('>{t("명식록")}<');
     expect(html).toContain('>대리가 기억<');
   });
 
