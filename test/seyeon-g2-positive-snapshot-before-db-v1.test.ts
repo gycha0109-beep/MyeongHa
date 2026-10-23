@@ -54,7 +54,7 @@ function input(value:unknown=snapshot()):SeyeonPositiveS0AtomicCommitInputV1{
     finalModelContextDigest:CONTEXT_DIGEST,
   };
 }
-function fakeClient(){
+function fakeClient(overrides:Readonly<Record<string,unknown>>={}){
   const statements:string[]=[];
   const client:PostgresTransactionQueryV1={
     async query<Row=Record<string,unknown>>(sql:string):Promise<PostgresQueryResultV1<Row>>{
@@ -63,6 +63,7 @@ function fakeClient(){
         turnId:TURN, attemptId:ATTEMPT, assistantMessageId:ASSISTANT,
         sequenceNo:2, committedAt:'2026-10-22T00:00:00.000Z',
         postTurnOutboxEventId:ANALYSIS, replayed:false,
+        ...overrides,
       } as unknown as Row]};
     },
   };
@@ -109,6 +110,20 @@ describe('S4/G2 positive original Grant adapter admits only verified official Po
     const {statements,port}=fakeClient();
     await expect(port.commitAfterValidation(make())).rejects.toThrow();
     expect(statements).toHaveLength(0);
+  });
+
+  it.each([
+    ['zero sequence', {sequenceNo:0}],
+    ['negative sequence', {sequenceNo:-1}],
+    ['fractional sequence', {sequenceNo:1.5}],
+    ['non-finite sequence', {sequenceNo:Infinity}],
+    ['different DB committed assistant', {assistantMessageId:USER}],
+    ['different DB committed attempt', {attemptId:USER}],
+    ['already-replayed DB receipt', {replayed:true}],
+  ] as const)('rejects non-first or mismatched G2 owner Commit receipt: %s',async(_name,override)=>{
+    const {statements,port}=fakeClient(override);
+    await expect(port.commitAfterValidation(input())).rejects.toThrow();
+    expect(statements).toHaveLength(1);
   });
 
   it('preserves a server-shaped exact canonical snapshot through the current G2 owner SQL',async()=>{
