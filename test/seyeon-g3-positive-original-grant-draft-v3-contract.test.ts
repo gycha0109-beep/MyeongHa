@@ -36,6 +36,13 @@ describe('§61 S5/G3 SOURCE ONLY original Memory first Reveal candidate',()=>{
     const sql=read(CANDIDATE);
     expect(sql).toContain("and t.state='committed'");
     expect(sql).toContain('and t.committed_at is not null');
+    // The first private send is an exclusive, one-shot Turn transition,
+    // committed only after Node's same-transaction direct socket handoff.
+    expect(sql).toContain('for update of t');
+    expect(sql).toContain("set state='delivered'");
+    expect(sql).toContain("delivered_at=clock_timestamp()");
+    expect(sql).toContain("and delivered_turn.delivered_at is null");
+    expect(sql).toContain('if not found then return; end if;');
     expect(sql).not.toContain("t.state in ('committed','delivered')");
     expect(sql).toContain("a.seyeon_personal_source_pin_jsonb->'positiveProof'");
     expect(sql).toContain("a.validation_result_jsonb->'personalRecordProvenance'");
