@@ -377,3 +377,46 @@
   .saju-pillar { min-height: 118px; }
   .saju-pillar-value strong { font-size: 25px; }
 }
+
+/* Free canonical-calculation display and non-saleable product-scope preview. */
+.saju-free-preview-panel {
+  display: grid;
+  grid-template-columns: minmax(210px, .78fr) minmax(0, 1.35fr);
+  gap: 28px;
+  margin: 22px 0 14px;
+  padding: 27px 32px;
+  border-radius: 16px;
+}
+.saju-preview-kicker {
+  color: #a35b79; font-size: 11px; font-weight: 800; letter-spacing: .11em;
+}
+.saju-free-preview-panel h2 {
+  margin: 10px 0; color: #2d1b2d; font: 700 25px/1.4 var(--mh-serif, serif);
+}
+.saju-free-preview-panel h3 { font: 700 16px/1.4 var(--mh-serif, serif); margin: 20px 0 9px; }
+.saju-free-preview-panel p { color: #776b74; line-height: 1.65; font-size: 13px; }
+.saju-preview-product {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; flex-wrap: wrap; border-bottom: 1px solid rgba(139,85,105,.15); padding-bottom: 14px;
+}
+.saju-preview-product strong { color: #813a5d; font-family: var(--mh-serif, serif); font-size: 19px; }
+.saju-preview-product span { color: #875b70; background: #f8e8ef; border-radius: 30px; padding: 6px 10px; font-size: 11px; }
+.saju-preview-outline { margin: 0; padding-left: 20px; font-size: 13px; color: #483943; line-height: 2; }
+.saju-preview-disclaimer { font-size: 11px !important; }
+.saju-preview-actions { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-top: 14px; }
+.saju-preview-actions a {
+  display: inline-flex; align-items: center; gap: 12px;
+  min-height: 43px; padding: 0 17px; border-radius: 99px; color: white;
+  background: linear-gradient(180deg, #9b5274, #813b5b); font-size: 12px; font-weight: 700;
+}
+.saju-preview-actions span { font-size: 12px; color: #947f8a; }
+.saju-preview-actions a:focus-visible { outline: 3px solid #bd688b; outline-offset: 3px; }
+html[data-theme="dark"] .saju-free-preview-panel h2,
+html[data-theme="dark"] .saju-free-preview-panel h3,
+html[data-theme="dark"] .saju-preview-outline { color: #f3e4ec; }
+html[data-theme="dark"] .saju-free-preview-panel p { color: #c1afb9; }
+html[data-theme="dark"] .saju-preview-product span { background: #54334a; color: #f2d4e0; }
+@media (max-width: 760px) {
+  .saju-free-preview-panel { grid-template-columns: 1fr; padding: 22px 18px; gap: 8px; }
+  .saju-free-preview-panel h2 { font-size: 22px; }
+}
