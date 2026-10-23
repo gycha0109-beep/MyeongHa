@@ -12,6 +12,7 @@ import {
 } from '../apps/api/src/official-reader-node-offprimary-privacy-read-v1.js';
 
 const SUBJECT='a1111111-1111-4111-8111-111111111111';
+const SIBLING='c3333333-3333-4333-8333-333333333333';
 const EPOCH='b2222222-2222-4222-8222-222222222222';
 const SELECTOR='original-reader-s6-synthetic-scope';
 const CHECKPOINT='durable-s4-replay-checkpoint-001';
@@ -96,6 +97,48 @@ describe('Privacy #2318 off-primary S4 restore lease and Subject denial',()=>{
     await expect(x.port.acquireReadLease({
       subjectId:SUBJECT,selector:SELECTOR,
     })).resolves.toBeNull();
+  });
+  it('never maps an uppercase UUID alias to a missing deletion tombstone',async()=>{
+    const x=fixture();
+    const before=await x.port.acquireReadLease({
+      subjectId:SUBJECT.toUpperCase(),selector:SELECTOR,
+    });
+    // Even before a known denial, the independent authority must use only
+    // the canonical UUID bytes used when sealing the deletion ledger.
+    expect(before).toBeNull();
+    writeFileSync(x.tombstone,'synthetic-deny-only',{mode:0o600});
+    await expect(x.port.acquireReadLease({
+      subjectId:SUBJECT.toUpperCase(),selector:SELECTOR,
+    })).resolves.toBeNull();
+    const uppercaseLease={
+      contractVersion:'official-reader-privacy-read-lease-v1' as const,
+      subjectId:SUBJECT.toUpperCase(),selector:SELECTOR,
+      restoreEpoch:EPOCH,ledgerCheckpoint:CHECKPOINT,
+      expiresAtEpochMs:Date.now()+1_000,
+    };
+    expect(x.port.isLeaseCurrent({
+      lease:uppercaseLease,subjectId:SUBJECT.toUpperCase(),
+      selector:SELECTOR,currentEpochMs:Date.now(),
+    })).toBe(false);
+  });
+  it('scopes independent Subject deletion denial to only the exact member',async()=>{
+    const x=fixture();
+    const siblingLease=await x.port.acquireReadLease({
+      subjectId:SIBLING,selector:SELECTOR,
+    });
+    expect(siblingLease?.subjectId).toBe(SIBLING);
+    writeFileSync(x.tombstone,'synthetic-deny-only',{mode:0o600});
+    expect(await x.port.acquireReadLease({
+      subjectId:SUBJECT,selector:SELECTOR,
+    })).toBeNull();
+    expect(await x.port.acquireReadLease({
+      subjectId:SIBLING,selector:SELECTOR,
+    })).toMatchObject({subjectId:SIBLING});
+    if(!siblingLease)throw Error('expected sibling lease');
+    expect(x.port.isLeaseCurrent({
+      lease:siblingLease,subjectId:SIBLING,
+      selector:SELECTOR,currentEpochMs:Date.now(),
+    })).toBe(true);
   });
   it('never trusts an expired, mismatched, or incorrectly signed checkpoint',async()=>{
     const x=fixture();

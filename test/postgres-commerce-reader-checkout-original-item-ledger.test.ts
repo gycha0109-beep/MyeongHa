@@ -67,6 +67,7 @@ describe.runIf(enabled)('S7 actual PG original Receipt -> Grant -> pinned Checko
       originatingGrantId: string;
       pinnedCapabilityItemKey: string;
       originalPaymentAttemptCreatedAt: string;
+      originalPurchaseIntentCreatedAt: string;
       s5CommittedAt: string;
     }>(relationalSql, [subject, purchase, grant, body]);
     return result.rows;
@@ -83,6 +84,8 @@ describe.runIf(enabled)('S7 actual PG original Receipt -> Grant -> pinned Checko
     });
     expect(Date.parse(rows[0]!.originalPaymentAttemptCreatedAt))
       .toBe(Date.parse('2026-09-01T00:02:00Z'));
+    expect(Date.parse(rows[0]!.originalPurchaseIntentCreatedAt))
+      .toBe(Date.parse('2026-09-01T00:01:00Z'));
     expect(Date.parse(rows[0]!.s5CommittedAt))
       .toBe(Date.parse('2026-09-01T00:05:00Z'));
     const count = await pg.query<{ count: string }>(

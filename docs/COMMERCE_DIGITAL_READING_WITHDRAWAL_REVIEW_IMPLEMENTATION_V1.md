@@ -25,7 +25,7 @@
 
 - `commerce-reader-checkout-notice-proof-v1.ts`는 구매 **전** 저장된 Purchase Intent × 고정 Capability Item 키를 기준으로 고지 revision·안내/예시 revision·서버 기록 표시/확인 시각과 최초 결제 시도 시각을 비교한다. **발급된 Grant ID는 결제 전 존재하지 않으므로 구매 전 고지 기록의 원래 키로 사용하지 않는다.**
 - 내부 Commerce Checkout Owner 포트는 결제 이후 해당 Purchase Intent의 **원본 Receipt → 원본 Grant → 고정 Capability Item**을 독립적으로 대조해 하나의 구매 단위에만 고지 기록을 연결해야 한다. 단순 구조적 `authority` 태그, 브라우저 체크·시각, 다른 영수증 또는 형제 Grant는 증거가 아니다.
-- S7 비공개 환불 검토 `commerce-reader-private-withdrawal-evidence-v1.ts`는 원본 구매·고지 레코드가 정확히 결속되고 `snapshotRecordedAt <= noticePresentedAt <= acknowledgedAt < originalPaymentAttemptCreatedAt <= S5 committedAt`일 때에만 **Checkout Owner 제공 원본 레코드가 형식·순서상 부합**했다고 표시한다. 그렇지 않으면 `missing_or_unverifiable`로 보류한다.
+- S7 비공개 환불 검토 `commerce-reader-private-withdrawal-evidence-v1.ts`는 원본 구매·고지 레코드가 정확히 결속되고 `originalPurchaseIntentCreatedAt <= snapshotRecordedAt <= noticePresentedAt <= acknowledgedAt < originalPaymentAttemptCreatedAt <= S5 committedAt`일 때에만 **Checkout Owner 제공 원본 레코드가 형식·순서상 부합**했다고 표시한다. 그렇지 않으면 `missing_or_unverifiable`로 보류한다.
 - 위 확인은 디지털 콘텐츠가 소비자에게 실제 제공됐다는 증명이 아니다. S7 제공 준비/클라이언트 ACK만으로 `DELIVERED_PROVABLE`을 합성하지 않고, 자동 청약철회 거절·결제 취소·Grant 변경·공개 응답은 계속 금지한다.
 - **아직 미구현·승인 대기:** 실제 불변 Checkout 고지 스냅샷 저장소·원본 Capability Item↔Grant 영속 결속 조회 어댑터, 최소 보존 기간·접근 권한, Legal 고지 방식 승인. 이 코드 변경은 운영 테이블·권한·상업 결제 페이지를 생성하거나 승인하지 않는다. 미승인 어댑터는 `null`을 반환하며 고지 증거를 만들 수 없다.
 
@@ -58,6 +58,12 @@
 - `client_ack_recorded_delivery_unproven`: 해당 원본 보호 본문에 대한 인증 클라이언트 ACK가 하나 이상 보존됨. **사람의 열람, 법정 소비자 제공 개시, 청약철회 제한 근거를 증명하지 않는다.** 여러 시도 중 ACK 없는 나머지는 `retainedUnacknowledgedAttempts`로 분리한다.
 - 환불 취소로 원본 영수증이 `revoked`인 경우에도 과거 보존 전달 사실은 사실 그대로 출력하지만 **현재 구매 유효로 되돌리지 않으며**, 법적 예외·미제공 가분 항목 우선 및 `automaticDenialAuthorized=false`, `providerRefundAuthorized=false`, `entitlementMutationAuthorized=false`를 유지한다.
 - 본 상태는 서버 내부 최소 증빙 표시 계약이다. Checkout 고지 원본, 실제 제공 증거, Privacy 보존·복원 및 Commerce/Legal 승인 전 **공개 응답/환불 자동 판정/유료 공개 전부 HOLD**.
+
+## S7 고지 원본의 구매 요청 생성 시점 검증 (2026-10-23)
+
+- 앞선 Checkout 증빙은 원본 Grant 결속과 최초 결제 시도 이전 고지 순서를 검사했으나, **기존 구매 요청이 생성되기 전의 고지 스냅샷**도 시각상 허용하는 틈이 있었다. 원본 Commerce 원장의 `purchase_intents.created_at`를 조회 어댑터가 함께 반환하고, 순서 `원본 Intent 생성 <= 고지 스냅샷 <= 실제 표시 <= 확인 < 최초 결제 시도 <= S5 저장 확정`을 동일 구매 단위에서 검증하도록 보강했다.
+- 원본 구매 요청보다 이른 기록·구매 요청이 최초 결제보다 뒤인 기록·잘못된 시각·다른 구매의 Grant는 고지 증빙으로 인정하지 않는다. 원본 Intent·Receipt·Grant·고정 Capability Item 결속과 비공개 S1/S7 관문은 변경하지 않는다.
+- `apps/api/src/commerce-reader-checkout-notice-proof-v1.ts`, `commerce-reader-postgres-checkout-notice-authority-v1.ts`, 관련 서버·격리 PostgreSQL 시험을 수정했다. **원본 고지 저장소가 승인됐다는 뜻은 아니다.** 새 저장 테이블·자동 법률 판정·실결제·유료 공개 기능은 계속 금지한다.
 
 ## 다음 수락 게이트
 

@@ -164,7 +164,10 @@ export function createOfficialReaderNodeOffPrimaryPrivacyReadPortV1(
   const expectedEpoch = config.expectedRestoreEpoch.toLowerCase();
 
   function tombstoned(subjectId: string): boolean {
-    if (!UUID.test(subjectId)) return true;
+    // Ledger filenames are HMACs of canonical UUID bytes. Accepting
+    // uppercase aliases would hash a different name and bypass a durable
+    // lower-case Subject denial marker. The DB Reader uses canonical IDs.
+    if (!UUID.test(subjectId) || subjectId !== subjectId.toLowerCase()) return true;
     const digest = createHmac('sha256', seal)
       .update(['account-subject-deny', subjectId].join('|'), 'utf8')
       .digest('hex');
@@ -195,7 +198,8 @@ export function createOfficialReaderNodeOffPrimaryPrivacyReadPortV1(
     async (input): Promise<OfficialReaderPrivacyReadLeaseV1 | null> => {
       const subjectId = input.subjectId;
       const selector = input.selector;
-      if (!UUID.test(subjectId) || typeof selector !== 'string'
+      if (!UUID.test(subjectId) || subjectId !== subjectId.toLowerCase()
+          || typeof selector !== 'string'
           || selector.length === 0 || selector.length > 256
           || tombstoned(subjectId)) return null;
       const now = Date.now();

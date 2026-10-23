@@ -53,6 +53,7 @@ function fixture(options: {
     originatingGrantId:GRANT,
     pinnedCapabilityItemKey:ITEM,
     originalPaymentAttemptCreatedAt:'2026-10-23T00:01:00.000Z',
+    originalPurchaseIntentCreatedAt:'2026-10-22T23:59:00.000Z',
     s5CommittedAt:'2026-10-23T00:05:00.000Z',
   };
   const query=vi.fn(async (sql:string,params?:readonly unknown[])=>{
@@ -95,6 +96,7 @@ describe('S7 private Postgres original Checkout notice authority',()=>{
       pinnedCapabilityItemKey:ITEM,
       originalGrantItemBinding:'original_receipt_purchase_intent_capability_item',
       originalPaymentAttemptCreatedAt:'2026-10-23T00:01:00.000Z',
+      originalPurchaseIntentCreatedAt:'2026-10-22T23:59:00.000Z',
     });
     expect(f.storeRead).toHaveBeenCalledExactlyOnceWith({
       purchaseIntentId:PURCHASE,pinnedCapabilityItemKey:ITEM,productSpecVersion:VERSION,
@@ -178,10 +180,25 @@ describe('S7 private Postgres original Checkout notice authority',()=>{
     expect(f.storeRead).toHaveBeenCalledTimes(1);
   });
 
+  it.each([
+    {createdAt:'2026-10-23T00:00:01.000Z',label:'notice snapshot predates the Purchase Intent'},
+    {createdAt:'2026-10-23T00:01:01.000Z',label:'Purchase Intent creation succeeds the first payment attempt'},
+  ])('rejects $label even if original Grant and notice tags match',async ({createdAt})=>{
+    const f=fixture({lineage:[{
+      purchaseIntentId:PURCHASE,originatingGrantId:GRANT,pinnedCapabilityItemKey:ITEM,
+      originalPaymentAttemptCreatedAt:'2026-10-23T00:01:00.000Z',
+      originalPurchaseIntentCreatedAt:createdAt,
+      s5CommittedAt:'2026-10-23T00:05:00.000Z',
+    }]});
+    expect(await f.authority.readExactServerCheckoutNotice(unit)).toBeNull();
+    expect(f.storeRead).toHaveBeenCalledTimes(1);
+  });
+
   it('rejects a first payment attempt after S5 commit',async()=>{
     const f=fixture({lineage:[{
       purchaseIntentId:PURCHASE,originatingGrantId:GRANT,pinnedCapabilityItemKey:ITEM,
       originalPaymentAttemptCreatedAt:'2026-10-23T00:06:00.000Z',
+      originalPurchaseIntentCreatedAt:'2026-10-22T23:59:00.000Z',
       s5CommittedAt:'2026-10-23T00:05:00.000Z',
     }]});
     expect(await f.authority.readExactServerCheckoutNotice(unit)).toBeNull();

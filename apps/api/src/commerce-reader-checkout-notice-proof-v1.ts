@@ -27,6 +27,8 @@ export interface CommerceReaderOriginalCheckoutNoticeRecordV1 {
     'original_receipt_purchase_intent_capability_item';
   readonly noticeRevision: string;
   readonly previewOrInformationRevision: string;
+  /** Immutable original Purchase Intent creation timestamp from Commerce ledger. */
+  readonly originalPurchaseIntentCreatedAt: string;
   readonly snapshotRecordedAt: string;
   readonly noticePresentedAt: string;
   readonly acknowledgedAt: string;
@@ -97,15 +99,17 @@ export function linkOriginalCheckoutNoticeToReaderGrantV1(input: Readonly<{
     return unavailable();
   }
 
+  const purchaseIntentAt = time(record.originalPurchaseIntentCreatedAt);
   const snapshotAt = time(record.snapshotRecordedAt);
   const presentedAt = time(record.noticePresentedAt);
   const acknowledgedAt = time(record.acknowledgedAt);
   const paymentAttemptAt = time(record.originalPaymentAttemptCreatedAt);
   const committedAt = time(input.s5CommittedAt);
-  if (snapshotAt === null || presentedAt === null ||
+  if (purchaseIntentAt === null || snapshotAt === null || presentedAt === null ||
       acknowledgedAt === null || paymentAttemptAt === null ||
       committedAt === null ||
-      !(snapshotAt <= presentedAt &&
+      !(purchaseIntentAt <= snapshotAt &&
+        snapshotAt <= presentedAt &&
         presentedAt <= acknowledgedAt &&
         acknowledgedAt < paymentAttemptAt &&
         paymentAttemptAt <= committedAt)) {
