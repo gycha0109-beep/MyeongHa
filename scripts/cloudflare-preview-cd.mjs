@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 export const CLOUDFLARE_PREVIEW_CD_V1 = Object.freeze({
   branch: 'feat/approved-character-card-labels-20261022',
   previewName: 'approved-character-labels',
-  workerName: 'myeongha',
+  workerName: 'myeongha-static-preview',
   wranglerVersion: '4.152.0',
 });
 

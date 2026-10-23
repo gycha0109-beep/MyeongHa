@@ -15,7 +15,7 @@ const correctContext = Object.freeze({
 });
 
 const previewConfig = Object.freeze({
-  name: 'myeongha',
+  name: 'myeongha-static-preview',
   main: './cloudflare/preview-worker.mjs',
   workers_dev: false,
   preview_urls: true,
@@ -54,6 +54,12 @@ describe('Cloudflare preview Git-based CD', () => {
 
   it('requires preview-only static routing with API interception', () => {
     expect(assertCloudflarePreviewConfiguration(previewConfig)).toBe(true);
+    // The Ops migration owns the canonical public myeongha Worker. Static
+    // preview CD must never redeploy it or disable workers.dev again.
+    expect(() => assertCloudflarePreviewConfiguration({
+      ...previewConfig,
+      name: 'myeongha',
+    })).toThrow(/static assets isolated/u);
     expect(() => assertCloudflarePreviewConfiguration({ ...previewConfig, workers_dev: true })).toThrow(/production workers.dev route disabled/u);
     expect(() => assertCloudflarePreviewConfiguration({ ...previewConfig, assets: { ...previewConfig.assets, run_worker_first: false } })).toThrow(/static assets isolated/u);
     expect(() => assertCloudflarePreviewConfiguration({ ...previewConfig, route: 'example.com/*' })).toThrow(/static assets isolated/u);
