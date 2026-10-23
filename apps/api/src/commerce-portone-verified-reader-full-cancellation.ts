@@ -83,8 +83,28 @@ export async function applyVerifiedPortOneV2ReaderFullCancellationV1(input: {
           grantCount: 0 as const,
         });
       }
-      if (effect.contractVersion !== 'official-reader-s2-unbound-grant-cancellation-v1'
-          && effect.contractVersion !== 'official-reader-s2-revoke-dispatch-v1') {
+      // This is a DB-authoritative effect, not a successful webhook merely
+      // because some JSON reported a positive grantCount. The 1900/1910
+      // writers have distinct lock/lineage contracts; reject a malformed
+      // result INSIDE the transaction so Receipt/Event/Grant all roll back.
+      if (!Array.isArray(effect.effects)
+          || effect.effects.length !== grantCount
+          || !Number.isSafeInteger(effect.scopeCount)
+          || (effect.scopeCount as number) < 0) {
+        throw new Error('Verified Reader cancellation result was not authoritative.');
+      }
+      if (effect.contractVersion === 'official-reader-s2-unbound-grant-cancellation-v1') {
+        if (effect.disposition !== 'cancelled_before_binding'
+            || effect.scopeCount !== 0) {
+          throw new Error('Verified Reader cancellation result was not authoritative.');
+        }
+      } else if (effect.contractVersion === 'official-reader-s2-revoke-dispatch-v1') {
+        if ((effect.scopeCount as number) < 1
+            || (effect.scopeCount as number) > grantCount
+            || effect.providerEventId !== result.providerEventId) {
+          throw new Error('Verified Reader cancellation result was not authoritative.');
+        }
+      } else {
         throw new Error('Verified Reader cancellation result was not authoritative.');
       }
       return Object.freeze({
