@@ -102,3 +102,11 @@
 - `apps/api/src/chat-open-http.ts`·`apps/api/src/chat-turn-send-http.ts`: 서버가 검증한 연령 권위를 **명시적으로 주입한 경우**, 확인 전 채팅방 생성 또는 AI 전송을 거절하고 기록 조회 실패 시 503으로 차단. `production-seyeon-turn-send-runtime-v1.ts`에서 해당 서버 전용 주입 슬롯을 전달할 수 있게 연결했다. 실제 운영에서 이 슬롯은 **아직 미설정**, 따라서 전 서비스 연령 강제 구현 완료로 판정하지 않는다.
 - 핵심 테스트만 추가: `test/legal-portone-v2-verified-age-admission-v1.test.ts`에서 연령별 이용 범위/미확인 거부, 기존 chat-open/turn-send HTTP 테스트에서 연령 미확인 시 DB 생성·AI 호출 금지 검증.
 - **다음:** DB/Privacy 삭제 그래프·데이터 보존 정합 및 최소 PG 권한 검증 후 제안 SQL 적용, Auth/Guest/Social 서버 합류 지점과 실제 PortOne 본인확인 시도 발급·완료 HTTP 경로에 이 권위를 활성 연결. 라이브 인증/결제 모두 계속 OFF.
+
+
+## 13. L2-P 본인확인 HTTP 및 삭제 정합 코드 (2026-10-24)
+
+- **구현:** `apps/api/src/portone-v2-identity-http-v1.ts`에 Subject 인증을 선행하는 인증 ID 발급·PortOne 결과 확인·DB 원자 소비 처리기를 추가. 클라이언트는 Subject·만 나이를 선택할 수 없음. 인증 소유권/만료/한번 사용 결과가 모두 확인될 때 최소 ageBand만 반환. 아직 실제 라우트/SDK/실운영 네트워크로 배선하지 않음. 기본 OFF.
+- **삭제 정합:** `supabase/proposals/1740_portone_identity_age_authority_v1.proposed.sql`에 Subject 상태가 비활성 또는 병합으로 변할 때 최소 개인정보인 인증 시도·연령 밴드를 즉시 삭제하는 트리거 제안. 계정 삭제는 Subject 행을 익명화하므로 FK ON DELETE CASCADE만 믿지 않는다. 신규 SQL은 **비적용 제안**이며 기존 승인된 삭제 정책 지문과 마이그레이션을 수정하지 않음.
+- **최소 검증:** `test/legal-portone-v2-identity-http-v1.test.ts`로 OFF/발급/완료/재사용 차단. DB Authority/Privacy 소유의 신규 DELETE 처분, PG17 trigger·권한, 실제 환경 증빙 및 PortOne 사업자 채널 계약은 여전히 선행 조건.
+- **다음:** 기존 삭제 복원·보존 계약에 맞춰 제안 SQL을 인수하고, 가입/게스트/소셜 공통 연령 검증을 활성화할 수 있는 상태인지 DB 적용 및 운영 증빙으로 판단. 결제/공개 인증 OFF 유지.
