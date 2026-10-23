@@ -61,6 +61,9 @@ export function LandingPage() {
             <p className="landing-description">
               명하는 사주 명식을 바탕으로 당신의 기록을 읽고, 그 해석을 대화와 관계 속에서 이어가는 세계입니다.
             </p>
+            <p className="landing-description" data-legal-ai-prior-notice>
+              명하의 캐릭터 대화는 생성형 인공지능을 이용합니다. 캐릭터는 실제 사람이 아니며, 대화 답변은 AI가 생성합니다.
+            </p>
 
             <div className="landing-actions">
               <a className="landing-primary-cta" href="hall.html?mode=guest"><span>명하에 들어가기</span><span aria-hidden="true">→</span></a>
