@@ -13,6 +13,8 @@ on:
       - 'apps/api/src/official-reader-private-restore-quarantine-state-v1.ts'
       - 'apps/api/src/official-reader-private-revocation-purge-worker-v1.ts'
       - 'apps/api/src/official-reader-private-revocation-purge-worker-v1.test.ts'
+      - 'scripts/operations/run-official-reader-privacy-purge-worker.mjs'
+      - 'scripts/operations/start-managed-reader-privacy-worker.mjs'
       - 'apps/api/src/official-reader-node-offprimary-privacy-read-v1.ts'
       - 'test/official-reader-s4-offprimary-privacy-read.e2e.test.ts'
       - 'test/official-reader-held-t1-t2-preflight-v1.test.ts'
@@ -33,6 +35,8 @@ on:
       - 'apps/api/src/official-reader-private-restore-quarantine-state-v1.ts'
       - 'apps/api/src/official-reader-private-revocation-purge-worker-v1.ts'
       - 'apps/api/src/official-reader-private-revocation-purge-worker-v1.test.ts'
+      - 'scripts/operations/run-official-reader-privacy-purge-worker.mjs'
+      - 'scripts/operations/start-managed-reader-privacy-worker.mjs'
       - 'apps/api/src/official-reader-node-offprimary-privacy-read-v1.ts'
       - 'test/official-reader-s4-offprimary-privacy-read.e2e.test.ts'
       - 'test/official-reader-held-t1-t2-preflight-v1.test.ts'
@@ -124,6 +128,11 @@ jobs:
             test/official-reader-s4-restore-reconciliation.e2e.test.ts \
             test/official-reader-s4-offprimary-privacy-read.e2e.test.ts \
             apps/api/src/official-reader-private-revocation-purge-worker-v1.test.ts
+
+      - name: Verify managed purge CLI syntax without running any production worker
+        run: |
+          node --check scripts/operations/run-official-reader-privacy-purge-worker.mjs
+          node --check scripts/operations/start-managed-reader-privacy-worker.mjs
 
       - name: Print non-identifying acceptance scope
         if: success()
