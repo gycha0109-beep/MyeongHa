@@ -48,7 +48,7 @@ export function assertSeyeonNodeChatResponseMetadataV1(
       typeof value.turnId !== 'string' || !UUID.test(value.turnId) ||
       typeof value.assistantMessageId !== 'string' ||
       !UUID.test(value.assistantMessageId) ||
-      !Number.isSafeInteger(value.sequenceNo) || value.sequenceNo < 1 ||
+      !Number.isSafeInteger(value.sequenceNo) || value.sequenceNo < 0 ||
       typeof value.replayed !== 'boolean' ||
       !isCanonicalSeyeonNodeRequestMetadataV1(value)) {
     throw new SeyeonNodeOriginalGrantSendBoundaryErrorV1(
