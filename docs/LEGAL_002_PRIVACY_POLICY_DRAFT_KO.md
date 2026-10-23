@@ -45,6 +45,15 @@
 - **미활성:** `PORTONE_V2_IDENTITY_VERIFICATION_LAUNCH_HOLD_V1`는 공개 인증/API·SDK·라이브 채널 모두 OFF. 이용약관/개인정보처리방침의 대외 게시와 실제 본인확인 수집을 승인하지 않는다.
 - 정본: `docs/LEGAL_MINOR_POLICY_V1_20261023.md`; 공식 API: https://developers.portone.io/opi/ko/extra/identity-verification/readme-v2
 
+
+### 2.3 PortOne V2 본인확인 데이터 파기 추가안 (내부 초안 · 미시행)
+
+- **제안 저장 항목:** 인증 시도 ID/Subject/시도 상태·만료 시각, 인증 완료 후 최소 연령 범주 `free_minor` / `adult`와 검증 시각. 원시 생년월일, 전화번호, 이름, CI·DI 및 인증 응답 전문은 저장하지 않는 설계.
+- **삭제 처분 후보:** `legal_portone_identity_attempts_v1`, `legal_portone_verified_age_v1` 모두 DELETE. 기존 승인된 59개 테이블/46 DELETE/4 ANONYMIZE/9 RETAIN 정책 및 P5Y Commerce 클래스는 변경하지 않는다. 후보 근거는 `docs/operations/PORTONE_IDENTITY_PRIVACY_DISPOSITION_DELTA_CANDIDATE_V1.json` 참조.
+- **계정 삭제·병합:** Subject 상태가 active가 아니거나 병합된 경우 인증 시도·검증된 연령 자격을 같은 DB 트랜잭션에서 지우는 트리거 SQL 제안. 현재 운영 DB에는 적용하지 않았으므로 실제 파기를 증명하는 수단이 아니다.
+- **만료·보유 주기 미확정:** 10분 경과 시 인증 시도의 *사용 권한*은 만료되지만, SQL 저장 행의 실제 파기 완료를 뜻하지 않는다. 소비된/만료된 시도 행의 물리적 삭제 수단과 주기 확정이 남았다. 백업 P30D는 기존 백업 수명 규칙으로 유지하며 이 내용을 신규 보유 기간으로 간주하지 않는다.
+- **정식 게시 보류:** 인증업체 계약/위수탁 안내, 실보유 항목과 파기 주기, 정책 변경 및 사용자 고지가 확정되기 전 외부 게시·데이터 수집·실인증 활성화 금지.
+
 ## 3. 처리와 보유기간
 - 서비스·개인화 개인정보는 목적이 달성되거나 정당한 삭제요청/계정 삭제 처리 사유가 충족될 때 해당 정책에 따라 삭제하는 것이 승인된 **제품 정책**입니다.
 - 승인된 계정 삭제 기본 분류: **서비스·개인화 관련 35개 테이블 삭제, 구조 흔적 4개 테이블 익명화, 상거래 증빙 9개 테이블 5년(P5Y) 보관**, 인증 매핑 및 외부 인증 계정 삭제.
