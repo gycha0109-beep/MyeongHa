@@ -461,6 +461,13 @@ function ensureRoomReady() {
 }
 
 async function sendTurn(message) {
+  // Browser-only warning barrier. Server-age identity authority is still a
+  // separate launch gate; a checkbox is NOT verified age or guardian consent.
+  const ageCheckbox = document.querySelector('[data-legal-age-chat-attestation]');
+  if (!(ageCheckbox instanceof HTMLInputElement) || !ageCheckbox.checked) {
+    setComposeStatus('만 14세 이상임을 확인한 후 대화를 시작할 수 있습니다.');
+    return;
+  }
   if (authoritativeCharacterId !== 'seyeon') {
     setComposeStatus('현재 운영 메시지 전송은 세연 대화에서만 사용할 수 있습니다.');
     return;
