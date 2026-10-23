@@ -32,6 +32,9 @@ export function ReadingPage() {
       </header>
 
       <div className="saju-status" id="saju-status" role="status">내 사주를 확인하는 중입니다…</div>
+      <button id="saju-calculation-retry" className="saju-calculation-retry" type="button" hidden>
+        저장된 출생정보로 계산 다시 시도
+      </button>
 
       <section className="saju-empty" id="saju-empty" hidden aria-labelledby="saju-empty-title">
         <div className="saju-empty-art" aria-hidden="true">
