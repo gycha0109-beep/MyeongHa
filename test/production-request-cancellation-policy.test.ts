@@ -22,9 +22,6 @@ const FUNCTION_POLICY = Object.freeze({
   'api/me/birth-profile.ts': 'not_yet_authorized_for_cancellation',
   'api/me/saju/calculation.ts': 'not_yet_authorized_for_cancellation',
   'api/readiness.ts': 'cancel_on_disconnect',
-  'api/chat/[threadId]/paid-readings/[safeMessageId].ts': 'not_yet_authorized_for_cancellation',
-  'api/chat/[threadId]/paid-readings/[safeMessageId]/ack.ts': 'not_yet_authorized_for_cancellation',
-  'api/readings/[readingId]/reader-continuity.ts': 'not_yet_authorized_for_cancellation',
   'api/session/bootstrap.ts': 'continue_to_terminal_outcome',
 } satisfies Readonly<Record<string, CancellationClass>>);
 
