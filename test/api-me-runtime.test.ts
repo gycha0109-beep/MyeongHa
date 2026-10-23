@@ -69,6 +69,24 @@ describe('GET /api/me production route adapter', () => {
     });
   });
 
+  it('routes the real Se-yeon memory revoke POST to Member identity without granting unapproved writes', async () => {
+    const memoryId = '22222222-2222-4222-8222-222222222222';
+    const response = await meEndpoint.fetch(new Request(
+      `https://myeongha.example/api/me?__myeongha_seyeon_memory_grant_revoke_id=${memoryId}`,
+      { method: 'POST' },
+    ));
+    expect(response.status).toBe(401);
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    const body = await response.json();
+    expect(body).toMatchObject({ ok: false, error: { code: 'AUTH_REQUIRED' } });
+
+    const forged = await meEndpoint.fetch(new Request(
+      `https://myeongha.example/api/me?__myeongha_seyeon_memory_grant_revoke_id=${memoryId}&subjectId=attacker`,
+      { method: 'POST' },
+    ));
+    expect(forged.status).toBe(404);
+  });
+
   it('preserves the source-safe GET-only method boundary at the executable route', async () => {
     const response = await meEndpoint.fetch(
       new Request('https://myeongha.example/api/me', { method: 'POST' }),
