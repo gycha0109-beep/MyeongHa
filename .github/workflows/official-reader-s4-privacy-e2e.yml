@@ -15,6 +15,10 @@ on:
       - 'apps/api/src/official-reader-private-revocation-purge-worker-v1.test.ts'
       - 'scripts/operations/run-official-reader-privacy-purge-worker.mjs'
       - 'scripts/operations/start-managed-reader-privacy-worker.mjs'
+      - 'scripts/operations/stage-official-reader-s4-production-migrations.py'
+      - 'scripts/operations/apply-official-reader-s4-scoped-production-migrations.sh'
+      - 'scripts/operations/official-reader-s4-scoped-migration-pre.sql'
+      - 'scripts/operations/official-reader-s4-scoped-migration-post.sql'
       - 'apps/api/src/official-reader-node-offprimary-privacy-read-v1.ts'
       - 'test/official-reader-s4-offprimary-privacy-read.e2e.test.ts'
       - 'test/official-reader-held-t1-t2-preflight-v1.test.ts'
@@ -37,6 +41,10 @@ on:
       - 'apps/api/src/official-reader-private-revocation-purge-worker-v1.test.ts'
       - 'scripts/operations/run-official-reader-privacy-purge-worker.mjs'
       - 'scripts/operations/start-managed-reader-privacy-worker.mjs'
+      - 'scripts/operations/stage-official-reader-s4-production-migrations.py'
+      - 'scripts/operations/apply-official-reader-s4-scoped-production-migrations.sh'
+      - 'scripts/operations/official-reader-s4-scoped-migration-pre.sql'
+      - 'scripts/operations/official-reader-s4-scoped-migration-post.sql'
       - 'apps/api/src/official-reader-node-offprimary-privacy-read-v1.ts'
       - 'test/official-reader-s4-offprimary-privacy-read.e2e.test.ts'
       - 'test/official-reader-held-t1-t2-preflight-v1.test.ts'
@@ -133,6 +141,18 @@ jobs:
         run: |
           node --check scripts/operations/run-official-reader-privacy-purge-worker.mjs
           node --check scripts/operations/start-managed-reader-privacy-worker.mjs
+
+      - name: Verify exact scoped migration staging stays executable without production access
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n scripts/operations/apply-official-reader-s4-scoped-production-migrations.sh
+          scratch="$(mktemp -d)"
+          trap 'rm -rf -- "$scratch"' EXIT
+          python3 scripts/operations/stage-official-reader-s4-production-migrations.py \
+            --source-dir "$PWD/supabase/migrations" \
+            --output-dir "$scratch/staged"
+          [[ "$(wc -l < "$scratch/staged/ordered-files.txt")" -eq 56 ]]
 
       - name: Print non-identifying acceptance scope
         if: success()
