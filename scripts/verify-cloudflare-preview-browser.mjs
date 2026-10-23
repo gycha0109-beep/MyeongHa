@@ -52,8 +52,9 @@ try {
   const tab = await tabResponse.json();
   socket = new WebSocket(tab.webSocketDebuggerUrl);
   await new Promise((resolve,reject)=>{
-    socket.addEventListener('open',resolve,{once:true});
-    socket.addEventListener('error',reject,{once:true});
+    const timer=setTimeout(()=>reject(Error('Chrome DevTools websocket connection timed out')),15_000);
+    socket.addEventListener('open',()=>{clearTimeout(timer);resolve();},{once:true});
+    socket.addEventListener('error',error=>{clearTimeout(timer);reject(error);},{once:true});
   });
   let serial=0;
   const pending=new Map();
