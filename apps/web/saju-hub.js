@@ -138,6 +138,18 @@ async function readBirthProfile(token, birthProfileId) {
   }
 }
 
+// The calculation endpoint independently authorizes the current subject/revision.
+// Failure to fetch optional birth-summary labels must not discard real calculated pillars.
+async function readDisplayBirthProfile(token, birthProfileId) {
+  if (!birthProfileId) return null;
+  try {
+    return await readBirthProfile(token, birthProfileId);
+  } catch (error) {
+    if (error?.status === 401 || error?.status === 403) throw error;
+    return null;
+  }
+}
+
 async function calculateSaju(token) {
   const response = await fetch(SAJU_CALCULATION_ENDPOINT, {
     method: 'POST',
@@ -456,7 +468,7 @@ async function loadExistingSaju() {
   setState('loading', '현재 세션의 명식을 확인하는 중입니다…');
 
   try {
-    let profile = birthProfileId ? await readBirthProfile(token, birthProfileId) : null;
+    let profile = await readDisplayBirthProfile(token, birthProfileId);
     if (birthProfileId && profile === null) removeSessionValue(BIRTH_PROFILE_ID_KEY);
 
     if (profile && !storedProfileHasSupportedBirthDate(profile)) {
@@ -468,7 +480,7 @@ async function loadExistingSaju() {
     const calculation = await calculateSaju(token);
     if (!profile) {
       const storedId = readSessionValue(BIRTH_PROFILE_ID_KEY);
-      profile = storedId ? await readBirthProfile(token, storedId) : null;
+      profile = await readDisplayBirthProfile(token, storedId);
     }
     renderCalculation(calculation, profile);
   } catch (error) {
@@ -510,7 +522,7 @@ async function submitBirthProfile(event) {
     const receipt = await createBirthProfile(token, request);
     profileCreated = true;
     const calculation = await calculateSaju(token);
-    const profile = await readBirthProfile(token, receipt.birthProfileId);
+    const profile = await readDisplayBirthProfile(token, receipt.birthProfileId);
     renderCalculation(calculation, profile);
     const continuedPreview = resumePreviewHrefV1(window.location.search);
     if (continuedPreview) window.location.assign(continuedPreview);
