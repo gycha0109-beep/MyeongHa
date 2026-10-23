@@ -116,6 +116,10 @@ async function main(){
   }
   const pem=await readFile(resolve(CA_PATH),'utf8');
   checkRootCertificate(pem);
+  if (process.argv.includes('--preflight')) {
+    console.log('Stage 5 local prerequisites: Worker manifest, pg driver and pinned root CA verified.');
+    return;
+  }
   const password=randomBytes(36).toString('base64url');
   const authRateSecret=randomBytes(48).toString('base64url');
   const end=new Date(Date.now()+180*24*60*60*1000).toISOString().slice(0,19).replace('T',' ')+'+00';
