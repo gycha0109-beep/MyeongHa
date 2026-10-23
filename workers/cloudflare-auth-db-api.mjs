@@ -486,7 +486,26 @@ export async function tryHandleCloudflareApprovedAuthV1(request, bindings, route
       const code = typeof error === 'object' && error !== null && 'code' in error &&
         typeof error.code === 'string' && /^[A-Z0-9_]{2,20}$/.test(error.code)
         ? error.code : 'UNCLASSIFIED';
-      console.warn('CF_GUEST_RUNTIME', error instanceof Error ? error.name : 'Unknown', code);
+      const rawMessage = error instanceof Error ? error.message.toLowerCase() : '';
+      const reason = /connect|socket|timeout|timed out|terminat|hang up|pool/.test(rawMessage)
+        ? 'PG_CONNECT'
+        : /ssl|tls|certificate|x509|handshake|secure/.test(rawMessage)
+          ? 'PG_TLS'
+          : /password|scram|sasl|authenticat/.test(rawMessage)
+            ? 'PG_LOGIN'
+            : /permission|denied|grant|role|privilege/.test(rawMessage)
+              ? 'PG_PERMISSION'
+              : /sql|syntax|function|relation|column|query|uuid|constraint/.test(rawMessage)
+                ? 'PG_QUERY'
+                : /guest|session|subject|expiry|fingerprint|token/.test(rawMessage)
+                  ? 'GUEST_RUNTIME'
+                  : /support|implement|buffer|crypto|node|module|undefined|argument/.test(rawMessage)
+                    ? 'WORKER_COMPAT'
+                    : 'UNCLASSIFIED';
+      const cause = error instanceof Error && error.cause instanceof Error ? error.cause : null;
+      console.warn('CF_GUEST_RUNTIME', error instanceof Error ? error.name : 'Unknown', code,
+        reason, 'length=' + rawMessage.length,
+        cause?.name ?? 'NoCause');
     }
     result = unavailable();
   }
