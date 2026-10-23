@@ -17,6 +17,7 @@ import { mobileColors } from '@/ui/mobile-colors';
 import { MobileUiText } from '@/ui/MobileUiText';
 import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
 import { useMobileUiLocale } from '@/ui/mobile-ui-locale';
+import { previewMobileAuthoredUiLabelV1, type MobilePlannedUiPreviewLocaleV1 } from '@/ui/mobile-planned-ui-screen-preview-v1';
 
 export const RECORDS_TABS_V1 = Object.freeze([
   { key: 'all', label: '전체' },
@@ -28,12 +29,15 @@ export const RECORDS_TABS_V1 = Object.freeze([
 export function RecordsTabs({
   selected,
   onSelect,
+  previewLocale = null,
 }: {
   selected: RecordsTabV1;
   onSelect: (tab: RecordsTabV1) => void;
+  previewLocale?: MobilePlannedUiPreviewLocaleV1 | null;
 }) {
   const styles = useMobileThemedStyles(staticStyles);
   const { t } = useMobileUiLocale();
+  const previewText = (source: string) => previewMobileAuthoredUiLabelV1(source, previewLocale, t);
   return (
     <View style={styles.tabs}>
       {RECORDS_TABS_V1.map((tab) => (
@@ -45,7 +49,7 @@ export function RecordsTabs({
           style={[styles.tab, selected === tab.key && styles.tabSelected]}
         >
           <Text style={[styles.tabText, selected === tab.key && styles.tabTextSelected]}>
-            {t(tab.label)}
+            {previewText(tab.label)}
           </Text>
         </Pressable>
       ))}
@@ -74,13 +78,16 @@ export function LifeFactCard({ item }: { item: LifeRecordFactV1 }) {
 export function ReadingHistoryCard({
   item,
   onOpen,
+  previewLocale = null,
 }: {
   item: ReadingHistoryItemV1;
   onOpen?: () => void;
+  previewLocale?: MobilePlannedUiPreviewLocaleV1 | null;
 }) {
   const styles = useMobileThemedStyles(staticStyles);
   const openable = readingIsArchiveOpenableV1(item.productResponseState);
   const { t } = useMobileUiLocale();
+  const previewText = (source: string) => previewMobileAuthoredUiLabelV1(source, previewLocale, t);
   const content = (
     <>
       <View style={styles.cardTop}>
@@ -91,7 +98,7 @@ export function ReadingHistoryCard({
       <Text style={styles.cardBody}>{t(readingReaderLabelV1(item.readerCharacterIds))}</Text>
       <Text style={styles.state}>{t(readingStateLabelV1(item.productResponseState))}</Text>
       {openable && onOpen !== undefined ? (
-        <MobileUiText style={styles.openHint}>저장된 풀이 다시 읽기 →</MobileUiText>
+        <MobileUiText style={styles.openHint}>{previewText('저장된 풀이 다시 읽기 →')}</MobileUiText>
       ) : null}
       <Text style={styles.caption}>풀이 기록 형식 · {item.readingContractVersion}</Text>
     </>
@@ -111,8 +118,10 @@ export function ReadingHistoryCard({
   );
 }
 
-export function MemoryCard({ item }: { item: MemoryItemV1 }) {
+export function MemoryCard({ item, previewLocale = null }: { item: MemoryItemV1; previewLocale?: MobilePlannedUiPreviewLocaleV1 | null }) {
   const styles = useMobileThemedStyles(staticStyles);
+  const { t } = useMobileUiLocale();
+  const previewText = (source: string) => previewMobileAuthoredUiLabelV1(source, previewLocale, t);
   return (
     <View style={styles.card}>
       <View style={styles.cardTop}>
@@ -120,7 +129,7 @@ export function MemoryCard({ item }: { item: MemoryItemV1 }) {
         <Text style={styles.date}>{formatRecordDateV1(item.createdAt)}</Text>
       </View>
       <Text style={styles.cardTitle}>{item.memoryType}</Text>
-      <MobileUiText style={styles.cardBody}>저장된 기억</MobileUiText>
+      <MobileUiText style={styles.cardBody}>{previewText('저장된 기억')}</MobileUiText>
       <Text style={styles.caption}>
         기록 형식 {item.schemaVersion}{item.createdByCharacterId === null ? '' : ' · 연결자 기록'}
       </Text>
@@ -128,9 +137,10 @@ export function MemoryCard({ item }: { item: MemoryItemV1 }) {
   );
 }
 
-export function RecordsEmptyState({ label }: { label: string }) {
+export function RecordsEmptyState({ label, previewLocale = null }: { label: string; previewLocale?: MobilePlannedUiPreviewLocaleV1 | null }) {
   const styles = useMobileThemedStyles(staticStyles);
   const { t } = useMobileUiLocale();
+  const previewText = (source: string) => previewMobileAuthoredUiLabelV1(source, previewLocale, t);
   const emptyByCategory: Readonly<Record<string, string>> = {
     '기록': '아직 기록이 없습니다',
     '현세록': '아직 현세록이 없습니다',
@@ -140,8 +150,8 @@ export function RecordsEmptyState({ label }: { label: string }) {
   return (
     <View style={styles.empty}>
       <Text style={styles.emptySymbol}>之</Text>
-      <Text style={styles.cardTitle}>{t(emptyByCategory[label] ?? '아직 기록이 없습니다')}</Text>
-      <MobileUiText style={styles.cardBody}>확인된 기록이 생기면 이곳에 표시됩니다.</MobileUiText>
+      <Text style={styles.cardTitle}>{previewText(emptyByCategory[label] ?? '아직 기록이 없습니다')}</Text>
+      <MobileUiText style={styles.cardBody}>{previewText('확인된 기록이 생기면 이곳에 표시됩니다.')}</MobileUiText>
     </View>
   );
 }
@@ -149,21 +159,24 @@ export function RecordsEmptyState({ label }: { label: string }) {
 export function RecordsFailureBanner({
   labels,
   onRetry,
+  previewLocale = null,
 }: {
   labels: readonly string[];
   onRetry: () => void;
+  previewLocale?: MobilePlannedUiPreviewLocaleV1 | null;
 }) {
   const styles = useMobileThemedStyles(staticStyles);
   const { t } = useMobileUiLocale();
+  const previewText = (source: string) => previewMobileAuthoredUiLabelV1(source, previewLocale, t);
   if (labels.length === 0) return null;
   return (
     <View style={styles.failure}>
       <View style={styles.failureCopy}>
-        <MobileUiText style={styles.failureTitle}>일부 기록을 불러오지 못했습니다</MobileUiText>
+        <MobileUiText style={styles.failureTitle}>{previewText('일부 기록을 불러오지 못했습니다')}</MobileUiText>
         <Text style={styles.cardBody}>{labels.map((label) => t(label)).join(' · ')}</Text>
       </View>
       <Pressable accessibilityRole="button" onPress={onRetry} style={styles.retryButton}>
-        <MobileUiText style={styles.retryText}>다시 시도</MobileUiText>
+        <MobileUiText style={styles.retryText}>{previewText('다시 시도')}</MobileUiText>
       </Pressable>
     </View>
   );
@@ -174,20 +187,24 @@ export function RecordsListFooter({
   hasMore,
   error,
   onRetry,
+  previewLocale = null,
 }: {
   loading: boolean;
   hasMore: boolean;
   error: boolean;
   onRetry: () => void;
+  previewLocale?: MobilePlannedUiPreviewLocaleV1 | null;
 }) {
   const styles = useMobileThemedStyles(staticStyles);
+  const { t } = useMobileUiLocale();
+  const previewText = (source: string) => previewMobileAuthoredUiLabelV1(source, previewLocale, t);
   if (loading) {
     return <ActivityIndicator color={mobileColors.navy} style={styles.footer} />;
   }
   if (error && hasMore) {
     return (
       <Pressable accessibilityRole="button" onPress={onRetry} style={styles.footerButton}>
-        <MobileUiText style={styles.retryText}>더 불러오기 다시 시도</MobileUiText>
+        <MobileUiText style={styles.retryText}>{previewText('더 불러오기 다시 시도')}</MobileUiText>
       </Pressable>
     );
   }

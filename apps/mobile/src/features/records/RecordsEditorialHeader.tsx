@@ -40,7 +40,7 @@ export function RecordsEditorialHeader({
         </MobileUiText>
       </View>
       <View style={styles.countRow}>
-        <Text style={styles.countCategory}>{t(tabLabels[selected])}</Text>
+        <Text style={styles.countCategory}>{previewText(tabLabels[selected])}</Text>
         <View style={styles.countDivider} />
         <Text style={styles.countText}>{itemCount === null
             ? t('기록을 확인하는 중')

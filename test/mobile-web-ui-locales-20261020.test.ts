@@ -191,7 +191,7 @@ describe('Mobile / Web UI localization parity', () => {
     ]);
     expect(home).toContain('t(topic.title)');
     expect(home).toContain('t(topic.subtitle)');
-    expect(records).toContain('t(emptyByCategory[label]');
+    expect(records).toContain('previewText(emptyByCategory[label]');
     expect(chat).toContain('t(presentation.openingLine)');
     expect(saju).toContain('t(topic.availability.statusLabel)');
     expect(saju).toContain('{step.primary}');

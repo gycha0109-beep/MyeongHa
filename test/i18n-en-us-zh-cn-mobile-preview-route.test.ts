@@ -144,7 +144,7 @@ describe('I18N-07 Expo developer-only Saju UI preview boundary', () => {
     expect(recordsRoute).toContain('loadMore(tab)');
     expect(recordsHeader).toContain("previewText('지나온 이야기에도')");
     expect(recordsHeader).toContain("previewText('나의 결이 남습니다.')");
-    expect(recordsHeader).toContain('t(tabLabels[selected])');
+    expect(recordsHeader).toContain('previewText(tabLabels[selected])');
     expect(recordsHeader).toContain("t('기록을 확인하는 중')");
     const active = (source: string) => 'active:' + source;
     expect(previewMobileAuthoredUiLabelV1('출생정보', 'en-US', active)).toBe('Birth details');
@@ -181,6 +181,37 @@ describe('I18N-07 Expo developer-only Saju UI preview boundary', () => {
     expect(previewMobileAuthoredUiLabelV1('생년월일 선택', 'en-US', active)).toBe('Select date of birth');
     expect(previewMobileAuthoredUiLabelV1('시 선택 닫기', 'zh-CN', active)).toBe('关闭小时选择器');
     expect(previewMobileAuthoredUiLabelV1('달력 닫기', null, active)).toBe('active:달력 닫기');
+  });
+
+  it('previews only authored Records tabs, empty states, archive affordance and retry UI', async () => {
+    const [route, components, header] = await Promise.all([
+      readFile(new URL('../apps/mobile/src/app/(tabs)/records/index.tsx', import.meta.url), 'utf8'),
+      readFile(new URL('../apps/mobile/src/features/records/RecordsComponents.tsx', import.meta.url), 'utf8'),
+      readFile(new URL('../apps/mobile/src/features/records/RecordsEditorialHeader.tsx', import.meta.url), 'utf8'),
+    ]);
+    expect(route).toContain('renderItem(item, openReading, previewLocale)');
+    expect(route).toContain('<RecordsTabs selected={tab} onSelect={setTab} previewLocale={previewLocale} />');
+    expect(route).toContain('<RecordsEmptyState previewLocale={previewLocale} label={');
+    expect(route).toContain('previewLocale={previewLocale}');
+    expect(components).toContain('previewText(tab.label)');
+    expect(components).toContain('previewText(emptyByCategory[label]');
+    expect(components).toContain("previewText('저장된 풀이 다시 읽기 →')");
+    expect(components).toContain("previewText('일부 기록을 불러오지 못했습니다')");
+    expect(components).toContain("previewText('더 불러오기 다시 시도')");
+    expect(components).toContain('item.factType');
+    expect(components).toContain('item.memoryType');
+    expect(components).toContain('item.sourceKind');
+    expect(components).toContain('readingIsArchiveOpenableV1(item.productResponseState)');
+    expect(components).toContain('t(readingReaderLabelV1(item.readerCharacterIds))');
+    expect(components).toContain('revokedAt !== null');
+    expect(header).toContain('previewText(tabLabels[selected])');
+    expect(header).toContain('itemCount === null');
+    expect(header).toContain('현재 불러온 기록');
+    const active = (s: string) => 'active:' + s;
+    expect(previewMobileAuthoredUiLabelV1('기억', 'en-US', active)).toBe('Memories');
+    expect(previewMobileAuthoredUiLabelV1('지난 읽기', 'zh-CN', active)).toBe('历史解读');
+    expect(previewMobileAuthoredUiLabelV1('저장된 풀이 다시 읽기 →', null, active))
+      .toBe('active:저장된 풀이 다시 읽기 →');
   });
 
 });

@@ -6,6 +6,7 @@ import type {
 import { router, useLocalSearchParams } from 'expo-router';
 import { plannedMobileUiPreviewLocaleV1, previewMobileAuthoredUiLabelV1 } from '@/ui/mobile-planned-ui-screen-preview-v1';
 import { useMobileUiLocale } from '@/ui/mobile-ui-locale';
+import type { MobilePlannedUiPreviewLocaleV1 } from '@/ui/mobile-planned-ui-screen-preview-v1';
 import { useEffect, useMemo, useState } from 'react';
 import {
   FlatList,
@@ -61,7 +62,11 @@ function visibleItems(tab: RecordsTabV1, snapshots: ReturnType<typeof useMobileR
   );
 }
 
-function renderItem(item: VisibleItem, onOpenReading: (readingId: string) => void) {
+function renderItem(
+  item: VisibleItem,
+  onOpenReading: (readingId: string) => void,
+  previewLocale: MobilePlannedUiPreviewLocaleV1 | null,
+) {
   switch (item.kind) {
     case 'life_fact':
     case 'life_only':
@@ -70,13 +75,14 @@ function renderItem(item: VisibleItem, onOpenReading: (readingId: string) => voi
     case 'reading_only':
       return (
         <ReadingHistoryCard
+          previewLocale={previewLocale}
           item={item.source}
           onOpen={() => onOpenReading(item.source.readingId)}
         />
       );
     case 'memory':
     case 'memory_only':
-      return <MemoryCard item={item.source} />;
+      return <MemoryCard item={item.source} previewLocale={previewLocale} />;
   }
 }
 
@@ -145,7 +151,7 @@ export default function RecordsScreen() {
           />
         )}
         keyExtractor={(item) => `${item.kind}:${item.id}`}
-        renderItem={({ item }) => renderItem(item, openReading)}
+        renderItem={({ item }) => renderItem(item, openReading, previewLocale)}
         contentContainerStyle={styles.content}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
         onEndReached={() => {
@@ -164,8 +170,9 @@ export default function RecordsScreen() {
               </MobileUiText>
             </View>
             <RecordsEditorialHeader selected={tab} itemCount={initialLoading ? null : items.length} previewLocale={previewLocale} />
-            <RecordsTabs selected={tab} onSelect={setTab} />
+            <RecordsTabs selected={tab} onSelect={setTab} previewLocale={previewLocale} />
             <RecordsFailureBanner
+              previewLocale={previewLocale}
               labels={failedLabels}
               onRetry={() => void retryFailed(tab)}
             />
@@ -177,7 +184,7 @@ export default function RecordsScreen() {
           </View>
         )}
         ListEmptyComponent={
-          initialLoading ? null : <RecordsEmptyState label={
+          initialLoading ? null : <RecordsEmptyState previewLocale={previewLocale} label={
             tab === 'all' ? '기록' :
             tab === 'life' ? '현세록' :
             tab === 'readings' ? '지난 읽기' : '기억'
@@ -185,6 +192,7 @@ export default function RecordsScreen() {
         }
         ListFooterComponent={
           <RecordsListFooter
+            previewLocale={previewLocale}
             loading={loadingMore}
             hasMore={hasMore}
             error={loadMoreError}
