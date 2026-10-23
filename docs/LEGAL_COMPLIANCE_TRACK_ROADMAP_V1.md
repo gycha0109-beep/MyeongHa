@@ -85,3 +85,11 @@
 - **저장 경계:** `apps/api/src/portone-v2-identity-age-finalization-v1.ts`에 저장소가 제공해야 하는 `readPendingOwnedAttempt`와 `consumeAndRecordAgeBand` 포트 계약 구현. Subject 소유·미사용 인증 시도 → 서버 조회 인증 성공 → 원자적 1회 소비 및 최소 연령 밴드 기록이 가능한 순서로 구성했다. **DB 실구현·발급/TTL/자동 마이그레이션을 제공하거나 호출하지 않음**.
 - **검증:** `test/legal-portone-v2-identity-lookup-v1.test.ts`, `test/legal-portone-v2-identity-age-finalization-v1.test.ts`로 HTTP 인증 헤더/고정 URL/한정된 리소스/타임아웃, 14·19세 경계/본인 소유·미사용, 재사용·불일치, 개인정보 원문 비반환을 합성 검증.
 - **다음 실제 구현:** 기존 DB/Privacy Authority 소유 트랙의 저장 모델 검토 후, 인증 시도 ID 발급·연결·만료 및 정확히 한 번 소비하는 DB 저장 권위를 연결. 그 뒤 Auth/Guest/Social/Chat API에서 같은 검증 상태를 참조하고 사용자가 실제 PortOne 채널과 API 키 계약을 준비한 때에만 SDK/공개 API를 활성화. 현재 모든 출시 게이트 HOLD.
+
+
+## 11. L2-P PostgreSQL 시도 권위 제안 및 서버 연결 (2026-10-23)
+
+- **구현:** `supabase/proposals/1740_portone_identity_age_authority_v1.proposed.sql`에 정규화된 최소 테이블 2개와 서버 호출용 발급/유효 조회/원자적 소비 SQL 제안. DB 시계 10분 유효기간, 동일 Subject당 1건 pending, replay/만료/삭제 상태 차단, Context assert 및 계정 row lock 포함. **이 SQL은 아직 DB에 적용되지 않았다.**
+- `apps/api/src/postgres-portone-identity-age-authority-v1.ts`에서 기존 `executePostgresSubjectTransactionV1`을 통해 신뢰된 Auth/Guest 증거를 매번 Subject로 재해결하고 각 DB 작업을 별도의 짧은 트랜잭션에서 실행. 외부 인증 서버 조회는 DB 트랜잭션 안에서 실행하지 않으며, 새 공개 HTTP API·SDK는 등록하지 않았다.
+- `test/legal-postgres-portone-identity-age-authority-v1.test.ts`에 모의 DB 트랜잭션 동작과 SQL 계약 테스트 추가. 실제 PostgreSQL 17 적용/권한/동시 실행 실증은 미완료.
+- **DB/Privacy 인수 조건:** 제안 SQL의 Security Definer 권위 및 EXECUTE ACL, 35 DELETE / 4 ANONYMIZE / 9 RETAIN P5Y·P30D 삭제/복원 정합, Guest→Member 승격과 인증 시도 폐기, 연령 밴드 보존기간·권한 재확인 주기 확정. 그 전엔 production migration 및 데이터 수집 보류.
