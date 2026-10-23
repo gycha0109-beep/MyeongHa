@@ -21,6 +21,8 @@ const THREAD = 'd2000000-0000-4000-8000-000000000003';
 const TURN = 'd3000000-0000-4000-8000-000000000004';
 const ATTEMPT = 'd4000000-0000-4000-8000-000000000005';
 const ASSISTANT = 'd5000000-0000-4000-8000-000000000006';
+const USER = 'd6000000-0000-4000-8000-000000000007';
+const POST_TURN_OUTBOX = 'd7000000-0000-4000-8000-000000000008';
 const INPUT = '지금 이 대화에 답해주세요';
 const CANARY = 'SYNTHETIC_DB_AUTHORIZED_G3_ANSWER';
 
@@ -30,15 +32,17 @@ function fakeRuntimeResult(userText: unknown): RunProductionSeyeonChatResultV1 {
     threadBinding: {threadId: THREAD, participantCharacterIds: ['seyeon']},
     execution: {
       disposition: 'executed',
-      receivedTurn: {turnId: TURN, userText, threadCharacterId: 'seyeon', replayed: false, committedTurn: null},
+      receivedTurn: {turnId: TURN, userMessageId: USER, userText, threadCharacterId: 'seyeon', replayed: false, committedTurn: null},
       attempt: {attemptId: ATTEMPT, replayed: false},
       committedTurn: {
         turnId: TURN,
         attemptId: ATTEMPT,
         assistantMessageId: ASSISTANT,
+        postTurnOutboxEventId: POST_TURN_OUTBOX,
         sequenceNo: 1,
         replayed: false,
       },
+      postTurnAnalysis: {status:'deferred',outboxEventId:POST_TURN_OUTBOX},
     },
   } as unknown as RunProductionSeyeonChatResultV1;
 }

@@ -208,8 +208,18 @@ export async function deliverSeyeonCommittedFirstPositiveMemoryNodeTurnV1(
       input.result?.execution?.attempt?.replayed!==false ||
       input.result?.execution?.attempt?.attemptId!==receipt?.attemptId ||
       !receipt || receipt.replayed!==false ||
+      // First private Reply requires G2's durable post-turn Outbox lineage,
+      // not only a committed assistant message. A different/deferred job
+      // must never inherit this exact original Grant's first-send authority.
+      (input.result?.execution?.postTurnAnalysis?.status!=='processed' &&
+       input.result?.execution?.postTurnAnalysis?.status!=='deferred') ||
+      (input.result?.execution?.postTurnAnalysis?.status==='deferred' &&
+       input.result.execution.postTurnAnalysis.outboxEventId!==
+         receipt.postTurnOutboxEventId) ||
       ![input.result.subjectId,receipt.turnId,receipt.attemptId,
-        receipt.assistantMessageId].every(s=>UUID.test(s))) {
+        input.result?.execution?.receivedTurn?.userMessageId,
+        receipt.assistantMessageId,
+        receipt.postTurnOutboxEventId].every(s=>typeof s==='string'&&UUID.test(s))) {
     input.response.destroy();
     throw new SeyeonG3FirstPositiveNodeUnavailableV1('INVALID_COMMIT');
   }
