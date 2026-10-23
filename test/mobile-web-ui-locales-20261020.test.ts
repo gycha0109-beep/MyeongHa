@@ -130,7 +130,9 @@ describe('Mobile / Web UI localization parity', () => {
       source('apps/mobile/src/features/chat/ChatReadComponents.tsx'),
     ]);
     expect(calendar).toContain("accessibilityLabel={t('달력 닫기')}");
-    expect(face).toContain("accessibilityLabel={t('전면 카메라로 정면 사진 촬영')}");
+    expect(face).toContain('accessibilityLabel={previewText("전면 카메라로 정면 사진 촬영")}');
+    expect(face).toContain('plannedMobileUiPreviewLocaleV1(uiPreview, __DEV__)');
+    expect(face).toContain('previewMobileAuthoredUiLabelV1(source, previewLocale, t)');
     expect(scene).toContain("t('근거')");
     expect(scene).toContain('{currentStep.primary}');
     expect(composer).toContain('SEYEON_HISTORY_REVEAL_HOLD');
