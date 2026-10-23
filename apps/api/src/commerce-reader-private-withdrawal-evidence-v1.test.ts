@@ -21,6 +21,7 @@ function fixture(overrides: Record<string, unknown> = {}) {
     purchaseIntentId: INTENT,
     unitId: GRANT,
     productSpecVersion: 'reading-v1',
+    originalReceiptStatus: 'verified',
     s5CommittedAt: S5_AT,
     responsePreparedAt: PREPARED_AT,
     clientAcknowledgedAt: ACK_AT,
@@ -29,7 +30,7 @@ function fixture(overrides: Record<string, unknown> = {}) {
     ...overrides,
   };
   const query = vi.fn(async (sql: string, params?: readonly unknown[]) => {
-    expect(sql).toContain('internal_qry_official_reader_withdrawal_delivery_evidence_v1');
+    expect(sql).toContain('internal_qry_official_reader_withdrawal_delivery_state_v2');
     expect(sql).not.toMatch(/\b(?:UPDATE|DELETE|INSERT)\b/iu);
     expect(params).toEqual([SUBJECT, INTENT, GRANT, BODY]);
     return { rows: [row] };
@@ -64,6 +65,7 @@ describe('Private Commerce original Receipt -> S5 commit -> S7 -> withdrawal evi
       purchaseIntentId: INTENT, unitId: GRANT, productSpecVersion: 'reading-v1',
     });
     expect(result.timeline).toEqual({
+      originalReceiptStatus: 'verified',
       s5CommittedAt: S5_AT,
       serverResponsePreparedAt: PREPARED_AT,
       authenticatedClientAcknowledgedAt: ACK_AT,
@@ -83,6 +85,22 @@ describe('Private Commerce original Receipt -> S5 commit -> S7 -> withdrawal evi
     expect(result.entitlementMutationAuthorized).toBe(false);
     expect(query).toHaveBeenCalledTimes(1);
     expect(notice).toHaveBeenCalledWith(result.purchasedUnit);
+  });
+
+  it('keeps historically retained cancellation evidence without treating a revoked original receipt as verified', async () => {
+    const { makeInput } = fixture({ originalReceiptStatus: 'revoked' });
+    const result = await reviewOfficialReaderPrivateWithdrawalEvidenceV1(makeInput());
+    expect(result.timeline.originalReceiptStatus).toBe('revoked');
+    expect(result.timeline.retainedAcknowledgedAttempts).toBe(1);
+    expect(result.review).toMatchObject({
+      classification: 'evidence_review_required',
+      reason: 'INVALID_OR_MISSING_SERVER_EVIDENCE',
+      automaticDenialAuthorized: false,
+      providerRefundAuthorized: false,
+      entitlementMutationAuthorized: false,
+    });
+    expect(result.timeline.consumerDeliveryProven).toBe(false);
+    expect(result.timeline.legallyProvenDeliveredAt).toBeNull();
   });
 
   it('keeps prepared-only and S5-only records strictly below delivered proof', async () => {
@@ -140,6 +158,9 @@ describe('Private Commerce original Receipt -> S5 commit -> S7 -> withdrawal evi
   });
 
   it.each([
+    { originalReceiptStatus: 'pending' },
+    { originalReceiptStatus: 'cancel_requested' },
+    { originalReceiptStatus: null },
     { unitId: BODY },
     { purchaseIntentId: BODY },
     { productSpecVersion: '' },
