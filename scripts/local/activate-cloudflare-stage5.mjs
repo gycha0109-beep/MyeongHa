@@ -61,7 +61,7 @@ async function wrangler(args,input='') {
 
 async function copySql(sql) {
   await runProcess('powershell.exe',
-    ['-NoProfile','-NonInteractive','-Command','Set-Clipboard'],sql);
+    ['-NoProfile','-NonInteractive','-Command','$input | Set-Clipboard'],sql);
 }
 
 async function verifyDatabase(password,pem) {
@@ -108,6 +108,12 @@ async function verifyDatabase(password,pem) {
 
 async function main(){
   if(process.platform!=='win32') throw Error('Run this setup on the authorized Windows development PC');
+  // An interrupted or outdated checkout must not write live Worker bindings.
+  const repoManifest=JSON.parse(await readFile(resolve('wrangler.jsonc'),'utf8'));
+  if(repoManifest.name!=='myeongha' ||
+     repoManifest.main!=='./workers/cloudflare-static-preview.mjs'){
+    throw Error('Run from the approved MyeongHa Ops repository root');
+  }
   const pem=await readFile(resolve(CA_PATH),'utf8');
   checkRootCertificate(pem);
   const password=randomBytes(36).toString('base64url');
