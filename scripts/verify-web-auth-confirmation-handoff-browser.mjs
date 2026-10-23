@@ -257,6 +257,7 @@ async function stageGuestA(client, origin) {
   await client.evaluate(`sessionStorage.setItem(${JSON.stringify(activeBearerKey)}, ${JSON.stringify(guestA)})`);
   await client.evaluate(`(() => {
     document.querySelector('#auth-tab-signup').click();
+    document.querySelector('[data-legal-age-self-declaration] input').click();
     document.querySelector('#auth-email').value = ${JSON.stringify(email)};
     document.querySelector('#auth-password').value = ${JSON.stringify(password)};
     document.querySelector('#auth-password-confirm').value = ${JSON.stringify(password)};
