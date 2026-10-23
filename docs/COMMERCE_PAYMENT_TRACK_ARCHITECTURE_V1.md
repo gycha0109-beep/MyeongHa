@@ -1,5 +1,7 @@
 # 명하 Commerce Payment Track Architecture v1
 
+> **2026-10-16 실행 상태 갱신:** 이 문서의 `Baseline 2026-09-16` 및 `Current frontier #844`, 과거 P0/Production 시점 표시는 역사적 스냅샷입니다. 현재 상품·결제·Official Reader 통합 진행 상태와 후속 우선순위는 [`COMMERCE_READER_PAYMENT_INTEGRATION_ROADMAP_20261016_V2.md`](./COMMERCE_READER_PAYMENT_INTEGRATION_ROADMAP_20261016_V2.md)를 먼저 확인하십시오. 특히 후속 보안 Draft PR #2118~#2153의 로컬 시험 성공을 main 병합·운영 DB 변경·판매 허가로 오인하지 마십시오. 본 문서의 결제 authority/invariant는 계속 유지됩니다.
+
 > Status: **CURRENT IMPLEMENTATION / PRE-PRODUCTION HOLD**  
 > Track lineage: **결제 권한 / Commerce 결제 연속 트랙**  
 > Baseline main: `9cb4f49e2511d2c2ff1283b63d9452d6b86c0059`  
