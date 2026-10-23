@@ -48,3 +48,10 @@
 - **L1:** #2318 및 Draft #2488(합성 삭제/복원), Draft #2301(DB Authority) 현행 OPEN. 본 DB/백업 **운영 실증을 완료한 것으로 인정하지 않는다**. 권리행사 화면은 MyPage에서 공식 접수처 미연결 상태를 표시하고 있으며, LEGAL-002 초안은 게시되지 않았다.
 - **L4:** `PORTONE_V2_BROWSER_CHECKOUT_PREPARATION_V1`, `PORTONE_V2_BROWSER_REQUEST_COMPOSER_V1`, `PORTONE_V2_BROWSER_SDK_EXECUTION_GUARD_V1`의 `active:false`/SDK OFF/공개 route 없음에 대한 Legal 회귀 테스트를 추가. *판매 비활성 증명*일 뿐 사전 환불 고지·인도·환급 구현 완료로 계산하지 않는다. 디지털 콘텐츠 환불 수동 분류기는 별도 Commerce 소유로 유지.
 - **L5 게시:** 사업자 상호·연락처, 최종 실제 데이터 처리방침과 국외 이전 항목, 미성년자 범위가 검증되지 않아 LEGAL-001/002/003 초안의 사용자 공개는 계속 보류. 대화 AI 사전 고지 구현은 이 보류를 해제하지 않는다.
+
+## 6. L1-A 권리행사 정보 동선 — 부분 구현 (2026-10-23)
+
+- `apps/web/src/my/MyPage.tsx` 설정에 **개인정보 확인 · 권리 안내** 접이식 패널 추가: 기존 `birth.html` 출생정보 화면과 `records.html` 저장 기록으로 안내. `aria-expanded`/연결된 패널 레이블로 키보드·스크린리더 상태 확인 가능.
+- 새 패널은 **읽기 전용 길찾기 안내**만 제공. 실제 열람·정정·삭제·처리정지 신청, 재인증, 접수·처리 완료 메시지 또는 계정 삭제 API 호출을 만들지 않았다. 정식 접수·문의 채널이 아직 없음이 안내되고, 실제 신청이 접수된 것처럼 표시하지 않는다.
+- `apps/web/ui-i18n.js`와 `apps/mobile/src/ui/mobile-ui-copy.ts`의 일본어·번체중국어 authored UI 복제, `test/legal-privacy-rights-surface.test.ts`의 링크·무접수·다국어 회귀 테스트를 추가했다. Native 화면에 동일 패널이 있다는 뜻은 아님.
+- **남은 L1 수락 조건:** 공식 개인정보 문의 접수 수단(운영 정보 확정), 신원 확인 및 접수·처리 이력, 권리행사별 법정 절차·예외·시한, 실 DB/백업의 실제 삭제·복원 후 비재노출 실증. DB/Privacy #2318·Draft #2488/#2301의 코드/운영 상태를 인수하되 중복 구현하지 않는다.
