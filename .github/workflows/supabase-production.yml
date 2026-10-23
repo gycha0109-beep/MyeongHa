@@ -78,6 +78,7 @@ jobs:
           set -euo pipefail
 
           requires_deploy=false
+          changed_files=''
           reason='no governed Production DB deployment-surface change detected'
           if [[ "$EVENT_NAME" == 'workflow_dispatch' && "${SCOPED_BACKFILL:-}" == 'true' && "${READER_S4_SCOPED:-}" == 'true' ]]; then
             echo 'HOLD_CONFLICTING_SCOPED_PRODUCTION_ACTIONS' >&2
@@ -156,6 +157,24 @@ jobs:
             elif grep -Eq '^(supabase/migrations/|[.]github/workflows/supabase-production[.]yml$|scripts/run-production-platform-integrity-postdeploy-verify[.]sh$|scripts/run-production-platform-integrity-read-audit[.]sh$|scripts/run-production-platform-integrity-data-api-surface-audit[.]sh$|scripts/operations/run-supabase-production-migrations[.]sh$)' <<<"$changed_files"; then
               requires_deploy=true
               reason='governed Production DB deployment-surface change detected'
+            fi
+          fi
+
+          # Reader 1740..2290 is staged-only. A main merge of Reader SQL
+          # must never route to the unrestricted Production db push --include-all.
+          # Only the separate backup+restore-verified manual scoped job may apply.
+          if [[ "$EVENT_NAME" == 'push' && "$requires_deploy" == 'true' ]]; then
+            reader_pending_changes="$(printf '%s\n' "$changed_files" | grep -E '^supabase/migrations/(17[4-9]0|1[89][0-9]0|2[0-2][0-9]0)_official_reader_.*[.]sql$' || true)"
+            if [[ -n "$reader_pending_changes" ]]; then
+              non_reader_deploy_changes="$(printf '%s\n' "$changed_files" |
+                grep -E '^(supabase/migrations/|[.]github/workflows/supabase-production[.]yml$|scripts/run-production-platform-integrity-postdeploy-verify[.]sh$|scripts/run-production-platform-integrity-read-audit[.]sh$|scripts/run-production-platform-integrity-data-api-surface-audit[.]sh$|scripts/operations/run-supabase-production-migrations[.]sh$)' |
+                grep -Ev '^(supabase/migrations/(17[4-9]0|1[89][0-9]0|2[0-2][0-9]0)_official_reader_.*[.]sql|[.]github/workflows/supabase-production[.]yml|scripts/operations/run-supabase-production-migrations[.]sh)$' || true)"
+              if [[ -n "$non_reader_deploy_changes" ]]; then
+                echo 'HOLD_READER_MIXED_PRODUCTION_DEPLOY: Reader and unrelated migrations require separate review' >&2
+                exit 1
+              fi
+              requires_deploy=false
+              reason='staged Reader 1740..2290 SQL is HOLD; unrestricted Production db push forbidden'
             fi
           fi
 
