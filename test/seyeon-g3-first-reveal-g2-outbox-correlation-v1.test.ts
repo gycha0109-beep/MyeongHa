@@ -49,7 +49,7 @@ type MutableResult={
 describe('S5/G3 first private Reply requires original G2 durable post-turn Outbox',()=>{
   it.each([
     ['missing original G2 Outbox',(r:MutableResult)=>{
-      r.execution.committedTurn.postTurnOutboxEventId=undefined;
+      delete r.execution.committedTurn.postTurnOutboxEventId;
     }],
     ['malformed original G2 Outbox',(r:MutableResult)=>{
       r.execution.committedTurn.postTurnOutboxEventId='not-a-uuid';
@@ -58,13 +58,13 @@ describe('S5/G3 first private Reply requires original G2 durable post-turn Outbo
       r.execution.postTurnAnalysis!.outboxEventId=OTHER;
     }],
     ['missing post-turn outcome',(r:MutableResult)=>{
-      r.execution.postTurnAnalysis=undefined;
+      delete r.execution.postTurnAnalysis;
     }],
     ['invented post-turn outcome',(r:MutableResult)=>{
       r.execution.postTurnAnalysis={status:'none'};
     }],
     ['missing original DB User Message identity',(r:MutableResult)=>{
-      r.execution.receivedTurn.userMessageId=undefined;
+      delete r.execution.receivedTurn.userMessageId;
     }],
     ['malformed original DB User Message identity',(r:MutableResult)=>{
       r.execution.receivedTurn.userMessageId='not-a-uuid';
