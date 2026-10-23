@@ -41,7 +41,7 @@ describe('member Se-yeon original memory grant revocation from Records', () => {
       resolveBearer: () => ({ kind: 'member', token: 'member-token' }),
     });
     await expect(client.revokeSeyeonMemoryGrant(MEMORY_ID)).rejects.toMatchObject({
-      code: 'WEB_RECORDS_REVOKE_UNAVAILABLE',
+      code: 'WEB_RECORDS_REVOKE_UNCONFIRMED',
     });
     expect(fetchImpl).toHaveBeenCalledTimes(1);
     fetchImpl.mockImplementation(async () => Response.json({
