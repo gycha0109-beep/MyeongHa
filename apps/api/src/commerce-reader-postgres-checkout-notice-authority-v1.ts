@@ -35,6 +35,7 @@ select
   grant_row.id::text as "originatingGrantId",
   capability_item.item_key as "pinnedCapabilityItemKey",
   first_attempt.created_at::text as "originalPaymentAttemptCreatedAt",
+  intent.created_at::text as "originalPurchaseIntentCreatedAt",
   original.s5_committed_at::text as "s5CommittedAt"
 from authorized_original original
 join public.entitlement_grants grant_row
@@ -86,6 +87,7 @@ type LineageRow = Readonly<{
   originatingGrantId: unknown;
   pinnedCapabilityItemKey: unknown;
   originalPaymentAttemptCreatedAt: unknown;
+  originalPurchaseIntentCreatedAt: unknown;
   s5CommittedAt: unknown;
 }>;
 
@@ -180,8 +182,9 @@ export function createCommerceReaderPostgresCheckoutNoticeAuthorityV1(input: Rea
             row.originatingGrantId!==unit.unitId ||
             !item(row.pinnedCapabilityItemKey)) return null;
         const paymentAt=iso(row.originalPaymentAttemptCreatedAt);
+        const intentAt=iso(row.originalPurchaseIntentCreatedAt);
         const committedAt=iso(row.s5CommittedAt);
-        if (paymentAt===null || committedAt===null) return null;
+        if (paymentAt===null || intentAt===null || committedAt===null) return null;
 
         const pinnedCapabilityItemKey=row.pinnedCapabilityItemKey;
         const original=await store.readOriginalNotice({
@@ -205,6 +208,7 @@ export function createCommerceReaderPostgresCheckoutNoticeAuthorityV1(input: Rea
           noticePresentedAt:original.noticePresentedAt,
           acknowledgedAt:original.acknowledgedAt,
           originalPaymentAttemptCreatedAt:paymentAt,
+          originalPurchaseIntentCreatedAt:intentAt,
         });
         // The ledger adapter is itself an authority boundary. Never return an
         // apparently attested notice if its recorded consent followed payment
