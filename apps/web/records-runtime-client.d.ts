@@ -39,6 +39,17 @@ export function createRecordsRuntimeClient(options?: RecordsRuntimeClientOptions
   readLifeFacts(): Promise<RecordsRuntimeSnapshotV1['lifeFacts']>;
   readReadings(): Promise<RecordsRuntimeSnapshotV1['readings']>;
   readMemories(): Promise<RecordsRuntimeSnapshotV1['memories']>;
+  readSeyeonMemoryGrantStatus(memoryItemId: string): Promise<Readonly<{
+    memoryItemId: string;
+    currentlyGranted: boolean;
+    grantedAt: string | null;
+  }>>;
+  revokeSeyeonMemoryGrant(memoryItemId: string): Promise<Readonly<{
+    memoryItemId: string;
+    characterId: 'seyeon';
+    revokedGrantCount: number;
+    replayed: boolean;
+  }>>;
   readRecords(): Promise<RecordsRuntimeSnapshotV1>;
 }>;
 
