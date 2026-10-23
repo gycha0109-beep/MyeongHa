@@ -5,19 +5,19 @@ import { parseChatThreadRouteV1 } from './chat-room-read-contract.js';
 const characters = {
   baekheon: {
     name: '백헌',
-    title: '충추원의 장',
+    title: '베테랑 조정자',
     sceneLabel: '백헌의 야간 기록실',
     intro: ['이야기를 시작하죠.', '지금 가장 먼저 꺼내고 싶은 것은 무엇입니까?'],
   },
   seyeon: {
     name: '세연',
-    title: '무녀',
+    title: '명하의 안내인',
     sceneLabel: '세연의 따뜻한 오후빛 대화 공간',
     intro: ['왔네요.', '오늘은 어떤 이야기부터 해볼까요?'],
   },
   yeoul: {
     name: '여울',
-    title: '설계관 기록관',
+    title: '운영관리팀 사원',
     sceneLabel: '여울의 회보라 기록 공간',
     intro: ['그래서, 무슨 얘기인데요?', '듣고는 있을게요.'],
   },
@@ -29,7 +29,7 @@ const characters = {
   },
   rahyeon: {
     name: '라현',
-    title: '연결자',
+    title: '전시 기획자',
     sceneLabel: '라현의 낮은 조도 응접 공간',
     intro: ['말해봐요.', '어디서부터 시작할지는 당신이 정해요.'],
   },
@@ -41,7 +41,7 @@ const characters = {
   },
   taegyeom: {
     name: '태겸',
-    title: '연결자',
+    title: '프로 격구 선수',
     sceneLabel: '태겸의 절제된 회색 공간',
     intro: ['핵심부터 말해보죠.', '무엇이 가장 걸립니까?'],
   },
