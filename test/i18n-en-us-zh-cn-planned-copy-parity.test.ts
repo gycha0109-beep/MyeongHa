@@ -24,7 +24,7 @@ const source = (path: string) => readFile(new URL('../' + path, import.meta.url)
 
 describe('I18N-07 staged EN-US and ZH-CN authored UI copy', () => {
   it('authors both UI target variants for navigation, account, Saju input and chat read-state without missing parity', () => {
-    expect(PLANNED_STATIC_UI_COPY_V1.size).toBe(275);
+    expect(PLANNED_STATIC_UI_COPY_V1.size).toBe(315);
     expect([...PLANNED_MOBILE_STATIC_UI_COPY_V1]).toEqual([...PLANNED_STATIC_UI_COPY_V1]);
     for (const [ko, pair] of PLANNED_STATIC_UI_COPY_V1) {
       expect(ko.trim().length).toBeGreaterThan(0);
@@ -48,6 +48,26 @@ describe('I18N-07 staged EN-US and ZH-CN authored UI copy', () => {
     expect(lookupPlannedMobileStaticUiCopyV1('현재 기록', 'zh-CN')).toBe('当前记录');
     expect(lookupPlannedMobileStaticUiCopyV1('달력 닫기', 'en-US')).toBe('Close calendar');
     expect(lookupPlannedMobileStaticUiCopyV1('전송', 'zh-CN')).toBe('发送');
+  });
+
+  it('reviews new EN/ZH-CN home, chat, account and photo shell labels', () => {
+    const examples = [
+      ['누구와 이야기를 시작해 볼까요?', 'Who would you like to talk to?', '想和谁开始聊天？'],
+      ['오늘의 포춘쿠키', "Today's fortune cookie", '今日幸运饼干'],
+      ['이야기 이어가기', 'Continue conversation', '继续对话'],
+      ['자주 묻는 질문', 'Frequently asked questions', '常见问题'],
+      ['사진 준비', 'Prepare photo', '准备照片'],
+      ['명식 닫기', 'Close birth chart', '关闭命盘'],
+    ] as const;
+    for (const [source, english, chinese] of examples) {
+      expect(lookupPlannedStaticUiCopyV1(source, 'en-US')).toBe(english);
+      expect(lookupPlannedStaticUiCopyV1(source, 'zh-CN')).toBe(chinese);
+      expect(lookupPlannedMobileStaticUiCopyV1(source, 'en-US')).toBe(english);
+      expect(lookupPlannedMobileStaticUiCopyV1(source, 'zh-CN')).toBe(chinese);
+    }
+    expect(normalizeUiLocale('en-US')).toBe('ko-KR');
+    expect(normalizeMobileUiLocale('zh-CN')).toBe('ko-KR');
+    expect(lookupPlannedStaticUiCopyV1('message.body', 'en-US')).toBeNull();
   });
 
   it('fails closed for unsupported input and for source, private messages or unknown copy', () => {
