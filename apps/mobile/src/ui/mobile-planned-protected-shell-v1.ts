@@ -132,6 +132,15 @@ const COPY = Object.freeze({
 }),
 } as const);
 
+// Keep preview-only copy immutable, including nested source-safety notices.
+for (const locale of PLANNED_PROTECTED_UI_LOCALES_V1) {
+  const entry = COPY[locale];
+  Object.freeze(entry.chat);
+  Object.freeze(entry.composer);
+  Object.freeze(entry.originalTextNotices);
+  Object.freeze(entry.reader);
+}
+
 // Exhaustive at compile time: adding a server-owned protected status requires
 // deliberate authored copy in every staged language, not generic success.
 const _entryStatusCoverage: Record<PlannedProtectedUiLocaleV1, Record<MobileOfficialReadingReaderEntryStatusV1, string>> = {
