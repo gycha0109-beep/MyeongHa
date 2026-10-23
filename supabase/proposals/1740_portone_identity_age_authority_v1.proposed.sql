@@ -51,7 +51,7 @@ revoke all on public.legal_portone_verified_age_v1 from myeongha_api_executor;
 create function public.cmd_issue_legal_portone_identity_v1(p_subject_id uuid)
 returns table (identity_verification_id text, expires_at timestamptz)
 language plpgsql security definer
-set search_path = pg_catalog, public
+set search_path = pg_catalog, public, pg_temp
 as $issue$
 declare
   v_now timestamptz := clock_timestamp();
@@ -91,7 +91,7 @@ create function public.qry_pending_legal_portone_identity_v1(
 )
 returns table (subject_id uuid, identity_verification_id text, status text)
 language plpgsql security definer
-set search_path = pg_catalog, public
+set search_path = pg_catalog, public, pg_temp
 as $read$
 begin
   perform public.assert_myeongha_subject_context_v1(p_subject_id);
@@ -109,7 +109,7 @@ create function public.cmd_consume_legal_portone_identity_v1(
 )
 returns boolean
 language plpgsql security definer
-set search_path = pg_catalog, public
+set search_path = pg_catalog, public, pg_temp
 as $consume$
 declare
   v_now timestamptz := clock_timestamp();
