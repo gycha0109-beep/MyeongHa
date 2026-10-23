@@ -12,7 +12,8 @@ import { useMobilePlannedUiPreviewSelectionV1, resolveMobilePlannedUiPreviewSele
 export function MobilePlannedUiQaSwitcherV1() {
   const { uiPreview } = useLocalSearchParams<{ uiPreview?: string | string[] }>();
   const selection = useMobilePlannedUiPreviewSelectionV1();
-  const active = resolveMobilePlannedUiPreviewSelectionV1(uiPreview, selection, __DEV__);
+  const routePreviewLocale = plannedMobileUiPreviewLocaleV1(uiPreview, __DEV__);
+  const active = resolveMobilePlannedUiPreviewSelectionV1(routePreviewLocale, selection, __DEV__);
   if (!__DEV__) return null;
 
   const options = [
