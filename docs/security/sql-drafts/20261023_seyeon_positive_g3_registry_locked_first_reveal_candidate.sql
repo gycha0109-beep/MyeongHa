@@ -1,5 +1,5 @@
 -- Watchtower-Track: security
--- SOURCE CANDIDATE ONLY: §61 S5/G3 exact G2 receipt locators (7 UUIDs).
+-- SOURCE CANDIDATE ONLY: §61 S5/G3 7 G2 locators + original client Turn key.
 -- Does not modify the existing reviewed 4-argument migration. No deployment,
 -- EXECUTE grants, SRC-25 approval, paid Provider or public first Reveal.
 -- Watchtower-Track: security
@@ -25,10 +25,10 @@ end
 $preflight$;
 
 -- No additional personal tables or extra Subject-linked deletion graph.
-create function public.qry_seyeon_positive_first_memory_locked_reveal_v2(
+create function public.qry_seyeon_positive_first_memory_locked_reveal_v3(
   p_subject_id uuid, p_thread_id uuid, p_turn_id uuid, p_attempt_id uuid,
   p_expected_user_message_id uuid, p_expected_assistant_message_id uuid,
-  p_expected_post_turn_outbox_event_id uuid
+  p_expected_post_turn_outbox_event_id uuid, p_expected_client_turn_id text
 ) returns table (assistant_text text)
 language plpgsql security definer
 set search_path=pg_catalog,public
@@ -44,7 +44,10 @@ begin
      or p_turn_id is null or p_attempt_id is null
      or p_expected_user_message_id is null
      or p_expected_assistant_message_id is null
-     or p_expected_post_turn_outbox_event_id is null then
+     or p_expected_post_turn_outbox_event_id is null
+     or p_expected_client_turn_id is null
+     or p_expected_client_turn_id <> btrim(p_expected_client_turn_id)
+     or length(p_expected_client_turn_id) not between 1 and 256 then
     return;
   end if;
   perform public.assert_myeongha_subject_context_v1(p_subject_id);
@@ -82,6 +85,9 @@ begin
     on a.turn_id=t.id and a.subject_id=t.subject_id
   where t.id=p_turn_id and t.thread_id=p_thread_id
     and t.subject_id=p_subject_id
+    -- Identical user text is not a substitute for this exact live receive.
+    -- A different request with the same body must not inherit first Reveal.
+    and t.client_turn_id=p_expected_client_turn_id
     and t.state in ('committed','delivered')
     and t.committed_attempt_id=p_attempt_id
     and a.id=p_attempt_id and a.state='committed'
@@ -266,8 +272,8 @@ $positive_reveal$;
 
 -- Restrict to the function owner only. No PUBLIC, authenticated, service,
 -- or myeongha_api_executor EXECUTE and NO route registration.
-revoke all on function public.qry_seyeon_positive_first_memory_locked_reveal_v2(
-  uuid,uuid,uuid,uuid,uuid,uuid,uuid
+revoke all on function public.qry_seyeon_positive_first_memory_locked_reveal_v3(
+  uuid,uuid,uuid,uuid,uuid,uuid,uuid,text
 ) from public;
 do $revoke_direct$
 declare v_role text;
@@ -275,15 +281,15 @@ begin
   for v_role in select rolname from pg_catalog.pg_roles
       where rolname in ('anon','authenticated','service_role') loop
     execute format(
-      'revoke all on function public.qry_seyeon_positive_first_memory_locked_reveal_v2(uuid,uuid,uuid,uuid,uuid,uuid,uuid) from %I',
+      'revoke all on function public.qry_seyeon_positive_first_memory_locked_reveal_v3(uuid,uuid,uuid,uuid,uuid,uuid,uuid,text) from %I',
       v_role
     );
   end loop;
 end
 $revoke_direct$;
 
-comment on function public.qry_seyeon_positive_first_memory_locked_reveal_v2(
-  uuid,uuid,uuid,uuid,uuid,uuid,uuid
+comment on function public.qry_seyeon_positive_first_memory_locked_reveal_v3(
+  uuid,uuid,uuid,uuid,uuid,uuid,uuid,text
 ) is 'G3 first single-Memory original-rights locked positive Reveal SOURCE ONLY; no API EXECUTE, no route or external proxy ACK approval';
 
 commit;
