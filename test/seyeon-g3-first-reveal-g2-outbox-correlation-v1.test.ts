@@ -38,38 +38,40 @@ function result():RunProductionSeyeonChatResultV1 {
   } as unknown as RunProductionSeyeonChatResultV1;
 }
 
+type MutableResult={
+  execution:{
+    committedTurn:{postTurnOutboxEventId?:string};
+    postTurnAnalysis?:{status:string;outboxEventId?:string};
+    receivedTurn:{userMessageId?:string};
+  };
+};
+
 describe('S5/G3 first private Reply requires original G2 durable post-turn Outbox',()=>{
   it.each([
-    ['missing original G2 Outbox',r=>{
+    ['missing original G2 Outbox',(r:MutableResult)=>{
       r.execution.committedTurn.postTurnOutboxEventId=undefined;
     }],
-    ['malformed original G2 Outbox',r=>{
+    ['malformed original G2 Outbox',(r:MutableResult)=>{
       r.execution.committedTurn.postTurnOutboxEventId='not-a-uuid';
     }],
-    ['different deferred worker Outbox',r=>{
-      r.execution.postTurnAnalysis.outboxEventId=OTHER;
+    ['different deferred worker Outbox',(r:MutableResult)=>{
+      r.execution.postTurnAnalysis!.outboxEventId=OTHER;
     }],
-    ['missing post-turn outcome',r=>{
+    ['missing post-turn outcome',(r:MutableResult)=>{
       r.execution.postTurnAnalysis=undefined;
     }],
-    ['invented post-turn outcome',r=>{
+    ['invented post-turn outcome',(r:MutableResult)=>{
       r.execution.postTurnAnalysis={status:'none'};
     }],
-    ['missing original DB User Message identity',r=>{
+    ['missing original DB User Message identity',(r:MutableResult)=>{
       r.execution.receivedTurn.userMessageId=undefined;
     }],
-    ['malformed original DB User Message identity',r=>{
+    ['malformed original DB User Message identity',(r:MutableResult)=>{
       r.execution.receivedTurn.userMessageId='not-a-uuid';
     }],
   ] as const)('denies %s before ANY original Grant SQL',async(_label,mutate)=>{
-    const value=result() as unknown as {
-      execution:{
-        committedTurn:{postTurnOutboxEventId?:string};
-        postTurnAnalysis?:{status:string;outboxEventId?:string};
-        receivedTurn:{userMessageId?:string};
-      };
-    };
-    mutate(value as never);
+    const value=result() as unknown as MutableResult;
+    mutate(value);
     let dbConnections=0;
     let destroyed=false;
     const pool:PostgresSubjectPoolV1={
