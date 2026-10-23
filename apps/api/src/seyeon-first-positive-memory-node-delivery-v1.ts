@@ -268,24 +268,30 @@ export async function deliverSeyeonCommittedFirstPositiveMemoryNodeTurnV1(
     input.response.destroy();
     throw new SeyeonG3FirstPositiveNodeUnavailableV1('INVALID_COMMIT');
   }
-  return sendSeyeonNodeOriginalGrantResponseV1({
-    response:input.response,
-    requestSignal:input.requestSignal,
-    withLockedOriginalGrant:createSeyeonFirstPositiveMemoryLockedReadV1({
-      pool:input.pool,
-      verifiedEvidence:input.verifiedEvidence,
-      expectedSubjectId:input.result.subjectId,
-      threadId:input.expectedThreadId,
-      turnId:receipt.turnId,
-      attemptId:receipt.attemptId,
-      originalUserMessageId:input.result.execution.receivedTurn.userMessageId,
-      committedAssistantMessageId:receipt.assistantMessageId,
-      postTurnOutboxEventId:originalPostTurnOutboxId,
-      currentClientTurnId:input.expectedClientTurnId,
-    }),
-    chatResponseMetadata:metadata,
-    ...(input.deadlineMs===undefined?{}:{deadlineMs:input.deadlineMs}),
-  });
+  try {
+    return await sendSeyeonNodeOriginalGrantResponseV1({
+      response:input.response,
+      requestSignal:input.requestSignal,
+      withLockedOriginalGrant:createSeyeonFirstPositiveMemoryLockedReadV1({
+        pool:input.pool,
+        verifiedEvidence:input.verifiedEvidence,
+        expectedSubjectId:input.result.subjectId,
+        threadId:input.expectedThreadId,
+        turnId:receipt.turnId,
+        attemptId:receipt.attemptId,
+        originalUserMessageId:input.result.execution.receivedTurn.userMessageId,
+        committedAssistantMessageId:receipt.assistantMessageId,
+        postTurnOutboxEventId:originalPostTurnOutboxId,
+        currentClientTurnId:input.expectedClientTurnId,
+      }),
+      chatResponseMetadata:metadata,
+      ...(input.deadlineMs===undefined?{}:{deadlineMs:input.deadlineMs}),
+    });
+  } catch (error) {
+    // Caller must not leave an open Node socket on a failed send admission.
+    if (!input.response.destroyed) input.response.destroy();
+    throw error;
+  }
 }
 
 /** Server-only pre-model+send seam. No HTTP router mounts or exports it. */
