@@ -21,6 +21,7 @@ export function AuthPage() {
   const controller = useRef<AuthController | null>(null);
   const [mode, setMode] = useState<AuthMode>('sign-in');
   const [busy, setBusy] = useState(false);
+  const [ageConfirmed, setAgeConfirmed] = useState(false);
   const [status, setStatus] = useState({ message: '', kind: '' as StatusKind });
 
   useLayoutEffect(() => {
@@ -33,12 +34,20 @@ export function AuthPage() {
   }, []);
 
   function handleSocialSignIn(provider: SocialProvider) {
+    if (!ageConfirmed) {
+      setStatus({ message: '만 14세 이상 이용 가능 여부를 먼저 확인해 주세요.', kind: 'error' });
+      return;
+    }
     void controller.current?.startSocial(provider);
   }
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
+    if (mode === 'sign-up' && !form.has('ageConfirmed')) {
+      setStatus({ message: '만 14세 이상 이용 가능 여부를 먼저 확인해 주세요.', kind: 'error' });
+      return;
+    }
     void controller.current?.submit({
       email: String(form.get('email') ?? ''),
       password: String(form.get('password') ?? ''),
@@ -65,6 +74,10 @@ export function AuthPage() {
         </div>
 
         <div className="auth-social" aria-label="소셜 로그인">
+          <label className="auth-age-confirm" data-legal-age-self-declaration>
+            <input type="checkbox" checked={ageConfirmed} onChange={(event) => setAgeConfirmed(event.currentTarget.checked)} />
+            저는 만 14세 이상입니다. 만 14세 미만은 보호자 동의 확인 기능이 준비되기 전까지 가입하거나 개인화 서비스를 이용할 수 없습니다.
+          </label>
           <div className="auth-social-actions">
             {SOCIAL_LOGIN_OPTIONS.map(({ provider, label }) => (
               <button
@@ -88,6 +101,7 @@ export function AuthPage() {
           <div className="auth-field"><label htmlFor="auth-email">이메일</label><input id="auth-email" name="email" type="email" autoComplete="email" inputMode="email" maxLength={320} required /></div>
           <div className="auth-field"><label htmlFor="auth-password">비밀번호</label><input id="auth-password" name="password" type="password" autoComplete={signingUp ? 'new-password' : 'current-password'} maxLength={1024} required /></div>
           <div className="auth-field" id="auth-confirm-field" hidden={!signingUp}><label htmlFor="auth-password-confirm">비밀번호 확인</label><input id="auth-password-confirm" name="passwordConfirm" type="password" autoComplete="new-password" maxLength={1024} required={signingUp} /></div>
+          <input type="hidden" name="ageConfirmed" value="1" disabled={!ageConfirmed} />
           <button className="auth-submit" id="auth-submit" type="submit" disabled={busy}>{submitLabel}</button>
           <p className={`auth-status${status.kind ? ` is-${status.kind}` : ''}`} id="auth-status" role="status" aria-live="polite">{status.message}</p>
         </form>
