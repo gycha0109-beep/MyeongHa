@@ -20,6 +20,52 @@ export type AppliedPortOneV2ReaderFullCancellationV1 =
   grantCount: number }>;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
 
+
+/**
+ * Inspect the actual 1900/1910 DB effect contracts, not merely their counts.
+ * A positive grantCount with an empty/malformed/duplicated effect must never
+ * commit as a successful Reader revoke. Replayed effects are legitimate, but
+ * still identify the exact previously recorded Grant and Entitlement Event.
+ */
+function hasAuthoritativeGrantEffects(
+  effects: readonly unknown[],
+  contractVersion: unknown,
+): boolean {
+  const grantIds = new Set<string>();
+  const entitlementEventIds = new Set<string>();
+  for (const effect of effects) {
+    if (typeof effect !== 'object' || effect === null || Array.isArray(effect)) {
+      return false;
+    }
+    const entry = effect as Record<string, unknown>;
+    let grantId: unknown;
+    let eventId: unknown;
+    if (contractVersion === 'official-reader-s2-revoke-dispatch-v1') {
+      // 1910 dispatch returns one 1770 scoped-provider-revoke result per Grant.
+      if (entry.contractVersion !== 'official-reader-s2-provider-revoke-v1' ||
+          !Number.isSafeInteger(entry.scopeCount) ||
+          (entry.scopeCount as number) < 1 ||
+          typeof entry.replayed !== 'boolean') return false;
+      grantId = entry.grantId;
+      eventId = entry.entitlementEventId;
+    } else if (contractVersion === 'official-reader-s2-unbound-grant-cancellation-v1') {
+      // 1900 directly serializes the original 1080 effect row to JSON.
+      if (typeof entry.result_replayed !== 'boolean') return false;
+      grantId = entry.result_grant_id;
+      eventId = entry.result_entitlement_event_id;
+    } else {
+      return false;
+    }
+    if (typeof grantId !== 'string' || !UUID.test(grantId) ||
+        typeof eventId !== 'string' || !UUID.test(eventId) ||
+        grantIds.has(grantId.toLowerCase()) ||
+        entitlementEventIds.has(eventId.toLowerCase())) return false;
+    grantIds.add(grantId.toLowerCase());
+    entitlementEventIds.add(eventId.toLowerCase());
+  }
+  return true;
+}
+
 /**
  * Internal Commerce transaction only. No caller-supplied Subject/Reader/Grant,
  * no public route and no PSP refund request. The DB command resolves the
@@ -89,6 +135,7 @@ export async function applyVerifiedPortOneV2ReaderFullCancellationV1(input: {
       // result INSIDE the transaction so Receipt/Event/Grant all roll back.
       if (!Array.isArray(effect.effects)
           || effect.effects.length !== grantCount
+          || !hasAuthoritativeGrantEffects(effect.effects, effect.contractVersion)
           || !Number.isSafeInteger(effect.scopeCount)
           || (effect.scopeCount as number) < 0) {
         throw new Error('Verified Reader cancellation result was not authoritative.');
