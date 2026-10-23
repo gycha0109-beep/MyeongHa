@@ -156,6 +156,9 @@ run_isolated_case myeongha_reader_birth_scope_lock_candidate_preflight_test bash
 run_isolated_case myeongha_reader_scope_lock_private_preflight_test bash test/db/official_reader_scope_lock_private_preflight.sh
 # S2 preflight: instrumented synthetic new Grant/Bind and revoke both acquire same scope lock.
 run_isolated_case myeongha_reader_scope_lock_s2_instrumented_race_test bash test/db/official_reader_scope_lock_s2_instrumented_race.sh
+# S7: real migrated Checkout ledger joins, original Receipt/Grant/Item and first attempt.
+# This remains a relational proof only: no approved notice store or S5 body.
+run_isolated_case myeongha_reader_checkout_original_ledger_test bash test/db/official_reader_checkout_original_item_postgres.sh
 bash test/db/entitlements_current_query.sh
 bash test/db/data_deletion_job_query.sh
 bash test/db/notification_preferences_query.sh
