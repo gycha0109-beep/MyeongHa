@@ -19,7 +19,8 @@ $guard$;
 
 create function seyeon_positive_candidate.reveal_first_once_r25(
   p_subject uuid,p_thread uuid,p_turn uuid,p_attempt uuid,
-  p_assistant_message uuid,p_client_turn_id text
+  p_assistant_message uuid,p_user_message uuid,
+  p_post_turn_outbox uuid,p_client_turn_id text
 ) returns text
 language plpgsql security definer
 set search_path=pg_catalog,public,seyeon_positive_candidate
@@ -32,6 +33,7 @@ begin
   perform public.assert_myeongha_subject_context_v1(p_subject);
   if p_subject is null or p_thread is null or p_turn is null
      or p_attempt is null or p_assistant_message is null
+     or p_user_message is null or p_post_turn_outbox is null
      or p_client_turn_id is null then
     return null;
   end if;
@@ -71,12 +73,14 @@ begin
   perform 1
   from public.outbox_events oe
   join public.conversation_messages original_user
-    on original_user.subject_id=p_subject
+    on original_user.id=p_user_message
+   and original_user.subject_id=p_subject
    and original_user.thread_id=p_thread
    and original_user.turn_id=p_turn
    and original_user.sender_type='user'
    and original_user.redacted_at is null
-  where oe.aggregate_type='chat_turn'
+  where oe.id=p_post_turn_outbox
+    and oe.aggregate_type='chat_turn'
     and oe.aggregate_id=p_turn::text
     and oe.event_type='SEYEON_POST_TURN_ANALYSIS_REQUESTED'
     and oe.event_schema_version='v1'
@@ -131,10 +135,10 @@ end
 $first_once$;
 
 revoke all on function seyeon_positive_candidate.reveal_first_once_r25(
-  uuid,uuid,uuid,uuid,uuid,text
+  uuid,uuid,uuid,uuid,uuid,uuid,uuid,text
 ) from public;
 grant execute on function seyeon_positive_candidate.reveal_first_once_r25(
-  uuid,uuid,uuid,uuid,uuid,text
+  uuid,uuid,uuid,uuid,uuid,uuid,uuid,text
 ) to myeongha_api_executor;
 commit;
 \echo 'R25 disposable PG first-once atomic delivery installed; production OFF'
