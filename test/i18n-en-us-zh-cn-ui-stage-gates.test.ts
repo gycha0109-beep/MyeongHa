@@ -61,11 +61,11 @@ describe('I18N-07 en-US/zh-CN UI-only staged selection acceptance', () => {
       source('apps/mobile/src/ui/mobile-ui-copy.ts'),
       source('apps/api/src/request-ui-locale-v1.ts'),
     ]);
-    expect(web).toContain("['en-US', 'English (준비 중)']");
+    expect(web).toContain("['en-US', 'English (not available yet)']");
     expect(web).toContain("['zh-CN', '简体中文 (准备中)']");
     expect(web).toContain('option.disabled = true;');
     expect(web).toContain('if (!PLANNED_UI_LOCALES.includes(value)) continue;');
-    expect(mobile).toContain("value: 'en-US', label: 'English · 준비 중'");
+    expect(mobile).toContain("value: 'en-US', label: 'English · Not available yet'");
     expect(mobile).toContain("value: 'zh-CN', label: '简体中文 · 准备中'");
     expect(mobile).toContain('PLANNED_MOBILE_UI_LOCALES.includes(choice.value)');
     expect(mobile).toContain('accessibilityState={{ selected: false, disabled: true }}');
