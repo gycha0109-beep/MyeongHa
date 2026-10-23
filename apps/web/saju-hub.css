@@ -377,3 +377,29 @@
   .saju-pillar { min-height: 118px; }
   .saju-pillar-value strong { font-size: 25px; }
 }
+
+
+/* Free Saju interpretation directly after the verified birth-chart calculation. */
+.saju-inline-preview {
+  margin: 26px 0;
+  padding: clamp(20px, 3vw, 34px);
+  border: 1px solid var(--mh-line-strong, #d7c4a8);
+  border-radius: 18px;
+  background: var(--mh-paper, #fffaf3);
+  color: var(--mh-ink, #252525);
+}
+.saju-inline-preview > h2 { margin: 0 0 12px; font-family: var(--mh-serif, serif); font-size: clamp(23px, 3vw, 30px); }
+.saju-inline-preview p, .saju-inline-preview li { line-height: 1.85; overflow-wrap: anywhere; white-space: pre-line; }
+.saju-inline-preview-section { margin: 22px 0 0; padding-top: 18px; border-top: 1px solid var(--mh-line, #e8ded0); }
+.saju-inline-preview-section h3 { margin: 0 0 10px; font-size: 19px; }
+.saju-inline-preview-section h4 { margin: 12px 0 6px; font-size: 15px; }
+.saju-inline-preview-section ul { margin: 10px 0; padding-left: 22px; }
+.saju-inline-preview-disclosure { margin-top: 24px; padding: 16px; border-radius: 10px; background: rgba(147, 122, 81, 0.08); font-size: 13px; }
+.saju-inline-preview-disclosure h3 { font-size: 15px; }
+.saju-inline-preview-actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-top: 16px; }
+.saju-inline-preview-actions button { border: 1px solid var(--mh-line-strong, #d7c4a8); background: transparent; padding: 10px 14px; border-radius: 8px; cursor: pointer; }
+.saju-inline-preview-detail { display: inline-block; margin-top: 22px; color: var(--mh-brass-strong, #84672e); font-weight: 700; }
+
+.saju-inline-preview-topics { display: flex; gap: 8px; flex-wrap: wrap; margin: 14px 0 20px; }
+.saju-inline-preview-topics button { cursor: pointer; border: 1px solid var(--mh-line-strong, #d7c4a8); border-radius: 999px; padding: 8px 15px; background: transparent; color: inherit; }
+.saju-inline-preview-topics button[aria-pressed="true"] { cursor: default; background: var(--mh-night-900, #192a39); color: #fff9f0; }
