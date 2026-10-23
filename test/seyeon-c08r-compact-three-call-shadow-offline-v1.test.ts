@@ -7,6 +7,8 @@ import {runSeyeonCensusFirstThreeCallShadowV1}
 import {createSeyeonQualityTrioSyntheticCensusV1} from '../scripts/seyeon-terra-glm-quality-trio-census-v1.mjs';
 import {SEYEON_COMPACT_SHADOW_PROMPT_VERSION_V1}
   from '../apps/api/src/seyeon-shadow-compact-prompts-v1.js';
+// @ts-expect-error: Offline reservation scenario MJS has no TypeScript declaration.
+import {quoteSeyeonThreeCallTenKrwShadowV1} from '../scripts/seyeon-c08r3-10krw-reserve-scenario-v1.mjs';
 import type {RunSeyeonCharacterTurnV2Input}
   from '../apps/api/src/seyeon-character-runtime-v2.js';
 
@@ -155,6 +157,26 @@ describe('C08-R public synthetic compact 3-call Shadow (NO external provider)',(
       compactBytes:compact.seen.reduce((n,x)=>n+x.bytes,0),
     };
     expect(totals.compactBytes).toBeLessThan(totals.baselineBytes);
+    // Actual adapter-serialized N06 body sizes feed the OFFLINE stress
+    // quotation. This is not a provider hard cap or charged-token proof.
+    const worstCase=quoteSeyeonThreeCallTenKrwShadowV1({
+      stages:compact.seen.map(row=>({
+        name:row.stage,requestBodyBytes:row.bytes,maxCompletionTokens:1536,
+      })),
+    });
+    expect(worstCase.reservedMicroUsd).toBe(6675);
+    expect(worstCase.reserveUpperKrw).toBe(16.6875);
+    expect(worstCase.targetMetUnderStressAssumptions).toBe(false);
+    expect(worstCase.providerHardCapVerified).toBe(false);
+    expect(worstCase.providerInvoiceReconciled).toBe(false);
+    console.log('SEYEON_C08R3_TEN_KRW_STRESS_SCENARIO',JSON.stringify({
+      baseline3Calls:baseline.seen.length,
+      compact3Calls:compact.seen.length,
+      compactReserveMicroUsd:worstCase.reservedMicroUsd,
+      compactReserveKrw:worstCase.reserveUpperKrw,
+      targetMet:worstCase.targetMetUnderStressAssumptions,
+      scenarioOnly:true,
+    }));
     console.log('SEYEON_C08R_THREE_CALL_OFFLINE_PROMPT_AUDIT',JSON.stringify({
       baseline:baseline.seen,compact:compact.seen,...totals,
       actualModelCalls:0,modelQualityVerified:false,latencyVerified:false,
