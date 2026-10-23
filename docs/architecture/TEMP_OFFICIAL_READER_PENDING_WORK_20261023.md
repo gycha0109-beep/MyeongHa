@@ -23,3 +23,4 @@
 - 결제 알림 재처리 시 구매권 유효 시작 시각을 매번 다시 생성하던 부분을, 기존 검증 영수증의 고정 확인 시각으로 변경했습니다. [순방향 DB 변경](../../supabase/migrations/2260_official_reader_verified_receipt_stable_fulfillment_clock_v1.sql) 및 [재처리 테스트](../../tests/commerce-verified-reader-fulfillment-idempotency.test.ts)를 추가했습니다.
 - 환불 뒤 원래 영수증이 취소 상태로 바뀌어도 과거 전달 메타데이터를 정확히 조회하고, 이를 현재 정상 결제로 잘못 분류하지 않게 [비공개 DB 조회](../../supabase/migrations/2250_official_reader_withdrawal_original_receipt_state_private_v2.sql)와 [서버 검토 코드](../../apps/api/src/commerce-reader-private-withdrawal-evidence-v1.ts)를 수정했습니다. 환불·법무 판단이나 유료 해설 공개 권한은 부여하지 않습니다.
 - **미완료:** 결제·환불 전체 실거래 동시성 인수, 공식 운영 사주 출처, 개인정보 삭제·복구, 운영 DB 이력 복구, 최종 E2E 시험. 따라서 상위 작업의 완료 체크는 아직 하지 않습니다.
+- 보호 유료 해설 환불·회수 삭제 워커의 `db_erased` 재개 경로에서 외부 삭제 원장에 기록된 **모든 body ID·암호화 키 참조의 형식·상호 중복·개수 한도**를 재검증하도록 보강했습니다. 손상·위조된 원장은 실제 키 파기/완료 처리를 하기 전에 fail-closed되도록 회귀 테스트를 추가했습니다. 이는 #2318 실 운영 복구 승인이나 #1887 운영 DB 복구 증명의 대체가 아닙니다.
