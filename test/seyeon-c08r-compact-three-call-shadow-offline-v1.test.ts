@@ -4,8 +4,7 @@ import {createOpenRouterSeyeonEvaluationProviderV1}
 import {runSeyeonCensusFirstThreeCallShadowV1}
   from '../apps/api/src/seyeon-census-first-three-call-shadow-v1.js';
 // @ts-expect-error: Versioned offline synthetic MJS module has no TS declarations.
-import {createSeyeonQualityTrioSyntheticCensusV1}
-  from '../scripts/seyeon-terra-glm-quality-trio-census-v1.mjs';
+import {createSeyeonQualityTrioSyntheticCensusV1} from '../scripts/seyeon-terra-glm-quality-trio-census-v1.mjs';
 import {SEYEON_COMPACT_SHADOW_PROMPT_VERSION_V1}
   from '../apps/api/src/seyeon-shadow-compact-prompts-v1.js';
 import type {RunSeyeonCharacterTurnV2Input}
