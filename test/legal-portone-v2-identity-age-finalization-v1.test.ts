@@ -3,6 +3,7 @@ import {
   finalizePortOneV2IdentityAgeV1,
   type PortOneV2IdentityAgeAuthorityPortV1,
 } from '../apps/api/src/portone-v2-identity-age-finalization-v1.js';
+import type { PortOneV2IdentityOwnedAttemptV1 } from '../apps/api/src/portone-v2-identity-verification-contract-v1.js';
 import type { PortOneV2IdentityLookupAdapterV1 } from '../apps/api/src/portone-v2-identity-verification-lookup-v1.js';
 
 const subjectId = 'subject-1';
@@ -11,7 +12,7 @@ const serverTime = '2026-10-23T06:00:00.000Z';
 const ownedAttempt = { subjectId, identityVerificationId, status: 'pending' as const };
 
 function harness(decision: Awaited<ReturnType<PortOneV2IdentityLookupAdapterV1['verify']>>, canConsume = true) {
-  const readPendingOwnedAttempt = vi.fn(async () => ownedAttempt);
+  const readPendingOwnedAttempt = vi.fn(async (): Promise<PortOneV2IdentityOwnedAttemptV1 | null> => ownedAttempt);
   const consumeAndRecordAgeBand = vi.fn(async () => canConsume);
   const verify = vi.fn(async () => decision);
   const authority: PortOneV2IdentityAgeAuthorityPortV1 = {
