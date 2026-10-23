@@ -1,8 +1,8 @@
--- Exclusive, forward-only 1740..2290 Official Reader boundary admission.
+-- Exclusive, forward-only 1740..2300 Official Reader boundary admission.
 -- Executes INSIDE the same --single-transaction as all subsequent DDL.
 -- No bypass for the historical remote-only 20261008090417 bundle.
 -- Supplied by protected-main execution after validating the paired backup.
--- This value is checked AGAIN within the same transaction as all 56 DDLs.
+-- This value is checked AGAIN within the same transaction as all 57 DDLs.
 select pg_catalog.set_config(
   'myeongha.reader_s4.expected_frontier', :'expected_frontier',true
 );
@@ -13,7 +13,7 @@ declare
   v_bundle record;
 begin
   perform pg_catalog.pg_advisory_xact_lock(
-    pg_catalog.hashtextextended('myeongha:production:reader-s4:1740-2290',2026)
+    pg_catalog.hashtextextended('myeongha:production:reader-s4:1740-2300',2026)
   );
   select count(*) into v_missing_predecessor
   from (values ('1400'),('1410'),('1420'),('1430'),('1440'),('1450'),
@@ -35,7 +35,7 @@ begin
   select count(*) into v_present_reader
     from supabase_migrations.schema_migrations m
    where m.version ~ '^[0-9]{4}$'
-     and m.version::integer between 1740 and 2290;
+     and m.version::integer between 1740 and 2300;
   if v_present_reader<>0
      or pg_catalog.to_regclass('public.official_reader_paid_answer_bodies') is not null
      or pg_catalog.to_regclass('public.official_reader_paid_answer_purge_jobs_v1') is not null

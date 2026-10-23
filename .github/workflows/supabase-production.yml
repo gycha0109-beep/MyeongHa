@@ -24,7 +24,7 @@ on:
         required: false
         type: string
       reader_s4_scoped_apply:
-        description: 'Exact Reader 1740..2290 manual-only forward migration'
+        description: 'Exact Reader 1740..2300 manual-only forward migration'
         required: false
         type: boolean
         default: false
@@ -37,7 +37,7 @@ on:
         required: false
         type: string
       reader_s4_confirmation:
-        description: 'APPLY_OFFICIAL_READER_1740_2290_ONLY'
+        description: 'APPLY_OFFICIAL_READER_1740_2300_ONLY'
         required: false
         type: string
 
@@ -132,7 +132,7 @@ jobs:
             reason='manual scoped Se-yeon backfill must never invoke ordinary db push'
           elif [[ "$EVENT_NAME" == 'workflow_dispatch' && "${READER_S4_SCOPED:-}" == 'true' ]]; then
             requires_deploy=false
-            reason='manual Reader 1740..2290 must never invoke ordinary db push'
+            reason='manual Reader 1740..2300 must never invoke ordinary db push'
           elif [[ "$EVENT_NAME" == 'workflow_dispatch' ]]; then
             requires_deploy=true
             reason='workflow_dispatch forces governed Production verification'
@@ -160,7 +160,7 @@ jobs:
             fi
           fi
 
-          # Reader 1740..2290 is staged-only. A main merge of Reader SQL
+          # Reader 1740..2300 is staged-only. A main merge of Reader SQL
           # must never route to the unrestricted Production db push --include-all.
           # Only the separate backup+restore-verified manual scoped job may apply.
           if [[ "$EVENT_NAME" == 'push' && "$requires_deploy" == 'true' ]]; then
@@ -174,7 +174,7 @@ jobs:
                 exit 1
               fi
               requires_deploy=false
-              reason='staged Reader 1740..2290 SQL is HOLD; unrestricted Production db push forbidden'
+              reason='staged Reader 1740..2300 SQL is HOLD; unrestricted Production db push forbidden'
             fi
           fi
 
@@ -297,8 +297,8 @@ jobs:
         shell: bash
         run: bash scripts/operations/seyeon-production-relationship-backfill-guarded.sh
 
-  official-reader-scoped-1740-2290:
-    name: Manual Official Reader 1740..2290 (guarded)
+  official-reader-scoped-1740-2300:
+    name: Manual Official Reader 1740..2300 (guarded)
     if: "${{ github.event_name == 'workflow_dispatch' && inputs.reader_s4_scoped_apply == true && inputs.relationship_backfill_1400_1450 != true }}"
     needs: change-gate
     runs-on: ubuntu-24.04

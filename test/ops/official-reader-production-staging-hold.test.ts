@@ -110,7 +110,7 @@ describe('Official Reader staged SQL cannot enter ordinary Production deployment
         },
       });
       expect(outcome.status).not.toBe(0);
-      expect(outcome.stderr).toContain('HOLD_OFFICIAL_READER_1740_2290');
+      expect(outcome.stderr).toContain('HOLD_OFFICIAL_READER_1740_2300');
       expect(existsSync(marker)).toBe(false);
     });
   });

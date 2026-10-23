@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Stage only the exact dormant Official Reader 1740..2290 migration sequence.
+"""Stage only the exact dormant Official Reader 1740..2300 migration sequence.
 
 Produces a transaction-ready ordered file list and faithful SQL history
 statements. Does not connect to a database or execute migrations.
@@ -12,9 +12,9 @@ import pathlib
 import re
 
 VERSION_FIRST = 1740
-VERSION_LAST = 2290
+VERSION_LAST = 2300
 VERSIONS = tuple(range(VERSION_FIRST, VERSION_LAST + 1, 10))
-EXPECTED_COUNT = 56
+EXPECTED_COUNT = 57
 
 
 def stage(source_dir: pathlib.Path, output_dir: pathlib.Path) -> None:
