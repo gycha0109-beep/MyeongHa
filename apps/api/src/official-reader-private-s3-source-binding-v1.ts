@@ -40,6 +40,8 @@ type BoundRecord = Readonly<{
   productSpecVersion: string;
   readingContractVersion: string;
   officialArtifactResponseHash: string;
+  /** Canonical DB-owned Birth Profile revision of the original Saju artifact. */
+  sourceBirthRevisionId: string;
   storedResponseDigest: string;
   candidateDigest: string;
 }> & { used: boolean };
@@ -67,6 +69,8 @@ function recordFrom(admission: PreparedOfficialReadingReaderAdmissionV1):
       || source.productId !== scope.productId
       || source.productSpecVersion !== scope.productSpecVersion
       || source.readingContractVersion !== scope.readingContractVersion
+      || typeof source.sourceBirthRevisionId !== 'string'
+      || source.sourceBirthRevisionId.trim().length === 0
       || source.responseHash !== scope.officialArtifactResponseHash
       || source.productResponseState !== 'delivered') unavailable();
 
@@ -82,6 +86,7 @@ function recordFrom(admission: PreparedOfficialReadingReaderAdmissionV1):
     productSpecVersion: scope.productSpecVersion,
     readingContractVersion: scope.readingContractVersion,
     officialArtifactResponseHash: scope.officialArtifactResponseHash,
+    sourceBirthRevisionId: source.sourceBirthRevisionId,
     storedResponseDigest: hashSajuHeldSourceProofRequestV1(
       source.responseSnapshotJsonb,
     ),
@@ -168,7 +173,7 @@ export function consumeOfficialReaderS3BoundPreviewSourceV1(input: Readonly<{
       'subjectId','readingId','threadId','readerCharacterId',
       'bundleId','releaseId','contentRevision',
       'productId','productSpecVersion','readingContractVersion',
-      'officialArtifactResponseHash','storedResponseDigest',
+      'officialArtifactResponseHash','sourceBirthRevisionId','storedResponseDigest',
     ];
     if (fields.some((field) => original[field] !== fresh[field])) {
       return unavailable();
