@@ -12,6 +12,9 @@ export function ChatHubPage() {
           <span className="chat-hub-eyebrow">CONVERSATION</span>
           <h1 id="chat-hub-title">대화</h1>
           <p>이곳에서 마음이 가는 연결자를 만나보세요.</p>
+          <p className="character-ai-disclosure" data-legal-ai-hub-prior-notice>
+            명하의 캐릭터 대화는 생성형 인공지능을 이용합니다. 캐릭터는 실제 사람이 아니며, 대화 답변은 AI가 생성합니다.
+          </p>
         </div>
         <a className="conversation-meet-button" href="#people" data-meet-shortcut hidden><span>다른 연결자 만나기</span><span aria-hidden="true">›</span></a>
       </section>
