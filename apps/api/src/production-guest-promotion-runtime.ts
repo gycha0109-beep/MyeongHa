@@ -106,7 +106,8 @@ export function createProductionGuestPromotionRuntimeV1(input: {
   readonly pool?: PostgresSubjectPoolV1;
 }): ProductionGuestPromotionRuntimeV1 {
   const config = parseProductionUserDataRuntimeConfigV1(input.env);
-  const pool = input.pool ?? createNodePostgresSubjectPoolV1(config);
+  const ownedPool = input.pool === undefined ? createNodePostgresSubjectPoolV1(config) : undefined;
+  const pool = input.pool ?? ownedPool!;
   const verifier = createProductionRequestIdentityVerifierV1({ config });
 
   return Object.freeze({
@@ -211,7 +212,7 @@ export function createProductionGuestPromotionRuntimeV1(input: {
       }
     },
     close() {
-      return input.pool === undefined ? pool.close() : Promise.resolve();
+      return ownedPool?.close() ?? Promise.resolve();
     },
   });
 }

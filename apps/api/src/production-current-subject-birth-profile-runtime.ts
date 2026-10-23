@@ -29,7 +29,8 @@ export function createProductionCurrentSubjectBirthProfileRuntimeV1(
   input: CreateProductionCurrentSubjectBirthProfileRuntimeInputV1,
 ): ProductionCurrentSubjectBirthProfileRuntimeV1 {
   const config = parseProductionUserDataRuntimeConfigV1(input.env);
-  const pool = input.pool ?? createNodePostgresSubjectPoolV1(config);
+  const ownedPool = input.pool === undefined ? createNodePostgresSubjectPoolV1(config) : undefined;
+  const pool = input.pool ?? ownedPool!;
   const identityEvidenceVerifier = createProductionRequestIdentityVerifierV1({
     config,
     ...(input.memberFetchImpl === undefined ? {} : { memberFetchImpl: input.memberFetchImpl }),
@@ -46,7 +47,7 @@ export function createProductionCurrentSubjectBirthProfileRuntimeV1(
       });
     },
     close() {
-      return input.pool === undefined ? pool.close() : Promise.resolve();
+      return ownedPool?.close() ?? Promise.resolve();
     },
   });
 }

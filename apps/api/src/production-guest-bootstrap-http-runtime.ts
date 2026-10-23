@@ -54,7 +54,8 @@ export function createProductionGuestBootstrapHttpRuntimeV1(
 ): ProductionGuestBootstrapHttpRuntimeV1 {
   const config = parseProductionUserDataRuntimeConfigV1(input.env);
   const activationConfig = parseProductionGuestBootstrapActivationConfigV1(input.env);
-  const pool = input.pool ?? createNodePostgresSubjectPoolV1(config);
+  const ownedPool = input.pool === undefined ? createNodePostgresSubjectPoolV1(config) : undefined;
+  const pool = input.pool ?? ownedPool!;
   const credentialIssuerPort = createProductionGuestBootstrapCredentialIssuerPortV1({
     config: activationConfig,
   });
@@ -86,7 +87,7 @@ export function createProductionGuestBootstrapHttpRuntimeV1(
       return response;
     },
     close() {
-      return input.pool === undefined ? pool.close() : Promise.resolve();
+      return ownedPool?.close() ?? Promise.resolve();
     },
   });
 }
