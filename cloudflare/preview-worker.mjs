@@ -16,6 +16,29 @@ export default {
   async fetch(request, env) {
     const pathname = new URL(request.url).pathname;
     const pathLower = pathname.toLowerCase();
+    // S-CF2: first REAL no-credential API handler in the actual preview
+    // Worker. This is a worker-liveness endpoint, NOT PostgreSQL/Provider
+    // readiness and never grants a positive chat, memory or Reader route.
+    // Keep the canonical API route exact; any alias stays fail-closed below.
+    if (pathname === '/api/health') {
+      if (request.method !== 'GET') {
+        return new Response(null, {
+          status: 405,
+          headers: protectedHeaders({ Allow: 'GET' }),
+        });
+      }
+      return new Response(JSON.stringify({
+        status: 'ok',
+        service: 'cloudflare-preview-worker',
+        dependencies: 'not_checked',
+        userDataApi: 'disabled',
+        privateMemoryChat: 'disabled',
+      }), {
+        status: 200,
+        headers: protectedHeaders({ 'Content-Type': 'application/json; charset=utf-8' }),
+      });
+    }
+
     if (pathLower === '/api' || pathLower.startsWith('/api/') || pathLower.startsWith('/api%2f')) {
       return new Response(JSON.stringify({ error: 'API_NOT_ACTIVATED_ON_PREVIEW' }), {
         status: 503,

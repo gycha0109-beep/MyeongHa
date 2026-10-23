@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import previewWorker from '../cloudflare/preview-worker.mjs';
 import {
   CLOUDFLARE_PREVIEW_CD_V1,
   assertCloudflarePreviewConfiguration,
@@ -57,4 +58,34 @@ describe('Cloudflare preview Git-based CD', () => {
     expect(() => assertCloudflarePreviewConfiguration({ ...previewConfig, assets: { ...previewConfig.assets, run_worker_first: false } })).toThrow(/static assets isolated/u);
     expect(() => assertCloudflarePreviewConfiguration({ ...previewConfig, route: 'example.com/*' })).toThrow(/static assets isolated/u);
   });
+
+  it('routes one real public preview health API but keeps personal APIs offline', async () => {
+    const env = {
+      ASSETS: { fetch: async () => new Response('<html>should stay static</html>') },
+    };
+    const live = await previewWorker.fetch(new Request('https://preview.example/api/health'), env);
+    expect(live.status).toBe(200);
+    expect(live.headers.get('Cache-Control')).toBe('no-store');
+    expect(await live.json()).toMatchObject({
+      status: 'ok',
+      dependencies: 'not_checked',
+      userDataApi: 'disabled',
+      privateMemoryChat: 'disabled',
+    });
+    const protectedChat = await previewWorker.fetch(new Request(
+      'https://preview.example/api/chat/123e4567-e89b-42d3-a456-426614174000/turns',
+      { method: 'POST' },
+    ), env);
+    expect(protectedChat.status).toBe(503);
+    expect(protectedChat.headers.get('Cache-Control')).toBe('no-store');
+    const privateRead = await previewWorker.fetch(new Request(
+      'https://preview.example/api/memories',
+    ), env);
+    expect(privateRead.status).toBe(503);
+    const noHealthWrite = await previewWorker.fetch(new Request(
+      'https://preview.example/api/health', { method: 'POST' },
+    ), env);
+    expect(noHealthWrite.status).toBe(405);
+  });
+
 });
