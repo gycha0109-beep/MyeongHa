@@ -5,6 +5,15 @@ import {
   denySeyeonCloudflareFirstRevealBeforeProviderV1,
   enforceSeyeonCloudflareOfflineFetchEgressFenceV1,
 } from '../apps/api/src/seyeon-cloudflare-offline-reveal-fence-v1.js';
+import {
+  holdSeyeonCloudflareOpsRouterHandoffOfflineV1,
+} from '../apps/api/src/seyeon-cloudflare-ops-router-handoff-offline-v1.js';
+import {
+  SupabaseMemberIdentityEvidenceVerifierV1,
+} from '../apps/api/src/supabase-member-identity-verifier.js';
+import {
+  MYEONGHA_PRODUCTION_SUPABASE_ORIGIN,
+} from '../apps/api/src/production-user-data-runtime-config.js';
 
 const SECURITY_HEADERS = Object.freeze({
   'Content-Security-Policy': "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; img-src 'self' data:; font-src 'self'; style-src 'self'; script-src 'self'; connect-src 'self'",
@@ -28,10 +37,36 @@ export default {
     // database or static HTML fallback before G0-D04 is authorized.
     if (pathLower === '/api/chat' || pathLower.startsWith('/api/chat/')) {
       const requestId = crypto.randomUUID();
-      return enforceSeyeonCloudflareOfflineFetchEgressFenceV1(
+      const sealed = () => enforceSeyeonCloudflareOfflineFetchEgressFenceV1(
         denySeyeonCloudflareFirstRevealBeforeProviderV1(requestId),
         requestId,
       );
+      // A preview with no approved Auth binding remains completely offline.
+      // Reuse the existing Member verifier; never accept a client-supplied
+      // Subject ID, supply a database client or invoke an AI Provider.
+      if (env?.MYEONGHA_SUPABASE_URL !== MYEONGHA_PRODUCTION_SUPABASE_ORIGIN ||
+          typeof env?.MYEONGHA_SUPABASE_API_KEY !== 'string') {
+        return sealed();
+      }
+      try {
+        const identityEvidenceVerifier = new SupabaseMemberIdentityEvidenceVerifierV1({
+          supabaseOrigin: MYEONGHA_PRODUCTION_SUPABASE_ORIGIN,
+          supabaseApiKey: env.MYEONGHA_SUPABASE_API_KEY,
+        });
+        const guarded = await holdSeyeonCloudflareOpsRouterHandoffOfflineV1({
+          request,
+          requestId,
+          opsRouteDisposition: 'protected_chat',
+          identityEvidenceVerifier,
+        });
+        // The last Fetch fence is unconditional even after trusted 4xx
+        // preflight. Successful Member verification only reaches 503.
+        return enforceSeyeonCloudflareOfflineFetchEgressFenceV1(
+          guarded, requestId,
+        );
+      } catch {
+        return sealed();
+      }
     }
     // An encoded API root must not fall through to static assets. Ops owns
     // the eventual raw-path router; Preview deliberately has no positive API.
