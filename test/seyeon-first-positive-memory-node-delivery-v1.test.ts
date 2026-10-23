@@ -21,6 +21,9 @@ const OTHER='d1000000-0000-4000-8000-000000000002';
 const THREAD='d2000000-0000-4000-8000-000000000003';
 const TURN='d3000000-0000-4000-8000-000000000004';
 const ATTEMPT='d4000000-0000-4000-8000-000000000005';
+const USER='d6000000-0000-4000-8000-000000000007';
+const ASSISTANT='d5000000-0000-4000-8000-000000000006';
+const POST_TURN_OUTBOX='d7000000-0000-4000-8000-000000000008';
 const CANARY='G3_OFFLINE_CURRENT_ORIGINAL_MEMORY';
 const EVIDENCE={kind:'member' as const,verifiedAuthUserId:AUTH};
 type Call={text:string;values:readonly unknown[]};
@@ -43,7 +46,7 @@ class FakeG3Connection implements PostgresSubjectConnectionV1 {
     if(text.includes('to_regprocedure(')){
       return {rows:[{ready:this.ready}] as unknown as readonly Row[]};
     }
-    if(text.includes('from public.qry_seyeon_positive_first_memory_locked_reveal_v1(')){
+    if(text.includes('from public.qry_seyeon_positive_first_memory_locked_reveal_v2(')){
       return {rows:[{assistantText:this.authorizedText}] as unknown as readonly Row[]};
     }
     return {rows:[]};
@@ -63,6 +66,9 @@ function read(pool:PostgresSubjectPoolV1,expectedSubjectId=SUBJECT){
   return createSeyeonFirstPositiveMemoryLockedReadV1({
     pool,verifiedEvidence:EVIDENCE,expectedSubjectId,
     threadId:THREAD,turnId:TURN,attemptId:ATTEMPT,
+    originalUserMessageId:USER,
+    committedAssistantMessageId:ASSISTANT,
+    postTurnOutboxEventId:POST_TURN_OUTBOX,
   });
 }
 function queries(db:FakeG3Connection){return db.calls.map(q=>q.text);}
@@ -77,7 +83,7 @@ describe('Se-yeon G3 Node-only original-Grant current Subject fence',()=>{
       deliver:async body=>{
         expect(body).toBe(CANARY);
         expect(queries(db).at(-1)).toContain(
-          'from public.qry_seyeon_positive_first_memory_locked_reveal_v1(',
+          'from public.qry_seyeon_positive_first_memory_locked_reveal_v2(',
         );
         expect(queries(db)).not.toContain('COMMIT');
         events.push('delivered-under-lock');
@@ -88,11 +94,31 @@ describe('Se-yeon G3 Node-only original-Grant current Subject fence',()=>{
       'BEGIN','SET LOCAL ROLE myeongha_api_executor',
       expect.stringContaining('public.begin_member_subject_context_v1'),
       expect.stringContaining('public.assert_myeongha_subject_context_v1'),
-      expect.stringContaining('from public.qry_seyeon_positive_first_memory_locked_reveal_v1('),
+      expect.stringContaining('from public.qry_seyeon_positive_first_memory_locked_reveal_v2('),
       'COMMIT',
     ]);
-    expect(db.calls[4]?.values).toEqual([SUBJECT,THREAD,TURN,ATTEMPT]);
+    expect(db.calls[4]?.values).toEqual([
+      SUBJECT,THREAD,TURN,ATTEMPT,USER,ASSISTANT,POST_TURN_OUTBOX,
+    ]);
     expect(db.releases).toEqual([undefined]);
+  });
+
+  it.each([
+    ['missing original User ID',undefined,ASSISTANT,POST_TURN_OUTBOX],
+    ['different invalid Assistant ID',USER,'not-an-id',POST_TURN_OUTBOX],
+    ['missing G2 Outbox ID',USER,ASSISTANT,undefined],
+    ['malformed G2 Outbox ID',USER,ASSISTANT,'wrong-event'],
+  ])('holds %s before any original G3 database lookup',(_label,user,assistant,outbox)=>{
+    const db=new FakeG3Connection(SUBJECT,CANARY,true);
+    const pool=new FakeG3Pool(db);
+    expect(()=>createSeyeonFirstPositiveMemoryLockedReadV1({
+      pool,verifiedEvidence:EVIDENCE,expectedSubjectId:SUBJECT,
+      threadId:THREAD,turnId:TURN,attemptId:ATTEMPT,
+      originalUserMessageId:user as string,
+      committedAssistantMessageId:assistant as string,
+      postTurnOutboxEventId:outbox as string,
+    })).toThrowError();
+    expect(pool.connects).toBe(0);
   });
 
   it('refuses a different DB-authenticated Subject before any G3 Grant or message read',async()=>{
@@ -105,7 +131,7 @@ describe('Se-yeon G3 Node-only original-Grant current Subject fence',()=>{
     })).rejects.toMatchObject({code:'INVALID_SCOPE'});
     expect(delivered).toBe(false);
     expect(queries(db).some(q=>q.includes(
-      'from public.qry_seyeon_positive_first_memory_locked_reveal_v1(',
+      'from public.qry_seyeon_positive_first_memory_locked_reveal_v2(',
     ))).toBe(false);
     expect(queries(db).at(-1)).toBe('ROLLBACK');
     expect(queries(db)).not.toContain('COMMIT');
@@ -170,7 +196,7 @@ describe('Se-yeon G3 Node-only original-Grant current Subject fence',()=>{
     expect(runtimeCalls).toBe(0);
     expect(pool.connects).toBe(1);
     expect(queries(connection)).not.toContainEqual(
-      expect.stringContaining('from public.qry_seyeon_positive_first_memory_locked_reveal_v1('),
+      expect.stringContaining('from public.qry_seyeon_positive_first_memory_locked_reveal_v2('),
     );
   });
 
@@ -242,7 +268,7 @@ describe('Se-yeon G3 Node-only original-Grant current Subject fence',()=>{
     expect(pool.connects).toBe(1);
     expect(queries(db).some(q => q.includes('has_function_privilege'))).toBe(true);
     expect(queries(db)).not.toContainEqual(
-      expect.stringContaining('from public.qry_seyeon_positive_first_memory_locked_reveal_v1('),
+      expect.stringContaining('from public.qry_seyeon_positive_first_memory_locked_reveal_v2('),
     );
   });
 
@@ -406,7 +432,7 @@ describe('Se-yeon G3 Node-only original-Grant current Subject fence',()=>{
     })).rejects.toMatchObject({code:'DB_NOT_READY'});
     expect(queries(db).some(q=>q.includes('has_function_privilege'))).toBe(true);
     expect(queries(db)).not.toContainEqual(
-      expect.stringContaining('from public.qry_seyeon_positive_first_memory_locked_reveal_v1('),
+      expect.stringContaining('from public.qry_seyeon_positive_first_memory_locked_reveal_v2('),
     );
   });
 });
