@@ -22,36 +22,12 @@ import {
   assertOfficialReaderPrivateCurrentVerifiedPurchaseScopeV1,
 } from './official-reader-private-exact-verified-purchase-guard-v1.js';
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
-const READ_SQL = `
-select
-  body_id::text as "bodyId",
-  thread_id::text as "threadId",
-  turn_id::text as "turnId",
-  attempt_id::text as "attemptId",
-  safe_message_id::text as "safeMessageId",
-  official_reading_id::text as "officialReadingId",
-  reader_character_id as "readerCharacterId",
-  reader_content_bundle_id::text as "readerContentBundleId",
-  content_release_id::text as "contentReleaseId",
-  originating_entitlement_grant_id::text as "originatingGrantId",
-  product_id::text as "productId",
-  source_response_hash as "sourceResponseHash",
-  encryption_scheme_version as "encryptionSchemeVersion",
-  encryption_key_ref as "encryptionKeyRef",
-  encryption_iv as "encryptionIv",
-  encryption_auth_tag as "encryptionAuthTag",
-  encrypted_body as "encryptedBody",
-  committed_at::text as "committedAt"
-from public.internal_qry_official_reader_paid_answer_ciphertext_v1(
-  $1::uuid, $2::uuid
-)
-`;
-const READ_CHAT_MARKER_SQL = READ_SQL.replace(
-  'from public.internal_qry_official_reader_paid_answer_ciphertext_v1(\n  $1::uuid, $2::uuid\n)',
-  'from public.internal_qry_official_reader_paid_chat_marker_ciphertext_v1(\n  $1::uuid, $2::uuid, $3::uuid\n)',
-);
+import {
+  selectPrivateOfficialReaderCiphertextQueryV1,
+  type OfficialReaderPrivateCiphertextSelectorV1,
+} from './official-reader-private-paid-answer-query-v1.js';
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 type CiphertextRow = Readonly<{
   bodyId: unknown;
   threadId: unknown;
@@ -136,10 +112,6 @@ type ReaderPaidPrivateReadInputV1 = Readonly<{
   /** Private-only S7, never accepted as a browser-authored release flag. */
   deliveryReservation?: OfficialReaderPrivateDeliveryReservationV1;
 }>;
-type ReaderPaidPrivateSelectorV1 =
-  | Readonly<{ kind: 'body'; bodyId: string }>
-  | Readonly<{ kind: 'chat_marker'; threadId: string; safeMessageId: string }>;
-
 export async function readPrivateOfficialReaderPaidAnswerV1(input:
   ReaderPaidPrivateReadInputV1 & Readonly<{ bodyId: string }>,
 ): Promise<PrivateOfficialReaderPaidAnswerReadV1> {
@@ -170,7 +142,7 @@ export async function readPrivateOfficialReaderPaidChatMessageV1(input:
 
 async function readPrivateOfficialReaderPaidAnswerCoreV1(
   input: ReaderPaidPrivateReadInputV1,
-  selector: ReaderPaidPrivateSelectorV1,
+  selector: OfficialReaderPrivateCiphertextSelectorV1,
 ): Promise<PrivateOfficialReaderPaidAnswerReadV1> {
   try {
     // Read Subject authority in a separate short transaction. Do not hold a
@@ -203,11 +175,13 @@ async function readPrivateOfficialReaderPaidAnswerCoreV1(
         if (!currentOfficialReaderPrivacyReadLeaseV1({
           port: input.privacyLedgerPort, lease, subjectId, selector: selectorKey,
         })) return unavailable();
+        // Each S6 selector calls its own private DB function. A Thread ID
+        // must never be interpreted as a paid body ID if a SQL layout drifts.
+        const lookup = selectPrivateOfficialReaderCiphertextQueryV1(
+          subjectId, selector,
+        );
         const result = await scope.client.query<CiphertextRow>(
-          selector.kind === 'body' ? READ_SQL : READ_CHAT_MARKER_SQL,
-          selector.kind === 'body'
-            ? [subjectId, selector.bodyId]
-            : [subjectId, selector.threadId, selector.safeMessageId],
+          lookup.sql, lookup.values,
         );
         const row = result.rows[0];
         if (result.rows.length !== 1 || row === undefined) return unavailable();
