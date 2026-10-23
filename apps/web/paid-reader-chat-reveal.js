@@ -2,6 +2,16 @@ import {
   getActiveBearer,
   invalidateMemberSession,
 } from './product-auth.js';
+import { getUiLocale, translateStaticUi } from './ui-i18n.js';
+
+function setPaidReaderUiText(node, source) {
+  node.dataset.readerPaidUiSource = source;
+  node.textContent = translateStaticUi(source, getUiLocale());
+}
+function paidReaderUi(source) {
+  return translateStaticUi(source, getUiLocale());
+}
+
 
 const ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 const CONTRACT = 'official-reader-paid-chat-message-v1';
@@ -18,9 +28,10 @@ function closeExpanded() {
   previous.retry.onclick = null;
   previous.body.textContent = '';
   previous.body.hidden = true;
-  previous.button.textContent = '구매권 확인 후 해설 열기';
+  setPaidReaderUiText(previous.button, '구매권 확인 후 해설 열기');
   previous.button.setAttribute('aria-expanded', 'false');
   previous.status.textContent = '';
+  delete previous.status.dataset.readerPaidUiSource;
 }
 
 function responseMessage(status, code) {
@@ -55,7 +66,7 @@ export function appendProtectedReaderChatRevealV1(card, input) {
   const button = document.createElement('button');
   button.className = 'conversation-paid-reader-reveal-button';
   button.type = 'button';
-  button.textContent = '구매권 확인 후 해설 열기';
+  setPaidReaderUiText(button, '구매권 확인 후 해설 열기');
   button.setAttribute('aria-expanded', 'false');
 
   const status = document.createElement('p');
@@ -68,13 +79,14 @@ export function appendProtectedReaderChatRevealV1(card, input) {
   const retry = document.createElement('button');
   retry.className = 'conversation-paid-reader-reveal-button conversation-paid-reader-reveal-retry-button';
   retry.type = 'button';
-  retry.textContent = '기기 수신 확인 다시 시도';
+  setPaidReaderUiText(retry, '기기 수신 확인 다시 시도');
   retry.hidden = true;
 
   const body = document.createElement('div');
   body.className = 'conversation-paid-reader-revealed-body';
   body.hidden = true;
-  body.setAttribute('aria-label', '현재 구매권으로 확인된 사주 해설');
+  body.dataset.readerPaidAriaSource = '현재 구매권으로 확인된 사주 해설';
+  body.setAttribute('aria-label', paidReaderUi('현재 구매권으로 확인된 사주 해설'));
 
   button.addEventListener('click', async () => {
     if (expanded?.button === button) {
@@ -90,13 +102,13 @@ export function appendProtectedReaderChatRevealV1(card, input) {
     };
     expanded = current;
     button.disabled = true;
-    status.textContent = '현재 이용권을 확인하고 있습니다…';
+    setPaidReaderUiText(status, '현재 이용권을 확인하고 있습니다…');
 
     try {
       const bearer = await getActiveBearer();
       if (expanded !== current || !card.isConnected) return;
       if (!bearer || bearer.kind !== 'member') {
-        status.textContent = '해설을 열려면 회원 로그인이 필요합니다.';
+        setPaidReaderUiText(status, '해설을 열려면 회원 로그인이 필요합니다.');
         return;
       }
 
@@ -132,7 +144,7 @@ export function appendProtectedReaderChatRevealV1(card, input) {
       let envelope = null;
       try { envelope = await response.json(); } catch { /* unavailable */ }
       if (!response.ok) {
-        status.textContent = responseMessage(response.status, envelope?.error?.code);
+        setPaidReaderUiText(status, responseMessage(response.status, envelope?.error?.code));
         return;
       }
 
@@ -156,19 +168,19 @@ export function appendProtectedReaderChatRevealV1(card, input) {
           || typeof data.delivery.acknowledgementToken !== 'string'
           || !DELIVERY_TOKEN.test(data.delivery.acknowledgementToken)
           || typeof data.delivery.replayed !== 'boolean') {
-        status.textContent = '서버에서 확인된 해설 정보를 표시할 수 없습니다.';
+        setPaidReaderUiText(status, '서버에서 확인된 해설 정보를 표시할 수 없습니다.');
         return;
       }
 
       body.textContent = data.body;
       body.hidden = false;
-      button.textContent = '해설 닫기';
+      setPaidReaderUiText(button, '해설 닫기');
       button.setAttribute('aria-expanded', 'true');
       // Do not claim delivery when the server merely built its HTTP
       // Response. Wait until the protected answer is inserted into the DOM,
       // then send a separate client acknowledgment. This proves a client
       // callback, not that the user personally read or understood it.
-      status.textContent = '현재 구매권으로 확인한 해설입니다. 수신 확인 중…';
+      setPaidReaderUiText(status, '현재 구매권으로 확인한 해설입니다. 수신 확인 중…');
       await new Promise((resolve) => requestAnimationFrame(resolve));
       if (expanded !== current || !card.isConnected
           || body.hidden || controller.signal.aborted) return;
@@ -242,9 +254,9 @@ export function appendProtectedReaderChatRevealV1(card, input) {
           // Do not claim receipt from a client display or missing ACK response.
         }
         if (expanded === current && !body.hidden && !controller.signal.aborted) {
-          status.textContent = acknowledged
+          setPaidReaderUiText(status, acknowledged
             ? '현재 구매권으로 확인한 해설입니다. 기기 수신 확인이 기록되었습니다.'
-            : '해설이 표시되었으나 기기 수신 확인은 기록되지 않았습니다.';
+            : '해설이 표시되었으나 기기 수신 확인은 기록되지 않았습니다.');
           retry.hidden = acknowledged;
           retry.disabled = false;
           if (acknowledged) retry.onclick = null;
@@ -252,13 +264,13 @@ export function appendProtectedReaderChatRevealV1(card, input) {
       }
       retry.onclick = () => {
         if (expanded !== current || controller.signal.aborted || retry.disabled) return;
-        status.textContent = '기기 수신 확인을 다시 요청하고 있습니다…';
+        setPaidReaderUiText(status, '기기 수신 확인을 다시 요청하고 있습니다…');
         void recordClientReceipt();
       };
       await recordClientReceipt();
     } catch (error) {
       if (expanded === current && error?.name !== 'AbortError') {
-        status.textContent = '해설을 불러오지 못했습니다. 다시 시도해 주세요.';
+        setPaidReaderUiText(status, '해설을 불러오지 못했습니다. 다시 시도해 주세요.');
       }
     } finally {
       button.disabled = false;
@@ -274,3 +286,13 @@ document.addEventListener('visibilitychange', () => {
   if (document.hidden) closeExpanded();
 });
 window.addEventListener('pagehide', closeExpanded);
+
+// Locale changes repaint only control labels. Never translate or cache paid body text.
+document.addEventListener('myeongha:localechange', () => {
+  for (const node of document.querySelectorAll('[data-reader-paid-ui-source]')) {
+    node.textContent = paidReaderUi(node.dataset.readerPaidUiSource);
+  }
+  for (const node of document.querySelectorAll('[data-reader-paid-aria-source]')) {
+    node.setAttribute('aria-label', paidReaderUi(node.dataset.readerPaidAriaSource));
+  }
+});

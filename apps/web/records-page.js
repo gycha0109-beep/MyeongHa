@@ -299,7 +299,7 @@ function appendCurrentReaderAccessControl(card, reading, readerCharacterId, auto
   controls.dataset.readerCharacterId = readerCharacterId;
   controls.setAttribute('aria-label', name + '의 현재 유료 해설·대화 접근 확인');
 
-  const button = textElement('button', 'records-reader-current-action', name + ' 대화 권한 확인');
+  const button = textElement('button', 'records-reader-current-action', name + ' ' + uiText('대화 권한 확인'));
   button.type = 'button';
   const status = textElement('p', 'records-reader-current-status', '');
   status.setAttribute('role', 'status');
@@ -312,7 +312,7 @@ function appendCurrentReaderAccessControl(card, reading, readerCharacterId, auto
     const ownRequest = ++generation;
     button.disabled = true;
     status.replaceChildren();
-    status.textContent = '현재 Reader 구매권과 대화방을 확인하고 있습니다…';
+    status.textContent = uiText('현재 Reader 구매권과 대화방을 확인하고 있습니다…');
     try {
       const result = await createRecordsRuntimeClient().readReaderContinuity({
         readingId: reading.readingId,
@@ -321,30 +321,30 @@ function appendCurrentReaderAccessControl(card, reading, readerCharacterId, auto
       if (!controls.isConnected || generation !== ownRequest) return;
       controls.dataset.currentAccess = '';
       if (result.state === 'held') {
-        status.textContent = '유료 Reader 대화 연결은 준비 중입니다. 저장된 공식 사주 보고서의 열람과는 별개입니다.';
+        status.textContent = uiText('유료 Reader 대화 연결은 준비 중입니다. 저장된 공식 사주 보고서의 열람과는 별개입니다.');
       } else if (result.state === 'not_confirmed') {
-        status.textContent = '현재 계정에서 이 Reader의 접근을 확인할 수 없습니다. 과거 구매·대리자 기록은 현재 이용권이 아닙니다.';
+        status.textContent = uiText('현재 계정에서 이 Reader의 접근을 확인할 수 없습니다. 과거 구매·대리자 기록은 현재 이용권이 아닙니다.');
       } else if (result.state === 'not_available'
           && result.purchaseState === 'verified_full_cancellation') {
         controls.dataset.currentAccess = 'cancelled';
-        status.textContent = '검증된 원거래 전액취소와 해당 Reader 구매권 회수가 확인되었습니다. 이 구매권으로 유료 해설을 생성·재열람하거나 원문을 기억에 재주입할 수 없습니다. 일반 캐릭터 채팅과 기존 공식 사주 보고서는 별도 접근 정책을 따릅니다.';
+        status.textContent = uiText('검증된 원거래 전액취소와 해당 Reader 구매권 회수가 확인되었습니다. 이 구매권으로 유료 해설을 생성·재열람하거나 원문을 기억에 재주입할 수 없습니다. 일반 캐릭터 채팅과 기존 공식 사주 보고서는 별도 접근 정책을 따릅니다.');
       } else if (result.state === 'not_available'
           && result.purchaseState === 'current_verified_purchase') {
         controls.dataset.currentAccess = 'reader-unavailable';
-        status.textContent = '정상 구매권은 확인되지만 현재 연결 가능한 Reader 대화방 또는 정책 승인이 확인되지 않습니다. 유료 해설 접근은 계속 차단됩니다.';
+        status.textContent = uiText('정상 구매권은 확인되지만 현재 연결 가능한 Reader 대화방 또는 정책 승인이 확인되지 않습니다. 유료 해설 접근은 계속 차단됩니다.');
       } else if (result.state === 'not_available') {
         controls.dataset.currentAccess = 'not-confirmed';
-        status.textContent = '현재 이 Reader의 유료 해설·후속 대화 권한이 확인되지 않았습니다. 환불·권한 회수·만료 여부를 임의로 단정하지 않습니다.';
+        status.textContent = uiText('현재 이 Reader의 유료 해설·후속 대화 권한이 확인되지 않았습니다. 환불·권한 회수·만료 여부를 임의로 단정하지 않습니다.');
       } else if (result.state === 'existing_thread_candidate') {
         controls.dataset.currentAccess = 'currently-authorized';
-        status.textContent = '현재 확인된 대화방입니다. 이동 후 서버에서 Reader 구매권을 다시 확인합니다. ';
-        const link = textElement('a', 'records-reader-current-thread', '기존 대화방으로 이동 →');
+        status.textContent = uiText('현재 확인된 대화방입니다. 이동 후 서버에서 Reader 구매권을 다시 확인합니다. ');
+        const link = textElement('a', 'records-reader-current-thread', uiText('기존 대화방으로 이동 →'));
         link.href = buildChatThreadUrlV1(result.threadId);
         status.append(link);
       }
     } catch {
       if (controls.isConnected && generation === ownRequest) {
-        status.textContent = 'Reader 권한 상태를 불러오지 못했습니다. 다시 확인할 수 있습니다.';
+        status.textContent = uiText('Reader 권한 상태를 불러오지 못했습니다. 다시 확인할 수 있습니다.');
       }
     } finally {
       if (controls.isConnected && generation === ownRequest) button.disabled = false;
