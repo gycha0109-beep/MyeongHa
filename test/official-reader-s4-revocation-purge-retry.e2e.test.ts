@@ -28,6 +28,7 @@ function fixture(options: {
   regressManifestAfterErase?: boolean;
   loseLeaseBeforeLedger?: boolean;
   sqlFailureAt?: 'list' | 'delivery-schema' | 'delivery-prune';
+  holdFirstKeyDestroy?: boolean;
 } = {}) {
   const events: string[]=[];
   let dbErased=false;
@@ -39,6 +40,12 @@ function fixture(options: {
   let loseLeaseOnce=options.loseLeaseOnce === true;
   let loseLeaseBeforeLedger=options.loseLeaseBeforeLedger === true;
   let pendingCommit: 'db-commit' | 'finish-commit' | undefined;
+  let liveOwner: unknown;
+  let destroyAttempts=0;
+  let notifyFirstKey: () => void = () => {};
+  let unblockFirstKey: () => void = () => {};
+  const firstKeyStarted=new Promise<void>(resolve => { notifyFirstKey=resolve; });
+  const firstKeyRelease=new Promise<void>(resolve => { unblockFirstKey=resolve; });
   function interrupt(point: CrashPoint) {
     if(crashAt===point) {
       crashAt=undefined;
@@ -53,7 +60,7 @@ function fixture(options: {
   });
   const pool: PostgresSubjectPoolV1 = {
     connect: async () => ({
-      query: async <T = Record<string, unknown>>(sql: string): Promise<{ rows: T[] }> => {
+      query: async <T = Record<string, unknown>>(sql: string, params?: readonly unknown[]): Promise<{ rows: T[] }> => {
         if(sql==='BEGIN') { if(transactionOpen) throw Error('nested transaction'); transactionOpen=true; return {rows:[]}; }
         if(sql==='COMMIT' || sql==='ROLLBACK') {
           transactionOpen=false;
@@ -75,6 +82,7 @@ function fixture(options: {
         }
         if(sql.includes('internal_claim_official_reader_paid_answer_purge_v1')) {
           events.push('claim');
+          liveOwner=params?.[1];
           return result([{subjectId:SUBJECT,readingId:READING,
             readerCharacterId:READER,jobStatus:dbErased?'db_erased':'claimed'}]);
         }
@@ -103,6 +111,7 @@ function fixture(options: {
         }
         if(sql.includes('internal_renew_official_reader_paid_answer_purge_lease_v1')) {
           events.push('lease');
+          if(params?.[1]!==liveOwner) return result([{renewed:false}]);
           if(loseLeaseBeforeLedger) {
             loseLeaseBeforeLedger=false;
             return result([{renewed:false}]);
@@ -114,6 +123,7 @@ function fixture(options: {
           return result([{renewed:true}]);
         }
         if(sql.includes('internal_finish_official_reader_paid_answer_purge_v1')) {
+          if(params?.[1]!==liveOwner) throw Error('stale worker cannot complete');
           if(!dbErased || !keyDestroyed) throw Error('premature completion');
           events.push('finish'); finished=true;
           if(crashAt==='finish-commit') pendingCommit='finish-commit';
@@ -148,6 +158,11 @@ function fixture(options: {
       initialKeyFailure=false;
       throw Error('synthetic key mount interruption');
     }
+    destroyAttempts++;
+    if(options.holdFirstKeyDestroy===true && destroyAttempts===1) {
+      notifyFirstKey();
+      await firstKeyRelease;
+    }
     keyDestroyed=true;
     interrupt('destroy-key');
   });
@@ -179,7 +194,8 @@ function fixture(options: {
   const run = (workerId:string) => runOfficialReaderPrivateRevocationPurgeBatchV1({
     pool,store,workerId,limit:1,
   });
-  return {run, events, destroyKey, scopeLedger,
+  return {run, events, destroyKey, scopeLedger, firstKeyStarted,
+    releaseFirstKey:()=>unblockFirstKey(),
     current:()=>({dbErased,finished,keyDestroyed})};
 }
 
@@ -333,5 +349,27 @@ describe('Privacy #2318 official Reader protected purge Worker retry seam', () =
       expect(String(outcome)).not.toContain('receipt=');
     });
   }
+
+  it('stale in-flight key erasure cannot ACK or complete after another Worker reclaims the lease', async () => {
+    const x=fixture({holdFirstKeyDestroy:true});
+    const oldWorker=x.run('incarnation-old');
+    await x.firstKeyStarted;
+    try {
+      const newWorker=await x.run('incarnation-new');
+      expect(newWorker).toMatchObject({
+        completed:1,rowsDeleted:0,keysDestroyed:1,publicPaidReadEnabled:false,
+      });
+    } finally {
+      x.releaseFirstKey();
+    }
+    await expect(oldWorker).rejects.toThrow(
+      'Protected Reader revocation cleanup is unavailable.',
+    );
+    expect(x.events.filter(e=>e==='db-delete')).toHaveLength(1);
+    expect(x.events.filter(e=>e==='finish')).toHaveLength(1);
+    expect(x.events.filter(e=>e==='ack-key')).toHaveLength(1);
+    expect(x.scopeLedger.recordScopeDeletionFence).toHaveBeenCalledTimes(1);
+    expect(x.current()).toEqual({dbErased:true,keyDestroyed:true,finished:true});
+  });
 
 });
