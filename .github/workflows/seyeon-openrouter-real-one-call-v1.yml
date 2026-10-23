@@ -1,0 +1,53 @@
+name: '[WT:character-memory] OpenRouter one public first preflight model request'
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/seyeon-openrouter-real-one-call.trigger'
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: seyeon-openrouter-real-one-call-lifetime-once
+  cancel-in-progress: false
+jobs:
+  probe:
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && github.run_attempt == 1 }}
+    environment: production
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Checkout immutable main SHA
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.sha }}
+      - name: Node 24
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install audited dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Verify one-call contract with fake HTTP
+        run: |
+          npx vitest run test/seyeon-openrouter-real-one-call-v1.test.mjs test/openrouter-seyeon-evaluation-provider-v1.test.ts
+          npm run build
+          node --check scripts/run-seyeon-openrouter-real-one-call-v1.mjs
+      - name: Exactly one owner-approved public synthetic model request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$OPENROUTER_API_KEY"
+          node scripts/run-seyeon-openrouter-real-one-call-v1.mjs
+      - name: Retain numeric-only evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: seyeon-openrouter-one-call-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/seyeon-openrouter-one-call/
+          if-no-files-found: warn
+          retention-days: 14

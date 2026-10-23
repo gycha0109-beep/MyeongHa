@@ -198,6 +198,8 @@ jobs:
             psql -v ON_ERROR_STOP=1 -f "${migration}" >/dev/null
           done
       - name: Run authority core
+        env:
+          MYEONGHA_AUTHORITY_PROFILE: '1'
         run: bash test/db/run_authority_core.sh
       - name: Run account deletion worker PostgreSQL synthetic E2E
         env:

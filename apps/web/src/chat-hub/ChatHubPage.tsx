@@ -11,9 +11,9 @@ export function ChatHubPage() {
         <div>
           <span className="chat-hub-eyebrow">CONVERSATION</span>
           <h1 id="chat-hub-title">대화</h1>
-          <p>이곳에서 마음이 가는 대리자를 만나보세요.</p>
+          <p>이곳에서 마음이 가는 연결자를 만나보세요.</p>
         </div>
-        <a className="conversation-meet-button" href="#people" data-meet-shortcut hidden><span>다른 대리자 만나기</span><span aria-hidden="true">›</span></a>
+        <a className="conversation-meet-button" href="#people" data-meet-shortcut hidden><span>다른 연결자 만나기</span><span aria-hidden="true">›</span></a>
       </section>
 
       <section className="chat-hub-primary conversation-primary" data-relationship-section hidden aria-label="이어갈 대화와 내 대화">
@@ -52,8 +52,8 @@ export function ChatHubPage() {
         <div className="chat-people-heading">
           <div>
             <span className="chat-hub-section-kicker">MEET</span>
-            <h2 id="people-title"><span data-discovery-heading>누구와 이야기를 시작해볼까요?</span><span data-returning-heading hidden>다른 대리자 만나기</span><span className="chat-people-star" aria-hidden="true">✦</span></h2>
-            <p>말하는 방식도, 분위기도 조금씩 다른 명하의 대리자들. 마음이 가는 사람을 선택해보세요.</p>
+            <h2 id="people-title"><span data-discovery-heading>누구와 이야기를 시작해볼까요?</span><span data-returning-heading hidden>다른 연결자 만나기</span><span className="chat-people-star" aria-hidden="true">✦</span></h2>
+            <p>말하는 방식도, 분위기도 조금씩 다른 명하의 연결자들. 마음이 가는 사람을 선택해보세요.</p>
           </div>
           <label className="chat-search">
             <span className="sr-only">사람 찾기</span><span className="chat-search-icon" aria-hidden="true" />
@@ -70,9 +70,17 @@ export function ChatHubPage() {
 
       <aside className="conversation-memory-note conversation-hub-status" data-hub-availability role="status" aria-label="대화 목록 연결 상태">
         <span className="conversation-memory-mark" aria-hidden="true">◇</span>
-        <p>이전 대화 목록은 아직 이 화면에 연결되지 않았습니다. 대리자 탐색은 이용할 수 있으며, 실제 대화 시작과 접근 가능 여부는 서버에서 확인합니다.</p>
+        <p>이전 대화 목록은 아직 이 화면에 연결되지 않았습니다. 연결자 탐색은 이용할 수 있으며, 실제 대화 시작과 접근 가능 여부는 서버에서 확인합니다.</p>
       </aside>
-      <p className="conversation-hub-verified-empty" data-hub-verified-empty hidden role="status">아직 이어지는 대화가 없습니다. 마음에 드는 대리자와 이야기를 시작해보세요.</p>
+      <p className="conversation-hub-verified-empty" data-hub-verified-empty hidden role="status">아직 이어지는 대화가 없습니다. 마음에 드는 연결자와 이야기를 시작해보세요.</p>
+
+      <section className="chat-pending-section" aria-labelledby="chat-pending-title">
+        <div className="chat-pending-heading">
+          <div><span className="chat-hub-section-kicker">COMING SOON</span><h2 id="chat-pending-title">연결자 등록 중</h2></div>
+          <p>세 연결자는 소개만 먼저 공개됩니다. 대화 기능은 준비 중입니다.</p>
+        </div>
+        <div className="chat-people-grid" data-pending-people-grid />
+      </section>
     </div>
   );
 }

@@ -425,9 +425,15 @@ export function createPersistingSeyeonAiProviderV1(input: {
     async generate(request: Parameters<SeyeonStructuredProviderPortV2['generate']>[0]) {
       const events: SeyeonAiCostEventV1[] = [];
       const durableProviderReceipts = new Set<string>();
+      const settledGovernedCallIds = new Set<string>();
+      let providerSucceeded = false;
       const observer = input.config.observeMetric;
-      const state: { binding: SeyeonAiCostLedgerBindingV1 | null; callId: string | null } = {
-        binding: null, callId: null,
+      const state: {
+        binding: SeyeonAiCostLedgerBindingV1 | null;
+        callId: string | null;
+        admittedQuote: SeyeonCostGovernorQuoteV1 | null;
+      } = {
+        binding: null, callId: null, admittedQuote: null,
       };
       const provider = createOpenAiSeyeonStructuredProviderV1({
         ...input.config,
@@ -468,6 +474,9 @@ export function createPersistingSeyeonAiProviderV1(input: {
                 ...call, quote, requestBodyBytes: call.requestBodyBytes,
               }),
             );
+            // Bind the immutable approved token ceilings to THIS call only
+            // after the database has committed its matching reservation.
+            state.admittedQuote = quote;
           }
           state.binding = binding;
           state.callId = call.callId;
@@ -497,7 +506,19 @@ export function createPersistingSeyeonAiProviderV1(input: {
         },
       });
       try {
-        return await provider.generate(request);
+        const generated = await provider.generate(request);
+        // The raw Provider intentionally does not fail inference when its
+        // metering callback fails. Under ENFORCE that cannot authorize the
+        // Chat Commit or a successful reply: the server must have stored the
+        // actual outcome against its pre-dispatch reservation. Never issue a
+        // second inference to repair a lost receipt.
+        if (input.governor !== undefined &&
+            (state.callId === null ||
+             !durableProviderReceipts.has(state.callId))) {
+          throw new Error('Governed Provider outcome receipt was not persisted; Chat Commit denied.');
+        }
+        providerSucceeded = true;
+        return generated;
       } finally {
         for (const event of events) {
           if (state.binding === null || state.callId !== event.callId) {
@@ -512,11 +533,21 @@ export function createPersistingSeyeonAiProviderV1(input: {
             continue;
           }
           try {
-            await input.runner.run(state.binding.subjectId, client =>
-              input.governor === undefined
-                ? settleSeyeonAiCallV1(client,state.binding!,event)
-                : settleGovernedSeyeonAiCallV1(client,state.binding!,event),
-            );
+            if (input.governor === undefined) {
+              await input.runner.run(state.binding.subjectId, client =>
+                settleSeyeonAiCallV1(client,state.binding!,event),
+              );
+            } else {
+              const receipt = await input.runner.run(state.binding.subjectId, client =>
+                settleGovernedSeyeonAiCallV1(client,state.binding!,event),
+              );
+              if (receipt.overCeiling) {
+                // Paid inference already occurred. Hold the reply, never retry.
+                console.error('MYEONGHA_SEYEON_COST_OVER_CEILING');
+              } else {
+                settledGovernedCallIds.add(receipt.callId);
+              }
+            }
           } catch {
             // Keep the started row for reconciliation. Never retry inference.
             console.error('MYEONGHA_SEYEON_COST_SETTLEMENT_FAILED');
@@ -524,6 +555,32 @@ export function createPersistingSeyeonAiProviderV1(input: {
         }
         if (state.callId !== null && events.length === 0) {
           console.error('MYEONGHA_SEYEON_COST_PROVIDER_EVENT_MISSING');
+        }
+        // A durable Provider outcome alone cannot authorize Chat Commit:
+        // the bounded DB settlement must also acknowledge the exact call.
+        if (input.governor !== undefined && providerSucceeded &&
+            (events.length !== 1 || state.callId === null ||
+             !settledGovernedCallIds.has(state.callId))) {
+          throw new Error('Governed cost settlement was not confirmed; Chat Commit denied.');
+        }
+        // Monetary overCeiling=false alone is insufficient: a large output
+        // with small input (or vice versa) may cost less than the *combined*
+        // quote while breaking an individually approved token ceiling.
+        // Account for the paid call first, then deny any unproven or
+        // out-of-contract successful Provider reply without retrying.
+        if (input.governor !== undefined && providerSucceeded) {
+          const event = events[0];
+          const quote = state.admittedQuote;
+          if (quote === null || event === undefined ||
+              event.outcome !== 'response_received' ||
+              event.costStatus !== 'estimated' ||
+              event.priceVersion !== quote.rateCardVersion ||
+              event.inputTokens === null ||
+              event.outputTokens === null ||
+              event.inputTokens > quote.inputCeilingTokens ||
+              event.outputTokens > quote.outputCeilingTokens) {
+            throw new Error('Governed Provider token ceiling evidence failed; Chat Commit denied.');
+          }
         }
       }
     },

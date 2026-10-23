@@ -3,11 +3,11 @@ import type {
   MemoryItemV1,
   ReadingHistoryItemV1,
 } from '@myeongha/api-client';
-import { router } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { router, useLocalSearchParams } from 'expo-router';
+import { useEffect, useMemo, useState } from 'react';
 import {
   FlatList,
-  SafeAreaView,
+  RefreshControl,
   StyleSheet,
   Text,
   View,
@@ -22,6 +22,7 @@ import {
   RecordsListFooter,
   RecordsTabs,
 } from '@/features/records/RecordsComponents';
+import { RecordsEditorialHeader } from '@/features/records/RecordsEditorialHeader';
 import { useMobileRecordsV1 } from '@/features/records/use-mobile-records';
 import {
   buildAllRecordTimelineV1,
@@ -30,6 +31,10 @@ import {
   type RecordsTabV1,
 } from '@/features/records/records-view-model';
 import { mobileColors } from '@/ui/mobile-colors';
+import { MobileUiText } from '@/ui/MobileUiText';
+import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
+import { useMobileTheme } from '@/ui/mobile-theme';
+import { useMobilePullRefreshV1 } from '@/ui/use-mobile-pull-refresh';
 
 type VisibleItem =
   | RecordTimelineItemV1
@@ -99,8 +104,14 @@ function initialLoadingForTab(tab: RecordsTabV1, snapshots: ReturnType<typeof us
 }
 
 export default function RecordsScreen() {
-  const [tab, setTab] = useState<RecordsTabV1>('all');
-  const { snapshots, retryFailed, loadMore } = useMobileRecordsV1();
+  const styles = useMobileThemedStyles(staticStyles);
+  const { colors } = useMobileTheme();
+  const { tab: routeTab } = useLocalSearchParams<{ tab?: string }>();
+  const requestedTab: RecordsTabV1 = routeTab === 'readings' ? 'readings' : 'all';
+  const [tab, setTab] = useState<RecordsTabV1>(requestedTab);
+  useEffect(() => { setTab(requestedTab); }, [requestedTab]);
+  const { snapshots, retryFailed, loadMore, refreshAll } = useMobileRecordsV1();
+  const { refreshing, onRefresh } = useMobilePullRefreshV1(refreshAll);
 
   const items = useMemo(() => visibleItems(tab, snapshots), [snapshots, tab]);
   const failedLabels = failedCollectionLabelsV1(snapshots, tab);
@@ -117,9 +128,17 @@ export default function RecordsScreen() {
     : snapshots[tab].status === 'error' && snapshots[tab].items.length > 0;
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <View style={[styles.safeArea, { backgroundColor: colors.canvas }]}>
       <FlatList
         data={items}
+        refreshControl={(
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => void onRefresh()}
+            tintColor={colors.navy}
+            colors={[colors.navy]}
+          />
+        )}
         keyExtractor={(item) => `${item.kind}:${item.id}`}
         renderItem={({ item }) => renderItem(item, openReading)}
         contentContainerStyle={styles.content}
@@ -133,12 +152,13 @@ export default function RecordsScreen() {
         ListHeaderComponent={(
           <View style={styles.headerStack}>
             <View style={styles.header}>
-              <Text style={styles.eyebrow}>MY RECORDS</Text>
-              <Text style={styles.title}>기록</Text>
-              <Text style={styles.description}>
-                삶의 사실, 사주 풀이 이력, 기억을 각 authority 그대로 확인합니다.
-              </Text>
+              <Text style={[styles.eyebrow, { color: colors.gold }]}>MY RECORDS</Text>
+              <MobileUiText style={[styles.title, { color: colors.ink }]}>기록</MobileUiText>
+              <MobileUiText style={[styles.description, { color: colors.muted }]}>
+                삶의 사실과 지난 풀이, 저장된 기억을 차분히 찾아보세요.
+              </MobileUiText>
             </View>
+            <RecordsEditorialHeader selected={tab} itemCount={initialLoading ? null : items.length} />
             <RecordsTabs selected={tab} onSelect={setTab} />
             <RecordsFailureBanner
               labels={failedLabels}
@@ -146,7 +166,7 @@ export default function RecordsScreen() {
             />
             {initialLoading ? (
               <View style={styles.loadingCard}>
-                <Text style={styles.loadingText}>기록을 불러오는 중입니다…</Text>
+                <MobileUiText style={styles.loadingText}>기록을 불러오는 중입니다…</MobileUiText>
               </View>
             ) : null}
           </View>
@@ -167,19 +187,18 @@ export default function RecordsScreen() {
           />
         }
       />
-    </SafeAreaView>
-  );
+    </View>  );
 }
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: mobileColors.canvas },
-  content: { flexGrow: 1, paddingHorizontal: 20, paddingTop: 28, paddingBottom: 28 },
-  headerStack: { gap: 18, marginBottom: 18 },
-  header: { gap: 8 },
-  eyebrow: { color: mobileColors.gold, fontSize: 12, fontWeight: '700', letterSpacing: 1.2 },
-  title: { color: mobileColors.ink, fontSize: 32, fontWeight: '700' },
-  description: { color: mobileColors.muted, fontSize: 15, lineHeight: 22 },
-  separator: { height: 12 },
+  content: { flexGrow: 1, paddingHorizontal: 20, paddingTop: 25, paddingBottom: 36 },
+  headerStack: { gap: 18, marginBottom: 20 },
+  header: { gap: 7 },
+  eyebrow: { color: mobileColors.gold, fontSize: 10, fontWeight: '900', letterSpacing: 1.5 },
+  title: { color: mobileColors.ink, fontSize: 31, fontWeight: '900', letterSpacing: -0.55 },
+  description: { color: mobileColors.muted, fontSize: 14, lineHeight: 21 },
+  separator: { height: 13 },
   loadingCard: {
     borderWidth: 1,
     borderColor: mobileColors.border,
@@ -189,3 +208,4 @@ const styles = StyleSheet.create({
   },
   loadingText: { color: mobileColors.muted, fontSize: 14 },
 });
+const staticStyles = styles;

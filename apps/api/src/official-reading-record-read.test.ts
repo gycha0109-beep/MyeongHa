@@ -56,6 +56,20 @@ describe('Official Reading Records read contract', () => {
     expect(result).not.toHaveProperty('readerContext');
   });
 
+  it('binds a server-pinned Reader hash to the Records DB row without returning the hash', async () => {
+    const read = (expectedResponseHash: string) => getOfficialReadingRecord({
+      resolvedSubjectId: SUBJECT_ID,
+      readingId: READING_ID,
+      expectedResponseHash,
+      authorityPort: port(ROW),
+    });
+    const admitted = await read(ROW.responseHash);
+    expect(admitted.readingId).toBe(READING_ID);
+    expect(admitted).not.toHaveProperty('responseHash');
+    await expect(read('sha256:wrong-reader-row')).rejects.toThrow('stored hash differs');
+    await expect(read('')).rejects.toThrow('stored hash differs');
+  });
+
   it('fails closed when the owner-scoped record does not exist', async () => {
     await expect(getOfficialReadingRecord({
       resolvedSubjectId: SUBJECT_ID,

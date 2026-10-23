@@ -1,0 +1,67 @@
+name: "[WT:character-memory] 세연 C06 F01 V2 2회 유료 재검증"
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_cost_limit:
+        description: "이전 3회 포함 총 예산 100원, 비용은 추정치이며 공급자 하드캡이 아님을 확인했습니다"
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: seyeon-c06-f01-v2-lifetime-one-dispatch
+  cancel-in-progress: false
+
+jobs:
+  compare:
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.confirm_cost_limit == true }}
+    name: F01 original/compact revised model screen (2 calls max)
+    runs-on: ubuntu-24.04
+    environment: production
+    timeout-minutes: 12
+    steps:
+      - name: Checkout reviewed main revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Setup Node 24
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Verify single-use policy, previous budget and all legacy holds
+        run: npx vitest run test/seyeon-cost-c06-f01-v2-budget-v1.test.mjs test/seyeon-paid-eval-hold-v1.test.mjs
+      - name: Build model provider
+        run: npm run build
+      - name: Verify first and only GitHub manual dispatch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          ID="$(node scripts/seyeon-cost-c06-f01-v2-once-admission-v1.mjs)"
+          test "$ID" = "$GITHUB_RUN_ID"
+          echo "SEYEON_C06_F01_V2_ONCE_ADMITTED_RUN_ID=$ID" >> "$GITHUB_ENV"
+      - name: Run F01 V2 two-request screen
+        env:
+          OPENAI_API_KEY2: ${{ secrets.OPENAI_API_KEY2 }}
+          SEYEON_C06_V2_EVIDENCE_PATH: ${{ runner.temp }}/seyeon-c06-f01-v2/evidence.jsonl
+          SEYEON_C06_V2_REPORT_PATH: ${{ runner.temp }}/seyeon-c06-f01-v2/report.json
+        run: |
+          test -n "${OPENAI_API_KEY2:-}"
+          node scripts/run-seyeon-cost-c06-f01-v2-eval-v1.mjs
+      - name: Preserve numeric evidence on any result
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: seyeon-c06-f01-v2-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/seyeon-c06-f01-v2/
+          if-no-files-found: warn
+          retention-days: 14

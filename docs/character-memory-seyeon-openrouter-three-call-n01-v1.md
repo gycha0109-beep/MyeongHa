@@ -1,0 +1,3 @@
+Watchtower-Track: character-memory
+
+OpenRouter GPT-OSS 20B N01 public-synthetic three-call full shadow evaluation. One immutable main push, no retry, maximum 3 requests, output cap 1536 each, pre-dispatch durable reserve $0.01 each. Existing estimated approvals ceiling 5,000 KRW; historical conservative reserved USD 0.816554, additional 0.03 USD, maximum 2,116.385 KRW at 2,500 KRW/USD. No content logged. Previous direct key baseline $0.022062 for 3-call Terra/Luna route. Only output guard result, hash, numeric metadata and per-stage tokens retained. Actual invoice unknown; no production promotion and no human voice quality claim.

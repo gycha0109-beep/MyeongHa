@@ -1,0 +1,10 @@
+export type SajuDisplayLocaleV1 = 'ko-KR' | 'ja-JP' | 'zh-TW';
+export declare const SAJU_DISPLAY_LOCALES_V1: readonly SajuDisplayLocaleV1[];
+export declare function sajuDisplayLocaleV1(locale: unknown): SajuDisplayLocaleV1;
+export declare function localizeSajuCopyV1(korean: string, locale?: string): string;
+export declare function sajuPillarLabelV1(key: string, locale?: string): string|null;
+export declare function sajuElementLabelV1(element: string, locale?: string): string;
+export declare function sajuYinYangLabelV1(value: string, locale?: string): string;
+export declare function projectSajuPillarDisplayV1(state: any, locale?: string): Readonly<{characters:string; text:string; meta:string}>;
+export declare function sajuCompletenessLabelV1(count: number, complete: boolean, locale?: string): string;
+export declare function sajuCurrentYearLabelV1(year: number, locale?: string): string;

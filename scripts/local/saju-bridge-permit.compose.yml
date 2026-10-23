@@ -1,0 +1,31 @@
+# Opt-in synthetic Permit V2 verification overlay. Never stage, deploy or run the actual Runner.
+services:
+  saju-bootstrap-permit:
+    image: postgres:15
+    working_dir: /myeongha
+    entrypoint: ["/bin/sh", "-euc"]
+    command:
+      - |
+        test "$$(psql -X -Atqc 'select current_database()')" = 'myeongha_saju_admission_local_verify'
+        psql -X -v ON_ERROR_STOP=1 -f test/db/fixtures/saju_staging_operator_admission_schema_8c2b2d302.sql
+        psql -X -v ON_ERROR_STOP=1 -f scripts/local/saju-bridge-permit-docker-login.sql
+    environment:
+      PGHOST: admission-db
+      PGPORT: "5432"
+      PGUSER: postgres
+      PGDATABASE: myeongha_saju_admission_local_verify
+      PGPASSWORD: ${SAJU_BRIDGE_LOCAL_ADMISSION_DB_PASSWORD:?disposable-secret-required}
+      PGSSLMODE: verify-full
+      PGSSLROOTCERT: /tls/ca.crt
+    volumes:
+      - type: volume
+        source: myeongha-workspace
+        target: /myeongha
+        read_only: true
+      - admission-tls-certs:/tls:ro
+    networks: [disposable]
+
+  saju-binding-verifier:
+    environment:
+      MYEONGHA_DOCKER_SAJU_PERMIT: "1"
+      SAJU_BRIDGE_LOCAL_ADMISSION_DB_PASSWORD: ${SAJU_BRIDGE_LOCAL_ADMISSION_DB_PASSWORD:?disposable-secret-required}

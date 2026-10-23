@@ -226,12 +226,9 @@ async function verifyHub(page, origin, suffix, width, height, mobile) {
       seyeon: 'seyeon-portrait-v2.webp',
       baekheon: 'baekheon-portrait-v2.webp',
       yeoul: 'yeoul-portrait-uploaded.svg',
-      seorin: 'seorin-portrait-v2.webp',
       rahyeon: 'rahyeon-portrait-v2.webp',
-      mira: 'mira-portrait-uploaded.svg',
       taegyeom: 'taegyeom-portrait-v2.webp',
       yunho: 'yunho-portrait-v2.webp',
-      doyun: 'doyoon-portrait-v2.webp',
     };
     const portraits = Object.entries(expectedPortraits).map(([key, filename]) => {
       const art = document.querySelector('.chat-person-art[data-character="' + key + '"]');
@@ -300,7 +297,7 @@ async function verifyHub(page, origin, suffix, width, height, mobile) {
   assert(!state.text.includes('아직 이어지고 있는 관계가 없습니다.'), `${suffix}: duplicate fabricated relationship placeholder resurfaced`);
   assert(state.discoveryTop > state.introBottom && state.discoveryTop - state.introBottom < 55, `${suffix}: discovery cards were pushed below an empty stage`);
   assert(state.incomingHidden, `${suffix}: incoming stories must stay hidden without runtime authority`);
-  assert(state.portraits.length === 9, `${suffix}: expected nine finalized portrait cards`);
+  assert(state.portraits.length === 6, `${suffix}: expected six visible launch portrait cards`);
   for (const portrait of state.portraits) {
     assert(portrait.present, `${suffix}: ${portrait.key} portrait image element missing`);
     assert(portrait.src.includes('/assets/characters/' + portrait.filename), `${suffix}: ${portrait.key} portrait mapping drifted`);

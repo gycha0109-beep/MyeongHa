@@ -13,7 +13,7 @@ function success(data: unknown): Response {
 }
 
 describe('mobile Chat read service', () => {
-  it('routes thread reads through the subject bearer boundary', async () => {
+  it('routes Member-owned thread reads exclusively through the Member bearer boundary', async () => {
     let authorization: string | null = null;
     const client = new MyeongHaApiClientV1({
       origin: 'https://myeongha.test',
@@ -38,9 +38,9 @@ describe('mobile Chat read service', () => {
     const service = createMobileChatReadServiceV1({
       client,
       session: {
-        async withActiveBearer(operation) {
+        async withMemberBearer(operation) {
           sessions += 1;
-          return operation('guest-token');
+          return operation('member-jwt-token');
         },
       },
     });
@@ -48,6 +48,6 @@ describe('mobile Chat read service', () => {
     await service.readThreadPage(threadId);
 
     expect(sessions).toBe(1);
-    expect(authorization).toBe('Bearer guest-token');
+    expect(authorization).toBe('Bearer member-jwt-token');
   });
 });

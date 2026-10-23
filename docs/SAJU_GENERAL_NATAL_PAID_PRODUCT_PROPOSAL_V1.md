@@ -236,7 +236,7 @@ conflicting methodology가 보존된 부분
 
 유료 상품이라고 해서 빈 semantic coverage를 prose로 채우지 않는다.
 
-### 6. 명하 대리자의 해설
+### 6. 명하 연결자의 해설
 
 Character/presenter가 동일한 governed result를 사용자 친화적으로 설명한다.
 

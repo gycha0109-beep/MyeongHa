@@ -19,11 +19,12 @@
 | `P0-SA-01` | Saju transport | **DECIDED** | authenticated internal HTTP service; calculation-only V1; no `/api/readings` activation |
 | `P0-CM-01` | Commerce launch rail | **DECIDED** | Web + one-off only for launch MVP; no subscription/bundle/native-store billing |
 | `P0-CM-02` | Web payment provider / PSP | **DECIDED** | PortOne V2; canonical provider key `portone_v2`; server lookup authority at `api.portone.io`; live merchant/credential/Production activation remains separately gated |
-| `P0-CM-03` | Launch paid Product / Capability catalog | **OPEN-P0** | Commerce v2 first inactive Product authority = `standard.love_relationship`; Reader is selected separately and pinned sparsely per Purchase Intent; Product Owner list price = KRW 8,900; Offer/Charge Terms and sale activation remain unresolved/disabled; stale `saju.general_natal.deep.v1` candidate is retired |
+| `P0-CM-03` | Saju-page-wide launch scope / paid Product & Capability catalog | **OPEN-P0 (activation)** | Product Owner direction: 사주 페이지 전체 공개 및 유료 서비스 운영 준비, 단일 최초 상품 한정 출시 아님. 현재 구체화된 inactive Product = `standard.love_relationship`, 정가 KRW 8,900 결정; 다른 상품의 가격·제공 조건은 개별 결정. Reader 별도 선택; Offer/Charge Terms 및 각 상품의 판매 활성화는 미승인; 역사적 `saju.general_natal.deep.v1` 후보는 폐기 |
 | `P0-CM-04` | Guest purchase ownership / continuity | **DECIDED** | active Guest 구매 허용; canonical `subjects.id` 소유; 새 Member promotion은 same-subject; 기존 Member merge 후 direct merged-Guest lineage로 권리 조합; historical Commerce owner rewrite 금지 |
 | `P0-AI-01` | AI provider/model/fallback | **OPEN-P0** | provider, model family, fallback, grounded-response validation implementation |
 | `P0-AGE-01` | Minimum age / character content policy | **OPEN-P0** | 최소 이용 연령, 미성년 허용 여부, 표현 강도/제한; content bundle policy-tag slot은 미리 두되 threshold/matrix는 미확정 |
 | `P0-PR-01` | Retention / backup / legal retention | **DECIDED** | service/personalization DELETE; 4 structural tombstones ANONYMIZE; 9 Commerce evidence/history tables RETAIN `P5Y`; existing encrypted backup lifecycle `P30D` + restore reconciliation before serviceability |
+| `P0-PR-02` | Official Reader paid interpretation privacy | **DECIDED — PRODUCT POLICY ONLY** | [기본 브랜치 제품 개인정보 정책 정본](OFFICIAL_READER_S4_PRIVACY_POLICY_DECISION_V1.md); 24h 본 DB 삭제 목표/90d 일반 로그 상한, 정확한 유료 권한, 원문 격리. 법무·기술·저장·운영 승인은 별도 HOLD |
 | `P0-PR-01A` | Guest bearer/session authentication TTL | **DECIDED** | 7 days / 604800 seconds for newly issued Guest credentials; does not decide expired-Guest data deletion or parent retention policy |
 | `P0-PR-01B` | Commerce provider-evidence data minimization | **DECIDED** | no raw secret/bearer/receipt/PCI storage; versioned keyed fingerprints + allowlisted bounded verified payload; parent `P0-PR-01` now supplies the separate `P5Y` retention baseline |
 | `P0-AUTH-01` | API→PostgreSQL execution identity / RLS enforcement model | **DECIDED** | non-BYPASSRLS API execution role + transaction-scoped trusted canonical `subject_id` context |
@@ -42,6 +43,29 @@ SUPERSEDED
 ```
 
 ## 4. Decision Records
+
+### P0-PR-02
+
+```yaml
+id: P0-PR-02
+status: DECIDED
+approval_scope: PRODUCT_POLICY_ONLY
+decided_at: 2026-10-19
+owner: PRODUCT_OWNER
+record: docs/OFFICIAL_READER_S4_PRIVACY_POLICY_DECISION_V1.md
+scope:
+  - protected paid content separate from ordinary Chat/Memory/Outbox
+  - current exact Grant checked on each server read; revoke/refund/expiry immediately blocks further access and model reinjection when no valid right remains
+  - primary database paid body removal within 24 hours after a valid deletion trigger (internal target, not legal deadline)
+  - non-content ordinary operations logs maximum 90 days (internal policy ceiling)
+  - existing Commerce P5Y and encrypted backup P30D unchanged
+  - no additional external processors or paid-body external transfers authorized
+does_not_approve:
+  - production database migration, protected content storage, public paid response or checkout
+  - LEGAL-002 or actual third-party data-flow/international-transfer review
+  - protected-table FK/deletion graph, RLS and restored-state privacy acceptance
+  - Saju Production source attestation or S5 final commit
+```
 
 ### P0-SA-01
 
@@ -213,12 +237,16 @@ rollback_or_change_policy: replacing PortOne V2, adding an equal launch provider
 record: docs/COMMERCE_WEB_PSP_DECISION_V1.md
 ```
 
-### P0-CM-03 — Commerce v2 first Standard Product / activation HOLD
+### P0-CM-03 — Saju page full-scope launch direction / individual Product activation HOLD
 
 ```yaml
 id: P0-CM-03
 status: OPEN-P0
 candidate_updated_at: 2026-09-19
+scope_direction_approved_at: 2026-10-16
+scope_direction: saju_page_full_public_opening_and_paid_services_preparation
+scope_boundary: all_saju_page_sections_in_launch_plan_not_automatic_sale_activation
+pricing_boundary: existing_8900_krw_applies_only_to_standard_love_relationship
 current_candidate:
   product_key: standard.love_relationship
   consumer_name: 연애·관계
@@ -280,7 +308,7 @@ record: docs/STANDARD_LOVE_RELATIONSHIP_PRODUCT_V1.md
 tracking: issue #1068
 ```
 
-This record supersedes the previous inactive General Natal candidate as the current Product direction. It still deliberately leaves **sale activation, exact price authority, Offer creation, and Product Reading runtime blocked**. Migration `1120_paid_general_natal_product_candidate.sql` remains immutable history; the supersession is forward-only in migration `1130_standard_love_relationship_reader_authority.sql`.
+The Product Owner now plans the **entire Saju page** as the public opening and paid-service preparation scope, rather than limiting launch planning to one 'first paid Product'. The existing `standard.love_relationship` record remains the currently specified inactive Commerce Product, with its KRW 8,900 list price decided; no price is implied for other Saju-page products. This record still deliberately leaves **sale activation, executable Charge Terms, Offer creation, and Product Reading runtime blocked**. Migration `1120_paid_general_natal_product_candidate.sql` remains immutable history; the supersession is forward-only in migration `1130_standard_love_relationship_reader_authority.sql`.
 
 ### P0-CM-04
 
@@ -574,7 +602,7 @@ record: docs/operations/POSTGRES_DR_READINESS_STATUS_V1.md
 
 `P0-CM-02` exact Web PSP is now **DECIDED: PortOne V2**. This closes provider selection only; live merchant/PG/channel/credential readiness and Production activation remain independent gates.
 
-`P0-CM-03` remains explicitly open for **sale activation**. The current Commerce v2 first Product authority is `standard.love_relationship`, with Reader identity selected separately and stored as sparse Purchase Intent provenance. The former `saju.general_natal.deep.v1` / KRW 9,900 candidate is historical and forward-retired. Product Owner list price is now **DECIDED: KRW 8,900**. No current saleable Offer or immutable Charge Terms exists, so the decided list price is not executable charge authority. Current Saju relationship Product Reading authority remains blocked, so Product activation must stay fail-closed.
+`P0-CM-03` remains explicitly open for **individual Product sale activation**. The Product Owner's launch plan covers the entire Saju page, not only a first paid Product. The currently specified inactive Commerce v2 Product is `standard.love_relationship`, with Reader identity selected separately and stored as sparse Purchase Intent provenance. The former `saju.general_natal.deep.v1` / KRW 9,900 candidate is historical and forward-retired. Product Owner list price is now **DECIDED: KRW 8,900**. No current saleable Offer or immutable Charge Terms exists, so the decided list price is not executable charge authority. Current Saju relationship Product Reading authority remains blocked, so Product activation must stay fail-closed.
 
 `P0-CM-04` closes the product/ownership question of whether Guest may purchase. Its historical `does_not_decide` list records the boundary at the time that decision was made; the later `P0-CM-02` record now supplies the PSP decision without rewriting `P0-CM-04` history.
 

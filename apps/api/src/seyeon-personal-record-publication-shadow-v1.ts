@@ -1,5 +1,8 @@
-import type {
-  SeyeonProductionContextSnapshotV1,
+import { createHash } from 'node:crypto';
+import { canonicalJson } from '../../../packages/domain/src/index.js';
+import {
+  SEYEON_PRODUCTION_CONTEXT_VERSION_V1,
+  type SeyeonProductionContextSnapshotV1,
 } from './seyeon-production-context-v1.js';
 import type {
   SeyeonProductionContextReadAuthorityPortV1,
@@ -22,7 +25,8 @@ export type SeyeonPersonalRecordPublicationPhaseV1 =
 export type SeyeonPersonalRecordPublicationReasonV1 =
   'NO_PERSONAL_RECORDS' | 'CURRENT_GRANTS_MATCH' |
   'UNVERIFIABLE_PINNED_REFERENCE' | 'CURRENT_AUTHORITY_UNAVAILABLE' |
-  'REVOKED_OR_CHANGED_GRANT' | 'AMBIGUOUS_CURRENT_AUTHORITY';
+  'REVOKED_OR_CHANGED_GRANT' | 'AMBIGUOUS_CURRENT_AUTHORITY' |
+  'CHANGED_RECORD_CONTENT' | 'UNVERIFIABLE_DERIVED_CONTEXT';
 
 export interface SeyeonPersonalRecordPublicationCheckV1 {
   readonly version: typeof SEYEON_PERSONAL_RECORD_PUBLICATION_SHADOW_V1;
@@ -63,6 +67,13 @@ function sourceRefKey(ref: PinnedRef): string {
   return [ref.recordKind, ref.recordId, ref.grantId].join(':');
 }
 
+const SHA = /^sha256:v1:[a-f0-9]{64}$/u;
+
+function digest(value: unknown): string {
+  return 'sha256:v1:' + createHash('sha256')
+    .update(canonicalJson(value)).digest('hex');
+}
+
 /**
  * Only the server-composed, admitted model-input sources may be pinned.
  * Neither model output nor caller-supplied text can mint a grant reference.
@@ -75,16 +86,64 @@ export async function evaluateSeyeonPersonalRecordPublicationShadowV1(input: {
     SeyeonProductionContextReadAuthorityPortV1, 'readPersonalRecords'
   >;
 }): Promise<SeyeonPersonalRecordPublicationCheckV1> {
-  const referenced = input.serverComposedContext.retrievedMemories.filter(
+  const snapshot = input.serverComposedContext;
+  if (snapshot === null || typeof snapshot !== 'object' ||
+      snapshot.version !== SEYEON_PRODUCTION_CONTEXT_VERSION_V1 ||
+      !Array.isArray(snapshot.retrievedMemories) ||
+      !Array.isArray(snapshot.personalRecordAdmissions) ||
+      !Array.isArray(snapshot.recentMessages) ||
+      !Array.isArray(snapshot.relationshipHistoryRecords) ||
+      !Number.isSafeInteger(snapshot.activeRelationshipEventCount) ||
+      snapshot.activeRelationshipEventCount < 0 ||
+      !Number.isSafeInteger(snapshot.historyThroughRevision) ||
+      snapshot.historyThroughRevision < 0 ||
+      (snapshot.relationshipRevisionUsedForTurn !== null &&
+       (!Number.isSafeInteger(snapshot.relationshipRevisionUsedForTurn) ||
+        snapshot.relationshipRevisionUsedForTurn < 0)) ||
+      snapshot.historyThroughRevision !== (snapshot.relationshipRevisionUsedForTurn ?? 0) ||
+      (snapshot.personalRecordProjectionCandidates !== undefined &&
+       !Array.isArray(snapshot.personalRecordProjectionCandidates))) {
+    return result(input.phase, 0, 'UNVERIFIABLE_PINNED_REFERENCE');
+  }
+  const memories = snapshot.retrievedMemories;
+  if (memories.some(m => m === null || typeof m !== 'object' ||
+        (m.kind !== 'memory' && m.kind !== 'life_fact' &&
+         m.kind !== 'relationship_event')) ||
+      snapshot.personalRecordAdmissions.some(a =>
+        a === null || typeof a !== 'object' ||
+        (a.reason !== 'ADMITTED' && a.reason !== 'UNSUPPORTED_SCHEMA'))) {
+    return result(input.phase, 0, 'UNVERIFIABLE_PINNED_REFERENCE');
+  }
+  const referenced = memories.filter(
     (item) => item.kind === 'memory' || item.kind === 'life_fact',
   );
+  const candidates = snapshot.personalRecordProjectionCandidates ?? [];
+  const admitted = snapshot.personalRecordAdmissions.filter(a => a.reason === 'ADMITTED');
+
+  if (referenced.length === 0 && (admitted.length !== 0 || candidates.length !== 0)) {
+    return result(input.phase, 0, 'UNVERIFIABLE_PINNED_REFERENCE');
+  }
+  if (referenced.length !== candidates.length) {
+    return result(input.phase, referenced.length, 'UNVERIFIABLE_PINNED_REFERENCE');
+  }
+
+  // A history or relationship revision can still have influenced the model
+  // after an event was reversed, deleted, or truncated from the active list.
+  // A "zero personal records" result must never erase that derived lineage.
+  const untrackedDerived = snapshot.recentMessages.length !== 0 ||
+    memories.some(m => m.kind === 'relationship_event') ||
+    snapshot.relationshipHistoryRecords.length !== 0 ||
+    snapshot.activeRelationshipEventCount !== 0 ||
+    snapshot.historyThroughRevision !== 0;
+  if (untrackedDerived) {
+    return result(input.phase, referenced.length, 'UNVERIFIABLE_DERIVED_CONTEXT');
+  }
   if (referenced.length === 0) {
-    // This does not authorize publication of other context such as relationship
-    // memories, nor a future Reader flow with a different source registry.
     return result(input.phase, 0, 'NO_PERSONAL_RECORDS');
   }
 
   const pinned: PinnedRef[] = [];
+  const sources = new Map<string, (typeof candidates)[number]>();
   const seen = new Set<string>();
   for (const item of referenced) {
     const parsed = REF.exec(item.sourceRef);
@@ -98,10 +157,30 @@ export async function evaluateSeyeonPersonalRecordPublicationShadowV1(input: {
       grantId: parsed[3]!,
     });
     const key = sourceRefKey(ref);
-    if (seen.has(key)) {
+    const candidate = candidates.find(c => c !== null && typeof c === 'object' &&
+      c.recordKind === ref.recordKind && c.recordId === ref.recordId &&
+      c.grantId === ref.grantId);
+    if (seen.has(key) || !candidate ||
+        candidate.projectedMemoryId !== item.memoryId ||
+        !SHA.test(candidate.projectedMemoryDigest) ||
+        !SHA.test(candidate.rawRecordDigest) ||
+        candidate.permitsAtomicCommit !== false ||
+        candidate.permitsHttpReveal !== false ||
+        !admitted.some(a => a.recordKind === ref.recordKind &&
+          a.recordId === ref.recordId &&
+          a.recordType === candidate.recordType &&
+          a.schemaVersion === candidate.schemaVersion)) {
+      return result(input.phase, referenced.length, 'UNVERIFIABLE_PINNED_REFERENCE');
+    }
+    try {
+      if (digest(item) !== candidate.projectedMemoryDigest) {
+        return result(input.phase, referenced.length, 'UNVERIFIABLE_PINNED_REFERENCE');
+      }
+    } catch {
       return result(input.phase, referenced.length, 'UNVERIFIABLE_PINNED_REFERENCE');
     }
     seen.add(key);
+    sources.set(key, candidate);
     pinned.push(ref);
   }
 
@@ -114,20 +193,51 @@ export async function evaluateSeyeonPersonalRecordPublicationShadowV1(input: {
   } catch {
     return result(input.phase, pinned.length, 'CURRENT_AUTHORITY_UNAVAILABLE');
   }
+  if (!Array.isArray(current)) {
+    return result(input.phase, pinned.length, 'AMBIGUOUS_CURRENT_AUTHORITY');
+  }
 
-  const currentKeys = new Set<string>();
+  const currentKeys = new Map<string, (typeof current)[number]>();
+  const recordKeys = new Set<string>();
   for (const row of current) {
-    if (row.recordKind !== 'life_fact' && row.recordKind !== 'memory') {
+    if (row === null || typeof row !== 'object' ||
+        (row.recordKind !== 'life_fact' && row.recordKind !== 'memory') ||
+        typeof row.recordId !== 'string' || typeof row.grantId !== 'string') {
       return result(input.phase, pinned.length, 'AMBIGUOUS_CURRENT_AUTHORITY');
     }
     const key = sourceRefKey(row);
-    if (currentKeys.has(key)) {
+    const recordKey = [row.recordKind, row.recordId].join(':');
+    if (currentKeys.has(key) || recordKeys.has(recordKey)) {
       return result(input.phase, pinned.length, 'AMBIGUOUS_CURRENT_AUTHORITY');
     }
-    currentKeys.add(key);
+    currentKeys.set(key, row);
+    recordKeys.add(recordKey);
   }
-  if (pinned.some((ref) => !currentKeys.has(sourceRefKey(ref)))) {
-    return result(input.phase, pinned.length, 'REVOKED_OR_CHANGED_GRANT');
+  for (const ref of pinned) {
+    const key = sourceRefKey(ref);
+    const row = currentKeys.get(key);
+    if (!row) {
+      return result(input.phase, pinned.length, 'REVOKED_OR_CHANGED_GRANT');
+    }
+    const candidate = sources.get(key)!;
+    if (row.recordType !== candidate.recordType ||
+        row.schemaVersion !== candidate.schemaVersion) {
+      return result(input.phase, pinned.length, 'CHANGED_RECORD_CONTENT');
+    }
+    try {
+      if (digest({
+        kind: row.recordKind,
+        recordId: row.recordId,
+        grantId: row.grantId,
+        recordType: row.recordType,
+        schemaVersion: row.schemaVersion,
+        payload: row.payload,
+      }) !== candidate.rawRecordDigest) {
+        return result(input.phase, pinned.length, 'CHANGED_RECORD_CONTENT');
+      }
+    } catch {
+      return result(input.phase, pinned.length, 'CHANGED_RECORD_CONTENT');
+    }
   }
   return result(input.phase, pinned.length, 'CURRENT_GRANTS_MATCH');
 }

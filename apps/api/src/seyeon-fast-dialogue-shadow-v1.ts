@@ -4,7 +4,10 @@ import {
   RENDERER_RESPONSE_SCHEMA_V2,
   TURN_INTERPRETATION_RESPONSE_SCHEMA_V2,
   type SeyeonStructuredProviderPortV2,
+  type SeyeonStructuredProviderRequestV2,
 } from './seyeon-character-runtime-v2.js';
+import { compactSeyeonShadowRequestV1 }
+  from './seyeon-shadow-compact-prompts-v1.js';
 import {
   admitSeyeonRendererDraftV2,
   buildSeyeonRendererPacketV2,
@@ -18,6 +21,8 @@ import {
 export const SEYEON_FAST_DIALOGUE_SHADOW_VERSION_V1 =
   'seyeon-fast-dialogue-shadow-v1' as const;
 export type SeyeonFastDialogueShadowStageFailureCodeV1 =
+  | 'FAST_THREAD_CENSUS_REJECTED'
+  | 'FAST_SENSITIVE_PREFLIGHT_REJECTED'
   | 'FAST_INTERPRETATION_GUARD_REJECTED'
   | 'FAST_RISK_CAUSALITY_REJECTED'
   | 'FAST_RENDERER_PACKET_REJECTED'
@@ -51,6 +56,70 @@ export const SEYEON_FAST_DIALOGUE_SHADOW_RESPONSE_SCHEMA_V1 = Object.freeze({
   }),
 });
 
+export const SEYEON_FIRST_TURN_CENSUS_SHADOW_VERSION_V1 =
+  'seyeon-first-turn-census-shadow-v1' as const;
+
+/**
+ * Server-side shadow dependency. The caller must supply a complete,
+ * subject/thread-scoped authoritative read, not a bounded recent-message
+ * window, client count, or model-generated statement. No production adapter
+ * has been approved or wired.
+ */
+export interface SeyeonFullThreadCensusShadowPortV1 {
+  readonly subjectId: string;
+  readonly threadId: string;
+  readFullThreadCensus(input: Readonly<{
+    subjectId: string;
+    threadId: string;
+    currentUserMessageId: string;
+  }>): unknown | Promise<unknown>;
+}
+
+function validCensusId(value: unknown): value is string {
+  return typeof value === 'string' && value.length > 0 &&
+    value.length <= 256 && value.trim() === value;
+}
+
+export async function requireAuthoritativeFirstTurnCensusShadowV1(input: Readonly<{
+  port: SeyeonFullThreadCensusShadowPortV1 | undefined;
+  currentUserMessageId: string;
+}>): Promise<void> {
+  const failure = () =>
+    new SeyeonFastDialogueShadowStageErrorV1('FAST_THREAD_CENSUS_REJECTED');
+  const port = input.port;
+  if (!port || !validCensusId(port.subjectId) ||
+      !validCensusId(port.threadId) ||
+      !validCensusId(input.currentUserMessageId) ||
+      typeof port.readFullThreadCensus !== 'function') {
+    throw failure();
+  }
+  let raw: unknown;
+  try {
+    raw = await port.readFullThreadCensus({
+      subjectId: port.subjectId,
+      threadId: port.threadId,
+      currentUserMessageId: input.currentUserMessageId,
+    });
+  } catch {
+    // Do not expose private storage exceptions, model text, or subject IDs.
+    throw failure();
+  }
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    throw failure();
+  }
+  const census = raw as Record<string, unknown>;
+  if (Object.keys(census).length !== 7 ||
+      census.schemaVersion !== SEYEON_FIRST_TURN_CENSUS_SHADOW_VERSION_V1 ||
+      census.subjectId !== port.subjectId ||
+      census.threadId !== port.threadId ||
+      census.currentUserMessageId !== input.currentUserMessageId ||
+      census.messageCount !== 1 ||
+      census.latestSenderType !== 'user' ||
+      census.complete !== true) {
+    throw failure();
+  }
+}
+
 /**
  * Offline, opt-in candidate: one model request for interpretation + draft,
  * followed by the existing independent semantic reviewer and server guards.
@@ -59,11 +128,23 @@ export const SEYEON_FAST_DIALOGUE_SHADOW_RESPONSE_SCHEMA_V1 = Object.freeze({
 export function createSeyeonFastDialogueShadowV1(input: {
   readonly candidateProvider: SeyeonStructuredProviderPortV2;
   readonly reviewerProvider: SeyeonStructuredProviderPortV2;
+  readonly fullThreadCensus?: SeyeonFullThreadCensusShadowPortV1;
+  /** Explicit evaluation only. The default/production-facing Shadow contract is unchanged. */
+  readonly promptProfile?: 'baseline' | 'compact_v1';
 }) {
+  if (input.promptProfile !== undefined &&
+      input.promptProfile !== 'baseline' && input.promptProfile !== 'compact_v1') {
+    throw new TypeError('FAST_SHADOW_PROMPT_PROFILE_HOLD');
+  }
   return Object.freeze({
     async evaluate(context: SeyeonRuntimeContextV2) {
       // Eligibility is intentionally stricter than future general-chat routing.
       if (context.character.characterId !== 'seyeon' ||
+          // No persisted relationship is NOT proof of first contact. A resumed
+          // thread can still have previous messages, including assistant text.
+          context.behaviorPolicy.interactionDepth !== 'public_first_contact' ||
+          context.recentConversation.length !== 1 ||
+          context.recentConversation[0]?.role !== 'user' ||
           !context.integrity.governedPreflightApplied ||
           context.integrity.decisions.length !== 0 ||
           context.disclosure.decision !== null ||
@@ -73,8 +154,12 @@ export function createSeyeonFastDialogueShadowV1(input: {
           context.relationshipSemantics !== null) {
         throw new TypeError('Fast-dialogue Shadow requires a governed, public, first-contact ordinary turn.');
       }
+      await requireAuthoritativeFirstTurnCensusShadowV1({
+        port: input.fullThreadCensus,
+        currentUserMessageId: context.recentConversation[0]!.messageId,
+      });
       const request = buildSeyeonTurnInterpreterRequestV2(context);
-      const raw: unknown = await input.candidateProvider.generate({
+      const proposal: SeyeonStructuredProviderRequestV2 = {
         contractVersion: 'seyeon-structured-provider-v2',
         purpose: 'turn_interpret_render_shadow',
         instructions: [
@@ -95,7 +180,11 @@ export function createSeyeonFastDialogueShadowV1(input: {
         ].join('\n'),
         input: request.input,
         responseSchema: SEYEON_FAST_DIALOGUE_SHADOW_RESPONSE_SCHEMA_V1,
-      });
+      };
+      const raw: unknown = await input.candidateProvider.generate(
+        input.promptProfile === 'compact_v1'
+          ? compactSeyeonShadowRequestV1(proposal) : proposal,
+      );
       if (typeof raw !== 'object' || raw === null || Array.isArray(raw) ||
           Object.keys(raw).length !== 2 ||
           !Object.hasOwn(raw, 'interpretation') || !Object.hasOwn(raw, 'draft')) {
@@ -123,12 +212,22 @@ export function createSeyeonFastDialogueShadowV1(input: {
           rawOutput: obj.draft,
           packet,
         }));
+      // Re-read authoritative full-thread history after candidate generation,
+      // before independently reviewing the candidate draft. A concurrent
+      // RECEIVE can invalidate first-contact eligibility between model 2 and
+      // model 3. This check does not pin a transaction or authorize Reveal.
+      await requireAuthoritativeFirstTurnCensusShadowV1({
+        port: input.fullThreadCensus,
+        currentUserMessageId: context.recentConversation[0]!.messageId,
+      });
+      const semanticRequest = buildSeyeonSemanticReviewRequestV2({
+        packet,
+        rendererDraft: draft,
+        utteranceHash: hashSeyeonRendererUtteranceV2(draft.utterance),
+      });
       const review: unknown = await input.reviewerProvider.generate(
-        buildSeyeonSemanticReviewRequestV2({
-          packet,
-          rendererDraft: draft,
-          utteranceHash: hashSeyeonRendererUtteranceV2(draft.utterance),
-        }),
+        input.promptProfile === 'compact_v1'
+          ? compactSeyeonShadowRequestV1(semanticRequest) : semanticRequest,
       );
       const envelope = admitStage('FAST_SEMANTIC_OUTPUT_REJECTED', () =>
         guardSeyeonRendererOutputV2({
@@ -136,6 +235,14 @@ export function createSeyeonFastDialogueShadowV1(input: {
           packet,
           semanticReview: review,
         }));
+      // The independent semantic-review provider may take time. A new
+      // RECEIVE while it runs invalidates the initial first-turn snapshot.
+      // Fail closed before returning even a Shadow-only envelope; this
+      // fourth read is NOT a commit lock or authorization to HTTP Reveal.
+      await requireAuthoritativeFirstTurnCensusShadowV1({
+        port: input.fullThreadCensus,
+        currentUserMessageId: context.recentConversation[0]!.messageId,
+      });
       return Object.freeze({
         version: SEYEON_FAST_DIALOGUE_SHADOW_VERSION_V1,
         scope: 'SHADOW_ONLY_NOT_PRODUCTION' as const,

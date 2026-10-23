@@ -252,7 +252,7 @@ Service-only라고 해서 source gap이 해소되는 것은 아니다. Existing-
 
 캐릭터 context read는 `record_access_grants` active explicit grant만 허용.
 
-`현재 대리자들에게 공유` = 승인 당시 eligible character set snapshot. future character auto grant 금지.
+`현재 연결자들에게 공유` = 승인 당시 eligible character set snapshot. future character auto grant 금지.
 
 `private` = durable record는 존재할 수 있으나 character grant 0.
 

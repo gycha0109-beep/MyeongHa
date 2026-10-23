@@ -1,14 +1,17 @@
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import {
   findMobileReaderPresentationV1,
-  MOBILE_READER_PRESENTATIONS_V1,
+  MOBILE_READER_VISIBLE_LAUNCH_PRESENTATIONS_V1,
   type MobileReaderPresentationIdV1,
   isMobileReaderPreviewSelectableV1,
 } from '@/features/reading/mobile-reader-presentation';
 import { createMobileReaderAccessViewStateV1 } from '@/features/reading/mobile-reader-access-view-model';
 import { mobileColors } from '@/ui/mobile-colors';
+import { MobileUiText } from '@/ui/MobileUiText';
+import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
+import { resolveMobileChatPortraitV1 } from '@/features/chat/chat-character-portraits';
 
 interface MobileReaderPickerPropsV1 {
   readonly selected: MobileReaderPresentationIdV1;
@@ -21,14 +24,24 @@ interface MobileReaderPickerPropsV1 {
  * create a Thread, assert eligibility, or alter the Saju/Face source result.
  */
 export function MobileReaderPicker({ selected, onChange, vertical }: MobileReaderPickerPropsV1) {
+  const styles = useMobileThemedStyles(staticStyles);
   const [expanded, setExpanded] = useState(false);
   const effectiveSelected = isMobileReaderPreviewSelectableV1(selected) ? selected : 'seyeon';
   const reader = findMobileReaderPresentationV1(effectiveSelected);
+  const selectedPortrait = resolveMobileChatPortraitV1(effectiveSelected);
   return (
     <View style={styles.panel}>
       <View style={styles.heading}>
+        {selectedPortrait !== null ? (
+          <Image
+            source={selectedPortrait}
+            style={styles.selectedPortrait}
+            resizeMode="cover"
+            accessibilityLabel={`${reader.name} 연결자 초상화`}
+          />
+        ) : null}
         <View style={styles.headingCopy}>
-          <Text style={styles.kicker}>READER · 세연 프리뷰 장면</Text>
+          <MobileUiText style={styles.kicker}>READER · 세연 프리뷰 장면</MobileUiText>
           <Text style={styles.title}>{reader.name} <Text style={styles.subtitle}>· {reader.title}</Text></Text>
           <Text style={styles.tone}>{reader.tone}</Text>
         </View>
@@ -44,9 +57,10 @@ export function MobileReaderPicker({ selected, onChange, vertical }: MobileReade
       </View>
       {expanded ? (
         <View style={styles.grid}>
-          {MOBILE_READER_PRESENTATIONS_V1.map((option) => {
+          {MOBILE_READER_VISIBLE_LAUNCH_PRESENTATIONS_V1.map((option) => {
             const available = isMobileReaderPreviewSelectableV1(option.key);
             const accessView = createMobileReaderAccessViewStateV1(option.key);
+            const portrait = resolveMobileChatPortraitV1(option.key);
             return (
             <Pressable
               key={option.key}
@@ -61,6 +75,10 @@ export function MobileReaderPicker({ selected, onChange, vertical }: MobileReade
               }}
               style={[styles.option, effectiveSelected === option.key && styles.selected, !available && styles.unavailable]}
             >
+              {portrait !== null ? (
+                <Image source={portrait} style={styles.optionPortrait} resizeMode="cover"
+                  accessibilityLabel={`${option.name} 연결자 초상화`} />
+              ) : null}
               <Text style={[styles.optionName, effectiveSelected === option.key && styles.selectedText]}>
                 {option.name}
               </Text>
@@ -76,8 +94,8 @@ export function MobileReaderPicker({ selected, onChange, vertical }: MobileReade
           })}
         </View>
       ) : null}
-      <Text style={styles.notice}>현재 세연만 프리뷰 장면을 선택할 수 있으며, 유료 Reader 해석은 아직 공개되지 않았습니다.</Text>
-      <Text style={styles.notice}>Reader 표시와 프리뷰 선택은 상품 지원, 구매 접근권, 공개 승인 또는 공식 Reading 열람 권한을 뜻하지 않습니다. 이 권한들은 서버가 각각 확인해야 합니다.</Text>
+      <MobileUiText style={styles.notice}>현재 세연만 프리뷰 장면을 선택할 수 있으며, 유료 Reader 해석은 아직 공개되지 않았습니다.</MobileUiText>
+      <MobileUiText style={styles.notice}>Reader 표시와 프리뷰 선택은 상품 지원, 구매 접근권, 공개 승인 또는 공식 Reading 열람 권한을 뜻하지 않습니다. 이 권한들은 서버가 각각 확인해야 합니다.</MobileUiText>
       <Text style={styles.notice}>
         {vertical === 'saju'
           ? '선택한 Reader는 현재 사주 프리뷰 화면의 표시만 바꿉니다. 해석 근거와 내용은 변경되지 않습니다.'
@@ -89,7 +107,8 @@ export function MobileReaderPicker({ selected, onChange, vertical }: MobileReade
 
 const styles = StyleSheet.create({
   panel: { gap: 12, padding: 16, borderRadius: 17, borderColor: mobileColors.border, borderWidth: 1, backgroundColor: mobileColors.surface },
-  heading: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  heading: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  selectedPortrait: { width: 92, height: 118, borderRadius: 14, borderWidth: 1, borderColor: mobileColors.gold },
   headingCopy: { flex: 1, gap: 5 },
   kicker: { color: mobileColors.gold, fontSize: 10, fontWeight: '900', letterSpacing: 0.7 },
   title: { color: mobileColors.ink, fontSize: 20, fontWeight: '800' },
@@ -98,7 +117,8 @@ const styles = StyleSheet.create({
   action: { minHeight: 42, paddingHorizontal: 16, borderRadius: 12, borderWidth: 1, borderColor: mobileColors.border, justifyContent: 'center' },
   actionText: { color: mobileColors.navy, fontSize: 13, fontWeight: '800' },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  option: { width: '31%', minHeight: 116, borderWidth: 1, borderColor: mobileColors.border, borderRadius: 12, alignItems: 'center', justifyContent: 'center', gap: 3, backgroundColor: mobileColors.canvas, padding: 5 },
+  option: { width: '31%', minHeight: 168, borderWidth: 1, borderColor: mobileColors.border, borderRadius: 12, alignItems: 'center', justifyContent: 'center', gap: 4, backgroundColor: mobileColors.canvas, padding: 5 },
+  optionPortrait: { width: '100%', height: 86, borderRadius: 9 },
   selected: { backgroundColor: mobileColors.navy, borderColor: mobileColors.navy },
   unavailable: { opacity: 0.5 },
   optionName: { color: mobileColors.ink, fontSize: 14, fontWeight: '800' },
@@ -108,3 +128,4 @@ const styles = StyleSheet.create({
   selectedText: { color: mobileColors.surface },
   notice: { color: mobileColors.muted, fontSize: 11, lineHeight: 17 },
 });
+const staticStyles = styles;

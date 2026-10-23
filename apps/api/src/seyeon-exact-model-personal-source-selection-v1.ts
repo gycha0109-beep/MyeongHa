@@ -27,6 +27,8 @@ export interface SeyeonExactSelectedPersonalSourceV1 {
   readonly schemaVersion: string;
   readonly rawRecordDigest: string;
   readonly projectedMemoryDigest: string;
+  readonly rawRecordPgDigest?: string;
+  readonly projectorVersion?: string;
 }
 
 export interface SeyeonExactModelPersonalSourceSelectionV1 {
@@ -42,6 +44,7 @@ export interface SeyeonExactModelPersonalSourceSelectionV1 {
 }
 
 const SHA = /^sha256:v1:[a-f0-9]{64}$/u;
+const PG_SHA = /^sha256:pg-jsonb:v1:[a-f0-9]{64}$/u;
 const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/u;
 
 function hash(value: unknown): string {
@@ -58,6 +61,10 @@ function validCandidate(c: SeyeonPersonalRecordProjectionCandidateV1): boolean {
     c.schemaVersion.length > 0 && c.schemaVersion.length <= 256 &&
     c.projectedMemoryId === c.recordKind + ':' + c.recordId &&
     SHA.test(c.rawRecordDigest) && SHA.test(c.projectedMemoryDigest) &&
+    (c.rawRecordPgDigest === undefined || PG_SHA.test(c.rawRecordPgDigest)) &&
+    (c.projectorVersion === undefined ||
+      (c.projectorVersion.length > 0 && c.projectorVersion.length <= 100 &&
+       c.projectorVersion === c.projectorVersion.trim())) &&
     c.permitsAtomicCommit === false && c.permitsHttpReveal === false;
 }
 
@@ -139,6 +146,8 @@ export function selectSeyeonExactModelPersonalSourcesV1(input: {
       schemaVersion: c.schemaVersion,
       rawRecordDigest: c.rawRecordDigest,
       projectedMemoryDigest: c.projectedMemoryDigest,
+      ...(c.rawRecordPgDigest === undefined ? {} : {rawRecordPgDigest: c.rawRecordPgDigest}),
+      ...(c.projectorVersion === undefined ? {} : {projectorVersion: c.projectorVersion}),
     }));
   }
 

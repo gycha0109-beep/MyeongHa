@@ -1,0 +1,54 @@
+name: '[WT:character-memory] OpenRouter GLM 5.3 Flash repaired import public N01 one-shot'
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/seyeon-openrouter-glm53flash-paid-repair-n01.trigger'
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: seyeon-openrouter-glm53flash-paid-repair-n01-lifetime-once
+  cancel-in-progress: false
+jobs:
+  evaluate:
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && github.run_attempt == 1 }}
+    environment: production
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Checkout pinned main SHA
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.sha }}
+      - name: Setup Node 24
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Verify existing domain guards and bounded driver
+        run: |
+          set -euo pipefail
+          npm ci --ignore-scripts --no-audit --no-fund
+          npx vitest run test/seyeon-openrouter-glm53flash-paid-repair-n01-v1.test.mjs test/seyeon-openrouter-glm53flash-paid-preflight-v1.test.mjs test/openrouter-seyeon-evaluation-provider-v1.test.ts test/seyeon-c08b-five-three-real-guards-offline-v1.test.ts
+          npm run build
+          node --check scripts/run-seyeon-openrouter-glm53flash-paid-repair-n01-v1.mjs
+      - name: One bounded synthetic three-call real experiment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        run: |
+          set -euo pipefail
+          set +x
+          test -n "$OPENROUTER_API_KEY"
+          node scripts/run-seyeon-openrouter-glm53flash-paid-repair-n01-v1.mjs
+      - name: Upload numeric-only evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: seyeon-glm53flash-paid-repaired-three-call-n01-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/seyeon-glm53flash-paid-repaired-three-call-n01/
+          if-no-files-found: warn
+          retention-days: 14

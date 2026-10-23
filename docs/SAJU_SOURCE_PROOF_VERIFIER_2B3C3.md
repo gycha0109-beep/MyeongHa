@@ -44,3 +44,12 @@ HMAC은 **서버 전송 출처/바이트 무결성**이지 Saju Claim 의미의 
 ## 검증
 
 정상 Saju 계약 동등 MAC/응답/nonce 검증, 동일 proof 재검증(replay), payload/body/증빙/profile/키/대상자/ttl/clock/lifecycle/권한 상승/내부 shape 오염/공유 저장소 장애를 각각 거부한다.
+
+
+## 2026-10-23 Source Owner v2 nonce 원장 키 계약 일치
+
+Saju `main`의 `verifyHeldSourceReadingTransportProofV1`과 명하 `verifySajuHeldSourceProofV1`는 **동일한 nonce ledger 식별자** `saju-proof-v2:` + `deterministicContentHash([issuer, audience, keyId, nonce])`를 사용한다. 사람 식별자는 signed payload의 신뢰된 서버 설정값과 비교한 뒤 사용하며 콜론 경계 충돌 및 key rotation간 잘못된 중복 판정을 막는다.
+
+기존 Postgres `createSajuSourceProofPostgresNonceClaimV1`는 이 문자열을 도메인 분리된 SHA-256으로 다시 해시하여 atomic unique INSERT한다. 동일 issuer/audience/keyId/nonce 조합은 모든 replica에서 한 번만 성공할 수 있고 DB 권한이나 연결이 없으면 차단된다. `myeongha/saju/source-transport-proof/v1\\0` HMAC MAC wire 규격은 변경하지 않는다.
+
+이 일치는 **Preview 출처 무결성**만 증명하며 Product/DB Reading UUID 변환, 별도 Production 의미/보호저장/판매 허가는 계속 HOLD이다.

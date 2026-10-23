@@ -11,6 +11,9 @@ import {
 } from './mobile-saju-topic-catalog';
 import { mobileSajuPreviewServiceV1 } from './native-mobile-saju-preview-service';
 import { mobileColors } from '@/ui/mobile-colors';
+import { MobileUiText } from '@/ui/MobileUiText';
+import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
+import { useMobileUiLocale } from '@/ui/mobile-ui-locale';
 
 type PreviewReadingTextV1 = Extract<
   MobileSajuTopicV1['availability'],
@@ -93,7 +96,9 @@ function errorCopy(error: unknown): Readonly<{ message: string; retryable: boole
   });
 }
 
-export function SajuPreviewReadingView() {
+export function SajuPreviewReadingView({ onOpenPreview }: { onOpenPreview?: (topic: MobileSajuTopicV1) => void }) {
+  const styles = useMobileThemedStyles(staticStyles);
+  const { t } = useMobileUiLocale();
   const [state, setState] = useState<PreviewStateV1>({ kind: 'idle' });
 
   async function load(
@@ -133,6 +138,10 @@ export function SajuPreviewReadingView() {
   function selectTopic(topic: MobileSajuTopicV1) {
     const availability = topic.availability;
     if (availability.kind === 'preview') {
+      if (onOpenPreview !== undefined) {
+        onOpenPreview(topic);
+        return;
+      }
       void load(topic, availability.readingText);
       return;
     }
@@ -149,23 +158,23 @@ export function SajuPreviewReadingView() {
   return (
     <View style={styles.section}>
       <View style={styles.headerCard}>
-        <Text style={styles.eyebrow}>SAJU READING</Text>
-        <Text style={styles.title}>사주 읽기</Text>
-        <Text style={styles.body}>
-          웹 사주 화면과 같은 주제 구성을 보여줍니다. 현재 서버 Preview 권한이 열린
-          주제만 바로 실행하고, 나머지는 필요한 입력이나 준비 상태를 그대로 표시합니다.
-        </Text>
-        <Text style={styles.authorityNote}>
+        <MobileUiText style={styles.eyebrow}>DISCOVER YOUR STORY · 사주</MobileUiText>
+        <MobileUiText style={styles.title}>사주 읽기</MobileUiText>
+        <MobileUiText style={styles.body}>
+          궁금한 주제를 선택해 더 깊이 살펴보세요. 준비된 풀이만 연결되며,
+          아직 확인이 필요한 주제는 현재 상태를 안내합니다.
+        </MobileUiText>
+        <MobileUiText style={styles.authorityNote}>
           다른 주제의 풀이로 자동 대체하지 않습니다.
-        </Text>
+        </MobileUiText>
       </View>
 
       {MOBILE_SAJU_TOPIC_SECTIONS_V1.map((section) => (
         <View key={section.key} style={styles.topicSection}>
           <View style={styles.sectionHeading}>
-            <Text style={styles.sectionTitle}>{section.title}</Text>
+            <Text style={styles.sectionTitle}>{t(section.title)}</Text>
             {section.support ? (
-              <Text style={styles.sectionSupport}>{section.support}</Text>
+              <Text style={styles.sectionSupport}>{t(section.support)}</Text>
             ) : null}
           </View>
 
@@ -193,7 +202,7 @@ export function SajuPreviewReadingView() {
 
                   <View style={styles.topicCopy}>
                     <View style={styles.topicTitleRow}>
-                      <Text style={styles.topicTitle}>{topic.label}</Text>
+                      <Text style={styles.topicTitle}>{t(topic.label)}</Text>
                       <View
                         style={[
                           styles.statusBadge,
@@ -210,11 +219,11 @@ export function SajuPreviewReadingView() {
                               : styles.statusBadgeTextBlocked,
                           ]}
                         >
-                          {topic.availability.statusLabel}
+                          {t(topic.availability.statusLabel)}
                         </Text>
                       </View>
                     </View>
-                    <Text style={styles.topicDescription}>{topic.description}</Text>
+                    <Text style={styles.topicDescription}>{t(topic.description)}</Text>
                   </View>
 
                   <Text style={styles.chevron}>›</Text>
@@ -227,33 +236,33 @@ export function SajuPreviewReadingView() {
 
       {state.kind === 'blocked' ? (
         <View style={styles.stateCard}>
-          <Text style={styles.stateKicker}>현재 실행 범위</Text>
-          <Text style={styles.stateTitle}>{state.topic.label}</Text>
-          <Text style={styles.muted}>{state.message}</Text>
-          <Text style={styles.authorityNote}>
+          <MobileUiText style={styles.stateKicker}>현재 실행 범위</MobileUiText>
+          <Text style={styles.stateTitle}>{t(state.topic.label)}</Text>
+          <Text style={styles.muted}>{t(state.message)}</Text>
+          <MobileUiText style={styles.authorityNote}>
             웹과 동일하게 권한이 열리기 전에는 다른 풀이를 대신 실행하지 않습니다.
-          </Text>
+          </MobileUiText>
         </View>
       ) : null}
 
       {state.kind === 'loading' ? (
         <View style={styles.stateCard}>
           <ActivityIndicator color={mobileColors.navy} />
-          <Text style={styles.muted}>{state.topic.label} 프리뷰를 준비하고 있습니다…</Text>
+          <Text style={styles.muted}>{t('{topic} 프리뷰를 준비하고 있습니다…').replace('{topic}', t(state.topic.label))}</Text>
         </View>
       ) : null}
 
       {state.kind === 'not_delivered' ? (
         <View style={styles.stateCard}>
           <Text style={styles.stateTitle}>{state.topic.label}</Text>
-          <Text style={styles.muted}>{notDeliveredCopy(state.result.responseState)}</Text>
+          <Text style={styles.muted}>{t(notDeliveredCopy(state.result.responseState))}</Text>
           {state.result.responseState === 'temporarily_unavailable' ? (
             <Pressable
               accessibilityRole="button"
               onPress={() => void load(state.topic, state.readingText)}
               style={styles.retryButton}
             >
-              <Text style={styles.retryButtonText}>다시 시도</Text>
+              <MobileUiText style={styles.retryButtonText}>다시 시도</MobileUiText>
             </Pressable>
           ) : null}
         </View>
@@ -269,7 +278,7 @@ export function SajuPreviewReadingView() {
               onPress={() => void load(state.topic, state.readingText)}
               style={styles.retryButton}
             >
-              <Text style={styles.retryButtonText}>다시 시도</Text>
+              <MobileUiText style={styles.retryButtonText}>다시 시도</MobileUiText>
             </Pressable>
           ) : null}
         </View>
@@ -279,14 +288,14 @@ export function SajuPreviewReadingView() {
         <>
           <View style={styles.resultHeading}>
             <Text style={styles.resultTitle}>{state.topic.label}</Text>
-            <Text style={styles.authorityNote}>
+            <MobileUiText style={styles.authorityNote}>
               Preview · 연구 검증 중인 원국 해석이며 확정적 미래 예측은 포함하지 않습니다.
-            </Text>
+            </MobileUiText>
           </View>
 
           {state.result.notices.length > 0 ? (
             <View style={styles.noticeCard}>
-              <Text style={styles.noticeTitle}>읽기 범위 안내</Text>
+              <MobileUiText style={styles.noticeTitle}>읽기 범위 안내</MobileUiText>
               {state.result.notices.map((notice, index) => (
                 <Text key={`${String(index)}:${notice}`} style={styles.noticeText}>
                   {notice}
@@ -303,7 +312,7 @@ export function SajuPreviewReadingView() {
 
               {step.structure.length > 0 ? (
                 <View style={styles.supportBlock}>
-                  <Text style={styles.supportTitle}>이 해석의 사주 근거</Text>
+                  <MobileUiText style={styles.supportTitle}>이 해석의 사주 근거</MobileUiText>
                   {step.structure.map((text, itemIndex) => (
                     <Text key={`structure:${String(itemIndex)}:${text}`} style={styles.supportText}>
                       {text}
@@ -314,7 +323,7 @@ export function SajuPreviewReadingView() {
 
               {step.supporting.length > 0 ? (
                 <View style={styles.supportBlock}>
-                  <Text style={styles.supportTitle}>함께 볼 포인트</Text>
+                  <MobileUiText style={styles.supportTitle}>함께 볼 포인트</MobileUiText>
                   {step.supporting.map((text, itemIndex) => (
                     <Text key={`support:${String(itemIndex)}:${text}`} style={styles.supportText}>
                       {text}
@@ -331,13 +340,13 @@ export function SajuPreviewReadingView() {
 }
 
 const styles = StyleSheet.create({
-  section: { gap: 16 },
+  section: { gap: 18 },
   headerCard: {
     borderWidth: 1,
     borderColor: mobileColors.border,
-    borderRadius: 18,
+    borderRadius: 14,
     backgroundColor: mobileColors.surface,
-    padding: 20,
+    padding: 22,
     gap: 10,
   },
   eyebrow: {
@@ -346,32 +355,32 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: 1.1,
   },
-  title: { color: mobileColors.ink, fontSize: 22, fontWeight: '800' },
+  title: { color: mobileColors.ink, fontSize: 24, fontWeight: '900', letterSpacing: -0.4 },
   body: { color: mobileColors.muted, fontSize: 14, lineHeight: 21 },
   authorityNote: { color: mobileColors.muted, fontSize: 11, lineHeight: 17 },
   topicSection: { gap: 10 },
   sectionHeading: { gap: 3, paddingHorizontal: 2 },
   sectionTitle: { color: mobileColors.ink, fontSize: 19, fontWeight: '800' },
   sectionSupport: { color: mobileColors.muted, fontSize: 12, lineHeight: 18 },
-  topicList: { gap: 8 },
+  topicList: { gap: 10 },
   topicCard: {
-    minHeight: 78,
+    minHeight: 90,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
     borderWidth: 1,
     borderColor: mobileColors.border,
-    borderRadius: 16,
+    borderRadius: 17,
     backgroundColor: mobileColors.surface,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
   },
   topicCardActive: {
     borderColor: mobileColors.navy,
   },
   topicIcon: {
-    width: 42,
-    height: 42,
+    width: 48,
+    height: 48,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 21,
@@ -382,8 +391,8 @@ const styles = StyleSheet.create({
   topicIconTextActive: { color: mobileColors.surface },
   topicCopy: { flex: 1, gap: 5 },
   topicTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
-  topicTitle: { color: mobileColors.ink, fontSize: 16, fontWeight: '800' },
-  topicDescription: { color: mobileColors.muted, fontSize: 12, lineHeight: 18 },
+  topicTitle: { color: mobileColors.ink, fontSize: 17, fontWeight: '800' },
+  topicDescription: { color: mobileColors.muted, fontSize: 12, lineHeight: 19 },
   statusBadge: {
     borderWidth: 1,
     borderRadius: 999,
@@ -466,3 +475,4 @@ const styles = StyleSheet.create({
   supportTitle: { color: mobileColors.ink, fontSize: 13, fontWeight: '800' },
   supportText: { color: mobileColors.muted, fontSize: 13, lineHeight: 20 },
 });
+const staticStyles = styles;

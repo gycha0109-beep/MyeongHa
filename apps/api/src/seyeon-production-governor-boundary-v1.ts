@@ -35,7 +35,9 @@ export function assertSeyeonProductionGovernorBoundaryV1(input: {
     if (config.origin !== undefined ||
         config.fetchImpl !== undefined ||
         config.beforeDispatch !== undefined ||
-        config.meteredBeforeDispatch !== undefined) {
+        config.meteredBeforeDispatch !== undefined ||
+        config.meteredAfterOutcome !== undefined ||
+        config.observeMetric !== undefined) {
       throw new Error('ENFORCE forbids alternate endpoint or injected Provider hooks.');
     }
   };
