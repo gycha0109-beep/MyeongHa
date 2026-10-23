@@ -24,7 +24,7 @@ const source = (path: string) => readFile(new URL('../' + path, import.meta.url)
 
 describe('I18N-07 staged EN-US and ZH-CN authored UI copy', () => {
   it('authors both UI target variants for navigation, account, Saju input and chat read-state without missing parity', () => {
-    expect(PLANNED_STATIC_UI_COPY_V1.size).toBe(191);
+    expect(PLANNED_STATIC_UI_COPY_V1.size).toBe(275);
     expect([...PLANNED_MOBILE_STATIC_UI_COPY_V1]).toEqual([...PLANNED_STATIC_UI_COPY_V1]);
     for (const [ko, pair] of PLANNED_STATIC_UI_COPY_V1) {
       expect(ko.trim().length).toBeGreaterThan(0);
@@ -46,6 +46,8 @@ describe('I18N-07 staged EN-US and ZH-CN authored UI copy', () => {
     expect(lookupPlannedStaticUiCopyV1('세계관 둘러보기', 'en-US')).toBe('Explore the world');
     expect(lookupPlannedStaticUiCopyV1('세계관 둘러보기', 'zh-CN')).toBe('探索世界观');
     expect(lookupPlannedMobileStaticUiCopyV1('현재 기록', 'zh-CN')).toBe('当前记录');
+    expect(lookupPlannedMobileStaticUiCopyV1('달력 닫기', 'en-US')).toBe('Close calendar');
+    expect(lookupPlannedMobileStaticUiCopyV1('전송', 'zh-CN')).toBe('发送');
   });
 
   it('fails closed for unsupported input and for source, private messages or unknown copy', () => {
@@ -59,7 +61,7 @@ describe('I18N-07 staged EN-US and ZH-CN authored UI copy', () => {
         expect(lookupPlannedMobileStaticUiCopyV1(text, locale)).toBeNull();
       }
     }
-    for (const protectedKey of ['세연','백헌','명하','갑','계','7명의 신의 연결자가']) {
+    for (const protectedKey of ['세연','백헌','명하','갑','계','목','금','7명의 신의 연결자가']) {
       expect(lookupPlannedStaticUiCopyV1(protectedKey, 'en-US')).toBeNull();
       expect(lookupPlannedMobileStaticUiCopyV1(protectedKey, 'zh-CN')).toBeNull();
     }

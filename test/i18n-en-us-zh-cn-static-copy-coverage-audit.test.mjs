@@ -56,6 +56,14 @@ describe('I18N-07 non-authorizing English and Simplified Chinese UI gap audit', 
     expect(status.ownership.reviewedUiOwnedKeys).toContain('세계관 둘러보기');
     expect(status.ownership.characterOwnedKeys).toContain('세연');
     expect(status.ownership.sourceOwnedKeys).toContain('갑');
+    expect(status.ownership.sourceOwnedKeys).toContain('목');
+    expect(status.byCatalogue.webCatalogueOnlyMissing).toContain('연결자와 함께 읽습니다.');
+    expect(status.byCatalogue.pageRouteClassificationComplete).toBe(false);
+    expect(
+      status.byCatalogue.webCatalogueOnlyMissing.length +
+      status.byCatalogue.mobileNativeCatalogueOnlyMissing.length +
+      status.byCatalogue.sharedCatalogueMissing.length,
+    ).toBe(status.unclassifiedOrUnauthoredKeys.length);
     expect(status.ownership.pendingOwnerReviewKeys).toContain('연결자와 함께 읽습니다.');
     expect(status.ownership.privateDynamicDataInspected).toBe(false);
     expect(status.ownership.readyForRelease).toBe(false);

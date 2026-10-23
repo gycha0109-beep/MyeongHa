@@ -31,7 +31,7 @@ export function extractStaticUiSourceKeysV1(content, arrayAnchor, arrayEnd) {
  * Conversation, private and official-reading bodies are outside this inventory.
  */
 export const CHARACTER_OWNED_STATIC_UI_KEYS_V1 = Object.freeze(["명하","7명의 신의 연결자가","세연","백헌","여울","서린","라현","미라","태겸","윤호","도윤","세연의 따뜻한 오후빛 대화 공간","백헌의 야간 기록실","여울의 회보라 기록 공간","서린의 조용한 기록 서고","라현의 낮은 조도 응접 공간","미라의 담백한 현대 생활 공간","태겸의 절제된 회색 공간","윤호의 따뜻한 목재 서재","도윤의 자유롭고 비공식적인 공간","MEET SEYEON · 세연"]);
-export const SOURCE_OWNED_STATIC_UI_KEYS_V1 = Object.freeze(["갑","을","병","정","무","기","경","신","임","계"]);
+export const SOURCE_OWNED_STATIC_UI_KEYS_V1 = Object.freeze(["갑","을","병","정","무","기","경","신","임","계","목","화","토","금","수"]);
 
 export function classifyPlannedUiCopyOwnershipV1(authoredKeys, plannedKeys) {
   const planned = new Set(plannedKeys);
@@ -59,11 +59,21 @@ export function auditPlannedUiCopyKeysV1(webKeys, mobileNativeKeys, plannedKeys)
   const staged = new Set(plannedKeys);
   const covered = required.filter((key) => staged.has(key));
   const missing = required.filter((key) => !staged.has(key));
+  const web = new Set(webKeys);
+  const mobile = new Set(mobileNativeKeys);
+  const byCatalogue = Object.freeze({
+    webCatalogueOnlyMissing: Object.freeze(missing.filter((key) => web.has(key) && !mobile.has(key))),
+    mobileNativeCatalogueOnlyMissing: Object.freeze(missing.filter((key) => mobile.has(key) && !web.has(key))),
+    sharedCatalogueMissing: Object.freeze(missing.filter((key) => web.has(key) && mobile.has(key))),
+    // Catalogue membership is NOT proof that a string belongs to a particular page.
+    pageRouteClassificationComplete: false,
+  });
   return Object.freeze({
     authoredKeys: required.length,
     stagedKeysWithinAuthoredCatalog: covered.length,
     unclassifiedOrUnauthoredKeys: Object.freeze(missing),
     ownership: classifyPlannedUiCopyOwnershipV1(required, plannedKeys),
+    byCatalogue,
     // A staged key may be an identity/source-bound text that is deliberately
     // NOT eligible for translation. Release admission must be reviewed separately.
     readyForRelease: false,
@@ -97,6 +107,7 @@ if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.m
     sourceOwnedCount: audit.ownership.sourceOwnedKeys.length,
     pendingOwnerReviewCount: audit.ownership.pendingOwnerReviewKeys.length,
     privateDynamicDataInspected: audit.ownership.privateDynamicDataInspected,
+    byCatalogueMissing: Object.fromEntries(Object.entries(audit.byCatalogue).filter(([key]) => key.endsWith('Missing')).map(([key, values]) => [key, values.length])),
     readyForRelease: audit.readyForRelease,
   }, null, 2) + '\n');
 }
