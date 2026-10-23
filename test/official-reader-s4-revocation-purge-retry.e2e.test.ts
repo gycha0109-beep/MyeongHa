@@ -45,8 +45,8 @@ function fixture(options: {
   let destroyAttempts=0;
   let notifyFirstKey: () => void = () => {};
   let unblockFirstKey: () => void = () => {};
-  const firstKeyStarted=new Promise<void>(resolve => { notifyFirstKey=resolve; });
-  const firstKeyRelease=new Promise<void>(resolve => { unblockFirstKey=resolve; });
+  const firstKeyStarted=new Promise<void>(resolve => { notifyFirstKey=()=>resolve(); });
+  const firstKeyRelease=new Promise<void>(resolve => { unblockFirstKey=()=>resolve(); });
   function interrupt(point: CrashPoint) {
     if(crashAt===point) {
       crashAt=undefined;
