@@ -28,9 +28,11 @@ const BASE: OfficialReaderScopeDeletionFenceV1 = {
 
 function fixture(
   overrides: Partial<OfficialReaderScopeDeletionFenceV1> = {},
-  phase: { claim?: 'claimed' | 'db_erased'; manifest?: 'eligible' | 'no_content' | 'sibling_right_present' | 'db_erased' } = {},
+  phase: { claim?: 'claimed' | 'db_erased'; manifest?: 'eligible' | 'no_content' | 'sibling_right_present' | 'db_erased'; loseLeaseAtRenewal?: number; keysInitiallyDestroyed?: boolean; uppercaseEligibleKey?: boolean } = {},
 ) {
   const fence = { ...BASE, ...overrides };
+  let renewals=0;
+  const destroyed=new Set<string>(phase.keysInitiallyDestroyed===false ? [] : [K1,K2]);
   const query = vi.fn(async (sql: string) => {
     if (sql === 'BEGIN' || sql === 'COMMIT' || sql === 'ROLLBACK'
         || sql.startsWith('SET LOCAL ROLE')) return { rows: [] };
@@ -47,10 +49,16 @@ function fixture(
       return { rows: [{ result: {
         state: phase.manifest ?? 'db_erased', subjectId: SUBJECT, readingId: READING,
         readerCharacterId: 'reader_a', externalFenceId: FENCE,
+        ...(phase.manifest==='eligible' ? { entries:[
+          {bodyId:B1,encryptionKeyRef:phase.uppercaseEligibleKey
+            ? 'reader-dek-v1:ABCDEF12-3456-4789-8abc-def012345678' : K1},
+          {bodyId:B2,encryptionKeyRef:K2},
+        ]} : {}),
       } }] };
     }
     if (sql.includes('internal_renew_official_reader_paid_answer_purge_lease_v1')) {
-      return { rows: [{ renewed: true }] };
+      renewals++;
+      return { rows: [{ renewed: renewals!==phase.loseLeaseAtRenewal }] };
     }
     if (sql.includes('internal_finish_official_reader_paid_answer_purge_v1')
         || sql.includes('internal_finish_empty_official_reader_paid_answer_purge_v1')) {
@@ -66,8 +74,8 @@ function fixture(
   const pool = {
     connect: vi.fn(async () => ({ query, release })),
   } as unknown as PostgresSubjectPoolV1;
-  const destroyKey = vi.fn(async () => undefined);
-  const isKeyDestroyed = vi.fn(async () => true);
+  const destroyKey = vi.fn(async (keyRef:string) => { destroyed.add(keyRef); });
+  const isKeyDestroyed = vi.fn(async (keyRef:string) => destroyed.has(keyRef));
   const ackDb = vi.fn(async () => undefined);
   const ackKeys = vi.fn(async () => undefined);
   const store = {
@@ -81,7 +89,8 @@ function fixture(
   const run = () => runOfficialReaderPrivateRevocationPurgeBatchV1({
     pool, store, workerId: 'privacy-worker-1', limit: 1,
   });
-  return { run, destroyKey, isKeyDestroyed, ackDb, ackKeys, query };
+  return { run, destroyKey, isKeyDestroyed, ackDb, ackKeys, query,
+    renewals:()=>renewals, destroyedKeys:()=>[...destroyed] };
 }
 
 describe('S4 resumed refund purge fence must be valid before key erasure', () => {
@@ -95,6 +104,38 @@ describe('S4 resumed refund purge fence must be valid before key erasure', () =>
     expect(ackDb).toHaveBeenCalledWith(JOB, FENCE);
     expect(ackKeys).toHaveBeenCalledWith(JOB, FENCE);
     expect(destroyKey).not.toHaveBeenCalled();
+  });
+
+  it('renews the live DB lease once per DEK and again before ACK',async()=>{
+    const x=fixture();
+    await expect(x.run()).resolves.toMatchObject({completed:1,failed:0});
+    // Entry renewal + TWO independent keys + final ACK renewal.
+    expect(x.renewals()).toBe(4);
+  });
+
+  it('stops before the second key when a competing worker reclaims ownership',async()=>{
+    const x=fixture({}, {loseLeaseAtRenewal:3,keysInitiallyDestroyed:false});
+    await expect(x.run()).rejects.toThrow(
+      'Protected Reader revocation cleanup is unavailable.',
+    );
+    expect(x.renewals()).toBe(3);
+    expect(x.destroyKey).toHaveBeenCalledTimes(1);
+    expect(x.destroyKey).toHaveBeenCalledWith(K1);
+    expect(x.destroyedKeys()).toEqual([K1]);
+    expect(x.ackKeys).not.toHaveBeenCalled();
+    expect(x.query.mock.calls.some(([sql])=>typeof sql==='string'
+      && sql.includes('internal_finish_official_reader_paid_answer_purge_v1'),
+    )).toBe(false);
+  });
+
+  it('rejects noncanonical eligible DEK references before creating a new fence',async()=>{
+    const x=fixture({}, {claim:'claimed',manifest:'eligible',uppercaseEligibleKey:true});
+    await expect(x.run()).rejects.toThrow(
+      'Protected Reader revocation cleanup is unavailable.',
+    );
+    expect(x.destroyKey).not.toHaveBeenCalled();
+    expect(x.ackKeys).not.toHaveBeenCalled();
+    expect(x.ackDb).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -147,6 +188,9 @@ describe('S4 resumed refund purge fence must be valid before key erasure', () =>
     ['null body', { bodyIds: [B1, null] }],
     ['wrong key array count', { keyRefs: [K1] }],
     ['empty key array', { keyRefs: [] }],
+    ['noncanonical uppercase DEK reference', {
+      keyRefs:['reader-dek-v1:ABCDEF12-3456-4789-8abc-def012345678',K2],
+    }],
   ])('fails closed for a corrupted external fence: %s', async (_label, patch) => {
     // A compromised record must never drive DEK destruction, key-erasure
     // acknowledgement or the SQL completion of a resumed purge job.

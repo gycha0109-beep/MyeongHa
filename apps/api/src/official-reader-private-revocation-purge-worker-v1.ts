@@ -166,7 +166,11 @@ function parseManifest(value: unknown, claim: PurgeClaim): PurgeManifest {
     const r = record as Record<string,unknown>;
     const bodyId = uuid(r.bodyId);
     const encryptionKeyRef = nonEmpty(r.encryptionKeyRef);
-    if (!REF.test(encryptionKeyRef)) return fail();
+    // The sealed key authority uses canonical lowercase DEK references.
+    // Accepting aliases would permit a forged manifest to bypass the
+    // one-original-key-per-answer deduplication check.
+    if (!REF.test(encryptionKeyRef)
+        || encryptionKeyRef !== encryptionKeyRef.toLowerCase()) return fail();
     return Object.freeze({bodyId,encryptionKeyRef});
   });
   if (new Set(entries.map(r=>r.bodyId)).size!==entries.length
@@ -198,7 +202,7 @@ function validateFence(
   const bodyIds=fence.bodyIds.map(uuid);
   const keyRefs=fence.keyRefs.map(ref => {
     const value=nonEmpty(ref);
-    if(!REF.test(value)) return fail();
+    if(!REF.test(value) || value!==value.toLowerCase()) return fail();
     return value;
   });
   if(new Set(bodyIds).size!==bodyIds.length
@@ -258,12 +262,10 @@ async function finishDbErased(input: {
   await store.scopeLedger.acknowledgeScopeDatabaseErasure(jobId,fence.fenceId);
   let keysDestroyed=0;
   for (let index=0;index<fence.keyRefs.length;index++) {
-    // The database lease is bounded. Renew it periodically while performing
-    // irreversible filesystem erasure OUTSIDE PostgreSQL transactions.
-    // A restarted Worker has a NEW ownership token; any stale caller stops.
-    if(index%100===0) {
-      await requireLiveLease(input.pool,jobId,input.worker);
-    }
+    // Renew the exact instance lease before EACH irreversible key erasure,
+    // not once per 100 keys. A reclaimed worker must stop before the next
+    // key even when a new owner takes over within a single manifest.
+    await requireLiveLease(input.pool,jobId,input.worker);
     const ref=fence.keyRefs[index]!;
     if (!(await store.keys.isKeyDestroyed(ref))) {
       await store.keys.destroyKey(ref);
