@@ -84,7 +84,7 @@ export default function SajuScreen() {
       title={previewText('사주')}
       refreshing={refreshing}
       onRefresh={() => void onRefresh()}
-      description={t('태어난 순간의 이야기를 바탕으로 나의 명식을 알아보세요.')}
+      description={previewText('태어난 순간의 이야기를 바탕으로 나의 명식을 알아보세요.')}
     >
       <MobilePlannedUiQaSwitcherV1 />
       <ReadingSubnav />
@@ -125,7 +125,7 @@ export default function SajuScreen() {
             })}
             style={styles.primaryButton}
           >
-            <MobileUiText style={styles.primaryButtonText}>선택한 연결자로 사주 읽기 시작 →</MobileUiText>
+            <MobileUiText style={styles.primaryButtonText}>{previewText("선택한 연결자로 사주 읽기 시작 →")}</MobileUiText>
           </Pressable>
           <SajuPreviewReadingView
             onOpenPreview={(topic) => router.push({

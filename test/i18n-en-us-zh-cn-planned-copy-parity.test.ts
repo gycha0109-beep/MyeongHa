@@ -24,7 +24,7 @@ const source = (path: string) => readFile(new URL('../' + path, import.meta.url)
 
 describe('I18N-07 staged EN-US and ZH-CN authored UI copy', () => {
   it('authors both UI target variants for navigation, account, Saju input and chat read-state without missing parity', () => {
-    expect(PLANNED_STATIC_UI_COPY_V1.size).toBe(477);
+    expect(PLANNED_STATIC_UI_COPY_V1.size).toBe(482);
     expect([...PLANNED_MOBILE_STATIC_UI_COPY_V1]).toEqual([...PLANNED_STATIC_UI_COPY_V1]);
     for (const [ko, pair] of PLANNED_STATIC_UI_COPY_V1) {
       expect(ko.trim().length).toBeGreaterThan(0);
@@ -140,6 +140,18 @@ describe('I18N-07 staged EN-US and ZH-CN authored UI copy', () => {
       expect(lookupPlannedMobileStaticUiCopyV1(ko, 'zh-CN')).toBe(zh);
     }
     expect(lookupPlannedMobileStaticUiCopyV1('record.private.body', 'en-US')).toBeNull();
+  });
+
+  it('stages source-authored EN/CN Saju, Face and Chat shell/warning text', () => {
+    const rows = [["태어난 순간의 이야기를 바탕으로 나의 명식을 알아보세요.","Explore your birth chart using the details of when you were born.","根据出生时的信息，了解您的命盘。"],["얼굴에 담긴 이야기를 만나기 위한 첫 단계, 사진부터 준비해 보세요.","Start by preparing a photo for your face-reading journey.","从准备照片开始，迈出面相解读的第一步。"],["저마다 다른 목소리로, 당신의 이야기를 들어줄 연결자들을 만나보세요.","Meet guides with different voices who are ready to hear your story.","认识风格各异、愿意倾听您故事的引路人。"],["대화 열기는 회원 로그인 후 가능합니다. 일부 AI 답변과 기존 기록은 현재 이용이 제한될 수 있습니다.","Sign in as a member to open a chat. Some AI replies and past records may currently be unavailable.","登录会员账户后才能开启对话。部分 AI 回复及历史记录目前可能无法使用。"],["선택한 연결자로 사주 읽기 시작 →","Start a Saju reading with your selected guide →","与所选引路人开始八字解读 →"]] as const;
+    for (const [ko, en, zh] of rows) {
+      expect(lookupPlannedStaticUiCopyV1(ko, 'en-US')).toBe(en);
+      expect(lookupPlannedStaticUiCopyV1(ko, 'zh-CN')).toBe(zh);
+      expect(lookupPlannedMobileStaticUiCopyV1(ko, 'en-US')).toBe(en);
+      expect(lookupPlannedMobileStaticUiCopyV1(ko, 'zh-CN')).toBe(zh);
+    }
+    expect(normalizeMobileUiLocale('en-US')).toBe('ko-KR');
+    expect(normalizeMobileUiLocale('zh-CN')).toBe('ko-KR');
   });
 
   it('fails closed for unsupported input and for source, private messages or unknown copy', () => {

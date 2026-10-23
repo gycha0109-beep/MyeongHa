@@ -248,4 +248,34 @@ describe('I18N-07 Expo developer-only Saju UI preview boundary', () => {
     expect(plannedMobileUiPreviewLocaleV1('en-US', false)).toBeNull();
   });
 
+  it('previews source-authored Saju, Face, and Chat warnings without translating user/private results', async () => {
+    const [saju, face, chat] = await Promise.all([
+      readFile(new URL('../apps/mobile/src/app/(tabs)/reading/index.tsx', import.meta.url), 'utf8'),
+      readFile(new URL('../apps/mobile/src/app/(tabs)/reading/face.tsx', import.meta.url), 'utf8'),
+      readFile(new URL('../apps/mobile/src/app/(tabs)/chat/index.tsx', import.meta.url), 'utf8'),
+    ]);
+    expect(saju).toContain("description={previewText('태어난 순간의 이야기를 바탕으로 나의 명식을 알아보세요.')}");
+    expect(face).toContain("description={previewText('얼굴에 담긴 이야기를 만나기 위한 첫 단계, 사진부터 준비해 보세요.')}");
+    expect(chat).toContain("description={previewText('저마다 다른 목소리로, 당신의 이야기를 들어줄 연결자들을 만나보세요.')}");
+    expect(chat).toContain('previewText("대화 열기는 회원 로그인 후 가능합니다. 일부 AI 답변과 기존 기록은 현재 이용이 제한될 수 있습니다.")');
+    expect(saju).toContain('previewText("선택한 연결자로 사주 읽기 시작 →")');
+    expect(saju).toContain('createMobileSajuViewModelV1({');
+    expect(face).toContain('source={{ uri: ready.uri }}');
+    expect(chat).toContain('character.displayName');
+    expect(chat).toContain('state.errorMessage');
+    expect(chat).toContain("router.push('/my')");
+    const active = (s: string) => 'active:' + s;
+    expect(previewMobileAuthoredUiLabelV1(
+      '대화 열기는 회원 로그인 후 가능합니다. 일부 AI 답변과 기존 기록은 현재 이용이 제한될 수 있습니다.',
+      'en-US', active,
+    )).toContain('Sign in as a member to open a chat.');
+    expect(previewMobileAuthoredUiLabelV1(
+      '얼굴에 담긴 이야기를 만나기 위한 첫 단계, 사진부터 준비해 보세요.', 'zh-CN', active,
+    )).toBe('从准备照片开始，迈出面相解读的第一步。');
+    expect(previewMobileAuthoredUiLabelV1('reader.message.body', 'zh-CN', active))
+      .toBe('active:reader.message.body');
+    expect(previewMobileAuthoredUiLabelV1('선택한 연결자로 사주 읽기 시작 →', null, active))
+      .toBe('active:선택한 연결자로 사주 읽기 시작 →');
+  });
+
 });

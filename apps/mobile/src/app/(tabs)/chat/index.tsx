@@ -37,7 +37,7 @@ export default function ChatHubScreen() {
     <MobileScreen
       eyebrow="MEET THE CHARACTERS"
       title={previewText('대화')}
-      description={t('저마다 다른 목소리로, 당신의 이야기를 들어줄 연결자들을 만나보세요.')}
+      description={previewText('저마다 다른 목소리로, 당신의 이야기를 들어줄 연결자들을 만나보세요.')}
       refreshing={refreshing}
       onRefresh={() => void onRefresh()}
     >
@@ -51,7 +51,7 @@ export default function ChatHubScreen() {
         <MobileUiText style={styles.body}>
           {previewText("마음이 가는 인물을 고르세요. 각 연결자의 이야기와 분위기가 다릅니다.")}
         </MobileUiText>
-        <MobileUiText style={styles.note}>대화 열기는 회원 로그인 후 가능합니다. 일부 AI 답변과 기존 기록은 현재 이용이 제한될 수 있습니다.</MobileUiText>
+        <MobileUiText style={styles.note}>{previewText("대화 열기는 회원 로그인 후 가능합니다. 일부 AI 답변과 기존 기록은 현재 이용이 제한될 수 있습니다.")}</MobileUiText>
         {state.access === 'checking' ? (
           <View style={styles.centerState}>
             <ActivityIndicator color={mobileColors.navy} />

@@ -99,7 +99,7 @@ export default function FaceScreen() {
       title={previewText('관상')}
       refreshing={refreshing}
       onRefresh={() => void onRefresh()}
-      description={t('얼굴에 담긴 이야기를 만나기 위한 첫 단계, 사진부터 준비해 보세요.')}
+      description={previewText('얼굴에 담긴 이야기를 만나기 위한 첫 단계, 사진부터 준비해 보세요.')}
     >
       <MobilePlannedUiQaSwitcherV1 />
       <ReadingSubnav />
