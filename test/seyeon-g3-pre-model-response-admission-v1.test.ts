@@ -85,6 +85,17 @@ describe('S5/G3 Node protected first-send metadata before model or original Gran
       requestId: ID,
       serverTime: TIME,
     })).not.toThrow();
+    // Zero-source direct Node delivery has a separate existing receipt
+    // contract: sequence 0 is valid there. Only private positive G3
+    // (deliverSeyeonCommittedFirstPositiveMemoryNodeTurnV1) requires >= 1.
+    expect(() => assertSeyeonNodeChatResponseMetadataV1({
+      turnId: TURN,
+      assistantMessageId: 'd4000000-0000-4000-8000-000000000005',
+      sequenceNo: 0,
+      replayed: false,
+      requestId: ID,
+      serverTime: TIME,
+    })).not.toThrow();
     for (const bad of [
       {requestId: 'with spaces', serverTime: TIME},
       {requestId: ID, serverTime: '2026-02-30T00:00:00.000Z'},

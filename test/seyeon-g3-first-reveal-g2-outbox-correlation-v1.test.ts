@@ -40,7 +40,7 @@ function result():RunProductionSeyeonChatResultV1 {
 
 type MutableResult={
   execution:{
-    committedTurn:{postTurnOutboxEventId?:string};
+    committedTurn:{postTurnOutboxEventId?:string;sequenceNo:number};
     postTurnAnalysis?:{status:string;outboxEventId?:string};
     receivedTurn:{userMessageId?:string};
   };
@@ -48,6 +48,12 @@ type MutableResult={
 
 describe('S5/G3 first private Reply requires original G2 durable post-turn Outbox',()=>{
   it.each([
+    ['invalid zero Commit sequence',(r:MutableResult)=>{
+      r.execution.committedTurn.sequenceNo=0;
+    }],
+    ['negative Commit sequence',(r:MutableResult)=>{
+      r.execution.committedTurn.sequenceNo=-1;
+    }],
     ['missing original G2 Outbox',(r:MutableResult)=>{
       delete r.execution.committedTurn.postTurnOutboxEventId;
     }],
