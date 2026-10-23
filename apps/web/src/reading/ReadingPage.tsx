@@ -19,6 +19,7 @@ const relationshipTopics = [
 export function ReadingPage() {
   useEffect(() => {
     void import('../../saju-hub.js');
+    void import('../../saju-five-domain-preview.js');
   }, []);
 
   return (
@@ -118,6 +119,25 @@ export function ReadingPage() {
           </div>
           <blockquote className="gm-saju-quote">“지금의 내가,<br />더 좋은 내일을 만듭니다.”</blockquote>
         </article>
+
+        <section className="gm-section saju-five-preview" aria-labelledby="saju-five-domain-title">
+          <div className="gm-section-head">
+            <div>
+              <h2 className="gm-section-title" id="saju-five-domain-title">내 사주 풀이 한 번에 보기</h2>
+              <p className="gm-section-support">전체 사주 · 직업 · 재물 · 사업 · 연애</p>
+            </div>
+            <button className="saju-primary-button saju-five-preview-run" id="saju-five-domain-run" type="button">
+              사주 풀이 받기 →
+            </button>
+          </div>
+          <p className="saju-authority-note">
+            내 명식에 연결된 기존 검증용 프리뷰만 표시합니다. 근거가 부족한 분야는 억지로 해석하지 않으며, 정식 상담·판매 결과로 저장되지 않습니다.
+          </p>
+          <p id="saju-five-domain-status" className="saju-five-preview-status" role="status" aria-live="polite">
+            위 버튼을 누르면 다섯 분야의 실제 풀이를 요청합니다.
+          </p>
+          <div className="saju-five-preview-results" id="saju-five-domain-results" aria-label="분야별 사주 풀이 결과" />
+        </section>
 
         <section className="gm-section" aria-labelledby="gm-reading-title">
           <div className="gm-section-head">
