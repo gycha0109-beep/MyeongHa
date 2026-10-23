@@ -21,6 +21,10 @@ export function inspectCloudflareHyperdriveBindingV1(bindings) {
   if (mode !== CLOUDFLARE_HYPERDRIVE_MODE_V1) throw Error('Unapproved Cloudflare DB transport');
   if (bindings?.MYEONGHA_CLOUDFLARE_HYPERDRIVE_ORIGIN_POLICY !==
       'supabase-verify-full-rls-v1') throw Error('Hyperdrive origin verification missing');
+  // Hyperdrive has a separately provisioned, unprivileged login; it is NOT
+  // the source Direct-TLS credential. Pin that role before any connection.
+  if (bindings?.MYEONGHA_CLOUDFLARE_HYPERDRIVE_PRINCIPAL !==
+      'myeongha_cf_hyperdrive_login') throw Error('Unexpected Hyperdrive login role');
   // A missing or malformed binding MUST NOT silently fall back to direct TCP.
   const value = bindings?.HYPERDRIVE?.connectionString;
   if (typeof value !== 'string' || value.length < 20 || value.length > 4096) {
@@ -75,6 +79,6 @@ export function createCloudflareSubjectPoolV1(config, bindings, options) {
   // preflight and the same subject/RLS transaction executor as Vercel.
   return createNodePostgresSubjectPoolFromDriverV1({
     driverPool,
-    expectedLoginPrincipal:config.databasePrincipal,
+    expectedLoginPrincipal:bindings.MYEONGHA_CLOUDFLARE_HYPERDRIVE_PRINCIPAL,
   });
 }

@@ -25,10 +25,15 @@ describe('Cloudflare Hyperdrive optional subject transport',()=>{
   const env={
     MYEONGHA_CLOUDFLARE_POSTGRES_TRANSPORT:mode,
     MYEONGHA_CLOUDFLARE_HYPERDRIVE_ORIGIN_POLICY:'supabase-verify-full-rls-v1',
+    MYEONGHA_CLOUDFLARE_HYPERDRIVE_PRINCIPAL:'myeongha_cf_hyperdrive_login',
   };
   expect(inspectCloudflareHyperdriveBindingV1({
     ...env,HYPERDRIVE:{connectionString:URL},
   })).toEqual({kind:'hyperdrive',connectionString:URL});
+  expect(()=>inspectCloudflareHyperdriveBindingV1({
+    ...env,MYEONGHA_CLOUDFLARE_HYPERDRIVE_PRINCIPAL:'postgres',
+    HYPERDRIVE:{connectionString:URL},
+  })).toThrow();
   for(const input of [
     'http://user:password@somehost:5432/postgres',
     'postgresql://user@somehost:5432/postgres',
