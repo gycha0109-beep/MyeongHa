@@ -163,6 +163,9 @@ run_isolated_case myeongha_reader_checkout_original_ledger_test bash test/db/off
 # status read. Clone-only S7 v1 test double isolates the v2 snapshot boundary;
 # the actual S5 body, retained ACK and Owner/Legal acceptance remain HOLD.
 run_isolated_case myeongha_reader_s7_receipt_snapshot_race_test bash test/db/official_reader_s7_original_receipt_snapshot_race.sh
+# Private S2/S7: actual migrated 2240/2250 original Receipt delivery evidence,
+# synthetic S4/2140 rows and genuine verified PortOne cancel; no S5/public grant.
+run_isolated_case myeongha_reader_s7_original_delivery_ledger_test bash test/db/official_reader_s7_original_delivery_ledger.sh
 bash test/db/entitlements_current_query.sh
 bash test/db/data_deletion_job_query.sh
 bash test/db/notification_preferences_query.sh
