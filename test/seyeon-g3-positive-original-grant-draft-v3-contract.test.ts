@@ -35,6 +35,7 @@ describe('§61 S5/G3 SOURCE ONLY original Memory first Reveal candidate',()=>{
   it('enforces fresh first-send state, actual Grant and current type/Outbox locks',()=>{
     const sql=read(CANDIDATE);
     expect(sql).toContain("and t.state='committed'");
+    expect(sql).toContain('and t.committed_at is not null');
     expect(sql).not.toContain("t.state in ('committed','delivered')");
     expect(sql).toContain("a.seyeon_personal_source_pin_jsonb->'positiveProof'");
     expect(sql).toContain("a.validation_result_jsonb->'personalRecordProvenance'");
