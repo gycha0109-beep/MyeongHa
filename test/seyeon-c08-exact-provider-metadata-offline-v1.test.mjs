@@ -148,6 +148,18 @@ describe('C08 alternative exact-provider metadata, no paid inference',()=>{
     }
   });
 
+  it('HTTP 200 with invalid model metadata never counts as a complete provider read',async()=>{
+    const sample=cases();
+    const fakeFetch=async url=>{
+      if(url.endsWith('/endpoints/zdr'))return Response.json({data:sample.zdrEndpoints});
+      return Response.json({data:{id:'unexpected/model',endpoints:[]}});
+    };
+    const r=await inspect({apiKey:'test-only-'+'x'.repeat(28),fetchImpl:fakeFetch});
+    expect(r.completeMetadataRead).toBe(false);
+    expect(r.models.every(m=>m.matchedEndpointCount===0)).toBe(true);
+    expect(r.paidInferenceAuthorized).toBe(false);
+  });
+
   it('missing key and partial GET errors remain HOLD without any inference attempt',async()=>{
     let count=0;
     const fakeFetch=async()=>{count++;return new Response('unavailable',{status:503});};
