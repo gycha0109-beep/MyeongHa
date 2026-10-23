@@ -29,6 +29,30 @@ describe('PR-04D3A Production Governor pre-activation gates (offline)', () => {
       ...common, mode: 'INVALID' as 'ENFORCE',
     })).toThrow('Unknown');
   });
+  it('refuses an active Governor in OFF mode before the ordinary Subject DB can meter costs', () => {
+    expect(() => assertSeyeonProductionGovernorBoundaryV1({
+      ...common, mode: 'OFF',
+    })).toThrow('OFF refuses an active cost Governor');
+    expect(() => assertSeyeonProductionGovernorBoundaryV1({
+      target: 'post_turn', mode: 'OFF',
+      providerConfig: base, governorConfigured: true,
+    })).toThrow('OFF refuses an active cost Governor');
+
+    const databaseConfig = {} as Parameters<
+      typeof createProductionSeyeonChatRuntimeV1
+    >[0]['databaseConfig'];
+    expect(() => createProductionSeyeonChatRuntimeV1({
+      databaseConfig, providerConfig: base, governorMode: 'OFF',
+      costGovernorForRole: () => { throw Error('must not be evaluated'); },
+    })).toThrow('OFF refuses an active cost Governor');
+    expect(() => createProductionSeyeonPostTurnWorkerRuntimeV1({
+      databaseConfig, providerConfig: base, governorMode: 'OFF',
+      costGovernor: {} as NonNullable<
+        Parameters<typeof createProductionSeyeonPostTurnWorkerRuntimeV1>[0]['costGovernor']
+      >,
+    })).toThrow('OFF refuses an active cost Governor');
+  });
+
   it('rejects injection, missing admission and incomplete role coverage', () => {
     expect(() => assertSeyeonProductionGovernorBoundaryV1({
       ...common, provider: { generate: vi.fn() },
