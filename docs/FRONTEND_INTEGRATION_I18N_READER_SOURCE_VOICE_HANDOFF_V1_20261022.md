@@ -222,6 +222,14 @@
 - **후속 실제 구현(로드맵 EN-UI-A/B/C, CN-UI-A/B/C):** 영어·간체의 독립 저자 UI 사전, 웹·모바일 각 화면별 문구·접근성 및 오류·HOLD, API 헤더 허용, 저장·재시작 복원, 혼합 원문/진행 중 전환/재시도 회귀를 묶어 실제 선택을 활성화한다. 비활성 후보 등록만으로 영어·간체 언어가 지원되었다고 보고할 수 없다.
 - **기존 승인 경계:** Reader `responseVoiceLocale`, Character speech/delta, 공식 Saju/Face 출력·소급 번역 ②, 결제·판매/중국 본토 운영 등은 **각 Source/Character/Reader/Ops 소유자 승인 전 HOLD**이며 이 작업에서 전혀 활성화하지 않는다.
 
+### 7.13 I18N-07 / EN-UI-B / CN-UI-B 1차 — 영어·간체 공통 UI 저자 사전
+
+- 기존 `apps/web/ui-i18n.js` / `apps/mobile/src/ui/mobile-ui-copy.ts`의 **기본 3언어 런타임과 저장·API 요청 경계는 그대로 둔다**. 웹·모바일에 각각 `apps/web/ui-i18n-planned-copy-v1.js`, `apps/mobile/src/ui/mobile-planned-ui-copy-v1.ts`를 추가해 **81개의 고정 UI 표현**을 `en-US`·`zh-CN` 각각 명시 작성했다. 공통 메뉴·계정·명식 입력·상태·읽기/채팅 조작 등 UI-owned 라벨만 포함한다.
+- `lookupPlannedStaticUiCopyV1` / `lookupPlannedMobileStaticUiCopyV1`는 **두 목표 언어의 알려진 고정 문구만 반환하고, 없거나 미지원인 값은 `null`**로 닫힌다. 원문 문자열·개인 대화/공식 해석·Character 고유명·서버 오류·출처를 번역하거나 표기 승인으로 위장하지 않는다. 사전은 active UI에 아직 import하지 않았으며 QA·화면 범위 확인 전 언어 선택을 활성화하지 않는다.
+- `test/i18n-en-us-zh-cn-planned-copy-parity.test.ts`는 81개 × 2언어 웹·모바일 동일성, 한글 누출 방지, 알 수 없는 원문 값에서 `null`, UI locale/API 허용값의 기존 3언어 유지 및 임의 Reader 응답 언어 호출 금지를 회귀 확인한다.
+- 기존 비활성 영어 선택지에 한국어 `준비 중` 문구가 남아 [Web PR Domain Gates #39885508282](https://github.com/gycha0109-beep/MyeongHa/actions/runs/39885508282)에서 일본어 페이지 브라우저 검증이 실패했다. 웹·모바일 비활성 영어 후보 라벨을 한국어가 없는 `English (not available yet)` / `English · Not available yet`으로 바꾸고 테스트 기준도 갱신했다. **통합 CI만 GREEN이어도 웹 도메인 게이트가 RED면 전체 GREEN으로 간주하지 않는다.**
+- **다음 실행:** 사전의 실제 제품 화면별 누락·오역 및 보호 안내·기존 로케일 왕복/리로드 수용을 완료한 후 웹·모바일·API `en-US`/`zh-CN` UI 선택을 동시에 활성화한다. 언어 선택에 따른 Reader/Saju/Face 외국어 생성, 기존 Reading 재번역 ②, Character별 이름/화법·구매 권한/운영 공개는 여전히 원래 소유자 승인 전 HOLD다.
+
 ## 8. 다음 구현 작업 및 승인 위치
 
 1. **캐릭터 설계 owner:** 위 6명 차이를 실제 Bible/typed Runtime 간에 해결하고 authoritative source/version을 확정. 이 I18N 트랙은 제안·인계만, 원본 수정 금지.
