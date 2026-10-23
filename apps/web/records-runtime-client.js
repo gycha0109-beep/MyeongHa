@@ -251,6 +251,26 @@ async function readPagedCollection(fetchImpl, endpoint, bearer, field) {
   }
 }
 
+const MEMORY_UUID_V1 = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
+
+function requireSeyeonGrantStatus(payload, memoryItemId) {
+  if (
+    payload.memoryItemId !== memoryItemId
+    || payload.characterId !== 'seyeon'
+    || typeof payload.currentlyGranted !== 'boolean'
+    || !(payload.grantedAt === null || (typeof payload.grantedAt === 'string' && Number.isFinite(Date.parse(payload.grantedAt))))
+    || (payload.currentlyGranted && payload.grantedAt === null)
+    || (!payload.currentlyGranted && payload.grantedAt !== null)
+  ) {
+    throw new RecordsRuntimeError('WEB_RECORDS_MALFORMED_RESPONSE', 'Current Se-yeon grant status is invalid.');
+  }
+  return Object.freeze({
+    memoryItemId,
+    currentlyGranted: payload.currentlyGranted,
+    grantedAt: payload.grantedAt,
+  });
+}
+
 export function createRecordsRuntimeClient(options = {}) {
   const fetchImpl = requireFetch(options.fetchImpl ?? globalThis.fetch);
   const resolveBearer = options.resolveBearer ?? ensureActiveBearer;
@@ -280,6 +300,18 @@ export function createRecordsRuntimeClient(options = {}) {
       )),
     readMemories: () => readStable((bearer) =>
       readPagedCollection(fetchImpl, endpoints.memories, bearer, 'memories')),
+    readSeyeonMemoryGrantStatus(memoryItemId) {
+      if (typeof memoryItemId !== 'string' || !MEMORY_UUID_V1.test(memoryItemId)) {
+        throw new RecordsRuntimeError('WEB_RECORDS_INVALID_MEMORY_ID', 'A valid memory identity is required.');
+      }
+      const endpoint = `${endpoints.memories}/${encodeURIComponent(memoryItemId)}/grants/seyeon`;
+      return readStable(async (bearer) => {
+        if (bearer.kind !== 'member') {
+          throw new RecordsRuntimeError('WEB_RECORDS_MEMBER_REQUIRED', 'Member identity is required for Se-yeon grant status.');
+        }
+        return requireSeyeonGrantStatus(await readJson(fetchImpl, endpoint, bearer), memoryItemId);
+      });
+    },
     readRecords() {
       return readStable(async (bearer) => {
         const profile = await readJson(fetchImpl, endpoints.profile, bearer);
