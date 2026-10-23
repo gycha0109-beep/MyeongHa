@@ -67,7 +67,7 @@
 ## 8. 법령 검토 기반 미성년자 제품 정책 — 부분 구현 (2026-10-23)
 
 - **정본:** `docs/LEGAL_MINOR_POLICY_V1_20261023.md`. 법령: 개인정보 보호법 §22의2, 시행령 §17의2, 민법 §4·§5. 법정대리인 동의·확인은 필요한 경우 정확히 검증되어야 하므로, 확인 체계가 없는 상태에서 만 14세 미만의 개인화/가입을 제공하는 대신 **서비스 대상 제외**를 선택. 만 14~18세는 무료 기능만, 직접 유료 구매는 만 19세 이상에 한함.
-- **구현:** `apps/api/src/legal-minor-age-policy-v1.ts`, `birth-profile-create-http.ts`의 서버 기준 한국 날짜 계산 및 **DB 요청 전 403 차단**. 양력 14번째 생일은 허용, 음력 경계 생일은 보수적 보류. `apps/web/src/auth/AuthPage.tsx` 14세 이상 자기 선언, `apps/web/src/birth/BirthPage.tsx`/`apps/web/src/reading/ReadingPage.tsx` 연령 안내, `apps/web/birth-runtime-client.js`/`apps/web/saju-hub.js` 거절 피드백 구현. 직접 유료 결제는 이전과 같이 비활성.
+- **구현:** `apps/api/src/legal-minor-age-policy-v1.ts`, `birth-profile-create-http.ts`의 서버 기준 한국 날짜 계산 및 **DB 요청 전 403 차단**. 양력 14번째 생일은 허용, 음력 경계 생일은 보수적 보류. `apps/web/src/auth/AuthPage.tsx` 14세 이상 자기 선언, `apps/web/src/chat/ChatPage.tsx`·`apps/web/chat-runtime-client.js`의 **브라우저 채팅 자기선언 전 송신 보류**, `apps/web/src/birth/BirthPage.tsx`/`apps/web/src/reading/ReadingPage.tsx` 연령 안내, `apps/web/birth-runtime-client.js`/`apps/web/saju-hub.js` 거절 피드백 구현. 직접 유료 결제는 이전과 같이 비활성.
 - **검증:** `test/legal-minor-age-policy-v1.test.ts`, `test/legal-minor-policy-surfaces.test.ts`, `test/birth-profile-create-http.test.ts`의 최소·성년·KST 자정·음력 경계·DB 진입 차단 테스트. Web/Mobile 정적 UI 번역 사전 동기화.
 - **중요한 한계:** Birth Profile 생일 값이나 14세 이상 자기 선언은 신뢰할 수 있는 **연령/법정대리인 인증이 아니다**. 서버 회원가입/소셜·게스트·기존 계정·대화에 공통 연령 권위가 없으므로 **전 서비스의 14세 미만 이용·개인정보 수집 차단을 입증하지 못함**. P0-AGE-01 캐릭터 콘텐츠 표현 정책은 OPEN. 유료 구매 19+는 향후 Commerce 권위에서 확인 필요.
 - **최종 상태:** L2 전체 완료 아님, 생산 운영/법정 동의 대체 아님, 출시 HOLD 유지. 기존 Privacy·DB·Commerce 권한 변경 없음.
