@@ -175,7 +175,12 @@ describe('S7 private Postgres original Checkout notice authority',()=>{
       purchaseIntentId:PURCHASE,
       originatingGrantId:GRANT,
       claim:{purchaseIntentId:PURCHASE,unitId:GRANT,reason:'change_of_mind'},
-      immutableCheckoutNoticeStore:{readOriginalNotice:f.storeRead},
+      immutableCheckoutNoticeStore:{
+        readOriginalNotice:async input=>{
+          await f.storeRead(input);
+          return snapshot;
+        },
+      },
     })).rejects.toThrow('Private Reader purchase/delivery evidence is unavailable.');
     expect(f.query).toHaveBeenCalledTimes(1);
     expect(f.storeRead).not.toHaveBeenCalled();
