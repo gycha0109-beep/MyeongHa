@@ -1,20 +1,20 @@
-# 명하 전체 다국어화 연속 작업 로드맵 v2.1 — 2026-10-23
+# 명하 전체 다국어화 연속 작업 로드맵 v2.2 — 2026-10-23
 
 > Track Key: `frontend-integration`
 >
-> 이 문서는 2026-10-21 v1 연속 작업 로드맵(`f96dce9f6d2c248404d602c8663fff53c9396831:docs/FRONTEND_INTEGRATION_I18N_CONTINUATION_ROADMAP_V1_20261021.md`)의 현행 후속 실행 기준인 v2를 **2026-10-23 영어 추가 결정에 맞게 v2.1로 개정**한 것이다. 기존 인계/PR 참조가 끊기지 않도록 파일 경로의 `V2_20261022`는 유지한다. 기존 source authority, 캐릭터 Bible, Reader Runtime/DB/Commerce 계약을 대체하지 않는다.
+> 이 문서는 2026-10-21 v1 연속 작업 로드맵(`f96dce9f6d2c248404d602c8663fff53c9396831:docs/FRONTEND_INTEGRATION_I18N_CONTINUATION_ROADMAP_V1_20261021.md`)의 현행 후속 실행 기준인 v2를 **2026-10-23 영어·중국어 간체 추가 결정에 맞게 v2.2로 개정**한 것이다. 기존 인계/PR 참조가 끊기지 않도록 파일 경로의 `V2_20261022`는 유지한다. 기존 source authority, 캐릭터 Bible, Reader Runtime/DB/Commerce 계약을 대체하지 않는다.
 >
-> 상태: **I18N-01~03 기존 3개 UI 로케일 기반 완료; `en-US`는 신규 계획(미구현); I18N-04/05 source 승인 대기; I18N-06 계약·표시 기반 부분 구현 / 실제 외국어 생성 HOLD; I18N-07 허가된 UI 부분 집합 진행 중**.
+> 상태: **I18N-01~03 기존 3개 UI 로케일 기반 완료; 신규 `en-US`·`zh-CN` UI는 로드맵에 편입(아직 미구현); I18N-04/05 source 승인 대기; I18N-06 계약·표시 기반 부분 구현 / 외국어 AI 생성 HOLD; I18N-07 허가된 UI 부분 집합 진행 중**.
 >
-> Track 범위: **현재 구현된 UI 3개 로케일 `ko-KR`/`ja-JP`/`zh-TW` + 새로 계획에 포함한 `en-US`(영어 UI 우선, 아직 미구현)**. 공식 사주·관상 표현 및 Reader 다국어 화법은 언어마다 기존 source·Character·출력 승인에 종속된다. `zh-CN`, 범용 영어(`en` 자동 매핑)/`en-GB` 자동 지원, 다국어 출생시간대·역법·해외 결제, 50개 언어 출시는 **현 범위 밖**이다.
+> Track 범위: **UI 목표 5개 로케일 `ko-KR` / `ja-JP` / `zh-TW` / `en-US` / `zh-CN`**. 앞의 3개는 기존 구현, 뒤의 영어·간체는 **로드맵 신규 목표(미구현)**다. 번체 대만(`zh-TW`)과 간체 중국 본토(`zh-CN`)는 **독립된 UI 카탈로그**로 취급하며 단순 글자 변환으로 간체 표현 승인 완료를 선언하지 않는다. 공식 사주·관상 표현 및 Reader 출력은 언어별 기존 source·Character·출력 승인에 종속된다. `en-GB` 자동 지원, 범용 `en`/`zh`/`zh-Hans` 자동 승격, `zh-HK`·다국어 출생시간대·역법·해외 결제, 50개 언어 출시는 **현 범위 밖**이다.
 
 ## 0. 불변 사항과 명확히 분리할 책임
 
-1. 사용자 명시적 UI 선택이 없으면 `ko-KR`; `Accept-Language` 및 기존 `profile.locale`로 외국어를 자동 선택하지 않는다. `en-US`도 **명시 선택 후 UI 수용과 서버 허용값을 함께 갱신했을 때만** 표시 선호로 활성화한다. `X-MyeongHa-UI-Locale`는 **표시 선호 입력**이지 Reader 응답·공식 풀이 언어 허가가 아니다. 기준 문서: `docs/FRONTEND_INTEGRATION_KOREAN_FIRST_UI_REQUEST_LOCALE_CONTRACT_V1_20261021.md`.
+1. 사용자 명시적 UI 선택이 없으면 `ko-KR`; `Accept-Language` 및 기존 `profile.locale`로 외국어를 자동 선택하지 않는다. `en-US`·`zh-CN`도 **명시 선택 후 UI 수용과 서버 허용값을 함께 갱신했을 때만** 표시 선호로 활성화한다. `X-MyeongHa-UI-Locale`는 **표시 선호 입력**이지 Reader 응답·공식 풀이 언어 허가가 아니다. 기준 문서: `docs/FRONTEND_INTEGRATION_KOREAN_FIRST_UI_REQUEST_LOCALE_CONTRACT_V1_20261021.md`.
 2. `gycha0109-beep/Saju` 및 source-owned Claim/Reading/사주 해석 권위와 관상 source-owned 판정·해석 권위를 변경하지 않는다. **공식 Reading은 Reader와 독립적인 결과**이며 Reader는 허용된 source 결과를 해설하는 표현 주체이지 공식 사주·관상 판정 생성자가 아니다.
 3. Reader의 canonical Character ID, 공통 바이블·성격·가치관·관계/기억/권한, source grounding, 구매/Grant, session/thread, idempotency, disclosure/limitation 및 원문 보존은 locale과 독립적으로 유지한다.
 4. 이전 한국어 공식 Reading, 이전 대화 메시지, 구매 기록을 UI 언어 선택만으로 번역·덮어쓰기·재발급하지 않는다. 새 언어로 말한 내용은 새로운 명리/관상 주장이 될 수 없다.
-5. 캐릭터 임시 이름은 승인된 한국어 한글, 일본어 가타카나, 대만 번체의 로마자 표기 정책을 유지한다. 영어 UI를 추가하더라도 **영어 고유명·로마자 표기·직함·개별 인칭을 I18N이 임의 확정하지 않는다**. 영어 전용 승인 표기 전까지 기존 소유자의 이름/직함 원문을 보존한다. 무단 한자·고유명 확정 금지.
+5. 캐릭터 임시 이름은 승인된 한국어 한글, 일본어 가타카나, 대만 번체의 로마자 표기 정책을 유지한다. 영어·간체 UI를 추가하더라도 **영어 고유명·로마자 표기, 간체 고유명·한자 표기, 직함·개별 인칭을 I18N이 임의 확정하지 않는다**. 전용 승인 표기 전까지 기존 소유자의 이름/직함 원문을 보존한다. 무단 한자·고유명 확정 금지.
 6. 실제 source/provider/semantic admission이 없는 다국어 공식 Reading 또는 운영하지 않는 관상 분석을 지원 완료로 표시하지 않는다. 지원하지 않는 locale/캐릭터/제품은 명시적 HOLD/미지원 처리한다.
 7. 작업 귀속 CI만 중단 판단에 사용한다. 현재 세션의 커밋·PR과 직접 연결된 통합 CI에서 결과에 의존하는 후속 단계만 남았다면 재조회 없이 중단한다. 다른 트랙/main CI는 중단 사유가 아니다. 브랜치·PR: `frontend-integration`, `Watchtower-Track: frontend-integration`. 원문 정책·운영 규칙 우선.
 
@@ -24,12 +24,12 @@
 |---|---|---|
 | 기초 UI 다국어/캐릭터 표기/사주 명식 표시 | 완료 | #2368, #2373, #2400, #2401, #2403 |
 | I18N-01 기록 이름·시각 변경, 원문 보존 | 완료 | PR #2406, 운영 READY |
-| I18N-02 UI authored 문구/상태/오류 처리 | **기존 KO/JA/ZH-TW 기반 완료**; `en-US` 사전·화면 확장은 신규 작업 | PR #2409, #2412, #2415, #2419 (마지막 PR merged 2026-10-21) |
-| I18N-03 웹→API 선택 로케일 전달·검증 | **기존 3개 UI 로케일 완료**; `en-US`는 client/server 허용값 확장 필요 | PR #2424, merge `50dae2c96616f89c5403b9c8c5d574eb35cfdc88`, 한국어 우선 ingress |
-| I18N-04 공식 사주 JA/ZH-TW/EN-US 표현 | **각 언어 source 준비도 종속 / 신규 영어 출력 미승인** | 템플릿 선택기만 존재 (`packages/domain/src/claim-narrative-locale-v1.ts`); EN 별도 source admission 필요 |
-| I18N-05 공식 관상 JA/ZH-TW/EN-US 표현 | **Face source 운영 준비도 종속 / 영어 포함 출력 미승인** | 실제 Face provider/admission 및 언어별 승인 필요 |
-| I18N-06 Reader AI JA/ZH-TW/EN-US 자연어 응답 | **기반 계약 부분 구현 / 캐릭터별 실제 외국어 화법·생성 공개 HOLD** | #2431/32/35 및 #2441 준비 기반; 영어 화법·출력은 신규 설계·승인 대상 |
-| I18N-07 통합·배포 | **기존 3개 UI 언어의 허가된 부분 집합 진행 중**; 영어 UI 수용 신규 계획 | PR #2441의 Reader/Chat UI-only 부분 구현·CI GREEN(최종 커밋 `48fb176a`, 아직 OPEN); 제품 출시 승인과 구분 |
+| I18N-02 UI authored 문구/상태/오류 처리 | **기존 KO/JA/ZH-TW 기반 완료**; `en-US`·`zh-CN` 사전·화면 확장은 신규 작업 | PR #2409, #2412, #2415, #2419 (마지막 PR merged 2026-10-21) |
+| I18N-03 웹→API 선택 로케일 전달·검증 | **기존 3개 UI 로케일 완료**; `en-US`·`zh-CN`은 client/server 허용값 확장 필요 | PR #2424, merge `50dae2c96616f89c5403b9c8c5d574eb35cfdc88`, 한국어 우선 ingress |
+| I18N-04 공식 사주 JA/ZH-TW/EN-US/ZH-CN 표현 | **각 언어 source 준비도 종속 / 신규 영어·간체 출력 미승인** | 템플릿 선택기만 존재 (`packages/domain/src/claim-narrative-locale-v1.ts`); EN·ZH-CN 각각 별도 source admission 필요 |
+| I18N-05 공식 관상 JA/ZH-TW/EN-US/ZH-CN 표현 | **Face source 운영 준비도 종속 / 영어·간체 포함 출력 미승인** | 실제 Face provider/admission 및 언어별 승인 필요 |
+| I18N-06 Reader AI JA/ZH-TW/EN-US/ZH-CN 자연어 응답 | **기반 계약 부분 구현 / 캐릭터별 실제 외국어 화법·생성 공개 HOLD** | #2431/32/35 및 #2441 준비 기반; 영어·간체 화법과 출력은 각각 신규 설계·승인 대상 |
+| I18N-07 통합·배포 | **기존 3개 UI 언어의 허가된 부분 집합 진행 중**; 영어·간체 UI 수용 신규 계획 | PR #2441의 Reader/Chat UI-only 부분 구현·CI GREEN(최종 커밋 `48fb176a`, 아직 OPEN); 제품 출시 승인과 구분 |
 
 상태 갱신 시 PR, main, CI, production SHA를 신규 근거로 삼되 위 완료 작업을 재수행하지 않는다. 다른 트랙의 새 main 커밋을 덮어쓰지 않는다.
 
@@ -58,7 +58,7 @@
 - **Source 승인 대기:** Saju/Face owner의 실제 다국어 ClaimNarrativeProfile·FaceNarrativeProfile, ClaimType/semanticKey/templateKey, 용어집·불확실성/출처·의미 동등성 검수, production admission.
 - **Reader 구체 화법 결정 대기:** 각 캐릭터의 일본어 1인칭·호칭·경어 및 번체 화법의 실제 값, 관계/격식 전환 조건. 예시 `태겸=俺`, `윤호=僕`, `세연=あたし`는 설명용 **미승인 예시**이며 캐릭터 설정에 쓰지 않는다.
 - 기존 대화 원문 보존은 유지하되, 선택 언어를 바꾼 뒤 **새로 생성하는 턴**과 진행 중 요청에 적용할 로케일 고정·재시도 정책은 I18N-06에서 기존 API 계약 안에서 좁게 결정한다. 과거 메시지 자동 번역/재작성은 금지.
-- `zh-CN` 추가, 새로운 국가/언어 50개 확대, 프로필 locale 동기화, 국가별 해외 상거래/역법은 추가 사용자 범위 결정 전 HOLD.
+- **과거 결정 범위 명시:** 2026-10-22 당시 `zh-CN` 추가는 HOLD였으나 **2026-10-23 사용자의 신규 UI 범위 결정으로 §2.2·§9에서 UI 목표에 한해 해제**되었다. 이 결정으로 간체 Reader/공식 풀이/중국 본토 운영·해외 상거래/역법/프로필 locale 동기화/50개 언어 출시가 승인되는 것은 아니다.
 
 ### 2.1 영어 `en-US` 추가 결정 — 2026-10-23 개정
 
@@ -69,29 +69,37 @@
 - **영어 공식 사주·관상:** 영어 용어집/표현 자산·근거/불확실성/주의/의미 동등성은 Saju/Face 소유자의 실제 source admission 이후에만 연결한다. `en-US`를 선택해도 원래 한국어 공식 기록/채팅을 자동 번역·재발급하지 않으며, 보류 ②는 그대로다.
 - **일정·우선순위:** 영어 UI를 기존 I18N-07 UI-only 작업과 **병렬 우선**으로 진행할 수 있으나, 영어 화법/공식 출력은 승인에 따른 후행이다. 무작정 모든 Reader 기능·언어 출시를 기다리지 않고 승인된 부분 집합만 반영한다.
 
+### 2.2 중국어 간체 `zh-CN` 추가 결정 — 2026-10-23 개정
+
+- **신규 사용자 결정:** 기존 번체 대만 `zh-TW`는 그대로 유지하고, **중국어 간체 `zh-CN`을 다섯 번째 UI 목표 로케일로 추가**한다. UI 국제화를 먼저 수행하고, Reader 간체 화법 및 공식 사주·관상 간체 출력은 기존 승인 게이트를 따르는 후행 작업으로 계획한다.
+- **간체 UI 계약:** 웹/모바일 선택기, 저장·복원, UI 문구(메뉴/오류/HOLD/접근성/원문 주의), `X-MyeongHa-UI-Locale`의 명시적 allowlist와 normalization/test를 `en-US`와 함께 확장한다. 미지원 범용 `zh`, `zh-Hans`, `zh-HK` 자동 추론·승격 없음. 미선택 시 KO 우선 유지.
+- **번체와 독립 작성:** 간체는 문자 변환뿐 아니라 지역별 자연스러운 UI 표현·호칭·명리·관상 용어가 다를 수 있으므로 `zh-TW`를 무검수로 변환해 공식 지원으로 표시하지 않는다. 제품의 공통 의미와 기존 서버 계약을 보존하면서 **UI 저자 문구만 별도 `zh-CN` 카탈로그**로 작성한다.
+- **보류 사항:** 캐릭터 이름/중국어 호칭·고유명, `character×zh-CN` voice delta, Reader 생성 언어, source-owned Saju/Face Claim/용어집/표현, 저장 공식 Reading 재번역(정책 ②), 중국 본토 서비스 운영·결제·현지 규정 검토는 **UI 추가와 별도로 미승인/HOLD**다.
+- **일정·우선순위:** 영어와 간체의 UI 기반 계약을 함께 확장하되 번역 자산과 승인·회귀는 로케일별 분리한다. 기존 3개 UI 언어와 Reader 정본/source 결정 진행을 대체하거나 되돌리지 않는다.
+
 ## 3. I18N-04 — 공식 사주 출력 (Saju bridge와 책임 분리)
 
 **Source/Saju bridge 책임:** Canonical 사주 계산, T5/T8/기타 승인된 interpretation claim·근거, 정식 ProductReadingResponse, provenance/semantic validity, product readiness 및 공개 계약.
 
-**이 트랙의 책임:** 이미 source-owned 승인된 구조화 의미/프로필을 받아 기존 `ko-KR`/`ja-JP`/`zh-TW` 및 향후 승인될 `en-US` 표현을 표시·선택하는 경계만 연결. ClaimType·RuleId·semanticKey 매핑, 공식 용어집과 렌더러 결합은 **Source의 실제 계약이 준비된 뒤** 적용. 같은 사주 엔진을 언어 수만큼 복제하지 않는다.
+**이 트랙의 책임:** 이미 source-owned 승인된 구조화 의미/프로필을 받아 기존 `ko-KR`/`ja-JP`/`zh-TW` 및 향후 source 승인을 거칠 `en-US`·`zh-CN` 표현을 표시·선택하는 경계만 연결. ClaimType·RuleId·semanticKey 매핑, 공식 용어집과 렌더러 결합은 **Source의 실제 계약이 준비된 뒤** 적용. 같은 사주 엔진을 언어 수만큼 복제하지 않는다.
 
 작업 순서:
 1. Saju 측 실제 승인된 claim + provenance + template/renderer availability와 공식 Reading 저장/재열람 경계를 확인한다.
 2. Source-owned 명리 용어집/표현 자산과 이 트랙의 표시 경계를 연결한다. 템플릿은 판단 권한이 아니다. LLM을 사용할 경우에도 확정된 의미를 현지어로 표현하는 범위만 허용하고 새로운 주장 생성 불가.
-3. locale에 맞는 source 결과·semantic admission이 없으면 명시적 unavailable/HOLD. **`en-US` UI 선택만으로 영어 공식 사주가 지원된다고 표시하지 않는다.** 한국어를 외국어 공식 풀이로 오인시키지 않는다.
+3. locale에 맞는 source 결과·semantic admission이 없으면 명시적 unavailable/HOLD. **`en-US`·`zh-CN` UI 선택만으로 해당 언어 공식 사주가 지원된다고 표시하지 않는다.** 한국어를 외국어 공식 풀이로 오인시키지 않는다.
 4. 이전 공식 Reading의 언어 재열람은 **보류 ② 승인 이전에는 구현·출시하지 않는다**.
 
 완료 기준: 실제 source 승인된 locale에서만 공식 읽기 결과가 나오고, 동일 Claim/grounding, epistemic qualifier, limitation, method attribution, entitlement이 유지됨. source 미준비 시 배포 미지원이 정상 동작.
 
 ## 4. I18N-05 — 공식 관상 출력 (Face source 준비도 종속)
 
-Face provider/production admission과 source-owned FaceNarrativeProfile·semanticKey·`ja-JP`/`zh-TW`/`en-US` 각 언어의 현지어 범위/주의 문구/용어집이 준비된 뒤, 승인된 표현만 연결한다. 엔진 제공 전 사진 준비 UI를 공식 분석 가동으로 표시하지 않는다. 준비 전 HOLD; Reader 화법 구현이 Face source 판정 권위를 대체하지 않는다.
+Face provider/production admission과 source-owned FaceNarrativeProfile·semanticKey·`ja-JP`/`zh-TW`/`en-US`/`zh-CN` 각 언어의 현지어 범위/주의 문구/용어집이 준비된 뒤, 승인된 표현만 연결한다. 엔진 제공 전 사진 준비 UI를 공식 분석 가동으로 표시하지 않는다. 준비 전 HOLD; Reader 화법 구현이 Face source 판정 권위를 대체하지 않는다.
 
 ## 5. I18N-06 — Reader AI 다국어 화법 시스템 (핵심 수정)
 
 ### 5.1 목표와 비목표
 
-목표: 캐릭터가 언어를 바꿔도 **같은 인물**로 들리도록, 공통 바이블을 복제하지 않고 표현 규칙을 조합한다. 현행 3개 UI locale에 신규 UI 목표 `en-US`를 더한 **4개 목표 로케일**로 계약을 확장하되, 실제 영어 Reader 출력은 후행 승인 전 HOLD한다.
+목표: 캐릭터가 언어를 바꿔도 **같은 인물**로 들리도록, 공통 바이블을 복제하지 않고 표현 규칙을 조합한다. 현행 3개 UI locale에 신규 UI 목표 `en-US`·`zh-CN`을 더한 **5개 목표 로케일**로 계약을 확장하되, 실제 영어·간체 Reader 출력은 각각 후행 승인 전 HOLD한다.
 
 비목표: 50개 언어/국가의 지원 선언, 캐릭터당 국가별 바이블 전량 작성, LLM에 캐릭터 판단/사주 claim/메모리/관계/권한 수정 권한 부여, 미승인 캐릭터 공개, Saju/Face renderer 대체.
 
@@ -99,7 +107,7 @@ Face provider/production admission과 source-owned FaceNarrativeProfile·semanti
 
 ```text
 canonical Character Bible + approved relationship/context + allowed Saju/Face grounding
-  + request locale (UI targets: ko-KR / ja-JP / zh-TW / en-US; Korean-first; voice output separate approval)
+  + request locale (UI targets: ko-KR / ja-JP / zh-TW / en-US / zh-CN; Korean-first; voice output separately approved)
   + locale-common voice conventions (1인칭/2인칭, 경어, 지역형 표현, 상담체)
   + character×locale style deltas (필요한 1인칭/호칭/높임말/말끝/금지 표현)
   + context-conditioned overrides (상대/관계 단계/격식/행동 정책, 승인 범위)
@@ -112,10 +120,10 @@ canonical Character Bible + approved relationship/context + allowed Saju/Face gr
 
 작업 항목:
 1. **I18N-06a — 계약 분리:** 현재 `seyeon-character-runtime-v2.ts`의 한국어 존댓말 지시를 즉시 치환하지 말고, 상위 source-bound guard/behavior를 그대로 유지하는 언어 입력과 versioned character voice locale profile 인터페이스를 분리. `X-MyeongHa-UI-Locale` 단독으로 비한국어 생성이 허가되지 않게 지원/승인 판정 분리. 미지원은 기존 KO 정책 또는 명시적인 불가 처리하되 **외국어라고 가장하지 않기**.
-2. **I18N-06b — 공통 locale 화법 규칙:** 일본어 경어·1/2인칭·상황별 정중도, 번체 중국어 호칭/지역어/상담 스타일 및 영어의 격식·호칭·거리감·완곡성·대화 리듬에 대한 *공통* 규칙을 각 언어로 작성. 영어 규칙도 authoring/guard 준비물이며 캐릭터별 실제 값이나 공개 승인으로 간주하지 않는다. 국가=언어로 가정하지 않으며 이 작업에서 `zh-CN`을 추가하지 않는다.
-3. **I18N-06c — character×locale delta:** 기존 바이블을 참조하는 작은 설정만 작성. `en-US`도 필요 시 sparse exception만 사용하며 캐릭터별 영어 바이블 전체를 복제하지 않는다. `characterId`, `locale`, `profileVersion`, `selfReference`, `addresseeStyle`, `politenessRegister`, `sentenceEnding`, `contextConditions`, `prohibitedStyle` 등 필요한 범위의 **선언적 스키마**를 설계. 값과 변동 조건을 승인하지 않은 캐릭터는 임의로 채우지 않고 HOLD. 예: 일본어의 `俺`/`僕`/`あたし`는 단순 한국어 `나` 번역이 아니라 캐릭터별·상황별 선택 대상.
+2. **I18N-06b — 공통 locale 화법 규칙:** 일본어 경어·1/2인칭·상황별 정중도, 번체 `zh-TW`의 호칭/지역어/상담 스타일, 간체 `zh-CN`의 별도 호칭/지역 관용어/정중도, 영어의 격식·호칭·거리감·완곡성·대화 리듬에 대한 *로케일 공통* 규칙을 각 언어로 작성. 영어 규칙도 authoring/guard 준비물이며 캐릭터별 실제 값이나 공개 승인으로 간주하지 않는다. 국가=언어로 가정하지 않으며 이 작업에서 `zh-CN`을 추가하지 않는다.
+3. **I18N-06c — character×locale delta:** 기존 바이블을 참조하는 작은 설정만 작성. `en-US`와 `zh-CN`도 필요 시 sparse exception만 사용하며 캐릭터별 영어·간체 바이블 전체를 복제하지 않는다. `characterId`, `locale`, `profileVersion`, `selfReference`, `addresseeStyle`, `politenessRegister`, `sentenceEnding`, `contextConditions`, `prohibitedStyle` 등 필요한 범위의 **선언적 스키마**를 설계. 값과 변동 조건을 승인하지 않은 캐릭터는 임의로 채우지 않고 HOLD. 예: 일본어의 `俺`/`僕`/`あたし`는 단순 한국어 `나` 번역이 아니라 캐릭터별·상황별 선택 대상.
 4. **I18N-06d — 합성/guard:** 생성기에게 선택 언어의 voice conventions + 해당 캐릭터 delta만 전달하되 canonical Bible, Reading source refs/claim scope, persona, 관계/기억, 행동·민감 정책 우선. 최종 Output Guard에서 language/script 일탈, persona/style 위반, 잘못된 1인칭/호칭/격식, 언어 섞임, 새로운 명리 확정 주장, qualifier/disclosure 누락, 권한 밖 정보와 원본 오염을 거부 또는 보호된 fallback. LLM 자체를 유일한 guard로 간주하지 않는다.
-5. **I18N-06e — 제한 수용/출시:** 우선 실제 지원·승인된 캐릭터×locale에 한해 language switch → 새 턴 → retry/idempotency → 원문 기록 재열람 → protected fallback을 수용. `en-US` UI 지원만 완료한 단계에서 실제 영어 Reader 응답은 아직 미지원이므로, 기존 원문 표시와 UI-응답 언어 불일치 안내를 우선 수용한다. 웹/모바일 UI locale과 실제 Reader 출력 locale 간 불일치를 사용자에게 은폐하지 않는다. 지원 밖 캐릭터·locale에 자동 확장 금지.
+5. **I18N-06e — 제한 수용/출시:** 우선 실제 지원·승인된 캐릭터×locale에 한해 language switch → 새 턴 → retry/idempotency → 원문 기록 재열람 → protected fallback을 수용. `en-US`·`zh-CN` UI 지원만 완료한 단계에서 실제 영어·간체 Reader 응답은 아직 미지원이므로, 기존 원문 표시와 UI-응답 언어 불일치 안내를 우선 수용한다. 웹/모바일 UI locale과 실제 Reader 출력 locale 간 불일치를 사용자에게 은폐하지 않는다. 지원 밖 캐릭터·locale에 자동 확장 금지.
 
 ### 5.3 확장성 원칙
 
@@ -126,33 +134,33 @@ canonical Character Bible + approved relationship/context + allowed Saju/Face gr
 - canonical Character ID/persona/관계·메모리·허용 source grounding/entitlement 불변.
 - 지원된 캐릭터×locale에서 승인한 인칭·호칭·경어·말투가 문맥별 일관되게 유지; 같은 캐릭터의 다른 언어는 성격 동일, 다른 캐릭터 간 구별 유지.
 - 사주/관상 claim·원문·출처/불확실성 의미 강화/누락 0; 과거 저장된 한국어 발화 재작성 0.
-- `ja-JP`/`zh-TW`/`en-US`를 포함한 unsupported 또는 unapproved voice profile에서 임의 외국어 공개 0; guard 실패 시 fail-closed.
+- `ja-JP`/`zh-TW`/`en-US`/`zh-CN`을 포함한 unsupported 또는 unapproved voice profile에서 임의 외국어 공개 0; guard 실패 시 fail-closed.
 - 웹/모바일·서버 locale 요청의 허용 범위가 실제 사용 가능 캐릭터/feature별로 일치.
 
 ## 6. I18N-07 — 통합 수용·배포
 
 I18N-04/05/06 중 source 승인·운영 준비도·캐릭터×locale 화법 승인·의미/Output Guard가 충족된 **부분 집합만** 수용한다. 전 기능 일괄 출시를 기다리거나 미지원 범위를 완료로 포장하지 않는다.
 
-1. 기존 KO/JA/ZH-TW 및 신규 EN-US **명시 선택**의 저장·reload·웹/모바일 동기화 경계, 동일 session/thread, 새 응답, 기록 재열람, 오류/거부, locale 변경 중 in-flight/재시도 경계. UI locale가 바뀌어도 이전 source 문장/진행 중 응답을 번역하지 않는다.
+1. 기존 KO/JA/ZH-TW 및 신규 EN-US/ZH-CN **명시 선택**의 저장·reload·웹/모바일 동기화 경계, 동일 session/thread, 새 응답, 기록 재열람, 오류/거부, locale 변경 중 in-flight/재시도 경계. UI locale가 바뀌어도 이전 source 문장/진행 중 응답을 번역하지 않는다.
 2. 캐릭터 정체성·상황별 1인칭/경어·말투 정합성, source-grounding/claim/qualifier, Reading/DB/Commerce 권한, 원문 보존 회귀.
-3. Source readiness/HOLD와 Reader 지원 상태를 UI에 분리 표시. 특히 **EN-US UI 제공**과 **EN-US Reader 응답·공식 사주·관상 미승인**을 독립 표시한다. 미구현 언어 공식 풀이를 공식 지원으로 표시하지 않는다.
+3. Source readiness/HOLD와 Reader 지원 상태를 UI에 분리 표시. 특히 **EN-US·ZH-CN UI 제공**과 **해당 로케일 Reader 응답·공식 사주·관상 미승인**을 독립 표시한다. 미구현 언어 공식 풀이를 공식 지원으로 표시하지 않는다.
 4. 정확한 CI 귀속·production SHA 확인 뒤 승인된 subset만 공개; 원래 운영 feature flags·release authority 유지.
 
 ## 7. 다음 실제 구현 순서와 중단 조건
 
-**병렬 우선 작업 — `en-US` UI 도입:** I18N-02/03의 기존 KO-first UI 계약을 유지한 상태에서 웹/모바일 locale 사전·선택/저장·UI request header allowlist·UI-only 소비 화면·원문 보존 안내를 영어까지 늘리고, 신규 I18N-07 회귀를 추가한다. 기존 진행 중 I18N-06 Reader source 정합성 결정과 독립적으로 진행하지만 영어 생성·공식 출력 승인은 앞당기지 않는다. 상세 절차는 §8.
+**병렬 우선 작업 — `en-US`·`zh-CN` UI 도입:** I18N-02/03의 기존 KO-first UI 계약을 유지한 상태에서 웹/모바일 locale 사전·선택/저장·UI request header allowlist·UI-only 소비 화면·원문 보존 안내를 영어·간체까지 늘리고, 신규 I18N-07 회귀를 추가한다. 기존 진행 중 I18N-06 Reader source 정합성 결정과 독립적으로 진행하지만 영어·간체 생성·공식 출력 승인은 앞당기지 않는다. 영어 상세 절차는 §8, 간체는 §9.
 
 1. **승인된 순서로 전환**: 먼저 `docs/FRONTEND_INTEGRATION_READER_SHARED_BIBLE_BASELINE_V1_20261022.md` 기준으로 캐릭터별 기존 Bible 및 published `speech`/`persona`의 언어 중립 화법 참조를 정리한다. 승인되지 않은 Draft는 명시적으로 HOLD하고 새 Canon을 만들지 않는다. 이후 준비된 **I18N-06a** 인터페이스를 사용한다. **비한국어 출력 공개는 하지 않는다.**
 2. **I18N-06b/06c 기반 PR 작성 완료(병합·출력 허가와 별개)**: 공통 언어 규칙 및 sparse 예외 스키마는 유지하고, 먼저 언어 중립 바이블 기준선과 연결한다. **그 후** 언어/국가별 후보를 제시·승인받아 개별 값을 등록한다. 미승인은 HOLD. 기존 KO character persona 변경 금지.
 3. 승인된 샘플 캐릭터×로케일만 **I18N-06d/e** 합성·guard 및 수용. 승인 없으면 출력 활성화 없이 인프라까지만 진행.
 4. I18N-04는 Saju source 준비도, I18N-05는 Face source 준비도 확보 시 병렬 진행. 공식 Reading의 이전 artifact 재언어화는 ② 보류 해제 후에만 착수.
-5. I18N-07은 실제 허가된 경로만 통합·배포. 영어 UI 부분 집합은 영어 Reader/공식 출력 승인 없이도 별도 UI 수용 조건을 충족하면 진행할 수 있다.
+5. I18N-07은 실제 허가된 경로만 통합·배포. 영어·간체 UI 부분 집합은 각 언어 Reader/공식 출력 승인 없이도 별도 UI 수용 조건을 충족하면 진행할 수 있다.
 
-## 8. 신규 `en-US` 작업 분해·순서·수용 게이트 (v2.1)
+## 8. 신규 `en-US` 작업 분해·순서·수용 게이트 (v2.2)
 
 | 순서 | 기존 단계 귀속 | 구현 범위 | 수용 기준 및 경계 | 상태 |
 |---|---|---|---|---|
-| **EN-UI-A** | I18N-02/03 | 웹·모바일 `en-US` 정적 UI 사전, 선택기/타입/normalize, 명시 선택 저장·복원, API `X-MyeongHa-UI-Locale` allowlist 조정 | 선택 전 KO-first, 지원 밖 `en`/`en-GB`/`zh-CN` 무단 확대 없음; 헤더는 UI preference만 전달 | **미구현 / 우선** |
+| **EN-UI-A** | I18N-02/03 | 웹·모바일 `en-US` 정적 UI 사전, 선택기/타입/normalize, 명시 선택 저장·복원, API `X-MyeongHa-UI-Locale` allowlist 조정 | 선택 전 KO-first, 지원 밖 `en`/`en-GB` 무단 확대 없음; 승인된 `zh-CN` 확장은 §9의 별도 명시 계약으로만 수행; 헤더는 UI preference만 전달 | **미구현 / 우선** |
 | **EN-UI-B** | I18N-07 허가된 부분 집합 | Chat/Reading/Reader Picker/기록/프리뷰의 영어 UI 저자 텍스트, 오류·HOLD·접근성, 원문 비번역 안내 | `message.body`, 공식 `step.*`/record, `openingLine`, 식별자·권한·결제/Grant·birth/timezone 불변. 출처/캐릭터 이름·직함은 원문 또는 승인된 표시만 | **미구현 / 우선** |
 | **EN-UI-C** | I18N-07 회귀 | 웹/모바일(locale 변경·reload·in-flight·retry·guest/member·HOLD), Korean fallback, UI/source 분리·응답 원문 보존 테스트 | 지원된 UI만 `en-US` 선택 가능, Reader/공식 풀이를 영어 지원으로 오표시 0, 인증/권한 우회 0 | **미구현 / EN-UI-A/B 후** |
 | **EN-VOICE** | I18N-06b/c/d/e | 9인 공통 source 기준 확정 뒤 English common voice convention과 필요한 캐릭터별 sparse delta 후보·출력 guard·제한 수용 | 6인 출처 충돌 Character owner 결정, 후보 사용자 승인, runtime source/persona/semantic/output admission 통과 전 실제 영어 대사 생성·출시 **HOLD** | **후행 / 승인 대기** |
@@ -175,10 +183,43 @@ UI 선택과 Reader/공식 출력/유료 구매 권한 사이에는 자동 승�
 
 ### 8.2 수용·중단 규칙
 
-- **계약 우선:** 현재 `en-US`는 아직 실제 UI 지원값이 아니다. 웹/모바일/API 경계가 동시에 준비되기 전에는 '영어 지원 완료'로 보고하지 않는다. 새 영어 선택은 한국어 기본을 변경하거나 `Accept-Language` 기반 자동 선택을 추가하지 않는다.
+- **계약 우선:** 현재 `en-US`와 `zh-CN`은 아직 실제 UI 지원값이 아니다. 웹/모바일/API 경계가 동시에 준비되기 전에는 '영어 지원 완료'로 보고하지 않는다. 새 영어·간체 선택은 한국어 기본을 변경하거나 `Accept-Language` 기반 자동 선택을 추가하지 않는다.
 - **원문 불변:** 과거 Chat/Official Reading/Reader utterance, 현재 서버가 생성한 한국어 텍스트, 비공개 정보·HOLD·보호 fallback의 내용을 영어 UI 사전으로 재해석·번역하지 않는다. UI-only notice로 원문 언어 유지·지원 범위를 명확하게 알린다.
-- **승인 분리:** EN UI의 구현·CI GREEN ≠ EN Reader output approval ≠ EN Saju/Face semantic/source approval ≠ 기존 Reading 재언어화 승인 ② ≠ 상용 release. 승인 책임은 Character/Saju/Face/Reader/UX/Ops 기존 owner에 남긴다.
+- **승인 분리:** EN·ZH-CN UI의 구현·CI GREEN ≠ 해당 locale Reader output approval ≠ 해당 locale Saju/Face semantic/source approval ≠ 기존 Reading 재언어화 승인 ② ≠ 상용 release. 승인 책임은 Character/Saju/Face/Reader/UX/Ops 기존 owner에 남긴다.
 - **CI/PR:** 기존 작업 브랜치·로드맵을 유지하고 변경 PR은 `Watchtower-Track: frontend-integration`으로 귀속한다. 관련 CI만 확인하며, CI 성공 시에도 자동으로 English production flag를 활성화하지 않는다. 병합은 auto-merge.
-- **완료 표기:** 구현한 실제 UI 화면/locale·메시지 원문 보호·미지원 표시·회귀 결과를 각각 보고한다. 영어 Reader/공식 출력은 소유자가 승인한 이후에만 별도 완료 상태로 갱신한다.
+- **완료 표기:** 구현한 실제 UI 화면/locale·메시지 원문 보호·미지원 표시·회귀 결과를 각각 보고한다. 영어·간체 Reader/공식 출력은 소유자가 승인한 이후에만 별도 완료 상태로 갱신한다.
+
+## 9. 신규 `zh-CN` 작업 분해·순서·수용 게이트 (v2.2)
+
+| 순서 | 기존 단계 귀속 | 구현 범위 | 수용 기준 및 경계 | 상태 |
+|---|---|---|---|---|
+| **CN-UI-A** | I18N-02/03 | `en-US`와 공통 웹·모바일 locale 계약 확장. 별도 `zh-CN` 타입·명시 선택·저장/복원·API UI 헤더 allowlist·Korean fallback | `zh-TW`와 식별자 분리; `zh`/`zh-Hans`/`zh-HK` 자동 매핑 금지; 기존 세 언어 선택·저장 호환성 유지 | **미구현 / 우선** |
+| **CN-UI-B** | I18N-07 허가된 부분 집합 | 번체 변환본을 무검수 유통하지 않는 간체 UI authored 카탈로그. Chat/Reading/Reader Picker/프리뷰/기록의 메뉴·상태·HOLD·접근성·원문 주의 문구 | Character 이름·직함은 별도 승인 전 기존 원문 보존. `message.body`, `openingLine`, 서버 `step.*`/Official artifact, 진단 코드/출처·권한/Grant 변조 0 | **미구현 / 우선** |
+| **CN-UI-C** | I18N-07 회귀 | KO/JA/ZH-TW/EN-US/ZH-CN 선택·복원·reload·in-flight·retry·guest/member·HOLD·원문 보존 테스트 | 번체/간체 UI 분리 및 Korean-first; 간체 UI만으로 Reader/공식 풀이를 간체 지원으로 오표시 0 | **미구현 / CN-UI-A/B 후** |
+| **CN-VOICE** | I18N-06b/c/d/e | 9인 중립 화법 source 인계와 6인 충돌 해결 후 간체 공통 화법·필요한 캐릭터별 sparse delta 후보·Output Guard | Character 소유자 정본, 중국어 호칭/인칭·관계 표현 사용자 승인, runtime·semantic·persona·출력 admission 통과 전 실제 간체 생성·공개 **HOLD** | **후행 / 승인 대기** |
+| **CN-SAJU** | I18N-04 | source-owned 간체 명리학 용어·서술 자산/semantic parity/qualifier/disclosure 연계 | Saju owner의 `zh-CN` source/renderer/provenance 승인 없으면 공식 풀이 출력 **HOLD**; 기존 artifact 재언어화 정책 ② 유지 | **후행 / Source 대기** |
+| **CN-FACE** | I18N-05 | source-owned 간체 관상 용어·해석 표현·주의/출처 안내 연계 | Face provider 및 `zh-CN` source/semantic admission 없으면 간체 관상 공식 출력 **HOLD** | **후행 / Source 대기** |
+
+### 9.1 의존 관계 및 출시 경계
+
+```text
+기존 KO/JA/ZH-TW UI + Korean-first 요청 계약
+  ├─ [공통 기반] EN-UI-A + CN-UI-A (타입·선택기·UI 헤더 allowlist 일괄 확장)
+  ├─ [로케일별 작성] EN-UI-B / CN-UI-B (서로 별도 UI 문구·HOLD·회귀)
+  ├─ [부분 수용] EN-UI-C / CN-UI-C → 영어·간체 UI-only 수용
+  ├─ [Character owner] 공통 published Bible·6인 충돌 해결
+  │       → 간체 공통 표현·예외 후보 승인 → Runtime/Output Guard → 승인된 Reader만
+  ├─ [Saju owner] 간체 Claim/용어집/renderer/source admission → 공식 사주 승인 후
+  └─ [Face owner] 간체 provider/source/semantic admission → 공식 관상 승인 후
+
+중국 본토 서비스 운영/결제/규제 대응은 locale UI 구현과 별개인 후행 승인 범위.
+```
+
+### 9.2 간체 전용 수용 원칙
+
+- UI 카탈로그의 간체 글자 사용만으로 `zh-TW`와 동일한 용어·화법을 승인한 것으로 보지 않는다. **저자 UI 문구는 `zh-CN`으로 별도 검토**, 공식 source 문장은 source 소유자 승인을 별도로 받는다.
+- 언어 선택값으로 출생 지역·절기·역법·시간대/계산 기준을 자동 전환하지 않는다. 간체 UI를 중국 본토 사용자에게 노출하는 것과 중국 본토 상품 판매·결제·개인정보 운영 허가는 다르다.
+- 기존 캐릭터 프로필, 원본 Chat, 과거 Official Reading, 서버 오류 식별자, source/semantic hash 및 server grant를 변경하지 않는다. `zh-CN` UI 선택은 LLM responseVoiceLocale·ReadingLocale·source admission의 근거가 아니다.
+- 영어·간체 양쪽 모두 UI 변경 완료와 실제 공개·운영 완료를 구분하고, 미승인 Reader/사주/관상 언어는 명시적으로 HOLD한다.
 
 PR 별 범위는 최소화한다. CI가 시작되었다는 사실만으로 unrelated 작업을 중단하지 않지만, **현재 작업 PR에 귀속된 CI가 다음 필수 단계인 경우** 결과를 반복 조회하지 않고 세션을 중단한다. 실행 완료 보고는 각각 한 줄: **한 것 / 남은 것 / 다음에 할 것 / 블로커 및 승인사항**.
