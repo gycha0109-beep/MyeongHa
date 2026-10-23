@@ -350,11 +350,13 @@ export async function tryHandleCloudflareApprovedAuthV1(request, bindings, route
 
   let approvedDbConfig;
   try {
+    // This shared DB preflight must not require the Member sign-in rate-limit
+    // secret for Guest bootstrap, OAuth start, profile reads or Birth routes.
+    // The rate-limit runtime below validates its own independent secret.
     // No socket opened: require the governed CA fingerprint, TLS verify-full
     // hostname target and request-scoped single-connection candidate BEFORE
     // Auth, Supabase, Naver redirect or PostgreSQL runtime acquisition.
     const config = parseProductionUserDataRuntimeConfigV1(bindings);
-    parseProductionMemberAuthRateLimitConfigV1(bindings);
     if (!approvedCloudflarePostgresTargetV1(config, bindings)) return unavailable();
     const tls = buildProductionNodePostgresPoolConfigV1(
       config, CLOUDFLARE_DIRECT_POSTGRES_CANDIDATE_LIMITS_V1,
