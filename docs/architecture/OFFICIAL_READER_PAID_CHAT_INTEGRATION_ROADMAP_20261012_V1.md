@@ -124,3 +124,14 @@ S1에서 공통 잠금 함수 자체가 성공하더라도 **S2 전체 경로가
 - 잠금 이후 현재 유효 묶음 판정: [#1987](https://github.com/gycha0109-beep/MyeongHa/pull/1987). **0개 / 1개 / 여러 묶음 충돌**만 구분하는 비공개 함수. 기존 검증 [38202209130](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38202209130) 성공. 새 본선에서는 변경된 DB 스키마 기준값과 재검증을 요구한다.
 - **선행 충돌:** RR-03 [#1960](https://github.com/gycha0109-beep/MyeongHa/pull/1960)의 `1720_official_reader_assistant_provenance_storage_v1.sql`과 현재 본선 Product `1720_standard_reader_product_scope_read_v1.sql`이 같은 1720 번호를 사용한다. 기존 RR-03/04의 근거 저장 내용을 삭제하거나 Product 기능으로 대체하지 않으며, 독립 번호 재배치·카탈로그·Privacy 삭제/복원 재검증 없이 병합/배포하지 않는다.
 - **미완료:** 실제 Commerce 발급·환불·회수 Writer의 공동 잠금 적용, RR-03 신뢰 출처 원자 저장, 유료 원문 보호 격리와 Reader 정식 조회, 운영 1400~1450 복구. 세 작업 가지의 검증 성공도 유료 답변 공개 승인으로 해석하지 않는다.
+
+## 10. S2 실제 기능 구현 — 검증된 Receipt → Grant → Reader 결속 원자 경로 (2026-10-18)
+
+**진행 상태: S2 부분 구현 / 전체 S2 미완료 / 운영·유료 공개 HOLD.** M1-N 형태로 검증 마일스톤을 추가하지 않고 위 §3의 기존 S2 납품 범위를 수행한다.
+
+- 신규 순방향 SQL `1760_official_reader_scope_atomic_receipt_bind_v1.sql`에서 **실제 저장 경로** `internal_apply_verified_reader_purchase_under_scope_v1`를 구현한다. 신뢰된 Subject 문맥과 DB 저장 Receipt·구매 Intent·Reader 선택을 확인한 후 S1의 `internal_acquire_official_reader_scope_lock_v1`로 **Subject×공식 Reading×Reader** 잠금을 먼저 잡는다.
+- 같은 PostgreSQL 트랜잭션 안에서 기존 1090 `internal_apply_verified_receipt_capability_effects_v1`로 실제 Capability Grant/Event/Projection/Outbox를 확정하고, 기존 1220 `cmd_bind_standard_reading_access_v2`로 공식 Reading/Reader Access를 결속한다. 저장된 반환 Reading/Reader/구매 Intent가 잠금 범위와 다르면 오류로 **전체 Grant/결속을 롤백**한다.
+- API/Public/Service Role에 새 SQL 함수 EXECUTE를 부여하지 않는다. `READ COMMITTED`와 서버 검증 Subject 필수이며, 현재 운영 DB·결제사·환불 API를 호출하지 않는다.
+- `test/db/official_reader_s2_atomic_receipt_bind_live_writer_race.sh`는 기존 S2 2세션 경합 fixture를 재사용해 **기존 수동 잠금 테스트 대신 실제 합성 Receipt·Grant·Reader 결속 함수를 호출**한다. T2 먼저→실제 발급 대기/커밋, Reader 묶음 충돌, 회수 먼저→T2 후 현재 권한 재조회가 핵심 인수 조건이다.
+- **여전히 미완료:** 원래 `internal_apply_entitlement_effect_v1`의 독립 공급자 회수·환불 Writer, 기존 1090의 직접 호출 경로, 모든 T2·추가 Reader 구매·기타 Commerce 경로에 공통 잠금을 강제한 상태가 아니다. 해당 우회 경로를 닫기 전에는 §3 **S2 완료**나 유료 해설 T2 정합성을 선언하지 않는다.
+- S2 전체 종료 전에 각 Writer의 기존 Receipt/Grant/Purchase/Birth 행 잠금과 새로운 범위 잠금의 **전역 획득 순서**를 검토하고, 독립 호출이 가능한 소유자 경로를 제한해야 한다. S3~S8은 원래 로드맵 순서와 소유자 승인을 그대로 따른다.

@@ -27,7 +27,8 @@
       "reading-history",
       "standard-reading-artifact-reread",
       "official-standard-reading-reader-interpretation",
-      "official-reader-provider-revoke-race"
+      "official-reader-provider-revoke-race",
+      "official-reader-s2-atomic-receipt-bind"
     ]
   },
   "commerce-payment": {

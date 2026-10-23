@@ -45,6 +45,7 @@ describe('shared CI verification plan', () => {
     expect(cases.filter((name: string) => name === 'saju-staging-operator-admission-v2')).toHaveLength(2);
     expect(new Set(cases).size).toBeGreaterThanOrEqual(44);
     expect(getDbSuite('content').cases).toContain('official-reader-provider-revoke-race');
+    expect(getDbSuite('content').cases).toContain('official-reader-s2-atomic-receipt-bind');
     expect(getDbSuite('runtime').cases).toContain('guest-promotion-auth-fk');
     expect(getDbSuite('runtime').cases).toContain('reader-memory-tenant-boundary');
     expect(getDbSuite('postgres17').cases).toContain('guest-promotion-auth-fk');
