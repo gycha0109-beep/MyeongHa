@@ -14,7 +14,7 @@ if (base.protocol !== 'https:' || !base.hostname.endsWith('.workers.dev') ||
 
 const pages = [
   ['index.html','.landing-header'],
-  ['hall.html','.gm-home-hero'],
+  ['hall.html','main .gm-home-hero, main .mhx-hero'],
   ['auth.html','.auth-layout'],
   ['birth.html','#birth-status'],
   ['chat-hub.html','.chat-hub-shell'],
