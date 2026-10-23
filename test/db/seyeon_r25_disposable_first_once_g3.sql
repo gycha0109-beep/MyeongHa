@@ -64,6 +64,47 @@ begin
   for update;
   if not found or v_state is distinct from 'committed' then return null; end if;
 
+  -- The same REAL G2 v2 Commit also emitted one durable Post-turn event.
+  -- First Reveal is not authorized by a standalone assistant message:
+  -- bind the DB-original user message, Assistant and Attempt to the same
+  -- event/snapshot before consuming this Turn's one-shot send right.
+  perform 1
+  from public.outbox_events oe
+  join public.conversation_messages original_user
+    on original_user.subject_id=p_subject
+   and original_user.thread_id=p_thread
+   and original_user.turn_id=p_turn
+   and original_user.sender_type='user'
+   and original_user.redacted_at is null
+  where oe.aggregate_type='chat_turn'
+    and oe.aggregate_id=p_turn::text
+    and oe.event_type='SEYEON_POST_TURN_ANALYSIS_REQUESTED'
+    and oe.event_schema_version='v1'
+    and oe.dedupe_key='seyeon-post-turn-v1'
+    and oe.payload_jsonb->>'schemaVersion'
+      = 'seyeon-post-turn-analysis-request-v1'
+    and oe.payload_jsonb->>'subjectId'=p_subject::text
+    and oe.payload_jsonb->>'characterId'='seyeon'
+    and oe.payload_jsonb->>'turnId'=p_turn::text
+    and oe.payload_jsonb->>'attemptId'=p_attempt::text
+    and oe.payload_jsonb->>'userMessageId'=original_user.id::text
+    and oe.payload_jsonb->>'assistantMessageId'=p_assistant_message::text
+    and oe.payload_jsonb->'snapshot'->>'schemaVersion'
+      = 'seyeon-post-turn-analysis-snapshot-v1'
+    and oe.payload_jsonb->'snapshot'->>'turnId'=p_turn::text
+    and oe.payload_jsonb->'snapshot'->>'userMessageId'=original_user.id::text
+    and oe.payload_jsonb->'snapshot'->>'assistantMessageId'
+      = p_assistant_message::text
+  for share of oe,original_user;
+  if not found then return null; end if;
+  if (select count(*) from public.outbox_events other_event
+      where other_event.aggregate_type='chat_turn'
+        and other_event.aggregate_id=p_turn::text
+        and other_event.event_type='SEYEON_POST_TURN_ANALYSIS_REQUESTED'
+        and other_event.dedupe_key='seyeon-post-turn-v1')<>1 then
+    return null;
+  end if;
+
   -- Preserve R5's ACTUAL original Memory/Grant/Attempt/Message checks.
   -- R5 locks Subject+original Grant/Record until the surrounding transaction
   -- owns the Node direct socket's 'finish'; no stale read-then-disclose.
