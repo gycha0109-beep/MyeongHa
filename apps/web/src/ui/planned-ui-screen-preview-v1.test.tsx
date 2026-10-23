@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { HomePage } from '../home/HomePage.js';
 import { ChatHubPage } from '../chat-hub/ChatHubPage.js';
 import { RecordsPage } from '../records/RecordsPage.js';
+import { ReadingPage } from '../reading/ReadingPage.js';
 import {
   resolveDevPlannedUiPreviewLocaleV1,
   previewReviewedUiTextV1,
@@ -74,4 +75,32 @@ describe('I18N-07 developer-only rendered EN/ZH UI preview', () => {
     expect(korean).toContain('>사주 기록</button>');
     expect(korean).not.toContain('data-planned-ui-preview=');
   });
+  it('renders approved Saju UI guidance in EN/CN without changing calculator DOM contracts', () => {
+    const english = renderToStaticMarkup(<ReadingPage previewLocale="en-US" />);
+    const chinese = renderToStaticMarkup(<ReadingPage previewLocale="zh-CN" />);
+    const korean = renderToStaticMarkup(<ReadingPage />);
+    expect(english).toContain('data-planned-ui-preview="en-US"');
+    expect(english).toContain('The available preview is for verification and is not an official guide interpretation.');
+    expect(english).toContain('Enter your birth details to calculate your chart for this session.');
+    expect(english).toContain('aria-label="Birth year"');
+    expect(english).toContain('Create my birth chart');
+    expect(chinese).toContain('data-planned-ui-preview="zh-CN"');
+    expect(chinese).toContain('当前提供的是验证用途的预览');
+    expect(chinese).toContain('aria-label="出生年份"');
+    expect(chinese).toContain('创建我的八字命盘');
+    expect(korean).toContain('프리뷰 확인은 현재 제공 가능한 검증용 읽기이며');
+    for (const html of [english, chinese, korean]) {
+      for (const id of ['saju-hub','saju-birth-form','saju-birth-year','saju-birth-month',
+        'saju-birth-day','saju-birth-time','saju-pillar-grid','saju-day-master',
+        'saju-element-bars','saju-completeness-copy','saju-flow-year','saju-birth-sex']) {
+        expect(html).toContain('id="' + id + '"');
+      }
+      expect(html).toContain('name="saju-calendar"');
+      expect(html).toContain('value="solar"');
+      expect(html).toContain('value="lunar"');
+      expect(html).toContain('href="reading-detail.html?topic=temperament&amp;scope=original"');
+    }
+    expect(korean).not.toContain('data-planned-ui-preview=');
+  });
+
 });
