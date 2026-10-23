@@ -40,6 +40,14 @@
   ],
   "rewrites": [
     {
+      "source": "/api/identity-verifications/attempts",
+      "destination": "/api/me?__myeongha_identity_action=issue"
+    },
+    {
+      "source": "/api/identity-verifications/complete",
+      "destination": "/api/me?__myeongha_identity_action=complete"
+    },
+    {
       "source": "/api/auth/social/naver/authorize",
       "destination": "/api/auth/sign-in?__myeongha_naver_oauth_bridge=authorize"
     },

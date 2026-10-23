@@ -59,16 +59,19 @@ function context(activation: boolean, readPending = true, canConsume = true) {
 }
 
 describe('LEGAL PortOne V2 identity HTTP source boundary', () => {
-  it('registers both Vercel entrypoints without provider secrets or activation', () => {
-    for (const [name, handler] of [
-      ['attempts', 'handlePortOneV2IdentityIssueRequestV1'],
-      ['complete', 'handlePortOneV2IdentityCompleteRequestV1'],
-    ] as const) {
-      const source = readFileSync(new URL(`../api/identity-verifications/${name}.ts`, import.meta.url), 'utf8');
-      expect(source).toContain(handler);
-      expect(source).not.toContain('testOnlyActivation');
-      expect(source).not.toContain('PORTONE_API_SECRET');
-    }
+  it('reuses the existing Vercel dispatcher with OFF-only identity routes', () => {
+    const web = JSON.parse(readFileSync(new URL('../vercel.json', import.meta.url), 'utf8')) as {
+      rewrites: Array<{ source: string; destination: string }>;
+    };
+    expect(web.rewrites).toEqual(expect.arrayContaining([
+      { source: '/api/identity-verifications/attempts', destination: '/api/me?__myeongha_identity_action=issue' },
+      { source: '/api/identity-verifications/complete', destination: '/api/me?__myeongha_identity_action=complete' },
+    ]));
+    const dispatcher = readFileSync(new URL('../api/me.ts', import.meta.url), 'utf8');
+    expect(dispatcher).toContain('handlePortOneV2IdentityIssueRequestV1');
+    expect(dispatcher).toContain('handlePortOneV2IdentityCompleteRequestV1');
+    expect(dispatcher).toContain('identityAction');
+    expect(dispatcher).not.toContain('testOnlyActivation');
   });
 
   it('registers inert routes, stays OFF, and makes zero DB/provider calls', async () => {

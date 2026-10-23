@@ -1,4 +1,8 @@
 import { executeSecurityObservedRequestV1 } from '../apps/api/src/security-observability.js';
+import {
+  handlePortOneV2IdentityIssueRequestV1,
+  handlePortOneV2IdentityCompleteRequestV1,
+} from '../apps/api/src/portone-v2-identity-http-v1.js';
 import { canonicalizeRequestUiLocaleHeadersV1 } from '../apps/api/src/request-ui-locale-v1.js';
 import { createNodePostgresSubjectPoolV1 } from '../apps/api/src/node-postgres-subject-pool.js';
 import { createProductionChatReadRuntimeV1 } from '../apps/api/src/production-chat-read-runtime.js';
@@ -19,6 +23,9 @@ import { parseProductionUserDataRuntimeConfigV1 } from '../apps/api/src/producti
 export const config = Object.freeze({ maxDuration: 60 });
 
 const PROFILE_ROUTE = '/api/me' as const;
+const IDENTITY_ISSUE_ROUTE = '/api/identity-verifications/attempts' as const;
+const IDENTITY_COMPLETE_ROUTE = '/api/identity-verifications/complete' as const;
+const IDENTITY_ACTION_PARAM = '__myeongha_identity_action' as const;
 const LIFE_RECORD_ROUTE = '/api/life-record' as const;
 const READINGS_ROUTE = '/api/readings' as const;
 const MEMORIES_ROUTE = '/api/memories' as const;
@@ -168,6 +175,8 @@ function getSajuPreviewReadingRuntime(): ReturnType<typeof createProductionCurre
 }
 
 type DispatchTarget =
+  | { readonly kind: 'identity-issue'; readonly route: typeof IDENTITY_ISSUE_ROUTE }
+  | { readonly kind: 'identity-complete'; readonly route: typeof IDENTITY_COMPLETE_ROUTE }
   | { readonly kind: 'profile'; readonly route: typeof PROFILE_ROUTE }
   | { readonly kind: 'saju-preview-reading'; readonly route: typeof SAJU_PREVIEW_READING_ROUTE }
   | {
@@ -247,6 +256,8 @@ function getChatPathThreadId(pathname: string): string | null | undefined {
   if (getChatTurnPathThreadId(pathname) !== undefined) return undefined;
   if (
     pathname === PROFILE_ROUTE ||
+    pathname === IDENTITY_ISSUE_ROUTE ||
+    pathname === IDENTITY_COMPLETE_ROUTE ||
     pathname === CHAT_OPEN_ROUTE ||
     pathname === LIFE_RECORD_ROUTE ||
     pathname === READINGS_ROUTE ||
@@ -323,6 +334,7 @@ function resolveDispatchTarget(request: Request): DispatchTarget | null {
 
   const keys = [...new Set(url.searchParams.keys())];
   const knownKeys = new Set<string>([
+    IDENTITY_ACTION_PARAM,
     RECORDS_ROUTE_PARAM,
     READING_RECORD_ID_PARAM,
     CHAT_OPEN_PARAM,
@@ -343,6 +355,23 @@ function resolveDispatchTarget(request: Request): DispatchTarget | null {
 
   const shareValue = getSingleNonEmptyParam(url.searchParams, VERCEL_SHARE_PARAM);
   if (shareValue === null) return null;
+
+  // Reuse the existing Vercel function budget rather than adding two public
+  // serverless functions. Only exact source routes or the governed rewrite
+  // markers reach the currently disabled identity handlers.
+  const identityAction = getSingleNonEmptyParam(url.searchParams, IDENTITY_ACTION_PARAM);
+  const identitySourceAction = url.pathname === IDENTITY_ISSUE_ROUTE ? 'issue'
+    : url.pathname === IDENTITY_COMPLETE_ROUTE ? 'complete' : undefined;
+  if (identityAction !== undefined || identitySourceAction !== undefined) {
+    if ((identityAction !== 'issue' && identityAction !== 'complete') ||
+        (url.pathname !== PROFILE_ROUTE && identitySourceAction !== identityAction) ||
+        keys.some(key => key !== IDENTITY_ACTION_PARAM && key !== VERCEL_SHARE_PARAM)) {
+      return null;
+    }
+    return identityAction === 'issue'
+      ? { kind: 'identity-issue', route: IDENTITY_ISSUE_ROUTE }
+      : { kind: 'identity-complete', route: IDENTITY_COMPLETE_ROUTE };
+  }
 
   const recordsRoute = getSingleNonEmptyParam(url.searchParams, RECORDS_ROUTE_PARAM);
   if (recordsRoute === null) return null;
@@ -745,6 +774,9 @@ function routeNotFound(): Response {
 
 function runtimeForTarget(target: DispatchTarget) {
   switch (target.kind) {
+    case 'identity-issue':
+    case 'identity-complete':
+      throw new Error('Disabled identity routes are dispatched before runtime initialization.');
     case 'profile':
       return getProfileRuntime();
     case 'saju-preview-reading':
@@ -779,6 +811,13 @@ export default {
         if (target === null) {
           cancelUnusedRequestBodyBestEffort(request);
           return routeNotFound();
+        }
+
+        if (target.kind === 'identity-issue' || target.kind === 'identity-complete') {
+          const identityRequest = toCanonicalMeRequestForTestV1(request, target);
+          return target.kind === 'identity-issue'
+            ? handlePortOneV2IdentityIssueRequestV1({ request: identityRequest, requestId })
+            : handlePortOneV2IdentityCompleteRequestV1({ request: identityRequest, requestId });
         }
 
         const result = await runtimeForTarget(target).handleRequest({
