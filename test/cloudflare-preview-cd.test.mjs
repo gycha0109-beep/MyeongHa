@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import previewWorker from '../cloudflare/preview-worker.mjs';
 import {
   CLOUDFLARE_PREVIEW_CD_V1,
@@ -91,4 +91,65 @@ describe('Cloudflare preview Git-based CD', () => {
     expect(aliased.status).toBe(503);
     expect(assetFetches).toBe(0);
   });
+  it('uses the existing Member preflight on the real Worker route when Auth is configured', async () => {
+    const asset = vi.fn(async () => new Response('wrong static fallback'));
+    const env = {
+      MYEONGHA_SUPABASE_URL: 'https://cnsfpcdiyofqvhpcegfc.supabase.co',
+      MYEONGHA_SUPABASE_API_KEY: 'preview-auth-test-key-1234567890',
+      ASSETS: { fetch: asset },
+    };
+    const url = 'https://preview.example/api/chat/123e4567-e89b-42d3-a456-426614174000/turns';
+    const method = await previewWorker.fetch(new Request(url), env);
+    expect(method.status).toBe(405);
+    expect(method.headers.get('Allow')).toBe('POST');
+    expect(await method.text()).toBe('');
+
+    const unauthenticated = await previewWorker.fetch(new Request(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        clientTurnId: '123e4567-e89b-42d3-a456-426614174001',
+        text: 'hello',
+      }),
+    }), env);
+    expect(unauthenticated.status).toBe(401);
+    expect((await unauthenticated.json()).error.code).toBe('AUTH_REQUIRED');
+
+    const verifiedUserId = '123e4567-e89b-42d3-a456-426614174002';
+    const upstream = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+      expect(input).toBe(env.MYEONGHA_SUPABASE_URL + '/auth/v1/user');
+      expect(init.headers.apikey).toBe(env.MYEONGHA_SUPABASE_API_KEY);
+      expect(init.headers.authorization).toBe('Bearer synthetic-member-token');
+      return Response.json({ id: verifiedUserId });
+    });
+    try {
+      const authenticated = await previewWorker.fetch(new Request(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer synthetic-member-token',
+        },
+        body: JSON.stringify({
+          clientTurnId: '123e4567-e89b-42d3-a456-426614174001',
+          text: 'hello',
+        }),
+      }), env);
+      expect(upstream).toHaveBeenCalledTimes(1);
+      expect(authenticated.status).toBe(503);
+      expect(authenticated.headers.get('Cache-Control')).toBe('no-store');
+      expect((await authenticated.json()).error.code)
+        .toBe('SEYEON_FIRST_REVEAL_AUTHORITY_UNAVAILABLE');
+      expect(asset).not.toHaveBeenCalled();
+    } finally {
+      upstream.mockRestore();
+    }
+
+    const missingAuthEnv = { ASSETS: { fetch: asset } };
+    const missing = await previewWorker.fetch(new Request(url), missingAuthEnv);
+    expect(missing.status).toBe(503);
+    expect((await missing.json()).error.code)
+      .toBe('SEYEON_FIRST_REVEAL_AUTHORITY_UNAVAILABLE');
+    expect(asset).not.toHaveBeenCalled();
+  });
+
 });
