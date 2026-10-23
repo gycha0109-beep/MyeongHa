@@ -55,3 +55,11 @@
 - 새 패널은 **읽기 전용 길찾기 안내**만 제공. 실제 열람·정정·삭제·처리정지 신청, 재인증, 접수·처리 완료 메시지 또는 계정 삭제 API 호출을 만들지 않았다. 정식 접수·문의 채널이 아직 없음이 안내되고, 실제 신청이 접수된 것처럼 표시하지 않는다.
 - `apps/web/ui-i18n.js`와 `apps/mobile/src/ui/mobile-ui-copy.ts`의 일본어·번체중국어 authored UI 복제, `test/legal-privacy-rights-surface.test.ts`의 링크·무접수·다국어 회귀 테스트를 추가했다. Native 화면에 동일 패널이 있다는 뜻은 아님.
 - **남은 L1 수락 조건:** 공식 개인정보 문의 접수 수단(운영 정보 확정), 신원 확인 및 접수·처리 이력, 권리행사별 법정 절차·예외·시한, 실 DB/백업의 실제 삭제·복원 후 비재노출 실증. DB/Privacy #2318·Draft #2488/#2301의 코드/운영 상태를 인수하되 중복 구현하지 않는다.
+
+## 7. L2-A 사용자 입력 전 안내와 실제 경계 (2026-10-23)
+
+- **채팅:** `apps/web/src/chat/ChatPage.tsx`의 전송 폼 직전에 민감한 내용·타인 개인정보 입력 주의 및 AI 답변 생성 사용 가능성 고지를 추가했다. 이 안내는 클라이언트 전송 차단·별도 동의·민감정보 탐지 시스템이 **아니다**. 실제 송신은 `apps/web/chat-runtime-client.js`의 POST 경로와 `production-seyeon-turn-send-runtime-v1.ts`/외부 모델 분기 정책을 따른다.
+- **Birth Profile:** `apps/web/src/birth/BirthPage.tsx`와 `apps/web/src/reading/ReadingPage.tsx`의 명식록 생성 폼에 본인 정보만 입력하라는 안내와 명식 계산/저장 목적을 명시한다. 두 경로 모두 `/api/birth-profiles` POST를 호출한다. 기존 출생시각 모름 및 성별 미선택 옵션은 유지한다.
+- **다국어/회귀:** `apps/web/ui-i18n.js`, `apps/mobile/src/ui/mobile-ui-copy.ts`에 일본어·번체중국어 작성 문구를 동기화하고 `test/legal-sensitive-input-guidance.test.ts`에서 전송 버튼 전 배치 및 화면 간 동일 목적 설명을 검증한다. Native 실제 화면 UI를 추가한 것으로 주장하지 않는다.
+- **법무 미완료:** 대화 본문에 포함될 수 있는 법정 민감정보의 실제 저장·조회·AI 외부 전송·로그/재사용·삭제 실증, 사전 고지의 실배포 가시성, 필요한 적법한 처리 근거/별도 동의, `P0-AGE-01` 연령 처리 정책과 구현. 사용자가 미성년자 허용 범위를 결정하기 전 계정 생성 차단이나 법정대리인 동의 UI를 임의로 개발하지 않는다.
+- **증빙 한계:** 기존 설계·코드상 안전 경계를 검토하는 단계이며, 민감정보 외부 전송 0이나 미성년자 수집 0을 증명했다고 판정하지 않는다.
