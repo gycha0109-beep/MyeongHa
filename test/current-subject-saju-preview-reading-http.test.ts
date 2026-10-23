@@ -124,6 +124,35 @@ function request(readingText = '전체 사주', method = 'POST'): Request {
 }
 
 describe('current-subject Saju Preview Reading HTTP boundary v1', () => {
+  it('blocks absent verified age before personal Birth DB reads or Saju provider I/O', async () => {
+    for (const failure of ['denied', 'unavailable'] as const) {
+      const events: string[] = [];
+      const saju = adapter(events);
+      const ageAdmissionPort = {
+        admitFreePersonalization: vi.fn(async () => {
+          if (failure === 'unavailable') throw new Error('DB unavailable');
+          return false;
+        }),
+      };
+      const response = await handleCurrentSubjectSajuPreviewReadingRequestV1({
+        request: request(),
+        requestId: REQUEST_ID,
+        serverTime: SERVER_TIME,
+        identityEvidenceVerifier: verifier(),
+        pool: createPool({ events }),
+        sajuAdapter: saju,
+        ageAdmissionPort,
+      });
+      expect(response.status).toBe(failure === 'denied' ? 403 : 503);
+      expect((await response.json()).error.code).toBe(
+        failure === 'denied' ? 'AGE_VERIFICATION_REQUIRED' : 'AGE_VERIFICATION_UNAVAILABLE',
+      );
+      expect(ageAdmissionPort.admitFreePersonalization).toHaveBeenCalledTimes(1);
+      expect(events).not.toContain('CONNECT');
+      expect(saju.requestReading).not.toHaveBeenCalled();
+    }
+  });
+
   it('allows only the provisionally approved Preview Reading texts', async () => {
     const saju = adapter();
     const connect = vi.fn();

@@ -1,4 +1,5 @@
 import { ApiCommandError } from './api-error.js';
+import type { PortOneVerifiedAgeAdmissionPortV1 } from './portone-v2-verified-age-admission-v1.js';
 import {
   AuthenticatedJsonRequestBodyTooLargeV1,
   readAuthenticatedJsonRequestBodyV1,
@@ -48,6 +49,8 @@ export interface HandleCurrentSubjectSajuPreviewReadingRequestInputV1<AdmittedRe
   readonly identityEvidenceVerifier: IdentityEvidenceVerificationPortV1;
   readonly pool: PostgresSubjectPoolV1;
   readonly sajuAdapter: SajuProductionReadingHttpAdapterV1<AdmittedResponse>;
+  /** Verified account-owner age admission, distinct from any Saju birth data. */
+  readonly ageAdmissionPort?: Pick<PortOneVerifiedAgeAdmissionPortV1, 'admitFreePersonalization'>;
 }
 
 function requireNonEmptyString(name: string, value: unknown): string {
@@ -226,6 +229,26 @@ export async function handleCurrentSubjectSajuPreviewReadingRequestV1<AdmittedRe
       retryable: false,
       requestId,
     });
+  }
+
+  // Reject unverified account owners before reading sensitive birth data or
+  // sending a preview to the Saju provider. Birth Profile DOB is not proof.
+  if (input.ageAdmissionPort !== undefined) {
+    let admitted = false;
+    try {
+      admitted = await input.ageAdmissionPort.admitFreePersonalization(verifiedEvidence);
+    } catch {
+      return errorResponse({
+        status: 503, code: 'AGE_VERIFICATION_UNAVAILABLE',
+        messageKey: 'age.verification_unavailable', retryable: true, requestId,
+      });
+    }
+    if (!admitted) {
+      return errorResponse({
+        status: 403, code: 'AGE_VERIFICATION_REQUIRED',
+        messageKey: 'age.verification_required', retryable: false, requestId,
+      });
+    }
   }
 
   try {

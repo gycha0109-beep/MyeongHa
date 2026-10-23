@@ -1,4 +1,5 @@
 import { ApiCommandError } from './api-error.js';
+import type { PortOneVerifiedAgeAdmissionPortV1 } from './portone-v2-verified-age-admission-v1.js';
 import {
   AuthenticatedJsonRequestBodyTooLargeV1,
   readAuthenticatedJsonRequestBodyV1,
@@ -36,6 +37,8 @@ export interface HandleTargetPersonCreateRequestInputV1 {
   readonly pool: PostgresSubjectPoolV1;
   readonly idPort: TargetPersonCreateIdPortV1;
   readonly fingerprintPort: BirthInputFingerprintPortV1;
+  /** Optional server-only, PortOne-backed free personalization authority. */
+  readonly ageAdmissionPort?: Pick<PortOneVerifiedAgeAdmissionPortV1, 'admitFreePersonalization'>;
 }
 
 function requireNonEmptyString(name: string, value: unknown): string {
@@ -190,6 +193,26 @@ export async function handleTargetPersonCreateRequestV1(
       retryable: false,
       requestId,
     });
+  }
+
+  // A third-party Target Person record must not bypass the same account-owner
+  // verified-age policy used for self Birth Profiles.
+  if (input.ageAdmissionPort !== undefined) {
+    let admitted = false;
+    try {
+      admitted = await input.ageAdmissionPort.admitFreePersonalization(verifiedEvidence);
+    } catch {
+      return jsonError({
+        status: 503, code: 'AGE_VERIFICATION_UNAVAILABLE',
+        messageKey: 'age.verification_unavailable', retryable: true, requestId,
+      });
+    }
+    if (!admitted) {
+      return jsonError({
+        status: 403, code: 'AGE_VERIFICATION_REQUIRED',
+        messageKey: 'age.verification_required', retryable: false, requestId,
+      });
+    }
   }
 
   try {
