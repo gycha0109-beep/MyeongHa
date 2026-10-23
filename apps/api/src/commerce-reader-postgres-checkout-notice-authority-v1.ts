@@ -154,7 +154,9 @@ export function createCommerceReaderPostgresCheckoutNoticeAuthorityV1(input: Rea
   readonly immutableCheckoutNoticeStore?: CommerceReaderImmutableCheckoutNoticeStoreV1;
 }>): CommerceReaderCheckoutNoticeAuthorityPortV1 {
   return Object.freeze({
-    async readExactServerCheckoutNotice(unit): Promise<CommerceReaderOriginalCheckoutNoticeRecordV1 | null> {
+    async readExactServerCheckoutNotice(
+      unit: Parameters<CommerceReaderCheckoutNoticeAuthorityPortV1['readExactServerCheckoutNotice']>[0],
+    ): Promise<CommerceReaderOriginalCheckoutNoticeRecordV1 | null> {
       try {
         const store=input.immutableCheckoutNoticeStore;
         const subject=input.scope?.resolvedSubject;
