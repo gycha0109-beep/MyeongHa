@@ -26,7 +26,11 @@
         "subject_deleted"
       ],
       "expiryDuration": "PT10M",
-      "note": "Expires for authorization after 10 minutes; physical cleanup of expired/consumed attempts remains a separate lifecycle requirement."
+      "note": "Authorization expires at the existing ten-minute TTL. Bounded SQL cleanup is implemented but unscheduled and unapplied; physical deletion occurs only when an authorized system-worker invocation executes it.",
+      "expiryPurgeFunction": "public.internal_purge_expired_legal_portone_attempts_v1",
+      "expiryPurgeMaxBatch": 250,
+      "expiryPurgeScheduled": false,
+      "physicalCleanupRule": "DB expires_at <= clock_timestamp() for pending/consumed/expired attempts; verified-age authority remains separate."
     },
     {
       "table": "legal_portone_verified_age_v1",
@@ -50,7 +54,7 @@
   "releasePrerequisites": [
     "DB Authority and Privacy disposition graph reconciliation",
     "PostgreSQL17 RLS/SECURITY DEFINER/DELETE transition smoke",
-    "Expired/consumed identity-attempt physical purge lifetime approved and implemented",
+    "Physical purge function deployed, execution cadence authorized and verified, including deletion/backups policy",
     "Provider contract/channel and secret configuration",
     "Verified public auth and guest age admission route integration"
   ],
