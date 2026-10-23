@@ -21,7 +21,8 @@ import type {
  * proposed or unapproved new notice table. The Checkout Owner must supply an
  * independently durable/approved original notice store to obtain any proof.
  */
-const ORIGINAL_CHECKOUT_UNIT_SQL_V1 = `
+/** Private SQL exported only to exercise exact relational joins on a disposable PostgreSQL ledger. */
+export const ORIGINAL_CHECKOUT_UNIT_SQL_V1 = `
 with authorized_original as materialized (
   select evidence.purchase_intent_id, evidence.unit_id
   from public.internal_qry_official_reader_withdrawal_delivery_state_v2(
