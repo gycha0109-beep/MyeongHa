@@ -13,6 +13,7 @@ const entry = (name, kind, reviewer, source) =>
 export const CLOUDFLARE_STAGE5_BINDING_CATALOG_V1 = Object.freeze([
   entry('MYEONGHA_CLOUDFLARE_EMERGENCY_HOLD','control','Security/API','workers/cloudflare-static-preview.mjs'),
   entry('MYEONGHA_CLOUDFLARE_AUTH_DB_MODE','approval','Security/API/DB','workers/cloudflare-auth-db-api.mjs'),
+  entry('MYEONGHA_CLOUDFLARE_SAJU_PREVIEW_MODE','approval','Security/API/Saju','workers/cloudflare-saju-preview-reading.mjs'),
   entry('MYEONGHA_CLOUDFLARE_AUTH_ORIGIN','approval','Security/API','workers/cloudflare-auth-db-api.mjs'),
   entry('MYEONGHA_CLOUDFLARE_DB_TLS_RLS_APPROVAL','approval','Security/API/DB','workers/cloudflare-auth-db-api.mjs'),
   entry('MYEONGHA_CLOUDFLARE_DB_APPROVED_HOST','approval','Security/DB','workers/cloudflare-auth-db-api.mjs'),

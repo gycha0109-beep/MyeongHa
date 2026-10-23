@@ -5,6 +5,7 @@ import {
 } from './cloudflare-seyeon-security.mjs';
 import { tryHandleCloudflareApprovedAuthV1 } from './cloudflare-auth-db-api.mjs';
 import { tryHandleCloudflareApprovedSajuCalculationV1 } from './cloudflare-saju-calculation.mjs';
+import { tryHandleCloudflareApprovedSajuPreviewReadingV1 } from './cloudflare-saju-preview-reading.mjs';
 
 // Cloudflare static preview: explicitly NOT the production API runtime.
 // Every /api request goes through this deny-only Worker; Static Assets serve
@@ -48,11 +49,14 @@ export function cloudflareEmergencyHoldEnabledV1(bindings) {
 
 export function sealCloudflareUnexpectedApiFailureV1(route) {
   const isSaju = route?.id === 'api.me.saju.calculation';
+  const isPreviewReading = route?.id === 'rewrite.saju.preview';
   return Response.json({
     ok: false,
-    error: isSaju
-      ? { code: 'SAJU_SERVICE_UNAVAILABLE', messageKey: 'saju.service_unavailable', retryable: true }
-      : { code: 'AUTH_UPSTREAM_UNAVAILABLE', messageKey: 'auth.auth_upstream_unavailable', retryable: true },
+    error: isPreviewReading
+      ? { code: 'SAJU_PREVIEW_TEMPORARILY_UNAVAILABLE', messageKey: 'saju.preview_temporarily_unavailable', retryable: true }
+      : isSaju
+        ? { code: 'SAJU_SERVICE_UNAVAILABLE', messageKey: 'saju.service_unavailable', retryable: true }
+        : { code: 'AUTH_UPSTREAM_UNAVAILABLE', messageKey: 'auth.auth_upstream_unavailable', retryable: true },
   }, { status: 503, headers: BASE_HEADERS });
 }
 
@@ -146,6 +150,8 @@ export default {
       if (approvedAuthResponse !== null) return approvedAuthResponse;
       const approvedCalculationResponse = await tryHandleCloudflareApprovedSajuCalculationV1(request, bindings, route);
       if (approvedCalculationResponse !== null) return approvedCalculationResponse;
+      const approvedPreviewReadingResponse = await tryHandleCloudflareApprovedSajuPreviewReadingV1(request, bindings, route);
+      if (approvedPreviewReadingResponse !== null) return approvedPreviewReadingResponse;
       return handleCloudflareStaticPreviewRequest(request);
     } catch {
       // Auth/DB or calculation adapters can fail outside their own try/catch.
