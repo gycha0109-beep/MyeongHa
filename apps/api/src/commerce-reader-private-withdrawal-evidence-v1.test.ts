@@ -16,6 +16,22 @@ const S5_AT = '2026-10-20T09:00:00.000Z';
 const PREPARED_AT = '2026-10-20T09:00:02.000Z';
 const ACK_AT = '2026-10-20T09:00:04.000Z';
 
+const ORIGINAL_CHECKOUT = Object.freeze({
+  authority: 'commerce_owner_immutable_checkout_notice_v1' as const,
+  purchaseIntentId: INTENT,
+  // Grant is resolved against original Receipt AFTER checkout; not a notice key.
+  originatingGrantId: GRANT,
+  productSpecVersion: 'reading-v1',
+  pinnedCapabilityItemKey: 'official-reader-purchased-unit',
+  originalGrantItemBinding: 'original_receipt_purchase_intent_capability_item' as const,
+  noticeRevision: 'rev-1',
+  previewOrInformationRevision: 'preview-1',
+  snapshotRecordedAt: '2026-10-20T08:55:00.000Z',
+  noticePresentedAt: '2026-10-20T08:56:00.000Z',
+  acknowledgedAt: '2026-10-20T08:57:00.000Z',
+  originalPaymentAttemptCreatedAt: '2026-10-20T08:58:00.000Z',
+});
+
 function fixture(overrides: Record<string, unknown> = {}) {
   const row = {
     purchaseIntentId: INTENT,
@@ -39,15 +55,7 @@ function fixture(overrides: Record<string, unknown> = {}) {
     resolvedSubject: { subjectId: SUBJECT, subjectKind: 'member' },
     client: { query } as unknown as PostgresTransactionQueryV1,
   } as PostgresSubjectExecutionScopeV1;
-  const notice = vi.fn(async () => ({
-    authority: 'server_checkout_snapshot' as const,
-    purchaseIntentId: INTENT,
-    unitId: GRANT,
-    productSpecVersion: 'reading-v1',
-    noticeRevision: 'rev-1',
-    previewOrInformationRevision: 'preview-1',
-    acknowledged: true as const,
-  }));
+  const notice = vi.fn(async () => ORIGINAL_CHECKOUT);
   const claim = { purchaseIntentId: INTENT, unitId: GRANT, reason: 'change_of_mind' };
   const makeInput = () => ({
     scope, purchaseIntentId: INTENT, originatingGrantId: GRANT,
@@ -81,6 +89,7 @@ describe('Private Commerce original Receipt -> S5 commit -> S7 -> withdrawal evi
       providerRefundAuthorized: false,
       entitlementMutationAuthorized: false,
     });
+    expect(result.checkoutNoticeEvidenceState).toBe('attested_original_checkout_notice');
     expect(result.refundAuthorized).toBe(false);
     expect(result.entitlementMutationAuthorized).toBe(false);
     expect(query).toHaveBeenCalledTimes(1);
@@ -138,13 +147,7 @@ describe('Private Commerce original Receipt -> S5 commit -> S7 -> withdrawal evi
     const mismatch = await reviewOfficialReaderPrivateWithdrawalEvidenceV1({
       ...makeInput(),
       checkoutNoticeAuthority: { readExactServerCheckoutNotice: async () => ({
-        authority: 'server_checkout_snapshot',
-        purchaseIntentId: INTENT,
-        unitId: BODY,
-        productSpecVersion: 'reading-v1',
-        noticeRevision: 'rev-1',
-        previewOrInformationRevision: 'preview-1',
-        acknowledged: true,
+        ...ORIGINAL_CHECKOUT, originatingGrantId: BODY,
       }) },
     });
     expect(mismatch.review.classification).toBe('not_proven_delivered');
@@ -153,8 +156,38 @@ describe('Private Commerce original Receipt -> S5 commit -> S7 -> withdrawal evi
       ...makeInput(),
       checkoutNoticeAuthority: { readExactServerCheckoutNotice: async () => null },
     });
+    expect(mismatch.checkoutNoticeEvidenceState).toBe('missing_or_unverifiable');
+    expect(withoutNotice.checkoutNoticeEvidenceState).toBe('missing_or_unverifiable');
     expect(withoutNotice.review.automaticDenialAuthorized).toBe(false);
     expect(withoutNotice.timeline.consumerDeliveryProven).toBe(false);
+  });
+
+  it.each([
+    { purchaseIntentId: BODY },
+    { originatingGrantId: BODY },
+    { originalGrantItemBinding: 'browser_claimed_receipt' },
+    { pinnedCapabilityItemKey: '' },
+    { noticeRevision: '' },
+    { snapshotRecordedAt: '2026-10-20T08:59:00.000Z' },
+    { noticePresentedAt: '2026-10-20T08:54:00.000Z' },
+    { acknowledgedAt: '2026-10-20T08:59:00.000Z' },
+    { originalPaymentAttemptCreatedAt: '2026-10-20T08:56:00.000Z' },
+    { originalPaymentAttemptCreatedAt: '2026-10-20T09:01:00.000Z' },
+    { acknowledgedAt: '2026-10-20T08:57:00+09:00' },
+  ])('never attributes forged, late or cross-item checkout evidence to the original Grant %#', async record => {
+    const { makeInput } = fixture();
+    const result = await reviewOfficialReaderPrivateWithdrawalEvidenceV1({
+      ...makeInput(),
+      checkoutNoticeAuthority: {
+        readExactServerCheckoutNotice: async () => ({
+          ...ORIGINAL_CHECKOUT, ...record,
+        } as typeof ORIGINAL_CHECKOUT),
+      },
+    });
+    expect(result.checkoutNoticeEvidenceState).toBe('missing_or_unverifiable');
+    expect(result.review.classification).toBe('not_proven_delivered');
+    expect(result.refundAuthorized).toBe(false);
+    expect(result.entitlementMutationAuthorized).toBe(false);
   });
 
   it.each([
