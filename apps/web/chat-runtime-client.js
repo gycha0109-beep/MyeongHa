@@ -1,4 +1,5 @@
 import { resolveCharacterDisplayNameV1 } from './character-display-locale.js';
+import { projectChatOutputLanguageNoticeV1 } from './chat-output-language-notice-v1.js';
 import { getUiLocale, getUiLocaleRequestHeadersV1, translateStaticUi } from './ui-i18n.js';
 import { resolveCanonicalCharacterPresentationV1 } from './character-presentation-identity.js';
 import {
@@ -31,6 +32,7 @@ const composeStatus = document.querySelector('[data-compose-status]');
 const chatStream = document.querySelector('[data-chat-stream]');
 const chatIntro = document.querySelector('[data-chat-intro]');
 const roomLoading = document.querySelector('[data-room-loading]');
+const languageNotice = document.querySelector('[data-chat-source-language-notice]');
 const retryButton = document.querySelector('[data-room-retry]');
 const messageInput = document.querySelector('[data-message-input]');
 const composer = document.querySelector('[data-composer]');
@@ -45,6 +47,17 @@ let roomLoadingSource = null;
 function uiText(source) {
   return translateStaticUi(source, getUiLocale());
 }
+
+function paintSourceLanguageNotice() {
+  if (!languageNotice) return;
+  const presentation = projectChatOutputLanguageNoticeV1(getUiLocale());
+  languageNotice.textContent = presentation.text;
+  languageNotice.hidden = !presentation.visible;
+  languageNotice.dataset.uiLocale = presentation.uiLocale;
+  languageNotice.dataset.originalSourceText = String(presentation.sourceTextPreserved);
+}
+
+paintSourceLanguageNotice();
 
 function setComposeStatus(message) {
   composeStatusSource = message;
@@ -259,6 +272,7 @@ function renderConversation(messages, authoritativeCharacterId) {
 // transcripts, no server refetch, no reinterpretation or modification of bodyText.
 // If the session changes, the existing authority guard removes these nodes.
 document.addEventListener('myeongha:localechange', () => {
+  paintSourceLanguageNotice();
   if (composeStatusSource !== null && composeStatus) composeStatus.textContent = uiText(composeStatusSource);
   if (roomLoadingSource !== null && roomLoading) roomLoading.textContent = uiText(roomLoadingSource);
   if (!chatStream) return;

@@ -6,6 +6,8 @@ import { MOBILE_UI_NATIVE_COPY } from './mobile-ui-native-copy.js';
  * Source locale is Korean, matching the web exactly.
  */
 export const SUPPORTED_MOBILE_UI_LOCALES = ['ko-KR','ja-JP','zh-TW'] as const;
+/** Roadmapped UI locales, not yet enabled for persistence, rendering or server UI headers. */
+export const PLANNED_MOBILE_UI_LOCALES = ['en-US', 'zh-CN'] as const;
 export type MobileUiLocale = typeof SUPPORTED_MOBILE_UI_LOCALES[number];
 export const MOBILE_UI_LOCALE_STORAGE_KEY = 'myeongha.mobile.ui.locale.v1';
 

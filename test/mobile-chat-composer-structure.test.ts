@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { readFile } from 'node:fs/promises';
+import { projectMobileChatComposeUiV1 } from '../apps/mobile/src/features/chat/mobile-chat-compose-ui-locale-v1.js';
 import {
   CHAT_LAUNCH_CHARACTER_IDS_V1,
 } from '../packages/api-client/src/index.js';
@@ -31,7 +32,10 @@ describe('mobile Chat has six visible characters with nine historical server ide
     expect(detail).toContain('<ChatComposer');
     expect(detail).toContain('<ChatReadMessages');
     expect(component).toContain("snapshot.characterId === 'seyeon'");
-    expect(component).toContain('이 캐릭터의 AI 대화는 준비 중입니다');
+    expect(component).toContain("snapshot.characterId === 'seyeon' ? 'waiting_history' : 'character_not_ready'");
+    expect(component).toContain('{composeUi.blockedTitle}');
+    expect(projectMobileChatComposeUiV1('ko-KR', 'character_not_ready').blockedTitle)
+      .toBe('이 캐릭터의 AI 대화는 준비 중입니다');
     expect(service).toContain("turn.characterId !== 'seyeon'");
   });
 

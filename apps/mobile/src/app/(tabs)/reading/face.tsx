@@ -1,3 +1,5 @@
+import { useLocalSearchParams } from 'expo-router';
+import { plannedMobileUiPreviewLocaleV1, previewMobileAuthoredUiLabelV1 } from '@/ui/mobile-planned-ui-screen-preview-v1';
 import { useState } from 'react';
 import {
   ActivityIndicator,
@@ -41,6 +43,9 @@ function sizeLabel(bytes: number | null): string {
 export default function FaceScreen() {
   const styles = useMobileThemedStyles(staticStyles);
   const { t } = useMobileUiLocale();
+  const { uiPreview } = useLocalSearchParams<{ uiPreview?: string | string[] }>();
+  const previewLocale = plannedMobileUiPreviewLocaleV1(uiPreview, __DEV__);
+  const previewText = (source: string) => previewMobileAuthoredUiLabelV1(source, previewLocale, t);
   const { colors } = useMobileTheme();
   const [state, setState] = useState<FaceMediaStateV1>({ kind: 'idle' });
   const [frontCameraOpen, setFrontCameraOpen] = useState(false);
@@ -90,7 +95,7 @@ export default function FaceScreen() {
   return (
     <MobileScreen
       eyebrow="FACE READING"
-      title={t('관상')}
+      title={previewText('관상')}
       refreshing={refreshing}
       onRefresh={() => void onRefresh()}
       description={t('얼굴에 담긴 이야기를 만나기 위한 첫 단계, 사진부터 준비해 보세요.')}
@@ -115,7 +120,7 @@ export default function FaceScreen() {
       <View style={styles.preview}>
         {ready !== null ? (
           <Image
-            accessibilityLabel={t('선택한 얼굴 사진 미리보기')}
+            accessibilityLabel={previewText("선택한 얼굴 사진 미리보기")}
             resizeMode="contain"
             source={{ uri: ready.uri }}
             style={styles.previewImage}
@@ -125,8 +130,8 @@ export default function FaceScreen() {
             <View style={styles.placeholderEmblem}>
               <Text style={styles.placeholderMark}>相</Text>
             </View>
-            <MobileUiText style={styles.placeholderTitle}>사진을 준비해 주세요</MobileUiText>
-            <MobileUiText style={styles.placeholderText}>정면 · 얼굴 전체 · 자연스러운 밝기</MobileUiText>
+            <MobileUiText style={styles.placeholderTitle}>{previewText("사진을 준비해 주세요")}</MobileUiText>
+            <MobileUiText style={styles.placeholderText}>{previewText("정면 · 얼굴 전체 · 자연스러운 밝기")}</MobileUiText>
           </View>
         )}
         <View pointerEvents="none" style={styles.previewFrame}>
@@ -148,7 +153,7 @@ export default function FaceScreen() {
               {ready.width} × {ready.height} · {sizeLabel(ready.fileSize)}
             </Text>
           </View>
-          <MobileUiText style={styles.readyBadge}>준비됨</MobileUiText>
+          <MobileUiText style={styles.readyBadge}>{previewText("준비됨")}</MobileUiText>
         </View>
       ) : null}
 
@@ -161,28 +166,28 @@ export default function FaceScreen() {
       <View style={styles.actions}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={t('전면 카메라로 정면 사진 촬영')}
+          accessibilityLabel={previewText("전면 카메라로 정면 사진 촬영")}
           disabled={picking}
           onPress={() => setFrontCameraOpen(true)}
           style={({ pressed }) => [styles.cameraAction, (pressed || picking) && styles.pressed]}
         >
-          <MobileUiText style={styles.cameraActionText}>▣  사진 촬영</MobileUiText>
+          <MobileUiText style={styles.cameraActionText}>{previewText("▣  사진 촬영")}</MobileUiText>
         </Pressable>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={t('사진첩에서 얼굴 사진 선택')}
+          accessibilityLabel={previewText("사진첩에서 얼굴 사진 선택")}
           disabled={picking}
           onPress={() => void choose('library', pickMobileFaceMediaFromLibraryV1)}
           style={({ pressed }) => [styles.secondary, (pressed || picking) && styles.pressed]}
         >
-          <MobileUiText style={styles.secondaryText}>▧  사진 선택</MobileUiText>
+          <MobileUiText style={styles.secondaryText}>{previewText("▧  사진 선택")}</MobileUiText>
         </Pressable>
       </View>
 
       {picking ? (
         <View style={styles.loadingRow}>
           <ActivityIndicator color={colors.navy} />
-          <MobileUiText style={styles.body}>사진을 준비하는 중입니다…</MobileUiText>
+          <MobileUiText style={styles.body}>{previewText("사진을 준비하는 중입니다…")}</MobileUiText>
         </View>
       ) : null}
 

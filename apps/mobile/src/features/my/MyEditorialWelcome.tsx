@@ -3,6 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { useMobileTheme } from '@/ui/mobile-theme';
 import { useMobileUiLocale } from '@/ui/mobile-ui-locale';
 import { MobileUiText } from '@/ui/MobileUiText';
+import { previewMobileAuthoredUiLabelV1, type MobilePlannedUiPreviewLocaleV1 } from '@/ui/mobile-planned-ui-screen-preview-v1';
 
 type MyAccountPresentation = 'guest' | 'member' | 'checking';
 
@@ -10,9 +11,10 @@ type MyAccountPresentation = 'guest' | 'member' | 'checking';
  * Visual account introduction only. The parent resolves account state from
  * the existing profile/session sources; this component grants no authority.
  */
-export function MyEditorialWelcome({ account }: { account: MyAccountPresentation }) {
+export function MyEditorialWelcome({ account, previewLocale = null }: { account: MyAccountPresentation; previewLocale?: MobilePlannedUiPreviewLocaleV1 | null }) {
   const { theme } = useMobileTheme();
   const { t } = useMobileUiLocale();
+  const previewText = (source: string) => previewMobileAuthoredUiLabelV1(source, previewLocale, t);
   const accountStatus = account === 'member'
     ? '회원 계정으로 이용 중'
     : account === 'guest'
@@ -26,15 +28,15 @@ export function MyEditorialWelcome({ account }: { account: MyAccountPresentation
         <Text style={styles.ornamentText}>命</Text>
       </View>
       <View style={styles.copy}>
-        <MobileUiText style={styles.eyebrow}>MY MYEONGHA · 나의 공간</MobileUiText>
-        <Text style={styles.title}>{t('나의 이야기를')}{'\n'}{t('이어가는 공간')}</Text>
+        <MobileUiText style={styles.eyebrow}>{previewText('MY MYEONGHA · 나의 공간')}</MobileUiText>
+        <Text style={styles.title}>{previewText('나의 이야기를')}{'\n'}{previewText('이어가는 공간')}</Text>
         <MobileUiText style={styles.subtitle}>
-          계정, 출생정보와 명하에서 이어지는 길을 한곳에서 살펴보세요.
+          {previewText('계정, 출생정보와 명하에서 이어지는 길을 한곳에서 살펴보세요.')}
         </MobileUiText>
       </View>
       <View style={styles.statusRow}>
         <View style={styles.statusDot} />
-        <Text style={styles.statusText}>{t(accountStatus)}</Text>
+        <Text style={styles.statusText}>{previewText(accountStatus)}</Text>
       </View>
     </View>
   );

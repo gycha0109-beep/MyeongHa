@@ -5,6 +5,7 @@ import {
   MOBILE_READER_PRESENTATIONS_V1,
   isMobileReaderPreviewSelectableV1,
 } from '../apps/mobile/src/features/reading/mobile-reader-presentation.js';
+import { projectMobileReaderPickerUiV1 } from '../apps/mobile/src/features/reading/mobile-reader-picker-ui-locale-v1.js';
 import {
   READER_PREVIEW_CANDIDATE_IDS_V1,
   READER_PUBLIC_INTERPRETATION_ENABLED_V1,
@@ -33,8 +34,10 @@ describe('mobile/web Reader staged capability alignment', () => {
     ]);
     expect(picker).toContain('disabled={!available}');
     expect(picker).toContain('if (!available) return;');
-    expect(picker).toContain('컨셉 준비 중');
-    expect(picker).toContain('유료 Reader 해석은 아직 공개되지 않았습니다.');
+    expect(picker).toContain('ui.conceptPending');
+    expect(projectMobileReaderPickerUiV1('ko-KR').conceptPending).toBe('컨셉 준비 중');
+    expect(picker).toContain('{ui.selectionLimit}');
+    expect(projectMobileReaderPickerUiV1('ko-KR').selectionLimit).toContain('유료 Reader 해석은 아직 공개되지 않았습니다.');
     expect(native).not.toContain('publicRouteActivated: true');
     expect(native).not.toContain('readerCharacterId:');
   });

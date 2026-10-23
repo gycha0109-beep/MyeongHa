@@ -795,3 +795,19 @@ body[data-character="doyun"] .character-room-scene {
     background-size: cover;
   }
 }
+
+/* I18N-06e: clearly distinguish the UI language from source-owned chat text. */
+.conversation-source-language-notice {
+  margin: 8px 20px 4px;
+  padding: 7px 11px;
+  border: 1px solid rgba(133, 96, 57, .26);
+  border-radius: 9px;
+  color: var(--room-ink-muted, #786d62);
+  background: rgba(250, 245, 237, .8);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.conversation-source-language-notice[hidden] {
+  display: none;
+}

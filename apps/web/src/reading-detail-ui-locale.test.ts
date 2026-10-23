@@ -1,6 +1,7 @@
+import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 import {
-  readingScopeLabelV1, readingSceneProgressV1, readingRouteStateCopyV1,
+  readingScopeLabelV1, readingSceneProgressV1, readingRouteStateCopyV1, readingSourceLanguageNoticeV1,
 } from '../reading-detail-ui-locale.js';
 
 describe('authored Reading scene locale presentation', () => {
@@ -15,6 +16,38 @@ describe('authored Reading scene locale presentation', () => {
     expect(readingSceneProgressV1(1, 3, flags, false, 'zh-TW').progress).toBe('解讀 2 / 3');
     expect(readingSceneProgressV1(2, 3, flags, false, 'ja-JP').nextLabel).toBe('鑑定を終了');
     expect(readingSceneProgressV1(2, 3, flags, true, 'zh-TW').authorityNote).toContain('正式八字解讀');
+  });
+
+  it('informs foreign-language UI readers that official and preview blocks stay in their source language', () => {
+    const ko = readingSourceLanguageNoticeV1('ko-KR');
+    expect(ko.visible).toBe(false);
+    expect(ko.text).toBe('');
+    for (const locale of ['ja-JP', 'zh-TW'] as const) {
+      const notice = readingSourceLanguageNoticeV1(locale);
+      expect(notice.visible).toBe(true);
+      expect(notice.uiLocale).toBe(locale);
+      expect(notice.sourceTextPreserved).toBe(true);
+      expect(notice.translatedReading).toBe(false);
+      expect(notice.text.length).toBeGreaterThan(20);
+    }
+    expect(readingSourceLanguageNoticeV1('zh-CN')).toEqual(ko);
+  });
+
+  it('wires the notice into the existing Reading UI while protecting source-owned text', async () => {
+    const [page, runtime] = await Promise.all([
+      readFile(new URL('./reading-detail/ReadingDetailPage.tsx', import.meta.url), 'utf8'),
+      readFile(new URL('../reading-character.js', import.meta.url), 'utf8'),
+    ]);
+    expect(page).toContain('data-reading-source-language-notice');
+    expect(page).toContain('role="note"');
+    expect(page).toContain('data-reading-step-title data-reading-content');
+    expect(page).toContain('data-reading-step-body data-reading-content');
+    expect(page).toContain('data-reading-structure-body data-reading-content');
+    expect(runtime).toContain("document.addEventListener('myeongha:localechange', renderSourceLanguageNotice)");
+    expect(runtime).toContain('sourceLanguageNotice.textContent = presentation.text;');
+    expect(runtime).toContain('sourceLanguageNotice.hidden = !presentation.visible;');
+    expect(runtime).toContain('if (stepBody) stepBody.textContent = step.primary;');
+    expect(runtime).toContain('if (stepTitle) stepTitle.textContent = step.title;');
   });
 
   it('keeps unsupported reading requests blocked in every locale', () => {

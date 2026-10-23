@@ -1,4 +1,5 @@
 import { readFile } from 'node:fs/promises';
+import { projectMobileOfficialReaderEntryUiV1 } from '../apps/mobile/src/features/reading/mobile-official-reader-entry-locale-v1.js';
 import { describe, expect, it } from 'vitest';
 import { MOBILE_CHAT_LAUNCH_ROSTER_V1 } from '../apps/mobile/src/features/chat/chat-launch-roster.js';
 import { resolveMobileChatCharacterPresentationV1 } from '../apps/mobile/src/features/chat/chat-character-presentation.js';
@@ -67,7 +68,13 @@ describe('mobile Character Room verified-empty greeting matches web', () => {
     expect(serverOpen).toContain('openMemberCharacterThreadV1');
     expect(serverOpen).toContain('withMemberBearer');
     expect(readRoom).toContain("if (current.status !== 'ready' || current.characterId !== 'seyeon') return");
-    expect(readerEntry).toContain('Reader 해설 진입 비활성');
+    // The access-disabled label is now authored per UI locale; verify both
+    // the canonical KO safety copy and the real disabled view binding.
+    expect(projectMobileOfficialReaderEntryUiV1('ko-KR', 'public_route_off').disabledAccessibilityLabel)
+      .toBe('Reader 해설 진입 비활성');
+    expect(readerEntry).toContain('accessibilityLabel={ui.disabledAccessibilityLabel}');
+    expect(readerEntry).toContain('projectMobileOfficialReaderEntryUiV1(locale, entry.status)');
+    expect(readerEntry).toContain('style={styles.disabled}');
     expect(components).not.toContain('openMemberCharacterThreadV1');
     expect(components).not.toContain('officialReadingId');
   });

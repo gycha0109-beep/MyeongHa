@@ -20,11 +20,15 @@ import { subscribeMobileSubjectCredentialChangesV1 } from '@/core/session/mobile
 import { mobileRecordsServiceV1 } from '@/features/records/native-mobile-records-service';
 import {
   formatRecordDateV1,
-  readingReaderLabelV1,
   readingTitleV1,
 } from '@/features/records/records-view-model';
 import { mobileColors } from '@/ui/mobile-colors';
-import { MobileUiText } from '@/ui/MobileUiText';
+import { useMobileUiLocale } from '@/ui/mobile-ui-locale';
+import { projectMobileSourceLanguageNoticeV1 } from '@/ui/mobile-source-language-notice-v1';
+import {
+  officialReadingArchiveFailureCopyV1,
+  projectMobileOfficialReadingShellV1,
+} from '@/ui/mobile-official-reading-shell-locale-v1';
 import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
 import { useMobilePullRefreshV1 } from '@/ui/use-mobile-pull-refresh';
 
@@ -79,6 +83,9 @@ function errorState(error: unknown): Extract<DetailStateV1, { kind: 'error' }> {
 
 export default function OfficialReadingDetailScreen() {
   const styles = useMobileThemedStyles(staticStyles);
+  const { locale, t } = useMobileUiLocale();
+  const sourceNotice = projectMobileSourceLanguageNoticeV1(locale, 'reading');
+  const shell = projectMobileOfficialReadingShellV1(locale);
   const params = useLocalSearchParams<{ readingId?: string | string[] }>();
   const readingId = typeof params.readingId === 'string' ? params.readingId : '';
   const [state, setState] = useState<DetailStateV1>({ kind: 'loading' });
@@ -138,26 +145,26 @@ export default function OfficialReadingDetailScreen() {
           onPress={() => router.back()}
           style={styles.backButton}
         >
-          <MobileUiText style={styles.backText}>← 기록으로 돌아가기</MobileUiText>
+          <Text style={styles.backText}>{shell.back}</Text>
         </Pressable>
 
         {state.kind === 'loading' ? (
           <View style={styles.stateCard}>
             <ActivityIndicator color={mobileColors.navy} />
-            <MobileUiText style={styles.muted}>저장된 공식 풀이를 불러오는 중입니다…</MobileUiText>
+            <Text style={styles.muted}>{shell.loading}</Text>
           </View>
         ) : null}
 
         {state.kind === 'error' ? (
           <View style={styles.stateCard}>
-            <Text style={styles.error}>{state.message}</Text>
+            <Text style={styles.error}>{officialReadingArchiveFailureCopyV1(state.message, locale)}</Text>
             {state.retryable ? (
               <Pressable
                 accessibilityRole="button"
                 onPress={() => void load()}
                 style={styles.retryButton}
               >
-                <MobileUiText style={styles.retryText}>다시 시도</MobileUiText>
+                <Text style={styles.retryText}>{shell.retry}</Text>
               </Pressable>
             ) : null}
           </View>
@@ -167,31 +174,30 @@ export default function OfficialReadingDetailScreen() {
           <>
             <View style={styles.headerCard}>
               <Text style={styles.eyebrow}>OFFICIAL READING ARCHIVE</Text>
-              <Text style={styles.title}>{readingTitleV1(state.record.sajuDomain)}</Text>
+              <Text style={styles.title}>{t(readingTitleV1(state.record.sajuDomain))}</Text>
               <Text style={styles.meta}>
-                {formatRecordDateV1(state.record.completedAt)} · {readingReaderLabelV1(state.record.readerCharacterIds)}
+                {formatRecordDateV1(state.record.completedAt)} · {shell.readerLabel(state.record.readerCharacterIds.length)}
               </Text>
-              <MobileUiText style={styles.authority}>
-                기록 · 당시 저장된 공식 사주 풀이를 그대로 다시 읽고 있습니다.
-              </MobileUiText>
+              <Text style={styles.authority}>{shell.original}</Text>
             </View>
 
+            {sourceNotice.visible ? (
+              <Text style={styles.sourceLanguageNotice}>{sourceNotice.text}</Text>
+            ) : null}
+
             <View style={styles.readerCard}>
-              <MobileUiText style={styles.readerCardTitle}>이 공식 Reading과 Reader</MobileUiText>
+              <Text style={styles.readerCardTitle}>{shell.readerHeading}</Text>
               <Text style={styles.readerCardText}>
                 {state.record.readerCharacterIds.length > 0
-                  ? `공식 기록에 연결된 Reader 정보: ${state.record.readerCharacterIds.length}명`
-                  : '이 공식 기록에 연결된 Reader 정보가 없습니다.'}
+                  ? shell.readerCount(state.record.readerCharacterIds.length)
+                  : shell.noReader}
               </Text>
-              <MobileUiText style={styles.readerCardText}>
-                Reader 연결 정보는 해설 구매·열람 권한 또는 해설 완료의 증명이 아닙니다.
-                Reader별 해설 다시 보기와 후속 대화는 별도의 서버 권한·기록 계약이 승인된 뒤 제공됩니다.
-              </MobileUiText>
+              <Text style={styles.readerCardText}>{shell.readerBoundary}</Text>
             </View>
 
             {state.record.display.notices.length > 0 ? (
               <View style={styles.noticeCard}>
-                <MobileUiText style={styles.noticeTitle}>읽기 범위 안내</MobileUiText>
+                <Text style={styles.noticeTitle}>{shell.noticesTitle}</Text>
                 {state.record.display.notices.map((notice, index) => (
                   <Text key={`${String(index)}:${notice}`} style={styles.noticeText}>
                     {notice}
@@ -202,13 +208,13 @@ export default function OfficialReadingDetailScreen() {
 
             {state.record.display.steps.map((step, index) => (
               <View key={`${String(index)}:${step.title}`} style={styles.readingCard}>
-                <Text style={styles.stepIndex}>읽기 {index + 1}</Text>
+                <Text style={styles.stepIndex}>{shell.stepPrefix} {index + 1}</Text>
                 <Text style={styles.stepTitle}>{step.title}</Text>
                 <Text style={styles.primaryText}>{step.primary}</Text>
 
                 {step.structure.length > 0 ? (
                   <View style={styles.supportBlock}>
-                    <MobileUiText style={styles.supportTitle}>이 해석의 사주 근거</MobileUiText>
+                    <Text style={styles.supportTitle}>{shell.structureTitle}</Text>
                     {step.structure.map((text, itemIndex) => (
                       <Text key={`structure:${String(itemIndex)}:${text}`} style={styles.supportText}>
                         {text}
@@ -219,7 +225,7 @@ export default function OfficialReadingDetailScreen() {
 
                 {step.supporting.length > 0 ? (
                   <View style={styles.supportBlock}>
-                    <MobileUiText style={styles.supportTitle}>함께 볼 포인트</MobileUiText>
+                    <Text style={styles.supportTitle}>{shell.supportingTitle}</Text>
                     {step.supporting.map((text, itemIndex) => (
                       <Text key={`support:${String(itemIndex)}:${text}`} style={styles.supportText}>
                         {text}
@@ -263,6 +269,7 @@ const styles = StyleSheet.create({
   title: { color: mobileColors.ink, fontSize: 27, fontWeight: '800' },
   meta: { color: mobileColors.muted, fontSize: 13, lineHeight: 19 },
   authority: { color: mobileColors.navy, fontSize: 12, lineHeight: 18, fontWeight: '700' },
+  sourceLanguageNotice: { fontSize: 12, lineHeight: 19, color: mobileColors.muted, backgroundColor: mobileColors.surface, borderWidth: 1, borderColor: mobileColors.border, padding: 12, borderRadius: 10 },
   muted: { color: mobileColors.muted, fontSize: 14, lineHeight: 21 },
   error: { color: mobileColors.seal, fontSize: 14, lineHeight: 20 },
   retryButton: {

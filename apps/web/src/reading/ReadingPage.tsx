@@ -1,3 +1,5 @@
+import { previewReviewedUiTextV1 } from '../ui/planned-ui-screen-preview-v1.js';
+import type { PlannedUiPreviewLocaleV1 } from '../ui/planned-ui-screen-preview-v1.js';
 import { resolveReadingAvailabilityV1 } from './reading-availability.js';
 import { useEffect } from 'react';
 
@@ -16,20 +18,21 @@ const relationshipTopics = [
   ['∞', '궁합', '함께할 때 더욱 빛나는 이야기', 'reading-detail.html?topic=compatibility', ''],
 ] as const;
 
-export function ReadingPage() {
+export function ReadingPage({ previewLocale = null }: { previewLocale?: PlannedUiPreviewLocaleV1 | null } = {}) {
+  const t = (source: string) => previewReviewedUiTextV1(source, previewLocale);
   useEffect(() => {
     void import('../../saju-hub.js');
   }, []);
 
   return (
-    <div className="gm-shell">
+    <div className="gm-shell" data-planned-ui-preview={previewLocale ?? undefined}>
       <header className="gm-saju-head">
-        <h1 className="gm-page-title">사주</h1>
-        <p className="gm-lede">내 명식과 사주 읽기 주제를 한곳에 모아봤어요.</p>
-        <p className="reading-availability-intro">프리뷰 확인은 현재 제공 가능한 검증용 읽기이며, 정식 Reader 해석과는 다릅니다. 준비 중인 주제는 상세 화면에서 제공 상태를 확인할 수 있습니다.</p>
+        <h1 className="gm-page-title">{t("사주")}</h1>
+        <p className="gm-lede">{t("내 명식과 사주 읽기 주제를 한곳에 모아봤어요.")}</p>
+        <p className="reading-availability-intro">{t("프리뷰 확인은 현재 제공 가능한 검증용 읽기이며, 정식 Reader 해석과는 다릅니다. 준비 중인 주제는 상세 화면에서 제공 상태를 확인할 수 있습니다.")}</p>
       </header>
 
-      <div className="saju-status" id="saju-status" role="status">내 사주를 확인하는 중입니다…</div>
+      <div className="saju-status" id="saju-status" role="status">{t("내 사주를 확인하는 중입니다…")}</div>
 
       <section className="saju-empty" id="saju-empty" hidden aria-labelledby="saju-empty-title">
         <div className="saju-empty-art" aria-hidden="true">
@@ -37,82 +40,82 @@ export function ReadingPage() {
           <span className="saju-empty-mark">命</span>
         </div>
         <div className="saju-empty-card">
-          <span className="saju-section-kicker">처음 시작하기</span>
-          <h2 id="saju-empty-title">아직 등록된 사주가 없습니다.</h2>
-          <p>태어난 정보를 입력하면 명하가 현재 세션의 자기 명식을 계산합니다. 로그인하지 않아도 먼저 확인할 수 있습니다.</p>
+          <span className="saju-section-kicker">{t("처음 시작하기")}</span>
+          <h2 id="saju-empty-title">{t("아직 등록된 사주가 없습니다.")}</h2>
+          <p>{t("태어난 정보를 입력하면 명하가 현재 세션의 자기 명식을 계산합니다. 로그인하지 않아도 먼저 확인할 수 있습니다.")}</p>
 
           <form className="saju-birth-form" id="saju-birth-form" noValidate>
             <div className="saju-form-grid">
               <label className="saju-field">
-                <span>생년월일</span>
-                <div className="saju-date-fields" role="group" aria-label="생년월일">
-                  <input id="saju-birth-year" className="saju-date-part saju-date-year" type="text" inputMode="numeric" autoComplete="bday-year" maxLength={4} pattern="[0-9]{4}" placeholder="YYYY" aria-label="출생 연도" required />
+                <span>{t("생년월일")}</span>
+                <div className="saju-date-fields" role="group" aria-label={t("생년월일")}>
+                  <input id="saju-birth-year" className="saju-date-part saju-date-year" type="text" inputMode="numeric" autoComplete="bday-year" maxLength={4} pattern="[0-9]{4}" placeholder="YYYY" aria-label={t("출생 연도")} required />
                   <span className="saju-date-separator" aria-hidden="true">.</span>
-                  <input id="saju-birth-month" className="saju-date-part" type="text" inputMode="numeric" autoComplete="bday-month" maxLength={2} pattern="[0-9]{1,2}" placeholder="MM" aria-label="출생 월" required />
+                  <input id="saju-birth-month" className="saju-date-part" type="text" inputMode="numeric" autoComplete="bday-month" maxLength={2} pattern="[0-9]{1,2}" placeholder="MM" aria-label={t("출생 월")} required />
                   <span className="saju-date-separator" aria-hidden="true">.</span>
-                  <input id="saju-birth-day" className="saju-date-part" type="text" inputMode="numeric" autoComplete="bday-day" maxLength={2} pattern="[0-9]{1,2}" placeholder="DD" aria-label="출생 일" required />
+                  <input id="saju-birth-day" className="saju-date-part" type="text" inputMode="numeric" autoComplete="bday-day" maxLength={2} pattern="[0-9]{1,2}" placeholder="DD" aria-label={t("출생 일")} required />
                 </div>
               </label>
               <label className="saju-field">
-                <span>출생시간</span>
+                <span>{t("출생시간")}</span>
                 <input id="saju-birth-time" type="text" inputMode="numeric" autoComplete="off" placeholder="HH:mm" maxLength={5} pattern="(?:[01][0-9]|2[0-3]):[0-5][0-9]" aria-label="출생시간 (24시간제 HH:mm)" required />
               </label>
             </div>
 
             <div className="saju-form-options">
-              <label><input id="saju-time-unknown" type="checkbox" /> 출생시간을 모릅니다</label>
-              <div className="saju-calendar-options" role="group" aria-label="달력 기준">
-                <label><input type="radio" name="saju-calendar" value="solar" defaultChecked /> 양력</label>
-                <label><input type="radio" name="saju-calendar" value="lunar" /> 음력</label>
-                <label id="saju-leap-wrap" hidden><input id="saju-leap-month" type="checkbox" /> 윤달</label>
+              <label><input id="saju-time-unknown" type="checkbox" /> {t("출생시간을 모릅니다")}</label>
+              <div className="saju-calendar-options" role="group" aria-label={t("달력 기준")}>
+                <label><input type="radio" name="saju-calendar" value="solar" defaultChecked /> {t("양력")}</label>
+                <label><input type="radio" name="saju-calendar" value="lunar" /> {t("음력")}</label>
+                <label id="saju-leap-wrap" hidden><input id="saju-leap-month" type="checkbox" /> {t("윤달")}</label>
               </div>
             </div>
 
             <label className="saju-field saju-field-select">
-              <span>성별 입력 <small>선택 사항</small></span>
+              <span>{t("성별 입력")} <small>{t("선택 사항")}</small></span>
               <select id="saju-birth-sex" defaultValue="">
-                <option value="">선택하지 않음</option>
-                <option value="male">남성</option>
-                <option value="female">여성</option>
-                <option value="unspecified">미지정</option>
+                <option value="">{t("선택하지 않음")}</option>
+                <option value="male">{t("남성")}</option>
+                <option value="female">{t("여성")}</option>
+                <option value="unspecified">{t("미지정")}</option>
               </select>
             </label>
 
             <div className="saju-form-error" id="saju-form-error" hidden role="alert" />
             <button className="saju-primary-button" id="saju-create-button" type="submit">
-              <span>내 사주 만들기</span><span aria-hidden="true">→</span>
+              <span>{t("내 사주 만들기")}</span><span aria-hidden="true">→</span>
             </button>
-            <p className="saju-guest-note"><span aria-hidden="true">◇</span> 게스트로 먼저 볼 수 있으며, 저장·동기화가 필요할 때 계정 연결을 사용합니다.</p>
+            <p className="saju-guest-note"><span aria-hidden="true">◇</span> {t("게스트로 먼저 볼 수 있으며, 저장·동기화가 필요할 때 계정 연결을 사용합니다.")}</p>
           </form>
         </div>
       </section>
 
-      <section id="saju-hub" hidden aria-label="계산된 내 사주">
+      <section id="saju-hub" hidden aria-label={t("계산된 내 사주")}>
         <article className="gm-saju-hero" aria-labelledby="gm-saju-profile-title">
           <div className="gm-saju-hero-copy">
-            <h2 className="gm-saju-title" id="gm-saju-profile-title">나의 명식</h2>
-            <p className="gm-saju-summary" id="saju-birth-summary">현재 자기 Birth Profile과 연결된 계산 결과입니다.</p>
+            <h2 className="gm-saju-title" id="gm-saju-profile-title">{t("나의 명식")}</h2>
+            <p className="gm-saju-summary" id="saju-birth-summary">{t("현재 자기 Birth Profile과 연결된 계산 결과입니다.")}</p>
             <details className="gm-chart-details">
-              <summary>기본 정보 보기 →</summary>
+              <summary>{t("기본 정보 보기 →")}</summary>
               <div className="gm-chart-panel">
-                <div className="saju-pillar-grid" id="saju-pillar-grid" aria-label="사주 네 기둥" />
+                <div className="saju-pillar-grid" id="saju-pillar-grid" aria-label={t("사주 네 기둥")} />
                 <div className="saju-chart-summary">
                   <div className="saju-day-master">
-                    <span>일간</span>
+                    <span>{t("일간")}</span>
                     <strong id="saju-day-master">—</strong>
-                    <small id="saju-day-master-meta">계산 결과 확인 중</small>
+                    <small id="saju-day-master-meta">{t("계산 결과 확인 중")}</small>
                   </div>
                   <div className="saju-elements">
-                    <span className="saju-summary-label">오행 분포</span>
+                    <span className="saju-summary-label">{t("오행 분포")}</span>
                     <div className="saju-element-bars" id="saju-element-bars" />
                   </div>
                   <div className="saju-structure-note">
-                    <span className="saju-summary-label">계산 상태</span>
+                    <span className="saju-summary-label">{t("계산 상태")}</span>
                     <strong id="saju-completeness-title">—</strong>
-                    <p id="saju-completeness-copy">확정된 계산 사실만 표시합니다.</p>
+                    <p id="saju-completeness-copy">{t("확정된 계산 사실만 표시합니다.")}</p>
                   </div>
                 </div>
-                <p className="saju-authority-note">이 영역은 계산된 명식 사실만 보여줍니다. 의미 해석은 별도 Reading에서 제공합니다.</p>
+                <p className="saju-authority-note">{t("이 영역은 계산된 명식 사실만 보여줍니다. 의미 해석은 별도 Reading에서 제공합니다.")}</p>
               </div>
             </details>
           </div>
@@ -121,14 +124,14 @@ export function ReadingPage() {
 
         <section className="gm-section" aria-labelledby="gm-reading-title">
           <div className="gm-section-head">
-            <div><h2 className="gm-section-title" id="gm-reading-title">나를 읽기 <span className="gm-section-support">나를 더 깊이 이해하는 시간</span></h2></div>
-            <a className="gm-inline-link" href="reading-detail.html?topic=temperament&scope=original">전체 보기 <span aria-hidden="true">›</span></a>
+            <div><h2 className="gm-section-title" id="gm-reading-title">{t("나를 읽기")} <span className="gm-section-support">{t("나를 더 깊이 이해하는 시간")}</span></h2></div>
+            <a className="gm-inline-link" href="reading-detail.html?topic=temperament&scope=original">{t("전체 보기")} <span aria-hidden="true">›</span></a>
           </div>
           <div className="gm-saju-reading-grid">
             {readingTopics.map(([icon, title, description, href, modifier]) => (
               <a className={`gm-card gm-saju-reading-card${modifier === 'is-wide' ? ' is-wide' : ''}`} href={href} key={href}>
                 <span className={`gm-icon${modifier === 'is-rose' ? ' is-rose' : ''}`} aria-hidden="true">{icon}</span>
-                <span><strong>{title}</strong><small>{description}</small><small className={`reading-topic-availability is-${resolveReadingAvailabilityV1(href).kind}`}>{resolveReadingAvailabilityV1(href).label}</small></span>
+                <span><strong>{t(title)}</strong><small>{t(description)}</small><small className={`reading-topic-availability is-${resolveReadingAvailabilityV1(href).kind}`}>{resolveReadingAvailabilityV1(href).label}</small></span>
                 <span className="gm-chevron" aria-hidden="true">›</span>
               </a>
             ))}
@@ -138,17 +141,17 @@ export function ReadingPage() {
         <section className="gm-section" aria-labelledby="gm-flow-title">
           <div className="gm-section-head">
             <h2 className="gm-section-title" id="gm-flow-title">지금의 흐름</h2>
-            <span className="gm-section-support">지금, 놓치지 말아야 할 시간</span>
+            <span className="gm-section-support">{t("지금, 놓치지 말아야 할 시간")}</span>
           </div>
           <div className="gm-saju-flow-grid">
             <a className="gm-card gm-flow-card" href="reading-detail.html?scope=year">
               <span className="gm-flow-thumb" aria-hidden="true" />
-              <span className="gm-flow-copy"><strong>올해</strong><p id="saju-flow-year">올해의 흐름</p><p>지금의 흐름을 한눈에, 주요 키워드와 변화의 시기를 읽어보세요.</p><small className="reading-topic-availability is-unavailable">정식 읽기 준비 중</small></span>
+              <span className="gm-flow-copy"><strong>{t("올해")}</strong><p id="saju-flow-year">올해의 흐름</p><p>지금의 흐름을 한눈에, 주요 키워드와 변화의 시기를 읽어보세요.</p><small className="reading-topic-availability is-unavailable">{t("정식 읽기 준비 중")}</small></span>
               <span className="gm-chevron" aria-hidden="true">›</span>
             </a>
             <a className="gm-card gm-flow-card" href="reading-detail.html?scope=month">
               <span className="gm-flow-thumb" aria-hidden="true" />
-              <span className="gm-flow-copy"><strong>이번 달</strong><p>이번 달의 기운과 흐름, 놓치지 말아야 할 순간을 짚어봅니다.</p><small className="reading-topic-availability is-unavailable">정식 읽기 준비 중</small></span>
+              <span className="gm-flow-copy"><strong>{t("이번 달")}</strong><p>이번 달의 기운과 흐름, 놓치지 말아야 할 순간을 짚어봅니다.</p><small className="reading-topic-availability is-unavailable">{t("정식 읽기 준비 중")}</small></span>
               <span className="gm-chevron" aria-hidden="true">›</span>
             </a>
           </div>
@@ -160,7 +163,7 @@ export function ReadingPage() {
             {relationshipTopics.map(([icon, title, description, href, modifier]) => (
               <a className="gm-card gm-relation-card" href={href} key={href}>
                 <span className={`gm-icon${modifier ? ` ${modifier}` : ''}`} aria-hidden="true">{icon}</span>
-                <span><strong>{title}</strong><small>{description}</small><small className={`reading-topic-availability is-${resolveReadingAvailabilityV1(href).kind}`}>{resolveReadingAvailabilityV1(href).label}</small></span>
+                <span><strong>{t(title)}</strong><small>{t(description)}</small><small className={`reading-topic-availability is-${resolveReadingAvailabilityV1(href).kind}`}>{resolveReadingAvailabilityV1(href).label}</small></span>
                 <span className="gm-chevron" aria-hidden="true">›</span>
               </a>
             ))}
@@ -168,10 +171,10 @@ export function ReadingPage() {
         </section>
 
         <section className="gm-section" aria-labelledby="gm-question-title">
-          <div className="gm-section-head"><h2 className="gm-section-title" id="gm-question-title">고민이 있다면</h2></div>
+          <div className="gm-section-head"><h2 className="gm-section-title" id="gm-question-title">{t("고민이 있다면")}</h2></div>
           <a className="gm-card gm-question-card" href="reading-detail.html?topic=question-specific">
             <span className="gm-icon" aria-hidden="true">…</span>
-            <span className="gm-question-copy"><strong>지금 고민으로 보기</strong><small>지금 마음에 있는 질문을 바탕으로, 사주가 전하는 범위 안에서 읽어보세요.</small><small className="reading-topic-availability is-input_pending">추가 입력 준비 중</small></span>
+            <span className="gm-question-copy"><strong>{t("지금 고민으로 보기")}</strong><small>지금 마음에 있는 질문을 바탕으로, 사주가 전하는 범위 안에서 읽어보세요.</small><small className="reading-topic-availability is-input_pending">{t("추가 입력 준비 중")}</small></span>
             <span className="gm-chevron" aria-hidden="true">›</span>
           </a>
         </section>

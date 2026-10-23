@@ -1,6 +1,6 @@
 import { resolveCharacterDisplayNameV1 } from './character-display-locale.js';
 import { getUiLocale, translateStaticUi } from './ui-i18n.js';
-import { readingScopeLabelV1, readingSceneProgressV1, readingRouteStateCopyV1 } from './reading-detail-ui-locale.js';
+import { readingScopeLabelV1, readingSceneProgressV1, readingRouteStateCopyV1, readingSourceLanguageNoticeV1 } from './reading-detail-ui-locale.js';
 import { resolveReadingDetailRoute } from './reading-detail-route.js';
 import { resolveSajuButtonEngineRequest } from './reading-saju-engine-request.js';
 import { isBrowserSajuPreviewDeliveryV1 } from './saju-preview-response-admission.js';
@@ -133,6 +133,16 @@ if (route.valid) {
   delete root.dataset.readingTopicKey;
   delete root.dataset.readingScopeKey;
 }
+
+const sourceLanguageNotice = document.querySelector('[data-reading-source-language-notice]');
+function renderSourceLanguageNotice() {
+  if (!sourceLanguageNotice) return;
+  const presentation = readingSourceLanguageNoticeV1(getUiLocale());
+  sourceLanguageNotice.textContent = presentation.text;
+  sourceLanguageNotice.hidden = !presentation.visible;
+}
+renderSourceLanguageNotice();
+document.addEventListener('myeongha:localechange', renderSourceLanguageNotice);
 
 const portrait = document.querySelector('[data-reader-portrait]');
 function renderReaderLocalePresentation() {

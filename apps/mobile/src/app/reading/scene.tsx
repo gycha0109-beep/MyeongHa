@@ -16,6 +16,7 @@ import { mobileSajuPreviewServiceV1 } from '@/features/saju/native-mobile-saju-p
 import { mobileColors } from '@/ui/mobile-colors';
 import { MobileUiText } from '@/ui/MobileUiText';
 import { useMobileUiLocale } from '@/ui/mobile-ui-locale';
+import { projectMobileSourceLanguageNoticeV1 } from '@/ui/mobile-source-language-notice-v1';
 import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
 
 const ROOM_ART = require('../../../assets/characters/chat-themes/seyeon-chat-theme-mobile-v1.webp');
@@ -38,7 +39,8 @@ function unavailableMessage(error: unknown): string {
 
 export default function SajuReaderSceneScreen() {
   const styles = useMobileThemedStyles(staticStyles);
-  const { t } = useMobileUiLocale();
+  const { t, locale } = useMobileUiLocale();
+  const sourceNotice = projectMobileSourceLanguageNoticeV1(locale, 'reading');
   const params = useLocalSearchParams<{ reader?: string | string[]; topic?: string | string[] }>();
   const readerId = typeof params.reader === 'string' ? params.reader : null;
   const topicKey = typeof params.topic === 'string' ? params.topic : null;
@@ -144,6 +146,9 @@ export default function SajuReaderSceneScreen() {
           </View>
         </ImageBackground>
         <MobileUiText style={styles.sceneNote}>장면 연출 · 실제 해석 내용은 서버의 검증된 사주 프리뷰만 사용합니다.</MobileUiText>
+        {state.kind === 'ready' && sourceNotice.visible ? (
+          <Text style={styles.sourceLanguageNotice}>{sourceNotice.text}</Text>
+        ) : null}
 
         {state.kind === 'unavailable' ? (
           <View style={styles.block}>
@@ -190,7 +195,7 @@ export default function SajuReaderSceneScreen() {
           </View>
         ) : currentStep !== undefined ? (
           <View style={styles.block}>
-            <Text style={styles.eyebrow}>{admission.topic.label} · {t('읽기')} {index + 1} / {state.result.steps.length}</Text>
+            <Text style={styles.eyebrow}>{t(admission.topic.label)} · {t('읽기')} {index + 1} / {state.result.steps.length}</Text>
             <Text style={styles.title}>{currentStep.title}</Text>
             <Text style={styles.body}>{currentStep.primary}</Text>
             <Pressable accessibilityRole="button" onPress={() => setDetailsOpen(v => !v)} style={styles.detailButton}>
@@ -241,6 +246,7 @@ const styles = StyleSheet.create({
   sceneName: { fontSize: 17, fontWeight: '900', color: mobileColors.navy },
   sceneLine: { fontSize: 12, color: mobileColors.ink },
   sceneNote: { fontSize: 11, color: mobileColors.muted, textAlign: 'center' },
+  sourceLanguageNotice: { fontSize: 12, lineHeight: 19, color: mobileColors.muted, backgroundColor: mobileColors.surface, borderColor: mobileColors.border, borderWidth: 1, padding: 12, borderRadius: 10 },
   block: { backgroundColor: mobileColors.surface, borderRadius: 18, borderWidth: 1, borderColor: mobileColors.border, padding: 21, gap: 14 },
   eyebrow: { color: mobileColors.gold, fontSize: 12, fontWeight: '800' },
   title: { color: mobileColors.ink, fontSize: 20, lineHeight: 27, fontWeight: '800' },

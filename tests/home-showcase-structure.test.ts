@@ -34,7 +34,7 @@ describe('Home Golden Master showcase structure', () => {
     expect(homeSource).not.toContain('이달의 운세 전체보기');
     expect(homeSource).not.toContain('오늘의 흐름은 사주 화면에서 직접 펼쳐볼 수 있습니다.');
     expect(homeSource).toContain('golden-master.css');
-    expect(homeSource).toContain('href="chat-hub.html">대화로 가기 →</a>');
+    expect(homeSource).toContain('href="chat-hub.html">{t("대화로 가기 →")}</a>');
   });
 
   it('pins the approved centered proportions without fabricating personalized authority', async () => {

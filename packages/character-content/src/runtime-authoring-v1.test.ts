@@ -15,6 +15,8 @@ import {
   CHARACTER_RUNTIME_BEHAVIOR_TRIGGER_KEYS_V1,
   CHARACTER_RUNTIME_QUESTION_STRATEGY_KEYS_V1,
   canCharacterInitiateSajuDomainEffective,
+  CHARACTER_CHAT_VOICE_AUTHORING_DECISION_V1,
+  resolveAdmittedCharacterChatVoiceAuthoringV1,
 } from './runtime-authoring-v1.js';
 
 const expectedCanonicalIds = [
@@ -111,6 +113,27 @@ describe('Character runtime authoring v1 authority', () => {
 
     const projection = JSON.stringify(seyeon);
     expect(projection).not.toContain('차분하고 균형 잡힌 검토자');
+  });
+
+  it('applies owner-cleared and Bible-only chat voice decisions without deleting history or roster IDs', () => {
+    expect(CHARACTER_RUNTIME_AUTHORING_V1_CHARACTER_IDS).toHaveLength(9);
+    expect(CHARACTER_CHAT_VOICE_AUTHORING_DECISION_V1.seorin).toBe('settings_cleared');
+    expect(CHARACTER_CHAT_VOICE_AUTHORING_DECISION_V1.mira).toBe('settings_cleared');
+    expect(CHARACTER_CHAT_VOICE_AUTHORING_DECISION_V1.doyun).toBe('bible_only');
+    for (const id of ['seorin', 'mira', 'doyun', 'unknown']) {
+      expect(resolveAdmittedCharacterChatVoiceAuthoringV1(id)).toBeNull();
+    }
+    for (const id of ['seyeon', 'yeoul', 'baekheon', 'rahyeon', 'taegyeom', 'yunho']) {
+      expect(resolveAdmittedCharacterChatVoiceAuthoringV1(id)?.characterId).toBe(id);
+    }
+    const yeoul = resolveAdmittedCharacterChatVoiceAuthoringV1('yeoul')!;
+    const baekheon = resolveAdmittedCharacterChatVoiceAuthoringV1('baekheon')!;
+    const seyeon = resolveAdmittedCharacterChatVoiceAuthoringV1('seyeon')!;
+    expect(yeoul.persona.communication.humorStyle).toContain('건조한 태클');
+    expect(yeoul.speech.register).toContain('새침');
+    expect(baekheon.persona.communication.humorStyle).toContain('능청');
+    expect(baekheon.relationshipBehavior.defaultMode.humorIntensity).not.toBe('none');
+    expect(seyeon.persona.intimacy.attachmentExpression).toContain('특별한 사람');
   });
 
   it('keeps publication-only fields outside the runtime authoring registry', () => {

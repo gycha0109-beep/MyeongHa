@@ -1,4 +1,5 @@
-import { router, useFocusEffect } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { plannedMobileUiPreviewLocaleV1, previewMobileAuthoredUiLabelV1 } from '@/ui/mobile-planned-ui-screen-preview-v1';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
@@ -45,6 +46,9 @@ function errorCopy(state: Exclude<MobileSajuLoadStateV1, { kind: 'birth_required
 export default function SajuScreen() {
   const styles = useMobileThemedStyles(staticStyles);
   const { t } = useMobileUiLocale();
+  const { uiPreview } = useLocalSearchParams<{ uiPreview?: string | string[] }>();
+  const previewLocale = plannedMobileUiPreviewLocaleV1(uiPreview, __DEV__);
+  const previewText = (source: string) => previewMobileAuthoredUiLabelV1(source, previewLocale, t);
   const [state, setState] = useState<ScreenState>({ kind: 'loading' });
   const [presentationReader, setPresentationReader] = useState<MobileReaderPresentationIdV1>('seyeon');
 
@@ -76,7 +80,7 @@ export default function SajuScreen() {
   return (
     <MobileScreen
       eyebrow="READING"
-      title={t('사주')}
+      title={previewText('사주')}
       refreshing={refreshing}
       onRefresh={() => void onRefresh()}
       description={t('태어난 순간의 이야기를 바탕으로 나의 명식을 알아보세요.')}
@@ -86,22 +90,22 @@ export default function SajuScreen() {
       {state.kind === 'loading' ? (
         <View style={styles.stateCard}>
           <ActivityIndicator color={mobileColors.navy} />
-          <MobileUiText style={styles.muted}>현재 출생정보와 명식을 확인하는 중입니다…</MobileUiText>
+          <MobileUiText style={styles.muted}>{previewText("현재 출생정보와 명식을 확인하는 중입니다…")}</MobileUiText>
         </View>
       ) : null}
 
       {state.kind === 'birth_required' ? (
         <View style={styles.stateCard}>
-          <MobileUiText style={styles.cardTitle}>출생정보가 필요합니다</MobileUiText>
+          <MobileUiText style={styles.cardTitle}>{previewText("출생정보가 필요합니다")}</MobileUiText>
           <MobileUiText style={styles.muted}>
-            내 명식을 계산하려면 현재 자기 출생정보를 먼저 등록해 주세요.
+            {previewText("내 명식을 계산하려면 현재 자기 출생정보를 먼저 등록해 주세요.")}
           </MobileUiText>
           <Pressable
             accessibilityRole="button"
             onPress={() => router.push('/birth')}
             style={styles.primaryButton}
           >
-            <MobileUiText style={styles.primaryButtonText}>출생정보 입력하기</MobileUiText>
+            <MobileUiText style={styles.primaryButtonText}>{previewText("출생정보 입력하기")}</MobileUiText>
           </Pressable>
         </View>
       ) : null}
@@ -147,7 +151,7 @@ export default function SajuScreen() {
               onPress={() => void load()}
               style={styles.secondaryButton}
             >
-              <MobileUiText style={styles.secondaryButtonText}>다시 시도</MobileUiText>
+              <MobileUiText style={styles.secondaryButtonText}>{previewText("다시 시도")}</MobileUiText>
             </Pressable>
           ) : null}
         </View>

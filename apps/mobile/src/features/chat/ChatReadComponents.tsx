@@ -10,6 +10,8 @@ import { MobileUiText } from '@/ui/MobileUiText';
 import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
 import { useMobileTheme } from '@/ui/mobile-theme';
 import { useMobileUiLocale } from '@/ui/mobile-ui-locale';
+import { projectMobileChatComposeUiV1 } from '@/features/chat/mobile-chat-compose-ui-locale-v1';
+import { projectMobileChatHistoryShellV1 } from '@/features/chat/mobile-chat-history-shell-locale-v1';
 import {
   ActivityIndicator,
   Image,
@@ -27,6 +29,8 @@ export function ChatReadHeader({
 }) {
   const styles = useMobileThemedStyles(staticStyles);
   const { theme } = useMobileTheme();
+  const { locale } = useMobileUiLocale();
+  const shell = projectMobileChatHistoryShellV1(locale);
   const character = snapshot.characterId === null
     ? null
     : MOBILE_CHAT_KNOWN_CHARACTERS_V1.find(
@@ -35,12 +39,12 @@ export function ChatReadHeader({
   const presentation = character === null
     ? null
     : resolveMobileChatCharacterPresentationV1(character.characterId);
-  const displayName = character?.displayName ?? '대화 상대';
+  const displayName = character?.displayName ?? shell.headerUnknownParticipant;
   const portrait = resolveMobileChatPortraitV1(snapshot.characterId);
   const isSeyeonTheme = snapshot.characterId === 'seyeon';
   const meta = presentation === null
-    ? '서버가 확인한 대화방'
-    : `${presentation.title} · 대화 기록`;
+    ? shell.headerVerifiedRoom
+    : `${presentation.title} · ${shell.headerHistoryLabel}`;
 
   return (
     <View style={[styles.headerCard, isSeyeonTheme && (theme === 'dark' ? styles.seyeonSurfaceDark : styles.seyeonSurface)]}>
@@ -54,7 +58,7 @@ export function ChatReadHeader({
             source={portrait}
             style={styles.avatarPortrait}
             resizeMode="cover"
-            accessibilityLabel={`${displayName} 연결자 초상화`}
+            accessibilityLabel={`${displayName} ${shell.headerPortrait}`}
           />
         )}
       </View>
@@ -74,12 +78,14 @@ export function ChatReadMessages({
 }) {
   const styles = useMobileThemedStyles(staticStyles);
   const { theme } = useMobileTheme();
+  const { locale } = useMobileUiLocale();
+  const shell = projectMobileChatHistoryShellV1(locale);
   const isSeyeonTheme = snapshot.characterId === 'seyeon';
   if (snapshot.status === 'loading_initial' || snapshot.status === 'idle') {
     return (
       <View style={[styles.stateCard, isSeyeonTheme && (theme === 'dark' ? styles.seyeonSurfaceDark : styles.seyeonSurface)]}>
         <ActivityIndicator color={mobileColors.navy} />
-        <MobileUiText style={styles.stateText}>대화 기록을 불러오는 중입니다…</MobileUiText>
+        <Text style={styles.stateText}>{shell.loading}</Text>
       </View>
     );
   }
@@ -87,12 +93,9 @@ export function ChatReadMessages({
   if (isSeyeonHistoryRevealHoldV1(snapshot)) {
     return (
       <View style={[styles.stateCard, styles.seyeonSurface]}>
-        <MobileUiText style={styles.errorTitle}>세연 대화 기록을 현재 표시할 수 없습니다</MobileUiText>
-        <MobileUiText style={styles.stateText}>
-          개인정보 보호를 위한 서버 확인이 끝나지 않아 대화 기록을 표시할 수 없습니다.
-          반복해서 불러와도 해제되지 않습니다.
-        </MobileUiText>
-        <MobileUiText style={styles.diagnosticText}>오류 코드: SEYEON_HISTORY_REVEAL_HOLD</MobileUiText>
+        <Text style={styles.errorTitle}>{shell.holdTitle}</Text>
+        <Text style={styles.stateText}>{shell.holdDescription}</Text>
+        <Text style={styles.diagnosticText}>{shell.errorCodeLabel}: SEYEON_HISTORY_REVEAL_HOLD</Text>
       </View>
     );
   }
@@ -100,12 +103,10 @@ export function ChatReadMessages({
   if (snapshot.status === 'error' && snapshot.messages.length === 0) {
     return (
       <View style={[styles.stateCard, isSeyeonTheme && (theme === 'dark' ? styles.seyeonSurfaceDark : styles.seyeonSurface)]}>
-        <MobileUiText style={styles.errorTitle}>대화를 불러오지 못했습니다</MobileUiText>
-        <MobileUiText style={styles.stateText}>
-          대화 기록을 확인하지 못했습니다. 아래에서 다시 불러올 수 있습니다.
-        </MobileUiText>
+        <Text style={styles.errorTitle}>{shell.errorTitle}</Text>
+        <Text style={styles.stateText}>{shell.errorDescription}</Text>
         {snapshot.errorCode !== null ? (
-          <Text style={styles.diagnosticText}>오류 코드: {snapshot.errorCode}</Text>
+          <Text style={styles.diagnosticText}>{shell.errorCodeLabel}: {snapshot.errorCode}</Text>
         ) : null}
       </View>
     );
@@ -124,7 +125,7 @@ export function ChatReadMessages({
             <View style={styles.messageAvatar}>
               {portrait === null
                 ? <Text style={styles.messageAvatarFallback}>{greeting.displayName.slice(0, 1)}</Text>
-                : <Image source={portrait} style={styles.avatarPortrait} resizeMode="cover" accessibilityLabel={greeting.displayName + ' 프로필'} />}
+                : <Image source={portrait} style={styles.avatarPortrait} resizeMode="cover" accessibilityLabel={greeting.displayName + ' ' + shell.profile} />}
             </View>
             <View style={styles.messageGroupStack}>
               <Text style={styles.messageGroupName}>{greeting.displayName}</Text>
@@ -139,7 +140,7 @@ export function ChatReadMessages({
     return (
       <View style={[styles.stateCard, isSeyeonTheme && (theme === 'dark' ? styles.seyeonSurfaceDark : styles.seyeonSurface)]}>
         <Text style={styles.emptyMark}>◇</Text>
-        <MobileUiText style={styles.errorTitle}>아직 표시할 메시지가 없습니다</MobileUiText>
+        <Text style={styles.errorTitle}>{shell.empty}</Text>
       </View>
     );
   }
@@ -176,7 +177,7 @@ export function ChatReadMessages({
                     source={portrait}
                     style={styles.avatarPortrait}
                     resizeMode="cover"
-                    accessibilityLabel={displayName + ' 프로필'}
+                    accessibilityLabel={displayName + ' ' + shell.profile}
                   />
                 )}
               </View>
@@ -241,16 +242,18 @@ export function ChatReadMore({
 }) {
   const styles = useMobileThemedStyles(staticStyles);
   const { theme } = useMobileTheme();
+  const { locale } = useMobileUiLocale();
+  const shell = projectMobileChatHistoryShellV1(locale);
   if (isSeyeonHistoryRevealHoldV1(snapshot)) return null;
   if (snapshot.status === 'error' && snapshot.messages.length === 0) {
     return onRetry === undefined ? null : (
       <Pressable accessibilityRole="button" onPress={onRetry} style={styles.loadMore}>
-        <MobileUiText style={styles.loadMoreText}>대화 다시 불러오기 ↻</MobileUiText>
+        <Text style={styles.loadMoreText}>{shell.retry}</Text>
       </Pressable>
     );
   }
   if (!snapshot.hasMore) {
-    return <MobileUiText style={styles.endText}>현재 확인할 수 있는 기록의 끝입니다.</MobileUiText>;
+    return <Text style={styles.endText}>{shell.end}</Text>;
   }
 
   return (
@@ -263,7 +266,7 @@ export function ChatReadMore({
       {snapshot.status === 'loading_more' ? (
         <ActivityIndicator color={mobileColors.navy} />
       ) : (
-        <MobileUiText style={styles.loadMoreText}>다음 메시지 불러오기</MobileUiText>
+        <Text style={styles.loadMoreText}>{shell.next}</Text>
       )}
     </Pressable>
   );
@@ -281,15 +284,15 @@ export function ChatComposer({
 }) {
   const styles = useMobileThemedStyles(staticStyles);
   const { theme } = useMobileTheme();
-  const { t } = useMobileUiLocale();
+  const { t, locale } = useMobileUiLocale();
+  const shell = projectMobileChatHistoryShellV1(locale);
+  const composeUi = projectMobileChatComposeUiV1(locale,
+    snapshot.characterId === null ? 'checking_character' : snapshot.characterId === 'seyeon' ? 'waiting_history' : 'character_not_ready');
   if (isSeyeonHistoryRevealHoldV1(snapshot)) {
     return (
       <View style={[styles.pendingCard, theme === 'dark' ? styles.seyeonSurfaceDark : styles.seyeonSurface]}>
-        <MobileUiText style={styles.pendingTitle}>세연 대화는 서버의 보호 조치로 잠시 중단되었습니다</MobileUiText>
-        <MobileUiText style={styles.stateText}>
-          대화 기록과 메시지 보내기는 개인정보 공개 권한 검증이 끝난 뒤 이용할 수 있습니다.
-          앱을 다시 설치해도 이 제한은 해제되지 않습니다.
-        </MobileUiText>
+        <Text style={styles.pendingTitle}>{shell.holdComposerTitle}</Text>
+        <Text style={styles.stateText}>{shell.holdComposerDescription}</Text>
       </View>
     );
   }
@@ -300,18 +303,8 @@ export function ChatComposer({
   if (!allowed) {
     return (
       <View style={styles.pendingCard}>
-        <Text style={styles.pendingTitle}>
-          {snapshot.characterId === null
-            ? '대화 상대를 확인하고 있습니다'
-            : seyeon
-              ? '대화 기록을 확인한 뒤 메시지를 보낼 수 있습니다'
-              : '이 캐릭터의 AI 대화는 준비 중입니다'}
-        </Text>
-        <Text style={styles.stateText}>
-          {seyeon
-            ? '대화방 기록을 불러오지 못한 경우 다시 입장해 주세요.'
-            : '캐릭터 대화방과 기록은 이용할 수 있으며, AI 답변 기능은 추후 열립니다.'}
-        </Text>
+        <Text style={styles.pendingTitle}>{composeUi.blockedTitle}</Text>
+        <Text style={styles.stateText}>{composeUi.blockedDescription}</Text>
       </View>
     );
   }
@@ -325,7 +318,7 @@ export function ChatComposer({
           value={draft}
           onChangeText={onChangeDraft}
           editable={!sending}
-          placeholder="세연에게 하고 싶은 말을 적어주세요"
+          placeholder={composeUi.placeholder}
           placeholderTextColor={mobileColors.muted}
           style={styles.composerInput}
         />

@@ -42,7 +42,7 @@ describe('Web Golden Master', () => {
     expect(productSection.match(/gm-product-card/gu)).toHaveLength(4);
     expectInOrder(productSection, ['전체 사주', '직업 · 커리어', '재물', '연애 · 관계']);
 
-    expect(home).toContain('href="chat-hub.html">대화로 가기 →</a>');
+    expect(home).toContain('href="chat-hub.html">{t("대화로 가기 →")}</a>');
     expect(home).toContain('지금은 저장된 사실을 이야기로 추측해 이어 붙이지 않습니다.');
     expect(home).not.toContain('연화');
     expect(home).not.toContain('세연');

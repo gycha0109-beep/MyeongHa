@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 
 import { MOBILE_CHAT_LAUNCH_ROSTER_V1, MOBILE_CHAT_PENDING_ROSTER_V1 } from '../apps/mobile/src/features/chat/chat-launch-roster.js';
+import { projectMobileChatHistoryShellV1 } from '../apps/mobile/src/features/chat/mobile-chat-history-shell-locale-v1.js';
 import { FORTUNE_COOKIE_MESSAGES_V1 as webMessages, pickFortuneCookieIndexV1 as webPick } from '../apps/web/src/home/fortune-cookie.js';
 import { FORTUNE_COOKIE_MESSAGES_V1 as mobileMessages, pickFortuneCookieIndexV1 as mobilePick } from '../apps/mobile/src/features/home/mobile-fortune-cookie.js';
 
@@ -73,8 +74,10 @@ describe('mobile chat + Reader portrait + Fortune Cookie parity', () => {
     expect(read).toContain('withMemberBearer');
     expect(read).not.toContain('withActiveBearer');
     expect(repo).toContain('CHAT_MEMBER_SESSION_REQUIRED');
-    expect(ui).toContain('오류 코드:');
-    expect(ui).toContain('대화 다시 불러오기');
+    expect(ui).toContain('{shell.errorCodeLabel}: {snapshot.errorCode}');
+    expect(projectMobileChatHistoryShellV1('ko-KR').errorCodeLabel).toBe('오류 코드');
+    expect(ui).toContain('{shell.retry}');
+    expect(projectMobileChatHistoryShellV1('ko-KR').retry).toContain('대화 다시 불러오기');
     expect(room).toContain('onRetry={() => void refresh()}');
   });
 });

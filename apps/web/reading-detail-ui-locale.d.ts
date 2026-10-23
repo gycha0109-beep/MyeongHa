@@ -33,6 +33,16 @@ export interface ReadingRouteStateCopyV1 {
   documentTitle: string;
 }
 
+export declare function readingSourceLanguageNoticeV1(
+  locale?: ReadingUiLocaleV1 | string,
+): Readonly<{
+  uiLocale: ReadingUiLocaleV1;
+  visible: boolean;
+  sourceTextPreserved: true;
+  translatedReading: false;
+  text: string;
+}>;
+
 export declare function readingScopeLabelV1(
   scope: string,
   year: number,
