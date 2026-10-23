@@ -1,4 +1,5 @@
 import { executeSecurityObservedRequestV1 } from '../apps/api/src/security-observability.js';
+import { tryDispatchHeldOfficialReaderV1 } from '../apps/api/src/official-reader-held-vercel-dispatch-v1.js';
 import { canonicalizeRequestUiLocaleHeadersV1 } from '../apps/api/src/request-ui-locale-v1.js';
 import { createNodePostgresSubjectPoolV1 } from '../apps/api/src/node-postgres-subject-pool.js';
 import { createProductionChatReadRuntimeV1 } from '../apps/api/src/production-chat-read-runtime.js';
@@ -775,6 +776,9 @@ export default {
       request,
       routeId: 'api.me.dispatch',
       execute: async ({ requestId, serverTime }) => {
+        // Held Reader routes remain gated; production paid reveal is not enabled.
+        const held = tryDispatchHeldOfficialReaderV1({ request, requestId, serverTime });
+        if (held !== null) return held;
         const target = resolveDispatchTarget(request);
         if (target === null) {
           cancelUnusedRequestBodyBestEffort(request);

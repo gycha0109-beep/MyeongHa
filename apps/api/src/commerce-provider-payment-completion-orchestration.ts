@@ -1,4 +1,5 @@
 import { ApiCommandError } from './api-error.js';
+import { fulfillVerifiedReaderReceiptV1 } from './commerce-verified-reader-fulfillment.js';
 import {
   loadCommerceProviderPaymentVerificationContextV1,
   type CommerceProviderPaymentVerificationResolutionV1,
@@ -30,6 +31,8 @@ export interface AuthenticatedCommerceProviderPaymentCompletionV1 {
   readonly receiptId: string;
   readonly providerEventId: string;
   readonly replayed: boolean;
+  /** Present only when trusted internal Reader fulfillment is explicitly enabled. */
+  readonly readerFulfillment?: 'issued' | 'already_bound' | 'not_reader';
 }
 
 const AUTHENTICATED_INGRESS_KEYS: ReadonlySet<string> = new Set([
@@ -176,6 +179,8 @@ export async function executeAuthenticatedCommerceProviderPaymentCompletionV1(in
   readonly ingress: unknown;
   readonly authenticator: CommerceProviderIngressAuthenticatorV1;
   readonly verificationAdapter: CommercePaymentVerificationAdapterV1;
+  /** Private, disabled-by-default S2 issuance. Not a paid-response activation. */
+  readonly privateReaderReceiptFulfillmentEnabled?: boolean;
 }): Promise<AuthenticatedCommerceProviderPaymentCompletionV1> {
   const authenticatedIngress = await authenticateProviderIngress({
     ingress: input.ingress,
@@ -198,10 +203,23 @@ export async function executeAuthenticatedCommerceProviderPaymentCompletionV1(in
     evidence,
   });
 
+  // Persisting verified payment evidence commits first. If private Reader
+  // fulfillment fails, the provider can retry the same canonical Receipt;
+  // replay is idempotent and does not manufacture a second Purchase/Grant.
+  const readerFulfillment = input.privateReaderReceiptFulfillmentEnabled === true
+    ? await fulfillVerifiedReaderReceiptV1({
+        pool: input.pool,
+        receiptId: persisted.receiptId,
+      })
+    : undefined;
+
   return Object.freeze({
     paymentAttemptId: resolution.paymentAttemptId,
     receiptId: persisted.receiptId,
     providerEventId: persisted.providerEventId,
     replayed: persisted.replayed,
+    ...(input.privateReaderReceiptFulfillmentEnabled === true
+      ? { readerFulfillment: readerFulfillment?.kind ?? 'not_reader' as const }
+      : {}),
   });
 }

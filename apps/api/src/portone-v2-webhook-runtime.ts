@@ -1,6 +1,7 @@
 import type { PostgresSubjectPoolV1 } from './postgres-subject-execution.js';
 import {
   createPortOneV2PaymentVerificationAdapterV1,
+  createPortOneV2FullCancellationVerifierV1,
   type PortOneV2PaymentHttpFetchV1,
 } from './portone-v2-payment-verification-adapter.js';
 import {
@@ -16,6 +17,8 @@ export interface PortOneV2WebhookRuntimeConfigV1 {
   readonly paymentTimeoutMs?: number;
   readonly paymentFetchImpl?: PortOneV2PaymentHttpFetchV1;
   readonly now?: () => Date;
+  /** S2 internal Reader grant/bind is off until explicitly owned and enabled. */
+  readonly privateReaderReceiptFulfillmentEnabled?: boolean;
 }
 
 export interface CreatePortOneV2WebhookRuntimeInputV1 {
@@ -39,6 +42,7 @@ export function createPortOneV2WebhookRuntimeV1(
     timeoutMs: config.paymentTimeoutMs,
     fetchImpl: config.paymentFetchImpl,
     now: config.now,
+    privateReaderReceiptFulfillmentEnabled: config.privateReaderReceiptFulfillmentEnabled === true,
   });
 
   const verificationAdapter = createPortOneV2PaymentVerificationAdapterV1({
@@ -53,10 +57,20 @@ export function createPortOneV2WebhookRuntimeV1(
     ...(configSnapshot.now === undefined ? {} : { now: configSnapshot.now }),
   });
 
+  const fullCancellationVerifier = createPortOneV2FullCancellationVerifierV1({
+    apiSecret: configSnapshot.apiSecret,
+    evidenceHmacSecret: configSnapshot.evidenceHmacSecret,
+    ...(configSnapshot.timeoutMs === undefined ? {} : { timeoutMs: configSnapshot.timeoutMs }),
+    ...(configSnapshot.fetchImpl === undefined ? {} : { fetchImpl: configSnapshot.fetchImpl }),
+  });
+
   const webhookConfig: PortOneV2WebhookPaymentCompletionConfigV1 = Object.freeze({
     environment: configSnapshot.environment,
     webhookSecrets: configSnapshot.webhookSecrets,
     ...(configSnapshot.now === undefined ? {} : { now: configSnapshot.now }),
+    ...(configSnapshot.privateReaderReceiptFulfillmentEnabled
+      ? { privateReaderReceiptFulfillmentEnabled: true }
+      : {}),
   });
   const pool = input.pool;
 
@@ -67,6 +81,7 @@ export function createPortOneV2WebhookRuntimeV1(
         pool,
         config: webhookConfig,
         verificationAdapter,
+        fullCancellationVerifier,
       }),
   });
 }

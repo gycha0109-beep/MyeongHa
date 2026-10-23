@@ -3,6 +3,7 @@ import {
   consumeOfficialReadingReaderAdmissionV1,
 } from './official-reading-reader-admission-v1.js';
 import type { ProductReaderEligibilityAuthorityPortV1 } from './product-reader-eligibility-policy-v1.js';
+import type { OfficialReaderPrivateCurrentPurchaseAuthorityPortV1 } from './official-reader-private-exact-verified-purchase-guard-v1.js';
 import {
   getServerPreparedChatReceiveContentEntryV1,
   type ChatReceivePlan,
@@ -49,6 +50,7 @@ export interface PrepareCharacterStandardReadingChatTurnPreflightInputV1 {
   readonly artifactAuthorityPort: CharacterStandardReadingArtifactAuthorityPortV1;
   /** Mandatory A2 Product/Commerce policy authority: absence fails closed. */
   readonly productReaderEligibilityAuthorityPort?: ProductReaderEligibilityAuthorityPortV1;
+  readonly currentVerifiedPurchaseAuthorityPort?: OfficialReaderPrivateCurrentPurchaseAuthorityPortV1;
   readonly relationshipAuthorityPort: CharacterRelationshipReadAuthorityPortV1;
   readonly memoryItemsAuthorityPort: MemoryItemsReadAuthorityPortV1;
   readonly memoryGrantsAuthorityPort: MemoryGrantsReadAuthorityPortV1;
@@ -111,6 +113,8 @@ export async function prepareCharacterStandardReadingChatTurnPreflightV1(
     accessAuthorityPort: input.accessAuthorityPort,
     artifactAuthorityPort: input.artifactAuthorityPort,
     productReaderEligibilityAuthorityPort: input.productReaderEligibilityAuthorityPort,
+    ...(input.currentVerifiedPurchaseAuthorityPort === undefined
+      ? {} : { currentVerifiedPurchaseAuthorityPort: input.currentVerifiedPurchaseAuthorityPort }),
     });
   } catch {
     throw new CharacterStandardReadingChatTurnPreflightErrorV1(
@@ -139,6 +143,8 @@ export async function prepareCharacterStandardReadingChatTurnPreflightV1(
       memoryGrantsAuthorityPort: input.memoryGrantsAuthorityPort,
       nonMemoryContextAuthorityPort: input.nonMemoryContextAuthorityPort,
       contextInput: input.contextInput,
+      ...(input.currentVerifiedPurchaseAuthorityPort === undefined
+      ? {} : { currentVerifiedPurchaseAuthorityPort: input.currentVerifiedPurchaseAuthorityPort }),
     });
   } catch (error) {
     if (error instanceof CharacterStandardReadingServerRuntimeAuthorityErrorV1) {

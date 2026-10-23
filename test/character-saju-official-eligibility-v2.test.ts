@@ -79,6 +79,9 @@ function fixture(reader = 'seyeon', domain: SajuDomain = 'general') {
       completedAt: '2026-10-09T07:30:00.000Z',
     }]) },
     productReaderEligibilityAuthorityPort: productAuthorityPort,
+    currentVerifiedPurchaseAuthorityPort: {
+      assertCurrentVerifiedPurchase: vi.fn(async () => undefined),
+    },
   };
   return { input, productAuthorityPort, readApprovedRule };
 }
@@ -95,6 +98,7 @@ describe('A3-alpha — official standard Character Saju eligibility V2', () => {
       const prepared = await prepareOfficialReadingReaderAdmissionV1(f.input);
       const proof = await issueCharacterSajuOfficialStandardEligibilityV2({
         prepared, currentScope: prepared.scope, productAuthorityPort: f.productAuthorityPort,
+        currentVerifiedPurchaseAuthorityPort: f.input.currentVerifiedPurchaseAuthorityPort,
       });
       expect(proof).toMatchObject({
         source: 'official_standard_product_rule',
@@ -111,6 +115,7 @@ describe('A3-alpha — official standard Character Saju eligibility V2', () => {
       })).toThrow(CharacterSajuOfficialEligibilityErrorV2);
       await expect(issueCharacterSajuOfficialStandardEligibilityV2({
         prepared, currentScope: prepared.scope, productAuthorityPort: f.productAuthorityPort,
+        currentVerifiedPurchaseAuthorityPort: f.input.currentVerifiedPurchaseAuthorityPort,
       })).rejects.toThrow(CharacterSajuOfficialEligibilityErrorV2);
     },
   );
@@ -120,6 +125,7 @@ describe('A3-alpha — official standard Character Saju eligibility V2', () => {
     const prepared = await prepareOfficialReadingReaderAdmissionV1(f.input);
     const proof = await issueCharacterSajuOfficialStandardEligibilityV2({
       prepared, currentScope: prepared.scope, productAuthorityPort: f.productAuthorityPort,
+        currentVerifiedPurchaseAuthorityPort: f.input.currentVerifiedPurchaseAuthorityPort,
     });
     expect(() => consumeCharacterSajuOfficialStandardEligibilityV2({
       proof: { ...proof }, currentScope: prepared.scope,
@@ -144,6 +150,7 @@ describe('A3-alpha — official standard Character Saju eligibility V2', () => {
     }));
     await expect(issueCharacterSajuOfficialStandardEligibilityV2({
       prepared, currentScope: prepared.scope, productAuthorityPort: f.productAuthorityPort,
+        currentVerifiedPurchaseAuthorityPort: f.input.currentVerifiedPurchaseAuthorityPort,
     })).rejects.toThrow(CharacterSajuOfficialEligibilityErrorV2);
   });
 
@@ -153,12 +160,14 @@ describe('A3-alpha — official standard Character Saju eligibility V2', () => {
     const changed = { ...prepared.scope, approvedPolicyRevision: 'stale' };
     await expect(issueCharacterSajuOfficialStandardEligibilityV2({
       prepared, currentScope: changed, productAuthorityPort: f.productAuthorityPort,
+        currentVerifiedPurchaseAuthorityPort: f.input.currentVerifiedPurchaseAuthorityPort,
     })).rejects.toThrow(CharacterSajuOfficialEligibilityErrorV2);
     f.readApprovedRule.mockImplementationOnce(async () => ({
       status: 'withheld', reason: 'disabled',
     }));
     await expect(issueCharacterSajuOfficialStandardEligibilityV2({
       prepared, currentScope: prepared.scope, productAuthorityPort: f.productAuthorityPort,
+        currentVerifiedPurchaseAuthorityPort: f.input.currentVerifiedPurchaseAuthorityPort,
     })).rejects.toThrow(CharacterSajuOfficialEligibilityErrorV2);
     expect(() => consumeCharacterSajuOfficialStandardEligibilityV2({
       proof: { source: 'official_standard_product_rule', admittedDomain: 'general',

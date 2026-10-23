@@ -2,12 +2,51 @@
 set -euo pipefail
 
 inventory_path="docs/operations/TRANSITIVE_SUBJECT_DEPENDENCY_GRAPH_V1.json"
+private_overlay_path="docs/operations/OFFICIAL_READER_PRIVATE_TRANSITIVE_SUBJECT_FK_OVERLAY_V1.json"
 
 expected="$(
-  node --input-type=module - "$inventory_path" <<'NODE'
+  node --input-type=module - "$inventory_path" "$private_overlay_path" <<'NODE'
 import { readFile } from 'node:fs/promises';
 const inventory = JSON.parse(await readFile(process.argv[2], 'utf8'));
-const lines = (inventory.edges ?? [])
+const overlay = JSON.parse(await readFile(process.argv[3], 'utf8'));
+if (inventory.schema !== 'myeongha-transitive-subject-dependency-graph-v1' ||
+    inventory.edges?.length !== 140 ||
+    overlay.schema !== 'myeongha-official-reader-private-transitive-subject-fk-overlay-v1' ||
+    overlay.graphAuthority !== 'SCHEMA_DISCOVERED_POLICY_NEUTRAL' ||
+    overlay.policyAuthority !== 'NONE_PENDING_PRIVACY_OWNER' ||
+    overlay.publicReleaseAuthorized !== false ||
+    overlay.executionAuthorized !== false ||
+    overlay.edges?.length !== 18) {
+  throw new Error('Subject FK historical graph or private Reader overlay invalid');
+}
+const expectedPrivateNames = new Set([
+  'official_reader_account_deletion_privacy_status_v1',
+  'official_reader_paid_answer_bodies',
+  'official_reader_paid_answer_purge_jobs_v1',
+  'official_reader_paid_delivery_attempts_v1',
+  'official_reader_s3_source_authority_receipts_v1',
+]);
+const depths = { 1: 5, 2: 4, 3: 8, 4: 1 };
+for (const edge of overlay.edges) {
+  if (edge.scope !== 'OFFICIAL_READER_PRIVATE' ||
+      edge.disposition !== 'UNDECIDED' ||
+      edge.executionAuthorized !== false ||
+      !expectedPrivateNames.has(edge.childTable) ||
+      !Number.isInteger(edge.minDepth) ||
+      !Array.isArray(edge.childColumns) ||
+      !Array.isArray(edge.parentColumns) ||
+      edge.childColumns.length !== edge.parentColumns.length ||
+      edge.childColumns.length === 0 ||
+      !depths[edge.minDepth]) {
+    throw new Error('Unapproved Reader graph overlay contains unknown or elevated edge');
+  }
+  depths[edge.minDepth]--;
+}
+if (Object.values(depths).some(value => value !== 0)) {
+  throw new Error('Reader graph overlay depth inventory mismatch');
+}
+const edges = [...inventory.edges, ...overlay.edges];
+const lines = edges
   .map((edge) => [
     edge.minDepth,
     edge.parentTable,
@@ -17,6 +56,7 @@ const lines = (inventory.edges ?? [])
     edge.parentColumns.join(','),
   ].join('|'))
   .sort();
+if (new Set(lines).size !== 158) throw new Error('Reader graph catalog has duplicate/missing edges');
 process.stdout.write(lines.join('\n'));
 NODE
 )"
@@ -129,13 +169,13 @@ edge_count="$(printf '%s\n' "$actual" | sed '/^$/d' | wc -l | tr -d ' ')"
 direct_count="$(printf '%s\n' "$actual" | awk -F '|' '$1 == "1" { count += 1 } END { print count + 0 }')"
 max_depth="$(printf '%s\n' "$actual" | awk -F '|' 'BEGIN { max = 0 } $1 + 0 > max { max = $1 + 0 } END { print max }')"
 
-[[ "$edge_count" == "140" ]] || {
-  echo "Expected exactly 140 current reachable FK edges, found $edge_count." >&2
+[[ "$edge_count" == "158" ]] || {
+  echo "Expected 140 historical plus 18 private Reader FK edges, found $edge_count." >&2
   exit 1
 }
 
-[[ "$direct_count" == "30" ]] || {
-  echo "Direct depth-1 edge count must stay consistent with #1063: expected=30 actual=$direct_count." >&2
+[[ "$direct_count" == "35" ]] || {
+  echo "Direct depth-1 edges must match 30 historical plus 5 Reader private edges: actual=$direct_count." >&2
   exit 1
 }
 

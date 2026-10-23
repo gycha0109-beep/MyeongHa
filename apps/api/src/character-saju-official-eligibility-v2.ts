@@ -1,3 +1,6 @@
+import type {
+  OfficialReaderPrivateCurrentPurchaseAuthorityPortV1,
+} from './official-reader-private-exact-verified-purchase-guard-v1.js';
 import {
   assessProductReaderEligibilityV1,
   type ProductReaderEligibilityAuthorityPortV1,
@@ -53,6 +56,8 @@ export async function issueCharacterSajuOfficialStandardEligibilityV2(input: {
   readonly prepared: PreparedOfficialReadingReaderAdmissionV1;
   readonly currentScope: OfficialReadingReaderAdmissionScopeV1;
   readonly productAuthorityPort: ProductReaderEligibilityAuthorityPortV1;
+  readonly currentVerifiedPurchaseAuthorityPort?:
+    OfficialReaderPrivateCurrentPurchaseAuthorityPortV1;
 }): Promise<CharacterSajuOfficialStandardEligibilityV2> {
   const { prepared, currentScope } = input;
   if (!sameScope(prepared.scope, currentScope) ||
@@ -67,6 +72,19 @@ export async function issueCharacterSajuOfficialStandardEligibilityV2(input: {
       prepared.source.responseHash !== currentScope.officialArtifactResponseHash) {
     return deny();
   }
+
+  // Even a valid opaque A2 ticket cannot authorize after its original
+  // PortOne Receipt is revoked. Check the exact verified current purchase
+  // before minting any Official Reader eligibility proof.
+  if (!input.currentVerifiedPurchaseAuthorityPort) return deny();
+  try {
+    await input.currentVerifiedPurchaseAuthorityPort.assertCurrentVerifiedPurchase({
+      subjectId: currentScope.subjectId,
+      readingId: currentScope.readingId,
+      readerCharacterId: currentScope.readerCharacterId,
+      readerContentBundleId: currentScope.readerContentBundleId,
+    });
+  } catch { return deny(); }
 
   const lookupInput = Object.freeze({
     productId: currentScope.productId,
@@ -97,6 +115,18 @@ export async function issueCharacterSajuOfficialStandardEligibilityV2(input: {
       lookup.rule.kind !== 'standard_all_readers') {
     return deny();
   }
+
+  // Current Receipt/Grant can change during Product policy resolution;
+  // repeat the exact S1 check immediately before consuming the one-use A2
+  // ticket and minting the official eligibility proof.
+  try {
+    await input.currentVerifiedPurchaseAuthorityPort.assertCurrentVerifiedPurchase({
+      subjectId: currentScope.subjectId,
+      readingId: currentScope.readingId,
+      readerCharacterId: currentScope.readerCharacterId,
+      readerContentBundleId: currentScope.readerContentBundleId,
+    });
+  } catch { return deny(); }
 
   // The A2 opaque ticket is the only issuance authority. A structural clone
   // or an already-consumed ticket can never mint this official V2 proof.

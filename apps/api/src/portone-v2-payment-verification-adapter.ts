@@ -907,3 +907,118 @@ export function createPortOneV2PaymentVerificationAdapterV1(
     },
   });
 }
+
+
+/**
+ * Actual PortOne V2 full-cancellation verification, separate from PAID.
+ * Ingress signature authentication only identifies the candidate; server GET must
+ * independently confirm CANCELLED and the exact succeeded cancellation ID.
+ * Partial/Pending/unknown payment states never authorize Reader revocation.
+ */
+export interface VerifiedPortOneV2FullCancellationV1 {
+  readonly paymentId: string;
+  readonly transactionId: string;
+  readonly cancellationId: string;
+  readonly environment: 'sandbox' | 'production';
+  readonly cancelledAt: string;
+  readonly verifiedAmountMinor: number;
+  readonly verifiedCurrency: string;
+  readonly evidenceFingerprint: string;
+  readonly verifierRevision: string;
+}
+
+export interface PortOneV2FullCancellationVerifierV1 {
+  verifyFullCancellation(input: {
+    readonly paymentId: string;
+    readonly transactionId: string;
+    readonly cancellationId: string;
+    readonly environment: 'sandbox' | 'production';
+  }): Promise<VerifiedPortOneV2FullCancellationV1>;
+}
+
+export function createPortOneV2FullCancellationVerifierV1(
+  config: PortOneV2PaymentVerificationAdapterConfigV1,
+): PortOneV2FullCancellationVerifierV1 {
+  const snapshot = snapshotVerificationConfig(config);
+  const apiSecret = resolveApiSecret(snapshot.apiSecret);
+  const evidenceHmacSecret = resolveEvidenceHmacSecret(snapshot.evidenceHmacSecret);
+  const timeoutMs = resolveTimeoutMs(snapshot.timeoutMs);
+  const fetchImpl = snapshot.fetchImpl ?? defaultFetch;
+
+  return Object.freeze({
+    async verifyFullCancellation(
+      input: {
+        readonly paymentId: string;
+        readonly transactionId: string;
+        readonly cancellationId: string;
+        readonly environment: 'sandbox' | 'production';
+      },
+    ): Promise<VerifiedPortOneV2FullCancellationV1> {
+      const paymentId = boundedIdentity(input.paymentId,'PortOne V2 cancel payment id');
+      const transactionId = boundedIdentity(input.transactionId,'PortOne V2 cancel transaction id');
+      const cancellationId = boundedIdentity(input.cancellationId,'PortOne V2 cancellation id');
+      if (input.environment !== 'production' && input.environment !== 'sandbox') {
+        return fail('INVALID_REQUEST','PortOne V2 cancellation environment is invalid.');
+      }
+
+      const lease = await fetchWithTimeout({
+        fetchImpl,
+        url: paymentUrl(paymentId),
+        apiSecret,
+        timeoutMs,
+      });
+      try {
+        const status = readResponseStatus(lease.response);
+        assertSuccessfulStatus(lease.response,status);
+        assertJsonContentType(lease.response,status);
+        assertDeclaredBodyBound(lease.response,status);
+        const payment = plainRecord(
+          await parseJsonResponse(lease.response,status,lease.deadline,lease.didTimeout),
+          'PortOne V2 cancelled payment',
+        );
+        if (payment.status !== 'CANCELLED'
+          || payment.id !== paymentId
+          || payment.transactionId !== transactionId
+          || requireEnvironment(payment.channel) !== input.environment) {
+          return fail('INVALID_PAYMENT',
+            'PortOne V2 payment is not the exact authoritative full cancellation.');
+        }
+        if (!Array.isArray(payment.cancellations)
+            || payment.cancellations.length===0
+            || !payment.cancellations.some((candidate: unknown) => {
+              if (typeof candidate !== 'object' || candidate===null
+                  || Array.isArray(candidate)) return false;
+              const item = candidate as Record<string,unknown>;
+              return item.id===cancellationId && item.status==='SUCCEEDED';
+            })) {
+          return fail('INVALID_PAYMENT',
+            'PortOne V2 exact successful cancellation is unavailable.');
+        }
+
+        const cancelledAt=requirePaidAt(payment.cancelledAt);
+        const verifiedAmountMinor=requireAmountMinor(payment.amount);
+        const verifiedCurrency=requireCurrency(payment.currency);
+        const canonical=JSON.stringify({
+          schemaVersion:'myeongha.portone-v2.full-cancel-evidence.v1',
+          paymentId,transactionId,cancellationId,
+          environment:input.environment,cancelledAt,
+          verifiedAmountMinor,verifiedCurrency,
+          status:'CANCELLED',
+        });
+        const evidenceFingerprint=fingerprintProductionCommerceEvidenceV1({
+          domain: PRODUCTION_COMMERCE_EVIDENCE_FINGERPRINT_BINDING_V1.domains.receiptEvidence,
+          canonicalEvidenceBytes: Buffer.from(canonical,'utf8'),
+          secret: evidenceHmacSecret,
+        });
+        return Object.freeze({
+          paymentId,transactionId,cancellationId,
+          environment:input.environment,cancelledAt,
+          verifiedAmountMinor,verifiedCurrency,evidenceFingerprint,
+          verifierRevision:'portone-v2-payment-full-cancel-lookup-v1',
+        });
+      } finally {
+        lease.release();
+      }
+    },
+  });
+}

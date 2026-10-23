@@ -1,3 +1,5 @@
+import { Link } from 'expo-router';
+import { MobilePaidReaderChatRevealV1 } from '@/features/chat/mobile-paid-reader-chat-reveal';
 import type { MobileChatThreadSnapshotV1 } from '@/features/chat/mobile-chat-read-repository';
 import { groupMobileChatMessagesV1 } from '@/features/chat/chat-view-model';
 import { isSeyeonHistoryRevealHoldV1 } from '@/features/chat/seyeon-history-hold-state';
@@ -211,10 +213,27 @@ export function ChatReadMessages({
                       system && styles.systemBubble,
                       characterGroup && isSeyeonTheme && (theme === 'dark' ? styles.seyeonBubbleDark : styles.seyeonBubble),
                       message.redacted && styles.redactedBubble,
+                      message.isPaidReaderMarker && styles.paidReaderBubble,
                     ]}>
+                      {message.isPaidReaderMarker ? (
+                        <Text style={styles.paidReaderLabel}>보호된 사주 해설</Text>
+                      ) : null}
                       <Text style={[styles.messageBody, user && styles.userMessageBody]}>
                         {message.body}
                       </Text>
+                      {message.isPaidReaderMarker ? (
+                        <MobilePaidReaderChatRevealV1
+                          threadId={snapshot.threadId}
+                          safeMessageId={message.id}
+                        />
+                      ) : null}
+                      {message.isPaidReaderMarker ? (
+                        <Link href="/records" asChild>
+                          <Pressable accessibilityRole="link" accessibilityLabel="내 사주 기록에서 이용권 확인" style={styles.paidReaderLink}>
+                            <Text style={styles.paidReaderHint}>내 기록 확인하기 →</Text>
+                          </Pressable>
+                        </Link>
+                      ) : null}
                     </View>
                     {!user && last && group.timeLabel !== '' ? (
                       <Text style={styles.messageTime}>{group.timeLabel}</Text>
@@ -435,6 +454,10 @@ const styles = StyleSheet.create({
   userBubble: { backgroundColor: mobileColors.navy, borderColor: mobileColors.navy },
   systemBubble: { maxWidth: '88%', backgroundColor: mobileColors.canvas },
   redactedBubble: { opacity: 0.7 },
+  paidReaderBubble: { maxWidth: '94%', borderColor: mobileColors.gold, backgroundColor: 'rgba(240, 226, 205, 0.55)' },
+  paidReaderLabel: { color: mobileColors.navy, fontSize: 12, fontWeight: '800', marginBottom: 5 },
+  paidReaderHint: { color: mobileColors.navy, fontSize: 12, fontWeight: '700' },
+  paidReaderLink: { alignSelf: 'flex-start', paddingVertical: 6 },
   messageBody: { color: mobileColors.ink, fontSize: 15, lineHeight: 24 },
   userMessageBody: { color: mobileColors.surface },
   messageTime: { color: mobileColors.muted, fontSize: 10, flexShrink: 0, paddingBottom: 2 },

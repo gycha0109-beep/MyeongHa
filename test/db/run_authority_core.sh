@@ -241,6 +241,8 @@ run_isolated_case myeongha_reader_product_scope_app_test bash test/db/standard_r
 run_isolated_case myeongha_standard_reading_unit_binding_test bash test/db/standard_reading_unit_binding.sh
 run_isolated_case myeongha_standard_reading_artifact_reread_test bash test/db/standard_reading_artifact_reread.sh
 run_isolated_case myeongha_official_standard_reader_interpretation_test bash test/db/official_standard_reading_reader_interpretation.sh
+# S4 disposable schema and synthetic access proof; never a Production migration.
+run_isolated_case myeongha_reader_s4_design_test psql -X -v ON_ERROR_STOP=1 -f test/db/official_reader_s4_protected_storage_design.sql
 run_isolated_case myeongha_reader_thread_locator_test bash test/db/official_reader_thread_locator_query.sh
 run_isolated_case myeongha_reader_first_thread_bundle_rollback_test bash test/db/official_reader_first_thread_bundle_rollback.sh
 run_isolated_case myeongha_reader_first_thread_app_test bash test/db/official_reader_first_thread_typescript_postgres.sh
@@ -252,6 +254,12 @@ run_isolated_case myeongha_reader_birth_scope_lock_candidate_preflight_test bash
 run_isolated_case myeongha_reader_scope_lock_private_preflight_test bash test/db/official_reader_scope_lock_private_preflight.sh
 # S2 instrumented concurrency only; production Writer integration remains HOLD.
 run_isolated_case myeongha_reader_scope_lock_s2_instrumented_race_test bash test/db/official_reader_scope_lock_s2_instrumented_race.sh
+# S7: verify actual migrated Checkout/Receipt/Grant/Item reference joins in an isolated clone.
+run_isolated_case myeongha_reader_checkout_original_ledger_test bash test/db/official_reader_checkout_original_item_postgres.sh
+# S2/S7: original verified cancellation races against protected Receipt snapshot.
+run_isolated_case myeongha_reader_s7_receipt_snapshot_race_test bash test/db/official_reader_s7_original_receipt_snapshot_race.sh
+# S4/S7: original Receipt-backed delivery evidence remains private.
+run_isolated_case myeongha_reader_s7_original_delivery_ledger_test bash test/db/official_reader_s7_original_delivery_ledger.sh
 authority_profile_stage 'remaining-authority-and-catalog'
 bash test/db/entitlements_current_query.sh
 bash test/db/data_deletion_job_query.sh

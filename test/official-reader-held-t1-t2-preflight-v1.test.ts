@@ -99,6 +99,9 @@ function fixture(options: {
       resolvedSubjectId: scope.resolvedSubject.subjectId,
       threadId: THREAD, readingId: READING, effectiveAt,
       contentEntry,
+      currentVerifiedPurchaseAuthorityPort: {
+        assertCurrentVerifiedPurchase: vi.fn(async () => undefined),
+      },
       threadBindingAuthorityPort: { readRuntimeBinding },
       accessAuthorityPort: { readAccessibleReadings: async () =>
         phase === 2 && options.revokedAtT2 ? [] : [{
@@ -199,6 +202,100 @@ describe('Deny-only Reader T1 / private generation / fresh T2 staging', () => {
     expect(f.events).toContain('rollback:2');
     expect(f.events).toContain('release:2');
     expect(f.events).not.toContain('commit:2');
+  });
+
+  it.each([
+    ['HTTP Response', () => new Response(PRIVATE)],
+    ['Request', () => new Request('https://example.invalid/internal', {
+      method: 'POST', body: PRIVATE,
+    })],
+    ['ReadableStream', () => new ReadableStream({
+      start(controller) {
+        controller.enqueue(PRIVATE);
+        controller.close();
+      },
+    })],
+    ['Blob', () => new Blob([PRIVATE])],
+    ['FormData', () => {
+      const form = new FormData();
+      form.append('protectedBody', PRIVATE);
+      return form;
+    }],
+  ])('rejects direct %s egress from private generation before fresh T2', async (_label, value) => {
+    const f = fixture();
+    const generatePrivate = vi.fn(async () => value());
+    await expect(runOfficialReaderHeldT1T2PreflightV1({
+      ...f.input, generatePrivate,
+    })).rejects.toEqual(new OfficialReaderHeldPreflightErrorV1());
+    expect(generatePrivate).toHaveBeenCalledOnce();
+    expect(f.events).toContain('commit:1');
+    expect(f.events).toContain('release:1');
+    expect(f.events).not.toContain('connect:2');
+    expect(JSON.stringify(f.events)).not.toContain(PRIVATE);
+  });
+
+  it.each([
+    ['nested Response', () => ({ provider: { output: new Response(PRIVATE) } })],
+    ['nested stream', () => ({ body: [new ReadableStream()] })],
+    ['nested Blob', () => ({ event: { blob: new Blob([PRIVATE]) } })],
+    ['nested Error', () => ({ audit: new Error(PRIVATE) })],
+    ['nested Promise', () => ({ event: { future: Promise.resolve(PRIVATE) } })],
+    ['nested binary', () => ({ payload: Buffer.from(PRIVATE) })],
+    ['deferred output callback', () => ({ payload: { toJSON: () => PRIVATE } })],
+    ['non-finite payload', () => ({ payload: Number.POSITIVE_INFINITY })],
+    ['getter invoking egress', () => {
+      const event: Record<string, unknown> = {};
+      Object.defineProperty(event, 'rawBody', {
+        enumerable: true, get: () => { throw Error('GETTER SHOULD NOT RUN'); },
+      });
+      return { event };
+    }],
+    ['cyclic object', () => {
+      const event: Record<string, unknown> = {};
+      event.self = event;
+      return event;
+    }],
+    ['excessive depth', () => {
+      let value: unknown = PRIVATE;
+      for (let index = 0; index < 18; index += 1) {
+        value = { nested: value };
+      }
+      return value;
+    }],
+  ])('blocks %s without exposing generated result and without starting T2', async (_label, build) => {
+    const f = fixture();
+    await expect(runOfficialReaderHeldT1T2PreflightV1({
+      ...f.input,
+      generatePrivate: async () => build(),
+    })).rejects.toEqual(new OfficialReaderHeldPreflightErrorV1());
+    expect(f.events).toContain('release:1');
+    expect(f.events).not.toContain('connect:2');
+    expect(JSON.stringify(f.events)).not.toContain(PRIVATE);
+  });
+
+  it('does not invoke a nested accessor during private-result inspection', async () => {
+    const f = fixture();
+    const getter = vi.fn(() => PRIVATE);
+    const value = {};
+    Object.defineProperty(value, 'leak', {
+      enumerable: true, get: getter,
+    });
+    await expect(runOfficialReaderHeldT1T2PreflightV1({
+      ...f.input, generatePrivate: async () => ({ value }),
+    })).rejects.toEqual(new OfficialReaderHeldPreflightErrorV1());
+    expect(getter).not.toHaveBeenCalled();
+  });
+
+  it('accepts a bounded plain private draft only to discard it and return HOLD', async () => {
+    const f = fixture();
+    const generatePrivate = vi.fn(async () => Object.freeze({
+      chapters: [{ raw: PRIVATE, evidence: { schemaVersion: 1, valid: true } }],
+    }));
+    const result = await runOfficialReaderHeldT1T2PreflightV1({ ...f.input, generatePrivate });
+    expect(generatePrivate).toHaveBeenCalledOnce();
+    expect(f.events).toContain('commit:2');
+    expect(result).toMatchObject({ status: 'held', publicDisclosureAuthorized: false });
+    expect(JSON.stringify(result)).not.toContain(PRIVATE);
   });
 
   it('sanitizes generation failure and never starts T2', async () => {

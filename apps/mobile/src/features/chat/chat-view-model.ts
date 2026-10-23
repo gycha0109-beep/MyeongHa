@@ -7,6 +7,7 @@ export interface MobileChatMessageViewV1 {
   readonly label: string;
   readonly body: string;
   readonly redacted: boolean;
+  readonly isPaidReaderMarker: boolean;
   readonly timeLabel: string;
 }
 
@@ -25,6 +26,9 @@ export function createMobileChatMessageViewV1(
   verifiedCharacterDisplayName?: string,
 ): MobileChatMessageViewV1 {
   const role = message.senderType;
+  const isPaidReaderMarker = role === 'system'
+    && message.redacted === false
+    && message.bodyText === '유료 해설 기록이 있습니다.';
   const label =
     role === 'user' ? '나' :
     role === 'character' ? (verifiedCharacterDisplayName?.trim() || '대화 상대') :
@@ -37,8 +41,11 @@ export function createMobileChatMessageViewV1(
     label,
     body: message.redacted
       ? '가려진 메시지'
-      : message.bodyText ?? '표시할 수 있는 텍스트가 없는 메시지',
+      : isPaidReaderMarker
+        ? '유료 사주 해설의 기록입니다. 현재 이용권이 확인되면 이 채팅방에서 해설을 열람할 수 있습니다.'
+        : message.bodyText ?? '표시할 수 있는 텍스트가 없는 메시지',
     redacted: message.redacted,
+    isPaidReaderMarker,
     timeLabel: timeLabel(message.createdAt),
   });
 }

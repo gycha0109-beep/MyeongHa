@@ -110,13 +110,57 @@ select
   has_function_privilege('myeongha_system_executor','public.internal_complete_account_deletion_v1(uuid,uuid,text)','EXECUTE')::int;")"
 [[ "$worker_grants" == "1|1|1|1" ]] || fail "worker lifecycle grants mismatch: $worker_grants"
 
-system_function_count="$("${psql_base[@]}" -Atc "
-select count(*)
-from pg_catalog.pg_proc p
-join pg_catalog.pg_namespace n on n.oid=p.pronamespace
-where n.nspname='public'
-  and pg_catalog.has_function_privilege('myeongha_system_executor',p.oid,'EXECUTE');")"
-[[ "$system_function_count" == "4" ]] || fail "system executor effective public-function allowlist drifted: $system_function_count"
+# Four core deletion capabilities plus exactly fourteen private S4/S7 Reader
+# purge/privacy/replay/prune operations explicitly granted in migrations 2010,
+# 2040 and 2060..2100. All other functions remain unavailable. A count
+# check alone could conceal a swapped or newly exposed privileged function.
+system_function_contract="$("${psql_base[@]}" -At -F '|' -c "
+with expected(signature) as (
+  values
+    ('public.internal_claim_account_deletion_outbox_v1(uuid,text,timestamptz)'),
+    ('public.internal_account_deletion_resume_state_v1(uuid,uuid,text)'),
+    ('public.internal_finalize_account_deletion_db_v1(uuid,uuid,text)'),
+    ('public.internal_complete_account_deletion_v1(uuid,uuid,text)'),
+    ('public.internal_qry_official_reader_account_deletion_manifest_v1(uuid,uuid,text)'),
+    ('public.internal_ack_official_reader_account_key_erasure_v1(uuid,uuid,text,text)'),
+    ('public.internal_qry_official_reader_account_privacy_pending_v1(uuid,uuid,text)'),
+    ('public.internal_replay_offprimary_reader_account_deletion_v1(uuid,uuid,text,uuid[])'),
+    ('public.internal_list_official_reader_paid_answer_purge_jobs_v1(integer)'),
+    ('public.internal_claim_official_reader_paid_answer_purge_v1(uuid,text)'),
+    ('public.internal_qry_official_reader_paid_answer_purge_manifest_v1(uuid,text)'),
+    ('public.internal_commit_official_reader_paid_answer_purge_v1(uuid,text,text,uuid[],text[])'),
+    ('public.internal_prune_official_reader_paid_delivery_v1(integer)'),
+    ('public.internal_release_official_reader_paid_answer_purge_v1(uuid,text)'),
+    ('public.internal_finish_empty_official_reader_paid_answer_purge_v1(uuid,text)'),
+    ('public.internal_replay_offprimary_reader_refund_purge_v1(uuid,uuid,uuid,text,uuid,uuid[])'),
+    ('public.internal_finish_official_reader_paid_answer_purge_v1(uuid,text,text,uuid[])'),
+    ('public.internal_renew_official_reader_paid_answer_purge_lease_v1(uuid,text)')
+), expected_oids as (
+  select signature, pg_catalog.to_regprocedure(signature) as oid
+  from expected
+), actual as (
+  select p.oid
+  from pg_catalog.pg_proc p
+  join pg_catalog.pg_namespace n on n.oid=p.pronamespace
+  where n.nspname='public'
+    and pg_catalog.has_function_privilege('myeongha_system_executor',p.oid,'EXECUTE')
+), unexpected as (
+  select a.oid from actual a
+  where not exists (select 1 from expected_oids e where e.oid=a.oid)
+), missing as (
+  select e.signature from expected_oids e
+  where e.oid is null or not exists (select 1 from actual a where a.oid=e.oid)
+)
+select
+  (select count(*) from actual),
+  (select count(*) from expected_oids),
+  (select count(*) from unexpected),
+  (select count(*) from missing),
+  (select count(distinct oid) from expected_oids)
+;")"
+[[ "$system_function_contract" == "18|18|0|0|18" ]] ||
+  fail "system executor exact 18-function allowlist drifted: $system_function_contract"
+pass "system executor grants only 4 deletion plus 14 explicitly scoped private S4/S7 Reader functions"
 
 for role in myeongha_api_executor myeongha_runtime myeongha_worker_runtime anon authenticated service_role; do
   worker_exec_count="$("${psql_base[@]}" -Atc "

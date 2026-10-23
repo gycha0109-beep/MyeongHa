@@ -411,6 +411,7 @@ export async function recheckCharacterStandardReaderFinalHoldV1(input: Readonly<
   accessAuthorityPort: PrepareOfficialReadingReaderAdmissionInputV1['accessAuthorityPort'];
   artifactAuthorityPort: PrepareOfficialReadingReaderAdmissionInputV1['artifactAuthorityPort'];
   productReaderEligibilityAuthorityPort: PrepareOfficialReadingReaderAdmissionInputV1['productReaderEligibilityAuthorityPort'];
+  currentVerifiedPurchaseAuthorityPort: NonNullable<PrepareOfficialReadingReaderAdmissionInputV1['currentVerifiedPurchaseAuthorityPort']>;
 }>): Promise<CharacterStandardReaderFreshRecheckHoldV1> {
   // No SQL/source/policy reads before checking both genuine server-minted
   // artifacts and their exact original source. A forged structural clone
@@ -456,6 +457,7 @@ export async function recheckCharacterStandardReaderFinalHoldV1(input: Readonly<
       accessAuthorityPort: input.accessAuthorityPort,
       artifactAuthorityPort: input.artifactAuthorityPort,
       productReaderEligibilityAuthorityPort: input.productReaderEligibilityAuthorityPort,
+      currentVerifiedPurchaseAuthorityPort: input.currentVerifiedPurchaseAuthorityPort,
     });
   } catch {
     return denyFresh('ACCESS_DENIED');

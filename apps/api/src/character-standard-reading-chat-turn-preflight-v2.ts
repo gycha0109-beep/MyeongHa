@@ -127,6 +127,8 @@ export async function prepareCharacterStandardReadingChatTurnPreflightV2(
     accessAuthorityPort: input.accessAuthorityPort,
     artifactAuthorityPort: input.artifactAuthorityPort,
     productReaderEligibilityAuthorityPort: input.productReaderEligibilityAuthorityPort,
+    ...(input.currentVerifiedPurchaseAuthorityPort === undefined
+      ? {} : { currentVerifiedPurchaseAuthorityPort: input.currentVerifiedPurchaseAuthorityPort }),
   };
 
   let first;
@@ -199,13 +201,17 @@ export async function prepareCharacterStandardReadingChatTurnPreflightV2(
       prepared: first,
       currentScope: scope,
       productAuthorityPort: input.productReaderEligibilityAuthorityPort,
+      ...(input.currentVerifiedPurchaseAuthorityPort === undefined
+      ? {} : { currentVerifiedPurchaseAuthorityPort: input.currentVerifiedPurchaseAuthorityPort }),
     });
     const baseContext = assembleCharacterRuntimeContext(base.contextInput);
-    runtime = assembleOfficialStandardReaderRuntimeV2({
+    runtime = await assembleOfficialStandardReaderRuntimeV2({
       proof,
       currentScope: scope,
       source: current.source,
       baseContext,
+      ...(input.currentVerifiedPurchaseAuthorityPort === undefined
+      ? {} : { currentVerifiedPurchaseAuthorityPort: input.currentVerifiedPurchaseAuthorityPort }),
     });
   } catch {
     return deny('ACCESS_DENIED');

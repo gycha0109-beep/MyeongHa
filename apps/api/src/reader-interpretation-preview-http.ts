@@ -14,6 +14,9 @@ import type {
 } from './character-standard-reading-server-runtime-authority.js';
 import type { ProductReaderEligibilityAuthorityPortV1 } from './product-reader-eligibility-policy-v1.js';
 import type {
+  OfficialReaderPrivateCurrentPurchaseAuthorityPortV1,
+} from './official-reader-private-exact-verified-purchase-guard-v1.js';
+import type {
   CharacterRelationshipReadAuthorityPortV1,
 } from './character-relationship-read.js';
 import type {
@@ -242,6 +245,8 @@ export async function runReaderInterpretationPreviewHttpV1(input: {
   readonly nonMemoryContextAuthorityPort: ReaderContextLifeFactsReadAuthorityPortV1;
   readonly groundingProjectionPort: OfficialReadingCharacterGroundingProjectionPortV1;
   readonly productReaderEligibilityAuthorityPort?: ProductReaderEligibilityAuthorityPortV1;
+  readonly currentVerifiedPurchaseAuthorityPort?:
+    OfficialReaderPrivateCurrentPurchaseAuthorityPortV1;
   readonly admitServerReader?: (serverReaderCharacterId: string) => void;
 }): Promise<ReaderInterpretationPreviewHttpResponseV1> {
   const subjectId = requireSubject(input.resolvedSubjectId);
@@ -274,6 +279,9 @@ export async function runReaderInterpretationPreviewHttpV1(input: {
     groundingProjectionPort: input.groundingProjectionPort,
     ...(input.productReaderEligibilityAuthorityPort
       ? { productReaderEligibilityAuthorityPort: input.productReaderEligibilityAuthorityPort }
+      : {}),
+    ...(input.currentVerifiedPurchaseAuthorityPort
+      ? { currentVerifiedPurchaseAuthorityPort: input.currentVerifiedPurchaseAuthorityPort }
       : {}),
     ...(input.admitServerReader ? { admitServerReader: input.admitServerReader } : {}),
   });

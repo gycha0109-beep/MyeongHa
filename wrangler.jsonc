@@ -1,4 +1,8 @@
 {
+  // CI-only preview. Production web remains governed by vercel.json.
+  // Preserve the existing Cloudflare Worker-first asset and preview bindings.
+  // No private Reader API, secret, database binding or production deployment.
+  // Never substitute "wrangler deploy" while the Reader DB migration gate is HOLD.
   "name": "myeongha",
   "main": "./cloudflare/preview-worker.mjs",
   "compatibility_date": "2026-10-20",

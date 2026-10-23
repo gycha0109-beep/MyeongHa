@@ -3,18 +3,26 @@ set -euo pipefail
 
 # DB-C4: actual NEW verified synthetic receipt -> independent purchase Grant
 # -> immutable Reader access INSERT, while an existing Reader Grant is locked.
-# This is a preflight showing the limitation of ONE ROW's FOR SHARE lock.
-# It is NOT an approved paid-Reader final-reveal or global writer-lock protocol.
+# Demonstrates a single Grant FOR SHARE is insufficient even after all actual
+# NEW purchase/bind writers join S1. No paid reveal or T2 approval.
 p() { command psql -X -v ON_ERROR_STOP=1 -At "$@"; }
 fail() { echo "FAIL $*" >&2; exit 1; }
 pass() { echo "PASS $*"; }
 tmpdir="$(mktemp -d)"
 holder_pid=""
+lock_pid=""
+bind_pid=""
 cleanup() {
   if [[ -n "$holder_pid" ]]; then
     kill "$holder_pid" >/dev/null 2>&1 || true
     wait "$holder_pid" >/dev/null 2>&1 || true
   fi
+  for pending in "${lock_pid:-}" "${bind_pid:-}"; do
+    if [[ -n "$pending" ]]; then
+      kill "$pending" >/dev/null 2>&1 || true
+      wait "$pending" >/dev/null 2>&1 || true
+    fi
+  done
   rm -rf "$tmpdir"
 }
 trap cleanup EXIT
@@ -140,6 +148,12 @@ set statement_timeout='7s';
 begin;
 -- Match the fixture's canonical Subject authority; never infer from a receipt.
 select pg_catalog.set_config('myeongha.subject_id', '$subject', true);
+-- The former row-lock-only demonstration now participates in S1: a NEW B4
+-- Grant can still commit during unrelated B2 row SHARE, but never bypasses
+-- the canonical Reader scope lock shared with direct 1220 and T2.
+select public.internal_acquire_official_reader_scope_lock_v1(
+  '$subject'::uuid,'$reading'::uuid,'$reader'
+);
 select * from public.internal_apply_verified_receipt_capability_effects_v1(
   '$b4_receipt'::uuid,
   array['test-reader-unit'], array[transaction_timestamp()],
@@ -186,9 +200,69 @@ official_count="$(p -c "select count(*) from public.standard_reading_official_bi
   fail "expected B4 NEW grant/access and two bundles while B2 lock held: $new_grants/$new_access/$active_bundles/$official_count"
 pass "DB-C4 actual NEW B4 receipt-backed Grant + immutable Reader access INSERT commits while B2 row SHARE locked"
 
-# Restore disabled test purchase Grants; immutable access provenance retained.
+# Standalone direct 1220 binding REPLAY is not exempt. It must contend on the
+# same advisory Subject×Official Reading×Reader key even though the Purchase
+# Intent and Grant rows are otherwise free to read.
 if ! wait "$holder_pid"; then cat "$tmpdir/holder.out" >&2; fail "B2 lock holder failed"; fi
 holder_pid=""
+p >"$tmpdir/scope-holder.out" 2>&1 <<SQL &
+set application_name='rr_s2_direct_bind_scope_holder';
+set statement_timeout='12s';
+begin;
+select pg_catalog.set_config('myeongha.subject_id', '$subject', true);
+select public.internal_acquire_official_reader_scope_lock_v1(
+  '$subject'::uuid,'$reading'::uuid,'$reader'
+);
+select pg_sleep(6);
+commit;
+SQL
+lock_pid=$!
+for _ in $(seq 1 100); do
+  held="$(p -c "select count(*) from pg_catalog.pg_stat_activity
+    where application_name='rr_s2_direct_bind_scope_holder'
+      and state='active' and wait_event_type='Timeout';")"
+  [[ "$held" == 1 ]] && break
+  sleep 0.05
+done
+[[ "${held:-0}" == 1 ]] || fail "S1 scope holder for direct 1220 was not observed"
+p >"$tmpdir/direct-1220-replay.out" 2>&1 <<SQL &
+set application_name='rr_s2_direct_bind_waits_scope';
+set statement_timeout='11s';
+begin;
+select pg_catalog.set_config('myeongha.subject_id', '$subject', true);
+select 'DIRECT_1220_REPLAY=' || replayed::text from public.cmd_bind_standard_reading_access_v2(
+  '$subject'::uuid,
+  '$b4_intent'::uuid,
+  '12193000-0000-0000-0000-000000000004'::uuid,
+  '12193100-0000-0000-0000-000000000004'::uuid,
+  'sha256:v1:7777777777777777777777777777777777777777777777777777777777777777',
+  'standard-reading-access-bind-v2',
+  '{"schemaVersion":"standard-reading-access-bind-v2","purchaseIntentId":"$b4_intent"}'::jsonb
+);
+commit;
+SQL
+bind_pid=$!
+waiting=0
+for _ in $(seq 1 100); do
+  waiting="$(p -c "select count(*) from pg_catalog.pg_stat_activity a
+    join pg_catalog.pg_locks l on l.pid=a.pid
+    where a.application_name='rr_s2_direct_bind_waits_scope'
+      and a.wait_event_type='Lock' and l.locktype='advisory'
+      and not l.granted;")"
+  [[ "$waiting" == 1 ]] && break
+  sleep 0.05
+done
+[[ "$waiting" == 1 ]] ||
+  { cat "$tmpdir/direct-1220-replay.out" >&2; fail "direct 1220 replay bypassed S1 advisory scope contention"; }
+if ! wait "$lock_pid"; then cat "$tmpdir/scope-holder.out" >&2; fail "scope lock holder failed"; fi
+lock_pid=""
+if ! wait "$bind_pid"; then cat "$tmpdir/direct-1220-replay.out" >&2; fail "direct 1220 replay after scope unlock failed"; fi
+bind_pid=""
+grep -qx 'DIRECT_1220_REPLAY=true' "$tmpdir/direct-1220-replay.out" ||
+  fail "direct 1220 replay did not preserve exactly-once authority after scope unlock"
+pass "direct legacy 1220 bind replay blocks on the same S1 scope lock before row locks"
+
+# Restore disabled test purchase Grants; immutable access provenance retained.
 p -c "update public.entitlement_grants
   set status='revoked', revision=revision+1,
       last_effective_at=clock_timestamp(),updated_at=clock_timestamp()

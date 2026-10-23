@@ -106,6 +106,70 @@ for (const [path, routeId] of fetchBoundaryRoutes) {
   forbidFragment(route, 'console.warn(', `Fetch security boundary ${path}`);
 }
 
+// The three S6/S7/Reader-continuity paths use the already-observed /api/me
+// production function. They are NOT unobserved routes or a release bypass.
+const heldDispatcherPath = 'apps/api/src/official-reader-held-vercel-dispatch-v1.ts';
+const heldDispatcher = readFileSync(resolve(root, heldDispatcherPath), 'utf8');
+const meDispatcher = readFileSync(resolve(root, 'api/me.ts'), 'utf8');
+const vercel = JSON.parse(readFileSync(resolve(root, 'vercel.json'), 'utf8'));
+requireFragment(
+  meDispatcher,
+  'tryDispatchHeldOfficialReaderV1({ request, requestId, serverTime })',
+  'Observed /api/me held Reader dispatch',
+);
+requireFragment(
+  meDispatcher,
+  "routeId: 'api.me.dispatch'",
+  'Observed /api/me held Reader dispatch',
+);
+requireFragment(
+  meDispatcher,
+  'executeSecurityObservedRequestV1',
+  'Observed /api/me held Reader dispatch',
+);
+
+const heldHandlers = [
+  {
+    source: '/api/chat/:threadId/paid-readings/:safeMessageId/ack',
+    target: '/api/me?__myeongha_held_reader_route=ack&__myeongha_held_reader_thread_id=:threadId&__myeongha_held_reader_message_id=:safeMessageId',
+    handler: 'handleOfficialReaderPaidDeliveryAckHttpV1',
+    release: 'paidReadReleaseEnabled: false',
+  },
+  {
+    source: '/api/chat/:threadId/paid-readings/:safeMessageId',
+    target: '/api/me?__myeongha_held_reader_route=message&__myeongha_held_reader_thread_id=:threadId&__myeongha_held_reader_message_id=:safeMessageId',
+    handler: 'handleOfficialReaderPaidChatMessageHttpV1',
+    release: 'paidReadReleaseEnabled: false',
+  },
+  {
+    source: '/api/readings/:readingId/reader-continuity',
+    target: '/api/me?__myeongha_held_reader_route=continuity&__myeongha_held_reader_reading_id=:readingId',
+    handler: 'handleCommerceReaderRecordContinuityHttpV1',
+    release: 'productReleaseEnabled: false',
+  },
+];
+for (const held of heldHandlers) {
+  const rewrites = (vercel.rewrites ?? []).filter(entry => entry.source === held.source);
+  if (rewrites.length !== 1 || rewrites[0].destination !== held.target) {
+    failures.push(`Observed Reader rewrite is missing or ambiguous: ${held.source}`);
+  }
+  requireFragment(heldDispatcher, held.handler, heldDispatcherPath);
+  requireFragment(heldDispatcher, held.release, heldDispatcherPath);
+}
+for (const fragment of [
+  "const KIND_PARAM = '__myeongha_held_reader_route'",
+  "const SHARE_PARAM = '_vercel_share'",
+  "if (!url.searchParams.has(KIND_PARAM)) return null;",
+  "return notFound(input.request)",
+  "url.pathname !== '/api/me'",
+  "url.searchParams.keys()",
+  "UUID.test(",
+]) {
+  requireFragment(heldDispatcher, fragment, heldDispatcherPath);
+}
+forbidFragment(heldDispatcher, 'console.error(', heldDispatcherPath);
+forbidFragment(heldDispatcher, 'console.warn(', heldDispatcherPath);
+
 const signInDispatcher = readFileSync(resolve(root, 'api/auth/sign-in.ts'), 'utf8');
 requireFragment(
   signInDispatcher,

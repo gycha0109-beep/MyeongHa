@@ -79,7 +79,12 @@ function ports() {
       },
     ]),
   };
-  return { accessAuthorityPort, artifactAuthorityPort };
+  return {
+    accessAuthorityPort, artifactAuthorityPort,
+    currentVerifiedPurchaseAuthorityPort: {
+      assertCurrentVerifiedPurchase: vi.fn(async () => undefined),
+    },
+  };
 }
 
 function authoredCharacter(characterId = 'baekheon'): CharacterContentDefinition {
@@ -380,7 +385,7 @@ describe('Official Reading -> Reader Chat context composition', () => {
       );
 
       const context =
-        assemblePreparedCharacterStandardReadingRuntimeContextV1(plan);
+        await assemblePreparedCharacterStandardReadingRuntimeContextV1(plan);
       expect(context.characterId).toBe('baekheon');
       expect(context.saju?.readingRef).toBe(READING_ID);
       expect(context.saju?.protectedSegments.map((segment) => segment.text)).toEqual([
@@ -406,8 +411,8 @@ describe('Official Reading -> Reader Chat context composition', () => {
       contextInput: plan.contextInput,
     });
 
-    expect(() =>
+    await expect(
       assemblePreparedCharacterStandardReadingRuntimeContextV1(forgedPlan),
-    ).toThrow(/was not minted by server authority/u);
+    ).rejects.toThrow(/was not minted by server authority/u);
   });
 });

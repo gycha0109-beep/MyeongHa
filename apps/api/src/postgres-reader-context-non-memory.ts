@@ -5,6 +5,9 @@ import {
   type ReaderRecentMessageAuthorityRowV1,
   type ReaderRelationshipEventAuthorityRowV1,
 } from './reader-context-non-memory-read.js';
+import {
+  excludeOfficialReaderS5SafeMarkersFromOrdinaryContextV1,
+} from './official-reader-s4-ordinary-context-isolation-v1.js';
 import type { PostgresTransactionQueryV1 } from './postgres-subject-execution.js';
 
 type LifeFactQueryRowV1 = Readonly<{
@@ -219,7 +222,7 @@ implements ReaderContextNonMemoryReadAuthorityPortV1 {
         READ_RECENT_MESSAGES_SQL,
         [input.subjectId, input.threadId, input.limit],
       );
-      return Object.freeze(result.rows.map((row) => Object.freeze({
+      const messages = result.rows.map((row) => Object.freeze({
         messageId: requireString('message id', row.messageId),
         sequenceNo: requireInteger('message sequence', row.sequenceNo),
         senderType: requireString('message sender type', row.senderType),
@@ -229,7 +232,8 @@ implements ReaderContextNonMemoryReadAuthorityPortV1 {
         ),
         text: requireString('message text', row.text),
         createdAt: requireTimestamp('message created timestamp', row.createdAt),
-      })));
+      }));
+      return excludeOfficialReaderS5SafeMarkersFromOrdinaryContextV1(messages);
     } catch (error) {
       return mapPostgresError(error);
     }

@@ -1,4 +1,7 @@
 import type { CharacterRuntimeContextV1 } from '../../../packages/domain/src/character-runtime-context.js';
+import type {
+  OfficialReaderPrivateCurrentPurchaseAuthorityPortV1,
+} from './official-reader-private-exact-verified-purchase-guard-v1.js';
 import {
   getChatThreadRuntimeBinding,
   type ChatThreadRuntimeBindingReadAuthorityPortV1,
@@ -24,6 +27,8 @@ export interface PrepareCharacterStandardReadingThreadRuntimeInputV1 {
   readonly accessAuthorityPort: CharacterStandardReadingAccessAuthorityPortV1;
   readonly artifactAuthorityPort: CharacterStandardReadingArtifactAuthorityPortV1;
   readonly contextInput: CharacterStandardReadingChatBaseContextInputV1;
+  readonly currentVerifiedPurchaseAuthorityPort?:
+    OfficialReaderPrivateCurrentPurchaseAuthorityPortV1;
 }
 
 export interface CharacterStandardReadingThreadRuntimeV1 {
@@ -93,9 +98,11 @@ export async function prepareCharacterStandardReadingThreadRuntimeV1(
     accessAuthorityPort: input.accessAuthorityPort,
     artifactAuthorityPort: input.artifactAuthorityPort,
     contextInput: input.contextInput,
+    ...(input.currentVerifiedPurchaseAuthorityPort === undefined
+      ? {} : { currentVerifiedPurchaseAuthorityPort: input.currentVerifiedPurchaseAuthorityPort }),
   });
 
-  const context = assemblePreparedCharacterStandardReadingRuntimeContextV1(plan);
+  const context = await assemblePreparedCharacterStandardReadingRuntimeContextV1(plan);
 
   return Object.freeze({
     threadBinding,

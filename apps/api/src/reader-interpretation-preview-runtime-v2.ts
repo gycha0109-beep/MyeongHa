@@ -104,6 +104,19 @@ export async function runThreadBoundReaderInterpretationPreviewV2(
   if (contentEntry.release.releaseId !== firstThread.activeContentReleaseId ||
       contentEntry.release.bundleId !== firstThread.activeContentBundleId) deny('SOURCE_MISMATCH');
   input.admitServerReader?.(reader);
+  if (!input.currentVerifiedPurchaseAuthorityPort) deny('ACCESS_DENIED');
+  try {
+    await input.currentVerifiedPurchaseAuthorityPort.assertCurrentVerifiedPurchase({
+      subjectId,
+      readingId,
+      readerCharacterId: reader,
+      readerContentBundleId: firstThread.activeContentBundleId,
+    });
+  } catch {
+    // No protected Saju source, ordinary Memory, or grounding projection
+    // may run on stale purchase evidence even in an internal Preview.
+    deny('ACCESS_DENIED');
+  }
 
   const admissionInput = {
     resolvedSubjectId: subjectId, threadId: input.threadId, readingId, effectiveAt,
@@ -112,6 +125,8 @@ export async function runThreadBoundReaderInterpretationPreviewV2(
     accessAuthorityPort: input.accessAuthorityPort,
     artifactAuthorityPort: input.artifactAuthorityPort,
     productReaderEligibilityAuthorityPort: input.productReaderEligibilityAuthorityPort,
+    currentVerifiedPurchaseAuthorityPort:
+      input.currentVerifiedPurchaseAuthorityPort,
   };
   let first;
   try { first = await prepareOfficialReadingReaderAdmissionV1(admissionInput); }
@@ -146,16 +161,32 @@ export async function runThreadBoundReaderInterpretationPreviewV2(
       base.contextInput.contentBundleId !== current.scope.readerContentBundleId ||
       current.source.responseHash !== first.source.responseHash) deny('SOURCE_MISMATCH');
 
+  // Recheck after independently reading the official artifact and
+  // relationship context. V1 and V2 use the same private exact Receipt+
+  // Grant+Bundle scope, never a historical Reader entitlement marker.
+  try {
+    await input.currentVerifiedPurchaseAuthorityPort.assertCurrentVerifiedPurchase({
+      subjectId,
+      readingId,
+      readerCharacterId: reader,
+      readerContentBundleId: current.scope.readerContentBundleId,
+    });
+  } catch { deny('ACCESS_DENIED'); }
+
   let context;
   try {
     const proof = await issueCharacterSajuOfficialStandardEligibilityV2({
       prepared: first, currentScope: current.scope,
       productAuthorityPort: input.productReaderEligibilityAuthorityPort,
+      currentVerifiedPurchaseAuthorityPort:
+        input.currentVerifiedPurchaseAuthorityPort,
     });
     const noSajuContext = assembleCharacterRuntimeContext(base.contextInput);
-    context = assembleOfficialStandardReaderRuntimeV2({
+    context = await assembleOfficialStandardReaderRuntimeV2({
       proof, currentScope: current.scope,
       source: current.source, baseContext: noSajuContext,
+      currentVerifiedPurchaseAuthorityPort:
+        input.currentVerifiedPurchaseAuthorityPort,
     });
   } catch {
     deny('ACCESS_DENIED');

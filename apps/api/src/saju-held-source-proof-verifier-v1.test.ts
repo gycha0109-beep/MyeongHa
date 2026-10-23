@@ -164,6 +164,34 @@ describe('2B-3C-3 MyeongHa source proof verification, Preview HOLD only', () => 
     expect(t.claimNonceOnce).not.toHaveBeenCalled();
   });
 
+  it('does not alias issuer/audience colon boundaries in the shared replay ledger', async () => {
+    const claimed: string[] = [];
+    const cases = [
+      { issuer: 'saju:preview', audience: 'api', keyId: 'preview-key-v1' },
+      { issuer: 'saju', audience: 'preview:api', keyId: 'preview-key-v1' },
+      { issuer: 'saju:preview', audience: 'api', keyId: 'preview-key-v2' },
+    ];
+    for (const identity of cases) {
+      const proof = envelope();
+      proof.proof.payload.issuer = identity.issuer;
+      proof.proof.payload.audience = identity.audience;
+      proof.proof.payload.keyId = identity.keyId;
+      proof.proof.signatureHex = createHmac('sha256', keyBytes)
+        .update(DOMAIN).update(hash(proof.proof.payload)).digest('hex');
+      const t: SajuHeldSourceProofVerifierTrustV1 = {
+        ...trust(),
+        trustedIssuer: identity.issuer,
+        expectedAudience: identity.audience,
+        trustedKeyId: identity.keyId,
+        claimNonceOnce: async (key) => { claimed.push(key); return true; },
+      };
+      expect(await verifySajuHeldSourceProofV1(proof, t, context()))
+        .toMatchObject({ state: 'held', transportIntegrity: 'VERIFIED', canSell: false });
+    }
+    expect(new Set(claimed).size).toBe(cases.length);
+    expect(claimed.every((key) => /^saju-proof-v2:[a-f0-9]{64}$/u.test(key))).toBe(true);
+  });
+
   it('fails closed when shared nonce claim is unavailable or rejects replay', async () => {
     for (const claim of [
       async () => false,

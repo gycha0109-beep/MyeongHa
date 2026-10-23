@@ -36,6 +36,19 @@ export interface RecordsRuntimeClientOptionsV1 {
 
 export function createRecordsRuntimeClient(options?: RecordsRuntimeClientOptionsV1): Readonly<{
   readProfile(): Promise<Record<string, unknown>>;
+  readReaderContinuity(input: Readonly<{
+    readingId: string;
+    readerCharacterId: string;
+  }>): Promise<
+    | Readonly<{state: 'held' | 'not_confirmed'}>
+    | Readonly<{state: 'not_available'; readingId: string; readerCharacterId: string}>
+    | Readonly<{
+        state: 'existing_thread_candidate';
+        readingId: string;
+        readerCharacterId: string;
+        threadId: string;
+      }>
+  >;
   readLifeFacts(): Promise<RecordsRuntimeSnapshotV1['lifeFacts']>;
   readReadings(): Promise<RecordsRuntimeSnapshotV1['readings']>;
   readMemories(): Promise<RecordsRuntimeSnapshotV1['memories']>;

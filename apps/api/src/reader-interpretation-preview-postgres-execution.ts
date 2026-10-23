@@ -3,11 +3,18 @@ import type {
   OfficialReadingCharacterGroundingProjectionPortV1,
 } from './reader-interpretation-preview-runtime-v1.js';
 import {
+  parseReaderInterpretationPreviewHttpRequestV1,
   runReaderInterpretationPreviewHttpV1,
   type ReaderInterpretationPreviewContextAuthorityPortV1,
   type ReaderInterpretationPreviewHttpResponseV1,
 } from './reader-interpretation-preview-http.js';
 import { assertReaderRuntimeInternalPreviewCandidateV1 } from './reader-production-rollout-policy-v1.js';
+import {
+  getChatThreadRuntimeBinding,
+} from './chat-thread-runtime-binding-read.js';
+import {
+  createOfficialReaderPrivateCurrentPurchaseAuthorityPortV1,
+} from './official-reader-private-exact-verified-purchase-guard-v1.js';
 import type { ProductReaderEligibilityAuthorityPortV1 } from './product-reader-eligibility-policy-v1.js';
 import { createPostgresCharacterRelationshipReadAuthorityPortV1 } from './postgres-character-relationship-read.js';
 import { createPostgresCharacterStandardReadingKnowledgePortsV1 } from './postgres-character-standard-reading-knowledge.js';
@@ -68,13 +75,46 @@ export function executeReaderInterpretationPreviewPostgresV1(
   return executePostgresSubjectTransactionV1({
     pool: input.pool,
     verifiedEvidence: input.verifiedEvidence,
-    execute: ({ resolvedSubject, client }) => {
+    execute: async (scope) => {
+      const { resolvedSubject, client } = scope;
       // The activation hash is derived only from the canonical subjects.id resolved
       // inside the transaction. Disabled/out-of-cohort requests stop here before
       // thread, Reading, content, relationship, Memory, or Saju authorities exist.
       assertProductionReaderInterpretationActivationV1({
         config: activationConfig,
         resolvedSubjectId: resolvedSubject.subjectId,
+      });
+
+      // A historically ACTIVE Reader Grant is not enough if its original
+      // verified provider Receipt was cancelled. Before reading relationship,
+      // Memory, private Saju source or projecting protected Reader context,
+      // resolve the actual one-Reader Thread under this canonical Subject
+      // and require current exact paid entitlement under the SAME S1 lock.
+      //
+      // This internal-preview entry remains held if its private S1 SQL/
+      // DB-Owner ACL is not installed: no legacy preview permission can
+      // bypass the Commerce refund boundary.
+      const request = parseReaderInterpretationPreviewHttpRequestV1(input.body);
+      const threadBindingPort =
+        createPostgresChatThreadRuntimeBindingAuthorityPortV1(client);
+      const currentThread = await getChatThreadRuntimeBinding({
+        resolvedSubjectId: resolvedSubject.subjectId,
+        threadId: request.threadId,
+        authorityPort: threadBindingPort,
+      });
+      if (currentThread.participantCharacterIds.length !== 1
+          || !currentThread.participantCharacterIds[0]) {
+        throw new Error('Official Reader current verified purchase is unavailable.');
+      }
+      const readerCharacterId = currentThread.participantCharacterIds[0];
+      assertReaderRuntimeInternalPreviewCandidateV1(readerCharacterId);
+      const currentVerifiedPurchaseAuthorityPort =
+        createOfficialReaderPrivateCurrentPurchaseAuthorityPortV1(scope);
+      await currentVerifiedPurchaseAuthorityPort.assertCurrentVerifiedPurchase({
+        subjectId: resolvedSubject.subjectId,
+        readingId: request.officialReadingId,
+        readerCharacterId,
+        readerContentBundleId: currentThread.activeContentBundleId,
       });
 
       const knowledgePorts =
@@ -86,8 +126,7 @@ export function executeReaderInterpretationPreviewPostgresV1(
         body: input.body,
         contextAuthorityPort: input.createContextAuthorityPort(client),
         contentReleaseRuntime: input.contentReleaseRuntime,
-        threadBindingAuthorityPort:
-          createPostgresChatThreadRuntimeBindingAuthorityPortV1(client),
+        threadBindingAuthorityPort: threadBindingPort,
         accessAuthorityPort: knowledgePorts.accessAuthorityPort,
         artifactAuthorityPort: knowledgePorts.artifactAuthorityPort,
         relationshipAuthorityPort:
@@ -99,6 +138,7 @@ export function executeReaderInterpretationPreviewPostgresV1(
         nonMemoryContextAuthorityPort:
           createPostgresReaderContextNonMemoryReadAuthorityPortV1(client),
         groundingProjectionPort: input.groundingProjectionPort,
+        currentVerifiedPurchaseAuthorityPort,
         ...(input.createProductReaderEligibilityAuthorityPort
           ? { productReaderEligibilityAuthorityPort:
               input.createProductReaderEligibilityAuthorityPort(client) }

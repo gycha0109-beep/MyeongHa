@@ -7,6 +7,10 @@ import {
   createChatOpenClientV1,
 } from './chat-open-client.js';
 import { applyCanonicalCharacterPresentationV1 } from './chat-character.js';
+import {
+  appendProtectedReaderChatRevealV1,
+  clearProtectedReaderChatRevealV1,
+} from './paid-reader-chat-reveal.js';
 import { parseChatRoomReadPayloadV1, parseChatThreadRouteV1 } from './chat-room-read-contract.js';
 import { getActiveBearer, invalidateGuestSession, invalidateMemberSession } from './product-auth.js';
 import { PRODUCT_AUTH_STORAGE_V1 } from './product-auth.js';
@@ -185,6 +189,16 @@ function senderLabel(message, authoritativeCharacterId) {
   return translateStaticUi('대화 기록', locale);
 }
 
+// The only permitted ordinary-Chat body for an S4 paid interpretation is an
+// inert status marker. A protected response never arrives in this Chat read.
+const PAID_READER_SAFE_MARKER_V1 = '유료 해설 기록이 있습니다.';
+
+function isPaidReaderSafeMarker(message) {
+  return message.senderType === 'system'
+    && message.redacted === false
+    && message.bodyText === PAID_READER_SAFE_MARKER_V1;
+}
+
 function safeMessageText(message) {
   if (message.redacted === true) return '삭제된 메시지입니다.';
   if (typeof message.bodyText === 'string' && message.bodyText.trim().length > 0) return message.bodyText;
@@ -208,7 +222,7 @@ function createStreamMessage(message, authoritativeCharacterId) {
   avatar.className = 'conversation-message-avatar';
   avatar.setAttribute('aria-hidden', 'true');
   avatar.dataset.character = message.senderType === 'character' ? 'runtime-character' : 'user';
-  avatar.textContent = message.senderType === 'user' ? translateStaticUi('나', getUiLocale()) : '대';
+  avatar.textContent = message.senderType === 'user' ? translateStaticUi('나', getUiLocale()) : message.senderType === 'system' ? '明' : '대';
 
   const body = document.createElement('div');
   body.className = 'conversation-message-body';
@@ -222,25 +236,53 @@ function createStreamMessage(message, authoritativeCharacterId) {
   if (typeof message.createdAt === 'string') time.dateTime = message.createdAt;
   heading.append(strong, time);
 
-  const paragraph = document.createElement('p');
-  const hasSourceBody = message.redacted !== true
-    && typeof message.bodyText === 'string'
-    && message.bodyText.trim().length > 0;
-  if (hasSourceBody) {
-    // Source-owned message text must not enter the static UI translation pipeline.
-    paragraph.dataset.chatBodySource = '';
-    paragraph.textContent = message.bodyText;
+  if (isPaidReaderSafeMarker(message)) {
+    // No paid body, source proof or purchase metadata enters ordinary Chat.
+    article.dataset.paidReaderMarker = 'true';
+    const marker = document.createElement('div');
+    marker.className = 'conversation-paid-reader-marker';
+    const badge = document.createElement('span');
+    badge.className = 'conversation-paid-reader-marker-label';
+    badge.dataset.paidReaderUiSource = '보호된 사주 해설';
+    badge.textContent = uiText('보호된 사주 해설');
+    const copy = document.createElement('p');
+    copy.dataset.paidReaderUiSource = '유료 사주 해설의 기록입니다. 현재 이용권이 확인되어야 내용을 볼 수 있습니다.';
+    copy.textContent = uiText('유료 사주 해설의 기록입니다. 현재 이용권이 확인되어야 내용을 볼 수 있습니다.');
+    const link = document.createElement('a');
+    link.className = 'conversation-paid-reader-marker-link';
+    link.href = 'records.html';
+    link.dataset.paidReaderUiSource = '내 기록 확인하기 →';
+    link.textContent = uiText('내 기록 확인하기 →');
+    marker.append(badge, copy, link);
+    if (threadId) {
+      appendProtectedReaderChatRevealV1(marker, {
+        threadId,
+        safeMessageId: message.messageId,
+      });
+    }
+    body.append(heading, marker);
   } else {
-    paragraph.dataset.chatUiPlaceholder = safeMessageText(message);
-    paragraph.textContent = uiText(safeMessageText(message));
+    const paragraph = document.createElement('p');
+    const hasSourceBody = message.redacted !== true
+      && typeof message.bodyText === 'string'
+      && message.bodyText.trim().length > 0;
+    if (hasSourceBody) {
+      // Source-owned message text must not enter the static UI translation pipeline.
+      paragraph.dataset.chatBodySource = '';
+      paragraph.textContent = message.bodyText;
+    } else {
+      paragraph.dataset.chatUiPlaceholder = safeMessageText(message);
+      paragraph.textContent = uiText(safeMessageText(message));
+    }
+    body.append(heading, paragraph);
   }
-  body.append(heading, paragraph);
   article.append(avatar, body);
   return article;
 }
 
 function renderConversation(messages, authoritativeCharacterId) {
   if (!chatStream) return;
+  clearProtectedReaderChatRevealV1();
   const nodes = messages.map((message) => createStreamMessage(message, authoritativeCharacterId)).filter(Boolean);
   if (nodes.length === 0) {
     if (chatIntro) {
@@ -262,6 +304,9 @@ document.addEventListener('myeongha:localechange', () => {
   if (composeStatusSource !== null && composeStatus) composeStatus.textContent = uiText(composeStatusSource);
   if (roomLoadingSource !== null && roomLoading) roomLoading.textContent = uiText(roomLoadingSource);
   if (!chatStream) return;
+  for (const node of chatStream.querySelectorAll('[data-paid-reader-ui-source]')) {
+    node.textContent = uiText(node.dataset.paidReaderUiSource);
+  }
   for (const article of chatStream.querySelectorAll('.conversation-message')) {
     const placeholder = article.querySelector('[data-chat-ui-placeholder]');
     if (placeholder) placeholder.textContent = uiText(placeholder.dataset.chatUiPlaceholder);
@@ -296,6 +341,7 @@ function renderRoomState(state) {
 }
 
 function clearOwnerScopedRoomStateForAuthorityChange() {
+  clearProtectedReaderChatRevealV1();
   chatStream?.replaceChildren();
   roomReady = false;
   if (contextPill) contextPill.hidden = true;

@@ -413,4 +413,66 @@ describe('Payment Attempt browser-to-server verification transport foundation', 
     expect(rootPackage).not.toContain('@portone/browser-sdk');
     expect(webPackage).not.toContain('@portone/browser-sdk');
   });
+  it('returns a Records entry only when an exact server verified Reader bind handoff is present', async () => {
+    const readingId = '33333333-3333-4333-8333-333333333333';
+    const readerContinuation = {
+      contractVersion: 'commerce-reader-product-continuity-v1',
+      officialReadingId: readingId,
+      readerCharacterId: 'seyeon',
+      receiptBinding: 'issued',
+      purchaseRole: 'initial_reading',
+      summary: 'requires_authorized_saju_source_and_reader_delivery',
+      readerFollowup: 'requires_fresh_exact_grant_and_existing_thread',
+      recordDetail: 'requires_current_subject_owned_read',
+      checkoutEnabled: false,
+      paidContentRevealed: false,
+    };
+    const result = await fetchPaymentAttemptServerVerificationV1({
+      paymentAttemptId: PAYMENT_ATTEMPT_ID,
+      fetchPort: fetchPort({body: {
+        ...successEnvelope(),
+        data: {
+          paymentAttemptId: PAYMENT_ATTEMPT_ID,
+          receiptId: RECEIPT_ID,
+          replayed: false,
+          readerContinuation,
+        },
+      }}),
+    });
+    expect(result.recordsEntryUrl).toBe(
+      'records.html?tab=saju&from=verified-reader-purchase'
+        + '&readingId=' + readingId + '&readerCharacterId=seyeon',
+    );
+    expect(JSON.stringify(result)).not.toContain('entitlementGrantId');
+    expect(JSON.stringify(result)).not.toContain('sourceResponseHash');
+    expect(JSON.stringify(result)).not.toContain('privateBody');
+  });
+
+  it('rejects counterfeit Reader continuation fields instead of fabricating payment or delivery', async () => {
+    const malformed = {
+      contractVersion: 'commerce-reader-product-continuity-v1',
+      officialReadingId: '33333333-3333-4333-8333-333333333333',
+      readerCharacterId: 'seyeon',
+      receiptBinding: 'issued',
+      purchaseRole: 'additional_reader_interpretation',
+      summary: 'requires_authorized_saju_source_and_reader_delivery',
+      readerFollowup: 'requires_fresh_exact_grant_and_existing_thread',
+      recordDetail: 'requires_current_subject_owned_read',
+      checkoutEnabled: false,
+      paidContentRevealed: true,
+    };
+    await expect(fetchPaymentAttemptServerVerificationV1({
+      paymentAttemptId: PAYMENT_ATTEMPT_ID,
+      fetchPort: fetchPort({body: {
+        ...successEnvelope(),
+        data: {
+          paymentAttemptId: PAYMENT_ATTEMPT_ID,
+          receiptId: RECEIPT_ID,
+          replayed: false,
+          readerContinuation: malformed,
+        },
+      }}),
+    })).rejects.toMatchObject({code:'INVALID_RESPONSE'});
+  });
+
 });

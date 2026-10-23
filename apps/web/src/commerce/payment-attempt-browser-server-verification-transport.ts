@@ -1,3 +1,8 @@
+import {
+  buildVerifiedReaderRecordsEntryUrlV1,
+  type CommerceReaderRecordsEntryV1,
+} from '../../commerce-reader-records-continuity.js';
+
 export const PAYMENT_ATTEMPT_SERVER_VERIFICATION_HTTP_CONTRACT_VERSION_V1 =
   'v0.9' as const;
 
@@ -69,6 +74,8 @@ export interface PaymentAttemptServerVerificationReceiptV1 {
   readonly paymentAttemptId: string;
   readonly receiptId: string;
   readonly replayed: boolean;
+  /** Navigation only; backend did not grant a Reader content or Chat right. */
+  readonly recordsEntryUrl?: string;
 }
 
 const UUID =
@@ -190,7 +197,8 @@ function parseSuccessEnvelope(
   }
   if (
     !isRecord(value.data) ||
-    !hasExactKeys(value.data, ['paymentAttemptId', 'receiptId', 'replayed'])
+    !(hasExactKeys(value.data, ['paymentAttemptId', 'receiptId', 'replayed'])
+      || hasExactKeys(value.data, ['paymentAttemptId', 'receiptId', 'replayed', 'readerContinuation']))
   ) {
     return invalidResponse(
       'Payment Attempt browser server verification success data is invalid.',
@@ -231,10 +239,25 @@ function parseSuccessEnvelope(
     );
   }
 
+  let recordsEntryUrl: string | undefined;
+  if (Object.prototype.hasOwnProperty.call(value.data, 'readerContinuation')) {
+    try {
+      recordsEntryUrl = buildVerifiedReaderRecordsEntryUrlV1(
+        value.data.readerContinuation as CommerceReaderRecordsEntryV1,
+      );
+    } catch {
+      return invalidResponse(
+        'Payment Attempt verified Reader Records handoff is invalid.',
+        200,
+      );
+    }
+  }
+
   return Object.freeze({
     paymentAttemptId: expectedPaymentAttemptId,
     receiptId,
     replayed: value.data.replayed,
+    ...(recordsEntryUrl === undefined ? {} : { recordsEntryUrl }),
   });
 }
 

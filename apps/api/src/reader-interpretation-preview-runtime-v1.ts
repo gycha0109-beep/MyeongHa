@@ -19,6 +19,9 @@ import {
 } from '../../../packages/domain/src/index.js';
 import { ApiCommandError } from './api-error.js';
 import type { ProductReaderEligibilityAuthorityPortV1 } from './product-reader-eligibility-policy-v1.js';
+import type {
+  OfficialReaderPrivateCurrentPurchaseAuthorityPortV1,
+} from './official-reader-private-exact-verified-purchase-guard-v1.js';
 import {
   prepareOfficialReadingReaderAdmissionV1,
   consumeOfficialReadingReaderAdmissionV1,
@@ -145,6 +148,9 @@ export interface RunThreadBoundReaderInterpretationPreviewInputV1 {
    * it cannot be substituted with a hard-coded standard Product or Reader role.
    */
   readonly productReaderEligibilityAuthorityPort?: ProductReaderEligibilityAuthorityPortV1;
+  /** Live Receipt+Grant+Reader+Bundle gate, mandatory for protected Saju. */
+  readonly currentVerifiedPurchaseAuthorityPort?:
+    OfficialReaderPrivateCurrentPurchaseAuthorityPortV1;
   /**
    * Optional production-only release admission after authoritative Thread
    * and Official Reading have been re-resolved. This is NOT a grant.
@@ -586,6 +592,23 @@ export async function runThreadBoundReaderInterpretationPreviewV1(
     );
   }
   input.admitServerReader?.(initialThreadBinding.participantCharacterIds[0]);
+  if (!input.currentVerifiedPurchaseAuthorityPort) {
+    throw new ReaderInterpretationPreviewRuntimeErrorV1(
+      'ACCESS_DENIED','Current verified Reader purchase authority is unavailable.',
+    );
+  }
+  try {
+    await input.currentVerifiedPurchaseAuthorityPort.assertCurrentVerifiedPurchase({
+      subjectId,
+      readingId: officialReadingId,
+      readerCharacterId: initialThreadBinding.participantCharacterIds[0],
+      readerContentBundleId: initialThreadBinding.activeContentBundleId,
+    });
+  } catch {
+    throw new ReaderInterpretationPreviewRuntimeErrorV1(
+      'ACCESS_DENIED','Current verified Reader purchase is unavailable.',
+    );
+  }
 
   let admission;
   try {
@@ -599,6 +622,8 @@ export async function runThreadBoundReaderInterpretationPreviewV1(
       accessAuthorityPort: input.accessAuthorityPort,
       artifactAuthorityPort: input.artifactAuthorityPort,
       productReaderEligibilityAuthorityPort: input.productReaderEligibilityAuthorityPort,
+      currentVerifiedPurchaseAuthorityPort:
+        input.currentVerifiedPurchaseAuthorityPort,
     });
   } catch (error) {
     if (error instanceof OfficialReadingReaderAdmissionErrorV1) {
@@ -626,6 +651,8 @@ export async function runThreadBoundReaderInterpretationPreviewV1(
       memoryGrantsAuthorityPort: input.memoryGrantsAuthorityPort,
       nonMemoryContextAuthorityPort: input.nonMemoryContextAuthorityPort,
       contextInput: input.contextInput,
+      currentVerifiedPurchaseAuthorityPort:
+        input.currentVerifiedPurchaseAuthorityPort,
     });
   } catch (error) {
     if (error instanceof CharacterStandardReadingServerRuntimeAuthorityErrorV1) {

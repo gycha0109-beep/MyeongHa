@@ -1,5 +1,8 @@
 import type { ContentReleaseRuntimeEntry } from '../../../packages/world-content/src/index.js';
 import type { ChatThreadRuntimeBindingV1 } from './chat-thread-runtime-binding-read.js';
+import type {
+  OfficialReaderPrivateCurrentPurchaseAuthorityPortV1,
+} from './official-reader-private-exact-verified-purchase-guard-v1.js';
 import {
   prepareCharacterStandardReadingThreadRuntimeV1,
   type CharacterStandardReadingThreadRuntimeV1,
@@ -56,6 +59,9 @@ export interface PrepareCharacterStandardReadingServerRuntimeInputV1 {
   readonly memoryGrantsAuthorityPort: MemoryGrantsReadAuthorityPortV1;
   readonly nonMemoryContextAuthorityPort: ReaderContextLifeFactsReadAuthorityPortV1;
   readonly contextInput: CharacterStandardReadingServerContextInputV1;
+  /** Required only for protected Official Saju projection (not ordinary Chat). */
+  readonly currentVerifiedPurchaseAuthorityPort?:
+    OfficialReaderPrivateCurrentPurchaseAuthorityPortV1;
 }
 
 export class CharacterStandardReadingServerRuntimeAuthorityErrorV1 extends Error {
@@ -262,6 +268,41 @@ export async function prepareCharacterStandardReadingServerBaseContextV2(
 export async function prepareCharacterStandardReadingServerRuntimeV1(
   input: PrepareCharacterStandardReadingServerRuntimeInputV1,
 ): Promise<CharacterStandardReadingThreadRuntimeV1> {
+  // Reject client-injected private/derived context before invoking any
+  // Thread, purchase, official Saju or mutable owner authority.
+  assertNoCallerContentAuthorityFields(input.contextInput);
+  // Legacy V1 also assembles exact Official Saju text, so it may NOT
+  // fetch relationship/Memory context or protected Reading under a
+  // refunded purchase. V2's base-only (no Saju) helper is unchanged.
+  const pinnedThread = await getChatThreadRuntimeBinding({
+    ...(input.resolvedSubjectId === undefined
+      ? {} : { resolvedSubjectId: input.resolvedSubjectId }),
+    threadId: input.threadId,
+    authorityPort: input.threadBindingAuthorityPort,
+  });
+  if (typeof input.resolvedSubjectId !== 'string'
+      || typeof input.readingId !== 'string'
+      || pinnedThread.participantCharacterIds.length !== 1
+      || !pinnedThread.participantCharacterIds[0]
+      || pinnedThread.activeContentBundleId !== input.contentEntry.release.bundleId
+      || pinnedThread.activeContentReleaseId !== input.contentEntry.release.releaseId
+      || !input.currentVerifiedPurchaseAuthorityPort) {
+    throw new CharacterStandardReadingServerRuntimeAuthorityErrorV1(
+      'Official Reader verified purchase is required before source/context reads.',
+    );
+  }
+  try {
+    await input.currentVerifiedPurchaseAuthorityPort.assertCurrentVerifiedPurchase({
+      subjectId: input.resolvedSubjectId!,
+      readingId: input.readingId,
+      readerCharacterId: pinnedThread.participantCharacterIds[0],
+      readerContentBundleId: pinnedThread.activeContentBundleId,
+    });
+  } catch {
+    throw new CharacterStandardReadingServerRuntimeAuthorityErrorV1(
+      'Official Reader current verified purchase is unavailable.',
+    );
+  }
   const base = await prepareCharacterStandardReadingServerBaseContextV2(input);
   const subjectBinding = input.resolvedSubjectId === undefined
     ? {} : { resolvedSubjectId: input.resolvedSubjectId };
@@ -274,6 +315,7 @@ export async function prepareCharacterStandardReadingServerRuntimeV1(
     accessAuthorityPort: input.accessAuthorityPort,
     artifactAuthorityPort: input.artifactAuthorityPort,
     contextInput: base.contextInput,
+    currentVerifiedPurchaseAuthorityPort: input.currentVerifiedPurchaseAuthorityPort,
   });
 
   if (runtime.threadBinding.activeContentReleaseId !== input.contentEntry.release.releaseId) {

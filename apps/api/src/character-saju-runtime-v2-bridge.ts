@@ -1,4 +1,7 @@
 import type { CharacterRuntimeContextV1 } from '../../../packages/domain/src/character-runtime-context.js';
+import type {
+  OfficialReaderPrivateCurrentPurchaseAuthorityPortV1,
+} from './official-reader-private-exact-verified-purchase-guard-v1.js';
 import { assembleCharacterRuntimeContextFromOfficialStandardV2, type CharacterRuntimeContextV2 } from '../../../packages/domain/src/character-saju-runtime-v2.js';
 import type { CharacterSajuOfficialStandardEligibilityV2 } from '../../../packages/domain/src/character-saju-eligibility-v2.js';
 import type { CharacterStandardReadingKnowledgeSourceV1 } from './character-standard-reading-knowledge.js';
@@ -10,12 +13,14 @@ import { projectOfficialStandardReadingToProtectedCharacterSajuContextV1 } from 
  * Server-only A3-beta bridge; still dormant, no public Reader/Chat activation.
  * The currentScope must be freshly re-resolved from server authority.
  */
-export function assembleOfficialStandardReaderRuntimeV2(input: {
+export async function assembleOfficialStandardReaderRuntimeV2(input: {
   readonly proof: CharacterSajuOfficialStandardEligibilityV2;
   readonly currentScope: OfficialReadingReaderAdmissionScopeV1;
   readonly source: CharacterStandardReadingKnowledgeSourceV1;
   readonly baseContext: CharacterRuntimeContextV1;
-}): CharacterRuntimeContextV2 {
+  readonly currentVerifiedPurchaseAuthorityPort?:
+    OfficialReaderPrivateCurrentPurchaseAuthorityPortV1;
+}): Promise<CharacterRuntimeContextV2> {
   const { source, currentScope, proof, baseContext } = input;
   if (source.subjectId !== currentScope.subjectId ||
       source.readingId !== currentScope.readingId ||
@@ -31,8 +36,24 @@ export function assembleOfficialStandardReaderRuntimeV2(input: {
       baseContext.saju !== null) {
     throw new TypeError('A3-beta Official Reader runtime source/scope mismatch.');
   }
-  const saju = projectOfficialStandardReadingToProtectedCharacterSajuContextV1(source);
+  // Source selection and proof issuance are not immutable purchase rights.
+  // Re-check the same canonical Reader x Reading x Bundle immediately before
+  // injecting the protected Saju source into the Character runtime.
+  if (!input.currentVerifiedPurchaseAuthorityPort) {
+    throw new TypeError('Official Reader current purchase authority is unavailable.');
+  }
+  try {
+    await input.currentVerifiedPurchaseAuthorityPort.assertCurrentVerifiedPurchase({
+      subjectId: currentScope.subjectId,
+      readingId: currentScope.readingId,
+      readerCharacterId: currentScope.readerCharacterId,
+      readerContentBundleId: currentScope.readerContentBundleId,
+    });
+  } catch {
+    throw new TypeError('Official Reader current purchase is unavailable.');
+  }
   consumeCharacterSajuOfficialStandardEligibilityV2({ proof, currentScope });
+  const saju = projectOfficialStandardReadingToProtectedCharacterSajuContextV1(source);
   return assembleCharacterRuntimeContextFromOfficialStandardV2({
     baseContext, saju, eligibility: proof,
   });

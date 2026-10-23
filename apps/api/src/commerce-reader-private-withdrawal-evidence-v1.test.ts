@@ -1,0 +1,300 @@
+import { describe, expect, it, vi } from 'vitest';
+import {
+  CommerceReaderPrivateWithdrawalEvidenceErrorV1,
+  reviewOfficialReaderPrivateWithdrawalEvidenceV1,
+} from './commerce-reader-private-withdrawal-evidence-v1.js';
+import type {
+  PostgresSubjectExecutionScopeV1,
+  PostgresTransactionQueryV1,
+} from './postgres-subject-execution.js';
+
+const SUBJECT = '11111111-1111-4111-8111-111111111111';
+const INTENT = '22222222-2222-4222-8222-222222222222';
+const GRANT = '33333333-3333-4333-8333-333333333333';
+const BODY = '44444444-4444-4444-8444-444444444444';
+const S5_AT = '2026-10-20T09:00:00.000Z';
+const PREPARED_AT = '2026-10-20T09:00:02.000Z';
+const ACK_AT = '2026-10-20T09:00:04.000Z';
+
+const ORIGINAL_CHECKOUT = Object.freeze({
+  authority: 'commerce_owner_immutable_checkout_notice_v1' as const,
+  purchaseIntentId: INTENT,
+  // Grant is resolved against original Receipt AFTER checkout; not a notice key.
+  originatingGrantId: GRANT,
+  productSpecVersion: 'reading-v1',
+  pinnedCapabilityItemKey: 'official-reader-purchased-unit',
+  originalGrantItemBinding: 'original_receipt_purchase_intent_capability_item' as const,
+  noticeRevision: 'rev-1',
+  previewOrInformationRevision: 'preview-1',
+  originalPurchaseIntentCreatedAt: '2026-10-20T08:54:00.000Z',
+  snapshotRecordedAt: '2026-10-20T08:55:00.000Z',
+  noticePresentedAt: '2026-10-20T08:56:00.000Z',
+  acknowledgedAt: '2026-10-20T08:57:00.000Z',
+  originalPaymentAttemptCreatedAt: '2026-10-20T08:58:00.000Z',
+});
+
+function fixture(overrides: Record<string, unknown> = {}) {
+  const row = {
+    purchaseIntentId: INTENT,
+    unitId: GRANT,
+    productSpecVersion: 'reading-v1',
+    originalReceiptStatus: 'verified',
+    s5CommittedAt: S5_AT,
+    responsePreparedAt: PREPARED_AT,
+    clientAcknowledgedAt: ACK_AT,
+    deliveryAttemptCount: '1',
+    acknowledgedAttemptCount: '1',
+    ...overrides,
+  };
+  const query = vi.fn(async (sql: string, params?: readonly unknown[]) => {
+    expect(sql).toContain('internal_qry_official_reader_withdrawal_delivery_state_v2');
+    expect(sql).not.toMatch(/\b(?:UPDATE|DELETE|INSERT)\b/iu);
+    expect(params).toEqual([SUBJECT, INTENT, GRANT, BODY]);
+    return { rows: [row] };
+  });
+  const scope = {
+    resolvedSubject: { subjectId: SUBJECT, subjectKind: 'member' },
+    client: { query } as unknown as PostgresTransactionQueryV1,
+  } as PostgresSubjectExecutionScopeV1;
+  const notice = vi.fn(async () => ORIGINAL_CHECKOUT);
+  const claim = { purchaseIntentId: INTENT, unitId: GRANT, reason: 'change_of_mind' };
+  const makeInput = () => ({
+    scope, purchaseIntentId: INTENT, originatingGrantId: GRANT,
+    bodyId: BODY, claim,
+    checkoutNoticeAuthority: { readExactServerCheckoutNotice: notice },
+  });
+  return { query, notice, makeInput };
+}
+
+describe('Private Commerce original Receipt -> S5 commit -> S7 -> withdrawal evidence', () => {
+  it('keeps commit, prepared and client ACK independently recorded without proving delivery', async () => {
+    const { query, notice, makeInput } = fixture();
+    const result = await reviewOfficialReaderPrivateWithdrawalEvidenceV1(makeInput());
+    expect(result.purchasedUnit).toEqual({
+      purchaseIntentId: INTENT, unitId: GRANT, productSpecVersion: 'reading-v1',
+    });
+    expect(result.timeline).toEqual({
+      originalReceiptStatus: 'verified',
+      s5CommittedAt: S5_AT,
+      serverResponsePreparedAt: PREPARED_AT,
+      authenticatedClientAcknowledgedAt: ACK_AT,
+      retainedDeliveryAttempts: 1,
+      retainedAcknowledgedAttempts: 1,
+      retainedUnacknowledgedAttempts: 0,
+      retainedDeliveryEvidenceState: 'client_ack_recorded_delivery_unproven',
+      consumerDeliveryProven: false,
+      legallyProvenDeliveredAt: null,
+    });
+    expect(result.review).toMatchObject({
+      classification: 'not_proven_delivered',
+      reason: 'CONTENT_NOT_PROVEN_DELIVERED',
+      automaticDenialAuthorized: false,
+      providerRefundAuthorized: false,
+      entitlementMutationAuthorized: false,
+    });
+    expect(result.checkoutNoticeEvidenceState).toBe('attested_original_checkout_notice');
+    expect(result.refundAuthorized).toBe(false);
+    expect(result.entitlementMutationAuthorized).toBe(false);
+    expect(query).toHaveBeenCalledTimes(1);
+    expect(notice).toHaveBeenCalledWith(result.purchasedUnit);
+  });
+
+  it('keeps historically retained cancellation evidence without treating a revoked original receipt as verified', async () => {
+    const { makeInput } = fixture({ originalReceiptStatus: 'revoked' });
+    const result = await reviewOfficialReaderPrivateWithdrawalEvidenceV1(makeInput());
+    expect(result.timeline.originalReceiptStatus).toBe('revoked');
+    expect(result.timeline.retainedAcknowledgedAttempts).toBe(1);
+    expect(result.review).toMatchObject({
+      classification: 'evidence_review_required',
+      reason: 'INVALID_OR_MISSING_SERVER_EVIDENCE',
+      automaticDenialAuthorized: false,
+      providerRefundAuthorized: false,
+      entitlementMutationAuthorized: false,
+    });
+    expect(result.timeline.consumerDeliveryProven).toBe(false);
+    expect(result.timeline.legallyProvenDeliveredAt).toBeNull();
+  });
+
+  it('keeps prepared-only and S5-only records strictly below delivered proof', async () => {
+    for (const partial of [
+      { clientAcknowledgedAt: null, acknowledgedAttemptCount: '0' },
+      {
+        responsePreparedAt: null, clientAcknowledgedAt: null,
+        deliveryAttemptCount: '0', acknowledgedAttemptCount: '0',
+      },
+    ]) {
+      const { makeInput } = fixture(partial);
+      const result = await reviewOfficialReaderPrivateWithdrawalEvidenceV1(makeInput());
+      expect(result.review.classification).toBe('not_proven_delivered');
+      expect(result.timeline.legallyProvenDeliveredAt).toBeNull();
+    }
+  });
+
+  it.each([
+    {
+      title: 'no retained records (including expired or Privacy-erased receipts)',
+      overrides: {
+        responsePreparedAt: null, clientAcknowledgedAt: null,
+        deliveryAttemptCount: '0', acknowledgedAttemptCount: '0',
+      },
+      retainedDeliveryEvidenceState: 'no_retained_delivery_receipts',
+      retainedUnacknowledgedAttempts: 0,
+    },
+    {
+      title: 'a prepared response without any authenticated acknowledgement',
+      overrides: { clientAcknowledgedAt: null, acknowledgedAttemptCount: '0' },
+      retainedDeliveryEvidenceState: 'response_prepared_no_retained_ack',
+      retainedUnacknowledgedAttempts: 1,
+    },
+    {
+      title: 'three independent response preparations but only one retained ACK',
+      overrides: { deliveryAttemptCount: '3', acknowledgedAttemptCount: '1' },
+      retainedDeliveryEvidenceState: 'client_ack_recorded_delivery_unproven',
+      retainedUnacknowledgedAttempts: 2,
+    },
+    {
+      title: 'repeated or duplicate network retries without any ACK',
+      overrides: {
+        deliveryAttemptCount: '4', acknowledgedAttemptCount: '0',
+        clientAcknowledgedAt: null,
+      },
+      retainedDeliveryEvidenceState: 'response_prepared_no_retained_ack',
+      retainedUnacknowledgedAttempts: 4,
+    },
+  ])('describes S7 $title without claiming a legal delivery or a network error', async row => {
+    const { makeInput } = fixture(row.overrides);
+    const result = await reviewOfficialReaderPrivateWithdrawalEvidenceV1(makeInput());
+    expect(result.timeline.retainedDeliveryEvidenceState).toBe(row.retainedDeliveryEvidenceState);
+    expect(result.timeline.retainedUnacknowledgedAttempts).toBe(row.retainedUnacknowledgedAttempts);
+    expect(result.timeline.consumerDeliveryProven).toBe(false);
+    expect(result.timeline.legallyProvenDeliveredAt).toBeNull();
+    expect(result.review.classification).toBe('not_proven_delivered');
+    expect(result.review.automaticDenialAuthorized).toBe(false);
+    expect(result.review.providerRefundAuthorized).toBe(false);
+    expect(result.entitlementMutationAuthorized).toBe(false);
+  });
+
+  it('does not borrow a surviving sibling right to turn a revoked original receipt ACK into delivery proof', async () => {
+    const { makeInput } = fixture({
+      originalReceiptStatus: 'revoked',
+      deliveryAttemptCount: '4',
+      acknowledgedAttemptCount: '2',
+    });
+    const result = await reviewOfficialReaderPrivateWithdrawalEvidenceV1(makeInput());
+    expect(result.timeline.originalReceiptStatus).toBe('revoked');
+    expect(result.timeline.retainedUnacknowledgedAttempts).toBe(2);
+    expect(result.timeline.retainedDeliveryEvidenceState).toBe('client_ack_recorded_delivery_unproven');
+    expect(result.timeline.consumerDeliveryProven).toBe(false);
+    expect(result.review.classification).toBe('evidence_review_required');
+    expect(result.refundAuthorized).toBe(false);
+  });
+
+  it('preserves statutory-complaint and separable-part priority over any ACK', async () => {
+    const { makeInput } = fixture();
+    const base = makeInput();
+    const defect = await reviewOfficialReaderPrivateWithdrawalEvidenceV1({
+      ...base, claim: { ...base.claim, reason: 'defect' },
+    });
+    expect(defect.review.classification).toBe('statutory_exception_review');
+    const part = await reviewOfficialReaderPrivateWithdrawalEvidenceV1({
+      ...base, claim: { ...base.claim, reason: 'unprovided_separable_part' },
+    });
+    expect(part.review.classification).toBe('separable_part_review');
+    expect(defect.refundAuthorized).toBe(false);
+    expect(part.refundAuthorized).toBe(false);
+  });
+
+  it('never borrows another independently purchased unit or an invented checkout notice', async () => {
+    const { makeInput } = fixture();
+    const mismatch = await reviewOfficialReaderPrivateWithdrawalEvidenceV1({
+      ...makeInput(),
+      checkoutNoticeAuthority: { readExactServerCheckoutNotice: async () => ({
+        ...ORIGINAL_CHECKOUT, originatingGrantId: BODY,
+      }) },
+    });
+    expect(mismatch.review.classification).toBe('not_proven_delivered');
+
+    const withoutNotice = await reviewOfficialReaderPrivateWithdrawalEvidenceV1({
+      ...makeInput(),
+      checkoutNoticeAuthority: { readExactServerCheckoutNotice: async () => null },
+    });
+    expect(mismatch.checkoutNoticeEvidenceState).toBe('missing_or_unverifiable');
+    expect(withoutNotice.checkoutNoticeEvidenceState).toBe('missing_or_unverifiable');
+    expect(withoutNotice.review.automaticDenialAuthorized).toBe(false);
+    expect(withoutNotice.timeline.consumerDeliveryProven).toBe(false);
+  });
+
+  it.each([
+    { authority: 'server_checkout_snapshot' },
+    { purchaseIntentId: BODY },
+    { originatingGrantId: BODY },
+    { productSpecVersion: 'another-reading-v2' },
+    { originalPurchaseIntentCreatedAt: 'not-a-date' },
+    { originalPurchaseIntentCreatedAt: '2026-10-20T08:56:00.000Z' },
+    { snapshotRecordedAt: 'not-a-date' },
+    { noticePresentedAt: '2026-10-20T08:56:00+09:00' },
+    { originalGrantItemBinding: 'browser_claimed_receipt' },
+    { pinnedCapabilityItemKey: '' },
+    { noticeRevision: '' },
+    { snapshotRecordedAt: '2026-10-20T08:59:00.000Z' },
+    { noticePresentedAt: '2026-10-20T08:54:00.000Z' },
+    { acknowledgedAt: '2026-10-20T08:59:00.000Z' },
+    { originalPaymentAttemptCreatedAt: '2026-10-20T08:56:00.000Z' },
+    { originalPaymentAttemptCreatedAt: '2026-10-20T09:01:00.000Z' },
+    { acknowledgedAt: '2026-10-20T08:57:00+09:00' },
+  ])('never attributes forged, late or cross-item checkout evidence to the original Grant %#', async record => {
+    const { makeInput } = fixture();
+    const result = await reviewOfficialReaderPrivateWithdrawalEvidenceV1({
+      ...makeInput(),
+      checkoutNoticeAuthority: {
+        readExactServerCheckoutNotice: async () => ({
+          ...ORIGINAL_CHECKOUT, ...record,
+        } as typeof ORIGINAL_CHECKOUT),
+      },
+    });
+    expect(result.checkoutNoticeEvidenceState).toBe('missing_or_unverifiable');
+    expect(result.review.classification).toBe('not_proven_delivered');
+    expect(result.refundAuthorized).toBe(false);
+    expect(result.entitlementMutationAuthorized).toBe(false);
+  });
+
+  it.each([
+    { originalReceiptStatus: 'pending' },
+    { originalReceiptStatus: 'cancel_requested' },
+    { originalReceiptStatus: null },
+    { unitId: BODY },
+    { purchaseIntentId: BODY },
+    { productSpecVersion: '' },
+    { responsePreparedAt: null, acknowledgedAttemptCount: '1' },
+    { deliveryAttemptCount: '0' },
+    { deliveryAttemptCount: '1', acknowledgedAttemptCount: '2' },
+    { clientAcknowledgedAt: S5_AT },
+    { s5CommittedAt: 'not-a-date' },
+    { deliveryAttemptCount: '-1' },
+    { deliveryAttemptCount: '9007199254740992' },
+  ])('fails closed for corrupted or cross-scope evidence %#', async row => {
+    const { makeInput, notice } = fixture(row);
+    await expect(reviewOfficialReaderPrivateWithdrawalEvidenceV1(makeInput()))
+      .rejects.toBeInstanceOf(CommerceReaderPrivateWithdrawalEvidenceErrorV1);
+    expect(notice).not.toHaveBeenCalled();
+  });
+
+  it('fails closed for missing evidence, wrong Subject type and unverifiable item selector', async () => {
+    const { makeInput, query } = fixture();
+    query.mockImplementationOnce(async () => ({ rows: [] }));
+    await expect(reviewOfficialReaderPrivateWithdrawalEvidenceV1(makeInput()))
+      .rejects.toBeInstanceOf(CommerceReaderPrivateWithdrawalEvidenceErrorV1);
+    const input = makeInput();
+    await expect(reviewOfficialReaderPrivateWithdrawalEvidenceV1({
+      ...input,
+      scope: {
+        ...input.scope,
+        resolvedSubject: { subjectId: SUBJECT, subjectKind: 'guest' },
+      },
+    })).rejects.toBeInstanceOf(CommerceReaderPrivateWithdrawalEvidenceErrorV1);
+    await expect(reviewOfficialReaderPrivateWithdrawalEvidenceV1({
+      ...input,
+      originatingGrantId: 'browser-unit',
+    })).rejects.toBeInstanceOf(CommerceReaderPrivateWithdrawalEvidenceErrorV1);
+  });
+});

@@ -46,9 +46,15 @@ describe('shared CI verification plan', () => {
     expect(new Set(cases).size).toBeGreaterThanOrEqual(44);
     expect(getDbSuite('content').cases).toContain('official-reader-provider-revoke-race');
     expect(getDbSuite('content').cases).toContain('official-reader-s2-atomic-receipt-bind');
+    expect(getDbSuite('content').cases).toContain('official-reader-s4-protected-storage-design');
+    expect(getDbSuite('content').cases).toContain('official-reader-s4-protected-storage-design');
+    expect(getDbSuite('postgres17').cases).toContain('official-reader-s2-atomic-receipt-bind');
+    expect(getDbSuite('postgres17').cases).toContain('official-reader-s4-protected-storage-design');
     expect(getDbSuite('runtime').cases).toContain('guest-promotion-auth-fk');
     expect(getDbSuite('runtime').cases).toContain('reader-memory-tenant-boundary');
     expect(getDbSuite('postgres17').cases).toContain('guest-promotion-auth-fk');
+    expect(getDbSuite('postgres17').cases).toContain('official-reader-s2-atomic-receipt-bind');
+    expect(getDbSuite('postgres17').cases).toContain('official-reader-s4-protected-storage-design');
     expect(getDbSuite('postgres17').cases).toContain('saju-single-project-operator-permit-pg17');
     expect(getDbSuite('postgres17').cases).toContain('seyeon-r2-rpc-catalog');
     expect(getDbSuite('postgres17').cases).toContain('seyeon-r2-pending-migrations');

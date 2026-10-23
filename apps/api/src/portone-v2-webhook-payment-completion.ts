@@ -7,9 +7,12 @@ import {
 } from './commerce-provider-payment-completion-orchestration.js';
 import type { CommercePaymentVerificationAdapterV1 } from './commerce-payment-verification-execution.js';
 import type { PostgresSubjectPoolV1 } from './postgres-subject-execution.js';
+import type { PortOneV2FullCancellationVerifierV1 } from './portone-v2-payment-verification-adapter.js';
+import { applyVerifiedPortOneV2ReaderFullCancellationV1 } from './commerce-portone-verified-reader-full-cancellation.js';
 
 export const PORTONE_V2_WEBHOOK_VERSION_V1 = '2024-04-25' as const;
 export const PORTONE_V2_WEBHOOK_PAID_EVENT_V1 = 'Transaction.Paid' as const;
+export const PORTONE_V2_WEBHOOK_FULL_CANCEL_EVENT_V1 = 'Transaction.Cancelled' as const;
 export const PORTONE_V2_WEBHOOK_TIMESTAMP_TOLERANCE_SECONDS_V1 = 300 as const;
 export const PORTONE_V2_WEBHOOK_MAX_BODY_BYTES_V1 = 65_536 as const;
 export const PORTONE_V2_WEBHOOK_MAX_ID_LENGTH_V1 = 512 as const;
@@ -44,6 +47,8 @@ export interface PortOneV2WebhookPaymentCompletionConfigV1 {
   readonly environment: 'sandbox' | 'production';
   readonly webhookSecrets: readonly string[];
   readonly now?: () => Date;
+  /** Explicit, internal S2 Reader purchase fulfillment; default disabled. */
+  readonly privateReaderReceiptFulfillmentEnabled?: boolean;
 }
 
 type PortOneV2WebhookPaymentCompletionConfigSnapshotV1 = Readonly<{
@@ -58,6 +63,15 @@ export interface AuthenticatedPortOneV2PaidWebhookV1 {
   readonly authenticatedIngress: AuthenticatedCommerceProviderIngressV1;
 }
 
+export interface AuthenticatedPortOneV2CancelWebhookV1 {
+  readonly kind: 'payment_cancellation';
+  readonly providerWebhookId: string;
+  readonly paymentId: string;
+  readonly transactionId: string;
+  readonly cancellationId: string;
+  readonly environment: 'sandbox' | 'production';
+}
+
 export interface IgnoredAuthenticatedPortOneV2WebhookV1 {
   readonly kind: 'ignored';
   readonly providerWebhookId: string;
@@ -66,6 +80,7 @@ export interface IgnoredAuthenticatedPortOneV2WebhookV1 {
 
 export type AuthenticatedPortOneV2WebhookDecisionV1 =
   | AuthenticatedPortOneV2PaidWebhookV1
+  | AuthenticatedPortOneV2CancelWebhookV1
   | IgnoredAuthenticatedPortOneV2WebhookV1;
 
 export type PortOneV2WebhookPaymentCompletionExecutionV1 =
@@ -73,6 +88,13 @@ export type PortOneV2WebhookPaymentCompletionExecutionV1 =
       kind: 'ignored';
       providerWebhookId: string;
       eventType: string;
+    }>
+  | Readonly<{
+      kind: 'cancelled';
+      providerWebhookId: string;
+      receiptId: string;
+      providerEventId: string;
+      grantCount: number;
     }>
   | Readonly<
       {
@@ -431,6 +453,17 @@ export function authenticatePortOneV2WebhookPaymentCompletionV1(input: {
 
   const payload = parseVerifiedPayload(rawBody);
   const type = eventType(payload);
+  if (type === PORTONE_V2_WEBHOOK_FULL_CANCEL_EVENT_V1) {
+    const data = plainRecord(payload.data, 'PortOne V2 cancelled webhook data');
+    return Object.freeze({
+      kind: 'payment_cancellation',
+      providerWebhookId: webhookId,
+      environment: config.environment,
+      paymentId: boundedString(data.paymentId, 'PortOne V2 cancellation paymentId', MAX_PROVIDER_ID_LENGTH),
+      transactionId: boundedString(data.transactionId, 'PortOne V2 cancellation transactionId', MAX_PROVIDER_ID_LENGTH),
+      cancellationId: boundedString(data.cancellationId, 'PortOne V2 cancellationId', MAX_PROVIDER_ID_LENGTH),
+    });
+  }
   if (type !== PORTONE_V2_WEBHOOK_PAID_EVENT_V1) {
     return Object.freeze({
       kind: 'ignored',
@@ -459,18 +492,54 @@ export async function executePortOneV2WebhookPaymentCompletionV1(input: {
   readonly request: PortOneV2WebhookRequestV1;
   readonly config: PortOneV2WebhookPaymentCompletionConfigV1;
   readonly verificationAdapter: CommercePaymentVerificationAdapterV1;
+  readonly fullCancellationVerifier?: PortOneV2FullCancellationVerifierV1;
 }): Promise<PortOneV2WebhookPaymentCompletionExecutionV1> {
   const decision = authenticatePortOneV2WebhookPaymentCompletionV1({
     request: input.request,
     config: input.config,
   });
   if (decision.kind === 'ignored') return decision;
+  if (decision.kind === 'payment_cancellation') {
+    if (input.fullCancellationVerifier === undefined) {
+      throw new PortOneV2WebhookPaymentCompletionErrorV1(
+        'INVALID_CONFIGURATION',
+        'PortOne V2 full cancellation verifier is unavailable.',
+      );
+    }
+    const evidence = await input.fullCancellationVerifier.verifyFullCancellation({
+      paymentId: decision.paymentId,
+      transactionId: decision.transactionId,
+      cancellationId: decision.cancellationId,
+      environment: decision.environment,
+    });
+    const applied = await applyVerifiedPortOneV2ReaderFullCancellationV1({
+      pool: input.pool,
+      evidence,
+    });
+    if (applied.kind === 'unrelated_commerce') {
+      return Object.freeze({
+        kind: 'ignored',
+        providerWebhookId: decision.providerWebhookId,
+        eventType: PORTONE_V2_WEBHOOK_FULL_CANCEL_EVENT_V1,
+      });
+    }
+    return Object.freeze({
+      kind: 'cancelled',
+      providerWebhookId: decision.providerWebhookId,
+      receiptId: applied.receiptId,
+      providerEventId: applied.providerEventId,
+      grantCount: applied.grantCount,
+    });
+  }
 
   const completed = await executeAuthenticatedCommerceProviderPaymentCompletionV1({
     pool: input.pool,
     ingress: Object.freeze({ providerWebhookId: decision.providerWebhookId }),
     authenticator: preauthenticatedIngressAuthenticator(decision.authenticatedIngress),
     verificationAdapter: input.verificationAdapter,
+    ...(input.config.privateReaderReceiptFulfillmentEnabled === true
+      ? { privateReaderReceiptFulfillmentEnabled: true }
+      : {}),
   });
 
   return Object.freeze({

@@ -2,15 +2,42 @@
 set -euo pipefail
 
 inventory_path="docs/operations/SUBJECT_OWNED_DATA_GRAPH_INVENTORY_V1.json"
+private_overlay_path="docs/operations/OFFICIAL_READER_PRIVATE_SUBJECT_FK_OVERLAY_V1.json"
 
 expected="$(
-  node --input-type=module - "$inventory_path" <<'NODE'
+  node --input-type=module - "$inventory_path" "$private_overlay_path" <<'NODE'
 import { readFile } from 'node:fs/promises';
 const inventory = JSON.parse(await readFile(process.argv[2], 'utf8'));
-const refs = inventory.references ?? [];
-const lines = refs
-  .map((entry) => `${entry.table}|${entry.column}`)
-  .sort();
+const overlay = JSON.parse(await readFile(process.argv[3], 'utf8'));
+if (inventory.schema !== 'myeongha-subject-owned-data-graph-inventory-v1' ||
+    inventory.references?.length !== 30 ||
+    overlay.schema !== 'myeongha-official-reader-private-subject-fk-overlay-v1' ||
+    overlay.policyAuthority !== 'NONE_PENDING_PRIVACY_OWNER' ||
+    overlay.publicReleaseAuthorized !== false ||
+    overlay.references?.length !== 5 ||
+    overlay.references.some((entry) =>
+      entry.column !== 'subject_id' ||
+      entry.disposition !== 'UNDECIDED' ||
+      entry.scope !== 'OFFICIAL_READER_PRIVATE' ||
+      entry.executionAuthorized !== false)) {
+  throw new Error('Subject FK inventory overlay cannot promote Privacy authority');
+}
+const expectedPrivate = [
+  'official_reader_account_deletion_privacy_status_v1',
+  'official_reader_paid_answer_bodies',
+  'official_reader_paid_answer_purge_jobs_v1',
+  'official_reader_paid_delivery_attempts_v1',
+  'official_reader_s3_source_authority_receipts_v1',
+].sort();
+const privateTables = overlay.references.map((entry) => entry.table).sort();
+if (JSON.stringify(privateTables) !== JSON.stringify(expectedPrivate)) {
+  throw new Error('Official Reader private direct Subject FK inventory is incomplete or broadened');
+}
+const refs = [...inventory.references, ...overlay.references];
+const lines = refs.map((entry) => `${entry.table}|${entry.column}`).sort();
+if (new Set(lines).size !== 35) {
+  throw new Error('Subject FK inventory contains duplicate or missing references');
+}
 process.stdout.write(lines.join('\n'));
 NODE
 )"
@@ -51,8 +78,8 @@ if [[ "$actual" != "$expected" ]]; then
 fi
 
 count="$(printf '%s\n' "$actual" | sed '/^$/d' | wc -l | tr -d ' ')"
-[[ "$count" == "30" ]] || {
-  echo "Expected exactly 30 current direct subject FK mappings, found $count." >&2
+[[ "$count" == "35" ]] || {
+  echo "Expected exactly 30 historical plus 5 private Reader direct subject FK mappings, found $count." >&2
   exit 1
 }
 echo "Subject-owned data graph catalog guard PASS: ${count} direct subject FK mappings are classified."

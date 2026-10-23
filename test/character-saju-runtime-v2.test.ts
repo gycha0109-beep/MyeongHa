@@ -89,6 +89,9 @@ function fixture(reader: string, domain: SajuDomain) {
       completedAt: '2026-10-09T07:30:00.000Z',
     }]) },
     productReaderEligibilityAuthorityPort: productAuthorityPort,
+    currentVerifiedPurchaseAuthorityPort: {
+      assertCurrentVerifiedPurchase: vi.fn(async () => undefined),
+    },
   };
   const speech = {
     register: 'respectful', sentenceRhythm: 'short', directness: 'medium',
@@ -160,10 +163,12 @@ async function authorize(reader: string, domain: SajuDomain) {
   const proof = await issueCharacterSajuOfficialStandardEligibilityV2({
     prepared, currentScope: prepared.scope,
     productAuthorityPort: f.productAuthorityPort,
+    currentVerifiedPurchaseAuthorityPort: f.input.currentVerifiedPurchaseAuthorityPort,
   });
-  const context = assembleOfficialStandardReaderRuntimeV2({
+  const context = await assembleOfficialStandardReaderRuntimeV2({
     proof, currentScope: prepared.scope,
     source: prepared.source, baseContext: f.baseContext,
+    currentVerifiedPurchaseAuthorityPort: f.input.currentVerifiedPurchaseAuthorityPort,
   });
   return { ...f, prepared, proof, context };
 }
@@ -237,7 +242,7 @@ describe('A3-beta: verified official standard Saju runtime, no fake Capability',
     expect(() => guard({
       ...admitted, saju: { ...admitted.saju, readingRef: 'other-reading' },
     })).toThrow(CharacterSajuRuntimeAdmissionErrorV2);
-    expect(() => guard(a.context as typeof admitted))
+    expect(() => guard(a.context as unknown as typeof admitted))
       .toThrow(CharacterSajuRuntimeAdmissionErrorV2);
   });
 
@@ -265,23 +270,27 @@ describe('A3-beta: verified official standard Saju runtime, no fake Capability',
 
   it('blocks forged, cloned, reused and scope-swapped proofs', async () => {
     const a = await authorize('seyeon', 'general');
-    expect(() => assembleOfficialStandardReaderRuntimeV2({
+    await expect(assembleOfficialStandardReaderRuntimeV2({
       proof: a.proof, currentScope: a.prepared.scope,
       source: a.prepared.source, baseContext: a.baseContext,
-    })).toThrow();
+    currentVerifiedPurchaseAuthorityPort: a.input.currentVerifiedPurchaseAuthorityPort,
+    })).rejects.toThrow();
     const b = fixture('seyeon', 'general');
     const prepared = await prepareOfficialReadingReaderAdmissionV1(b.input);
     const proof = await issueCharacterSajuOfficialStandardEligibilityV2({
       prepared, currentScope: prepared.scope, productAuthorityPort: b.productAuthorityPort,
+      currentVerifiedPurchaseAuthorityPort: b.input.currentVerifiedPurchaseAuthorityPort,
     });
-    expect(() => assembleOfficialStandardReaderRuntimeV2({
+    await expect(assembleOfficialStandardReaderRuntimeV2({
       proof: { ...proof }, currentScope: prepared.scope,
       source: prepared.source, baseContext: b.baseContext,
-    })).toThrow();
-    expect(() => assembleOfficialStandardReaderRuntimeV2({
+      currentVerifiedPurchaseAuthorityPort: b.input.currentVerifiedPurchaseAuthorityPort,
+    })).rejects.toThrow();
+    await expect(assembleOfficialStandardReaderRuntimeV2({
       proof, currentScope: { ...prepared.scope, contentReleaseId: 'revoked-release' },
       source: prepared.source, baseContext: b.baseContext,
-    })).toThrow();
+      currentVerifiedPurchaseAuthorityPort: b.input.currentVerifiedPurchaseAuthorityPort,
+    })).rejects.toThrow();
   });
 
   it('rejects wrong Reader, reading hash drift and caller-cloned grounded context', async () => {

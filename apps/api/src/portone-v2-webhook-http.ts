@@ -1,4 +1,5 @@
 import type { CommercePaymentVerificationAdapterV1 } from './commerce-payment-verification-execution.js';
+import type { PortOneV2FullCancellationVerifierV1 } from './portone-v2-payment-verification-adapter.js';
 import {
   INGRESS_REQUEST_BODY_COMPLETION_DEADLINE_MS_V1,
   IngressRequestBodyCompletionDeadlineExceededV1,
@@ -31,6 +32,7 @@ export interface HandlePortOneV2WebhookRequestInputV1 {
   readonly pool: PostgresSubjectPoolV1;
   readonly config: PortOneV2WebhookPaymentCompletionConfigV1;
   readonly verificationAdapter: CommercePaymentVerificationAdapterV1;
+  readonly fullCancellationVerifier?: PortOneV2FullCancellationVerifierV1;
 }
 
 function matchesRoute(request: Request): boolean {
@@ -186,6 +188,7 @@ export async function handlePortOneV2WebhookRequestV1(
       },
       config: input.config,
       verificationAdapter: input.verificationAdapter,
+      ...(input.fullCancellationVerifier === undefined ? {} : { fullCancellationVerifier: input.fullCancellationVerifier }),
     });
     return noStoreResponse(204);
   } catch (error) {

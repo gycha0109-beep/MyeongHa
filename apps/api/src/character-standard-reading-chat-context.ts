@@ -14,6 +14,9 @@ import {
 import {
   projectOfficialStandardReadingToProtectedCharacterSajuContextV1,
 } from './character-standard-reading-protected-context.js';
+import type {
+  OfficialReaderPrivateCurrentPurchaseAuthorityPortV1,
+} from './official-reader-private-exact-verified-purchase-guard-v1.js';
 
 export type CharacterStandardReadingChatBaseContextInputV1 = Omit<
   CharacterRuntimeContextAssemblyInputV1,
@@ -28,6 +31,9 @@ export interface PrepareCharacterStandardReadingChatContextInputV1 {
   readonly accessAuthorityPort: CharacterStandardReadingAccessAuthorityPortV1;
   readonly artifactAuthorityPort: CharacterStandardReadingArtifactAuthorityPortV1;
   readonly contextInput: CharacterStandardReadingChatBaseContextInputV1;
+  /** Private S1-locked Commerce Receipt/Grant check; no fallback. */
+  readonly currentVerifiedPurchaseAuthorityPort?:
+    OfficialReaderPrivateCurrentPurchaseAuthorityPortV1;
 }
 
 export interface CharacterStandardReadingChatContextPlanV1 {
@@ -42,7 +48,61 @@ export class CharacterStandardReadingChatContextErrorV1 extends Error {
   }
 }
 
-const preparedOfficialReadingChatPlansV1 = new WeakSet<object>();
+type PrivateReaderContextPlanRecordV1 = {
+  readonly authorityPort: OfficialReaderPrivateCurrentPurchaseAuthorityPortV1;
+  readonly scope: Readonly<{
+    subjectId: string;
+    readingId: string;
+    readerCharacterId: string;
+    readerContentBundleId: string;
+  }>;
+  used: boolean;
+};
+const preparedOfficialReadingChatPlansV1 =
+  new WeakMap<object, PrivateReaderContextPlanRecordV1>();
+
+function verifiedPurchaseScope(input: Readonly<{
+  resolvedSubjectId?: string;
+  readingId: unknown;
+  readerCharacterId: unknown;
+  contentBundleId: unknown;
+}>): PrivateReaderContextPlanRecordV1['scope'] {
+  if (typeof input.resolvedSubjectId !== 'string'
+      || input.resolvedSubjectId.trim().length === 0
+      || typeof input.readingId !== 'string' || input.readingId.trim().length === 0
+      || typeof input.readerCharacterId !== 'string'
+      || input.readerCharacterId.trim().length === 0
+      || typeof input.contentBundleId !== 'string'
+      || input.contentBundleId.trim().length === 0) {
+    throw new CharacterStandardReadingChatContextErrorV1(
+      'Official Reader protected context requires an exact canonical purchase scope.',
+    );
+  }
+  return Object.freeze({
+    subjectId: input.resolvedSubjectId,
+    readingId: input.readingId,
+    readerCharacterId: input.readerCharacterId,
+    readerContentBundleId: input.contentBundleId,
+  });
+}
+
+async function assertCurrentPaidContext(
+  authorityPort: OfficialReaderPrivateCurrentPurchaseAuthorityPortV1 | undefined,
+  scope: PrivateReaderContextPlanRecordV1['scope'],
+): Promise<void> {
+  if (!authorityPort || typeof authorityPort.assertCurrentVerifiedPurchase !== 'function') {
+    throw new CharacterStandardReadingChatContextErrorV1(
+      'Official Reader current verified purchase authority is missing.',
+    );
+  }
+  try {
+    await authorityPort.assertCurrentVerifiedPurchase(scope);
+  } catch {
+    throw new CharacterStandardReadingChatContextErrorV1(
+      'Official Reader current verified purchase is unavailable.',
+    );
+  }
+}
 
 function assertNoCallerSajuContext(
   input: CharacterStandardReadingChatBaseContextInputV1,
@@ -70,6 +130,20 @@ export async function prepareCharacterStandardReadingChatContextV1(
   input: PrepareCharacterStandardReadingChatContextInputV1,
 ): Promise<CharacterStandardReadingChatContextPlanV1> {
   assertNoCallerSajuContext(input.contextInput);
+  const purchaseScope = verifiedPurchaseScope({
+    ...(input.resolvedSubjectId === undefined
+      ? {} : { resolvedSubjectId: input.resolvedSubjectId }),
+    readingId: input.readingId,
+    readerCharacterId: input.readerCharacterId,
+    contentBundleId: input.contextInput.contentBundleId,
+  });
+  // Resolve no protected Saju source under a historical Grant whose
+  // verified PortOne Receipt has already been cancelled. This also blocks
+  // a same-Reading sibling purchase pinned to a DIFFERENT Reader Bundle.
+  await assertCurrentPaidContext(
+    input.currentVerifiedPurchaseAuthorityPort,
+    purchaseScope,
+  );
 
   const source = await resolveCharacterStandardReadingKnowledgeV1({
     ...(input.resolvedSubjectId === undefined
@@ -103,6 +177,15 @@ export async function prepareCharacterStandardReadingChatContextV1(
     );
   }
 
+  if (source.subjectId !== purchaseScope.subjectId
+      || source.readingId !== purchaseScope.readingId
+      || source.readerCharacterId !== purchaseScope.readerCharacterId
+      || source.readerContentBundleId !== purchaseScope.readerContentBundleId) {
+    throw new CharacterStandardReadingChatContextErrorV1(
+      'Official Reading source and verified purchase scope differ.',
+    );
+  }
+  await assertCurrentPaidContext(input.currentVerifiedPurchaseAuthorityPort,purchaseScope);
   const saju =
     projectOfficialStandardReadingToProtectedCharacterSajuContextV1(source);
 
@@ -114,7 +197,11 @@ export async function prepareCharacterStandardReadingChatContextV1(
     }),
   });
 
-  preparedOfficialReadingChatPlansV1.add(plan);
+  preparedOfficialReadingChatPlansV1.set(plan, {
+    authorityPort: input.currentVerifiedPurchaseAuthorityPort!,
+    scope: purchaseScope,
+    used: false,
+  });
   return plan;
 }
 
@@ -126,21 +213,31 @@ export async function prepareCharacterStandardReadingChatContextV1(
  * runtime assembly can consume the exact server-retrieved protected Reading
  * without weakening the direct Saju injection guard.
  */
-export function assemblePreparedCharacterStandardReadingRuntimeContextV1(
+export async function assemblePreparedCharacterStandardReadingRuntimeContextV1(
   plan: CharacterStandardReadingChatContextPlanV1,
-): CharacterRuntimeContextV1 {
-  if (!preparedOfficialReadingChatPlansV1.has(plan)) {
+): Promise<CharacterRuntimeContextV1> {
+  const record = preparedOfficialReadingChatPlansV1.get(plan);
+  if (!record || record.used) {
     throw new CharacterStandardReadingChatContextErrorV1(
       'Official Reading runtime context plan was not minted by server authority.',
     );
   }
 
+  // Consume before the awaited fresh S1 check: an old plan cannot be
+  // replayed after refund or reused in another turn to re-inject text.
+  record.used = true;
+  await assertCurrentPaidContext(record.authorityPort,record.scope);
   const saju = plan.contextInput.saju;
   if (
     saju === undefined ||
     saju.readingRef !== plan.source.readingId ||
     saju.domain !== plan.source.sajuDomain ||
-    plan.contextInput.character.characterId !== plan.source.readerCharacterId
+    plan.contextInput.character.characterId !== plan.source.readerCharacterId ||
+    plan.source.subjectId !== record.scope.subjectId ||
+    plan.source.readingId !== record.scope.readingId ||
+    plan.source.readerCharacterId !== record.scope.readerCharacterId ||
+    plan.source.readerContentBundleId !== record.scope.readerContentBundleId ||
+    plan.contextInput.contentBundleId !== record.scope.readerContentBundleId
   ) {
     throw new CharacterStandardReadingChatContextErrorV1(
       'Official Reading runtime context plan provenance is inconsistent.',

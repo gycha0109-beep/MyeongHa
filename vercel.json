@@ -72,6 +72,18 @@
       "destination": "/api/me?__myeongha_chat_turn_send=1&__myeongha_chat_thread_id=:threadId"
     },
     {
+      "source": "/api/chat/:threadId/paid-readings/:safeMessageId/ack",
+      "destination": "/api/me?__myeongha_held_reader_route=ack&__myeongha_held_reader_thread_id=:threadId&__myeongha_held_reader_message_id=:safeMessageId"
+    },
+    {
+      "source": "/api/chat/:threadId/paid-readings/:safeMessageId",
+      "destination": "/api/me?__myeongha_held_reader_route=message&__myeongha_held_reader_thread_id=:threadId&__myeongha_held_reader_message_id=:safeMessageId"
+    },
+    {
+      "source": "/api/readings/:readingId/reader-continuity",
+      "destination": "/api/me?__myeongha_held_reader_route=continuity&__myeongha_held_reader_reading_id=:readingId"
+    },
+    {
       "source": "/api/chat/:threadId",
       "destination": "/api/me?__myeongha_chat_thread_id=:threadId"
     },

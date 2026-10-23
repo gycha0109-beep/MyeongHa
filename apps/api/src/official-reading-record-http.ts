@@ -112,6 +112,18 @@ class TransactionOfficialReadingRecordPortV1 implements OfficialReadingRecordRea
   }
 }
 
+/**
+ * Shared, strictly owner-scoped Records adapter. Allows the private
+ * Commerce purchase-continuity read to reuse the SAME stored Official
+ * Reading authority without cloning a Reader-specific Saju report.
+ * The caller must already hold a verified Subject PostgreSQL transaction.
+ */
+export function createPostgresOfficialReadingRecordAuthorityPortV1(
+  client: PostgresTransactionQueryV1,
+): OfficialReadingRecordReadAuthorityPortV1 {
+  return new TransactionOfficialReadingRecordPortV1(client);
+}
+
 function requestedReadingId(request: Request): string | null {
   const url = new URL(request.url);
   if (url.pathname !== READINGS_ROUTE) return null;
@@ -181,7 +193,7 @@ export async function handleOfficialReadingRecordRequestV1(input: {
         getOfficialReadingRecord({
           resolvedSubjectId: resolvedSubject.subjectId,
           readingId,
-          authorityPort: new TransactionOfficialReadingRecordPortV1(client),
+          authorityPort: createPostgresOfficialReadingRecordAuthorityPortV1(client),
         }),
     });
     return successResponse(data, requestId, serverTime);

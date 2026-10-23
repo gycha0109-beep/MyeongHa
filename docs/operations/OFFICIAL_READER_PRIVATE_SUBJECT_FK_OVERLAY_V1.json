@@ -1,0 +1,43 @@
+{
+  "schema": "myeongha-official-reader-private-subject-fk-overlay-v1",
+  "policyAuthority": "NONE_PENDING_PRIVACY_OWNER",
+  "publicReleaseAuthorized": false,
+  "description": "Exactly five private Official Reader direct Subject FKs added after historical P0-PR-01 discovery. Visibility only; no deletion, retention, restore or runtime execution authority.",
+  "references": [
+    {
+      "table": "official_reader_account_deletion_privacy_status_v1",
+      "column": "subject_id",
+      "scope": "OFFICIAL_READER_PRIVATE",
+      "disposition": "UNDECIDED",
+      "executionAuthorized": false
+    },
+    {
+      "table": "official_reader_paid_answer_bodies",
+      "column": "subject_id",
+      "scope": "OFFICIAL_READER_PRIVATE",
+      "disposition": "UNDECIDED",
+      "executionAuthorized": false
+    },
+    {
+      "table": "official_reader_paid_answer_purge_jobs_v1",
+      "column": "subject_id",
+      "scope": "OFFICIAL_READER_PRIVATE",
+      "disposition": "UNDECIDED",
+      "executionAuthorized": false
+    },
+    {
+      "table": "official_reader_paid_delivery_attempts_v1",
+      "column": "subject_id",
+      "scope": "OFFICIAL_READER_PRIVATE",
+      "disposition": "UNDECIDED",
+      "executionAuthorized": false
+    },
+    {
+      "table": "official_reader_s3_source_authority_receipts_v1",
+      "column": "subject_id",
+      "scope": "OFFICIAL_READER_PRIVATE",
+      "disposition": "UNDECIDED",
+      "executionAuthorized": false
+    }
+  ]
+}

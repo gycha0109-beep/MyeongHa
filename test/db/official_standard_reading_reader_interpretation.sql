@@ -228,6 +228,21 @@ insert into public.commerce_receipts(
   clock_timestamp(), clock_timestamp(), 'production', 'test-verifier-v1', 1, 'KRW'
 );
 
+-- At initial issuance no official Reading exists. This synthetic fixture
+-- supplies the proposed Reading, taking the actual shared S1 lock first.
+begin;
+select pg_catalog.set_config(
+  'myeongha.subject_id','11390000-0000-0000-0000-000000000001',true);
+select pg_catalog.set_config(
+  'myeongha.reader_pending_reading_id',
+  '12103100-0000-0000-0000-000000000001',true);
+select public.internal_acquire_official_reader_scope_lock_v1(
+  '11390000-0000-0000-0000-000000000001',
+  '12103100-0000-0000-0000-000000000001','test-standard-reader');
+select public.internal_acquire_official_reader_scope_lock_v1(
+  '11390000-0000-0000-0000-000000000001',
+  '12103100-0000-0000-0000-000000000001','test-unlockable-reader');
+
 select * from public.internal_apply_verified_receipt_capability_effects_v1(
   '12102000-0000-0000-0000-000000000001',
   array['test-reader-unit'],
@@ -245,6 +260,7 @@ select * from public.internal_apply_verified_receipt_capability_effects_v1(
   array[null]::timestamptz[],
   array[null]::text[]
 );
+commit;
 
 select pg_catalog.set_config(
   'myeongha.subject_id',
@@ -866,6 +882,22 @@ cross join (values
 ) as x(intent_id, bundle_id, selection_hash)
 where sel.purchase_intent_id = '12102300-0000-0000-0000-000000000001';
 
+-- Original payment-attempt provenance must exist BEFORE the purchase is
+-- verified. The real PortOne cancellation verifier later binds to this
+-- immutable provider request instead of trusting webhook-supplied identities.
+insert into public.commerce_payment_attempts(
+  id,purchase_intent_id,subject_id,product_offer_id,attempt_no,
+  provider,environment,idempotency_key,provider_request_id,
+  provider_transaction_id,status,created_at,updated_at
+)
+select '12197000-0000-0000-0000-000000000001'::uuid,
+  pi.id,pi.subject_id,pi.product_offer_id,1,'portone_v2','production',
+  'synthetic-portone-full-cancel-request',
+  'synthetic-portone-reader-b2-payment','tx-official-reader-b2',
+  'response_received',clock_timestamp(),clock_timestamp()
+from public.purchase_intents pi
+where pi.id='12192300-0000-0000-0000-000000000002';
+
 update public.purchase_intents
 set status = 'verified', updated_at = clock_timestamp()
 where id in (
@@ -894,12 +926,19 @@ cross join (values
 ) as x(receipt_id, intent_id, transaction_id, fingerprint)
 where cr.id = '12102000-0000-0000-0000-000000000002';
 
+begin;
+select pg_catalog.set_config('myeongha.subject_id',
+  '11390000-0000-0000-0000-000000000001',true);
+select public.internal_acquire_official_reader_scope_lock_v1(
+  '11390000-0000-0000-0000-000000000001',
+  '12103100-0000-0000-0000-000000000001','test-unlockable-reader');
 select * from public.internal_apply_verified_receipt_capability_effects_v1(
   '12192000-0000-0000-0000-000000000002',
   array['test-reader-unit'], array[transaction_timestamp()],
   array[transaction_timestamp()], array[null]::timestamptz[],
   array[null]::text[]
 );
+commit;
 
 select pg_temp.assert_v2_true(
   'DB-C1 B2 has a distinct verified receipt-backed active purchase Grant',
@@ -976,12 +1015,19 @@ select pg_temp.assert_v2_true(
 -- DB-C2 creates another independently verified purchase of the same Reader
 -- against a DIFFERENT published content bundle. The exact-one A2 chooser must
 -- reject the two distinct metadata candidates rather than select one.
+begin;
+select pg_catalog.set_config('myeongha.subject_id',
+  '11390000-0000-0000-0000-000000000001',true);
+select public.internal_acquire_official_reader_scope_lock_v1(
+  '11390000-0000-0000-0000-000000000001',
+  '12103100-0000-0000-0000-000000000001','test-unlockable-reader');
 select * from public.internal_apply_verified_receipt_capability_effects_v1(
   '12192000-0000-0000-0000-000000000003',
   array['test-reader-unit'], array[transaction_timestamp()],
   array[transaction_timestamp()], array[null]::timestamptz[],
   array[null]::text[]
 );
+commit;
 
 select pg_temp.assert_v2_true(
   'DB-C2 other-bundle B3 binds same official Reading but distinct bundle provenance',

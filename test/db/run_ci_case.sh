@@ -271,12 +271,32 @@ case "$case_name" in
     bash test/db/official_standard_reading_reader_interpretation.sh
     catalog_snapshot
     ;;
+  official-reader-s4-protected-storage-design)
+    version_num="$(psql -Atqc 'show server_version_num')"
+    if [[ "$version_num" -ge 170000 ]]; then
+      verify_pg17
+      apply_pg17_migrations_without_birth_authority
+    else
+      apply_standard_migrations
+    fi
+    # The rehearsal runs this same disposable fixture in pre-deletion mode,
+    # then restores bytes and finalizes the real Chat graph in its own session.
+    # The authority-core job retains the original complete S4 SQL test.
+    bash test/db/official_reader_s4_logical_restore_deletion_rehearsal.sh
+    # test-only schemas; catalog snapshot of deployed migrations intentionally unchanged
+    ;;
   official-reader-provider-revoke-race)
     apply_standard_migrations
     bash test/db/official_reader_provider_effect_revoke_race_preflight.sh
     ;;
   official-reader-s2-atomic-receipt-bind)
-    apply_standard_migrations
+    version_num="$(psql -Atqc 'show server_version_num')"
+    if [[ "$version_num" -ge 170000 ]]; then
+      verify_pg17
+      apply_pg17_migrations_without_birth_authority
+    else
+      apply_standard_migrations
+    fi
     bash test/db/official_reader_s2_atomic_receipt_bind_live_writer_race.sh
     ;;
   records-production-read-authority)

@@ -124,6 +124,11 @@ bp="$(p -c "select id from public.birth_profiles
 p >"$tmpdir/b4-grant.out" 2>&1 <<SQL || { cat "$tmpdir/b4-grant.out" >&2; fail "verified B4 purchase Grant setup failed"; }
 begin;
 select pg_catalog.set_config('myeongha.subject_id', '$subject', true);
+-- DB-C5 preserves the Birth/Grant row-order characterization while making
+-- the independently issued B4 Grant obey the production S2 Reader scope lock.
+select public.internal_acquire_official_reader_scope_lock_v1(
+  '$subject'::uuid,'$reading'::uuid,'$reader'
+);
 select * from public.internal_apply_verified_receipt_capability_effects_v1(
   '$b4_receipt'::uuid,
   array['test-reader-unit'], array[transaction_timestamp()],
