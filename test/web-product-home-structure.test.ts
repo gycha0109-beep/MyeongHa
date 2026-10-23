@@ -21,21 +21,18 @@ describe('MyeongHa product Home — Golden Master', () => {
     }
   });
 
-  it('preserves the approved Golden Master Home hierarchy without sidebars', async () => {
+  it('preserves the approved topic-first Home hierarchy without sidebars', async () => {
     const [html, page] = await Promise.all([readFile(hallPath, 'utf8'), readFile(homePagePath, 'utf8')]);
     const homeSource = `${html}\n${page}`;
+    const topicHero = page.indexOf('className="mhx-hero"');
+    const characters = page.indexOf('className="mhx-characters"');
+    const content = page.indexOf('id="mhx-today-title"');
+    const recent = page.indexOf('id="mhx-recent-title"');
 
-    const greeting = homeSource.indexOf('className="gm-home-head"');
-    const character = homeSource.indexOf('className="gm-home-hero"');
-    const month = homeSource.indexOf('id="home-month-title"');
-    const products = homeSource.indexOf('id="home-products-title"');
-    const recent = homeSource.indexOf('id="home-recent-title"');
-
-    expect(greeting).toBeGreaterThan(-1);
-    expect(character).toBeGreaterThan(greeting);
-    expect(month).toBeGreaterThan(character);
-    expect(products).toBeGreaterThan(month);
-    expect(recent).toBeGreaterThan(products);
+    expect(topicHero).toBeGreaterThan(-1);
+    expect(characters).toBeGreaterThan(topicHero);
+    expect(content).toBeGreaterThan(characters);
+    expect(recent).toBeGreaterThan(content);
     expect(homeSource).not.toContain('home-sidebar');
     expect(homeSource).not.toContain('gm-sidebar');
   });
@@ -87,9 +84,9 @@ describe('MyeongHa product Home — Golden Master', () => {
 
     expect(homeSource).toContain('href="reading.html"');
     expect(homeSource).toContain('href="records.html"');
-    expect(homeSource).toContain('href="chat-hub.html">대화로 가기 →</a>');
-    expect(homeSource).toContain('오늘 이야기할 사람');
-    expect(homeSource).toContain('캐릭터 선택');
+    expect(homeSource).toContain('href="chat-hub.html"');
+    expect(homeSource).toContain('사주 관심 주제');
+    expect(homeSource).toContain('mhx-characters');
     expect(homeSource).not.toContain('href="chat.html?character=');
     expect(homeSource).not.toContain('세연');
   });
