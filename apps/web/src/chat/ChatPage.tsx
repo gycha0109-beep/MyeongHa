@@ -70,6 +70,10 @@ export function ChatPage() {
             </article>
           </div>
 
+          <p className="character-ai-disclosure" data-legal-sensitive-chat-guidance>
+            건강·종교·성생활 등 민감한 정보와 타인의 개인정보는 대화에 입력하지 마세요. 입력된 대화는 AI 답변 생성에 사용될 수 있습니다.
+          </p>
+
           <form className="character-composer conversation-composer" data-composer data-runtime-busy="false">
             <label className="sr-only" htmlFor="character-message">메시지</label>
             <textarea id="character-message" rows={1} placeholder="메시지를 입력하세요…" data-message-input />
