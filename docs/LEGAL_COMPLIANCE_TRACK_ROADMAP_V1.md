@@ -93,3 +93,12 @@
 - `apps/api/src/postgres-portone-identity-age-authority-v1.ts`에서 기존 `executePostgresSubjectTransactionV1`을 통해 신뢰된 Auth/Guest 증거를 매번 Subject로 재해결하고 각 DB 작업을 별도의 짧은 트랜잭션에서 실행. 외부 인증 서버 조회는 DB 트랜잭션 안에서 실행하지 않으며, 새 공개 HTTP API·SDK는 등록하지 않았다.
 - `test/legal-postgres-portone-identity-age-authority-v1.test.ts`에 모의 DB 트랜잭션 동작과 SQL 계약 테스트 추가. 실제 PostgreSQL 17 적용/권한/동시 실행 실증은 미완료.
 - **DB/Privacy 인수 조건:** 제안 SQL의 Security Definer 권위 및 EXECUTE ACL, 35 DELETE / 4 ANONYMIZE / 9 RETAIN P5Y·P30D 삭제/복원 정합, Guest→Member 승격과 인증 시도 폐기, 연령 밴드 보존기간·권한 재확인 주기 확정. 그 전엔 production migration 및 데이터 수집 보류.
+
+
+## 12. L2-P 검증 연령의 서버 이용 권한 연결 (2026-10-24)
+
+- `supabase/proposals/1740_portone_identity_age_authority_v1.proposed.sql`에 검증된 Subject의 최소 연령 밴드를 읽는 private DB 함수 `qry_verified_legal_portone_age_v1` 추가. active Subject 검증·Subject context assertion·동시 삭제와 충돌하는 공유 잠금 적용. **제안 SQL은 운영 DB에 적용되지 않았음**.
+- `apps/api/src/portone-v2-verified-age-admission-v1.ts`: 기존 Subject 인증 트랜잭션으로 `free_minor`/`adult` 조회. 무료 개인화는 두 밴드 허용, 직접 유료 구매 자격은 `adult`만 허용, 인증 기록이 없으면 거절. 미상 DB 상태는 조용히 성인으로 추정하지 않는다.
+- `apps/api/src/chat-open-http.ts`·`apps/api/src/chat-turn-send-http.ts`: 서버가 검증한 연령 권위를 **명시적으로 주입한 경우**, 확인 전 채팅방 생성 또는 AI 전송을 거절하고 기록 조회 실패 시 503으로 차단. `production-seyeon-turn-send-runtime-v1.ts`에서 해당 서버 전용 주입 슬롯을 전달할 수 있게 연결했다. 실제 운영에서 이 슬롯은 **아직 미설정**, 따라서 전 서비스 연령 강제 구현 완료로 판정하지 않는다.
+- 핵심 테스트만 추가: `test/legal-portone-v2-verified-age-admission-v1.test.ts`에서 연령별 이용 범위/미확인 거부, 기존 chat-open/turn-send HTTP 테스트에서 연령 미확인 시 DB 생성·AI 호출 금지 검증.
+- **다음:** DB/Privacy 삭제 그래프·데이터 보존 정합 및 최소 PG 권한 검증 후 제안 SQL 적용, Auth/Guest/Social 서버 합류 지점과 실제 PortOne 본인확인 시도 발급·완료 HTTP 경로에 이 권위를 활성 연결. 라이브 인증/결제 모두 계속 OFF.
