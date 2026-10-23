@@ -420,3 +420,22 @@ html[data-theme="dark"] .saju-preview-product span { background: #54334a; color:
   .saju-free-preview-panel { grid-template-columns: 1fr; padding: 22px 18px; gap: 8px; }
   .saju-free-preview-panel h2 { font-size: 22px; }
 }
+
+.saju-preview-entry {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 20px; padding: 20px 23px; margin: 16px 0 20px;
+  border: 1px solid rgba(149,75,112,.22); border-radius: 15px;
+  background: linear-gradient(95deg, #fffaf5, #f5e7ed);
+  box-shadow: 0 5px 18px rgba(66,38,55,.05);
+}
+.saju-preview-entry strong { font: 700 19px/1.45 var(--mh-serif, serif); color: #5e2647; }
+.saju-preview-entry p { margin: 5px 0 0; color: #716672; font-size: 12px; line-height: 1.6; }
+.saju-preview-open { flex: 0 0 auto; min-height: 45px; display: inline-flex; align-items: center; justify-content: center; gap: 12px; padding: 10px 20px; text-decoration: none; }
+.saju-preview-open:focus-visible { outline: 3px solid #9d4775; outline-offset: 3px; }
+html[data-theme="dark"] .saju-preview-entry { background: #292630; border-color: #70415d; }
+html[data-theme="dark"] .saju-preview-entry strong { color: #f5d7e5; }
+html[data-theme="dark"] .saju-preview-entry p { color: #d6c3ca; }
+@media (max-width: 680px) {
+  .saju-preview-entry { flex-direction: column; align-items: stretch; padding: 18px; }
+  .saju-preview-open { width: 100%; }
+}
