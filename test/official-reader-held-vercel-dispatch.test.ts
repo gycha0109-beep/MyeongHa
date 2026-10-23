@@ -7,7 +7,8 @@ const READING = '33333333-3333-4333-8333-333333333333';
 
 function request(uri: string, method = 'GET', extra?: Record<string, string>): Request {
   return new Request('https://myeongha.example' + uri, {
-    method, headers: extra,
+    method,
+    ...(extra === undefined ? {} : { headers: extra }),
   });
 }
 
