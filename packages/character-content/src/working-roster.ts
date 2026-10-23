@@ -35,8 +35,8 @@ const workingEntry = (
 });
 
 /**
- * Exact current Character Concept V1 working roster with Product Owner-approved
- * MVP Launch official display names.
+ * Full nine-character Concept V1 pool with Product Owner-approved
+ * official display names. Initial launch is a separate six-character subset.
  *
  * `launch-approved` applies only to Launch roster membership/display-name
  * authority. It does not promote the working relationship-fantasy directions to
@@ -56,3 +56,26 @@ export const CHARACTER_CONCEPT_V1_WORKING_ROSTER = [
 ] as const satisfies readonly CharacterConceptV1WorkingRosterEntry[];
 
 export const CHARACTER_CONCEPT_V1_WORKING_ROSTER_SIZE = 9 as const;
+
+/**
+ * Product Owner-approved initial October 2026 launch roster.
+ * Source: docs/source-authority-decisions/CHARACTER_LAUNCH_MVP_AUTHORITY_V1.md §10.
+ * Do not confuse this launch subset with the full nine-character concept pool.
+ * This declaration does not itself enforce runtime availability.
+ */
+export const CHARACTER_INITIAL_LAUNCH_DISPLAY_NAMES = [
+  '세연',
+  '여울',
+  '라현',
+  '백헌',
+  '태겸',
+  '윤호',
+] as const;
+
+export const CHARACTER_INITIAL_LAUNCH_ROSTER_SIZE = 6 as const;
+
+export const CHARACTER_DEFERRED_DISPLAY_NAMES = [
+  '서린',
+  '미라',
+  '도윤',
+] as const;

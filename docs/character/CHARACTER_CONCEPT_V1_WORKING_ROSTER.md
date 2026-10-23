@@ -6,9 +6,9 @@
 
 ## 1. 권한 경계
 
-2026-09-06 제품 소유자 승인에 따라 기존 Character Concept V1 working roster를 **MVP Production Launch roster membership + 공식 표시 이름 권한**으로 승격한다.
+2026-09-06 제품 소유자 승인에 따라 기존 Character Concept V1 working roster를 **MVP Production Launch roster membership + 공식 표시 이름 권한 (2026-10-15 1차 출시 6명으로 변경)**으로 승격한다.
 
-MVP Launch roster는 정확히 9명이다.
+**2026-10-15 변경 승인:** 1차 Launch roster는 정확히 **6명**이다. 아래 9명은 이름이 승인된 전체 Character Concept pool이며, 1차 출시 명단과 구별한다.
 
 ```text
 세연
@@ -30,18 +30,18 @@ MVP Launch roster는 정확히 9명이다.
 
 - `docs/source-authority-decisions/CHARACTER_LAUNCH_MVP_AUTHORITY_V1.md`
 
-## 2. 승인된 Launch roster
+## 2. 승인된 전체 캐릭터 콘셉트 9명 (1차 출시 6명)
 
 | 공식 표시 이름 | Launch 상태 | 기존 relationship fantasy / direction | User-facing relationship hook |
 | --- | --- | --- | --- |
 | 세연 | Launch | First Companion / 정실감 / 소꿉친구적 순애 | 돌아오면 얘가 있을 것 같다. |
 | 여울 | Launch | 호감 부정 / 질투 / 숨길 수 없는 관심 | 신경 쓰는 게 너무 티 나는데 본인만 아니라고 우기는 여자. |
-| 서린 | Launch | 오래 기억해주는 사람 / 잔잔하고 깊은 관계 | 이 사람은 내가 한 말을 정말 기억한다. |
+| 서린 | Deferred (후속 출시) | 오래 기억해주는 사람 / 잔잔하고 깊은 관계 | 이 사람은 내가 한 말을 정말 기억한다. |
 | 라현 | Launch | 성숙한 매혹 / 주도권 / 심리전 | 이 사람한테 휘말리고 싶다. |
-| 미라 | Launch | 잘생긴 여자 / 무심다정 / Friends-to-Lovers | 너무 자연스럽게 가까워서 사랑인지도 몰랐던 잘생긴 여자. |
+| 미라 | Deferred (후속 출시) | 잘생긴 여자 / 무심다정 / Friends-to-Lovers | 너무 자연스럽게 가까워서 사랑인지도 몰랐던 잘생긴 여자. |
 | 태겸 | Launch | 냉미남 / 마찰 / 인정받는 관계 | 저 인간한테 인정받고 싶다. |
 | 윤호 | Launch | 다정남 / 생활형 안정 / 안경 너드 미남 | 누군가에게 편하게 기대고 싶다. |
-| 도윤 | Launch | 능글 / 아웃사이더 / 공범 / 선택적 특별취급 | 왜 나한테만 이러지? |
+| 도윤 | Deferred (후속 출시) | 능글 / 아웃사이더 / 공범 / 선택적 특별취급 | 왜 나한테만 이러지? |
 | 백헌 | Launch | 연상 / 베테랑 / 으른섹시 / 능력에서 오는 안정 | 흔들리지 않는 어른의 사적인 얼굴을 보고 싶다. |
 
 Relationship-fantasy 방향은 기존 Concept V1 source의 설계 방향을 보존한다. 이 표의 관계 방향이 곧 상세 Persona/Behavior 전체 승인이라는 뜻은 아니다.
@@ -99,10 +99,10 @@ RelationshipBehavior rules
 
 ## 4. Launch 사용 가능 정책
 
-승인된 Launch 9명은 모든 정상 Member에게 출시 시점부터 기본 사용 가능하다.
+승인된 **1차 Launch 6명(세연·여울·라현·백헌·태겸·윤호)**만 모든 정상 Member에게 1차 출시 시점부터 기본 사용 가능하다. 서린·미라·도윤은 후속 출시 후보이며 1차에는 노출·대화방 생성 대상이 아니다.
 
 ```text
-Launch 9
+Launch 6
 → default available
 → 조건부 unlock 불필요
 ```
@@ -129,7 +129,7 @@ Member Chat thread create/reuse의 핵심 제품 정책은 `CHARACTER_LAUNCH_MVP
 
 허용:
 
-- 정확한 Launch roster 9명 membership 유지;
+- 정확한 1차 Launch 6명 membership 유지; 전체 9명 concept pool 보존;
 - 위 9개 공식 표시 이름 사용;
 - `미라`를 공식 표시 이름으로 사용;
 - 기존 relationship-fantasy 방향 보존;
@@ -138,8 +138,8 @@ Member Chat thread create/reuse의 핵심 제품 정책은 `CHARACTER_LAUNCH_MVP
 
 금지:
 
-- Launch roster를 5명으로 축소;
-- 승인 없이 9명 외 캐릭터를 Launch roster에 추가;
+- 1차 Launch roster를 6명 미만으로 무단 축소;
+- 승인 없이 1차 Launch 6명 외 캐릭터를 추가;
 - `미라`를 temporary로 되돌림;
 - 표시 이름을 근거로 canonical `characterId`를 자동 생성하고 그것을 source canon이라고 주장;
 - 누락된 gender/age/origin/principle-calling/visual을 추론;
@@ -150,4 +150,12 @@ Member Chat thread create/reuse의 핵심 제품 정책은 `CHARACTER_LAUNCH_MVP
 
 Character C1은 계속 Canon / Persona / Behavior / Saju Capability / Relationship Behavior 분리, controlled rendering, relationship projection, roster differentiation의 architecture authority다.
 
-이 문서는 C1의 Launch minimum(>=5)을 충족하는 **실제 MVP Launch roster = 9명**과 공식 표시 이름을 확정한다. 상세 C2 content는 별도 authoring/검토 대상이다.
+이 문서는 C1의 Launch minimum(>=5)을 충족하는 **실제 1차 MVP Launch roster = 6명 (전체 concept pool 9명)**과 공식 표시 이름을 확정한다. 상세 C2 content는 별도 authoring/검토 대상이다.
+
+## 8. 2026-10-15 1차 런칭 명단 승인
+
+**여성 3명:** 세연·여울·라현. **남성 3명:** 백헌·태겸·윤호.
+
+**후속 출시 후보:** 서린·미라·도윤. 전체 Concept/표시 이름과 개인별 Canary 참가 동기는 보존한다. 1차 출시와 별개로 authoring을 진행할 수 있다. 실제 Production 활성화·노출·대화방 생성 제한은 제품 코드 및 출시 번들 검증을 거쳐야 한다.
+
+Authority: `docs/source-authority-decisions/CHARACTER_LAUNCH_MVP_AUTHORITY_V1.md` §10 (2026-10-15 변경 승인).
