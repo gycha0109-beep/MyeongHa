@@ -50,6 +50,15 @@
 - 격리 PostgreSQL 실거래 표본에 `internal_qry_official_reader_withdrawal_delivery_state_v2`를 **치환하지 않고 직접 실행하는 음성 시험**을 더했다. 원본 Receipt/Grant가 있어도 S5 보호 본문·Reader 범위 승인 증거가 없으면 행이 0이며, 외부 고지 저장소를 조회하지 않는다. Subject 문맥 없는 직접 SQL 역시 거부된다.
 - 기존 구매 Item 양성 결속 시험의 `authorized_original` CTE 치환은 오직 관계형 JOIN 검증용으로 유지한다. 이번 추가 음성 시험은 S5 실제 보호 본문 **양성 제공 권한이나 법정 인도 증명이 아니다**. Saju Production·Privacy 삭제/복원·Commerce/Legal Checkout 저장·고지·보존 승인, S8 공개 전부 HOLD.
 
+## S7 환불 내부 검토용 전달 불확실성 분류 (2026-10-23)
+
+- 기존 2240/2250 **원본 Receipt→Grant→S5 보호 본문**과 보존 중인 전달 저널을 읽는 비공개 검토에서, 전달 시도·클라이언트 수신 확인 개수 외에 `retainedUnacknowledgedAttempts` 및 `retainedDeliveryEvidenceState`를 반환한다. 전송·환불·Grant 변경은 수행하지 않는다.
+- `no_retained_delivery_receipts`: 보존 중인 시도 없음. **전혀 전송된 적이 없었다는 뜻이 아니다.** 현재 S7 저널은 최대 90일, 개인정보 정리에 의해 더 일찍 삭제될 수 있다.
+- `response_prepared_no_retained_ack`: 서버 응답 준비 시도는 있으나 보존 중인 인증 클라이언트 ACK 없음. **네트워크 전달 실패나 사용자 미열람이 증명됐다는 뜻이 아니다.** 타임아웃·응답 유실·사용자 미확인 모두 같은 기술 상태에 속할 수 있다.
+- `client_ack_recorded_delivery_unproven`: 해당 원본 보호 본문에 대한 인증 클라이언트 ACK가 하나 이상 보존됨. **사람의 열람, 법정 소비자 제공 개시, 청약철회 제한 근거를 증명하지 않는다.** 여러 시도 중 ACK 없는 나머지는 `retainedUnacknowledgedAttempts`로 분리한다.
+- 환불 취소로 원본 영수증이 `revoked`인 경우에도 과거 보존 전달 사실은 사실 그대로 출력하지만 **현재 구매 유효로 되돌리지 않으며**, 법적 예외·미제공 가분 항목 우선 및 `automaticDenialAuthorized=false`, `providerRefundAuthorized=false`, `entitlementMutationAuthorized=false`를 유지한다.
+- 본 상태는 서버 내부 최소 증빙 표시 계약이다. Checkout 고지 원본, 실제 제공 증거, Privacy 보존·복원 및 Commerce/Legal 승인 전 **공개 응답/환불 자동 판정/유료 공개 전부 HOLD**.
+
 ## 다음 수락 게이트
 
 1. Commerce/Legal이 실제 상품 단위와 법정 기간·고지/미리보기·취소 경로를 승인.
