@@ -109,16 +109,16 @@ describe('S4 resumed refund purge fence must be valid before key erasure', () =>
   it('renews the live DB lease once per DEK and again before ACK',async()=>{
     const x=fixture();
     await expect(x.run()).resolves.toMatchObject({completed:1,failed:0});
-    // Entry renewal + TWO independent keys + final ACK renewal.
-    expect(x.renewals()).toBe(4);
+    // Resume/entry + DB-erased ACK + TWO independent keys + final ACK.
+    expect(x.renewals()).toBe(5);
   });
 
   it('stops before the second key when a competing worker reclaims ownership',async()=>{
-    const x=fixture({}, {loseLeaseAtRenewal:3,keysInitiallyDestroyed:false});
+    const x=fixture({}, {loseLeaseAtRenewal:4,keysInitiallyDestroyed:false});
     await expect(x.run()).rejects.toThrow(
       'Protected Reader revocation cleanup is unavailable.',
     );
-    expect(x.renewals()).toBe(3);
+    expect(x.renewals()).toBe(4);
     expect(x.destroyKey).toHaveBeenCalledTimes(1);
     expect(x.destroyKey).toHaveBeenCalledWith(K1);
     expect(x.destroyedKeys()).toEqual([K1]);
