@@ -60,8 +60,8 @@ spec="$(p -c "select product_spec_version
  where reading_id='12103100-0000-0000-0000-000000000001'::uuid
  and subject_id='$subject'::uuid;")"
 [[ -n "$spec" ]] || fail "original Official Reading product version missing"
-before="$(read_evidence "$intent" "$grant")
-[[ "$before" == 'verified|2|1|$spec' ]] ||
+before="$(read_evidence "$intent" "$grant")"
+[[ "$before" == "verified|2|1|$spec" ]] ||
  fail "real 2240/2250 pre-cancel proof incorrect: $before"
 [[ -z "$(read_evidence "$other_intent" "$grant")" ]] ||
  fail "S7 substituted another Purchase Intent"
@@ -125,7 +125,7 @@ after="$(read_evidence "$intent" "$grant")"
 [[ "$(s6_count "$subject")" == 0 ]] ||
   fail "S6 retained paid ciphertext access after verified B2 refund with B3 different bundle"
 echo 'PASS S6 denies post-refund re-read even while independent different-bundle B3 stays active'
-[[ "$after" == 'revoked|2|1|$spec' ]] ||
+[[ "$after" == "revoked|2|1|$spec" ]] ||
  fail "real S7 revoked-Receipt history lost/reclassified: $after"
 [[ -z "$(read_evidence "$other_intent" "$grant")" ]] ||
  fail "post-refund S7 used sibling Purchase Intent"
