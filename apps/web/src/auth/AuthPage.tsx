@@ -105,6 +105,7 @@ export function AuthPage() {
           <button className="auth-submit" id="auth-submit" type="submit" disabled={busy}>{submitLabel}</button>
           <p className={`auth-status${status.kind ? ` is-${status.kind}` : ''}`} id="auth-status" role="status" aria-live="polite">{status.message}</p>
         </form>
+        <p className="auth-footnote" data-legal-minor-paid-policy>유료 해설 구매는 만 19세 이상만 가능합니다. 현재 공개 결제는 제공하지 않습니다.</p>
         <p className="auth-footnote">인증 정보는 명하 서버가 Supabase Auth 경계로 전달하며, 제품 페이지는 서버가 검증한 회원 토큰으로 사용자 데이터를 요청합니다.</p>
       </section>
     </div>
