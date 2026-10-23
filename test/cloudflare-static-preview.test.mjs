@@ -221,6 +221,9 @@ describe('Cloudflare static-only deployment boundary', () => {
     const approvedAuth = {
       MYEONGHA_CLOUDFLARE_AUTH_DB_MODE: 'approved-auth-db-v1',
       MYEONGHA_CLOUDFLARE_AUTH_ORIGIN: origin,
+      MYEONGHA_CLOUDFLARE_DB_TLS_RLS_APPROVAL: 'approved-isolated-tls-rls-v1',
+      MYEONGHA_CLOUDFLARE_DB_APPROVED_HOST: 'db.synthetic.example.com',
+      MYEONGHA_CLOUDFLARE_DB_APPROVED_PORT: '5432',
     };
     expect(await tryHandleCloudflareApprovedSajuCalculationV1(request, {}, route)).toBeNull();
     expect(await tryHandleCloudflareApprovedSajuCalculationV1(request, approvedAuth, route)).toBeNull();
