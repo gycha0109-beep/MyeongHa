@@ -21,7 +21,15 @@ export function assertSeyeonProductionGovernorBoundaryV1(input: {
   >>> | undefined;
   readonly governorConfigured: boolean;
 }): void {
-  if (input.mode === undefined || input.mode === 'OFF') return;
+  if (input.mode === undefined || input.mode === 'OFF') {
+    // An injected Governor is active metering, not OFF compatibility.
+    // It would otherwise use the ordinary Subject DB runner because
+    // the separate Governed cost pool is only created in ENFORCE.
+    if (input.governorConfigured) {
+      throw new Error('OFF refuses an active cost Governor without ENFORCE cost DB authority.');
+    }
+    return;
+  }
   if (input.mode !== 'ENFORCE') {
     throw new Error('Unknown Se-yeon AI Governor mode.');
   }
