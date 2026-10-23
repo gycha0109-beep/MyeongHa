@@ -94,6 +94,60 @@ insert into public.commerce_payment_attempts(
   '2026-09-01T00:02:00Z','2026-09-01T00:02:00Z'
 );
 
+-- The same original Purchase Intent may have a second, independently
+-- allocated payment attempt. Notice acknowledgement must PRECEDE attempt 1,
+-- never borrow the later retry's timestamp as the original checkout boundary.
+insert into public.commerce_payment_attempts(
+  id,purchase_intent_id,subject_id,product_offer_id,attempt_no,
+  provider,environment,idempotency_key,provider_request_id,
+  status,created_at,updated_at
+) values (
+  'f7770000-0000-4000-8000-000000000002',
+  'f7760000-0000-4000-8000-000000000001',
+  'f7720000-0000-4000-8000-000000000001',
+  'f7750000-0000-4000-8000-000000000001',
+  2,'portone_v2','production','original-reader-attempt-2',
+  'test-only-portone-original-reader-attempt-2','created',
+  '2026-09-01T00:02:30Z','2026-09-01T00:02:30Z'
+);
+
+-- Distinct legitimate purchase by the SAME member for the SAME pinned
+-- product/capability. Two Grants must remain independent despite sharing
+-- Subject, offer, entitlement, scope and item_key.
+insert into public.purchase_intents(
+  id,subject_id,product_offer_id,idempotency_key,request_hash,
+  offer_snapshot_jsonb,offer_snapshot_hash,status,created_at,updated_at,
+  expected_amount_minor,expected_currency,charge_terms_version,
+  capability_set_id,capability_snapshot_jsonb,capability_snapshot_hash
+)
+select 'f7760000-0000-4000-8000-000000000002'::uuid,
+  subject_id,product_offer_id,'sibling-reader-unit-test',
+  'sha256:sibling-reader-unit-intent',
+  offer_snapshot_jsonb,offer_snapshot_hash,'created',
+  '2026-09-01T00:01:30Z'::timestamptz,
+  '2026-09-01T00:01:30Z'::timestamptz,
+  expected_amount_minor,expected_currency,charge_terms_version,
+  capability_set_id,capability_snapshot_jsonb,capability_snapshot_hash
+from public.purchase_intents
+where id='f7760000-0000-4000-8000-000000000001'::uuid;
+
+insert into public.commerce_payment_attempts(
+  id,purchase_intent_id,subject_id,product_offer_id,attempt_no,
+  provider,environment,idempotency_key,provider_request_id,
+  status,created_at,updated_at
+) values (
+  'f7770000-0000-4000-8000-000000000003',
+  'f7760000-0000-4000-8000-000000000002',
+  'f7720000-0000-4000-8000-000000000001',
+  'f7750000-0000-4000-8000-000000000001',
+  1,'portone_v2','production','sibling-reader-attempt-1',
+  'test-only-portone-sibling-reader-attempt','created',
+  '2026-09-01T00:02:45Z','2026-09-01T00:02:45Z'
+);
+update public.purchase_intents
+set status='verified',updated_at='2026-09-01T00:04:00Z'
+where id='f7760000-0000-4000-8000-000000000002';
+
 update public.purchase_intents
 set status='verified',updated_at='2026-09-01T00:04:00Z'
 where id='f7760000-0000-4000-8000-000000000001';
@@ -120,6 +174,34 @@ select * from public.internal_apply_entitlement_effect_v1(
   null,'original-reader-item',
   null,null,'granted','2026-09-01T00:03:00Z','active',
   '2026-09-01T00:03:00Z','2099-01-01T00:00:00Z',null
+);
+
+-- The sibling is verified independently. Neither Receipt nor Grant may
+-- be substituted for the original checkout notice or delivery evidence.
+insert into public.commerce_receipts(
+  id,subject_id,purchase_intent_id,product_offer_id,
+  platform,provider,external_transaction_id,receipt_fingerprint,
+  verification_status,verified_payload_jsonb,verified_at,created_at,
+  environment,verifier_revision,verified_amount_minor,verified_currency
+)
+select
+  'f7780000-0000-4000-8000-000000000002'::uuid,
+  subject_id,'f7760000-0000-4000-8000-000000000002'::uuid,
+  product_offer_id,platform,provider,
+  'test-only-portone-sibling-reader-transaction',
+  'hmac-sha256:k1:9015000000000000000000000000000000000000000000000000000000000002',
+  'verified',verified_payload_jsonb,
+  '2026-09-01T00:03:30Z'::timestamptz,
+  '2026-09-01T00:03:30Z'::timestamptz,
+  environment,verifier_revision,verified_amount_minor,verified_currency
+from public.commerce_receipts
+where id='f7780000-0000-4000-8000-000000000001'::uuid;
+
+select * from public.internal_apply_entitlement_effect_v1(
+  'receipt','f7780000-0000-4000-8000-000000000002'::uuid,
+  null,'original-reader-item',
+  null,null,'granted','2026-09-01T00:03:30Z','active',
+  '2026-09-01T00:03:30Z','2099-01-01T00:00:00Z',null
 );
 
 do $fixture_check$
