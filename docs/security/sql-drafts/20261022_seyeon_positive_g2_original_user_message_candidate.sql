@@ -79,7 +79,12 @@ begin
       where reg.record_kind='memory' and reg.enabled
         and reg.record_type=v_positive ->> 'recordType'
         and reg.schema_version=v_positive ->> 'recordSchemaVersion'
-        and reg.projector_version=v_positive ->> 'projectorVersion';
+        and reg.projector_version=v_positive ->> 'projectorVersion'
+      -- This is a CURRENT permission, not a former approval snapshot.
+      -- Hold the enabled type contract under a row SHARE lock across
+      -- the same actual v2 assistant+Outbox Commit transaction. Disabling
+      -- inference after G1 must not race past a stale G2 registry read.
+      for share of reg;
       if not found then
         raise exception using errcode='23514',
           constraint='seyeon_positive_g2_type_unregistered',
