@@ -1,3 +1,5 @@
+import { awaitBoundedUpstreamJsonResponseHeadersV1 } from './upstream-json-response-resource.js';
+
 export const SUPABASE_AUTH_UPSTREAM_DEFAULT_TIMEOUT_MS_V1 = 5_000 as const;
 export const SUPABASE_AUTH_UPSTREAM_MAX_TIMEOUT_MS_V1 = 30_000 as const;
 
@@ -52,10 +54,16 @@ export async function fetchSupabaseAuthWithDeadlineV1(
   };
 
   try {
-    const response = await fetchImpl(input, {
-      ...init,
-      signal: controller.signal,
-    });
+    // AbortSignal alone cannot bound a Fetch implementation that ignores
+    // cancellation. The shared header race rejects at the real deadline
+    // and discards a response arriving after its authorization window.
+    const response = await awaitBoundedUpstreamJsonResponseHeadersV1(
+      fetchImpl(input, {
+        ...init,
+        signal: controller.signal,
+      }),
+      controller.signal,
+    );
     return Object.freeze({
       response,
       signal: controller.signal,
