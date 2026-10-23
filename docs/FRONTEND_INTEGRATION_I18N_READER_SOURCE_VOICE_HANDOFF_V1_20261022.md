@@ -244,6 +244,13 @@
 - `test/i18n-en-us-zh-cn-planned-archive-shell-v1.test.ts`는 EN/ZH-CN 고정 라벨·Reader 수 표시·오류·원문 불변·HOLD 및 기존 실행 화면 미연결을 확인한다.
 - 다음 I18N-07 부분 수용 단계는 화면별 영어·간체 고정 UI 키의 누락 및 접근성/상태 보존 테스트를 완료한 뒤 웹/모바일/API 사용자 명시 선택을 함께 활성화하는 것이다. 생성형 Reader 및 공식 Saju/Face 출력, 저장 공식 풀이 재언어화 정책 ②는 여전히 source/owner 승인 전 HOLD다.
 
+### 7.16 I18N-07 / EN-UI-B·CN-UI-B — Reader 선택기와 사주 프리뷰 상태 문구 준비
+
+- `apps/mobile/src/features/reading/mobile-planned-reader-picker-ui-v1.ts`에 신규 영어·중국어 간체의 **Reader 선택 UI 저자 문구 12개씩**을 작성했다. 현재 Reader 표시·프리뷰 선택(세연만 허용)·Face/Saju 준비 화면·원문 보존 안내·구매 및 공식 Reading 접근 권한 경계를 보존한다. 캐릭터 이름의 별도 현지어 표기가 미승인 상태이므로 새로운 영어/간체 이름을 확정하지 않는다.
+- `apps/mobile/src/features/saju/mobile-planned-saju-preview-ui-v1.ts`에는 신규 두 언어의 **사주 프리뷰 UI 표제·진행·4종 근거 부족/불가·4종 오류 분류·보호된 일반 실패를 포함한 21개 항목**을 별도 작성했다. 정상/비정상 `responseState` 및 API 오류는 정확한 기존 코드에만 매핑하고, 알 수 없는 오류 문자열/사적 문장은 일반 UI 실패로 닫는다. 명식 산출값이나 `step.title`/`step.primary`/`step.structure`/`step.supporting`/`notice`를 번역하지 않는다.
+- `test/i18n-en-us-zh-cn-planned-reader-picker-saju-ui-v1.test.ts`는 기존 Picker 필드 전수 동등, 신규 두 로케일 문구 한글 잔존 방지, source/권한 분리, 서버 미지원/오류 보호 fallback, 실제 Picker/Saju 코드가 신규 준비 사전을 아직 import하지 않는 점을 검사한다.
+- 현재 **지원된 실제 UI 3개(`ko-KR`/`ja-JP`/`zh-TW`)는 변경 없음**, `en-US`/`zh-CN`는 미활성 후보 상태다. UI 준비 자산의 추가 = 해당 언어의 Reader 발화/공식 풀이/구매/릴리스 승인 아님. 다음은 EN/CN-UI-B 각 화면별 저자 문구 완전성 및 접근성 수용을 마친 뒤 EN/CN-UI-A/C 요청·저장·재실행 계약을 활성화하는 것이다.
+
 ## 8. 다음 구현 작업 및 승인 위치
 
 1. **캐릭터 설계 owner:** 위 6명 차이를 실제 Bible/typed Runtime 간에 해결하고 authoritative source/version을 확정. 이 I18N 트랙은 제안·인계만, 원본 수정 금지.
