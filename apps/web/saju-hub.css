@@ -439,3 +439,11 @@ html[data-theme="dark"] .saju-preview-entry p { color: #d6c3ca; }
   .saju-preview-entry { flex-direction: column; align-items: stretch; padding: 18px; }
   .saju-preview-open { width: 100%; }
 }
+
+.saju-calculation-retry {
+  display: block; min-height: 44px; margin: 12px 0 20px; padding: 10px 23px;
+  border: 1px solid #b56c86; border-radius: 999px;
+  color: #fff; background: #873f61; font-weight: 700; cursor: pointer;
+}
+.saju-calculation-retry[hidden] { display: none; }
+.saju-calculation-retry:focus-visible { outline: 3px solid #ae6685; outline-offset: 3px; }
