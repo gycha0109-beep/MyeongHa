@@ -1,0 +1,13 @@
+{
+  // CI-only Cloudflare Worker Preview of the MyeongHa static web output.
+  // The canonical production web deployment remains governed by vercel.json.
+  // This is a static-assets Worker: no private Reader API, secrets, or DB bindings.
+  "name": "myeongha",
+  "compatibility_date": "2026-10-23",
+  "assets": {
+    "directory": "./public"
+  },
+  // Required by the Cloudflare Builds 'npx wrangler preview' command.
+  // Never substitute 'wrangler deploy' on a pending DB Owner branch.
+  "previews": {}
+}

@@ -190,6 +190,14 @@ export async function commitPrivateOfficialReaderPaidAnswerV1(input: {
           return unavailable();
         }
         assertCurrentScope(original, current.scope);
+        // Birth Profile revision is a DB-owned source fact, not a browser
+        // scope field. A new revision must never reuse a previous signed
+        // Preview/source-unit ticket even if Reading and response IDs match.
+        const originalBirthRevision=staged.originalAdmission.source.sourceBirthRevisionId;
+        const currentBirthRevision=current.source.sourceBirthRevisionId;
+        if (typeof originalBirthRevision!=='string'
+            || originalBirthRevision.trim().length===0
+            || originalBirthRevision!==currentBirthRevision) return unavailable();
         // Preserve Commerce refund as the authority. This locks the
         // exact official Reader scope with S1 and rechecks a currently
         // verified production Receipt for the pinned Bundle, before any

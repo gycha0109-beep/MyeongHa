@@ -191,7 +191,7 @@ function validateFence(
       || fence.readerCharacterId!==claim.readerCharacterId
       || !UUID.test(fence.fenceId)
       || !Array.isArray(fence.bodyIds) || !Array.isArray(fence.keyRefs)
-      || fence.bodyIds.length===0
+      || fence.bodyIds.length===0 || fence.bodyIds.length>50000
       || fence.bodyIds.length!==fence.keyRefs.length) return fail();
   // On DB-erased replay, a corrupt ledger must never supply arbitrary key
   // references to an irreversible destruction port.
