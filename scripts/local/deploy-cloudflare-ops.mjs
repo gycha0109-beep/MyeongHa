@@ -3,7 +3,7 @@
 // workers.dev routing and preserve production secrets.
 // Watchtower-Track: ops
 import { readFile } from 'node:fs/promises';
-import { spawn } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import { resolve } from 'node:path';
 
 const WORKER = 'myeongha';
@@ -32,7 +32,7 @@ async function assertDeployOwnership() {
      !config.assets.run_worker_first.includes('/api/*')) {
     throw Error('Unsafe Cloudflare worker config: exact Ops Worker and workers_dev=true required');
   }
-  const branch=await command('git',['branch','--show-current']);
+  const branch=execFileSync('git',['branch','--show-current'],{encoding:'utf8'}).trim();
   if(branch!==APPROVED_BRANCH) {
     throw Error('Refusing to publish shared myeongha Worker from non-Ops branch');
   }
