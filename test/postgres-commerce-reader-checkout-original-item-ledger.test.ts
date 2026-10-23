@@ -2,7 +2,12 @@ import { afterAll, describe, expect, it } from 'vitest';
 import { Pool } from 'pg';
 import {
   ORIGINAL_CHECKOUT_UNIT_SQL_V1,
+  createCommerceReaderPostgresCheckoutNoticeAuthorityV1,
 } from '../apps/api/src/commerce-reader-postgres-checkout-notice-authority-v1.js';
+import type {
+  PostgresSubjectExecutionScopeV1,
+  PostgresTransactionQueryV1,
+} from '../apps/api/src/postgres-subject-execution.js';
 
 /**
  * Actual migrated PostgreSQL relational test, NOT a simulated S7
@@ -27,7 +32,8 @@ const cteEnd = ORIGINAL_CHECKOUT_UNIT_SQL_V1.indexOf('\nselect\n  intent.id::tex
 if (cteEnd < 0) throw new Error('Original Commerce Checkout ledger query shape changed.');
 
 const relationalSql = `with authorized_original as materialized (
-  select $2::uuid as purchase_intent_id, $3::uuid as unit_id
+  select $2::uuid as purchase_intent_id, $3::uuid as unit_id,
+         '2026-09-01T00:05:00Z'::timestamptz as s5_committed_at
   where $4::uuid = '${BODY}'::uuid
 )` + ORIGINAL_CHECKOUT_UNIT_SQL_V1.slice(cteEnd);
 
@@ -59,6 +65,7 @@ describe.runIf(enabled)('S7 actual PG original Receipt -> Grant -> pinned Checko
       originatingGrantId: string;
       pinnedCapabilityItemKey: string;
       originalPaymentAttemptCreatedAt: string;
+      s5CommittedAt: string;
     }>(relationalSql, [subject, purchase, grant, body]);
     return result.rows;
   }
@@ -74,6 +81,8 @@ describe.runIf(enabled)('S7 actual PG original Receipt -> Grant -> pinned Checko
     });
     expect(Date.parse(rows[0]!.originalPaymentAttemptCreatedAt))
       .toBe(Date.parse('2026-09-01T00:02:00Z'));
+    expect(Date.parse(rows[0]!.s5CommittedAt))
+      .toBe(Date.parse('2026-09-01T00:05:00Z'));
     const count = await pg.query<{ count: string }>(
       'select count(*)::text as count from public.commerce_payment_attempts where purchase_intent_id=$1::uuid',
       [PURCHASE],
@@ -88,6 +97,57 @@ describe.runIf(enabled)('S7 actual PG original Receipt -> Grant -> pinned Checko
     expect(await read(SUBJECT, PURCHASE, DIFFERENT)).toEqual([]);
     expect(await read(SUBJECT, PURCHASE, grant, DIFFERENT)).toEqual([]);
     expect(await read(SUBJECT, PURCHASE, grant)).toHaveLength(1);
+  });
+
+  it('does NOT bypass the real S7 protected-body/S1 gate when no paid answer was committed', async () => {
+    const grant=await originalGrant();
+    const session=await pg.connect();
+    try {
+      await session.query('begin isolation level read committed');
+      await session.query("select pg_catalog.set_config('myeongha.subject_id',$1,true)",[SUBJECT]);
+
+      // Unlike relationalSql (which isolates ONLY real Commerce joins),
+      // this runs Production's unchanged S7 gate against actual migrated DB.
+      const source=await session.query(
+        'select * from public.internal_qry_official_reader_withdrawal_delivery_state_v2($1::uuid,$2::uuid,$3::uuid,$4::uuid)',
+        [SUBJECT,PURCHASE,grant,BODY],
+      );
+      expect(source.rows).toEqual([]);
+
+      // Even an injected test-only Checkout store must never be consulted
+      // when the real protected S5 body/original delivery authorization is absent.
+      let storeCalls=0;
+      const scope={
+        resolvedSubject:{subjectId:SUBJECT,subjectKind:'member'},
+        client:{
+          query:async <Row=Record<string,unknown>>(sql:string,args:readonly unknown[]=[])=>({
+            rows:(await session.query(sql,[...args])).rows as Row[],
+          }),
+        } as PostgresTransactionQueryV1,
+      } as PostgresSubjectExecutionScopeV1;
+      const authority=createCommerceReaderPostgresCheckoutNoticeAuthorityV1({
+        scope,bodyId:BODY,
+        immutableCheckoutNoticeStore:{
+          readOriginalNotice:async()=>{storeCalls+=1;return null;},
+        },
+      });
+      expect(await authority.readExactServerCheckoutNotice({
+        purchaseIntentId:PURCHASE,unitId:grant,productSpecVersion:'reader-reading-v1',
+      })).toBeNull();
+      expect(storeCalls).toBe(0);
+      await session.query('rollback');
+    } finally {
+      await session.query('rollback').catch(()=>undefined);
+      session.release();
+    }
+  });
+
+  it('requires the real trusted Subject context, not bare SQL or browser flags', async () => {
+    const grant=await originalGrant();
+    await expect(pg.query(
+      'select * from public.internal_qry_official_reader_withdrawal_delivery_state_v2($1::uuid,$2::uuid,$3::uuid,$4::uuid)',
+      [SUBJECT,PURCHASE,grant,BODY],
+    )).rejects.toMatchObject({ code:'28000' });
   });
 
   it('keeps payment attempts as prior provenance rather than post-payment invented notice', async () => {
