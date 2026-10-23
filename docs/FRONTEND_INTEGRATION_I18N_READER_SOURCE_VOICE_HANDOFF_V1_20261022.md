@@ -304,3 +304,9 @@
 - `scripts/i18n/planned-ui-mobile-screen-review-v1.mjs`에서 마이·사주·관상·기록·채팅 허브·출생정보 등록의 **6개 실제 TSX 화면**을 검토하고, **37개 화면별 고정 문자열**을 EN/CN 예정 사전의 source 키와 명시 연결했다. 모바일 사전과 웹 사전의 키/번역 parity를 독립 테스트로 유지한다.
 - `test/i18n-en-us-zh-cn-mobile-screen-review.test.ts`는 화면/키 누락·중복·사전 parity 및 `readyForRelease=false` 경계를 검증한다. 화면 파일에 정적 문자열이 존재한다는 사실은 **실제 EN/CN 렌더/접근성·전 화면 완료·고객 공개 승인**이 아니다.
 - 개인 메시지, 공식 Reading, 원시 계산·캐릭터 의미·구매/Grant를 읽거나 변경하지 않는다. EN/CN 실제 선택·API 헤더 허용과 화면별 런타임 검증은 아직 미완료.
+
+### 7.24 EN/CN-UI-B — 서비스 안내·보호 문구 및 화면 설명 62개 확장 (2026-10-23)
+
+- 기존 웹/모바일 고정 UI source catalog에서 명시 선별한 62개 한국어 저자 문구를 영어 `en-US` 및 간체 `zh-CN` 각각 작성하고 **웹·모바일 동일 464개 사전 키/번역**을 맞췄다. 범위는 홈·온보딩·계정·대화 탐색, 저장 기록·개인정보 안내, 사주 프리뷰 제공 범위·공식 기록 비저장 주의, 관상 브라우저 사진 미리보기·분석 미연결 고지이다.
+- 사주·관상 결과 원문, 사용자 개인 대화, 캐릭터 이름/발화, server-owned error/code, Birth factual source와 결제/권한은 수정하지 않는다. 두 신규 UI 언어는 **준비용 사전일 뿐 실제 선택/API 출력 언어로 활성화하지 않는다**.
+- `test/i18n-en-us-zh-cn-planned-copy-parity.test.ts`는 원문 보호 고지 대표 5개를 정확한 EN/CN 쌍으로 검증한다. 미완료 UI source 검토, 화면 렌더/접근성, 언어 전환/저장/헤더 계약은 EN/CN-UI-A/C 후속 단계다.

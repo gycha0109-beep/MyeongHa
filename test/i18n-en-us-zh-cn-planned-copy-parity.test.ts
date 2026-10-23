@@ -24,7 +24,7 @@ const source = (path: string) => readFile(new URL('../' + path, import.meta.url)
 
 describe('I18N-07 staged EN-US and ZH-CN authored UI copy', () => {
   it('authors both UI target variants for navigation, account, Saju input and chat read-state without missing parity', () => {
-    expect(PLANNED_STATIC_UI_COPY_V1.size).toBe(402);
+    expect(PLANNED_STATIC_UI_COPY_V1.size).toBe(464);
     expect([...PLANNED_MOBILE_STATIC_UI_COPY_V1]).toEqual([...PLANNED_STATIC_UI_COPY_V1]);
     for (const [ko, pair] of PLANNED_STATIC_UI_COPY_V1) {
       expect(ko.trim().length).toBeGreaterThan(0);
@@ -90,6 +90,34 @@ describe('I18N-07 staged EN-US and ZH-CN authored UI copy', () => {
     expect(normalizeUiLocale('en-US')).toBe('ko-KR');
     expect(normalizeMobileUiLocale('zh-CN')).toBe('ko-KR');
     expect(lookupPlannedStaticUiCopyV1('message.body', 'en-US')).toBeNull();
+  });
+
+  it('authors accurate EN/CN disclaimers for previews, account privacy and photo preparation', () => {
+    const reviewed = [
+      ['현재 월간 해석은 준비 중입니다. 검증된 전체 사주 프리뷰의 제공 상태를 상세 화면에서 확인할 수 있습니다.',
+       'Monthly readings are not yet available. Check the detailed screen for availability of the verified general Saju preview.',
+       '月度解读尚未开放。您可在详情页查看已验证的八字整体预览的提供状态。'],
+      ['이 프리뷰는 공식 풀이 기록에 저장되지 않습니다. 다른 사주 읽기는 사주 페이지에서 선택할 수 있습니다.',
+       'This preview is not saved as an official reading. Select other Saju readings on the Saju page.',
+       '此预览不会保存为正式解读记录。您可在八字页面选择其他解读。'],
+      ['현재 관상 화면은 브라우저에서 사진을 미리 확인하는 단계이며, 사진 분석 기능은 아직 연결되지 않았습니다.',
+       'The face-reading screen currently previews photos in your browser. Photo analysis is not yet connected.',
+       '目前面相页面仅支持在浏览器中预览照片，尚未接入照片分析功能。'],
+      ['캐릭터가 삭제된 후 남는 기억 범위는 서로 다를 수 있습니다.',
+       'The memories retained after a character is deleted may vary.',
+       '删除角色后保留的记忆范围可能有所不同。'],
+      ['현재 저장된 계정 정보를 조회하는 화면입니다. 프로필 변경 및 회원 탈퇴 요청은 검증된 서버 절차가 연결되기 전까지 이 화면에서 실행하지 않습니다.',
+       'This screen shows saved account information. Profile edits and account deletion requests are unavailable here until verified server procedures are connected.',
+       '此页面仅展示已保存的账户信息。在接入已验证的服务器流程前，无法在此修改资料或申请注销账户。'],
+    ] as const;
+    for (const [source, en, zh] of reviewed) {
+      expect(lookupPlannedStaticUiCopyV1(source, 'en-US')).toBe(en);
+      expect(lookupPlannedStaticUiCopyV1(source, 'zh-CN')).toBe(zh);
+      expect(lookupPlannedMobileStaticUiCopyV1(source, 'en-US')).toBe(en);
+      expect(lookupPlannedMobileStaticUiCopyV1(source, 'zh-CN')).toBe(zh);
+    }
+    expect(normalizeUiLocale('zh-CN')).toBe('ko-KR');
+    expect(normalizeMobileUiLocale('en-US')).toBe('ko-KR');
   });
 
   it('fails closed for unsupported input and for source, private messages or unknown copy', () => {
