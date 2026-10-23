@@ -1,5 +1,5 @@
 import {
-  constants, existsSync, lstatSync, openSync, closeSync,
+  constants, lstatSync, openSync, closeSync,
   readFileSync, fstatSync,
 } from 'node:fs';
 import {
@@ -168,7 +168,16 @@ export function createOfficialReaderNodeOffPrimaryPrivacyReadPortV1(
     const digest = createHmac('sha256', seal)
       .update(['account-subject-deny', subjectId].join('|'), 'utf8')
       .digest('hex');
-    return existsSync(join(root, 'account-subject-deny-' + digest + '.json'));
+    try {
+      lstatSync(join(root, 'account-subject-deny-' + digest + '.json'));
+      return true;
+    } catch (error) {
+      // existsSync maps BOTH ENOENT and inaccessible/misconfigured ledger
+      // mounts to false. Only an actual missing tombstone is a non-denial;
+      // EACCES, EIO and unexpected filesystem failures must block paid reads.
+      return !(error instanceof Error && 'code' in error
+        && error.code === 'ENOENT');
+    }
   }
 
   function currentCertificate(at: number) {

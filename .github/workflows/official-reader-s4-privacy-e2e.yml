@@ -11,6 +11,8 @@ on:
       - 'test/official-reader-s4-restore-reconciliation.e2e.test.ts'
       - 'apps/api/src/official-reader-private-restore-reconciliation-v1.ts'
       - 'apps/api/src/official-reader-private-restore-quarantine-state-v1.ts'
+      - 'apps/api/src/official-reader-node-offprimary-privacy-read-v1.ts'
+      - 'test/official-reader-s4-offprimary-privacy-read.e2e.test.ts'
       - 'test/official-reader-held-t1-t2-preflight-v1.test.ts'
       - 'apps/api/src/official-reader-s4-ordinary-context-isolation-v1.ts'
       - 'apps/api/src/official-reader-held-t1-t2-preflight-v1.ts'
@@ -27,6 +29,8 @@ on:
       - 'test/official-reader-s4-restore-reconciliation.e2e.test.ts'
       - 'apps/api/src/official-reader-private-restore-reconciliation-v1.ts'
       - 'apps/api/src/official-reader-private-restore-quarantine-state-v1.ts'
+      - 'apps/api/src/official-reader-node-offprimary-privacy-read-v1.ts'
+      - 'test/official-reader-s4-offprimary-privacy-read.e2e.test.ts'
       - 'test/official-reader-held-t1-t2-preflight-v1.test.ts'
       - 'apps/api/src/official-reader-s4-ordinary-context-isolation-v1.ts'
       - 'apps/api/src/official-reader-held-t1-t2-preflight-v1.ts'
@@ -113,7 +117,8 @@ jobs:
             test/official-reader-held-t1-t2-preflight-v1.test.ts \
             test/official-reader-s4-privacy-context.e2e.test.ts \
             test/official-reader-s4-revocation-purge-retry.e2e.test.ts \
-            test/official-reader-s4-restore-reconciliation.e2e.test.ts
+            test/official-reader-s4-restore-reconciliation.e2e.test.ts \
+            test/official-reader-s4-offprimary-privacy-read.e2e.test.ts
 
       - name: Print non-identifying acceptance scope
         if: success()
@@ -126,6 +131,7 @@ jobs:
             echo '- Restored-derived quarantine: real 2230 SQL independently denies old-backup Memory Items, Memory Proposals, Life Facts and Chat Outbox in rollback-only disposable transactions.'
             echo '- Purge worker: exact S1/DB erasure before key destruction, failure without premature ACK, DB-erased retry without duplicate deletion, sibling-right deferral.'
             echo '- Restore runner: durable exact manifests, rollback-only multi-fence preflight, derived-data quarantine, recheck and idempotent key replay; paid service remains OFF.'
+            echo '- Off-primary paid-read authority: signed restore certificate, immediate Subject tombstone revocation and inaccessible ledger fail-closed.'
             echo '- Reader context: exact safe SYSTEM marker excluded before model input; ordinary user prose preserved; revoked T2 never reveals paid text.'
             echo '- **Not proved:** production personal-data deletion within 24h, P30D real backup/PITR, actual off-primary ledger/KMS durability, external AI/log sinks, or final legal sign-off.'
             echo '- Status: Privacy #2318 OPEN; paid/public OFF; no production database, vendor, or storage changes.'
