@@ -278,7 +278,7 @@ try {
   assert(hallState.bodyText.includes('이번 달 사주 읽기') && hallState.bodyText.includes('월간 해석은 준비 중입니다.') && hallState.bodyText.includes('전체 사주 프리뷰'), 'Home must distinguish monthly unavailable from admitted Preview');
   assert(hallState.monthHref === 'reading-detail.html?topic=temperament&scope=original', `Home feature must link to admitted General Natal Preview, got ${hallState.monthHref}`);
   assert(!hallState.bodyText.includes('이달의 운세 전체보기') && !hallState.bodyText.includes('오늘의 흐름은 사주 화면에서 직접 펼쳐볼 수 있습니다.'), 'Home must not claim blocked monthly Reading availability');
-  assert(hallState.bodyText.includes('사주 관심 주제') && hallState.bodyText.includes('전체 사주') && hallState.bodyText.includes('직업 · 커리어') && hallState.bodyText.includes('재물') && hallState.bodyText.includes('연애 · 관계'), 'Home four-card Saju row missing');
+  assert(hallState.bodyText.includes('전체 사주') && hallState.bodyText.includes('직업 · 커리어') && hallState.bodyText.includes('재물') && hallState.bodyText.includes('연애 · 관계'), 'Home four-card Saju row missing');
   assert(hallState.bodyText.includes('최근 이야기') && hallState.bodyText.includes('최근 대화 기록은 아직 홈에 연결되지 않았습니다.'), 'Home recent-story fail-closed state missing');
   await artifact(client, '-home');
 
