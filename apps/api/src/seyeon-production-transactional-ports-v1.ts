@@ -11,6 +11,10 @@ import {
   createPostgresSeyeonProductionChatPersistencePortV1,
 } from './postgres-seyeon-production-chat-execution-v1.js';
 import {
+  createSeyeonPositiveS0OwnerDbPortsV1,
+  type SeyeonPositiveS0OwnerDbPortsV1,
+} from './postgres-seyeon-positive-memory-source-runtime-v1.js';
+import {
   createPostgresSeyeonProductionContextReadAuthorityPortV1,
 } from './postgres-seyeon-production-context-read-v1.js';
 import {
@@ -48,6 +52,8 @@ export interface SeyeonProductionTransactionalPortsV1 {
   readonly threadBinding: ChatThreadRuntimeBindingReadAuthorityPortV1;
   readonly bundleManifest: ContentBundleManifestReadAuthorityPortV1;
   readonly chatPersistence: SeyeonProductionChatPersistencePortV1;
+  /** G1/G2 DB Owner ports, not a model or HTTP Reveal capability. */
+  readonly positivePersonalSource: SeyeonPositiveS0OwnerDbPortsV1;
   readonly relationshipRead: SeyeonProductionRelationshipReadAuthorityPortV1;
   readonly contextRead: SeyeonProductionContextReadAuthorityPortV1;
   readonly postTurnAnalysis: SeyeonPostTurnAnalysisOutboxPortV1;
@@ -149,6 +155,26 @@ export function createSeyeonProductionTransactionalPortsV1(input: {
       },
     });
 
+  // Source Authority never comes from HTTP/LLM. The existing verified
+  // Subject Runner binds both G1 and G2 commands to the same Member scope.
+  const positivePersonalSource: SeyeonPositiveS0OwnerDbPortsV1 =
+    Object.freeze({
+      pinBeforeModel(request: Parameters<SeyeonPositiveS0OwnerDbPortsV1['pinBeforeModel']>[0]) {
+        requireSubject(subjectId, request.subjectId);
+        return runner.run(subjectId, (client) =>
+          createSeyeonPositiveS0OwnerDbPortsV1(client)
+            .pinBeforeModel(request),
+        );
+      },
+      commitAfterValidation(request: Parameters<SeyeonPositiveS0OwnerDbPortsV1['commitAfterValidation']>[0]) {
+        requireSubject(subjectId, request.subjectId);
+        return runner.run(subjectId, (client) =>
+          createSeyeonPositiveS0OwnerDbPortsV1(client)
+            .commitAfterValidation(request),
+        );
+      },
+    });
+
   const relationshipRead: SeyeonProductionRelationshipReadAuthorityPortV1 =
     Object.freeze({
       readCurrent(request: Parameters<SeyeonProductionRelationshipReadAuthorityPortV1['readCurrent']>[0]) {
@@ -246,6 +272,7 @@ export function createSeyeonProductionTransactionalPortsV1(input: {
     threadBinding,
     bundleManifest,
     chatPersistence,
+    positivePersonalSource,
     relationshipRead,
     contextRead,
     postTurnAnalysis,

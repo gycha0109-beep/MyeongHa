@@ -9,6 +9,7 @@ on:
       - main
     paths:
       - '.github/ops/postgres-restore-seyeon-20261008090417.once'
+      - '.github/ops/postgres-restore-backup-39067271230-20261018.once'
   workflow_dispatch:
     inputs:
       backup_run_id:
@@ -45,7 +46,7 @@ concurrency:
 jobs:
   restore-drill:
     name: isolated-supabase-postgres-17-restore
-    if: "${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && startsWith(github.event.head_commit.message, 'ops(dr): one-shot restore backup 38088591661')) }}"
+    if: "${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && (startsWith(github.event.head_commit.message, 'ops(dr): one-shot restore backup 38088591661') || startsWith(github.event.head_commit.message, 'ops(dr): one-shot restore backup 39067271230'))) }}"
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     environment: production
@@ -87,14 +88,28 @@ jobs:
           [[ "$GITHUB_REF" == 'refs/heads/main' ]]
           [[ "$(git rev-parse HEAD)" == "$GITHUB_SHA" ]]
           [[ -z "$(git status --porcelain)" ]]
-          [[ "$(git show -s --format=%s HEAD)" == 'ops(dr): one-shot restore backup 38088591661 (#1947)' ]]
-          [[ "$(cat .github/ops/postgres-restore-seyeon-20261008090417.once)" == 'POSTGRES-RESTORE-SEYEON-20261008090417-V1' ]]
-          point="$(date -u -d '2026-10-10T21:44:36Z' +%s)"
-          now="$(date -u +%s)"
-          (( now >= point && now - point <= 14400 ))
-          echo 'backup_run_id=38088591661' >> "$GITHUB_OUTPUT"
-          echo 'incident_reference_utc=2026-10-10T21:44:36Z' >> "$GITHUB_OUTPUT"
-          echo 'SCOPED_RESTORE_PROOF_ONLY: backup 38088591661; never Production SQL'
+          subject="$(git show -s --format=%s HEAD)"
+          if [[ "$subject" == 'ops(dr): one-shot restore backup 39067271230' ]]; then
+            # Owner-approved read-only recovery drill; only the exact reviewed main
+            # squash commit and marker are admitted, and permission self-expires.
+            [[ "$(cat .github/ops/postgres-restore-backup-39067271230-20261018.once)" == 'POSTGRES-RESTORE-BACKUP-39067271230-20261018-V1' ]]
+            point="$(date -u -d '2026-10-18T08:00:00Z' +%s)"
+            now="$(date -u +%s)"
+            (( now >= point && now - point <= 14400 ))
+            echo 'backup_run_id=39067271230' >> "$GITHUB_OUTPUT"
+            echo 'incident_reference_utc=2026-10-18T08:00:00Z' >> "$GITHUB_OUTPUT"
+            echo 'SCOPED_RESTORE_PROOF_ONLY: backup 39067271230; no Production SQL or privacy canary'
+          else
+            # Historical one-shot path, retained only for evidence; expired.
+            [[ "$subject" == 'ops(dr): one-shot restore backup 38088591661 (#1947)' ]]
+            [[ "$(cat .github/ops/postgres-restore-seyeon-20261008090417.once)" == 'POSTGRES-RESTORE-SEYEON-20261008090417-V1' ]]
+            point="$(date -u -d '2026-10-10T21:44:36Z' +%s)"
+            now="$(date -u +%s)"
+            (( now >= point && now - point <= 14400 ))
+            echo 'backup_run_id=38088591661' >> "$GITHUB_OUTPUT"
+            echo 'incident_reference_utc=2026-10-10T21:44:36Z' >> "$GITHUB_OUTPUT"
+            echo 'SCOPED_RESTORE_PROOF_ONLY: backup 38088591661; never Production SQL'
+          fi
 
       - name: Validate drill input and source backup authority
         id: source
@@ -210,6 +225,8 @@ jobs:
         run: |
           set -euo pipefail
           jq -er '"backup_migration_frontier=\(.backup_migration_frontier)"' "$RESTORE_EVIDENCE_PATH"
+          jq -er '"seyeon_early_history_restore_proof=\(.seyeon_early_history_restore_proof)"' "$RESTORE_EVIDENCE_PATH"
+          jq -er '"seyeon_early_functions_restore_proof=\(.seyeon_early_functions_restore_proof)"' "$RESTORE_EVIDENCE_PATH"
           jq -er '"member_auth_rate_limit_schema_restore=\(.member_auth_rate_limit_schema_restore)"' "$RESTORE_EVIDENCE_PATH"
           jq -er '"member_auth_rate_limit_unlogged=\(.member_auth_rate_limit_unlogged)"' "$RESTORE_EVIDENCE_PATH"
           jq -er '"member_auth_rate_limit_ephemeral_data_restore=\(.member_auth_rate_limit_ephemeral_data_restore)"' "$RESTORE_EVIDENCE_PATH"

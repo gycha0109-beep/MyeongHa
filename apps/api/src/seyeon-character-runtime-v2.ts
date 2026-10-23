@@ -36,6 +36,10 @@ import {
   type CharacterGovernedPreflightResultV1,
 } from './character-governed-preflight-v1.js';
 import type {
+  CharacterDisclosurePreflightResultV2,
+  CharacterDisclosureTopicClassificationV2,
+} from './character-disclosure-preflight-v2.js';
+import type {
   CharacterIntegrityAuthorityResolverPortV1,
   CharacterIntegrityClaimClassifierPortV1,
 } from './character-integrity-preflight-v1.js';
@@ -112,6 +116,23 @@ export type SeyeonExperimentalRelationshipSemanticsPortV2 =
   SeyeonRelationshipSemanticsPortV2;
 
 export interface RunSeyeonCharacterTurnV2Input {
+  readonly assertBeforePrivateSourceDescriptorRead?: (
+    classification: CharacterDisclosureTopicClassificationV2,
+  ) => unknown;
+  readonly assertBeforePrivateSourceRetrieval?: (
+    preflight: CharacterDisclosurePreflightResultV2,
+  ) => unknown;
+  /** Production may require a new source-census check after Preflight retrieval. */
+  readonly assertGovernedPreflightSourceClosure?: (
+    preflight: CharacterGovernedPreflightResultV1,
+  ) => unknown;
+  /** Last model-input source seal after Preflight and canonical Context assembly.
+   * Failure aborts BEFORE Interpreter, Renderer and Semantic Reviewer.
+   * Provider/HTTP permission is still separately governed.
+   */
+  readonly assertBeforeModelContext?: (
+    context: SeyeonRuntimeContextV2,
+  ) => unknown | Promise<unknown>;
   readonly userMessageRef: string;
   readonly userText: string;
   readonly contextInput: Omit<
@@ -564,6 +585,12 @@ export async function runSeyeonCharacterTurnV2(
       relationship: input.governance.relationship,
       integrity: input.governance.integrity,
       disclosure: input.governance.disclosure,
+      ...(input.assertBeforePrivateSourceDescriptorRead === undefined
+        ? {}
+        : { beforeSourceDescriptorRead: input.assertBeforePrivateSourceDescriptorRead }),
+      ...(input.assertBeforePrivateSourceRetrieval === undefined
+        ? {}
+        : { beforePrivateSourceRetrieval: input.assertBeforePrivateSourceRetrieval }),
     });
   } catch (error) {
     throw new SeyeonCharacterRuntimeErrorV2(
@@ -571,6 +598,13 @@ export async function runSeyeonCharacterTurnV2(
       error instanceof Error ? error.message : 'Se-yeon governed preflight failed.',
       error,
     );
+  }
+
+  // Preflight may introduce private sources AFTER an earlier model-input Pin.
+  // Production supplies a fail-closed callback; no further model stage or
+  // relationship/context assembly may run before its verdict succeeds.
+  if (input.assertGovernedPreflightSourceClosure !== undefined) {
+    await input.assertGovernedPreflightSourceClosure(governedPreflight);
   }
 
   let relationshipSemantics: SeyeonRelationshipRuntimeSemanticsV2 | null = null;
@@ -618,6 +652,14 @@ export async function runSeyeonCharacterTurnV2(
       error instanceof Error ? error.message : 'Se-yeon context assembly failed.',
       error,
     );
+  }
+
+  // The pre-Prefight G1 Pin seals the input candidates; the final
+  // assembled prompt MUST still carry exactly that DB-authorized source set.
+  // The Production callback checks the assembled model context, not merely
+  // the input supplied to the assembler. A failed seal cannot reach Provider.
+  if (input.assertBeforeModelContext !== undefined) {
+    await input.assertBeforeModelContext(context);
   }
 
   const rawInterpretation = await generate(

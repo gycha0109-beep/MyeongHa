@@ -7,6 +7,7 @@ import { useCallback, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
+  RefreshControl,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -23,6 +24,9 @@ import {
   readingTitleV1,
 } from '@/features/records/records-view-model';
 import { mobileColors } from '@/ui/mobile-colors';
+import { MobileUiText } from '@/ui/MobileUiText';
+import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
+import { useMobilePullRefreshV1 } from '@/ui/use-mobile-pull-refresh';
 
 type DetailStateV1 =
   | Readonly<{ kind: 'loading' }>
@@ -74,6 +78,7 @@ function errorState(error: unknown): Extract<DetailStateV1, { kind: 'error' }> {
 }
 
 export default function OfficialReadingDetailScreen() {
+  const styles = useMobileThemedStyles(staticStyles);
   const params = useLocalSearchParams<{ readingId?: string | string[] }>();
   const readingId = typeof params.readingId === 'string' ? params.readingId : '';
   const [state, setState] = useState<DetailStateV1>({ kind: 'loading' });
@@ -94,6 +99,8 @@ export default function OfficialReadingDetailScreen() {
       }
     }
   }, [readingId]);
+
+  const { refreshing, onRefresh } = useMobilePullRefreshV1(load);
 
   useFocusEffect(useCallback(() => {
     focused.current = true;
@@ -116,19 +123,28 @@ export default function OfficialReadingDetailScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView contentContainerStyle={styles.content}
+        refreshControl={(
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => void onRefresh()}
+            tintColor={mobileColors.navy}
+            colors={[mobileColors.navy]}
+          />
+        )}
+      >
         <Pressable
           accessibilityRole="button"
           onPress={() => router.back()}
           style={styles.backButton}
         >
-          <Text style={styles.backText}>← 기록으로 돌아가기</Text>
+          <MobileUiText style={styles.backText}>← 기록으로 돌아가기</MobileUiText>
         </Pressable>
 
         {state.kind === 'loading' ? (
           <View style={styles.stateCard}>
             <ActivityIndicator color={mobileColors.navy} />
-            <Text style={styles.muted}>저장된 공식 풀이를 불러오는 중입니다…</Text>
+            <MobileUiText style={styles.muted}>저장된 공식 풀이를 불러오는 중입니다…</MobileUiText>
           </View>
         ) : null}
 
@@ -141,7 +157,7 @@ export default function OfficialReadingDetailScreen() {
                 onPress={() => void load()}
                 style={styles.retryButton}
               >
-                <Text style={styles.retryText}>다시 시도</Text>
+                <MobileUiText style={styles.retryText}>다시 시도</MobileUiText>
               </Pressable>
             ) : null}
           </View>
@@ -155,27 +171,27 @@ export default function OfficialReadingDetailScreen() {
               <Text style={styles.meta}>
                 {formatRecordDateV1(state.record.completedAt)} · {readingReaderLabelV1(state.record.readerCharacterIds)}
               </Text>
-              <Text style={styles.authority}>
+              <MobileUiText style={styles.authority}>
                 기록 · 당시 저장된 공식 사주 풀이를 그대로 다시 읽고 있습니다.
-              </Text>
+              </MobileUiText>
             </View>
 
             <View style={styles.readerCard}>
-              <Text style={styles.readerCardTitle}>이 공식 Reading과 Reader</Text>
+              <MobileUiText style={styles.readerCardTitle}>이 공식 Reading과 Reader</MobileUiText>
               <Text style={styles.readerCardText}>
                 {state.record.readerCharacterIds.length > 0
                   ? `공식 기록에 연결된 Reader 정보: ${state.record.readerCharacterIds.length}명`
                   : '이 공식 기록에 연결된 Reader 정보가 없습니다.'}
               </Text>
-              <Text style={styles.readerCardText}>
+              <MobileUiText style={styles.readerCardText}>
                 Reader 연결 정보는 해설 구매·열람 권한 또는 해설 완료의 증명이 아닙니다.
                 Reader별 해설 다시 보기와 후속 대화는 별도의 서버 권한·기록 계약이 승인된 뒤 제공됩니다.
-              </Text>
+              </MobileUiText>
             </View>
 
             {state.record.display.notices.length > 0 ? (
               <View style={styles.noticeCard}>
-                <Text style={styles.noticeTitle}>읽기 범위 안내</Text>
+                <MobileUiText style={styles.noticeTitle}>읽기 범위 안내</MobileUiText>
                 {state.record.display.notices.map((notice, index) => (
                   <Text key={`${String(index)}:${notice}`} style={styles.noticeText}>
                     {notice}
@@ -192,7 +208,7 @@ export default function OfficialReadingDetailScreen() {
 
                 {step.structure.length > 0 ? (
                   <View style={styles.supportBlock}>
-                    <Text style={styles.supportTitle}>이 해석의 사주 근거</Text>
+                    <MobileUiText style={styles.supportTitle}>이 해석의 사주 근거</MobileUiText>
                     {step.structure.map((text, itemIndex) => (
                       <Text key={`structure:${String(itemIndex)}:${text}`} style={styles.supportText}>
                         {text}
@@ -203,7 +219,7 @@ export default function OfficialReadingDetailScreen() {
 
                 {step.supporting.length > 0 ? (
                   <View style={styles.supportBlock}>
-                    <Text style={styles.supportTitle}>함께 볼 포인트</Text>
+                    <MobileUiText style={styles.supportTitle}>함께 볼 포인트</MobileUiText>
                     {step.supporting.map((text, itemIndex) => (
                       <Text key={`support:${String(itemIndex)}:${text}`} style={styles.supportText}>
                         {text}
@@ -298,3 +314,4 @@ const styles = StyleSheet.create({
   supportTitle: { color: mobileColors.ink, fontSize: 13, fontWeight: '800' },
   supportText: { color: mobileColors.muted, fontSize: 13, lineHeight: 20 },
 });
+const staticStyles = styles;

@@ -38,7 +38,8 @@ export interface SeyeonAttemptZeroPersonalProofV1 {
 
 type Context = Pick<
   SeyeonProductionContextSnapshotV1,
-  'version' | 'retrievedMemories' | 'personalRecordAdmissions'
+  'version' | 'retrievedMemories' | 'personalRecordAdmissions' |
+  'personalRecordProjectionCandidates'
 >;
 
 function identity(value: unknown): value is string {
@@ -69,7 +70,10 @@ export function createSeyeonAttemptZeroPersonalProofV1(input: {
   if (c === null || typeof c !== 'object' ||
       c.version !== CONTEXT_VERSION ||
       !Array.isArray(c.retrievedMemories) ||
-      !Array.isArray(c.personalRecordAdmissions)) {
+      !Array.isArray(c.personalRecordAdmissions) ||
+      (c.personalRecordProjectionCandidates !== undefined &&
+       (!Array.isArray(c.personalRecordProjectionCandidates) ||
+        c.personalRecordProjectionCandidates.length !== 0))) {
     throw new SeyeonAttemptZeroPersonalProofHoldV1();
   }
 

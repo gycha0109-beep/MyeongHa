@@ -1,3 +1,4 @@
+import { getUiLocaleRequestHeadersV1 } from './ui-i18n.js';
 import { parseReadingHistoryPayloadV1, ReadingHistoryContractErrorV1 } from './reading-history-contract.js';
 import { unwrapApiSuccessEnvelope, WebApiEnvelopeError } from './api-envelope.js';
 import { assertBirthProfile } from './my-runtime-client.js';
@@ -91,6 +92,7 @@ async function readJson(fetchImpl, endpoint, bearer) {
       method: 'GET',
       headers: {
         Accept: 'application/json',
+        ...getUiLocaleRequestHeadersV1(),
         Authorization: `Bearer ${bearer.token}`,
       },
       credentials: 'same-origin',

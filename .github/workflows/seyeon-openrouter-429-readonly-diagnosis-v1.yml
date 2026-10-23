@@ -1,0 +1,52 @@
+name: '[WT:character-memory] OpenRouter 429 read-only account and provider diagnosis'
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/seyeon-openrouter-429-readonly.trigger'
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: seyeon-openrouter-429-readonly-lifetime-once
+  cancel-in-progress: false
+jobs:
+  audit:
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && github.run_attempt == 1 }}
+    runs-on: ubuntu-24.04
+    environment: production
+    timeout-minutes: 8
+    steps:
+      - name: Checkout immutable source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.sha }}
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Offline contract verification
+        run: |
+          set -euo pipefail
+          npm ci --ignore-scripts --no-audit --no-fund
+          npx vitest run test/seyeon-openrouter-429-readonly-v1.test.mjs
+      - name: Read account and model metadata only
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        run: |
+          set -euo pipefail
+          set +x
+          test -n "$OPENROUTER_API_KEY"
+          node scripts/seyeon-openrouter-429-readonly-v1.mjs
+      - name: Numeric-only evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: seyeon-openrouter-429-readonly-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/seyeon-openrouter-429-readonly/
+          if-no-files-found: warn
+          retention-days: 14

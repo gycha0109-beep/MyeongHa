@@ -1,3 +1,8 @@
+import {
+  readBoundedUpstreamJsonTextV1,
+  awaitBoundedUpstreamJsonResponseHeadersV1,
+  UpstreamJsonResponseTooLargeV1,
+} from './upstream-json-response-resource.js';
 import type { SeyeonStructuredProviderRequestV2 } from './seyeon-character-runtime-v2.js';
 import type { OpenAiSeyeonStructuredProviderFetchV1 } from './openai-seyeon-structured-provider-v1.js';
 import type { SeyeonAiGovernorAdmissionV1 } from './postgres-seyeon-ai-cost-ledger-v1.js';
@@ -31,6 +36,8 @@ export interface SeyeonOpenAiInputTokenCountConfigV1 {
 function isRecord(x: unknown): x is Record<string, unknown> {
   return typeof x === 'object' && x !== null && !Array.isArray(x);
 }
+
+export const SEYEON_OPENAI_INPUT_TOKEN_COUNT_MAX_RESPONSE_BYTES_V1 = 8192 as const;
 
 const BODY_FIELDS = new Set([
   'model','store','max_output_tokens','instructions','input','text',
@@ -112,7 +119,7 @@ export function createSeyeonOpenAiInputTokenCountAdmissionV1(
       let result: Response;
       try {
         try {
-          result = await send(SEYEON_OPENAI_INPUT_TOKEN_COUNT_ENDPOINT_V1,{
+          result = await awaitBoundedUpstreamJsonResponseHeadersV1(send(SEYEON_OPENAI_INPUT_TOKEN_COUNT_ENDPOINT_V1,{
             method:'POST',
             headers:{
               authorization:'Bearer '+config.apiKey,
@@ -122,23 +129,34 @@ export function createSeyeonOpenAiInputTokenCountAdmissionV1(
             body:countBody,
             signal:controller.signal,
             redirect:'error',
-          });
+          }),controller.signal);
         } catch {
           throw new Error('Input token count request failed or exceeded its deadline.');
         }
         if (!result.ok ||
-            !(result.headers.get('content-type') ?? '').toLowerCase()
-              .includes('application/json')) {
+            !/^application\/json(?:\s*;|$)/iu.test(
+              (result.headers.get('content-type') ?? '').trim()
+            )) {
+          try { void result.body?.cancel().catch(() => undefined); }
+          catch { /* A rejected response never authorizes a model request. */ }
           throw new Error('Input token count provider declined or returned unknown format.');
         }
         let bytes: string;
         try {
-          bytes = await result.text();
-        } catch {
+          // Bound memory while reading, not after Response.text() has already
+          // buffered an untrusted upstream body. Abort stalled streams.
+          bytes = await readBoundedUpstreamJsonTextV1(result, {
+            maximumBodyBytes: SEYEON_OPENAI_INPUT_TOKEN_COUNT_MAX_RESPONSE_BYTES_V1,
+            signal: controller.signal,
+          });
+        } catch (error) {
+          if (error instanceof UpstreamJsonResponseTooLargeV1) {
+            throw new Error('Input token count response was oversized.');
+          }
           throw new Error('Input token count response body failed or timed out.');
         }
-        if (new TextEncoder().encode(bytes).byteLength>8192) {
-          throw new Error('Input token count response was oversized.');
+        if (controller.signal.aborted) {
+          throw new Error('Input token count response body failed or timed out.');
         }
         let payload: unknown;
         try { payload=JSON.parse(bytes); }
@@ -153,6 +171,9 @@ export function createSeyeonOpenAiInputTokenCountAdmissionV1(
         if (!Number.isSafeInteger(resultUpperBound) ||
             resultUpperBound>policy.maximumInputTokens) {
           throw new Error('Input token count exceeds approved model budget.');
+        }
+        if (controller.signal.aborted) {
+          throw new Error('Input token count request failed or exceeded its deadline.');
         }
         return resultUpperBound;
 

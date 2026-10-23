@@ -55,13 +55,13 @@ jobs:
       - name: Build pinned runtime evaluator
         run: npm run build
 
-      - name: Compare the actual five-call and three-call paths
-        env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          SEYEON_DIALOGUE_PATH_EVIDENCE_PATH: ${{ runner.temp }}/seyeon-dialogue-path-real-api-v1/evidence.json
+      # Historical comparison only. The earlier route used a production key;
+      # NEVER revive this job to spend an evaluation budget. A separate,
+      # reviewed one-shot runner must own isolated keys and paid admission.
+      - name: Reject retired paid comparison (no secrets available)
         run: |
-          test -n "${OPENAI_API_KEY:-}"
-          node scripts/run-seyeon-dialogue-path-real-api-eval-v1.mjs
+          echo "SEYEON_LEGACY_EVAL_PAID_HOLD: use a separately reviewed evaluation-only workflow" >&2
+          exit 1
 
       - name: Retain synthetic IDs and numeric metrics only
         if: always()

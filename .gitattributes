@@ -1,0 +1,2 @@
+# Linux PostgreSQL CI case shell scripts must stay LF even under Windows core.autocrlf.
+test/db/*.sh text eol=lf

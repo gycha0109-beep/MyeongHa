@@ -33,11 +33,11 @@ Mobile now has:
 - owner-scoped Target Persons list in My plus source-authorized create-only registration for Target metadata + Target Birth revision 1;
 - Home projection composed from current Profile, Birth, latest Reading History, and calculation-only Saju evidence;
 - known-thread Chat read through `GET /api/chat/:threadId` with forward cursor pagination and redaction-safe rendering;
-- Member-only Chat open/reuse through `POST /api/chat` for the exact approved Launch 9 roster, with server-authoritative publication/availability and thread convergence;
+- Member-only Chat open/reuse through `POST /api/chat`, with six characters listed in the current mobile discovery UI. Server-recognized historical nine identity IDs, thread ownership, publication/availability, and concurrency convergence remain authoritative on the server;
 - Face Reading camera/library photo staging through Expo ImagePicker with image-only selection, 16MB client bound, local preview, and no server analysis;
 - source-authorized Expo Push Device Installation registration/refresh/rebind/revoke plumbing with SecureStore installation identity, user-initiated OS permission request, startup no-prompt sync, and account-switch fail-closed revoke;
 - activated EAS project identity `5c20243c-60a8-44f3-9d8c-ca06ccc8bebe` bound to `@johnny0109/myeongha-mobile` and EAS Production;
-- successful no-production-signing Android physical-smoke build (`2e5b3093-5f09-469a-a99d-38cc53e5f117`) using Node 24.14.0 and `:app:assembleDebug`;
+- historical no-production-signing `:app:assembleDebug` physical-smoke artifact (`2e5b3093-5f09-469a-a99d-38cc53e5f117`) only; that result does **not** prove offline standalone launch. The current EAS profile uses `:app:assembleRelease`, but fresh exact-main APK bytes and a Metro-free physical-device launch still require validation;
 - release-readiness preflight with iOS buildNumber / Android versionCode sequencing and fail-closed platform identity checks;
 - release-only API origin guard that requires the canonical Production origin and rejects staging/local overrides while preserving flexible development runtime configuration;
 - CI export smoke for both Android and iOS from the same Expo source, using isolated output directories after release preflight;
@@ -54,7 +54,7 @@ Still gated after M3-B / M11-A4:
 - production Character catalog/recommendation projection;
 - Face Reading engine intake / analysis upload. M7 does not treat `exif: false` as proof that selected file bytes are metadata-stripped;
 - Mobile iOS/Android transport is selected as Expo Push Notifications, but notification sending, attempt-provider provenance/resolution, retry/failover, and autonomous scheduling remain blocked by SRC-31 / SRC-32; M9-A only registers, refreshes, rebinds, and revokes the current device;
-- Push Production activation and the first Android physical-smoke build are complete; physical-device register/relaunch/logout/rebind evidence is still pending;
+- Push Production activation completed, but the historical Android debug build is not a standalone acceptance. User-reported `Unable to load script` on a stale debug APK is recorded; fresh main release APK verification and physical-device register/relaunch/logout/rebind evidence remain pending;
 - native store commerce;
 - signed store distribution still requires external Apple/Google developer-account and signing authority; production app identity is fixed to `com.myeongha.app` on both platforms.
 
@@ -84,3 +84,20 @@ npm run verify:mobile-release-readiness-contract
 ```
 
 That mode still fails on malformed release configuration and any non-canonical `EXPO_PUBLIC_MYEONGHA_API_ORIGIN`. The production app identity and activated EAS project identity are now fixed; store signing remains external.
+
+## 2026-10-15 Android field UX follow-up (PR candidate)
+
+- Chat discovery shows six bundled portrait-backed Characters (세연·여울·라현·태겸·윤호·백헌) before sign-in. 서린·미라·도윤 are not presented in the mobile launch menu; existing thread identities/data are preserved. Opening/sending Chat remains Member-only and server-owned.
+- The My authentication card is shown independently of Profile API fetch success. Existing-Member guest merge remains disabled.
+- Add Person and saved target lists are hidden from My until Compatibility entry UX is approved; Target Person APIs and data remain intact.
+- Face "사진 촬영" uses an in-app Expo CameraView front-facing selfie preview rather than an OEM system camera picker. Photos remain ephemeral and no Face upload/analysis is enabled.
+- Guest subjects can register their own Birth and calculate current Saju through Guest bearer authority. Paid Official Reader interpretation stays closed.
+- The My notification registration card is removed by product request. Internal already-authorized Push lifecycle/sync remains unchanged; first-entry opt-in and delivery scheduling are not activated by this change.
+- This candidate needs a new native APK and Android hardware validation; TypeScript/export tests alone cannot prove the default front camera or OS permissions.
+
+## 2026-10-15 launch menu and authentication evidence boundary
+
+- Web presentation assets were reused as immutable, locally bundled Android WebP portraits; the Yeoul SVG's embedded existing WebP data was extracted without inventing or regenerating artwork. Six binary files are required by the mobile portrait manifest.
+- Google/Kakao/Naver source and app buttons exist, but **live Production provider activation remains unverified** and depends on independently authorized Vercel/Supabase/provider console configuration per `docs/MOBILE_SOCIAL_AUTH_V1.md`. An APK code change alone cannot enable providers. Do not claim phone login passed without a real roundtrip.
+- Seyeon Chat read/send remains available to a verified **Member** via the existing Chat room API. If login fails, the member-only Chat open will also fail; no Guest bypass is added.
+- A guest/member's current Saju calculation is bound to the current Birth revision and checked for match; the selected decorative Reader perspective does not change the server's Preview Reading response. No per-Reader generated interpretation is enabled.

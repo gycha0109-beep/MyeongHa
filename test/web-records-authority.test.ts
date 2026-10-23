@@ -6,6 +6,8 @@ const webRoot = join(process.cwd(), 'apps', 'web');
 const html = `${readFileSync(join(webRoot, 'records.html'), 'utf8')}\n${readFileSync(join(webRoot, 'src', 'records', 'RecordsPage.tsx'), 'utf8')}`;
 const client = readFileSync(join(webRoot, 'records-runtime-client.js'), 'utf8');
 const page = readFileSync(join(webRoot, 'records-page.js'), 'utf8');
+const recordsLocale = readFileSync(join(webRoot, 'records-page-ui-locale.js'), 'utf8');
+const i18n = readFileSync(join(webRoot, 'ui-i18n.js'), 'utf8');
 const handoff = readFileSync(join(webRoot, 'reading-history-handoff.js'), 'utf8');
 
 describe('web records authority boundary', () => {
@@ -52,7 +54,8 @@ describe('web records authority boundary', () => {
     expect(page).toContain('function renderCurrentBirthProfile(birth)');
     expect(page).toContain('renderCurrentBirthProfile(records.birth)');
     expect(page).toContain('function renderBirthProfileUnavailable(');
-    expect(page).toContain('확인되지 않은 정보는 대신 보여드리지 않습니다.');
+    expect(page).toContain('recordsBirthUnavailableV1(getUiLocale())');
+    expect(recordsLocale).toContain('확인되지 않은 정보는 대신 보여드리지 않습니다.');
     expect(page).toContain('과거 수정 이력이나 사주 풀이 결과가 아닙니다.');
   });
 
@@ -67,6 +70,9 @@ describe('web records authority boundary', () => {
     expect(page).toContain('textContent');
     expect(page).not.toContain('innerHTML');
     expect(page).not.toContain('insertAdjacentHTML');
+    expect(page).toContain("element.dataset.recordsSource = ''");
+    expect(page).toContain("nameNode.dataset.recordsSource = ''");
+    expect(i18n).toContain('[data-records-source]');
   });
 
   it('opens the Saju records tab for an explicit Reading completion handoff', () => {

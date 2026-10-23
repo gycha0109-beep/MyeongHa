@@ -233,7 +233,7 @@ repetition_penalty
 - 사용자가 Character의 명 / 소명 / 서약을 직접 질문함
 - 현재 소임과 개인 욕구가 실제로 충돌함
 - Calling이 원인이 된 중요한 선택 / 실패 / 후회 / 관계 사건을 이야기함
-- World episode 또는 대리자 관련 사건에서 해당 정보가 장면 이해에 필요함
+- World episode 또는 연결자 관련 사건에서 해당 정보가 장면 이해에 필요함
 - 관계가 충분히 깊어 Character가 자신의 삶의 해석을 자발적으로 공개하는 장면
 
 직접 설명할 때도 Character는 World Authority의 전지적 해설자가 아니다. 자신의 지식과 개인적 해석 범위에서 말한다.

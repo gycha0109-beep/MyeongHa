@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { assertSubmissionEvent, assertPrerequisites, assertStagedPolicy, validateCandidate } from '../scripts/ci/integration-candidate.mjs';
+import { assertSubmissionEvent, assertPrerequisites, assertStagedPolicy, assertParallelTrackLoosePolicy, validateCandidate } from '../scripts/ci/integration-candidate.mjs';
 
 const candidate = { pr: '42', head: 'a'.repeat(40), base: 'b'.repeat(40) };
 const current = () => ({
@@ -45,6 +45,17 @@ describe('pinned integration admission and required evidence', () => {
     expect(() => assertStagedPolicy(rules(15368))).not.toThrow();
     expect(() => assertStagedPolicy(rules(15368, true))).not.toThrow();
   });
+  it('permits frozen-head parallel work only under explicit loose main freshness rules', () => {
+    const rules = strict => [{ type: 'required_status_checks', parameters: {
+      strict_required_status_checks_policy: strict,
+      required_status_checks: [{ context: 'CI Integration Verify', integration_id: 15368 }],
+    } }];
+    expect(() => assertParallelTrackLoosePolicy(rules(false))).not.toThrow();
+    expect(() => assertParallelTrackLoosePolicy(rules(true))).toThrow('loose main-freshness');
+    expect(() => assertParallelTrackLoosePolicy([])).toThrow('loose main-freshness');
+    expect(() => assertParallelTrackLoosePolicy([{ type: 'pull_request' }])).toThrow('loose main-freshness');
+  });
+
   it('requires every selected check and ignores only the integration check being requested', () => {
     const required = [{ context: 'CI Verify', integration_id: 15368 }, { context: 'CI Integration Verify', integration_id: 15368 }];
     expect(() => assertPrerequisites(required, [check()], [])).not.toThrow();

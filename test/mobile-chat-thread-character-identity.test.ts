@@ -16,7 +16,7 @@ describe('mobile Chat thread Character identity presentation', () => {
 
     expect(detail).toContain('<ChatReadHeader snapshot={snapshot} />');
     expect(components).toContain('snapshot.characterId');
-    expect(components).toContain('MOBILE_CHAT_LAUNCH_ROSTER_V1.find');
+    expect(components).toContain('MOBILE_CHAT_KNOWN_CHARACTERS_V1.find');
     expect(components).toContain('resolveMobileChatCharacterPresentationV1');
   });
 

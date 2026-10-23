@@ -1,0 +1,109 @@
+# Local disposable Phase 1: real GoTrue and four independent PostgreSQL 15 clusters.
+# No host ports, Docker socket, production networks, persistent shared volumes or public routes.
+name: myeongha-saju-disposable
+services:
+  auth-db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${SAJU_BRIDGE_LOCAL_AUTH_DB_PASSWORD:?disposable-secret-required}
+      POSTGRES_DB: myeongha_saju_gotrue_verify
+    volumes:
+      - auth-data:/var/lib/postgresql/data
+      - ./saju-bridge-auth-init.sql:/docker-entrypoint-initdb.d/01-gotrue-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d myeongha_saju_gotrue_verify"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+    networks: [disposable]
+
+  subject-db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${SAJU_BRIDGE_LOCAL_SUBJECT_DB_PASSWORD:?disposable-secret-required}
+      POSTGRES_DB: myeongha_saju_subject_local_verify
+    volumes:
+      - subject-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d myeongha_saju_subject_local_verify"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+    networks: [disposable]
+
+  nonce-db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${SAJU_BRIDGE_LOCAL_NONCE_DB_PASSWORD:?disposable-secret-required}
+      POSTGRES_DB: myeongha_saju_nonce_local_verify
+    volumes:
+      - nonce-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d myeongha_saju_nonce_local_verify"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+    networks: [disposable]
+
+  admission-db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${SAJU_BRIDGE_LOCAL_ADMISSION_DB_PASSWORD:?disposable-secret-required}
+      POSTGRES_DB: myeongha_saju_admission_local_verify
+    volumes:
+      - admission-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d myeongha_saju_admission_local_verify"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+    networks: [disposable]
+
+  gotrue:
+    image: supabase/gotrue:v2.196.0
+    depends_on:
+      auth-db:
+        condition: service_healthy
+    environment:
+      GOTRUE_API_HOST: 0.0.0.0
+      GOTRUE_API_PORT: "9999"
+      API_EXTERNAL_URL: http://gotrue:9999
+      GOTRUE_SITE_URL: http://127.0.0.1:3000
+      GOTRUE_DB_DRIVER: postgres
+      GOTRUE_DB_DATABASE_URL: ${SAJU_BRIDGE_LOCAL_AUTH_DB_URL:?disposable-secret-required}
+      GOTRUE_JWT_SECRET: ${SAJU_BRIDGE_LOCAL_JWT_SECRET:?disposable-secret-required}
+      GOTRUE_JWT_AUD: authenticated
+      GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
+      GOTRUE_JWT_EXP: "300"
+      GOTRUE_EXTERNAL_EMAIL_ENABLED: "true"
+      GOTRUE_MAILER_AUTOCONFIRM: "true"
+      GOTRUE_DISABLE_SIGNUP: "false"
+      GOTRUE_EXTERNAL_PHONE_ENABLED: "false"
+    networks: [disposable]
+
+  auth-verifier:
+    image: node:24-bookworm-slim
+    depends_on:
+      gotrue:
+        condition: service_started
+    working_dir: /work
+    volumes:
+      - ./saju-bridge-local-auth-smoke.mjs:/work/smoke.mjs:ro
+    entrypoint: ["node", "/work/smoke.mjs"]
+    environment:
+      SAJU_BRIDGE_LOCAL_AUTH_URL: http://gotrue:9999
+    networks: [disposable]
+
+networks:
+  disposable:
+    internal: true
+
+volumes:
+  auth-data:
+  subject-data:
+  nonce-data:
+  admission-data:

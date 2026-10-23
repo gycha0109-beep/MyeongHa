@@ -1,45 +1,30 @@
-name: "[WT:character-memory] 세연 Luna-Terra 모델 분류 비교"
+name: "[WT:character-memory] 세연 C06 8회 유료 분류 선별 (F01 HOLD)"
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - '.github/seyeon-model-eval-v1.trigger'
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: seyeon-model-eval-v1
+  group: seyeon-c06-eight-call-manual-v1
   cancel-in-progress: false
 
 jobs:
   compare:
-    # Cost incident hold: no paid model requests until a separately reviewed approval PR.
-    # This blocks push-triggered AND workflow_dispatch runs; do not remove for optimization tests.
+    # Reviewed-scope replacement: this is NOT the legacy 100/400-call runner.
+    # Main-only, manual-only, dedicated KEY2, max 8 attempts, 0 retries.
+    # Run #38845185681 consumed 3 paid calls; prior-run budget is not durable.
+    # C06 F01 original overclassification HOLD. Never replay all 8 by pressing Re-run.
+    # A separate owner-reviewed carry-forward + lifetime budget gate is required.
     if: ${{ false }}
-    name: 세연 운영 프롬프트 기반 Luna/Terra 격리 비교
+    name: 세연 기존/압축 통합 분류 지시문 4쌍 (최대 8회)
     runs-on: ubuntu-24.04
     environment: production
-    timeout-minutes: 15
+    timeout-minutes: 12
     steps:
-      - name: Checkout evaluated revision
+      - name: Checkout reviewed revision
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Enforce trusted main trigger and bounded experiment
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [ "${{ github.event_name }}" = "push" ]; then
-            [ "${{ github.ref }}" = "refs/heads/main" ]
-            [ "$(tr -d '\r\n' < .github/seyeon-model-eval-v1.trigger)" = "fire-2026-10-08-v2" ]
-          else
-            [ "${{ github.event_name }}" = "workflow_dispatch" ]
-            [ "${{ github.ref }}" = "refs/heads/main" ]
-          fi
-          test -f scripts/run-seyeon-model-eval-v1.mjs
 
       - name: Setup Node 24
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
@@ -50,25 +35,26 @@ jobs:
       - name: Install dependencies
         run: npm ci --ignore-scripts --no-audit --no-fund
 
-      - name: Run deterministic benchmark contract tests
-        run: npx vitest run test/seyeon-model-eval-v1.test.mjs
+      - name: Verify eight-call budget and legacy lock
+        run: npx vitest run test/seyeon-cost-c06-eight-call-budget-v1.test.mjs test/seyeon-paid-eval-hold-v1.test.mjs test/seyeon-security-four-cell-eval-plan-v1.test.mjs
 
-      - name: Build evaluator
+      - name: Build evaluated runtime
         run: npm run build
 
-      - name: Compare Luna and Terra on synthetic governed classification
+      - name: Run one bounded synthetic-only live classification screen
         env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          SEYEON_EVAL_EVIDENCE_PATH: ${{ runner.temp }}/seyeon-model-eval-v1/evidence.json
+          OPENAI_API_KEY2: ${{ secrets.OPENAI_API_KEY2 }}
+          SEYEON_C06_EVIDENCE_PATH: ${{ runner.temp }}/seyeon-c06-eight-call/attempts.jsonl
+          SEYEON_C06_REPORT_PATH: ${{ runner.temp }}/seyeon-c06-eight-call/report.json
         run: |
-          test -n "${OPENAI_API_KEY:-}"
-          node scripts/run-seyeon-model-eval-v1.mjs
+          test -n "${OPENAI_API_KEY2:-}"
+          node scripts/run-seyeon-cost-c06-eight-call-v1.mjs
 
-      - name: Retain bounded evidence
+      - name: Save bounded numeric outcomes, even on failure
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: seyeon-model-eval-v1-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/seyeon-model-eval-v1/evidence.json
+          name: seyeon-c06-eight-call-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/seyeon-c06-eight-call/
           if-no-files-found: warn
           retention-days: 14

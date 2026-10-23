@@ -28,7 +28,7 @@ describe('MyeongHa conversation hub relationship-first IA', () => {
     expect(myConversations).toBeGreaterThan(primary);
     expect(incoming).toBeGreaterThan(myConversations);
     expect(discoverySection).toBeGreaterThan(incoming);
-    expect(source).toContain('이곳에서 마음이 가는 대리자를 만나보세요.');
+    expect(source).toContain('이곳에서 마음이 가는 연결자를 만나보세요.');
     expect(source).toContain('누구와 이야기를 시작해볼까요?');
     expect(source).toContain('data-chat-hub-state="unavailable"');
     expect(source).toContain('data-relationship-section hidden');

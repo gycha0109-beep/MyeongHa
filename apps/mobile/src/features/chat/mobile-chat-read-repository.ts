@@ -1,3 +1,5 @@
+import { MyeongHaApiClientErrorV1 } from '@myeongha/api-client';
+import { MobileMemberSessionErrorV1 } from '@/core/session/mobile-member-session';
 import type {
   ChatMessageV1,
   ChatRelationshipV1,
@@ -171,7 +173,13 @@ export function createMobileChatReadRepositoryV1(input: {
           errorCode:
             error instanceof MobileChatReadRepositoryErrorV1
               ? error.code
-              : 'CHAT_READ_FAILED',
+              : error instanceof MobileMemberSessionErrorV1
+                ? 'CHAT_MEMBER_SESSION_REQUIRED'
+                : error instanceof MyeongHaApiClientErrorV1
+                  ? (/^[A-Z][A-Z0-9_]{1,70}$/u.test(error.code)
+                      ? error.code
+                      : 'CHAT_API_ERROR')
+                  : 'CHAT_READ_FAILED',
         });
         throw error;
       } finally {
@@ -211,7 +219,13 @@ export function createMobileChatReadRepositoryV1(input: {
           errorCode:
             error instanceof MobileChatReadRepositoryErrorV1
               ? error.code
-              : 'CHAT_READ_FAILED',
+              : error instanceof MobileMemberSessionErrorV1
+                ? 'CHAT_MEMBER_SESSION_REQUIRED'
+                : error instanceof MyeongHaApiClientErrorV1
+                  ? (/^[A-Z][A-Z0-9_]{1,70}$/u.test(error.code)
+                      ? error.code
+                      : 'CHAT_API_ERROR')
+                  : 'CHAT_READ_FAILED',
         });
         throw error;
       } finally {

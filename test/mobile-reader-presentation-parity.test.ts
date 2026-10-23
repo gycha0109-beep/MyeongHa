@@ -38,7 +38,9 @@ describe('mobile Saju and Face Reader presentation parity', () => {
     ]);
     expect(saju).toContain('<MobileReaderPicker');
     expect(saju).toContain('vertical="saju"');
-    expect(saju).toContain('<SajuPreviewReadingView />');
+    expect(saju).toContain('<SajuPreviewReadingView');
+    expect(saju).toContain('onOpenPreview=');
+    expect(saju).toContain("pathname: '/reading/scene'");
     expect(face).toContain('<MobileReaderPicker');
     expect(face).toContain('vertical="face"');
     expect(face).toContain('disabled\n        style={styles.primaryDisabled}');

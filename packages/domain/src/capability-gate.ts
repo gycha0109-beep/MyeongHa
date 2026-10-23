@@ -4,8 +4,62 @@ export type SajuDomainAvailability =
   | 'unavailable'
   | 'not_requested';
 
+/**
+ * Negative-only, server-observed signals. These labels never authorize a
+ * capability, select a Saju source, or replace the existing Content Policy.
+ * Possible harm/threat signals require the separately established content
+ * policy decision; they are not blanket denials of supportive conversations.
+ */
+export type CapabilitySecuritySignalV1 =
+  | 'instruction_override_attempt'
+  | 'new_source_authority'
+  | 'invalid_input'
+  | 'possible_prompt_injection'
+  | 'possible_self_harm'
+  | 'possible_threat';
+
+export type CapabilitySecurityVetoV1 =
+  | 'SECURITY_SIGNAL_INVALID'
+  | 'SECURITY_INPUT_INVALID'
+  | 'SECURITY_INSTRUCTION_OVERRIDE_DENIED'
+  | 'SAJU_NEW_SOURCE_AUTHORITY_REQUIRED';
+
+const KNOWN_CAPABILITY_SECURITY_SIGNALS_V1: readonly CapabilitySecuritySignalV1[] =
+  Object.freeze([
+    'instruction_override_attempt',
+    'new_source_authority',
+    'invalid_input',
+    'possible_prompt_injection',
+    'possible_self_harm',
+    'possible_threat',
+  ]);
+
+/** A signal can only remove permission; no value returned here grants it. */
+export function evaluateCapabilitySecuritySignalsV1(
+  signals: readonly CapabilitySecuritySignalV1[],
+): CapabilitySecurityVetoV1 | null {
+  if (!Array.isArray(signals) || signals.length > KNOWN_CAPABILITY_SECURITY_SIGNALS_V1.length) {
+    return 'SECURITY_SIGNAL_INVALID';
+  }
+  const seen = new Set<CapabilitySecuritySignalV1>();
+  for (const signal of signals) {
+    if (!KNOWN_CAPABILITY_SECURITY_SIGNALS_V1.includes(signal) || seen.has(signal)) {
+      return 'SECURITY_SIGNAL_INVALID';
+    }
+    seen.add(signal);
+  }
+  if (seen.has('invalid_input')) return 'SECURITY_INPUT_INVALID';
+  if (seen.has('instruction_override_attempt')) {
+    return 'SECURITY_INSTRUCTION_OVERRIDE_DENIED';
+  }
+  if (seen.has('new_source_authority')) return 'SAJU_NEW_SOURCE_AUTHORITY_REQUIRED';
+  return null;
+}
+
 export interface CapabilityGateInput {
   readonly needsSaju: boolean;
+  /** Optional negative-only signals issued by server scope/safety inspection. */
+  readonly securitySignals?: readonly CapabilitySecuritySignalV1[];
   readonly characterCapabilityAllowed: boolean;
   readonly userConsentAllowed: boolean;
   readonly sajuDomainAvailability: SajuDomainAvailability;
@@ -23,7 +77,8 @@ export type CapabilityDenialReason =
   | 'ENTITLEMENT_DENIED'
   | 'SAJU_CHARACTER_CAPABILITY_DENIED'
   | 'SAJU_DOMAIN_UNAVAILABLE'
-  | 'SAJU_DOMAIN_STATE_INVALID';
+  | 'SAJU_DOMAIN_STATE_INVALID'
+  | CapabilitySecurityVetoV1;
 
 export type CapabilityGateResult =
   | { readonly allowed: true; readonly sajuCoverage: 'none' | 'full' | 'partial' }
@@ -46,6 +101,13 @@ export function evaluateCapabilityGate(
   }
   if (!input.entitlementAllowed) {
     return { allowed: false, reason: 'ENTITLEMENT_DENIED' };
+  }
+
+  const securityVeto = evaluateCapabilitySecuritySignalsV1(
+    input.securitySignals === undefined ? [] : input.securitySignals,
+  );
+  if (securityVeto !== null) {
+    return { allowed: false, reason: securityVeto };
   }
 
   if (!input.needsSaju) {
