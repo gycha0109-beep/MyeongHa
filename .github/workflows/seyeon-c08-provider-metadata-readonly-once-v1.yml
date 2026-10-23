@@ -1,5 +1,10 @@
 name: '[WT:character-memory] C08 provider ZDR/schema/price GET-once'
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/seyeon-c08-provider-metadata-readonly-once.trigger'
   workflow_dispatch:
     inputs:
       expected_head_sha:
@@ -17,7 +22,7 @@ concurrency:
 
 jobs:
   metadata:
-    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.run_attempt == 1 && inputs.expected_head_sha == github.sha }}
+    if: ${{ github.ref == 'refs/heads/main' && github.run_attempt == 1 && (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.expected_head_sha == github.sha)) }}
     runs-on: ubuntu-24.04
     environment: production
     timeout-minutes: 8
@@ -41,7 +46,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-          EXPECTED_HEAD_SHA: ${{ inputs.expected_head_sha }}
+          EXPECTED_HEAD_SHA: ${{ github.event_name == 'push' && github.sha || inputs.expected_head_sha }}
         run: |
           set -euo pipefail
           set +x
