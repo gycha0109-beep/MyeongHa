@@ -2,7 +2,7 @@
 
 > Watchtower-Track: security
 >
-> **2026-10-24 실행 방식 갱신:** 구현 90% / 검증 10%를 작업 배분의 기본값으로 적용한다. 이는 진행률이나 보안 PASS 비율이 아니다. 기존 구현 재조사·동일 부정 테스트 추가보다 실제 caller·서버 조립·사용자 경로의 미연결 부분을 먼저 구현한다. 변경 경계의 최소 필수 검증과 기존 CI/Integration 게이트는 유지한다. **현재 실행 큐와 종료 차단은 §62를 우선한다.** 아래 날짜별 내용은 당시 증거다.
+> **2026-10-24 실행 방식 갱신:** 구현 90% / 검증 10%를 작업 배분의 기본값으로 적용한다. 이는 진행률이나 보안 PASS 비율이 아니다. 기존 구현 재조사·동일 부정 테스트 추가보다 실제 caller·서버 조립·사용자 경로의 미연결 부분을 먼저 구현한다. 변경 경계의 최소 필수 검증과 기존 CI/Integration 게이트는 유지한다. **현재 브랜치 구현·병합 기준은 §63을 우선한다.** 아래 날짜별 내용은 당시 증거다.
 >
 > **현재 실행 기준선**: [AI 보안 종료 원장 #1866](https://github.com/gycha0109-beep/MyeongHa/issues/1866), [P0 Grant/Commit/Reveal #1843](https://github.com/gycha0109-beep/MyeongHa/issues/1843), [운영 DB/DR #1887](https://github.com/gycha0109-beep/MyeongHa/issues/1887), [G0~G6 계약](../security/SEYEON_AI_SECURITY_COMPLETION_GATES_V1.md).
 >
@@ -664,3 +664,30 @@ S8의 **비파괴/격리 검토는 S2~S7과 병렬 진행 가능**하며, S8 Pro
 ### 승인 경계와 트랙 종료
 
 현재 사용자의 AGENTS.md는 DB schema/migration/RLS, 인증·권한·개인정보 정책, main 병합, production 배포/traffic 변경에 **명시적 승인**을 요구한다. “전체 트랙 진행”을 특정 미적용 SQL/ACL/배포 승인으로 바꾸지 않는다. 실제 G0 기술 판정·SRC-25 계약, DB 적용/Role/DR 및 대상 transport의 취소-송출 증거가 없는 상태에서 전체 트랙을 VERIFIED/MERGED/DEPLOYED 또는 종료로 표시하지 않는다.
+
+
+## 63. 2026-10-24 브랜치 구현을 묶어서 완료 후 병합
+
+**사용자 후속 지시:** “브랜치 안에서 로드맵 다 밀고 다 밀면 병합”. 이에 따라 §62의 반복 main 병합 승인 요청은 종료한다. 아래 브랜치 코드·필수 CI가 완료되면 이 PR의 main 병합은 이미 승인되었다. 운영 DB 쓰기·역할 부여·유료 호출·공개/배포 승인은 이 지시에서 추정하지 않는다.
+
+**초기 구현 Scope:** 기존 G0 S0 제안의 원본 `conversation_recall/v1` Memory 1건, 현재 verified Member/현재 Turn, 승인된 공개 Bible, direct Node의 최초 비스트리밍 Reply. 다른 파생 출처/History/Replay/Worker/Reader 및 다중 Memory·Life Fact는 기존 미승인 차단을 유지한다. 구현 편의를 위해 이 범위를 자동 확장하거나 G0 승인으로 기록하지 않는다.
+
+| 로드맵 | 브랜치 구현 산출물 | 최종 판정 조건 |
+| --- | --- | --- |
+| S1/S2 | 기존 zero/derived HOLD 유지. private accept·철회 factory에 기존 server-owned DB 승인 callback을 전달할 수 있도록 연결. 현재 caller는 승인 전달 없음 | 직접 HTTP/Auth/실패·불명 COMMIT 회귀 유지. 제품 정책의 재승인 요청 없음 |
+| S3/G1 | 기존 Draft의 원본 source registry·exact Grant/Record/PG digest Pin 실행본, 기존 단일 codec의 명시적 server composition. Global Projectors=[] 유지 | 실제 RLS 역할에서 모델 이전 Pin 영속화, type/Grant/Subject/Attempt 미일치 거부 |
+| S4/G2 | 현재 UserMessage ID까지 TS→DB 8-UUID/JSONB/3-text 계약으로 결속, 실제 v2+두 Outbox를 동일 TX 처리 | 기존 v2 원본 UserMessage 우회 검사 재사용. 잘못된 재발급 Grant/원본 Snapshot 거부 및 rollback |
+| S5/G3 | v3 원본 User/Assistant/Outbox/ClientTurn 현재 권한 조회, exclusive 첫 송출권 소비, 실제 Node HTTP ingress+Production factory | fresh DB original→실제 socket→finish→동일 TX COMMIT. abort rollback 및 철회 경합. Node finish를 proxy/클라이언트 ACK로 주장하지 않음 |
+| S6/G4 | 새 first Memory Production factory가 기존 ENFORCE/native role Governor·별도 cost DB·공식 정책 조립을 사용. 승인/DB 미준비 시 credential 이전 차단 | 기존 비용 Governor/legacy RPC·영수증 회귀를 사용. 유료 실 호출/예산 승격 없음 |
+| S7/G5 | 기존 PG17 suite에 named disposable S0 실제 production-table+TS port+HTTP 사례 연결. 신규 Workflow 없음 | Pin→v2 Commit→한 번 송출→private 0-Grant 저장, revoke/regrant, 두 PG 세션, socket abort, 기존 legacy v2 차단, forward-only stop |
+| S8/S9 | [실행 SQL 묶음](../../scripts/operations/seyeon-security-s0/README.md), deterministic 설치/중단 digest plan, 데이터 보존·철회 권한 보존 stop | 자동 migration/운영 apply 없음. 실제 DB/DR 및 G0-D04 대상 transport·G6 승인은 운영 게이트로 남김 |
+
+### 실제 SQL 통합에서 수정한 결함
+
+- 기존 Owner SQL은 `subjects`/원본 Memory/Grant의 SELECT-only RLS 역할로 `FOR SHARE`를 시도해 권한 오류 또는 0행 거부가 발생했다. 넓은 UPDATE/RLS 권한을 주지 않고 **private lock-only 함수**를 만들어 원본 canonical Subject·Grant·Message 잠금만 위임한다. API 직접 EXECUTE/본문 반환/신규 Subject-linked 테이블은 없다. 근거는 격리 DB의 실제 실행 실패이며 필요한 DB caller까지 범위를 확장했다.
+- 이전 준비 검사의 8 UUID와 실제 TS/초안 SQL의 7 UUID 불일치는 전체 호출 계약을 원본 UserMessage 포함 8 UUID로 맞췄다. 현재 운영 zero 경로는 보존한다.
+- SQL private Memory codec의 길이 제한은 기존 TypeScript UTF-16 4000 code-unit와 동일하게 맞췄다. 암시적 payload 변환이나 별도 schema를 추가하지 않는다.
+
+### 종료 보고 구분
+
+브랜치 코드+필수 CI·Integration 완료 후 병합은 **S0 구현 병합**으로 보고한다. 실제 G0 서명·SRC-25 운영 등록·DB/ACL·동일 백업 복원·target transport V/R/S/ACK·유료/공개 승인 없이 전체 AI 보안 트랙의 A+B+C 운영 종료를 기록하지 않는다. 미확정 영역의 소유권을 합성 테스트나 개발자 해시로 대신하지 않는다.

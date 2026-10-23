@@ -212,10 +212,10 @@ select turn_id::text as "turnId",
        replayed
 from public.cmd_commit_seyeon_positive_chat_turn_v1(
   $1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6::uuid,
-  $7::uuid,$8::jsonb,$9::text,$10::text,$11::text
+  $7::uuid,$8::uuid,$9::jsonb,$10::text,$11::text,$12::text
 )`.trim(),[
         input.subjectId,input.threadId,input.turnId,input.attemptId,
-        input.assistantMessageId,input.chatOutboxEventId,
+        input.userMessageId,input.assistantMessageId,input.chatOutboxEventId,
         input.postTurnOutboxEventId,JSON.stringify(input.postTurnSnapshot),
         input.postTurnSnapshotHash,input.selectedSourcesDigest,
         input.finalModelContextDigest,

@@ -44,3 +44,26 @@ Cloudflare 변경 검토 시 [공식 best practices](https://developers.cloudfla
 4. G4~G6: 실제 예산·운영 DB/DR·승인된 배포 transport·최종 제한 smoke가 필요하다. 유료 호출/공개/운영 데이터 변경/production 배포는 실행하지 않았다.
 
 사용자 AGENTS.md의 승인 경계에 따라 main 병합·DB schema/migration/ACL·인증/개인정보 정책·production 배포/traffic은 별도 명시 승인 대상이다. 기존 다른 작업 변경은 이 배치에 포함하지 않는다.
+
+
+## 후속 브랜치 구현 (사용자 병합 지시 반영)
+
+사용자가 브랜치에서 로드맵 구현을 묶어서 완료한 뒤 병합하도록 지시했다. 이 PR의 main 병합 재승인은 요청하지 않는다. 앞 절의 main 승인 대기 표기는 이전 시점 기록이며 현재 실행 기준은 [로드맵 §63](SEYEON_AI_SECURITY_EXECUTION_ROADMAP_V2_20261016.md#63-2026-10-24-브랜치-구현을-묶어서-완료-후-병합)이다.
+
+- `production-seyeon-first-memory-node-runtime-v1.ts`: 기존 verified Member/ordinary pool, source-owner 승인, ENFORCE/native role Governor/분리 cost DB, 실제 Chat 실행과 첫 원본 잠금 송출의 Production composition. DB/Source/비용 승인이 없으면 provider credential resolution 이전 차단.
+- 기존 private accept·revoke factory가 server-owned 승인 callback을 실제 HTTP handler까지 전달. 현재 배포 caller/default는 DENY를 유지. `production-seyeon-chat-runtime-v1.ts`는 명시 승인된 초기 단일 codec을 사용하는 경로에서도 ENFORCE를 요구한다.
+- 기존 SQL Draft의 실행본을 `scripts/operations/seyeon-security-s0`에 정리. 넓은 source UPDATE/RLS 권한을 추가하지 않고 private lock-only owner 함수로 실제 RLS row lock 결함 해결. G2 TS/SQL은 원본 UserMessage를 포함하는 8 UUID 계약. SQL/Node codec의 UTF-16 길이 계약 일치.
+- `plan.mjs`의 단일 설치 목록으로 LF/UTF-8 digest와 forward-only stop 산출. [고정 source plan](SEYEON_AI_SECURITY_S0_SOURCE_PLAN_20261024.json)의 해시는 파일 결속이며 승인 서명이 아니다. SQL은 자동 migration 디렉터리에 없고 운영 DB에 미적용.
+- 기존 PG17 CI suite의 `seyeon-security-s0-real-path-pg17`에 실제 production-table/기존 TS port/Node socket 경로 연결. 신규 Workflow 없음. source 변경이 PG17을 빠뜨리지 않도록 기존 두 router에 직접 dependency 추가.
+
+### 실제 실패·수정 및 검증
+
+- 로컬 PostgreSQL은 18.6만 설치되어 있어 별도 loopback transient instance를 생성했다. PG17 판정은 이 결과로 대체하지 않고 기존 CI의 **실제 17** 사례를 필수로 둔다. Docker daemon 없음은 코드 실패로 분류하지 않는다.
+- 기존 PG17 harness와 같은 Birth 0860 격리 제외를 사용했다. 최초 전체 적용은 기존 managed-creator membership 보호에서 중단되어 이 기존 전용 제외 경로로 전환했다. 운영 migration이나 골든을 수정하지 않았다.
+- Source owner의 SELECT-only 역할에서 `FOR SHARE` 권한 오류/UPDATE RLS로 인한 0행 거부를 실제로 재현. source table에 UPDATE 정책을 주지 않고 private lock-only RPC로 수정 후 actual Pin/Commit/Reveal 통과.
+- 초기 합성 fixture의 필수 timestamp/dedupe/unique content hash 누락을 보완. 런타임 권한 검사나 수락 기준을 약화하지 않음.
+- 기존 v2가 이미 원본 UserMessage 불일치를 차단함을 실 SQL로 확인해, 중복 deferred Outbox barrier를 추가하지 않았다. 기존 `seyeon_post_turn_user_message_mismatch`와 전체 rollback을 재사용한다.
+- 최종 격리 PG18 preliminary **6/6 PASS**: 실제 G1 Pin → v2 Commit+Outbox → 실제 loopback HTTP 첫 송출 1회/재사용 거부 → private Memory 0-Grant 저장 및 UTF-16 음성; revoked original Grant+regrant 차단; 독립 2세션 lock-wait; abort rollback; 기존 legacy v2 원본 Snapshot 거부; stop 후 데이터/consent withdrawal 보존.
+- server composition 기본 차단 직접 테스트 **2/2 PASS**, 관련 기존 직접 회귀 및 타입 검사/빌드 PASS. 최종 exact-head PG17/전체 CI/Integration·병합 증거는 PR에 기록한다. 이전 SHA의 CI 결과를 새 코드에 재사용하지 않는다.
+
+**상태 구분:** 브랜치의 S0 구현을 검증 후 병합한다. 운영 G0/SRC-25·DB/ACL·동일 백업 DR·target transport V/R/S/ACK·G6 및 공개/유료 승인은 미실행이며, G0~G6 전체 운영 트랙 종료로 표시하지 않는다. History/Replay/Worker/Reader 및 다중 source는 미승인 차단을 유지한다.

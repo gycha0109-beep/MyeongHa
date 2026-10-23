@@ -1,0 +1,39 @@
+// Watchtower-Track: security
+// Pure source plan. Hashes bind SQL files, never owner approval.
+import { readFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { pathToFileURL } from 'node:url';
+
+export const SEYEON_SECURITY_S0_SQL_SOURCES = Object.freeze([
+  '../seyeon-private-memory-grant-revoke-r17-candidate.sql',
+  '00-original-source-locks.sql', '01-source-pin.sql', '02-atomic-commit.sql',
+  '03-private-memory-accept.sql', '04-locked-reveal.sql',
+]);
+
+export async function buildSeyeonSecurityS0InstallationPlan() {
+  const describe = async source => {
+    const normalized = (await readFile(new URL(source, import.meta.url), 'utf8')).replace(/\r\n/gu, '\n');
+    return { source, sha256LfUtf8: createHash('sha256').update(normalized).digest('hex'),
+      bytesLfUtf8: Buffer.byteLength(normalized, 'utf8') };
+  };
+  return {
+    schemaVersion: 'seyeon-security-s0-installation-plan-v1',
+    scope: 'one-original-conversation-recall-memory',
+    productionAuthorization: 'NOT_GRANTED', automaticMigration: false,
+    defaultModelUseEnabled: false, defaultWritableEnabled: false,
+    positiveApiExecuteGranted: false, externalProxyRevealAuthorized: false,
+    files: await Promise.all(SEYEON_SECURITY_S0_SQL_SOURCES.map(describe)),
+    stop: await describe('stop-positive-use.sql'),
+    stopPreservesConsentWithdrawal: true,
+    remainingReleaseEvidence: [
+      'G0/SRC-25 owner decision', 'PG17 original Grant/Commit/Reveal race',
+      'approved governed budget and dedicated DB role',
+      'same-backup isolated restore and RPO/RTO',
+      'G0-D04 target transport V/R/S/ACK', 'G6 explicit deployment approval',
+    ],
+  };
+}
+
+if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {
+  process.stdout.write(JSON.stringify(await buildSeyeonSecurityS0InstallationPlan(), null, 2) + '\n');
+}
