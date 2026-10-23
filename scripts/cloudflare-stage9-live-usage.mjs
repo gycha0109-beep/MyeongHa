@@ -54,6 +54,8 @@ function buildsLimit(payload) {
 const PREVIEW_BRANCH = 'feat/ops/cloudflare-authdb-clean-snapshot-20261021';
 const MAX_BUILD_HISTORY_PAGES = 10;
 const uuid = v => typeof v === 'string' && /^[a-f0-9]{32}$/.test(v);
+const buildUuid = v => typeof v === 'string' &&
+  /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(v);
 const timestamp = v => typeof v === 'string' && Number.isFinite(Date.parse(v));
 
 // Build records belong to the exact Ops Preview, not main or another track.
@@ -79,7 +81,7 @@ export function normalizeCloudflareStage9BuildHistoryV1({
     cancelled: 0, terminated: 0, inProgress: 0,
     completedWithRuntime: 0, measuredRunWallSeconds: 0 };
   for (const entry of records) {
-    if (!uuid(entry?.build_uuid) || seen.has(entry.build_uuid) ||
+    if (!buildUuid(entry?.build_uuid) || seen.has(entry.build_uuid) ||
         !timestamp(entry.created_on) ||
         entry.build_trigger_metadata?.branch !== PREVIEW_BRANCH) return null;
     seen.add(entry.build_uuid);

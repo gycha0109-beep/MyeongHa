@@ -12,7 +12,7 @@ const builds={success:true,result:{has_reached_build_minutes_limit:false,build_m
 const account='a'.repeat(32), tag='b'.repeat(32), preview='c'.repeat(32);
 const branch='feat/ops/cloudflare-authdb-clean-snapshot-20261021';
 const one={
-  build_uuid:'d'.repeat(32),
+  build_uuid:'dddddddd-dddd-dddd-dddd-dddddddddddd',
   created_on:'2026-10-23T00:15:00.000Z',
   running_on:'2026-10-23T00:15:01.000Z',
   stopped_on:'2026-10-23T00:15:41.000Z',
@@ -35,7 +35,7 @@ describe('Ops Preview-only actual Workers Builds history (not main)',()=>{
     });
   });
   it('rejects mixed main-branch records, duplicate identities and incomplete pagination',()=>{
-    const outside={...one,build_uuid:'e'.repeat(32),
+    const outside={...one,build_uuid:'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee',
       build_trigger_metadata:{branch:'main'}};
     const args={pages:[page([outside])],fromUtc,toUtc};
     expect(normalizeCloudflareStage9BuildHistoryV1(args)).toBeNull();
