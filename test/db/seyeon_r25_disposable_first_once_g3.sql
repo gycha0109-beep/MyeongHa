@@ -36,6 +36,20 @@ begin
     return null;
   end if;
 
+  -- Match the real G3/current Grant lock hierarchy: Subject → Thread →
+  -- Turn → current original Grant/Memory. A revoke must serialise on the
+  -- Subject before private bytes can leave Node, without inverse lock order.
+  perform 1 from public.subjects subj
+  where subj.id=p_subject and subj.status='active'
+    and subj.merged_into_subject_id is null
+  for share;
+  if not found then return null; end if;
+
+  perform 1 from public.conversation_threads th
+  where th.id=p_thread and th.subject_id=p_subject and th.status='active'
+  for share;
+  if not found then return null; end if;
+
   -- Real locked Turn is the one-shot serialization point for A vs B.
   -- Verify original client idempotency key, committed Attempt and timestamp;
   -- an already-delivered Turn can NEVER acquire a second first-send permit.
