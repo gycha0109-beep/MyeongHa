@@ -82,7 +82,7 @@ export function HomePage() {
         </div>
         <div className="mhx-character-list">
           {featuredReaders.map((reader) => (
-            <article className="mhx-character" key={reader.key}>
+            <article className="mhx-character" data-presentation={reader.key} key={reader.key}>
               <div className="mhx-character-art">
                 <img src={reader.portrait} alt={reader.name} loading="lazy" decoding="async" />
                 <div className="mhx-character-caption">
