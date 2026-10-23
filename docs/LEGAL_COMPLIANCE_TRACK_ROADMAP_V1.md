@@ -110,3 +110,12 @@
 - **삭제 정합:** `supabase/proposals/1740_portone_identity_age_authority_v1.proposed.sql`에 Subject 상태가 비활성 또는 병합으로 변할 때 최소 개인정보인 인증 시도·연령 밴드를 즉시 삭제하는 트리거 제안. 계정 삭제는 Subject 행을 익명화하므로 FK ON DELETE CASCADE만 믿지 않는다. 신규 SQL은 **비적용 제안**이며 기존 승인된 삭제 정책 지문과 마이그레이션을 수정하지 않음.
 - **최소 검증:** `test/legal-portone-v2-identity-http-v1.test.ts`로 OFF/발급/완료/재사용 차단. DB Authority/Privacy 소유의 신규 DELETE 처분, PG17 trigger·권한, 실제 환경 증빙 및 PortOne 사업자 채널 계약은 여전히 선행 조건.
 - **다음:** 기존 삭제 복원·보존 계약에 맞춰 제안 SQL을 인수하고, 가입/게스트/소셜 공통 연령 검증을 활성화할 수 있는 상태인지 DB 적용 및 운영 증빙으로 판단. 결제/공개 인증 OFF 유지.
+
+
+## 14. L2-P DB·Privacy 삭제 처분 추가 후보 + 비자동 배포 SQL (2026-10-24)
+
+- **기존 승인 정책 보존:** `docs/operations/ACCOUNT_DELETION_DISPOSITION_POLICY_V1.json` 59 테이블/46 DELETE/4 ANONYMIZE/9 RETAIN, fingerprint `c745bacb0e9b2d13013c1048fc4273203af68b9c4816eef7b6c9fe37e4db167b` 유지. 기존 P5Y Commerce/백업 P30D를 새 인증정보에 복제하지 않음.
+- **신규 처분 추가 후보:** `docs/operations/PORTONE_IDENTITY_PRIVACY_DISPOSITION_DELTA_CANDIDATE_V1.json`의 `legal_portone_identity_attempts_v1` 및 `legal_portone_verified_age_v1`를 DELETE 후보로 분리. 승인된 그래프에 무단 합산·덮어쓰기하지 않으며 새 테이블의 물리적 만료/소비 후 정리 주기는 여전히 확정·구현이 필요함.
+- **실행 가능한 SQL 사본:** `supabase/release-candidates/1740_portone_identity_age_authority_v1.sql`로 DB DDL을 독립 파일로 준비. **supabase/migrations에는 추가하지 않았으며 실행하지 않았다.** 신규 두 테이블 RLS ON, service_role/공개 API 직접 접근 차단, Subject 비활성·병합 전이 DELETE 트리거 및 Subject Scoped 내부 함수 포함.
+- **필수만 확인:** `test/legal-portone-identity-privacy-release-candidate.test.ts`에서 원 승인 policy/그래프 지문 유지, DELETE 추가 후보 2건, 제안 SQL과 배포 후보 동일성, 비자동 migration 상태 확인. PostgreSQL 17 실제 트랜잭션·RLS 실증은 이번 단계 수행하지 않음.
+- **배포 조건:** 기존 Privacy/DB 삭제 그래프 개정 결정, 만료·소비된 인증 시도의 물리적 파기 라이프사이클, SQL 실DB 권한 및 삭제 전이 검증, 인증 채널 계약·비밀키. **운영 DB/인증 API/PG 결제 전부 OFF**.
