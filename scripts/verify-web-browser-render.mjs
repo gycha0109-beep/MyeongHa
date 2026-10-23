@@ -228,7 +228,7 @@ let client;
 try {
   client = await cdp(await devtoolsPort(profile, chrome));
 
-  await navigate(client, origin, '/hall.html', '.gm-home-hero');
+  await navigate(client, origin, '/hall.html', '.mhx-hero');
   const hallState = await client.evaluate(`(() => {
     const inspect = (selector, minW, minH) => {
       const el = document.querySelector(selector);
@@ -237,49 +237,49 @@ try {
       return { selector, exists: true, width: Math.round(r.width), height: Math.round(r.height),
         visible: r.width >= minW && r.height >= minH && s.display !== 'none' && s.visibility !== 'hidden' && Number(s.opacity) > 0 };
     };
-    const shell = document.querySelector('.gm-shell')?.getBoundingClientRect();
-    const products = [...document.querySelectorAll('.gm-home-products .gm-product-card')];
+    const shell = document.querySelector('.mhx-home')?.getBoundingClientRect();
+    const products = [...document.querySelectorAll('.mhx-topics .mhx-topic')];
     const productRects = products.map((item) => item.getBoundingClientRect());
     return {
       pathname: location.pathname,
       bodyText: document.body.innerText,
       styles: [...document.styleSheets].map((sheet) => sheet.href ? new URL(sheet.href).pathname : 'inline'),
-      heroHref: document.querySelector('.gm-home-hero .gm-primary-button')?.getAttribute('href') ?? '',
-      monthHref: document.querySelector('.gm-month-card')?.getAttribute('href') ?? '',
+      heroHref: document.querySelector('.mhx-hero-actions .mhx-primary-link')?.getAttribute('href') ?? '',
+      monthHref: document.querySelector('.mhx-content-grid .mhx-content-card:nth-child(2)')?.getAttribute('href') ?? '',
       shellWidth: shell ? Math.round(shell.width) : 0,
       productCount: products.length,
       productTopBands: productRects.map((rect) => Math.round(rect.top)),
       oldSidebars: document.querySelectorAll('.home-sidebar, .gm-sidebar').length,
       overflow: document.documentElement.scrollWidth - innerWidth,
       elements: [
-        inspect('.product-header', 100, 40), inspect('.gm-home-hero', 900, 250),
-        inspect('.gm-month-card', 900, 140), inspect('.gm-home-products', 900, 70),
-        inspect('.gm-recent-card', 900, 60),
+        inspect('.product-header', 100, 40), inspect('.mhx-hero', 900, 300),
+        inspect('.mhx-characters', 900, 220), inspect('.mhx-topics', 900, 70),
+        inspect('.mhx-content-grid', 900, 70), inspect('.mhx-recent-card', 900, 60),
       ],
     };
   })()`);
 
   assert(hallState.pathname === '/hall.html', `Expected /hall.html, got ${hallState.pathname}`);
-  for (const css of ['/product.css', '/golden-master.css', '/product-theme.css', '/golden-master-lock.css']) {
+  for (const css of ['/product.css', '/golden-master.css', '/product-theme.css', '/golden-master-lock.css', '/home-moonlight.css']) {
     assert(hallState.styles.includes(css), `Home Golden Master stylesheet not loaded: ${css}`);
   }
   for (const el of hallState.elements) {
     assert(el.exists && el.visible, `Home Golden Master element unavailable: ${el.selector}`);
   }
-  assert(hallState.shellWidth >= 1180 && hallState.shellWidth <= 1240, `Unexpected Home Golden Master shell width: ${hallState.shellWidth}`);
+  assert(hallState.shellWidth >= 1180 && hallState.shellWidth <= 1312, `Unexpected Home Golden Master shell width: ${hallState.shellWidth}`);
   assert(hallState.productCount === 4, `Home Golden Master must expose exactly four product cards, got ${hallState.productCount}`);
   assert(new Set(hallState.productTopBands).size === 1, `Home product cards are not a single desktop row: ${JSON.stringify(hallState.productTopBands)}`);
   assert(hallState.oldSidebars === 0, `Home Golden Master reintroduced sidebar layout: ${hallState.oldSidebars}`);
   assert(hallState.overflow <= 2, `Home Golden Master horizontal overflow: ${hallState.overflow}px`);
-  assert(hallState.bodyText.includes('좋은 저녁이에요'), 'Home Golden Master greeting missing');
-  assert(hallState.bodyText.includes('오늘 이야기할 사람') && hallState.bodyText.includes('캐릭터 선택'), 'Home Character chooser missing');
-  assert(hallState.heroHref === 'chat-hub.html', `Home global conversation entry must route through the hub: ${hallState.heroHref}`);
-  assert(!hallState.bodyText.includes('세연') && !hallState.bodyText.includes('연화'), 'Home must not infer a named Character mapping');
-  assert(hallState.bodyText.includes('이번 달 사주 읽기') && hallState.bodyText.includes('현재 월간 해석은 준비 중입니다.') && hallState.bodyText.includes('전체 사주 프리뷰'), 'Home must distinguish monthly unavailable from admitted Preview');
+  assert(hallState.bodyText.includes('요즘, 무엇이 가장') && hallState.bodyText.includes('궁금하세요?'), 'Home topic-first headline missing');
+  assert(hallState.bodyText.includes('당신의 이야기를') && hallState.bodyText.includes('들어줄 사람이 있어요'), 'Home character discovery missing');
+  assert(hallState.heroHref === 'reading-detail.html?topic=temperament&scope=original', `Home preview entry must route to approved preview: ${hallState.heroHref}`);
+  assert(!hallState.bodyText.includes('연화') && !hallState.bodyText.includes('대화 시작 완료'), 'Home must not invent Character or relationship state');
+  assert(hallState.bodyText.includes('이번 달 사주 읽기') && hallState.bodyText.includes('월간 해석은 준비 중입니다.') && hallState.bodyText.includes('전체 사주 프리뷰'), 'Home must distinguish monthly unavailable from admitted Preview');
   assert(hallState.monthHref === 'reading-detail.html?topic=temperament&scope=original', `Home feature must link to admitted General Natal Preview, got ${hallState.monthHref}`);
   assert(!hallState.bodyText.includes('이달의 운세 전체보기') && !hallState.bodyText.includes('오늘의 흐름은 사주 화면에서 직접 펼쳐볼 수 있습니다.'), 'Home must not claim blocked monthly Reading availability');
-  assert(hallState.bodyText.includes('사주 읽기 주제') && hallState.bodyText.includes('전체 사주') && hallState.bodyText.includes('직업 · 커리어') && hallState.bodyText.includes('재물') && hallState.bodyText.includes('연애 · 관계'), 'Home four-card Saju row missing');
-  assert(hallState.bodyText.includes('최근 이야기') && hallState.bodyText.includes('지금은 저장된 사실을 이야기로 추측해 이어 붙이지 않습니다.'), 'Home recent-story fail-closed state missing');
+  assert(hallState.bodyText.includes('사주 관심 주제') && hallState.bodyText.includes('전체 사주') && hallState.bodyText.includes('직업 · 커리어') && hallState.bodyText.includes('재물') && hallState.bodyText.includes('연애 · 관계'), 'Home four-card Saju row missing');
+  assert(hallState.bodyText.includes('최근 이야기') && hallState.bodyText.includes('최근 대화 기록은 아직 홈에 연결되지 않았습니다.'), 'Home recent-story fail-closed state missing');
   await artifact(client, '-home');
 
   await navigate(client, origin, '/reading.html', '#saju-empty');
