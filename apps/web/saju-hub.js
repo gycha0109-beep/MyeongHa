@@ -1,5 +1,6 @@
 import { ensureActiveBearer, getActiveBearer, invalidateGuestSession, invalidateMemberSession } from './product-auth.js';
 import { getUiLocale } from './ui-i18n.js';
+import { resumePreviewHrefV1 } from './reading-preview-continuation.js';
 import {
   sajuPillarLabelV1, sajuElementLabelV1, sajuYinYangLabelV1,
   projectSajuPillarDisplayV1, sajuCompletenessLabelV1,
@@ -511,6 +512,8 @@ async function submitBirthProfile(event) {
     const calculation = await calculateSaju(token);
     const profile = await readBirthProfile(token, receipt.birthProfileId);
     renderCalculation(calculation, profile);
+    const continuedPreview = resumePreviewHrefV1(window.location.search);
+    if (continuedPreview) window.location.assign(continuedPreview);
   } catch (error) {
     if (error?.status === 401) {
       handleUnauthorized(activeBearer);
