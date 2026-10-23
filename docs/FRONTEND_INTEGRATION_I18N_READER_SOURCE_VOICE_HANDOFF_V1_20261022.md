@@ -267,3 +267,11 @@
 5. **Ops/Commerce:** public/paid/source readiness, 캐시·생성 시점, 저장/삭제/환불 권한은 소유자 승인 및 실제 production evidence 전 HOLD.
 
 **정확한 완료 표기:** 이번 PR은 read-only projection + metadata parity boundary + 테스트 + 인계 계약의 구현이다. 캐릭터 개인 바이블 확정, 일본어/번체 Reader 실제 응답, 공식 Reading 재번역/저장, 새 유료 판매/서비스 운영은 완료하지 않았다.
+
+### 7.18 사용자 캐릭터 화법 결정 — 2026-10-23
+
+- **서린·미라:** 이전 typed Runtime에는 기록용 후보가 남아 있지만, 현행 새 Chat/Reader 화법 입력으로 사용하지 않는다. `resolveAdmittedCharacterChatVoiceAuthoringV1`은 두 캐릭터에 `null`, `prepareReaderLanguageNeutralVoiceHandoffV1`은 `character_voice_cleared` HOLD를 반환한다. 캐릭터 ID, 이전 게시 콘텐츠, 저장된 메시지 자체를 삭제하거나 소급 변조하지 않는다.
+- **도윤:** 기존 '신속한 결정 코치' Runtime 스타일은 신규 채팅 화법에서 폐기하고 승인된 캐릭터 기획/Bible 의미만 보존한다. 버전·출처를 확인할 수 있는 도윤의 개별 발행 Bible이 없어 현재 voice handoff는 `bible_source_not_available` HOLD. 임의의 새 도윤 대사를 생성하거나 기존 typed runtime을 바이블로 둔갑시키지 않는다.
+- **세연·여울·백헌:** 각각 `SEYEON_CHARACTER_BIBLE_DRAFT_V0_2`, `YEOUL_CHARACTER_BIBLE_DRAFT_V0_3`, `BAEKHEON_CHARACTER_BIBLE_DRAFT_V0_2`의 인물·E 표현·관계 진전 경계를 기준으로 `runtime-authoring-v1.ts`의 대화 말투, 심리·질문, 관계 모드를 정렬했다. 캐릭터별 외국어 호칭·인칭을 채우거나 운영 콘텐츠를 자동 교체하지 않는다.
+- `READER_VOICE_ALIGNMENT_DIAGNOSTICS_V1`와 보호된 voice composition/최종 output boundary 회귀에서 사용자 선택을 고정했다. **9인 구성 유지**는 9인 전원의 대화 설정 수용을 뜻하지 않는다. 기록용 후보 배열의 과거 항목은 새로운 대화의 승인값이 아니다.
+- 세 캐릭터의 실제 운영 발행 버전과 새로운 바이블 정렬 draft의 일치는 별도 콘텐츠 릴리스 검증이 필요하다. 한국어 기존 게시물·원문·권한·현재 지원 3개 UI locale는 변경하지 않는다.
