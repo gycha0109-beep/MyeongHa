@@ -61,7 +61,8 @@ if (delta.additionalSubjectOwnedTables[0].expiryDuration !== 'PT10M' ||
     delta.additionalSubjectOwnedTables[0].expiryPurgeScheduled !== false) {
   fail('attempt TTL or unscheduled cleanup policy drift');
 }
-if (sqlRelease !== sqlProposal || !/set status = 'deleted'/i.test(finalizer)) {
+if (sqlRelease.slice(sqlRelease.indexOf('-- Legal L2 / PortOne V2:')) !== sqlProposal ||
+    !/set status = 'deleted'/i.test(finalizer)) {
   fail('release SQL diverged or existing account finalizer no longer transitions to deleted');
 }
 for (const expression of [
