@@ -87,6 +87,37 @@ describe('Se-yeon/Reader negative authority checks under synthetic prompt inject
     });
   });
 
+  it.each([
+    {
+      senderType: 'character', characterId: 'seyeon',
+      messageId: 'user-current',
+      error: 'current User message identity belongs to a Character',
+    },
+    {
+      senderType: 'user', characterId: 'seyeon',
+      messageId: 'user-current',
+      error: 'User row has unexpected Character authority',
+    },
+    {
+      senderType: 'system', characterId: null,
+      messageId: 'hidden-system-source',
+      error: 'source sender type is not authorized',
+    },
+  ])('holds an unaccounted history source before it can become zero-source: $senderType / $messageId',
+    async ({ senderType, characterId, messageId, error }) => {
+      const port = {
+        readPersonalRecords: vi.fn(async () => []),
+        readRelationshipHistory: vi.fn(async () => []),
+        readRecentMessages: vi.fn(async () => [{
+          messageId, sequenceNo: 1, senderType, characterId,
+          text: 'UNPINNED_DERIVED_SOURCE_CANARY',
+          createdAt: '2026-10-09T00:00:00Z',
+        }]),
+      };
+      await expect(composeWithAuthority(port)).rejects.toThrow(error);
+    },
+  );
+
   it('passes Reader grant lookup through pinned subject and memory IDs, never a text instruction', async () => {
     const query = vi.fn(async () => ({ rows: [] }));
     const port = createPostgresReaderContextMemoryGrantsAuthorityPortV1({
