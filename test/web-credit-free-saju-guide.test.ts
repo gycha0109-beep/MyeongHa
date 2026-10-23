@@ -1,0 +1,55 @@
+import { readFile } from 'node:fs/promises';
+import { describe, expect, it } from 'vitest';
+
+const load = (name: string) => readFile(new URL('../apps/web/' + name, import.meta.url), 'utf8');
+
+describe('Web credit guidance and free Saju contract', () => {
+  it('keeps all recharge action unavailable until a saleable server checkout exists', async () => {
+    const [dialog, chat, runtime, css, html] = await Promise.all([
+      load('src/commerce/CreditRechargeDialog.tsx'),
+      load('src/chat/ChatPage.tsx'),
+      load('chat-runtime-client.js'),
+      load('credit-recharge.css'),
+      load('chat.html'),
+    ]);
+    expect(dialog).toContain('CREDIT_RECHARGE_PUBLIC_CHECKOUT_ACTIVE = false');
+    expect(dialog).toContain('disabled={!CREDIT_RECHARGE_PUBLIC_CHECKOUT_ACTIVE}');
+    expect(dialog).toContain('현재 사용 가능한 크레딧');
+    expect(dialog).toContain('조회 미연결');
+    expect(dialog).toContain('판매 준비 중');
+    expect(dialog).toContain("dialog.showModal()");
+    expect(dialog).toContain("openerRef.current?.focus()");
+    expect(chat).toContain('<CreditRechargeDialog />');
+    expect(chat).toContain("myeongha:credit-menu");
+    expect(html).toContain('credit-recharge.css');
+    expect(css).toContain('credit-recharge-dialog::backdrop');
+    expect(runtime).toContain("code === 'INSUFFICIENT_CREDITS' || code === 'CREDIT_INSUFFICIENT'");
+    expect(runtime).toContain("myeongha:credit-shortage");
+    expect(runtime).toContain('turnId: pendingTurn.clientTurnId');
+    expect(runtime).toContain("messageInput.value = ''");
+    expect(runtime.indexOf("messageInput.value = ''")).toBeLessThan(runtime.indexOf('} catch (error) {\n    const code = error instanceof Error ? error.message'));
+    expect(dialog).not.toContain('requestPayment(');
+    expect(dialog).not.toContain('purchase-intent');
+  });
+
+  it('uses the existing Saju calculation display and only an explicitly non-saleable product outline', async () => {
+    const [page, hub, admission] = await Promise.all([
+      load('src/reading/ReadingPage.tsx'),
+      load('saju-hub.js'),
+      load('saju-preview-response-admission.js'),
+    ]);
+    for (const field of ['saju-birth-summary','saju-pillar-grid','saju-day-master','saju-element-bars','saju-completeness-copy']) {
+      expect(page).toContain(field);
+    }
+    expect(page).toContain('className="gm-chart-details" open');
+    expect(page).toContain('무료 기본 명식');
+    expect(page).toContain('정식 읽기 구성 미리보기');
+    expect(page).toContain('구성 안내 예시이며 확정된 결과물 목차가 아닙니다.');
+    expect(page).toContain('판매 준비 중 · 아직 구매할 수 없습니다');
+    expect(page).toContain('href="reading-detail.html?topic=love"');
+    expect(page).not.toContain('product_offer_id');
+    expect(page).not.toContain('entitlement: true');
+    expect(hub).toContain("const SAJU_CALCULATION_ENDPOINT = '/api/me/saju/calculation'");
+    expect(admission).toContain("payload.data.lifecycle !== 'preview'");
+  });
+});
