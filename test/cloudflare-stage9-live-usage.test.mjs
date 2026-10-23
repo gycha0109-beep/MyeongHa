@@ -48,7 +48,7 @@ describe('read-only live Cloudflare usage evidence',()=>{
     expect(make({graphql:invalid}).worker).toBeNull();
     expect(()=>make({fromUtc:'2026-10-24T00:00:00.000Z'})).toThrow();
   });
-  it('reads only GraphQL analytics and Builds limit; sanitizes credentials and provider payloads',async()=>{
+  it('reads only approved Cloudflare analytics/builds endpoints; sanitizes provider data',async()=>{
     const calls=[];
     const f=async(url,init)=>{
       calls.push({url,init});
@@ -58,7 +58,9 @@ describe('read-only live Cloudflare usage evidence',()=>{
       accountId:'a'.repeat(32),apiToken:'PRIVATE-TOKEN',
       now:new Date(toUtc),fetchImpl:f,
     });
-    expect(calls.map(c=>c.init.method)).toEqual(['POST','GET']);
+    expect(calls.map(c=>c.init.method)).toEqual(['POST','GET','GET']);
+    expect(calls[2].url).toContain('/workers/scripts');
+    expect(r.buildHistory).toBeNull();
     expect(calls[0].url).toBe('https://api.cloudflare.com/client/v4/graphql');
     expect(calls[1].url).toContain('/builds/account/limits');
     expect(r.worker.requests).toBe(2715);
