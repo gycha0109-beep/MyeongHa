@@ -15,7 +15,8 @@ function protectedHeaders(extra = {}) {
 export default {
   async fetch(request, env) {
     const pathname = new URL(request.url).pathname;
-    if (/^\\/api(?:\\/|%2f|$)/iu.test(pathname)) {
+    const pathLower = pathname.toLowerCase();
+    if (pathLower === '/api' || pathLower.startsWith('/api/') || pathLower.startsWith('/api%2f')) {
       return new Response(JSON.stringify({ error: 'API_NOT_ACTIVATED_ON_PREVIEW' }), {
         status: 503,
         headers: protectedHeaders({ 'Content-Type': 'application/json; charset=utf-8' }),
