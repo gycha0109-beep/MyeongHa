@@ -10,7 +10,7 @@ import {
 /**
  * PRIVATE S7 -> Commerce withdrawal-review handoff.
  *
- * The DB, not the browser, resolves the exact verified Production Receipt,
+ * The DB, not the browser, resolves the exact original Production Receipt,
  * original purchase Grant, persisted S5 body and retained S7 journal under
  * the shared S1 lock. One original Grant is one purchased unit: a surviving
  * sibling purchase cannot be borrowed as this unit's delivery proof.
@@ -35,8 +35,9 @@ select
   response_prepared_at::text as "responsePreparedAt",
   client_acknowledged_at::text as "clientAcknowledgedAt",
   delivery_attempt_count::text as "deliveryAttemptCount",
-  acknowledged_attempt_count::text as "acknowledgedAttemptCount"
-from public.internal_qry_official_reader_withdrawal_delivery_evidence_v1(
+  acknowledged_attempt_count::text as "acknowledgedAttemptCount",
+  original_receipt_status::text as "originalReceiptStatus"
+from public.internal_qry_official_reader_withdrawal_delivery_state_v2(
   $1::uuid,$2::uuid,$3::uuid,$4::uuid
 )
 `;
@@ -50,6 +51,7 @@ type EvidenceRow = Readonly<{
   clientAcknowledgedAt: unknown;
   deliveryAttemptCount: unknown;
   acknowledgedAttemptCount: unknown;
+  originalReceiptStatus: unknown;
 }>;
 
 type PurchasedUnit = Readonly<{
@@ -73,6 +75,8 @@ export interface CommerceReaderPrivateWithdrawalEvidenceV1 {
   readonly contractVersion: typeof COMMERCE_READER_PRIVATE_WITHDRAWAL_EVIDENCE_VERSION_V1;
   readonly purchasedUnit: PurchasedUnit;
   readonly timeline: Readonly<{
+    /** Current, independently checked state of THIS original Receipt. */
+    readonly originalReceiptStatus: 'verified' | 'revoked';
     readonly s5CommittedAt: string;
     readonly serverResponsePreparedAt: string | null;
     readonly authenticatedClientAcknowledgedAt: string | null;
@@ -163,6 +167,10 @@ export async function reviewOfficialReaderPrivateWithdrawalEvidenceV1(input: Rea
       optionalTimestamp(row.clientAcknowledgedAt);
     const retainedDeliveryAttempts = count(row.deliveryAttemptCount);
     const retainedAcknowledgedAttempts = count(row.acknowledgedAttemptCount);
+    const originalReceiptStatus = row.originalReceiptStatus;
+    if (originalReceiptStatus !== 'verified' && originalReceiptStatus !== 'revoked') {
+      return fail();
+    }
 
     if (retainedAcknowledgedAttempts > retainedDeliveryAttempts ||
         (retainedDeliveryAttempts === 0) !== (serverResponsePreparedAt === null) ||
@@ -182,7 +190,9 @@ export async function reviewOfficialReaderPrivateWithdrawalEvidenceV1(input: Rea
       await input.checkoutNoticeAuthority.readExactServerCheckoutNotice(purchasedUnit);
 
     const review = assessDigitalReadingWithdrawalReviewV1({
-      purchase: { ...purchasedUnit, status: 'verified' },
+      // A previously verified Receipt can later be revoked by the provider.
+      // Never manufacture a currently verified purchase for legal triage.
+      purchase: { ...purchasedUnit, status: originalReceiptStatus },
       claim: input.claim,
       notice: checkoutNotice,
       delivery: {
@@ -197,6 +207,7 @@ export async function reviewOfficialReaderPrivateWithdrawalEvidenceV1(input: Rea
       contractVersion: COMMERCE_READER_PRIVATE_WITHDRAWAL_EVIDENCE_VERSION_V1,
       purchasedUnit,
       timeline: Object.freeze({
+        originalReceiptStatus,
         s5CommittedAt,
         serverResponsePreparedAt,
         authenticatedClientAcknowledgedAt,
