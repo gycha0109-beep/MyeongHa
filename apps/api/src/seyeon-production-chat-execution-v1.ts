@@ -43,6 +43,7 @@ import {
   createSeyeonAttemptZeroPersonalProofV1,
 } from './seyeon-attempt-zero-personal-proof-v1.js';
 import type { SeyeonAttemptZeroPersonalProofV1 } from './seyeon-attempt-zero-personal-proof-v1.js';
+import {assertSeyeonPositiveG1FinalModelContextSealV1} from './seyeon-positive-g1-final-model-context-seal-v1.js';
 import type { SeyeonPositiveS0OwnerDbPortsV1 } from './postgres-seyeon-positive-memory-source-runtime-v1.js';
 import type {
   SeyeonExactModelPersonalSourceSelectionV1,
@@ -742,6 +743,9 @@ export async function runSeyeonProductionChatExecutionV1(
               exactModelPersonalSources.selectedPersonalRecordCount !== 1 ||
               exactModelPersonalSources.selectedMemoryCount !== 1 ||
               exactModelPersonalSources.selectedSources.length !== 1 ||
+              // A relationship-derived source has no Owner-verified original
+              // Grant; the positive one-Memory DB Pin cannot cover it.
+              exactModelPersonalSources.selectedUnpinnedDerivedSources.length !== 0 ||
               productionContext.personalRecordAdmissions.length !== 1 ||
               productionContext.personalRecordAdmissions[0]?.reason !== 'ADMITTED' ||
               productionContext.personalRecordProjectionCandidates?.length !== 1 ||
@@ -782,6 +786,7 @@ export async function runSeyeonProductionChatExecutionV1(
               recordType: source.recordType,
               schemaVersion: source.schemaVersion,
               projectorVersion: source.projectorVersion,
+              selectedSources: exactModelPersonalSources.selectedSources,
               selectedSourcesDigest: positiveModelCorrelation.selectedSourcesDigest,
               projectedMemoryDigest: source.projectedMemoryDigest,
               finalModelContextDigest: positiveModelCorrelation.finalModelContextDigest,
@@ -802,30 +807,19 @@ export async function runSeyeonProductionChatExecutionV1(
 
         const runtime = await runSeyeonCharacterTurnV2({
           ...(positiveModelCorrelation === null ? {} : {
-            assertBeforeModelContext: (assembled: {
-              readonly retrievedMemories: readonly import('../../../packages/domain/src/seyeon-runtime-context-v2.js').SeyeonRetrievedMemoryV2[];
-              readonly disclosure: { readonly retrievedSources: readonly unknown[] };
-              readonly recentConversation: readonly unknown[];
-            }) => {
-              // Recompute from the FINAL assembled model context. This check
-              // runs after Preflight and before Interpreter's first Provider.
-              const actual = selectSeyeonExactModelPersonalSourcesV1({
-                retrievedMemories: assembled.retrievedMemories,
+            assertBeforeModelContext: (assembled) => {
+              // G1 pins the pre-Preflight input. The final Interpreter
+              // packet must match the deterministic closure of that input,
+              // not a tautological re-hash of the original input value.
+              // Unpinned Preflight/derived sources HOLD before Provider.
+              assertSeyeonPositiveG1FinalModelContextSealV1({
+                pinnedContextInput:contextInput,
+                pinnedContextInputDigest:positiveModelCorrelation?.finalModelContextDigest ?? '',
+                selectedSourcesDigest:positiveModelCorrelation?.selectedSourcesDigest ?? '',
                 sourceCandidates:
                   productionContext.personalRecordProjectionCandidates ?? [],
+                assembledContext:assembled,
               });
-              if (actual.selectedPersonalRecordCount !== 1 ||
-                  actual.selectedMemoryCount !== 1 ||
-                  actual.selectedSources.length !== 1 ||
-                  actual.selectedSourcesDigest !== positiveModelCorrelation?.selectedSourcesDigest ||
-                  assembled.retrievedMemories.length !== 1 ||
-                  assembled.disclosure.retrievedSources.length !== 0 ||
-                  assembled.recentConversation.length !== 0 ||
-                  sha256(contextInput) !== positiveModelCorrelation?.finalModelContextDigest) {
-                throw new SeyeonProductionChatExecutionErrorV1(
-                  'Se-yeon assembled model context differs from DB-pinned original Memory.',
-                );
-              }
             },
           }),
           assertBeforePrivateSourceDescriptorRead: assertSeyeonZeroPrivateDescriptorBeforeReadV1,
@@ -945,6 +939,7 @@ export async function runSeyeonProductionChatExecutionV1(
               threadId,
               turnId: receivedTurn.turnId,
               attemptId: attempt.attemptId,
+              userMessageId: receivedTurn.userMessageId,
               assistantMessageId,
               chatOutboxEventId,
               postTurnOutboxEventId,

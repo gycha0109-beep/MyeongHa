@@ -166,6 +166,8 @@ function requireReadingSnapshot(
 export async function getOfficialReadingRecord(input: {
   readonly resolvedSubjectId?: string;
   readonly readingId?: string;
+  /** Server-owned Reader snapshot hash, never returned in the public Records projection. */
+  readonly expectedResponseHash?: string;
   readonly authorityPort: OfficialReadingRecordReadAuthorityPortV1;
 }): Promise<OfficialReadingRecordV1> {
   const subjectId = requireSubjectId(input.resolvedSubjectId);
@@ -179,7 +181,11 @@ export async function getOfficialReadingRecord(input: {
     if (requireStoredUuid('Stored Official Reading identity', row.readingId) !== readingId) {
       throw new Error('Official Reading record authority returned a different Reading identity.');
     }
-    requireStoredString('response hash', row.responseHash);
+    const storedResponseHash = requireStoredString('response hash', row.responseHash);
+    if (input.expectedResponseHash !== undefined &&
+        storedResponseHash !== input.expectedResponseHash) {
+      throw new Error('Official Reading record stored hash differs from the pinned Reader source.');
+    }
 
     const readingContractVersion = requireStoredString(
       'Reading contract version',

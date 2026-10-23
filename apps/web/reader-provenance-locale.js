@@ -7,7 +7,7 @@ export function readerProvenanceLocaleLabelV1(ids, locale = 'ko-KR') {
     if (language === 'zh-TW') return '尚無 Reader 紀錄';
     return 'Reader 기록 없음';
   }
-  const unknown = language === 'ko-KR' ? '대리자' : '代理人';
+  const unknown = language === 'ko-KR' ? '연결자' : '代理人';
   const names = ids.map(id => resolveCharacterDisplayNameV1(id, language) ?? unknown);
   const joined = names.join(' · ');
   if (language === 'ja-JP') return joined + 'による鑑定';

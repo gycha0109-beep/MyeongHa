@@ -1,0 +1,62 @@
+name: '[WT:character-memory] C08 provider ZDR/schema/price GET-once'
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/seyeon-c08-provider-metadata-readonly-once.trigger'
+  workflow_dispatch:
+    inputs:
+      expected_head_sha:
+        description: Exact current main commit SHA (40 hex)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: seyeon-c08-provider-metadata-get-once
+  cancel-in-progress: false
+
+jobs:
+  metadata:
+    if: ${{ github.ref == 'refs/heads/main' && github.run_attempt == 1 && (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.expected_head_sha == github.sha)) }}
+    runs-on: ubuntu-24.04
+    environment: production
+    timeout-minutes: 8
+    steps:
+      - name: Checkout exact main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.sha }}
+      - name: Setup Node 24
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Offline verifier before any external GET
+        run: |
+          set -euo pipefail
+          npm ci --ignore-scripts --no-audit --no-fund
+          npx vitest run test/seyeon-c08-exact-provider-metadata-offline-v1.test.mjs test/seyeon-c08-provider-metadata-readonly-once-v1.test.mjs
+      - name: Four official metadata GETs only (no model inference)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          EXPECTED_HEAD_SHA: ${{ github.event_name == 'push' && github.sha || inputs.expected_head_sha }}
+        run: |
+          set -euo pipefail
+          set +x
+          test -n "$OPENROUTER_API_KEY"
+          node scripts/seyeon-c08-provider-metadata-readonly-once-v1.mjs
+      - name: Retain sanitized public provider metadata
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: seyeon-c08-provider-get-once-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/seyeon-c08-provider-metadata-readback/
+          if-no-files-found: warn
+          retention-days: 14

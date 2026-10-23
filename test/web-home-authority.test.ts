@@ -39,11 +39,10 @@ describe('web Home authority boundary', () => {
     expect(client).not.toContain('character');
   });
 
-  it('uses the browser calendar for the date but does not invent a daily interpretation', () => {
-    expect(page).toContain("new Intl.DateTimeFormat('ko-KR'");
-    expect(page).toContain('new Date()');
-    expect(homeSource).toContain('검증된 전체 사주 프리뷰의 제공 상태를 상세 화면에서 확인할 수 있습니다.');
-    expect(homeSource).toContain('현재 월간 해석은 준비 중입니다.');
+  it('discloses currently available preview scope without inventing monthly or daily interpretations', () => {
+    expect(homeSource).toContain('정식 읽기 제공 여부는 상세 화면에서 확인할 수 있습니다.');
+    expect(homeSource).toContain('월간 해석은 준비 중입니다.');
+    expect(page).toContain('공식 사주 운세와는 별개입니다.');
     expect(homeSource).not.toContain('href="reading-detail.html?scope=month"');
     expect(homeSource).not.toContain('오늘의 흐름은 사주 화면에서 직접 펼쳐볼 수 있습니다.');
     expect(homeSource).not.toContain('좋은 흐름을 만듭니다');
@@ -51,16 +50,16 @@ describe('web Home authority boundary', () => {
 
   it('does not derive a Life Thread from unresolved Life Fact type/value schemas', () => {
     expect(lifeRecordRead).toContain('does not define positive Life Fact type/value schemas while SRC-25 remains');
-    expect(homeSource).toContain('지금은 저장된 사실을 이야기로 추측해 이어 붙이지 않습니다.');
+    expect(homeSource).toContain('최근 대화 기록은 아직 홈에 연결되지 않았습니다.');
     expect(client).not.toContain('/api/life-record');
   });
 
-  it('does not infer a named today-character mapping in the browser', () => {
+  it('shows only existing character presentation entries without minting chat authority', () => {
     expect(characterResolver).toContain('callers must not substitute');
     expect(characterResolver).toContain('infer the mapping in the browser');
-    expect(homeSource).toContain('오늘 이야기할 사람');
-    expect(homeSource).toContain('캐릭터 선택');
-    expect(homeSource).not.toContain('세연');
+    expect(page).toContain("findReaderPresentation(key)");
+    expect(page).toContain('reader.portrait');
+    expect(page).toContain('href="chat-hub.html"');
     expect(homeSource).not.toContain('chat.html?character=');
   });
 

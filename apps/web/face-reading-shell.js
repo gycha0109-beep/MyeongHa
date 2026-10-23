@@ -172,14 +172,14 @@ function openReaderPicker() {
   if (!delegatePicker) {
     delegatePicker = createDelegatePicker({
       titleId: 'face-reader-picker-title',
-      description: '관상 결과 자체는 대리자에 따라 바뀌지 않습니다. 확인된 결과를 무엇부터 보고 어떤 말투로 풀어주는지가 달라집니다.',
-      targetLabel: '관상 · 대리자 선택',
-      note: '대리자는 확인된 관상 결과의 전달 방식과 대화 경험을 맡습니다. 대리자 선택이 관상 의미 자체를 새로 만들거나 바꾸지는 않습니다.',
+      description: '관상 결과 자체는 연결자에 따라 바뀌지 않습니다. 확인된 결과를 무엇부터 보고 어떤 말투로 풀어주는지가 달라집니다.',
+      targetLabel: '관상 · 연결자 선택',
+      note: '연결자는 확인된 관상 결과의 전달 방식과 대화 경험을 맡습니다. 연결자 선택이 관상 의미 자체를 새로 만들거나 바꾸지는 않습니다.',
       resolveOption: (reader) => ({
         selectable: true,
         title: reader.title,
         tone: reader.tone,
-        action: '이 대리자와 보기 →',
+        action: '이 연결자와 보기 →',
         ariaLabel: reader.name + '과 함께 관상 보기',
       }),
       onSelect(reader) {

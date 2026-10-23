@@ -19,6 +19,15 @@ export function FortuneCookie() {
   const t = (source: string) => translateStaticUi(source, locale);
 
   useEffect(() => {
+    const openFromHomeCard = () => {
+      setRevealed(false);
+      setPreviewOpen(true);
+    };
+    document.addEventListener('myeongha:open-fortune-cookie', openFromHomeCard);
+    return () => document.removeEventListener('myeongha:open-fortune-cookie', openFromHomeCard);
+  }, []);
+
+  useEffect(() => {
     const onLocaleChange = (event: Event) => {
       const selected = (event as CustomEvent<{ locale: string }>).detail?.locale;
       setLocale(normalizeUiLocale(selected));

@@ -3,6 +3,10 @@
 // active zero-only Chat runtime; no positive Provider/HTTP capability is given.
 import type {PostgresTransactionQueryV1} from './postgres-subject-execution.js';
 import type {SeyeonProductionChatCommitReceiptV1} from './seyeon-production-chat-execution-v1.js';
+import {createHash} from 'node:crypto';
+import {canonicalJson} from '../../../packages/domain/src/index.js';
+import type {SeyeonExactSelectedPersonalSourceV1} from './seyeon-exact-model-personal-source-selection-v1.js';
+import {validateSeyeonPostTurnAnalysisSnapshotV1} from './seyeon-post-turn-analysis-worker-v1.js';
 
 export const SEYEON_POSITIVE_G1_SOURCE_PIN_SQL_V1 =
   'public.cmd_mark_seyeon_positive_context_ready_pinned_v1' as const;
@@ -23,6 +27,8 @@ export interface SeyeonPositiveS0SourcePinInputV1 {
   readonly recordType:string;
   readonly schemaVersion:string;
   readonly projectorVersion:string;
+  /** Same complete, ordered model selection used to derive selectedSourcesDigest. */
+  readonly selectedSources:readonly SeyeonExactSelectedPersonalSourceV1[];
   readonly selectedSourcesDigest:string;
   readonly projectedMemoryDigest:string;
   readonly finalModelContextDigest:string;
@@ -34,6 +40,7 @@ export interface SeyeonPositiveS0AtomicCommitInputV1 {
   readonly threadId:string;
   readonly turnId:string;
   readonly attemptId:string;
+  readonly userMessageId:string;
   readonly assistantMessageId:string;
   readonly chatOutboxEventId:string;
   readonly postTurnOutboxEventId:string;
@@ -73,7 +80,7 @@ function receiptText(value:unknown):string{
 }
 function receiptNumber(value:unknown):number{
   const n=typeof value==='number'?value:typeof value==='string'?Number(value):NaN;
-  if(!Number.isSafeInteger(n)||n<0)throw Error('Se-yeon DB Commit sequence malformed');
+  if(!Number.isSafeInteger(n)||n<1)throw Error('Se-yeon DB Commit sequence malformed');
   return n;
 }
 
@@ -89,6 +96,34 @@ export function createSeyeonPositiveS0OwnerDbPortsV1(
             input.finalModelContextDigest].every(digest)
         || !PG_SHA.test(input.expectedOriginalPgDigest)) {
         throw Error('Se-yeon positive G1 requires exact server-created source');
+      }
+      // §57/§60: bind the immutable DB G1 Pin digest to the SAME actual
+      // one-source model selection. A syntactically valid digest is never
+      // proof that a matching original Memory/Grant was selected.
+      const selected=input.selectedSources;
+      const source=Array.isArray(selected)&&selected.length===1?selected[0]:null;
+      const sourceKeys=[
+        'recordKind','recordId','grantId','recordType','schemaVersion',
+        'rawRecordDigest','projectedMemoryDigest','rawRecordPgDigest',
+        'projectorVersion',
+      ] as const;
+      if(!source||typeof source!=='object'||Array.isArray(source)
+        ||Object.keys(source).length!==sourceKeys.length
+        ||sourceKeys.some(key=>!Object.prototype.hasOwnProperty.call(source,key))
+        ||source.recordKind!=='memory'
+        ||source.recordId!==input.originalMemoryId
+        ||source.grantId!==input.originalGrantId
+        ||source.recordType!==input.recordType
+        ||source.schemaVersion!==input.schemaVersion
+        ||source.projectorVersion!==input.projectorVersion
+        ||source.projectedMemoryDigest!==input.projectedMemoryDigest
+        ||source.rawRecordPgDigest!==input.expectedOriginalPgDigest
+        ||!SHA.test(source.rawRecordDigest)
+        ||!SHA.test(source.projectedMemoryDigest)
+        ||!PG_SHA.test(source.rawRecordPgDigest)
+        ||'sha256:v1:'+createHash('sha256')
+          .update(canonicalJson(selected)).digest('hex')!==input.selectedSourcesDigest) {
+        throw Error('Se-yeon positive G1 selected source digest mismatch');
       }
       const rows=await client.query<{receipt:unknown}>(`
 select public.cmd_mark_seyeon_positive_context_ready_pinned_v1(
@@ -106,11 +141,29 @@ select public.cmd_mark_seyeon_positive_context_ready_pinned_v1(
       if(receipt===null||typeof receipt!=='object'||Array.isArray(receipt))
         throw Error('Se-yeon G1 owner Pin receipt missing');
       const proof=receipt as Record<string,unknown>;
-      if(proof.schemaVersion!=='seyeon-positive-original-memory-source-pin-v1'
+      // The DB owner defines exactly one original Memory / original Grant
+      // proof. Do not promote a partial receipt or a mismatched type/projector
+      // to model authority even when the IDs and digest strings happen to fit.
+      const expectedKeys=[
+        'schemaVersion','subjectId','threadId','turnId','attemptId',
+        'characterId','recordKind','recordId','originalGrantId',
+        'originalGrantedAt','recordType','recordSchemaVersion',
+        'projectorVersion','selectedSourcesDigest','projectedMemoryDigest',
+        'originalPgJsonbDigest','finalModelContextDigest',
+      ] as const;
+      if(Object.keys(proof).length!==expectedKeys.length
+        ||expectedKeys.some(key=>!Object.prototype.hasOwnProperty.call(proof,key))
+        ||proof.schemaVersion!=='seyeon-positive-original-memory-source-pin-v1'
         ||proof.subjectId!==input.subjectId||proof.threadId!==input.threadId
         ||proof.turnId!==input.turnId||proof.attemptId!==input.attemptId
+        ||proof.characterId!=='seyeon'||proof.recordKind!=='memory'
         ||proof.originalGrantId!==input.originalGrantId
         ||proof.recordId!==input.originalMemoryId
+        ||proof.recordType!==input.recordType
+        ||proof.recordSchemaVersion!==input.schemaVersion
+        ||proof.projectorVersion!==input.projectorVersion
+        ||typeof proof.originalGrantedAt!=='string'
+        ||!Number.isFinite(Date.parse(proof.originalGrantedAt))
         ||proof.selectedSourcesDigest!==input.selectedSourcesDigest
         ||proof.projectedMemoryDigest!==input.projectedMemoryDigest
         ||proof.finalModelContextDigest!==input.finalModelContextDigest
@@ -122,7 +175,7 @@ select public.cmd_mark_seyeon_positive_context_ready_pinned_v1(
       input:SeyeonPositiveS0AtomicCommitInputV1,
     ):Promise<SeyeonProductionChatCommitReceiptV1>{
       if(![input.subjectId,input.threadId,input.turnId,input.attemptId,
-          input.assistantMessageId,input.chatOutboxEventId,
+          input.userMessageId,input.assistantMessageId,input.chatOutboxEventId,
           input.postTurnOutboxEventId].every(exactId)
         ||![input.postTurnSnapshotHash,input.selectedSourcesDigest,
              input.finalModelContextDigest].every(digest)
@@ -130,6 +183,24 @@ select public.cmd_mark_seyeon_positive_context_ready_pinned_v1(
         ||typeof input.postTurnSnapshot!=='object'
         ||Array.isArray(input.postTurnSnapshot)) {
         throw Error('Se-yeon positive G2 requires exact validated source');
+      }
+      // Positive G2 may only commit the actual official post-turn snapshot
+      // for this server turn and assistant. A checksum-shaped string or
+      // self-rehashed ad hoc object is not a validated worker projection.
+      // Deny before entering the DB owner commit transaction.
+      let verifiedSnapshot: ReturnType<typeof validateSeyeonPostTurnAnalysisSnapshotV1>;
+      try {
+        verifiedSnapshot=validateSeyeonPostTurnAnalysisSnapshotV1(
+          input.postTurnSnapshot,input.postTurnSnapshotHash,
+        );
+      } catch {
+        throw Error('Se-yeon positive G2 Post-turn Snapshot unverified');
+      }
+      if(verifiedSnapshot.turnId!==input.turnId
+        ||verifiedSnapshot.userMessageId!==input.userMessageId
+        ||verifiedSnapshot.assistantMessageId!==input.assistantMessageId
+        ||canonicalJson(verifiedSnapshot)!==canonicalJson(input.postTurnSnapshot)){
+        throw Error('Se-yeon positive G2 Post-turn Snapshot identity mismatched');
       }
       const result=await client.query<Record<string,unknown>>(`
 select turn_id::text as "turnId",

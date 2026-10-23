@@ -37,7 +37,7 @@ function authoredCharacter(
     contentVersion: CONTENT_VERSION,
     displayName: '세연',
     gender: 'female',
-    deityProxyLabel: '결의 대리자',
+    deityProxyLabel: '결의 연결자',
     shortDescriptor: 'fixture source-complete Character lane',
     personalityTraits: ['deliberate'],
     flaws: ['over-retention'],

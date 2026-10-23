@@ -15,6 +15,7 @@ import type {
 import {
   sendSeyeonNodeOriginalGrantResponseV1,
   assertSeyeonNodeChatResponseMetadataV1,
+  assertSeyeonNodeFirstSendAdmissionV1,
   type SeyeonNodeChatResponseMetadataV1,
   type SeyeonNodeOriginalGrantSendOutcomeV1,
   type SeyeonOriginalGrantLockedReadV1,
@@ -22,7 +23,7 @@ import {
 
 export const SEYEON_G3_FIRST_POSITIVE_MEMORY_NODE_V1 = Object.freeze({
   version: 'seyeon-g3-first-positive-memory-node-v1',
-  dbAuthority: 'public.qry_seyeon_positive_first_memory_locked_reveal_v1',
+  dbAuthority: 'public.qry_seyeon_positive_first_memory_locked_reveal_v3',
   transport: 'node:http.ServerResponse',
   publicRouteMounted: false,
   availableForProduction: false,
@@ -37,8 +38,9 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-
 
 const LOCKED_G3_SQL = `
 select assistant_text as "assistantText"
-from public.qry_seyeon_positive_first_memory_locked_reveal_v1(
-  $1::uuid,$2::uuid,$3::uuid,$4::uuid
+from public.qry_seyeon_positive_first_memory_locked_reveal_v3(
+  $1::uuid,$2::uuid,$3::uuid,$4::uuid,
+  $5::uuid,$6::uuid,$7::uuid,$8::text
 )
 `.trim();
 
@@ -54,7 +56,7 @@ select
     'public.cmd_commit_seyeon_positive_chat_turn_v1(uuid,uuid,uuid,uuid,uuid,uuid,uuid,jsonb,text,text,text)'
   ) is not null
   and to_regprocedure(
-    'public.qry_seyeon_positive_first_memory_locked_reveal_v1(uuid,uuid,uuid,uuid)'
+    'public.qry_seyeon_positive_first_memory_locked_reveal_v3(uuid,uuid,uuid,uuid,uuid,uuid,uuid,text)'
   ) is not null
   and (
     select count(*)
@@ -67,7 +69,7 @@ select
         'public.cmd_commit_seyeon_positive_chat_turn_v1(uuid,uuid,uuid,uuid,uuid,uuid,uuid,uuid,jsonb,text,text,text)'
       ),
       to_regprocedure(
-        'public.qry_seyeon_positive_first_memory_locked_reveal_v1(uuid,uuid,uuid,uuid)'
+        'public.qry_seyeon_positive_first_memory_locked_reveal_v3(uuid,uuid,uuid,uuid,uuid,uuid,uuid,text)'
       )
     )
       and p.prosecdef
@@ -76,11 +78,11 @@ select
       and not pg_catalog.has_function_privilege('authenticated',p.oid,'EXECUTE')
       and not pg_catalog.has_function_privilege('service_role',p.oid,'EXECUTE')
       and (
-        (p.proname='qry_seyeon_positive_first_memory_locked_reveal_v1'
+        (p.proname='qry_seyeon_positive_first_memory_locked_reveal_v3'
          and pg_catalog.pg_get_userbyid(p.proowner)='postgres'
          and 'row_security=off'=any(p.proconfig))
         or
-        (p.proname<>'qry_seyeon_positive_first_memory_locked_reveal_v1'
+        (p.proname<>'qry_seyeon_positive_first_memory_locked_reveal_v3'
          and pg_catalog.pg_get_userbyid(p.proowner)=
            'myeongha_seyeon_chat_runtime_owner')
       )
@@ -128,7 +130,8 @@ export async function assertSeyeonFirstPositiveNodeDbReadyV1(input: Readonly<{
 }
 
 /**
- * Only server-owned commit locators; never the result's assistantText,
+ * Only server-owned commit locators, including DB-original User,
+ * Assistant and durable Post-turn Outbox IDs; never the result's assistantText,
  * client JSON or any replay cache. An independent DB-owner G3 function
  * rechecks current original Grant+Memory and holds row locks until deliver
  * finishes on the SAME direct Node socket, or rollback on interruption.
@@ -140,10 +143,20 @@ export function createSeyeonFirstPositiveMemoryLockedReadV1(input: Readonly<{
   threadId: string;
   turnId: string;
   attemptId: string;
+  originalUserMessageId: string;
+  committedAssistantMessageId: string;
+  postTurnOutboxEventId: string;
+  currentClientTurnId: string;
 }>): SeyeonOriginalGrantLockedReadV1 {
   if (!member(input.verifiedEvidence) ||
       ![input.expectedSubjectId,input.threadId,input.turnId,
-        input.attemptId].every(value=>UUID.test(value))) {
+        input.attemptId,input.originalUserMessageId,
+        input.committedAssistantMessageId,input.postTurnOutboxEventId]
+        .every(value=>typeof value==='string'&&UUID.test(value)) ||
+      typeof input.currentClientTurnId!=='string' ||
+      input.currentClientTurnId.length<1 ||
+      input.currentClientTurnId.length>256 ||
+      input.currentClientTurnId.trim()!==input.currentClientTurnId) {
     throw new SeyeonG3FirstPositiveNodeUnavailableV1('INVALID_SCOPE');
   }
   let used=false;
@@ -163,6 +176,8 @@ export function createSeyeonFirstPositiveMemoryLockedReadV1(input: Readonly<{
         }
         const result=await client.query<{assistantText:unknown}>(LOCKED_G3_SQL,[
           resolvedSubject.subjectId,input.threadId,input.turnId,input.attemptId,
+          input.originalUserMessageId,input.committedAssistantMessageId,
+          input.postTurnOutboxEventId,input.currentClientTurnId,
         ]);
         const value=result.rows.length===1 ? result.rows[0]?.assistantText : null;
         const body=typeof value==='string'&&value.trim().length>0&&
@@ -183,25 +198,59 @@ export async function deliverSeyeonCommittedFirstPositiveMemoryNodeTurnV1(
     verifiedEvidence:VerifiedSubjectIdentityEvidenceV1;
     result:RunProductionSeyeonChatResultV1;
     expectedThreadId:string;
+    expectedClientTurnId:string;
     requestId:string;
     serverTime:string;
     deadlineMs?:number;
   }>,
 ):Promise<SeyeonNodeOriginalGrantSendOutcomeV1>{
   const receipt=input.result?.execution?.committedTurn;
+  const originalPostTurnOutboxId=receipt?.postTurnOutboxEventId;
   // An old committed Replay must not inherit the first-send admission.
   if (!member(input.verifiedEvidence) ||
       !UUID.test(input.expectedThreadId) ||
+      typeof input.expectedClientTurnId!=='string' ||
+      input.expectedClientTurnId.length<1 ||
+      input.expectedClientTurnId.length>256 ||
+      input.expectedClientTurnId.trim()!==input.expectedClientTurnId ||
       !responseWritable(input.response,input.requestSignal) ||
       input.result?.threadBinding?.threadId!==input.expectedThreadId ||
+      !Array.isArray(input.result?.threadBinding?.participantCharacterIds) ||
+      input.result.threadBinding.participantCharacterIds.length!==1 ||
+      input.result.threadBinding.participantCharacterIds[0]!=='seyeon' ||
       input.result?.execution?.disposition!=='executed' ||
+      input.result?.execution?.receivedTurn?.turnId!==receipt?.turnId ||
+      input.result?.execution?.receivedTurn?.threadCharacterId!=='seyeon' ||
+      // A newly executed attempt does not erase a prior receive replay or
+      // grant fresh first-Reveal rights to a previously committed user Turn.
+      // Only a newly received DB-original User Turn may acquire this first
+      // private Reveal. A prior committed/delivered/failed receipt is stale.
+      input.result?.execution?.receivedTurn?.turnState!=='received' ||
       input.result?.execution?.receivedTurn?.replayed!==false ||
+      input.result?.execution?.receivedTurn?.committedTurn!==null ||
       input.result?.execution?.attempt?.replayed!==false ||
       input.result?.execution?.attempt?.attemptId!==receipt?.attemptId ||
-      input.result?.execution?.receivedTurn?.turnId!==receipt?.turnId ||
       !receipt || receipt.replayed!==false ||
+      !Number.isSafeInteger(receipt.sequenceNo) || receipt.sequenceNo<1 ||
+      // First private Reply requires G2's durable post-turn Outbox lineage,
+      // not only a committed assistant message. A different/deferred job
+      // must never inherit this exact original Grant's first-send authority.
+      (input.result?.execution?.postTurnAnalysis?.status!=='processed' &&
+       input.result?.execution?.postTurnAnalysis?.status!=='deferred') ||
+      // BOTH inline-processed and deferred post-turn outcomes must belong
+      // to this exact G2 durable Outbox. A processed foreign job cannot
+      // inherit the first original-Memory send right.
+      (input.result?.execution?.postTurnAnalysis?.status==='processed' &&
+       input.result.execution.postTurnAnalysis.result.outboxEventId!==
+         receipt.postTurnOutboxEventId) ||
+      (input.result?.execution?.postTurnAnalysis?.status==='deferred' &&
+       input.result.execution.postTurnAnalysis.outboxEventId!==
+         receipt.postTurnOutboxEventId) ||
+      typeof originalPostTurnOutboxId!=='string' ||
+      !UUID.test(originalPostTurnOutboxId) ||
       ![input.result.subjectId,receipt.turnId,receipt.attemptId,
-        receipt.assistantMessageId].every(s=>UUID.test(s))) {
+        input.result?.execution?.receivedTurn?.userMessageId,
+        receipt.assistantMessageId].every(s=>typeof s==='string'&&UUID.test(s))) {
     input.response.destroy();
     throw new SeyeonG3FirstPositiveNodeUnavailableV1('INVALID_COMMIT');
   }
@@ -230,13 +279,16 @@ export async function deliverSeyeonCommittedFirstPositiveMemoryNodeTurnV1(
         threadId:input.expectedThreadId,
         turnId:receipt.turnId,
         attemptId:receipt.attemptId,
+        originalUserMessageId:input.result.execution.receivedTurn.userMessageId,
+        committedAssistantMessageId:receipt.assistantMessageId,
+        postTurnOutboxEventId:originalPostTurnOutboxId,
+        currentClientTurnId:input.expectedClientTurnId,
       }),
       chatResponseMetadata:metadata,
       ...(input.deadlineMs===undefined?{}:{deadlineMs:input.deadlineMs}),
     });
   } catch (error) {
-    // The direct G3 delivery export must fail closed too: sender validation
-    // can throw before its internal socket abort/rollback handlers are active.
+    // Caller must not leave an open Node socket on a failed send admission.
     if (!input.response.destroyed) input.response.destroy();
     throw error;
   }
@@ -266,34 +318,65 @@ export async function executeAndDeliverSeyeonFirstPositiveMemoryNodeTurnV1(
     input.response.destroy();
     throw new SeyeonG3FirstPositiveNodeUnavailableV1('INVALID_SCOPE');
   }
+  // Even an unmounted direct Node candidate must reject invalid server
+  // receipt metadata and deadline before G1/G2/G3 readiness or paid model
+  // dispatch. Validation after runtime.run() would be too late.
+  try {
+    assertSeyeonNodeFirstSendAdmissionV1(input);
+  } catch {
+    input.response.destroy();
+    throw new SeyeonG3FirstPositiveNodeUnavailableV1('INVALID_SCOPE');
+  }
   // Check all exact real DB owner RPCs before runtime.run can send paid
   // Interpreter/Renderer requests or persist any personal context.
+  // Owner/ACL readiness can fail while the unmounted Node handler still
+  // owns an open socket. Terminate it before propagating the HOLD so no
+  // outer fallback can accidentally write an unapproved response.
   try {
     await assertSeyeonFirstPositiveNodeDbReadyV1(input);
-    if (!responseWritable(input.response,input.requestSignal)) {
-      throw new SeyeonG3FirstPositiveNodeUnavailableV1('INVALID_SCOPE');
-    }
-    const result=await input.runtime.run({
+  } catch (error) {
+    input.response.destroy();
+    throw error;
+  }
+  if (!responseWritable(input.response,input.requestSignal)) {
+    input.response.destroy();
+    throw new SeyeonG3FirstPositiveNodeUnavailableV1('INVALID_SCOPE');
+  }
+  // A governed runtime/provider failure must not leave a writable Node
+  // response that an outer catch/fallback can turn into an unauthorized
+  // success or an error containing private model text.
+  let result: RunProductionSeyeonChatResultV1;
+  try {
+    result=await input.runtime.run({
       verifiedEvidence:input.verifiedEvidence,
       threadId:input.threadId,
       clientTurnId:input.clientTurnId,
       text:input.text.trim(),
     });
-    return await deliverSeyeonCommittedFirstPositiveMemoryNodeTurnV1({
-      response:input.response,
-      requestSignal:input.requestSignal,
-      pool:input.pool,
-      verifiedEvidence:input.verifiedEvidence,
-      result,
-      expectedThreadId:input.threadId,
-      requestId:input.requestId,
-      serverTime:input.serverTime,
-      ...(input.deadlineMs===undefined?{}:{deadlineMs:input.deadlineMs}),
-    });
   } catch (error) {
-    // No runtime failure may leave a live socket to an unmounted fallback
-    // handler that might disclose stale or caller-supplied personal content.
-    if (!input.response.destroyed) input.response.destroy();
+    input.response.destroy();
     throw error;
   }
+  // The runtime may have resolved/replayed a different DB user message
+  // despite being invoked with this request. A committed result is not
+  // authorization to disclose a reply to a different message. Require
+  // byte-exact agreement with the normalized text sent to runtime.run()
+  // before fetching ANY original-Grant-protected assistant response.
+  if (result?.execution?.disposition !== 'executed' ||
+      result.execution.receivedTurn?.userText !== input.text.trim()) {
+    input.response.destroy();
+    throw new SeyeonG3FirstPositiveNodeUnavailableV1('INVALID_COMMIT');
+  }
+  return deliverSeyeonCommittedFirstPositiveMemoryNodeTurnV1({
+    response:input.response,
+    requestSignal:input.requestSignal,
+    pool:input.pool,
+    verifiedEvidence:input.verifiedEvidence,
+    result,
+    expectedThreadId:input.threadId,
+    expectedClientTurnId:input.clientTurnId,
+    requestId:input.requestId,
+    serverTime:input.serverTime,
+    ...(input.deadlineMs===undefined?{}:{deadlineMs:input.deadlineMs}),
+  });
 }

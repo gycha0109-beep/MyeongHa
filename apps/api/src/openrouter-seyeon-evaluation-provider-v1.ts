@@ -302,7 +302,8 @@ export function createOpenRouterSeyeonEvaluationProviderV1(
         const reasoning = outputDetails.reasoning_tokens === undefined
           ? 0 : token(outputDetails.reasoning_tokens);
         if (prompt === null || prompt < 1 || completion === null ||
-            completion < 1 || cached === null || cached > prompt ||
+            completion < 1 || completion > config.maxCompletionTokens ||
+            cached === null || cached > prompt ||
             reasoning === null || reasoning > completion) {
           await observe('usage_unknown', response.status, null, 'usage_invalid');
           return fail('USAGE_UNKNOWN', response.status);

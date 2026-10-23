@@ -12,12 +12,12 @@ export interface MobileChatCharacterPresentationV1 {
  */
 export const MOBILE_CHAT_CHARACTER_PRESENTATION_BY_ID_V1 = Object.freeze({
   seyeon: Object.freeze({
-    title: '무녀',
+    title: '명하의 안내인',
     openingLine: '왔네요. 오늘은 어떤 이야기부터 해볼까요?',
     tags: Object.freeze(['밝고 가까운', '따뜻한', '편하게'] as const),
   }),
   yeoul: Object.freeze({
-    title: '설계관 기록관',
+    title: '운영관리팀 사원',
     openingLine: '그래서, 무슨 얘기인데요? 듣고는 있을게요.',
     tags: Object.freeze(['새침한', '빠른 반응', '솔직한'] as const),
   }),
@@ -27,32 +27,32 @@ export const MOBILE_CHAT_CHARACTER_PRESENTATION_BY_ID_V1 = Object.freeze({
     tags: Object.freeze(['조용한', '기억', '천천히'] as const),
   }),
   rahyeon: Object.freeze({
-    title: '대리자',
+    title: '전시 기획자',
     openingLine: '말해봐요. 어디서부터 시작할지는 당신이 정해요.',
     tags: Object.freeze(['성숙한', '긴장감', '주도적인'] as const),
   }),
   mira: Object.freeze({
-    title: '대리자',
+    title: '연결자',
     openingLine: '편하게 말해요. 듣고 있을게요.',
     tags: Object.freeze(['무심다정', '친구 같은', '담백한'] as const),
   }),
   taegyeom: Object.freeze({
-    title: '대리자',
+    title: '프로 격구 선수',
     openingLine: '핵심부터 말해보죠. 무엇이 가장 걸립니까?',
     tags: Object.freeze(['차가운', '까다로운', '핵심부터'] as const),
   }),
   yunho: Object.freeze({
-    title: '대리자',
+    title: '연결자',
     openingLine: '천천히 말씀하셔도 됩니다. 어떤 이야기부터 시작할까요?',
     tags: Object.freeze(['따뜻한', '안정적인', '지적인'] as const),
   }),
   doyun: Object.freeze({
-    title: '대리자',
+    title: '연결자',
     openingLine: '자, 무슨 얘기부터 해볼까요? 편하게 말해요.',
     tags: Object.freeze(['자유로운', '능청스러운', '가벼운'] as const),
   }),
   baekheon: Object.freeze({
-    title: '충추원의 장',
+    title: '베테랑 조정자',
     openingLine: '이야기를 시작하죠. 지금 가장 먼저 꺼내고 싶은 것은 무엇입니까?',
     tags: Object.freeze(['선택과 책임', '차분한', '직설적인'] as const),
   }),
