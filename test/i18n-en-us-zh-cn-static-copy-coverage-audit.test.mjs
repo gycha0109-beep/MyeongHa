@@ -4,6 +4,7 @@ import {
   extractStaticUiSourceKeysV1,
   auditPlannedUiCopyKeysV1,
   auditCurrentPlannedUiCopyV1,
+  classifyPlannedUiCopyOwnershipV1,
 } from '../scripts/i18n/planned-ui-copy-coverage-v1.mjs';
 
 describe('I18N-07 non-authorizing English and Simplified Chinese UI gap audit', () => {
@@ -30,6 +31,17 @@ describe('I18N-07 non-authorizing English and Simplified Chinese UI gap audit', 
     expect(Object.isFrozen(status.unclassifiedOrUnauthoredKeys)).toBe(true);
   });
 
+  it('respects protected owners and leaves unreviewed text pending', () => {
+    const a = classifyPlannedUiCopyOwnershipV1(['홈','세연','갑','미심사 문구','홈'], ['홈','세연','갑']);
+    expect(a.reviewedUiOwnedKeys).toEqual(['홈']);
+    expect(a.characterOwnedKeys).toEqual(['세연']);
+    expect(a.sourceOwnedKeys).toEqual(['갑']);
+    expect(a.pendingOwnerReviewKeys).toEqual(['미심사 문구']);
+    expect(a.privateDynamicDataInspected).toBe(false);
+    expect(a.readyForRelease).toBe(false);
+    expect(Object.isFrozen(a.pendingOwnerReviewKeys)).toBe(true);
+  });
+
   it('audits actual current web and native static catalogues without translating source data', async () => {
     const root = fileURLToPath(new URL('../', import.meta.url));
     const status = await auditCurrentPlannedUiCopyV1(root);
@@ -41,6 +53,18 @@ describe('I18N-07 non-authorizing English and Simplified Chinese UI gap audit', 
     expect(status.authoredKeys).toBe(
       status.stagedKeysWithinAuthoredCatalog + status.unclassifiedOrUnauthoredKeys.length,
     );
+    expect(status.ownership.reviewedUiOwnedKeys).toContain('세계관 둘러보기');
+    expect(status.ownership.characterOwnedKeys).toContain('세연');
+    expect(status.ownership.sourceOwnedKeys).toContain('갑');
+    expect(status.ownership.pendingOwnerReviewKeys).toContain('연결자와 함께 읽습니다.');
+    expect(status.ownership.privateDynamicDataInspected).toBe(false);
+    expect(status.ownership.readyForRelease).toBe(false);
+    expect(
+      status.ownership.reviewedUiOwnedKeys.length +
+      status.ownership.characterOwnedKeys.length +
+      status.ownership.sourceOwnedKeys.length +
+      status.ownership.pendingOwnerReviewKeys.length,
+    ).toBe(status.authoredKeys);
     expect(status.readyForRelease).toBe(false);
   });
 });

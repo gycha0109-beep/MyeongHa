@@ -25,6 +25,35 @@ export function extractStaticUiSourceKeysV1(content, arrayAnchor, arrayEnd) {
   return [...new Set(data.map((row) => row[0]))];
 }
 
+/**
+ * Only explicitly staged authored labels are reviewed UI-owned; identity and
+ * source atoms are protected. Everything else requires manual owner review.
+ * Conversation, private and official-reading bodies are outside this inventory.
+ */
+export const CHARACTER_OWNED_STATIC_UI_KEYS_V1 = Object.freeze(["명하","7명의 신의 연결자가","세연","백헌","여울","서린","라현","미라","태겸","윤호","도윤","세연의 따뜻한 오후빛 대화 공간","백헌의 야간 기록실","여울의 회보라 기록 공간","서린의 조용한 기록 서고","라현의 낮은 조도 응접 공간","미라의 담백한 현대 생활 공간","태겸의 절제된 회색 공간","윤호의 따뜻한 목재 서재","도윤의 자유롭고 비공식적인 공간","MEET SEYEON · 세연"]);
+export const SOURCE_OWNED_STATIC_UI_KEYS_V1 = Object.freeze(["갑","을","병","정","무","기","경","신","임","계"]);
+
+export function classifyPlannedUiCopyOwnershipV1(authoredKeys, plannedKeys) {
+  const planned = new Set(plannedKeys);
+  const character = new Set(CHARACTER_OWNED_STATIC_UI_KEYS_V1);
+  const source = new Set(SOURCE_OWNED_STATIC_UI_KEYS_V1);
+  const reviewedUiOwnedKeys = [], characterOwnedKeys = [], sourceOwnedKeys = [], pendingOwnerReviewKeys = [];
+  for (const key of new Set(authoredKeys)) {
+    if (character.has(key)) characterOwnedKeys.push(key);
+    else if (source.has(key)) sourceOwnedKeys.push(key);
+    else if (planned.has(key)) reviewedUiOwnedKeys.push(key);
+    else pendingOwnerReviewKeys.push(key);
+  }
+  return Object.freeze({
+    reviewedUiOwnedKeys: Object.freeze(reviewedUiOwnedKeys),
+    characterOwnedKeys: Object.freeze(characterOwnedKeys),
+    sourceOwnedKeys: Object.freeze(sourceOwnedKeys),
+    pendingOwnerReviewKeys: Object.freeze(pendingOwnerReviewKeys),
+    privateDynamicDataInspected: false,
+    readyForRelease: false,
+  });
+}
+
 export function auditPlannedUiCopyKeysV1(webKeys, mobileNativeKeys, plannedKeys) {
   const required = [...new Set([...webKeys, ...mobileNativeKeys])];
   const staged = new Set(plannedKeys);
@@ -34,6 +63,7 @@ export function auditPlannedUiCopyKeysV1(webKeys, mobileNativeKeys, plannedKeys)
     authoredKeys: required.length,
     stagedKeysWithinAuthoredCatalog: covered.length,
     unclassifiedOrUnauthoredKeys: Object.freeze(missing),
+    ownership: classifyPlannedUiCopyOwnershipV1(required, plannedKeys),
     // A staged key may be an identity/source-bound text that is deliberately
     // NOT eligible for translation. Release admission must be reviewed separately.
     readyForRelease: false,
@@ -62,6 +92,11 @@ if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.m
     stagedKeysWithinAuthoredCatalog: audit.stagedKeysWithinAuthoredCatalog,
     unclassifiedOrUnauthoredCount: audit.unclassifiedOrUnauthoredKeys.length,
     sampleUnclassifiedKeys: audit.unclassifiedOrUnauthoredKeys.slice(0, 15),
+    reviewedUiOwnedCount: audit.ownership.reviewedUiOwnedKeys.length,
+    characterOwnedCount: audit.ownership.characterOwnedKeys.length,
+    sourceOwnedCount: audit.ownership.sourceOwnedKeys.length,
+    pendingOwnerReviewCount: audit.ownership.pendingOwnerReviewKeys.length,
+    privateDynamicDataInspected: audit.ownership.privateDynamicDataInspected,
     readyForRelease: audit.readyForRelease,
   }, null, 2) + '\n');
 }
