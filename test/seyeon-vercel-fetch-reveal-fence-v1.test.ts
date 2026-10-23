@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   enforceSeyeonVercelFetchRevealFenceV1,
-  registerSeyeonStaticPreflightDenialV1,
+  createSeyeonVercelStaticPreflightDenialV1,
 } from '../apps/api/src/seyeon-vercel-fetch-reveal-fence-v1.js';
 
 const CANARY = 'NEVER_RETURN_PRIVATE_SEYEON_ASSISTANT_BODY';
@@ -35,12 +35,12 @@ describe('Vercel Fetch final SeYeon response fence', () => {
   });
 
   it('preserves pre-provider, no-store 401 validation without disclosing assistant text', async () => {
-    const input = Response.json({
-      ok: false,
-      error: { code: 'AUTH_REQUIRED', messageKey: 'auth.required', retryable: false },
-    }, { status: 401, headers: { 'Cache-Control': 'no-store' } });
+    const input = createSeyeonVercelStaticPreflightDenialV1({
+      status: 401, code: 'AUTH_REQUIRED', messageKey: 'auth.required',
+      retryable: false, requestId: 'r12-auth',
+    });
     const result = enforceSeyeonVercelFetchRevealFenceV1(
-      registerSeyeonStaticPreflightDenialV1(input), 'r12-auth',
+      input, 'r12-auth',
     );
     expect(result).toBe(input);
     expect(result.status).toBe(401);
@@ -49,23 +49,35 @@ describe('Vercel Fetch final SeYeon response fence', () => {
     });
   });
   it('rejects a registered 4xx if headers change or its body was already consumed', async () => {
-    const registered = registerSeyeonStaticPreflightDenialV1(Response.json({
-      ok: false,
-      error: { code: 'AUTH_REQUIRED', messageKey: 'auth.required', retryable: false },
-    }, { status: 401, headers: { 'Cache-Control': 'no-store' } }));
+    const registered = createSeyeonVercelStaticPreflightDenialV1({
+      status: 401, code: 'AUTH_REQUIRED', messageKey: 'auth.required',
+      retryable: false, requestId: 'r13-auth',
+    });
     registered.headers.set('X-Private-Assistant', CANARY);
     const mutated = enforceSeyeonVercelFetchRevealFenceV1(registered, 'r13-mutated');
     expect(mutated.status).toBe(503);
     expect(await mutated.text()).not.toContain(CANARY);
 
-    const consumed = registerSeyeonStaticPreflightDenialV1(Response.json({
-      ok: false,
-      error: { code: 'AUTH_REQUIRED', messageKey: 'auth.required', retryable: false },
-    }, { status: 401, headers: { 'Cache-Control': 'no-store' } }));
+    const consumed = createSeyeonVercelStaticPreflightDenialV1({
+      status: 401, code: 'AUTH_REQUIRED', messageKey: 'auth.required',
+      retryable: false, requestId: 'r13-auth',
+    });
     await consumed.text();
     const result = enforceSeyeonVercelFetchRevealFenceV1(consumed, 'r13-consumed');
     expect(result.status).toBe(503);
     expect((await result.json()).error.code).toBe('SEYEON_FIRST_REVEAL_AUTHORITY_UNAVAILABLE');
+  });
+
+  it('rejects arbitrary static error claims before a Response can be trusted', () => {
+    for (const invalid of [
+      { status: 403, code: 'AUTH_REQUIRED', messageKey: 'auth.required', retryable: false },
+      { status: 401, code: 'AUTH_REQUIRED', messageKey: 'custom.secret', retryable: false },
+      { status: 401, code: 'AUTH_REQUIRED', messageKey: 'auth.required', retryable: true },
+    ]) {
+      expect(() => createSeyeonVercelStaticPreflightDenialV1({
+        ...invalid, requestId: 'r13-invalid',
+      })).toThrow('Unapproved');
+    }
   });
 
   it('blocks forged unregistered 401/403 errors carrying private assistant bytes', async () => {
