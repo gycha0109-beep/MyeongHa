@@ -14,6 +14,7 @@ import {
   type PostgresSubjectPoolV1,
 } from './postgres-subject-execution.js';
 import { createPostgresBirthProfileCreateAuthorityPortV1 } from './postgres-birth-profile-create-authority.js';
+import { resolveSelfBirthAgeAdmissionV1 } from './legal-minor-age-policy-v1.js';
 
 const POST_METHOD = 'POST' as const;
 const ROUTE = '/api/birth-profiles' as const;
@@ -190,6 +191,28 @@ export async function handleBirthProfileCreateRequestV1(
       retryable: false,
       requestId,
     });
+  }
+
+
+  // This is a SELF Birth Profile, so the submitted DOB must not admit an
+  // under-14 child without audited guardian consent. No DB/AI call is started.
+  const submitted = requestBody as { input: { birthDate: string; calendarType?: string } };
+  const admission = resolveSelfBirthAgeAdmissionV1({
+    birthDate: submitted.input.birthDate,
+    calendarType: submitted.input.calendarType,
+    serverTime,
+  });
+  if (admission === 'under14_denied' || admission === 'age_boundary_unverified') {
+    return jsonError({
+      status: 403,
+      code: admission === 'under14_denied' ? 'AGE_RESTRICTED' : 'AGE_VERIFICATION_REQUIRED',
+      messageKey: admission === 'under14_denied' ? 'birth_profile.age_restricted' : 'birth_profile.age_verification_required',
+      retryable: false,
+      requestId,
+    });
+  }
+  if (admission === 'invalid') {
+    return jsonError({ status: 400, code: 'INVALID_REQUEST', messageKey: 'request.invalid', retryable: false, requestId });
   }
 
   try {
