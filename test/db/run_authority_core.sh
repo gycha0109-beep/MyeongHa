@@ -159,6 +159,10 @@ run_isolated_case myeongha_reader_scope_lock_s2_instrumented_race_test bash test
 # S7: real migrated Checkout ledger joins, original Receipt/Grant/Item and first attempt.
 # This remains a relational proof only: no approved notice store or S5 body.
 run_isolated_case myeongha_reader_checkout_original_ledger_test bash test/db/official_reader_checkout_original_item_postgres.sh
+# S2/S7: real verified original Reader refund overlaps the historical Receipt
+# status read. Clone-only S7 v1 test double isolates the v2 snapshot boundary;
+# the actual S5 body, retained ACK and Owner/Legal acceptance remain HOLD.
+run_isolated_case myeongha_reader_s7_receipt_snapshot_race_test bash test/db/official_reader_s7_original_receipt_snapshot_race.sh
 bash test/db/entitlements_current_query.sh
 bash test/db/data_deletion_job_query.sh
 bash test/db/notification_preferences_query.sh
