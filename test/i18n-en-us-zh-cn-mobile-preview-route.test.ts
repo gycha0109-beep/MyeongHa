@@ -140,7 +140,7 @@ describe('I18N-07 Expo developer-only Saju UI preview boundary', () => {
     expect(recordsRoute).toContain('previewLocale={previewLocale}');
     expect(recordsRoute).toContain('visibleItems(tab, snapshots)');
     expect(recordsRoute).toContain('itemCount={initialLoading ? null : items.length}');
-    expect(recordsRoute).toContain('openReading(item.source.readingId)');
+    expect(recordsRoute).toContain('onOpenReading(item.source.readingId)');
     expect(recordsRoute).toContain('loadMore(tab)');
     expect(recordsHeader).toContain("previewText('지나온 이야기에도')");
     expect(recordsHeader).toContain("previewText('나의 결이 남습니다.')");
