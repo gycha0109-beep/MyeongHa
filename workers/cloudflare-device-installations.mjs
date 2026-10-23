@@ -1,3 +1,4 @@
+import { createCloudflareSubjectPoolV1 } from './cloudflare-hyperdrive-subject-pool.mjs';
 // Cloudflare device-installation register/revoke adapter. Existing
 // subject/RLS/token-protection HTTP runtime remains the sole authority.
 // Watchtower-Track: ops
@@ -12,7 +13,6 @@ import { createProductionDeviceInstallationRuntimeV1 } from '../apps/api/src/pro
 import { parseProductionUserDataRuntimeConfigV1 } from '../apps/api/src/production-user-data-runtime-config.ts';
 import {
   buildProductionNodePostgresPoolConfigV1,
-  createNodePostgresSubjectPoolV1,
 } from '../apps/api/src/node-postgres-subject-pool.ts';
 import { CLOUDFLARE_DIRECT_POSTGRES_CANDIDATE_LIMITS_V1 } from '../apps/api/src/cloudflare-direct-postgres-candidate.ts';
 
@@ -92,7 +92,7 @@ export async function tryHandleCloudflareApprovedDeviceInstallationsV1(request, 
     config = parseProductionUserDataRuntimeConfigV1(bindings);
     if (!approvedCloudflarePostgresTargetV1(config, bindings)) return unavailable();
     const tls = buildProductionNodePostgresPoolConfigV1(
-      config, CLOUDFLARE_DIRECT_POSTGRES_CANDIDATE_LIMITS_V1,
+      config, bindings, CLOUDFLARE_DIRECT_POSTGRES_CANDIDATE_LIMITS_V1,
     );
     if (tls.max !== 1 || !tls.ssl || typeof tls.ssl !== 'object' ||
         tls.ssl.rejectUnauthorized !== true) return unavailable();
@@ -104,8 +104,8 @@ export async function tryHandleCloudflareApprovedDeviceInstallationsV1(request, 
   let subjectPool;
   let result;
   try {
-    subjectPool = createNodePostgresSubjectPoolV1(
-      config, CLOUDFLARE_DIRECT_POSTGRES_CANDIDATE_LIMITS_V1,
+    subjectPool = createCloudflareSubjectPoolV1(
+      config, bindings, CLOUDFLARE_DIRECT_POSTGRES_CANDIDATE_LIMITS_V1,
     );
     runtime = createProductionDeviceInstallationRuntimeV1({
       env: bindings,

@@ -1,3 +1,4 @@
+import { createCloudflareSubjectPoolV1 } from './cloudflare-hyperdrive-subject-pool.mjs';
 // Ops stage 4 / S-CF2: mount existing Security-owned fail-closed boundaries.
 // Server-owned DB participant scope is mandatory before distinguishing SeYeon
 // from other Characters. Never authorize a positive protected response here.
@@ -22,7 +23,7 @@ import {
 } from '../apps/api/src/seyeon-cloudflare-offline-reveal-fence-v1.ts';
 import { parseProductionUserDataRuntimeConfigV1 } from '../apps/api/src/production-user-data-runtime-config.ts';
 import { createProductionRequestIdentityVerifierV1 } from '../apps/api/src/production-request-identity-verifier.ts';
-import { buildProductionNodePostgresPoolConfigV1, createNodePostgresSubjectPoolV1 } from '../apps/api/src/node-postgres-subject-pool.ts';
+import { buildProductionNodePostgresPoolConfigV1 } from '../apps/api/src/node-postgres-subject-pool.ts';
 import { CLOUDFLARE_DIRECT_POSTGRES_CANDIDATE_LIMITS_V1 } from '../apps/api/src/cloudflare-direct-postgres-candidate.ts';
 
 export const CLOUDFLARE_SEYEON_EGRESS_STAGES_V1 = Object.freeze([
@@ -111,12 +112,12 @@ function createDefaultSubjectScope(bindings) {
   // fails, no pool has been allocated and nothing can remain unclosed.
   if(!approvedCloudflarePostgresTargetV1(config,bindings)) throw Error('Unapproved scoped chat DB host');
   const strict=buildProductionNodePostgresPoolConfigV1(
-    config,CLOUDFLARE_DIRECT_POSTGRES_CANDIDATE_LIMITS_V1,
+    config,bindings, CLOUDFLARE_DIRECT_POSTGRES_CANDIDATE_LIMITS_V1,
   );
   if(strict.max!==1||typeof strict.ssl!=='object'||strict.ssl===null||
      strict.ssl.rejectUnauthorized!==true) throw Error('Unapproved scoped chat TLS');
   const identityEvidenceVerifier = createProductionRequestIdentityVerifierV1({ config });
-  const pool=createNodePostgresSubjectPoolV1(config,CLOUDFLARE_DIRECT_POSTGRES_CANDIDATE_LIMITS_V1);
+  const pool=createCloudflareSubjectPoolV1(config,bindings, CLOUDFLARE_DIRECT_POSTGRES_CANDIDATE_LIMITS_V1);
   return { pool, identityEvidenceVerifier, close: () => pool.close() };
 }
 

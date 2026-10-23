@@ -1,3 +1,4 @@
+import { createCloudflareSubjectPoolV1 } from './cloudflare-hyperdrive-subject-pool.mjs';
 // Cloudflare Saju preview-reading adapter, separate from calculation-only.
 // The existing subject/reading authorities decide all positive results.
 // Watchtower-Track: ops
@@ -13,7 +14,6 @@ import { parseProductionUserDataRuntimeConfigV1 } from '../apps/api/src/producti
 import { parseProductionSajuRuntimeConfigV1 } from '../apps/api/src/production-saju-runtime-config.ts';
 import {
   buildProductionNodePostgresPoolConfigV1,
-  createNodePostgresSubjectPoolV1,
 } from '../apps/api/src/node-postgres-subject-pool.ts';
 import { CLOUDFLARE_DIRECT_POSTGRES_CANDIDATE_LIMITS_V1 } from '../apps/api/src/cloudflare-direct-postgres-candidate.ts';
 
@@ -82,7 +82,7 @@ export async function tryHandleCloudflareApprovedSajuPreviewReadingV1(request, b
     parseProductionSajuRuntimeConfigV1(bindings);
     if (!approvedCloudflarePostgresTargetV1(config, bindings)) return unavailable();
     const tls = buildProductionNodePostgresPoolConfigV1(
-      config, CLOUDFLARE_DIRECT_POSTGRES_CANDIDATE_LIMITS_V1,
+      config, bindings, CLOUDFLARE_DIRECT_POSTGRES_CANDIDATE_LIMITS_V1,
     );
     if (tls.max !== 1 || !tls.ssl || typeof tls.ssl !== 'object' ||
         tls.ssl.rejectUnauthorized !== true) return unavailable();
@@ -94,8 +94,8 @@ export async function tryHandleCloudflareApprovedSajuPreviewReadingV1(request, b
   let subjectPool;
   let result;
   try {
-    subjectPool = createNodePostgresSubjectPoolV1(
-      config, CLOUDFLARE_DIRECT_POSTGRES_CANDIDATE_LIMITS_V1,
+    subjectPool = createCloudflareSubjectPoolV1(
+      config, bindings, CLOUDFLARE_DIRECT_POSTGRES_CANDIDATE_LIMITS_V1,
     );
     runtime = createProductionCurrentSubjectSajuPreviewReadingRuntimeV1({
       env: bindings, pool: subjectPool,

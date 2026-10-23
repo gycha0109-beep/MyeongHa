@@ -1,3 +1,4 @@
+import { createCloudflareSubjectPoolV1 } from './cloudflare-hyperdrive-subject-pool.mjs';
 // Cloudflare calculation-only adapter. Independent explicit approval after
 // Auth/DB origin admission; absent bindings leave the public route at 404.
 // Never activate Reading/LLM, face image processing, or commerce here.
@@ -13,7 +14,6 @@ import { createProductionCurrentSubjectSajuCalculationRuntimeV1 } from '../apps/
 import { parseProductionUserDataRuntimeConfigV1 } from '../apps/api/src/production-user-data-runtime-config.ts';
 import {
   buildProductionNodePostgresPoolConfigV1,
-  createNodePostgresSubjectPoolV1,
 } from '../apps/api/src/node-postgres-subject-pool.ts';
 import { CLOUDFLARE_DIRECT_POSTGRES_CANDIDATE_LIMITS_V1 } from '../apps/api/src/cloudflare-direct-postgres-candidate.ts';
 import { CURRENT_SUBJECT_SAJU_CALCULATION_HTTP_BINDINGS_V1 } from '../apps/api/src/current-subject-saju-calculation-http.ts';
@@ -102,7 +102,7 @@ export async function tryHandleCloudflareApprovedSajuCalculationV1(request, bind
     config = parseProductionUserDataRuntimeConfigV1(bindings);
     if (!approvedCloudflarePostgresTargetV1(config, bindings)) return unavailable();
     const tls = buildProductionNodePostgresPoolConfigV1(
-      config, CLOUDFLARE_DIRECT_POSTGRES_CANDIDATE_LIMITS_V1,
+      config, bindings, CLOUDFLARE_DIRECT_POSTGRES_CANDIDATE_LIMITS_V1,
     );
     if (tls.max !== 1 || !tls.ssl ||
         typeof tls.ssl !== 'object' || tls.ssl.rejectUnauthorized !== true) {
@@ -122,8 +122,8 @@ export async function tryHandleCloudflareApprovedSajuCalculationV1(request, bind
     // canonical Birth revision selection, restricted Postgres and the
     // calculation-only HTTPS producer. Per-request lifetime prevents
     // cross-request pg connection reuse on Workers.
-    subjectPool = createNodePostgresSubjectPoolV1(
-      config, CLOUDFLARE_DIRECT_POSTGRES_CANDIDATE_LIMITS_V1,
+    subjectPool = createCloudflareSubjectPoolV1(
+      config, bindings, CLOUDFLARE_DIRECT_POSTGRES_CANDIDATE_LIMITS_V1,
     );
     runtime = createProductionCurrentSubjectSajuCalculationRuntimeV1({
       env: bindings, pool: subjectPool,

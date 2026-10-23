@@ -1,3 +1,4 @@
+import { createCloudflareSubjectPoolV1 } from './cloudflare-hyperdrive-subject-pool.mjs';
 // Cloudflare owner-scoped records API adapter. Reuses the Vercel authority
 // and its subject/RLS enforcement; never opens Chat/AI or a Vercel proxy.
 // Watchtower-Track: ops
@@ -16,7 +17,6 @@ import {
 import { parseProductionUserDataRuntimeConfigV1 } from '../apps/api/src/production-user-data-runtime-config.ts';
 import {
   buildProductionNodePostgresPoolConfigV1,
-  createNodePostgresSubjectPoolV1,
 } from '../apps/api/src/node-postgres-subject-pool.ts';
 import { CLOUDFLARE_DIRECT_POSTGRES_CANDIDATE_LIMITS_V1 } from '../apps/api/src/cloudflare-direct-postgres-candidate.ts';
 
@@ -85,14 +85,14 @@ export async function tryHandleCloudflareApprovedRecordsV1(request,bindings,rout
     config=parseProductionUserDataRuntimeConfigV1(bindings);
     if(!approvedCloudflarePostgresTargetV1(config,bindings)) return unavailable();
     const tls=buildProductionNodePostgresPoolConfigV1(
-      config,CLOUDFLARE_DIRECT_POSTGRES_CANDIDATE_LIMITS_V1,
+      config,bindings, CLOUDFLARE_DIRECT_POSTGRES_CANDIDATE_LIMITS_V1,
     );
     if(tls.max!==1||!tls.ssl||typeof tls.ssl!=='object'||
        tls.ssl.rejectUnauthorized!==true) return unavailable();
   }catch{return unavailable();}
   let pool,runtime,result;
   try{
-    pool=createNodePostgresSubjectPoolV1(config,CLOUDFLARE_DIRECT_POSTGRES_CANDIDATE_LIMITS_V1);
+    pool=createCloudflareSubjectPoolV1(config,bindings, CLOUDFLARE_DIRECT_POSTGRES_CANDIDATE_LIMITS_V1);
     runtime=route.id==='rewrite.life-record'
       ?createProductionLifeRecordReadRuntimeV1({env:bindings,pool})
       :readings

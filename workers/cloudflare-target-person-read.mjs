@@ -1,3 +1,4 @@
+import { createCloudflareSubjectPoolV1 } from './cloudflare-hyperdrive-subject-pool.mjs';
 // Owner-scoped target-person reads use the existing Vercel runtime
 // and PostgreSQL subject/RLS authority. No Vercel proxy or mutation.
 // Watchtower-Track: ops
@@ -13,7 +14,6 @@ import { createProductionTargetPersonCreateRuntimeV1 } from '../apps/api/src/pro
 import { parseProductionUserDataRuntimeConfigV1 } from '../apps/api/src/production-user-data-runtime-config.ts';
 import {
   buildProductionNodePostgresPoolConfigV1,
-  createNodePostgresSubjectPoolV1,
 } from '../apps/api/src/node-postgres-subject-pool.ts';
 import { CLOUDFLARE_DIRECT_POSTGRES_CANDIDATE_LIMITS_V1 } from '../apps/api/src/cloudflare-direct-postgres-candidate.ts';
 
@@ -73,7 +73,7 @@ export async function tryHandleCloudflareApprovedTargetPersonReadV1(request, bin
   try {
     config = parseProductionUserDataRuntimeConfigV1(bindings);
     if (!approvedCloudflarePostgresTargetV1(config, bindings)) return unavailable();
-    const tls = buildProductionNodePostgresPoolConfigV1(config, CLOUDFLARE_DIRECT_POSTGRES_CANDIDATE_LIMITS_V1);
+    const tls = buildProductionNodePostgresPoolConfigV1(config, bindings, CLOUDFLARE_DIRECT_POSTGRES_CANDIDATE_LIMITS_V1);
     if (tls.max !== 1 || !tls.ssl || typeof tls.ssl !== 'object' || tls.ssl.rejectUnauthorized !== true) return unavailable();
   } catch {
     return unavailable();
@@ -81,7 +81,7 @@ export async function tryHandleCloudflareApprovedTargetPersonReadV1(request, bin
 
   let pool, runtime, result;
   try {
-    pool = createNodePostgresSubjectPoolV1(config, CLOUDFLARE_DIRECT_POSTGRES_CANDIDATE_LIMITS_V1);
+    pool = createCloudflareSubjectPoolV1(config, bindings, CLOUDFLARE_DIRECT_POSTGRES_CANDIDATE_LIMITS_V1);
     runtime = isCreate
       ? createProductionTargetPersonCreateRuntimeV1({ env: bindings, pool })
       : createProductionTargetPersonReadRuntimeV1({ env: bindings, pool });

@@ -1,3 +1,4 @@
+import { createCloudflareSubjectPoolV1 } from './cloudflare-hyperdrive-subject-pool.mjs';
 // Owner-scoped generic Character Chat open/history API. Security's
 // Se-yeon/mixed-thread fence always runs BEFORE this independent admission.
 // This adapter never handles chat turns, Provider calls or assistant reveals.
@@ -13,7 +14,6 @@ import { createProductionChatReadRuntimeV1 } from '../apps/api/src/production-ch
 import { parseProductionUserDataRuntimeConfigV1 } from '../apps/api/src/production-user-data-runtime-config.ts';
 import {
   buildProductionNodePostgresPoolConfigV1,
-  createNodePostgresSubjectPoolV1,
 } from '../apps/api/src/node-postgres-subject-pool.ts';
 import { CLOUDFLARE_DIRECT_POSTGRES_CANDIDATE_LIMITS_V1 } from '../apps/api/src/cloudflare-direct-postgres-candidate.ts';
 
@@ -89,14 +89,14 @@ export async function tryHandleCloudflareGenericChatReadV1(request,bindings,rout
     config=parseProductionUserDataRuntimeConfigV1(bindings);
     if(!approvedCloudflarePostgresTargetV1(config,bindings)) return unavailable();
     const tls=buildProductionNodePostgresPoolConfigV1(
-      config,CLOUDFLARE_DIRECT_POSTGRES_CANDIDATE_LIMITS_V1,
+      config,bindings, CLOUDFLARE_DIRECT_POSTGRES_CANDIDATE_LIMITS_V1,
     );
     if(tls.max!==1 || typeof tls.ssl!=='object'||tls.ssl===null||
        tls.ssl.rejectUnauthorized!==true) return unavailable();
   } catch { return unavailable(); }
   let pool,runtime,result;
   try {
-    pool=createNodePostgresSubjectPoolV1(config,CLOUDFLARE_DIRECT_POSTGRES_CANDIDATE_LIMITS_V1);
+    pool=createCloudflareSubjectPoolV1(config,bindings, CLOUDFLARE_DIRECT_POSTGRES_CANDIDATE_LIMITS_V1);
     runtime=createProductionChatReadRuntimeV1({env:bindings,pool});
     result=await runtime.handleRequest({
       request,requestId:crypto.randomUUID(),serverTime:new Date().toISOString(),

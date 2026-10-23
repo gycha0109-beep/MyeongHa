@@ -1,3 +1,4 @@
+import { createCloudflareSubjectPoolV1 } from './cloudflare-hyperdrive-subject-pool.mjs';
 // Cloudflare direct Auth/DB adapter. Activated only after an explicit exact
 // origin + secret policy binding; missing bindings leave preview APIs at 404.
 // Never proxy to Vercel or promote Seyeon, Commerce, or records.
@@ -16,7 +17,6 @@ import { handleSocialAuthStartRequestV1 } from '../apps/api/src/social-auth-star
 import { handleNaverOAuthBridgeRequestV1 } from '../apps/api/src/naver-oauth-bridge-http.ts';
 import {
   buildProductionNodePostgresPoolConfigV1,
-  createNodePostgresSubjectPoolV1,
 } from '../apps/api/src/node-postgres-subject-pool.ts';
 import { PostgresMemberAuthRateLimitAdmissionPortV1 } from '../apps/api/src/postgres-member-auth-rate-limit.ts';
 import { CLOUDFLARE_DIRECT_POSTGRES_CANDIDATE_LIMITS_V1 } from '../apps/api/src/cloudflare-direct-postgres-candidate.ts';
@@ -381,8 +381,8 @@ export async function tryHandleCloudflareApprovedAuthV1(request, bindings, route
   // pool injection. A Worker HTTP fetch owns a max-one-connection pool;
   // legacy Vercel calls without the option keep their unchanged defaults.
   function createSubjectPool() {
-    subjectPool = createNodePostgresSubjectPoolV1(
-      approvedDbConfig, CLOUDFLARE_DIRECT_POSTGRES_CANDIDATE_LIMITS_V1,
+    subjectPool = createCloudflareSubjectPoolV1(
+      approvedDbConfig, bindings, CLOUDFLARE_DIRECT_POSTGRES_CANDIDATE_LIMITS_V1,
     );
     return subjectPool;
   }
@@ -466,7 +466,7 @@ export async function tryHandleCloudflareApprovedAuthV1(request, bindings, route
       // Cloudflare injects a distinct request-owned pool with max=1, then
       // closes it on every success/error path after the Auth runtime settles.
       const rateLimitConfig = parseProductionMemberAuthRateLimitConfigV1(bindings);
-      memberRateLimitPool = createNodePostgresSubjectPoolV1(
+      memberRateLimitPool = createCloudflareSubjectPoolV1(
         rateLimitConfig, CLOUDFLARE_DIRECT_POSTGRES_CANDIDATE_LIMITS_V1,
       );
       runtime = createProductionMemberAuthHttpRuntimeV1({
