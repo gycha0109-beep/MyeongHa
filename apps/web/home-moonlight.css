@@ -50,12 +50,17 @@ body.gm-page[data-page="home"] .product-profile { display: inline-flex; }
   z-index: -1;
   top: 0; bottom: 0; right: 0;
   width: 60%;
+  /* The 320px orbit illustration creates a huge circular frame at hero scale.
+     Layer existing approved ink-wash motifs instead; no new artwork or identity. */
   background:
-    url("home-v5-plum-corner.webp") right -24px top -22px / 340px auto no-repeat,
-    url("home-landscape.svg") right -90px bottom -70px / 870px auto no-repeat,
-    url("home-v5-mountain.webp") center bottom -18px / 100% auto no-repeat;
-  opacity: .80;
-  filter: saturate(.75) sepia(.10);
+    url("home-v5-plum-corner.webp") right -20px top -24px / 340px auto no-repeat,
+    radial-gradient(ellipse at 64% 91%, rgba(237,206,208,.46), transparent 48%),
+    linear-gradient(0deg, rgba(25,25,41,.32), transparent 85%),
+    url("home-v5-mountain.webp") right bottom -30px / 104% auto no-repeat,
+    url("home-paper-mountains.svg") right bottom 4px / 112% auto no-repeat;
+  opacity: .79;
+  filter: saturate(.72) sepia(.08);
+  mask-image: linear-gradient(90deg, transparent, #000 24%);
 }
 .mhx-hero::after {
   content: "";
@@ -225,7 +230,10 @@ body.gm-page[data-page="home"] .product-profile { display: inline-flex; }
   transition: transform .15s, box-shadow .15s;
 }
 .mhx-character-art { position: relative; height: 184px; overflow: hidden; background: #dbcbd0; }
-.mhx-character-art img { width: 100%; height: 100%; object-fit: cover; object-position: center 24%; display: block; }
+.mhx-character-art img { width: 100%; height: 100%; object-fit: cover; object-position: center 36%; display: block; }
+/* The uploaded Yeoul portrait has a lower face focal point than the other cards.
+   Adjust framing only; retain the approved source pixels and original aspect ratio. */
+.mhx-character[data-presentation="yeoul"] .mhx-character-art img { object-position: center 57%; }
 .mhx-character-caption {
   position: absolute;
   inset: auto 0 0;
@@ -351,7 +359,7 @@ html[data-theme="dark"] .mhx-characters {
   .mhx-home { width: calc(100% - 36px); }
   .mhx-hero { margin: 0 -18px; padding: 30px 18px 36px; }
   .mhx-topics { width: 100%; max-width: 710px; grid-template-columns: repeat(2, minmax(0,1fr)); }
-  .mhx-hero::before { width: 75%; opacity: .4; }
+  .mhx-hero::before { width: 78%; opacity: .46; mask-image: linear-gradient(90deg, transparent, #000 30%); }
   .mhx-moon { right: 9%; top: 22px; width: 80px; }
   .mhx-hero-heading { max-width: 720px; }
   .mhx-hero-quote { display: none; }
