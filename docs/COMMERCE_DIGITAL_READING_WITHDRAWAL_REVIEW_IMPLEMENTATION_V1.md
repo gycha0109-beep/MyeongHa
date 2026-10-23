@@ -37,6 +37,13 @@
 - `CommerceReaderImmutableCheckoutNoticeStoreV1`가 없으면 DB 조회도 수행하지 않고 `null`을 반환한다. Store/DB 오류, 잘못된 회원·범위, 다중 결과 또는 후행 고지는 `missing_or_unverifiable` 상태다. 단위·통합 모의 DB 시험은 `commerce-reader-postgres-checkout-notice-authority-v1.test.ts`에 포함한다.
 - **저장소·보존기간·실제 운영 연결은 미승인:** 새 Checkout 증빙 테이블, 실행 권한, 개인정보 처리/파기 정책, 운영 결제 페이지, 공개 API/자동 환불 판단을 만들거나 활성화하지 않았다. Commerce·Privacy·Legal Owner의 원본 스냅샷 저장 및 보존 범위 승인 후에만 실제 저장소를 연결한다. 이 비공개 어댑터의 구조 및 합성 테스트는 실제 PostgreSQL 원장 자료 검증이나 법률상 콘텐츠 제공 증명이 아니다.
 
+## S7 실제 PostgreSQL 원본 구매 항목 결속 격리 검증 (2026-10-23)
+
+- `test/db/official_reader_checkout_notice_original_ledger_fixture.sql`에서 마이그레이션이 적용된 **격리 DB**에 구매 요청 생성→최초 Payment Attempt→Purchase 검증→원본 Receipt→정본 `internal_apply_entitlement_effect_v1`의 Grant 발급 순서로 시험 데이터를 구성한다. 일반적인 JSON mock만으로 거래 결속에 성공했다고 선언하지 않는다.
+- `test/postgres-commerce-reader-checkout-original-item-ledger.test.ts`는 배포 코드의 `ORIGINAL_CHECKOUT_UNIT_SQL_V1`에서 **기존 S7 2250 권한 관문에 해당하는 CTE만** 합성한 이미 검증된 원본 ID로 치환한다. 나머지는 동일한 실제 SQL을 PostgreSQL에서 실행하여 **원본 Subject × Purchase × Receipt × Grant × Capability Item × 최초 시도** 정합성과 교차 구매/Grant/Subject 차단을 검사한다.
+- 해당 합성 CTE는 **진짜 S7 비공개 Reader 권한 획득을 시험하는 것이 아니다.** 정본 S7 보호 본문/실제 사용자 ACK, Privacy 복원 게이트, 법정 소비자 공급 증빙 또는 결제 전 고지의 실존을 만들지 않는다. 실제 2250 S1 잠금·Owner 승인·재검사 조건은 별도로 남아 있다.
+- `test/db/run_authority_core.sh`는 새 시험을 기존 격리 템플릿의 복제 DB에서 실행하며, 비CI 및 localhost 외 DB를 거부한다. 테스트용 거래 자료는 격리 DB 종료와 함께 폐기한다. 실제 불변 Checkout 고지 저장·복원·보존·접근 제어는 여전히 Commerce·Privacy·Legal 승인 대기이고 Public/Offer/유료 응답은 **OFF**다.
+
 ## 다음 수락 게이트
 
 1. Commerce/Legal이 실제 상품 단위와 법정 기간·고지/미리보기·취소 경로를 승인.
