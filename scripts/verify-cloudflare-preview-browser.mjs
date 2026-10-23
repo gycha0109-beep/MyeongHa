@@ -67,8 +67,18 @@ try {
   });
   const send=(method,params={})=>new Promise((resolve,reject)=>{
     const id=++serial;
-    pending.set(id,{resolve,reject});
-    socket.send(JSON.stringify({id,method,params}));
+    // Browser-side DevTools calls can stall indefinitely after Chrome quits
+    // on Windows; bound every command rather than hanging the smoke.
+    const timeout=setTimeout(()=>{
+      pending.delete(id);
+      reject(Error('Chrome DevTools timed out: '+method));
+    },15_000);
+    pending.set(id,{
+      resolve:value=>{ clearTimeout(timeout); resolve(value); },
+      reject:error=>{ clearTimeout(timeout); reject(error); },
+    });
+    try { socket.send(JSON.stringify({id,method,params})); }
+    catch (error) { clearTimeout(timeout); pending.delete(id); reject(error); }
   });
   const evaluate=async expression=>{
     const result=await send('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true});
