@@ -4,8 +4,9 @@ import type {
 import type {
   CommerceReaderCheckoutNoticeAuthorityPortV1,
 } from './commerce-reader-private-withdrawal-evidence-v1.js';
-import type {
-  CommerceReaderOriginalCheckoutNoticeRecordV1,
+import {
+  linkOriginalCheckoutNoticeToReaderGrantV1,
+  type CommerceReaderOriginalCheckoutNoticeRecordV1,
 } from './commerce-reader-checkout-notice-proof-v1.js';
 
 /**
@@ -24,7 +25,7 @@ import type {
 /** Private SQL exported only to exercise exact relational joins on a disposable PostgreSQL ledger. */
 export const ORIGINAL_CHECKOUT_UNIT_SQL_V1 = `
 with authorized_original as materialized (
-  select evidence.purchase_intent_id, evidence.unit_id
+  select evidence.purchase_intent_id, evidence.unit_id, evidence.s5_committed_at
   from public.internal_qry_official_reader_withdrawal_delivery_state_v2(
     $1::uuid,$2::uuid,$3::uuid,$4::uuid
   ) evidence
@@ -33,7 +34,8 @@ select
   intent.id::text as "purchaseIntentId",
   grant_row.id::text as "originatingGrantId",
   capability_item.item_key as "pinnedCapabilityItemKey",
-  first_attempt.created_at::text as "originalPaymentAttemptCreatedAt"
+  first_attempt.created_at::text as "originalPaymentAttemptCreatedAt",
+  original.s5_committed_at::text as "s5CommittedAt"
 from authorized_original original
 join public.entitlement_grants grant_row
   on grant_row.id=original.unit_id
@@ -84,6 +86,7 @@ type LineageRow = Readonly<{
   originatingGrantId: unknown;
   pinnedCapabilityItemKey: unknown;
   originalPaymentAttemptCreatedAt: unknown;
+  s5CommittedAt: unknown;
 }>;
 
 type OriginalNoticeRecord = Readonly<{
@@ -177,7 +180,8 @@ export function createCommerceReaderPostgresCheckoutNoticeAuthorityV1(input: Rea
             row.originatingGrantId!==unit.unitId ||
             !item(row.pinnedCapabilityItemKey)) return null;
         const paymentAt=iso(row.originalPaymentAttemptCreatedAt);
-        if (paymentAt===null) return null;
+        const committedAt=iso(row.s5CommittedAt);
+        if (paymentAt===null || committedAt===null) return null;
 
         const pinnedCapabilityItemKey=row.pinnedCapabilityItemKey;
         const original=await store.readOriginalNotice({
@@ -188,7 +192,7 @@ export function createCommerceReaderPostgresCheckoutNoticeAuthorityV1(input: Rea
         if (!noticeIsExact(original,unit.purchaseIntentId,
           pinnedCapabilityItemKey,unit.productSpecVersion)) return null;
 
-        return Object.freeze({
+        const resolved: CommerceReaderOriginalCheckoutNoticeRecordV1 = Object.freeze({
           authority:'commerce_owner_immutable_checkout_notice_v1',
           purchaseIntentId:unit.purchaseIntentId,
           originatingGrantId:unit.unitId,
@@ -202,6 +206,13 @@ export function createCommerceReaderPostgresCheckoutNoticeAuthorityV1(input: Rea
           acknowledgedAt:original.acknowledgedAt,
           originalPaymentAttemptCreatedAt:paymentAt,
         });
+        // The ledger adapter is itself an authority boundary. Never return an
+        // apparently attested notice if its recorded consent followed payment
+        // or the protected answer committed before the payment attempt.
+        const proof=linkOriginalCheckoutNoticeToReaderGrantV1({
+          record:resolved,unit,s5CommittedAt:committedAt,
+        });
+        return proof.notice===null ? null : resolved;
       } catch {
         // Do not expose Commerce tables, Receipt IDs, provider or Notice state.
         return null;
