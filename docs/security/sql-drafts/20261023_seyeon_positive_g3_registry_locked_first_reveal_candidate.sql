@@ -1,8 +1,7 @@
 -- Watchtower-Track: security
--- SOURCE CANDIDATE ONLY; NOT a registered Supabase migration or approved Reveal.
--- §61 S5/G3: additional active SRC-25 registry row-share fence for last-hop
--- first response; do not deploy without G0-D04 technical Owner/S-ACK proof.
--- Preserve the original reviewed 20261021183000 migration byte-identically.
+-- SOURCE CANDIDATE ONLY: §61 S5/G3 exact G2 receipt locators (7 UUIDs).
+-- Does not modify the existing reviewed 4-argument migration. No deployment,
+-- EXECUTE grants, SRC-25 approval, paid Provider or public first Reveal.
 -- Watchtower-Track: security
 -- S5/G3 production-schema source code: strictly first committed Se-yeon turn
 -- backed by ONE immutable original Memory/Grant positive G1 Pin.
@@ -26,8 +25,10 @@ end
 $preflight$;
 
 -- No additional personal tables or extra Subject-linked deletion graph.
-create function public.qry_seyeon_positive_first_memory_locked_reveal_v1(
-  p_subject_id uuid, p_thread_id uuid, p_turn_id uuid, p_attempt_id uuid
+create function public.qry_seyeon_positive_first_memory_locked_reveal_v2(
+  p_subject_id uuid, p_thread_id uuid, p_turn_id uuid, p_attempt_id uuid,
+  p_expected_user_message_id uuid, p_expected_assistant_message_id uuid,
+  p_expected_post_turn_outbox_event_id uuid
 ) returns table (assistant_text text)
 language plpgsql security definer
 set search_path=pg_catalog,public
@@ -38,10 +39,12 @@ declare
   v_original record;
   v_message text;
   v_memory_digest text;
-  v_current_post_turn_outbox uuid;
 begin
   if p_subject_id is null or p_thread_id is null
-     or p_turn_id is null or p_attempt_id is null then
+     or p_turn_id is null or p_attempt_id is null
+     or p_expected_user_message_id is null
+     or p_expected_assistant_message_id is null
+     or p_expected_post_turn_outbox_event_id is null then
     return;
   end if;
   perform public.assert_myeongha_subject_context_v1(p_subject_id);
@@ -110,9 +113,7 @@ begin
     and reg.record_type=v_pin->>'recordType'
     and reg.schema_version=v_pin->>'recordSchemaVersion'
     and reg.projector_version=v_pin->>'projectorVersion'
-  -- Keep the CURRENT permitted inference contract locked until the same
-  -- direct Node socket finish or rollback. A competing model-use disable
-  -- must not COMMIT after this check while original private bytes send.
+  -- SRC-25 model-use disable must serialize behind the original Reveal.
   for share of reg;
   if not found then return; end if;
 
@@ -190,15 +191,14 @@ begin
     )
   then return; end if;
 
-  -- G2's v2 Commit MUST have emitted exactly one durable post-turn Outbox
-  -- for this current Subject/Turn/Attempt/Assistant and its original User
-  -- message. The Node request/DTO cannot substitute a claimed Outbox UUID.
-  -- SHARE-lock the actual row until the direct Node handoff completes, so
-  -- a competing retry/rewrite cannot replace this provenance mid-send.
-  select oe.id into v_current_post_turn_outbox
+  -- §61: DB independently binds the exact G2 Commit receipt locators
+  -- (User, Assistant and durable post-turn Outbox) supplied by this Node
+  -- attempt. The original Grant, registry and Subject/Thread locks remain
+  -- held across this read and the direct Node socket handoff.
+  perform 1
   from public.outbox_events oe
   join public.conversation_messages original_user
-    on original_user.id::text=oe.payload_jsonb->>'userMessageId'
+    on original_user.id=p_expected_user_message_id
    and original_user.subject_id=p_subject_id
    and original_user.thread_id=p_thread_id
    and original_user.turn_id=p_turn_id
@@ -208,72 +208,35 @@ begin
     on original_attempt.id=p_attempt_id
    and original_attempt.subject_id=p_subject_id
    and original_attempt.turn_id=p_turn_id
-   and original_attempt.committed_message_id::text
-       = oe.payload_jsonb->>'assistantMessageId'
-  where oe.aggregate_type='chat_turn'
+   and original_attempt.state='committed'
+   and original_attempt.committed_message_id=p_expected_assistant_message_id
+  where oe.id=p_expected_post_turn_outbox_event_id
+    and oe.aggregate_type='chat_turn'
     and oe.aggregate_id=p_turn_id::text
     and oe.event_type='SEYEON_POST_TURN_ANALYSIS_REQUESTED'
     and oe.event_schema_version='v1'
     and oe.dedupe_key='seyeon-post-turn-v1'
     and oe.payload_jsonb->>'schemaVersion'
-        = 'seyeon-post-turn-analysis-request-v1'
+      = 'seyeon-post-turn-analysis-request-v1'
     and oe.payload_jsonb->>'subjectId'=p_subject_id::text
     and oe.payload_jsonb->>'characterId'='seyeon'
     and oe.payload_jsonb->>'turnId'=p_turn_id::text
     and oe.payload_jsonb->>'attemptId'=p_attempt_id::text
+    and oe.payload_jsonb->>'userMessageId'
+      = p_expected_user_message_id::text
+    and oe.payload_jsonb->>'assistantMessageId'
+      = p_expected_assistant_message_id::text
     and oe.payload_jsonb->'snapshot'->>'schemaVersion'
-        = 'seyeon-post-turn-analysis-snapshot-v1'
+      = 'seyeon-post-turn-analysis-snapshot-v1'
     and oe.payload_jsonb->'snapshot'->>'turnId'=p_turn_id::text
     and oe.payload_jsonb->'snapshot'->>'userMessageId'
-        = original_user.id::text
+      = p_expected_user_message_id::text
     and oe.payload_jsonb->'snapshot'->>'assistantMessageId'
-        = original_attempt.committed_message_id::text
+      = p_expected_assistant_message_id::text
     and oe.payload_jsonb->>'snapshotHash'
-        ~ '^sha256:v1:[a-f0-9]{64}
-    on msg.id=a.committed_message_id
-   and msg.subject_id=a.subject_id and msg.turn_id=a.turn_id
-  where a.id=p_attempt_id and a.turn_id=p_turn_id
-    and a.subject_id=p_subject_id and a.state='committed'
-    and msg.thread_id=p_thread_id and msg.sender_type='character'
-    and msg.redacted_at is null
-    and msg.body_text is not null and length(btrim(msg.body_text))>0
-    and msg.body_text=a.generated_body_text
-  for share of a,msg;
-  if not found or v_message is null then return; end if;
-
-  return query select v_message;
-end
-$positive_reveal$;
-
--- Restrict to the function owner only. No PUBLIC, authenticated, service,
--- or myeongha_api_executor EXECUTE and NO route registration.
-revoke all on function public.qry_seyeon_positive_first_memory_locked_reveal_v1(
-  uuid,uuid,uuid,uuid
-) from public;
-do $revoke_direct$
-declare v_role text;
-begin
-  for v_role in select rolname from pg_catalog.pg_roles
-      where rolname in ('anon','authenticated','service_role') loop
-    execute format(
-      'revoke all on function public.qry_seyeon_positive_first_memory_locked_reveal_v1(uuid,uuid,uuid,uuid) from %I',
-      v_role
-    );
-  end loop;
-end
-$revoke_direct$;
-
-comment on function public.qry_seyeon_positive_first_memory_locked_reveal_v1(
-  uuid,uuid,uuid,uuid
-) is 'G3 first single-Memory original-rights locked positive Reveal SOURCE ONLY; no API EXECUTE, no route or external proxy ACK approval';
-
-commit;
-
+      ~ '^sha256:v1:[a-f0-9]{64}$'
   for share of oe,original_user,original_attempt;
-  if not found or v_current_post_turn_outbox is null then return; end if;
-
-  -- Even with duplicate poisoned Outbox rows, the first private response
-  -- requires exactly ONE immutable v2 post-turn record for its Turn.
+  if not found then return; end if;
   if (select count(*) from public.outbox_events other_post
       where other_post.aggregate_type='chat_turn'
         and other_post.aggregate_id=p_turn_id::text
@@ -289,6 +252,7 @@ commit;
    and msg.subject_id=a.subject_id and msg.turn_id=a.turn_id
   where a.id=p_attempt_id and a.turn_id=p_turn_id
     and a.subject_id=p_subject_id and a.state='committed'
+    and a.committed_message_id=p_expected_assistant_message_id
     and msg.thread_id=p_thread_id and msg.sender_type='character'
     and msg.redacted_at is null
     and msg.body_text is not null and length(btrim(msg.body_text))>0
@@ -302,8 +266,8 @@ $positive_reveal$;
 
 -- Restrict to the function owner only. No PUBLIC, authenticated, service,
 -- or myeongha_api_executor EXECUTE and NO route registration.
-revoke all on function public.qry_seyeon_positive_first_memory_locked_reveal_v1(
-  uuid,uuid,uuid,uuid
+revoke all on function public.qry_seyeon_positive_first_memory_locked_reveal_v2(
+  uuid,uuid,uuid,uuid,uuid,uuid,uuid
 ) from public;
 do $revoke_direct$
 declare v_role text;
@@ -311,15 +275,15 @@ begin
   for v_role in select rolname from pg_catalog.pg_roles
       where rolname in ('anon','authenticated','service_role') loop
     execute format(
-      'revoke all on function public.qry_seyeon_positive_first_memory_locked_reveal_v1(uuid,uuid,uuid,uuid) from %I',
+      'revoke all on function public.qry_seyeon_positive_first_memory_locked_reveal_v2(uuid,uuid,uuid,uuid) from %I',
       v_role
     );
   end loop;
 end
 $revoke_direct$;
 
-comment on function public.qry_seyeon_positive_first_memory_locked_reveal_v1(
-  uuid,uuid,uuid,uuid
+comment on function public.qry_seyeon_positive_first_memory_locked_reveal_v2(
+  uuid,uuid,uuid,uuid,uuid,uuid,uuid
 ) is 'G3 first single-Memory original-rights locked positive Reveal SOURCE ONLY; no API EXECUTE, no route or external proxy ACK approval';
 
 commit;
