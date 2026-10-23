@@ -491,13 +491,18 @@ function renderMemories(payload, subjectKind) {
           if (item.isConnected && current.currentlyGranted) {
             status.textContent = uiText('철회가 아직 확인되지 않았습니다. 다시 확인해 주세요.');
           }
-        } catch (error) {
-          if (item.isConnected) {
-            const unavailable = error instanceof RecordsRuntimeError &&
-              error.code === 'WEB_RECORDS_REVOKE_UNAVAILABLE';
-            status.textContent = uiText(unavailable
-              ? '현재 철회 기능을 사용할 수 없습니다. 접근권한은 철회되지 않았습니다.'
-              : '철회 결과를 확인할 수 없습니다. 접근권한을 다시 확인해 주세요.');
+        } catch {
+          // 503 can also mean the COMMIT response was lost. Resolve the
+          // CURRENT grant before making any claim about revocation.
+          try {
+            const current = await refreshGrant();
+            if (item.isConnected && current.currentlyGranted) {
+              status.textContent = uiText('현재 세연의 접근이 허용되어 있습니다. 철회가 확인되지 않았습니다.');
+            }
+          } catch {
+            if (item.isConnected) {
+              status.textContent = uiText('철회 결과를 확인할 수 없습니다. 현재 접근권한을 다시 확인해 주세요.');
+            }
           }
         } finally {
           check.disabled = false;
