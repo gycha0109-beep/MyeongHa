@@ -39,6 +39,15 @@ Watchtower-Track: legal-compliance
 - **개인정보 최소화:** 인증업체에 건네는 값과 인증 후 저장할 최소 필드/처리 목적/보존기간/제3자 제공·위탁은 실제 계약과 개인정보 처리방침 확정 후 명시. CI/DI·전화번호·이름 수집을 기능적으로 자동 승인하지 않음.
 - **공식 근거:** https://developers.portone.io/opi/ko/extra/identity-verification/readme-v2 / https://developers.portone.io/api/rest-v2/identityVerification
 
+
+### 2.2 PostgreSQL 인증 시도 발급·조회·1회 소비 — 코드 구현, DB 적용 보류
+
+- 제안 SQL: `supabase/proposals/1740_portone_identity_age_authority_v1.proposed.sql`. **배포된 마이그레이션 아님.** 기존 canonical Subject FK와 DB 서버 시계로 인증 ID를 발급하고, 10분 만료 및 동일 Subject당 1개 pending 제한을 적용.
+- 제안 저장 항목: `legal_portone_identity_attempts_v1`에 인증 ID/Subject/상태/시각, `legal_portone_verified_age_v1`에 Subject/나이 구간/인증 ID/검증 시각만 저장. 원본 출생일, 이름, 전화번호, CI/DI, 응답 전문은 저장하지 않음.
+- `apps/api/src/postgres-portone-identity-age-authority-v1.ts`는 기존 Subject 권위 트랜잭션으로 Issue/Read/Consume SQL을 호출하며, 인증 대상 Subject가 인증된 Subject와 다르면 DB 명령 전에 거절. **외부 PortOne HTTP 요청 중에는 DB 트랜잭션을 유지하지 않음.**
+- `test/legal-postgres-portone-identity-age-authority-v1.test.ts`는 모의 PostgreSQL에서 트랜잭션 분리, 다른 Subject 차단, 잘못된 DB 결과 거절, SQL 정책을 확인. 실제 PostgreSQL17에 제안 SQL을 실행한 동시성·ACL·삭제/복원 E2E 통과 근거는 **없음**.
+- **후속 필수:** DB Authority에 제안 SQL을 인계해 계정 삭제 35 DELETE / 4 ANONYMIZE / 9 RETAIN P5Y 및 백업 P30D 정책에 새 테이블을 반영하고, Guest→Member 승격·만료 증빙·자격 갱신을 검증한 뒤 migration 적용. 인증 제공자 계약·키·SDK·공개 API는 모두 OFF.
+
 ## 3. 출시 전에 반드시 남은 항목
 
 - [ ] **A1 가입 경계:** 서버 회원가입, 소셜 가입·콜백, 게스트 발급에서 **회피할 수 없는 신뢰 가능한 연령 증명/거절**. 현재 브라우저의 체크박스만으로는 API 직접 호출, 기존 계정 사용, 소셜 우회가 가능하다. 만 14세 미만 서비스 일괄 차단 완료 주장은 금지한다.
