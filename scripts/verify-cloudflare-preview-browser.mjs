@@ -101,7 +101,21 @@ try {
   assert(!failures.length,'Cloudflare preview live browser rendering failed');
 } finally {
   socket?.close();
-  if(chrome.exitCode===null) chrome.kill('SIGTERM');
+  if (chrome.exitCode === null) {
+    // Windows keeps Chrome's profile dictionaries locked until the browser
+    // process exits. Wait for that exit before attempting a recursive delete.
+    const exited = new Promise(resolve => chrome.once('exit', resolve));
+    chrome.kill('SIGTERM');
+    await Promise.race([exited, sleep(3_000)]);
+  }
   await sleep(350);
-  await rm(profile,{recursive:true,force:true,maxRetries:4,retryDelay:100});
+  for (let attempt = 0; attempt < 6; attempt++) {
+    try {
+      await rm(profile,{recursive:true,force:true,maxRetries:8,retryDelay:250});
+      break;
+    } catch (error) {
+      if (!['EBUSY','EPERM','ENOTEMPTY'].includes(error?.code) || attempt === 5) throw error;
+      await sleep((attempt + 1) * 400);
+    }
+  }
 }
