@@ -430,7 +430,11 @@ describe('Se-yeon G3 Node-only original-Grant current Subject fence',()=>{
     await expect(assertSeyeonFirstPositiveNodeDbReadyV1({
       pool:new FakeG3Pool(db),verifiedEvidence:EVIDENCE,
     })).rejects.toMatchObject({code:'DB_NOT_READY'});
-    expect(queries(db).some(q=>q.includes('has_function_privilege'))).toBe(true);
+    const readiness=queries(db).find(q=>q.includes('has_function_privilege'));
+    expect(readiness).toContain(
+      'qry_seyeon_positive_first_memory_locked_reveal_v2(uuid,uuid,uuid,uuid,uuid,uuid,uuid)',
+    );
+    expect(readiness).not.toContain('qry_seyeon_positive_first_memory_locked_reveal_v1');
     expect(queries(db)).not.toContainEqual(
       expect.stringContaining('from public.qry_seyeon_positive_first_memory_locked_reveal_v2('),
     );
