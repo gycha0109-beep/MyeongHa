@@ -104,7 +104,10 @@ begin
         ))=1
     and a.validation_result_jsonb->'personalRecordProvenance'
       =a.seyeon_personal_source_pin_jsonb->'positiveProof'
-  for share of t,a;
+  -- One concurrent first sender at a time: serialise on the actual Turn
+  -- before any original Grant/private assistant bytes may be consulted.
+  for update of t
+  for share of a;
   if not found or jsonb_typeof(v_pin) is distinct from 'object'
      or v_pin->>'schemaVersion' is distinct from
         'seyeon-positive-original-memory-source-pin-v1'
@@ -270,6 +273,28 @@ begin
     and msg.body_text=a.generated_body_text
   for share of a,msg;
   if not found or v_message is null then return; end if;
+
+  -- Consume THIS first-send right before handing bytes to direct Node.
+  -- This UPDATE is still UNCOMMITTED while Node holds this SAME owner
+  -- transaction throughout ServerResponse 'finish'. On disconnect, timeout,
+  -- or handoff failure the whole transaction rolls back (including delivery).
+  -- Concurrent request B waits on the original Turn FOR UPDATE, then sees
+  -- state='delivered' and receives NO private assistant text.
+  -- 'delivered' records local Node OS-buffer handoff, NOT browser/Edge ACK.
+  update public.chat_turns delivered_turn
+  set state='delivered',
+      delivered_at=clock_timestamp(),
+      revision=delivered_turn.revision+1,
+      updated_at=clock_timestamp()
+  where delivered_turn.id=p_turn_id
+    and delivered_turn.thread_id=p_thread_id
+    and delivered_turn.subject_id=p_subject_id
+    and delivered_turn.client_turn_id=p_expected_client_turn_id
+    and delivered_turn.state='committed'
+    and delivered_turn.delivered_at is null
+    and delivered_turn.committed_at is not null
+    and delivered_turn.committed_attempt_id=p_attempt_id;
+  if not found then return; end if;
 
   return query select v_message;
 end
