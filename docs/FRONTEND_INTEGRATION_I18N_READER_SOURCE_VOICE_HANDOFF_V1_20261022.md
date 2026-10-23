@@ -230,6 +230,13 @@
 - 기존 비활성 영어 선택지에 한국어 `준비 중` 문구가 남아 [Web PR Domain Gates #39885508282](https://github.com/gycha0109-beep/MyeongHa/actions/runs/39885508282)에서 일본어 페이지 브라우저 검증이 실패했다. 웹·모바일 비활성 영어 후보 라벨을 한국어가 없는 `English (not available yet)` / `English · Not available yet`으로 바꾸고 테스트 기준도 갱신했다. **통합 CI만 GREEN이어도 웹 도메인 게이트가 RED면 전체 GREEN으로 간주하지 않는다.**
 - **다음 실행:** 사전의 실제 제품 화면별 누락·오역 및 보호 안내·기존 로케일 왕복/리로드 수용을 완료한 후 웹·모바일·API `en-US`/`zh-CN` UI 선택을 동시에 활성화한다. 언어 선택에 따른 Reader/Saju/Face 외국어 생성, 기존 Reading 재번역 ②, Character별 이름/화법·구매 권한/운영 공개는 여전히 원래 소유자 승인 전 HOLD다.
 
+### 7.14 I18N-07 / EN-UI-B / CN-UI-B — Chat·Reader 보안/HOLD 상태 문구 준비
+
+- `apps/mobile/src/ui/mobile-planned-protected-shell-v1.ts`는 기존 모바일 Chat History UI **17개 키**, 입력창 차단 안내 **6개 키**, 과거 Chat·Reading 원문 보존 고지 **2개**, 공식 Reader 소개·진입 차단 안내 **13개 키와 10개 서버 승인 상태 코드**를 `en-US`·`zh-CN` 각각 작성한 **비활성 UI 전용 자산**이다. 기존 `projectMobileChatHistoryShellV1`, `projectMobileChatComposeUiV1`, `projectMobileOfficialReaderEntryUiV1`, `projectMobileSourceLanguageNoticeV1`의 3언어 실제 동작은 그대로다.
+- 새 `projectPlannedProtectedUiV1(requestedLocale)`는 **두 신규 목표 로케일에서만** 고정 UI 사전을 검사할 수 있고 다른 값은 `null`로 닫는다. `activeUiLocaleAdmitted=false`, `sourceTextTranslated=false`, `chatMessageTranslated=false`, `chatSendAllowedByLocale=false`, `privacyHoldBypassed=false`, `readerOutputLocalized=false`, `interpretationReleased=false`를 유지하며 사용자/공식 기록/LLM/구매 권한을 인수하지 않는다.
+- Reader 접근 상태 키는 기존 `MobileOfficialReadingReaderEntryStatusV1` 전체에 **컴파일 시점 전수 체크**를 적용한다. `test/i18n-en-us-zh-cn-protected-shell-v1.test.ts`는 필수 UI 필드·각 locale의 문구·개인정보 보호 반복 조회/재설치 해제 불가·source 원문 보존·미승인 언어 fallback·출력/권한 비승격을 회귀 고정한다. 실제 클라이언트 사용 경로에는 아직 연결하지 않는다.
+- **다음 단계:** EN-UI-B/CN-UI-B 각 화면의 나머지 일반 UI·접근성·공식 아카이브 안내 등 누락 없는 자산 작성과 회귀 후, EN-UI-A/CN-UI-A의 웹/모바일/API 동시 명시 선택·저장·재시작 테스트 및 I18N-07 UI-only 수용. Source/Character/Reader의 새 언어 생성·원래 Official artifact 재언어화/운영 공개는 별도 승인 전 HOLD다.
+
 ## 8. 다음 구현 작업 및 승인 위치
 
 1. **캐릭터 설계 owner:** 위 6명 차이를 실제 Bible/typed Runtime 간에 해결하고 authoritative source/version을 확정. 이 I18N 트랙은 제안·인계만, 원본 수정 금지.
