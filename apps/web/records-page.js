@@ -1,3 +1,4 @@
+import { resolveCanonicalCharacterPresentationV1 } from './character-presentation-identity.js';
 import { readerProvenanceLocaleLabelV1 } from './reader-provenance-locale.js';
 import { getUiLocale, translateStaticUi } from './ui-i18n.js';
 import { recordsBirthRevisionV1, recordsBirthUnavailableV1, recordsReadingSummaryV1, recordsTimestampV1 } from './records-page-ui-locale.js';
