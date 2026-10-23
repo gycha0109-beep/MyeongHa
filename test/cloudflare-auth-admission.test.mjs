@@ -170,8 +170,8 @@ describe('Cloudflare Auth/DB admission is fail-closed until explicit host and se
       expect(held.status).toBe(404);
     }
     const target = {
-      databaseUrl: 'postgresql://synthetic-user:synthetic-secret@db.synthetic.example.com:5432/isolated?sslmode=verify-full',
-      databasePrincipal: 'synthetic-user',
+      databaseUrl: 'postgresql://synthetic_user:synthetic-secret@db.synthetic.example.com:5432/isolated?sslmode=verify-full',
+      databasePrincipal: 'synthetic_user',
     };
     expect(approvedCloudflarePostgresTargetV1(target, ENABLED)).toBe(true);
     const poolerHost = 'aws-0-ap-southeast-1.pooler.supabase.com';
@@ -198,10 +198,10 @@ describe('Cloudflare Auth/DB admission is fail-closed until explicit host and se
     )).toBe(false);
 
     for (const url of [
-      'postgresql://synthetic-user:synthetic-secret@db.synthetic.example.com/isolated?sslmode=verify-full',
-      'postgresql://synthetic-user:synthetic-secret@other.example.com:5432/isolated?sslmode=verify-full',
-      'postgresql://synthetic-user:synthetic-secret@db.synthetic.example.com:5433/isolated?sslmode=verify-full',
-      'postgresql://synthetic-user:synthetic-secret@127.0.0.1:5432/isolated?sslmode=verify-full',
+      'postgresql://synthetic_user:synthetic-secret@db.synthetic.example.com/isolated?sslmode=verify-full',
+      'postgresql://synthetic_user:synthetic-secret@other.example.com:5432/isolated?sslmode=verify-full',
+      'postgresql://synthetic_user:synthetic-secret@db.synthetic.example.com:5433/isolated?sslmode=verify-full',
+      'postgresql://synthetic_user:synthetic-secret@127.0.0.1:5432/isolated?sslmode=verify-full',
     ]) {
       expect(approvedCloudflarePostgresTargetV1({ databaseUrl: url }, ENABLED)).toBe(false);
     }
