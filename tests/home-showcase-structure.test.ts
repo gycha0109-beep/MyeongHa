@@ -14,27 +14,28 @@ describe('Home Golden Master showcase structure', () => {
     const homeSource = `${html}\n${page}`;
 
     for (const label of [
-      '좋은 저녁이에요',
-      '오늘 이야기할 사람',
-      '캐릭터 선택',
-      '이번 달 사주 읽기',
-      '사주 읽기 주제',
+      '요즘, 무엇이 가장',
+      '궁금하세요?',
+      '사주 관심 주제',
       '전체 사주',
       '직업 · 커리어',
       '재물',
       '연애 · 관계',
+      '당신의 이야기를',
+      '지금, 확인해 보세요',
+      '이번 달 사주 읽기',
       '최근 이야기',
     ]) {
       expect(homeSource).toContain(label);
     }
 
-    expect(homeSource).toContain('제공 상태 확인');
-    expect(homeSource).toContain('읽기 확인');
-    expect(homeSource).toContain('전체 주제 보기');
+    expect(homeSource).toContain('사주 프리뷰 보기');
+    expect(homeSource).toContain('resolveReadingAvailabilityV1(topic.href).label');
+    expect(homeSource).toContain('인물 둘러보기');
     expect(homeSource).not.toContain('이달의 운세 전체보기');
     expect(homeSource).not.toContain('오늘의 흐름은 사주 화면에서 직접 펼쳐볼 수 있습니다.');
     expect(homeSource).toContain('golden-master.css');
-    expect(homeSource).toContain('href="chat-hub.html">대화로 가기 →</a>');
+    expect(homeSource).toContain('href="chat-hub.html"');
   });
 
   it('pins the approved centered proportions without fabricating personalized authority', async () => {
