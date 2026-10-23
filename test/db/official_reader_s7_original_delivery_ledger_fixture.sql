@@ -99,8 +99,35 @@ begin
  update public.chat_turn_attempts set state='committed',committed_message_id=m where id=a;
  update public.chat_turns set state='committed',committed_attempt_id=a,
   committed_at=instant,updated_at=instant,revision=revision+1 where id=u;
- -- Genuine 1950 origin trigger validates original active verified Receipt,
- -- exact Reader Access, committed synthetic Chat and system-only safe marker.
+ -- CI ONLY: the private 2110 source-proof guard intentionally blocks any
+ -- protected body without a matching Saju Production authority receipt.
+ -- The actual Saju issuer is not implemented/approved (#2410). Insert one
+ -- isolated privileged TEST receipt with synthetic identifiers to verify
+ -- that the 2110 cross-table match remains enforced. This never executes a
+ -- Production issuer and DOES NOT approve S3/S5 storage, reveal or payment.
+ insert into public.official_reader_s3_source_authority_receipts_v1(
+   id,subject_id,official_reading_id,reader_character_id,
+   reader_content_bundle_id,content_release_id,product_id,
+   product_spec_version,official_artifact_response_hash,
+   source_response_hash,source_attestation_ref,issuer_id,issuer_key_id,
+   source_proof_fingerprint,attestation_contract_version,
+   production_interpretation_authority,source_coverage_authority,
+   semantic_guard_version,output_guard_version,source_verified_at
+ ) values (
+   'f70c0000-0000-4000-8000-000000000001'::uuid,
+   s,r,'test-unlockable-reader',b,release_id,
+   '11392000-0000-0000-0000-000000000001'::uuid,
+   'fixture-only-s7','fixture-only-artifact-response-hash',
+   'sha256:v1:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+   'fixture:no-saju-authority','ci-isolated-fixture','fixture-only-key',
+   'sha256:v1:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+   'official-reader-saju-production-source-proof-v1',
+   'verified','complete','fixture-no-approval',
+   'fixture-no-approval',instant
+ );
+ -- Genuine 1950 origin and 2110 S3 binding triggers are NOT disabled:
+ -- they validate the exact B2 Grant, Reader, safe Chat marker and isolated
+ -- source receipt. The test does NOT exercise a Production Saju issuer.
  insert into public.official_reader_paid_answer_bodies(
   id,subject_id,thread_id,turn_id,attempt_id,safe_message_id,
   thread_character_id,official_reading_id,reader_character_id,
@@ -112,7 +139,8 @@ begin
  ) values(body,s,t,u,a,m,c,r,'test-unlockable-reader',b,release_id,
   original_grant,'11392000-0000-0000-0000-000000000001'::uuid,
   'fixture-only-s7','fixture-only-artifact-response-hash',
-  'fixture:no-saju-authority','fixture-only',
+  'fixture:no-saju-authority',
+  'sha256:v1:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
   'fixture-no-approval','fixture-no-approval','aes-256-gcm-v1','fixture-no-key',
   decode('00112233445566778899aabb','hex'),
   decode('00112233445566778899aabbccddeeff','hex'),
