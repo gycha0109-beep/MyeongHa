@@ -343,6 +343,14 @@ async function readChatState(
     parsed.afterSequenceNo,
     parsed.pageSize,
   ]);
+  // A current participant set is not proof about the entire history.
+  // A formerly participating Se-yeon can still own a committed message
+  // after the thread is reconfigured to contain other Characters only.
+  // Check the full bounded stream page (including the extra cursor row)
+  // BEFORE retrieving relationship state or serializing any message body.
+  if (streamResult.rows.some((row) => row.characterId === 'seyeon')) {
+    throw new SeyeonChatHistoryRevealHoldV1();
+  }
   const relationshipResult = await client.query<RelationshipRow>(READ_RELATIONSHIP_SQL, [
     subjectId,
     binding.primaryCharacterId,
