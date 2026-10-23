@@ -52,7 +52,7 @@ for (const entry of delta.additionalSubjectOwnedTables) {
   }
   const tableDefinition = sqlProposal.match(new RegExp(
     'create\\s+table\\s+public\\.' + entry.table + '\\s*\\(([\\s\\S]*?)\\n\\);', 'i'));
-  if (!tableDefinition || !/subject_id\s+uuid\s+(?:primary key\s+)?references\s+public\.subjects\(id\)\s+on\s+delete\s+cascade/i.test(tableDefinition[1])) {
+  if (!tableDefinition || !/subject_id\s+uuid\s+(?:(?:not\s+null|primary\s+key)\s+)*references\s+public\.subjects\(id\)\s+on\s+delete\s+cascade/i.test(tableDefinition[1])) {
     fail('missing cascade ownership for ' + entry.table);
   }
 }
