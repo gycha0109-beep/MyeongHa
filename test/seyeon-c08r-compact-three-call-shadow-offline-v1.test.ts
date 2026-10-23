@@ -240,9 +240,9 @@ describe('C08-R public synthetic compact 3-call Shadow (NO external provider)',(
     expect(plan.paidDispatchAuthorized).toBe(false);
     expect(plan.strictJsonSchemaRuntimeVerified).toBe(false);
     expect(plan.providerHardTurnBillCapVerified).toBe(false);
-    expect(plan.arms[0]!.stages.map(s=>s.requestBodyBytes))
+    expect(plan.arms[0]!.stages.map((s:{requestBodyBytes:number})=>s.requestBodyBytes))
       .toEqual(base.seen.map(x=>x.bytes));
-    expect(plan.arms[1]!.stages.map(s=>s.requestBodyBytes))
+    expect(plan.arms[1]!.stages.map((s:{requestBodyBytes:number})=>s.requestBodyBytes))
       .toEqual(compact.seen.map(x=>x.bytes));
     expect(plan.arms[1]!.reservedMicroUsd).toBeLessThan(plan.arms[0]!.reservedMicroUsd);
     console.log('SEYEON_C08_N06_ADAPTER_WIRE_PAIR_OFFLINE',JSON.stringify({
