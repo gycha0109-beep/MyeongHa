@@ -49,6 +49,28 @@
 | **S8 DB 이력/배포/복구** | P3 Ops+DB | 2026-10-19 기준 1520~1720 원격 이력 21/21과 로컬 파일의 **실제 DDL/Owner/ACL/정책 동등성**을 대조. 원격-only `20261008090417` 보존, 새 `20261018190000` 포함 최신 스키마 기준 재해복구 증거·잠금·재시도·forward-only 절차 검토. 임의 repair·재실행 금지 | 버전별 manifest/diff·권한/함수 실측·운영 dry-run 근거, 최신 배포 스키마와 **같은 백업의** 격리 복원·digest·RPO/RTO 승인. **과거 actor 신원 재조사 불필요** | **이력 21/21 확인, 동등성/DR HOLD** |
 | **S9 G6 제한적 운영** | P4 Integration Owner | G0~G5 증거/DR·보안 로그·알림·되돌리기 기준 승인 후, 내부 synthetic smoke→제한적 공개/유료 판단 | 범위, Owner, SHA, run URL, 사고 중단·권한 회수·비용 상한. 전단계 승인 없는 PUBLIC/PAYMENT 불가 | HOLD |
 
+### 2026-10-23 구현 진척도 상태판 — 사실 기반, 승인 상태와 별개
+
+> **표시 규칙:** `■` = 검증된 개발 구현 완료(운영 PASS 뜻 아님), `◧` = 개발 후보/일부 증거만 확인, `□` = 필수 조건 미충족 또는 별도 승인 HOLD. **단계별 완료율·전체 퍼센트는 산정하지 않는다.** 서로 다른 기술 승인·CI·배포 조건을 임의로 합산하지 않는다. 상세 실행 의존성은 §4와 G0~G6 원장이 기준이다.
+
+| 로드맵 단계 | 구현 진척도 | 확인 가능한 증거 / 남은 완료 조건 |
+| --- | --- | --- |
+| **S1** 0건 출처 무결성 | **■ 개발 완료** | #2186 검증·병합. **양수 Memory 모델 사용 승인과 무관** |
+| **S2 / G0** 접근·철회 정책 | **◧ 개발 후보 · □ 공동 승인** | exact Grant·취소·재부여/파생 출처 negative 경계 후보 존재; Security+DB+Character 기술 Owner 공동 승인 OPEN |
+| **S3 / G1** 모델 이전 양수 원본 Pin | **◧ 서버 코드/합성 PG · □ 운영 적용** | 정확한 단일 Memory SourceSet·원본 Grant/PG Digest·최종 모델 입력 결속 코드 main. SRC-25 registry 0, SQL #2422 Draft, DB EXECUTE 0; 실 타입·Codec·Owner 검증 필수 |
+| **S4 / G2** 원자 Commit | **◧ 서버·DB 격리 후보 · □ 운영 적용** | #2489 [전체 통합 #39880146016](https://github.com/gycha0109-beep/MyeongHa/actions/runs/39880146016) SUCCESS 및 main 반영; 1-based Commit receipt, 원본 User/Post-turn/G1 결속 SQL은 #2422 **격리 Draft**, 실제 운영 DB 2세션 revoke/ACL 증명 OPEN |
+| **S5 / G3** 최초 공개·Replay/History | **◧ Node 차단·출처 결속 · □ 공개/ACK** | #2490 [전체 통합 #39884092612](https://github.com/gycha0109-beep/MyeongHa/actions/runs/39884092612) SUCCESS 및 main 반영. #2491은 기본 CI green/7인자 G3 원본 User·Assistant·Outbox 연결, [전체 통합 #39889293678](https://github.com/gycha0109-beep/MyeongHa/actions/runs/39889293678) 결과 대기. #2492는 0번 sequence 허용 결함 수정 후보. **first Reveal/History/Replay 503** |
+| **S-CF1/2** Worker 차단 | **◧ 오프라인 차단 완료 · □ 실 Router/Preview** | #2383/#2388/#2392/#2394/#2395의 비운영 차단 코드 main; Ops Router 실장/실 Worker Preview 검증은 미완료 |
+| **S-CF5 / G0-D04** last-hop 권한 | **□ 기술 승인·실증 HOLD** | Node `finish` ≠ Edge/Proxy/브라우저 ACK. 현재 배포 런타임의 R/V/S/ACK·2세션 원본 Grant 철회/송출·Owner 기술 서명 필요 |
+| **S6 / G4** 모델·비용 | **◧ 비용 하부 보호 · □ 실 종단/유료** | 격리 비용 원장·Governor 검증 일부 main. 실제 유료 Provider/Worker 연결은 별도 Owner 승인 전 OFF |
+| **S7 / G5** 보안 종합 | **□ 운영 종단 HOLD** | 실제 Cloudflare Preview, PG 철회 경합, S0~S6 증거 및 비공개 송출 전수 매트릭스 미완료 |
+| **S8** DB/DR | **◧ 원격 이력 확인 · □ 동등성/DR** | 1520~1720 원격 마이그레이션 21/21 등록은 읽기 전용 확인. DDL/Owner/ACL 전량 동등성 및 동일 백업 격리 복원/RPO/RTO 보류 |
+| **S9 / G6** 제한 운영 | **□ 승인 HOLD** | G0~G5·G0-D04·DR 종합 승인 전 공개/과금/데이터 이관 금지 |
+
+**이번 작업 단위 시각화 (S5/G3):**
+`#2490 [■ 통합 통과·main] → #2491 [■ 기본 CI 통과 | ◧ 통합 실행 | □ 병합 확인] → #2492 [◧ 기본 CI 실행 | □ 통합 | □ 병합]`.
+위 PR/실행 상태는 기록 시점의 조회 결과일 뿐, 미래 CI 성공을 예고하지 않는다. **#2422는 Draft·미병합·미적용**이며 SQL 후보가 검증 또는 배포됐다는 뜻이 아니다.
+
 ### S1 세부 수락 기준 (가장 먼저 실행)
 
 1. 서버가 조립한 출처 스냅샷에 `personalRecordProjectionCandidates`가 `[]` 또는 지원된 레거시 생략 상태이면 현재 0건 계약을 유지한다.
