@@ -251,6 +251,13 @@
 - `test/i18n-en-us-zh-cn-planned-reader-picker-saju-ui-v1.test.ts`는 기존 Picker 필드 전수 동등, 신규 두 로케일 문구 한글 잔존 방지, source/권한 분리, 서버 미지원/오류 보호 fallback, 실제 Picker/Saju 코드가 신규 준비 사전을 아직 import하지 않는 점을 검사한다.
 - 현재 **지원된 실제 UI 3개(`ko-KR`/`ja-JP`/`zh-TW`)는 변경 없음**, `en-US`/`zh-CN`는 미활성 후보 상태다. UI 준비 자산의 추가 = 해당 언어의 Reader 발화/공식 풀이/구매/릴리스 승인 아님. 다음은 EN/CN-UI-B 각 화면별 저자 문구 완전성 및 접근성 수용을 마친 뒤 EN/CN-UI-A/C 요청·저장·재실행 계약을 활성화하는 것이다.
 
+### 7.17 I18N-07 / EN-UI-C·CN-UI-C — 현행 고정 UI 사전 누락 실측과 수용 게이트
+
+- `scripts/i18n/planned-ui-copy-coverage-v1.mjs`은 **웹의 기존 `COPY`와 모바일의 native-only `MOBILE_UI_NATIVE_COPY` 저자 UI 문자열 키만 읽어** 신규 `PLANNED_STATIC_UI_COPY_V1`과 대조한다. 외부 API·개인 대화/저장 공식 풀이/Reader 출력은 조회하지 않는다. 실행: `node scripts/i18n/planned-ui-copy-coverage-v1.mjs`.
+- 2026-10-23 코드 스냅샷 기준 웹 authored 642행 + 모바일 native-only 264행, 중복 제거 **887개 정적 UI 키**이다. 이 중 기존 신규 사전(81행)과 일치한 것은 **80개**, 아직 저자 사전 대응이 확인되지 않은 키는 **807개**다. 이 수치는 로케일별 번역 완성률이 아니며, 여기에는 캐릭터 이름·용어/source 근거·원문 보존 이유로 **의도적으로 번역하지 않아야 하거나 별도 소유자 승인이 필요한 키**도 포함될 수 있다. 개별 키의 번역 대상 여부를 분류하기 전 '807개 전부 번역 필요'로 해석 금지.
+- 실행 결과는 `authoredKeys`, `stagedKeysWithinAuthoredCatalog`, `unclassifiedOrUnauthoredKeys`, `readyForRelease:false`를 돌려준다. **숫자를 맞추는 것만으로 locale 지원을 활성화하지 않는다**. 기존 3개 언어가 계속 실제 허용값이며 두 새 언어는 비활성이다.
+- `test/i18n-en-us-zh-cn-static-copy-coverage-audit.test.mjs`는 키 중복 제거, malformed input 실패, 실제 사전 분류 누락 노출, 출시 readiness 비승격을 확인한다. 뒤이어 고정 UI 키를 화면/authority owner별로 분류하고 EN/CN 각 locale의 고정 문구·읽기/Chat/Reader 접근성 및 항목별 경계를 수용해야 한다.
+
 ## 8. 다음 구현 작업 및 승인 위치
 
 1. **캐릭터 설계 owner:** 위 6명 차이를 실제 Bible/typed Runtime 간에 해결하고 authoritative source/version을 확정. 이 I18N 트랙은 제안·인계만, 원본 수정 금지.
