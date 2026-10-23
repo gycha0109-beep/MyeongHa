@@ -1,6 +1,8 @@
 /** Localized labels only: never translates user chat messages or official readings. */
 export type WebUiLocale = 'ko-KR' | 'ja-JP' | 'zh-TW';
 export declare const SUPPORTED_UI_LOCALES: readonly WebUiLocale[];
+/** Planned UI targets only; not available in the picker or API until translations pass acceptance. */
+export declare const PLANNED_UI_LOCALES: readonly ('en-US' | 'zh-CN')[];
 export declare const UI_LOCALE_STORAGE_KEY: string;
 export declare const UI_LOCALE_REQUEST_HEADER_V1: 'X-MyeongHa-UI-Locale';
 export declare function normalizeUiLocale(value: unknown): WebUiLocale;
