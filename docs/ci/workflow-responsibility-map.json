@@ -553,6 +553,12 @@
       "prMode": "required-router",
       "mainMode": "none",
       "workTrackAttribution": "pr-metadata"
+    },
+    "official-reader-s4-privacy-e2e.yml": {
+      "responsibility": "official-reader-privacy-isolated-postgres-e2e",
+      "prMode": "narrow",
+      "mainMode": "narrow",
+      "workTrackAttribution": "pr-metadata"
     }
   }
 }

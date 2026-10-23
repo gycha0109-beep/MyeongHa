@@ -79,7 +79,11 @@ export function tryDispatchHeldOfficialReaderV1(input: Readonly<{
     return notFound(input.request);
   }
 
-  const canonical = new URL(`https://myeongha.internal${path}`);
+  // Keep the trusted incoming request origin while canonicalizing only the
+  // server-validated pathname. Delivery ACK's same-origin check must compare
+  // the browser's Origin to the actual site, not a synthetic .internal host.
+  // This builds an in-process Request only; it performs no outbound fetch.
+  const canonical = new URL(path, url);
   if (kind === 'continuity') {
     canonical.searchParams.set(READER_PARAM, one(url.searchParams, READER_PARAM)!);
   }

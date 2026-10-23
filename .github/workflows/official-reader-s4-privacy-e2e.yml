@@ -1,0 +1,172 @@
+name: Official Reader S4 Privacy Synthetic E2E
+run-name: "Reader S4 synthetic privacy deletion + restore E2E"
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/official-reader-s4-privacy-e2e.yml'
+      - 'test/db/official_reader_s4_**'
+      - 'test/official-reader-s4-privacy-context.e2e.test.ts'
+      - 'test/official-reader-s4-revocation-purge-retry.e2e.test.ts'
+      - 'test/official-reader-s4-restore-reconciliation.e2e.test.ts'
+      - 'apps/api/src/official-reader-private-restore-reconciliation-v1.ts'
+      - 'apps/api/src/official-reader-private-restore-quarantine-state-v1.ts'
+      - 'apps/api/src/official-reader-private-revocation-purge-worker-v1.ts'
+      - 'apps/api/src/official-reader-private-revocation-purge-worker-v1.test.ts'
+      - 'scripts/operations/run-official-reader-privacy-purge-worker.mjs'
+      - 'scripts/operations/start-managed-reader-privacy-worker.mjs'
+      - 'scripts/operations/stage-official-reader-s4-production-migrations.py'
+      - 'scripts/operations/apply-official-reader-s4-scoped-production-migrations.sh'
+      - 'scripts/operations/official-reader-s4-scoped-migration-pre.sql'
+      - 'scripts/operations/official-reader-s4-scoped-migration-post.sql'
+      - 'apps/api/src/official-reader-node-offprimary-privacy-read-v1.ts'
+      - 'test/official-reader-s4-offprimary-privacy-read.e2e.test.ts'
+      - 'test/official-reader-held-t1-t2-preflight-v1.test.ts'
+      - 'apps/api/src/official-reader-s4-ordinary-context-isolation-v1.ts'
+      - 'apps/api/src/official-reader-held-t1-t2-preflight-v1.ts'
+      - 'supabase/migrations/*official_reader*'
+      - 'test/db/run_ci_case.sh'
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/official-reader-s4-privacy-e2e.yml'
+      - 'test/db/official_reader_s4_**'
+      - 'test/official-reader-s4-privacy-context.e2e.test.ts'
+      - 'test/official-reader-s4-revocation-purge-retry.e2e.test.ts'
+      - 'test/official-reader-s4-restore-reconciliation.e2e.test.ts'
+      - 'apps/api/src/official-reader-private-restore-reconciliation-v1.ts'
+      - 'apps/api/src/official-reader-private-restore-quarantine-state-v1.ts'
+      - 'apps/api/src/official-reader-private-revocation-purge-worker-v1.ts'
+      - 'apps/api/src/official-reader-private-revocation-purge-worker-v1.test.ts'
+      - 'scripts/operations/run-official-reader-privacy-purge-worker.mjs'
+      - 'scripts/operations/start-managed-reader-privacy-worker.mjs'
+      - 'scripts/operations/stage-official-reader-s4-production-migrations.py'
+      - 'scripts/operations/apply-official-reader-s4-scoped-production-migrations.sh'
+      - 'scripts/operations/official-reader-s4-scoped-migration-pre.sql'
+      - 'scripts/operations/official-reader-s4-scoped-migration-post.sql'
+      - 'apps/api/src/official-reader-node-offprimary-privacy-read-v1.ts'
+      - 'test/official-reader-s4-offprimary-privacy-read.e2e.test.ts'
+      - 'test/official-reader-held-t1-t2-preflight-v1.test.ts'
+      - 'apps/api/src/official-reader-s4-ordinary-context-isolation-v1.ts'
+      - 'apps/api/src/official-reader-held-t1-t2-preflight-v1.ts'
+      - 'supabase/migrations/*official_reader*'
+      - 'test/db/run_ci_case.sh'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: reader-s4-privacy-synthetic-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  protected-reader-privacy:
+    name: S4 revoke / deletion / stale backup / AI context · PostgreSQL ${{ matrix.postgres }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        postgres: ['15.14', '17.6']
+    services:
+      postgres:
+        image: postgres:${{ matrix.postgres }}
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: synthetic-reader-s4-only
+          POSTGRES_DB: myeongha_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d myeongha_test"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=12
+    env:
+      PGHOST: localhost
+      PGPORT: '5432'
+      PGUSER: postgres
+      PGPASSWORD: synthetic-reader-s4-only
+      PGDATABASE: myeongha_test
+      MYEONGHA_WATCHTOWER_TRACK: db-authority-core
+
+    steps:
+      - name: Checkout isolated test candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Require ephemeral PostgreSQL and forbid production credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$PGHOST" == 'localhost' && "$PGDATABASE" == 'myeongha_test' ]]
+          [[ "$MYEONGHA_WATCHTOWER_TRACK" == 'db-authority-core' ]]
+          [[ -z "${DATABASE_URL:-}" && -z "${SUPABASE_DB_URL:-}" ]]
+          actual="$(psql -Atqc 'show server_version_num')"
+          requested="${{ matrix.postgres }}"
+          [[ "$((actual / 10000))" == "${requested%%.*}" ]]
+          echo 'scope=github_actions_synthetic_ephemeral_postgres'
+
+      - name: Run real SQL revoke → physical delete → stale-backup restore denial
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Same PostgreSQL 15/17 migration + fake official Reader fixture as
+          # existing DB owner test suite. Exercises both native 1190 completion
+          # contract and independent mock tombstone/epoch in a disposable DB.
+          bash test/db/run_ci_case.sh official-reader-s4-protected-storage-design
+          echo 's4_sql_restore_rehearsal=PASS' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Setup Node for non-persistent Reader/AI-context boundary E2E
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install locked test dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Verify revoked T2 never discloses and SYSTEM marker never enters ordinary AI context
+        run: |
+          npx vitest run \
+            test/official-reader-held-t1-t2-preflight-v1.test.ts \
+            test/official-reader-s4-privacy-context.e2e.test.ts \
+            test/official-reader-s4-revocation-purge-retry.e2e.test.ts \
+            test/official-reader-s4-restore-reconciliation.e2e.test.ts \
+            test/official-reader-s4-offprimary-privacy-read.e2e.test.ts \
+            apps/api/src/official-reader-private-revocation-purge-worker-v1.test.ts
+
+      - name: Verify managed purge CLI syntax without running any production worker
+        run: |
+          node --check scripts/operations/run-official-reader-privacy-purge-worker.mjs
+          node --check scripts/operations/start-managed-reader-privacy-worker.mjs
+
+      - name: Verify exact scoped migration staging stays executable without production access
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n scripts/operations/apply-official-reader-s4-scoped-production-migrations.sh
+          scratch="$(mktemp -d)"
+          trap 'rm -rf -- "$scratch"' EXIT
+          python3 scripts/operations/stage-official-reader-s4-production-migrations.py \
+            --source-dir "$PWD/supabase/migrations" \
+            --output-dir "$scratch/staged"
+          [[ "$(wc -l < "$scratch/staged/ordered-files.txt")" -eq 57 ]]
+
+      - name: Print non-identifying acceptance scope
+        if: success()
+        shell: bash
+        run: |
+          {
+            echo '### Privacy #2318 — synthetic S4 E2E passed'
+            echo ''
+            echo '- PostgreSQL ${{ matrix.postgres }}: isolated migrations, revoke/last-right, ciphertext purge, stale-backup resurrection, independent tombstone and restore epoch, native completion denial.'
+            echo '- Restored-derived quarantine: real 2230 SQL independently denies old-backup Memory Items, Memory Proposals, Life Facts and Chat Outbox in rollback-only disposable transactions.'
+            echo '- Purge worker: exact S1/DB erasure before key destruction, failure without premature ACK, DB-erased retry without duplicate deletion, sibling-right deferral.'
+            echo '- Restore runner: durable exact manifests, rollback-only multi-fence preflight, derived-data quarantine, recheck and idempotent key replay; paid service remains OFF.'
+            echo '- Off-primary paid-read authority: signed restore certificate, immediate Subject tombstone revocation and inaccessible ledger fail-closed.'
+            echo '- Reader context: exact safe SYSTEM marker excluded before model input; ordinary user prose preserved; revoked T2 never reveals paid text.'
+            echo '- **Not proved:** production personal-data deletion within 24h, P30D real backup/PITR, actual off-primary ledger/KMS durability, external AI/log sinks, or final legal sign-off.'
+            echo '- Status: Privacy #2318 OPEN; paid/public OFF; no production database, vendor, or storage changes.'
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -13,6 +13,10 @@ export interface OfficialReaderPrivacyReadLeaseV1 {
   /** Opaque off-primary ledger checkpoint; never client supplied. */
   readonly ledgerCheckpoint: string;
   readonly restoreEpoch: string;
+  /** Signed acceptance identity, not a raw signature or private key.
+   * The Node recovery provider binds this to the EXACT accepted certificate,
+   * so replacement invalidates an in-flight protected answer lease. */
+  readonly acceptanceProofDigest?: string;
   readonly expiresAtEpochMs: number;
 }
 

@@ -166,7 +166,11 @@ function parseManifest(value: unknown, claim: PurgeClaim): PurgeManifest {
     const r = record as Record<string,unknown>;
     const bodyId = uuid(r.bodyId);
     const encryptionKeyRef = nonEmpty(r.encryptionKeyRef);
-    if (!REF.test(encryptionKeyRef)) return fail();
+    // The sealed key authority uses canonical lowercase DEK references.
+    // Accepting aliases would permit a forged manifest to bypass the
+    // one-original-key-per-answer deduplication check.
+    if (!REF.test(encryptionKeyRef)
+        || encryptionKeyRef !== encryptionKeyRef.toLowerCase()) return fail();
     return Object.freeze({bodyId,encryptionKeyRef});
   });
   if (new Set(entries.map(r=>r.bodyId)).size!==entries.length
@@ -193,16 +197,16 @@ function validateFence(
       || !Array.isArray(fence.bodyIds) || !Array.isArray(fence.keyRefs)
       || fence.bodyIds.length===0 || fence.bodyIds.length>50000
       || fence.bodyIds.length!==fence.keyRefs.length) return fail();
-  // A db_erased retry trusts this backup-independent fence to choose
-  // irreversible DEK destruction. Re-check EVERY element and uniqueness,
-  // even though a newly recorded eligible manifest was already validated.
-  // An invalid/duplicated key must never enter the erasure loop.
-  if (fence.bodyIds.some(id => typeof id!=='string' || !UUID.test(id))
-      || fence.keyRefs.some(ref => typeof ref!=='string' || !REF.test(ref))
-      || new Set(fence.bodyIds.map(id => id.toLowerCase())).size!==fence.bodyIds.length
-      || new Set(fence.keyRefs.map(ref => ref.toLowerCase())).size!==fence.keyRefs.length) {
-    return fail();
-  }
+  // On DB-erased replay, a corrupt ledger must never supply arbitrary key
+  // references to an irreversible destruction port.
+  const bodyIds=fence.bodyIds.map(uuid);
+  const keyRefs=fence.keyRefs.map(ref => {
+    const value=nonEmpty(ref);
+    if(!REF.test(value) || value!==value.toLowerCase()) return fail();
+    return value;
+  });
+  if(new Set(bodyIds).size!==bodyIds.length
+      || new Set(keyRefs).size!==keyRefs.length) return fail();
   return fence;
 }
 
@@ -211,13 +215,20 @@ async function transaction<T>(
   sql: string,
   params: readonly unknown[],
 ): Promise<readonly T[]> {
-  return executePostgresAccountDeletionWorkerTransactionV1({
-    pool,
-    execute: async (client) => {
-      const result = await client.query<T>(sql,params);
-      return result.rows;
-    },
-  });
+  try {
+    return await executePostgresAccountDeletionWorkerTransactionV1({
+      pool,
+      execute: async (client) => {
+        const result = await client.query<T>(sql,params);
+        return result.rows;
+      },
+    });
+  } catch {
+    // The discovery and receipt-pruning queries execute outside the per-job
+    // retry handler. Sanitize DB/driver failures here as well: raw SQL errors
+    // may contain Subject, Receipt, DEK or protected-body identifiers.
+    return fail();
+  }
 }
 
 async function single<T>(pool: PostgresSubjectPoolV1,sql:string,
@@ -251,12 +262,10 @@ async function finishDbErased(input: {
   await store.scopeLedger.acknowledgeScopeDatabaseErasure(jobId,fence.fenceId);
   let keysDestroyed=0;
   for (let index=0;index<fence.keyRefs.length;index++) {
-    // The database lease is bounded. Renew it periodically while performing
-    // irreversible filesystem erasure OUTSIDE PostgreSQL transactions.
-    // A restarted Worker has a NEW ownership token; any stale caller stops.
-    if(index%100===0) {
-      await requireLiveLease(input.pool,jobId,input.worker);
-    }
+    // Renew the exact instance lease before EACH irreversible key erasure,
+    // not once per 100 keys. A reclaimed worker must stop before the next
+    // key even when a new owner takes over within a single manifest.
+    await requireLiveLease(input.pool,jobId,input.worker);
     const ref=fence.keyRefs[index]!;
     if (!(await store.keys.isKeyDestroyed(ref))) {
       await store.keys.destroyKey(ref);
@@ -313,11 +322,9 @@ export async function runOfficialReaderPrivateRevocationPurgeBatchV1(input: {
       input.pool,MANIFEST_SQL,[jobId,worker],
     );
     const manifest=parseManifest(snapshot.result,claim);
-
-    // A resumed post-erasure job can only finish destroying the keys from
-    // its already committed, externally sealed deletion fence. Conversely
-    // a newly claimed job cannot reuse a post-erasure fence to skip the
-    // exact current-Grant and ciphertext manifest checks.
+    // DB and manifest must agree on the irreversible erasure transition.
+    // Never replay a physical delete or take the empty/sibling path on
+    // a previously DB-erased job with inconsistent restored authority.
     if ((claim.jobStatus==='db_erased') !== (manifest.state==='db_erased')) {
       return fail();
     }
@@ -342,6 +349,9 @@ export async function runOfficialReaderPrivateRevocationPurgeBatchV1(input: {
 
     let fence:OfficialReaderScopeDeletionFenceV1;
     if (manifest.state==='db_erased') {
+      // Never access the independent erasure ledger on an expired claim.
+      // The worker that reacquires the live lease owns any resume attempt.
+      await requireLiveLease(input.pool,jobId,worker);
       fence=validateFence(
         await input.store.scopeLedger.readScopeDeletionFence(jobId),jobId,claim,
       );
@@ -349,6 +359,9 @@ export async function runOfficialReaderPrivateRevocationPurgeBatchV1(input: {
     } else {
       if (manifest.state !== 'eligible') return fail();
       const entries=manifest.entries;
+      // Manifest selection is not a lease renewal. Check current ownership
+      // again before publishing the immutable off-primary deletion fence.
+      await requireLiveLease(input.pool,jobId,worker);
       fence=validateFence(
         await input.store.scopeLedger.recordScopeDeletionFence({
           jobId,
@@ -361,10 +374,15 @@ export async function runOfficialReaderPrivateRevocationPurgeBatchV1(input: {
       );
       const expectedBodyIds=[...entries.map(e=>e.bodyId)];
       const expectedKeys=[...entries.map(e=>e.encryptionKeyRef)];
-      if (fence.bodyIds.length!==expectedBodyIds.length
-          || fence.keyRefs.length!==expectedKeys.length
-          || !expectedBodyIds.every(id=>fence.bodyIds.includes(id))
-          || !expectedKeys.every(id=>fence.keyRefs.includes(id))) {
+      const persistedPairs=new Map(
+        fence.bodyIds.map((id,index)=>[id,fence.keyRefs[index]] as const),
+      );
+      if (fence.bodyIds.length!==entries.length
+          || fence.keyRefs.length!==entries.length
+          || !entries.every(entry=>
+            persistedPairs.get(entry.bodyId)===entry.encryptionKeyRef)) {
+        // A swapped key set is NOT the same deletion manifest, even if
+        // each ID/key exists somewhere in the sealed fence.
         return fail();
       }
 

@@ -23,6 +23,23 @@ on:
         description: 'Must be APPLY_RELATIONSHIP_1400_1450_ONLY'
         required: false
         type: string
+      reader_s4_scoped_apply:
+        description: 'Exact Reader 1740..2300 manual-only forward migration'
+        required: false
+        type: boolean
+        default: false
+      reader_s4_backup_run_id:
+        description: 'Fresh Production backup run ID for current main SHA'
+        required: false
+        type: string
+      reader_s4_restore_run_id:
+        description: 'Paired successful isolated restore run ID'
+        required: false
+        type: string
+      reader_s4_confirmation:
+        description: 'APPLY_OFFICIAL_READER_1740_2300_ONLY'
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -56,12 +73,17 @@ jobs:
           BEFORE_SHA: ${{ github.event.before }}
           CURRENT_SHA: ${{ github.sha }}
           SCOPED_BACKFILL: ${{ inputs.relationship_backfill_1400_1450 }}
+          READER_S4_SCOPED: ${{ inputs.reader_s4_scoped_apply }}
         run: |
           set -euo pipefail
 
           requires_deploy=false
           changed_files=''
           reason='no governed Production DB deployment-surface change detected'
+          if [[ "$EVENT_NAME" == 'workflow_dispatch' && "${SCOPED_BACKFILL:-}" == 'true' && "${READER_S4_SCOPED:-}" == 'true' ]]; then
+            echo 'HOLD_CONFLICTING_SCOPED_PRODUCTION_ACTIONS' >&2
+            exit 1
+          fi
 
           # Exact one-shot staging, not a Production DB deployment. The new
           # locked Reveal function is unmounted; invoking unrestricted db push
@@ -108,6 +130,9 @@ jobs:
           elif [[ "$EVENT_NAME" == 'workflow_dispatch' && "${SCOPED_BACKFILL:-}" == 'true' ]]; then
             requires_deploy=false
             reason='manual scoped Se-yeon backfill must never invoke ordinary db push'
+          elif [[ "$EVENT_NAME" == 'workflow_dispatch' && "${READER_S4_SCOPED:-}" == 'true' ]]; then
+            requires_deploy=false
+            reason='manual Reader 1740..2300 must never invoke ordinary db push'
           elif [[ "$EVENT_NAME" == 'workflow_dispatch' ]]; then
             requires_deploy=true
             reason='workflow_dispatch forces governed Production verification'
@@ -121,13 +146,21 @@ jobs:
             changed_files="$(git diff --name-only "$BEFORE_SHA" "$CURRENT_SHA")"
             printf '%s\n' "$changed_files"
 
-            if grep -Eq '^(supabase/migrations/|[.]github/workflows/supabase-production[.]yml$|scripts/run-production-platform-integrity-postdeploy-verify[.]sh$|scripts/run-production-platform-integrity-read-audit[.]sh$|scripts/run-production-platform-integrity-data-api-surface-audit[.]sh$|scripts/operations/run-supabase-production-migrations[.]sh$)' <<<"$changed_files"; then
+            # The dedicated Reader S4 tool is manual-only, even if its
+            # workflow and unrelated TS/tests are bundled in a squash merge.
+            # Any actual migration SQL/ordinary Production script change
+            # still follows the existing governed Production deploy gate.
+            if grep -Fxq 'scripts/operations/apply-official-reader-s4-scoped-production-migrations.sh' <<<"$changed_files" &&
+               ! grep -Eq '^(supabase/migrations/|scripts/operations/run-supabase-production-migrations[.]sh$|scripts/run-production-platform-integrity-postdeploy-verify[.]sh$|scripts/run-production-platform-integrity-read-audit[.]sh$|scripts/run-production-platform-integrity-data-api-surface-audit[.]sh$)' <<<"$changed_files"; then
+              requires_deploy=false
+              reason='Reader scoped deployment tooling changed; no automatic db push'
+            elif grep -Eq '^(supabase/migrations/|[.]github/workflows/supabase-production[.]yml$|scripts/run-production-platform-integrity-postdeploy-verify[.]sh$|scripts/run-production-platform-integrity-read-audit[.]sh$|scripts/run-production-platform-integrity-data-api-surface-audit[.]sh$|scripts/operations/run-supabase-production-migrations[.]sh$)' <<<"$changed_files"; then
               requires_deploy=true
               reason='governed Production DB deployment-surface change detected'
             fi
           fi
 
-          # Reader 1740..2290 is staged-only. A main merge of Reader SQL
+          # Reader 1740..2300 is staged-only. A main merge of Reader SQL
           # must never route to the unrestricted Production db push --include-all.
           # Only the separate backup+restore-verified manual scoped job may apply.
           if [[ "$EVENT_NAME" == 'push' && "$requires_deploy" == 'true' ]]; then
@@ -141,7 +174,7 @@ jobs:
                 exit 1
               fi
               requires_deploy=false
-              reason='staged Reader 1740..2290 SQL is HOLD; unrestricted Production db push forbidden'
+              reason='staged Reader 1740..2300 SQL is HOLD; unrestricted Production db push forbidden'
             fi
           fi
 
@@ -263,3 +296,36 @@ jobs:
       - name: Require fresh backup and matching restore before scoped atomic SQL
         shell: bash
         run: bash scripts/operations/seyeon-production-relationship-backfill-guarded.sh
+
+  official-reader-scoped-1740-2300:
+    name: Manual Official Reader 1740..2300 (guarded)
+    if: "${{ github.event_name == 'workflow_dispatch' && inputs.reader_s4_scoped_apply == true && inputs.relationship_backfill_1400_1450 != true }}"
+    needs: change-gate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    environment: production
+    permissions:
+      contents: read
+      actions: read
+    env:
+      CI: 'true'
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PRODUCTION_SESSION_POOLER_HOST: ${{ secrets.SUPABASE_PRODUCTION_SESSION_POOLER_HOST }}
+      SUPABASE_PRODUCTION_SERVER_ROOT_CERT_PEM: ${{ secrets.SUPABASE_PRODUCTION_SERVER_ROOT_CERT_PEM }}
+      GH_TOKEN: ${{ github.token }}
+      READER_S4_BACKUP_RUN_ID: ${{ inputs.reader_s4_backup_run_id }}
+      READER_S4_RESTORE_RUN_ID: ${{ inputs.reader_s4_restore_run_id }}
+      READER_S4_SCOPE_CONFIRMATION: ${{ inputs.reader_s4_confirmation }}
+    steps:
+      - name: Checkout immutable main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install PostgreSQL client and jq
+        shell: bash
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client jq >/dev/null
+      - name: Apply exact Reader migrations after current backup and restore
+        shell: bash
+        run: bash scripts/operations/apply-official-reader-s4-scoped-production-migrations.sh

@@ -39,6 +39,8 @@ if (config?.contractVersion !== 'myeongha-production-reader-privacy-purge-worker
     || launch.singleProcessSequentialBatches !== true
     || process.env[launch.ownerActivationEnvironment] !== launch.ownerActivationValue
     || config?.gates?.noTemporaryStorageFallback !== true
+    || config?.gates?.noDeploymentWithoutMigrationRecovery !== true
+    || config?.gates?.noEmissionOfSubjectOrKeyIdentifiers !== true
     || config?.gates?.noPaidReadActivation !== true) unavailable();
 
 const existingWorkerDatabaseEnv = [
@@ -67,6 +69,83 @@ if (!Array.isArray(config.sharedOffPrimaryEnvironment)
 const entry = join(projectRoot, 'scripts/operations/run-official-reader-privacy-purge-worker.mjs');
 const compiledRuntime = join(projectRoot, 'dist/apps/api/src/production-account-deletion-worker-runtime.js');
 if (!existsSync(entry) || !existsSync(compiledRuntime)) unavailable();
+
+// An activation flag cannot substitute for an installed, least-privilege
+// S4 database. Confirm the REAL Worker DB identity, the private off-primary
+// mount and the exact deletion RPCs BEFORE spawning a destructive process.
+// This preflight uses SELECT against pg_catalog only, on a READ ONLY
+// transaction. It never queries protected rows, mutates schema or logs IDs.
+const requiredPrivateFunctions = [
+  'internal_list_official_reader_paid_answer_purge_jobs_v1(integer)',
+  'internal_claim_official_reader_paid_answer_purge_v1(uuid,text)',
+  'internal_qry_official_reader_paid_answer_purge_manifest_v1(uuid,text)',
+  'internal_commit_official_reader_paid_answer_purge_v1(uuid,text,text,uuid[],text[])',
+  'internal_renew_official_reader_paid_answer_purge_lease_v1(uuid,text)',
+  'internal_finish_official_reader_paid_answer_purge_v1(uuid,text,text,uuid[])',
+  'internal_finish_empty_official_reader_paid_answer_purge_v1(uuid,text)',
+  'internal_release_official_reader_paid_answer_purge_v1(uuid,text)',
+];
+let pool;
+try {
+  const [dbConfig, dbPool, offPrimaryConfig, offPrimaryStore] = await Promise.all([
+    import('../../dist/apps/api/src/production-account-deletion-worker-db-config.js'),
+    import('../../dist/apps/api/src/node-postgres-account-deletion-worker-pool.js'),
+    import('../../dist/apps/api/src/official-reader-offprimary-worker-config-v1.js'),
+    import('../../dist/apps/api/src/official-reader-node-offprimary-privacy-store-v1.js'),
+  ]);
+  const parsedDb = dbConfig.parseProductionAccountDeletionWorkerDbConfigV1(
+    process.env,
+  );
+  const parsedMount = offPrimaryConfig.parseOfficialReaderOffPrimaryWorkerConfigV1(
+    process.env,
+  );
+  if (parsedMount === null) unavailable();
+  offPrimaryStore.createOfficialReaderNodeOffPrimaryStoreV1(parsedMount);
+  pool = dbPool.createNodePostgresAccountDeletionWorkerPoolV1(parsedDb);
+  const connection = await pool.connect();
+  let began = false;
+  try {
+    await connection.query('BEGIN READ ONLY');
+    began = true;
+    await connection.query('SET LOCAL ROLE myeongha_system_executor');
+    const { rows } = await connection.query(`
+      select
+        (select c.relrowsecurity and c.relforcerowsecurity
+           from pg_catalog.pg_class c
+          where c.oid=pg_catalog.to_regclass('public.official_reader_paid_answer_bodies')
+        ) as "protectedRls",
+        (select c.relrowsecurity and c.relforcerowsecurity
+           from pg_catalog.pg_class c
+          where c.oid=pg_catalog.to_regclass('public.official_reader_paid_answer_purge_jobs_v1')
+        ) as "queueRls"
+    `);
+    // A missing function must never be ignored by the count. Use the exact
+    // pg_catalog.to_regprocedure for each static signature separately.
+    const rpcRows = await connection.query(`
+      select
+        pg_catalog.to_regprocedure('public.' || sig) is not null as "installed",
+        pg_catalog.has_function_privilege(
+          current_user, pg_catalog.to_regprocedure('public.' || sig), 'EXECUTE'
+        ) as "canExecute"
+      from pg_catalog.unnest($1::text[]) as f(sig)
+    `, [requiredPrivateFunctions]);
+    if (rows.length !== 1
+        || rows[0].protectedRls !== true
+        || rows[0].queueRls !== true
+        || rpcRows.rows.length !== requiredPrivateFunctions.length
+        || rpcRows.rows.some(row =>
+          row.installed !== true || row.canExecute !== true)) unavailable();
+    await connection.query('ROLLBACK');
+    began = false;
+  } finally {
+    if (began) await connection.query('ROLLBACK').catch(() => {});
+    connection.release();
+  }
+} catch {
+  unavailable();
+} finally {
+  if (pool) await pool.close();
+}
 
 // No shell or inherited HTTP listener; one child with one sequential loop.
 // The child owns bounded DB leases and retry/backoff; this process forwards

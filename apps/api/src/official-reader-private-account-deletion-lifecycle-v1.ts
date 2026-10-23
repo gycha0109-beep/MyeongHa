@@ -101,22 +101,19 @@ function normalizeManifest(value: OfficialReaderProtectedDeletionManifestV1) {
       || value.entries.length === 0
       || value.entries.length > MAX_KEYS_PER_ACCOUNT) return failed();
 
-  const ids = new Set<string>();
-  const refs = new Set<string>();
-  for (const row of value.entries) {
-    const id = normalizedUuid(row.bodyId);
-    const ref = boundedRef(row.encryptionKeyRef);
-    if (ids.has(id) || refs.has(ref)) {
-      // Destroying a shared key would erase other content. All protected
-      // answers MUST have dedicated, uniquely eradicable key references.
-      return failed();
-    }
-    ids.add(id);
-    refs.add(ref);
+  const pairs = value.entries.map(row => ({
+    id: normalizedUuid(row.bodyId),
+    key: boundedRef(row.encryptionKeyRef),
+  })).sort((a, b) => a.id.localeCompare(b.id));
+  if (new Set(pairs.map(pair => pair.id)).size !== pairs.length
+      || new Set(pairs.map(pair => pair.key)).size !== pairs.length) {
+    // A key may not be shared, and each immutable body must retain its
+    // original key reference through account deletion and backup replay.
+    return failed();
   }
   return Object.freeze({
-    bodyIds: Object.freeze([...ids].sort()),
-    keyRefs: Object.freeze([...refs].sort()),
+    bodyIds: Object.freeze(pairs.map(pair => pair.id)),
+    keyRefs: Object.freeze(pairs.map(pair => pair.key)),
   });
 }
 
@@ -144,11 +141,19 @@ function requireFence(
   return value;
 }
 
-function sameValues(a: readonly string[], b: readonly string[]): boolean {
-  if (a.length !== b.length) return false;
-  const expected = [...a].sort();
-  const actual = [...b].sort();
-  return expected.every((value, index) => value === actual[index]);
+function sameManifestPairs(
+  expectedBodyIds: readonly string[],
+  expectedKeyRefs: readonly string[],
+  actualBodyIds: readonly string[],
+  actualKeyRefs: readonly string[],
+): boolean {
+  if (expectedBodyIds.length !== actualBodyIds.length
+      || expectedBodyIds.length !== expectedKeyRefs.length
+      || actualBodyIds.length !== actualKeyRefs.length) return false;
+  const known = new Map(expectedBodyIds.map((bodyId, index) =>
+    [bodyId, expectedKeyRefs[index]] as const));
+  return actualBodyIds.every((bodyId, index) =>
+    known.get(bodyId) === actualKeyRefs[index]);
 }
 
 export function createOfficialReaderAccountPrivacyDeletionPortV1(input: {
@@ -171,8 +176,9 @@ export function createOfficialReaderAccountPrivacyDeletionPortV1(input: {
         }),
         subjectId, deletionJobId,
       );
-      if (!sameValues(saved.bodyIds, manifest.bodyIds)
-          || !sameValues(saved.keyRefs, manifest.keyRefs)) return failed();
+      if (!sameManifestPairs(
+        manifest.bodyIds, manifest.keyRefs, saved.bodyIds, saved.keyRefs,
+      )) return failed();
 
       // A stale, uncommitted response is not a restore-independent fence.
       const reread = requireFence(
@@ -180,8 +186,9 @@ export function createOfficialReaderAccountPrivacyDeletionPortV1(input: {
         subjectId, deletionJobId,
       );
       if (reread.fenceId !== saved.fenceId
-          || !sameValues(reread.bodyIds, manifest.bodyIds)
-          || !sameValues(reread.keyRefs, manifest.keyRefs)) return failed();
+          || !sameManifestPairs(
+            manifest.bodyIds, manifest.keyRefs, reread.bodyIds, reread.keyRefs,
+          )) return failed();
       return reread;
     },
 

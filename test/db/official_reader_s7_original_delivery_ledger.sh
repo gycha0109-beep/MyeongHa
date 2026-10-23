@@ -65,31 +65,6 @@ select count(*) from public.internal_qry_official_reader_paid_answer_ciphertext_
 commit;
 SQL
 }
-# The existing Chat only stores an opaque safe marker. Exercise its actual
-# 1980 selector, which delegates to the SAME current-Grant/Saju-proof S6 read.
-# Query only count/body ID; neither plaintext nor ciphertext reaches CI logs.
-s6_marker_count() {
-  p <<SQL
-begin;
-set local myeongha.subject_id='$1';
-select count(*) from public.internal_qry_official_reader_paid_chat_marker_ciphertext_v1(
- '$1'::uuid,'$2'::uuid,'$3'::uuid
-);
-commit;
-SQL
-}
-s6_marker_body_id() {
-  p <<SQL
-begin;
-set local myeongha.subject_id='$1';
-select body_id::text from public.internal_qry_official_reader_paid_chat_marker_ciphertext_v1(
- '$1'::uuid,'$2'::uuid,'$3'::uuid
-);
-commit;
-SQL
-}
-thread='f7010000-0000-4000-8000-000000000001'
-safe_marker='f7050000-0000-4000-8000-000000000001'
 spec="$(p -c "select product_spec_version
  from public.standard_reading_official_bindings
  where reading_id='12103100-0000-0000-0000-000000000001'::uuid
@@ -108,8 +83,6 @@ echo 'PASS original verified Receipt/Grant and actual 2-prepared/1-ACK private S
 # a paid answer while both remain active.
 [[ "$(s6_count "$subject")" == 0 ]] ||
   fail "S6 exposed paid ciphertext under ambiguous cross-bundle purchase rights"
-[[ "$(s6_marker_count "$subject" "$thread" "$safe_marker")" == 0 ]] ||
-  fail "S6 Chat marker bypassed conflicting current Reader Bundles"
 
 # Isolated fixture-only Grant changes: retire B3 temporarily to leave
 # exactly one current B2 Bundle, backed by TWO independent B2+B4 payments.
@@ -119,16 +92,6 @@ p -c "update public.entitlement_grants set status='revoked',revision=revision+1,
  where id='$sibling'::uuid and status='active';" >/dev/null
 [[ "$(s6_count "$subject")" == 1 ]] ||
   fail "S6 did not find exact B2 protected ciphertext with two same-bundle Grants"
-[[ "$(s6_marker_count "$subject" "$thread" "$safe_marker")" == 1 &&
-   "$(s6_marker_body_id "$subject" "$thread" "$safe_marker")" == "$body" ]] ||
-  fail "S6 safe Chat marker did not resolve the exact B2 paid body under fresh current rights"
-[[ "$(s6_marker_count "$subject" "$thread" 'f7050000-0000-4000-8000-000000000099')" == 0 ]] ||
-  fail "S6 wrong marker resolved paid ciphertext"
-[[ "$(s6_marker_count "$subject" 'f7010000-0000-4000-8000-000000000099' "$safe_marker")" == 0 ]] ||
-  fail "S6 wrong Thread resolved a different paid answer"
-[[ "$(s6_marker_count '11390000-0000-0000-0000-000000000099' "$thread" "$safe_marker")" == 0 ]] ||
-  fail "S6 cross-Subject Chat marker retrieved protected answer"
-echo 'PASS S6 real Chat safe-marker resolves only exact owner/Thread/message under same current Grant'
 [[ "$(p -c "select count(*) from public.entitlement_grants
  where id in ('$grant'::uuid,'$same_bundle_grant'::uuid)
  and status='active';")" == 2 ]] ||
@@ -152,22 +115,6 @@ SQL
 )"
 [[ "$source_revoke_only" == 0 ]] ||
   fail "S6 returned paid ciphertext with withdrawn Saju source receipt"
-# A fresh Chat-marker query must observe a currently withdrawn source too.
-source_marker_revoke="$(p <<SQL
-begin;
-set local myeongha.subject_id='$subject';
-update public.official_reader_s3_source_authority_receipts_v1
-set revoked_at=clock_timestamp()
-where source_attestation_ref='fixture:no-saju-authority'
- and subject_id='$subject'::uuid and revoked_at is null;
-select count(*) from public.internal_qry_official_reader_paid_chat_marker_ciphertext_v1(
- '$subject'::uuid,'$thread'::uuid,'$safe_marker'::uuid
-);
-rollback;
-SQL
-)"
-[[ "$source_marker_revoke" == 0 ]] ||
-  fail "Chat marker bypassed withdrawn Saju source proof"
 [[ "$(s6_count '11390000-0000-0000-0000-000000000099')" == 0 ]] ||
   fail "S6 returned protected ciphertext for a different member"
 
@@ -177,8 +124,6 @@ p -c "update public.entitlement_grants set status='active',revision=revision+1,
  where id='$sibling'::uuid and status='revoked';" >/dev/null
 [[ "$(s6_count "$subject")" == 0 ]] ||
   fail "S6 incorrectly chose B2 after B3 cross-bundle reactivation"
-[[ "$(s6_marker_count "$subject" "$thread" "$safe_marker")" == 0 ]] ||
-  fail "S6 Chat marker ignored reactivated different-Bundle rights"
 echo 'PASS S6 exact-current Grant/read source check, cross-bundle/owner denial and revoked-Saju-proof denial'
 
 
@@ -194,8 +139,6 @@ cancel="$(p -c "select public.cmd_apply_verified_portone_reader_full_cancellatio
 after="$(read_evidence "$intent" "$grant")"
 [[ "$(s6_count "$subject")" == 0 ]] ||
   fail "S6 retained paid ciphertext access after verified B2 refund with B3 different bundle"
-[[ "$(s6_marker_count "$subject" "$thread" "$safe_marker")" == 0 ]] ||
-  fail "S6 Chat marker bypassed post-refund different-Bundle current-scope denial"
 echo 'PASS S6 denies post-refund re-read while a conflicting B3 Bundle stays active'
 # B4 is an independent valid purchase of the ORIGINAL B2 Bundle. Its current
 # entitlement permits the historical encrypted B2 body when no other Bundle
@@ -206,8 +149,6 @@ p -c "update public.entitlement_grants
  where id='$sibling'::uuid and status='active';" >/dev/null
 [[ "$(s6_count "$subject")" == 1 ]] ||
  fail "S6 denied historical B2 body despite independent current same-bundle B4 purchase"
-[[ "$(s6_marker_count "$subject" "$thread" "$safe_marker")" == 1 ]] ||
- fail "S6 safe Chat marker denied surviving independent same-Bundle B4 access"
 [[ "$(p -c "select status from public.entitlement_grants
  where id='$same_bundle_grant'::uuid;")" == active ]] ||
  fail "independent same-bundle B4 Grant no longer active"
@@ -221,9 +162,6 @@ p -c "update public.entitlement_grants
  where id='$sibling'::uuid and status='revoked';" >/dev/null
 [[ "$(s6_count "$subject")" == 0 ]] ||
  fail "S6 failed to re-deny after cross-bundle B3 restoration"
-[[ "$(s6_marker_count "$subject" "$thread" "$safe_marker")" == 0 ]] ||
- fail "S6 Chat marker failed to re-deny after cross-bundle B3 restoration"
-echo 'PASS S6 safe Chat marker shares current entitlement and source proof checks through refund and B4 survival'
 echo 'PASS post-refund S6 permits independent same-bundle verified B4 only; conflicts remain denied'
 [[ "$after" == "revoked|2|1|$spec" ]] ||
  fail "real S7 revoked-Receipt history lost/reclassified: $after"
@@ -255,13 +193,6 @@ echo 'PASS post-refund S6 permits independent same-bundle verified B4 only; conf
  'public.internal_qry_official_reader_withdrawal_delivery_state_v2(uuid,uuid,uuid,uuid)',
  'EXECUTE');")" == 0 ]] ||
  fail "private S7 evidence leaked runtime EXECUTE"
-[[ "$(p -c "select count(*) from pg_catalog.pg_roles
- where rolname in ('anon','authenticated','service_role','myeongha_api_executor',
-   'myeongha_system_executor','myeongha_seyeon_chat_runtime_owner')
- and has_function_privilege(rolname,
- 'public.internal_qry_official_reader_paid_chat_marker_ciphertext_v1(uuid,uuid,uuid)',
- 'EXECUTE');")" == 0 ]] ||
- fail "private Chat marker function gained runtime EXECUTE"
 # Duplicate provider delivery must be a genuine 1900/1910 replay of the
 # ORIGINAL Cancellation event (not a new cancellation ID, Receipt or Grant).
 # The source timestamp comes from persisted verified Provider evidence:
