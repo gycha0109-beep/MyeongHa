@@ -24,7 +24,7 @@ const source = (path: string) => readFile(new URL('../' + path, import.meta.url)
 
 describe('I18N-07 staged EN-US and ZH-CN authored UI copy', () => {
   it('authors both UI target variants for navigation, account, Saju input and chat read-state without missing parity', () => {
-    expect(PLANNED_STATIC_UI_COPY_V1.size).toBe(472);
+    expect(PLANNED_STATIC_UI_COPY_V1.size).toBe(477);
     expect([...PLANNED_MOBILE_STATIC_UI_COPY_V1]).toEqual([...PLANNED_STATIC_UI_COPY_V1]);
     for (const [ko, pair] of PLANNED_STATIC_UI_COPY_V1) {
       expect(ko.trim().length).toBeGreaterThan(0);
@@ -129,6 +129,17 @@ describe('I18N-07 staged EN-US and ZH-CN authored UI copy', () => {
     }
     expect(normalizeUiLocale('en-US')).toBe('ko-KR');
     expect(normalizeMobileUiLocale('zh-CN')).toBe('ko-KR');
+  });
+
+  it('stages birth-input and archive headings without interpreting record contents', () => {
+    const entries = [["명식을 계산하기 위한 현재 자기 출생정보를 등록합니다.","Register your current birth details to calculate your birth chart.","登记您当前的出生信息以计算命盘。"],["MY ARCHIVE · 명하","MY ARCHIVE · MyeongHa","MY ARCHIVE · 命河"],["지나온 이야기에도","Even in stories past,","即使在过往的故事里，"],["나의 결이 남습니다.","my unique imprint remains.","也留有属于我的印记。"],["기억","Memories","记忆"]] as const;
+    for (const [ko, en, zh] of entries) {
+      expect(lookupPlannedStaticUiCopyV1(ko, 'en-US')).toBe(en);
+      expect(lookupPlannedStaticUiCopyV1(ko, 'zh-CN')).toBe(zh);
+      expect(lookupPlannedMobileStaticUiCopyV1(ko, 'en-US')).toBe(en);
+      expect(lookupPlannedMobileStaticUiCopyV1(ko, 'zh-CN')).toBe(zh);
+    }
+    expect(lookupPlannedMobileStaticUiCopyV1('record.private.body', 'en-US')).toBeNull();
   });
 
   it('fails closed for unsupported input and for source, private messages or unknown copy', () => {
