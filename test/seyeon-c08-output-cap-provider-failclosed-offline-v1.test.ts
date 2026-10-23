@@ -4,8 +4,7 @@ import {
   type OpenRouterSeyeonMetricV1,
 } from '../apps/api/src/openrouter-seyeon-evaluation-provider-v1.js';
 // @ts-expect-error Offline scenario MJS has no TS declarations.
-import {auditSeyeonStageCompletionCapsOfflineV1} from
-  '../scripts/seyeon-c08-stage-cap-feasibility-offline-v1.mjs';
+import {auditSeyeonStageCompletionCapsOfflineV1} from '../scripts/seyeon-c08-stage-cap-feasibility-offline-v1.mjs';
 
 const MODEL = 'z-ai/glm-5.3-flash';
 const CAP = 128;
