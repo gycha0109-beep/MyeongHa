@@ -366,8 +366,10 @@ export async function tryHandleCloudflareApprovedAuthV1(request, bindings, route
       return unavailable();
     }
     approvedDbConfig = config;
-  } catch {
-    // Include neither CA, connection URL nor upstream exception in HTTP.
+  } catch (error) {
+    // Temporary owner-only tail diagnostics: class name, never the exception
+    // message, connection URL, certificate, request or authentication token.
+    if (isGuestBootstrap) console.warn('CF_GUEST_PREFLIGHT', error instanceof Error ? error.name : 'Unknown');
     return unavailable();
   }
 
@@ -479,7 +481,13 @@ export async function tryHandleCloudflareApprovedAuthV1(request, bindings, route
         ? { request, action: 'refresh', authAction: 'social-complete' }
         : { request, action });
     }
-  } catch {
+  } catch (error) {
+    if (isGuestBootstrap) {
+      const code = typeof error === 'object' && error !== null && 'code' in error &&
+        typeof error.code === 'string' && /^[A-Z0-9_]{2,20}$/.test(error.code)
+        ? error.code : 'UNCLASSIFIED';
+      console.warn('CF_GUEST_RUNTIME', error instanceof Error ? error.name : 'Unknown', code);
+    }
     result = unavailable();
   }
   if (!await closeCloudflareAuthResourcesV1(
