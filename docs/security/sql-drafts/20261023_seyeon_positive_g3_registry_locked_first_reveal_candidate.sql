@@ -88,7 +88,9 @@ begin
     -- Identical user text is not a substitute for this exact live receive.
     -- A different request with the same body must not inherit first Reveal.
     and t.client_turn_id=p_expected_client_turn_id
-    and t.state in ('committed','delivered')
+    -- A delivered Turn has ALREADY crossed the first-Reveal boundary.
+    -- Never turn an old delivery into a second original-Grant disclosure.
+    and t.state='committed'
     and t.committed_attempt_id=p_attempt_id
     and a.id=p_attempt_id and a.state='committed'
     and a.planner_version='seyeon-production-chat-planner-v1'
