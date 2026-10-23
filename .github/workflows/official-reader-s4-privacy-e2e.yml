@@ -152,7 +152,7 @@ jobs:
           python3 scripts/operations/stage-official-reader-s4-production-migrations.py \
             --source-dir "$PWD/supabase/migrations" \
             --output-dir "$scratch/staged"
-          [[ "$(wc -l < "$scratch/staged/ordered-files.txt")" -eq 56 ]]
+          [[ "$(wc -l < "$scratch/staged/ordered-files.txt")" -eq 57 ]]
 
       - name: Print non-identifying acceptance scope
         if: success()
