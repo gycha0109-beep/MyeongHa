@@ -54,7 +54,7 @@ language plpgsql security definer
 set search_path = pg_catalog, public, pg_temp
 as $issue$
 declare
-  v_now timestamptz := clock_timestamp();
+  v_now timestamptz;
   v_id text := 'iv_' || replace(gen_random_uuid()::text, '-', '');
 begin
   perform public.assert_myeongha_subject_context_v1(p_subject_id);
@@ -68,6 +68,8 @@ begin
       message='Legal identity verification requires an active subject';
   end if;
 
+  -- Refresh clock after acquiring Subject lock (no stale TTL after lock waits).
+  v_now := clock_timestamp();
   update public.legal_portone_identity_attempts_v1 a
     set status='expired'
     where a.subject_id=p_subject_id and a.status='pending'
@@ -112,7 +114,7 @@ language plpgsql security definer
 set search_path = pg_catalog, public, pg_temp
 as $consume$
 declare
-  v_now timestamptz := clock_timestamp();
+  v_now timestamptz;
 begin
   perform public.assert_myeongha_subject_context_v1(p_subject_id);
   if p_age_band not in ('free_minor','adult') or p_age_band is null then
@@ -124,6 +126,8 @@ begin
     and s.status='active' and s.merged_into_subject_id is null
     for update;
   if not found then return false; end if;
+  -- Re-read database clock after waiting for Subject lock.
+  v_now := clock_timestamp();
 
   -- Exactly one concurrent consumer wins. If this update affects no rows,
   -- DO NOT write or replace an age entitlement.
