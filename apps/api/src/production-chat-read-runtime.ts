@@ -3,6 +3,7 @@ import { handleChatOpenRequestV1 } from './chat-open-http.js';
 import { handleChatReadRequestV1 } from './chat-read-http.js';
 import type { PostgresSubjectPoolV1 } from './postgres-subject-execution.js';
 import { createProductionPostgresSubjectPoolLeaseV1 } from './production-postgres-subject-pool-lease.js';
+import { createProductionPortOneVerifiedAgeAdmissionPortV1 } from './portone-v2-age-enforcement-activation-v1.js';
 import { createProductionRequestIdentityVerifierV1 } from './production-request-identity-verifier.js';
 import {
   parseProductionUserDataRuntimeConfigV1,
@@ -58,6 +59,10 @@ export function createProductionChatReadRuntimeV1(
       : { memberFetchImpl: input.memberFetchImpl }),
   });
   const createUuid = input.createUuid ?? randomUUID;
+  const ageAdmissionPort = createProductionPortOneVerifiedAgeAdmissionPortV1({
+    env: input.env,
+    pool: poolLease.pool,
+  });
 
   return Object.freeze({
     async handleRequest(requestInput: ProductionChatReadRequestV1) {
@@ -70,6 +75,7 @@ export function createProductionChatReadRuntimeV1(
             identityEvidenceVerifier,
             pool: poolLease.pool,
             createUuid,
+            ...(ageAdmissionPort === undefined ? {} : { ageAdmissionPort }),
           })
         : await handleChatReadRequestV1({
             request: requestInput.request,

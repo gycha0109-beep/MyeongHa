@@ -162,6 +162,53 @@ function makeInput(overrides: Partial<HandleBirthProfileCreateRequestInputV1> = 
 }
 
 describe('production Birth Profile create HTTP foundation', () => {
+  it('blocks both guest and member Birth Profile writes without a trusted verified age', async () => {
+    for (const kind of ['guest', 'member'] as const) {
+      const { input, pool, fingerprintPort, verifier } = makeInput();
+      verifier.evidence = kind === 'guest'
+        ? { kind: 'guest', verifiedGuestTokenHash: 'guest-fingerprint' }
+        : { kind: 'member', verifiedAuthUserId: '91000000-0000-0000-0000-000000000001' };
+      let checkedKind: string | undefined;
+      const response = await handleBirthProfileCreateRequestV1({
+        ...input,
+        ageAdmissionPort: {
+          admitFreePersonalization: async evidence => {
+            checkedKind = evidence.kind;
+            return false;
+          },
+        },
+      });
+      expect(checkedKind).toBe(kind);
+      expect(response.status).toBe(403);
+      expect((await response.json()).error.code).toBe('AGE_VERIFICATION_REQUIRED');
+      expect(pool.connectCalls).toBe(0);
+      expect(fingerprintPort.calls).toBe(0);
+    }
+  });
+
+  it('returns 503 without DB writes when verified-age lookup fails', async () => {
+    const { input, pool } = makeInput();
+    const response = await handleBirthProfileCreateRequestV1({
+      ...input,
+      ageAdmissionPort: {
+        admitFreePersonalization: async () => { throw new Error('postgres unavailable'); },
+      },
+    });
+    expect(response.status).toBe(503);
+    expect((await response.json()).error.code).toBe('AGE_VERIFICATION_UNAVAILABLE');
+    expect(pool.connectCalls).toBe(0);
+  });
+
+  it('permits valid Birth Profile creation after trusted age admission', async () => {
+    const { input, pool } = makeInput();
+    const response = await handleBirthProfileCreateRequestV1({
+      ...input,
+      ageAdmissionPort: { admitFreePersonalization: async () => true },
+    });
+    expect(response.status).toBe(201);
+    expect(pool.connectCalls).toBe(1);
+  });
+
   it('pins POST to the approved governed runtime wrapper only', () => {
     expect(BIRTH_PROFILE_CREATE_HTTP_BINDINGS_V1).toEqual({
       method: 'POST',

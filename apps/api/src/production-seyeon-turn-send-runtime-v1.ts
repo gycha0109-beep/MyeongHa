@@ -5,6 +5,7 @@ import type {
 } from '../../../packages/domain/src/index.js';
 import type { IdentityEvidenceVerificationPortV1 } from './current-subject-profile-http.js';
 import type { PortOneVerifiedAgeAdmissionPortV1 } from './portone-v2-verified-age-admission-v1.js';
+import { createProductionPortOneVerifiedAgeAdmissionPortV1 } from './portone-v2-age-enforcement-activation-v1.js';
 import {
   handleSeyeonChatTurnSendRequestV1,
 } from './chat-turn-send-http.js';
@@ -197,6 +198,14 @@ export function createProductionSeyeonTurnSendRuntimeV1(
   input: CreateProductionSeyeonTurnSendRuntimeInputV1,
 ): ProductionSeyeonTurnSendRuntimeV1 {
   const config = parseProductionUserDataRuntimeConfigV1(input.env);
+  const productionAgeAdmissionPort = createProductionPortOneVerifiedAgeAdmissionPortV1({
+    env: input.env,
+    ...(input.pool === undefined ? {} : { pool: input.pool }),
+  });
+  if (productionAgeAdmissionPort !== undefined && input.ageAdmissionPort !== undefined) {
+    throw new Error('PortOne production enforcement cannot be overridden by a test age adapter.');
+  }
+  const ageAdmissionPort = productionAgeAdmissionPort ?? input.ageAdmissionPort;
   const identityEvidenceVerifier = input.identityEvidenceVerifier ??
     createProductionRequestIdentityVerifierV1({
       config,
@@ -210,7 +219,7 @@ export function createProductionSeyeonTurnSendRuntimeV1(
         requestId: requestInput.requestId,
         serverTime: requestInput.serverTime,
         identityEvidenceVerifier,
-        ...(input.ageAdmissionPort === undefined ? {} : { ageAdmissionPort: input.ageAdmissionPort }),
+        ...(ageAdmissionPort === undefined ? {} : { ageAdmissionPort }),
         runtime: Object.freeze({
           run: async (runInput) => {
             const providerConfig =

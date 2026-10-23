@@ -4,6 +4,7 @@ import type { PostgresSubjectPoolV1 } from './postgres-subject-execution.js';
 import { createProductionBirthInputFingerprintPortV1 } from './production-birth-input-fingerprint.js';
 import { parseProductionBirthProfileCreateRuntimeConfigV1 } from './production-birth-profile-create-runtime-config.js';
 import { createProductionPostgresSubjectPoolLeaseV1 } from './production-postgres-subject-pool-lease.js';
+import { createProductionPortOneVerifiedAgeAdmissionPortV1 } from './portone-v2-age-enforcement-activation-v1.js';
 import { createProductionRequestIdentityVerifierV1 } from './production-request-identity-verifier.js';
 import {
   parseProductionUserDataRuntimeConfigV1,
@@ -51,6 +52,10 @@ export function createProductionBirthProfileCreateRuntimeV1(
       ? {}
       : { memberFetchImpl: input.memberFetchImpl }),
   });
+  const ageAdmissionPort = createProductionPortOneVerifiedAgeAdmissionPortV1({
+    env: input.env,
+    pool: poolLease.pool,
+  });
   const fingerprintPort = createProductionBirthInputFingerprintPortV1(
     createConfig.birthInputHmacK1Secret,
   );
@@ -69,6 +74,7 @@ export function createProductionBirthProfileCreateRuntimeV1(
         pool: poolLease.pool,
         idPort,
         fingerprintPort,
+        ...(ageAdmissionPort === undefined ? {} : { ageAdmissionPort }),
       });
     },
     close() {

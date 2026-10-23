@@ -1,4 +1,5 @@
 import { ApiCommandError } from './api-error.js';
+import type { PortOneVerifiedAgeAdmissionPortV1 } from './portone-v2-verified-age-admission-v1.js';
 import {
   AuthenticatedJsonRequestBodyTooLargeV1,
   readAuthenticatedJsonRequestBodyV1,
@@ -37,6 +38,8 @@ export interface HandleBirthProfileCreateRequestInputV1 {
   readonly pool: PostgresSubjectPoolV1;
   readonly idPort: BirthProfileCreateIdPortV1;
   readonly fingerprintPort: BirthInputFingerprintPortV1;
+  /** Server-only verified-age authority, OFF until DB/Privacy approval. */
+  readonly ageAdmissionPort?: Pick<PortOneVerifiedAgeAdmissionPortV1, 'admitFreePersonalization'>;
 }
 
 function requireNonEmptyString(name: string, value: unknown): string {
@@ -213,6 +216,33 @@ export async function handleBirthProfileCreateRequestV1(
   }
   if (admission === 'invalid') {
     return jsonError({ status: 400, code: 'INVALID_REQUEST', messageKey: 'request.invalid', retryable: false, requestId });
+  }
+
+  // When separately enabled, admit only a server-resolved Member or Guest
+  // with an actual PortOne-backed age band. A submitted self DOB alone is
+  // never sufficient; refuse before the profile write or fingerprint operation.
+  if (input.ageAdmissionPort !== undefined) {
+    let admitted = false;
+    try {
+      admitted = await input.ageAdmissionPort.admitFreePersonalization(verifiedEvidence);
+    } catch {
+      return jsonError({
+        status: 503,
+        code: 'AGE_VERIFICATION_UNAVAILABLE',
+        messageKey: 'age.verification_unavailable',
+        retryable: true,
+        requestId,
+      });
+    }
+    if (!admitted) {
+      return jsonError({
+        status: 403,
+        code: 'AGE_VERIFICATION_REQUIRED',
+        messageKey: 'age.verification_required',
+        retryable: false,
+        requestId,
+      });
+    }
   }
 
   try {
