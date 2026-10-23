@@ -31,6 +31,21 @@ describe('I18N-07 non-authorizing English and Simplified Chinese UI gap audit', 
     expect(Object.isFrozen(status.unclassifiedOrUnauthoredKeys)).toBe(true);
   });
 
+  it('reuses a one-shot planned key iterator for coverage and ownership classification', () => {
+    const stagedKeys = new Map([['홈', ['Home', '首页']], ['기록', ['Records', '记录']]]).keys();
+    const status = auditPlannedUiCopyKeysV1(
+      ['홈', '기록', '세연', '갑', '새 문구'],
+      ['홈', '세연'],
+      stagedKeys,
+    );
+    expect(status.stagedKeysWithinAuthoredCatalog).toBe(2);
+    expect(status.ownership.reviewedUiOwnedKeys).toEqual(['홈', '기록']);
+    expect(status.ownership.characterOwnedKeys).toEqual(['세연']);
+    expect(status.ownership.sourceOwnedKeys).toEqual(['갑']);
+    expect(status.ownership.pendingOwnerReviewKeys).toEqual(['새 문구']);
+    expect(status.ownership.readyForRelease).toBe(false);
+  });
+
   it('respects protected owners and leaves unreviewed text pending', () => {
     const a = classifyPlannedUiCopyOwnershipV1(['홈','세연','갑','미심사 문구','홈'], ['홈','세연','갑']);
     expect(a.reviewedUiOwnedKeys).toEqual(['홈']);

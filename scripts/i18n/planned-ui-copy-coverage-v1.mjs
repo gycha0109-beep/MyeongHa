@@ -72,7 +72,7 @@ export function auditPlannedUiCopyKeysV1(webKeys, mobileNativeKeys, plannedKeys)
     authoredKeys: required.length,
     stagedKeysWithinAuthoredCatalog: covered.length,
     unclassifiedOrUnauthoredKeys: Object.freeze(missing),
-    ownership: classifyPlannedUiCopyOwnershipV1(required, plannedKeys),
+    ownership: classifyPlannedUiCopyOwnershipV1(required, staged),
     byCatalogue,
     // A staged key may be an identity/source-bound text that is deliberately
     // NOT eligible for translation. Release admission must be reviewed separately.
