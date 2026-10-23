@@ -1,3 +1,4 @@
+import { MobilePlannedUiQaSwitcherV1 } from '@/ui/MobilePlannedUiQaSwitcherV1';
 import { MyeongHaApiClientErrorV1, type BirthCalendarTypeV1, type BirthSexV1 } from '@myeongha/api-client';
 import { router, useLocalSearchParams } from 'expo-router';
 import { plannedMobileUiPreviewLocaleV1, previewMobileAuthoredUiLabelV1 } from '@/ui/mobile-planned-ui-screen-preview-v1';
@@ -156,6 +157,7 @@ export default function BirthInputScreen() {
           />
         )}
       >
+        <MobilePlannedUiQaSwitcherV1 />
         <Pressable accessibilityRole="button" onPress={() => router.back()}>
           <MobileUiText style={styles.back}>{previewText("‹ 사주로 돌아가기")}</MobileUiText>
         </Pressable>

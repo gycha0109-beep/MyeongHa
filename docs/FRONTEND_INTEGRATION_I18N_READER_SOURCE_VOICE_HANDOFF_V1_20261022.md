@@ -383,3 +383,9 @@
 - 기록 `RecordsScreen`이 `previewLocale`를 기록 탭/빈 목록/일부 실패/더 불러오기, 저장 풀이 다시 읽기 버튼, 기억 카드의 일반 고정 라벨로 전달한다. `RecordsEditorialHeader`의 정적 탭명 역시 영어/간체 후보 사전으로 표시한다. 기본 `null` prop과 기존 3개 언어 번역 `t` fallback을 유지한다.
 - 실제 LifeFact/Memory/Reading item의 개인 내용·표제·Reader 이름·계약 상태는 기존 계약대로 노출하고, 저장/철회·페이지네이션·권한 및 archive openability 로직을 변경하지 않는다. 미번역 서버 상태·시간 정보와 계수 표현은 기존 언어 그대로이며 출시 가능한 완전 번역으로 승격하지 않는다.
 - 기존 records 소스 회귀와 EN/CN 개발 미리보기 검증은 추가 prop 전파와 원문 보호를 확인하며 접근성·실기기·서비스 언어 선택은 여전히 HOLD다.
+
+### 7.38 EN/CN-UI-C — Expo 개발 전용 영어·간체 전환 QA 컨트롤 (2026-10-24)
+
+- 기존 `uiPreview=en-US|zh-CN`를 직접 URL에 입력해야 하던 6개 모바일 화면(사주·관상·대화 탐색·마이·기록·출생 입력)에 `MobilePlannedUiQaSwitcherV1`를 렌더한다. **`__DEV__`가 거짓이면 컨트롤은 렌더되지 않는다**. 개발 시 현재 화면의 transient route query(`router.setParams`)만 영어·간체·기존 UI로 전환한다. query 변경 시 기존 라우트의 기록 탭/폼 입력·출처를 재설정하지 않도록 별도 페이지 이동을 하지 않는다.
+- 이 스위처는 `MobileUiLocaleProvider`의 저장·복원, SecureStore, 사용자 선택 언어, Accept-Language/API 헤더, 공식 Reading/Reader 음성, 캐릭터 메시지와 접근 권한을 변경하지 않는다. `Current UI`는 현재 활성 지원 로케일을 유지한다. 모든 screen UI 출처/문구 검증과 실기기 스크린샷/접근성 QA는 별도 미완료 단계이며 **영어·간체 운영 공개 HOLD**다.
+- `test/i18n-en-us-zh-cn-mobile-preview-route.test.ts`에서 6개 실제 화면 삽입·정확한 2개 QA 언어·공백으로 원래 UI 복귀·개발 전용 방어/비저장/비이동 조건을 검증한다.

@@ -1,3 +1,4 @@
+import { MobilePlannedUiQaSwitcherV1 } from '@/ui/MobilePlannedUiQaSwitcherV1';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { plannedMobileUiPreviewLocaleV1, previewMobileAuthoredUiLabelV1 } from '@/ui/mobile-planned-ui-screen-preview-v1';
 import { useCallback, useState } from 'react';
@@ -85,6 +86,7 @@ export default function SajuScreen() {
       onRefresh={() => void onRefresh()}
       description={t('태어난 순간의 이야기를 바탕으로 나의 명식을 알아보세요.')}
     >
+      <MobilePlannedUiQaSwitcherV1 />
       <ReadingSubnav />
 
       {state.kind === 'loading' ? (

@@ -214,4 +214,38 @@ describe('I18N-07 Expo developer-only Saju UI preview boundary', () => {
       .toBe('active:저장된 풀이 다시 읽기 →');
   });
 
+  it('exposes transient QA toggles across the six staged Expo routes only', async () => {
+    const switcher = await readFile(
+      new URL('../apps/mobile/src/ui/MobilePlannedUiQaSwitcherV1.tsx', import.meta.url), 'utf8',
+    );
+    const routes = await Promise.all([
+      '../apps/mobile/src/app/(tabs)/reading/index.tsx',
+      '../apps/mobile/src/app/(tabs)/reading/face.tsx',
+      '../apps/mobile/src/app/(tabs)/chat/index.tsx',
+      '../apps/mobile/src/app/(tabs)/my/index.tsx',
+      '../apps/mobile/src/app/(tabs)/records/index.tsx',
+      '../apps/mobile/src/app/birth/index.tsx',
+    ].map((path) => readFile(new URL(path, import.meta.url), 'utf8')));
+    for (const route of routes) {
+      expect(route).toContain('<MobilePlannedUiQaSwitcherV1 />');
+      expect(route).toContain('plannedMobileUiPreviewLocaleV1(uiPreview, __DEV__)');
+      expect(route).not.toContain('X-MyeongHa-UI-Locale');
+    }
+    expect(switcher).toContain('if (!__DEV__) return null');
+    expect(switcher).toContain('plannedMobileUiPreviewLocaleV1(uiPreview, __DEV__)');
+    expect(switcher).toContain('router.setParams({ uiPreview: option.value })');
+    expect(switcher).toContain("value: 'en-US'");
+    expect(switcher).toContain("value: 'zh-CN'");
+    expect(switcher).toContain("value: ''");
+    expect(switcher).toContain('accessibilityState={{ selected }}');
+    expect(switcher).not.toContain('SecureStore');
+    expect(switcher).not.toContain('setLocale(');
+    expect(switcher).not.toContain('router.push(');
+    expect(switcher).not.toContain('X-MyeongHa-UI-Locale');
+    expect(plannedMobileUiPreviewLocaleV1('', true)).toBeNull();
+    expect(plannedMobileUiPreviewLocaleV1('en-US', true)).toBe('en-US');
+    expect(plannedMobileUiPreviewLocaleV1('zh-CN', true)).toBe('zh-CN');
+    expect(plannedMobileUiPreviewLocaleV1('en-US', false)).toBeNull();
+  });
+
 });

@@ -1,3 +1,4 @@
+import { MobilePlannedUiQaSwitcherV1 } from '@/ui/MobilePlannedUiQaSwitcherV1';
 import { useCallback, useEffect, useState } from 'react';
 import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { plannedMobileUiPreviewLocaleV1, previewMobileAuthoredUiLabelV1 } from '@/ui/mobile-planned-ui-screen-preview-v1';
@@ -137,6 +138,7 @@ export default function MyScreen() {
       onRefresh={() => void onRefresh()}
       description={previewText('나의 계정과 이야기, 설정을 살펴보세요.')}
     >
+      <MobilePlannedUiQaSwitcherV1 />
       <MyEditorialWelcome account={currentAccount} previewLocale={previewLocale} />
       <MyMemberAuthCard
           previewLocale={previewLocale}

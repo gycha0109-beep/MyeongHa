@@ -1,3 +1,4 @@
+import { MobilePlannedUiQaSwitcherV1 } from '@/ui/MobilePlannedUiQaSwitcherV1';
 import { useLocalSearchParams } from 'expo-router';
 import { plannedMobileUiPreviewLocaleV1, previewMobileAuthoredUiLabelV1 } from '@/ui/mobile-planned-ui-screen-preview-v1';
 import { useState } from 'react';
@@ -100,6 +101,7 @@ export default function FaceScreen() {
       onRefresh={() => void onRefresh()}
       description={t('얼굴에 담긴 이야기를 만나기 위한 첫 단계, 사진부터 준비해 보세요.')}
     >
+      <MobilePlannedUiQaSwitcherV1 />
       <ReadingSubnav />
       <FaceEditorialIntro readerId={presentationReader} />
       <MobileReaderPicker selected={presentationReader} onChange={setPresentationReader} vertical="face" />

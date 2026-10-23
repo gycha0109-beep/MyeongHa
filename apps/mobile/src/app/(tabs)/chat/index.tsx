@@ -1,3 +1,4 @@
+import { MobilePlannedUiQaSwitcherV1 } from '@/ui/MobilePlannedUiQaSwitcherV1';
 import { router, useLocalSearchParams } from 'expo-router';
 import { plannedMobileUiPreviewLocaleV1, previewMobileAuthoredUiLabelV1 } from '@/ui/mobile-planned-ui-screen-preview-v1';
 import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -40,6 +41,7 @@ export default function ChatHubScreen() {
       refreshing={refreshing}
       onRefresh={() => void onRefresh()}
     >
+      <MobilePlannedUiQaSwitcherV1 />
       <View style={styles.intro}>
         <View style={styles.introHeading}>
           <Text style={styles.kicker}>THE PEOPLE OF MYEONGHA</Text>

@@ -1,3 +1,4 @@
+import { MobilePlannedUiQaSwitcherV1 } from '@/ui/MobilePlannedUiQaSwitcherV1';
 import type {
   LifeRecordFactV1,
   MemoryItemV1,
@@ -162,6 +163,7 @@ export default function RecordsScreen() {
         onEndReachedThreshold={0.4}
         ListHeaderComponent={(
           <View style={styles.headerStack}>
+            <MobilePlannedUiQaSwitcherV1 />
             <View style={styles.header}>
               <Text style={[styles.eyebrow, { color: colors.gold }]}>MY RECORDS</Text>
               <MobileUiText style={[styles.title, { color: colors.ink }]}>{previewText('기록')}</MobileUiText>
