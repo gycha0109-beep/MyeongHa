@@ -148,11 +148,34 @@ begin
   return true;
 end $consume$;
 
+-- This is a server-only verified age authority read, not a public age lookup.
+-- SELECT FOR SHARE of the active Subject prevents a concurrent deletion
+-- status update from invalidating eligibility before the caller commits.
+create function public.qry_verified_legal_portone_age_v1(p_subject_id uuid)
+returns text
+language plpgsql security definer
+set search_path = pg_catalog, public, pg_temp
+as $verified_age$
+declare
+  v_band text;
+begin
+  perform public.assert_myeongha_subject_context_v1(p_subject_id);
+  select v.age_band into v_band
+  from public.subjects s
+  left join public.legal_portone_verified_age_v1 v on v.subject_id=s.id
+  where s.id=p_subject_id and s.status='active'
+    and s.merged_into_subject_id is null
+  for share of s;
+  return v_band;
+end $verified_age$;
+
 revoke all on function public.cmd_issue_legal_portone_identity_v1(uuid) from public, anon, authenticated;
 revoke all on function public.qry_pending_legal_portone_identity_v1(uuid,text) from public, anon, authenticated;
 revoke all on function public.cmd_consume_legal_portone_identity_v1(uuid,text,text) from public, anon, authenticated;
 grant execute on function public.cmd_issue_legal_portone_identity_v1(uuid) to myeongha_api_executor;
 grant execute on function public.qry_pending_legal_portone_identity_v1(uuid,text) to myeongha_api_executor;
 grant execute on function public.cmd_consume_legal_portone_identity_v1(uuid,text,text) to myeongha_api_executor;
+revoke all on function public.qry_verified_legal_portone_age_v1(uuid) from public, anon, authenticated;
+grant execute on function public.qry_verified_legal_portone_age_v1(uuid) to myeongha_api_executor;
 
 commit;
