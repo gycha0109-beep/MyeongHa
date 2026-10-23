@@ -129,7 +129,8 @@ describe('Mobile / Web UI localization parity', () => {
       source('apps/mobile/src/app/reading/scene.tsx'),
       source('apps/mobile/src/features/chat/ChatReadComponents.tsx'),
     ]);
-    expect(calendar).toContain("accessibilityLabel={t('달력 닫기')}");
+    expect(calendar).toContain("accessibilityLabel={previewText('달력 닫기')}");
+    expect(calendar).toContain('previewMobileAuthoredUiLabelV1(source, previewLocale, t)');
     expect(face).toContain('accessibilityLabel={previewText("전면 카메라로 정면 사진 촬영")}');
     expect(face).toContain('plannedMobileUiPreviewLocaleV1(uiPreview, __DEV__)');
     expect(face).toContain('previewMobileAuthoredUiLabelV1(source, previewLocale, t)');

@@ -14,6 +14,7 @@ import { mobileColors } from '@/ui/mobile-colors';
 import { MobileUiText } from '@/ui/MobileUiText';
 import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
 import { useMobileUiLocale } from '@/ui/mobile-ui-locale';
+import { previewMobileAuthoredUiLabelV1, type MobilePlannedUiPreviewLocaleV1 } from '@/ui/mobile-planned-ui-screen-preview-v1';
 
 type PickerStep = 'year' | 'month' | 'day';
 export type BirthDateParts = Readonly<{ year: string; month: string; day: string }>;
@@ -41,7 +42,9 @@ export function BirthDateCalendar({
   value,
   onClose,
   onSelect,
+  previewLocale = null,
 }: {
+  previewLocale?: MobilePlannedUiPreviewLocaleV1 | null;
   visible: boolean;
   calendarType: BirthCalendarTypeV1;
   value: BirthDateParts;
@@ -50,6 +53,7 @@ export function BirthDateCalendar({
 }) {
   const styles = useMobileThemedStyles(staticStyles);
   const { locale, t } = useMobileUiLocale();
+  const previewText = (source: string) => previewMobileAuthoredUiLabelV1(source, previewLocale, t);
   const yearUnit = locale === 'ko-KR' ? '년' : '年';
   const monthUnit = locale === 'ja-JP' ? '月' : locale === 'zh-TW' ? '月' : '월';
   const dayUnit = locale === 'ko-KR' ? '일' : '日';
@@ -81,7 +85,7 @@ export function BirthDateCalendar({
     ? new Date(Date.UTC(year, month - 1, 1)).getUTCDay()
     : 0;
   const dayChoices = Array.from({ length: dayCount }, (_, index) => index + 1);
-  const dateLabel = t(calendarType === 'solar' ? '양력' : '음력');
+  const dateLabel = previewText(calendarType === 'solar' ? '양력' : '음력');
 
   function finish(day: number) {
     onSelect({
@@ -95,15 +99,15 @@ export function BirthDateCalendar({
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <SafeAreaView style={styles.overlay}>
-        <Pressable accessibilityRole="button" accessibilityLabel={t('달력 닫기')} onPress={onClose} style={styles.scrim} />
+        <Pressable accessibilityRole="button" accessibilityLabel={previewText('달력 닫기')} onPress={onClose} style={styles.scrim} />
         <View style={styles.sheet}>
           <View style={styles.topRow}>
             <View style={styles.heading}>
               <Text style={styles.kicker}>BIRTH DATE · {dateLabel}</Text>
-              <MobileUiText style={styles.title}>생년월일 선택</MobileUiText>
+              <MobileUiText style={styles.title}>{previewText('생년월일 선택')}</MobileUiText>
             </View>
             <Pressable accessibilityRole="button" onPress={onClose} style={styles.close}>
-              <MobileUiText style={styles.closeText}>닫기 ✕</MobileUiText>
+              <MobileUiText style={styles.closeText}>{previewText('닫기 ✕')}</MobileUiText>
             </Pressable>
           </View>
 
@@ -119,19 +123,19 @@ export function BirthDateCalendar({
               <Text style={[styles.crumbText, step === 'month' && styles.crumbTextActive]}>{month}{monthUnit}</Text>
             </Pressable>
             <Text style={styles.crumbArrow}>›</Text>
-            <Text style={styles.currentStep}>{step === 'day' ? t('날짜 선택') : dayUnit}</Text>
+            <Text style={styles.currentStep}>{step === 'day' ? previewText('날짜 선택') : dayUnit}</Text>
           </View>
 
           <ScrollView style={styles.pickerScroll} contentContainerStyle={styles.pickerBody}>
             {step === 'year' ? (
               <>
                 <View style={styles.navRow}>
-                  <Pressable accessibilityRole="button" accessibilityLabel={t('10년 전')} disabled={decade <= MIN_YEAR}
+                  <Pressable accessibilityRole="button" accessibilityLabel={previewText('10년 전')} disabled={decade <= MIN_YEAR}
                     onPress={() => setDecade((prev) => prev - 10)} style={styles.navButton}>
                     <Text style={styles.navText}>‹</Text>
                   </Pressable>
                   <Text style={styles.navTitle}>{decade}–{decade + 9}{yearUnit}</Text>
-                  <Pressable accessibilityRole="button" accessibilityLabel={t('10년 후')} disabled={decade + 10 > todayYear}
+                  <Pressable accessibilityRole="button" accessibilityLabel={previewText('10년 후')} disabled={decade + 10 > todayYear}
                     onPress={() => setDecade((prev) => prev + 10)} style={styles.navButton}>
                     <Text style={styles.navText}>›</Text>
                   </Pressable>
@@ -148,11 +152,11 @@ export function BirthDateCalendar({
                     );
                   })}
                 </View>
-                <MobileUiText style={styles.hint}>화살표로 10년 단위 이동 후 출생 연도를 선택하세요.</MobileUiText>
+                <MobileUiText style={styles.hint}>{previewText('화살표로 10년 단위 이동 후 출생 연도를 선택하세요.')}</MobileUiText>
               </>
             ) : step === 'month' ? (
               <>
-                <Text style={styles.sectionTitle}>{year}{yearUnit} · {t('출생 월')}</Text>
+                <Text style={styles.sectionTitle}>{year}{yearUnit} · {previewText('출생 월')}</Text>
                 <View style={styles.choiceGrid}>
                   {MONTHS.map((choice) => (
                     <Pressable key={choice} accessibilityRole="button" accessibilityLabel={choice + monthUnit}
@@ -166,7 +170,7 @@ export function BirthDateCalendar({
             ) : (
               <>
                 <View style={styles.navRow}>
-                  <Pressable accessibilityRole="button" accessibilityLabel={t('이전 달')}
+                  <Pressable accessibilityRole="button" accessibilityLabel={previewText('이전 달')}
                     onPress={() => {
                       if (month === 1) { setYear((prev) => Math.max(MIN_YEAR, prev - 1)); setMonth(12); }
                       else setMonth((prev) => prev - 1);
@@ -175,7 +179,7 @@ export function BirthDateCalendar({
                     <Text style={styles.navText}>‹</Text>
                   </Pressable>
                   <Text style={styles.navTitle}>{year}{yearUnit} {month}{monthUnit} · {dateLabel}</Text>
-                  <Pressable accessibilityRole="button" accessibilityLabel={t('다음 달')}
+                  <Pressable accessibilityRole="button" accessibilityLabel={previewText('다음 달')}
                     disabled={year >= todayYear && month === 12}
                     onPress={() => {
                       if (month === 12) { setYear((prev) => prev + 1); setMonth(1); }
@@ -211,7 +215,7 @@ export function BirthDateCalendar({
                   </View>
                 ) : (
                   <>
-                    <MobileUiText style={styles.hint}>음력은 양력의 요일 배열과 다릅니다. 해당 월의 날짜를 선택해 주세요.</MobileUiText>
+                    <MobileUiText style={styles.hint}>{previewText('음력은 양력의 요일 배열과 다릅니다. 해당 월의 날짜를 선택해 주세요.')}</MobileUiText>
                     <View style={styles.daysGrid}>
                       {dayChoices.map((choice) => {
                         const active = Number(value.year) === year &&

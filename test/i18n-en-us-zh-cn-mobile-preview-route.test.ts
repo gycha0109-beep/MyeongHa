@@ -154,4 +154,33 @@ describe('I18N-07 Expo developer-only Saju UI preview boundary', () => {
       .toBe('active:나의 결이 남습니다.');
   });
 
+  it('passes Expo preview only to fixed calendar and time-picker copy while leaving values intact', async () => {
+    const [route, calendar, time] = await Promise.all([
+      readFile(new URL('../apps/mobile/src/app/birth/index.tsx', import.meta.url), 'utf8'),
+      readFile(new URL('../apps/mobile/src/features/birth/BirthDateCalendar.tsx', import.meta.url), 'utf8'),
+      readFile(new URL('../apps/mobile/src/features/birth/BirthTime12HourField.tsx', import.meta.url), 'utf8'),
+    ]);
+    expect(route).toContain('<BirthDateCalendar\\n            previewLocale={previewLocale}');
+    expect(route).toContain('<BirthTime12HourField\\n            previewLocale={previewLocale}');
+    for (const source of [calendar, time]) {
+      expect(source).toContain('previewMobileAuthoredUiLabelV1(source, previewLocale, t)');
+      expect(source).toContain('previewLocale = null');
+      expect(source).not.toContain('X-MyeongHa-UI-Locale');
+    }
+    expect(calendar).toContain("accessibilityLabel={previewText('달력 닫기')}");
+    expect(calendar).toContain("previewText('생년월일 선택')");
+    expect(calendar).toContain('onSelect({');
+    expect(calendar).toContain('daysInMonth(calendarType, year, month)');
+    expect(calendar).toContain("calendarType === 'lunar' ? 30");
+    expect(time).toContain("previewText('출생시간 분')");
+    expect(time).toContain("previewText('태어난 시각 선택')");
+    expect(time).toContain('value={minute}');
+    expect(time).toContain('onMinuteChange(value.replace(/\\D/gu');
+    expect(time).toContain('onHourChange(hour)');
+    const active = (s: string) => 'active:' + s;
+    expect(previewMobileAuthoredUiLabelV1('생년월일 선택', 'en-US', active)).toBe('Select date of birth');
+    expect(previewMobileAuthoredUiLabelV1('시 선택 닫기', 'zh-CN', active)).toBe('关闭小时选择器');
+    expect(previewMobileAuthoredUiLabelV1('달력 닫기', null, active)).toBe('active:달력 닫기');
+  });
+
 });

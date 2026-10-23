@@ -212,6 +212,7 @@ export default function BirthInputScreen() {
             {previewText("연도 → 월 → 날짜 순서로 선택할 수 있습니다.")}
           </MobileUiText>
           <BirthDateCalendar
+            previewLocale={previewLocale}
             visible={datePickerVisible}
             calendarType={calendarType}
             value={{ year, month, day }}
@@ -244,6 +245,7 @@ export default function BirthInputScreen() {
             </View>
           </View>
           <BirthTime12HourField
+            previewLocale={previewLocale}
             meridiem={meridiem}
             hour12={hour12}
             minute={minute}
