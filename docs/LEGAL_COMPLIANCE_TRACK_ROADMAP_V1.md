@@ -119,3 +119,12 @@
 - **실행 가능한 SQL 사본:** `supabase/release-candidates/1740_portone_identity_age_authority_v1.sql`로 DB DDL을 독립 파일로 준비. **supabase/migrations에는 추가하지 않았으며 실행하지 않았다.** 신규 두 테이블 RLS ON, service_role/공개 API 직접 접근 차단, Subject 비활성·병합 전이 DELETE 트리거 및 Subject Scoped 내부 함수 포함.
 - **필수만 확인:** `test/legal-portone-identity-privacy-release-candidate.test.ts`에서 원 승인 policy/그래프 지문 유지, DELETE 추가 후보 2건, 제안 SQL과 배포 후보 동일성, 비자동 migration 상태 확인. PostgreSQL 17 실제 트랜잭션·RLS 실증은 이번 단계 수행하지 않음.
 - **배포 조건:** 기존 Privacy/DB 삭제 그래프 개정 결정, 만료·소비된 인증 시도의 물리적 파기 라이프사이클, SQL 실DB 권한 및 삭제 전이 검증, 인증 채널 계약·비밀키. **운영 DB/인증 API/PG 결제 전부 OFF**.
+
+
+## 15. L2-P PortOne 인증 시도 만료·소비 데이터 물리 정리 (2026-10-24)
+
+- **실제 구현:** `supabase/proposals/1740_portone_identity_age_authority_v1.proposed.sql`의 `internal_purge_expired_legal_portone_attempts_v1(integer)`는 이미 확정된 인증 **10분 TTL**이 지난 `legal_portone_identity_attempts_v1` 행만 삭제한다. `FOR UPDATE SKIP LOCKED`, 정렬 인덱스, 1~250건 배치 제한으로 장시간 잠금/중복 작업을 방지하고, 비밀키·본인정보를 반환하지 않고 삭제 건수만 반환한다. `legal_portone_verified_age_v1`는 정리 대상 아님.
+- **서버 작업자:** `apps/api/src/postgres-portone-identity-attempt-purge-v1.ts`의 `createPostgresPortOneIdentityAttemptPurgePortV1`가 기존 격리 시스템 작업자 `myeongha_system_executor` 트랜잭션에서만 실행되도록 준비. 일반 API/anon/authenticated/service_role에는 EXECUTE를 부여하지 않는다.
+- **배포 경계:** SQL 원본과 `supabase/release-candidates/1740_portone_identity_age_authority_v1.sql` 동기화 완료. **migration 미적용, 작업자 스케줄 미등록, 운영 DB 삭제 미실행**. 물리 삭제의 자동 실행 주기·운영 보존기간·개인정보 삭제 정책 승인은 확정하지 않는다. 만료·소비 상태와 관계없이 TTL 경과 행만 삭제 가능하며 미만료 consumed 기록은 만료 시각 이전에 강제 정리하지 않는다.
+- **필수 확인:** `test/legal-portone-identity-attempt-purge-v1.test.ts`에서 시스템 역할·배치 상한·트랜잭션 롤백·나이 권한 테이블 비삭제를 최소 검증. 기존 승인 삭제 정책 59개 테이블/46 DELETE/4 ANONYMIZE/9 RETAIN 변경 없음.
+- **다음:** DB Authority/Privacy에서 신규 테이블 처분과 정리 주기 확정 후 제안 SQL의 PG17 함수·ACL·계정 삭제 전이 실증, 작업자 호출 스케줄/운영 연결. 인증 제공자 계약·채널키 전에는 SDK/공개 본인확인·결제 OFF 유지.
