@@ -77,6 +77,12 @@ async function runOnce() {
   // still a failed maintenance poll: never reset the retry counter merely
   // because the worker returned aggregate counters instead of throwing.
   if (report.failed > 0) unavailable();
+  // A full, successful batch may leave additional deletion jobs pending.
+  // Drain them serially without imposing a whole polling interval per batch.
+  // If only sibling-right deferrals or stale claims remain, use the normal
+  // interval instead of spinning on the same queue entries.
+  return report.discovered === limit
+    && report.completed + report.empty > 0;
 }
 
 function sleepForInterval(seconds) {
@@ -99,8 +105,9 @@ try {
   do {
     // One batch at a time. A Worker crash leaves its DB lease reclaimable
     // after 15 minutes; its independent tombstone remains immutable.
+    let drainRemaining = false;
     try {
-      await runOnce();
+      drainRemaining = await runOnce();
       consecutiveFailures = 0;
     } catch {
       // No SQL, Subject, Receipt, key reference, or private message contents.
@@ -117,7 +124,7 @@ try {
         break;
       }
     }
-    if (intervalSeconds !== null && !stopRequested) {
+    if (intervalSeconds !== null && !stopRequested && !drainRemaining) {
       const backoff = consecutiveFailures === 0
         ? intervalSeconds
         : Math.min(
