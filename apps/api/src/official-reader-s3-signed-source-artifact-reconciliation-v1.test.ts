@@ -3,6 +3,11 @@ import { describe, expect, it, vi } from 'vitest';
 import { hashProtectedSajuTextV1 } from '../../../packages/domain/src/index.js';
 import type { CharacterStandardReadingKnowledgeSourceV1 } from './character-standard-reading-knowledge.js';
 import type { OfficialReadingReaderAdmissionScopeV1 } from './official-reading-reader-admission-v1.js';
+import type { PreparedOfficialReadingReaderAdmissionV1 } from './official-reading-reader-admission-v1.js';
+import {
+  prepareOfficialReaderS3BoundPreviewSourceV1,
+  consumeOfficialReaderS3BoundPreviewSourceV1,
+} from './official-reader-private-s3-source-binding-v1.js';
 import {
   OFFICIAL_READER_S3_COVERAGE_PREFLIGHT_VERSION_V1,
 } from './official-reader-s3-source-coverage-preflight-v1.js';
@@ -161,6 +166,47 @@ function run(overrides: Partial<Parameters<typeof reconcileOfficialReaderS3Signe
   });
 }
 describe('S3: authentic Saju Preview envelope reconciled with DB-pinned official v2 response', () => {
+  it('pins DB Birth revision across T1 to T2 without converting Preview into release permission', async () => {
+    const original = {
+      scope: SCOPE,
+      source: source(),
+      ticket: { kind: 'official-reading-reader-server-admission-v1' },
+    } as PreparedOfficialReadingReaderAdmissionV1;
+    const sourceCoverageCandidate = candidate();
+    const issue = () => prepareOfficialReaderS3BoundPreviewSourceV1({
+      originalAdmission: original,
+      sourceCoverageCandidate,
+      signedPreviewEnvelope: envelope(),
+      verifierTrust: trust(),
+      verifierContext: {
+        expectedNonce: NONCE, expectedRequestBody: REQUEST, nowMs: NOW + 1_000,
+      },
+    });
+    const oldTicket = await issue();
+    expect(oldTicket).toMatchObject({
+      lifecycle: 'preview', canPersist: false, canDisclose: false,
+    });
+    const nextRevision = {
+      ...original,
+      source: source({ sourceBirthRevisionId: '99999999-9999-4999-8999-999999999999' }),
+    };
+    expect(() => consumeOfficialReaderS3BoundPreviewSourceV1({
+      token: oldTicket,
+      freshAdmission: nextRevision,
+      sourceCoverageCandidate,
+    })).toThrow('Official Reader signed source binding is unavailable.');
+
+    const currentTicket = await issue();
+    expect(consumeOfficialReaderS3BoundPreviewSourceV1({
+      token: currentTicket, freshAdmission: original, sourceCoverageCandidate,
+    }).storedResponseDigest).toBe(
+      hashSajuHeldSourceProofRequestV1(original.source.responseSnapshotJsonb),
+    );
+    expect(() => consumeOfficialReaderS3BoundPreviewSourceV1({
+      token: currentTicket, freshAdmission: original, sourceCoverageCandidate,
+    })).toThrow();
+  });
+
   it('compares exact independent signed and stored bytes while withholding all paid authority', async () => {
     const result = await run();
     expect(result).toEqual({
