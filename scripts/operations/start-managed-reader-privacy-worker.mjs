@@ -118,9 +118,7 @@ try {
            from pg_catalog.pg_class c
           where c.oid=pg_catalog.to_regclass('public.official_reader_paid_answer_purge_jobs_v1')
         ) as "queueRls"
-    `, [requiredPrivateFunctions.map(
-      signature => 'public.' + signature,
-    ).map(signature => signature)]);
+    `);
     // A missing function must never be ignored by the count. Use the exact
     // pg_catalog.to_regprocedure for each static signature separately.
     const rpcRows = await connection.query(`
