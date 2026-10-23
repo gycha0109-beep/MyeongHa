@@ -252,8 +252,9 @@ async function reveal(id:Fixture):Promise<string|null>{
 // original Turn under FOR UPDATE before Node socket finish/Tx COMMIT.
 async function firstOnceR25(c:PoolClient,id:Fixture) {
   const q=await c.query<{answer:string|null}>(
-    'select seyeon_positive_candidate.reveal_first_once_r25($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6::text) as answer',
-    [subject,id.thread,id.turn,id.attempt,id.assistantMessage,'g2-real-v2-'+Number(id.turn.slice(-12))],
+    'select seyeon_positive_candidate.reveal_first_once_r25($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6::uuid,$7::uuid,$8::text) as answer',
+    [subject,id.thread,id.turn,id.attempt,id.assistantMessage,
+     id.userMessage,id.postOutbox,'g2-real-v2-'+Number(id.turn.slice(-12))],
   );
   return q.rows[0]?.answer??null;
 }
