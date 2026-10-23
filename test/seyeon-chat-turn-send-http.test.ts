@@ -51,6 +51,23 @@ function replayResult() {
 }
 
 describe('Seyeon Member turn-send HTTP', () => {
+  it('blocks unverified age before runtime or AI Provider execution when enabled', async () => {
+    let runtimeCalls = 0;
+    const response = await handleSeyeonChatTurnSendRequestV1({
+      request: request(),
+      requestId: 'req-age-gate',
+      serverTime: '2026-10-23T06:00:00Z',
+      identityEvidenceVerifier: memberVerifier(),
+      ageAdmissionPort: { admitFreePersonalization: async () => false },
+      runtime: { run: async () => { runtimeCalls++; return replayResult() as never; } },
+    });
+    expect(response.status).toBe(403);
+    expect((await response.json() as { error: { code: string } }).error.code)
+      .toBe('AGE_VERIFICATION_REQUIRED');
+    expect(runtimeCalls).toBe(0);
+  });
+
+
   it.each(['committed_replay', 'executed'] as const)(
     'refuses %s HTTP first Reveal before metered runtime and sends zero assistant bytes',
     async (disposition) => {
