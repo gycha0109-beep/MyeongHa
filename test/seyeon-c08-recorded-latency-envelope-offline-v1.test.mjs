@@ -11,11 +11,11 @@ describe('C08 N06 5s E2E latency: FREE historical replay only',()=>{
       unifiedPreflightMs:4417,
       interpretationAndDraftMs:9282,
       independentSemanticReviewMs:8697,
-      finalGuardedEndToEndMs:23893,
+      recordedThreeCallPathMs:23893,
     });
     expect(a.recordedStageSumMs).toBe(22396);
-    expect(a.recordedNonStageOverheadMs).toBe(1497);
-    expect(a.hypotheticalFinalMs).toBe(23893);
+    expect(a.recordedUnattributedGapMs).toBe(1497);
+    expect(a.hypotheticalPathMs).toBe(23893);
     expect(a.historicalReplayOverTargetMs).toBe(18893);
     expect(a.hypotheticalReplayMeetsFiveSeconds).toBe(false);
   });
@@ -25,7 +25,7 @@ describe('C08 N06 5s E2E latency: FREE historical replay only',()=>{
     expect(a.preservedGenerationMs).toBe(9282);
     expect(a.preservedIndependentReviewMs).toBe(8697);
     expect(a.retainedReview).toBe(true);
-    expect(a.hypotheticalFinalMs).toBe(19476);
+    expect(a.hypotheticalPathMs).toBe(19476);
     expect(a.historicalReplayOverTargetMs).toBe(14476);
     expect(a.hypotheticalReplayMeetsFiveSeconds).toBe(false);
     expect(a.measuredAlternativeLatency).toBe(false);
@@ -40,7 +40,7 @@ describe('C08 N06 5s E2E latency: FREE historical replay only',()=>{
       unifiedPreflightMs:50,
       interpretationAndDraftMs:1000,
       independentSemanticReviewMs:1000,
-      finalGuardedEndToEndMs:2500,
+      recordedThreeCallPathMs:2500,
     }});
     expect(a.hypotheticalReplayMeetsFiveSeconds).toBe(true);
     expect(a.measuredAlternativeLatency).toBe(false);
@@ -55,7 +55,7 @@ describe('C08 N06 5s E2E latency: FREE historical replay only',()=>{
     {candidate:'hypothetical_skip_unified_preflight',timings:{}},
     {candidate:'preserved_three_call',timings:{...N06,independentSemanticReviewMs:-1}},
     {candidate:'preserved_three_call',timings:{...N06,interpretationAndDraftMs:NaN}},
-    {candidate:'preserved_three_call',timings:{...N06,finalGuardedEndToEndMs:1}},
+    {candidate:'preserved_three_call',timings:{...N06,recordedThreeCallPathMs:1}},
   ])('rejects invalid topology or inconsistent latency evidence: %j',input=>{
     expect(()=>replay(input)).toThrow(/C08_LATENCY_.*_HOLD/);
   });
