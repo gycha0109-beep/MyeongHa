@@ -15,7 +15,7 @@ describe('LEGAL L5: visible generative-AI disclosures', () => {
 
   it('shows localized AI prior notice before characters can be selected from the hub', async () => {
     const hub = readFileSync(new URL('../apps/web/src/chat-hub/ChatHubPage.tsx', import.meta.url), 'utf8');
-    const notice = hub.match(/<p\\s+className="character-ai-disclosure"\\s+data-legal-ai-hub-prior-notice>([\\s\\S]*?)<\\/p>/u);
+    const notice = hub.match(/<p\s+className="character-ai-disclosure"\s+data-legal-ai-hub-prior-notice>([\s\S]*?)<\/p>/u);
     expect(notice).not.toBeNull();
     expect(notice?.[1]).toContain('생성형 인공지능');
     expect(notice?.[1]).toContain('실제 사람이 아니며');
