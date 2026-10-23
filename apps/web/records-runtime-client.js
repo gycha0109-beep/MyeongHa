@@ -302,7 +302,7 @@ async function postSeyeonGrantRevoke(fetchImpl, endpoint, bearer, memoryItemId) 
     throw new RecordsRuntimeError('WEB_RECORDS_MEMBER_REQUIRED', 'Member identity is required.');
   }
   if (response.status === 503) {
-    throw new RecordsRuntimeError('WEB_RECORDS_REVOKE_UNAVAILABLE', 'Memory access revocation is not available.');
+    throw new RecordsRuntimeError('WEB_RECORDS_REVOKE_UNCONFIRMED', 'Memory revocation status is uncertain. Verify the current grant before reporting the result.');
   }
   if (!response.ok) {
     throw new RecordsRuntimeError('WEB_RECORDS_REVOKE_UNCONFIRMED', 'Memory revocation has no confirmed outcome.');
