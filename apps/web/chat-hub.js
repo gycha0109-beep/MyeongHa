@@ -6,21 +6,21 @@ const people = Object.freeze([
   {
     key: 'seyeon',
     name: '세연',
-    title: '무녀',
+    title: '명하의 안내인',
     line: '왔네요. 오늘은 어떤 이야기부터 해볼까요?',
     tags: ['밝고 가까운', '따뜻한', '편하게'],
   },
   {
     key: 'baekheon',
     name: '백헌',
-    title: '충추원의 장',
+    title: '베테랑 조정자',
     line: '이야기를 시작하죠. 지금 가장 먼저 꺼내고 싶은 것은 무엇입니까?',
     tags: ['선택과 책임', '차분한', '직설적인'],
   },
   {
     key: 'yeoul',
     name: '여울',
-    title: '설계관 기록관',
+    title: '운영관리팀 사원',
     line: '그래서, 무슨 얘기인데요? 듣고는 있을게요.',
     tags: ['새침한', '빠른 반응', '솔직한'],
   },
@@ -34,35 +34,35 @@ const people = Object.freeze([
   {
     key: 'rahyeon',
     name: '라현',
-    title: '대리자',
+    title: '전시 기획자',
     line: '말해봐요. 어디서부터 시작할지는 당신이 정해요.',
     tags: ['성숙한', '긴장감', '주도적인'],
   },
   {
     key: 'mira',
     name: '미라',
-    title: '대리자',
+    title: '연결자',
     line: '편하게 말해요. 듣고 있을게요.',
     tags: ['무심다정', '친구 같은', '담백한'],
   },
   {
     key: 'taegyeom',
     name: '태겸',
-    title: '대리자',
+    title: '프로 격구 선수',
     line: '핵심부터 말해보죠. 무엇이 가장 걸립니까?',
     tags: ['차가운', '까다로운', '핵심부터'],
   },
   {
     key: 'yunho',
     name: '윤호',
-    title: '대리자',
+    title: '연결자',
     line: '천천히 말씀하셔도 됩니다. 어떤 이야기부터 시작할까요?',
     tags: ['따뜻한', '안정적인', '지적인'],
   },
   {
     key: 'doyun',
     name: '도윤',
-    title: '대리자',
+    title: '연결자',
     line: '자, 무슨 얘기부터 해볼까요? 편하게 말해요.',
     tags: ['자유로운', '능청스러운', '가벼운'],
   },
@@ -177,7 +177,7 @@ function createPersonCard(person, { pending = false } = {}) {
 
   const line = document.createElement('p');
   line.className = 'chat-person-line';
-  line.textContent = pending ? '이 대리자는 현재 등록을 준비 중입니다.' : person.line;
+  line.textContent = pending ? '이 연결자는 현재 등록을 준비 중입니다.' : person.line;
 
   const tags = document.createElement('div');
   tags.className = 'chat-person-tags';
