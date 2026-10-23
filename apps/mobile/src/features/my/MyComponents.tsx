@@ -11,6 +11,7 @@ import { MobileUiText } from '@/ui/MobileUiText';
 import { useMobileTheme } from '@/ui/mobile-theme';
 import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
 import { useMobileUiLocale } from '@/ui/mobile-ui-locale';
+import { PLANNED_MOBILE_UI_LOCALES } from '@/ui/mobile-ui-copy';
 
 export function MyProfileCard({
   profile,
@@ -371,6 +372,10 @@ const localeChoices = [
   { value: 'ja-JP', label: '日本語' },
   { value: 'zh-TW', label: '繁體中文' },
 ] as const;
+const plannedLocaleChoices = [
+  { value: 'en-US', label: 'English · 준비 중' },
+  { value: 'zh-CN', label: '简体中文 · 准备中' },
+] as const;
 
 function MyLocaleSelector() {
   const themedStyles = useMobileThemedStyles(styles);
@@ -403,6 +408,20 @@ function MyLocaleSelector() {
             </Pressable>
           );
         })}
+      </View>
+      <View style={themedStyles.localeChoices}>
+        {plannedLocaleChoices.filter((choice) => PLANNED_MOBILE_UI_LOCALES.includes(choice.value)).map((choice) => (
+          <Pressable
+            key={choice.value}
+            accessibilityRole="radio"
+            accessibilityState={{ selected: false, disabled: true }}
+            accessibilityLabel={choice.label}
+            disabled
+            style={[themedStyles.localeChoice, { backgroundColor: colors.surface, borderColor: colors.border, opacity: 0.58 }]}
+          >
+            <Text style={{ color: colors.muted, fontSize: 12, fontWeight: '700' }}>{choice.label}</Text>
+          </Pressable>
+        ))}
       </View>
       <Text style={themedStyles.caption}>
         {locale === 'ja-JP'
