@@ -12,6 +12,7 @@ import {
 } from './prepare-cloudflare-static.mjs';
 import { CLOUDFLARE_DIRECT_API_ROUTES, CLOUDFLARE_REWRITE_ROUTES } from '../workers/cloudflare-api-router.mjs';
 import { summarizeCloudflarePreviewProbeMetricsV1 } from './cloudflare-preview-smoke-metrics.mjs';
+import { STAGE9_NEGATIVE_REPLAY_PROBES_V1 } from './cloudflare-preview-negative-replay.mjs';
 import { assessCloudflarePreviewOpsStopGateV1 } from './cloudflare-preview-ops-stop-gate.mjs';
 import {
   buildCloudflarePreviewSmokeEvidenceV1,
@@ -44,6 +45,7 @@ assert(baseline.size === expected.length && expected.every(h=>baseline.has(h)), 
 const failures = [];
 const timingSamples = [];
 const publicHtmlSha256 = Object.create(null);
+const negativeReplayFences = Object.create(null);
 let requests = 0;
 async function check(path, status, options = {}) {
   const target = new URL(path, parsed);
@@ -252,6 +254,33 @@ async function main() {
       failures.push({path:'/api/me/saju/calculation',reason:'calculation-authority-bypass'});
     }
   }
+  if (scf2) {
+    // Extra checks directly cover the Stage 9 negative-only retry boundary.
+    // Identical synthetic requests never activate Auth, Reader or PortOne.
+    for (const probe of STAGE9_NEGATIVE_REPLAY_PROBES_V1) {
+      const response=await check(probe.path,probe.expectedStatus,{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:probe.body,
+      });
+      if (!response) continue;
+      let fenced=false;
+      if (probe.expectedStatus===503) {
+        const payload=await response.json().catch(()=>null);
+        fenced=payload?.ok===false &&
+          payload?.error?.code==='SEYEON_FIRST_REVEAL_AUTHORITY_UNAVAILABLE' &&
+          payload?.error?.retryable===false;
+      } else {
+        fenced=(await response.text()).trim()==='';
+      }
+      if (response.status!==probe.expectedStatus || !fenced) {
+        failures.push({reason:'negative-post-replay-escaped',routeId:probe.id});
+      } else {
+        negativeReplayFences[probe.id] =
+          probe.expectedStatus===503?'HOLD_503':'DENY_404';
+      }
+    }
+  }
   const opsMetrics = scf2 ? summarizeCloudflarePreviewProbeMetricsV1(timingSamples) : null;
   const opsStopGate = scf2 ? assessCloudflarePreviewOpsStopGateV1({
     metrics:opsMetrics,expectedCommit:expectedHead,attestedCommit,
@@ -273,6 +302,7 @@ async function main() {
       expectedCommit:expectedHead,attestedCommit,
       metrics:opsMetrics,stopGate:opsStopGate,
       htmlSha256:publicHtmlSha256,
+      negativeReplayFences,
       githubRunId:process.env.GITHUB_RUN_ID,
       githubRunAttempt:process.env.GITHUB_RUN_ATTEMPT,
     });

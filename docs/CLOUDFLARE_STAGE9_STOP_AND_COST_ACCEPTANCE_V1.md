@@ -79,3 +79,10 @@ scripts/cloudflare-preview-ops-stop-gate.mjs에서 실행되는 읽기 전용 �
 - 기존 `verifyCloudflareStaticArtifact()`가 **이미 파일 크기·개수·숨김 Secret·맵 파일·심볼릭 링크·API 디렉터리**를 확인하는 동일 정적 파일 순회에서, 25MiB 이내 허용된 실제 배포 파일 전체의 바이트 SHA-256을 스트리밍으로 측정한다.
 - 정렬된 공개 상대 파일 경로 + 정확한 바이트 수 + 파일 SHA-256을 결합하여 하나의 `staticAssetTreeSha256`(64자리)를 기존 CI 출력에 추가한다. 파일별 내용/경로 목록·Secret·JWT·사용자 원본을 로그/Artifact로 내보내지 않는다. 순회 순서가 바뀌어도 동일한 파일 트리는 같은 체크섬을 생성하며, 한 바이트라도 바뀌면 다른 SHA가 된다.
 - **적용 범위 `LOCAL_STATIC_ARTIFACT_ONLY`**: 전체 Static Assets **로컬 빌드 출력**의 무결성 증거이며, 원격 Worker bundle/CDN POP 수신본·이미지 사용자 입력·CPU/실청구/개별 asset의 HTTP 배포까지 증명하지 않는다. 원격 실배포에서 실제 바이트를 읽는 체크섬은 기존 11개 공개 HTML의 `publicHtmlSha256` 별도 증거로 유지한다.
+
+### 2026-10-23 — 실패한 POST·중복 AI·미이관 결제 Webhook Replay 원격 차단
+
+- 단계 9 로드맵의 **실패한 POST 재시도·동일 요청 중복·중단된 AI/결제 replay 방어**에 맞춰 `scripts/cloudflare-preview-negative-replay.mjs`에 **추가 합성 POST 4개**를 고정한다: 같은 Auth sign-in 재시도 404, 세연 first/turns `?replay=1` 중복 503, 아직 공개/이관되지 않은 PortOne webhook path로 **동일 합성 body** 2회 호출 시 둘 다 404.
+- 기존 원격 Smoke HTTP **58→62**, 세연 의도된 보호 503 **6→7**로 변경한다. 정적 및 Preview exact SHA/HTML 11 digest 검사는 그대로 유지하고, `negativeReplayFences`에 4개 고정 id와 DENY_404/HOLD_503만 수집한다. 본문·실제 사용자 ID·유효 결제 영수증·Provider 키를 포함하지 않는다.
+- `scripts/cloudflare-preview-smoke-evidence.mjs`의 허용 목록과 `scripts/accept-cloudflare-stage9-evidence-pair.mjs`에서 **현재·pinned recovery 두 버전 모두** 4개 차단 코드 및 62/7 개수 미충족·긍정 실행 증거 위조를 거부한다. 배포/Cloudflare 계정 변경, 결제·AI provider 호출 없음. #2384 Stage4 legacy Probe 계약은 바꾸지 않는다.
+- **중요한 한계**: 미이관 webhook의 **404 fail-close** 확인은 PortOne 인증 서명·결제 상태 기계·실제 중복 결제 방어가 동작한다는 증거가 아니다. 세연 미승인 503도 수신/ACK·provider 첫 Reveal의 긍정 E2E 승인 근거가 아니므로 Reader/Commerce/AI는 계속 HOLD.

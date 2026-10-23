@@ -3,6 +3,7 @@ import { mkdtemp, mkdir, readFile, rm, writeFile, symlink } from 'node:fs/promis
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { HTML_ENTRIES } from '../scripts/verify-cloudflare-static.mjs';
+import { STAGE9_NEGATIVE_REPLAY_FENCE_VALUES_V1 } from '../scripts/cloudflare-preview-negative-replay.mjs';
 import {
   acceptCloudflareStage9EvidencePairV1,
   readCloudflareStage9EvidencePairV1,
@@ -17,10 +18,10 @@ const sample=(path,expectedStatus,actualStatus,elapsedMs)=>({
   path,expectedStatus,actualStatus,elapsedMs,
 });
 const probes=[
-  ...Array.from({length:50},(_,i)=>sample(i%2?'/index.html':'/',200,200,10+i)),
+  ...Array.from({length:53},(_,i)=>sample(i%2?'/index.html':'/',200,200,10+i)),
   sample('/api/health',200,200,20),
   sample('/api/me',404,404,21),
-  ...Array.from({length:6},(_,i)=>sample(
+  ...Array.from({length:7},(_,i)=>sample(
     '/api/chat/PRIVATE-THREAD/turns?state=SECRET',503,503,22+i)),
 ];
 const metrics=summarizeCloudflarePreviewProbeMetricsV1(probes);
@@ -32,6 +33,7 @@ const make= (target,sha)=>{
     target,expectedCommit:sha,attestedCommit:sha,metrics,stopGate,
     githubRunId:RUN,githubRunAttempt:ATTEMPT,
     htmlSha256:Object.fromEntries(HTML_ENTRIES.map(x=>[x,'d'.repeat(64)])),
+    negativeReplayFences:STAGE9_NEGATIVE_REPLAY_FENCE_VALUES_V1,
   });
 };
 const current=make('current',HEAD);
@@ -41,14 +43,14 @@ const pair=(change={})=>acceptCloudflareStage9EvidencePairV1({
 });
 
 describe('Cloudflare Stage 9 exact-SHA CI evidence pair acceptance',()=>{
-  it('admits two matching-run, held, sanitized 58-probe records only',()=>{
+  it('admits two matching-run, held, sanitized 62-probe records only',()=>{
     const result=pair();
     expect(result).toMatchObject({
       schema:'myeongha-cloudflare-stage9-evidence-pair-acceptance-v1',
       status:'PASS',production:'HOLD',cost:'COST_OR_LIMIT_EVIDENCE_HOLD',
       githubRun:{id:RUN,attempt:ATTEMPT},
-      current:{commit:HEAD,httpSamples:58,protected503:6},
-      recovery:{commit:STAGE9_PINNED_RECOVERY_SHA_V1,httpSamples:58,protected503:6},
+      current:{commit:HEAD,httpSamples:62,protected503:7},
+      recovery:{commit:STAGE9_PINNED_RECOVERY_SHA_V1,httpSamples:62,protected503:7},
       actualRollbackOrRestorePerformed:false,
     });
     expect(JSON.stringify(result)).not.toContain('PRIVATE-THREAD');
@@ -74,6 +76,10 @@ describe('Cloudflare Stage 9 exact-SHA CI evidence pair acceptance',()=>{
       {current:{...current,decision:{...current.decision,preview:'STOP_REHEARSAL'}}},
       {current:{...current,decision:{...current.decision,billing:'ACCOUNT_READ_CONFIRMED'}}},
       {current:{...current,notMeasured:[]}},
+      {current:{...current,negativeReplayFences:{}}},
+      {current:{...current,negativeReplayFences:{
+        ...STAGE9_NEGATIVE_REPLAY_FENCE_VALUES_V1,
+        'commerce.webhook.duplicate':'ENABLED'}}},
       {current:{...current,publicHtmlSha256:{}}},
       {current:{...current,publicHtmlSha256:{...current.publicHtmlSha256,
         'auth.html':'INVALID-DIGEST'}}},

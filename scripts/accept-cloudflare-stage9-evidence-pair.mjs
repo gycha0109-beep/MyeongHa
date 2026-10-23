@@ -6,13 +6,14 @@ import { lstat, readFile, readdir } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { HTML_ENTRIES } from './verify-cloudflare-static.mjs';
+import { STAGE9_NEGATIVE_REPLAY_FENCE_VALUES_V1 } from './cloudflare-preview-negative-replay.mjs';
 import {
   CLOUDFLARE_DIRECT_API_ROUTES, CLOUDFLARE_REWRITE_ROUTES,
 } from '../workers/cloudflare-api-router.mjs';
 
 export const STAGE9_PINNED_RECOVERY_SHA_V1 =
   'd4f7cebb3d9be6b4ad9e526c53e3f5b8585cc9c0';
-const EXPECTED_PROBES=58, EXPECTED_PROTECTED_HOLDS=6;
+const EXPECTED_PROBES=62, EXPECTED_PROTECTED_HOLDS=7;
 const CLASS_NAMES=Object.freeze(['static','health','api-denial','protected-hold']);
 const COUNTERS=Object.freeze([
   'requestAttempts','responses','transportFailures','unexpectedStatuses',
@@ -21,7 +22,7 @@ const COUNTERS=Object.freeze([
 const ROOT_FIELDS=Object.freeze([
   'schema','evidenceSource','target','expectedCommit','attestedCommit',
   'githubRun','syntheticRequestCount','counters','groups','byRoute',
-  'publicHtmlSha256','decision','notMeasured',
+  'publicHtmlSha256','negativeReplayFences','decision','notMeasured',
 ]);
 const STAT_FIELDS=Object.freeze(['n','p50Ms','p95Ms','maxMs']);
 const DECISION_FIELDS=Object.freeze([
@@ -99,6 +100,11 @@ function checkOne(record,target,expectedSha,runId,attempt) {
   for(const name of HTML_ENTRIES) {
     const digest=record.publicHtmlSha256[name];
     assert(typeof digest==='string'&&/^[a-f0-9]{64}$/.test(digest));
+  }
+  assert(exactKeys(record.negativeReplayFences,
+    Object.keys(STAGE9_NEGATIVE_REPLAY_FENCE_VALUES_V1)));
+  for(const [key,expected] of Object.entries(STAGE9_NEGATIVE_REPLAY_FENCE_VALUES_V1)) {
+    assert(record.negativeReplayFences[key]===expected);
   }
   assert(isRecord(record.byRoute));
   const keys=Object.keys(record.byRoute);

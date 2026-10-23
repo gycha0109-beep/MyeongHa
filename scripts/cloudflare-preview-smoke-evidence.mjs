@@ -5,6 +5,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
 import { HTML_ENTRIES } from './verify-cloudflare-static.mjs';
+import { STAGE9_NEGATIVE_REPLAY_FENCE_VALUES_V1 } from './cloudflare-preview-negative-replay.mjs';
 import {
   CLOUDFLARE_DIRECT_API_ROUTES,
   CLOUDFLARE_REWRITE_ROUTES,
@@ -72,7 +73,7 @@ function boundedStats(stat) {
 
 export function buildCloudflarePreviewSmokeEvidenceV1({
   target, expectedCommit, attestedCommit, metrics, stopGate,
-  githubRunId, githubRunAttempt, htmlSha256,
+  githubRunId, githubRunAttempt, htmlSha256, negativeReplayFences,
 }) {
   if (!ALLOWED_TARGETS.includes(target) ||
       typeof expectedCommit !== 'string' ||
@@ -107,6 +108,14 @@ export function buildCloudflarePreviewSmokeEvidenceV1({
   }
   const publicHtmlChecksums=Object.fromEntries(
     HTML_ENTRIES.map(name=>[name,htmlSha256[name]]));
+  const fences=STAGE9_NEGATIVE_REPLAY_FENCE_VALUES_V1;
+  if (!negativeReplayFences || typeof negativeReplayFences !== 'object' ||
+      Array.isArray(negativeReplayFences) ||
+      JSON.stringify(Object.keys(negativeReplayFences).sort()) !==
+        JSON.stringify(Object.keys(fences).sort()) ||
+      Object.keys(fences).some(key=>negativeReplayFences[key]!==fences[key])) {
+    throw Error('Synthetic retry/replay was not denied by the Preview');
+  }
   const counters = Object.fromEntries(COUNTERS.map(k => [k, boundedCounter(metrics[k])]));
   const groups = Object.fromEntries(CLASSES.map(k => [k, boundedStats(metrics.groups?.[k])]));
   if (!metrics.byRoute || typeof metrics.byRoute !== 'object' ||
@@ -130,6 +139,7 @@ export function buildCloudflarePreviewSmokeEvidenceV1({
     syntheticRequestCount: counters.requestAttempts,
     counters, groups, byRoute: routes,
     publicHtmlSha256:publicHtmlChecksums,
+    negativeReplayFences:{...fences},
     decision: {
       preview: stopGate.previewDecision,
       production: 'HOLD',

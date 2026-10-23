@@ -3,6 +3,7 @@ import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { HTML_ENTRIES } from '../scripts/verify-cloudflare-static.mjs';
+import { STAGE9_NEGATIVE_REPLAY_FENCE_VALUES_V1 } from '../scripts/cloudflare-preview-negative-replay.mjs';
 import {
   buildCloudflarePreviewSmokeEvidenceV1,
   writeCloudflarePreviewSmokeEvidenceV1,
@@ -25,6 +26,7 @@ const make=(updates={})=>buildCloudflarePreviewSmokeEvidenceV1({
   target:'current',expectedCommit:SHA,attestedCommit:SHA,
   metrics,stopGate,
   htmlSha256:Object.fromEntries(HTML_ENTRIES.map(x=>[x,'c'.repeat(64)])),
+  negativeReplayFences:STAGE9_NEGATIVE_REPLAY_FENCE_VALUES_V1,
   ...updates,
 });
 
@@ -48,6 +50,7 @@ describe('Stage 9 immutable, scrubbed CI evidence artifact',()=>{
     expect(result.byRoute['rewrite.chat.turns'].n).toBe(1);
     expect(Object.keys(result.publicHtmlSha256).sort()).toEqual([...HTML_ENTRIES].sort());
     expect(result.publicHtmlSha256['index.html']).toBe('c'.repeat(64));
+    expect(result.negativeReplayFences).toEqual(STAGE9_NEGATIVE_REPLAY_FENCE_VALUES_V1);
     const serial=JSON.stringify(result);
     expect(serial).not.toContain('PRIVATE_SECRET');
     expect(serial).not.toContain('SECRET-THREAD-ID');
@@ -65,6 +68,11 @@ describe('Stage 9 immutable, scrubbed CI evidence artifact',()=>{
       {stopGate:{...stopGate,reasons:['PRIVATE_SECRET']}},
       {stopGate:{...stopGate,productionCutover:'GO'}},
       {stopGate:{...stopGate,automaticProductionMutation:true}},
+      {negativeReplayFences:{}},
+      {negativeReplayFences:{...STAGE9_NEGATIVE_REPLAY_FENCE_VALUES_V1,
+        'commerce.webhook.duplicate':'ACCEPTED'}},
+      {negativeReplayFences:{...STAGE9_NEGATIVE_REPLAY_FENCE_VALUES_V1,
+        'forged.provider.receipt':'DENY_404'}},
       {htmlSha256:Object.fromEntries(HTML_ENTRIES.slice(1).map(x=>[x,'a'.repeat(64)]))},
       {htmlSha256:{...Object.fromEntries(HTML_ENTRIES.map(x=>[x,'a'.repeat(64)])),
         'api/secret.json':'a'.repeat(64)}},
