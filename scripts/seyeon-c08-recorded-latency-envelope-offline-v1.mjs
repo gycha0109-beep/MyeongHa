@@ -9,7 +9,7 @@ export const SEYEON_C08_N06_RECORDED_LATENCY_V1=Object.freeze({
   unifiedPreflightMs:4417,
   interpretationAndDraftMs:9282,
   independentSemanticReviewMs:8697,
-  finalGuardedEndToEndMs:23893,
+  recordedThreeCallPathMs:23893,
 });
 export const SEYEON_C08_TARGET_FINAL_MS_V1=5000;
 export const SEYEON_C08_LATENCY_CANDIDATES_V1=Object.freeze([
@@ -20,7 +20,7 @@ const positiveMs=x=>Number.isSafeInteger(x)&&x>0;
 
 /**
  * Omission subtracts only the recorded unified-preflight duration, retaining
- * every other stage and the recorded observed non-model gap. It does NOT
+ * every other stage and the unaccounted remainder of recorded path elapsed time. It does NOT
  * assert the other durations would remain constant in an actual 2-call run.
  */
 export function replaySeyeonC08RecordedLatencyEnvelopeOfflineV1({
@@ -32,35 +32,35 @@ export function replaySeyeonC08RecordedLatencyEnvelopeOfflineV1({
      !positiveMs(timings.unifiedPreflightMs)||
      !positiveMs(timings.interpretationAndDraftMs)||
      !positiveMs(timings.independentSemanticReviewMs)||
-     !positiveMs(timings.finalGuardedEndToEndMs)){
+     !positiveMs(timings.recordedThreeCallPathMs)){
     throw new TypeError('C08_LATENCY_INPUT_UNVERIFIED_HOLD');
   }
   const modelStagesMs=timings.unifiedPreflightMs+
     timings.interpretationAndDraftMs+timings.independentSemanticReviewMs;
   if(!Number.isSafeInteger(modelStagesMs)||
-     timings.finalGuardedEndToEndMs<modelStagesMs){
+     timings.recordedThreeCallPathMs<modelStagesMs){
     throw new TypeError('C08_LATENCY_INCONSISTENT_EVIDENCE_HOLD');
   }
-  const observedOtherOverheadMs=timings.finalGuardedEndToEndMs-modelStagesMs;
+  const observedOtherOverheadMs=timings.recordedThreeCallPathMs-modelStagesMs;
   const skipUnifiedPreflight=candidate==='hypothetical_skip_unified_preflight';
-  const hypotheticalFinalMs=timings.finalGuardedEndToEndMs-
+  const hypotheticalPathMs=timings.recordedThreeCallPathMs-
     (skipUnifiedPreflight?timings.unifiedPreflightMs:0);
   return Object.freeze({
     version:'seyeon-c08-recorded-latency-envelope-offline-v1',
     scope:'SINGLE_HISTORICAL_N06_ARITHMETIC_REPLAY_ONLY',
     candidate,
-    recordedFinalMs:timings.finalGuardedEndToEndMs,
+    recordedPathMs:timings.recordedThreeCallPathMs,
     recordedStageSumMs:modelStagesMs,
-    recordedNonStageOverheadMs:observedOtherOverheadMs,
+    recordedUnattributedGapMs:observedOtherOverheadMs,
     preservedGenerationMs:timings.interpretationAndDraftMs,
     preservedIndependentReviewMs:timings.independentSemanticReviewMs,
     retainedReview:true,
-    hypotheticalFinalMs,
+    hypotheticalPathMs,
     targetFinalMs:SEYEON_C08_TARGET_FINAL_MS_V1,
     historicalReplayOverTargetMs:Math.max(
-      0,hypotheticalFinalMs-SEYEON_C08_TARGET_FINAL_MS_V1),
+      0,hypotheticalPathMs-SEYEON_C08_TARGET_FINAL_MS_V1),
     hypotheticalReplayMeetsFiveSeconds:
-      hypotheticalFinalMs<=SEYEON_C08_TARGET_FINAL_MS_V1,
+      hypotheticalPathMs<=SEYEON_C08_TARGET_FINAL_MS_V1,
     measuredAlternativeLatency:false,
     repeatLatencyP50P95Verified:false,
     modelQualityVerified:false,
