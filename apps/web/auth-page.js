@@ -776,9 +776,17 @@ async function submitAuth({ email: rawEmail, password, confirmation }) {
   setStatus('');
   try {
     if (mode === 'sign-up') {
-      await ensureGuestBearer();
+      // Under approved preenrollment, the verified proof must be saved for
+      // atomic Member binding; Guest bootstrap would consume it prematurely.
+      if (!await preenrollmentCapabilityAvailable()) {
+        await ensureGuestBearer();
+      }
       const result = await signUpWithPassword(email, password, nextHref());
       if (result.status === 'verification_required') {
+        if (readGuestBearer() === null) {
+          setStatus(`${result.email}로 확인 메일을 보냈습니다. 이메일 확인 후 로그인해 주세요.`, 'success');
+          return;
+        }
         if (!await stageConfirmationGuestHandoff(result.email)) {
           setStatus('확인 메일은 전송됐지만 현재 게스트 흐름의 계정 연결 정보를 안전하게 보존하지 못했습니다. 이 탭을 닫지 말고 이메일 확인 후 돌아와 주세요.', 'error');
           return;
@@ -801,7 +809,11 @@ async function submitAuth({ email: rawEmail, password, confirmation }) {
 
 export function createAuthPageController(adapter) {
   ui = adapter;
-  mode = 'sign-in';
+  const callbacks = new URL(location.href).searchParams;
+  // A pre-account verification redirect must remount its signup-only
+  // completion handler even though a fresh AuthPage defaults to Sign-in.
+  mode = callbacks.get('preenrollmentIdentity') === 'callback' &&
+    callbacks.get('social') !== 'callback' ? 'sign-up' : 'sign-in';
   busy = false;
   ui.setMode(mode);
   ui.setBusy(false, mode);

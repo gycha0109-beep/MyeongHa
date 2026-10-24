@@ -100,6 +100,14 @@ describe('L2 A1 browser preenrollment identity flow', () => {
     expect(auth).toContain('data-legal-preenrollment-start');
     expect(auth).toContain('flow.resumeFromRedirect(params)');
     expect(auth).toContain('history.replaceState');
+    const controller = readFileSync(new URL('../apps/web/auth-page.js', import.meta.url), 'utf8');
+    expect(controller).toContain("callbacks.get('preenrollmentIdentity') === 'callback'");
+    expect(controller).toContain("? 'sign-up' : 'sign-in'");
+    // Both password and Social pre-verified enrollments must leave the
+    // single-use age proof intact rather than minting a Guest first.
+    expect(controller.split('if (!await preenrollmentCapabilityAvailable())')).toHaveLength(3);
+    expect(controller).toContain('if (readGuestBearer() === null)');
+
     const notices = [
       '가입 전 본인확인',
       '만 14세 이상인지 본인확인 업체의 서버 결과로 확인합니다. 체크박스만으로 연령 확인이 완료되지는 않습니다.',

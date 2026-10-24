@@ -84,7 +84,8 @@ export function createProductionGuestBootstrapHttpRuntimeV1(
           } catch {
             // Fail closed with the existing age-unavailable response.
           }
-          if (!preenrollmentEnabled) {
+          if (!preenrollmentEnabled ||
+              requestInput.request.headers.get('origin') !== 'https://myeongha.vercel.app') {
             return denyUnverifiedInitialIdentityAdmissionV1({
               env: input.env, surface: 'guest-bootstrap',
             })!;

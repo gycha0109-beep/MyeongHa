@@ -18,8 +18,10 @@ export function createApprovedPortOnePreenrollmentMemberBindingPortV1(input: Rea
 }>): (SupabasePreenrollmentMemberBindingPortV1 & {
   admitExistingMember(verifiedAuthUserId: string): Promise<boolean>;
 }) | null {
-  // Reject partially-approved environments before touching a database.
-  if (resolveProductionPortOnePreenrollmentModeV1(input.env) !== 'enforce') return null;
+  // Reject partially-approved environments and cross-origin form/CSRF
+  // submissions before touching any private identity or database authority.
+  if (resolveProductionPortOnePreenrollmentModeV1(input.env) !== 'enforce' ||
+      input.request.headers.get('origin') !== 'https://myeongha.vercel.app') return null;
   const rawNonce = extractPortOnePreenrollmentCookieV1(input.request);
   const secret = input.env.MYEONGHA_PORTONE_PREENROLLMENT_BINDING_SECRET;
   if (rawNonce === null && input.allowExistingMemberOnly !== true) return null;

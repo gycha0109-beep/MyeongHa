@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { createApprovedPortOnePreenrollmentMemberBindingPortV1 } from '../apps/api/src/portone-v2-approved-member-binding-v1.js';
 import {
   extractPortOnePreenrollmentCookieV1,
   fingerprintPortOnePreenrollmentBindingV1,
@@ -75,6 +76,21 @@ describe('L2 A1 preenrollment PortOne identity admission', () => {
         ...approved, ...failure,
       })).toThrow();
     }
+  });
+
+  it('does not compose a Member binding for a cross-origin request', () => {
+    const pool = { connect: vi.fn() };
+    const bad = createApprovedPortOnePreenrollmentMemberBindingPortV1({
+      env: approved, pool,
+      request: new Request('https://myeongha.vercel.app/api/auth/sign-up', {
+        method: 'POST', headers: {
+          Origin: 'https://attacker.invalid',
+          Cookie: serializePortOnePreenrollmentCookieV1(nonce),
+        },
+      }),
+    });
+    expect(bad).toBeNull();
+    expect(pool.connect).not.toHaveBeenCalled();
   });
 
   it('issues 256-bit nonce with HttpOnly/Secure/SameSite Strict and HMAC separation', () => {
