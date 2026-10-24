@@ -1,0 +1,55 @@
+name: Production Saju Admission Canary
+run-name: '[WT:security] Saju Admission ${{ inputs.phase }}'
+on:
+  workflow_dispatch:
+    inputs:
+      deployment_origin:
+        required: true
+        type: string
+      expected_sha:
+        required: true
+        type: string
+      phase:
+        required: true
+        type: choice
+        options: [canary, production]
+      confirmation:
+        required: true
+        type: string
+      watchtower_track:
+        required: true
+        default: security
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: production-saju-admission-canary
+  cancel-in-progress: false
+jobs:
+  verify:
+    if: github.ref == 'refs/heads/main' && inputs.confirmation == 'VERIFY_SAJU_ADMISSION_SYNTHETIC_MEMBER_GUEST' && inputs.watchtower_track == 'security'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: production
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '24'
+      - name: Verify authenticated deployment identity and actual Member Guest quota boundary
+        env:
+          SAJU_ADMISSION_DEPLOYMENT_ORIGIN: ${{ inputs.deployment_origin }}
+          SAJU_ADMISSION_EXPECTED_SHA: ${{ inputs.expected_sha }}
+          SAJU_ADMISSION_CANARY_PHASE: ${{ inputs.phase }}
+          SAJU_ADMISSION_CANARY_EVIDENCE_PATH: ${{ runner.temp }}/saju-admission-canary-evidence.json
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+          MYEONGHA_PRODUCTION_MEMBER_EMAIL: ${{ secrets.MYEONGHA_PRODUCTION_MEMBER_EMAIL }}
+          MYEONGHA_PRODUCTION_MEMBER_PASSWORD: ${{ secrets.MYEONGHA_PRODUCTION_MEMBER_PASSWORD }}
+          MYEONGHA_PRODUCTION_MEMBER_EXPECTED_SUBJECT_ID: ${{ secrets.MYEONGHA_PRODUCTION_MEMBER_EXPECTED_SUBJECT_ID }}
+        run: node scripts/verify-production-saju-admission-canary.mjs
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: saju-admission-${{ inputs.phase }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/saju-admission-canary-evidence.json
+          if-no-files-found: error

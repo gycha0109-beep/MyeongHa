@@ -577,6 +577,18 @@
       "prMode": "required-router",
       "mainMode": "none",
       "workTrackAttribution": "pr-metadata"
+    },
+    "saju-abuse-counter-cleanup.yml": {
+      "responsibility": "production-security-maintenance",
+      "prMode": "none",
+      "mainMode": "scheduled-manual",
+      "workTrackAttribution": "scheduled-operations"
+    },
+    "production-saju-admission-canary.yml": {
+      "responsibility": "production-saju-smoke",
+      "prMode": "none",
+      "mainMode": "manual",
+      "workTrackAttribution": "dispatch-input"
     }
   }
 }

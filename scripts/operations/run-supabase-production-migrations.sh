@@ -14,6 +14,21 @@ if [[ ! "$host" =~ ^[a-z0-9-]+([.][a-z0-9-]+)*[.]pooler[.]supabase[.]com$ ]]; th
   exit 1
 fi
 
+# These four scoped migrations were applied through the approved managed API.
+# Reconcile their exact SQL receipts only; never replay unrelated historical SQL.
+if [[ "${SUPABASE_SAJU_ADMISSION_RECONCILE_ONLY:-false}" == true ]]; then
+  [[ "${SUPABASE_PROMOTION_REPAIR_ONLY:-false}" == false && "${SUPABASE_SEYEON_MANIFEST_ACL_REPAIR_ONLY:-false}" == false ]]
+  cert_file="$(mktemp "${RUNNER_TEMP:?}/saju-admission-ca.XXXXXX")"
+  trap 'rm -f "$cert_file"' EXIT
+  chmod 600 "$cert_file"
+  printf '%s\n' "${SUPABASE_PRODUCTION_SERVER_ROOT_CERT_PEM:?}" > "$cert_file"
+  export PGHOST="$host" PGPORT=5432 PGDATABASE=postgres PGUSER="postgres.$SUPABASE_PROJECT_ID"
+  export PGPASSWORD="$SUPABASE_DB_PASSWORD" PGSSLMODE=verify-full PGSSLROOTCERT="$cert_file"
+  bash scripts/operations/verify-saju-admission-production-history.sh
+  exit 0
+fi
+[[ "${SUPABASE_SAJU_ADMISSION_RECONCILE_ONLY:-false}" == false ]]
+
 encoded_password="$(python3 - <<'PY'
 import os
 import urllib.parse

@@ -1,0 +1,36 @@
+{
+  "schemaVersion": "myeongha-saju-admission-production-migrations-v1",
+  "projectId": "cnsfpcdiyofqvhpcegfc",
+  "approvalRef": "docs/security/SECURITY_PRODUCTION_ACTIVATION_20261024.md",
+  "productionMutationAuthorized": true,
+  "migrations": [
+    {
+      "version": "20261024134543",
+      "name": "saju_abuse_admission_runtime_authority",
+      "path": "supabase/migrations/20261024134543_saju_abuse_admission_runtime_authority.sql",
+      "sqlSha256": "dfded18e04b1e6547ef05daa3b19412218901a03efa1938868501d3a1d0e1169",
+      "gitBlobSha1": "4be88ed0003bc4db226cc2324a506183094f35ff"
+    },
+    {
+      "version": "20261024134610",
+      "name": "saju_abuse_admission_production_policy_v1",
+      "path": "supabase/migrations/20261024134610_saju_abuse_admission_production_policy_v1.sql",
+      "sqlSha256": "1bbd6df458e385cd43b297d316b55f96814e981b30b48ca8085ca6bb6a5e0736",
+      "gitBlobSha1": "c9a6354ec0d1fb2c932aca1e1916e65a5c623705"
+    },
+    {
+      "version": "20261024135504",
+      "name": "saju_abuse_admission_cleanup_worker_authority",
+      "path": "supabase/migrations/20261024135504_saju_abuse_admission_cleanup_worker_authority.sql",
+      "sqlSha256": "244422717bd1562a2ee7004a72a831e88a637b1144ea0ca00665bd6f2e916b77",
+      "gitBlobSha1": "cd31fb16e0985c732208cf69d41d1bd88f7ef31e"
+    },
+    {
+      "version": "20261024141330",
+      "name": "saju_abuse_admission_policy_approval_clock_v2",
+      "path": "supabase/migrations/20261024141330_saju_abuse_admission_policy_approval_clock_v2.sql",
+      "sqlSha256": "4300e129825df977189d79aeafae482a3878fd9ef034e851f88d5bf00edefcfc",
+      "gitBlobSha1": "9b3abf4f8296c8385b55f29e224381bdf14e8a4e"
+    }
+  ]
+}

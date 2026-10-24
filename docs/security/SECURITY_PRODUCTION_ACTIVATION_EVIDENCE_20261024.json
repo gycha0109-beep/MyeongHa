@@ -1,0 +1,88 @@
+{
+  "schemaVersion": "myeongha-security-production-activation-evidence-v1",
+  "status": "DB_APPLIED_ALERT_ACTIVE_RELEASE_PENDING",
+  "authorization": "User explicitly requested completion of remaining policy selection, Production DB application, enforcement and alert activation.",
+  "sourceDateKst": "2026-10-24",
+  "supabaseProjectId": "cnsfpcdiyofqvhpcegfc",
+  "databaseReceipts": {
+    "migrations": [
+      {
+        "name": "saju_abuse_admission_runtime_authority",
+        "sha256": "dfded18e04b1e6547ef05daa3b19412218901a03efa1938868501d3a1d0e1169",
+        "version": "20261024134543"
+      },
+      {
+        "name": "saju_abuse_admission_production_policy_v1",
+        "sha256": "1bbd6df458e385cd43b297d316b55f96814e981b30b48ca8085ca6bb6a5e0736",
+        "version": "20261024134610"
+      },
+      {
+        "name": "saju_abuse_admission_cleanup_worker_authority",
+        "sha256": "244422717bd1562a2ee7004a72a831e88a637b1144ea0ca00665bd6f2e916b77",
+        "version": "20261024135504"
+      },
+      {
+        "name": "saju_abuse_admission_policy_approval_clock_v2",
+        "sha256": "4300e129825df977189d79aeafae482a3878fd9ef034e851f88d5bf00edefcfc",
+        "version": "20261024141330"
+      }
+    ],
+    "enabledPolicies": [
+      {
+        "hash": "8240f3c510d2b52289ee78f40adc6d396e3eb66b935c9c66f20232a7b32a64ba",
+        "limit": 2,
+        "route": "api.me.saju.calculation",
+        "version": "canary-20261024-v2",
+        "approvedAt": "2026-10-24T14:13:30.716983+00:00"
+      },
+      {
+        "hash": "bb22413e4163019ae9d1eb35b559aeb8a8ab993136c767fba2987ca7f918019b",
+        "limit": 2,
+        "route": "api.me.saju.preview-reading",
+        "version": "canary-20261024-v2",
+        "approvedAt": "2026-10-24T14:13:30.717975+00:00"
+      }
+    ],
+    "activeBucketCount": 0,
+    "anonPublicTableObjects": 0,
+    "anonPublicFunctionObjects": 0,
+    "authenticatedPublicTableObjects": 0,
+    "authenticatedPublicFunctionObjects": 0
+  },
+  "applicationReleaseSwitch": "unset/off; Production enforcement NOT yet active",
+  "productionPolicyVersion": "production-20261024-v2",
+  "productionLimits": {
+    "calculation": 60,
+    "previewReading": 20,
+    "windowSeconds": 60,
+    "retentionEligibilitySeconds": 3600
+  },
+  "alert": {
+    "provider": "vercel",
+    "ruleId": "ar_01a16e32-e6de-75fb-88b8-434e5ae0a8b5",
+    "scope": "prj_nXF0b5uv27Lyucz2SEBxzdCRXVsP",
+    "filter": "statusGroup:4xx AND route:/api/*",
+    "state": "ACTIVE",
+    "readBackVerified": true,
+    "existing5xxRulePreserved": "ar_01a0fb72-ee7b-723e-943c-7fd428917c2e"
+  },
+  "localChecks": {
+    "managedNonSuperuserMigrationAnd84HttpAttacks": "PASS",
+    "productionPolicyAndCleanup5000Plus2LivePreserved": "PASS",
+    "canaryDestinationBoundaryTests": "PASS",
+    "typescript": "PASS"
+  },
+  "externalPlatformFollowup": {
+    "issue": 425,
+    "status": "BLOCKED_EXTERNAL",
+    "currentAnonymousAndAuthenticatedObjectExposure": 0,
+    "platformOwnedDefaultAclStillPresent": true,
+    "supportedSupabaseAdminMutationProcedureFound": false
+  },
+  "diagnostics": [
+    "Initial managed fixture lacked schema GRANT OPTION; aligned it with actual database-owner capability and reran PASS.",
+    "Local old full catalog PG17 replay is blocked by existing 0860 managed-principal parity checks; PG15 CI remains authoritative. No existing migrations were weakened.",
+    "Initial v1 rounded approval timestamp was inaccurate; immutable v1 retained disabled, v2 registered against actual DB clock."
+  ],
+  "next": "Exact-head CI, protected merge, staged Production Member/Guest canary, final policy toggle and promotion, restricted worker cleanup run."
+}

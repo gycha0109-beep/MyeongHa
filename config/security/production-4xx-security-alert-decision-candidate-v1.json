@@ -1,8 +1,10 @@
 {
   "schemaVersion": "myeongha-security-alert-decision-candidate-v1",
   "issue": "#1527",
-  "policyAuthority": "NOT_APPROVED",
-  "productionMutationAuthorized": false,
+  "policyAuthority": "APPROVED",
+  "productionMutationAuthorized": true,
+  "approvalRef": "docs/security/SECURITY_PRODUCTION_ACTIVATION_20261024.md",
+  "authorityBasis": "Explicit user instruction to complete remaining Production activation; initial native anomaly coverage without invented fixed thresholds.",
   "transportAuthority": "config/security/production-security-alerting-v1.json",
   "ruleConfig": "config/security/vercel-production-4xx-error-anomaly-rule-candidate-v1.json",
   "numericThresholdOwnedBy": "vercel-native-anomaly-model",
@@ -10,5 +12,7 @@
   "coverage": "API 4xx anomalies include 401/403/429 and other API 4xx; this is not an individual-status detector.",
   "providerSchemaVersion": 3,
   "providerSchemaCommand": "vercel --scope johnny-self alerts rules schema --type built-in --format json",
-  "providerSchemaReadDateKst": "2026-10-24"
+  "providerSchemaReadDateKst": "2026-10-24",
+  "providerRuleId": "ar_01a16e32-e6de-75fb-88b8-434e5ae0a8b5",
+  "activationState": "ACTIVE"
 }

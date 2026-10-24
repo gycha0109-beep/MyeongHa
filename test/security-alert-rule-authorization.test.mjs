@@ -6,9 +6,14 @@ const read = (path) => JSON.parse(readFileSync(path, 'utf8'));
 const authorityPath = 'config/security/production-security-alerting-v1.json';
 const desiredPath = 'config/security/vercel-production-4xx-error-anomaly-rule-candidate-v1.json';
 const decision = read('config/security/production-4xx-security-alert-decision-candidate-v1.json');
-const input = () => ({ mode: 'preflight', authorityPath, desiredPath, authority: read(authorityPath), desired: read(desiredPath), decision: structuredClone(decision) });
+const input = () => ({ mode: 'preflight', authorityPath, desiredPath, authority: read(authorityPath), desired: read(desiredPath), decision: { ...structuredClone(decision), policyAuthority: 'NOT_APPROVED', productionMutationAuthorized: false } });
 
 describe('supported Vercel 4xx anomaly execution authorization', () => {
+  it('accepts the explicitly approved Production activation manifest', () => {
+    expect(decision.policyAuthority).toBe('APPROVED');
+    expect(decision.productionMutationAuthorized).toBe(true);
+    expect(() => authorizeSecurityAlertRule({ ...input(), mode: 'activate', decision: structuredClone(decision) })).not.toThrow();
+  });
   it('permits read-only preflight for the exact candidate but prevents activation', () => {
     expect(() => authorizeSecurityAlertRule(input())).not.toThrow();
     expect(() => authorizeSecurityAlertRule({ ...input(), mode: 'activate' })).toThrow('SECURITY_ALERT_RULE_NOT_AUTHORIZED');

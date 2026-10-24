@@ -42,6 +42,7 @@ jobs:
       requires_deploy: ${{ steps.relevance.outputs.requires_deploy }}
       promotion_repair_only: ${{ steps.relevance.outputs.promotion_repair_only }}
       seyeon_manifest_repair_only: ${{ steps.relevance.outputs.seyeon_manifest_repair_only }}
+      saju_admission_reconcile_only: ${{ steps.relevance.outputs.saju_admission_reconcile_only }}
     steps:
       - name: Checkout deployment surface
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -140,6 +141,19 @@ jobs:
               seyeon_manifest_repair_only=true
             fi
           fi
+          saju_admission_reconcile_only=false
+          if [[ "$EVENT_NAME" == push && "$requires_deploy" == true ]]; then
+            migration_changes="$(printf '%s\n' "${changed_files:-}" | grep '^supabase/migrations/' || true)"
+            expected_saju_migrations="$(printf '%s\n' \
+              'supabase/migrations/20261024134543_saju_abuse_admission_runtime_authority.sql' \
+              'supabase/migrations/20261024134610_saju_abuse_admission_production_policy_v1.sql' \
+              'supabase/migrations/20261024135504_saju_abuse_admission_cleanup_worker_authority.sql' \
+              'supabase/migrations/20261024141330_saju_abuse_admission_policy_approval_clock_v2.sql')"
+            if [[ "$migration_changes" == "$expected_saju_migrations" ]]; then
+              saju_admission_reconcile_only=true
+            fi
+          fi
+          echo "saju_admission_reconcile_only=$saju_admission_reconcile_only" >> "$GITHUB_OUTPUT"
           echo "requires_deploy=$requires_deploy" >> "$GITHUB_OUTPUT"
           echo "promotion_repair_only=$promotion_repair_only" >> "$GITHUB_OUTPUT"
           echo "seyeon_manifest_repair_only=$seyeon_manifest_repair_only" >> "$GITHUB_OUTPUT"
@@ -166,6 +180,8 @@ jobs:
       SUPABASE_PRODUCTION_SESSION_POOLER_HOST: ${{ secrets.SUPABASE_PRODUCTION_SESSION_POOLER_HOST }}
       SUPABASE_PROMOTION_REPAIR_ONLY: ${{ needs.change-gate.outputs.promotion_repair_only }}
       SUPABASE_SEYEON_MANIFEST_ACL_REPAIR_ONLY: ${{ needs.change-gate.outputs.seyeon_manifest_repair_only }}
+      SUPABASE_SAJU_ADMISSION_RECONCILE_ONLY: ${{ needs.change-gate.outputs.saju_admission_reconcile_only }}
+      SUPABASE_PRODUCTION_SERVER_ROOT_CERT_PEM: ${{ secrets.SUPABASE_PRODUCTION_SERVER_ROOT_CERT_PEM }}
 
     steps:
       - name: Checkout
