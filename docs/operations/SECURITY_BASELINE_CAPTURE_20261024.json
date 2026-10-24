@@ -1,0 +1,236 @@
+{
+  "schemaVersion": "myeongha-security-baseline-capture-report-v1",
+  "mode": "evidence_only",
+  "captures": [
+    {
+      "from": "2026-10-23T19:50:00.000Z",
+      "to": "2026-10-23T19:53:00.000Z",
+      "declaredRecordCount": 17,
+      "declaredRecordLimit": 100,
+      "capReached": false,
+      "retentionLimited": false,
+      "sourceSha256": "2da4b80fc7bdca84032240fecd4a653ba5d1a89943954c7fb3f245bec61b7eb0"
+    }
+  ],
+  "collectionQuality": {
+    "queryGaps": [],
+    "capReached": false,
+    "retentionLimited": false,
+    "providerBoundsIndependentlyVerified": false,
+    "completePopulationProven": false,
+    "note": "Declared query intervals do not prove log delivery, filter coverage, retention completeness, or zero demand."
+  },
+  "saju": {
+    "schemaVersion": "myeongha-saju-abuse-baseline-report-v1",
+    "mode": "evidence_only",
+    "observationWindow": {
+      "firstAuthenticatedAttemptAt": "2026-10-23T19:50:52.649Z",
+      "lastAuthenticatedAttemptAt": "2026-10-23T19:52:06.276Z",
+      "retentionNote": null
+    },
+    "inputQuality": {
+      "parsedEventCount": 14,
+      "exactDuplicateEventCount": 0,
+      "configuredSyntheticRequestCount": 17,
+      "syntheticExcludedRequestCount": 0,
+      "syntheticExcludedEventCount": 0,
+      "unmatchedAuthenticatedAdmissionCount": 0,
+      "orphanOutcomeCount": 0
+    },
+    "authenticatedAttempts": {
+      "total": 7,
+      "uniquePseudonymousClients": 1,
+      "subjectKindDistribution": {
+        "member": 7
+      },
+      "perClientRequestCountHistogram": {
+        "7": 1
+      },
+      "routeDistribution": {
+        "api.me.saju.calculation": 2,
+        "api.me.saju.preview-reading": 5
+      }
+    },
+    "correlatedOutcomes": {
+      "matched": 7,
+      "unmatchedAuthenticatedAdmissions": 0,
+      "coverageRatio": 1,
+      "statusCodeDistribution": {
+        "200": 7
+      },
+      "statusClassDistribution": {
+        "2xx": 7
+      },
+      "matchedFailureOutcomeCount": 0,
+      "failureFollowedByLaterAttemptCount": 0,
+      "failureFollowedByLaterAttemptIntervalMs": {
+        "count": 0,
+        "minMs": null,
+        "medianMs": null,
+        "maxMs": null
+      }
+    },
+    "burstEvidence": {
+      "burstWindowSeconds": null,
+      "maxAuthenticatedAttemptsBySingleClient": null,
+      "perClientBurstMaxHistogram": null,
+      "note": "No burst window was supplied; no burst threshold was inferred."
+    },
+    "perRoute": {
+      "api.me.saju.calculation": {
+        "authenticatedAttempts": {
+          "total": 2,
+          "uniquePseudonymousClients": 1,
+          "subjectKindDistribution": {
+            "member": 2
+          },
+          "perClientRequestCountHistogram": {
+            "2": 1
+          }
+        },
+        "correlatedOutcomes": {
+          "matched": 2,
+          "unmatchedAuthenticatedAdmissions": 0,
+          "coverageRatio": 1,
+          "statusCodeDistribution": {
+            "200": 2
+          },
+          "statusClassDistribution": {
+            "2xx": 2
+          },
+          "matchedFailureOutcomeCount": 0,
+          "failureFollowedByLaterAttemptCount": 0,
+          "failureFollowedByLaterAttemptIntervalMs": {
+            "count": 0,
+            "minMs": null,
+            "medianMs": null,
+            "maxMs": null
+          }
+        },
+        "burstEvidence": {
+          "burstWindowSeconds": null,
+          "maxAuthenticatedAttemptsBySingleClient": null,
+          "perClientBurstMaxHistogram": null,
+          "note": "No burst window was supplied; no burst threshold was inferred."
+        }
+      },
+      "api.me.saju.preview-reading": {
+        "authenticatedAttempts": {
+          "total": 5,
+          "uniquePseudonymousClients": 1,
+          "subjectKindDistribution": {
+            "member": 5
+          },
+          "perClientRequestCountHistogram": {
+            "5": 1
+          }
+        },
+        "correlatedOutcomes": {
+          "matched": 5,
+          "unmatchedAuthenticatedAdmissions": 0,
+          "coverageRatio": 1,
+          "statusCodeDistribution": {
+            "200": 5
+          },
+          "statusClassDistribution": {
+            "2xx": 5
+          },
+          "matchedFailureOutcomeCount": 0,
+          "failureFollowedByLaterAttemptCount": 0,
+          "failureFollowedByLaterAttemptIntervalMs": {
+            "count": 0,
+            "minMs": null,
+            "medianMs": null,
+            "maxMs": null
+          }
+        },
+        "burstEvidence": {
+          "burstWindowSeconds": null,
+          "maxAuthenticatedAttemptsBySingleClient": null,
+          "perClientBurstMaxHistogram": null,
+          "note": "No burst window was supplied; no burst threshold was inferred."
+        }
+      }
+    },
+    "policyDecision": {
+      "produced": false,
+      "numericLimit": null,
+      "windowSeconds": null,
+      "enforcementAuthorized": false,
+      "note": "Baseline evidence does not automatically choose or authorize an admission policy."
+    }
+  },
+  "security": {
+    "schemaVersion": "myeongha-security-event-baseline-report-v1",
+    "mode": "evidence_only",
+    "inputQuality": {
+      "parsedEventCount": 3,
+      "exactDuplicateEventCount": 0,
+      "syntheticExcludedEventCount": 0,
+      "population": "non-excluded-events; unregistered synthetic traffic may remain"
+    },
+    "totalEvents": 3,
+    "statusDistribution": {
+      "503": 3
+    },
+    "routeDistribution": {
+      "api.me.dispatch": 3
+    },
+    "methodDistribution": {
+      "GET": 3
+    },
+    "byEventCode": {
+      "ACCESS_DENIED": {
+        "totalEvents": 0,
+        "statusDistribution": {},
+        "routeDistribution": {},
+        "methodDistribution": {}
+      },
+      "RATE_LIMITED": {
+        "totalEvents": 0,
+        "statusDistribution": {},
+        "routeDistribution": {},
+        "methodDistribution": {}
+      },
+      "SERVER_FAILURE": {
+        "totalEvents": 3,
+        "statusDistribution": {
+          "503": 3
+        },
+        "routeDistribution": {
+          "api.me.dispatch": 3
+        },
+        "methodDistribution": {
+          "GET": 3
+        }
+      },
+      "UNEXPECTED_EXCEPTION": {
+        "totalEvents": 0,
+        "statusDistribution": {},
+        "routeDistribution": {},
+        "methodDistribution": {}
+      }
+    },
+    "policyDecision": {
+      "produced": false,
+      "fixedThreshold": null,
+      "providerMutationAuthorized": false
+    }
+  },
+  "decision": {
+    "numericAdmissionPolicy": "HOLD",
+    "securityAlertThreshold": "HOLD",
+    "enforcementAuthorized": false,
+    "providerMutationAuthorized": false,
+    "issueClosureAllowed": false
+  },
+  "source": {
+    "provider": "vercel",
+    "projectId": "prj_nXF0b5uv27Lyucz2SEBxzdCRXVsP",
+    "deploymentId": "dpl_5tQMn4NnTgWZxF17eDuVwY3K7ZHf",
+    "query": "MYEONGHA_",
+    "populationClassification": "UNCLASSIFIED; canonical synthetic exclusions may not include recent manual smoke requests",
+    "captureDateKst": "2026-10-24",
+    "limitation": "A prior full 30-minute exact-bounds query timed out; this is a narrower deployment-scoped three-minute response."
+  }
+}

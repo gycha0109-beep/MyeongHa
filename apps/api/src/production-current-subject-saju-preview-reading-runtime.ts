@@ -1,4 +1,6 @@
 import { handleCurrentSubjectSajuPreviewReadingRequestV1 } from './current-subject-saju-preview-reading-http.js';
+import type { SajuAbuseAdmissionGateV1 } from './saju-abuse-admission-http.js';
+import { PostgresSajuAbuseAdmissionPortV1 } from './postgres-saju-abuse-admission.js';
 import { createProductionRequestIdentityVerifierV1 } from './production-request-identity-verifier.js';
 import {
   parseProductionSajuRuntimeConfigV1,
@@ -41,6 +43,8 @@ export interface CreateProductionCurrentSubjectSajuPreviewReadingRuntimeInputV1 
   readonly sajuAbuseOutcomeWriter?: SajuAbuseOutcomeObservationWriterV1;
   /** Test/runtime clock injection only. */
   readonly now?: () => number;
+  /** Server composition only; activation requires separately approved policy and durable store. */
+  readonly sajuAbuseAdmissionEnabled?: boolean;
 }
 
 export function createProductionCurrentSubjectSajuPreviewReadingRuntimeV1(
@@ -58,6 +62,9 @@ export function createProductionCurrentSubjectSajuPreviewReadingRuntimeV1(
       ? {}
       : { memberFetchImpl: input.memberFetchImpl }),
   });
+  const sajuAbuseAdmission: SajuAbuseAdmissionGateV1 | undefined = input.sajuAbuseAdmissionEnabled === true
+    ? { admissionPort: new PostgresSajuAbuseAdmissionPortV1(poolLease.pool), secret: userDataConfig.guestFingerprintSecret }
+    : undefined;
   const sajuAdapter = createSajuPreviewReadingHttpAdapterV1({
     baseUrl: sajuConfig.serviceOrigin,
     bearerToken: sajuConfig.serviceBearer,
@@ -83,6 +90,7 @@ export function createProductionCurrentSubjectSajuPreviewReadingRuntimeV1(
         identityEvidenceVerifier: observedIdentityEvidenceVerifier,
         pool: poolLease.pool,
         sajuAdapter,
+        ...(sajuAbuseAdmission === undefined ? {} : { sajuAbuseAdmission }),
       });
 
       observeSajuAbuseOutcomeV1({

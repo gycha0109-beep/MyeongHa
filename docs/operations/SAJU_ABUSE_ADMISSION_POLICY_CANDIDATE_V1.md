@@ -2,6 +2,8 @@
 
 Status: **NOT APPROVED**
 
+2026-10-24 implementation update: after explicit user approval for **DB implementation and isolated verification**, the [general Security roadmap](../security/SECURITY_EXECUTION_ROADMAP_V1.md) contains the non-activated HTTP gate, real PostgreSQL port, dormant migration, and actual Production composition connection. PostgreSQL 17.11 synthetic verification passed. The DB checks live Guest sessions before creating counters, returns its immutable policy version/hash and evaluation clock atomically, and creates no policy rows in the migration. No Production numeric policy, DB application, deployment, or gate activation is approved. The original policy/activation requirements below remain in force.
+
 Issue authority: **#1526**
 
 This document defines the parts of the Saju abuse-control policy that can be fixed before a usable organic Production baseline exists. It is a candidate contract only. It does not authorize Production enforcement or any numeric request limit.

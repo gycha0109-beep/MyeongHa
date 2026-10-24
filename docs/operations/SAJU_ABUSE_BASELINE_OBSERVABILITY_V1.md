@@ -128,6 +128,8 @@ Logging failure and invalid observation clock values do not alter authentication
 
 ## Baseline analyzer
 
+For multiple exported captures, use the [general Security roadmap](../security/SECURITY_EXECUTION_ROADMAP_V1.md) and `scripts/collect-security-baseline.mjs`. It reuses this analyzer, accepts JSONL as well as JSON/text, applies the canonical synthetic exclusions, and records declared query windows, gaps and provider limitations. Collection does not promote the unapproved admission policy. The [2026-10-24 checkpoint](SECURITY_BASELINE_CAPTURE_20261024.json) includes seven unclassified Member attempts and cannot establish organic demand.
+
 Repository-owned evidence analysis is provided by:
 
 ```text
