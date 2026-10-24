@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 export const CLOUDFLARE_PREVIEW_CD_V1 = Object.freeze({
   branch: 'feat/approved-character-card-labels-20261022',
   previewName: 'approved-character-labels',
-  workerName: 'myeongha-static-preview',
+  workerName: 'myeongha',
   wranglerVersion: '4.152.0',
 });
 
@@ -40,8 +40,8 @@ export function assertCloudflarePreviewConfiguration(config) {
   const expected = CLOUDFLARE_PREVIEW_CD_V1;
   if (
     config?.name !== expected.workerName ||
-    config?.main !== './cloudflare/preview-worker.mjs' ||
-    config?.workers_dev !== false ||
+    config?.main !== './cloudflare/myeongha-worker.mjs' ||
+    config?.workers_dev !== true ||
     config?.preview_urls !== true ||
     config?.assets?.directory !== './public' ||
     config?.assets?.binding !== 'ASSETS' ||
@@ -52,9 +52,10 @@ export function assertCloudflarePreviewConfiguration(config) {
     typeof config.previews !== 'object' ||
     Array.isArray(config.previews) ||
     config?.routes !== undefined ||
-    config?.route !== undefined
+    config?.route !== undefined ||
+    config?.services !== undefined
   ) {
-    throw new Error('Cloudflare preview CD configuration must keep static assets isolated and the production workers.dev route disabled.');
+    throw new Error('Cloudflare preview CD must target the existing single Worker with isolated preview deployment and no Worker service bindings.');
   }
   return true;
 }

@@ -5,9 +5,8 @@ import { fileURLToPath } from 'node:url';
 
 export const WEB_CD = Object.freeze({
   branch: 'main',
-  worker: 'myeongha-web',
-  apiWorker: 'myeongha',
-  config: 'wrangler.web.jsonc',
+  worker: 'myeongha',
+  config: 'wrangler.jsonc',
   version: '4.152.0',
 });
 
@@ -20,18 +19,17 @@ export function assertMainWebCdEnvironment({ workersCi, branch, sha, checkoutSha
 
 export function assertMainWebConfig(config) {
   if (config?.name !== WEB_CD.worker ||
-      config?.main !== './cloudflare/web-worker.mjs' ||
+      config?.main !== './cloudflare/myeongha-worker.mjs' ||
       config?.workers_dev !== true ||
+      config?.preview_urls !== true ||
       config?.assets?.directory !== './public' ||
       config?.assets?.binding !== 'ASSETS' ||
       config?.assets?.run_worker_first !== true ||
       config?.assets?.html_handling !== 'none' ||
       config?.assets?.not_found_handling !== 'none' ||
-      config?.services?.length !== 1 ||
-      config.services[0]?.binding !== 'AUTHORITY_API' ||
-      config.services[0]?.service !== WEB_CD.apiWorker ||
+      config?.services !== undefined ||
       config?.route !== undefined || config?.routes !== undefined) {
-    throw new Error('Live web CD cannot replace the existing Auth/DB/Saju Worker or bypass its Service Binding.');
+    throw new Error('Single Worker must serve web assets and sealed API routes without a second Worker binding.');
   }
 }
 
@@ -41,7 +39,7 @@ function deploy() {
     cwd: root, encoding: 'utf8',
   }).trim();
   if (process.env.WRANGLER_CI_OVERRIDE_NAME !== WEB_CD.worker) {
-    throw new Error('Cloudflare Workers Builds target must be myeongha-web; refusing to replace the API Worker.');
+    throw new Error('Cloudflare Workers Builds target must be myeongha; refusing to deploy an unrelated Worker.');
   }
   assertMainWebCdEnvironment({
     workersCi: process.env.WORKERS_CI,
@@ -54,7 +52,7 @@ function deploy() {
     accessSync(resolve(root, path));
   }
   const args = ['--yes', `wrangler@${WEB_CD.version}`, 'deploy', '--config', WEB_CD.config];
-  console.log(`Cloudflare merged-main web CD: ${checkoutSha} -> ${WEB_CD.worker}`);
+  console.log(`Cloudflare merged-main single Worker CD: ${checkoutSha} -> ${WEB_CD.worker}`);
   const child = spawnSync('npx', args, {
     cwd: root, stdio: 'inherit', env: process.env,
   });

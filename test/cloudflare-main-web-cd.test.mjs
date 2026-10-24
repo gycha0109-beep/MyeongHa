@@ -1,20 +1,55 @@
 import { readFileSync } from 'node:fs';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { assertMainWebCdEnvironment, assertMainWebConfig } from '../scripts/cloudflare-main-web-cd.mjs';
+import liveWorker from '../cloudflare/myeongha-worker.mjs';
 
-const configuration = JSON.parse(readFileSync(new URL('../wrangler.web.jsonc', import.meta.url), 'utf8'));
-const worker = readFileSync(new URL('../cloudflare/web-worker.mjs', import.meta.url), 'utf8');
+const configuration = JSON.parse(readFileSync(new URL('../wrangler.jsonc', import.meta.url), 'utf8'));
 
-describe('merged main Cloudflare web CD', () => {
-  it('deploys a separate public site with the existing security API as a bound service', () => {
+describe('merged-main Cloudflare single Worker CD', () => {
+  it('uses only myeongha for static web and fail-closed APIs', () => {
     expect(() => assertMainWebConfig(configuration)).not.toThrow();
-    expect(configuration.name).not.toBe('myeongha');
-    expect(configuration.services[0].service).toBe('myeongha');
-    expect(worker).toContain('env.AUTHORITY_API.fetch(request)');
-    expect(worker).toContain('env.ASSETS.fetch(request)');
-    expect(worker).not.toContain('fetch(new Request(');
-    expect(worker).not.toContain('api.vercel.app');
-    expect(worker).not.toContain('databaseUrl');
+    expect(configuration.name).toBe('myeongha');
+    expect(configuration.main).toBe('./cloudflare/myeongha-worker.mjs');
+    expect(configuration).not.toHaveProperty('services');
+    expect(configuration.assets.run_worker_first).toBe(true);
+  });
+
+  it('publishes health from the same Worker without calling the assets binding', async () => {
+    const asset = vi.fn(async () => new Response('<html>never</html>'));
+    const response = await liveWorker.fetch(new Request('https://test.example/api/health'), {
+      ASSETS: { fetch: asset },
+    });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ status: 'ok' });
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
+    expect(response.headers.get('X-Robots-Tag')).toContain('noindex');
+    expect(asset).not.toHaveBeenCalled();
+  });
+
+  it('keeps protected, encoded and unknown APIs fail-closed instead of serving HTML', async () => {
+    const asset = vi.fn(async () => new Response('PRIVATE_STATIC_FALLBACK'));
+    const env = { ASSETS: { fetch: asset } };
+    for (const path of ['/api/chat', '/api/readiness', '/api/unknown', '/%61pi/chat',
+        '/api/health?%255f%255fmyeongha_chat_thread_id=forged']) {
+      const response = await liveWorker.fetch(new Request('https://test.example' + path), env);
+      expect(response.status).toBe(503);
+      expect(response.headers.get('Cache-Control')).toBe('no-store');
+      expect(response.headers.get('X-Content-Type-Options')).toBe('nosniff');
+      expect(response.headers.get('content-type')).toContain('application/json');
+      expect(await response.text()).not.toContain('PRIVATE_STATIC_FALLBACK');
+    }
+    expect(asset).not.toHaveBeenCalled();
+  });
+
+  it('serves the unchanged multipage web assets through the same Worker', async () => {
+    const asset = vi.fn(async () => new Response('<html>page</html>'));
+    const response = await liveWorker.fetch(new Request('https://test.example/hall.html'), {
+      ASSETS: { fetch: asset },
+    });
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Content-Security-Policy')).toContain("default-src 'self'");
+    expect(await response.text()).toBe('<html>page</html>');
+    expect(asset).toHaveBeenCalledTimes(1);
   });
 
   it('denies non-merged or local deploy attempts', () => {
@@ -29,11 +64,12 @@ describe('merged main Cloudflare web CD', () => {
     ]) expect(() => assertMainWebCdEnvironment(invalid)).toThrow();
   });
 
-  it('cannot silently replace the production API Worker', () => {
+  it('rejects every attempt to deploy a second Worker or self-binding API proxy', () => {
     for (const bad of [
-      { ...configuration, name: 'myeongha' },
-      { ...configuration, services: [] },
-      { ...configuration, services: [{ binding: 'AUTHORITY_API', service: 'other' }] },
+      { ...configuration, name: 'myeongha-web' },
+      { ...configuration, main: './cloudflare/web-worker.mjs' },
+      { ...configuration, services: [{ binding: 'AUTHORITY_API', service: 'myeongha' }] },
+      { ...configuration, workers_dev: false },
       { ...configuration, routes: ['example.com/*'] },
     ]) expect(() => assertMainWebConfig(bad)).toThrow();
   });
