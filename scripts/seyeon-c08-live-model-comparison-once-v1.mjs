@@ -25,7 +25,7 @@ export const MAX_CALLS=BENCH_MODELS.length*BENCH_CASES.length;
 export const FX_KRW_USD=2500;
 const obj=x=>x!==null&&typeof x==='object'&&!Array.isArray(x);
 const hash=/^[a-f0-9]{40}$/u;
-const tagPattern=/^[a-z0-9][a-z0-9_-]*(?:\\/[a-z0-9][a-z0-9_-]*)?$/u;
+const tagPattern=/^[a-z0-9][a-z0-9_-]*(?:\/[a-z0-9][a-z0-9_-]*)?$/u;
 const userAgent='MyeongHa-C08-Public-Synthetic-Benchmark/1';
 const finiteMoney=x=>typeof x==='number'&&Number.isFinite(x)&&x>=0?x:null;
 const mUSD=x=>typeof x==='string'||typeof x==='number'
@@ -53,7 +53,7 @@ async function readJson(url,key,fetchImpl){
   const resp=await fetchImpl(url,{method:'GET',redirect:'error',
     signal:AbortSignal.timeout(15000),headers:headers(key)});
   if(resp.status!==200||
-    !/^application\\/json(?:\\s*;|$)/iu.test(resp.headers.get('content-type')??''))
+    !/^application\/json(?:\s*;|$)/iu.test(resp.headers.get('content-type')??''))
     throw Error('BENCHMARK_METADATA_HTTP_'+resp.status);
   const txt=await resp.text();
   if(Buffer.byteLength(txt,'utf8')>2000000)throw Error('BENCHMARK_METADATA_SIZE_HOLD');
@@ -219,7 +219,7 @@ export function reportMarkdown(report){
     ', 사전 예약 총액 '+(report.reservedMicroUsd*FX_KRW_USD/1e6).toFixed(4)+
     '원, 토큰 추정 합계 '+(report.estimatedMicroUsd*FX_KRW_USD/1e6).toFixed(4)+
     '원. 실제 청구 미정산. 사람 품질 평가 미완료.');
-  return lines.join('\\n')+'\\n';
+  return lines.join('\n')+'\n';
 }
 async function main(){
   const env=process.env;
@@ -235,11 +235,11 @@ async function main(){
   const ledger=await open(join(dir,'journal.jsonl'),'wx',0o600);
   try{
     const report=await compare({apiKey:env.OPENROUTER_API_KEY,
-      journal:async row=>{await ledger.appendFile(JSON.stringify(row)+'\\n');await ledger.sync();}});
+      journal:async row=>{await ledger.appendFile(JSON.stringify(row)+'\n');await ledger.sync();}});
     await writeFile(join(dir,'report.json'),JSON.stringify({
       ...report,runId:env.GITHUB_RUN_ID,headSha:env.GITHUB_SHA,
       invoiceReconciled:false,productionAuthorized:false,
-    },null,2)+'\\n',{flag:'wx',mode:0o600});
+    },null,2)+'\n',{flag:'wx',mode:0o600});
     await writeFile(join(dir,'comparison.md'),reportMarkdown(report),{flag:'wx',mode:0o600});
     console.log('C08_MULTI_MODEL_BENCHMARK '+JSON.stringify({
       attempted:report.attempted,valid:report.rows.filter(x=>x.status==='OK').length,
