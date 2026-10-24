@@ -70,7 +70,6 @@ describe('Web Golden Master', () => {
     expect(html).toContain('href="saju-preview-landing.css"');
     expect(saju).toContain('id="saju-hub"');
     expectInOrder(page.slice(page.indexOf('return (')), [
-      '무료 프리뷰 화면',
       'saju-empty',
       'saju-hub',
       '나의 사주 기본 정보',
@@ -79,6 +78,9 @@ describe('Web Golden Master', () => {
       '유료 사주 해석에서 제공되는 내용',
       '예시 결과물 미리보기',
     ]);
+    expect(page).not.toContain('무료 프리뷰 화면 <span>(미구매 상태)</span>');
+    expect(page).toContain('saju-design-additional-card');
+    expect(page).not.toContain('<details className="saju-design-more">');
     expectInOrder(page.slice(page.indexOf('const productPreviewTopics')), [
       '전체 사주 해석', '직업 · 커리어', '재물', '연애 · 관계',
     ]);
