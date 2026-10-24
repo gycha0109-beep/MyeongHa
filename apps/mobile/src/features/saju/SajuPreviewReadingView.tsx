@@ -272,7 +272,7 @@ export function SajuPreviewReadingView({ onOpenPreview }: { onOpenPreview?: (top
       {state.kind === 'error' ? (
         <View style={styles.stateCard}>
           <Text style={styles.stateTitle}>{t(state.topic.label)}</Text>
-          <Text style={styles.error}>{state.message}</Text>
+          <Text style={styles.error}>{t(state.message)}</Text>
           {state.retryable ? (
             <Pressable
               accessibilityRole="button"

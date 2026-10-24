@@ -148,7 +148,7 @@ export default function SajuReaderSceneScreen() {
         {state.kind === 'unavailable' ? (
           <View style={styles.block}>
             <MobileUiText style={styles.title}>읽기를 표시하지 못했습니다</MobileUiText>
-            <Text style={styles.muted}>{state.message}</Text>
+            <Text style={styles.muted}>{t(state.message)}</Text>
             <Pressable accessibilityRole="button" style={styles.action} onPress={() => router.replace('/reading')}>
               <MobileUiText style={styles.actionText}>사주로 돌아가기</MobileUiText>
             </Pressable>
@@ -176,7 +176,7 @@ export default function SajuReaderSceneScreen() {
                 onPress={() => void continueToReaderChat()}
               >
                 <Text style={styles.actionText}>
-                  {chatOpenState.openingCharacterId !== null ? '세연과의 대화 불러오는 중…' : '세연과 대화로 넘어가기 →'}
+                  {t(chatOpenState.openingCharacterId !== null ? '세연과의 대화 불러오는 중…' : '세연과 대화로 넘어가기 →')}
                 </Text>
               </Pressable>
             )}

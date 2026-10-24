@@ -194,4 +194,31 @@ describe('Mobile / Web UI localization parity', () => {
     expect(saju).toContain('{step.primary}');
     expect(profile).toContain("profile.displayName === '호칭 미설정'");
   });
+
+  it('localizes UI-only Saju and Reader error/HOLD states in new locales without translating source payloads', () => {
+    const labels = [
+      '현재 이 주제를 표시할 만큼 검증된 해석 근거가 충분하지 않습니다.',
+      '사주 프리뷰를 불러오지 못했습니다.',
+      '검증되지 않은 사주 해석 응답은 표시하지 않습니다.',
+      '현재 승인된 프리뷰 범위 밖의 읽기입니다.',
+      '계정 또는 세션이 변경되어 이전 사주 읽기를 종료했습니다.',
+      '좋은 오후예요', '좋은 저녁이에요',
+      '연결자 초상화', '{count}/4 기둥 확정',
+      '내 사주를 확인하면 읽기의 시작점을 찾을 수 있습니다.',
+      '일주가 확정되면 일간을 표시합니다.',
+      '장면 연출 · 실제 해석 내용은 서버의 검증된 사주 프리뷰만 사용합니다.',
+      '현재 확인할 수 있는 기록의 끝입니다.',
+    ];
+    for (const locale of ['en-US', 'zh-CN'] as const) {
+      for (const label of labels) {
+        const result = translateMobileUiCopy(label, locale);
+        expect(result, `${locale} missing: ${label}`).not.toBe(label);
+        expect(result).not.toMatch(/[가-힣]/u);
+      }
+    }
+    const original = '사용자의 고유한 대화 내용';
+    expect(translateMobileUiCopy(original, 'en-US')).toBe(original);
+    expect(translateMobileUiCopy(original, 'zh-CN')).toBe(original);
+  });
+
 });
