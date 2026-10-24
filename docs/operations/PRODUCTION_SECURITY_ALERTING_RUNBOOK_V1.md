@@ -1,5 +1,7 @@
 # Production Security Alerting Runbook v1
 
+> Primary server correction (2026-10-25): Cloudflare Worker `myeongha` is the execution target for general security. See [Cloudflare execution evidence](../security/GENERAL_SECURITY_CLOUDFLARE_EXECUTION_20261024.md). The Vercel rules and baseline below cover the auxiliary Vercel runtime only and cannot prove Cloudflare log collection, alert configuration, or delivery. Cloudflare uses the existing event schema at its actual Worker entrypoint. Workers Logs enablement and native monitor delivery require their own live readback; do not infer either from Vercel rule IDs.
+
 ## Purpose
 
 This runbook governs OWASP A09:2025 Production alerting for MyeongHa.
