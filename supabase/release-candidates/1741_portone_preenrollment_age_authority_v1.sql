@@ -271,7 +271,7 @@ create function public.qry_verified_legal_portone_preenrollment_v1(
   p_binding_digest text
 )
 returns text
-language plpgsql stable security definer
+language plpgsql volatile security definer
 set search_path = pg_catalog, public, pg_temp
 as $eligible$
 declare v_band text;

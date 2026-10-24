@@ -283,6 +283,18 @@ set -e
 [[ "$(q "select status from public.legal_portone_preenrollment_v1 where identity_verification_id='$preid_d'")" == verified ]] ||
  fail 'failed Member creation consumed proof'
 q "insert into auth.users(id) values ('$member_d');" >/dev/null
+# A direct Supabase Auth signup cannot grant a canonical MyeongHa Subject
+# until the server consumes its independently verified age proof.
+set +e
+q "begin; set local role myeongha_api_executor;
+  select subject_id from public.begin_member_subject_context_v1('$member_d'::uuid);
+  commit;" >/dev/null 2>&1
+direct_signup_rc=$?
+set -e
+[[ "$direct_signup_rc" != 0 ]] ||
+  fail 'raw Supabase Auth signup bypassed canonical Member admission'
+[[ "$(q "select count(*) from public.subjects where auth_user_id='$member_d'")" == 0 ]] ||
+  fail 'unverified Auth UUID unexpectedly had a canonical Subject'
 member_result="$(bind_member "$member_d" "$binding_d")"
 [[ "$member_result" == *"free_minor"* ]] || fail 'verified Member creation returned wrong age band'
 [[ "$(q "select count(*) from public.subjects s
