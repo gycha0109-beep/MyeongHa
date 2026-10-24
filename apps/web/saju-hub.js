@@ -1,6 +1,7 @@
 import { ensureActiveBearer, getActiveBearer, invalidateGuestSession, invalidateMemberSession } from './product-auth.js';
 import { getUiLocale } from './ui-i18n.js';
 import { resumePreviewHrefV1 } from './reading-preview-continuation.js';
+import { installSajuOverviewRetryV1, loadSajuOverviewReadingV1 } from './saju-overview-reading.js';
 import {
   sajuPillarLabelV1, sajuElementLabelV1, sajuYinYangLabelV1,
   projectSajuPillarDisplayV1, sajuCompletenessLabelV1,
@@ -526,6 +527,7 @@ async function loadExistingSaju() {
       profile = await readDisplayBirthProfile(token, storedId);
     }
     renderCalculation(calculation, profile);
+    void loadSajuOverviewReadingV1(activeBearer);
   } catch (error) {
     if (error?.status === 401) {
       handleUnauthorized(activeBearer);
@@ -567,6 +569,7 @@ async function submitBirthProfile(event) {
     const calculation = await calculateSaju(token);
     const profile = await readDisplayBirthProfile(token, receipt.birthProfileId);
     renderCalculation(calculation, profile);
+    void loadSajuOverviewReadingV1(activeBearer);
     const continuedPreview = resumePreviewHrefV1(window.location.search);
     if (continuedPreview) window.location.assign(continuedPreview);
   } catch (error) {
@@ -599,6 +602,7 @@ async function submitBirthProfile(event) {
   }
 }
 
+installSajuOverviewRetryV1();
 setupBirthDateInputs();
 byId('saju-time-unknown').addEventListener('change', syncBirthControls);
 for (const input of document.querySelectorAll('input[name="saju-calendar"]')) {
