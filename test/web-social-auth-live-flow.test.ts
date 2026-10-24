@@ -11,6 +11,9 @@ const refreshRoute = readFileSync(resolve(root, 'api/auth/refresh.ts'), 'utf8');
 describe('web social auth live flow', () => {
   it('starts provider OAuth instead of rendering placeholder-only buttons', () => {
     expect(authPage).toContain("fetch('/api/auth/social/start'");
+    expect(authPage).toContain("WEB_SOCIAL_AUTH_ORIGINS.has(location.origin)");
+    expect(authPage).toContain("https://myeongha.gycha0109.workers.dev");
+    expect(authPage).toContain("https://myeongha-web.gycha0109.workers.dev");
     expect(authPage).toContain('WEB_SOCIAL_AUTH_CALLBACK_URI');
     expect(authPage).toContain('location.assign(authorizationUrl.toString())');
     expect(authPage).toContain('startSocial: startSocialAuth');
