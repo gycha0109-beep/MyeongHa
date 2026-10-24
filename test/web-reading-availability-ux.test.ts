@@ -71,7 +71,7 @@ describe('Web Saju Product discovery: honest route availability', () => {
       load('src/home/HomePage.tsx'),
       load('golden-master.css'),
     ]);
-    expect(reading).toContain('resolveReadingAvailabilityV1(href).label');
+    expect(reading).toContain('availability.label');
     expect(reading).toContain('추가 입력 준비 중');
     expect(reading).toContain('정식 읽기 준비 중');
     expect(home).toContain('resolveReadingAvailabilityV1(');
