@@ -58,6 +58,21 @@ describe('C08 actual N06 research: model endpoint with ZDR enforced on POST',()=
     expect(r.reservedMicroUsd).toBeLessThanOrEqual(4000);
     expect(JSON.stringify(r)).not.toContain('먼저 이야기해볼게');
   });
+  it('accepts OpenRouter official token-only endpoint shape with omitted request field',()=>{
+    const priceOnly={...row,pricing:{
+      prompt:'0.00000003',completion:'0.00000017',
+    }};
+    const chosen=chooseSeyeonC08N06ModelEndpointRouteV2({
+      id:C08_N06_CANARY_MODEL,endpoints:[priceOnly],
+    },key);
+    expect(chosen).toMatchObject({tag:'openai',inputRate:0.03,outputRate:0.17});
+    expect(chooseSeyeonC08N06ModelEndpointRouteV2({
+      id:C08_N06_CANARY_MODEL,endpoints:[{
+        ...priceOnly,pricing:{...priceOnly.pricing,request:'0.01'},
+      }],
+    },key)).toBe(null);
+  });
+
   it('cannot elevate an invalid, duplicate or expensive endpoint',()=>{
     for(const bad of [
       {status:1},{supported_parameters:[]},{pricing:{...row.pricing,request:'0.1'}},
