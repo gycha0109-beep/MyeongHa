@@ -90,6 +90,7 @@ describe('C08 N06 first ACTUAL PAID canary admission, mocked API in CI',()=>{
     });
     expect(b.response_format.json_schema.strict).toBe(true);
     expect(b.max_completion_tokens).toBe(256);
+    expect(b.reasoning).toEqual({effort:'low'});
     const reserveQuote=reserve(body,{inputRate:0.03,outputRate:0.17});
     expect(reserveQuote.reservedMicroUsd).toBeGreaterThan(0);
     expect(reserveQuote.reservedMicroUsd).toBeLessThan(4000);
@@ -145,6 +146,47 @@ describe('C08 N06 first ACTUAL PAID canary admission, mocked API in CI',()=>{
       expect(r.attemptedPaidCalls).toBe(1);
       expect(urls.filter(x=>x.init.method==='POST')).toHaveLength(1);
     }
+  });
+
+  it('classifies exhausted reasoning budget without retaining text or attempting a replay',async()=>{
+    const post=Response.json({
+      choices:[{finish_reason:'length',message:{content:''}}],
+      usage:{prompt_tokens:114,completion_tokens:256,
+        completion_tokens_details:{reasoning_tokens:256}},
+    });
+    const {urls,fetchImpl}=fakeResponses({post});
+    const evidence=[];
+    const r=await run({apiKey:'test-only-'+'x'.repeat(30),
+      fetchImpl,journal:async value=>evidence.push(value)});
+    expect(r).toMatchObject({
+      attemptedPaidCalls:1,verdict:'HOLD',reason:'COMPLETION_LIMIT_REACHED',
+      httpStatus:200,finishReason:'length',reasoningTokens:256,
+      visibleOutputTokens:0,jsonShapeObserved:false,
+      productionPromotionAuthorized:false,
+    });
+    expect(urls.filter(x=>x.init.method==='POST')).toHaveLength(1);
+    expect(evidence[0].kind).toBe('reserved_before_post');
+    expect(evidence[1]).toMatchObject({kind:'observed_paid_call',
+      finishReason:'length',reasoningTokens:256,visibleOutputTokens:0});
+    expect(JSON.stringify(evidence)).not.toContain('test-only-');
+    expect(JSON.stringify(r)).not.toContain('오늘은 내가');
+  });
+  it('keeps strict JSON and independent usage checks mandatory with low reasoning',async()=>{
+    const post=Response.json({
+      choices:[{finish_reason:'stop',message:{content:'invalid json'}}],
+      usage:{prompt_tokens:114,completion_tokens:10,
+        completion_tokens_details:{reasoning_tokens:4}},
+    });
+    const {urls,fetchImpl}=fakeResponses({post});
+    const r=await run({apiKey:'test-only-'+'x'.repeat(30),
+      fetchImpl,journal:async()=>{}});
+    expect(r).toMatchObject({
+      attemptedPaidCalls:1,verdict:'HOLD',
+      reason:'INVALID_OR_EMPTY_STRICT_JSON',
+      finishReason:'stop',reasoningTokens:4,visibleOutputTokens:6,
+      jsonShapeObserved:false,
+    });
+    expect(urls.filter(x=>x.init.method==='POST')).toHaveLength(1);
   });
 
   it('main workflow is single-marker-only, contains no pull request trigger',()=>{
