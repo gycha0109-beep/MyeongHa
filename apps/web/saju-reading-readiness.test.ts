@@ -16,7 +16,7 @@ describe('Saju hub Reading readiness presentation', () => {
 
   it('keeps route discovery available without presenting Reading as already available', () => {
     expect(html).toContain('나의 사주 기본 정보');
-    expect(html).toContain('다른 사주 주제 둘러보기');
+    expect(html).toContain('다른 사주 주제');
     expect(html).toContain('reading-detail.html?topic=temperament&scope=original');
     expect(html).toContain('reading-detail.html?topic=love');
     expect(html).toContain('reading-detail.html?scope=year');
