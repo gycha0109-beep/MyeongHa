@@ -1,0 +1,68 @@
+/* Credit guide is informational until a server-owned wallet/offer/checkout is admitted. */
+.chat-credit-entry {
+  align-self: center;
+  min-height: 40px;
+  padding: 8px 14px;
+  border: 1px solid rgba(149, 76, 107, .37);
+  border-radius: 999px;
+  background: rgba(250, 239, 244, .9);
+  color: #823b5c;
+  font: 700 12px/1.35 var(--mh-sans, sans-serif);
+  cursor: pointer;
+}
+.chat-credit-entry:focus-visible,
+.credit-recharge-dialog button:focus-visible { outline: 3px solid #b36083; outline-offset: 3px; }
+.credit-recharge-dialog {
+  position: fixed;
+  width: min(440px, calc(100vw - 24px));
+  max-height: min(88dvh, 680px);
+  padding: 0;
+  margin: auto;
+  border: 1px solid rgba(121, 62, 87, .24);
+  border-radius: 20px;
+  color: #271a30;
+  background: #fffaf6;
+  box-shadow: 0 22px 65px rgba(33, 17, 32, .24);
+  overflow-y: auto;
+}
+.credit-recharge-dialog::backdrop { background: rgba(34, 22, 36, .55); backdrop-filter: blur(3px); }
+.credit-dialog-content { position: relative; padding: 29px; }
+.credit-dialog-eyebrow { font-size: 11px; color: #a05d76; letter-spacing: .14em; font-weight: 700; }
+.credit-dialog-close {
+  position: absolute; top: 16px; right: 16px; width: 38px; height: 38px;
+  border: 0; border-radius: 50%; background: #f7e9ef; color: #71344f; font-size: 22px; cursor: pointer;
+}
+.credit-recharge-dialog h2 {
+  margin: 12px 0 8px; font: 700 clamp(24px, 5vw, 29px)/1.3 var(--mh-serif, serif);
+  color: #2b192f;
+}
+.credit-recharge-dialog p { line-height: 1.65; }
+#credit-dialog-description { margin: 0 0 21px; color: #73636d; font-size: 13px; }
+.credit-dialog-facts { display: grid; gap: 9px; margin: 0 0 15px; }
+.credit-dialog-facts div { display: flex; justify-content: space-between; gap: 15px; padding: 12px 13px; background: #f9f1ef; border-radius: 10px; }
+.credit-dialog-facts dt { color: #675b65; font-size: 12px; }
+.credit-dialog-facts dd { margin: 0; color: #672f4d; font-size: 13px; font-weight: 700; text-align: right; }
+.credit-dialog-offer { padding: 16px; border: 1px solid #e9c9d5; border-radius: 14px; background: #fff; }
+.credit-dialog-offer > div { display: inline-flex; flex-direction: column; gap: 4px; }
+.credit-dialog-offer strong { color: #823858; font-size: 17px; }
+.credit-dialog-offer span { font-size: 11px; color: #a16b80; }
+.credit-dialog-offer > strong { float: right; }
+.credit-dialog-offer p { clear: both; margin: 12px 0 0; color: #746874; font-size: 12px; }
+.credit-dialog-hold { font-size: 12px; color: #805266; }
+.credit-dialog-actions { display: flex; gap: 10px; margin-top: 19px; }
+.credit-dialog-actions button { min-height: 46px; border-radius: 999px; font-weight: 700; cursor: pointer; }
+.credit-dialog-buy { flex: 1.3; border: 0; color: white; background: #863b5c; }
+.credit-dialog-buy:disabled { color: #94838a; background: #eadfe4; cursor: not-allowed; }
+.credit-dialog-later { flex: 1; border: 1px solid #d7b9c7; color: #733d57; background: white; }
+html[data-theme="dark"] .credit-recharge-dialog { color: #f5e8ee; background: #1e2630; border-color: #644354; }
+html[data-theme="dark"] .credit-recharge-dialog h2 { color: #f7e9f0; }
+html[data-theme="dark"] .credit-dialog-facts div, html[data-theme="dark"] .credit-dialog-offer { background: #2a3039; border-color: #624355; }
+html[data-theme="dark"] .credit-dialog-facts dd, html[data-theme="dark"] .credit-dialog-offer strong { color: #edc5d5; }
+html[data-theme="dark"] .credit-dialog-facts dt, html[data-theme="dark"] #credit-dialog-description,
+html[data-theme="dark"] .credit-dialog-offer p { color: #cbb8c2; }
+@media (max-width: 600px) {
+  .credit-recharge-dialog { width: 100%; max-width: none; max-height: 88dvh; margin: auto 0 0; border-radius: 20px 20px 0 0; }
+  .credit-dialog-content { padding: 24px 20px max(20px, env(safe-area-inset-bottom)); }
+  .credit-dialog-actions { flex-direction: column; }
+  .credit-dialog-actions button { width: 100%; }
+}
