@@ -85,7 +85,7 @@ export function guardSeyeonC08LocalPublicUtteranceV1(utterance: unknown): string
     /(?:기억나|기억해|그때|예전에|지난번|작년|어렸을|어릴\s*때|태어났|살았|다녔|했었|갔었|봤었)/u,
     /(?:부모님|가족사|전남친|전여친|첫사랑|트라우마|비밀|비공개|관리자|시스템|프롬프트|권한|소스|API|개인정보)/iu,
     /(?:사귀|사랑해|결혼|질투|소유|내\s*사람|안아|껴안|붙잡|연인이|애인이)/u,
-    /(?:매일|항상|평생|오래전부터|원래\s*저는|제\s*고향|제\s*직업|제\s*학교|저는\s*\d+살)/u,
+    /(?:매일|항상|평생|오래전부터|원래\s*저는|제\s*고향|제\s*직업|제\s*학교|제\s*이름|제\s*집|제가\s*살|저는\s*\d+살)/u,
     /(?:너는|당신은|당신이|네가).{0,24}(?:분명|틀림없이|사실|원래|했잖|였잖|생각했|느꼈)/u,
     /(?:\d{2,4}년|\d{1,2}월|\d{1,2}일|[A-Za-z]{4,})/u,
     /(?:[았었였]어요|[았었였]죠|[았었였]잖아요)/u,
@@ -247,7 +247,7 @@ export async function runSeyeonC08LocalOneCallShadowV1(input: Readonly<{
   });
   if (!quote || quote.providerOutputTokenCapVerified !== true ||
       !Number.isSafeInteger(quote.reservedMicroUsd) ||
-      quote.reservedMicroUsd < 0 || quote.reservedMicroUsd > 4000) {
+      quote.reservedMicroUsd <= 0 || quote.reservedMicroUsd > 4000) {
     throw new SeyeonC08LocalHoldV1('LOCAL_BUDGET_UNVERIFIED');
   }
   const raw:unknown = await input.dialogueProvider.generate(request);
