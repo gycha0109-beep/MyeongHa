@@ -432,9 +432,21 @@ export async function handleSupabaseAuthRequestV1(input: {
         : readRequiredString(completeBody, 'state', 128);
       if (refreshToken === null || /\s/u.test(refreshToken) ||
           providedState === null || !/^[A-Za-z0-9_-]{16,128}$/u.test(providedState)) {
-        // Existing verified Social Members also need a well-formed OAuth
-        // correlation value. Never exchange an uncorrelated refresh token.
         return errorResponse('INVALID_REQUEST', 400);
+      }
+      if (input.preenrollmentMemberPort !== undefined) {
+        // Verify the SAME browser actor who started OAuth before exchanging
+        // an attacker-supplied refresh token. Existing and new Members use
+        // separate cookie-backed signed states, with no client authority.
+        let correlated = false;
+        try {
+          correlated =
+            input.preenrollmentMemberPort.verifySocialState?.(providedState) === true ||
+            input.preenrollmentMemberPort.verifyExistingSocialState?.(providedState) === true;
+        } catch {
+          return errorResponse('SOCIAL_AUTH_CALLBACK_STATE_MISMATCH', 403);
+        }
+        if (!correlated) return errorResponse('SOCIAL_AUTH_CALLBACK_STATE_MISMATCH', 403);
       }
 
       const upstream = await callSupabase(config, '/auth/v1/token?grant_type=refresh_token', {

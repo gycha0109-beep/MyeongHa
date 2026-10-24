@@ -166,6 +166,7 @@ describe('A1 Social Auth preverified age hold and atomic Member binding', () => 
     });
     expect(rejected.status).toBe(403);
     expect(rejected.headers.get('set-cookie')).toBeNull();
+    expect(upstream).toHaveBeenCalledOnce();
   });
 
   it('does not grant an unverified OAuth account access on existing-member-only callback', async () => {
