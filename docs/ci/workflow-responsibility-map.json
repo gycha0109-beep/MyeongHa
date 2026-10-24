@@ -440,6 +440,12 @@
       "mainMode": "one-shot-trigger",
       "workTrackAttribution": "commit-metadata"
     },
+    "seyeon-c08-n06-paid-low-reasoning-once-v4.yml": {
+      "responsibility": "character-memory-one-owner-approved-public-n06-low-reasoning-model-post",
+      "prMode": "none",
+      "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "commit-metadata"
+    },
     "seyeon-c08-n06-paid-token-only-once-v3.yml": {
       "responsibility": "character-memory-bounded-public-n06-token-only-model-inference-once",
       "prMode": "none",
