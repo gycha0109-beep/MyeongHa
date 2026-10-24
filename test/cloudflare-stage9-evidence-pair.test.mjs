@@ -3,11 +3,13 @@ import { mkdtemp, mkdir, readFile, rm, writeFile, symlink } from 'node:fs/promis
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { HTML_ENTRIES } from '../scripts/verify-cloudflare-static.mjs';
+import { CLOUDFLARE_DIRECT_API_ROUTES, CLOUDFLARE_REWRITE_ROUTES } from '../workers/cloudflare-api-router.mjs';
 import { STAGE9_NEGATIVE_REPLAY_FENCE_VALUES_V1 } from '../scripts/cloudflare-preview-negative-replay.mjs';
 import {
   acceptCloudflareStage9EvidencePairV1,
   readCloudflareStage9EvidencePairV1,
   STAGE9_PINNED_RECOVERY_SHA_V1,
+  STAGE9_SC_F2_EXPECTED_PROBES_V1,
 } from '../scripts/accept-cloudflare-stage9-evidence-pair.mjs';
 import { buildCloudflarePreviewSmokeEvidenceV1 } from '../scripts/cloudflare-preview-smoke-evidence.mjs';
 import { summarizeCloudflarePreviewProbeMetricsV1 } from '../scripts/cloudflare-preview-smoke-metrics.mjs';
@@ -17,14 +19,22 @@ const HEAD='a'.repeat(40),RUN='39799999999',ATTEMPT='1';
 const sample=(path,expectedStatus,actualStatus,elapsedMs)=>({
   path,expectedStatus,actualStatus,elapsedMs,
 });
+// Mirror the declared route inventory, not an arbitrary sample total.
 const probes=[
-  ...Array.from({length:53},(_,i)=>sample(i%2?'/index.html':'/',200,200,10+i)),
-  sample('/api/health',200,200,20),
-  sample('/api/me',404,404,21),
-  sample('/api/memories/synthetic-id/grants/seyeon',404,404,23),
-  sample('/api/memories/synthetic-id/grants/seyeon/revoke',404,404,24),
-  ...Array.from({length:7},(_,i)=>sample(
-    '/api/chat/PRIVATE-THREAD/turns?state=SECRET',503,503,22+i)),
+  sample('/',200,200,10),
+  ...HTML_ENTRIES.map((name,i)=>sample('/'+name,200,200,11+i)),
+  sample('/index.html',200,200,24),
+  ...Array.from({length:5},(_,i)=>sample('/api/health',200,200,30+i)),
+  ...CLOUDFLARE_DIRECT_API_ROUTES.filter(route=>route.id!=='api.health')
+    .map((route,i)=>sample(route.path,404,404,40+i)),
+  ...CLOUDFLARE_REWRITE_ROUTES.map((route,i)=>{
+    const chat=route.id==='rewrite.chat.turns';
+    return sample(route.source.replace(/:([A-Za-z]+)/g,'synthetic-id'),
+      chat?503:404,chat?503:404,60+i);
+  }),
+  ...Array.from({length:10},(_,i)=>sample('/api/unknown',404,404,90+i)),
+  ...Array.from({length:6},(_,i)=>sample(
+    '/api/chat/PRIVATE-THREAD/turns?state=SECRET',503,503,110+i)),
 ];
 const metrics=summarizeCloudflarePreviewProbeMetricsV1(probes);
 const make= (target,sha)=>{
@@ -45,14 +55,15 @@ const pair=(change={})=>acceptCloudflareStage9EvidencePairV1({
 });
 
 describe('Cloudflare Stage 9 exact-SHA CI evidence pair acceptance',()=>{
-  it('admits two matching-run, held, sanitized 64-probe records only',()=>{
+  it('admits two matching-run, held, sanitized inventory-complete records only',()=>{
+    expect(STAGE9_SC_F2_EXPECTED_PROBES_V1).toBe(probes.length);
     const result=pair();
     expect(result).toMatchObject({
       schema:'myeongha-cloudflare-stage9-evidence-pair-acceptance-v1',
       status:'PASS',production:'HOLD',cost:'COST_OR_LIMIT_EVIDENCE_HOLD',
       githubRun:{id:RUN,attempt:ATTEMPT},
-      current:{commit:HEAD,httpSamples:64,protected503:7},
-      recovery:{commit:STAGE9_PINNED_RECOVERY_SHA_V1,httpSamples:64,protected503:7},
+      current:{commit:HEAD,httpSamples:STAGE9_SC_F2_EXPECTED_PROBES_V1,protected503:7},
+      recovery:{commit:STAGE9_PINNED_RECOVERY_SHA_V1,httpSamples:STAGE9_SC_F2_EXPECTED_PROBES_V1,protected503:7},
       actualRollbackOrRestorePerformed:false,
     });
     expect(current.byRoute['rewrite.seyeon.memory.grant.status'].n).toBe(1);
@@ -89,7 +100,7 @@ describe('Cloudflare Stage 9 exact-SHA CI evidence pair acceptance',()=>{
         'auth.html':'INVALID-DIGEST'}}},
       {recovery:{...recovery,publicHtmlSha256:{...recovery.publicHtmlSha256,
         'new-private.html':'f'.repeat(64)}}},
-      {current:{...current,syntheticRequestCount:62}},
+      {current:{...current,syntheticRequestCount:STAGE9_SC_F2_EXPECTED_PROBES_V1-1}},
       {current:{...current,byRoute:Object.fromEntries(
         Object.entries(current.byRoute).filter(([name])=>name!==
           'rewrite.seyeon.memory.grant.status'))}},

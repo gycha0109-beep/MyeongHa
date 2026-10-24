@@ -6,14 +6,22 @@ import { lstat, readFile, readdir } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { HTML_ENTRIES } from './verify-cloudflare-static.mjs';
-import { STAGE9_NEGATIVE_REPLAY_FENCE_VALUES_V1 } from './cloudflare-preview-negative-replay.mjs';
+import { STAGE9_NEGATIVE_REPLAY_FENCE_VALUES_V1, STAGE9_NEGATIVE_REPLAY_PROBES_V1 } from './cloudflare-preview-negative-replay.mjs';
 import {
   CLOUDFLARE_DIRECT_API_ROUTES, CLOUDFLARE_REWRITE_ROUTES,
 } from '../workers/cloudflare-api-router.mjs';
 
 export const STAGE9_PINNED_RECOVERY_SHA_V1 =
   'd4f7cebb3d9be6b4ad9e526c53e3f5b8585cc9c0';
-const EXPECTED_PROBES=64, EXPECTED_PROTECTED_HOLDS=7;
+// SCF2 smoke: 30 non-inventory requests + replay fixture count + one per
+// non-health direct route + one per Vercel rewrite. A route addition requires
+// deployed negative coverage, but no manually drifted 62/64 constant.
+export const STAGE9_SC_F2_EXPECTED_PROBES_V1 = 30 +
+  STAGE9_NEGATIVE_REPLAY_PROBES_V1.length +
+  CLOUDFLARE_DIRECT_API_ROUTES.length - 1 +
+  CLOUDFLARE_REWRITE_ROUTES.length;
+const EXPECTED_PROBES=STAGE9_SC_F2_EXPECTED_PROBES_V1;
+const EXPECTED_PROTECTED_HOLDS=7;
 const CLASS_NAMES=Object.freeze(['static','health','api-denial','protected-hold']);
 const COUNTERS=Object.freeze([
   'requestAttempts','responses','transportFailures','unexpectedStatuses',
