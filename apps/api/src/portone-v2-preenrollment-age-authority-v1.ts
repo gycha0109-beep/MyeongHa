@@ -48,6 +48,11 @@ export function serializePortOnePreenrollmentCookieV1(rawNonce: string): string 
   return `${PORTONE_PREENROLLMENT_AGE_AUTHORITY_V1.cookieName}=${rawNonce}; Path=/; Max-Age=600; HttpOnly; Secure; SameSite=Strict`;
 }
 
+/** A consumed one-time proof no longer needs a browser possession cookie. */
+export function expirePortOnePreenrollmentCookieV1(): string {
+  return `${PORTONE_PREENROLLMENT_AGE_AUTHORITY_V1.cookieName}=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Strict`;
+}
+
 export function extractPortOnePreenrollmentCookieV1(request: Request): string | null {
   const header = request.headers.get('cookie');
   if (header === null || header.length > 8192) return null;

@@ -1,4 +1,5 @@
 import { denyUnverifiedInitialIdentityAdmissionV1 } from './portone-v2-preidentity-admission-v1.js';
+import { expirePortOnePreenrollmentCookieV1 } from './portone-v2-preenrollment-age-authority-v1.js';
 import {
   MYEONGHA_PRODUCTION_SUPABASE_ORIGIN,
   PRODUCTION_USER_DATA_RUNTIME_ENV_V1,
@@ -26,6 +27,12 @@ import {
 
 const NO_STORE = 'no-store' as const;
 const MAX_AUTH_BODY_BYTES = 16_384;
+
+/** Cookie clearing never replaces server-side one-shot consumption. */
+function eraseUsedPreenrollmentCookieV1(response: Response): Response {
+  response.headers.append('Set-Cookie', expirePortOnePreenrollmentCookieV1());
+  return response;
+}
 const JSON_HEADERS = Object.freeze({
   Accept: 'application/json',
   'Content-Type': 'application/json',
@@ -427,6 +434,7 @@ export async function handleSupabaseAuthRequestV1(input: {
       }
       const session = normalizeSession(upstream.payload);
       if (session === null) return errorResponse('AUTH_UPSTREAM_MALFORMED', 502);
+      let newlyBoundSocialMember = false;
       if (input.preenrollmentMemberPort !== undefined) {
         // OFF/legacy social sign-in keeps its original transport contract.
         // Once A1 is enabled, binding always requires a trusted upstream UUID.
@@ -441,12 +449,15 @@ export async function handleSupabaseAuthRequestV1(input: {
               return errorResponse('AGE_VERIFICATION_REQUIRED', 403);
             }
             await input.preenrollmentMemberPort.bindMember(session.user.id);
+            newlyBoundSocialMember = true;
           }
         } catch {
           return errorResponse('AGE_VERIFICATION_UNAVAILABLE', 503);
         }
       }
-      return authenticatedResponse(session, {}, true);
+      const socialResponse = authenticatedResponse(session, {}, true);
+      return newlyBoundSocialMember
+        ? eraseUsedPreenrollmentCookieV1(socialResponse) : socialResponse;
     }
 
     if (input.action === 'refresh') {
@@ -539,6 +550,7 @@ export async function handleSupabaseAuthRequestV1(input: {
         // pre-enrollment cookie. Never mint a new Subject for existing Members.
         // A missing/expired proof does not block login needed for privacy
         // rights; downstream personalization still requires verified age.
+        let recoveredMember = false;
         if (input.preenrollmentMemberPort !== undefined) {
           if (session.user.id === null) return errorResponse('AUTH_UPSTREAM_MALFORMED', 502);
           try {
@@ -547,6 +559,7 @@ export async function handleSupabaseAuthRequestV1(input: {
             ) ?? false;
             if (!existing && await input.preenrollmentMemberPort.readVerified()) {
               await input.preenrollmentMemberPort.bindMember(session.user.id);
+              recoveredMember = true;
             }
           } catch {
             // A failed attempted recovery must not claim successful age binding
@@ -554,11 +567,13 @@ export async function handleSupabaseAuthRequestV1(input: {
             return errorResponse('AGE_VERIFICATION_UNAVAILABLE', 503);
           }
         }
-        return authenticatedResponse(
+        const signInResponse = authenticatedResponse(
           session,
           { passwordCompromiseCheck: compromiseCheck.status },
           webCookieTransport,
         );
+        return recoveredMember
+          ? eraseUsedPreenrollmentCookieV1(signInResponse) : signInResponse;
       }
       if (input.action === 'sign-up' && input.preenrollmentMemberPort !== undefined) {
         if (session.user.id === null) return errorResponse('AUTH_UPSTREAM_MALFORMED', 502);
@@ -570,7 +585,9 @@ export async function handleSupabaseAuthRequestV1(input: {
           return errorResponse('AGE_VERIFICATION_UNAVAILABLE', 503);
         }
       }
-      return authenticatedResponse(session, {}, webCookieTransport);
+      const signupResponse = authenticatedResponse(session, {}, webCookieTransport);
+      return input.action === 'sign-up' && input.preenrollmentMemberPort !== undefined
+        ? eraseUsedPreenrollmentCookieV1(signupResponse) : signupResponse;
     }
 
     if (input.action === 'sign-up') {
@@ -587,13 +604,15 @@ export async function handleSupabaseAuthRequestV1(input: {
           return errorResponse('AGE_VERIFICATION_UNAVAILABLE', 503);
         }
       }
-      return response({
+      const verificationResponse = response({
         ok: true,
         data: {
           status: 'verification_required',
           email: user.email ?? email,
         },
       });
+      return input.preenrollmentMemberPort === undefined
+        ? verificationResponse : eraseUsedPreenrollmentCookieV1(verificationResponse);
     }
 
     return errorResponse('AUTH_UPSTREAM_MALFORMED', 502);

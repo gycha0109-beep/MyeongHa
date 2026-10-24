@@ -3,6 +3,7 @@ import { resolveProductionPortOneVerifiedAgeModeV1 } from './portone-v2-age-enfo
 import { resolveProductionPortOnePreenrollmentModeV1 } from './portone-v2-preenrollment-http-runtime-v1.js';
 import {
   extractPortOnePreenrollmentCookieV1,
+  expirePortOnePreenrollmentCookieV1,
   fingerprintPortOnePreenrollmentBindingV1,
 } from './portone-v2-preenrollment-age-authority-v1.js';
 import { handleGuestBootstrapRequestV1 } from './guest-bootstrap-http.js';
@@ -136,6 +137,11 @@ export function createProductionGuestBootstrapHttpRuntimeV1(
 
       if (response.status === 405) {
         cancelUnusedRequestBodyBestEffort(requestInput.request);
+      }
+      if (response.ok && preenrollmentBindingDigest !== undefined) {
+        // Only a successful new Guest creation can reach here with a proof;
+        // its transaction has already consumed the age authority.
+        response.headers.append('Set-Cookie', expirePortOnePreenrollmentCookieV1());
       }
       return response;
     },

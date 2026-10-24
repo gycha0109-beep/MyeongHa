@@ -105,6 +105,7 @@ describe('A1 Social Auth preverified age hold and atomic Member binding', () => 
     expect(proof.admitExistingMember).toHaveBeenCalledWith(id);
     expect(proof.bindMember).toHaveBeenCalledWith(id);
     expect((await response.json()).data.status).toBe('authenticated');
+    expect(response.headers.get('set-cookie')).toContain('__Host-myeongha-preage-v1=;');
   });
 
   it('does not mint a new Subject for already-verified existing Member, and withholds tokens on DB errors', async () => {

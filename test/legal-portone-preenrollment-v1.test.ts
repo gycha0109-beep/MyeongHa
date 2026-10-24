@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { createApprovedPortOnePreenrollmentMemberBindingPortV1 } from '../apps/api/src/portone-v2-approved-member-binding-v1.js';
 import {
   extractPortOnePreenrollmentCookieV1,
+  expirePortOnePreenrollmentCookieV1,
   fingerprintPortOnePreenrollmentBindingV1,
   issuePortOnePreenrollmentHttpOnlyNonceV1,
   serializePortOnePreenrollmentCookieV1,
@@ -108,6 +109,7 @@ describe('L2 A1 preenrollment PortOne identity admission', () => {
       .toMatch(/^[a-f0-9]{64}$/u);
     const cookie = serializePortOnePreenrollmentCookieV1(nonce);
     expect(cookie).toContain('HttpOnly; Secure; SameSite=Strict');
+    expect(expirePortOnePreenrollmentCookieV1()).toContain('Max-Age=0; HttpOnly; Secure; SameSite=Strict');
     expect(extractPortOnePreenrollmentCookieV1(
       new Request(base, { headers: { Cookie: cookie } }),
     )).toBe(nonce);

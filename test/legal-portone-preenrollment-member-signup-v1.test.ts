@@ -60,6 +60,8 @@ describe('A1 Member signup verified preenrollment binding', () => {
     });
     expect(result.status).toBe(200);
     expect((await result.json()).data.status).toBe('verification_required');
+    expect(result.headers.get('set-cookie')).toContain('__Host-myeongha-preage-v1=;');
+    expect(result.headers.get('set-cookie')).toContain('Max-Age=0');
     expect(port.readVerified).toHaveBeenCalledOnce();
     expect(port.bindMember).toHaveBeenCalledExactlyOnceWith(id);
   });
