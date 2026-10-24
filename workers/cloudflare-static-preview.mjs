@@ -1,4 +1,5 @@
 import { matchCloudflareApiRoute } from './cloudflare-api-router.mjs';
+import { executeSecurityObservedRequestV1 } from '../apps/api/src/security-observability.ts';
 import {
   tryHandleCloudflareSeyeonSecurityV1,
   fenceCloudflareSeyeonBeforeFetchReturnV1,
@@ -110,10 +111,9 @@ export function handleCloudflareStaticPreviewRequest(request) {
   });
 }
 
-export default {
-  async fetch(request, bindings) {
+const cloudflareRuntime = {
+  async fetch(request, bindings, route) {
     const url = new URL(request.url);
-    const route = matchCloudflareApiRoute(url.pathname);
     // One emergency flag disables Auth/DB/Saju without contacting a provider
     // or acquiring a connection. Chat stays behind its independent 503 fence.
     const emergencyHold = cloudflareEmergencyHoldEnabledV1(bindings);
@@ -174,5 +174,17 @@ export default {
       // Keep a fixed no-store error code; never emit platform HTML/errors.
       return sealCloudflareUnexpectedApiFailureV1(route);
     }
+  },
+};
+
+export default {
+  fetch(request, bindings) {
+    const route = matchCloudflareApiRoute(new URL(request.url).pathname);
+    if (route === null) return cloudflareRuntime.fetch(request, bindings, route);
+    return executeSecurityObservedRequestV1({
+      request,
+      routeId: route.id,
+      execute: () => cloudflareRuntime.fetch(request, bindings, route),
+    });
   },
 };

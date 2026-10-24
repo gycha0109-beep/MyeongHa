@@ -1,5 +1,7 @@
 # 명하 Security 실행 로드맵 v1
 
+> **현재 실행 대상 정정:** 주 서버는 Cloudflare입니다. 최신 대상·실행 상태·미완료 경계는 [Cloudflare 실행 기록](GENERAL_SECURITY_CLOUDFLARE_EXECUTION_20261024.md)을 따릅니다. 아래 Vercel/Node 개발 이력과 검증 결과만으로 Cloudflare 운영 완료를 선언하지 않습니다.
+
 > Watchtower-Track: security
 > 갱신: 2026-10-24 KST
 > 구현 기준: `1fce280a039d7d7ec5192ce2f5ba7851fc7b6023` (착수 당시 원격 main과 일치 확인; 이후 main의 최신성을 주장하지 않음)

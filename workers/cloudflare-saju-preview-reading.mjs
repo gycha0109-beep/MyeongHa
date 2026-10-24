@@ -10,6 +10,7 @@ import {
   CLOUDFLARE_APPROVED_RESPONSE_HEADERS_V1,
 } from './cloudflare-auth-db-api.mjs';
 import { createProductionCurrentSubjectSajuPreviewReadingRuntimeV1 } from '../apps/api/src/production-current-subject-saju-preview-reading-runtime.ts';
+import { isSajuAbuseAdmissionEnabledV1 } from '../apps/api/src/saju-abuse-admission-activation.ts';
 import { parseProductionUserDataRuntimeConfigV1 } from '../apps/api/src/production-user-data-runtime-config.ts';
 import { parseProductionSajuRuntimeConfigV1 } from '../apps/api/src/production-saju-runtime-config.ts';
 import {
@@ -99,6 +100,7 @@ export async function tryHandleCloudflareApprovedSajuPreviewReadingV1(request, b
     );
     runtime = createProductionCurrentSubjectSajuPreviewReadingRuntimeV1({
       env: bindings, pool: subjectPool,
+      sajuAbuseAdmissionEnabled: isSajuAbuseAdmissionEnabledV1(bindings),
     });
     result = await runtime.handleRequest({
       request,
