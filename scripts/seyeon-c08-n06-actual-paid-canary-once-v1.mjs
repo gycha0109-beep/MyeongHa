@@ -179,7 +179,7 @@ export async function preflightSeyeonC08N06ModelEndpointV2(key,fetchImpl=fetch){
         headers:{authorization:'Bearer '+key.trim(),accept:'application/json'},
       });
       if(r.status!==200||
-         !/^application\\/json(?:\\s*;|$)/iu.test(r.headers.get('content-type')??'')||
+         !/^application\/json(?:\s*;|$)/iu.test(r.headers.get('content-type')??'')||
          Number(r.headers.get('content-length')??'0')>1000000)return null;
       const raw=await r.text();
       if(Buffer.byteLength(raw,'utf8')>1000000)return null;
