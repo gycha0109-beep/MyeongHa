@@ -60,6 +60,12 @@ npx vitest run test/seyeon-security-s0-live-model.e2e.test.ts --maxWorkers=1 --b
 
 이전 실패도 보존했다: 최초 실제 G1 current User 거부, 모델 의미 검증 거부(안전하게 비공개), 실제 G2 후 UUID/slug 송출 거부, 관찰기의 JSON escape 비교 오류. 의미 검증을 약화하지 않았다. fixture는 주체 없는 1인칭 습관 진술에서 명확한 사용자의 대화 회상으로 수정했다. 기존 `conversation_recall/v1` codec/claimKind/권한 정책은 변경하지 않았다.
 
+### CI의 추가 직접 fixture 보정
+
+최초 PR HEAD `d10f2dab`의 CI #40097621895에서 영향 테스트의 `seyeon-g3-first-reply-request-content-v1.test.ts` 정상 사례 두 개가 `INVALID_COMMIT`으로 실패했다. expected=실제 participant UUID로 G3 request/Outbox 검사를 실행, observed=이 직접 caller fixture 두 파일에만 아직 slug `seyeon`이 남음, runtime=GitHub Node24/Vitest, stage=첫 송출 guard, classification=stale synthetic fixture. 두 fixture를 같은 DB UUID 계약으로 보정하고 `npx vitest related apps/api/src/seyeon-first-positive-memory-node-delivery-v1.ts apps/api/src/seyeon-positive-g1-final-model-context-seal-v1.ts apps/api/src/seyeon-production-chat-execution-v1.ts --run --passWithNoTests`로 직접 영향 테스트를 실행한다. 제품 검사/DB 조건을 완화하지 않으며 이전 HEAD 실패를 PASS로 재사용하지 않는다.
+
+위 related 실행은 **278 PASS / 28 SKIP**, 파일 29 PASS / 3 SKIP이다. 최초 로컬 실행의 HTTPS 사례 3개는 `openssl ENOENT`였으며 설치된 Git의 `mingw64/bin`을 해당 프로세스 PATH에 추가해 그대로 실행했다. 제품/테스트 skip 조건을 추가하지 않았다. 근거는 `artifacts/seyeon-real-model-e2e-20261024/related.log`다.
+
 Architecture Check:
 
 * Docs updated: yes — 이 증거와 실행 로드맵의 실제 모델 후속 기록.
