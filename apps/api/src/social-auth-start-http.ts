@@ -11,7 +11,11 @@ const NO_STORE = 'no-store' as const;
 const MOBILE_SOCIAL_REDIRECT_SCHEME = 'myeongha:' as const;
 const MOBILE_SOCIAL_REDIRECT_HOST = 'auth' as const;
 const MOBILE_SOCIAL_REDIRECT_PATH = '/callback' as const;
-const WEB_SOCIAL_REDIRECT_ORIGIN = 'https://myeongha.vercel.app' as const;
+const WEB_SOCIAL_REDIRECT_ORIGINS = new Set([
+  'https://myeongha.vercel.app',
+  'https://myeongha.gycha0109.workers.dev',
+  'https://myeongha-web.gycha0109.workers.dev',
+]);
 const WEB_SOCIAL_REDIRECT_PATH = '/auth.html' as const;
 const WEB_SOCIAL_REDIRECT_MARKER = 'callback' as const;
 const SOCIAL_AUTH_STATE_TTL_MS = 10 * 60 * 1000;
@@ -89,7 +93,7 @@ function parseRedirectUri(value: unknown): URL | null {
     url.search === '';
   const web =
     commonSafe &&
-    url.origin === WEB_SOCIAL_REDIRECT_ORIGIN &&
+    WEB_SOCIAL_REDIRECT_ORIGINS.has(url.origin) &&
     url.pathname === WEB_SOCIAL_REDIRECT_PATH &&
     url.searchParams.getAll('social').length === 1 &&
     url.searchParams.get('social') === WEB_SOCIAL_REDIRECT_MARKER &&

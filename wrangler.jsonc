@@ -11,5 +11,18 @@
     "not_found_handling": "none",
     "run_worker_first": true
   },
-  "previews": {}
+  "previews": {},
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "ratelimits": [
+    {
+      "name": "AUTH_RATE_LIMITER",
+      "namespace_id": "25691",
+      "simple": {
+        "limit": 12,
+        "period": 60
+      }
+    }
+  ]
 }

@@ -24,7 +24,11 @@ const CONFIRMATION_GUEST_HANDOFF_ENTRY_PREFIX = 'myeongha.pendingGuestConfirmati
 const CONFIRMATION_GUEST_HANDOFF_TTL_MS = 24 * 60 * 60 * 1000;
 // Keep the same mixed-version namespace used by product-auth.js so promotion cannot cross a newer Member mutation.
 const MEMBER_MUTATION_LOCK_NAME = 'myeongha.memberSession.v1.refresh.lock';
-const WEB_SOCIAL_AUTH_CALLBACK_URI = 'https://myeongha.vercel.app/auth.html?social=callback';
+const CLOUDFLARE_AUTH_ORIGINS = new Set([
+  'https://myeongha.gycha0109.workers.dev',
+  'https://myeongha-web.gycha0109.workers.dev',
+]);
+const WEB_SOCIAL_AUTH_CALLBACK_URI = `${CLOUDFLARE_AUTH_ORIGINS.has(location.origin) ? location.origin : 'https://myeongha.vercel.app'}/auth.html?social=callback`;
 const WEB_SOCIAL_AUTH_PROVIDERS = new Set(['google', 'kakao', 'naver']);
 const ALLOWED_NEXT = new Set([
   'hall.html',
@@ -95,7 +99,8 @@ async function startSocialAuth(provider) {
   setBusy(true);
   setStatus('');
   try {
-    await ensureGuestBearer();
+    // Existing guest context is preserved. Cloudflare native Auth does not create a phantom guest.
+    if (!CLOUDFLARE_AUTH_ORIGINS.has(location.origin)) await ensureGuestBearer();
     const guestBearer = readGuestBearer();
 
     let response;
@@ -758,10 +763,10 @@ async function submitAuth({ email: rawEmail, password, confirmation }) {
   setStatus('');
   try {
     if (mode === 'sign-up') {
-      await ensureGuestBearer();
+      if (!CLOUDFLARE_AUTH_ORIGINS.has(location.origin)) await ensureGuestBearer();
       const result = await signUpWithPassword(email, password, nextHref());
       if (result.status === 'verification_required') {
-        if (!await stageConfirmationGuestHandoff(result.email)) {
+        if (readGuestBearer() && !await stageConfirmationGuestHandoff(result.email)) {
           setStatus('확인 메일은 전송됐지만 현재 게스트 흐름의 계정 연결 정보를 안전하게 보존하지 못했습니다. 이 탭을 닫지 말고 이메일 확인 후 돌아와 주세요.', 'error');
           return;
         }

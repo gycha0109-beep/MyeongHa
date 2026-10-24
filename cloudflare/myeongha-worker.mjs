@@ -3,6 +3,7 @@
 // until its native Workers implementation has been separately verified.
 // Never proxy an API request to this Worker itself or to an unapproved origin.
 import sealedRuntime from './preview-worker.mjs';
+import { handleCloudflareAuthRequest } from './member-auth-worker.mjs';
 
 const HEALTH_HEADERS = Object.freeze({
   'Cache-Control': 'no-store',
@@ -28,6 +29,8 @@ export default {
       }
       return Response.json({ status: 'ok' }, { headers: HEALTH_HEADERS });
     }
+    const authResponse = await handleCloudflareAuthRequest(request, env);
+    if (authResponse !== null) return authResponse;
     return sealedRuntime.fetch(request, env, ctx);
   },
 };
