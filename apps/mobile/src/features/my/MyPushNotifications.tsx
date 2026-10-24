@@ -3,6 +3,7 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-nati
 import type { MobilePushStatusV1 } from '@/core/push/mobile-push-service';
 import { mobileColors } from '@/ui/mobile-colors';
 import { MobileUiText } from '@/ui/MobileUiText';
+import { useMobileUiLocale } from '@/ui/mobile-ui-locale';
 
 function copyFor(status: MobilePushStatusV1 | null): Readonly<{
   title: string;
@@ -53,14 +54,15 @@ export function MyPushNotifications({
   readonly onDisable: () => void;
   readonly onRetry: () => void;
 }) {
+  const { t } = useMobileUiLocale();
   const copy = copyFor(status);
   const enabled = status?.kind === 'enabled';
 
   return (
     <View style={styles.card}>
       <Text style={styles.kicker}>NOTIFICATIONS</Text>
-      <Text style={styles.title}>{copy.title}</Text>
-      <Text style={styles.body}>{copy.body}</Text>
+      <Text style={styles.title}>{t(copy.title)}</Text>
+      <Text style={styles.body}>{t(copy.body)}</Text>
 
       {errorMessage !== null ? (
         <Text style={styles.error}>{errorMessage}</Text>

@@ -236,6 +236,23 @@ describe('Mobile / Web UI localization parity', () => {
     expect(composer).toContain("placeholder={t('세연에게 하고 싶은 말을 적어주세요')}");
     expect(people).toContain('item.relationshipLabel');
     expect(people).toContain('item.displayLabel?.trim()');
+    const extraCopy = ["이 기기 알림 연결됨","현재 주체에 Expo Push 수신 기기가 등록되어 있습니다.","알림 연결 확인 필요","기기 권한은 유지 중이며 서버 등록을 다시 확인해야 합니다.","기기 알림 권한 꺼짐","OS 설정에서 알림 권한을 허용한 뒤 다시 연결해 주세요.","현재 빌드에서는 준비 중","EAS projectId가 연결된 네이티브 빌드에서 Push 등록을 활성화합니다.","알림 받기","사용자가 허용하면 이 기기를 현재 주체의 Push 수신 기기로 등록합니다.","알림 연결을 확인하는 중입니다…","이 기기 알림 끄기","다시 연결","알림 허용 및 기기 등록","지금은 기기 등록·갱신·해제 기반만 활성화합니다. 자동 발송 시점과 빈도는 아직 적용하지 않습니다.","얼굴에 담긴 나의 이야기","정면 사진을 준비하고, {reader}과 함께할 관상 읽기의 시작을 만나보세요.","이야기가 머무는 곳","오늘은 어떤 이야기를 나눠볼까요?","여섯 연결자의 이야기를 만나보세요.","캐릭터 만나기","명식과 풀이 살펴보기","지난 이야기","대화 가능 여부와 기록 접근은 로그인 및 현재 서비스 상태에 따라 달라집니다.","음력 29일·30일 및 윤달의 실제 존재 여부는 저장 시 서버에서 확인합니다.","외부 로그인 화면에서 확인을 마치면 자동으로 돌아옵니다.","연결되지 않은 결제·상세 계정관리·지원 상태는 임의로 표시하지 않습니다."];
+    for (const locale of ['en-US', 'zh-CN'] as const) {
+      for (const label of extraCopy) {
+        const translated = translateMobileUiCopy(label, locale);
+        expect(translated, `${locale} missing: ${label}`).not.toBe(label);
+        expect(translated.replace('{reader}', '')).not.toMatch(/[가-힣]/u);
+      }
+    }
+    const [push, faceEditorial] = await Promise.all([
+      source('apps/mobile/src/features/my/MyPushNotifications.tsx'),
+      source('apps/mobile/src/features/face/FaceEditorialIntro.tsx'),
+    ]);
+    expect(push).toContain('t(copy.title)');
+    expect(push).toContain('t(copy.body)');
+    expect(push).toContain('{errorMessage}');
+    expect(faceEditorial).toContain('reader: reader.name');
+    expect(formatMobileUiCopy('정면 사진을 준비하고, {reader}과 함께할 관상 읽기의 시작을 만나보세요.', { reader: '세연' }, 'en-US')).toContain('세연');
     const original = '사용자의 고유한 대화 내용';
     expect(translateMobileUiCopy(original, 'en-US')).toBe(original);
     expect(translateMobileUiCopy(original, 'zh-CN')).toBe(original);
