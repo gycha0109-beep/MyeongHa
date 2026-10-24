@@ -23,7 +23,7 @@ body.saju-hub-page .saju-design-chart-content [hidden] { display: none !importan
 .saju-design-hero:after { content:""; z-index:-2; position:absolute; inset:0; background: url("home-paper-mountains.svg") right bottom/auto 180px no-repeat; opacity:.52; }
 .saju-design-hero-text { position:relative; z-index:1; max-width:680px; }
 .saju-design-eyebrow { font-size:11px; font-weight:800; letter-spacing:.22em; color:#a45c5e; }
-.saju-design-hero h2 { margin:7px 0 8px; font: 700 clamp(26px,3.1vw,36px)/1.25 var(--mh-serif,serif); color:#54202e; }
+.saju-design-hero h1 { margin:7px 0 8px; font: 700 clamp(26px,3.1vw,36px)/1.25 var(--mh-serif,serif); color:#54202e; }
 .saju-design-hero p { margin:0; line-height:1.65; font-size:14px; color:#50383a; }
 .saju-design-core { display:grid; grid-template-columns:minmax(0,.95fr) minmax(0,1.08fr); gap:16px; padding:0 35px 12px; align-items:stretch; }
 .saju-design-card { border:1px solid #ead9d0; border-radius:10px; background:rgba(255,250,246,.85); padding:20px 22px 17px; box-shadow:0 3px 13px rgba(128,65,55,.055); min-width:0; }
@@ -87,7 +87,7 @@ html[data-theme="dark"] body.saju-hub-page { background:#241e25; }
 html[data-theme="dark"] .saju-design-preview { background:#302931; border-color:#694c53; }
 html[data-theme="dark"] .saju-design-hero:before { background:linear-gradient(90deg,rgba(50,41,46,.98),rgba(50,41,46,.75)),url("home-plum-branch.svg") right/auto 215px no-repeat; }
 html[data-theme="dark"] .saju-design-card,html[data-theme="dark"] .saju-design-product-card,html[data-theme="dark"] .saju-design-example-sheet,html[data-theme="dark"] .saju-design-pillars { background:#393038; border-color:#75575f; }
-html[data-theme="dark"] .saju-design-hero h2,html[data-theme="dark"] .saju-design-card h3,html[data-theme="dark"] .saju-design-products h2,html[data-theme="dark"] .saju-design-product-card h3,html[data-theme="dark"] .saju-design-example h2 { color:#f4dce0; }
+html[data-theme="dark"] .saju-design-hero h1,html[data-theme="dark"] .saju-design-card h3,html[data-theme="dark"] .saju-design-products h2,html[data-theme="dark"] .saju-design-product-card h3,html[data-theme="dark"] .saju-design-example h2 { color:#f4dce0; }
 html[data-theme="dark"] .saju-design-hero p,html[data-theme="dark"] .saju-design-birth-fields dd,html[data-theme="dark"] .saju-design-product-card ul { color:#ead8d7; }
 html[data-theme="dark"] .saju-design-example { background:#503c45;border-color:#82616d; }
 @media (max-width:850px) {
