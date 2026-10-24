@@ -107,8 +107,9 @@ select
   has_function_privilege('myeongha_system_executor','public.internal_claim_account_deletion_outbox_v1(uuid,text,timestamptz)','EXECUTE')::int,
   has_function_privilege('myeongha_system_executor','public.internal_account_deletion_resume_state_v1(uuid,uuid,text)','EXECUTE')::int,
   has_function_privilege('myeongha_system_executor','public.internal_finalize_account_deletion_db_v1(uuid,uuid,text)','EXECUTE')::int,
-  has_function_privilege('myeongha_system_executor','public.internal_complete_account_deletion_v1(uuid,uuid,text)','EXECUTE')::int;")"
-[[ "$worker_grants" == "1|1|1|1" ]] || fail "worker lifecycle grants mismatch: $worker_grants"
+  has_function_privilege('myeongha_system_executor','public.internal_complete_account_deletion_v1(uuid,uuid,text)','EXECUTE')::int,
+  has_function_privilege('myeongha_system_executor','public.cmd_cleanup_saju_abuse_admission_buckets_v1()','EXECUTE')::int;")"
+[[ "$worker_grants" == "1|1|1|1|1" ]] || fail "worker lifecycle and bounded Saju cleanup grants mismatch: $worker_grants"
 
 system_function_count="$("${psql_base[@]}" -Atc "
 select count(*)
@@ -116,7 +117,7 @@ from pg_catalog.pg_proc p
 join pg_catalog.pg_namespace n on n.oid=p.pronamespace
 where n.nspname='public'
   and pg_catalog.has_function_privilege('myeongha_system_executor',p.oid,'EXECUTE');")"
-[[ "$system_function_count" == "4" ]] || fail "system executor effective public-function allowlist drifted: $system_function_count"
+[[ "$system_function_count" == "5" ]] || fail "system executor effective public-function allowlist drifted: $system_function_count"
 
 for role in myeongha_api_executor myeongha_runtime myeongha_worker_runtime anon authenticated service_role; do
   worker_exec_count="$("${psql_base[@]}" -Atc "

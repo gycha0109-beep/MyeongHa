@@ -39,6 +39,8 @@ Member·Guest는 기존 canonical HMAC으로 각각 구분하며 두 경로의 b
 
 ## 실행 상태
 
-운영 적용 전 준비 중입니다. 현재 상태와 실행 근거는 PR 및 후속 evidence에 기록합니다. 새 gate는 서버 release switch가 true이고 DB 정책이 활성인 경우에만 동작합니다.
+운영 DB 네 migration과 API 4xx native anomaly 경보를 적용하고 재조회했습니다. 공개 release switch는 아직 꺼져 있으며, PR #2556의 필수 CI·통합 검사와 staged Production canary 뒤 공개 적용합니다. 현재 상태와 실행 근거는 `SECURITY_PRODUCTION_ACTIVATION_EVIDENCE_20261024.json`에 기록합니다. 새 gate는 서버 release switch가 true이고 DB 정책이 활성인 경우에만 동작합니다.
+
+첫 CI 실행(40102100007)에서 새 schema가 PG15 catalog hash를 `36c26720ce81e0626cae72a28e5b7fa05d9c169bafe16030e8a3cd2bc3fcf026`으로 변경한 것을 모든 snapshot 실행에서 확인했습니다. 기준 hash를 갱신하고 기존 system executor의 정확한 함수 allowlist에 승인된 bounded cleanup 하나를 추가했습니다. 기존 account-deletion 권한 검사와 총 함수 수 검사는 유지합니다.
 
 정책 승인 시각 정정: 최초 v1에 입력한 13:00 UTC 반올림 시각은 실제 승인 수신/적용 시각이 아니었습니다. v1을 비활성 이력으로 보존하고, DB clock의 실제 등록 시각을 가진 v2를 새로 등록했습니다. 불변 정책 내용의 UPDATE·삭제나 trigger 우회는 하지 않았습니다.
