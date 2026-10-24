@@ -48,6 +48,10 @@
       "destination": "/api/me?__myeongha_identity_action=complete"
     },
     {
+      "source": "/api/identity-verifications/capability",
+      "destination": "/api/me?__myeongha_identity_action=status"
+    },
+    {
       "source": "/api/auth/social/naver/authorize",
       "destination": "/api/auth/sign-in?__myeongha_naver_oauth_bridge=authorize"
     },
@@ -126,7 +130,7 @@
       "headers": [
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; img-src 'self' data:; font-src 'self'; style-src 'self'; script-src 'self'; connect-src 'self'"
+          "value": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; img-src 'self' data:; font-src 'self'; style-src 'self'; script-src 'self' https://cdn.portone.io; connect-src 'self'"
         },
         {
           "key": "Referrer-Policy",

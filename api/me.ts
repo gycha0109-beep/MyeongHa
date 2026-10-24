@@ -31,6 +31,7 @@ export const config = Object.freeze({ maxDuration: 60 });
 const PROFILE_ROUTE = '/api/me' as const;
 const IDENTITY_ISSUE_ROUTE = '/api/identity-verifications/attempts' as const;
 const IDENTITY_COMPLETE_ROUTE = '/api/identity-verifications/complete' as const;
+const IDENTITY_CAPABILITY_ROUTE = '/api/identity-verifications/capability' as const;
 const IDENTITY_ACTION_PARAM = '__myeongha_identity_action' as const;
 const LIFE_RECORD_ROUTE = '/api/life-record' as const;
 const READINGS_ROUTE = '/api/readings' as const;
@@ -212,6 +213,7 @@ function getSajuPreviewReadingRuntime(): ReturnType<typeof createProductionCurre
 type DispatchTarget =
   | { readonly kind: 'identity-issue'; readonly route: typeof IDENTITY_ISSUE_ROUTE }
   | { readonly kind: 'identity-complete'; readonly route: typeof IDENTITY_COMPLETE_ROUTE }
+  | { readonly kind: 'identity-capability'; readonly route: typeof IDENTITY_CAPABILITY_ROUTE }
   | { readonly kind: 'profile'; readonly route: typeof PROFILE_ROUTE }
   | { readonly kind: 'saju-preview-reading'; readonly route: typeof SAJU_PREVIEW_READING_ROUTE }
   | {
@@ -294,6 +296,7 @@ function getChatPathThreadId(pathname: string): string | null | undefined {
     pathname === PROFILE_ROUTE ||
     pathname === IDENTITY_ISSUE_ROUTE ||
     pathname === IDENTITY_COMPLETE_ROUTE ||
+    pathname === IDENTITY_CAPABILITY_ROUTE ||
     pathname === CHAT_OPEN_ROUTE ||
     pathname === LIFE_RECORD_ROUTE ||
     pathname === READINGS_ROUTE ||
@@ -407,16 +410,19 @@ function resolveDispatchTarget(request: Request): DispatchTarget | null {
   // markers reach the currently disabled identity handlers.
   const identityAction = getSingleNonEmptyParam(url.searchParams, IDENTITY_ACTION_PARAM);
   const identitySourceAction = url.pathname === IDENTITY_ISSUE_ROUTE ? 'issue'
-    : url.pathname === IDENTITY_COMPLETE_ROUTE ? 'complete' : undefined;
+    : url.pathname === IDENTITY_COMPLETE_ROUTE ? 'complete'
+    : url.pathname === IDENTITY_CAPABILITY_ROUTE ? 'status' : undefined;
   if (identityAction !== undefined || identitySourceAction !== undefined) {
-    if ((identityAction !== 'issue' && identityAction !== 'complete') ||
+    if ((identityAction !== 'issue' && identityAction !== 'complete' && identityAction !== 'status') ||
         (url.pathname !== PROFILE_ROUTE && identitySourceAction !== identityAction) ||
         keys.some(key => key !== IDENTITY_ACTION_PARAM && key !== VERCEL_SHARE_PARAM)) {
       return null;
     }
     return identityAction === 'issue'
       ? { kind: 'identity-issue', route: IDENTITY_ISSUE_ROUTE }
-      : { kind: 'identity-complete', route: IDENTITY_COMPLETE_ROUTE };
+      : identityAction === 'complete'
+        ? { kind: 'identity-complete', route: IDENTITY_COMPLETE_ROUTE }
+        : { kind: 'identity-capability', route: IDENTITY_CAPABILITY_ROUTE };
   }
 
   const recordsRoute = getSingleNonEmptyParam(url.searchParams, RECORDS_ROUTE_PARAM);
@@ -822,7 +828,8 @@ function runtimeForTarget(target: DispatchTarget) {
   switch (target.kind) {
     case 'identity-issue':
     case 'identity-complete':
-      throw new Error('Disabled identity routes are dispatched before runtime initialization.');
+    case 'identity-capability':
+      throw new Error('Identity routes are dispatched before runtime initialization.');
     case 'profile':
       return getProfileRuntime();
     case 'saju-preview-reading':
@@ -859,6 +866,24 @@ export default {
         if (target === null) {
           cancelUnusedRequestBodyBestEffort(request);
           return routeNotFound();
+        }
+
+        if (target.kind === 'identity-capability') {
+          if (request.method !== 'GET') {
+            return new Response(null, {
+              status: 405, headers: { Allow: 'GET', 'Cache-Control': 'no-store' },
+            });
+          }
+          let enabled = false;
+          try {
+            enabled = resolveProductionPortOneIdentityHttpModeV1(process.env) === 'enforce';
+          } catch {
+            // Invalid production configuration is a public HOLD, never a
+            // detailed error revealing vendor/Privacy/DB approval state.
+          }
+          return Response.json({ ok: true, data: { available: enabled } }, {
+            headers: { 'Cache-Control': 'no-store' },
+          });
         }
 
         if (target.kind === 'identity-issue' || target.kind === 'identity-complete') {

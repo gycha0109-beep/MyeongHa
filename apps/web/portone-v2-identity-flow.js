@@ -91,6 +91,7 @@ export function createWebPortOneIdentityFlowV1(input = {}) {
   const store = input.pendingStore ?? globalThis.sessionStorage;
   const now = input.now ?? Date.now;
   const sdk = input.sdk;
+  const sdkFactory = input.sdkFactory;
   const origin = input.origin ?? 'https://myeongha.vercel.app';
   if (typeof fetchImpl !== 'function' || typeof resolveBearer !== 'function' ||
       !store || typeof now !== 'function') return fail('INVALID_CLIENT_SETUP');
@@ -135,7 +136,10 @@ export function createWebPortOneIdentityFlowV1(input = {}) {
 
   return Object.freeze({
     async start() {
-      if (!sdk || typeof sdk.requestIdentityVerification !== 'function') {
+      // Never load a remote SDK while the server-side identity gate is OFF.
+      // The approved server-owned issue must succeed before lazy SDK loading.
+      if ((!sdk || typeof sdk.requestIdentityVerification !== 'function') &&
+          typeof sdkFactory !== 'function') {
         return fail('SDK_UNAVAILABLE');
       }
       const redirectUrl = safeRedirectUrl(origin);
@@ -144,7 +148,12 @@ export function createWebPortOneIdentityFlowV1(input = {}) {
       writePending(store, issued);
       let providerReply;
       try {
-        providerReply = await sdk.requestIdentityVerification({
+        const approvedSdk = sdk && typeof sdk.requestIdentityVerification === 'function'
+          ? sdk : await sdkFactory();
+        if (!approvedSdk || typeof approvedSdk.requestIdentityVerification !== 'function') {
+          return fail('SDK_UNAVAILABLE');
+        }
+        providerReply = await approvedSdk.requestIdentityVerification({
           storeId: issued.storeId,
           channelKey: issued.channelKey,
           identityVerificationId: issued.identityVerificationId,

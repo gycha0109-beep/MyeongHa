@@ -34,6 +34,7 @@ export interface WebPortOneIdentityPendingStorageV1 {
 
 export function createWebPortOneIdentityFlowV1(input?: Readonly<{
   sdk?: WebPortOneBrowserSdkPortV1 | null;
+  sdkFactory?: () => Promise<WebPortOneBrowserSdkPortV1>;
   fetchImpl?: (url: string, init: RequestInit) => Promise<Response>;
   pendingStore?: WebPortOneIdentityPendingStorageV1;
   resolveBearer?: () => Promise<Readonly<{

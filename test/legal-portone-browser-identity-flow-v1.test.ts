@@ -69,6 +69,24 @@ describe('L2 browser PortOne V2 server-owned identity transport', () => {
     expect(t.pendingStore.getItem(WEB_PORTONE_IDENTITY_FLOW_V1.pendingKey)).toBeNull();
   });
 
+  it('does not fetch a remote SDK if the server identity feature is disabled', async () => {
+    const sdkFactory = vi.fn(async () => ({
+      requestIdentityVerification: vi.fn(async () => undefined),
+    }));
+    const flow = createWebPortOneIdentityFlowV1({
+      sdkFactory,
+      pendingStore: memory(),
+      now: fixedNow,
+      origin: base,
+      resolveBearer: async () => ({ kind: 'member', token: 'test' }),
+      fetchImpl: vi.fn(async () => Response.json({
+        ok: false, error: { code: 'IDENTITY_VERIFICATION_DISABLED' },
+      }, { status: 503 })),
+    });
+    await expect(flow.start()).rejects.toMatchObject({ code: 'IDENTITY_UNAVAILABLE' });
+    expect(sdkFactory).not.toHaveBeenCalled();
+  });
+
   it('does not even issue an attempt unless a PortOne SDK is injected', async () => {
     const fetchImpl = vi.fn();
     const flow = createWebPortOneIdentityFlowV1({

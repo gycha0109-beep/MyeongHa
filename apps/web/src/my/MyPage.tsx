@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { createMyRuntimeClient, MyRuntimeError } from '../../my-runtime-client.js';
 import { PRODUCT_AUTH_STORAGE_V1, readMemberSession, signOutMember } from '../../product-auth.js';
 import { shouldReloadMyForMemberSessionStorageChange } from '../../product-auth-surface.js';
+import { createWebPortOneIdentityFlowV1 } from '../../portone-v2-identity-flow.js';
+import type { WebPortOneBrowserSdkPortV1 } from '../../portone-v2-identity-flow.js';
 
 type Profile = {
   displayName: string | null;
@@ -291,6 +293,103 @@ function RecentSection() {
 }
 
 
+/** The SDK is fetched only after a signed-in Subject receives an approved
+ * server-owned verification ID. OFF never contacts the PortOne CDN. */
+async function loadApprovedPortOneBrowserSdkV1(): Promise<WebPortOneBrowserSdkPortV1> {
+  const url = 'https://cdn.portone.io/v2/browser-sdk.esm.js';
+  const loaded: unknown = await import(/* @vite-ignore */ url);
+  if (!loaded || typeof loaded !== 'object' ||
+      !('requestIdentityVerification' in loaded) ||
+      typeof loaded.requestIdentityVerification !== 'function') {
+    throw new Error('PortOne browser SDK is unavailable.');
+  }
+  return loaded as WebPortOneBrowserSdkPortV1;
+}
+
+function VerifiedAgeSection() {
+  const [available, setAvailable] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [status, setStatus] = useState('');
+  useEffect(() => {
+    let active = true;
+    async function inspect() {
+      let enabled = false;
+      try {
+        const response = await fetch('/api/identity-verifications/capability', {
+          method: 'GET', cache: 'no-store', credentials: 'same-origin',
+          headers: { Accept: 'application/json' },
+        });
+        const payload: unknown = response.ok ? await response.json() : null;
+        enabled = !!payload && typeof payload === 'object' &&
+          'data' in payload && !!payload.data &&
+          typeof payload.data === 'object' && 'available' in payload.data &&
+          payload.data.available === true;
+      } catch {
+        // Fail closed when capability cannot be checked.
+      }
+      if (active) setAvailable(enabled);
+
+      const search = new URLSearchParams(window.location.search);
+      if (!search.has('identityVerification')) return;
+      const url = new URL(window.location.href);
+      url.searchParams.delete('identityVerification');
+      url.searchParams.delete('identityVerificationId');
+      url.searchParams.delete('identityVerificationTxId');
+      url.searchParams.delete('code');
+      url.searchParams.delete('message');
+      url.searchParams.delete('pgCode');
+      url.searchParams.delete('pgMessage');
+      window.history.replaceState(null, '', url.pathname + url.search + url.hash);
+      if (!enabled || !active) return;
+      try {
+        const flow = createWebPortOneIdentityFlowV1({ origin: window.location.origin });
+        await flow.resumeFromRedirect(search);
+        if (active) setStatus('본인확인이 완료되었습니다. 만 14세 이상 무료 이용 자격이 확인되었습니다.');
+      } catch {
+        if (active) setStatus('본인확인을 완료하지 못했습니다. 인증 절차와 이용 자격을 다시 확인해 주세요.');
+      }
+    }
+    void inspect();
+    return () => { active = false; };
+  }, []);
+
+  async function start() {
+    if (!available || busy) return;
+    setBusy(true);
+    setStatus('');
+    try {
+      const flow = createWebPortOneIdentityFlowV1({
+        origin: window.location.origin,
+        sdkFactory: loadApprovedPortOneBrowserSdkV1,
+      });
+      const result = await flow.start();
+      if (result.kind === 'redirect_pending') {
+        setStatus('본인확인 화면에서 절차를 완료해 주세요.');
+      } else {
+        setStatus('본인확인이 완료되었습니다. 만 14세 이상 무료 이용 자격이 확인되었습니다.');
+      }
+    } catch {
+      setStatus('본인확인을 완료하지 못했습니다. 인증 절차와 이용 자격을 다시 확인해 주세요.');
+    } finally { setBusy(false); }
+  }
+
+  return (
+    <div data-legal-verified-age>
+      <h3>본인확인·연령 확인</h3>
+      <p>본인확인은 명하 서버가 발급한 요청으로 진행하며, 인증 결과는 서버에서 재확인합니다.</p>
+      {available ? (
+        <button type="button" className="my-setting-inline-link"
+          data-legal-identity-start onClick={() => void start()} disabled={busy}>
+          {busy ? '본인확인 진행 중…' : '본인확인 시작'}
+        </button>
+      ) : (
+        <p className="my-setting-caveat">현재 본인확인은 준비 중입니다. 인증 업체 계약과 개인정보 처리 승인 후 제공됩니다.</p>
+      )}
+      <p role="status" aria-live="polite">{status}</p>
+    </div>
+  );
+}
+
 function SettingsSection({ account, openPanel, setOpenPanel }: {
   account: AccountState;
   openPanel: SettingsPanel;
@@ -350,6 +449,9 @@ function SettingsSection({ account, openPanel, setOpenPanel }: {
                 <a className="my-setting-inline-link" href="auth.html?next=my.html">회원 계정 연결하기 →</a>
               ) : null}
               <p className="my-setting-caveat">현재 저장된 계정 정보를 조회하는 화면입니다. 프로필 변경 및 회원 탈퇴 요청은 검증된 서버 절차가 연결되기 전까지 이 화면에서 실행하지 않습니다.</p>
+              {payload.subjectKind === 'member' && payload.subjectStatus === 'active' ? (
+                <VerifiedAgeSection />
+              ) : null}
             </>
           ) : null}
         </div>
