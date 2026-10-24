@@ -129,8 +129,6 @@ function assertLocalContext(input: Readonly<{
   if (!Array.isArray(messages) || messages.length < 1 || messages.length > 7 ||
       messages.length % 2 !== 1 ||
       input.contextInput.relationship !== null ||
-      (input.contextInput.relationshipSemantics !== null &&
-       input.contextInput.relationshipSemantics !== undefined) ||
       !Array.isArray(input.contextInput.retrievedMemories) ||
       input.contextInput.retrievedMemories.length !== 0 ||
       input.governance?.relationship?.gate !== 'PUBLIC') {
