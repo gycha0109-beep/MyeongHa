@@ -10,7 +10,7 @@ const BUNDLE_ID = '66666666-6666-4666-8666-666666666666';
 const MESSAGE_ID = '77777777-7777-4777-8777-777777777777';
 const AUTH_ID = '11111111-1111-4111-8111-111111111111';
 
-function fakePool(options: { denied?: boolean; observed?: (sql: string, values: readonly unknown[]) => void } = {}): PostgresSubjectPoolV1 {
+function fakePool(options: { denied?: boolean; history?: boolean; observed?: (sql: string, values: readonly unknown[]) => void } = {}): PostgresSubjectPoolV1 {
   return {
     async connect() {
       return {
@@ -39,7 +39,7 @@ function fakePool(options: { denied?: boolean; observed?: (sql: string, values: 
           if (sql.includes('qry_chat_thread_stream_v2')) {
             options.observed?.(sql, values);
             return {
-              rows: [{
+              rows: options.history ? [{
                 messageId: MESSAGE_ID,
                 sequenceNo: 1,
                 senderType: 'character',
@@ -50,7 +50,7 @@ function fakePool(options: { denied?: boolean; observed?: (sql: string, values: 
                 createdAt: '2026-10-24T00:00:00.000Z',
                 redacted: false,
                 redactedAt: null,
-              } as Row],
+              } as Row] : [],
             };
           }
           if (sql.includes('qry_character_relationship_v1')) return { rows: [] };
@@ -80,20 +80,27 @@ function invoke(options: {
   });
 }
 
-describe('Seyeon owner-scoped transcript read', () => {
-  it('reads the authenticated owner transcript without a character-wide 503', async () => {
+describe('Seyeon empty-room initialization with historical Reveal HOLD', () => {
+  it('opens a strictly empty owner-scoped Seyeon room without exposing history', async () => {
     const reads: { sql: string; values: readonly unknown[] }[] = [];
     const response = await invoke({ pool: fakePool({ observed: (sql, values) => reads.push({ sql, values }) }) });
     const data = await response.json() as any;
     expect(response.status).toBe(200);
     expect(response.headers.get('cache-control')).toBe('no-store');
     expect(data.data.characterId).toBe('seyeon');
-    expect(data.data.messages).toHaveLength(1);
-    expect(data.data.messages[0].bodyText).toBe('안녕하세요.');
+    expect(data.data.messages).toHaveLength(0);
     expect(reads).toHaveLength(2);
     expect(reads[0].values).toEqual([SUBJECT_ID, THREAD_ID]);
     expect(reads[1].values[0]).toBe(SUBJECT_ID);
     expect(reads[1].values[1]).toBe(THREAD_ID);
+  });
+
+  it('keeps any Seyeon message history protected pending current-rights proof', async () => {
+    const response = await invoke({ pool: fakePool({ history: true }) });
+    const payload = await response.json() as any;
+    expect(response.status).toBe(503);
+    expect(payload.error.code).toBe('SEYEON_HISTORY_REVEAL_HOLD');
+    expect(JSON.stringify(payload)).not.toContain('안녕하세요.');
   });
 
   it('rejects missing authentication before opening the database', async () => {
