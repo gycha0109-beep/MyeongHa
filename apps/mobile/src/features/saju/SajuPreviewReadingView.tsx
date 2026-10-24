@@ -307,7 +307,7 @@ export function SajuPreviewReadingView({ onOpenPreview }: { onOpenPreview?: (top
 
           {state.result.steps.map((step, index) => (
             <View key={`${String(index)}:${step.title}`} style={styles.readingCard}>
-              <Text style={styles.stepIndex}>{formatMobileUiCopy('읽기 {index}', { index: index + 1 }, locale)}</Text>
+              <Text style={styles.stepIndex}>{formatMobileUiCopy('읽기 {index}', { index: String(index + 1) }, locale)}</Text>
               <Text style={styles.stepTitle}>{step.title}</Text>
               <Text style={styles.primaryText}>{step.primary}</Text>
 
