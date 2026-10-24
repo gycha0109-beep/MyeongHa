@@ -25,6 +25,11 @@ import {
   createProductionReadingHistoryReadRuntimeV1,
 } from '../apps/api/src/production-records-read-runtime.js';
 import { parseProductionUserDataRuntimeConfigV1 } from '../apps/api/src/production-user-data-runtime-config.js';
+import {
+  createProductionPortOnePreenrollmentHttpRuntimeV1,
+  resolveProductionPortOnePreenrollmentModeV1,
+  PORTONE_PREENROLLMENT_HTTP_RELEASE_V1,
+} from '../apps/api/src/portone-v2-preenrollment-http-runtime-v1.js';
 
 export const config = Object.freeze({ maxDuration: 60 });
 
@@ -33,6 +38,9 @@ const IDENTITY_ISSUE_ROUTE = '/api/identity-verifications/attempts' as const;
 const IDENTITY_COMPLETE_ROUTE = '/api/identity-verifications/complete' as const;
 const IDENTITY_CAPABILITY_ROUTE = '/api/identity-verifications/capability' as const;
 const IDENTITY_ACTION_PARAM = '__myeongha_identity_action' as const;
+const PREENROLLMENT_ISSUE_ROUTE = PORTONE_PREENROLLMENT_HTTP_RELEASE_V1.issueRoute;
+const PREENROLLMENT_COMPLETE_ROUTE = PORTONE_PREENROLLMENT_HTTP_RELEASE_V1.completeRoute;
+const PREENROLLMENT_CAPABILITY_ROUTE = PORTONE_PREENROLLMENT_HTTP_RELEASE_V1.capabilityRoute;
 const LIFE_RECORD_ROUTE = '/api/life-record' as const;
 const READINGS_ROUTE = '/api/readings' as const;
 const MEMORIES_ROUTE = '/api/memories' as const;
@@ -65,6 +73,7 @@ const NO_STORE_CACHE_CONTROL = 'no-store' as const;
 
 let sharedPostgresPool: ReturnType<typeof createNodePostgresSubjectPoolV1> | undefined;
 let identityRuntime: ReturnType<typeof createProductionPortOneIdentityHttpRuntimeV1> | undefined;
+let preenrollmentRuntime: ReturnType<typeof createProductionPortOnePreenrollmentHttpRuntimeV1> | undefined;
 let profileRuntime:
   | ReturnType<typeof createProductionCurrentSubjectProfileRuntimeV1>
   | undefined;
@@ -112,6 +121,14 @@ function getIdentityRuntime(): ReturnType<typeof createProductionPortOneIdentity
     pool: getSharedPostgresPool(),
   });
   return identityRuntime;
+}
+
+function getPreenrollmentRuntime(): ReturnType<typeof createProductionPortOnePreenrollmentHttpRuntimeV1> {
+  preenrollmentRuntime ??= createProductionPortOnePreenrollmentHttpRuntimeV1({
+    env: process.env,
+    pool: getSharedPostgresPool(),
+  });
+  return preenrollmentRuntime;
 }
 
 function getProfileRuntime(): ReturnType<typeof createProductionCurrentSubjectProfileRuntimeV1> {
@@ -214,6 +231,9 @@ type DispatchTarget =
   | { readonly kind: 'identity-issue'; readonly route: typeof IDENTITY_ISSUE_ROUTE }
   | { readonly kind: 'identity-complete'; readonly route: typeof IDENTITY_COMPLETE_ROUTE }
   | { readonly kind: 'identity-capability'; readonly route: typeof IDENTITY_CAPABILITY_ROUTE }
+  | { readonly kind: 'preenrollment-issue'; readonly route: typeof PREENROLLMENT_ISSUE_ROUTE }
+  | { readonly kind: 'preenrollment-complete'; readonly route: typeof PREENROLLMENT_COMPLETE_ROUTE }
+  | { readonly kind: 'preenrollment-capability'; readonly route: typeof PREENROLLMENT_CAPABILITY_ROUTE }
   | { readonly kind: 'profile'; readonly route: typeof PROFILE_ROUTE }
   | { readonly kind: 'saju-preview-reading'; readonly route: typeof SAJU_PREVIEW_READING_ROUTE }
   | {
@@ -297,6 +317,9 @@ function getChatPathThreadId(pathname: string): string | null | undefined {
     pathname === IDENTITY_ISSUE_ROUTE ||
     pathname === IDENTITY_COMPLETE_ROUTE ||
     pathname === IDENTITY_CAPABILITY_ROUTE ||
+    pathname === PREENROLLMENT_ISSUE_ROUTE ||
+    pathname === PREENROLLMENT_COMPLETE_ROUTE ||
+    pathname === PREENROLLMENT_CAPABILITY_ROUTE ||
     pathname === CHAT_OPEN_ROUTE ||
     pathname === LIFE_RECORD_ROUTE ||
     pathname === READINGS_ROUTE ||
@@ -411,9 +434,12 @@ function resolveDispatchTarget(request: Request): DispatchTarget | null {
   const identityAction = getSingleNonEmptyParam(url.searchParams, IDENTITY_ACTION_PARAM);
   const identitySourceAction = url.pathname === IDENTITY_ISSUE_ROUTE ? 'issue'
     : url.pathname === IDENTITY_COMPLETE_ROUTE ? 'complete'
-    : url.pathname === IDENTITY_CAPABILITY_ROUTE ? 'status' : undefined;
+    : url.pathname === IDENTITY_CAPABILITY_ROUTE ? 'status'
+    : url.pathname === PREENROLLMENT_ISSUE_ROUTE ? 'pre-issue'
+    : url.pathname === PREENROLLMENT_COMPLETE_ROUTE ? 'pre-complete'
+    : url.pathname === PREENROLLMENT_CAPABILITY_ROUTE ? 'pre-status' : undefined;
   if (identityAction !== undefined || identitySourceAction !== undefined) {
-    if ((identityAction !== 'issue' && identityAction !== 'complete' && identityAction !== 'status') ||
+    if (!['issue', 'complete', 'status', 'pre-issue', 'pre-complete', 'pre-status'].includes(identityAction ?? '') ||
         (url.pathname !== PROFILE_ROUTE && identitySourceAction !== identityAction) ||
         keys.some(key => key !== IDENTITY_ACTION_PARAM && key !== VERCEL_SHARE_PARAM)) {
       return null;
@@ -422,7 +448,13 @@ function resolveDispatchTarget(request: Request): DispatchTarget | null {
       ? { kind: 'identity-issue', route: IDENTITY_ISSUE_ROUTE }
       : identityAction === 'complete'
         ? { kind: 'identity-complete', route: IDENTITY_COMPLETE_ROUTE }
-        : { kind: 'identity-capability', route: IDENTITY_CAPABILITY_ROUTE };
+        : identityAction === 'status'
+          ? { kind: 'identity-capability', route: IDENTITY_CAPABILITY_ROUTE }
+          : identityAction === 'pre-issue'
+            ? { kind: 'preenrollment-issue', route: PREENROLLMENT_ISSUE_ROUTE }
+            : identityAction === 'pre-complete'
+              ? { kind: 'preenrollment-complete', route: PREENROLLMENT_COMPLETE_ROUTE }
+              : { kind: 'preenrollment-capability', route: PREENROLLMENT_CAPABILITY_ROUTE };
   }
 
   const recordsRoute = getSingleNonEmptyParam(url.searchParams, RECORDS_ROUTE_PARAM);
@@ -829,6 +861,9 @@ function runtimeForTarget(target: DispatchTarget) {
     case 'identity-issue':
     case 'identity-complete':
     case 'identity-capability':
+    case 'preenrollment-issue':
+    case 'preenrollment-complete':
+    case 'preenrollment-capability':
       throw new Error('Identity routes are dispatched before runtime initialization.');
     case 'profile':
       return getProfileRuntime();
@@ -866,6 +901,46 @@ export default {
         if (target === null) {
           cancelUnusedRequestBodyBestEffort(request);
           return routeNotFound();
+        }
+
+        if (target.kind === 'preenrollment-capability') {
+          if (request.method !== 'GET') {
+            return new Response(null, {
+              status: 405, headers: { Allow: 'GET', 'Cache-Control': 'no-store' },
+            });
+          }
+          let available = false;
+          try {
+            available = resolveProductionPortOnePreenrollmentModeV1(process.env) === 'enforce';
+          } catch {
+            // Misconfigured approvals are indistinguishable from OFF publicly.
+          }
+          return Response.json({ ok: true, data: { available } },
+            { headers: { 'Cache-Control': 'no-store' } });
+        }
+
+        if (target.kind === 'preenrollment-issue' || target.kind === 'preenrollment-complete') {
+          try {
+            if (resolveProductionPortOnePreenrollmentModeV1(process.env) !== 'enforce') {
+              cancelUnusedRequestBodyBestEffort(request);
+              return Response.json({
+                ok: false,
+                error: { code: 'IDENTITY_VERIFICATION_DISABLED', retryable: false },
+                meta: { requestId },
+              }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
+            }
+            return await getPreenrollmentRuntime().handleRequest({
+              request: toCanonicalMeRequestForTestV1(request, target),
+              requestId,
+              serverTime,
+              action: target.kind === 'preenrollment-issue' ? 'issue' : 'complete',
+            });
+          } catch {
+            return Response.json({ ok: false,
+              error: { code: 'IDENTITY_VERIFICATION_UNAVAILABLE', retryable: false },
+              meta: { requestId },
+            }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
+          }
         }
 
         if (target.kind === 'identity-capability') {

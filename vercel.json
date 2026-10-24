@@ -52,6 +52,18 @@
       "destination": "/api/me?__myeongha_identity_action=status"
     },
     {
+      "source": "/api/identity-verifications/pre-enrollment/attempts",
+      "destination": "/api/me?__myeongha_identity_action=pre-issue"
+    },
+    {
+      "source": "/api/identity-verifications/pre-enrollment/complete",
+      "destination": "/api/me?__myeongha_identity_action=pre-complete"
+    },
+    {
+      "source": "/api/identity-verifications/pre-enrollment/capability",
+      "destination": "/api/me?__myeongha_identity_action=pre-status"
+    },
+    {
       "source": "/api/auth/social/naver/authorize",
       "destination": "/api/auth/sign-in?__myeongha_naver_oauth_bridge=authorize"
     },
