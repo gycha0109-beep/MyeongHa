@@ -3,6 +3,7 @@ import {
   classifySeyeonC08LocalEntryV1,
   guardSeyeonC08LocalPublicUtteranceV1,
   guardSeyeonC08LocalMoveV1,
+  quoteSeyeonC08LocalOneCallBudgetV1,
   runSeyeonC08LocalOneCallShadowV1,
 } from '../apps/api/src/seyeon-c08-local-one-call-shadow-v1.js';
 import type {RunSeyeonCharacterTurnV2Input} from
@@ -179,6 +180,29 @@ describe('C08 local preflight / single dialogue LLM / local output guard (OFFLIN
     const extra=harness();
     await expect(extra.run({maxCompletionTokens:1537})).rejects.toThrow('LOCAL_BUDGET_UNVERIFIED');
     expect(extra.requests).toHaveLength(0);
+  });
+
+  it('prices one provider call with conservative byte/token reservation; hard billing remains unverified',()=>{
+    const quote=quoteSeyeonC08LocalOneCallBudgetV1({
+      requestBytes:12800,maxCompletionTokens:256,
+      inputUsdPerMillion:0.03,outputUsdPerMillion:0.17,
+      providerOutputTokenCapVerified:true,
+    });
+    expect(quote).toEqual({
+      reservedMicroUsd:428,providerOutputTokenCapVerified:true,
+      hardBillingCapVerified:false,
+    });
+    for(const candidate of [
+      {requestBytes:32769,maxCompletionTokens:256,inputUsdPerMillion:0.03,
+        outputUsdPerMillion:0.17,providerOutputTokenCapVerified:true},
+      {requestBytes:32768,maxCompletionTokens:1536,inputUsdPerMillion:5,
+        outputUsdPerMillion:10,providerOutputTokenCapVerified:true},
+      {requestBytes:12000,maxCompletionTokens:256,inputUsdPerMillion:0.03,
+        outputUsdPerMillion:0.17,providerOutputTokenCapVerified:false},
+    ]){
+      expect(()=>quoteSeyeonC08LocalOneCallBudgetV1(candidate))
+        .toThrow('LOCAL_BUDGET_UNVERIFIED');
+    }
   });
 
   it('sanitizes a provider error and never retries it',async()=>{
