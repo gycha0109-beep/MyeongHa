@@ -143,8 +143,8 @@ export function chooseSeyeonC08N06ModelEndpointRouteV2(details,key){
       !e.supported_parameters.includes('response_format')||
       !Number.isSafeInteger(e.max_completion_tokens)||
       e.max_completion_tokens<C08_N06_CANARY_MAX_COMPLETION||
-      !record(e.pricing)||e.pricing.request===undefined||
-      Number(e.pricing.request)!==0)return [];
+      !record(e.pricing)||
+      (e.pricing.request!==undefined&&Number(e.pricing.request)!==0))return [];
     const inputRate=rate(e.pricing.prompt);
     const outputRate=rate(e.pricing.completion);
     if(inputRate===null||outputRate===null||
