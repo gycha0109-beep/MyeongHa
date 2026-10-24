@@ -44,7 +44,7 @@ export type SeyeonC08LocalEntryV1 = (typeof ENTRY_GRAMMARS)[number]['kind'];
 export class SeyeonC08LocalHoldV1 extends Error {
   constructor(readonly code:
     'LOCAL_INPUT_NOT_PROVEN' | 'LOCAL_CONTEXT_NOT_PROVEN' |
-    'LOCAL_OUTPUT_UNVERIFIABLE' | 'LOCAL_BUDGET_UNVERIFIED') {
+    'LOCAL_OUTPUT_UNVERIFIABLE' | 'LOCAL_BUDGET_UNVERIFIED' | 'LOCAL_PROVIDER_FAILURE') {
     super(code);
     this.name = 'SeyeonC08LocalHoldV1';
   }
@@ -167,7 +167,15 @@ async function requireSeyeonC08PublicThreadCensusV1(
   currentUserMessageId:string,expectedCount:number,
 ):Promise<void>{
   const fail=()=>new SeyeonC08LocalHoldV1('LOCAL_CONTEXT_NOT_PROVEN');
-  if(!port || !port.subjectId || !port.threadId ||
+  if(!port || typeof port.subjectId!=='string' ||
+     port.subjectId.length<1 || port.subjectId.length>256 ||
+     port.subjectId.trim()!==port.subjectId ||
+     typeof port.threadId!=='string' ||
+     port.threadId.length<1 || port.threadId.length>256 ||
+     port.threadId.trim()!==port.threadId ||
+     typeof currentUserMessageId!=='string' ||
+     currentUserMessageId.length<1 || currentUserMessageId.length>256 ||
+     currentUserMessageId.trim()!==currentUserMessageId ||
      typeof port.readFullThreadCensus!=='function' ||
      !Number.isSafeInteger(expectedCount) || expectedCount<1 || expectedCount>7){
     throw fail();
@@ -316,16 +324,21 @@ export async function runSeyeonC08LocalOneCallShadowV1(input: Readonly<{
       typeof input.reserveBeforeModel !== 'function') {
     throw new SeyeonC08LocalHoldV1('LOCAL_BUDGET_UNVERIFIED');
   }
+  const requestBytes=Buffer.byteLength(JSON.stringify(request),'utf8');
+  if(requestBytes<1 || requestBytes>32768){
+    throw new SeyeonC08LocalHoldV1('LOCAL_BUDGET_UNVERIFIED');
+  }
   const quote = await input.reserveBeforeModel({
-    requestBytes:Buffer.byteLength(JSON.stringify(request),'utf8'),
-    maxCompletionTokens:input.maxCompletionTokens,
+    requestBytes,maxCompletionTokens:input.maxCompletionTokens,
   });
   if (!quote || quote.providerOutputTokenCapVerified !== true ||
       !Number.isSafeInteger(quote.reservedMicroUsd) ||
       quote.reservedMicroUsd <= 0 || quote.reservedMicroUsd > 4000) {
     throw new SeyeonC08LocalHoldV1('LOCAL_BUDGET_UNVERIFIED');
   }
-  const raw:unknown = await input.dialogueProvider.generate(request);
+  let raw:unknown;
+  try{raw=await input.dialogueProvider.generate(request);}
+  catch{throw new SeyeonC08LocalHoldV1('LOCAL_PROVIDER_FAILURE');}
   // Census after remote generation and immediately before local output
   // admission. This is NOT an atomic DB transaction.
   await requireSeyeonC08PublicThreadCensusV1(
