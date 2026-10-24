@@ -20,6 +20,7 @@ const FUNCTION_POLICY = Object.freeze({
   'api/health.ts': 'cancel_on_disconnect',
   'api/me.ts': 'continue_to_terminal_outcome',
   'api/me/birth-profile.ts': 'not_yet_authorized_for_cancellation',
+  'api/me/credits.ts': 'not_yet_authorized_for_cancellation',
   'api/me/saju/calculation.ts': 'not_yet_authorized_for_cancellation',
   'api/readiness.ts': 'cancel_on_disconnect',
   'api/session/bootstrap.ts': 'continue_to_terminal_outcome',
