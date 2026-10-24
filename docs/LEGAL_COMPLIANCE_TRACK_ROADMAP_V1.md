@@ -163,3 +163,13 @@
 - `apps/web/auth-page.js`: 웹 가입 버튼의 명시적 `mode=sign-up` 진입을 지원. Auth callback 및 `social` 재진입 보호 흐름을 유지.
 - `MyComponents.tsx`: 웹 이동 조건·기존 앱 로그인 안내와 일본어/번체중국어 사전 동기화. 실제 웹 인증 완료 후 신규 세션은 기존 API에서만 발급.
 - **출시 HOLD:** 이것은 모바일 SDK를 통한 네이티브 본인인증 구현이 **아니며**, 시스템 브라우저의 인증 쿠키를 앱으로 반환할 수 있는 것이 아니다. 브라우저에서 계정을 만든 뒤 앱 로그인해야 한다. PortOne 공급자 계약·DB 제안 SQL 승인/실제 적용/PG17 GREEN/수집처 및 외부처리 적합성은 미확인; 현재 인증·결제 모두 OFF.
+
+## 19. 2026-10-25 L4 구매 보류 및 L3 외부 전송 경계 보강
+
+> PR #2504 동일 브랜치 후속 구현. 법적 검토 완료·운영 DB 적용·상업적 판매 승인 또는 통합 CI 통과를 뜻하지 않음.
+
+- **L4 Purchase Intent 운영 차단:** `production-purchase-intent-create-runtime-v3.ts`에서 PortOne 성인 연령 권한이 `ENFORCE`로 활성화되더라도 상품별 계약·가격 고지, 미리보기/충분한 정보, 체크 증거, 제공·환불 처리 권위가 검증되지 않았으면 `503 PURCHASE_UNAVAILABLE` 상태 유지. 고객이 입력하는 임의 동의 boolean이나 환경변수만으로 이 차단을 해제하지 않음. `test/legal-production-adult-purchase-hold-v1.test.ts`에 이 경계 회귀 확인 추가. Commerce/S7 소유의 실제 고지·인도·환불·철회 구현은 여전히 미완료.
+- **L3 수신지 고정:** `openai-seyeon-structured-provider-v1.ts`의 외부 AI 요청 목적지를 `https://api.openai.com` 또는 `https://ai-gateway.vercel.sh`만 허용. 임의 HTTPS 원점이 감사 로그상 OpenAI Direct로 오분류되면서 사용자 메시지·기억을 받는 경로 차단.
+- **L3 Gateway 하위 처리 업체 제약:** Gateway 모델은 `openai/` 네임스페이스만 허용, OpenAI Direct 모델은 비접두 식별자만 허용. 운영 환경 모델 재설정만으로 미감사 AI 사업자에게 전송되는 경로 차단. `test/legal-seyeon-external-egress-evidence-v1.test.ts`에 허용·차단 사례 추가.
+- **검증 한계:** 위 코드는 신규 정적/단위 회귀 조건을 추가한 상태. 2026-10-25 해당 브랜치 최신 SHA의 전체 통합 GitHub Actions, PG17 A1 실행·Web/Native 빌드·운영 공급자 계약 및 배포 지역/실데이터 송수신 실증은 아직 성공 증거 없음. Workers/GitGuardian 개별 성공만으로 통합 GREEN으로 간주하지 않음.
+- **계속 보류:** `1740`/`1741` Production 적용, 실제 본인확인·PG 결제·유료 판매, LEGAL-001/002/003 공개, P5Y/P30D 및 승인 삭제 그래프 변경은 하지 않음. PR은 전체 수락 조건 충족 전 Draft 유지 및 미병합.
