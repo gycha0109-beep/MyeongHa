@@ -395,7 +395,7 @@ function renderBirthDetails(profile, locale = getUiLocale()) {
     ? byLocale('음력', '旧暦', '農曆')
     : input?.calendarType === 'solar' ? byLocale('양력', '新暦', '國曆') : missing;
   const time = input?.timeKnown === false ? byLocale('시간 모름', '時刻不明', '時間不詳') :
-    typeof input?.birthTime === 'string' && /^(?:[01]\\d|2[0-3]):[0-5]\\d/u.test(input.birthTime)
+    typeof input?.birthTime === 'string' && /^(?:[01]\d|2[0-3]):[0-5]\d$/u.test(input.birthTime)
       ? (() => {
           const [hour, minute] = input.birthTime.slice(0,5).split(':').map(Number);
           return byLocale(`${hour < 12 ? '오전' : '오후'} ${hour % 12 || 12}시 ${String(minute).padStart(2, '0')}분`,
