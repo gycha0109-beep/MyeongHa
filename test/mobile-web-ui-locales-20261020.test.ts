@@ -161,7 +161,7 @@ describe('Mobile / Web UI localization parity', () => {
       '네 기둥 계산 완료', '좋은 아침이에요',
       '이용 상태는 대화방에서 확인',
     ];
-    for (const locale of ['ja-JP', 'zh-TW'] as const) {
+    for (const locale of ['ja-JP', 'zh-TW', 'en-US', 'zh-CN'] as const) {
       for (const copy of visibleCopy) {
         const translated = translateMobileUiCopy(copy, locale);
         expect(translated, copy).not.toBe(copy);

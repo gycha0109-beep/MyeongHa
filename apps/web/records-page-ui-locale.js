@@ -14,6 +14,18 @@ const COPY = Object.freeze({
     delivered: (date, title) => `${date}に鑑定した「${title}」の記録です。保存済みの公式鑑定を変更せずに再度開けます。`,
     pending: (date, title) => `${date}の「${title}」の記録です。完了したOfficial Readingのみ再度開けます。`,
   }),
+  'en-US': Object.freeze({
+    birthUnavailable: 'Birth details could not be loaded. We will not display unverified information instead.',
+    revision: (number) => `Current input · revision ${number}`,
+    delivered: (date, title) => `${date} · ${title}. You can reopen the saved official reading unchanged.`,
+    pending: (date, title) => `${date} · ${title}. Only completed Official Reading records can be reopened.`,
+  }),
+  'zh-CN': Object.freeze({
+    birthUnavailable: '目前无法加载出生资料。不会用未经确认的信息替代显示。',
+    revision: (number) => `当前输入 · revision ${number}`,
+    delivered: (date, title) => `${date}的「${title}」解读记录。可原样重新打开已保存的正式解读。`,
+    pending: (date, title) => `${date}的「${title}」解读记录。仅已完成的 Official Reading 可以重新打开。`,
+  }),
   'zh-TW': Object.freeze({
     birthUnavailable: '目前無法載入出生資料，不會以未經確認的資訊替代顯示。',
     revision: (number) => `目前輸入 · revision ${number}`,
