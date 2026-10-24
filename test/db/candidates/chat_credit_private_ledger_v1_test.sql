@@ -162,6 +162,166 @@ begin
  end;
 end $paid_candidate$;
 
+-- The first eligible Reading reward must never mint without approved source.
+do $bonus$
+declare s uuid := 'cc110000-0000-4000-8000-000000000001';
+begin
+ begin
+   perform public.internal_cmd_chat_first_paid_reading_reward_v1(
+     s,'cc170000-0000-4000-8000-000000000001',null
+   );
+   raise exception 'Missing eligible Reading Offer unexpectedly rewarded';
+ exception when raise_exception then
+   if sqlerrm='Missing eligible Reading Offer unexpectedly rewarded' then raise; end if;
+ end;
+ insert into public.chat_credit_lots_v1(
+   subject_id,source_kind,source_ref,credits_issued,credits_remaining,issued_at,expires_at
+ ) values (
+   s,'reading_reward','cc170000-0000-4000-8000-000000000001',150,150,
+   clock_timestamp(),clock_timestamp()+interval '90 days'
+ );
+ begin
+   insert into public.chat_credit_lots_v1(
+     subject_id,source_kind,source_ref,credits_issued,credits_remaining,issued_at,expires_at
+   ) values (
+     s,'reading_reward','cc170000-0000-4000-8000-000000000002',150,150,
+     clock_timestamp(),clock_timestamp()+interval '90 days'
+   );
+   raise exception 'Second paid Reading reward incorrectly minted';
+ exception when unique_violation then null;
+ end;
+end $bonus$;
+
+-- An uncommitted/unknown ClientTurn must never accept a delivery ACK.
+do $ack$
+declare s uuid := 'cc110000-0000-4000-8000-000000000001';
+ t uuid := 'cc120000-0000-4000-8000-000000000001';
+begin
+ begin
+   perform public.internal_cmd_chat_credit_ack_delivered_v1(
+     s,t,'cc130000-0000-4000-8000-000000000120',
+     'cc180000-0000-4000-8000-000000000001',
+     'cc190000-0000-4000-8000-000000000001',
+     'cc200000-0000-4000-8000-000000000001'
+   );
+   raise exception 'Missing settled ChatTurn unexpectedly charged';
+ exception when raise_exception then
+   if sqlerrm='Missing settled ChatTurn unexpectedly charged' then raise; end if;
+ end;
+end $ack$;
+
+
+-- End-to-end verification in a DISPOSABLE DB only: simulate a fully pinned,
+-- enabled Credit Offer + verified production-environment PortOne receipt.
+-- This is NOT a live Product catalog seed and contains no real transactions.
+insert into public.products(id,product_key,product_type,enabled,created_at)
+values('cc210000-0000-4000-8000-000000000001','chat_credits_300_v1',
+  'credit',true,clock_timestamp());
+insert into public.product_capability_sets(
+  id,product_id,definition_version,definition_hash,created_at
+) values (
+  'cc220000-0000-4000-8000-000000000001',
+  'cc210000-0000-4000-8000-000000000001',
+  'candidate-credits-v1','sha256:candidate-credits-300',clock_timestamp()
+);
+insert into public.product_capability_items(
+ capability_set_id,item_key,entitlement_key,scope_mode,fixed_scope_key,
+ validity_mode,duration_seconds
+) values (
+ 'cc220000-0000-4000-8000-000000000001',
+ 'candidate-chat-credits-300','candidate.chat.credits',
+ 'global',null,'unbounded',null
+);
+insert into public.product_offers(
+ id,product_id,platform,provider,external_product_id,currency,
+ display_price_minor,enabled,created_at,capability_set_id
+) values (
+ 'cc230000-0000-4000-8000-000000000001',
+ 'cc210000-0000-4000-8000-000000000001',
+ 'web','portone_v2','candidate-chat-credits-300','KRW',1900,true,
+ clock_timestamp(),'cc220000-0000-4000-8000-000000000001'
+);
+insert into public.purchase_intents(
+ id,subject_id,product_offer_id,idempotency_key,request_hash,
+ offer_snapshot_jsonb,offer_snapshot_hash,status,created_at,updated_at,
+ expected_amount_minor,expected_currency,charge_terms_version,
+ capability_set_id,capability_snapshot_jsonb,capability_snapshot_hash
+) values (
+ 'cc240000-0000-4000-8000-000000000001',
+ 'cc110000-0000-4000-8000-000000000001',
+ 'cc230000-0000-4000-8000-000000000001',
+ 'candidate-credit-purchase-1','sha256:candidate-request',
+ '{}'::jsonb,'sha256:candidate-offer-snapshot','verified',
+ clock_timestamp(),clock_timestamp(),1900,'KRW','candidate-terms-v1',
+ 'cc220000-0000-4000-8000-000000000001',
+ jsonb_build_object(
+   'capabilitySetId','cc220000-0000-4000-8000-000000000001',
+   'definitionVersion','candidate-credits-v1',
+   'definitionHash','sha256:candidate-credits-300'
+ ),
+ 'sha256:candidate-capability-snapshot'
+);
+insert into public.commerce_receipts(
+ id,subject_id,purchase_intent_id,product_offer_id,platform,provider,
+ external_transaction_id,receipt_fingerprint,verification_status,
+ verified_at,created_at,environment,verifier_revision,
+ verified_amount_minor,verified_currency
+) values (
+ 'cc250000-0000-4000-8000-000000000001',
+ 'cc110000-0000-4000-8000-000000000001',
+ 'cc240000-0000-4000-8000-000000000001',
+ 'cc230000-0000-4000-8000-000000000001',
+ 'web','portone_v2','candidate-portone-paid-1',
+ 'hmac-sha256:k1:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc',
+ 'verified',clock_timestamp(),clock_timestamp(),
+ 'production','candidate-only',1900,'KRW'
+);
+
+do $topup_positive$
+declare
+ s uuid := 'cc110000-0000-4000-8000-000000000001';
+ receipt uuid := 'cc250000-0000-4000-8000-000000000001';
+ offer uuid := 'cc230000-0000-4000-8000-000000000001';
+ v_first uuid;
+ v_second uuid;
+ v_first_issued boolean;
+ v_second_issued boolean;
+ v_prior bigint;
+ v_after bigint;
+ v_replay_balance bigint;
+begin
+ select available_credits into v_prior
+ from public.internal_qry_chat_credit_balance_v1(s);
+ select lot_id,issued,available_credits
+ into v_first,v_first_issued,v_after
+ from public.internal_cmd_chat_credit_verified_topup_v1(
+   s,receipt,offer,'never',null
+ );
+ if v_first is null or v_first_issued is distinct from true
+    or v_after<>v_prior+300 then
+   raise exception 'Verified 1900 KRW Receipt did not mint exactly 300 credits';
+ end if;
+ select lot_id,issued,available_credits
+ into v_second,v_second_issued,v_replay_balance
+ from public.internal_cmd_chat_credit_verified_topup_v1(
+   s,receipt,offer,'never',null
+ );
+ if v_second is distinct from v_first
+    or v_second_issued is distinct from false
+    or v_replay_balance<>v_after then
+   raise exception 'Verified Receipt replay minted duplicate 300 credits';
+ end if;
+ begin
+   perform public.internal_cmd_chat_credit_verified_topup_v1(
+     s,'cc250000-0000-4000-8000-000000000002',
+     offer,'never',null
+   );
+   raise exception 'Unverified Receipt unexpectedly minted credits';
+ exception when raise_exception then
+   if sqlerrm='Unverified Receipt unexpectedly minted credits' then raise; end if;
+ end;
+end $topup_positive$;
+
 -- Fail closed to runtime/public roles until an approved owner port is wired.
 do $acl$
 declare n text;
@@ -172,6 +332,8 @@ begin
    if has_function_privilege(n,'public.internal_cmd_chat_credit_reserve_v1(uuid,uuid,uuid)','EXECUTE')
       or has_function_privilege(n,'public.internal_cmd_chat_credit_finalize_v1(uuid,uuid,boolean,uuid)','EXECUTE')
       or has_function_privilege(n,'public.internal_cmd_chat_credit_verified_topup_v1(uuid,uuid,uuid,text,integer)','EXECUTE')
+      or has_function_privilege(n,'public.internal_cmd_chat_first_paid_reading_reward_v1(uuid,uuid,uuid)','EXECUTE')
+      or has_function_privilege(n,'public.internal_cmd_chat_credit_ack_delivered_v1(uuid,uuid,uuid,uuid,uuid,uuid)','EXECUTE')
       or has_table_privilege(n,'public.chat_credit_lots_v1','INSERT') then
      raise exception 'Credit private ledger leaked runtime access to %',n;
    end if;
