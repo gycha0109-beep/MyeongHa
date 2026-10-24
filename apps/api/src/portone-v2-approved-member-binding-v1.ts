@@ -13,6 +13,8 @@ export function createApprovedPortOnePreenrollmentMemberBindingPortV1(input: Rea
   env: ProductionUserDataRuntimeEnvV1;
   request: Request;
   pool: PostgresSubjectPoolV1;
+  /** Social callback may check an EXISTING verified Member without a cookie. */
+  allowExistingMemberOnly?: true;
 }>): (SupabasePreenrollmentMemberBindingPortV1 & {
   admitExistingMember(verifiedAuthUserId: string): Promise<boolean>;
 }) | null {
@@ -20,15 +22,18 @@ export function createApprovedPortOnePreenrollmentMemberBindingPortV1(input: Rea
   if (resolveProductionPortOnePreenrollmentModeV1(input.env) !== 'enforce') return null;
   const rawNonce = extractPortOnePreenrollmentCookieV1(input.request);
   const secret = input.env.MYEONGHA_PORTONE_PREENROLLMENT_BINDING_SECRET;
-  if (rawNonce === null || typeof secret !== 'string') return null;
-  const digest = fingerprintPortOnePreenrollmentBindingV1({ rawNonce, secret });
+  if (rawNonce === null && input.allowExistingMemberOnly !== true) return null;
+  if (rawNonce !== null && typeof secret !== 'string') return null;
+  const digest = rawNonce === null ? null
+    : fingerprintPortOnePreenrollmentBindingV1({ rawNonce, secret: secret! });
   const authority = createPostgresPortOnePreenrollmentAgeAuthorityV1(input.pool);
   const verifiedAge = createPostgresPortOneVerifiedAgeAdmissionPortV1(input.pool);
   return Object.freeze({
     async readVerified() {
-      return await authority.readVerified(digest) !== null;
+      return digest !== null && await authority.readVerified(digest) !== null;
     },
     async bindMember(verifiedAuthUserId: string) {
+      if (digest === null) throw new Error('New Social account requires preenrollment proof.');
       await authority.bindMember(verifiedAuthUserId, digest);
     },
     async admitExistingMember(verifiedAuthUserId: string) {

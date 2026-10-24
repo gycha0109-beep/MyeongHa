@@ -1,5 +1,6 @@
 import { denyUnverifiedInitialIdentityAdmissionV1 } from './portone-v2-preidentity-admission-v1.js';
 import { resolveProductionPortOneVerifiedAgeModeV1 } from './portone-v2-age-enforcement-activation-v1.js';
+import { resolveProductionPortOnePreenrollmentModeV1 } from './portone-v2-preenrollment-http-runtime-v1.js';
 import {
   extractPortOnePreenrollmentCookieV1,
   fingerprintPortOnePreenrollmentBindingV1,
@@ -74,6 +75,20 @@ export function createProductionGuestBootstrapHttpRuntimeV1(
           requestInput.request.headers.get('authorization') === null) {
         const mode = resolveProductionPortOneVerifiedAgeModeV1(input.env);
         if (mode === 'enforce') {
+          // Fresh Guest must use a live-approved preenrollment activation,
+          // never a stale approval flag or an already-disabled flow.
+          let preenrollmentEnabled = false;
+          try {
+            preenrollmentEnabled =
+              resolveProductionPortOnePreenrollmentModeV1(input.env) === 'enforce';
+          } catch {
+            // Fail closed with the existing age-unavailable response.
+          }
+          if (!preenrollmentEnabled) {
+            return denyUnverifiedInitialIdentityAdmissionV1({
+              env: input.env, surface: 'guest-bootstrap',
+            })!;
+          }
           // Do not trust the browser's birth date, bearer, or checked consent.
           // Only a fresh HttpOnly cookie with an operator-configured server HMAC
           // may enter the atomic Guest+age DB command.

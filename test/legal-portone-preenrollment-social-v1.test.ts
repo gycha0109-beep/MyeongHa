@@ -61,19 +61,34 @@ describe('A1 Social Auth preverified age hold and atomic Member binding', () => 
     expect(proof.readVerified).toHaveBeenCalledOnce();
   });
 
-  it('blocks Social completion before Supabase token exchange when proof absent', async () => {
+  it('never exchanges Social tokens without an approved admission port', async () => {
     const fetch = vi.fn();
     vi.stubGlobal('fetch', fetch);
     const missing = await handleSupabaseAuthRequestV1({
       request: socialCompleteRequest(), env, action: 'social-complete',
     });
     expect(missing.status).toBe(503);
-    const falseProof = await handleSupabaseAuthRequestV1({
-      request: socialCompleteRequest(), env, action: 'social-complete',
-      preenrollmentMemberPort: admission(false),
-    });
-    expect(falseProof.status).toBe(403);
     expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('denies a newly-created OAuth user AFTER provider lookup if proof is missing', async () => {
+    const upstream = vi.fn(async () => Response.json({
+      access_token: 'fresh-access-token', refresh_token: 'fresh-refresh-token',
+      expires_in: 3600, user: { id, email: 'unverified@example.com' },
+    }));
+    vi.stubGlobal('fetch', upstream);
+    const proof = admission(false);
+    const response = await handleSupabaseAuthRequestV1({
+      request: socialCompleteRequest(), env, action: 'social-complete',
+      preenrollmentMemberPort: proof,
+    });
+    expect(response.status).toBe(403);
+    expect((await response.json()).error.code).toBe('AGE_VERIFICATION_REQUIRED');
+    expect(upstream).toHaveBeenCalledOnce();
+    expect(proof.admitExistingMember).toHaveBeenCalledWith(id);
+    expect(proof.readVerified).toHaveBeenCalledOnce();
+    expect(proof.bindMember).not.toHaveBeenCalled();
+    expect(response.headers.get('set-cookie')).toBeNull();
   });
 
   it('binds the fresh OAuth Auth UUID before returning tokens', async () => {
@@ -107,6 +122,7 @@ describe('A1 Social Auth preverified age hold and atomic Member binding', () => 
     });
     expect(success.status).toBe(200);
     expect(existing.bindMember).not.toHaveBeenCalled();
+    expect(existing.readVerified).not.toHaveBeenCalled();
 
     const failed = {
       ...admission(true),

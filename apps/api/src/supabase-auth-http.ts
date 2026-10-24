@@ -377,12 +377,14 @@ export async function handleSupabaseAuthRequestV1(input: {
         if (input.preenrollmentMemberPort === undefined) {
           return denied;
         }
-        try {
-          if (!await input.preenrollmentMemberPort.readVerified()) {
-            return errorResponse('AGE_VERIFICATION_REQUIRED', 403);
+        if (input.action === 'sign-up') {
+          try {
+            if (!await input.preenrollmentMemberPort.readVerified()) {
+              return errorResponse('AGE_VERIFICATION_REQUIRED', 403);
+            }
+          } catch {
+            return errorResponse('AGE_VERIFICATION_UNAVAILABLE', 503);
           }
-        } catch {
-          return errorResponse('AGE_VERIFICATION_UNAVAILABLE', 503);
         }
       }
     }
@@ -431,6 +433,12 @@ export async function handleSupabaseAuthRequestV1(input: {
         try {
           const existing = await input.preenrollmentMemberPort.admitExistingMember?.(session.user.id) ?? false;
           if (!existing) {
+            // OAuth may create a fresh Supabase user before the callback.
+            // Such a user never receives MyeongHa tokens without a still-live,
+            // independently verified browser-bound age proof.
+            if (!await input.preenrollmentMemberPort.readVerified()) {
+              return errorResponse('AGE_VERIFICATION_REQUIRED', 403);
+            }
             await input.preenrollmentMemberPort.bindMember(session.user.id);
           }
         } catch {

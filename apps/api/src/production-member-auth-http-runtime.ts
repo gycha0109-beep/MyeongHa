@@ -123,6 +123,7 @@ export function createProductionMemberAuthHttpRuntimeV1(
         requestInput.authAction ??
         requestInput.action;
       let preenrollmentBindingDigest: string | undefined;
+      let admitExistingSocialMemberOnly = false;
       if (requestInput.request.method === 'POST' &&
           (authAction === 'sign-up' || authAction === 'social-complete')) {
         const denied = denyUnverifiedInitialIdentityAdmissionV1({
@@ -130,16 +131,19 @@ export function createProductionMemberAuthHttpRuntimeV1(
           surface: authAction === 'sign-up' ? 'member-sign-up' : 'social-complete',
         });
         if (denied !== null) {
-          if (authAction !== 'sign-up' && authAction !== 'social-complete') return denied;
           try {
             if (resolveProductionPortOneVerifiedAgeModeV1(input.env) !== 'enforce' ||
                 resolveProductionPortOnePreenrollmentModeV1(input.env) !== 'enforce') return denied;
             const rawNonce = extractPortOnePreenrollmentCookieV1(requestInput.request);
             const secret = input.env.MYEONGHA_PORTONE_PREENROLLMENT_BINDING_SECRET;
-            if (rawNonce === null || typeof secret !== 'string') return denied;
-            preenrollmentBindingDigest = fingerprintPortOnePreenrollmentBindingV1({
-              rawNonce, secret,
-            });
+            if (rawNonce === null || typeof secret !== 'string') {
+              if (authAction !== 'social-complete') return denied;
+              admitExistingSocialMemberOnly = true;
+            } else {
+              preenrollmentBindingDigest = fingerprintPortOnePreenrollmentBindingV1({
+                rawNonce, secret,
+              });
+            }
           } catch { return denied; }
         }
       }
@@ -164,15 +168,18 @@ export function createProductionMemberAuthHttpRuntimeV1(
       // The pre-account proof is read only after rate-limit admission. Its
       // atomic binding to a canonical Member occurs AFTER the trusted Supabase
       // UUID is received, and BEFORE any new session token is returned.
-      if (preenrollmentBindingDigest !== undefined && currentState.pool === undefined) {
+      if ((preenrollmentBindingDigest !== undefined || admitExistingSocialMemberOnly) &&
+          currentState.pool === undefined) {
         return createMemberAuthRateLimitUnavailableResponseV1(requestInput.request);
       }
       const preenrollmentMemberPort =
-        preenrollmentBindingDigest !== undefined && currentState.pool !== undefined
+        (preenrollmentBindingDigest !== undefined || admitExistingSocialMemberOnly) &&
+          currentState.pool !== undefined
           ? createApprovedPortOnePreenrollmentMemberBindingPortV1({
               env: input.env,
               request: requestInput.request,
               pool: currentState.pool,
+              ...(admitExistingSocialMemberOnly ? { allowExistingMemberOnly: true as const } : {}),
             }) ?? undefined
           : undefined;
 
