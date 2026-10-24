@@ -1,5 +1,6 @@
 import type { SajuProductionCalculationIngressArtifactV1 } from '../../../packages/domain/src/index.js';
 import { ApiCommandError } from './api-error.js';
+import { admitSajuAbuseHttpRequestV1, type SajuAbuseAdmissionGateV1 } from './saju-abuse-admission-http.js';
 import {
   BirthProfileReadAuthorityPortErrorV1,
   getBirthProfile,
@@ -41,6 +42,7 @@ export interface HandleCurrentSubjectSajuCalculationRequestInputV1 {
   readonly identityEvidenceVerifier: IdentityEvidenceVerificationPortV1;
   readonly pool: PostgresSubjectPoolV1;
   readonly sajuAdapter: SajuProductionCalculationHttpAdapterV1;
+  readonly sajuAbuseAdmission?: SajuAbuseAdmissionGateV1;
 }
 
 type SelfBirthProfileLocatorQueryRowV1 = Readonly<{
@@ -440,6 +442,14 @@ export async function handleCurrentSubjectSajuCalculationRequestV1(
       retryable: false,
       requestId,
     });
+  }
+
+  if (input.sajuAbuseAdmission !== undefined) {
+    const denied = await admitSajuAbuseHttpRequestV1({
+      request: input.request, requestId, routeId: 'api.me.saju.calculation',
+      evidence: verifiedEvidence, gate: input.sajuAbuseAdmission,
+    });
+    if (denied !== null) return denied;
   }
 
   try {

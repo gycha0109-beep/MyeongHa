@@ -99,6 +99,31 @@ catalog_snapshot() {
 }
 
 case "$case_name" in
+  saju-abuse-admission-attack-e2e)
+    verify_pg17
+    [[ "${GITHUB_ACTIONS:-}" == true && "${DB_SUITE:-}" == postgres17
+        && "${PGHOST:-}" == localhost && "${PGPORT:-}" == 5432
+        && "${PGDATABASE:-}" =~ ^myeongha_ci_case_[0-9]+$ ]] || {
+      echo HOLD_SAJU_ADMISSION_NOT_DISPOSABLE_PG17 >&2; exit 1;
+    }
+    [[ ! -e supabase/migrations/20261024065948_saju_abuse_admission_runtime_authority.sql ]] || {
+      echo HOLD_SAJU_ADMISSION_UNAPPROVED_PRODUCTION_SQL >&2; exit 1;
+    }
+    npm ci --ignore-scripts --no-audit --no-fund
+    npm run build
+    node --input-type=module -e '
+      import { spawnSync } from "node:child_process";
+      const url = new URL("postgresql://127.0.0.1:5432/");
+      url.username = process.env.PGUSER;
+      url.password = process.env.PGPASSWORD;
+      url.pathname = process.env.PGDATABASE;
+      const result = spawnSync(process.execPath, ["scripts/verify-saju-abuse-admission-postgres.mjs"], {
+        stdio: "inherit", env: { ...process.env, MYEONGHA_SAJU_ADMISSION_TEST_DATABASE_URL: url.href },
+      });
+      if (result.error) throw result.error;
+      process.exit(result.status ?? 1);
+    '
+    ;;
   seyeon-c08y-disposable-shared-ledger-pg17)
     verify_pg17
     # Synthetic table/RPC schema only: NO repository/Production migrations.

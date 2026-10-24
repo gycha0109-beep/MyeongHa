@@ -27,6 +27,10 @@ The repository does not pin or call an undocumented Alert Rules REST endpoint. T
 
 ## Not yet activated as alert thresholds
 
+The [general Security roadmap](../security/SECURITY_EXECUTION_ROADMAP_V1.md#실제-차단경보-구현-2026-10-24-후속) also defines a supported native API **4xx anomaly candidate**, including 401/403/429 and other API 4xx. It uses the provider-owned anomaly baseline rather than a repository numeric threshold. Candidate rule/decision files are present, and the existing CLI operation supports them with an additional activation authorization guard. Its decision remains `NOT_APPROVED`, provider mutation remains false, and no 4xx rule was activated. This does not change the baseline-only individual-status decisions below.
+
+Implementation and the current bounded checkpoint are tracked in the [general Security roadmap](../security/SECURITY_EXECUTION_ROADMAP_V1.md). `npm run security:baseline -- <manifest> --output <new-report>` now merges exported captures and aggregates the existing security-event schema, retaining query/cap/retention limitations without persisting event identifiers. The [2026-10-24 capture](SECURITY_BASELINE_CAPTURE_20261024.json) has three 503 events and no 401/403/429 sample; it does not establish an organic or complete population. The older baseline below remains historical evidence.
+
 The following signals are observable but remain baseline-gated.
 
 Authority state: `BASELINE_REQUIRED`.

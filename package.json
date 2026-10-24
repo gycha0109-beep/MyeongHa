@@ -12,6 +12,7 @@
     "packages/*"
   ],
   "scripts": {
+    "security:baseline": "node scripts/collect-security-baseline.mjs",
     "dev": "npm run dev -w @myeongha/web",
     "start": "npm run build:web && npm run preview -w @myeongha/web",
     "typecheck": "tsc -p tsconfig.json --noEmit && npm run typecheck -w @myeongha/api-client && npm run typecheck -w @myeongha/web && npm run typecheck -w @myeongha/mobile",
