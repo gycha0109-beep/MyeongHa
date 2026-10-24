@@ -10,6 +10,24 @@ import {
 import { handlePurchaseIntentCreateRequestV3 } from './purchase-intent-create-http-v3.js';
 import type { SupabaseMemberVerifierFetchV1 } from './supabase-member-identity-verifier.js';
 
+/**
+ * Legal L4 sale admission is separate from verified-adult authority.
+ * There is no trusted per-offer checkout notice, preview, delivery-proof or
+ * refund-remedy binding. Enabling age verification must not enable sales.
+ * Replacing this hold requires a Commerce/S7 server-owned, per-offer evidence
+ * contract; an environment flag or client checkbox is not sufficient.
+ */
+export const LEGAL_DIGITAL_READING_PURCHASE_HOLD_V1 = Object.freeze({
+  perOfferContractAndPriceNoticeVerified: false,
+  preCheckoutPreviewOrInformationVerified: false,
+  noticeAcknowledgementEvidenceVerified: false,
+  deliveryAndRefundRemedyAuthorityVerified: false,
+} as const);
+
+function legalDigitalReadingPurchaseAdmittedV1(): boolean {
+  return Object.values(LEGAL_DIGITAL_READING_PURCHASE_HOLD_V1).every((verified) => verified === true);
+}
+
 export interface ProductionPurchaseIntentCreateRequestV3 {
   readonly request: Request;
   readonly requestId: string;
@@ -52,9 +70,11 @@ export function createProductionPurchaseIntentCreateRuntimeV3(
 
   return Object.freeze({
     handleRequest(requestInput: ProductionPurchaseIntentCreateRequestV3) {
-      // Unlike free personalization, direct purchase has no OFF fallback:
-      // never open a purchase intent unless the adult authority is enabled.
-      if (requestInput.request.method === 'POST' && ageAdmissionPort === undefined) {
+      // Adult age verification alone is insufficient for a legal sale.
+      if (
+        requestInput.request.method === 'POST' &&
+        (!legalDigitalReadingPurchaseAdmittedV1() || ageAdmissionPort === undefined)
+      ) {
         return Promise.resolve(Response.json({
           ok: false,
           error: {
