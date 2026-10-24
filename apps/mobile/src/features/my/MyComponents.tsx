@@ -81,7 +81,7 @@ export function MyMemberAuthCard({
         <MobileUiText style={themedStyles.body}>
           이 기기에서는 회원 세션을 우선 사용합니다.
         </MobileUiText>
-        {errorMessage !== null ? <Text style={themedStyles.error}>{errorMessage}</Text> : null}
+        {errorMessage !== null ? <MobileUiText style={themedStyles.error}>{errorMessage}</MobileUiText> : null}
         <Pressable
           accessibilityRole="button"
           disabled={pending}
@@ -170,7 +170,7 @@ export function MyMemberAuthCard({
             style={themedStyles.authInput}
             value={password}
           />
-          {errorMessage !== null ? <Text style={themedStyles.error}>{errorMessage}</Text> : null}
+          {errorMessage !== null ? <MobileUiText style={themedStyles.error}>{errorMessage}</MobileUiText> : null}
           <Pressable
             accessibilityRole="button"
             disabled={pending || email.trim().length === 0 || password.length === 0}
@@ -200,6 +200,9 @@ export function MyMemberAuthCard({
           <MobileUiText style={themedStyles.caption}>
             새 계정은 현재 게스트 주체를 그대로 회원으로 승격합니다. 기존 회원 계정과의 게스트 기록 병합은 아직 지원하지 않습니다.
           </MobileUiText>
+          <MobileUiText style={themedStyles.caption}>
+            연령 본인확인이 필요한 경우 공식 웹 브라우저에서 새 계정을 만든 뒤 앱에 로그인해 주세요.
+          </MobileUiText>
         </>
       ) : (
         <>
@@ -221,7 +224,7 @@ export function MyMemberAuthCard({
             style={themedStyles.authInput}
             value={password}
           />
-          {errorMessage !== null ? <Text style={themedStyles.error}>{errorMessage}</Text> : null}
+          {errorMessage !== null ? <MobileUiText style={themedStyles.error}>{errorMessage}</MobileUiText> : null}
           <Pressable
             accessibilityRole="button"
             disabled={pending || password.length === 0}

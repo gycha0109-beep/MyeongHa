@@ -4,6 +4,8 @@ import {
   resolveMobilePreenrollmentAdmissionV1,
 } from '../apps/mobile/src/core/auth/mobile-preenrollment-web-handoff.js';
 import { readFileSync } from 'node:fs';
+import { translateStaticUi } from '../apps/web/ui-i18n.js';
+import { translateMobileUiCopy } from '../apps/mobile/src/ui/mobile-ui-copy.js';
 
 const origin = MOBILE_PREENROLLMENT_WEB_HANDOFF_V1.productionOrigin;
 const input = (data: unknown, status = 200) => ({
@@ -61,5 +63,23 @@ describe('Legal A1 native-to-web preenrollment admission', () => {
     expect(hook).toContain('nativeMobileRuntimeV1.memberSession.signIn(email, password)');
     const web = readFileSync(new URL('../apps/web/auth-page.js', import.meta.url), 'utf8');
     expect(web).toContain("callbacks.get('mode') === 'sign-up'");
+    const panel = readFileSync(new URL(
+      '../apps/mobile/src/features/my/MyComponents.tsx', import.meta.url,
+    ), 'utf8');
+    const disclosure = '연령 본인확인이 필요한 경우 공식 웹 브라우저에서 새 계정을 만든 뒤 앱에 로그인해 주세요.';
+    expect(panel).toContain(disclosure);
+    for (const text of [
+      disclosure,
+      '현재 신규 가입과 소셜 인증 가능 여부를 확인할 수 없습니다. 연결을 확인하고 다시 시도해 주세요.',
+      '본인확인과 새 계정 생성은 공식 웹 브라우저에서 진행합니다. 완료 후 앱에서 기존 계정으로 로그인해 주세요.',
+      '공식 가입 페이지를 열지 못했습니다. 브라우저에서 명하 계정 생성 화면을 이용해 주세요.',
+    ]) {
+      for (const locale of ['ja-JP', 'zh-TW'] as const) {
+        const translated = translateMobileUiCopy(text, locale);
+        expect(translated).not.toBe(text);
+        expect(translated).toBe(translateStaticUi(text, locale));
+        expect(translated).not.toMatch(/[가-힣]/u);
+      }
+    }
   });
 });

@@ -155,3 +155,11 @@
 - **회원·게스트·소셜:** 신규 게스트 발급과 최소 연령 저장은 1개 PG 트랜잭션. 이메일 가입은 서버 연령 판정 후 Supabase 응답의 UUID만으로 회원·연령을 DB에서 결속; 실패 시 신규 토큰 보류. 신규 소셜은 OAuth 완료 후 소비 전 권위를 검사하고 미검증 시 세션 보류. 기존 확인된 Member는 별도의 신규 증명 재사용 없이 서버 DB 최소 연령 권위로 확인; 기존 유효 Guest/Member 세션 재사용 및 개인정보 권리행사는 차단하지 않는다. 인증 완료 리다이렉트 후 가입 탭 복귀, 비의도적 선행 Guest 발급 방지 및 동일 출처 검사를 구현했다.
 - **정합성 복원:** A1 SQL의 문자열 치환 손상 및 PG17 Bash 인용부를 복구하여 SQL 원본/수동 배포 후보를 동일하게 유지하고, 손상 재발 방지 소스 회귀 단언을 추가. 새 `legal_portone_preenrollment_v1`은 승인된 Subject 소유 테이블 59개 집합 **외부**의 10분 단기 데이터로 별도 삭제 제안에 남긴다. 별도 `myeongha_system_executor` 물리정리 포트 구현, 자동 실행·운영 DB 적용은 하지 않았다.
 - **필수 후속:** (1) 관련 GH CI 및 격리 PG17 신규 케이스 실제 GREEN (아직 미확인), (2) Supabase Auth 직접 등록 우회/장애 후 고아 Auth 계정 처리 및 Social redirect state와 브라우저 증거의 재사용 방지 E2E, (3) PortOne 인증 제공자 계약·선불/보안 설정, (4) Privacy 삭제·만료/복원 정책 사용자 승인, (5) 본 DB 권한/서버 SDK/공개 UX 실증. 해당 요건 전에는 전체 L2와 서비스 출시를 완료로 표시하지 않는다.
+
+## 18. 2026-10-25 A1 모바일 신규 가입 경계 — 웹 소유 인증으로 안전하게 이관
+
+- `apps/mobile/src/core/auth/mobile-preenrollment-web-handoff.ts`: 공식 API 원점의 `/api/identity-verifications/pre-enrollment/capability`를 무캐시로 검사. 미승인/OFF일 때 기존 Native 흐름 유지, 서버 A1 `available:true`일 때 Native는 **독립적인 PortOne 인증 권한을 주장하지 않고** 같은 공식 HTTPS 웹 원점의 `/auth.html?mode=sign-up`으로 전환. 능력 확인 실패/비정상 응답/비신뢰 원점은 Guest 생성·신규 가입을 시도하지 않는 `unavailable` 상태.
+- `use-mobile-member-auth.tsx`: 회원가입 및 소셜 OAuth 시작 **전** 사전 검사. A1 웹 전환 시 Guest 신규 발급·사회관계 로그인 시작·가입 요청 전송 없음. 기존 계정 비밀번호 로그인, 개인정보 권리행사 목적의 로그인 및 기존 서명 경로 유지. Native App과 시스템 웹 브라우저 사이에 HttpOnly `__Host-` 쿠키, PortOne 인증 ID, 인증 결과, Access/Refresh Token을 전달·저장하지 않음.
+- `apps/web/auth-page.js`: 웹 가입 버튼의 명시적 `mode=sign-up` 진입을 지원. Auth callback 및 `social` 재진입 보호 흐름을 유지.
+- `MyComponents.tsx`: 웹 이동 조건·기존 앱 로그인 안내와 일본어/번체중국어 사전 동기화. 실제 웹 인증 완료 후 신규 세션은 기존 API에서만 발급.
+- **출시 HOLD:** 이것은 모바일 SDK를 통한 네이티브 본인인증 구현이 **아니며**, 시스템 브라우저의 인증 쿠키를 앱으로 반환할 수 있는 것이 아니다. 브라우저에서 계정을 만든 뒤 앱 로그인해야 한다. PortOne 공급자 계약·DB 제안 SQL 승인/실제 적용/PG17 GREEN/수집처 및 외부처리 적합성은 미확인; 현재 인증·결제 모두 OFF.
