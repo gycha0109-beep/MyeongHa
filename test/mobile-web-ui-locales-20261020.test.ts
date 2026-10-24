@@ -216,6 +216,26 @@ describe('Mobile / Web UI localization parity', () => {
         expect(result).not.toMatch(/[가-힣]/u);
       }
     }
+    const acceptanceCopy = ["Reader 선택","프리뷰만","프리뷰 소개","컨셉 준비 중","닫기","변경","현재 세연만 프리뷰 장면을 선택할 수 있으며, 유료 Reader 해석은 아직 공개되지 않았습니다.","Reader 표시와 프리뷰 선택은 상품 지원, 구매 접근권, 공개 승인 또는 공식 Reading 열람 권한을 뜻하지 않습니다. 이 권한들은 서버가 각각 확인해야 합니다.","선택한 Reader는 현재 사주 프리뷰 화면의 표시만 바꿉니다. 해석 근거와 내용은 변경되지 않습니다.","선택한 Reader는 현재 관상 준비 화면의 표시만 바꿉니다. 사진 분석과 Reader 풀이는 아직 열리지 않았습니다.","READER · 세연 프리뷰 장면","READER · 준비 중","이 공식 사주를 읽어줄 인물","공식 Reading 기반의 Reader 소개입니다. 해설 실행 및 후속 대화는 제공되지 않습니다.","인물 소개만 변경하며 유료 해설은 실행하지 않습니다.","소개 보기","현재 선택은 인물 소개를 보기 위한 것입니다. 이 Reader의 구매 접근권, 공식 Reading 열람 또는 전용 Thread가 생성되지 않습니다.","해설 진입 상태","Reader 해설 진입 비활성","해설 서비스 준비 중","Reader 소개 및 기록 연결은 상품 적격성, 구매 접근권, 공개 승인, 공식 Reading 접근 허가의 증명이 아닙니다.","공식 Reader 해설은 아직 공개되지 않았습니다.","상품·구매·공개 승인·공식 Reading 접근을 서버에서 확인해야 합니다.","이 상품은 해당 Reader 해설 대상이 아닙니다.","해설 구매 접근권이 확인되지 않았습니다.","해당 Reader 해설의 공개 승인을 기다리고 있습니다.","해당 Reader 해설은 현재 이용할 수 없습니다.","이 공식 Reading에 대한 해설 접근이 허용되지 않았습니다.","서버 확인 중 일시적인 문제가 발생했습니다. 해설 진입은 차단됩니다.","권한 또는 응답을 안전하게 확인할 수 없어 해설 진입을 차단했습니다.","개별 확인 후에도 실제 해설 진입에는 별도 서버 승인이 필요합니다.","대화 상대","서버가 확인한 대화방","프로필","오류 코드","세연에게 하고 싶은 말을 적어주세요","대화 상대를 확인하고 있습니다","대화 기록을 확인한 뒤 메시지를 보낼 수 있습니다","이 캐릭터의 AI 대화는 준비 중입니다","대화방 기록을 불러오지 못한 경우 다시 입장해 주세요.","캐릭터 대화방과 기록은 이용할 수 있으며, AI 답변 기능은 추후 열립니다.","등록된 대상","현재 계정에 등록된 대상의 출생정보를 확인합니다.","이름 없는 대상","성별 미지정","성별 정보 없음","음력 · 윤달","출생정보 revision","신규 추가만 지원합니다. 수정·삭제·궁합 실행은 아직 지원하지 않습니다.","현재 등록된 대상이 없습니다.","새 대상 추가","궁합 등에 사용할 상대의 기본 정보와 출생정보를 등록합니다.","이름 또는 별칭","관계 (예: 친구)","선택 안 함","대상 추가","생성 후 라벨 수정·삭제·출생정보 수정·궁합 실행은 아직 열지 않습니다.","세연 대화 기록을 현재 표시할 수 없습니다","개인정보 보호를 위한 서버 확인이 끝나지 않아 대화 기록을 표시할 수 없습니다. 반복해서 불러와도 해제되지 않습니다.","대화 기록을 확인하지 못했습니다. 아래에서 다시 불러올 수 있습니다.","세연 대화는 서버의 보호 조치로 잠시 중단되었습니다","대화 기록과 메시지 보내기는 개인정보 공개 권한 검증이 끝난 뒤 이용할 수 있습니다. 앱을 다시 설치해도 이 제한은 해제되지 않습니다."];
+    for (const locale of ['en-US', 'zh-CN'] as const) {
+      for (const label of acceptanceCopy) {
+        const translated = translateMobileUiCopy(label, locale);
+        expect(translated, `${locale} missing: ${label}`).not.toBe(label);
+        expect(translated).not.toMatch(/[가-힣]/u);
+      }
+    }
+    const [picker, readerEntry, composer, people] = await Promise.all([
+      source('apps/mobile/src/features/reading/MobileReaderPicker.tsx'),
+      source('apps/mobile/src/features/reading/MobileOfficialReadingReaderEntry.tsx'),
+      source('apps/mobile/src/features/chat/ChatReadComponents.tsx'),
+      source('apps/mobile/src/features/my/MyTargetPersons.tsx'),
+    ]);
+    expect(picker).toContain("t(accessView.previewPresentation");
+    expect(readerEntry).toContain('t(entry.statusMessage)');
+    expect(composer).toContain('{message.body}');
+    expect(composer).toContain("placeholder={t('세연에게 하고 싶은 말을 적어주세요')}");
+    expect(people).toContain('item.relationshipLabel');
+    expect(people).toContain('item.displayLabel?.trim()');
     const original = '사용자의 고유한 대화 내용';
     expect(translateMobileUiCopy(original, 'en-US')).toBe(original);
     expect(translateMobileUiCopy(original, 'zh-CN')).toBe(original);

@@ -27,6 +27,7 @@ export function ChatReadHeader({
 }) {
   const styles = useMobileThemedStyles(staticStyles);
   const { theme } = useMobileTheme();
+  const { t } = useMobileUiLocale();
   const character = snapshot.characterId === null
     ? null
     : MOBILE_CHAT_KNOWN_CHARACTERS_V1.find(
@@ -35,12 +36,12 @@ export function ChatReadHeader({
   const presentation = character === null
     ? null
     : resolveMobileChatCharacterPresentationV1(character.characterId);
-  const displayName = character?.displayName ?? '대화 상대';
+  const displayName = character?.displayName ?? t('대화 상대');
   const portrait = resolveMobileChatPortraitV1(snapshot.characterId);
   const isSeyeonTheme = snapshot.characterId === 'seyeon';
   const meta = presentation === null
-    ? '서버가 확인한 대화방'
-    : `${presentation.title} · 대화 기록`;
+    ? t('서버가 확인한 대화방')
+    : `${presentation.title} · ${t('대화 기록')}`;
 
   return (
     <View style={[styles.headerCard, isSeyeonTheme && (theme === 'dark' ? styles.seyeonSurfaceDark : styles.seyeonSurface)]}>
@@ -54,7 +55,7 @@ export function ChatReadHeader({
             source={portrait}
             style={styles.avatarPortrait}
             resizeMode="cover"
-            accessibilityLabel={`${displayName} 연결자 초상화`}
+            accessibilityLabel={`${displayName} ${t('연결자 초상화')}`}
           />
         )}
       </View>
@@ -74,6 +75,7 @@ export function ChatReadMessages({
 }) {
   const styles = useMobileThemedStyles(staticStyles);
   const { theme } = useMobileTheme();
+  const { t } = useMobileUiLocale();
   const isSeyeonTheme = snapshot.characterId === 'seyeon';
   if (snapshot.status === 'loading_initial' || snapshot.status === 'idle') {
     return (
@@ -105,7 +107,7 @@ export function ChatReadMessages({
           대화 기록을 확인하지 못했습니다. 아래에서 다시 불러올 수 있습니다.
         </MobileUiText>
         {snapshot.errorCode !== null ? (
-          <Text style={styles.diagnosticText}>오류 코드: {snapshot.errorCode}</Text>
+          <Text style={styles.diagnosticText}>{t('오류 코드')}: {snapshot.errorCode}</Text>
         ) : null}
       </View>
     );
@@ -124,7 +126,7 @@ export function ChatReadMessages({
             <View style={styles.messageAvatar}>
               {portrait === null
                 ? <Text style={styles.messageAvatarFallback}>{greeting.displayName.slice(0, 1)}</Text>
-                : <Image source={portrait} style={styles.avatarPortrait} resizeMode="cover" accessibilityLabel={greeting.displayName + ' 프로필'} />}
+                : <Image source={portrait} style={styles.avatarPortrait} resizeMode="cover" accessibilityLabel={`${greeting.displayName} ${t('프로필')}`} />}
             </View>
             <View style={styles.messageGroupStack}>
               <Text style={styles.messageGroupName}>{greeting.displayName}</Text>
@@ -148,7 +150,7 @@ export function ChatReadMessages({
     entry => entry.characterId === snapshot.characterId,
   );
   // The room's verified Character identity, not a guess from a message body.
-  const displayName = character?.displayName ?? '대화 상대';
+  const displayName = character?.displayName ?? t('대화 상대');
   const groups = groupMobileChatMessagesV1(snapshot.messages, displayName);
 
   return (
@@ -176,7 +178,7 @@ export function ChatReadMessages({
                     source={portrait}
                     style={styles.avatarPortrait}
                     resizeMode="cover"
-                    accessibilityLabel={displayName + ' 프로필'}
+                    accessibilityLabel={`${displayName} ${t('프로필')}`}
                   />
                 )}
               </View>
@@ -302,15 +304,15 @@ export function ChatComposer({
       <View style={styles.pendingCard}>
         <Text style={styles.pendingTitle}>
           {snapshot.characterId === null
-            ? '대화 상대를 확인하고 있습니다'
+            ? t('대화 상대를 확인하고 있습니다')
             : seyeon
-              ? '대화 기록을 확인한 뒤 메시지를 보낼 수 있습니다'
-              : '이 캐릭터의 AI 대화는 준비 중입니다'}
+              ? t('대화 기록을 확인한 뒤 메시지를 보낼 수 있습니다')
+              : t('이 캐릭터의 AI 대화는 준비 중입니다')}
         </Text>
         <Text style={styles.stateText}>
           {seyeon
-            ? '대화방 기록을 불러오지 못한 경우 다시 입장해 주세요.'
-            : '캐릭터 대화방과 기록은 이용할 수 있으며, AI 답변 기능은 추후 열립니다.'}
+            ? t('대화방 기록을 불러오지 못한 경우 다시 입장해 주세요.')
+            : t('캐릭터 대화방과 기록은 이용할 수 있으며, AI 답변 기능은 추후 열립니다.')}
         </Text>
       </View>
     );
@@ -325,7 +327,7 @@ export function ChatComposer({
           value={draft}
           onChangeText={onChangeDraft}
           editable={!sending}
-          placeholder="세연에게 하고 싶은 말을 적어주세요"
+          placeholder={t('세연에게 하고 싶은 말을 적어주세요')}
           placeholderTextColor={mobileColors.muted}
           style={styles.composerInput}
         />

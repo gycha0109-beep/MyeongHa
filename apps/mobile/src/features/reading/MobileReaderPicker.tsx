@@ -12,6 +12,7 @@ import { mobileColors } from '@/ui/mobile-colors';
 import { MobileUiText } from '@/ui/MobileUiText';
 import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
 import { resolveMobileChatPortraitV1 } from '@/features/chat/chat-character-portraits';
+import { useMobileUiLocale } from '@/ui/mobile-ui-locale';
 
 interface MobileReaderPickerPropsV1 {
   readonly selected: MobileReaderPresentationIdV1;
@@ -25,6 +26,7 @@ interface MobileReaderPickerPropsV1 {
  */
 export function MobileReaderPicker({ selected, onChange, vertical }: MobileReaderPickerPropsV1) {
   const styles = useMobileThemedStyles(staticStyles);
+  const { t } = useMobileUiLocale();
   const [expanded, setExpanded] = useState(false);
   const effectiveSelected = isMobileReaderPreviewSelectableV1(selected) ? selected : 'seyeon';
   const reader = findMobileReaderPresentationV1(effectiveSelected);
@@ -37,7 +39,7 @@ export function MobileReaderPicker({ selected, onChange, vertical }: MobileReade
             source={selectedPortrait}
             style={styles.selectedPortrait}
             resizeMode="cover"
-            accessibilityLabel={`${reader.name} 연결자 초상화`}
+            accessibilityLabel={`${reader.name} ${t('연결자 초상화')}`}
           />
         ) : null}
         <View style={styles.headingCopy}>
@@ -47,12 +49,12 @@ export function MobileReaderPicker({ selected, onChange, vertical }: MobileReade
         </View>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Reader 선택"
+          accessibilityLabel={t('Reader 선택')}
           accessibilityState={{ expanded }}
           onPress={() => setExpanded((current) => !current)}
           style={styles.action}
         >
-          <Text style={styles.actionText}>{expanded ? '닫기' : '변경'}</Text>
+          <Text style={styles.actionText}>{t(expanded ? '닫기' : '변경')}</Text>
         </Pressable>
       </View>
       {expanded ? (
@@ -65,7 +67,7 @@ export function MobileReaderPicker({ selected, onChange, vertical }: MobileReade
             <Pressable
               key={option.key}
               accessibilityRole="button"
-              accessibilityLabel={`${option.name} Reader 선택`}
+              accessibilityLabel={`${option.name} ${t('Reader 선택')}`}
               accessibilityState={{ selected: effectiveSelected === option.key, disabled: !available }}
               disabled={!available}
               onPress={() => {
@@ -77,7 +79,7 @@ export function MobileReaderPicker({ selected, onChange, vertical }: MobileReade
             >
               {portrait !== null ? (
                 <Image source={portrait} style={styles.optionPortrait} resizeMode="cover"
-                  accessibilityLabel={`${option.name} 연결자 초상화`} />
+                  accessibilityLabel={`${option.name} ${t('연결자 초상화')}`} />
               ) : null}
               <Text style={[styles.optionName, effectiveSelected === option.key && styles.selectedText]}>
                 {option.name}
@@ -87,7 +89,7 @@ export function MobileReaderPicker({ selected, onChange, vertical }: MobileReade
               </Text>
               <Text style={styles.optionTone}>{option.tone}</Text>
               <Text style={styles.optionStatus}>
-                {accessView.previewPresentation === 'preview_available' ? '프리뷰만' : '컨셉 준비 중'}
+                {t(accessView.previewPresentation === 'preview_available' ? '프리뷰만' : '컨셉 준비 중')}
               </Text>
             </Pressable>
             );
@@ -98,8 +100,8 @@ export function MobileReaderPicker({ selected, onChange, vertical }: MobileReade
       <MobileUiText style={styles.notice}>Reader 표시와 프리뷰 선택은 상품 지원, 구매 접근권, 공개 승인 또는 공식 Reading 열람 권한을 뜻하지 않습니다. 이 권한들은 서버가 각각 확인해야 합니다.</MobileUiText>
       <Text style={styles.notice}>
         {vertical === 'saju'
-          ? '선택한 Reader는 현재 사주 프리뷰 화면의 표시만 바꿉니다. 해석 근거와 내용은 변경되지 않습니다.'
-          : '선택한 Reader는 현재 관상 준비 화면의 표시만 바꿉니다. 사진 분석과 Reader 풀이는 아직 열리지 않았습니다.'}
+          ? t('선택한 Reader는 현재 사주 프리뷰 화면의 표시만 바꿉니다. 해석 근거와 내용은 변경되지 않습니다.')
+          : t('선택한 Reader는 현재 관상 준비 화면의 표시만 바꿉니다. 사진 분석과 Reader 풀이는 아직 열리지 않았습니다.')}
       </Text>
     </View>
   );
