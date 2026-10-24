@@ -112,7 +112,7 @@ describe('Cloudflare Stage 9 exact-SHA CI evidence pair acceptance',()=>{
         'PRIVATE-THREAD-ID':{n:1,p50Ms:1,p95Ms:1,maxMs:1}}}},
       {current:{...current,secret:'PRIVATE-SECRET'}},
       {recovery:{...recovery,byRoute:{...recovery.byRoute,
-        'static.root':{...recovery.byRoute['static.root'],n:1}}}},
+        'static.root':{...recovery.byRoute['static.root'],n:recovery.byRoute['static.root'].n+1}}}},
     ])expect(()=>pair(changed)).toThrow(/Stage 9 evidence acceptance failed/);
   });
 

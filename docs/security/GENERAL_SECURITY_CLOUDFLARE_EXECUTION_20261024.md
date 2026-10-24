@@ -30,6 +30,10 @@ The actual Ops Worker now wraps recognized API routes with the existing security
 
 ## Current completion boundary
 
+2026-10-25 KST resume: live Worker advanced independently to deployment `58476751-fc92-4de0-9d35-3b91e4347c50`, version `16e4b572-6190-482b-81fe-596bad3c0fe2` (100%). Existing source branch #2420 remains at the source SHA above; no inference that this security change is deployed is made. Binding names now include Saju service origin, but not Saju mode/preview mode or admission activation.
+
+CI run `40104886385` exposed two pre-existing fixture errors, reproduced directly before correction: the supposed route-count corruption set `static.root.n` to its unchanged value 1, and the Face preview test expected no cleanup for an empty invalid string while the existing implementation cleans up every returned string. The fixtures now mutate the count relative to its real value and assert exact cleanup of each invalid candidate. No production validation, evidence acceptance rule, or Face behavior was weakened or changed. Scope expanded only to these mandatory CI failures.
+
 Verification on this branch: 50 direct composition/event/router/Saju/fence tests PASS; TypeScript build PASS; Cloudflare static build PASS (11 HTML entries). Pinned Wrangler 4.151.2 ran the actual local workerd and passed 10 HTTP health/method/query/API-denial/Chat-fence requests without credentials or remote DB access. This proves local import/execution and denial boundaries only. The existing bundle-budget runner requires Linux and rejects Windows before its dry-run; its budget result is not claimed as PASS. Local workerd was stopped after verification.
 
 Cloudflare composition/event changes are locally verified; live admission enforcement and Cloudflare alert delivery are **not verified or deployed**. The existing live Saju routes remain closed. Do not count a 404 or a mocked composition test as a positive quota canary.
