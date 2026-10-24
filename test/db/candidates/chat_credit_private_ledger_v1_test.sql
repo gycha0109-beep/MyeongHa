@@ -192,6 +192,24 @@ begin
  end;
 end $bonus$;
 
+-- An uncommitted/unknown ClientTurn must never accept a delivery ACK.
+do $ack$
+declare s uuid := 'cc110000-0000-4000-8000-000000000001';
+ t uuid := 'cc120000-0000-4000-8000-000000000001';
+begin
+ begin
+   perform public.internal_cmd_chat_credit_ack_delivered_v1(
+     s,t,'cc130000-0000-4000-8000-000000000120',
+     'cc180000-0000-4000-8000-000000000001',
+     'cc190000-0000-4000-8000-000000000001',
+     'cc200000-0000-4000-8000-000000000001'
+   );
+   raise exception 'Missing settled ChatTurn unexpectedly charged';
+ exception when raise_exception then
+   if sqlerrm='Missing settled ChatTurn unexpectedly charged' then raise; end if;
+ end;
+end $ack$;
+
 -- Fail closed to runtime/public roles until an approved owner port is wired.
 do $acl$
 declare n text;
@@ -203,6 +221,7 @@ begin
       or has_function_privilege(n,'public.internal_cmd_chat_credit_finalize_v1(uuid,uuid,boolean,uuid)','EXECUTE')
       or has_function_privilege(n,'public.internal_cmd_chat_credit_verified_topup_v1(uuid,uuid,uuid,text,integer)','EXECUTE')
       or has_function_privilege(n,'public.internal_cmd_chat_first_paid_reading_reward_v1(uuid,uuid,uuid)','EXECUTE')
+      or has_function_privilege(n,'public.internal_cmd_chat_credit_ack_delivered_v1(uuid,uuid,uuid,uuid,uuid,uuid)','EXECUTE')
       or has_table_privilege(n,'public.chat_credit_lots_v1','INSERT') then
      raise exception 'Credit private ledger leaked runtime access to %',n;
    end if;

@@ -442,3 +442,90 @@ end $$;
 revoke all on function public.internal_cmd_chat_first_paid_reading_reward_v1(
   uuid,uuid,uuid
 ) from public;
+
+-- The delivery acknowledgement is an exact owned ChatTurn + committed assistant
+-- message correlation. A browser "success" flag alone cannot debit anything.
+-- Chat/UI tracks must adopt this acknowledged-delivery contract before mounting.
+create function public.internal_cmd_chat_credit_ack_delivered_v1(
+  p_subject_id uuid,
+  p_thread_id uuid,
+  p_client_turn_id uuid,
+  p_reservation_id uuid,
+  p_turn_id uuid,
+  p_assistant_message_id uuid
+)
+returns text
+language plpgsql volatile security definer
+set search_path=pg_catalog,public
+as $$
+declare
+  v_turn public.chat_turns%rowtype;
+  v_reservation public.chat_credit_turn_reservations_v1%rowtype;
+  v_message_id uuid;
+begin
+  if p_subject_id is null or p_thread_id is null or p_client_turn_id is null
+     or p_reservation_id is null or p_turn_id is null or p_assistant_message_id is null then
+    raise exception 'Delivery acknowledgement requires exact owner and committed turn identities';
+  end if;
+
+  perform 1 from public.subjects
+  where id=p_subject_id and kind='member' and status='active'
+  for update;
+  if not found then raise exception 'Only active Member can acknowledge paid chat'; end if;
+
+  select * into v_reservation
+  from public.chat_credit_turn_reservations_v1
+  where id=p_reservation_id and subject_id=p_subject_id
+    and thread_id=p_thread_id and client_turn_id=p_client_turn_id
+  for update;
+  if not found or v_reservation.state='released' then
+    raise exception 'Delivery has no valid owned credit reservation';
+  end if;
+
+  select * into v_turn from public.chat_turns
+  where id=p_turn_id
+    and subject_id=p_subject_id
+    and thread_id=p_thread_id
+    and client_turn_id=p_client_turn_id::text
+  for update;
+  if not found or v_turn.state not in ('committed','delivered')
+     or v_turn.committed_attempt_id is null or v_turn.committed_at is null then
+    raise exception 'Delivery has no matching committed ChatTurn';
+  end if;
+
+  select a.committed_message_id into v_message_id
+  from public.chat_turn_attempts a
+  join public.conversation_messages m
+    on m.id=a.committed_message_id
+   and m.turn_id=p_turn_id
+   and m.subject_id=p_subject_id
+   and m.thread_id=p_thread_id
+   and m.sender_type='character'
+   and m.redacted_at is null
+  where a.id=v_turn.committed_attempt_id
+    and a.turn_id=p_turn_id
+    and a.subject_id=p_subject_id
+    and a.state='committed'
+    and a.committed_message_id=p_assistant_message_id;
+  if not found or v_message_id is distinct from p_assistant_message_id then
+    raise exception 'Delivery assistant message is not the committed reply';
+  end if;
+
+  if v_turn.state='committed' then
+    update public.chat_turns set
+      state='delivered',
+      delivered_at=clock_timestamp(),
+      updated_at=clock_timestamp()
+    where id=p_turn_id and subject_id=p_subject_id and state='committed';
+  elsif v_turn.delivered_at is null then
+    raise exception 'Delivered ChatTurn has no persisted delivery timestamp';
+  end if;
+
+  return public.internal_cmd_chat_credit_finalize_v1(
+    p_subject_id,p_reservation_id,true,p_turn_id
+  );
+end $$;
+
+revoke all on function public.internal_cmd_chat_credit_ack_delivered_v1(
+  uuid,uuid,uuid,uuid,uuid,uuid
+) from public;
