@@ -340,7 +340,7 @@ export async function executeSeyeonC08N06ResearchWorkflowV2({
   const admitted=admitSeyeonC08N06PaidCanaryOnceV1(env,h,c,{
     repo:C08_N06_CANARY_REPO,marker,
   });
-  const dir=join(env.RUNNER_TEMP,workflow.replace(/\\.yml$/u,''));
+  const dir=join(env.RUNNER_TEMP,workflow.replace(/\.yml$/u,''));
   await mkdir(dir,{recursive:true,mode:0o700});
   const ledger=await open(join(dir,'journal.jsonl'),'wx',0o600);
   const journal=async x=>{
