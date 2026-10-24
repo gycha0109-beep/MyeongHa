@@ -5,6 +5,26 @@ const landing = readFileSync(new URL('../apps/web/src/landing/LandingPage.tsx', 
 const chat = readFileSync(new URL('../apps/web/src/chat/ChatPage.tsx', import.meta.url), 'utf8');
 
 describe('LEGAL L5: visible generative-AI disclosures', () => {
+  it('discloses that saved readings and memories may contain AI interpretation on both records screens', async () => {
+    const notice = '지난 읽기와 저장된 기억에는 생성형 AI가 작성하거나 요약한 내용이 포함될 수 있습니다. AI의 해석·기억은 확인된 삶의 사실과 다를 수 있습니다.';
+    const web = readFileSync(new URL('../apps/web/src/records/RecordsPage.tsx', import.meta.url), 'utf8');
+    const native = readFileSync(new URL('../apps/mobile/src/app/(tabs)/records/index.tsx', import.meta.url), 'utf8');
+    expect(web).toContain('data-legal-ai-records-notice');
+    expect(web).toContain(notice);
+    expect(web.indexOf('data-legal-ai-records-notice')).toBeLessThan(web.indexOf('id="records-content"'));
+    expect(native).toContain(notice);
+    expect(native.indexOf(notice)).toBeLessThan(native.indexOf('<RecordsEditorialHeader'));
+    const { translateStaticUi } = await import('../apps/web/ui-i18n.js');
+    const { translateMobileUiCopy } = await import('../apps/mobile/src/ui/mobile-ui-copy.js');
+    for (const locale of ['ja-JP', 'zh-TW'] as const) {
+      const translated = translateStaticUi(notice, locale);
+      expect(translated).not.toBe(notice);
+      expect(translated).not.toMatch(/[가-힣]/u);
+      expect(translateMobileUiCopy(notice, locale)).toBe(translated);
+    }
+  });
+
+
   it('labels Reader character interpretation before showing generated reading results', async () => {
     const web = readFileSync(new URL('../apps/web/src/reading-detail/ReadingDetailPage.tsx', import.meta.url), 'utf8');
     const native = readFileSync(new URL('../apps/mobile/src/app/reading/[readingId].tsx', import.meta.url), 'utf8');

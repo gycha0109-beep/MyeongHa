@@ -157,6 +157,9 @@ export default function RecordsScreen() {
               <MobileUiText style={[styles.description, { color: colors.muted }]}>
                 삶의 사실과 지난 풀이, 저장된 기억을 차분히 찾아보세요.
               </MobileUiText>
+              <MobileUiText style={[styles.description, { color: colors.muted }]}>
+                지난 읽기와 저장된 기억에는 생성형 AI가 작성하거나 요약한 내용이 포함될 수 있습니다. AI의 해석·기억은 확인된 삶의 사실과 다를 수 있습니다.
+              </MobileUiText>
             </View>
             <RecordsEditorialHeader selected={tab} itemCount={initialLoading ? null : items.length} />
             <RecordsTabs selected={tab} onSelect={setTab} />

@@ -13,6 +13,9 @@ export function RecordsPage() {
           <h1 className="records-title">기록</h1>
         </div>
         <p className="records-lead">내가 남긴 삶의 사실, 사주에서 읽어낸 결과, 태어난 순간의 기록, 대리가 기억하고 있는 내용을 서로 섞지 않고 확인합니다.</p>
+        <p className="records-lead" data-legal-ai-records-notice>
+          지난 읽기와 저장된 기억에는 생성형 AI가 작성하거나 요약한 내용이 포함될 수 있습니다. AI의 해석·기억은 확인된 삶의 사실과 다를 수 있습니다.
+        </p>
       </header>
 
       <div id="records-status" className="records-status" role="status">기록을 불러오는 중입니다…</div>
