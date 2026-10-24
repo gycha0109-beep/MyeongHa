@@ -43,6 +43,7 @@ jobs:
       promotion_repair_only: ${{ steps.relevance.outputs.promotion_repair_only }}
       seyeon_manifest_repair_only: ${{ steps.relevance.outputs.seyeon_manifest_repair_only }}
       saju_admission_reconcile_only: ${{ steps.relevance.outputs.saju_admission_reconcile_only }}
+      chat_credit_signup_scope_only: ${{ steps.relevance.outputs.chat_credit_signup_scope_only }}
     steps:
       - name: Checkout deployment surface
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -141,6 +142,15 @@ jobs:
               seyeon_manifest_repair_only=true
             fi
           fi
+          chat_credit_signup_scope_only=false
+          if [[ "$EVENT_NAME" == push && "$requires_deploy" == true ]]; then
+            migration_changes="$(printf '%s\n' "${changed_files:-}" | grep '^supabase/migrations/' || true)"
+            if [[ "$migration_changes" == 'supabase/migrations/1725_chat_credit_signup_wallet_runtime_v1.sql' ]]; then
+              chat_credit_signup_scope_only=true
+            fi
+          fi
+          echo "chat_credit_signup_scope_only=$chat_credit_signup_scope_only" >> "$GITHUB_OUTPUT"
+
           saju_admission_reconcile_only=false
           if [[ "$EVENT_NAME" == push && "$requires_deploy" == true ]]; then
             migration_changes="$(printf '%s\n' "${changed_files:-}" | grep '^supabase/migrations/' || true)"
@@ -166,6 +176,7 @@ jobs:
             echo "- requires_deploy: $requires_deploy"
             echo "- promotion_repair_only: $promotion_repair_only"
             echo "- seyeon_manifest_repair_only: $seyeon_manifest_repair_only"
+            echo "- chat_credit_signup_scope_only: $chat_credit_signup_scope_only"
             echo "- reason: $reason"
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -181,6 +192,7 @@ jobs:
       SUPABASE_PROMOTION_REPAIR_ONLY: ${{ needs.change-gate.outputs.promotion_repair_only }}
       SUPABASE_SEYEON_MANIFEST_ACL_REPAIR_ONLY: ${{ needs.change-gate.outputs.seyeon_manifest_repair_only }}
       SUPABASE_SAJU_ADMISSION_RECONCILE_ONLY: ${{ needs.change-gate.outputs.saju_admission_reconcile_only }}
+      SUPABASE_CHAT_CREDIT_SIGNUP_SCOPE_ONLY: ${{ needs.change-gate.outputs.chat_credit_signup_scope_only }}
       SUPABASE_PRODUCTION_SERVER_ROOT_CERT_PEM: ${{ secrets.SUPABASE_PRODUCTION_SERVER_ROOT_CERT_PEM }}
 
     steps:
