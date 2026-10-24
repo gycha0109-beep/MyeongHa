@@ -90,9 +90,9 @@ describe('Seyeon empty-room initialization with historical Reveal HOLD', () => {
     expect(data.data.characterId).toBe('seyeon');
     expect(data.data.messages).toHaveLength(0);
     expect(reads).toHaveLength(2);
-    expect(reads[0].values).toEqual([SUBJECT_ID, THREAD_ID]);
-    expect(reads[1].values[0]).toBe(SUBJECT_ID);
-    expect(reads[1].values[1]).toBe(THREAD_ID);
+    expect(reads[0]?.values).toEqual([SUBJECT_ID, THREAD_ID]);
+    expect(reads[1]?.values[0]).toBe(SUBJECT_ID);
+    expect(reads[1]?.values[1]).toBe(THREAD_ID);
   });
 
   it('keeps any Seyeon message history protected pending current-rights proof', async () => {
