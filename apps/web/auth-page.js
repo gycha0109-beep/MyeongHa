@@ -812,8 +812,9 @@ export function createAuthPageController(adapter) {
   const callbacks = new URL(location.href).searchParams;
   // A pre-account verification redirect must remount its signup-only
   // completion handler even though a fresh AuthPage defaults to Sign-in.
-  mode = callbacks.get('preenrollmentIdentity') === 'callback' &&
-    callbacks.get('social') !== 'callback' ? 'sign-up' : 'sign-in';
+  mode = ((callbacks.get('preenrollmentIdentity') === 'callback' ||
+    callbacks.get('mode') === 'sign-up') &&
+    callbacks.get('social') !== 'callback') ? 'sign-up' : 'sign-in';
   busy = false;
   ui.setMode(mode);
   ui.setBusy(false, mode);

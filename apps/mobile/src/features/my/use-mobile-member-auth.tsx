@@ -10,6 +10,7 @@ import {
   MobileSocialAuthErrorV1,
 } from '@/core/auth/mobile-social-auth';
 import { nativeMobileSocialAuthServiceV1 } from '@/core/auth/native-mobile-social-auth';
+import { resolveMobilePreenrollmentAdmissionV1 } from '@/core/auth/mobile-preenrollment-web-handoff';
 import { MobileSocialAuthReturnGateV1 } from '@/core/auth/mobile-social-auth-return-gate';
 import { describeMobileAuthDiagnosticV1 } from '@/features/my/mobile-auth-error-diagnostics';
 import { nativeMobilePushServiceV1 } from '@/core/push/native-mobile-push-service';
@@ -108,6 +109,37 @@ export function useMobileMemberAuthV1() {
   const [authRevision, setAuthRevision] = useState(0);
   const socialReturnGate = useRef(new MobileSocialAuthReturnGateV1());
   const socialCallbackInFlight = useRef(false);
+
+  // Native HTTP requests cannot reuse the browser's HttpOnly __Host- cookie.
+  // New account creation therefore runs only in the first-party web origin
+  // when A1 preenrollment is enabled; legacy flows remain unchanged while OFF.
+  const requireWebPreenrollment = useCallback(async () => {
+    const decision = await resolveMobilePreenrollmentAdmissionV1({
+      apiOrigin: nativeMobileRuntimeV1.config.apiOrigin,
+      fetchImpl: fetch,
+    });
+    if (decision.kind === 'legacy') return false;
+    if (decision.kind === 'unavailable') {
+      setState(Object.freeze({
+        kind: 'error' as const,
+        message: '현재 신규 가입과 소셜 인증 가능 여부를 확인할 수 없습니다. 연결을 확인하고 다시 시도해 주세요.',
+      }));
+      return true;
+    }
+    try {
+      await Linking.openURL(decision.webUrl);
+      setState(Object.freeze({
+        kind: 'error' as const,
+        message: '본인확인과 새 계정 생성은 공식 웹 브라우저에서 진행합니다. 완료 후 앱에서 기존 계정으로 로그인해 주세요.',
+      }));
+    } catch {
+      setState(Object.freeze({
+        kind: 'error' as const,
+        message: '공식 가입 페이지를 열지 못했습니다. 브라우저에서 명하 계정 생성 화면을 이용해 주세요.',
+      }));
+    }
+    return true;
+  }, []);
   const resumeCancelTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const clearResumeCancelTimer = useCallback(() => {
@@ -257,6 +289,7 @@ export function useMobileMemberAuthV1() {
   }, [handleSocialCallback]);
 
   const signInWithSocial = useCallback(async (provider: SocialAuthProviderV1) => {
+    if (await requireWebPreenrollment()) return false;
     clearResumeCancelTimer();
     const attempt = socialReturnGate.current.begin();
     setState(Object.freeze({ kind: 'submitting', message: null }));
@@ -280,7 +313,7 @@ export function useMobileMemberAuthV1() {
       }
       return false;
     }
-  }, [clearResumeCancelTimer, scheduleResumeCancel]);
+  }, [clearResumeCancelTimer, scheduleResumeCancel, requireWebPreenrollment]);
 
   const cancelSocialSignIn = useCallback(async () => {
     clearResumeCancelTimer();
@@ -316,6 +349,7 @@ export function useMobileMemberAuthV1() {
   }, []);
 
   const signUp = useCallback(async (email: string, password: string) => {
+    if (await requireWebPreenrollment()) return false;
     setState(Object.freeze({ kind: 'submitting', message: null }));
     try {
       const result = await mobileNewMemberEnrollmentServiceV1.start(email, password);
@@ -359,7 +393,7 @@ export function useMobileMemberAuthV1() {
       setState(Object.freeze({ kind: 'error', message: messageFor(error) }));
       return false;
     }
-  }, []);
+  }, [requireWebPreenrollment]);
 
   const completeSignUp = useCallback(async (email: string, password: string) => {
     setState(Object.freeze({ kind: 'submitting', message: null }));
