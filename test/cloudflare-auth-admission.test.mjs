@@ -34,6 +34,42 @@ async function get(path, bindings, method = 'GET', base = PRIVATE_ORIGIN, header
 }
 
 describe('Cloudflare Auth/DB admission is fail-closed until explicit host and secrets', () => {
+  it('rejects malformed trusted composition origins before OAuth redirects', async () => {
+    for (const webOrigin of [
+      'http://auth.synthetic-myeongha.dev',
+      PRIVATE_ORIGIN + '/',
+      PRIVATE_ORIGIN + '/callback',
+      PRIVATE_ORIGIN + '?next=evil',
+      PRIVATE_ORIGIN + '#fragment',
+      'https://user:password@auth.synthetic-myeongha.dev',
+      'not-an-origin',
+    ]) {
+      const naver = await handleNaverOAuthBridgeRequestV1({
+        request: new Request(PRIVATE_ORIGIN + '/api/auth/social/naver/authorize'),
+        action: 'authorize',
+        env: {
+          MYEONGHA_NAVER_OAUTH_BRIDGE_ENABLED: 'true',
+          MYEONGHA_NAVER_CLIENT_ID: 'synthetic-app',
+          MYEONGHA_NAVER_OAUTH_BRIDGE_KEY: randomBytes(32).toString('base64url'),
+        },
+        webOrigin,
+      });
+      expect(naver.status).toBe(400);
+      expect(naver.headers.get('location')).toBeNull();
+      const social = await handleSocialAuthStartRequestV1({
+        request: new Request(PRIVATE_ORIGIN + '/api/auth/social/start', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ provider: 'google', redirectUri: PRIVATE_ORIGIN + '/auth.html?social=callback' }),
+        }),
+        env: { MYEONGHA_SOCIAL_AUTH_GOOGLE_ENABLED: 'true' },
+        webOrigin,
+      });
+      expect(social.status).toBe(400);
+      expect(social.headers.get('location')).toBeNull();
+    }
+  });
+
   it('returns original 404 for all protected paths when no approval binding exists', async () => {
     for (const [path, method] of [
       ['/api/auth/sign-in', 'POST'],
