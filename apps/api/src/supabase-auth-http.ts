@@ -430,8 +430,14 @@ export async function handleSupabaseAuthRequestV1(input: {
       const providedState = completeBody === null
         ? null
         : readRequiredString(completeBody, 'state', 128);
-      if (refreshToken === null || /\s/u.test(refreshToken) ||
-          providedState === null || !/^[A-Za-z0-9_-]{16,128}$/u.test(providedState)) {
+      if (refreshToken === null || /\s/u.test(refreshToken)) {
+        return errorResponse('INVALID_REQUEST', 400);
+      }
+      // A1-only protection: the legacy/off social transport already has
+      // browser pending-state correlation but historically accepts requests
+      // without a server-side A1 state. Do not silently break that path.
+      if (input.preenrollmentMemberPort !== undefined &&
+          (providedState === null || !/^[A-Za-z0-9_-]{16,128}$/u.test(providedState))) {
         return errorResponse('INVALID_REQUEST', 400);
       }
       if (input.preenrollmentMemberPort !== undefined) {

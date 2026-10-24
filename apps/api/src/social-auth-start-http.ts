@@ -181,6 +181,13 @@ export async function handleSocialAuthStartRequestV1(input: {
   if (!providerEnabled(input.env, provider)) {
     return failure('SOCIAL_AUTH_PROVIDER_DISABLED', 503);
   }
+  if (denied !== null && provider === 'naver') {
+    // The custom Naver bridge is currently fail-closed during A1 admission:
+    // its server-to-server token/userinfo stages cannot safely carry the
+    // pre-account browser proof. Reject before sending a customer into an
+    // OAuth redirect that cannot return through the verified-age gate.
+    return failure('SOCIAL_AUTH_PROVIDER_DISABLED', 503);
+  }
 
   const now = input.nowEpochMs?.() ?? Date.now();
   let state = randomState();

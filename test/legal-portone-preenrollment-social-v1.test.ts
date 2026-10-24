@@ -58,6 +58,22 @@ describe('A1 Social Auth preverified age hold and atomic Member binding', () => 
     expect((await declined.json()).error.code).toBe('AGE_VERIFICATION_REQUIRED');
   });
 
+  it('holds Naver OAuth before redirect when A1 has no approved bridge transport', async () => {
+    const request = new Request('https://myeongha.vercel.app/api/auth/social/start', {
+      method: 'POST',
+      headers: { Origin: 'https://myeongha.vercel.app', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ provider: 'naver',
+        redirectUri: 'https://myeongha.vercel.app/auth.html?social=callback' }),
+    });
+    const result = await handleSocialAuthStartRequestV1({
+      request, env: { ...env, MYEONGHA_SOCIAL_AUTH_NAVER_ENABLED: 'true' },
+      preenrollmentMemberPort: admission(true),
+    });
+    expect(result.status).toBe(503);
+    expect((await result.json()).error.code).toBe('SOCIAL_AUTH_PROVIDER_DISABLED');
+    expect(result.headers.get('set-cookie')).toBeNull();
+  });
+
   it('lets verified EXISTING Social Members discover Web OAuth without a new proof', async () => {
     const request = new Request('https://myeongha.vercel.app/api/auth/social/start', {
       method: 'POST',
