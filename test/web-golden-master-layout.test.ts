@@ -70,13 +70,13 @@ describe('Web Golden Master', () => {
     expect(html).toContain('href="saju-preview-landing.css"');
     expect(saju).toContain('id="saju-hub"');
     expectInOrder(page.slice(page.indexOf('return (')), [
-      '무료 프리뷰 화면',
       'saju-empty',
       'saju-hub',
       '나의 사주 기본 정보',
       '입력 정보',
       '나의 사주 명식',
       '유료 사주 해석에서 제공되는 내용',
+      '다른 사주 주제',
       '예시 결과물 미리보기',
     ]);
     expectInOrder(page.slice(page.indexOf('const productPreviewTopics')), [
@@ -98,6 +98,7 @@ describe('Web Golden Master', () => {
     for (const id of runtimeIds) expect(saju).toContain(`id="${id}"`);
     expect(saju).not.toContain('gm-sidebar');
     expect(design).toContain('.saju-design-product-grid');
+    expect(design).toContain('.saju-design-more-grid');
     expect(design).toContain('@media (max-width:690px)');
   });
 
