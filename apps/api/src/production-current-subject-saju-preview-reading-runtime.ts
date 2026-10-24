@@ -18,6 +18,7 @@ import {
   type SajuAbuseOutcomeObservationWriterV1,
 } from './saju-abuse-observability.js';
 import { createProductionPostgresSubjectPoolLeaseV1 } from './production-postgres-subject-pool-lease.js';
+import { createProductionPortOneVerifiedAgeAdmissionPortV1 } from './portone-v2-age-enforcement-activation-v1.js';
 
 export interface ProductionCurrentSubjectSajuPreviewReadingRequestV1 {
   readonly request: Request;
@@ -58,6 +59,10 @@ export function createProductionCurrentSubjectSajuPreviewReadingRuntimeV1(
       ? {}
       : { memberFetchImpl: input.memberFetchImpl }),
   });
+  const ageAdmissionPort = createProductionPortOneVerifiedAgeAdmissionPortV1({
+    env: input.env,
+    pool: poolLease.pool,
+  });
   const sajuAdapter = createSajuPreviewReadingHttpAdapterV1({
     baseUrl: sajuConfig.serviceOrigin,
     bearerToken: sajuConfig.serviceBearer,
@@ -83,6 +88,7 @@ export function createProductionCurrentSubjectSajuPreviewReadingRuntimeV1(
         identityEvidenceVerifier: observedIdentityEvidenceVerifier,
         pool: poolLease.pool,
         sajuAdapter,
+        ...(ageAdmissionPort === undefined ? {} : { ageAdmissionPort }),
       });
 
       observeSajuAbuseOutcomeV1({

@@ -1,4 +1,12 @@
 import { executeSecurityObservedRequestV1 } from '../apps/api/src/security-observability.js';
+import {
+  createProductionPortOneIdentityHttpRuntimeV1,
+  resolveProductionPortOneIdentityHttpModeV1,
+} from '../apps/api/src/portone-v2-production-identity-http-runtime-v1.js';
+import {
+  handlePortOneV2IdentityIssueRequestV1,
+  handlePortOneV2IdentityCompleteRequestV1,
+} from '../apps/api/src/portone-v2-identity-http-v1.js';
 import { canonicalizeRequestUiLocaleHeadersV1 } from '../apps/api/src/request-ui-locale-v1.js';
 import { createNodePostgresSubjectPoolV1 } from '../apps/api/src/node-postgres-subject-pool.js';
 import { createProductionChatReadRuntimeV1 } from '../apps/api/src/production-chat-read-runtime.js';
@@ -22,6 +30,9 @@ import { parseProductionUserDataRuntimeConfigV1 } from '../apps/api/src/producti
 export const config = Object.freeze({ maxDuration: 60 });
 
 const PROFILE_ROUTE = '/api/me' as const;
+const IDENTITY_ISSUE_ROUTE = '/api/identity-verifications/attempts' as const;
+const IDENTITY_COMPLETE_ROUTE = '/api/identity-verifications/complete' as const;
+const IDENTITY_ACTION_PARAM = '__myeongha_identity_action' as const;
 const LIFE_RECORD_ROUTE = '/api/life-record' as const;
 const READINGS_ROUTE = '/api/readings' as const;
 const MEMORIES_ROUTE = '/api/memories' as const;
@@ -54,6 +65,7 @@ const VERCEL_SHARE_PARAM = '_vercel_share' as const;
 const NO_STORE_CACHE_CONTROL = 'no-store' as const;
 
 let sharedPostgresPool: ReturnType<typeof createNodePostgresSubjectPoolV1> | undefined;
+let identityRuntime: ReturnType<typeof createProductionPortOneIdentityHttpRuntimeV1> | undefined;
 let profileRuntime:
   | ReturnType<typeof createProductionCurrentSubjectProfileRuntimeV1>
   | undefined;
@@ -96,6 +108,14 @@ function getSharedPostgresPool(): ReturnType<typeof createNodePostgresSubjectPoo
     parseProductionUserDataRuntimeConfigV1(process.env),
   );
   return sharedPostgresPool;
+}
+
+function getIdentityRuntime(): ReturnType<typeof createProductionPortOneIdentityHttpRuntimeV1> {
+  identityRuntime ??= createProductionPortOneIdentityHttpRuntimeV1({
+    env: process.env,
+    pool: getSharedPostgresPool(),
+  });
+  return identityRuntime;
 }
 
 function getProfileRuntime(): ReturnType<typeof createProductionCurrentSubjectProfileRuntimeV1> {
@@ -203,6 +223,8 @@ function getSajuPreviewReadingRuntime(): ReturnType<typeof createProductionCurre
 }
 
 type DispatchTarget =
+  | { readonly kind: 'identity-issue'; readonly route: typeof IDENTITY_ISSUE_ROUTE }
+  | { readonly kind: 'identity-complete'; readonly route: typeof IDENTITY_COMPLETE_ROUTE }
   | { readonly kind: 'profile'; readonly route: typeof PROFILE_ROUTE }
   | { readonly kind: 'saju-preview-reading'; readonly route: typeof SAJU_PREVIEW_READING_ROUTE }
   | {
@@ -284,6 +306,8 @@ function getChatPathThreadId(pathname: string): string | null | undefined {
   if (getChatTurnPathThreadId(pathname) !== undefined) return undefined;
   if (
     pathname === PROFILE_ROUTE ||
+    pathname === IDENTITY_ISSUE_ROUTE ||
+    pathname === IDENTITY_COMPLETE_ROUTE ||
     pathname === CHAT_OPEN_ROUTE ||
     pathname === LIFE_RECORD_ROUTE ||
     pathname === READINGS_ROUTE ||
@@ -360,6 +384,7 @@ function resolveDispatchTarget(request: Request): DispatchTarget | null {
 
   const keys = [...new Set(url.searchParams.keys())];
   const knownKeys = new Set<string>([
+    IDENTITY_ACTION_PARAM,
     RECORDS_ROUTE_PARAM,
     SEYEON_GRANT_STATUS_PARAM,
     SEYEON_GRANT_REVOKE_PARAM,
@@ -401,6 +426,23 @@ function resolveDispatchTarget(request: Request): DispatchTarget | null {
         keys.some(key => key !== SEYEON_GRANT_STATUS_PARAM && key !== VERCEL_SHARE_PARAM)) return null;
     return { kind: 'seyeon-memory-grant-status',
       route: `${MEMORIES_ROUTE}/${grantStatusId}/grants/seyeon` };
+  }
+
+  // Reuse the existing Vercel function budget rather than adding two public
+  // serverless functions. Only exact source routes or the governed rewrite
+  // markers reach the currently disabled identity handlers.
+  const identityAction = getSingleNonEmptyParam(url.searchParams, IDENTITY_ACTION_PARAM);
+  const identitySourceAction = url.pathname === IDENTITY_ISSUE_ROUTE ? 'issue'
+    : url.pathname === IDENTITY_COMPLETE_ROUTE ? 'complete' : undefined;
+  if (identityAction !== undefined || identitySourceAction !== undefined) {
+    if ((identityAction !== 'issue' && identityAction !== 'complete') ||
+        (url.pathname !== PROFILE_ROUTE && identitySourceAction !== identityAction) ||
+        keys.some(key => key !== IDENTITY_ACTION_PARAM && key !== VERCEL_SHARE_PARAM)) {
+      return null;
+    }
+    return identityAction === 'issue'
+      ? { kind: 'identity-issue', route: IDENTITY_ISSUE_ROUTE }
+      : { kind: 'identity-complete', route: IDENTITY_COMPLETE_ROUTE };
   }
 
   const recordsRoute = getSingleNonEmptyParam(url.searchParams, RECORDS_ROUTE_PARAM);
@@ -804,6 +846,9 @@ function routeNotFound(): Response {
 
 function runtimeForTarget(target: DispatchTarget) {
   switch (target.kind) {
+    case 'identity-issue':
+    case 'identity-complete':
+      throw new Error('Disabled identity routes are dispatched before runtime initialization.');
     case 'profile':
       return getProfileRuntime();
     case 'saju-preview-reading':
@@ -842,6 +887,31 @@ export default {
         if (target === null) {
           cancelUnusedRequestBodyBestEffort(request);
           return routeNotFound();
+        }
+
+        if (target.kind === 'identity-issue' || target.kind === 'identity-complete') {
+          const identityRequest = toCanonicalMeRequestForTestV1(request, target);
+          try {
+            // OFF never initializes a database pool or reads provider secrets.
+            if (resolveProductionPortOneIdentityHttpModeV1(process.env) === 'off') {
+              return target.kind === 'identity-issue'
+                ? handlePortOneV2IdentityIssueRequestV1({ request: identityRequest, requestId })
+                : handlePortOneV2IdentityCompleteRequestV1({ request: identityRequest, requestId });
+            }
+            return await getIdentityRuntime().handleRequest({
+              request: identityRequest,
+              requestId,
+              serverTime,
+              action: target.kind === 'identity-issue' ? 'issue' : 'complete',
+            });
+          } catch {
+            // Fail closed without disclosing contract state, keys or private DB errors.
+            return Response.json({
+              ok: false,
+              error: { code: 'IDENTITY_VERIFICATION_UNAVAILABLE', retryable: false },
+              meta: { requestId },
+            }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
+          }
         }
 
         const result = await runtimeForTarget(target).handleRequest({

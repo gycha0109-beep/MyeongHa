@@ -77,7 +77,12 @@ function fakePool(input: { queriedSql?: string[]; commandConstraint?: string } =
   };
 }
 
-function invoke(input: { request?: Request; evidence?: VerifiedSubjectIdentityEvidenceV1 | null; pool?: PostgresSubjectPoolV1 } = {}) {
+function invoke(input: {
+  request?: Request;
+  evidence?: VerifiedSubjectIdentityEvidenceV1 | null;
+  pool?: PostgresSubjectPoolV1;
+  adultAdmission?: (evidence: VerifiedSubjectIdentityEvidenceV1) => Promise<boolean>;
+} = {}) {
   return handlePurchaseIntentCreateRequestV3({
     request: input.request ?? post({ productOfferId: OFFER_ID, idempotencyKey: 'checkout-1' }),
     requestId: 'req-purchase-intent-v3',
@@ -85,10 +90,52 @@ function invoke(input: { request?: Request; evidence?: VerifiedSubjectIdentityEv
     identityEvidenceVerifier: verifier(input.evidence === undefined ? { kind: 'member', verifiedAuthUserId: AUTH_USER_ID } : input.evidence),
     pool: input.pool ?? fakePool(),
     idPort: { nextPurchaseIntentId: vi.fn(async () => PURCHASE_INTENT_ID) },
+    ...(input.adultAdmission === undefined ? {} : {
+      ageAdmissionPort: { admitAdultDirectPurchase: input.adultAdmission },
+    }),
   });
 }
 
 describe('Purchase Intent v3 HTTP runtime foundation', () => {
+  it('refuses 14-18 or unknown adult age before opening the purchase DB', async () => {
+    for (const evidence of [
+      { kind: 'member' as const, verifiedAuthUserId: AUTH_USER_ID },
+      { kind: 'guest' as const, verifiedGuestTokenHash: 'guest-fingerprint' },
+    ]) {
+      const connect = vi.fn();
+      const verifyAdult = vi.fn(async () => false);
+      const response = await invoke({
+        pool: { connect },
+        evidence,
+        adultAdmission: verifyAdult,
+      });
+      expect(response.status).toBe(403);
+      expect((await response.json()).error.code).toBe('ADULT_PURCHASE_REQUIRED');
+      expect(verifyAdult).toHaveBeenCalledWith(evidence);
+      expect(connect).not.toHaveBeenCalled();
+    }
+  });
+
+  it('fails closed when trusted adult lookup is unavailable', async () => {
+    const connect = vi.fn();
+    const response = await invoke({
+      pool: { connect },
+      adultAdmission: async () => { throw new Error('DB unavailable'); },
+    });
+    expect(response.status).toBe(503);
+    expect(connect).not.toHaveBeenCalled();
+  });
+
+  it('creates intent only after verified adult admission', async () => {
+    const query: string[] = [];
+    const response = await invoke({
+      pool: fakePool({ queriedSql: query }),
+      adultAdmission: async () => true,
+    });
+    expect(response.status).toBe(200);
+    expect(query.some(x => x.includes('cmd_create_purchase_intent_v3'))).toBe(true);
+  });
+
   it('requires verified identity before parsing body or connecting PostgreSQL', async () => {
     const connect = vi.fn(async () => { throw new Error('must not connect'); });
     const request = new Request('https://myeongha.internal/internal-not-publicly-mounted', {

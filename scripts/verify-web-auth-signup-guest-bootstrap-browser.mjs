@@ -222,6 +222,7 @@ try {
     localStorage.removeItem(${JSON.stringify(handoffKey)});
     sessionStorage.removeItem(${JSON.stringify(guestBearerKey)});
     document.querySelector('#auth-tab-signup').click();
+    document.querySelector('[data-legal-age-self-declaration] input').click();
   })()`);
   await waitFor(
     client,

@@ -187,6 +187,8 @@ async function waitFor(client, expression, message) {
 function scheduleSignUpExpression() {
   return `(() => {
     document.querySelector('#auth-tab-signup').click();
+    const ageConfirm = document.querySelector('[data-legal-age-self-declaration] input');
+    if (!ageConfirm?.checked) ageConfirm?.click();
     document.querySelector('#auth-email').value = ${JSON.stringify(currentEmail)};
     document.querySelector('#auth-password').value = ${JSON.stringify(password)};
     document.querySelector('#auth-password-confirm').value = ${JSON.stringify(password)};

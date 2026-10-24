@@ -49,6 +49,10 @@ export function ChatPage() {
             </div>
           </header>
 
+          <p className="character-ai-disclosure" data-legal-ai-generation-label>
+            이 대화의 캐릭터 답변은 생성형 AI가 작성합니다. 캐릭터는 실제 사람이 아니며, 답변은 사실과 다를 수 있습니다.
+          </p>
+
           <div className="conversation-thread-bar" data-thread-bar hidden>
             <span aria-hidden="true">◇</span>
             <span>이어진 이야기</span>
@@ -65,6 +69,15 @@ export function ChatPage() {
               </div>
             </article>
           </div>
+
+          <p className="character-ai-disclosure" data-legal-sensitive-chat-guidance>
+            건강·종교·성생활 등 민감한 정보와 타인의 개인정보는 대화에 입력하지 마세요. 입력된 대화는 AI 답변 생성에 사용될 수 있습니다.
+          </p>
+
+          <label className="character-ai-disclosure" data-legal-age-chat-attestation-label>
+            <input type="checkbox" data-legal-age-chat-attestation />
+            저는 만 14세 이상이며, 개인화 대화가 AI 답변 생성에 사용될 수 있음을 확인했습니다.
+          </label>
 
           <form className="character-composer conversation-composer" data-composer data-runtime-busy="false">
             <label className="sr-only" htmlFor="character-message">메시지</label>

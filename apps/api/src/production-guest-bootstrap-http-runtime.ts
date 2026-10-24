@@ -1,3 +1,4 @@
+import { denyUnverifiedInitialIdentityAdmissionV1 } from './portone-v2-preidentity-admission-v1.js';
 import { handleGuestBootstrapRequestV1 } from './guest-bootstrap-http.js';
 import { createNodePostgresSubjectPoolV1 } from './node-postgres-subject-pool.js';
 import {
@@ -59,6 +60,13 @@ export function createProductionGuestBootstrapHttpRuntimeV1(
 
   return Object.freeze({
     async handleRequest(requestInput: ProductionGuestBootstrapHttpRequestV1) {
+      if (requestInput.request.method === 'POST') {
+        const denied = denyUnverifiedInitialIdentityAdmissionV1({
+          env: input.env,
+          surface: 'guest-bootstrap',
+        });
+        if (denied !== null) return denied;
+      }
       const runtimePorts = createProductionGuestBootstrapRuntimePortsV1({
         request: requestInput.request,
         config,

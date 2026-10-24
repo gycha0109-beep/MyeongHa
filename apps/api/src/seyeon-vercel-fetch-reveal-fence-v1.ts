@@ -35,6 +35,7 @@ const STATIC_JSON_DENIALS_V1 = Object.freeze([
   [400, 'INVALID_REQUEST', 'request.invalid', false],
   [401, 'AUTH_REQUIRED', 'auth.required', false],
   [403, 'FORBIDDEN', 'chat.member_required', false],
+  [403, 'AGE_VERIFICATION_REQUIRED', 'age.verification_required', false],
   [404, 'NOT_FOUND', 'chat.not_found', false],
   [408, 'REQUEST_BODY_TIMEOUT', 'auth.request_body_timeout', false],
   [409, 'IDEMPOTENCY_CONFLICT', 'chat.idempotency_conflict', false],

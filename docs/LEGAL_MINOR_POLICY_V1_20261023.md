@@ -1,0 +1,73 @@
+# 명하 연령·미성년자 처리 정책 v1 — 2026-10-23
+
+Watchtower-Track: legal-compliance
+상태: **제품 정책 임시 확정 / L2 코드 부분 구현 / 출시 법무·운영 증거 HOLD**.
+적용 범위: 대한민국 대상 명하 무료 가입·게스트/출생정보/캐릭터 대화 및 장래의 유료 공식 해설. 사용자 지시에 따라 법령 검토를 거쳐 보수적인 기본 정책을 정한다.
+
+## 1. 법률과 제품 정책 구분
+
+| 구분 | 현재 법적 요구·위험 | 명하 정책(운영 선택) |
+| --- | --- | --- |
+| 만 14세 미만 | 개인정보 보호법 §22의2: 동의가 필요한 처리에서는 **법정대리인 동의와 동의 사실 확인** 필요. 시행령 §17의2에 확인 방법 규정. 14세 미만에게는 쉬운 설명 제공 | 법정대리인 동의 검증 플로우가 없으므로 **계정 신규 등록 및 개인화 서비스 제공 대상에서 제외**. 이는 한국법의 전 서비스 일괄 이용금지 규정이 아니라 위험 최소화를 위한 선택 |
+| 만 14~18세 | 개인정보 보호법의 **14세 미만 특별 동의 규칙**이 기계적으로 적용되는 구간은 아님. 민법 §4·§5: 19세 미만 미성년자의 법률행위에는 원칙적으로 법정대리인의 동의가 필요하며 취소 위험 존재 | **무료 기능만 허용**하되 수집 목적·민감정보 주의·미성년자에게 알기 쉬운 안내 유지. 동의·계약 성립 조건/이용약관은 무료 기능도 별도 검토 |
+| 만 19세 이상 | 민법 §4에 따른 성년 | 유료 콘텐츠의 *연령* 요건은 충족할 수 있지만 **가격·상품·고지·환불·권한·호스팅·DB 등 기존 출시 게이트가 여전히 우선** |
+
+법령:
+- 개인정보 보호법 §22의2, 2026-09-11 시행: https://www.law.go.kr/LSW/lsLinkCommonInfo.do?chrClsCd=010202&lsJoLnkSeq=1029334873
+- 개인정보 보호법 시행령 §17의2(법정대리인 동의 확인 절차): https://law.go.kr/LSW/lsInfoP.do?ancYnChk=0&lsId=011468
+- 민법 §4(19세 성년): https://www.law.go.kr/LSW/lsLinkCommonInfo.do?chrClsCd=010202&lsJoLnkSeq=1029560047
+- 민법 §5(미성년자 법률행위): https://law.go.kr/LSW/lsLinkCommonInfo.do?chrClsCd=010202&lsJoLnkSeq=1026990807
+
+**법률 적용 주의:** §22의2는 14세 미만 아동의 개인정보 처리에 *이 법에 따른 동의가 필요한 경우* 법정대리인 동의·확인을 요구한다. 개인정보의 모든 수집·이용이 자동으로 동의 필수인 것처럼 오인하지 않는다. 이 정책은 법적 최소기준보다 보수적인 **서비스 제공 범위 결정**을 포함한다.
+
+## 2. 실제 구현 및 검증 범위
+
+- `apps/api/src/legal-minor-age-policy-v1.ts`: 한국 시간 기준 **서버 시계**로 자기 Birth Profile의 신고 생일을 분류. 양력 만 14세 생일 당일에는 무료만 허용하며 19세부터 성인 분류. 음력 기준 **만 14세 경계 출생연도**는 정확한 양력 변환 권위가 검증되지 않아 임의 계산 없이 보류.
+- `apps/api/src/birth-profile-create-http.ts`: `POST /api/birth-profiles`에서 **PostgreSQL 연결·HMAC 계산·저장 전에** 만 14세 미만/연령 경계 불명 요청을 HTTP 403으로 차단하고 고정 오류코드 `AGE_RESTRICTED` / `AGE_VERIFICATION_REQUIRED`를 반환. 데이터 원문·태어난 날짜를 오류 응답 및 로그에 넣지 않는다.
+- `apps/web/src/birth/BirthPage.tsx`, `apps/web/src/reading/ReadingPage.tsx`: 정책 고지와 서버 거부 표시. `apps/web/src/auth/AuthPage.tsx`: 신규 이메일 가입 및 소셜 인증 시작에서 **14세 이상 본인 선언**을 확인. `apps/web/src/chat/ChatPage.tsx` 및 `apps/web/chat-runtime-client.js`: 메시지 전송 전 동일 자기 선언 체크 여부 확인. **이 선언은 연령·본인 확인/법정대리인 동의 확인이 아니며 직접 API 호출을 차단하지 못한다.**
+- 결제 SDK·공개 Offer·PG 연동은 기존대로 OFF. 직접 구매는 **19세 이상 성인 자격이 신뢰할 수 있는 서버 권위로 확인된 이후에만** 별도 활성화 판단할 수 있다. 자기 Birth Profile 생년월일로 결제 자격을 증명하지 않는다.
+- 기존 고객 데이터/기존 계정의 연령 소급검증·일괄 삭제는 진행하지 않는다. 개인정보 파기·복원은 Privacy/DB 책임 영역.
+
+## 2.1 2026-10-23 본인확인 제공자 추가 결정
+
+- **제공자 확정:** PortOne V2. 기존 결제 PSP 결정 `P0-CM-02`와 같으나 **인증 채널/검증 저장/권한 발급/거래 ID는 결제와 별도**. `P0-AGE-02 = DECIDED`.
+- **공식 브라우저 API:** `PortOne.requestIdentityVerification({ storeId, identityVerificationId, channelKey })`; 모바일 redirect 쿼리는 서버 신뢰 증거가 아니다.
+- **공식 서버 API:** `GET https://api.portone.io/identity-verifications/{identityVerificationId}`; 비밀 키는 서버에서만 사용. 결과의 `status === 'VERIFIED'` + `id` 일치 + `verifiedCustomer.birthDate`로 **한국 시간 기준 만 14/19세 밴드** 평가. 본인확인 수단은 다날·KCP 휴대폰 또는 이니시스 통합인증 등 *PortOne V2에서 허용된 계약 채널*로만 구성.
+- **구현:** `apps/api/src/portone-v2-identity-verification-contract-v1.ts`는 서버 조회 응답을 평가하는 **읽기 전용, 오프라인 판정 함수**. 서버가 발행한 Subject 연결 인증 시도 ID와 미소비 상태 검증, 미확인/잘못된 인증/14세 미만은 거절하고 `free_minor` 또는 `adult` 밴드만 반환. 전화번호·이름·CI·DI·원문 생년월일 등은 반환하지 않음. `test/legal-portone-v2-identity-verification-contract.test.ts`에서 성공·미성년·거짓 응답·타인 인증 ID·소비된 시도 거부를 검증.
+- **이번 구현 확장:** `apps/api/src/portone-v2-identity-verification-lookup-v1.ts`에 **서버 전용 PortOne V2 GET 조회 어댑터**를 추가했다. 비밀키 기반 `Authorization: PortOne ...`, 고정 `https://api.portone.io` URL, 리다이렉트 금지, 전체 요청/응답 타임아웃 및 16KiB 응답 상한, HTTP 상태·JSON·검증 결과 불일치시 Fail Closed, 원시 이름·전화번호·CI·DI·생년월일 반환 금지를 검증한다. `apps/api/src/portone-v2-identity-age-finalization-v1.ts`는 인증 시도 소유 Subject 조회 → 서버 단건조회 → *원자적 1회 소비 및 연령 밴드 저장이 가능한 권위 포트*를 순서대로 실행하는 오케스트레이션 계약이다. 관련 `test/legal-portone-v2-identity-lookup-v1.test.ts`, `test/legal-portone-v2-identity-age-finalization-v1.test.ts` 추가. 현재 오프라인 가짜 응답 기반 테스트만 수행하며 **실제 운영 API 요청·DB 쓰기 경로는 없음**.
+- **구현/운영 구분:** 서버 ID 발급·만료·원자적 소비 SQL **제안 및 TypeScript 어댑터**, 인증 HTTP **비등록 처리기**, 삭제 트리거 **제안**은 작성했다. 하지만 실제 DB migration/SDK/라우트, 계정 Subject 인증 권한 영속화 실증, 환경 비밀키·인증 채널 설정, 한국 외 인증·개명 처리 및 운영 계약·요금은 **미완료**. 실제 인증과 공개 API는 계속 OFF.
+- **개인정보 최소화:** 인증업체에 건네는 값과 인증 후 저장할 최소 필드/처리 목적/보존기간/제3자 제공·위탁은 실제 계약과 개인정보 처리방침 확정 후 명시. CI/DI·전화번호·이름 수집을 기능적으로 자동 승인하지 않음.
+- **공식 근거:** https://developers.portone.io/opi/ko/extra/identity-verification/readme-v2 / https://developers.portone.io/api/rest-v2/identityVerification
+
+
+### 2.2 PostgreSQL 인증 시도 발급·조회·1회 소비 — 코드 구현, DB 적용 보류
+
+- 제안 SQL: `supabase/proposals/1740_portone_identity_age_authority_v1.proposed.sql`. **배포된 마이그레이션 아님.** 기존 canonical Subject FK와 DB 서버 시계로 인증 ID를 발급하고, 10분 만료 및 동일 Subject당 1개 pending 제한을 적용.
+- 제안 저장 항목: `legal_portone_identity_attempts_v1`에 인증 ID/Subject/상태/시각, `legal_portone_verified_age_v1`에 Subject/나이 구간/인증 ID/검증 시각만 저장. 원본 출생일, 이름, 전화번호, CI/DI, 응답 전문은 저장하지 않음.
+- `apps/api/src/postgres-portone-identity-age-authority-v1.ts`는 기존 Subject 권위 트랜잭션으로 Issue/Read/Consume SQL을 호출하며, 인증 대상 Subject가 인증된 Subject와 다르면 DB 명령 전에 거절. **외부 PortOne HTTP 요청 중에는 DB 트랜잭션을 유지하지 않음.**
+- `test/legal-postgres-portone-identity-age-authority-v1.test.ts`는 모의 PostgreSQL에서 트랜잭션 분리, 다른 Subject 차단, 잘못된 DB 결과 거절, SQL 정책을 확인. 실제 PostgreSQL17에 제안 SQL을 실행한 동시성·ACL·삭제/복원 E2E 통과 근거는 **없음**.
+- **후속 필수:** DB Authority에 제안 SQL을 인계해 계정 삭제 35 DELETE / 4 ANONYMIZE / 9 RETAIN P5Y 및 백업 P30D 정책에 새 테이블을 반영하고, Guest→Member 승격·만료 증빙·자격 갱신을 검증한 뒤 migration 적용. 인증 제공자 계약·키·SDK·공개 API는 모두 OFF.
+
+
+### 2.3 본인확인 발급·완료 HTTP 및 삭제 트리거 제안 (2026-10-24)
+
+- `apps/api/src/portone-v2-identity-http-v1.ts`: `POST /api/identity-verifications/attempts`와 `POST /api/identity-verifications/complete`를 위한 **비등록된 서버 HTTP 처리기**를 작성. Auth/Guest 인증 증거로 Subject를 DB에서 다시 확인하며, 발급 요청은 빈 JSON만 허용해 클라이언트 지정 인증 ID·Subject를 받지 않음. 완료 요청은 서버가 발급한 형식의 인증 ID 1개만 받고, PortOne 서버 재조회와 DB 1회 소비가 모두 성공한 경우에만 최소 연령 구간을 응답. 실패 시 PII/비밀값/DB 상세 노출 금지. **기본 OFF, Vercel 공개 라우트 없음, 테스트 전용 활성화 주입 외에는 실행 불가**.
+- `supabase/proposals/1740_portone_identity_age_authority_v1.proposed.sql`에 Subject가 `deletion_pending`/`deleted`/`merged` 등 비활성 상태로 전환하면 본인확인 시도와 연령 증빙을 트랜잭션 내 삭제하는 trigger 함수 제안. 기존 계정 삭제 정책은 Subject 행을 `ANONYMIZE`하므로, `ON DELETE CASCADE`만으로 삭제 완료로 판단하지 않음. DB/Privacy의 정식 삭제·백업 P30D·P5Y 보존 계약 변경 없음.
+- 소규모 `test/legal-portone-v2-identity-http-v1.test.ts`로 라우트 OFF·서버 ID 발급·검증 후 1회 기록·재사용 차단만 확인. 실제 DB 마이그레이션, 트리거 실증, SDK·PortOne 인증 채널 계약은 미진행.
+- **다음:** DB Authority/Privacy 정본의 삭제 처분 목록에 두 제안 테이블을 `DELETE` 후보로 편입하고 PG17에서 트리거·권한을 확인한 후, 안전하게 운영 라우트·연령 권한 강제를 연결할 수 있는지 판단. 기존 승인된 `46 DELETE / 4 ANONYMIZE / 9 RETAIN` 등의 기준 집계와 지문은 임의 변경하지 않음.
+
+## 3. 출시 전에 반드시 남은 항목
+
+- [ ] **A1 가입 경계:** 서버 회원가입, 소셜 가입·콜백, 게스트 발급에서 **회피할 수 없는 신뢰 가능한 연령 증명/거절**. 현재 브라우저의 체크박스만으로는 API 직접 호출, 기존 계정 사용, 소셜 우회가 가능하다. 만 14세 미만 서비스 일괄 차단 완료 주장은 금지한다.
+- [ ] **A2 채팅/기존 계정:** 서버 캐릭터 대화·저장·AI 전송 전 이용 연령 확인; 출생프로필을 만들지 않은 가입자가 나이를 증명했다는 가정 금지.
+- [ ] **A3 음력 경계:** 달력 권위에 따른 음력→양력 변환 검증 후 만 14세·만 19세 생일 처리. 현행 경계 보류는 성인 또는 14세 이상 이용자를 일부 거절할 수 있는 보수적 정책이다.
+- [ ] **A4 유료 상품:** Commerce 소유의 상품/결제 권위에서 **검증된 성년 자격** 확인, 구매 직전 가드 및 법정대리인 동의 기반 미성년자 구매를 지원할지 별도 선택. 현재는 미성년 직접 결제 OFF이며 상품 판매 전체도 OFF.
+- [ ] **A5 문서·운영:** 실제 무료 약관 성립 방식, 개인정보 수집 법적 근거, 14~18세 고지, 계정삭제/권리행사 채널, 상담·시스템 오류 시 구제, 개인정보 처리방침 게시 버전.
+- [ ] **A6 운영 검증:** 운영 환경/브라우저·모바일·권한이 다른 API 요청에서 미성년자 가입·대화·외부 모델 전송·명식록 생성이 경로별로 예상대로 거절되는 실증.
+
+## 4. 비활성화 유지
+
+- 법정대리인 정보 수집, 본인확인 서비스, 신분증 저장, 자녀/부모 신원 연결 등은 **이번 변경에 추가하지 않음**.
+- `P0-PR-02` 개인정보 삭제·백업 30일·상거래 5년 보존과 RR-03 정책을 수정하지 않음.
+- 14세 자기 신고 및 생년월일 값은 **신원검증 증빙이 아니라 미확인 사용자 주장**. 이를 신뢰 가능한 계약·결제 권위로 재사용하지 않는다.
+- 법무 최종 판정은 A1–A6 완료 전 **HOLD**로 유지한다.

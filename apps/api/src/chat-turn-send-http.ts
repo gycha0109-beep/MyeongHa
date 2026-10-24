@@ -1,4 +1,5 @@
 import { ApiCommandError } from './api-error.js';
+import type { PortOneVerifiedAgeAdmissionPortV1 } from './portone-v2-verified-age-admission-v1.js';
 import type { IdentityEvidenceVerificationPortV1 } from './current-subject-profile-http.js';
 import type { VerifiedSubjectIdentityEvidenceV1 } from './subject-identity-resolver.js';
 import {
@@ -42,6 +43,8 @@ export interface HandleSeyeonChatTurnSendRequestInputV1 {
   readonly serverTime: string;
   readonly identityEvidenceVerifier: IdentityEvidenceVerificationPortV1;
   readonly runtime: Pick<ProductionSeyeonChatRuntimeV1, 'run'>;
+  /** Server-only injection; OFF until PortOne DB authority is deployed. */
+  readonly ageAdmissionPort?: Pick<PortOneVerifiedAgeAdmissionPortV1, 'admitFreePersonalization'>;
 }
 
 function jsonError(input: {
@@ -295,6 +298,27 @@ export async function handleSeyeonChatTurnSendRequestV1(
     identityEvidenceVerifier: input.identityEvidenceVerifier,
   });
   if (preflight.kind === 'denied') return preflight.response;
+  // Never run the AI provider when required verified-age proof is absent.
+  // This injection remains OFF in production until the proposed DB schema is approved.
+  if (input.ageAdmissionPort !== undefined) {
+    let admitted = false;
+    try {
+      admitted = await input.ageAdmissionPort.admitFreePersonalization(preflight.verifiedEvidence);
+    } catch {
+      return jsonError({
+        status: 503, code: 'AGE_VERIFICATION_UNAVAILABLE',
+        messageKey: 'age.verification_unavailable', retryable: true,
+        requestId: input.requestId,
+      });
+    }
+    if (!admitted) {
+      return jsonError({
+        status: 403, code: 'AGE_VERIFICATION_REQUIRED',
+        messageKey: 'age.verification_required', retryable: false,
+        requestId: input.requestId,
+      });
+    }
+  }
 
   try {
     // G0/G3 current-rights Reveal has no DB-owned linearization seam yet.

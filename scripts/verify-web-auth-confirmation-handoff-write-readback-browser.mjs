@@ -259,6 +259,8 @@ try {
     localStorage.setItem(${JSON.stringify(handoffKey)}, ${JSON.stringify(legacyAggregate)});
     sessionStorage.setItem(${JSON.stringify(activeBearerKey)}, ${JSON.stringify(currentGuest)});
     document.querySelector('#auth-tab-signup').click();
+    const ageConfirm = document.querySelector('[data-legal-age-self-declaration] input');
+    if (!ageConfirm?.checked) ageConfirm?.click();
     document.querySelector('#auth-email').value = ${JSON.stringify(currentEmail)};
     document.querySelector('#auth-password').value = ${JSON.stringify(password)};
     document.querySelector('#auth-password-confirm').value = ${JSON.stringify(password)};

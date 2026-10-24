@@ -273,6 +273,8 @@ async function prepareGuestTab(client, origin, guestBearer, { clearShared = fals
 async function scheduleSignUp(client, email) {
   const scheduled = await client.evaluate(`(() => {
     document.querySelector('#auth-tab-signup').click();
+    const ageConfirm = document.querySelector('[data-legal-age-self-declaration] input');
+    if (!ageConfirm?.checked) ageConfirm?.click();
     const emailInput = document.querySelector('#auth-email');
     const passwordInput = document.querySelector('#auth-password');
     const confirmation = document.querySelector('#auth-password-confirm');

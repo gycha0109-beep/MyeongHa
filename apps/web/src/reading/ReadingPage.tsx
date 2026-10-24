@@ -78,6 +78,8 @@ export function ReadingPage() {
               </select>
             </label>
 
+            <p className="saju-guest-note" data-legal-age-policy-notice>명하의 개인화 서비스는 만 14세 이상 이용할 수 있습니다. 만 14세 미만은 보호자 동의 확인 기능이 준비되기 전까지 명식록을 만들 수 없습니다.</p>
+            <p className="saju-guest-note" data-legal-birth-data-guidance>본인의 출생정보만 입력해 주세요. 입력한 출생정보는 명식 계산에 사용되고 명식록에 저장됩니다.</p>
             <div className="saju-form-error" id="saju-form-error" hidden role="alert" />
             <button className="saju-primary-button" id="saju-create-button" type="submit">
               <span>내 사주 만들기</span><span aria-hidden="true">→</span>

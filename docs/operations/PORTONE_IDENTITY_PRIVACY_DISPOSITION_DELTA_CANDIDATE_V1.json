@@ -1,0 +1,62 @@
+{
+  "schema": "myeongha-portone-identity-privacy-disposition-delta-candidate-v1",
+  "track": "legal-compliance",
+  "status": "PROPOSED_NOT_APPLIED",
+  "executionAuthorized": false,
+  "existingApprovedPolicy": "docs/operations/ACCOUNT_DELETION_DISPOSITION_POLICY_V1.json",
+  "existingApprovedGraph": "docs/operations/TRANSITIVE_SUBJECT_DEPENDENCY_GRAPH_V1.json",
+  "existingApprovedGraphFingerprintSha256": "c745bacb0e9b2d13013c1048fc4273203af68b9c4816eef7b6c9fe37e4db167b",
+  "existingApprovedDispositionCounts": {
+    "DELETE": 46,
+    "ANONYMIZE": 4,
+    "RETAIN": 9
+  },
+  "existingApprovedReachableTables": 59,
+  "additionalSubjectOwnedTables": [
+    {
+      "table": "legal_portone_identity_attempts_v1",
+      "subjectColumn": "subject_id",
+      "disposition": "DELETE",
+      "sourcePurpose": "single-use PortOne identity attempt",
+      "containsRawIdentityResult": false,
+      "retentionPeriod": null,
+      "purgeEvents": [
+        "subject_inactive",
+        "subject_merged",
+        "subject_deleted"
+      ],
+      "expiryDuration": "PT10M",
+      "note": "Authorization expires at the existing ten-minute TTL. Bounded SQL cleanup is implemented but unscheduled and unapplied; physical deletion occurs only when an authorized system-worker invocation executes it.",
+      "expiryPurgeFunction": "public.internal_purge_expired_legal_portone_attempts_v1",
+      "expiryPurgeMaxBatch": 250,
+      "expiryPurgeScheduled": false,
+      "physicalCleanupRule": "DB expires_at <= clock_timestamp() for pending/consumed/expired attempts; verified-age authority remains separate."
+    },
+    {
+      "table": "legal_portone_verified_age_v1",
+      "subjectColumn": "subject_id",
+      "disposition": "DELETE",
+      "sourcePurpose": "minimum verified age band (free_minor/adult)",
+      "containsRawIdentityResult": false,
+      "retentionPeriod": null,
+      "purgeEvents": [
+        "subject_inactive",
+        "subject_merged",
+        "subject_deleted"
+      ],
+      "note": "No separate P5Y Commerce retention. Do not carry Guest identity proof to a different Member subject without a separately verified reconciliation."
+    }
+  ],
+  "backupHandling": "P30D_EXISTING_CYCLE_UNCHANGED",
+  "commerceEvidenceRetention": "P5Y_EXISTING_CLASSES_UNCHANGED",
+  "sqlProposal": "supabase/proposals/1740_portone_identity_age_authority_v1.proposed.sql",
+  "releaseCandidate": "supabase/release-candidates/1740_portone_identity_age_authority_v1.sql",
+  "releasePrerequisites": [
+    "DB Authority and Privacy disposition graph reconciliation",
+    "PostgreSQL17 RLS/SECURITY DEFINER/DELETE transition smoke",
+    "Physical purge function deployed, execution cadence authorized and verified, including deletion/backups policy",
+    "Provider contract/channel and secret configuration",
+    "Verified public auth and guest age admission route integration"
+  ],
+  "notes": "An additive pending-policy delta only. Do not mutate or recalculate the existing approved P0-PR-01 graph and fingerprint. Never run release candidate automatically."
+}

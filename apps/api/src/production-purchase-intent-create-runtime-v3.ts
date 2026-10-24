@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { PostgresSubjectPoolV1 } from './postgres-subject-execution.js';
 import { createProductionPostgresSubjectPoolLeaseV1 } from './production-postgres-subject-pool-lease.js';
+import { createProductionPortOneVerifiedAgeAdmissionPortV1 } from './portone-v2-age-enforcement-activation-v1.js';
 import { createProductionRequestIdentityVerifierV1 } from './production-request-identity-verifier.js';
 import {
   parseProductionUserDataRuntimeConfigV1,
@@ -43,10 +44,26 @@ export function createProductionPurchaseIntentCreateRuntimeV3(
     config,
     ...(input.memberFetchImpl === undefined ? {} : { memberFetchImpl: input.memberFetchImpl }),
   });
+  const ageAdmissionPort = createProductionPortOneVerifiedAgeAdmissionPortV1({
+    env: input.env,
+    pool: poolLease.pool,
+  });
   const idPort = Object.freeze({ nextPurchaseIntentId: randomUUID });
 
   return Object.freeze({
     handleRequest(requestInput: ProductionPurchaseIntentCreateRequestV3) {
+      // Unlike free personalization, direct purchase has no OFF fallback:
+      // never open a purchase intent unless the adult authority is enabled.
+      if (requestInput.request.method === 'POST' && ageAdmissionPort === undefined) {
+        return Promise.resolve(Response.json({
+          ok: false,
+          error: {
+            code: 'PURCHASE_UNAVAILABLE',
+            messageKey: 'commerce.purchase_unavailable',
+            retryable: false,
+          },
+        }, { status: 503, headers: { 'Cache-Control': 'no-store' } }));
+      }
       return handlePurchaseIntentCreateRequestV3({
         request: requestInput.request,
         requestId: requestInput.requestId,
@@ -54,6 +71,7 @@ export function createProductionPurchaseIntentCreateRuntimeV3(
         identityEvidenceVerifier,
         pool: poolLease.pool,
         idPort,
+        ...(ageAdmissionPort === undefined ? {} : { ageAdmissionPort }),
       });
     },
     close() {
