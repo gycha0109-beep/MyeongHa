@@ -55,9 +55,9 @@ describe('Legal A1 native-to-web preenrollment admission', () => {
     ), 'utf8');
     const signup = hook.slice(hook.indexOf('  const signUp = useCallback('));
     const social = hook.slice(hook.indexOf('  const signInWithSocial = useCallback('));
-    expect(signup.indexOf('await requireWebPreenrollment()'))
+    expect(signup.indexOf("await requireWebPreenrollment('signup')"))
       .toBeLessThan(signup.indexOf('mobileNewMemberEnrollmentServiceV1.start('));
-    expect(social.indexOf('await requireWebPreenrollment()'))
+    expect(social.indexOf("await requireWebPreenrollment('social')"))
       .toBeLessThan(social.indexOf('nativeMobileSocialAuthServiceV1.start('));
     expect(hook).toContain('Linking.openURL(decision.webUrl)');
     expect(hook).toContain('nativeMobileRuntimeV1.memberSession.signIn(email, password)');
@@ -80,6 +80,7 @@ describe('Legal A1 native-to-web preenrollment admission', () => {
       '현재 신규 가입과 소셜 인증 가능 여부를 확인할 수 없습니다. 연결을 확인하고 다시 시도해 주세요.',
       '본인확인과 새 계정 생성은 공식 웹 브라우저에서 진행합니다. 완료 후 앱에서 기존 계정으로 로그인해 주세요.',
       '공식 가입 페이지를 열지 못했습니다. 브라우저에서 명하 계정 생성 화면을 이용해 주세요.',
+      '현재 앱의 소셜 로그인은 본인확인 적용 중 사용할 수 없습니다. 웹의 소셜 로그인 세션은 앱으로 자동 연결되지 않습니다.',
     ]) {
       for (const locale of ['ja-JP', 'zh-TW'] as const) {
         const translated = translateMobileUiCopy(text, locale);

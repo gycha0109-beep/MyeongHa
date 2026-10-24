@@ -124,7 +124,7 @@ export function useMobileMemberAuthV1() {
   // Native HTTP requests cannot reuse the browser's HttpOnly __Host- cookie.
   // New account creation therefore runs only in the first-party web origin
   // when A1 preenrollment is enabled; legacy flows remain unchanged while OFF.
-  const requireWebPreenrollment = useCallback(async () => {
+  const requireWebPreenrollment = useCallback(async (purpose: 'signup' | 'social') => {
     const decision = await resolveMobilePreenrollmentAdmissionV1({
       apiOrigin: nativeMobileRuntimeV1.config.apiOrigin,
       fetchImpl: fetch,
@@ -141,6 +141,15 @@ export function useMobileMemberAuthV1() {
       return true;
     }
     setWebPreenrollmentRequired(true);
+    if (purpose === 'social') {
+      // A system-browser OAuth session cannot be silently imported into this
+      // Native app; calling it a successful Mobile login would be incorrect.
+      setState(Object.freeze({
+        kind: 'error' as const,
+        message: '현재 앱의 소셜 로그인은 본인확인 적용 중 사용할 수 없습니다. 웹의 소셜 로그인 세션은 앱으로 자동 연결되지 않습니다.',
+      }));
+      return true;
+    }
     try {
       await Linking.openURL(decision.webUrl);
       setState(Object.freeze({
@@ -304,7 +313,7 @@ export function useMobileMemberAuthV1() {
   }, [handleSocialCallback]);
 
   const signInWithSocial = useCallback(async (provider: SocialAuthProviderV1) => {
-    if (await requireWebPreenrollment()) return false;
+    if (await requireWebPreenrollment('social')) return false;
     clearResumeCancelTimer();
     const attempt = socialReturnGate.current.begin();
     setState(Object.freeze({ kind: 'submitting', message: null }));
@@ -364,7 +373,7 @@ export function useMobileMemberAuthV1() {
   }, []);
 
   const signUp = useCallback(async (email: string, password: string) => {
-    if (await requireWebPreenrollment()) return false;
+    if (await requireWebPreenrollment('signup')) return false;
     if (email.trim().length === 0 || password.length === 0) {
       setState(Object.freeze({
         kind: 'error', message: '이메일과 비밀번호를 입력해 주세요.',
