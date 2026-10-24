@@ -73,7 +73,7 @@ describe('Saju admission on actual HTTP consumers', () => {
   });
 
   it('rejects malformed numeric policy returned by the authoritative store', async () => {
-    const currentGate = gate({ admissionPort: { admit: vi.fn(async () => ({ policy, allowed: true, requestCount: 1, resetAt: new Date(NOW + 1000).toISOString(), evaluatedAt: new Date(NOW).toISOString(), policy: { ...policy, windowSeconds: NaN } })) } });
+    const currentGate = gate({ admissionPort: { admit: vi.fn(async () => ({ allowed: true, requestCount: 1, resetAt: new Date(NOW + 1000).toISOString(), evaluatedAt: new Date(NOW).toISOString(), policy: { ...policy, windowSeconds: NaN } })) } });
     const response = await admitSajuAbuseHttpRequestV1({ request: request(routes[0]), requestId: 'req-1', routeId: routes[0], evidence: MEMBER, gate: currentGate });
     expect(response?.status).toBe(503);
     expect(currentGate.admissionPort.admit).toHaveBeenCalledTimes(1);
