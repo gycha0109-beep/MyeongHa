@@ -1,7 +1,6 @@
 import { ensureActiveBearer, getActiveBearer, invalidateGuestSession, invalidateMemberSession } from './product-auth.js';
 import { getUiLocale } from './ui-i18n.js';
 import { resumePreviewHrefV1 } from './reading-preview-continuation.js';
-import { installSajuOverviewRetryV1, loadSajuOverviewReadingV1 } from './saju-overview-reading.js';
 import {
   sajuPillarLabelV1, sajuElementLabelV1, sajuYinYangLabelV1,
   projectSajuPillarDisplayV1, sajuCompletenessLabelV1,
@@ -139,9 +138,35 @@ async function readBirthProfile(token, birthProfileId) {
   }
 }
 
-// The calculation endpoint independently authorizes the current subject/revision.
-// Failure to fetch optional birth-summary labels must not discard real calculated pillars.
+// The current-subject endpoint resolves a persisted profile independently of
+// this browser tab's sessionStorage. Its identity is checked by the server.
+async function readCurrentBirthProfile(token) {
+  const response = await fetch('/api/me/birth-profile', {
+    method: 'GET',
+    headers: bearerHeaders(token),
+    credentials: 'same-origin',
+    cache: 'no-store',
+  });
+  if (!response.ok) return null;
+  const data = unwrapSuccess(await readJson(response));
+  const profile = data?.birthProfile;
+  return profile?.currentRevision?.input ? profile : null;
+}
+
+// A calculated Saju is never hidden just because optional birth-label retrieval
+// is unavailable. Prefer current-subject authority over a tab-local profile ID.
 async function readDisplayBirthProfile(token, birthProfileId) {
+  try {
+    const current = await readCurrentBirthProfile(token);
+    if (current) {
+      if (typeof current.birthProfileId === 'string') {
+        writeSessionValue(BIRTH_PROFILE_ID_KEY, current.birthProfileId);
+      }
+      return current;
+    }
+  } catch {
+    // The older by-ID route remains available for deployments without this read.
+  }
   if (!birthProfileId) return null;
   try {
     return await readBirthProfile(token, birthProfileId);
@@ -527,7 +552,6 @@ async function loadExistingSaju() {
       profile = await readDisplayBirthProfile(token, storedId);
     }
     renderCalculation(calculation, profile);
-    void loadSajuOverviewReadingV1(activeBearer);
   } catch (error) {
     if (error?.status === 401) {
       handleUnauthorized(activeBearer);
@@ -568,8 +592,10 @@ async function submitBirthProfile(event) {
     profileCreated = true;
     const calculation = await calculateSaju(token);
     const profile = await readDisplayBirthProfile(token, receipt.birthProfileId);
-    renderCalculation(calculation, profile);
-    void loadSajuOverviewReadingV1(activeBearer);
+    // The successful server create receipt confirms the submitted input was
+    // accepted. Use it for this page if the optional profile GET is unavailable.
+    const displayProfile = profile ?? { currentRevision: { input: request.input } };
+    renderCalculation(calculation, displayProfile);
     const continuedPreview = resumePreviewHrefV1(window.location.search);
     if (continuedPreview) window.location.assign(continuedPreview);
   } catch (error) {
@@ -602,7 +628,6 @@ async function submitBirthProfile(event) {
   }
 }
 
-installSajuOverviewRetryV1();
 setupBirthDateInputs();
 byId('saju-time-unknown').addEventListener('change', syncBirthControls);
 for (const input of document.querySelectorAll('input[name="saju-calendar"]')) {
