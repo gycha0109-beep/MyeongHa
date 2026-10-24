@@ -29,22 +29,29 @@ function digest(value:unknown):string {
  * It does not sign arbitrary Preflight integrity claims, relationship
  * overlays, disclosure retrieval or modified Bible/policy fields. The final
  * assembled Interpreter input must equal the deterministic assembly of
- * precisely that pinned input under zero added sources. This rejects newly
- * assembled derived context BEFORE the first Provider request; G0/DB Owner
- * approval remains a separate requirement.
+ * precisely that pinned input, including the exact DB-owned current User
+ * message, under zero added historical sources. This rejects newly assembled
+ * derived context BEFORE Interpreter dispatch; G0/DB Owner approval remains
+ * a separate requirement. Public-only Preflight runs before this seal.
  */
 export function assertSeyeonPositiveG1FinalModelContextSealV1(input:Readonly<{
   pinnedContextInput:RunSeyeonCharacterTurnV2Input['contextInput'];
   pinnedContextInputDigest:string;
   selectedSourcesDigest:string;
   sourceCandidates:readonly SeyeonPersonalRecordProjectionCandidateV1[];
+  currentUserMessageRef:string;
+  currentUserText:string;
   assembledContext:SeyeonRuntimeContextV2;
 }>):void {
   try {
     if(digest(input.pinnedContextInput)!==input.pinnedContextInputDigest ||
        input.pinnedContextInput.relationship!==null ||
        !Array.isArray(input.pinnedContextInput.recentMessages) ||
-       input.pinnedContextInput.recentMessages.length!==0) {
+       input.pinnedContextInput.recentMessages.length!==1 ||
+       !input.currentUserMessageRef || !input.currentUserText ||
+       input.pinnedContextInput.recentMessages[0]?.role!=='user' ||
+       input.pinnedContextInput.recentMessages[0]?.messageId!==input.currentUserMessageRef ||
+       input.pinnedContextInput.recentMessages[0]?.text!==input.currentUserText) {
       throw new SeyeonPositiveG1FinalModelContextHoldV1();
     }
     const expected=assembleSeyeonRuntimeContextV2({
@@ -57,7 +64,7 @@ export function assertSeyeonPositiveG1FinalModelContextSealV1(input:Readonly<{
     });
     if(canonicalJson(input.assembledContext)!==canonicalJson(expected) ||
        expected.retrievedMemories.length!==1 ||
-       expected.recentConversation.length!==0 ||
+       expected.recentConversation.length!==1 ||
        expected.integrity.decisions.length!==0 ||
        expected.disclosure.retrievedSources.length!==0) {
       throw new SeyeonPositiveG1FinalModelContextHoldV1();

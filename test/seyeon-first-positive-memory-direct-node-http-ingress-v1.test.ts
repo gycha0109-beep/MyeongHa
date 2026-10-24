@@ -28,7 +28,7 @@ function result(): RunProductionSeyeonChatResultV1 {
     execution: {
       disposition: 'executed',
       receivedTurn: {
-        turnId, userMessageId: userId, threadCharacterId: 'seyeon',
+        turnId, userMessageId: userId, threadCharacterId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
         turnState: 'received', replayed: false, committedTurn: null,
         userText: '안녕 세연',
       },
