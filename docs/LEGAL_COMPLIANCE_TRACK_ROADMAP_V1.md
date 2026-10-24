@@ -231,3 +231,9 @@
 - 기존 검증 Member가 **가입 전 A1 본인확인 쿠키로 소셜 OAuth를 시작한 뒤 기존 계정으로 로그인**하면, 새 Member를 생성하지 않더라도 남아 있는 미소비 사전 연령 증명을 `cmd_consume_legal_portone_preenrollment_v1`로 단일 소비한다. 이후에만 인증 세션을 반환하고 사전 연령 쿠키를 폐기한다.
 - 앞 절의 별도 기존 회원 OAuth 상태 쿠키로 로그인하는 경로에는 A1 증명이 없으므로 이 소비를 요구하지 않는다. 동일 사전 증명으로 기존 회원 로그인과 신규 Guest/Member 생성에 중복 사용할 수 있는 여지를 닫는다.
 - 만료·경합·DB 오류로 증명 소비에 실패하면 세션/쿠키 발급을 거절한다. `test/legal-portone-preenrollment-social-v1.test.ts`에 소비 성공 시 쿠키 제거, 소비 실패 시 인증 결과 미발급 확인을 추가했다. SQL 자체는 기존 미적용 1741 제안이며 운영 적용/PG17 증빙은 여전히 별도 조건이다.
+
+
+## 28. 2026-10-25 독립 검증 단계·최종 통합 게이트 정본
+
+- 검증 실행 순서/합격 기준/실행 URL 및 head SHA 기반 증거 기록은 [`LEGAL_COMPLIANCE_VALIDATION_PLAN_V1.md`](./LEGAL_COMPLIANCE_VALIDATION_PLAN_V1.md)를 따른다. 구현 중 표적 단위·격리 DB 검증과 구현 완료 후 **고정 SHA의 CI Integration**을 구분한다. 전 기능 완료 전에 통합 CI·병합을 실행하지 않는다.
+- 문서는 현재 모든 GREEN 상태를 **미확인**으로 명시한다. 실제 SQL 배포·PortOne 실인증·유료 판매·법정 게시를 승인하거나 실행하지 않는다.
