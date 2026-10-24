@@ -12,7 +12,7 @@ import type {
 
 const memberAuthId = '91000000-0000-0000-0000-000000000001';
 const subjectId = '92000000-0000-0000-0000-000000000001';
-const identityVerificationId = 'iv_' + 'a'.repeat(32);
+const identityVerificationId = 'iv' + 'a'.repeat(32);
 const expiresAt = '2026-10-23T07:10:00.000Z';
 const evidence = { kind: 'member', verifiedAuthUserId: memberAuthId } as const;
 

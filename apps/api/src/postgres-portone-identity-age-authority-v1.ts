@@ -49,7 +49,7 @@ function checkIssue(rows: readonly IssueRow[]): PostgresPortOneIdentityIssuedAtt
   const row = rows[0]!;
   if (
     typeof row.identityVerificationId !== 'string' ||
-    !/^iv_[a-f0-9]{32}$/u.test(row.identityVerificationId) ||
+    !/^iv[a-f0-9]{32}$/u.test(row.identityVerificationId) ||
     typeof row.expiresAt !== 'string' || !Number.isFinite(Date.parse(row.expiresAt))
   ) throw new Error('PortOne identity issue authority returned invalid output.');
   return Object.freeze({

@@ -10,7 +10,7 @@ export const WEB_PORTONE_IDENTITY_FLOW_V1 = Object.freeze({
   redirectValue: 'callback',
 });
 
-const ID_PATTERN = /^iv_[a-f0-9]{32}$/u;
+const ID_PATTERN = /^iv[a-f0-9]{32}$/u;
 const STORE_PATTERN = /^store-[A-Za-z0-9_-]{8,128}$/u;
 const CHANNEL_PATTERN = /^channel-key-[A-Za-z0-9_-]{8,128}$/u;
 
@@ -49,7 +49,8 @@ function assertPending(store, now) {
   let data = null;
   try { data = JSON.parse(value); } catch { return fail('NO_PENDING_IDENTITY'); }
   if (!isObject(data) || !ID_PATTERN.test(data.identityVerificationId) ||
-      typeof data.expiresAt !== 'string' || Date.parse(data.expiresAt) <= now) {
+      typeof data.expiresAt !== 'string' || !Number.isFinite(Date.parse(data.expiresAt)) ||
+      Date.parse(data.expiresAt) <= now) {
     return fail('NO_PENDING_IDENTITY');
   }
   return data;

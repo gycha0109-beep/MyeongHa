@@ -45,7 +45,7 @@ function onlyId(value: unknown): value is { identityVerificationId: string } {
   const obj = value as Record<string, unknown>;
   return Object.keys(obj).length === 1 &&
     typeof obj.identityVerificationId === 'string' &&
-    /^iv_[a-f0-9]{32}$/u.test(obj.identityVerificationId);
+    /^iv[a-f0-9]{32}$/u.test(obj.identityVerificationId);
 }
 async function handle(input: PortOneV2IdentityHttpInputV1, action: 'issue' | 'complete'): Promise<Response> {
   // This remains inert without explicit test injection OR separately approved

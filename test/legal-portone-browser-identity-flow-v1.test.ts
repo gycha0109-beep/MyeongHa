@@ -5,7 +5,7 @@ import {
   WEB_PORTONE_IDENTITY_FLOW_V1,
 } from '../apps/web/portone-v2-identity-flow.js';
 
-const id = 'iv_' + 'a'.repeat(32);
+const id = 'iv' + 'a'.repeat(32);
 const base = 'https://myeongha.vercel.app';
 const expiry = '2026-10-24T08:31:00.000Z';
 const fixedNow = () => Date.parse('2026-10-24T08:22:00.000Z');
@@ -105,7 +105,7 @@ describe('L2 browser PortOne V2 server-owned identity transport', () => {
 
   it('refuses spoofed popup ID without invoking complete', async () => {
     const t = setup({ sdk: { requestIdentityVerification: vi.fn(async () => ({
-      identityVerificationId: 'iv_' + 'b'.repeat(32),
+      identityVerificationId: 'iv' + 'b'.repeat(32),
     })) } });
     await expect(t.flow.start()).rejects.toMatchObject({ code: 'PROVIDER_NOT_VERIFIED' });
     expect(t.calls.map(x => x.route)).toEqual([WEB_PORTONE_IDENTITY_FLOW_V1.issueRoute]);
@@ -116,7 +116,7 @@ describe('L2 browser PortOne V2 server-owned identity transport', () => {
     const t = setup({ sdk: { requestIdentityVerification: vi.fn(async () => undefined) } });
     expect(await t.flow.start()).toEqual({ kind: 'redirect_pending' });
     const spoofed = new URLSearchParams({
-      identityVerification: 'callback', identityVerificationId: 'iv_' + 'b'.repeat(32),
+      identityVerification: 'callback', identityVerificationId: 'iv' + 'b'.repeat(32),
     });
     await expect(t.flow.resumeFromRedirect(spoofed)).rejects.toMatchObject({ code: 'IDENTITY_MISMATCH' });
     const valid = new URLSearchParams({ identityVerification: 'callback', identityVerificationId: id });

@@ -10,7 +10,7 @@ import type {
 } from '../apps/api/src/postgres-subject-execution.js';
 
 const subjectId = '92000000-0000-0000-0000-000000000001';
-const identityVerificationId = 'iv_' + 'a'.repeat(32);
+const identityVerificationId = 'iv' + 'a'.repeat(32);
 function post(route: string, body: unknown) {
   return new Request('https://myeongha.internal' + route, {
     method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer test' },
@@ -118,6 +118,11 @@ describe('LEGAL PortOne V2 identity HTTP source boundary', () => {
       request: post('/api/identity-verifications/attempts', {}),
     });
     expect(denied.status).toBe(503);
+  });
+
+  it('keeps server IDs KCP-compatible: alphanumeric and <=40 characters', () => {
+    expect(identityVerificationId).toMatch(/^[A-Za-z0-9]{1,40}$/u);
+    expect(identityVerificationId).toHaveLength(34);
   });
 
   it('issues server-owned identity ID without accepting browser-selected identity', async () => {

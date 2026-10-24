@@ -76,7 +76,7 @@ age() {
   as_subject "$1" "select coalesce(public.qry_verified_legal_portone_age_v1('$2'::uuid),'NONE');" | tail -n 1
 }
 attempt_id="$(issue "$sql_user_a" "$sql_subject_a")"
-[[ "$attempt_id" =~ ^iv_[a-f0-9]{32}$ ]] || fail 'server attempt not generated'
+[[ "$attempt_id" =~ ^iv[a-f0-9]{32}$ ]] || fail 'server attempt not generated'
 [[ "$(age "$sql_user_a" "$sql_subject_a")" == NONE ]] || fail 'age granted before verification'
 [[ "$(consume "$sql_user_a" "$sql_subject_a" "$attempt_id" free_minor)" == t ]] ||
   fail 'valid single use refused'
