@@ -243,11 +243,17 @@ set search_path=pg_catalog,public
 as $credit_signup$
 declare
   v_now timestamptz := pg_catalog.clock_timestamp();
+  v_new_member boolean := false;
 begin
-  if new.kind='member' and new.status='active' and new.auth_user_id is not null
-     and (tg_op='INSERT' or
-       (tg_op='UPDATE' and (old.kind is distinct from 'member'
-         or old.auth_user_id is null))) then
+  if new.kind='member' and new.status='active' and new.auth_user_id is not null then
+    if tg_op='INSERT' then
+      v_new_member := true;
+    elsif tg_op='UPDATE' then
+      v_new_member := old.kind is distinct from 'member'
+        or old.auth_user_id is null;
+    end if;
+  end if;
+  if v_new_member then
     insert into public.chat_credit_lots_v1
       (subject_id,source_kind,source_ref,credits_issued,credits_remaining,issued_at,expires_at)
     values(new.id,'signup',new.id,50,50,v_now,v_now+interval '30 days')
