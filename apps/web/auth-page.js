@@ -85,6 +85,19 @@ function mergedSocialCallbackParams(url) {
   return merged;
 }
 
+async function preenrollmentCapabilityAvailable() {
+  try {
+    const response = await fetch('/api/identity-verifications/pre-enrollment/capability', {
+      method: 'GET', credentials: 'same-origin', cache: 'no-store',
+    });
+    if (!response.ok) return false;
+    const payload = await response.json();
+    return payload?.ok === true && payload?.data?.available === true;
+  } catch {
+    return false;
+  }
+}
+
 async function startSocialAuth(provider) {
   if (busy) return;
   if (!WEB_SOCIAL_AUTH_PROVIDERS.has(provider)) {
@@ -95,7 +108,12 @@ async function startSocialAuth(provider) {
   setBusy(true);
   setStatus('');
   try {
-    await ensureGuestBearer();
+    // In approved A1 pre-registration mode, creating a Guest would consume
+    // the verified actor's ONE proof before Social OAuth can bind its Member.
+    // Preserve any existing Guest, but never force a new one in this mode.
+    if (!await preenrollmentCapabilityAvailable()) {
+      await ensureGuestBearer();
+    }
     const guestBearer = readGuestBearer();
 
     let response;

@@ -346,6 +346,8 @@ export interface SupabasePreenrollmentMemberBindingPortV1 {
   readVerified(): Promise<boolean>;
   /** Trusted Supabase response UUID only; consumes proof & creates Member+age atomically. */
   bindMember(verifiedAuthUserId: string): Promise<void>;
+  /** Existing verified Social Members must never be rewritten or re-issued. */
+  admitExistingMember?(verifiedAuthUserId: string): Promise<boolean>;
 }
 
 export async function handleSupabaseAuthRequestV1(input: {
@@ -372,7 +374,7 @@ export async function handleSupabaseAuthRequestV1(input: {
         surface: input.action === 'sign-up' ? 'member-sign-up' : 'social-complete',
       });
       if (denied !== null) {
-        if (input.action !== 'sign-up' || input.preenrollmentMemberPort === undefined) {
+        if (input.preenrollmentMemberPort === undefined) {
           return denied;
         }
         try {
@@ -422,7 +424,19 @@ export async function handleSupabaseAuthRequestV1(input: {
         return upstreamError('refresh', upstream.response.status);
       }
       const session = normalizeSession(upstream.payload);
-      if (session === null) return errorResponse('AUTH_UPSTREAM_MALFORMED', 502);
+      if (session === null || session.user.id === null) {
+        return errorResponse('AUTH_UPSTREAM_MALFORMED', 502);
+      }
+      if (input.preenrollmentMemberPort !== undefined) {
+        try {
+          const existing = await input.preenrollmentMemberPort.admitExistingMember?.(session.user.id) ?? false;
+          if (!existing) {
+            await input.preenrollmentMemberPort.bindMember(session.user.id);
+          }
+        } catch {
+          return errorResponse('AGE_VERIFICATION_UNAVAILABLE', 503);
+        }
+      }
       return authenticatedResponse(session, {}, true);
     }
 

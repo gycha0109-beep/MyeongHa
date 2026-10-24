@@ -1,8 +1,8 @@
 import { denyUnverifiedInitialIdentityAdmissionV1 } from './portone-v2-preidentity-admission-v1.js';
+import { createApprovedPortOnePreenrollmentMemberBindingPortV1 } from './portone-v2-approved-member-binding-v1.js';
 import { resolveProductionPortOneVerifiedAgeModeV1 } from './portone-v2-age-enforcement-activation-v1.js';
 import { resolveProductionPortOnePreenrollmentModeV1 } from './portone-v2-preenrollment-http-runtime-v1.js';
 import {
-  createPostgresPortOnePreenrollmentAgeAuthorityV1,
   extractPortOnePreenrollmentCookieV1,
   fingerprintPortOnePreenrollmentBindingV1,
 } from './portone-v2-preenrollment-age-authority-v1.js';
@@ -26,7 +26,6 @@ import {
 import {
   handleSupabaseAuthRequestV1,
   type SupabaseAuthActionV1,
-  type SupabasePreenrollmentMemberBindingPortV1,
 } from './supabase-auth-http.js';
 import type {
   ProductionUserDataRuntimeEnvV1,
@@ -130,7 +129,7 @@ export function createProductionMemberAuthHttpRuntimeV1(
           surface: authAction === 'sign-up' ? 'member-sign-up' : 'social-complete',
         });
         if (denied !== null) {
-          if (authAction !== 'sign-up') return denied;
+          if (authAction !== 'sign-up' && authAction !== 'social-complete') return denied;
           try {
             if (resolveProductionPortOneVerifiedAgeModeV1(input.env) !== 'enforce' ||
                 resolveProductionPortOnePreenrollmentModeV1(input.env) !== 'enforce') return denied;
@@ -169,18 +168,11 @@ export function createProductionMemberAuthHttpRuntimeV1(
       }
       const preenrollmentMemberPort =
         preenrollmentBindingDigest !== undefined && currentState.pool !== undefined
-          ? (() => {
-              const authority = createPostgresPortOnePreenrollmentAgeAuthorityV1(currentState.pool!);
-              const digest = preenrollmentBindingDigest;
-              return Object.freeze({
-                async readVerified() {
-                  return await authority.readVerified(digest) !== null;
-                },
-                async bindMember(verifiedAuthUserId: string) {
-                  await authority.bindMember(verifiedAuthUserId, digest);
-                },
-              } satisfies SupabasePreenrollmentMemberBindingPortV1);
-            })()
+          ? createApprovedPortOnePreenrollmentMemberBindingPortV1({
+              env: input.env,
+              request: requestInput.request,
+              pool: currentState.pool,
+            }) ?? undefined
           : undefined;
 
       return handleMemberAuthRateLimitHttpV1({

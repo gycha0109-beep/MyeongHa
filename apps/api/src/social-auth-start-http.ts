@@ -1,4 +1,5 @@
 import { denyUnverifiedInitialIdentityAdmissionV1 } from './portone-v2-preidentity-admission-v1.js';
+import type { SupabasePreenrollmentMemberBindingPortV1 } from './supabase-auth-http.js';
 import {
   AuthenticatedJsonRequestBodyTooLargeV1,
   readAuthenticatedJsonRequestBodyV1,
@@ -115,6 +116,7 @@ export async function handleSocialAuthStartRequestV1(input: {
   readonly request: Request;
   readonly env: ProductionUserDataRuntimeEnvV1;
   readonly nowEpochMs?: () => number;
+  readonly preenrollmentMemberPort?: Pick<SupabasePreenrollmentMemberBindingPortV1, 'readVerified'>;
 }): Promise<Response> {
   if (input.request.method !== 'POST') {
     cancelUnusedRequestBody(input.request);
@@ -129,8 +131,19 @@ export async function handleSocialAuthStartRequestV1(input: {
     surface: 'social-start',
   });
   if (denied !== null) {
-    cancelUnusedRequestBody(input.request);
-    return denied;
+    if (input.preenrollmentMemberPort === undefined) {
+      cancelUnusedRequestBody(input.request);
+      return denied;
+    }
+    try {
+      if (!await input.preenrollmentMemberPort.readVerified()) {
+        cancelUnusedRequestBody(input.request);
+        return failure('AGE_VERIFICATION_REQUIRED', 403);
+      }
+    } catch {
+      cancelUnusedRequestBody(input.request);
+      return failure('AGE_VERIFICATION_UNAVAILABLE', 503);
+    }
   }
 
   let body: unknown;
