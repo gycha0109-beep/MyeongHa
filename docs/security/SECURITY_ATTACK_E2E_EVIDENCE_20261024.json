@@ -83,7 +83,8 @@
     "scripts/lib/saju-admission-attack-e2e.mjs": "afffa08bce7bc1a7ebbe439ee0f02bde74359a7d6bb8bbb4f22852a6e8687797",
     "scripts/ci/db-pr-router.mjs": "ddb53ed4cab37d1e3b8b838a14f15fc5eb292ab7d176403083f014759bb49910",
     "scripts/ci/db-suites.json": "15f517eb6bac256e8a5d2b87010f269e733274fd9a92de494043741c7ae626ce",
-    "test/db/run_ci_case.sh": "a327a2709fa683e6368614517bf0f572d9b13370de8d8c476913a5d1186f0c4a"
+    "test/db/run_ci_case.sh": "a327a2709fa683e6368614517bf0f572d9b13370de8d8c476913a5d1186f0c4a",
+    "test/saju-held-cross-repo-local-postgres-nonce.test.ts": "0731e9f848c0f4a0939085d5b069a3c5a84bb2595b4a311934ff21b61ae8b536"
   },
   "limitations": [
     "Hosted Auth and successful Saju responses are mocked; actual HTTP, PG17, SQL, restricted LOGIN and deny paths are exercised.",
@@ -95,7 +96,8 @@
     "SQL owner comments now execute before revoking temporary owner membership.",
     "Merged main 50de60e3038dec829a25aab88d64864d35242041 before PR head freeze; preserved both PG17 cases/router entries. Current main already installs pinned dependencies once, so the admission case reuses them. Router 8 tests and merged build PASS; bash syntax PASS.",
     "GitGuardian detected the literal synthetic PostgreSQL config fixture in commit 1f6b18ae. It was never used to connect: the restricted loopback pool is injected. Replaced the unused placeholder password with an in-memory random UUID; fresh 84-request attack E2E rerun PASS.",
-    "PR #2549 preserved as history: GitGuardian continued reporting the removed synthetic credential from old commits. Final reviewed tree transferred to a new branch as one clean commit; no force-push, history deletion or scanner suppression."
+    "PR #2549 preserved as history: GitGuardian continued reporting the removed synthetic credential from old commits. Final reviewed tree transferred to a new branch as one clean commit; no force-push, history deletion or scanner suppression.",
+    "Scope expanded only to the directly triggered cross-repo nonce E2E after failure. Run40078934178 and earlier unrelated run40073579467 both failed two DB inspection assertions because the fixture still derived issuer:audience:nonce while main verifier since a0a14916 uses tuple-v2 including keyId. Updated only the test inspection digest; held/replay/concurrency/tamper/RLS assertions and runtime remain unchanged. Fresh hosted loopback rerun required; no local PG15/issuer PASS claimed."
   ],
   "next": "Required exact-head CI, isolated integration, protected PR merge"
 }
