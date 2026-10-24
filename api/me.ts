@@ -2,6 +2,7 @@ import { executeSecurityObservedRequestV1 } from '../apps/api/src/security-obser
 import { canonicalizeRequestUiLocaleHeadersV1 } from '../apps/api/src/request-ui-locale-v1.js';
 import { createNodePostgresSubjectPoolV1 } from '../apps/api/src/node-postgres-subject-pool.js';
 import { createProductionChatReadRuntimeV1 } from '../apps/api/src/production-chat-read-runtime.js';
+import { createProductionChatCreditWalletRuntimeV1 } from '../apps/api/src/production-chat-credit-wallet-runtime-v1.js';
 import { createProductionSeyeonTurnSendRuntimeV1 } from '../apps/api/src/production-seyeon-turn-send-runtime-v1.js';
 import { createProductionSeyeonMemoryGrantRevokeRuntimeV1 } from '../apps/api/src/production-seyeon-memory-grant-revoke-runtime-v1.js';
 import { createProductionRequestIdentityVerifierV1 } from '../apps/api/src/production-request-identity-verifier.js';
@@ -23,6 +24,8 @@ import { parseProductionUserDataRuntimeConfigV1 } from '../apps/api/src/producti
 export const config = Object.freeze({ maxDuration: 60 });
 
 const PROFILE_ROUTE = '/api/me' as const;
+const CREDIT_WALLET_ROUTE = '/api/me/credits' as const;
+const CREDIT_WALLET_PARAM = '__myeongha_chat_credit_wallet' as const;
 const LIFE_RECORD_ROUTE = '/api/life-record' as const;
 const READINGS_ROUTE = '/api/readings' as const;
 const MEMORIES_ROUTE = '/api/memories' as const;
@@ -57,6 +60,9 @@ const NO_STORE_CACHE_CONTROL = 'no-store' as const;
 let sharedPostgresPool: ReturnType<typeof createNodePostgresSubjectPoolV1> | undefined;
 let profileRuntime:
   | ReturnType<typeof createProductionCurrentSubjectProfileRuntimeV1>
+  | undefined;
+let creditWalletRuntime:
+  | ReturnType<typeof createProductionChatCreditWalletRuntimeV1>
   | undefined;
 let lifeRecordRuntime:
   | ReturnType<typeof createProductionLifeRecordReadRuntimeV1>
@@ -105,6 +111,14 @@ function getProfileRuntime(): ReturnType<typeof createProductionCurrentSubjectPr
     pool: getSharedPostgresPool(),
   });
   return profileRuntime;
+}
+
+function getCreditWalletRuntime(): ReturnType<typeof createProductionChatCreditWalletRuntimeV1> {
+  creditWalletRuntime ??= createProductionChatCreditWalletRuntimeV1({
+    env: process.env,
+    pool: getSharedPostgresPool(),
+  });
+  return creditWalletRuntime;
 }
 
 function getLifeRecordRuntime(): ReturnType<typeof createProductionLifeRecordReadRuntimeV1> {
@@ -206,6 +220,7 @@ function getSajuPreviewReadingRuntime(): ReturnType<typeof createProductionCurre
 
 type DispatchTarget =
   | { readonly kind: 'profile'; readonly route: typeof PROFILE_ROUTE }
+  | { readonly kind: 'credit-wallet'; readonly route: typeof CREDIT_WALLET_ROUTE }
   | { readonly kind: 'saju-preview-reading'; readonly route: typeof SAJU_PREVIEW_READING_ROUTE }
   | {
       readonly kind: 'records';
@@ -363,6 +378,7 @@ function resolveDispatchTarget(request: Request): DispatchTarget | null {
   const keys = [...new Set(url.searchParams.keys())];
   const knownKeys = new Set<string>([
     RECORDS_ROUTE_PARAM,
+    CREDIT_WALLET_PARAM,
     SEYEON_GRANT_STATUS_PARAM,
     SEYEON_GRANT_REVOKE_PARAM,
     READING_RECORD_ID_PARAM,
@@ -384,6 +400,20 @@ function resolveDispatchTarget(request: Request): DispatchTarget | null {
 
   const shareValue = getSingleNonEmptyParam(url.searchParams, VERCEL_SHARE_PARAM);
   if (shareValue === null) return null;
+
+  // Credits are routed through the existing Member /api/me Function to stay
+  // under the hard 12-Function Vercel plan limit. No Subject IDs or unrelated
+  // query keys may cross this private rewrite boundary.
+  const creditWalletValue = getSingleNonEmptyParam(url.searchParams, CREDIT_WALLET_PARAM);
+  if (creditWalletValue === null) return null;
+  if (creditWalletValue !== undefined || url.pathname === CREDIT_WALLET_ROUTE) {
+    if (
+      creditWalletValue !== '1' ||
+      (url.pathname !== PROFILE_ROUTE && url.pathname !== CREDIT_WALLET_ROUTE) ||
+      keys.some(key => key !== CREDIT_WALLET_PARAM && key !== VERCEL_SHARE_PARAM)
+    ) return null;
+    return { kind: 'credit-wallet', route: CREDIT_WALLET_ROUTE };
+  }
 
   const grantRevokeId = getSingleNonEmptyParam(url.searchParams, SEYEON_GRANT_REVOKE_PARAM);
   if (grantRevokeId === null) return null;
@@ -808,6 +838,8 @@ function runtimeForTarget(target: DispatchTarget) {
   switch (target.kind) {
     case 'profile':
       return getProfileRuntime();
+    case 'credit-wallet':
+      return getCreditWalletRuntime();
     case 'saju-preview-reading':
       return getSajuPreviewReadingRuntime();
     case 'records':

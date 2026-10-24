@@ -15,7 +15,6 @@ const fetchBoundaryRoutes = new Map([
   ['api/health.ts', 'api.health'],
   ['api/me.ts', 'api.me.dispatch'],
   ['api/me/birth-profile.ts', 'api.me.birth-profile'],
-  ['api/me/credits.ts', 'api.me.credits'],
   ['api/me/saju/calculation.ts', 'api.me.saju.calculation'],
   ['api/readiness.ts', 'api.readiness'],
   ['api/session/bootstrap.ts', 'api.session.bootstrap'],
