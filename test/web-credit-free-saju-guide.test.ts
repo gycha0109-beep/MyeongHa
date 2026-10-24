@@ -41,12 +41,17 @@ describe('Web credit guidance and free Saju contract', () => {
     for (const field of ['saju-birth-summary','saju-pillar-grid','saju-day-master','saju-element-bars','saju-completeness-copy']) {
       expect(page).toContain(field);
     }
-    expect(page).toContain('className="gm-chart-details" open');
-    expect(page).toContain('무료 기본 명식');
-    expect(page).toContain('정식 읽기 구성 미리보기');
-    expect(page).toContain('구성 안내 예시이며 확정된 결과물 목차가 아닙니다.');
-    expect(page).toContain('판매 준비 중 · 아직 구매할 수 없습니다');
-    expect(page).toContain('href="reading-detail.html?topic=love"');
+    expect(page).toContain('무료 프리뷰 화면');
+    expect(page).toContain('나의 사주 기본 정보');
+    expect(page).toContain('saju-design-birth-fields');
+    expect(page).toContain('saju-design-chart-tabs');
+    expect(page).toContain('유료 사주 해석에서 제공되는 내용');
+    expect(page).toContain('productPreviewTopics.map');
+    expect(page).toContain('예시 결과물 미리보기');
+    expect(page).toContain('현재 결제 기능은 준비 중입니다.');
+    expect(page).toContain('reading-detail.html?topic=love');
+    expect(page).not.toContain('gm-chart-details');
+    expect(page).not.toContain('disabled={!CREDIT_RECHARGE_PUBLIC_CHECKOUT_ACTIVE}');
     expect(page).not.toContain('product_offer_id');
     expect(page).not.toContain('entitlement: true');
     expect(hub).toContain("const SAJU_CALCULATION_ENDPOINT = '/api/me/saju/calculation'");
