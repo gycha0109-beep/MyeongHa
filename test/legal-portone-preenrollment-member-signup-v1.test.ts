@@ -84,4 +84,75 @@ describe('A1 Member signup verified preenrollment binding', () => {
     expect(body).not.toContain(id);
     expect(port.bindMember).toHaveBeenCalledWith(id);
   });
+  const signIn = () => new Request('https://myeongha.vercel.app/api/auth/sign-in', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: 'new@example.com', password: 'strong-test-password' }),
+  });
+  const upstreamSession = () => Response.json({
+    access_token: 'recovery-access-token',
+    refresh_token: 'recovery-refresh-token',
+    expires_in: 3600,
+    user: { id, email: 'new@example.com' },
+  });
+
+  it('recovers orphaned Supabase Auth UUID on a later verified password sign-in', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => upstreamSession()));
+    const existing = vi.fn(async () => false);
+    const port: SupabasePreenrollmentMemberBindingPortV1 = {
+      ...proof(true), admitExistingMember: existing,
+    };
+    const result = await handleSupabaseAuthRequestV1({
+      request: signIn(), action: 'sign-in', env,
+      passwordCompromiseGuard: guard, preenrollmentMemberPort: port,
+    });
+    expect(result.status).toBe(200);
+    expect(existing).toHaveBeenCalledWith(id);
+    expect(port.readVerified).toHaveBeenCalledOnce();
+    expect(port.bindMember).toHaveBeenCalledExactlyOnceWith(id);
+  });
+
+  it('does not rebind existing Member or read new proof after valid sign-in', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => upstreamSession()));
+    const port: SupabasePreenrollmentMemberBindingPortV1 = {
+      ...proof(false), admitExistingMember: vi.fn(async () => true),
+    };
+    const result = await handleSupabaseAuthRequestV1({
+      request: signIn(), action: 'sign-in', env,
+      passwordCompromiseGuard: guard, preenrollmentMemberPort: port,
+    });
+    expect(result.status).toBe(200);
+    expect(port.readVerified).not.toHaveBeenCalled();
+    expect(port.bindMember).not.toHaveBeenCalled();
+  });
+
+  it('allows privacy-capable sign-in without a recoverable proof, but grants no age authority', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => upstreamSession()));
+    const port: SupabasePreenrollmentMemberBindingPortV1 = {
+      ...proof(false), admitExistingMember: vi.fn(async () => false),
+    };
+    const result = await handleSupabaseAuthRequestV1({
+      request: signIn(), action: 'sign-in', env,
+      passwordCompromiseGuard: guard, preenrollmentMemberPort: port,
+    });
+    expect(result.status).toBe(200);
+    expect(port.bindMember).not.toHaveBeenCalled();
+  });
+
+  it('withholds newly-issued session if an attempted orphan recovery fails', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => upstreamSession()));
+    const port: SupabasePreenrollmentMemberBindingPortV1 = {
+      ...proof(true), admitExistingMember: vi.fn(async () => false),
+      bindMember: vi.fn(async () => { throw new Error('DB unavailable'); }),
+    };
+    const result = await handleSupabaseAuthRequestV1({
+      request: signIn(), action: 'sign-in', env,
+      passwordCompromiseGuard: guard, preenrollmentMemberPort: port,
+    });
+    expect(result.status).toBe(503);
+    expect(result.headers.get('set-cookie')).toBeNull();
+    const body = JSON.stringify(await result.json());
+    expect(body).not.toContain('recovery-access-token');
+    expect(body).not.toContain('recovery-refresh-token');
+  });
+
 });

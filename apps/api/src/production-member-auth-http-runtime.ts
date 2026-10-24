@@ -148,6 +148,27 @@ export function createProductionMemberAuthHttpRuntimeV1(
         }
       }
 
+      if (requestInput.request.method === 'POST' && authAction === 'sign-in') {
+        // Sign-in remains available even if no pre-enrollment proof exists.
+        // When an approved proof IS present it can recover an Auth account
+        // whose initial canonical Member binding failed after Signup.
+        try {
+          if (resolveProductionPortOneVerifiedAgeModeV1(input.env) === 'enforce' &&
+              resolveProductionPortOnePreenrollmentModeV1(input.env) === 'enforce' &&
+              requestInput.request.headers.get('origin') === 'https://myeongha.vercel.app') {
+            const rawNonce = extractPortOnePreenrollmentCookieV1(requestInput.request);
+            const secret = input.env.MYEONGHA_PORTONE_PREENROLLMENT_BINDING_SECRET;
+            if (rawNonce !== null && typeof secret === 'string') {
+              preenrollmentBindingDigest = fingerprintPortOnePreenrollmentBindingV1({
+                rawNonce, secret,
+              });
+            }
+          }
+        } catch {
+          // Invalid/inactive optional recovery never prevents a normal login.
+        }
+      }
+
       if (requestInput.request.method !== 'POST') {
         return authHandler({
           request: requestInput.request,

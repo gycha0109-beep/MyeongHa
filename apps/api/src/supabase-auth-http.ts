@@ -534,6 +534,26 @@ export async function handleSupabaseAuthRequestV1(input: {
           }
           return errorResponse('COMPROMISED_PASSWORD', 403);
         }
+        // Recovery after Supabase accepted a Signup but binding failed:
+        // the Auth user can later sign in with password AND a fresh verified
+        // pre-enrollment cookie. Never mint a new Subject for existing Members.
+        // A missing/expired proof does not block login needed for privacy
+        // rights; downstream personalization still requires verified age.
+        if (input.preenrollmentMemberPort !== undefined) {
+          if (session.user.id === null) return errorResponse('AUTH_UPSTREAM_MALFORMED', 502);
+          try {
+            const existing = await input.preenrollmentMemberPort.admitExistingMember?.(
+              session.user.id,
+            ) ?? false;
+            if (!existing && await input.preenrollmentMemberPort.readVerified()) {
+              await input.preenrollmentMemberPort.bindMember(session.user.id);
+            }
+          } catch {
+            // A failed attempted recovery must not claim successful age binding
+            // or return a newly issued session as evidence of that binding.
+            return errorResponse('AGE_VERIFICATION_UNAVAILABLE', 503);
+          }
+        }
         return authenticatedResponse(
           session,
           { passwordCompromiseCheck: compromiseCheck.status },
