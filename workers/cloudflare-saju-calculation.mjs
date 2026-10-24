@@ -11,6 +11,7 @@ import {
   CLOUDFLARE_APPROVED_RESPONSE_HEADERS_V1,
 } from './cloudflare-auth-db-api.mjs';
 import { createProductionCurrentSubjectSajuCalculationRuntimeV1 } from '../apps/api/src/production-current-subject-saju-calculation-runtime.ts';
+import { isSajuAbuseAdmissionEnabledV1 } from '../apps/api/src/saju-abuse-admission-activation.ts';
 import { parseProductionUserDataRuntimeConfigV1 } from '../apps/api/src/production-user-data-runtime-config.ts';
 import {
   buildProductionNodePostgresPoolConfigV1,
@@ -127,6 +128,7 @@ export async function tryHandleCloudflareApprovedSajuCalculationV1(request, bind
     );
     runtime = createProductionCurrentSubjectSajuCalculationRuntimeV1({
       env: bindings, pool: subjectPool,
+      sajuAbuseAdmissionEnabled: isSajuAbuseAdmissionEnabledV1(bindings),
     });
     result = await runtime.handleRequest({
       request: canonicalRequest,
