@@ -7,7 +7,7 @@
 create table public.chat_credit_lots_v1 (
   id uuid primary key default pg_catalog.gen_random_uuid(),
   subject_id uuid not null references public.subjects(id),
-  source_kind text not null check (source_kind in ('signup','portone_topup')),
+  source_kind text not null check (source_kind in ('signup','portone_topup','reading_reward')),
   source_ref uuid not null,
   credits_issued integer not null check (credits_issued > 0),
   credits_remaining integer not null check (credits_remaining >= 0),
@@ -17,10 +17,14 @@ create table public.chat_credit_lots_v1 (
   constraint chat_credit_lots_validity_v1 check (
     (source_kind = 'signup' and expires_at is not null and expires_at > issued_at)
     or (source_kind = 'portone_topup' and (expires_at is null or expires_at > issued_at))
+    or (source_kind = 'reading_reward' and expires_at >= issued_at + interval '90 days')
   ),
   constraint chat_credit_lots_unique_source_v1 unique(subject_id,source_kind,source_ref),
   constraint chat_credit_lots_global_source_v1 unique(source_kind,source_ref)
 );
+create unique index chat_credit_first_reading_reward_once_v1
+  on public.chat_credit_lots_v1(subject_id) where source_kind = 'reading_reward';
+
 create index chat_credit_lots_spendable_v1
   on public.chat_credit_lots_v1(subject_id,expires_at,issued_at,id)
   where credits_remaining > 0;
@@ -346,4 +350,95 @@ end $$;
 
 revoke all on function public.internal_cmd_chat_credit_verified_topup_v1(
   uuid,uuid,uuid,text,integer
+) from public;
+
+-- First eligible paid Reading reward candidate: ONE 150-credit/90-day bonus
+-- per canonical owner, never an independent browser/PSP credit issuance route.
+-- Server must supply a governance-approved eligible Reading Offer; until
+-- Product/Offer eligibility and refund semantics are signed off this is inert.
+create function public.internal_cmd_chat_first_paid_reading_reward_v1(
+  p_subject_id uuid,
+  p_receipt_id uuid,
+  p_approved_reading_offer_id uuid
+)
+returns table(lot_id uuid, outcome text, available_credits bigint, total_credits bigint)
+language plpgsql volatile security definer
+set search_path=pg_catalog,public
+as $$
+declare
+ v_now timestamptz := clock_timestamp();
+ v_existing public.chat_credit_lots_v1%rowtype;
+ v_lot_id uuid;
+ v_outcome text := 'issued';
+begin
+ if p_subject_id is null or p_receipt_id is null or p_approved_reading_offer_id is null then
+   raise exception 'First Reading reward requires approved owner, Receipt and Offer';
+ end if;
+ perform 1 from public.subjects
+ where id=p_subject_id and status='active' for update;
+ if not found then raise exception 'Reading reward owner is not active'; end if;
+
+ perform 1 from public.commerce_receipts cr
+ join public.purchase_intents pi
+   on pi.id=cr.purchase_intent_id
+  and pi.subject_id=cr.subject_id
+  and pi.product_offer_id=cr.product_offer_id
+ join public.product_offers po on po.id=cr.product_offer_id
+ join public.products p on p.id=po.product_id
+ join public.product_capability_sets pcs
+   on pcs.id=pi.capability_set_id and pcs.product_id=p.id
+ where cr.id=p_receipt_id
+   and cr.subject_id=p_subject_id
+   and cr.product_offer_id=p_approved_reading_offer_id
+   and cr.provider='portone_v2'
+   and cr.platform='web'
+   and cr.environment='production'
+   and cr.verification_status='verified'
+   and cr.verified_at is not null
+   and cr.verified_amount_minor > 0
+   and cr.verified_amount_minor=pi.expected_amount_minor
+   and cr.verified_currency=pi.expected_currency
+   and cr.external_transaction_id<>''
+   and cr.receipt_fingerprint<>''
+   and pi.status='verified'
+   and pi.capability_snapshot_hash is not null
+   and pi.capability_snapshot_jsonb=pg_catalog.jsonb_build_object(
+      'capabilitySetId',pcs.id::text,
+      'definitionVersion',pcs.definition_version,
+      'definitionHash',pcs.definition_hash
+   )
+   and po.enabled and po.retired_at is null
+   and po.provider='portone_v2' and po.platform='web'
+   and po.currency=pi.expected_currency
+   and po.display_price_minor=pi.expected_amount_minor
+   and p.enabled and p.retired_at is null
+   and p.product_type='reading'
+ for share of cr,pi,po,p,pcs;
+ if not found then raise exception 'Not an approved verified paid Reading'; end if;
+
+ select l.* into v_existing
+ from public.chat_credit_lots_v1 l
+ where l.subject_id=p_subject_id and l.source_kind='reading_reward'
+ for update;
+ if found then
+   if v_existing.credits_issued<>150 or v_existing.expires_at is null then
+     raise exception 'Existing Reading reward source is invalid';
+   end if;
+   v_lot_id:=v_existing.id;
+   v_outcome:='already_awarded';
+ else
+   insert into public.chat_credit_lots_v1
+     (subject_id,source_kind,source_ref,credits_issued,credits_remaining,issued_at,expires_at)
+   values(p_subject_id,'reading_reward',p_receipt_id,150,150,v_now,
+     v_now + interval '90 days')
+   returning id into v_lot_id;
+ end if;
+
+ return query
+ select v_lot_id,v_outcome,b.available_credits,b.total_credits
+ from public.internal_qry_chat_credit_balance_v1(p_subject_id) b;
+end $$;
+
+revoke all on function public.internal_cmd_chat_first_paid_reading_reward_v1(
+  uuid,uuid,uuid
 ) from public;

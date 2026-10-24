@@ -162,6 +162,36 @@ begin
  end;
 end $paid_candidate$;
 
+-- The first eligible Reading reward must never mint without approved source.
+do $bonus$
+declare s uuid := 'cc110000-0000-4000-8000-000000000001';
+begin
+ begin
+   perform public.internal_cmd_chat_first_paid_reading_reward_v1(
+     s,'cc170000-0000-4000-8000-000000000001',null
+   );
+   raise exception 'Missing eligible Reading Offer unexpectedly rewarded';
+ exception when raise_exception then
+   if sqlerrm='Missing eligible Reading Offer unexpectedly rewarded' then raise; end if;
+ end;
+ insert into public.chat_credit_lots_v1(
+   subject_id,source_kind,source_ref,credits_issued,credits_remaining,issued_at,expires_at
+ ) values (
+   s,'reading_reward','cc170000-0000-4000-8000-000000000001',150,150,
+   clock_timestamp(),clock_timestamp()+interval '90 days'
+ );
+ begin
+   insert into public.chat_credit_lots_v1(
+     subject_id,source_kind,source_ref,credits_issued,credits_remaining,issued_at,expires_at
+   ) values (
+     s,'reading_reward','cc170000-0000-4000-8000-000000000002',150,150,
+     clock_timestamp(),clock_timestamp()+interval '90 days'
+   );
+   raise exception 'Second paid Reading reward incorrectly minted';
+ exception when unique_violation then null;
+ end;
+end $bonus$;
+
 -- Fail closed to runtime/public roles until an approved owner port is wired.
 do $acl$
 declare n text;
@@ -172,6 +202,7 @@ begin
    if has_function_privilege(n,'public.internal_cmd_chat_credit_reserve_v1(uuid,uuid,uuid)','EXECUTE')
       or has_function_privilege(n,'public.internal_cmd_chat_credit_finalize_v1(uuid,uuid,boolean,uuid)','EXECUTE')
       or has_function_privilege(n,'public.internal_cmd_chat_credit_verified_topup_v1(uuid,uuid,uuid,text,integer)','EXECUTE')
+      or has_function_privilege(n,'public.internal_cmd_chat_first_paid_reading_reward_v1(uuid,uuid,uuid)','EXECUTE')
       or has_table_privilege(n,'public.chat_credit_lots_v1','INSERT') then
      raise exception 'Credit private ledger leaked runtime access to %',n;
    end if;
