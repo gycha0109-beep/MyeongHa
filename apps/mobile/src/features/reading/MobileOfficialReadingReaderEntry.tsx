@@ -25,6 +25,7 @@ export function MobileOfficialReadingReaderEntry({
       <MobileUiText style={styles.eyebrow}>READER · 준비 중</MobileUiText>
       <MobileUiText style={styles.title}>이 공식 사주를 읽어줄 인물</MobileUiText>
       <MobileUiText style={styles.copy}>공식 Reading 기반의 Reader 소개입니다. 해설 실행 및 후속 대화는 제공되지 않습니다.</MobileUiText>
+      <MobileUiText style={styles.copy}>유료 해설 구매는 만 19세 이상만 가능합니다. 현재 공개 결제는 제공하지 않습니다.</MobileUiText>
       <View style={styles.grid}>
         {MOBILE_READER_PRESENTATIONS_V1.map((reader) => (
           <Pressable

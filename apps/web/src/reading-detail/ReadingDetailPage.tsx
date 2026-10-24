@@ -13,6 +13,7 @@ export function ReadingDetailPage() {
         <span className="reading-route-kicker" data-reading-product-title>사주 읽기</span>
         <h1 data-reading-state-title>읽기를 확인하는 중입니다.</h1>
         <p data-reading-state-copy>요청한 주제와 범위를 확인하고 있습니다.</p>
+        <p className="reading-authority-note" data-legal-reading-paid-age-hold>유료 해설 구매는 만 19세 이상만 가능합니다. 현재 공개 결제는 제공하지 않습니다.</p>
         <a className="reading-route-action" data-reading-route-action href="reading.html">다른 사주 읽기 보기 <span aria-hidden="true">→</span></a>
       </section>
 

@@ -128,3 +128,22 @@
 - **배포 경계:** SQL 원본과 `supabase/release-candidates/1740_portone_identity_age_authority_v1.sql` 동기화 완료. **migration 미적용, 작업자 스케줄 미등록, 운영 DB 삭제 미실행**. 물리 삭제의 자동 실행 주기·운영 보존기간·개인정보 삭제 정책 승인은 확정하지 않는다. 만료·소비 상태와 관계없이 TTL 경과 행만 삭제 가능하며 미만료 consumed 기록은 만료 시각 이전에 강제 정리하지 않는다.
 - **필수 확인:** `test/legal-portone-identity-attempt-purge-v1.test.ts`에서 시스템 역할·배치 상한·트랜잭션 롤백·나이 권한 테이블 비삭제를 최소 검증. 기존 승인 삭제 정책 59개 테이블/46 DELETE/4 ANONYMIZE/9 RETAIN 변경 없음.
 - **다음:** DB Authority/Privacy에서 신규 테이블 처분과 정리 주기 확정 후 제안 SQL의 PG17 함수·ACL·계정 삭제 전이 실증, 작업자 호출 스케줄/운영 연결. 인증 제공자 계약·채널키 전에는 SDK/공개 본인확인·결제 OFF 유지.
+
+## 13. 2026-10-24 단일 브랜치 연속 구현 — 출시 HOLD 유지
+
+> 범위: PR #2504의 `fix/legal-compliance/ai-disclosure-and-launch-audit-20261023` 브랜치. 통합 CI 완료·운영 실증 또는 법적 적합성 완료를 의미하지 않는다. 전환 승인과 운영 DB 변경은 수행하지 않았다.
+
+- **L2 서버 연령 경계:** `MYEONGHA_PORTONE_VERIFIED_AGE_ENFORCEMENT=ENFORCE` 시 기존 무료 Chat Open/Send 및 Chat Read에서 검증된 Subject 연령 권위를 조회하고, 회원 신규 가입·소셜 인증 시작/완료·Naver Bridge·신규 게스트 발급은 검증된 가입 전 Subject 바인딩이 없는 동안 503으로 차단한다. **가입 전 본인인증 바인딩은 미구현**이므로 ENFORCE를 켜면 신규 유입이 가능해졌다고 해석하면 안 된다. 기존 계정의 로그인·탈퇴/개인정보 권리행사를 나이 체크로 무조건 차단하지 않는다.
+- **L2 PortOne V2:** 서버 발행 인증 시도 ID는 KCP의 영숫자 40자 제한에 맞춘 `iv` + 소문자 hex 32자리(총 34자). SQL 제안·서버 파서·웹 브라우저·격리 PG17 테스트 동일. 현재 Vercel 12개 함수 예산은 유지하면서 `/api/identity-verifications/{attempts,complete,capability}`를 기존 `/api/me` 디스패처의 명시적 재작성으로 연결했다. 전용 공개 함수는 추가하지 않았다.
+- **L2 인증 화면:** 마이페이지 회원 계정은 서버 `GET /api/identity-verifications/capability` 가 `available:true`일 때만 실제 시작 버튼을 표시. server-issued ID와 공개 `storeId/channelKey`를 받은 후에만 공식 PortOne V2 SDK ESM을 지연 로딩하며, 팝업·모바일 리디렉션 이후에도 서버의 단건조회+원자적 소비로만 연령을 확정한다. 브라우저 callback 성공값 자체는 신뢰하지 않는다. 서버 API 비밀키·CI/DI·실명·전화번호·원문 생일은 브라우저 응답에 싣지 않는다.
+- **승인 게이트:** PortOne identity HTTP `ENFORCE`는 검증된 연령 DB migration `APPROVED_AND_APPLIED`, 개인정보 disposition `APPROVED`, 공급자 계약 `APPROVED`, Store ID, Channel Key, 서버 비밀키가 모두 있어야만 활성화하도록 구성했다. 배포 환경 설정을 변경하거나 승인 없이 실인증을 수행하지 않았다. SDK 도메인은 CSP에 정확한 `https://cdn.portone.io`만 추가했으며 기능이 OFF일 때 SDK 다운로드·신원 제공자 호출은 발생하지 않는다.
+- **L2 SQL 격리검증:** `test/db/portone_identity_age_authority_pg17.sh`를 실제 `postgres17` DB CI 매니페스트에 등록했다. 일회성 소비·동시성·시간 만료·권한/ACL·시스템 전용 purge·계정 삭제·복원 후 권한 비재노출·게스트 병합시 원본 인증 권위 제거를 **폐기형 로컬호스트 CI DB에서만** 검사하도록 작성. **해당 신규 케이스의 실제 GREEN 결과를 관측하기 전에는 성공 판정하지 않음.**
+- **L4 연령 판매 경계:** 아직 공개되지 않은 Purchase Intent V3에서 성년 검증권위가 OFF면 HTTP 503, 켜진 상태라도 검증된 `adult` 없이는 403으로 구매 시도를 만들지 않는다. Reading Web/Native 유료 19+ 제한을 표시한다. 이는 결제·인도·환불 체인 자체의 구현 완료는 아니다.
+- **L5 AI 고지:** 모바일 홈/대화 허브/대화방과 Web Reader·모바일 공식 Reading 보관 본문에 생성형 AI 및 비실재 캐릭터 고지와 검증 한계를 실제 텍스트로 배치. Web/Native 일본어·번체중국어 사전을 작성한 동일 번역으로 동기화했다. 실제 배포 시각 및 접근성 검증은 계속 필요하다.
+
+### 다음 실행 시 필수 잔여 작업 (범위를 축소하거나 완료 처리하지 말 것)
+
+1. **A1:** 가입 전 신뢰된 연령 인증을 안전하게 Signup/Social/Guest에 결속하고 재사용·탈취·실패 재시도/성공 소유권을 원자적으로 보장하는 별도 서버/DB 설계·실구현. 현 ENFORCE는 가입 차단이라는 안전한 임시상태이지 완성된 가입 플로우가 아님.
+2. **L2 DB/Privacy:** 제안 SQL과 삭제 분류 delta의 최종 승인, 실제 PG17 케이스 GREEN, 본 DB 변경/권위·보존·복원 후 비재노출 운영 실증. 원본 승인된 46 DELETE/4 ANONYMIZE/9 RETAIN 집계·지문 임의 변경 금지.
+3. **L3:** OpenAI/Vercel/Supabase/PortOne 활성화 계약·국외 처리항목·배포 환경 확인, 공급자 계약 증거와 개인정보 처리방침 최종 합치. 사업자정보·정식 접수 채널 미확정.
+4. **L4/L5:** Commerce/S7 소유 환불 접수·제공/철회·미제공 처리 검증, 법적 게시문구 확정과 공개 UX E2E, 모바일·웹 실제 배포 확인. 최종 통합 GREEN 및 사용자 결정 이후에만 병합.

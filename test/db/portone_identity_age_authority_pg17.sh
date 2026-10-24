@@ -136,4 +136,36 @@ q "update public.subjects set status='deletion_pending',updated_at=clock_timesta
 [[ "$(q "select count(*) from public.legal_portone_identity_attempts_v1 where subject_id='$sql_subject_a'")" == 0 ]] ||
   fail 'attempt history survived deletion transition'
 pass 'deletion-pending transition deletes both identity authorities'
+
+# A historical restore/reactivation must never resurrect earlier age evidence.
+q "update public.subjects set status='active',updated_at=clock_timestamp()
+  where id='$sql_subject_a';" >/dev/null
+[[ "$(age "$sql_user_a" "$sql_subject_a")" == NONE ]] ||
+  fail 'reactivation exposed stale age proof'
+pass 'subject reactivation cannot resurrect deleted age proof'
+
+# A Guest promoted to an existing Member must not transfer an independent,
+# potentially different person's verified-age record through the merge.
+sql_guest=93000000-0000-4000-8000-000000000003
+merge_attempt="iv$(printf 'c%.0s' {1..32})"
+merge_proof="iv$(printf 'd%.0s' {1..32})"
+q "insert into public.subjects(id,kind,auth_user_id,status,merged_into_subject_id,created_at,updated_at)
+ values('$sql_guest','guest',null,'active',null,clock_timestamp(),clock_timestamp());
+ insert into public.legal_portone_identity_attempts_v1
+ (identity_verification_id,subject_id,status,issued_at,expires_at)
+ values('$merge_attempt','$sql_guest','pending',clock_timestamp(),clock_timestamp()+interval '10 minutes');
+ insert into public.legal_portone_verified_age_v1
+ (subject_id,age_band,verification_id,verified_at)
+ values('$sql_guest','free_minor','$merge_proof',clock_timestamp());" >/dev/null
+q "update public.subjects set status='merged',
+ merged_into_subject_id='$sql_subject_b',
+ updated_at=clock_timestamp() where id='$sql_guest';" >/dev/null
+[[ "$(q "select count(*) from public.legal_portone_identity_attempts_v1 where subject_id='$sql_guest'")" == 0 ]] ||
+  fail 'merged Guest pending attempt survived merge'
+[[ "$(q "select count(*) from public.legal_portone_verified_age_v1 where subject_id='$sql_guest'")" == 0 ]] ||
+  fail 'merged Guest age-band survived merge'
+[[ "$(age "$sql_user_b" "$sql_subject_b")" == NONE ]] ||
+  fail 'Guest age band migrated to another Member without independent provider proof'
+pass 'Guest merge invalidates Guest identity and cannot transfer age band'
+
 echo 'PASS PortOne identity PG17 disposable authority smoke complete; no Production migration applied.'
