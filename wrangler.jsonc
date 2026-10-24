@@ -1,8 +1,8 @@
 {
-  "name": "myeongha-static-preview",
-  "main": "./cloudflare/preview-worker.mjs",
+  "name": "myeongha",
+  "main": "./cloudflare/myeongha-worker.mjs",
   "compatibility_date": "2026-10-20",
-  "workers_dev": false,
+  "workers_dev": true,
   "preview_urls": true,
   "assets": {
     "directory": "./public",

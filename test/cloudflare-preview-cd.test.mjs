@@ -15,9 +15,9 @@ const correctContext = Object.freeze({
 });
 
 const previewConfig = Object.freeze({
-  name: 'myeongha-static-preview',
-  main: './cloudflare/preview-worker.mjs',
-  workers_dev: false,
+  name: 'myeongha',
+  main: './cloudflare/myeongha-worker.mjs',
+  workers_dev: true,
   preview_urls: true,
   assets: {
     directory: './public',
@@ -54,15 +54,14 @@ describe('Cloudflare preview Git-based CD', () => {
 
   it('requires preview-only static routing with API interception', () => {
     expect(assertCloudflarePreviewConfiguration(previewConfig)).toBe(true);
-    // The Ops migration owns the canonical public myeongha Worker. Static
-    // preview CD must never redeploy it or disable workers.dev again.
+    // Both preview and production use the same source-controlled Worker.
     expect(() => assertCloudflarePreviewConfiguration({
-      ...previewConfig,
-      name: 'myeongha',
-    })).toThrow(/static assets isolated/u);
-    expect(() => assertCloudflarePreviewConfiguration({ ...previewConfig, workers_dev: true })).toThrow(/production workers.dev route disabled/u);
-    expect(() => assertCloudflarePreviewConfiguration({ ...previewConfig, assets: { ...previewConfig.assets, run_worker_first: false } })).toThrow(/static assets isolated/u);
-    expect(() => assertCloudflarePreviewConfiguration({ ...previewConfig, route: 'example.com/*' })).toThrow(/static assets isolated/u);
+      ...previewConfig, name: 'myeongha-web',
+    })).toThrow(/single Worker/u);
+    expect(() => assertCloudflarePreviewConfiguration({ ...previewConfig, workers_dev: false })).toThrow(/single Worker/u);
+    expect(() => assertCloudflarePreviewConfiguration({ ...previewConfig, assets: { ...previewConfig.assets, run_worker_first: false } })).toThrow(/single Worker/u);
+    expect(() => assertCloudflarePreviewConfiguration({ ...previewConfig, services: [{ binding: 'AUTHORITY_API', service: 'myeongha' }] })).toThrow(/single Worker/u);
+    expect(() => assertCloudflarePreviewConfiguration({ ...previewConfig, route: 'example.com/*' })).toThrow(/single Worker/u);
   });
   it('routes real Preview chat traffic through the existing sealed Se-yeon Fetch fence', async () => {
     let assetFetches = 0;
