@@ -56,6 +56,58 @@ describe('A1 Social Auth preverified age hold and atomic Member binding', () => 
     expect((await declined.json()).error.code).toBe('AGE_VERIFICATION_REQUIRED');
   });
 
+  it('lets verified EXISTING Social Members discover Web OAuth without a new proof', async () => {
+    const request = new Request('https://myeongha.vercel.app/api/auth/social/start', {
+      method: 'POST',
+      headers: { Origin: 'https://myeongha.vercel.app', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ provider: 'google',
+        redirectUri: 'https://myeongha.vercel.app/auth.html?social=callback' }),
+    });
+    const result = await handleSocialAuthStartRequestV1({
+      request, env, approvedExistingMemberStart: true,
+    });
+    expect(result.status).toBe(200);
+    const body = await result.json();
+    expect(body.data.authorizationUrl).toContain('/auth/v1/authorize');
+    expect(body.data.state).toMatch(/^[A-Za-z0-9_-]{16,128}$/u);
+    expect(body.data.state).not.toBe(signedSocialState);
+
+    const unauthorized = await handleSocialAuthStartRequestV1({
+      request: socialStartRequest(), env, approvedExistingMemberStart: true,
+    });
+    expect(unauthorized.status).toBe(403);
+
+    const native = await handleSocialAuthStartRequestV1({
+      request: new Request('https://myeongha.vercel.app/api/auth/social/start', {
+        method: 'POST',
+        headers: { Origin: 'https://myeongha.vercel.app', 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          provider: 'google', redirectUri: 'myeongha://auth/callback',
+        }),
+      }),
+      env, approvedExistingMemberStart: true,
+    });
+    expect(native.status).toBe(403);
+  });
+
+  it('does not grant an unverified OAuth account access on existing-member-only callback', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({
+      access_token: 'new-access', refresh_token: 'new-refresh', expires_in: 3600,
+      user: { id, email: 'new-social@example.com' },
+    })));
+    const existingOnly: SupabasePreenrollmentMemberBindingPortV1 = {
+      ...admission(false),
+      admitExistingMember: vi.fn(async () => false),
+    };
+    const result = await handleSupabaseAuthRequestV1({
+      request: socialCompleteRequest('legacy-state-for-existing-member'),
+      env, action: 'social-complete', preenrollmentMemberPort: existingOnly,
+    });
+    expect(result.status).toBe(403);
+    expect(existingOnly.bindMember).not.toHaveBeenCalled();
+    expect(result.headers.get('set-cookie')).toBeNull();
+  });
+
   it('allows only preverified Social start without exposing secrets or age DOB', async () => {
     const proof = admission(true);
     const response = await handleSocialAuthStartRequestV1({

@@ -86,16 +86,30 @@ export default {
         if (target.kind === 'social-start') {
           try {
             let preenrollmentMemberPort;
-            if (resolveProductionPortOnePreenrollmentModeV1(process.env) === 'enforce' &&
-                extractPortOnePreenrollmentCookieV1(request) !== null) {
-              preenrollmentMemberPort = createApprovedPortOnePreenrollmentMemberBindingPortV1({
-                env: process.env, request, pool: getPreenrollmentPool(),
-              }) ?? undefined;
+            let approvedExistingMemberStart = false;
+            if (resolveProductionPortOnePreenrollmentModeV1(process.env) === 'enforce') {
+              // OAuth initiation alone has no Member authority. A no-cookie
+              // login can proceed to the provider only on our exact Web
+              // origin; the callback MUST require an existing verified
+              // Member, never bind or authorize an unknown account.
+              if (request.headers.get('origin') !== 'https://myeongha.vercel.app') {
+                return Promise.resolve(Response.json({
+                  ok: false, error: { code: 'AGE_VERIFICATION_REQUIRED', retryable: false },
+                }, { status: 403, headers: { 'Cache-Control': 'no-store' } }));
+              }
+              if (extractPortOnePreenrollmentCookieV1(request) !== null) {
+                preenrollmentMemberPort = createApprovedPortOnePreenrollmentMemberBindingPortV1({
+                  env: process.env, request, pool: getPreenrollmentPool(),
+                }) ?? undefined;
+              } else {
+                approvedExistingMemberStart = true;
+              }
             }
             return handleSocialAuthStartRequestV1({
               request,
               env: process.env,
               ...(preenrollmentMemberPort === undefined ? {} : { preenrollmentMemberPort }),
+              ...(approvedExistingMemberStart ? { approvedExistingMemberStart: true as const } : {}),
             });
           } catch {
             return Promise.resolve(Response.json({

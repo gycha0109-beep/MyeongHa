@@ -117,6 +117,8 @@ export async function handleSocialAuthStartRequestV1(input: {
   readonly env: ProductionUserDataRuntimeEnvV1;
   readonly nowEpochMs?: () => number;
   readonly preenrollmentMemberPort?: Pick<SupabasePreenrollmentMemberBindingPortV1, 'readVerified' | 'issueSocialState'>;
+  /** Trusted dispatcher gate only: OAuth discovery for an EXISTING Member. */
+  readonly approvedExistingMemberStart?: true;
 }): Promise<Response> {
   if (input.request.method !== 'POST') {
     cancelUnusedRequestBody(input.request);
@@ -132,17 +134,20 @@ export async function handleSocialAuthStartRequestV1(input: {
   });
   if (denied !== null) {
     if (input.preenrollmentMemberPort === undefined) {
-      cancelUnusedRequestBody(input.request);
-      return denied;
-    }
-    try {
-      if (!await input.preenrollmentMemberPort.readVerified()) {
+      if (input.approvedExistingMemberStart !== true) {
         cancelUnusedRequestBody(input.request);
-        return failure('AGE_VERIFICATION_REQUIRED', 403);
+        return denied;
       }
-    } catch {
-      cancelUnusedRequestBody(input.request);
-      return failure('AGE_VERIFICATION_UNAVAILABLE', 503);
+    } else {
+      try {
+        if (!await input.preenrollmentMemberPort.readVerified()) {
+          cancelUnusedRequestBody(input.request);
+          return failure('AGE_VERIFICATION_REQUIRED', 403);
+        }
+      } catch {
+        cancelUnusedRequestBody(input.request);
+        return failure('AGE_VERIFICATION_UNAVAILABLE', 503);
+      }
     }
   }
 
@@ -162,6 +167,12 @@ export async function handleSocialAuthStartRequestV1(input: {
   if (provider === null || redirectUri === null) {
     return failure('INVALID_REQUEST', 400);
   }
+  if (denied !== null && input.approvedExistingMemberStart === true &&
+      input.preenrollmentMemberPort === undefined &&
+      (redirectUri.origin !== WEB_SOCIAL_REDIRECT_ORIGIN ||
+       input.request.headers.get('origin') !== WEB_SOCIAL_REDIRECT_ORIGIN)) {
+    return failure('AGE_VERIFICATION_REQUIRED', 403);
+  }
 
   if (!providerEnabled(input.env, provider)) {
     return failure('SOCIAL_AUTH_PROVIDER_DISABLED', 503);
@@ -169,9 +180,9 @@ export async function handleSocialAuthStartRequestV1(input: {
 
   const now = input.nowEpochMs?.() ?? Date.now();
   let state = randomState();
-  if (denied !== null) {
+  if (denied !== null && input.preenrollmentMemberPort !== undefined) {
     try {
-      if (input.preenrollmentMemberPort?.issueSocialState === undefined) {
+      if (input.preenrollmentMemberPort.issueSocialState === undefined) {
         return failure('AGE_VERIFICATION_UNAVAILABLE', 503);
       }
       state = input.preenrollmentMemberPort.issueSocialState(now);
