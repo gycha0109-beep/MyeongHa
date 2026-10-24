@@ -1,5 +1,9 @@
 import { executeSecurityObservedRequestV1 } from '../apps/api/src/security-observability.js';
 import {
+  createProductionPortOneIdentityHttpRuntimeV1,
+  resolveProductionPortOneIdentityHttpModeV1,
+} from '../apps/api/src/portone-v2-production-identity-http-runtime-v1.js';
+import {
   handlePortOneV2IdentityIssueRequestV1,
   handlePortOneV2IdentityCompleteRequestV1,
 } from '../apps/api/src/portone-v2-identity-http-v1.js';
@@ -59,6 +63,7 @@ const VERCEL_SHARE_PARAM = '_vercel_share' as const;
 const NO_STORE_CACHE_CONTROL = 'no-store' as const;
 
 let sharedPostgresPool: ReturnType<typeof createNodePostgresSubjectPoolV1> | undefined;
+let identityRuntime: ReturnType<typeof createProductionPortOneIdentityHttpRuntimeV1> | undefined;
 let profileRuntime:
   | ReturnType<typeof createProductionCurrentSubjectProfileRuntimeV1>
   | undefined;
@@ -98,6 +103,14 @@ function getSharedPostgresPool(): ReturnType<typeof createNodePostgresSubjectPoo
     parseProductionUserDataRuntimeConfigV1(process.env),
   );
   return sharedPostgresPool;
+}
+
+function getIdentityRuntime(): ReturnType<typeof createProductionPortOneIdentityHttpRuntimeV1> {
+  identityRuntime ??= createProductionPortOneIdentityHttpRuntimeV1({
+    env: process.env,
+    pool: getSharedPostgresPool(),
+  });
+  return identityRuntime;
 }
 
 function getProfileRuntime(): ReturnType<typeof createProductionCurrentSubjectProfileRuntimeV1> {
@@ -850,9 +863,27 @@ export default {
 
         if (target.kind === 'identity-issue' || target.kind === 'identity-complete') {
           const identityRequest = toCanonicalMeRequestForTestV1(request, target);
-          return target.kind === 'identity-issue'
-            ? handlePortOneV2IdentityIssueRequestV1({ request: identityRequest, requestId })
-            : handlePortOneV2IdentityCompleteRequestV1({ request: identityRequest, requestId });
+          try {
+            // OFF never initializes a database pool or reads provider secrets.
+            if (resolveProductionPortOneIdentityHttpModeV1(process.env) === 'off') {
+              return target.kind === 'identity-issue'
+                ? handlePortOneV2IdentityIssueRequestV1({ request: identityRequest, requestId })
+                : handlePortOneV2IdentityCompleteRequestV1({ request: identityRequest, requestId });
+            }
+            return await getIdentityRuntime().handleRequest({
+              request: identityRequest,
+              requestId,
+              serverTime,
+              action: target.kind === 'identity-issue' ? 'issue' : 'complete',
+            });
+          } catch {
+            // Fail closed without disclosing contract state, keys or private DB errors.
+            return Response.json({
+              ok: false,
+              error: { code: 'IDENTITY_VERIFICATION_UNAVAILABLE', retryable: false },
+              meta: { requestId },
+            }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
+          }
         }
 
         const result = await runtimeForTarget(target).handleRequest({

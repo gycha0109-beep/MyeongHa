@@ -24,8 +24,10 @@ export interface PortOneV2IdentityHttpInputV1 {
   readonly identityEvidenceVerifier?: IdentityEvidenceVerificationPortV1;
   readonly pool?: PostgresSubjectPoolV1;
   readonly lookup?: PortOneV2IdentityLookupAdapterV1;
-  /** Internal tests only. No production route supplies this flag. */
+  /** Internal tests only. */
   readonly testOnlyActivation?: true;
+  /** Set only by the production composition after ALL operator approval gates. */
+  readonly productionActivationApproved?: true;
 }
 
 function failure(status: number, code: string, requestId: string): Response {
@@ -44,9 +46,11 @@ function onlyId(value: unknown): value is { identityVerificationId: string } {
     /^iv_[a-f0-9]{32}$/u.test(obj.identityVerificationId);
 }
 async function handle(input: PortOneV2IdentityHttpInputV1, action: 'issue' | 'complete'): Promise<Response> {
-  // Public routes are registered in OFF mode only. Production callers never
-  // provide the internal test activation flag; do not open DB or call PortOne.
-  if (input.testOnlyActivation !== true) return failure(503, 'IDENTITY_VERIFICATION_DISABLED', input.requestId);
+  // This remains inert without explicit test injection OR separately approved
+  // production composition. Browser-controlled fields cannot set either flag.
+  if (input.testOnlyActivation !== true && input.productionActivationApproved !== true) {
+    return failure(503, 'IDENTITY_VERIFICATION_DISABLED', input.requestId);
+  }
   if (!input.identityEvidenceVerifier || !input.pool || !input.lookup || !input.serverTime) {
     return failure(503, 'IDENTITY_VERIFICATION_UNAVAILABLE', input.requestId);
   }
