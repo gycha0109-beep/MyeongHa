@@ -91,10 +91,9 @@ describe('LEGAL PortOne V2 identity HTTP source boundary', () => {
   });
 
   it('returns a server-owned public SDK channel only for approved production composition', async () => {
-    const t = context(true);
+    const t = context(false);
     const accepted = await handlePortOneV2IdentityIssueRequestV1({
       ...t.common,
-      testOnlyActivation: undefined,
       productionActivationApproved: true,
       browserChannel: {
         storeId: 'store-0123456789',
@@ -113,7 +112,6 @@ describe('LEGAL PortOne V2 identity HTTP source boundary', () => {
 
     const denied = await handlePortOneV2IdentityIssueRequestV1({
       ...t.common,
-      testOnlyActivation: undefined,
       productionActivationApproved: true,
       request: post('/api/identity-verifications/attempts', {}),
     });

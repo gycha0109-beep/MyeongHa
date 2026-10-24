@@ -4,6 +4,7 @@ import {
   WebPortOneIdentityFlowErrorV1,
   WEB_PORTONE_IDENTITY_FLOW_V1,
 } from '../apps/web/portone-v2-identity-flow.js';
+import type { WebPortOneBrowserSdkPortV1 } from '../apps/web/portone-v2-identity-flow.js';
 
 const id = 'iv' + 'a'.repeat(32);
 const base = 'https://myeongha.vercel.app';
@@ -21,8 +22,8 @@ function memory() {
   };
 }
 function setup(opts: Readonly<{
-  sdk?: { requestIdentityVerification: ReturnType<typeof vi.fn> };
-  fetchImpl?: ReturnType<typeof vi.fn>;
+  sdk?: WebPortOneBrowserSdkPortV1;
+  fetchImpl?: (route: string, init: RequestInit) => Promise<Response>;
   pendingStore?: ReturnType<typeof memory>;
   resolveBearer?: () => Promise<{ kind: 'member'; token: string } | null>;
 }> = {}) {
@@ -33,7 +34,7 @@ function setup(opts: Readonly<{
       ? issue : { ageBand: 'free_minor' } });
   });
   const sdk = opts.sdk ?? {
-    requestIdentityVerification: vi.fn(async (req) => ({
+    requestIdentityVerification: vi.fn(async (req: { identityVerificationId: string }) => ({
       transactionType: 'IDENTITY_VERIFICATION',
       identityVerificationId: req.identityVerificationId,
     })),
