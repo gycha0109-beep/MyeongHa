@@ -119,6 +119,46 @@ export function guardSeyeonC08LocalMoveV1(kind: SeyeonC08LocalEntryV1,
  * recent-message window. Prior entries are only locally admissible public
  * texts: no memory-backed/relationship-backed conversation can enter here.
  */
+/**
+ * Offline conservative upper-bound reservation for one model request.
+ * Since input tokenization varies, byte count is treated as an upper bound
+ * on input tokens. USD per million tokens numerically equals microUSD/token.
+ * No inference/billing claim follows from this local reservation.
+ */
+export function quoteSeyeonC08LocalOneCallBudgetV1(input: Readonly<{
+  requestBytes:number;
+  maxCompletionTokens:number;
+  inputUsdPerMillion:number;
+  outputUsdPerMillion:number;
+  providerOutputTokenCapVerified:boolean;
+}>):Readonly<{reservedMicroUsd:number;providerOutputTokenCapVerified:true;
+  hardBillingCapVerified:false}> {
+  if (!Number.isSafeInteger(input?.requestBytes) ||
+      input.requestBytes<1 || input.requestBytes>32768 ||
+      !Number.isSafeInteger(input.maxCompletionTokens) ||
+      input.maxCompletionTokens<64 || input.maxCompletionTokens>1536 ||
+      typeof input.inputUsdPerMillion!=='number' ||
+      !Number.isFinite(input.inputUsdPerMillion) ||
+      input.inputUsdPerMillion<=0 || input.inputUsdPerMillion>5 ||
+      typeof input.outputUsdPerMillion!=='number' ||
+      !Number.isFinite(input.outputUsdPerMillion) ||
+      input.outputUsdPerMillion<=0 || input.outputUsdPerMillion>10 ||
+      input.providerOutputTokenCapVerified!==true) {
+    throw new SeyeonC08LocalHoldV1('LOCAL_BUDGET_UNVERIFIED');
+  }
+  const reservedMicroUsd=Math.ceil(
+    input.requestBytes*input.inputUsdPerMillion+
+    input.maxCompletionTokens*input.outputUsdPerMillion,
+  );
+  if(!Number.isSafeInteger(reservedMicroUsd) ||
+     reservedMicroUsd<=0 || reservedMicroUsd>4000)
+    throw new SeyeonC08LocalHoldV1('LOCAL_BUDGET_UNVERIFIED');
+  return Object.freeze({
+    reservedMicroUsd,providerOutputTokenCapVerified:true as const,
+    hardBillingCapVerified:false as const,
+  });
+}
+
 function assertLocalContext(input: Readonly<{
   userMessageRef: string;
   userText: string;
