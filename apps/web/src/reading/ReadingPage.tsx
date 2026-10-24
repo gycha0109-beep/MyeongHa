@@ -1,11 +1,23 @@
 import { resumePreviewHrefV1 } from '../../reading-preview-continuation.js';
 import { useEffect, useState } from 'react';
+import { resolveReadingAvailabilityV1 } from './reading-availability.js';
 
 const productPreviewTopics = [
   { symbol: '▤', title: '전체 사주 해석', href: 'reading-detail.html?topic=temperament&scope=original', outline: ['타고난 기질과 성향', '강점과 약점', '삶의 주요 흐름', '인생의 중요한 시기', '통합 조언'] },
   { symbol: '✎', title: '직업 · 커리어', href: 'reading-detail.html?topic=career', outline: ['일의 성향과 적성', '커리어 방향', '직업별 궁합', '성장의 흐름', '현실적 조언'] },
   { symbol: '◇', title: '재물', href: 'reading-detail.html?topic=money', outline: ['재물 운의 흐름', '수입과 지출 성향', '재물 운이 강한 시기', '투자 · 사업 성향', '재물 관리 조언'] },
   { symbol: '✿', title: '연애 · 관계', href: 'reading-detail.html?topic=love', outline: ['연애 성향과 인연 흐름', '잘 맞는 상대 유형', '관계에서 주의할 점', '결혼 운의 흐름', '행복한 관계를 위한 조언'] },
+] as const;
+
+const additionalReadingTopics = [
+  ['사업', 'reading-detail.html?topic=business'],
+  ['가족', 'reading-detail.html?topic=family'],
+  ['삶의 단계', 'reading-detail.html?topic=life-stage'],
+  ['올해', 'reading-detail.html?scope=year'],
+  ['이번 달', 'reading-detail.html?scope=month'],
+  ['배우자 · 관계', 'reading-detail.html?topic=spouse'],
+  ['궁합', 'reading-detail.html?topic=compatibility'],
+  ['지금 고민으로 보기', 'reading-detail.html?topic=question-specific'],
 ] as const;
 
 export function ReadingPage() {
@@ -172,6 +184,18 @@ export function ReadingPage() {
           </div>
         </section>
         <div className="saju-design-preview-link"><span>지금 확인할 수 있는 무료 개인별 사주 프리뷰</span><a href={resumedPreview ?? 'reading-detail.html?topic=temperament&scope=original'}>무료 사주 프리뷰 열기 →</a></div>
+        <details className="saju-design-more">
+          <summary>다른 사주 주제 둘러보기</summary>
+          <div className="saju-design-more-grid">
+            {additionalReadingTopics.map(([title, href]) => (
+              <a href={href} key={href}>
+                <strong>{title}</strong>
+                <span className={`reading-topic-availability is-${resolveReadingAvailabilityV1(href).kind}`}>{resolveReadingAvailabilityV1(href).label}</span>
+              </a>
+            ))}
+          </div>
+          <p>추가 입력 준비 중 · 정식 읽기 준비 중인 주제는 현재 이용할 수 없습니다.</p>
+        </details>
         <span id="saju-flow-year" hidden aria-hidden="true" />
       </section>
     </div>
