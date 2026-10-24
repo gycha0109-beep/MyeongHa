@@ -7,15 +7,19 @@
 create table public.chat_credit_lots_v1 (
   id uuid primary key default pg_catalog.gen_random_uuid(),
   subject_id uuid not null references public.subjects(id),
-  source_kind text not null check (source_kind in ('signup')),
+  source_kind text not null check (source_kind in ('signup','portone_topup')),
   source_ref uuid not null,
   credits_issued integer not null check (credits_issued > 0),
   credits_remaining integer not null check (credits_remaining >= 0),
   issued_at timestamptz not null,
-  expires_at timestamptz not null,
+  expires_at timestamptz null,
   constraint chat_credit_lots_remaining_bound_v1 check (credits_remaining <= credits_issued),
-  constraint chat_credit_lots_validity_v1 check (expires_at > issued_at),
-  constraint chat_credit_lots_unique_source_v1 unique(subject_id,source_kind,source_ref)
+  constraint chat_credit_lots_validity_v1 check (
+    (source_kind = 'signup' and expires_at is not null and expires_at > issued_at)
+    or (source_kind = 'portone_topup' and (expires_at is null or expires_at > issued_at))
+  ),
+  constraint chat_credit_lots_unique_source_v1 unique(subject_id,source_kind,source_ref),
+  constraint chat_credit_lots_global_source_v1 unique(source_kind,source_ref)
 );
 create index chat_credit_lots_spendable_v1
   on public.chat_credit_lots_v1(subject_id,expires_at,issued_at,id)
@@ -71,7 +75,7 @@ begin
     raise exception 'Credit owner is not an active Subject';
   end if;
   return query
-  select coalesce(sum(credits_remaining) filter (where expires_at>clock_timestamp()),0)::bigint,
+  select coalesce(sum(credits_remaining) filter (where (expires_at is null or expires_at>clock_timestamp())),0)::bigint,
          coalesce(sum(credits_remaining),0)::bigint
     from public.chat_credit_lots_v1 where subject_id=p_subject_id;
 end $$;
@@ -150,8 +154,8 @@ begin
   for v_lot in select l.id,l.credits_remaining
     from public.chat_credit_lots_v1 l
     where l.subject_id=p_subject_id and l.credits_remaining>0
-      and l.expires_at>clock_timestamp()
-    order by l.expires_at,l.issued_at,l.id for update
+      and (l.expires_at is null or l.expires_at>clock_timestamp())
+    order by l.expires_at nulls last,l.issued_at,l.id for update
   loop
     v_take:=least(v_remaining,v_lot.credits_remaining);
     update public.chat_credit_lots_v1 set credits_remaining=credits_remaining-v_take
@@ -220,3 +224,126 @@ revoke all on function public.internal_qry_chat_credit_balance_v1(uuid) from pub
 revoke all on function public.internal_cmd_chat_signup_credit_v1(uuid) from public;
 revoke all on function public.internal_cmd_chat_credit_reserve_v1(uuid,uuid,uuid) from public;
 revoke all on function public.internal_cmd_chat_credit_finalize_v1(uuid,uuid,boolean,uuid) from public;
+
+
+-- Candidate-only verified PortOne receipt -> exactly-one paid Credit Lot.
+-- No EXECUTE grant, no checkout mount, no LIVE activation. An explicit
+-- Product-governance-approved validity policy is required; no default term.
+-- Unresolved refund/revocation rules must be handled before Production use.
+create function public.internal_cmd_chat_credit_verified_topup_v1(
+  p_subject_id uuid,
+  p_receipt_id uuid,
+  p_approved_offer_id uuid,
+  p_validity_mode text,
+  p_validity_days integer
+)
+returns table(lot_id uuid,issued boolean,available_credits bigint,total_credits bigint)
+language plpgsql volatile security definer
+set search_path=pg_catalog,public
+as $$
+declare
+  v_now timestamptz := clock_timestamp();
+  v_expiry timestamptz;
+  v_existing public.chat_credit_lots_v1%rowtype;
+  v_lot_id uuid;
+  v_issued boolean := false;
+begin
+  if p_subject_id is null or p_receipt_id is null or p_approved_offer_id is null then
+    raise exception 'Verified top-up requires exact server-approved Subject, Receipt and Offer';
+  end if;
+  if not (
+    (p_validity_mode = 'never' and p_validity_days is null)
+    or (p_validity_mode = 'days' and p_validity_days is not null and p_validity_days > 0)
+  ) then
+    raise exception 'Paid credit validity is not explicitly approved';
+  end if;
+
+  -- Same lock as reserve/signup: payout cannot race two concurrent spends.
+  perform 1 from public.subjects
+  where id=p_subject_id and status='active'
+  for update;
+  if not found then raise exception 'Verified top-up owner is not active'; end if;
+
+  -- Independently recheck source authority INSIDE the mint transaction.
+  -- The external provider lookup/persistence happens before this function.
+  -- Locks block concurrent Receipt revoke or Offer retirement during issuance.
+  perform 1 from public.commerce_receipts cr
+  join public.purchase_intents pi
+    on pi.id=cr.purchase_intent_id
+   and pi.subject_id=cr.subject_id
+   and pi.product_offer_id=cr.product_offer_id
+  join public.product_offers po on po.id=cr.product_offer_id
+  join public.products p on p.id=po.product_id
+  join public.product_capability_sets pcs
+    on pcs.id=pi.capability_set_id and pcs.product_id=p.id
+  where cr.id=p_receipt_id
+    and cr.subject_id=p_subject_id
+    and cr.product_offer_id=p_approved_offer_id
+    and cr.provider='portone_v2'
+    and cr.platform='web'
+    and cr.environment='production'
+    and cr.verification_status='verified'
+    and cr.verified_at is not null
+    and cr.verified_amount_minor=1900
+    and cr.verified_currency='KRW'
+    and cr.external_transaction_id<>''
+    and cr.receipt_fingerprint<>''
+    and pi.status='verified'
+    and pi.expected_amount_minor=1900
+    and pi.expected_currency='KRW'
+    and pi.capability_snapshot_hash is not null
+    and pi.capability_snapshot_jsonb=pg_catalog.jsonb_build_object(
+      'capabilitySetId',pcs.id::text,
+      'definitionVersion',pcs.definition_version,
+      'definitionHash',pcs.definition_hash
+    )
+    and po.provider='portone_v2'
+    and po.platform='web'
+    and po.enabled and po.retired_at is null
+    and po.currency='KRW'
+    and po.display_price_minor=1900
+    and p.enabled and p.retired_at is null
+    and p.product_key='chat_credits_300_v1'
+    and p.product_type='credit'
+  for share of cr,pi,po,p,pcs;
+  if not found then
+    raise exception 'Receipt is not authorized for PortOne credit fulfillment';
+  end if;
+
+  -- This validity is an explicit, server-authorized input, not a business
+  -- policy invented by the candidate. First issuance pins immutable expiry.
+  v_expiry := case when p_validity_mode='days'
+    then v_now + pg_catalog.make_interval(days => p_validity_days)
+    else null end;
+  if v_expiry is not null and v_expiry <= v_now then
+    raise exception 'Paid credit expiration is invalid';
+  end if;
+
+  select l.* into v_existing from public.chat_credit_lots_v1 l
+    where l.source_kind='portone_topup' and l.source_ref=p_receipt_id
+    for update;
+  if found then
+    if v_existing.subject_id<>p_subject_id or v_existing.credits_issued<>300 then
+      raise exception 'Paid credit source already belongs to incompatible lot';
+    end if;
+    v_lot_id := v_existing.id;
+  else
+    insert into public.chat_credit_lots_v1
+      (subject_id,source_kind,source_ref,credits_issued,credits_remaining,issued_at,expires_at)
+    values(p_subject_id,'portone_topup',p_receipt_id,300,300,v_now,v_expiry)
+    on conflict on constraint chat_credit_lots_global_source_v1 do nothing
+    returning id into v_lot_id;
+    if v_lot_id is null then
+      raise exception 'Paid credit source conflicted with another owner';
+    end if;
+    v_issued := true;
+  end if;
+
+  return query
+  select v_lot_id,v_issued,b.available_credits,b.total_credits
+    from public.internal_qry_chat_credit_balance_v1(p_subject_id) b;
+end $$;
+
+revoke all on function public.internal_cmd_chat_credit_verified_topup_v1(
+  uuid,uuid,uuid,text,integer
+) from public;
