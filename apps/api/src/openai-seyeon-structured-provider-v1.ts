@@ -41,6 +41,7 @@ export type OpenAiSeyeonStructuredProviderFetchV1 = (
 export interface OpenAiSeyeonStructuredProviderConfigV1 {
   readonly apiKey: string;
   readonly model: string;
+  /** Only the audited OpenAI Direct or Vercel AI Gateway origin is permitted. */
   readonly origin?: string;
   readonly timeoutMs?: number;
   /** Opt-in provider-enforced output ceiling, including reasoning tokens. */
@@ -200,6 +201,15 @@ function responsesEndpoint(originValue: string | undefined): string {
     return failConfiguration(
       'OpenAI origin must be a credential-free HTTPS origin.',
     );
+  }
+  // The external-egress audit has exactly two destination classes.
+  // A generic HTTPS host must not receive user messages or memories while
+  // being mislabeled as an OpenAI Direct dispatch.
+  if (
+    url.origin !== OPENAI_RESPONSES_DEFAULT_ORIGIN_V1 &&
+    url.origin !== 'https://ai-gateway.vercel.sh'
+  ) {
+    return failConfiguration('OpenAI origin is not an audited provider destination.');
   }
   return new URL('/v1/responses', url).toString();
 }

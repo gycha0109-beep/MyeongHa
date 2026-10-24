@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { createOpenAiSeyeonStructuredProviderV1 } from '../apps/api/src/openai-seyeon-structured-provider-v1.js';
 import { describe, expect, it } from 'vitest';
 import {
   buildSeyeonExternalEgressEvidenceV1,
@@ -6,6 +7,27 @@ import {
 } from '../apps/api/src/seyeon-external-egress-evidence-v1.js';
 
 describe('L3-A OpenAI/Vercel AI Gateway outbound data-class evidence', () => {
+  it('rejects unreviewed outbound hosts before any AI request can be sent', () => {
+    const config = {
+      apiKey: 'synthetic-key-with-no-user-private-data-12345',
+      model: 'gpt-5.6-terra',
+    };
+    expect(() => createOpenAiSeyeonStructuredProviderV1(config)).not.toThrow();
+    expect(() => createOpenAiSeyeonStructuredProviderV1({
+      ...config, model: 'openai/gpt-5.6-sol', origin: 'https://ai-gateway.vercel.sh',
+    })).not.toThrow();
+    for (const origin of [
+      'https://unreviewed.example',
+      'https://api.openai.com.evil.example',
+      'https://127.0.0.1',
+      'https://ai-gateway.vercel.sh.evil.example',
+    ]) {
+      expect(() => createOpenAiSeyeonStructuredProviderV1({
+        ...config, origin,
+      })).toThrow('OpenAI origin is not an audited provider destination.');
+    }
+  });
+
   it('only records a fixed set of safe categories and coarse volume buckets', () => {
     const secrets = {
       message: '실명 홍길동, 전화번호 010-1234-5678, 건강 관련 비밀',
