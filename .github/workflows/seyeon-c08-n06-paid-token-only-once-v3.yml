@@ -1,0 +1,57 @@
+name: '[WT:character-memory] C08 N06 paid token-only price V3 once'
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/seyeon-c08-n06-paid-token-only-once-v3.trigger'
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: seyeon-c08-n06-paid-token-only-once-v3
+  cancel-in-progress: false
+
+jobs:
+  actual_n06:
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && github.run_attempt == 1 }}
+    runs-on: ubuntu-24.04
+    environment: production
+    timeout-minutes: 8
+    steps:
+      - name: Checkout protected main exact commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.sha }}
+      - name: Setup Node 24
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Verify budget and actual model response shape
+        run: |
+          set -euo pipefail
+          npm ci --ignore-scripts --no-audit --no-fund
+          npx vitest run test/seyeon-c08-n06-actual-paid-canary-once-v1.test.mjs test/seyeon-c08-n06-exact-model-route-paid-v2.test.mjs
+          node --check scripts/seyeon-c08-n06-actual-paid-canary-once-v1.mjs
+      - name: Attempt owner-approved first bounded actual N06 inference
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          EXPECTED_HEAD_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          set +x
+          test -n "$OPENROUTER_API_KEY"
+          node scripts/seyeon-c08-n06-paid-token-only-once-v3.mjs
+      - name: Save sanitized actual result and reservation journal
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: seyeon-c08-n06-v3-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/seyeon-c08-n06-paid-token-only-once-v3/
+          if-no-files-found: warn
+          retention-days: 14
