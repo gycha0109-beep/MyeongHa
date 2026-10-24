@@ -104,6 +104,64 @@ begin
  ) then raise exception 'Signup 30-day expiry not preserved'; end if;
 end $credit$;
 
+-- A paid lot with an EXPLICITLY chosen no-expiry test policy remains spendable.
+-- Fixture-only direct insertion; it is not payment or Production fulfillment.
+do $paid_candidate$
+declare
+ s uuid := 'cc110000-0000-4000-8000-000000000001';
+ t uuid := 'cc120000-0000-4000-8000-000000000001';
+ r uuid;
+ a bigint;
+ result_kind text;
+begin
+ insert into public.chat_credit_lots_v1(
+   subject_id,source_kind,source_ref,credits_issued,credits_remaining,issued_at,expires_at
+ ) values(
+   s,'portone_topup','cc150000-0000-4000-8000-000000000001',300,300,clock_timestamp(),null
+ );
+ select available_credits into a from public.internal_qry_chat_credit_balance_v1(s);
+ if a<>300 then raise exception 'Explicit non-expiring paid candidate lot is not spendable'; end if;
+ select outcome,reservation_id into result_kind,r
+ from public.internal_cmd_chat_credit_reserve_v1(
+   s,t,'cc130000-0000-4000-8000-000000000120'
+ );
+ if result_kind<>'reserved' then raise exception 'Paid candidate lot could not reserve'; end if;
+ perform public.internal_cmd_chat_credit_finalize_v1(
+   s,r,true,'cc140000-0000-4000-8000-000000000120'
+ );
+ select available_credits into a from public.internal_qry_chat_credit_balance_v1(s);
+ if a<>290 then raise exception 'Paid candidate lot was not charged exactly 10'; end if;
+ -- Same receipt cannot be minted twice even across subjects.
+ begin
+   insert into public.chat_credit_lots_v1(
+     subject_id,source_kind,source_ref,credits_issued,credits_remaining,issued_at,expires_at
+   ) values(
+     s,'portone_topup','cc150000-0000-4000-8000-000000000001',300,300,clock_timestamp(),null
+   );
+   raise exception 'Duplicate receipt source unexpectedly minted';
+ exception when unique_violation then null;
+ end;
+ -- A missing approved Offer can never cause a paid mint.
+ begin
+   perform public.internal_cmd_chat_credit_verified_topup_v1(
+     s,'cc150000-0000-4000-8000-000000000002',null,'never',null
+   );
+   raise exception 'Unapproved Offer unexpectedly minted';
+ exception when raise_exception then
+   if sqlerrm='Unapproved Offer unexpectedly minted' then raise; end if;
+ end;
+ -- Missing validity policy is independently blocked.
+ begin
+   perform public.internal_cmd_chat_credit_verified_topup_v1(
+     s,'cc150000-0000-4000-8000-000000000002',
+     'cc160000-0000-4000-8000-000000000001',null,null
+   );
+   raise exception 'Unknown paid validity unexpectedly minted';
+ exception when raise_exception then
+   if sqlerrm='Unknown paid validity unexpectedly minted' then raise; end if;
+ end;
+end $paid_candidate$;
+
 -- Fail closed to runtime/public roles until an approved owner port is wired.
 do $acl$
 declare n text;
@@ -113,6 +171,7 @@ begin
  loop
    if has_function_privilege(n,'public.internal_cmd_chat_credit_reserve_v1(uuid,uuid,uuid)','EXECUTE')
       or has_function_privilege(n,'public.internal_cmd_chat_credit_finalize_v1(uuid,uuid,boolean,uuid)','EXECUTE')
+      or has_function_privilege(n,'public.internal_cmd_chat_credit_verified_topup_v1(uuid,uuid,uuid,text,integer)','EXECUTE')
       or has_table_privilege(n,'public.chat_credit_lots_v1','INSERT') then
      raise exception 'Credit private ledger leaked runtime access to %',n;
    end if;
