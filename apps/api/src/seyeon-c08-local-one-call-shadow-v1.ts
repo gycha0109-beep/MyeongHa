@@ -186,7 +186,10 @@ function assertLocalContext(input: Readonly<{
     }
     seenIds.add(message.messageId);
     if (message.role==='user'){
-      if (!classifySeyeonC08LocalEntryV1(message.text)) {
+      // Prior user messages must be locally provable history; the current
+      // message is classified separately as LOCAL_INPUT_NOT_PROVEN.
+      if (i<messages.length-1 &&
+          !classifySeyeonC08LocalEntryV1(message.text)) {
         throw new SeyeonC08LocalHoldV1('LOCAL_CONTEXT_NOT_PROVEN');
       }
     }else {
