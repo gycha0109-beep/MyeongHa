@@ -40,6 +40,9 @@ function deploy() {
   const checkoutSha = execFileSync('git', ['rev-parse', 'HEAD'], {
     cwd: root, encoding: 'utf8',
   }).trim();
+  if (process.env.WRANGLER_CI_OVERRIDE_NAME !== WEB_CD.worker) {
+    throw new Error('Cloudflare Workers Builds target must be myeongha-web; refusing to replace the API Worker.');
+  }
   assertMainWebCdEnvironment({
     workersCi: process.env.WORKERS_CI,
     branch: process.env.WORKERS_CI_BRANCH,
