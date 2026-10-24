@@ -13,7 +13,7 @@ import {
 
 export const STAGE9_PINNED_RECOVERY_SHA_V1 =
   'd4f7cebb3d9be6b4ad9e526c53e3f5b8585cc9c0';
-const EXPECTED_PROBES=62, EXPECTED_PROTECTED_HOLDS=7;
+const EXPECTED_PROBES=64, EXPECTED_PROTECTED_HOLDS=7;
 const CLASS_NAMES=Object.freeze(['static','health','api-denial','protected-hold']);
 const COUNTERS=Object.freeze([
   'requestAttempts','responses','transportFailures','unexpectedStatuses',
@@ -115,7 +115,9 @@ function checkOne(record,target,expectedSha,runId,attempt) {
   assert(routeTotal===EXPECTED_PROBES&&
     record.byRoute['static.root']?.n>0&&
     record.byRoute['api.health']?.n>0&&
-    record.byRoute['rewrite.chat.turns']?.n>0);
+    record.byRoute['rewrite.chat.turns']?.n>0&&
+    record.byRoute['rewrite.seyeon.memory.grant.status']?.n>0&&
+    record.byRoute['rewrite.seyeon.memory.grant.revoke']?.n>0);
 
   assert(exactKeys(record.decision,DECISION_FIELDS)&&
     record.decision.preview==='ALLOW_DENY_ONLY_PREVIEW'&&
