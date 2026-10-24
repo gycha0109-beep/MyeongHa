@@ -21,6 +21,8 @@ const probes=[
   ...Array.from({length:53},(_,i)=>sample(i%2?'/index.html':'/',200,200,10+i)),
   sample('/api/health',200,200,20),
   sample('/api/me',404,404,21),
+  sample('/api/memories/synthetic-id/grants/seyeon',404,404,23),
+  sample('/api/memories/synthetic-id/grants/seyeon/revoke',404,404,24),
   ...Array.from({length:7},(_,i)=>sample(
     '/api/chat/PRIVATE-THREAD/turns?state=SECRET',503,503,22+i)),
 ];
@@ -43,16 +45,18 @@ const pair=(change={})=>acceptCloudflareStage9EvidencePairV1({
 });
 
 describe('Cloudflare Stage 9 exact-SHA CI evidence pair acceptance',()=>{
-  it('admits two matching-run, held, sanitized 62-probe records only',()=>{
+  it('admits two matching-run, held, sanitized 64-probe records only',()=>{
     const result=pair();
     expect(result).toMatchObject({
       schema:'myeongha-cloudflare-stage9-evidence-pair-acceptance-v1',
       status:'PASS',production:'HOLD',cost:'COST_OR_LIMIT_EVIDENCE_HOLD',
       githubRun:{id:RUN,attempt:ATTEMPT},
-      current:{commit:HEAD,httpSamples:62,protected503:7},
-      recovery:{commit:STAGE9_PINNED_RECOVERY_SHA_V1,httpSamples:62,protected503:7},
+      current:{commit:HEAD,httpSamples:64,protected503:7},
+      recovery:{commit:STAGE9_PINNED_RECOVERY_SHA_V1,httpSamples:64,protected503:7},
       actualRollbackOrRestorePerformed:false,
     });
+    expect(current.byRoute['rewrite.seyeon.memory.grant.status'].n).toBe(1);
+    expect(current.byRoute['rewrite.seyeon.memory.grant.revoke'].n).toBe(1);
     expect(JSON.stringify(result)).not.toContain('PRIVATE-THREAD');
     expect(JSON.stringify(result)).not.toContain('SECRET');
   });
@@ -85,6 +89,10 @@ describe('Cloudflare Stage 9 exact-SHA CI evidence pair acceptance',()=>{
         'auth.html':'INVALID-DIGEST'}}},
       {recovery:{...recovery,publicHtmlSha256:{...recovery.publicHtmlSha256,
         'new-private.html':'f'.repeat(64)}}},
+      {current:{...current,syntheticRequestCount:62}},
+      {current:{...current,byRoute:Object.fromEntries(
+        Object.entries(current.byRoute).filter(([name])=>name!==
+          'rewrite.seyeon.memory.grant.status'))}},
       {current:{...current,counters:{...current.counters,expectedHolds503:0}}},
       {current:{...current,counters:{...current.counters,http429:1}}},
       {current:{...current,groups:{...current.groups,
