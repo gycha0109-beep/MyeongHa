@@ -8,8 +8,9 @@ import {
 import type {RunSeyeonCharacterTurnV2Input} from
   '../apps/api/src/seyeon-character-runtime-v2.js';
 // @ts-expect-error Existing Gold fixture is a synthetic JS module without declarations.
-import {SEYEON_C07_BOUNDARY_MATRIX_V1 as GOLD} from
-  '../scripts/seyeon-cost-c07-cross-topic-boundary-v1.mjs';
+import {SEYEON_C07_BOUNDARY_MATRIX_V1 as GOLD} from '../scripts/seyeon-cost-c07-cross-topic-boundary-v1.mjs';
+type GoldCase = Readonly<{id:string;text:string}>;
+const GOLD_CASES:GoldCase[] = Array.from(GOLD as GoldCase[]);
 
 const ID='synthetic:local:N06';
 const TEXT='오늘은 네가 먼저 이야기해 줘.';
@@ -123,7 +124,7 @@ describe('C08 local preflight / single dialogue LLM / local output guard (OFFLIN
     }
   });
 
-  it.each(GOLD)('$id: admits only N01/N02; refuses all other C07 Gold original messages',async gold=>{
+  it.each(GOLD_CASES)('$id: admits only N01/N02; refuses all other C07 Gold original messages',async gold=>{
     const h=harness({text:gold.text});
     if(gold.id==='N01'||gold.id==='N02'){
       const result=await h.run();
