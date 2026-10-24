@@ -199,8 +199,13 @@ try {
   results.transactionRollbackPreventsLeakedCounter = true;
 
   stage = 'production-composition-real-adapter';
+  // Configuration-shape fixture only: the injected loopback pool owns every DB call.
+  // Generate the unused password in memory instead of committing credential-shaped text.
+  const syntheticDatabaseUrl = new URL('postgresql://aws-0-test.pooler.supabase.com:5432/postgres?sslmode=require');
+  syntheticDatabaseUrl.username = 'myeongha_runtime.cnsfpcdiyofqvhpcegfc';
+  syntheticDatabaseUrl.password = randomUUID();
   const env = {
-    MYEONGHA_DATABASE_URL: 'postgresql://myeongha_runtime.cnsfpcdiyofqvhpcegfc:synthetic@aws-0-test.pooler.supabase.com:5432/postgres?sslmode=require',
+    MYEONGHA_DATABASE_URL: syntheticDatabaseUrl.href,
     MYEONGHA_DATABASE_PRINCIPAL: 'myeongha_runtime', MYEONGHA_DATABASE_TLS_PEER_MODE: 'verify-full',
     MYEONGHA_DATABASE_SSL_ROOT_CERT_PEM: '-----BEGIN CERTIFICATE-----\\ntest-only\\n-----END CERTIFICATE-----',
     MYEONGHA_SUPABASE_URL: 'https://cnsfpcdiyofqvhpcegfc.supabase.co', MYEONGHA_SUPABASE_API_KEY: 'sb_publishable_isolated_only_for_admission_test',

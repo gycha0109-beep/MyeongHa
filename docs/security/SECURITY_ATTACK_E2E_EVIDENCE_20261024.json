@@ -79,7 +79,7 @@
     "apps/api/src/current-subject-saju-preview-reading-http.ts": "cc74dd8ec53ad9aac8f065b1664b63b74a4fd18fabef0a05b7a86edb834b2e35",
     "apps/api/src/production-current-subject-saju-calculation-runtime.ts": "9accc094c12c5d7fe86d7d2e57ee0933fb7c0a8031d9fa26521a8196f7ecd370",
     "apps/api/src/production-current-subject-saju-preview-reading-runtime.ts": "fd0fce359f4435343f39ce79f54920296541f4d8a1a011e6315bb3caf16fad89",
-    "scripts/verify-saju-abuse-admission-postgres.mjs": "1648e338d81f3a6721e7932e729144d12d71d7d70f186cac0e2898ab6134d2c2",
+    "scripts/verify-saju-abuse-admission-postgres.mjs": "b145388a4b91b332d1461bc26dbb4f6e23db3e2fc8a0e6b9b96f61cacdde1b8d",
     "scripts/lib/saju-admission-attack-e2e.mjs": "afffa08bce7bc1a7ebbe439ee0f02bde74359a7d6bb8bbb4f22852a6e8687797",
     "scripts/ci/db-pr-router.mjs": "ddb53ed4cab37d1e3b8b838a14f15fc5eb292ab7d176403083f014759bb49910",
     "scripts/ci/db-suites.json": "15f517eb6bac256e8a5d2b87010f269e733274fd9a92de494043741c7ae626ce",
@@ -93,7 +93,8 @@
   "diagnostics": [
     "Initial harness assumed cache headers absent in the existing calculation handler, body admission ordering and uppercase Auth mock header. Corrected assertions/mock to existing contracts; final fresh DB run PASS.",
     "SQL owner comments now execute before revoking temporary owner membership.",
-    "Merged main 50de60e3038dec829a25aab88d64864d35242041 before PR head freeze; preserved both PG17 cases/router entries. Current main already installs pinned dependencies once, so the admission case reuses them. Router 8 tests and merged build PASS; bash syntax PASS."
+    "Merged main 50de60e3038dec829a25aab88d64864d35242041 before PR head freeze; preserved both PG17 cases/router entries. Current main already installs pinned dependencies once, so the admission case reuses them. Router 8 tests and merged build PASS; bash syntax PASS.",
+    "GitGuardian detected the literal synthetic PostgreSQL config fixture in commit 1f6b18ae. It was never used to connect: the restricted loopback pool is injected. Replaced the unused placeholder password with an in-memory random UUID; fresh 84-request attack E2E rerun PASS."
   ],
   "next": "Required exact-head CI, isolated integration, protected PR merge"
 }
