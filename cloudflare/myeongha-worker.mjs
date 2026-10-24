@@ -9,7 +9,7 @@ function malformedApiRoot(pathname) {
   if (pathname === '/api' || pathname.startsWith('/api/')) return false;
   let segment = pathname.split('/')[1] ?? '';
   for (let depth = 0; depth < 12; depth++) {
-    if (/^api(?:$|[\\/\\.;\\u0000%])/iu.test(segment)) return true;
+    if (/^api(?:$|[\/\\.;\u0000%])/iu.test(segment)) return true;
     if (!segment.includes('%')) break;
     try {
       const decoded = decodeURIComponent(segment);
@@ -17,7 +17,7 @@ function malformedApiRoot(pathname) {
       segment = decoded;
     } catch { return true; }
   }
-  return /^api(?:$|[\\/\\.;\\u0000%])/iu.test(segment);
+  return /^api(?:$|[\/\\.;\u0000%])/iu.test(segment);
 }
 
 export default {
