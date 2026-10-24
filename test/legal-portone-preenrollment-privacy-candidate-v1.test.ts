@@ -44,6 +44,17 @@ describe('L2 A1 Privacy HOLD on subjectless identity proof', () => {
     expect(proposal).toContain('public.cmd_bind_verified_member_preenrollment_v1');
     expect(proposal).toContain('for update skip locked');
     expect(proposal).toContain('public.internal_purge_legal_portone_preenrollment_v1');
+    // A previously malformed string substitution duplicated SQL tails and
+    // broke the PG17 shell regex. Enforce well-formed source-level invariants.
+    expect(proposal.split('commit;')).toHaveLength(2);
+    expect(proposal).not.toContain('commit;\\n then');
+    expect(proposal).toContain("p_binding_digest !~ '^[a-f0-9]{64}$'");
+    expect(proposal).toContain('public.qry_verified_legal_portone_preenrollment_v1');
+    expect(proposal).toContain('public.cmd_bind_verified_member_preenrollment_v1');
+    const pgSmoke = read('test/db/portone_identity_age_authority_pg17.sh');
+    expect(pgSmoke).toContain("grep -E '^[tf]$'");
+    expect(pgSmoke).toContain('guest_create "$binding_c"');
+    expect(pgSmoke).toContain('bind_member "$member_d"');
     expect(read('supabase/release-candidates/1740_portone_identity_age_authority_v1.sql'))
       .toContain("check (verification_id ~ '^iv[a-f0-9]{32}$')");
   });

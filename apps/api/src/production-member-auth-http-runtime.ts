@@ -26,6 +26,7 @@ import {
 import {
   handleSupabaseAuthRequestV1,
   type SupabaseAuthActionV1,
+  type SupabasePreenrollmentMemberBindingPortV1,
 } from './supabase-auth-http.js';
 import type {
   ProductionUserDataRuntimeEnvV1,

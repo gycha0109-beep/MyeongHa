@@ -66,7 +66,12 @@ export function createProductionGuestBootstrapHttpRuntimeV1(
   return Object.freeze({
     async handleRequest(requestInput: ProductionGuestBootstrapHttpRequestV1) {
       let preenrollmentBindingDigest: string | undefined;
-      if (requestInput.request.method === 'POST') {
+      // Existing authenticated Member/Guest bootstrap is a read-only resume,
+      // never a fresh Subject creation; keep it reachable without a second
+      // pre-registration proof. Invalid Authorization is rejected by the
+      // canonical request-identity resolver before any Guest write.
+      if (requestInput.request.method === 'POST' &&
+          requestInput.request.headers.get('authorization') === null) {
         const mode = resolveProductionPortOneVerifiedAgeModeV1(input.env);
         if (mode === 'enforce') {
           // Do not trust the browser's birth date, bearer, or checked consent.
