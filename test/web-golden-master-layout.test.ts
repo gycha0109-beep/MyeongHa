@@ -58,65 +58,47 @@ describe('Web Golden Master', () => {
     expect(home).not.toContain('gm-sidebar');
   });
 
-  it('pins the approved Saju 3 + 3 + full-width catalog structure', async () => {
-    const [html, page] = await Promise.all([
+  it('pins the Saju free-preview reference layout and retained calculation identifiers', async () => {
+    const [html, page, design] = await Promise.all([
       readWebFile('reading.html'),
       readWebFile('src/reading/ReadingPage.tsx'),
+      readWebFile('saju-preview-landing.css'),
     ]);
     const saju = `${html}\n${page}`;
 
     expect(saju).toContain('class="product-page gm-page saju-hub-page"');
+    expect(html).toContain('href="saju-preview-landing.css"');
     expect(saju).toContain('id="saju-hub"');
-    const catalog = page.match(/const readingTopics = \[([\s\S]*?)\] as const;/u)?.[1] ?? '';
-    expectInOrder(catalog, [
-      '전체 사주',
-      '직업 · 커리어',
-      '재물',
-      '연애 · 관계',
-      '사업',
-      '가족',
-      '삶의 단계',
-    ]);
     expectInOrder(page.slice(page.indexOf('return (')), [
-      '무료 기본 명식',
-      '나를 읽기',
-      '지금의 흐름',
-      '올해',
-      '이번 달',
-      '사람과의 관계',
-      '고민이 있다면',
-      '지금 고민으로 보기',
+      '무료 프리뷰 화면',
+      'saju-empty',
+      'saju-hub',
+      '나의 사주 기본 정보',
+      '입력 정보',
+      '나의 사주 명식',
+      '유료 사주 해석에서 제공되는 내용',
+      '예시 결과물 미리보기',
     ]);
-
-    expect(catalog.match(/reading-detail\.html\?/gu)).toHaveLength(7);
-    expect(catalog.match(/is-wide/gu)).toHaveLength(1);
+    expectInOrder(page.slice(page.indexOf('const productPreviewTopics')), [
+      '전체 사주 해석', '직업 · 커리어', '재물', '연애 · 관계',
+    ]);
 
     const runtimeIds = [
-      'saju-status',
-      'saju-empty',
-      'saju-birth-form',
-      'saju-birth-year',
-      'saju-birth-month',
-      'saju-birth-day',
-      'saju-birth-time',
-      'saju-time-unknown',
-      'saju-leap-wrap',
-      'saju-leap-month',
-      'saju-birth-sex',
-      'saju-form-error',
-      'saju-create-button',
-      'saju-pillar-grid',
-      'saju-element-bars',
-      'saju-day-master',
-      'saju-day-master-meta',
-      'saju-completeness-title',
-      'saju-completeness-copy',
-      'saju-birth-summary',
-      'saju-flow-year',
+      'saju-status', 'saju-empty', 'saju-birth-form',
+      'saju-birth-year', 'saju-birth-month', 'saju-birth-day',
+      'saju-birth-time', 'saju-time-unknown', 'saju-leap-wrap',
+      'saju-leap-month', 'saju-birth-sex', 'saju-form-error',
+      'saju-create-button', 'saju-pillar-grid', 'saju-element-bars',
+      'saju-day-master', 'saju-day-master-meta', 'saju-completeness-title',
+      'saju-completeness-copy', 'saju-birth-summary', 'saju-flow-year',
+      'saju-birth-date-display', 'saju-birth-time-display',
+      'saju-birth-sex-display', 'saju-birth-place-display',
+      'saju-birth-calendar-display',
     ] as const;
-
     for (const id of runtimeIds) expect(saju).toContain(`id="${id}"`);
     expect(saju).not.toContain('gm-sidebar');
+    expect(design).toContain('.saju-design-product-grid');
+    expect(design).toContain('@media (max-width:690px)');
   });
 
   it('pins the desktop geometry and post-theme lock layer', async () => {
