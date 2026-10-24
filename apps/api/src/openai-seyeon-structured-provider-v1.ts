@@ -1,3 +1,4 @@
+import { buildSeyeonExternalEgressEvidenceV1 } from './seyeon-external-egress-evidence-v1.js';
 import {
   awaitBoundedUpstreamJsonResponseHeadersV1,
   readBoundedUpstreamJsonTextV1,
@@ -459,6 +460,18 @@ export function createOpenAiSeyeonStructuredProviderV1(
 
       let response: Response;
       try {
+        // Content-free L3 evidence at the actual provider dispatch boundary.
+        const egressEvidence = buildSeyeonExternalEgressEvidenceV1({
+          purpose: request.purpose,
+          destination: endpoint === 'https://ai-gateway.vercel.sh/v1/responses'
+            ? 'vercel_ai_gateway' : 'openai_direct',
+          providerInput: request.input,
+        });
+        try {
+          console.info('MYEONGHA_SEYEON_EGRESS_EVIDENCE ' + JSON.stringify(egressEvidence));
+        } catch {
+          // Logging availability must never become request authority.
+        }
         response = await awaitBoundedUpstreamJsonResponseHeadersV1(fetchImpl(endpoint, {
           method: 'POST',
           headers: {

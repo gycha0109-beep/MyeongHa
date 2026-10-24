@@ -68,3 +68,10 @@
 
 - **현재 활성화 금지:** `MYEONGHA_PORTONE_PREENROLLMENT_HTTP_MODE`, `MYEONGHA_PORTONE_IDENTITY_HTTP_MODE`, 관련 `APPROVED`/마이그레이션 표시는 실제 사용자 계약·DB 적용 승인 없이 변경하지 않는다. 기존 59개 테이블 삭제정책(46 DELETE, 4 ANONYMIZE, 9 RETAIN), P5Y/P30D은 이 제안에 의해 자동 개정되지 않는다.
 - **출시 전 필요 증명:** PortOne 공급자/하위 인증업체의 위탁·제3자 제공·국외이전 분류, 정확한 수집 항목·보관/파기·거부 효과, 계약 및 개인정보 처리방침 합치, 본인과 가입 계정의 결속 수준, 공급자 응답 원문이 관측 로그에 남지 않는지, 서버·브라우저 쿠키 및 10분 물리 삭제의 운영 검증.
+
+## 2026-10-25 L3-A AI 외부 요청 콘텐츠 비노출 구조 증빙
+
+- `apps/api/src/seyeon-external-egress-evidence-v1.ts`의 고정형 지표를 `openai-seyeon-structured-provider-v1.ts`의 **실제 Responses API dispatch 직전**에 연결했다. 지표는 `turn_interpretation`·`dialogue_render`·`semantic_review` 단계, 실제 라우팅 `openai_direct` 또는 `vercel_ai_gateway`, 최근 대화/기억 항목 수 구간(`none`, `1-5`, `6-20`, `21+`, `unknown`), 렌더 패킷/초안 포함 여부 및 `store: false` 요청 사실로만 구성한다.
+- 새 지표에는 자유대화 본문, 기억/민감정보 원문, 실명, 개인 식별자, sourceRef, 프롬프트, UUID, 비밀키, 모델 응답, 인증 토큰, 임의 클라이언트 필드명/값을 **넣지 않는다**. 기존 Provider Metrics와 마찬가지로 외부 API 호출의 성공/실제 처리·원격 파기 증명은 별개이며, 출처의 응답이나 계약 범위를 대체하지 않는다.
+- `storeFalseRequested: true`는 요청 속 `store: false`를 확인했다는 뜻일 뿐 공급자/게이트웨이 로그 보존 0이나 국외 이전 부재를 의미하지 않는다. API 키 존재 여부에 따른 Direct/Gateway 우선순위 및 서버 측 provider 계약은 기존과 동일.
+- **출시 HOLD:** 각 업체 DPA·국외 이전 고지·수탁자/하위 처리자/보존기간과 운영 로그 정책 승인 및 실제 배포 관측 전에는 L3 완료로 분류하지 않는다. 현재 단계의 구현은 구조 분류값을 로그에 내보내는 개발 코드이며, 로그 보관/삭제·전송 국가를 확정하지 않는다.
