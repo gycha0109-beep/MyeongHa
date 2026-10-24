@@ -134,6 +134,8 @@ describe('Mobile / Web UI localization parity', () => {
     expect(scene).toContain("t('근거')");
     expect(scene).toContain('{currentStep.primary}');
     expect(composer).toContain('SEYEON_HISTORY_REVEAL_HOLD');
+    expect(composer).toContain("t('개인정보 보호를 위한 서버 확인이 끝나지 않아");
+    expect(composer).toContain("t('대화 기록과 메시지 보내기는 개인정보 공개 권한 검증이");
   });
 
   it('keeps Android status/navigation windows outside the scrollable app and tabs', async () => {
@@ -195,7 +197,7 @@ describe('Mobile / Web UI localization parity', () => {
     expect(profile).toContain("profile.displayName === '호칭 미설정'");
   });
 
-  it('localizes UI-only Saju and Reader error/HOLD states in new locales without translating source payloads', () => {
+  it('localizes UI-only Saju and Reader error/HOLD states in new locales without translating source payloads', async () => {
     const labels = [
       '현재 이 주제를 표시할 만큼 검증된 해석 근거가 충분하지 않습니다.',
       '사주 프리뷰를 불러오지 못했습니다.',

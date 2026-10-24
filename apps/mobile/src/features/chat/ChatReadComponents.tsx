@@ -90,11 +90,8 @@ export function ChatReadMessages({
     return (
       <View style={[styles.stateCard, styles.seyeonSurface]}>
         <MobileUiText style={styles.errorTitle}>세연 대화 기록을 현재 표시할 수 없습니다</MobileUiText>
-        <MobileUiText style={styles.stateText}>
-          개인정보 보호를 위한 서버 확인이 끝나지 않아 대화 기록을 표시할 수 없습니다.
-          반복해서 불러와도 해제되지 않습니다.
-        </MobileUiText>
-        <MobileUiText style={styles.diagnosticText}>오류 코드: SEYEON_HISTORY_REVEAL_HOLD</MobileUiText>
+        <Text style={styles.stateText}>{t('개인정보 보호를 위한 서버 확인이 끝나지 않아 대화 기록을 표시할 수 없습니다. 반복해서 불러와도 해제되지 않습니다.')}</Text>
+        <Text style={styles.diagnosticText}>{t('오류 코드')}: SEYEON_HISTORY_REVEAL_HOLD</Text>
       </View>
     );
   }
@@ -103,9 +100,7 @@ export function ChatReadMessages({
     return (
       <View style={[styles.stateCard, isSeyeonTheme && (theme === 'dark' ? styles.seyeonSurfaceDark : styles.seyeonSurface)]}>
         <MobileUiText style={styles.errorTitle}>대화를 불러오지 못했습니다</MobileUiText>
-        <MobileUiText style={styles.stateText}>
-          대화 기록을 확인하지 못했습니다. 아래에서 다시 불러올 수 있습니다.
-        </MobileUiText>
+        <Text style={styles.stateText}>{t('대화 기록을 확인하지 못했습니다. 아래에서 다시 불러올 수 있습니다.')}</Text>
         {snapshot.errorCode !== null ? (
           <Text style={styles.diagnosticText}>{t('오류 코드')}: {snapshot.errorCode}</Text>
         ) : null}
@@ -288,10 +283,7 @@ export function ChatComposer({
     return (
       <View style={[styles.pendingCard, theme === 'dark' ? styles.seyeonSurfaceDark : styles.seyeonSurface]}>
         <MobileUiText style={styles.pendingTitle}>세연 대화는 서버의 보호 조치로 잠시 중단되었습니다</MobileUiText>
-        <MobileUiText style={styles.stateText}>
-          대화 기록과 메시지 보내기는 개인정보 공개 권한 검증이 끝난 뒤 이용할 수 있습니다.
-          앱을 다시 설치해도 이 제한은 해제되지 않습니다.
-        </MobileUiText>
+        <Text style={styles.stateText}>{t('대화 기록과 메시지 보내기는 개인정보 공개 권한 검증이 끝난 뒤 이용할 수 있습니다. 앱을 다시 설치해도 이 제한은 해제되지 않습니다.')}</Text>
       </View>
     );
   }
