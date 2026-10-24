@@ -59,6 +59,10 @@ export function ReadingDetailPage() {
             </div>
           </header>
 
+          <p className="reading-authority-note" data-legal-ai-reading-notice>
+            명하의 사주 해설은 생성형 AI를 활용할 수 있으며, 캐릭터는 실제 사람이 아닙니다. 해설은 참고용으로 확인해 주세요.
+          </p>
+
           <div className="reading-sheet-body">
             <section className="reading-block reading-block-primary">
               <span className="reading-block-icon" aria-hidden="true">✿</span>

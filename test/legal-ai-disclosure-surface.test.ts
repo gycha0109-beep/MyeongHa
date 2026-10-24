@@ -5,6 +5,25 @@ const landing = readFileSync(new URL('../apps/web/src/landing/LandingPage.tsx', 
 const chat = readFileSync(new URL('../apps/web/src/chat/ChatPage.tsx', import.meta.url), 'utf8');
 
 describe('LEGAL L5: visible generative-AI disclosures', () => {
+  it('labels Reader character interpretation before showing generated reading results', async () => {
+    const web = readFileSync(new URL('../apps/web/src/reading-detail/ReadingDetailPage.tsx', import.meta.url), 'utf8');
+    const native = readFileSync(new URL('../apps/mobile/src/app/reading/[readingId].tsx', import.meta.url), 'utf8');
+    const notice = '명하의 사주 해설은 생성형 AI를 활용할 수 있으며, 캐릭터는 실제 사람이 아닙니다. 해설은 참고용으로 확인해 주세요.';
+    expect(web).toContain('data-legal-ai-reading-notice');
+    expect(web).toContain(notice);
+    expect(web.indexOf('data-legal-ai-reading-notice')).toBeLessThan(web.indexOf('className="reading-sheet-body"'));
+    expect(native).toContain(notice);
+    expect(native.indexOf(notice)).toBeLessThan(native.indexOf('state.record.display.steps.map'));
+    const { translateStaticUi } = await import('../apps/web/ui-i18n.js');
+    const { translateMobileUiCopy } = await import('../apps/mobile/src/ui/mobile-ui-copy.js');
+    for (const locale of ['ja-JP', 'zh-TW'] as const) {
+      const translated = translateStaticUi(notice, locale);
+      expect(translated).not.toBe(notice);
+      expect(translated).not.toMatch(/[가-힣]/u);
+      expect(translateMobileUiCopy(notice, locale)).toBe(translated);
+    }
+  });
+
   it('shows native home AI notice before its character-entry action', () => {
     const home = readFileSync(new URL('../apps/mobile/src/features/home/HomeCharacterFeature.tsx', import.meta.url), 'utf8');
     expect(home).toContain('명하의 캐릭터 대화는 생성형 인공지능을 이용합니다.');
