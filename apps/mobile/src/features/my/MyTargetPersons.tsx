@@ -57,6 +57,7 @@ export function MyTargetPersonsSection({
 }: {
   items: readonly TargetPersonV1[];
 }) {
+  const { t } = useMobileUiLocale();
   return (
     <View style={styles.section}>
       <View style={styles.intro}>
@@ -71,7 +72,7 @@ export function MyTargetPersonsSection({
         <View key={item.targetPersonId} style={styles.card}>
           <View style={styles.heading}>
             <Text style={styles.name}>
-              {item.displayLabel?.trim() || '이름 없는 대상'}
+              {item.displayLabel?.trim() || t('이름 없는 대상')}
             </Text>
             {item.relationshipLabel?.trim() ? (
               <Text style={styles.relationship}>{item.relationshipLabel}</Text>
@@ -83,16 +84,16 @@ export function MyTargetPersonsSection({
           </View>
           <View style={styles.factRow}>
             <MobileUiText style={styles.factLabel}>태어난 시간</MobileUiText>
-            <Text style={styles.factValue}>{timeLabel(item)}</Text>
+            <Text style={styles.factValue}>{t(timeLabel(item))}</Text>
           </View>
           <View style={styles.factRow}>
             <MobileUiText style={styles.factLabel}>기준</MobileUiText>
             <Text style={styles.factValue}>
-              {calendarLabel(item)} · {sexLabel(item)}
+              {t(calendarLabel(item))} · {t(sexLabel(item))}
             </Text>
           </View>
           <Text style={styles.revision}>
-            출생정보 revision {item.currentRevision.revisionNo}
+            {t('출생정보 revision')} {item.currentRevision.revisionNo}
           </Text>
         </View>
       ))}
@@ -197,7 +198,7 @@ export function MyTargetPersonCreateCard({
         accessibilityLabel={t('대상 이름')}
         value={displayLabel}
         onChangeText={setDisplayLabel}
-        placeholder="이름 또는 별칭"
+        placeholder={t('이름 또는 별칭')}
         placeholderTextColor={mobileColors.muted}
         style={styles.input}
       />
@@ -205,7 +206,7 @@ export function MyTargetPersonCreateCard({
         accessibilityLabel={t('관계')}
         value={relationshipLabel}
         onChangeText={setRelationshipLabel}
-        placeholder="관계 (예: 친구)"
+        placeholder={t('관계 (예: 친구)')}
         placeholderTextColor={mobileColors.muted}
         style={styles.input}
       />
@@ -223,7 +224,7 @@ export function MyTargetPersonCreateCard({
               styles.segmentText,
               calendarType === value && styles.segmentTextSelected,
             ]}>
-              {value === 'solar' ? '양력' : '음력'}
+              {t(value === 'solar' ? '양력' : '음력')}
             </Text>
           </Pressable>
         ))}
@@ -280,7 +281,7 @@ export function MyTargetPersonCreateCard({
         editable={timeKnown}
         value={birthTime}
         onChangeText={setBirthTime}
-        placeholder={timeKnown ? '14:30' : '시간 모름'}
+        placeholder={timeKnown ? '14:30' : t('시간 모름')}
         placeholderTextColor={mobileColors.muted}
         style={[styles.input, !timeKnown && styles.inputDisabled]}
       />
@@ -305,7 +306,7 @@ export function MyTargetPersonCreateCard({
               styles.segmentText,
               sex === option.value && styles.segmentTextSelected,
             ]}>
-              {option.label}
+              {t(option.label)}
             </Text>
           </Pressable>
         ))}

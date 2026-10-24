@@ -25,7 +25,7 @@ describe('mobile Chat thread Character identity presentation', () => {
       'apps/mobile/src/features/chat/ChatReadComponents.tsx',
     );
 
-    expect(components).toContain("const displayName = character?.displayName ?? '대화 상대'");
+    expect(components).toContain("const displayName = character?.displayName ?? t('대화 상대')");
     expect(components).toContain("character === null ? '明' : displayName.slice(0, 1)");
     expect(components).not.toContain('threadId.includes');
     expect(components).not.toContain('routeThreadId');

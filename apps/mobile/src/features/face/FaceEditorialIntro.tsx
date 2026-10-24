@@ -4,6 +4,8 @@ import { resolveMobileChatPortraitV1 } from '@/features/chat/chat-character-port
 import { findMobileReaderPresentationV1, type MobileReaderPresentationIdV1 } from '@/features/reading/mobile-reader-presentation';
 import { useMobileTheme } from '@/ui/mobile-theme';
 import { MobileUiText } from '@/ui/MobileUiText';
+import { useMobileUiLocale } from '@/ui/mobile-ui-locale';
+import { formatMobileUiCopy } from '@/ui/mobile-ui-copy';
 
 /**
  * Face-reading onboarding hero.
@@ -12,6 +14,7 @@ import { MobileUiText } from '@/ui/MobileUiText';
  */
 export function FaceEditorialIntro({ readerId }: { readerId: MobileReaderPresentationIdV1 }) {
   const { theme } = useMobileTheme();
+  const { locale } = useMobileUiLocale();
   const reader = findMobileReaderPresentationV1(readerId);
   const portrait = resolveMobileChatPortraitV1(readerId);
 
@@ -28,7 +31,7 @@ export function FaceEditorialIntro({ readerId }: { readerId: MobileReaderPresent
         <Text style={styles.eyebrow}>FACE READING · 相</Text>
         <MobileUiText style={styles.title}>얼굴에 담긴 나의 이야기</MobileUiText>
         <Text style={styles.body}>
-          정면 사진을 준비하고, {reader.name}과 함께할 관상 읽기의 시작을 만나보세요.
+          {formatMobileUiCopy('정면 사진을 준비하고, {reader}과 함께할 관상 읽기의 시작을 만나보세요.', { reader: reader.name }, locale)}
         </Text>
         <View style={styles.statusRow}>
           <View style={styles.statusDot} />
