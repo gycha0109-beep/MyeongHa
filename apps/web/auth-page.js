@@ -766,9 +766,11 @@ async function submitAuth({ email: rawEmail, password, confirmation }) {
       if (!CLOUDFLARE_AUTH_ORIGINS.has(location.origin)) await ensureGuestBearer();
       const result = await signUpWithPassword(email, password, nextHref());
       if (result.status === 'verification_required') {
-        if (readGuestBearer() && !await stageConfirmationGuestHandoff(result.email)) {
-          setStatus('확인 메일은 전송됐지만 현재 게스트 흐름의 계정 연결 정보를 안전하게 보존하지 못했습니다. 이 탭을 닫지 말고 이메일 확인 후 돌아와 주세요.', 'error');
-          return;
+        if (readGuestBearer()) {
+          if (!await stageConfirmationGuestHandoff(result.email)) {
+            setStatus('확인 메일은 전송됐지만 현재 게스트 흐름의 계정 연결 정보를 안전하게 보존하지 못했습니다. 이 탭을 닫지 말고 이메일 확인 후 돌아와 주세요.', 'error');
+            return;
+          }
         }
         setStatus(`${result.email}로 확인 메일을 보냈습니다. 이메일 확인 후 이 로그인 화면으로 돌아와 현재 게스트 흐름을 이어갈 수 있습니다.`, 'success');
         return;
