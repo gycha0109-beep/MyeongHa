@@ -1,4 +1,5 @@
 import { ApiCommandError } from './api-error.js';
+import type { PortOneVerifiedAgeAdmissionPortV1 } from './portone-v2-verified-age-admission-v1.js';
 import type { IdentityEvidenceVerificationPortV1 } from './current-subject-profile-http.js';
 import {
   createPostgresPurchaseIntentRuntimePortsV3,
@@ -35,6 +36,8 @@ export interface HandlePurchaseIntentCreateRequestInputV3 {
   readonly identityEvidenceVerifier: IdentityEvidenceVerificationPortV1;
   readonly pool: PostgresSubjectPoolV1;
   readonly idPort: PurchaseIntentIdPortV1;
+  /** Server-owned verified adult proof, mandatory in production runtime. */
+  readonly ageAdmissionPort?: Pick<PortOneVerifiedAgeAdmissionPortV1, 'admitAdultDirectPurchase'>;
 }
 
 function requireNonEmptyString(name: string, value: unknown): string {
@@ -157,6 +160,24 @@ export async function handlePurchaseIntentCreateRequestV3(
       retryable: false,
       requestId,
     });
+  }
+
+  if (input.ageAdmissionPort !== undefined) {
+    let adult = false;
+    try {
+      adult = await input.ageAdmissionPort.admitAdultDirectPurchase(verifiedEvidence);
+    } catch {
+      return jsonError({
+        status: 503, code: 'AGE_VERIFICATION_UNAVAILABLE',
+        messageKey: 'age.verification_unavailable', retryable: true, requestId,
+      });
+    }
+    if (!adult) {
+      return jsonError({
+        status: 403, code: 'ADULT_PURCHASE_REQUIRED',
+        messageKey: 'commerce.adult_purchase_required', retryable: false, requestId,
+      });
+    }
   }
 
   try {
