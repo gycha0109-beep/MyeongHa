@@ -42,7 +42,7 @@ apply_pg17_migrations_through_seyeon_production_frontier() {
         20261007150457_guest_promotion_auth_fk_validation.sql|20261008043000_seyeon_manifest_acl_restore.sql)
           timestamped_count=$(( timestamped_count + 1 ))
           ;;
-        20261018190000_seyeon_locked_first_zero_source_reveal_v1.sql)
+        20261018190000_seyeon_locked_first_zero_source_reveal_v1.sql|20261024134543_saju_abuse_admission_runtime_authority.sql|20261024134610_saju_abuse_admission_production_policy_v1.sql|20261024135504_saju_abuse_admission_cleanup_worker_authority.sql|20261024141330_saju_abuse_admission_policy_approval_clock_v2.sql)
           # Post-frontier security migration is known but must NEVER be replayed
           # into the historical 1510 R2 catalog/restore authority fixture.
           # Reject a same-named modified migration instead of silently skipping.
@@ -51,6 +51,12 @@ apply_pg17_migrations_through_seyeon_production_frontier() {
           # with coreutils if git is missing. Windows CRLF checkout is allowed
           # ONLY when LF normalization produces the unchanged pinned SQL blob.
           local reviewed_blob_sha1='3fbe7322cb3f11484a3e0a42bdc0598879b3d1d8'
+          case "$basename" in
+            20261024134543_saju_abuse_admission_runtime_authority.sql) reviewed_blob_sha1='4be88ed0003bc4db226cc2324a506183094f35ff' ;;
+            20261024134610_saju_abuse_admission_production_policy_v1.sql) reviewed_blob_sha1='c9a6354ec0d1fb2c932aca1e1916e65a5c623705' ;;
+            20261024135504_saju_abuse_admission_cleanup_worker_authority.sql) reviewed_blob_sha1='cd31fb16e0985c732208cf69d41d1bd88f7ef31e' ;;
+            20261024141330_saju_abuse_admission_policy_approval_clock_v2.sql) reviewed_blob_sha1='9b3abf4f8296c8385b55f29e224381bdf14e8a4e' ;;
+          esac
           local local_blob_sha1 local_bytes normalized_bytes
           if command -v git >/dev/null 2>&1; then
             local_blob_sha1="$(git hash-object "$migration")"
@@ -116,11 +122,13 @@ case "$case_name" in
       url.username = process.env.PGUSER;
       url.password = process.env.PGPASSWORD;
       url.pathname = process.env.PGDATABASE;
-      const result = spawnSync(process.execPath, ["scripts/verify-saju-abuse-admission-postgres.mjs"], {
-        stdio: "inherit", env: { ...process.env, MYEONGHA_SAJU_ADMISSION_TEST_DATABASE_URL: url.href },
-      });
-      if (result.error) throw result.error;
-      process.exit(result.status ?? 1);
+      for (const script of ["scripts/verify-saju-abuse-admission-postgres.mjs", "scripts/verify-saju-abuse-production-policy-postgres.mjs"]) {
+        const result = spawnSync(process.execPath, [script], {
+          stdio: "inherit", env: { ...process.env, MYEONGHA_SAJU_ADMISSION_TEST_DATABASE_URL: url.href },
+        });
+        if (result.error) throw result.error;
+        if (result.status !== 0) process.exit(result.status ?? 1);
+      }
     '
     ;;
   seyeon-security-s0-real-path-pg17)

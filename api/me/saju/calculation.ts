@@ -4,6 +4,7 @@ import { CURRENT_SUBJECT_SAJU_CALCULATION_HTTP_BINDINGS_V1 } from '../../../apps
 import { IngressRequestBodyCompletionDeadlineExceededV1 } from '../../../apps/api/src/ingress-request-body-deadline.js';
 import { createProductionCurrentSubjectSajuCalculationRuntimeV1 } from '../../../apps/api/src/production-current-subject-saju-calculation-runtime.js';
 import { hasRequestBodyWithoutDrainingV1 } from '../../../apps/api/src/request-body-presence-probe.js';
+import { isSajuAbuseAdmissionEnabledV1 } from '../../../apps/api/src/saju-abuse-admission-activation.js';
 
 const NO_STORE_CACHE_CONTROL = 'no-store' as const;
 
@@ -12,6 +13,7 @@ let runtime: ReturnType<typeof createProductionCurrentSubjectSajuCalculationRunt
 function getRuntime(): ReturnType<typeof createProductionCurrentSubjectSajuCalculationRuntimeV1> {
   runtime ??= createProductionCurrentSubjectSajuCalculationRuntimeV1({
     env: process.env,
+    sajuAbuseAdmissionEnabled: isSajuAbuseAdmissionEnabledV1(process.env),
   });
   return runtime;
 }

@@ -78,9 +78,17 @@ try {
     for (const name of migrations) await admin.query(await readFile(`supabase/migrations/${name}`, 'utf8'));
     // Exact prerequisite from 0870_guest_promotion_runtime_authority.sql; do not load unrelated promotion writers.
     await admin.query('ALTER TABLE public.guest_sessions ENABLE ROW LEVEL SECURITY');
+    // Match the managed migration actor: CREATEROLE, never SUPERUSER.
+    await admin.query("DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='myeongha_saju_migration_test') THEN CREATE ROLE myeongha_saju_migration_test NOLOGIN CREATEROLE INHERIT NOSUPERUSER NOCREATEDB NOBYPASSRLS; END IF; END $$");
+    await admin.query('GRANT USAGE, CREATE ON SCHEMA public TO myeongha_saju_migration_test WITH GRANT OPTION');
+    await admin.query('ALTER TABLE public.subjects OWNER TO myeongha_saju_migration_test');
+    await admin.query('ALTER TABLE public.guest_sessions OWNER TO myeongha_saju_migration_test');
+    await admin.query('SET LOCAL ROLE myeongha_saju_migration_test');
     // Simulate platform default grants; the new migration must explicitly remove them.
     await admin.query('ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated, service_role');
-    await admin.query(await readFile('supabase/proposals/20261024065948_saju_abuse_admission_runtime_authority.sql', 'utf8'));
+    await admin.query(await readFile('supabase/migrations/20261024134543_saju_abuse_admission_runtime_authority.sql', 'utf8'));
+    await admin.query('RESET ROLE');
+    results.nonSuperuserManagedMigration = true;
     await admin.query("DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='myeongha_saju_admission_test_login') THEN CREATE ROLE myeongha_saju_admission_test_login LOGIN NOINHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS; END IF; END $$");
     await admin.query('GRANT myeongha_api_executor TO myeongha_saju_admission_test_login');
     const passwordCommand = (await admin.query("SELECT format('ALTER ROLE myeongha_saju_admission_test_login PASSWORD %L', $1::text) AS command", [loginUrl.password])).rows[0].command;

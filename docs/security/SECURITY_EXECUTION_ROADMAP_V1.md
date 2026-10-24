@@ -5,6 +5,8 @@
 > 구현 기준: `1fce280a039d7d7ec5192ce2f5ba7851fc7b6023` (착수 당시 원격 main과 일치 확인; 이후 main의 최신성을 주장하지 않음)
 > 현재 작업: `codex/general-security-attack-e2e-20261024`; 공격 E2E 후 필수 CI·PR 병합 진행. 운영 DB 적용·수치 활성화는 HOLD입니다.
 
+> 운영 후속(2026-10-24): 개발 PR #2551은 MERGED입니다. 사용자가 남은 운영 단계까지 지시하여 [운영 적용 문서](SECURITY_PRODUCTION_ACTIVATION_20261024.md)로 승격했습니다. DB admission·정책 등록과 4xx 경보는 적용했고 공개 enforcement는 staged canary 전까지 비활성입니다. 아래는 최초 개발 승인 시점 기록이며 최신 운영 상태는 [운영 근거](SECURITY_PRODUCTION_ACTIVATION_EVIDENCE_20261024.json)를 따릅니다. 플랫폼 #425는 지원 절차 미확인으로 BLOCKED_EXTERNAL입니다.
+
 ## 목표와 작업 배분
 
 일반 security의 실제 미구현 경로를 닫습니다. 기본 작업 배분은 **구현 90 / 검증 10**입니다. 매 단계에서 실행 가능한 코드를 먼저 완성하고, 직접 consumer·실패 경계만 한 번 검증합니다. 필수 검증 후 새 Critical/High 문제나 명시된 완료 조건 미충족이 없으면 같은 검증을 반복하지 않습니다. 전체 재감사·음성 fixture 추가·새 verifier 작성만을 독립 진척으로 세지 않습니다.

@@ -9,6 +9,7 @@ import { handleSeyeonMemberMemoryGrantStatusRequestV1 } from '../apps/api/src/se
 import { enforceSeyeonVercelFetchRevealFenceV1 } from '../apps/api/src/seyeon-vercel-fetch-reveal-fence-v1.js';
 import { createProductionCurrentSubjectProfileRuntimeV1 } from '../apps/api/src/production-current-subject-profile-runtime.js';
 import { createProductionCurrentSubjectSajuPreviewReadingRuntimeV1 } from '../apps/api/src/production-current-subject-saju-preview-reading-runtime.js';
+import { isSajuAbuseAdmissionEnabledV1 } from '../apps/api/src/saju-abuse-admission-activation.js';
 import { createProductionDeviceInstallationRuntimeV1 } from '../apps/api/src/production-device-installation-runtime.js';
 import { createProductionTargetPersonCreateRuntimeV1 } from '../apps/api/src/production-target-person-create-runtime.js';
 import { createProductionTargetPersonReadRuntimeV1 } from '../apps/api/src/production-target-person-read-runtime.js';
@@ -197,6 +198,7 @@ function getDeviceInstallationRuntime(): ReturnType<typeof createProductionDevic
 function getSajuPreviewReadingRuntime(): ReturnType<typeof createProductionCurrentSubjectSajuPreviewReadingRuntimeV1> {
   sajuPreviewReadingRuntime ??= createProductionCurrentSubjectSajuPreviewReadingRuntimeV1({
     env: process.env,
+    sajuAbuseAdmissionEnabled: isSajuAbuseAdmissionEnabledV1(process.env),
     pool: getSharedPostgresPool(),
   });
   return sajuPreviewReadingRuntime;

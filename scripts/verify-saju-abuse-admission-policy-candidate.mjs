@@ -264,5 +264,5 @@ for (const forbiddenField of [
 }
 
 console.log(
-  'MyeongHa Saju abuse admission policy candidate verification passed: identity/store/failure/retry boundaries are pinned while numeric limits and Production enforcement remain unapproved.',
+  'Historical Saju admission candidate verification passed: identity/store/failure/retry boundaries remain pinned. Separate Production authority is recorded in docs/security/SECURITY_PRODUCTION_ACTIVATION_20261024.md and the applied migration manifest.',
 );

@@ -36,6 +36,8 @@ const commerceEntitlementPatterns = [
 const postgres17Patterns = [
   /^supabase\/proposals\/20261024065948_saju_abuse_admission_runtime_authority\.sql$/u,
   /^scripts\/(?:verify-saju-abuse-admission-postgres|lib\/saju-admission-attack-e2e)\.mjs$/u,
+  /^scripts\/verify-saju-abuse-production-policy-postgres\.mjs$/u,
+  /^apps\/api\/src\/saju-abuse-admission-activation\.ts$/u,
   /^apps\/api\/src\/(?:postgres-saju-abuse-admission|saju-abuse-admission-http|current-subject-saju-(?:calculation|preview-reading)-http|production-current-subject-saju-(?:calculation|preview-reading)-runtime)\.ts$/u,
   /^scripts\/operations\/seyeon-security-s0\//u,
   /^test\/seyeon-security-s0-postgres\.e2e\.test\.ts$/u,
