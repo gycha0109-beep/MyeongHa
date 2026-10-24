@@ -29,7 +29,7 @@ export const SEYEON_C08_LOCAL_ONE_CALL_VERSION_V1 =
  */
 const ENTRY_GRAMMARS = Object.freeze([
   { kind: 'greeting', move: 'neutral_or_other',
-    re: /^(?:안녕(?:하세요)?|반가워요|반갑습니다|좋은\s*(?:아침|저녁)이에요)[.!~\s]*$/u },
+    re: /^(?:안녕(?:하세요)?(?:[,，]\s*세연아)?|반가워요|반갑습니다|좋은\s*(?:아침|저녁)이에요)[.!~\s]*$/u },
   { kind: 'initiative', move: 'neutral_or_other',
     re: /^(?:오늘은\s*네가\s*먼저\s*이야기해\s*줘|오늘은\s*세연(?:이|이가)?\s*먼저\s*이야기해\s*줘(?:요)?|세연아?\s*먼저\s*얘기해\s*줘)[.!?~\s]*$/u },
   { kind: 'low_state', move: 'low_intensity_state_share',
