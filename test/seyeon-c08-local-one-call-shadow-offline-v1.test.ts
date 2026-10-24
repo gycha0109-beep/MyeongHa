@@ -52,6 +52,7 @@ function harness(opts:{
   beforeModel?:()=>void;
   history?:RunSeyeonCharacterTurnV2Input['contextInput']['recentMessages'];
   falseCensusCount?:boolean;
+  modelThrows?:boolean;
 }={}){
   const text=opts.text??TEXT;
   const messages=opts.history??[{messageId:ID,role:'user' as const,text}];
@@ -78,6 +79,7 @@ function harness(opts:{
       events.push('model');
       opts.beforeModel?.();
       requests.push(req);
+      if(opts.modelThrows)throw Error('SECRET_PROVIDER_LOG_MUST_NOT_ESCAPED');
       return Object.hasOwn(opts,'output')?opts.output:{...DRAFT,
         utterance:LOCAL_GOOD_DRAFTS[classifySeyeonC08LocalEntryV1(text)!.kind]};
     },
@@ -176,6 +178,13 @@ describe('C08 local preflight / single dialogue LLM / local output guard (OFFLIN
     const extra=harness();
     await expect(extra.run({maxCompletionTokens:1537})).rejects.toThrow('LOCAL_BUDGET_UNVERIFIED');
     expect(extra.requests).toHaveLength(0);
+  });
+
+  it('sanitizes a provider error and never retries it',async()=>{
+    const h=harness({modelThrows:true});
+    await expect(h.run()).rejects.toThrow('LOCAL_PROVIDER_FAILURE');
+    expect(h.requests).toHaveLength(1);
+    expect(h.events.filter(x=>x==='model')).toHaveLength(1);
   });
 
   it('rejects invalid/malformed, ungrounded memory, forbidden relationship text',async()=>{
