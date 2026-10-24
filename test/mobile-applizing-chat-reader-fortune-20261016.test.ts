@@ -73,7 +73,8 @@ describe('mobile chat + Reader portrait + Fortune Cookie parity', () => {
     expect(read).toContain('withMemberBearer');
     expect(read).not.toContain('withActiveBearer');
     expect(repo).toContain('CHAT_MEMBER_SESSION_REQUIRED');
-    expect(ui).toContain('오류 코드:');
+    expect(ui).toContain("t('오류 코드')");
+    expect(ui).toContain('{snapshot.errorCode}');
     expect(ui).toContain('대화 다시 불러오기');
     expect(room).toContain('onRetry={() => void refresh()}');
   });

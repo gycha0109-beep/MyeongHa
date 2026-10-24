@@ -223,7 +223,8 @@ describe('Mobile / Web UI localization parity', () => {
       for (const label of acceptanceCopy) {
         const translated = translateMobileUiCopy(label, locale);
         expect(translated, `${locale} missing: ${label}`).not.toBe(label);
-        expect(translated).not.toMatch(/[가-힣]/u);
+        // Preserve the Character's canonical Korean name even in localized UI.
+        expect(translated.replaceAll('세연', '')).not.toMatch(/[가-힣]/u);
       }
     }
     const [picker, readerEntry, composer, people] = await Promise.all([
