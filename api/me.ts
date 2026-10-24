@@ -301,6 +301,7 @@ function getChatPathThreadId(pathname: string): string | null | undefined {
   if (getChatTurnPathThreadId(pathname) !== undefined) return undefined;
   if (
     pathname === PROFILE_ROUTE ||
+    pathname === CREDIT_WALLET_ROUTE ||
     pathname === CHAT_OPEN_ROUTE ||
     pathname === LIFE_RECORD_ROUTE ||
     pathname === READINGS_ROUTE ||
