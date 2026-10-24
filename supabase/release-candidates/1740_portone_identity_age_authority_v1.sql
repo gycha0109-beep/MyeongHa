@@ -10,6 +10,7 @@
 -- Release prerequisites: DB Authority owner review, privacy deletion graph /
 -- retention integration, role ACL verification, isolated PG17 transaction tests.
 -- No provider keys, birth dates, CI/DI, telephone numbers or raw payloads.
+-- IDs use 'iv' + 32 hex (34 ASCII alphanumerics) for KCP's <=40-character constraint;
 --
 -- API usage: execute under an authenticated begin_*_subject_context_v1()
 -- transaction and SET LOCAL ROLE myeongha_api_executor. Never expose as RPC
@@ -24,7 +25,7 @@ create table public.legal_portone_identity_attempts_v1 (
   expires_at timestamptz not null,
   consumed_at timestamptz null,
   constraint legal_portone_attempt_id_format
-    check (identity_verification_id ~ '^iv_[a-f0-9]{32}$'),
+    check (identity_verification_id ~ '^iv[a-f0-9]{32}$'),
   constraint legal_portone_attempt_status
     check (status in ('pending','consumed','expired')),
   constraint legal_portone_attempt_timestamps
@@ -48,7 +49,7 @@ create table public.legal_portone_verified_age_v1 (
   verification_id text not null,
   verified_at timestamptz not null,
   constraint legal_portone_verified_id_format
-    check (verification_id ~ '^iv_[a-f0-9]{32}$')
+    check (verification_id ~ '^iv[a-f0-9]{32}$')
 );
 create unique index legal_portone_verified_identity_single_use
   on public.legal_portone_verified_age_v1(verification_id);
@@ -80,7 +81,7 @@ set search_path = pg_catalog, public, pg_temp
 as $issue$
 declare
   v_now timestamptz;
-  v_id text := 'iv_' || replace(gen_random_uuid()::text, '-', '');
+  v_id text := 'iv' || replace(gen_random_uuid()::text, '-', '');
 begin
   perform public.assert_myeongha_subject_context_v1(p_subject_id);
   -- Serializes parallel issuers and account deletion subject state changes.

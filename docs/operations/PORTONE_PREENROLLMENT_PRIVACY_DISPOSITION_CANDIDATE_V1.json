@@ -1,0 +1,58 @@
+{
+  "schema": "myeongha-portone-preenrollment-privacy-disposition-candidate-v1",
+  "track": "legal-compliance",
+  "status": "PROPOSED_NOT_APPLIED",
+  "executionAuthorized": false,
+  "existingApprovedPolicy": "docs/operations/ACCOUNT_DELETION_DISPOSITION_POLICY_V1.json",
+  "existingApprovedGraphFingerprintSha256": "c745bacb0e9b2d13013c1048fc4273203af68b9c4816eef7b6c9fe37e4db167b",
+  "existingApprovedDispositionCounts": {
+    "DELETE": 46,
+    "ANONYMIZE": 4,
+    "RETAIN": 9
+  },
+  "existingApprovedReachableTables": 59,
+  "notSubjectOwnedTables": [
+    {
+      "table": "legal_portone_preenrollment_v1",
+      "disposition": "DELETE",
+      "sourcePurpose": "opaque cookie-bound PortOne V2 age proof before a canonical Subject exists",
+      "containsRawIdentityResult": false,
+      "containsRawBirthDate": false,
+      "containsIdentityNumbers": false,
+      "storedFields": [
+        "identity_verification_id",
+        "binding_digest",
+        "status",
+        "age_band",
+        "issued_at",
+        "expires_at",
+        "verified_at",
+        "consumed_at"
+      ],
+      "rawCookiePersisted": false,
+      "hmacDigestSemantics": "server-only 256-bit HMAC-SHA256 over independently random 256-bit HttpOnly actor nonce",
+      "expiryDuration": "PT10M",
+      "purgeFunction": "public.internal_purge_legal_portone_preenrollment_v1",
+      "expiryPurgeMaxBatch": 250,
+      "expiryPurgeScheduled": false,
+      "accessControl": "RLS ON, no client table privilege, API executor narrow SECURITY DEFINER functions only",
+      "accountLinkage": "atomic one-use conversion to either new Guest or new Member, never both",
+      "backups": "P30D_EXISTING_CYCLE_UNCHANGED"
+    }
+  ],
+  "subjectAgeBindingTarget": "legal_portone_verified_age_v1",
+  "subjectAgeDispositionCandidate": "docs/operations/PORTONE_IDENTITY_PRIVACY_DISPOSITION_DELTA_CANDIDATE_V1.json",
+  "backupHandling": "P30D_EXISTING_CYCLE_UNCHANGED",
+  "commerceEvidenceRetention": "P5Y_EXISTING_CLASSES_UNCHANGED",
+  "sqlProposal": "supabase/proposals/1741_portone_preenrollment_age_authority_v1.proposed.sql",
+  "releaseCandidate": "supabase/release-candidates/1741_portone_preenrollment_age_authority_v1.sql",
+  "operatingMode": "OFF",
+  "releasePrerequisites": [
+    "Operator-authorized Privacy approval for subjectless proof and physical purge policy",
+    "DB Authority acceptance of proposed 1740+1741 SQL and PostgreSQL17 concurrency/ACL/restore evidence",
+    "PortOne V2 identity provider/channel contract and server-only credentials",
+    "Production anti-abuse rate limiting and identity attempt cost controls",
+    "End-to-end preenrollment cookie integrity, Social OAuth and Supabase direct registration bypass audit"
+  ],
+  "notes": "Additive candidate only: never merge its table into the approved 59-table subject ownership graph without separately validated Privacy/DB policy change."
+}
