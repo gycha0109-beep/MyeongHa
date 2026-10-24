@@ -202,6 +202,10 @@ export function buildSeyeonC08N06CanaryBodyV1(tag,prices=C08_N06_CANARY_MAX_PRIC
   return JSON.stringify({
     model:C08_N06_CANARY_MODEL,stream:false,
     max_completion_tokens:C08_N06_CANARY_MAX_COMPLETION,
+    // Reasoning counts against the total completion cap. Without an explicit
+    // low effort, the real V3 response used all 256 output tokens but no
+    // valid JSON was observed (GitHub run #40098031603). No paid replay.
+    reasoning:{effort:'low'},
     messages:[
       {role:'system',content:'Single public fictional first-contact prompt. Do not claim private memory, relationship history, privileged access, or hidden facts. Return only the strict JSON object.'},
       {role:'user',content:C08_N06_CANARY_TEXT},
@@ -280,6 +284,13 @@ export async function runSeyeonC08N06ActualCanaryV1({
   const usage=parsed?.usage;
   const inTokens=token(usage?.prompt_tokens),
     outTokens=token(usage?.completion_tokens);
+  const reasoningTokens=token(usage?.completion_tokens_details?.reasoning_tokens);
+  const visibleOutputTokens=outTokens!==null&&reasoningTokens!==null&&
+    reasoningTokens<=outTokens?outTokens-reasoningTokens:null;
+  const rawFinishReason=parsed?.choices?.[0]?.finish_reason;
+  // Allowlist stable protocol states, never retain model-generated text.
+  const finishReason=['stop','length','content_filter','tool_calls'].includes(
+    rawFinishReason)?rawFinishReason:null;
   let content=null,parsedObject=null;
   try{
     const msg=parsed?.choices?.[0]?.message?.content;
@@ -293,17 +304,26 @@ export async function runSeyeonC08N06ActualCanaryV1({
   }catch{/* malformed JSON => HOLD */}
   const strictSchemaObserved=!!parsedObject;
   const valid=err===null&&resp?.status===200&&
-    parsed?.choices?.[0]?.finish_reason==='stop'&&
-    strictSchemaObserved&&inTokens!==null&&outTokens!==null&&
+    finishReason==='stop'&&strictSchemaObserved&&
+    inTokens!==null&&outTokens!==null&&
     outTokens<=C08_N06_CANARY_MAX_COMPLETION;
+  const holdReason=err??(
+    finishReason==='length'?'COMPLETION_LIMIT_REACHED':
+    !strictSchemaObserved?'INVALID_OR_EMPTY_STRICT_JSON':
+    inTokens===null||outTokens===null?'MISSING_TOKEN_USAGE':
+    outTokens>C08_N06_CANARY_MAX_COMPLETION?'OVER_COMPLETION_BUDGET':
+    finishReason!=='stop'?'NONSTOP_FINISH_REASON':
+    'GUARD_USAGE_OR_LENGTH_HOLD'
+  );
   const report=Object.freeze({
     schema:'seyeon-c08-n06-actual-paid-canary-v1',
     caseId:'N06',scope:'PUBLIC_SYNTHETIC_SINGLE_POST_RESEARCH_ONLY',
     model:C08_N06_CANARY_MODEL,providerTag:route.tag,
     attemptedPaidCalls:1,
     verdict:valid?'OBSERVED_VALID_JSON':'HOLD',
-    reason:valid?'SCHEMA_AND_USAGE_OK':err??'GUARD_USAGE_OR_LENGTH_HOLD',
+    reason:valid?'SCHEMA_AND_USAGE_OK':holdReason,
     httpStatus:resp?.status??null,elapsedMs:duration,
+    finishReason,reasoningTokens,visibleOutputTokens,
     bodyBytes:reserve.bodyBytes,reservedMicroUsd:reserve.reservedMicroUsd,
     inputTokens:inTokens,completionTokens:outTokens,
     estimatedUsageMicroUsd:inTokens!==null&&outTokens!==null?
@@ -319,6 +339,9 @@ export async function runSeyeonC08N06ActualCanaryV1({
   });
   await journal({kind:'observed_paid_call',verdict:report.verdict,
     httpStatus:report.httpStatus,elapsedMs:report.elapsedMs,
+    finishReason:report.finishReason,
+    reasoningTokens:report.reasoningTokens,
+    visibleOutputTokens:report.visibleOutputTokens,
     estimatedUsageMicroUsd:report.estimatedUsageMicroUsd});
   return report;
 }
