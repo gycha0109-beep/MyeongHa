@@ -168,4 +168,39 @@ describe('Cloudflare preview Git-based CD', () => {
     expect(asset).not.toHaveBeenCalled();
   });
 
+  it('intercepts encoded Chat and legacy rewrite markers before Auth, API or static fallback', async () => {
+    const asset = vi.fn(async () => new Response('PRIVATE_STATIC_FALLBACK'));
+    const upstream = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => {
+      throw Error('Aliases must be denied before Auth or Provider dispatch');
+    });
+    const env = {
+      MYEONGHA_SUPABASE_URL: 'https://cnsfpcdiyofqvhpcegfc.supabase.co',
+      MYEONGHA_SUPABASE_API_KEY: 'preview-auth-test-key-1234567890',
+      ASSETS: { fetch: asset },
+    };
+    try {
+      for (const path of [
+        '/api/%63hat', '/%2561pi/%2563hat', '/api%2Fchat',
+        '/index.html?__myeongha_chat_thread_id=forged',
+        '/api/health?%255f%255fmyeongha_chat_thread_id=forged',
+      ]) {
+        const response = await previewWorker.fetch(new Request(`https://preview.example${path}`, {
+          headers: { Authorization: 'Bearer synthetic-member-token' },
+        }), env);
+        expect(response.status).toBe(503);
+        expect(response.headers.get('Cache-Control')).toBe('no-store');
+        expect((await response.json()).error.code)
+          .toBe('SEYEON_FIRST_REVEAL_AUTHORITY_UNAVAILABLE');
+      }
+      expect(asset).not.toHaveBeenCalled();
+      expect(upstream).not.toHaveBeenCalled();
+
+      const normal = await previewWorker.fetch(new Request('https://preview.example/index.html?lang=ko'), env);
+      expect(normal.status).toBe(200);
+      expect(asset).toHaveBeenCalledTimes(1);
+    } finally {
+      upstream.mockRestore();
+    }
+  });
+
 });

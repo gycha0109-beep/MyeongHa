@@ -56,6 +56,8 @@ const knownFullPatterns = [
 ];
 
 const dbPatterns = [
+  /^scripts\/operations\/seyeon-security-s0\//u,
+  /^test\/seyeon-security-s0-postgres\.e2e\.test\.ts$/u,
   // PG17-dependent current-rights/revoke→HTTP race tests must run the
   // real PostgreSQL authority-core harness even without SQL file edits.
   /^test\/seyeon-r5-current-reveal-disposable\.test\.ts$/u,

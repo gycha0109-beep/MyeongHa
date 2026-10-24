@@ -99,6 +99,16 @@ catalog_snapshot() {
 }
 
 case "$case_name" in
+  seyeon-security-s0-real-path-pg17)
+    verify_pg17
+    [[ "${CI:-}" == true && "${GITHUB_ACTIONS:-}" == true &&
+       "${DB_SUITE:-}" == postgres17 && "${PGHOST:-}" == localhost &&
+       "${PGDATABASE:-}" =~ ^myeongha_ci_case_[0-9]+$ ]] || {
+      echo HOLD_S0_REQUIRES_DISPOSABLE_PG17 >&2; exit 1;
+    }
+    apply_pg17_migrations_without_birth_authority
+    bash test/db/seyeon_security_s0_real_path_pg17.sh
+    ;;
   seyeon-c08y-disposable-shared-ledger-pg17)
     verify_pg17
     # Synthetic table/RPC schema only: NO repository/Production migrations.

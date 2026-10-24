@@ -7,6 +7,7 @@ import {
 } from '../apps/api/src/seyeon-cloudflare-offline-reveal-fence-v1.js';
 import {
   holdSeyeonCloudflareOpsRouterHandoffOfflineV1,
+  isSeyeonCloudflareProtectedIngressAliasV1,
 } from '../apps/api/src/seyeon-cloudflare-ops-router-handoff-offline-v1.js';
 import {
   SupabaseMemberIdentityEvidenceVerifierV1,
@@ -50,7 +51,8 @@ export default {
     // This is the ACTUAL Cloudflare Preview fetch entrypoint. Se-yeon
     // first send, history and replay cannot proceed into any Provider,
     // database or static HTML fallback before G0-D04 is authorized.
-    if (pathLower === '/api/chat' || pathLower.startsWith('/api/chat/')) {
+    if (pathLower === '/api/chat' || pathLower.startsWith('/api/chat/') ||
+        isSeyeonCloudflareProtectedIngressAliasV1(request)) {
       const requestId = crypto.randomUUID();
       const sealed = () => sealProtectedHttpResponse(
         enforceSeyeonCloudflareOfflineFetchEgressFenceV1(

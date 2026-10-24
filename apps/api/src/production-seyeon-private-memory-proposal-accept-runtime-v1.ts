@@ -25,6 +25,8 @@ export interface CreateProductionSeyeonPrivateMemoryAcceptRuntimeV1Input {
   readonly env: ProductionUserDataRuntimeEnvV1;
   readonly pool?: PostgresSubjectPoolV1;
   readonly memberFetchImpl?: SupabaseMemberVerifierFetchV1;
+  /** Explicit reviewed server composition only; absent on all public callers. */
+  readonly approvedDbWriteAdmission?: () => boolean | Promise<boolean>;
 }
 
 /**
@@ -52,14 +54,17 @@ export function createProductionSeyeonPrivateMemoryAcceptRuntimeV1(
       requestId: string;
       serverTime: string;
     }>): Promise<Response> {
-      // Do NOT provide approvedDbWriteAdmission. The new SQL is a nondeployed
-      // Draft, has no API EXECUTE privilege and has no enabled type registry.
+      // Default stays DENY. Only a reviewed server composition can supply
+      // admission; requests, environment variables and model text cannot.
       return handleSeyeonPrivateMemoryProposalAcceptRequestV1({
         request: requestInput.request,
         requestId: requestInput.requestId,
         serverTime: requestInput.serverTime,
         identityEvidenceVerifier,
         pool: poolLease.pool,
+        ...(input.approvedDbWriteAdmission === undefined ? {} : {
+          approvedDbWriteAdmission: input.approvedDbWriteAdmission,
+        }),
       });
     },
     close() { return poolLease.close(); },

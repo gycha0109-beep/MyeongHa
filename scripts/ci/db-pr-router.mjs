@@ -34,6 +34,9 @@ const commerceEntitlementPatterns = [
 ];
 
 const postgres17Patterns = [
+  /^scripts\/operations\/seyeon-security-s0\//u,
+  /^test\/seyeon-security-s0-postgres\.e2e\.test\.ts$/u,
+  /^test\/db\/seyeon_security_s0_real_path_pg17\.sh$/u,
   // R5/R9 exact-original-Grant tests require the named disposable PG17
   // authority-core harness. A source-only test edit must not silently skip
   // the real DB race suite on a normal PR.
