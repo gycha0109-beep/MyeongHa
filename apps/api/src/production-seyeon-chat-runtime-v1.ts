@@ -48,6 +48,7 @@ import {
   createSeyeonProductionGovernanceV1,
 } from './seyeon-production-governance-v1.js';
 import { assertSeyeonPositiveProjectorsNotEnabledV1 } from './seyeon-positive-projector-admission-hold-v1.js';
+import { SEYEON_CONVERSATION_RECALL_PROJECTOR_V1 } from './seyeon-conversation-recall-memory-contract-v1.js';
 import {
   createSeyeonProductionRuntimeIdPortV1,
 } from './seyeon-production-runtime-ids-v1.js';
@@ -175,6 +176,11 @@ export interface CreateProductionSeyeonChatRuntimeInputV1 {
   readonly createUuid?: () => string;
   /** Server-owned public Web compatibility authority. Never derived from a request. */
   readonly clientCompatibilityProfile?: CharacterClientCompatibilityProfileV1;
+  /** Explicit source-owner approval, server-only. No deployed caller sets it.
+   * The initial implementation supports one conversation_recall/v1 Memory;
+   * DB registry, G1/G2 and current-rights Reveal remain independent guards.
+   */
+  readonly approvedPersonalRecordModelUse?: () => boolean | Promise<boolean>;
 }
 
 function text(value: string, path: string, max: number): string {
@@ -291,6 +297,10 @@ export function createProductionSeyeonChatRuntimeV1(
   // Never initialize a Production Provider/DB runtime with a positive
   // Projector while G0/G1/SRC-25 and atomic Commit are unapproved.
   assertSeyeonPositiveProjectorsNotEnabledV1();
+  if (input.approvedPersonalRecordModelUse !== undefined &&
+      input.governorMode !== 'ENFORCE') {
+    throw new Error('Positive Memory requires the enforced server cost Governor.');
+  }
   if (input.costGovernorForRole !== undefined &&
       input.provider !== undefined) {
     throw new Error('Governed chat requires native, fully metered Provider config.');
@@ -339,6 +349,10 @@ export function createProductionSeyeonChatRuntimeV1(
       // Recheck before Subject resolution: no new positive projector can
       // silently ride an existing Production runtime instance.
       assertSeyeonPositiveProjectorsNotEnabledV1();
+      if (input.approvedPersonalRecordModelUse !== undefined &&
+          (await input.approvedPersonalRecordModelUse()) !== true) {
+        throw new Error('Positive Memory source-owner approval is unavailable.');
+      }
       const threadId = text(runInput.threadId, 'threadId', 256);
       const clientTurnId = text(
         runInput.clientTurnId,
@@ -502,6 +516,12 @@ export function createProductionSeyeonChatRuntimeV1(
           semanticReviewerProvider: meteredReviewer,
           persistencePort: meteredChatPersistence,
           positivePersonalSourcePort: ports.positivePersonalSource,
+          ...(input.approvedPersonalRecordModelUse === undefined ? {} : {
+            serverOwnedPersonalRecordProjectors: Object.freeze([
+              SEYEON_CONVERSATION_RECALL_PROJECTOR_V1,
+            ]),
+            maxPersonalRecords: 1,
+          }),
           executionIdPort: idPort,
           postTurn: Object.freeze({
             ledger,

@@ -23,6 +23,8 @@ export interface CreateProductionSeyeonMemoryGrantRevokeRuntimeInputV1 {
   readonly env: ProductionUserDataRuntimeEnvV1;
   readonly pool?: PostgresSubjectPoolV1;
   readonly memberFetchImpl?: SupabaseMemberVerifierFetchV1;
+  /** Explicit server approval; no public caller or environment toggle sets it. */
+  readonly approvedDbWriteAdmission?: () => boolean | Promise<boolean>;
 }
 
 export function createProductionSeyeonMemoryGrantRevokeRuntimeV1(
@@ -55,6 +57,9 @@ export function createProductionSeyeonMemoryGrantRevokeRuntimeV1(
         serverTime: requestInput.serverTime,
         identityEvidenceVerifier,
         pool: poolLease.pool,
+        ...(input.approvedDbWriteAdmission === undefined ? {} : {
+          approvedDbWriteAdmission: input.approvedDbWriteAdmission,
+        }),
         // Future explicit admission will execute the private, fixed-SeYeon
         // owner command, not the unprivileged R15 legacy SECURITY INVOKER.
         // This closure cannot be influenced by HTTP payload or environment.

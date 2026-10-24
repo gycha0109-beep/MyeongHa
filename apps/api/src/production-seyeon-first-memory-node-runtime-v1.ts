@@ -1,0 +1,95 @@
+// Watchtower-Track: security
+// Complete server composition for the initial one-original-Memory scope.
+// No public route, deployment flag, schema registration or paid activation.
+import type { IncomingMessage, ServerResponse } from 'node:http';
+import type { PostgresSubjectPoolV1 } from './postgres-subject-execution.js';
+import { createProductionPostgresSubjectPoolLeaseV1 } from './production-postgres-subject-pool-lease.js';
+import { createProductionRequestIdentityVerifierV1 } from './production-request-identity-verifier.js';
+import { createProductionSeyeonChatRuntimeV1 } from './production-seyeon-chat-runtime-v1.js';
+import {
+  parseProductionUserDataRuntimeConfigV1,
+  type ProductionUserDataRuntimeEnvV1,
+} from './production-user-data-runtime-config.js';
+import { parseSeyeonGovernedDbConfigV1 } from './seyeon-governed-postgres-pool-v1.js';
+import {
+  createSeyeonProductionChatGovernorsV1,
+  type SeyeonProductionChatGovernorApprovalV1,
+} from './seyeon-production-governor-factory-v1.js';
+import {
+  resolveProductionSeyeonProviderConfigAtRequestV1,
+  resolveProductionSeyeonRoleProviderConfigsV1,
+} from './production-seyeon-turn-send-runtime-v1.js';
+import { handleSeyeonFirstPositiveMemoryDirectNodeHttpV1 } from './seyeon-first-positive-memory-node-http-ingress-v1.js';
+import type { SupabaseMemberVerifierFetchV1 } from './supabase-member-identity-verifier.js';
+
+export interface CreateProductionSeyeonFirstMemoryNodeRuntimeInputV1 {
+  readonly env: ProductionUserDataRuntimeEnvV1;
+  readonly pool?: PostgresSubjectPoolV1;
+  readonly memberFetchImpl?: SupabaseMemberVerifierFetchV1;
+  /** Reviewed server policy only, never headers, JSON, env flags or model text. */
+  readonly approvedPersonalRecordModelUse?: () => boolean | Promise<boolean>;
+  readonly governorApproval?: SeyeonProductionChatGovernorApprovalV1;
+}
+
+/**
+ * Auth/body → exact G1/G2/G3 readiness → owner approval → enforced Governor
+ * → existing server source/Pin/model/Commit → locked original DB read/send.
+ * Credentials are resolved inside a request and never cached across users.
+ * This composes the implementation without authorizing its deployment.
+ */
+export function createProductionSeyeonFirstMemoryNodeRuntimeV1(
+  input: CreateProductionSeyeonFirstMemoryNodeRuntimeInputV1,
+) {
+  const config = parseProductionUserDataRuntimeConfigV1(input.env);
+  const lease = createProductionPostgresSubjectPoolLeaseV1({
+    config, ...(input.pool === undefined ? {} : { pool: input.pool }),
+  });
+  const verifier = createProductionRequestIdentityVerifierV1({
+    config, ...(input.memberFetchImpl === undefined ? {} : { memberFetchImpl: input.memberFetchImpl }),
+  });
+  return Object.freeze({
+    handleNodeRequest(request: Readonly<{
+      incoming: IncomingMessage;
+      response: ServerResponse;
+      requestId?: string;
+      serverTime?: string;
+    }>) {
+      return handleSeyeonFirstPositiveMemoryDirectNodeHttpV1({
+        ...request, pool: lease.pool, identityEvidenceVerifier: verifier,
+        runtime: {
+          async run(turn) {
+            if (input.approvedPersonalRecordModelUse === undefined ||
+                (await input.approvedPersonalRecordModelUse()) !== true ||
+                input.governorApproval === undefined) {
+              throw Error('First Memory runtime requires reviewed source and cost authority.');
+            }
+            // Readiness has already succeeded before this closure can access
+            // provider credentials or create any metered model implementation.
+            const base = await resolveProductionSeyeonProviderConfigAtRequestV1(input.env);
+            const roles = resolveProductionSeyeonRoleProviderConfigsV1(input.env, base);
+            const governors = createSeyeonProductionChatGovernorsV1({
+              baseProviderConfig: base,
+              ...(roles === undefined ? {} : { roleProviderConfigs: roles }),
+              approval: input.governorApproval,
+            });
+            const governedDbConfig = parseSeyeonGovernedDbConfigV1({
+              env: input.env, ordinaryDatabaseUrl: config.databaseUrl,
+              ordinaryDatabasePrincipal: config.databasePrincipal,
+              rootCertificatePem: config.databaseSslRootCertificatePem ?? '',
+            });
+            const runtime = createProductionSeyeonChatRuntimeV1({
+              databaseConfig: config, pool: lease.pool,
+              providerConfig: base, roleProviderConfigs: governors.roleProviderConfigs,
+              governorMode: 'ENFORCE', costGovernorForRole: governors.costGovernorForRole,
+              governedDbConfig,
+              approvedPersonalRecordModelUse: input.approvedPersonalRecordModelUse,
+            });
+            try { return await runtime.run(turn); }
+            finally { await runtime.close(); }
+          },
+        },
+      });
+    },
+    close() { return lease.close(); },
+  });
+}

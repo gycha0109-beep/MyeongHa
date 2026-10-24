@@ -1,0 +1,56 @@
+{
+  "schemaVersion": "seyeon-security-s0-installation-plan-v1",
+  "scope": "one-original-conversation-recall-memory",
+  "productionAuthorization": "NOT_GRANTED",
+  "automaticMigration": false,
+  "defaultModelUseEnabled": false,
+  "defaultWritableEnabled": false,
+  "positiveApiExecuteGranted": false,
+  "externalProxyRevealAuthorized": false,
+  "files": [
+    {
+      "source": "../seyeon-private-memory-grant-revoke-r17-candidate.sql",
+      "sha256LfUtf8": "d5ca3bf0fa840370fa9abb1fc54fc2054c65c3b3fa1287f207ad172a5fdd1939",
+      "bytesLfUtf8": 5820
+    },
+    {
+      "source": "00-original-source-locks.sql",
+      "sha256LfUtf8": "a9195f85c4106762a99bdbe3997eab5721b28b108b9b8f6814f090934158952f",
+      "bytesLfUtf8": 3028
+    },
+    {
+      "source": "01-source-pin.sql",
+      "sha256LfUtf8": "2bfd11f37da7161b64482e22f6664f0f1ba5d15fc7352af39360a56262bf0a4f",
+      "bytesLfUtf8": 9396
+    },
+    {
+      "source": "02-atomic-commit.sql",
+      "sha256LfUtf8": "faa9e7d172886ad7d59a08c60ccc101c02a4b781271376c16596d514b58c20d0",
+      "bytesLfUtf8": 14680
+    },
+    {
+      "source": "03-private-memory-accept.sql",
+      "sha256LfUtf8": "0e78e3f93bd7c271a516df1fb11fa413b838369dde4ee89c57056283b9825e11",
+      "bytesLfUtf8": 10378
+    },
+    {
+      "source": "04-locked-reveal.sql",
+      "sha256LfUtf8": "2c9ba8fae32860df04c8f068b29c8df1a98d7f1983bf8a3ae036ddfb97b256db",
+      "bytesLfUtf8": 14479
+    }
+  ],
+  "stop": {
+    "source": "stop-positive-use.sql",
+    "sha256LfUtf8": "27485f73d65237f73ba37f8e461b5f66aeac1a3ad0b2c28d3a17f6acec09353c",
+    "bytesLfUtf8": 987
+  },
+  "stopPreservesConsentWithdrawal": true,
+  "remainingReleaseEvidence": [
+    "G0/SRC-25 owner decision",
+    "PG17 original Grant/Commit/Reveal race",
+    "approved governed budget and dedicated DB role",
+    "same-backup isolated restore and RPO/RTO",
+    "G0-D04 target transport V/R/S/ACK",
+    "G6 explicit deployment approval"
+  ]
+}

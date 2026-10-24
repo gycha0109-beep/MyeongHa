@@ -109,7 +109,6 @@ case "$case_name" in
     [[ ! -e supabase/migrations/20261024065948_saju_abuse_admission_runtime_authority.sql ]] || {
       echo HOLD_SAJU_ADMISSION_UNAPPROVED_PRODUCTION_SQL >&2; exit 1;
     }
-    npm ci --ignore-scripts --no-audit --no-fund
     npm run build
     node --input-type=module -e '
       import { spawnSync } from "node:child_process";
@@ -123,6 +122,16 @@ case "$case_name" in
       if (result.error) throw result.error;
       process.exit(result.status ?? 1);
     '
+    ;;
+  seyeon-security-s0-real-path-pg17)
+    verify_pg17
+    [[ "${CI:-}" == true && "${GITHUB_ACTIONS:-}" == true &&
+       "${DB_SUITE:-}" == postgres17 && "${PGHOST:-}" == localhost &&
+       "${PGDATABASE:-}" =~ ^myeongha_ci_case_[0-9]+$ ]] || {
+      echo HOLD_S0_REQUIRES_DISPOSABLE_PG17 >&2; exit 1;
+    }
+    apply_pg17_migrations_without_birth_authority
+    bash test/db/seyeon_security_s0_real_path_pg17.sh
     ;;
   seyeon-c08y-disposable-shared-ledger-pg17)
     verify_pg17
