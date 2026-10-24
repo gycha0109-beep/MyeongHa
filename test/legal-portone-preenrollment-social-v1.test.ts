@@ -41,6 +41,7 @@ const admission = (found: boolean): SupabasePreenrollmentMemberBindingPortV1 => 
   admitExistingMember: vi.fn(async () => false),
   issueSocialState: vi.fn(() => signedSocialState),
   verifySocialState: vi.fn((state: string) => state === signedSocialState),
+  retireExistingSocialProof: vi.fn(async () => true),
 });
 afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
@@ -284,6 +285,8 @@ describe('A1 Social Auth preverified age hold and atomic Member binding', () => 
     expect(success.status).toBe(200);
     expect(existing.bindMember).not.toHaveBeenCalled();
     expect(existing.readVerified).not.toHaveBeenCalled();
+    expect(existing.retireExistingSocialProof).toHaveBeenCalledOnce();
+    expect(success.headers.get('set-cookie')).toContain('__Host-myeongha-preage-v1=;');
 
     const failed = {
       ...admission(true),
@@ -297,6 +300,29 @@ describe('A1 Social Auth preverified age hold and atomic Member binding', () => 
     expect((await blocked.clone().json()).error.code).toBe('AGE_BINDING_RECOVERY_REQUIRED');
     expect(blocked.headers.get('set-cookie')).toBeNull();
     expect(JSON.stringify(await blocked.json())).not.toContain('fresh-access-token');
+  });
+
+  it('denies an existing Social session when redundant pre-account proof cannot be atomically retired', async () => {
+    const fetch = vi.fn(async () => Response.json({
+      access_token: 'existing-access', refresh_token: 'existing-refresh',
+      expires_in: 3600, user: { id, email: 'existing@example.com' },
+    }));
+    vi.stubGlobal('fetch', fetch);
+    const port: SupabasePreenrollmentMemberBindingPortV1 = {
+      ...admission(true),
+      admitExistingMember: vi.fn(async () => true),
+      retireExistingSocialProof: vi.fn(async () => false),
+    };
+    const response = await handleSupabaseAuthRequestV1({
+      request: socialCompleteRequest(), env, action: 'social-complete',
+      preenrollmentMemberPort: port,
+    });
+    expect(response.status).toBe(403);
+    expect((await response.json()).error.code).toBe('AGE_VERIFICATION_REQUIRED');
+    expect(response.headers.get('set-cookie')).toBeNull();
+    expect(port.bindMember).not.toHaveBeenCalled();
+    expect(port.retireExistingSocialProof).toHaveBeenCalledOnce();
+    expect(fetch).toHaveBeenCalledOnce();
   });
 
   it('does not accidentally consume the age proof by creating a Guest before approved Social OAuth', () => {

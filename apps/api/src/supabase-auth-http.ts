@@ -361,6 +361,8 @@ export interface SupabasePreenrollmentMemberBindingPortV1 {
   verifySocialState?(state: string): boolean;
   /** Separate cookie-bound OAuth correlation for existing verified Members. */
   verifyExistingSocialState?(state: string): boolean;
+  /** Drop an unused A1 age proof if OAuth resolves to an ALREADY verified Member. */
+  retireExistingSocialProof?(): Promise<boolean>;
 }
 
 export async function handleSupabaseAuthRequestV1(input: {
@@ -466,6 +468,7 @@ export async function handleSupabaseAuthRequestV1(input: {
       if (session === null) return errorResponse('AUTH_UPSTREAM_MALFORMED', 502);
       let newlyBoundSocialMember = false;
       let matchedExistingSocialCookie = false;
+      let retiredRedundantPreenrollmentProof = false;
       if (input.preenrollmentMemberPort !== undefined) {
         // OFF/legacy social sign-in keeps its original transport contract.
         // Once A1 is enabled, binding always requires a trusted upstream UUID.
@@ -477,9 +480,17 @@ export async function handleSupabaseAuthRequestV1(input: {
             // OAuth start proof, not merely a client-submitted state string.
             matchedExistingSocialCookie =
               input.preenrollmentMemberPort.verifyExistingSocialState?.(providedState!) === true;
-            if (!matchedExistingSocialCookie &&
-                input.preenrollmentMemberPort.verifySocialState?.(providedState!) !== true) {
-              return errorResponse('SOCIAL_AUTH_CALLBACK_STATE_MISMATCH', 403);
+            if (!matchedExistingSocialCookie) {
+              if (input.preenrollmentMemberPort.verifySocialState?.(providedState!) !== true) {
+                return errorResponse('SOCIAL_AUTH_CALLBACK_STATE_MISMATCH', 403);
+              }
+              // Signing into an existing verified Member with a pre-account
+              // proof must not leave that same proof available to mint ANOTHER
+              // Guest/Member. Consume atomically before releasing any session.
+              if (await input.preenrollmentMemberPort.retireExistingSocialProof?.() !== true) {
+                return errorResponse('AGE_VERIFICATION_REQUIRED', 403);
+              }
+              retiredRedundantPreenrollmentProof = true;
             }
           } else {
             // OAuth may create a fresh Supabase user before the callback.
@@ -508,7 +519,9 @@ export async function handleSupabaseAuthRequestV1(input: {
         }
       }
       const socialResponse = authenticatedResponse(session, {}, true);
-      if (newlyBoundSocialMember) return eraseUsedPreenrollmentCookieV1(socialResponse);
+      if (newlyBoundSocialMember || retiredRedundantPreenrollmentProof) {
+        return eraseUsedPreenrollmentCookieV1(socialResponse);
+      }
       if (matchedExistingSocialCookie) {
         socialResponse.headers.append('Set-Cookie', expireExistingMemberSocialStateCookieV1());
       }

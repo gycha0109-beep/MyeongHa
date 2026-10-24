@@ -62,6 +62,12 @@ export function createApprovedPortOnePreenrollmentMemberBindingPortV1(input: Rea
           secret, request: input.request, state, nowEpochMs: Date.now(),
         });
     },
+    async retireExistingSocialProof() {
+      // This authority is only called after an upstream verified existing
+      // Member has been independently admitted. The one-use A1 SQL claim
+      // prevents a second fresh account from inheriting the same age proof.
+      return digest !== null && await authority.consume(digest) !== null;
+    },
     async bindMember(verifiedAuthUserId: string) {
       if (digest === null) throw new Error('New Social account requires preenrollment proof.');
       await authority.bindMember(verifiedAuthUserId, digest);
