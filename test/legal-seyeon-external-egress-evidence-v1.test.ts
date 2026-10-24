@@ -16,6 +16,12 @@ describe('L3-A OpenAI/Vercel AI Gateway outbound data-class evidence', () => {
     expect(() => createOpenAiSeyeonStructuredProviderV1({
       ...config, model: 'openai/gpt-5.6-sol', origin: 'https://ai-gateway.vercel.sh',
     })).not.toThrow();
+    expect(() => createOpenAiSeyeonStructuredProviderV1({
+      ...config, model: 'anthropic/claude-other-model', origin: 'https://ai-gateway.vercel.sh',
+    })).toThrow('AI Gateway model must use the approved OpenAI namespace.');
+    expect(() => createOpenAiSeyeonStructuredProviderV1({
+      ...config, model: 'openai/gpt-5.6-sol',
+    })).toThrow('OpenAI Direct model must use an unscoped identifier.');
     for (const origin of [
       'https://unreviewed.example',
       'https://api.openai.com.evil.example',

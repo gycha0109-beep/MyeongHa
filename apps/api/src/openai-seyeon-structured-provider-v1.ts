@@ -373,6 +373,15 @@ export function createOpenAiSeyeonStructuredProviderV1(
   const apiKey = requiredSecret(config.apiKey);
   const model = modelKey(config.model);
   const endpoint = responsesEndpoint(config.origin);
+  // A Gateway model selects a downstream processor. Keep it within the
+  // provider disclosed by this OpenAI-only Seyeon runtime, not an arbitrary
+  // model vendor chosen through a deployment override.
+  if (endpoint === 'https://ai-gateway.vercel.sh/v1/responses' && !model.startsWith('openai/')) {
+    return failConfiguration('AI Gateway model must use the approved OpenAI namespace.');
+  }
+  if (endpoint !== 'https://ai-gateway.vercel.sh/v1/responses' && model.includes('/')) {
+    return failConfiguration('OpenAI Direct model must use an unscoped identifier.');
+  }
   const requestTimeoutMs = timeoutMs(config.timeoutMs);
   const requestOutputCeiling = maxOutputTokens(config.maxOutputTokens);
   const fetchImpl = config.fetchImpl ?? fetch;
