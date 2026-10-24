@@ -57,6 +57,7 @@
     "workflow": "db-postgres17-authority-suite.yml",
     "postgres": 17,
     "cases": [
+      "saju-abuse-admission-attack-e2e",
       "guest-promotion-auth-fk",
       "birth-profile-create-runtime-authority",
       "content-release-lifecycle",

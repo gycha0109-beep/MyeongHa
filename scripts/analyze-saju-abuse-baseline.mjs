@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { parseRuntimeLogEvents } from './lib/runtime-log-events.mjs';
 
 export const SAJU_ABUSE_BASELINE_REPORT_SCHEMA_V1 =
   'myeongha-saju-abuse-baseline-report-v1';
@@ -98,64 +99,11 @@ function normalizeEvent(value) {
   fail('unsupported schemaVersion');
 }
 
-function parseMessage(message) {
-  if (typeof message !== 'string') return [];
-  const events = [];
-  for (const line of message.split(/\r?\n/u)) {
-    const index = line.indexOf(PREFIX);
-    if (index < 0) continue;
-    const payload = line.slice(index + PREFIX.length).trim();
-    if (payload.length === 0) continue;
-    try {
-      events.push(normalizeEvent(JSON.parse(payload)));
-    } catch (error) {
-      fail('invalid observation payload: ' + error.message);
-    }
-  }
-  return events;
-}
-
-function collectEvents(value, target) {
-  if (Array.isArray(value)) {
-    for (const item of value) collectEvents(item, target);
-    return;
-  }
-  if (!isRecord(value)) return;
-
-  if (value.schemaVersion === ADMISSION_SCHEMA || value.schemaVersion === OUTCOME_SCHEMA) {
-    target.push(normalizeEvent(value));
-    return;
-  }
-
-  if (typeof value.message === 'string') {
-    target.push(...parseMessage(value.message));
-  }
-  if (typeof value.text === 'string') {
-    target.push(...parseMessage(value.text));
-  }
-}
-
 export function parseSajuAbuseObservationText(text) {
-  if (typeof text !== 'string') fail('input text must be a string');
-  const trimmed = text.trim();
-  if (trimmed.length === 0) return [];
-
-  let parsedJson;
-  let parsedAsJson = false;
-  try {
-    parsedJson = JSON.parse(trimmed);
-    parsedAsJson = true;
-  } catch {
-    parsedAsJson = false;
-  }
-
-  if (parsedAsJson) {
-    const events = [];
-    collectEvents(parsedJson, events);
-    return events;
-  }
-
-  return parseMessage(text);
+  return parseRuntimeLogEvents(text, {
+    prefix: PREFIX,
+    schemas: [ADMISSION_SCHEMA, OUTCOME_SCHEMA],
+  }).map(normalizeEvent);
 }
 
 function canonicalEvent(event) {
@@ -412,6 +360,9 @@ export function analyzeSajuAbuseBaseline(input) {
     const outcome = outcomeByRequest.get(requestId);
     if (outcome !== undefined && outcome.routeId !== admission.routeId) {
       fail('route mismatch for correlated requestId: ' + requestId);
+    }
+    if (outcome !== undefined && Date.parse(outcome.completedAt) < Date.parse(admission.occurredAt)) {
+      fail('outcome precedes authenticated admission');
     }
   }
 
