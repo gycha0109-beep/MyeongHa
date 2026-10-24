@@ -227,7 +227,7 @@ describe('current-subject Saju calculation HTTP boundary v1', () => {
     expect(saju.calculate).not.toHaveBeenCalled();
   });
 
-  it('commits the authoritative Birth Profile transaction before starting external Saju transport', async () => {
+  it.each([false, true])('commits the authoritative Birth Profile transaction before external Saju transport (admission=%s)', async (admissionEnabled) => {
     const events: string[] = [];
     const identity = verifier();
     const pool = createPool({ events });
@@ -240,6 +240,14 @@ describe('current-subject Saju calculation HTTP boundary v1', () => {
       identityEvidenceVerifier: identity,
       pool,
       sajuAdapter: saju,
+      ...(admissionEnabled ? { sajuAbuseAdmission: {
+        secret: 'synthetic-admission-secret-over-thirty-two-bytes',
+        admissionPort: { admit: async () => {
+          events.push('SAJU_ADMIT');
+          return { allowed: true, requestCount: 1, resetAt: new Date(Date.parse(SERVER_TIME) + 60_000).toISOString(), evaluatedAt: SERVER_TIME,
+            policy: { policyVersion: 'synthetic-v1', policyHash: 'a'.repeat(64), windowSeconds: 60, requestLimit: 3, blockedCountSaturation: 4, retryAfterMaximumSeconds: 60, cleanupRetentionSeconds: 60 } };
+        } },
+      } } : {}),
     });
 
     expect(response.status).toBe(200);
@@ -272,6 +280,7 @@ describe('current-subject Saju calculation HTTP boundary v1', () => {
     expect(events.indexOf('COMMIT')).toBeGreaterThan(-1);
     expect(events.indexOf('SAJU_CALCULATE')).toBeGreaterThan(events.indexOf('COMMIT'));
     expect(events.indexOf('RELEASE')).toBeLessThan(events.indexOf('SAJU_CALCULATE'));
+    if (admissionEnabled) expect(events.indexOf('SAJU_ADMIT')).toBeLessThan(events.indexOf('CONNECT'));
   });
 
   it('fails closed on locator/current-revision drift and never calls Saju', async () => {

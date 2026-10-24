@@ -162,7 +162,7 @@ describe('current-subject Saju Preview Reading HTTP boundary v1', () => {
     expect(saju.requestReading).not.toHaveBeenCalled();
   });
 
-  it('binds the authoritative current Birth revision and commits before Preview transport', async () => {
+  it.each([false, true])('binds current Birth revision and commits before Preview transport (admission=%s)', async (admissionEnabled) => {
     const events: string[] = [];
     const saju = adapter(events);
     const response = await handleCurrentSubjectSajuPreviewReadingRequestV1({
@@ -172,6 +172,14 @@ describe('current-subject Saju Preview Reading HTTP boundary v1', () => {
       identityEvidenceVerifier: verifier(),
       pool: createPool({ events }),
       sajuAdapter: saju,
+      ...(admissionEnabled ? { sajuAbuseAdmission: {
+        secret: 'synthetic-admission-secret-over-thirty-two-bytes',
+        admissionPort: { admit: async () => {
+          events.push('SAJU_ADMIT');
+          return { allowed: true, requestCount: 1, resetAt: new Date(Date.parse(SERVER_TIME) + 60_000).toISOString(), evaluatedAt: SERVER_TIME,
+            policy: { policyVersion: 'synthetic-v1', policyHash: 'a'.repeat(64), windowSeconds: 60, requestLimit: 3, blockedCountSaturation: 4, retryAfterMaximumSeconds: 60, cleanupRetentionSeconds: 60 } };
+        } },
+      } } : {}),
     });
 
     expect(response.status).toBe(200);
@@ -202,6 +210,7 @@ describe('current-subject Saju Preview Reading HTTP boundary v1', () => {
     expect(events.indexOf('COMMIT')).toBeGreaterThan(-1);
     expect(events.indexOf('SAJU_PREVIEW_READING')).toBeGreaterThan(events.indexOf('COMMIT'));
     expect(events.indexOf('RELEASE')).toBeLessThan(events.indexOf('SAJU_PREVIEW_READING'));
+    if (admissionEnabled) expect(events.indexOf('SAJU_ADMIT')).toBeLessThan(events.indexOf('CONNECT'));
   });
 
   it('returns a non-retryable Birth Profile requirement when current self Birth data is absent', async () => {

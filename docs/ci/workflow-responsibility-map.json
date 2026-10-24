@@ -440,6 +440,24 @@
       "mainMode": "one-shot-trigger",
       "workTrackAttribution": "commit-metadata"
     },
+    "seyeon-c08-n06-paid-token-only-once-v3.yml": {
+      "responsibility": "character-memory-bounded-public-n06-token-only-model-inference-once",
+      "prMode": "none",
+      "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "commit-metadata"
+    },
+    "seyeon-c08-n06-paid-exact-model-once-v2.yml": {
+      "responsibility": "character-memory-one-owner-approved-public-n06-paid-model-post-exact-route",
+      "prMode": "none",
+      "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "commit-metadata"
+    },
+    "seyeon-c08-n06-paid-canary-once-v1.yml": {
+      "responsibility": "character-memory-owner-preapproved-public-n06-one-chargeable-post-json-canary",
+      "prMode": "none",
+      "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "commit-metadata"
+    },
     "seyeon-openrouter-glm53flash-paid-three-call-n01-v1.yml": {
       "responsibility": "character-memory-funded-new-model-actual-3call-public-shadow",
       "prMode": "none",
@@ -484,6 +502,12 @@
     },
     "seyeon-openrouter-xing-free-three-call-n01-v1.yml": {
       "responsibility": "character-memory-free-model-exact-zdr-json-public-only-shadow",
+      "prMode": "none",
+      "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "commit-metadata"
+    },
+    "seyeon-c08-provider-get-shape-diagnostic-once-v1.yml": {
+      "responsibility": "character-memory-one-shot-official-provider-get-structure-diagnosis-only",
       "prMode": "none",
       "mainMode": "one-shot-trigger",
       "workTrackAttribution": "commit-metadata"

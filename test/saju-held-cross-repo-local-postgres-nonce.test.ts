@@ -137,8 +137,15 @@ function verifier(pool: Pool) {
 }
 
 function digest(sample: Issued): string {
-  const replayKey = process.env.MYEONGHA_LOCAL_SAJU_ISSUER + ':'
-    + process.env.MYEONGHA_LOCAL_SAJU_AUDIENCE + ':' + sample.nonce;
+  // Independently derive the current tuple-v2 protocol value. The legacy
+  // issuer:audience:nonce lookup cannot observe a v2 claim or bind key rotation.
+  const tupleDigest = createHash('sha256').update(JSON.stringify([
+    process.env.MYEONGHA_LOCAL_SAJU_ISSUER,
+    process.env.MYEONGHA_LOCAL_SAJU_AUDIENCE,
+    process.env.MYEONGHA_LOCAL_SAJU_KEY_ID,
+    sample.nonce,
+  ])).digest('hex');
+  const replayKey = 'saju-proof-v2:' + tupleDigest;
   return createHash('sha256')
     .update('myeongha/saju/source-proof/nonce-replay/v1\0')
     .update(replayKey).digest('hex');

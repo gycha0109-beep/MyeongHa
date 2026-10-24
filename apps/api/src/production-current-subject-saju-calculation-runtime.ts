@@ -1,4 +1,6 @@
 import { handleCurrentSubjectSajuCalculationRequestV1 } from './current-subject-saju-calculation-http.js';
+import type { SajuAbuseAdmissionGateV1 } from './saju-abuse-admission-http.js';
+import { PostgresSajuAbuseAdmissionPortV1 } from './postgres-saju-abuse-admission.js';
 import type { PostgresSubjectPoolV1 } from './postgres-subject-execution.js';
 import { createProductionPostgresSubjectPoolLeaseV1 } from './production-postgres-subject-pool-lease.js';
 import { createProductionRequestIdentityVerifierV1 } from './production-request-identity-verifier.js';
@@ -44,6 +46,8 @@ export interface CreateProductionCurrentSubjectSajuCalculationRuntimeInputV1 {
   readonly sajuAbuseOutcomeWriter?: SajuAbuseOutcomeObservationWriterV1;
   /** Test/runtime clock injection only. */
   readonly now?: () => number;
+  /** Server composition only; activation requires separately approved policy and durable store. */
+  readonly sajuAbuseAdmissionEnabled?: boolean;
 }
 
 function cancelUnusedRequestBodyBestEffort(request: Request): void {
@@ -79,6 +83,9 @@ export function createProductionCurrentSubjectSajuCalculationRuntimeV1(
       ? {}
       : { memberFetchImpl: input.memberFetchImpl }),
   });
+  const sajuAbuseAdmission: SajuAbuseAdmissionGateV1 | undefined = input.sajuAbuseAdmissionEnabled === true
+    ? { admissionPort: new PostgresSajuAbuseAdmissionPortV1(poolLease.pool), secret: userDataConfig.guestFingerprintSecret }
+    : undefined;
   const sajuAdapter = createSajuProductionCalculationHttpAdapterV1({
     baseUrl: sajuConfig.serviceOrigin,
     bearerToken: sajuConfig.serviceBearer,
@@ -104,6 +111,7 @@ export function createProductionCurrentSubjectSajuCalculationRuntimeV1(
         identityEvidenceVerifier: observedIdentityEvidenceVerifier,
         pool: poolLease.pool,
         sajuAdapter,
+        ...(sajuAbuseAdmission === undefined ? {} : { sajuAbuseAdmission }),
       });
 
       observeSajuAbuseOutcomeV1({
