@@ -69,6 +69,24 @@ if [[ "${SUPABASE_PROMOTION_REPAIR_ONLY:-false}" != 'false' ]]; then
   exit 1
 fi
 
+# Independent last-resort admission: even if a future workflow accidentally
+# selects ordinary deployment (including a manual run or unrelated main push),
+# staged Official Reader 1740..2290 must never reach migration repair or
+# supabase db push --include-all. Only the separately guarded scoped
+# apply-official-reader-s4-scoped-production-migrations.sh is authorized.
+# Keep the existing exact incident-only repairs above intact.
+for reader_migration in supabase/migrations/*_official_reader_*.sql; do
+  [[ -e "$reader_migration" ]] || continue
+  reader_filename="${reader_migration##*/}"
+  if [[ "$reader_filename" =~ ^([0-9]{4})_official_reader_.*[.]sql$ ]]; then
+    reader_version=$((10#${BASH_REMATCH[1]}))
+    if (( reader_version >= 1740 && reader_version <= 2290 )); then
+      echo "HOLD_OFFICIAL_READER_1740_2290: ordinary Production migration path prohibited (${reader_filename}); use approved scoped manual flow" >&2
+      exit 1
+    fi
+  fi
+done
+
 # A historical recovery has already installed 1460-1510 while 1400-1450
 # relationship Event/Correction/Snapshot functions are absent in Production.
 # Fail CLOSED before legacy migration repair OR db push; ordinary --include-all
