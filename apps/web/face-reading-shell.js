@@ -2,7 +2,7 @@ import { resolveCharacterDisplayNameV1 } from './character-display-locale.js';
 import { READER_PRESENTATIONS, findReaderPresentation } from './reader-presentation-catalog.js';
 import { createDelegatePicker } from './reader-picker-dialog.js';
 import { faceReadingUiStateV1 } from './face-reading-ui-locale.js';
-import { createEphemeralFacePreviewUrlV1 } from './face-preview-object-url.js';
+import { createEphemeralFacePreviewUrlV1, hasLocalFaceImageSignatureV1 } from './face-preview-object-url.js';
 import { getUiLocale, translateStaticUi } from './ui-i18n.js';
 
 const camera = document.querySelector('[data-face-camera]');
@@ -115,7 +115,7 @@ function showSelectedFile(file) {
   renderReader();
 }
 
-function choose(file) {
+async function choose(file) {
   if (!file) return;
 
   const allowed = new Set(['image/jpeg', 'image/png', 'image/webp']);
@@ -128,6 +128,16 @@ function choose(file) {
   setIdlePreview();
   previewPhase = 'loading';
   renderReader();
+
+  // The browser-provided MIME is a hint, not trusted image evidence. Read
+  // only the first twelve bytes; ignore an older async selection entirely.
+  let authentic = false;
+  try { authentic = await hasLocalFaceImageSignatureV1(file); } catch { /* invalid image */ }
+  if (revision !== selectionRevision) return;
+  if (!authentic) {
+    rejectPreview('invalid-image');
+    return;
+  }
 
   // No Base64 data URL, HTTP upload or persistent image store. The object
   // URL is limited to this preview and explicitly revoked on every reset.
