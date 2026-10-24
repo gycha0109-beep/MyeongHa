@@ -38,6 +38,8 @@ type ItemScope = Readonly<{
 /** Only a verified server-side purchase authority may supply this fact. */
 export type VerifiedDigitalReadingPurchaseV1 = ItemScope & Readonly<{
   readonly status: 'verified';
+  /** Server purchase authority timestamp, not client order creation time. */
+  readonly purchasedAt: string;
 }>;
 
 /**
@@ -49,6 +51,9 @@ export type DigitalReadingCheckoutNoticeV1 = ItemScope & Readonly<{
   readonly noticeRevision: string;
   readonly previewOrInformationRevision: string;
   readonly acknowledged: true;
+  /** Durable server presentation and acknowledgement records, before purchase. */
+  readonly displayedAt: string;
+  readonly acknowledgedAt: string;
 }>;
 
 /**
@@ -149,7 +154,7 @@ export function assessDigitalReadingWithdrawalReviewV1(input: Readonly<{
   const claim = input.claim;
   if (!obj(purchase) || purchase.status !== 'verified' ||
       !id(purchase.purchaseIntentId) || !id(purchase.unitId) ||
-      !id(purchase.productSpecVersion) || !obj(claim) ||
+      !id(purchase.productSpecVersion) || !isoInstant(purchase.purchasedAt) || !obj(claim) ||
       claim.purchaseIntentId !== purchase.purchaseIntentId ||
       claim.unitId !== purchase.unitId ||
       typeof claim.reason !== 'string' || !reasons.has(claim.reason)) {
@@ -177,7 +182,8 @@ export function assessDigitalReadingWithdrawalReviewV1(input: Readonly<{
   if (delivery.state !== 'DELIVERED_PROVABLE') {
     return review('not_proven_delivered', 'CONTENT_NOT_PROVEN_DELIVERED');
   }
-  if (!isoInstant(delivery.deliveredAt)) {
+  if (!isoInstant(delivery.deliveredAt) ||
+      Date.parse(delivery.deliveredAt) < Date.parse(scope.purchasedAt)) {
     return review('evidence_review_required', 'INVALID_OR_MISSING_SERVER_EVIDENCE');
   }
 
@@ -186,7 +192,11 @@ export function assessDigitalReadingWithdrawalReviewV1(input: Readonly<{
       notice.authority !== 'server_checkout_snapshot' ||
       notice.acknowledged !== true ||
       !id(notice.noticeRevision) ||
-      !id(notice.previewOrInformationRevision)) {
+      !id(notice.previewOrInformationRevision) ||
+      !isoInstant(notice.displayedAt) ||
+      !isoInstant(notice.acknowledgedAt) ||
+      Date.parse(notice.displayedAt) > Date.parse(notice.acknowledgedAt) ||
+      Date.parse(notice.acknowledgedAt) > Date.parse(scope.purchasedAt)) {
     return review('evidence_review_required', 'INVALID_OR_MISSING_SERVER_EVIDENCE');
   }
 

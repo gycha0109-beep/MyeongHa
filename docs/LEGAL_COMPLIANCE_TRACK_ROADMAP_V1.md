@@ -173,3 +173,10 @@
 - **L3 Gateway 하위 처리 업체 제약:** Gateway 모델은 `openai/` 네임스페이스만 허용, OpenAI Direct 모델은 비접두 식별자만 허용. 운영 환경 모델 재설정만으로 미감사 AI 사업자에게 전송되는 경로 차단. `test/legal-seyeon-external-egress-evidence-v1.test.ts`에 허용·차단 사례 추가.
 - **검증 한계:** 위 코드는 신규 정적/단위 회귀 조건을 추가한 상태. 2026-10-25 해당 브랜치 최신 SHA의 전체 통합 GitHub Actions, PG17 A1 실행·Web/Native 빌드·운영 공급자 계약 및 배포 지역/실데이터 송수신 실증은 아직 성공 증거 없음. Workers/GitGuardian 개별 성공만으로 통합 GREEN으로 간주하지 않음.
 - **계속 보류:** `1740`/`1741` Production 적용, 실제 본인확인·PG 결제·유료 판매, LEGAL-001/002/003 공개, P5Y/P30D 및 승인 삭제 그래프 변경은 하지 않음. PR은 전체 수락 조건 충족 전 Draft 유지 및 미병합.
+
+
+## 20. 2026-10-25 L4 서버 구매·고지·실제 인도 시각 증거의 순서 검증
+
+- `commerce-digital-reading-withdrawal-review-v1.ts`의 읽기 전용 법률 검토 후보는 이제 **검증된 결제 시각**(`purchasedAt`), 서버 기록의 **고지 표시·확인 시각**(`displayedAt`/`acknowledgedAt`), 실제 인도 시각(`deliveredAt`)을 요구한다. 표시 ≤ 확인 ≤ 결제 ≤ 인도 순서를 입증하지 못하면 단순변심 제한 검토 후보로 올리지 않고 `evidence_review_required`를 반환한다.
+- 구매 후 소급 확인, 표시 이전 확인, 결제 전 인도를 법적 제공 증명처럼 분류하는 경우를 차단한다. 브라우저 시간이 아닌 독립 서버 권위만 입력이라는 계약은 유지하고, **자동 환불 거절·환급·Grant 변경 권한은 계속 전부 false**다.
+- `test/commerce-digital-reading-withdrawal-review-v1.test.ts`의 정상·역순·시간 누락·비실재 날짜를 보완했다. **테스트 실행/최종 통합 CI/PG17 GREEN은 이 커밋만으로 주장하지 않는다.** Commerce/S7이 실제 주문·고지/미리보기·배송 증빙을 서버에서 기록하고 조회하는 기능은 여전히 미완료이며 유료 판매 OFF를 유지한다.

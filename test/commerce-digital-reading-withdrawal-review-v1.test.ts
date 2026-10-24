@@ -10,7 +10,7 @@ const UNIT = Object.freeze({
   unitId: 'synthetic-reading-a-seyeon-one-off',
   productSpecVersion: 'synthetic-standard-v1',
 });
-const PURCHASE = Object.freeze({ ...UNIT, status: 'verified' });
+const PURCHASE = Object.freeze({ ...UNIT, status: 'verified', purchasedAt: '2026-10-12T01:00:00.000Z' });
 const CLAIM = Object.freeze({ ...UNIT, reason: 'change_of_mind' });
 const NOTICE = Object.freeze({
   ...UNIT,
@@ -18,6 +18,8 @@ const NOTICE = Object.freeze({
   noticeRevision: 'synthetic-notice-revision-v1',
   previewOrInformationRevision: 'synthetic-sample-revision-v1',
   acknowledged: true,
+  displayedAt: '2026-10-12T00:58:00.000Z',
+  acknowledgedAt: '2026-10-12T00:59:00.000Z',
 });
 const DELIVERY = Object.freeze({
   ...UNIT,
@@ -106,6 +108,8 @@ describe('internal digital-Reading withdrawal triage (never refund/deny authorit
     { ...PURCHASE, purchaseIntentId: '' },
     { ...PURCHASE, unitId: '   ' },
     { ...PURCHASE, productSpecVersion: null },
+    { ...PURCHASE, purchasedAt: undefined },
+    { ...PURCHASE, purchasedAt: '2026-02-30T01:00:00.000Z' },
   ])('does not trust an unverified or malformed historical purchase %s', (purchase) => {
     expect(decide({ purchase }).classification).toBe('evidence_review_required');
   });
@@ -131,6 +135,7 @@ describe('internal digital-Reading withdrawal triage (never refund/deny authorit
     { ...DELIVERY, deliveredAt: null },
     { ...DELIVERY, deliveredAt: 'not-an-instant' },
     { ...DELIVERY, deliveredAt: '2026-02-30T00:00:00.000Z' },
+    { ...DELIVERY, deliveredAt: '2026-10-12T00:59:59.999Z' },
   ])('fails closed on non-authoritative, malformed or cross-unit delivery proof %s', (delivery) => {
     expect(decide({ delivery }).classification).toBe('evidence_review_required');
   });
@@ -144,6 +149,11 @@ describe('internal digital-Reading withdrawal triage (never refund/deny authorit
     { ...NOTICE, acknowledged: false },
     { ...NOTICE, noticeRevision: '' },
     { ...NOTICE, previewOrInformationRevision: '' },
+    { ...NOTICE, displayedAt: null },
+    { ...NOTICE, acknowledgedAt: undefined },
+    { ...NOTICE, displayedAt: '2026-02-30T00:00:00.000Z' },
+    { ...NOTICE, displayedAt: '2026-10-12T00:59:01.000Z' },
+    { ...NOTICE, acknowledgedAt: '2026-10-12T01:00:01.000Z' },
   ])('never assumes a purchase-wide notice or browser checkbox is unit-specific evidence %s', (notice) => {
     expect(decide({ notice }).classification).toBe('evidence_review_required');
   });
