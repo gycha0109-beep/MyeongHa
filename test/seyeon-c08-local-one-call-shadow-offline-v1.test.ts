@@ -66,7 +66,7 @@ function harness(opts:{
       events.push('model');
       opts.beforeModel?.();
       requests.push(req);
-      return opts.output??DRAFT;
+      return Object.hasOwn(opts,'output')?opts.output:DRAFT;
     },
   };
   const run=(overrides:Record<string,unknown>={})=>
@@ -95,7 +95,7 @@ function harness(opts:{
 
 describe('C08 local preflight / single dialogue LLM / local output guard (OFFLINE)',()=>{
   it('accepts only grammatically bounded first-contact messages',()=>{
-    for(const t of [TEXT,'안녕하세요','반갑습니다','오늘 좀 피곤해.',
+    for(const t of [TEXT,'안녕하세요','안녕, 세연아!','반갑습니다','오늘 좀 피곤해.',
       '천천히 이야기하고 싶어.','지금 뭐 하고 싶어?','어떤 이야기가 편해?']){
       expect(classifySeyeonC08LocalEntryV1(t)).not.toBeNull();
     }
@@ -110,8 +110,14 @@ describe('C08 local preflight / single dialogue LLM / local output guard (OFFLIN
 
   it.each(GOLD)('$id: refuses C07 Gold original text before model dispatch',async gold=>{
     const h=harness({text:gold.text});
-    await expect(h.run()).rejects.toThrow('LOCAL_INPUT_NOT_PROVEN');
-    expect(h.events).toEqual([]);
+    if(gold.id==='N01'||gold.id==='N02'){
+      const result=await h.run();
+      expect(result.llmCalls).toBe(1);
+      expect(result.interpretation.reveal.level).toBe('public');
+    }else{
+      await expect(h.run()).rejects.toThrow('LOCAL_INPUT_NOT_PROVEN');
+      expect(h.events).toEqual([]);
+    }
   });
 
   it('returns a separately labelled local-guarded draft with exactly one model call',async()=>{
