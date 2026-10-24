@@ -50,6 +50,9 @@ export type DigitalReadingCheckoutNoticeV1 = ItemScope & Readonly<{
   readonly authority: 'server_checkout_snapshot';
   readonly noticeRevision: string;
   readonly previewOrInformationRevision: string;
+  /** One demonstrably provided measure required before limiting withdrawal. */
+  readonly safeguardMethod: 'sample' | 'trial' | 'time_limited' | 'sufficient_information';
+  readonly safeguardProvidedAt: string;
   readonly acknowledged: true;
   /** Durable server presentation and acknowledgement records, before purchase. */
   readonly displayedAt: string;
@@ -120,6 +123,9 @@ function sameItem(
 const reasons: ReadonlySet<string> = new Set([
   'change_of_mind', 'not_provided', 'delivery_failed', 'not_as_described',
   'defect', 'duplicate_charge', 'unprovided_separable_part', 'other',
+]);
+const safeguardMethods: ReadonlySet<string> = new Set([
+  'sample', 'trial', 'time_limited', 'sufficient_information',
 ]);
 const states: ReadonlySet<string> = new Set([
   'PURCHASED_NOT_PROVIDED', 'RENDERING_PRIVATE', 'T2_COMMITTED_UNDELIVERED',
@@ -193,9 +199,13 @@ export function assessDigitalReadingWithdrawalReviewV1(input: Readonly<{
       notice.acknowledged !== true ||
       !id(notice.noticeRevision) ||
       !id(notice.previewOrInformationRevision) ||
+      typeof notice.safeguardMethod !== 'string' ||
+      !safeguardMethods.has(notice.safeguardMethod) ||
+      !isoInstant(notice.safeguardProvidedAt) ||
       !isoInstant(notice.displayedAt) ||
       !isoInstant(notice.acknowledgedAt) ||
       Date.parse(notice.displayedAt) > Date.parse(notice.acknowledgedAt) ||
+      Date.parse(notice.safeguardProvidedAt) > Date.parse(notice.acknowledgedAt) ||
       Date.parse(notice.acknowledgedAt) > Date.parse(scope.purchasedAt)) {
     return review('evidence_review_required', 'INVALID_OR_MISSING_SERVER_EVIDENCE');
   }
