@@ -134,6 +134,8 @@ describe('Mobile / Web UI localization parity', () => {
     expect(scene).toContain("t('근거')");
     expect(scene).toContain('{currentStep.primary}');
     expect(composer).toContain('SEYEON_HISTORY_REVEAL_HOLD');
+    expect(composer).toContain("t('개인정보 보호를 위한 서버 확인이 끝나지 않아");
+    expect(composer).toContain("t('대화 기록과 메시지 보내기는 개인정보 공개 권한 검증이");
   });
 
   it('keeps Android status/navigation windows outside the scrollable app and tabs', async () => {
@@ -195,7 +197,7 @@ describe('Mobile / Web UI localization parity', () => {
     expect(profile).toContain("profile.displayName === '호칭 미설정'");
   });
 
-  it('localizes UI-only Saju and Reader error/HOLD states in new locales without translating source payloads', () => {
+  it('localizes UI-only Saju and Reader error/HOLD states in new locales without translating source payloads', async () => {
     const labels = [
       '현재 이 주제를 표시할 만큼 검증된 해석 근거가 충분하지 않습니다.',
       '사주 프리뷰를 불러오지 못했습니다.',
@@ -216,6 +218,76 @@ describe('Mobile / Web UI localization parity', () => {
         expect(result).not.toMatch(/[가-힣]/u);
       }
     }
+    const acceptanceCopy = ["Reader 선택","프리뷰만","프리뷰 소개","컨셉 준비 중","닫기","변경","현재 세연만 프리뷰 장면을 선택할 수 있으며, 유료 Reader 해석은 아직 공개되지 않았습니다.","Reader 표시와 프리뷰 선택은 상품 지원, 구매 접근권, 공개 승인 또는 공식 Reading 열람 권한을 뜻하지 않습니다. 이 권한들은 서버가 각각 확인해야 합니다.","선택한 Reader는 현재 사주 프리뷰 화면의 표시만 바꿉니다. 해석 근거와 내용은 변경되지 않습니다.","선택한 Reader는 현재 관상 준비 화면의 표시만 바꿉니다. 사진 분석과 Reader 풀이는 아직 열리지 않았습니다.","READER · 세연 프리뷰 장면","READER · 준비 중","이 공식 사주를 읽어줄 인물","공식 Reading 기반의 Reader 소개입니다. 해설 실행 및 후속 대화는 제공되지 않습니다.","인물 소개만 변경하며 유료 해설은 실행하지 않습니다.","소개 보기","현재 선택은 인물 소개를 보기 위한 것입니다. 이 Reader의 구매 접근권, 공식 Reading 열람 또는 전용 Thread가 생성되지 않습니다.","해설 진입 상태","Reader 해설 진입 비활성","해설 서비스 준비 중","Reader 소개 및 기록 연결은 상품 적격성, 구매 접근권, 공개 승인, 공식 Reading 접근 허가의 증명이 아닙니다.","공식 Reader 해설은 아직 공개되지 않았습니다.","상품·구매·공개 승인·공식 Reading 접근을 서버에서 확인해야 합니다.","이 상품은 해당 Reader 해설 대상이 아닙니다.","해설 구매 접근권이 확인되지 않았습니다.","해당 Reader 해설의 공개 승인을 기다리고 있습니다.","해당 Reader 해설은 현재 이용할 수 없습니다.","이 공식 Reading에 대한 해설 접근이 허용되지 않았습니다.","서버 확인 중 일시적인 문제가 발생했습니다. 해설 진입은 차단됩니다.","권한 또는 응답을 안전하게 확인할 수 없어 해설 진입을 차단했습니다.","개별 확인 후에도 실제 해설 진입에는 별도 서버 승인이 필요합니다.","대화 상대","서버가 확인한 대화방","프로필","오류 코드","세연에게 하고 싶은 말을 적어주세요","대화 상대를 확인하고 있습니다","대화 기록을 확인한 뒤 메시지를 보낼 수 있습니다","이 캐릭터의 AI 대화는 준비 중입니다","대화방 기록을 불러오지 못한 경우 다시 입장해 주세요.","캐릭터 대화방과 기록은 이용할 수 있으며, AI 답변 기능은 추후 열립니다.","등록된 대상","현재 계정에 등록된 대상의 출생정보를 확인합니다.","이름 없는 대상","성별 미지정","성별 정보 없음","음력 · 윤달","출생정보 revision","신규 추가만 지원합니다. 수정·삭제·궁합 실행은 아직 지원하지 않습니다.","현재 등록된 대상이 없습니다.","새 대상 추가","궁합 등에 사용할 상대의 기본 정보와 출생정보를 등록합니다.","이름 또는 별칭","관계 (예: 친구)","선택 안 함","대상 추가","생성 후 라벨 수정·삭제·출생정보 수정·궁합 실행은 아직 열지 않습니다.","세연 대화 기록을 현재 표시할 수 없습니다","개인정보 보호를 위한 서버 확인이 끝나지 않아 대화 기록을 표시할 수 없습니다. 반복해서 불러와도 해제되지 않습니다.","대화 기록을 확인하지 못했습니다. 아래에서 다시 불러올 수 있습니다.","세연 대화는 서버의 보호 조치로 잠시 중단되었습니다","대화 기록과 메시지 보내기는 개인정보 공개 권한 검증이 끝난 뒤 이용할 수 있습니다. 앱을 다시 설치해도 이 제한은 해제되지 않습니다."];
+    for (const locale of ['en-US', 'zh-CN'] as const) {
+      for (const label of acceptanceCopy) {
+        const translated = translateMobileUiCopy(label, locale);
+        expect(translated, `${locale} missing: ${label}`).not.toBe(label);
+        // Preserve the Character's canonical Korean name even in localized UI.
+        expect(translated.replaceAll('세연', '')).not.toMatch(/[가-힣]/u);
+      }
+    }
+    const [picker, readerEntry, composer, people] = await Promise.all([
+      source('apps/mobile/src/features/reading/MobileReaderPicker.tsx'),
+      source('apps/mobile/src/features/reading/MobileOfficialReadingReaderEntry.tsx'),
+      source('apps/mobile/src/features/chat/ChatReadComponents.tsx'),
+      source('apps/mobile/src/features/my/MyTargetPersons.tsx'),
+    ]);
+    expect(picker).toContain("t(accessView.previewPresentation");
+    expect(readerEntry).toContain('t(entry.statusMessage)');
+    expect(composer).toContain('{message.body}');
+    expect(composer).toContain("placeholder={t('세연에게 하고 싶은 말을 적어주세요')}");
+    expect(people).toContain('item.relationshipLabel');
+    expect(people).toContain('item.displayLabel?.trim()');
+    const extraCopy = ["이 기기 알림 연결됨","현재 주체에 Expo Push 수신 기기가 등록되어 있습니다.","알림 연결 확인 필요","기기 권한은 유지 중이며 서버 등록을 다시 확인해야 합니다.","기기 알림 권한 꺼짐","OS 설정에서 알림 권한을 허용한 뒤 다시 연결해 주세요.","현재 빌드에서는 준비 중","EAS projectId가 연결된 네이티브 빌드에서 Push 등록을 활성화합니다.","알림 받기","사용자가 허용하면 이 기기를 현재 주체의 Push 수신 기기로 등록합니다.","알림 연결을 확인하는 중입니다…","이 기기 알림 끄기","다시 연결","알림 허용 및 기기 등록","지금은 기기 등록·갱신·해제 기반만 활성화합니다. 자동 발송 시점과 빈도는 아직 적용하지 않습니다.","얼굴에 담긴 나의 이야기","정면 사진을 준비하고, {reader}과 함께할 관상 읽기의 시작을 만나보세요.","이야기가 머무는 곳","오늘은 어떤 이야기를 나눠볼까요?","여섯 연결자의 이야기를 만나보세요.","캐릭터 만나기","명식과 풀이 살펴보기","지난 이야기","대화 가능 여부와 기록 접근은 로그인 및 현재 서비스 상태에 따라 달라집니다.","음력 29일·30일 및 윤달의 실제 존재 여부는 저장 시 서버에서 확인합니다.","외부 로그인 화면에서 확인을 마치면 자동으로 돌아옵니다.","연결되지 않은 결제·상세 계정관리·지원 상태는 임의로 표시하지 않습니다."];
+    for (const locale of ['en-US', 'zh-CN'] as const) {
+      for (const label of extraCopy) {
+        const translated = translateMobileUiCopy(label, locale);
+        expect(translated, `${locale} missing: ${label}`).not.toBe(label);
+        expect(translated.replace('{reader}', '')).not.toMatch(/[가-힣]/u);
+      }
+    }
+    const [push, faceEditorial] = await Promise.all([
+      source('apps/mobile/src/features/my/MyPushNotifications.tsx'),
+      source('apps/mobile/src/features/face/FaceEditorialIntro.tsx'),
+    ]);
+    expect(push).toContain('t(copy.title)');
+    expect(push).toContain('t(copy.body)');
+    expect(push).toContain('{errorMessage}');
+    expect(faceEditorial).toContain('reader: reader.name');
+    expect(formatMobileUiCopy('정면 사진을 준비하고, {reader}과 함께할 관상 읽기의 시작을 만나보세요.', { reader: '세연' }, 'en-US')).toContain('세연');
+    const finalMobileCopy = ["촬영한 사진","선택한 사진","사진 준비 완료","사진을 준비하면 다음 단계가 표시됩니다","관상 분석 기능 준비 중","{reader}과 관상 보기 준비","카메라 권한이 필요합니다. 기기 설정에서 카메라 접근을 허용해 주세요.","사진을 준비하지 못했습니다. 잠시 후 다시 시도해 주세요.","한 장의 사진만 선택할 수 있습니다.","16MB 이하의 사진을 선택해 주세요.","JPEG, PNG 또는 WebP 사진을 선택해 주세요.","선택한 사진을 사용할 수 없습니다. 다른 사진을 선택해 주세요.","카메라 권한을 확인하지 못했습니다.","사진을 촬영하지 못했습니다. 다시 시도해 주세요.","전면 카메라를 열지 못했습니다.","촬영 중…","사진 촬영","달력에서 날짜 선택","이미 등록된 출생정보가 있습니다. 현재 내용은 사주 탭에서 확인해 주세요.","현재 출생정보를 다시 확인하지 못했습니다. 입력 내용은 그대로 유지됩니다.","출생정보를 확인해 주세요.","입력값을 처리하지 못했습니다. 생년월일과 출생시간을 확인해 주세요.","서버에 연결하지 못했습니다. 네트워크를 확인하고 다시 시도해 주세요.","출생정보를 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.","출생 연도는 네 자리로 입력해 주세요.","출생 연도를 확인해 주세요.","존재하는 양력 생년월일을 입력해 주세요.","출생시간은 HH:mm 형식으로 입력해 주세요.","출생시간을 확인해 주세요.","달력 유형을 확인해 주세요.","출생 월을 입력해 주세요.","출생 월을 확인해 주세요.","출생 일을 입력해 주세요.","출생 일을 확인해 주세요.","저장된 공식 풀이를 불러오는 중입니다…","로그인 상태가 변경되어 이전 계정의 공식 풀이를 표시하지 않았습니다.","현재 기록에서 이 저장된 풀이를 찾을 수 없습니다.","저장된 공식 풀이를 안전하게 표시할 수 없습니다.","저장된 풀이를 불러오지 못했습니다.","이 공식 Reading과 Reader","공식 기록에 연결된 Reader 정보: {count}명","이 공식 기록에 연결된 Reader 정보가 없습니다.","Reader 연결 정보는 해설 구매·열람 권한 또는 해설 완료의 증명이 아닙니다. Reader별 해설 다시 보기와 후속 대화는 별도의 서버 권한·기록 계약이 승인된 뒤 제공됩니다.","기록 · 당시 저장된 공식 사주 풀이를 그대로 다시 읽고 있습니다."];
+    for (const locale of ['en-US', 'zh-CN'] as const) {
+      for (const label of finalMobileCopy) {
+        const localized = translateMobileUiCopy(label, locale);
+        expect(localized, `${locale} missing: ${label}`).not.toBe(label);
+        expect(localized).not.toMatch(/[가-힣]/u);
+      }
+    }
+    const [face, camera, birth, archived] = await Promise.all([
+      source('apps/mobile/src/app/(tabs)/reading/face.tsx'),
+      source('apps/mobile/src/platform/media/MobileFrontCameraV1.tsx'),
+      source('apps/mobile/src/app/birth/index.tsx'),
+      source('apps/mobile/src/app/reading/[readingId].tsx'),
+    ]);
+    expect(face).toContain('formatMobileUiCopy(');
+    expect(face).toContain('{t(state.message)}');
+    expect(camera).toContain('t(error)');
+    expect(birth).toContain("{t(option.label)}");
+    expect(birth).toContain("locale === 'en-US'");
+    expect(archived).toContain('formatMobileUiCopy(');
+    expect(archived).toContain('{step.primary}');
+    expect(archived).toContain('{notice}');
+    expect(archived).toContain('{text}');
+    const missingLeafCopy = ["로그인 후 대화하기 →","‹ 대화로 돌아가기","대화 링크를 확인할 수 없습니다","올바른 기존 대화 링크로 다시 들어와 주세요.","대화로 돌아가기","출생정보를 확인하는 중입니다…","선택한 Reader와 전체 사주 읽기 시작","PHOTO · 정면 사진","{reader}에게 보여줄 사진","얼굴 전체가 보이도록 정면을 바라봐 주세요. 밝은 조명과 선명한 사진이 좋습니다.","▣ 사진 촬영","▧ 사진 선택","현재는 사진 촬영·선택과 미리보기만 가능합니다. 서버 분석은 시작하지 않습니다. 얼굴 분석과 관상 풀이는 아직 제공하지 않습니다.","선택한 사진은 이 화면에서만 일시적으로 사용하며 기기 보안 저장소나 앱 기록에 저장하지 않습니다.","삶의 사실과 지난 풀이, 저장된 기억을 차분히 찾아보세요.","← 기록으로 돌아가기","아직 내 명식이 없습니다. 출생정보를 등록하면 현재 명식을 확인할 수 있습니다.","현재 출생정보를 기준으로 계산된 명식 사실만 보여줍니다.","명하","회원 전용 · 세연과의 대화는 서버에 보관됩니다.","세연에게 보낼 메시지","관계","지금 확인할 수 있는 삶의 기록과 사주 풀이를 차분히 살펴보세요.","모호","미확정","궁금한 주제를 선택해 더 깊이 살펴보세요. 준비된 풀이만 연결되며, 아직 확인이 필요한 주제는 현재 상태를 안내합니다.","다른 주제의 풀이로 자동 대체하지 않습니다.","웹과 동일하게 권한이 열리기 전에는 다른 풀이를 대신 실행하지 않습니다.","Preview · 연구 검증 중인 원국 해석이며 확정적 미래 예측은 포함하지 않습니다.","나의 명식, 나를 읽는 첫 장","태어난 순간의 정보를 토대로 계산한 명식을 확인해 보세요.","이 정보는 검증된 명식 계산 결과입니다. 하루 운세나 미래를 예측한 내용이 아닙니다.","얼굴 전체가 타원 안에 들어오도록 맞춰주세요","정면 사진을 촬영하려면 카메라 권한이 필요합니다."];
+    for (const locale of ['en-US', 'zh-CN'] as const) {
+      for (const label of missingLeafCopy) {
+        const rendered = translateMobileUiCopy(label, locale);
+        expect(rendered, `${locale} missing: ${label}`).not.toBe(label);
+        expect(rendered.replaceAll('세연', '')).not.toMatch(/[가-힣]/u);
+      }
+    }
+    expect(formatMobileUiCopy('{reader}에게 보여줄 사진', { reader: '세연' }, 'en-US')).toBe('Photo for 세연');
     const original = '사용자의 고유한 대화 내용';
     expect(translateMobileUiCopy(original, 'en-US')).toBe(original);
     expect(translateMobileUiCopy(original, 'zh-CN')).toBe(original);

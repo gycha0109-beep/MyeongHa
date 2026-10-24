@@ -1,4 +1,5 @@
 import { MobileUiText } from '@/ui/MobileUiText';
+import { useMobileUiLocale } from '@/ui/mobile-ui-locale';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -26,6 +27,7 @@ export function MobileFrontCameraV1({
   onClose,
   onCaptured,
 }: MobileFrontCameraPropsV1) {
+  const { t } = useMobileUiLocale();
   const camera = useRef<CameraView | null>(null);
   const askedAutomatically = useRef(false);
   const [permission, requestPermission] = useCameraPermissions();
@@ -130,7 +132,7 @@ export function MobileFrontCameraV1({
           </View>
         )}
 
-        {error !== null ? <Text style={styles.error}>{error}</Text> : null}
+        {error !== null ? <Text style={styles.error}>{t(error)}</Text> : null}
         <MobileUiText style={styles.hint}>밝은 곳에서 정면을 바라보고, 흔들리지 않게 촬영해 주세요.</MobileUiText>
         <Pressable
           accessibilityRole="button"
@@ -139,7 +141,7 @@ export function MobileFrontCameraV1({
           onPress={() => void capture()}
           style={[styles.shutter, (!permission?.granted || !ready || capturing) && styles.disabled]}
         >
-          <Text style={styles.shutterText}>{capturing ? '촬영 중…' : '사진 촬영'}</Text>
+          <Text style={styles.shutterText}>{t(capturing ? '촬영 중…' : '사진 촬영')}</Text>
         </Pressable>
       </SafeAreaView>
     </Modal>

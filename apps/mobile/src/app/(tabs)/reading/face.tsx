@@ -20,6 +20,7 @@ import { FaceEditorialIntro } from '@/features/face/FaceEditorialIntro';
 import { findMobileReaderPresentationV1, type MobileReaderPresentationIdV1 } from '@/features/reading/mobile-reader-presentation';
 import { MobileScreen } from '@/ui/MobileScreen';
 import { useMobileUiLocale } from '@/ui/mobile-ui-locale';
+import { formatMobileUiCopy } from '@/ui/mobile-ui-copy';
 import { MobileUiText } from '@/ui/MobileUiText';
 import { mobileColors } from '@/ui/mobile-colors';
 import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
@@ -40,7 +41,7 @@ function sizeLabel(bytes: number | null): string {
 
 export default function FaceScreen() {
   const styles = useMobileThemedStyles(staticStyles);
-  const { t } = useMobileUiLocale();
+  const { t, locale } = useMobileUiLocale();
   const { colors } = useMobileTheme();
   const [state, setState] = useState<FaceMediaStateV1>({ kind: 'idle' });
   const [frontCameraOpen, setFrontCameraOpen] = useState(false);
@@ -142,7 +143,7 @@ export default function FaceScreen() {
           <Text style={styles.fileMark}>▧</Text>
           <View style={styles.fileCopy}>
             <Text style={styles.fileTitle}>
-              {ready.source === 'camera' ? '촬영한 사진' : '선택한 사진'}
+              {t(ready.source === 'camera' ? '촬영한 사진' : '선택한 사진')}
             </Text>
             <Text style={styles.fileMeta}>
               {ready.width} × {ready.height} · {sizeLabel(ready.fileSize)}
@@ -154,7 +155,7 @@ export default function FaceScreen() {
 
       {state.kind === 'error' ? (
         <View style={styles.errorCard}>
-          <Text style={styles.errorText}>{state.message}</Text>
+          <Text style={styles.errorText}>{t(state.message)}</Text>
         </View>
       ) : null}
 
@@ -190,7 +191,9 @@ export default function FaceScreen() {
         <Text style={styles.statusMark}>◎</Text>
         <View style={styles.statusCopy}>
           <Text style={styles.statusTitle}>
-            {ready === null ? `${readerPresentation.name}과 관상 보기 준비` : '사진 준비 완료'}
+            {ready === null
+              ? formatMobileUiCopy('{reader}과 관상 보기 준비', { reader: readerPresentation.name }, locale)
+              : t('사진 준비 완료')}
           </Text>
           <MobileUiText style={styles.body}>
             현재는 사진 촬영·선택과 미리보기만 가능합니다. 서버 분석은 시작하지 않습니다. 얼굴 분석과 관상 풀이는 아직 제공하지 않습니다.
@@ -205,7 +208,7 @@ export default function FaceScreen() {
         style={styles.primaryDisabled}
       >
         <Text style={styles.primaryDisabledText}>
-          {ready === null ? '사진을 준비하면 다음 단계가 표시됩니다' : '관상 분석 기능 준비 중'}
+          {t(ready === null ? '사진을 준비하면 다음 단계가 표시됩니다' : '관상 분석 기능 준비 중')}
         </Text>
       </Pressable>
 

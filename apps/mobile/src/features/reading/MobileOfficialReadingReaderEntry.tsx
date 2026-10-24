@@ -11,11 +11,13 @@ import {
 } from '@/features/reading/mobile-reader-presentation';
 import { mobileColors } from '@/ui/mobile-colors';
 import { MobileUiText } from '@/ui/MobileUiText';
+import { useMobileUiLocale } from '@/ui/mobile-ui-locale';
 
 export function MobileOfficialReadingReaderEntry({
   record,
 }: Readonly<{ record: OfficialReadingRecordV1 }>) {
   // Local presentation selection is not a purchase, interpretation or Thread action.
+  const { t } = useMobileUiLocale();
   const [selectedReaderId, setSelectedReaderId] = useState<MobileReaderPresentationIdV1>('seyeon');
   const selectedReader = findMobileReaderPresentationV1(selectedReaderId);
   const entry = projectMobileOfficialReadingReaderEntryV1(record, selectedReaderId);
@@ -30,8 +32,8 @@ export function MobileOfficialReadingReaderEntry({
           <Pressable
             key={reader.key}
             accessibilityRole="button"
-            accessibilityLabel={`${reader.name} 소개 보기`}
-            accessibilityHint="인물 소개만 변경하며 유료 해설은 실행하지 않습니다."
+            accessibilityLabel={`${reader.name} ${t('소개 보기')}`}
+            accessibilityHint={t('인물 소개만 변경하며 유료 해설은 실행하지 않습니다.')}
             accessibilityState={{ selected: selectedReaderId === reader.key }}
             onPress={() => setSelectedReaderId(reader.key)}
             style={[
@@ -43,7 +45,7 @@ export function MobileOfficialReadingReaderEntry({
             <Text style={styles.name}>{reader.name}</Text>
             <Text style={styles.sub}>{reader.title}</Text>
             <Text style={styles.sub}>
-              {isMobileReaderPreviewSelectableV1(reader.key) ? '프리뷰 소개' : '컨셉 준비 중'}
+              {t(isMobileReaderPreviewSelectableV1(reader.key) ? '프리뷰 소개' : '컨셉 준비 중')}
             </Text>
           </Pressable>
         ))}
@@ -56,8 +58,8 @@ export function MobileOfficialReadingReaderEntry({
         </MobileUiText>
       </View>
       <MobileUiText style={styles.name}>해설 진입 상태</MobileUiText>
-      <Text style={styles.copy}>{entry.statusMessage}</Text>
-      <View accessible accessibilityLabel="Reader 해설 진입 비활성" style={styles.disabled}>
+      <Text style={styles.copy}>{t(entry.statusMessage)}</Text>
+      <View accessible accessibilityLabel={t('Reader 해설 진입 비활성')} style={styles.disabled}>
         <MobileUiText style={styles.disabledText}>해설 서비스 준비 중</MobileUiText>
       </View>
       <MobileUiText style={styles.copy}>
