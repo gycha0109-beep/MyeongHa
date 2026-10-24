@@ -88,14 +88,15 @@ language plpgsql volatile security definer
 set search_path=pg_catalog,public
 as $$
 declare v_id uuid;
+ v_now timestamptz := clock_timestamp();
 begin
   perform 1 from public.subjects where id=p_subject_id
     and kind='member' and status='active' for update;
   if not found then raise exception 'Only active Member signup is eligible'; end if;
   insert into public.chat_credit_lots_v1
     (subject_id,source_kind,source_ref,credits_issued,credits_remaining,issued_at,expires_at)
-  values (p_subject_id,'signup',p_subject_id,50,50,clock_timestamp(),
-          clock_timestamp()+interval '30 days')
+  values (p_subject_id,'signup',p_subject_id,50,50,v_now,
+          v_now+interval '30 days')
   on conflict on constraint chat_credit_lots_unique_source_v1 do nothing;
   select id into strict v_id from public.chat_credit_lots_v1
   where subject_id=p_subject_id and source_kind='signup' and source_ref=p_subject_id;
@@ -244,9 +245,9 @@ declare
   v_now timestamptz := pg_catalog.clock_timestamp();
 begin
   if new.kind='member' and new.status='active' and new.auth_user_id is not null
-     and (tg_op='INSERT'
-       or old.kind is distinct from 'member'
-       or old.auth_user_id is null) then
+     and (tg_op='INSERT' or
+       (tg_op='UPDATE' and (old.kind is distinct from 'member'
+         or old.auth_user_id is null))) then
     insert into public.chat_credit_lots_v1
       (subject_id,source_kind,source_ref,credits_issued,credits_remaining,issued_at,expires_at)
     values(new.id,'signup',new.id,50,50,v_now,v_now+interval '30 days')
