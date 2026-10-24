@@ -73,6 +73,43 @@ apply_pg17_migrations_through_seyeon_production_frontier() {
           }
           continue
           ;;
+        20261021180000_seyeon_positive_pre_model_source_pin_v1.sql|20261021181000_seyeon_positive_same_transaction_commit_v1.sql|20261021182000_seyeon_private_conversation_recall_proposal_accept_v1.sql|20261021183000_seyeon_positive_first_memory_locked_reveal_v1.sql)
+          # Post-frontier G1/G2 migrations MUST NOT be executed when
+          # reconstructing the historical 1510 catalog or DR boundary.
+          # Recognize only the exact reviewed Git blobs; all changed or
+          # unexpected timestamped SQL is still an immediate HOLD.
+          local reviewed_positive_sha1 positive_sha1 positive_bytes normalized_positive_bytes
+          case "${basename}" in
+            20261021180000_seyeon_positive_pre_model_source_pin_v1.sql)
+              reviewed_positive_sha1='6494daf8d0d76ff8994098a873b63dbec7e7a393' ;;
+            20261021181000_seyeon_positive_same_transaction_commit_v1.sql)
+              reviewed_positive_sha1='b6fe5892157f6edceaa610ddfa5cf0d06816fa93' ;;
+            20261021182000_seyeon_private_conversation_recall_proposal_accept_v1.sql)
+              reviewed_positive_sha1='2c0a52b61daf27723da3012df0cf58313b4d652d' ;;
+            20261021183000_seyeon_positive_first_memory_locked_reveal_v1.sql)
+              reviewed_positive_sha1='0660026151378ceeaf195b78b1ca8f568ec5e8aa' ;;
+          esac
+          if command -v git >/dev/null 2>&1; then
+            positive_sha1="$(git hash-object "$migration")"
+          else
+            positive_bytes="$(wc -c < "$migration" | tr -d '[:space:]')"
+            positive_sha1="$(
+              { printf 'blob %s\\0' "$positive_bytes"; cat "$migration"; } |
+                sha1sum | cut -d ' ' -f 1
+            )"
+          fi
+          if [[ "$positive_sha1" != "$reviewed_positive_sha1" ]]; then
+            normalized_positive_bytes="$(sed 's/\\r$//' "$migration" | wc -c | tr -d '[:space:]')"
+            positive_sha1="$(
+              { printf 'blob %s\\0' "$normalized_positive_bytes"; sed 's/\\r$//' "$migration"; } |
+                sha1sum | cut -d ' ' -f 1
+            )"
+          fi
+          [[ "$positive_sha1" == "$reviewed_positive_sha1" ]] || {
+            echo "HOLD_R2_POSITIVE_G1_G2_SQL_FINGERPRINT_DRIFT" >&2; return 1;
+          }
+          continue
+          ;;
         *) echo "HOLD_R2_UNREVIEWED_TIMESTAMPED_MIGRATION" >&2; return 1 ;;
       esac
     else
