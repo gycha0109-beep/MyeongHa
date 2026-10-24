@@ -90,6 +90,36 @@ describe('LEGAL PortOne V2 identity HTTP source boundary', () => {
     expect(t.lookup.verify).not.toHaveBeenCalled();
   });
 
+  it('returns a server-owned public SDK channel only for approved production composition', async () => {
+    const t = context(true);
+    const accepted = await handlePortOneV2IdentityIssueRequestV1({
+      ...t.common,
+      testOnlyActivation: undefined,
+      productionActivationApproved: true,
+      browserChannel: {
+        storeId: 'store-0123456789',
+        channelKey: 'channel-key-0123456789',
+      },
+      request: post('/api/identity-verifications/attempts', {}),
+    });
+    expect(accepted.status).toBe(200);
+    const body = await accepted.json();
+    expect(body.data).toMatchObject({
+      identityVerificationId,
+      storeId: 'store-0123456789',
+      channelKey: 'channel-key-0123456789',
+    });
+    expect(JSON.stringify(body)).not.toContain('secret');
+
+    const denied = await handlePortOneV2IdentityIssueRequestV1({
+      ...t.common,
+      testOnlyActivation: undefined,
+      productionActivationApproved: true,
+      request: post('/api/identity-verifications/attempts', {}),
+    });
+    expect(denied.status).toBe(503);
+  });
+
   it('issues server-owned identity ID without accepting browser-selected identity', async () => {
     const t = context(true);
     const response = await handlePortOneV2IdentityIssueRequestV1({

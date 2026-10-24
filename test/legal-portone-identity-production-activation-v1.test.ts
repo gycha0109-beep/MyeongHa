@@ -44,6 +44,8 @@ describe('PortOne approved production identity composition', () => {
     const cases = [
       { ...approved, [setting.contract]: 'PENDING' },
       { ...approved, [setting.channelKey]: '' },
+      { ...approved, [setting.channelKey]: 'not-channel' },
+      { ...approved, [setting.storeId]: 'not-store' },
       { ...approved, [setting.storeId]: '' },
       { ...approved, [setting.apiSecret]: 'short' },
       { ...approved, MYEONGHA_PORTONE_IDENTITY_MIGRATION_STATE: 'PROPOSED' },

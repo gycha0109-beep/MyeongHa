@@ -43,7 +43,9 @@ export function resolveProductionPortOneIdentityHttpModeV1(
   }
   for (const field of [keys.storeId, keys.channelKey]) {
     const value = env[field];
-    if (typeof value !== 'string' || !/^[a-zA-Z0-9_-]{8,128}$/u.test(value)) {
+    if (typeof value !== 'string' || !(field === keys.storeId
+      ? /^store-[a-zA-Z0-9_-]{8,128}$/u.test(value)
+      : /^channel-key-[a-zA-Z0-9_-]{8,128}$/u.test(value))) {
       throw new Error('PortOne identity channel configuration is missing.');
     }
   }
@@ -85,6 +87,10 @@ export function createProductionPortOneIdentityHttpRuntimeV1(input: Readonly<{
         pool: input.pool,
         lookup,
         productionActivationApproved: true as const,
+        browserChannel: Object.freeze({
+          storeId: input.env[PORTONE_V2_PRODUCTION_IDENTITY_HTTP_ACTIVATION_V1.storeId]!,
+          channelKey: input.env[PORTONE_V2_PRODUCTION_IDENTITY_HTTP_ACTIVATION_V1.channelKey]!,
+        }),
       };
       return inputRequest.action === 'issue'
         ? handlePortOneV2IdentityIssueRequestV1(input)

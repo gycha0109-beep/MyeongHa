@@ -28,6 +28,8 @@ export interface PortOneV2IdentityHttpInputV1 {
   readonly testOnlyActivation?: true;
   /** Set only by the production composition after ALL operator approval gates. */
   readonly productionActivationApproved?: true;
+  /** Public channel selectors supplied exclusively by the approved server composition. */
+  readonly browserChannel?: Readonly<{ storeId: string; channelKey: string }>;
 }
 
 function failure(status: number, code: string, requestId: string): Response {
@@ -71,6 +73,23 @@ async function handle(input: PortOneV2IdentityHttpInputV1, action: 'issue' | 'co
     if (action === 'issue') {
       if (!body || typeof body !== 'object' || Array.isArray(body) || Object.keys(body).length !== 0) {
         return failure(400, 'INVALID_REQUEST', input.requestId);
+      }
+      // Server issues the one-time ID; the browser never chooses it.
+      // Public channel selectors may be returned only by approved production
+      // composition. Never include API secrets, subject identity or PII.
+      if (input.productionActivationApproved === true) {
+        const channel = input.browserChannel;
+        if (!channel ||
+            !/^store-[a-zA-Z0-9_-]{8,128}$/u.test(channel.storeId) ||
+            !/^channel-key-[a-zA-Z0-9_-]{8,128}$/u.test(channel.channelKey)) {
+          return failure(503, 'IDENTITY_VERIFICATION_UNAVAILABLE', input.requestId);
+        }
+        const issued = await authority.issueIdentityAttempt();
+        return success({
+          ...issued,
+          storeId: channel.storeId,
+          channelKey: channel.channelKey,
+        }, input.requestId);
       }
       return success(await authority.issueIdentityAttempt(), input.requestId);
     }
