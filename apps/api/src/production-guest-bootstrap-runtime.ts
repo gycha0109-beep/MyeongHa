@@ -45,6 +45,21 @@ from public.cmd_create_guest_session_runtime_v1(
 )
 `.trim();
 
+const CREATE_VERIFIED_GUEST_SESSION_SQL = `
+select
+  subject_id::text as "subjectId",
+  guest_session_id::text as "guestSessionId",
+  expires_at::text as "expiresAt",
+  replayed
+from public.cmd_create_verified_guest_session_v1(
+  $1::uuid,
+  $2::uuid,
+  $3::text,
+  $4::timestamptz,
+  $5::text
+)
+`.trim();
+
 const READ_CURRENT_GUEST_SESSION_SQL = `
 select
   subject_id::text as "subjectId",
@@ -140,6 +155,13 @@ function requireCurrentGuestIdentity(
 }
 
 function mapCreateAuthorityError(error: unknown): never {
+  if (isPostgresConstraint(error, 'legal_portone_preenrollment_required') ||
+      isPostgresConstraint(error, 'legal_portone_preenrollment_guest_replay')) {
+    throw new GuestBootstrapAuthorityPortErrorV1(
+      'AGE_VERIFICATION_REQUIRED',
+      'Verified pre-enrollment age proof was absent or was already used.',
+    );
+  }
   if (isPostgresConstraint(error, 'guest_bootstrap_runtime_verifier_format')) {
     throw new GuestBootstrapAuthorityPortErrorV1(
       'INVALID_INPUT',
@@ -181,7 +203,10 @@ function mapCreateAuthorityError(error: unknown): never {
 export class PostgresGuestBootstrapAuthorityPortV1
   implements GuestBootstrapAuthorityPortV1
 {
-  constructor(private readonly pool: PostgresSubjectPoolV1) {}
+  constructor(
+    private readonly pool: PostgresSubjectPoolV1,
+    private readonly preenrollmentBindingDigest?: string,
+  ) {}
 
   async createGuestSession(input: {
     readonly subjectId: string;
@@ -199,8 +224,12 @@ export class PostgresGuestBootstrapAuthorityPortV1
       await connection.query(ENTER_EXECUTION_ROLE_SQL);
 
       const result = await connection.query<GuestBootstrapAuthorityDbRowV1>(
-        CREATE_GUEST_SESSION_SQL,
-        [input.subjectId, input.guestSessionId, input.tokenHash, input.expiresAt],
+        this.preenrollmentBindingDigest === undefined
+          ? CREATE_GUEST_SESSION_SQL : CREATE_VERIFIED_GUEST_SESSION_SQL,
+        this.preenrollmentBindingDigest === undefined
+          ? [input.subjectId, input.guestSessionId, input.tokenHash, input.expiresAt]
+          : [input.subjectId, input.guestSessionId, input.tokenHash,
+             input.expiresAt, this.preenrollmentBindingDigest],
       );
       const rows = requireAuthorityRows(result.rows);
 
@@ -285,6 +314,8 @@ export interface CreateProductionGuestBootstrapRuntimePortsInputV1 {
   readonly config: ProductionUserDataRuntimeConfigV1;
   readonly pool: PostgresSubjectPoolV1;
   readonly memberFetchImpl?: CreateProductionRequestIdentityVerifierInputV1['memberFetchImpl'];
+  /** HMAC of a verified pre-Subject possession cookie, never sent by the browser. */
+  readonly preenrollmentBindingDigest?: string;
 }
 
 export interface ProductionGuestBootstrapRuntimePortsV1 {
@@ -315,7 +346,9 @@ export function createProductionGuestBootstrapRuntimePortsV1(
       pool: input.pool,
     }),
     tokenFingerprintPort: createProductionGuestBearerTokenFingerprintPortV1(input.config),
-    authorityPort: new PostgresGuestBootstrapAuthorityPortV1(input.pool),
+    authorityPort: new PostgresGuestBootstrapAuthorityPortV1(
+      input.pool, input.preenrollmentBindingDigest,
+    ),
   });
 }
 

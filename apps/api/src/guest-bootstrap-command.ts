@@ -63,6 +63,7 @@ export interface GuestBootstrapAuthorityRowV1 {
 export type GuestBootstrapAuthorityFailureCodeV1 =
   | 'IDENTITY_CONFLICT'
   | 'SESSION_NOT_REUSABLE'
+  | 'AGE_VERIFICATION_REQUIRED'
   | 'INVALID_INPUT';
 
 export class GuestBootstrapAuthorityPortErrorV1 extends Error {
@@ -202,6 +203,10 @@ function mapAuthorityError(error: unknown): never {
       throw new Error('Guest bootstrap authority rejected a trusted reusable session identity.');
     case 'INVALID_INPUT':
       throw new Error('Guest bootstrap authority rejected trusted server input.');
+    case 'AGE_VERIFICATION_REQUIRED':
+      throw new GuestBootstrapAuthorityPortErrorV1(
+        'AGE_VERIFICATION_REQUIRED', 'A verified age proof is required.',
+      );
   }
 }
 

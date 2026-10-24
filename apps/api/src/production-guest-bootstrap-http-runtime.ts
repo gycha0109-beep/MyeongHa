@@ -1,4 +1,9 @@
 import { denyUnverifiedInitialIdentityAdmissionV1 } from './portone-v2-preidentity-admission-v1.js';
+import { resolveProductionPortOneVerifiedAgeModeV1 } from './portone-v2-age-enforcement-activation-v1.js';
+import {
+  extractPortOnePreenrollmentCookieV1,
+  fingerprintPortOnePreenrollmentBindingV1,
+} from './portone-v2-preenrollment-age-authority-v1.js';
 import { handleGuestBootstrapRequestV1 } from './guest-bootstrap-http.js';
 import { createNodePostgresSubjectPoolV1 } from './node-postgres-subject-pool.js';
 import {
@@ -60,17 +65,39 @@ export function createProductionGuestBootstrapHttpRuntimeV1(
 
   return Object.freeze({
     async handleRequest(requestInput: ProductionGuestBootstrapHttpRequestV1) {
+      let preenrollmentBindingDigest: string | undefined;
       if (requestInput.request.method === 'POST') {
-        const denied = denyUnverifiedInitialIdentityAdmissionV1({
-          env: input.env,
-          surface: 'guest-bootstrap',
-        });
-        if (denied !== null) return denied;
+        const mode = resolveProductionPortOneVerifiedAgeModeV1(input.env);
+        if (mode === 'enforce') {
+          // Do not trust the browser's birth date, bearer, or checked consent.
+          // Only a fresh HttpOnly cookie with an operator-configured server HMAC
+          // may enter the atomic Guest+age DB command.
+          const rawNonce = extractPortOnePreenrollmentCookieV1(requestInput.request);
+          const secret = input.env.MYEONGHA_PORTONE_PREENROLLMENT_BINDING_SECRET;
+          if (rawNonce === null || typeof secret !== 'string' ||
+              input.env.MYEONGHA_PORTONE_PREENROLLMENT_MIGRATION_STATE !== 'APPROVED_AND_APPLIED' ||
+              input.env.MYEONGHA_PORTONE_PREENROLLMENT_PRIVACY_STATE !== 'APPROVED') {
+            return denyUnverifiedInitialIdentityAdmissionV1({
+              env: input.env, surface: 'guest-bootstrap',
+            })!;
+          }
+          try {
+            preenrollmentBindingDigest = fingerprintPortOnePreenrollmentBindingV1({
+              rawNonce, secret,
+            });
+          } catch {
+            return denyUnverifiedInitialIdentityAdmissionV1({
+              env: input.env, surface: 'guest-bootstrap',
+            })!;
+          }
+        }
       }
       const runtimePorts = createProductionGuestBootstrapRuntimePortsV1({
         request: requestInput.request,
         config,
         pool,
+        ...(preenrollmentBindingDigest === undefined
+          ? {} : { preenrollmentBindingDigest }),
         ...(input.memberFetchImpl === undefined
           ? {}
           : { memberFetchImpl: input.memberFetchImpl }),

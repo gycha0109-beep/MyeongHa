@@ -3,6 +3,7 @@ import {
   bootstrapSession,
   type BootstrapSessionResponseV1,
   type GuestBootstrapAuthorityPortV1,
+  GuestBootstrapAuthorityPortErrorV1,
   type GuestBootstrapCredentialIssuerPortV1,
   type GuestBootstrapIdentityResolverPortV1,
   type GuestBootstrapTokenFingerprintPortV1,
@@ -144,6 +145,18 @@ export async function handleGuestBootstrapRequestV1(
         messageKey: 'auth.request_body_timeout',
         requestId,
       });
+    }
+    if (error instanceof GuestBootstrapAuthorityPortErrorV1 &&
+        error.code === 'AGE_VERIFICATION_REQUIRED') {
+      return Response.json({
+        ok: false,
+        error: {
+          code: 'AGE_VERIFICATION_REQUIRED',
+          messageKey: 'age.verification_required',
+          retryable: false,
+        },
+        meta: { apiContractVersion: API_CONTRACT_VERSION, requestId },
+      }, { status: 403, headers: responseHeaders() });
     }
     if (error instanceof ApiCommandError) {
       if (error.code === 'INVALID_REQUEST') {

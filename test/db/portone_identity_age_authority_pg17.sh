@@ -168,4 +168,114 @@ q "update public.subjects set status='merged',
   fail 'Guest age band migrated to another Member without independent provider proof'
 pass 'Guest merge invalidates Guest identity and cannot transfer age band'
 
+# A1: a browser-bound proof is separate from member/guest Subject identity.
+# The SQL proposal remains unapplied and is evaluated only in isolated PG17.
+psql -X -v ON_ERROR_STOP=1 -f supabase/proposals/1741_portone_preenrollment_age_authority_v1.proposed.sql >/dev/null
+binding_a="$(printf 'a%.0s' {1..64})"
+binding_b="$(printf 'b%.0s' {1..64})"
+
+pre_issue() {
+  local digest="$1"
+  q "begin; set local role myeongha_api_executor;
+    select identity_verification_id from public.cmd_issue_legal_portone_preenrollment_v1('$digest');
+    commit;" | grep '^iv' | tail -n 1
+}
+pre_pending() {
+  local digest="$1" id="$2"
+  q "begin; set local role myeongha_api_executor;
+    select public.qry_pending_legal_portone_preenrollment_v1('$digest','$id');
+    commit;" | grep -E '^[tf]
+ | tail -n 1
+}
+pre_verify() {
+  local digest="$1" id="$2" band="$3"
+  q "begin; set local role myeongha_api_executor;
+    select public.cmd_verify_legal_portone_preenrollment_v1('$digest','$id','$band');
+    commit;" | grep -E '^[tf]
+ | tail -n 1
+}
+pre_consume() {
+  local digest="$1"
+  q "begin; set local role myeongha_api_executor;
+    select coalesce(public.cmd_consume_legal_portone_preenrollment_v1('$digest'),'NONE');
+    commit;" | tail -n 1
+}
+
+[[ "$(q "select case when
+ not has_table_privilege('authenticated','public.legal_portone_preenrollment_v1','SELECT')
+ and not has_table_privilege('myeongha_api_executor','public.legal_portone_preenrollment_v1','SELECT')
+ and not has_function_privilege('anon','public.cmd_issue_legal_portone_preenrollment_v1(text)','EXECUTE')
+ and not has_function_privilege('service_role','public.cmd_consume_legal_portone_preenrollment_v1(text)','EXECUTE')
+ and has_function_privilege('myeongha_api_executor','public.cmd_issue_legal_portone_preenrollment_v1(text)','EXECUTE')
+ then 't' else 'f' end")" == t ]] || fail 'preenrollment table/function ACL mismatch'
+
+preid="$(pre_issue "$binding_a")"
+[[ "$preid" =~ ^iv[a-f0-9]{32}$ ]] || fail 'pre-enrollment generated noncompliant ID'
+[[ "$(pre_pending "$binding_a" "$preid")" == t ]] || fail 'owned preenrollment not pending'
+[[ "$(pre_pending "$binding_b" "$preid")" == f ]] || fail 'cross-browser cookie read allowed'
+[[ "$(pre_consume "$binding_a")" == NONE ]] || fail 'pre-verification cookie consumed'
+[[ "$(pre_verify "$binding_b" "$preid" adult)" == f ]] || fail 'cross-cookie verification granted'
+[[ "$(pre_verify "$binding_a" "$preid" free_minor)" == t ]] || fail 'provider-confirmed transition rejected'
+[[ "$(pre_verify "$binding_a" "$preid" adult)" == f ]] || fail 'verified band overwritten'
+[[ "$(pre_consume "$binding_b")" == NONE ]] || fail 'other cookie consumed proof'
+[[ "$(pre_consume "$binding_a")" == free_minor ]] || fail 'verified proof not atomically claimed'
+[[ "$(pre_consume "$binding_a")" == NONE ]] || fail 'proof replay allowed'
+pass 'A1 cookie-bound one-shot age verification + cross-browser isolation'
+
+# The expired proof must fail even if still present physically.
+expired_pre="$(pre_issue "$binding_b")"
+q "update public.legal_portone_preenrollment_v1 set
+   issued_at=clock_timestamp()-interval '30 minutes',
+   expires_at=clock_timestamp()-interval '20 minutes'
+   where identity_verification_id='$expired_pre';" >/dev/null
+[[ "$(pre_pending "$binding_b" "$expired_pre")" == f ]] || fail 'expired proof visible'
+[[ "$(pre_verify "$binding_b" "$expired_pre" adult)" == f ]] || fail 'expired proof verified'
+[[ "$(pre_consume "$binding_b")" == NONE ]] || fail 'expired proof consumed'
+[[ "$(q "begin; set local role myeongha_system_executor;
+ select public.internal_purge_legal_portone_preenrollment_v1(250); commit;" | tail -n 1)" == 1 ]] ||
+  fail 'preenrollment expiry cleanup count mismatch'
+pass 'A1 expired proof denied and TTL cleanup run only by system executor'
+
+# A1 atomic Guest creation must claim verified preenrollment in the SAME
+# transaction as canonical Subject+Guest token issuance.
+binding_c="$(printf 'c%.0s' {1..64})"
+preid_c="$(pre_issue "$binding_c")"
+[[ "$(pre_verify "$binding_c" "$preid_c" adult)" == t ]] || fail 'Guest fixture was not verified'
+guest_c=94000000-0000-4000-8000-000000000001
+guest_session_c=95000000-0000-4000-8000-000000000001
+guest_hash="myeongha-guest-bearer-hmac-sha256-v1:$(printf 'e%.0s' {1..64})"
+guest_create() {
+  local digest="$1" sid="$2" gs="$3" hash="$4"
+  q "begin; set local role myeongha_api_executor;
+    select subject_id, guest_session_id, replayed from
+      public.cmd_create_verified_guest_session_v1(
+        '$sid'::uuid,'$gs'::uuid,'$hash',
+        clock_timestamp()+interval '1 day','$digest'
+      ); commit;"
+}
+set +e
+guest_create "$binding_c" "$guest_c" "$guest_session_c" "invalid-token-fingerprint" >/dev/null 2>&1
+bad_guest_rc=$?
+set -e
+[[ "$bad_guest_rc" != 0 ]] || fail 'bad Guest token verifier was accepted'
+[[ "$(q "select status from public.legal_portone_preenrollment_v1 where identity_verification_id='$preid_c'")" == verified ]] ||
+ fail 'failed Guest transaction consumed proof'
+[[ "$(q "select count(*) from public.subjects where id='$guest_c'")" == 0 ]] ||
+ fail 'failed Guest transaction persisted Subject'
+
+guest_result="$(guest_create "$binding_c" "$guest_c" "$guest_session_c" "$guest_hash")"
+[[ "$guest_result" == *"$guest_c"* ]] || fail 'verified Guest creation returned no Subject'
+[[ "$(q "select age_band from public.legal_portone_verified_age_v1 where subject_id='$guest_c'")" == adult ]] ||
+ fail 'verified Guest age authority not atomically recorded'
+[[ "$(q "select status from public.legal_portone_preenrollment_v1 where identity_verification_id='$preid_c'")" == consumed ]] ||
+ fail 'Guest issuance did not atomically consume preenrollment'
+set +e
+guest_create "$binding_c" "94000000-0000-4000-8000-000000000002" "95000000-0000-4000-8000-000000000002" "$guest_hash" >/dev/null 2>&1
+guest_replay_rc=$?
+set -e
+[[ "$guest_replay_rc" != 0 ]] || fail 'Guest birth proof replayed'
+[[ "$(q "select count(*) from public.subjects where id='94000000-0000-4000-8000-000000000002'")" == 0 ]] ||
+ fail 'replay persisted second Guest'
+pass 'A1 Guest Subject+token+adult verified authority are one atomic, non-replayable transaction'
+
 echo 'PASS PortOne identity PG17 disposable authority smoke complete; no Production migration applied.'
