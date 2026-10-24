@@ -116,7 +116,7 @@ export async function handleSocialAuthStartRequestV1(input: {
   readonly request: Request;
   readonly env: ProductionUserDataRuntimeEnvV1;
   readonly nowEpochMs?: () => number;
-  readonly preenrollmentMemberPort?: Pick<SupabasePreenrollmentMemberBindingPortV1, 'readVerified'>;
+  readonly preenrollmentMemberPort?: Pick<SupabasePreenrollmentMemberBindingPortV1, 'readVerified' | 'issueSocialState'>;
 }): Promise<Response> {
   if (input.request.method !== 'POST') {
     cancelUnusedRequestBody(input.request);
@@ -167,7 +167,21 @@ export async function handleSocialAuthStartRequestV1(input: {
     return failure('SOCIAL_AUTH_PROVIDER_DISABLED', 503);
   }
 
-  const state = randomState();
+  const now = input.nowEpochMs?.() ?? Date.now();
+  let state = randomState();
+  if (denied !== null) {
+    try {
+      if (input.preenrollmentMemberPort?.issueSocialState === undefined) {
+        return failure('AGE_VERIFICATION_UNAVAILABLE', 503);
+      }
+      state = input.preenrollmentMemberPort.issueSocialState(now);
+      if (!/^[a-zA-Z0-9_-]{16,128}$/u.test(state)) {
+        return failure('AGE_VERIFICATION_UNAVAILABLE', 503);
+      }
+    } catch {
+      return failure('AGE_VERIFICATION_UNAVAILABLE', 503);
+    }
+  }
   redirectUri.searchParams.set('state', state);
 
   const authorizationUrl = new URL(
@@ -177,7 +191,6 @@ export async function handleSocialAuthStartRequestV1(input: {
   authorizationUrl.searchParams.set('provider', SUPABASE_PROVIDER_V1[provider]);
   authorizationUrl.searchParams.set('redirect_to', redirectUri.toString());
 
-  const now = input.nowEpochMs?.() ?? Date.now();
   return response(Object.freeze({
     provider,
     authorizationUrl: authorizationUrl.toString(),

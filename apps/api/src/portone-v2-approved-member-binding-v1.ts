@@ -5,6 +5,10 @@ import {
   fingerprintPortOnePreenrollmentBindingV1,
 } from './portone-v2-preenrollment-age-authority-v1.js';
 import { createPostgresPortOneVerifiedAgeAdmissionPortV1 } from './portone-v2-verified-age-admission-v1.js';
+import {
+  issuePortOneBoundSocialStateV1,
+  verifyPortOneBoundSocialStateV1,
+} from './portone-v2-preenrollment-social-state-v1.js';
 import { resolveProductionPortOnePreenrollmentModeV1 } from './portone-v2-preenrollment-http-runtime-v1.js';
 import type { ProductionUserDataRuntimeEnvV1 } from './production-user-data-runtime-config.js';
 import type { SupabasePreenrollmentMemberBindingPortV1 } from './supabase-auth-http.js';
@@ -33,6 +37,20 @@ export function createApprovedPortOnePreenrollmentMemberBindingPortV1(input: Rea
   return Object.freeze({
     async readVerified() {
       return digest !== null && await authority.readVerified(digest) !== null;
+    },
+    issueSocialState(nowEpochMs: number) {
+      if (digest === null || typeof secret !== 'string') {
+        throw new Error('Social state requires verified pre-account ownership.');
+      }
+      return issuePortOneBoundSocialStateV1({
+        secret, bindingDigest: digest, nowEpochMs,
+      });
+    },
+    verifySocialState(state: string) {
+      return digest !== null && typeof secret === 'string' &&
+        verifyPortOneBoundSocialStateV1({
+          secret, bindingDigest: digest, state, nowEpochMs: Date.now(),
+        });
     },
     async bindMember(verifiedAuthUserId: string) {
       if (digest === null) throw new Error('New Social account requires preenrollment proof.');

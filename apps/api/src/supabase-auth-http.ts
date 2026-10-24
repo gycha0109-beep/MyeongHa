@@ -355,6 +355,9 @@ export interface SupabasePreenrollmentMemberBindingPortV1 {
   bindMember(verifiedAuthUserId: string): Promise<void>;
   /** Existing verified Social Members must never be rewritten or re-issued. */
   admitExistingMember?(verifiedAuthUserId: string): Promise<boolean>;
+  /** HMAC-signed OAuth state bound to same HttpOnly actor as provider proof. */
+  issueSocialState?(nowEpochMs: number): string;
+  verifySocialState?(state: string): boolean;
 }
 
 export async function handleSupabaseAuthRequestV1(input: {
@@ -421,6 +424,9 @@ export async function handleSupabaseAuthRequestV1(input: {
       const refreshToken = completeBody === null
         ? null
         : readRequiredString(completeBody, 'refreshToken', 4096);
+      const providedState = completeBody === null
+        ? null
+        : readRequiredString(completeBody, 'state', 128);
       if (refreshToken === null || /\s/u.test(refreshToken)) {
         return errorResponse('INVALID_REQUEST', 400);
       }
@@ -447,6 +453,12 @@ export async function handleSupabaseAuthRequestV1(input: {
             // independently verified browser-bound age proof.
             if (!await input.preenrollmentMemberPort.readVerified()) {
               return errorResponse('AGE_VERIFICATION_REQUIRED', 403);
+            }
+            // A different fresh age cookie cannot complete an OAuth attempt
+            // initiated by somebody else's verified pre-account actor.
+            if (providedState === null ||
+                input.preenrollmentMemberPort.verifySocialState?.(providedState) !== true) {
+              return errorResponse('SOCIAL_AUTH_CALLBACK_STATE_MISMATCH', 403);
             }
             await input.preenrollmentMemberPort.bindMember(session.user.id);
             newlyBoundSocialMember = true;

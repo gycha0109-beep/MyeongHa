@@ -253,7 +253,7 @@ async function consumeSocialReturn() {
   }
 
   try {
-    const session = await signInWithSocialRefreshToken(refreshToken);
+    const session = await signInWithSocialRefreshToken(refreshToken, pending.state);
     clearWebSocialAuthPending();
     await finishAuthenticated(session);
   } catch (error) {

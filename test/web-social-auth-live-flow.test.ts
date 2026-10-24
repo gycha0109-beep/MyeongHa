@@ -20,7 +20,7 @@ describe('web social auth live flow', () => {
     expect(productAuth).toContain("const WEB_SOCIAL_AUTH_PENDING_KEY = 'myeongha.webSocialAuthPending.v1'");
     expect(authPage).toContain('returnedState !== pending.state');
     expect(authPage).toContain('readGuestBearer() !== pending.guestBearer');
-    expect(authPage).toContain('signInWithSocialRefreshToken(refreshToken)');
+    expect(authPage).toContain('signInWithSocialRefreshToken(refreshToken, pending.state)');
     expect(authPage).toContain('await finishAuthenticated(session)');
     expect(authPage).not.toContain('sessionStorage.setItem');
   });

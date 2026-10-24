@@ -854,7 +854,7 @@ export async function ensureActiveBearer() {
   return ensureActiveBearer();
 }
 
-export async function signInWithSocialRefreshToken(refreshToken) {
+export async function signInWithSocialRefreshToken(refreshToken, callbackState) {
   if (
     typeof refreshToken !== 'string' ||
     refreshToken.length === 0 ||
@@ -870,7 +870,7 @@ export async function signInWithSocialRefreshToken(refreshToken) {
   return withMemberMutationLock(async () => {
     const data = await postJson(
       '/api/auth/refresh?__myeongha_social_complete=1',
-      { refreshToken },
+      callbackState === undefined ? { refreshToken } : { refreshToken, state: callbackState },
     );
     if (!isRecord(data) || data.status !== 'authenticated') {
       throw new ProductAuthError(
