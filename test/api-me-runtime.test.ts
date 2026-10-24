@@ -57,6 +57,13 @@ describe('GET /api/me production route adapter', () => {
       meta: { apiContractVersion: 'v0.9' },
     });
 
+    const sourcePreserved = await meEndpoint.fetch(new Request(
+      'https://myeongha.example/api/me/credits?__myeongha_chat_credit_wallet=1',
+      { method: 'GET' },
+    ));
+    expect(sourcePreserved.status).toBe(401);
+    expect(sourcePreserved.headers.get('cache-control')).toBe('no-store');
+
     const unsupportedMethod = await meEndpoint.fetch(
       new Request('https://myeongha.example/api/me?__myeongha_chat_credit_wallet=1', {
         method: 'POST',
