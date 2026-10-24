@@ -8,6 +8,15 @@ export const WEB_PORTONE_IDENTITY_FLOW_V1 = Object.freeze({
   redirectPath: '/my.html',
   redirectMarker: 'identityVerification',
   redirectValue: 'callback',
+  preenrollment: Object.freeze({
+    issueRoute: '/api/identity-verifications/pre-enrollment/attempts',
+    completeRoute: '/api/identity-verifications/pre-enrollment/complete',
+    capabilityRoute: '/api/identity-verifications/pre-enrollment/capability',
+    pendingKey: 'myeongha.portoneIdentity.preenrollment.pending.v1',
+    redirectPath: '/auth.html',
+    redirectMarker: 'preenrollmentIdentity',
+    redirectValue: 'callback',
+  }),
 });
 
 const ID_PATTERN = /^iv[a-f0-9]{32}$/u;
@@ -42,9 +51,9 @@ function assertIssued(value, now) {
     expiresAt: value.expiresAt,
   });
 }
-function assertPending(store, now) {
+function assertPending(store, now, flow) {
   let value = null;
-  try { value = store.getItem(WEB_PORTONE_IDENTITY_FLOW_V1.pendingKey); } catch { return fail('PENDING_STORAGE_UNAVAILABLE'); }
+  try { value = store.getItem(flow.pendingKey); } catch { return fail('PENDING_STORAGE_UNAVAILABLE'); }
   if (typeof value !== 'string' || value.length > 300) return fail('NO_PENDING_IDENTITY');
   let data = null;
   try { data = JSON.parse(value); } catch { return fail('NO_PENDING_IDENTITY'); }
@@ -55,18 +64,18 @@ function assertPending(store, now) {
   }
   return data;
 }
-function clearPending(store) {
-  try { store.removeItem(WEB_PORTONE_IDENTITY_FLOW_V1.pendingKey); } catch {}
+function clearPending(store, flow) {
+  try { store.removeItem(flow.pendingKey); } catch {}
 }
-function writePending(store, issued) {
+function writePending(store, issued, flow) {
   try {
-    store.setItem(WEB_PORTONE_IDENTITY_FLOW_V1.pendingKey, JSON.stringify({
+    store.setItem(flow.pendingKey, JSON.stringify({
       identityVerificationId: issued.identityVerificationId,
       expiresAt: issued.expiresAt,
     }));
   } catch { return fail('PENDING_STORAGE_UNAVAILABLE'); }
 }
-function safeRedirectUrl(baseOrigin) {
+function safeRedirectUrl(baseOrigin, flow) {
   let origin;
   try { origin = new URL(baseOrigin); } catch { return fail('UNTRUSTED_ORIGIN'); }
   if (origin.protocol !== 'https:' ||
@@ -74,9 +83,8 @@ function safeRedirectUrl(baseOrigin) {
       origin.pathname !== '/' || origin.search || origin.hash) {
     return fail('UNTRUSTED_ORIGIN');
   }
-  const target = new URL(WEB_PORTONE_IDENTITY_FLOW_V1.redirectPath, origin);
-  target.searchParams.set(WEB_PORTONE_IDENTITY_FLOW_V1.redirectMarker,
-    WEB_PORTONE_IDENTITY_FLOW_V1.redirectValue);
+  const target = new URL(flow.redirectPath, origin);
+  target.searchParams.set(flow.redirectMarker, flow.redirectValue);
   return target.toString();
 }
 
@@ -93,14 +101,17 @@ export function createWebPortOneIdentityFlowV1(input = {}) {
   const sdk = input.sdk;
   const sdkFactory = input.sdkFactory;
   const origin = input.origin ?? 'https://myeongha.vercel.app';
+  const unregistered = input.preenrollment === true;
+  const flow = unregistered
+    ? WEB_PORTONE_IDENTITY_FLOW_V1.preenrollment : WEB_PORTONE_IDENTITY_FLOW_V1;
   if (typeof fetchImpl !== 'function' || typeof resolveBearer !== 'function' ||
       !store || typeof now !== 'function') return fail('INVALID_CLIENT_SETUP');
 
   async function authorizedPost(route, body) {
-    const credential = await resolveBearer();
-    if (!credential || typeof credential.token !== 'string' ||
+    const credential = unregistered ? null : await resolveBearer();
+    if (!unregistered && (!credential || typeof credential.token !== 'string' ||
         credential.token.length === 0 ||
-        (credential.kind !== 'member' && credential.kind !== 'guest')) return fail('AUTH_REQUIRED');
+        (credential.kind !== 'member' && credential.kind !== 'guest'))) return fail('AUTH_REQUIRED');
     let response;
     try {
       response = await fetchImpl(route, {
@@ -108,7 +119,7 @@ export function createWebPortOneIdentityFlowV1(input = {}) {
         headers: {
           Accept: 'application/json',
           'Content-Type': 'application/json',
-          Authorization: 'Bearer ' + credential.token,
+          ...(unregistered ? {} : { Authorization: 'Bearer ' + credential.token }),
         },
         credentials: 'same-origin',
         cache: 'no-store',
@@ -126,7 +137,7 @@ export function createWebPortOneIdentityFlowV1(input = {}) {
   }
 
   async function complete(id) {
-    const data = await authorizedPost(WEB_PORTONE_IDENTITY_FLOW_V1.completeRoute,
+    const data = await authorizedPost(flow.completeRoute,
       { identityVerificationId: id });
     if (data.ageBand !== 'adult' && data.ageBand !== 'free_minor') {
       return fail('INVALID_SERVER_RESPONSE');
@@ -142,10 +153,10 @@ export function createWebPortOneIdentityFlowV1(input = {}) {
           typeof sdkFactory !== 'function') {
         return fail('SDK_UNAVAILABLE');
       }
-      const redirectUrl = safeRedirectUrl(origin);
+      const redirectUrl = safeRedirectUrl(origin, flow);
       const issued = assertIssued(
-        await authorizedPost(WEB_PORTONE_IDENTITY_FLOW_V1.issueRoute, {}), now());
-      writePending(store, issued);
+        await authorizedPost(flow.issueRoute, {}), now());
+      writePending(store, issued, flow);
       let providerReply;
       try {
         const approvedSdk = sdk && typeof sdk.requestIdentityVerification === 'function'
@@ -160,7 +171,7 @@ export function createWebPortOneIdentityFlowV1(input = {}) {
           redirectUrl,
         });
       } catch {
-        clearPending(store);
+        clearPending(store, flow);
         return fail('SDK_UNAVAILABLE');
       }
       // A successful redirect may navigate away before the Promise resolves.
@@ -169,23 +180,23 @@ export function createWebPortOneIdentityFlowV1(input = {}) {
       }
       if (!isObject(providerReply) || providerReply.code !== undefined ||
           providerReply.identityVerificationId !== issued.identityVerificationId) {
-        clearPending(store);
+        clearPending(store, flow);
         return fail('PROVIDER_NOT_VERIFIED');
       }
       try {
         const result = await complete(issued.identityVerificationId);
         return Object.freeze({ kind: 'verified', ...result });
-      } finally { clearPending(store); }
+      } finally { clearPending(store, flow); }
     },
     async resumeFromRedirect(query) {
       let params;
       try { params = new URLSearchParams(query); } catch { return fail('INVALID_REDIRECT'); }
-      if (params.getAll(WEB_PORTONE_IDENTITY_FLOW_V1.redirectMarker).length !== 1 ||
-          params.get(WEB_PORTONE_IDENTITY_FLOW_V1.redirectMarker) !== WEB_PORTONE_IDENTITY_FLOW_V1.redirectValue ||
+      if (params.getAll(flow.redirectMarker).length !== 1 ||
+          params.get(flow.redirectMarker) !== flow.redirectValue ||
           params.has('code')) {
         return fail('INVALID_REDIRECT');
       }
-      const pending = assertPending(store, now());
+      const pending = assertPending(store, now(), flow);
       if (params.getAll('identityVerificationId').length !== 1 ||
           params.get('identityVerificationId') !== pending.identityVerificationId) {
         return fail('IDENTITY_MISMATCH');
@@ -193,8 +204,8 @@ export function createWebPortOneIdentityFlowV1(input = {}) {
       try {
         const result = await complete(pending.identityVerificationId);
         return Object.freeze({ kind: 'verified', ...result });
-      } finally { clearPending(store); }
+      } finally { clearPending(store, flow); }
     },
-    discardPending() { clearPending(store); },
+    discardPending() { clearPending(store, flow); },
   });
 }

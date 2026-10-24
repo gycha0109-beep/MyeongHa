@@ -6,6 +6,15 @@ export const WEB_PORTONE_IDENTITY_FLOW_V1: Readonly<{
   redirectPath: '/my.html';
   redirectMarker: 'identityVerification';
   redirectValue: 'callback';
+  preenrollment: Readonly<{
+    issueRoute: '/api/identity-verifications/pre-enrollment/attempts';
+    completeRoute: '/api/identity-verifications/pre-enrollment/complete';
+    capabilityRoute: '/api/identity-verifications/pre-enrollment/capability';
+    pendingKey: 'myeongha.portoneIdentity.preenrollment.pending.v1';
+    redirectPath: '/auth.html';
+    redirectMarker: 'preenrollmentIdentity';
+    redirectValue: 'callback';
+  }>;
 }>;
 
 export class WebPortOneIdentityFlowErrorV1 extends Error {
@@ -34,6 +43,7 @@ export interface WebPortOneIdentityPendingStorageV1 {
 
 export function createWebPortOneIdentityFlowV1(input?: Readonly<{
   sdk?: WebPortOneBrowserSdkPortV1 | null;
+  preenrollment?: boolean;
   sdkFactory?: () => Promise<WebPortOneBrowserSdkPortV1>;
   fetchImpl?: (url: string, init: RequestInit) => Promise<Response>;
   pendingStore?: WebPortOneIdentityPendingStorageV1;

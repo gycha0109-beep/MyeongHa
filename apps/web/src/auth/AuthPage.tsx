@@ -1,5 +1,10 @@
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createAuthPageController } from '../../auth-page.js';
+import {
+  createWebPortOneIdentityFlowV1,
+  WEB_PORTONE_IDENTITY_FLOW_V1,
+  type WebPortOneBrowserSdkPortV1,
+} from '../../portone-v2-identity-flow.js';
 
 type AuthMode = 'sign-in' | 'sign-up';
 type StatusKind = '' | 'error' | 'success';
@@ -16,6 +21,100 @@ type AuthController = {
   submit(input: { email: string; password: string; confirmation: string }): Promise<void>;
   dispose(): void;
 };
+
+async function loadPortOnePreenrollmentSdk(): Promise<WebPortOneBrowserSdkPortV1> {
+  // Never imported before server-issued attempt succeeds.
+  const sdkUrl = 'https://cdn.portone.io/v2/browser-sdk.esm.js';
+  const loaded: unknown = await import(/* @vite-ignore */ sdkUrl);
+  if (!loaded || typeof loaded !== 'object' ||
+      !('requestIdentityVerification' in loaded) ||
+      typeof loaded.requestIdentityVerification !== 'function') {
+    throw new Error('PortOne SDK unavailable.');
+  }
+  return loaded as WebPortOneBrowserSdkPortV1;
+}
+
+function PreEnrollmentAgeSection() {
+  const [available, setAvailable] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [status, setStatus] = useState('');
+  useEffect(() => {
+    let active = true;
+    async function check() {
+      let permitted = false;
+      try {
+        const response = await fetch(
+          WEB_PORTONE_IDENTITY_FLOW_V1.preenrollment.capabilityRoute,
+          { method: 'GET', credentials: 'same-origin', cache: 'no-store' },
+        );
+        if (response.ok) {
+          const payload: unknown = await response.json();
+          permitted = !!payload && typeof payload === 'object' &&
+            'data' in payload && !!payload.data &&
+            typeof payload.data === 'object' &&
+            'available' in payload.data && payload.data.available === true;
+        }
+      } catch {
+        // An unreachable capability server is an OFF state.
+      }
+      if (active) setAvailable(permitted);
+      const params = new URLSearchParams(window.location.search);
+      if (!params.has('preenrollmentIdentity')) return;
+      const url = new URL(window.location.href);
+      for (const key of ['preenrollmentIdentity', 'identityVerificationId',
+                         'code', 'message', 'pgCode', 'pgMessage']) {
+        url.searchParams.delete(key);
+      }
+      window.history.replaceState(null, '', url.pathname + url.search + url.hash);
+      if (!permitted || !active) return;
+      try {
+        const flow = createWebPortOneIdentityFlowV1({
+          origin: window.location.origin, preenrollment: true,
+        });
+        await flow.resumeFromRedirect(params);
+        if (active) setStatus('가입 전 본인확인이 완료되었습니다. 회원 계정 연결은 별도 서버 확인 후 진행됩니다.');
+      } catch {
+        if (active) setStatus('가입 전 본인확인을 완료하지 못했습니다. 인증 절차를 다시 확인해 주세요.');
+      }
+    }
+    void check();
+    return () => { active = false; };
+  }, []);
+
+  async function start() {
+    if (!available || busy) return;
+    setBusy(true);
+    setStatus('');
+    try {
+      const result = await createWebPortOneIdentityFlowV1({
+        origin: window.location.origin,
+        preenrollment: true,
+        sdkFactory: loadPortOnePreenrollmentSdk,
+      }).start();
+      setStatus(result.kind === 'verified'
+        ? '가입 전 본인확인이 완료되었습니다. 회원 계정 연결은 별도 서버 확인 후 진행됩니다.'
+        : '본인확인 화면에서 인증 절차를 완료해 주세요.');
+    } catch {
+      setStatus('가입 전 본인확인을 완료하지 못했습니다. 인증 절차를 다시 확인해 주세요.');
+    } finally { setBusy(false); }
+  }
+
+  return (
+    <div className="auth-preserve-note" data-legal-preenrollment-age>
+      <strong>가입 전 본인확인</strong>
+      <p>만 14세 이상인지 본인확인 업체의 서버 결과로 확인합니다. 체크박스만으로 연령 확인이 완료되지는 않습니다.</p>
+      {available ? (
+        <button type="button" disabled={busy} data-legal-preenrollment-start
+          onClick={() => void start()}>
+          {busy ? '본인확인 진행 중…' : '가입 전 본인확인 시작'}
+        </button>
+      ) : (
+        <p>가입 전 본인확인 기능은 현재 준비 중입니다. 승인 전에는 진행할 수 없습니다.</p>
+      )}
+      <p role="status" aria-live="polite">{status}</p>
+    </div>
+  );
+}
 
 export function AuthPage() {
   const controller = useRef<AuthController | null>(null);
@@ -96,6 +195,8 @@ export function AuthPage() {
             <span>또는 이메일로 계속</span>
           </div>
         </div>
+
+        {signingUp ? <PreEnrollmentAgeSection /> : null}
 
         <form className="auth-form" id="auth-form" noValidate onSubmit={handleSubmit}>
           <div className="auth-field"><label htmlFor="auth-email">이메일</label><input id="auth-email" name="email" type="email" autoComplete="email" inputMode="email" maxLength={320} required /></div>
