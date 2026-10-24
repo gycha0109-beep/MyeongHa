@@ -85,6 +85,7 @@ export function guardSeyeonC08LocalPublicUtteranceV1(utterance: unknown): string
     /(?:사귀|사랑해|결혼|질투|소유|내\s*사람|안아|껴안|붙잡|연인이|애인이)/u,
     /(?:매일|항상|평생|오래전부터|원래\s*저는|제\s*고향|제\s*직업|제\s*학교|제\s*이름|제\s*집|제가\s*살|저는\s*\d+살)/u,
     /(?:너는|당신은|당신이|네가).{0,24}(?:분명|틀림없이|사실|원래|했잖|였잖|생각했|느꼈)/u,
+    /(?:원하시면|무엇을\s*도와|도움이\s*필요|도와드릴|상담해|메뉴를\s*골라|푹\s*쉬|충분히\s*쉬|기운\s*내|화이팅|행복해질\s*거예요)/u,
     /(?:\d{2,4}년|\d{1,2}월|\d{1,2}일|[A-Za-z]{4,})/u,
     /(?:[았었였]어요|[았었였]죠|[았었였]잖아요)/u,
   ];
@@ -385,6 +386,10 @@ export async function runSeyeonC08LocalOneCallShadowV1(input: Readonly<{
   const draft = admitSeyeonRendererDraftV2({rawOutput:raw,packet});
   guardSeyeonC08LocalPublicUtteranceV1(draft.utterance);
   guardSeyeonC08LocalMoveV1(classified.kind,draft.utterance);
+  const questionCount=(draft.utterance.match(/[?？]/gu)??[]).length;
+  if(questionCount>context.behaviorPolicy.maxQuestionsPerUtterance){
+    throw new SeyeonC08LocalHoldV1('LOCAL_OUTPUT_UNVERIFIABLE');
+  }
   if (draft.memoryRefsMentioned.length ||
       draft.privateSourceRefsMentioned.length ||
       draft.disclosureSliceIds.length ||
