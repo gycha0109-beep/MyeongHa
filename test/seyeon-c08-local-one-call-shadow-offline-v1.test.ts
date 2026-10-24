@@ -266,6 +266,10 @@ describe('C08 local preflight / single dialogue LLM / local output guard (OFFLIN
     expect(result.llmCalls).toBe(1);
     expect(result.censusReads).toBe(4);
     expect(h.requests).toHaveLength(1);
+    const renderInput=h.requests[0]!.input as
+      {packet:{recentConversation:readonly {messageId:string;role:string;text:string}[]}};
+    expect(renderInput.packet.recentConversation.map(x=>x.messageId))
+      .toEqual(['m1','m2',ID]);
     expect(h.events).toEqual(['census1','census2','reserve','model','census3','census4']);
 
     const mismatch=harness({history,falseCensusCount:true});
