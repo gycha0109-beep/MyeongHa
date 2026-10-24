@@ -281,6 +281,40 @@ try {
   assert(hallState.bodyText.includes('전체 사주') && hallState.bodyText.includes('직업 · 커리어') && hallState.bodyText.includes('재물') && hallState.bodyText.includes('연애 · 관계'), 'Home four-card Saju row missing');
   assert(hallState.bodyText.includes('최근 이야기') && hallState.bodyText.includes('최근 대화 기록은 아직 홈에 연결되지 않았습니다.'), 'Home recent-story fail-closed state missing');
   await artifact(client, '-home');
+  // Measure actual home cards at the tablet/mobile breakpoints, not just desktop markup.
+  for (const [width, expectedTopicColumns] of [[740, 2], [390, 2]]) {
+    await client.send('Emulation.setDeviceMetricsOverride', {
+      width, height: 920, deviceScaleFactor: 1, mobile: width < 600,
+    });
+    await navigate(client, origin, '/hall.html', '.mhx-hero');
+    await sleep(160);
+    const layout = await client.evaluate(`(async () => {
+      const cards = [...document.querySelectorAll('.mhx-topic')];
+      const portraits = [...document.querySelectorAll('.mhx-character-art img')];
+      const list = document.querySelector('.mhx-character-list');
+      return {
+        width: innerWidth,
+        overflow: document.documentElement.scrollWidth - innerWidth,
+        topicCount: cards.length,
+        topicColumns: new Set(cards.map(el => Math.round(el.getBoundingClientRect().left))).size,
+        characterCount: portraits.length,
+        portraitsLoaded: (await Promise.all(portraits.map(img => img.decode().then(() => img.naturalWidth > 0).catch(() => false)))).every(Boolean),
+        characterScroll: list && getComputedStyle(list).overflowX === 'auto',
+        recentNotice: document.body.innerText.includes('최근 대화 연결 안내'),
+      };
+    })()`);
+    assert(layout.overflow <= 2, `Home horizontal overflow at ${width}px: ${layout.overflow}px`);
+    assert(layout.topicCount === 4 && layout.topicColumns === expectedTopicColumns,
+      `Home topic cards lost 2-column layout at ${width}px: ${JSON.stringify(layout)}`);
+    assert(layout.characterCount === 3 && layout.portraitsLoaded && layout.characterScroll,
+      `Home existing character artwork unavailable or clipped at ${width}px: ${JSON.stringify(layout)}`);
+    assert(layout.recentNotice, 'Recent conversation status must not pretend the thread list is empty');
+    await artifact(client, `-home-${width}`);
+  }
+  await client.send('Emulation.setDeviceMetricsOverride', {
+    width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false,
+  });
+
 
   await navigate(client, origin, '/reading.html', '#saju-empty');
   await waitForVisible(client, '#saju-empty');
