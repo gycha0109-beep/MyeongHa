@@ -11,7 +11,7 @@ describe('governed production signup wallet',()=>{
     });
   });
   it('pins actual source migration to signup only and account-deletion erasure',()=>{
-    const sql=readFileSync(new URL('../../../supabase/migrations/1730_chat_credit_signup_wallet_runtime_v1.sql',import.meta.url),'utf8');
+    const sql=readFileSync(new URL('../../../supabase/migrations/20261025000000_chat_credit_signup_wallet_runtime_v1.sql',import.meta.url),'utf8');
     expect(sql).toContain("source_kind = 'signup'");
     expect(sql).toContain("v_now+interval '30 days'");
     expect(sql).toContain('internal_tr_chat_credit_subject_erasure_v1');
