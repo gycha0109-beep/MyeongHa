@@ -10,10 +10,8 @@ import {
 } from '../../../packages/domain/src/index.js';
 import { runCharacterGovernedPreflightV1 } from './character-governed-preflight-v1.js';
 import { buildSeyeonRendererRequestV2 } from './seyeon-character-runtime-v2.js';
-import {
-  requireAuthoritativeFirstTurnCensusShadowV1,
-  type SeyeonFullThreadCensusShadowPortV1,
-} from './seyeon-fast-dialogue-shadow-v1.js';
+import type { SeyeonFullThreadCensusShadowPortV1 }
+  from './seyeon-fast-dialogue-shadow-v1.js';
 import type {
   RunSeyeonCharacterTurnV2Input,
   SeyeonStructuredProviderPortV2,
@@ -116,16 +114,20 @@ export function guardSeyeonC08LocalMoveV1(kind: SeyeonC08LocalEntryV1,
   }
 }
 
+/**
+ * Full-thread count must match the ENTIRE supplied dialogue, not a truncated
+ * recent-message window. Prior entries are only locally admissible public
+ * texts: no memory-backed/relationship-backed conversation can enter here.
+ */
 function assertLocalContext(input: Readonly<{
   userMessageRef: string;
   userText: string;
   contextInput: RunSeyeonCharacterTurnV2Input['contextInput'];
   governance: RunSeyeonCharacterTurnV2Input['governance'];
-}>): void {
+}>): number {
   const messages = input.contextInput?.recentMessages;
-  const current = Array.isArray(messages) && messages.length === 1 ? messages[0] : undefined;
-  if (!current || current.role !== 'user' || current.text !== input.userText ||
-      current.messageId !== input.userMessageRef ||
+  if (!Array.isArray(messages) || messages.length < 1 || messages.length > 7 ||
+      messages.length % 2 !== 1 ||
       input.contextInput.relationship !== null ||
       (input.contextInput.relationshipSemantics !== null &&
        input.contextInput.relationshipSemantics !== undefined) ||
@@ -134,7 +136,59 @@ function assertLocalContext(input: Readonly<{
       input.governance?.relationship?.gate !== 'PUBLIC') {
     throw new SeyeonC08LocalHoldV1('LOCAL_CONTEXT_NOT_PROVEN');
   }
+  const seenIds=new Set<string>();
+  for (let i=0; i<messages.length; i++){
+    const message=messages[i];
+    if (!message || typeof message.messageId!=='string' ||
+        message.messageId.length===0 || message.messageId.length>256 ||
+        seenIds.has(message.messageId) ||
+        message.role!==(i%2===0?'user':'assistant')) {
+      throw new SeyeonC08LocalHoldV1('LOCAL_CONTEXT_NOT_PROVEN');
+    }
+    seenIds.add(message.messageId);
+    if (message.role==='user'){
+      if (!classifySeyeonC08LocalEntryV1(message.text)) {
+        throw new SeyeonC08LocalHoldV1('LOCAL_CONTEXT_NOT_PROVEN');
+      }
+    }else {
+      try{guardSeyeonC08LocalPublicUtteranceV1(message.text);}
+      catch{throw new SeyeonC08LocalHoldV1('LOCAL_CONTEXT_NOT_PROVEN');}
+    }
+  }
+  const current=messages[messages.length-1]!;
+  if (current.role!=='user' || current.messageId!==input.userMessageRef ||
+      current.text!==input.userText) {
+    throw new SeyeonC08LocalHoldV1('LOCAL_CONTEXT_NOT_PROVEN');
+  }
+  return messages.length;
 }
+async function requireSeyeonC08PublicThreadCensusV1(
+  port: SeyeonFullThreadCensusShadowPortV1,
+  currentUserMessageId:string,expectedCount:number,
+):Promise<void>{
+  const fail=()=>new SeyeonC08LocalHoldV1('LOCAL_CONTEXT_NOT_PROVEN');
+  if(!port || !port.subjectId || !port.threadId ||
+     typeof port.readFullThreadCensus!=='function' ||
+     !Number.isSafeInteger(expectedCount) || expectedCount<1 || expectedCount>7){
+    throw fail();
+  }
+  let raw:unknown;
+  try{
+    raw=await port.readFullThreadCensus({
+      subjectId:port.subjectId,threadId:port.threadId,
+      currentUserMessageId,
+    });
+  }catch{throw fail();}
+  if(typeof raw!=='object' || raw===null || Array.isArray(raw))throw fail();
+  const c=raw as Record<string,unknown>;
+  if(Object.keys(c).length!==7 ||
+     c.schemaVersion!=='seyeon-first-turn-census-shadow-v1' ||
+     c.subjectId!==port.subjectId || c.threadId!==port.threadId ||
+     c.currentUserMessageId!==currentUserMessageId ||
+     c.messageCount!==expectedCount || c.latestSenderType!=='user' ||
+     c.complete!==true)throw fail();
+}
+
 function planLocalFirstTurn(
   kind: SeyeonC08LocalEntryV1,
   messageId: string,
@@ -172,7 +226,8 @@ function planLocalFirstTurn(
 }
 
 /**
- * 1-call research Shadow. NO model-side preflight, NO reviewer impostor,
+ * 1-call public/no-memory research Shadow (up to 7 full thread messages).
+ * NO model-side preflight, NO reviewer impostor,
  * NO HTTP Reveal, NO memory/Canon/relationship mutation, NO production
  * adapter. Fail-closed when local admission cannot establish parity.
  */
@@ -189,13 +244,13 @@ export async function runSeyeonC08LocalOneCallShadowV1(input: Readonly<{
     Promise<Readonly<{reservedMicroUsd:number; providerOutputTokenCapVerified:boolean}>>;
   maxCompletionTokens: number;
 }>) {
-  assertLocalContext(input);
+  const expectedCount=assertLocalContext(input);
   const classified = classifySeyeonC08LocalEntryV1(input.userText);
   if (!classified) throw new SeyeonC08LocalHoldV1('LOCAL_INPUT_NOT_PROVEN');
 
-  await requireAuthoritativeFirstTurnCensusShadowV1({
-    port:input.fullThreadCensus,currentUserMessageId:input.userMessageRef,
-  });
+  await requireSeyeonC08PublicThreadCensusV1(
+    input.fullThreadCensus,input.userMessageRef,expectedCount,
+  );
 
   // Existing source/claim authority pipeline is reused. The empty
   // classification is only valid inside the closed, local entry grammar.
@@ -234,7 +289,7 @@ export async function runSeyeonC08LocalOneCallShadowV1(input: Readonly<{
   if (context.behaviorPolicy.interactionDepth !== 'public_first_contact' ||
       context.relationship !== null || context.relationshipSemantics !== null ||
       context.retrievedMemories.length !== 0 ||
-      context.recentConversation.length !== 1 ||
+      context.recentConversation.length !== expectedCount ||
       context.integrity.decisions.length !== 0) {
     throw new SeyeonC08LocalHoldV1('LOCAL_CONTEXT_NOT_PROVEN');
   }
@@ -251,9 +306,9 @@ export async function runSeyeonC08LocalOneCallShadowV1(input: Readonly<{
       'C08 restricted local-first-contact only: present-time public dialogue. No autobiographical or shared past, places, dates, relationship claims, private facts, personal-history guesses or user mind-reading. One to three short natural polite Korean sentences. Do not invent memory or suggest a continuing relationship.',
     ].join('\n'),
   });
-  await requireAuthoritativeFirstTurnCensusShadowV1({
-    port:input.fullThreadCensus,currentUserMessageId:input.userMessageRef,
-  });
+  await requireSeyeonC08PublicThreadCensusV1(
+    input.fullThreadCensus,input.userMessageRef,expectedCount,
+  );
 
   if (!Number.isSafeInteger(input.maxCompletionTokens) ||
       input.maxCompletionTokens < 64 ||
@@ -273,9 +328,9 @@ export async function runSeyeonC08LocalOneCallShadowV1(input: Readonly<{
   const raw:unknown = await input.dialogueProvider.generate(request);
   // Census after remote generation and immediately before local output
   // admission. This is NOT an atomic DB transaction.
-  await requireAuthoritativeFirstTurnCensusShadowV1({
-    port:input.fullThreadCensus,currentUserMessageId:input.userMessageRef,
-  });
+  await requireSeyeonC08PublicThreadCensusV1(
+    input.fullThreadCensus,input.userMessageRef,expectedCount,
+  );
   const draft = admitSeyeonRendererDraftV2({rawOutput:raw,packet});
   guardSeyeonC08LocalPublicUtteranceV1(draft.utterance);
   guardSeyeonC08LocalMoveV1(classified.kind,draft.utterance);
@@ -285,9 +340,9 @@ export async function runSeyeonC08LocalOneCallShadowV1(input: Readonly<{
       draft.revealLevel !== 'public') {
     throw new SeyeonC08LocalHoldV1('LOCAL_OUTPUT_UNVERIFIABLE');
   }
-  await requireAuthoritativeFirstTurnCensusShadowV1({
-    port:input.fullThreadCensus,currentUserMessageId:input.userMessageRef,
-  });
+  await requireSeyeonC08PublicThreadCensusV1(
+    input.fullThreadCensus,input.userMessageRef,expectedCount,
+  );
   return Object.freeze({
     version:SEYEON_C08_LOCAL_ONE_CALL_VERSION_V1,
     scope:'SHADOW_ONLY_NOT_PRODUCTION' as const,
