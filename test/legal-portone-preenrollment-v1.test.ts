@@ -78,6 +78,7 @@ describe('L2 A1 preenrollment PortOne identity admission', () => {
       { [g.privacySetting]: 'PENDING' },
       { [g.migrationSetting]: 'PROPOSED' },
       { [g.bindingKeySetting]: 'short' },
+      { MYEONGHA_AUTH_RATE_LIMIT_SECRET: '' },
       { MYEONGHA_PORTONE_IDENTITY_PROVIDER_CONTRACT_STATE: 'PENDING' },
       { MYEONGHA_PORTONE_VERIFIED_AGE_ENFORCEMENT: 'OFF' },
     ]) {

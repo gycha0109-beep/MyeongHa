@@ -53,3 +53,18 @@
 - 공식 근거: https://www.law.go.kr/LSW/lsLinkCommonInfo.do?chrClsCd=010202&lsJoLnkSeq=1029334953 · https://www.law.go.kr/LSW/lsLinkCommonInfo.do?chrClsCd=010202&lsJoLnkSeq=1034292881 · https://supabase.com/legal/privacy-resources/data-residency-and-transfers-faq · https://vercel.com/legal/terms
 
 **L3 판정:** 국외 저장 리전과 AI 송신 후보 필드는 확인. 하지만 운영 송신 구성·실제 위탁 계약/법적 근거/고지의 교차 증명이 없으므로 **출시 적법성 미확정**, 미승인 신규 유료 원문 외부 전송 계속 금지. `P0-PR-02` 제품 정책은 변경하지 않는다.
+
+## 2026-10-24 L3 추가: PortOne V2 **연령 본인확인**의 국외처리·개인정보 최소화 증빙
+
+> 본 절은 `L2 A1` 비적용 코드의 **정적 데이터 흐름**만 기록한다. PortOne 실제 인증업체 계약, PG/기관 하위 처리자, 처리가 일어나는 국가 및 보존·재위탁 사항은 확인되지 않았다. **운영 `OFF`**, 실명의 실제 송수신 미검증.
+
+| 단계 | 저장소 근거 | 서버/외부/브라우저 필드 | 승인 및 위험 |
+| --- | --- | --- | --- |
+| 브라우저 발급 | `portone-v2-preenrollment-http-runtime-v1.ts`, `portone-v2-preenrollment-age-authority-v1.ts` | 브라우저에는 `identityVerificationId`, 공개 `storeId`, `channelKey`, 만료시각만. 보안 쿠키 `__Host-myeongha-preage-v1`은 HttpOnly/Secure/Strict·600초. 원문 쿠키는 DB에 저장하지 않고 서버 비밀키 HMAC만 저장 | 클라이언트 확인·신고 나이 및 자가 생일은 법적 연령 권위가 아님 |
+| PortOne 본인확인 | `apps/web/portone-v2-identity-flow.js`, `portone-v2-identity-verification-lookup-v1.ts` | **미승인 비활성 단계**에서 SDK를 미로딩. 승인 발급 후 공식 브라우저 SDK 및 서버 GET `https://api.portone.io/identity-verifications/{id}` 계약. 공급자 인증 화면에서 수집·위탁되는 항목은 계약 기준으로 별도 확정 필요 | 실제 처리 주체/국가·연락처·보유기간·취급 정보 확정 전 개인정보 처리방침 완성 불가 |
+| 나이 판정 | `portone-v2-identity-verification-contract-v1.ts`, `portone-v2-preenrollment-finalization-v1.ts` | 공급자 서버 결과의 `status=VERIFIED`, 일치하는 인증 ID, `verifiedCustomer.birthDate`를 **서버 메모리에서만** 최소 밴드(`free_minor` 또는 `adult`)로 정규화. CI/DI·전화번호·실명·생일 원문을 신설 테이블에 저장하지 않음 | 이것은 저장소 계약이며 실제 PortOne 응답/로그의 데이터 최소화를 운영에서 증명한 것이 아님 |
+| 인증 전 임시 저장 | 비적용 `1741_portone_preenrollment_age_authority_v1.proposed.sql` 및 `PORTONE_PREENROLLMENT_PRIVACY_DISPOSITION_CANDIDATE_V1.json` | `identity_verification_id`, cookie HMAC digest, 2단계 상태, 연령 밴드, DB 시각. 10분 TTL·1회 소비; 미사용/소비된 행도 만료 후 system 작업자가 물리 제거해야 함 | 만료 물리 정리 포트는 소스만 구현, 운영 스케줄·실 DB 적용 없음 |
+| 계정 권위 귀속 | `cmd_bind_verified_member_preenrollment_v1`, `cmd_create_verified_guest_session_v1` SQL 제안 | 미사용 증거를 새로운 서버 확인 회원/게스트의 `subject_id`와 `legal_portone_verified_age_v1`에 원자 결속. 계정 및 기존 본인확인 기록의 최종 파기정책 후보는 별도 검토 | 가입 전 증거와 실제 인증 주체의 법적 동일인 검증 범위/절차는 공급자 계약·운영 실증 필요 |
+
+- **현재 활성화 금지:** `MYEONGHA_PORTONE_PREENROLLMENT_HTTP_MODE`, `MYEONGHA_PORTONE_IDENTITY_HTTP_MODE`, 관련 `APPROVED`/마이그레이션 표시는 실제 사용자 계약·DB 적용 승인 없이 변경하지 않는다. 기존 59개 테이블 삭제정책(46 DELETE, 4 ANONYMIZE, 9 RETAIN), P5Y/P30D은 이 제안에 의해 자동 개정되지 않는다.
+- **출시 전 필요 증명:** PortOne 공급자/하위 인증업체의 위탁·제3자 제공·국외이전 분류, 정확한 수집 항목·보관/파기·거부 효과, 계약 및 개인정보 처리방침 합치, 본인과 가입 계정의 결속 수준, 공급자 응답 원문이 관측 로그에 남지 않는지, 서버·브라우저 쿠키 및 10분 물리 삭제의 운영 검증.

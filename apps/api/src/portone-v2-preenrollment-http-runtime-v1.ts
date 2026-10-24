@@ -66,6 +66,13 @@ export function resolveProductionPortOnePreenrollmentModeV1(
       secret.trim() !== secret || /[\r\n]/u.test(secret)) {
     throw new Error('Preenrollment server-only cookie HMAC key is missing.');
   }
+  // The public capability response must never advertise readiness when the
+  // cost-abuse limiter lacks its server-only HMAC key.
+  const limiterKey = env.MYEONGHA_AUTH_RATE_LIMIT_SECRET;
+  if (typeof limiterKey !== 'string' || limiterKey.trim() !== limiterKey ||
+      limiterKey.length < 32) {
+    throw new Error('Preenrollment identity request limiter is not approved.');
+  }
   return 'enforce';
 }
 
