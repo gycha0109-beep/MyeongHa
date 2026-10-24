@@ -67,3 +67,10 @@ Cloudflare 변경 검토 시 [공식 best practices](https://developers.cloudfla
 - server composition 기본 차단 직접 테스트 **2/2 PASS**, 관련 기존 직접 회귀 및 타입 검사/빌드 PASS. 최종 exact-head PG17/전체 CI/Integration·병합 증거는 PR에 기록한다. 이전 SHA의 CI 결과를 새 코드에 재사용하지 않는다.
 
 **상태 구분:** 브랜치의 S0 구현을 검증 후 병합한다. 운영 G0/SRC-25·DB/ACL·동일 백업 DR·target transport V/R/S/ACK·G6 및 공개/유료 승인은 미실행이며, G0~G6 전체 운영 트랙 종료로 표시하지 않는다. History/Replay/Worker/Reader 및 다중 source는 미승인 차단을 유지한다.
+
+
+### 새 HEAD CI의 PG17 의존성 준비 수정
+
+`aa172196`의 [CI #40022132645](https://github.com/gycha0109-beep/MyeongHa/actions/runs/40022132645)에서 유일한 원인 실패는 `DB dependency · postgres17`의 신규 S0 사례가 SQL 테스트 시작 전에 `ERR_MODULE_NOT_FOUND: pg`로 종료된 것이다. expected=lockfile의 pg/Vitest로 실제 PG17 S0 실행, observed=기존 SQL-only DB job에 node_modules 없음, runtime=Ubuntu/Node24/PostgreSQL17.6, stage=case install runner import, classification=CI dependency setup. 재현은 해당 job의 `node scripts/ci/run-db-track.mjs postgres17`.
+
+기존 `ci-db-track.yml`의 PG17에만 `npm ci --ignore-scripts --no-audit --no-fund` 단계를 넣고 단일 기존 case runner를 유지한다. 새 Workflow/패키지/DB 검사 완화 없음. 동일 HEAD의 Governance/Web/전체 코드 회귀·authority core와 나머지 DB suite는 SUCCESS였으나 이전 HEAD CI 실패를 PASS로 기록하지 않는다. 변경 후 새 HEAD에서 PG17 및 필수 CI/Integration을 확인한다.
