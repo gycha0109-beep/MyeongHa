@@ -221,7 +221,10 @@ export async function deliverSeyeonCommittedFirstPositiveMemoryNodeTurnV1(
       input.result.threadBinding.participantCharacterIds[0]!=='seyeon' ||
       input.result?.execution?.disposition!=='executed' ||
       input.result?.execution?.receivedTurn?.turnId!==receipt?.turnId ||
-      input.result?.execution?.receivedTurn?.threadCharacterId!=='seyeon' ||
+      // Persistence returns conversation_thread_characters.id (UUID), not
+      // the character_id slug. Canonical Se-yeon ownership is rechecked by
+      // the locked DB Reveal and the server thread binding above.
+      !UUID.test(input.result?.execution?.receivedTurn?.threadCharacterId ?? '') ||
       // A newly executed attempt does not erase a prior receive replay or
       // grant fresh first-Reveal rights to a previously committed user Turn.
       // Only a newly received DB-original User Turn may acquire this first

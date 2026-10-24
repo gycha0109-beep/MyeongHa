@@ -292,10 +292,10 @@ describe('Se-yeon G3 Node-only original-Grant current Subject fence',()=>{
   });
 
   it.each([
-    ['Commit belongs to another attempt', { attemptId: ATTEMPT, receiptAttemptId: OTHER, attemptReplayed: false, characterId: 'seyeon' }],
-    ['executed attempt was actually an in-flight replay', { attemptId: ATTEMPT, receiptAttemptId: ATTEMPT, attemptReplayed: true, characterId: 'seyeon' }],
-    ['committed turn was attributed to another Character', { attemptId: ATTEMPT, receiptAttemptId: ATTEMPT, attemptReplayed: false, characterId: 'other-character' }],
-    ['attempt receipt is missing', { attemptId: undefined, receiptAttemptId: ATTEMPT, attemptReplayed: false, characterId: 'seyeon' }],
+    ['Commit belongs to another attempt', { attemptId: ATTEMPT, receiptAttemptId: OTHER, attemptReplayed: false, characterId: 'd8000000-0000-4000-8000-000000000009' }],
+    ['executed attempt was actually an in-flight replay', { attemptId: ATTEMPT, receiptAttemptId: ATTEMPT, attemptReplayed: true, characterId: 'd8000000-0000-4000-8000-000000000009' }],
+    ['Character slug is not a DB thread participant UUID', { attemptId: ATTEMPT, receiptAttemptId: ATTEMPT, attemptReplayed: false, characterId: 'other-character' }],
+    ['attempt receipt is missing', { attemptId: undefined, receiptAttemptId: ATTEMPT, attemptReplayed: false, characterId: 'd8000000-0000-4000-8000-000000000009' }],
   ])('blocks mismatched G3 executed lineage: %s before original Grant lookup', async (_name, mismatch) => {
     let destroyed = false;
     let dbConnections = 0;
@@ -365,7 +365,7 @@ describe('Se-yeon G3 Node-only original-Grant current Subject fence',()=>{
       threadBinding: {threadId: THREAD, participantCharacterIds: participants},
       execution: {
         disposition: 'executed',
-        receivedTurn: {turnId: TURN, threadCharacterId: 'seyeon'},
+        receivedTurn: {turnId: TURN, threadCharacterId: 'd8000000-0000-4000-8000-000000000009'},
         attempt: {attemptId: ATTEMPT, replayed: false},
         committedTurn: {
           turnId: TURN,
@@ -421,7 +421,7 @@ describe('Se-yeon G3 Node-only original-Grant current Subject fence',()=>{
       execution:{
         disposition:'executed',
         receivedTurn:{
-          turnId:TURN,threadCharacterId:'seyeon',
+          turnId:TURN,threadCharacterId:'d8000000-0000-4000-8000-000000000009',
           userText:'안녕하세요',
           ...receiveState,
         },

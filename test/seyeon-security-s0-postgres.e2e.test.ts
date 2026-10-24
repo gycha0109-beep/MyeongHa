@@ -17,6 +17,10 @@ import { revokeSeyeonOriginalMemoryGrantAndAckV1 } from '../apps/api/src/seyeon-
 import { acceptSeyeonPrivateConversationRecallProposalV1 } from '../apps/api/src/postgres-seyeon-private-memory-proposal-accept-v1.js';
 import { handleSeyeonFirstPositiveMemoryDirectNodeHttpV1 } from '../apps/api/src/seyeon-first-positive-memory-node-http-ingress-v1.js';
 import type { RunProductionSeyeonChatResultV1 } from '../apps/api/src/production-seyeon-chat-runtime-v1.js';
+import { composeSeyeonProductionContextV1, type SeyeonProductionContextSnapshotV1 } from '../apps/api/src/seyeon-production-context-v1.js';
+import { createPostgresSeyeonProductionContextReadAuthorityPortV1 } from '../apps/api/src/postgres-seyeon-production-context-read-v1.js';
+import { SEYEON_CONVERSATION_RECALL_PROJECTOR_V1 } from '../apps/api/src/seyeon-conversation-recall-memory-contract-v1.js';
+import { selectSeyeonExactModelPersonalSourcesV1 } from '../apps/api/src/seyeon-exact-model-personal-source-selection-v1.js';
 
 const enabled = process.env.SEYEON_SECURITY_S0_REAL_PG === '1';
 const hash = (value: unknown) => 'sha256:v1:' + createHash('sha256').update(canonicalJson(value)).digest('hex');
@@ -59,27 +63,29 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
   });
   afterAll(async () => { await pool?.end(); });
 
-  async function prepare(n: number) {
+  async function prepare(n: number, virtual?: { summary: string }) {
     const auth = uuid(10, n), subject = uuid(11, n), thread = uuid(14, n);
     const turn = uuid(16, n), attempt = uuid(17, n), user = uuid(18, n);
     const assistant = uuid(19, n), memory = uuid(24, n), grant = uuid(25, n);
+    const userText = virtual === undefined ? 'Synthetic first hello' : '내가 주말에 뭐 한다고 했지?';
     const adapt = (sql: string) => sql.replaceAll('000000000001', String(n).padStart(12, '0'))
       .replaceAll('first-zero-test-v1', 'first-zero-test-v1-' + n)
       .replaceAll('first-zero-test-release', 'first-zero-test-release-' + n)
       .replaceAll('first-zero-disposable-v1', uuid(30, n))
-      .replaceAll("repeat('a',64)", "repeat('" + n.toString(16) + "',64)");
+      .replaceAll("repeat('a',64)", "repeat('" + n.toString(16) + "',64)")
+      .replaceAll('Synthetic first hello', userText);
     await pool.query(adapt(baseline.slice(0, seedEnd)));
     await pool.query(`insert into public.memory_items(
       id,subject_id,memory_type,schema_version,content_jsonb,source_kind,created_by_character_id,created_at)
-      values($1,$2,'conversation_recall','v1','{"summary":"synthetic approved recall"}','user_approved','seyeon',clock_timestamp());
-    `.trim(), [memory, subject]);
+      values($1,$2,'conversation_recall','v1',$3::jsonb,'user_approved','seyeon',clock_timestamp());
+    `.trim(), [memory, subject, JSON.stringify({ summary: virtual?.summary ?? 'synthetic approved recall' })]);
     await pool.query(`insert into public.record_access_grants(
       id,subject_id,memory_item_id,grantee_character_id,grant_reason,granted_at)
       values($1,$2,$3,'seyeon','user_choice',clock_timestamp())`, [grant, subject, memory]);
     const { rows: [raw] } = await pool.query(`select
       'sha256:pg-jsonb:v1:'||encode(sha256(convert_to(content_jsonb::text,'UTF8')),'hex') as digest
       from public.memory_items where id=$1`, [memory]);
-    const source = {
+    let source = {
       recordKind: 'memory' as const, recordId: memory, grantId: grant,
       recordType: 'conversation_recall', schemaVersion: 'v1',
       rawRecordDigest: hash({ summary: 'synthetic approved recall' }),
@@ -87,10 +93,32 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
       projectedMemoryDigest: hash({ memoryId: memory, summary: 'synthetic approved recall' }),
       projectorVersion: 'seyeon-conversation-recall-projector-v1',
     };
-    const selectionDigest = hash([source]), contextDigest = hash({ synthetic: turn });
     const evidence = { kind: 'member' as const, verifiedAuthUserId: auth };
     const run = <T>(execute: Parameters<typeof executePostgresSubjectTransactionV1<T>>[0]['execute']) =>
       executePostgresSubjectTransactionV1({ pool: subjectPool, verifiedEvidence: evidence, execute });
+    const readContext = () => run(({ client }) => composeSeyeonProductionContextV1({
+      resolvedSubjectId: subject, threadId: thread, currentUserMessageRef: user,
+      relationshipRevisionUsedForTurn: null,
+      authorityPort: createPostgresSeyeonProductionContextReadAuthorityPortV1(client),
+      serverOwnedPersonalRecordProjectors: [SEYEON_CONVERSATION_RECALL_PROJECTOR_V1],
+      maxPersonalRecords: 1,
+    }));
+    let modelContext: SeyeonProductionContextSnapshotV1 | undefined;
+    if (virtual !== undefined) {
+      modelContext = await readContext();
+      expect(modelContext.retrievedMemories).toHaveLength(1);
+      expect(modelContext.retrievedMemories[0]?.summary).toBe(virtual.summary);
+      const selected = selectSeyeonExactModelPersonalSourcesV1({
+        retrievedMemories: modelContext.retrievedMemories,
+        sourceCandidates: modelContext.personalRecordProjectionCandidates ?? [],
+        maxRetrievedMemories: 1,
+      });
+      expect(selected.selectedSources).toHaveLength(1);
+      source = selected.selectedSources[0] as typeof source;
+      expect(source.recordId).toBe(memory);
+      expect(source.grantId).toBe(grant);
+    }
+    const selectionDigest = hash([source]), contextDigest = hash(modelContext ?? { synthetic: turn });
     await run(({ client }) => createSeyeonPositiveS0OwnerDbPortsV1(client).pinBeforeModel({
       subjectId: subject, threadId: thread, turnId: turn, attemptId: attempt,
       originalMemoryId: memory, originalGrantId: grant, recordType: source.recordType,
@@ -99,14 +127,25 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
       projectedMemoryDigest: source.projectedMemoryDigest,
       finalModelContextDigest: contextDigest, expectedOriginalPgDigest: source.rawRecordPgDigest,
     }));
+    let assistantText = 'DB_LOCKED_ZERO_SOURCE_SYNTHETIC_OK';
+    if (modelContext !== undefined) {
+      // Explicit local synthetic model: no provider, credential, or paid call.
+      // It receives ONLY the DB-read, projected context after durable G1 Pin.
+      const { rows: [pin] } = await pool.query(`select
+        seyeon_personal_source_pin_jsonb->'positiveProof'->>'finalModelContextDigest' as digest
+        from public.chat_turn_attempts where id=$1`, [attempt]);
+      expect(pin.digest).toBe(contextDigest);
+      assistantText = '기억해요. ' + modelContext.retrievedMemories[0]!.summary;
+    }
     const generation = adapt(baseline.slice(generationStart, generationEnd))
-      .replaceAll("->'zeroProof'", "->'positiveProof'");
+      .replaceAll("->'zeroProof'", "->'positiveProof'")
+      .replaceAll('DB_LOCKED_ZERO_SOURCE_SYNTHETIC_OK', assistantText.replaceAll("'", "''"));
     await pool.query(`BEGIN; set local myeongha.subject_id='${subject}';\n${generation}\nCOMMIT;`);
     const snapshot = {
       schemaVersion: 'seyeon-post-turn-analysis-snapshot-v1', mode: 'OFF',
       turnId: turn, userMessageId: user, assistantMessageId: assistant,
       preparedAt: '2026-10-24T00:00:00.000Z', productionAuthorityRef: 'production:synthetic-test',
-      interpretation: {}, envelope: { utterance: 'DB_LOCKED_ZERO_SOURCE_SYNTHETIC_OK' },
+      interpretation: {}, envelope: { utterance: assistantText },
       eventAuthorityEvidence: {}, priorEvents: [], relationshipBefore: {}, productionCausalBindings: [],
       identity: { experimentalEventId: uuid(26, n), experimentalEventDedupeKey: 's0-test-' + n,
         productionEventId: 's0-production-' + n, relationshipSyncOutboxEventId: 's0-sync-' + n },
@@ -128,7 +167,47 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
     const revoke = () => revokeSeyeonOriginalMemoryGrantAndAckV1({
       pool: subjectPool, verifiedEvidence: evidence, memoryItemId: memory, dbCommand: 'private_candidate',
     });
-    return { n, auth, subject, thread, turn, attempt, user, assistant, memory, grant, evidence, run, commitInput, commit, locked, revoke };
+    return { n, auth, subject, thread, turn, attempt, user, assistant, memory, grant, evidence, run, commitInput, commit, locked, revoke, readContext, assistantText, userText };
+  }
+
+  async function requestVirtualFirstReply(f: Awaited<ReturnType<typeof prepare>>, revokeBeforeReveal = false) {
+    let complete!: () => void;
+    const handled = new Promise<void>(resolve => { complete = resolve; });
+    const server = createServer((incoming, response) => {
+      void handleSeyeonFirstPositiveMemoryDirectNodeHttpV1({
+        incoming, response, pool: subjectPool,
+        identityEvidenceVerifier: { verifyRequestIdentity: async () => f.evidence },
+        runtime: { run: async () => {
+          const committed = await f.commit();
+          if (revokeBeforeReveal) await f.revoke();
+          return {
+            subjectId: f.subject,
+            threadBinding: { threadId: f.thread, participantCharacterIds: ['seyeon'] },
+            execution: {
+              disposition: 'executed', committedTurn: committed,
+              receivedTurn: { turnId: f.turn, userMessageId: f.user,
+                threadCharacterId: uuid(15, f.n), turnState: 'received', replayed: false,
+                committedTurn: null, userText: f.userText },
+              attempt: { attemptId: f.attempt, replayed: false },
+              postTurnAnalysis: { status: 'deferred', outboxEventId: uuid(23, f.n) },
+            },
+          } as unknown as RunProductionSeyeonChatResultV1;
+        } },
+      }).finally(complete);
+    });
+    await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
+    try {
+      const response = await fetch(`http://127.0.0.1:${(server.address() as AddressInfo).port}/api/chat/${f.thread}/turns`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ clientTurnId: uuid(30, f.n), text: f.userText }),
+      });
+      const body = await response.text();
+      await handled;
+      return { status: response.status, cache: response.headers.get('Cache-Control'), body };
+    } finally {
+      server.closeAllConnections();
+      await new Promise<void>(resolve => server.close(() => resolve()));
+    }
   }
 
   it('persists exact G1, commits actual v2 plus two Outboxes, consumes first Reveal once, and keeps private acceptance at zero grants', async () => {
@@ -147,7 +226,7 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
             execution: {
               disposition: 'executed', committedTurn: committed,
               receivedTurn: { turnId: f.turn, userMessageId: f.user,
-                threadCharacterId: 'seyeon', turnState: 'received', replayed: false,
+                threadCharacterId: uuid(15, f.n), turnState: 'received', replayed: false,
                 committedTurn: null, userText: 'Synthetic first hello' },
               attempt: { attemptId: f.attempt, replayed: false },
               postTurnAnalysis: { status: 'deferred', outboxEventId: uuid(23, 1) },
@@ -252,6 +331,42 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
     await f.locked()({ signal: new AbortController().signal, deliver: async body => {
       expect(body).toBe('DB_LOCKED_ZERO_SOURCE_SYNTHETIC_OK');
     } });
+  });
+
+  it('reads a virtual Korean memory through the real context projector, pins before a synthetic model, and sends its DB answer over HTTP', async () => {
+    const summary = '나는 매주 토요일 아침에 한강을 산책한다.';
+    const f = await prepare(6, { summary });
+    const response = await requestVirtualFirstReply(f);
+    expect(response.status).toBe(200);
+    expect(response.cache).toBe('no-store');
+    expect(JSON.parse(response.body).data.assistantText).toBe('기억해요. ' + summary);
+    const { rows: [stored] } = await pool.query(`select body_text from public.conversation_messages where id=$1`, [f.assistant]);
+    expect(stored.body_text).toBe(f.assistantText);
+    await f.revoke();
+    expect((await f.readContext()).retrievedMemories).toHaveLength(0);
+    await f.locked()({ signal: new AbortController().signal, deliver: async body => { expect(body).toBeNull(); } });
+    console.info('VIRTUAL_MEMORY_E2E ' + JSON.stringify({
+      case: 'approved-memory-first-reply', memory: summary,
+      model: 'local-synthetic-no-provider', question: f.userText, reply: f.assistantText,
+      httpStatus: response.status, pinBeforeModel: true,
+      originalGrantRevoked: true, personalRecordsAfterRevoke: 0,
+    }));
+  });
+
+  it('withholds the actual HTTP body when the virtual memory is revoked after generation and Commit but before first Reveal', async () => {
+    const summary = '나는 매주 토요일 아침에 한강을 산책한다.';
+    const f = await prepare(7, { summary });
+    const response = await requestVirtualFirstReply(f, true);
+    expect(response.status).toBe(503);
+    expect(response.cache).toBe('no-store');
+    expect(response.body).not.toContain(summary);
+    expect(response.body).not.toContain(f.assistantText);
+    expect((await f.readContext()).retrievedMemories).toHaveLength(0);
+    console.info('VIRTUAL_MEMORY_E2E ' + JSON.stringify({
+      case: 'revoke-before-first-reveal', model: 'local-synthetic-no-provider',
+      httpStatus: response.status, privateBodyExposed: false,
+      personalRecordsAfterRevoke: 0,
+    }));
   });
 
   it('stops model/write/Reveal admission without deleting data or removing consent withdrawal', async () => {

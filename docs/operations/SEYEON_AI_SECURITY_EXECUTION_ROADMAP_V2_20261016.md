@@ -691,3 +691,11 @@ S8의 **비파괴/격리 검토는 S2~S7과 병렬 진행 가능**하며, S8 Pro
 ### 종료 보고 구분
 
 브랜치 코드+필수 CI·Integration 완료 후 병합은 **S0 구현 병합**으로 보고한다. 실제 G0 서명·SRC-25 운영 등록·DB/ACL·동일 백업 복원·target transport V/R/S/ACK·유료/공개 승인 없이 전체 AI 보안 트랙의 A+B+C 운영 종료를 기록하지 않는다. 미확정 영역의 소유권을 합성 테스트나 개발자 해시로 대신하지 않는다.
+
+## 64. 2026-10-24 가상 기억과 실제 모델의 내부 서버 E2E
+
+사용자가 실제 모델 실행을 지시하고 기억 추가 UI 없이 내부 fixture로 진행하도록 확인했다. 현재 `conversation_recall/v1` 가상 기억·Grant를 격리 DB에만 등록하고 실제 production Chat runtime, native `gpt-5.6-terra`, ENFORCE Governor, 실제 generated/validated/G2와 Node socket 송출을 실행했다. 새 기억 추가 제품 기능은 만들지 않았다.
+
+실행에서 확인한 current User 1건을 과거 메시지로 오인한 G1 seal 결함과 `threadCharacterId` UUID/slug 불일치를 직접 caller/guard에서 수정했다. 원본 현재 질문 ID/text의 정확한 일치, 전체 context/source digest, 단일 Se-yeon thread와 현재 원본 Grant 검사는 유지한다. 직접 회귀 50/50과 타입/빌드 PASS. 실제 모델 정상/전송 전 철회 2/2 PASS 및 사전 G1 철회 1/1 PASS(모델·count 요청 0회)는 [실행 증거](SEYEON_AI_SECURITY_REAL_MODEL_E2E_20261024.md)에 구분해서 기록했다.
+
+상태는 **격리 실제 모델 서버 경계 VERIFIED**다. 가상 identity와 로컬 PG18/TLS 없는 pool seam을 사용했으므로 hosted Auth·운영 DB/DR·외부 proxy V/R/S/ACK·공개 활성화 또는 전체 트랙 종료는 여전히 입증하지 않는다. 운영 정책/registry/예산/route/DDL 적용은 없다. 브랜치 변경의 CI/병합 상태는 PR의 정확한 SHA 증거로 별도 기록한다.

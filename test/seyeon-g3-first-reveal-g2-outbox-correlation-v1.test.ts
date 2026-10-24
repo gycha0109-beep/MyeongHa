@@ -26,7 +26,7 @@ function result():RunProductionSeyeonChatResultV1 {
       disposition:'executed',
       receivedTurn:{
         turnId:TURN,userMessageId:USER,userText:'원본 합성 메시지',
-        threadCharacterId:'seyeon',turnState:'received',replayed:false,committedTurn:null,
+        threadCharacterId:'d8000000-0000-4000-8000-000000000009',turnState:'received',replayed:false,committedTurn:null,
       },
       attempt:{attemptId:ATTEMPT,replayed:false},
       committedTurn:{

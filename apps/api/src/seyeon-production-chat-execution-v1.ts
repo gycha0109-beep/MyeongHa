@@ -816,6 +816,8 @@ export async function runSeyeonProductionChatExecutionV1(
                 pinnedContextInput:contextInput,
                 pinnedContextInputDigest:positiveModelCorrelation?.finalModelContextDigest ?? '',
                 selectedSourcesDigest:positiveModelCorrelation?.selectedSourcesDigest ?? '',
+                currentUserMessageRef:receivedTurn.userMessageId,
+                currentUserText:receivedTurn.userText,
                 sourceCandidates:
                   productionContext.personalRecordProjectionCandidates ?? [],
                 assembledContext:assembled,
