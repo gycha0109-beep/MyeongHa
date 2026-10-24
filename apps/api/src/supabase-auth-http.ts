@@ -426,10 +426,11 @@ export async function handleSupabaseAuthRequestV1(input: {
         return upstreamError('refresh', upstream.response.status);
       }
       const session = normalizeSession(upstream.payload);
-      if (session === null || session.user.id === null) {
-        return errorResponse('AUTH_UPSTREAM_MALFORMED', 502);
-      }
+      if (session === null) return errorResponse('AUTH_UPSTREAM_MALFORMED', 502);
       if (input.preenrollmentMemberPort !== undefined) {
+        // OFF/legacy social sign-in keeps its original transport contract.
+        // Once A1 is enabled, binding always requires a trusted upstream UUID.
+        if (session.user.id === null) return errorResponse('AUTH_UPSTREAM_MALFORMED', 502);
         try {
           const existing = await input.preenrollmentMemberPort.admitExistingMember?.(session.user.id) ?? false;
           if (!existing) {

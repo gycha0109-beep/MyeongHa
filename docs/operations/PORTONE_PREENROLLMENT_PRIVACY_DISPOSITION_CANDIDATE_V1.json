@@ -37,7 +37,10 @@
       "expiryPurgeScheduled": false,
       "accessControl": "RLS ON, no client table privilege, API executor narrow SECURITY DEFINER functions only",
       "accountLinkage": "atomic one-use conversion to either new Guest or new Member, never both",
-      "backups": "P30D_EXISTING_CYCLE_UNCHANGED"
+      "backups": "P30D_EXISTING_CYCLE_UNCHANGED",
+      "purgeWorkerPort": "apps/api/src/postgres-portone-preenrollment-purge-v1.ts",
+      "purgeWorkerAutoScheduled": false,
+      "purgeWorkerExecutionRole": "myeongha_system_executor"
     }
   ],
   "subjectAgeBindingTarget": "legal_portone_verified_age_v1",
@@ -54,5 +57,5 @@
     "Production anti-abuse rate limiting and identity attempt cost controls",
     "End-to-end preenrollment cookie integrity, Social OAuth and Supabase direct registration bypass audit"
   ],
-  "notes": "Additive candidate only: never merge its table into the approved 59-table subject ownership graph without separately validated Privacy/DB policy change."
+  "notes": "Additive candidate only: never merge its table into the approved 59-table subject ownership graph without separately validated Privacy/DB policy change. A manual system-role cleanup port is now available as source code but not invoked or scheduled; no Production proof of physical purge exists."
 }

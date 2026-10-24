@@ -129,7 +129,7 @@
 - **필수 확인:** `test/legal-portone-identity-attempt-purge-v1.test.ts`에서 시스템 역할·배치 상한·트랜잭션 롤백·나이 권한 테이블 비삭제를 최소 검증. 기존 승인 삭제 정책 59개 테이블/46 DELETE/4 ANONYMIZE/9 RETAIN 변경 없음.
 - **다음:** DB Authority/Privacy에서 신규 테이블 처분과 정리 주기 확정 후 제안 SQL의 PG17 함수·ACL·계정 삭제 전이 실증, 작업자 호출 스케줄/운영 연결. 인증 제공자 계약·채널키 전에는 SDK/공개 본인확인·결제 OFF 유지.
 
-## 13. 2026-10-24 단일 브랜치 연속 구현 — 출시 HOLD 유지
+## 16. 2026-10-24 단일 브랜치 연속 구현 — 출시 HOLD 유지
 
 > 범위: PR #2504의 `fix/legal-compliance/ai-disclosure-and-launch-audit-20261023` 브랜치. 통합 CI 완료·운영 실증 또는 법적 적합성 완료를 의미하지 않는다. 전환 승인과 운영 DB 변경은 수행하지 않았다.
 
@@ -147,3 +147,11 @@
 2. **L2 DB/Privacy:** 제안 SQL과 삭제 분류 delta의 최종 승인, 실제 PG17 케이스 GREEN, 본 DB 변경/권위·보존·복원 후 비재노출 운영 실증. 원본 승인된 46 DELETE/4 ANONYMIZE/9 RETAIN 집계·지문 임의 변경 금지.
 3. **L3:** OpenAI/Vercel/Supabase/PortOne 활성화 계약·국외 처리항목·배포 환경 확인, 공급자 계약 증거와 개인정보 처리방침 최종 합치. 사업자정보·정식 접수 채널 미확정.
 4. **L4/L5:** Commerce/S7 소유 환불 접수·제공/철회·미제공 처리 검증, 법적 게시문구 확정과 공개 UX E2E, 모바일·웹 실제 배포 확인. 최종 통합 GREEN 및 사용자 결정 이후에만 병합.
+
+## 17. 2026-10-24 A1 가입 전 PortOne V2 검증 권위 — 구현 진행 및 출시 보류
+
+- **A1 데이터 모델:** 비적용 `1741_portone_preenrollment_age_authority_v1.proposed.sql`의 10분 TTL·256비트 무작위 브라우저 nonce 서버 HMAC·고정 길이 KCP 영숫자 ID·일회성 VERIFY/CONSUME 권위. `1740`의 기존 최소 연령 밴드 권위에 새로운 Guest/Member를 **각각 같은 DB 트랜잭션 안에서** 결속하되 PortOne 원문·CI/DI·생년월일·전화번호는 저장하지 않는다. Supabase Auth 계정 생성과 DB Subject 생성 **간의 분산 원자성은 구현되지 않았으며**, 외부 인증 실패/DB 장애 후 미연결 Auth 계정 복구·삭제는 별도 처리와 실증이 필요하다.
+- **A1 실제 진입:** 기존 `/api/me` 한 함수에 `/api/identity-verifications/pre-enrollment/{attempts,complete,capability}` 정확한 재작성 등록. 완전 승인된 `MYEONGHA_PORTONE_PREENROLLMENT_HTTP_MODE=ENFORCE`, 적용 SQL, Privacy, 기존 PortOne 제공자 계약·인증 게이트 없이는 요청/SDK/DB 연계를 허용하지 않는다. **운영 설정은 변경하지 않았다.** 서버에서 1회 발급한 ID/HttpOnly·Secure·SameSite=Strict 쿠키를 인증 서버 결과에 결속한다. 가입·소셜·신규 게스트의 사전 검증과 귀속은 이 기본 OFF 권위를 공유한다.
+- **회원·게스트·소셜:** 신규 게스트 발급과 최소 연령 저장은 1개 PG 트랜잭션. 이메일 가입은 서버 연령 판정 후 Supabase 응답의 UUID만으로 회원·연령을 DB에서 결속; 실패 시 신규 토큰 보류. 신규 소셜은 OAuth 완료 후 소비 전 권위를 검사하고 미검증 시 세션 보류. 기존 확인된 Member는 별도의 신규 증명 재사용 없이 서버 DB 최소 연령 권위로 확인; 기존 유효 Guest/Member 세션 재사용 및 개인정보 권리행사는 차단하지 않는다. 인증 완료 리다이렉트 후 가입 탭 복귀, 비의도적 선행 Guest 발급 방지 및 동일 출처 검사를 구현했다.
+- **정합성 복원:** A1 SQL의 문자열 치환 손상 및 PG17 Bash 인용부를 복구하여 SQL 원본/수동 배포 후보를 동일하게 유지하고, 손상 재발 방지 소스 회귀 단언을 추가. 새 `legal_portone_preenrollment_v1`은 승인된 Subject 소유 테이블 59개 집합 **외부**의 10분 단기 데이터로 별도 삭제 제안에 남긴다. 별도 `myeongha_system_executor` 물리정리 포트 구현, 자동 실행·운영 DB 적용은 하지 않았다.
+- **필수 후속:** (1) 관련 GH CI 및 격리 PG17 신규 케이스 실제 GREEN (아직 미확인), (2) Supabase Auth 직접 등록 우회/장애 후 고아 Auth 계정 처리 및 Social redirect state와 브라우저 증거의 재사용 방지 E2E, (3) PortOne 인증 제공자 계약·선불/보안 설정, (4) Privacy 삭제·만료/복원 정책 사용자 승인, (5) 본 DB 권한/서버 SDK/공개 UX 실증. 해당 요건 전에는 전체 L2와 서비스 출시를 완료로 표시하지 않는다.
