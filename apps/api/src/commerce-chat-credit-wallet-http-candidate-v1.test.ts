@@ -20,7 +20,7 @@ function fixture(kind:'member'|'guest'|null) {
             :query.includes('internal_qry_chat_credit_balance')
             ?[{availableCredits:'40',totalCredits:'50'}]
             :[];
-          return {rows:rows as readonly Row[]};
+          return {rows:rows as unknown as readonly Row[]};
         },
         release(){},
       };
