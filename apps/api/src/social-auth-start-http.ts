@@ -1,4 +1,5 @@
 import { denyUnverifiedInitialIdentityAdmissionV1 } from './portone-v2-preidentity-admission-v1.js';
+import { issueExistingMemberSocialStateV1 } from './portone-v2-existing-social-state-v1.js';
 import type { SupabasePreenrollmentMemberBindingPortV1 } from './supabase-auth-http.js';
 import {
   AuthenticatedJsonRequestBodyTooLargeV1,
@@ -32,10 +33,13 @@ const SUPABASE_PROVIDER_V1 = Object.freeze({
   naver: 'custom:naver',
 } as const satisfies Record<SocialAuthProviderServerV1, string>);
 
-function response(data: unknown, status = 200): Response {
+function response(data: unknown, status = 200, cookie?: string): Response {
   return Response.json(
     { ok: true, data },
-    { status, headers: { 'Cache-Control': NO_STORE } },
+    { status, headers: {
+      'Cache-Control': NO_STORE,
+      ...(cookie === undefined ? {} : { 'Set-Cookie': cookie }),
+    } },
   );
 }
 
@@ -180,6 +184,20 @@ export async function handleSocialAuthStartRequestV1(input: {
 
   const now = input.nowEpochMs?.() ?? Date.now();
   let state = randomState();
+  let existingMemberStateCookie: string | undefined;
+  if (denied !== null && input.approvedExistingMemberStart === true &&
+      input.preenrollmentMemberPort === undefined) {
+    try {
+      const issued = issueExistingMemberSocialStateV1({
+        secret: input.env.MYEONGHA_PORTONE_PREENROLLMENT_BINDING_SECRET ?? '',
+        nowEpochMs: now,
+      });
+      state = issued.state;
+      existingMemberStateCookie = issued.cookie;
+    } catch {
+      return failure('AGE_VERIFICATION_UNAVAILABLE', 503);
+    }
+  }
   if (denied !== null && input.preenrollmentMemberPort !== undefined) {
     try {
       if (input.preenrollmentMemberPort.issueSocialState === undefined) {
@@ -207,5 +225,5 @@ export async function handleSocialAuthStartRequestV1(input: {
     authorizationUrl: authorizationUrl.toString(),
     state,
     expiresAt: new Date(now + SOCIAL_AUTH_STATE_TTL_MS).toISOString(),
-  }));
+  }), 200, existingMemberStateCookie);
 }

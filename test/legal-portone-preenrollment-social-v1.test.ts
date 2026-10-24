@@ -4,6 +4,7 @@ import { handleSupabaseAuthRequestV1 } from '../apps/api/src/supabase-auth-http.
 import type { SupabasePreenrollmentMemberBindingPortV1 } from '../apps/api/src/supabase-auth-http.js';
 import { readFileSync } from 'node:fs';
 import { issuePortOneBoundSocialStateV1, verifyPortOneBoundSocialStateV1 } from '../apps/api/src/portone-v2-preenrollment-social-state-v1.js';
+import { issueExistingMemberSocialStateV1, verifyExistingMemberSocialStateV1 } from '../apps/api/src/portone-v2-existing-social-state-v1.js';
 
 const env = {
   MYEONGHA_SUPABASE_URL: 'https://cnsfpcdiyofqvhpcegfc.supabase.co',
@@ -12,6 +13,7 @@ const env = {
   MYEONGHA_PORTONE_IDENTITY_MIGRATION_STATE: 'APPROVED_AND_APPLIED',
   MYEONGHA_PORTONE_IDENTITY_PRIVACY_DISPOSITION_STATE: 'APPROVED',
   MYEONGHA_SOCIAL_AUTH_GOOGLE_ENABLED: 'true',
+  MYEONGHA_PORTONE_PREENROLLMENT_BINDING_SECRET: 'test-a1-existing-social-state-cookie-secret-at-least-32-chars',
 };
 const id = '22222222-2222-4222-8222-222222222222';
 const socialClock = Date.parse('2026-10-24T08:00:00Z');
@@ -71,6 +73,8 @@ describe('A1 Social Auth preverified age hold and atomic Member binding', () => 
     expect(body.data.authorizationUrl).toContain('/auth/v1/authorize');
     expect(body.data.state).toMatch(/^[A-Za-z0-9_-]{16,128}$/u);
     expect(body.data.state).not.toBe(signedSocialState);
+    expect(result.headers.get('set-cookie')).toContain('__Host-myeongha-existing-social-v1=');
+    expect(result.headers.get('set-cookie')).toContain('HttpOnly; Secure; SameSite=Strict');
 
     const unauthorized = await handleSocialAuthStartRequestV1({
       request: socialStartRequest(), env, approvedExistingMemberStart: true,
@@ -114,6 +118,54 @@ describe('A1 Social Auth preverified age hold and atomic Member binding', () => 
       expect(response.headers.get('set-cookie')).toBeNull();
     }
     expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('binds existing Member OAuth state to a separate HttpOnly cookie, then clears it on login', async () => {
+    const secret = env.MYEONGHA_PORTONE_PREENROLLMENT_BINDING_SECRET;
+    const issued = issueExistingMemberSocialStateV1({
+      secret, nowEpochMs: socialClock, nonceFactory: () => 'b'.repeat(43),
+    });
+    const cookieRequest = new Request('https://myeongha.vercel.app/api/auth/refresh', {
+      headers: { Cookie: issued.cookie.split(';')[0]! },
+    });
+    expect(verifyExistingMemberSocialStateV1({
+      secret, request: cookieRequest, state: issued.state, nowEpochMs: socialClock + 1_000,
+    })).toBe(true);
+    expect(verifyExistingMemberSocialStateV1({
+      secret, request: new Request(cookieRequest.url), state: issued.state, nowEpochMs: socialClock,
+    })).toBe(false);
+    expect(verifyExistingMemberSocialStateV1({
+      secret, request: cookieRequest, state: issued.state, nowEpochMs: socialClock + 601_000,
+    })).toBe(false);
+    const upstream = vi.fn(async () => Response.json({
+      access_token: 'existing-access', refresh_token: 'existing-refresh', expires_in: 3600,
+      user: { id, email: 'existing@example.com' },
+    }));
+    vi.stubGlobal('fetch', upstream);
+    const existingPort: SupabasePreenrollmentMemberBindingPortV1 = {
+      ...admission(false),
+      admitExistingMember: vi.fn(async () => true),
+      verifySocialState: () => false,
+      verifyExistingSocialState: (state) => verifyExistingMemberSocialStateV1({
+        secret, request: cookieRequest, state, nowEpochMs: socialClock + 1_000,
+      }),
+    };
+    const successful = await handleSupabaseAuthRequestV1({
+      request: socialCompleteRequest(issued.state), env, action: 'social-complete',
+      preenrollmentMemberPort: existingPort,
+    });
+    expect(successful.status).toBe(200);
+    expect(successful.headers.get('set-cookie')).toContain('__Host-myeongha-existing-social-v1=;');
+    expect(existingPort.bindMember).not.toHaveBeenCalled();
+    expect(upstream).toHaveBeenCalledOnce();
+
+    const forged = { ...existingPort, verifyExistingSocialState: () => false };
+    const rejected = await handleSupabaseAuthRequestV1({
+      request: socialCompleteRequest(issued.state), env, action: 'social-complete',
+      preenrollmentMemberPort: forged,
+    });
+    expect(rejected.status).toBe(403);
+    expect(rejected.headers.get('set-cookie')).toBeNull();
   });
 
   it('does not grant an unverified OAuth account access on existing-member-only callback', async () => {

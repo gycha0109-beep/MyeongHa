@@ -1,5 +1,6 @@
 import { denyUnverifiedInitialIdentityAdmissionV1 } from './portone-v2-preidentity-admission-v1.js';
 import { expirePortOnePreenrollmentCookieV1 } from './portone-v2-preenrollment-age-authority-v1.js';
+import { expireExistingMemberSocialStateCookieV1 } from './portone-v2-existing-social-state-v1.js';
 import {
   MYEONGHA_PRODUCTION_SUPABASE_ORIGIN,
   PRODUCTION_USER_DATA_RUNTIME_ENV_V1,
@@ -358,6 +359,8 @@ export interface SupabasePreenrollmentMemberBindingPortV1 {
   /** HMAC-signed OAuth state bound to same HttpOnly actor as provider proof. */
   issueSocialState?(nowEpochMs: number): string;
   verifySocialState?(state: string): boolean;
+  /** Separate cookie-bound OAuth correlation for existing verified Members. */
+  verifyExistingSocialState?(state: string): boolean;
 }
 
 export async function handleSupabaseAuthRequestV1(input: {
@@ -444,13 +447,23 @@ export async function handleSupabaseAuthRequestV1(input: {
       const session = normalizeSession(upstream.payload);
       if (session === null) return errorResponse('AUTH_UPSTREAM_MALFORMED', 502);
       let newlyBoundSocialMember = false;
+      let matchedExistingSocialCookie = false;
       if (input.preenrollmentMemberPort !== undefined) {
         // OFF/legacy social sign-in keeps its original transport contract.
         // Once A1 is enabled, binding always requires a trusted upstream UUID.
         if (session.user.id === null) return errorResponse('AUTH_UPSTREAM_MALFORMED', 502);
         try {
           const existing = await input.preenrollmentMemberPort.admitExistingMember?.(session.user.id) ?? false;
-          if (!existing) {
+          if (existing) {
+            // Existing accounts also require a server-verifiable same-browser
+            // OAuth start proof, not merely a client-submitted state string.
+            matchedExistingSocialCookie =
+              input.preenrollmentMemberPort.verifyExistingSocialState?.(providedState!) === true;
+            if (!matchedExistingSocialCookie &&
+                input.preenrollmentMemberPort.verifySocialState?.(providedState!) !== true) {
+              return errorResponse('SOCIAL_AUTH_CALLBACK_STATE_MISMATCH', 403);
+            }
+          } else {
             // OAuth may create a fresh Supabase user before the callback.
             // Such a user never receives MyeongHa tokens without a still-live,
             // independently verified browser-bound age proof.
@@ -477,8 +490,11 @@ export async function handleSupabaseAuthRequestV1(input: {
         }
       }
       const socialResponse = authenticatedResponse(session, {}, true);
-      return newlyBoundSocialMember
-        ? eraseUsedPreenrollmentCookieV1(socialResponse) : socialResponse;
+      if (newlyBoundSocialMember) return eraseUsedPreenrollmentCookieV1(socialResponse);
+      if (matchedExistingSocialCookie) {
+        socialResponse.headers.append('Set-Cookie', expireExistingMemberSocialStateCookieV1());
+      }
+      return socialResponse;
     }
 
     if (input.action === 'refresh') {

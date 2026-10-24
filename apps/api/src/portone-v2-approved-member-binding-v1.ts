@@ -6,6 +6,9 @@ import {
 } from './portone-v2-preenrollment-age-authority-v1.js';
 import { createPostgresPortOneVerifiedAgeAdmissionPortV1 } from './portone-v2-verified-age-admission-v1.js';
 import {
+  verifyExistingMemberSocialStateV1,
+} from './portone-v2-existing-social-state-v1.js';
+import {
   issuePortOneBoundSocialStateV1,
   verifyPortOneBoundSocialStateV1,
 } from './portone-v2-preenrollment-social-state-v1.js';
@@ -50,6 +53,13 @@ export function createApprovedPortOnePreenrollmentMemberBindingPortV1(input: Rea
       return digest !== null && typeof secret === 'string' &&
         verifyPortOneBoundSocialStateV1({
           secret, bindingDigest: digest, state, nowEpochMs: Date.now(),
+        });
+    },
+    verifyExistingSocialState(state: string) {
+      return input.allowExistingMemberOnly === true && rawNonce === null &&
+        typeof secret === 'string' &&
+        verifyExistingMemberSocialStateV1({
+          secret, request: input.request, state, nowEpochMs: Date.now(),
         });
     },
     async bindMember(verifiedAuthUserId: string) {

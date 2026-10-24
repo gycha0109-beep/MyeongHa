@@ -202,3 +202,11 @@
 - `supabase-auth-http.ts`의 소셜 완료 처리에서 신규 계정뿐 아니라 **기존 검증된 Member**도 OAuth 상관관계 `state`가 존재하고 제한된 안전 형식이어야 Supabase 토큰 교환을 시도할 수 있게 했다. 누락/변형 `state`는 네트워크 호출 전 400으로 거절하고 세션·쿠키는 발급하지 않는다.
 - **중요 제한:** 기존 회원 콜백의 상태가 복구·저장된 OAuth 시작 상태와 실제로 일치함을 서버 단독으로 입증하는 기능은 아직 없다. 브라우저 pending state 교차 검증을 유지하며, 향후 서버측 일회성 OAuth transaction 권위가 필요하면 별도 설계/적용해야 한다. 신규 계정은 기존 서명된 쿠키 결속 검증 및 원자적 소비를 그대로 사용한다.
 - `test/legal-portone-preenrollment-social-v1.test.ts`에 누락·형식 오류와 상류 토큰 미교환, 결속 실패의 복구 신호 및 무쿠키를 검증하는 회귀 항목 추가. 운영 인증·결제 및 통합 CI는 실행하지 않았다.
+
+
+## 24. 2026-10-25 L2 기존 소셜 회원 콜백의 서버 검증 상태 결속
+
+- 기존 verified Member의 OAuth 시작 시 미결속 임의 `state` 대신 **별도 10분짜리 HttpOnly/Secure/SameSite=Strict 쿠키와 HMAC 서명 `state`**를 동시 발급한다. `__Host-myeongha-existing-social-v1`은 가입 전 연령 증명 `__Host-myeongha-preage-v1`과 구분된다. 새 계정 가입용 연령 증명·DB 권위는 절대 재사용하지 않는다.
+- `social-complete`에서 Supabase 검증된 Auth UUID가 기존 Member인 경우에도 이 서버 쿠키에 상관된 서명 상태 또는 기존 사전검증 쿠키 상태를 검사하고 불일치면 세션 발급을 거절한다. 별도 기존 회원 쿠키가 성공 시 폐기되며 새 미검증 회원을 생성/승인할 수 없다.
+- 상태는 최대 10분 HMAC 인증이며 **인증 토큰이나 개인정보 원문을 쿠키에 담지 않는다**. 일회성 DB nonce ledger는 없는 단계이므로 쿠키 제거 자체가 네트워크 상 원자적 1회 사용을 보장한다고 주장하지 않는다. 미완료 시 실운영 OAuth E2E·브라우저 리디렉션 쿠키 수신 및 롤백 검증 필요.
+- 회귀: `test/legal-portone-preenrollment-social-v1.test.ts`에서 별도 쿠키 발급·만료·미소지 거절·상태 검증·성공 후 폐기 시나리오. 운영 설정·OAuth 실제 호출·통합 CI/PG17은 이 세션에서 실행하지 않음.
