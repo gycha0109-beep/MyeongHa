@@ -81,9 +81,9 @@
     "apps/api/src/production-current-subject-saju-preview-reading-runtime.ts": "fd0fce359f4435343f39ce79f54920296541f4d8a1a011e6315bb3caf16fad89",
     "scripts/verify-saju-abuse-admission-postgres.mjs": "1648e338d81f3a6721e7932e729144d12d71d7d70f186cac0e2898ab6134d2c2",
     "scripts/lib/saju-admission-attack-e2e.mjs": "afffa08bce7bc1a7ebbe439ee0f02bde74359a7d6bb8bbb4f22852a6e8687797",
-    "scripts/ci/db-pr-router.mjs": "ff247773ae6a8dba51be86a10c25ebbd85065b5438cf913acdc4559ace38514d",
-    "scripts/ci/db-suites.json": "c6632ddba32da830b177487c807420c40c6ab59ba97b0f814375a4eb8e4e792f",
-    "test/db/run_ci_case.sh": "99d56e72c5c36f1d2a3f0084186f758315f2be1dbdb08af2c4cc26b6da144448"
+    "scripts/ci/db-pr-router.mjs": "ddb53ed4cab37d1e3b8b838a14f15fc5eb292ab7d176403083f014759bb49910",
+    "scripts/ci/db-suites.json": "15f517eb6bac256e8a5d2b87010f269e733274fd9a92de494043741c7ae626ce",
+    "test/db/run_ci_case.sh": "a327a2709fa683e6368614517bf0f572d9b13370de8d8c476913a5d1186f0c4a"
   },
   "limitations": [
     "Hosted Auth and successful Saju responses are mocked; actual HTTP, PG17, SQL, restricted LOGIN and deny paths are exercised.",
@@ -92,7 +92,8 @@
   ],
   "diagnostics": [
     "Initial harness assumed cache headers absent in the existing calculation handler, body admission ordering and uppercase Auth mock header. Corrected assertions/mock to existing contracts; final fresh DB run PASS.",
-    "SQL owner comments now execute before revoking temporary owner membership."
+    "SQL owner comments now execute before revoking temporary owner membership.",
+    "Merged main 50de60e3038dec829a25aab88d64864d35242041 before PR head freeze; preserved both PG17 cases/router entries. Current main already installs pinned dependencies once, so the admission case reuses them. Router 8 tests and merged build PASS; bash syntax PASS."
   ],
   "next": "Required exact-head CI, isolated integration, protected PR merge"
 }
