@@ -1,3 +1,4 @@
+import { denyUnverifiedInitialIdentityAdmissionV1 } from './portone-v2-preidentity-admission-v1.js';
 import {
   MYEONGHA_PRODUCTION_SUPABASE_ORIGIN,
   PRODUCTION_USER_DATA_RUNTIME_ENV_V1,
@@ -357,6 +358,13 @@ export async function handleSupabaseAuthRequestV1(input: {
   const webCookieTransport = usesWebCookieTransport(input.request);
 
   try {
+    if (input.action === 'sign-up' || input.action === 'social-complete') {
+      const denied = denyUnverifiedInitialIdentityAdmissionV1({
+        env: input.env,
+        surface: input.action === 'sign-up' ? 'member-sign-up' : 'social-complete',
+      });
+      if (denied !== null) return denied;
+    }
     if (input.action === 'sign-out') {
       const authorization = input.request.headers.get('authorization');
       if (!authorization || !/^Bearer [^\s,]+$/u.test(authorization)) {

@@ -83,6 +83,7 @@ export function createProductionChatReadRuntimeV1(
             serverTime: requestInput.serverTime,
             identityEvidenceVerifier,
             pool: poolLease.pool,
+            ...(ageAdmissionPort === undefined ? {} : { ageAdmissionPort }),
           });
 
       if (response.status === 405) {

@@ -1,4 +1,5 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes, timingSafeEqual } from 'node:crypto';
+import { denyUnverifiedInitialIdentityAdmissionV1 } from './portone-v2-preidentity-admission-v1.js';
 import { readAuthenticatedJsonRequestBodyV1 } from './authenticated-json-request-resource.js';
 import { MYEONGHA_PRODUCTION_SUPABASE_ORIGIN } from './production-user-data-runtime-config.js';
 
@@ -140,6 +141,11 @@ export async function handleNaverOAuthBridgeRequestV1(input: {
 }): Promise<Response> {
   const expectedMethod = input.action === 'token' ? 'POST' : 'GET';
   if (input.request.method !== expectedMethod) return new Response(null, { status: 405, headers: { ...HEADERS, Allow: expectedMethod } });
+  const denied = denyUnverifiedInitialIdentityAdmissionV1({
+    env: input.env,
+    surface: 'naver-bridge',
+  });
+  if (denied !== null) return denied;
   const clientId = input.env.MYEONGHA_NAVER_CLIENT_ID;
   const encodedKey = input.env.MYEONGHA_NAVER_OAUTH_BRIDGE_KEY;
   if (input.env.MYEONGHA_NAVER_OAUTH_BRIDGE_ENABLED !== 'true' || !bounded(clientId, 128) || !encodedKey || !/^[A-Za-z0-9_-]{43}$/u.test(encodedKey)) return error(503);

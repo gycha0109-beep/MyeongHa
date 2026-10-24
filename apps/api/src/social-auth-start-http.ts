@@ -1,3 +1,4 @@
+import { denyUnverifiedInitialIdentityAdmissionV1 } from './portone-v2-preidentity-admission-v1.js';
 import {
   AuthenticatedJsonRequestBodyTooLargeV1,
   readAuthenticatedJsonRequestBodyV1,
@@ -121,6 +122,15 @@ export async function handleSocialAuthStartRequestV1(input: {
       status: 405,
       headers: { Allow: 'POST', 'Cache-Control': NO_STORE },
     });
+  }
+
+  const denied = denyUnverifiedInitialIdentityAdmissionV1({
+    env: input.env,
+    surface: 'social-start',
+  });
+  if (denied !== null) {
+    cancelUnusedRequestBody(input.request);
+    return denied;
   }
 
   let body: unknown;

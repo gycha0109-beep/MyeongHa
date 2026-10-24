@@ -1,3 +1,4 @@
+import { denyUnverifiedInitialIdentityAdmissionV1 } from './portone-v2-preidentity-admission-v1.js';
 import {
   createMemberAuthRateLimitUnavailableResponseV1,
   handleMemberAuthRateLimitHttpV1,
@@ -109,6 +110,14 @@ export function createProductionMemberAuthHttpRuntimeV1(
       const authAction =
         requestInput.authAction ??
         requestInput.action;
+      if (requestInput.request.method === 'POST' &&
+          (authAction === 'sign-up' || authAction === 'social-complete')) {
+        const denied = denyUnverifiedInitialIdentityAdmissionV1({
+          env: input.env,
+          surface: authAction === 'sign-up' ? 'member-sign-up' : 'social-complete',
+        });
+        if (denied !== null) return denied;
+      }
 
       if (requestInput.request.method !== 'POST') {
         return authHandler({

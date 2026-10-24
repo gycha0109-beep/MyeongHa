@@ -1,4 +1,5 @@
 import type { IdentityEvidenceVerificationPortV1 } from './current-subject-profile-http.js';
+import type { PortOneVerifiedAgeAdmissionPortV1 } from './portone-v2-verified-age-admission-v1.js';
 import {
   CollectionReadPaginationInputErrorV1,
   parseCollectionPageSizeV1,
@@ -39,6 +40,8 @@ export interface HandleChatReadRequestInputV1 {
   readonly serverTime: string;
   readonly identityEvidenceVerifier: IdentityEvidenceVerificationPortV1;
   readonly pool: PostgresSubjectPoolV1;
+  /** Optional verified-age authority; OFF until DB and Privacy approvals. */
+  readonly ageAdmissionPort?: Pick<PortOneVerifiedAgeAdmissionPortV1, 'admitFreePersonalization'>;
 }
 
 type ParsedChatReadRequestV1 = Readonly<{
@@ -409,6 +412,18 @@ export async function handleChatReadRequestV1(
   const verifiedEvidence = await input.identityEvidenceVerifier.verifyRequestIdentity(input.request);
   if (verifiedEvidence === null) {
     return jsonError(401, 'AUTH_REQUIRED', 'auth.required', input.requestId);
+  }
+
+  if (input.ageAdmissionPort !== undefined) {
+    let admitted = false;
+    try {
+      admitted = await input.ageAdmissionPort.admitFreePersonalization(verifiedEvidence);
+    } catch {
+      return jsonError(503, 'AGE_VERIFICATION_UNAVAILABLE', 'age.verification_unavailable', input.requestId);
+    }
+    if (!admitted) {
+      return jsonError(403, 'AGE_VERIFICATION_REQUIRED', 'age.verification_required', input.requestId);
+    }
   }
 
   try {
