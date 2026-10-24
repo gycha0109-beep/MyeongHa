@@ -5,7 +5,7 @@ import { FORTUNE_COOKIE_LOCALE_COPY_V1, fortuneCookieMessageV1 } from './fortune
 describe('Fortune cookie locales', () => {
   it('localizes all 100 authored fortunes without changing the draw identity', () => {
     expect(FORTUNE_COOKIE_MESSAGES_V1).toHaveLength(100);
-    for (const locale of ['ja-JP','zh-TW'] as const) {
+    for (const locale of ['ja-JP','zh-TW','en-US','zh-CN'] as const) {
       expect(FORTUNE_COOKIE_LOCALE_COPY_V1[locale]).toHaveLength(FORTUNE_COOKIE_MESSAGES_V1.length);
       FORTUNE_COOKIE_MESSAGES_V1.forEach((original, index) => {
         const localized = fortuneCookieMessageV1(index, locale);
@@ -19,5 +19,7 @@ describe('Fortune cookie locales', () => {
   it('does not fabricate a reading for an invalid draw', () => {
     expect(fortuneCookieMessageV1(-1, 'ja-JP')).toBe('');
     expect(fortuneCookieMessageV1(9999,'zh-TW')).toBe('');
+    expect(fortuneCookieMessageV1(9999,'en-US')).toBe('');
+    expect(fortuneCookieMessageV1(-1,'zh-CN')).toBe('');
   });
 });

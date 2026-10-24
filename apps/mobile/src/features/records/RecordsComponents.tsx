@@ -55,6 +55,7 @@ export function RecordsTabs({
 
 export function LifeFactCard({ item }: { item: LifeRecordFactV1 }) {
   const styles = useMobileThemedStyles(staticStyles);
+  const { t } = useMobileUiLocale();
   const revoked = item.revokedAt !== null;
   return (
     <View style={[styles.card, revoked && styles.cardMuted]}>
@@ -63,9 +64,9 @@ export function LifeFactCard({ item }: { item: LifeRecordFactV1 }) {
         <Text style={styles.date}>{formatRecordDateV1(item.confirmedAt)}</Text>
       </View>
       <Text style={styles.cardTitle}>{item.factType}</Text>
-      <Text style={styles.caption}>기록 형식 {item.schemaVersion} · 출처 {item.sourceKind}</Text>
+      <Text style={styles.caption}>{t('기록 형식')} {item.schemaVersion} · {t('출처')} {item.sourceKind}</Text>
       <Text style={[styles.state, revoked && styles.revoked]}>
-        {revoked ? '철회됨' : '기록됨'}
+        {t(revoked ? '철회됨' : '기록됨')}
       </Text>
     </View>
   );
@@ -93,7 +94,7 @@ export function ReadingHistoryCard({
       {openable && onOpen !== undefined ? (
         <MobileUiText style={styles.openHint}>저장된 풀이 다시 읽기 →</MobileUiText>
       ) : null}
-      <Text style={styles.caption}>풀이 기록 형식 · {item.readingContractVersion}</Text>
+      <Text style={styles.caption}>{t('풀이 기록 형식')} · {item.readingContractVersion}</Text>
     </>
   );
 
@@ -113,6 +114,7 @@ export function ReadingHistoryCard({
 
 export function MemoryCard({ item }: { item: MemoryItemV1 }) {
   const styles = useMobileThemedStyles(staticStyles);
+  const { t } = useMobileUiLocale();
   return (
     <View style={styles.card}>
       <View style={styles.cardTop}>
@@ -122,7 +124,7 @@ export function MemoryCard({ item }: { item: MemoryItemV1 }) {
       <Text style={styles.cardTitle}>{item.memoryType}</Text>
       <MobileUiText style={styles.cardBody}>저장된 기억</MobileUiText>
       <Text style={styles.caption}>
-        기록 형식 {item.schemaVersion}{item.createdByCharacterId === null ? '' : ' · 연결자 기록'}
+        {t('기록 형식')} {item.schemaVersion}{item.createdByCharacterId === null ? '' : ' · ' + t('연결자 기록')}
       </Text>
     </View>
   );

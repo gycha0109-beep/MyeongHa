@@ -14,18 +14,19 @@ describe('Records authored presentation', () => {
   });
 
   it('localizes UI-only revision and missing-birth warnings without inventing a profile', () => {
-    for (const locale of ['ja-JP', 'zh-TW']) {
+    for (const locale of ['ja-JP', 'zh-TW', 'en-US', 'zh-CN']) {
       expect(recordsBirthUnavailableV1(locale)).not.toMatch(/[가-힣]/u);
       expect(recordsBirthRevisionV1(17, locale)).toContain('revision 17');
       expect(recordsBirthRevisionV1(17, locale)).not.toMatch(/[가-힣]/u);
     }
-    expect(recordsBirthUnavailableV1('zh-CN')).toBe(recordsBirthUnavailableV1('ko-KR'));
+    expect(recordsBirthUnavailableV1('en-GB')).toBe(recordsBirthUnavailableV1('ko-KR'));
+    expect(recordsBirthRevisionV1(17, 'zh-HK')).toBe(recordsBirthRevisionV1(17, 'ko-KR'));
   });
 
   it('preserves availability and identity when repainting an official history card', () => {
     const source = Object.freeze({ completedAt: '2026-10-21T00:00:00Z', title: 'Original user text', openable: true });
     const pending = { ...source, openable: false };
-    for (const locale of ['ko-KR', 'ja-JP', 'zh-TW'] as const) {
+    for (const locale of ['ko-KR', 'ja-JP', 'zh-TW', 'en-US', 'zh-CN'] as const) {
       const delivered = recordsReadingSummaryV1(source, locale);
       const blocked = recordsReadingSummaryV1(pending, locale);
       expect(delivered).toContain(source.title);
@@ -36,6 +37,11 @@ describe('Records authored presentation', () => {
         expect(delivered).not.toMatch(/[가-힣]/u);
         expect(blocked).not.toMatch(/[가-힣]/u);
       }
+    }
+    for (const locale of ['en-US', 'zh-CN']) {
+      expect(recordsReadingSummaryV1(source, locale)).toContain(source.title);
+      expect(recordsReadingSummaryV1(pending, locale)).toContain(source.title);
+      expect(recordsReadingSummaryV1(pending, locale)).toContain('Official Reading');
     }
     expect(source.openable).toBe(true);
   });

@@ -57,6 +57,7 @@
     "workflow": "db-postgres17-authority-suite.yml",
     "postgres": 17,
     "cases": [
+      "saju-abuse-admission-attack-e2e",
       "guest-promotion-auth-fk",
       "birth-profile-create-runtime-authority",
       "content-release-lifecycle",
@@ -78,7 +79,8 @@
       "saju-single-project-operator-permit-pg17",
       "seyeon-c08-first-turn-local-pg17",
       "seyeon-first-zero-locked-reveal-disposable-pg17",
-      "seyeon-c08y-disposable-shared-ledger-pg17"
+      "seyeon-c08y-disposable-shared-ledger-pg17",
+      "seyeon-security-s0-real-path-pg17"
     ]
   }
 }

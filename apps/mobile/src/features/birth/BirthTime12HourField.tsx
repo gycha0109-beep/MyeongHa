@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 
 import type { MobileBirthMeridiemV1 } from './birth-clock-12hour.js';
+import type { MobileUiLocale } from '@/ui/mobile-ui-copy';
 import { mobileColors } from '@/ui/mobile-colors';
 import { MobileUiText } from '@/ui/MobileUiText';
 import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
@@ -18,9 +19,10 @@ import { useMobileUiLocale } from '@/ui/mobile-ui-locale';
 
 const HOURS = Array.from({ length: 12 }, (_, index) => String(index + 1));
 
-function periodLabelFor(option: MobileBirthMeridiemV1, locale: 'ko-KR' | 'ja-JP' | 'zh-TW'): string {
+function periodLabelFor(option: MobileBirthMeridiemV1, locale: MobileUiLocale): string {
   if (locale === 'ja-JP') return option === 'am' ? '午前' : '午後';
-  if (locale === 'zh-TW') return option === 'am' ? '上午' : '下午';
+  if (locale === 'zh-TW' || locale === 'zh-CN') return option === 'am' ? '上午' : '下午';
+  if (locale === 'en-US') return option === 'am' ? 'Morning' : 'Afternoon';
   return option === 'am' ? '오전' : '오후';
 }
 
@@ -37,14 +39,10 @@ export function BirthTime12HourField({
 }) {
   const styles = useMobileThemedStyles(staticStyles);
   const { locale, t } = useMobileUiLocale();
-  const hourUnit = locale === 'ko-KR' ? '시' : locale === 'ja-JP' ? '時' : '時';
-  const minuteUnit = locale === 'ko-KR' ? '분' : locale === 'ja-JP' ? '分' : '分';
+  const hourUnit = locale === 'ko-KR' ? '시' : locale === 'en-US' ? 'h' : '時';
+  const minuteUnit = locale === 'ko-KR' ? '분' : locale === 'en-US' ? 'min' : '分';
   const [hourModalVisible, setHourModalVisible] = useState(false);
-  const periodLabel = locale === 'ja-JP'
-    ? meridiem === 'am' ? '午前' : '午後'
-    : locale === 'zh-TW'
-      ? meridiem === 'am' ? '上午' : '下午'
-      : meridiem === 'am' ? '오전' : '오후';
+  const periodLabel = periodLabelFor(meridiem, locale);
 
   return (
     <>

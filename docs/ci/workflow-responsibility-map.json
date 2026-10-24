@@ -38,12 +38,6 @@
       "mainMode": "required",
       "workTrackAttribution": "pr-metadata"
     },
-    "cloudflare-preview-remote-smoke.yml": {
-      "responsibility": "cloudflare-preview-exact-sha-remote-smoke",
-      "prMode": "narrow",
-      "mainMode": "none",
-      "workTrackAttribution": "pr-metadata"
-    },
     "db-commerce-entitlement-suite.yml": {
       "responsibility": "commerce-entitlement-verification",
       "prMode": "routed-via-ci",
@@ -356,18 +350,6 @@
       "mainMode": "one-shot-trigger",
       "workTrackAttribution": "commit-metadata"
     },
-    "seyeon-c08-provider-get-shape-diagnostic-once-v1.yml": {
-      "responsibility": "character-memory-one-shot-official-provider-get-structure-diagnosis-only",
-      "prMode": "none",
-      "mainMode": "one-shot-trigger",
-      "workTrackAttribution": "commit-metadata"
-    },
-    "seyeon-c08-provider-metadata-readonly-once-v1.yml": {
-      "responsibility": "character-memory-one-shot-public-provider-metadata-get-only",
-      "prMode": "none",
-      "mainMode": "one-shot-trigger",
-      "workTrackAttribution": "commit-metadata"
-    },
     "seyeon-c08u-eval-project-key-readiness-v1.yml": {
       "responsibility": "character-memory-eval-key-read-only-preflight",
       "prMode": "none",
@@ -506,6 +488,18 @@
       "mainMode": "one-shot-trigger",
       "workTrackAttribution": "commit-metadata"
     },
+    "seyeon-c08-provider-get-shape-diagnostic-once-v1.yml": {
+      "responsibility": "character-memory-one-shot-official-provider-get-structure-diagnosis-only",
+      "prMode": "none",
+      "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "commit-metadata"
+    },
+    "seyeon-c08-provider-metadata-readonly-once-v1.yml": {
+      "responsibility": "character-memory-one-shot-public-provider-metadata-get-only",
+      "prMode": "none",
+      "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "commit-metadata"
+    },
     "seyeon-openrouter-zdr-json-catalog-v1.yml": {
       "responsibility": "character-memory-openrouter-zdr-json-public-provider-metadata-only",
       "prMode": "none",
@@ -563,6 +557,24 @@
     "web-pr-domain-gates.yml": {
       "responsibility": "web-pr-verification",
       "prMode": "required-router",
+      "mainMode": "none",
+      "workTrackAttribution": "pr-metadata"
+    },
+    "seyeon-c08-n06-paid-exact-model-once-v2.yml": {
+      "responsibility": "character-memory-one-owner-approved-public-n06-paid-model-post-exact-route",
+      "prMode": "none",
+      "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "commit-metadata"
+    },
+    "seyeon-c08-n06-paid-canary-once-v1.yml": {
+      "responsibility": "character-memory-owner-preapproved-public-n06-one-chargeable-post-json-canary",
+      "prMode": "none",
+      "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "commit-metadata"
+    },
+    "cloudflare-preview-remote-smoke.yml": {
+      "responsibility": "cloudflare-preview-exact-sha-remote-smoke",
+      "prMode": "narrow",
       "mainMode": "none",
       "workTrackAttribution": "pr-metadata"
     }

@@ -1,4 +1,4 @@
-export type ReadingUiLocaleV1 = 'ko-KR' | 'ja-JP' | 'zh-TW';
+export type ReadingUiLocaleV1 = 'ko-KR' | 'ja-JP' | 'zh-TW' | 'en-US' | 'zh-CN';
 
 export interface ReadingSceneFlagsV1 {
   hasStructure: boolean;

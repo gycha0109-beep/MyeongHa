@@ -155,6 +155,9 @@ run_isolated_case myeongha_seyeon_positive_pin_candidate_test bash test/db/seyeo
 # actual v2/core + both Outbox atomicity, in a NEW disposable cloned database.
 authority_profile_stage 'seyeon-r2-actual-v2-isolated'
 run_isolated_case myeongha_seyeon_positive_pin_candidate_test bash test/db/seyeon_r2_disposable_actual_v2_revoke_race.sh
+# Payment track: keep the new, not-yet-approved credit ledger schema isolated.
+# Never include it in Production migrations or modify the DB's Privacy graph.
+run_isolated_case myeongha_commerce_credit_candidate_test bash test/db/candidates/chat_credit_private_ledger_v1.sh
 authority_profile_stage 'seyeon-governor-and-cost-races'
 psql -v ON_ERROR_STOP=1 -f test/db/seyeon_zero_personal_source_pre_model_pin_v1.sql
 psql -v ON_ERROR_STOP=1 -f test/db/seyeon_ai_call_lifecycle_v1.sql

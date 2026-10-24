@@ -370,6 +370,8 @@ const localeChoices = [
   { value: 'ko-KR', label: '한국어' },
   { value: 'ja-JP', label: '日本語' },
   { value: 'zh-TW', label: '繁體中文' },
+  { value: 'en-US', label: 'English' },
+  { value: 'zh-CN', label: '简体中文' },
 ] as const;
 
 function MyLocaleSelector() {
@@ -409,7 +411,11 @@ function MyLocaleSelector() {
           ? '画面の固定ラベルのみを翻訳します。会話・個人情報・公式鑑定は変更しません。'
           : locale === 'zh-TW'
             ? '只翻譯介面的固定文字，不改動對話、個人資料或正式解讀。'
-            : '화면에 고정된 안내 문구만 번역합니다. 대화·개인정보·공식 해석은 변경하지 않습니다.'}
+            : locale === 'en-US'
+              ? 'Fixed UI text only. Chats, private records and official readings remain unchanged.'
+              : locale === 'zh-CN'
+                ? '仅翻译固定界面文案。聊天、私人记录与正式解读保持原文。'
+                : '화면에 고정된 안내 문구만 번역합니다. 대화·개인정보·공식 해석은 변경하지 않습니다.'}
       </Text>
     </View>
   );

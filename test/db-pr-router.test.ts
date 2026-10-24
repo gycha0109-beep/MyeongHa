@@ -43,6 +43,22 @@ function route(paths: readonly string[]): DbRoutingResult {
 }
 
 describe('DB PR router', () => {
+  it('routes dormant Saju admission SQL and actual consumers to the PG17 attack suite', () => {
+    for (const path of [
+      'supabase/proposals/20261024065948_saju_abuse_admission_runtime_authority.sql',
+      'scripts/verify-saju-abuse-admission-postgres.mjs',
+      'scripts/lib/saju-admission-attack-e2e.mjs',
+      'apps/api/src/postgres-saju-abuse-admission.ts',
+      'apps/api/src/saju-abuse-admission-http.ts',
+      'apps/api/src/current-subject-saju-calculation-http.ts',
+      'apps/api/src/production-current-subject-saju-preview-reading-runtime.ts',
+    ]) {
+      const result = route([path]);
+      expect(result.suites).toEqual(['postgres17']);
+      expect(result.pg17Cases).toContain('saju-abuse-admission-attack-e2e');
+      expect(result.pg15Cases).toEqual([]);
+    }
+  });
   it('keeps non-DB changes out of specialized DB suites', () => {
     expect(route(['apps/web/home.js'])).toEqual({
       suites: [],

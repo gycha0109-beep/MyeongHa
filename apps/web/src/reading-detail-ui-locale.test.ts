@@ -41,5 +41,16 @@ describe('authored Reading scene locale presentation', () => {
     expect(loading.stateCopy).toContain('出生資料');
     expect(readingSceneProgressV1(0, 1, { hasStructure: false, hasSupporting: false }, false, 'unknown').progress)
       .toBe('읽기 1 / 1');
+    for (const [locale, yearLabel, recordNote, blockedCopy] of [
+      ['en-US', '2026 · This year', 'official Saju reading', 'no reading request will be sent'],
+      ['zh-CN', '2026年 · 今年', '正式八字解读', '不会发送解读请求'],
+    ] as const) {
+      expect(readingScopeLabelV1('year', 2026, locale)).toBe(yearLabel);
+      expect(readingSceneProgressV1(0, 1, { hasStructure: false, hasSupporting: false }, true, locale).authorityNote)
+        .toContain(recordNote);
+      const localized = readingRouteStateCopyV1(route, request, 'blocked', 2026, locale);
+      expect(localized.stateCopy).toContain('adapter-v1');
+      expect(localized.stateCopy).toContain(blockedCopy);
+    }
   });
 });

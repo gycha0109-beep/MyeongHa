@@ -14,6 +14,7 @@ import { mobileColors } from '@/ui/mobile-colors';
 import { MobileUiText } from '@/ui/MobileUiText';
 import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
 import { useMobileUiLocale } from '@/ui/mobile-ui-locale';
+import { formatMobileUiCopy } from '@/ui/mobile-ui-copy';
 
 type PreviewReadingTextV1 = Extract<
   MobileSajuTopicV1['availability'],
@@ -98,7 +99,7 @@ function errorCopy(error: unknown): Readonly<{ message: string; retryable: boole
 
 export function SajuPreviewReadingView({ onOpenPreview }: { onOpenPreview?: (topic: MobileSajuTopicV1) => void }) {
   const styles = useMobileThemedStyles(staticStyles);
-  const { t } = useMobileUiLocale();
+  const { t, locale } = useMobileUiLocale();
   const [state, setState] = useState<PreviewStateV1>({ kind: 'idle' });
 
   async function load(
@@ -254,7 +255,7 @@ export function SajuPreviewReadingView({ onOpenPreview }: { onOpenPreview?: (top
 
       {state.kind === 'not_delivered' ? (
         <View style={styles.stateCard}>
-          <Text style={styles.stateTitle}>{state.topic.label}</Text>
+          <Text style={styles.stateTitle}>{t(state.topic.label)}</Text>
           <Text style={styles.muted}>{t(notDeliveredCopy(state.result.responseState))}</Text>
           {state.result.responseState === 'temporarily_unavailable' ? (
             <Pressable
@@ -270,8 +271,8 @@ export function SajuPreviewReadingView({ onOpenPreview }: { onOpenPreview?: (top
 
       {state.kind === 'error' ? (
         <View style={styles.stateCard}>
-          <Text style={styles.stateTitle}>{state.topic.label}</Text>
-          <Text style={styles.error}>{state.message}</Text>
+          <Text style={styles.stateTitle}>{t(state.topic.label)}</Text>
+          <Text style={styles.error}>{t(state.message)}</Text>
           {state.retryable ? (
             <Pressable
               accessibilityRole="button"
@@ -287,7 +288,7 @@ export function SajuPreviewReadingView({ onOpenPreview }: { onOpenPreview?: (top
       {state.kind === 'ready' ? (
         <>
           <View style={styles.resultHeading}>
-            <Text style={styles.resultTitle}>{state.topic.label}</Text>
+            <Text style={styles.resultTitle}>{t(state.topic.label)}</Text>
             <MobileUiText style={styles.authorityNote}>
               Preview · 연구 검증 중인 원국 해석이며 확정적 미래 예측은 포함하지 않습니다.
             </MobileUiText>
@@ -306,7 +307,7 @@ export function SajuPreviewReadingView({ onOpenPreview }: { onOpenPreview?: (top
 
           {state.result.steps.map((step, index) => (
             <View key={`${String(index)}:${step.title}`} style={styles.readingCard}>
-              <Text style={styles.stepIndex}>읽기 {index + 1}</Text>
+              <Text style={styles.stepIndex}>{formatMobileUiCopy('읽기 {index}', { index: String(index + 1) }, locale)}</Text>
               <Text style={styles.stepTitle}>{step.title}</Text>
               <Text style={styles.primaryText}>{step.primary}</Text>
 

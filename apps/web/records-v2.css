@@ -80,3 +80,8 @@ html[data-theme="dark"] body.records-page .records-reading-badge{color:#d9a8b9;b
 .records-birth-revision{display:block;color:var(--mh-ink-muted);font-size:10px}
 .records-birth-link{display:inline-flex;margin-top:12px;color:var(--mh-brass-strong);font-weight:700}
 @media(max-width:420px){.records-birth-facts{grid-template-columns:1fr}}
+
+.records-memory-grant-check{align-self:flex-start;margin-top:8px;padding:7px 12px;border:1px solid var(--records-line-strong);border-radius:8px;background:var(--records-paper-soft);color:var(--mh-ink-strong);font:inherit;font-size:12px;cursor:pointer}
+.records-memory-grant-check:disabled{opacity:.6;cursor:wait}
+.records-memory-grant-check:focus-visible{outline:2px solid var(--mh-brass-strong);outline-offset:3px}
+.records-memory-grant-status{display:block;color:var(--mh-ink-muted);font-size:12px;line-height:1.5}

@@ -6,6 +6,17 @@ import { expect, it } from 'vitest';
 import { resolveDbPrRouting } from '../scripts/ci/db-pr-router.mjs';
 import { resolvePrGates } from '../scripts/ci/pr-gate-router.mjs';
 
+it('routes S0 source SQL and its actual production-table test to the existing PG17 suite', () => {
+  for (const path of [
+    'scripts/operations/seyeon-security-s0/02-atomic-commit.sql',
+    'test/seyeon-security-s0-postgres.e2e.test.ts',
+    'test/db/seyeon_security_s0_real_path_pg17.sh',
+  ]) {
+    expect(resolveDbPrRouting([path]).suites).toContain('postgres17');
+    expect(resolvePrGates([path]).db).toBe(true);
+  }
+});
+
 it('does not schedule Commerce added only to the base while Character work advances', () => {
   const directory = mkdtempSync(join(tmpdir(), 'myeongha-pr-scope-'));
   const git = (...args: string[]) => execFileSync('git', args, { cwd: directory, encoding: 'utf8' }).trim();
