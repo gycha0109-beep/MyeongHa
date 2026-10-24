@@ -24,7 +24,12 @@ const CONFIRMATION_GUEST_HANDOFF_ENTRY_PREFIX = 'myeongha.pendingGuestConfirmati
 const CONFIRMATION_GUEST_HANDOFF_TTL_MS = 24 * 60 * 60 * 1000;
 // Keep the same mixed-version namespace used by product-auth.js so promotion cannot cross a newer Member mutation.
 const MEMBER_MUTATION_LOCK_NAME = 'myeongha.memberSession.v1.refresh.lock';
-const WEB_SOCIAL_AUTH_CALLBACK_URI = 'https://myeongha.vercel.app/auth.html?social=callback';
+const WEB_SOCIAL_AUTH_ORIGINS = new Set([
+  'https://myeongha.vercel.app',
+  'https://myeongha.gycha0109.workers.dev',
+  'https://myeongha-web.gycha0109.workers.dev',
+]);
+const WEB_SOCIAL_AUTH_CALLBACK_URI = `${WEB_SOCIAL_AUTH_ORIGINS.has(location.origin) ? location.origin : 'https://myeongha.vercel.app'}/auth.html?social=callback`;
 const WEB_SOCIAL_AUTH_PROVIDERS = new Set(['google', 'kakao', 'naver']);
 const ALLOWED_NEXT = new Set([
   'hall.html',
