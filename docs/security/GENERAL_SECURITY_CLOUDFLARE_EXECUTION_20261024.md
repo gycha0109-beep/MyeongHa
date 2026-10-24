@@ -30,6 +30,12 @@ The actual Ops Worker now wraps recognized API routes with the existing security
 
 ## Current completion boundary
 
+PR #2560 is MERGED into the Ops branch at `e8abb1135b17550f2f4569f2cec920382244cfea`. Exact-head CI run `40130485820`, Governance, Web and GitGuardian passed. This is an Ops source merge, not a main merge or a live deployment claim. A pinned Wrangler 4.151.2 local dry-run compiled the exact merged source: 955.78 KiB uncompressed / 182.97 KiB gzip. The stock Linux-only budget script was not modified or bypassed.
+
+Fresh 2026-10-25 HTTP checks now return 503 `API_NOT_ACTIVATED_ON_PREVIEW` for me and both Saju routes, with health still 200. This differs from the previous Ops/Auth 401/404 behavior and from the reviewed Ops source; a fresh Ops source deployment is needed rather than assuming that the latest platform version contains this PR. No authenticated session was sent into that mismatched version.
+
+The Ops Wrangler configuration now enables Workers Logs for existing application console/security events, with full head sampling and automatic invocation logs disabled. The latter avoids creating a separate request-URL invocation log stream. Numeric rate limits remain exclusively in the DB; this setting does not enable Saju, Auth, or paid plans. Cloudflare native monitor setup and independent provider readback remain required after actual log ingestion is verified. Configuration follows the [official Workers Logs contract](https://developers.cloudflare.com/workers/observability/logs/workers-logs/).
+
 2026-10-25 KST resume: live Worker advanced independently to deployment `58476751-fc92-4de0-9d35-3b91e4347c50`, version `16e4b572-6190-482b-81fe-596bad3c0fe2` (100%). Existing source branch #2420 remains at the source SHA above; no inference that this security change is deployed is made. Binding names now include Saju service origin, but not Saju mode/preview mode or admission activation.
 
 CI run `40104886385` exposed two pre-existing fixture errors, reproduced directly before correction: the supposed route-count corruption set `static.root.n` to its unchanged value 1, and the Face preview test expected no cleanup for an empty invalid string while the existing implementation cleans up every returned string. The fixtures now mutate the count relative to its real value and assert exact cleanup of each invalid candidate. No production validation, evidence acceptance rule, or Face behavior was weakened or changed. Scope expanded only to these mandatory CI failures.
