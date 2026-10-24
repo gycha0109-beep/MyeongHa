@@ -1,0 +1,121 @@
+/* Reference-style free Saju product preview. Server-calculated facts remain authoritative. */
+body.saju-hub-page {
+  background: radial-gradient(ellipse at 52% 1%, #fffaf5 0, #f7eee7 43%, #f4eae3 100%);
+  color: #4d2833;
+}
+body.saju-hub-page .gm-saju-main { padding: 12px 0 72px; }
+body.saju-hub-page .gm-shell { width: min(1180px, calc(100% - 36px)); }
+body.saju-hub-page #saju-hub[hidden],
+body.saju-hub-page .saju-design-chart-content [hidden] { display: none !important; }
+.saju-design-ribbon { max-width: 930px; margin: 0 auto 24px; text-align: center; }
+.saju-design-ribbon > div {
+  display: flex; align-items: center; justify-content: center; gap: 22px;
+  border-radius: 17px; background: linear-gradient(155deg,#6a303e,#874959 44%,#68303f);
+  box-shadow: 0 10px 25px rgba(86,42,49,.13); padding: 13px 18px; color: #fff9f5;
+}
+.saju-design-ribbon strong { font: 700 clamp(18px,2.35vw,31px)/1.22 var(--mh-serif,serif); letter-spacing: -.02em; }
+.saju-design-ribbon strong span { font-size: .73em; font-weight: 500; }
+.saju-design-ribbon b { padding: 5px 22px; border-radius: 999px; background: linear-gradient(#fff9f7,#ecd7d5); color:#763645; font-size: 18px; }
+.saju-design-ribbon p { margin: 9px 0 0; color:#5c2939; font-size: clamp(12px,1.25vw,16px); font-weight: 700; }
+.saju-design-preview { position:relative; border:1px solid #edddd7; border-radius: 16px; overflow:hidden; background:rgba(255,249,243,.5); box-shadow:0 12px 38px rgba(117,66,56,.055); }
+.saju-design-hero { position:relative; min-height:165px; padding:26px 38px 9px; isolation:isolate; overflow:hidden; }
+.saju-design-hero:before { content:""; position:absolute; z-index:-1; inset:0; opacity:.82; background:linear-gradient(90deg,#fff7f1 0%,rgba(255,247,240,.9) 43%,rgba(255,247,241,.32) 90%),url("home-plum-branch.svg") right 11% / auto 215px no-repeat; }
+.saju-design-hero:after { content:""; z-index:-2; position:absolute; inset:0; background: url("home-paper-mountains.svg") right bottom/auto 180px no-repeat; opacity:.52; }
+.saju-design-hero-text { position:relative; z-index:1; max-width:680px; }
+.saju-design-eyebrow { font-size:11px; font-weight:800; letter-spacing:.22em; color:#a45c5e; }
+.saju-design-hero h2 { margin:7px 0 8px; font: 700 clamp(26px,3.1vw,36px)/1.25 var(--mh-serif,serif); color:#54202e; }
+.saju-design-hero p { margin:0; line-height:1.65; font-size:14px; color:#50383a; }
+.saju-design-core { display:grid; grid-template-columns:minmax(0,.95fr) minmax(0,1.08fr); gap:16px; padding:0 35px 12px; align-items:stretch; }
+.saju-design-card { border:1px solid #ead9d0; border-radius:10px; background:rgba(255,250,246,.85); padding:20px 22px 17px; box-shadow:0 3px 13px rgba(128,65,55,.055); min-width:0; }
+.saju-design-card-heading { display:flex; justify-content:space-between; align-items:center; gap:10px; padding-bottom:10px; }
+.saju-design-card h3 { margin:0; color:#54212c; font:700 20px/1.32 var(--mh-serif,serif); }
+.saju-design-edit { flex:0 0 auto; display:inline-flex; align-items:center; min-height:31px; padding:4px 10px; border:1px solid #bb7882; border-radius:8px; color:#8d4658 !important; font-size:11px; font-weight:700; text-decoration:none; }
+.saju-design-edit:hover,.saju-design-edit:focus-visible { background:#f8e9e7; }
+.saju-design-birth-fields { margin:0; display:grid; }
+.saju-design-birth-fields > div { display:grid; grid-template-columns:96px minmax(0,1fr); align-items:baseline; gap:8px; min-height:40px; padding:8px 2px 7px; border-bottom:1px solid #efe5dd; font-size:13px; }
+.saju-design-birth-fields > div:last-child { border-bottom:0; }
+.saju-design-birth-fields dt { color:#85746e; }
+.saju-design-birth-fields dd { margin:0; color:#342a2a; overflow-wrap:anywhere; font-weight:600; }
+.saju-design-source-note { margin:9px 0 0; font-size:10px; color:#a28c83; line-height:1.5; }
+.saju-design-chart-tabs { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin:0 0 10px; }
+.saju-design-chart-tabs button { padding:7px 2px; min-width:0; min-height:32px; border:1px solid #ead9d3; border-radius:999px; background:#fffaf5; color:#968580; font-size:12px; cursor:pointer; }
+.saju-design-chart-tabs button.is-selected { color:#fff9f5; background:linear-gradient(#9a5065,#76384d); border-color:#76384d; }
+.saju-design-chart-tabs button:focus-visible,.saju-design-product-card a:focus-visible,.saju-design-preview-link a:focus-visible { outline:3px solid #b46e81; outline-offset:3px; }
+.saju-design-chart-content { min-height:174px; }
+.saju-design-pillars { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:0; margin:0; padding:0; overflow:hidden; border:1px solid #e8d7c9; border-radius:7px; background:rgba(254,248,240,.74); }
+.saju-design-pillars .saju-pillar { border:0; border-radius:0; min-width:0; min-height:170px; display:flex; flex-direction:column; align-items:center; justify-content:flex-start; gap:4px; background:none; box-shadow:none; padding:0 3px 9px; }
+.saju-design-pillars .saju-pillar + .saju-pillar { border-left:1px solid #e8d7c9; }
+.saju-design-pillars .saju-pillar.is-day { background:linear-gradient(180deg,rgba(255,232,227,.72),transparent); box-shadow:none; }
+.saju-design-pillars .saju-pillar-label { align-self:stretch; text-align:center; padding:8px 0; border-bottom:1px solid #e8d7c9; color:#7f6f67; font-size:11px; }
+.saju-design-pillars .saju-pillar-value { display:flex; flex-direction:column; align-items:center; gap:5px; line-height:1.5; }
+.saju-design-pillars .saju-pillar-value strong { display:block; writing-mode:vertical-rl; text-orientation:upright; letter-spacing:6px; font:700 clamp(25px,2.25vw,32px)/1.4 var(--mh-serif,serif); color:#503c31; }
+.saju-design-pillars .saju-pillar.is-day strong { color:#ae303f; }
+.saju-design-pillars .saju-pillar-value span { color:#88766b; font-size:11px; text-align:center; line-height:1.35; }
+.saju-design-pillars .saju-pillar-meta { color:#a29387; font-size:10px; text-align:center; line-height:1.25; }
+.saju-design-elements-panel,.saju-design-structure-panel { min-height:175px; padding:12px 13px; border:1px solid #e8d7c9; border-radius:7px; background:#fffaf4; }
+.saju-design-elements-panel > p { margin:0 0 10px; font-size:12px; color:#837069; }
+.saju-design-elements-panel .saju-element-bars { display:grid; gap:6px; }
+.saju-design-structure-panel { display:flex; flex-direction:column; justify-content:center; }
+.saju-design-structure-panel strong { color:#76384d; font-size:18px; }
+.saju-design-structure-panel p { color:#86736c; font-size:12px; }
+.saju-design-chart-foot { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:6px; margin-top:9px; color:#99847e; font-size:10px; }
+.saju-design-chart-foot .saju-day-master { display:flex; gap:6px; align-items:center; }
+.saju-design-chart-foot .saju-day-master > span { font-size:10px; }
+.saju-design-chart-foot .saju-day-master strong { font-size:15px; color:#7a394a; }
+.saju-design-chart-foot .saju-day-master small { grid-column:auto; margin:0; font-size:10px; }
+.saju-design-products { padding:14px 35px 0; }
+.saju-design-products h2,.saju-design-example h2 { margin:0; font:700 clamp(21px,2.1vw,26px)/1.45 var(--mh-serif,serif); color:#612835; }
+.saju-design-products > p { margin:3px 0 17px; font-size:13px; color:#8d7773; }
+.saju-design-product-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:13px; }
+.saju-design-product-card { display:flex; flex-direction:column; min-height:255px; min-width:0; padding:15px 17px 14px; border:1px solid #e6d7d2; border-radius:10px; background:rgba(255,250,246,.85); box-shadow:0 3px 12px rgba(112,57,58,.035); }
+.saju-design-product-card header { display:flex; align-items:center; gap:10px; padding-bottom:11px; border-bottom:1px solid #efe1db; }
+.saju-design-topic-symbol { flex:0 0 auto; display:grid; place-items:center; width:41px; height:41px; border-radius:50%; color:#ad6474; background:linear-gradient(145deg,#f9efee,#eecdd0); font:26px/1 var(--mh-serif,serif); }
+.saju-design-product-card h3 { margin:0; font:700 15px/1.4 var(--mh-serif,serif); color:#65313b; }
+.saju-design-product-card ul { margin:12px 0 15px; padding-left:16px; flex:1; color:#644f4e; font-size:12px; line-height:1.85; }
+.saju-design-product-card li::marker { color:#ad6778; }
+.saju-design-product-card a { text-align:center; align-self:stretch; padding:8px 7px; border:1px solid #b26f7c; border-radius:8px; text-decoration:none; color:#834256; font-size:12px; font-weight:700; }
+.saju-design-product-card a:hover { background:#f7e8e6; }
+.saju-design-example { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:20px; align-items:center; margin:19px 35px 25px; padding:15px 20px; border-radius:10px; border:1px solid #eed9d6; background:linear-gradient(110deg,#f5e0df,#f4dedd 65%,#f7e7e5); }
+.saju-design-example h2 span { display:inline-block; padding:2px 13px; margin-left:7px; border-radius:999px; background:#e5bec3; color:#fff; font:600 11px/1.6 var(--mh-sans,sans-serif); vertical-align:middle; }
+.saju-design-example-copy p { margin:9px 0 0; color:#624d4d; font-size:13px; line-height:1.65; }
+.saju-design-example-sheet { border:1px solid #ead1cf; border-radius:7px; background:rgba(255,252,247,.89); padding:18px 22px; box-shadow:0 3px 13px rgba(104,53,59,.05); }
+.saju-design-example-sheet h3 { margin:0 0 8px; padding-bottom:8px; border-bottom:1px solid #efe4e2; color:#4b3434; font:700 16px/1.5 var(--mh-serif,serif); }
+.saju-design-example-sheet p { margin:0; font-size:11px; line-height:1.75; color:#99827e; }
+.saju-design-preview-link { padding:14px 35px 22px; display:flex; align-items:center; justify-content:space-between; gap:12px; border-top:1px solid #eadbd5; font-size:12px; color:#806869; }
+.saju-design-preview-link a { display:inline-block; padding:11px 17px; border-radius:100px; text-decoration:none; color:#fff; background:#824358; font-weight:700; }
+html[data-theme="dark"] body.saju-hub-page { background:#241e25; }
+html[data-theme="dark"] .saju-design-preview { background:#302931; border-color:#694c53; }
+html[data-theme="dark"] .saju-design-hero:before { background:linear-gradient(90deg,rgba(50,41,46,.98),rgba(50,41,46,.75)),url("home-plum-branch.svg") right/auto 215px no-repeat; }
+html[data-theme="dark"] .saju-design-card,html[data-theme="dark"] .saju-design-product-card,html[data-theme="dark"] .saju-design-example-sheet,html[data-theme="dark"] .saju-design-pillars { background:#393038; border-color:#75575f; }
+html[data-theme="dark"] .saju-design-hero h2,html[data-theme="dark"] .saju-design-card h3,html[data-theme="dark"] .saju-design-products h2,html[data-theme="dark"] .saju-design-product-card h3,html[data-theme="dark"] .saju-design-example h2 { color:#f4dce0; }
+html[data-theme="dark"] .saju-design-hero p,html[data-theme="dark"] .saju-design-birth-fields dd,html[data-theme="dark"] .saju-design-product-card ul { color:#ead8d7; }
+html[data-theme="dark"] .saju-design-example { background:#503c45;border-color:#82616d; }
+@media (max-width:850px) {
+ .saju-design-core { padding:0 18px 11px;gap:10px; }
+ .saju-design-card { padding:15px 14px 13px; }
+ .saju-design-products { padding:15px 18px 0; }
+ .saju-design-product-grid { gap:10px; }
+ .saju-design-product-card { padding:12px 11px; }
+ .saju-design-example { margin:17px 18px 23px; }
+}
+@media (max-width:690px) {
+ body.saju-hub-page .gm-shell { width:calc(100% - 20px); }
+ .saju-design-ribbon { margin-bottom:14px; }
+ .saju-design-ribbon > div { gap:12px; padding:11px 8px; }
+ .saju-design-ribbon b { padding:5px 12px; font-size:14px; }
+ .saju-design-hero { min-height:154px; padding:24px 20px 15px; }
+ .saju-design-hero p br { display:none; }
+ .saju-design-core { grid-template-columns:1fr; }
+ .saju-design-chart-content { min-height:160px; }
+ .saju-design-pillars .saju-pillar { min-height:160px; }
+ .saju-design-product-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+ .saju-design-product-card { min-height:228px; }
+ .saju-design-example { grid-template-columns:1fr; gap:11px; }
+ .saju-design-preview-link { flex-direction:column; align-items:stretch; padding:14px 18px 18px; }
+ .saju-design-preview-link a { text-align:center; }
+}
+@media (max-width:350px) {
+ .saju-design-ribbon strong { font-size:15px; }
+ .saju-design-birth-fields > div { grid-template-columns:82px minmax(0,1fr); font-size:12px; }
+ .saju-design-product-grid { grid-template-columns:1fr; }
+}
