@@ -19,6 +19,9 @@ export function assertMainWebCdEnvironment({ workersCi, branch, sha, checkoutSha
 
 export function assertMainWebConfig(config) {
   if (config?.name !== WEB_CD.worker ||
+      !Array.isArray(config?.compatibility_flags) ||
+      config.compatibility_flags.length !== 1 ||
+      config.compatibility_flags[0] !== 'nodejs_compat' ||
       config?.main !== './cloudflare/myeongha-worker.mjs' ||
       config?.workers_dev !== true ||
       config?.preview_urls !== true ||
@@ -51,7 +54,7 @@ function deploy() {
   for (const path of ['public/index.html', 'public/hall.html', 'public/reading.html', 'public/saju-preview-landing.css']) {
     accessSync(resolve(root, path));
   }
-  const args = ['--yes', `wrangler@${WEB_CD.version}`, 'deploy', '--config', WEB_CD.config];
+  const args = ['--yes', `wrangler@${WEB_CD.version}`, 'deploy', '--config', WEB_CD.config, '--keep-vars'];
   console.log(`Cloudflare merged-main single Worker CD: ${checkoutSha} -> ${WEB_CD.worker}`);
   const child = spawnSync('npx', args, {
     cwd: root, stdio: 'inherit', env: process.env,
