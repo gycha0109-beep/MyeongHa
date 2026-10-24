@@ -427,7 +427,10 @@ export async function handleSupabaseAuthRequestV1(input: {
       const providedState = completeBody === null
         ? null
         : readRequiredString(completeBody, 'state', 128);
-      if (refreshToken === null || /\s/u.test(refreshToken)) {
+      if (refreshToken === null || /\s/u.test(refreshToken) ||
+          providedState === null || !/^[A-Za-z0-9_-]{16,128}$/u.test(providedState)) {
+        // Existing verified Social Members also need a well-formed OAuth
+        // correlation value. Never exchange an uncorrelated refresh token.
         return errorResponse('INVALID_REQUEST', 400);
       }
 

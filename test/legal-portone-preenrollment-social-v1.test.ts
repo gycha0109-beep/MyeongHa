@@ -90,6 +90,32 @@ describe('A1 Social Auth preverified age hold and atomic Member binding', () => 
     expect(native.status).toBe(403);
   });
 
+  it('does not exchange even an existing Member Social refresh token without OAuth correlation state', async () => {
+    const fetch = vi.fn();
+    vi.stubGlobal('fetch', fetch);
+    const existing = {
+      ...admission(false),
+      admitExistingMember: vi.fn(async () => true),
+    };
+    for (const state of [undefined, '', 'bad state', 'too-short']) {
+      const payload: Record<string, string> = { refreshToken: 'opaque-oauth-refresh' };
+      if (state !== undefined) payload.state = state;
+      const response = await handleSupabaseAuthRequestV1({
+        request: new Request('https://myeongha.vercel.app/api/auth/social/complete', {
+          method: 'POST', headers: {
+            'Content-Type': 'application/json',
+            'X-MyeongHa-Auth-Transport': 'web-cookie-v1',
+          },
+          body: JSON.stringify(payload),
+        }),
+        env, action: 'social-complete', preenrollmentMemberPort: existing,
+      });
+      expect(response.status).toBe(400);
+      expect(response.headers.get('set-cookie')).toBeNull();
+    }
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
   it('does not grant an unverified OAuth account access on existing-member-only callback', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => Response.json({
       access_token: 'new-access', refresh_token: 'new-refresh', expires_in: 3600,
@@ -199,6 +225,7 @@ describe('A1 Social Auth preverified age hold and atomic Member binding', () => 
       preenrollmentMemberPort: failed,
     });
     expect(blocked.status).toBe(503);
+    expect((await blocked.clone().json()).error.code).toBe('AGE_BINDING_RECOVERY_REQUIRED');
     expect(blocked.headers.get('set-cookie')).toBeNull();
     expect(JSON.stringify(await blocked.json())).not.toContain('fresh-access-token');
   });
