@@ -26,7 +26,16 @@
   "delivery": { "channel": "email", "recipientAuthority": "existing Cloudflare account owner", "recipientCount": 1 },
   "providerConfiguration": "ACTIVE_READBACK_VERIFIED",
   "actualPrimaryLogIngestion": "PENDING_OPS_API_ROLLOUT",
-  "actualNotificationReceipt": "NOT_VERIFIED",
+  "actualNotificationReceipt": "SYNTHETIC_PROVIDER_TEST_RECEIVED",
+  "deliveryTest": {
+    "method": "official Cloudflare monitor Test action; executed once",
+    "providerHistoryId": "6a141d9c-9feb-47f6-b1d4-b7c3e3de1c89",
+    "sentAtUtc": "2026-10-24T20:53:08.807195Z",
+    "receivedAtUtc": "2026-10-24T20:53:15Z",
+    "receiptEvidence": "connected Gmail exact monitor-subject search; one matching Cloudflare notification in INBOX",
+    "rawEmailBodyOrAddressPersisted": false,
+    "organicAnomalyTriggerTested": false
+  },
   "organicBaselineEstablished": false,
   "authorization": "User requested completion including alert activation; clarified Cloudflare as primary server.",
   "observedDateKst": "2026-10-25"

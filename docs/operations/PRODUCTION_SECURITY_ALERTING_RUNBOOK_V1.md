@@ -6,7 +6,7 @@ General security targets Cloudflare Worker `myeongha`, not the auxiliary Vercel 
 
 Workers Logs is enabled in the primary Wrangler config; automatic invocation URL logs are disabled. This persists existing application event output rather than a second application event schema. Provider retention, sampling and attached metadata remain platform-owned. Actual collection requires the matching Worker source/config deployment. Confirm a sanitized existing security event from the exact live version, then inspect the monitor's evaluation and delivery status. `Enabled` alone does not prove email receipt. Do not flood Production to force anomaly detection; use a supported delivery test if available. Current rollout/evidence is in [Cloudflare execution](../security/GENERAL_SECURITY_CLOUDFLARE_EXECUTION_20261024.md).
 
-The Vercel rules below cover the auxiliary provider only and cannot establish Cloudflare completion.
+The official Cloudflare monitor Test action was executed once and its sample notification was independently found in the account-owner mailbox. Synthetic provider notification delivery is verified; organic anomaly firing and actual primary Worker log ingestion remain separate checks. The Vercel rules below cover the auxiliary provider only and cannot establish Cloudflare completion.
 
 ## Purpose
 

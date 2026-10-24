@@ -30,6 +30,8 @@ The actual Ops Worker now wraps recognized API routes with the existing security
 
 ## Current completion boundary
 
+The official monitor **Test** action was executed once. Cloudflare history record `6a141d9c-9feb-47f6-b1d4-b7c3e3de1c89` records dispatch at `2026-10-24T20:53:08.807195Z`; an exact monitor-subject Gmail search found the matching notification from Cloudflare in INBOX at `20:53:15Z`. Synthetic provider notification delivery is VERIFIED. No mailbox address, body, credential, or Gmail message ID is persisted here. This tests provider delivery, not organic anomaly firing or ingestion from the restored live Worker.
+
 PR #2571 is MERGED into Ops at `322b56dafff65f5d243a4915bc23eaab5cd0a5bb` after CI/Governance/Web/GitGuardian passed. The current main single-Worker configuration needs the same log collection setting, so it is carried forward here without changing routing or enabling any API.
 
 Cloudflare native monitor `fab0d24cd73740f5b2dba97766f78a66` was created through the supported dashboard and independently read back with the official `alerting/v3/policies` API: enabled, exact account and `scriptName=myeongha`, `ACCESS_DENIED`/`RATE_LIMITED` event count query, `zscore_spike`, native defaults 3.5 sigma / 5m recent / 4h baseline, actual execution interval 1m, repeat 1h, existing account-owner email recipient count 1. The query returns aggregate counts only and its preview showed zero for the available window. This is not an organic baseline, live event collection proof, or notification receipt. Source query and provider authority are in `config/security/cloudflare-primary-*`.
