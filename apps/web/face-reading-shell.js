@@ -2,6 +2,7 @@ import { resolveCharacterDisplayNameV1 } from './character-display-locale.js';
 import { READER_PRESENTATIONS, findReaderPresentation } from './reader-presentation-catalog.js';
 import { createDelegatePicker } from './reader-picker-dialog.js';
 import { faceReadingUiStateV1 } from './face-reading-ui-locale.js';
+import { createEphemeralFacePreviewUrlV1 } from './face-preview-object-url.js';
 import { getUiLocale, translateStaticUi } from './ui-i18n.js';
 
 const camera = document.querySelector('[data-face-camera]');
@@ -28,6 +29,7 @@ const statusCopy = document.querySelector('[data-face-status-copy]');
 let selectionRevision = 0;
 let selectedFile = null;
 let previewPhase = 'idle';
+const previewObjectUrl = createEphemeralFacePreviewUrlV1();
 
 function resolveInitialReader() {
   const readerKey = new URL(window.location.href).searchParams.get('reader');
@@ -75,6 +77,7 @@ function renderReader() {
 }
 
 function setIdlePreview() {
+  previewObjectUrl.clear();
   selectedFile = null;
   previewPhase = 'idle';
   image.onload = null;
@@ -102,7 +105,8 @@ function rejectPreview(phase) {
 }
 
 function showSelectedFile(file) {
-  selectedFile = file;
+  // Keep only the UI metadata, not the original File or its EXIF payload.
+  selectedFile = { name: file.name, size: file.size };
   previewPhase = 'ready';
   placeholder.hidden = true;
   corners.hidden = false;
@@ -125,39 +129,28 @@ function choose(file) {
   previewPhase = 'loading';
   renderReader();
 
-  const reader = new FileReader();
-
-  reader.onerror = () => {
+  // No Base64 data URL, HTTP upload or persistent image store. The object
+  // URL is limited to this preview and explicitly revoked on every reset.
+  image.onload = () => {
     if (revision !== selectionRevision) return;
+    image.onload = null;
+    image.onerror = null;
+    image.hidden = false;
+    showSelectedFile(file);
+  };
+  image.onerror = () => {
+    if (revision !== selectionRevision) return;
+    rejectPreview('image-error');
+  };
+
+  try {
+    image.src = previewObjectUrl.open(file);
+    // Input elements must not retain a second reference to the source File.
+    camera.value = '';
+    gallery.value = '';
+  } catch {
     rejectPreview('read-error');
-  };
-
-  reader.onload = () => {
-    if (revision !== selectionRevision) return;
-
-    const source = typeof reader.result === 'string' ? reader.result : '';
-    if (!source.startsWith('data:image/')) {
-      rejectPreview('invalid-image');
-      return;
-    }
-
-    image.onload = () => {
-      if (revision !== selectionRevision) return;
-      image.onload = null;
-      image.onerror = null;
-      image.hidden = false;
-      showSelectedFile(file);
-    };
-
-    image.onerror = () => {
-      if (revision !== selectionRevision) return;
-      rejectPreview('image-error');
-    };
-
-    image.src = source;
-  };
-
-  reader.readAsDataURL(file);
+  }
 }
 
 function openPhotoPicker(input) {
@@ -198,6 +191,8 @@ galleryButton?.addEventListener('click', () => openPhotoPicker(gallery));
 camera?.addEventListener('change', event => choose(event.currentTarget.files?.[0] ?? null));
 gallery?.addEventListener('change', event => choose(event.currentTarget.files?.[0] ?? null));
 readerChangeButton?.addEventListener('click', openReaderPicker);
+// Revoke any remaining blob URL on navigation/BFCache entry, not on tab hide.
+window.addEventListener('pagehide', resetPreview);
 
 renderReader();
 

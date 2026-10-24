@@ -63,6 +63,8 @@ describe('Face Reading 연결자 selection presentation', () => {
     expect(shared).toContain('image.src = reader.portrait');
     expect(html).toContain('data-face-reader-change');
     expect(runtime).toContain('analyze.disabled = true');
-    expect(runtime).toContain('new FileReader()');
+    expect(runtime).toContain('previewObjectUrl.open(file)');
+    expect(runtime).toContain("window.addEventListener('pagehide', resetPreview)");
+    expect(runtime).not.toContain('new FileReader()');
   });
 });
