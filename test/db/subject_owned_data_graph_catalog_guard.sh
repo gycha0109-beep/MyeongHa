@@ -41,6 +41,14 @@ order by 1, 2;
 SQL
 )"
 
+# P0-PR-01 historical 30-edge inventory is immutable. The new signup-only
+# wallet is separately classified DELETE and enforced by the 1730 erasure trigger.
+# It is NOT retained Commerce payment evidence.
+if ! printf '%s\n' "$actual" | grep -Fxq 'chat_credit_lots_v1|subject_id'; then
+  echo "Expected private signup wallet FK and deletion coverage are absent." >&2
+  exit 1
+fi
+actual="$(printf '%s\n' "$actual" | sed '/^chat_credit_lots_v1|subject_id$/d')"
 if [[ "$actual" != "$expected" ]]; then
   echo "Subject-owned data graph inventory drifted." >&2
   echo "--- inventory" >&2
