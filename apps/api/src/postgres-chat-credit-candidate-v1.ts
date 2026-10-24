@@ -85,7 +85,7 @@ export function createPostgresChatCreditCandidatePortsV1(input: Readonly<{
   }
   return Object.freeze({
     balance: Object.freeze({
-      async readCurrentSpendable({ verifiedSubjectId }) {
+      async readCurrentSpendable({ verifiedSubjectId }: Parameters<ChatCreditAvailableBalancePortV1['readCurrentSpendable']>[0]) {
         matchSubject(verifiedSubjectId);
         const result=await input.client.query<BalanceRowV1>(BALANCE_SQL,[subject]);
         const row=single(result.rows);
@@ -96,7 +96,7 @@ export function createPostgresChatCreditCandidatePortsV1(input: Readonly<{
       },
     }),
     reservation: Object.freeze({
-      async reserveForReply({ verifiedSubjectId,threadId,clientTurnId,requiredCredits }): Promise<ChatCreditAtomicReservationOutcomeV1> {
+      async reserveForReply({ verifiedSubjectId,threadId,clientTurnId,requiredCredits }: Parameters<ChatCreditAtomicReservationPortV1['reserveForReply']>[0]): Promise<ChatCreditAtomicReservationOutcomeV1> {
         matchSubject(verifiedSubjectId);
         if (requiredCredits!==10 || !uuid(threadId) || !uuid(clientTurnId)) {
           throw new Error('Credit reservation scope/amount invalid.');
