@@ -1,5 +1,6 @@
 import { ensureActiveBearer, getActiveBearer, invalidateGuestSession, invalidateMemberSession } from './product-auth.js';
 import { getUiLocale } from './ui-i18n.js';
+import { resumePreviewHrefV1 } from './reading-preview-continuation.js';
 import { installSajuOverviewRetryV1, loadSajuOverviewReadingV1 } from './saju-overview-reading.js';
 import {
   sajuPillarLabelV1, sajuElementLabelV1, sajuYinYangLabelV1,
@@ -138,6 +139,18 @@ async function readBirthProfile(token, birthProfileId) {
   }
 }
 
+// The calculation endpoint independently authorizes the current subject/revision.
+// Failure to fetch optional birth-summary labels must not discard real calculated pillars.
+async function readDisplayBirthProfile(token, birthProfileId) {
+  if (!birthProfileId) return null;
+  try {
+    return await readBirthProfile(token, birthProfileId);
+  } catch (error) {
+    if (error?.status === 401 || error?.status === 403) throw error;
+    return null;
+  }
+}
+
 async function calculateSaju(token) {
   const response = await fetch(SAJU_CALCULATION_ENDPOINT, {
     method: 'POST',
@@ -255,6 +268,8 @@ function buildBirthRequest() {
 
 function setState(state, message = '') {
   const status = byId('saju-status');
+  const retry = byId('saju-calculation-retry');
+  retry.hidden = state !== 'error';
   const empty = byId('saju-empty');
   const hub = byId('saju-hub');
   status.hidden = state !== 'loading' && !message;
@@ -361,6 +376,45 @@ function formatBirthSummary(profile, locale = 'ko-KR') {
   return [date, time, calendar].filter(Boolean).join(' · ') || localizeSajuCopyV1('현재 자기 Birth Profile과 연결된 계산 결과입니다.',locale);
 }
 
+let lastRenderedBirthProfile = null;
+
+// Present only server-owned Birth Profile facts; never invent birthplace or sex.
+function renderBirthDetails(profile, locale = getUiLocale()) {
+  const input = profile?.currentRevision?.input;
+  const missing = locale === 'ja-JP' ? '確認できません' : locale === 'zh-TW' ? '無法確認' : '확인 불가';
+  const unavailable = locale === 'ja-JP' ? '入力項目なし' : locale === 'zh-TW' ? '未提供' : '제공되지 않음';
+  const byLocale = (ko, ja, zh) => locale === 'ja-JP' ? ja : locale === 'zh-TW' ? zh : ko;
+  const sourceDate = typeof input?.birthDate === 'string' && STORED_BIRTH_DATE_PATTERN.test(input.birthDate)
+    ? input.birthDate : null;
+  const dateParts = sourceDate?.split('-').map(Number);
+  const date = dateParts
+    ? byLocale(`${dateParts[0]}년 ${dateParts[1]}월 ${dateParts[2]}일`,
+      `${dateParts[0]}年${dateParts[1]}月${dateParts[2]}日`,
+      `${dateParts[0]}年${dateParts[1]}月${dateParts[2]}日`)
+    : missing;
+  const calendar = input?.calendarType === 'lunar'
+    ? byLocale('음력', '旧暦', '農曆')
+    : input?.calendarType === 'solar' ? byLocale('양력', '新暦', '國曆') : missing;
+  const time = input?.timeKnown === false ? byLocale('시간 모름', '時刻不明', '時間不詳') :
+    typeof input?.birthTime === 'string' && /^(?:[01]\d|2[0-3]):[0-5]\d$/u.test(input.birthTime)
+      ? (() => {
+          const [hour, minute] = input.birthTime.slice(0,5).split(':').map(Number);
+          return byLocale(`${hour < 12 ? '오전' : '오후'} ${hour % 12 || 12}시 ${String(minute).padStart(2, '0')}분`,
+            `${hour}:${String(minute).padStart(2, '0')}`, `${hour}:${String(minute).padStart(2, '0')}`);
+        })() : missing;
+  const sex = input?.sex === 'female' ? byLocale('여성', '女性', '女性') :
+    input?.sex === 'male' ? byLocale('남성', '男性', '男性') :
+    input?.sex === 'unspecified' || input?.sex === null ? byLocale('미입력', '未指定', '未指定') : missing;
+  const place = typeof input?.birthPlace === 'string' && input.birthPlace.trim()
+    ? input.birthPlace.trim() : unavailable;
+  byId('saju-birth-date-display').textContent = date + (sourceDate ? ` (${calendar})` : '');
+  byId('saju-birth-time-display').textContent = time;
+  byId('saju-birth-sex-display').textContent = sex;
+  byId('saju-birth-place-display').textContent = place;
+  byId('saju-birth-calendar-display').textContent =
+    input ? `${calendar} · ${byLocale('서버 계산 기준', 'サーバー計算基準', '伺服器計算基準')}` : missing;
+}
+
 function retranslateCalculatedSaju() {
   const hub = document.getElementById('saju-hub');
   if (!hub || hub.hidden) return;
@@ -394,11 +448,13 @@ function retranslateCalculatedSaju() {
   );
   const birthSummary = byId('saju-birth-summary');
   birthSummary.textContent = birthSummary.dataset['saju' + suffix] ?? birthSummary.textContent;
+  renderBirthDetails(lastRenderedBirthProfile, locale);
   byId('saju-flow-year').textContent = sajuCurrentYearLabelV1(new Date().getFullYear(),locale);
 }
 document.addEventListener('myeongha:localechange', retranslateCalculatedSaju);
 
 function renderCalculation(calculation, profile) {
+  lastRenderedBirthProfile = profile;
   const snapshot = calculation?.snapshot;
   if (!snapshot || typeof snapshot !== 'object') throw new Error('Saju snapshot is unavailable.');
   renderPillars(snapshot);
@@ -435,7 +491,7 @@ function storedProfileHasSupportedBirthDate(profile) {
 }
 
 function showCalculationUnavailable() {
-  setState('error', '출생정보는 등록되어 있지만 현재 사주 계산 서비스를 사용할 수 없습니다. 입력을 다시 등록하지 말고 잠시 후 새로고침해 주세요.');
+  setState('error', '출생정보는 저장되어 있습니다. 다시 입력하지 말고 계산 재시도 버튼으로 결과를 확인해 주세요.');
 }
 
 async function loadExistingSaju() {
@@ -456,7 +512,7 @@ async function loadExistingSaju() {
   setState('loading', '현재 세션의 명식을 확인하는 중입니다…');
 
   try {
-    let profile = birthProfileId ? await readBirthProfile(token, birthProfileId) : null;
+    let profile = await readDisplayBirthProfile(token, birthProfileId);
     if (birthProfileId && profile === null) removeSessionValue(BIRTH_PROFILE_ID_KEY);
 
     if (profile && !storedProfileHasSupportedBirthDate(profile)) {
@@ -468,7 +524,7 @@ async function loadExistingSaju() {
     const calculation = await calculateSaju(token);
     if (!profile) {
       const storedId = readSessionValue(BIRTH_PROFILE_ID_KEY);
-      profile = storedId ? await readBirthProfile(token, storedId) : null;
+      profile = await readDisplayBirthProfile(token, storedId);
     }
     renderCalculation(calculation, profile);
     void loadSajuOverviewReadingV1(activeBearer);
@@ -511,9 +567,11 @@ async function submitBirthProfile(event) {
     const receipt = await createBirthProfile(token, request);
     profileCreated = true;
     const calculation = await calculateSaju(token);
-    const profile = await readBirthProfile(token, receipt.birthProfileId);
+    const profile = await readDisplayBirthProfile(token, receipt.birthProfileId);
     renderCalculation(calculation, profile);
     void loadSajuOverviewReadingV1(activeBearer);
+    const continuedPreview = resumePreviewHrefV1(window.location.search);
+    if (continuedPreview) window.location.assign(continuedPreview);
   } catch (error) {
     if (error?.status === 401) {
       handleUnauthorized(activeBearer);
@@ -551,6 +609,7 @@ for (const input of document.querySelectorAll('input[name="saju-calendar"]')) {
   input.addEventListener('change', syncBirthControls);
 }
 byId('saju-birth-form').addEventListener('submit', submitBirthProfile);
+byId('saju-calculation-retry').addEventListener('click', () => void loadExistingSaju());
 
 syncBirthControls();
 void loadExistingSaju();

@@ -18,6 +18,8 @@ import {
 
 const RID='11111111-1111-4111-8111-111111111111';
 const GID='22222222-2222-4222-8222-222222222222';
+const currentUserMessageRef='33333333-3333-4333-8333-333333333333';
+const currentUserText='Synthetic current user question';
 const hash=(value:unknown)=>'sha256:v1:'+
   createHash('sha256').update(canonicalJson(value)).digest('hex');
 const memory:SeyeonRetrievedMemoryV2={
@@ -35,7 +37,7 @@ const candidate:SeyeonPersonalRecordProjectionCandidateV1={
   permitsAtomicCommit:false,permitsHttpReveal:false,
 };
 const contextInput:RunSeyeonCharacterTurnV2Input['contextInput']={
-  relationship:null,recentMessages:[],retrievedMemories:[memory],
+  relationship:null,recentMessages:[{messageId:currentUserMessageRef,role:'user',text:currentUserText}],retrievedMemories:[memory],
 };
 const original=assembleSeyeonRuntimeContextV2({
   ...contextInput,relationshipSemantics:null,integrityDecisions:[],
@@ -50,12 +52,24 @@ const base={
   pinnedContextInputDigest:hash(contextInput),
   selectedSourcesDigest:selected.selectedSourcesDigest,
   sourceCandidates:[candidate],
+  currentUserMessageRef,currentUserText,
   assembledContext:original,
 };
 
 describe('S3/G1 original Memory final Interpreter packet seal (offline)',()=>{
   it('keeps the same complete deterministic one-Memory model Context',()=>{
     expect(()=>assertSeyeonPositiveG1FinalModelContextSealV1(base)).not.toThrow();
+  });
+
+  it('requires the exact original current user and rejects absent, past, duplicate or assistant messages',()=>{
+    const current=contextInput.recentMessages[0]!;
+    for(const messages of [[],[current,current],[{...current,role:'assistant' as const}],
+      [{...current,messageId:RID}],[{...current,text:'another question'}]]) {
+      const pinnedContextInput={...contextInput,recentMessages:messages};
+      expect(()=>assertSeyeonPositiveG1FinalModelContextSealV1({
+        ...base,pinnedContextInput,pinnedContextInputDigest:hash(pinnedContextInput),
+      })).toThrow(SeyeonPositiveG1FinalModelContextHoldV1);
+    }
   });
 
   it('rejects rehashed selection of another original Grant before Provider',()=>{

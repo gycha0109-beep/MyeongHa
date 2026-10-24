@@ -3,6 +3,7 @@ import { getUiLocale, translateStaticUi } from './ui-i18n.js';
 import { readingScopeLabelV1, readingSceneProgressV1, readingRouteStateCopyV1 } from './reading-detail-ui-locale.js';
 import { resolveReadingDetailRoute } from './reading-detail-route.js';
 import { resolveSajuButtonEngineRequest } from './reading-saju-engine-request.js';
+import { previewSetupHrefV1 } from './reading-preview-continuation.js';
 import { isBrowserSajuPreviewDeliveryV1 } from './saju-preview-response-admission.js';
 import {
   getActiveBearer, invalidateGuestSession, invalidateMemberSession,
@@ -316,6 +317,10 @@ function renderPreviewFailure(title, copy, state = 'preview_unavailable') {
   if (productTitle) productTitle.textContent = route.label;
   if (stateTitle) stateTitle.textContent = title;
   if (stateCopy) stateCopy.textContent = copy;
+  if (state === 'preview_requires_profile' && routeAction) {
+    routeAction.setAttribute('href', previewSetupHrefV1(params));
+    routeAction.textContent = '출생정보 입력 후 이 사주 읽기 보기 →';
+  }
 }
 
 function invalidateActiveBearer(activeBearer) {
