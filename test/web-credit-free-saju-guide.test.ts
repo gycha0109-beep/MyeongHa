@@ -41,7 +41,10 @@ describe('Web credit guidance and free Saju contract', () => {
     for (const field of ['saju-birth-summary','saju-pillar-grid','saju-day-master','saju-element-bars','saju-completeness-copy']) {
       expect(page).toContain(field);
     }
-    expect(page).toContain('무료 프리뷰 화면');
+    expect(page).not.toContain('무료 프리뷰 화면');
+    expect(page).not.toContain('나의 전체 사주 해석');
+    expect(page).toContain('다른 사주 주제');
+    expect(page).not.toContain('<details className="saju-design-more">');
     expect(page).toContain('나의 사주 기본 정보');
     expect(page).toContain('saju-design-birth-fields');
     expect(page).toContain('saju-design-chart-tabs');
@@ -55,6 +58,7 @@ describe('Web credit guidance and free Saju contract', () => {
     expect(page).not.toContain('product_offer_id');
     expect(page).not.toContain('entitlement: true');
     expect(hub).toContain("const SAJU_CALCULATION_ENDPOINT = '/api/me/saju/calculation'");
+    expect(hub).toContain("fetch('/api/me/birth-profile'");
     expect(admission).toContain("payload.data.lifecycle !== 'preview'");
   });
 });
