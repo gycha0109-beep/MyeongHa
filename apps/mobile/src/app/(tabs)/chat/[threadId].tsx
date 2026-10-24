@@ -69,6 +69,9 @@ function ValidChatThread({ threadId }: { threadId: string }) {
         <ChatReadMessages snapshot={snapshot} />
         <ChatReadMore snapshot={snapshot} onLoadMore={() => void loadMore()} onRetry={() => void refresh()} />
       </ScrollView>
+      <View style={styles.aiDisclosure} accessible accessibilityRole="text">
+        <MobileUiText style={styles.aiDisclosureText}>이 대화의 캐릭터 답변은 생성형 AI가 작성합니다. 캐릭터는 실제 사람이 아니며, 답변은 사실과 다를 수 있습니다.</MobileUiText>
+      </View>
       <ChatComposer
         snapshot={snapshot}
         draft={draft}
@@ -123,6 +126,16 @@ export default function ChatThreadScreen() {
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: mobileColors.canvas },
   room: { flex: 1 },
+  aiDisclosure: {
+    paddingHorizontal: 16,
+    paddingVertical: 7,
+    backgroundColor: mobileColors.canvas,
+  },
+  aiDisclosureText: {
+    color: mobileColors.muted,
+    fontSize: 11,
+    lineHeight: 17,
+  },
   stream: { flex: 1 },
   seyeonThemeBackground: { flex: 1 },
   seyeonThemeImage: { opacity: 0.98 },

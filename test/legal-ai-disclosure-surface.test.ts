@@ -5,6 +5,20 @@ const landing = readFileSync(new URL('../apps/web/src/landing/LandingPage.tsx', 
 const chat = readFileSync(new URL('../apps/web/src/chat/ChatPage.tsx', import.meta.url), 'utf8');
 
 describe('LEGAL L5: visible generative-AI disclosures', () => {
+  it('discloses generated characters on native mobile before character selection', () => {
+    const hub = readFileSync(new URL('../apps/mobile/src/app/(tabs)/chat/index.tsx', import.meta.url), 'utf8');
+    expect(hub).toContain('명하의 캐릭터 대화는 생성형 인공지능을 이용합니다.');
+    expect(hub).toContain('캐릭터는 실제 사람이 아니며');
+    expect(hub.indexOf('명하의 캐릭터 대화는 생성형 인공지능')).toBeLessThan(hub.indexOf('style={styles.roster}'));
+  });
+
+  it('keeps the native chat AI-result disclosure visible before the composer', () => {
+    const thread = readFileSync(new URL('../apps/mobile/src/app/(tabs)/chat/[threadId].tsx', import.meta.url), 'utf8');
+    expect(thread).toContain('이 대화의 캐릭터 답변은 생성형 AI가 작성합니다.');
+    expect(thread.indexOf('이 대화의 캐릭터 답변은 생성형 AI')).toBeLessThan(thread.indexOf('<ChatComposer'));
+    expect(thread).toContain('<View style={styles.aiDisclosure}');
+  });
+
   it('states the AI-based nature before the public entry action', () => {
     const notice = landing.match(/<p\s+className="landing-description"\s+data-legal-ai-prior-notice>([\s\S]*?)<\/p>/u);
     expect(notice).not.toBeNull();

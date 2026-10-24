@@ -45,6 +45,7 @@ export default function ChatHubScreen() {
         <MobileUiText style={styles.body}>
           마음이 가는 인물을 고르세요. 각 연결자의 이야기와 분위기가 다릅니다.
         </MobileUiText>
+        <MobileUiText style={styles.note} accessibilityRole="text">명하의 캐릭터 대화는 생성형 인공지능을 이용합니다. 캐릭터는 실제 사람이 아니며, 대화 답변은 AI가 생성합니다.</MobileUiText>
         <MobileUiText style={styles.note}>대화 열기는 회원 로그인 후 가능합니다. 일부 AI 답변과 기존 기록은 현재 이용이 제한될 수 있습니다.</MobileUiText>
         {state.access === 'checking' ? (
           <View style={styles.centerState}>
