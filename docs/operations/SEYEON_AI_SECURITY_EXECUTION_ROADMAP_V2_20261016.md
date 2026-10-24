@@ -699,3 +699,9 @@ S8의 **비파괴/격리 검토는 S2~S7과 병렬 진행 가능**하며, S8 Pro
 실행에서 확인한 current User 1건을 과거 메시지로 오인한 G1 seal 결함과 `threadCharacterId` UUID/slug 불일치를 직접 caller/guard에서 수정했다. 원본 현재 질문 ID/text의 정확한 일치, 전체 context/source digest, 단일 Se-yeon thread와 현재 원본 Grant 검사는 유지한다. 직접 회귀 50/50과 타입/빌드 PASS. 실제 모델 정상/전송 전 철회 2/2 PASS 및 사전 G1 철회 1/1 PASS(모델·count 요청 0회)는 [실행 증거](SEYEON_AI_SECURITY_REAL_MODEL_E2E_20261024.md)에 구분해서 기록했다.
 
 상태는 **격리 실제 모델 서버 경계 VERIFIED**다. 가상 identity와 로컬 PG18/TLS 없는 pool seam을 사용했으므로 hosted Auth·운영 DB/DR·외부 proxy V/R/S/ACK·공개 활성화 또는 전체 트랙 종료는 여전히 입증하지 않는다. 운영 정책/registry/예산/route/DDL 적용은 없다. 브랜치 변경의 CI/병합 상태는 PR의 정확한 SHA 증거로 별도 기록한다.
+
+## 65. 2026-10-25 운영 적용 재개
+
+사용자가 “운영 적용까지 밀어”, “작업 재개”를 지시했으므로 운영 실행 승인 재요청은 하지 않는다. 최신 `main@dc52b80c`와 실제 운영 DB/Worker를 조회하고 운영 백업 #40104377484의 격리 PG17.6 복원 #40130586169를 성공시켰다. 최초 복원 실패는 `watchtower_track=security` 입력이 `ops` 사전 조건과 불일치한 것이며, DB 복원 전에 중단됐다. 공개 HTTPS의 첫 전송·기록 조회·encoded alias는 비인증 401/503/no-store 및 HTML fallback 없음으로 확인했다.
+
+**운영 활성화 HOLD:** 단일 운영 Worker는 Fetch fence를 사용하고, S0 positive 구현은 동일 Node socket을 요구하여 현재 배포 consumer가 없다. 운영 DB에도 S0 schema/registry/G1/G2/G3가 없다. Node `finish`나 Fetch 반환을 Cloudflare 실제 송출/철회 증거로 바꾸지 않는다. G0-D04 기술 판정·SRC-25 운영 타입 결정은 사용자 운영 실행 승인과 별도이며 자동 서명하지 않는다. 복원 증거도 `dr_ready=false`로 전체 provider 복구를 주장하지 않는다. 구체적 증거·남은 실행 순서는 [운영 재개 기록](SEYEON_AI_SECURITY_PRODUCTION_ROLLOUT_20261025.md)에 남겼다. 이번에 운영 DDL/DML/ACL/secret/traffic 변경은 하지 않았다.
