@@ -70,6 +70,10 @@ describe('Legal A1 native-to-web preenrollment admission', () => {
     expect(panel).toContain(disclosure);
     expect(panel).toContain('webPreenrollmentRequired ?');
     expect(panel).toContain('공식 웹에서 가입·본인확인');
+    expect(panel).toContain('{!webPreenrollmentRequired ? <View style={themedStyles.socialActions}>');
+    expect(panel).toContain('{webPreenrollmentRequired ? (');
+    expect(panel).toContain('새 계정은 현재 게스트 주체를 그대로 회원으로 승격합니다.');
+
     const screen = readFileSync(new URL(
       '../apps/mobile/src/app/(tabs)/my/index.tsx', import.meta.url,
     ), 'utf8');

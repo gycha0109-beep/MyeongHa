@@ -109,7 +109,7 @@ export function MyMemberAuthCard({
       {verificationRequired === null ? (
         <>
 
-          <View style={themedStyles.socialActions}>
+          {!webPreenrollmentRequired ? <View style={themedStyles.socialActions}>
             {([
               ['google', 'Google로 계속'],
               ['kakao', '카카오로 계속'],
@@ -127,7 +127,11 @@ export function MyMemberAuthCard({
                 </Text>
               </Pressable>
             ))}
-          </View>
+          </View> : (
+            <MobileUiText style={themedStyles.caption}>
+              현재 앱의 소셜 로그인은 본인확인 적용 중 사용할 수 없습니다. 웹의 소셜 로그인 세션은 앱으로 자동 연결되지 않습니다.
+            </MobileUiText>
+          )}
           {socialPendingProvider !== null ? (
             <>
               <MobileUiText style={themedStyles.caption}>
@@ -203,12 +207,15 @@ export function MyMemberAuthCard({
               {webPreenrollmentRequired ? '공식 웹에서 가입·본인확인' : '새 계정 만들기'}
             </MobileUiText>
           </Pressable>
-          <MobileUiText style={themedStyles.caption}>
-            새 계정은 현재 게스트 주체를 그대로 회원으로 승격합니다. 기존 회원 계정과의 게스트 기록 병합은 아직 지원하지 않습니다.
-          </MobileUiText>
-          <MobileUiText style={themedStyles.caption}>
-            연령 본인확인이 필요한 경우 공식 웹 브라우저에서 새 계정을 만든 뒤 앱에 로그인해 주세요.
-          </MobileUiText>
+          {webPreenrollmentRequired ? (
+            <MobileUiText style={themedStyles.caption}>
+              연령 본인확인이 필요한 경우 공식 웹 브라우저에서 새 계정을 만든 뒤 앱에 로그인해 주세요.
+            </MobileUiText>
+          ) : (
+            <MobileUiText style={themedStyles.caption}>
+              새 계정은 현재 게스트 주체를 그대로 회원으로 승격합니다. 기존 회원 계정과의 게스트 기록 병합은 아직 지원하지 않습니다.
+            </MobileUiText>
+          )}
         </>
       ) : (
         <>
