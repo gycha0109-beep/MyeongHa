@@ -4,6 +4,12 @@
 -- authorized. The existing Se-yeon AI provider cost ledger is independent.
 -- Watchtower-Track: commerce-payment
 
+-- This extends Product Type only within a disposable candidate database.
+-- It is NOT a Production migration or approval to sell credits.
+alter table public.products drop constraint products_type_check;
+alter table public.products add constraint products_type_check
+  check (product_type in ('reading','episode','subscription','bundle','credit'));
+
 create table public.chat_credit_lots_v1 (
   id uuid primary key default pg_catalog.gen_random_uuid(),
   subject_id uuid not null references public.subjects(id),
