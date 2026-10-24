@@ -206,7 +206,7 @@ declare
   v_now timestamptz;
   v_guest record;
 begin
-  if p_binding_digest is null or p_binding_digest !~ '^[a-f0-9]{64} then
+  if p_binding_digest is null or p_binding_digest !~ '^[a-f0-9]{64}$' then
     raise exception using errcode='23514',
       constraint='legal_portone_preenrollment_required';
   end if;

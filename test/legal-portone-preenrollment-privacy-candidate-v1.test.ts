@@ -49,6 +49,8 @@ describe('L2 A1 Privacy HOLD on subjectless identity proof', () => {
     expect(proposal.split('commit;')).toHaveLength(2);
     expect(proposal).not.toContain('commit;\\n then');
     expect(proposal).toContain("p_binding_digest !~ '^[a-f0-9]{64}$'");
+    expect(proposal).not.toContain("p_binding_digest !~ '^[a-f0-9]{64} then");
+    expect(proposal).toContain("if p_binding_digest is null or p_binding_digest !~ '^[a-f0-9]{64}$' then");
     expect(proposal).toContain('public.qry_verified_legal_portone_preenrollment_v1');
     expect(proposal).toContain('public.cmd_bind_verified_member_preenrollment_v1');
     const pgSmoke = read('test/db/portone_identity_age_authority_pg17.sh');
