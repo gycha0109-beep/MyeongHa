@@ -24,7 +24,7 @@
 
 이 목록은 `main` Git 트리의 `api/**/*.ts` 직접 엔트리 파일을 확인한 결과다. 임의의 파일명만으로 새 public API를 추가하지 않는다.
 
-## 2. Vercel rewrites: 17개 원본 기준 전체 목록
+## 2. Vercel rewrites: 현재 19개 (초기 17개에서 기억 권한 경로 2개 추가)
 
 | # | 공개 경로 | 현재 Vercel 함수/marker | Workers 설계 판단 |
 |---:|---|---|---|
@@ -39,14 +39,16 @@
 | 9 | `/api/chat/:threadId` | `me?__myeongha_chat_thread_id=:threadId` | Chat read owner |
 | 10 | `/api/life-record` | `me?__myeongha_records_read=life-record` | Subject private read |
 | 11 | `/api/readings` | `me?__myeongha_records_read=readings` | Reading product scope |
-| 12 | `/api/memories` | `me?__myeongha_records_read=memories` | Consent/retraction read |
-| 13 | `/api/birth-profiles/:id` | `birth-profiles?__myeongha_birth_profile_id=:id` | Revision/owner authorization |
-| 14 | `/api/device-installations/register` | `me?__myeongha_device_installation_action=register` | Subject/device authorization |
-| 15 | `/api/device-installations/:id/revoke` | `me?__myeongha_device_installation_action=revoke&__myeongha_device_installation_id=:id` | Device revoke |
-| 16 | `/api/target-persons` | `me?__myeongha_target_person_read=list` | Target person owner |
-| 17 | `/api/target-persons/:id` | `me?__myeongha_target_person_read=detail&__myeongha_target_person_id=:id` | Detail cross-user deny |
+| 12 | `/api/memories/:memoryItemId/grants/seyeon/revoke` | `me?__myeongha_seyeon_memory_grant_revoke_id=:memoryItemId` | 세연 기억 권한 철회; DB Authority 인수 전 404 HOLD |
+| 13 | `/api/memories/:memoryItemId/grants/seyeon` | `me?__myeongha_seyeon_memory_grant_status_id=:memoryItemId` | 세연 기억 권한 상태; subject/scope 확인 전 404 HOLD |
+| 14 | `/api/memories` | `me?__myeongha_records_read=memories` | Consent/retraction read |
+| 15 | `/api/birth-profiles/:id` | `birth-profiles?__myeongha_birth_profile_id=:id` | Revision/owner authorization |
+| 16 | `/api/device-installations/register` | `me?__myeongha_device_installation_action=register` | Subject/device authorization |
+| 17 | `/api/device-installations/:id/revoke` | `me?__myeongha_device_installation_action=revoke&__myeongha_device_installation_id=:id` | Device revoke |
+| 18 | `/api/target-persons` | `me?__myeongha_target_person_read=list` | Target person owner |
+| 19 | `/api/target-persons/:id` | `me?__myeongha_target_person_read=detail&__myeongha_target_person_id=:id` | Detail cross-user deny |
 
-**초기 프리뷰는 29개 경로 모두 차단했다. 이후 로드맵 4단계에서 직접 엔트리 중 `GET /api/health`만 외부 의존성 없는 `200 {"status":"ok"}` 상태 확인으로 허용했다.** `/api/health`는 GET 이외 메서드 405, 쿼리/인코딩 변형 404이며 **readiness의 TLS Canary는 404 차단**이다. 나머지 API와 17개 rewrites는 여전히 404, `POST /api/chat/:threadId/turns`는 별도 503 HOLD다. 경로 매칭은 `workers/cloudflare-api-router.mjs`에 표와 1:1로 고정하고, Vercel의 marker query를 privileged handler로 전달하지 않는다.
+**초기 프리뷰는 29개 경로(12 direct + 당시 17 rewrite)를 모두 차단했다. 현재 inventory는 31개(12 + 19)다. 이후 로드맵 4단계에서 직접 엔트리 중 `GET /api/health`만 외부 의존성 없는 `200 {"status":"ok"}` 상태 확인으로 허용했다.** `/api/health`는 GET 이외 메서드 405, 쿼리/인코딩 변형 404이며 **readiness의 TLS Canary는 404 차단**이다. 나머지 API와 19개 rewrites는 기본 404, `POST /api/chat/:threadId/turns`는 별도 503 HOLD다. 경로 매칭은 `workers/cloudflare-api-router.mjs`에 표와 1:1로 고정하고, Vercel의 marker query를 privileged handler로 전달하지 않는다.
 
 ## 3. 정적 빌드 계약(실제 확인)
 
@@ -78,3 +80,9 @@
 4. 다음 API 단계는 기존 Source owner/Auth/Commerce/AI gate를 훼손하지 않도록 **denial → handler별 positive verification**으로 진행.
 
 관련 Cloudflare 문서: [Static Assets](https://developers.cloudflare.com/workers/static-assets/), [Wrangler assets 설정](https://developers.cloudflare.com/workers/wrangler/configuration/#assets), [Static Assets headers](https://developers.cloudflare.com/workers/static-assets/headers/).
+
+## 6. 단계 6 관상 프리뷰 이미지 경계 (2026-10-24)
+
+- 현재 Vercel `api/`에는 별도의 관상 사진 업로드 endpoint가 없다. 웹 `face-reading.html`은 **로컬 파일 미리보기만** 제공하며 분석 버튼은 비활성화되어 있다. 이를 실제 관상 엔진/Extractor 출시로 오인하거나 Cloudflare에 새로운 public upload URL을 임의 생성하지 않는다.
+- `apps/web/face-preview-object-url.js`와 `face-reading-shell.js`: JPEG/PNG/WebP 타입·16 MiB 상한과 파일 선두 12바이트 매직 서명을 검사한다. 원본 이미지를 Base64 데이터 URL로 복제하지 않고 임시 Blob URL을 사용하며, 재선택/오류/문서 이탈 시 해당 URL을 해제한다. 선택 중 비동기 검사 결과가 오래됐으면 폐기한다.
+- 이 검사와 미리보기는 EXIF 삭제·기하 관측·관상 품질 판단·Face semantic engine/서버 업로드와 **별개**다. 실제 관상 기능이 승인되기 전에는 서버 전송, 장기 저장, 유료 해석을 활성화하지 않는다. 운영 CPU·메모리·외부 subrequest는 이 로컬 프리뷰로 계측된 것이 아니다.
