@@ -141,3 +141,15 @@ html[data-theme="dark"] .saju-design-example { background:#503c45;border-color:#
 }
 html[data-theme="dark"] .saju-design-overview h2,html[data-theme="dark"] .saju-overview-section h3 { color:#f3dde0; }
 html[data-theme="dark"] .saju-overview-section p { color:#d9c5c7; }
+
+/* Secondary route discovery: keep unapproved offerings visibly non-executable. */
+.saju-design-more { margin: 0 35px 24px; border-top:1px solid #eadbd5; padding-top:12px; }
+.saju-design-more summary { color:#794054; cursor:pointer; font-size:12px; font-weight:700; padding:8px 0; }
+.saju-design-more-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:9px; margin:10px 0; }
+.saju-design-more-grid a { display:flex; flex-direction:column; gap:6px; min-width:0; padding:12px; border:1px solid #ead9d0; border-radius:8px; background:#fffaf7; text-decoration:none; }
+.saju-design-more-grid strong { font-size:12px; color:#5b3442; }
+.saju-design-more-grid .reading-topic-availability { align-self:flex-start; font-size:10px; }
+.saju-design-more p { margin:5px 0 9px; color:#987d7e; font-size:11px; }
+@media (max-width:690px) { .saju-design-more { margin:0 18px 22px; }.saju-design-more-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+html[data-theme="dark"] .saju-design-more-grid a { background:#393038; border-color:#75575f; }
+html[data-theme="dark"] .saju-design-more-grid strong { color:#f3dde0; }
