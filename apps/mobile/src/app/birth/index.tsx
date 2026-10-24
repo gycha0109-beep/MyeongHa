@@ -39,7 +39,7 @@ const sexOptions = [
 
 export default function BirthInputScreen() {
   const styles = useMobileThemedStyles(staticStyles);
-  const { t } = useMobileUiLocale();
+  const { t, locale } = useMobileUiLocale();
   const [calendarType, setCalendarType] = useState<BirthCalendarTypeV1>('solar');
   const [year, setYear] = useState('');
   const [month, setMonth] = useState('');
@@ -176,7 +176,7 @@ export default function BirthInputScreen() {
                 style={[styles.segment, calendarType === value && styles.segmentSelected]}
               >
                 <Text style={[styles.segmentText, calendarType === value && styles.segmentTextSelected]}>
-                  {value === 'solar' ? '양력' : '음력'}
+                  {t(value === 'solar' ? '양력' : '음력')}
                 </Text>
               </Pressable>
             ))}
@@ -198,8 +198,10 @@ export default function BirthInputScreen() {
               <Text style={styles.dateHint}>{t(calendarType === 'solar' ? '양력 생년월일' : '음력 생년월일')}</Text>
               <Text style={[styles.dateValue, !year && styles.datePlaceholder]}>
                 {year && month && day
-                  ? year + '년 ' + Number(month) + '월 ' + Number(day) + '일'
-                  : '달력에서 날짜 선택'}
+                  ? locale === 'en-US'
+                    ? `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`
+                    : `${year}年${Number(month)}月${Number(day)}日`.replace('年', locale === 'ko-KR' ? '년 ' : '年').replace('月', locale === 'ko-KR' ? '월 ' : '月').replace('日', locale === 'ko-KR' ? '일' : '日')
+                  : t('달력에서 날짜 선택')}
               </Text>
             </View>
             <Text style={styles.dateChevron}>›</Text>
@@ -272,14 +274,14 @@ export default function BirthInputScreen() {
                 style={[styles.segment, sex === option.value && styles.segmentSelected]}
               >
                 <Text style={[styles.segmentText, sex === option.value && styles.segmentTextSelected]}>
-                  {option.label}
+                  {t(option.label)}
                 </Text>
               </Pressable>
             ))}
           </View>
         </View>
 
-        {error ? <Text style={styles.error}>{error}</Text> : null}
+        {error ? <Text style={styles.error}>{t(error)}</Text> : null}
 
         <Pressable
           accessibilityRole="button"

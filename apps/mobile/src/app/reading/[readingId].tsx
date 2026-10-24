@@ -25,6 +25,8 @@ import {
 } from '@/features/records/records-view-model';
 import { mobileColors } from '@/ui/mobile-colors';
 import { MobileUiText } from '@/ui/MobileUiText';
+import { useMobileUiLocale } from '@/ui/mobile-ui-locale';
+import { formatMobileUiCopy } from '@/ui/mobile-ui-copy';
 import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
 import { useMobilePullRefreshV1 } from '@/ui/use-mobile-pull-refresh';
 
@@ -79,6 +81,7 @@ function errorState(error: unknown): Extract<DetailStateV1, { kind: 'error' }> {
 
 export default function OfficialReadingDetailScreen() {
   const styles = useMobileThemedStyles(staticStyles);
+  const { t, locale } = useMobileUiLocale();
   const params = useLocalSearchParams<{ readingId?: string | string[] }>();
   const readingId = typeof params.readingId === 'string' ? params.readingId : '';
   const [state, setState] = useState<DetailStateV1>({ kind: 'loading' });
@@ -150,7 +153,7 @@ export default function OfficialReadingDetailScreen() {
 
         {state.kind === 'error' ? (
           <View style={styles.stateCard}>
-            <Text style={styles.error}>{state.message}</Text>
+            <Text style={styles.error}>{t(state.message)}</Text>
             {state.retryable ? (
               <Pressable
                 accessibilityRole="button"
@@ -180,8 +183,8 @@ export default function OfficialReadingDetailScreen() {
               <MobileUiText style={styles.readerCardTitle}>이 공식 Reading과 Reader</MobileUiText>
               <Text style={styles.readerCardText}>
                 {state.record.readerCharacterIds.length > 0
-                  ? `공식 기록에 연결된 Reader 정보: ${state.record.readerCharacterIds.length}명`
-                  : '이 공식 기록에 연결된 Reader 정보가 없습니다.'}
+                  ? formatMobileUiCopy('공식 기록에 연결된 Reader 정보: {count}명', { count: String(state.record.readerCharacterIds.length) }, locale)
+                  : t('이 공식 기록에 연결된 Reader 정보가 없습니다.')}
               </Text>
               <MobileUiText style={styles.readerCardText}>
                 Reader 연결 정보는 해설 구매·열람 권한 또는 해설 완료의 증명이 아닙니다.
@@ -202,7 +205,7 @@ export default function OfficialReadingDetailScreen() {
 
             {state.record.display.steps.map((step, index) => (
               <View key={`${String(index)}:${step.title}`} style={styles.readingCard}>
-                <Text style={styles.stepIndex}>읽기 {index + 1}</Text>
+                <Text style={styles.stepIndex}>{formatMobileUiCopy('읽기 {index}', { index: String(index + 1) }, locale)}</Text>
                 <Text style={styles.stepTitle}>{step.title}</Text>
                 <Text style={styles.primaryText}>{step.primary}</Text>
 

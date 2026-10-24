@@ -256,6 +256,29 @@ describe('Mobile / Web UI localization parity', () => {
     expect(push).toContain('{errorMessage}');
     expect(faceEditorial).toContain('reader: reader.name');
     expect(formatMobileUiCopy('정면 사진을 준비하고, {reader}과 함께할 관상 읽기의 시작을 만나보세요.', { reader: '세연' }, 'en-US')).toContain('세연');
+    const finalMobileCopy = ["촬영한 사진","선택한 사진","사진 준비 완료","사진을 준비하면 다음 단계가 표시됩니다","관상 분석 기능 준비 중","{reader}과 관상 보기 준비","카메라 권한이 필요합니다. 기기 설정에서 카메라 접근을 허용해 주세요.","사진을 준비하지 못했습니다. 잠시 후 다시 시도해 주세요.","한 장의 사진만 선택할 수 있습니다.","16MB 이하의 사진을 선택해 주세요.","JPEG, PNG 또는 WebP 사진을 선택해 주세요.","선택한 사진을 사용할 수 없습니다. 다른 사진을 선택해 주세요.","카메라 권한을 확인하지 못했습니다.","사진을 촬영하지 못했습니다. 다시 시도해 주세요.","전면 카메라를 열지 못했습니다.","촬영 중…","사진 촬영","달력에서 날짜 선택","이미 등록된 출생정보가 있습니다. 현재 내용은 사주 탭에서 확인해 주세요.","현재 출생정보를 다시 확인하지 못했습니다. 입력 내용은 그대로 유지됩니다.","출생정보를 확인해 주세요.","입력값을 처리하지 못했습니다. 생년월일과 출생시간을 확인해 주세요.","서버에 연결하지 못했습니다. 네트워크를 확인하고 다시 시도해 주세요.","출생정보를 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.","출생 연도는 네 자리로 입력해 주세요.","출생 연도를 확인해 주세요.","존재하는 양력 생년월일을 입력해 주세요.","출생시간은 HH:mm 형식으로 입력해 주세요.","출생시간을 확인해 주세요.","달력 유형을 확인해 주세요.","출생 월을 입력해 주세요.","출생 월을 확인해 주세요.","출생 일을 입력해 주세요.","출생 일을 확인해 주세요.","저장된 공식 풀이를 불러오는 중입니다…","로그인 상태가 변경되어 이전 계정의 공식 풀이를 표시하지 않았습니다.","현재 기록에서 이 저장된 풀이를 찾을 수 없습니다.","저장된 공식 풀이를 안전하게 표시할 수 없습니다.","저장된 풀이를 불러오지 못했습니다.","이 공식 Reading과 Reader","공식 기록에 연결된 Reader 정보: {count}명","이 공식 기록에 연결된 Reader 정보가 없습니다.","Reader 연결 정보는 해설 구매·열람 권한 또는 해설 완료의 증명이 아닙니다. Reader별 해설 다시 보기와 후속 대화는 별도의 서버 권한·기록 계약이 승인된 뒤 제공됩니다.","기록 · 당시 저장된 공식 사주 풀이를 그대로 다시 읽고 있습니다."];
+    for (const locale of ['en-US', 'zh-CN'] as const) {
+      for (const label of finalMobileCopy) {
+        const localized = translateMobileUiCopy(label, locale);
+        expect(localized, `${locale} missing: ${label}`).not.toBe(label);
+        expect(localized).not.toMatch(/[가-힣]/u);
+      }
+    }
+    const [face, camera, birth, archived] = await Promise.all([
+      source('apps/mobile/src/app/(tabs)/reading/face.tsx'),
+      source('apps/mobile/src/platform/media/MobileFrontCameraV1.tsx'),
+      source('apps/mobile/src/app/birth/index.tsx'),
+      source('apps/mobile/src/app/reading/[readingId].tsx'),
+    ]);
+    expect(face).toContain('formatMobileUiCopy(');
+    expect(face).toContain('{t(state.message)}');
+    expect(camera).toContain('t(error)');
+    expect(birth).toContain("{t(option.label)}");
+    expect(birth).toContain("locale === 'en-US'");
+    expect(archived).toContain('formatMobileUiCopy(');
+    expect(archived).toContain('{step.primary}');
+    expect(archived).toContain('{notice}');
+    expect(archived).toContain('{text}');
     const original = '사용자의 고유한 대화 내용';
     expect(translateMobileUiCopy(original, 'en-US')).toBe(original);
     expect(translateMobileUiCopy(original, 'zh-CN')).toBe(original);
