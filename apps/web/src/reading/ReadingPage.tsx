@@ -1,37 +1,27 @@
-import { resolveReadingAvailabilityV1 } from './reading-availability.js';
 import { resumePreviewHrefV1 } from '../../reading-preview-continuation.js';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
-const readingTopics = [
-  ['✦', '전체 사주', '나라는 사람을 더 깊이', 'reading-detail.html?topic=temperament&scope=original', ''],
-  ['⌁', '직업 · 커리어', '지금의 길, 더 나은 길로', 'reading-detail.html?topic=career', ''],
-  ['財', '재물', '흐르는 기회를 잡는 법', 'reading-detail.html?topic=money', ''],
-  ['緣', '연애 · 관계', '더 좋은 인연이 있는 곳', 'reading-detail.html?topic=love', 'is-rose'],
-  ['業', '사업', '시작과 확장의 흐름', 'reading-detail.html?topic=business', ''],
-  ['家', '가족', '함께하는 마음의 길', 'reading-detail.html?topic=family', ''],
-  ['葉', '삶의 단계', '지금의 시기를 지나, 다음으로', 'reading-detail.html?topic=life-stage', 'is-wide'],
-] as const;
-
-const relationshipTopics = [
-  ['♡', '배우자 · 관계', '소중한 인연의 흐름을 알아보세요.', 'reading-detail.html?topic=spouse', 'is-rose'],
-  ['∞', '궁합', '함께할 때 더욱 빛나는 이야기', 'reading-detail.html?topic=compatibility', ''],
+const productPreviewTopics = [
+  { symbol: '▤', title: '전체 사주 해석', href: 'reading-detail.html?topic=temperament&scope=original', outline: ['타고난 기질과 성향', '강점과 약점', '삶의 주요 흐름', '인생의 중요한 시기', '통합 조언'] },
+  { symbol: '✎', title: '직업 · 커리어', href: 'reading-detail.html?topic=career', outline: ['일의 성향과 적성', '커리어 방향', '직업별 궁합', '성장의 흐름', '현실적 조언'] },
+  { symbol: '◇', title: '재물', href: 'reading-detail.html?topic=money', outline: ['재물 운의 흐름', '수입과 지출 성향', '재물 운이 강한 시기', '투자 · 사업 성향', '재물 관리 조언'] },
+  { symbol: '✿', title: '연애 · 관계', href: 'reading-detail.html?topic=love', outline: ['연애 성향과 인연 흐름', '잘 맞는 상대 유형', '관계에서 주의할 점', '결혼 운의 흐름', '행복한 관계를 위한 조언'] },
 ] as const;
 
 export function ReadingPage() {
   const resumedPreview = typeof window === 'undefined' ? null : resumePreviewHrefV1(window.location.search);
+  const [chartTab, setChartTab] = useState<'pillars' | 'elements' | 'structure'>('pillars');
   useEffect(() => {
     void import('../../saju-hub.js');
   }, []);
 
   return (
     <div className="gm-shell">
-      <header className="gm-saju-head">
-        <h1 className="gm-page-title">사주</h1>
-        <p className="gm-lede">내 명식과 사주 읽기 주제를 한곳에 모아봤어요.</p>
-        <p className="reading-availability-intro">프리뷰 확인은 현재 제공 가능한 검증용 읽기이며, 정식 Reader 해석과는 다릅니다. 준비 중인 주제는 상세 화면에서 제공 상태를 확인할 수 있습니다.</p>
-      </header>
-
-      <div className="saju-status" id="saju-status" role="status">내 사주를 확인하는 중입니다…</div>
+      <div className="saju-design-ribbon" aria-label="무료 프리뷰 화면. 아직 구매하지 않은 상태">
+        <div><strong>무료 프리뷰 화면 <span>(미구매 상태)</span></strong><b>무료</b></div>
+        <p>기본 명식 확인 + 유료 결과물 구성 미리보기 (개인화된 유료 해석 본문 없음)</p>
+      </div>
+            <div className="saju-status" id="saju-status" role="status">내 사주를 확인하는 중입니다…</div>
       <button id="saju-calculation-retry" className="saju-calculation-retry" type="button" hidden>
         저장된 출생정보로 계산 다시 시도
       </button>
@@ -92,128 +82,85 @@ export function ReadingPage() {
         </div>
       </section>
 
-      <section id="saju-hub" hidden aria-label="계산된 내 사주">
-        <div className="saju-preview-entry">
-          <div>
-            <strong>명식 계산이 완료되면 사주 프리뷰를 확인할 수 있어요</strong>
-            <p>정식 유료 해석과는 별개로, 서버에서 제공되는 무료 프리뷰를 바로 열어보세요.</p>
+
+      <section id="saju-hub" className="saju-design-preview" hidden aria-label="내 사주 무료 프리뷰">
+        <div className="saju-design-hero">
+          <div className="saju-design-hero-text">
+            <span className="saju-design-eyebrow">SAJU PREVIEW</span>
+            <h2>나의 사주 기본 정보</h2>
+            <p>입력하신 생년월일시를 기준으로 계산한 기본 명식입니다.<br />아래는 유료 해석에서 다루는 내용과 구성 미리보기도 함께 보여드립니다.</p>
           </div>
-          <a className="saju-primary-button saju-preview-open" href={resumedPreview ?? 'reading-detail.html?topic=temperament&scope=original'}>
-            사주 프리뷰 결과 보기 <span aria-hidden="true">→</span>
-          </a>
         </div>
-        <article className="gm-saju-hero" aria-labelledby="gm-saju-profile-title">
-          <div className="gm-saju-hero-copy">
-            <h2 className="gm-saju-title" id="gm-saju-profile-title">무료 기본 명식</h2>
-            <p className="gm-saju-summary" id="saju-birth-summary">현재 자기 Birth Profile과 연결된 계산 결과입니다.</p>
-            <details className="gm-chart-details" open>
-              <summary>기본 정보 보기 →</summary>
-              <div className="gm-chart-panel">
-                <div className="saju-pillar-grid" id="saju-pillar-grid" aria-label="사주 네 기둥" />
-                <div className="saju-chart-summary">
-                  <div className="saju-day-master">
-                    <span>일간</span>
-                    <strong id="saju-day-master">—</strong>
-                    <small id="saju-day-master-meta">계산 결과 확인 중</small>
-                  </div>
-                  <div className="saju-elements">
-                    <span className="saju-summary-label">오행 분포</span>
-                    <div className="saju-element-bars" id="saju-element-bars" />
-                  </div>
-                  <div className="saju-structure-note">
-                    <span className="saju-summary-label">계산 상태</span>
-                    <strong id="saju-completeness-title">—</strong>
-                    <p id="saju-completeness-copy">확정된 계산 사실만 표시합니다.</p>
-                  </div>
-                </div>
-                <p className="saju-authority-note">이 영역은 계산된 명식 사실만 보여줍니다. 의미 해석은 별도 Reading에서 제공합니다.</p>
+
+        <div className="saju-design-core">
+          <section className="saju-design-card saju-design-birth-card" aria-labelledby="saju-design-birth-title">
+            <header className="saju-design-card-heading">
+              <h3 id="saju-design-birth-title">입력 정보</h3>
+              <a className="saju-design-edit" href="my.html#my-birth-title" title="저장된 출생정보 확인. 기존 정보 수정 기능은 준비 중입니다.">✎ 입력 정보 확인</a>
+            </header>
+            <dl className="saju-design-birth-fields">
+              <div><dt>생년월일</dt><dd id="saju-birth-date-display">확인 중</dd></div>
+              <div><dt>출생 시간</dt><dd id="saju-birth-time-display">확인 중</dd></div>
+              <div><dt>성별</dt><dd id="saju-birth-sex-display">확인 중</dd></div>
+              <div><dt>출생지</dt><dd id="saju-birth-place-display">제공되지 않음</dd></div>
+              <div><dt>계산 기준</dt><dd id="saju-birth-calendar-display">확인 중</dd></div>
+            </dl>
+            <p className="saju-design-source-note" id="saju-birth-summary">현재 자기 Birth Profile과 연결된 계산 결과입니다.</p>
+          </section>
+
+          <section className="saju-design-card saju-design-chart-card" aria-labelledby="saju-design-chart-title">
+            <header className="saju-design-card-heading">
+              <h3 id="saju-design-chart-title">나의 사주 명식</h3>
+            </header>
+            <div className="saju-design-chart-tabs" role="tablist" aria-label="사주 계산 결과">
+              <button type="button" role="tab" aria-selected={chartTab === 'pillars'} className={chartTab === 'pillars' ? 'is-selected' : ''} onClick={() => setChartTab('pillars')}>사주팔자</button>
+              <button type="button" role="tab" aria-selected={chartTab === 'elements'} className={chartTab === 'elements' ? 'is-selected' : ''} onClick={() => setChartTab('elements')}>오행 분포</button>
+              <button type="button" role="tab" aria-selected={chartTab === 'structure'} className={chartTab === 'structure' ? 'is-selected' : ''} onClick={() => setChartTab('structure')}>계산 상태</button>
+            </div>
+            <div className="saju-design-chart-content" role="tabpanel">
+              <div id="saju-pillar-grid" className="saju-pillar-grid saju-design-pillars" hidden={chartTab !== 'pillars'} aria-label="사주 네 기둥" />
+              <div className="saju-design-elements-panel" hidden={chartTab !== 'elements'}>
+                <p>서버가 계산한 천간·지지의 오행을 집계한 값입니다.</p>
+                <div id="saju-element-bars" className="saju-element-bars" />
               </div>
-            </details>
-          </div>
-          <blockquote className="gm-saju-quote">“지금의 내가,<br />더 좋은 내일을 만듭니다.”</blockquote>
-        </article>
-
-        <section className="saju-free-preview-panel gm-card" aria-labelledby="saju-free-preview-title">
-          <div className="saju-free-preview-intro">
-            <span className="saju-preview-kicker">FREE · PREVIEW</span>
-            <h2 id="saju-free-preview-title">정식 읽기 구성 미리보기</h2>
-            <p>무료 기본 명식은 위의 서버 계산 결과입니다. 아래 내용은 실제 개인별 유료 해석이 아닌, 승인된 상품 주제와 다루는 범위에 대한 안내입니다.</p>
-          </div>
-          <div className="saju-free-preview-body">
-            <div className="saju-preview-product">
-              <strong>연애·관계 정식 읽기</strong>
-              <span>판매 준비 중 · 아직 구매할 수 없습니다</span>
+              <div className="saju-design-structure-panel" hidden={chartTab !== 'structure'}>
+                <strong id="saju-completeness-title">—</strong>
+                <p id="saju-completeness-copy">확정된 계산 사실만 표시합니다.</p>
+              </div>
             </div>
-            <h3>상품에서 다루는 범위</h3>
-            <ol className="saju-preview-outline">
-              <li>관계에 들어가는 방식과 애정 표현</li>
-              <li>상대에게 기대하는 점과 친밀감의 변화</li>
-              <li>갈등 대응과 반복되는 관계 패턴</li>
-            </ol>
-            <p className="saju-preview-disclaimer">구성 안내 예시이며 확정된 결과물 목차가 아닙니다. 개인화된 본문이나 유료 Reading 데이터는 내려받지 않습니다.</p>
-            <div className="saju-preview-actions">
-              <a href="reading-detail.html?topic=love">무료 연애·관계 프리뷰 확인 <span aria-hidden="true">→</span></a>
-              <span aria-label="유료 상품 구매 준비 중">정식 읽기 구매 준비 중</span>
+            <div className="saju-design-chart-foot">
+              <div className="saju-day-master"><span>일간</span><strong id="saju-day-master">—</strong><small id="saju-day-master-meta">계산 결과 확인 중</small></div>
+              <small>실제 명식 계산 결과이며, 유료 해석 본문은 포함되지 않습니다.</small>
             </div>
-          </div>
-        </section>
+          </section>
+        </div>
 
-        <section className="gm-section" aria-labelledby="gm-reading-title">
-          <div className="gm-section-head">
-            <div><h2 className="gm-section-title" id="gm-reading-title">나를 읽기 <span className="gm-section-support">나를 더 깊이 이해하는 시간</span></h2></div>
-            <a className="gm-inline-link" href="reading-detail.html?topic=temperament&scope=original">전체 보기 <span aria-hidden="true">›</span></a>
-          </div>
-          <div className="gm-saju-reading-grid">
-            {readingTopics.map(([icon, title, description, href, modifier]) => (
-              <a className={`gm-card gm-saju-reading-card${modifier === 'is-wide' ? ' is-wide' : ''}`} href={href} key={href}>
-                <span className={`gm-icon${modifier === 'is-rose' ? ' is-rose' : ''}`} aria-hidden="true">{icon}</span>
-                <span><strong>{title}</strong><small>{description}</small><small className={`reading-topic-availability is-${resolveReadingAvailabilityV1(href).kind}`}>{resolveReadingAvailabilityV1(href).label}</small></span>
-                <span className="gm-chevron" aria-hidden="true">›</span>
-              </a>
+        <section className="saju-design-products" aria-labelledby="saju-design-products-title">
+          <h2 id="saju-design-products-title">유료 사주 해석에서 제공되는 내용</h2>
+          <p>구매하시면 아래와 같은 주제의 상세한 해석을 확인하실 수 있습니다. 현재 결제 기능은 준비 중입니다.</p>
+          <div className="saju-design-product-grid">
+            {productPreviewTopics.map((topic) => (
+              <article className="saju-design-product-card" key={topic.title}>
+                <header><span className="saju-design-topic-symbol" aria-hidden="true">{topic.symbol}</span><h3>{topic.title}</h3></header>
+                <ul>{topic.outline.map((item) => <li key={item}>{item}</li>)}</ul>
+                <a href={topic.href}>구성 자세히 보기</a>
+              </article>
             ))}
           </div>
         </section>
 
-        <section className="gm-section" aria-labelledby="gm-flow-title">
-          <div className="gm-section-head">
-            <h2 className="gm-section-title" id="gm-flow-title">지금의 흐름</h2>
-            <span className="gm-section-support">지금, 놓치지 말아야 할 시간</span>
+        <section className="saju-design-example" aria-labelledby="saju-design-example-title">
+          <div className="saju-design-example-copy">
+            <h2 id="saju-design-example-title">예시 결과물 미리보기 <span>예시</span></h2>
+            <p>아래는 실제 결과물 형식의 예시입니다.<br />개인별 해석 내용은 구매 후 확인하실 수 있습니다.</p>
           </div>
-          <div className="gm-saju-flow-grid">
-            <a className="gm-card gm-flow-card" href="reading-detail.html?scope=year">
-              <span className="gm-flow-thumb" aria-hidden="true" />
-              <span className="gm-flow-copy"><strong>올해</strong><p id="saju-flow-year">올해의 흐름</p><p>지금의 흐름을 한눈에, 주요 키워드와 변화의 시기를 읽어보세요.</p><small className="reading-topic-availability is-unavailable">정식 읽기 준비 중</small></span>
-              <span className="gm-chevron" aria-hidden="true">›</span>
-            </a>
-            <a className="gm-card gm-flow-card" href="reading-detail.html?scope=month">
-              <span className="gm-flow-thumb" aria-hidden="true" />
-              <span className="gm-flow-copy"><strong>이번 달</strong><p>이번 달의 기운과 흐름, 놓치지 말아야 할 순간을 짚어봅니다.</p><small className="reading-topic-availability is-unavailable">정식 읽기 준비 중</small></span>
-              <span className="gm-chevron" aria-hidden="true">›</span>
-            </a>
+          <div className="saju-design-example-sheet" aria-label="예시 해석 내용. 개인별 결과가 아닙니다.">
+            <h3>1. 기본 성향과 기질</h3>
+            <p>• 예시 사용자의 명식을 바탕으로 성향과 기질을 살펴봅니다. 실제 구매 시 고객님의 사주에 맞춘 상세한 해석이 제공됩니다.</p>
           </div>
         </section>
-
-        <section className="gm-section" aria-labelledby="gm-relation-title">
-          <div className="gm-section-head"><h2 className="gm-section-title" id="gm-relation-title">사람과의 관계</h2></div>
-          <div className="gm-relationship-grid">
-            {relationshipTopics.map(([icon, title, description, href, modifier]) => (
-              <a className="gm-card gm-relation-card" href={href} key={href}>
-                <span className={`gm-icon${modifier ? ` ${modifier}` : ''}`} aria-hidden="true">{icon}</span>
-                <span><strong>{title}</strong><small>{description}</small><small className={`reading-topic-availability is-${resolveReadingAvailabilityV1(href).kind}`}>{resolveReadingAvailabilityV1(href).label}</small></span>
-                <span className="gm-chevron" aria-hidden="true">›</span>
-              </a>
-            ))}
-          </div>
-        </section>
-
-        <section className="gm-section" aria-labelledby="gm-question-title">
-          <div className="gm-section-head"><h2 className="gm-section-title" id="gm-question-title">고민이 있다면</h2></div>
-          <a className="gm-card gm-question-card" href="reading-detail.html?topic=question-specific">
-            <span className="gm-icon" aria-hidden="true">…</span>
-            <span className="gm-question-copy"><strong>지금 고민으로 보기</strong><small>지금 마음에 있는 질문을 바탕으로, 사주가 전하는 범위 안에서 읽어보세요.</small><small className="reading-topic-availability is-input_pending">추가 입력 준비 중</small></span>
-            <span className="gm-chevron" aria-hidden="true">›</span>
-          </a>
-        </section>
+        <div className="saju-design-preview-link"><span>지금 확인할 수 있는 무료 개인별 사주 프리뷰</span><a href={resumedPreview ?? 'reading-detail.html?topic=temperament&scope=original'}>무료 사주 프리뷰 열기 →</a></div>
+        <span id="saju-flow-year" hidden aria-hidden="true" />
       </section>
     </div>
   );
