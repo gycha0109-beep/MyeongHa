@@ -12,6 +12,12 @@ import { createPortOneV2IdentityLookupAdapterV1,
   type PortOneV2IdentityLookupAdapterV1,
 } from './portone-v2-identity-verification-lookup-v1.js';
 import { readChatOpenJsonRequestBodyV1 } from './chat-open-request-body.js';
+import {
+  fingerprintMemberAuthClientV1,
+  readTrustedVercelClientIpV1,
+} from './member-auth-client-network-key.js';
+import type { MemberAuthRateLimitAdmissionPortV1 } from './member-auth-rate-limit.js';
+import { PostgresMemberAuthRateLimitAdmissionPortV1 } from './postgres-member-auth-rate-limit.js';
 import { AuthenticatedJsonRequestBodyTooLargeV1 } from './authenticated-json-request-resource.js';
 import { IngressRequestBodyCompletionDeadlineExceededV1 } from './ingress-request-body-deadline.js';
 import type { PostgresSubjectPoolV1 } from './postgres-subject-execution.js';
@@ -68,6 +74,8 @@ export function createProductionPortOnePreenrollmentHttpRuntimeV1(input: Readonl
   pool: PostgresSubjectPoolV1;
   providerLookup?: Pick<PortOneV2IdentityLookupAdapterV1, 'verify'>;
   nonceFactory?: () => string;
+  /** Test-seam only. Production uses existing PostgreSQL Auth limiter. */
+  rateLimitAdmissionPort?: MemberAuthRateLimitAdmissionPortV1;
 }>) {
   if (resolveProductionPortOnePreenrollmentModeV1(input.env) !== 'enforce') {
     throw new Error('Preenrollment HTTP must not be constructed while disabled.');
@@ -78,6 +86,14 @@ export function createProductionPortOnePreenrollmentHttpRuntimeV1(input: Readonl
     apiSecret: input.env[PORTONE_V2_PRODUCTION_IDENTITY_HTTP_ACTIVATION_V1.apiSecret]!,
   });
   const authority = createPostgresPortOnePreenrollmentAgeAuthorityV1(input.pool);
+  const rateLimitAdmissionPort = input.rateLimitAdmissionPort
+    ?? new PostgresMemberAuthRateLimitAdmissionPortV1(input.pool);
+  // Conservative shared 'sign-up' bucket protects both issue and completion
+  // without inventing an additional identity/IP table or exposure route.
+  const rateLimitSecret = input.env.MYEONGHA_AUTH_RATE_LIMIT_SECRET;
+  if (typeof rateLimitSecret !== 'string' || rateLimitSecret.length < 32) {
+    throw new Error('Preenrollment identity rate-limit key is unavailable.');
+  }
 
   return Object.freeze({
     async handleRequest(inputRequest: Readonly<{
@@ -97,6 +113,33 @@ export function createProductionPortOnePreenrollmentHttpRuntimeV1(input: Readonl
       // Same-origin browser initiation and HttpOnly possession are mandatory.
       if (request.headers.get('origin') !== g.origin ||
           request.headers.has('authorization')) return fail(403, 'IDENTITY_VERIFICATION_REQUIRED');
+
+      // Protect unauthenticated identity attempts AND provider GET completions
+      // against cost amplification. Bad/missing forwarded IP or DB rate-limit
+      // authority fails closed before PortOne SDK/provider or new attempt writes.
+      try {
+        const clientIp = readTrustedVercelClientIpV1(request);
+        const clientFingerprint = fingerprintMemberAuthClientV1({
+          clientIp, action: 'sign-up', secret: rateLimitSecret,
+        });
+        const admission = await rateLimitAdmissionPort.admit({
+          action: 'sign-up', clientFingerprint,
+        });
+        if (!admission.allowed) {
+          const resetMs = Date.parse(admission.resetAt);
+          if (!Number.isFinite(resetMs)) throw new Error('Rate-limit reset is invalid.');
+          const after = Math.max(1, Math.min(60,
+            Math.ceil((resetMs - Date.now()) / 1000)));
+          return Response.json({
+            ok: false, error: { code: 'RATE_LIMITED', retryable: false },
+          }, { status: 429, headers: {
+            'Cache-Control': 'no-store', 'Retry-After': String(after),
+          } });
+        }
+      } catch {
+        return fail(503, 'IDENTITY_VERIFICATION_UNAVAILABLE');
+      }
+
       try {
         const body = await readChatOpenJsonRequestBodyV1(request);
         if (!body || typeof body !== 'object' || Array.isArray(body)) {

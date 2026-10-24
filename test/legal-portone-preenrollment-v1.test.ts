@@ -25,6 +25,7 @@ const approved = {
   MYEONGHA_PORTONE_IDENTITY_STORE_ID: 'store-0123456789',
   MYEONGHA_PORTONE_IDENTITY_CHANNEL_KEY: 'channel-key-0123456789',
   MYEONGHA_PORTONE_IDENTITY_API_SECRET: 'test-only-portone-secret-material-never-live',
+  MYEONGHA_AUTH_RATE_LIMIT_SECRET: 'test-auth-request-rate-limit-secret-for-preenrollment',
   [g.modeSetting]: 'ENFORCE',
   [g.migrationSetting]: 'APPROVED_AND_APPLIED',
   [g.privacySetting]: 'APPROVED',
@@ -34,9 +35,16 @@ const serverTime = '2026-10-24T01:00:00Z';
 const base = 'https://myeongha.internal';
 const issueRequest = () => new Request(base + g.issueRoute, {
   method: 'POST',
-  headers: { Origin: g.origin, 'Content-Type': 'application/json' },
+  headers: { Origin: g.origin, 'Content-Type': 'application/json',
+    'x-forwarded-for': '203.0.113.40' },
   body: '{}',
 });
+function limiter(allowed = true) {
+  return { admit: vi.fn(async () => ({
+    allowed, requestCount: allowed ? 1 : 31,
+    resetAt: new Date(Date.now() + 20_000).toISOString(),
+  })) };
+}
 function fakeDb() {
   const sql: string[] = [];
   const args: Array<readonly unknown[] | undefined> = [];
@@ -117,6 +125,7 @@ describe('L2 A1 preenrollment PortOne identity admission', () => {
     const rt = createProductionPortOnePreenrollmentHttpRuntimeV1({
       env: approved, pool: { connect: db.connect },
       providerLookup: lookup, nonceFactory: () => nonce,
+      rateLimitAdmissionPort: limiter(),
     });
     const response = await rt.handleRequest({
       request: issueRequest(), action: 'issue', requestId: 'req', serverTime,
@@ -151,10 +160,12 @@ describe('L2 A1 preenrollment PortOne identity admission', () => {
     const rt = createProductionPortOnePreenrollmentHttpRuntimeV1({
       env: approved, pool: { connect: db.connect },
       providerLookup: lookup, nonceFactory: () => nonce,
+      rateLimitAdmissionPort: limiter(),
     });
     const complete = (cookie?: string) => new Request(base + g.completeRoute, {
       method: 'POST', headers: {
         Origin: g.origin, 'Content-Type': 'application/json',
+        'x-forwarded-for': '203.0.113.40',
         ...(cookie === undefined ? {} : { Cookie: cookie }),
       }, body: JSON.stringify({ identityVerificationId: id }),
     });
@@ -172,4 +183,41 @@ describe('L2 A1 preenrollment PortOne identity admission', () => {
     expect(lookup.verify).toHaveBeenCalledOnce();
     expect(db.sql.some(x => x.includes('cmd_verify_legal_portone_preenrollment_v1'))).toBe(true);
   });
+  it('throttles issue before creating any DB attempt or loading provider SDK', async () => {
+    const db = fakeDb();
+    const lookup = { verify: vi.fn() };
+    const blocked = limiter(false);
+    const rt = createProductionPortOnePreenrollmentHttpRuntimeV1({
+      env: approved, pool: { connect: db.connect },
+      providerLookup: lookup, nonceFactory: () => nonce,
+      rateLimitAdmissionPort: blocked,
+    });
+    const response = await rt.handleRequest({
+      request: issueRequest(), action: 'issue', requestId: 'req', serverTime,
+    });
+    expect(response.status).toBe(429);
+    expect(response.headers.get('retry-after')).toMatch(/^[1-9][0-9]*$/u);
+    expect(db.connect).not.toHaveBeenCalled();
+    expect(lookup.verify).not.toHaveBeenCalled();
+    expect(blocked.admit).toHaveBeenCalledWith({
+      action: 'sign-up', clientFingerprint: expect.any(Uint8Array),
+    });
+  });
+
+  it('denies unknown forwarder/limiter failure before any identity DB or provider call', async () => {
+    const db = fakeDb();
+    const rt = createProductionPortOnePreenrollmentHttpRuntimeV1({
+      env: approved, pool: { connect: db.connect },
+      rateLimitAdmissionPort: limiter(),
+    });
+    const noForwarder = await rt.handleRequest({
+      request: new Request(base + g.issueRoute, {
+        method: 'POST', headers: { Origin: g.origin, 'Content-Type': 'application/json' },
+        body: '{}',
+      }), action: 'issue', requestId: 'req', serverTime,
+    });
+    expect(noForwarder.status).toBe(503);
+    expect(db.connect).not.toHaveBeenCalled();
+  });
+
 });
