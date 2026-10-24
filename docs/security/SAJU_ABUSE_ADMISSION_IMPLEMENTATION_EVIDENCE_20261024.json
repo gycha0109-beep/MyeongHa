@@ -1,0 +1,101 @@
+{
+  "schemaVersion": "myeongha-security-implementation-evidence-v1",
+  "verificationDateKst": "2026-10-24",
+  "developmentStatus": "VERIFIED",
+  "baseCommit": "1fce280a039d7d7ec5192ce2f5ba7851fc7b6023",
+  "workingTreeState": "uncommitted development; no merge or deployment",
+  "authorization": {
+    "source": "explicit user reply in this chat",
+    "reply": "DB 구현·격리 검증 승인",
+    "scope": "migration and DB adapter implementation; synthetic disposable database verification",
+    "productionApplicationAuthorized": false,
+    "numericPolicyActivationAuthorized": false,
+    "deploymentAuthorized": false
+  },
+  "isolatedPostgres": {
+    "version": "17.11",
+    "runtime": "EDB Windows binaries, separate temporary cluster",
+    "archiveSha256": "4b8db0930c38f6ef845db919551dedda3b6b845aeb0927b3d79a6e8e9e4537cf",
+    "archiveChecksumVerified": true,
+    "verification": {
+      "schemaVersion": "myeongha-saju-admission-isolated-verification-v1",
+      "status": "PASS",
+      "results": {
+        "postgresMajor": 17,
+        "migrationEmptyPoliciesAndLeastPrivilege": true,
+        "missingPolicyFailsClosedWithoutCounter": true,
+        "realDatabaseNormalMemberGuestBothRoutes": true,
+        "concurrentAllowed": 3,
+        "concurrentDenied": 9,
+        "routeAndIdentityBucketsIndependent": true,
+        "resetAndBoundedCleanup": true,
+        "invalidExpiredConsumedClaimedGuestNoAllocation": true,
+        "immutablePolicyAndNewVersionFreshBucket": true,
+        "transactionRollbackPreventsLeakedCounter": true,
+        "productionCompositionMemberGuestBothRoutesDeniedBeforeUpstream": true
+      },
+      "scope": "synthetic fresh loopback PostgreSQL 17; actual SQL/adapter/HTTP; hosted Auth and upstream Saju mocked; no Production mutation"
+    },
+    "clusterStopped": true,
+    "clusterFilesRetained": true,
+    "deletion": "Automatic approval review rejected recursive deletion as blocked by policy; no deletion retried."
+  },
+  "checks": {
+    "targetedVitest": {
+      "files": 10,
+      "tests": 90,
+      "result": "PASS"
+    },
+    "productionTypescriptBuild": "PASS",
+    "governance": [
+      "saju-abuse-admission-policy-candidate PASS",
+      "security-observability PASS",
+      "production-security-alerting PASS"
+    ],
+    "migrationVersionUniqueness": "PASS",
+    "isolatedSupabaseSecurityAdvisors": {
+      "cli": "2.82.0",
+      "level": "warn",
+      "failOn": "error",
+      "exitCode": 0,
+      "observed": "No issues found"
+    }
+  },
+  "sourceSha256": {
+    "supabase/migrations/20261024065948_saju_abuse_admission_runtime_authority.sql": "de6ef028bdfc3b605d36ce6e4607951546500d3b6b6a5c92285ce8fbbd3e169f",
+    "apps/api/src/saju-abuse-admission-http.ts": "ede04fc95ebd924f4137f7cc1ebc0fb7ddd6e90731ab394d997c7871e46b4dad",
+    "apps/api/src/postgres-saju-abuse-admission.ts": "e9ea416f089ee68cadea006f0009d5ae91137f7f309c4b4bb3c5894ec91558da",
+    "apps/api/src/current-subject-saju-calculation-http.ts": "cb6e91d61d0e7734e3356d82741ac7ebe86798be47a7a4e8858c97e4e3c1254b",
+    "apps/api/src/current-subject-saju-preview-reading-http.ts": "1fff9c44e54c40d6042937f2ae410f426a25668c0e8fe3d8c11830e049e76a9c",
+    "apps/api/src/production-current-subject-saju-calculation-runtime.ts": "9825ec5b53220e89f1201803a0c45edd8c681d33da4d91a10546a00ce6f20a32",
+    "apps/api/src/production-current-subject-saju-preview-reading-runtime.ts": "9b324f2c6609ee72fe5fbcb649dbcaf29111bcaa0bbf0ee698d7a700275ede50",
+    "scripts/verify-saju-abuse-admission-postgres.mjs": "edb371bdea653ec21c1bd4208b26b80ee2ca105c4475a4162459d1cd2817ec84"
+  },
+  "diagnostics": [
+    {
+      "expected": "normal Member and Guest HTTP 200",
+      "observed": "initial Guest calculation returned 503",
+      "runtime": "isolated PostgreSQL 17.11 / Node 24",
+      "failureStage": "normal-http-member-guest",
+      "classification": "ASSERTION_OR_RUNTIME",
+      "resolution": "DB evaluation and reset time are now returned atomically; independent API clock comparison was removed. Final full isolated run passed; initial transient source was not independently proven.",
+      "reproductionCommand": "npm run build; node scripts/verify-saju-abuse-admission-postgres.mjs with guarded fresh local test URL"
+    },
+    {
+      "expected": "no security advisor errors on relevant RLS foundations",
+      "observed": "minimal fixture omitted existing 0870 Guest RLS enablement",
+      "runtime": "isolated PostgreSQL 17.11 / Supabase CLI 2.82.0",
+      "failureStage": "security-advisors",
+      "classification": "FIXTURE_PREREQUISITE",
+      "resolution": "Fixture mirrors the exact existing 0870 enablement; migration asserts Subject/Guest RLS prerequisites. Final advisors returned no issues.",
+      "reproductionCommand": "supabase db advisors --db-url <guarded-loopback-url> --type security --level warn --fail-on error --output json; local PGSSLMODE=disable"
+    }
+  ],
+  "limitations": [
+    "No Production migration, user-data write, numeric policy registration, provider alert activation, merge or deployment.",
+    "Hosted Auth and Saju upstream are mocked in isolated execution.",
+    "Only direct migration/consumer dependencies are installed in the fresh test DB, including the exact Guest RLS prerequisite from 0870; this is not a full repository migration replay.",
+    "Counter cleanup is bounded and opportunistic; no hard retention deadline or Production schedule is asserted.",
+    "The 4xx alert candidate includes all API 4xx rather than individual-status thresholds; its decision remains NOT_APPROVED."
+  ]
+}

@@ -29,25 +29,73 @@ function unchangedTrustedDenial(response: Response): boolean {
       snapshot.headers[index]?.[1] === value);
 }
 
-export function registerSeyeonStaticPreflightDenialV1(
-  response: Response,
-): Response {
-  const contentType = response.headers.get('content-type')?.toLowerCase() ?? '';
-  if (
-    response.status < 400 || response.status > 499 ||
-    response.headers.get('cache-control') !== NO_STORE ||
-    contentType.includes('text/event-stream')
-  ) {
-    throw new Error('Untrusted Se-yeon preflight denial cannot be registered.');
-  }
-  if (response.bodyUsed || response.body?.locked === true) {
-    throw new Error('Consumed Se-yeon preflight denial cannot be registered.');
-  }
+// Only these static error tuples may be exposed as a 4xx. An arbitrary
+// Response, caller-owned body or extra JSON field cannot be registered.
+const STATIC_JSON_DENIALS_V1 = Object.freeze([
+  [400, 'INVALID_REQUEST', 'request.invalid', false],
+  [401, 'AUTH_REQUIRED', 'auth.required', false],
+  [403, 'FORBIDDEN', 'chat.member_required', false],
+  [404, 'NOT_FOUND', 'chat.not_found', false],
+  [408, 'REQUEST_BODY_TIMEOUT', 'auth.request_body_timeout', false],
+  [409, 'IDEMPOTENCY_CONFLICT', 'chat.idempotency_conflict', false],
+  [409, 'TURN_IN_FLIGHT', 'chat.turn_in_flight', true],
+  [409, 'TURN_IN_FLIGHT', 'chat.pending_turn_must_be_retried', true],
+  [409, 'CONTENT_INCOMPATIBLE', 'chat.content_incompatible', false],
+  [413, 'REQUEST_TOO_LARGE', 'request.too_large', false],
+  [422, 'CONTENT_INCOMPATIBLE', 'chat.content_incompatible', false],
+] as const);
+
+export type SeyeonVercelStaticPreflightDenialInputV1 = Readonly<{
+  status: number;
+  code: string;
+  messageKey: string;
+  retryable: boolean;
+  requestId: string;
+}>;
+
+function trustConstructedStaticDenial(response: Response): Response {
   trustedDenials.set(response, {
     status: response.status,
     headers: [...response.headers.entries()],
   });
   return response;
+}
+
+/**
+ * Server-controlled immutable 4xx construction only. The caller cannot
+ * submit a Response or an arbitrary JSON body to the final Fetch fence.
+ */
+export function createSeyeonVercelStaticPreflightDenialV1(
+  input: SeyeonVercelStaticPreflightDenialInputV1,
+): Response {
+  const allowed = STATIC_JSON_DENIALS_V1.some(([status, code, messageKey, retryable]) =>
+    input.status === status &&
+    input.code === code &&
+    input.messageKey === messageKey &&
+    input.retryable === retryable);
+  if (!allowed) {
+    throw new Error('Unapproved Se-yeon static preflight denial tuple.');
+  }
+  return trustConstructedStaticDenial(Response.json({
+    ok: false,
+    error: {
+      code: input.code,
+      messageKey: input.messageKey,
+      retryable: input.retryable,
+    },
+    meta: { apiContractVersion: 'v0.9', requestId: input.requestId },
+  }, { status: input.status, headers: { 'Cache-Control': NO_STORE } }));
+}
+
+export function createSeyeonVercelEmptyPreflightDenialV1(
+  kind: 'not_found' | 'method_not_allowed',
+): Response {
+  return trustConstructedStaticDenial(new Response(null, {
+    status: kind === 'not_found' ? 404 : 405,
+    headers: kind === 'not_found'
+      ? { 'Cache-Control': NO_STORE }
+      : { Allow: 'POST', 'Cache-Control': NO_STORE },
+  }));
 }
 
 export const SEYEON_VERCEL_FETCH_REVEAL_FENCE_V1 = Object.freeze({

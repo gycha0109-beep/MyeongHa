@@ -1,5 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import { appendFileSync, readFileSync } from 'node:fs';
+import { authorizeSecurityAlertRule } from '../lib/security-alert-rule-authorization.mjs';
 
 function fail(message) {
   console.error(message);
@@ -211,21 +212,27 @@ function inspectRule(authority, ruleId) {
   return result.rule;
 }
 
-const [mode, desiredPath, authorityPath] = process.argv.slice(2);
+const [mode, desiredPath, authorityPath, decisionPath] = process.argv.slice(2);
 if (!['preflight', 'activate', 'require'].includes(mode ?? '')) {
   fail(
-    'Usage: ensure-vercel-security-alert-rule.mjs <preflight|activate|require> <desired-json> <authority-json>',
+    'Usage: ensure-vercel-security-alert-rule.mjs <preflight|activate|require> <desired-json> <authority-json> [decision-json]',
   );
 }
 if (!desiredPath || !authorityPath) {
   fail('Missing alert rule or authority input path.');
 }
 
-const token = process.env.VERCEL_TOKEN;
-if (!token) fail('VERCEL_SECURITY_ALERTS_TOKEN is not available to the workflow.');
-
 const desired = JSON.parse(readFileSync(desiredPath, 'utf8'));
 const authority = JSON.parse(readFileSync(authorityPath, 'utf8'));
+const decision = decisionPath === undefined ? undefined : JSON.parse(readFileSync(decisionPath, 'utf8'));
+try {
+  authorizeSecurityAlertRule({ mode, desiredPath, authorityPath, desired, authority, decision });
+} catch {
+  fail('SECURITY_ALERT_RULE_NOT_AUTHORIZED: additional rule activation requires its exact approved decision.');
+}
+
+const token = process.env.VERCEL_TOKEN;
+if (!token) fail('VERCEL_SECURITY_ALERTS_TOKEN is not available to the workflow.');
 
 if (authority.activation?.providerInterface !== 'alerts-rules-cli') {
   fail('Alert authority does not pin the official Vercel Alert Rules CLI interface.');

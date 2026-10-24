@@ -53,7 +53,7 @@ select
     'public.cmd_mark_seyeon_positive_context_ready_pinned_v1(uuid,uuid,uuid,uuid,uuid,uuid,text,text,text,text,text,text,text)'
   ) is not null
   and to_regprocedure(
-    'public.cmd_commit_seyeon_positive_chat_turn_v1(uuid,uuid,uuid,uuid,uuid,uuid,uuid,jsonb,text,text,text)'
+    'public.cmd_commit_seyeon_positive_chat_turn_v1(uuid,uuid,uuid,uuid,uuid,uuid,uuid,uuid,jsonb,text,text,text)'
   ) is not null
   and to_regprocedure(
     'public.qry_seyeon_positive_first_memory_locked_reveal_v3(uuid,uuid,uuid,uuid,uuid,uuid,uuid,text)'
@@ -73,6 +73,7 @@ select
       )
     )
       and p.prosecdef
+      and pg_catalog.has_function_privilege(current_user,p.oid,'EXECUTE')
       and pg_catalog.has_function_privilege('myeongha_api_executor',p.oid,'EXECUTE')
       and not pg_catalog.has_function_privilege('anon',p.oid,'EXECUTE')
       and not pg_catalog.has_function_privilege('authenticated',p.oid,'EXECUTE')
@@ -268,24 +269,30 @@ export async function deliverSeyeonCommittedFirstPositiveMemoryNodeTurnV1(
     input.response.destroy();
     throw new SeyeonG3FirstPositiveNodeUnavailableV1('INVALID_COMMIT');
   }
-  return sendSeyeonNodeOriginalGrantResponseV1({
-    response:input.response,
-    requestSignal:input.requestSignal,
-    withLockedOriginalGrant:createSeyeonFirstPositiveMemoryLockedReadV1({
-      pool:input.pool,
-      verifiedEvidence:input.verifiedEvidence,
-      expectedSubjectId:input.result.subjectId,
-      threadId:input.expectedThreadId,
-      turnId:receipt.turnId,
-      attemptId:receipt.attemptId,
-      originalUserMessageId:input.result.execution.receivedTurn.userMessageId,
-      committedAssistantMessageId:receipt.assistantMessageId,
-      postTurnOutboxEventId:originalPostTurnOutboxId,
-      currentClientTurnId:input.expectedClientTurnId,
-    }),
-    chatResponseMetadata:metadata,
-    ...(input.deadlineMs===undefined?{}:{deadlineMs:input.deadlineMs}),
-  });
+  try {
+    return await sendSeyeonNodeOriginalGrantResponseV1({
+      response:input.response,
+      requestSignal:input.requestSignal,
+      withLockedOriginalGrant:createSeyeonFirstPositiveMemoryLockedReadV1({
+        pool:input.pool,
+        verifiedEvidence:input.verifiedEvidence,
+        expectedSubjectId:input.result.subjectId,
+        threadId:input.expectedThreadId,
+        turnId:receipt.turnId,
+        attemptId:receipt.attemptId,
+        originalUserMessageId:input.result.execution.receivedTurn.userMessageId,
+        committedAssistantMessageId:receipt.assistantMessageId,
+        postTurnOutboxEventId:originalPostTurnOutboxId,
+        currentClientTurnId:input.expectedClientTurnId,
+      }),
+      chatResponseMetadata:metadata,
+      ...(input.deadlineMs===undefined?{}:{deadlineMs:input.deadlineMs}),
+    });
+  } catch (error) {
+    // Caller must not leave an open Node socket on a failed send admission.
+    if (!input.response.destroyed) input.response.destroy();
+    throw error;
+  }
 }
 
 /** Server-only pre-model+send seam. No HTTP router mounts or exports it. */

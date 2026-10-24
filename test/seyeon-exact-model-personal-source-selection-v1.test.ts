@@ -89,6 +89,18 @@ describe('G1-B exact personal record runtime source selection, no DB authorizati
       permitsAtomicCommit: false,
       permitsHttpReveal: false,
     });
+    expect(result.selectedUnpinnedDerivedSources).toEqual([{
+      kind: 'relationship_event',
+      memoryId: event.memoryId,
+      sourceRef: event.sourceRef,
+      selectedModelMemoryDigest: hash(event),
+      originalGrantVerified: false,
+    }]);
+    expect(result.selectedModelSourceCensusDigest).toBe(hash({
+      originalPersonalSources: result.selectedSources,
+      unpinnedDerivedSources: result.selectedUnpinnedDerivedSources,
+    }));
+    expect(Object.isFrozen(result.selectedUnpinnedDerivedSources)).toBe(true);
     expect(Object.isFrozen(result)).toBe(true);
     expect(Object.isFrozen(result.selectedSources)).toBe(true);
     expect(result.selectedSources.some(x=> x.recordId === ID2)).toBe(false);
@@ -101,6 +113,8 @@ describe('G1-B exact personal record runtime source selection, no DB authorizati
     expect(r.selectedSourcesDigest).toBe(hash([]));
     const noPersonal = select({ memories: [event], candidates: [] });
     expect(noPersonal.selectedSources).toEqual([]);
+    expect(noPersonal.selectedUnpinnedDerivedSources).toHaveLength(1);
+    expect(noPersonal.selectedUnpinnedDerivedSources[0]?.originalGrantVerified).toBe(false);
   });
 
   it('fails closed for missing candidate, forged grant, changed projections, duplicate identities, and invalid digests', () => {
@@ -111,6 +125,7 @@ describe('G1-B exact personal record runtime source selection, no DB authorizati
       [{ ...c1, rawRecordDigest: 'sha256:v1:bad' }, c2],
       [c1, c1],
       [c1, { ...c2, permitsHttpReveal: true } as unknown as SeyeonPersonalRecordProjectionCandidateV1],
+      [{ ...c1, hiddenGrantAuthority: 'attacker' } as SeyeonPersonalRecordProjectionCandidateV1, c2],
     ];
     for (const candidates of invalidCases) {
       expect(() => select({ candidates })).toThrow(SeyeonExactModelPersonalSourceSelectionHoldV1);

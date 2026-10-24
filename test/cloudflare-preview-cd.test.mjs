@@ -15,7 +15,7 @@ const correctContext = Object.freeze({
 });
 
 const previewConfig = Object.freeze({
-  name: 'myeongha',
+  name: 'myeongha-static-preview',
   main: './cloudflare/preview-worker.mjs',
   workers_dev: false,
   preview_urls: true,
@@ -54,6 +54,12 @@ describe('Cloudflare preview Git-based CD', () => {
 
   it('requires preview-only static routing with API interception', () => {
     expect(assertCloudflarePreviewConfiguration(previewConfig)).toBe(true);
+    // The Ops migration owns the canonical public myeongha Worker. Static
+    // preview CD must never redeploy it or disable workers.dev again.
+    expect(() => assertCloudflarePreviewConfiguration({
+      ...previewConfig,
+      name: 'myeongha',
+    })).toThrow(/static assets isolated/u);
     expect(() => assertCloudflarePreviewConfiguration({ ...previewConfig, workers_dev: true })).toThrow(/production workers.dev route disabled/u);
     expect(() => assertCloudflarePreviewConfiguration({ ...previewConfig, assets: { ...previewConfig.assets, run_worker_first: false } })).toThrow(/static assets isolated/u);
     expect(() => assertCloudflarePreviewConfiguration({ ...previewConfig, route: 'example.com/*' })).toThrow(/static assets isolated/u);
@@ -160,6 +166,41 @@ describe('Cloudflare preview Git-based CD', () => {
     expect((await missing.json()).error.code)
       .toBe('SEYEON_FIRST_REVEAL_AUTHORITY_UNAVAILABLE');
     expect(asset).not.toHaveBeenCalled();
+  });
+
+  it('intercepts encoded Chat and legacy rewrite markers before Auth, API or static fallback', async () => {
+    const asset = vi.fn(async () => new Response('PRIVATE_STATIC_FALLBACK'));
+    const upstream = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => {
+      throw Error('Aliases must be denied before Auth or Provider dispatch');
+    });
+    const env = {
+      MYEONGHA_SUPABASE_URL: 'https://cnsfpcdiyofqvhpcegfc.supabase.co',
+      MYEONGHA_SUPABASE_API_KEY: 'preview-auth-test-key-1234567890',
+      ASSETS: { fetch: asset },
+    };
+    try {
+      for (const path of [
+        '/api/%63hat', '/%2561pi/%2563hat', '/api%2Fchat',
+        '/index.html?__myeongha_chat_thread_id=forged',
+        '/api/health?%255f%255fmyeongha_chat_thread_id=forged',
+      ]) {
+        const response = await previewWorker.fetch(new Request(`https://preview.example${path}`, {
+          headers: { Authorization: 'Bearer synthetic-member-token' },
+        }), env);
+        expect(response.status).toBe(503);
+        expect(response.headers.get('Cache-Control')).toBe('no-store');
+        expect((await response.json()).error.code)
+          .toBe('SEYEON_FIRST_REVEAL_AUTHORITY_UNAVAILABLE');
+      }
+      expect(asset).not.toHaveBeenCalled();
+      expect(upstream).not.toHaveBeenCalled();
+
+      const normal = await previewWorker.fetch(new Request('https://preview.example/index.html?lang=ko'), env);
+      expect(normal.status).toBe(200);
+      expect(asset).toHaveBeenCalledTimes(1);
+    } finally {
+      upstream.mockRestore();
+    }
   });
 
 });

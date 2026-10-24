@@ -1,4 +1,5 @@
 import { ApiCommandError } from './api-error.js';
+import { admitSajuAbuseHttpRequestV1, type SajuAbuseAdmissionGateV1 } from './saju-abuse-admission-http.js';
 import {
   AuthenticatedJsonRequestBodyTooLargeV1,
   readAuthenticatedJsonRequestBodyV1,
@@ -48,6 +49,7 @@ export interface HandleCurrentSubjectSajuPreviewReadingRequestInputV1<AdmittedRe
   readonly identityEvidenceVerifier: IdentityEvidenceVerificationPortV1;
   readonly pool: PostgresSubjectPoolV1;
   readonly sajuAdapter: SajuProductionReadingHttpAdapterV1<AdmittedResponse>;
+  readonly sajuAbuseAdmission?: SajuAbuseAdmissionGateV1;
 }
 
 function requireNonEmptyString(name: string, value: unknown): string {
@@ -170,6 +172,14 @@ export async function handleCurrentSubjectSajuPreviewReadingRequestV1<AdmittedRe
       retryable: false,
       requestId,
     });
+  }
+
+  if (input.sajuAbuseAdmission !== undefined) {
+    const denied = await admitSajuAbuseHttpRequestV1({
+      request: input.request, requestId, routeId: 'api.me.saju.preview-reading',
+      evidence: verifiedEvidence, gate: input.sajuAbuseAdmission,
+    });
+    if (denied !== null) return denied;
   }
 
   const bodyDeadline = createIngressRequestBodyCompletionDeadlineLeaseV1();

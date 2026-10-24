@@ -414,7 +414,7 @@ function renderSajuReadings(readingPayload, lifeFactsPayload) {
   renderSajuReadingEmpty(target);
 }
 
-function renderMemories(payload) {
+function renderMemories(payload, subjectKind) {
   const target = byId('memory-records-list');
   clear(target);
   const memories = requireArray(payload, 'memories');
@@ -447,6 +447,29 @@ function renderMemories(payload) {
     item.append(sourceElement('span', 'fine', formatStoredValue(memory.contentJsonb)));
     const provenance = memory.createdByCharacterId ? `${memory.createdByCharacterId} · ${formatTimestamp(memory.createdAt)}` : formatTimestamp(memory.createdAt);
     item.append(sourceElement('span', 'fine', provenance));
+    if (subjectKind === 'member' && typeof memory.memoryItemId === 'string') {
+      const check = uiElement('button', 'records-memory-grant-check', '세연 접근권한 확인');
+      check.type = 'button';
+      const status = textElement('span', 'records-memory-grant-status', '');
+      status.setAttribute('role', 'status');
+      check.addEventListener('click', async () => {
+        check.disabled = true;
+        status.textContent = uiText('현재 권한 확인 중…');
+        try {
+          const result = await createRecordsRuntimeClient().readSeyeonMemoryGrantStatus(memory.memoryItemId);
+          if (item.isConnected) {
+            status.textContent = uiText(result.currentlyGranted
+              ? '현재 세연의 접근이 허용되어 있습니다.'
+              : '현재 세연의 접근 권한이 없습니다.');
+          }
+        } catch {
+          if (item.isConnected) status.textContent = uiText('현재 접근권한을 확인할 수 없습니다.');
+        } finally {
+          check.disabled = false;
+        }
+      });
+      item.append(check, status);
+    }
     target.append(item);
   }
 }
@@ -476,7 +499,7 @@ function renderLoadedRecords(records) {
   renderCurrentBirthProfile(records.birth);
   renderLifeFacts(records.lifeFacts);
   renderSajuReadings(records.readings, records.lifeFacts);
-  renderMemories(records.memories);
+  renderMemories(records.memories, records.profile?.subjectKind);
 }
 
 async function boot() {

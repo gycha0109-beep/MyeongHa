@@ -457,6 +457,16 @@ describe('Se-yeon G3 Node-only original-Grant current Subject fence',()=>{
       'qry_seyeon_positive_first_memory_locked_reveal_v3(uuid,uuid,uuid,uuid,uuid,uuid,uuid,text)',
     );
     expect(readiness).not.toContain('qry_seyeon_positive_first_memory_locked_reveal_v1');
+    // Both existence and owner/ACL checks must address the same actual
+    // eight-UUID G2 overload; a seven-UUID typo permanently denies readiness.
+    const commitSignatures = [...readiness!.matchAll(
+      /public\.cmd_commit_seyeon_positive_chat_turn_v1\(([^)]+)\)/gu,
+    )].map(match => match[1]);
+    expect(commitSignatures).toEqual([
+      'uuid,uuid,uuid,uuid,uuid,uuid,uuid,uuid,jsonb,text,text,text',
+      'uuid,uuid,uuid,uuid,uuid,uuid,uuid,uuid,jsonb,text,text,text',
+    ]);
+    expect(readiness).toContain("has_function_privilege(current_user,p.oid,'EXECUTE')");
     expect(queries(db)).not.toContainEqual(
       expect.stringContaining('from public.qry_seyeon_positive_first_memory_locked_reveal_v3('),
     );

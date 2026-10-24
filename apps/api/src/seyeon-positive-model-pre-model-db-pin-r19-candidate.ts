@@ -42,6 +42,9 @@ function requireSelection(
       selection.permitsAtomicCommit !== false ||
       selection.permitsHttpReveal !== false ||
       !SHA.test(selection.selectedSourcesDigest) ||
+      !SHA.test(selection.selectedModelSourceCensusDigest) ||
+      !Array.isArray(selection.selectedUnpinnedDerivedSources) ||
+      selection.selectedUnpinnedDerivedSources.length !== 0 ||
       !Number.isSafeInteger(selection.selectedPersonalRecordCount) ||
       selection.selectedPersonalRecordCount < 1 ||
       selection.selectedPersonalRecordCount > 2 ||
@@ -50,7 +53,15 @@ function requireSelection(
       selection.selectedSources.length !== selection.selectedPersonalRecordCount ||
       selection.selectedSourcesDigest !== 'sha256:v1:' +
         createHash('sha256').update(canonicalJson(selection.selectedSources))
-          .digest('hex')) {
+          .digest('hex') ||
+      // The disposable R19 pin only persists original Memory/Grant edges.
+      // It must never accept an additional model-selected derived Event
+      // omitted from its SQL source_set schema.
+      selection.selectedModelSourceCensusDigest !== 'sha256:v1:' +
+        createHash('sha256').update(canonicalJson({
+          originalPersonalSources: selection.selectedSources,
+          unpinnedDerivedSources: [],
+        })).digest('hex')) {
     throw new SeyeonR19OfflinePositivePinHoldV1();
   }
 

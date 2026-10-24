@@ -216,3 +216,8 @@ At minimum:
 - revoked/superseded record remains excluded from current context;
 - accepted Character Memory remains structurally distinct from Life Fact/Birth/episode authority;
 - schema/version provenance remains sufficient to interpret stored historical records deterministically.
+
+
+## 2026-10-24 초기 S0 서버·DB 실행본
+
+[보안 실행 로드맵 §63](../operations/SEYEON_AI_SECURITY_EXECUTION_ROADMAP_V2_20261016.md#63-2026-10-24-브랜치-구현을-묶어서-완료-후-병합)에서 기존 `conversation_recall/v1` codec과 명시적 server-owned 승인, 원본 Grant/Record Pin·Commit·first Node Reveal의 실행본을 연결했다. [SQL 묶음](../../scripts/operations/seyeon-security-s0/README.md)은 빈 registry/positive API EXECUTE 미부여로 설치되며 자동 Production migration이 아니다. 실제 branch/격리 DB 검증은 normative type 승인이나 운영 등록을 대신하지 않는다. **SRC-25 OPEN 유지**, global Projectors=[]와 배포 caller의 승인 부재/DENY를 유지한다.
