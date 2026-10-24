@@ -33,6 +33,7 @@ export function HomeCharacterFeature() {
           <MobileUiText style={styles.heroEyebrow}>MEET SEYEON · 세연</MobileUiText>
           <MobileUiText style={styles.heroTitle}>오늘은 어떤 이야기를 나눠볼까요?</MobileUiText>
           <MobileUiText style={styles.heroDescription}>여섯 연결자의 이야기를 만나보세요.</MobileUiText>
+          <MobileUiText style={styles.aiPriorNotice}>명하의 캐릭터 대화는 생성형 인공지능을 이용합니다. 캐릭터는 실제 사람이 아니며, 대화 답변은 AI가 생성합니다.</MobileUiText>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={t('캐릭터 선택 화면으로 이동')}
@@ -149,6 +150,7 @@ const styles = StyleSheet.create({
     textShadowRadius: 5,
   },
   heroDescription: { color: '#FBF0DF', fontSize: 13, fontWeight: '600' },
+  aiPriorNotice: { color: '#FFF3DE', fontSize: 11, lineHeight: 17, fontWeight: '600' },
   heroAction: {
     marginTop: 3,
     minHeight: 48,

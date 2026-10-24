@@ -5,6 +5,12 @@ const landing = readFileSync(new URL('../apps/web/src/landing/LandingPage.tsx', 
 const chat = readFileSync(new URL('../apps/web/src/chat/ChatPage.tsx', import.meta.url), 'utf8');
 
 describe('LEGAL L5: visible generative-AI disclosures', () => {
+  it('shows native home AI notice before its character-entry action', () => {
+    const home = readFileSync(new URL('../apps/mobile/src/features/home/HomeCharacterFeature.tsx', import.meta.url), 'utf8');
+    expect(home).toContain('명하의 캐릭터 대화는 생성형 인공지능을 이용합니다.');
+    expect(home.indexOf('명하의 캐릭터 대화는 생성형 인공지능')).toBeLessThan(home.indexOf("router.push('/chat')"));
+  });
+
   it('discloses generated characters on native mobile before character selection', () => {
     const hub = readFileSync(new URL('../apps/mobile/src/app/(tabs)/chat/index.tsx', import.meta.url), 'utf8');
     expect(hub).toContain('명하의 캐릭터 대화는 생성형 인공지능을 이용합니다.');
