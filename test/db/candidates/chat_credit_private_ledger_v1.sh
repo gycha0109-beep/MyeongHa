@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 : "${PGDATABASE:?Disposable PostgreSQL database is required}"
+psql -v ON_ERROR_STOP=1 -f test/db/chat_credit_signup_wallet_production_v1_test.sql >/dev/null
 # The disposable template now contains the signup-only Production schema.
 # Drop it only in this isolated candidate DB before replaying the broader
 # paid/Reading/ACK candidate DDL; never drop Production objects or privileges.
