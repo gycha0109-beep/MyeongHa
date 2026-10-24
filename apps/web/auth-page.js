@@ -704,6 +704,12 @@ function authErrorMessage(error) {
       return '유출 이력이 확인된 비밀번호는 사용할 수 없습니다. 다른 비밀번호로 다시 시도해 주세요.';
     case 'PASSWORD_SECURITY_UNAVAILABLE':
       return '비밀번호 안전성 확인 서비스를 사용할 수 없습니다. 잠시 뒤 다시 시도해 주세요.';
+    case 'AGE_BINDING_RECOVERY_REQUIRED':
+      return '인증 서버에서 계정 등록 또는 로그인이 진행됐으나 연령 확인 연결을 완료하지 못했습니다. 계정이 이미 만들어졌을 수 있으므로 재가입을 반복하지 마세요. 가입 화면에서 본인확인을 다시 완료한 뒤 기존 이메일·비밀번호로 로그인해 주세요. 소셜 계정은 본인확인 후 같은 소셜 로그인으로 다시 시도해 주세요.';
+    case 'AGE_VERIFICATION_REQUIRED':
+      return '계속하려면 가입 화면에서 본인확인을 완료해 주세요.';
+    case 'AGE_VERIFICATION_UNAVAILABLE':
+      return '연령 확인 서버를 사용할 수 없습니다. 본인확인 상태를 확인한 뒤 다시 시도해 주세요.';
     case 'RATE_LIMITED':
       return '요청이 너무 많습니다. 잠시 뒤 다시 시도해 주세요.';
     case 'WEB_AUTH_NETWORK_FAILED':

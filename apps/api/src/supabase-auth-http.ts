@@ -460,7 +460,13 @@ export async function handleSupabaseAuthRequestV1(input: {
                 input.preenrollmentMemberPort.verifySocialState?.(providedState) !== true) {
               return errorResponse('SOCIAL_AUTH_CALLBACK_STATE_MISMATCH', 403);
             }
-            await input.preenrollmentMemberPort.bindMember(session.user.id);
+            try {
+              await input.preenrollmentMemberPort.bindMember(session.user.id);
+            } catch {
+              // Social login may have minted an upstream Auth user, but it
+              // has no verified-age Subject. No tokens/cookies are released.
+              return errorResponse('AGE_BINDING_RECOVERY_REQUIRED', 503);
+            }
             newlyBoundSocialMember = true;
           }
         } catch {
@@ -592,9 +598,11 @@ export async function handleSupabaseAuthRequestV1(input: {
         try {
           await input.preenrollmentMemberPort.bindMember(session.user.id);
         } catch {
-          // The new Supabase account may already exist. Never return tokens
-          // unless verified age was atomically bound to the Member Subject.
-          return errorResponse('AGE_VERIFICATION_UNAVAILABLE', 503);
+          // Supabase may already have created the Auth account. Distinguish
+          // this state from a failed upstream signup without exposing UUID,
+          // credentials or a session. A verified password sign-in can later
+          // recover the missing canonical Member binding.
+          return errorResponse('AGE_BINDING_RECOVERY_REQUIRED', 503);
         }
       }
       const signupResponse = authenticatedResponse(session, {}, webCookieTransport);
@@ -613,7 +621,9 @@ export async function handleSupabaseAuthRequestV1(input: {
         try {
           await input.preenrollmentMemberPort.bindMember(user.id);
         } catch {
-          return errorResponse('AGE_VERIFICATION_UNAVAILABLE', 503);
+          // An email-confirmation account may now exist upstream even though
+          // canonical Subject binding failed. Never issue a success response.
+          return errorResponse('AGE_BINDING_RECOVERY_REQUIRED', 503);
         }
       }
       const verificationResponse = response({

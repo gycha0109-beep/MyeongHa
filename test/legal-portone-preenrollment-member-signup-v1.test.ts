@@ -80,11 +80,13 @@ describe('A1 Member signup verified preenrollment binding', () => {
       passwordCompromiseGuard: guard, preenrollmentMemberPort: port,
     });
     expect(response.status).toBe(503);
+    expect((await response.clone().json()).error.code).toBe('AGE_BINDING_RECOVERY_REQUIRED');
     const body = JSON.stringify(await response.json());
     expect(body).not.toContain('token');
     expect(body).not.toContain('refresh');
     expect(body).not.toContain(id);
     expect(port.bindMember).toHaveBeenCalledWith(id);
+    expect(response.headers.get('set-cookie')).toBeNull();
   });
   const signIn = () => new Request('https://myeongha.vercel.app/api/auth/sign-in', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
