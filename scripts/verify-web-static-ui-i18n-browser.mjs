@@ -124,6 +124,29 @@ try{
   await sleep(150);
   const safe=await evaluate('(()=>({user:document.querySelector(".conversation-message[data-sender=user]")?.textContent,reading:document.querySelector("[data-official-reading]")?.textContent}))()');
   if(safe.user!=='사주'||safe.reading!=='사주')failures.push({page:'chat.html',safe});
+  // I18N-07: the newly selectable UI locales must survive navigation without
+  // reinterpreting recorded messages or official Reading content.
+  await send('Emulation.setDeviceMetricsOverride',{width:1440,height:1000,deviceScaleFactor:1,mobile:false});
+  for(const [locale,heading] of [['en-US','Saju'],['zh-CN','八字']]){
+    await navigate('reading.html','#saju-birth-form');
+    await change(locale);
+    const selected=await evaluate('(()=>({lang:document.documentElement.lang,stored:localStorage.getItem("myeongha.ui.locale.v1"),picker:document.querySelector(".ui-locale-select")?.value,heading:document.querySelector(".gm-page-title")?.textContent.trim()}))()');
+    if(selected.lang!==locale||selected.stored!==locale||selected.picker!==locale||selected.heading!==heading){
+      failures.push({page:'reading.html',lang:locale,selected});
+    }
+    await navigate('hall.html','.mhx-hero');
+    const restored=await evaluate('(()=>({lang:document.documentElement.lang,stored:localStorage.getItem("myeongha.ui.locale.v1"),picker:document.querySelector(".ui-locale-select")?.value}))()');
+    if(restored.lang!==locale||restored.stored!==locale||restored.picker!==locale){
+      failures.push({page:'hall.html',lang:locale,restored});
+    }
+    await navigate('chat.html','.conversation-chat-panel');
+    await evaluate('(()=>{const m=document.createElement("article");m.className="conversation-message";m.dataset.sender="user";m.textContent="사주";document.querySelector("[data-chat-stream]").append(m);const r=document.createElement("div");r.dataset.officialReading="";r.textContent="사주";document.body.append(r);})()');
+    await sleep(150);
+    const source=await evaluate('(()=>({lang:document.documentElement.lang,user:document.querySelector(".conversation-message[data-sender=user]")?.textContent,reading:document.querySelector("[data-official-reading]")?.textContent}))()');
+    if(source.lang!==locale||source.user!=='사주'||source.reading!=='사주'){
+      failures.push({page:'chat.html',lang:locale,source});
+    }
+  }
   console.log(JSON.stringify({status:failures.length?'FAIL':'PASS',pages:pages.length,failures},null,2));
   assert(!failures.length,'Untranslated or invalid static UI across locales');
 }finally{

@@ -78,5 +78,8 @@ describe('mobile Birth calendar and 12-hour clock', () => {
     expect(picker).toContain('maxLength={2}');
     expect(picker).toContain('onHourChange(hour)');
     expect(picker).not.toContain('19:30');
+    expect(picker).toContain('MobileUiLocale');
+    expect(picker).toContain("locale === 'en-US'");
+    expect(picker).toContain("locale === 'zh-CN'");
   });
 });
