@@ -2,6 +2,7 @@ import {describe,expect,it} from 'vitest';
 import {
   classifySeyeonC08LocalEntryV1,
   guardSeyeonC08LocalPublicUtteranceV1,
+  guardSeyeonC08LocalMoveV1,
   runSeyeonC08LocalOneCallShadowV1,
 } from '../apps/api/src/seyeon-c08-local-one-call-shadow-v1.js';
 import type {RunSeyeonCharacterTurnV2Input} from
@@ -18,6 +19,14 @@ const DRAFT=Object.freeze({
   expressionState:'baseline',revealLevel:'public',
   memoryRefsMentioned:[],privateSourceRefsMentioned:[],disclosureSliceIds:[],
 });
+const LOCAL_GOOD_DRAFTS={
+  greeting:'안녕하세요. 저는 세연이에요. 지금 인사드리니 반가워요.',
+  initiative:DRAFT.utterance,
+  low_state:'오늘 좀 피곤하셨군요. 저는 가벼운 이야기부터 꺼내볼게요.',
+  pace:'천천히 이야기해도 좋아요. 저는 서두르지 않을게요.',
+  current_want:'저는 지금 재미있는 이야기를 해 보고 싶어요.',
+  boundary:'저는 편한 일상 이야기가 좋아요. 오늘은 가볍게 시작할까요?',
+} as const;
 const inputContext:RunSeyeonCharacterTurnV2Input['contextInput']={
   relationship:null,recentMessages:[{messageId:ID,role:'user',text:TEXT}],
   retrievedMemories:[],
@@ -66,7 +75,8 @@ function harness(opts:{
       events.push('model');
       opts.beforeModel?.();
       requests.push(req);
-      return Object.hasOwn(opts,'output')?opts.output:DRAFT;
+      return Object.hasOwn(opts,'output')?opts.output:{...DRAFT,
+        utterance:LOCAL_GOOD_DRAFTS[classifySeyeonC08LocalEntryV1(text)!.kind]};
     },
   };
   const run=(overrides:Record<string,unknown>={})=>
@@ -108,7 +118,7 @@ describe('C08 local preflight / single dialogue LLM / local output guard (OFFLIN
     }
   });
 
-  it.each(GOLD)('$id: refuses C07 Gold original text before model dispatch',async gold=>{
+  it.each(GOLD)('$id: admits only N01/N02; refuses all other C07 Gold original messages',async gold=>{
     const h=harness({text:gold.text});
     if(gold.id==='N01'||gold.id==='N02'){
       const result=await h.run();
@@ -187,6 +197,21 @@ describe('C08 local preflight / single dialogue LLM / local output guard (OFFLIN
       expect(h.requests).toHaveLength(1);
       expect(h.censusRows.length).toBeGreaterThanOrEqual(3);
     }
+  });
+
+  it('rejects valid-looking but intent-mismatched outputs locally',async()=>{
+    for(const [text,utterance] of [
+      ['어떤 이야기가 편해?','오늘은 제가 먼저 이야기할게요. 작은 농담부터 꺼낼게요.'],
+      ['지금 뭐 하고 싶어?','안녕하세요. 어떤 이야기든 좋아요.'],
+      ['천천히 이야기하고 싶어.','오늘은 제가 먼저 이야기해 볼게요.'],
+      ['안녕하세요','오늘은 제가 먼저 이야기해 볼게요.'],
+    ] as const){
+      const h=harness({text,output:{...DRAFT,utterance}});
+      await expect(h.run()).rejects.toThrow('LOCAL_OUTPUT_UNVERIFIABLE');
+      expect(h.requests).toHaveLength(1);
+    }
+    expect(()=>guardSeyeonC08LocalMoveV1('greeting',
+      '저는 지금 이야기하고 싶어요.')).toThrow('LOCAL_OUTPUT_UNVERIFIABLE');
   });
 
   it('does not expose a draft if the thread changes during generation or before return',async()=>{
