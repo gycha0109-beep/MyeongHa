@@ -14,6 +14,7 @@ on:
       - 'scripts/ci/run-db-track.mjs'
       - '.github/workflows/ci-db-track.yml'
       - 'test/db/birth_profile_create_runtime_authority.sh'
+      - 'test/db/portone_identity_age_authority_pg17.sh'
       - 'test/db/content_release_lifecycle_authority.sh'
       - 'test/db/member_character_thread_open_concurrency.sh'
       - 'docs/CHARACTER_GATE_B_PUBLICATION_BLOCKER_EVIDENCE.md'

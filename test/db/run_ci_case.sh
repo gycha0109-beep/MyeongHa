@@ -99,6 +99,16 @@ catalog_snapshot() {
 }
 
 case "$case_name" in
+  portone-identity-age-authority-pg17)
+    verify_pg17
+    [[ "${GITHUB_ACTIONS:-}" == true && "${CI:-}" == true &&
+       "${DB_SUITE:-}" == postgres17 && "${PGHOST:-}" == localhost &&
+       "${PGPORT:-}" == 5432 && "${PGDATABASE:-}" =~ ^myeongha_ci_case_[0-9]+$ ]] || {
+      echo HOLD_PORTONE_PG17_DISPOSABLE_CI_ONLY >&2; exit 1;
+    }
+    apply_pg17_migrations_without_birth_authority
+    bash test/db/portone_identity_age_authority_pg17.sh
+    ;;
   seyeon-c08y-disposable-shared-ledger-pg17)
     verify_pg17
     # Synthetic table/RPC schema only: NO repository/Production migrations.
