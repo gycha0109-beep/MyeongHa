@@ -1,0 +1,88 @@
+name: Cloudflare Preview Remote Smoke
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cloudflare-preview-remote-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  remote-preview:
+    name: Cloudflare Preview · Real HTTP + Chrome
+    if: github.event.pull_request.head.repo.full_name == 'gycha0109-beep/MyeongHa' && (github.head_ref == 'feat/ops/cloudflare-static-preview-20261020' || github.head_ref == 'feat/ops/cloudflare-authdb-clean-snapshot-20261021')
+    runs-on: ubuntu-latest
+    timeout-minutes: 16
+    env:
+      MYEONGHA_CLOUDFLARE_PREVIEW_URL: ${{ github.head_ref == 'feat/ops/cloudflare-static-preview-20261020' && 'https://feat-ops-cloudflare-static-preview-20261020-myeongha.gycha0109.workers.dev' || 'https://feat-ops-cloudflare-authdb-clean-snapshot-20261021-myeongha.gycha0109.workers.dev' }}
+      MYEONGHA_CLOUDFLARE_SMOKE_CONTRACT: ${{ github.head_ref == 'feat/ops/cloudflare-static-preview-20261020' && 'stage4-legacy' || 'scf2-stage5' }}
+      MYEONGHA_CLOUDFLARE_EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          # Only Ops needs local ancestry for the bounded, no-write recovery dry-run.
+          fetch-depth: ${{ github.head_ref == 'feat/ops/cloudflare-authdb-clean-snapshot-20261021' && '0' || '1' }}
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Preflight pinned Preview rollback and restore plan (dry-run only)
+        if: github.head_ref == 'feat/ops/cloudflare-authdb-clean-snapshot-20261021'
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          git switch -c feat/ops/cloudflare-authdb-clean-snapshot-20261021
+          node scripts/local/rehearse-cloudflare-preview-rollback.mjs --rollback d4f7cebb3d9be6b4ad9e526c53e3f5b8585cc9c0 --restore "$EXPECTED_HEAD"
+      - name: Verify deployed HTTP headers, 11 HTML routes and all API HOLDs
+        env:
+          MYEONGHA_CLOUDFLARE_EVIDENCE_KIND: ${{ github.head_ref == 'feat/ops/cloudflare-authdb-clean-snapshot-20261021' && 'current' || '' }}
+        run: node scripts/verify-cloudflare-preview-remote.mjs
+      - name: Verify immutable earlier Preview recovery candidate
+        if: github.head_ref == 'feat/ops/cloudflare-authdb-clean-snapshot-20261021'
+        env:
+          # Preselected, deployed, Git-SHA-attested non-production recovery point.
+          # This step ONLY reads the immutable deployment URL; it never rolls
+          # the mutable branch Preview back or updates routes/production.
+          MYEONGHA_CLOUDFLARE_PREVIEW_URL: https://59a14b13-myeongha.gycha0109.workers.dev
+          MYEONGHA_CLOUDFLARE_EXPECTED_HEAD: d4f7cebb3d9be6b4ad9e526c53e3f5b8585cc9c0
+          MYEONGHA_CLOUDFLARE_EVIDENCE_KIND: recovery
+        run: node scripts/verify-cloudflare-preview-remote.mjs
+      - name: Install headless Chrome
+        id: chrome
+        uses: browser-actions/setup-chrome@48ad923757ca74d66703209fe939badbdf80f2f4
+        with:
+          chrome-version: stable
+          install-dependencies: true
+      - name: Verify 11 rendered pages in real Chrome
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
+        run: node scripts/verify-cloudflare-preview-browser.mjs
+      - name: Verify immutable recovery candidate renders all 11 pages
+        if: github.head_ref == 'feat/ops/cloudflare-authdb-clean-snapshot-20261021'
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
+          MYEONGHA_CLOUDFLARE_PREVIEW_URL: https://59a14b13-myeongha.gycha0109.workers.dev
+        run: node scripts/verify-cloudflare-preview-browser.mjs
+      - name: Verify existing Vercel Production static standby (GET only)
+        if: github.head_ref == 'feat/ops/cloudflare-authdb-clean-snapshot-20261021'
+        run: node scripts/verify-cloudflare-vercel-standby.mjs
+
+      - name: Accept matching Stage 9 current and pinned recovery evidence
+        if: always() && !cancelled() && github.head_ref == 'feat/ops/cloudflare-authdb-clean-snapshot-20261021'
+        env:
+          MYEONGHA_CLOUDFLARE_EVIDENCE_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: node scripts/accept-cloudflare-stage9-evidence-pair.mjs
+
+      - name: Upload Stage 9 sanitized Preview evidence (current and pinned recovery)
+        if: always() && github.head_ref == 'feat/ops/cloudflare-authdb-clean-snapshot-20261021'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: cloudflare-preview-stage9-evidence
+          path: artifacts/cloudflare-preview-stage9/*.json
+          if-no-files-found: error
+          retention-days: 7

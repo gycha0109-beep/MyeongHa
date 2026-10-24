@@ -1,6 +1,7 @@
 import { isGuestPromotionEmptyRequestBodyV1 } from './guest-promotion-request-body.js';
 import { IngressRequestBodyCompletionDeadlineExceededV1 } from './ingress-request-body-deadline.js';
 import { createNodePostgresSubjectPoolV1 } from './node-postgres-subject-pool.js';
+import type { PostgresSubjectPoolV1 } from './postgres-subject-execution.js';
 import { executePostgresSubjectTransactionV1 } from './postgres-subject-execution.js';
 import { createProductionRequestIdentityVerifierV1 } from './production-request-identity-verifier.js';
 import {
@@ -102,9 +103,11 @@ export interface ProductionGuestPromotionRuntimeV1 {
 
 export function createProductionGuestPromotionRuntimeV1(input: {
   readonly env: ProductionUserDataRuntimeEnvV1;
+  readonly pool?: PostgresSubjectPoolV1;
 }): ProductionGuestPromotionRuntimeV1 {
   const config = parseProductionUserDataRuntimeConfigV1(input.env);
-  const pool = createNodePostgresSubjectPoolV1(config);
+  const ownedPool = input.pool === undefined ? createNodePostgresSubjectPoolV1(config) : undefined;
+  const pool = input.pool ?? ownedPool!;
   const verifier = createProductionRequestIdentityVerifierV1({ config });
 
   return Object.freeze({
@@ -209,7 +212,7 @@ export function createProductionGuestPromotionRuntimeV1(input: {
       }
     },
     close() {
-      return pool.close();
+      return ownedPool?.close() ?? Promise.resolve();
     },
   });
 }

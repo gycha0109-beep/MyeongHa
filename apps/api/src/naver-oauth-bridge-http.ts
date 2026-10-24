@@ -137,6 +137,7 @@ export async function handleNaverOAuthBridgeRequestV1(input: {
   readonly env: NaverOAuthBridgeEnvV1;
   readonly fetchImpl?: NaverOAuthBridgeFetchV1;
   readonly nowEpochMs?: () => number;
+  readonly webOrigin?: string;
 }): Promise<Response> {
   const expectedMethod = input.action === 'token' ? 'POST' : 'GET';
   if (input.request.method !== expectedMethod) return new Response(null, { status: 405, headers: { ...HEADERS, Allow: expectedMethod } });
@@ -148,14 +149,22 @@ export async function handleNaverOAuthBridgeRequestV1(input: {
   const now = input.nowEpochMs?.() ?? Date.now();
   const fetcher = input.fetchImpl ?? fetch;
   const url = new URL(input.request.url);
-  if (url.origin !== ORIGIN || (url.pathname !== `${PATH}${input.action}` && url.pathname !== '/api/auth/sign-in')) return error();
+  const approvedWebOrigin = input.webOrigin ?? ORIGIN;
+  let host: URL;
+  try { host = new URL(approvedWebOrigin); }
+  catch { return error(); }
+  if (host.origin !== approvedWebOrigin || host.protocol !== 'https:' ||
+      host.username !== '' || host.password !== '' || host.search !== '' ||
+      host.hash !== '') return error();
+  const callback = approvedWebOrigin + '/api/auth/social/naver/callback';
+  if (url.origin !== approvedWebOrigin || (url.pathname !== `${PATH}${input.action}` && url.pathname !== '/api/auth/sign-in')) return error();
   try {
     if (input.action === 'authorize') {
       const state = unique(url, 'state');
       const challenge = unique(url, 'code_challenge');
       if (unique(url, 'client_id') !== clientId || unique(url, 'redirect_uri') !== SUPABASE_CALLBACK || unique(url, 'response_type') !== 'code' || !state || !challenge || !/^[A-Za-z0-9_-]{43}$/u.test(challenge) || unique(url, 'code_challenge_method') !== 'S256') return error();
       const naver = new URL('https://nid.naver.com/oauth2.0/authorize');
-      naver.search = new URLSearchParams({ response_type: 'code', client_id: clientId, redirect_uri: CALLBACK, state: seal({ kind: 'state', exp: now + STATE_TTL, state, challenge }, key) }).toString();
+      naver.search = new URLSearchParams({ response_type: 'code', client_id: clientId, redirect_uri: callback, state: seal({ kind: 'state', exp: now + STATE_TTL, state, challenge }, key) }).toString();
       return redirect(naver);
     }
     if (input.action === 'callback') {
@@ -183,7 +192,7 @@ export async function handleNaverOAuthBridgeRequestV1(input: {
       const result = await readUpstream(await fetcher('https://nid.naver.com/oauth2.0/token', {
         method: 'POST', redirect: 'error', signal: AbortSignal.timeout(5000),
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({ grant_type: 'authorization_code', client_id: clientId, client_secret: body.client_secret, redirect_uri: CALLBACK, code: flow.code, state: flow.state }),
+        body: new URLSearchParams({ grant_type: 'authorization_code', client_id: clientId, client_secret: body.client_secret, redirect_uri: callback, code: flow.code, state: flow.state }),
       }));
       if (!record(result) || !bounded(result.access_token) || typeof result.token_type !== 'string' || result.token_type.toLowerCase() !== 'bearer') return error(502);
       const seconds = typeof result.expires_in === 'string' ? Number(result.expires_in) : result.expires_in;

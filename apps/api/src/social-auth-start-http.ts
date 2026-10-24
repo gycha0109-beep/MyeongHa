@@ -68,7 +68,7 @@ function parseProvider(value: unknown): SocialAuthProviderServerV1 | null {
     : null;
 }
 
-function parseRedirectUri(value: unknown): URL | null {
+function parseRedirectUri(value: unknown, approvedWebOrigin: string = WEB_SOCIAL_REDIRECT_ORIGIN): URL | null {
   if (typeof value !== 'string' || value.length > 512) return null;
   let url: URL;
   try {
@@ -89,7 +89,7 @@ function parseRedirectUri(value: unknown): URL | null {
     url.search === '';
   const web =
     commonSafe &&
-    url.origin === WEB_SOCIAL_REDIRECT_ORIGIN &&
+    url.origin === approvedWebOrigin &&
     url.pathname === WEB_SOCIAL_REDIRECT_PATH &&
     url.searchParams.getAll('social').length === 1 &&
     url.searchParams.get('social') === WEB_SOCIAL_REDIRECT_MARKER &&
@@ -114,6 +114,7 @@ export async function handleSocialAuthStartRequestV1(input: {
   readonly request: Request;
   readonly env: ProductionUserDataRuntimeEnvV1;
   readonly nowEpochMs?: () => number;
+  readonly webOrigin?: string;
 }): Promise<Response> {
   if (input.request.method !== 'POST') {
     cancelUnusedRequestBody(input.request);
@@ -135,7 +136,14 @@ export async function handleSocialAuthStartRequestV1(input: {
 
   if (!isRecord(body)) return failure('INVALID_REQUEST', 400);
   const provider = parseProvider(body.provider);
-  const redirectUri = parseRedirectUri(body.redirectUri);
+  const approvedWebOrigin = input.webOrigin ?? WEB_SOCIAL_REDIRECT_ORIGIN;
+  let host: URL;
+  try { host = new URL(approvedWebOrigin); }
+  catch { return failure('INVALID_REQUEST', 400); }
+  if (host.origin !== approvedWebOrigin || host.protocol !== 'https:' ||
+      host.username !== '' || host.password !== '' || host.search !== '' ||
+      host.hash !== '') return failure('INVALID_REQUEST', 400);
+  const redirectUri = parseRedirectUri(body.redirectUri, approvedWebOrigin);
   if (provider === null || redirectUri === null) {
     return failure('INVALID_REQUEST', 400);
   }
