@@ -299,7 +299,7 @@ function setState(state, message = '') {
   status.hidden = state !== 'loading' && !message;
   status.textContent = message || '내 사주를 확인하는 중입니다…';
   empty.hidden = state !== 'empty';
-  hub.hidden = state !== 'ready';
+  hub.hidden = state !== 'ready' && state !== 'profile-only';
 }
 
 function setFormError(message) {
@@ -514,7 +514,15 @@ function storedProfileHasSupportedBirthDate(profile) {
   return typeof birthDate === 'string' && STORED_BIRTH_DATE_PATTERN.test(birthDate);
 }
 
-function showCalculationUnavailable() {
+function showCalculationUnavailable(profile = null) {
+  if (profile?.currentRevision?.input) {
+    lastRenderedBirthProfile = profile;
+    renderBirthDetails(profile);
+    byId('saju-birth-summary').textContent = formatBirthSummary(profile);
+    setState('profile-only', '저장된 출생정보를 표시했습니다. 명식 계산은 다시 시도해 주세요.');
+    byId('saju-calculation-retry').hidden = false;
+    return;
+  }
   setState('error', '출생정보는 저장되어 있습니다. 다시 입력하지 말고 계산 재시도 버튼으로 결과를 확인해 주세요.');
 }
 
@@ -534,9 +542,10 @@ async function loadExistingSaju() {
   const { token } = activeBearer;
   const birthProfileId = readSessionValue(BIRTH_PROFILE_ID_KEY);
   setState('loading', '현재 세션의 명식을 확인하는 중입니다…');
+  let profile = null;
 
   try {
-    let profile = await resolveDisplayBirthProfile(token, birthProfileId);
+    profile = await resolveDisplayBirthProfile(token, birthProfileId);
     if (birthProfileId && profile === null) removeSessionValue(BIRTH_PROFILE_ID_KEY);
 
     if (profile && !storedProfileHasSupportedBirthDate(profile)) {
@@ -566,7 +575,7 @@ async function loadExistingSaju() {
       return;
     }
     if (error?.operation === 'saju-calculation') {
-      showCalculationUnavailable();
+      showCalculationUnavailable(profile);
       return;
     }
     setState('error', '현재 등록된 출생정보를 확인하지 못했습니다. 잠시 후 새로고침해 주세요.');
@@ -601,7 +610,8 @@ async function submitBirthProfile(event) {
       return;
     }
     if (profileCreated && error?.operation === 'saju-calculation') {
-      showCalculationUnavailable();
+      const saved = await resolveDisplayBirthProfile(activeBearer.token, readSessionValue(BIRTH_PROFILE_ID_KEY)).catch(() => null);
+      showCalculationUnavailable(saved);
       return;
     }
 
