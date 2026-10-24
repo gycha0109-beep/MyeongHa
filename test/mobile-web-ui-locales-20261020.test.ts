@@ -279,6 +279,15 @@ describe('Mobile / Web UI localization parity', () => {
     expect(archived).toContain('{step.primary}');
     expect(archived).toContain('{notice}');
     expect(archived).toContain('{text}');
+    const missingLeafCopy = ["로그인 후 대화하기 →","‹ 대화로 돌아가기","대화 링크를 확인할 수 없습니다","올바른 기존 대화 링크로 다시 들어와 주세요.","대화로 돌아가기","출생정보를 확인하는 중입니다…","선택한 Reader와 전체 사주 읽기 시작","PHOTO · 정면 사진","{reader}에게 보여줄 사진","얼굴 전체가 보이도록 정면을 바라봐 주세요. 밝은 조명과 선명한 사진이 좋습니다.","▣ 사진 촬영","▧ 사진 선택","현재는 사진 촬영·선택과 미리보기만 가능합니다. 서버 분석은 시작하지 않습니다. 얼굴 분석과 관상 풀이는 아직 제공하지 않습니다.","선택한 사진은 이 화면에서만 일시적으로 사용하며 기기 보안 저장소나 앱 기록에 저장하지 않습니다.","삶의 사실과 지난 풀이, 저장된 기억을 차분히 찾아보세요.","← 기록으로 돌아가기","아직 내 명식이 없습니다. 출생정보를 등록하면 현재 명식을 확인할 수 있습니다.","현재 출생정보를 기준으로 계산된 명식 사실만 보여줍니다.","명하","회원 전용 · 세연과의 대화는 서버에 보관됩니다.","세연에게 보낼 메시지","관계","지금 확인할 수 있는 삶의 기록과 사주 풀이를 차분히 살펴보세요.","모호","미확정","궁금한 주제를 선택해 더 깊이 살펴보세요. 준비된 풀이만 연결되며, 아직 확인이 필요한 주제는 현재 상태를 안내합니다.","다른 주제의 풀이로 자동 대체하지 않습니다.","웹과 동일하게 권한이 열리기 전에는 다른 풀이를 대신 실행하지 않습니다.","Preview · 연구 검증 중인 원국 해석이며 확정적 미래 예측은 포함하지 않습니다.","나의 명식, 나를 읽는 첫 장","태어난 순간의 정보를 토대로 계산한 명식을 확인해 보세요.","이 정보는 검증된 명식 계산 결과입니다. 하루 운세나 미래를 예측한 내용이 아닙니다.","얼굴 전체가 타원 안에 들어오도록 맞춰주세요","정면 사진을 촬영하려면 카메라 권한이 필요합니다."];
+    for (const locale of ['en-US', 'zh-CN'] as const) {
+      for (const label of missingLeafCopy) {
+        const rendered = translateMobileUiCopy(label, locale);
+        expect(rendered, `${locale} missing: ${label}`).not.toBe(label);
+        expect(rendered.replaceAll('세연', '')).not.toMatch(/[가-힣]/u);
+      }
+    }
+    expect(formatMobileUiCopy('{reader}에게 보여줄 사진', { reader: '세연' }, 'en-US')).toBe('Photo for 세연');
     const original = '사용자의 고유한 대화 내용';
     expect(translateMobileUiCopy(original, 'en-US')).toBe(original);
     expect(translateMobileUiCopy(original, 'zh-CN')).toBe(original);

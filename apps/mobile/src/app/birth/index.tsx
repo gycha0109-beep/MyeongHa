@@ -200,7 +200,9 @@ export default function BirthInputScreen() {
                 {year && month && day
                   ? locale === 'en-US'
                     ? `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`
-                    : `${year}年${Number(month)}月${Number(day)}日`.replace('年', locale === 'ko-KR' ? '년 ' : '年').replace('月', locale === 'ko-KR' ? '월 ' : '月').replace('日', locale === 'ko-KR' ? '일' : '日')
+                    : locale === 'ko-KR'
+                      ? `${year}년 ${Number(month)}월 ${Number(day)}일`
+                      : `${year}年${Number(month)}月${Number(day)}日`
                   : t('달력에서 날짜 선택')}
               </Text>
             </View>
