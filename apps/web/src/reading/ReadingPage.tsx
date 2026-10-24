@@ -87,7 +87,7 @@ export function ReadingPage() {
         <div className="saju-design-hero">
           <div className="saju-design-hero-text">
             <span className="saju-design-eyebrow">SAJU PREVIEW</span>
-            <h2>나의 사주 기본 정보</h2>
+            <h1>나의 사주 기본 정보</h1>
             <p>입력하신 생년월일시를 기준으로 계산한 기본 명식입니다.<br />아래는 유료 해석에서 다루는 내용과 구성 미리보기도 함께 보여드립니다.</p>
           </div>
         </div>
