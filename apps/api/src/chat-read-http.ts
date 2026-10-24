@@ -15,6 +15,14 @@ const ROUTE_PREFIX = '/api/chat/' as const;
 const API_CONTRACT_VERSION = 'v0.9' as const;
 const NO_STORE = 'no-store' as const;
 
+/** G3/S5: no DB-current-rights Reveal for historical Se-yeon material yet. */
+class SeyeonChatHistoryRevealHoldV1 extends Error {
+  constructor() {
+    super('Se-yeon chat history Reveal requires current source authorization.');
+    this.name = 'SeyeonChatHistoryRevealHoldV1';
+  }
+}
+
 export const CHAT_READ_HTTP_BINDING_V1 = Object.freeze({
   method: GET_METHOD,
   route: '/api/chat/:threadId',
@@ -322,12 +330,29 @@ async function readChatState(
   }
   const binding = mapThreadBinding(bindingResult.rows[0], parsed.threadId);
 
+  // A newly created, strictly empty Se-yeon room contains no historical
+  // material to reveal. Do not block its initial owner-scoped shell.
+  // Every non-empty or paginated Se-yeon transcript still requires G3.
   const streamResult = await client.query<StreamRow>(READ_STREAM_SQL, [
     subjectId,
     parsed.threadId,
     parsed.afterSequenceNo,
     parsed.pageSize,
   ]);
+  if (
+    binding.participantCharacterIds.includes('seyeon') &&
+    (parsed.afterSequenceNo !== 0 || streamResult.rows.length !== 0)
+  ) {
+    throw new SeyeonChatHistoryRevealHoldV1();
+  }
+  // A current participant set is not proof about the entire history.
+  // A formerly participating Se-yeon can still own a committed message
+  // after the thread is reconfigured to contain other Characters only.
+  // Check the full bounded stream page (including the extra cursor row)
+  // BEFORE retrieving relationship state or serializing any message body.
+  if (streamResult.rows.some((row) => row.characterId === 'seyeon')) {
+    throw new SeyeonChatHistoryRevealHoldV1();
+  }
   const relationshipResult = await client.query<RelationshipRow>(READ_RELATIONSHIP_SQL, [
     subjectId,
     binding.primaryCharacterId,
@@ -401,6 +426,9 @@ export async function handleChatReadRequestV1(
       stringValue('server time', input.serverTime),
     );
   } catch (error) {
+    if (error instanceof SeyeonChatHistoryRevealHoldV1) {
+      return jsonError(503, 'SEYEON_HISTORY_REVEAL_HOLD', 'chat.unavailable', input.requestId);
+    }
     const constraint = postgresConstraint(error);
     if (constraint !== null && (
       constraint.includes('subject_ineligible') ||
