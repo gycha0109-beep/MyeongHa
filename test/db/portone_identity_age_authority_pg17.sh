@@ -278,4 +278,42 @@ set -e
  fail 'replay persisted second Guest'
 pass 'A1 Guest Subject+token+adult verified authority are one atomic, non-replayable transaction'
 
+# Member signup: the trusted Supabase Auth UUID must already exist, and
+# one verified pre-account proof creates exactly one Member Subject+age grant.
+binding_d="$(printf 'd%.0s' {1..64})"
+preid_d="$(pre_issue "$binding_d")"
+[[ "$(pre_verify "$binding_d" "$preid_d" free_minor)" == t ]] ||
+  fail 'Member proof was not verified'
+member_d=91000000-0000-4000-8000-000000000004
+bind_member() {
+  local user="$1" binding="$2"
+  q "begin; set local role myeongha_api_executor;
+    select subject_id,age_band from
+    public.cmd_bind_verified_member_preenrollment_v1('$user'::uuid,'$binding');
+    commit;"
+}
+set +e
+bind_member "$member_d" "$binding_d" >/dev/null 2>&1
+missing_member_rc=$?
+set -e
+[[ "$missing_member_rc" != 0 ]] || fail 'untrusted/nonexistent Supabase user accepted'
+[[ "$(q "select status from public.legal_portone_preenrollment_v1 where identity_verification_id='$preid_d'")" == verified ]] ||
+  fail 'missing upstream user consumed preenrollment'
+q "insert into auth.users(id) values ('$member_d');" >/dev/null
+member_result="$(bind_member "$member_d" "$binding_d")"
+[[ "$member_result" == *"free_minor"* ]] || fail 'verified Member was not bound'
+[[ "$(q "select count(*) from public.subjects s
+  join public.legal_portone_verified_age_v1 v on v.subject_id=s.id
+  where s.auth_user_id='$member_d' and s.kind='member' and s.status='active'
+  and v.age_band='free_minor' and v.verification_id='$preid_d'")" == 1 ]] ||
+  fail 'Member Subject/verified-age missing or inconsistent'
+set +e
+bind_member "$member_d" "$binding_d" >/dev/null 2>&1
+replayed_member_rc=$?
+set -e
+[[ "$replayed_member_rc" != 0 ]] || fail 'Member proof replay succeeded'
+[[ "$(q "select count(*) from public.subjects where auth_user_id='$member_d'")" == 1 ]] ||
+  fail 'Member replay duplicated Subject'
+pass 'A1 atomic Supabase Member Subject creation and one-time verified age proof'
+
 echo 'PASS PortOne identity PG17 disposable authority smoke complete; no Production migration applied.'

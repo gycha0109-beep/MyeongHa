@@ -341,11 +341,19 @@ function upstreamError(action: SupabaseAuthActionV1, status: number): Response {
   return errorResponse('AUTH_UPSTREAM_UNAVAILABLE', status >= 500 ? 503 : 502);
 }
 
+export interface SupabasePreenrollmentMemberBindingPortV1 {
+  /** Server-validated HttpOnly actor proof, before sending Signup upstream. */
+  readVerified(): Promise<boolean>;
+  /** Trusted Supabase response UUID only; consumes proof & creates Member+age atomically. */
+  bindMember(verifiedAuthUserId: string): Promise<void>;
+}
+
 export async function handleSupabaseAuthRequestV1(input: {
   readonly request: Request;
   readonly env: ProductionUserDataRuntimeEnvV1;
   readonly action: SupabaseAuthActionV1;
   readonly passwordCompromiseGuard?: PasswordCompromiseGuardPortV1;
+  readonly preenrollmentMemberPort?: SupabasePreenrollmentMemberBindingPortV1;
 }): Promise<Response> {
   if (input.request.method !== 'POST') {
     return new Response(null, {
@@ -363,7 +371,18 @@ export async function handleSupabaseAuthRequestV1(input: {
         env: input.env,
         surface: input.action === 'sign-up' ? 'member-sign-up' : 'social-complete',
       });
-      if (denied !== null) return denied;
+      if (denied !== null) {
+        if (input.action !== 'sign-up' || input.preenrollmentMemberPort === undefined) {
+          return denied;
+        }
+        try {
+          if (!await input.preenrollmentMemberPort.readVerified()) {
+            return errorResponse('AGE_VERIFICATION_REQUIRED', 403);
+          }
+        } catch {
+          return errorResponse('AGE_VERIFICATION_UNAVAILABLE', 503);
+        }
+      }
     }
     if (input.action === 'sign-out') {
       const authorization = input.request.headers.get('authorization');
@@ -498,6 +517,16 @@ export async function handleSupabaseAuthRequestV1(input: {
           webCookieTransport,
         );
       }
+      if (input.action === 'sign-up' && input.preenrollmentMemberPort !== undefined) {
+        if (session.user.id === null) return errorResponse('AUTH_UPSTREAM_MALFORMED', 502);
+        try {
+          await input.preenrollmentMemberPort.bindMember(session.user.id);
+        } catch {
+          // The new Supabase account may already exist. Never return tokens
+          // unless verified age was atomically bound to the Member Subject.
+          return errorResponse('AGE_VERIFICATION_UNAVAILABLE', 503);
+        }
+      }
       return authenticatedResponse(session, {}, webCookieTransport);
     }
 
@@ -507,6 +536,14 @@ export async function handleSupabaseAuthRequestV1(input: {
         ? (payload as Record<string, unknown>)
         : {};
       const user = readUser(root.user ?? root);
+      if (input.preenrollmentMemberPort !== undefined) {
+        if (user.id === null) return errorResponse('AUTH_UPSTREAM_MALFORMED', 502);
+        try {
+          await input.preenrollmentMemberPort.bindMember(user.id);
+        } catch {
+          return errorResponse('AGE_VERIFICATION_UNAVAILABLE', 503);
+        }
+      }
       return response({
         ok: true,
         data: {

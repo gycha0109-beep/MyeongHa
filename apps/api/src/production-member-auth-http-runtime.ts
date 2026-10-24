@@ -1,4 +1,12 @@
 import { denyUnverifiedInitialIdentityAdmissionV1 } from './portone-v2-preidentity-admission-v1.js';
+import { resolveProductionPortOneVerifiedAgeModeV1 } from './portone-v2-age-enforcement-activation-v1.js';
+import { resolveProductionPortOnePreenrollmentModeV1 } from './portone-v2-preenrollment-http-runtime-v1.js';
+import {
+  createPostgresPortOnePreenrollmentAgeAuthorityV1,
+  extractPortOnePreenrollmentCookieV1,
+  fingerprintPortOnePreenrollmentBindingV1,
+} from './portone-v2-preenrollment-age-authority-v1.js';
+import type { PostgresSubjectPoolV1 } from './postgres-subject-execution.js';
 import {
   createMemberAuthRateLimitUnavailableResponseV1,
   handleMemberAuthRateLimitHttpV1,
@@ -18,6 +26,7 @@ import {
 import {
   handleSupabaseAuthRequestV1,
   type SupabaseAuthActionV1,
+  type SupabasePreenrollmentMemberBindingPortV1,
 } from './supabase-auth-http.js';
 import type {
   ProductionUserDataRuntimeEnvV1,
@@ -35,6 +44,7 @@ type MemberAuthUpstreamHandlerV1 = (input: {
   readonly request: Request;
   readonly env: ProductionUserDataRuntimeEnvV1;
   readonly action: SupabaseAuthActionV1;
+  readonly preenrollmentMemberPort?: SupabasePreenrollmentMemberBindingPortV1;
 }) => Promise<Response>;
 
 type ProductionMemberAuthHttpRequestV1 =
@@ -67,6 +77,7 @@ export interface CreateProductionMemberAuthHttpRuntimeInputV1 {
 type RuntimeStateV1 = Readonly<{
   secret: string;
   admissionPort: MemberAuthRateLimitAdmissionPortV1;
+  pool?: PostgresSubjectPoolV1;
   close: () => Promise<void>;
 }>;
 
@@ -97,6 +108,7 @@ export function createProductionMemberAuthHttpRuntimeV1(
     state = Object.freeze({
       secret: config.authRateLimitSecret,
       admissionPort: new PostgresMemberAuthRateLimitAdmissionPortV1(pool),
+      pool,
       close: () => pool.close(),
     });
     return state;
@@ -110,13 +122,26 @@ export function createProductionMemberAuthHttpRuntimeV1(
       const authAction =
         requestInput.authAction ??
         requestInput.action;
+      let preenrollmentBindingDigest: string | undefined;
       if (requestInput.request.method === 'POST' &&
           (authAction === 'sign-up' || authAction === 'social-complete')) {
         const denied = denyUnverifiedInitialIdentityAdmissionV1({
           env: input.env,
           surface: authAction === 'sign-up' ? 'member-sign-up' : 'social-complete',
         });
-        if (denied !== null) return denied;
+        if (denied !== null) {
+          if (authAction !== 'sign-up') return denied;
+          try {
+            if (resolveProductionPortOneVerifiedAgeModeV1(input.env) !== 'enforce' ||
+                resolveProductionPortOnePreenrollmentModeV1(input.env) !== 'enforce') return denied;
+            const rawNonce = extractPortOnePreenrollmentCookieV1(requestInput.request);
+            const secret = input.env.MYEONGHA_PORTONE_PREENROLLMENT_BINDING_SECRET;
+            if (rawNonce === null || typeof secret !== 'string') return denied;
+            preenrollmentBindingDigest = fingerprintPortOnePreenrollmentBindingV1({
+              rawNonce, secret,
+            });
+          } catch { return denied; }
+        }
       }
 
       if (requestInput.request.method !== 'POST') {
@@ -136,6 +161,28 @@ export function createProductionMemberAuthHttpRuntimeV1(
         );
       }
 
+      // The pre-account proof is read only after rate-limit admission. Its
+      // atomic binding to a canonical Member occurs AFTER the trusted Supabase
+      // UUID is received, and BEFORE any new session token is returned.
+      if (preenrollmentBindingDigest !== undefined && currentState.pool === undefined) {
+        return createMemberAuthRateLimitUnavailableResponseV1(requestInput.request);
+      }
+      const preenrollmentMemberPort =
+        preenrollmentBindingDigest !== undefined && currentState.pool !== undefined
+          ? (() => {
+              const authority = createPostgresPortOnePreenrollmentAgeAuthorityV1(currentState.pool!);
+              const digest = preenrollmentBindingDigest;
+              return Object.freeze({
+                async readVerified() {
+                  return await authority.readVerified(digest) !== null;
+                },
+                async bindMember(verifiedAuthUserId: string) {
+                  await authority.bindMember(verifiedAuthUserId, digest);
+                },
+              } satisfies SupabasePreenrollmentMemberBindingPortV1);
+            })()
+          : undefined;
+
       return handleMemberAuthRateLimitHttpV1({
         request: requestInput.request,
         action: requestInput.action,
@@ -145,6 +192,7 @@ export function createProductionMemberAuthHttpRuntimeV1(
           request: requestInput.request,
           env: input.env,
           action: authAction,
+          ...(preenrollmentMemberPort === undefined ? {} : { preenrollmentMemberPort }),
         }),
       });
     },

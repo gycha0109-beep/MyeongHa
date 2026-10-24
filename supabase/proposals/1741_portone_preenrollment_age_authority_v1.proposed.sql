@@ -249,6 +249,197 @@ begin
                       v_guest.expires_at, false;
 end $guest$;
 
+-- Read-only eligibility probe before contacting Supabase Signup. Not a grant;
+-- the subsequent Member creation MUST re-check and consume in the same DB txn.
+create function public.qry_verified_legal_portone_preenrollment_v1(
+  p_binding_digest text
+)
+returns text
+language plpgsql stable security definer
+set search_path = pg_catalog, public, pg_temp
+as $eligible$
+declare v_band text;
+begin
+  if p_binding_digest is null or p_binding_digest !~ '^[a-f0-9]{64} The
+-- auth.users UUID is supplied by the server's upstream response, never a
+-- browser field. A canonical Member + verified age must commit together.
+create function public.cmd_bind_verified_member_preenrollment_v1(
+  p_verified_auth_user_id uuid,
+  p_binding_digest text
+)
+returns table (subject_id uuid, age_band text)
+language plpgsql security definer
+set search_path = pg_catalog, public, pg_temp
+as $member$
+declare
+  v_band text;
+  v_verification_id text;
+  v_new_subject_id uuid := gen_random_uuid();
+  v_now timestamptz;
+begin
+  if p_verified_auth_user_id is null or
+     p_binding_digest is null or p_binding_digest !~ '^[a-f0-9]{64}
+  uuid,uuid,text,timestamptz,text
+) from public,anon,authenticated,service_role;
+grant execute on function public.cmd_create_verified_guest_session_v1(
+  uuid,uuid,text,timestamptz,text
+) to myeongha_api_executor;
+
+commit;
+ then
+    raise exception using errcode='23514',
+      constraint='legal_portone_preenrollment_member_required';
+  end if;
+  if not exists(select 1 from auth.users where id=p_verified_auth_user_id) then
+    raise exception using errcode='23514',
+      constraint='legal_portone_preenrollment_auth_user_missing';
+  end if;
+  -- Do not overwrite or adopt an existing Member's private Subject.
+  if exists(select 1 from public.subjects
+      where auth_user_id=p_verified_auth_user_id) then
+    raise exception using errcode='23514',
+      constraint='legal_portone_preenrollment_existing_member';
+  end if;
+  select a.age_band,a.identity_verification_id into v_band,v_verification_id
+    from public.legal_portone_preenrollment_v1 a
+    where a.binding_digest=p_binding_digest and a.status='verified'
+    for update;
+  v_now := clock_timestamp();
+  if v_band not in ('free_minor','adult') or v_verification_id is null or
+     not exists(select 1 from public.legal_portone_preenrollment_v1
+       where identity_verification_id=v_verification_id and expires_at>v_now) then
+    raise exception using errcode='23514',
+      constraint='legal_portone_preenrollment_member_required';
+  end if;
+  insert into public.subjects(
+    id,kind,auth_user_id,status,merged_into_subject_id,created_at,updated_at
+  ) values(
+    v_new_subject_id,'member',p_verified_auth_user_id,'active',
+    null,v_now,v_now
+  );
+  update public.legal_portone_preenrollment_v1
+    set status='consumed',consumed_at=clock_timestamp()
+    where identity_verification_id=v_verification_id
+      and binding_digest=p_binding_digest and status='verified'
+      and expires_at>clock_timestamp();
+  if not found then
+    raise exception using errcode='23514',
+      constraint='legal_portone_preenrollment_member_required';
+  end if;
+  insert into public.legal_portone_verified_age_v1(
+    subject_id,age_band,verification_id,verified_at
+  ) values(v_new_subject_id,v_band,v_verification_id,v_now);
+  return query select v_new_subject_id,v_band;
+end $member$;
+
+revoke all on function public.cmd_bind_verified_member_preenrollment_v1(
+  uuid,text
+) from public,anon,authenticated,service_role;
+grant execute on function public.cmd_bind_verified_member_preenrollment_v1(
+  uuid,text
+) to myeongha_api_executor;
+
+revoke all on function public.cmd_create_verified_guest_session_v1(
+  uuid,uuid,text,timestamptz,text
+) from public,anon,authenticated,service_role;
+grant execute on function public.cmd_create_verified_guest_session_v1(
+  uuid,uuid,text,timestamptz,text
+) to myeongha_api_executor;
+
+commit;
+ then
+    return null;
+  end if;
+  select a.age_band into v_band
+    from public.legal_portone_preenrollment_v1 a
+    where a.binding_digest=p_binding_digest and a.status='verified'
+      and a.expires_at>clock_timestamp();
+  return v_band;
+end $eligible$;
+revoke all on function public.qry_verified_legal_portone_preenrollment_v1(text)
+ from public,anon,authenticated,service_role;
+grant execute on function public.qry_verified_legal_portone_preenrollment_v1(text)
+ to myeongha_api_executor;
+
+-- Member signup finishes after the trusted Supabase Auth response. The
+-- auth.users UUID is supplied by the server's upstream response, never a
+-- browser field. A canonical Member + verified age must commit together.
+create function public.cmd_bind_verified_member_preenrollment_v1(
+  p_verified_auth_user_id uuid,
+  p_binding_digest text
+)
+returns table (subject_id uuid, age_band text)
+language plpgsql security definer
+set search_path = pg_catalog, public, pg_temp
+as $member$
+declare
+  v_band text;
+  v_verification_id text;
+  v_new_subject_id uuid := gen_random_uuid();
+  v_now timestamptz;
+begin
+  if p_verified_auth_user_id is null or
+     p_binding_digest is null or p_binding_digest !~ '^[a-f0-9]{64}
+  uuid,uuid,text,timestamptz,text
+) from public,anon,authenticated,service_role;
+grant execute on function public.cmd_create_verified_guest_session_v1(
+  uuid,uuid,text,timestamptz,text
+) to myeongha_api_executor;
+
+commit;
+ then
+    raise exception using errcode='23514',
+      constraint='legal_portone_preenrollment_member_required';
+  end if;
+  if not exists(select 1 from auth.users where id=p_verified_auth_user_id) then
+    raise exception using errcode='23514',
+      constraint='legal_portone_preenrollment_auth_user_missing';
+  end if;
+  -- Do not overwrite or adopt an existing Member's private Subject.
+  if exists(select 1 from public.subjects
+      where auth_user_id=p_verified_auth_user_id) then
+    raise exception using errcode='23514',
+      constraint='legal_portone_preenrollment_existing_member';
+  end if;
+  select a.age_band,a.identity_verification_id into v_band,v_verification_id
+    from public.legal_portone_preenrollment_v1 a
+    where a.binding_digest=p_binding_digest and a.status='verified'
+    for update;
+  v_now := clock_timestamp();
+  if v_band not in ('free_minor','adult') or v_verification_id is null or
+     not exists(select 1 from public.legal_portone_preenrollment_v1
+       where identity_verification_id=v_verification_id and expires_at>v_now) then
+    raise exception using errcode='23514',
+      constraint='legal_portone_preenrollment_member_required';
+  end if;
+  insert into public.subjects(
+    id,kind,auth_user_id,status,merged_into_subject_id,created_at,updated_at
+  ) values(
+    v_new_subject_id,'member',p_verified_auth_user_id,'active',
+    null,v_now,v_now
+  );
+  update public.legal_portone_preenrollment_v1
+    set status='consumed',consumed_at=clock_timestamp()
+    where identity_verification_id=v_verification_id
+      and binding_digest=p_binding_digest and status='verified'
+      and expires_at>clock_timestamp();
+  if not found then
+    raise exception using errcode='23514',
+      constraint='legal_portone_preenrollment_member_required';
+  end if;
+  insert into public.legal_portone_verified_age_v1(
+    subject_id,age_band,verification_id,verified_at
+  ) values(v_new_subject_id,v_band,v_verification_id,v_now);
+  return query select v_new_subject_id,v_band;
+end $member$;
+
+revoke all on function public.cmd_bind_verified_member_preenrollment_v1(
+  uuid,text
+) from public,anon,authenticated,service_role;
+grant execute on function public.cmd_bind_verified_member_preenrollment_v1(
+  uuid,text
+) to myeongha_api_executor;
+
 revoke all on function public.cmd_create_verified_guest_session_v1(
   uuid,uuid,text,timestamptz,text
 ) from public,anon,authenticated,service_role;

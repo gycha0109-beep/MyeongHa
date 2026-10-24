@@ -151,6 +151,44 @@ export function createPostgresPortOnePreenrollmentAgeAuthorityV1(pool: PostgresS
         return rows[0].accepted;
       });
     },
+    async readVerified(bindingDigest: string): Promise<AgeBand | null> {
+      requireDigest(bindingDigest);
+      return withRole(pool, async db => {
+        const { rows } = await db.query<BandRow>(
+          'select public.qry_verified_legal_portone_preenrollment_v1($1::text) as "ageBand"',
+          [bindingDigest],
+        );
+        if (rows.length !== 1) throw new Error('Preenrollment eligibility query returned invalid row count.');
+        const band = rows[0]?.ageBand;
+        if (band === null || band === undefined) return null;
+        if (band !== 'adult' && band !== 'free_minor') {
+          throw new Error('Preenrollment eligibility returned an invalid age band.');
+        }
+        return band;
+      });
+    },
+    async bindMember(verifiedAuthUserId: string, bindingDigest: string): Promise<{
+      readonly subjectId: string; readonly ageBand: AgeBand;
+    }> {
+      requireDigest(bindingDigest);
+      if (!/^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/iu.test(verifiedAuthUserId)) {
+        throw new Error('Supabase verified Auth user identity is malformed.');
+      }
+      return withRole(pool, async db => {
+        const { rows } = await db.query<Readonly<{ subjectId: unknown; ageBand: unknown }>>(
+          'select subject_id::text as "subjectId", age_band as "ageBand" from public.cmd_bind_verified_member_preenrollment_v1($1::uuid,$2::text)',
+          [verifiedAuthUserId, bindingDigest],
+        );
+        if (rows.length !== 1 || typeof rows[0]?.subjectId !== 'string' ||
+            (rows[0].ageBand !== 'adult' && rows[0].ageBand !== 'free_minor')) {
+          throw new Error('Preenrollment Member binding returned invalid output.');
+        }
+        return Object.freeze({
+          subjectId: rows[0].subjectId,
+          ageBand: rows[0].ageBand,
+        });
+      });
+    },
     async consume(bindingDigest: string): Promise<AgeBand | null> {
       requireDigest(bindingDigest);
       return withRole(pool, async db => {
