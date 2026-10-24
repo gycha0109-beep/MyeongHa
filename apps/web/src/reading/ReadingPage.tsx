@@ -30,11 +30,7 @@ export function ReadingPage() {
   return (
     <div className="gm-shell">
       <h1 className="gm-page-title saju-design-sr-title">사주</h1>
-      <div className="saju-design-ribbon" aria-label="무료 프리뷰 화면. 아직 구매하지 않은 상태">
-        <div><strong>무료 프리뷰 화면 <span>(미구매 상태)</span></strong><b>무료</b></div>
-        <p>기본 명식 확인 + 유료 결과물 구성 미리보기 (개인화된 유료 해석 본문 없음)</p>
-      </div>
-            <div className="saju-status" id="saju-status" role="status">내 사주를 확인하는 중입니다…</div>
+      <div className="saju-status" id="saju-status" role="status">내 사주를 확인하는 중입니다…</div>
       <button id="saju-calculation-retry" className="saju-calculation-retry" type="button" hidden>
         저장된 출생정보로 계산 다시 시도
       </button>
@@ -162,6 +158,19 @@ export function ReadingPage() {
           </div>
         </section>
 
+        <section className="saju-design-more" aria-labelledby="saju-design-more-title">
+          <h2 id="saju-design-more-title">다른 사주 주제</h2>
+          <div className="saju-design-more-grid">
+            {additionalReadingTopics.map(([title, href]) => (
+              <a href={href} key={href}>
+                <strong>{title}</strong>
+                <span className={`reading-topic-availability is-${resolveReadingAvailabilityV1(href).kind}`}>{resolveReadingAvailabilityV1(href).label}</span>
+              </a>
+            ))}
+          </div>
+          <p>추가 입력 준비 중 · 정식 읽기 준비 중인 주제는 현재 이용할 수 없습니다.</p>
+        </section>
+
         <section className="saju-design-example" aria-labelledby="saju-design-example-title">
           <div className="saju-design-example-copy">
             <h2 id="saju-design-example-title">예시 결과물 미리보기 <span>예시</span></h2>
@@ -172,31 +181,7 @@ export function ReadingPage() {
             <p>• 예시 사용자의 명식을 바탕으로 성향과 기질을 살펴봅니다. 실제 구매 시 고객님의 사주에 맞춘 상세한 해석이 제공됩니다.</p>
           </div>
         </section>
-        <section id="saju-overview-preview" className="saju-design-overview" aria-labelledby="saju-overview-title" hidden>
-          <div className="saju-design-overview-head">
-            <div><span className="saju-design-eyebrow">SAJU READING</span><h2 id="saju-overview-title">나의 전체 사주 해석</h2><p>실제 사주 서비스에서 받은 무료 프리뷰입니다. 유료 해설과 구분됩니다.</p></div>
-            <a id="saju-overview-full" href="reading-detail.html?topic=temperament&scope=original" hidden>자세히 읽기 →</a>
-          </div>
-          <div className="saju-design-card saju-overview-card">
-            <p id="saju-overview-status" role="status" aria-live="polite">사주 해석을 불러오는 중입니다…</p>
-            <div id="saju-overview-result" className="saju-overview-result" aria-live="polite" />
-            <button id="saju-overview-retry" className="saju-primary-button saju-overview-retry" type="button" hidden>해석 다시 불러오기</button>
-            <p className="saju-design-source-note">무료 프리뷰이며, 구매권 또는 저장된 유료 해석을 의미하지 않습니다.</p>
-          </div>
-        </section>
         <div className="saju-design-preview-link"><span>지금 확인할 수 있는 무료 개인별 사주 프리뷰</span><a href={resumedPreview ?? 'reading-detail.html?topic=temperament&scope=original'}>무료 사주 프리뷰 열기 →</a></div>
-        <details className="saju-design-more">
-          <summary>다른 사주 주제 둘러보기</summary>
-          <div className="saju-design-more-grid">
-            {additionalReadingTopics.map(([title, href]) => (
-              <a href={href} key={href}>
-                <strong>{title}</strong>
-                <span className={`reading-topic-availability is-${resolveReadingAvailabilityV1(href).kind}`}>{resolveReadingAvailabilityV1(href).label}</span>
-              </a>
-            ))}
-          </div>
-          <p>추가 입력 준비 중 · 정식 읽기 준비 중인 주제는 현재 이용할 수 없습니다.</p>
-        </details>
         <span id="saju-flow-year" hidden aria-hidden="true" />
       </section>
     </div>

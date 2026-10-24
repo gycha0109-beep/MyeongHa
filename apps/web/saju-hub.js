@@ -1,7 +1,6 @@
 import { ensureActiveBearer, getActiveBearer, invalidateGuestSession, invalidateMemberSession } from './product-auth.js';
 import { getUiLocale } from './ui-i18n.js';
 import { resumePreviewHrefV1 } from './reading-preview-continuation.js';
-import { installSajuOverviewRetryV1, loadSajuOverviewReadingV1 } from './saju-overview-reading.js';
 import {
   sajuPillarLabelV1, sajuElementLabelV1, sajuYinYangLabelV1,
   projectSajuPillarDisplayV1, sajuCompletenessLabelV1,
@@ -10,6 +9,7 @@ import {
 
 const BIRTH_PROFILE_ID_KEY = 'myeongha.guestBirthProfileId.v1';
 const BIRTH_PROFILE_ENDPOINT = '/api/birth-profiles';
+const SELF_BIRTH_PROFILE_ENDPOINT = '/api/me/birth-profile';
 const SAJU_CALCULATION_ENDPOINT = '/api/me/saju/calculation';
 const STORED_BIRTH_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/u;
 const ELEMENTS = ['목', '화', '토', '금', '수'];
@@ -149,6 +149,30 @@ async function readDisplayBirthProfile(token, birthProfileId) {
     if (error?.status === 401 || error?.status === 403) throw error;
     return null;
   }
+}
+
+async function readCurrentSelfBirthProfile(token) {
+  const response = await fetch(SELF_BIRTH_PROFILE_ENDPOINT, {
+    method: 'GET',
+    headers: bearerHeaders(token),
+    credentials: 'same-origin',
+    cache: 'no-store',
+  });
+  if (!response.ok) {
+    if (response.status === 401 || response.status === 403) {
+      throw requestError('birth-read', response.status, null, 'Current birth profile permission unavailable.');
+    }
+    return null;
+  }
+  const data = unwrapSuccess(await readJson(response));
+  return data?.birthProfile?.currentRevision?.input ? data.birthProfile : null;
+}
+
+async function resolveDisplayBirthProfile(token, birthProfileId) {
+  // Session storage is a guest shortcut, not the member's authoritative profile locator.
+  const current = await readCurrentSelfBirthProfile(token);
+  if (current) return current;
+  return readDisplayBirthProfile(token, birthProfileId);
 }
 
 async function calculateSaju(token) {
@@ -512,7 +536,7 @@ async function loadExistingSaju() {
   setState('loading', '현재 세션의 명식을 확인하는 중입니다…');
 
   try {
-    let profile = await readDisplayBirthProfile(token, birthProfileId);
+    let profile = await resolveDisplayBirthProfile(token, birthProfileId);
     if (birthProfileId && profile === null) removeSessionValue(BIRTH_PROFILE_ID_KEY);
 
     if (profile && !storedProfileHasSupportedBirthDate(profile)) {
@@ -524,10 +548,9 @@ async function loadExistingSaju() {
     const calculation = await calculateSaju(token);
     if (!profile) {
       const storedId = readSessionValue(BIRTH_PROFILE_ID_KEY);
-      profile = await readDisplayBirthProfile(token, storedId);
+      profile = await resolveDisplayBirthProfile(token, storedId);
     }
     renderCalculation(calculation, profile);
-    void loadSajuOverviewReadingV1(activeBearer);
   } catch (error) {
     if (error?.status === 401) {
       handleUnauthorized(activeBearer);
@@ -567,9 +590,8 @@ async function submitBirthProfile(event) {
     const receipt = await createBirthProfile(token, request);
     profileCreated = true;
     const calculation = await calculateSaju(token);
-    const profile = await readDisplayBirthProfile(token, receipt.birthProfileId);
+    const profile = await resolveDisplayBirthProfile(token, receipt.birthProfileId);
     renderCalculation(calculation, profile);
-    void loadSajuOverviewReadingV1(activeBearer);
     const continuedPreview = resumePreviewHrefV1(window.location.search);
     if (continuedPreview) window.location.assign(continuedPreview);
   } catch (error) {
@@ -602,7 +624,6 @@ async function submitBirthProfile(event) {
   }
 }
 
-installSajuOverviewRetryV1();
 setupBirthDateInputs();
 byId('saju-time-unknown').addEventListener('change', syncBirthControls);
 for (const input of document.querySelectorAll('input[name="saju-calendar"]')) {

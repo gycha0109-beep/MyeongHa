@@ -156,3 +156,7 @@ html[data-theme="dark"] .saju-design-more-grid strong { color:#f3dde0; }
 
 /* Retain a translatable document heading without altering the screenshot composition. */
 .saju-design-sr-title { position:absolute !important; width:1px !important; height:1px !important; padding:0 !important; margin:-1px !important; overflow:hidden !important; clip:rect(0,0,0,0) !important; white-space:nowrap !important; border:0 !important; }
+
+.saju-design-more h2 { margin: 0 0 14px; font: 700 clamp(19px,2vw,25px)/1.4 var(--mh-serif,serif); color:#612835; }
+.saju-design-more { margin-top: 20px; padding-top: 20px; border-top: 1px solid #eadbd5; }
+html[data-theme="dark"] .saju-design-more h2 { color:#f4dce0; }
