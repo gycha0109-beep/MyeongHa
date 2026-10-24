@@ -96,6 +96,26 @@ export function guardSeyeonC08LocalPublicUtteranceV1(utterance: unknown): string
   return utterance;
 }
 
+/**
+ * Minimal act-specific, local postconditions. These are deliberately
+ * necessary-not-sufficient surface checks, not a claim of semantic equivalence
+ * to a model reviewer. Reject unclear output instead of calling another LLM.
+ */
+export function guardSeyeonC08LocalMoveV1(kind: SeyeonC08LocalEntryV1,
+  utterance: string): void {
+  const requires:Record<SeyeonC08LocalEntryV1, readonly RegExp[]> = {
+    greeting: [/안녕|반갑|처음/u],
+    initiative: [/저는|제가|저도/u],
+    low_state: [/지치|피곤|심심|지루|오늘/u,/저는|제가|저도/u],
+    pace: [/천천히|서두르|조용|침묵|속도/u],
+    current_want: [/저는|제가|저도/u,/지금|오늘/u],
+    boundary: [/편해|괜찮|선호|좋아|원하/u],
+  };
+  if(!requires[kind] || !requires[kind].every(re=>re.test(utterance))){
+    throw new SeyeonC08LocalHoldV1('LOCAL_OUTPUT_UNVERIFIABLE');
+  }
+}
+
 function assertLocalContext(input: Readonly<{
   userMessageRef: string;
   userText: string;
@@ -258,6 +278,7 @@ export async function runSeyeonC08LocalOneCallShadowV1(input: Readonly<{
   });
   const draft = admitSeyeonRendererDraftV2({rawOutput:raw,packet});
   guardSeyeonC08LocalPublicUtteranceV1(draft.utterance);
+  guardSeyeonC08LocalMoveV1(classified.kind,draft.utterance);
   if (draft.memoryRefsMentioned.length ||
       draft.privateSourceRefsMentioned.length ||
       draft.disclosureSliceIds.length ||
