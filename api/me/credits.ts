@@ -34,7 +34,8 @@ function withNoStore(response:Response):Response {
 export default {
   fetch(request:Request):Promise<Response> {
     return executeSecurityObservedRequestV1({
-      request,routeId:'api.me.credits',requestIdFactory:randomUUID,
+      request,
+      routeId: 'api.me.credits',requestIdFactory:randomUUID,
       execute:async ({requestId})=>{
         const safe=canonicalRequest(request);
         if(safe===null)return new Response(null,{status:404,headers:{'Cache-Control':NO_STORE}});

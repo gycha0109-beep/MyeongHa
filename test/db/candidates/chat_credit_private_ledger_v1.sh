@@ -8,8 +8,8 @@ psql -v ON_ERROR_STOP=1 -f test/db/chat_credit_signup_wallet_production_v1_test.
 psql -v ON_ERROR_STOP=1 >/dev/null <<'SQL'
 drop trigger if exists tr_chat_credit_member_signup_v1 on public.subjects;
 drop trigger if exists tr_chat_credit_subject_erasure_v1 on public.subjects;
-drop function if exists public.internal_tr_chat_credit_member_signup_v1();
-drop function if exists public.internal_tr_chat_credit_subject_erasure_v1();
+drop function if exists commerce_credit_private.internal_tr_chat_credit_member_signup_v1();
+drop function if exists commerce_credit_private.internal_tr_chat_credit_subject_erasure_v1();
 drop function if exists public.internal_cmd_chat_credit_finalize_v1(uuid,uuid,boolean,uuid);
 drop function if exists public.internal_cmd_chat_credit_reserve_v1(uuid,uuid,uuid);
 drop function if exists public.internal_cmd_chat_signup_credit_v1(uuid);

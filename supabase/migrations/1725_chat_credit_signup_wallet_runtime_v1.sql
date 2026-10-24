@@ -234,9 +234,13 @@ revoke all on function public.internal_cmd_chat_credit_finalize_v1(uuid,uuid,boo
 grant execute on function public.internal_qry_chat_credit_balance_v1(uuid)
   to myeongha_api_executor;
 
+-- Private trigger functions are deliberately outside the exposed public schema.
+create schema if not exists commerce_credit_private;
+revoke all on schema commerce_credit_private from public, anon, authenticated, service_role, myeongha_api_executor;
+
 -- New Member creation/Guest-to-Member promotion auto-grants signup credits in
 -- the same transaction. Existing Member records are NOT backfilled.
-create function public.internal_tr_chat_credit_member_signup_v1()
+create function commerce_credit_private.internal_tr_chat_credit_member_signup_v1()
 returns trigger
 language plpgsql volatile security definer
 set search_path=pg_catalog,public
@@ -262,16 +266,16 @@ begin
   return new;
 end;
 $credit_signup$;
-revoke all on function public.internal_tr_chat_credit_member_signup_v1() from public;
+revoke all on function commerce_credit_private.internal_tr_chat_credit_member_signup_v1() from public;
 
 create trigger tr_chat_credit_member_signup_v1
 after insert or update of kind,auth_user_id,status on public.subjects
-for each row execute function public.internal_tr_chat_credit_member_signup_v1();
+for each row execute function commerce_credit_private.internal_tr_chat_credit_member_signup_v1();
 
 -- The approved deletion policy classifies signup wallet rows as DELETE, not
 -- retained Commerce payment evidence. Purge all wallet state before account
 -- tombstone is marked deleted; thread deletion can also cascade reservations.
-create function public.internal_tr_chat_credit_subject_erasure_v1()
+create function commerce_credit_private.internal_tr_chat_credit_subject_erasure_v1()
 returns trigger
 language plpgsql volatile security definer
 set search_path=pg_catalog,public
@@ -287,11 +291,11 @@ begin
   return new;
 end;
 $credit_erasure$;
-revoke all on function public.internal_tr_chat_credit_subject_erasure_v1() from public;
+revoke all on function commerce_credit_private.internal_tr_chat_credit_subject_erasure_v1() from public;
 
 create trigger tr_chat_credit_subject_erasure_v1
 before update of status on public.subjects
-for each row execute function public.internal_tr_chat_credit_subject_erasure_v1();
+for each row execute function commerce_credit_private.internal_tr_chat_credit_subject_erasure_v1();
 
 -- Fail closed for unauthenticated/REST/legacy DB clients.
 revoke all on table public.chat_credit_lots_v1,
