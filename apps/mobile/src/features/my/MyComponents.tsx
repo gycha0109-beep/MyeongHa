@@ -41,6 +41,7 @@ export function MyMemberAuthCard({
   errorMessage,
   verificationRequired,
   socialPendingProvider,
+  webPreenrollmentRequired,
   onEmailChange,
   onPasswordChange,
   onSignIn,
@@ -61,6 +62,7 @@ export function MyMemberAuthCard({
     message: string;
   }> | null;
   socialPendingProvider: SocialAuthProviderV1 | null;
+  webPreenrollmentRequired: boolean;
   onEmailChange: (value: string) => void;
   onPasswordChange: (value: string) => void;
   onSignIn: () => void;
@@ -187,15 +189,19 @@ export function MyMemberAuthCard({
           </Pressable>
           <Pressable
             accessibilityRole="button"
-            disabled={pending || email.trim().length === 0 || password.length === 0}
+            disabled={pending || (!webPreenrollmentRequired &&
+              (email.trim().length === 0 || password.length === 0))}
             onPress={onSignUp}
             style={[
               themedStyles.secondaryAction,
-              (pending || email.trim().length === 0 || password.length === 0) &&
+              (pending || (!webPreenrollmentRequired &&
+                (email.trim().length === 0 || password.length === 0))) &&
                 themedStyles.disabledAction,
             ]}
           >
-            <MobileUiText style={themedStyles.secondaryActionText}>새 계정 만들기</MobileUiText>
+            <MobileUiText style={themedStyles.secondaryActionText}>
+              {webPreenrollmentRequired ? '공식 웹에서 가입·본인확인' : '새 계정 만들기'}
+            </MobileUiText>
           </Pressable>
           <MobileUiText style={themedStyles.caption}>
             새 계정은 현재 게스트 주체를 그대로 회원으로 승격합니다. 기존 회원 계정과의 게스트 기록 병합은 아직 지원하지 않습니다.

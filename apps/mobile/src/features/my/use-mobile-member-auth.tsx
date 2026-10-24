@@ -107,6 +107,17 @@ export function useMobileMemberAuthV1() {
     Object.freeze({ kind: 'idle', message: null }),
   );
   const [authRevision, setAuthRevision] = useState(0);
+  const [webPreenrollmentRequired, setWebPreenrollmentRequired] = useState(false);
+  useEffect(() => {
+    let active = true;
+    void resolveMobilePreenrollmentAdmissionV1({
+      apiOrigin: nativeMobileRuntimeV1.config.apiOrigin,
+      fetchImpl: fetch,
+    }).then((decision) => {
+      if (active) setWebPreenrollmentRequired(decision.kind === 'web_required');
+    });
+    return () => { active = false; };
+  }, []);
   const socialReturnGate = useRef(new MobileSocialAuthReturnGateV1());
   const socialCallbackInFlight = useRef(false);
 
@@ -118,7 +129,10 @@ export function useMobileMemberAuthV1() {
       apiOrigin: nativeMobileRuntimeV1.config.apiOrigin,
       fetchImpl: fetch,
     });
-    if (decision.kind === 'legacy') return false;
+    if (decision.kind === 'legacy') {
+      setWebPreenrollmentRequired(false);
+      return false;
+    }
     if (decision.kind === 'unavailable') {
       setState(Object.freeze({
         kind: 'error' as const,
@@ -126,6 +140,7 @@ export function useMobileMemberAuthV1() {
       }));
       return true;
     }
+    setWebPreenrollmentRequired(true);
     try {
       await Linking.openURL(decision.webUrl);
       setState(Object.freeze({
@@ -350,6 +365,12 @@ export function useMobileMemberAuthV1() {
 
   const signUp = useCallback(async (email: string, password: string) => {
     if (await requireWebPreenrollment()) return false;
+    if (email.trim().length === 0 || password.length === 0) {
+      setState(Object.freeze({
+        kind: 'error', message: '이메일과 비밀번호를 입력해 주세요.',
+      }));
+      return false;
+    }
     setState(Object.freeze({ kind: 'submitting', message: null }));
     try {
       const result = await mobileNewMemberEnrollmentServiceV1.start(email, password);
@@ -454,6 +475,7 @@ export function useMobileMemberAuthV1() {
   return Object.freeze({
     state,
     authRevision,
+    webPreenrollmentRequired,
     signIn,
     signInWithSocial,
     cancelSocialSignIn,

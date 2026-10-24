@@ -68,8 +68,15 @@ describe('Legal A1 native-to-web preenrollment admission', () => {
     ), 'utf8');
     const disclosure = '연령 본인확인이 필요한 경우 공식 웹 브라우저에서 새 계정을 만든 뒤 앱에 로그인해 주세요.';
     expect(panel).toContain(disclosure);
+    expect(panel).toContain('webPreenrollmentRequired ?');
+    expect(panel).toContain('공식 웹에서 가입·본인확인');
+    const screen = readFileSync(new URL(
+      '../apps/mobile/src/app/(tabs)/my/index.tsx', import.meta.url,
+    ), 'utf8');
+    expect(screen).toContain('webPreenrollmentRequired={memberAuth.webPreenrollmentRequired}');
     for (const text of [
       disclosure,
+      '공식 웹에서 가입·본인확인',
       '현재 신규 가입과 소셜 인증 가능 여부를 확인할 수 없습니다. 연결을 확인하고 다시 시도해 주세요.',
       '본인확인과 새 계정 생성은 공식 웹 브라우저에서 진행합니다. 완료 후 앱에서 기존 계정으로 로그인해 주세요.',
       '공식 가입 페이지를 열지 못했습니다. 브라우저에서 명하 계정 생성 화면을 이용해 주세요.',

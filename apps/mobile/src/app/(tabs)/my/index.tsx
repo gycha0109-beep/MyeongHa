@@ -144,6 +144,7 @@ export default function MyScreen() {
             memberAuth.state.kind === 'submitting' ||
             memberAuth.state.kind === 'social_pending'
           }
+          webPreenrollmentRequired={memberAuth.webPreenrollmentRequired}
           socialPendingProvider={
             memberAuth.state.kind === 'social_pending'
               ? memberAuth.state.provider
