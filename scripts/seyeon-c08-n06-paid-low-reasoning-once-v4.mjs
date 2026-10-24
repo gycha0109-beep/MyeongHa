@@ -15,6 +15,6 @@ executeSeyeonC08N06ResearchWorkflowV2({
   marker:'.github/seyeon-c08-n06-paid-low-reasoning-once-v4.trigger',
   routePreflight:preflightSeyeonC08N06ModelEndpointV2,
 }).catch(()=>{
-  console.error('C08_N06_PAID_TOKEN_ONLY_V4_HOLD');
+  console.error('C08_N06_PAID_LOW_REASONING_V4_HOLD');
   process.exitCode=1;
 });
