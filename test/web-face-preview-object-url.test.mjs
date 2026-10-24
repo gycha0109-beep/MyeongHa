@@ -26,7 +26,7 @@ describe('Cloudflare Stage 6 local Face photo preview lifetime', () => {
         createObjectURL: () => candidate, revokeObjectURL,
       });
       expect(() => url.open(image)).toThrow();
-      expect(revokeObjectURL).toHaveBeenCalledTimes(candidate ? 1 : 0);
+      expect(revokeObjectURL).toHaveBeenCalledExactlyOnceWith(candidate);
     }
     const url = createEphemeralFacePreviewUrlV1({ createObjectURL: vi.fn() });
     expect(() => url.open(null)).toThrow();
