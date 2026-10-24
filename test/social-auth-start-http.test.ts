@@ -103,6 +103,27 @@ describe('social auth start HTTP boundary', () => {
     expect(redirect.searchParams.get('state')).toBe(payload.data.state);
   });
 
+  it.each([
+    'https://myeongha.gycha0109.workers.dev',
+    'https://myeongha-web.gycha0109.workers.dev',
+  ])('keeps the approved Cloudflare login callback on %s', async (origin) => {
+    const response = await handleSocialAuthStartRequestV1({
+      request: request({
+        provider: 'google',
+        redirectUri: `${origin}/auth.html?social=callback`,
+      }),
+      env: { MYEONGHA_SOCIAL_AUTH_GOOGLE_ENABLED: 'true' },
+    });
+    expect(response.status).toBe(200);
+    const payload = await response.json() as { data: { authorizationUrl: string; state: string } };
+    const authorize = new URL(payload.data.authorizationUrl);
+    const redirect = new URL(authorize.searchParams.get('redirect_to') ?? '');
+    expect(redirect.origin).toBe(origin);
+    expect(redirect.pathname).toBe('/auth.html');
+    expect(redirect.searchParams.get('social')).toBe('callback');
+    expect(redirect.searchParams.get('state')).toBe(payload.data.state);
+  });
+
   it('rejects arbitrary redirect URIs', async () => {
     const response = await handleSocialAuthStartRequestV1({
       request: request({
