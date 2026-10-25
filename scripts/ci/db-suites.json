@@ -38,7 +38,8 @@
       "commerce-payment-attempt-handoff-context",
       "commerce-payment-verification-context",
       "commerce-provider-payment-verification-context",
-      "commerce-verified-payment-evidence-persistence"
+      "commerce-verified-payment-evidence-persistence",
+      "commerce-payment-adversarial-e2e"
     ]
   },
   "commerce-entitlement": {

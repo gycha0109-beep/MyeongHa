@@ -221,6 +221,11 @@ case "$case_name" in
     psql -1 -v ON_ERROR_STOP=1 -f test/db/commerce_trigger_security_hardening.sql
     bash test/db/entitlement_projection_recompute_concurrency.sh
     ;;
+  commerce-payment-adversarial-e2e)
+    apply_standard_migrations
+    bash test/db/commerce_payment_adversarial_e2e_v1.sh
+    catalog_snapshot
+    ;;
   commerce-payment-attempt-authority)
     apply_standard_migrations
     bash test/db/commerce_payment_attempt_authority.sh
