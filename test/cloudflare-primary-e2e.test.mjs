@@ -70,7 +70,11 @@ describe('Cloudflare primary live E2E verifier (offline harness)', () => {
         throw Error('credentialed sign-in was called before admissions');
       }
       const result = await fetchImpl(input, init);
-      if (!new URL(input).pathname.startsWith('/api/')) return result;
+      if (![
+        '/api/health', '/api/readiness', '/api/me',
+        '/api/auth/sign-in', '/api/me/birth-profile',
+        '/api/me/saju/calculation', '/api/me/saju/preview-reading',
+      ].includes(new URL(input).pathname)) return result;
       const headersWithVersion = new Headers(result.headers);
       headersWithVersion.set('x-myeongha-worker-version', expectedVersion);
       return new Response(result.body, {
