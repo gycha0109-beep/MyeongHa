@@ -36,6 +36,9 @@ export type SeyeonCloudflareThreadScopeDecisionV1 =
   /** Never authorizes History or Reveal. Generic Chat must independently re-verify
    * ownership, participant binding and zero messages in a fresh transaction. */
   | Readonly<{ kind: 'seyeon_empty_thread_requires_ops_reauthorization'; threadId: string }>
+  /** Existing messages are not disclosed. Only an independently verified
+   * metadata shell may be returned; history/replay stays withheld. */
+  | Readonly<{ kind: 'seyeon_existing_thread_shell_requires_ops_reauthorization'; threadId: string }>
   | Readonly<{ kind: 'seyeon_protected_held'; threadId: string; response: Response }>
   | Readonly<{ kind: 'denied'; response: Response }>;
 
@@ -86,11 +89,12 @@ function validReadQuery(url: URL): boolean {
  * come from the existing owner-scoped query. Never use client characterId,
  * a rewrite marker, a cached thread label or an unscoped SQL query.
  *
- * Nonempty or mixed SeYeon threads always remain behind the independent
- * first/History/Replay HOLD. A single-SeYeon first page proven to have zero
- * stored messages receives NO response here: a separate owner-scoped reader
- * must authenticate and verify emptiness again before returning metadata.
- * Unknown/bad DB state remains fixed 503/no-store, never an HTML fallback.
+ * Existing SeYeon message content, mixed threads and paginated History stay
+ * behind the independent first/History/Replay HOLD. A single-SeYeon first
+ * page, whether previously used or empty, receives NO response here: a
+ * separate owner-scoped reader must authenticate again and return only a
+ * metadata shell without any stored message or relationship projection.
+ * Unknown/bad DB state remains fixed 503/no-store, never HTML fallback.
  *
  * This contract alone is NOT a mounted Worker router or a transport G0-D04
  * proof. The Ops handler must independently reauthorize unrelated-thread
@@ -183,8 +187,14 @@ export async function scopeSeyeonCloudflareOwnedChatRequestV1(input: Readonly<{
     // This is NOT authority to reveal any chat message or to generate a paid
     // model turn. The Ops Chat reader rechecks everything inside its own
     // transaction and still rejects Se-yeon messages, replay and pagination.
-    if (verdict.confirmedEmpty) {
-      return {kind:'seyeon_empty_thread_requires_ops_reauthorization',threadId};
+    if (route.kind === 'thread_read' && verdict.binding.participantCharacterIds.length === 1 &&
+        verdict.binding.participantCharacterIds[0] === 'seyeon') {
+      const url = new URL(input.request.url);
+      const firstPage = !url.searchParams.has('afterSequenceNo') ||
+        url.searchParams.get('afterSequenceNo') === '0';
+      if (firstPage) return verdict.confirmedEmpty
+        ? {kind:'seyeon_empty_thread_requires_ops_reauthorization',threadId}
+        : {kind:'seyeon_existing_thread_shell_requires_ops_reauthorization',threadId};
     }
 
     const response = await holdSeyeonCloudflareProtectedChatRouteV1({

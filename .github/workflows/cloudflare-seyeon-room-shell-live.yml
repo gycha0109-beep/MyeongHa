@@ -1,0 +1,51 @@
+# Watchtower-Track: security
+name: Cloudflare SeYeon Owned Room Shell Live E2E
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Enter VERIFY_SEYEON_ROOM_SHELL to run a protected Member E2E.'
+        required: true
+        type: string
+      worker_version:
+        description: 'Exact, independently confirmed production Worker version ID.'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cloudflare-seyeon-room-shell-live
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Verify Member room shell without history reveal
+    runs-on: ubuntu-24.04
+    environment: production
+    env:
+      EXPECTED_CONFIRM: ${{ inputs.confirm }}
+      CLOUDFLARE_EXPECTED_WORKER_VERSION: ${{ inputs.worker_version }}
+      MYEONGHA_PRODUCTION_MEMBER_EMAIL: ${{ secrets.MYEONGHA_PRODUCTION_MEMBER_EMAIL }}
+      MYEONGHA_PRODUCTION_MEMBER_PASSWORD: ${{ secrets.MYEONGHA_PRODUCTION_MEMBER_PASSWORD }}
+      MYEONGHA_PRODUCTION_MEMBER_EXPECTED_SUBJECT_ID: ${{ secrets.MYEONGHA_PRODUCTION_MEMBER_EXPECTED_SUBJECT_ID }}
+    steps:
+      - name: Verify authorized scope and test account are configured
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$EXPECTED_CONFIRM" = "VERIFY_SEYEON_ROOM_SHELL"
+          [[ "$CLOUDFLARE_EXPECTED_WORKER_VERSION" =~ ^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$ ]]
+          test -n "${MYEONGHA_PRODUCTION_MEMBER_EMAIL:-}"
+          test -n "${MYEONGHA_PRODUCTION_MEMBER_PASSWORD:-}"
+          test -n "${MYEONGHA_PRODUCTION_MEMBER_EXPECTED_SUBJECT_ID:-}"
+      - name: Check out the approved verifier
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Verify empty response envelope and History/anonymous denial
+        run: node scripts/verify-cloudflare-seyeon-room-shell-live.mjs

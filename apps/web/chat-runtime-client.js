@@ -41,6 +41,7 @@ let roomReady = false;
 let queuedSubmission = false;
 let sendingTurn = false;
 let authoritativeCharacterId = null;
+let historyWithheld = false;
 let composeStatusSource = null;
 let roomLoadingSource = null;
 
@@ -284,6 +285,7 @@ document.addEventListener('myeongha:localechange', () => {
 });
 
 function renderRoomState(state) {
+  historyWithheld = state.historyWithheld === true;
   renderConversation(state.messages, state.characterId);
 
   // Exact-nine product authority maps canonical Character id to the same
@@ -300,6 +302,7 @@ function renderRoomState(state) {
 function clearOwnerScopedRoomStateForAuthorityChange() {
   chatStream?.replaceChildren();
   roomReady = false;
+  historyWithheld = false;
   if (contextPill) contextPill.hidden = true;
   if (contextTitle) contextTitle.textContent = '';
   setComposeStatus('현재 계정의 대화 권한을 다시 확인하는 중입니다.');
@@ -362,9 +365,11 @@ async function loadRoomState() {
     const seenCursors = new Set([0]);
     let afterSequenceNo = 0;
     let characterId = null;
+    let protectedHistory = false;
 
     for (;;) {
       const page = await readChatPage(activeBearer, afterSequenceNo);
+      if (page.historyWithheld === true) protectedHistory = true;
       if (characterId === null) {
         characterId = page.characterId;
       } else if (page.characterId !== characterId) {
@@ -399,6 +404,7 @@ async function loadRoomState() {
     renderRoomState(Object.freeze({
       characterId,
       messages: Object.freeze(messages),
+      historyWithheld:protectedHistory,
     }));
     return true;
   } catch {
@@ -436,7 +442,9 @@ function ensureRoomReady() {
       if (!loaded) return false;
       roomReady = true;
       if (retryButton) retryButton.hidden = true;
-      setComposeStatus('');
+      setComposeStatus(historyWithheld
+        ? '이전 대화 기록은 개인정보 보호를 위해 표시하지 않습니다. 새 AI 답변은 아직 준비 중입니다.'
+        : '');
       restorePendingDraft();
       return true;
     } catch (error) {

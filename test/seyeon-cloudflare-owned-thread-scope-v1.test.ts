@@ -80,7 +80,7 @@ describe('S-CF2 owned-thread scope — OFFLINE, no router mounted', () => {
   });
 
   it.each([{ participants: ['seyeon'] }, { participants: ['baekheon', 'seyeon'] }])(
-    'holds DB-participant SeYeon first send, history, mixed thread ($participants)',
+    'keeps SeYeon messages sealed while permitting independently checked single-room metadata ($participants)',
     async ({ participants }) => {
       for (const [path, method, body] of [
         ['/api/chat/' + THREAD + '/turns', 'POST', { clientTurnId: TURN, text: PRIVATE }],
@@ -91,8 +91,15 @@ describe('S-CF2 owned-thread scope — OFFLINE, no router mounted', () => {
           request: request(path, method, body),
           requestId: ID, identityEvidenceVerifier: f.auth, pool: f.pool,
         });
-        expect(result.kind).toBe('seyeon_protected_held');
-        if (result.kind === 'seyeon_protected_held') await assertHeld(result.response);
+        if(method === 'GET' && participants.length === 1) {
+          expect(result).toEqual({
+            kind:'seyeon_existing_thread_shell_requires_ops_reauthorization',
+            threadId:THREAD,
+          });
+        } else {
+          expect(result.kind).toBe('seyeon_protected_held');
+          if (result.kind === 'seyeon_protected_held') await assertHeld(result.response);
+        }
         expect(f.queries.some(x => x.sql.includes('qry_chat_thread_runtime_binding_v1'))).toBe(true);
         expect(f.queries.some(x => x.sql.includes('qry_chat_thread_stream_v2')))
           .toBe(method === 'GET' && participants.length === 1);
@@ -137,6 +144,10 @@ describe('S-CF2 owned-thread scope — OFFLINE, no router mounted', () => {
     });
     if (typeof empty !== 'boolean' && participants.length === 1) {
       expect(result.kind).toBe('denied');
+    } else if (empty === true && participants.length === 1) {
+      expect(result).toEqual({
+        kind:'seyeon_existing_thread_shell_requires_ops_reauthorization',threadId:THREAD,
+      });
     } else {
       expect(result.kind).toBe('seyeon_protected_held');
     }
