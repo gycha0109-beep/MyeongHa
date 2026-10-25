@@ -38,7 +38,10 @@ export function createSeyeonC08ServerMemoryProofPortV1(input:Readonly<{
      input.threadId!==input.threadId.trim()||input.threadId.length>256||
      typeof input.readScopedMemoryGrant!=='function')throw hold();
   return Object.freeze({
-    async readAuthoritativeMemoryGrant(key){
+    async readAuthoritativeMemoryGrant(key:Readonly<{
+      subjectId:string;threadId:string;currentUserMessageId:string;
+      characterId:'seyeon';memoryId:string;sourceRef:string;
+    }>){
       if(key.subjectId!==input.subjectId||key.threadId!==input.threadId||
          key.characterId!=='seyeon'||!key.currentUserMessageId.trim()||
          !key.memoryId.trim()||!key.sourceRef.trim()||
