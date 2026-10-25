@@ -5,6 +5,7 @@ Watchtower-Track: character-memory
 ## 실제 변경 / 범위
 
 - 신규 Shadow 코드: `apps/api/src/seyeon-c08-local-one-call-shadow-v1.ts`
+- 신규 서버 공식 이력 어댑터: `apps/api/src/seyeon-c08-local-thread-integrity-port-v1.ts`
 - 신규 회귀: `test/seyeon-c08-local-one-call-shadow-offline-v1.test.ts`
 - 기존 `runSeyeonCensusFirstThreeCallShadowV1`, Production, Reader, DB, Canon, 개인 Memory, 관계·Grant, 결제 코드는 **수정하지 않는다**. 기존 3회 경로로 롤백 가능하다.
 - 이 구현은 **별도 opt-in 함수**로 호출하는 연구용 Shadow이다. 안전 동등성·정식 응답 라우팅·Production 공개 승인을 제공하지 않는다.
@@ -16,7 +17,13 @@ Watchtower-Track: character-memory
 2. **기존 서버 권한 엔진 재사용**: 분류를 생략하지 않고 로컬이 실제로 증명할 수 있는 닫힌 문법에만 `claims=[]` / `topicKey=null`을 적용한다. 기존 `runCharacterGovernedPreflightV1`·`assembleSeyeonRuntimeContextV2`·`guardSeyeonTurnInterpretationV2`·`guardSeyeonRiskBearingActionCausalityV1`·`buildSeyeonRendererPacketV2` 유지. 개인정보 Source Descriptor, 사실 Resolver 및 Retriever 실행 금지.
 3. **대사 생성, LLM 정확히 1회**: 서버가 현재 user move와 공용 reveal/행동 범위를 고정하고 기존 `buildSeyeonRendererRequestV2`를 사용한다. 임의 Memory/관계/사생활을 만들지 말도록 한 공개 첫 만남 지침을 추가. 기존 지시문 `baseline`을 기본값으로 보존하고, 별도 실험용 `compact_v1`은 지시문만 축약하며 출력 스키마·Guard·packet은 그대로 유지한다. 가격 예약 검증과 출력 토큰 상한 확인이 없으면 호출 전 거부. 예약 한도는 최대 4,000 microUSD ≈ 10 KRW(가정 환율 2,500). 이는 청구서 하드캡 증거가 아니다.
 4. **사후 로컬 검증, LLM 0회**: 기존 `admitSeyeonRendererDraftV2`로 스키마/출처 참조/표현/공개 단계 검증. 보수적인 공개 문장·허위 기억/관계/고정 전기/사적 사실/관리자 문구 검출과 입력 의도별 대사 필수 조건 검사. 내용 검증 실패 시 대사 **미반환**, 재생성·추가 LLM 호출·자동 fallback 없음. 결과는 `localGuardedDraft`, `verification=LOCAL_RESTRICTED_NOT_SEMANTIC_PARITY`로만 보고.
-5. **경합 검사**: 모델 이전·이후 등 4회 authoritative 재검사를 유지한다. 첫 턴은 기존 7필드 Census 조회 4회, 여러 턴은 `readAuthoritativeThreadCommitment`로 count/role/전체 ID·role·본문 해시를 **각 체크포인트당 단일 서버 조회**로 검증한다. 1~7개 전체 메시지와 최신 user ID/송신자 일치가 필요하다. 단일 서버 조회에서 해당 count/hash가 같이 산출되지 않으면 거부한다. Census는 DB snapshot/commit lock이 아니며 마지막 검사 직후 레이스를 없애지 못한다.
+5. **경합 검사**: 모델 이전·이후 등 4회 authoritative 재검사를 유지한다. 첫 턴은 기존 7필드 Census 조회 4회, 여러 턴은 `readAuthoritativeThreadCommitment`로 count/role/전체 ID·role·본문 해시를 **각 체크포인트당 단일 서버 조회**로 검증한다. 1~7개 전체 메시지와 최신 user ID/송신자 일치가 필요하다. `createSeyeonC08LocalThreadIntegrityPortV1`은 서버 저장소의 완전한 메시지 조회 포트를 받아 순서·본문 digest와 count를 한 번에 구성하며, 출력 전에 불변 복사본으로 고정한다. 단일 서버 조회에서 해당 count/hash가 같이 산출되지 않으면 거부한다. Census는 DB snapshot/commit lock이 아니며 마지막 검사 직후 레이스를 없애지 못한다.
+
+## 호출 전 경로 판정
+
+- `assessSeyeonC08LocalOneCallRouteV1`: 모델 호출·private Source 조회 없이 동일한 입력 문법과 공식 이력 검사로 `ONE_CALL_SHADOW_CANDIDATE` 또는 `RETAIN_THREE_CALL_BASELINE`을 반환한다.
+- `RETAIN_THREE_CALL_BASELINE`는 호출자가 기존 검증 경로를 유지해야 한다는 **계획 신호**일 뿐, 추가 유료 호출이나 자동 재시도 승인이 아니다. 적격으로 판정되어도 뒤의 모든 재검사/비용 예약/로컬 출력검증을 통과해야 연구용 localGuardedDraft를 얻는다.
+- 저장소 어댑터의 `readCompleteServerThread` 구현은 인증된 사용자·스레드 범위에서 **트랜잭션으로 일관된 전체 기록**을 읽어야 한다. 현재 기본 브랜치의 Production DB와 연결하지 않았다.
 
 ## 우선 구현 범위 및 한계
 
