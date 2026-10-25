@@ -56,6 +56,7 @@ function harness(opts:{
   beforeModel?:()=>void;
   history?:RunSeyeonCharacterTurnV2Input['contextInput']['recentMessages'];
   falseCensusCount?:boolean;
+  falseCommitmentCount?:boolean;
   modelThrows?:boolean;
   missingCommitment?:boolean;
   mismatchedCommitment?:boolean;
@@ -79,8 +80,8 @@ function harness(opts:{
         return {
           schemaVersion:SEYEON_C08_PUBLIC_THREAD_COMMITMENT_V1,
           subjectId,threadId,currentUserMessageId,
-          messageCount:messages.length,latestSenderType:'user',
-          complete:true,
+          messageCount:opts.falseCommitmentCount?messages.length+1:messages.length,
+          latestSenderType:'user',complete:true,
           transcriptHash:opts.mismatchedCommitment ||
             opts.staleCommitmentAt===commitmentReads
             ? 'sha256:'+'f'.repeat(64)
@@ -297,11 +298,11 @@ describe('C08 local preflight / single dialogue LLM / local output guard (OFFLIN
     expect(renderInput.packet.recentConversation.map(x=>x.messageId))
       .toEqual(['m1','m2',ID]);
     expect(h.events).toEqual([
-      'census1','commitment1','census2','commitment2',
-      'reserve','model','census3','commitment3','census4','commitment4',
+      'commitment1','commitment2','reserve','model','commitment3','commitment4',
     ]);
+    expect(h.censusRows).toHaveLength(0);
 
-    const mismatch=harness({history,falseCensusCount:true});
+    const mismatch=harness({history,falseCommitmentCount:true});
     await expect(mismatch.run()).rejects.toThrow('LOCAL_CONTEXT_NOT_PROVEN');
     expect(mismatch.requests).toHaveLength(0);
     for(const opts of [
