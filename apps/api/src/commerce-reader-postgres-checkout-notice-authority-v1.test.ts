@@ -105,6 +105,26 @@ describe('S7 private Postgres original Checkout notice authority',()=>{
     expect(f.query).toHaveBeenCalledTimes(1);
   });
 
+  it('rejects a noncanonical pinned item even when the proposal store echoes the same item',async()=>{
+    const noncanonical='NOT-AN-APPROVED-STANDARD-READER-ITEM';
+    const f=fixture({
+      lineage:[{
+        purchaseIntentId:PURCHASE,originatingGrantId:GRANT,
+        pinnedCapabilityItemKey:noncanonical,
+        originalPaymentAttemptCreatedAt:'2026-10-23T00:01:00.000Z',
+        originalPurchaseIntentCreatedAt:'2026-10-22T23:59:00.000Z',
+        s5CommittedAt:'2026-10-23T00:05:00.000Z',
+      }],
+      snapshot:{...snapshot,pinnedCapabilityItemKey:noncanonical},
+    });
+    expect(await f.authority.readExactServerCheckoutNotice(unit)).toBeNull();
+    expect(f.storeRead).toHaveBeenCalledExactlyOnceWith({
+      purchaseIntentId:PURCHASE,
+      pinnedCapabilityItemKey:noncanonical,
+      productSpecVersion:VERSION,
+    });
+  });
+
   it('integrates original immutable Checkout notice into read-only S7 withdrawal review',async()=>{
     const f=fixture();
     const result=await reviewOfficialReaderPrivateWithdrawalEvidenceV1({

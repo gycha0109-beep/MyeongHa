@@ -10,6 +10,10 @@ import {
   linkOriginalCheckoutNoticeToReaderGrantV1,
   type CommerceReaderOriginalCheckoutNoticeRecordV1,
 } from './commerce-reader-checkout-notice-proof-v1.js';
+import {
+  checkReaderCheckoutPrepaymentSequenceV1,
+  type ReaderCheckoutPrepaymentEventV1,
+} from './commerce-reader-checkout-prepayment-sequence-v1.js';
 
 /**
  * Private read-only bridge across the EXISTING Commerce ledger.
@@ -196,6 +200,30 @@ export function createCommerceReaderPostgresCheckoutNoticeAuthorityV1(input: Rea
         });
         if (!noticeIsExact(original,unit.purchaseIntentId,
           pinnedCapabilityItemKey,unit.productSpecVersion)) return null;
+
+        // Join the earlier Checkout sequence verifier to the REAL original
+        // Receipt->Grant->Item and first Payment Attempt discovered above.
+        // The former is only a structural check: authority still requires
+        // both independent DB reads and the final S5-timestamp proof below.
+        const checkoutIdentity = {
+          purchaseIntentId:unit.purchaseIntentId,
+          pinnedCapabilityItemKey,
+          productSpecVersion:unit.productSpecVersion,
+          noticeRevision:original.noticeRevision,
+          previewOrInformationRevision:original.previewOrInformationRevision,
+        } as const;
+        const originalSequence: readonly ReaderCheckoutPrepaymentEventV1[] = [
+          {...checkoutIdentity,kind:'snapshot_recorded',
+            occurredAt:original.snapshotRecordedAt},
+          {...checkoutIdentity,kind:'notice_presented',
+            occurredAt:original.noticePresentedAt},
+          {...checkoutIdentity,kind:'customer_confirmed',
+            occurredAt:original.acknowledgedAt},
+          {...checkoutIdentity,kind:'payment_attempt_started',
+            occurredAt:paymentAt,attemptNo:1},
+        ];
+        if (!checkReaderCheckoutPrepaymentSequenceV1(originalSequence)
+          .eligibleForApprovedWriter) return null;
 
         const resolved: CommerceReaderOriginalCheckoutNoticeRecordV1 = Object.freeze({
           authority:'commerce_owner_immutable_checkout_notice_v1',
