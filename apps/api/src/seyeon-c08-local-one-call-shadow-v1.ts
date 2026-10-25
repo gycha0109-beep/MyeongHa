@@ -163,9 +163,9 @@ export function quoteSeyeonC08LocalOneCallBudgetV1(input: Readonly<{
 }
 
 /**
- * The original Census verifies only count/latest sender. For a multi-turn
- * candidate this extra authoritative store port binds *all* message IDs,
- * roles and bodies to the server's thread. The caller must supply a DB-backed
+ * The original first-turn Census verifies only count/latest sender. For a
+ * multi-turn candidate one authoritative snapshot must bind *all* message
+ * IDs, roles and bodies to the server's thread. The caller must supply a DB-backed
  * implementation; client-supplied hashes are NOT authoritative.
  */
 export const SEYEON_C08_PUBLIC_THREAD_COMMITMENT_V1 =
@@ -257,40 +257,35 @@ async function requireSeyeonC08PublicThreadCensusV1(
      typeof currentUserMessageId!=='string' ||
      currentUserMessageId.length<1 || currentUserMessageId.length>256 ||
      currentUserMessageId.trim()!==currentUserMessageId ||
-     typeof port.readFullThreadCensus!=='function' ||
      !Number.isSafeInteger(expectedCount) || expectedCount<1 || expectedCount>7){
     throw fail();
   }
-  let raw:unknown;
-  try{
-    raw=await port.readFullThreadCensus({
-      subjectId:port.subjectId,threadId:port.threadId,
-      currentUserMessageId,
-    });
-  }catch{throw fail();}
-  if(typeof raw!=='object' || raw===null || Array.isArray(raw))throw fail();
-  const c=raw as Record<string,unknown>;
-  if(Object.keys(c).length!==7 ||
-     c.schemaVersion!=='seyeon-first-turn-census-shadow-v1' ||
-     c.subjectId!==port.subjectId || c.threadId!==port.threadId ||
-     c.currentUserMessageId!==currentUserMessageId ||
-     c.messageCount!==expectedCount || c.latestSenderType!=='user' ||
-     c.complete!==true)throw fail();
-  // For >1 messages, count equality is insufficient: require a second,
-  // authoritative *content* commitment as well on every one of the four
-  // censorship/race reads, not only once at admission.
-  if(expectedCount===1)return;
+  // One authoritative read per recheck: for a multi-turn public thread the
+  // commitment carries both census metadata and the entire content digest.
+  // Do not read a count and hash in two separate, racy queries.
+  const key={subjectId:port.subjectId,threadId:port.threadId,
+    currentUserMessageId};
+  if(expectedCount===1){
+    if(typeof port.readFullThreadCensus!=='function')throw fail();
+    let raw:unknown;
+    try{raw=await port.readFullThreadCensus(key);}catch{throw fail();}
+    if(typeof raw!=='object'||raw===null||Array.isArray(raw))throw fail();
+    const c=raw as Record<string,unknown>;
+    if(Object.keys(c).length!==7 ||
+       c.schemaVersion!=='seyeon-first-turn-census-shadow-v1' ||
+       c.subjectId!==port.subjectId || c.threadId!==port.threadId ||
+       c.currentUserMessageId!==currentUserMessageId ||
+       c.messageCount!==1 || c.latestSenderType!=='user' ||
+       c.complete!==true)throw fail();
+    return;
+  }
   if(typeof port.readAuthoritativeThreadCommitment!=='function' ||
      !/^sha256:[a-f0-9]{64}$/u.test(expectedTranscriptHash))throw fail();
-  let rawCommitment:unknown;
-  try{
-    rawCommitment=await port.readAuthoritativeThreadCommitment({
-      subjectId:port.subjectId,threadId:port.threadId,currentUserMessageId,
-    });
-  }catch{throw fail();}
-  if(typeof rawCommitment!=='object'||rawCommitment===null||
-     Array.isArray(rawCommitment))throw fail();
-  const z=rawCommitment as Record<string,unknown>;
+  let raw:unknown;
+  try{raw=await port.readAuthoritativeThreadCommitment(key);}
+  catch{throw fail();}
+  if(typeof raw!=='object'||raw===null||Array.isArray(raw))throw fail();
+  const z=raw as Record<string,unknown>;
   if(Object.keys(z).length!==8 ||
      z.schemaVersion!==SEYEON_C08_PUBLIC_THREAD_COMMITMENT_V1 ||
      z.subjectId!==port.subjectId || z.threadId!==port.threadId ||
