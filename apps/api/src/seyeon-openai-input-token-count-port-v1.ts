@@ -114,6 +114,11 @@ export function createSeyeonOpenAiInputTokenCountAdmissionV1(
       exactRequestBodyBytes: number,
       serializedRequestBody: string,
     ): Promise<number> {
+      const startedAt = performance.now();
+      let stage = 'request_framing';
+      let httpStatus: number | null = null;
+      let certified = false;
+      try {
       // The native provider's final JSON body is the only accepted source.
       const countBody = projectExactCountRequest(
         serializedRequestBody,
@@ -125,6 +130,7 @@ export function createSeyeonOpenAiInputTokenCountAdmissionV1(
       const timeout = setTimeout(() => controller.abort(),limitMs);
       let result: Response;
       try {
+        stage = 'response_headers';
         try {
           result = await awaitBoundedUpstreamJsonResponseHeadersV1(send(SEYEON_OPENAI_INPUT_TOKEN_COUNT_ENDPOINT_V1,{
             method:'POST',
@@ -140,6 +146,8 @@ export function createSeyeonOpenAiInputTokenCountAdmissionV1(
         } catch {
           throw new Error('Input token count request failed or exceeded its deadline.');
         }
+        httpStatus = result.status;
+        stage = 'provider_response';
         if (!result.ok ||
             !/^application\/json(?:\s*;|$)/iu.test(
               (result.headers.get('content-type') ?? '').trim()
@@ -150,6 +158,7 @@ export function createSeyeonOpenAiInputTokenCountAdmissionV1(
         }
         let bytes: string;
         try {
+          stage = 'response_body';
           // Bound memory while reading, not after Response.text() has already
           // buffered an untrusted upstream body. Abort stalled streams.
           bytes = await readBoundedUpstreamJsonTextV1(result, {
@@ -166,6 +175,7 @@ export function createSeyeonOpenAiInputTokenCountAdmissionV1(
           throw new Error('Input token count response body failed or timed out.');
         }
         let payload: unknown;
+        stage = 'receipt_validation';
         try { payload=JSON.parse(bytes); }
         catch { throw new Error('Input token count response is invalid JSON.'); }
         if (!isRecord(payload) ||
@@ -182,10 +192,19 @@ export function createSeyeonOpenAiInputTokenCountAdmissionV1(
         if (controller.signal.aborted) {
           throw new Error('Input token count request failed or exceeded its deadline.');
         }
+        certified = true;
         return resultUpperBound;
 
       } finally {
         clearTimeout(timeout);
+      }
+      } finally {
+        // Fixed phase/status metadata only: no request, key, URL, response body,
+        // Subject, call ID or raw exception text crosses the log boundary.
+        console.info('MYEONGHA_SEYEON_INPUT_COUNT_DIAGNOSTIC ' + JSON.stringify({
+          schemaVersion: 'seyeon-input-count-diagnostic-v1', stage, httpStatus,
+          certified, elapsedMs: Math.max(0, Math.round(performance.now() - startedAt)),
+        }));
       }
     },
   });
