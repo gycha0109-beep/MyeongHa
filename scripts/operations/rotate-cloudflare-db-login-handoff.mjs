@@ -15,6 +15,7 @@ const PROJECT = 'cnsfpcdiyofqvhpcegfc';
 const ROLE = 'myeongha_cf_api_login';
 const PUB_DER_B64 = 'MIIBojANBgkqhkiG9w0BAQEFAAOCAY8AMIIBigKCAYEAxjfAtf/z/OaD32OLoNfv23JsUDEHCtyXIXXyljXpT5gF2j0k0LuMamcs5y+rS03LFk+QDCvlIAAC+UQZOu5kMt0H36G+3Ok5vnKVC3F/RK5sqNTGnJObNQtxeS9OWq757CSQV9lUxXR5Cm6I0PXUq3w1LkHtf4xYhWKUOdaU1q9CJaym1AC32G53hfhIldkEvQI1BTPEmpdV38LZpMqLMzHHYoMASRVcYnvYlVNp4gBGimhB4Ub/oQvhWJgB9stdriJPOkt8SNCVdJBqv48W8wvNAaNT7s5OUGbpFCyV4/k5cFRlED9u2/85zoiSAoiX2gWI2bmes4KQeYEfIihreHsQGueCUEOyTtimylpYtImBsq6wpa218Yh0YKWdRMS0hTfjy1Mulp9QeyY2TEfu95Pin5dAu3tzsvxK7+tlKd6jMBBwT6IuLvrlabkrBioazcXYZrXP0ZBtFvpcab1j4IfGJFXmQ/FOR0E/vbND4XBdCkMaTGbtqrkiUm5Lxk1XAgMBAAE=';
 const REQUIRED_CONFIRM = 'ROTATE_MYEONGHA_CF_DB_LOGIN_20261026';
+let stage = 'START';
 
 function ensure(condition, reason) {
   if (!condition) throw new Error(reason);
@@ -85,6 +86,7 @@ async function main() {
       PGSSLMODE: 'verify-full', PGSSLROOTCERT: certPath,
     };
 
+    stage = 'OWNER_CONNECTION_AND_ROLE_PREFLIGHT';
     const preflight = await query(`select case when
       exists(select 1 from pg_roles where rolname='myeongha_cf_api_login'
         and rolcanlogin and not rolbypassrls and not rolsuper
@@ -107,18 +109,43 @@ async function main() {
     const verifier = scramVerifier(password);
     ensure(/^SCRAM-SHA-256\$4096:[A-Za-z0-9+/=]+\$[A-Za-z0-9+/=]+:[A-Za-z0-9+/=]+$/.test(verifier),
       'Password verifier format invalid');
+    // Preserve only the recipient-encrypted credential before any mutation.
+    // This ensures an operator can reconcile an uncertain DB write or pooler check.
+    stage = 'STAGE_ENCRYPTED_HANDOFF';
+    await writeFile(process.env.HANDOFF_OUTPUT, ciphertext,
+      { flag: 'wx', mode: 0o600 });
+
+    stage = 'ALTER_DEDICATED_ROLE_PASSWORD';
     await query("ALTER ROLE " + ROLE + " WITH PASSWORD '" + verifier + "';", baseEnv);
 
     // Verify the new isolated login over full peer-verified TLS and target
     // transaction port before sending any credential to an encrypted artifact.
-    const check = await query('select current_user;', {
-      ...baseEnv, PGPORT: '6543', PGUSER: ROLE + '.' + PROJECT,
-      PGPASSWORD: password,
-    }, { read: true });
-    ensure(check === ROLE, 'Dedicated login verification failed');
+    stage = 'VERIFY_DEDICATED_LOGIN';
+    // Supavisor Shared Pooler may briefly cache the old role verifier.
+    // Do not rotate again; allow one bounded reconnect after cache settling.
+    await new Promise(resolve => setTimeout(resolve, 15_000));
+    let verified = false;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      if (attempt > 0) {
+        await new Promise(resolve => setTimeout(resolve, 10_000));
+      }
+      try {
+        const check = await query('select current_user;', {
+          ...baseEnv, PGPORT: '6543', PGUSER: ROLE + '.' + PROJECT,
+          PGPASSWORD: password,
+        }, { read: true });
+        if (check === ROLE) {
+          verified = true;
+          break;
+        }
+      } catch {
+        // The encrypted handoff is already stored; fail closed after two
+        // bounded checks. Never print pooler responses or login credentials.
+      }
+    }
+    ensure(verified, 'Dedicated login verification failed');
 
-    await writeFile(process.env.HANDOFF_OUTPUT, ciphertext,
-      { flag: 'wx', mode: 0o600 });
+    stage = 'COMPLETE';
     console.log('cloudflare_db_rotation=ROTATED_AND_LOGIN_VERIFIED_ENCRYPTED_HANDOFF_READY');
   } finally {
     await rm(tempRoot, { recursive: true, force: true });
@@ -138,7 +165,14 @@ try {
     'Ciphertext too short', 'Password verifier format invalid',
     'Dedicated login verification failed', 'PostgreSQL protected command failed',
   ];
-  console.error('cloudflare_db_rotation=FAILED: ' +
+  // Fixed stage marker contains no SQL text or runtime data.
+  const knownStages = new Set([
+    'START', 'OWNER_CONNECTION_AND_ROLE_PREFLIGHT',
+    'STAGE_ENCRYPTED_HANDOFF', 'ALTER_DEDICATED_ROLE_PASSWORD',
+    'VERIFY_DEDICATED_LOGIN', 'COMPLETE',
+  ]);
+  console.error('cloudflare_db_rotation=FAILED_STAGE_' +
+    (knownStages.has(stage) ? stage : 'UNKNOWN') + ': ' +
     (known.includes(message) ? message : 'Encrypted rotation operation failed'));
   process.exitCode = 1;
 }
