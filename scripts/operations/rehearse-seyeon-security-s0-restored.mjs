@@ -80,6 +80,32 @@ try{
   if(principal?.restricted!==true||principal?.exact_edge!==true){
     throw Error('Isolated install principal differs from the read-only Production snapshot.');
   }
+  // A pg_dump database restore does not imply the cloned database has
+  // the hosted pg_database_owner/public schema privileges. Production's
+  // postgres has both USAGE and CREATE on public. Mirror ONLY that exact
+  // install-principal privilege inside this throwaway clone, not on source.
+  const isolatedSchemaAdmin=new Client({...db,user:'supabase_admin',database:target});
+  await isolatedSchemaAdmin.connect();
+  try{
+    const {rows:[scope]}=await isolatedSchemaAdmin.query(`select
+      current_database()=$1 as target_db,
+      current_user='supabase_admin' as isolated_admin,
+      (select pg_get_userbyid(nspowner)='pg_database_owner'
+       from pg_namespace where nspname='public') as public_owner,
+      has_schema_privilege('postgres','public','USAGE') as postgres_usage,
+      has_schema_privilege('postgres','public','CREATE') as postgres_create`,[target]);
+    if(scope?.target_db!==true||scope.isolated_admin!==true||
+       scope.public_owner!==true)throw Error('Disposable public schema owner mismatch.');
+    if(scope.postgres_usage!==true||scope.postgres_create!==true){
+      await isolatedSchemaAdmin.query('grant usage, create on schema public to postgres');
+    }
+    const {rows:[confirmedSchema]}=await isolatedSchemaAdmin.query(`select
+      has_schema_privilege('postgres','public','USAGE') as usage_ok,
+      has_schema_privilege('postgres','public','CREATE') as create_ok`);
+    if(confirmedSchema?.usage_ok!==true||confirmedSchema.create_ok!==true){
+      throw Error('Isolated postgres public-schema entitlement mismatch.');
+    }
+  }finally{await isolatedSchemaAdmin.end();}
   const local=new Client({...db,user:'postgres',database:target});
   await local.connect();
   try{
