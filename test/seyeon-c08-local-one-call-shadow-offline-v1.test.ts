@@ -9,6 +9,8 @@ import {
   compactSeyeonC08LocalRendererRequestV1,
   runSeyeonC08LocalOneCallShadowV1,
 } from '../apps/api/src/seyeon-c08-local-one-call-shadow-v1.js';
+import {createSeyeonC08LocalThreadIntegrityPortV1} from
+  '../apps/api/src/seyeon-c08-local-thread-integrity-port-v1.js';
 import type {RunSeyeonCharacterTurnV2Input} from
   '../apps/api/src/seyeon-character-runtime-v2.js';
 // @ts-expect-error Existing Gold fixture is a synthetic JS module without declarations.
@@ -362,6 +364,52 @@ describe('C08 local preflight / single dialogue LLM / local output guard (OFFLIN
     const poisoned=harness({history:altered,mismatchedCommitment:true});
     await expect(poisoned.run()).rejects.toThrow('LOCAL_CONTEXT_NOT_PROVEN');
     expect(poisoned.requests).toHaveLength(0);
+  });
+
+  it('binds the supplied thread to independent server-owned source rows via the real local port adapter',async()=>{
+    const history=[
+      {messageId:'m1',role:'user' as const,text:'안녕하세요'},
+      {messageId:'m2',role:'assistant' as const,
+        text:LOCAL_GOOD_DRAFTS.greeting},
+      {messageId:ID,role:'user' as const,text:TEXT},
+    ];
+    let reads=0;
+    const port=createSeyeonC08LocalThreadIntegrityPortV1({
+      subjectId:'synthetic:owner',threadId:'synthetic:thread',
+      async readCompleteServerThread(){
+        reads++;
+        return {subjectId:'synthetic:owner',threadId:'synthetic:thread',
+          complete:true as const,messages:history};
+      },
+    });
+    const pass=harness({history});
+    const got=await pass.run({fullThreadCensus:port});
+    expect(got.llmCalls).toBe(1);
+    expect(reads).toBe(4);
+    expect(pass.requests).toHaveLength(1);
+
+    const tampered=history.map(x=>({...x}));
+    tampered[1]!.text='안녕하세요. 저는 세연이에요. 오늘은 더 얘기해봐요.';
+    const attacker=harness({history:tampered});
+    await expect(attacker.run({fullThreadCensus:port}))
+      .rejects.toThrow('LOCAL_CONTEXT_NOT_PROVEN');
+    expect(attacker.requests).toHaveLength(0);
+
+    let after=0;
+    const raced=createSeyeonC08LocalThreadIntegrityPortV1({
+      subjectId:'synthetic:owner',threadId:'synthetic:thread',
+      async readCompleteServerThread(){
+        after++;
+        return {subjectId:'synthetic:owner',threadId:'synthetic:thread',
+          complete:true as const,
+          messages:after===4 ? tampered : history};
+      },
+    });
+    const stale=harness({history});
+    await expect(stale.run({fullThreadCensus:raced}))
+      .rejects.toThrow('LOCAL_CONTEXT_NOT_PROVEN');
+    expect(stale.requests).toHaveLength(1);
+    expect(after).toBe(4);
   });
 
   it('denies forged prior assistant biography, unrecognized user turn or truncation',async()=>{
