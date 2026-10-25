@@ -126,3 +126,20 @@ Architecture Check:
 expected=원본 Pin → native count → DB 비용 승인 → 생성 → receipt, observed=Pin 후 사전 승인 거부, runtime=실제 Cloudflare Worker/Hosted Auth/PG17.6, failure stage=governed_preflight, classification=사전 승인 원인 미분리다. 원래 요청을 자동 재전송하거나 실패한 Attempt를 변경하지 않는다. 실행 원본과 가상 cohort IDs는 보호된 operator 상태에 보존하며 공개 증거에는 credential·Grant/Subject IDs·proof를 넣지 않는다.
 
 직접 dependency인 input-count와 DB governed start의 진단만 보강한다. count는 고정 단계/HTTP status/소요시간/certified 여부, DB start는 허용된 SQLSTATE/constraint만 남긴다. raw 오류·본문·키·사용자/호출 IDs는 기록하지 않는다. 30/30 직접 회귀 및 build PASS, 특히 반사된 비밀/입력과 transport 오류가 로그에 나오지 않는 검증을 포함한다. deadline/예산/승인 정책, 재시도, 모델 dispatch 조건은 변경하지 않는다. 추가 운영 시도는 이 진단이 반영되고 현재 실패가 조정된 별도 가상 campaign에서 수행한다.
+
+
+## workerd의 redirect:error 요청 생성 실패 수정
+
+#2611을 필수 Integration #40229191983 통과 후 `7ec5e69f`로 병합했고, 실제 Cloudflare build `801d8aa4-eca2-4f38-9142-137885d5a24d` 및 100% version `d14240b0-895e-4892-8c12-5b936c83f7fa`를 대조했다. 기존 사용하지 않은 예산/정리된 cohort/정확히 닫힌 registry를 검증한 scoped 관리 SQL로만 S0를 재개했다. 두 번째 독립 가상 계정에서도 원본 Pin 뒤 HTTP 503이 났고, 새 로그는 count의 response_headers 단계에서 HTTP status=null/certified=false를 기록했다. DB governed start에는 도달하지 않았고 생성 원장/발행 reply는 0이다. 즉시 동일 forward stop을 적용했다. 두 실패 cohort 모두 기존 계정 삭제 start → worker claim → DB finalizer → hosted Auth 삭제 → completion 절차로 정리했으며 Memory/Grant/Turn/cost 행 0을 확인했다.
+
+실제 로컬 workerd에서 같은 RequestInit을 실행해 `redirect:'error'`가 요청 생성 순간 TypeError를 던지며 upstream 요청 0건임을 재현했다. [Cloudflare Request 계약](https://developers.cloudflare.com/workers/runtime-apis/request/)도 이 mode를 구현하지 않는다고 명시한다. 유출된 this/receiver 가설은 재현에서 배제했고, source inspection과 재현이 일치하는 redirect mode만 고친다.
+
+직접 count 및 native structured provider 두 caller만 manual로 바꾼다. 기존 !ok 분기가 모든 3xx를 거부하고 Location을 따라가지 않으므로 credential 전달/인증 범위를 넓히지 않는다. 실제 production 모듈을 가져온 로컬 workerd + 소유 loopback HTTP fixture에서 수정 전 count/생성 모두 요청 전 실패, 수정 후 count=114 및 structured reply 성공을 확인했다. 302는 두 경로 모두 거부했고 redirect target 도달=0이었다. 실제 운영 credential·DB·모델 호출을 사용한 검증이 아니다. [workerd 공개 증거](SEYEON_S0_WORKER_FETCH_COMPAT_20261026.json)에 기록한다.
+
+관련 회귀 361 PASS/75 SKIP였으며 OpenSSL PATH 부재로 시작하지 못한 직접 HTTPS 3 suites는 올바른 PATH로 별도 재실행해 39/39 PASS다. 최신 redirect 거부/호출 정책 직접 회귀 21/21, build와 root TypeScript noEmit PASS다. 운영 source는 계속 닫혀 있고 수정 배포 후 별도의 새 가상 cohort에서 최종 native HTTP 수신/철회를 확인해야 한다.
+
+Architecture Check:
+
+* Docs updated: yes — 실제 실패 원인, redirect 거부 동등성 및 격리 workerd 증거.
+* Ghost-code risk: passed — 기존 count/native model 두 직접 caller의 transport만 수정.
+* Notes: 새로운 proxy·fallback·endpoint·크레딧/원가 한도·재시도 정책·권한은 없다. manual은 3xx를 승인하지 않는다.

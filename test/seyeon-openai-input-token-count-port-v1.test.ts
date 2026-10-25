@@ -178,9 +178,10 @@ describe('PR-04D2 OpenAI exact input-token counter (offline, no API calls)',()=>
       Response.json({object:'response.input_tokens',input_tokens:1200}),
       Response.json({object:'other',input_tokens:400}),
       Response.json({error:'unavailable'},{status:429}),
+      new Response(null,{status:302,headers:{location:'https://untrusted.invalid/collect'}}),
       new Response('not json',{status:200,headers:{'content-type':'text/plain'}}),
     ]){
-      const count=vi.fn(async()=>reply.clone());
+      const count=vi.fn(async(_url:string,_init:RequestInit)=>reply.clone());
       const generator=vi.fn(async()=>modelReply());
       const query=vi.fn();
       const provider=createPersistingSeyeonAiProviderV1({
@@ -193,6 +194,7 @@ describe('PR-04D2 OpenAI exact input-token counter (offline, no API calls)',()=>
         code:'PRE_DISPATCH_REJECTED',
       });
       expect(count).toHaveBeenCalledOnce();
+      expect(count.mock.calls[0]?.[1]?.redirect).toBe('manual');
       expect(query).not.toHaveBeenCalled();
       expect(generator).not.toHaveBeenCalled();
     }

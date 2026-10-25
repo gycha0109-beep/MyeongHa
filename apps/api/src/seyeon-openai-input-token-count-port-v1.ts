@@ -141,7 +141,9 @@ export function createSeyeonOpenAiInputTokenCountAdmissionV1(
             },
             body:countBody,
             signal:controller.signal,
-            redirect:'error',
+            // workerd rejects the "error" mode before any network request.
+            // Manual never follows; the !ok guard below rejects every 3xx.
+            redirect:'manual',
           }),controller.signal);
         } catch {
           throw new Error('Input token count request failed or exceeded its deadline.');
