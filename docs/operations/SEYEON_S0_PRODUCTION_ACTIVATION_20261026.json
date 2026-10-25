@@ -187,7 +187,49 @@
     "installPrincipalEdgeRestoredFromBackup": false,
     "fullProviderDisasterRecoveryReady": false
   },
-  "workerActivation": "PENDING",
-  "hostedModelSmoke": "PENDING",
-  "fullProviderDisasterRecoveryReady": false
+  "workerActivation": {
+    "mergeSha": "b1237e5ac7662821535f043011ea0609a0a67b5a",
+    "version": "b037f122-7e07-40b7-b6e5-4ad08fbd3148",
+    "percentage": 100,
+    "buildId": "4ae8e889-2f20-484d-bb3e-bcf0ea5b182c"
+  },
+  "hostedModelSmoke": {
+    "schemaVersion": "seyeon-s0-hosted-http-canary-v1",
+    "workerVersion": "b037f122-7e07-40b7-b6e5-4ad08fbd3148",
+    "target": "https://myeongha.gycha0109.workers.dev",
+    "syntheticOwnedCohort": true,
+    "checks": [
+      "independent-primary-version",
+      "hosted-member-login",
+      "verified-member-token",
+      "owned-synthetic-member-thread",
+      "unseen-original-thread",
+      "no-existing-user-memory"
+    ],
+    "productionPaidChatRelease": false,
+    "firstHttpStatus": 503,
+    "responseWorkerVersion": "b037f122-7e07-40b7-b6e5-4ad08fbd3148",
+    "status": "FAILED",
+    "failure": {
+      "stage": "first-original-model-http",
+      "code": null,
+      "constraint": null,
+      "reason": "native-first-reply-http-200"
+    },
+    "forwardStopped": true,
+    "receiptAcknowledged": false
+  },
+  "fullProviderDisasterRecoveryReady": false,
+  "currentState": "HOLD_FORWARD_STOPPED",
+  "failureEvidence": {
+    "runtimeStage": "governed_preflight",
+    "providerFailureCode": "PRE_DISPATCH_REJECTED",
+    "originalPinPersisted": true,
+    "paidCallLedgerRows": 0,
+    "aiExecutionLogRows": 0,
+    "replyIssued": false,
+    "attemptState": "failed_retryable",
+    "receiptApiExecute": true,
+    "withdrawalApiExecute": true
+  }
 }

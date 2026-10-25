@@ -115,3 +115,14 @@ Architecture Check:
 * Docs updated: yes — 적용 이력, source digest, 예산 및 크레딧 경계.
 * Ghost-code risk: findings — SQL은 활성이나 Worker gate 변경은 아직 미배포, hosted smoke 미완료.
 * Notes: 기존 원본 Memory 1건과 최초 수신/철회만 활성화한다. 새 타입·fallback·크레딧 정책·결제 차감·History/Replay authority는 추가하지 않는다.
+
+
+## 첫 hosted S0 시도 및 forward stop
+
+#2607은 필수 CI/Integration #40227449044 통과 후 `b1237e5a`로 병합했다. Cloudflare build `4ae8e889-2f20-484d-bb3e-bcf0ea5b182c`의 실제 commit hash와 build log의 Current Version ID를 대조했고, 활성 deployment 100% 및 응답 header가 `b037f122-7e07-40b7-b6e5-4ad08fbd3148`로 일치했다. post-main CI #40228221737도 SUCCESS다.
+
+실제 primary 로그인=200, 원본 Memory/Grant 가상 cohort 및 current Member/Thread 해석, 원본 DB Pin까지 통과했다. 최초 답변은 HTTP 503이며 runtimeStage=governed_preflight, providerFailureCode=PRE_DISPATCH_REJECTED였다. Attempt는 failed_retryable이고 유료 call ledger=0, ai_execution_logs=0, issued receipt=0이다. 이미 준비한 canonical forward stop을 실행하여 registry/Pin/Commit/issuer를 닫고 receipt/withdrawal EXECUTE를 보존했다. 현재 상태는 **HOLD_FORWARD_STOPPED**, 운영 수신/철회 E2E PASS나 일반 채팅 DEPLOYED가 아니다.
+
+expected=원본 Pin → native count → DB 비용 승인 → 생성 → receipt, observed=Pin 후 사전 승인 거부, runtime=실제 Cloudflare Worker/Hosted Auth/PG17.6, failure stage=governed_preflight, classification=사전 승인 원인 미분리다. 원래 요청을 자동 재전송하거나 실패한 Attempt를 변경하지 않는다. 실행 원본과 가상 cohort IDs는 보호된 operator 상태에 보존하며 공개 증거에는 credential·Grant/Subject IDs·proof를 넣지 않는다.
+
+직접 dependency인 input-count와 DB governed start의 진단만 보강한다. count는 고정 단계/HTTP status/소요시간/certified 여부, DB start는 허용된 SQLSTATE/constraint만 남긴다. raw 오류·본문·키·사용자/호출 IDs는 기록하지 않는다. 30/30 직접 회귀 및 build PASS, 특히 반사된 비밀/입력과 transport 오류가 로그에 나오지 않는 검증을 포함한다. deadline/예산/승인 정책, 재시도, 모델 dispatch 조건은 변경하지 않는다. 추가 운영 시도는 이 진단이 반영되고 현재 실패가 조정된 별도 가상 campaign에서 수행한다.

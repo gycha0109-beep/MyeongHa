@@ -469,11 +469,21 @@ export function createPersistingSeyeonAiProviderV1(input: {
                 enforcedOutputTokenLimit: input.config.maxOutputTokens ?? null,
               },
             });
+            try {
             await input.runner.run(binding.subjectId, client =>
               startGovernedSeyeonAiCallV1(client,binding,{
                 ...call, quote, requestBodyBytes: call.requestBodyBytes,
               }),
             );
+            } catch (error) {
+              const e = error as {code?: unknown; constraint?: unknown};
+              console.error('MYEONGHA_SEYEON_GOVERNOR_ADMISSION_DIAGNOSTIC ' + JSON.stringify({
+                schemaVersion: 'seyeon-governor-admission-diagnostic-v1',
+                sqlState: typeof e?.code === 'string' && /^[A-Z0-9]{5}$/u.test(e.code) ? e.code : null,
+                sqlConstraint: typeof e?.constraint === 'string' && /^seyeon_[a-z0-9_]{1,95}$/u.test(e.constraint) ? e.constraint : null,
+              }));
+              throw error;
+            }
             // Bind the immutable approved token ceilings to THIS call only
             // after the database has committed its matching reservation.
             state.admittedQuote = quote;
