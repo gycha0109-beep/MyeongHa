@@ -109,6 +109,8 @@ function validCandidate(c: SeyeonPersonalRecordProjectionCandidateV1): boolean {
 export function selectSeyeonExactModelPersonalSourcesV1(input: {
   readonly retrievedMemories: readonly SeyeonRetrievedMemoryV2[];
   readonly maxRetrievedMemories?: number;
+  /** Server-owned first-Memory constraint; never a client/model capability. */
+  readonly requiredPersonalRecordCount?: 1;
   readonly sourceCandidates: readonly SeyeonPersonalRecordProjectionCandidateV1[];
 }): SeyeonExactModelPersonalSourceSelectionV1 {
   if (!Array.isArray(input.retrievedMemories) ||
@@ -195,6 +197,11 @@ export function selectSeyeonExactModelPersonalSourcesV1(input: {
       ...(c.rawRecordPgDigest === undefined ? {} : {rawRecordPgDigest: c.rawRecordPgDigest}),
       ...(c.projectorVersion === undefined ? {} : {projectorVersion: c.projectorVersion}),
     }));
+  }
+
+  if(input.requiredPersonalRecordCount!==undefined&&
+     (input.requiredPersonalRecordCount!==1||selectedSources.length!==1)){
+    throw new SeyeonExactModelPersonalSourceSelectionHoldV1();
   }
 
   return Object.freeze({

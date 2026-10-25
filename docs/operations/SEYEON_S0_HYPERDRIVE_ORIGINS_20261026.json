@@ -1,0 +1,43 @@
+{
+  "schemaVersion": "seyeon-s0-hyperdrive-predeployment-evidence-v1",
+  "accountId": "410d3f82ed3ccc66609a2b698803859b",
+  "projectRef": "cnsfpcdiyofqvhpcegfc",
+  "certificateId": "d25c14bc-d654-46b8-89cf-5c4baf931771",
+  "certificateMatchesPinnedPem": true,
+  "sslmode": "verify-full",
+  "sqlCachingDisabled": true,
+  "originConnectionLimit": 5,
+  "bindings": [
+    {
+      "binding": "SEYEON_SUBJECT_HYPERDRIVE",
+      "id": "8ee320f55db94f66b2681fcc43995219",
+      "principal": "myeongha_seyeon_subject_login"
+    },
+    {
+      "binding": "SEYEON_GOVERNED_HYPERDRIVE",
+      "id": "64e88db2afcd4118afe1fe29bdf31742",
+      "principal": "myeongha_seyeon_governed_login"
+    }
+  ],
+  "actualTypedPoolProof": {
+    "atUtc": "2026-10-25T19:10:29.509Z",
+    "pinnedCaStrictTls": true,
+    "ordinary": {
+      "executionRole": "myeongha_api_executor",
+      "serverVersion": "17.6",
+      "crossRoleDenied": true,
+      "actualTypedPoolPreflight": true
+    },
+    "governed": {
+      "executionRole": "myeongha_seyeon_governed_executor",
+      "serverVersion": "17.6",
+      "crossRoleDenied": true,
+      "actualTypedPoolPreflight": true
+    }
+  },
+  "existingOpsLoginRotated": false,
+  "newOriginPasswordsAddedToWorker": false,
+  "productionModelEnabled": false,
+  "productionS0SchemaInstalled": false,
+  "scope": "prepared-origin-tls-and-role-separation-only"
+}

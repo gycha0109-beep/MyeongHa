@@ -1,9 +1,10 @@
 {
   "name": "myeongha",
   "main": "./cloudflare/myeongha-worker.mjs",
-  "alias": {
-    "pg-cloudflare": "./cloudflare/postgres-native-socket.mjs"
-  },
+  "hyperdrive": [
+    {"binding":"SEYEON_SUBJECT_HYPERDRIVE","id":"8ee320f55db94f66b2681fcc43995219"},
+    {"binding":"SEYEON_GOVERNED_HYPERDRIVE","id":"64e88db2afcd4118afe1fe29bdf31742"}
+  ],
   "compatibility_date": "2026-10-20",
   "workers_dev": true,
   "preview_urls": true,

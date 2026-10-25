@@ -11,7 +11,7 @@ import {prepareProductionPostgresStrictLibpqV1} from './prepare-production-postg
 
 const args=process.argv.slice(2);
 const option=name=>{const i=args.indexOf(name);return i<0?null:args[i+1];};
-const envFile=option('--env-file'),caFile=option('--ca-file'),output=option('--output-secrets-file');
+const envFile=option('--env-file'),caFile=option('--ca-file'),output=option('--output-operator-file');
 if(!args.includes('--apply')||![envFile,caFile,output].every(p=>typeof p==='string'&&isAbsolute(p))){
   throw Error('Explicit --apply and absolute env/CA/exclusive secret output paths required.');
 }
@@ -22,11 +22,12 @@ for(const root of [fileURLToPath(new URL('../../',import.meta.url)),dirname(envF
   }
 }
 const source=parseEnv(await readFile(envFile,'utf8'));
-const requiredCredentialKeys=['SUPABASE_DB_PASSWORD','MYEONGHA_WORKER_DATABASE_URL','OPENAI_API_KEY'];
+const requiredCredentialKeys=['SUPABASE_DB_PASSWORD','MYEONGHA_WORKER_DATABASE_URL'];
 if(requiredCredentialKeys.some(key=>typeof source[key]!=='string'||source[key].trim().length===0)){
   throw Error('Existing operator DB and native Provider credentials required.');
 }
 const ref='cnsfpcdiyofqvhpcegfc',principal='myeongha_seyeon_governed_login';
+const ordinaryPrincipal='myeongha_seyeon_subject_login';
 const ordinary=new URL(source.MYEONGHA_WORKER_DATABASE_URL);
 const secretDir=dirname(resolve(output));
 await mkdir(secretDir,{recursive:true,mode:0o700});
@@ -47,34 +48,44 @@ try{
   await client.query('set local lock_timeout=\'5s\'');
   await client.query("select pg_advisory_xact_lock(hashtextextended('seyeon-s0-governed-login-bootstrap-v1',0))");
   const {rows:[state]}=await client.query(`select current_user='postgres' and current_database()='postgres' as owner,
-    to_regprocedure('seyeon_private.cmd_ack_seyeon_positive_reply_v1(uuid,text)') is not null as installed,
-    exists(select 1 from pg_roles where rolname=$1) as login_exists`,[principal]);
+    exists(select 1 from pg_roles where rolname='myeongha_seyeon_governed_executor' and not rolcanlogin and not rolsuper and not rolbypassrls)
+    and to_regclass('public.seyeon_ai_governor_daily_budgets_v1') is not null as installed,
+    exists(select 1 from pg_roles where rolname in($1,$2)) as login_exists`,[principal,ordinaryPrincipal]);
   if(state.owner!==true||state.installed!==true||state.login_exists!==false){
-    throw Error('Requires installed S0 and absent dedicated LOGIN; never rotate an unknown existing credential.');
+    throw Error('Requires existing governed authority and absent dedicated LOGINs; never rotate an unknown credential.');
   }
   const password=randomBytes(32).toString('hex');
+  const ordinaryPassword=randomBytes(32).toString('hex');
   const governed=new URL(ordinary);
   governed.username=`${principal}.${ref}`;governed.password=password;
   governed.port='5432';governed.pathname='/postgres';governed.search='?sslmode=verify-full';
   // Save before sending credential DDL: ambiguous COMMIT must never lose the
   // only credential copy or silently trigger a second CREATE/rotation.
-  await writeFile(output,JSON.stringify({OPENAI_API_KEY:source.OPENAI_API_KEY,
-    MYEONGHA_SEYEON_OPENAI_MODEL:'gpt-5.6-terra',
-    MYEONGHA_SEYEON_GOVERNED_DATABASE_URL:governed.href,
-    MYEONGHA_SEYEON_GOVERNED_DATABASE_PRINCIPAL:principal},null,2)+'\n',{flag:'wx',mode:0o600});
+  const hyperdriveOrdinary=new URL(ordinary);
+  hyperdriveOrdinary.username=`${ordinaryPrincipal}.${ref}`;
+  hyperdriveOrdinary.password=ordinaryPassword;hyperdriveOrdinary.port='5432';
+  hyperdriveOrdinary.pathname='/postgres';hyperdriveOrdinary.search='?sslmode=verify-full';
+  await writeFile(output,JSON.stringify({schemaVersion:'seyeon-s0-operator-origins-v1',
+    origins:{ordinary:hyperdriveOrdinary.href,governed:governed.href}},null,2)+'\n',
+    {flag:'wx',mode:0o600});
   // Send a SCRAM verifier, never the plaintext password in SQL text/parameters.
   // Generated ASCII hex needs no SASLprep normalization.
-  if(!/^[a-f0-9]{64}$/u.test(password))throw Error('Credential generation failure');
-  const salt=randomBytes(16),iterations=4096;
-  const salted=pbkdf2Sync(password,salt,iterations,32,'sha256');
-  const stored=createHash('sha256').update(createHmac('sha256',salted).update('Client Key').digest()).digest('base64');
-  const server=createHmac('sha256',salted).update('Server Key').digest('base64');
-  const verifier=`SCRAM-SHA-256$${iterations}:${salt.toString('base64')}$${stored}:${server}`;
+  const verifier=secret=>{
+    if(!/^[a-f0-9]{64}$/u.test(secret))throw Error('Credential generation failure');
+    const salt=randomBytes(16),iterations=4096;
+    const salted=pbkdf2Sync(secret,salt,iterations,32,'sha256');
+    const stored=createHash('sha256').update(createHmac('sha256',salted).update('Client Key').digest()).digest('base64');
+    const server=createHmac('sha256',salted).update('Server Key').digest('base64');
+    return `SCRAM-SHA-256$${iterations}:${salt.toString('base64')}$${stored}:${server}`;
+  };
   await client.query(`create role myeongha_seyeon_governed_login login noinherit nosuperuser
-    nocreatedb nocreaterole noreplication nobypassrls connection limit 4 password '${verifier}'`);
-  await client.query('grant myeongha_seyeon_governed_executor to myeongha_seyeon_governed_login');
+    nocreatedb nocreaterole noreplication nobypassrls connection limit 5 password '${verifier(password)}'`);
+  await client.query(`create role myeongha_seyeon_subject_login login noinherit nosuperuser
+    nocreatedb nocreaterole noreplication nobypassrls connection limit 5 password '${verifier(ordinaryPassword)}'`);
+  await client.query('grant myeongha_seyeon_governed_executor to myeongha_seyeon_governed_login with inherit false,set true');
+  await client.query('grant myeongha_api_executor to myeongha_seyeon_subject_login with inherit false,set true');
   await client.query('COMMIT');transaction=false;
-  console.log('S0_DEDICATED_LOGIN_CREATED_SECRETS_SAVED_LOCALLY');
+  console.log('S0_SEPARATE_LOGINS_CREATED_OPERATOR_ORIGINS_SAVED_LOCALLY');
 }catch(error){
   if(transaction)try{await client.query('ROLLBACK');}catch{ /* retain exclusive credential file for outcome reconciliation */ }
   // A server message can include SQL credential material. Emit only fixed text.

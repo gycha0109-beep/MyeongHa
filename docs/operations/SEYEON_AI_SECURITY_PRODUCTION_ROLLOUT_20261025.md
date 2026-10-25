@@ -88,3 +88,11 @@ Architecture Check: 문서와 실행 증거만 추가했다. runtime/API/DB/권�
 실제 수정은 다음으로 한정한다. registry 소유권을 넘기기 전에 새 소유자의 임시 schema CREATE를 부여하고, 함수 ACL 작업을 끝낸 뒤 임시 소유자 membership을 회수한다. restricted postgres인 G3가 기존 thread assertion과 registry row lock을 사용할 최소 권한을 추가한다. registry는 기존 NOLOGIN owner를 유지하며, registry 잠금 보조 함수만 그 owner가 실행하고 postgres에만 EXECUTE한다. API·anon·authenticated·service_role에는 해당 보조 함수나 raw registry 접근을 열지 않는다.
 
 원본 설치 SQL 전체의 atomic/default-closed 설치 PASS, 실제 일반 API 계정으로 원본 G1/G2/G3·수신/철회·유실 경합 **11/11 PASS**. 기존 Role ADMIN snapshot은 유지하며 함수 소유권·RLS·현재 권한 검사를 약화하지 않았다. 선택적 복원 리허설도 설치자·fixture 관리자·API 계정을 분리한다. 운영 DB 설치와 모델 활성화는 아직 실행하지 않았다.
+
+## 2026-10-26 Hyperdrive 운영 준비
+
+Worker의 custom-CA Node TLS alias는 실제 workerd의 CA 보장으로 사용할 수 없어 제거한다. 기존 Hyperdrive pool/실제 LOGIN preflight를 재사용하고 S0용 두 binding을 분리했다. 기존 Ops LOGIN의 자격증명을 보존하기 위해 별도의 `myeongha_seyeon_subject_login`과 `myeongha_seyeon_governed_login`을 만들었다. 각 LOGIN은 NOINHERIT/NOSUPERUSER/NOBYPASSRLS이고 API 또는 governed executor 한 가지만 SET할 수 있다. 기존 계정 암호를 교체하거나 Worker에 origin 비밀번호를 추가하지 않았다.
+
+두 origin은 실제 Cloudflare 생성 단계에서 고정 CA/verify-full 연결 검사를 통과했다. API 재조회에서 CA ID, SQL cache disabled, origin connection limit=5, 서로 다른 주체/ID를 확인했다. 실제 운영 PostgreSQL 17.6에서 기존 typed pool preflight와 올바른 역할 전이, 반대 역할 전이 거부도 통과했다. 상세 metadata는 [origin 증거](SEYEON_S0_HYPERDRIVE_ORIGINS_20261026.json)에 있다. 모델 gate는 false이고 실제 S0 모델 사용이나 HTTP positive 완료 증거로 계산하지 않는다.
+
+복원 #40200284088의 추가 실패는 fixture 비밀번호를 `format`에 전달할 때 `$1`의 타입이 추론되지 않은 `42P18`이었다. `$1::text`로 고정했고 실제 PostgreSQL에서 typed format을 확인했다. main의 기존 public-schema entitlement 보정과 다른 제품/UI 변경도 함께 보존했다. S0 모델 경로는 원본 source가 0건이면 provider/count 전 차단하며, primary로 승인된 Origin에서만 들어갈 수 있다.

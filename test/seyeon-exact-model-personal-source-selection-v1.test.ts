@@ -63,6 +63,15 @@ const select = (input: {
 });
 
 describe('G1-B exact personal record runtime source selection, no DB authorization', () => {
+  it('holds the first-Memory scope before model dispatch when its original source is absent',()=>{
+    const empty={retrievedMemories:[],sourceCandidates:[]};
+    expect(selectSeyeonExactModelPersonalSourcesV1(empty).selectedPersonalRecordCount).toBe(0);
+    expect(()=>selectSeyeonExactModelPersonalSourcesV1({...empty,requiredPersonalRecordCount:1}))
+      .toThrow(SeyeonExactModelPersonalSourceSelectionHoldV1);
+    expect(selectSeyeonExactModelPersonalSourcesV1({retrievedMemories:[m1],sourceCandidates:[c1],
+      requiredPersonalRecordCount:1}).selectedPersonalRecordCount).toBe(1);
+  });
+
   it('uses the identical normalized rank and cap as runtime and excludes preselected but dropped inputs', () => {
     const result = select({ limit: 2 });
     const actual = selectSeyeonRuntimeRetrievedMemoriesV2({
