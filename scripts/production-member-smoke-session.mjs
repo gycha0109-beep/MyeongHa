@@ -1,5 +1,4 @@
 const PRODUCTION_ORIGIN = 'https://myeongha.vercel.app';
-const SIGN_IN_URL = `${PRODUCTION_ORIGIN}/api/auth/sign-in`;
 const REQUEST_TIMEOUT_MS = 15_000;
 
 function requireCredential(name, { trim = true } = {}) {
@@ -48,11 +47,17 @@ async function readJsonWithoutLogging(response) {
   return value;
 }
 
-export async function acquireProductionMemberSmokeSession() {
+export async function acquireProductionMemberSmokeSession({ origin = PRODUCTION_ORIGIN, expectedCloudflareVersion } = {}) {
+  if (![PRODUCTION_ORIGIN, 'https://myeongha.gycha0109.workers.dev'].includes(origin)) {
+    throw new Error('Unapproved production Member smoke origin.');
+  }
+  if (origin !== PRODUCTION_ORIGIN && !/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/iu.test(expectedCloudflareVersion ?? '')) {
+    throw new Error('Cloudflare Member smoke requires an expected Worker version.');
+  }
   const email = requireCredential('MYEONGHA_PRODUCTION_MEMBER_EMAIL');
   const password = requireCredential('MYEONGHA_PRODUCTION_MEMBER_PASSWORD', { trim: false });
 
-  const response = await fetch(SIGN_IN_URL, {
+  const response = await fetch(`${origin}/api/auth/sign-in`, {
     method: 'POST',
     headers: {
       Accept: 'application/json',
@@ -64,6 +69,9 @@ export async function acquireProductionMemberSmokeSession() {
   });
 
   requireNoStore(response);
+  if (origin !== PRODUCTION_ORIGIN && response.headers.get('X-Myeongha-Worker-Version') !== expectedCloudflareVersion) {
+    throw new Error('Cloudflare Worker version changed during Member sign-in; do not replay.');
+  }
   requireJsonContentType(response);
   if (response.status !== 200) {
     throw new Error(`Production Member smoke sign-in expected HTTP 200, received ${response.status}.`);

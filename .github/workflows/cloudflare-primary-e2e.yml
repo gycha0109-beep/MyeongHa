@@ -1,0 +1,40 @@
+name: Cloudflare Primary Worker E2E
+run-name: "Cloudflare primary anonymous live E2E"
+on:
+  pull_request:
+    paths:
+      - 'scripts/verify-cloudflare-primary-e2e.mjs'
+      - 'test/cloudflare-primary-e2e.test.mjs'
+      - '.github/workflows/cloudflare-primary-e2e.yml'
+      - '.github/workflows/cloudflare-primary-e2e-member.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/verify-cloudflare-primary-e2e.mjs'
+      - 'test/cloudflare-primary-e2e.test.mjs'
+      - '.github/workflows/cloudflare-primary-e2e.yml'
+      - '.github/workflows/cloudflare-primary-e2e-member.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+concurrency:
+  group: cloudflare-primary-e2e-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  anonymous:
+    name: Cloudflare live E2E - anonymous ingress and HOLD
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Verify exact governed Cloudflare production ingress (no secrets)
+        env:
+          MYEONGHA_CLOUDFLARE_E2E_MODE: anonymous
+        run: node scripts/verify-cloudflare-primary-e2e.mjs
+

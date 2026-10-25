@@ -1,0 +1,42 @@
+{
+  "schemaVersion": "myeongha-cloudflare-primary-security-monitor-v1",
+  "provider": "cloudflare",
+  "accountId": "410d3f82ed3ccc66609a2b698803859b",
+  "workerName": "myeongha",
+  "primaryOrigin": "https://myeongha.gycha0109.workers.dev",
+  "policyId": "fab0d24cd73740f5b2dba97766f78a66",
+  "name": "MyeongHa Cloudflare API Access Denied and Rate Limited Anomalies",
+  "alertType": "custom_analytics",
+  "queryPath": "config/security/cloudflare-primary-access-security-events.sql",
+  "querySha256Utf8LfTrimEnd": "8ac97df8e79806a5ac13637e8b890df00abd7c34a869fd95971595d1060634b1",
+  "querySource": "sql_api",
+  "dataset": "logs.workersLogs",
+  "eventSchema": "myeongha-security-event-v1",
+  "eventCodes": ["ACCESS_DENIED", "RATE_LIMITED"],
+  "detection": {
+    "algorithm": "zscore_spike",
+    "sensitivityStandardDeviations": 3.5,
+    "recentWindow": "5m",
+    "baselineWindow": "4h",
+    "executionInterval": "1m",
+    "repeatNotificationInterval": "1h",
+    "selectionAuthority": "Cloudflare UI native defaults; increase only",
+    "repositoryFixedRequestThreshold": null
+  },
+  "delivery": { "channel": "email", "recipientAuthority": "existing Cloudflare account owner", "recipientCount": 1 },
+  "providerConfiguration": "ACTIVE_READBACK_VERIFIED",
+  "actualPrimaryLogIngestion": "PENDING_OPS_API_ROLLOUT",
+  "actualNotificationReceipt": "SYNTHETIC_PROVIDER_TEST_RECEIVED",
+  "deliveryTest": {
+    "method": "official Cloudflare monitor Test action; executed once",
+    "providerHistoryId": "6a141d9c-9feb-47f6-b1d4-b7c3e3de1c89",
+    "sentAtUtc": "2026-10-24T20:53:08.807195Z",
+    "receivedAtUtc": "2026-10-24T20:53:15Z",
+    "receiptEvidence": "connected Gmail exact monitor-subject search; one matching Cloudflare notification in INBOX",
+    "rawEmailBodyOrAddressPersisted": false,
+    "organicAnomalyTriggerTested": false
+  },
+  "organicBaselineEstablished": false,
+  "authorization": "User requested completion including alert activation; clarified Cloudflare as primary server.",
+  "observedDateKst": "2026-10-25"
+}

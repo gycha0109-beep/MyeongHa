@@ -30,6 +30,11 @@ const JSON_HEADERS = Object.freeze({
   'Content-Type': 'application/json',
 } as const);
 const MYEONGHA_PRODUCTION_WEB_ORIGIN = 'https://myeongha.vercel.app' as const;
+const MYEONGHA_AUTH_WEB_ORIGINS = new Set([
+  MYEONGHA_PRODUCTION_WEB_ORIGIN,
+  'https://myeongha.gycha0109.workers.dev',
+  'https://myeongha-web.gycha0109.workers.dev',
+]);
 const WEB_AUTH_TRANSPORT_HEADER_V1 = 'x-myeongha-auth-transport' as const;
 const WEB_AUTH_TRANSPORT_VALUE_V1 = 'web-cookie-v1' as const;
 const ALLOWED_AUTH_NEXT_PAGES = new Set([
@@ -202,11 +207,11 @@ function normalizeEmail(value: string): string | null {
   return email;
 }
 
-function normalizeAuthNext(value: unknown): string {
+function normalizeAuthNext(value: unknown, authOrigin: string = MYEONGHA_PRODUCTION_WEB_ORIGIN): string {
   if (typeof value !== 'string' || value.length === 0 || value.length > 2048) return 'hall.html';
   try {
-    const resolved = new URL(value, `${MYEONGHA_PRODUCTION_WEB_ORIGIN}/auth.html`);
-    if (resolved.origin !== MYEONGHA_PRODUCTION_WEB_ORIGIN) return 'hall.html';
+    const resolved = new URL(value, `${authOrigin}/auth.html`);
+    if (resolved.origin !== authOrigin) return 'hall.html';
     const page = resolved.pathname.split('/').pop() ?? '';
     if (!ALLOWED_AUTH_NEXT_PAGES.has(page)) return 'hall.html';
     return `${page}${resolved.search}${resolved.hash}`;
@@ -215,10 +220,12 @@ function normalizeAuthNext(value: unknown): string {
   }
 }
 
-function signupRedirectPath(body: Record<string, unknown>): string {
-  const redirect = new URL('/auth.html', MYEONGHA_PRODUCTION_WEB_ORIGIN);
+function signupRedirectPath(body: Record<string, unknown>, request: Request): string {
+  const requestOrigin = new URL(request.url).origin;
+  const authOrigin = MYEONGHA_AUTH_WEB_ORIGINS.has(requestOrigin) ? requestOrigin : MYEONGHA_PRODUCTION_WEB_ORIGIN;
+  const redirect = new URL('/auth.html', authOrigin);
   redirect.searchParams.set('confirmed', '1');
-  redirect.searchParams.set('next', normalizeAuthNext(body.next));
+  redirect.searchParams.set('next', normalizeAuthNext(body.next, authOrigin));
   return `/auth/v1/signup?redirect_to=${encodeURIComponent(redirect.toString())}`;
 }
 
@@ -461,7 +468,7 @@ export async function handleSupabaseAuthRequestV1(input: {
 
     const path = input.action === 'sign-in'
       ? '/auth/v1/token?grant_type=password'
-      : signupRedirectPath(body);
+      : signupRedirectPath(body, input.request);
     const upstream = await callSupabase(config, path, {
       method: 'POST',
       body: JSON.stringify({ email, password }),

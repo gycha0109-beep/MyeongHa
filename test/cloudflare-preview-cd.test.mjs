@@ -17,6 +17,7 @@ const correctContext = Object.freeze({
 const previewConfig = Object.freeze({
   name: 'myeongha',
   main: './cloudflare/myeongha-worker.mjs',
+  compatibility_flags: ['nodejs_compat'],
   workers_dev: true,
   preview_urls: true,
   assets: {

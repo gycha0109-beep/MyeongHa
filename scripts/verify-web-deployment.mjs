@@ -247,6 +247,20 @@ await assertMissing(
   'Memories must not consume a separate Vercel function while the Records dispatcher rewrite is active.',
 );
 
+const creditWalletRewrites = (vercelConfig.rewrites ?? []).filter(
+  entry => entry.source === '/api/me/credits',
+);
+if (
+  creditWalletRewrites.length !== 1 ||
+  creditWalletRewrites[0]?.destination !== '/api/me?__myeongha_chat_credit_wallet=1'
+) {
+  throw new Error('Credit wallet must rewrite through the existing Member /api/me Function.');
+}
+await assertMissing(
+  resolve('api/me/credits.ts'),
+  'Credit wallet must not consume a thirteenth Vercel Function.',
+);
+
 const chatRewriteMatches = (vercelConfig.rewrites ?? []).filter(
   (entry) => entry.source === '/api/chat/:threadId',
 );

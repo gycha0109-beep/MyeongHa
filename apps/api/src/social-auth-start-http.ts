@@ -11,7 +11,11 @@ const NO_STORE = 'no-store' as const;
 const MOBILE_SOCIAL_REDIRECT_SCHEME = 'myeongha:' as const;
 const MOBILE_SOCIAL_REDIRECT_HOST = 'auth' as const;
 const MOBILE_SOCIAL_REDIRECT_PATH = '/callback' as const;
-const WEB_SOCIAL_REDIRECT_ORIGIN = 'https://myeongha.vercel.app' as const;
+const WEB_SOCIAL_REDIRECT_ORIGINS = new Set([
+  'https://myeongha.vercel.app',
+  'https://myeongha.gycha0109.workers.dev',
+  'https://myeongha-web.gycha0109.workers.dev',
+]);
 const WEB_SOCIAL_REDIRECT_PATH = '/auth.html' as const;
 const WEB_SOCIAL_REDIRECT_MARKER = 'callback' as const;
 const SOCIAL_AUTH_STATE_TTL_MS = 10 * 60 * 1000;
@@ -68,7 +72,7 @@ function parseProvider(value: unknown): SocialAuthProviderServerV1 | null {
     : null;
 }
 
-function parseRedirectUri(value: unknown): URL | null {
+function parseRedirectUri(value: unknown, approvedWebOrigin?: string): URL | null {
   if (typeof value !== 'string' || value.length > 512) return null;
   let url: URL;
   try {
@@ -89,7 +93,9 @@ function parseRedirectUri(value: unknown): URL | null {
     url.search === '';
   const web =
     commonSafe &&
-    url.origin === WEB_SOCIAL_REDIRECT_ORIGIN &&
+    (approvedWebOrigin === undefined
+      ? WEB_SOCIAL_REDIRECT_ORIGINS.has(url.origin)
+      : url.origin === approvedWebOrigin) &&
     url.pathname === WEB_SOCIAL_REDIRECT_PATH &&
     url.searchParams.getAll('social').length === 1 &&
     url.searchParams.get('social') === WEB_SOCIAL_REDIRECT_MARKER &&
@@ -111,6 +117,7 @@ function randomState(): string {
 }
 
 export async function handleSocialAuthStartRequestV1(input: {
+  readonly webOrigin?: string;
   readonly request: Request;
   readonly env: ProductionUserDataRuntimeEnvV1;
   readonly nowEpochMs?: () => number;
@@ -135,7 +142,16 @@ export async function handleSocialAuthStartRequestV1(input: {
 
   if (!isRecord(body)) return failure('INVALID_REQUEST', 400);
   const provider = parseProvider(body.provider);
-  const redirectUri = parseRedirectUri(body.redirectUri);
+  const approvedWebOrigin = input.webOrigin;
+  if (approvedWebOrigin !== undefined) {
+    let host: URL;
+    try { host = new URL(approvedWebOrigin); }
+    catch { return failure('INVALID_REQUEST', 400); }
+    if (host.origin !== approvedWebOrigin || host.protocol !== 'https:' ||
+        host.username !== '' || host.password !== '' || host.search !== '' ||
+        host.hash !== '') return failure('INVALID_REQUEST', 400);
+  }
+  const redirectUri = parseRedirectUri(body.redirectUri, approvedWebOrigin);
   if (provider === null || redirectUri === null) {
     return failure('INVALID_REQUEST', 400);
   }

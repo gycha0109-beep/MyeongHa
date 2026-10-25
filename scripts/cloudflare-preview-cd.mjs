@@ -40,6 +40,9 @@ export function assertCloudflarePreviewConfiguration(config) {
   const expected = CLOUDFLARE_PREVIEW_CD_V1;
   if (
     config?.name !== expected.workerName ||
+    !Array.isArray(config?.compatibility_flags) ||
+    config.compatibility_flags.length !== 1 ||
+    config.compatibility_flags[0] !== 'nodejs_compat' ||
     config?.main !== './cloudflare/myeongha-worker.mjs' ||
     config?.workers_dev !== true ||
     config?.preview_urls !== true ||
