@@ -210,6 +210,89 @@ describe('C08 local preflight / single dialogue LLM / local output guard (OFFLIN
     expect(storageReads).toBe(1);
   });
 
+  it('admits PUBLIC established relationship after four authoritative revision proofs, still one model and public reveal',async()=>{
+    const h=harness({relationship:'present'});
+    const relation={
+      stageKey:'close',closenessBand:'high' as const,trustBand:'high' as const,
+      frictionBand:'low' as const,revision:1,policyVersion:'v1',
+    };
+    const trustGov={...governance(),relationship:{
+      gate:'PUBLIC' as const,trustBand:'high' as const,relevantSharedHistoryRefs:[],
+    }};
+    let proofs=0;
+    const proof={
+      async readAuthoritativeRelationship(query:{
+        subjectId:string;threadId:string;currentUserMessageId:string;
+        characterId:'seyeon';
+      }){
+        proofs++;
+        return {
+          schemaVersion:'seyeon-c08-public-relationship-proof-v1',
+          ...query,complete:true,publicConversationEligible:true,
+          privateDisclosureAuthorized:false,relationship:relation,
+        };
+      },
+    };
+    const result=await h.run({governance:trustGov,relationshipProofPort:proof});
+    expect(result.llmCalls).toBe(1);
+    expect(result.publicRelationshipAuthority)
+      .toBe('VERIFIED_ESTABLISHED_RELATIONSHIP');
+    expect(result.interpretation.reveal.level).toBe('public');
+    expect(result.interpretation.memoryRefsUsed).toEqual([]);
+    expect(h.requests).toHaveLength(1);
+    const request=h.requests[0]!.input as {
+      packet:{relationship:{revision:number};interpretation:{reveal:{level:string}}};
+    };
+    expect(request.packet.relationship.revision).toBe(1);
+    expect(request.packet.interpretation.reveal.level).toBe('public');
+    expect(proofs).toBe(4);
+  });
+
+  it('denies relationship spoofing, missing proof, revoked public permission and concurrent revision changes',async()=>{
+    const base={
+      stageKey:'close',closenessBand:'high' as const,trustBand:'high' as const,
+      frictionBand:'low' as const,revision:1,policyVersion:'v1',
+    };
+    const trustGov={...governance(),relationship:{
+      gate:'PUBLIC' as const,trustBand:'high' as const,relevantSharedHistoryRefs:[],
+    }};
+    const make=(fault:'missing'|'revision'|'private'|'revoked'|'late')=>{
+      const h=harness({relationship:'present'});
+      let proofs=0;
+      const proof={
+        async readAuthoritativeRelationship(query:{
+          subjectId:string;threadId:string;currentUserMessageId:string;
+          characterId:'seyeon';
+        }){
+          proofs++;
+          return {
+            schemaVersion:'seyeon-c08-public-relationship-proof-v1',
+            ...query,complete:true,
+            publicConversationEligible:fault!=='revoked',
+            privateDisclosureAuthorized:fault==='private',
+            relationship:fault==='revision'||(fault==='late'&&proofs===4)
+              ? {...base,revision:2}:base,
+          };
+        },
+      };
+      return {h,run:()=>h.run({governance:trustGov,
+        ...(fault==='missing'?{}:{relationshipProofPort:proof})}),
+        get proofs(){return proofs;}};
+    };
+    for(const fault of ['missing','revision','private','revoked'] as const){
+      const test=make(fault);
+      await expect(test.run()).rejects.toThrow('LOCAL_CONTEXT_NOT_PROVEN');
+      expect(test.h.requests).toHaveLength(0);
+    }
+    const late=make('late');
+    await expect(late.run()).rejects.toThrow('LOCAL_CONTEXT_NOT_PROVEN');
+    expect(late.h.requests).toHaveLength(1);
+    expect(late.proofs).toBe(4);
+    const spoof=harness({relationship:'present'});
+    await expect(spoof.run()).rejects.toThrow('LOCAL_CONTEXT_NOT_PROVEN');
+    expect(spoof.requests).toHaveLength(0);
+  });
+
   it('returns a separately labelled local-guarded draft with exactly one model call',async()=>{
     const h=harness();
     const result=await h.run();
