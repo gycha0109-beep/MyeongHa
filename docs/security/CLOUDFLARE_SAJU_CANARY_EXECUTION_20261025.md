@@ -67,3 +67,19 @@ new public contract. Record the existing exact route and static ID in the
 inventory (20 rewrites); retain the existing 404 until an independently governed
 Cloudflare credit-wallet adapter exists. This is inventory alignment only, not
 wallet activation, DB/schema modification, or a new alias/fallback.
+
+The merged #2572 Workers Build `dd8d0e93-f3b1-48da-b2cf-592bb9be1f57` succeeded.
+Provider readback: deployment `7e9daf69-5843-4599-bdfb-ca07cf1358fb`, version
+`17f50aaf-4c5d-470e-8d28-8f639a9c7f26` at 100%. Fresh credential-free probes:
+health 200; me 503 `AUTH_UPSTREAM_UNAVAILABLE`; both Saju POST routes 404;
+all no-store. Expected admitted unauthenticated me is 401. Observed failure
+stage is primary Auth/DB composition, classified as a live runtime/binding
+prerequisite; do not send a Member session or create a fixture to force progress.
+Reproduce without credentials: GET `/api/me`, POST `/api/me/saju/calculation`,
+POST `/api/me/saju/preview-reading` at the canonical origin above.
+
+#1536's immutable restore-image acceptance was separately rechecked: the current
+workflow retains digest `sha256:b3bfedb107413abb3b8cb0d0874b0414a1dceb3d55bc0c778de6ad22d1f7dc86`;
+governed restore run `39114107262` remains successful at
+`2d73b41500b6e6f3eb74ac358252602d0da686a7`. The issue was closed as completed.
+This does not claim a new DR drill or Production privacy-ledger replay.
