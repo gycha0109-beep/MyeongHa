@@ -1,4 +1,5 @@
 name: Legal Commerce E2E (isolated)
+# Focused Auth/Commerce evidence only, never final integration or Production.
 on:
   pull_request:
     paths:

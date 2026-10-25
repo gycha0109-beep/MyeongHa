@@ -12,7 +12,7 @@ returns void language plpgsql as $$
 begin
   if accepted is not true then raise exception 'FAIL legal-commerce %',label; end if;
   raise notice 'PASS legal-commerce %',label;
-end $;
+end $$;
 -- Roles are changed with SET LOCAL ROLE during this disposable fixture.
 -- PostgreSQL 17 may not give temporary helper functions PUBLIC EXECUTE.
 grant execute on function pg_temp.ensure(text,boolean)
