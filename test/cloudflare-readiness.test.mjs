@@ -110,6 +110,40 @@ describe('Cloudflare readiness config-only parity',()=>{
     }
   });
 
+  it('categorizes safe login differences without printing actual login or database password',async()=>{
+    const hostname='aws-0-ap-southeast-1.pooler.supabase.com';
+    const cases=[
+      {login:'postgres.cnsfpcdiyofqvhpcegfc',code:'DB_LOGIN_PRIVILEGED_DEFAULT'},
+      {login:'myeongha_api_executor.cnsfpcdiyofqvhpcegfc',code:'DB_LOGIN_NOLOGIN_EXECUTOR'},
+      {login:'myeongha_cf_api_login',code:'DB_LOGIN_MISSING_TENANT_SUFFIX'},
+      {login:'myeongha_cf_api_login.other-tenant',code:'DB_LOGIN_CF_ROLE_WRONG_TENANT'},
+      {login:'myeongha_other_login.cnsfpcdiyofqvhpcegfc',code:'DB_LOGIN_DIFFERENT_ROLE_SAME_TENANT'},
+      {login:'other-login',code:'DB_LOGIN_OTHER_MISMATCH'},
+    ];
+    for (const row of cases) {
+      const password='never-show-secret-'+row.code;
+      const secretUrl='postgresql://'+row.login+':'+password+'@'+hostname+
+        ':6543/postgres?sslmode=require';
+      const env={
+        ...configuredReadinessTestBindings(),
+        MYEONGHA_CLOUDFLARE_DB_APPROVED_HOST:hostname,
+        MYEONGHA_CLOUDFLARE_DB_APPROVED_PORT:'6543',
+        MYEONGHA_DATABASE_PRINCIPAL:'myeongha_cf_api_login',
+        MYEONGHA_DATABASE_URL:secretUrl,
+      };
+      const warning=vi.spyOn(console,'warn').mockImplementation(()=>{});
+      try {
+        const response=await worker.fetch(request(),env);
+        expect(response.status).toBe(503);
+        expect(warning).toHaveBeenCalledWith('CF_READINESS_PREFLIGHT_V1',row.code);
+        expect(JSON.stringify(warning.mock.calls)).not.toContain(password);
+        expect(JSON.stringify(warning.mock.calls)).not.toContain(row.login);
+      } finally {
+        warning.mockRestore();
+      }
+    }
+  });
+
   it('never runs Vercel TLS canary or allows query/rewrite selectors',async()=>{
     const post=await worker.fetch(request('/api/readiness','POST'),bindings);
     expect(post.status).toBe(405);

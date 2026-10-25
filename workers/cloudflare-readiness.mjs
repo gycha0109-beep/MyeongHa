@@ -48,7 +48,33 @@ function logReadinessFailureCategoryV1(bindings) {
                       ? 'DB_URL_OTHER_PIN_TRANSACTION_6543'
                       : 'DB_PORT_MISMATCH_OTHER'
         )
-        : decodeURIComponent(source.username) !== expectedLogin ? 'DB_LOGIN_MISMATCH'
+        : decodeURIComponent(source.username) !== expectedLogin ? (() => {
+          // Static category only. Never write the decoded username or DB DSN.
+          const login = decodeURIComponent(source.username);
+          const projectSuffix = '.cnsfpcdiyofqvhpcegfc';
+          if (login === 'postgres' || login.startsWith('postgres.')) {
+            return 'DB_LOGIN_PRIVILEGED_DEFAULT';
+          }
+          if (login === 'myeongha_api_executor' ||
+              login === 'myeongha_api_executor' + projectSuffix) {
+            return 'DB_LOGIN_NOLOGIN_EXECUTOR';
+          }
+          if (typeof config.databasePrincipal === 'string' &&
+              login === config.databasePrincipal &&
+              host?.endsWith('.pooler.supabase.com')) {
+            return 'DB_LOGIN_MISSING_TENANT_SUFFIX';
+          }
+          if (login === 'myeongha_cf_api_login' + projectSuffix) {
+            return 'DB_PRINCIPAL_PIN_MISMATCH_CF_ROLE';
+          }
+          if (login.startsWith('myeongha_cf_api_login.')) {
+            return 'DB_LOGIN_CF_ROLE_WRONG_TENANT';
+          }
+          if (login.endsWith(projectSuffix)) {
+            return 'DB_LOGIN_DIFFERENT_ROLE_SAME_TENANT';
+          }
+          return 'DB_LOGIN_OTHER_MISMATCH';
+        })()
         : host?.endsWith('.pooler.supabase.com') && source.pathname !== '/postgres'
           ? 'DB_TENANT_PATH_MISMATCH'
           : 'DB_TARGET_MISMATCH';
