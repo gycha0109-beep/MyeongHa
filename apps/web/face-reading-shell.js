@@ -44,14 +44,30 @@ function updateReaderUrl(readerKey) {
   window.history.replaceState(window.history.state, '', url);
 }
 
+// Preserve each canonical-name element across locale switches and Reader selection.
+function renderReaderHeading(element, source, readerName) {
+  if (!element) return;
+  const nameElement = element.querySelector('[data-face-reader-name]');
+  if (!nameElement) return;
+  const rendered = formatStaticUi(source, { reader: readerName }, getUiLocale());
+  const nameOffset = rendered.indexOf(readerName);
+  if (nameOffset < 0) return;
+  nameElement.textContent = readerName;
+  element.replaceChildren(
+    rendered.slice(0, nameOffset),
+    nameElement,
+    rendered.slice(nameOffset + readerName.length),
+  );
+}
+
 function renderReader() {
   document.body.dataset.reader = selectedReader.key;
 
   const displayName = resolveCharacterDisplayNameV1(selectedReader.key, getUiLocale()) ?? selectedReader.name;
   for (const node of readerNameNodes) node.textContent = displayName;
-  if (readerHeading) readerHeading.textContent = formatStaticUi('{reader}과 함께 관상을 봅니다.', { reader: displayName }, getUiLocale());
-  if (captureHeading) captureHeading.textContent = formatStaticUi('{reader}에게 관상 보기', { reader: displayName }, getUiLocale());
-  if (flowHeading) flowHeading.textContent = formatStaticUi('{reader}과 함께하는 관상, 이렇게 진행됩니다.', { reader: displayName }, getUiLocale());
+  renderReaderHeading(readerHeading, '{reader}과 함께 관상을 봅니다.', displayName);
+  renderReaderHeading(captureHeading, '{reader}에게 관상 보기', displayName);
+  renderReaderHeading(flowHeading, '{reader}과 함께하는 관상, 이렇게 진행됩니다.', displayName);
 
   if (readerPortrait instanceof HTMLImageElement) {
     readerPortrait.src = selectedReader.portrait;

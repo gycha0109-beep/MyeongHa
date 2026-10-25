@@ -83,7 +83,9 @@ describe('Web EN/CN screenshot UI acceptance', () => {
     expect(read('chat-hub.js')).toContain('uiLabel(person.line)');
     expect(read('reader-picker-dialog.js')).toContain('paintFixedUi();');
     expect(read('reader-picker-dialog.js')).toContain('translateStaticUi(targetSource, locale)');
-    expect(read('face-reading-shell.js')).toContain("formatStaticUi('{reader}과 함께 관상을 봅니다.'");
+    expect(read('face-reading-shell.js')).toContain("renderReaderHeading(readerHeading, '{reader}과 함께 관상을 봅니다.'");
+    expect(read('face-reading-shell.js')).toContain("element.replaceChildren(");
+    expect(read('face-reading-shell.js')).toContain("element.querySelector('[data-face-reader-name]')");
     expect(read('face-reading.html')).toContain('data-face-reader-heading');
     expect(read('src/my/MyPage.tsx')).toContain('uiLabel(state.message)');
     expect(read('src/my/MyPage.tsx')).toContain('uiLabel(item.detail)');
