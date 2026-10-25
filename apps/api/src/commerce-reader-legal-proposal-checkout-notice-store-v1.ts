@@ -96,7 +96,9 @@ export function createCommerceReaderLegalProposalCheckoutNoticeStoreV1(input: Re
   scope: PostgresSubjectExecutionScopeV1;
 }>): CommerceReaderImmutableCheckoutNoticeStoreV1 {
   return Object.freeze({
-    async readOriginalNotice(unit) {
+    async readOriginalNotice(
+      unit: Parameters<CommerceReaderImmutableCheckoutNoticeStoreV1['readOriginalNotice']>[0],
+    ) {
       try {
         const subject = input.scope?.resolvedSubject;
         const client = input.scope?.client;
