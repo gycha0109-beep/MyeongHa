@@ -713,3 +713,11 @@ S8의 **비파괴/격리 검토는 S2~S7과 병렬 진행 가능**하며, S8 Pro
 source schema/최초 Reply·receipt·철회 서버 composition, 공용 API client의 전체 응답 파싱 후 receipt, 별도 비용 LOGIN의 session-pooler 표기, 기존 terminal trigger의 delivery metadata만 허용하는 좁은 예외를 구현했다. S0 native 요청은 cache-write가 생기지 않도록 explicit caching/breakpoint 0개를 사용한다. 새 개인정보 table·새 workflow·새 Worker·추가 추론 역할은 없다.
 
 기존 복원 workflow에 선택적 S0 복원본 clone 설치/경합 실행을 추가했다. 운영 자격증명은 명시적 CA/verify-full과 생성한 SCRAM verifier로 설정하고, 비밀값은 체크아웃 밖 ACL 제한 파일을 사용한다. source installer는 v2에서도 registry/positive EXECUTE/default model use를 열지 않는다. 실제 운영 enable은 코드·PG17 복원본·대상 Worker 증거와 함께 별도로 기록한다.
+
+## 67. 2026-10-25 사용자 지시 — 단일 완료 브랜치 방식
+
+- **현 작업 기준:** `feat/security/seyeon-s0-roadmap-to-closure-20261025` (시작 기준 `main@284916a7`). 이후 세연 대화 복구 S0 로드맵 작업을 이 브랜치에 누적한다. **기능별 PR·매번 Full Integration·중간 병합을 하지 않는다.** 실제 남은 로드맵 구현이 끝난 뒤 최종 로컬 검사 → CI/Full Integration → 하나의 PR → 병합한다.
+- 2026-10-25 이전에 `main`에 병합된 #2583, #2585, #2586, #2587, #2590, #2567은 완료된 기반 작업이며 다시 병합하지 않는다. 다른 트랙의 미병합 PR은 자동 병합하지 않는다.
+- 같은 브랜치에서 복원본 PG17 S0 default-CLOSED 설치·원본 철회/receipt 경합, 원본 Memory 접근 철회 UI, Cloudflare 본인 소유의 **완전 빈** 세연 대화방 전용 허용, 실제 S0 런타임 비용·DB 최소권한·수신 확인을 계속 연결한다. 개인기록 출처 승인, G0-D04/G3 송출·권한철회 증거, Cloudflare 실제 Worker, G5/G6 제한 운영 검증은 기존 기준을 유지한다.
+- **범위 제한:** History/Replay/Reader, 승인되지 않은 개인기록 유형, 양수 Registry·API EXECUTE·유료 호출·공개 플래그를 단순 UI 개방 목적으로 우회하지 않는다. 조건이 미충족이면 해당 요청만 503/보류하고 나머지 구현을 계속한다. 국소 테스트는 수행하되 작업별 CI를 요구하지 않는다.
+- 현재 브랜치 상태는 구현 중이다. 완료율·운영 활성화·검증 PASS는 실제 실행 결과가 생기기 전까지 추정하지 않는다.

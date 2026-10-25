@@ -1,4 +1,6 @@
 import { createCloudflareSubjectPoolV1 } from './cloudflare-hyperdrive-subject-pool.mjs';
+import { tryHandleCloudflareGenericChatReadV1 } from './cloudflare-chat-read.mjs';
+import { admitCloudflareSeyeonEmptyRoomV1 } from './cloudflare-seyeon-empty-room.mjs';
 // Ops stage 4 / S-CF2: mount existing Security-owned fail-closed boundaries.
 // Server-owned DB participant scope is mandatory before distinguishing SeYeon
 // from other Characters. Never authorize a positive protected response here.
@@ -188,6 +190,18 @@ export async function tryHandleCloudflareSeyeonSecurityV1(
   if (verdict?.kind === 'unrelated_thread_requires_ops_reauthorization' &&
       verdict.threadId === ingress.threadId) {
     return null;
+  }
+  // Empty first-page room shells contain no historical content. The generic
+  // handler independently reauthorizes the current owner in a fresh DB TX;
+  // a second-layer allowlist reconstructs an empty shell ONLY. If history
+  // appears between the two transactions, its response is discarded here.
+  if (ingress.kind === 'history' && verdict?.kind === 'seyeon_protected_held') {
+    try {
+      const candidate = await (dependencies.readGenericRoom ??
+        tryHandleCloudflareGenericChatReadV1)(request,bindings,route);
+      const safe = await admitCloudflareSeyeonEmptyRoomV1(request,candidate,ingress.threadId);
+      if(safe !== null) return enforceHeaders(safe);
+    } catch { /* Any failure remains held. */ }
   }
   // Own/mixed SeYeon and any uncertain/unrecognized verdict remain held.
   // Even a malicious injected success or forged 4xx cannot cross this fence.
