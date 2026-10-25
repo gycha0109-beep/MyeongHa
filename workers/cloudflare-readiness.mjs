@@ -71,7 +71,23 @@ function logReadinessFailureCategoryV1(bindings) {
             return 'DB_LOGIN_CF_ROLE_WRONG_TENANT';
           }
           if (login.endsWith(projectSuffix)) {
-            return 'DB_LOGIN_DIFFERENT_ROLE_SAME_TENANT';
+            // Classify fixed, known roles and approved hostname candidates.
+            // Do not emit the actual URL, host, login, or secret.
+            const role = login.slice(0, -projectSuffix.length);
+            const roleCode = role === 'myeongha_runtime'
+              ? 'LEGACY_RUNTIME'
+              : role === 'myeongha_worker_runtime'
+                ? 'LEGACY_WORKER'
+                : role === 'myeongha_cf_hyperdrive_login'
+                  ? 'HYPERDRIVE_ONLY'
+                  : 'OTHER_SAME_TENANT';
+            const hostCode =
+              host === 'aws-0-ap-southeast-1.pooler.supabase.com'
+                ? 'POOLER_AWS0_SG'
+                : host === 'aws-1-ap-southeast-1.pooler.supabase.com'
+                  ? 'POOLER_AWS1_SG'
+                  : 'OTHER_HOST';
+            return 'DB_LOGIN_' + roleCode + '_' + hostCode;
           }
           return 'DB_LOGIN_OTHER_MISMATCH';
         })()

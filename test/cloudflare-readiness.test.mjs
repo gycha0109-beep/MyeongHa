@@ -117,7 +117,10 @@ describe('Cloudflare readiness config-only parity',()=>{
       {login:'myeongha_api_executor.cnsfpcdiyofqvhpcegfc',code:'DB_LOGIN_NOLOGIN_EXECUTOR'},
       {login:'myeongha_cf_api_login',code:'DB_LOGIN_MISSING_TENANT_SUFFIX'},
       {login:'myeongha_cf_api_login.other-tenant',code:'DB_LOGIN_CF_ROLE_WRONG_TENANT'},
-      {login:'myeongha_other_login.cnsfpcdiyofqvhpcegfc',code:'DB_LOGIN_DIFFERENT_ROLE_SAME_TENANT'},
+      {login:'myeongha_other_login.cnsfpcdiyofqvhpcegfc',code:'DB_LOGIN_OTHER_SAME_TENANT_POOLER_AWS0_SG'},
+      {login:'myeongha_runtime.cnsfpcdiyofqvhpcegfc',code:'DB_LOGIN_LEGACY_RUNTIME_POOLER_AWS0_SG'},
+      {login:'myeongha_worker_runtime.cnsfpcdiyofqvhpcegfc',code:'DB_LOGIN_LEGACY_WORKER_POOLER_AWS0_SG'},
+      {login:'myeongha_cf_hyperdrive_login.cnsfpcdiyofqvhpcegfc',code:'DB_LOGIN_HYPERDRIVE_ONLY_POOLER_AWS0_SG'},
       {login:'other-login',code:'DB_LOGIN_OTHER_MISMATCH'},
     ];
     for (const row of cases) {
