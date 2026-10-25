@@ -27,6 +27,35 @@ describe('merged-main Cloudflare single Worker CD', () => {
     expect(asset).not.toHaveBeenCalled();
   });
 
+  it('binds API canary responses to provider metadata rather than a request header', async () => {
+    const version = '123e4567-e89b-42d3-a456-426614174000';
+    const response = await liveWorker.fetch(new Request('https://test.example/api/health', {
+      headers: { 'X-Myeongha-Worker-Version': 'forged-client-version' },
+    }), { CF_VERSION_METADATA: { id: version } });
+    expect(response.headers.get('X-Myeongha-Worker-Version')).toBe(version);
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
+    expect(await response.json()).toEqual({ status: 'ok' });
+    const absent = await liveWorker.fetch(new Request('https://test.example/api/health'), {});
+    expect(absent.headers.has('X-Myeongha-Worker-Version')).toBe(false);
+  });
+
+  it('emits native login denial exactly once without logging client inputs', async () => {
+    const log = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const response = await liveWorker.fetch(new Request('https://myeongha.gycha0109.workers.dev/api/auth/sign-in', {
+        method: 'POST', headers: { Origin: 'https://private-attacker.invalid', Authorization: 'Bearer private-token' },
+        body: 'private-password-and-birth-data',
+      }), {});
+      expect(response.status).toBe(403);
+      expect(log).toHaveBeenCalledTimes(1);
+      const line = log.mock.calls[0][0];
+      expect(line).toContain('MYEONGHA_SECURITY_EVENT ');
+      expect(line).toContain('"routeId":"api.auth.sign-in"');
+      expect(line).toContain('"eventCode":"ACCESS_DENIED"');
+      expect(line).not.toContain('private-');
+    } finally { log.mockRestore(); }
+  });
+
   it('keeps protected, encoded and unknown APIs fail-closed instead of serving HTML', async () => {
     const asset = vi.fn(async () => new Response('PRIVATE_STATIC_FALLBACK'));
     const env = { ASSETS: { fetch: asset } };

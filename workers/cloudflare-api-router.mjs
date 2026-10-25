@@ -24,6 +24,7 @@ export const CLOUDFLARE_REWRITE_ROUTES = Object.freeze([
   Object.freeze({ id: "rewrite.naver.token", source: "/api/auth/social/naver/token", destination: "/api/auth/sign-in?__myeongha_naver_oauth_bridge=token" }),
   Object.freeze({ id: "rewrite.naver.userinfo", source: "/api/auth/social/naver/userinfo", destination: "/api/auth/sign-in?__myeongha_naver_oauth_bridge=userinfo" }),
   Object.freeze({ id: "rewrite.social.start", source: "/api/auth/social/start", destination: "/api/auth/sign-in?__myeongha_social_auth_start=1" }),
+  Object.freeze({ id: "rewrite.chat.credit-wallet", source: "/api/me/credits", destination: "/api/me?__myeongha_chat_credit_wallet=1" }),
   Object.freeze({ id: "rewrite.saju.preview", source: "/api/me/saju/preview-reading", destination: "/api/me?__myeongha_saju_preview_reading=1" }),
   Object.freeze({ id: "rewrite.chat.open", source: "/api/chat", destination: "/api/me?__myeongha_chat_open=1" }),
   Object.freeze({ id: "rewrite.chat.turns", source: "/api/chat/:threadId/turns", destination: "/api/me?__myeongha_chat_turn_send=1&__myeongha_chat_thread_id=:threadId" }),

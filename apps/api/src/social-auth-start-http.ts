@@ -142,7 +142,16 @@ export async function handleSocialAuthStartRequestV1(input: {
 
   if (!isRecord(body)) return failure('INVALID_REQUEST', 400);
   const provider = parseProvider(body.provider);
-  const redirectUri = parseRedirectUri(body.redirectUri, input.webOrigin);
+  const approvedWebOrigin = input.webOrigin;
+  if (approvedWebOrigin !== undefined) {
+    let host: URL;
+    try { host = new URL(approvedWebOrigin); }
+    catch { return failure('INVALID_REQUEST', 400); }
+    if (host.origin !== approvedWebOrigin || host.protocol !== 'https:' ||
+        host.username !== '' || host.password !== '' || host.search !== '' ||
+        host.hash !== '') return failure('INVALID_REQUEST', 400);
+  }
+  const redirectUri = parseRedirectUri(body.redirectUri, approvedWebOrigin);
   if (provider === null || redirectUri === null) {
     return failure('INVALID_REQUEST', 400);
   }
