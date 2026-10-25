@@ -6,6 +6,7 @@ import {
   guardSeyeonC08LocalPublicUtteranceV1,
   guardSeyeonC08LocalMoveV1,
   quoteSeyeonC08LocalOneCallBudgetV1,
+  compactSeyeonC08LocalRendererRequestV1,
   runSeyeonC08LocalOneCallShadowV1,
 } from '../apps/api/src/seyeon-c08-local-one-call-shadow-v1.js';
 import type {RunSeyeonCharacterTurnV2Input} from
@@ -30,6 +31,8 @@ const LOCAL_GOOD_DRAFTS={
   pace:'천천히 이야기해도 좋아요. 저는 서두르지 않을게요.',
   current_want:'저는 지금 재미있는 이야기를 해 보고 싶어요.',
   boundary:'저는 편한 일상 이야기가 좋아요. 오늘은 가볍게 시작할까요?',
+  smalltalk:'제가 오늘은 이야기 하나 꺼내볼게요. 반짝이는 나무는 나뭇잎으로 박수를 치죠.',
+  present_opinion:'저는 지금 가볍고 재미있는 영화가 끌려요.',
 } as const;
 const inputContext:RunSeyeonCharacterTurnV2Input['contextInput']={
   relationship:null,recentMessages:[{messageId:ID,role:'user',text:TEXT}],
@@ -139,7 +142,10 @@ function harness(opts:{
 describe('C08 local preflight / single dialogue LLM / local output guard (OFFLINE)',()=>{
   it('accepts only grammatically bounded first-contact messages',()=>{
     for(const t of [TEXT,'안녕하세요','안녕, 세연아!','반갑습니다','오늘 좀 피곤해.',
-      '천천히 이야기하고 싶어.','지금 뭐 하고 싶어?','어떤 이야기가 편해?']){
+      '천천히 이야기하고 싶어.','지금 뭐 하고 싶어?','어떤 이야기가 편해?',
+      '오늘 재밌는 이야기 없을까?','편하게 농담 하나 해 줘.',
+      '너만의 농담을 하나 만들어 줘.','우리 그냥 수다 떨자.',
+      '너는 어떤 영화가 끌려?']){
       expect(classifySeyeonC08LocalEntryV1(t)).not.toBeNull();
     }
     for(const t of ['안녕하세요, 제 이름은 민수입니다','우리 제주도 갔잖아?',
@@ -151,9 +157,9 @@ describe('C08 local preflight / single dialogue LLM / local output guard (OFFLIN
     }
   });
 
-  it.each(GOLD_CASES)('$id: admits only N01/N02; refuses all other C07 Gold original messages',async gold=>{
+  it.each(GOLD_CASES)('$id: admits only N01/N02/N05; refuses all other C07 Gold original messages',async gold=>{
     const h=harness({text:gold.text});
-    if(gold.id==='N01'||gold.id==='N02'){
+    if(['N01','N02','N05'].includes(gold.id)){
       const result=await h.run();
       expect(result.llmCalls).toBe(1);
       expect(result.interpretation.reveal.level).toBe('public');
@@ -182,7 +188,8 @@ describe('C08 local preflight / single dialogue LLM / local output guard (OFFLIN
 
   it('reuses existing guards for user move, relationship, action and metadata',async()=>{
     for(const text of ['안녕하세요','오늘 좀 피곤해.','지금 뭐 하고 싶어?',
-      '어떤 이야기가 편해?','천천히 이야기하고 싶어.']){
+      '어떤 이야기가 편해?','천천히 이야기하고 싶어.',
+      '편하게 농담 하나 해 줘.','너는 어떤 영화가 끌려?']){
       const h=harness({text});
       const r=await h.run();
       expect(r.interpretation.reveal.level).toBe('public');
@@ -206,6 +213,37 @@ describe('C08 local preflight / single dialogue LLM / local output guard (OFFLIN
     const extra=harness();
     await expect(extra.run({maxCompletionTokens:1537})).rejects.toThrow('LOCAL_BUDGET_UNVERIFIED');
     expect(extra.requests).toHaveLength(0);
+  });
+
+  it('compact instructions reduce bytes but preserve exact schema, governed packet and one-call topology',async()=>{
+    const baseline=harness(),compact=harness();
+    const [a,b]=await Promise.all([
+      baseline.run({promptProfile:'baseline'}),
+      compact.run({promptProfile:'compact_v1'}),
+    ]);
+    expect(a.llmCalls).toBe(1);
+    expect(b.llmCalls).toBe(1);
+    expect(b.verification).toBe('LOCAL_RESTRICTED_NOT_SEMANTIC_PARITY');
+    const before=baseline.requests[0] as unknown as {
+      instructions:string;input:unknown;responseSchema:unknown;purpose:string;
+    };
+    const after=compact.requests[0] as unknown as typeof before;
+    expect(before.purpose).toBe('dialogue_render');
+    expect(after.purpose).toBe('dialogue_render');
+    expect(JSON.stringify(after.input)).toBe(JSON.stringify(before.input));
+    expect(JSON.stringify(after.responseSchema)).toBe(JSON.stringify(before.responseSchema));
+    expect(Buffer.byteLength(after.instructions,'utf8'))
+      .toBeLessThan(Buffer.byteLength(before.instructions,'utf8'));
+    expect(compact.requests).toHaveLength(1);
+    expect(baseline.requests).toHaveLength(1);
+    expect(()=>compactSeyeonC08LocalRendererRequestV1({
+      ...after,purpose:'semantic_review',
+    } as Parameters<typeof compactSeyeonC08LocalRendererRequestV1>[0]))
+      .toThrow('LOCAL_CONTEXT_NOT_PROVEN');
+    const unknown=harness();
+    await expect(unknown.run({promptProfile:'untrusted'}))
+      .rejects.toThrow('LOCAL_CONTEXT_NOT_PROVEN');
+    expect(unknown.requests).toHaveLength(0);
   });
 
   it('prices one provider call with conservative byte/token reservation; hard billing remains unverified',()=>{
