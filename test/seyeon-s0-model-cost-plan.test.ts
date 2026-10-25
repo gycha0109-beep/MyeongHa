@@ -28,14 +28,20 @@ describe('S0 Governor model policy staging defaults closed',()=>{
       expect(p.priceQuote.outputMicroUsdPerMillion).toBe(draft.outputMicroUsdPerMillion);
     }
   });
-  it('rejects missing, impossible and inconsistent budgets',()=>{
-    const valid=parseSeyeonS0CostBudgetV1({utcDate:'2026-10-26',globalMicroUsd:'1000000',subjectMicroUsd:'50000'});
-    expect(valid.globalMicroUsd).toBe('1000000');
+  it('requires one explicit provider emergency ceiling without a member daily USD cap',()=>{
+    const valid=parseSeyeonS0CostBudgetV1({utcDate:'2026-10-26',globalMicroUsd:'1000000'});
+    expect(valid).toEqual({utcDate:'2026-10-26',
+      globalMicroUsd:'1000000',subjectMicroUsd:'1000000'});
     for(const fields of [
-      {utcDate:'2026-10-26',globalMicroUsd:'100',subjectMicroUsd:'200'},
-      {utcDate:'2026-99-99',globalMicroUsd:'100',subjectMicroUsd:'10'},
-      {utcDate:'2026-10-26',globalMicroUsd:'0',subjectMicroUsd:'10'},
-      {utcDate:'2026-10-26',globalMicroUsd:'NaN',subjectMicroUsd:'10'},
+      {utcDate:'2026-99-99',globalMicroUsd:'100'},
+      {utcDate:'2026-10-26',globalMicroUsd:'0'},
+      {utcDate:'2026-10-26',globalMicroUsd:'NaN'},
+      {utcDate:'2026-10-26',globalMicroUsd:null},
     ]) expect(()=>parseSeyeonS0CostBudgetV1(fields)).toThrow();
+    expect(()=>parseSeyeonS0CostBudgetV1({
+      utcDate:'2026-10-26',globalMicroUsd:'100',
+      // @ts-expect-error per-member dollar budgets are intentionally forbidden
+      subjectMicroUsd:'10',
+    })).toThrow();
   });
 });

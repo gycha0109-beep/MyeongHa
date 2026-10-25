@@ -75,8 +75,22 @@ export default {
       }finally{try{await runtime?.close();}catch{ /* never replace a committed response with private diagnostics */ }}
       }});
     }
-    // Security holds encoded, aliased and legacy-marker protected Chat
-    // before any Auth, DB, provider or asset call.
+    // Exact canonical room-open and room-read requests reach the existing
+    // independently authenticated Chat API. Its Se-yeon owner/history fence
+    // runs before returning data. No positive model/send route is granted here.
+    const canonicalOpen=request.method==='POST' &&
+      url.pathname==='/api/chat' && url.search==='';
+    const canonicalRoomRead=request.method==='GET' &&
+      /^\/api\/chat\/[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/iu.test(url.pathname) &&
+      [...url.searchParams.keys()].every(k=>k==='afterSequenceNo'||k==='pageSize') &&
+      new Set(url.searchParams.keys()).size===[...url.searchParams.keys()].length;
+    if((canonicalOpen||canonicalRoomRead) &&
+       !malformedApiRoot(url.pathname) &&
+       ![...url.searchParams.keys()].some(k=>k.toLowerCase().includes('myeongha_chat_'))){
+      return apiRuntime.fetch(request,env,ctx);
+    }
+    // All aliases, rewrite markers, and unsupported protected operations
+    // remain behind the sealed first-reveal/History fence.
     if (isSeyeonCloudflareProtectedIngressAliasV1(request) ||
         malformedApiRoot(url.pathname)) {
       return sealedRuntime.fetch(request, env, ctx);
