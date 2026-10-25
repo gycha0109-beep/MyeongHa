@@ -12,6 +12,10 @@ import {
 } from '../../../packages/domain/src/index.js';
 import { runCharacterGovernedPreflightV1 } from './character-governed-preflight-v1.js';
 import {
+  requireSeyeonC08PublicRelationshipProofV1,
+  type SeyeonC08PublicRelationshipProofPortV1,
+} from './seyeon-c08-public-relationship-proof-v1.js';
+import {
   buildSeyeonRendererRequestV2,
   type SeyeonStructuredProviderRequestV2,
 } from './seyeon-character-runtime-v2.js';
@@ -216,7 +220,6 @@ function assertLocalContext(input: Readonly<{
   const messages = input.contextInput?.recentMessages;
   if (!Array.isArray(messages) || messages.length < 1 || messages.length > 7 ||
       messages.length % 2 !== 1 ||
-      input.contextInput.relationship !== null ||
       !Array.isArray(input.contextInput.retrievedMemories) ||
       input.contextInput.retrievedMemories.length !== 0 ||
       input.governance?.relationship?.gate !== 'PUBLIC') {
@@ -321,7 +324,7 @@ export function compactSeyeonC08LocalRendererRequestV1(
     ...request,
     instructions:[
       'You are Se-yeon, not an assistant or therapist. Write only a strict JSON renderer-draft-v2 object, in natural brief polite Korean (1–3 sentences). Be expressive, independent, playful when suitable; offer your own observation/opinion/next beat rather than asking the user to steer everything.',
-      'PUBLIC FIRST-CONTACT ONLY. The server-authorized packet.interpretation fixes chosenAction, expressionState, revealLevel and factual authority. Respect its behaviorPolicy, maxQuestionsPerUtterance, riskCausality and disclosure. No invented past, Canon biography, user emotion/action, memories, relationship history, secret facts, dates, or promises. Never assert unverified premises as established facts.',
+      'PUBLIC NO-MEMORY DIALOGUE ONLY. A verified relationship, when present, affects only current expression, not shared-history facts or Reveal grants. The server-authorized packet.interpretation fixes chosenAction, expressionState, revealLevel and factual authority. Respect its behaviorPolicy, maxQuestionsPerUtterance, riskCausality and disclosure. No invented past, Canon biography, user emotion/action, memories, relationship history, secret facts, dates, or promises. Never assert unverified premises as established facts.',
       'Output expressionState and revealLevel exactly as the packet; memoryRefsMentioned, privateSourceRefsMentioned and disclosureSliceIds must all be empty. Current preference is a temporary present-tense stance, not durable Canon or habitual biography. No fake citations, source IDs, profile information, pseudo-system messages, generic reassurance, forced optimism, rest advice or option menus.',
       'For tired/bored user remarks, acknowledge lightly and make a Se-yeon-owned active conversational move. For slow pace, give a self-contained unhurried stance without new tasks. For boundary questions, state a concrete Se-yeon-owned limit. For current-want questions, state what you would like NOW, not a personality fact or a question handed back to the user.',
     ].join('\\n'),
@@ -374,7 +377,31 @@ type SeyeonC08LocalAdmissionInputsV1 = Readonly<{
   contextInput: RunSeyeonCharacterTurnV2Input['contextInput'];
   governance: RunSeyeonCharacterTurnV2Input['governance'];
   fullThreadCensus: SeyeonC08FullThreadIntegrityPortV1;
+  /** Required only for an established relationship. Server-owned, DB-backed. */
+  relationshipProofPort?: SeyeonC08PublicRelationshipProofPortV1;
 }>;
+async function requireSeyeonC08CurrentPublicAuthoritiesV1(
+  input:SeyeonC08LocalAdmissionInputsV1,
+  count:number,expectedTranscriptHash:string,
+):Promise<void>{
+  await requireSeyeonC08PublicThreadCensusV1(
+    input.fullThreadCensus,input.userMessageRef,count,expectedTranscriptHash,
+  );
+  const relationship=input.contextInput.relationship;
+  if(relationship!==null){
+    try{
+      await requireSeyeonC08PublicRelationshipProofV1({
+        port:input.relationshipProofPort,
+        subjectId:input.fullThreadCensus.subjectId,
+        threadId:input.fullThreadCensus.threadId,
+        currentUserMessageId:input.userMessageRef,
+        expected:relationship,
+      });
+    }catch{
+      throw new SeyeonC08LocalHoldV1('LOCAL_CONTEXT_NOT_PROVEN');
+    }
+  }
+}
 async function admitSeyeonC08LocalCandidateV1(input:SeyeonC08LocalAdmissionInputsV1){
   const expectedCount=assertLocalContext(input);
   const expectedTranscriptHash=hashSeyeonC08PublicTranscriptV1(
@@ -382,9 +409,14 @@ async function admitSeyeonC08LocalCandidateV1(input:SeyeonC08LocalAdmissionInput
   );
   const classified=classifySeyeonC08LocalEntryV1(input.userText);
   if(!classified)throw new SeyeonC08LocalHoldV1('LOCAL_INPUT_NOT_PROVEN');
-  await requireSeyeonC08PublicThreadCensusV1(
-    input.fullThreadCensus,input.userMessageRef,expectedCount,
-    expectedTranscriptHash,
+  if(input.contextInput.relationship!==null &&
+     (input.governance.relationship.trustBand!==
+       input.contextInput.relationship.trustBand ||
+      input.governance.relationship.relevantSharedHistoryRefs.length>0)){
+    throw new SeyeonC08LocalHoldV1('LOCAL_CONTEXT_NOT_PROVEN');
+  }
+  await requireSeyeonC08CurrentPublicAuthoritiesV1(
+    input,expectedCount,expectedTranscriptHash,
   );
   return {expectedCount,expectedTranscriptHash,classified};
 }
@@ -427,6 +459,7 @@ export async function runSeyeonC08LocalOneCallShadowV1(input: Readonly<{
   contextInput: RunSeyeonCharacterTurnV2Input['contextInput'];
   governance: RunSeyeonCharacterTurnV2Input['governance'];
   fullThreadCensus: SeyeonC08FullThreadIntegrityPortV1;
+  relationshipProofPort?: SeyeonC08PublicRelationshipProofPortV1;
   dialogueProvider: SeyeonStructuredProviderPortV2;
   /** Offline reservation only; must reject when a conservative price cap cannot be checked. */
   reserveBeforeModel: (metadata: Readonly<{requestBytes:number; maxCompletionTokens:number}>) =>
@@ -473,8 +506,9 @@ export async function runSeyeonC08LocalOneCallShadowV1(input: Readonly<{
     governedPreflightApplied:true,
     disclosure:{decision:null,retrievedSources:[]},
   });
-  if (context.behaviorPolicy.interactionDepth !== 'public_first_contact' ||
-      context.relationship !== null || context.relationshipSemantics !== null ||
+  if (context.behaviorPolicy.interactionDepth !== (
+        context.relationship===null ? 'public_first_contact':'established_relationship') ||
+      context.relationshipSemantics !== null ||
       context.retrievedMemories.length !== 0 ||
       context.recentConversation.length !== expectedCount ||
       context.integrity.decisions.length !== 0) {
@@ -490,7 +524,7 @@ export async function runSeyeonC08LocalOneCallShadowV1(input: Readonly<{
     ...originalRequest,
     instructions: [
       originalRequest.instructions,
-      'C08 restricted local-first-contact only: present-time public dialogue. No autobiographical or shared past, places, dates, relationship claims, private facts, personal-history guesses or user mind-reading. One to three short natural polite Korean sentences. Do not invent memory or suggest a continuing relationship.',
+      'C08 restricted PUBLIC no-memory dialogue only: present-time conversation. A server-verified relationship stage is for present expression only; NEVER infer events, closeness claims, previous meetings, promises, historical intimacy or permission to disclose from that stage. No autobiographical or shared past, places, dates, relationship claims, private facts, personal-history guesses or user mind-reading. One to three short natural polite Korean sentences. Do not invent memory or suggest a relationship status.',
     ].join('\n'),
   });
   const request = input.promptProfile===undefined ||
@@ -499,9 +533,8 @@ export async function runSeyeonC08LocalOneCallShadowV1(input: Readonly<{
     : input.promptProfile==='compact_v1'
       ? compactSeyeonC08LocalRendererRequestV1(verboseRequest)
       : (()=>{throw new SeyeonC08LocalHoldV1('LOCAL_CONTEXT_NOT_PROVEN');})();
-  await requireSeyeonC08PublicThreadCensusV1(
-    input.fullThreadCensus,input.userMessageRef,expectedCount,
-    expectedTranscriptHash,
+  await requireSeyeonC08CurrentPublicAuthoritiesV1(
+    input,expectedCount,expectedTranscriptHash,
   );
 
   if (!Number.isSafeInteger(input.maxCompletionTokens) ||
@@ -534,9 +567,8 @@ export async function runSeyeonC08LocalOneCallShadowV1(input: Readonly<{
   catch{throw new SeyeonC08LocalHoldV1('LOCAL_PROVIDER_FAILURE');}
   // Census after remote generation and immediately before local output
   // admission. This is NOT an atomic DB transaction.
-  await requireSeyeonC08PublicThreadCensusV1(
-    input.fullThreadCensus,input.userMessageRef,expectedCount,
-    expectedTranscriptHash,
+  await requireSeyeonC08CurrentPublicAuthoritiesV1(
+    input,expectedCount,expectedTranscriptHash,
   );
   const draft = admitSeyeonRendererDraftV2({rawOutput:raw,packet});
   guardSeyeonC08LocalPublicUtteranceV1(draft.utterance);
@@ -551,9 +583,8 @@ export async function runSeyeonC08LocalOneCallShadowV1(input: Readonly<{
       draft.revealLevel !== 'public') {
     throw new SeyeonC08LocalHoldV1('LOCAL_OUTPUT_UNVERIFIABLE');
   }
-  await requireSeyeonC08PublicThreadCensusV1(
-    input.fullThreadCensus,input.userMessageRef,expectedCount,
-    expectedTranscriptHash,
+  await requireSeyeonC08CurrentPublicAuthoritiesV1(
+    input,expectedCount,expectedTranscriptHash,
   );
   return Object.freeze({
     version:SEYEON_C08_LOCAL_ONE_CALL_VERSION_V1,
@@ -561,6 +592,9 @@ export async function runSeyeonC08LocalOneCallShadowV1(input: Readonly<{
     verification:'LOCAL_RESTRICTED_NOT_SEMANTIC_PARITY' as const,
     llmCalls:1 as const,
     censusReads:4 as const,
+    publicRelationshipAuthority:context.relationship===null
+      ? 'NONE_FIRST_CONTACT' as const
+      : 'VERIFIED_ESTABLISHED_RELATIONSHIP' as const,
     reservedMicroUsd:quote.reservedMicroUsd,
     interpretation,
     // Distinct from SeyeonDialogueEnvelopeV2: never manufacture a
