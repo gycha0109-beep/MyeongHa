@@ -5,11 +5,22 @@
 import { readFile } from 'node:fs/promises';
 import { execFileSync, spawn } from 'node:child_process';
 import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const WORKER = 'myeongha';
 const APPROVED_BRANCH = 'feat/ops/cloudflare-authdb-clean-snapshot-20261021';
 const BASE = 'https://myeongha.gycha0109.workers.dev';
 const CHECK_ONLY = process.argv.includes('--check');
+
+export function resolveCloudflareOpsVersionMetadataV1(commitSha) {
+  if (typeof commitSha !== 'string' || !/^[a-f0-9]{40}$/.test(commitSha)) {
+    throw Error('Cloudflare Ops deployment requires an exact Git commit SHA');
+  }
+  return Object.freeze({
+    tag: `ops-${commitSha}`,
+    message: `ops-${APPROVED_BRANCH}@${commitSha}`,
+  });
+}
 
 function command(bin, args) {
   return new Promise((resolveCommand, reject) => {
@@ -36,6 +47,13 @@ async function assertDeployOwnership() {
   if(branch!==APPROVED_BRANCH) {
     throw Error('Refusing to publish shared myeongha Worker from non-Ops branch');
   }
+  const workingTree=execFileSync('git',['status','--porcelain','--untracked-files=all'],
+    {encoding:'utf8'}).trim();
+  if(workingTree) {
+    throw Error('Refusing to publish shared myeongha Worker from a dirty worktree');
+  }
+  const commitSha=execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim();
+  return {commitSha, ...resolveCloudflareOpsVersionMetadataV1(commitSha)};
 }
 
 async function verifyPublicRoutes() {
@@ -59,19 +77,22 @@ async function verifyPublicRoutes() {
 }
 
 async function main() {
-  await assertDeployOwnership();
+  const provenance=await assertDeployOwnership();
   console.log('Ops Worker ownership/config preflight PASS: workers_dev=true');
   if(CHECK_ONLY)return;
   // Independent tracks MUST use their own Worker name. Another deployment
   // with workers_dev=false will disable this hostname for everyone.
   if(process.platform==='win32') {
     await command('cmd.exe',['/d','/s','/c',
-      'npx.cmd --yes wrangler@4.151.2 deploy --config wrangler.ops.jsonc --keep-vars']);
+      `npx.cmd --yes wrangler@4.151.2 deploy --config wrangler.ops.jsonc --keep-vars --tag ${provenance.tag} --message ${provenance.message}`]);
   } else {
-    await command('npx',['--yes','wrangler@4.151.2','deploy','--config','wrangler.ops.jsonc','--keep-vars']);
+    await command('npx',['--yes','wrangler@4.151.2','deploy','--config','wrangler.ops.jsonc','--keep-vars',
+      '--tag',provenance.tag,'--message',provenance.message]);
   }
   await verifyPublicRoutes();
   console.log('Cloudflare Ops published; workers.dev HTML + health HTTP 200 PASS');
 }
 
-main().catch(error=>{console.error(error.message);process.exitCode=1});
+if(process.argv[1] && resolve(process.argv[1])===fileURLToPath(import.meta.url)) {
+  main().catch(error=>{console.error(error.message);process.exitCode=1});
+}
