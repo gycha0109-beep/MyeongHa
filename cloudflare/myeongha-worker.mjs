@@ -4,6 +4,9 @@
 import sealedRuntime from './preview-worker.mjs';
 import apiRuntime from '../workers/cloudflare-static-preview.mjs';
 import { isSeyeonCloudflareProtectedIngressAliasV1 } from '../apps/api/src/seyeon-cloudflare-ops-router-handoff-offline-v1.js';
+import { cloudflareAuthRoute, handleCloudflareAuthRequest } from './member-auth-worker.mjs';
+import { matchCloudflareApiRoute } from '../workers/cloudflare-api-router.mjs';
+import { executeSecurityObservedRequestV1 } from '../apps/api/src/security-observability.ts';
 
 function malformedApiRoot(pathname) {
   if (pathname === '/api' || pathname.startsWith('/api/')) return false;
@@ -33,7 +36,13 @@ export default {
     }
     if (url.pathname === '/api' || url.pathname.startsWith('/api/')) {
       // No Service Binding, external API proxy, or second Worker hop.
-      const response = await apiRuntime.fetch(request, env, ctx);
+      const route = matchCloudflareApiRoute(url.pathname);
+      const response = cloudflareAuthRoute(request) !== null && route !== null
+        ? await executeSecurityObservedRequestV1({
+            request, routeId: route.id,
+            execute: () => handleCloudflareAuthRequest(request, env),
+          })
+        : await apiRuntime.fetch(request, env, ctx);
       const version = env?.CF_VERSION_METADATA?.id;
       if (typeof version !== 'string' || !/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/iu.test(version)) return response;
       const headers = new Headers(response.headers);

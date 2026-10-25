@@ -15,6 +15,13 @@ The official [version metadata binding](https://developers.cloudflare.com/worker
 provides the UUID; request headers never select it. This is an additive response
 header, not a new API payload, route, authority, or positive capability.
 
+The later native Member login path from #2573 keeps its existing priority and
+Auth limiter. Its denial/rate-limit/server responses now pass through the same
+security emitter using the existing static router IDs; other API responses keep
+their existing single emitter. This direct consumer was included because it
+otherwise bypasses primary #1527 event coverage. No client URL, header, body,
+credential or new event category is logged.
+
 Phase `boundary` performs only health and credential-free API admission checks.
 It does not establish normal or quota behavior. Missing/mismatched metadata,
 closed adapters, or absent producer configuration fail before credentials are
