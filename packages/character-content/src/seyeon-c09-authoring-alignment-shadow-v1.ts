@@ -46,7 +46,7 @@ export interface SeyeonC09AuthoringAuditEntryV1 {
  * family history, biography, authorized user memory or relationship events.
  */
 export const SEYEON_C09_CURRENT_FACT_AUDIT_V1:
-  readonly SeyeonC09AuthoringAuditEntryV1[] = Object.freeze([
+  readonly SeyeonC09AuthoringAuditEntryV1[] = Object.freeze(([
   { key: 'identity.reference_age', status: 'DEFINED_IN_CURRENT_DRAFT', sourceSection: 'B1', disclosurePosture: 'SERVER_GATE_REQUIRED', staleLegacyUndefinedKey: 'exact_age' },
   { key: 'identity.exact_birth_year', status: 'AUTHOR_UNDEFINED', sourceSection: 'B1', disclosurePosture: 'NO_FACT', staleLegacyUndefinedKey: null },
   { key: 'identity.birthday', status: 'DEFINED_IN_CURRENT_DRAFT', sourceSection: 'B1', disclosurePosture: 'SERVER_GATE_REQUIRED', staleLegacyUndefinedKey: null },
@@ -69,7 +69,7 @@ export const SEYEON_C09_CURRENT_FACT_AUDIT_V1:
   { key: 'world.specific_city_institution_address', status: 'WORLD_DEPENDENT', sourceSection: 'B1/CURRENT UNDEFINED AREAS', disclosurePosture: 'NO_FACT', staleLegacyUndefinedKey: 'world_position' },
   { key: 'world.specific_family_or_ex_names', status: 'AUTHOR_UNDEFINED', sourceSection: 'B1/CURRENT UNDEFINED AREAS', disclosurePosture: 'NO_FACT', staleLegacyUndefinedKey: null },
   { key: 'person.public_personality', status: 'DEFINED_IN_CURRENT_DRAFT', sourceSection: 'A1-A4/H1/R11.1', disclosurePosture: 'PUBLIC_BEHAVIOR_ONLY', staleLegacyUndefinedKey: null },
-].map((entry) => Object.freeze(entry)));
+] satisfies readonly SeyeonC09AuthoringAuditEntryV1[]).map((entry) => Object.freeze(entry)));
 
 /**
  * Reports the stale assumptions instead of modifying the active production
@@ -89,11 +89,11 @@ export function auditSeyeonC09CurrentAuthoringAlignmentV1() {
     scope: 'SHADOW_ONLY_NOT_PRODUCTION_FACT_AUTHORITY' as const,
     currentSources: SEYEON_C09_CURRENT_AUTHORED_SOURCES_V1,
     legacySourcePinsDiffer: Object.freeze({
-      bible: SEYEON_AUTHORED_PROJECTION_V2.source.bible.gitBlobSha !==
+      bible: String(SEYEON_AUTHORED_PROJECTION_V2.source.bible.gitBlobSha) !==
         SEYEON_C09_CURRENT_AUTHORED_SOURCES_V1.bible.gitBlobSha,
-      runtime: SEYEON_AUTHORED_PROJECTION_V2.source.runtime.gitBlobSha !==
+      runtime: String(SEYEON_AUTHORED_PROJECTION_V2.source.runtime.gitBlobSha) !==
         SEYEON_C09_CURRENT_AUTHORED_SOURCES_V1.runtime.gitBlobSha,
-      factRegistry: SEYEON_AUTHORED_PROJECTION_V2.factAuthority.sourceBible.gitBlobSha !==
+      factRegistry: String(SEYEON_AUTHORED_PROJECTION_V2.factAuthority.sourceBible.gitBlobSha) !==
         SEYEON_C09_CURRENT_AUTHORED_SOURCES_V1.bible.gitBlobSha,
     }),
     legacyUndefinedButDefinedInCurrentDraft: Object.freeze(staleUndefinedKeys),
