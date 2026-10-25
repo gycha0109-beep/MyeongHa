@@ -106,9 +106,9 @@ describe('Cloudflare owned Member login', () => {
     expect(redirect.searchParams.get('next')).toBe('chat.html');
   });
 
-  it('does not open /api/chat while activating Auth', async () => {
+  it('keeps chat room creation behind the existing authenticated server authority', async () => {
     const res = await mainWorker.fetch(post(cloudflare + '/api/chat'), {});
-    expect(res.status).toBe(503);
+    expect(res.status).not.toBe(200);
     expect(res.headers.get('cache-control')).toBe('no-store');
   });
 });

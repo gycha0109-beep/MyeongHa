@@ -85,6 +85,21 @@ export default {
       }});
       return withWorkerVersion(response,env);
     }
+    // Allow only exact room creation and owner-scoped thread re-read through
+    // the existing authenticated API. This does not open model turns, Reveal,
+    // consent history, replay, or any client-controlled legacy routing alias.
+    const canonicalOpen = request.method === 'POST' &&
+      url.pathname === '/api/chat' && url.search === '';
+    const readKeys = [...url.searchParams.keys()];
+    const canonicalRoomRead = request.method === 'GET' &&
+      /^\/api\/chat\/[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/iu.test(url.pathname) &&
+      readKeys.every(key => key === 'afterSequenceNo' || key === 'pageSize') &&
+      readKeys.length === new Set(readKeys).size;
+    if ((canonicalOpen || canonicalRoomRead) &&
+        !malformedApiRoot(url.pathname) &&
+        !readKeys.some(key => key.toLowerCase().includes('myeongha_chat_'))) {
+      return withWorkerVersion(await apiRuntime.fetch(request, env, ctx), env);
+    }
     // Security holds encoded, aliased and legacy-marker protected Chat
     // before any Auth, DB, provider or asset call.
     if (isSeyeonCloudflareProtectedIngressAliasV1(request) ||
