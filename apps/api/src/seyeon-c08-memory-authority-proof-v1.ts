@@ -30,7 +30,7 @@ export function hashSeyeonC08MemorySummaryV1(summary:string):string{
   if(typeof summary!=='string'||!summary.trim()||
      summary.length>4000)throw hold();
   return 'sha256:'+createHash('sha256')
-    .update('seyeon-c08-memory-summary-v1\\n','utf8')
+    .update('seyeon-c08-memory-summary-v1\n','utf8')
     .update(summary,'utf8').digest('hex');
 }
 
@@ -63,7 +63,7 @@ export async function requireSeyeonC08MemoryAuthorityProofV1(input:Readonly<{
       characterId:'seyeon',memoryId:m.memoryId,sourceRef:m.sourceRef,
     });
   }catch{throw hold();}
-  if(!isRecord(raw)||Object.keys(raw).length!==13||
+  if(!isRecord(raw)||Object.keys(raw).length!==14||
      raw.schemaVersion!==SEYEON_C08_MEMORY_PROOF_VERSION_V1||
      raw.subjectId!==input.subjectId||raw.threadId!==input.threadId||
      raw.currentUserMessageId!==input.currentUserMessageId||
