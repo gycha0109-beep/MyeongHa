@@ -1,76 +1,77 @@
-# 세연 C08 로컬 사전 검증 → LLM 대사 1회 → 로컬 사후 검증 (V1)
+# 세연 C08 — 실제 대화 중심 LLM 1회 경로 실행 로드맵 (개편)
 
 Watchtower-Track: character-memory
 
-## 실제 변경 / 범위
+> 목표: 기존 3회 LLM 호출을 유지 가능한 기준선으로 보존하면서, 세연이 공개 대화·관계·허가된 기억을 자연스럽게 활용하는 **실제 LLM 1회 대화 경로**를 구현한다. 검증 계약 자체가 제품 목표는 아니다.
 
-- 신규 Shadow 코드: `apps/api/src/seyeon-c08-local-one-call-shadow-v1.ts`
-- 신규 서버 공식 이력 어댑터: `apps/api/src/seyeon-c08-local-thread-integrity-port-v1.ts`
-- 신규 회귀: `test/seyeon-c08-local-one-call-shadow-offline-v1.test.ts`
-- 기존 `runSeyeonCensusFirstThreeCallShadowV1`, Production, Reader, DB, Canon, 개인 Memory, 관계·Grant, 결제 코드는 **수정하지 않는다**. 기존 3회 경로로 롤백 가능하다.
-- 이 구현은 **별도 opt-in 함수**로 호출하는 연구용 Shadow이다. 안전 동등성·정식 응답 라우팅·Production 공개 승인을 제공하지 않는다.
-- 기존 `SeyeonDialogueEnvelopeV2`를 반환하지 않는다. 독립 LLM 검토를 했다고 속이는 `failureCodes:[]` 또는 임의 `semanticReviewHash`를 생성하지 않는다.
+## 최종 성공 기준
 
-## 호출 구조
+1. 사용자 메시지 → 서버 권한/맥락 구성 → LLM 대사 생성 **정확히 1회** → 로컬 검증 → 실제 사용 가능한 대사 반환까지 하나의 실행 경로로 연결한다.
+2. 공개 잡담에 한정하지 않고, 기존 엔진이 허용한 관계 상태와 실제 사용자 기억을 반영한다. 권한 없는 사실·공동 과거·관계 신분은 만들어내지 않는다.
+3. 기존 3회 호출 경로는 코드와 라우팅에서 보존하고, 1회 경로가 실패하면 **사전에 명시한 분기 정책**을 적용한다. 몰래 추가 유료 호출하지 않는다.
+4. 목표 지표는 턴당 10원 이하 및 최종 대사 약 5초다. 목표치와 실제 측정치는 구분하며, 실모델 유료 비교는 사용자 승인 전 실행하지 않는다.
+5. 독립 LLM 의미 검증을 생략한 경로를 동등한 안전 검증으로 표기하지 않는다. 실제 서비스 승격은 별도 근거와 승인 후 진행한다.
 
-1. **사전 로컬 검증, LLM 0회**: 서버 제공 현재 메시지/과거 모든 메시지, 공개 첫 만남, 무관계·무기억, 단일 최신 user turn, 전체 authoritative Census(첫 턴) 또는 권한 있는 저장소의 완전한 대화 내용·순서 SHA-256 commitment(다중 턴) 일치를 검사. 메시지 수만 같으면 통과하는 허점은 허용하지 않는다. 현재 입력과 이전 user 입력은 닫힌 문장 문법(인사·대화 시작·가벼운 상태·속도·현재 선호·대화 경계·일상 잡담/농담·현재 영화 선택)에 해당해야 한다. 이전 assistant 문장도 보수적 로컬 공개 Guard를 통과해야 한다. 미확인 의미는 `LOCAL_INPUT_NOT_PROVEN`/`LOCAL_CONTEXT_NOT_PROVEN`으로 거부한다.
-2. **기존 서버 권한 엔진 재사용**: 분류를 생략하지 않고 로컬이 실제로 증명할 수 있는 닫힌 문법에만 `claims=[]` / `topicKey=null`을 적용한다. 기존 `runCharacterGovernedPreflightV1`·`assembleSeyeonRuntimeContextV2`·`guardSeyeonTurnInterpretationV2`·`guardSeyeonRiskBearingActionCausalityV1`·`buildSeyeonRendererPacketV2` 유지. 개인정보 Source Descriptor, 사실 Resolver 및 Retriever 실행 금지.
-3. **대사 생성, LLM 정확히 1회**: 서버가 현재 user move와 공용 reveal/행동 범위를 고정하고 기존 `buildSeyeonRendererRequestV2`를 사용한다. 임의 Memory/관계/사생활을 만들지 말도록 한 공개 첫 만남 지침을 추가. 기존 지시문 `baseline`을 기본값으로 보존하고, 별도 실험용 `compact_v1`은 지시문만 축약하며 출력 스키마·Guard·packet은 그대로 유지한다. 가격 예약 검증과 출력 토큰 상한 확인이 없으면 호출 전 거부. 예약 한도는 최대 4,000 microUSD ≈ 10 KRW(가정 환율 2,500). 이는 청구서 하드캡 증거가 아니다.
-4. **사후 로컬 검증, LLM 0회**: 기존 `admitSeyeonRendererDraftV2`로 스키마/출처 참조/표현/공개 단계 검증. 보수적인 공개 문장·허위 기억/관계/고정 전기/사적 사실/관리자 문구 검출과 입력 의도별 대사 필수 조건 검사. 기존 Assistant 대사와 글자·띄어쓰기·문장부호만 다른 동일 문장을 반복 출력하면 차단한다(세연이 주도적으로 말하는 행동 자체의 반복은 허용). 내용 검증 실패 시 대사 **미반환**, 재생성·추가 LLM 호출·자동 fallback 없음. 결과는 `localGuardedDraft`, `verification=LOCAL_RESTRICTED_NOT_SEMANTIC_PARITY`로만 보고.
-5. **경합 검사**: 모델 이전·이후 등 4회 authoritative 재검사를 유지한다. 첫 턴은 기존 7필드 Census 조회 4회, 여러 턴은 `readAuthoritativeThreadCommitment`로 count/role/전체 ID·role·본문 해시를 **각 체크포인트당 단일 서버 조회**로 검증한다. 1~7개 전체 메시지와 최신 user ID/송신자 일치가 필요하다. `createSeyeonC08LocalThreadIntegrityPortV1`은 서버 저장소의 완전한 메시지 조회 포트를 받아 순서·본문 digest와 count를 한 번에 구성하며, 출력 전에 불변 복사본으로 고정한다. 단일 서버 조회에서 해당 count/hash가 같이 산출되지 않으면 거부한다. Census는 DB snapshot/commit lock이 아니며 마지막 검사 직후 레이스를 없애지 못한다.
+## 구현 순서 — 사용자 가치 우선
 
-## 호출 전 경로 판정
+### P0. 현재 코드 정리와 실제 1회 경로 연결
 
-- `assessSeyeonC08LocalOneCallRouteV1`: 모델 호출·private Source 조회 없이 동일한 입력 문법과 공식 이력 검사로 `ONE_CALL_SHADOW_CANDIDATE` 또는 `RETAIN_THREE_CALL_BASELINE`을 반환한다.
-- `RETAIN_THREE_CALL_BASELINE`는 호출자가 기존 검증 경로를 유지해야 한다는 **계획 신호**일 뿐, 추가 유료 호출이나 자동 재시도 승인이 아니다. 적격으로 판정되어도 뒤의 모든 재검사/비용 예약/로컬 출력검증을 통과해야 연구용 localGuardedDraft를 얻는다.
-- 저장소 어댑터의 `readCompleteServerThread` 구현은 인증된 사용자·스레드 범위에서 **트랜잭션으로 일관된 전체 기록**을 읽어야 한다. 현재 기본 브랜치의 Production DB와 연결하지 않았다.
+- 기존 `runSeyeonC08LocalOneCallShadowV1`의 사전 로컬 검증 → `buildSeyeonRendererRequestV2` → 실제 LLM 1회 → `admitSeyeonRendererDraftV2` 흐름을 기준으로 삼는다.
+- 현재 연구용 `localGuardedDraft`를 실제 서버 호출자가 수신할 수 있는 **명시적인 opt-in 응답 어댑터**와 연결한다. 기존 `SeyeonDialogueEnvelopeV2`나 Production 라우팅을 조용히 대체하지 않는다.
+- 입력 거부·출력 거부·비용 예약 실패를 구분하여 호출자에게 반환한다. 실패를 감추는 자동 모델 재시도나 가짜 검증 PASS는 금지한다.
+- **완료 조건:** 한 서버 진입점에서 공개 대화 입력을 받아 1회 대사 결과 또는 명확한 HOLD를 끝까지 처리하며, 기존 3회 경로는 그대로 남는다.
 
-## 우선 구현 범위 및 한계
+### P1. 관계를 반영한 자연스러운 대화
 
-- **허용**: 기존 3회 기본 경로와 분리된 공개·무기억·무관계 대화, 메시지 1~7개 전체를 authoritative census와 비교할 수 있는 경우만.
-- **보류**: 개인 관계·기억·친밀한 표현, 민감 가족/연애/상처, 공유 과거, 권한 사칭, 안전 동등성이 검증되지 않은 자유형 문장, 전체 Thread 확인 불가, 장기 대화/실제 서비스 라우팅. 예상치 못한 메시지는 기존 경로로 **상위 호출자가 명시적으로 분기**해야 한다(자동 모델 fallback 없음).
-- 자연어 정규식은 독립 의미 검토의 범용 대체품이 아니다. 인정 범위를 좁혀 연구 후보로 사용한다. 민감 표현을 변형하거나 은유하면 검사가 누락될 위험이 있으므로 **사용자 대상 배포는 HOLD**.
-- 오프라인 테스트의 mock Provider는 실제 지연·비용·캐릭터성·안전 동등성·ZDR·invoice hard cap 증거가 아니다. 실모델 비교는 이번 브랜치에서 수행하지 않는다.
+- 이미 구현한 `requireSeyeonC08PublicRelationshipProofV1` 및 서버 관계 포트를 기존 Character Runtime Context에 연결한다.
+- 관계 단계는 말투·반응 깊이·대화 주도성에만 반영하고, 공유 사건이나 사생활 사실의 근거로 오용하지 않는다.
+- **완료 조건:** 서로 다른 검증된 관계 단계에서 1회 경로가 해당 단계에 맞는 대사를 반환하고, 불일치·철회는 호출 전에 HOLD한다.
 
-## 검증
+### P2. 허가된 기억을 실제 대사에 사용
 
-- 적격 입력 예시와 C07 원본 Gold 36개에 대한 기본 경로 검사. N01/N02만 닫힌 문법에 적격하며 나머지는 호출 전 HOLD.
-- 부적격 사용자 주장·민감 정보·관리자/관계 사칭, 가짜 assistant 과거, 같은 메시지 수에서 본문/순서 변경, 저장소 commitment 누락·불일치·경합, 이력 누락/중복, Census 경합, 원장 예약 초과, 출력 JSON/출처 위반 및 대사 행동 불일치: 모델 호출 횟수와 공개 반환 여부 검사.
-- 검증이 모두 통과한 뒤에야 별도로 안전 임계값·실모델 p50/p95·한국어 캐릭터성 비교를 준비한다. 유료 호출/Production 승격은 별도 증거와 승인이 필요하다.
+- 이미 구현한 Memory Authority Proof / Immutable Fact Slot / Server Fact Slot Port를 **재사용**한다. 같은 기능의 신규 권한 프레임워크를 만들지 않는다.
+- 현재 `retrievedMemories.length=0` 제한을 무조건 해제하지 않는다. 먼저 인증된 DB에서 실제 기억 본문과 Grant를 동일한 권한 경계 안에서 조회하고, 모델에 전달 가능한 **최소 사실 표현**을 서버에서 구성하는 계약을 구현한다.
+- 출처·소유자·캐릭터·스레드·Grant·Revision을 모델 호출 전후 검증한다. 철회·경합 시 대사를 반환하지 않는다.
+- 서버에서 승인한 사실만 프롬프트에 넣고, 대사 출력에서는 해당 사실의 과장·변조·무단 공개를 차단한다. 기존 Slot의 `modelContentAccess=DENIED`는 이 보호 계약이 완성될 때까지 유지한다.
+- **완료 조건:** 허가된 실제 기억이 있는 대화에서 세연이 그 사실을 정확하게 활용한 1회 대사를 생성하고, 철회·다른 사용자 기억·위조 사실은 차단한다.
 
-## 로컬 계약 및 완료 조건
+### P3. 자유형 대화 및 캐릭터 품질 확대
 
-- `hashSeyeonC08PublicTranscriptV1(messages)`는 `[messageId,role,text]` 순서를 길이 구분해 해시한다. 다중 턴의 비교 값은 반드시 **서버의 완전한 공식 이력 조회**에서 생성해야 한다. 클라이언트가 제공한 hash/확인 표시는 권한 증거가 아니다.
-- `readAuthoritativeThreadCommitment`는 `{schemaVersion:'seyeon-c08-public-thread-commitment-v1',subjectId,threadId,currentUserMessageId,messageCount,latestSenderType:'user',complete:true,transcriptHash}` 8필드만 반환한다. 누락·누적 이력 절단·해시 오염 시 0회 또는 1회 호출 후 HOLD. 각각의 체크포인트는 원자적 snapshot을 읽어야 한다.
-- `compact_v1`은 프롬프트 길이의 연구 후보일 뿐, 블라인드 대사 품질·Gold 의미 동등성·속도/비용 달성을 입증하지 않는다. 실모델 유료 호출은 하지 않는다.
-- 1회 연구 경로를 앱에 연결하거나 적격 범위를 자유형 대화/Memory/관계 단계까지 확대하려면 서버 출처 검증·권한·캐릭터 성능의 별도 근거가 필요하다.
+- 현재 닫힌 공개 문장 문법은 초기 안전 구간으로 유지하되, 기존 Character Preflight/Interpretation/Renderer를 활용해 지원 가능한 사용자 발화 범위를 단계적으로 확장한다.
+- 정규식만으로 자유형 발화의 의미 안전성을 증명했다고 주장하지 않는다. 로컬에서 증명할 수 없는 경우 명확히 HOLD하고 기존 경로 선택권은 상위 호출자에게 둔다.
+- 반복 발화, 무미건조한 응답, 캐릭터 말투 이탈, 사용자 의도 미응답을 실제 대화 품질 검토 항목으로 삼는다.
+- **완료 조건:** 공개·관계·기억 사용 사례에서 1회 경로의 적격/부적격 결과와 생성 대사를 일관되게 설명할 수 있다.
 
-## C08 공개 관계 단계 확장 (연구 Shadow)
+### P4. 성능·비용·동등성 검증 및 승격 판단
 
-- 공개 입력 문법과 전체 대화 원본 확인을 유지하는 경우에만 `contextInput.relationship`이 있어도 생성 후보가 될 수 있다.
-- 관계 정보는 `requireSeyeonC08PublicRelationshipProofV1`과 `createSeyeonC08ServerRelationshipProofPortV1`로 인증된 저장소의 `stageKey/closenessBand/trustBand/frictionBand/revision/policyVersion`와 정확히 비교한다. 각 턴에서 원본 Census 검사와 함께 4회 재확인한다. Stage/Revision 불일치, 철회, 타인 소유자의 자료, 사적 공개 허용 데이터는 즉시 HOLD.
-- 관계 Stage는 **현재 말투·응대 깊이 조절에만 사용**하고, 과거 공동 사건·관계 신분 주장·친밀감 상승·개인 기억·비공개 사연 공개의 근거가 되지 않는다. Interpretation의 Reveal은 여전히 PUBLIC, risk-bearing action 미사용, private descriptor 조회 0, AI 대사 1회다.
-- 기존 Production 관계 포트에 직접 연결되지 않았으며 인증·트랜잭션을 보장하는 DB 포트를 추후 호출자가 제공해야 한다. 이 기능의 오프라인 적격성 검사는 사용자 대상 Production 전환 근거가 아니다.
+- 무료 오프라인 검증으로 호출 횟수, 출력 계약, ACL/Grant 철회, 경합, 회귀를 확인한다.
+- **별도 사용자 승인 후에만** 실제 유료 모델로 기존 3회 경로와 1회 경로를 비교한다. p50/p95 지연, 실제 청구 비용, 한국어 캐릭터성, 기억 정확도, 위험 발화 대응을 측정한다.
+- 목표 미달이면 프롬프트·컨텍스트·로컬 가드를 개선한다. 측정 없이 10원/5초 달성이나 안전 동등성을 선언하지 않는다.
+- **완료 조건:** 비교 근거와 잔여 위험이 정리되고 사용자가 Production 승격 여부를 결정할 수 있다.
 
-## 기억 출처 검증 계약 (대사 연결 전 단계)
+## 현재 확인된 구현 자산
 
-- `apps/api/src/seyeon-c08-server-memory-proof-port-v1.ts`는 인증된 DB의 subject/thread/Grant 범위와 최신 저장본을 조회해 메모리 본문 대신 hash만 반환한다. 실제 Production DB 연결은 하지 않았다.
-- `apps/api/src/seyeon-c08-memory-authority-proof-v1.ts`는 단일 `life_fact/memory` 타입의 `claimKind=fact`를 대상으로 DB가 확인한 `memoryId/sourceRef/summaryHash/grantState=ACTIVE/origin=AUTHORITATIVE_STORED_USER_MEMORY/assistantGenerated=false`를 검증한다.
-- 동일한 기억이라고 해도 `summaryHash`가 다르거나 User Grant가 철회·누락되면 HOLD. `relationship_event`나 `character_interpretation`, AI가 만든 이벤트는 거부.
-- 성공해도 `memoryMayBeSentToModel=false`, `memoryMayBeQuotedToUser=false`로 고정한다. 향후 **서버가 검증된 정확한 기억 내용을 불변 슬롯으로 출력할 계약**을 마련하기 전에는 모델에게 사적인 기억을 제공하거나 Callback을 출력하지 않는다.
-- 이 메모리 증명 함수는 아직 `runSeyeonC08LocalOneCallShadowV1`에 연결하지 않았다. 현재 1회 생성 경로의 `retrievedMemories.length=0` 제한은 유지한다.
+- `apps/api/src/seyeon-c08-local-one-call-shadow-v1.ts`: 공개 닫힌 문법 기반 연구용 1회 Shadow 경로. 관계/기억/자유형 실사용 경로 완성 아님.
+- `apps/api/src/seyeon-c08-local-thread-integrity-port-v1.ts`: 서버 공식 대화 이력 무결성 포트.
+- `apps/api/src/seyeon-c08-memory-authority-proof-v1.ts`, `seyeon-c08-server-memory-proof-port-v1.ts`: 기억 출처 증명. 실제 대사 사용 미연결.
+- `apps/api/src/seyeon-c08-immutable-fact-slot-v1.ts`, `seyeon-c08-server-fact-slot-port-v1.ts`: 본문 비노출 Fact Slot/DB 연결 경계. 실제 DB 및 대사 생성 미연결.
+- 기존 공개 관계 증명 및 관계 포트: 관계 Stage 검증 연구 구현. Production DB 연결 근거 없음.
+- 기존 오프라인 회귀 테스트: 기본 거부·무결성 검증 자산. 실제 캐릭터 품질·비용·안전 동등성 증거 아님.
 
-## 같은 브랜치 작업 규칙
+## 작업 운영 규칙
 
-사용자 지시: 브랜치 하나에서 구조 변경 구현을 끝까지 진행. 작업 완료 전 PR 병합, Full Integration CI, 새 유료 호출 금지.
+- **현재 브랜치** `feat/character-memory/c08-local-one-call-shadow-v1`, **Draft PR #2575**에서 계속 구현한다. 새 브랜치를 만들지 않는다.
+- 기존 3회 기본 경로, Production 라우팅, Canon, DB, 결제, 기존 Grant 정책을 임의 변경하지 않는다.
+- 구조 구현 완료 전 PR 병합 및 Full Integration CI 실행 금지. 자동 발생하는 기본 PR 체크는 확인하되, 다른 트랙 CI 때문에 작업을 중단하지 않는다.
+- 유료 모델 실험과 Production 공개는 사용자 별도 승인 대상이다.
+- 구현을 우선한다. 검증 코드·문서·추가 추상화만 늘리는 작업은 **실제 대사 경로를 완성하는 데 직접 필요할 때만** 수행한다.
 
-## 서버 소유 불변 Fact Slot 계약 — 1단계 구현
+## 현 시점 판정
 
-- `apps/api/src/seyeon-c08-immutable-fact-slot-v1.ts`: 기존 Memory Authority Proof를 재사용하고 별도의 원본/Grant 스냅샷을 받아, `subjectId/threadId/currentUserMessageId/characterId/memoryId/sourceRef/kind/summaryHash/sourceRevision/grantId/grantRevision`를 하나의 읽기 전용 binding hash로 고정한다. 이는 서버 내부 무결성 지문이지 공개 인증 토큰이나 익명화 증거가 아니다.
-- `apps/api/src/seyeon-c08-server-fact-slot-port-v1.ts`: 인증된 원본 DB의 동일 스냅샷에서 실제 사용자 소유 기록과 정확히 세연에게 유효한 Grant를 조회할 서버 포트. 여기의 callback은 현재 Production DB에 연결하지 않았다.
-- 오직 `memory | life_fact`, `claimKind=fact`, 활성 원본·Grant, 비AI 생성·서버 저장 원본, 완전한 소유 스냅샷만 받는다. `relationship_event`, 해석, 다른 사용자·캐릭터·스레드, 철회, Source/Grant Revision 변경은 HOLD한다.
-- 반환 Slot에는 **기억 본문이 포함되지 않는다**. `modelContentAccess=DENIED`, `userQuoteAccess=DENIED`, `rendering=SERVER_PROTECTED_CONTRACT_REQUIRED` 고정. 생성 프롬프트 및 사용자 출력으로 사실 내용이 전달되지 않으며, 독립 의미 검사/안전 승인으로 가장하지 않는다.
-- `requireSeyeonC08FactSlotStillCurrentV1`은 원본/Grant를 다시 읽고 pinned Slot과 정확히 비교한다. 모델 호출 전후 체크포인트와 실제 저장 DB 트랜잭션, 서버 보호 렌더링 연결 전에는 **단순 증명 계약**이다. 이 함수 호출만으로 원자적 commit/reveal을 보장하지 않는다.
-- `test/seyeon-c08-immutable-fact-slot-offline-v1.test.ts`에서 허용한 슬롯의 비노출, 철회, 출처 변경, revision 변경, 기록 교체 및 위조를 오프라인 확인한다.
+- **P0:** 연구용 Shadow 존재, 실제 서버 응답 어댑터 연결 미확인 — 미완료.
+- **P1:** 관계 검증 연구 자산 존재, 실제 1회 대사 경로 통합 미완료.
+- **P2:** 메타데이터 Fact Slot 구현, 본문 보호 렌더링/실제 기억 대사 통합 미완료.
+- **P3:** 닫힌 문법 이외 자유형 대화 확장 미완료.
+- **P4:** 실모델 성능·비용·안전 동등성 미측정; 승인 전 HOLD.
 
-**현재 연결 상태:** 기존 `runSeyeonC08LocalOneCallShadowV1`는 계속 `retrievedMemories.length=0`을 요구한다. Slot을 모델 대사에 섞지 않았으며, 권한 있는 사실의 **서버 보호 렌더링/사후 승인 계약 구현**과 네 체크포인트에서 재검증 연결은 다음 작업이다. 이는 1회 기억 기반 대화의 Production 공개 근거가 아니다.
+이전 상세 구현 기록은 Git 커밋과 해당 소스/테스트에 남긴다. 이 문서는 이후 작업의 **우선순위와 완료 기준**을 규정한다.
