@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { admitCloudflareSeyeonEmptyRoomV1 } from '../workers/cloudflare-seyeon-empty-room.mjs';
+import { parseChatRoomReadPayloadV1 } from '../apps/web/chat-room-read-contract.js';
 
 const threadId='123e4567-e89b-42d3-a456-426614174000';
 const release='223e4567-e89b-42d3-a456-426614174000';
@@ -28,6 +29,9 @@ describe('Se-yeon empty-room Edge egress admission',()=>{
     const json=JSON.parse(text);
     expect(json.data).toMatchObject({threadId,characterId:'seyeon',messages:[],
       relationship:null,latestCharacterMessage:null,pagination:{hasMore:false}});
+    expect(parseChatRoomReadPayloadV1(json.data,{
+      expectedThreadId:threadId,expectedAfterSequenceNo:0,
+    })).toMatchObject({threadId,characterId:'seyeon',messages:[]});
     expect(response?.headers.get('cache-control')).toBe('no-store');
     expect(response?.headers.get('x-content-type-options')).toBe('nosniff');
   });
