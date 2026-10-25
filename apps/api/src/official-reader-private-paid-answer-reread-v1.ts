@@ -166,7 +166,7 @@ async function readPrivateOfficialReaderPaidAnswerCoreV1(
       port: input.privacyLedgerPort, lease, subjectId, selector: selectorKey,
     })) return unavailable();
 
-    return await executePostgresSubjectTransactionV1({
+    const answer = await executePostgresSubjectTransactionV1({
       pool: input.pool,
       verifiedEvidence: input.verifiedEvidence,
       execute: async (scope) => {
@@ -281,6 +281,15 @@ async function readPrivateOfficialReaderPaidAnswerCoreV1(
         });
       },
     });
+    // The S1 transaction and its S7 prepare receipt have now COMMITTED.
+    // A separate Privacy deletion/restore epoch may have changed during
+    // COMMIT or connection release. Check the same off-primary lease again
+    // immediately before returning plaintext to the caller. Do not claim
+    // that this can withdraw content already sent to a consumer.
+    if (!currentOfficialReaderPrivacyReadLeaseV1({
+      port: input.privacyLedgerPort, lease, subjectId, selector: selectorKey,
+    })) return unavailable();
+    return answer;
   } catch {
     return unavailable();
   }
