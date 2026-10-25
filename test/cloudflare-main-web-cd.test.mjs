@@ -10,6 +10,7 @@ describe('merged-main Cloudflare single Worker CD', () => {
     expect(() => assertMainWebConfig(configuration)).not.toThrow();
     expect(configuration.name).toBe('myeongha');
     expect(configuration.main).toBe('./cloudflare/myeongha-worker.mjs');
+    expect(configuration.compatibility_flags).toEqual(['nodejs_compat']);
     expect(configuration).not.toHaveProperty('services');
     expect(configuration.assets.run_worker_first).toBe(true);
   });
@@ -29,13 +30,14 @@ describe('merged-main Cloudflare single Worker CD', () => {
   it('keeps protected, encoded and unknown APIs fail-closed instead of serving HTML', async () => {
     const asset = vi.fn(async () => new Response('PRIVATE_STATIC_FALLBACK'));
     const env = { ASSETS: { fetch: asset } };
-    for (const path of ['/api/chat', '/api/readiness', '/api/unknown', '/%61pi/chat',
-        '/api/health?%255f%255fmyeongha_chat_thread_id=forged']) {
+    for (const [path, expected] of [['/api/chat', 503], ['/api/readiness', 404],
+        ['/api/unknown', 404], ['/%61pi/chat', 503],
+        ['/api/health?%255f%255fmyeongha_chat_thread_id=forged', 503]]) {
       const response = await liveWorker.fetch(new Request('https://test.example' + path), env);
-      expect(response.status).toBe(503);
+      expect(response.status).toBe(expected);
       expect(response.headers.get('Cache-Control')).toBe('no-store');
       expect(response.headers.get('X-Content-Type-Options')).toBe('nosniff');
-      expect(response.headers.get('content-type')).toContain('application/json');
+      if (expected === 503) expect(response.headers.get('content-type')).toContain('application/json');
       expect(await response.text()).not.toContain('PRIVATE_STATIC_FALLBACK');
     }
     expect(asset).not.toHaveBeenCalled();
@@ -50,6 +52,32 @@ describe('merged-main Cloudflare single Worker CD', () => {
     expect(response.headers.get('Content-Security-Policy')).toContain("default-src 'self'");
     expect(await response.text()).toBe('<html>page</html>');
     expect(asset).toHaveBeenCalledTimes(1);
+  });
+
+  it('serves the website root as index.html while leaving unknown paths unrewritten', async () => {
+    const requested = [];
+    const env = { ASSETS: { async fetch(req) {
+      requested.push(new URL(req.url).pathname);
+      return new Response('<html>index</html>');
+    } } };
+    expect((await liveWorker.fetch(new Request('https://test.example/'), env)).status).toBe(200);
+    expect(requested).toEqual(['/index.html']);
+  });
+
+  it('restores gated native Auth/DB dispatch instead of blanket-blocking all APIs', async () => {
+    const origin = 'https://auth.synthetic-myeongha.dev';
+    const env = {
+      MYEONGHA_CLOUDFLARE_AUTH_DB_MODE: 'approved-auth-db-v1',
+      MYEONGHA_CLOUDFLARE_AUTH_ORIGIN: origin,
+      MYEONGHA_CLOUDFLARE_DB_TLS_RLS_APPROVAL: 'approved-isolated-tls-rls-v1',
+      MYEONGHA_CLOUDFLARE_DB_APPROVED_HOST: 'db.synthetic.example.com',
+      MYEONGHA_CLOUDFLARE_DB_APPROVED_PORT: '5432',
+      ASSETS: { async fetch() { throw Error('API must never fetch assets'); } },
+    };
+    const response = await liveWorker.fetch(new Request(origin + '/api/me'), env);
+    expect(response.status).toBe(503);
+    expect(response.headers.get('content-type')).toContain('application/json');
+    expect((await response.json()).error.code).toBe('AUTH_UPSTREAM_UNAVAILABLE');
   });
 
   it('denies non-merged or local deploy attempts', () => {

@@ -72,7 +72,7 @@ function parseProvider(value: unknown): SocialAuthProviderServerV1 | null {
     : null;
 }
 
-function parseRedirectUri(value: unknown): URL | null {
+function parseRedirectUri(value: unknown, approvedWebOrigin?: string): URL | null {
   if (typeof value !== 'string' || value.length > 512) return null;
   let url: URL;
   try {
@@ -93,7 +93,9 @@ function parseRedirectUri(value: unknown): URL | null {
     url.search === '';
   const web =
     commonSafe &&
-    WEB_SOCIAL_REDIRECT_ORIGINS.has(url.origin) &&
+    (approvedWebOrigin === undefined
+      ? WEB_SOCIAL_REDIRECT_ORIGINS.has(url.origin)
+      : url.origin === approvedWebOrigin) &&
     url.pathname === WEB_SOCIAL_REDIRECT_PATH &&
     url.searchParams.getAll('social').length === 1 &&
     url.searchParams.get('social') === WEB_SOCIAL_REDIRECT_MARKER &&
@@ -115,6 +117,7 @@ function randomState(): string {
 }
 
 export async function handleSocialAuthStartRequestV1(input: {
+  readonly webOrigin?: string;
   readonly request: Request;
   readonly env: ProductionUserDataRuntimeEnvV1;
   readonly nowEpochMs?: () => number;
@@ -139,7 +142,7 @@ export async function handleSocialAuthStartRequestV1(input: {
 
   if (!isRecord(body)) return failure('INVALID_REQUEST', 400);
   const provider = parseProvider(body.provider);
-  const redirectUri = parseRedirectUri(body.redirectUri);
+  const redirectUri = parseRedirectUri(body.redirectUri, input.webOrigin);
   if (provider === null || redirectUri === null) {
     return failure('INVALID_REQUEST', 400);
   }
