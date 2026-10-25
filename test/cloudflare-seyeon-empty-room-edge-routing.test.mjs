@@ -34,6 +34,14 @@ describe('S0 Worker ingress never equates an empty shell with History permission
     expect(d.scope).toHaveBeenCalledTimes(1);
     expect(d.close).toHaveBeenCalledTimes(1);
   });
+  it('passes an owned nonempty room only to independent metadata-shell authorization',async()=>{
+    const d=setup({kind:'seyeon_existing_thread_shell_requires_ops_reauthorization',threadId:ID});
+    const response=await tryHandleCloudflareSeyeonSecurityV1(request(),{},{
+      id:'rewrite.chat.thread',
+    },d);
+    expect(response).toBeNull();
+    expect(d.close).toHaveBeenCalledTimes(1);
+  });
   it('never admits a paid send even if a future scope returns the empty marker incorrectly',async()=>{
     const d=setup({kind:'seyeon_empty_thread_requires_ops_reauthorization',threadId:ID});
     const response=await tryHandleCloudflareSeyeonSecurityV1(request('POST','/turns'),{},{

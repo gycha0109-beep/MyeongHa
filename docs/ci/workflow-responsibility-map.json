@@ -62,6 +62,12 @@
       "mainMode": "triggered-operations",
       "workTrackAttribution": "pr-metadata"
     },
+    "cloudflare-seyeon-room-shell-live.yml": {
+      "responsibility": "cloudflare-seyeon-owner-metadata-room-live-e2e",
+      "prMode": "none",
+      "mainMode": "manual",
+      "workTrackAttribution": "workflow-dispatch"
+    },
     "cloudflare-saju-admission-canary.yml": {
       "responsibility": "production-saju-smoke",
       "prMode": "none",

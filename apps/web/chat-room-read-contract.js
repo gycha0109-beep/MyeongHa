@@ -190,6 +190,16 @@ export function parseChatRoomReadPayloadV1(payload, options) {
   }
 
   const paginationState = parsePagination(payload, lastSequenceNo, messages.length);
+  if (payload.historyWithheld !== undefined &&
+      typeof payload.historyWithheld !== 'boolean') {
+    fail('historyWithheld is invalid');
+  }
+  const historyWithheld = payload.historyWithheld === true;
+  if (historyWithheld && (characterId !== 'seyeon' ||
+      afterSequenceNo !== 0 || lastSequenceNo !== 0 ||
+      messages.length !== 0 || paginationState.hasMore)) {
+    fail('protected Se-yeon room shell must not include history');
+  }
 
   return Object.freeze({
     threadId,
@@ -198,5 +208,6 @@ export function parseChatRoomReadPayloadV1(payload, options) {
     lastSequenceNo,
     messages: Object.freeze(messages),
     pagination: paginationState,
+    historyWithheld,
   });
 }

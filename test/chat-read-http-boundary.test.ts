@@ -72,6 +72,11 @@ class FakeConnection implements PostgresSubjectConnectionV1 {
         }] as unknown as readonly Row[],
       };
     }
+    if (text.includes('select exists (') &&
+        text.includes('qry_chat_thread_stream_v2')) {
+      return {rows:[{hasMessages:this.streamRows === undefined ||
+        this.streamRows.length > 0}] as unknown as readonly Row[]};
+    }
     if (text.includes('qry_chat_thread_stream_v2')) {
       return {
         rows: (this.streamRows ?? [{
@@ -243,11 +248,54 @@ describe('owner Chat read HTTP boundary', () => {
     });
     expect(body).not.toContain('PRIVATE_HISTORY_CANARY_NEVER_REVEAL');
     expect(body).not.toContain('PRIVATE_PAYLOAD_CANARY');
-    // The owner-scoped stream must be inspected to distinguish an empty
-    // room shell from protected existing Se-yeon history.
-    expect(callTexts(f.connection).some(x => x.includes('qry_chat_thread_stream_v2'))).toBe(true);
+    // Mixed Se-yeon remains held without reading any message body.
+    expect(callTexts(f.connection).some(x => x.includes('qry_chat_thread_stream_v2'))).toBe(false);
     expect(callTexts(f.connection).some(x => x.includes('qry_character_relationship_v1'))).toBe(false);
     expect(callTexts(f.connection).at(-1)).toBe('ROLLBACK');
+  });
+
+  it.each([true,false])('returns only a redacted owner metadata shell for single Se-yeon, hasHistory=%s',async(hasHistory)=>{
+    const f=fixture();
+    f.connection.participantCharacterIds=['seyeon'];
+    f.connection.streamRows=hasHistory ? [{
+      messageId:'96000000-0000-4000-8000-000000000001',
+      sequenceNo:4,senderType:'character',characterId:'seyeon',
+      bodyText:'PRIVATE_HISTORY_MUST_NEVER_LEAK',
+      messagePayloadJsonb:{private:'CANARY'},
+      messageSchemaVersion:'v1',
+      createdAt:new Date('2026-09-05T15:00:00.000Z'),
+      redacted:false,redactedAt:null,
+    }]:[];
+    const response=await handleChatReadRequestV1(f.input);
+    const body=await response.text();
+    expect(response.status).toBe(200);
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    const payload=JSON.parse(body);
+    expect(payload).toMatchObject({
+      ok:true,
+      data:{
+        threadId:THREAD_ID,characterId:'seyeon',
+        afterSequenceNo:0,lastSequenceNo:0,
+        historyWithheld:hasHistory,messages:[],
+        pagination:{pageSize:50,hasMore:false,nextAfterSequenceNo:null},
+      },
+    });
+    expect(body).not.toContain('PRIVATE_HISTORY_MUST_NEVER_LEAK');
+    expect(body).not.toContain('CANARY');
+    expect(body).not.toContain('messageId');
+    expect(f.connection.calls.some(q=>q.text.includes('select exists (')&&
+      q.text.includes('qry_chat_thread_stream_v2'))).toBe(true);
+    expect(f.connection.calls.some(q=>q.text.includes('qry_character_relationship_v1'))).toBe(false);
+    expect(callTexts(f.connection).at(-1)).toBe('COMMIT');
+  });
+
+  it('holds all paginated Se-yeon history even when an owned thread is active',async()=>{
+    const f=fixture(`https://myeongha.test/api/chat/${THREAD_ID}?afterSequenceNo=1`);
+    f.connection.participantCharacterIds=['seyeon'];
+    const response=await handleChatReadRequestV1(f.input);
+    expect(response.status).toBe(503);
+    expect((await response.json()).error.code).toBe('SEYEON_HISTORY_REVEAL_HOLD');
+    expect(f.connection.calls.some(q=>q.text.includes('qry_chat_thread_stream_v2'))).toBe(false);
   });
 
   it('holds an old Se-yeon speaker even when current DB participants exclude Se-yeon', async () => {

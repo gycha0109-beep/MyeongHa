@@ -108,6 +108,16 @@ select
 from public.qry_chat_thread_stream_v2($1::uuid, $2::uuid, $3::bigint, $4::integer)
 `.trim();
 
+// Owner-scoped metadata-only Se-yeon room shell: PostgreSQL returns a
+// boolean, never the body/payload of an existing, protected message.
+const SEYEON_HAS_MESSAGES_SQL = `
+select exists (
+  select 1 from public.qry_chat_thread_stream_v2(
+    $1::uuid, $2::uuid, 0::bigint, 1::integer
+  )
+) as "hasMessages"
+`.trim();
+
 const READ_RELATIONSHIP_SQL = `
 select
   state_id::text as "stateId",
@@ -330,21 +340,45 @@ async function readChatState(
   }
   const binding = mapThreadBinding(bindingResult.rows[0], parsed.threadId);
 
-  // A newly created, strictly empty Se-yeon room contains no historical
-  // material to reveal. Do not block its initial owner-scoped shell.
-  // Every non-empty or paginated Se-yeon transcript still requires G3.
+  // A single-participant Se-yeon GET is a metadata-only shell. The caller
+  // is already owner-scoped; neither existing body text nor even a redacted
+  // message row may cross this boundary before History/Replay approval.
+  // Do not substitute a false "empty history": explicitly mark withheld data.
+  if (binding.participantCharacterIds.length === 1 &&
+      binding.primaryCharacterId === 'seyeon') {
+    if (parsed.afterSequenceNo !== 0) throw new SeyeonChatHistoryRevealHoldV1();
+    const existence = await client.query<{hasMessages:boolean}>(SEYEON_HAS_MESSAGES_SQL, [
+      subjectId,parsed.threadId,
+    ]);
+    if (existence.rows.length !== 1 ||
+        typeof existence.rows[0]?.hasMessages !== 'boolean') {
+      throw new Error('Missing authoritative Se-yeon shell existence result.');
+    }
+    return Object.freeze({
+      threadId:binding.threadId,
+      characterId:'seyeon',
+      afterSequenceNo:0,
+      lastSequenceNo:0,
+      messages:Object.freeze([]),
+      pagination:Object.freeze({
+        pageSize:parsed.pageSize,
+        hasMore:false,
+        nextAfterSequenceNo:null,
+      }),
+      historyWithheld:existence.rows[0].hasMessages,
+      latestCharacterMessage:null,
+      relationship:null,
+    });
+  }
+  if (binding.participantCharacterIds.includes('seyeon')) {
+    throw new SeyeonChatHistoryRevealHoldV1();
+  }
   const streamResult = await client.query<StreamRow>(READ_STREAM_SQL, [
     subjectId,
     parsed.threadId,
     parsed.afterSequenceNo,
     parsed.pageSize,
   ]);
-  if (
-    binding.participantCharacterIds.includes('seyeon') &&
-    (parsed.afterSequenceNo !== 0 || streamResult.rows.length !== 0)
-  ) {
-    throw new SeyeonChatHistoryRevealHoldV1();
-  }
   // A current participant set is not proof about the entire history.
   // A formerly participating Se-yeon can still own a committed message
   // after the thread is reconfigured to contain other Characters only.
