@@ -7,7 +7,10 @@ describe('Seyeon Web turn-send wiring', () => {
       new URL('../apps/web/chat-runtime-client.js', import.meta.url),
       'utf8',
     );
-    expect(source).toContain('/turns');
+    expect(source).toContain('sendSeyeonBrowserTurnWithReceiptV1');
+    const shared = await readFile(new URL('../packages/api-client/src/chat.ts', import.meta.url), 'utf8');
+    expect(shared).toContain('/turns');
+    expect(shared).toContain('/api/chat/delivery-receipts/');
     expect(source).toContain('clientTurnId: pendingTurn.clientTurnId');
     expect(source).toContain('clientTurnId: crypto.randomUUID()');
     expect(source).toContain('const rereadSucceeded = await loadRoomState()');
