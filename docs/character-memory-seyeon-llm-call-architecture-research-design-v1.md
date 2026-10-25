@@ -196,6 +196,14 @@ type LlmStructureEvalRecordV1 = Readonly<{
 6. **프롬프트 축약:** `baseline` vs `compact_v1`을 동일 캐릭터·보안 평가로 검증한다. 축약 자체가 이득/동등성 증거는 아니다.
 7. **조건부 호출:** 독립 리뷰를 생략하는 사용자 응답 경로는 좁은 안전 근거와 별도 승격 조건이 없는 한 승인하지 않는다.
 
+## C09 세연 고정 Persona + 상황별 Runtime Slice 단일 호출 후보 (추가 조사)
+
+- 실제 최신 Authoring 원본 기준: Bible v0.2 `5fddbce24c5606d888b64ab3c8dbf3256b65e04d`, Runtime v0.1 `d6bc911021e30aa70fde133c4350513008a721e7`. 두 원본 모두 DRAFT이며 Production Canon으로 자동 승격하지 않는다.
+- `packages/character-content/src/seyeon-authored-projection-v2.ts`의 선언된 원본 SHA가 현재 Bible/Runtime과 불일치하고 일부 undefined/fact 필드가 최신 Bible과 어긋난다. 실제 모델 Context에 붙이기 전에 Authoring Projection 정합성 해결 필요.
+- `apps/api/src/seyeon-c09-persona-prompt-profile-shadow-v1.ts`에 **core / core_examples / core_focus** 세 가지 평가용 프로필을 실제 구성했다. 고정 성격 + 필요한 공개 Runtime 1~2개 Slice만 선택하며, 아직 모델 호출 또는 서버 경로 연결은 없다.
+- 설계·섹션별 대응·비공개 경계·평가 기준: [세연 C09 단일 호출 Persona 구성 설계](character-memory-seyeon-c09-single-call-persona-composition-design-v1.md).
+- 평가 전에는 '1회 호출로 충분하다'거나 'Runtime 요약이 성격·보안을 보존한다'고 주장할 수 없다.
+
 ## 6. 바로 이어갈 구현 순서 (설계 이후)
 
 - **R0 (최우선):** 현재 5회 동기 경로의 실제 역할별 호출을 계측 항목에 매핑하고 A 기준선의 비용·지연 분모를 명확히 한다. 기존 Provider 메트릭 재사용, 별도 계측 프레임워크 중복 구현 금지.
