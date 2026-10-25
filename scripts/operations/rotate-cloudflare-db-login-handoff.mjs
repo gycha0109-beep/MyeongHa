@@ -121,11 +121,29 @@ async function main() {
     // Verify the new isolated login over full peer-verified TLS and target
     // transaction port before sending any credential to an encrypted artifact.
     stage = 'VERIFY_DEDICATED_LOGIN';
-    const check = await query('select current_user;', {
-      ...baseEnv, PGPORT: '6543', PGUSER: ROLE + '.' + PROJECT,
-      PGPASSWORD: password,
-    }, { read: true });
-    ensure(check === ROLE, 'Dedicated login verification failed');
+    // Supavisor Shared Pooler may briefly cache the old role verifier.
+    // Do not rotate again; allow one bounded reconnect after cache settling.
+    await new Promise(resolve => setTimeout(resolve, 15_000));
+    let verified = false;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      if (attempt > 0) {
+        await new Promise(resolve => setTimeout(resolve, 10_000));
+      }
+      try {
+        const check = await query('select current_user;', {
+          ...baseEnv, PGPORT: '6543', PGUSER: ROLE + '.' + PROJECT,
+          PGPASSWORD: password,
+        }, { read: true });
+        if (check === ROLE) {
+          verified = true;
+          break;
+        }
+      } catch {
+        // The encrypted handoff is already stored; fail closed after two
+        // bounded checks. Never print pooler responses or login credentials.
+      }
+    }
+    ensure(verified, 'Dedicated login verification failed');
 
     stage = 'COMPLETE';
     console.log('cloudflare_db_rotation=ROTATED_AND_LOGIN_VERIFIED_ENCRYPTED_HANDOFF_READY');
