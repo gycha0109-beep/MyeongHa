@@ -274,3 +274,12 @@
 - `production-payment-attempt-handoff-context-runtime.ts`에서 위 포트를 **무조건 서버 주입**한다. `1743` 제안 SQL의 `qry_legal_digital_reading_handoff_ready_v1`은 현재 canonical Subject가 소유한 상태 `created` Payment Attempt를 구매 단위로 역추적하고, 기존의 행 잠금 `qry_legal_digital_reading_checkout_ready_v1`을 호출한다.
 - 고지 누락·확인 누락·판매대상 불일치·결제 후 재호출·다른 구매자/Attempt·DB 오류에는 PSP 요청값/Store ID/PG 키를 보내지 않는다. 내부 트랜잭션은 실패 시 롤백한다. 일반 레거시 경로는 아직 publicRoute=null이며 실제 결제 앱/라우트 생성 없음.
 - `payment-attempt-handoff-context-http.test.ts`, `legal-digital-reading-checkout-admission-v1.test.ts`, 폐기형 PG17 `legal_commerce_checkout_delivery_pg17.sh`로 PSP handoff 긍정/차단·DB 질의 순서·신원 격리·실제 ACL을 확인한다. **이 코드도 S7 디지털 콘텐츠 실제 전송 증거를 생성하거나 유료 판매를 활성화하지 않는다.**
+
+
+## 34. 2026-10-25 DB Owner #2301 S7 원본 Receipt·Grant 증빙의 법무 환불 검토 인수 경계
+
+- **검증한 소스:** 미병합 DB Owner Draft [#2301](https://github.com/gycha0109-beep/MyeongHa/pull/2301)의 `official-reader-private-delivery-journal-v1.ts`, `official-reader-paid-chat-delivery-ack-http-v1.ts`, `commerce-reader-private-withdrawal-evidence-v1.ts`, `2250_official_reader_withdrawal_original_receipt_state_private_v2.sql`. S5 본문 저장·S7 서버 응답 준비·클라이언트 ACK·공급자 검증 후 Receipt 회수는 서로 독립된 사건. 특히 **인증된 ACK ≠ 법적으로 실제 콘텐츠 인도 입증**.
+- **실제 신규 코드:** `apps/api/src/commerce-reader-s7-owner-withdrawal-bridge-v1.ts`는 원본 Receipt/Grant/S5 body를 검증하는 *별도 DB Owner 권위 포트*의 반환값을 회원 canonical Subject 트랜잭션 안에서 받아, 최초 구매와 Grant 결속·서버 응답 준비·인증된 클라이언트 ACK·미ACK 수·현재 원본 Receipt 검증/회수 상태·불변환불 검토값을 정합 검증한다. 반환 결과는 `actualConsumerDeliveryProven:false`, `legallyProvenDeliveredAt:null`, `providerRefundAuthorized:false`, `entitlementMutationAuthorized:false`로 고정. 이 포트는 클라이언트가 주입하는 인증 증거가 아니며 공개 라우트 없음.
+- **권한 경계:** #2301의 `internal_qry_official_reader_withdrawal_delivery_state_v2`는 API/Commerce/System 런타임의 직접 SQL EXECUTE를 명시적으로 REVOKE한 owner-only 기능이다. 이 PR에서는 그 권한을 부여하거나 원본 SQL을 복제하지 않으며, DB Owner 인수 완료 이전에 S7 실제 호출을 성공했다고 선언하지 않는다. Owner 포트가 없거나, DB/승인/조회 실패, Grant/Receipt 불일치, 차단된/회수된 영수증의 긍정 해석, 잘못된 ACK 시간·경합 수, 위조된 `restriction_review_candidate`는 ROLLBACK·무응답으로 실패한다.
+- **검증:** `test/legal-reader-s7-original-receipt-withdrawal-e2e-v1.test.ts`와 표적 Legal Commerce E2E 워크플로에 동일 트랜잭션 회원 소유·미ACK/서버 준비/중복 ACK·원본 영수증 회수·위조 인도 후보·Grant 교차사용·DB 소유권 실패 검사를 연결한다. **이는 DB Owner S7 결과 계약을 모사한 격리 E2E**로, 실제 #2301 마이그레이션/실클라이언트 전송 E2E는 아직 실행할 수 없다. 현재 별도 SQL 1743의 `cmd_record_digital_reading_delivery_v1`을 S7 준비/ACK로 자동 호출하지 않는다.
+- **남은 해제 조건:** #2299 → #2301 스택의 DB Owner 인수, S7 private port 승인된 호출 위치/권한·원본 수집/보존 권위, 실제 외부 통신/전송 완료 증명과 고객 환불 접수, 법무·Privacy·Commerce 인수. 그 전까지 유료 판매·공개 Reader·운영 SQL 적용 OFF.

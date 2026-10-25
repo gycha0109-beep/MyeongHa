@@ -16,6 +16,8 @@ on:
       - 'apps/api/src/supabase-auth-http.ts'
       - 'apps/api/src/production-purchase-intent-create-runtime-v3.ts'
       - 'test/legal-commerce-checkout-delivery-e2e-v1.test.ts'
+      - 'apps/api/src/commerce-reader-s7-owner-withdrawal-bridge-v1.ts'
+      - 'test/legal-reader-s7-original-receipt-withdrawal-e2e-v1.test.ts'
       - 'test/legal-portone-preenrollment-*.test.ts'
       - 'test/legal-existing-social-state-authority-v1.test.ts'
       - 'test/db/legal_commerce_checkout_delivery_pg17.sh'
@@ -39,6 +41,8 @@ on:
       - 'apps/api/src/supabase-auth-http.ts'
       - 'apps/api/src/production-purchase-intent-create-runtime-v3.ts'
       - 'test/legal-commerce-checkout-delivery-e2e-v1.test.ts'
+      - 'apps/api/src/commerce-reader-s7-owner-withdrawal-bridge-v1.ts'
+      - 'test/legal-reader-s7-original-receipt-withdrawal-e2e-v1.test.ts'
       - 'test/legal-portone-preenrollment-*.test.ts'
       - 'test/legal-existing-social-state-authority-v1.test.ts'
       - 'test/db/legal_commerce_checkout_delivery_pg17.sh'
@@ -73,6 +77,7 @@ jobs:
         run: |
           npx vitest run \
             test/legal-commerce-checkout-delivery-e2e-v1.test.ts \
+            test/legal-reader-s7-original-receipt-withdrawal-e2e-v1.test.ts \
             test/commerce-digital-reading-withdrawal-orchestration-v1.test.ts \
             test/commerce-digital-reading-withdrawal-review-v1.test.ts \
             test/legal-digital-reading-checkout-admission-v1.test.ts \
