@@ -1,5 +1,13 @@
 # Production Security Alerting Runbook v1
 
+## Primary Cloudflare runtime (2026-10-25)
+
+General security targets Cloudflare Worker `myeongha`, not the auxiliary Vercel runtime. [Monitor authority](../../config/security/cloudflare-primary-security-monitor-v1.json) binds the exact account, Worker, query file and native monitor `fab0d24cd73740f5b2dba97766f78a66`. It counts existing `ACCESS_DENIED` (401/403) and `RATE_LIMITED` (429) security events only. The provider's native default sensitivity is 3.5 sigma over a 5-minute recent window against a 4-hour baseline; increase-only, evaluation every minute, repeat after one hour. These are native model settings, not an organic traffic estimate or a fixed request threshold. The query was previewed and the active configuration independently re-read through the official Cloudflare API.
+
+Workers Logs is enabled in the primary Wrangler config; automatic invocation URL logs are disabled. This persists existing application event output rather than a second application event schema. Provider retention, sampling and attached metadata remain platform-owned. Actual collection requires the matching Worker source/config deployment. Confirm a sanitized existing security event from the exact live version, then inspect the monitor's evaluation and delivery status. `Enabled` alone does not prove email receipt. Do not flood Production to force anomaly detection; use a supported delivery test if available. Current rollout/evidence is in [Cloudflare execution](../security/GENERAL_SECURITY_CLOUDFLARE_EXECUTION_20261024.md).
+
+The official Cloudflare monitor Test action was executed once and its sample notification was independently found in the account-owner mailbox. Synthetic provider notification delivery is verified; organic anomaly firing and actual primary Worker log ingestion remain separate checks. The Vercel rules below cover the auxiliary provider only and cannot establish Cloudflare completion.
+
 ## Purpose
 
 This runbook governs OWASP A09:2025 Production alerting for MyeongHa.

@@ -4,6 +4,14 @@
   "compatibility_date": "2026-10-20",
   "workers_dev": true,
   "preview_urls": true,
+  "observability": {
+    "enabled": true,
+    "logs": {
+      "enabled": true,
+      "head_sampling_rate": 1,
+      "invocation_logs": false
+    }
+  },
   "assets": {
     "directory": "./public",
     "binding": "ASSETS",
@@ -14,5 +22,15 @@
   "previews": {},
   "compatibility_flags": [
     "nodejs_compat"
+  ],
+  "ratelimits": [
+    {
+      "name": "AUTH_RATE_LIMITER",
+      "namespace_id": "25691",
+      "simple": {
+        "limit": 12,
+        "period": 60
+      }
+    }
   ]
 }
