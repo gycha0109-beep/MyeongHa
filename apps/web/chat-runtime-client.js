@@ -12,6 +12,7 @@ import { getActiveBearer, invalidateGuestSession, invalidateMemberSession } from
 import { PRODUCT_AUTH_STORAGE_V1 } from './product-auth.js';
 import { MyeongHaApiClientErrorV1 } from '../../packages/api-client/src/index.ts';
 import { sendSeyeonBrowserTurnWithReceiptV1 } from './chat-turn-receipt-client.js';
+import { createSeyeonAcknowledgedTurnPresentationV1 } from './seyeon-receipt-presentation.js';
 import { shouldReloadChatForMemberSessionStorageChange } from './product-auth-surface.js';
 
 const params = new URLSearchParams(window.location.search);
@@ -480,8 +481,9 @@ async function sendTurn(message) {
     if (!activeBearer || activeBearer.kind !== 'member') {
       throw new Error('MEMBER_REQUIRED');
     }
+    let acknowledgedTurn;
     try {
-      await sendSeyeonBrowserTurnWithReceiptV1({
+      acknowledgedTurn = await sendSeyeonBrowserTurnWithReceiptV1({
         origin: window.location.origin,
         bearer: activeBearer.token,
         threadId,
@@ -518,15 +520,20 @@ async function sendTurn(message) {
       throw new Error('INVALID_RESPONSE');
     }
 
-    const rereadSucceeded = await loadRoomState();
-    if (!rereadSucceeded) throw new Error('AUTHORITATIVE_REREAD_FAILED');
-
+    // History/Replay are intentionally HOLD in S0. The ACKed response is
+    // the only protected text this browser may display. Re-reading History
+    // would fail with 503 and falsely turn a committed model answer into a
+    // retryable send. No assistant body is persisted to browser storage.
+    renderConversation(
+      createSeyeonAcknowledgedTurnPresentationV1(pendingTurn, acknowledgedTurn),
+      authoritativeCharacterId,
+    );
     clearPendingTurn(pendingTurn.clientTurnId);
     if (messageInput instanceof HTMLTextAreaElement) {
       messageInput.value = '';
       messageInput.style.height = 'auto';
     }
-    setComposeStatus('세연의 답변이 도착했습니다.');
+    setComposeStatus('이번 답변의 수신이 확인되었습니다. 이전 대화 기록은 현재 제공되지 않습니다.');
   } catch (error) {
     const code = error instanceof Error ? error.message : '';
     const messageByCode = {
