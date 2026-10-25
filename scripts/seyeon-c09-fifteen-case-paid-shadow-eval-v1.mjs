@@ -72,7 +72,7 @@ function persist() {
     records,
   },null,2),'utf8');
 }
-for(const testCase of cases) for(const profile of profiles) {
+evaluation: for(const testCase of cases) for(const profile of profiles) {
   if(records.length>=limitRaw) break;
   const plan=composeSeyeonC09PersonaPromptPlanV1({
     profile,
@@ -149,7 +149,7 @@ for(const testCase of cases) for(const profile of profiles) {
     console.log('STOP_PROVIDER_UNAVAILABLE: no further billable attempts');
     persist();
     process.exitCode=2;
-    break;
+    break evaluation;
   }
 }
 persist();
