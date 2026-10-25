@@ -37,7 +37,7 @@ export interface CreateProductionSeyeonFirstMemoryNodeRuntimeInputV1 {
  * Credentials are resolved inside a request and never cached across users.
  * This composes the implementation without authorizing its deployment.
  */
-export function createProductionSeyeonFirstMemoryNodeRuntimeV1(
+export function createProductionSeyeonFirstMemoryExecutionV1(
   input: CreateProductionSeyeonFirstMemoryNodeRuntimeInputV1,
 ) {
   const config = parseProductionUserDataRuntimeConfigV1(input.env);
@@ -48,48 +48,57 @@ export function createProductionSeyeonFirstMemoryNodeRuntimeV1(
     config, ...(input.memberFetchImpl === undefined ? {} : { memberFetchImpl: input.memberFetchImpl }),
   });
   return Object.freeze({
-    handleNodeRequest(request: Readonly<{
-      incoming: IncomingMessage;
-      response: ServerResponse;
-      requestId?: string;
-      serverTime?: string;
-    }>) {
-      return handleSeyeonFirstPositiveMemoryDirectNodeHttpV1({
-        ...request, pool: lease.pool, identityEvidenceVerifier: verifier,
-        runtime: {
-          async run(turn) {
-            if (input.approvedPersonalRecordModelUse === undefined ||
-                (await input.approvedPersonalRecordModelUse()) !== true ||
-                input.governorApproval === undefined) {
-              throw Error('First Memory runtime requires reviewed source and cost authority.');
-            }
-            // Readiness has already succeeded before this closure can access
-            // provider credentials or create any metered model implementation.
-            const base = await resolveProductionSeyeonProviderConfigAtRequestV1(input.env);
-            const roles = resolveProductionSeyeonRoleProviderConfigsV1(input.env, base);
-            const governors = createSeyeonProductionChatGovernorsV1({
-              baseProviderConfig: base,
-              ...(roles === undefined ? {} : { roleProviderConfigs: roles }),
-              approval: input.governorApproval,
-            });
-            const governedDbConfig = parseSeyeonGovernedDbConfigV1({
-              env: input.env, ordinaryDatabaseUrl: config.databaseUrl,
-              ordinaryDatabasePrincipal: config.databasePrincipal,
-              rootCertificatePem: config.databaseSslRootCertificatePem ?? '',
-            });
-            const runtime = createProductionSeyeonChatRuntimeV1({
-              databaseConfig: config, pool: lease.pool,
-              providerConfig: base, roleProviderConfigs: governors.roleProviderConfigs,
-              governorMode: 'ENFORCE', costGovernorForRole: governors.costGovernorForRole,
-              governedDbConfig,
-              approvedPersonalRecordModelUse: input.approvedPersonalRecordModelUse,
-            });
-            try { return await runtime.run(turn); }
-            finally { await runtime.close(); }
-          },
-        },
+    pool: lease.pool, identityEvidenceVerifier: verifier,
+    runtime: {
+    async run(turn: Parameters<ReturnType<typeof createProductionSeyeonChatRuntimeV1>['run']>[0]) {
+      if (input.approvedPersonalRecordModelUse === undefined ||
+          (await input.approvedPersonalRecordModelUse()) !== true ||
+          input.governorApproval === undefined) {
+        throw Error('First Memory runtime requires reviewed source and cost authority.');
+      }
+      // Readiness has already succeeded before this closure can access
+      // provider credentials or create any metered model implementation.
+      const base = {...await resolveProductionSeyeonProviderConfigAtRequestV1(input.env),
+        disablePromptCaching:true as const};
+      const roles = resolveProductionSeyeonRoleProviderConfigsV1(input.env, base);
+      const governors = createSeyeonProductionChatGovernorsV1({
+        baseProviderConfig: base,
+        ...(roles === undefined ? {} : { roleProviderConfigs: roles }),
+        approval: input.governorApproval,
       });
+      const governedDbConfig = parseSeyeonGovernedDbConfigV1({
+        env: input.env, ordinaryDatabaseUrl: config.databaseUrl,
+        ordinaryDatabasePrincipal: config.databasePrincipal,
+        rootCertificatePem: config.databaseSslRootCertificatePem ?? '',
+      });
+      const runtime = createProductionSeyeonChatRuntimeV1({
+        databaseConfig: config, pool: lease.pool,
+        providerConfig: base, roleProviderConfigs: governors.roleProviderConfigs,
+        governorMode: 'ENFORCE', costGovernorForRole: governors.costGovernorForRole,
+        governedDbConfig,
+        approvedPersonalRecordModelUse: input.approvedPersonalRecordModelUse,
+      });
+      try { return await runtime.run(turn); }
+      finally { await runtime.close(); }
+    },
     },
     close() { return lease.close(); },
+  });
+}
+
+export function createProductionSeyeonFirstMemoryNodeRuntimeV1(
+  input: CreateProductionSeyeonFirstMemoryNodeRuntimeInputV1,
+) {
+  const execution=createProductionSeyeonFirstMemoryExecutionV1(input);
+  return Object.freeze({
+    handleNodeRequest(request: Readonly<{
+      incoming: IncomingMessage; response: ServerResponse;
+      requestId?: string; serverTime?: string;
+    }>) {
+      return handleSeyeonFirstPositiveMemoryDirectNodeHttpV1({...request,
+        pool:execution.pool,identityEvidenceVerifier:execution.identityEvidenceVerifier,
+        runtime:execution.runtime});
+    },
+    close() { return execution.close(); },
   });
 }

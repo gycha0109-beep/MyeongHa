@@ -55,7 +55,7 @@ export function cloudflareAuthRoute(request) {
   return url.search === '' ? action : 'invalid-query';
 }
 
-async function rateLimit(request, env, action) {
+export async function rateLimitCloudflareRequestV1(request, env, action) {
   const secret = env?.MYEONGHA_AUTH_RATE_LIMIT_SECRET;
   if (typeof secret !== 'string' || secret.length < 32 ||
       typeof env?.AUTH_RATE_LIMITER?.limit !== 'function') {
@@ -83,7 +83,7 @@ export async function handleCloudflareAuthRequest(request, env) {
     return error('INVALID_REQUEST', 403);
   }
   try {
-    const rejected = await rateLimit(request, env, action);
+    const rejected = await rateLimitCloudflareRequestV1(request, env, action);
     if (rejected !== null) return rejected;
     const result = action === 'social-start'
       ? await handleSocialAuthStartRequestV1({ request, env })

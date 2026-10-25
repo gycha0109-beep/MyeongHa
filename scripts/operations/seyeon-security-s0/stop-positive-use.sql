@@ -14,6 +14,10 @@ revoke all on function public.cmd_mark_seyeon_positive_context_ready_pinned_v1(
   uuid,uuid,uuid,uuid,uuid,uuid,uuid,text),
   public.cmd_accept_seyeon_private_conversation_recall_proposal_v1(uuid,uuid,uuid)
   from myeongha_api_executor;
+revoke all on function public.cmd_issue_seyeon_positive_first_reply_v1(
+  uuid,uuid,uuid,uuid,uuid,uuid,uuid,text,bytea) from myeongha_api_executor;
+-- Keep receipt ACK and request-revoke available: an incident stop must not
+-- strand issued replies or remove an existing withdrawal request.
 -- Keep seyeon_private.cmd_revoke_seyeon_memory_grant_v1 available so an
 -- incident stop cannot remove the user's ability to withdraw existing grants.
 commit;

@@ -175,7 +175,10 @@ describe('MyeongHa immersive long-form Character Room', () => {
     expect(transport).toContain('const loaded = await loadRoomState()');
     expect(transport).toContain('roomReady = true');
     expect(transport).not.toContain('window.location.assign(');
-    expect(transport).toContain('/turns');
+    expect(transport).toContain('sendSeyeonBrowserTurnWithReceiptV1');
+    const sharedChat = await readFile(new URL('../packages/api-client/src/chat.ts', import.meta.url), 'utf8');
+    expect(sharedChat).toContain('/turns');
+    expect(sharedChat).toContain('/api/chat/delivery-receipts/');
     expect(transport).toContain('clientTurnId: crypto.randomUUID()');
     expect(transport).toContain("authoritativeCharacterId !== 'seyeon'");
     expect(transport).toContain("activeBearer.kind !== 'member'");

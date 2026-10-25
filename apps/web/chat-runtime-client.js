@@ -10,6 +10,8 @@ import { applyCanonicalCharacterPresentationV1 } from './chat-character.js';
 import { parseChatRoomReadPayloadV1, parseChatThreadRouteV1 } from './chat-room-read-contract.js';
 import { getActiveBearer, invalidateGuestSession, invalidateMemberSession } from './product-auth.js';
 import { PRODUCT_AUTH_STORAGE_V1 } from './product-auth.js';
+import { MyeongHaApiClientErrorV1 } from '../../packages/api-client/src/index.ts';
+import { sendSeyeonBrowserTurnWithReceiptV1 } from './chat-turn-receipt-client.js';
 import { shouldReloadChatForMemberSessionStorageChange } from './product-auth-surface.js';
 
 const params = new URLSearchParams(window.location.search);
@@ -478,61 +480,44 @@ async function sendTurn(message) {
     if (!activeBearer || activeBearer.kind !== 'member') {
       throw new Error('MEMBER_REQUIRED');
     }
-    const response = await fetch(
-      `/api/chat/${encodeURIComponent(threadId)}/turns`,
-      {
-        method: 'POST',
-        credentials: 'same-origin',
-        cache: 'no-store',
-        headers: {
-          Accept: 'application/json',
-          'Accept-Language': getUiLocale(),
-          ...getUiLocaleRequestHeadersV1(),
-          Authorization: `Bearer ${activeBearer.token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          clientTurnId: pendingTurn.clientTurnId,
-          text: pendingTurn.text,
-        }),
-      },
-    );
-
-    if (response.status === 401) {
-      invalidateRejectedBearer(activeBearer);
-      throw new Error('AUTH_REQUIRED');
-    }
-
-    let envelope = null;
     try {
-      envelope = await response.json();
-    } catch {
+      await sendSeyeonBrowserTurnWithReceiptV1({
+        origin: window.location.origin,
+        bearer: activeBearer.token,
+        threadId,
+        turn: { clientTurnId: pendingTurn.clientTurnId, text: pendingTurn.text },
+        language: getUiLocale(),
+        localeHeaders: getUiLocaleRequestHeadersV1(),
+      });
+    } catch (error) {
+      if (error instanceof MyeongHaApiClientErrorV1) {
+        if (error.status === 401 || error.code === 'AUTH_REQUIRED') {
+          invalidateRejectedBearer(activeBearer);
+          throw new Error('AUTH_REQUIRED');
+        }
+        if (error.code === 'IDEMPOTENCY_CONFLICT') {
+          clearPendingTurn(pendingTurn.clientTurnId);
+          throw new Error('IDEMPOTENCY_CONFLICT');
+        }
+        if (error.code === 'INSUFFICIENT_CREDITS' || error.code === 'CREDIT_INSUFFICIENT') {
+          document.dispatchEvent(new CustomEvent('myeongha:credit-shortage', {
+            detail: { turnId: pendingTurn.clientTurnId },
+          }));
+          throw new Error('CREDIT_SHORTAGE');
+        }
+        if (error.status === 403) throw new Error('MEMBER_REQUIRED');
+        if (['CONTENT_INCOMPATIBLE', 'CAPABILITY_UNAVAILABLE', 'TURN_IN_FLIGHT',
+          'AI_TEMPORARILY_UNAVAILABLE'].includes(error.code)) {
+          throw new Error(error.code);
+        }
+        throw new Error(error.kind === 'malformed_response'
+          ? 'INVALID_RESPONSE' : 'TURN_SEND_FAILED');
+      }
+      // Includes a syntactically invalid or unacknowledged delivery receipt.
+      // Leave the draft and stable clientTurnId intact for reconciliation.
       throw new Error('INVALID_RESPONSE');
     }
 
-    if (!response.ok) {
-      const code = envelope?.error?.code;
-      if (code === 'CONTENT_INCOMPATIBLE') throw new Error('CONTENT_INCOMPATIBLE');
-      if (code === 'CAPABILITY_UNAVAILABLE') throw new Error('CAPABILITY_UNAVAILABLE');
-      if (code === 'TURN_IN_FLIGHT') throw new Error('TURN_IN_FLIGHT');
-      if (code === 'IDEMPOTENCY_CONFLICT') {
-        clearPendingTurn(pendingTurn.clientTurnId);
-        throw new Error('IDEMPOTENCY_CONFLICT');
-      }
-      if (code === 'AI_TEMPORARILY_UNAVAILABLE') throw new Error('AI_TEMPORARILY_UNAVAILABLE');
-      if (code === 'INSUFFICIENT_CREDITS' || code === 'CREDIT_INSUFFICIENT') {
-        // Act only on an explicit server denial; retain the draft and idempotency key.
-        document.dispatchEvent(new CustomEvent('myeongha:credit-shortage', {
-          detail: { turnId: pendingTurn.clientTurnId },
-        }));
-        throw new Error('CREDIT_SHORTAGE');
-      }
-      if (response.status === 403) throw new Error('MEMBER_REQUIRED');
-      throw new Error('TURN_SEND_FAILED');
-    }
-
-    const { unwrapApiSuccessEnvelope } = await apiEnvelopePromise;
-    unwrapApiSuccessEnvelope(envelope);
     const rereadSucceeded = await loadRoomState();
     if (!rereadSucceeded) throw new Error('AUTHORITATIVE_REREAD_FAILED');
 
