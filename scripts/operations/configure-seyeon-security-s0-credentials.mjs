@@ -22,7 +22,8 @@ for(const root of [fileURLToPath(new URL('../../',import.meta.url)),dirname(envF
   }
 }
 const source=parseEnv(await readFile(envFile,'utf8'));
-if(!source.SUPABASE_DB_PASSWORD||!source.MYEONGHA_WORKER_DATABASE_URL||!source.OPENAI_API_KEY){
+const requiredCredentialKeys=['SUPABASE_DB_PASSWORD','MYEONGHA_WORKER_DATABASE_URL','OPENAI_API_KEY'];
+if(requiredCredentialKeys.some(key=>typeof source[key]!=='string'||source[key].trim().length===0)){
   throw Error('Existing operator DB and native Provider credentials required.');
 }
 const ref='cnsfpcdiyofqvhpcegfc',principal='myeongha_seyeon_governed_login';
