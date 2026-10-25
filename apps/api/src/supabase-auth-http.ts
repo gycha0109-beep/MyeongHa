@@ -361,6 +361,8 @@ export interface SupabasePreenrollmentMemberBindingPortV1 {
   verifySocialState?(state: string): boolean;
   /** Separate cookie-bound OAuth correlation for existing verified Members. */
   verifyExistingSocialState?(state: string): boolean;
+  /** Atomic 1742 claim only AFTER trusted upstream existing-Member admission. */
+  consumeExistingSocialState?(state: string): Promise<boolean>;
   /** Drop an unused A1 age proof if OAuth resolves to an ALREADY verified Member. */
   retireExistingSocialProof?(): Promise<boolean>;
 }
@@ -480,7 +482,11 @@ export async function handleSupabaseAuthRequestV1(input: {
             // OAuth start proof, not merely a client-submitted state string.
             matchedExistingSocialCookie =
               input.preenrollmentMemberPort.verifyExistingSocialState?.(providedState!) === true;
-            if (!matchedExistingSocialCookie) {
+            if (matchedExistingSocialCookie) {
+              if (await input.preenrollmentMemberPort.consumeExistingSocialState?.(providedState!) !== true) {
+                return errorResponse('SOCIAL_AUTH_CALLBACK_STATE_MISMATCH', 403);
+              }
+            } else {
               if (input.preenrollmentMemberPort.verifySocialState?.(providedState!) !== true) {
                 return errorResponse('SOCIAL_AUTH_CALLBACK_STATE_MISMATCH', 403);
               }

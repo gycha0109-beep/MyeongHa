@@ -4,7 +4,7 @@ import { handleSupabaseAuthRequestV1 } from '../apps/api/src/supabase-auth-http.
 import type { SupabasePreenrollmentMemberBindingPortV1 } from '../apps/api/src/supabase-auth-http.js';
 import { readFileSync } from 'node:fs';
 import { issuePortOneBoundSocialStateV1, verifyPortOneBoundSocialStateV1 } from '../apps/api/src/portone-v2-preenrollment-social-state-v1.js';
-import { issueExistingMemberSocialStateV1, verifyExistingMemberSocialStateV1 } from '../apps/api/src/portone-v2-existing-social-state-v1.js';
+import { issueExistingMemberSocialStateV1, fingerprintExistingMemberSocialStateV1, verifyExistingMemberSocialStateV1 } from '../apps/api/src/portone-v2-existing-social-state-v1.js';
 
 const env = {
   MYEONGHA_SUPABASE_URL: 'https://cnsfpcdiyofqvhpcegfc.supabase.co',
@@ -82,8 +82,10 @@ describe('A1 Social Auth preverified age hold and atomic Member binding', () => 
       body: JSON.stringify({ provider: 'google',
         redirectUri: 'https://myeongha.vercel.app/auth.html?social=callback' }),
     });
+    const issue = vi.fn(async () => true);
     const result = await handleSocialAuthStartRequestV1({
       request, env, approvedExistingMemberStart: true,
+      existingSocialStatePort: { issue },
     });
     expect(result.status).toBe(200);
     const body = await result.json();
@@ -92,6 +94,7 @@ describe('A1 Social Auth preverified age hold and atomic Member binding', () => 
     expect(body.data.state).not.toBe(signedSocialState);
     expect(result.headers.get('set-cookie')).toContain('__Host-myeongha-existing-social-v1=');
     expect(result.headers.get('set-cookie')).toContain('HttpOnly; Secure; SameSite=Strict');
+    expect(issue).toHaveBeenCalledWith(expect.stringMatching(/^[a-f0-9]{64}$/u));
 
     const unauthorized = await handleSocialAuthStartRequestV1({
       request: socialStartRequest(), env, approvedExistingMemberStart: true,
@@ -109,6 +112,24 @@ describe('A1 Social Auth preverified age hold and atomic Member binding', () => 
       env, approvedExistingMemberStart: true,
     });
     expect(native.status).toBe(403);
+  });
+
+  it('does not redirect or issue a cookie if durable OAuth state is unavailable', async () => {
+    for (const port of [undefined, { issue: async () => false },
+      { issue: async () => { throw new Error('DB unavailable'); } }]) {
+      const request = new Request('https://myeongha.vercel.app/api/auth/social/start', {
+        method: 'POST',
+        headers: { Origin: 'https://myeongha.vercel.app', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider: 'google',
+          redirectUri: 'https://myeongha.vercel.app/auth.html?social=callback' }),
+      });
+      const response = await handleSocialAuthStartRequestV1({
+        request, env, approvedExistingMemberStart: true,
+        ...(port === undefined ? {} : { existingSocialStatePort: port }),
+      });
+      expect(response.status).toBe(503);
+      expect(response.headers.get('set-cookie')).toBeNull();
+    }
   });
 
   it('does not exchange even an existing Member Social refresh token without OAuth correlation state', async () => {
@@ -148,6 +169,8 @@ describe('A1 Social Auth preverified age hold and atomic Member binding', () => 
     expect(verifyExistingMemberSocialStateV1({
       secret, request: cookieRequest, state: issued.state, nowEpochMs: socialClock + 1_000,
     })).toBe(true);
+    expect(fingerprintExistingMemberSocialStateV1({ secret, state: issued.state }))
+      .toMatch(/^[a-f0-9]{64}$/u);
     expect(verifyExistingMemberSocialStateV1({
       secret, request: new Request(cookieRequest.url), state: issued.state, nowEpochMs: socialClock,
     })).toBe(false);
@@ -159,10 +182,12 @@ describe('A1 Social Auth preverified age hold and atomic Member binding', () => 
       user: { id, email: 'existing@example.com' },
     }));
     vi.stubGlobal('fetch', upstream);
+    const consumeExistingSocialState = vi.fn(async () => true);
     const existingPort: SupabasePreenrollmentMemberBindingPortV1 = {
       ...admission(false),
       admitExistingMember: vi.fn(async () => true),
       verifySocialState: () => false,
+      consumeExistingSocialState,
       verifyExistingSocialState: (state) => verifyExistingMemberSocialStateV1({
         secret, request: cookieRequest, state, nowEpochMs: socialClock + 1_000,
       }),
@@ -173,6 +198,7 @@ describe('A1 Social Auth preverified age hold and atomic Member binding', () => 
     });
     expect(successful.status).toBe(200);
     expect(successful.headers.get('set-cookie')).toContain('__Host-myeongha-existing-social-v1=;');
+    expect(consumeExistingSocialState).toHaveBeenCalledExactlyOnceWith(issued.state);
     expect(existingPort.bindMember).not.toHaveBeenCalled();
     expect(upstream).toHaveBeenCalledOnce();
 
@@ -184,6 +210,15 @@ describe('A1 Social Auth preverified age hold and atomic Member binding', () => 
     expect(rejected.status).toBe(403);
     expect(rejected.headers.get('set-cookie')).toBeNull();
     expect(upstream).toHaveBeenCalledOnce();
+
+    const replayed = await handleSupabaseAuthRequestV1({
+      request: socialCompleteRequest(issued.state), env, action: 'social-complete',
+      preenrollmentMemberPort: {
+        ...existingPort, consumeExistingSocialState: async () => false,
+      },
+    });
+    expect(replayed.status).toBe(403);
+    expect(replayed.headers.get('set-cookie')).toBeNull();
   });
 
   it('does not grant an unverified OAuth account access on existing-member-only callback', async () => {

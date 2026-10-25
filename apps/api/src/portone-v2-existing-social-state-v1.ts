@@ -9,6 +9,22 @@ export const EXISTING_MEMBER_SOCIAL_STATE_COOKIE_V1 =
   '__Host-myeongha-existing-social-v1' as const;
 const NONCE = /^[A-Za-z0-9_-]{43}$/u;
 const PURPOSE = 'myeongha-existing-member-social-state-v1';
+const ISSUED_STATE = /^[0-9a-z]{10}[a-f0-9]{32}[A-Za-z0-9_-]{43}$/u;
+
+/** HMAC-only durable correlation; raw OAuth state/cookie never enters PostgreSQL. */
+export function fingerprintExistingMemberSocialStateV1(input: Readonly<{
+  secret: string;
+  state: string;
+}>): string {
+  if (typeof input.secret !== 'string' || input.secret.length < 32 ||
+      input.secret.trim() !== input.secret || !ISSUED_STATE.test(input.state)) {
+    throw new Error('Existing Member OAuth digest cannot be issued.');
+  }
+  return createHmac('sha256', input.secret)
+    .update(PURPOSE).update('\0').update('state').update('\0')
+    .update(input.state).digest('hex');
+}
+
 
 function bindingDigest(secret: string, nonce: string): string {
   if (typeof secret !== 'string' || secret.length < 32 ||

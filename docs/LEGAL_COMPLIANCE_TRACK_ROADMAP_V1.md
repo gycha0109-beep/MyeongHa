@@ -244,3 +244,10 @@
 - `apps/api/src/commerce-digital-reading-withdrawal-orchestration-v1.ts`에 **내부 전용** 읽기 경계 `reviewOwnedDigitalReadingWithdrawalV1` 추가. 이미 신뢰된 Member/Guest 신원 증거를 기존 `executePostgresSubjectTransactionV1`에서 canonical Subject로 확정한 뒤, 서버 소유 `OwnedDigitalReadingReviewSnapshotPortV1`이 *동일 트랜잭션*에서 한 구매 단위의 결제/고지/제공 사실만 읽도록 규약화한다.
 - 사용자 선택 입력은 `purchaseIntentId`, `unitId`, `reason`만 허용하며 브라우저 `paid`, `readAt`, `delivered`, `acknowledged`, `refundApproved` 등은 **무시**한다. 저장된 사건이 없으면 `evidence_review_required`, 다른 단위 고지·인도는 거절, DB 실패 시 ROLLBACK. 반환에는 구매 식별자, 사주 본문, PG 응답 원문을 포함하지 않는다.
 - `test/commerce-digital-reading-withdrawal-orchestration-v1.test.ts`의 가짜 DB 트랜잭션으로 소유자 검증/상태 누락/클라이언트 위조/타 단위/DB 실패/예외 우선순위를 점검하도록 구성했다. **실제 Commerce/S7 구매·고지·배송 일관성 스냅샷 저장 및 조회 권위는 미구현**, 서버 포트 인젝션 실연결 전 이 경계는 `active:false`, 공개 라우트 없음, 결제/환불/Grant 변경 권한 없음. 판매 OFF.
+
+
+## 30. 2026-10-25 A1 기존 소셜 회원 OAuth 상태 DB 1회 소비 구현
+
+- 기존 Member OAuth 서명 쿠키의 **재사용 가능성**을 해소하기 위해 미적용 제안 SQL `supabase/proposals/1742_existing_member_social_state_v1.proposed.sql`에 HMAC 상태 지문만 기록하는 10분 TTL 테이블, 중복 발급 거절, 원자적 1회 소비, System 전용 만료물리정리, RLS/ACL 최소 권한을 정의했다. 추가 테이블은 기존 삭제/보존 승인 그래프 바깥이며 Privacy/DB 승인 이전 운영 적용 금지.
+- 기존 Member OAuth 시작은 DB `cmd_issue_existing_member_social_state_v1`에서 서버 서명 상태를 등록하기 **전에는 리디렉션·쿠키를 발급하지 않는다**. 완료는 원래 브라우저 소유 HMAC 검증 및 Supabase 조회의 기존 Member 확인 뒤 DB `cmd_consume_existing_member_social_state_v1` 1회 성공일 때만 세션을 발급한다. 중복 콜백·DB 오류·만료 시 비발급.
+- 인증 시작/완료 포트, 라우터, 로그인 서버를 같은 PR에 연결했으며 `test/legal-portone-preenrollment-social-v1.test.ts`, `test/legal-existing-social-state-authority-v1.test.ts`, 폐기형 `test/db/portone_identity_age_authority_pg17.sh`에 검증 항목을 보강했다. **PG17 GREEN/실브라우저 소셜 로그인/통합 CI/Production 적용은 아직 미확인 또는 미실행**. A1 OFF 기존 소셜 경로를 변경하지 않는다.

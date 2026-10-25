@@ -309,4 +309,42 @@ set -e
 [[ "$member_replay_rc" != 0 ]] || fail 'same verified proof bound multiple Members'
 pass 'A1 atomic Supabase Member creation and replay refusal'
 
+# Proposal 1742 exists solely in this disposable PG17 database.
+psql -X -v ON_ERROR_STOP=1 -f supabase/proposals/1742_existing_member_social_state_v1.proposed.sql >/dev/null
+social_digest="$(printf '9%.0s' {1..64})"
+social_issue() {
+  q "begin; set local role myeongha_api_executor;
+    select public.cmd_issue_existing_member_social_state_v1('$1'); commit;" |
+    grep -E '^[tf]
+ | tail -n 1
+}
+social_consume() {
+  q "begin; set local role myeongha_api_executor;
+    select public.cmd_consume_existing_member_social_state_v1('$1'); commit;" |
+    grep -E '^[tf]
+ | tail -n 1
+}
+[[ "$(social_issue "$social_digest")" == t ]] || fail 'OAuth state not issued'
+[[ "$(social_issue "$social_digest")" == f ]] || fail 'OAuth state duplicate issue accepted'
+[[ "$(social_consume "$social_digest")" == t ]] || fail 'OAuth state not consumed'
+[[ "$(social_consume "$social_digest")" == f ]] || fail 'OAuth state replay accepted'
+[[ "$(q "select case when
+ not has_table_privilege('authenticated','public.legal_existing_member_social_states_v1','SELECT')
+ and not has_table_privilege('myeongha_api_executor','public.legal_existing_member_social_states_v1','SELECT')
+ and not has_function_privilege('anon','public.cmd_issue_existing_member_social_state_v1(text)','EXECUTE')
+ and has_function_privilege('myeongha_api_executor','public.cmd_consume_existing_member_social_state_v1(text)','EXECUTE')
+ then 't' else 'f' end")" == t ]] || fail 'OAuth state role ACL escaped'
+expired_social="$(printf '8%.0s' {1..64})"
+[[ "$(social_issue "$expired_social")" == t ]] || fail 'OAuth expiry fixture missing'
+q "update public.legal_existing_member_social_states_v1
+ set issued_at=clock_timestamp()-interval '30 minutes',
+ expires_at=clock_timestamp()-interval '20 minutes'
+ where state_digest='$expired_social';" >/dev/null
+[[ "$(social_consume "$expired_social")" == f ]] || fail 'expired OAuth state consumed'
+[[ "$(q "begin; set local role myeongha_system_executor;
+ select public.internal_purge_existing_member_social_states_v1(250); commit;" |
+ grep -E '^[0-9]+
+ | tail -n 1)" == 1 ]] || fail 'OAuth expiry purge mismatch'
+pass 'A1 existing Member OAuth signed state one-use and TTL'
+
 echo 'PASS PortOne identity PG17 disposable authority smoke complete; no Production migration applied.'

@@ -6,8 +6,10 @@ import {
 } from './portone-v2-preenrollment-age-authority-v1.js';
 import { createPostgresPortOneVerifiedAgeAdmissionPortV1 } from './portone-v2-verified-age-admission-v1.js';
 import {
+  fingerprintExistingMemberSocialStateV1,
   verifyExistingMemberSocialStateV1,
 } from './portone-v2-existing-social-state-v1.js';
+import { createPostgresExistingMemberSocialStateAuthorityV1 } from './portone-v2-existing-social-state-authority-v1.js';
 import {
   issuePortOneBoundSocialStateV1,
   verifyPortOneBoundSocialStateV1,
@@ -37,6 +39,7 @@ export function createApprovedPortOnePreenrollmentMemberBindingPortV1(input: Rea
     : fingerprintPortOnePreenrollmentBindingV1({ rawNonce, secret: secret! });
   const authority = createPostgresPortOnePreenrollmentAgeAuthorityV1(input.pool);
   const verifiedAge = createPostgresPortOneVerifiedAgeAdmissionPortV1(input.pool);
+  const existingSocial = createPostgresExistingMemberSocialStateAuthorityV1(input.pool);
   return Object.freeze({
     async readVerified() {
       return digest !== null && await authority.readVerified(digest) !== null;
@@ -61,6 +64,14 @@ export function createApprovedPortOnePreenrollmentMemberBindingPortV1(input: Rea
         verifyExistingMemberSocialStateV1({
           secret, request: input.request, state, nowEpochMs: Date.now(),
         });
+    },
+    async consumeExistingSocialState(state: string) {
+      if (input.allowExistingMemberOnly !== true || rawNonce !== null ||
+          typeof secret !== 'string' ||
+          !verifyExistingMemberSocialStateV1({
+            secret, request: input.request, state, nowEpochMs: Date.now(),
+          })) return false;
+      return existingSocial.consume(fingerprintExistingMemberSocialStateV1({ secret, state }));
     },
     async retireExistingSocialProof() {
       // This authority is only called after an upstream verified existing

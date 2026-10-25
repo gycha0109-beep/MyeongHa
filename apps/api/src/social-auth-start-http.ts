@@ -1,5 +1,5 @@
 import { denyUnverifiedInitialIdentityAdmissionV1 } from './portone-v2-preidentity-admission-v1.js';
-import { issueExistingMemberSocialStateV1 } from './portone-v2-existing-social-state-v1.js';
+import { fingerprintExistingMemberSocialStateV1, issueExistingMemberSocialStateV1 } from './portone-v2-existing-social-state-v1.js';
 import type { SupabasePreenrollmentMemberBindingPortV1 } from './supabase-auth-http.js';
 import {
   AuthenticatedJsonRequestBodyTooLargeV1,
@@ -123,6 +123,8 @@ export async function handleSocialAuthStartRequestV1(input: {
   readonly preenrollmentMemberPort?: Pick<SupabasePreenrollmentMemberBindingPortV1, 'readVerified' | 'issueSocialState'>;
   /** Trusted dispatcher gate only: OAuth discovery for an EXISTING Member. */
   readonly approvedExistingMemberStart?: true;
+  /** Required only for A1 existing Member starts; one-time DB proof before redirect. */
+  readonly existingSocialStatePort?: Readonly<{ issue(digest: string): Promise<boolean> }>;
 }): Promise<Response> {
   if (input.request.method !== 'POST') {
     cancelUnusedRequestBody(input.request);
@@ -199,6 +201,13 @@ export async function handleSocialAuthStartRequestV1(input: {
         secret: input.env.MYEONGHA_PORTONE_PREENROLLMENT_BINDING_SECRET ?? '',
         nowEpochMs: now,
       });
+      if (input.existingSocialStatePort === undefined ||
+          !await input.existingSocialStatePort.issue(
+            fingerprintExistingMemberSocialStateV1({
+              secret: input.env.MYEONGHA_PORTONE_PREENROLLMENT_BINDING_SECRET ?? '',
+              state: issued.state,
+            }),
+          )) return failure('AGE_VERIFICATION_UNAVAILABLE', 503);
       state = issued.state;
       existingMemberStateCookie = issued.cookie;
     } catch {
