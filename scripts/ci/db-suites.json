@@ -79,7 +79,8 @@
       "seyeon-c08-first-turn-local-pg17",
       "seyeon-first-zero-locked-reveal-disposable-pg17",
       "seyeon-c08y-disposable-shared-ledger-pg17",
-      "portone-identity-age-authority-pg17"
+      "portone-identity-age-authority-pg17",
+      "legal-commerce-checkout-delivery-pg17"
     ]
   }
 }

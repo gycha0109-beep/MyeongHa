@@ -99,6 +99,18 @@ catalog_snapshot() {
 }
 
 case "$case_name" in
+  legal-commerce-checkout-delivery-pg17)
+    verify_pg17
+    [[ "${GITHUB_ACTIONS:-}" == true && "${CI:-}" == true &&
+       "${DB_SUITE:-}" == postgres17 && "${PGHOST:-}" == localhost &&
+       "${PGPORT:-}" == 5432 && "${PGDATABASE:-}" =~ ^myeongha_ci_case_[0-9]+$ ]] || {
+      echo HOLD_LEGAL_COMMERCE_PG17_DISPOSABLE_CI_ONLY >&2; exit 1;
+    }
+    apply_pg17_migrations_without_birth_authority
+    psql -X -v ON_ERROR_STOP=1 -f test/db/standard_love_relationship_reader_authority.sql >/dev/null
+    psql -X -v ON_ERROR_STOP=1 -f supabase/proposals/1743_digital_reading_checkout_delivery_evidence_v1.proposed.sql >/dev/null
+    bash test/db/legal_commerce_checkout_delivery_pg17.sh
+    ;;
   portone-identity-age-authority-pg17)
     verify_pg17
     [[ "${GITHUB_ACTIONS:-}" == true && "${CI:-}" == true &&

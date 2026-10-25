@@ -1,4 +1,5 @@
 import { ApiCommandError } from './api-error.js';
+import { createPostgresOwnedDigitalReadingReviewSnapshotPortV1 } from './postgres-digital-reading-withdrawal-evidence-v1.js';
 import {
   assessDigitalReadingWithdrawalReviewV1,
   type DigitalReadingWithdrawalReasonV1,
@@ -86,5 +87,19 @@ export async function reviewOwnedDigitalReadingWithdrawalV1(input: Readonly<{
         claim: { purchaseIntentId, unitId, reason },
       });
     },
+  });
+}
+
+/**
+ * Actual internal composition for the proposed Commerce/S7 PostgreSQL authority.
+ * A Member or Guest credential has to be verified before this call. No public
+ * route, refund rejection or payment/Grant effect is activated by this wrapper.
+ */
+export function reviewOwnedDigitalReadingWithdrawalFromPostgresV1(
+  input: Omit<Parameters<typeof reviewOwnedDigitalReadingWithdrawalV1>[0], 'evidencePort'>,
+): Promise<DigitalReadingWithdrawalReviewV1> {
+  return reviewOwnedDigitalReadingWithdrawalV1({
+    ...input,
+    evidencePort: createPostgresOwnedDigitalReadingReviewSnapshotPortV1(),
   });
 }

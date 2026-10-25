@@ -1,0 +1,93 @@
+name: Legal Commerce E2E (isolated)
+on:
+  pull_request:
+    paths:
+      - 'apps/api/src/commerce-digital-reading-*'
+      - 'apps/api/src/postgres-digital-reading-*'
+      - 'test/legal-commerce-checkout-delivery-e2e-v1.test.ts'
+      - 'test/db/legal_commerce_checkout_delivery_pg17.sh'
+      - 'test/db/run_ci_case.sh'
+      - 'supabase/proposals/1743_digital_reading_checkout_delivery_evidence_v1.proposed.sql'
+      - '.github/workflows/legal-commerce-e2e.yml'
+  push:
+    branches:
+      - fix/legal-compliance/ai-disclosure-and-launch-audit-20261023
+    paths:
+      - 'apps/api/src/commerce-digital-reading-*'
+      - 'apps/api/src/postgres-digital-reading-*'
+      - 'test/legal-commerce-checkout-delivery-e2e-v1.test.ts'
+      - 'test/db/legal_commerce_checkout_delivery_pg17.sh'
+      - 'test/db/run_ci_case.sh'
+      - 'supabase/proposals/1743_digital_reading_checkout_delivery_evidence_v1.proposed.sql'
+      - '.github/workflows/legal-commerce-e2e.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: legal-commerce-e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  node-e2e:
+    name: Owned checkout-delivery-withdrawal E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install exact locked dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Compile TypeScript
+        run: npx tsc -p tsconfig.json --noEmit
+      - name: Execute Commerce E2E and critical classification regressions
+        run: |
+          npx vitest run \
+            test/legal-commerce-checkout-delivery-e2e-v1.test.ts \
+            test/commerce-digital-reading-withdrawal-orchestration-v1.test.ts \
+            test/commerce-digital-reading-withdrawal-review-v1.test.ts
+
+  pg17-e2e:
+    name: Disposable PostgreSQL 17 actual SQL E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17.6
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ${{ github.run_id }}-${{ github.run_attempt }}
+          POSTGRES_DB: myeongha_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d myeongha_test"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+    env:
+      PGHOST: localhost
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: ${{ github.run_id }}-${{ github.run_attempt }}
+      DB_SUITE: postgres17
+      CI: "true"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Create ephemeral one-run test database
+        shell: bash
+        env:
+          PGDATABASE: myeongha_test
+        run: |
+          set -euo pipefail
+          psql -v ON_ERROR_STOP=1 -c "create database myeongha_ci_case_${GITHUB_RUN_ID};"
+      - name: Run actual purchase to notice to delivery SQL E2E
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PGDATABASE="myeongha_ci_case_${GITHUB_RUN_ID}"
+          bash test/db/run_ci_case.sh legal-commerce-checkout-delivery-pg17
