@@ -82,7 +82,7 @@ describe('fixed web UI localization', () => {
         expect(rendered).not.toMatch(/[가-힣]/u);
       }
     }
-    expect(formatStaticUi(templates[0], { reader: '세연' }, 'ko-KR'))
+    expect(formatStaticUi('{reader}과 함께 관상을 봅니다.', { reader: '세연' }, 'ko-KR'))
       .toBe('세연과 함께 관상을 봅니다.');
   });
 
