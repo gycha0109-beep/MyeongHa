@@ -34,13 +34,17 @@ export function createSeyeonC08LocalThreadIntegrityPortV1(input:Readonly<{
   if(typeof input?.subjectId!=='string'||!input.subjectId.trim()||
      typeof input.threadId!=='string'||!input.threadId.trim()||
      input.subjectId.length>256||input.threadId.length>256||
+     input.subjectId!==input.subjectId.trim()||
+     input.threadId!==input.threadId.trim()||
      typeof input.readCompleteServerThread!=='function')throw invalid();
   async function read(query:Readonly<{
     subjectId:string;threadId:string;currentUserMessageId:string;
   }>){
     if(query.subjectId!==input.subjectId||query.threadId!==input.threadId||
        typeof query.currentUserMessageId!=='string'||
-       !query.currentUserMessageId.trim())throw invalid();
+       !query.currentUserMessageId.trim()||
+       query.currentUserMessageId!==query.currentUserMessageId.trim()||
+       query.currentUserMessageId.length>256)throw invalid();
     let result: SeyeonC08AuthoritativeThreadReadV1;
     try{result=await input.readCompleteServerThread(query);}
     catch{throw invalid();}
@@ -53,14 +57,20 @@ export function createSeyeonC08LocalThreadIntegrityPortV1(input:Readonly<{
     for(let i=0;i<result.messages.length;i++){
       const m=result.messages[i];
       if(!m||typeof m.messageId!=='string'||!m.messageId.trim()||
-         m.messageId.length>256||seen.has(m.messageId)||
+         m.messageId.length>256||m.messageId.trim()!==m.messageId||
+         seen.has(m.messageId)||
          m.role!==(i%2===0?'user':'assistant')||
-         typeof m.text!=='string'||!m.text.trim())throw invalid();
+         typeof m.text!=='string'||!m.text.trim()||
+         m.text.length>4000)throw invalid();
       seen.add(m.messageId);
     }
     if(result.messages[result.messages.length-1]?.messageId!==
        query.currentUserMessageId)throw invalid();
-    return result.messages;
+    // Take an immutable copy of the exact DB-returned rows before hashing;
+    // later mutation of a shared data-array cannot alter this checkpoint.
+    return Object.freeze(result.messages.map(m=>Object.freeze({
+      messageId:m.messageId,role:m.role,text:m.text,
+    })));
   }
   return Object.freeze({
     subjectId:input.subjectId,
