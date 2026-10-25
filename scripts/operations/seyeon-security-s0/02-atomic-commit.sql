@@ -294,10 +294,12 @@ alter function public.cmd_commit_seyeon_positive_chat_turn_v1(
   uuid,uuid,uuid,uuid,uuid,uuid,uuid,uuid,jsonb,text,text,text
 ) owner to myeongha_seyeon_chat_runtime_owner;
 revoke create on schema public from myeongha_seyeon_chat_runtime_owner;
-revoke myeongha_seyeon_chat_runtime_owner from current_user;
 revoke all on function public.cmd_commit_seyeon_positive_chat_turn_v1(
   uuid,uuid,uuid,uuid,uuid,uuid,uuid,uuid,jsonb,text,text,text
 ) from public,anon,authenticated,service_role;
+
+-- Complete function ACL changes before dropping temporary owner authority.
+revoke myeongha_seyeon_chat_runtime_owner from current_user;
 
 -- No EXECUTE to the API login. Until the authorized type/codec and G3
 -- contracts exist, positive Provider/HTTP remain impossible.

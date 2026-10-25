@@ -24,6 +24,33 @@ begin
 end
 $preflight$;
 
+-- postgres is a restricted managed owner, not a superuser. Delegate the
+-- registry row lock to its existing NOLOGIN owner without granting the API
+-- or postgres direct registry access or broad inherited owner authority.
+grant myeongha_seyeon_chat_runtime_owner to current_user;
+grant create on schema seyeon_private to myeongha_seyeon_chat_runtime_owner;
+create function seyeon_private.lock_positive_source_registry_v1(
+  p_record_type text,p_schema_version text,p_projector_version text
+) returns boolean language plpgsql security definer
+set search_path=pg_catalog,public
+as $registry_lock$
+begin
+  perform 1 from public.seyeon_positive_source_type_registry_v1 reg
+  where reg.record_kind='memory' and reg.enabled
+    and reg.record_type=p_record_type and reg.schema_version=p_schema_version
+    and reg.projector_version=p_projector_version for share of reg;
+  return found;
+end
+$registry_lock$;
+alter function seyeon_private.lock_positive_source_registry_v1(text,text,text)
+  owner to myeongha_seyeon_chat_runtime_owner;
+revoke create on schema seyeon_private from myeongha_seyeon_chat_runtime_owner;
+revoke all on function seyeon_private.lock_positive_source_registry_v1(text,text,text)
+  from public,anon,authenticated,service_role,myeongha_api_executor;
+grant execute on function seyeon_private.lock_positive_source_registry_v1(text,text,text),
+  public.assert_seyeon_chat_thread_runtime_v1(uuid,uuid) to postgres;
+revoke myeongha_seyeon_chat_runtime_owner from current_user;
+
 -- Receipt metadata lives on the existing Attempt, preserving the deletion graph.
 alter table public.chat_turn_attempts
   add column seyeon_positive_delivery_receipt_hash bytea,
@@ -144,14 +171,9 @@ begin
   end if;
 
   -- No SRC-25 registered model-inference permission => absolutely no Reveal.
-  perform 1 from public.seyeon_positive_source_type_registry_v1 reg
-  where reg.record_kind='memory' and reg.enabled
-    and reg.record_type=v_pin->>'recordType'
-    and reg.schema_version=v_pin->>'recordSchemaVersion'
-    and reg.projector_version=v_pin->>'projectorVersion'
-  -- SRC-25 model-use disable must serialize behind the original Reveal.
-  for share of reg;
-  if not found then return; end if;
+  if not seyeon_private.lock_positive_source_registry_v1(
+    v_pin->>'recordType',v_pin->>'recordSchemaVersion',v_pin->>'projectorVersion'
+  ) then return; end if;
 
   -- Same original Grant ID, not any newer regrant for the Memory.
   -- SHARE locks are kept until the caller finishes its controlled direct

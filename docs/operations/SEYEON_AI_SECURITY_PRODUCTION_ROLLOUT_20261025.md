@@ -80,3 +80,11 @@ Architecture Check: 문서와 실행 증거만 추가했다. runtime/API/DB/권�
 운영 `pg_auth_members`를 다시 읽었다. postgres는 NOSUPERUSER이며, `supabase_admin`이 부여한 runtime-owner edge는 ADMIN=true, INHERIT=false, SET=false다. `run-production-postgres-strict-dump.sh`는 provider-managed postgres를 수신자로 하는 GRANT를 의도적으로 제외한다. 따라서 이 edge 부재는 S0 source SQL 결함이 아닌 portable backup 범위 차이다.
 
 범위를 선택적 S0 리허설의 설치 관리자 사전 조건으로만 확장한다. 실제 조회한 metadata snapshot을 저장하고 고정 loopback Actions 서비스의 runtime-owner edge 하나만 현재 운영과 동일하게 구성한다. postgres 슈퍼유저화, application API 권한 확대, 원본 G1/G2/G3 약화 또는 운영 DDL은 하지 않는다. evidence는 이 edge가 encrypted backup에서 복구된 것으로 표시하지 않으며 full DR=false를 유지한다. 원본 SQL digest는 바뀌지 않는다. 재현은 기존 restore workflow의 `seyeon_security_s0_rehearsal=true`다.
+
+## 제한 관리자 설치 및 일반 API 검증
+
+복원 #40197005243의 schema permission 실패를 로컬의 별도 PostgreSQL 18.6 클러스터에서 재현했다. bootstrap 관리자는 supabase_admin, S0 설치자는 NOSUPERUSER postgres, API 세션은 NOINHERIT 일반 LOGIN으로 분리했다. 기존 슈퍼유저 postgres 클러스터의 설정·데이터는 검증 대상으로 사용하지 않았다.
+
+실제 수정은 다음으로 한정한다. registry 소유권을 넘기기 전에 새 소유자의 임시 schema CREATE를 부여하고, 함수 ACL 작업을 끝낸 뒤 임시 소유자 membership을 회수한다. restricted postgres인 G3가 기존 thread assertion과 registry row lock을 사용할 최소 권한을 추가한다. registry는 기존 NOLOGIN owner를 유지하며, registry 잠금 보조 함수만 그 owner가 실행하고 postgres에만 EXECUTE한다. API·anon·authenticated·service_role에는 해당 보조 함수나 raw registry 접근을 열지 않는다.
+
+원본 설치 SQL 전체의 atomic/default-closed 설치 PASS, 실제 일반 API 계정으로 원본 G1/G2/G3·수신/철회·유실 경합 **11/11 PASS**. 기존 Role ADMIN snapshot은 유지하며 함수 소유권·RLS·현재 권한 검사를 약화하지 않았다. 선택적 복원 리허설도 설치자·fixture 관리자·API 계정을 분리한다. 운영 DB 설치와 모델 활성화는 아직 실행하지 않았다.
