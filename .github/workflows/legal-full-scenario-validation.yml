@@ -1,0 +1,207 @@
+name: Legal L1-L5 Scenario Verification (isolated)
+# Comprehensive NON-Production contract validation for Legal PR #2504.
+# NEVER infer release approval, execute the S4 Integration gate, or deploy proposals.
+on:
+  push:
+    branches:
+      - fix/legal-compliance/ai-disclosure-and-launch-audit-20261023
+    paths:
+      - '.github/workflows/legal-full-scenario-validation.yml'
+      - 'docs/LEGAL_COMPLIANCE_TEST_MATRIX_V1.md'
+      - 'test/legal-*.test.ts'
+      - 'test/db/portone_identity_age_authority_pg17.sh'
+      - 'test/db/legal_commerce_checkout_delivery_pg17.sh'
+      - 'supabase/proposals/1740_*.proposed.sql'
+      - 'supabase/proposals/1741_*.proposed.sql'
+      - 'supabase/proposals/1742_*.proposed.sql'
+      - 'supabase/proposals/1743_*.proposed.sql'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: legal-l1-l5-scenario-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  l1-l5-typecheck-vitest:
+    name: L1-L5 TypeScript and Auth/Privacy/Commerce scenarios
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Workspace TypeScript (API, API client, Web, Native)
+        run: npm run typecheck
+      - name: All Legal cases plus direct cross-track regression neighbors
+        run: |
+          npx vitest run \
+            test/legal-*.test.ts \
+            test/commerce-digital-reading-withdrawal-review-v1.test.ts \
+            test/commerce-digital-reading-withdrawal-orchestration-v1.test.ts \
+            test/account-deletion-start-api-boundary.test.ts \
+            test/account-deletion-worker-runtime-postgres.e2e.test.ts \
+            apps/api/src/supabase-auth-http.test.ts \
+            apps/api/src/payment-attempt-create-http.test.ts \
+            apps/api/src/payment-attempt-handoff-context-http.test.ts \
+            apps/api/src/payment-attempt-server-verification-http.test.ts \
+            apps/api/src/production-payment-attempt-server-verification-runtime.test.ts
+
+  l1-l3-governance:
+    name: L1-L3 deletion graph, restore plans, egress containment
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Approved privacy disposition and DB execution gate
+        run: |
+          npm run verify:approved-account-deletion-policy
+          npm run verify:account-deletion-disposition-execution-gate
+      - name: Restore/recovery ledger and non-reexposure plan
+        run: |
+          npm run verify:production-postgres-privacy-recovery-ledger-workflow
+          npm run verify:postgres-privacy-reconciliation-plan
+      - name: PortOne personal identity disposition and API boundary
+        run: |
+          npm run verify:portone-identity-privacy-candidate
+          npm run verify:production-data-api-containment
+
+  l2-portone-pg17:
+    name: L2 disposable PostgreSQL 17 A1/state concurrency
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    services:
+      postgres:
+        image: postgres:17.6
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ${{ github.run_id }}-${{ github.run_attempt }}
+          POSTGRES_DB: myeongha_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d myeongha_test"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+    env:
+      PGHOST: localhost
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: ${{ github.run_id }}-${{ github.run_attempt }}
+      CI: 'true'
+      DB_SUITE: postgres17
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Generate uniquely named disposable database
+        shell: bash
+        env:
+          PGDATABASE: myeongha_test
+        run: |
+          set -euo pipefail
+          psql -X -v ON_ERROR_STOP=1 -c "create database myeongha_ci_case_${GITHUB_RUN_ID};"
+      - name: A1/1740–1742 isolated SQL including atomic replay and purge
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PGDATABASE="myeongha_ci_case_${GITHUB_RUN_ID}"
+          bash test/db/run_ci_case.sh portone-identity-age-authority-pg17
+
+  l4-commerce-pg17:
+    name: L4 disposable PostgreSQL 17 checkout/payment/S7 ledger
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    services:
+      postgres:
+        image: postgres:17.6
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ${{ github.run_id }}-${{ github.run_attempt }}
+          POSTGRES_DB: myeongha_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d myeongha_test"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+    env:
+      PGHOST: localhost
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: ${{ github.run_id }}-${{ github.run_attempt }}
+      CI: 'true'
+      DB_SUITE: postgres17
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Generate uniquely named disposable database
+        shell: bash
+        env:
+          PGDATABASE: myeongha_test
+        run: |
+          set -euo pipefail
+          psql -X -v ON_ERROR_STOP=1 -c "create database myeongha_ci_case_${GITHUB_RUN_ID};"
+      - name: 1743 isolated checkout/handoff/receipt and delivery SQL
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PGDATABASE="myeongha_ci_case_${GITHUB_RUN_ID}"
+          bash test/db/run_ci_case.sh legal-commerce-checkout-delivery-pg17
+
+  l2-l5-web-chrome:
+    name: L2/L5 static web build and real Chrome with local mock auth
+    runs-on: ubuntu-latest
+    timeout-minutes: 16
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Build web and verify deploy configuration
+        run: |
+          npm run build:web
+          npm run verify:deployment-config
+      - name: Local Chrome (no remote Supabase or provider)
+        id: chrome
+        uses: browser-actions/setup-chrome@48ad923757ca74d66703209fe939badbdf80f2f4
+        with:
+          chrome-version: stable
+          install-dependencies: true
+      - name: Browser signup / guest bootstrap & session recovery
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
+        run: |
+          node scripts/run-web-auth-signup-guest-bootstrap-browser-smoke.mjs
+          node scripts/verify-web-auth-continuity-browser.mjs
+          node scripts/verify-web-auth-failed-login-guest-browser.mjs
+
+  l5-mobile-export:
+    name: L5 Native iOS/Android nonrelease bundle and contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Nonrelease readiness and Android/iOS export
+        run: |
+          npm run verify:mobile-release-readiness-contract
+          npm run verify:mobile-push-activation-readiness-contract
+          npm run verify:mobile-android-physical-smoke-readiness
+          npm run export:ci -w @myeongha/mobile
+          npm run verify:mobile-export-artifacts

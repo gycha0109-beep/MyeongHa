@@ -70,3 +70,12 @@ npm run test --   apps/api/src/supabase-auth-http.test.ts   test/legal-portone-p
 | S5 Production/법적 게시 | 승인·실증 필요 | **HOLD** |
 
 완료 조건은 통합 GREEN **만**이 아니라 소유 트랙 결과·인증·실제 배송/환불·삭제/복원·법무 공개 문구·운영 증거의 교차 확인이다.
+
+
+## 2026-10-25 L1–L5 전 시나리오 분리 검증 (S1–S3)
+
+- [전 시나리오 매트릭스](./LEGAL_COMPLIANCE_TEST_MATRIX_V1.md): 56건의 대표 정상/공격/거절/동시성/복구/화면/운영 예외와 기존 테스트를 대응시킨 추적성 정본. 파일 하나당 여러 개의 개별 Vitest 시나리오가 있을 수 있으며 숫자는 대표 시나리오 분류 수이지 Vitest 건수가 아니다.
+- [표적 전체 실행 워크플로](../.github/workflows/legal-full-scenario-validation.yml): HEAD push 시 6개 독립 잡; TypeScript+전체 Legal Vitest 및 연관 Auth/Privacy/Commerce, Privacy 59 테이블·원장/복원/처분 검증, A1 제안 1740–1742 PG17, Commerce 제안 1743 PG17, 로컬 Chrome Web, nonrelease Mobile Android/iOS export.
+- 외부 공급자 API 키/요금/실결제/실인증, Production DB, 배포/법정 문구 게시는 건드리지 않는다. SQL은 `myeongha_ci_case_<run_id>` 로컬 PostgreSQL 17에서만 적용하며, 현재 SQL migration으로 옮기지 않는다. #2301 S7 private Owner SQL의 런타임 REVOKE는 존중한다.
+- **S4 최종 Integration CI와 분리**한다. 워크플로 success는 코드·합성 경계 검증이지 법적/운영 출시 인수나 미병합 #2301의 실DB 검증이 아니다.
+- SHA별 실제 결과는 [매트릭스 결과 절](./LEGAL_COMPLIANCE_TEST_MATRIX_V1.md#sha별-실행-결과)에 기록한다. 여기의 종전 "최신 GREEN 미확인" 표는 이전 시점의 기록으로, 새 검증 결과가 확인되면 새 SHA를 명시해 대체한다.
