@@ -1,6 +1,8 @@
 import { denyUnverifiedInitialIdentityAdmissionV1 } from './portone-v2-preidentity-admission-v1.js';
 import { fingerprintExistingMemberSocialStateV1, issueExistingMemberSocialStateV1 } from './portone-v2-existing-social-state-v1.js';
 import type { SupabasePreenrollmentMemberBindingPortV1 } from './supabase-auth-http.js';
+import type { MemberAuthRateLimitAdmissionPortV1 } from './member-auth-rate-limit.js';
+import { fingerprintMemberAuthClientV1, readTrustedVercelClientIpV1 } from './member-auth-client-network-key.js';
 import {
   AuthenticatedJsonRequestBodyTooLargeV1,
   readAuthenticatedJsonRequestBodyV1,
@@ -125,6 +127,8 @@ export async function handleSocialAuthStartRequestV1(input: {
   readonly approvedExistingMemberStart?: true;
   /** Required only for A1 existing Member starts; one-time DB proof before redirect. */
   readonly existingSocialStatePort?: Readonly<{ issue(digest: string): Promise<boolean> }>;
+  /** Rate-limit anonymous OAuth state writes using existing sign-in bucket. */
+  readonly existingSocialStartAdmissionPort?: MemberAuthRateLimitAdmissionPortV1;
 }): Promise<Response> {
   if (input.request.method !== 'POST') {
     cancelUnusedRequestBody(input.request);
@@ -189,6 +193,28 @@ export async function handleSocialAuthStartRequestV1(input: {
     // pre-account browser proof. Reject before sending a customer into an
     // OAuth redirect that cannot return through the verified-age gate.
     return failure('SOCIAL_AUTH_PROVIDER_DISABLED', 503);
+  }
+
+  if (denied !== null && input.approvedExistingMemberStart === true &&
+      input.preenrollmentMemberPort === undefined) {
+    // Creating a durable anonymous OAuth state consumes server DB capacity.
+    // Apply the existing server-owned sign-in rate limit BEFORE writing it.
+    try {
+      const secret = input.env.MYEONGHA_AUTH_RATE_LIMIT_SECRET;
+      if (typeof secret !== 'string' || input.existingSocialStartAdmissionPort === undefined) {
+        return failure('AGE_VERIFICATION_UNAVAILABLE', 503);
+      }
+      const admission = await input.existingSocialStartAdmissionPort.admit({
+        action: 'sign-in',
+        clientFingerprint: fingerprintMemberAuthClientV1({
+          clientIp: readTrustedVercelClientIpV1(input.request),
+          action: 'sign-in', secret,
+        }),
+      });
+      if (!admission.allowed) return failure('RATE_LIMITED', 429);
+    } catch {
+      return failure('AGE_VERIFICATION_UNAVAILABLE', 503);
+    }
   }
 
   const now = input.nowEpochMs?.() ?? Date.now();

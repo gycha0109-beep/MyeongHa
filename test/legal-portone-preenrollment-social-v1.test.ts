@@ -14,6 +14,7 @@ const env = {
   MYEONGHA_PORTONE_IDENTITY_PRIVACY_DISPOSITION_STATE: 'APPROVED',
   MYEONGHA_SOCIAL_AUTH_GOOGLE_ENABLED: 'true',
   MYEONGHA_PORTONE_PREENROLLMENT_BINDING_SECRET: 'test-a1-existing-social-state-cookie-secret-at-least-32-chars',
+  MYEONGHA_AUTH_RATE_LIMIT_SECRET: 'test-a1-oauth-request-limit-secret-at-least-32-chars',
 };
 const id = '22222222-2222-4222-8222-222222222222';
 const socialClock = Date.parse('2026-10-24T08:00:00Z');
@@ -78,14 +79,24 @@ describe('A1 Social Auth preverified age hold and atomic Member binding', () => 
   it('lets verified EXISTING Social Members discover Web OAuth without a new proof', async () => {
     const request = new Request('https://myeongha.vercel.app/api/auth/social/start', {
       method: 'POST',
-      headers: { Origin: 'https://myeongha.vercel.app', 'Content-Type': 'application/json' },
+      headers: {
+        Origin: 'https://myeongha.vercel.app',
+        'Content-Type': 'application/json',
+        'x-forwarded-for': '203.0.113.12',
+      },
       body: JSON.stringify({ provider: 'google',
         redirectUri: 'https://myeongha.vercel.app/auth.html?social=callback' }),
     });
     const issue = vi.fn(async () => true);
+    const admit = vi.fn(async () => ({ allowed: true, requestCount: 1,
+      resetAt: '2026-10-24T08:01:00.000Z' }));
     const result = await handleSocialAuthStartRequestV1({
       request, env, approvedExistingMemberStart: true,
       existingSocialStatePort: { issue },
+      existingSocialStartAdmissionPort: { admit },
+    });
+    expect(admit).toHaveBeenCalledWith({
+      action: 'sign-in', clientFingerprint: expect.any(Uint8Array),
     });
     expect(result.status).toBe(200);
     const body = await result.json();
@@ -95,6 +106,7 @@ describe('A1 Social Auth preverified age hold and atomic Member binding', () => 
     expect(result.headers.get('set-cookie')).toContain('__Host-myeongha-existing-social-v1=');
     expect(result.headers.get('set-cookie')).toContain('HttpOnly; Secure; SameSite=Strict');
     expect(issue).toHaveBeenCalledWith(expect.stringMatching(/^[a-f0-9]{64}$/u));
+    expect(issue).toHaveBeenCalledOnce();
 
     const unauthorized = await handleSocialAuthStartRequestV1({
       request: socialStartRequest(), env, approvedExistingMemberStart: true,
@@ -114,18 +126,58 @@ describe('A1 Social Auth preverified age hold and atomic Member binding', () => 
     expect(native.status).toBe(403);
   });
 
+  it('rejects missing client network proof or denied rate-limit before DB state writes', async () => {
+    const issue = vi.fn(async () => true);
+    const request = (includeIp: boolean) => new Request('https://myeongha.vercel.app/api/auth/social/start', {
+      method: 'POST', headers: {
+        Origin: 'https://myeongha.vercel.app',
+        'Content-Type': 'application/json',
+        ...(includeIp ? { 'x-forwarded-for': '203.0.113.12' } : {}),
+      },
+      body: JSON.stringify({
+        provider: 'google', redirectUri: 'https://myeongha.vercel.app/auth.html?social=callback',
+      }),
+    });
+    const allowed = { admit: vi.fn(async () => ({
+      allowed: true, requestCount: 1, resetAt: '2026-10-24T08:01:00.000Z',
+    })) };
+    const deniedAdmission = { admit: vi.fn(async () => ({
+      allowed: false, requestCount: 31, resetAt: '2026-10-24T08:01:00.000Z',
+    })) };
+    const withoutIp = await handleSocialAuthStartRequestV1({
+      request: request(false), env, approvedExistingMemberStart: true,
+      existingSocialStatePort: { issue }, existingSocialStartAdmissionPort: allowed,
+    });
+    expect(withoutIp.status).toBe(503);
+    expect(allowed.admit).not.toHaveBeenCalled();
+    const throttled = await handleSocialAuthStartRequestV1({
+      request: request(true), env, approvedExistingMemberStart: true,
+      existingSocialStatePort: { issue }, existingSocialStartAdmissionPort: deniedAdmission,
+    });
+    expect(throttled.status).toBe(429);
+    expect(issue).not.toHaveBeenCalled();
+    expect(throttled.headers.get('set-cookie')).toBeNull();
+  });
+
   it('does not redirect or issue a cookie if durable OAuth state is unavailable', async () => {
     for (const port of [undefined, { issue: async () => false },
       { issue: async () => { throw new Error('DB unavailable'); } }]) {
       const request = new Request('https://myeongha.vercel.app/api/auth/social/start', {
         method: 'POST',
-        headers: { Origin: 'https://myeongha.vercel.app', 'Content-Type': 'application/json' },
+        headers: {
+          Origin: 'https://myeongha.vercel.app',
+          'Content-Type': 'application/json',
+          'x-forwarded-for': '203.0.113.12',
+        },
         body: JSON.stringify({ provider: 'google',
           redirectUri: 'https://myeongha.vercel.app/auth.html?social=callback' }),
       });
       const response = await handleSocialAuthStartRequestV1({
         request, env, approvedExistingMemberStart: true,
         ...(port === undefined ? {} : { existingSocialStatePort: port }),
+        existingSocialStartAdmissionPort: { admit: async () => ({
+          allowed: true, requestCount: 1, resetAt: '2026-10-24T08:01:00.000Z',
+        }) },
       });
       expect(response.status).toBe(503);
       expect(response.headers.get('set-cookie')).toBeNull();

@@ -251,3 +251,9 @@
 - 기존 Member OAuth 서명 쿠키의 **재사용 가능성**을 해소하기 위해 미적용 제안 SQL `supabase/proposals/1742_existing_member_social_state_v1.proposed.sql`에 HMAC 상태 지문만 기록하는 10분 TTL 테이블, 중복 발급 거절, 원자적 1회 소비, System 전용 만료물리정리, RLS/ACL 최소 권한을 정의했다. 추가 테이블은 기존 삭제/보존 승인 그래프 바깥이며 Privacy/DB 승인 이전 운영 적용 금지.
 - 기존 Member OAuth 시작은 DB `cmd_issue_existing_member_social_state_v1`에서 서버 서명 상태를 등록하기 **전에는 리디렉션·쿠키를 발급하지 않는다**. 완료는 원래 브라우저 소유 HMAC 검증 및 Supabase 조회의 기존 Member 확인 뒤 DB `cmd_consume_existing_member_social_state_v1` 1회 성공일 때만 세션을 발급한다. 중복 콜백·DB 오류·만료 시 비발급.
 - 인증 시작/완료 포트, 라우터, 로그인 서버를 같은 PR에 연결했으며 `test/legal-portone-preenrollment-social-v1.test.ts`, `test/legal-existing-social-state-authority-v1.test.ts`, 폐기형 `test/db/portone_identity_age_authority_pg17.sh`에 검증 항목을 보강했다. **PG17 GREEN/실브라우저 소셜 로그인/통합 CI/Production 적용은 아직 미확인 또는 미실행**. A1 OFF 기존 소셜 경로를 변경하지 않는다.
+
+
+## 31. 2026-10-25 기존 회원 소셜 OAuth 익명 상태 발급 시 서버 요청 제한
+
+- 제안 1742의 신규 상태 레코드 INSERT가 익명 Web Social start에서 무제한 생성되지 않도록, 기존 `PostgresMemberAuthRateLimitAdmissionPortV1`의 **sign-in 버킷** 및 신뢰된 Vercel IP를 HMAC으로 지문화하는 진입 검사를 추가했다. 정확한 동일 출처·등록된 Provider·브라우저 요청 형식 확인 뒤, 서버 rate limiter가 허용한 경우만 SQL issue를 시도한다.
+- IP 헤더 누락/비정상, rate-limit 비밀키 또는 DB 권위 누락/장애는 503, 비용 제한 초과는 429이며 어느 경우든 세션·OAuth state 쿠키·리디렉션은 발급하지 않는다. `test/legal-portone-preenrollment-social-v1.test.ts`에 IP 누락/429/정상 버킷을 추가했다. 신규 DB 테이블 운영 마이그레이션·기능 활성화는 승인 전 OFF 유지.

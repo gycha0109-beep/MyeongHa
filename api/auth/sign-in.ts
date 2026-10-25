@@ -1,5 +1,6 @@
 import { handleSocialAuthStartRequestV1 } from '../../apps/api/src/social-auth-start-http.js';
 import { createPostgresExistingMemberSocialStateAuthorityV1 } from '../../apps/api/src/portone-v2-existing-social-state-authority-v1.js';
+import { PostgresMemberAuthRateLimitAdmissionPortV1 } from '../../apps/api/src/postgres-member-auth-rate-limit.js';
 import { createApprovedPortOnePreenrollmentMemberBindingPortV1 } from '../../apps/api/src/portone-v2-approved-member-binding-v1.js';
 import { extractPortOnePreenrollmentCookieV1 } from '../../apps/api/src/portone-v2-preenrollment-age-authority-v1.js';
 import { resolveProductionPortOnePreenrollmentModeV1 } from '../../apps/api/src/portone-v2-preenrollment-http-runtime-v1.js';
@@ -113,6 +114,9 @@ export default {
               ...(approvedExistingMemberStart ? {
                 approvedExistingMemberStart: true as const,
                 existingSocialStatePort: createPostgresExistingMemberSocialStateAuthorityV1(
+                  getPreenrollmentPool(),
+                ),
+                existingSocialStartAdmissionPort: new PostgresMemberAuthRateLimitAdmissionPortV1(
                   getPreenrollmentPool(),
                 ),
               } : {}),
