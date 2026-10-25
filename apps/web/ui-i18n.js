@@ -133,9 +133,9 @@ function createLanguagePicker(locale, onChange) {
   select.setAttribute('aria-label', '언어 선택');
   const choices = [
     ['ko-KR', '한국어'],
+    ['en-US', 'English'],
     ['ja-JP', '日本語'],
     ['zh-TW', '繁體中文'],
-    ['en-US', 'English'],
     ['zh-CN', '简体中文'],
   ];
   for (const [value, label] of choices) {
