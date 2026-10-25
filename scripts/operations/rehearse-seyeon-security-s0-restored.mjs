@@ -28,9 +28,15 @@ let created=false;
 try{
   const {rows:[server]}=await admin.query(`select current_user as role,
     current_setting('server_version_num')::int as version,
-    inet_server_addr()::text as address`);
+    inet_server_addr()::text as address,
+    -- The GitHub runner connects through a loopback-published Docker port;
+    -- PostgreSQL itself listens on the private Docker bridge interface.
+    (inet_server_addr() <<= inet '172.16.0.0/12' and
+     inet_client_addr() <<= inet '172.16.0.0/12') as docker_bridge`);
   if(server.role!=='supabase_admin'||server.version<170000||server.version>=180000||
-     server.address!=='127.0.0.1')throw Error('Local managed PG17 target mismatch.');
+     (server.address!=='127.0.0.1'&&server.docker_bridge!==true)){
+    throw Error('Local managed PG17 target mismatch.');
+  }
   if((await admin.query('select 1 from pg_database where datname=$1',[target])).rows.length){
     throw Error('Disposable rehearsal target already exists; never overwrite it.');
   }
