@@ -7,7 +7,7 @@ Target is **only** https://myeongha.gycha0109.workers.dev; no Vercel or second W
 ## Execution
 
 - PR changes to the E2E verifier run the **anonymous** workflow against the currently deployed primary Worker without GitHub Secrets.
-- After the PR is merged to main, a main push of these files additionally runs a separate **authenticated** workflow using the existing production Member smoke account in GitHub's \`production\` environment. A workflow_dispatch on main needs exact \`VERIFY_CLOUDFLARE_PRIMARY_E2E\` confirmation.
+- The **authenticated** workflow is manual-only on main; dispatch with exact `VERIFY_CLOUDFLARE_PRIMARY_E2E` confirmation and the independently verified current Worker version. It loads the existing protected production Member smoke credentials only inside the GitHub `production` environment and refuses to sign in until Auth/DB and Saju are both admitted.
 - The CLI can be used on a permitted network with \`MYEONGHA_CLOUDFLARE_E2E_MODE=anonymous node scripts/verify-cloudflare-primary-e2e.mjs\`.
 - No registration, Birth-profile creation, chat turn sends, LLM invocation or Commerce mutation takes place. The only authenticated calls with effects are a Member session sign-in (consumes one ordinary rate-limit slot) and the existing calculation-only POST.
 
@@ -57,3 +57,5 @@ It does not add another Worker, public route, DB role or permission.
 A PASS of unauthenticated boundary E2E proves only that these surfaces are
 stopped or access-controlled, **not** that Member Saju production calculation
 succeeds. Do not remove `myeongha-web` based on a kill-switch test alone.
+
+The current Cloudflare static-asset endpoints (`/`, `/hall.html`) serve HTML **without** the `X-Myeongha-Worker-Version` response header. Authenticate-mode version-pinning is mandatory for **every `/api/*` response**, beginning with the constant `/api/health` response before touching Member credentials; it is not mandatory for static-asset HTML. A live run against the older verifier failed at `web root` before sending Member credentials. Regression tests prevent that false negative and still reject a wrong API version before credentials.

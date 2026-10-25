@@ -61,6 +61,42 @@ describe('Cloudflare primary live E2E verifier (offline harness)', () => {
       .rejects.toThrow(/invalid JSON/);
   });
 
+  it('pins API version but not asset HTML, and stops before credential sign-in on unready setup', async () => {
+    const expectedVersion = '123e4567-e89b-42d3-a456-426614174000';
+    const { fetchImpl, visited } = mockFetch();
+    const versionedFetch = async (input, init) => {
+      if (new URL(input).pathname === '/api/auth/sign-in' &&
+          init.headers.Origin === CLOUDFLARE_PRIMARY_E2E_ORIGIN) {
+        throw Error('credentialed sign-in was called before admissions');
+      }
+      const result = await fetchImpl(input, init);
+      if (!new URL(input).pathname.startsWith('/api/')) return result;
+      const headersWithVersion = new Headers(result.headers);
+      headersWithVersion.set('x-myeongha-worker-version', expectedVersion);
+      return new Response(result.body, {
+        status: result.status,
+        headers: headersWithVersion,
+      });
+    };
+    await expect(runCloudflarePrimaryE2E({
+      mode: 'authenticated', expectedVersion, fetchImpl: versionedFetch,
+    })).rejects.toThrow(
+      /BLOCKED_BY_ADMISSION: readiness=503 member=401 saju=404 preview=404/,
+    );
+    expect(visited[0].path).toBe('/');
+    expect(visited[1].path).toBe('/hall.html');
+    expect(visited.some(x => x.path === '/api/health')).toBe(true);
+  });
+
+  it('fails before any credential even when health API reports a different deployment', async () => {
+    const expectedVersion = '123e4567-e89b-42d3-a456-426614174000';
+    const { fetchImpl, visited } = mockFetch();
+    await expect(runCloudflarePrimaryE2E({
+      mode: 'authenticated', expectedVersion, fetchImpl,
+    })).rejects.toThrow(/health returned a different deployed Worker version/);
+    expect(visited.map(x => x.path)).toEqual(['/', '/hall.html', '/api/health']);
+  });
+
   it('cannot silently redirect E2E traffic to a non-primary origin', async () => {
     const { fetchImpl } = mockFetch();
     await expect(runCloudflarePrimaryE2E({
