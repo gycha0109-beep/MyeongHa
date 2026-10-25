@@ -45,6 +45,20 @@ Watchtower-Track: character-memory
 - `compact_v1`은 프롬프트 길이의 연구 후보일 뿐, 블라인드 대사 품질·Gold 의미 동등성·속도/비용 달성을 입증하지 않는다. 실모델 유료 호출은 하지 않는다.
 - 1회 연구 경로를 앱에 연결하거나 적격 범위를 자유형 대화/Memory/관계 단계까지 확대하려면 서버 출처 검증·권한·캐릭터 성능의 별도 근거가 필요하다.
 
+## C08 공개 관계 단계 확장 (연구 Shadow)
+
+- 공개 입력 문법과 전체 대화 원본 확인을 유지하는 경우에만 `contextInput.relationship`이 있어도 생성 후보가 될 수 있다.
+- 관계 정보는 `requireSeyeonC08PublicRelationshipProofV1`과 `createSeyeonC08ServerRelationshipProofPortV1`로 인증된 저장소의 `stageKey/closenessBand/trustBand/frictionBand/revision/policyVersion`와 정확히 비교한다. 각 턴에서 원본 Census 검사와 함께 4회 재확인한다. Stage/Revision 불일치, 철회, 타인 소유자의 자료, 사적 공개 허용 데이터는 즉시 HOLD.
+- 관계 Stage는 **현재 말투·응대 깊이 조절에만 사용**하고, 과거 공동 사건·관계 신분 주장·친밀감 상승·개인 기억·비공개 사연 공개의 근거가 되지 않는다. Interpretation의 Reveal은 여전히 PUBLIC, risk-bearing action 미사용, private descriptor 조회 0, AI 대사 1회다.
+- 기존 Production 관계 포트에 직접 연결되지 않았으며 인증·트랜잭션을 보장하는 DB 포트를 추후 호출자가 제공해야 한다. 이 기능의 오프라인 적격성 검사는 사용자 대상 Production 전환 근거가 아니다.
+
+## 기억 출처 검증 계약 (대사 연결 전 단계)
+
+- `apps/api/src/seyeon-c08-memory-authority-proof-v1.ts`는 단일 `life_fact/memory` 타입의 `claimKind=fact`를 대상으로 DB가 확인한 `memoryId/sourceRef/summaryHash/grantState=ACTIVE/origin=AUTHORITATIVE_STORED_USER_MEMORY/assistantGenerated=false`를 검증한다.
+- 동일한 기억이라고 해도 `summaryHash`가 다르거나 User Grant가 철회·누락되면 HOLD. `relationship_event`나 `character_interpretation`, AI가 만든 이벤트는 거부.
+- 성공해도 `memoryMayBeSentToModel=false`, `memoryMayBeQuotedToUser=false`로 고정한다. 향후 **서버가 검증된 정확한 기억 내용을 불변 슬롯으로 출력할 계약**을 마련하기 전에는 모델에게 사적인 기억을 제공하거나 Callback을 출력하지 않는다.
+- 이 메모리 증명 함수는 아직 `runSeyeonC08LocalOneCallShadowV1`에 연결하지 않았다. 현재 1회 생성 경로의 `retrievedMemories.length=0` 제한은 유지한다.
+
 ## 같은 브랜치 작업 규칙
 
 사용자 지시: 브랜치 하나에서 구조 변경 구현을 끝까지 진행. 작업 완료 전 PR 병합, Full Integration CI, 새 유료 호출 금지.
