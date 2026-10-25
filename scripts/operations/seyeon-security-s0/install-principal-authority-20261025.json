@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "seyeon-s0-install-principal-authority-v1",
+  "projectRef": "cnsfpcdiyofqvhpcegfc",
+  "observedAtUtc": "2026-10-25T13:05:01Z",
+  "source": "production-read-only-pg-auth-members",
+  "postgresSuperuser": false,
+  "scope": "isolated-rehearsal-install-principal-only",
+  "membership": {
+    "role": "myeongha_seyeon_chat_runtime_owner",
+    "member": "postgres",
+    "grantor": "supabase_admin",
+    "adminOption": true,
+    "inheritOption": false,
+    "setOption": false
+  },
+  "fullProviderDisasterRecoveryReady": false
+}

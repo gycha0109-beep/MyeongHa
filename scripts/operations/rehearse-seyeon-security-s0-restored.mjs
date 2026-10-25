@@ -7,6 +7,14 @@ import {Client} from 'pg';
 import {buildSeyeonSecurityS0InstallationPlan} from './seyeon-security-s0/plan.mjs';
 
 const target='myeongha_seyeon_security_s0_test';
+const installPrincipalAuthority=JSON.parse(await readFile(new URL(
+  './seyeon-security-s0/install-principal-authority-20261025.json',import.meta.url),'utf8'));
+if(installPrincipalAuthority.projectRef!=='cnsfpcdiyofqvhpcegfc'||
+   installPrincipalAuthority.postgresSuperuser!==false||
+   JSON.stringify(installPrincipalAuthority.membership)!==JSON.stringify({
+     role:'myeongha_seyeon_chat_runtime_owner',member:'postgres',grantor:'supabase_admin',
+     adminOption:true,inheritOption:false,setOption:false})){throw Error('Install principal source authority mismatch.');}
+
 if(process.env.CI!=='true'||process.env.GITHUB_ACTIONS!=='true'||
    process.env.GITHUB_WORKFLOW!=='PostgreSQL Isolated Restore Drill'||
    process.env.GITHUB_REF!=='refs/heads/main'||
@@ -57,6 +65,21 @@ try{
   created=true;
   await admin.query('alter database postgres with allow_connections true');
   sourceConnectionsPaused=false;
+  // The portable backup intentionally excludes the provider-managed postgres
+  // membership edges. Reproduce the separately read CURRENT install-principal
+  // edge, never pretend this edge was restored from the encrypted backup.
+  // Application roles and source SQL are unchanged; postgres stays NOSUPERUSER.
+  await admin.query(`grant myeongha_seyeon_chat_runtime_owner to postgres
+    with admin true, inherit false, set false`);
+  const {rows:[principal]}=await admin.query(`select not p.rolsuper as restricted,
+    m.admin_option and not m.inherit_option and not m.set_option as exact_edge
+    from pg_roles p join pg_auth_members m on m.member=p.oid
+    join pg_roles granted on granted.oid=m.roleid
+    where p.rolname='postgres' and granted.rolname='myeongha_seyeon_chat_runtime_owner'
+      and pg_get_userbyid(m.grantor)='supabase_admin'`);
+  if(principal?.restricted!==true||principal?.exact_edge!==true){
+    throw Error('Isolated install principal differs from the read-only Production snapshot.');
+  }
   const local=new Client({...db,user:'postgres',database:target});
   await local.connect();
   try{
@@ -87,6 +110,7 @@ try{
     nativeProviderCalls:0,installedDefaultClosed:true,
     testsPassed:result.numPassedTests,testsFailed:0,
     installationPlan:await buildSeyeonSecurityS0InstallationPlan(),
+    installPrincipalAuthority,installPrincipalEdgeRestoredFromBackup:false,
     fullProviderDisasterRecoveryReady:false};
   await writeFile(process.env.SEYEON_S0_REHEARSAL_EVIDENCE_PATH,JSON.stringify(evidence,null,2)+'\n',{mode:0o600});
   console.log('S0_RESTORED_BACKUP_REHEARSAL_PASS');

@@ -72,3 +72,11 @@ Architecture Check: 문서와 실행 증거만 추가했다. runtime/API/DB/권�
 ## 통합 검증 추가
 
 최신 main `eea60444`의 단일 Worker Auth/DB/Saju 라우팅·관측·버전 표식을 보존했다. 새 S0의 정확한 POST 경로만 기존 HOLD 앞에서 별도 admission을 받고, alias/query/기존 History·Replay는 HOLD를 유지한다. 기존 HMAC IP 기반 Cloudflare limiter를 재사용하여 receipt 추측 요청도 DB 연결 전에 제한한다. emergency hold는 새 모델 사용을 막고 이미 발행된 receipt/철회는 보존한다. 결속 증명·atomic installer DB 11/11, 통합 후 직접 회귀 51/51, 활성 gate를 mock한 라우팅/요청 제한/긴급 중단 3/3, root typecheck·build와 Worker dry-run PASS다. 실제 운영 gate는 아직 false다.
+
+## 복원본의 설치 관리자 권한 차이
+
+2026-10-25 복원 #40195629381은 실제 S0 installer 단계에서 `42501 permission denied to grant role myeongha_seyeon_chat_runtime_owner`로 실패했다. SQL bundle은 atomic rollback됐고 운영은 변경하지 않았다. 기대값은 운영 postgres의 역할 ADMIN 권한이며 관측값은 portable restore의 해당 권한 부재다.
+
+운영 `pg_auth_members`를 다시 읽었다. postgres는 NOSUPERUSER이며, `supabase_admin`이 부여한 runtime-owner edge는 ADMIN=true, INHERIT=false, SET=false다. `run-production-postgres-strict-dump.sh`는 provider-managed postgres를 수신자로 하는 GRANT를 의도적으로 제외한다. 따라서 이 edge 부재는 S0 source SQL 결함이 아닌 portable backup 범위 차이다.
+
+범위를 선택적 S0 리허설의 설치 관리자 사전 조건으로만 확장한다. 실제 조회한 metadata snapshot을 저장하고 고정 loopback Actions 서비스의 runtime-owner edge 하나만 현재 운영과 동일하게 구성한다. postgres 슈퍼유저화, application API 권한 확대, 원본 G1/G2/G3 약화 또는 운영 DDL은 하지 않는다. evidence는 이 edge가 encrypted backup에서 복구된 것으로 표시하지 않으며 full DR=false를 유지한다. 원본 SQL digest는 바뀌지 않는다. 재현은 기존 restore workflow의 `seyeon_security_s0_rehearsal=true`다.
