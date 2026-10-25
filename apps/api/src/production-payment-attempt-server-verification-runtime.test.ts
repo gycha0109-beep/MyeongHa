@@ -257,7 +257,12 @@ describe('production Payment Attempt server verification runtime', () => {
       verificationConfig: {
         apiSecret: API_SECRET,
         evidenceHmacSecret: EVIDENCE_SECRET,
-        fetchImpl: async () => new Response(JSON.stringify(paidPaymentBody()), {
+        // The stored Receipt is a production Reader purchase. The provider
+        // channel must be LIVE; a TEST/sandbox payment is deliberately
+        // rejected before any Reader Grant writer is reachable.
+        fetchImpl: async () => new Response(JSON.stringify({
+          ...paidPaymentBody(), channel: { type: 'LIVE' },
+        }), {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
         }),
