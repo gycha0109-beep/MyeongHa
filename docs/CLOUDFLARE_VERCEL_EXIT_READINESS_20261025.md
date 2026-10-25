@@ -83,3 +83,24 @@ Watchtower-Track: ops
 - Cloudflare deployed Worker / DNS / Supabase DB roles / Vercel production / PR merge remain untouched in this Ops branch.
 
 Watchtower-Track: ops
+
+## Stage 9/10 실제 사용자 도메인 대조 강화 (2026-10-26)
+
+- Vercel 종료를 승인하려면 기존 canonical Worker URL과 **다른 실제 HTTPS 사용자 정의 도메인**의 접속 근거가 반드시 필요합니다. 현재 Cloudflare 계정에는 해당 사용자 정의 도메인 바인딩이 관찰되지 않아 자동 판정은 계속 `HOLD`입니다.
+- 릴리스 증거 매니페스트 `myeongha-vercel-retirement-evidence-v1`에 `publicOrigin` (경로·사용자정보·포트가 없는 정확한 HTTPS 사용자 정의 도메인 origin)을 필수로 추가했습니다. `.workers.dev`/ `.vercel.app`, localhost, example/reserved, 임의 HTTP 및 잘못된 URL은 거부합니다.
+- 읽기 전용 검사기는 `publicOrigin`의 11개 HTML 및 루트 경로 HEAD, `/api/health`, `/api/readiness` GET, Worker 버전 재확인을 추가 수행합니다. 증거상의 origin과 라이브 origin, 공개 도메인 Worker 버전과 canonical 버전, 양쪽 readiness 결과가 모두 일치해야 합니다.
+- DNS 연결 또는 반영되지 않은 호스트는 CLI 조회가 실패하면 반드시 `HOLD`. 외부 호스트에서 인증/쿠키/시크릿/개인정보를 전송하거나 쓰기 요청은 보내지 않으며 redirect 금지 정책을 유지합니다.
+- 포맷이 맞는 증거 URL이나 `passed: true`는 그 자체로 증거 진위를 검증하지 못합니다. CI와 사용자 최종 승인 자체는 독립적으로 확인해야 합니다.
+- 실제 운영 시크릿, 커스텀 DNS, Supabase OAuth 공급자 등록 및 Vercel 종료는 변경하지 않았습니다.
+
+Watchtower-Track: ops
+
+## 실환경 DB failure category 확정 (2026-10-26 03:04 KST)
+
+- Cloudflare 100% 운영 Worker 버전 92 `8f68530e-ed17-4cf1-9733-b97f6999396c`의 owner-only `CF_READINESS_PREFLIGHT_V1` 로그 4건에서 동일한 **`DB_LOGIN_LEGACY_RUNTIME_POOLER_AWS0_SG`** 분류 확인.
+- 이 코드는 승인된 Supavisor pooler 호스트와 같은 프로젝트 접미사를 사용하지만 DB URL의 **login role 부분이 기존 `myeongha_runtime`**이며, CF 전용 login principal과 불일치한다는 의미. 시크릿 값·DB URL 원문은 수집하거나 출력하지 않음.
+- 해당 역할 `myeongha_runtime`은 DB에서 실제 존재하지만 CF 전용 `myeongha_cf_api_login` 대체재가 아님. 두 역할의 용도를 혼동하여 직접 DB role을 바꾸거나 비밀번호를 유추하는 작업은 금지.
+- 필요한 후속 운영 조치는 **기존 승인된 credential source**에서 CF 전용 login role의 실제 matching password를 확인한 후, 동일한 승인된 Supavisor host/port/tenant 정책의 `MYEONGHA_DATABASE_URL` 및 `MYEONGHA_DATABASE_PRINCIPAL` 일치를 이관하는 것. Cloudflare Secret 변경은 새로운 미배포 버전 생성/승인 절차와 연결하고, Worker Production deploy 없이 positive E2E 통과로 간주하지 않음.
+- 기존 Worker 가동 상태는 그대로 두었으며 이 트랙에서는 production Secret/DB role/password/DNS/alias/deployment/PR merge 변경 없음.
+
+Watchtower-Track: ops

@@ -29,6 +29,23 @@ const VERSION_PATTERN = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-
 const MAX_JSON_BYTES = 8192;
 const STATUS_VALUES = new Set(['ready', 'degraded', 'unready']);
 
+export function approvedRetirementPublicOriginV1(candidate) {
+  if (typeof candidate !== 'string' || candidate.length > 253) return null;
+  let url;
+  try { url = new URL(candidate); } catch { return null; }
+  if (url.protocol !== 'https:' || url.origin !== candidate ||
+      url.username || url.password || url.port || url.pathname !== '/' ||
+      url.search || url.hash) return null;
+  const hostname = url.hostname;
+  if (!/^(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z][a-z0-9-]{1,62}$/u.test(hostname) ||
+      hostname === 'myeongha.vercel.app' ||
+      /\.(?:vercel\.app|workers\.dev|localhost|local|internal|invalid|test|example)$/u.test(hostname) ||
+      ['example.com', 'example.net', 'example.org'].some(
+        reserved => hostname === reserved || hostname.endsWith('.' + reserved),
+      )) return null;
+  return candidate;
+}
+
 function probeStatus(response) {
   return Number.isInteger(response?.status) ? response.status : 0;
 }
@@ -59,6 +76,7 @@ function summarizeReadiness(response, report) {
 export function parseVercelRetirementEvidenceV1(document) {
   if (document?.schemaVersion !== 'myeongha-vercel-retirement-evidence-v1' ||
       !VERSION_PATTERN.test(document?.workerVersion ?? '') ||
+      approvedRetirementPublicOriginV1(document?.publicOrigin) === null ||
       !/^[a-f0-9]{40}$/iu.test(document?.gitSha ?? '') ||
       document?.checks === null || typeof document?.checks !== 'object' ||
       Array.isArray(document?.checks)) throw Error('Invalid retirement evidence identity');
@@ -68,7 +86,8 @@ export function parseVercelRetirementEvidenceV1(document) {
     checks[name] = row?.passed === true && typeof row?.evidenceRef === 'string' &&
       /^https:\/\/github\.com\/gycha0109-beep\/MyeongHa\/(?:actions\/runs\/[0-9]+|pull\/[0-9]+(?:\/checks)?|blob\/[a-f0-9]{40}\/[a-zA-Z0-9_.\/-]+)$/u.test(row.evidenceRef);
   }
-  return Object.freeze({ ...checks, evidenceWorkerVersion: document.workerVersion });
+  return Object.freeze({ ...checks, evidenceWorkerVersion: document.workerVersion,
+    publicOrigin: document.publicOrigin });
 }
 
 export function evaluateVercelRetirementV1(snapshot, evidence = {}) {
@@ -89,10 +108,23 @@ export function evaluateVercelRetirementV1(snapshot, evidence = {}) {
   addBlock(blocked, 'EVIDENCE_VERSION_DRIFT',
     typeof evidence.evidenceWorkerVersion === 'string' &&
     evidence.evidenceWorkerVersion !== snapshot.cloudflare.version);
+  const publicOrigin = approvedRetirementPublicOriginV1(evidence.publicOrigin);
+  const livePublic = snapshot.public;
+  addBlock(blocked, 'CUSTOM_DOMAIN_NOT_VERIFIED',
+    publicOrigin === null || livePublic?.origin !== publicOrigin ||
+    livePublic?.health !== 200 || livePublic?.ready?.http !== 200 ||
+    livePublic?.ready?.status !== 'ready' ||
+    livePublic?.ready?.userData !== 'ready' ||
+    livePublic?.ready?.sajuCalculation !== 'ready');
+  if (publicOrigin !== null) addBlock(blocked, 'CUSTOM_DOMAIN_WORKER_VERSION_MISMATCH',
+    livePublic?.version !== snapshot.cloudflare.version ||
+    livePublic?.confirmationVersion !== snapshot.cloudflare.confirmationVersion);
   for (const path of STATIC_PAGES) {
     addBlock(blocked, 'STATIC_ROUTE_NOT_READY:' + path,
       snapshot.cloudflare.static[path] !== 200 ||
       snapshot.vercel.static[path] !== 200);
+    if (publicOrigin !== null) addBlock(blocked, 'CUSTOM_DOMAIN_STATIC_NOT_READY:' + path,
+      livePublic?.static?.[path] !== 200);
   }
   // These are independent operational acceptance records, never inferred
   // from a 200 health check or user-supplied "all good" text.
@@ -106,6 +138,7 @@ export function evaluateVercelRetirementV1(snapshot, evidence = {}) {
       ? snapshot.cloudflare.version : null,
     vercelReadiness: snapshot.vercel.ready,
     cloudflareReadiness: snapshot.cloudflare.ready,
+    publicDomainReadiness: livePublic?.ready ?? null,
     blocked,
   });
 }
@@ -146,11 +179,16 @@ export async function runVercelRetirementAuditV1({ fetchImpl = fetch, evidence =
     if (!(response instanceof Response)) throw Error('Invalid HTTP response');
     return response;
   }
+  const publicOrigin = approvedRetirementPublicOriginV1(evidence.publicOrigin);
   const cfStatic = {};
   const vercelStatic = {};
+  const publicStatic = {};
   for (const path of STATIC_PAGES) {
     cfStatic[path] = probeStatus(await request(CLOUDFLARE_ORIGIN, path, 'HEAD'));
     vercelStatic[path] = probeStatus(await request(VERCEL_ORIGIN, path, 'HEAD'));
+    if (publicOrigin !== null) {
+      publicStatic[path] = probeStatus(await request(publicOrigin, path, 'HEAD'));
+    }
   }
   const cfHealth = await request(CLOUDFLARE_ORIGIN, '/api/health');
   const workerVersion = getHeader(cfHealth, 'x-myeongha-worker-version');
@@ -163,6 +201,22 @@ export async function runVercelRetirementAuditV1({ fetchImpl = fetch, evidence =
   // Another track can deploy between checks; never use an inconsistent version
   // as a Vercel shutdown signal.
   const cfConfirmation = await request(CLOUDFLARE_ORIGIN, '/api/health');
+  // A custom domain is a distinct runtime origin. Test its actual /api/*
+  // Worker identity and readiness rather than trusting a file-level flag.
+  let publicSnapshot = null;
+  if (publicOrigin !== null) {
+    const publicHealth = await request(publicOrigin, '/api/health');
+    const publicReadiness = await request(publicOrigin, '/api/readiness');
+    const ready = summarizeReadiness(publicReadiness,
+      await readBoundedJson(publicReadiness));
+    const confirm = await request(publicOrigin, '/api/health');
+    publicSnapshot = {
+      origin: publicOrigin, health: probeStatus(publicHealth), ready,
+      version: getHeader(publicHealth, 'x-myeongha-worker-version'),
+      confirmationVersion: getHeader(confirm, 'x-myeongha-worker-version'),
+      static: publicStatic,
+    };
+  }
   return evaluateVercelRetirementV1({
     cloudflare: {
       health: probeStatus(cfHealth),
@@ -171,6 +225,7 @@ export async function runVercelRetirementAuditV1({ fetchImpl = fetch, evidence =
       confirmationVersion: getHeader(cfConfirmation, 'x-myeongha-worker-version'),
     },
     vercel: { health: probeStatus(vercelHealth), ready: vercelReady, static: vercelStatic },
+    public: publicSnapshot,
   }, evidence);
 }
 

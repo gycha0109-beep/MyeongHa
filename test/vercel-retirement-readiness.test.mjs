@@ -2,10 +2,11 @@ import { describe, expect, it } from 'vitest';
 import {
   CLOUDFLARE_ORIGIN, VERCEL_ORIGIN, RETIREMENT_EVIDENCE,
   evaluateVercelRetirementV1, runVercelRetirementAuditV1,
-  parseVercelRetirementEvidenceV1,
+  parseVercelRetirementEvidenceV1, approvedRetirementPublicOriginV1,
 } from '../scripts/verify-vercel-retirement-readiness.mjs';
 
 const version = '123e4567-e89b-42d3-a456-426614174000';
+const PUBLIC_ORIGIN = 'https://app.myeongha-release.dev';
 const routes = ['/', '/index.html', '/auth.html', '/birth.html', '/chat.html',
   '/chat-hub.html', '/face-reading.html', '/hall.html', '/my.html',
   '/reading-detail.html', '/reading.html', '/records.html'];
@@ -20,10 +21,16 @@ const happySnapshot = () => ({
     health: 200, ready: readiness(),
     static: Object.fromEntries(routes.map(path => [path, 200])),
   },
+  public: {
+    origin: PUBLIC_ORIGIN, health: 200, ready: readiness(),
+    version, confirmationVersion: version,
+    static: Object.fromEntries(routes.map(path => [path, 200])),
+  },
 });
-const completeEvidence = () => Object.fromEntries(
-  RETIREMENT_EVIDENCE.map(name => [name, true]),
-);
+const completeEvidence = () => ({
+  ...Object.fromEntries(RETIREMENT_EVIDENCE.map(name => [name, true])),
+  publicOrigin: PUBLIC_ORIGIN,
+});
 
 function fixtureFetch(state = 'ready') {
   const requests = [];
@@ -31,10 +38,10 @@ function fixtureFetch(state = 'ready') {
     requests.push({ uri, method: options.method, credentials: options.credentials,
       redirect: options.redirect });
     const { origin, pathname } = new URL(uri);
-    expect([CLOUDFLARE_ORIGIN, VERCEL_ORIGIN]).toContain(origin);
+    expect([CLOUDFLARE_ORIGIN, VERCEL_ORIGIN, PUBLIC_ORIGIN]).toContain(origin);
     expect(['GET', 'HEAD']).toContain(options.method);
     const headers = new Headers();
-    if (origin === CLOUDFLARE_ORIGIN && pathname.startsWith('/api/')) {
+    if (origin !== VERCEL_ORIGIN && pathname.startsWith('/api/')) {
       headers.set('x-myeongha-worker-version', version);
     }
     if (options.method === 'HEAD') {
@@ -46,7 +53,7 @@ function fixtureFetch(state = 'ready') {
       return Response.json({ status: 'ok' }, { status: 200, headers });
     }
     if (pathname === '/api/readiness') {
-      const isCf = origin === CLOUDFLARE_ORIGIN;
+      const isCf = origin !== VERCEL_ORIGIN;
       const blocked = isCf && state !== 'ready';
       return Response.json({ status: blocked ? 'unready' : 'ready',
         capabilities: {
@@ -61,6 +68,76 @@ function fixtureFetch(state = 'ready') {
 }
 
 describe('read-only Vercel retirement gate', () => {
+  it('rejects unapproved external hostnames and requires real public-domain proof', () => {
+    for (const candidate of [
+      'http://app.myeongha-release.dev',
+      'https://myeongha.vercel.app',
+      'https://another.vercel.app',
+      'https://another.gycha0109.workers.dev',
+      'https://example.com',
+      'https://app.example.com',
+      'https://127.0.0.1',
+      'https://localhost',
+      'https://app.myeongha-release.dev:8443',
+      'https://app.myeongha-release.dev/',
+      'https://app.myeongha-release.dev/health',
+    ]) expect(approvedRetirementPublicOriginV1(candidate)).toBeNull();
+    expect(approvedRetirementPublicOriginV1(PUBLIC_ORIGIN)).toBe(PUBLIC_ORIGIN);
+    const evidence = completeEvidence();
+    delete evidence.publicOrigin;
+    const snapshot = happySnapshot();
+    delete snapshot.public;
+    const report = evaluateVercelRetirementV1(snapshot, evidence);
+    expect(report.result).toBe('HOLD');
+    expect(report.blocked).toContain('CUSTOM_DOMAIN_NOT_VERIFIED');
+    expect(report.blocked).not.toContain('CUSTOM_DOMAIN_WORKER_VERSION_MISMATCH');
+    const manifest = {
+      schemaVersion: 'myeongha-vercel-retirement-evidence-v1',
+      workerVersion: version, gitSha: 'a'.repeat(40),
+      checks: Object.fromEntries(RETIREMENT_EVIDENCE.map(name => [
+        name, { passed: true, evidenceRef: 'https://github.com/gycha0109-beep/MyeongHa/pull/2597' },
+      ])),
+    };
+    expect(() => parseVercelRetirementEvidenceV1(manifest))
+      .toThrow(/identity/);
+  });
+
+  it('holds when the public-domain Worker version or readiness diverges', async () => {
+    const fixture = fixtureFetch('ready');
+    const changed = async (uri, init) => {
+      if (uri === PUBLIC_ORIGIN + '/api/health') {
+        return Response.json({ status: 'ok' }, {
+          status: 200,
+          headers: { 'x-myeongha-worker-version': '223e4567-e89b-42d3-a456-426614174000' },
+        });
+      }
+      return fixture.fetchImpl(uri, init);
+    };
+    const report = await runVercelRetirementAuditV1({
+      fetchImpl: changed, evidence: completeEvidence(),
+    });
+    expect(report.result).toBe('HOLD');
+    expect(report.blocked).toContain('CUSTOM_DOMAIN_WORKER_VERSION_MISMATCH');
+    const unready = happySnapshot();
+    unready.public.ready = readiness(503, 'unready');
+    const hold = evaluateVercelRetirementV1(unready, completeEvidence());
+    expect(hold.blocked).toContain('CUSTOM_DOMAIN_NOT_VERIFIED');
+    expect(hold.shutdownExecuted).toBe(false);
+  });
+
+  it('passes only when a distinct public host has all required evidence and exact version', async () => {
+    const fixture = fixtureFetch('ready');
+    const report = await runVercelRetirementAuditV1({
+      fetchImpl: fixture.fetchImpl, evidence: completeEvidence(),
+    });
+    expect(report.result).toBe('ELIGIBLE_FOR_MANUAL_RETIREMENT');
+    expect(report.blocked).toEqual([]);
+    expect(report.shutdownExecuted).toBe(false);
+    expect(report.publicDomainReadiness).toEqual(readiness());
+    expect(fixture.requests).toHaveLength(44);
+  });
+
+
   it('requires pinned Git SHA and cited, separately attested gate evidence', () => {
     const gitSha = 'a'.repeat(40);
     const checks = Object.fromEntries(RETIREMENT_EVIDENCE.map(name => [
@@ -68,7 +145,7 @@ describe('read-only Vercel retirement gate', () => {
     ]));
     const parsed = parseVercelRetirementEvidenceV1({
       schemaVersion: 'myeongha-vercel-retirement-evidence-v1',
-      workerVersion: version, gitSha, checks,
+      workerVersion: version, gitSha, publicOrigin: PUBLIC_ORIGIN, checks,
     });
     expect(parsed.approvedCustomDomain).toBe(true);
     expect(parsed.explicitFinalShutdownApproval).toBe(true);
@@ -78,21 +155,22 @@ describe('read-only Vercel retirement gate', () => {
     expect(mismatch.blocked).toContain('EVIDENCE_VERSION_DRIFT');
     expect(parseVercelRetirementEvidenceV1({
       schemaVersion: 'myeongha-vercel-retirement-evidence-v1',
-      workerVersion: version, gitSha,
+      workerVersion: version, gitSha, publicOrigin: PUBLIC_ORIGIN,
       checks: { ...checks, explicitFinalShutdownApproval: {
         passed: true, evidenceRef: 'https://untrusted.example/approval',
       } },
     }).explicitFinalShutdownApproval).toBe(false);
     expect(() => parseVercelRetirementEvidenceV1({
       schemaVersion: 'myeongha-vercel-retirement-evidence-v1',
-      workerVersion: version, gitSha: 'short', checks,
+      workerVersion: version, gitSha: 'short', publicOrigin: PUBLIC_ORIGIN, checks,
     })).toThrow(/identity/);
   });
 
   it('never interprets a healthy site as permission to shut down', () => {
     const report = evaluateVercelRetirementV1(happySnapshot());
     expect(report.result).toBe('HOLD');
-    expect(report.blocked).toHaveLength(RETIREMENT_EVIDENCE.length);
+    expect(report.blocked).toContain('CUSTOM_DOMAIN_NOT_VERIFIED');
+    expect(report.blocked.length).toBeGreaterThan(RETIREMENT_EVIDENCE.length);
     expect(report.shutdownExecuted).toBe(false);
   });
 
@@ -129,7 +207,7 @@ describe('read-only Vercel retirement gate', () => {
     expect(report.blocked).toContain('CLOUDFLARE_USER_DATA_NOT_READY');
     expect(report.blocked).toContain('CLOUDFLARE_SAJU_NOT_READY');
     expect(report.cloudflareVersion).toBe(version);
-    expect(requests).toHaveLength(29); // 24 HEAD + 5 GET
+    expect(requests).toHaveLength(44); // 36 HEAD + 8 GET
     expect(requests.every(r => r.credentials === 'omit' && r.redirect === 'error')).toBe(true);
     expect(requests.every(r => r.method === 'GET' || r.method === 'HEAD')).toBe(true);
   });
