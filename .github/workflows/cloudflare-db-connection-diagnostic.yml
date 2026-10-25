@@ -1,0 +1,42 @@
+name: "Cloudflare dedicated DB owner read-only diagnostic"
+run-name: "[WT:ops] Cloudflare DB owner diagnostics (read only)"
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "One-time read-only diagnostic confirmation"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cloudflare-db-owner-readonly-diagnostic
+  cancel-in-progress: false
+
+jobs:
+  diagnostic:
+    if: ${{ github.ref == 'refs/heads/main' && inputs.confirm == 'VERIFY_MYEONGHA_CF_DB_OWNER_CONNECTIVITY_20261026' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    environment: production
+    env:
+      DIAG_CONFIRM: ${{ inputs.confirm }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PRODUCTION_SESSION_POOLER_HOST: ${{ secrets.SUPABASE_PRODUCTION_SESSION_POOLER_HOST }}
+      SUPABASE_PRODUCTION_SERVER_ROOT_CERT_PEM: ${{ secrets.SUPABASE_PRODUCTION_SERVER_ROOT_CERT_PEM }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '24'
+      - name: Install PostgreSQL client
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y postgresql-client
+      - name: Verify DB owner and dedicated role without changing any credentials
+        run: node scripts/operations/diagnose-cloudflare-db-owner-readonly.mjs
