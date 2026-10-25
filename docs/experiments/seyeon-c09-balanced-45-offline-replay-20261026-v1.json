@@ -1,0 +1,396 @@
+{
+  "source": "docs/experiments/seyeon-c09-15x3-generative-gpt-41-mini-20261026-raw-v1.json",
+  "schemaVersion": "seyeon-c09-balanced-45-offline-replay-v1",
+  "originalPaidModelRequestsReused": 45,
+  "newPaidModelRequests": 0,
+  "productionPreflightPerformed": false,
+  "independentSemanticReviewerPerformed": false,
+  "regeneratedAnswers": false,
+  "newBalancedModelQualityMeasured": false,
+  "guardIsHighConfidencePartialFilter": true,
+  "summary": {
+    "baseline": {
+      "total": 15,
+      "passedOldLocalGuards": 15,
+      "passedNewSpeechBoundary": 10,
+      "rejectedByNewSpeechBoundary": 5
+    },
+    "character_first_v1": {
+      "total": 15,
+      "passedOldLocalGuards": 0,
+      "passedNewSpeechBoundary": 7,
+      "rejectedByNewSpeechBoundary": 8
+    },
+    "character_first_life_v1": {
+      "total": 15,
+      "passedOldLocalGuards": 0,
+      "passedNewSpeechBoundary": 7,
+      "rejectedByNewSpeechBoundary": 8
+    }
+  },
+  "results": [
+    {
+      "id": 1,
+      "profile": "baseline",
+      "oldRendererAndInterpretationGuardsPassed": true,
+      "newSpeechBoundaryPassed": true,
+      "newSpeechBoundaryFailureReasons": []
+    },
+    {
+      "id": 1,
+      "profile": "character_first_v1",
+      "oldRendererAndInterpretationGuardsPassed": false,
+      "newSpeechBoundaryPassed": false,
+      "newSpeechBoundaryFailureReasons": [
+        "HONORIFIC_DRIFT"
+      ]
+    },
+    {
+      "id": 1,
+      "profile": "character_first_life_v1",
+      "oldRendererAndInterpretationGuardsPassed": false,
+      "newSpeechBoundaryPassed": false,
+      "newSpeechBoundaryFailureReasons": [
+        "HONORIFIC_DRIFT"
+      ]
+    },
+    {
+      "id": 2,
+      "profile": "baseline",
+      "oldRendererAndInterpretationGuardsPassed": true,
+      "newSpeechBoundaryPassed": true,
+      "newSpeechBoundaryFailureReasons": []
+    },
+    {
+      "id": 2,
+      "profile": "character_first_v1",
+      "oldRendererAndInterpretationGuardsPassed": false,
+      "newSpeechBoundaryPassed": false,
+      "newSpeechBoundaryFailureReasons": [
+        "HONORIFIC_DRIFT"
+      ]
+    },
+    {
+      "id": 2,
+      "profile": "character_first_life_v1",
+      "oldRendererAndInterpretationGuardsPassed": false,
+      "newSpeechBoundaryPassed": true,
+      "newSpeechBoundaryFailureReasons": []
+    },
+    {
+      "id": 3,
+      "profile": "baseline",
+      "oldRendererAndInterpretationGuardsPassed": true,
+      "newSpeechBoundaryPassed": true,
+      "newSpeechBoundaryFailureReasons": []
+    },
+    {
+      "id": 3,
+      "profile": "character_first_v1",
+      "oldRendererAndInterpretationGuardsPassed": false,
+      "newSpeechBoundaryPassed": false,
+      "newSpeechBoundaryFailureReasons": [
+        "HONORIFIC_DRIFT"
+      ]
+    },
+    {
+      "id": 3,
+      "profile": "character_first_life_v1",
+      "oldRendererAndInterpretationGuardsPassed": false,
+      "newSpeechBoundaryPassed": true,
+      "newSpeechBoundaryFailureReasons": []
+    },
+    {
+      "id": 4,
+      "profile": "baseline",
+      "oldRendererAndInterpretationGuardsPassed": true,
+      "newSpeechBoundaryPassed": true,
+      "newSpeechBoundaryFailureReasons": []
+    },
+    {
+      "id": 4,
+      "profile": "character_first_v1",
+      "oldRendererAndInterpretationGuardsPassed": false,
+      "newSpeechBoundaryPassed": true,
+      "newSpeechBoundaryFailureReasons": []
+    },
+    {
+      "id": 4,
+      "profile": "character_first_life_v1",
+      "oldRendererAndInterpretationGuardsPassed": false,
+      "newSpeechBoundaryPassed": true,
+      "newSpeechBoundaryFailureReasons": []
+    },
+    {
+      "id": 5,
+      "profile": "baseline",
+      "oldRendererAndInterpretationGuardsPassed": true,
+      "newSpeechBoundaryPassed": true,
+      "newSpeechBoundaryFailureReasons": []
+    },
+    {
+      "id": 5,
+      "profile": "character_first_v1",
+      "oldRendererAndInterpretationGuardsPassed": false,
+      "newSpeechBoundaryPassed": true,
+      "newSpeechBoundaryFailureReasons": []
+    },
+    {
+      "id": 5,
+      "profile": "character_first_life_v1",
+      "oldRendererAndInterpretationGuardsPassed": false,
+      "newSpeechBoundaryPassed": false,
+      "newSpeechBoundaryFailureReasons": [
+        "HONORIFIC_DRIFT"
+      ]
+    },
+    {
+      "id": 6,
+      "profile": "baseline",
+      "oldRendererAndInterpretationGuardsPassed": true,
+      "newSpeechBoundaryPassed": true,
+      "newSpeechBoundaryFailureReasons": []
+    },
+    {
+      "id": 6,
+      "profile": "character_first_v1",
+      "oldRendererAndInterpretationGuardsPassed": false,
+      "newSpeechBoundaryPassed": true,
+      "newSpeechBoundaryFailureReasons": []
+    },
+    {
+      "id": 6,
+      "profile": "character_first_life_v1",
+      "oldRendererAndInterpretationGuardsPassed": false,
+      "newSpeechBoundaryPassed": true,
+      "newSpeechBoundaryFailureReasons": []
+    },
+    {
+      "id": 7,
+      "profile": "baseline",
+      "oldRendererAndInterpretationGuardsPassed": true,
+      "newSpeechBoundaryPassed": true,
+      "newSpeechBoundaryFailureReasons": []
+    },
+    {
+      "id": 7,
+      "profile": "character_first_v1",
+      "oldRendererAndInterpretationGuardsPassed": false,
+      "newSpeechBoundaryPassed": false,
+      "newSpeechBoundaryFailureReasons": [
+        "HONORIFIC_DRIFT"
+      ]
+    },
+    {
+      "id": 7,
+      "profile": "character_first_life_v1",
+      "oldRendererAndInterpretationGuardsPassed": false,
+      "newSpeechBoundaryPassed": false,
+      "newSpeechBoundaryFailureReasons": [
+        "UNVERIFIED_RELATIONSHIP_AFFIRMATION"
+      ]
+    },
+    {
+      "id": 8,
+      "profile": "baseline",
+      "oldRendererAndInterpretationGuardsPassed": true,
+      "newSpeechBoundaryPassed": true,
+      "newSpeechBoundaryFailureReasons": []
+    },
+    {
+      "id": 8,
+      "profile": "character_first_v1",
+      "oldRendererAndInterpretationGuardsPassed": false,
+      "newSpeechBoundaryPassed": false,
+      "newSpeechBoundaryFailureReasons": [
+        "HONORIFIC_DRIFT"
+      ]
+    },
+    {
+      "id": 8,
+      "profile": "character_first_life_v1",
+      "oldRendererAndInterpretationGuardsPassed": false,
+      "newSpeechBoundaryPassed": false,
+      "newSpeechBoundaryFailureReasons": [
+        "HONORIFIC_DRIFT"
+      ]
+    },
+    {
+      "id": 9,
+      "profile": "baseline",
+      "oldRendererAndInterpretationGuardsPassed": true,
+      "newSpeechBoundaryPassed": true,
+      "newSpeechBoundaryFailureReasons": []
+    },
+    {
+      "id": 9,
+      "profile": "character_first_v1",
+      "oldRendererAndInterpretationGuardsPassed": false,
+      "newSpeechBoundaryPassed": true,
+      "newSpeechBoundaryFailureReasons": []
+    },
+    {
+      "id": 9,
+      "profile": "character_first_life_v1",
+      "oldRendererAndInterpretationGuardsPassed": false,
+      "newSpeechBoundaryPassed": true,
+      "newSpeechBoundaryFailureReasons": []
+    },
+    {
+      "id": 10,
+      "profile": "baseline",
+      "oldRendererAndInterpretationGuardsPassed": true,
+      "newSpeechBoundaryPassed": false,
+      "newSpeechBoundaryFailureReasons": [
+        "UNVERIFIED_SHARED_MEMORY_AFFIRMATION"
+      ]
+    },
+    {
+      "id": 10,
+      "profile": "character_first_v1",
+      "oldRendererAndInterpretationGuardsPassed": false,
+      "newSpeechBoundaryPassed": false,
+      "newSpeechBoundaryFailureReasons": [
+        "HONORIFIC_DRIFT"
+      ]
+    },
+    {
+      "id": 10,
+      "profile": "character_first_life_v1",
+      "oldRendererAndInterpretationGuardsPassed": false,
+      "newSpeechBoundaryPassed": false,
+      "newSpeechBoundaryFailureReasons": [
+        "HONORIFIC_DRIFT",
+        "UNVERIFIED_SHARED_MEMORY_AFFIRMATION"
+      ]
+    },
+    {
+      "id": 11,
+      "profile": "baseline",
+      "oldRendererAndInterpretationGuardsPassed": true,
+      "newSpeechBoundaryPassed": false,
+      "newSpeechBoundaryFailureReasons": [
+        "TECHNICAL_SELF_DESCRIPTION"
+      ]
+    },
+    {
+      "id": 11,
+      "profile": "character_first_v1",
+      "oldRendererAndInterpretationGuardsPassed": false,
+      "newSpeechBoundaryPassed": true,
+      "newSpeechBoundaryFailureReasons": []
+    },
+    {
+      "id": 11,
+      "profile": "character_first_life_v1",
+      "oldRendererAndInterpretationGuardsPassed": false,
+      "newSpeechBoundaryPassed": true,
+      "newSpeechBoundaryFailureReasons": []
+    },
+    {
+      "id": 12,
+      "profile": "baseline",
+      "oldRendererAndInterpretationGuardsPassed": true,
+      "newSpeechBoundaryPassed": true,
+      "newSpeechBoundaryFailureReasons": []
+    },
+    {
+      "id": 12,
+      "profile": "character_first_v1",
+      "oldRendererAndInterpretationGuardsPassed": false,
+      "newSpeechBoundaryPassed": true,
+      "newSpeechBoundaryFailureReasons": []
+    },
+    {
+      "id": 12,
+      "profile": "character_first_life_v1",
+      "oldRendererAndInterpretationGuardsPassed": false,
+      "newSpeechBoundaryPassed": true,
+      "newSpeechBoundaryFailureReasons": []
+    },
+    {
+      "id": 13,
+      "profile": "baseline",
+      "oldRendererAndInterpretationGuardsPassed": true,
+      "newSpeechBoundaryPassed": false,
+      "newSpeechBoundaryFailureReasons": [
+        "HONORIFIC_DRIFT"
+      ]
+    },
+    {
+      "id": 13,
+      "profile": "character_first_v1",
+      "oldRendererAndInterpretationGuardsPassed": false,
+      "newSpeechBoundaryPassed": false,
+      "newSpeechBoundaryFailureReasons": [
+        "HONORIFIC_DRIFT",
+        "UNVERIFIED_SHARED_MEMORY_AFFIRMATION",
+        "UNVERIFIED_RELATIONSHIP_AFFIRMATION"
+      ]
+    },
+    {
+      "id": 13,
+      "profile": "character_first_life_v1",
+      "oldRendererAndInterpretationGuardsPassed": false,
+      "newSpeechBoundaryPassed": false,
+      "newSpeechBoundaryFailureReasons": [
+        "HONORIFIC_DRIFT",
+        "UNVERIFIED_RELATIONSHIP_AFFIRMATION"
+      ]
+    },
+    {
+      "id": 14,
+      "profile": "baseline",
+      "oldRendererAndInterpretationGuardsPassed": true,
+      "newSpeechBoundaryPassed": false,
+      "newSpeechBoundaryFailureReasons": [
+        "TECHNICAL_SELF_DESCRIPTION",
+        "UNAUTHORIZED_SAJU_OFFER"
+      ]
+    },
+    {
+      "id": 14,
+      "profile": "character_first_v1",
+      "oldRendererAndInterpretationGuardsPassed": false,
+      "newSpeechBoundaryPassed": true,
+      "newSpeechBoundaryFailureReasons": []
+    },
+    {
+      "id": 14,
+      "profile": "character_first_life_v1",
+      "oldRendererAndInterpretationGuardsPassed": false,
+      "newSpeechBoundaryPassed": false,
+      "newSpeechBoundaryFailureReasons": [
+        "TECHNICAL_SELF_DESCRIPTION",
+        "UNAUTHORIZED_SAJU_OFFER"
+      ]
+    },
+    {
+      "id": 15,
+      "profile": "baseline",
+      "oldRendererAndInterpretationGuardsPassed": true,
+      "newSpeechBoundaryPassed": false,
+      "newSpeechBoundaryFailureReasons": [
+        "FORGED_CONVERSATION_CONTINUATION"
+      ]
+    },
+    {
+      "id": 15,
+      "profile": "character_first_v1",
+      "oldRendererAndInterpretationGuardsPassed": false,
+      "newSpeechBoundaryPassed": false,
+      "newSpeechBoundaryFailureReasons": [
+        "FORGED_CONVERSATION_CONTINUATION"
+      ]
+    },
+    {
+      "id": 15,
+      "profile": "character_first_life_v1",
+      "oldRendererAndInterpretationGuardsPassed": false,
+      "newSpeechBoundaryPassed": false,
+      "newSpeechBoundaryFailureReasons": [
+        "FORGED_CONVERSATION_CONTINUATION"
+      ]
+    }
+  ]
+}
