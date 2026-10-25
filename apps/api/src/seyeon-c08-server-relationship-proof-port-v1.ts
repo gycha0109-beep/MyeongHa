@@ -33,7 +33,10 @@ export function createSeyeonC08ServerRelationshipProofPortV1(input:Readonly<{
      input.threadId!==input.threadId.trim()||input.threadId.length>256||
      typeof input.readCurrentRelationship!=='function')throw fail();
   return Object.freeze({
-    async readAuthoritativeRelationship(key){
+    async readAuthoritativeRelationship(key:Readonly<{
+      subjectId:string;threadId:string;currentUserMessageId:string;
+      characterId:'seyeon';
+    }>){
       if(key.subjectId!==input.subjectId||key.threadId!==input.threadId||
          key.characterId!=='seyeon'||!key.currentUserMessageId?.trim()||
          key.currentUserMessageId.length>256)throw fail();
