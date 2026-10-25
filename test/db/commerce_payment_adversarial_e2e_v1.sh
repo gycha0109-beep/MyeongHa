@@ -48,10 +48,13 @@ expect_denied "API_EXECUTOR_FORGED_TOPUP" 'permission denied for function intern
 expect_denied "API_EXECUTOR_FORGED_DEBIT" 'permission denied for function internal_cmd_chat_credit_reserve_v1' "begin; set local role myeongha_api_executor; set local myeongha.subject_id='$alice'; select * from public.internal_cmd_chat_credit_reserve_v1('$alice','cda30000-0000-4000-8000-000000000001','cda40000-0000-4000-8000-000000000001'); rollback;"
 expect_denied "API_EXECUTOR_FORGED_FINALIZE" 'permission denied for function internal_cmd_chat_credit_finalize_v1' "begin; set local role myeongha_api_executor; set local myeongha.subject_id='$alice'; select public.internal_cmd_chat_credit_finalize_v1('$alice','cda50000-0000-4000-8000-000000000001',true,null); rollback;"
 
-# Use the real sandbox TESTPAY SQL commerce entrypoints, not mocked success.
-# Existing suites assert pinned price/terms, idempotency, forged status,
-# cross-subject ownership, provider evidence and replay/timestamp conflicts.
-bash test/db/commerce_payment_attempt_authority.sh
+# Payment Attempt concurrency/idempotency is covered in the adjacent
+# independent 'commerce-payment-attempt-authority' case, because that fixture
+# intentionally reuses 'merchant-order-1' for a different synthetic actor.
+# Running both fixtures in this same DB would violate the correctly enforced
+# global (provider,environment,provider_request_id) uniqueness invariant.
+# Here we exercise actual TESTPAY verified-evidence issuance, rollback,
+# cross-owner and amount/currency/environment/timestamp replay checks.
 bash test/db/commerce_verified_payment_evidence_persistence.sh
 bash test/db/commerce_verified_payment_replay_timestamp.sh
 echo 'PASS_COMMERCE_PAYMENT_ATTACK_E2E_SANDBOX_ONLY_NO_REAL_CHARGES'
