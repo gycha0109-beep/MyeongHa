@@ -315,14 +315,12 @@ social_digest="$(printf '9%.0s' {1..64})"
 social_issue() {
   q "begin; set local role myeongha_api_executor;
     select public.cmd_issue_existing_member_social_state_v1('$1'); commit;" |
-    grep -E '^[tf]
- | tail -n 1
+    grep -E '^[tf]$' | tail -n 1
 }
 social_consume() {
   q "begin; set local role myeongha_api_executor;
     select public.cmd_consume_existing_member_social_state_v1('$1'); commit;" |
-    grep -E '^[tf]
- | tail -n 1
+    grep -E '^[tf]$' | tail -n 1
 }
 [[ "$(social_issue "$social_digest")" == t ]] || fail 'OAuth state not issued'
 [[ "$(social_issue "$social_digest")" == f ]] || fail 'OAuth state duplicate issue accepted'
@@ -343,8 +341,8 @@ q "update public.legal_existing_member_social_states_v1
 [[ "$(social_consume "$expired_social")" == f ]] || fail 'expired OAuth state consumed'
 [[ "$(q "begin; set local role myeongha_system_executor;
  select public.internal_purge_existing_member_social_states_v1(250); commit;" |
- grep -E '^[0-9]+
- | tail -n 1)" == 1 ]] || fail 'OAuth expiry purge mismatch'
+ grep -E '^[0-9]+$' | tail -n 1)" == 1 ]] || fail 'OAuth expiry purge mismatch'
+
 # Concurrent OAuth completions must have exactly one successful DB claim.
 social_race="$(printf '7%.0s' {1..64})"
 [[ "$(social_issue "$social_race")" == t ]] || fail 'OAuth race fixture issue'
@@ -359,11 +357,9 @@ sleep 0.2
 social_b=$!
 wait "$social_a" || fail 'OAuth first concurrent consumer'
 wait "$social_b" || fail 'OAuth second concurrent consumer'
-[[ "$(grep -hc '^t
-
-echo 'PASS PortOne identity PG17 disposable authority smoke complete; no Production migration applied.'
- "$tmp/social-first" "$tmp/social-second" | awk '{sum+=$1} END {print sum+0}')" == 1 ]] ||
- fail 'OAuth DB consumed state twice'
+social_successes="$(grep -Ec '^t$' "$tmp/social-first" "$tmp/social-second" |
+  awk -F: '{sum+=$NF} END {print sum+0}')"
+[[ "$social_successes" == 1 ]] || fail 'OAuth DB consumed state twice'
 pass 'A1 existing Member OAuth signed state one-use and TTL'
 
 echo 'PASS PortOne identity PG17 disposable authority smoke complete; no Production migration applied.'

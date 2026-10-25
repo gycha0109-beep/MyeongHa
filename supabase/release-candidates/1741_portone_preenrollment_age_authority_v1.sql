@@ -60,10 +60,10 @@ begin
   -- Never accept client-controlled digest; the HTTP adapter hashes an
   -- HttpOnly, Secure, SameSite cookie using a server-held key.
   perform pg_advisory_xact_lock(hashtextextended(p_binding_digest, 1741));
-  delete from public.legal_portone_preenrollment_v1
-    where binding_digest=p_binding_digest and expires_at<=v_now;
-  if exists(select 1 from public.legal_portone_preenrollment_v1
-    where binding_digest=p_binding_digest and status in ('pending','verified')) then
+  delete from public.legal_portone_preenrollment_v1 as a
+    where a.binding_digest=p_binding_digest and a.expires_at<=v_now;
+  if exists(select 1 from public.legal_portone_preenrollment_v1 as a
+    where a.binding_digest=p_binding_digest and a.status in ('pending','verified')) then
     raise exception using errcode='23514',
       constraint='legal_portone_preenrollment_already_pending';
   end if;
@@ -241,11 +241,11 @@ begin
     raise exception using errcode='23514',
       constraint='legal_portone_preenrollment_guest_replay';
   end if;
-  update public.legal_portone_preenrollment_v1
+  update public.legal_portone_preenrollment_v1 as a
     set status='consumed',consumed_at=clock_timestamp()
-    where identity_verification_id=v_verification_id
-      and binding_digest=p_binding_digest
-      and status='verified' and expires_at>clock_timestamp();
+    where a.identity_verification_id=v_verification_id
+      and a.binding_digest=p_binding_digest
+      and a.status='verified' and a.expires_at>clock_timestamp();
   if not found then
     raise exception using errcode='23514',
       constraint='legal_portone_preenrollment_required';
