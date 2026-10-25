@@ -730,3 +730,10 @@ source schema/최초 Reply·receipt·철회 서버 composition, 공용 API clien
 - 긴급 중단: 새 소스 사용·G1/G2·모델 비용 활성화는 중단하되 이미 발급된 답변 receipt ACK와 사용자 철회 경로를 제거하지 않는다.
 - 미완료: S0 실제 복원 PG17 최신 SQL 통합 경합 PASS, SRC-25/G0-D04/G3 실제 운영 승인 증거, 전용 DB 로그인·비용 예산/시크릿 설치, Cloudflare Worker 정책의 승인된 릴리스 전환, 사용자 인증 운영 G5/G6 smoke. **운영 공개 및 실대화 활성화는 여전히 HOLD.**
 - 이 절은 구현 상태 기록이지 임의 승인·테스트 PASS·운영 활성화 선언이 아니다.
+
+## 69. 2026-10-26 운영 계정 현황 재검증 (읽기 전용)
+
+- 운영 Supabase catalog: `myeongha_seyeon_governed_login`은 이미 존재하며 LOGIN=true, SUPERUSER=false, BYPASSRLS=false, CREATEROLE=false, CREATEDB=false, connection limit 5, `myeongha_seyeon_governed_executor` SET 가능. 기존 계정을 재생성·비밀번호 회전하지 않는다.
+- 같은 운영 DB에서 S0 `cmd_ack_seyeon_positive_reply_v1`, `cmd_set_s0_positive_source_gate_v1` 미설치, Governor 모델 정책/일일 예산 0건. 따라서 세연 실대화는 미활성화.
+- SUN 작업기존 `.env`에는 `OPENAI_API_KEY`만 확인되고, 전용 governed DB URL 및 principal 키는 없다. credential 원문을 보거나 출력하지 않았다. 기존 로그인과 자격증명 일치성을 확인하기 전에는 `configure-seyeon-security-s0-credentials.mjs`를 재실행하지 않는다.
+- 별도 트랙/기존 운영 DB 상태를 추정하여 덮어쓰지 않으며, S0 실제 DR 리허설과 SRC-25/G0-D04/G3/G5 증거가 확보되기 전까지 Production 데이터/ACL/Provider/Cloudflare 공개 변경은 하지 않는다.
