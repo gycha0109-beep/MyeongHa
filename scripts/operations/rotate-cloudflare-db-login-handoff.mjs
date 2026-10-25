@@ -1,9 +1,15 @@
-// One-time owner-local, encrypted credential handoff for the production Cloudflare
-// dedicated PostgreSQL LOGIN. No password, SQL containing a password, account
-// token, provider response body, or decrypted secret is ever logged/artifacted.
+// One-time encrypted handoff for the independent Cloudflare PostgreSQL LOGIN.
+// Uses only the approved production Postgres password + session pooler + pinned CA.
+// Secrets never appear in source, output, GitHub logs, SQL text, or the artifact.
 // Watchtower-Track: ops
-import { randomBytes, createPublicKey, publicEncrypt, constants } from 'node:crypto';
-import { writeFile } from 'node:fs/promises';
+import {
+  randomBytes, createPublicKey, publicEncrypt, constants,
+  pbkdf2Sync, createHmac, createHash,
+} from 'node:crypto';
+import { mkdtemp, writeFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { spawn } from 'node:child_process';
 
 const PROJECT = 'cnsfpcdiyofqvhpcegfc';
 const ROLE = 'myeongha_cf_api_login';
@@ -14,86 +20,125 @@ function ensure(condition, reason) {
   if (!condition) throw new Error(reason);
 }
 
-async function runQuery(query) {
-  const response = await fetch(
-    'https://api.supabase.com/v1/projects/' + PROJECT + '/database/query',
-    {
-      method: 'POST',
-      redirect: 'error',
-      signal: AbortSignal.timeout(30_000),
-      headers: {
-        Authorization: 'Bearer ' + process.env.SUPABASE_ACCESS_TOKEN,
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-      },
-      body: JSON.stringify({ query, read_only: false }),
-    },
-  );
-  ensure(response.status === 201,
-    'Supabase management SQL operation rejected (HTTP ' + response.status + ')');
-  const payload = await response.json();
-  ensure(!payload?.error, 'Supabase management SQL returned an error');
-  return Array.isArray(payload) ? payload : payload?.result;
+function scramVerifier(password) {
+  const salt = randomBytes(16);
+  const salted = pbkdf2Sync(password, salt, 4096, 32, 'sha256');
+  const stored = createHash('sha256')
+    .update(createHmac('sha256', salted).update('Client Key').digest()).digest();
+  const server = createHmac('sha256', salted).update('Server Key').digest();
+  return 'SCRAM-SHA-256$4096:' + salt.toString('base64') + '$' +
+    stored.toString('base64') + ':' + server.toString('base64');
+}
+
+async function query(sql, env, { read = false } = {}) {
+  return new Promise((resolve, reject) => {
+    const proc = spawn('psql', ['-X', '-v', 'ON_ERROR_STOP=1', '-qAt'], {
+      env, stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    let output = '';
+    let failed = false;
+    proc.on('error', () => { failed = true; });
+    proc.stdout.on('data', chunk => {
+      if (read && output.length < 256) output += String(chunk).slice(0, 256);
+    });
+    // Never log stderr: the database transport may mention hosts or credentials.
+    proc.stderr.on('data', () => {});
+    proc.stdin.on('error', () => {});
+    proc.stdin.end(sql + '\n');
+    proc.on('close', code => {
+      if (failed || code !== 0) reject(new Error('PostgreSQL protected command failed'));
+      else resolve(read ? output.trim() : '');
+    });
+  });
 }
 
 async function main() {
   ensure(process.env.CONFIRM === REQUIRED_CONFIRM, 'Invalid operator confirmation');
   ensure(process.env.GITHUB_REF === 'refs/heads/main', 'Not a main-branch operation');
   ensure(process.env.GITHUB_RUN_ATTEMPT === '1', 'Do not retry an uncertain rotation');
-  ensure(typeof process.env.SUPABASE_ACCESS_TOKEN === 'string' &&
-    process.env.SUPABASE_ACCESS_TOKEN.length >= 20, 'Production management token missing');
+  ensure(typeof process.env.SUPABASE_DB_PASSWORD === 'string' &&
+    process.env.SUPABASE_DB_PASSWORD.length >= 8, 'Production DB owner password missing');
+  ensure(typeof process.env.SUPABASE_PRODUCTION_SERVER_ROOT_CERT_PEM === 'string' &&
+    process.env.SUPABASE_PRODUCTION_SERVER_ROOT_CERT_PEM.includes('BEGIN CERTIFICATE'),
+    'Production pinned root CA missing');
+  const host = process.env.SUPABASE_PRODUCTION_SESSION_POOLER_HOST;
+  ensure(typeof host === 'string' &&
+    /^[a-z0-9-]+(?:\.[a-z0-9-]+)*\.pooler\.supabase\.com$/.test(host),
+    'Production session pooler host rejected');
   ensure(typeof process.env.HANDOFF_OUTPUT === 'string' &&
     process.env.HANDOFF_OUTPUT.endsWith('.bin'), 'Encrypted handoff path not configured');
 
   const recipient = createPublicKey({
-    key: Buffer.from(PUB_DER_B64, 'base64'),
-    format: 'der',
-    type: 'spki',
+    key: Buffer.from(PUB_DER_B64, 'base64'), format: 'der', type: 'spki',
   });
   ensure(recipient.asymmetricKeyType === 'rsa' &&
     recipient.asymmetricKeyDetails?.modulusLength >= 3072, 'Recipient key rejected');
 
-  const rows = await runQuery(`select
-    exists(select 1 from pg_roles where rolname='myeongha_cf_api_login'
-      and rolcanlogin and not rolbypassrls and not rolsuper
-      and not rolcreaterole and not rolcreatedb) as safe_login,
-    pg_has_role('myeongha_cf_api_login','myeongha_api_executor','MEMBER') as member_executor,
-    exists(select 1 from pg_roles where rolname='myeongha_api_executor'
-      and not rolcanlogin and not rolbypassrls) as safe_executor;`);
-  ensure(Array.isArray(rows) && rows.length === 1 &&
-    rows[0]?.safe_login === true && rows[0]?.member_executor === true &&
-    rows[0]?.safe_executor === true, 'Dedicated DB role authority preflight failed');
+  const tempRoot = await mkdtemp(path.join(process.env.RUNNER_TEMP || tmpdir(), 'cf-db-ca-'));
+  const certPath = path.join(tempRoot, 'root.pem');
+  try {
+    await writeFile(certPath, process.env.SUPABASE_PRODUCTION_SERVER_ROOT_CERT_PEM,
+      { flag: 'wx', mode: 0o600 });
+    const baseEnv = {
+      ...process.env, PGHOST: host, PGPORT: '5432', PGDATABASE: 'postgres',
+      PGUSER: 'postgres.' + PROJECT, PGPASSWORD: process.env.SUPABASE_DB_PASSWORD,
+      PGSSLMODE: 'verify-full', PGSSLROOTCERT: certPath,
+    };
 
-  const password = randomBytes(48).toString('hex');
-  ensure(/^[a-f0-9]{96}$/.test(password), 'Generated password format failure');
-  const ciphertext = publicEncrypt({
-    key: recipient, padding: constants.RSA_PKCS1_OAEP_PADDING, oaepHash: 'sha256',
-  }, Buffer.from(password, 'utf8'));
-  ensure(ciphertext.length >= 384, 'Ciphertext too short');
+    const preflight = await query(`select case when
+      exists(select 1 from pg_roles where rolname='myeongha_cf_api_login'
+        and rolcanlogin and not rolbypassrls and not rolsuper
+        and not rolcreaterole and not rolcreatedb)
+      and pg_has_role('myeongha_cf_api_login','myeongha_api_executor','MEMBER')
+      and exists(select 1 from pg_roles where rolname='myeongha_api_executor'
+        and not rolcanlogin and not rolbypassrls)
+      then 'PASS' else 'FAIL' end;`, baseEnv, { read: true });
+    ensure(preflight === 'PASS', 'Dedicated role authority preflight failed');
 
-  // Role credentials are altered only after the RSA encrypted handoff
-  // exists in memory and all independent role/RLS preconditions passed.
-  await runQuery("ALTER ROLE " + ROLE + " WITH PASSWORD '" + password + "';");
-  await writeFile(process.env.HANDOFF_OUTPUT, ciphertext, { flag: 'wx', mode: 0o600 });
-  console.log('cloudflare_db_rotation=ROTATED_ENCRYPTED_HANDOFF_READY');
+    const password = randomBytes(48).toString('hex');
+    ensure(/^[a-f0-9]{96}$/.test(password), 'Generated password format failure');
+    const ciphertext = publicEncrypt({
+      key: recipient, padding: constants.RSA_PKCS1_OAEP_PADDING,
+      oaepHash: 'sha256',
+    }, Buffer.from(password, 'utf8'));
+    ensure(ciphertext.length >= 384, 'Ciphertext too short');
+
+    // Never send plaintext password through PostgreSQL protocol logs.
+    const verifier = scramVerifier(password);
+    ensure(/^SCRAM-SHA-256\$4096:[A-Za-z0-9+/=]+\$[A-Za-z0-9+/=]+:[A-Za-z0-9+/=]+$/.test(verifier),
+      'Password verifier format invalid');
+    await query("ALTER ROLE " + ROLE + " WITH PASSWORD '" + verifier + "';", baseEnv);
+
+    // Verify the new isolated login over full peer-verified TLS and target
+    // transaction port before sending any credential to an encrypted artifact.
+    const check = await query('select current_user;', {
+      ...baseEnv, PGPORT: '6543', PGUSER: ROLE + '.' + PROJECT,
+      PGPASSWORD: password,
+    }, { read: true });
+    ensure(check === ROLE, 'Dedicated login verification failed');
+
+    await writeFile(process.env.HANDOFF_OUTPUT, ciphertext,
+      { flag: 'wx', mode: 0o600 });
+    console.log('cloudflare_db_rotation=ROTATED_AND_LOGIN_VERIFIED_ENCRYPTED_HANDOFF_READY');
+  } finally {
+    await rm(tempRoot, { recursive: true, force: true });
+  }
 }
 
 try {
   await main();
 } catch (error) {
-  // Print a short, fixed class only. Never print provider response text,
-  // environment values, generated password, SQL, or the error object.
-  const text = error instanceof Error ? error.message : '';
-  const allowed = [
+  const message = error instanceof Error ? error.message : '';
+  const known = [
     'Invalid operator confirmation', 'Not a main-branch operation',
-    'Do not retry an uncertain rotation', 'Production management token missing',
+    'Do not retry an uncertain rotation', 'Production DB owner password missing',
+    'Production pinned root CA missing', 'Production session pooler host rejected',
     'Encrypted handoff path not configured', 'Recipient key rejected',
-    'Dedicated DB role authority preflight failed', 'Generated password format failure',
-    'Ciphertext too short', 'Supabase management SQL returned an error',
+    'Dedicated role authority preflight failed', 'Generated password format failure',
+    'Ciphertext too short', 'Password verifier format invalid',
+    'Dedicated login verification failed', 'PostgreSQL protected command failed',
   ];
-  const category = allowed.includes(text) ? text
-    : /^Supabase management SQL operation rejected \(HTTP [0-9]{3}\)$/.test(text)
-      ? text : 'Encrypted rotation operation failed';
-  console.error('cloudflare_db_rotation=FAILED: ' + category);
+  console.error('cloudflare_db_rotation=FAILED: ' +
+    (known.includes(message) ? message : 'Encrypted rotation operation failed'));
   process.exitCode = 1;
 }
