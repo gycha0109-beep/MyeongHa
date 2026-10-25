@@ -3,6 +3,8 @@ import {
   hashSeyeonC08MemorySummaryV1,
   requireSeyeonC08MemoryAuthorityProofV1,
 } from '../apps/api/src/seyeon-c08-memory-authority-proof-v1.js';
+import {createSeyeonC08ServerMemoryProofPortV1} from
+  '../apps/api/src/seyeon-c08-server-memory-proof-port-v1.js';
 import type {SeyeonRetrievedMemoryV2} from
   '../packages/domain/src/seyeon-runtime-context-v2.js';
 
@@ -43,6 +45,38 @@ describe('C08 memory grant verification (NO model calls, no reveal)',()=>{
       serverRenderedSlotRequired:true,
     });
     expect(JSON.stringify(got)).not.toContain(memory.summary);
+  });
+
+  it('uses a server-owned scoped Grant reader and never returns private memory content',async()=>{
+    let reads=0;
+    const port=createSeyeonC08ServerMemoryProofPortV1({
+      subjectId:key.subjectId,threadId:key.threadId,
+      async readScopedMemoryGrant(query){
+        reads++;
+        expect(query).toMatchObject({...key,characterId:'seyeon',
+          memoryId:memory.memoryId,sourceRef:memory.sourceRef});
+        return {subjectId:key.subjectId,threadId:key.threadId,
+          characterId:'seyeon',memoryId:memory.memoryId,
+          sourceRef:memory.sourceRef,kind:'memory',claimKind:'fact',
+          summary:memory.summary,grantState:'ACTIVE',
+          origin:'AUTHORITATIVE_STORED_USER_MEMORY',
+          assistantGenerated:false,complete:true};
+      },
+    });
+    const got=await requireSeyeonC08MemoryAuthorityProofV1({
+      ...key,memory,port,
+    });
+    expect(reads).toBe(1);
+    expect(got.verified).toBe(true);
+    expect(got.memoryMayBeSentToModel).toBe(false);
+    expect(JSON.stringify(got)).not.toContain(memory.summary);
+    const spoofedPort=createSeyeonC08ServerMemoryProofPortV1({
+      subjectId:'different:owner',threadId:key.threadId,
+      async readScopedMemoryGrant(){throw Error('MUST_NOT_READ');},
+    });
+    await expect(requireSeyeonC08MemoryAuthorityProofV1({
+      ...key,memory,port:spoofedPort,
+    })).rejects.toThrow('LOCAL_MEMORY_AUTHORITY_UNPROVEN');
   });
 
   it('holds revoked ACL, absent fact authority, wrong source, tampering, or assistant-created history',async()=>{
