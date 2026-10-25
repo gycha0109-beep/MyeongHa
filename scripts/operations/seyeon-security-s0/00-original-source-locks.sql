@@ -1,6 +1,15 @@
 -- Watchtower-Track: security
 -- Private, canonical-subject lock commands. No content return or DML.
 begin;
+-- A withdrawal request blocks new model/Commit/Reveal use immediately.
+-- Completion may wait for an already-issued HTTP response receipt.
+alter table public.record_access_grants
+  add column seyeon_revoke_requested_at timestamptz;
+-- Restrictive policy composes with the existing permissive policies. Pending
+-- withdrawals disappear from every non-owner source reader immediately.
+create policy seyeon_pending_withdrawal_blocks_source_select_v1
+on public.record_access_grants as restrictive for select to public
+using (seyeon_revoke_requested_at is null);
 create function seyeon_private.lock_memory_subject_v1(p_subject_id uuid)
 returns void language plpgsql security definer
 set search_path=pg_catalog,public set row_security=off
@@ -29,7 +38,8 @@ begin
     where g.id=p_grant_id and g.subject_id=p_subject_id
       and g.memory_item_id=p_memory_id and g.life_fact_id is null
       and g.grantee_character_id='seyeon' and g.grant_reason='user_choice'
-      and g.revoked_at is null and m.revoked_at is null
+      and g.revoked_at is null and g.seyeon_revoke_requested_at is null
+      and m.revoked_at is null
       and m.source_kind='user_approved' for share of g,m;
   if not found then raise exception using errcode='42501',
     constraint='seyeon_source_lock_original_grant_required',

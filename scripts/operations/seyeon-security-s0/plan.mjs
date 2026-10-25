@@ -7,7 +7,8 @@ import { pathToFileURL } from 'node:url';
 export const SEYEON_SECURITY_S0_SQL_SOURCES = Object.freeze([
   '../seyeon-private-memory-grant-revoke-r17-candidate.sql',
   '00-original-source-locks.sql', '01-source-pin.sql', '02-atomic-commit.sql',
-  '03-private-memory-accept.sql', '04-locked-reveal.sql',
+  '03-private-memory-accept.sql', '04-locked-reveal.sql', '05-http-delivery-receipt.sql',
+  '06-attempt-receipt-progression.sql',
 ]);
 
 export async function buildSeyeonSecurityS0InstallationPlan() {
@@ -17,19 +18,19 @@ export async function buildSeyeonSecurityS0InstallationPlan() {
       bytesLfUtf8: Buffer.byteLength(normalized, 'utf8') };
   };
   return {
-    schemaVersion: 'seyeon-security-s0-installation-plan-v1',
+    schemaVersion: 'seyeon-security-s0-installation-plan-v2',
     scope: 'one-original-conversation-recall-memory',
-    productionAuthorization: 'NOT_GRANTED', automaticMigration: false,
+    installerMayActivateProduction: false, automaticMigration: false,
     defaultModelUseEnabled: false, defaultWritableEnabled: false,
-    positiveApiExecuteGranted: false, externalProxyRevealAuthorized: false,
+    positiveApiExecuteGranted: false, externalProxyRevealEnabledByInstaller: false,
     files: await Promise.all(SEYEON_SECURITY_S0_SQL_SOURCES.map(describe)),
     stop: await describe('stop-positive-use.sql'),
     stopPreservesConsentWithdrawal: true,
     remainingReleaseEvidence: [
-      'G0/SRC-25 owner decision', 'PG17 original Grant/Commit/Reveal race',
+      'PG17 original Grant/Commit/Reveal and durable receipt race',
       'approved governed budget and dedicated DB role',
       'same-backup isolated restore and RPO/RTO',
-      'G0-D04 target transport V/R/S/ACK', 'G6 explicit deployment approval',
+      'target HTTP receipt/source-invalidation evidence', 'G6 bounded authenticated Production smoke',
     ],
   };
 }

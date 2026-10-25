@@ -16,6 +16,7 @@ import { createSeyeonFirstPositiveMemoryLockedReadV1 } from '../apps/api/src/sey
 import { revokeSeyeonOriginalMemoryGrantAndAckV1 } from '../apps/api/src/seyeon-original-grant-revoke-ack-v1.js';
 import { acceptSeyeonPrivateConversationRecallProposalV1 } from '../apps/api/src/postgres-seyeon-private-memory-proposal-accept-v1.js';
 import { handleSeyeonFirstPositiveMemoryDirectNodeHttpV1 } from '../apps/api/src/seyeon-first-positive-memory-node-http-ingress-v1.js';
+import { handleSeyeonFirstPositiveMemoryFetchV1,handleSeyeonPositiveReplyReceiptV1 } from '../apps/api/src/seyeon-first-positive-memory-fetch-delivery-v1.js';
 import type { RunProductionSeyeonChatResultV1 } from '../apps/api/src/production-seyeon-chat-runtime-v1.js';
 import { composeSeyeonProductionContextV1, type SeyeonProductionContextSnapshotV1 } from '../apps/api/src/seyeon-production-context-v1.js';
 import { createPostgresSeyeonProductionContextReadAuthorityPortV1 } from '../apps/api/src/postgres-seyeon-production-context-read-v1.js';
@@ -23,6 +24,7 @@ import { SEYEON_CONVERSATION_RECALL_PROJECTOR_V1 } from '../apps/api/src/seyeon-
 import { selectSeyeonExactModelPersonalSourcesV1 } from '../apps/api/src/seyeon-exact-model-personal-source-selection-v1.js';
 
 const enabled = process.env.SEYEON_SECURITY_S0_REAL_PG === '1';
+const receiptProof=(text:string,challenge:string)=>createHash('sha256').update('seyeon-positive-http-receipt-v1\n'+Buffer.byteLength(text,'utf8')+':'+text+':'+createHash('sha256').update(challenge).digest('hex')).digest('hex');
 const hash = (value: unknown) => 'sha256:v1:' + createHash('sha256').update(canonicalJson(value)).digest('hex');
 const uuid = (part: number, n: number) => `a8${part}0000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 const baseline = readFileSync(new URL('./db/seyeon_first_zero_locked_reveal_disposable_pg17.sql', import.meta.url), 'utf8')
@@ -59,7 +61,12 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
       grant execute on function public.qry_seyeon_positive_first_memory_locked_reveal_v3(
         uuid,uuid,uuid,uuid,uuid,uuid,uuid,text) to myeongha_api_executor;
       grant execute on function public.cmd_accept_seyeon_private_conversation_recall_proposal_v1(
-        uuid,uuid,uuid) to myeongha_api_executor;`);
+        uuid,uuid,uuid) to myeongha_api_executor;
+      grant execute on function public.cmd_issue_seyeon_positive_first_reply_v1(
+        uuid,uuid,uuid,uuid,uuid,uuid,uuid,text,bytea),
+        seyeon_private.cmd_ack_seyeon_positive_reply_v1(uuid,text),
+        seyeon_private.cmd_request_seyeon_memory_revoke_v1(uuid,uuid)
+        to myeongha_api_executor;`);
   });
   afterAll(async () => { await pool?.end(); });
 
@@ -367,6 +374,99 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
       httpStatus: response.status, privateBodyExposed: false,
       personalRecordsAfterRevoke: 0,
     }));
+  });
+
+  async function fetchReply(f:Awaited<ReturnType<typeof prepare>>){
+    return handleSeyeonFirstPositiveMemoryFetchV1({
+      request:new Request(`https://receipt.test/api/chat/${f.thread}/turns`,{method:'POST',
+        headers:{'Content-Type':'application/json','x-myeongha-delivery-receipt':'v1'},
+        body:JSON.stringify({clientTurnId:uuid(30,f.n),text:f.userText})}),
+      requestId:'receipt-e2e',serverTime:new Date().toISOString(),pool:subjectPool,
+      identityEvidenceVerifier:{verifyRequestIdentity:async()=>f.evidence},
+      runtime:{run:async()=>({subjectId:f.subject,
+        threadBinding:{threadId:f.thread,participantCharacterIds:['seyeon']},
+        execution:{disposition:'executed',committedTurn:await f.commit(),
+          receivedTurn:{turnId:f.turn,userMessageId:f.user,threadCharacterId:uuid(15,f.n),
+            turnState:'received',replayed:false,committedTurn:null,userText:f.userText},
+          attempt:{attemptId:f.attempt,replayed:false},
+          postTurnAnalysis:{status:'deferred',outboxEventId:uuid(23,f.n)}}}) as unknown as RunProductionSeyeonChatResultV1},
+    });
+  }
+  const requestRevoke=(f:Awaited<ReturnType<typeof prepare>>)=>f.run(async({client})=>{
+    const r=await client.query<{result:Record<string,unknown>}>(`select
+      seyeon_private.cmd_request_seyeon_memory_revoke_v1($1::uuid,$2::uuid) as result`,[f.subject,f.memory]);
+    return r.rows[0]!.result;
+  });
+  const ack=(attempt:string,proof:string)=>handleSeyeonPositiveReplyReceiptV1({
+    request:new Request(`https://receipt.test/api/chat/delivery-receipts/${attempt}`,{method:'POST',
+      headers:{'Content-Type':'application/json'},body:JSON.stringify({proof})}),
+    requestId:'receipt-ack',pool:subjectPool,
+  });
+
+  it('holds withdrawal before an unread Fetch response, blocks legacy invalidation, then completes only after its exact receipt',async()=>{
+    const f=await prepare(8);
+    const response=await fetchReply(f);
+    expect(response.status).toBe(200);
+    // The Fetch body is NOT consumed: this is the former R -> V -> S gap.
+    expect(response.bodyUsed).toBe(false);
+    expect(await requestRevoke(f)).toMatchObject({status:'pending',newUseBlocked:true});
+    const {rows:[g]}=await pool.query(`select revoked_at,seyeon_revoke_requested_at
+      from public.record_access_grants where id=$1`,[f.grant]);
+    expect(g.revoked_at).toBeNull();expect(g.seyeon_revoke_requested_at).not.toBeNull();
+    expect((await f.readContext()).retrievedMemories).toHaveLength(0);
+    await expect(f.revoke()).rejects.toMatchObject({constraint:'seyeon_positive_delivery_receipt_pending'});
+    await expect(pool.query('update public.memory_items set revoked_at=clock_timestamp() where id=$1',[f.memory]))
+      .rejects.toMatchObject({constraint:'seyeon_positive_delivery_receipt_pending'});
+    await expect(f.run(({client})=>client.query(`select seyeon_private.lock_original_memory_grant_v1(
+      $1::uuid,$2::uuid,$3::uuid)`,[f.subject,f.memory,f.grant])))
+      .rejects.toThrow(); // API cannot call this private authority directly.
+    const payload=await response.json();
+    expect(payload.data.assistantText).toBe(f.assistantText);
+    const receipt=payload.data.deliveryReceipt as {attemptId:string;challenge:string};
+    expect((await ack(uuid(17,999),receiptProof(payload.data.assistantText,receipt.challenge))).status).toBe(503);
+    expect((await ack(f.attempt,'0'.repeat(64))).status).toBe(503);
+    expect((await ack(f.attempt,receipt.challenge)).status).toBe(503);
+    expect((await ack(receipt.attemptId,receiptProof(payload.data.assistantText,receipt.challenge))).status).toBe(200);
+    expect((await ack(receipt.attemptId,receiptProof(payload.data.assistantText,receipt.challenge))).status).toBe(200);
+    const {rows:[after]}=await pool.query('select revoked_at from public.record_access_grants where id=$1',[f.grant]);
+    expect(after.revoked_at).not.toBeNull();
+    expect(await requestRevoke(f)).toMatchObject({status:'committed',replayed:true});
+    await f.locked()({signal:new AbortController().signal,deliver:async text=>expect(text).toBeNull()});
+  });
+
+  it('serializes two real sessions: an uncommitted issue makes revoke wait, then durably pending instead of falsely complete',async()=>{
+    const f=await prepare(9);await f.commit();
+    let issued!:()=>void,release!:()=>void;
+    const issuanceReached=new Promise<void>(resolve=>{issued=resolve;});
+    const permit=new Promise<void>(resolve=>{release=resolve;});
+    const proof='9'.repeat(64);
+    const issuance=f.run(async({client})=>{
+      const r=await client.query(`select * from public.cmd_issue_seyeon_positive_first_reply_v1(
+        $1,$2,$3,$4,$5,$6,$7,$8,sha256(convert_to($9,'UTF8')))`,[
+        f.subject,f.thread,f.turn,f.attempt,f.user,f.assistant,uuid(23,9),uuid(30,9),proof]);
+      expect(r.rows).toHaveLength(1);issued();await permit;
+    });
+    await issuanceReached;
+    let revokeComplete=false;
+    const revoke=requestRevoke(f).then(r=>{revokeComplete=true;return r;});
+    await new Promise(resolve=>setTimeout(resolve,120));
+    expect(revokeComplete).toBe(false);release();await issuance;
+    expect(await revoke).toMatchObject({status:'pending'});
+    expect((await ack(f.attempt,receiptProof(f.assistantText,proof))).status).toBe(200);
+    expect(await requestRevoke(f)).toMatchObject({status:'committed'});
+  });
+
+  it('keeps a lost/crashed Fetch issuance durable across new DB sessions; time and ordinary deletion never manufacture receipt',async()=>{
+    const f=await prepare(10);const response=await fetchReply(f);
+    expect(response.status).toBe(200);
+    // Simulate losing the entire Response without reading its challenge.
+    await response.body?.cancel();
+    expect(await requestRevoke(f)).toMatchObject({status:'pending',newUseBlocked:true});
+    await expect(pool.query('delete from public.chat_turn_attempts where id=$1',[f.attempt]))
+      .rejects.toMatchObject({constraint:'seyeon_positive_delivery_receipt_pending'});
+    await expect(f.run(({client})=>client.query('update public.chat_turn_attempts set seyeon_positive_delivery_received_at=clock_timestamp() where id=$1',[f.attempt])))
+      .rejects.toMatchObject({code:'42501'});
+    expect(await requestRevoke(f)).toMatchObject({status:'pending',newUseBlocked:true});
   });
 
   it('stops model/write/Reveal admission without deleting data or removing consent withdrawal', async () => {

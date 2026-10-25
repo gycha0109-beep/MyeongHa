@@ -23,7 +23,7 @@ describe('Web credit guidance and free Saju contract', () => {
     expect(chat).toContain("myeongha:credit-menu");
     expect(html).toContain('credit-recharge.css');
     expect(css).toContain('credit-recharge-dialog::backdrop');
-    expect(runtime).toContain("code === 'INSUFFICIENT_CREDITS' || code === 'CREDIT_INSUFFICIENT'");
+    expect(runtime).toContain("error.code === 'INSUFFICIENT_CREDITS' || error.code === 'CREDIT_INSUFFICIENT'");
     expect(runtime).toContain("myeongha:credit-shortage");
     expect(runtime).toContain('turnId: pendingTurn.clientTurnId');
     expect(runtime).toContain("messageInput.value = ''");

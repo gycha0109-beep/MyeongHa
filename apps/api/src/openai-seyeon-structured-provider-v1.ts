@@ -38,6 +38,8 @@ export type OpenAiSeyeonStructuredProviderFetchV1 = (
 ) => Promise<Response>;
 
 export interface OpenAiSeyeonStructuredProviderConfigV1 {
+  /** Native GPT-5.6+ only: explicit caching with NO breakpoints => no cache writes. */
+  readonly disablePromptCaching?: true;
   readonly apiKey: string;
   readonly model: string;
   readonly origin?: string;
@@ -389,6 +391,7 @@ export function createOpenAiSeyeonStructuredProviderV1(
               ? { providerOptions: { gateway: { only: ['openai'] } } }
               : {}),
             store: false,
+            ...(config.disablePromptCaching===true ? {prompt_cache_options:{mode:'explicit'}} : {}),
             ...(requestOutputCeiling === undefined ? {} : { max_output_tokens: requestOutputCeiling }),
             instructions: request.instructions + '\n\n' + SEYEON_PROVIDER_UNTRUSTED_DATA_BOUNDARY_V1,
             input: [

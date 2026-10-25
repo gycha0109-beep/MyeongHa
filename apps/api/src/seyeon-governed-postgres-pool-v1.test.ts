@@ -59,6 +59,19 @@ function driver(input: {preflight?:Readonly<Record<string,unknown>>; failSql?:st
 const evidence={kind:'member',verifiedAuthUserId:'a1000000-0000-0000-0000-000000000001'} as const;
 
 describe('Se-yeon D3B2B-3B2 isolated governed credential boundary',()=>{
+  it('accepts only the exact production project suffix on the same session pooler',()=>{
+    const host='aws-0-ap-southeast-1.pooler.supabase.com';
+    const root={ordinaryDatabaseUrl:`postgresql://ordinary.cnsfpcdiyofqvhpcegfc:ordinary-secret@${host}:5432/postgres?sslmode=verify-full`,
+      ordinaryDatabasePrincipal:'ordinary',rootCertificatePem:'offline-root'};
+    const url=`postgresql://${SEYEON_GOVERNED_DB_LOGIN_V1}.cnsfpcdiyofqvhpcegfc:unique-secret@${host}:5432/postgres?sslmode=verify-full`;
+    const parse=(value:string)=>parseSeyeonGovernedDbConfigV1({...root,env:{
+      MYEONGHA_SEYEON_GOVERNED_DATABASE_URL:value,
+      MYEONGHA_SEYEON_GOVERNED_DATABASE_PRINCIPAL:SEYEON_GOVERNED_DB_LOGIN_V1}});
+    expect(parse(url).databasePrincipal).toBe(SEYEON_GOVERNED_DB_LOGIN_V1);
+    expect(()=>parse(url.replace('cnsfpcdiyofqvhpcegfc','aaaaaaaaaaaaaaaaaaaa'))).toThrow();
+    expect(()=>parse(url.replace(':5432',':6543'))).toThrow();
+    expect(()=>parse(url.replace(host,'untrusted.example'))).toThrow();
+  });
   it('requires a different project-bound login, password, and strict TLS source',()=>{
     const input={
       ordinaryDatabaseUrl:BASE_URL,

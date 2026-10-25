@@ -34,6 +34,11 @@ on:
         description: Watchtower Track Key for CI attribution
         required: true
         type: string
+      seyeon_security_s0_rehearsal:
+        description: Rehearse the closed S0 SQL and synthetic receipt races on a disposable clone of this restored backup
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   actions: read
@@ -233,6 +238,24 @@ jobs:
           jq -er '"member_auth_rate_limit_owner_restore=\(.member_auth_rate_limit_owner_restore)"' "$RESTORE_EVIDENCE_PATH"
           jq -er '"member_auth_rate_limit_acl_restore=\(.member_auth_rate_limit_acl_restore)"' "$RESTORE_EVIDENCE_PATH"
           jq -er '"member_auth_rate_limit_synthetic_admission=\(.member_auth_rate_limit_synthetic_admission)"' "$RESTORE_EVIDENCE_PATH"
+
+      - name: Set up Node for optional S0 restored-backup rehearsal
+        if: inputs.seyeon_security_s0_rehearsal
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: '24'
+          package-manager-cache: false
+
+      - name: Install pinned optional S0 rehearsal dependencies
+        if: inputs.seyeon_security_s0_rehearsal
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Rehearse S0 installation and receipt races on an isolated restored clone
+        if: inputs.seyeon_security_s0_rehearsal
+        env:
+          RESTORE_EVIDENCE_PATH: ${{ runner.temp }}/restore-evidence/restore-evidence.json
+          SEYEON_S0_REHEARSAL_EVIDENCE_PATH: ${{ runner.temp }}/restore-evidence/seyeon-security-s0-rehearsal.json
+        run: node scripts/operations/rehearse-seyeon-security-s0-restored.mjs
 
       - name: Upload restore drill evidence only
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7

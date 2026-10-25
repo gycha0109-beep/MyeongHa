@@ -1,6 +1,9 @@
 {
   "name": "myeongha",
   "main": "./cloudflare/myeongha-worker.mjs",
+  "alias": {
+    "pg-cloudflare": "./cloudflare/postgres-native-socket.mjs"
+  },
   "compatibility_date": "2026-10-20",
   "workers_dev": true,
   "preview_urls": true,
