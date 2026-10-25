@@ -12,11 +12,11 @@ Watchtower-Track: character-memory
 
 ## 호출 구조
 
-1. **사전 로컬 검증, LLM 0회**: 서버 제공 현재 메시지/과거 모든 메시지, 공개 첫 만남, 무관계·무기억, 단일 최신 user turn, 전체 authoritative Census와 대화 길이 일치 여부를 검사. 현재 입력과 이전 user 입력은 닫힌 문장 문법(인사·대화 시작·가벼운 상태·속도·현재 선호·대화 경계)에 해당해야 한다. 이전 assistant 문장도 보수적 로컬 공개 Guard를 통과해야 한다. 미확인 의미는 `LOCAL_INPUT_NOT_PROVEN`/`LOCAL_CONTEXT_NOT_PROVEN`으로 거부한다.
+1. **사전 로컬 검증, LLM 0회**: 서버 제공 현재 메시지/과거 모든 메시지, 공개 첫 만남, 무관계·무기억, 단일 최신 user turn, 전체 authoritative Census(첫 턴) 또는 권한 있는 저장소의 완전한 대화 내용·순서 SHA-256 commitment(다중 턴) 일치를 검사. 메시지 수만 같으면 통과하는 허점은 허용하지 않는다. 현재 입력과 이전 user 입력은 닫힌 문장 문법(인사·대화 시작·가벼운 상태·속도·현재 선호·대화 경계·일상 잡담/농담·현재 영화 선택)에 해당해야 한다. 이전 assistant 문장도 보수적 로컬 공개 Guard를 통과해야 한다. 미확인 의미는 `LOCAL_INPUT_NOT_PROVEN`/`LOCAL_CONTEXT_NOT_PROVEN`으로 거부한다.
 2. **기존 서버 권한 엔진 재사용**: 분류를 생략하지 않고 로컬이 실제로 증명할 수 있는 닫힌 문법에만 `claims=[]` / `topicKey=null`을 적용한다. 기존 `runCharacterGovernedPreflightV1`·`assembleSeyeonRuntimeContextV2`·`guardSeyeonTurnInterpretationV2`·`guardSeyeonRiskBearingActionCausalityV1`·`buildSeyeonRendererPacketV2` 유지. 개인정보 Source Descriptor, 사실 Resolver 및 Retriever 실행 금지.
-3. **대사 생성, LLM 정확히 1회**: 서버가 현재 user move와 공용 reveal/행동 범위를 고정하고 기존 `buildSeyeonRendererRequestV2`를 사용한다. 임의 Memory/관계/사생활을 만들지 말도록 한 공개 첫 만남 지침을 추가. 가격 예약 검증과 출력 토큰 상한 확인이 없으면 호출 전 거부. 예약 한도는 최대 4,000 microUSD ≈ 10 KRW(가정 환율 2,500). 이는 청구서 하드캡 증거가 아니다.
+3. **대사 생성, LLM 정확히 1회**: 서버가 현재 user move와 공용 reveal/행동 범위를 고정하고 기존 `buildSeyeonRendererRequestV2`를 사용한다. 임의 Memory/관계/사생활을 만들지 말도록 한 공개 첫 만남 지침을 추가. 기존 지시문 `baseline`을 기본값으로 보존하고, 별도 실험용 `compact_v1`은 지시문만 축약하며 출력 스키마·Guard·packet은 그대로 유지한다. 가격 예약 검증과 출력 토큰 상한 확인이 없으면 호출 전 거부. 예약 한도는 최대 4,000 microUSD ≈ 10 KRW(가정 환율 2,500). 이는 청구서 하드캡 증거가 아니다.
 4. **사후 로컬 검증, LLM 0회**: 기존 `admitSeyeonRendererDraftV2`로 스키마/출처 참조/표현/공개 단계 검증. 보수적인 공개 문장·허위 기억/관계/고정 전기/사적 사실/관리자 문구 검출과 입력 의도별 대사 필수 조건 검사. 내용 검증 실패 시 대사 **미반환**, 재생성·추가 LLM 호출·자동 fallback 없음. 결과는 `localGuardedDraft`, `verification=LOCAL_RESTRICTED_NOT_SEMANTIC_PARITY`로만 보고.
-5. **경합 검사**: 모델 이전·이후 등 4회 authoritative Census 검사를 유지한다. 모든 검사에 전체 메시지 수(최대 7개)와 최신 user ID/송신자 일치가 필요하다. Census는 DB snapshot/commit lock이 아니며 마지막 검사 직후 레이스를 없애지 못한다.
+5. **경합 검사**: 모델 이전·이후 등 4회 authoritative 재검사를 유지한다. 첫 턴은 기존 7필드 Census 조회 4회, 여러 턴은 `readAuthoritativeThreadCommitment`로 count/role/전체 ID·role·본문 해시를 **각 체크포인트당 단일 서버 조회**로 검증한다. 1~7개 전체 메시지와 최신 user ID/송신자 일치가 필요하다. 단일 서버 조회에서 해당 count/hash가 같이 산출되지 않으면 거부한다. Census는 DB snapshot/commit lock이 아니며 마지막 검사 직후 레이스를 없애지 못한다.
 
 ## 우선 구현 범위 및 한계
 
@@ -28,8 +28,15 @@ Watchtower-Track: character-memory
 ## 검증
 
 - 적격 입력 예시와 C07 원본 Gold 36개에 대한 기본 경로 검사. N01/N02만 닫힌 문법에 적격하며 나머지는 호출 전 HOLD.
-- 부적격 사용자 주장·민감 정보·관리자/관계 사칭, 가짜 assistant 과거, 이력 누락/중복, Census 경합, 원장 예약 초과, 출력 JSON/출처 위반 및 대사 행동 불일치: 모델 호출 횟수와 공개 반환 여부 검사.
+- 부적격 사용자 주장·민감 정보·관리자/관계 사칭, 가짜 assistant 과거, 같은 메시지 수에서 본문/순서 변경, 저장소 commitment 누락·불일치·경합, 이력 누락/중복, Census 경합, 원장 예약 초과, 출력 JSON/출처 위반 및 대사 행동 불일치: 모델 호출 횟수와 공개 반환 여부 검사.
 - 검증이 모두 통과한 뒤에야 별도로 안전 임계값·실모델 p50/p95·한국어 캐릭터성 비교를 준비한다. 유료 호출/Production 승격은 별도 증거와 승인이 필요하다.
+
+## 로컬 계약 및 완료 조건
+
+- `hashSeyeonC08PublicTranscriptV1(messages)`는 `[messageId,role,text]` 순서를 길이 구분해 해시한다. 다중 턴의 비교 값은 반드시 **서버의 완전한 공식 이력 조회**에서 생성해야 한다. 클라이언트가 제공한 hash/확인 표시는 권한 증거가 아니다.
+- `readAuthoritativeThreadCommitment`는 `{schemaVersion:'seyeon-c08-public-thread-commitment-v1',subjectId,threadId,currentUserMessageId,messageCount,latestSenderType:'user',complete:true,transcriptHash}` 8필드만 반환한다. 누락·누적 이력 절단·해시 오염 시 0회 또는 1회 호출 후 HOLD. 각각의 체크포인트는 원자적 snapshot을 읽어야 한다.
+- `compact_v1`은 프롬프트 길이의 연구 후보일 뿐, 블라인드 대사 품질·Gold 의미 동등성·속도/비용 달성을 입증하지 않는다. 실모델 유료 호출은 하지 않는다.
+- 1회 연구 경로를 앱에 연결하거나 적격 범위를 자유형 대화/Memory/관계 단계까지 확대하려면 서버 출처 검증·권한·캐릭터 성능의 별도 근거가 필요하다.
 
 ## 같은 브랜치 작업 규칙
 
