@@ -5,8 +5,8 @@ import type {SeyeonCostGovernorModelPolicyV1} from './seyeon-cost-governor-serve
 
 export const SEYEON_SECURITY_S0_PRODUCTION_V1=Object.freeze({
   contractVersion:'seyeon-positive-http-receipt-barrier-v1',
-  receiptAndWithdrawalEnabled:false,
-  modelUseEnabled:false,
+  receiptAndWithdrawalEnabled:true,
+  modelUseEnabled:true,
   model:'gpt-5.6-terra',
   recordType:'conversation_recall',schemaVersion:'v1',
   projectorVersion:'seyeon-conversation-recall-projector-v1',

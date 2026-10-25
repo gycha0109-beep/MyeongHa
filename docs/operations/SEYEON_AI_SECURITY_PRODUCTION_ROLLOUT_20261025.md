@@ -96,3 +96,22 @@ Worker의 custom-CA Node TLS alias는 실제 workerd의 CA 보장으로 사용�
 두 origin은 실제 Cloudflare 생성 단계에서 고정 CA/verify-full 연결 검사를 통과했다. API 재조회에서 CA ID, SQL cache disabled, origin connection limit=5, 서로 다른 주체/ID를 확인했다. 실제 운영 PostgreSQL 17.6에서 기존 typed pool preflight와 올바른 역할 전이, 반대 역할 전이 거부도 통과했다. 상세 metadata는 [origin 증거](SEYEON_S0_HYPERDRIVE_ORIGINS_20261026.json)에 있다. 모델 gate는 false이고 실제 S0 모델 사용이나 HTTP positive 완료 증거로 계산하지 않는다.
 
 복원 #40200284088의 추가 실패는 fixture 비밀번호를 `format`에 전달할 때 `$1`의 타입이 추론되지 않은 `42P18`이었다. `$1::text`로 고정했고 실제 PostgreSQL에서 typed format을 확인했다. main의 기존 public-schema entitlement 보정과 다른 제품/UI 변경도 함께 보존했다. S0 모델 경로는 원본 source가 0건이면 provider/count 전 차단하며, primary로 승인된 Origin에서만 들어갈 수 있다.
+
+
+## 2026-10-26 실제 운영 SQL 적용
+
+Hyperdrive 연결 PR #2605를 필수 CI/Integration 통과 후 `23bc82ba`로 병합했다. 새 백업 #40224757670을 복원한 [PG17 리허설 #40226477877](https://github.com/gycha0109-beep/MyeongHa/actions/runs/40226477877)은 NOSUPERUSER postgres 설치 및 별도 일반 API LOGIN의 원본 수신/철회 경합 11/11 PASS다. 설치 8개 SQL의 LF SHA-256은 운영에 적용할 source bundle과 전부 일치한다. full DR=false는 유지한다.
+
+운영에는 Supabase 관리 apply로 `20261025193416 seyeon_s0_http_receipt_runtime_v1`을 atomic 설치했다. source bundle hash는 `3f3d7b7af286823bd57a37636e436efacb54fa5f79627fe1ac8d8825f7b4b20f`, target guard/closed postcondition을 포함한 실제 관리 SQL hash는 `20f335556c0c861275100e76d4e3380296d0e8c4f211f89f29d09643279bcc98`이다. 설치 직후 positive API EXECUTE 0, raw-lock API EXECUTE=false, operator owner privilege 잔류=false였다. 기존 자동 migration backlog를 일괄 적용하지 않았으며 이 두 scoped 관리 이력은 source SQL 디렉터리에 결속된다. supabase/migrations로 중복 추가하거나 history repair하지 않는다.
+
+다음 activation SQL은 실제 PG17 transaction 적용/rollback 후 `20261025193454 seyeon_s0_bounded_activation_20261025`로 적용했다. 원본 registry 한 쌍만 enabled=true/writable=false, 기존 native 모델 policy 1건, 2026-10-25~31 UTC의 전체 원가 예산 $1/day다. 최초에 임의로 넣은 사용자별 $0.50 제한은 사용자 지시에 따라 운영 DML로 제거했다. 기존 DB의 필수 Subject ceiling은 global ceiling과 같게 두어 별도의 사용자 제한을 만들지 않는다. 최종 builder도 같은 값을 산출한다. 사용자 크레딧 잔액/정책을 변경하지 않았다. 현재 지갑 runtime의 chatDebitEnabled=false 및 credit ACK 후보 미연결은 그대로 명시하며, 이 내부 synthetic smoke를 일반 유료 채팅 출시/차감 완료로 계산하지 않는다.
+
+최초 답변의 Pin/Commit/issuer와 receipt/withdrawal만 API EXECUTE를 부여했고, 이전 unreceipted Node G3 및 private Memory accept는 닫혀 있다. 제한 postgres가 기존 stop SQL의 registry owner 권한을 상속하지 않는 점을 발견해 stop transaction 안에서만 owner membership을 빌리고 즉시 회수하도록 수정했다. 실제 운영 PG17에서 forward stop을 실행/rollback해 새 사용 차단과 receipt/withdrawal 보존을 확인했다. [공개 실행 증거](SEYEON_S0_PRODUCTION_ACTIVATION_20261026.json)에 metadata를 남긴다.
+
+현재 Worker gate 활성화 PR과 hosted native model/receipt smoke는 아직 PENDING이다. primary sign-in=200, 기존 일반 /api/me=503은 재확인했으며 S0 전용 두 pool의 실제 HTTP authority를 대신 증명하지 않는다. 이 후속 단계가 통과하기 전 DEPLOYED로 표시하지 않는다.
+
+Architecture Check:
+
+* Docs updated: yes — 적용 이력, source digest, 예산 및 크레딧 경계.
+* Ghost-code risk: findings — SQL은 활성이나 Worker gate 변경은 아직 미배포, hosted smoke 미완료.
+* Notes: 기존 원본 Memory 1건과 최초 수신/철회만 활성화한다. 새 타입·fallback·크레딧 정책·결제 차감·History/Replay authority는 추가하지 않는다.
