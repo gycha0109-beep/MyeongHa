@@ -253,7 +253,7 @@ try {
       overflow: document.documentElement.scrollWidth - innerWidth,
       elements: [
         inspect('.product-header', 100, 40), inspect('.mhx-hero', 900, 300),
-        inspect('.mhx-characters', 900, 220), inspect('.mhx-topics', 900, 70),
+        inspect('.mhx-characters', 900, 220), inspect('.mhx-topics', 600, 220),
         inspect('.mhx-content-grid', 900, 70), inspect('.mhx-recent-card', 900, 60),
       ],
     };
@@ -266,9 +266,9 @@ try {
   for (const el of hallState.elements) {
     assert(el.exists && el.visible, `Home Golden Master element unavailable: ${el.selector}`);
   }
-  assert(hallState.shellWidth >= 1180 && hallState.shellWidth <= 1312, `Unexpected Home Golden Master shell width: ${hallState.shellWidth}`);
+  assert(Math.abs(hallState.shellWidth - 1440) <= 2, `Home hero container should span the viewport: ${hallState.shellWidth}`);
   assert(hallState.productCount === 4, `Home Golden Master must expose exactly four product cards, got ${hallState.productCount}`);
-  assert(new Set(hallState.productTopBands).size === 1, `Home product cards are not a single desktop row: ${JSON.stringify(hallState.productTopBands)}`);
+  assert(hallState.productTopBands.length === 4 && hallState.productTopBands[0] === hallState.productTopBands[1] && hallState.productTopBands[2] === hallState.productTopBands[3] && hallState.productTopBands[2] > hallState.productTopBands[0], `Home product cards must form two rows of two: ${JSON.stringify(hallState.productTopBands)}`);
   assert(hallState.oldSidebars === 0, `Home Golden Master reintroduced sidebar layout: ${hallState.oldSidebars}`);
   assert(hallState.overflow <= 2, `Home Golden Master horizontal overflow: ${hallState.overflow}px`);
   assert(hallState.bodyText.includes('요즘, 무엇이 가장') && hallState.bodyText.includes('궁금하세요?'), 'Home topic-first headline missing');

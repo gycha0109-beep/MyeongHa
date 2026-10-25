@@ -47,7 +47,7 @@ export function HomePage() {
         <div className="mhx-hero-inner">
           <p className="mhx-eyebrow">흐르는 시간을, 더 나은 이야기로</p>
           <h1 id="mhx-hero-title" className="mhx-hero-heading">
-            요즘, 무엇이<br />가장 <em>궁금하세요?</em>
+            요즘, 무엇이 가장 <em>궁금하세요?</em>
           </h1>
           <p className="mhx-hero-subtitle">궁금한 주제를 선택하면, 명하가 당신의 이야기를 시작합니다.</p>
           <div className="mhx-topics" aria-label="사주 관심 주제">

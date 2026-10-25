@@ -432,7 +432,7 @@ body.gm-page[data-page="home"] .mhx-eyebrow {
 body.gm-page[data-page="home"] .mhx-hero-heading {
   font-size: clamp(39px, 3.45vw, 55px);
   line-height: 1.2;
-  max-width: 650px;
+  max-width: 550px;
   letter-spacing: -.055em;
   color: #fff0f5;
 }
@@ -648,9 +648,19 @@ html:not([data-theme="dark"]) body.gm-page[data-page="home"] .mhx-characters-int
 
 /* Full-bleed illustration and seamless art-to-content transition on desktop. */
 @media (min-width: 901px) {
-  body.gm-page[data-page="home"] .mhx-hero { margin-inline: calc(50% - 50vw); }
+  body.gm-page[data-page="home"] .mhx-hero { margin-inline: 0; }
 }
 body.gm-page[data-page="home"] .mhx-hero::before {
   -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 29%);
   mask-image: linear-gradient(90deg, transparent 0%, #000 29%);
+}
+
+/* Avoid 100vw's scrollbar-gutter overflow: the hero is full-bleed through its parent. */
+body.gm-page[data-page="home"] .mhx-home { width: 100%; max-width: none; }
+body.gm-page[data-page="home"] .mhx-hero { margin-inline: 0; }
+body.gm-page[data-page="home"] .mhx-characters { width: min(1444px, calc(100% - 48px)); margin-inline: auto; }
+body.gm-page[data-page="home"] .mhx-section { width: min(1360px, calc(100% - 64px)); margin-inline: auto; }
+@media (max-width: 580px) {
+  body.gm-page[data-page="home"] .mhx-characters { width: calc(100% - 28px); }
+  body.gm-page[data-page="home"] .mhx-section { width: calc(100% - 28px); }
 }
