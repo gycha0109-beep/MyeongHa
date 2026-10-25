@@ -150,7 +150,7 @@ describe('C09 open-ended character-first composition', () => {
     })).toThrow('C09_CHARACTER_FIRST_CONTEXT_NOT_SEALED');
     expect(() => composeSeyeonC09CharacterFirstShadowRequestV1({
       profile: 'character_first_v1',
-      context: { ...context, retrievedMemories: [{}] } as SeyeonRuntimeContextV2,
+      context: { ...context, retrievedMemories: [{}] } as unknown as SeyeonRuntimeContextV2,
       request: base,
     })).toThrow('C09_CHARACTER_FIRST_NOT_GOVERNED_PUBLIC_FIRST_CONTACT');
   });
@@ -161,7 +161,7 @@ describe('C09 character-first guarded generator integration (mock provider, no p
     ['character_first_v1', 'approach'],
     ['character_first_life_v1', 'tease'],
   ] as const)('lets model originate %s action=%s with one generation and independent reviewer', async (profile, action) => {
-    const generated = vi.fn(async () => proposedAnswer(action));
+    const generated = vi.fn(async (_request: unknown) => proposedAnswer(action));
     const reviewed = passReviewer();
     const shadow = createSeyeonFastDialogueShadowV1({
       candidateProvider: { providerKey: 'mock', modelKey: 'mock', generate: generated },
@@ -182,7 +182,7 @@ describe('C09 character-first guarded generator integration (mock provider, no p
   });
 
   it('refuses unverified claims before calling either model', async () => {
-    const generated = vi.fn(async () => proposedAnswer('approach'));
+    const generated = vi.fn(async (_request: unknown) => proposedAnswer('approach'));
     const reviewed = passReviewer();
     const shadow = createSeyeonFastDialogueShadowV1({
       candidateProvider: { providerKey: 'mock', modelKey: 'mock', generate: generated },
@@ -194,13 +194,13 @@ describe('C09 character-first guarded generator integration (mock provider, no p
     await expect(shadow.evaluate({
       ...context,
       integrity: { ...context.integrity, decisions: [{}] },
-    } as SeyeonRuntimeContextV2)).rejects.toThrow();
+    } as unknown as SeyeonRuntimeContextV2)).rejects.toThrow();
     expect(generated).not.toHaveBeenCalled();
     expect(reviewed).not.toHaveBeenCalled();
   });
 
   it('does not publish a candidate that fails independent semantic checking', async () => {
-    const generated = vi.fn(async () => proposedAnswer('approach'));
+    const generated = vi.fn(async (_request: unknown) => proposedAnswer('approach'));
     const reviewed = vi.fn(async () => ({
       schemaVersion: 'seyeon-semantic-review-v2',
       reviewedUtteranceHash: 'deliberately-wrong-hash',
