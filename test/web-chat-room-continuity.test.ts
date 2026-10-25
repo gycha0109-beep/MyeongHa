@@ -51,7 +51,8 @@ describe('Web Character Room continuous open and resume', () => {
     expect(runtime).toContain('getOrCreatePendingTurn(message)');
     expect(runtime).toContain('clientTurnId: pendingTurn.clientTurnId');
     expect(runtime).toContain("authoritativeCharacterId !== 'seyeon'");
-    expect(runtime).toContain('const rereadSucceeded = await loadRoomState()');
+    expect(runtime).toContain('createSeyeonAcknowledgedTurnPresentationV1(pendingTurn, acknowledgedTurn)');
+    expect(runtime).not.toContain('const rereadSucceeded = await loadRoomState()');
     expect(runtime).toContain('clearPendingTurn(pendingTurn.clientTurnId)');
     expect(runtime).toContain('메시지를 보내지 못했습니다. 입력한 내용은 그대로 남아 있습니다.');
   });

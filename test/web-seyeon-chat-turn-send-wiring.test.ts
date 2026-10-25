@@ -13,8 +13,8 @@ describe('Seyeon Web turn-send wiring', () => {
     expect(shared).toContain('/api/chat/delivery-receipts/');
     expect(source).toContain('clientTurnId: pendingTurn.clientTurnId');
     expect(source).toContain('clientTurnId: crypto.randomUUID()');
-    expect(source).toContain('const rereadSucceeded = await loadRoomState()');
-    expect(source).toContain("if (!rereadSucceeded) throw new Error('AUTHORITATIVE_REREAD_FAILED')");
+    expect(source).toContain('createSeyeonAcknowledgedTurnPresentationV1(pendingTurn, acknowledgedTurn)');
+    expect(source).not.toContain('const rereadSucceeded = await loadRoomState()');
     expect(source).toContain("authoritativeCharacterId !== 'seyeon'");
     expect(source).not.toContain('웹 메시지 전송은 아직 운영 연결 전');
   });
