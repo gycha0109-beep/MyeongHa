@@ -73,7 +73,15 @@ function formatResponseSchema(schema) {
   if (!schema || typeof schema !== 'object') return schema;
   return Object.fromEntries(Object.entries(schema)
     .filter(([key]) => supported.has(key))
-    .map(([key,value]) => [key,formatResponseSchema(value)]));
+    .map(([key,value]) => [
+      key,
+      key === 'properties' || key === '$defs'
+        ? Object.fromEntries(Object.entries(value)
+          .map(([fieldName,fieldSchema]) => [
+            fieldName,formatResponseSchema(fieldSchema),
+          ]))
+        : formatResponseSchema(value),
+    ]));
 }
 function persist() {
   mkdirSync(dirname(output), { recursive: true });
