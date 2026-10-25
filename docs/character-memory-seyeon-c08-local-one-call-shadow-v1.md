@@ -97,6 +97,13 @@ Watchtower-Track: character-memory
 - 목표 미달이면 프롬프트·컨텍스트·로컬 가드를 개선한다. 측정 없이 10원/5초 달성이나 안전 동등성을 선언하지 않는다.
 - **완료 조건:** 비교 근거와 잔여 위험이 정리되고 사용자가 Production 승격 여부를 결정할 수 있다.
 
+## C09 고정 성격 + 상황별 Runtime 구성 설계 진행
+
+- 현재 Bible/Runtime 실제 원본의 섹션별 Always-On 및 공개 상황별 Slice 구분 설계 완료.
+- 평가용 `core` / `core_examples` / `core_focus` 세 프롬프트 프로필 컴포저와 오프라인 테스트 추가. LLM 호출·Production 연결 없음.
+- Projection에 기록된 Bible/Runtime 원본 SHA가 현재 원본과 다르며 일부 undefined/fact 항목이 어긋나므로 실제 생성 경로 연동 전 정합성 해결이 필요.
+- 자세한 문서: [C09 고정/상황별 Persona 프롬프트 설계](character-memory-seyeon-c09-single-call-persona-composition-design-v1.md).
+
 ## 현재 확인된 구현 자산
 
 - `apps/api/src/seyeon-c08-local-one-call-shadow-v1.ts`: 공개 닫힌 문법 기반 연구용 1회 Shadow 경로. 관계/기억/자유형 실사용 경로 완성 아님.
