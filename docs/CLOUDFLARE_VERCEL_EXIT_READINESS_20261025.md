@@ -104,3 +104,14 @@ Watchtower-Track: ops
 - 기존 Worker 가동 상태는 그대로 두었으며 이 트랙에서는 production Secret/DB role/password/DNS/alias/deployment/PR merge 변경 없음.
 
 Watchtower-Track: ops
+
+## Cloudflare dedicated DB credentials: verified staging path (2026-10-26)
+
+- `npm run stage:cloudflare-db-credential` is a **dry run by default**. It verifies the current `wrangler.jsonc` targets `myeongha` and `./cloudflare/myeongha-worker.mjs`, then validates the Cloudflare dedicated DB login, approved Supavisor host, tenant suffix, connection port, TLS settings and fixed origin. If any binding is absent, return `HOLD`; **never** read a production secret from Git, Cloudflare API or an arbitrary Preview.
+- Only after matching authorized credentials have been securely provided in **process environment**, running `npm run stage:cloudflare-db-credential -- --apply` performs a **live, read-only** PostgreSQL TLS peer/auth probe before upload. It requires the exact pinned CA fingerprint defined by `apps/api/src/production-postgres-tls-peer-verification.ts`; TLS `rejectUnauthorized=true` with hostname matching; a single SELECT must confirm `current_user=myeongha_cf_api_login`, login capability, membership in `myeongha_api_executor`, `rolbypassrls=false` and `rolsuper=false`. It does not execute CREATE/ALTER/UPDATE/DELETE statements.
+- After that positive probe, it sends **only** `MYEONGHA_DATABASE_URL` and `MYEONGHA_DATABASE_PRINCIPAL` through the Wrangler `versions secret bulk` stdin pipe, using current `wrangler.jsonc`. No secrets are placed in CLI arguments, log output, PR, temp file or Vercel Preview. This builds a **new undeployed Worker version** and does **not** switch traffic.
+- The new version must be checked for unchanged non-DB bindings, exact version provenance and secret key presence; then deployment and positive Member/Saju E2E remain distinct operational acceptance steps. Passing a local SSL/role SELECT never counts as an active Cloudflare Worker DB acceptance.
+- This session contains no authorized plain dedicated DB password in the local environment, so the staging command was dry-run `HOLD` and no Secret was uploaded. The existing database account must not have its password silently reset: another environment may use it. Apply only a matching credential from the authorized source; never invent or reuse the legacy `myeongha_runtime` password.
+- Read-only Supabase role inventory and owner-only Cloudflare runtime diagnostics identify the role mismatch without accessing the DB password; the deployed Worker is not modified.
+
+Watchtower-Track: ops

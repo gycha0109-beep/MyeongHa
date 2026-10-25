@@ -19,6 +19,7 @@
     "test": "vitest run",
     "audit:vercel-retirement": "node scripts/verify-vercel-retirement-readiness.mjs",
     "verify:cloudflare-db-handoff": "node scripts/operations/verify-cloudflare-db-handoff.mjs",
+    "stage:cloudflare-db-credential": "node scripts/operations/stage-cloudflare-db-credential-version.mjs",
     "verify:vercel-retirement": "node scripts/verify-vercel-retirement-readiness.mjs --require-ready",
     "build": "tsc -p tsconfig.build.json",
     "build:web": "node scripts/build-web-static.mjs && npm run build -w @myeongha/web",
