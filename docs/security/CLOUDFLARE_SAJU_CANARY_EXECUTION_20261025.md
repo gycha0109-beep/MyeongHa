@@ -53,3 +53,9 @@ regressions, exact-version and unadmitted-API rejection before credentials,
 synthetic full Member/Guest quota transport, and Wrangler 4.152.0 dry-run.
 The dry-run bundle is 963.40 KiB / gzip 185.09 KiB. These are implementation
 checks, not authenticated live quota evidence. Actual dispatch remains required.
+
+Actual local workerd (Wrangler 4.152.0) also passed ten HTTP health, metadata,
+method, closed-API, protected Chat/encoded-alias, marker-query and static-root
+checks. No remote DB or credentials were used; local evidence is retained at
+`.wrangler/cloudflare-security-local-http-20261025.json` outside Git. The server
+was stopped after the checks. Native Auth regression and governance checks pass.
