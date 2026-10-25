@@ -4,7 +4,7 @@
 
 **분류:** S1 = TypeScript/Vitest/거버넌스·정적 검증, S2 = Production과 분리된 PG17, S3 = 로컬 mock 브라우저/네이티브 export, HOLD = 현재 실행 불가한 실제 계약·사용자 승인·운영 증거. **모든 검증은 실제 PR HEAD SHA와 로그로 판정하며 미실행을 PASS로 표기하지 않는다.**
 
-**검증 실행:** `.github/workflows/legal-full-scenario-validation.yml` — 범위를 나눈 6개 독립 잡; S4 최종 `ci-integration.yml`이 아니고 Production에 접근하지 않는다.
+**검증 실행:** `.github/workflows/legal-full-scenario-validation.yml` — 범위를 나눈 7개 독립 잡; S4 최종 `ci-integration.yml`이 아니고 Production에 접근하지 않는다.
 
 
 ## L1 개인정보·권리행사·삭제/복원
@@ -15,7 +15,7 @@
 | L1-02 | 권리 신청을 접수했다고 허위 안내하지 않음 | `test/legal-privacy-rights-surface.test.ts` | S1 |
 | L1-03 | 한/일/번체 안내문 정합 | `test/legal-privacy-rights-surface.test.ts` | S1 |
 | L1-04 | 익명·타인 인증으로 계정 삭제 시작 불가 | `test/account-deletion-start-api-boundary.test.ts` | S1 |
-| L1-05 | 삭제 worker의 Subject 경계·트랜잭션 복구 | `test/account-deletion-worker-runtime-postgres.e2e.test.ts` | S1 |
+| L1-05 | 삭제 worker의 Subject 경계·트랜잭션 복구 | `test/account-deletion-worker-runtime-postgres.e2e.test.ts` — `MYEONGHA_RUN_ACCOUNT_DELETION_DB_E2E=1`, 독립 PG17 | S2 |
 | L1-06 | 59 테이블 삭제/익명화/보존 승인 그래프 변경 방지 | `verify:approved-account-deletion-policy · verify:account-deletion-disposition-execution-gate` | S1 |
 | L1-07 | 복원 ledger·키·P30D 정책 실행 계약 확인 | `verify:production-postgres-privacy-recovery-ledger-workflow · verify:postgres-privacy-reconciliation-plan` | S1 |
 | L1-08 | PortOne 신원정보 처분 후보와 Privacy 충돌 탐지 | `verify:portone-identity-privacy-candidate` | S1 |
@@ -92,7 +92,7 @@
 
 1. **S1/앱:** `npm ci --ignore-scripts`, `npm run typecheck`, `npx vitest run test/legal-*.test.ts`와 인접 Payment/Auth/Privacy tests. 하나라도 fail이면 해당 SHA의 S1은 FAIL. 로그에는 실제 테스트 총수를 명시한다.
 2. **S1/거버넌스:** 승인 59개 테이블의 DELETE 46/ANONYMIZE 4/RETAIN 9 해시·P5Y/P30D 회귀와 DB containment; 검사 실패는 무단 재승인/정책 변경으로 고치지 않는다.
-3. **S2:** PortOne 제안 SQL 1740–1742, Commerce 제안 1743을 각각 별도의 PostgreSQL 17.6 컨테이너 `localhost` / 일회성 `myeongha_ci_case_숫자` DB에만 적용. 수동 또는 Production migration 금지. 교차 Subject, 중복, 만료, RLS/ACL, 소유 거래 및 결제 후 우회 거절.
+3. **S2:** 계정 삭제 worker는 일반 Vitest 환경에서 의도적으로 SKIP되므로 7번째 별도 PG17 CI에서 `MYEONGHA_RUN_ACCOUNT_DELETION_DB_E2E=1`로 1건 실제 실행한다. 의도적인 S1 skip을 L1 PASS로 오인하지 않는다. PortOne 제안 SQL 1740–1742, Commerce 제안 1743을 각각 별도의 PostgreSQL 17.6 컨테이너 `localhost` / 일회성 `myeongha_ci_case_숫자` DB에만 적용. 수동 또는 Production migration 금지. 교차 Subject, 중복, 만료, RLS/ACL, 소유 거래 및 결제 후 우회 거절.
 4. **S3:** chrome local mock 웹 로그인/게스트 브라우저, 정적 Web 배포 검증, 비상업 iOS/Android Expo export. 이는 실제 PortOne 로그인, SameSite cross-domain provider callback 실증, 실기기 접근성, Production 호스팅 인수가 아니다.
 5. **S4:** CI Integration은 로드맵 §28 및 기존 `LEGAL_COMPLIANCE_VALIDATION_PLAN_V1.md`의 **전 기능/소유 트랙 완료 조건 이후**에만 별도 핀 고정 SHA로 실행. 이 매트릭스의 초록색 배지는 S4 결과를 대신하지 않는다.
 6. **S5/HOLD:** 계약·신원채널·실결제·운영 DB·권리접수·국외처리 증빙·실사용 약관·실제 S7 인도가 필요한 항목은 `미검증`으로 명시하고 정상/합성 테스트 성공에 끼워 넣지 않는다.

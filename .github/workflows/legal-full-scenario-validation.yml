@@ -205,3 +205,60 @@ jobs:
           npm run verify:mobile-android-physical-smoke-readiness
           npm run export:ci -w @myeongha/mobile
           npm run verify:mobile-export-artifacts
+
+  l1-privacy-worker-pg17:
+    name: L1 disposable PostgreSQL 17 actual account-deletion worker E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    services:
+      postgres:
+        image: postgres:17.6
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ${{ github.run_id }}-${{ github.run_attempt }}
+          POSTGRES_DB: myeongha_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d myeongha_test"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+    env:
+      PGHOST: localhost
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: ${{ github.run_id }}-${{ github.run_attempt }}
+      CI: 'true'
+      DB_SUITE: postgres17
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Bootstrap isolated database and current reviewed migrations
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "${GITHUB_ACTIONS:-}" == true && "${CI:-}" == true &&
+             "${DB_SUITE:-}" == postgres17 && "${PGHOST:-}" == localhost &&
+             "${PGPORT:-}" == 5432 ]] || exit 1
+          PGDATABASE=myeongha_test psql -X -v ON_ERROR_STOP=1 \
+            -c "create database myeongha_ci_case_${GITHUB_RUN_ID};"
+          export PGDATABASE="myeongha_ci_case_${GITHUB_RUN_ID}"
+          [[ "$PGDATABASE" =~ ^myeongha_ci_case_[0-9]+$ ]] || exit 1
+          psql -X -v ON_ERROR_STOP=1 -f test/db/bootstrap_supabase_auth_stub.sql >/dev/null
+          for migration in supabase/migrations/*.sql; do
+            [[ "$migration" == */0860_birth_profile_create_runtime_authority.sql ]] && continue
+            psql -X -v ON_ERROR_STOP=1 -f "$migration" >/dev/null
+          done
+      - name: Real PG17 deletion worker, original Subject, Auth, replay and retained Commerce ACL
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PGDATABASE="myeongha_ci_case_${GITHUB_RUN_ID}"
+          [[ "$PGHOST" == localhost && "$PGDATABASE" =~ ^myeongha_ci_case_[0-9]+$ ]] || exit 1
+          MYEONGHA_RUN_ACCOUNT_DELETION_DB_E2E=1 npx vitest run \
+            test/account-deletion-worker-runtime-postgres.e2e.test.ts
