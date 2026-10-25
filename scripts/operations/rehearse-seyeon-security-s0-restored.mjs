@@ -57,6 +57,36 @@ try{
   created=true;
   await admin.query('alter database postgres with allow_connections true');
   sourceConnectionsPaused=false;
+
+  // Managed Supabase PG17 grants the restored postgres role ADMIN OPTION on
+  // this existing NOLOGIN function owner. A logical database backup does not
+  // restore cluster-global role memberships into GitHub Actions. Recreate ONLY
+  // that exact pre-existing authority in this isolated container. The S0 SQL
+  // must still pass its original role/ownership checks unchanged.
+  const {rows:[membership]}=await admin.query(`select
+    current_user='supabase_admin' as isolated_admin,
+    exists(select 1 from pg_roles where rolname='postgres') as postgres_exists,
+    exists(select 1 from pg_roles
+      where rolname='myeongha_seyeon_chat_runtime_owner' and not rolcanlogin) as owner_exists,
+    exists(select 1 from pg_auth_members m
+      join pg_roles role on role.oid=m.roleid
+      join pg_roles member on member.oid=m.member
+      where role.rolname='myeongha_seyeon_chat_runtime_owner'
+        and member.rolname='postgres' and m.admin_option) as already_admin`);
+  if(membership?.isolated_admin!==true||membership.postgres_exists!==true||
+     membership.owner_exists!==true){
+    throw Error('Restored S0 owner role catalog mismatch.');
+  }
+  if(membership.already_admin!==true){
+    await admin.query('grant myeongha_seyeon_chat_runtime_owner to postgres with admin option');
+  }
+  const {rows:[confirmed]}=await admin.query(`select exists(
+    select 1 from pg_auth_members m
+    join pg_roles role on role.oid=m.roleid
+    join pg_roles member on member.oid=m.member
+    where role.rolname='myeongha_seyeon_chat_runtime_owner'
+      and member.rolname='postgres' and m.admin_option) as authorized`);
+  if(confirmed?.authorized!==true)throw Error('Isolated owner role ADMIN OPTION not restored.');
   const local=new Client({...db,user:'postgres',database:target});
   await local.connect();
   try{
