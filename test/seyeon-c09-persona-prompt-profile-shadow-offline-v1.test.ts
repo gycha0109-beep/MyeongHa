@@ -8,7 +8,7 @@ import {
 } from '../apps/api/src/seyeon-c09-persona-prompt-profile-shadow-v1.js';
 
 function gitBlobHash(path: string): string {
-  const bytes = readFileSync(resolve(process.cwd(), path));
+  const bytes = Buffer.from(readFileSync(resolve(process.cwd(), path), 'utf8').replace(/\r\n/g, '\n'), 'utf8');
   return createHash('sha1')
     .update('blob ' + bytes.byteLength + '\0')
     .update(bytes)
