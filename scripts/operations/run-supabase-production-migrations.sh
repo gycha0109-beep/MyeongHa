@@ -39,6 +39,76 @@ db_url="postgresql://postgres.${SUPABASE_PROJECT_ID}:${encoded_password}@${host}
 echo "::add-mask::$db_url"
 db_args=(--db-url "$db_url")
 
+# Exceptionally admit ONLY the exact vetted 1725 signup wallet migration.
+# This exists because legacy Se-yeon 1400-1450 migration lineage is explicitly
+# HOLD and normal --include-all must never replay the unrelated backlog.
+# Do not accept arbitrary migration files or a generic bypass flag.
+if [[ "${SUPABASE_CHAT_CREDIT_SIGNUP_SCOPE_ONLY:-false}" == 'true' ]]; then
+  [[ "${SUPABASE_PROMOTION_REPAIR_ONLY:-false}" == false \
+    && "${SUPABASE_SEYEON_MANIFEST_ACL_REPAIR_ONLY:-false}" == false \
+    && "${SUPABASE_SAJU_ADMISSION_RECONCILE_ONLY:-false}" == false ]] || {
+    echo 'HOLD_CREDIT_SIGNUP_CONFLICTING_PRODUCTION_SCOPE' >&2
+    exit 1
+  }
+  credit_version='1725'
+  credit_file="supabase/migrations/${credit_version}_chat_credit_signup_wallet_runtime_v1.sql"
+  [[ -f "$credit_file" ]] || { echo 'HOLD_CREDIT_SIGNUP_SQL_MISSING' >&2; exit 1; }
+  [[ "$(git hash-object "$credit_file")" == '2b847d1a1b4ae62678e524b7ebcf32835a377ddf' ]] || {
+    echo 'HOLD_CREDIT_SIGNUP_SQL_HASH_DRIFT' >&2
+    exit 1
+  }
+  cert_file="$(mktemp "${RUNNER_TEMP:?}/credit-signup-ca.XXXXXX")"
+  trap 'rm -f "$cert_file"' EXIT
+  chmod 600 "$cert_file"
+  printf '%s\n' "${SUPABASE_PRODUCTION_SERVER_ROOT_CERT_PEM:?}" > "$cert_file"
+  export PGHOST="$host" PGPORT=5432 PGDATABASE=postgres
+  export PGUSER="postgres.$SUPABASE_PROJECT_ID" PGPASSWORD="$SUPABASE_DB_PASSWORD"
+  export PGSSLMODE=verify-full PGSSLROOTCERT="$cert_file"
+
+  # No writes unless the preceding 1720 migration has actually been recorded.
+  [[ "$(psql -X -v ON_ERROR_STOP=1 -qAtc "select count(*) from supabase_migrations.schema_migrations where version='1720'")" == 1 ]] || {
+    echo 'HOLD_CREDIT_SIGNUP_BASE_MIGRATION_UNAVAILABLE' >&2; exit 1
+  }
+  [[ "$(psql -X -v ON_ERROR_STOP=1 -qAtc "select to_regprocedure('public.assert_myeongha_subject_context_v1(uuid)') is not null")" == t ]] || {
+    echo 'HOLD_CREDIT_SIGNUP_SUBJECT_CONTEXT_MISSING' >&2; exit 1
+  }
+  credit_applied="$(psql -X -v ON_ERROR_STOP=1 -qAtc "select count(*) from supabase_migrations.schema_migrations where version='$credit_version'")"
+  credit_schema="$(psql -X -v ON_ERROR_STOP=1 -qAtc "select to_regclass('public.chat_credit_lots_v1') is not null")"
+  if [[ "$credit_applied" == 1 && "$credit_schema" == t ]]; then
+    echo 'Credit signup wallet 1725 already applied and recorded; no replay.'
+    exit 0
+  fi
+  [[ "$credit_applied" == 0 && "$credit_schema" == f ]] || {
+    echo 'HOLD_CREDIT_SIGNUP_HISTORY_SCHEMA_DISAGREEMENT' >&2; exit 1
+  }
+  # Execute this file atomically and no other migration. If the CLI history
+  # registration fails afterwards, retry must HOLD on schema/history mismatch.
+  psql -X -v ON_ERROR_STOP=1 -1 -c "set lock_timeout='5s'; set statement_timeout='30s'" -f "$credit_file"
+  supabase migration repair "$credit_version" --status applied "${db_args[@]}"
+  [[ "$(psql -X -v ON_ERROR_STOP=1 -qAtc "select count(*) from supabase_migrations.schema_migrations where version='$credit_version'")" == 1 ]] || {
+    echo 'HOLD_CREDIT_SIGNUP_HISTORY_NOT_RECORDED' >&2; exit 1
+  }
+  psql -X -v ON_ERROR_STOP=1 -qAt <<'CREDIT_VERIFY'
+do $proof$
+begin
+  if to_regclass('public.chat_credit_lots_v1') is null
+    or to_regprocedure('public.internal_qry_chat_credit_balance_v1(uuid)') is null
+    or not exists(select 1 from pg_trigger where tgname='tr_chat_credit_member_signup_v1' and not tgisinternal)
+    or not exists(select 1 from pg_trigger where tgname='tr_chat_credit_subject_erasure_v1' and not tgisinternal)
+    or not has_function_privilege('myeongha_api_executor','public.internal_qry_chat_credit_balance_v1(uuid)','EXECUTE')
+    or has_function_privilege('anon','public.internal_qry_chat_credit_balance_v1(uuid)','EXECUTE')
+    or has_function_privilege('myeongha_api_executor','public.internal_cmd_chat_credit_reserve_v1(uuid,uuid,uuid)','EXECUTE') then
+    raise exception 'HOLD_CREDIT_SIGNUP_PRODUCTION_VERIFICATION';
+  end if;
+end $proof$;
+CREDIT_VERIFY
+  echo 'PASS_CREDIT_SIGNUP_SCOPED_PRODUCTION_1725_APPLIED_NO_BACKLOG_REPLAY'
+  exit 0
+fi
+[[ "${SUPABASE_CHAT_CREDIT_SIGNUP_SCOPE_ONLY:-false}" == false ]] || {
+  echo 'HOLD_CREDIT_SIGNUP_INVALID_SCOPE' >&2; exit 1
+}
+
 # Apply only the exact, reviewed Se-yeon manifest ACL repair and leave every
 # unrelated pending migration untouched. No direct role membership changes.
 if [[ "${SUPABASE_SEYEON_MANIFEST_ACL_REPAIR_ONLY:-false}" == 'true' ]]; then

@@ -116,6 +116,20 @@ order by
 SQL
 )"
 
+# The 140-edge inventory is a historical frozen schema snapshot. New signup
+# wallet edges are separately governed DELETE, never retained Commerce evidence.
+wallet_edges="$(printf '%s\n' "$actual" | awk -F '|' '$3 ~ /^chat_credit_/ { print }' | sort)"
+expected_wallet_edges="$(printf '%s\n' \
+  '1|subjects|chat_credit_lots_v1|chat_credit_lots_v1_subject_id_fkey|subject_id|id' \
+  '2|chat_credit_lots_v1|chat_credit_turn_allocations_v1|chat_credit_turn_allocations_v1_lot_id_fkey|lot_id|id' \
+  '2|conversation_threads|chat_credit_turn_reservations_v1|chat_credit_turn_reservations_thread_v1|thread_id,subject_id|id,subject_id' \
+  '3|chat_credit_turn_reservations_v1|chat_credit_turn_allocations_v1|chat_credit_turn_allocations_v1_reservation_id_fkey|reservation_id|id' | sort)"
+if [[ "$wallet_edges" != "$expected_wallet_edges" ]]; then
+  echo 'Production signup wallet FK extension is unexpected or incomplete.' >&2
+  echo "$wallet_edges" >&2
+  exit 1
+fi
+actual="$(printf '%s\n' "$actual" | awk -F '|' '$3 !~ /^chat_credit_/' )"
 if [[ "$actual" != "$expected" ]]; then
   echo "Transitive Subject dependency graph inventory drifted." >&2
   echo "--- inventory" >&2

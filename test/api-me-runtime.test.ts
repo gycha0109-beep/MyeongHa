@@ -44,6 +44,49 @@ describe('GET /api/me production route adapter', () => {
     );
   });
 
+  it('dispatches credits through the Member /api/me Function without a thirteenth deployment', async () => {
+    const request = new Request(
+      'https://myeongha.example/api/me?__myeongha_chat_credit_wallet=1',
+      { method: 'GET' },
+    );
+    const response = await meEndpoint.fetch(request);
+    expect(response.status).toBe(401);
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    await expect(response.json()).resolves.toMatchObject({
+      ok: false, error: { code: 'AUTH_REQUIRED' },
+      meta: { apiContractVersion: 'v0.9' },
+    });
+
+    const sourcePreserved = await meEndpoint.fetch(new Request(
+      'https://myeongha.example/api/me/credits?__myeongha_chat_credit_wallet=1',
+      { method: 'GET' },
+    ));
+    expect(sourcePreserved.status).toBe(401);
+    expect(sourcePreserved.headers.get('cache-control')).toBe('no-store');
+
+    const unsupportedMethod = await meEndpoint.fetch(
+      new Request('https://myeongha.example/api/me?__myeongha_chat_credit_wallet=1', {
+        method: 'POST',
+      }),
+    );
+    expect(unsupportedMethod.status).toBe(405);
+    expect(unsupportedMethod.headers.get('allow')).toBe('GET');
+    expect(unsupportedMethod.headers.get('cache-control')).toBe('no-store');
+  });
+
+  it.each([
+    'https://myeongha.example/api/me/credits',
+    'https://myeongha.example/api/me?__myeongha_chat_credit_wallet=',
+    'https://myeongha.example/api/me?__myeongha_chat_credit_wallet=0',
+    'https://myeongha.example/api/me?__myeongha_chat_credit_wallet=1&subjectId=attacker',
+    'https://myeongha.example/api/me?__myeongha_chat_credit_wallet=1&__myeongha_records_read=memories',
+    'https://myeongha.example/api/me?__myeongha_chat_credit_wallet=1&__myeongha_chat_credit_wallet=1',
+  ])('rejects malformed or mixed credit-wallet rewrite authority %s', async url => {
+    const response = await meEndpoint.fetch(new Request(url, { method: 'GET' }));
+    expect(response.status).toBe(404);
+    expect(response.headers.get('cache-control')).toBe('no-store');
+  });
+
   it('dispatches the private Saju Preview Reading rewrite without exposing upstream authority', async () => {
     const response = await meEndpoint.fetch(
       new Request(
