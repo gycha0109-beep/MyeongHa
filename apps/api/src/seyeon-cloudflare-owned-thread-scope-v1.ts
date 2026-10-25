@@ -33,12 +33,26 @@ export type SeyeonCloudflareThreadScopeDecisionV1 =
   | Readonly<{ kind: 'not_chat' }>
   | Readonly<{ kind: 'chat_open_requires_ops_authority' }>
   | Readonly<{ kind: 'unrelated_thread_requires_ops_reauthorization'; threadId: string }>
+  /** Never authorizes History or Reveal. Generic Chat must independently re-verify
+   * ownership, participant binding and zero messages in a fresh transaction. */
+  | Readonly<{ kind: 'seyeon_empty_thread_requires_ops_reauthorization'; threadId: string }>
   | Readonly<{ kind: 'seyeon_protected_held'; threadId: string; response: Response }>
   | Readonly<{ kind: 'denied'; response: Response }>;
 
 function held(requestId: string): Response {
   return enforceSeyeonCloudflareOfflineFetchEgressFenceV1(null, requestId);
 }
+
+// A strictly owner-scoped existence test, not a History query result.
+// PostgreSQL returns only one boolean and never serializes a message body to
+// the Worker. Even redacted messages count as existing history.
+const HAS_STORED_MESSAGES_SQL = `
+select exists (
+  select 1 from public.qry_chat_thread_stream_v2(
+    $1::uuid, $2::uuid, 0::bigint, 1::integer
+  )
+) as "hasMessages"
+`.trim();
 
 // Chat history GET supports only the existing read controller's pagination
 // keys; all other query, replay markers and duplicate controls deny before DB.
@@ -72,9 +86,11 @@ function validReadQuery(url: URL): boolean {
  * come from the existing owner-scoped query. Never use client characterId,
  * a rewrite marker, a cached thread label or an unscoped SQL query.
  *
- * Protected/mixed SeYeon threads always run the independent first/History/
- * Replay HOLD. Unknown/bad DB state is a fixed 503/no-store, not an HTML
- * fallback. Unrelated threads receive NO response or admission token here.
+ * Nonempty or mixed SeYeon threads always remain behind the independent
+ * first/History/Replay HOLD. A single-SeYeon first page proven to have zero
+ * stored messages receives NO response here: a separate owner-scoped reader
+ * must authenticate and verify emptiness again before returning metadata.
+ * Unknown/bad DB state remains fixed 503/no-store, never an HTML fallback.
  *
  * This contract alone is NOT a mounted Worker router or a transport G0-D04
  * proof. The Ops handler must independently reauthorize unrelated-thread
@@ -128,22 +144,47 @@ export async function scopeSeyeonCloudflareOwnedChatRequestV1(input: Readonly<{
     if (evidence === null || evidence.kind !== 'member') {
       return { kind: 'denied', response: held(input.requestId) };
     }
-    const binding = await executePostgresSubjectTransactionV1({
+    const verdict = await executePostgresSubjectTransactionV1({
       pool: input.pool,
       verifiedEvidence: evidence,
-      execute: ({ resolvedSubject, client }) =>
-        getChatThreadRuntimeBinding({
+      execute: async ({ resolvedSubject, client }) => {
+        const binding = await getChatThreadRuntimeBinding({
           resolvedSubjectId: resolvedSubject.subjectId,
           threadId,
           authorityPort: createPostgresChatThreadRuntimeBindingAuthorityPortV1(client),
-        }),
+        });
+        let confirmedEmpty = false;
+        const url = new URL(input.request.url);
+        const firstPage = !url.searchParams.has('afterSequenceNo') ||
+          url.searchParams.get('afterSequenceNo') === '0';
+        if (route.kind === 'thread_read' && firstPage &&
+            binding.participantCharacterIds.length === 1 &&
+            binding.participantCharacterIds[0] === 'seyeon') {
+          const existence = await client.query<{hasMessages:boolean}>(
+            HAS_STORED_MESSAGES_SQL, [resolvedSubject.subjectId, threadId],
+          );
+          if (existence.rows.length !== 1 ||
+              typeof existence.rows[0]?.hasMessages !== 'boolean') {
+            throw Error('Missing authoritative empty-room evidence');
+          }
+          confirmedEmpty = existence.rows[0].hasMessages === false;
+        }
+        return {binding, confirmedEmpty};
+      },
     });
 
-    if (!binding.participantCharacterIds.includes('seyeon')) {
+    if (!verdict.binding.participantCharacterIds.includes('seyeon')) {
       return {
         kind: 'unrelated_thread_requires_ops_reauthorization',
         threadId,
       };
+    }
+    // An owned, single-participant, zero-message first page is metadata only.
+    // This is NOT authority to reveal any chat message or to generate a paid
+    // model turn. The Ops Chat reader rechecks everything inside its own
+    // transaction and still rejects Se-yeon messages, replay and pagination.
+    if (verdict.confirmedEmpty) {
+      return {kind:'seyeon_empty_thread_requires_ops_reauthorization',threadId};
     }
 
     const response = await holdSeyeonCloudflareProtectedChatRouteV1({
