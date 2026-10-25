@@ -95,7 +95,7 @@ try{
     throw Error('Isolated ordinary fixture role collision');
   }
   const fixtureDdl=(await admin.query(`select format(
-    'create role myeongha_s0_receipt_test_login login noinherit nosuperuser nocreatedb nocreaterole noreplication nobypassrls password %L',$1) as sql`,[db.password])).rows[0].sql;
+    'create role myeongha_s0_receipt_test_login login noinherit nosuperuser nocreatedb nocreaterole noreplication nobypassrls password %L',$1::text) as sql`,[db.password])).rows[0].sql;
   await admin.query(fixtureDdl);
   await admin.query('grant myeongha_api_executor to myeongha_s0_receipt_test_login with inherit false,set true');
   const env={...process.env,PGHOST:'127.0.0.1',PGPORT:'5432',PGUSER:'postgres',

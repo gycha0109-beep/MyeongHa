@@ -181,6 +181,7 @@ export interface CreateProductionSeyeonChatRuntimeInputV1 {
    * DB registry, G1/G2 and current-rights Reveal remain independent guards.
    */
   readonly approvedPersonalRecordModelUse?: () => boolean | Promise<boolean>;
+  readonly requiredPersonalRecordCount?: 1;
 }
 
 function text(value: string, path: string, max: number): string {
@@ -516,6 +517,7 @@ export function createProductionSeyeonChatRuntimeV1(
           semanticReviewerProvider: meteredReviewer,
           persistencePort: meteredChatPersistence,
           positivePersonalSourcePort: ports.positivePersonalSource,
+          ...(input.requiredPersonalRecordCount===undefined?{}:{requiredPersonalRecordCount:input.requiredPersonalRecordCount}),
           ...(input.approvedPersonalRecordModelUse === undefined ? {} : {
             serverOwnedPersonalRecordProjectors: Object.freeze([
               SEYEON_CONVERSATION_RECALL_PROJECTOR_V1,

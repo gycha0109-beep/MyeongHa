@@ -274,6 +274,7 @@ extends BaseProductionSliceInputV1 {
   readonly persistencePort: SeyeonProductionChatPersistencePortV1;
   /** Only the existing verified Subject runner may supply this Owner port. */
   readonly positivePersonalSourcePort?: SeyeonPositiveS0OwnerDbPortsV1;
+  readonly requiredPersonalRecordCount?: 1;
   readonly executionIdPort: SeyeonProductionChatExecutionIdPortV1;
   readonly relationshipSyncOutboxPort?:
     SeyeonProductionRelationshipSyncOutboxPortV1;
@@ -698,6 +699,7 @@ export async function runSeyeonProductionChatExecutionV1(
         // Exact sorted/truncated source set used by the model, not an
         // unbounded list from DB or an LLM-selected free-text sourceRef.
         const exactModelPersonalSources = selectSeyeonExactModelPersonalSourcesV1({
+          ...(input.requiredPersonalRecordCount===undefined?{}:{requiredPersonalRecordCount:input.requiredPersonalRecordCount}),
           retrievedMemories: contextInput.retrievedMemories,
           ...(contextInput.maxRetrievedMemories === undefined ? {} : {
             maxRetrievedMemories: contextInput.maxRetrievedMemories,
