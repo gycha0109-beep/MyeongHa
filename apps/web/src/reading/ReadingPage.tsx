@@ -30,11 +30,7 @@ export function ReadingPage() {
   return (
     <div className="gm-shell">
       <h1 className="gm-page-title saju-design-sr-title">사주</h1>
-      <div className="saju-design-ribbon" aria-label="무료 프리뷰 화면. 아직 구매하지 않은 상태">
-        <div><strong>무료 프리뷰 화면 <span>(미구매 상태)</span></strong><b>무료</b></div>
-        <p>기본 명식 확인 + 유료 결과물 구성 미리보기 (개인화된 유료 해석 본문 없음)</p>
-      </div>
-            <div className="saju-status" id="saju-status" role="status">내 사주를 확인하는 중입니다…</div>
+      <div className="saju-status" id="saju-status" role="status">내 사주를 확인하는 중입니다…</div>
       <button id="saju-calculation-retry" className="saju-calculation-retry" type="button" hidden>
         저장된 출생정보로 계산 다시 시도
       </button>
