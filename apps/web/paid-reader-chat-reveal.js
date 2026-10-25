@@ -287,6 +287,21 @@ document.addEventListener('visibilitychange', () => {
 });
 window.addEventListener('pagehide', closeExpanded);
 
+// Member session replacement/logout in this tab revokes the local right to
+// keep previously decrypted paid content on-screen. Abort any in-flight GET
+// or ACK, clear plaintext/receipt, and require a fresh server-authorized read.
+// The shared Product Auth module emits this event after its committed change.
+window.addEventListener('myeongha:auth-changed', closeExpanded);
+
+// Cross-tab login/logout does not emit auth-changed in the current document.
+// Clear immediately on the canonical Member localStorage mutation rather
+// than waiting for the room's delayed reload or for a subsequent API call.
+window.addEventListener('storage', (event) => {
+  if (event.key === 'myeongha.memberSession.v1' || event.key === null) {
+    closeExpanded();
+  }
+});
+
 // Locale changes repaint only control labels. Never translate or cache paid body text.
 document.addEventListener('myeongha:localechange', () => {
   for (const node of document.querySelectorAll('[data-reader-paid-ui-source]')) {
