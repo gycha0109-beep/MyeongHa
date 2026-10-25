@@ -33,7 +33,21 @@ function logReadinessFailureCategoryV1(bindings) {
         ? config.databasePrincipal + '.cnsfpcdiyofqvhpcegfc'
         : config.databasePrincipal;
       code = source.hostname !== host ? 'DB_HOST_MISMATCH'
-        : source.port !== port ? 'DB_PORT_MISMATCH'
+        : source.port !== port ? (
+          source.port === '5432' && port === '6543'
+            ? 'DB_URL_SESSION_5432_PIN_TRANSACTION_6543'
+            : source.port === '6543' && port === '5432'
+              ? 'DB_URL_TRANSACTION_6543_PIN_SESSION_5432'
+              : source.port === '5432'
+                ? 'DB_URL_SESSION_5432_PIN_OTHER'
+                : source.port === '6543'
+                  ? 'DB_URL_TRANSACTION_6543_PIN_OTHER'
+                  : port === '5432'
+                    ? 'DB_URL_OTHER_PIN_SESSION_5432'
+                    : port === '6543'
+                      ? 'DB_URL_OTHER_PIN_TRANSACTION_6543'
+                      : 'DB_PORT_MISMATCH_OTHER'
+        )
         : decodeURIComponent(source.username) !== expectedLogin ? 'DB_LOGIN_MISMATCH'
         : host?.endsWith('.pooler.supabase.com') && source.pathname !== '/postgres'
           ? 'DB_TENANT_PATH_MISMATCH'
