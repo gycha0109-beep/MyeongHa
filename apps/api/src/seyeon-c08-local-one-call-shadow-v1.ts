@@ -143,7 +143,7 @@ export function guardSeyeonC08LocalReplyNoveltyV1(
   history:readonly SeyeonRecentMessageV2[],
 ):void{
   const normalized=(s:string)=>s.toLocaleLowerCase('ko-KR')
-    .replace(/[^\\p{L}\\p{N}]/gu,'');
+    .replace(/[^\p{L}\p{N}]/gu,'');
   const candidate=normalized(utterance);
   if(!candidate||candidate.length<6)
     throw new SeyeonC08LocalHoldV1('LOCAL_OUTPUT_UNVERIFIABLE');
