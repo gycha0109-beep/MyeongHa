@@ -247,6 +247,7 @@ try {
       heroHref: document.querySelector('.mhx-hero-actions .mhx-primary-link')?.getAttribute('href') ?? '',
       monthHref: document.querySelector('.mhx-content-grid .mhx-content-card:nth-child(2)')?.getAttribute('href') ?? '',
       shellWidth: shell ? Math.round(shell.width) : 0,
+      contentWidth: document.documentElement.clientWidth,
       productCount: products.length,
       productTopBands: productRects.map((rect) => Math.round(rect.top)),
       oldSidebars: document.querySelectorAll('.home-sidebar, .gm-sidebar').length,
@@ -266,7 +267,7 @@ try {
   for (const el of hallState.elements) {
     assert(el.exists && el.visible, `Home Golden Master element unavailable: ${el.selector}`);
   }
-  assert(Math.abs(hallState.shellWidth - 1440) <= 2, `Home hero container should span the viewport: ${hallState.shellWidth}`);
+  assert(Math.abs(hallState.shellWidth - hallState.contentWidth) <= 2, `Home hero container must match the scrollable viewport: shell=${hallState.shellWidth}, content=${hallState.contentWidth}`);
   assert(hallState.productCount === 4, `Home Golden Master must expose exactly four product cards, got ${hallState.productCount}`);
   assert(hallState.productTopBands.length === 4 && hallState.productTopBands[0] === hallState.productTopBands[1] && hallState.productTopBands[2] === hallState.productTopBands[3] && hallState.productTopBands[2] > hallState.productTopBands[0], `Home product cards must form two rows of two: ${JSON.stringify(hallState.productTopBands)}`);
   assert(hallState.oldSidebars === 0, `Home Golden Master reintroduced sidebar layout: ${hallState.oldSidebars}`);
