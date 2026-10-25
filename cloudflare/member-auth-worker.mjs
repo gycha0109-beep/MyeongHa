@@ -1,5 +1,6 @@
 import { handleSupabaseAuthRequestV1 } from '../apps/api/src/supabase-auth-http.js';
 import { handleSocialAuthStartRequestV1 } from '../apps/api/src/social-auth-start-http.js';
+import { approvedCloudflareAuthOriginV1, approvedCloudflareStage5HandoffV1 } from '../workers/cloudflare-auth-db-api.mjs';
 
 const OWNED_ORIGINS = new Set([
   'https://myeongha.gycha0109.workers.dev',
@@ -39,11 +40,17 @@ function seal(response) {
   });
 }
 
-export function cloudflareAuthRoute(request) {
+export function cloudflareAuthRoute(request, env) {
   const url = new URL(request.url);
-  if (!OWNED_ORIGINS.has(url.origin)) return null;
   const action = AUTH_ROUTES[url.pathname];
   if (action === undefined) return null;
+  if (!OWNED_ORIGINS.has(url.origin)) {
+    // A custom Cloudflare host must be the exact host approved for Auth/DB.
+    // Never trust a caller-provided Host, Origin, or arbitrary workers.dev alias.
+    if (approvedCloudflareAuthOriginV1(request, env) !== url.origin ||
+        !approvedCloudflareStage5HandoffV1(env, url.origin,
+          action === 'social-start' || (action === 'refresh' && url.search !== ''))) return null;
+  }
   if (action === 'refresh') {
     const markers = url.searchParams.getAll('__myeongha_social_complete');
     if (markers.length === 0 && url.search === '') return 'refresh';
@@ -71,7 +78,7 @@ export async function rateLimitCloudflareRequestV1(request, env, action) {
 }
 
 export async function handleCloudflareAuthRequest(request, env) {
-  const action = cloudflareAuthRoute(request);
+  const action = cloudflareAuthRoute(request, env);
   if (action === null) return null;
   if (request.method !== 'POST') return new Response(null, {
     status: 405, headers: { ...HEADERS, Allow: 'POST' },

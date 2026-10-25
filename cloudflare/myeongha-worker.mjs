@@ -83,7 +83,7 @@ export default {
       // Preserve native Member Auth/Rate Limiter priority and single event
       // coverage before governed Ops API fallthrough.
       const route = matchCloudflareApiRoute(url.pathname);
-      const response = cloudflareAuthRoute(request) !== null && route !== null
+      const response = cloudflareAuthRoute(request, env) !== null && route !== null
         ? await executeSecurityObservedRequestV1({
             request, routeId: route.id,
             execute: () => handleCloudflareAuthRequest(request, env),
