@@ -105,17 +105,6 @@ function classifyTurnLocalDispositionV1(userText: string): SeyeonC09LocalDisposi
       expressionBias: 'baseline',
     };
   }
-  if (/(?:지금|현재).{0,16}(?:뭐\s*(?:해|하고)|어디\s*있|뭘\s*하고)/u.test(text)) {
-    return {
-      sourceKind: 'TURN_ONLY_REACTION',
-      situation: 'present_activity_unknown',
-      presentAttention: '지금 무엇을 하는지 묻지만 승인된 현재 장면 정보는 없다.',
-      turnLocalWant: '현재 대화에서의 생각과 관심을 말하고 실제 활동은 꾸며내지 않는다.',
-      tension: '자기 존재감을 보이고 싶어도 확인되지 않은 장소나 일과를 만들 수는 없다.',
-      preferredAction: 'approach',
-      expressionBias: 'baseline',
-    };
-  }
   if (/(?:너는|세연은|넌|너가|네가).{0,25}(?:하고\s*싶|원하는|뭐\s*하고\s*싶|진짜\s*뭘)/u.test(text)) {
     return {
       sourceKind: 'PUBLIC_BIBLE_CHARACTER_TENDENCY',
@@ -123,6 +112,17 @@ function classifyTurnLocalDispositionV1(userText: string): SeyeonC09LocalDisposi
       presentAttention: '상대가 세연 자신의 지금 욕구를 직접 묻는다.',
       turnLocalWant: '상대의 취향을 되묻기보다 지금 끌리는 작은 경험이나 관점을 말하고 싶다.',
       tension: '자기 취향을 말하되 그 자리에서 실제 행동·과거 사건이 발생했다고 꾸미지는 않는다.',
+      preferredAction: 'approach',
+      expressionBias: 'baseline',
+    };
+  }
+  if (/(?:지금|현재).{0,16}(?:뭐\s*(?:해|하고)|어디\s*있|뭘\s*하고)/u.test(text)) {
+    return {
+      sourceKind: 'TURN_ONLY_REACTION',
+      situation: 'present_activity_unknown',
+      presentAttention: '지금 무엇을 하는지 묻지만 승인된 현재 장면 정보는 없다.',
+      turnLocalWant: '현재 대화에서의 생각과 관심을 말하고 실제 활동은 꾸며내지 않는다.',
+      tension: '자기 존재감을 보이고 싶어도 확인되지 않은 장소나 일과를 만들 수는 없다.',
       preferredAction: 'approach',
       expressionBias: 'baseline',
     };
