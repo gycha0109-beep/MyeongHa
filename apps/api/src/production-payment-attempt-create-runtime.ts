@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { createPostgresDigitalReadingCheckoutAdmissionPortV1 } from './commerce-digital-reading-checkout-admission-v1.js';
 import {
   derivePaymentAttemptProviderRequestIdV1,
   requirePaymentAttemptEnvironmentV1,
@@ -65,6 +66,9 @@ export function createProductionPaymentAttemptCreateRuntimeV1(
         identityEvidenceVerifier,
         pool: poolLease.pool,
         identityPort,
+        // Hard-wired, independent of env/client booleans. A missing 1743
+        // authority fails closed; dormant runtime never activates sales.
+        checkoutAdmissionPort: createPostgresDigitalReadingCheckoutAdmissionPortV1(),
       });
     },
     close() {

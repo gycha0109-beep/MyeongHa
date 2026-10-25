@@ -257,3 +257,12 @@
 
 - 제안 1742의 신규 상태 레코드 INSERT가 익명 Web Social start에서 무제한 생성되지 않도록, 기존 `PostgresMemberAuthRateLimitAdmissionPortV1`의 **sign-in 버킷** 및 신뢰된 Vercel IP를 HMAC으로 지문화하는 진입 검사를 추가했다. 정확한 동일 출처·등록된 Provider·브라우저 요청 형식 확인 뒤, 서버 rate limiter가 허용한 경우만 SQL issue를 시도한다.
 - IP 헤더 누락/비정상, rate-limit 비밀키 또는 DB 권위 누락/장애는 503, 비용 제한 초과는 429이며 어느 경우든 세션·OAuth state 쿠키·리디렉션은 발급하지 않는다. `test/legal-portone-preenrollment-social-v1.test.ts`에 IP 누락/429/정상 버킷을 추가했다. 신규 DB 테이블 운영 마이그레이션·기능 활성화는 승인 전 OFF 유지.
+
+
+## 32. 2026-10-25 L4 실제 Payment Attempt 입구에 구매단위 사전고지 확인 연결
+
+- `apps/api/src/payment-attempt-create-http.ts`에 신뢰된 `DigitalReadingCheckoutAdmissionPortV1`을 **Payment Attempt DB 생성 명령 앞, 동일 canonical Subject·PostgreSQL 트랜잭션 안에서** 호출하는 경계 추가. 고지가 없거나 DB가 거절하면 403 및 ROLLBACK, 생성 명령 호출 없음. 실패를 성공한 결제로 위장하지 않음.
+- `apps/api/src/production-payment-attempt-create-runtime.ts`는 위 포트를 무조건 서버에서 주입한다. `commerce-digital-reading-checkout-admission-v1.ts`가 실행 역할을 가진 서버 트랜잭션에서만 `public.qry_legal_digital_reading_checkout_ready_v1`을 조회한다. 클라이언트 `acknowledged`/구매금액/상품단위 값으로 우회 불가.
+- SQL은 이미 제안 중인 `1743`에 서명된 신규 구매 단위의 계약·가격·사전 정보/미리보기·선행 고지·명시적 확인을 요구하는 **행 잠금이 걸린 읽기 함수**로 추가. 같은 트랜잭션에서 Purchase Intent를 `FOR UPDATE`해 동시 결제 진입의 타이밍 경합을 줄임. 결제 후 재진입/다른 구매자·상품/비활성 상품은 거절.
+- `payment-attempt-create-http.test.ts`, `legal-digital-reading-checkout-admission-v1.test.ts`, `legal_commerce_checkout_delivery_pg17.sh`에 허용·차단·DB 오류·전후 상태·권한 테스트 추가, 표적 Actions 실행에 포함. 기존 일반 Payment Attempt 테스트와 내부 코드 어댑터를 변경하되, **실제 주문/Reader 응답 공개 라우트·실PG/실인증은 절대 활성화하지 않는다**.
+- **S7 남은 실제 연결:** 소유 트랙의 S7 실제 전송 성공 콜백과 확정된 수신증거 생산 코드가 이 브랜치에서 완성되어 있지 않으므로 `S7 ACK`, `T2 COMMIT`만으로 디지털콘텐츠 실제 제공을 추정하거나 `cmd_record_digital_reading_delivery_v1` 호출을 합성하지 않음. 실제 S7 결속과 고객용 환불 접수/유료 전송은 계속 미완료. 합성 E2E GREEN은 운영 배송 실증이 아님.

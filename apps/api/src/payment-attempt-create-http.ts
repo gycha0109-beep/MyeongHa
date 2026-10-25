@@ -1,4 +1,5 @@
 import { ApiCommandError } from './api-error.js';
+import type { DigitalReadingCheckoutAdmissionPortV1 } from './commerce-digital-reading-checkout-admission-v1.js';
 import type { IdentityEvidenceVerificationPortV1 } from './current-subject-profile-http.js';
 import {
   createPaymentAttemptV1,
@@ -34,6 +35,8 @@ export interface HandlePaymentAttemptCreateRequestInputV1 {
   readonly identityEvidenceVerifier: IdentityEvidenceVerificationPortV1;
   readonly pool: PostgresSubjectPoolV1;
   readonly identityPort: PaymentAttemptServerIdentityPortV1;
+  /** Runtime-provided server/DB-only gate. When present, denial is fail-closed. */
+  readonly checkoutAdmissionPort?: DigitalReadingCheckoutAdmissionPortV1;
 }
 
 function requireNonEmptyString(name: string, value: unknown): string {
@@ -171,14 +174,21 @@ export async function handlePaymentAttemptCreateRequestV1(
     const data = await executePostgresSubjectTransactionV1({
       pool: input.pool,
       verifiedEvidence,
-      execute: ({ resolvedSubject, client }) =>
-        createPaymentAttemptV1({
-          resolvedSubjectId: resolvedSubject.subjectId,
+      execute: async (scope) => {
+        if (input.checkoutAdmissionPort !== undefined &&
+            !await input.checkoutAdmissionPort.admit({
+              scope, purchaseIntentId: requestBody.purchaseIntentId,
+            })) {
+          throw new ApiCommandError('FORBIDDEN', 'Server-owned checkout notice evidence is not ready.');
+        }
+        return createPaymentAttemptV1({
+          resolvedSubjectId: scope.resolvedSubject.subjectId,
           request: requestBody,
           environment,
           identityPort: input.identityPort,
-          authorityPort: createPostgresPaymentAttemptCreateAuthorityPortV1(client),
-        }),
+          authorityPort: createPostgresPaymentAttemptCreateAuthorityPortV1(scope.client),
+        });
+      },
     });
     return successResponse(data, requestId, serverTime);
   } catch (error) {

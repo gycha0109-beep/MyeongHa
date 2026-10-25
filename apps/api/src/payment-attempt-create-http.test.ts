@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import type { DigitalReadingCheckoutAdmissionPortV1 } from './commerce-digital-reading-checkout-admission-v1.js';
 import type { IdentityEvidenceVerificationPortV1 } from './current-subject-profile-http.js';
 import {
   derivePaymentAttemptProviderRequestIdV1,
@@ -114,6 +115,7 @@ function invoke(input: {
   evidence?: VerifiedSubjectIdentityEvidenceV1 | null;
   pool?: PostgresSubjectPoolV1;
   serverIdentityPort?: PaymentAttemptServerIdentityPortV1;
+  checkoutAdmissionPort?: DigitalReadingCheckoutAdmissionPortV1;
 } = {}) {
   return handlePaymentAttemptCreateRequestV1({
     request: input.request ?? post({
@@ -130,6 +132,8 @@ function invoke(input: {
     ),
     pool: input.pool ?? fakePool(),
     identityPort: input.serverIdentityPort ?? identityPort(),
+    ...(input.checkoutAdmissionPort === undefined ? {} :
+      { checkoutAdmissionPort: input.checkoutAdmissionPort }),
   });
 }
 
@@ -181,6 +185,55 @@ describe('Payment Attempt authenticated HTTP runtime foundation', () => {
     expect(JSON.stringify(payload)).not.toContain('testpay');
     expect(JSON.stringify(payload)).not.toContain('amountMinor');
     expect(JSON.stringify(payload)).not.toContain('currency');
+  });
+
+  it('refuses to mint Payment Attempt before DB-owned displayed/acknowledged checkout proof', async () => {
+    const queriedSql: string[] = [];
+    const admission = vi.fn(async () => false);
+    const response = await invoke({
+      pool: fakePool({ queriedSql }),
+      checkoutAdmissionPort: { admit: admission },
+    });
+    expect(response.status).toBe(403);
+    expect((await response.json()).error.code).toBe('FORBIDDEN');
+    expect(admission).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({
+      purchaseIntentId: PURCHASE_INTENT_ID,
+      scope: expect.objectContaining({
+        resolvedSubject: { subjectId: SUBJECT_ID, subjectKind: 'member' },
+      }),
+    }));
+    expect(queriedSql.some(sql => sql.includes('cmd_create_payment_attempt_v1'))).toBe(false);
+    expect(queriedSql.at(-1)).toBe('ROLLBACK');
+  });
+
+  it('uses admitted checkout proof inside the SAME transaction before the PSP attempt command', async () => {
+    const queriedSql: string[] = [];
+    const admit = vi.fn(async () => {
+      queriedSql.push('SERVER_CHECKOUT_PROOF_CHECKED');
+      return true;
+    });
+    const response = await invoke({
+      pool: fakePool({ queriedSql }),
+      checkoutAdmissionPort: { admit },
+    });
+    expect(response.status).toBe(200);
+    expect(admit).toHaveBeenCalledOnce();
+    const gateIndex = queriedSql.indexOf('SERVER_CHECKOUT_PROOF_CHECKED');
+    const createIndex = queriedSql.findIndex(sql => sql.includes('cmd_create_payment_attempt_v1'));
+    expect(gateIndex).toBeGreaterThan(0);
+    expect(createIndex).toBeGreaterThan(gateIndex);
+    expect(queriedSql.at(-1)).toBe('COMMIT');
+  });
+
+  it('does not mint an attempt when checkout DB authority throws', async () => {
+    const queriedSql: string[] = [];
+    const error = new Error('missing approved checkout DB proposal');
+    await expect(invoke({
+      pool: fakePool({ queriedSql }),
+      checkoutAdmissionPort: { admit: async () => { throw error; } },
+    })).rejects.toBe(error);
+    expect(queriedSql.at(-1)).toBe('ROLLBACK');
+    expect(queriedSql.some(sql => sql.includes('cmd_create_payment_attempt_v1'))).toBe(false);
   });
 
   it('derives a stable opaque provider request identity for exact replay', () => {

@@ -25,6 +25,17 @@ select pg_temp.ensure('fixture', exists (
     and s.reader_character_id='test-standard-reader'
 ));
 
+-- Payment Attempt checkout gate must reject a missing display+acknowledgement.
+begin;
+set local role myeongha_api_executor;
+select pg_catalog.set_config('myeongha.subject_id',
+  '11390000-0000-0000-0000-000000000001',true);
+select pg_temp.ensure('payment gate denies missing checkout notice',
+  public.qry_legal_digital_reading_checkout_ready_v1(
+    '11390000-0000-0000-0000-000000000001',
+    '11392300-0000-0000-0000-000000000001')=false);
+commit;
+
 begin;
 set local role myeongha_commerce_internal_executor;
 select pg_temp.ensure('cannot deliver before verified provider receipt',
@@ -55,6 +66,22 @@ select pg_temp.ensure('explicit acknowledgement',
     '11390000-0000-0000-0000-000000000001',
     '11392300-0000-0000-0000-000000000001',
     'standard-reading:test-standard-reader','notice-test-v1')=true);
+commit;
+
+-- Before provider payment, the owner can attempt checkout ONLY after
+-- one server-presented notice and an explicit customer acknowledgement.
+begin;
+set local role myeongha_api_executor;
+select pg_catalog.set_config('myeongha.subject_id',
+  '11390000-0000-0000-0000-000000000001',true);
+select pg_temp.ensure('payment gate admits signed-off same-unit notice',
+  public.qry_legal_digital_reading_checkout_ready_v1(
+    '11390000-0000-0000-0000-000000000001',
+    '11392300-0000-0000-0000-000000000001')=true);
+select pg_temp.ensure('payment gate denies foreign Purchase Intent',
+  public.qry_legal_digital_reading_checkout_ready_v1(
+    '11390000-0000-0000-0000-000000000001',
+    '11392300-0000-0000-0000-000000000099')=false);
 commit;
 
 -- Before a provider-verified receipt, client/T2 events cannot claim purchase.
@@ -96,6 +123,10 @@ begin;
 set local role myeongha_api_executor;
 select pg_catalog.set_config('myeongha.subject_id',
   '11390000-0000-0000-0000-000000000001',true);
+select pg_temp.ensure('payment gate denies new attempt after verification',
+  public.qry_legal_digital_reading_checkout_ready_v1(
+    '11390000-0000-0000-0000-000000000001',
+    '11392300-0000-0000-0000-000000000001')=false);
 select pg_temp.ensure('verified receipt but undelivered',(
   select purchase_json->>'status'='verified' and delivery_json is null
   from public.qry_owned_digital_reading_withdrawal_snapshot_v1(
@@ -156,6 +187,12 @@ select pg_temp.ensure('no direct customer table reads',
     'EXECUTE')
   and not has_function_privilege('myeongha_api_executor',
     'public.cmd_record_digital_reading_delivery_v1(uuid,uuid,text,text)',
+    'EXECUTE')
+  and not has_function_privilege('anon',
+    'public.qry_legal_digital_reading_checkout_ready_v1(uuid,uuid)',
+    'EXECUTE')
+  and has_function_privilege('myeongha_api_executor',
+    'public.qry_legal_digital_reading_checkout_ready_v1(uuid,uuid)',
     'EXECUTE')
 );
 select 'PASS legal Commerce PG17 checkout-to-delivery E2E' as result;

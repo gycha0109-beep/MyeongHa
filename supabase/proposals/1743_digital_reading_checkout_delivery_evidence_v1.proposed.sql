@@ -190,6 +190,56 @@ begin
     and p_unit_id='standard-reading:'||selection.reader_character_id;
 end $query$;
 
+-- Called immediately before minting ANY Payment Attempt. This is the actual
+-- payment path guard, not a client checkbox or an after-the-fact refund claim.
+-- Lock this purchase row until Payment Attempt creation COMMIT/ROLLBACK.
+create function public.qry_legal_digital_reading_checkout_ready_v1(
+  p_subject_id uuid,p_purchase_intent_id uuid
+) returns boolean language plpgsql volatile security definer
+set search_path=pg_catalog,public,pg_temp as $ready$
+begin
+  perform public.assert_myeongha_subject_context_v1(p_subject_id);
+  if p_purchase_intent_id is null then return false; end if;
+  perform 1 from public.purchase_intents pi
+   where pi.id=p_purchase_intent_id and pi.subject_id=p_subject_id
+     and pi.status in ('created','pending')
+   for update of pi;
+  if not found then return false; end if;
+
+  return exists(
+    select 1
+    from public.purchase_intents pi
+    join public.purchase_intent_reader_selections selected
+      on selected.purchase_intent_id=pi.id
+    join public.standard_reading_product_specs spec
+      on spec.product_id=selected.product_id
+    join public.product_offers offer on offer.id=pi.product_offer_id
+    join public.products product on product.id=selected.product_id
+    join public.legal_digital_reading_checkout_evidence_v1 notice
+      on notice.purchase_intent_id=pi.id
+       and notice.unit_id='standard-reading:'||selected.reader_character_id
+    where pi.id=p_purchase_intent_id and pi.subject_id=p_subject_id
+      and pi.status in ('created','pending')
+      and product.id=offer.product_id
+      and product.enabled and product.retired_at is null
+      and offer.enabled and offer.retired_at is null
+      and spec.retired_at is null
+      and notice.product_spec_version=spec.spec_version
+      and pi.expected_amount_minor>0
+      and pi.expected_currency is not null
+      and pi.charge_terms_version is not null
+      and notice.acknowledged_at is not null
+      and notice.displayed_at<=notice.safeguard_provided_at
+      and notice.safeguard_provided_at<=notice.acknowledged_at
+      and not exists(
+        select 1 from public.commerce_receipts receipt
+        where receipt.purchase_intent_id=pi.id
+          and receipt.subject_id=p_subject_id
+          and receipt.verification_status='verified'
+      )
+  );
+end $ready$;
+
 revoke all on function public.cmd_record_digital_reading_checkout_display_v1(
   uuid,uuid,text,text,text,text) from public,anon,authenticated,service_role,myeongha_api_executor;
 revoke all on function public.cmd_record_digital_reading_checkout_ack_v1(
@@ -206,4 +256,8 @@ grant execute on function public.cmd_record_digital_reading_delivery_v1(
   uuid,uuid,text,text) to myeongha_commerce_internal_executor;
 grant execute on function public.qry_owned_digital_reading_withdrawal_snapshot_v1(
   uuid,uuid,text) to myeongha_api_executor;
+revoke all on function public.qry_legal_digital_reading_checkout_ready_v1(uuid,uuid)
+  from public,anon,authenticated,service_role;
+grant execute on function public.qry_legal_digital_reading_checkout_ready_v1(uuid,uuid)
+  to myeongha_api_executor;
 commit;

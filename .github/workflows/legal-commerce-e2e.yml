@@ -4,6 +4,10 @@ on:
   pull_request:
     paths:
       - 'apps/api/src/commerce-digital-reading-*'
+      - 'apps/api/src/payment-attempt-create-http.ts'
+      - 'apps/api/src/payment-attempt-create-http.test.ts'
+      - 'apps/api/src/production-payment-attempt-create-runtime.ts'
+      - 'test/legal-digital-reading-checkout-admission-v1.test.ts'
       - 'apps/api/src/postgres-digital-reading-*'
       - 'apps/api/src/portone-v2-production-identity-http-runtime-v1.ts'
       - 'apps/api/src/supabase-auth-http.ts'
@@ -20,6 +24,10 @@ on:
       - fix/legal-compliance/ai-disclosure-and-launch-audit-20261023
     paths:
       - 'apps/api/src/commerce-digital-reading-*'
+      - 'apps/api/src/payment-attempt-create-http.ts'
+      - 'apps/api/src/payment-attempt-create-http.test.ts'
+      - 'apps/api/src/production-payment-attempt-create-runtime.ts'
+      - 'test/legal-digital-reading-checkout-admission-v1.test.ts'
       - 'apps/api/src/postgres-digital-reading-*'
       - 'apps/api/src/portone-v2-production-identity-http-runtime-v1.ts'
       - 'apps/api/src/supabase-auth-http.ts'
@@ -61,6 +69,8 @@ jobs:
             test/legal-commerce-checkout-delivery-e2e-v1.test.ts \
             test/commerce-digital-reading-withdrawal-orchestration-v1.test.ts \
             test/commerce-digital-reading-withdrawal-review-v1.test.ts \
+            test/legal-digital-reading-checkout-admission-v1.test.ts \
+            apps/api/src/payment-attempt-create-http.test.ts \
             test/legal-portone-preenrollment-social-v1.test.ts \
             test/legal-portone-preenrollment-member-signup-v1.test.ts \
             test/legal-existing-social-state-authority-v1.test.ts
