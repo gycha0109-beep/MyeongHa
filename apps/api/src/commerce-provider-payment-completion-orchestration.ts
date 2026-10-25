@@ -39,8 +39,8 @@ export interface AuthenticatedCommerceProviderPaymentCompletionV1 {
   readonly readerFulfillment?: 'issued' | 'already_bound' | 'not_reader';
   /**
    * Server-only post-Receipt Records/Reader navigation candidate. Never a
-   * fresh access grant or S5/S7 content delivery. The webhook HTTP returns
-   * 204 with NO JSON body and does not expose this projection to PortOne.
+   * fresh access grant or S5/S7 content delivery. This is an internal
+   * provider-neutral result; no public response carries this projection.
    */
   readonly readerContinuation?: CommerceReaderReceiptContinuationV1;
 }
