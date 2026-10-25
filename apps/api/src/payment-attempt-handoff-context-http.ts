@@ -1,4 +1,5 @@
 import { ApiCommandError } from './api-error.js';
+import type { DigitalReadingHandoffAdmissionPortV1 } from './commerce-digital-reading-checkout-admission-v1.js';
 import type { IdentityEvidenceVerificationPortV1 } from './current-subject-profile-http.js';
 import {
   loadPaymentAttemptHandoffContextV1,
@@ -28,6 +29,8 @@ export interface HandlePaymentAttemptHandoffContextRequestInputV1 {
   readonly serverTime: string;
   readonly identityEvidenceVerifier: IdentityEvidenceVerificationPortV1;
   readonly pool: PostgresSubjectPoolV1;
+  /** Server-injected checkout evidence check before exposing PSP paymentId. */
+  readonly checkoutHandoffPort?: DigitalReadingHandoffAdmissionPortV1;
 }
 
 function requireNonEmptyString(name: string, value: unknown): string {
@@ -156,6 +159,12 @@ export async function handlePaymentAttemptHandoffContextRequestV1(
       verifiedEvidence,
       execute: async (scope) => {
         const requestBody = await readBodyAfterSubjectResolution(input.request);
+        if (input.checkoutHandoffPort !== undefined &&
+            !await input.checkoutHandoffPort.admit({
+              scope, paymentAttemptId: requestBody.paymentAttemptId,
+            })) {
+          throw new ApiCommandError('FORBIDDEN', 'Server-owned checkout evidence is not ready for PSP handoff.');
+        }
         return loadPaymentAttemptHandoffContextV1({
           scope,
           paymentAttemptId: requestBody.paymentAttemptId,

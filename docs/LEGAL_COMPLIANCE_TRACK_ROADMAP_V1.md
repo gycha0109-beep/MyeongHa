@@ -266,3 +266,11 @@
 - SQL은 이미 제안 중인 `1743`에 서명된 신규 구매 단위의 계약·가격·사전 정보/미리보기·선행 고지·명시적 확인을 요구하는 **행 잠금이 걸린 읽기 함수**로 추가. 같은 트랜잭션에서 Purchase Intent를 `FOR UPDATE`해 동시 결제 진입의 타이밍 경합을 줄임. 결제 후 재진입/다른 구매자·상품/비활성 상품은 거절.
 - `payment-attempt-create-http.test.ts`, `legal-digital-reading-checkout-admission-v1.test.ts`, `legal_commerce_checkout_delivery_pg17.sh`에 허용·차단·DB 오류·전후 상태·권한 테스트 추가, 표적 Actions 실행에 포함. 기존 일반 Payment Attempt 테스트와 내부 코드 어댑터를 변경하되, **실제 주문/Reader 응답 공개 라우트·실PG/실인증은 절대 활성화하지 않는다**.
 - **S7 남은 실제 연결:** 소유 트랙의 S7 실제 전송 성공 콜백과 확정된 수신증거 생산 코드가 이 브랜치에서 완성되어 있지 않으므로 `S7 ACK`, `T2 COMMIT`만으로 디지털콘텐츠 실제 제공을 추정하거나 `cmd_record_digital_reading_delivery_v1` 호출을 합성하지 않음. 실제 S7 결속과 고객용 환불 접수/유료 전송은 계속 미완료. 합성 E2E GREEN은 운영 배송 실증이 아님.
+
+
+## 33. 2026-10-25 L4 PSP Payment Attempt handoff 읽기에서도 사전 고지 재검증
+
+- 이미 생성된 과거/다른 경로의 Payment Attempt에서도 공급자 `providerRequestId`(PortOne `paymentId`)를 읽어갈 수 있으므로 `apps/api/src/payment-attempt-handoff-context-http.ts`의 실제 PSP handoff 정보 반환 직전에 서버 `DigitalReadingHandoffAdmissionPortV1`을 추가했다.
+- `production-payment-attempt-handoff-context-runtime.ts`에서 위 포트를 **무조건 서버 주입**한다. `1743` 제안 SQL의 `qry_legal_digital_reading_handoff_ready_v1`은 현재 canonical Subject가 소유한 상태 `created` Payment Attempt를 구매 단위로 역추적하고, 기존의 행 잠금 `qry_legal_digital_reading_checkout_ready_v1`을 호출한다.
+- 고지 누락·확인 누락·판매대상 불일치·결제 후 재호출·다른 구매자/Attempt·DB 오류에는 PSP 요청값/Store ID/PG 키를 보내지 않는다. 내부 트랜잭션은 실패 시 롤백한다. 일반 레거시 경로는 아직 publicRoute=null이며 실제 결제 앱/라우트 생성 없음.
+- `payment-attempt-handoff-context-http.test.ts`, `legal-digital-reading-checkout-admission-v1.test.ts`, 폐기형 PG17 `legal_commerce_checkout_delivery_pg17.sh`로 PSP handoff 긍정/차단·DB 질의 순서·신원 격리·실제 ACL을 확인한다. **이 코드도 S7 디지털 콘텐츠 실제 전송 증거를 생성하거나 유료 판매를 활성화하지 않는다.**

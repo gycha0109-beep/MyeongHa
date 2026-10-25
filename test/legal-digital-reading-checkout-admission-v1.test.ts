@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createPostgresDigitalReadingCheckoutAdmissionPortV1,
+  createPostgresDigitalReadingHandoffAdmissionPortV1,
   OWNED_DIGITAL_READING_CHECKOUT_READY_SQL_V1 } from '../apps/api/src/commerce-digital-reading-checkout-admission-v1.js';
 import type { PostgresSubjectExecutionScopeV1 } from '../apps/api/src/postgres-subject-execution.js';
 
@@ -39,10 +40,29 @@ describe('purchase-attempt real DB notice/ack gate', () => {
     await expect(gate.admit({scope:scope(true,2).subject,purchaseIntentId:INTENT}))
       .rejects.toThrow(/malformed proof/u);
   });
+  it('re-checks the PSP handoff attempt against the same owner before releasing paymentId', async () => {
+    const s=scope(true);
+    const gate=createPostgresDigitalReadingHandoffAdmissionPortV1();
+    await expect(gate.admit({scope:s.subject,paymentAttemptId:INTENT})).resolves.toBe(true);
+    expect(s.query).toHaveBeenCalledWith(
+      expect.stringContaining('qry_legal_digital_reading_handoff_ready_v1'),
+      [OWNER,INTENT],
+    );
+    const s2=scope(false);
+    await expect(gate.admit({scope:s2.subject,paymentAttemptId:INTENT}))
+      .resolves.toBe(false);
+    const malformed=scope('true');
+    await expect(gate.admit({scope:malformed.subject,paymentAttemptId:INTENT}))
+      .rejects.toThrow(/malformed proof/u);
+  });
+
   it('does not touch the database for invalid or caller-mutable intent identifiers', async () => {
     const s=scope(true);
     await expect(createPostgresDigitalReadingCheckoutAdmissionPortV1()
       .admit({scope:s.subject,purchaseIntentId:'malformed'}))
+      .rejects.toMatchObject({code:'INVALID_REQUEST'});
+    await expect(createPostgresDigitalReadingHandoffAdmissionPortV1()
+      .admit({scope:s.subject,paymentAttemptId:'not-a-uuid'}))
       .rejects.toMatchObject({code:'INVALID_REQUEST'});
     expect(s.query).not.toHaveBeenCalled();
   });

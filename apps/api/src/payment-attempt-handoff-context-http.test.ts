@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import type { DigitalReadingHandoffAdmissionPortV1 } from './commerce-digital-reading-checkout-admission-v1.js';
 import type { IdentityEvidenceVerificationPortV1 } from './current-subject-profile-http.js';
 import {
   handlePaymentAttemptHandoffContextRequestV1,
@@ -84,6 +85,7 @@ function invoke(input: {
   request?: Request;
   evidence?: VerifiedSubjectIdentityEvidenceV1 | null;
   pool?: PostgresSubjectPoolV1;
+  checkoutHandoffPort?: DigitalReadingHandoffAdmissionPortV1;
 } = {}) {
   return handlePaymentAttemptHandoffContextRequestV1({
     request: input.request ?? post({ paymentAttemptId: PAYMENT_ATTEMPT_ID }),
@@ -95,6 +97,8 @@ function invoke(input: {
         : input.evidence,
     ),
     pool: input.pool ?? fakePool(),
+    ...(input.checkoutHandoffPort === undefined ? {} :
+      { checkoutHandoffPort: input.checkoutHandoffPort }),
   });
 }
 
@@ -160,6 +164,56 @@ describe('Payment Attempt handoff context authenticated HTTP foundation', () => 
     expect(JSON.stringify(payload)).not.toContain('channelKey');
     expect(queriedSql.filter((sql) => sql.includes('qry_commerce_payment_attempt_handoff_context_v1'))).toHaveLength(1);
     expect(queriedSql.some((sql) => /\b(insert|update|delete)\b/iu.test(sql))).toBe(false);
+  });
+
+  it('withholds PSP paymentId if stored purchase notice or explicit acknowledgement is absent', async () => {
+    const queriedSql: string[] = [];
+    const admit = vi.fn(async () => false);
+    const response = await invoke({
+      pool: fakePool({ queriedSql }),
+      checkoutHandoffPort: { admit },
+    });
+    const payload = await response.json();
+    expect(response.status).toBe(403);
+    expect((payload as any).error.code).toBe('FORBIDDEN');
+    expect(admit).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({
+      paymentAttemptId: PAYMENT_ATTEMPT_ID,
+      scope: expect.objectContaining({
+        resolvedSubject: { subjectId: SUBJECT_ID, subjectKind: 'member' },
+      }),
+    }));
+    expect(queriedSql.some(sql => sql.includes('qry_commerce_payment_attempt_handoff_context_v1'))).toBe(false);
+    expect(queriedSql.at(-1)).toBe('ROLLBACK');
+    expect(JSON.stringify(payload)).not.toContain(PROVIDER_REQUEST_ID);
+  });
+
+  it('exposes only the DB-owned PSP request when checkout re-admission succeeds', async () => {
+    const queriedSql: string[] = [];
+    const admit = vi.fn(async () => {
+      queriedSql.push('SERVER_CHECKOUT_HANDOFF_ACCEPTED');
+      return true;
+    });
+    const response = await invoke({
+      pool: fakePool({ queriedSql }),
+      checkoutHandoffPort: { admit },
+    });
+    expect(response.status).toBe(200);
+    expect(admit).toHaveBeenCalledOnce();
+    const check = queriedSql.indexOf('SERVER_CHECKOUT_HANDOFF_ACCEPTED');
+    const handoff = queriedSql.findIndex(sql => sql.includes('qry_commerce_payment_attempt_handoff_context_v1'));
+    expect(handoff).toBeGreaterThan(check);
+    expect(queriedSql.at(-1)).toBe('COMMIT');
+  });
+
+  it('rolls back and leaks no payment ID when the checkout authority DB is unavailable', async () => {
+    const queriedSql: string[] = [];
+    const error = new Error('private checkout state unavailable');
+    await expect(invoke({
+      pool: fakePool({ queriedSql }),
+      checkoutHandoffPort: { admit: async () => { throw error; } },
+    })).rejects.toBe(error);
+    expect(queriedSql.at(-1)).toBe('ROLLBACK');
+    expect(queriedSql.some(sql => sql.includes('qry_commerce_payment_attempt_handoff_context_v1'))).toBe(false);
   });
 
   it('maps owner mismatch or unavailable context to NOT_FOUND without database detail', async () => {

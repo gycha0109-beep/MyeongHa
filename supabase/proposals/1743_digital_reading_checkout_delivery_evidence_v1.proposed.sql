@@ -240,6 +240,26 @@ begin
   );
 end $ready$;
 
+-- A historical/payment-attempt replay must not bypass checkout proof when
+-- retrieving the PSP handoff paymentId. Same locked Purchase Intent as create.
+create function public.qry_legal_digital_reading_handoff_ready_v1(
+  p_subject_id uuid,p_payment_attempt_id uuid
+) returns boolean language plpgsql volatile security definer
+set search_path=pg_catalog,public,pg_temp as $handoff$
+declare v_purchase_intent_id uuid;
+begin
+  perform public.assert_myeongha_subject_context_v1(p_subject_id);
+  if p_payment_attempt_id is null then return false; end if;
+  select attempt.purchase_intent_id into v_purchase_intent_id
+  from public.commerce_payment_attempts attempt
+  where attempt.id=p_payment_attempt_id and attempt.subject_id=p_subject_id
+    and attempt.status='created';
+  if not found then return false; end if;
+  return public.qry_legal_digital_reading_checkout_ready_v1(
+    p_subject_id,v_purchase_intent_id
+  );
+end $handoff$;
+
 revoke all on function public.cmd_record_digital_reading_checkout_display_v1(
   uuid,uuid,text,text,text,text) from public,anon,authenticated,service_role,myeongha_api_executor;
 revoke all on function public.cmd_record_digital_reading_checkout_ack_v1(
@@ -259,5 +279,9 @@ grant execute on function public.qry_owned_digital_reading_withdrawal_snapshot_v
 revoke all on function public.qry_legal_digital_reading_checkout_ready_v1(uuid,uuid)
   from public,anon,authenticated,service_role;
 grant execute on function public.qry_legal_digital_reading_checkout_ready_v1(uuid,uuid)
+  to myeongha_api_executor;
+revoke all on function public.qry_legal_digital_reading_handoff_ready_v1(uuid,uuid)
+  from public,anon,authenticated,service_role;
+grant execute on function public.qry_legal_digital_reading_handoff_ready_v1(uuid,uuid)
   to myeongha_api_executor;
 commit;

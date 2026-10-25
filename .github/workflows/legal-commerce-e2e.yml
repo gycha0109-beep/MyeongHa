@@ -5,6 +5,9 @@ on:
     paths:
       - 'apps/api/src/commerce-digital-reading-*'
       - 'apps/api/src/payment-attempt-create-http.ts'
+      - 'apps/api/src/payment-attempt-handoff-context-http.ts'
+      - 'apps/api/src/payment-attempt-handoff-context-http.test.ts'
+      - 'apps/api/src/production-payment-attempt-handoff-context-runtime.ts'
       - 'apps/api/src/payment-attempt-create-http.test.ts'
       - 'apps/api/src/production-payment-attempt-create-runtime.ts'
       - 'test/legal-digital-reading-checkout-admission-v1.test.ts'
@@ -25,6 +28,9 @@ on:
     paths:
       - 'apps/api/src/commerce-digital-reading-*'
       - 'apps/api/src/payment-attempt-create-http.ts'
+      - 'apps/api/src/payment-attempt-handoff-context-http.ts'
+      - 'apps/api/src/payment-attempt-handoff-context-http.test.ts'
+      - 'apps/api/src/production-payment-attempt-handoff-context-runtime.ts'
       - 'apps/api/src/payment-attempt-create-http.test.ts'
       - 'apps/api/src/production-payment-attempt-create-runtime.ts'
       - 'test/legal-digital-reading-checkout-admission-v1.test.ts'
@@ -71,6 +77,7 @@ jobs:
             test/commerce-digital-reading-withdrawal-review-v1.test.ts \
             test/legal-digital-reading-checkout-admission-v1.test.ts \
             apps/api/src/payment-attempt-create-http.test.ts \
+            apps/api/src/payment-attempt-handoff-context-http.test.ts \
             test/legal-portone-preenrollment-social-v1.test.ts \
             test/legal-portone-preenrollment-member-signup-v1.test.ts \
             test/legal-existing-social-state-authority-v1.test.ts

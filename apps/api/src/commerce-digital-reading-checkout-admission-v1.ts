@@ -43,3 +43,39 @@ DigitalReadingCheckoutAdmissionPortV1 {
     },
   });
 }
+
+/**
+ * Second independent gate at the PSP handoff/read boundary. A previously
+ * created Payment Attempt cannot disclose a paymentId without the same
+ * owner-held checkout notice. This remains internal and unmounted.
+ */
+export interface DigitalReadingHandoffAdmissionPortV1 {
+  admit(input: Readonly<{
+    scope: PostgresSubjectExecutionScopeV1;
+    paymentAttemptId: string;
+  }>): Promise<boolean>;
+}
+
+const HANDOFF_QUERY = `
+select public.qry_legal_digital_reading_handoff_ready_v1(
+  $1::uuid,$2::uuid) as "ready"
+`.trim();
+
+export function createPostgresDigitalReadingHandoffAdmissionPortV1():
+DigitalReadingHandoffAdmissionPortV1 {
+  return Object.freeze({
+    async admit({ scope, paymentAttemptId }: Parameters<DigitalReadingHandoffAdmissionPortV1['admit']>[0]) {
+      if (!UUID.test(paymentAttemptId)) {
+        throw new ApiCommandError('INVALID_REQUEST', 'Checkout Payment Attempt is invalid.');
+      }
+      const { rows } = await scope.client.query<ReadyRow>(HANDOFF_QUERY, [
+        scope.resolvedSubject.subjectId,
+        paymentAttemptId.toLowerCase(),
+      ]);
+      if (rows.length !== 1 || typeof rows[0]?.ready !== 'boolean') {
+        throw new Error('Checkout PSP handoff authority returned malformed proof.');
+      }
+      return rows[0].ready;
+    },
+  });
+}

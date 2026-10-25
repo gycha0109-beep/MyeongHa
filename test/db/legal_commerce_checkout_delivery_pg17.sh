@@ -84,6 +84,35 @@ select pg_temp.ensure('payment gate denies foreign Purchase Intent',
     '11392300-0000-0000-0000-000000000099')=false);
 commit;
 
+-- Simulated internally-created Payment Attempt. Even a historical/other
+-- producer-created attempt must be denied PSP handoff without current notice.
+insert into public.commerce_payment_attempts(
+  id,purchase_intent_id,subject_id,product_offer_id,attempt_no,provider,
+  environment,idempotency_key,provider_request_id,provider_transaction_id,
+  status,failure_code,created_at,updated_at
+) values (
+  '11392500-0000-0000-0000-000000000001',
+  '11392300-0000-0000-0000-000000000001',
+  '11390000-0000-0000-0000-000000000001',
+  '11392200-0000-0000-0000-000000000001',
+  1,'portone_v2','production','synthetic-legal-handoff-v1',
+  'synthetic-legal-provider-request-v1',null,'created',null,
+  clock_timestamp(),clock_timestamp()
+);
+begin;
+set local role myeongha_api_executor;
+select pg_catalog.set_config('myeongha.subject_id',
+  '11390000-0000-0000-0000-000000000001',true);
+select pg_temp.ensure('PSP handoff requires owner and checkout proof',
+  public.qry_legal_digital_reading_handoff_ready_v1(
+    '11390000-0000-0000-0000-000000000001',
+    '11392500-0000-0000-0000-000000000001')=true);
+select pg_temp.ensure('unrelated PSP attempt never gains paymentId',
+  public.qry_legal_digital_reading_handoff_ready_v1(
+    '11390000-0000-0000-0000-000000000001',
+    '11392500-0000-0000-0000-000000000099')=false);
+commit;
+
 -- Before a provider-verified receipt, client/T2 events cannot claim purchase.
 begin;
 set local role myeongha_api_executor;
@@ -123,6 +152,10 @@ begin;
 set local role myeongha_api_executor;
 select pg_catalog.set_config('myeongha.subject_id',
   '11390000-0000-0000-0000-000000000001',true);
+select pg_temp.ensure('PSP handoff stops after verified receipt',
+  public.qry_legal_digital_reading_handoff_ready_v1(
+    '11390000-0000-0000-0000-000000000001',
+    '11392500-0000-0000-0000-000000000001')=false);
 select pg_temp.ensure('payment gate denies new attempt after verification',
   public.qry_legal_digital_reading_checkout_ready_v1(
     '11390000-0000-0000-0000-000000000001',
@@ -193,6 +226,12 @@ select pg_temp.ensure('no direct customer table reads',
     'EXECUTE')
   and has_function_privilege('myeongha_api_executor',
     'public.qry_legal_digital_reading_checkout_ready_v1(uuid,uuid)',
+    'EXECUTE')
+  and has_function_privilege('myeongha_api_executor',
+    'public.qry_legal_digital_reading_handoff_ready_v1(uuid,uuid)',
+    'EXECUTE')
+  and not has_function_privilege('anon',
+    'public.qry_legal_digital_reading_handoff_ready_v1(uuid,uuid)',
     'EXECUTE')
 );
 select 'PASS legal Commerce PG17 checkout-to-delivery E2E' as result;

@@ -1,4 +1,5 @@
 import { handlePaymentAttemptHandoffContextRequestV1 } from './payment-attempt-handoff-context-http.js';
+import { createPostgresDigitalReadingHandoffAdmissionPortV1 } from './commerce-digital-reading-checkout-admission-v1.js';
 import type { PostgresSubjectPoolV1 } from './postgres-subject-execution.js';
 import { createProductionPostgresSubjectPoolLeaseV1 } from './production-postgres-subject-pool-lease.js';
 import { createProductionRequestIdentityVerifierV1 } from './production-request-identity-verifier.js';
@@ -51,6 +52,7 @@ export function createProductionPaymentAttemptHandoffContextRuntimeV1(
         serverTime: requestInput.serverTime,
         identityEvidenceVerifier,
         pool: poolLease.pool,
+        checkoutHandoffPort: createPostgresDigitalReadingHandoffAdmissionPortV1(),
       });
     },
     close() {
