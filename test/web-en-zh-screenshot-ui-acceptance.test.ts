@@ -14,6 +14,8 @@ const screens = [
   'src/birth/BirthPage.tsx',
   'src/reading/ReadingPage.tsx',
   'src/landing/LandingPage.tsx',
+  'src/auth/AuthPage.tsx',
+  'src/commerce/CreditRechargeDialog.tsx',
 ] as const;
 const fixedUi = [
   '명하의 안내인',
@@ -54,6 +56,12 @@ const fixedUi = [
   '무료 프리뷰이며, 구매권 또는 저장된 유료 해석을 의미하지 않습니다.',
   '사진을 불러오고 있습니다.',
   '사진을 먼저 준비해주세요',
+  '이어 보던 흐름을',
+  '내 계정으로 가져갑니다.',
+  '계정 인증',
+  '크레딧이 부족해요',
+  '현재 사용 가능한 크레딧',
+  '크레딧 충전하기',
 ] as const;
 
 describe('Web EN/CN screenshot UI acceptance', () => {
