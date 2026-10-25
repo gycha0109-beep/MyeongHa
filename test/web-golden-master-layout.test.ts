@@ -70,7 +70,6 @@ describe('Web Golden Master', () => {
     expect(html).toContain('href="saju-preview-landing.css"');
     expect(saju).toContain('id="saju-hub"');
     expectInOrder(page.slice(page.indexOf('return (')), [
-      '무료 프리뷰 화면',
       'saju-empty',
       'saju-hub',
       '나의 사주 기본 정보',

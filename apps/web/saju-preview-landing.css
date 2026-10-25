@@ -7,16 +7,6 @@ body.saju-hub-page .gm-saju-main { padding: 12px 0 72px; }
 body.saju-hub-page .gm-shell { width: min(1180px, calc(100% - 36px)); }
 body.saju-hub-page #saju-hub[hidden],
 body.saju-hub-page .saju-design-chart-content [hidden] { display: none !important; }
-.saju-design-ribbon { max-width: 930px; margin: 0 auto 24px; text-align: center; }
-.saju-design-ribbon > div {
-  display: flex; align-items: center; justify-content: center; gap: 22px;
-  border-radius: 17px; background: linear-gradient(155deg,#6a303e,#874959 44%,#68303f);
-  box-shadow: 0 10px 25px rgba(86,42,49,.13); padding: 13px 18px; color: #fff9f5;
-}
-.saju-design-ribbon strong { font: 700 clamp(18px,2.35vw,31px)/1.22 var(--mh-serif,serif); letter-spacing: -.02em; }
-.saju-design-ribbon strong span { font-size: .73em; font-weight: 500; }
-.saju-design-ribbon b { padding: 5px 22px; border-radius: 999px; background: linear-gradient(#fff9f7,#ecd7d5); color:#763645; font-size: 18px; }
-.saju-design-ribbon p { margin: 9px 0 0; color:#5c2939; font-size: clamp(12px,1.25vw,16px); font-weight: 700; }
 .saju-design-preview { position:relative; border:1px solid #edddd7; border-radius: 16px; overflow:hidden; background:rgba(255,249,243,.5); box-shadow:0 12px 38px rgba(117,66,56,.055); }
 .saju-design-hero { position:relative; min-height:165px; padding:26px 38px 9px; isolation:isolate; overflow:hidden; }
 .saju-design-hero:before { content:""; position:absolute; z-index:-1; inset:0; opacity:.82; background:linear-gradient(90deg,#fff7f1 0%,rgba(255,247,240,.9) 43%,rgba(255,247,241,.32) 90%),url("home-plum-branch.svg") right 11% / auto 215px no-repeat; }
@@ -100,10 +90,8 @@ html[data-theme="dark"] .saju-design-example { background:#503c45;border-color:#
 }
 @media (max-width:690px) {
  body.saju-hub-page .gm-shell { width:calc(100% - 20px); }
- .saju-design-ribbon { margin-bottom:14px; }
- .saju-design-ribbon > div { gap:12px; padding:11px 8px; }
- .saju-design-ribbon b { padding:5px 12px; font-size:14px; }
- .saju-design-hero { min-height:154px; padding:24px 20px 15px; }
+.saju-design-ribbon > div { gap:12px; padding:11px 8px; }
+.saju-design-hero { min-height:154px; padding:24px 20px 15px; }
  .saju-design-hero p br { display:none; }
  .saju-design-core { grid-template-columns:1fr; }
  .saju-design-chart-content { min-height:160px; }
@@ -115,8 +103,7 @@ html[data-theme="dark"] .saju-design-example { background:#503c45;border-color:#
  .saju-design-preview-link a { text-align:center; }
 }
 @media (max-width:350px) {
- .saju-design-ribbon strong { font-size:15px; }
- .saju-design-birth-fields > div { grid-template-columns:82px minmax(0,1fr); font-size:12px; }
+.saju-design-birth-fields > div { grid-template-columns:82px minmax(0,1fr); font-size:12px; }
  .saju-design-product-grid { grid-template-columns:1fr; }
 }
 /* Live server-authorized free preview, separate from the static paid sample. */
@@ -156,3 +143,102 @@ html[data-theme="dark"] .saju-design-more-grid strong { color:#f3dde0; }
 
 /* Retain a translatable document heading without altering the screenshot composition. */
 .saju-design-sr-title { position:absolute !important; width:1px !important; height:1px !important; padding:0 !important; margin:-1px !important; overflow:hidden !important; clip:rect(0,0,0,0) !important; white-space:nowrap !important; border:0 !important; }
+
+/* Saju entry form — the decorative seal owns a dedicated row above the card. */
+body.saju-hub-page .saju-empty {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 20px;
+  min-height: 650px;
+  padding: 42px 24px;
+}
+body.saju-hub-page .saju-empty-art {
+  position: relative;
+  top: auto;
+  left: auto;
+  width: 94px;
+  height: 94px;
+  margin: 0;
+  transform: none;
+  flex: 0 0 auto;
+  opacity: 1;
+}
+body.saju-hub-page .saju-empty-mark { font-size: 32px; line-height: 1; }
+body.saju-hub-page .saju-empty-card {
+  width: min(610px, 100%);
+  margin-top: 0;
+}
+@media (max-width: 690px) {
+  body.saju-hub-page .saju-empty { padding: 30px 12px; gap: 16px; }
+  body.saju-hub-page .saju-empty-art { width: 80px; height: 80px; }
+  body.saju-hub-page .saju-empty-card { width: 100%; margin-top: 0; }
+}
+
+/* Dark mode: consistent ink, brass, and warm-neutral input surfaces. */
+html[data-theme="dark"] body.saju-hub-page .saju-empty {
+  background: radial-gradient(circle at 50% 2%, #25343a 0, #15232a 34%, #101b22 100%);
+  border-color: #615342;
+  box-shadow: 0 18px 48px rgba(0,0,0,.25);
+}
+html[data-theme="dark"] body.saju-hub-page .saju-empty::after { border-color: rgba(208,173,122,.16); }
+html[data-theme="dark"] body.saju-hub-page .saju-empty-orbit {
+  border-color: #b39465;
+  box-shadow: 0 0 0 18px rgba(211,174,118,.035);
+}
+html[data-theme="dark"] body.saju-hub-page .saju-empty-mark,
+html[data-theme="dark"] body.saju-hub-page .saju-section-kicker { color: #dbb682; }
+html[data-theme="dark"] body.saju-hub-page .saju-empty-card {
+  background: rgba(16,29,36,.97);
+  border-color: #77634a;
+  box-shadow: 0 22px 55px rgba(0,0,0,.3);
+}
+html[data-theme="dark"] body.saju-hub-page .saju-empty-card h2,
+html[data-theme="dark"] body.saju-hub-page .saju-field { color: #f3e9da; }
+html[data-theme="dark"] body.saju-hub-page .saju-empty-card > p,
+html[data-theme="dark"] body.saju-hub-page .saju-form-options { color: #c2b6a9; }
+html[data-theme="dark"] body.saju-hub-page .saju-field small,
+html[data-theme="dark"] body.saju-hub-page .saju-guest-note,
+html[data-theme="dark"] body.saju-hub-page .saju-date-separator { color: #b5a698 !important; }
+html[data-theme="dark"] body.saju-hub-page .saju-date-fields,
+html[data-theme="dark"] body.saju-hub-page .saju-field input:not([type="radio"]):not([type="checkbox"]),
+html[data-theme="dark"] body.saju-hub-page .saju-field select {
+  color-scheme: dark;
+  color: #f3e9da;
+  background: #1d3038;
+  border-color: #79664e;
+}
+html[data-theme="dark"] body.saju-hub-page .saju-field .saju-date-part {
+  background: transparent !important;
+  border: 0;
+  box-shadow: none;
+  color: #f3e9da;
+}
+html[data-theme="dark"] body.saju-hub-page .saju-field input::placeholder {
+  color: #ac9e8e;
+  opacity: 1;
+}
+html[data-theme="dark"] body.saju-hub-page .saju-date-fields:focus-within,
+html[data-theme="dark"] body.saju-hub-page .saju-field input:focus-visible,
+html[data-theme="dark"] body.saju-hub-page .saju-field select:focus-visible {
+  outline-color: #ddbb88;
+  border-color: #ddbb88;
+  box-shadow: 0 0 0 3px rgba(221,187,136,.17);
+}
+html[data-theme="dark"] body.saju-hub-page input[type="checkbox"],
+html[data-theme="dark"] body.saju-hub-page input[type="radio"] { accent-color: #dfb880; }
+html[data-theme="dark"] body.saju-hub-page .saju-primary-button {
+  border-color: #dfb880;
+  background: #dfb880;
+  color: #16232a;
+}
+html[data-theme="dark"] body.saju-hub-page .saju-primary-button:hover {
+  border-color: #ebc995;
+  background: #ebc995;
+}
+html[data-theme="dark"] body.saju-hub-page .saju-form-error {
+  background: rgba(174,74,74,.13);
+  border-color: #c77873;
+  color: #ffdbd4;
+}
