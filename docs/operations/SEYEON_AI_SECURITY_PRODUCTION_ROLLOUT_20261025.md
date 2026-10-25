@@ -68,3 +68,7 @@ Architecture Check: 문서와 실행 증거만 추가했다. runtime/API/DB/권�
 위 항목은 최초 재개 시점의 기록이다. 이후 사용자가 “자체적으로 설계 해서 진행하도록” 지시했으므로 기술 설계 대기를 [HTTP 수신 증명 장벽 구현](../security/SEYEON_S0_HTTP_RECEIPT_BARRIER_V1_20261025.md)으로 전환했다. 실제 원본 검증 authority를 공유하는 Fetch consumer와 durable issuance/receipt·withdrawal intent·DB invalidation guard를 작성했다. 직접 회귀 38 PASS, 관련 회귀 734 PASS/72 SKIP, root typecheck·웹/Worker dry-run build를 실행했다. 복원본 S0 리허설과 운영 설치·활성화 증거는 실행 후 추가한다.
 
 이후 조회한 새 운영 백업 #40131259663은 SUCCESS, source SHA `dc52b80c`, 생성 `2026-10-24T20:46:03Z`다. 최신 main에는 #2573의 native Member Auth와 #2574의 Cloudflare 관측이 추가되었으므로 해당 변경을 보존해서 합친다. 만료된 로컬 관리 API 토큰이나 다른 조직에 로그인된 브라우저를 승인/운영 권한으로 사용하지 않았다. 기존 인증된 Supabase CLI와 명시적 CA를 확인한 직접 PostgreSQL 연결은 해당 프로젝트에 접근 가능하다.
+
+## 통합 검증 추가
+
+최신 main `eea60444`의 단일 Worker Auth/DB/Saju 라우팅·관측·버전 표식을 보존했다. 새 S0의 정확한 POST 경로만 기존 HOLD 앞에서 별도 admission을 받고, alias/query/기존 History·Replay는 HOLD를 유지한다. 기존 HMAC IP 기반 Cloudflare limiter를 재사용하여 receipt 추측 요청도 DB 연결 전에 제한한다. emergency hold는 새 모델 사용을 막고 이미 발행된 receipt/철회는 보존한다. 결속 증명·atomic installer DB 11/11, 통합 후 직접 회귀 51/51, 활성 gate를 mock한 라우팅/요청 제한/긴급 중단 3/3, root typecheck·build와 Worker dry-run PASS다. 실제 운영 gate는 아직 false다.
