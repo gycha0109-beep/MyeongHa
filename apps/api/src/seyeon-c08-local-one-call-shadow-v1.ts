@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import {
   admitSeyeonRendererDraftV2,
   assembleSeyeonRuntimeContextV2,
@@ -6,6 +7,7 @@ import {
   guardSeyeonTurnInterpretationV2,
   hashSeyeonRendererUtteranceV2,
   type SeyeonRuntimeContextV2,
+  type SeyeonRecentMessageV2,
   type SeyeonTurnInterpretationV2,
 } from '../../../packages/domain/src/index.js';
 import { runCharacterGovernedPreflightV1 } from './character-governed-preflight-v1.js';
@@ -160,6 +162,42 @@ export function quoteSeyeonC08LocalOneCallBudgetV1(input: Readonly<{
   });
 }
 
+/**
+ * The original Census verifies only count/latest sender. For a multi-turn
+ * candidate this extra authoritative store port binds *all* message IDs,
+ * roles and bodies to the server's thread. The caller must supply a DB-backed
+ * implementation; client-supplied hashes are NOT authoritative.
+ */
+export const SEYEON_C08_PUBLIC_THREAD_COMMITMENT_V1 =
+  'seyeon-c08-public-thread-commitment-v1' as const;
+export type SeyeonC08FullThreadIntegrityPortV1 =
+  SeyeonFullThreadCensusShadowPortV1 & Readonly<{
+    readAuthoritativeThreadCommitment?: (input:ReadOnlyThreadKeyV1) =>
+      unknown | Promise<unknown>;
+  }>;
+type ReadOnlyThreadKeyV1 = Readonly<{
+  subjectId:string;threadId:string;currentUserMessageId:string;
+}>;
+export function hashSeyeonC08PublicTranscriptV1(
+  messages:readonly SeyeonRecentMessageV2[],
+):string {
+  if(!Array.isArray(messages)||messages.length<1||messages.length>7)
+    throw new SeyeonC08LocalHoldV1('LOCAL_CONTEXT_NOT_PROVEN');
+  const hash=createHash('sha256');
+  hash.update('seyeon-c08-public-thread-commitment-v1\\n','utf8');
+  // JSON fields are length delimited and escaped by JSON.stringify; preserve
+  // exact Unicode and message order, do not trim or normalize anything.
+  for(const m of messages){
+    if(!m || typeof m.messageId!=='string' ||
+       !['user','assistant'].includes(m.role) || typeof m.text!=='string')
+      throw new SeyeonC08LocalHoldV1('LOCAL_CONTEXT_NOT_PROVEN');
+    const row=JSON.stringify([m.messageId,m.role,m.text]);
+    hash.update(String(Buffer.byteLength(row,'utf8'))+':','utf8');
+    hash.update(row,'utf8');
+  }
+  return 'sha256:'+hash.digest('hex');
+}
+
 function assertLocalContext(input: Readonly<{
   userMessageRef: string;
   userText: string;
@@ -205,8 +243,9 @@ function assertLocalContext(input: Readonly<{
   return messages.length;
 }
 async function requireSeyeonC08PublicThreadCensusV1(
-  port: SeyeonFullThreadCensusShadowPortV1,
+  port: SeyeonC08FullThreadIntegrityPortV1,
   currentUserMessageId:string,expectedCount:number,
+  expectedTranscriptHash:string,
 ):Promise<void>{
   const fail=()=>new SeyeonC08LocalHoldV1('LOCAL_CONTEXT_NOT_PROVEN');
   if(!port || typeof port.subjectId!=='string' ||
@@ -237,6 +276,28 @@ async function requireSeyeonC08PublicThreadCensusV1(
      c.currentUserMessageId!==currentUserMessageId ||
      c.messageCount!==expectedCount || c.latestSenderType!=='user' ||
      c.complete!==true)throw fail();
+  // For >1 messages, count equality is insufficient: require a second,
+  // authoritative *content* commitment as well on every one of the four
+  // censorship/race reads, not only once at admission.
+  if(expectedCount===1)return;
+  if(typeof port.readAuthoritativeThreadCommitment!=='function' ||
+     !/^sha256:[a-f0-9]{64}$/u.test(expectedTranscriptHash))throw fail();
+  let rawCommitment:unknown;
+  try{
+    rawCommitment=await port.readAuthoritativeThreadCommitment({
+      subjectId:port.subjectId,threadId:port.threadId,currentUserMessageId,
+    });
+  }catch{throw fail();}
+  if(typeof rawCommitment!=='object'||rawCommitment===null||
+     Array.isArray(rawCommitment))throw fail();
+  const z=rawCommitment as Record<string,unknown>;
+  if(Object.keys(z).length!==8 ||
+     z.schemaVersion!==SEYEON_C08_PUBLIC_THREAD_COMMITMENT_V1 ||
+     z.subjectId!==port.subjectId || z.threadId!==port.threadId ||
+     z.currentUserMessageId!==currentUserMessageId ||
+     z.messageCount!==expectedCount || z.latestSenderType!=='user' ||
+     z.complete!==true || z.transcriptHash!==expectedTranscriptHash)
+    throw fail();
 }
 
 function planLocalFirstTurn(
@@ -286,7 +347,7 @@ export async function runSeyeonC08LocalOneCallShadowV1(input: Readonly<{
   userText: string;
   contextInput: RunSeyeonCharacterTurnV2Input['contextInput'];
   governance: RunSeyeonCharacterTurnV2Input['governance'];
-  fullThreadCensus: SeyeonFullThreadCensusShadowPortV1;
+  fullThreadCensus: SeyeonC08FullThreadIntegrityPortV1;
   dialogueProvider: SeyeonStructuredProviderPortV2;
   /** Offline reservation only; must reject when a conservative price cap cannot be checked. */
   reserveBeforeModel: (metadata: Readonly<{requestBytes:number; maxCompletionTokens:number}>) =>
@@ -295,11 +356,15 @@ export async function runSeyeonC08LocalOneCallShadowV1(input: Readonly<{
   maxCompletionTokens: number;
 }>) {
   const expectedCount=assertLocalContext(input);
+  const expectedTranscriptHash=hashSeyeonC08PublicTranscriptV1(
+    input.contextInput.recentMessages,
+  );
   const classified = classifySeyeonC08LocalEntryV1(input.userText);
   if (!classified) throw new SeyeonC08LocalHoldV1('LOCAL_INPUT_NOT_PROVEN');
 
   await requireSeyeonC08PublicThreadCensusV1(
     input.fullThreadCensus,input.userMessageRef,expectedCount,
+    expectedTranscriptHash,
   );
 
   // Existing source/claim authority pipeline is reused. The empty
@@ -358,6 +423,7 @@ export async function runSeyeonC08LocalOneCallShadowV1(input: Readonly<{
   });
   await requireSeyeonC08PublicThreadCensusV1(
     input.fullThreadCensus,input.userMessageRef,expectedCount,
+    expectedTranscriptHash,
   );
 
   if (!Number.isSafeInteger(input.maxCompletionTokens) ||
@@ -385,6 +451,7 @@ export async function runSeyeonC08LocalOneCallShadowV1(input: Readonly<{
   // admission. This is NOT an atomic DB transaction.
   await requireSeyeonC08PublicThreadCensusV1(
     input.fullThreadCensus,input.userMessageRef,expectedCount,
+    expectedTranscriptHash,
   );
   const draft = admitSeyeonRendererDraftV2({rawOutput:raw,packet});
   guardSeyeonC08LocalPublicUtteranceV1(draft.utterance);
@@ -401,6 +468,7 @@ export async function runSeyeonC08LocalOneCallShadowV1(input: Readonly<{
   }
   await requireSeyeonC08PublicThreadCensusV1(
     input.fullThreadCensus,input.userMessageRef,expectedCount,
+    expectedTranscriptHash,
   );
   return Object.freeze({
     version:SEYEON_C08_LOCAL_ONE_CALL_VERSION_V1,
