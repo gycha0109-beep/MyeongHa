@@ -245,12 +245,12 @@ html[data-theme="dark"] body.saju-hub-page .saju-form-error {
 
 /* Empty saju birth form: theme-specific celestial artwork, with the form kept readable. */
 body.saju-hub-page .saju-empty {
-  background: #faf6ef url("./assets/saju/saju-empty-light.avif") center / cover no-repeat;
+  background: #faf6ef url("./assets/saju/saju-empty-light.avif?v=20261026-threadless") center / cover no-repeat;
 }
 body.saju-hub-page .saju-empty::before,
 body.saju-hub-page .saju-empty::after {
   content: none;
 }
 html[data-theme="dark"] body.saju-hub-page .saju-empty {
-  background: #171c23 url("./assets/saju/saju-empty-dark.avif") center / cover no-repeat;
+  background: #171c23 url("./assets/saju/saju-empty-dark.avif?v=20261026-threadless") center / cover no-repeat;
 }
