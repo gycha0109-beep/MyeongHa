@@ -229,10 +229,12 @@ alter function public.cmd_accept_seyeon_private_conversation_recall_proposal_v1(
   uuid,uuid,uuid
 ) owner to myeongha_seyeon_chat_runtime_owner;
 revoke create on schema public from myeongha_seyeon_chat_runtime_owner;
-revoke myeongha_seyeon_chat_runtime_owner from current_user;
 revoke all on function public.cmd_accept_seyeon_private_conversation_recall_proposal_v1(
   uuid,uuid,uuid
 ) from public,anon,authenticated,service_role;
+
+-- Complete function ACL changes before dropping temporary owner authority.
+revoke myeongha_seyeon_chat_runtime_owner from current_user;
 
 -- No GRANT EXECUTE to myeongha_api_executor, no HTTP registration, no
 -- positive registry row or character Grant creation, no Production DB writes.

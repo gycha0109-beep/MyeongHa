@@ -88,9 +88,20 @@ try{
       not exists(select 1 from auth.users where id::text like 'a8100000-0000-4000-8000-%') as fixtures_absent`);
     if(preflight.absent!==true||preflight.fixtures_absent!==true)throw Error('S0 installation/fixture collision; no overwrite.');
   }finally{await local.end();}
+  // Fixture administration is separate from restricted SQL installation and
+  // actual ordinary API execution. No superuser connection handles an API TX.
+  const fixtureRole='myeongha_s0_receipt_test_login';
+  if((await admin.query('select 1 from pg_roles where rolname=$1',[fixtureRole])).rows.length){
+    throw Error('Isolated ordinary fixture role collision');
+  }
+  const fixtureDdl=(await admin.query(`select format(
+    'create role myeongha_s0_receipt_test_login login noinherit nosuperuser nocreatedb nocreaterole noreplication nobypassrls password %L',$1) as sql`,[db.password])).rows[0].sql;
+  await admin.query(fixtureDdl);
+  await admin.query('grant myeongha_api_executor to myeongha_s0_receipt_test_login with inherit false,set true');
   const env={...process.env,PGHOST:'127.0.0.1',PGPORT:'5432',PGUSER:'postgres',
     PGPASSWORD:'restore-drill',PGDATABASE:target,PGSSLMODE:'disable',DB_SUITE:'postgres17',
-    SEYEON_SECURITY_S0_REAL_PG:'1'};
+    SEYEON_SECURITY_S0_REAL_PG:'1',SEYEON_S0_TEST_ADMIN_USER:'supabase_admin',
+    SEYEON_S0_TEST_ORDINARY_USER:fixtureRole};
   execFileSync(process.execPath,['scripts/operations/seyeon-security-s0/install-isolated.mjs'],
     {env,stdio:'inherit',timeout:60_000});
   const output=join(process.env.RUNNER_TEMP,'seyeon-security-s0-rehearsal','vitest.json');
@@ -108,6 +119,8 @@ try{
     backupMigrationFrontier:restore.backup_migration_frontier,
     target:'loopback-disposable-clone-of-restored-postgres',productionMutation:false,
     nativeProviderCalls:0,installedDefaultClosed:true,
+    installationPrincipal:'postgres-nosuperuser',fixtureAdmin:'supabase_admin-loopback-only',
+    apiExecutionPrincipal:fixtureRole,
     testsPassed:result.numPassedTests,testsFailed:0,
     installationPlan:await buildSeyeonSecurityS0InstallationPlan(),
     installPrincipalAuthority,installPrincipalEdgeRestoredFromBackup:false,
