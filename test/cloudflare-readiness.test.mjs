@@ -11,6 +11,20 @@ const bindings = Object.freeze({
 });
 const request = (path='/api/readiness',method='GET')=>new Request(origin+path,{method});
 
+function configuredReadinessTestBindings() {
+  return {
+    ...bindings,
+    MYEONGHA_DATABASE_URL:
+      'postgresql://myeongha_login:synthetic-password@db.synthetic.example.com:5432/postgres?sslmode=require',
+    MYEONGHA_DATABASE_PRINCIPAL:'myeongha_login',
+    MYEONGHA_DATABASE_TLS_PEER_MODE:'verify-full',
+    MYEONGHA_DATABASE_SSL_ROOT_CERT_PEM:'synthetic-certificate-not-for-production',
+    MYEONGHA_SUPABASE_URL:'https://cnsfpcdiyofqvhpcegfc.supabase.co',
+    MYEONGHA_SUPABASE_API_KEY:'abcdefghijklmnopqrstuvwx',
+    MYEONGHA_GUEST_FINGERPRINT_SECRET:'abcdefghijklmnopqrstuvwx12345678',
+  };
+}
+
 describe('Cloudflare readiness config-only parity',()=>{
   it('keeps readiness 404 without exact Auth/DB handoff and never reads secrets',async()=>{
     const response=await worker.fetch(request(),{});
@@ -66,6 +80,70 @@ describe('Cloudflare readiness config-only parity',()=>{
       expect(JSON.stringify(warning.mock.calls)).not.toContain(secret);
     } finally {
       warning.mockRestore();
+    }
+  });
+
+  it('classifies only known Supabase port modes without logging sensitive connection strings',async()=>{
+    const value='not-a-loggable-password';
+    const url=(port)=>'postgresql://myeongha_login:'+value+
+      '@db.synthetic.example.com:'+port+'/postgres?sslmode=require';
+    const entries=[
+      {urlPort:'5432',pinPort:'6543',expected:'DB_URL_SESSION_5432_PIN_TRANSACTION_6543'},
+      {urlPort:'6543',pinPort:'5432',expected:'DB_URL_TRANSACTION_6543_PIN_SESSION_5432'},
+      {urlPort:'5433',pinPort:'5432',expected:'DB_URL_OTHER_PIN_SESSION_5432'},
+    ];
+    for (const row of entries) {
+      const bindings={
+        ...configuredReadinessTestBindings(),
+        MYEONGHA_DATABASE_URL:url(row.urlPort),
+        MYEONGHA_CLOUDFLARE_DB_APPROVED_PORT:row.pinPort,
+      };
+      const warning=vi.spyOn(console,'warn').mockImplementation(()=>{});
+      try {
+        const response=await worker.fetch(request(),bindings);
+        expect(response.status).toBe(503);
+        expect(warning).toHaveBeenCalledWith('CF_READINESS_PREFLIGHT_V1',row.expected);
+        expect(JSON.stringify(warning.mock.calls)).not.toContain(value);
+      } finally {
+        warning.mockRestore();
+      }
+    }
+  });
+
+  it('categorizes safe login differences without printing actual login or database password',async()=>{
+    const hostname='aws-0-ap-southeast-1.pooler.supabase.com';
+    const cases=[
+      {login:'postgres.cnsfpcdiyofqvhpcegfc',code:'DB_LOGIN_PRIVILEGED_DEFAULT'},
+      {login:'myeongha_api_executor.cnsfpcdiyofqvhpcegfc',code:'DB_LOGIN_NOLOGIN_EXECUTOR'},
+      {login:'myeongha_cf_api_login',code:'DB_LOGIN_MISSING_TENANT_SUFFIX'},
+      {login:'myeongha_cf_api_login.other-tenant',code:'DB_LOGIN_CF_ROLE_WRONG_TENANT'},
+      {login:'myeongha_other_login.cnsfpcdiyofqvhpcegfc',code:'DB_LOGIN_OTHER_SAME_TENANT_POOLER_AWS0_SG'},
+      {login:'myeongha_runtime.cnsfpcdiyofqvhpcegfc',code:'DB_LOGIN_LEGACY_RUNTIME_POOLER_AWS0_SG'},
+      {login:'myeongha_worker_runtime.cnsfpcdiyofqvhpcegfc',code:'DB_LOGIN_LEGACY_WORKER_POOLER_AWS0_SG'},
+      {login:'myeongha_cf_hyperdrive_login.cnsfpcdiyofqvhpcegfc',code:'DB_LOGIN_HYPERDRIVE_ONLY_POOLER_AWS0_SG'},
+      {login:'other-login',code:'DB_LOGIN_OTHER_MISMATCH'},
+    ];
+    for (const row of cases) {
+      const password='never-show-secret-'+row.code;
+      const secretUrl='postgresql://'+row.login+':'+password+'@'+hostname+
+        ':6543/postgres?sslmode=require';
+      const env={
+        ...configuredReadinessTestBindings(),
+        MYEONGHA_CLOUDFLARE_DB_APPROVED_HOST:hostname,
+        MYEONGHA_CLOUDFLARE_DB_APPROVED_PORT:'6543',
+        MYEONGHA_DATABASE_PRINCIPAL:'myeongha_cf_api_login',
+        MYEONGHA_DATABASE_URL:secretUrl,
+      };
+      const warning=vi.spyOn(console,'warn').mockImplementation(()=>{});
+      try {
+        const response=await worker.fetch(request(),env);
+        expect(response.status).toBe(503);
+        expect(warning).toHaveBeenCalledWith('CF_READINESS_PREFLIGHT_V1',row.code);
+        expect(JSON.stringify(warning.mock.calls)).not.toContain(password);
+        expect(JSON.stringify(warning.mock.calls)).not.toContain(row.login);
+      } finally {
+        warning.mockRestore();
+      }
     }
   });
 
