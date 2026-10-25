@@ -71,3 +71,15 @@ Watchtower-Track: ops
 - Vercel 종료 게이트는 위 익명 E2E PASS 와 별개로 반드시 `HOLD`; live Member/DB/Saju E2E 와 롤백 증거는 확보되지 않음.
 
 Watchtower-Track: ops
+
+## Dedicated Cloudflare DB role and offline preflight (2026-10-26 KST)
+
+- Supabase project metadata (read-only) confirms dedicated login role `myeongha_cf_api_login` is LOGIN=true, BYPASSRLS=false, SUPERUSER=false, member of `myeongha_api_executor`, and authorized until 2027-04-21 UTC. The DB account does **not** need to be recreated or escalated to a privileged/default account.
+- `npm run verify:cloudflare-db-handoff` runs a **read-only offline advisory** on the invoking process environment for the canonical primary Worker origin; no secrets are provisioned or retrieved. It makes zero network calls and prints only a bounded `CONFIG_CONTRACT_PASS` or `HOLD` category. It never prints DB URL, username, host, password, root certificate or private origin. No environment is auto-loaded: missing source values must fail closed.
+- Exact contract for `myeongha`: `MYEONGHA_DATABASE_PRINCIPAL=myeongha_cf_api_login`; Supavisor login account is this role plus the fixed, governed project tenant suffix; URL host+port exactly match separately approved Worker bindings; required TLS peer mode is `verify-full` with configured root CA. A legacy Vercel DB login or the `myeongha_api_executor` NOLOGIN role is not a valid substitute.
+- A `CONFIG_CONTRACT_PASS` **only proves local syntax and binding agreement**. It does not prove Supavisor password authentication, DB socket availability, session RLS, actual Worker Secret parity or the positive Member/Saju E2E. Worker version #79 secret digest verification cannot be assumed to cover later automatically deployed versions.
+- Production `MYEONGHA_DATABASE_URL` and the dedicated login role's **matching credential** must be provisioned through the already authorized secure secret handling workflow. Never copy Vercel's unrelated DB password or silently alter an existing database login.
+- Previous live Cloudflare /api/readiness remains HTTP 503. The preflight does not change it or bypass its gate.
+- Cloudflare deployed Worker / DNS / Supabase DB roles / Vercel production / PR merge remain untouched in this Ops branch.
+
+Watchtower-Track: ops
