@@ -53,7 +53,9 @@ export default {
     const revokeRoute=/^\/api\/memories\/[a-f0-9-]+\/grants\/seyeon\/revoke$/u.test(url.pathname);
     const firstReplyRoute=/^\/api\/chat\/[a-f0-9-]+\/turns$/u.test(url.pathname);
     if(approvedCloudflareAuthOriginV1(request,env)!==null && request.method==='POST' && url.search==='' && SEYEON_SECURITY_S0_PRODUCTION_V1.receiptAndWithdrawalEnabled &&
-       (receiptRoute||revokeRoute||(firstReplyRoute&&SEYEON_SECURITY_S0_PRODUCTION_V1.modelUseEnabled&&!cloudflareEmergencyHoldEnabledV1(env)))){
+       (receiptRoute||revokeRoute||(firstReplyRoute&&SEYEON_SECURITY_S0_PRODUCTION_V1.modelUseEnabled&&
+       SEYEON_SECURITY_S0_PRODUCTION_V1.creditBilling?.productionMounted===true&&
+       !cloudflareEmergencyHoldEnabledV1(env)))){
       // Import inside the request: DB pools/credentials never become isolate
       // global state. Every alias/history/replay still reaches the sealed router.
       const response=await executeSecurityObservedRequestV1({request,

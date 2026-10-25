@@ -3,7 +3,8 @@ const handleRequest=vi.fn(async()=>Response.json({ok:true,data:{accepted:true}})
 const close=vi.fn(async()=>{});
 const create=vi.fn(()=>({handleRequest,close}));
 vi.mock('../apps/api/src/seyeon-security-s0-production-policy-v1.js',()=>({
-  SEYEON_SECURITY_S0_PRODUCTION_V1:{receiptAndWithdrawalEnabled:true,modelUseEnabled:true},
+  SEYEON_SECURITY_S0_PRODUCTION_V1:{receiptAndWithdrawalEnabled:true,modelUseEnabled:true,
+    creditBilling:{productionMounted:false}},
   SEYEON_SECURITY_S0_GOVERNOR_APPROVAL_V1:{},
 }));
 vi.mock('../workers/cloudflare-seyeon-first-memory-runtime.mjs',()=>({
@@ -29,6 +30,15 @@ describe('primary Worker S0 receipt routing',()=>{
    const bindings=env();bindings.AUTH_RATE_LIMITER.limit.mockResolvedValue({success:false});
    expect((await worker.default.fetch(request('/api/chat/delivery-receipts/'+id),bindings,{})).status).toBe(429);
    expect(create).not.toHaveBeenCalled();
+ });
+ it('blocks uncharged paid turns even with model enabled, while permitting verified receipts',async()=>{
+   const bindings=env();
+   const blocked=await worker.default.fetch(request('/api/chat/'+id+'/turns'),bindings,{});
+   expect(blocked.status).toBe(503);
+   expect(create).not.toHaveBeenCalled();
+   const receipt=await worker.default.fetch(request('/api/chat/delivery-receipts/'+id),bindings,{});
+   expect(receipt.status).toBe(200);
+   expect(create).toHaveBeenCalledTimes(1);
  });
  it('preserves alias holds and blocks fresh model use during emergency hold while retaining receipts',async()=>{
    const bindings={...env(),MYEONGHA_CLOUDFLARE_EMERGENCY_HOLD:'true'};
