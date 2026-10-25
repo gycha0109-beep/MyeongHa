@@ -65,16 +65,21 @@ async function readBoundedJson(request:Request):Promise<AckPayload|null> {
   const contentLength=request.headers.get('Content-Length');
   if (contentLength !== null && (!/^\d+$/u.test(contentLength)
       || Number(contentLength)>MAX_BODY_BYTES)) return null;
-  const reader=request.body.getReader();
+  let reader:ReadableStreamDefaultReader<Uint8Array>|null=null;
   const chunks:Uint8Array[]=[];
   let length=0;
   try {
+    // getReader() can throw for a locked or interrupted body BEFORE read().
+    // No malformed S7 ACK may escape the governed 400 response boundary.
+    reader=request.body.getReader();
     for (;;) {
       const next=await reader.read();
+      if (typeof next?.done!=='boolean') return null;
       if (next.done) break;
+      if (!(next.value instanceof Uint8Array)) return null;
       length+=next.value.byteLength;
-      if(length>MAX_BODY_BYTES) {
-        await reader.cancel();
+      if(!Number.isSafeInteger(length) || length>MAX_BODY_BYTES) {
+        try { await reader.cancel(); } catch { /* preserve the rejection */ }
         return null;
       }
       chunks.push(next.value);
@@ -113,7 +118,7 @@ async function readBoundedJson(request:Request):Promise<AckPayload|null> {
   } catch {
     return null;
   } finally {
-    reader.releaseLock();
+    try { reader?.releaseLock(); } catch { /* cleanup is not ACK authority */ }
   }
 }
 
