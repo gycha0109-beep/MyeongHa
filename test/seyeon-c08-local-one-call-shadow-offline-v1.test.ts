@@ -1,6 +1,8 @@
 import {describe,expect,it} from 'vitest';
 import {
   classifySeyeonC08LocalEntryV1,
+  hashSeyeonC08PublicTranscriptV1,
+  SEYEON_C08_PUBLIC_THREAD_COMMITMENT_V1,
   guardSeyeonC08LocalPublicUtteranceV1,
   guardSeyeonC08LocalMoveV1,
   quoteSeyeonC08LocalOneCallBudgetV1,
@@ -55,14 +57,37 @@ function harness(opts:{
   history?:RunSeyeonCharacterTurnV2Input['contextInput']['recentMessages'];
   falseCensusCount?:boolean;
   modelThrows?:boolean;
+  missingCommitment?:boolean;
+  mismatchedCommitment?:boolean;
+  staleCommitmentAt?:number;
+
 }={}){
   const text=opts.text??TEXT;
   const messages=opts.history??[{messageId:ID,role:'user' as const,text}];
   const censusRows:number[]=[];
   const requests:{purpose:string;input:unknown}[]=[];
   const events:string[]=[];
+  let commitmentReads=0;
   const port={
     subjectId:'synthetic:owner',threadId:'synthetic:thread',
+    ...(!opts.missingCommitment?{
+      readAuthoritativeThreadCommitment({
+        subjectId,threadId,currentUserMessageId,
+      }:{subjectId:string;threadId:string;currentUserMessageId:string}){
+        commitmentReads++;
+        events.push('commitment'+commitmentReads);
+        return {
+          schemaVersion:SEYEON_C08_PUBLIC_THREAD_COMMITMENT_V1,
+          subjectId,threadId,currentUserMessageId,
+          messageCount:messages.length,latestSenderType:'user',
+          complete:true,
+          transcriptHash:opts.mismatchedCommitment ||
+            opts.staleCommitmentAt===commitmentReads
+            ? 'sha256:'+'f'.repeat(64)
+            : hashSeyeonC08PublicTranscriptV1(messages),
+        };
+      },
+    }:{}),
     readFullThreadCensus({
       subjectId,threadId,currentUserMessageId,
     }:{subjectId:string;threadId:string;currentUserMessageId:string}){
@@ -107,7 +132,7 @@ function harness(opts:{
       },
       ...overrides,
     } as Parameters<typeof runSeyeonC08LocalOneCallShadowV1>[0]);
-  return {run,events,requests,censusRows};
+  return {run,events,requests,censusRows,get commitmentReads(){return commitmentReads;}};
 }
 
 describe('C08 local preflight / single dialogue LLM / local output guard (OFFLINE)',()=>{
@@ -266,15 +291,38 @@ describe('C08 local preflight / single dialogue LLM / local output guard (OFFLIN
     expect(result.llmCalls).toBe(1);
     expect(result.censusReads).toBe(4);
     expect(h.requests).toHaveLength(1);
+    expect(h.commitmentReads).toBe(4);
     const renderInput=h.requests[0]!.input as
       {packet:{recentConversation:readonly {messageId:string;role:string;text:string}[]}};
     expect(renderInput.packet.recentConversation.map(x=>x.messageId))
       .toEqual(['m1','m2',ID]);
-    expect(h.events).toEqual(['census1','census2','reserve','model','census3','census4']);
+    expect(h.events).toEqual([
+      'census1','commitment1','census2','commitment2',
+      'reserve','model','census3','commitment3','census4','commitment4',
+    ]);
 
     const mismatch=harness({history,falseCensusCount:true});
     await expect(mismatch.run()).rejects.toThrow('LOCAL_CONTEXT_NOT_PROVEN');
     expect(mismatch.requests).toHaveLength(0);
+    for(const opts of [
+      {missingCommitment:true},
+      {mismatchedCommitment:true},
+      {staleCommitmentAt:2},
+    ]){
+      const t=harness({history,...opts});
+      await expect(t.run()).rejects.toThrow('LOCAL_CONTEXT_NOT_PROVEN');
+      expect(t.requests).toHaveLength(0);
+    }
+    for(const at of [3,4]){
+      const t=harness({history,staleCommitmentAt:at});
+      await expect(t.run()).rejects.toThrow('LOCAL_CONTEXT_NOT_PROVEN');
+      expect(t.requests).toHaveLength(1);
+    }
+    const altered=history.map(x=>({...x}));
+    altered[1]!.text='오늘은 제가 먼저 이야기할게요. 지금은 딴 이야기가 좋아요.';
+    const poisoned=harness({history:altered,mismatchedCommitment:true});
+    await expect(poisoned.run()).rejects.toThrow('LOCAL_CONTEXT_NOT_PROVEN');
+    expect(poisoned.requests).toHaveLength(0);
   });
 
   it('denies forged prior assistant biography, unrecognized user turn or truncation',async()=>{
