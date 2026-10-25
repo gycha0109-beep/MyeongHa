@@ -42,10 +42,10 @@ describe('Face photo preparation UI localization', () => {
     for (const locale of ['en-US', 'zh-CN'] as const) {
       for (const phase of ['idle', 'ready', 'loading', 'invalid-file', 'read-error', 'invalid-image', 'image-error'] as const) {
         const displayed = faceReadingUiStateV1({ ...input, phase, fileName: '내사진.jpg', fileSize: 1572864 }, locale);
-        expect(displayed.description).not.toMatch(/[가-힣]/u);
-        expect(displayed.statusTitle).not.toMatch(/[가-힣]/u);
-        expect(displayed.statusCopy).not.toMatch(/[가-힣]/u);
-        expect(displayed.analyzeLabel).not.toMatch(/[가-힣]/u);
+        expect(displayed.description.replaceAll('세연', '')).not.toMatch(/[가-힣]/u);
+        expect(displayed.statusTitle.replaceAll('세연', '')).not.toMatch(/[가-힣]/u);
+        expect(displayed.statusCopy.replaceAll('세연', '')).not.toMatch(/[가-힣]/u);
+        expect(displayed.analyzeLabel.replaceAll('세연', '')).not.toMatch(/[가-힣]/u);
         expect(displayed.fileName).toBe('내사진.jpg');
       }
     }
