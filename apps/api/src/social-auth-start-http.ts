@@ -93,7 +93,9 @@ function parseRedirectUri(value: unknown, approvedWebOrigin?: string): URL | nul
     url.search === '';
   const web =
     commonSafe &&
-    (approvedWebOrigin === undefined ? WEB_SOCIAL_REDIRECT_ORIGINS.has(url.origin) : url.origin === approvedWebOrigin) &&
+    (approvedWebOrigin === undefined
+      ? WEB_SOCIAL_REDIRECT_ORIGINS.has(url.origin)
+      : url.origin === approvedWebOrigin) &&
     url.pathname === WEB_SOCIAL_REDIRECT_PATH &&
     url.searchParams.getAll('social').length === 1 &&
     url.searchParams.get('social') === WEB_SOCIAL_REDIRECT_MARKER &&
@@ -115,10 +117,10 @@ function randomState(): string {
 }
 
 export async function handleSocialAuthStartRequestV1(input: {
+  readonly webOrigin?: string;
   readonly request: Request;
   readonly env: ProductionUserDataRuntimeEnvV1;
   readonly nowEpochMs?: () => number;
-  readonly webOrigin?: string;
 }): Promise<Response> {
   if (input.request.method !== 'POST') {
     cancelUnusedRequestBody(input.request);

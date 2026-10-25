@@ -590,6 +590,12 @@
       "mainMode": "scheduled-manual",
       "workTrackAttribution": "scheduled-operations"
     },
+    "cloudflare-saju-admission-canary.yml": {
+      "responsibility": "production-saju-smoke",
+      "prMode": "none",
+      "mainMode": "manual",
+      "workTrackAttribution": "dispatch-input"
+    },
     "production-saju-admission-canary.yml": {
       "responsibility": "production-saju-smoke",
       "prMode": "none",
