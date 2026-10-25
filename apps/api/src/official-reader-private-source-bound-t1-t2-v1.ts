@@ -1,4 +1,5 @@
 import type { CharacterStandardReadingKnowledgeSourceV1 } from './character-standard-reading-knowledge.js';
+import { hashSajuHeldSourceProofRequestV1 } from './saju-held-source-proof-verifier-v1.js';
 import type {
   PreparedOfficialReadingReaderAdmissionV1,
 } from './official-reading-reader-admission-v1.js';
@@ -43,9 +44,17 @@ import type { VerifiedSubjectIdentityEvidenceV1 } from './subject-identity-resol
 
 const CLOCK_SQL = 'select clock_timestamp()::text as "effectiveAt"';
 
-type PrivateGenerationResultV1 = Omit<
+/**
+ * The language-model/private generator owns ONLY answer text. In particular,
+ * it cannot issue an Saju Production attestation, choose a Receipt-backed
+ * Grant, or mint persisted answer/attempt/message identities.
+ */
+type PrivateGenerationResultV1 = Readonly<{ privateBody: string }>;
+
+export type OfficialReaderProductionCommitStagingV1 = Pick<
   PrivateOfficialReaderPaidAnswerStagedV1,
-  'originalAdmission' | 'boundSignedPreviewSource' | 'sourceCoverageCandidate'
+  | 'turnId' | 'attemptId' | 'bodyId' | 'safeMessageId'
+  | 'originatingGrantId' | 'productionSource'
 >;
 
 interface PreparedSignedSourceV1 {
@@ -74,7 +83,21 @@ export interface OfficialReaderSourceBoundT1T2InputV1 {
     source: CharacterStandardReadingKnowledgeSourceV1,
   ) => Promise<PreparedSignedSourceV1>;
 
-  /** Only a private server-side generator; never ordinary Chat transport. */
+  /**
+   * Independent server-owned Saju PRODUCTION attestation + purchase lineage
+   * + answer identity resolver. This is NOT the Preview transport verifier or
+   * a callback to the model; never fill it from a browser/provider response.
+   *
+   * Intentionally has NO default. Saju's Production issuer and Privacy
+   * acceptance are not installed; without this port private generation is
+   * denied before spending inference. The held S5 DB gate remains independent.
+   */
+  readonly prepareProductionCommitStaging?: (input: Readonly<{
+    originalAdmission: PreparedOfficialReadingReaderAdmissionV1;
+    verifiedPreviewCandidate: unknown;
+  }>) => Promise<OfficialReaderProductionCommitStagingV1 | null>;
+
+  /** Only private answer text, never an attestation/Grant/identity. */
   readonly generatePrivate: (
     source: CharacterStandardReadingKnowledgeSourceV1,
   ) => Promise<PrivateGenerationResultV1>;
@@ -89,6 +112,62 @@ export class OfficialReaderSourceBoundT1T2ErrorV1 extends Error {
 }
 function unavailable(): never {
   throw new OfficialReaderSourceBoundT1T2ErrorV1();
+}
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
+const SOURCE_HASH = /^sha256:v1:[a-f0-9]{64}$/u;
+
+function exactPlain(value: unknown, keys: readonly string[]): value is Record<string, unknown> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const prototype = Object.getPrototypeOf(value) as unknown;
+  return (prototype === Object.prototype || prototype === null)
+    && Reflect.ownKeys(value).length === keys.length
+    && keys.every(key => Object.hasOwn(value, key)
+      && Object.getOwnPropertyDescriptor(value, key)?.get === undefined);
+}
+
+function verifiedServerStaging(
+  value: unknown,
+  admission: PreparedOfficialReadingReaderAdmissionV1,
+): OfficialReaderProductionCommitStagingV1 {
+  const keys = [
+    'turnId', 'attemptId', 'bodyId', 'safeMessageId',
+    'originatingGrantId', 'productionSource',
+  ];
+  if (!exactPlain(value, keys)) return unavailable();
+  const uuids = [value.turnId, value.attemptId, value.bodyId,
+    value.safeMessageId, value.originatingGrantId];
+  if (!uuids.every(id => typeof id === 'string' && UUID.test(id))) return unavailable();
+  const proof = value.productionSource;
+  if (!exactPlain(proof, [
+    'sourceAttestationRef','sourceResponseHash',
+    'semanticGuardVersion','outputGuardVersion',
+  ])) return unavailable();
+  const strings = [proof.sourceAttestationRef,
+    proof.semanticGuardVersion, proof.outputGuardVersion];
+  if (!strings.every(v => typeof v === 'string'
+      && v.trim() === v && v.length > 0 && v.length <= 256)
+      || typeof proof.sourceResponseHash !== 'string'
+      || !SOURCE_HASH.test(proof.sourceResponseHash)
+      || proof.sourceResponseHash !== 'sha256:v1:' +
+        hashSajuHeldSourceProofRequestV1(admission.source.responseSnapshotJsonb)) {
+    return unavailable();
+  }
+  // These are syntactic/binding defenses only; the Production Saju issuer
+  // must verify the attestation independently and the SQL S5 gate is HELD.
+  return Object.freeze({
+    turnId: (value.turnId as string).toLowerCase(),
+    attemptId: (value.attemptId as string).toLowerCase(),
+    bodyId: (value.bodyId as string).toLowerCase(),
+    safeMessageId: (value.safeMessageId as string).toLowerCase(),
+    originatingGrantId: (value.originatingGrantId as string).toLowerCase(),
+    productionSource: Object.freeze({
+      sourceAttestationRef: proof.sourceAttestationRef as string,
+      sourceResponseHash: proof.sourceResponseHash as string,
+      semanticGuardVersion: proof.semanticGuardVersion as string,
+      outputGuardVersion: proof.outputGuardVersion as string,
+    }),
+  });
 }
 
 async function clock(scope: PostgresSubjectExecutionScopeV1): Promise<string> {
@@ -142,18 +221,34 @@ export async function runOfficialReaderPrivateSourceBoundT1T2V1(
       verifierContext: preparedSource.context,
     });
 
-    // No DB transaction is held here. This callback may only be installed
-    // by the private server, after its independent semantic/output guards.
-    const generated = await input.generatePrivate(first.source);
-    if (generated === null || typeof generated !== 'object'
-        || Array.isArray(generated)
-        || typeof generated.privateBody !== 'string'
-        || generated.privateBody.trim().length === 0) return unavailable();
+    // No DB transaction is held here. A PREVIEW signature is still NOT the
+    // official Production source issuer. If the independently verified
+    // Production/Receipt-bound staging authority is absent, do not even call
+    // the paid private generator.
+    if (typeof input.prepareProductionCommitStaging !== 'function') {
+      return unavailable();
+    }
+    const trusted = verifiedServerStaging(
+      await input.prepareProductionCommitStaging({
+        originalAdmission: first,
+        verifiedPreviewCandidate: preparedSource.candidate,
+      }),
+      first,
+    );
 
-    // Caller cannot replace the server-issued T1 admission or the one-use
-    // signed proof handle through a generator's returned object.
+    // Only the private text is produced by the model/provider. Forbid
+    // provider-originated source assertions, IDs, metadata and delivery flags.
+    const generated: unknown = await input.generatePrivate(first.source);
+    if (!exactPlain(generated, ['privateBody'])
+        || typeof generated.privateBody !== 'string'
+        || generated.privateBody.trim().length === 0
+        || Buffer.byteLength(generated.privateBody, 'utf8') > 262_144) {
+      return unavailable();
+    }
+
     const staged: PrivateOfficialReaderPaidAnswerStagedV1 = Object.freeze({
-      ...generated,
+      ...trusted,
+      privateBody: generated.privateBody,
       originalAdmission: first,
       sourceCoverageCandidate: preparedSource.candidate,
       boundSignedPreviewSource: signed,
