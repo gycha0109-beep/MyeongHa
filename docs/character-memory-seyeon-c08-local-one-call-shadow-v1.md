@@ -63,3 +63,14 @@ Watchtower-Track: character-memory
 ## 같은 브랜치 작업 규칙
 
 사용자 지시: 브랜치 하나에서 구조 변경 구현을 끝까지 진행. 작업 완료 전 PR 병합, Full Integration CI, 새 유료 호출 금지.
+
+## 서버 소유 불변 Fact Slot 계약 — 1단계 구현
+
+- `apps/api/src/seyeon-c08-immutable-fact-slot-v1.ts`: 기존 Memory Authority Proof를 재사용하고 별도의 원본/Grant 스냅샷을 받아, `subjectId/threadId/currentUserMessageId/characterId/memoryId/sourceRef/kind/summaryHash/sourceRevision/grantId/grantRevision`를 하나의 읽기 전용 binding hash로 고정한다. 이는 서버 내부 무결성 지문이지 공개 인증 토큰이나 익명화 증거가 아니다.
+- `apps/api/src/seyeon-c08-server-fact-slot-port-v1.ts`: 인증된 원본 DB의 동일 스냅샷에서 실제 사용자 소유 기록과 정확히 세연에게 유효한 Grant를 조회할 서버 포트. 여기의 callback은 현재 Production DB에 연결하지 않았다.
+- 오직 `memory | life_fact`, `claimKind=fact`, 활성 원본·Grant, 비AI 생성·서버 저장 원본, 완전한 소유 스냅샷만 받는다. `relationship_event`, 해석, 다른 사용자·캐릭터·스레드, 철회, Source/Grant Revision 변경은 HOLD한다.
+- 반환 Slot에는 **기억 본문이 포함되지 않는다**. `modelContentAccess=DENIED`, `userQuoteAccess=DENIED`, `rendering=SERVER_PROTECTED_CONTRACT_REQUIRED` 고정. 생성 프롬프트 및 사용자 출력으로 사실 내용이 전달되지 않으며, 독립 의미 검사/안전 승인으로 가장하지 않는다.
+- `requireSeyeonC08FactSlotStillCurrentV1`은 원본/Grant를 다시 읽고 pinned Slot과 정확히 비교한다. 모델 호출 전후 체크포인트와 실제 저장 DB 트랜잭션, 서버 보호 렌더링 연결 전에는 **단순 증명 계약**이다. 이 함수 호출만으로 원자적 commit/reveal을 보장하지 않는다.
+- `test/seyeon-c08-immutable-fact-slot-offline-v1.test.ts`에서 허용한 슬롯의 비노출, 철회, 출처 변경, revision 변경, 기록 교체 및 위조를 오프라인 확인한다.
+
+**현재 연결 상태:** 기존 `runSeyeonC08LocalOneCallShadowV1`는 계속 `retrievedMemories.length=0`을 요구한다. Slot을 모델 대사에 섞지 않았으며, 권한 있는 사실의 **서버 보호 렌더링/사후 승인 계약 구현**과 네 체크포인트에서 재검증 연결은 다음 작업이다. 이는 1회 기억 기반 대화의 Production 공개 근거가 아니다.
