@@ -2,7 +2,7 @@ import { resolveCharacterDisplayNameV1 } from './character-display-locale.js';
 import { READER_PRESENTATIONS, findReaderPresentation } from './reader-presentation-catalog.js';
 import { createDelegatePicker } from './reader-picker-dialog.js';
 import { faceReadingUiStateV1 } from './face-reading-ui-locale.js';
-import { getUiLocale, translateStaticUi } from './ui-i18n.js';
+import { formatStaticUi, getUiLocale, translateStaticUi } from './ui-i18n.js';
 
 const camera = document.querySelector('[data-face-camera]');
 const gallery = document.querySelector('[data-face-gallery]');
@@ -22,6 +22,9 @@ const readerPortrait = document.querySelector('[data-face-reader-portrait]');
 const readerTitle = document.querySelector('[data-face-reader-title]');
 const readerTone = document.querySelector('[data-face-reader-tone]');
 const readerNameNodes = document.querySelectorAll('[data-face-reader-name]');
+const readerHeading = document.querySelector('[data-face-reader-heading]');
+const captureHeading = document.querySelector('[data-face-capture-heading]');
+const flowHeading = document.querySelector('[data-face-flow-heading]');
 const statusTitle = document.querySelector('[data-face-status-title]');
 const statusCopy = document.querySelector('[data-face-status-copy]');
 
@@ -44,9 +47,11 @@ function updateReaderUrl(readerKey) {
 function renderReader() {
   document.body.dataset.reader = selectedReader.key;
 
-  for (const node of readerNameNodes) {
-    node.textContent = (resolveCharacterDisplayNameV1(selectedReader.key, getUiLocale()) ?? selectedReader.name);
-  }
+  const displayName = resolveCharacterDisplayNameV1(selectedReader.key, getUiLocale()) ?? selectedReader.name;
+  for (const node of readerNameNodes) node.textContent = displayName;
+  if (readerHeading) readerHeading.textContent = formatStaticUi('{reader}과 함께 관상을 봅니다.', { reader: displayName }, getUiLocale());
+  if (captureHeading) captureHeading.textContent = formatStaticUi('{reader}에게 관상 보기', { reader: displayName }, getUiLocale());
+  if (flowHeading) flowHeading.textContent = formatStaticUi('{reader}과 함께하는 관상, 이렇게 진행됩니다.', { reader: displayName }, getUiLocale());
 
   if (readerPortrait instanceof HTMLImageElement) {
     readerPortrait.src = selectedReader.portrait;
