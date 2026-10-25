@@ -10,6 +10,8 @@ import {
   runSeyeonC08LocalOneCallShadowV1,
   assessSeyeonC08LocalOneCallRouteV1,
 } from '../apps/api/src/seyeon-c08-local-one-call-shadow-v1.js';
+import {createSeyeonC08ServerRelationshipProofPortV1} from
+  '../apps/api/src/seyeon-c08-server-relationship-proof-port-v1.js';
 import {createSeyeonC08LocalThreadIntegrityPortV1} from
   '../apps/api/src/seyeon-c08-local-thread-integrity-port-v1.js';
 import type {RunSeyeonCharacterTurnV2Input} from
@@ -246,6 +248,55 @@ describe('C08 local preflight / single dialogue LLM / local output guard (OFFLIN
     expect(request.packet.relationship.revision).toBe(1);
     expect(request.packet.interpretation.reveal.level).toBe('public');
     expect(proofs).toBe(4);
+  });
+
+  it('binds the public relationship proof to server rows; different owner, revoked access, stale relationship all HOLD',async()=>{
+    const h=harness({relationship:'present'});
+    const relation={
+      stageKey:'close',closenessBand:'high' as const,trustBand:'high' as const,
+      frictionBand:'low' as const,revision:1,policyVersion:'v1',
+    };
+    const trustGov={...governance(),relationship:{
+      gate:'PUBLIC' as const,trustBand:'high' as const,relevantSharedHistoryRefs:[],
+    }};
+    let reads=0;
+    const proof=createSeyeonC08ServerRelationshipProofPortV1({
+      subjectId:'synthetic:owner',threadId:'synthetic:thread',
+      async readCurrentRelationship(key){
+        reads++;
+        return {subjectId:key.subjectId,threadId:key.threadId,
+          characterId:'seyeon' as const,complete:true as const,
+          publicConversationEligible:true,
+          privateDisclosureAuthorized:false as const,relationship:relation};
+      },
+    });
+    const result=await h.run({governance:trustGov,relationshipProofPort:proof});
+    expect(result.publicRelationshipAuthority).toBe('VERIFIED_ESTABLISHED_RELATIONSHIP');
+    expect(h.requests).toHaveLength(1);
+    expect(reads).toBe(4);
+    const fakeOwner=harness({relationship:'present'});
+    const other=createSeyeonC08ServerRelationshipProofPortV1({
+      subjectId:'different:owner',threadId:'synthetic:thread',
+      async readCurrentRelationship(){
+        throw Error('SHOULD_NOT_RUN');
+      },
+    });
+    await expect(fakeOwner.run({governance:trustGov,relationshipProofPort:other}))
+      .rejects.toThrow('LOCAL_CONTEXT_NOT_PROVEN');
+    expect(fakeOwner.requests).toHaveLength(0);
+    const revoked=harness({relationship:'present'});
+    const revokePort=createSeyeonC08ServerRelationshipProofPortV1({
+      subjectId:'synthetic:owner',threadId:'synthetic:thread',
+      async readCurrentRelationship(key){
+        return {subjectId:key.subjectId,threadId:key.threadId,
+          characterId:'seyeon' as const,complete:true as const,
+          publicConversationEligible:false,
+          privateDisclosureAuthorized:false as const,relationship:relation};
+      },
+    });
+    await expect(revoked.run({governance:trustGov,relationshipProofPort:revokePort}))
+      .rejects.toThrow('LOCAL_CONTEXT_NOT_PROVEN');
+    expect(revoked.requests).toHaveLength(0);
   });
 
   it('denies relationship spoofing, missing proof, revoked public permission and concurrent revision changes',async()=>{
