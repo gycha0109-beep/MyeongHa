@@ -471,7 +471,9 @@ export function createOpenAiSeyeonStructuredProviderV1(
             'x-client-request-id': callId,
           },
           body: requestBody,
-          redirect: 'error',
+          // Portable to workerd: do not follow or forward credentials to a
+          // Location target. All 3xx fail the existing non-2xx guard below.
+          redirect: 'manual',
           signal: controller.signal,
         }), controller.signal);
       } catch {

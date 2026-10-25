@@ -1,0 +1,105 @@
+{
+  "schemaVersion": "seyeon-s0-worker-fetch-compat-v1",
+  "runtime": "Wrangler 4.152.0 local workerd; compatibility_date 2026-10-20 nodejs_compat",
+  "scope": "Actual production counter and provider modules with owned loopback HTTP fixture; no DB/model credentials or external provider requests",
+  "before": {
+    "localWorkerd": true,
+    "productionCredentials": false,
+    "externalProviderCalls": 0,
+    "redirect": false,
+    "countError": {
+      "name": "Error",
+      "message": "Input token count request failed or exceeded its deadline."
+    },
+    "generationError": {
+      "name": "OpenAiSeyeonStructuredProviderErrorV1",
+      "code": "NETWORK_FAILURE",
+      "message": "OpenAI structured request failed before a response was accepted."
+    }
+  },
+  "after": {
+    "normal": {
+      "localWorkerd": true,
+      "productionCredentials": false,
+      "externalProviderCalls": 0,
+      "redirect": false,
+      "count": 114,
+      "generated": {
+        "ok": true
+      }
+    },
+    "redirect": {
+      "localWorkerd": true,
+      "productionCredentials": false,
+      "externalProviderCalls": 0,
+      "redirect": true,
+      "countError": {
+        "name": "Error",
+        "message": "Input token count provider declined or returned unknown format."
+      },
+      "generationError": {
+        "name": "OpenAiSeyeonStructuredProviderErrorV1",
+        "code": "HTTP_FAILURE",
+        "message": "OpenAI structured request returned a non-success status."
+      }
+    },
+    "upstream": {
+      "requests": [
+        {
+          "path": "/count",
+          "syntheticCredential": true
+        },
+        {
+          "path": "/generate",
+          "syntheticCredential": true
+        },
+        {
+          "path": "/count",
+          "syntheticCredential": true
+        },
+        {
+          "path": "/generate",
+          "syntheticCredential": true
+        }
+      ],
+      "redirectTargetHits": 0
+    }
+  },
+  "hostedReceiptE2e": "UNVERIFIED",
+  "firstFailedCohortCleanup": {
+    "schemaVersion": "seyeon-s0-owned-canary-cleanup-v1",
+    "status": "completed",
+    "existingAccountDeletionAuthority": true,
+    "resumedFrom": "db_finalization_required",
+    "dbFinalizerInvoked": true,
+    "dbFinalizerReplayed": false,
+    "authDeletionInvoked": true,
+    "authDeletionOutcome": "deleted",
+    "completionInvoked": true,
+    "completionReplayed": false,
+    "alreadyCompleted": false,
+    "auth_absent": true,
+    "memories_erased": true,
+    "grants_erased": true,
+    "turns_erased": true,
+    "cost_rows_erased": true
+  },
+  "secondFailedCohortCleanup": {
+    "schemaVersion": "seyeon-s0-owned-canary-cleanup-v1",
+    "status": "completed",
+    "existingAccountDeletionAuthority": true,
+    "resumedFrom": "db_finalization_required",
+    "dbFinalizerInvoked": true,
+    "dbFinalizerReplayed": false,
+    "authDeletionInvoked": true,
+    "authDeletionOutcome": "deleted",
+    "completionInvoked": true,
+    "completionReplayed": false,
+    "alreadyCompleted": false,
+    "auth_absent": true,
+    "memories_erased": true,
+    "grants_erased": true,
+    "turns_erased": true,
+    "cost_rows_erased": true
+  }
+}

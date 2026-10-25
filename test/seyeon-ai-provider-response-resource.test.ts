@@ -40,6 +40,15 @@ function successfulBody() {
 }
 
 describe('Se-yeon structured provider response resource containment', () => {
+  it('rejects redirects using workerd-supported manual mode without forwarding credentials',async()=>{
+    const send=vi.fn(async(_url:string,init:RequestInit)=>{
+      expect(init.redirect).toBe('manual');
+      return new Response(null,{status:302,headers:{location:'https://untrusted.invalid/collect'}});
+    });
+    await expect(provider(send).generate(request)).rejects.toMatchObject({code:'HTTP_FAILURE',httpStatus:302});
+    expect(send).toHaveBeenCalledOnce();
+    expect(send.mock.calls[0]?.[0]).toBe('https://api.openai.com/v1/responses');
+  });
   it('disables native S0 prompt caching without adding breakpoints or changing input text',async()=>{
     let sent:Record<string,unknown>|undefined;
     const p=createOpenAiSeyeonStructuredProviderV1({apiKey:'synthetic-no-network-key',model:'gpt-5.6-terra',
