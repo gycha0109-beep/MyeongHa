@@ -134,6 +134,27 @@ export function guardSeyeonC08LocalMoveV1(kind: SeyeonC08LocalEntryV1,
 }
 
 /**
+ * Distinguishes repeating a general initiative pattern from repeating a
+ * concrete reply word-for-word. Normalization removes only punctuation and
+ * spacing; do not infer paraphrase equivalence with regex similarity scores.
+ */
+export function guardSeyeonC08LocalReplyNoveltyV1(
+  utterance:string,
+  history:readonly SeyeonRecentMessageV2[],
+):void{
+  const normalized=(s:string)=>s.toLocaleLowerCase('ko-KR')
+    .replace(/[^\\p{L}\\p{N}]/gu,'');
+  const candidate=normalized(utterance);
+  if(!candidate||candidate.length<6)
+    throw new SeyeonC08LocalHoldV1('LOCAL_OUTPUT_UNVERIFIABLE');
+  for(const previous of history){
+    if(previous.role!=='assistant')continue;
+    if(normalized(previous.text)===candidate)
+      throw new SeyeonC08LocalHoldV1('LOCAL_OUTPUT_UNVERIFIABLE');
+  }
+}
+
+/**
  * Full-thread count must match the ENTIRE supplied dialogue, not a truncated
  * recent-message window. Prior entries are only locally admissible public
  * texts: no memory-backed/relationship-backed conversation can enter here.
@@ -576,6 +597,7 @@ export async function runSeyeonC08LocalOneCallShadowV1(input: Readonly<{
   const draft = admitSeyeonRendererDraftV2({rawOutput:raw,packet});
   guardSeyeonC08LocalPublicUtteranceV1(draft.utterance);
   guardSeyeonC08LocalMoveV1(classified.kind,draft.utterance);
+  guardSeyeonC08LocalReplyNoveltyV1(draft.utterance,context.recentConversation);
   const questionCount=(draft.utterance.match(/[?？]/gu)??[]).length;
   if(questionCount>context.behaviorPolicy.maxQuestionsPerUtterance){
     throw new SeyeonC08LocalHoldV1('LOCAL_OUTPUT_UNVERIFIABLE');
