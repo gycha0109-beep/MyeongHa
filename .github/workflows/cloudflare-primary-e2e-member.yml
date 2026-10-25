@@ -1,0 +1,48 @@
+name: Cloudflare Primary Worker Authenticated E2E
+run-name: "[WT:ops] Cloudflare Member DB and Saju live E2E"
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: Type VERIFY_CLOUDFLARE_PRIMARY_E2E to run governed Member and Saju checks
+        required: true
+        type: string
+      worker_version:
+        description: Exact deployed myeongha Worker UUID independently read from Cloudflare
+        required: true
+        type: string
+
+permissions:
+  contents: read
+concurrency:
+  group: cloudflare-primary-e2e-member
+  cancel-in-progress: false
+
+jobs:
+  member:
+    name: Live Member login, DB ownership and calculation-only Saju
+    if: ${{ github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.confirm == 'VERIFY_CLOUDFLARE_PRIMARY_E2E' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    environment: production
+    env:
+      MYEONGHA_CLOUDFLARE_E2E_MODE: authenticated
+      CLOUDFLARE_EXPECTED_WORKER_VERSION: ${{ inputs.worker_version }}
+      MYEONGHA_PRODUCTION_MEMBER_EMAIL: ${{ secrets.MYEONGHA_PRODUCTION_MEMBER_EMAIL }}
+      MYEONGHA_PRODUCTION_MEMBER_PASSWORD: ${{ secrets.MYEONGHA_PRODUCTION_MEMBER_PASSWORD }}
+      MYEONGHA_PRODUCTION_MEMBER_EXPECTED_SUBJECT_ID: ${{ secrets.MYEONGHA_PRODUCTION_MEMBER_EXPECTED_SUBJECT_ID }}
+    steps:
+      - name: Fail closed when governed production credentials are absent
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$MYEONGHA_PRODUCTION_MEMBER_EMAIL"
+          test -n "$MYEONGHA_PRODUCTION_MEMBER_PASSWORD"
+          test -n "$MYEONGHA_PRODUCTION_MEMBER_EXPECTED_SUBJECT_ID"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Verify Member login, authoritative PostgreSQL profile and calculation-only Saju
+        run: node scripts/verify-cloudflare-primary-e2e.mjs

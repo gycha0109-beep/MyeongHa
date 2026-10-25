@@ -38,6 +38,24 @@
       "mainMode": "required",
       "workTrackAttribution": "pr-metadata"
     },
+    "cloudflare-primary-e2e-member.yml": {
+      "responsibility": "cloudflare-primary-member-db-saju-live-e2e",
+      "prMode": "none",
+      "mainMode": "manual",
+      "workTrackAttribution": "workflow-dispatch"
+    },
+    "cloudflare-primary-e2e.yml": {
+      "responsibility": "cloudflare-primary-live-anonymous-e2e",
+      "prMode": "narrow",
+      "mainMode": "triggered-operations",
+      "workTrackAttribution": "pr-metadata"
+    },
+    "cloudflare-saju-admission-canary.yml": {
+      "responsibility": "production-saju-smoke",
+      "prMode": "none",
+      "mainMode": "manual",
+      "workTrackAttribution": "dispatch-input"
+    },
     "db-commerce-entitlement-suite.yml": {
       "responsibility": "commerce-entitlement-verification",
       "prMode": "routed-via-ci",
@@ -266,6 +284,12 @@
       "mainMode": "triggered-operations",
       "workTrackAttribution": "none"
     },
+    "production-saju-admission-canary.yml": {
+      "responsibility": "production-saju-smoke",
+      "prMode": "none",
+      "mainMode": "manual",
+      "workTrackAttribution": "dispatch-input"
+    },
     "production-saju-current-subject-smoke.yml": {
       "responsibility": "production-saju-smoke",
       "prMode": "none",
@@ -308,6 +332,12 @@
       "mainMode": "narrow",
       "workTrackAttribution": "pr-metadata"
     },
+    "saju-abuse-counter-cleanup.yml": {
+      "responsibility": "production-security-maintenance",
+      "prMode": "none",
+      "mainMode": "scheduled-manual",
+      "workTrackAttribution": "scheduled-operations"
+    },
     "saju-bridge-cross-repo-local-http.yml": {
       "responsibility": "saju-bridge-local-transport-verification",
       "prMode": "narrow",
@@ -346,6 +376,42 @@
     },
     "seyeon-c08-key2-pinned-recovery-real-v2.yml": {
       "responsibility": "character-memory-bounded-real-model-evaluation",
+      "prMode": "none",
+      "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "commit-metadata"
+    },
+    "seyeon-c08-n06-paid-canary-once-v1.yml": {
+      "responsibility": "character-memory-owner-preapproved-public-n06-one-chargeable-post-json-canary",
+      "prMode": "none",
+      "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "commit-metadata"
+    },
+    "seyeon-c08-n06-paid-exact-model-once-v2.yml": {
+      "responsibility": "character-memory-one-owner-approved-public-n06-paid-model-post-exact-route",
+      "prMode": "none",
+      "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "commit-metadata"
+    },
+    "seyeon-c08-n06-paid-low-reasoning-once-v4.yml": {
+      "responsibility": "character-memory-one-owner-approved-public-n06-low-reasoning-model-post",
+      "prMode": "none",
+      "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "commit-metadata"
+    },
+    "seyeon-c08-n06-paid-token-only-once-v3.yml": {
+      "responsibility": "character-memory-bounded-public-n06-token-only-model-inference-once",
+      "prMode": "none",
+      "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "commit-metadata"
+    },
+    "seyeon-c08-provider-get-shape-diagnostic-once-v1.yml": {
+      "responsibility": "character-memory-one-shot-official-provider-get-structure-diagnosis-only",
+      "prMode": "none",
+      "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "commit-metadata"
+    },
+    "seyeon-c08-provider-metadata-readonly-once-v1.yml": {
+      "responsibility": "character-memory-one-shot-public-provider-metadata-get-only",
       "prMode": "none",
       "mainMode": "one-shot-trigger",
       "workTrackAttribution": "commit-metadata"
@@ -440,30 +506,6 @@
       "mainMode": "one-shot-trigger",
       "workTrackAttribution": "commit-metadata"
     },
-    "seyeon-c08-n06-paid-low-reasoning-once-v4.yml": {
-      "responsibility": "character-memory-one-owner-approved-public-n06-low-reasoning-model-post",
-      "prMode": "none",
-      "mainMode": "one-shot-trigger",
-      "workTrackAttribution": "commit-metadata"
-    },
-    "seyeon-c08-n06-paid-token-only-once-v3.yml": {
-      "responsibility": "character-memory-bounded-public-n06-token-only-model-inference-once",
-      "prMode": "none",
-      "mainMode": "one-shot-trigger",
-      "workTrackAttribution": "commit-metadata"
-    },
-    "seyeon-c08-n06-paid-exact-model-once-v2.yml": {
-      "responsibility": "character-memory-one-owner-approved-public-n06-paid-model-post-exact-route",
-      "prMode": "none",
-      "mainMode": "one-shot-trigger",
-      "workTrackAttribution": "commit-metadata"
-    },
-    "seyeon-c08-n06-paid-canary-once-v1.yml": {
-      "responsibility": "character-memory-owner-preapproved-public-n06-one-chargeable-post-json-canary",
-      "prMode": "none",
-      "mainMode": "one-shot-trigger",
-      "workTrackAttribution": "commit-metadata"
-    },
     "seyeon-openrouter-glm53flash-paid-three-call-n01-v1.yml": {
       "responsibility": "character-memory-funded-new-model-actual-3call-public-shadow",
       "prMode": "none",
@@ -508,18 +550,6 @@
     },
     "seyeon-openrouter-xing-free-three-call-n01-v1.yml": {
       "responsibility": "character-memory-free-model-exact-zdr-json-public-only-shadow",
-      "prMode": "none",
-      "mainMode": "one-shot-trigger",
-      "workTrackAttribution": "commit-metadata"
-    },
-    "seyeon-c08-provider-get-shape-diagnostic-once-v1.yml": {
-      "responsibility": "character-memory-one-shot-official-provider-get-structure-diagnosis-only",
-      "prMode": "none",
-      "mainMode": "one-shot-trigger",
-      "workTrackAttribution": "commit-metadata"
-    },
-    "seyeon-c08-provider-metadata-readonly-once-v1.yml": {
-      "responsibility": "character-memory-one-shot-public-provider-metadata-get-only",
       "prMode": "none",
       "mainMode": "one-shot-trigger",
       "workTrackAttribution": "commit-metadata"
@@ -583,24 +613,6 @@
       "prMode": "required-router",
       "mainMode": "none",
       "workTrackAttribution": "pr-metadata"
-    },
-    "saju-abuse-counter-cleanup.yml": {
-      "responsibility": "production-security-maintenance",
-      "prMode": "none",
-      "mainMode": "scheduled-manual",
-      "workTrackAttribution": "scheduled-operations"
-    },
-    "cloudflare-saju-admission-canary.yml": {
-      "responsibility": "production-saju-smoke",
-      "prMode": "none",
-      "mainMode": "manual",
-      "workTrackAttribution": "dispatch-input"
-    },
-    "production-saju-admission-canary.yml": {
-      "responsibility": "production-saju-smoke",
-      "prMode": "none",
-      "mainMode": "manual",
-      "workTrackAttribution": "dispatch-input"
     }
   }
 }
