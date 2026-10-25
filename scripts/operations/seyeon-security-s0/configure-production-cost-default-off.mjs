@@ -6,22 +6,18 @@ import {isAbsolute} from 'node:path';
 import {parseEnv} from 'node:util';
 import {Client} from 'pg';
 import {SEYEON_S0_COST_POLICY_DRAFT_V1 as policy,
-  SEYEON_S0_DEFAULT_DAILY_BUDGET_V1 as defaults,
   parseSeyeonS0CostBudgetV1} from './model-cost-plan.mjs';
 
 const argv=process.argv.slice(2);
 const option=name=>{const index=argv.indexOf(name);return index<0?null:argv[index+1];};
 const envFile=option('--env-file'),caFile=option('--ca-file');
-const explicitCaps=['--global-micro-usd','--subject-micro-usd'].filter(k=>argv.includes(k));
-if(!argv.includes('--apply')||!((argv.length===7&&explicitCaps.length===0)||
-   (argv.length===11&&explicitCaps.length===2))||
-   ![envFile,caFile].every(p=>typeof p==='string'&&isAbsolute(p))){
-  throw Error('Explicit --apply, absolute env and CA, UTC date, and either both caps or finite defaults required.');
+if(argv.length!==9||!argv.includes('--apply')||
+   ![envFile,caFile].every(p=>typeof p==='string'&&isAbsolute(p))||
+   argv.includes('--subject-micro-usd')){
+  throw Error('Explicit --apply, absolute env and CA, UTC date and one global provider-safety ceiling required.');
 }
 const budget=parseSeyeonS0CostBudgetV1({
-  utcDate:option('--utc-date'),
-  globalMicroUsd:option('--global-micro-usd')??defaults.globalMicroUsd,
-  subjectMicroUsd:option('--subject-micro-usd')??defaults.subjectMicroUsd,
+  utcDate:option('--utc-date'),globalMicroUsd:option('--global-micro-usd'),
 });
 const ref=execFileSync('git',['branch','--show-current'],{encoding:'utf8'}).trim();
 const dirty=execFileSync('git',['status','--porcelain'],{encoding:'utf8'}).trim();
@@ -78,7 +74,9 @@ try{
         and output_micro_usd_per_million=$12 and not is_active) as inactive_exact_policy,
     (select count(*)=1 from public.seyeon_ai_governor_daily_budgets_v1
       where bucket_utc_date=$13::date and global_limit_micro_usd=$14::bigint
-        and subject_limit_micro_usd=$15::bigint and occupied_micro_usd=0) as exact_empty_budget`,[
+        and subject_limit_micro_usd=$15::bigint
+        and subject_limit_micro_usd=global_limit_micro_usd
+        and occupied_micro_usd=0) as exact_empty_budget`,[
     p.providerKey,p.modelKey,p.policyVersion,p.priceVersion,p.allowedPurposes,
     p.contextWindowTokens,p.maximumInputTokens,p.maximumOutputTokens,
     p.maximumSerializedRequestBytes,p.inputMicroUsdPerMillion,

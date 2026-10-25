@@ -84,8 +84,8 @@ try{
         and output_micro_usd_per_million=$13) as inactive_cost_policy,
     (select count(*)=1 from public.seyeon_ai_governor_daily_budgets_v1
       where bucket_utc_date=$14::date and occupied_micro_usd=0 and
-        global_limit_micro_usd>0 and subject_limit_micro_usd>0 and
-        subject_limit_micro_usd<=global_limit_micro_usd) as bounded_budget`,[
+        global_limit_micro_usd>0 and
+        subject_limit_micro_usd=global_limit_micro_usd) as bounded_budget`,[
       String(evidence.backupMigrationFrontier),policy.providerKey,policy.modelKey,
       policy.policyVersion,policy.priceVersion,policy.allowedPurposes,
       policy.contextWindowTokens,policy.maximumInputTokens,policy.maximumOutputTokens,

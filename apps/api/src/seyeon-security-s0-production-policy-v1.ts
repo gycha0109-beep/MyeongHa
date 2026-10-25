@@ -2,11 +2,21 @@
 // Server-owned scope/policy. Neither HTTP fields nor environment flags activate it.
 import type {SeyeonProductionChatGovernorApprovalV1} from './seyeon-production-governor-factory-v1.js';
 import type {SeyeonCostGovernorModelPolicyV1} from './seyeon-cost-governor-server-policy-v1.js';
+import {COMMERCE_CHAT_CREDIT_POLICY_V1} from './commerce-chat-credit-gate-v1.js';
 
 export const SEYEON_SECURITY_S0_PRODUCTION_V1=Object.freeze({
   contractVersion:'seyeon-positive-http-receipt-barrier-v1',
   receiptAndWithdrawalEnabled:false,
   modelUseEnabled:false,
+  // Customer eligibility is based on spendable credits, never a USD/day allowance.
+  // Keep paid model use closed until the atomic reservation AND receipt-linked
+  // 10-credit settlement paths are mounted on this exact production HTTP route.
+  creditBilling:Object.freeze({
+    creditsPerDeliveredReply:COMMERCE_CHAT_CREDIT_POLICY_V1.creditsPerDeliveredAiReply,
+    reservationRequiredBeforeModel:true,
+    settleOnlyAfterDeliveryReceipt:true,
+    productionMounted:false,
+  }),
   model:'gpt-5.6-terra',
   recordType:'conversation_recall',schemaVersion:'v1',
   projectorVersion:'seyeon-conversation-recall-projector-v1',

@@ -7,5 +7,5 @@ export declare const SEYEON_S0_COST_POLICY_DRAFT_V1: Readonly<{
  outputMicroUsdPerMillion:number; isActive:false;
 }>;
 export declare function parseSeyeonS0CostBudgetV1(input:Readonly<{
- utcDate:string|null;globalMicroUsd:string|null;subjectMicroUsd:string|null;
+ utcDate:string|null;globalMicroUsd:string|null;subjectMicroUsd?:never;
 }>):Readonly<{utcDate:string;globalMicroUsd:string;subjectMicroUsd:string}>;

@@ -1,9 +1,7 @@
 // Watchtower-Track: security
-// Deterministic, inactive S0 ledger policy. Finite daily defaults may be overridden.
-// Limits are in micro-USD: global $5/day; per subject $0.25/day.
-export const SEYEON_S0_DEFAULT_DAILY_BUDGET_V1=Object.freeze({
-  globalMicroUsd:'5000000',subjectMicroUsd:'250000',
-});
+// Deterministic, inactive S0 provider-cost policy. A single explicit global
+// emergency ceiling protects provider spend; consumer eligibility uses credits.
+// The legacy DB subject ceiling is set equal to global: no extra per-user cap.
 export const SEYEON_S0_COST_POLICY_DRAFT_V1=Object.freeze({
   providerKey:'openai-responses',modelKey:'gpt-5.6-terra',
   policyVersion:'seyeon-s0-receipt-production-20261025',
@@ -23,11 +21,14 @@ export function parseSeyeonS0CostBudgetV1({utcDate,globalMicroUsd,subjectMicroUs
      new Date(utcDate+'T00:00:00Z').toISOString().slice(0,10)!==utcDate){
     throw Error('An exact valid UTC budget date is required.');
   }
-  for(const value of [globalMicroUsd,subjectMicroUsd]){
-    if(typeof value!=='string'|| !/^[1-9][0-9]{0,10}$/.test(value) ||
-       !Number.isSafeInteger(Number(value))) throw Error('Invalid bounded micro-USD limit.');
+  if(subjectMicroUsd!==undefined){
+    throw Error('A customer daily USD cap is not part of the credit-based policy.');
   }
-  if(Number(subjectMicroUsd)>Number(globalMicroUsd))
-    throw Error('Subject budget exceeds global budget.');
-  return Object.freeze({utcDate,globalMicroUsd,subjectMicroUsd});
+  if(typeof globalMicroUsd!=='string'||!/^[1-9][0-9]{0,10}$/.test(globalMicroUsd) ||
+     !Number.isSafeInteger(Number(globalMicroUsd))){
+    throw Error('An explicit finite global provider-safety ceiling is required.');
+  }
+  // Preserve the existing DB Governor schema without a second member-specific
+  // cutoff: no one Subject can exceed global spend even without this check.
+  return Object.freeze({utcDate,globalMicroUsd,subjectMicroUsd:globalMicroUsd});
 }

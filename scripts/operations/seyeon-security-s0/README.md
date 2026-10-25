@@ -30,7 +30,7 @@ DB 최초 설치·타입 계약·운영 역할 부여·동일 백업 복원·실
 
 1. `install-production-default-closed.mjs`: **최종 main, 깨끗한 HEAD, 동일 HEAD PostgreSQL 17 복원 리허설 증거**가 일치하는 경우에만 원자적 S0 설치. 설치 후 Registry는 비어 있고 API positive EXECUTE는 금지됩니다.
 2. `configure-seyeon-security-s0-credentials.mjs`: 설치 이후 독립 비용 DB LOGIN/Provider 시크릿을 로컬 보호 경로에 생성합니다. 기존 DB 비밀번호나 Provider 토큰을 저장소에 넣지 않습니다.
-3. `configure-production-cost-default-off.mjs`: 해당 UTC일 글로벌·개인 예산을 **명시적으로** 지정합니다. 이미 다른 정책·예산이 존재하면 덮어쓰지 않습니다. 모델은 비활성으로 둡니다.
+3. `configure-production-cost-default-off.mjs`: 모델 원가 통제용 **서비스 전체 안전 상한 하나만** 명시적으로 지정합니다. 기존 DB가 요구하는 회원별 비용 한도 칸에는 같은 값을 기록해 회원별로 더 낮은 일일 상한을 두지 않습니다. 회원 이용권은 기존 크레딧 원장이 결정합니다. 임의 기본 달러값은 없습니다. 이미 다른 정책·예산이 존재하면 덮어쓰지 않으며 모델은 비활성으로 둡니다. [크레딧·비용 정책](../../../docs/operations/SEYEON_S0_CREDIT_AND_COST_POLICY_20261026.md)을 따릅니다.
 4. `activate-production-s0-after-evidence.mjs`: 최종 main·복원 리허설·SRC-25 승인·G0-D04·G1/G2·G3·G5 실제 파일 해시 검증 후에만 한 원자 트랜잭션으로 S0 소스와 API/모델 권한을 열 수 있습니다. 역사 조회·Replay·Writer 권한은 열지 않습니다. 이 명령을 구현했다고 운영 승인으로 취급하지 않습니다.
 5. `reconcile-existing-governed-login.mjs`: 운영 DB에 전용 로그인 역할이 이미 존재하면 비밀번호를 재생성하지 않고, 별도로 보관한 기존 자격증명으로 **읽기 전용** SSL 인증·권한 검증을 합니다. 일치하는 기존 자격증명이 없으면 종료하고 임의 회전하지 않습니다.
 6. `emergency-stop-production-s0.mjs`: 운영 중 새 모델 사용·S0 소스·G1/G2를 차단하고 권한을 재검증합니다. 기존 receipt ACK와 사용자의 철회 권한은 이전과 동일하게 유지합니다. 비상 중단 자체는 사용자의 철회를 완료했다고 주장하지 않습니다.
