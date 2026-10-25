@@ -69,7 +69,7 @@ function invoke(port: OwnedDigitalReadingReviewSnapshotPortV1, pool: PostgresSub
 describe('subject-owned internal digital Reading withdrawal evidence orchestration', () => {
   it('resolves the authenticated Subject and loads one server-owned DB snapshot before review', async () => {
     const { pool, log, release } = fakePool();
-    const loadSnapshot = vi.fn(async ({ scope, purchaseIntentId, unitId }) => {
+    const loadSnapshot = vi.fn(async ({ scope, purchaseIntentId, unitId }: Parameters<OwnedDigitalReadingReviewSnapshotPortV1['loadSnapshot']>[0]) => {
       expect(scope.resolvedSubject).toEqual({ subjectId: SUBJECT, subjectKind: 'member' });
       expect(purchaseIntentId).toBe(PURCHASE_ID);
       expect(unitId).toBe(UNIT);
