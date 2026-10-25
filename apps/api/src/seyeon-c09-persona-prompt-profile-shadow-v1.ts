@@ -144,7 +144,8 @@ export function composeSeyeonC09PersonaPromptPlanV1(input: Readonly<{
       new Set(requested).size !== requested.length) {
     throw new TypeError('C09_UNKNOWN_OR_DUPLICATE_FOCUS');
   }
-  const selected = requested.map((focus) => PUBLIC_FOCUS_V1[focus]);
+  const selected = (requested as readonly SeyeonC09PublicFocusV1[])
+    .map((focus) => PUBLIC_FOCUS_V1[focus]);
   const lines = [
     ...ALWAYS_ON_PUBLIC_PERSONA_V1,
     ...(input.profile === 'core' ? [] : AUTHOR_EXAMPLES_V1),
