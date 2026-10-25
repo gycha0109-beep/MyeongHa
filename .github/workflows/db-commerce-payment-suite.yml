@@ -13,6 +13,8 @@ on:
       - 'scripts/ci/db-pr-router.mjs'
       - 'scripts/ci/run-db-track.mjs'
       - '.github/workflows/ci-db-track.yml'
+      - 'test/db/commerce_payment_adversarial_e2e_v1.sql'
+      - 'test/db/commerce_payment_adversarial_e2e_v1.sh'
       - 'test/db/commerce_payment_attempt_authority.sh'
       - 'test/db/commerce_payment_attempt_handoff_context.sh'
       - 'test/db/commerce_payment_verification_context.sh'
