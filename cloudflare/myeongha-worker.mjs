@@ -4,6 +4,7 @@
 import sealedRuntime from './preview-worker.mjs';
 import apiRuntime from '../workers/cloudflare-static-preview.mjs';
 import { isSeyeonCloudflareProtectedIngressAliasV1 } from '../apps/api/src/seyeon-cloudflare-ops-router-handoff-offline-v1.js';
+import { handleCloudflareAuthRequest } from './member-auth-worker.mjs';
 
 function malformedApiRoot(pathname) {
   if (pathname === '/api' || pathname.startsWith('/api/')) return false;
@@ -21,7 +22,7 @@ function malformedApiRoot(pathname) {
 }
 
 export default {
-  fetch(request, env, ctx) {
+  async fetch(request, env, ctx) {
     let url;
     try { url = new URL(request.url); }
     catch { return sealedRuntime.fetch(request, env, ctx); }
@@ -33,6 +34,8 @@ export default {
     }
     if (url.pathname === '/api' || url.pathname.startsWith('/api/')) {
       // No Service Binding, external API proxy, or second Worker hop.
+      const authResponse = await handleCloudflareAuthRequest(request, env);
+      if (authResponse !== null) return authResponse;
       return apiRuntime.fetch(request, env, ctx);
     }
     // Only the documented root resolves to index.html. Other missing pages

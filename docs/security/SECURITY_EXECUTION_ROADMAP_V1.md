@@ -1,5 +1,7 @@
 # 명하 Security 실행 로드맵 v1
 
+> **2026-10-25 현재 기준:** 주 서버는 Cloudflare입니다. [실행 기록](GENERAL_SECURITY_CLOUDFLARE_EXECUTION_20261024.md)과 [Cloudflare 경보 정본](../../config/security/cloudflare-primary-security-monitor-v1.json)을 따릅니다. Ops PR #2560(admission/event 연결), #2571(로그 수집 설정)은 MERGED입니다. Cloudflare native 보안 모니터는 생성·활성화·provider 재조회 완료입니다. 실제 주 서버 로그 유입/알림 수신 및 Saju 정상·초과 canary는 Ops의 단일 Worker API 이식(#2572) 후 실행해야 하므로 운영 전체 완료는 아닙니다. 아래 Vercel/Node 기록은 과거 개발·보조 환경 증거입니다.
+
 > Watchtower-Track: security
 > 갱신: 2026-10-24 KST
 > 구현 기준: `1fce280a039d7d7ec5192ce2f5ba7851fc7b6023` (착수 당시 원격 main과 일치 확인; 이후 main의 최신성을 주장하지 않음)
