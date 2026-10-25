@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 /**
- * Shadow-only Gemini adapter for the C09 persona experiment.
- * Run from repo root with GOOGLE_AI_API_KEY set:
- *   node scripts/seyeon-c09-fifteen-case-paid-shadow-eval-v1.mjs --model gemini-3.8-flash
- * Optional: --dry-run, --limit 3, --output <path>.
+ * Shadow-only OpenAI / Gemini adapter for the C09 persona experiment.
+ * Run from repo root with OPENAI_API_KEY or GOOGLE_AI_API_KEY set:
+ *   node scripts/seyeon-c09-fifteen-case-paid-shadow-eval-v1.mjs --provider openai --model gpt-4.1-mini
+ * Optional: --dry-run, --limit 3, --resume, --output <path>.
  *
- * Exactly one generateContent request per row; at most 15*3 = 45 paid attempts.
+ * One provider generation request per case/profile; bounded transient retries
+ * are allowed. There are at most 15*3 = 45 unique successful outputs.
  * This is NOT the MyeongHa production route, classifier, risk guard or semantic reviewer.
  */
 import { writeFileSync, mkdirSync, readFileSync, existsSync } from 'node:fs';
