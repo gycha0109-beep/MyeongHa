@@ -25,7 +25,7 @@
 ```bash
 npm ci --ignore-scripts --no-audit --no-fund
 npm run typecheck
-npm run test --   apps/api/src/supabase-auth-http.test.ts   test/legal-portone-preenrollment-social-v1.test.ts   test/legal-portone-preenrollment-member-signup-v1.test.ts   test/legal-portone-preenrollment-v1.test.ts   test/legal-portone-preenrollment-dispatch-v1.test.ts   test/legal-production-adult-purchase-hold-v1.test.ts   test/commerce-digital-reading-withdrawal-review-v1.test.ts   test/legal-seyeon-external-egress-evidence-v1.test.ts   test/legal-ai-disclosure-surface.test.ts
+npm run test --   apps/api/src/supabase-auth-http.test.ts   test/legal-portone-preenrollment-social-v1.test.ts   test/legal-existing-social-state-authority-v1.test.ts   test/legal-portone-preenrollment-member-signup-v1.test.ts   test/legal-portone-preenrollment-v1.test.ts   test/legal-portone-preenrollment-dispatch-v1.test.ts   test/legal-production-adult-purchase-hold-v1.test.ts   test/commerce-digital-reading-withdrawal-review-v1.test.ts   test/commerce-digital-reading-withdrawal-orchestration-v1.test.ts   test/legal-seyeon-external-egress-evidence-v1.test.ts   test/legal-ai-disclosure-surface.test.ts
 ```
 
 수락: TypeScript 오류 0, 표적 테스트 실패 0. 음성 테스트에는 미인증/14세 미만/직접 구매 미성년, 만료·복제·타인 소유 PortOne ID, Auth upstream 성공 뒤 Member 결속 실패, 서버 미결속 OAuth state, 기존 OFF 인증 호환, 민감 payload/토큰 무출력, 제3자 Gateway 모델 차단 및 유료 판매 503이 포함된다.
@@ -34,7 +34,8 @@ npm run test --   apps/api/src/supabase-auth-http.test.ts   test/legal-portone-p
 
 - 대상: `scripts/ci/db-suites.json`의 `postgres17` / `portone-identity-age-authority-pg17`. 실제 실행 경로는 `test/db/run_ci_case.sh` → `test/db/portone_identity_age_authority_pg17.sh`.
 - `test/db/portone_identity_age_authority_pg17.sh`는 **GitHub Actions + CI + DB_SUITE=postgres17 + localhost:5432 + 이름이 `myeongha_ci_case_숫자`인 일회성 데이터베이스**를 확인하며, Production 자격증명 관련 환경이 있으면 즉시 거절한다. 조건을 우회하거나 운영 DB에 적용해 검증하지 않는다.
-- A1의 1740/1741 제안 SQL은 이 폐기형 DB에만 실행한다. 수락: RLS/ACL, 연령 밴드, 서버 ID 발급/10분 TTL/물리정리, 인증 일회성 소비, 회원·게스트 원자 결속, 신규 Auth UUID 직접 우회 거절, 동시 중복 소비 단 1건 성공, 계정 삭제·Guest merge 후 증명 재노출 0.
+- A1의 1740/1741 SQL 및 기존 소셜 회원 일회성 상태의 1742 제안 SQL은 폐기형 DB에만 실행한다. 수락: RLS/ACL, 연령 밴드, 서버 ID 발급/10분 TTL/물리정리, 인증 일회성 소비, 회원·게스트 원자 결속, 신규 Auth UUID 직접 우회 거절, 동시 중복 소비 단 1건 성공, 계정 삭제·Guest merge 후 증명 재노출 0.
+- 1742는 만료·중복·동시 두 세션의 단 1건 소비·시스템 물리삭제·ACL을 검사하며 OAuth state/쿠키 원문은 DB에 보관하지 않는다.
 - S2는 L2 관련 코드가 준비된 후 **해당 SHA의 격리 suite**를 확인한다. 워크플로 수동 dispatch가 기본 브랜치 코드를 검사하는 경우 이를 PR head 통과 증거로 쓰지 않는다. PG17 GREEN 미확인 시 L2 완료 아님.
 
 ## S3. 출시 전 Web/Native·입력/정보 경계 E2E (비상업 합성 환경)

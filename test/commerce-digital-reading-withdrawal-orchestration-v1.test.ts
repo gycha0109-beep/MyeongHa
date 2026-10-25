@@ -7,6 +7,7 @@ import {
 import type { PostgresSubjectPoolV1, PostgresSubjectConnectionV1 } from '../apps/api/src/postgres-subject-execution.js';
 
 const AUTH_USER = '11111111-1111-4111-8111-111111111111';
+const GUEST_HASH = 'myeongha-guest-bearer-hmac-sha256-v1:' + 'a'.repeat(64);
 const SUBJECT = '22222222-2222-4222-8222-222222222222';
 const PURCHASE_ID = '33333333-3333-4333-8333-333333333333';
 const UNIT = 'reading-a-seyeon-once';
@@ -27,7 +28,7 @@ const evidence = {
   },
 };
 
-function fakePool(input: { missingSubject?: boolean; error?: Error } = {}) {
+function fakePool(input: { missingSubject?: boolean; error?: Error; guest?: boolean } = {}) {
   const log: string[] = [];
   const release = vi.fn();
   const connection: PostgresSubjectConnectionV1 = {
@@ -41,6 +42,10 @@ function fakePool(input: { missingSubject?: boolean; error?: Error } = {}) {
           });
         }
         return { rows: [{ subjectId: SUBJECT, subjectKind: 'member' } as Row] };
+      }
+      if (text.includes('begin_guest_subject_context_v1')) {
+        expect(values).toEqual([GUEST_HASH]);
+        return { rows: [{ subjectId: SUBJECT, subjectKind: 'guest' } as Row] };
       }
       if (text.includes('assert_myeongha_subject_context_v1')) {
         expect(values).toEqual([SUBJECT]);
@@ -94,6 +99,21 @@ describe('subject-owned internal digital Reading withdrawal evidence orchestrati
     expect(release).toHaveBeenCalledOnce();
     expect(JSON.stringify(review)).not.toContain(PURCHASE_ID);
     expect(OWNED_DIGITAL_READING_WITHDRAWAL_REVIEW_V1.publicRoute).toBeNull();
+  });
+
+  it('resolves a verified Guest rather than trusting a browser Subject ID', async () => {
+    const { pool, log } = fakePool({ guest: true });
+    const loadSnapshot = vi.fn(async ({ scope }: Parameters<OwnedDigitalReadingReviewSnapshotPortV1['loadSnapshot']>[0]) => {
+      expect(scope.resolvedSubject).toEqual({ subjectId: SUBJECT, subjectKind: 'guest' });
+      return evidence;
+    });
+    const result = await invoke({ loadSnapshot }, pool, {
+      verifiedEvidence: { kind: 'guest', verifiedGuestTokenHash: GUEST_HASH },
+      subjectId: 'client-other-subject',
+    });
+    expect(result.classification).toBe('restriction_review_candidate');
+    expect(log.some(s => s.includes('begin_guest_subject_context_v1'))).toBe(true);
+    expect(log.some(s => s.includes('begin_member_subject_context_v1'))).toBe(false);
   });
 
   it('ignores attempted caller-provided purchase, delivery and notice authority', async () => {
