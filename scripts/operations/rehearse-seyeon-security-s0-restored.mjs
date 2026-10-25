@@ -25,6 +25,7 @@ const db={host:'127.0.0.1',port:5432,password:'restore-drill',ssl:false,
 const admin=new Client({...db,user:'supabase_admin',database:'template1'});
 await admin.connect();
 let created=false;
+let sourceConnectionsPaused=false;
 try{
   const {rows:[server]}=await admin.query(`select current_user as role,
     current_setting('server_version_num')::int as version,
@@ -40,9 +41,22 @@ try{
   if((await admin.query('select 1 from pg_database where datname=$1',[target])).rows.length){
     throw Error('Disposable rehearsal target already exists; never overwrite it.');
   }
-  // Literal names only. Never clone a URL/database supplied by the caller.
+  // This is an ephemeral GitHub Actions PostgreSQL 17 service, never the hosted
+  // database. Supabase background clients can still use the restored 'postgres'
+  // database and would otherwise make CREATE DATABASE ... TEMPLATE fail.
+  // Temporarily reject reconnects, wait for existing local sessions to end,
+  // clone the fixed database, then immediately restore admission.
+  await admin.query('alter database postgres with allow_connections false');
+  sourceConnectionsPaused=true;
+  const active=await admin.query(`select pg_terminate_backend(pid,5000) as ended
+    from pg_stat_activity where datname='postgres' and pid<>pg_backend_pid()`);
+  if(active.rows.some(row=>row.ended!==true)){
+    throw Error('Disposable restored database still has active sessions.');
+  }
   await admin.query('create database myeongha_seyeon_security_s0_test owner postgres template postgres');
   created=true;
+  await admin.query('alter database postgres with allow_connections true');
+  sourceConnectionsPaused=false;
   const local=new Client({...db,user:'postgres',database:target});
   await local.connect();
   try{
@@ -77,8 +91,16 @@ try{
   await writeFile(process.env.SEYEON_S0_REHEARSAL_EVIDENCE_PATH,JSON.stringify(evidence,null,2)+'\n',{mode:0o600});
   console.log('S0_RESTORED_BACKUP_REHEARSAL_PASS');
 }finally{
-  // This constant target can contain restored user data. Never upload it.
-  // Cleanup runs only for the clone this process demonstrably created.
-  if(created)await admin.query('drop database myeongha_seyeon_security_s0_test with (force)');
-  await admin.end();
+  // Re-enable the original restored database even if cloning or later tests
+  // fail. Preserve both cleanup obligations; neither targets Production.
+  try{
+    if(sourceConnectionsPaused){
+      await admin.query('alter database postgres with allow_connections true');
+      sourceConnectionsPaused=false;
+    }
+  }finally{
+    try{
+      if(created)await admin.query('drop database myeongha_seyeon_security_s0_test with (force)');
+    }finally{await admin.end();}
+  }
 }
