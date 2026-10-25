@@ -79,7 +79,12 @@ export function tryDispatchHeldOfficialReaderV1(input: Readonly<{
     return notFound(input.request);
   }
 
-  const canonical = new URL(`https://myeongha.internal${path}`);
+  // Preserve the caller-visible URL origin when routing through /api/me.
+  // In particular the S7 ACK handler validates the actual browser Origin
+  // against request.url.origin. Replacing it with an internal synthetic
+  // hostname rejects same-origin customers after Vercel routing.
+  // Route identity is still derived solely from validated metadata above.
+  const canonical = new URL(path, url.origin);
   if (kind === 'continuity') {
     canonical.searchParams.set(READER_PARAM, one(url.searchParams, READER_PARAM)!);
   }

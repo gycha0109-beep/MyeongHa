@@ -18,6 +18,8 @@ const PURCHASE_INTENT_ID = '22222222-2222-4222-8222-222222222222';
 const PAYMENT_ATTEMPT_ID = '33333333-3333-4333-8333-333333333333';
 const RECEIPT_ID = '44444444-4444-4444-8444-444444444444';
 const PROVIDER_EVENT_ID = '55555555-5555-4555-8555-555555555555';
+const READING_ID = '66666666-6666-4666-8666-666666666666';
+const GRANT_ID = '77777777-7777-4777-8777-777777777777';
 const PROVIDER_REQUEST_ID = 'server-owned-portone-payment-id';
 const EXTERNAL_PRODUCT_ID = 'server-owned-product';
 const PROVIDER_TRANSACTION_ID = 'server-verified-portone-transaction';
@@ -41,6 +43,7 @@ const ENV = Object.freeze({
 function fakePool(input: {
   queriedSql?: string[];
   connect?: PostgresSubjectPoolV1['connect'];
+  readerReceipt?: boolean;
 } = {}): PostgresSubjectPoolV1 {
   const connectImpl = async (): Promise<PostgresSubjectConnectionV1> => ({
     async query<Row = Record<string, unknown>>(
@@ -77,7 +80,7 @@ function fakePool(input: {
             purchaseIntentId: PURCHASE_INTENT_ID,
             provider: 'portone_v2',
             platform: 'web',
-            environment: 'sandbox',
+            environment: input.readerReceipt ? 'production' : 'sandbox',
             providerRequestId: PROVIDER_REQUEST_ID,
             expectedProviderTransactionId: null,
             expectedExternalProductId: EXTERNAL_PRODUCT_ID,
@@ -92,7 +95,7 @@ function fakePool(input: {
         expect(values?.[1]).toBe(PURCHASE_INTENT_ID);
         expect(values?.[2]).toBe('portone_v2');
         expect(values?.[3]).toBe('web');
-        expect(values?.[4]).toBe('sandbox');
+        expect(values?.[4]).toBe(input.readerReceipt ? 'production' : 'sandbox');
         expect(values?.[5]).toBe(PROVIDER_TRANSACTION_ID);
         expect(values?.[8]).toBe(EXTERNAL_PRODUCT_ID);
         expect(values?.[9]).toBe('active');
@@ -107,6 +110,40 @@ function fakePool(input: {
         };
       }
 
+      if (input.readerReceipt && text.includes('internal_resolve_verified_reader_receipt_fulfillment_v1')) {
+        expect(values).toEqual([RECEIPT_ID]);
+        return {
+          rows: [{
+            purchaseIntentId: PURCHASE_INTENT_ID,
+            existingOfficialReadingId: READING_ID,
+            capabilityItemKey: 'standard-reading-access',
+            validityMode: 'unbounded',
+            purchaseRole: 'additional_reader_interpretation',
+            preparedAt: '2026-09-18T00:00:00.000Z',
+          } as Row],
+        };
+      }
+      if (input.readerReceipt && text.includes('cmd_apply_verified_reader_receipt_bind_internal_v1')) {
+        expect(values?.[0]).toBe(RECEIPT_ID);
+        expect(values?.[1]).toBe(READING_ID);
+        return {
+          rows: [{
+            result: {
+              contractVersion: 'official-reader-s2-atomic-receipt-bind-v1',
+              readerAccess: {
+                purchase_intent_id: PURCHASE_INTENT_ID,
+                entitlement_grant_id: GRANT_ID,
+                reader_character_id: 'seyeon',
+                reading_id: READING_ID,
+                replayed: false,
+                official_reading_created: false,
+                interpretation_created: true,
+              },
+              capabilityEffects: [{}],
+            },
+          } as Row],
+        };
+      }
       throw new Error(
         `Unexpected SQL in production payment verification runtime test: ${text}`,
       );
@@ -210,6 +247,59 @@ describe('production Payment Attempt server verification runtime', () => {
     expect(JSON.stringify(payload)).not.toContain(API_SECRET);
 
     await runtime.close();
+  });
+
+  it('wires trusted server-only S2 Reader issuance after provider verification, never as public checkout', async () => {
+    const queriedSql: string[] = [];
+    const runtime = createProductionPaymentAttemptServerVerificationRuntimeV1({
+      env: ENV,
+      pool: fakePool({ queriedSql, readerReceipt: true }),
+      verificationConfig: {
+        apiSecret: API_SECRET,
+        evidenceHmacSecret: EVIDENCE_SECRET,
+        fetchImpl: async () => new Response(JSON.stringify(paidPaymentBody()), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+        now: () => new Date('2026-09-18T00:00:01.000Z'),
+      },
+      // Explicit internal DB Owner injection; no URL, browser or env switch.
+      privateReaderReceiptFulfillmentEnabled: true,
+    });
+    try {
+      const response=await runtime.handleRequest({
+        request:post(),
+        requestId:'private-s2-receipt-to-reader',
+        serverTime:'2026-09-18T00:00:02.000Z',
+      });
+      expect(response.status).toBe(200);
+      const payload=await response.json() as any;
+      expect(payload.data).toMatchObject({
+        paymentAttemptId:PAYMENT_ATTEMPT_ID,
+        receiptId:RECEIPT_ID,
+        readerContinuation:{
+          officialReadingId:READING_ID,
+          readerCharacterId:'seyeon',
+          receiptBinding:'issued',
+          summary:'requires_authorized_saju_source_and_reader_delivery',
+          readerFollowup:'requires_fresh_exact_grant_and_existing_thread',
+          paidContentRevealed:false,
+          checkoutEnabled:false,
+        },
+      });
+      expect(queriedSql.findIndex(s=>s.includes('cmd_persist_verified_payment_evidence_v1')))
+        .toBeLessThan(queriedSql.findIndex(s=>s.includes('internal_resolve_verified_reader_receipt_fulfillment_v1')));
+      expect(queriedSql.findIndex(s=>s.includes('internal_resolve_verified_reader_receipt_fulfillment_v1')))
+        .toBeLessThan(queriedSql.findIndex(s=>s.includes('cmd_apply_verified_reader_receipt_bind_internal_v1')));
+      expect(queriedSql.filter(s=>s==='BEGIN')).toHaveLength(4);
+      expect(queriedSql.filter(s=>s==='COMMIT')).toHaveLength(4);
+      expect(JSON.stringify(payload)).not.toContain(PROVIDER_REQUEST_ID);
+      expect(JSON.stringify(payload)).not.toContain(GRANT_ID);
+    } finally {
+      await runtime.close();
+    }
+    expect(PRODUCTION_PAYMENT_ATTEMPT_SERVER_VERIFICATION_RUNTIME_BINDINGS_V1.publicRoute).toBeNull();
+    expect(PRODUCTION_PAYMENT_ATTEMPT_SERVER_VERIFICATION_RUNTIME_BINDINGS_V1.routeMounted).toBe(false);
   });
 
   it('requires request identity before any DB or PortOne provider work', async () => {
