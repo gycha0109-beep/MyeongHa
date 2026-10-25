@@ -9,6 +9,13 @@ const file=(name:string)=>readFile(new URL('../scripts/operations/seyeon-securit
   import.meta.url),'utf8');
 
 describe('S0 Production operator commands stay closed and reversible',()=>{
+  it('types the restored PG17 isolated fixture password parameter explicitly',async()=>{
+    const source=await readFile(new URL('../scripts/operations/rehearse-seyeon-security-s0-restored.mjs',
+      import.meta.url),'utf8');
+    // PG 42P18: format(%L,$1) without a cast has no parameter type context.
+    expect(source).toContain("password %L',$1::text) as sql");
+    expect(source).not.toContain("password %L',$1) as sql");
+  });
   it('always requires explicit CLI action and never touches DB by default',async()=>{
     for(const script of [
       'activate-production-s0-after-evidence.mjs',

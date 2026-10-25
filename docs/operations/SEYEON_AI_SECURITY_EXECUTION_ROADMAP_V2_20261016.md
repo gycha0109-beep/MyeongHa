@@ -737,3 +737,10 @@ source schema/최초 Reply·receipt·철회 서버 composition, 공용 API clien
 - 같은 운영 DB에서 S0 `cmd_ack_seyeon_positive_reply_v1`, `cmd_set_s0_positive_source_gate_v1` 미설치, Governor 모델 정책/일일 예산 0건. 따라서 세연 실대화는 미활성화.
 - SUN 작업기존 `.env`에는 `OPENAI_API_KEY`만 확인되고, 전용 governed DB URL 및 principal 키는 없다. credential 원문을 보거나 출력하지 않았다. 기존 로그인과 자격증명 일치성을 확인하기 전에는 `configure-seyeon-security-s0-credentials.mjs`를 재실행하지 않는다.
 - 별도 트랙/기존 운영 DB 상태를 추정하여 덮어쓰지 않으며, S0 실제 DR 리허설과 SRC-25/G0-D04/G3/G5 증거가 확보되기 전까지 Production 데이터/ACL/Provider/Cloudflare 공개 변경은 하지 않는다.
+
+## 70. 2026-10-26 실제 복원 CI 장애 및 단일 브랜치 보완
+
+- 마지막 S0 설치 포함 복원 리허설 `#40200284088`은 PostgreSQL 17 격리 DB까지 진행했으나, 임시 전용 테스트 로그인 생성 시 `format('...%L',$1)` 매개변수가 PostgreSQL `42P18`을 발생시켜 테스트 설치 전에 실패했다. 단일 작업 브랜치에서 `$1::text`로 수정하고 로컬 회귀 테스트를 추가했다. **현재 수정의 PG17 실증 PASS는 아직 아님.**
+- SUN 환경에는 로컬 PostgreSQL 18.6이 있고 WSL Ubuntu에는 PostgreSQL/연동 Docker 엔진이 없어, 동일 버전 PostgreSQL 17 복원 실증 대체 환경으로 간주할 수 없다. 제반 운영 권한 증명을 PG18로 대체하지 않는다.
+- `main`과 단일 작업 브랜치의 사전 가상 병합에서 `scripts/operations/seyeon-security-s0/04-locked-reveal.sql` 충돌 1건을 확인했다. 중간 병합은 실행하지 않았으며 전체 S0 구현 종료 후 최종 통합 때 원본 ACL과 임시 NOLOGIN owner RPC 변경을 함께 보존한다.
+- 로드맵의 원본 유형 SRC-25, 철회/송출 G0-D04/G3, 별도 Gov 로그인 자격증명 및 운영 모델 비용 예산은 여전히 미확보·미검증이다. 코드 구현만으로 실대화 활성화를 주장하지 않는다.
