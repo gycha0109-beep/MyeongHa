@@ -164,11 +164,15 @@ export async function runCloudflarePrimaryE2E(options = {}) {
       headers: method === 'POST' ? { 'Content-Type': 'application/json' } : {},
       ...(method === 'POST' ? { body: '{}' } : {}),
     });
-    expectedHttp(response, name, [503]);
+    expectedHttp(response, name, name === 'chat.turn_hold' ? [401, 503] : [503]);
     apiHeaders(response, name);
     noSecretEgress(response, name);
     const payload = await boundedJson(response, name);
     assert(payload.ok !== true, name + ' leaked positive chat output');
+    if (response.status === 401) {
+      assert(payload?.error?.code === 'AUTH_REQUIRED',
+        name + ' did not return the verified Member AUTH_REQUIRED boundary');
+    }
     mark(name, response.status);
   }
 

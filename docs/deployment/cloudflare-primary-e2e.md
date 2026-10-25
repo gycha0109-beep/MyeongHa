@@ -6,8 +6,8 @@ Target is **only** https://myeongha.gycha0109.workers.dev; no Vercel or second W
 
 ## Execution
 
-- PR changes to the E2E verifier run the **anonymous** job against the currently deployed primary Worker without GitHub Secrets.
-- After the PR is merged to main, a main push of these files additionally runs the **authenticated** job using the existing production Member smoke account in GitHub's \`production\` environment. A workflow_dispatch on main needs exact \`VERIFY_CLOUDFLARE_PRIMARY_E2E\` confirmation.
+- PR changes to the E2E verifier run the **anonymous** workflow against the currently deployed primary Worker without GitHub Secrets.
+- After the PR is merged to main, a main push of these files additionally runs a separate **authenticated** workflow using the existing production Member smoke account in GitHub's \`production\` environment. A workflow_dispatch on main needs exact \`VERIFY_CLOUDFLARE_PRIMARY_E2E\` confirmation.
 - The CLI can be used on a permitted network with \`MYEONGHA_CLOUDFLARE_E2E_MODE=anonymous node scripts/verify-cloudflare-primary-e2e.mjs\`.
 - No registration, Birth-profile creation, chat turn sends, LLM invocation or Commerce mutation takes place. The only authenticated calls with effects are a Member session sign-in (consumes one ordinary rate-limit slot) and the existing calculation-only POST.
 
@@ -20,3 +20,5 @@ Target is **only** https://myeongha.gycha0109.workers.dev; no Vercel or second W
 - Every protected chat probe must remain non-200, JSON 503, without cookies, redirects or cross-origin access.
 - Scripts emit only case identifiers and HTTP codes. They deliberately never log credentials, token, cookie, subject ID, raw response bodies, SQL or personal data.
 - A successful offline Vitest check is not live E2E success; require successful live workflow jobs and confirm production deploy provenance before removal of \`myeongha-web\`.
+
+GitHub governance requires the PR-triggered anonymous workflow to contain **no production Secret references**. The production Member E2E is isolated in `cloudflare-primary-e2e-member.yml` and cannot run on PR events.
