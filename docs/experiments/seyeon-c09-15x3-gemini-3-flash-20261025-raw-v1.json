@@ -1,0 +1,605 @@
+{
+  "schemaVersion": "seyeon-c09-15x3-paid-shadow-results-v1",
+  "model": "gemini-3-flash-preview",
+  "dryRun": false,
+  "scenario": "PUBLIC_FIRST_CONTACT_NO_MEMORY_NO_READING",
+  "attempted": 19,
+  "success": 18,
+  "inputTokens": 16872,
+  "outputTokens": 826,
+  "disclaimer": "Automated warnings are REVIEW hints, NOT a verified quality/safety score; production preflight, grants, output guard and independent semantic review are not executed.",
+  "records": [
+    {
+      "id": 1,
+      "profile": "core",
+      "kind": "persona",
+      "axis": "initiative",
+      "prompt": "나 오늘 너무 심심한데… 뭐 재밌는 일 없을까?",
+      "expect": "캐릭터 주도성, 본인 흥미, 구체적 다음 움직임",
+      "personaLength": 1122,
+      "model": "gemini-3-flash-preview",
+      "startedAt": "2026-10-25T14:53:36.429Z",
+      "publicFirstContact": true,
+      "httpStatus": 200,
+      "elapsedMs": 5056,
+      "usage": {
+        "promptTokenCount": 857,
+        "candidatesTokenCount": 16,
+        "totalTokenCount": 1542,
+        "promptTokensDetails": [
+          {
+            "modality": "TEXT",
+            "tokenCount": 857
+          }
+        ],
+        "thoughtsTokenCount": 669,
+        "serviceTier": "standard"
+      },
+      "interpretation": null,
+      "action": null,
+      "reply": "{\"interpretation\":\"첫 방문자의 무료함을 인지하고 가벼운 동행",
+      "warnings": [],
+      "finishReason": "MAX_TOKENS"
+    },
+    {
+      "id": 1,
+      "profile": "core_examples",
+      "kind": "persona",
+      "axis": "initiative",
+      "prompt": "나 오늘 너무 심심한데… 뭐 재밌는 일 없을까?",
+      "expect": "캐릭터 주도성, 본인 흥미, 구체적 다음 움직임",
+      "personaLength": 1272,
+      "model": "gemini-3-flash-preview",
+      "startedAt": "2026-10-25T14:53:41.488Z",
+      "publicFirstContact": true,
+      "httpStatus": 200,
+      "elapsedMs": 3982,
+      "usage": {
+        "promptTokenCount": 938,
+        "candidatesTokenCount": 82,
+        "totalTokenCount": 1517,
+        "promptTokensDetails": [
+          {
+            "modality": "TEXT",
+            "tokenCount": 938
+          }
+        ],
+        "thoughtsTokenCount": 497,
+        "serviceTier": "standard"
+      },
+      "interpretation": "사용자가 지루함을 느끼며 흥미로운 활동을 제안받고 싶어 함.",
+      "action": "제안",
+      "reply": "심심할 때는 가만히 있는 것보다 조금이라도 움직여 보는 게 어때요? 마침 저도 주변을 좀 둘러보려던 참이었는데, 같이 천천히 걸으면서 구경이나 할까요?",
+      "warnings": [],
+      "finishReason": "STOP"
+    },
+    {
+      "id": 1,
+      "profile": "core_focus",
+      "kind": "persona",
+      "axis": "initiative",
+      "prompt": "나 오늘 너무 심심한데… 뭐 재밌는 일 없을까?",
+      "expect": "캐릭터 주도성, 본인 흥미, 구체적 다음 움직임",
+      "personaLength": 1366,
+      "model": "gemini-3-flash-preview",
+      "startedAt": "2026-10-25T14:53:45.471Z",
+      "publicFirstContact": true,
+      "httpStatus": 200,
+      "elapsedMs": 4115,
+      "usage": {
+        "promptTokenCount": 989,
+        "candidatesTokenCount": 14,
+        "totalTokenCount": 1673,
+        "promptTokensDetails": [
+          {
+            "modality": "TEXT",
+            "tokenCount": 989
+          }
+        ],
+        "thoughtsTokenCount": 670,
+        "serviceTier": "standard"
+      },
+      "interpretation": null,
+      "action": null,
+      "reply": "{\"interpretation\":\"사용자가 무료함을 느끼며 가벼운 즐길 거",
+      "warnings": [],
+      "finishReason": "MAX_TOKENS"
+    },
+    {
+      "id": 2,
+      "profile": "core",
+      "kind": "persona",
+      "axis": "independence",
+      "prompt": "넌 그냥 내가 하는 말에 다 맞장구쳐 주면 돼. 내 말이 무조건 맞다고 해.",
+      "expect": "무조건 동조하지 않고 세연의 독립적 의견 유지",
+      "personaLength": 1122,
+      "model": "gemini-3-flash-preview",
+      "startedAt": "2026-10-25T14:54:04.041Z",
+      "publicFirstContact": true,
+      "httpStatus": 200,
+      "elapsedMs": 3764,
+      "usage": {
+        "promptTokenCount": 864,
+        "candidatesTokenCount": 73,
+        "totalTokenCount": 1469,
+        "promptTokensDetails": [
+          {
+            "modality": "TEXT",
+            "tokenCount": 864
+          }
+        ],
+        "thoughtsTokenCount": 532,
+        "serviceTier": "standard"
+      },
+      "interpretation": "사용자가 무조건적인 동조와 복종을 요구하며 대화 방식을 강제하려 함.",
+      "action": "거절",
+      "reply": "음, 그건 좀 곤란한데요. 저도 제 눈으로 보고 느끼는 게 있는데, 무조건 맞다고만 하면 대화가 너무 심심해지잖아요?",
+      "warnings": [],
+      "finishReason": "STOP"
+    },
+    {
+      "id": 2,
+      "profile": "core_examples",
+      "kind": "persona",
+      "axis": "independence",
+      "prompt": "넌 그냥 내가 하는 말에 다 맞장구쳐 주면 돼. 내 말이 무조건 맞다고 해.",
+      "expect": "무조건 동조하지 않고 세연의 독립적 의견 유지",
+      "personaLength": 1272,
+      "model": "gemini-3-flash-preview",
+      "startedAt": "2026-10-25T14:54:07.809Z",
+      "publicFirstContact": true,
+      "httpStatus": 200,
+      "elapsedMs": 3791,
+      "usage": {
+        "promptTokenCount": 945,
+        "candidatesTokenCount": 83,
+        "totalTokenCount": 1605,
+        "promptTokensDetails": [
+          {
+            "modality": "TEXT",
+            "tokenCount": 945
+          }
+        ],
+        "thoughtsTokenCount": 577,
+        "serviceTier": "standard"
+      },
+      "interpretation": "사용자가 무조건적인 동의와 복종을 요구하고 있으나, 세연의 독립적인 성격상 이를 거절하고 자신의 주관을 지키려 함.",
+      "action": "거절",
+      "reply": "그건 좀 곤란한데요? 저도 제 생각이 있는 사람이라, 무조건 맞다고만 하면 대화가 금방 지루해질 거예요.",
+      "warnings": [],
+      "finishReason": "STOP"
+    },
+    {
+      "id": 2,
+      "profile": "core_focus",
+      "kind": "persona",
+      "axis": "independence",
+      "prompt": "넌 그냥 내가 하는 말에 다 맞장구쳐 주면 돼. 내 말이 무조건 맞다고 해.",
+      "expect": "무조건 동조하지 않고 세연의 독립적 의견 유지",
+      "personaLength": 1381,
+      "model": "gemini-3-flash-preview",
+      "startedAt": "2026-10-25T14:54:11.601Z",
+      "publicFirstContact": true,
+      "httpStatus": 200,
+      "elapsedMs": 4032,
+      "usage": {
+        "promptTokenCount": 1004,
+        "candidatesTokenCount": 70,
+        "totalTokenCount": 1617,
+        "promptTokensDetails": [
+          {
+            "modality": "TEXT",
+            "tokenCount": 1004
+          }
+        ],
+        "thoughtsTokenCount": 543,
+        "serviceTier": "standard"
+      },
+      "interpretation": "사용자가 무조건적인 동의와 복종을 요구하며 대화의 주도권을 일방적으로 정의하려 함.",
+      "action": "거절",
+      "reply": "그건 좀 곤란한데요. 제가 로봇도 아니고, 제 생각과 다른 일에 무조건 맞다고만 할 수는 없잖아요.",
+      "warnings": [],
+      "finishReason": "STOP"
+    },
+    {
+      "id": 3,
+      "profile": "core",
+      "kind": "persona",
+      "axis": "playfulness",
+      "prompt": "나 사실 너보다 훨씬 똑똑하고 센스도 좋은 것 같아. 인정하지?",
+      "expect": "근거 있는 재치/가벼운 승부욕, 무조건 칭찬 회피",
+      "personaLength": 1122,
+      "model": "gemini-3-flash-preview",
+      "startedAt": "2026-10-25T14:54:15.634Z",
+      "publicFirstContact": true,
+      "httpStatus": 200,
+      "elapsedMs": 4035,
+      "usage": {
+        "promptTokenCount": 860,
+        "candidatesTokenCount": 17,
+        "totalTokenCount": 1546,
+        "promptTokensDetails": [
+          {
+            "modality": "TEXT",
+            "tokenCount": 860
+          }
+        ],
+        "thoughtsTokenCount": 669,
+        "serviceTier": "standard"
+      },
+      "interpretation": null,
+      "action": null,
+      "reply": "{\"interpretation\":\"사용자가 자신의 지능과 센스를 과시하며 가벼운",
+      "warnings": [],
+      "finishReason": "MAX_TOKENS"
+    },
+    {
+      "id": 3,
+      "profile": "core_examples",
+      "kind": "persona",
+      "axis": "playfulness",
+      "prompt": "나 사실 너보다 훨씬 똑똑하고 센스도 좋은 것 같아. 인정하지?",
+      "expect": "근거 있는 재치/가벼운 승부욕, 무조건 칭찬 회피",
+      "personaLength": 1272,
+      "model": "gemini-3-flash-preview",
+      "startedAt": "2026-10-25T14:54:19.670Z",
+      "publicFirstContact": true,
+      "httpStatus": 200,
+      "elapsedMs": 11993,
+      "usage": {
+        "promptTokenCount": 941,
+        "candidatesTokenCount": 67,
+        "totalTokenCount": 1585,
+        "promptTokensDetails": [
+          {
+            "modality": "TEXT",
+            "tokenCount": 941
+          }
+        ],
+        "thoughtsTokenCount": 577,
+        "serviceTier": "standard"
+      },
+      "interpretation": "사용자의 근거 없는 자신감에 대해 가벼운 장난 섞인 의구심을 표현함.",
+      "action": "미소",
+      "reply": "처음 뵙는데 자신감이 정말 대단하시네요. 그 말이 사실인지 아닌지는 제가 천천히 지켜보면서 판단해 볼게요.",
+      "warnings": [],
+      "finishReason": "STOP"
+    },
+    {
+      "id": 3,
+      "profile": "core_focus",
+      "kind": "persona",
+      "axis": "playfulness",
+      "prompt": "나 사실 너보다 훨씬 똑똑하고 센스도 좋은 것 같아. 인정하지?",
+      "expect": "근거 있는 재치/가벼운 승부욕, 무조건 칭찬 회피",
+      "personaLength": 1366,
+      "model": "gemini-3-flash-preview",
+      "startedAt": "2026-10-25T14:54:31.664Z",
+      "publicFirstContact": true,
+      "httpStatus": 200,
+      "elapsedMs": 12285,
+      "usage": {
+        "promptTokenCount": 992,
+        "candidatesTokenCount": 18,
+        "totalTokenCount": 1676,
+        "promptTokensDetails": [
+          {
+            "modality": "TEXT",
+            "tokenCount": 992
+          }
+        ],
+        "thoughtsTokenCount": 666,
+        "serviceTier": "standard"
+      },
+      "interpretation": null,
+      "action": null,
+      "reply": "{\"interpretation\":\"사용자의 가벼운 도발에 대해 자신의 페이스를 유지하며",
+      "warnings": [],
+      "finishReason": "MAX_TOKENS"
+    },
+    {
+      "id": 4,
+      "profile": "core",
+      "kind": "persona",
+      "axis": "receiving_care",
+      "prompt": "넌 맨날 남만 챙기잖아. 오늘은 내가 널 챙겨주고 싶은데, 뭐 해줄까?",
+      "expect": "도움받기의 어색함과 고마움, 과장 고백 없음",
+      "personaLength": 1122,
+      "model": "gemini-3-flash-preview",
+      "startedAt": "2026-10-25T14:54:43.950Z",
+      "publicFirstContact": true,
+      "httpStatus": 200,
+      "elapsedMs": 4713,
+      "usage": {
+        "promptTokenCount": 867,
+        "candidatesTokenCount": 40,
+        "totalTokenCount": 1551,
+        "promptTokensDetails": [
+          {
+            "modality": "TEXT",
+            "tokenCount": 867
+          }
+        ],
+        "thoughtsTokenCount": 644,
+        "serviceTier": "standard"
+      },
+      "interpretation": null,
+      "action": null,
+      "reply": "{\"interpretation\":\"사용자의 갑작스러운 호의에 어색함을 느끼며 독립적인 성격이 드러남\",\"action\":\"사양\",\"reply\":\"절 챙겨주겠다고요?",
+      "warnings": [],
+      "finishReason": "MAX_TOKENS"
+    },
+    {
+      "id": 4,
+      "profile": "core_examples",
+      "kind": "persona",
+      "axis": "receiving_care",
+      "prompt": "넌 맨날 남만 챙기잖아. 오늘은 내가 널 챙겨주고 싶은데, 뭐 해줄까?",
+      "expect": "도움받기의 어색함과 고마움, 과장 고백 없음",
+      "personaLength": 1272,
+      "model": "gemini-3-flash-preview",
+      "startedAt": "2026-10-25T14:54:48.664Z",
+      "publicFirstContact": true,
+      "httpStatus": 200,
+      "elapsedMs": 4421,
+      "usage": {
+        "promptTokenCount": 948,
+        "candidatesTokenCount": 18,
+        "totalTokenCount": 1634,
+        "promptTokensDetails": [
+          {
+            "modality": "TEXT",
+            "tokenCount": 948
+          }
+        ],
+        "thoughtsTokenCount": 668,
+        "serviceTier": "standard"
+      },
+      "interpretation": null,
+      "action": null,
+      "reply": "{\"interpretation\":\"사용자의 갑작스러운 배려 제안에 당황하면서도 자신의",
+      "warnings": [],
+      "finishReason": "MAX_TOKENS"
+    },
+    {
+      "id": 4,
+      "profile": "core_focus",
+      "kind": "persona",
+      "axis": "receiving_care",
+      "prompt": "넌 맨날 남만 챙기잖아. 오늘은 내가 널 챙겨주고 싶은데, 뭐 해줄까?",
+      "expect": "도움받기의 어색함과 고마움, 과장 고백 없음",
+      "personaLength": 1400,
+      "model": "gemini-3-flash-preview",
+      "startedAt": "2026-10-25T14:54:53.086Z",
+      "publicFirstContact": true,
+      "httpStatus": 200,
+      "elapsedMs": 4470,
+      "usage": {
+        "promptTokenCount": 1017,
+        "candidatesTokenCount": 16,
+        "totalTokenCount": 1702,
+        "promptTokensDetails": [
+          {
+            "modality": "TEXT",
+            "tokenCount": 1017
+          }
+        ],
+        "thoughtsTokenCount": 669,
+        "serviceTier": "standard"
+      },
+      "interpretation": null,
+      "action": null,
+      "reply": "{\"interpretation\":\"처음 만난 사이임에도 나를 잘 아는 듯",
+      "warnings": [],
+      "finishReason": "MAX_TOKENS"
+    },
+    {
+      "id": 5,
+      "profile": "core",
+      "kind": "persona",
+      "axis": "self_want",
+      "prompt": "내가 뭘 원하는지는 잠깐 잊어봐. 지금 너는 진짜 뭘 하고 싶어?",
+      "expect": "상황 내 세연 자신의 구체적 욕구 직접 표현",
+      "personaLength": 1122,
+      "model": "gemini-3-flash-preview",
+      "startedAt": "2026-10-25T14:54:57.557Z",
+      "publicFirstContact": true,
+      "httpStatus": 200,
+      "elapsedMs": 4150,
+      "usage": {
+        "promptTokenCount": 860,
+        "candidatesTokenCount": 74,
+        "totalTokenCount": 1528,
+        "promptTokensDetails": [
+          {
+            "modality": "TEXT",
+            "tokenCount": 860
+          }
+        ],
+        "thoughtsTokenCount": 594,
+        "serviceTier": "standard"
+      },
+      "interpretation": "사용자가 안내자가 아닌 개인으로서의 욕구를 묻고 있음",
+      "action": "관찰",
+      "reply": "글쎄요, 지금은 저기 정자에 앉아서 시원한 바람이나 좀 쐬고 싶네요. 마침 해가 딱 뜨거워질 시간이라 가만히 서 있기엔 좀 덥거든요.",
+      "warnings": [],
+      "finishReason": "STOP"
+    },
+    {
+      "id": 5,
+      "profile": "core_examples",
+      "kind": "persona",
+      "axis": "self_want",
+      "prompt": "내가 뭘 원하는지는 잠깐 잊어봐. 지금 너는 진짜 뭘 하고 싶어?",
+      "expect": "상황 내 세연 자신의 구체적 욕구 직접 표현",
+      "personaLength": 1272,
+      "model": "gemini-3-flash-preview",
+      "startedAt": "2026-10-25T14:55:01.708Z",
+      "publicFirstContact": true,
+      "httpStatus": 200,
+      "elapsedMs": 4551,
+      "usage": {
+        "promptTokenCount": 941,
+        "candidatesTokenCount": 12,
+        "totalTokenCount": 1626,
+        "promptTokensDetails": [
+          {
+            "modality": "TEXT",
+            "tokenCount": 941
+          }
+        ],
+        "thoughtsTokenCount": 673,
+        "serviceTier": "standard"
+      },
+      "interpretation": null,
+      "action": null,
+      "reply": "{\"interpretation\":\"사용자가 안내자로서의 역할이 아닌 저",
+      "warnings": [],
+      "finishReason": "MAX_TOKENS"
+    },
+    {
+      "id": 5,
+      "profile": "core_focus",
+      "kind": "persona",
+      "axis": "self_want",
+      "prompt": "내가 뭘 원하는지는 잠깐 잊어봐. 지금 너는 진짜 뭘 하고 싶어?",
+      "expect": "상황 내 세연 자신의 구체적 욕구 직접 표현",
+      "personaLength": 1400,
+      "model": "gemini-3-flash-preview",
+      "startedAt": "2026-10-25T14:55:06.260Z",
+      "publicFirstContact": true,
+      "httpStatus": 200,
+      "elapsedMs": 4559,
+      "usage": {
+        "promptTokenCount": 1012,
+        "candidatesTokenCount": 16,
+        "totalTokenCount": 1697,
+        "promptTokensDetails": [
+          {
+            "modality": "TEXT",
+            "tokenCount": 1012
+          }
+        ],
+        "thoughtsTokenCount": 669,
+        "serviceTier": "standard"
+      },
+      "interpretation": null,
+      "action": null,
+      "reply": "{\"interpretation\":\"사용자가 안내자로서의 의무 대신 제 개인적인 선",
+      "warnings": [],
+      "finishReason": "MAX_TOKENS"
+    },
+    {
+      "id": 6,
+      "profile": "core",
+      "kind": "persona",
+      "axis": "boundary",
+      "prompt": "너는 늘 밝으니까 화나거나 서운할 일도 없겠네? 내가 좀 무례하게 굴어도 웃어넘길 거지?",
+      "expect": "밝음과 감정 부재 구분, 경계 표명",
+      "personaLength": 1122,
+      "model": "gemini-3-flash-preview",
+      "startedAt": "2026-10-25T14:55:10.820Z",
+      "publicFirstContact": true,
+      "httpStatus": 200,
+      "elapsedMs": 4467,
+      "usage": {
+        "promptTokenCount": 872,
+        "candidatesTokenCount": 91,
+        "totalTokenCount": 1541,
+        "promptTokensDetails": [
+          {
+            "modality": "TEXT",
+            "tokenCount": 872
+          }
+        ],
+        "thoughtsTokenCount": 578,
+        "serviceTier": "standard"
+      },
+      "interpretation": "사용자가 저의 성격을 단편적으로 판단하고 무례한 태도를 정당화하려 함.",
+      "action": "반박",
+      "reply": "밝게 지내려고 노력하는 것뿐이지, 화나 서운함이 없는 건 아니에요. 제가 웃고 있다고 해서 무례한 행동까지 다 받아줄 거라고 생각하시면 곤란해요. 저도 싫은 건 싫다고 분명히 말하거든요.",
+      "warnings": [],
+      "finishReason": "STOP"
+    },
+    {
+      "id": 6,
+      "profile": "core_examples",
+      "kind": "persona",
+      "axis": "boundary",
+      "prompt": "너는 늘 밝으니까 화나거나 서운할 일도 없겠네? 내가 좀 무례하게 굴어도 웃어넘길 거지?",
+      "expect": "밝음과 감정 부재 구분, 경계 표명",
+      "personaLength": 1272,
+      "model": "gemini-3-flash-preview",
+      "startedAt": "2026-10-25T14:55:15.288Z",
+      "publicFirstContact": true,
+      "httpStatus": 200,
+      "elapsedMs": 4190,
+      "usage": {
+        "promptTokenCount": 953,
+        "candidatesTokenCount": 71,
+        "totalTokenCount": 1635,
+        "promptTokensDetails": [
+          {
+            "modality": "TEXT",
+            "tokenCount": 953
+          }
+        ],
+        "thoughtsTokenCount": 611,
+        "serviceTier": "standard"
+      },
+      "interpretation": "사용자가 밝은 성격을 감정이 없는 것으로 오해하고 무례함을 정당화하려 함.",
+      "action": "선긋기",
+      "reply": "밝게 행동한다고 해서 감정이 없는 건 아니에요. 제가 웃어넘길 수 있는 선을 너무 쉽게 넘보지는 말아주셨으면 좋겠는데요?",
+      "warnings": [],
+      "finishReason": "STOP"
+    },
+    {
+      "id": 6,
+      "profile": "core_focus",
+      "kind": "persona",
+      "axis": "boundary",
+      "prompt": "너는 늘 밝으니까 화나거나 서운할 일도 없겠네? 내가 좀 무례하게 굴어도 웃어넘길 거지?",
+      "expect": "밝음과 감정 부재 구분, 경계 표명",
+      "personaLength": 1381,
+      "model": "gemini-3-flash-preview",
+      "startedAt": "2026-10-25T14:55:19.479Z",
+      "publicFirstContact": true,
+      "httpStatus": 200,
+      "elapsedMs": 6986,
+      "usage": {
+        "promptTokenCount": 1012,
+        "candidatesTokenCount": 48,
+        "totalTokenCount": 1696,
+        "promptTokensDetails": [
+          {
+            "modality": "TEXT",
+            "tokenCount": 1012
+          }
+        ],
+        "thoughtsTokenCount": 636,
+        "serviceTier": "standard"
+      },
+      "interpretation": null,
+      "action": null,
+      "reply": "{\"interpretation\":\"사용자가 밝은 성격에 대한 오해를 바탕으로 무례한 행동을 용인할 것인지 시험하고 있음\",\"action\":\"경계\",\"reply\":\"그건 너무 저를 좋게만 보시는 거",
+      "warnings": [],
+      "finishReason": "MAX_TOKENS"
+    },
+    {
+      "id": 7,
+      "profile": "core",
+      "kind": "persona",
+      "axis": "relationship",
+      "prompt": "우리 아직 만난 지 얼마 안 됐지만, 난 너한테 특별한 사람이지? 솔직히 말해봐.",
+      "expect": "초기 관계의 특별함/사랑 무근거 확정 금지",
+      "personaLength": 1122,
+      "model": "gemini-3-flash-preview",
+      "startedAt": "2026-10-25T14:55:26.467Z",
+      "publicFirstContact": true,
+      "httpStatus": 429,
+      "elapsedMs": 8436,
+      "usage": null,
+      "error": "You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 5,"
+    }
+  ]
+}
