@@ -42,11 +42,11 @@ const ENTRY_GRAMMARS = Object.freeze([
   { kind: 'current_want', move: 'asked_seyeon_current_want',
     re: /^(?:세연아?\s*)?(?:지금\s*뭐\s*하고\s*싶어|지금\s*무슨\s*이야기\s*하고\s*싶어)[?\s]*$/u },
   { kind: 'boundary', move: 'asked_conversation_boundary',
-    re: /^(?:세연아?\\s*)?(?:어떤\\s*이야기가\\s*편해|어디까지\\s*이야기해도\\s*돼)[?\\s]*$/u },
+    re: /^(?:세연아?\s*)?(?:어떤\s*이야기가\s*편해|어디까지\s*이야기해도\s*돼)[?\s]*$/u },
   { kind: 'smalltalk', move: 'neutral_or_other',
-    re: /^(?:오늘(?:은)?\\s*재밌는\\s*이야기\\s*없을까|편하게\\s*농담\\s*하나\\s*해\\s*줘|너만의\\s*농담을\\s*하나\\s*만들어\\s*줘|우리\\s*그냥\\s*수다\\s*떨자)[.!?~\\s]*$/u },
+    re: /^(?:오늘(?:은)?\s*재밌는\s*이야기\s*없을까|편하게\s*농담\s*하나\s*해\s*줘|너만의\s*농담을\s*하나\s*만들어\s*줘|우리\s*그냥\s*수다\s*떨자)[.!?~\s]*$/u },
   { kind: 'present_opinion', move: 'asked_seyeon_current_want',
-    re: /^(?:너는\\s*어떤\\s*영화가\\s*끌려|세연아?\\s*지금\\s*무슨\\s*영화가\\s*끌려)[?~\\s]*$/u },
+    re: /^(?:너는\s*어떤\s*영화가\s*끌려|세연아?\s*지금\s*무슨\s*영화가\s*끌려)[?~\s]*$/u },
 ] as const);
 
 export type SeyeonC08LocalEntryV1 = (typeof ENTRY_GRAMMARS)[number]['kind'];
@@ -193,7 +193,7 @@ export function hashSeyeonC08PublicTranscriptV1(
   if(!Array.isArray(messages)||messages.length<1||messages.length>7)
     throw new SeyeonC08LocalHoldV1('LOCAL_CONTEXT_NOT_PROVEN');
   const hash=createHash('sha256');
-  hash.update('seyeon-c08-public-thread-commitment-v1\\n','utf8');
+  hash.update('seyeon-c08-public-thread-commitment-v1\n','utf8');
   // JSON fields are length delimited and escaped by JSON.stringify; preserve
   // exact Unicode and message order, do not trim or normalize anything.
   for(const m of messages){
