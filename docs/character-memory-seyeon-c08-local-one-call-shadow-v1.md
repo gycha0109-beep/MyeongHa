@@ -54,6 +54,7 @@ Watchtower-Track: character-memory
 
 ## 기억 출처 검증 계약 (대사 연결 전 단계)
 
+- `apps/api/src/seyeon-c08-server-memory-proof-port-v1.ts`는 인증된 DB의 subject/thread/Grant 범위와 최신 저장본을 조회해 메모리 본문 대신 hash만 반환한다. 실제 Production DB 연결은 하지 않았다.
 - `apps/api/src/seyeon-c08-memory-authority-proof-v1.ts`는 단일 `life_fact/memory` 타입의 `claimKind=fact`를 대상으로 DB가 확인한 `memoryId/sourceRef/summaryHash/grantState=ACTIVE/origin=AUTHORITATIVE_STORED_USER_MEMORY/assistantGenerated=false`를 검증한다.
 - 동일한 기억이라고 해도 `summaryHash`가 다르거나 User Grant가 철회·누락되면 HOLD. `relationship_event`나 `character_interpretation`, AI가 만든 이벤트는 거부.
 - 성공해도 `memoryMayBeSentToModel=false`, `memoryMayBeQuotedToUser=false`로 고정한다. 향후 **서버가 검증된 정확한 기억 내용을 불변 슬롯으로 출력할 계약**을 마련하기 전에는 모델에게 사적인 기억을 제공하거나 Callback을 출력하지 않는다.
