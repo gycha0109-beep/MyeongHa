@@ -74,6 +74,12 @@ describe('C09 A-based balanced persona request without hardcoded actions', () =>
     expect(balanced.responseSchema).toBe(SEYEON_FAST_DIALOGUE_SHADOW_RESPONSE_SCHEMA_V1);
     const newInput = balanced.input as {
       context: SeyeonRuntimeContextV2;
+      allowedRendererOutputVocabulary: {
+        selfDisclosureAllowed: boolean;
+        memoryIds: readonly string[];
+        privateSourceRefs: readonly string[];
+        disclosureSliceIds: readonly string[];
+      };
       c09BalancedPersona: {
         noPredeterminedAction: boolean;
         noRelationshipOrMemoryMutation: boolean;
@@ -81,6 +87,10 @@ describe('C09 A-based balanced persona request without hardcoded actions', () =>
       };
     };
     expect(newInput.context).toBe(context);
+    expect(newInput.allowedRendererOutputVocabulary).toEqual({
+      selfDisclosureAllowed: false, memoryIds: [],
+      privateSourceRefs: [], disclosureSliceIds: [],
+    });
     expect(newInput.c09BalancedPersona.noPredeterminedAction).toBe(true);
     expect(newInput.c09BalancedPersona.noRelationshipOrMemoryMutation).toBe(true);
     expect(newInput.c09BalancedPersona.publicCharacterInclinations.length).toBeGreaterThan(3);
