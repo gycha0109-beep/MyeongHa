@@ -78,7 +78,10 @@ export async function runCloudflarePrimaryE2E(options = {}) {
       },
     });
     assert(response instanceof Response, label + ' missing Fetch Response');
-    if (mode === 'authenticated') {
+    // Cloudflare Static Assets have no CF_VERSION_METADATA response header.
+    // Version-pin every API response (including /api/health) before credentials,
+    // but never require that header on public HTML assets.
+    if (mode === 'authenticated' && (path === '/api' || path.startsWith('/api/'))) {
       assert(response.headers.get('x-myeongha-worker-version') === expectedVersion,
         label + ' returned a different deployed Worker version; no credential replay');
     }
