@@ -217,7 +217,7 @@ describe('owner Chat read HTTP boundary', () => {
   it.each([
     ['primary', ['seyeon', OTHER_CHARACTER_ID]],
     ['secondary', [PRIMARY_CHARACTER_ID, 'seyeon']],
-  ] as const)('holds Se-yeon %s Chat GET before any stream or relationship read', async (_position, participants) => {
+  ] as const)('holds nonempty Se-yeon %s Chat GET before relationship read', async (_position, participants) => {
     const f = fixture();
     f.connection.participantCharacterIds = participants;
     f.connection.streamRows = [{
@@ -243,7 +243,9 @@ describe('owner Chat read HTTP boundary', () => {
     });
     expect(body).not.toContain('PRIVATE_HISTORY_CANARY_NEVER_REVEAL');
     expect(body).not.toContain('PRIVATE_PAYLOAD_CANARY');
-    expect(callTexts(f.connection).some(x => x.includes('qry_chat_thread_stream_v2'))).toBe(false);
+    // The owner-scoped stream must be inspected to distinguish an empty
+    // room shell from protected existing Se-yeon history.
+    expect(callTexts(f.connection).some(x => x.includes('qry_chat_thread_stream_v2'))).toBe(true);
     expect(callTexts(f.connection).some(x => x.includes('qry_character_relationship_v1'))).toBe(false);
     expect(callTexts(f.connection).at(-1)).toBe('ROLLBACK');
   });

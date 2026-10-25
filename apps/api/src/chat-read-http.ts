@@ -330,19 +330,21 @@ async function readChatState(
   }
   const binding = mapThreadBinding(bindingResult.rows[0], parsed.threadId);
 
-  // Enforce G3 fail-closed on the DB-owned participant set, not a caller
-  // supplied Character ID. Even a mixed thread can carry Se-yeon-derived
-  // assistant text; never fetch or serialize it before current-rights proof.
-  if (binding.participantCharacterIds.includes('seyeon')) {
-    throw new SeyeonChatHistoryRevealHoldV1();
-  }
-
+  // A newly created, strictly empty Se-yeon room contains no historical
+  // material to reveal. Do not block its initial owner-scoped shell.
+  // Every non-empty or paginated Se-yeon transcript still requires G3.
   const streamResult = await client.query<StreamRow>(READ_STREAM_SQL, [
     subjectId,
     parsed.threadId,
     parsed.afterSequenceNo,
     parsed.pageSize,
   ]);
+  if (
+    binding.participantCharacterIds.includes('seyeon') &&
+    (parsed.afterSequenceNo !== 0 || streamResult.rows.length !== 0)
+  ) {
+    throw new SeyeonChatHistoryRevealHoldV1();
+  }
   // A current participant set is not proof about the entire history.
   // A formerly participating Se-yeon can still own a committed message
   // after the thread is reconfigured to contain other Characters only.
