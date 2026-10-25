@@ -21,7 +21,8 @@ const candidate=(data:object,status=200)=>
 describe('Se-yeon empty-room Edge egress admission',()=>{
   it('returns only an owner-read first-page empty shell and strips relationship state',async()=>{
     const request=new Request(path);
-    const response=await admitCloudflareSeyeonEmptyRoomV1(request,candidate(room),threadId);
+    const response=await admitCloudflareSeyeonEmptyRoomV1(
+      request,candidate({...room,contentRevision:0}),threadId);
     expect(response?.status).toBe(200);
     const text=await response!.text();
     expect(text).not.toContain('NEVER_PUBLIC');

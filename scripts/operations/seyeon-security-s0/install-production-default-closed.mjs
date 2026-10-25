@@ -65,11 +65,13 @@ try{
     current_setting('server_version_num')::integer between 170000 and 179999 as expected_pg17,
     to_regnamespace('seyeon_private') is null as s0_schema_absent,
     to_regprocedure('seyeon_private.cmd_ack_seyeon_positive_reply_v1(uuid,text)') is null as receipt_absent,
-    (select coalesce(max(version),0)::text from supabase_migrations.schema_migrations)=$1 as backup_matches_schema,
-    exists(select 1 from pg_auth_members m join pg_roles p on p.oid=m.roleid
+    (select coalesce(max(version),'') from supabase_migrations.schema_migrations)=$1 as backup_matches_schema,
+    (select count(*)=1 from pg_auth_members m join pg_roles p on p.oid=m.roleid
       join pg_roles u on u.oid=m.member
       where p.rolname='myeongha_seyeon_chat_runtime_owner'
-        and u.rolname='postgres' and m.admin_option) as installer_role_admin`,[
+        and u.rolname='postgres' and m.admin_option
+        and not m.inherit_option and not m.set_option
+        and pg_get_userbyid(m.grantor)='supabase_admin') as installer_role_admin`,[
        String(evidence.backupMigrationFrontier)]);
   if(!preflight||!Object.values(preflight).every(x=>x===true)){
     throw Error('Production S0 initial state does not match reviewed proof.');
@@ -80,15 +82,26 @@ try{
   await client.query(bundle.sql);
   const {rows:[closed]}=await client.query(`select
     to_regprocedure('seyeon_private.cmd_ack_seyeon_positive_reply_v1(uuid,text)') is not null as receipt_exists,
+    to_regprocedure('seyeon_private.cmd_set_s0_positive_source_gate_v1(boolean)') is not null as private_gate_exists,
+    has_function_privilege('postgres',
+      'seyeon_private.cmd_set_s0_positive_source_gate_v1(boolean)','EXECUTE') as private_gate_operator_only,
     to_regprocedure('public.cmd_issue_seyeon_positive_first_reply_v1(uuid,uuid,uuid,uuid,uuid,uuid,uuid,text,bytea)') is not null as issuer_exists,
     to_regprocedure('public.qry_seyeon_positive_first_memory_locked_reveal_v3(uuid,uuid,uuid,uuid,uuid,uuid,uuid,text)') is not null as g3_exists,
     not exists(select 1 from public.seyeon_positive_source_type_registry_v1) as registry_empty,
     not has_function_privilege('myeongha_api_executor',
       'seyeon_private.cmd_ack_seyeon_positive_reply_v1(uuid,text)','EXECUTE') as receipt_execute_denied,
     not has_function_privilege('myeongha_api_executor',
+      'seyeon_private.cmd_set_s0_positive_source_gate_v1(boolean)','EXECUTE') as gate_execute_denied,
+    not has_function_privilege('myeongha_api_executor',
       'public.cmd_issue_seyeon_positive_first_reply_v1(uuid,uuid,uuid,uuid,uuid,uuid,uuid,text,bytea)','EXECUTE') as issuer_execute_denied,
     not has_function_privilege('myeongha_api_executor',
-      'public.qry_seyeon_positive_first_memory_locked_reveal_v3(uuid,uuid,uuid,uuid,uuid,uuid,uuid,text)','EXECUTE') as g3_execute_denied`);
+      'public.qry_seyeon_positive_first_memory_locked_reveal_v3(uuid,uuid,uuid,uuid,uuid,uuid,uuid,uuid,text)','EXECUTE') as g3_execute_denied,
+    (select count(*)=1 from pg_auth_members m join pg_roles p on p.oid=m.roleid
+      join pg_roles u on u.oid=m.member
+      where p.rolname='myeongha_seyeon_chat_runtime_owner'
+        and u.rolname='postgres' and m.admin_option
+        and not m.inherit_option and not m.set_option
+        and pg_get_userbyid(m.grantor)='supabase_admin') as installer_role_preserved`);
   if(!closed||!Object.values(closed).every(x=>x===true)){
     throw Error('S0 default-CLOSED ACL or registry invariant failed.');
   }

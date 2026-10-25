@@ -25,3 +25,13 @@ node scripts/operations/seyeon-security-s0/plan.mjs
 Private accept와 revoke의 Production factory도 기존 server-owned 승인 callback을 전달할 수 있다. 현재 배포 caller는 전달하지 않으므로 기본 DENY다. 사용자 JSON·header·env flag로 승인할 수 없다.
 
 DB 최초 설치·타입 계약·운영 역할 부여·동일 백업 복원·실제 외부 transport V/R/S/ACK 및 유료/공개 승인은 이 브랜치가 대신하지 않는다. History/Replay/Reader/Worker/다중 Memory·Life Fact의 미확정 파생 공개는 계속 차단한다.
+
+## 2026-10-26: 통합 브랜치 운영 명령 (미활성화)
+
+1. `install-production-default-closed.mjs`: **최종 main, 깨끗한 HEAD, 동일 HEAD PostgreSQL 17 복원 리허설 증거**가 일치하는 경우에만 원자적 S0 설치. 설치 후 Registry는 비어 있고 API positive EXECUTE는 금지됩니다.
+2. `configure-seyeon-security-s0-credentials.mjs`: 설치 이후 독립 비용 DB LOGIN/Provider 시크릿을 로컬 보호 경로에 생성합니다. 기존 DB 비밀번호나 Provider 토큰을 저장소에 넣지 않습니다.
+3. `configure-production-cost-default-off.mjs`: 해당 UTC일 글로벌·개인 예산을 **명시적으로** 지정합니다. 이미 다른 정책·예산이 존재하면 덮어쓰지 않습니다. 모델은 비활성으로 둡니다.
+4. `activate-production-s0-after-evidence.mjs`: 최종 main·복원 리허설·SRC-25 승인·G0-D04·G1/G2·G3·G5 실제 파일 해시 검증 후에만 한 원자 트랜잭션으로 S0 소스와 API/모델 권한을 열 수 있습니다. 역사 조회·Replay·Writer 권한은 열지 않습니다. 이 명령을 구현했다고 운영 승인으로 취급하지 않습니다.
+5. `emergency-stop-production-s0.mjs`: 운영 중 새 모델 사용·S0 소스·G1/G2를 차단하고 권한을 재검증합니다. 기존 receipt ACK와 사용자의 철회 권한은 이전과 동일하게 유지합니다. 비상 중단 자체는 사용자의 철회를 완료했다고 주장하지 않습니다.
+
+**현황:** 위 명령은 단일 브랜치에 구현되었으나 현재 승인된 릴리스 증거·운영 DB 설치·Cloudflare Provider 배포·사용자 인증 G5/G6 smoke가 완료되지 않았습니다. 운영 S0는 HOLD입니다. 기능별 PR/CI는 실행하지 않고 최종 완료 후 한 번의 통합 단계로 넘깁니다.

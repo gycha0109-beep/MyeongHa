@@ -44,10 +44,84 @@ end
 $registry_lock$;
 alter function seyeon_private.lock_positive_source_registry_v1(text,text,text)
   owner to myeongha_seyeon_chat_runtime_owner;
+
+-- An explicit operator-only source gate. The registry is owned by this
+-- NOLOGIN role; the restricted postgres installer must not receive raw table
+-- UPDATE/INSERT, and the ordinary API must never toggle this switch.
+create function seyeon_private.cmd_set_s0_positive_source_gate_v1(p_enabled boolean)
+returns boolean language plpgsql security definer
+set search_path=pg_catalog,public
+as $s0_gate$
+begin
+  if p_enabled is null then
+    raise exception using errcode='22023',message='S0 source gate requires a boolean';
+  end if;
+  if p_enabled then
+    -- Fail if any other SRC-25 type was independently registered. A default
+    -- CLOSED install exposes no types; this method can authorize only S0.
+    if exists(select 1 from public.seyeon_positive_source_type_registry_v1 reg
+      where (reg.record_kind,reg.record_type,reg.schema_version,reg.projector_version)
+        is distinct from
+        ('memory','conversation_recall','v1','seyeon-conversation-recall-projector-v1')) then
+      raise exception using errcode='23514',message='S0 scope registration conflict';
+    end if;
+    insert into public.seyeon_positive_source_type_registry_v1
+      (record_kind,record_type,schema_version,projector_version,enabled,writable_enabled)
+    values ('memory','conversation_recall','v1','seyeon-conversation-recall-projector-v1',
+      true,false)
+    on conflict (record_kind,record_type,schema_version,projector_version)
+    do update set enabled=true,writable_enabled=false;
+  else
+    -- Emergency stop is stronger than an exact-type stop: no registered
+    -- positive source remains usable even if a future type was introduced.
+    update public.seyeon_positive_source_type_registry_v1
+      set enabled=false,writable_enabled=false;
+  end if;
+  return true;
+end
+$s0_gate$;
+alter function seyeon_private.cmd_set_s0_positive_source_gate_v1(boolean)
+  owner to myeongha_seyeon_chat_runtime_owner;
+
+-- Only this NOLOGIN owner can change EXECUTE on its G1/G2/private approval
+-- functions. The operator invokes this fixed RPC; no broad owner membership
+-- or raw private-record DML is granted to the normal API or to postgres.
+create function seyeon_private.cmd_set_s0_owner_rpc_permissions_v1(p_enabled boolean)
+returns boolean language plpgsql security definer
+set search_path=pg_catalog,public
+as $s0_owner_acl$
+begin
+  if p_enabled is null then
+    raise exception using errcode='22023',message='S0 RPC gate requires a boolean';
+  end if;
+  if p_enabled then
+    execute 'grant execute on function public.cmd_mark_seyeon_positive_context_ready_pinned_v1(
+      uuid,uuid,uuid,uuid,uuid,uuid,text,text,text,text,text,text,text) to myeongha_api_executor';
+    execute 'grant execute on function public.cmd_commit_seyeon_positive_chat_turn_v1(
+      uuid,uuid,uuid,uuid,uuid,uuid,uuid,uuid,jsonb,text,text,text) to myeongha_api_executor';
+    execute 'grant execute on function public.cmd_accept_seyeon_private_conversation_recall_proposal_v1(
+      uuid,uuid,uuid) to myeongha_api_executor';
+  else
+    execute 'revoke execute on function public.cmd_mark_seyeon_positive_context_ready_pinned_v1(
+      uuid,uuid,uuid,uuid,uuid,uuid,text,text,text,text,text,text,text) from myeongha_api_executor';
+    execute 'revoke execute on function public.cmd_commit_seyeon_positive_chat_turn_v1(
+      uuid,uuid,uuid,uuid,uuid,uuid,uuid,uuid,jsonb,text,text,text) from myeongha_api_executor';
+    execute 'revoke execute on function public.cmd_accept_seyeon_private_conversation_recall_proposal_v1(
+      uuid,uuid,uuid) from myeongha_api_executor';
+  end if;
+  return true;
+end
+$s0_owner_acl$;
+alter function seyeon_private.cmd_set_s0_owner_rpc_permissions_v1(boolean)
+  owner to myeongha_seyeon_chat_runtime_owner;
 revoke create on schema seyeon_private from myeongha_seyeon_chat_runtime_owner;
-revoke all on function seyeon_private.lock_positive_source_registry_v1(text,text,text)
+revoke all on function seyeon_private.lock_positive_source_registry_v1(text,text,text),
+  seyeon_private.cmd_set_s0_positive_source_gate_v1(boolean),
+  seyeon_private.cmd_set_s0_owner_rpc_permissions_v1(boolean)
   from public,anon,authenticated,service_role,myeongha_api_executor;
 grant execute on function seyeon_private.lock_positive_source_registry_v1(text,text,text),
+  seyeon_private.cmd_set_s0_positive_source_gate_v1(boolean),
+  seyeon_private.cmd_set_s0_owner_rpc_permissions_v1(boolean),
   public.assert_seyeon_chat_thread_runtime_v1(uuid,uuid) to postgres;
 revoke myeongha_seyeon_chat_runtime_owner from current_user;
 

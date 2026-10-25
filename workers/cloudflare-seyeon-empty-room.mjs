@@ -27,7 +27,7 @@ export async function admitCloudflareSeyeonEmptyRoomV1(request, candidate, threa
   const data=envelope.data;
   if (data.threadId !== threadId || data.characterId !== 'seyeon' ||
       !UUID.test(data.contentReleaseId ?? '') || !UUID.test(data.contentBundleId ?? '') ||
-      !Number.isSafeInteger(data.contentRevision) || data.contentRevision<1 ||
+      !Number.isSafeInteger(data.contentRevision) || data.contentRevision<0 ||
       data.afterSequenceNo!==0 || data.lastSequenceNo!==0 ||
       !Array.isArray(data.messages) || data.messages.length!==0 ||
       data.latestCharacterMessage!==null || !data.pagination ||
