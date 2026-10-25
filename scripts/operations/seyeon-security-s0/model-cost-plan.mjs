@@ -1,5 +1,9 @@
 // Watchtower-Track: security
-// Deterministic, inactive S0 ledger policy. Actual caps are operator supplied.
+// Deterministic, inactive S0 ledger policy. Finite daily defaults may be overridden.
+// Limits are in micro-USD: global $5/day; per subject $0.25/day.
+export const SEYEON_S0_DEFAULT_DAILY_BUDGET_V1=Object.freeze({
+  globalMicroUsd:'5000000',subjectMicroUsd:'250000',
+});
 export const SEYEON_S0_COST_POLICY_DRAFT_V1=Object.freeze({
   providerKey:'openai-responses',modelKey:'gpt-5.6-terra',
   policyVersion:'seyeon-s0-receipt-production-20261025',

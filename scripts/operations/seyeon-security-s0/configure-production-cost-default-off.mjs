@@ -6,18 +6,22 @@ import {isAbsolute} from 'node:path';
 import {parseEnv} from 'node:util';
 import {Client} from 'pg';
 import {SEYEON_S0_COST_POLICY_DRAFT_V1 as policy,
+  SEYEON_S0_DEFAULT_DAILY_BUDGET_V1 as defaults,
   parseSeyeonS0CostBudgetV1} from './model-cost-plan.mjs';
 
 const argv=process.argv.slice(2);
 const option=name=>{const index=argv.indexOf(name);return index<0?null:argv[index+1];};
 const envFile=option('--env-file'),caFile=option('--ca-file');
-if(argv.length!==11||!argv.includes('--apply')||
+const explicitCaps=['--global-micro-usd','--subject-micro-usd'].filter(k=>argv.includes(k));
+if(!argv.includes('--apply')||!((argv.length===7&&explicitCaps.length===0)||
+   (argv.length===11&&explicitCaps.length===2))||
    ![envFile,caFile].every(p=>typeof p==='string'&&isAbsolute(p))){
-  throw Error('Explicit --apply, absolute env and CA, and three budget values required.');
+  throw Error('Explicit --apply, absolute env and CA, UTC date, and either both caps or finite defaults required.');
 }
 const budget=parseSeyeonS0CostBudgetV1({
-  utcDate:option('--utc-date'),globalMicroUsd:option('--global-micro-usd'),
-  subjectMicroUsd:option('--subject-micro-usd'),
+  utcDate:option('--utc-date'),
+  globalMicroUsd:option('--global-micro-usd')??defaults.globalMicroUsd,
+  subjectMicroUsd:option('--subject-micro-usd')??defaults.subjectMicroUsd,
 });
 const ref=execFileSync('git',['branch','--show-current'],{encoding:'utf8'}).trim();
 const dirty=execFileSync('git',['status','--porcelain'],{encoding:'utf8'}).trim();
