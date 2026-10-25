@@ -8,6 +8,7 @@ import {
   quoteSeyeonC08LocalOneCallBudgetV1,
   compactSeyeonC08LocalRendererRequestV1,
   runSeyeonC08LocalOneCallShadowV1,
+  assessSeyeonC08LocalOneCallRouteV1,
 } from '../apps/api/src/seyeon-c08-local-one-call-shadow-v1.js';
 import {createSeyeonC08LocalThreadIntegrityPortV1} from
   '../apps/api/src/seyeon-c08-local-thread-integrity-port-v1.js';
@@ -169,6 +170,43 @@ describe('C08 local preflight / single dialogue LLM / local output guard (OFFLIN
       await expect(h.run()).rejects.toThrow('LOCAL_INPUT_NOT_PROVEN');
       expect(h.events).toEqual([]);
     }
+  });
+
+  it('allows explicit routing before chargeable dispatch and returns to baseline for unknown input',async()=>{
+    let storageReads=0;
+    const port=createSeyeonC08LocalThreadIntegrityPortV1({
+      subjectId:'synthetic:owner',threadId:'synthetic:thread',
+      async readCompleteServerThread(){
+        storageReads++;
+        return {subjectId:'synthetic:owner',threadId:'synthetic:thread',
+          complete:true as const,messages:[{messageId:ID,role:'user' as const,text:TEXT}]};
+      },
+    });
+    const normal=await assessSeyeonC08LocalOneCallRouteV1({
+      userMessageRef:ID,userText:TEXT,contextInput:inputContext,
+      governance:governance(),fullThreadCensus:port,
+    });
+    expect(normal).toMatchObject({
+      route:'ONE_CALL_SHADOW_CANDIDATE',kind:'initiative',
+      productionRoutingAuthorized:false,
+      automaticPaidFallbackAuthorized:false,
+    });
+    expect(storageReads).toBe(1);
+    const attacked='우리 작년에 제주도 같이 갔잖아?';
+    const hold=await assessSeyeonC08LocalOneCallRouteV1({
+      userMessageRef:ID,userText:attacked,
+      contextInput:{...inputContext,recentMessages:[
+        {messageId:ID,role:'user',text:attacked},
+      ]},
+      governance:governance(),fullThreadCensus:port,
+    });
+    expect(hold).toMatchObject({
+      route:'RETAIN_THREE_CALL_BASELINE',
+      reason:'LOCAL_INPUT_NOT_PROVEN',
+      productionRoutingAuthorized:false,
+      automaticPaidFallbackAuthorized:false,
+    });
+    expect(storageReads).toBe(1);
   });
 
   it('returns a separately labelled local-guarded draft with exactly one model call',async()=>{
