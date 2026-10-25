@@ -210,6 +210,15 @@ export async function runOfficialReaderPrivateSourceBoundT1T2V1(
       },
     });
 
+    // T1 purchase admission succeeded, but a missing independent Production
+    // issuer is not a reason to contact Saju's one-use PREVIEW transport.
+    // In particular, never spend its shared nonce on an unfulfillable S5
+    // request. The existing held S5 SQL gate remains authoritative even when
+    // a staging callback is supplied in isolated tests.
+    if (typeof input.prepareProductionCommitStaging !== 'function') {
+      return unavailable();
+    }
+
     // Saju transport verification performs shared nonce claim and HMAC
     // authentication OUTSIDE PostgreSQL S1/Reader locks.
     const preparedSource = await input.prepareSignedSource(first.source);
@@ -222,12 +231,8 @@ export async function runOfficialReaderPrivateSourceBoundT1T2V1(
     });
 
     // No DB transaction is held here. A PREVIEW signature is still NOT the
-    // official Production source issuer. If the independently verified
-    // Production/Receipt-bound staging authority is absent, do not even call
-    // the paid private generator.
-    if (typeof input.prepareProductionCommitStaging !== 'function') {
-      return unavailable();
-    }
+    // official Production source issuer. The earlier positive port check
+    // cannot be replaced by an AI-originated assertion or Preview signature.
     const trusted = verifiedServerStaging(
       await input.prepareProductionCommitStaging({
         originalAdmission: first,

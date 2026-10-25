@@ -122,15 +122,18 @@ export function createProductionAccountDeletionWorkerRuntimeV1(input: {
   /** Optional owner-injected independent deletion provider (not combined with filesystem mode). */
   readonly readerPrivacyDeletionPort?: OfficialReaderAccountPrivacyDeletionPortV1;
 }): ProductionAccountDeletionWorkerRuntimeLeaseV1 {
-  if (input.readerPrivacyDeletionPort !== undefined
-      && input.readerOffPrimaryStoreConfig !== undefined) {
+  // Resolve the actual worker environment BEFORE enforcing exclusivity.
+  // Otherwise an injected Privacy deletion provider can silently coexist
+  // with a different off-primary provider supplied through process.env:
+  // account deletion would use one authority while refund purge uses another.
+  const offPrimaryConfig = input.readerOffPrimaryStoreConfig
+    ?? parseOfficialReaderOffPrimaryWorkerConfigV1(process.env);
+  if (input.readerPrivacyDeletionPort !== undefined && offPrimaryConfig !== null) {
     throw new Error('Protected Reader deletion can use only one Privacy provider.');
   }
   // Construct off-primary ports only when durable, owner-provisioned mount
   // configuration was passed. Missing/wrong roots refuse to start; there is
   // deliberately no /tmp or backed-up DB fallback.
-  const offPrimaryConfig = input.readerOffPrimaryStoreConfig
-    ?? parseOfficialReaderOffPrimaryWorkerConfigV1(process.env);
   const offPrimary = offPrimaryConfig === null
     ? null
     : createOfficialReaderNodeOffPrimaryStoreV1(offPrimaryConfig);

@@ -111,7 +111,9 @@ describe('S3 Preview -> S5 server-only Production staging cannot be supplied by 
     await expect(runOfficialReaderPrivateSourceBoundT1T2V1(f.base))
       .rejects.toBeInstanceOf(OfficialReaderSourceBoundT1T2ErrorV1);
     expect(f.prepareAdmission).toHaveBeenCalledTimes(1);
-    expect(f.prepareSignedSource).toHaveBeenCalledTimes(1);
+    // A missing Production issuer must not consume a one-use Saju Preview
+    // nonce or invoke the model, despite a valid current purchase.
+    expect(f.prepareSignedSource).not.toHaveBeenCalled();
     expect(f.generatePrivate).not.toHaveBeenCalled();
     expect(commitPrivateOfficialReaderPaidAnswerV1).not.toHaveBeenCalled();
   });
