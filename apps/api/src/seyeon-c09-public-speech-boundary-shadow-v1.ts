@@ -55,14 +55,14 @@ export function inspectSeyeonC09PublicSpeechBoundaryV1(input: Readonly<{
     /(?:^|[\s,!?])(?:내가|난|너는|너랑|너한테|너도|네가|니가|나한테)(?=\s|[가-힣,.!?~])/u.test(text) ||
     /(?:네\s+선택권|네\s+기억)/u.test(text) ||
     /(?:할게|할까|볼까|있을까|할래|봐줘|해봐|알겠어|그랬어|했잖아|다니까|할거야|할\s*거야|괜찮아|인정해|해보자|하자|그럴걸|섭섭할걸|떠볼까|잖아|거야|기억하는구나)(?=[.!?~\s]|$)/u.test(text) ||
-    /(?:[가-힣]+(?:니까|구나|까|니|지))\?(?=[\s]|$)/u.test(text)
+    /(?:[가-힣]+(?:구나|잖아|거야))\?(?=[\s]|$)/u.test(text)
   ) add('HONORIFIC_DRIFT');
 
   // A character may respond to an unverified premise, but cannot testify to
   // memories that the authoritative first-turn context contains no evidence for.
   // Do not prohibit transparent uncertainty ("제 기억에는 없어요").
   if (
-    /(?:기억나요|기억해요|기억나[.!?\s]|기억도\s*확실|기억하는구나|내가\s*그랬다(?:니까|고)|그때.{0,70}(?:했던\s*거|했었[어다]))/u.test(text) &&
+    /(?:기억나요|기억해요|기억나[.!?\s]|기억도\s*확실|기억하는구나|내가\s*그랬다(?:니까|고))/u.test(text) &&
     !/(?:기억(?:에|이)?\s*(?:없|나지\s*않|안\s*나)|확인할\s*수\s*없|그런\s*적\s*없|기억하지\s*못|사실인지\s*모르)/u.test(text)
   ) add('UNVERIFIED_SHARED_MEMORY_AFFIRMATION');
 
