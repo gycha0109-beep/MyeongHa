@@ -93,8 +93,9 @@ export async function handleCloudflareAuthRequest(request, env) {
     const rejected = await rateLimitCloudflareRequestV1(request, env, action);
     if (rejected !== null) return rejected;
     const result = action === 'social-start'
-      ? await handleSocialAuthStartRequestV1({ request, env })
-      : await handleSupabaseAuthRequestV1({ request, env, action });
+      ? await handleSocialAuthStartRequestV1({ request, env, webOrigin: new URL(request.url).origin })
+      : await handleSupabaseAuthRequestV1({ request, env, action,
+        approvedWebOrigin: new URL(request.url).origin });
     return seal(result);
   } catch {
     return error('AUTH_UPSTREAM_UNAVAILABLE', 503);

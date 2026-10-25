@@ -220,9 +220,16 @@ function normalizeAuthNext(value: unknown, authOrigin: string = MYEONGHA_PRODUCT
   }
 }
 
-function signupRedirectPath(body: Record<string, unknown>, request: Request): string {
+function signupRedirectPath(body: Record<string, unknown>, request: Request, approvedWebOrigin?: string): string {
   const requestOrigin = new URL(request.url).origin;
-  const authOrigin = MYEONGHA_AUTH_WEB_ORIGINS.has(requestOrigin) ? requestOrigin : MYEONGHA_PRODUCTION_WEB_ORIGIN;
+  // Only a server-admitted same-origin Cloudflare host may override the
+  // legacy Vercel callback. An arbitrary client redirect is never authority.
+  const exactApproved = approvedWebOrigin === requestOrigin &&
+    requestOrigin.startsWith('https://') &&
+    new URL(requestOrigin).port === '';
+  const authOrigin = MYEONGHA_AUTH_WEB_ORIGINS.has(requestOrigin) ||
+    (approvedWebOrigin !== undefined && exactApproved)
+    ? requestOrigin : MYEONGHA_PRODUCTION_WEB_ORIGIN;
   const redirect = new URL('/auth.html', authOrigin);
   redirect.searchParams.set('confirmed', '1');
   redirect.searchParams.set('next', normalizeAuthNext(body.next, authOrigin));
@@ -351,6 +358,7 @@ export async function handleSupabaseAuthRequestV1(input: {
   readonly request: Request;
   readonly env: ProductionUserDataRuntimeEnvV1;
   readonly action: SupabaseAuthActionV1;
+  readonly approvedWebOrigin?: string;
   readonly passwordCompromiseGuard?: PasswordCompromiseGuardPortV1;
 }): Promise<Response> {
   if (input.request.method !== 'POST') {
@@ -468,7 +476,7 @@ export async function handleSupabaseAuthRequestV1(input: {
 
     const path = input.action === 'sign-in'
       ? '/auth/v1/token?grant_type=password'
-      : signupRedirectPath(body, input.request);
+      : signupRedirectPath(body, input.request, input.approvedWebOrigin);
     const upstream = await callSupabase(config, path, {
       method: 'POST',
       body: JSON.stringify({ email, password }),
