@@ -368,6 +368,53 @@ function planLocalFirstTurn(
   });
 }
 
+type SeyeonC08LocalAdmissionInputsV1 = Readonly<{
+  userMessageRef: string;
+  userText: string;
+  contextInput: RunSeyeonCharacterTurnV2Input['contextInput'];
+  governance: RunSeyeonCharacterTurnV2Input['governance'];
+  fullThreadCensus: SeyeonC08FullThreadIntegrityPortV1;
+}>;
+async function admitSeyeonC08LocalCandidateV1(input:SeyeonC08LocalAdmissionInputsV1){
+  const expectedCount=assertLocalContext(input);
+  const expectedTranscriptHash=hashSeyeonC08PublicTranscriptV1(
+    input.contextInput.recentMessages,
+  );
+  const classified=classifySeyeonC08LocalEntryV1(input.userText);
+  if(!classified)throw new SeyeonC08LocalHoldV1('LOCAL_INPUT_NOT_PROVEN');
+  await requireSeyeonC08PublicThreadCensusV1(
+    input.fullThreadCensus,input.userMessageRef,expectedCount,
+    expectedTranscriptHash,
+  );
+  return {expectedCount,expectedTranscriptHash,classified};
+}
+/**
+ * Optional read-only router precheck: the caller explicitly chooses whether
+ * to invoke the original 3-call baseline, without trying one paid model first.
+ * A SHADOW_CANDIDATE is *not* authority to route production traffic.
+ */
+export async function assessSeyeonC08LocalOneCallRouteV1(
+  input:SeyeonC08LocalAdmissionInputsV1,
+){
+  try{
+    const admissible=await admitSeyeonC08LocalCandidateV1(input);
+    return Object.freeze({
+      route:'ONE_CALL_SHADOW_CANDIDATE' as const,
+      kind:admissible.classified.kind,
+      productionRoutingAuthorized:false as const,
+      automaticPaidFallbackAuthorized:false as const,
+    });
+  }catch(e){
+    if(!(e instanceof SeyeonC08LocalHoldV1))throw e;
+    return Object.freeze({
+      route:'RETAIN_THREE_CALL_BASELINE' as const,
+      reason:e.code,
+      productionRoutingAuthorized:false as const,
+      automaticPaidFallbackAuthorized:false as const,
+    });
+  }
+}
+
 /**
  * 1-call public/no-memory research Shadow (up to 7 full thread messages).
  * NO model-side preflight, NO reviewer impostor,
@@ -389,17 +436,8 @@ export async function runSeyeonC08LocalOneCallShadowV1(input: Readonly<{
   /** Evaluation only. Baseline remains the default for fair shadow comparison. */
   promptProfile?: 'baseline' | 'compact_v1';
 }>) {
-  const expectedCount=assertLocalContext(input);
-  const expectedTranscriptHash=hashSeyeonC08PublicTranscriptV1(
-    input.contextInput.recentMessages,
-  );
-  const classified = classifySeyeonC08LocalEntryV1(input.userText);
-  if (!classified) throw new SeyeonC08LocalHoldV1('LOCAL_INPUT_NOT_PROVEN');
-
-  await requireSeyeonC08PublicThreadCensusV1(
-    input.fullThreadCensus,input.userMessageRef,expectedCount,
-    expectedTranscriptHash,
-  );
+  const {expectedCount,expectedTranscriptHash,classified}=
+    await admitSeyeonC08LocalCandidateV1(input);
 
   // Existing source/claim authority pipeline is reused. The empty
   // classification is only valid inside the closed, local entry grammar.
