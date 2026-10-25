@@ -14,12 +14,22 @@ describe('S0 Production operator commands stay closed and reversible',()=>{
       'activate-production-s0-after-evidence.mjs',
       'emergency-stop-production-s0.mjs',
       'install-production-default-closed.mjs',
+      'reconcile-existing-governed-login.mjs',
     ]){
       const result=spawnSync(process.execPath,[
         fileURLToPath(new URL('../scripts/operations/seyeon-security-s0/'+script,import.meta.url)),
       ],{encoding:'utf8',timeout:5000});
       expect(result.status).not.toBe(0);
     }
+  });
+  it('existing governed-login reconciliation refuses credential rotation and privileged connections',async()=>{
+    const source=await file('reconcile-existing-governed-login.mjs');
+    expect(source).toContain('BEGIN READ ONLY');
+    expect(source).toContain('SEYEON_S0_EXISTING_GOVERNED_LOGIN_NO_ROTATION');
+    expect(source).toContain("not rolbypassrls");
+    expect(source).toContain('no_direct_policy_table');
+    expect(source).toContain('no_direct_budget_table');
+    expect(source).not.toMatch(/create\\s+role|alter\\s+role|grant\\s+.*\\s+to\\s+/i);
   });
   it('S0 source bundle contains owner-operated gates inaccessible to ordinary API',async()=>{
     const bundle=await buildSeyeonSecurityS0InstallationBundle();
