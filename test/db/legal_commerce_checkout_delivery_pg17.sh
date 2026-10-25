@@ -12,7 +12,11 @@ returns void language plpgsql as $$
 begin
   if accepted is not true then raise exception 'FAIL legal-commerce %',label; end if;
   raise notice 'PASS legal-commerce %',label;
-end $$;
+end $;
+-- Roles are changed with SET LOCAL ROLE during this disposable fixture.
+-- PostgreSQL 17 may not give temporary helper functions PUBLIC EXECUTE.
+grant execute on function pg_temp.ensure(text,boolean)
+  to myeongha_api_executor,myeongha_commerce_internal_executor;
 
 -- The fixture is an isolated enabled Reader and pinned Purchase Intent only.
 select pg_temp.ensure('fixture', exists (

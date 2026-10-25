@@ -4,6 +4,9 @@ on:
     paths:
       - 'apps/api/src/commerce-digital-reading-*'
       - 'apps/api/src/postgres-digital-reading-*'
+      - 'apps/api/src/portone-v2-production-identity-http-runtime-v1.ts'
+      - 'apps/api/src/supabase-auth-http.ts'
+      - 'apps/api/src/production-purchase-intent-create-runtime-v3.ts'
       - 'test/legal-commerce-checkout-delivery-e2e-v1.test.ts'
       - 'test/db/legal_commerce_checkout_delivery_pg17.sh'
       - 'test/db/run_ci_case.sh'
@@ -15,6 +18,9 @@ on:
     paths:
       - 'apps/api/src/commerce-digital-reading-*'
       - 'apps/api/src/postgres-digital-reading-*'
+      - 'apps/api/src/portone-v2-production-identity-http-runtime-v1.ts'
+      - 'apps/api/src/supabase-auth-http.ts'
+      - 'apps/api/src/production-purchase-intent-create-runtime-v3.ts'
       - 'test/legal-commerce-checkout-delivery-e2e-v1.test.ts'
       - 'test/db/legal_commerce_checkout_delivery_pg17.sh'
       - 'test/db/run_ci_case.sh'
