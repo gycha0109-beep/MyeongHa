@@ -82,6 +82,15 @@ export function composeSeyeonC09BalancedPersonaShadowRequestV1(input: Readonly<{
     ].join('\n'),
     input: Object.freeze({
       ...requestInput,
+      // Combined one-call generation did not previously expose the renderer's
+      // closed output vocabulary. Make the FIRST-CONTACT restrictions explicit
+      // before generating; do not repair/strip unauthorized output afterward.
+      allowedRendererOutputVocabulary: Object.freeze({
+        selfDisclosureAllowed: false as const,
+        memoryIds: Object.freeze([] as string[]),
+        privateSourceRefs: Object.freeze([] as string[]),
+        disclosureSliceIds: Object.freeze([] as string[]),
+      }),
       c09BalancedPersona: Object.freeze({
         version: SEYEON_C09_BALANCED_PERSONA_SHADOW_VERSION_V1,
         source: SEYEON_C09_CURRENT_AUTHORED_SOURCES_V1,
