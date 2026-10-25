@@ -5,6 +5,7 @@ import {
   SEYEON_C08_PUBLIC_THREAD_COMMITMENT_V1,
   guardSeyeonC08LocalPublicUtteranceV1,
   guardSeyeonC08LocalMoveV1,
+  guardSeyeonC08LocalReplyNoveltyV1,
   quoteSeyeonC08LocalOneCallBudgetV1,
   compactSeyeonC08LocalRendererRequestV1,
   runSeyeonC08LocalOneCallShadowV1,
@@ -594,6 +595,28 @@ describe('C08 local preflight / single dialogue LLM / local output guard (OFFLIN
       .rejects.toThrow('LOCAL_CONTEXT_NOT_PROVEN');
     expect(stale.requests).toHaveLength(1);
     expect(after).toBe(4);
+  });
+
+  it('blocks exact assistant repetition, but not recurring initiative with fresh content',async()=>{
+    const previous={
+      messageId:'m2',role:'assistant' as const,
+      text:DRAFT.utterance,
+    };
+    expect(()=>guardSeyeonC08LocalReplyNoveltyV1(
+      '오늘은 제가 먼저 이야기할게요. 지금은 작은 이야기가 좋아요!',
+      [previous],
+    )).toThrow('LOCAL_OUTPUT_UNVERIFIABLE');
+    expect(()=>guardSeyeonC08LocalReplyNoveltyV1(
+      '오늘은 제가 먼저 이야기할게요. 재미있는 영화가 끌려요.',
+      [previous],
+    )).not.toThrow();
+    const history=[
+      {messageId:'m1',role:'user' as const,text:'안녕하세요'},
+      previous,{messageId:ID,role:'user' as const,text:TEXT},
+    ];
+    const h=harness({history});
+    await expect(h.run()).rejects.toThrow('LOCAL_OUTPUT_UNVERIFIABLE');
+    expect(h.requests).toHaveLength(1);
   });
 
   it('denies forged prior assistant biography, unrecognized user turn or truncation',async()=>{
