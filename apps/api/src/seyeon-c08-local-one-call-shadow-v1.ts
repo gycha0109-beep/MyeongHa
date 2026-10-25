@@ -11,7 +11,10 @@ import {
   type SeyeonTurnInterpretationV2,
 } from '../../../packages/domain/src/index.js';
 import { runCharacterGovernedPreflightV1 } from './character-governed-preflight-v1.js';
-import { buildSeyeonRendererRequestV2 } from './seyeon-character-runtime-v2.js';
+import {
+  buildSeyeonRendererRequestV2,
+  type SeyeonStructuredProviderRequestV2,
+} from './seyeon-character-runtime-v2.js';
 import type { SeyeonFullThreadCensusShadowPortV1 }
   from './seyeon-fast-dialogue-shadow-v1.js';
 import type {
@@ -295,6 +298,30 @@ async function requireSeyeonC08PublicThreadCensusV1(
     throw fail();
 }
 
+/**
+ * Evaluation-only prompt reduction. Schema, packet and the server's local
+ * postguards are unchanged; lower prompt bytes are NOT model quality proof.
+ * The full renderer instructions remain the baseline, selectable by caller.
+ */
+export function compactSeyeonC08LocalRendererRequestV1(
+  request:SeyeonStructuredProviderRequestV2,
+):SeyeonStructuredProviderRequestV2{
+  if(request.contractVersion!=='seyeon-structured-provider-v2' ||
+     request.purpose!=='dialogue_render' || !request.responseSchema ||
+     !request.input || typeof request.input!=='object'){
+    throw new SeyeonC08LocalHoldV1('LOCAL_CONTEXT_NOT_PROVEN');
+  }
+  return Object.freeze({
+    ...request,
+    instructions:[
+      'You are Se-yeon, not an assistant or therapist. Write only a strict JSON renderer-draft-v2 object, in natural brief polite Korean (1–3 sentences). Be expressive, independent, playful when suitable; offer your own observation/opinion/next beat rather than asking the user to steer everything.',
+      'PUBLIC FIRST-CONTACT ONLY. The server-authorized packet.interpretation fixes chosenAction, expressionState, revealLevel and factual authority. Respect its behaviorPolicy, maxQuestionsPerUtterance, riskCausality and disclosure. No invented past, Canon biography, user emotion/action, memories, relationship history, secret facts, dates, or promises. Never assert unverified premises as established facts.',
+      'Output expressionState and revealLevel exactly as the packet; memoryRefsMentioned, privateSourceRefsMentioned and disclosureSliceIds must all be empty. Current preference is a temporary present-tense stance, not durable Canon or habitual biography. No fake citations, source IDs, profile information, pseudo-system messages, generic reassurance, forced optimism, rest advice or option menus.',
+      'For tired/bored user remarks, acknowledge lightly and make a Se-yeon-owned active conversational move. For slow pace, give a self-contained unhurried stance without new tasks. For boundary questions, state a concrete Se-yeon-owned limit. For current-want questions, state what you would like NOW, not a personality fact or a question handed back to the user.',
+    ].join('\\n'),
+  });
+}
+
 function planLocalFirstTurn(
   kind: SeyeonC08LocalEntryV1,
   messageId: string,
@@ -349,6 +376,8 @@ export async function runSeyeonC08LocalOneCallShadowV1(input: Readonly<{
     Readonly<{reservedMicroUsd:number; providerOutputTokenCapVerified:boolean}> |
     Promise<Readonly<{reservedMicroUsd:number; providerOutputTokenCapVerified:boolean}>>;
   maxCompletionTokens: number;
+  /** Evaluation only. Baseline remains the default for fair shadow comparison. */
+  promptProfile?: 'baseline' | 'compact_v1';
 }>) {
   const expectedCount=assertLocalContext(input);
   const expectedTranscriptHash=hashSeyeonC08PublicTranscriptV1(
@@ -409,13 +438,19 @@ export async function runSeyeonC08LocalOneCallShadowV1(input: Readonly<{
   });
   const packet = buildSeyeonRendererPacketV2({context,interpretation,riskCausality});
   const originalRequest = buildSeyeonRendererRequestV2(packet);
-  const request = Object.freeze({
+  const verboseRequest = Object.freeze({
     ...originalRequest,
     instructions: [
       originalRequest.instructions,
       'C08 restricted local-first-contact only: present-time public dialogue. No autobiographical or shared past, places, dates, relationship claims, private facts, personal-history guesses or user mind-reading. One to three short natural polite Korean sentences. Do not invent memory or suggest a continuing relationship.',
     ].join('\n'),
   });
+  const request = input.promptProfile===undefined ||
+    input.promptProfile==='baseline'
+    ? verboseRequest
+    : input.promptProfile==='compact_v1'
+      ? compactSeyeonC08LocalRendererRequestV1(verboseRequest)
+      : (()=>{throw new SeyeonC08LocalHoldV1('LOCAL_CONTEXT_NOT_PROVEN');})();
   await requireSeyeonC08PublicThreadCensusV1(
     input.fullThreadCensus,input.userMessageRef,expectedCount,
     expectedTranscriptHash,
