@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { normalizeUiLocale, SUPPORTED_UI_LOCALES, translateStaticUi } from '../ui-i18n.js';
+import { formatStaticUi, normalizeUiLocale, SUPPORTED_UI_LOCALES, translateStaticUi } from '../ui-i18n.js';
 
 describe('fixed web UI localization', () => {
   it('supports five fixed UI locales', () => {
@@ -66,6 +66,24 @@ describe('fixed web UI localization', () => {
         expect(translateStaticUi(source, locale)).not.toMatch(/[가-힣]/u);
       }
     }
+  });
+
+  it('formats the three Face Reader headings in Japanese and Traditional Chinese, with safe canonical names', () => {
+    const templates = ["{reader}과 함께 관상을 봅니다.","{reader}에게 관상 보기","{reader}과 함께하는 관상, 이렇게 진행됩니다."];
+    const expectations: Record<'ja-JP' | 'zh-TW', string[]> = {
+      'ja-JP': ["セヨンと一緒に人相を見ます。","セヨンと人相を見てみましょう","セヨンと一緒に進める人相の流れ"],
+      'zh-TW': ["與Seyeon一起看面相。","與Seyeon一起查看面相","與Seyeon一起看面相的流程"],
+    };
+    for (const locale of ['ja-JP', 'zh-TW'] as const) {
+      for (const [index, source] of templates.entries()) {
+        const name = locale === 'ja-JP' ? 'セヨン' : 'Seyeon';
+        const rendered = formatStaticUi(source, { reader: name }, locale);
+        expect(rendered).toBe(expectations[locale][index]);
+        expect(rendered).not.toMatch(/[가-힣]/u);
+      }
+    }
+    expect(formatStaticUi(templates[0], { reader: '세연' }, 'ko-KR'))
+      .toBe('세연과 함께 관상을 봅니다.');
   });
 
 });
