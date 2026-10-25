@@ -13,6 +13,7 @@ import type {
 } from './postgres-subject-execution.js';
 import {
   MYEONGHA_API_EXECUTION_ROLE,
+  MYEONGHA_PRODUCTION_SUPABASE_PROJECT_REF,
   type ProductionPostgresRuntimeConfigV1,
 } from './production-user-data-runtime-config.js';
 
@@ -87,8 +88,13 @@ export function parseSeyeonGovernedDbConfigV1(input: {
   }
   const governed = parsedUrl(url);
   const ordinary = parsedUrl(input.ordinaryDatabaseUrl);
-  if (governed.username !== encodeURIComponent(SEYEON_GOVERNED_DB_LOGIN_V1) &&
-      decodeURIComponent(governed.username) !== SEYEON_GOVERNED_DB_LOGIN_V1) {
+  const user = decodeURIComponent(governed.username);
+  const supavisorUser = `${SEYEON_GOVERNED_DB_LOGIN_V1}.${MYEONGHA_PRODUCTION_SUPABASE_PROJECT_REF}`;
+  // Supavisor routes the connection by its project suffix. current_user is
+  // still the canonical dedicated LOGIN, checked independently on connect.
+  const sessionPooler = /^[a-z0-9-]+(?:\.[a-z0-9-]+)*\.pooler\.supabase\.com$/u.test(governed.hostname)
+    && governed.port === '5432' && user === supavisorUser;
+  if (user !== SEYEON_GOVERNED_DB_LOGIN_V1 && !sessionPooler) {
     return fail('INVALID_CONFIG', 'Governed database URL principal does not match the dedicated login.');
   }
   if (governed.href === ordinary.href ||

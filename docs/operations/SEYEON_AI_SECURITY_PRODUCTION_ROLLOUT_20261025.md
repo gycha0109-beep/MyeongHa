@@ -62,3 +62,9 @@ gh workflow run postgres-isolated-restore-drill.yml --ref main -f backup_run_id=
 과거 `SEYEON_AI_SECURITY_S0_SOURCE_PLAN_20261024.json`의 `productionAuthorization=NOT_GRANTED`는 당시 source plan의 기록이며 현재 사용자의 운영 실행 권한 부재를 뜻하지 않는다. 파일 digest나 과거 기록을 G0 기술 승인으로 바꾸지도 않는다.
 
 Architecture Check: 문서와 실행 증거만 추가했다. runtime/API/DB/권한/정책 변경 없음. Ghost-code risk는 현재 Node positive 구현에 운영 Fetch consumer가 없는 것으로 명시하며, 배포 완료로 세지 않는다.
+
+## 후속 지시와 실행 전환
+
+위 항목은 최초 재개 시점의 기록이다. 이후 사용자가 “자체적으로 설계 해서 진행하도록” 지시했으므로 기술 설계 대기를 [HTTP 수신 증명 장벽 구현](../security/SEYEON_S0_HTTP_RECEIPT_BARRIER_V1_20261025.md)으로 전환했다. 실제 원본 검증 authority를 공유하는 Fetch consumer와 durable issuance/receipt·withdrawal intent·DB invalidation guard를 작성했다. 직접 회귀 38 PASS, 관련 회귀 734 PASS/72 SKIP, root typecheck·웹/Worker dry-run build를 실행했다. 복원본 S0 리허설과 운영 설치·활성화 증거는 실행 후 추가한다.
+
+이후 조회한 새 운영 백업 #40131259663은 SUCCESS, source SHA `dc52b80c`, 생성 `2026-10-24T20:46:03Z`다. 최신 main에는 #2573의 native Member Auth와 #2574의 Cloudflare 관측이 추가되었으므로 해당 변경을 보존해서 합친다. 만료된 로컬 관리 API 토큰이나 다른 조직에 로그인된 브라우저를 승인/운영 권한으로 사용하지 않았다. 기존 인증된 Supabase CLI와 명시적 CA를 확인한 직접 PostgreSQL 연결은 해당 프로젝트에 접근 가능하다.

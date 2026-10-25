@@ -14,6 +14,7 @@ import { createSeyeonProductionChatGovernorsV1 } from '../apps/api/src/seyeon-pr
 import type { SeyeonCostGovernorModelPolicyV1 } from '../apps/api/src/seyeon-cost-governor-server-policy-v1.js';
 import { SEYEON_PRODUCTION_PROVIDER_ROUTING_V1 } from '../apps/api/src/production-seyeon-turn-send-runtime-v1.js';
 import { handleSeyeonFirstPositiveMemoryDirectNodeHttpV1 } from '../apps/api/src/seyeon-first-positive-memory-node-http-ingress-v1.js';
+import {handleSeyeonFirstPositiveMemoryFetchV1,handleSeyeonPositiveReplyReceiptV1} from '../apps/api/src/seyeon-first-positive-memory-fetch-delivery-v1.js';
 import { executePostgresSubjectTransactionV1, type PostgresSubjectPoolV1 } from '../apps/api/src/postgres-subject-execution.js';
 import { revokeSeyeonOriginalMemoryGrantAndAckV1 } from '../apps/api/src/seyeon-original-grant-revoke-ack-v1.js';
 import { MYEONGHA_PRODUCTION_SUPABASE_ORIGIN } from '../apps/api/src/production-user-data-runtime-config.js';
@@ -86,7 +87,11 @@ describe.skipIf(!enabled)('S0 live native model on real server execution and dis
       grant execute on function public.cmd_commit_seyeon_positive_chat_turn_v1(
         uuid,uuid,uuid,uuid,uuid,uuid,uuid,uuid,jsonb,text,text,text) to myeongha_api_executor;
       grant execute on function public.qry_seyeon_positive_first_memory_locked_reveal_v3(
-        uuid,uuid,uuid,uuid,uuid,uuid,uuid,text) to myeongha_api_executor;`);
+        uuid,uuid,uuid,uuid,uuid,uuid,uuid,text) to myeongha_api_executor;
+      grant execute on function public.cmd_issue_seyeon_positive_first_reply_v1(
+        uuid,uuid,uuid,uuid,uuid,uuid,uuid,text,bytea),
+        seyeon_private.cmd_ack_seyeon_positive_reply_v1(uuid,text),
+        seyeon_private.cmd_request_seyeon_memory_revoke_v1(uuid,uuid) to myeongha_api_executor;`);
     const p = policy(Object.values(purposes).flat());
     await admin.query(`insert into public.seyeon_ai_governor_model_policies_v1(
       provider_key,model_key,policy_version,price_version,allowed_purposes,context_window_tokens,
@@ -125,6 +130,7 @@ describe.skipIf(!enabled)('S0 live native model on real server execution and dis
       const entry: Record<string, unknown> = { case: activeCase, countOnly,
         schema: body.text?.format?.name ?? null, requestSha256: createHash('sha256').update(bytes).digest('hex'),
         containsVirtualMemory: strings.includes(summary), containsVirtualPlace: strings.some(value => value.includes('한강')),
+        promptCacheOptions:body.prompt_cache_options??null,
         pinPersistedBeforeDispatch: true, store: body.store, maxOutputTokens: body.max_output_tokens ?? null };
       network.push(entry);
       const response = await nativeFetch(input, init);
@@ -178,9 +184,9 @@ describe.skipIf(!enabled)('S0 live native model on real server execution and dis
     return { n, subject, thread, memory, evidence, revoke };
   }
 
-  async function send(f: Awaited<ReturnType<typeof seed>>, revokeAfterCommit = false, revokeBeforePin = false) {
+  async function send(f: Awaited<ReturnType<typeof seed>>, revokeAfterCommit = false, revokeBeforePin = false, receiptHttp = false) {
     activeSubject = f.subject;
-    activeCase = revokeBeforePin ? 'revoked-before-model-pin' : revokeAfterCommit ? 'revoked-before-first-reveal' : 'approved-real-model';
+    activeCase = receiptHttp?'real-model-http-receipt':revokeBeforePin ? 'revoked-before-model-pin' : revokeAfterCommit ? 'revoked-before-first-reveal' : 'approved-real-model';
     let revokedBeforePin = false;
     const runtimePool: PostgresSubjectPoolV1 = !revokeBeforePin ? ordinary : {
       async connect() {
@@ -200,7 +206,8 @@ describe.skipIf(!enabled)('S0 live native model on real server execution and dis
         };
       },
     };
-    const base = { apiKey, model, timeoutMs: 120000 };
+    const base = { apiKey, model, timeoutMs: 120000,
+      ...(receiptHttp?{disablePromptCaching:true as const}:{}) };
     const setup = createSeyeonProductionChatGovernorsV1({ baseProviderConfig: base,
       approval: { policies: { preflight: policy(purposes.preflight), interpreter: policy(purposes.interpreter),
         renderer: policy(purposes.renderer), reviewer: policy(purposes.reviewer) },
@@ -214,6 +221,33 @@ describe.skipIf(!enabled)('S0 live native model on real server execution and dis
       providerConfig: base, roleProviderConfigs: setup.roleProviderConfigs,
       costGovernorForRole: setup.costGovernorForRole, approvedPersonalRecordModelUse: () => true,
     });
+    if(receiptHttp){
+      try{
+        const response=await handleSeyeonFirstPositiveMemoryFetchV1({
+          request:new Request(`https://local-fetch.test/api/chat/${f.thread}/turns`,{method:'POST',
+            headers:{'Content-Type':'application/json','x-myeongha-delivery-receipt':'v1'},
+            body:JSON.stringify({clientTurnId:prefix(30,f.n),text:question})}),
+          requestId:'live-receipt-e2e',serverTime:new Date().toISOString(),pool:ordinary,
+          identityEvidenceVerifier:{verifyRequestIdentity:async()=>f.evidence},runtime});
+        expect(response.status).toBe(200);expect(response.bodyUsed).toBe(false);
+        const pending=await executePostgresSubjectTransactionV1({pool:ordinary,verifiedEvidence:f.evidence,
+          execute:({client})=>client.query<{result:{status:string}}>(`select
+            seyeon_private.cmd_request_seyeon_memory_revoke_v1($1,$2) as result`,[f.subject,f.memory])});
+        expect(pending.rows[0]?.result.status).toBe('pending');
+        const payload=await response.json();
+        const receipt=payload.data.deliveryReceipt;
+        const ack=await handleSeyeonPositiveReplyReceiptV1({request:new Request(
+          `https://local-fetch.test/api/chat/delivery-receipts/${receipt.attemptId}`,{method:'POST',
+            headers:{'Content-Type':'application/json'},body:JSON.stringify({proof:createHash('sha256').update('seyeon-positive-http-receipt-v1\n'+Buffer.byteLength(payload.data.assistantText,'utf8')+':'+payload.data.assistantText+':'+createHash('sha256').update(receipt.challenge).digest('hex')).digest('hex')})}),
+          requestId:'live-receipt-ack',pool:ordinary});
+        expect(ack.status).toBe(200);
+        const {rows:[grant]}=await admin.query('select revoked_at from public.record_access_grants where memory_item_id=$1',[f.memory]);
+        expect(grant.revoked_at).not.toBeNull();
+        delete payload.data.deliveryReceipt;
+        return {status:response.status,cache:response.headers.get('Cache-Control'),body:JSON.stringify(payload),
+          revokedBeforePin:false,failureConstraint:undefined};
+      }finally{await runtime.close();}
+    }
     let complete!: () => void;
     const handled = new Promise<void>(resolve => { complete = resolve; });
     let failure: unknown;
@@ -251,6 +285,19 @@ describe.skipIf(!enabled)('S0 live native model on real server execution and dis
       await runtime.close();
     }
   }
+
+  it('uses real inference with disabled prompt caching and completes pending withdrawal only after the HTTP receipt',async()=>{
+    const f=await seed(13);const response=await send(f,false,false,true);
+    expect(response.status).toBe(200);
+    const reply=JSON.parse(response.body).data.assistantText as string;
+    expect(reply).toContain('한강');expect(reply).toMatch(/노란|노랑/u);
+    const calls=network.filter(r=>r.case===activeCase&&r.countOnly===false);
+    expect(calls.length).toBeGreaterThanOrEqual(5);
+    expect(calls.every(r=>(r.promptCacheOptions as {mode?:string})?.mode==='explicit')).toBe(true);
+    outcomes.push({case:activeCase,status:200,reply,pendingBeforeConsumption:true,
+      exactReceiptAccepted:true,withdrawalCompletedAfterReceipt:true,realModelCalls:calls.length});
+    console.info('LIVE_MODEL_RECEIPT_REPLY '+JSON.stringify({status:200,reply,realModelCalls:calls.length}));
+  },260000);
 
   it('uses real inference and real generated/validated/Commit rows to reveal a remembered activity', async () => {
     const f = await seed(10);

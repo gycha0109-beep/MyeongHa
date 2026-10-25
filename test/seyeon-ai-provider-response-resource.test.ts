@@ -40,6 +40,18 @@ function successfulBody() {
 }
 
 describe('Se-yeon structured provider response resource containment', () => {
+  it('disables native S0 prompt caching without adding breakpoints or changing input text',async()=>{
+    let sent:Record<string,unknown>|undefined;
+    const p=createOpenAiSeyeonStructuredProviderV1({apiKey:'synthetic-no-network-key',model:'gpt-5.6-terra',
+      disablePromptCaching:true,fetchImpl:async(_url,init)=>{
+        sent=JSON.parse(String(init.body));return Response.json(successfulBody());
+      }});
+    await expect(p.generate(request)).resolves.toEqual({accepted:true});
+    expect(sent?.prompt_cache_options).toEqual({mode:'explicit'});
+    expect(JSON.stringify(sent?.input)).not.toContain('prompt_cache_breakpoint');
+    expect(JSON.stringify(sent?.input)).toContain('synthetic test only');
+    expect(sent?.store).toBe(false);
+  });
   it('accepts a valid bounded success response', async () => {
     const result = await provider(async () => Response.json(successfulBody())).generate(request);
     expect(result).toEqual({ accepted: true });

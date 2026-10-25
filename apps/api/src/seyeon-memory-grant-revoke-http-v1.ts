@@ -42,7 +42,9 @@ export interface HandleSeyeonMemoryGrantRevokeRequestInputV1 {
   /** Server-owned test adapter; never accept from an HTTP request. */
   readonly revoke?: (
     input: RevokeSeyeonOriginalMemoryGrantAndAckInputV1,
-  ) => Promise<SeyeonOriginalMemoryGrantRevokeAckV1>;
+  ) => Promise<SeyeonOriginalMemoryGrantRevokeAckV1 | Readonly<{
+    status:'pending'; memoryItemId:string; characterId:'seyeon'; newUseBlocked:true;
+  }>>;
 }
 
 function problem(input: {
@@ -164,6 +166,13 @@ export async function handleSeyeonMemoryGrantRevokeRequestV1(
       verifiedEvidence: evidence,
       memoryItemId,
     });
+    if (data.status === 'pending') {
+      if (data.memoryItemId !== memoryItemId || data.characterId !== 'seyeon' ||
+          data.newUseBlocked !== true) return unavailable(requestId);
+      return Response.json({ok:true,data,
+        meta:{apiContractVersion:API_CONTRACT,requestId,serverTime:input.serverTime}},
+      {status:202,headers:{'Cache-Control':CACHE_CONTROL}});
+    }
     // Do not report success for any uncommitted, malformed or forged port
     // response. R15 itself returns this only after DB COMMIT.
     if (data.status !== 'committed' ||

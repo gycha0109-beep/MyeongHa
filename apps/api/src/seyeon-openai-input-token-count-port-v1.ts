@@ -40,7 +40,7 @@ function isRecord(x: unknown): x is Record<string, unknown> {
 export const SEYEON_OPENAI_INPUT_TOKEN_COUNT_MAX_RESPONSE_BYTES_V1 = 8192 as const;
 
 const BODY_FIELDS = new Set([
-  'model','store','max_output_tokens','instructions','input','text',
+  'model','store','max_output_tokens','instructions','input','text','prompt_cache_options',
 ]);
 
 function projectExactCountRequest(
@@ -68,6 +68,13 @@ function projectExactCountRequest(
     // Reject the gateway's providerOptions, images/tools that aren't part of
     // this strict text-only contract and any newly introduced API fields.
     throw new Error('Input token count cannot certify unsupported request framing.');
+  }
+
+  if(parsed.prompt_cache_options!==undefined &&
+     (!isRecord(parsed.prompt_cache_options)||
+      Object.keys(parsed.prompt_cache_options).length!==1||
+      parsed.prompt_cache_options.mode!=='explicit')){
+    throw new Error('Input token count accepts only disabled prompt caching.');
   }
 
   // POST /responses/input_tokens accepts these precise input-bearing fields.

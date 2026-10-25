@@ -24,11 +24,28 @@ begin
 end
 $preflight$;
 
--- No additional personal tables or extra Subject-linked deletion graph.
-create function public.qry_seyeon_positive_first_memory_locked_reveal_v3(
+-- Receipt metadata lives on the existing Attempt, preserving the deletion graph.
+alter table public.chat_turn_attempts
+  add column seyeon_positive_delivery_receipt_hash bytea,
+  add column seyeon_positive_delivery_issued_at timestamptz,
+  add column seyeon_positive_delivery_received_at timestamptz,
+  add constraint seyeon_positive_delivery_receipt_shape check (
+    (seyeon_positive_delivery_receipt_hash is null
+     and seyeon_positive_delivery_issued_at is null
+     and seyeon_positive_delivery_received_at is null)
+    or (seyeon_positive_delivery_receipt_hash is not null
+        and octet_length(seyeon_positive_delivery_receipt_hash)=32
+        and seyeon_positive_delivery_issued_at is not null
+        and (seyeon_positive_delivery_received_at is null
+             or seyeon_positive_delivery_received_at>=seyeon_positive_delivery_issued_at))
+  );
+
+-- One source/Grant/Outbox authority shared by direct Node and receipt-based HTTP.
+create function seyeon_private.lock_positive_first_memory_reply_v1(
   p_subject_id uuid, p_thread_id uuid, p_turn_id uuid, p_attempt_id uuid,
   p_expected_user_message_id uuid, p_expected_assistant_message_id uuid,
-  p_expected_post_turn_outbox_event_id uuid, p_expected_client_turn_id text
+  p_expected_post_turn_outbox_event_id uuid, p_expected_client_turn_id text,
+  p_delivery_receipt_hash bytea
 ) returns table (assistant_text text)
 language plpgsql security definer
 set search_path=pg_catalog,public
@@ -39,6 +56,7 @@ declare
   v_original record;
   v_message text;
   v_memory_digest text;
+  v_receipt_proof text;
 begin
   if p_subject_id is null or p_thread_id is null
      or p_turn_id is null or p_attempt_id is null
@@ -48,6 +66,9 @@ begin
      or p_expected_client_turn_id is null
      or p_expected_client_turn_id <> btrim(p_expected_client_turn_id)
      or length(p_expected_client_turn_id) not between 1 and 256 then
+    return;
+  end if;
+  if p_delivery_receipt_hash is not null and octet_length(p_delivery_receipt_hash)<>32 then
     return;
   end if;
   perform public.assert_myeongha_subject_context_v1(p_subject_id);
@@ -96,6 +117,7 @@ begin
     and t.committed_at is not null
     and t.committed_attempt_id=p_attempt_id
     and a.id=p_attempt_id and a.state='committed'
+    and a.seyeon_positive_delivery_issued_at is null
     and a.planner_version='seyeon-production-chat-planner-v1'
     and a.seyeon_personal_source_pinned_at is not null
     and a.seyeon_personal_source_pin_jsonb ? 'positiveProof'
@@ -144,6 +166,7 @@ begin
     and g.life_fact_id is null
     and g.grantee_character_id='seyeon'
     and g.grant_reason='user_choice' and g.revoked_at is null
+    and g.seyeon_revoke_requested_at is null
     and m.revoked_at is null and m.source_kind='user_approved'
     and m.memory_type=v_pin->>'recordType'
     and m.schema_version=v_pin->>'recordSchemaVersion'
@@ -274,6 +297,25 @@ begin
   for share of a,msg;
   if not found or v_message is null then return; end if;
 
+  -- HTTP issuance is durable BEFORE Response construction. A pending receipt
+  -- prevents any revoke/invalidating write from completing, including after
+  -- Worker crash or DB COMMIT ambiguity. It NEVER expires into permission.
+  if p_delivery_receipt_hash is not null then
+    -- Bind receipt to the exact protected UTF-8 body AND the fresh challenge.
+    -- The DB sees only the challenge hash, never the bearer challenge itself.
+    v_receipt_proof:=encode(sha256(convert_to(
+      'seyeon-positive-http-receipt-v1'||chr(10)||octet_length(v_message)::text||':'||
+      v_message||':'||encode(p_delivery_receipt_hash,'hex'),'UTF8')),'hex');
+    update public.chat_turn_attempts
+    set seyeon_positive_delivery_receipt_hash=sha256(convert_to(v_receipt_proof,'UTF8')),
+        seyeon_positive_delivery_issued_at=clock_timestamp()
+    where id=p_attempt_id and subject_id=p_subject_id
+      and seyeon_positive_delivery_issued_at is null;
+    if not found then return; end if;
+    return query select v_message;
+    return;
+  end if;
+
   -- Consume THIS first-send right before handing bytes to direct Node.
   -- This UPDATE is still UNCOMMITTED while Node holds this SAME owner
   -- transaction throughout ServerResponse 'finish'. On disconnect, timeout,
@@ -299,6 +341,43 @@ begin
   return query select v_message;
 end
 $positive_reveal$;
+
+revoke all on function seyeon_private.lock_positive_first_memory_reply_v1(
+  uuid,uuid,uuid,uuid,uuid,uuid,uuid,text,bytea
+) from public,anon,authenticated,service_role,myeongha_api_executor;
+
+create function public.qry_seyeon_positive_first_memory_locked_reveal_v3(
+  p_subject_id uuid,p_thread_id uuid,p_turn_id uuid,p_attempt_id uuid,
+  p_expected_user_message_id uuid,p_expected_assistant_message_id uuid,
+  p_expected_post_turn_outbox_event_id uuid,p_expected_client_turn_id text
+) returns table(assistant_text text)
+language sql security definer set search_path=pg_catalog,public set row_security=off
+as $node_reveal$
+  select * from seyeon_private.lock_positive_first_memory_reply_v1(
+    p_subject_id,p_thread_id,p_turn_id,p_attempt_id,p_expected_user_message_id,
+    p_expected_assistant_message_id,p_expected_post_turn_outbox_event_id,
+    p_expected_client_turn_id,null::bytea);
+$node_reveal$;
+
+create function public.cmd_issue_seyeon_positive_first_reply_v1(
+  p_subject_id uuid,p_thread_id uuid,p_turn_id uuid,p_attempt_id uuid,
+  p_expected_user_message_id uuid,p_expected_assistant_message_id uuid,
+  p_expected_post_turn_outbox_event_id uuid,p_expected_client_turn_id text,
+  p_delivery_receipt_hash bytea
+) returns table(assistant_text text)
+language plpgsql security definer set search_path=pg_catalog,public set row_security=off
+as $http_issue$
+begin
+  if p_delivery_receipt_hash is null or octet_length(p_delivery_receipt_hash)<>32 then return; end if;
+  return query select * from seyeon_private.lock_positive_first_memory_reply_v1(
+    p_subject_id,p_thread_id,p_turn_id,p_attempt_id,p_expected_user_message_id,
+    p_expected_assistant_message_id,p_expected_post_turn_outbox_event_id,
+    p_expected_client_turn_id,p_delivery_receipt_hash);
+end
+$http_issue$;
+revoke all on function public.cmd_issue_seyeon_positive_first_reply_v1(
+  uuid,uuid,uuid,uuid,uuid,uuid,uuid,text,bytea
+) from public,anon,authenticated,service_role,myeongha_api_executor;
 
 -- Restrict to the function owner only. No PUBLIC, authenticated, service,
 -- or myeongha_api_executor EXECUTE and NO route registration.

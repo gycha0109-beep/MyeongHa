@@ -447,8 +447,31 @@ export async function sendSeyeonChatTurnV1(
     path: `/api/chat/${encodeURIComponent(threadId)}/turns`,
     bearer,
     body: request,
+    ...(globalThis.crypto?.subtle===undefined?{}:{deliveryReceipt:'v1' as const}),
   });
-  return parseSeyeonTurnSendResultV1(data);
+  const result = parseSeyeonTurnSendResultV1(data);
+  // Only a completely parsed original response may provide this capability.
+  // Never persist/log the proof, replay the model request, or copy it to UI.
+  if (isRecord(data) && data.deliveryReceipt !== undefined) {
+    const receipt = data.deliveryReceipt;
+    if (!isRecord(receipt) || Object.keys(receipt).sort().join(',') !== 'attemptId,challenge' ||
+        typeof receipt.attemptId !== 'string' ||
+        !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(receipt.attemptId) ||
+        typeof receipt.challenge !== 'string' || !/^[a-f0-9]{64}$/u.test(receipt.challenge) || result.replayed ||
+        globalThis.crypto?.subtle===undefined || typeof data.assistantText!=='string') {
+      return invalid('turn delivery receipt is invalid.');
+    }
+    const encoder=new TextEncoder();
+    const hash=async(text:string)=>Array.from(new Uint8Array(await globalThis.crypto.subtle.digest(
+      'SHA-256',encoder.encode(text)))).map(byte=>byte.toString(16).padStart(2,'0')).join('');
+    const challengeHash=await hash(receipt.challenge);
+    const proof=await hash('seyeon-positive-http-receipt-v1\n'+encoder.encode(data.assistantText).byteLength+
+      ':'+data.assistantText+':'+challengeHash);
+    const ack = await client.requestData({method:'POST',
+      path:`/api/chat/delivery-receipts/${receipt.attemptId}`,body:{proof}});
+    if (!isRecord(ack) || ack.accepted !== true) return invalid('turn delivery receipt was not accepted.');
+  }
+  return result;
 }
 
 function parseChatOpenResultV1(

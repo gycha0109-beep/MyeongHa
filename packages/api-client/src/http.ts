@@ -33,6 +33,8 @@ export interface MyeongHaApiRequestV1 {
   readonly bearer?: string;
   readonly guestBearer?: string;
   readonly body?: unknown;
+  /** Negotiate receipt support; this is never source-use authorization. */
+  readonly deliveryReceipt?: 'v1';
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -165,6 +167,9 @@ export class MyeongHaApiClientV1 {
     }
     if (input.body !== undefined) {
       headers.set('Content-Type', 'application/json');
+    }
+    if (input.deliveryReceipt === 'v1') {
+      headers.set('x-myeongha-delivery-receipt', 'v1');
     }
 
     let response: Response;

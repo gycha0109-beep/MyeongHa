@@ -65,6 +65,22 @@ function runner(query:ReturnType<typeof vi.fn>):SeyeonProductionSubjectTransacti
   };
 }
 describe('PR-04D2 OpenAI exact input-token counter (offline, no API calls)',()=>{
+  it('accepts only explicit caching without API breakpoints and preserves every input-bearing field',async()=>{
+    const seen:string[]=[];
+    const counter=createSeyeonOpenAiInputTokenCountAdmissionV1(makeConfig(async(_url,init)=>{
+      seen.push(String(init?.body));return Response.json({object:'response.input_tokens',input_tokens:100});
+    }));
+    const frame={model:policy.modelKey,store:false,max_output_tokens:800,
+      instructions:'unchanged',input:[{role:'user',content:[{type:'input_text',text:'original'}]}],
+      text:{format:{type:'json_schema',schema:request.responseSchema}},prompt_cache_options:{mode:'explicit'}};
+    const body=JSON.stringify(frame);
+    await expect(counter.certifiedInputTokenUpperBound(request,Buffer.byteLength(body),body)).resolves.toBe(164);
+    const projected=JSON.parse(seen[0]!);
+    expect(projected.input).toEqual(frame.input);expect(projected.instructions).toBe(frame.instructions);
+    const altered=JSON.stringify({...frame,prompt_cache_options:{mode:'implicit'}});
+    await expect(counter.certifiedInputTokenUpperBound(request,Buffer.byteLength(altered),altered)).rejects.toThrow();
+    expect(seen).toHaveLength(1);
+  });
   it('counts exactly the provider input structure before a governed DB admit or model call',async()=>{
     const steps:string[]=[];
     let callId='';
