@@ -37,7 +37,7 @@ Watchtower-Track: security
 
 새 요청 capability header `x-myeongha-delivery-receipt:v1`은 클라이언트 수신 프로토콜 지원을 나타낼 뿐 개인정보 사용 승인으로 취급하지 않는다. 지원하지 않는 클라이언트는 모델 호출 전 차단한다. 응답 data에 `deliveryReceipt`가 추가되며 공용 API client는 원본 텍스트 파싱 후 receipt를 보내고 capability를 caller/UI 결과에서 제거한다. receipt 실패가 모델 재호출 허가가 되지 않는다.
 
-운영 기본값은 `seyeon-security-s0-production-policy-v1.ts`의 두 gate가 모두 false다. receipt/withdrawal gate와 model-use gate를 분리해 중단 시 기존 receipt와 철회 능력을 보존한다. 실제 DB 설치·기존 백업 복제본 리허설·필수 CI·운영 smoke 없이 gate를 올리지 않는다.
+설치 기본값은 닫혀 있다. 2026-10-26 운영 SQL/PG17 복원·rollback 검증 이후의 별도 활성화 변경에서 `seyeon-security-s0-production-policy-v1.ts`의 두 gate를 올린다. receipt/withdrawal gate와 model-use gate를 분리해 중단 시 기존 receipt와 철회 능력을 보존한다. 실제 DB 설치·기존 백업 복제본 리허설·필수 CI 후 staged 활성화로 운영 smoke를 수행하고, 실패하면 forward stop한다. smoke 통과 전 배포 완료로 판정하지 않는다.
 
 ## 현재 검증
 
@@ -57,3 +57,6 @@ Architecture Check:
 운영 origin 비밀번호는 보호된 로컬 operator 파일에만 남기고 Wrangler의 기존 인증 및 공개 command-handler API를 프로세스 내부에서 사용해 등록한다. 비밀번호·DB URL·token을 CLI argv나 tool 인자에 넣지 않는다. Worker에는 origin 비밀번호를 추가하지 않으며, 기존 원본 DB 설정을 바꾸지 않는다. 새로운 두 Hyperdrive ID와 read-only 구성 검증 결과를 실제 실행 뒤 기록한다.
 
 S0 최초 기억 경로는 서버 전용 `requiredPersonalRecordCount:1`을 exact-model selector에 전달한다. 원본 기억이 없거나 철회로 사라졌으면 governance/provider/input-count 전에서 HOLD한다. 기존 일반 zero-source 실행은 바꾸지 않는다. 이 constraint는 HTTP/LLM 입력 또는 모델 packet의 권한 필드가 아니다.
+
+
+2026-10-26 PG17 복원본 11/11 PASS와 운영 source/권한/forward-stop rollback 증거는 [운영 실행 기록](../operations/SEYEON_AI_SECURITY_PRODUCTION_ROLLOUT_20261025.md)에 있다. 사용자별 별도 금액 제한을 두지 않는다. 전체 원가 보호 예산은 제품 크레딧 지갑·차감 authority를 대신하지 않는다.
