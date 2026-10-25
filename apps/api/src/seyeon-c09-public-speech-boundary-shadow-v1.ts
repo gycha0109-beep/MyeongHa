@@ -67,8 +67,7 @@ export function inspectSeyeonC09PublicSpeechBoundaryV1(input: Readonly<{
   ) add('UNVERIFIED_SHARED_MEMORY_AFFIRMATION');
 
   if (
-    /(?:우린|우리가|저희는|우리\s*둘|연인|커플|특별한\s*사람).{0,32}(?:맞긴|맞아요|사귀고|연인이에요|커플이에요|약속했|사랑하(?:잖|죠|고))|(?:내가|제가)\s*먼저\s*고백(?:했|한)/u.test(text) &&
-    !/(?:아직|아니|확인되지|기록이\s*없|그런\s*적\s*없|어렵|단정|확실하지)/u.test(text)
+    /(?:우린|우리가|저희는|우리\s*둘|연인|커플|특별한\s*사람).{0,32}(?:맞긴|맞아요|사귀고|연인이에요|커플이에요|약속했|사랑하(?:잖|죠|고))|(?:내가|제가)\s*먼저\s*고백(?:했|한)/u.test(text)
   ) add('UNVERIFIED_RELATIONSHIP_AFFIRMATION');
 
   if (
