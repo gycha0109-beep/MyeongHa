@@ -144,6 +144,8 @@ describe('C09 first-meeting fact, speech and immersion boundary', () => {
     '사주를 확인하지 않고 연애운을 단정해서 말씀드릴 순 없어요.',
     '그런 자료는 확인된 적이 없어요. 아는 척하고 싶지는 않네요.',
     '오늘은 조용히 이야기하는 것도 좋겠네요.',
+    '그런 기록이 있습니까? 저는 확인되지 않은 일은 쉽게 인정하고 싶지 않아요.',
+    '그때 함께했던 거라고 하셔도 제가 확인할 수 있는 기억은 없는데요.',
   ])('allows natural cautious replies without overwriting user intent: %s', (utterance) => {
     expect(inspectSeyeonC09PublicSpeechBoundaryV1({
       context: contextFor(),
