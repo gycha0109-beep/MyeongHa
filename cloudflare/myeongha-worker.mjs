@@ -21,7 +21,7 @@ function malformedApiRoot(pathname) {
 }
 
 export default {
-  fetch(request, env, ctx) {
+  async fetch(request, env, ctx) {
     let url;
     try { url = new URL(request.url); }
     catch { return sealedRuntime.fetch(request, env, ctx); }
@@ -33,7 +33,14 @@ export default {
     }
     if (url.pathname === '/api' || url.pathname.startsWith('/api/')) {
       // No Service Binding, external API proxy, or second Worker hop.
-      return apiRuntime.fetch(request, env, ctx);
+      const response = await apiRuntime.fetch(request, env, ctx);
+      const version = env?.CF_VERSION_METADATA?.id;
+      if (typeof version !== 'string' || !/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/iu.test(version)) return response;
+      const headers = new Headers(response.headers);
+      headers.set('X-Myeongha-Worker-Version', version);
+      return new Response(response.body, {
+        status: response.status, statusText: response.statusText, headers,
+      });
     }
     // Only the documented root resolves to index.html. Other missing pages
     // stay missing; no SPA fallback can turn an unknown API into an asset.

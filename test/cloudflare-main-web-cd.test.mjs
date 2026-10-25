@@ -27,6 +27,18 @@ describe('merged-main Cloudflare single Worker CD', () => {
     expect(asset).not.toHaveBeenCalled();
   });
 
+  it('binds API canary responses to provider metadata rather than a request header', async () => {
+    const version = '123e4567-e89b-42d3-a456-426614174000';
+    const response = await liveWorker.fetch(new Request('https://test.example/api/health', {
+      headers: { 'X-Myeongha-Worker-Version': 'forged-client-version' },
+    }), { CF_VERSION_METADATA: { id: version } });
+    expect(response.headers.get('X-Myeongha-Worker-Version')).toBe(version);
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
+    expect(await response.json()).toEqual({ status: 'ok' });
+    const absent = await liveWorker.fetch(new Request('https://test.example/api/health'), {});
+    expect(absent.headers.has('X-Myeongha-Worker-Version')).toBe(false);
+  });
+
   it('keeps protected, encoded and unknown APIs fail-closed instead of serving HTML', async () => {
     const asset = vi.fn(async () => new Response('PRIVATE_STATIC_FALLBACK'));
     const env = { ASSETS: { fetch: asset } };
