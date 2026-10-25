@@ -185,11 +185,16 @@ export async function tryHandleCloudflareSeyeonSecurityV1(
       return held(requestId);
     }
   }
-  if (verdict?.kind === 'unrelated_thread_requires_ops_reauthorization' &&
+  if ((verdict?.kind === 'unrelated_thread_requires_ops_reauthorization' ||
+       (verdict?.kind === 'seyeon_empty_thread_requires_ops_reauthorization' &&
+        ingress.kind === 'history')) &&
       verdict.threadId === ingress.threadId) {
+    // No positive response crosses this fence. The independent generic Chat
+    // reader must authenticate again, verify DB ownership and the present
+    // absence of every Se-yeon message before any empty shell is returned.
     return null;
   }
-  // Own/mixed SeYeon and any uncertain/unrecognized verdict remain held.
+  // Non-empty/mixed SeYeon and any uncertain/unrecognized verdict remain held.
   // Even a malicious injected success or forged 4xx cannot cross this fence.
   return enforceHeaders(fenceCloudflareSeyeonBeforeFetchReturnV1(
     verdict?.kind === 'seyeon_protected_held' || verdict?.kind === 'denied'
