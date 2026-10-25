@@ -1,5 +1,5 @@
 name: Cloudflare Primary Worker E2E
-run-name: "[WT:ops] Cloudflare primary live E2E"
+run-name: "Cloudflare primary anonymous live E2E"
 on:
   pull_request:
     paths:
