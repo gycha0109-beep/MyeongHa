@@ -38,6 +38,12 @@
       "mainMode": "required",
       "workTrackAttribution": "pr-metadata"
     },
+    "cloudflare-db-connection-diagnostic.yml": {
+      "responsibility": "cloudflare-dedicated-db-credential-readonly-diagnostic",
+      "prMode": "none",
+      "mainMode": "manual",
+      "workTrackAttribution": "workflow-dispatch"
+    },
     "cloudflare-db-dedicated-credential-handoff.yml": {
       "responsibility": "cloudflare-dedicated-db-credential-rotation",
       "prMode": "none",
