@@ -202,9 +202,7 @@ html[data-theme="dark"] body.saju-hub-page .saju-chat-bridge {
 
 html[data-theme="dark"] body.saju-hub-page .saju-empty {
   border-color: var(--mh-line);
-  background:
-    radial-gradient(circle at 50% 32%, rgba(196, 154, 92, .10), transparent 18rem),
-    linear-gradient(180deg, rgba(16, 27, 34, .98), rgba(9, 18, 24, .96));
+  background: #171c23 url("./assets/saju/saju-empty-dark.avif?v=20261026-threadless") center / cover no-repeat;
 }
 
 html[data-theme="dark"] body.saju-hub-page .saju-empty::before {

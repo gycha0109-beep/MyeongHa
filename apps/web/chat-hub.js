@@ -1,6 +1,8 @@
 import { resolveCharacterDisplayNameV1 } from './character-display-locale.js';
-import { getUiLocale } from './ui-i18n.js';
+import { getUiLocale, translateStaticUi } from './ui-i18n.js';
 import { parseChatThreadIdV1 } from './chat-room-read-contract.js';
+
+const uiLabel = source => translateStaticUi(source, getUiLocale());
 
 const people = Object.freeze([
   {
@@ -172,19 +174,19 @@ function createPersonCard(person, { pending = false } = {}) {
   name.textContent = resolveCharacterDisplayNameV1(person.key, getUiLocale()) ?? person.name;
 
   const title = document.createElement('span');
-  title.textContent = person.title;
+  title.textContent = uiLabel(person.title);
   titleRow.append(name, title);
 
   const line = document.createElement('p');
   line.className = 'chat-person-line';
-  line.textContent = pending ? '이 연결자는 현재 등록을 준비 중입니다.' : person.line;
+  line.textContent = uiLabel(pending ? '이 연결자는 현재 등록을 준비 중입니다.' : person.line);
 
   const tags = document.createElement('div');
   tags.className = 'chat-person-tags';
   person.tags.slice(0, 3).forEach((tag) => {
     const tagNode = document.createElement('span');
     tagNode.className = 'chat-person-tag';
-    tagNode.textContent = tag;
+    tagNode.textContent = uiLabel(tag);
     tags.append(tagNode);
   });
 
@@ -196,7 +198,7 @@ function createPersonCard(person, { pending = false } = {}) {
   }
 
   const actionLabel = document.createElement('span');
-  actionLabel.textContent = pending ? '등록 중 · 대화 준비 중' : '이야기하기';
+  actionLabel.textContent = uiLabel(pending ? '등록 중 · 대화 준비 중' : '이야기하기');
   const actionArrow = document.createElement('span');
   actionArrow.setAttribute('aria-hidden', 'true');
   actionArrow.textContent = pending ? '◇' : '→';
@@ -209,7 +211,7 @@ function createPersonCard(person, { pending = false } = {}) {
 }
 
 function normalizedSearchText(person) {
-  return [person.name, resolveCharacterDisplayNameV1(person.key, getUiLocale()), person.title, person.line, ...person.tags].join(' ').toLowerCase();
+  return [person.name, resolveCharacterDisplayNameV1(person.key, getUiLocale()), person.title, person.line, ...person.tags, uiLabel(person.title), uiLabel(person.line), ...person.tags.map(uiLabel)].join(' ').toLowerCase();
 }
 
 function filteredPeople() {
@@ -229,7 +231,7 @@ function renderPeople() {
   if (peopleMore) {
     peopleMore.hidden = !shouldLimit || shown.length >= matches.length;
     const label = peopleMore.querySelector('span');
-    if (label) label.textContent = '다른 사람 더 보기';
+    if (label) label.textContent = uiLabel('다른 사람 더 보기');
   }
 }
 
@@ -304,7 +306,7 @@ function createRecentItem(item) {
   if (item.hasIncoming === true) {
     const badge = document.createElement('em');
     badge.className = 'chat-thread-badge';
-    badge.textContent = '새 이야기';
+    badge.textContent = uiLabel('새 이야기');
     heading.append(badge);
   }
   const preview = document.createElement('span');
@@ -320,7 +322,7 @@ function createRecentItem(item) {
   if (item.unread === true || item.hasIncoming === true) {
     const dot = document.createElement('span');
     dot.className = 'chat-thread-unread';
-    dot.setAttribute('aria-label', '새 이야기 있음');
+    dot.setAttribute('aria-label', uiLabel('새 이야기 있음'));
     meta.append(dot);
   }
 
@@ -369,7 +371,7 @@ function createIncomingItem(item) {
   const message = document.createElement('p');
   message.textContent = item.message.trim();
   const note = document.createElement('small');
-  note.textContent = '새로운 이야기가 도착했어요.';
+  note.textContent = uiLabel('새로운 이야기가 도착했어요.');
   copy.append(strong, message, note);
 
   const arrow = document.createElement('span');

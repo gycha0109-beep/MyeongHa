@@ -1,5 +1,5 @@
 import { resolveCharacterDisplayNameV1 } from './character-display-locale.js';
-import { getUiLocale } from './ui-i18n.js';
+import { getUiLocale, translateStaticUi } from './ui-i18n.js';
 import { resolveCanonicalCharacterPresentationV1 } from './character-presentation-identity.js';
 import { parseChatThreadRouteV1 } from './chat-room-read-contract.js';
 const characters = {
@@ -93,7 +93,7 @@ document.querySelectorAll('[data-character-name], [data-dialogue-name]').forEach
 });
 
 document.querySelectorAll('[data-character-title]').forEach((node) => {
-  node.textContent = character.title;
+  node.textContent = translateStaticUi(character.title, getUiLocale());
 });
 
 document.querySelectorAll('[data-character-avatar]').forEach((node) => {
@@ -133,7 +133,7 @@ export function applyCanonicalCharacterPresentationV1(characterId) {
     node.textContent = resolveCharacterDisplayNameV1(identity.presentationKey, getUiLocale());
   });
   document.querySelectorAll('[data-character-title]').forEach((node) => {
-    node.textContent = next.title;
+    node.textContent = translateStaticUi(next.title, getUiLocale());
   });
   document.querySelectorAll('[data-character-avatar]').forEach((node) => {
     node.dataset.character = identity.presentationKey;

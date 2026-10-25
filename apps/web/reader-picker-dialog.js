@@ -134,6 +134,20 @@ export function createDelegatePicker({
   dialog.append(panel);
   dialog.setAttribute('aria-labelledby', heading.id);
   document.body.append(dialog);
+  let targetSource = targetLabel;
+  function paintFixedUi() {
+    const locale = getUiLocale();
+    close.setAttribute('aria-label', translateStaticUi('연결자 선택 닫기', locale));
+    kicker.textContent = translateStaticUi('연결자', locale);
+    heading.textContent = translateStaticUi(titleText, locale);
+    copy.textContent = translateStaticUi(description, locale);
+    target.textContent = translateStaticUi(targetSource, locale);
+    search.setAttribute('aria-label', translateStaticUi('연결자 검색', locale));
+    search.placeholder = translateStaticUi('이름이나 설명으로 연결자 찾기', locale);
+    empty.textContent = translateStaticUi('검색과 일치하는 연결자가 없습니다.', locale);
+    footnote.textContent = translateStaticUi(note, locale);
+  }
+  paintFixedUi();
 
   const filter = () => {
     const query = search.value.trim().toLocaleLowerCase('ko-KR');
@@ -147,6 +161,7 @@ export function createDelegatePicker({
   };
 
   document.addEventListener('myeongha:localechange', () => {
+    paintFixedUi();
     for (const paintLocale of localePainters) paintLocale();
     filter();
   });
@@ -170,7 +185,8 @@ export function createDelegatePicker({
   });
 
   function open({ selectedKey = null, targetText = null } = {}) {
-    if (targetText !== null) target.textContent = targetText;
+    if (targetText !== null) targetSource = targetText;
+    paintFixedUi();
     for (const button of grid.querySelectorAll('[data-reader-key]')) {
       const isSelected = selectedKey !== null && button.dataset.readerKey === selectedKey;
       button.classList.toggle('is-selected', isSelected);
