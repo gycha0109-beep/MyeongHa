@@ -8,6 +8,8 @@ on:
       - 'apps/api/src/supabase-auth-http.ts'
       - 'apps/api/src/production-purchase-intent-create-runtime-v3.ts'
       - 'test/legal-commerce-checkout-delivery-e2e-v1.test.ts'
+      - 'test/legal-portone-preenrollment-*.test.ts'
+      - 'test/legal-existing-social-state-authority-v1.test.ts'
       - 'test/db/legal_commerce_checkout_delivery_pg17.sh'
       - 'test/db/run_ci_case.sh'
       - 'supabase/proposals/1743_digital_reading_checkout_delivery_evidence_v1.proposed.sql'
@@ -22,6 +24,8 @@ on:
       - 'apps/api/src/supabase-auth-http.ts'
       - 'apps/api/src/production-purchase-intent-create-runtime-v3.ts'
       - 'test/legal-commerce-checkout-delivery-e2e-v1.test.ts'
+      - 'test/legal-portone-preenrollment-*.test.ts'
+      - 'test/legal-existing-social-state-authority-v1.test.ts'
       - 'test/db/legal_commerce_checkout_delivery_pg17.sh'
       - 'test/db/run_ci_case.sh'
       - 'supabase/proposals/1743_digital_reading_checkout_delivery_evidence_v1.proposed.sql'
@@ -50,12 +54,15 @@ jobs:
         run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Compile TypeScript
         run: npx tsc -p tsconfig.json --noEmit
-      - name: Execute Commerce E2E and critical classification regressions
+      - name: Execute Auth and Commerce E2E with consumer-rights regressions
         run: |
           npx vitest run \
             test/legal-commerce-checkout-delivery-e2e-v1.test.ts \
             test/commerce-digital-reading-withdrawal-orchestration-v1.test.ts \
-            test/commerce-digital-reading-withdrawal-review-v1.test.ts
+            test/commerce-digital-reading-withdrawal-review-v1.test.ts \
+            test/legal-portone-preenrollment-social-v1.test.ts \
+            test/legal-portone-preenrollment-member-signup-v1.test.ts \
+            test/legal-existing-social-state-authority-v1.test.ts
 
   pg17-e2e:
     name: Disposable PostgreSQL 17 actual SQL E2E
