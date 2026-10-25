@@ -445,6 +445,7 @@ export async function handleSupabaseAuthRequestV1(input: {
         return errorResponse('INVALID_REQUEST', 400);
       }
       if (input.preenrollmentMemberPort !== undefined) {
+        if (providedState === null) return errorResponse('INVALID_REQUEST', 400);
         // Verify the SAME browser actor who started OAuth before exchanging
         // an attacker-supplied refresh token. Existing and new Members use
         // separate cookie-backed signed states, with no client authority.

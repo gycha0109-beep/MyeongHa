@@ -25,7 +25,7 @@ export const LEGAL_DIGITAL_READING_PURCHASE_HOLD_V1 = Object.freeze({
 } as const);
 
 function legalDigitalReadingPurchaseAdmittedV1(): boolean {
-  return Object.values(LEGAL_DIGITAL_READING_PURCHASE_HOLD_V1).every((verified) => verified === true);
+  return Object.values(LEGAL_DIGITAL_READING_PURCHASE_HOLD_V1).every(Boolean);
 }
 
 export interface ProductionPurchaseIntentCreateRequestV3 {

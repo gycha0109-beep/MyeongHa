@@ -79,7 +79,7 @@ export function createProductionPortOneIdentityHttpRuntimeV1(input: Readonly<{
       serverTime: string;
       action: 'issue' | 'complete';
     }>): Promise<Response> {
-      const input = {
+      const identityInput = {
         request: inputRequest.request,
         requestId: inputRequest.requestId,
         serverTime: inputRequest.serverTime,
@@ -93,8 +93,8 @@ export function createProductionPortOneIdentityHttpRuntimeV1(input: Readonly<{
         }),
       };
       return inputRequest.action === 'issue'
-        ? handlePortOneV2IdentityIssueRequestV1(input)
-        : handlePortOneV2IdentityCompleteRequestV1(input);
+        ? handlePortOneV2IdentityIssueRequestV1(identityInput)
+        : handlePortOneV2IdentityCompleteRequestV1(identityInput);
     },
   });
 }
