@@ -9,6 +9,10 @@ import {
 import { compactSeyeonShadowRequestV1 }
   from './seyeon-shadow-compact-prompts-v1.js';
 import {
+  composeSeyeonC09CharacterFirstShadowRequestV1,
+  type SeyeonC09CharacterFirstProfileV1,
+} from './seyeon-c09-character-first-composer-shadow-v1.js';
+import {
   admitSeyeonRendererDraftV2,
   buildSeyeonRendererPacketV2,
   guardSeyeonRendererOutputV2,
@@ -130,10 +134,12 @@ export function createSeyeonFastDialogueShadowV1(input: {
   readonly reviewerProvider: SeyeonStructuredProviderPortV2;
   readonly fullThreadCensus?: SeyeonFullThreadCensusShadowPortV1;
   /** Explicit evaluation only. The default/production-facing Shadow contract is unchanged. */
-  readonly promptProfile?: 'baseline' | 'compact_v1';
+  readonly promptProfile?: 'baseline' | 'compact_v1' | SeyeonC09CharacterFirstProfileV1;
 }) {
   if (input.promptProfile !== undefined &&
-      input.promptProfile !== 'baseline' && input.promptProfile !== 'compact_v1') {
+      input.promptProfile !== 'baseline' && input.promptProfile !== 'compact_v1' &&
+      input.promptProfile !== 'character_first_v1' &&
+      input.promptProfile !== 'character_first_life_v1') {
     throw new TypeError('FAST_SHADOW_PROMPT_PROFILE_HOLD');
   }
   return Object.freeze({
@@ -181,10 +187,18 @@ export function createSeyeonFastDialogueShadowV1(input: {
         input: request.input,
         responseSchema: SEYEON_FAST_DIALOGUE_SHADOW_RESPONSE_SCHEMA_V1,
       };
-      const raw: unknown = await input.candidateProvider.generate(
+      const candidateRequest =
         input.promptProfile === 'compact_v1'
-          ? compactSeyeonShadowRequestV1(proposal) : proposal,
-      );
+          ? compactSeyeonShadowRequestV1(proposal)
+          : input.promptProfile === 'character_first_v1' ||
+              input.promptProfile === 'character_first_life_v1'
+            ? composeSeyeonC09CharacterFirstShadowRequestV1({
+              profile: input.promptProfile,
+              context,
+              request: proposal,
+            })
+            : proposal;
+      const raw: unknown = await input.candidateProvider.generate(candidateRequest);
       if (typeof raw !== 'object' || raw === null || Array.isArray(raw) ||
           Object.keys(raw).length !== 2 ||
           !Object.hasOwn(raw, 'interpretation') || !Object.hasOwn(raw, 'draft')) {
