@@ -19,6 +19,10 @@ export interface SeyeonC08AuthoritativeThreadReadV1 {
   readonly messages:readonly SeyeonRecentMessageV2[];
 }
 
+type SeyeonC08ThreadQueryV1=Readonly<{
+  subjectId:string;threadId:string;currentUserMessageId:string;
+}>;
+
 export function createSeyeonC08LocalThreadIntegrityPortV1(input:Readonly<{
   subjectId:string;
   threadId:string;
@@ -61,7 +65,7 @@ export function createSeyeonC08LocalThreadIntegrityPortV1(input:Readonly<{
   return Object.freeze({
     subjectId:input.subjectId,
     threadId:input.threadId,
-    async readFullThreadCensus(query){
+    async readFullThreadCensus(query:SeyeonC08ThreadQueryV1){
       const messages=await read(query);
       if(messages.length!==1)throw invalid();
       return Object.freeze({
@@ -71,7 +75,7 @@ export function createSeyeonC08LocalThreadIntegrityPortV1(input:Readonly<{
         messageCount:1,latestSenderType:'user' as const,complete:true as const,
       });
     },
-    async readAuthoritativeThreadCommitment(query){
+    async readAuthoritativeThreadCommitment(query:SeyeonC08ThreadQueryV1){
       const messages=await read(query);
       if(messages.length===1)throw invalid();
       return Object.freeze({
