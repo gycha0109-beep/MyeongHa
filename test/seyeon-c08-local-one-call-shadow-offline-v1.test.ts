@@ -58,7 +58,7 @@ function governance():RunSeyeonCharacterTurnV2Input['governance']{
 }
 function harness(opts:{
   text?:string;output?:unknown;staleRead?:number;
-  allowBudget?:boolean;relationship?:'present'|null;
+  allowBudget?:boolean;budgetThrows?:boolean;relationship?:'present'|null;
   beforeModel?:()=>void;
   history?:RunSeyeonCharacterTurnV2Input['contextInput']['recentMessages'];
   falseCensusCount?:boolean;
@@ -132,6 +132,7 @@ function harness(opts:{
       maxCompletionTokens:256,
       reserveBeforeModel:async({requestBytes,maxCompletionTokens})=>{
         events.push('reserve');
+        if(opts.budgetThrows)throw Error('SENSITIVE_BUDGET_PROVIDER_SECRET');
         expect(requestBytes).toBeGreaterThan(0);
         expect(maxCompletionTokens).toBe(256);
         return {reservedMicroUsd:opts.allowBudget===false?4001:2000,
@@ -307,6 +308,13 @@ describe('C08 local preflight / single dialogue LLM / local output guard (OFFLIN
       expect(()=>quoteSeyeonC08LocalOneCallBudgetV1(candidate))
         .toThrow('LOCAL_BUDGET_UNVERIFIED');
     }
+  });
+
+  it('refuses budget quote provider failure without leaking details or dispatching a model',async()=>{
+    const h=harness({budgetThrows:true});
+    await expect(h.run()).rejects.toThrow('LOCAL_BUDGET_UNVERIFIED');
+    expect(h.requests).toHaveLength(0);
+    expect(h.events).not.toContain('model');
   });
 
   it('sanitizes a provider error and never retries it',async()=>{
