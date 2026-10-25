@@ -70,7 +70,7 @@ describe('C09 A-based balanced persona request without hardcoded actions', () =>
     const balanced = composeSeyeonC09BalancedPersonaShadowRequestV1({ context, request });
     expect(balanced.instructions).toContain(baseline.instructions);
     expect(balanced.instructions).toContain('존댓말');
-    expect(balanced.instructions).toContain('다른 순간');
+    expect(balanced.instructions).toContain('매번 말로 설명할 필요는');
     expect(balanced.responseSchema).toBe(SEYEON_FAST_DIALOGUE_SHADOW_RESPONSE_SCHEMA_V1);
     const newInput = balanced.input as {
       context: SeyeonRuntimeContextV2;
