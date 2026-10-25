@@ -108,6 +108,10 @@ describe('C09 open-ended character-first composition', () => {
     expect(result.instructions).toContain('Generate those interpretation fields yourself');
     expect(result.instructions).not.toContain('심심할 땐');
     expect(result.instructions).not.toContain('내부 정책을');
+    expect(result.instructions).toContain('disclosureSliceIds=[]');
+    expect(result.instructions).toContain('chosenAction.key=self_disclose');
+    expect(result.instructions).toContain('한국어 존댓말');
+    expect(result.instructions).toContain('실제로 기억한다고 말하지 않습니다');
     expect(Object.hasOwn(input, 'preselectedAction')).toBe(false);
   });
 
@@ -219,4 +223,28 @@ describe('C09 character-first guarded generator integration (mock provider, no p
     expect(generated).toHaveBeenCalledOnce();
     expect(reviewed).toHaveBeenCalledOnce();
   });
+
+  it('rejects Bible slice IDs misreported as permission to reveal information', async () => {
+    const ordinary = proposedAnswer('approach');
+    const generated = vi.fn(async (_request: unknown) => ({
+      ...ordinary,
+      draft: {
+        ...ordinary.draft,
+        disclosureSliceIds: ['A_character_compass'],
+      },
+    }));
+    const reviewed = passReviewer();
+    const shadow = createSeyeonFastDialogueShadowV1({
+      candidateProvider: { providerKey: 'mock', modelKey: 'mock', generate: generated },
+      reviewerProvider: { providerKey: 'mock', modelKey: 'mock', generate: reviewed },
+      promptProfile: 'character_first_life_v1',
+      fullThreadCensus: syntheticFirstTurnCensusShadowV1(),
+    });
+    await expect(shadow.evaluate(publicContext())).rejects.toMatchObject({
+      code: 'FAST_RENDERER_GUARD_REJECTED',
+    });
+    expect(generated).toHaveBeenCalledOnce();
+    expect(reviewed).not.toHaveBeenCalled();
+  });
+
 });
