@@ -59,3 +59,11 @@ method, closed-API, protected Chat/encoded-alias, marker-query and static-root
 checks. No remote DB or credentials were used; local evidence is retained at
 `.wrangler/cloudflare-security-local-http-20261025.json` outside Git. The server
 was stopped after the checks. Native Auth regression and governance checks pass.
+
+PR #2572 subsequently merged as `396bcbb517cd2e77a1d3c3e4e32e1d399f205924`.
+Main also added the governed credit-wallet rewrite via #2564. The required CI
+consumer test caught the old 19-entry Cloudflare route inventory missing that
+new public contract. Record the existing exact route and static ID in the
+inventory (20 rewrites); retain the existing 404 until an independently governed
+Cloudflare credit-wallet adapter exists. This is inventory alignment only, not
+wallet activation, DB/schema modification, or a new alias/fallback.
