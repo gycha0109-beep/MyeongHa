@@ -1,0 +1,72 @@
+name: Cloudflare Primary Worker E2E
+run-name: "[WT:ops] Cloudflare primary live E2E"
+on:
+  pull_request:
+    paths:
+      - 'scripts/verify-cloudflare-primary-e2e.mjs'
+      - 'test/cloudflare-primary-e2e.test.mjs'
+      - '.github/workflows/cloudflare-primary-e2e.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/verify-cloudflare-primary-e2e.mjs'
+      - 'test/cloudflare-primary-e2e.test.mjs'
+      - '.github/workflows/cloudflare-primary-e2e.yml'
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: Type VERIFY_CLOUDFLARE_PRIMARY_E2E to allow production Member sign-in and calculation
+        required: true
+        type: string
+
+permissions:
+  contents: read
+concurrency:
+  group: cloudflare-primary-e2e-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  anonymous:
+    name: Cloudflare live E2E - anonymous ingress and HOLD
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Verify exact governed Cloudflare production ingress (no secrets)
+        env:
+          MYEONGHA_CLOUDFLARE_E2E_MODE: anonymous
+        run: node scripts/verify-cloudflare-primary-e2e.mjs
+
+  member:
+    name: Cloudflare live E2E - authenticated DB and Saju
+    needs: anonymous
+    # Never expose secrets to pull-request code. A main push after merge
+    # runs once with the existing governed production Member smoke account.
+    if: ${{ github.ref == 'refs/heads/main' && (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.confirm == 'VERIFY_CLOUDFLARE_PRIMARY_E2E')) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    environment: production
+    env:
+      MYEONGHA_CLOUDFLARE_E2E_MODE: authenticated
+      MYEONGHA_PRODUCTION_MEMBER_EMAIL: ${{ secrets.MYEONGHA_PRODUCTION_MEMBER_EMAIL }}
+      MYEONGHA_PRODUCTION_MEMBER_PASSWORD: ${{ secrets.MYEONGHA_PRODUCTION_MEMBER_PASSWORD }}
+      MYEONGHA_PRODUCTION_MEMBER_EXPECTED_SUBJECT_ID: ${{ secrets.MYEONGHA_PRODUCTION_MEMBER_EXPECTED_SUBJECT_ID }}
+    steps:
+      - name: Fail closed when governed production credentials are absent
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$MYEONGHA_PRODUCTION_MEMBER_EMAIL"
+          test -n "$MYEONGHA_PRODUCTION_MEMBER_PASSWORD"
+          test -n "$MYEONGHA_PRODUCTION_MEMBER_EXPECTED_SUBJECT_ID"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Verify Member login, authoritative PostgreSQL profile and calculation-only Saju
+        run: node scripts/verify-cloudflare-primary-e2e.mjs
