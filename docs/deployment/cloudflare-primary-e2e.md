@@ -22,3 +22,5 @@ Target is **only** https://myeongha.gycha0109.workers.dev; no Vercel or second W
 - A successful offline Vitest check is not live E2E success; require successful live workflow jobs and confirm production deploy provenance before removal of \`myeongha-web\`.
 
 GitHub governance requires the PR-triggered anonymous workflow to contain **no production Secret references**. The production Member E2E is isolated in `cloudflare-primary-e2e-member.yml` and cannot run on PR events.
+
+Observed 2026-10-25 public E2E: readiness=503, unauthenticated Member=503, Saju calculation=404. This is **not** authorization to force a positive E2E or enable Saju mode. Follow the existing Security Cloudflare Saju canary prerequisite gate before using a Member credential.

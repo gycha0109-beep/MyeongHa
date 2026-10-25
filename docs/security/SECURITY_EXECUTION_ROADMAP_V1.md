@@ -1,5 +1,7 @@
 # 명하 Security 실행 로드맵 v1
 
+> 2026-10-25 재개 상태: 주 서버는 Cloudflare `myeongha`입니다. #2574의 실제 로그 수집 설정과 native 경보가 반영됐고 시험 알림 수신을 확인했습니다. #2572 API 복구도 main에 병합됐습니다. #2578에서 실제 Worker 버전에 결속한 Cloudflare E2E 실행 경로와 native 로그인 이벤트 누락을 보완합니다. 운영의 인증된 정상·quota E2E는 미통과이며 전체 로드맵은 완료가 아닙니다. #1536은 기존 고정 digest와 성공 복구 실행을 현재 재확인해 CLOSED, #425는 BLOCKED_EXTERNAL입니다.
+
 > **2026-10-25 현재 기준:** 주 서버는 Cloudflare입니다. [실행 기록](GENERAL_SECURITY_CLOUDFLARE_EXECUTION_20261024.md)과 [Cloudflare 경보 정본](../../config/security/cloudflare-primary-security-monitor-v1.json)을 따릅니다. Ops PR #2560(admission/event 연결), #2571(로그 수집 설정)은 MERGED입니다. Cloudflare native 보안 모니터는 생성·활성화·provider 재조회 완료입니다. 실제 주 서버 로그 유입/알림 수신 및 Saju 정상·초과 canary는 Ops의 단일 Worker API 이식(#2572) 후 실행해야 하므로 운영 전체 완료는 아닙니다. 아래 Vercel/Node 기록은 과거 개발·보조 환경 증거입니다.
 
 > Watchtower-Track: security

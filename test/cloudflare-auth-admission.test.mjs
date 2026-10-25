@@ -60,7 +60,7 @@ describe('Cloudflare Auth/DB admission is fail-closed until explicit host and se
         request: new Request(PRIVATE_ORIGIN + '/api/auth/social/start', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ provider: 'google', redirectUri: PRIVATE_ORIGIN + '/auth.html?social=callback' }),
+          body: JSON.stringify({ provider: 'google', redirectUri: webOrigin + '/auth.html?social=callback' }),
         }),
         env: { MYEONGHA_SOCIAL_AUTH_GOOGLE_ENABLED: 'true' },
         webOrigin,

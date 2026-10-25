@@ -16,7 +16,8 @@ function fixture(path, init = {}) {
     status: 'unready', capabilities: { userData: 'unready' },
   }, { status: 503, headers });
   if (path === '/api/me') return Response.json({ ok: false, error: { code: 'AUTH_REQUIRED' } }, { status: 401, headers });
-  if (path === '/api/me/saju/calculation') return new Response(null, { status: 404, headers });
+  if (path === '/api/me/saju/calculation' || path === '/api/me/saju/preview-reading')
+    return new Response(null, { status: 404, headers });
   if (path === '/api/auth/sign-in') return Response.json({
     ok: false, error: { code: 'INVALID_REQUEST' },
   }, { status: 403, headers });
@@ -40,10 +41,11 @@ describe('Cloudflare primary live E2E verifier (offline harness)', () => {
     const result = await runCloudflarePrimaryE2E({ fetchImpl });
     expect(result.result).toBe('PASS');
     expect(result.mode).toBe('anonymous');
-    expect(result.checks).toHaveLength(13);
+    expect(result.checks).toHaveLength(14);
     expect(result.checks.map(x => x.name)).toContain('api.readiness.config_only');
     expect(visited.some(x => x.path === '/api/me/saju/calculation' && x.method === 'POST')).toBe(true);
     expect(visited.some(x => x.path.endsWith('/turns') && x.method === 'POST')).toBe(true);
+    expect(visited.some(x => x.path === '/api/me/saju/preview-reading' && x.method === 'POST')).toBe(true);
   });
 
   it('rejects an accidental positive protected Chat or HTML API fallback', async () => {

@@ -56,6 +56,12 @@ export async function runCloudflarePrimaryE2E(options = {}) {
     'E2E target is pinned to the governed Cloudflare primary Worker');
   const mode = options.mode ?? 'anonymous';
   assert(mode === 'anonymous' || mode === 'authenticated', 'Unknown E2E mode');
+  const expectedVersion = options.expectedVersion ?? process.env.CLOUDFLARE_EXPECTED_WORKER_VERSION;
+  if (mode === 'authenticated') {
+    assert(typeof expectedVersion === 'string' &&
+      /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/iu.test(expectedVersion),
+      'Authenticated Cloudflare E2E requires the independently verified exact Worker version');
+  }
   const fetchImpl = options.fetchImpl ?? fetch;
   const checks = [];
 
@@ -72,6 +78,10 @@ export async function runCloudflarePrimaryE2E(options = {}) {
       },
     });
     assert(response instanceof Response, label + ' missing Fetch Response');
+    if (mode === 'authenticated') {
+      assert(response.headers.get('x-myeongha-worker-version') === expectedVersion,
+        label + ' returned a different deployed Worker version; no credential replay');
+    }
     return response;
   }
   function mark(label, status) {
@@ -133,6 +143,16 @@ export async function runCloudflarePrimaryE2E(options = {}) {
   noSecretEgress(sajuAnonymous, 'unauthenticated Saju');
   mark('api.saju.anonymous_fence', sajuAnonymous.status);
 
+  const previewAnonymous = await call('unauthenticated Saju preview', '/api/me/saju/preview-reading', {
+    method: 'POST',
+    headers: { Origin: origin, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ readingText: '전체 사주' }),
+  });
+  expectedHttp(previewAnonymous, 'unauthenticated Saju preview', [401, 403, 404, 503]);
+  apiHeaders(previewAnonymous, 'unauthenticated Saju preview', { json: previewAnonymous.status !== 404 });
+  noSecretEgress(previewAnonymous, 'unauthenticated Saju preview');
+  mark('api.saju.preview_anonymous_fence', previewAnonymous.status);
+
   const crossOriginAuth = await call('cross-origin login denial', '/api/auth/sign-in', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Origin: 'https://untrusted.example.org' },
@@ -177,6 +197,13 @@ export async function runCloudflarePrimaryE2E(options = {}) {
   }
 
   if (mode === 'authenticated') {
+    // Security-owned production prerequisite: do not send credentials while
+    // the native Member and both Saju adapters are unadmitted. No retries.
+    assert(ready.status === 200 && meAnonymous.status === 401 &&
+      sajuAnonymous.status === 401 && previewAnonymous.status === 401,
+      'Cloudflare positive E2E BLOCKED_BY_ADMISSION: readiness=' + ready.status +
+      ' member=' + meAnonymous.status + ' saju=' + sajuAnonymous.status +
+      ' preview=' + previewAnonymous.status);
     const { email, password, expectedSubjectId } = options.credentials ?? {};
     assert(typeof email === 'string' && email.length > 0 &&
       typeof password === 'string' && password.length > 0 &&
@@ -265,7 +292,8 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     expectedSubjectId: process.env.MYEONGHA_PRODUCTION_MEMBER_EXPECTED_SUBJECT_ID,
   } : undefined;
   try {
-    const result = await runCloudflarePrimaryE2E({ mode, credentials });
+    const result = await runCloudflarePrimaryE2E({ mode, credentials,
+      expectedVersion: process.env.CLOUDFLARE_EXPECTED_WORKER_VERSION });
     console.log(JSON.stringify(result));
   } catch (error) {
     // Fail closed without printing upstream bodies or request inputs.

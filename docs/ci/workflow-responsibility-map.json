@@ -41,14 +41,20 @@
     "cloudflare-primary-e2e-member.yml": {
       "responsibility": "cloudflare-primary-member-db-saju-live-e2e",
       "prMode": "none",
-      "mainMode": "triggered-operations",
-      "workTrackAttribution": "commit-metadata"
+      "mainMode": "manual",
+      "workTrackAttribution": "workflow-dispatch"
     },
     "cloudflare-primary-e2e.yml": {
       "responsibility": "cloudflare-primary-live-anonymous-e2e",
       "prMode": "narrow",
       "mainMode": "triggered-operations",
       "workTrackAttribution": "pr-metadata"
+    },
+    "cloudflare-saju-admission-canary.yml": {
+      "responsibility": "production-saju-smoke",
+      "prMode": "none",
+      "mainMode": "manual",
+      "workTrackAttribution": "dispatch-input"
     },
     "db-commerce-entitlement-suite.yml": {
       "responsibility": "commerce-entitlement-verification",
