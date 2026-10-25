@@ -28,7 +28,7 @@ type ReadyRow = Readonly<{ ready?: unknown }>;
 export function createPostgresDigitalReadingCheckoutAdmissionPortV1():
 DigitalReadingCheckoutAdmissionPortV1 {
   return Object.freeze({
-    async admit({ scope, purchaseIntentId }) {
+    async admit({ scope, purchaseIntentId }: Parameters<DigitalReadingCheckoutAdmissionPortV1['admit']>[0]) {
       if (!UUID.test(purchaseIntentId)) {
         throw new ApiCommandError('INVALID_REQUEST', 'Checkout Purchase Intent is invalid.');
       }
