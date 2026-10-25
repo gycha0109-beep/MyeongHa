@@ -237,3 +237,10 @@
 
 - 검증 실행 순서/합격 기준/실행 URL 및 head SHA 기반 증거 기록은 [`LEGAL_COMPLIANCE_VALIDATION_PLAN_V1.md`](./LEGAL_COMPLIANCE_VALIDATION_PLAN_V1.md)를 따른다. 구현 중 표적 단위·격리 DB 검증과 구현 완료 후 **고정 SHA의 CI Integration**을 구분한다. 전 기능 완료 전에 통합 CI·병합을 실행하지 않는다.
 - 문서는 현재 모든 GREEN 상태를 **미확인**으로 명시한다. 실제 SQL 배포·PortOne 실인증·유료 판매·법정 게시를 승인하거나 실행하지 않는다.
+
+
+## 29. 2026-10-25 L4 인증된 구매자 Subject 기반 환불 검토 합성 경계
+
+- `apps/api/src/commerce-digital-reading-withdrawal-orchestration-v1.ts`에 **내부 전용** 읽기 경계 `reviewOwnedDigitalReadingWithdrawalV1` 추가. 이미 신뢰된 Member/Guest 신원 증거를 기존 `executePostgresSubjectTransactionV1`에서 canonical Subject로 확정한 뒤, 서버 소유 `OwnedDigitalReadingReviewSnapshotPortV1`이 *동일 트랜잭션*에서 한 구매 단위의 결제/고지/제공 사실만 읽도록 규약화한다.
+- 사용자 선택 입력은 `purchaseIntentId`, `unitId`, `reason`만 허용하며 브라우저 `paid`, `readAt`, `delivered`, `acknowledged`, `refundApproved` 등은 **무시**한다. 저장된 사건이 없으면 `evidence_review_required`, 다른 단위 고지·인도는 거절, DB 실패 시 ROLLBACK. 반환에는 구매 식별자, 사주 본문, PG 응답 원문을 포함하지 않는다.
+- `test/commerce-digital-reading-withdrawal-orchestration-v1.test.ts`의 가짜 DB 트랜잭션으로 소유자 검증/상태 누락/클라이언트 위조/타 단위/DB 실패/예외 우선순위를 점검하도록 구성했다. **실제 Commerce/S7 구매·고지·배송 일관성 스냅샷 저장 및 조회 권위는 미구현**, 서버 포트 인젝션 실연결 전 이 경계는 `active:false`, 공개 라우트 없음, 결제/환불/Grant 변경 권한 없음. 판매 OFF.
