@@ -1,4 +1,5 @@
 import { createCloudflareSubjectPoolV1 } from './cloudflare-hyperdrive-subject-pool.mjs';
+import { isCloudflareSajuKilledV1 } from './cloudflare-saju-kill-switch.mjs';
 // Cloudflare calculation-only adapter. Independent explicit approval after
 // Auth/DB origin admission; absent bindings leave the public route at 404.
 // Never activate Reading/LLM, face image processing, or commerce here.
@@ -80,6 +81,9 @@ async function bodyPresenceBoundRequest(request) {
 /** @returns {Promise<Response|null>} null keeps the deny-first 404. */
 export async function tryHandleCloudflareApprovedSajuCalculationV1(request, bindings, route) {
   if (route?.id !== 'api.me.saju.calculation') return null;
+  // The operator kill switch wins over every positive Saju approval and is
+  // evaluated before trusted-origin admission, provider secrets or DB access.
+  if (isCloudflareSajuKilledV1(bindings)) return null;
   // Auth/DB subject resolution must be separately approved before calculation.
   const origin = approvedCloudflareAuthOriginV1(request, bindings);
   if (origin === null || bindings?.MYEONGHA_CLOUDFLARE_SAJU_MODE !== APPROVED_CALCULATION_MODE) {

@@ -24,3 +24,36 @@ Target is **only** https://myeongha.gycha0109.workers.dev; no Vercel or second W
 GitHub governance requires the PR-triggered anonymous workflow to contain **no production Secret references**. The production Member E2E is isolated in `cloudflare-primary-e2e-member.yml` and cannot run on PR events.
 
 Observed 2026-10-25 public E2E: readiness=503, unauthenticated Member=503, Saju calculation=404. This is **not** authorization to force a positive E2E or enable Saju mode. Follow the existing Security Cloudflare Saju canary prerequisite gate before using a Member credential.
+
+## Saju-only emergency kill switch (2026-10-25)
+
+The **one** existing production Worker owns both Saju routes. Added
+`MYEONGHA_CLOUDFLARE_SAJU_KILL_SWITCH` is a server-side **stop switch**
+for `/api/me/saju/calculation` and `/api/me/saju/preview-reading`.
+It does not add another Worker, public route, DB role or permission.
+
+- Exact `true` (or any explicitly malformed value) returns the original
+  no-store 404 before Saju credentials, DB, producer or reading request body.
+- Exact `false` or absence only clears this emergency stop. It **does not**
+  activate either route. The existing independent exact approval modes remain
+  `MYEONGHA_CLOUDFLARE_SAJU_MODE=approved-calculation-only-v1` and
+  `MYEONGHA_CLOUDFLARE_SAJU_PREVIEW_MODE=approved-preview-reading-v1`.
+- The existing global `MYEONGHA_CLOUDFLARE_EMERGENCY_HOLD` remains a
+  separate, broader Auth/DB emergency stop. Neither gate can override the other.
+- A production ON switch is a non-sensitive, independent `secret_text`
+  binding on `myeongha` only, preserved by `wrangler deploy --keep-vars`.
+  Do not add the secret or its value to git, logs or a browser request.
+- To unblock, first verify the approved producer Bearer exists in the authorized
+  source, the current Member/DB/TLS binding is valid, approved calculation and
+  preview configurations are present, the approved abuse-admission policy is
+  active, and the pinned Worker version is correct. The already-existing
+  Cloudflare Saju canary must pass its governed phases. Do not invent a Bearer,
+  copy an unknown secret or flip activation values to bypass failed canaries.
+- Emergency response to any anomaly: turn this stop switch to exact `true`
+  through the authorized Cloudflare Worker secret API; verify returned deployment
+  identity and then repeat credential-free HTTP checks. Do not change the
+  existing Seyeon Chat security gate or the whole-worker emergency HOLD.
+
+A PASS of unauthenticated boundary E2E proves only that these surfaces are
+stopped or access-controlled, **not** that Member Saju production calculation
+succeeds. Do not remove `myeongha-web` based on a kill-switch test alone.

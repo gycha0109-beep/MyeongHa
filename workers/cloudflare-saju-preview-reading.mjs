@@ -1,4 +1,5 @@
 import { createCloudflareSubjectPoolV1 } from './cloudflare-hyperdrive-subject-pool.mjs';
+import { isCloudflareSajuKilledV1 } from './cloudflare-saju-kill-switch.mjs';
 // Cloudflare Saju preview-reading adapter, separate from calculation-only.
 // The existing subject/reading authorities decide all positive results.
 // Watchtower-Track: ops
@@ -66,6 +67,9 @@ export function fenceCloudflareSajuPreviewReadingResponseV1(candidate) {
 // and Saju producer admission; no fallthrough to Vercel is possible.
 export async function tryHandleCloudflareApprovedSajuPreviewReadingV1(request, bindings, route) {
   if (route?.id !== 'rewrite.saju.preview') return null;
+  // Emergency disable must be checked before Auth/DB, producer config or
+  // any Saju request body processing. Both modes share one operator switch.
+  if (isCloudflareSajuKilledV1(bindings)) return null;
   const origin = approvedCloudflareAuthOriginV1(request, bindings);
   if (origin === null || bindings?.MYEONGHA_CLOUDFLARE_SAJU_PREVIEW_MODE !== APPROVED_MODE) {
     return null;
