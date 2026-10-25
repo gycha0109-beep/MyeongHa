@@ -43,10 +43,12 @@ on public.record_access_grants for select
 to myeongha_seyeon_chat_runtime_owner
 using (subject_id=public.current_myeongha_subject_id());
 
+-- Restricted installers must grant schema CREATE to the new owner BEFORE
+-- transferring ownership. The temporary grant is revoked below.
 grant myeongha_seyeon_chat_runtime_owner to current_user;
+grant create on schema public to myeongha_seyeon_chat_runtime_owner;
 alter table public.seyeon_positive_source_type_registry_v1
   owner to myeongha_seyeon_chat_runtime_owner;
-grant create on schema public to myeongha_seyeon_chat_runtime_owner;
 
 create function public.cmd_mark_seyeon_positive_context_ready_pinned_v1(
   p_subject_id uuid, p_thread_id uuid, p_turn_id uuid,
@@ -202,11 +204,13 @@ alter function public.cmd_mark_seyeon_positive_context_ready_pinned_v1(
   uuid,uuid,uuid,uuid,uuid,uuid,text,text,text,text,text,text,text
 ) owner to myeongha_seyeon_chat_runtime_owner;
 revoke create on schema public from myeongha_seyeon_chat_runtime_owner;
-revoke myeongha_seyeon_chat_runtime_owner from current_user;
 revoke all on function public.cmd_mark_seyeon_positive_context_ready_pinned_v1(
   uuid,uuid,uuid,uuid,uuid,uuid,text,text,text,text,text,text,text
 ) from public,anon,authenticated,service_role;
 
 -- Intentionally NO GRANT EXECUTE TO myeongha_api_executor and no type
 -- registration, positive Projector, model call or HTTP Reveal.
+-- Complete function ACL changes before dropping temporary owner authority.
+revoke myeongha_seyeon_chat_runtime_owner from current_user;
+
 commit;

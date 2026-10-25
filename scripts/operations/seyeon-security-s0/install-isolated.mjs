@@ -34,6 +34,9 @@ try {
   }
   await client.query('BEGIN');
   await client.query((await buildSeyeonSecurityS0InstallationBundle()).sql);
+  // Restricted postgres has ADMIN but no inherited owner privileges. Borrow
+  // owner authority only to inspect the empty registry, then drop it in this TX.
+  await client.query('grant myeongha_seyeon_chat_runtime_owner to current_user');
   const { rows: [acl] } = await client.query(`select
     not has_function_privilege('myeongha_api_executor',
       'public.cmd_mark_seyeon_positive_context_ready_pinned_v1(uuid,uuid,uuid,uuid,uuid,uuid,text,text,text,text,text,text,text)', 'EXECUTE')
@@ -54,6 +57,7 @@ try {
       'seyeon_private.lock_memory_subject_v1(uuid)', 'EXECUTE')
     as closed`);
   if (acl.closed !== true) throw Error('S0 installation unexpectedly enabled model use or Reveal.');
+  await client.query('revoke myeongha_seyeon_chat_runtime_owner from current_user');
   await client.query('COMMIT');
   for(const source of SEYEON_SECURITY_S0_SQL_SOURCES)process.stdout.write(`S0_INSTALLED ${source}\n`);
   process.stdout.write(`S0_DEFAULT_CLOSED PostgreSQL ${target.version}\n`);

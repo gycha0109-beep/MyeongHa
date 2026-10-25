@@ -36,6 +36,7 @@ if (seedEnd < 0 || generationStart < 0 || generationEnd < 0) throw Error('Existi
 
 describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first Reveal → revoke', () => {
   let pool: Pool;
+  let ordinaryPool: Pool | undefined;
   let subjectPool: PostgresSubjectPoolV1;
   beforeAll(async () => {
     const db = process.env.PGDATABASE ?? '';
@@ -45,12 +46,21 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
            process.env.DB_SUITE === 'postgres17' && /^myeongha_ci_case_[0-9]+$/u.test(db)))) {
       throw Error('S0 real tests require the named disposable database.');
     }
+    const adminUser=process.env.SEYEON_S0_TEST_ADMIN_USER??'postgres';
+    const ordinaryUser=process.env.SEYEON_S0_TEST_ORDINARY_USER;
+    if(!['postgres','supabase_admin'].includes(adminUser)||
+       (ordinaryUser!==undefined&&ordinaryUser!=='myeongha_s0_receipt_test_login')){
+      throw Error('Unsupported isolated fixture principals');
+    }
     pool = new Pool({
       host: process.env.PGHOST, port: Number(process.env.PGPORT ?? 5432),
-      user: 'postgres', database: db, password: process.env.PGPASSWORD,
+      user: adminUser, database: db, password: process.env.PGPASSWORD,
       ssl: false, max: 4, statement_timeout: 5000,
     });
-    subjectPool = pool as unknown as PostgresSubjectPoolV1;
+    if(ordinaryUser!==undefined){ordinaryPool=new Pool({host:process.env.PGHOST,
+      port:Number(process.env.PGPORT??5432),user:ordinaryUser,database:db,
+      password:process.env.PGPASSWORD,ssl:false,max:4,statement_timeout:5000});}
+    subjectPool = (ordinaryPool??pool) as unknown as PostgresSubjectPoolV1;
     // These are isolated test admissions, NEVER deployment instructions.
     await pool.query(`insert into public.seyeon_positive_source_type_registry_v1
       values('memory','conversation_recall','v1','seyeon-conversation-recall-projector-v1',true,true);
@@ -68,7 +78,7 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
         seyeon_private.cmd_request_seyeon_memory_revoke_v1(uuid,uuid)
         to myeongha_api_executor;`);
   });
-  afterAll(async () => { await pool?.end(); });
+  afterAll(async () => { await ordinaryPool?.end();await pool?.end(); });
 
   async function prepare(n: number, virtual?: { summary: string }) {
     const auth = uuid(10, n), subject = uuid(11, n), thread = uuid(14, n);
