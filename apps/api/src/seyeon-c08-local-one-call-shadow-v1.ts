@@ -514,9 +514,16 @@ export async function runSeyeonC08LocalOneCallShadowV1(input: Readonly<{
   if(requestBytes<1 || requestBytes>32768){
     throw new SeyeonC08LocalHoldV1('LOCAL_BUDGET_UNVERIFIED');
   }
-  const quote = await input.reserveBeforeModel({
-    requestBytes,maxCompletionTokens:input.maxCompletionTokens,
-  });
+  let quote:Awaited<ReturnType<typeof input.reserveBeforeModel>>;
+  try{
+    quote=await input.reserveBeforeModel({
+      requestBytes,maxCompletionTokens:input.maxCompletionTokens,
+    });
+  }catch{
+    // The quote provider can be remote; never leak token, price route, or
+    // underlying adapter exception to caller/logs.
+    throw new SeyeonC08LocalHoldV1('LOCAL_BUDGET_UNVERIFIED');
+  }
   if (!quote || quote.providerOutputTokenCapVerified !== true ||
       !Number.isSafeInteger(quote.reservedMicroUsd) ||
       quote.reservedMicroUsd <= 0 || quote.reservedMicroUsd > 4000) {
