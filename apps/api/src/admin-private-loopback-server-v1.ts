@@ -130,8 +130,9 @@ export function createAdminLoopbackServerV1(input: AdminLoopbackOptionsV1): Serv
           return;
         }
         if (memberOrigin === null) {
+          try { await limitedBody(req); }
+          catch { jsonReply(res, 413, { error: 'ADMIN_AUTH_BODY_INVALID' }); return; }
           jsonReply(res, 503, { error: 'ADMIN_AUTH_ORIGIN_UNAVAILABLE' });
-          req.resume();
           return;
         }
         try {
