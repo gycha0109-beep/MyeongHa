@@ -5,6 +5,7 @@ import type { AdminRoute, AdminSection } from './routes.js';
 import { StatusPanel } from './StatusPanel.js';
 import { AdminLogin, AdminWorkbench } from './AdminWorkbench.js';
 import { fetchAdminReadV1 } from './admin-client.js';
+import { BetaAnalyticsReadiness, OperatorActionsReadiness } from './AdminOperationalReadiness.js';
 
 const sectionDetails: Record<Exclude<AdminSection, 'overview'>, readonly string[]> = {
   users: ['사용자 검색 및 가입 상태', 'Reading · 권한 메타데이터', '게스트 · 회원 병합 및 삭제 상태'],
@@ -232,8 +233,12 @@ export function App() {
               {ownerToken === null ? <LockNotice /> : null}
               {route.section === 'overview' ? <><Overview token={ownerToken} />{ownerToken === null && <AdminLogin onSession={setOwnerToken} />}</> : ownerToken === null
                 ? <><PendingSection section={route.section} /><AdminLogin onSession={setOwnerToken} /></>
-                : <AdminWorkbench key={route.section} section={route.section} token={ownerToken}
-                    onSessionExpired={() => setOwnerToken(null)} onNavigate={onNavigate} />}
+                : <>{route.section === 'analytics'
+                  ? <BetaAnalyticsReadiness />
+                  : <AdminWorkbench key={route.section} section={route.section} token={ownerToken}
+                      onSessionExpired={() => setOwnerToken(null)} onNavigate={onNavigate} />}
+                    {['users', 'commerce', 'issues'].includes(route.section) &&
+                      <OperatorActionsReadiness />}</>}
             </>
           ) : (
             <>
