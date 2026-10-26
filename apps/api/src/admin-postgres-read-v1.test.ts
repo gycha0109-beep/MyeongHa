@@ -55,6 +55,17 @@ describe('admin dedicated readonly PostgreSQL adapter', () => {
     expect(h.sql[2]).not.toContain(receiptId);
     expect(h.params[2]).toEqual([1, null, null, null, 0, receiptId]);
   });
+  it('counts only authority-backed active Members and 7-day verified operations', async () => {
+    const sql = ADMIN_READ_SQL_V1.overview ?? '';
+    expect(sql).toContain("s.kind='member' AND s.status='active'");
+    expect(sql).toContain("r.verification_status='verified'");
+    expect(sql).toContain("r.execution_status='succeeded'");
+    expect(sql).toContain("INTERVAL '7 days'");
+    expect(sql).not.toMatch(/SUM\(.*amount|payload_jsonb|raw_birth/iu);
+    const h = harness();
+    await h.port.read(filters('overview'));
+    expect(h.sql[2]).toContain('COUNT(*)');
+  });
   it('provides bounded pagination', async () => {
     const h = harness('myeongha_admin_reader',Array.from({length:3},()=>({subjectId:SUBJECT})));
     const result = await h.port.read({ ...filters(),limit:2 });

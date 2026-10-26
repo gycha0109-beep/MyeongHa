@@ -4,6 +4,7 @@ import { adminRoutes, getAdminRoute } from './routes.js';
 import type { AdminRoute, AdminSection } from './routes.js';
 import { StatusPanel } from './StatusPanel.js';
 import { AdminLogin, AdminWorkbench } from './AdminWorkbench.js';
+import { fetchAdminReadV1 } from './admin-client.js';
 
 const sectionDetails: Record<Exclude<AdminSection, 'overview'>, readonly string[]> = {
   users: ['사용자 검색 및 가입 상태', 'Reading · 권한 메타데이터', '게스트 · 회원 병합 및 삭제 상태'],
@@ -14,10 +15,10 @@ const sectionDetails: Record<Exclude<AdminSection, 'overview'>, readonly string[
 };
 
 const metrics = [
-  { title: '등록 사용자', note: '운영자 조회 API 미연결' },
-  { title: '검증된 결제', note: '결제 원장 조회 API 미연결' },
-  { title: '사주 Reading', note: 'Reading 조회 API 미연결' },
-  { title: 'AI 운영 비용', note: '비용 집계 API 미연결' },
+  { key: 'members_active', title: '현재 활성 회원', note: '현재 활성 회원 계정 기준' },
+  { key: 'verified_receipts_7d', title: '최근 7일 검증 영수증', note: '서버 검증 상태 verified 기준' },
+  { key: 'completed_readings_7d', title: '최근 7일 완료 Reading', note: '완료 처리 시각 기준' },
+  { key: 'ai_calls_7d', title: '최근 7일 AI 호출', note: '실행 로그 기준 · 원가가 아님' },
 ] as const;
 
 function navigateTo(path: string, setPath: (path: string) => void) {
@@ -79,15 +80,38 @@ function LockNotice() {
   );
 }
 
-function Overview() {
+function Overview({ token }: { readonly token: string | null }) {
+  const [summary, setSummary] = useState<Readonly<Record<string, string>> | null>(null);
+  const [unavailable, setUnavailable] = useState(false);
+  useEffect(() => {
+    if (token === null) { setSummary(null); setUnavailable(false); return; }
+    let active = true;
+    setSummary(null);
+    setUnavailable(false);
+    void fetchAdminReadV1('/api/admin/overview', token).then(payload => {
+      if (!active) return;
+      const accepted = new Set(metrics.map(metric => metric.key));
+      const next: Record<string, string> = {};
+      for (const row of payload.rows) {
+        if (typeof row.metricKey !== 'string' || !accepted.has(row.metricKey as typeof metrics[number]['key']) ||
+            typeof row.metricValue !== 'string' || !/^\d{1,16}$/u.test(row.metricValue)) {
+          throw new Error('Invalid administrator metric result');
+        }
+        next[row.metricKey] = row.metricValue;
+      }
+      if (Object.keys(next).length !== metrics.length) throw new Error('Administrator metrics incomplete');
+      setSummary(next);
+    }).catch(() => { if (active) { setSummary(null); setUnavailable(true); } });
+    return () => { active = false; };
+  }, [token]);
   return (
     <>
       <div className="overview-heading">
         <div>
           <h2>서비스 현황</h2>
-          <p>검증된 운영 데이터만 표시합니다. 연결되지 않은 값은 —로 유지됩니다.</p>
+          <p>실제 조회 가능한 정본 메타데이터만 사용하며, 권한·연결 문제가 있으면 —로 표시합니다.</p>
         </div>
-        <span className="neutral-tag">데이터 연결 대기</span>
+        <span className="neutral-tag">{summary !== null ? '권한 확인 · 실제 집계' : unavailable ? '조회 불가' : '데이터 연결 대기'}</span>
       </div>
       <div className="metrics">
         {metrics.map((metric) => (
@@ -96,7 +120,7 @@ function Overview() {
               <span>{metric.title}</span>
               <span className="metric-card__dot" aria-hidden="true" />
             </div>
-            <p className="metric-card__value" aria-label={metric.title + ' 측정 불가'}>—</p>
+            <p className="metric-card__value" aria-label={metric.title + (summary ? ' 집계값' : ' 측정 불가')}>{summary?.[metric.key] ?? '—'}</p>
             <p className="metric-card__note">{metric.note}</p>
           </article>
         ))}
@@ -122,9 +146,9 @@ function Overview() {
           </div>
           <div className="readiness-list">
             <div><span>관리자 웹 화면</span><span className="readiness-ready">골격 구축</span></div>
-            <div><span>운영자 인증</span><span className="readiness-wait">미연결</span></div>
-            <div><span>관리자 읽기 API</span><span className="readiness-wait">미연결</span></div>
-            <div><span>실제 운영 데이터</span><span className="readiness-wait">미연결</span></div>
+            <div><span>운영자 인증</span><span className={token ? 'readiness-ready' : 'readiness-wait'}>{token ? '서버 확인' : '미확인'}</span></div>
+            <div><span>관리자 읽기 API</span><span className={summary ? 'readiness-ready' : 'readiness-wait'}>{summary ? '응답 확인' : '미연결'}</span></div>
+            <div><span>실제 운영 데이터</span><span className={summary ? 'readiness-ready' : 'readiness-wait'}>{summary ? '집계 확인' : '미연결'}</span></div>
           </div>
           <div className="surface__foot">운영자 권한 검증은 다음 구현 단계에서 서버에 연결합니다.</div>
         </section>
@@ -206,7 +230,7 @@ export function App() {
             <>
               <SectionIntro route={route} />
               {ownerToken === null ? <LockNotice /> : null}
-              {route.section === 'overview' ? <><Overview />{ownerToken === null && <AdminLogin onSession={setOwnerToken} />}</> : ownerToken === null
+              {route.section === 'overview' ? <><Overview token={ownerToken} />{ownerToken === null && <AdminLogin onSession={setOwnerToken} />}</> : ownerToken === null
                 ? <><PendingSection section={route.section} /><AdminLogin onSession={setOwnerToken} /></>
                 : <AdminWorkbench key={route.section} section={route.section} token={ownerToken}
                     onSessionExpired={() => setOwnerToken(null)} onNavigate={onNavigate} />}

@@ -1,5 +1,5 @@
 export const ADMIN_READ_KINDS_V1 = [
-  'users', 'user-detail', 'commerce', 'commerce-detail', 'credits', 'readings', 'ai-costs', 'ai-estimates', 'analytics', 'issues', 'catalog', 'characters', 'content-releases', 'deletion-jobs',
+  'overview', 'users', 'user-detail', 'commerce', 'commerce-detail', 'credits', 'readings', 'ai-costs', 'ai-estimates', 'analytics', 'issues', 'catalog', 'characters', 'content-releases', 'deletion-jobs',
 ] as const;
 
 export type AdminReadKindV1 = (typeof ADMIN_READ_KINDS_V1)[number];
@@ -27,6 +27,7 @@ export interface AdminReadPortV1 {
 }
 
 const SAFE_COLUMNS: Readonly<Record<AdminReadKindV1, readonly string[]>> = Object.freeze({
+  overview: ['metricKey','metricValue','window'],
   users: ['subjectId', 'kind', 'status', 'createdAt', 'lastActivityAt'],
   'user-detail': ['subjectId', 'kind', 'status', 'createdAt', 'lastActivityAt', 'readingsCount', 'verifiedPurchasesCount', 'activeEntitlementsCount', 'availableCredits'],
   'commerce-detail': ['transactionId','subjectId','productKey','provider','platform','providerStatus','purchaseStatus','createdAt','verifiedAt','amountMinor','currency','entitlementStatus'],

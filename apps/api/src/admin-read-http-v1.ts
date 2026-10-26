@@ -33,6 +33,7 @@ export interface AdminReadHttpDependenciesV1 {
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 const PATH_PREFIX = '/api/admin/';
 const ROUTES: Readonly<Record<string, AdminReadKindV1>> = {
+  overview: 'overview',
   users: 'users',
   commerce: 'commerce',
   credits: 'credits',
@@ -106,6 +107,7 @@ export function parseAdminReadFiltersV1(url: URL): AdminListFiltersV1 {
     throw new Error('Administrator limit is out of range.');
   }
   const cursor = url.searchParams.get('cursor');
+  if (kind === 'overview' && cursor !== null) throw new Error('Overview is not paginated.');
   if (cursor !== null && (!/^[1-9]\d{0,4}$/u.test(cursor) || Number(cursor) > 10_000 || (kind === 'user-detail' || kind === 'commerce-detail'))) {
     throw new Error('Administrator cursor is invalid.');
   }
@@ -114,7 +116,7 @@ export function parseAdminReadFiltersV1(url: URL): AdminListFiltersV1 {
     throw new Error('Administrator subject reference is invalid.');
   }
   subjectId ??= querySubject?.toLowerCase() ?? null;
-  if (subjectId !== null && ['issues','analytics','catalog','characters','content-releases'].includes(kind)) {
+  if (subjectId !== null && ['overview','issues','analytics','catalog','characters','content-releases'].includes(kind)) {
     throw new Error('Subject filter is not supported by the requested authority.');
   }
   if (kind === 'user-detail' || kind === 'commerce-detail') {
@@ -124,7 +126,7 @@ export function parseAdminReadFiltersV1(url: URL): AdminListFiltersV1 {
   }
   const from = readDate(url.searchParams.get('from'));
   const to = readDate(url.searchParams.get('to'));
-  if (from !== null && ['catalog','characters','content-releases'].includes(kind)) {
+  if (from !== null && ['overview','catalog','characters','content-releases'].includes(kind)) {
     throw new Error('Date filter is not supported by the requested authority.');
   }
   if ((from === null) !== (to === null)) {
