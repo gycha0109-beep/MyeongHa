@@ -14,11 +14,15 @@ export function normalizeUiLocale(value) {
 
 export function translateStaticUi(source, locale) {
   if (locale === 'ko-KR') return source;
-  const myRow = MY_STATIC_UI_COPY_V1.get(source);
-  if (myRow) return myRow[locale === 'ja-JP' ? 0 : locale === 'zh-TW' ? 1 : locale === 'en-US' ? 2 : 3];
-  if (locale === 'en-US' || locale === 'zh-CN') return lookupPlannedStaticUiCopyV1(source, locale) ?? source;
+  if (locale === 'en-US' || locale === 'zh-CN') {
+    return lookupPlannedStaticUiCopyV1(source, locale)
+      ?? MY_STATIC_UI_COPY_V1.get(source)?.[locale === 'en-US' ? 2 : 3]
+      ?? source;
+  }
   const row = COPY.get(source);
-  return row?.[locale === 'ja-JP' ? 0 : locale === 'zh-TW' ? 1 : -1] ?? source;
+  if (row) return row[locale === 'ja-JP' ? 0 : 1];
+  const myRow = MY_STATIC_UI_COPY_V1.get(source);
+  return myRow?.[locale === 'ja-JP' ? 0 : 1] ?? source;
 }
 export function getUiLocale() {
   return typeof window === 'undefined' ? 'ko-KR' : storedLocale();
