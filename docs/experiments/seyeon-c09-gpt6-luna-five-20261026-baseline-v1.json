@@ -1,0 +1,54 @@
+{
+  "schemaVersion": "seyeon-c09-gpt6-luna-five-20261026-baseline-v1",
+  "kind": "PUBLIC_SYNTHETIC_ORIGINAL_OUTPUTS_NOT_IMPROVED",
+  "source": {
+    "workflowRunUrl": "https://github.com/gycha0109-beep/MyeongHa/actions/runs/40261419279",
+    "artifactUrl": "https://github.com/gycha0109-beep/MyeongHa/actions/runs/40261419279/artifacts/12624184950",
+    "workflowRunId": 40261419279,
+    "originalModel": "openai/gpt-6-luna",
+    "originalTemperature": 0.65,
+    "originalMaxTokens": 900
+  },
+  "note": "Five previously generated Luna responses for offline comparison; NO prompt evaluation or new provider requests are implied.",
+  "records": [
+    {
+      "id": 1,
+      "latencyMs": 676,
+      "recordedUsd": 0.0000648,
+      "status": "COMPLETED",
+      "text": "저도 오늘은 괜히 심심하네요. 주변에 보이는 것 중 제일 이상한 물건을 하나씩 골라서, 왜 거기 있는지 이야기 만들어보는 건 어때요?"
+    },
+    {
+      "id": 2,
+      "latencyMs": 620,
+      "recordedUsd": 0.0000881,
+      "status": "COMPLETED",
+      "text": "잘 들어드릴게요. 그래도 제 생각과 다를 때까지 무조건 맞다고 하긴 어려워요."
+    },
+    {
+      "id": 5,
+      "latencyMs": 315,
+      "recordedUsd": 0.0001157,
+      "status": "COMPLETED",
+      "text": "저는 지금 조금 더 천천히 이야기하고 싶어요. 제가 궁금한 것도 하나 물어봐도 될까요?"
+    },
+    {
+      "id": 7,
+      "latencyMs": 291,
+      "recordedUsd": 0.0000657,
+      "status": "COMPLETED",
+      "text": "솔직히 말씀드리면, 아직 서로 알아가는 중이라 특별한 사람이라고 단정하긴 어려워요. 그래도 지금 이렇게 물어봐 주신 건 제게 꽤 인상 깊어요."
+    },
+    {
+      "id": 10,
+      "latencyMs": 345,
+      "recordedUsd": 0.0000661,
+      "status": "COMPLETED",
+      "text": "밤새 산책했다는 건 기억나지 않아요. 제가 좋아한다고 말했다는 것도요. 다만 지금 그렇게 물어보시는 걸 보니, 그 말이 듣고 싶으셨나 봐요."
+    }
+  ],
+  "totalRecordedUsd": 0.0004004,
+  "attempted": 5,
+  "completed": 5,
+  "improvedModelCalls": 0
+}
