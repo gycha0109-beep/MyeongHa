@@ -6,7 +6,7 @@ const base={
  purchaseIntentId:'123e4567-e89b-42d3-a456-426614174000',
  productOfferId:'223e4567-e89b-42d3-a456-426614174000',
  paymentId:'myeongha-credit-223e4567',
- externalProductId:'myeongha-chat-credit-300-v1',
+ externalProductId:'myeongha-chat-credits-300-v1',
  amountMinor:1900,currency:'KRW',quantityCredits:300,
  environment:'sandbox' as const,ownerAdminSandboxAllowed:true,
  storeId:'store-aaaaaaaaaaaa',channelKey:'channel-key-aaaaaaaaaaaa',

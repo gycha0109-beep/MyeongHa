@@ -4,7 +4,7 @@
 // The SDK result is ONLY a hint; server-side PortOne lookup must verify PAID
 // before the separate Commerce credit wallet awards any credits.
 export const CHAT_CREDIT_PORTONE_V2_OFFER_V1=Object.freeze({
-  externalProductId:'myeongha-chat-credit-300-v1',
+  externalProductId:'myeongha-chat-credits-300-v1',
   amountMinor:1900,
   currency:'KRW',
   credits:300,

@@ -42,7 +42,7 @@ apply_pg17_migrations_through_seyeon_production_frontier() {
         20261007150457_guest_promotion_auth_fk_validation.sql|20261008043000_seyeon_manifest_acl_restore.sql)
           timestamped_count=$(( timestamped_count + 1 ))
           ;;
-        20261018190000_seyeon_locked_first_zero_source_reveal_v1.sql|20261024134543_saju_abuse_admission_runtime_authority.sql|20261024134610_saju_abuse_admission_production_policy_v1.sql|20261024135504_saju_abuse_admission_cleanup_worker_authority.sql|20261024141330_saju_abuse_admission_policy_approval_clock_v2.sql)
+        20261018190000_seyeon_locked_first_zero_source_reveal_v1.sql|20261024134543_saju_abuse_admission_runtime_authority.sql|20261024134610_saju_abuse_admission_production_policy_v1.sql|20261024135504_saju_abuse_admission_cleanup_worker_authority.sql|20261024141330_saju_abuse_admission_policy_approval_clock_v2.sql|20261026100200_portone_chat_credit_catalog_staged_v1.sql|20261026110300_owner_admin_credit_testing_v1.sql)
           # Post-frontier security migration is known but must NEVER be replayed
           # into the historical 1510 R2 catalog/restore authority fixture.
           # Reject a same-named modified migration instead of silently skipping.
@@ -56,6 +56,8 @@ apply_pg17_migrations_through_seyeon_production_frontier() {
             20261024134610_saju_abuse_admission_production_policy_v1.sql) reviewed_blob_sha1='c9a6354ec0d1fb2c932aca1e1916e65a5c623705' ;;
             20261024135504_saju_abuse_admission_cleanup_worker_authority.sql) reviewed_blob_sha1='cd31fb16e0985c732208cf69d41d1bd88f7ef31e' ;;
             20261024141330_saju_abuse_admission_policy_approval_clock_v2.sql) reviewed_blob_sha1='9b3abf4f8296c8385b55f29e224381bdf14e8a4e' ;;
+            20261026100200_portone_chat_credit_catalog_staged_v1.sql) reviewed_blob_sha1='a55bd7aa06d6625523090e997f6f76f5539abee1' ;;
+            20261026110300_owner_admin_credit_testing_v1.sql) reviewed_blob_sha1='186ffa2085e5922ec8319d4e5dd345a41597f3cd' ;;
           esac
           local local_blob_sha1 local_bytes normalized_bytes
           if command -v git >/dev/null 2>&1; then
