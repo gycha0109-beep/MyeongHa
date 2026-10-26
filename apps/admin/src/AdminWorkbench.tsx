@@ -6,7 +6,7 @@ import type { AdminSection } from './routes.js';
 import { StatusPanel } from './StatusPanel.js';
 
 type ListSection = Exclude<AdminSection, 'overview'>;
-type ReadTab = 'commerce' | 'credits' | 'readings' | 'ai-costs' | 'ai-estimates' | 'issues' | 'catalog' | 'characters' | 'content-releases' | 'deletion-jobs';
+type ReadTab = 'commerce' | 'credits' | 'readings' | 'ai-costs' | 'ai-estimates' | 'credit-reservations' | 'issues' | 'catalog' | 'characters' | 'content-releases' | 'deletion-jobs';
 const DATA_PATHS: Record<ListSection, string> = {
   users: 'users',
   commerce: 'commerce',
@@ -27,6 +27,11 @@ const LABELS: Record<string, string> = {
   availableCredits: '가용 크레딧',
   eventId: '크레딧 내역 참조',
   creditDelta: '발급 크레딧',
+  reservationId: '사용 예약 참조',
+  requiredCredits: '예약 크레딧',
+  state: '정산 상태',
+  deliveredTurnId: '전달 대화 참조',
+  finalizedAt: '정산 시각',
   eventKind: '지급 근거',
   balanceAfter: '지급 후 잔액',
   correlationId: '원장 출처 참조',
@@ -204,7 +209,7 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
       <span className="neutral-tag">서버 검증 필수</span>
     </div>
     <div className="admin-tabs" aria-label="조회 종류">
-      {(section === 'commerce' ? [['commerce','결제 내역'],['credits','크레딧 지급']] : section === 'readings' ? [['readings','Reading'],['ai-costs','AI 호출'],['ai-estimates','AI 추정 원가']] : section === 'issues' ? [['issues','운영 이슈'],['deletion-jobs','삭제 작업'],['catalog','상품 카탈로그'],['characters','캐릭터'],['content-releases','콘텐츠 릴리스']] : [])
+      {(section === 'commerce' ? [['commerce','결제 내역'],['credits','크레딧 지급'],['credit-reservations','크레딧 사용·정산']] : section === 'readings' ? [['readings','Reading'],['ai-costs','AI 호출'],['ai-estimates','AI 추정 원가']] : section === 'issues' ? [['issues','운영 이슈'],['deletion-jobs','삭제 작업'],['catalog','상품 카탈로그'],['characters','캐릭터'],['content-releases','콘텐츠 릴리스']] : [])
         .map(([name,label]) => <button key={name} type="button" className={tab===name ? 'active' : ''} onClick={() => { setTab(name as ReadTab); setCursor(null); setDetail(null); }}>{label}</button>)}
     </div>
     <div className="admin-toolbar">

@@ -36,6 +36,8 @@ grant select (id, product_key, product_type, enabled, created_at)
 grant select (subject_id, status) on public.entitlements to myeongha_admin_reader;
 grant select (id, subject_id, source_kind, source_ref, credits_issued, credits_remaining, issued_at, expires_at)
   on public.chat_credit_lots_v1 to myeongha_admin_reader;
+grant select (id, subject_id, required_credits, state, delivered_turn_id, created_at, finalized_at)
+  on public.chat_credit_turn_reservations_v1 to myeongha_admin_reader;
 grant select (created_at, subject_id, stage, model, status, input_tokens, output_tokens, latency_ms)
   on public.ai_execution_logs to myeongha_admin_reader;
 grant select (created_at, subject_id, phase, model_key, outcome, cost_status, estimated_cost_micro_usd)
@@ -66,6 +68,8 @@ create policy admin_read_product_metadata_v1 on public.products
 create policy admin_read_entitlements_metadata_v1 on public.entitlements
   for select to myeongha_admin_reader using (true);
 create policy admin_read_credit_lot_metadata_v1 on public.chat_credit_lots_v1
+  for select to myeongha_admin_reader using (true);
+create policy admin_read_credit_reservations_v1 on public.chat_credit_turn_reservations_v1
   for select to myeongha_admin_reader using (true);
 create policy admin_read_ai_execution_metadata_v1 on public.ai_execution_logs
   for select to myeongha_admin_reader using (true);
