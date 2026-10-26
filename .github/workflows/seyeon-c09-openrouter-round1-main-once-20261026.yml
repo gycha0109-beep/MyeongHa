@@ -1,0 +1,63 @@
+name: '[WT:character-memory] C09 OpenRouter 8x5 paid model selection round 1 ONCE'
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/seyeon-c09-openrouter-round1-main-once-20261026.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: seyeon-c09-openrouter-round1-20261026-lifetime-once
+  cancel-in-progress: false
+
+jobs:
+  compare-models:
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && github.run_attempt == 1 }}
+    runs-on: ubuntu-24.04
+    environment: production
+    timeout-minutes: 50
+    steps:
+      - name: Checkout pinned and tested research-only Shadow script
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: 'b878d71d4be0c60bb9b28794e02c14af5dff2fde'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '24'
+
+      - name: Non-paying script syntax and input validation
+        run: |
+          set -euo pipefail
+          node --check scripts/seyeon-c09-openrouter-round1-8x5-v1.mjs
+          node scripts/seyeon-c09-openrouter-round1-8x5-v1.mjs --dry-run > /dev/null
+          echo 'Validated 8 candidate model IDs x 5 unchanged public test questions.'
+
+      - name: Execute user-approved 8x5 first round (up to 40 paid calls, USD 2 guard)
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        run: |
+          set -euo pipefail
+          set +x
+          if [ -z "$OPENROUTER_API_KEY" ]; then
+            echo '::error::production environment OpenRouter key not configured; no paid calls'
+            exit 2
+          fi
+          node scripts/seyeon-c09-openrouter-round1-8x5-v1.mjs --execute --approved-first-round-40
+
+      - name: Retain public-only model responses, billing estimates and errors
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: seyeon-c09-openrouter-round1-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            artifacts/seyeon-c09-openrouter-round1-8x5-20261026-v1.json
+            artifacts/seyeon-c09-openrouter-round1-8x5-20261026-v1.md
+          if-no-files-found: warn
+          retention-days: 14
