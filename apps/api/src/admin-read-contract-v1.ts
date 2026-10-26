@@ -1,5 +1,5 @@
 export const ADMIN_READ_KINDS_V1 = [
-  'users', 'user-detail', 'commerce', 'credits', 'readings', 'ai-costs', 'ai-estimates', 'analytics', 'issues', 'catalog',
+  'users', 'user-detail', 'commerce', 'credits', 'readings', 'ai-costs', 'ai-estimates', 'analytics', 'issues', 'catalog', 'characters', 'content-releases', 'deletion-jobs',
 ] as const;
 
 export type AdminReadKindV1 = (typeof ADMIN_READ_KINDS_V1)[number];
@@ -33,6 +33,9 @@ const SAFE_COLUMNS: Readonly<Record<AdminReadKindV1, readonly string[]>> = Objec
   readings: ['readingId', 'subjectId', 'status', 'productKey', 'domain', 'engineVersion', 'createdAt', 'errorCode'],
   'ai-costs': ['day', 'feature', 'model', 'requests', 'successes', 'failures', 'totalTokens', 'costKrw', 'p95LatencyMs'],
   'ai-estimates': ['day', 'feature', 'model', 'requests', 'successes', 'failures', 'estimatedMicroUsd', 'unknownCostCalls', 'costStatus'],
+  characters: ['characterId', 'contentVersion', 'availability', 'enabled', 'releaseAt', 'publishedAt'],
+  'content-releases': ['releaseKey', 'contentVersion', 'status', 'isDefault', 'activatedAt', 'createdAt'],
+  'deletion-jobs': ['deletionJobId', 'subjectId', 'scope', 'status', 'requestedAt', 'completedAt', 'errorCode'],
   catalog: ['productKey', 'productType', 'catalogEnabled', 'createdAt', 'offerCount'],
   analytics: ['day', 'campaignKey', 'visitors', 'checkoutAttempts', 'verifiedPurchases', 'conversionRate', 'sampleSize'],
   issues: ['issueId', 'category', 'severity', 'status', 'createdAt', 'requestId'],

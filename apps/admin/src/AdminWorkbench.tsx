@@ -6,7 +6,7 @@ import type { AdminSection } from './routes.js';
 import { StatusPanel } from './StatusPanel.js';
 
 type ListSection = Exclude<AdminSection, 'overview'>;
-type ReadTab = 'commerce' | 'credits' | 'readings' | 'ai-costs' | 'ai-estimates' | 'issues' | 'catalog';
+type ReadTab = 'commerce' | 'credits' | 'readings' | 'ai-costs' | 'ai-estimates' | 'issues' | 'catalog' | 'characters' | 'content-releases' | 'deletion-jobs';
 const DATA_PATHS: Record<ListSection, string> = {
   users: 'users',
   commerce: 'commerce',
@@ -56,6 +56,19 @@ const LABELS: Record<string, string> = {
   productType: '상품 종류',
   catalogEnabled: '카탈로그 활성',
   offerCount: '제안 수',
+  deletionJobId: '삭제 작업 참조',
+  requestedAt: '요청 시각',
+  completedAt: '완료 시각',
+  scope: '처리 범위',
+  characterId: '캐릭터 참조',
+  contentVersion: '콘텐츠 버전',
+  availability: '공개 상태',
+  enabled: '카탈로그 활성',
+  releaseAt: '공개 예정',
+  publishedAt: '게시 시각',
+  releaseKey: '릴리스 참조',
+  isDefault: '기본 릴리스',
+  activatedAt: '활성화 시각',
   issueId: '이슈 참조',
   category: '이슈 유형',
   severity: '심각도',
@@ -177,7 +190,7 @@ export function AdminWorkbench({ section, token, onSessionExpired }: {
       <span className="neutral-tag">서버 검증 필수</span>
     </div>
     <div className="admin-tabs" aria-label="조회 종류">
-      {(section === 'commerce' ? [['commerce','결제 내역'],['credits','크레딧 지급']] : section === 'readings' ? [['readings','Reading'],['ai-costs','AI 호출'],['ai-estimates','AI 추정 원가']] : section === 'issues' ? [['issues','운영 이슈'],['catalog','상품 카탈로그']] : [])
+      {(section === 'commerce' ? [['commerce','결제 내역'],['credits','크레딧 지급']] : section === 'readings' ? [['readings','Reading'],['ai-costs','AI 호출'],['ai-estimates','AI 추정 원가']] : section === 'issues' ? [['issues','운영 이슈'],['deletion-jobs','삭제 작업'],['catalog','상품 카탈로그'],['characters','캐릭터'],['content-releases','콘텐츠 릴리스']] : [])
         .map(([name,label]) => <button key={name} type="button" className={tab===name ? 'active' : ''} onClick={() => { setTab(name as ReadTab); setCursor(null); setDetail(null); }}>{label}</button>)}
     </div>
     <div className="admin-toolbar">
