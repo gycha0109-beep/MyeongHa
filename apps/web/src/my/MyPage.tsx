@@ -45,7 +45,7 @@ type BirthState =
   | { kind: 'ready'; payload: BirthPayload }
   | { kind: 'unavailable'; message: string };
 
-type MyPanel = 'account' | 'memory' | 'orders' | 'passes' | 'birth' | 'display' | 'support' | null;
+type MyPanel = 'account' | 'memory' | 'orders' | 'passes' | 'birth' | 'display' | null;
 type Glyph = 'user' | 'memory' | 'bag' | 'ticket' | 'calendar' | 'palette' | 'chat' | 'chevron' | 'arrow' | 'logout' | 'moon';
 
 function MyGlyph({ name }: { name: Glyph }) {
@@ -185,13 +185,6 @@ function Detail({ panel, account, birth }: { panel: Exclude<MyPanel, null>; acco
               <option value="ko-KR">한국어</option><option value="ja-JP">日本語</option><option value="zh-TW">繁體中文</option><option value="en-US">English</option><option value="zh-CN">简体中文</option>
             </select>
           </div>
-        </>
-      ) : null}
-      {panel === 'support' ? (
-        <>
-          <h3>문의</h3>
-          <p>명하 이용 중 불편한 사항을 관리자에게 문의할 수 있는 공간입니다.</p>
-          <p className="my-detail-hint">관리자 문의 페이지와 접수 기능은 준비 중입니다. 이 화면에서는 아직 문의를 제출할 수 없습니다.</p>
         </>
       ) : null}
     </div>
@@ -334,9 +327,13 @@ export function MyPage() {
           <div className="my-choice-grid my-settings-grid">
             <Choice title="출생 정보" description="사주 계산에 사용하는 정보 관리" glyph="calendar" open={activePanel === 'birth'} onClick={() => toggle('birth')} />
             <Choice title="화면 및 언어" description="테마 · 언어 설정" glyph="palette" open={activePanel === 'display'} onClick={() => toggle('display')} />
-            <Choice title="문의" description="관리자에게 문의하기" glyph="chat" open={activePanel === 'support'} onClick={() => toggle('support')} />
+            <a className="my-choice-card" href="contact.html" aria-label="관리자에게 문의하기">
+              <span className="my-icon-circle"><MyGlyph name="chat" /></span>
+              <span className="my-choice-copy"><strong>문의</strong><span>관리자에게 문의하기</span></span>
+              <span className="my-chevron"><MyGlyph name="chevron" /></span>
+            </a>
           </div>
-          {activePanel === 'birth' ? details('birth') : activePanel === 'display' ? details('display') : activePanel === 'support' ? details('support') : null}
+          {activePanel === 'birth' ? details('birth') : activePanel === 'display' ? details('display') : null}
         </section>
 
         <footer className="my-footer">

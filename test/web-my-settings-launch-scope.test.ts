@@ -65,7 +65,9 @@ describe('My settings and approved dashboard layout', () => {
     expect(page).toContain('캐릭터별 메모리 조회·저장 기능은 아직 연결되지 않았습니다.');
     expect(page).toContain('구매 내역 조회가 연결되지 않았습니다.');
     expect(page).toContain('이용권 조회가 연결되지 않았습니다.');
-    expect(page).toContain('관리자 문의 페이지와 접수 기능은 준비 중입니다.');
+    expect(page).toContain('href="contact.html"');
+    expect(page).toContain('<strong>문의</strong>');
+    expect(page).not.toContain('관리자 문의 페이지와 접수 기능은 준비 중입니다.');
     expect(page).not.toContain('잔여 이용권 0');
     expect(page).not.toContain('프리미엄');
     expect(page).not.toContain('구독 중');

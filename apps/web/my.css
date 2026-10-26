@@ -413,3 +413,5 @@ html[data-theme="dark"] .my-settings-section::before { opacity: .07; }
   .my-detail-panel { padding: 16px; }
   .my-footer > span { display: none; }
 }
+
+.my-setting-link{color:var(--mh-ink-strong);text-decoration:none;transition:background .16s ease}.my-setting-link:hover,.my-setting-link:focus-visible{background:color-mix(in srgb,var(--mh-brass) 9%,transparent)}.my-setting-link .my-setting-chevron{color:var(--mh-brass-strong)}

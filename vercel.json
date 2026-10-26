@@ -60,6 +60,10 @@
       "destination": "/api/auth/sign-in?__myeongha_social_auth_start=1"
     },
     {
+      "source": "/api/contact",
+      "destination": "/api/me?__myeongha_contact_inquiry=1"
+    },
+    {
       "source": "/api/me/credits",
       "destination": "/api/me?__myeongha_chat_credit_wallet=1"
     },
