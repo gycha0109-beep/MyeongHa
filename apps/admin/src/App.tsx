@@ -28,7 +28,7 @@ function navigateTo(path: string, setPath: (path: string) => void) {
   if (window.location.pathname + window.location.search !== destination.pathname + destination.search) {
     window.history.pushState(null, '', destination.pathname + destination.search);
   }
-  setPath(destination.pathname);
+  setPath(destination.pathname + destination.search);
   window.scrollTo({ top: 0, behavior: 'instant' });
 }
 
@@ -184,12 +184,12 @@ function PendingSection({ section }: { readonly section: Exclude<AdminSection, '
 }
 
 export function App() {
-  const [path, setPath] = useState(() => window.location.pathname);
+  const [path, setPath] = useState(() => window.location.pathname + window.location.search);
   const [ownerToken, setOwnerToken] = useState<string | null>(null);
-  const route = getAdminRoute(path);
+  const route = getAdminRoute(path.split('?')[0] ?? path);
 
   useEffect(() => {
-    const onPopState = () => setPath(window.location.pathname);
+    const onPopState = () => setPath(window.location.pathname + window.location.search);
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
   }, []);
@@ -235,7 +235,7 @@ export function App() {
                 ? <><PendingSection section={route.section} /><AdminLogin onSession={setOwnerToken} /></>
                 : <>{route.section === 'analytics'
                   ? <BetaAnalyticsReadiness />
-                  : <AdminWorkbench key={route.section} section={route.section} token={ownerToken}
+                  : <AdminWorkbench key={route.section + ':' + path} section={route.section} token={ownerToken}
                       onSessionExpired={() => setOwnerToken(null)} onNavigate={onNavigate} />}
                     {['users', 'commerce', 'issues'].includes(route.section) &&
                       <OperatorActionsReadiness />}</>}
