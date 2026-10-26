@@ -88,3 +88,58 @@ Architecture Check: 문서와 실행 증거만 추가했다. runtime/API/DB/권�
 실제 수정은 다음으로 한정한다. registry 소유권을 넘기기 전에 새 소유자의 임시 schema CREATE를 부여하고, 함수 ACL 작업을 끝낸 뒤 임시 소유자 membership을 회수한다. restricted postgres인 G3가 기존 thread assertion과 registry row lock을 사용할 최소 권한을 추가한다. registry는 기존 NOLOGIN owner를 유지하며, registry 잠금 보조 함수만 그 owner가 실행하고 postgres에만 EXECUTE한다. API·anon·authenticated·service_role에는 해당 보조 함수나 raw registry 접근을 열지 않는다.
 
 원본 설치 SQL 전체의 atomic/default-closed 설치 PASS, 실제 일반 API 계정으로 원본 G1/G2/G3·수신/철회·유실 경합 **11/11 PASS**. 기존 Role ADMIN snapshot은 유지하며 함수 소유권·RLS·현재 권한 검사를 약화하지 않았다. 선택적 복원 리허설도 설치자·fixture 관리자·API 계정을 분리한다. 운영 DB 설치와 모델 활성화는 아직 실행하지 않았다.
+
+## 2026-10-26 Hyperdrive 운영 준비
+
+Worker의 custom-CA Node TLS alias는 실제 workerd의 CA 보장으로 사용할 수 없어 제거한다. 기존 Hyperdrive pool/실제 LOGIN preflight를 재사용하고 S0용 두 binding을 분리했다. 기존 Ops LOGIN의 자격증명을 보존하기 위해 별도의 `myeongha_seyeon_subject_login`과 `myeongha_seyeon_governed_login`을 만들었다. 각 LOGIN은 NOINHERIT/NOSUPERUSER/NOBYPASSRLS이고 API 또는 governed executor 한 가지만 SET할 수 있다. 기존 계정 암호를 교체하거나 Worker에 origin 비밀번호를 추가하지 않았다.
+
+두 origin은 실제 Cloudflare 생성 단계에서 고정 CA/verify-full 연결 검사를 통과했다. API 재조회에서 CA ID, SQL cache disabled, origin connection limit=5, 서로 다른 주체/ID를 확인했다. 실제 운영 PostgreSQL 17.6에서 기존 typed pool preflight와 올바른 역할 전이, 반대 역할 전이 거부도 통과했다. 상세 metadata는 [origin 증거](SEYEON_S0_HYPERDRIVE_ORIGINS_20261026.json)에 있다. 모델 gate는 false이고 실제 S0 모델 사용이나 HTTP positive 완료 증거로 계산하지 않는다.
+
+복원 #40200284088의 추가 실패는 fixture 비밀번호를 `format`에 전달할 때 `$1`의 타입이 추론되지 않은 `42P18`이었다. `$1::text`로 고정했고 실제 PostgreSQL에서 typed format을 확인했다. main의 기존 public-schema entitlement 보정과 다른 제품/UI 변경도 함께 보존했다. S0 모델 경로는 원본 source가 0건이면 provider/count 전 차단하며, primary로 승인된 Origin에서만 들어갈 수 있다.
+
+
+## 2026-10-26 실제 운영 SQL 적용
+
+Hyperdrive 연결 PR #2605를 필수 CI/Integration 통과 후 `23bc82ba`로 병합했다. 새 백업 #40224757670을 복원한 [PG17 리허설 #40226477877](https://github.com/gycha0109-beep/MyeongHa/actions/runs/40226477877)은 NOSUPERUSER postgres 설치 및 별도 일반 API LOGIN의 원본 수신/철회 경합 11/11 PASS다. 설치 8개 SQL의 LF SHA-256은 운영에 적용할 source bundle과 전부 일치한다. full DR=false는 유지한다.
+
+운영에는 Supabase 관리 apply로 `20261025193416 seyeon_s0_http_receipt_runtime_v1`을 atomic 설치했다. source bundle hash는 `3f3d7b7af286823bd57a37636e436efacb54fa5f79627fe1ac8d8825f7b4b20f`, target guard/closed postcondition을 포함한 실제 관리 SQL hash는 `20f335556c0c861275100e76d4e3380296d0e8c4f211f89f29d09643279bcc98`이다. 설치 직후 positive API EXECUTE 0, raw-lock API EXECUTE=false, operator owner privilege 잔류=false였다. 기존 자동 migration backlog를 일괄 적용하지 않았으며 이 두 scoped 관리 이력은 source SQL 디렉터리에 결속된다. supabase/migrations로 중복 추가하거나 history repair하지 않는다.
+
+다음 activation SQL은 실제 PG17 transaction 적용/rollback 후 `20261025193454 seyeon_s0_bounded_activation_20261025`로 적용했다. 원본 registry 한 쌍만 enabled=true/writable=false, 기존 native 모델 policy 1건, 2026-10-25~31 UTC의 전체 원가 예산 $1/day다. 최초에 임의로 넣은 사용자별 $0.50 제한은 사용자 지시에 따라 운영 DML로 제거했다. 기존 DB의 필수 Subject ceiling은 global ceiling과 같게 두어 별도의 사용자 제한을 만들지 않는다. 최종 builder도 같은 값을 산출한다. 사용자 크레딧 잔액/정책을 변경하지 않았다. 현재 지갑 runtime의 chatDebitEnabled=false 및 credit ACK 후보 미연결은 그대로 명시하며, 이 내부 synthetic smoke를 일반 유료 채팅 출시/차감 완료로 계산하지 않는다.
+
+최초 답변의 Pin/Commit/issuer와 receipt/withdrawal만 API EXECUTE를 부여했고, 이전 unreceipted Node G3 및 private Memory accept는 닫혀 있다. 제한 postgres가 기존 stop SQL의 registry owner 권한을 상속하지 않는 점을 발견해 stop transaction 안에서만 owner membership을 빌리고 즉시 회수하도록 수정했다. 실제 운영 PG17에서 forward stop을 실행/rollback해 새 사용 차단과 receipt/withdrawal 보존을 확인했다. [공개 실행 증거](SEYEON_S0_PRODUCTION_ACTIVATION_20261026.json)에 metadata를 남긴다.
+
+현재 Worker gate 활성화 PR과 hosted native model/receipt smoke는 아직 PENDING이다. primary sign-in=200, 기존 일반 /api/me=503은 재확인했으며 S0 전용 두 pool의 실제 HTTP authority를 대신 증명하지 않는다. 이 후속 단계가 통과하기 전 DEPLOYED로 표시하지 않는다.
+
+Architecture Check:
+
+* Docs updated: yes — 적용 이력, source digest, 예산 및 크레딧 경계.
+* Ghost-code risk: findings — SQL은 활성이나 Worker gate 변경은 아직 미배포, hosted smoke 미완료.
+* Notes: 기존 원본 Memory 1건과 최초 수신/철회만 활성화한다. 새 타입·fallback·크레딧 정책·결제 차감·History/Replay authority는 추가하지 않는다.
+
+
+## 첫 hosted S0 시도 및 forward stop
+
+#2607은 필수 CI/Integration #40227449044 통과 후 `b1237e5a`로 병합했다. Cloudflare build `4ae8e889-2f20-484d-bb3e-bcf0ea5b182c`의 실제 commit hash와 build log의 Current Version ID를 대조했고, 활성 deployment 100% 및 응답 header가 `b037f122-7e07-40b7-b6e5-4ad08fbd3148`로 일치했다. post-main CI #40228221737도 SUCCESS다.
+
+실제 primary 로그인=200, 원본 Memory/Grant 가상 cohort 및 current Member/Thread 해석, 원본 DB Pin까지 통과했다. 최초 답변은 HTTP 503이며 runtimeStage=governed_preflight, providerFailureCode=PRE_DISPATCH_REJECTED였다. Attempt는 failed_retryable이고 유료 call ledger=0, ai_execution_logs=0, issued receipt=0이다. 이미 준비한 canonical forward stop을 실행하여 registry/Pin/Commit/issuer를 닫고 receipt/withdrawal EXECUTE를 보존했다. 현재 상태는 **HOLD_FORWARD_STOPPED**, 운영 수신/철회 E2E PASS나 일반 채팅 DEPLOYED가 아니다.
+
+expected=원본 Pin → native count → DB 비용 승인 → 생성 → receipt, observed=Pin 후 사전 승인 거부, runtime=실제 Cloudflare Worker/Hosted Auth/PG17.6, failure stage=governed_preflight, classification=사전 승인 원인 미분리다. 원래 요청을 자동 재전송하거나 실패한 Attempt를 변경하지 않는다. 실행 원본과 가상 cohort IDs는 보호된 operator 상태에 보존하며 공개 증거에는 credential·Grant/Subject IDs·proof를 넣지 않는다.
+
+직접 dependency인 input-count와 DB governed start의 진단만 보강한다. count는 고정 단계/HTTP status/소요시간/certified 여부, DB start는 허용된 SQLSTATE/constraint만 남긴다. raw 오류·본문·키·사용자/호출 IDs는 기록하지 않는다. 30/30 직접 회귀 및 build PASS, 특히 반사된 비밀/입력과 transport 오류가 로그에 나오지 않는 검증을 포함한다. deadline/예산/승인 정책, 재시도, 모델 dispatch 조건은 변경하지 않는다. 추가 운영 시도는 이 진단이 반영되고 현재 실패가 조정된 별도 가상 campaign에서 수행한다.
+
+
+## workerd의 redirect:error 요청 생성 실패 수정
+
+#2611을 필수 Integration #40229191983 통과 후 `7ec5e69f`로 병합했고, 실제 Cloudflare build `801d8aa4-eca2-4f38-9142-137885d5a24d` 및 100% version `d14240b0-895e-4892-8c12-5b936c83f7fa`를 대조했다. 기존 사용하지 않은 예산/정리된 cohort/정확히 닫힌 registry를 검증한 scoped 관리 SQL로만 S0를 재개했다. 두 번째 독립 가상 계정에서도 원본 Pin 뒤 HTTP 503이 났고, 새 로그는 count의 response_headers 단계에서 HTTP status=null/certified=false를 기록했다. DB governed start에는 도달하지 않았고 생성 원장/발행 reply는 0이다. 즉시 동일 forward stop을 적용했다. 두 실패 cohort 모두 기존 계정 삭제 start → worker claim → DB finalizer → hosted Auth 삭제 → completion 절차로 정리했으며 Memory/Grant/Turn/cost 행 0을 확인했다.
+
+실제 로컬 workerd에서 같은 RequestInit을 실행해 `redirect:'error'`가 요청 생성 순간 TypeError를 던지며 upstream 요청 0건임을 재현했다. [Cloudflare Request 계약](https://developers.cloudflare.com/workers/runtime-apis/request/)도 이 mode를 구현하지 않는다고 명시한다. 유출된 this/receiver 가설은 재현에서 배제했고, source inspection과 재현이 일치하는 redirect mode만 고친다.
+
+직접 count 및 native structured provider 두 caller만 manual로 바꾼다. 기존 !ok 분기가 모든 3xx를 거부하고 Location을 따라가지 않으므로 credential 전달/인증 범위를 넓히지 않는다. 실제 production 모듈을 가져온 로컬 workerd + 소유 loopback HTTP fixture에서 수정 전 count/생성 모두 요청 전 실패, 수정 후 count=114 및 structured reply 성공을 확인했다. 302는 두 경로 모두 거부했고 redirect target 도달=0이었다. 실제 운영 credential·DB·모델 호출을 사용한 검증이 아니다. [workerd 공개 증거](SEYEON_S0_WORKER_FETCH_COMPAT_20261026.json)에 기록한다.
+
+관련 회귀 361 PASS/75 SKIP였으며 OpenSSL PATH 부재로 시작하지 못한 직접 HTTPS 3 suites는 올바른 PATH로 별도 재실행해 39/39 PASS다. 최신 redirect 거부/호출 정책 직접 회귀 21/21, build와 root TypeScript noEmit PASS다. 운영 source는 계속 닫혀 있고 수정 배포 후 별도의 새 가상 cohort에서 최종 native HTTP 수신/철회를 확인해야 한다.
+
+Architecture Check:
+
+* Docs updated: yes — 실제 실패 원인, redirect 거부 동등성 및 격리 workerd 증거.
+* Ghost-code risk: passed — 기존 count/native model 두 직접 caller의 transport만 수정.
+* Notes: 새로운 proxy·fallback·endpoint·크레딧/원가 한도·재시도 정책·권한은 없다. manual은 3xx를 승인하지 않는다.

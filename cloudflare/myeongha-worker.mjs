@@ -7,6 +7,7 @@ import {SEYEON_SECURITY_S0_PRODUCTION_V1,
 import apiRuntime, {cloudflareEmergencyHoldEnabledV1} from '../workers/cloudflare-static-preview.mjs';
 import { isSeyeonCloudflareProtectedIngressAliasV1 } from '../apps/api/src/seyeon-cloudflare-ops-router-handoff-offline-v1.js';
 import { cloudflareAuthRoute, handleCloudflareAuthRequest, rateLimitCloudflareRequestV1 } from './member-auth-worker.mjs';
+import {approvedCloudflareAuthOriginV1} from '../workers/cloudflare-auth-db-api.mjs';
 import { matchCloudflareApiRoute } from '../workers/cloudflare-api-router.mjs';
 import { executeSecurityObservedRequestV1 } from '../apps/api/src/security-observability.ts';
 
@@ -17,6 +18,16 @@ const HEALTH_HEADERS = Object.freeze({
   'X-Content-Type-Options':'nosniff','X-Frame-Options':'DENY',
   'X-Robots-Tag':'noindex, nofollow, noarchive',
 });
+
+function withWorkerVersion(response,env){
+  const version = env?.CF_VERSION_METADATA?.id;
+  if (typeof version !== 'string' || !/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/iu.test(version)) return response;
+  const headers = new Headers(response.headers);
+  headers.set('X-Myeongha-Worker-Version', version);
+  return new Response(response.body, {
+    status: response.status, statusText: response.statusText, headers,
+  });
+}
 
 function malformedApiRoot(pathname) {
   if (pathname === '/api' || pathname.startsWith('/api/')) return false;
@@ -41,11 +52,13 @@ export default {
     const receiptRoute=/^\/api\/chat\/delivery-receipts\/[a-f0-9-]+$/u.test(url.pathname);
     const revokeRoute=/^\/api\/memories\/[a-f0-9-]+\/grants\/seyeon\/revoke$/u.test(url.pathname);
     const firstReplyRoute=/^\/api\/chat\/[a-f0-9-]+\/turns$/u.test(url.pathname);
-    if(request.method==='POST' && url.search==='' && SEYEON_SECURITY_S0_PRODUCTION_V1.receiptAndWithdrawalEnabled &&
-       (receiptRoute||revokeRoute||(firstReplyRoute&&SEYEON_SECURITY_S0_PRODUCTION_V1.modelUseEnabled&&!cloudflareEmergencyHoldEnabledV1(env)))){
+    if(approvedCloudflareAuthOriginV1(request,env)!==null && request.method==='POST' && url.search==='' && SEYEON_SECURITY_S0_PRODUCTION_V1.receiptAndWithdrawalEnabled &&
+       (receiptRoute||revokeRoute||(firstReplyRoute&&SEYEON_SECURITY_S0_PRODUCTION_V1.modelUseEnabled&&
+       SEYEON_SECURITY_S0_PRODUCTION_V1.creditBilling?.productionMounted===true&&
+       !cloudflareEmergencyHoldEnabledV1(env)))){
       // Import inside the request: DB pools/credentials never become isolate
       // global state. Every alias/history/replay still reaches the sealed router.
-      return executeSecurityObservedRequestV1({request,
+      const response=await executeSecurityObservedRequestV1({request,
         routeId:receiptRoute?'api.chat.delivery-receipt':revokeRoute?'api.memories.seyeon.revoke':'rewrite.chat.turns',
         execute:async()=>{
       let runtime;
@@ -53,9 +66,9 @@ export default {
         const rejected=await rateLimitCloudflareRequestV1(request,env,
           receiptRoute?'seyeon-receipt':revokeRoute?'seyeon-withdrawal':'seyeon-turn');
         if(rejected)return rejected;
-        const {createProductionSeyeonFirstMemoryFetchRuntimeV1}=await import(
-          '../apps/api/src/production-seyeon-first-memory-fetch-runtime-v1.js');
-        runtime=createProductionSeyeonFirstMemoryFetchRuntimeV1({
+        const {createCloudflareSeyeonFirstMemoryRuntimeV1}=await import(
+          '../workers/cloudflare-seyeon-first-memory-runtime.mjs');
+        runtime=createCloudflareSeyeonFirstMemoryRuntimeV1({
           env,approvedPersonalRecordModelUse:()=>SEYEON_SECURITY_S0_PRODUCTION_V1.receiptAndWithdrawalEnabled,
           governorApproval:SEYEON_SECURITY_S0_GOVERNOR_APPROVAL_V1,
         });
@@ -72,6 +85,22 @@ export default {
           {status:503,headers:HEALTH_HEADERS});
       }finally{try{await runtime?.close();}catch{ /* never replace a committed response with private diagnostics */ }}
       }});
+      return withWorkerVersion(response,env);
+    }
+    // Allow only exact room creation and owner-scoped thread re-read through
+    // the existing authenticated API. This does not open model turns, Reveal,
+    // consent history, replay, or any client-controlled legacy routing alias.
+    const canonicalOpen = request.method === 'POST' &&
+      url.pathname === '/api/chat' && url.search === '';
+    const readKeys = [...url.searchParams.keys()];
+    const canonicalRoomRead = request.method === 'GET' &&
+      /^\/api\/chat\/[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/iu.test(url.pathname) &&
+      readKeys.every(key => key === 'afterSequenceNo' || key === 'pageSize') &&
+      readKeys.length === new Set(readKeys).size;
+    if ((canonicalOpen || canonicalRoomRead) &&
+        !malformedApiRoot(url.pathname) &&
+        !readKeys.some(key => key.toLowerCase().includes('myeongha_chat_'))) {
+      return withWorkerVersion(await apiRuntime.fetch(request, env, ctx), env);
     }
     // Security holds encoded, aliased and legacy-marker protected Chat
     // before any Auth, DB, provider or asset call.
@@ -89,13 +118,7 @@ export default {
             execute: () => handleCloudflareAuthRequest(request, env),
           })
         : await apiRuntime.fetch(request, env, ctx);
-      const version = env?.CF_VERSION_METADATA?.id;
-      if (typeof version !== 'string' || !/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/iu.test(version)) return response;
-      const headers = new Headers(response.headers);
-      headers.set('X-Myeongha-Worker-Version', version);
-      return new Response(response.body, {
-        status: response.status, statusText: response.statusText, headers,
-      });
+      return withWorkerVersion(response,env);
     }
     if (url.pathname === '/' && (request.method === 'GET' || request.method === 'HEAD')) {
       const index = new URL(url);

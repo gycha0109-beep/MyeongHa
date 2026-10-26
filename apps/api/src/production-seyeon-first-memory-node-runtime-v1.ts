@@ -10,6 +10,7 @@ import {
   parseProductionUserDataRuntimeConfigV1,
   type ProductionUserDataRuntimeEnvV1,
 } from './production-user-data-runtime-config.js';
+import type {SeyeonGovernedPostgresSubjectPoolV1} from './seyeon-governed-postgres-pool-v1.js';
 import { parseSeyeonGovernedDbConfigV1 } from './seyeon-governed-postgres-pool-v1.js';
 import {
   createSeyeonProductionChatGovernorsV1,
@@ -25,6 +26,7 @@ import type { SupabaseMemberVerifierFetchV1 } from './supabase-member-identity-v
 export interface CreateProductionSeyeonFirstMemoryNodeRuntimeInputV1 {
   readonly env: ProductionUserDataRuntimeEnvV1;
   readonly pool?: PostgresSubjectPoolV1;
+  readonly governedCostPool?: SeyeonGovernedPostgresSubjectPoolV1;
   readonly memberFetchImpl?: SupabaseMemberVerifierFetchV1;
   /** Reviewed server policy only, never headers, JSON, env flags or model text. */
   readonly approvedPersonalRecordModelUse?: () => boolean | Promise<boolean>;
@@ -66,16 +68,18 @@ export function createProductionSeyeonFirstMemoryExecutionV1(
         ...(roles === undefined ? {} : { roleProviderConfigs: roles }),
         approval: input.governorApproval,
       });
-      const governedDbConfig = parseSeyeonGovernedDbConfigV1({
+      const governedDbConfig = input.governedCostPool===undefined?parseSeyeonGovernedDbConfigV1({
         env: input.env, ordinaryDatabaseUrl: config.databaseUrl,
         ordinaryDatabasePrincipal: config.databasePrincipal,
         rootCertificatePem: config.databaseSslRootCertificatePem ?? '',
-      });
+      }):undefined;
       const runtime = createProductionSeyeonChatRuntimeV1({
         databaseConfig: config, pool: lease.pool,
+        requiredPersonalRecordCount:1,
         providerConfig: base, roleProviderConfigs: governors.roleProviderConfigs,
         governorMode: 'ENFORCE', costGovernorForRole: governors.costGovernorForRole,
-        governedDbConfig,
+        ...(governedDbConfig===undefined?{}:{governedDbConfig}),
+        ...(input.governedCostPool===undefined?{}:{governedCostPool:input.governedCostPool}),
         approvedPersonalRecordModelUse: input.approvedPersonalRecordModelUse,
       });
       try { return await runtime.run(turn); }

@@ -65,6 +65,27 @@ function runner(query:ReturnType<typeof vi.fn>):SeyeonProductionSubjectTransacti
   };
 }
 describe('PR-04D2 OpenAI exact input-token counter (offline, no API calls)',()=>{
+  it('distinguishes provider rejection from transport failure without logging reflected secrets or input',async()=>{
+    const logger=vi.spyOn(console,'info').mockImplementation(()=>undefined);
+    const frame=JSON.stringify({model:policy.modelKey,store:false,max_output_tokens:800,
+      instructions:'PRIVATE_INSTRUCTIONS',input:[{role:'user',content:[{type:'input_text',text:'PRIVATE_USER_TEXT'}]}],
+      text:{format:{type:'json_schema',schema:request.responseSchema}}});
+    try{
+      const rejected=createSeyeonOpenAiInputTokenCountAdmissionV1(makeConfig(async()=>
+        Response.json({error:{message:serverKey+' PRIVATE_USER_TEXT'}},{status:429})));
+      await expect(rejected.certifiedInputTokenUpperBound(request,Buffer.byteLength(frame),frame)).rejects.toThrow();
+      const unavailable=createSeyeonOpenAiInputTokenCountAdmissionV1(makeConfig(async()=>{
+        throw Error(serverKey+' PRIVATE_USER_TEXT');
+      }));
+      await expect(unavailable.certifiedInputTokenUpperBound(request,Buffer.byteLength(frame),frame)).rejects.toThrow();
+      const logs=logger.mock.calls.map(([line])=>JSON.parse(String(line).split('DIAGNOSTIC ')[1]!));
+      expect(logs).toMatchObject([
+        {stage:'provider_response',httpStatus:429,certified:false},
+        {stage:'response_headers',httpStatus:null,certified:false},
+      ]);
+      expect(JSON.stringify(logger.mock.calls)).not.toMatch(/PRIVATE_|sk-synthetic|api\.openai\.com/u);
+    }finally{logger.mockRestore();}
+  });
   it('accepts only explicit caching without API breakpoints and preserves every input-bearing field',async()=>{
     const seen:string[]=[];
     const counter=createSeyeonOpenAiInputTokenCountAdmissionV1(makeConfig(async(_url,init)=>{
@@ -157,9 +178,10 @@ describe('PR-04D2 OpenAI exact input-token counter (offline, no API calls)',()=>
       Response.json({object:'response.input_tokens',input_tokens:1200}),
       Response.json({object:'other',input_tokens:400}),
       Response.json({error:'unavailable'},{status:429}),
+      new Response(null,{status:302,headers:{location:'https://untrusted.invalid/collect'}}),
       new Response('not json',{status:200,headers:{'content-type':'text/plain'}}),
     ]){
-      const count=vi.fn(async()=>reply.clone());
+      const count=vi.fn(async(_url:string,_init:RequestInit)=>reply.clone());
       const generator=vi.fn(async()=>modelReply());
       const query=vi.fn();
       const provider=createPersistingSeyeonAiProviderV1({
@@ -172,6 +194,7 @@ describe('PR-04D2 OpenAI exact input-token counter (offline, no API calls)',()=>
         code:'PRE_DISPATCH_REJECTED',
       });
       expect(count).toHaveBeenCalledOnce();
+      expect(count.mock.calls[0]?.[1]?.redirect).toBe('manual');
       expect(query).not.toHaveBeenCalled();
       expect(generator).not.toHaveBeenCalled();
     }

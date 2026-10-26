@@ -1,0 +1,235 @@
+{
+  "projectRef": "cnsfpcdiyofqvhpcegfc",
+  "registry": [
+    {
+      "record_kind": "memory",
+      "record_type": "conversation_recall",
+      "schema_version": "v1",
+      "projector_version": "seyeon-conversation-recall-projector-v1",
+      "enabled": true,
+      "writable_enabled": false
+    }
+  ],
+  "migrations": [
+    {
+      "name": "seyeon_s0_http_receipt_runtime_v1",
+      "version": "20261025193416"
+    },
+    {
+      "name": "seyeon_s0_bounded_activation_20261025",
+      "version": "20261025193454"
+    }
+  ],
+  "policy": [
+    {
+      "provider_key": "openai-responses",
+      "model_key": "gpt-5.6-terra",
+      "policy_version": "seyeon-s0-receipt-production-20261025",
+      "price_version": "openai-terra-20261025-no-cache",
+      "is_active": true
+    }
+  ],
+  "budgets": [
+    {
+      "bucket_utc_date": "2026-10-25",
+      "global_limit_micro_usd": "1000000",
+      "subject_limit_micro_usd": "1000000",
+      "occupied_micro_usd": "0"
+    },
+    {
+      "bucket_utc_date": "2026-10-26",
+      "global_limit_micro_usd": "1000000",
+      "subject_limit_micro_usd": "1000000",
+      "occupied_micro_usd": "0"
+    },
+    {
+      "bucket_utc_date": "2026-10-27",
+      "global_limit_micro_usd": "1000000",
+      "subject_limit_micro_usd": "1000000",
+      "occupied_micro_usd": "0"
+    },
+    {
+      "bucket_utc_date": "2026-10-28",
+      "global_limit_micro_usd": "1000000",
+      "subject_limit_micro_usd": "1000000",
+      "occupied_micro_usd": "0"
+    },
+    {
+      "bucket_utc_date": "2026-10-29",
+      "global_limit_micro_usd": "1000000",
+      "subject_limit_micro_usd": "1000000",
+      "occupied_micro_usd": "0"
+    },
+    {
+      "bucket_utc_date": "2026-10-30",
+      "global_limit_micro_usd": "1000000",
+      "subject_limit_micro_usd": "1000000",
+      "occupied_micro_usd": "0"
+    },
+    {
+      "bucket_utc_date": "2026-10-31",
+      "global_limit_micro_usd": "1000000",
+      "subject_limit_micro_usd": "1000000",
+      "occupied_micro_usd": "0"
+    }
+  ],
+  "forwardStopRollback": {
+    "closed": true,
+    "receipt": true,
+    "withdrawal": true,
+    "issuerclosed": true
+  },
+  "productionModelCalls": 0,
+  "schemaVersion": "seyeon-s0-production-activation-v1",
+  "sourceSha": "23bc82ba7e6f9a04a50dd5467ddf7538ec347b9a",
+  "sourceBundleSha256": "3f3d7b7af286823bd57a37636e436efacb54fa5f79627fe1ac8d8825f7b4b20f",
+  "managedInstallationSha256": "20f335556c0c861275100e76d4e3380296d0e8c4f211f89f29d09643279bcc98",
+  "initialActivationSha256": "2a9d485f6f05bd443b8a79b2c2b58784d9475252199fc92baecc0094ae48ea22",
+  "subjectCapCorrection": "User instructed removal; subject ceiling equals global ceiling, no additional per-user limit.",
+  "restoredBackup": {
+    "schemaVersion": "seyeon-security-s0-restored-rehearsal-v1",
+    "workflowRunId": "40226477877",
+    "sourceSha": "23bc82ba7e6f9a04a50dd5467ddf7538ec347b9a",
+    "backupRunId": "40224757670",
+    "backupSourceSha": "981cbdddc71071be4a082e0a472b3ba22fb9dbb6",
+    "backupMigrationFrontier": 20261024141330,
+    "target": "loopback-disposable-clone-of-restored-postgres",
+    "productionMutation": false,
+    "nativeProviderCalls": 0,
+    "installedDefaultClosed": true,
+    "installationPrincipal": "postgres-nosuperuser",
+    "fixtureAdmin": "supabase_admin-loopback-only",
+    "apiExecutionPrincipal": "myeongha_s0_receipt_test_login",
+    "testsPassed": 11,
+    "testsFailed": 0,
+    "installationPlan": {
+      "schemaVersion": "seyeon-security-s0-installation-plan-v2",
+      "scope": "one-original-conversation-recall-memory",
+      "installerMayActivateProduction": false,
+      "automaticMigration": false,
+      "defaultModelUseEnabled": false,
+      "defaultWritableEnabled": false,
+      "positiveApiExecuteGranted": false,
+      "externalProxyRevealEnabledByInstaller": false,
+      "files": [
+        {
+          "source": "../seyeon-private-memory-grant-revoke-r17-candidate.sql",
+          "sha256LfUtf8": "d5ca3bf0fa840370fa9abb1fc54fc2054c65c3b3fa1287f207ad172a5fdd1939",
+          "bytesLfUtf8": 5820
+        },
+        {
+          "source": "00-original-source-locks.sql",
+          "sha256LfUtf8": "2b5dd988dc25a6c4458447c811e049184c7dfd4abced392028cbd517909c316a",
+          "bytesLfUtf8": 3634
+        },
+        {
+          "source": "01-source-pin.sql",
+          "sha256LfUtf8": "526b1e08bfb2d0c47fc97212c18d9f3a980b09d2b03af1277a319cbe7720241c",
+          "bytesLfUtf8": 9612
+        },
+        {
+          "source": "02-atomic-commit.sql",
+          "sha256LfUtf8": "1d3b1f96a01c04cda7e1f7b892876d3c743cd4f06e71587376668a96e6c94de9",
+          "bytesLfUtf8": 14757
+        },
+        {
+          "source": "03-private-memory-accept.sql",
+          "sha256LfUtf8": "333a709f47d74d22bb63895f6ee15df0ce0a70d8abc25eea87ad1fd6dcb50117",
+          "bytesLfUtf8": 10455
+        },
+        {
+          "source": "04-locked-reveal.sql",
+          "sha256LfUtf8": "f9eea32d221d2de627abd789d13b0b133351bf50dcb366f50c679cb62523f12f",
+          "bytesLfUtf8": 19872
+        },
+        {
+          "source": "05-http-delivery-receipt.sql",
+          "sha256LfUtf8": "a8369659109bd2d213da17fb7530c091667933f8516029a4b9a5f69bf2b71605",
+          "bytesLfUtf8": 11117
+        },
+        {
+          "source": "06-attempt-receipt-progression.sql",
+          "sha256LfUtf8": "43af1556dd0765c65a741a41ac8a64bc48571e439e584c57b13d031abca082d5",
+          "bytesLfUtf8": 5033
+        }
+      ],
+      "stop": {
+        "source": "stop-positive-use.sql",
+        "sha256LfUtf8": "649327f5a9f3bc814faf1754b1f8970c590dd2d01ea7e940a2625d6d947e6aea",
+        "bytesLfUtf8": 1279
+      },
+      "stopPreservesConsentWithdrawal": true,
+      "remainingReleaseEvidence": [
+        "PG17 original Grant/Commit/Reveal and durable receipt race",
+        "approved governed budget and dedicated DB role",
+        "same-backup isolated restore and RPO/RTO",
+        "target HTTP receipt/source-invalidation evidence",
+        "G6 bounded authenticated Production smoke"
+      ]
+    },
+    "installPrincipalAuthority": {
+      "schemaVersion": "seyeon-s0-install-principal-authority-v1",
+      "projectRef": "cnsfpcdiyofqvhpcegfc",
+      "observedAtUtc": "2026-10-25T13:05:01Z",
+      "source": "production-read-only-pg-auth-members",
+      "postgresSuperuser": false,
+      "scope": "isolated-rehearsal-install-principal-only",
+      "membership": {
+        "role": "myeongha_seyeon_chat_runtime_owner",
+        "member": "postgres",
+        "grantor": "supabase_admin",
+        "adminOption": true,
+        "inheritOption": false,
+        "setOption": false
+      },
+      "fullProviderDisasterRecoveryReady": false
+    },
+    "installPrincipalEdgeRestoredFromBackup": false,
+    "fullProviderDisasterRecoveryReady": false
+  },
+  "workerActivation": {
+    "mergeSha": "b1237e5ac7662821535f043011ea0609a0a67b5a",
+    "version": "b037f122-7e07-40b7-b6e5-4ad08fbd3148",
+    "percentage": 100,
+    "buildId": "4ae8e889-2f20-484d-bb3e-bcf0ea5b182c"
+  },
+  "hostedModelSmoke": {
+    "schemaVersion": "seyeon-s0-hosted-http-canary-v1",
+    "workerVersion": "b037f122-7e07-40b7-b6e5-4ad08fbd3148",
+    "target": "https://myeongha.gycha0109.workers.dev",
+    "syntheticOwnedCohort": true,
+    "checks": [
+      "independent-primary-version",
+      "hosted-member-login",
+      "verified-member-token",
+      "owned-synthetic-member-thread",
+      "unseen-original-thread",
+      "no-existing-user-memory"
+    ],
+    "productionPaidChatRelease": false,
+    "firstHttpStatus": 503,
+    "responseWorkerVersion": "b037f122-7e07-40b7-b6e5-4ad08fbd3148",
+    "status": "FAILED",
+    "failure": {
+      "stage": "first-original-model-http",
+      "code": null,
+      "constraint": null,
+      "reason": "native-first-reply-http-200"
+    },
+    "forwardStopped": true,
+    "receiptAcknowledged": false
+  },
+  "fullProviderDisasterRecoveryReady": false,
+  "currentState": "HOLD_FORWARD_STOPPED",
+  "failureEvidence": {
+    "runtimeStage": "governed_preflight",
+    "providerFailureCode": "PRE_DISPATCH_REJECTED",
+    "originalPinPersisted": true,
+    "paidCallLedgerRows": 0,
+    "aiExecutionLogRows": 0,
+    "replyIssued": false,
+    "attemptState": "failed_retryable",
+    "receiptApiExecute": true,
+    "withdrawalApiExecute": true
+  }
+}

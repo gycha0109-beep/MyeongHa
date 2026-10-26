@@ -202,7 +202,7 @@ html[data-theme="dark"] body.saju-hub-page .saju-chat-bridge {
 
 html[data-theme="dark"] body.saju-hub-page .saju-empty {
   border-color: var(--mh-line);
-  background: #171c23 url("./assets/saju/saju-empty-dark.avif") center / cover no-repeat;
+  background: #171c23 url("./assets/saju/saju-empty-dark.avif?v=20261026-threadless") center / cover no-repeat;
 }
 
 html[data-theme="dark"] body.saju-hub-page .saju-empty::before {

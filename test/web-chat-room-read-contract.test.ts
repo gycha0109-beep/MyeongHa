@@ -64,6 +64,7 @@ describe('browser Chat room read contract', () => {
       characterId: 'canonical-primary',
       afterSequenceNo: 0,
       lastSequenceNo: 2,
+      historyWithheld: false,
       messages: [
         {
           messageId: '96000000-0000-4000-8000-000000000001',
@@ -96,6 +97,25 @@ describe('browser Chat room read contract', () => {
     expect(result).not.toHaveProperty('contentBundleId');
     expect(result).not.toHaveProperty('relationship');
     expect(result.messages[0]).not.toHaveProperty('messagePayloadJsonb');
+  });
+
+  it('admits only a metadata-only protected Se-yeon room and refuses any hidden-history body',()=>{
+    const shell={
+      threadId:THREAD_ID,characterId:'seyeon',
+      afterSequenceNo:0,lastSequenceNo:0,
+      messages:[],historyWithheld:true,
+      pagination:{pageSize:50,hasMore:false,nextAfterSequenceNo:null},
+    };
+    expect(parseChatRoomReadPayloadV1(shell,{expectedThreadId:THREAD_ID}))
+      .toMatchObject({characterId:'seyeon',messages:[],historyWithheld:true});
+    expect(()=>parseChatRoomReadPayloadV1({...shell,characterId:'baekheon'},
+      {expectedThreadId:THREAD_ID})).toThrow('protected Se-yeon room shell');
+    expect(()=>parseChatRoomReadPayloadV1({...shell,historyWithheld:'true'},
+      {expectedThreadId:THREAD_ID})).toThrow('historyWithheld is invalid');
+    expect(()=>parseChatRoomReadPayloadV1({...shell,messages:payload().messages,lastSequenceNo:2},
+      {expectedThreadId:THREAD_ID})).toThrow('protected Se-yeon room shell');
+    expect(()=>parseChatRoomReadPayloadV1({...shell,afterSequenceNo:1,lastSequenceNo:1},
+      {expectedThreadId:THREAD_ID,expectedAfterSequenceNo:1})).toThrow('protected Se-yeon room shell');
   });
 
   it('requires bounded pagination metadata to match the authoritative stream', () => {

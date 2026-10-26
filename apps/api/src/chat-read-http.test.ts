@@ -38,20 +38,10 @@ function fakePool(options: { denied?: boolean; history?: boolean; observed?: (sq
           }
           if (sql.includes('qry_chat_thread_stream_v2')) {
             options.observed?.(sql, values);
-            return {
-              rows: options.history ? [{
-                messageId: MESSAGE_ID,
-                sequenceNo: 1,
-                senderType: 'character',
-                characterId: 'seyeon',
-                bodyText: '안녕하세요.',
-                messagePayloadJsonb: null,
-                messageSchemaVersion: null,
-                createdAt: '2026-10-24T00:00:00.000Z',
-                redacted: false,
-                redactedAt: null,
-              } as Row] : [],
-            };
+            if (!sql.includes('select exists (')) {
+              throw new Error('Protected message content must remain unqueried');
+            }
+            return {rows:[{hasMessages:options.history===true} as Row]};
           }
           if (sql.includes('qry_character_relationship_v1')) return { rows: [] };
           throw new Error('Unexpected query in owner-only chat read test');
@@ -89,6 +79,7 @@ describe('Seyeon empty-room initialization with historical Reveal HOLD', () => {
     expect(response.headers.get('cache-control')).toBe('no-store');
     expect(data.data.characterId).toBe('seyeon');
     expect(data.data.messages).toHaveLength(0);
+    expect(data.data.historyWithheld).toBe(false);
     expect(reads).toHaveLength(2);
     expect(reads[0]?.values).toEqual([SUBJECT_ID, THREAD_ID]);
     expect(reads[1]?.values[0]).toBe(SUBJECT_ID);
@@ -98,8 +89,10 @@ describe('Seyeon empty-room initialization with historical Reveal HOLD', () => {
   it('keeps any Seyeon message history protected pending current-rights proof', async () => {
     const response = await invoke({ pool: fakePool({ history: true }) });
     const payload = await response.json() as any;
-    expect(response.status).toBe(503);
-    expect(payload.error.code).toBe('SEYEON_HISTORY_REVEAL_HOLD');
+    expect(response.status).toBe(200);
+    expect(payload.data.messages).toEqual([]);
+    expect(payload.data.historyWithheld).toBe(true);
+    expect(payload.data.relationship).toBeNull();
     expect(JSON.stringify(payload)).not.toContain('안녕하세요.');
   });
 

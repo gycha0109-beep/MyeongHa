@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { createMyRuntimeClient, MyRuntimeError } from '../../my-runtime-client.js';
 import { PRODUCT_AUTH_STORAGE_V1, readMemberSession, signOutMember } from '../../product-auth.js';
 import { shouldReloadMyForMemberSessionStorageChange } from '../../product-auth-surface.js';
+import { getUiLocale, translateStaticUi } from '../../ui-i18n.js';
 
 type Profile = {
   displayName: string | null;
@@ -43,6 +44,8 @@ type BirthState =
   | { kind: 'loading' }
   | { kind: 'ready'; payload: BirthPayload }
   | { kind: 'unavailable'; message: string };
+
+const uiLabel = (source: string) => translateStaticUi(source, getUiLocale());
 
 function birthDateText(value: string) {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/u.exec(value);
@@ -124,7 +127,7 @@ function ProfileHome({ state, onOpenAccount }: { state: AccountState; onOpenAcco
       <div className="my-status" id="my-status" role="status" hidden={state.kind === 'ready'}>
         {state.kind === 'loading'
           ? '내 정보를 불러오는 중입니다…'
-          : state.kind === 'unavailable' ? state.message : ''}
+          : state.kind === 'unavailable' ? uiLabel(state.message) : ''}
         {state.kind === 'unavailable' && state.login ? (
           <div className="my-status-action">
             <AuthActions subjectKind={undefined} hasStoredMemberSession={hasStoredMemberSession} />
@@ -179,7 +182,7 @@ function BirthSection({ state }: { state: BirthState }) {
         {state.kind === 'loading'
           ? '출생 정보를 확인하는 중입니다…'
           : state.kind === 'unavailable'
-            ? state.message
+            ? uiLabel(state.message)
             : isEmpty ? (
               <>
                 저장된 본인 출생 정보가 없습니다.
@@ -281,8 +284,8 @@ function RecentSection() {
         {items.map((item) => (
           <a className="my-recent-card" href={item.href} key={item.label}>
             <span className="my-recent-icon" aria-hidden="true">{item.icon}</span>
-            <span className="my-recent-copy"><strong>{item.label}</strong><span>{item.detail}</span></span>
-            <span className="my-recent-action">{item.action} <span aria-hidden="true">→</span></span>
+            <span className="my-recent-copy"><strong>{uiLabel(item.label)}</strong><span>{uiLabel(item.detail)}</span></span>
+            <span className="my-recent-action">{uiLabel(item.action)} <span aria-hidden="true">→</span></span>
           </a>
         ))}
       </div>
@@ -332,7 +335,7 @@ function SettingsSection({ account, openPanel, setOpenPanel }: {
           {account.kind === 'loading' ? <p>계정 정보를 확인하는 중입니다…</p> : null}
           {account.kind === 'unavailable' ? (
             <>
-              <p>{account.message}</p>
+              <p>{uiLabel(account.message)}</p>
               {account.login ? <a href="auth.html?next=my.html">로그인하기 →</a> : null}
             </>
           ) : null}

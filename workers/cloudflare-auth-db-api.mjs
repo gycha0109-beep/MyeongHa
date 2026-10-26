@@ -482,6 +482,22 @@ export async function tryHandleCloudflareApprovedAuthV1(request, bindings, route
         : { request, action });
     }
   } catch (error) {
+    if (isMemberProfile) {
+      // Bounded categories only. Never log SQL, credentials, request, user data,
+      // arbitrary error messages, stacks, hostname, or provider response bodies.
+      const message = error instanceof Error ? error.message.toLowerCase() : '';
+      const code = typeof error?.code === 'string' && /^[a-z0-9_]{2,16}$/iu.test(error.code)
+        ? error.code.toUpperCase() : 'NO_CODE';
+      const kind = /getaddrinfo|enotfound|eai_again|dns/.test(message) ? 'DB_DNS'
+        : /certificate|tls|ssl|self.signed|hostname mismatch|verify-full/.test(message) ? 'DB_TLS'
+        : /password|scram|sasl|authentication failed/.test(message) ? 'DB_LOGIN'
+        : /connect|socket|econn|timeout|terminated|network|pool/.test(message) ? 'DB_CONNECT'
+        : /permission|role|denied|privilege|grant/.test(message) ? 'DB_PERMISSION'
+        : /relation|function|column|query|syntax|constraint|transaction/.test(message) ? 'DB_QUERY'
+        : /unsupported|not implemented|buffer|crypto|module/.test(message) ? 'WORKER_COMPAT'
+        : 'OTHER';
+      console.warn('CF_MEMBER_PROFILE_DIAGNOSTIC_V1', kind, code);
+    }
     if (isGuestBootstrap) {
       const code = typeof error === 'object' && error !== null && 'code' in error &&
         typeof error.code === 'string' && /^[A-Z0-9_]{2,20}$/.test(error.code)
@@ -511,7 +527,10 @@ export async function tryHandleCloudflareApprovedAuthV1(request, bindings, route
   }
   if (!await closeCloudflareAuthResourcesV1(
     runtime, memberRateLimitPool, subjectPool,
-  )) return unavailable();
+  )) {
+    if (isMemberProfile) console.warn('CF_MEMBER_PROFILE_DIAGNOSTIC_V1', 'RESOURCE_CLOSE', 'NO_CODE');
+    return unavailable();
+  }
 
   // Final boundary applies to all approved Auth, Guest, Naver and profile
   // responses. Never forward an unexpected HTML 500, stream or redirect.

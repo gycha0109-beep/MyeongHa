@@ -7,6 +7,7 @@ import {
   createNodePostgresSubjectPoolFromDriverV1,
   createNodePostgresSubjectPoolV1,
 } from '../apps/api/src/node-postgres-subject-pool.ts';
+import {createSeyeonGovernedPostgresPoolFromDriverV1,SEYEON_GOVERNED_DB_LOGIN_V1} from '../apps/api/src/seyeon-governed-postgres-pool-v1.ts';
 import { MYEONGHA_API_EXECUTION_ROLE } from '../apps/api/src/production-user-data-runtime-config.ts';
 
 export const CLOUDFLARE_HYPERDRIVE_MODE_V1 = 'approved-supabase-hyperdrive-v1';
@@ -30,12 +31,17 @@ export function inspectCloudflareHyperdriveBindingV1(bindings) {
   if (typeof value !== 'string' || value.length < 20 || value.length > 4096) {
     throw Error('Missing Hyperdrive runtime binding');
   }
+  requireHyperdriveConnectionStringV1(value);
+  return { kind: 'hyperdrive', connectionString: value };
+}
+
+function requireHyperdriveConnectionStringV1(value){
   let url;
   try { url = new URL(value); } catch { throw Error('Invalid Hyperdrive connection string'); }
   if (!['postgres:', 'postgresql:'].includes(url.protocol) ||
       url.hostname === '' || url.username === '' || url.password === '' ||
       url.hash !== '') throw Error('Unsafe Hyperdrive connection string');
-  return { kind: 'hyperdrive', connectionString: value };
+  return value;
 }
 
 export function createCloudflareSubjectPoolV1(config, bindings, options) {
@@ -48,8 +54,18 @@ export function createCloudflareSubjectPoolV1(config, bindings, options) {
       !/^[a-z_][a-z0-9_]{0,62}$/.test(config.databasePrincipal)) {
     throw Error('Hyperdrive execution role is not authorized');
   }
+  const driverPool=createHyperdriveDriverPoolV1(target.connectionString,options);
+  // Reuse the existing authoritative LOGIN principal + executable role
+  // preflight and the same subject/RLS transaction executor as Vercel.
+  return createNodePostgresSubjectPoolFromDriverV1({
+    driverPool,
+    expectedLoginPrincipal:bindings.MYEONGHA_CLOUDFLARE_HYPERDRIVE_PRINCIPAL,
+  });
+}
+
+function createHyperdriveDriverPoolV1(connectionString,options){
   const pg=new Pool({
-    connectionString:target.connectionString,
+    connectionString,
     max:1,
     connectionTimeoutMillis:options?.connectionTimeoutMs??5_000,
     idleTimeoutMillis:options?.idleTimeoutMs??1_000,
@@ -60,7 +76,7 @@ export function createCloudflareSubjectPoolV1(config, bindings, options) {
     // No SQL, connection URI, error message or credentials in Worker logs.
     console.error('Cloudflare Hyperdrive idle pool error',error?.name??'Unknown');
   });
-  const driverPool={
+  return {
     async connect() {
       const client=await pg.connect();
       return {
@@ -75,10 +91,31 @@ export function createCloudflareSubjectPoolV1(config, bindings, options) {
     },
     async end() { await pg.end(); },
   };
-  // Reuse the existing authoritative LOGIN principal + executable role
-  // preflight and the same subject/RLS transaction executor as Vercel.
+}
+
+// S0 has its own two origin LOGINs; the preexisting Ops LOGIN and global
+// transport selection are preserved. Fixed server bindings are not HTTP input.
+function seyeonHyperdriveBindingsV1(bindings){
+  const ordinary=bindings?.SEYEON_SUBJECT_HYPERDRIVE?.connectionString;
+  const governed=bindings?.SEYEON_GOVERNED_HYPERDRIVE?.connectionString;
+  if(typeof ordinary!=='string'||ordinary.length<20||ordinary.length>4096||
+     typeof governed!=='string'||governed.length<20||governed.length>4096||ordinary===governed){
+    throw Error('Separate SeYeon Hyperdrive bindings unavailable');
+  }
+  return {ordinary:requireHyperdriveConnectionStringV1(ordinary),
+    governed:requireHyperdriveConnectionStringV1(governed)};
+}
+export function createCloudflareSeyeonSubjectPoolV1(bindings,options){
+  const target=seyeonHyperdriveBindingsV1(bindings);
   return createNodePostgresSubjectPoolFromDriverV1({
-    driverPool,
-    expectedLoginPrincipal:bindings.MYEONGHA_CLOUDFLARE_HYPERDRIVE_PRINCIPAL,
+    driverPool:createHyperdriveDriverPoolV1(target.ordinary,options),
+    expectedLoginPrincipal:'myeongha_seyeon_subject_login',
+  });
+}
+export function createCloudflareSeyeonGovernedPoolV1(bindings,options){
+  const target=seyeonHyperdriveBindingsV1(bindings);
+  return createSeyeonGovernedPostgresPoolFromDriverV1({
+    driverPool:createHyperdriveDriverPoolV1(target.governed,options),
+    expectedPrincipal:SEYEON_GOVERNED_DB_LOGIN_V1,
   });
 }
