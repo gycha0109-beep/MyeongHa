@@ -5,8 +5,8 @@ export const ADMIN_AUDIT_ROLE_V1 = 'myeongha_admin_audit_writer' as const;
 
 const INSERT_SQL = [
   'INSERT INTO myeongha_admin_ops.admin_audit_events_v1',
-  '(request_id, actor_auth_user_id, action, outcome, occurred_at)',
-  'VALUES ($1::uuid, $2::uuid, $3::text, $4::text, $5::timestamptz)',
+  '(request_id, actor_auth_user_id, target_ref, action, outcome, occurred_at)',
+  'VALUES ($1::uuid, $2::uuid, $3::uuid, $4::text, $5::text, $6::timestamptz)',
 ].join(' ');
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
@@ -15,6 +15,7 @@ const ACTION = /^[a-z:-]{1,64}$/u;
 function validate(event: AdminAuditEventV1) {
   if (!UUID.test(event.requestId) ||
     (event.actorAuthUserId !== null && !UUID.test(event.actorAuthUserId)) ||
+    (event.targetRef !== undefined && event.targetRef !== null && !UUID.test(event.targetRef)) ||
     !ACTION.test(event.action) ||
     !['allowed', 'denied', 'failed'].includes(event.outcome) ||
     !Number.isFinite(Date.parse(event.at))) {
@@ -43,6 +44,7 @@ export function createAdminPostgresAuditPortV1(input: {
         await connection.query(INSERT_SQL, [
           event.requestId,
           event.actorAuthUserId,
+          event.targetRef ?? null,
           event.action,
           event.outcome,
           event.at,

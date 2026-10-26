@@ -10,6 +10,7 @@ revoke all on schema myeongha_admin_ops from public;
 create table if not exists myeongha_admin_ops.admin_audit_events_v1 (
   request_id uuid primary key,
   actor_auth_user_id uuid null,
+  target_ref uuid null,
   action text not null check (action ~ '^[a-z:-]{1,64}$'),
   outcome text not null check (outcome in ('allowed', 'denied', 'failed')),
   occurred_at timestamptz not null,

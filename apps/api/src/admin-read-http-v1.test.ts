@@ -112,6 +112,9 @@ describe('admin owner-only reads', () => {
     expect(text).not.toMatch(/not-allowed|privateNote|never leak|email/);
     expect(JSON.parse(text).rows[0]).toEqual({ subjectId: subject, status: 'active' });
     expect(h.auditEvents[0]?.actorAuthUserId).toBe(OWNER);
+    const detail = harness();
+    expect((await detail.call('/api/admin/users/' + subject)).status).toBe(200);
+    expect(detail.auditEvents[0]?.targetRef).toBe(subject);
   });
 
   it('refuses unknown paths, unsafe filters, and writes before DB access', async () => {

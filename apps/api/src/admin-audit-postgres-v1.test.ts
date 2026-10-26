@@ -26,6 +26,7 @@ function harness(role: string) {
 const event = {
   requestId: OWNER,
   actorAuthUserId: OWNER,
+  targetRef: OWNER,
   action: 'read:users',
   outcome: 'allowed' as const,
   at: '2026-10-26T12:00:00.000Z',
@@ -44,7 +45,7 @@ describe('admin audit writer boundary', () => {
     await h.port.append(event);
     expect(h.queries[2]?.text).toContain('INSERT INTO myeongha_admin_ops.admin_audit_events_v1');
     expect(h.queries[2]?.values).toEqual([
-      OWNER, OWNER, 'read:users', 'allowed', '2026-10-26T12:00:00.000Z',
+      OWNER, OWNER, OWNER, 'read:users', 'allowed', '2026-10-26T12:00:00.000Z',
     ]);
     expect(h.queries.at(-1)?.text).toBe('COMMIT');
   });

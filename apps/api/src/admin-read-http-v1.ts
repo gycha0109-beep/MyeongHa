@@ -13,6 +13,7 @@ export type AdminAuditOutcomeV1 = 'allowed' | 'denied' | 'failed';
 export interface AdminAuditEventV1 {
   readonly requestId: string;
   readonly actorAuthUserId: string | null;
+  readonly targetRef?: string | null;
   readonly action: string;
   readonly outcome: AdminAuditOutcomeV1;
   readonly at: string;
@@ -199,7 +200,8 @@ export function createAdminReadHttpHandlerV1(deps: AdminReadHttpDependenciesV1) 
       actorAuthUserId: string | null,
       action: string,
       outcome: AdminAuditOutcomeV1,
-    ) => deps.audit.append(Object.freeze({ requestId, actorAuthUserId, action, outcome, at }));
+      targetRef: string | null = null,
+    ) => deps.audit.append(Object.freeze({ requestId, actorAuthUserId, action, outcome, targetRef, at }));
 
     if (request.method !== 'GET') {
       try { await append(null, 'invalid-method', 'denied'); }
@@ -251,11 +253,11 @@ export function createAdminReadHttpHandlerV1(deps: AdminReadHttpDependenciesV1) 
         await deps.reads.read(filters),
         filters.limit,
       );
-      await append(actor.authUserId, (isIssueExport ? 'export:' : 'read:') + filters.kind, 'allowed');
+      await append(actor.authUserId, (isIssueExport ? 'export:' : 'read:') + filters.kind, 'allowed', filters.recordId ?? filters.subjectId);
       if (isIssueExport) return issueExportResponse(requestId, result.rows);
       return response(200, requestId, { kind: filters.kind, ...result });
     } catch {
-      try { await append(actor.authUserId, (isIssueExport ? 'export:' : 'read:') + filters.kind, 'failed'); }
+      try { await append(actor.authUserId, (isIssueExport ? 'export:' : 'read:') + filters.kind, 'failed', filters.recordId ?? filters.subjectId); }
       catch { return response(503, requestId, { error: 'ADMIN_AUDIT_UNAVAILABLE' }); }
       return response(503, requestId, { error: 'ADMIN_READ_UNAVAILABLE' });
     }

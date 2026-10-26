@@ -84,7 +84,7 @@ create policy admin_read_character_catalog_metadata_v1 on public.character_runti
 
 -- Audit-only INSERT. Never grant read, update or delete for audit events.
 grant usage on schema myeongha_admin_ops to myeongha_admin_audit_writer;
-grant insert (request_id, actor_auth_user_id, action, outcome, occurred_at)
+grant insert (request_id, actor_auth_user_id, target_ref, action, outcome, occurred_at)
   on myeongha_admin_ops.admin_audit_events_v1 to myeongha_admin_audit_writer;
 create policy admin_append_audit_v1 on myeongha_admin_ops.admin_audit_events_v1
   for insert to myeongha_admin_audit_writer with check (true);
