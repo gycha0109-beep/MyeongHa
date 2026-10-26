@@ -285,6 +285,22 @@ case "$case_name" in
     bash test/db/official_reader_s4_logical_restore_deletion_rehearsal.sh
     # test-only schemas; catalog snapshot of deployed migrations intentionally unchanged
     ;;
+  official-reader-s7-original-delivery-ledger)
+    version_num="$(psql -Atqc 'show server_version_num')"
+    if [[ "$version_num" -ge 170000 ]]; then
+      verify_pg17
+      apply_pg17_migrations_without_birth_authority
+    else
+      [[ "$version_num" -ge 150000 && "$version_num" -lt 160000 ]] || {
+        echo 'FAIL: Official Reader S7 E2E requires PostgreSQL 15 or 17' >&2
+        exit 1
+      }
+      apply_standard_migrations
+    fi
+    # Actual migrated S4 protected answer + S6 current entitlement/source
+    # + S7 delivery/ACK and verified PortOne cancellation on disposable DB.
+    bash test/db/official_reader_s7_original_delivery_ledger.sh
+    ;;
   official-reader-provider-revoke-race)
     apply_standard_migrations
     bash test/db/official_reader_provider_effect_revoke_race_preflight.sh

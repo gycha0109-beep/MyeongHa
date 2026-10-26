@@ -15,6 +15,7 @@ const runtimePatterns = [
 ];
 
 const contentPatterns = [
+  /^test\/db\/official_reader_s7_original_delivery_ledger\.sh$/u,
   /^test\/db\/(?:active_default_content_release_query|character_saju_runtime_components_query|chat_thread_runtime_binding_query|episode_progress_bundle_query|outbox_success_completion_concurrency)\.sh$/u,
   /^test\/db\/reading_history_authority_query\.sql$/u,
   /^test\/db\/(?:standard_reading_artifact_reread|official_standard_reading_reader_interpretation)\.(?:sql|sh)$/u,
@@ -34,6 +35,7 @@ const commerceEntitlementPatterns = [
 ];
 
 const postgres17Patterns = [
+  /^test\/db\/official_reader_s7_original_delivery_ledger\.sh$/u,
   // R5/R9 exact-original-Grant tests require the named disposable PG17
   // authority-core harness. A source-only test edit must not silently skip
   // the real DB race suite on a normal PR.

@@ -29,7 +29,8 @@
       "official-standard-reading-reader-interpretation",
       "official-reader-provider-revoke-race",
       "official-reader-s2-atomic-receipt-bind",
-      "official-reader-s4-protected-storage-design"
+      "official-reader-s4-protected-storage-design",
+      "official-reader-s7-original-delivery-ledger"
     ]
   },
   "commerce-payment": {
@@ -82,7 +83,8 @@
       "seyeon-first-zero-locked-reveal-disposable-pg17",
       "seyeon-c08y-disposable-shared-ledger-pg17",
       "official-reader-s2-atomic-receipt-bind",
-      "official-reader-s4-protected-storage-design"
+      "official-reader-s4-protected-storage-design",
+      "official-reader-s7-original-delivery-ledger"
     ]
   }
 }

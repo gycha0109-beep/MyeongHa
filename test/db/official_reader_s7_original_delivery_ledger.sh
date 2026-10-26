@@ -3,8 +3,20 @@ set -euo pipefail
 # Actual migrated 2240/2250 S7 evidence + 1900/1910 PortOne cancellation.
 # S4 protected body and S7 ACK here are synthetic fixture rows ONLY.
 # No authorized S5 commit, checkout notice, consumer delivery or refund decision.
-if [[ "$CI" != true || "$PGHOST" != localhost ||
-      "$PGDATABASE" != myeongha_reader_s7_original_delivery_ledger_test ]]; then
+# Preserve the original authority-core scratch target. CI PG15/17 matrix
+# also uses a dedicated, per-case disposable database with no public network.
+legacy_scratch=false
+matrix_scratch=false
+if [[ "${CI:-}" == true && "${PGHOST:-}" == localhost &&
+      "${PGDATABASE:-}" == myeongha_reader_s7_original_delivery_ledger_test ]]; then
+  legacy_scratch=true
+fi
+if [[ "${CI:-}" == true && "${GITHUB_ACTIONS:-}" == true &&
+      "${PGHOST:-}" == localhost && "${PGDATABASE:-}" =~ ^myeongha_ci_case_[0-9]+$ &&
+      ( "${DB_SUITE:-}" == content || "${DB_SUITE:-}" == postgres17 ) ]]; then
+  matrix_scratch=true
+fi
+if [[ "$legacy_scratch" != true && "$matrix_scratch" != true ]]; then
   echo 'FAIL: isolated CI PostgreSQL is required' >&2
   exit 1
 fi
@@ -129,6 +141,52 @@ p -c "update public.entitlement_grants set status='revoked',revision=revision+1,
 [[ "$(s6_marker_count '11390000-0000-0000-0000-000000000099' "$thread" "$safe_marker")" == 0 ]] ||
   fail "S6 cross-Subject Chat marker retrieved protected answer"
 echo 'PASS S6 real Chat safe-marker resolves only exact owner/Thread/message under same current Grant'
+# Real migrated S7 prepare writer: a client may retry the SAME delivery
+# request but cannot substitute another acknowledgement secret. Rollback
+# leaves the original 2-prepared/1-ACK historical fixture unchanged.
+prepared_lifecycle="$(p <<SQL
+begin;
+set local myeongha.subject_id='$subject';
+select 'first:' || already_prepared::text
+from public.internal_prepare_official_reader_paid_delivery_v1(
+ '$subject'::uuid,'$body'::uuid,'$thread'::uuid,'$safe_marker'::uuid,
+ 'f70a0000-0000-4000-8000-000000000003'::uuid,
+ 'sha256:v1:3333333333333333333333333333333333333333333333333333333333333333'
+);
+select 'retry:' || already_prepared::text
+from public.internal_prepare_official_reader_paid_delivery_v1(
+ '$subject'::uuid,'$body'::uuid,'$thread'::uuid,'$safe_marker'::uuid,
+ 'f70a0000-0000-4000-8000-000000000003'::uuid,
+ 'sha256:v1:3333333333333333333333333333333333333333333333333333333333333333'
+);
+do \$s7_replay\$
+declare denied boolean:=false;
+begin
+ begin
+  perform 1 from public.internal_prepare_official_reader_paid_delivery_v1(
+   '$subject'::uuid,'$body'::uuid,'$thread'::uuid,'$safe_marker'::uuid,
+   'f70a0000-0000-4000-8000-000000000003'::uuid,
+   'sha256:v1:4444444444444444444444444444444444444444444444444444444444444444'
+  );
+ exception when check_violation then denied:=true;
+ end;
+ if not denied then
+  raise exception 'S7 original delivery retry accepted a changed token';
+ end if;
+end \$s7_replay\$;
+select 'stored:' || count(*)::text
+from public.official_reader_paid_delivery_attempts_v1
+where delivery_request_id='f70a0000-0000-4000-8000-000000000003'::uuid
+ and subject_id='$subject'::uuid and client_acknowledged_at is null;
+rollback;
+SQL
+)"
+[[ "$prepared_lifecycle" == "$(printf 'first:false\nretry:true\nstored:1')" ]] ||
+  fail "real S7 prepare/retry/forgery test failed: $prepared_lifecycle"
+[[ "$(p -c "select count(*) from public.official_reader_paid_delivery_attempts_v1
+ where delivery_request_id='f70a0000-0000-4000-8000-000000000003'::uuid;")" == 0 ]] ||
+  fail "rolled-back S7 prepare contaminated the historical fixture"
+echo 'PASS real S7 prepare original receipt, idempotent retry, forged token denial and rollback'
 [[ "$(p -c "select count(*) from public.entitlement_grants
  where id in ('$grant'::uuid,'$same_bundle_grant'::uuid)
  and status='active';")" == 2 ]] ||
