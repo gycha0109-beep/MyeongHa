@@ -6,6 +6,7 @@ import type { AdminSection } from './routes.js';
 import { StatusPanel } from './StatusPanel.js';
 
 type ListSection = Exclude<AdminSection, 'overview'>;
+type ReadTab = 'commerce' | 'credits' | 'readings' | 'ai-costs' | 'ai-estimates' | 'issues' | 'catalog';
 const DATA_PATHS: Record<ListSection, string> = {
   users: 'users',
   commerce: 'commerce',
@@ -43,6 +44,12 @@ const LABELS: Record<string, string> = {
   totalTokens: '토큰',
   costKrw: '원화 비용',
   p95LatencyMs: 'P95 지연',
+  estimatedMicroUsd: '추정 비용(마이크로 USD)',
+  unknownCostCalls: '원가 미확인 호출',
+  costStatus: '원가 근거',
+  productType: '상품 종류',
+  catalogEnabled: '카탈로그 활성',
+  offerCount: '제안 수',
   issueId: '이슈 참조',
   category: '이슈 유형',
   severity: '심각도',
@@ -53,11 +60,11 @@ function isSubjectId(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(value);
 }
 
-function buildListPath(section: ListSection, subject: string, cursor: string | null): string {
+function buildListPath(section: ListSection, subject: string, cursor: string | null, tab: ReadTab): string {
   const params = new URLSearchParams({ limit: '20' });
   if (subject.length > 0) params.set('subjectId', subject);
   if (cursor !== null) params.set('cursor', cursor);
-  return '/api/admin/' + DATA_PATHS[section] + '?' + params.toString();
+  return '/api/admin/' + tab + '?' + params.toString();
 }
 
 function DataTable({ result, section, onDetail }: {
@@ -129,6 +136,7 @@ export function AdminWorkbench({ section, token, onSessionExpired }: {
   readonly onSessionExpired: () => void;
 }) {
   const [cursor, setCursor] = useState<string | null>(null);
+  const [tab, setTab] = useState<ReadTab>(() => DATA_PATHS[section] as ReadTab);
   const [subject, setSubject] = useState('');
   const [pendingSubject, setPendingSubject] = useState('');
   const [detail, setDetail] = useState<string | null>(null);
@@ -144,7 +152,7 @@ export function AdminWorkbench({ section, token, onSessionExpired }: {
     setResult(null);
     const url = detail !== null
       ? '/api/admin/users/' + detail
-      : buildListPath(section, subject, cursor);
+      : buildListPath(section, subject, cursor, tab);
     void fetchAdminReadV1(url, token)
       .then(value => { if (mounted) setResult(value); })
       .catch(e => {
@@ -156,13 +164,17 @@ export function AdminWorkbench({ section, token, onSessionExpired }: {
       mounted = false;
       controller.abort();
     };
-  }, [section, token, cursor, subject, detail]);
+  }, [section, token, cursor, subject, detail, tab]);
 
   return <section className="surface admin-data">
     <div className="surface__head">
       <div><span className="section-kicker">VERIFIED READ ONLY</span>
         <h2>{detail !== null ? '사용자 상세' : '관리자 실데이터 조회'}</h2></div>
       <span className="neutral-tag">서버 검증 필수</span>
+    </div>
+    <div className="admin-tabs" aria-label="조회 종류">
+      {(section === 'commerce' ? [['commerce','결제 내역'],['credits','크레딧 지급']] : section === 'readings' ? [['readings','Reading'],['ai-costs','AI 호출'],['ai-estimates','AI 추정 원가']] : section === 'issues' ? [['issues','운영 이슈'],['catalog','상품 카탈로그']] : [])
+        .map(([name,label]) => <button key={name} type="button" className={tab===name ? 'active' : ''} onClick={() => { setTab(name as ReadTab); setCursor(null); setDetail(null); }}>{label}</button>)}
     </div>
     <div className="admin-toolbar">
       {detail !== null

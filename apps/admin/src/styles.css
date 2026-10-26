@@ -150,3 +150,7 @@ button { cursor: pointer; }
 .admin-table td { min-width: 65px; max-width: 350px; overflow-wrap: anywhere; padding: 13px 12px; color: #435165; border-bottom: 1px solid #f0f2f5; }
 .admin-table .table-link { border: 0; background: none; font-weight: 700; color: #6855c4; text-decoration: underline; }
 .admin-pagination { margin-top: 18px; display: flex; justify-content: flex-end; }
+
+.admin-tabs { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 20px; }
+.admin-tabs button { padding: 9px 15px; font-size: 11px; color: #69768b; background: #f1f3f7; border: 1px solid #e2e6ed; border-radius: 6px; cursor: pointer; }
+.admin-tabs button.active { color: #fff; background: #334562; border-color: #334562; }

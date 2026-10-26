@@ -38,6 +38,8 @@ const ROUTES: Readonly<Record<string, AdminReadKindV1>> = {
   credits: 'credits',
   readings: 'readings',
   'ai-costs': 'ai-costs',
+  'ai-estimates': 'ai-estimates',
+  catalog: 'catalog',
   analytics: 'analytics',
   issues: 'issues',
 };
