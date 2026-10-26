@@ -8,6 +8,7 @@ import {
   chatCreditTopUpOfferForUiV1,
 } from './commerce-chat-credit-gate-v1.js';
 import {createPostgresChatCreditCandidatePortsV1} from './postgres-chat-credit-candidate-v1.js';
+import {readOperatorChatCapabilityV1} from './commerce-operator-chat-capability-v1.js';
 
 export const CHAT_CREDIT_WALLET_HTTP_CANDIDATE_V1=Object.freeze({
   method:'GET',
@@ -68,10 +69,12 @@ export async function handleMemberChatCreditWalletCandidateV1(input:Readonly<{
         client:scope.client,
         canonicalSubjectId:scope.resolvedSubject.subjectId,
       }).balance;
-      return readChatCreditAvailabilityV1({
+      const credits = await readChatCreditAvailabilityV1({
         verifiedSubjectId:scope.resolvedSubject.subjectId,
         balancePort:balance,
       });
+      const operator = await readOperatorChatCapabilityV1(scope.client,scope.resolvedSubject.subjectId);
+      return {...credits,operator};
     },
   });
   return Response.json({
@@ -80,7 +83,9 @@ export async function handleMemberChatCreditWalletCandidateV1(input:Readonly<{
       availableCredits:state.availableCredits,
       totalCredits:state.totalCredits,
       requiredCredits:state.requiredCredits,
-      insufficient:state.insufficient,
+      insufficient:state.operator.freeChat ? false : state.insufficient,
+      operatorFreeChat:state.operator.freeChat,
+      operatorSandboxCheckout:state.operator.sandboxCheckout,
       topUp:chatCreditTopUpOfferForUiV1(),
     },
     meta:{apiContractVersion:'v0.9',requestId:input.requestId,

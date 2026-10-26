@@ -19,6 +19,8 @@ function fixture(kind:'member'|'guest'|null) {
             ?[{subjectId:subject,subjectKind:'member'}]
             :query.includes('internal_qry_chat_credit_balance')
             ?[{availableCredits:'40',totalCredits:'50'}]
+            :query.includes('qry_operator_chat_test_capability')
+            ?[{freeChat:false,sandboxCheckout:false}]
             :[];
           return {rows:rows as unknown as readonly Row[]};
         },
