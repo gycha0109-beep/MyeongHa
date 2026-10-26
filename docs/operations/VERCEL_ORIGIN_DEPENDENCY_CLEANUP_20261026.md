@@ -51,3 +51,27 @@
 - `npm run verify:production:api` now defaults to the canonical Cloudflare Worker instead of Vercel. The existing `MYEONGHA_PRODUCTION_ORIGIN` override remains usable to check the Vercel standby explicitly before retirement or rollback. Live health tests for both origins passed (HTTP 200, `{"status":"ok"}`); production health verifier regression tests: 7/7 passed.
 - Remaining acceptance is not automatically promoted: real OAuth/provider callback round-trip, Guest-to-Member continuity, production secret binding parity, exact deployed source SHA, full Preview acceptance for the same release, rollback rehearsal, stability observation and explicit final Vercel shutdown approval all require independent evidence. Vercel-owned links and historical mobile binaries are not migrated by this source change.
 - No Vercel shutdown, production Worker deploy, DNS changes, provider configuration, Supabase DB mutation, secret value disclosure or PR merge occurred. Vercel remains a live standby.
+
+## Final-phase verification: OAuth, Guest continuity, rollback boundary — 2026-10-26 KST
+
+This is a bounded operational evidence record, **not** a claim that Vercel may be deleted. All external probes used the already-authorized origins. No user data, password, cookie, OAuth state, authorization URL, or API token is stored in this file.
+
+### Confirmed live
+
+- GitHub PR #2597 previous commit `280a280681bf41842b2b5633d16bd96b01dd5288`: 5 GitHub Actions workflows succeeded; GitGuardian green as previously checked. This is CI success, not independently authenticated OAuth success.
+- **Cloudflare deployed runtime changed during this final-stage session** from Worker #122 `9defd0bf-0561-4318-af5c-daed4d39105f` to #123 `37f7b28f-667c-4af1-98c0-f833e83200f2` (Cloudflare deployments API shows #123 at 100%). #122 has been retained as an immutable version candidate. Both versions present 41 bindings by **name and type**. Secret value parity, actual rollback, source SHA parity and persistent session continuity were **not** proven by this comparison.
+- The governed Member→own PostgreSQL/Birth→calculation-only Saju production workflow [#40261086788](https://github.com/gycha0109-beep/MyeongHa/actions/runs/40261086788) completed successfully for **#122 only**. It must be rerun, with its `worker_version` input pinned to **#123**, to attest the presently deployed Worker; historical success cannot be promoted to current release acceptance. This workflow already uses the production secret environment and requires explicit `VERIFY_CLOUDFLARE_PRIMARY_E2E` confirmation. No new workflow or test account is needed.
+- On Worker **#123**, Google, Kakao and Naver `POST /api/auth/social/start` each returned HTTP 200, Supabase authorization URL, and a `redirect_to` pointing to the same Cloudflare `/auth.html?social=callback` origin. Request state/authorization URLs were not logged. This verifies **provider initiation and exact callback construction**, but *not* an actual third-party sign-in and callback exchange or provider dashboard allowlist.
+- On Worker **#123**, `GET /api/session/bootstrap` returned **405**, unauthenticated `POST /api/auth/promote-guest` returned **401**, and a fake Naver callback state returned **400**. These verify security rejects only; no actual Guest→Member promotion occurred and no new Guest identity was created.
+- The existing Cloudflare primary anonymous ingress E2E passed **14/14** on #123, including `/api/readiness=200` and auth/saju/chat hold boundaries. Focused offline OAuth/Guest/rollback gate and production verifier unit tests passed **85/85 across 10 files**.
+- Read-only `npm run audit:vercel-retirement` on #123 returned `HOLD` with exactly 12 `MISSING_EVIDENCE` gates. Cloudflare, Vercel standby, and Cloudflare public-origin health/readiness all reported **ready**. #123 Worker version remained unchanged across the start/end of the audit. No shutdown was attempted.
+
+### Cutover/rollback plan (not yet an executed rollback rehearsal)
+
+1. Maintain the Vercel standby with verified health/readiness and its current separate application state. This is a safe fallback endpoint, **not** a substitute for redirecting established `myeongha.vercel.app` visitors after deletion.
+2. Before any live rollback, pin and preserve the intended Worker version, obtain the exact source revision and non-DB secret binding parity; check how stale mobile binaries, browser sessions, callback allowlists and old public links behave after cutover.
+3. Obtain evidence for a *real* OAuth provider round-trip and Guest→Member promotion with a governed test identity and an approved reversible scenario, without modifying a user's existing records.
+4. Rehearse rollback only through the established operational deployment procedure with a separately scoped maintenance window. **Do not** silently deploy the preserved #122 Worker or switch DNS: this would affect concurrent development tracks and real traffic. Re-verify production Member and Saju on the actual recovered version after the rehearsal.
+5. Record exact-SHA Preview/CI, production Secret parity, observed cutover stability and an explicit final Vercel shutdown decision. Until all are supported, leave the fail-closed retirement gate at `HOLD`.
+
+**No production Worker deployment, rollback deployment, DNS change, Vercel shutdown, OAuth provider-console edit, synthetic Guest mutation, or PR merge was performed in this final-stage audit.**
