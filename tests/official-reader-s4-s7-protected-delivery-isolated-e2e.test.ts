@@ -298,7 +298,7 @@ describe('S4/S7 isolated protected Reader HTTP + current-purchase + Privacy + AC
       .not.toBe(h.pending.get(REQUEST_ID)?.tokenHash);
   });
 
-  it('does not leak a decrypted answer or prepare delivery when Privacy revokes during the final SQL COMMIT', async () => {
+  it('withholds plaintext after a Privacy revoke at COMMIT even if a prepared-only S7 receipt persists', async () => {
     const h = isolatedReaderHarness();
     h.revokePrivacyOnSecondCommit();
     const response = await h.get();
@@ -306,7 +306,10 @@ describe('S4/S7 isolated protected Reader HTTP + current-purchase + Privacy + AC
     expect(await response.text()).not.toContain(PRIVATE_TEXT);
     expect(h.committedTransactions).toBe(2);
     expect(h.reads).toBe(1);
-    expect(h.pending.size).toBe(0);
+    // Prepared is NOT delivered: a server-side attempt may commit before
+    // the independent Privacy lease is checked again. No client ACK exists.
+    expect(h.pending.size).toBe(1);
+    expect(h.pending.get(REQUEST_ID)?.ackAt).toBeNull();
   });
 
   it('blocks cross-member, cross-marker, revoked Receipt, source revocation and Privacy restore tombstone before new plaintext release', async () => {
