@@ -36,12 +36,6 @@ form?.addEventListener('submit', async (event) => {
   event.preventDefault();
   if (!form.reportValidity() || sending) return;
   const fields = new FormData(form);
-  if (fields.get('company')) {
-    announce('문의가 접수되었습니다.', 'success');
-    form.reset();
-    submissionId = undefined;
-    return;
-  }
   submissionId ??= crypto.randomUUID();
   sending = true;
   submit.disabled = true;

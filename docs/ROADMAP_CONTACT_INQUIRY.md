@@ -130,3 +130,15 @@
 **외부 의존성:** `RESEND_API_KEY`, 실제 인증된 `CONTACT_FROM_EMAIL`, Cloudflare 해당 환경 설정 권한. 확보·등록 여부는 아직 확인되지 않았으며 추정해서 완료로 표시하지 않는다.
 
 **다음 실행 작업:** `feat/frontend-integration/contact-inquiry-production` 브랜치에서 **I1 — Cloudflare 문의 요청 진입 연결**부터 코드를 구현한다.
+
+## 6. 구현 진행 기록 (2026-10-26)
+
+- [x] **I1** Cloudflare `POST /api/contact` 라우트에서 실제 어댑터 호출 (`workers/cloudflare-contact-inquiry.mjs`)
+- [x] **I2** 기존 승인된 `GET /api/me`를 이용한 게스트/회원 주체 확인 및 기존 Worker 요청 제한기 연결
+- [ ] **I3** 공통 Resend 발송 경로를 Worker에 연동한 코드는 완료. **실제 `RESEND_API_KEY` 및 인증된 `CONTACT_FROM_EMAIL` 미등록**으로 운영 설정은 보류
+- [x] **I4** 문의 상태 메시지와 정적 폼의 5개 언어 처리, 전송 확인 코드 기반 성공 처리
+- [x] **I5** 단일 Worker 경로 유지, 배포 구성/Secret 설정 문서 업데이트
+- [ ] **V1** 최종 통합 검증 **미실행** (I3의 실제 발송 설정 필요)
+- [ ] **M1** 최종 병합 **미실행** (V1 필수 선행)
+
+단계별 기능 검증·중간 PR·자동 병합은 수행하지 않는다. **I3 발송 비밀정보가 준비되어야 V1로 넘어갈 수 있다.**
