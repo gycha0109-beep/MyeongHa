@@ -99,12 +99,13 @@ function DataTable({ result, section, onDetail }: {
   return <div className="admin-table-scroll">
     <table className="admin-table">
       <thead><tr>{columns.map(k => <th scope="col" key={k}>{LABELS[k]}</th>)}
-        {section === 'users' && <th scope="col">상세</th>}</tr></thead>
+        {(section === 'users' || (section === 'commerce' && result.kind === 'commerce')) && <th scope="col">상세</th>}</tr></thead>
       <tbody>{result.rows.map((row, i) => <tr key={String(row.transactionId ?? row.readingId ?? row.eventId ?? row.issueId ?? row.subjectId ?? i) + ':' + i}>
         {columns.map(k => <td key={k}>{row[k] === null || row[k] === undefined ? '—' : String(row[k])}</td>)}
-        {section === 'users' && <td>{typeof row.subjectId === 'string' && isSubjectId(row.subjectId)
+        {(section === 'users' || (section === 'commerce' && result.kind === 'commerce')) && <td>{section === 'users' && typeof row.subjectId === 'string' && isSubjectId(row.subjectId)
           ? <button type="button" className="table-link" onClick={() => onDetail(String(row.subjectId))}>조회</button>
-          : '—'}</td>}
+          : section === 'commerce' && typeof row.transactionId === 'string' && isSubjectId(row.transactionId)
+            ? <button type="button" className="table-link" onClick={() => onDetail(String(row.transactionId))}>검증 내역</button> : '—'}</td>}
       </tr>)}</tbody>
     </table>
   </div>;
@@ -179,7 +180,7 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
     setError('');
     setResult(null);
     const url = detail !== null
-      ? '/api/admin/users/' + detail
+      ? (section === 'commerce' ? '/api/admin/commerce/' : '/api/admin/users/') + detail
       : buildListPath(section, subject, cursor, tab, from, to);
     void fetchAdminReadV1(url, token)
       .then(value => { if (mounted) setResult(value); })
@@ -206,7 +207,7 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
     <div className="admin-toolbar">
       {detail !== null
         ? <><button type="button" onClick={() => setDetail(null)}>목록으로</button>
-            {onNavigate && <><button type="button" onClick={() => onNavigate('/admin/readings?subjectId=' + detail)}>Reading 조회</button><button type="button" onClick={() => onNavigate('/admin/commerce?subjectId=' + detail)}>결제 조회</button></>}</>
+            {section === 'users' && onNavigate && <><button type="button" onClick={() => onNavigate('/admin/readings?subjectId=' + detail)}>Reading 조회</button><button type="button" onClick={() => onNavigate('/admin/commerce?subjectId=' + detail)}>결제 조회</button></>}</>
         : <>
           {section !== 'issues' && section !== 'analytics' && <form onSubmit={e => {
             e.preventDefault();

@@ -8,6 +8,7 @@ export const ADMIN_READ_SQL_V1: Readonly<Record<AdminReadKindV1, string | null>>
 {
   "users": "SELECT s.id::text AS \"subjectId\", s.kind, s.status, s.created_at::text AS \"createdAt\", NULL::text AS \"lastActivityAt\" FROM public.subjects s WHERE ($2::uuid IS NULL OR s.id=$2::uuid) AND ($3::date IS NULL OR s.created_at >= $3::date) AND ($4::date IS NULL OR s.created_at < $4::date + INTERVAL '1 day') ORDER BY s.created_at DESC,s.id DESC LIMIT $1::int OFFSET $5::int",
   "user-detail": "SELECT s.id::text AS \"subjectId\",s.kind,s.status,s.created_at::text AS \"createdAt\",NULL::text AS \"lastActivityAt\",(SELECT COUNT(*)::text FROM public.readings r WHERE r.subject_id=s.id) AS \"readingsCount\",(SELECT COUNT(*)::text FROM public.commerce_receipts c WHERE c.subject_id=s.id AND c.verification_status='verified') AS \"verifiedPurchasesCount\",(SELECT COUNT(*)::text FROM public.entitlements e WHERE e.subject_id=s.id AND e.status='active') AS \"activeEntitlementsCount\",(SELECT COALESCE(SUM(l.credits_remaining) FILTER(WHERE l.expires_at>CURRENT_TIMESTAMP),0)::text FROM public.chat_credit_lots_v1 l WHERE l.subject_id=s.id) AS \"availableCredits\" FROM public.subjects s WHERE s.id=$2::uuid LIMIT 1",
+  "commerce-detail": "SELECT r.id::text AS \"transactionId\",r.subject_id::text AS \"subjectId\",p.product_key AS \"productKey\",r.provider AS \"provider\",r.platform AS \"platform\",r.verification_status AS \"providerStatus\",intent.status AS \"purchaseStatus\",r.created_at::text AS \"createdAt\",r.verified_at::text AS \"verifiedAt\",NULL::text AS \"amountMinor\",po.currency AS \"currency\",NULL::text AS \"entitlementStatus\" FROM public.commerce_receipts r LEFT JOIN public.purchase_intents intent ON intent.id=r.purchase_intent_id LEFT JOIN public.product_offers po ON po.id=r.product_offer_id LEFT JOIN public.products p ON p.id=po.product_id WHERE r.id=$6::uuid LIMIT 1",
   "commerce": "SELECT r.id::text AS \"transactionId\",r.subject_id::text AS \"subjectId\",p.product_key AS \"productKey\",NULL::text AS \"amountMinor\",po.currency AS \"currency\",r.verification_status AS \"providerStatus\",r.verified_at::text AS \"verifiedAt\",NULL::text AS \"entitlementStatus\" FROM public.commerce_receipts r LEFT JOIN public.product_offers po ON po.id=r.product_offer_id LEFT JOIN public.products p ON p.id=po.product_id WHERE ($2::uuid IS NULL OR r.subject_id=$2::uuid) AND ($3::date IS NULL OR r.created_at >= $3::date) AND ($4::date IS NULL OR r.created_at < $4::date + INTERVAL '1 day') AND r.created_at >= CURRENT_TIMESTAMP - INTERVAL '90 days' ORDER BY r.created_at DESC,r.id DESC LIMIT $1::int OFFSET $5::int",
   "credits": "SELECT lot.id::text AS \"eventId\",lot.subject_id::text AS \"subjectId\",lot.credits_issued AS \"creditDelta\",lot.issued_at::text AS \"createdAt\",lot.source_kind AS \"eventKind\",NULL::text AS \"balanceAfter\",lot.source_ref::text AS \"correlationId\" FROM public.chat_credit_lots_v1 lot WHERE ($2::uuid IS NULL OR lot.subject_id=$2::uuid) AND ($3::date IS NULL OR lot.issued_at >= $3::date) AND ($4::date IS NULL OR lot.issued_at < $4::date + INTERVAL '1 day') AND lot.issued_at >= CURRENT_TIMESTAMP - INTERVAL '90 days' ORDER BY lot.issued_at DESC,lot.id DESC LIMIT $1::int OFFSET $5::int",
   "readings": "SELECT r.id::text AS \"readingId\",r.subject_id::text AS \"subjectId\",r.execution_status AS \"status\",NULL::text AS \"productKey\",r.saju_domain AS \"domain\",NULL::text AS \"engineVersion\",r.created_at::text AS \"createdAt\",NULL::text AS \"errorCode\" FROM public.readings r WHERE ($2::uuid IS NULL OR r.subject_id=$2::uuid) AND ($3::date IS NULL OR r.created_at >= $3::date) AND ($4::date IS NULL OR r.created_at < $4::date + INTERVAL '1 day') AND r.created_at >= CURRENT_TIMESTAMP - INTERVAL '90 days' ORDER BY r.created_at DESC,r.id DESC LIMIT $1::int OFFSET $5::int",
@@ -46,16 +47,21 @@ async function runQuery(
   if (filters.kind === 'user-detail' && filters.subjectId === null) {
     throw new Error('User detail requires an exact subject reference.');
   }
+  if (filters.kind === 'commerce-detail' && filters.recordId === undefined) {
+    throw new Error('Transaction detail requires an exact receipt reference.');
+  }
   const offset = readOffset(filters.cursor);
-  const amount = filters.kind === 'user-detail' ? 1 : filters.limit;
+  const detail = filters.kind === 'user-detail' || filters.kind === 'commerce-detail';
+  const amount = detail ? 1 : filters.limit;
   const result = await client.query<Record<string, unknown>>(query, [
-    amount + (filters.kind === 'user-detail' ? 0 : 1),
+    amount + (detail ? 0 : 1),
     filters.subjectId, filters.from, filters.to, offset,
+    filters.recordId ?? null,
   ]);
   if (result.rows.length > amount + 1 || offset + amount > 10_050) {
     throw new AdminReadAuthorityUnavailableV1();
   }
-  const next = filters.kind !== 'user-detail' && result.rows.length > amount
+  const next = !detail && result.rows.length > amount
     ? String(offset + amount)
     : null;
   return Object.freeze({ rows: result.rows.slice(0, amount), nextCursor: next });

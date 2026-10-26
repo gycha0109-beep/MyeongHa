@@ -27,8 +27,9 @@ grant usage on schema public to myeongha_admin_reader;
 grant select (id, kind, status, created_at) on public.subjects to myeongha_admin_reader;
 grant select (id, subject_id, execution_status, saju_domain, created_at)
   on public.readings to myeongha_admin_reader;
-grant select (id, subject_id, product_offer_id, verification_status, verified_at, created_at)
+grant select (id, subject_id, purchase_intent_id, provider, platform, product_offer_id, verification_status, verified_at, created_at)
   on public.commerce_receipts to myeongha_admin_reader;
+grant select (id, status) on public.purchase_intents to myeongha_admin_reader;
 grant select (id, product_id, currency) on public.product_offers to myeongha_admin_reader;
 grant select (id, product_key, product_type, enabled, created_at)
   on public.products to myeongha_admin_reader;
@@ -55,6 +56,8 @@ create policy admin_read_subject_metadata_v1 on public.subjects
 create policy admin_read_reading_metadata_v1 on public.readings
   for select to myeongha_admin_reader using (true);
 create policy admin_read_receipt_metadata_v1 on public.commerce_receipts
+  for select to myeongha_admin_reader using (true);
+create policy admin_read_purchase_intent_status_v1 on public.purchase_intents
   for select to myeongha_admin_reader using (true);
 create policy admin_read_offer_metadata_v1 on public.product_offers
   for select to myeongha_admin_reader using (true);

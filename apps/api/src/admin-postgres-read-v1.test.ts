@@ -47,6 +47,14 @@ describe('admin dedicated readonly PostgreSQL adapter', () => {
       .every(query => !/verified_payload_jsonb|request_snapshot_jsonb|event_jsonb|payload_jsonb|birth_input/iu.test(query!)))
       .toBe(true);
   });
+  it('looks up exactly one verified receipt reference without accepting user SQL', async () => {
+    const receiptId = '123e4567-e89b-42d3-a456-426614174003';
+    const h = harness();
+    await h.port.read({ ...filters('commerce-detail'), recordId: receiptId });
+    expect(h.sql[2]).toContain('r.id=$6::uuid');
+    expect(h.sql[2]).not.toContain(receiptId);
+    expect(h.params[2]).toEqual([1, null, null, null, 0, receiptId]);
+  });
   it('provides bounded pagination', async () => {
     const h = harness('myeongha_admin_reader',Array.from({length:3},()=>({subjectId:SUBJECT})));
     const result = await h.port.read({ ...filters(),limit:2 });

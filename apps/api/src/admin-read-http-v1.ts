@@ -75,10 +75,15 @@ export function parseAdminReadFiltersV1(url: URL): AdminListFiltersV1 {
   const fragments = url.pathname.slice(PATH_PREFIX.length).split('/');
   let kind: AdminReadKindV1;
   let subjectId: string | null = null;
+  let recordId: string | null = null;
   if (fragments.length === 2 && fragments[0] === 'users' &&
     typeof fragments[1] === 'string' && UUID.test(fragments[1])) {
     kind = 'user-detail';
     subjectId = fragments[1].toLowerCase();
+  } else if (fragments.length === 2 && fragments[0] === 'commerce' &&
+    typeof fragments[1] === 'string' && UUID.test(fragments[1])) {
+    kind = 'commerce-detail';
+    recordId = fragments[1].toLowerCase();
   } else if (fragments.length === 1 &&
     Object.hasOwn(ROUTES, fragments[0] ?? '')) {
     kind = ROUTES[fragments[0] ?? '']!;
@@ -101,11 +106,11 @@ export function parseAdminReadFiltersV1(url: URL): AdminListFiltersV1 {
     throw new Error('Administrator limit is out of range.');
   }
   const cursor = url.searchParams.get('cursor');
-  if (cursor !== null && (!/^[1-9]\d{0,4}$/u.test(cursor) || Number(cursor) > 10_000 || kind === 'user-detail')) {
+  if (cursor !== null && (!/^[1-9]\d{0,4}$/u.test(cursor) || Number(cursor) > 10_000 || (kind === 'user-detail' || kind === 'commerce-detail'))) {
     throw new Error('Administrator cursor is invalid.');
   }
   const querySubject = url.searchParams.get('subjectId');
-  if (querySubject !== null && (!UUID.test(querySubject) || kind === 'user-detail')) {
+  if (querySubject !== null && (!UUID.test(querySubject) || (kind === 'user-detail' || kind === 'commerce-detail'))) {
     throw new Error('Administrator subject reference is invalid.');
   }
   subjectId ??= querySubject?.toLowerCase() ?? null;
@@ -120,7 +125,7 @@ export function parseAdminReadFiltersV1(url: URL): AdminListFiltersV1 {
     throw new Error('Administrator date range exceeds policy.');
   }
   if (!ADMIN_READ_KINDS_V1.includes(kind)) throw new Error('Unknown administrator kind.');
-  return Object.freeze({ kind, limit, cursor, subjectId, from, to });
+  return Object.freeze({ kind, limit, cursor, subjectId, recordId, from, to });
 }
 
 /** Unmounted by default. A privileged deployment must separately approve this entrypoint. */
