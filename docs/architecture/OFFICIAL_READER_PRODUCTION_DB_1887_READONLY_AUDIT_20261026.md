@@ -35,7 +35,7 @@ Use `scripts/operations/seyeon-r2-rpc-per-function-parity-readonly.sql` in both 
 
 | Evidence | Observed status |
 | --- | --- |
-| Latest successful encrypted backup | [run 40232489516](https://github.com/gycha0109-beep/MyeongHa/actions/runs/40232489516), artifact `12613877032` (not expired), 2026-10-25 20:48 UTC, SHA `02cfa8144fd103b38670f5966963696903f04e10` |
+| Latest successful encrypted backup | [run 40232489516](https://github.com/gycha0109-beep/MyeongHa/actions/runs/40232489516), artifact `12613877032` (not expired), 2026-10-25 20:48 UTC, source SHA `02cfa8144fd103b38670f5966963696903f04e10`, recorded migration frontier **20261025203519** |
 | Latest successful isolated restore | [run 40226477877](https://github.com/gycha0109-beep/MyeongHa/actions/runs/40226477877), artifact `12611398051` (not expired), 2026-10-25 19:32 UTC; restored **earlier backup 40224757670**, not latest 40232489516 |
 | Latest Privacy Recovery Ledger | [run 40255489032](https://github.com/gycha0109-beep/MyeongHa/actions/runs/40255489032), artifact `12622033718` (not expired), 2026-10-26 01:42 UTC; source backup **40232489516** |
 | Production privacy canary | Latest known SUCCESS [run 36863674453](https://github.com/gycha0109-beep/MyeongHa/actions/runs/36863674453) on 2026-10-01: **not** a matching fresh canary |
