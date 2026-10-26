@@ -1,3 +1,10 @@
+export class AdminAccessDeniedErrorV1 extends Error {
+  constructor() {
+    super('관리자 접근 권한이 거부되었습니다.');
+    this.name = 'AdminAccessDeniedErrorV1';
+  }
+}
+
 export interface AdminReadResponse {
   readonly kind: string;
   readonly rows: readonly Readonly<Record<string, string | number | boolean | null>>[];
@@ -67,7 +74,7 @@ export async function fetchAdminReadV1(
     credentials: 'omit',
   });
   if (response.status === 403 || response.status === 401) {
-    throw new Error('관리자 접근 권한이 거부되었습니다.');
+    throw new AdminAccessDeniedErrorV1();
   }
   if (!response.ok) {
     throw new Error('관리자 읽기 서버를 이용할 수 없습니다.');
@@ -107,6 +114,7 @@ export async function verifyAdminOwnerSessionV1(
     credentials: 'omit',
     cache: 'no-store',
   });
+  if (response.status === 401 || response.status === 403) throw new AdminAccessDeniedErrorV1();
   if (!response.ok) throw new Error('관리자 권한을 확인하지 못했습니다.');
   const payload: unknown = await response.json();
   if (!isRecord(payload) || payload.authorized !== true) {
@@ -128,6 +136,7 @@ export async function fetchAdminIssuesCsvV1(
     credentials: 'omit',
     cache: 'no-store',
   });
+  if (res.status === 401 || res.status === 403) throw new AdminAccessDeniedErrorV1();
   if (!res.ok || !res.headers.get('content-type')?.startsWith('text/csv')) {
     throw new Error('감사된 운영 이슈 내보내기를 완료하지 못했습니다.');
   }

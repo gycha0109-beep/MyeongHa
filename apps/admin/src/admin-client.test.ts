@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fetchAdminReadV1, signInForAdminSessionV1, verifyAdminOwnerSessionV1, fetchAdminIssuesCsvV1 } from './admin-client.js';
+import { fetchAdminReadV1, signInForAdminSessionV1, verifyAdminOwnerSessionV1, fetchAdminIssuesCsvV1, AdminAccessDeniedErrorV1 } from './admin-client.js';
 const JWT = 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.signature';
 describe('admin browser API client', () => {
   it('downloads only audited issues CSV and rejects plain JSON substitutes', async () => {
@@ -28,7 +28,7 @@ describe('admin browser API client', () => {
   });
   it('treats 403 as denied, never as a successful empty result', async () => {
     const fake = (async () => Response.json({ error: 'ADMIN_FORBIDDEN' }, { status: 403 })) as typeof fetch;
-    await expect(fetchAdminReadV1('/api/admin/users', JWT, fake)).rejects.toThrow('권한');
+    await expect(fetchAdminReadV1('/api/admin/users', JWT, fake)).rejects.toBeInstanceOf(AdminAccessDeniedErrorV1);
   });
   it('accepts only primitive projected rows', async () => {
     const fake = (async () => Response.json({

@@ -4,7 +4,7 @@ import { adminRoutes, getAdminRoute } from './routes.js';
 import type { AdminRoute, AdminSection } from './routes.js';
 import { StatusPanel } from './StatusPanel.js';
 import { AdminLogin, AdminWorkbench } from './AdminWorkbench.js';
-import { fetchAdminReadV1 } from './admin-client.js';
+import { fetchAdminReadV1, AdminAccessDeniedErrorV1 } from './admin-client.js';
 import { BetaAnalyticsReadiness, OperatorActionsReadiness } from './AdminOperationalReadiness.js';
 
 const sectionDetails: Record<Exclude<AdminSection, 'overview'>, readonly string[]> = {
@@ -81,7 +81,7 @@ function LockNotice() {
   );
 }
 
-function Overview({ token }: { readonly token: string | null }) {
+function Overview({ token, onSessionExpired }: { readonly token: string | null; readonly onSessionExpired: () => void }) {
   const [summary, setSummary] = useState<Readonly<Record<string, string>> | null>(null);
   const [unavailable, setUnavailable] = useState(false);
   useEffect(() => {
@@ -102,7 +102,7 @@ function Overview({ token }: { readonly token: string | null }) {
       }
       if (Object.keys(next).length !== metrics.length) throw new Error('Administrator metrics incomplete');
       setSummary(next);
-    }).catch(() => { if (active) { setSummary(null); setUnavailable(true); } });
+    }).catch(error => { if (active) { setSummary(null); setUnavailable(true); if (error instanceof AdminAccessDeniedErrorV1) onSessionExpired(); } });
     return () => { active = false; };
   }, [token]);
   return (
@@ -231,7 +231,7 @@ export function App() {
             <>
               <SectionIntro route={route} />
               {ownerToken === null ? <LockNotice /> : null}
-              {route.section === 'overview' ? <><Overview token={ownerToken} />{ownerToken === null && <AdminLogin onSession={setOwnerToken} />}</> : ownerToken === null
+              {route.section === 'overview' ? <><Overview token={ownerToken} onSessionExpired={() => setOwnerToken(null)} />{ownerToken === null && <AdminLogin onSession={setOwnerToken} />}</> : ownerToken === null
                 ? <><PendingSection section={route.section} /><AdminLogin onSession={setOwnerToken} /></>
                 : <>{route.section === 'analytics'
                   ? <BetaAnalyticsReadiness />

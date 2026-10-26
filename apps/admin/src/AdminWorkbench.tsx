@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
-import { fetchAdminReadV1, signInForAdminSessionV1, verifyAdminOwnerSessionV1, fetchAdminIssuesCsvV1 } from './admin-client.js';
+import { fetchAdminReadV1, signInForAdminSessionV1, verifyAdminOwnerSessionV1, fetchAdminIssuesCsvV1, AdminAccessDeniedErrorV1 } from './admin-client.js';
 import type { AdminReadResponse } from './admin-client.js';
 import type { AdminSection } from './routes.js';
 import { StatusPanel } from './StatusPanel.js';
@@ -186,6 +186,7 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
       .then(value => { if (mounted) setResult(value); })
       .catch(e => {
         if (!mounted) return;
+        if (e instanceof AdminAccessDeniedErrorV1) { onSessionExpired(); return; }
         setError(e instanceof Error ? e.message : '조회할 수 없습니다.');
       })
       .finally(() => { if (mounted) setLoading(false); });
@@ -236,7 +237,10 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
               link.click();
               URL.revokeObjectURL(url);
             })
-            .catch(() => setError('내보내기를 완료할 수 없습니다. 권한과 감사 저장 상태를 확인해 주세요.'));
+            .catch(error => {
+              if (error instanceof AdminAccessDeniedErrorV1) { onSessionExpired(); return; }
+              setError('내보내기를 완료할 수 없습니다. 권한과 감사 저장 상태를 확인해 주세요.');
+            });
         }}>운영 이슈 CSV (최대 50건)</button>}
       <button type="button" onClick={onSessionExpired}>로그아웃</button>
       {detail === null && <form className="date-range-form" onSubmit={e => {
