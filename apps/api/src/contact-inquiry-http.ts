@@ -8,7 +8,7 @@ interface ContactInquiryOptionsV1 {
   readonly request: Request;
   readonly env: ContactInquiryEnvironmentV1;
   readonly verifySession: (authorization: string) => Promise<boolean>;
-  readonly sendFetch?: typeof fetch;
+  readonly sendFetch?: (url: string, init: RequestInit) => Promise<Response>;
 }
 
 const MAX_BYTES = 12_288;
@@ -128,7 +128,7 @@ export async function handleContactInquiryRequestV1({
   }
   if (body.consent !== true ||
       !submissionId || !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(submissionId) ||
-      !category || !(category in CATEGORY_LABELS) || !name || !validEmail(email) ||
+      !category || !Object.hasOwn(CATEGORY_LABELS, category) || !name || !validEmail(email) ||
       !subject || /[\r\n]/u.test(subject) || !message) {
     return respond(400, 'INVALID_FIELDS', 'Required inquiry details are missing or invalid.');
   }

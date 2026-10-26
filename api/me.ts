@@ -863,7 +863,11 @@ function runtimeForTarget(target: DispatchTarget) {
           serverTime: string;
         }) => handleContactInquiryRequestV1({
           request,
-          env: process.env,
+          env: {
+            RESEND_API_KEY: process.env.RESEND_API_KEY,
+            CONTACT_FROM_EMAIL: process.env.CONTACT_FROM_EMAIL,
+            CONTACT_TO_EMAIL: process.env.CONTACT_TO_EMAIL,
+          },
           verifySession: async (authorization) => {
             const probe = new Request('https://myeongha.internal/api/me', {
               method: 'GET',

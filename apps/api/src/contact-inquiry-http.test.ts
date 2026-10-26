@@ -27,7 +27,7 @@ function request(body: unknown, headers: Record<string, string> = {}) {
 
 describe('contact inquiry delivery', () => {
   it('sends only after verifying the session and preserves the reply-to address', async () => {
-    const sendFetch = vi.fn<typeof fetch>(async (_url, options) => {
+    const sendFetch = vi.fn< (url: string, init: RequestInit) => Promise<Response> >(async (_url, options) => {
       const body = JSON.parse(String(options?.body));
       expect(body.to).toEqual(['gycha0109@gmail.com']);
       expect(body.reply_to).toEqual(['tester@example.com']);
@@ -43,7 +43,7 @@ describe('contact inquiry delivery', () => {
   });
 
   it('rejects unauthorized senders without calling the email provider', async () => {
-    const sendFetch = vi.fn<typeof fetch>();
+    const sendFetch = vi.fn< (url: string, init: RequestInit) => Promise<Response> >();
     const result = await handleContactInquiryRequestV1({
       request: request(valid), env, verifySession: async () => false, sendFetch,
     });
@@ -52,7 +52,7 @@ describe('contact inquiry delivery', () => {
   });
 
   it('rejects malicious origin and invalid content', async () => {
-    const sendFetch = vi.fn<typeof fetch>();
+    const sendFetch = vi.fn< (url: string, init: RequestInit) => Promise<Response> >();
     const origin = await handleContactInquiryRequestV1({
       request: request(valid, { Origin: 'https://untrusted.example' }),
       env, verifySession: async () => true, sendFetch,
