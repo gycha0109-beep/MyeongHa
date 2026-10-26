@@ -136,7 +136,7 @@ for (const forbidden of ['pull_request:', 'schedule:']) {
 }
 if (onSection.includes('push:')) {
   // Exceptional one-shot restore is never a general scheduled/push job.
-  // Both version-specific marker contracts preserve the manual interface.
+  // Every exact one-shot marker contract preserves the manual interface.
   const legacy1310 = onSection.includes(
     "'.github/ops/postgres-restore-frontier-1310.once'",
   );
@@ -146,12 +146,15 @@ if (onSection.includes('push:')) {
   const latestOwnerApproved = onSection.includes(
     "'.github/ops/postgres-restore-backup-39067271230-20261018.once'",
   );
-  if (legacy1310 || !seyeonIncident || !latestOwnerApproved) {
-    throw new Error('Restore one-shot push must have only the two reviewed historical/current source markers.');
+  const currentBackupApproved = onSection.includes(
+    "'.github/ops/postgres-restore-backup-40232489516-20261026.once'",
+  );
+  if (legacy1310 || !seyeonIncident || !latestOwnerApproved || !currentBackupApproved) {
+    throw new Error('Restore one-shot push must have exactly the three reviewed historical/current source markers.');
   }
   const triggerMarkers = onSection.split('\n').filter((line) => line.includes('.github/ops/') && line.includes('.once\''));
-  if (triggerMarkers.length !== 2) {
-    throw new Error('Restore one-shot push allows exactly two pinned marker paths.');
+  if (triggerMarkers.length !== 3) {
+    throw new Error('Restore one-shot push allows exactly three pinned marker paths.');
   }
   for (const fragment of ['branches:', '- main']) {
     requireFragment(onSection, fragment, workflowPath);
@@ -168,6 +171,11 @@ if (onSection.includes('push:')) {
     'POSTGRES-RESTORE-BACKUP-39067271230-20261018-V1',
     'backup_run_id=39067271230',
     'incident_reference_utc=2026-10-18T08:00:00Z',
+    "ops(dr): one-shot restore backup 40232489516",
+    'POSTGRES-RESTORE-BACKUP-40232489516-20261026-V1',
+    'backup_run_id=40232489516',
+    'incident_reference_utc=2026-10-26T00:00:00Z',
+    'now - point <= 86400',
     'now - point <= 14400',
     'backup_run_id=38088591661',
     'incident_reference_utc=2026-10-10T21:44:36Z',
