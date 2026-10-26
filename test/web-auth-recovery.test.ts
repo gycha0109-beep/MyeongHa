@@ -71,7 +71,8 @@ describe('web auth recovery boundary', () => {
   it('exposes logout/session-clear recovery when My receives AUTH_REQUIRED with a stored member session', () => {
     expect(myPage).toContain('hasStoredMemberSession: Boolean(readMemberSession())');
     expect(myPage).toContain("const canSignOut = hasStoredMemberSession && subjectKind !== 'guest';");
-    expect(myPage).toContain('<AuthActions subjectKind={undefined} hasStoredMemberSession={hasStoredMemberSession} />');
+    expect(myPage).toContain("subjectKind={account.kind === 'unavailable' ? undefined : payload?.subjectKind}");
+    expect(myPage).toContain("hasStoredMemberSession={account.kind === 'unavailable' ? account.hasStoredMemberSession : Boolean(memberSession)}");
     expect(myPage).toContain("signingOut ? '로그아웃 중…' : '로그아웃'");
     expect(myPage).toContain('await signOutMember()');
     expect(myPage).toContain('내 정보를 보려면 현재 세션이 필요합니다.');

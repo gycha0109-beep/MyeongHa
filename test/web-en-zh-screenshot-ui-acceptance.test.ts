@@ -87,8 +87,8 @@ describe('Web EN/CN screenshot UI acceptance', () => {
     expect(read('face-reading-shell.js')).toContain("element.replaceChildren(");
     expect(read('face-reading-shell.js')).toContain("element.querySelector('[data-face-reader-name]')");
     expect(read('face-reading.html')).toContain('data-face-reader-heading');
-    expect(read('src/my/MyPage.tsx')).toContain('uiLabel(state.message)');
-    expect(read('src/my/MyPage.tsx')).toContain('uiLabel(item.detail)');
+    expect(read('src/my/MyPage.tsx')).toContain('uiLabel(account.message)');
+    expect(read('src/my/MyPage.tsx')).toContain('uiLabel(birth.message)');
     for (const screen of screens) expect(read(screen).length).toBeGreaterThan(100);
   });
   it('never translates unrecognized user input, official interpretations or stored records', () => {

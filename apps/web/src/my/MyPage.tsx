@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react';
 import { createMyRuntimeClient, MyRuntimeError } from '../../my-runtime-client.js';
 import { PRODUCT_AUTH_STORAGE_V1, readMemberSession, signOutMember } from '../../product-auth.js';
 import { shouldReloadMyForMemberSessionStorageChange } from '../../product-auth-surface.js';
-import { getUiLocale } from '../../ui-i18n.js';
+import { getUiLocale, translateStaticUi } from '../../ui-i18n.js';
+
+const uiLabel = (source: string) => translateStaticUi(source, getUiLocale());
 
 type Profile = {
   displayName: string | null;
@@ -122,7 +124,7 @@ function Detail({ panel, account, birth }: { panel: Exclude<MyPanel, null>; acco
         <>
           <h3>계정 정보</h3>
           {account.kind === 'loading' ? <p>계정 정보를 확인하는 중입니다…</p> : null}
-          {account.kind === 'unavailable' ? <p>{account.message}</p> : null}
+          {account.kind === 'unavailable' ? <p>{uiLabel(account.message)}</p> : null}
           {payload ? (
             <dl className="my-account-facts">
               <div><dt>로그인 이메일</dt><dd>{payload.subjectKind === 'member' ? session?.user?.email ?? '현재 세션에서 확인할 수 없습니다.' : '게스트 계정'}</dd></div>
@@ -160,7 +162,7 @@ function Detail({ panel, account, birth }: { panel: Exclude<MyPanel, null>; acco
         <>
           <h3>출생 정보</h3>
           {birth.kind === 'loading' ? <p>저장된 출생 정보를 확인하는 중입니다…</p> : null}
-          {birth.kind === 'unavailable' ? <p>{birth.message}</p> : null}
+          {birth.kind === 'unavailable' ? <p>{uiLabel(birth.message)}</p> : null}
           {birth.kind === 'ready' && !input ? <p>저장된 본인 출생 정보가 없습니다. <a className="my-detail-link" href="birth.html">출생 정보 입력하기 <MyGlyph name="arrow" /></a></p> : null}
           {input ? (
             <dl className="my-account-facts">
@@ -339,7 +341,7 @@ export function MyPage() {
 
         <footer className="my-footer">
           <span>MYEONGHA · 나를 이해하는 또 하나의 방법</span>
-          <AuthActions subjectKind={payload?.subjectKind} hasStoredMemberSession={Boolean(memberSession)} />
+          <AuthActions subjectKind={account.kind === 'unavailable' ? undefined : payload?.subjectKind} hasStoredMemberSession={account.kind === 'unavailable' ? account.hasStoredMemberSession : Boolean(memberSession)} />
         </footer>
       </div>
     </div>
