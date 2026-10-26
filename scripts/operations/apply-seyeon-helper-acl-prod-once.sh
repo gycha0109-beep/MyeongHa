@@ -7,15 +7,17 @@ readonly repo='gycha0109-beep/MyeongHa'
 readonly project='cnsfpcdiyofqvhpcegfc'
 readonly version='20261026025332'
 readonly migration='supabase/migrations/20261026025332_seyeon_chat_helper_service_role_least_privilege.sql'
-readonly expected_blob='462cf970f362550fbcfc4f6168ee6b1e0b5cf078'
+readonly expected_blob='d705f9a064c8f1c955942cc1fc60d24502fdd183'
 readonly marker='.github/ops/seyeon-helper-acl-prod-20261026.once'
-readonly expected_subject='ops(db): one-shot Se-yeon helper ACL 40232489516 40266252936'
+readonly expected_subject='ops(db): retry scoped Se-yeon helper owner revoke'
 readonly backup_run='40232489516'
 readonly restore_run='40266252936'
 readonly restore_artifact='12626875235'
 
-[[ "$GITHUB_REPOSITORY" == "$repo" && "$GITHUB_EVENT_NAME" == push &&
+[[ "$GITHUB_REPOSITORY" == "$repo" && "$GITHUB_EVENT_NAME" == workflow_dispatch &&
    "$GITHUB_REF" == refs/heads/main && "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ &&
+   "${REVIEWED_MAIN_SHA:-}" == "$GITHUB_SHA" &&
+   "${SCOPED_CONFIRMATION:-}" == 'RETRY_SCOPED_SEYEON_HELPER_OWNER_REVOKE' &&
    "$(git rev-parse HEAD)" == "$GITHUB_SHA" &&
    "$(git show -s --format=%s HEAD)" == "$expected_subject" ]] || hold SCOPE_OR_COMMIT
 [[ "$(cat "$marker")" == 'SEYEON-HELPER-ACL-PROD-20261026-40232489516-40266252936-V1' ]] || hold MARKER
@@ -25,7 +27,14 @@ readonly restore_artifact='12626875235'
 
 # The squash merge must touch ONLY these reviewed paths. No unrelated SQL.
 actual="$(git diff --name-only HEAD^ HEAD)"
-expected="$(printf '%s\n'   '.github/ops/seyeon-helper-acl-prod-20261026.once'   '.github/workflows/production-seyeon-helper-acl-one-shot.yml'   '.github/workflows/supabase-production.yml'   'docs/ci/workflow-responsibility-map.json'   'scripts/ci/db-pr-router.mjs'   'scripts/ci/db-suites.json'   'scripts/operations/apply-seyeon-helper-acl-prod-once.sh'   'supabase/migrations/20261026025332_seyeon_chat_helper_service_role_least_privilege.sql'   'test/db/run_ci_case.sh'   'test/db/seyeon_r2_helper_service_role_least_privilege.sh')"
+expected="$(printf '%s\n' \
+  '.github/workflows/production-seyeon-helper-acl-one-shot.yml' \
+  '.github/workflows/supabase-production.yml' \
+  'docs/ci/workflow-responsibility-map.json' \
+  'scripts/operations/apply-seyeon-helper-acl-prod-once.sh' \
+  'supabase/migrations/20261026025332_seyeon_chat_helper_service_role_least_privilege.sql' \
+  'test/db/run_ci_case.sh' \
+  'test/db/seyeon_r2_helper_service_role_least_privilege.sh')"
 [[ "$actual" == "$expected" ]] || hold CHANGED_PATHS
 now="$(date -u +%s)"
 point="$(date -u -d '2026-10-26T00:00:00Z' +%s)"
@@ -86,6 +95,22 @@ select case when
   and (select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace
        where n.nspname='public' and p.proname<>'assert_seyeon_chat_thread_runtime_v1'
          and p.prosrc like '%assert_seyeon_chat_thread_runtime_v1%' and not p.prosecdef)=0
+  and not pg_has_role('postgres','myeongha_seyeon_chat_runtime_owner','SET')
+  and not pg_has_role('postgres','myeongha_seyeon_chat_runtime_owner','USAGE')
+  and (select count(*) from pg_auth_members m
+       where m.roleid='myeongha_seyeon_chat_runtime_owner'::regrole
+         and m.member='postgres'::regrole)=1
+  and exists(select 1 from pg_auth_members m
+       where m.roleid='myeongha_seyeon_chat_runtime_owner'::regrole
+         and m.member='postgres'::regrole
+         and m.grantor='supabase_admin'::regrole
+         and m.admin_option and not m.inherit_option and not m.set_option)
+  and (select count(*) from pg_proc p,
+       lateral aclexplode(p.proacl) a
+       where p.oid='public.assert_seyeon_chat_thread_runtime_v1(uuid,uuid)'::regprocedure
+         and a.grantee='service_role'::regrole
+         and a.grantor='myeongha_seyeon_chat_runtime_owner'::regrole
+         and a.privilege_type='EXECUTE' and not a.is_grantable)=1
 then 'EXACT_SCOPE_OK' else 'HOLD' end;
 SQL
 )"
@@ -107,6 +132,16 @@ select case when
   and not has_function_privilege('authenticated','public.assert_seyeon_chat_thread_runtime_v1(uuid,uuid)','EXECUTE')
   and not has_function_privilege('myeongha_api_executor','public.assert_seyeon_chat_thread_runtime_v1(uuid,uuid)','EXECUTE')
   and has_function_privilege('myeongha_seyeon_chat_runtime_owner','public.assert_seyeon_chat_thread_runtime_v1(uuid,uuid)','EXECUTE')
+  and not pg_has_role('postgres','myeongha_seyeon_chat_runtime_owner','SET')
+  and not pg_has_role('postgres','myeongha_seyeon_chat_runtime_owner','USAGE')
+  and (select count(*) from pg_auth_members m
+       where m.roleid='myeongha_seyeon_chat_runtime_owner'::regrole
+         and m.member='postgres'::regrole)=1
+  and exists(select 1 from pg_auth_members m
+       where m.roleid='myeongha_seyeon_chat_runtime_owner'::regrole
+         and m.member='postgres'::regrole
+         and m.grantor='supabase_admin'::regrole
+         and m.admin_option and not m.inherit_option and not m.set_option)
 then 'SCOPED_ACL_AND_MIGRATION_REGISTERED' else 'HOLD' end;
 SQL
 )"

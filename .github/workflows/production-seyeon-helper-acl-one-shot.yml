@@ -2,11 +2,16 @@ name: Se-yeon Scoped Helper ACL One-Shot
 run-name: "[WT:db-authority-core] Scoped helper service_role revoke"
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - '.github/ops/seyeon-helper-acl-prod-20261026.once'
+  workflow_dispatch:
+    inputs:
+      reviewed_main_sha:
+        description: Exact reviewed and merged main commit SHA (40 lowercase hex)
+        required: true
+        type: string
+      confirmation:
+        description: Enter RETRY_SCOPED_SEYEON_HELPER_OWNER_REVOKE
+        required: true
+        type: string
 
 permissions:
   actions: read
@@ -27,6 +32,8 @@ jobs:
       SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
       SUPABASE_PRODUCTION_SESSION_POOLER_HOST: ${{ secrets.SUPABASE_PRODUCTION_SESSION_POOLER_HOST }}
       GH_TOKEN: ${{ github.token }}
+      REVIEWED_MAIN_SHA: ${{ inputs.reviewed_main_sha }}
+      SCOPED_CONFIRMATION: ${{ inputs.confirmation }}
     steps:
       - name: Checkout exact one-shot merge
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

@@ -57,7 +57,7 @@ apply_pg17_migrations_through_seyeon_production_frontier() {
               hold_reason='HOLD_R2_ZERO_REVEAL_SQL_FINGERPRINT_DRIFT'
               ;;
             20261026025332_seyeon_chat_helper_service_role_least_privilege.sql)
-              reviewed_blob_sha1='462cf970f362550fbcfc4f6168ee6b1e0b5cf078'
+              reviewed_blob_sha1='d705f9a064c8f1c955942cc1fc60d24502fdd183'
               hold_reason='HOLD_R2_CHAT_HELPER_ACL_SQL_FINGERPRINT_DRIFT'
               ;;
           esac
