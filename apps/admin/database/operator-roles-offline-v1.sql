@@ -38,7 +38,7 @@ grant select (id, subject_id, source_kind, source_ref, credits_issued, credits_r
   on public.chat_credit_lots_v1 to myeongha_admin_reader;
 grant select (id, subject_id, required_credits, state, delivered_turn_id, created_at, finalized_at)
   on public.chat_credit_turn_reservations_v1 to myeongha_admin_reader;
-grant select (created_at, subject_id, stage, model, status, input_tokens, output_tokens, latency_ms)
+grant select (id, created_at, subject_id, stage, model, status, error_code, input_tokens, output_tokens, latency_ms)
   on public.ai_execution_logs to myeongha_admin_reader;
 grant select (created_at, subject_id, phase, model_key, outcome, cost_status, estimated_cost_micro_usd)
   on public.seyeon_ai_call_cost_events to myeongha_admin_reader;

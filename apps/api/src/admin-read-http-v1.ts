@@ -41,6 +41,7 @@ const ROUTES: Readonly<Record<string, AdminReadKindV1>> = {
   'credit-reservations': 'credit-reservations',
   readings: 'readings',
   'ai-costs': 'ai-costs',
+  'ai-errors': 'ai-errors',
   'ai-estimates': 'ai-estimates',
   catalog: 'catalog',
   characters: 'characters',

@@ -44,6 +44,8 @@ describe('admin dedicated readonly PostgreSQL adapter', () => {
     await expect(h.port.read(filters('analytics'))).rejects.toThrow();
     expect(ADMIN_READ_SQL_V1['credit-reservations']).toContain('public.chat_credit_turn_reservations_v1');
     expect(ADMIN_READ_SQL_V1['credit-reservations']).toContain('r.required_credits');
+    expect(ADMIN_READ_SQL_V1['ai-errors']).toContain("l.status IN ('failed','blocked')");
+    expect(ADMIN_READ_SQL_V1['ai-errors']).not.toContain('output_ref_jsonb');
     expect(h.sql.at(-1)).toBe('ROLLBACK');
     expect(Object.values(ADMIN_READ_SQL_V1).filter(Boolean)
       .every(query => !/verified_payload_jsonb|request_snapshot_jsonb|event_jsonb|payload_jsonb|birth_input/iu.test(query!)))
