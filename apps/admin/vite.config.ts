@@ -13,6 +13,10 @@ export default defineConfig({
     host: '127.0.0.1',
     port: 4184,
     strictPort: true,
+    proxy: {
+      '/api/admin': { target: 'http://127.0.0.1:4185', changeOrigin: true },
+      '/api/auth/sign-in': { target: 'http://127.0.0.1:4185', changeOrigin: true },
+    },
   },
   preview: {
     host: '127.0.0.1',
