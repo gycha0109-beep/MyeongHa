@@ -440,6 +440,12 @@
       "mainMode": "one-shot-trigger",
       "workTrackAttribution": "commit-metadata"
     },
+    "seyeon-c09-gpt6-luna-five-main-once-20261026.yml": {
+      "responsibility": "character-memory-owner-approved-single-model-gpt6-luna-five-public-dialogues-once",
+      "prMode": "none",
+      "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "commit-metadata"
+    },
     "seyeon-c09-openrouter-round1-main-once-20261026.yml": {
       "responsibility": "character-memory-owner-approved-public-eight-model-five-question-openrouter-screening-once",
       "prMode": "none",
