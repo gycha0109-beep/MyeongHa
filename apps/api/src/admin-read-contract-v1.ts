@@ -27,7 +27,7 @@ export interface AdminReadPortV1 {
 
 const SAFE_COLUMNS: Readonly<Record<AdminReadKindV1, readonly string[]>> = Object.freeze({
   users: ['subjectId', 'kind', 'status', 'createdAt', 'lastActivityAt'],
-  'user-detail': ['subjectId', 'kind', 'status', 'createdAt', 'lastActivityAt', 'readingsCount', 'verifiedPurchasesCount', 'availableCredits'],
+  'user-detail': ['subjectId', 'kind', 'status', 'createdAt', 'lastActivityAt', 'readingsCount', 'verifiedPurchasesCount', 'activeEntitlementsCount', 'availableCredits'],
   commerce: ['transactionId', 'subjectId', 'productKey', 'amountMinor', 'currency', 'providerStatus', 'verifiedAt', 'entitlementStatus'],
   credits: ['eventId', 'subjectId', 'creditDelta', 'createdAt', 'eventKind', 'balanceAfter', 'correlationId'],
   readings: ['readingId', 'subjectId', 'status', 'productKey', 'domain', 'engineVersion', 'createdAt', 'errorCode'],
