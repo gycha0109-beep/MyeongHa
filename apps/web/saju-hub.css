@@ -378,21 +378,6 @@
   .saju-pillar-value strong { font-size: 25px; }
 }
 
-/* Direct real Saju Reading result, shown after a verified Birth Profile calculation. */
-.saju-overview-card { padding: 24px; display: grid; gap: 15px; }
-.saju-overview-card [role="status"] { margin: 0; color: var(--mh-ink-muted); }
-.saju-overview-result { display: grid; gap: 18px; }
-.saju-overview-section { border-bottom: 1px solid var(--mh-line-strong); padding-bottom: 14px; }
-.saju-overview-section:last-child { border-bottom: 0; padding-bottom: 0; }
-.saju-overview-section h3 { font-size: 18px; line-height: 1.5; margin: 0 0 9px; }
-.saju-overview-section p { font-size: 14px; line-height: 1.8; margin: 0 0 9px; white-space: pre-wrap; }
-.saju-overview-retry { justify-self: start; }
-@media (max-width: 767px) {
-  .saju-overview-card { padding: 20px 16px; }
-  .saju-overview-section h3 { font-size: 17px; }
-  .saju-overview-section p { font-size: 13px; }
-}
-
 /* Free canonical-calculation display and non-saleable product-scope preview. */
 .saju-free-preview-panel {
   display: grid;

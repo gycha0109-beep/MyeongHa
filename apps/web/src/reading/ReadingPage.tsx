@@ -152,7 +152,7 @@ export function ReadingPage() {
               <article className="saju-design-product-card" key={topic.title}>
                 <header><span className="saju-design-topic-symbol" aria-hidden="true">{topic.symbol}</span><h3>{topic.title}</h3></header>
                 <ul>{topic.outline.map((item) => <li key={item}>{item}</li>)}</ul>
-                <a href={topic.href}>구성 자세히 보기</a>
+                <a href={topic.href}>이 해석 선택하기</a>
               </article>
             ))}
           </div>
@@ -168,18 +168,7 @@ export function ReadingPage() {
             <p>• 예시 사용자의 명식을 바탕으로 성향과 기질을 살펴봅니다. 실제 구매 시 고객님의 사주에 맞춘 상세한 해석이 제공됩니다.</p>
           </div>
         </section>
-        <section id="saju-overview-preview" className="saju-design-overview" aria-labelledby="saju-overview-title" hidden>
-          <div className="saju-design-overview-head">
-            <div><span className="saju-design-eyebrow">SAJU READING</span><h2 id="saju-overview-title">나의 전체 사주 해석</h2><p>실제 사주 서비스에서 받은 무료 프리뷰입니다. 유료 해설과 구분됩니다.</p></div>
-            <a id="saju-overview-full" href="reading-detail.html?topic=temperament&scope=original" hidden>자세히 읽기 →</a>
-          </div>
-          <div className="saju-design-card saju-overview-card">
-            <p id="saju-overview-status" role="status" aria-live="polite">사주 해석을 불러오는 중입니다…</p>
-            <div id="saju-overview-result" className="saju-overview-result" aria-live="polite" />
-            <button id="saju-overview-retry" className="saju-primary-button saju-overview-retry" type="button" hidden>해석 다시 불러오기</button>
-            <p className="saju-design-source-note">무료 프리뷰이며, 구매권 또는 저장된 유료 해석을 의미하지 않습니다.</p>
-          </div>
-        </section>
+
         <div className="saju-design-preview-link"><span>지금 확인할 수 있는 무료 개인별 사주 프리뷰</span><a href={resumedPreview ?? 'reading-detail.html?topic=temperament&scope=original'}>무료 사주 프리뷰 열기 →</a></div>
         <details className="saju-design-more">
           <summary>다른 사주 주제 둘러보기</summary>
