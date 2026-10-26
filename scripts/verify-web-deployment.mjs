@@ -154,7 +154,7 @@ await assertExists(resolve('cloudflare/preview-worker.mjs'));
 
 for (const path of ['cloudflare/myeongha-worker.mjs', 'cloudflare/preview-worker.mjs']) {
   const source = await readFile(resolve(path), 'utf8');
-  if (!/['"]X-Robots-Tag['"]\\s*:\\s*['"]noindex, nofollow, noarchive['"]/u.test(source)) {
+  if (!/['"]X-Robots-Tag['"]\s*:\s*['"]noindex, nofollow, noarchive['"]/u.test(source)) {
     throw new Error(path + ': the unlaunched web must retain noindex security policy.');
   }
 }
