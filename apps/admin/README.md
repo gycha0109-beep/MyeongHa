@@ -32,3 +32,20 @@ React 19와 기존 web 워크스페이스에서 설치하는 Vite 8 빌드 도�
 로딩, 데이터 없음, 접근 거부, 오류에 공통 StatusPanel을 사용합니다. 뒤로 가기/앞으로 가기와 키보드 내비게이션을 지원합니다.
 
 구현 순서 정본: docs/ADMIN_IMPLEMENTATION_ROADMAP_V1.md (Admin-01 → Admin-02 → …)
+
+## 연속 구현 현황 (2026-10-26)
+
+- A0: 화면 6개, 독립 빌드, 공통 상태, 반응형 구성. 기존 사용자 웹 변경 없음.
+- A1: 서버 측 Member 검증 + Owner 허용 목록, 전용 관리자 읽기 역할 검사, 감사 writer 역할 검사, 쿼리 및 응답 필드 제한 구현. 별도 비공개 배포/DB 역할 설치 전까지 실제 활성화 금지.
+- A2: 사용자 목록과 상세 메타데이터를 조회하는 파라미터화 SQL 및 화면 검색·페이징 구현. 실운영 권한은 미연결.
+- A3: 검증 영수증 메타데이터, 가입 크레딧 지급 lot 조회 구현. 실제 결제 금액·잔여 크레딧·환불·권한 지급은 검증된 별도 계약 없으면 미표시.
+- A4: Reading 실행 상태, AI 호출 건수·토큰·지연, 별도 추정 USD 비용 이벤트 조회 구현. 원화 원가나 공급사 청구금액으로 간주 금지.
+- A5: 베타 analytics 집계 원본 미확인. 조회 비활성, 임의 퍼널 데이터 없음.
+- A6: 승인된 운영 명령 미연결. 임의 지급·환불·계정 변경 기능 없음.
+- A7: 상품 카탈로그 메타데이터 읽기 전용 조회 추가. 활성 플래그는 판매 출시 승인과 다름.
+
+### 독립 운영 접근 게이트
+
+별도 관리자 Runtime 조합은 apps/api/src/admin-private-runtime-v1.ts에만 있으며 기존 공개 api 디렉터리와 연결되지 않았습니다. 서버 환경설정에는 MYEONGHA_ADMIN_PRIVATE_ENABLED, MYEONGHA_ADMIN_OWNER_AUTH_USER_ID, MYEONGHA_ADMIN_SUPABASE_ORIGIN, MYEONGHA_SUPABASE_API_KEY가 필요합니다. 비공개 호스팅, dedicated admin reader 및 audit writer 권한/보존 정책, 감사 RLS의 설치·실증 없이 운영 데이터 조회 불가 상태를 유지합니다.
+
+오프라인 감사 스키마 후보: apps/admin/database/operator-audit-local-v1.sql. 운영 마이그레이션에 포함되지 않았습니다.

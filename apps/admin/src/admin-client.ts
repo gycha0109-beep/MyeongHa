@@ -57,7 +57,7 @@ export async function fetchAdminReadV1(
   token: string,
   fetchImpl: typeof fetch = fetch,
 ): Promise<AdminReadResponse> {
-  if (!jwtLike(token) || !/^\/api\/admin\/[a-z0-9/?=&-]+$/u.test(path)) {
+  if (!jwtLike(token) || !/^\/api\/admin\/[A-Za-z0-9/?=&-]+$/u.test(path)) {
     throw new Error('관리자 조회 경로 또는 세션이 유효하지 않습니다.');
   }
   const response = await fetchImpl(path, {

@@ -24,6 +24,11 @@ const LABELS: Record<string, string> = {
   readingsCount: 'Reading 수',
   verifiedPurchasesCount: '검증된 구매 수',
   availableCredits: '가용 크레딧',
+  eventId: '크레딧 내역 참조',
+  creditDelta: '발급 크레딧',
+  eventKind: '지급 근거',
+  balanceAfter: '지급 후 잔액',
+  correlationId: '원장 출처 참조',
   transactionId: '거래 참조',
   productKey: '상품',
   amountMinor: '검증 금액',
@@ -145,7 +150,6 @@ export function AdminWorkbench({ section, token, onSessionExpired }: {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const controller = new AbortController();
     let mounted = true;
     setLoading(true);
     setError('');
@@ -162,7 +166,6 @@ export function AdminWorkbench({ section, token, onSessionExpired }: {
       .finally(() => { if (mounted) setLoading(false); });
     return () => {
       mounted = false;
-      controller.abort();
     };
   }, [section, token, cursor, subject, detail, tab]);
 
