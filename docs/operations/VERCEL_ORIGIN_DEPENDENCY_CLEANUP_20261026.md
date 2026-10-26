@@ -96,3 +96,13 @@ Executed on the authorized local Windows PC, Docker Desktop Linux engine 29.8.2 
 - 이것은 **코드·CI 의존성 분리**이며 실제 운영 Vercel 삭제 또는 Cloudflare 릴리스 승인 증거를 대신하지 않는다. 종료 게이트 `HOLD`, 독립 E2E와 정본 버전 확인, OAuth/Guest 연속성, 롤백 및 최종 사용자 종료 승인은 기존 정책대로 남는다.
 
 Watchtower-Track: ops
+
+
+## 2026-10-26 KST — latest deployed Worker, authenticated E2E and fail-closed retirement audit
+
+- Independently queried the Cloudflare `myeongha` deployment API: latest 100% production Worker version `34eb0caa-a66f-4eb2-a869-de4ea3a98cc7` (deployment `91818edb-fdd9-456c-8184-94f6f48b7ac1`, created `2026-10-26T12:14:35Z`). Do not reuse the older #122/#123 version pins as proof for this release.
+- Dispatched the existing production-scoped authenticated Member → DB ownership/current Birth → calculation-only Saju workflow on `main`, with exact `worker_version=34eb0caa-a66f-4eb2-a869-de4ea3a98cc7`. **PASS**, run https://github.com/gycha0109-beep/MyeongHa/actions/runs/40323466700, workflow source commit `0bc93474318f1af29b1fd0adab53c31ecea0d406`. No secrets or private response data were accessed or recorded in this document.
+- From an authorized Windows execution environment, ran `node scripts/verify-cloudflare-primary-e2e.mjs` on the same canonical origin: anonymous ingress/boundary **14/14 PASS**, with expected unauthorized Member/Saju 401 and Chat security fences. Independent of the authenticated run above.
+- Ran actual read-only `node scripts/verify-vercel-retirement-readiness.mjs` using the Ops PR branch commit `d1e99ab2d07d7fe867491b516877bbf140ab3233`: **HOLD**. Canonical Cloudflare, public origin and Vercel standby all returned HTTP 200 with `userData=ready`, `sajuCalculation=ready`; Worker version remained the same for the double-check. The auditor reported all 12 `MISSING_EVIDENCE` gates because no independently attested release manifest was supplied. A live workflow PASS is not automatically converted to a manifest check flag.
+- Cloudflare API confirms 41 Worker bindings by **name and type** for this live version; actual Secret value parity is unproven. Full OAuth provider callback, production Guest→Member data continuity, full exact-release SHA provenance, rollback deployment/recovery and cutover stability observation still need independently verifiable evidence. User requested eventual Vercel retirement **after** validation; this is not unconditional authorization to bypass failing gates.
+- The Ops PR remained draft and unmerged at verification time. **No production deploy, DNS change, Worker rollback, Supabase/provider edit, Vercel pause/deletion or secret mutation was made by this verification.** Do not pause Vercel until release acceptance succeeds.
