@@ -149,11 +149,27 @@ export function createAdminReadHttpHandlerV1(deps: AdminReadHttpDependenciesV1) 
 
     let actor: { authUserId: string } | null;
     try { actor = await deps.auth.verifyOwner(request); }
-    catch { return response(503, requestId, { error: 'ADMIN_AUTH_UNAVAILABLE' }); }
+    catch {
+      try { await append(null, 'admin-auth', 'failed'); }
+      catch { return response(503, requestId, { error: 'ADMIN_AUDIT_UNAVAILABLE' }); }
+      return response(503, requestId, { error: 'ADMIN_AUTH_UNAVAILABLE' });
+    }
     if (actor === null) {
       try { await append(null, 'admin-read', 'denied'); }
       catch { return response(503, requestId, { error: 'ADMIN_AUDIT_UNAVAILABLE' }); }
       return response(403, requestId, { error: 'ADMIN_FORBIDDEN' });
+    }
+
+    const requestUrl = new URL(request.url);
+    if (requestUrl.pathname === '/api/admin/session') {
+      if (requestUrl.search !== '') {
+        try { await append(actor.authUserId, 'invalid-query', 'denied'); }
+        catch { return response(503, requestId, { error: 'ADMIN_AUDIT_UNAVAILABLE' }); }
+        return response(400, requestId, { error: 'ADMIN_BAD_REQUEST' });
+      }
+      try { await append(actor.authUserId, 'session:verify', 'allowed'); }
+      catch { return response(503, requestId, { error: 'ADMIN_AUDIT_UNAVAILABLE' }); }
+      return response(200, requestId, { authorized: true });
     }
 
     let filters: AdminListFiltersV1;

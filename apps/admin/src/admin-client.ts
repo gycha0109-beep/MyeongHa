@@ -94,3 +94,22 @@ export async function fetchAdminReadV1(
     nextCursor: payload.nextCursor,
   };
 }
+
+/** Rejects every Member session until the independent Admin Owner gate passes. */
+export async function verifyAdminOwnerSessionV1(
+  token: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<void> {
+  if (!jwtLike(token)) throw new Error('관리자 세션 자격 증명이 유효하지 않습니다.');
+  const response = await fetchImpl('/api/admin/session', {
+    method: 'GET',
+    headers: { Accept: 'application/json', Authorization: 'Bearer ' + token },
+    credentials: 'omit',
+    cache: 'no-store',
+  });
+  if (!response.ok) throw new Error('관리자 권한을 확인하지 못했습니다.');
+  const payload: unknown = await response.json();
+  if (!isRecord(payload) || payload.authorized !== true) {
+    throw new Error('관리자 권한을 확인하지 못했습니다.');
+  }
+}

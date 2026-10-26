@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
-import { fetchAdminReadV1, signInForAdminSessionV1 } from './admin-client.js';
+import { fetchAdminReadV1, signInForAdminSessionV1, verifyAdminOwnerSessionV1 } from './admin-client.js';
 import type { AdminReadResponse } from './admin-client.js';
 import type { AdminSection } from './routes.js';
 import { StatusPanel } from './StatusPanel.js';
@@ -124,6 +124,7 @@ export function AdminLogin({ onSession }: {
     setError('');
     try {
       const token = await signInForAdminSessionV1(email.trim(), password);
+      await verifyAdminOwnerSessionV1(token);
       setPassword('');
       onSession(token);
     } catch {

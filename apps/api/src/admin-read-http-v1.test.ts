@@ -57,6 +57,21 @@ function harness(options: {
 }
 
 describe('admin owner-only reads', () => {
+  it('verifies only Owner session before any data query, with required audit', async () => {
+    const allowed = harness();
+    const result = await allowed.call('/api/admin/session');
+    expect(result.status).toBe(200);
+    expect(await result.json()).toEqual({ authorized: true });
+    expect(allowed.readCount).toBe(0);
+    expect(allowed.auditEvents[0]?.action).toBe('session:verify');
+    const other = harness({ principal: 'stranger' });
+    expect((await other.call('/api/admin/session')).status).toBe(403);
+    expect((await other.call('/api/admin/session?unexpected=1')).status).toBe(403);
+    expect(other.readCount).toBe(0);
+    expect((await harness({ throwAudit: true }).call('/api/admin/session')).status).toBe(503);
+    expect((await allowed.call('/api/admin/session?unexpected=1')).status).toBe(400);
+  });
+
   it.each(['stranger', 'guest', 'missing'] as const)('rejects %s before any read', async principal => {
     const h = harness({ principal });
     const res = await h.call();
