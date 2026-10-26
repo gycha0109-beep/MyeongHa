@@ -29,7 +29,7 @@ const record=(x:unknown):x is Record<string,unknown> =>
   x!==null&&typeof x==='object'&&!Array.isArray(x);
 const id=(x:unknown):x is string =>
   typeof x==='string'&&x.length>0&&x.length<=256&&x.trim()===x &&
-  !/[\\u0000-\\u001f\\u007f]/u.test(x);
+  !/[\u0000-\u001f\u007f]/u.test(x);
 
 export interface SeyeonC08FactSlotReadKeyV1 {
   readonly subjectId:string;

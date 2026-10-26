@@ -119,6 +119,22 @@ describe('C08 immutable server-owned fact slot (offline metadata only)',()=>{
     })).rejects.toThrow('LOCAL_FACT_SLOT_AUTHORITY_UNPROVEN');
   });
 
+  it('accepts ordinary scoped ID characters but rejects control bytes before any authority read',async()=>{
+    const normal=harness();
+    // The canonical synthetic message ID includes both 'u' and '1'.
+    // Neither is a control code; a mis-escaped character class once blocked it.
+    const admitted=await admitSeyeonC08ImmutableFactSlotV1(normal.input);
+    expect(admitted.currentUserMessageId).toBe('synthetic:user-1');
+    for(const forbidden of ['\u0000','\u0009','\u000a','\u001f','\u007f']){
+      const h=harness();
+      await expect(admitSeyeonC08ImmutableFactSlotV1({
+        ...h.input,currentUserMessageId:'synthetic:user-1'+forbidden,
+      })).rejects.toThrow('LOCAL_FACT_SLOT_AUTHORITY_UNPROVEN');
+      expect(h.proofReads).toBe(0);
+      expect(h.factReads).toBe(0);
+    }
+  });
+
   it('does not accept fabricated source data or relationship events as facts',async()=>{
     const h=harness();
     const forged={...h.input,
