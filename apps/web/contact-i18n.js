@@ -8,7 +8,7 @@ export const CONTACT_STATIC_COPY_V1 = Object.freeze([
   ['← 마이페이지로 돌아가기','← マイページへ戻る','← 返回我的頁面','← Back to My Page','← 返回我的页面'],
   ['무엇을 도와드릴까요?','どのようなことでお困りですか？','需要我們協助什麼？','How can we help?','有什么可以帮助您？'],
   ['서비스 이용 중 궁금하신 점이나 불편한 점을 남겨주세요. 확인 후 입력하신 이메일로 답변드리겠습니다.','サービスについてのご質問やお困りごとをお送りください。確認後、入力したメールアドレスへ返信します。','如有服務相關疑問或問題，請留言。我們確認後將回覆至您填寫的電子郵件。','Send us your questions or issues. We will reply to the email you provide after reviewing your inquiry.','如有服务相关问题，请留言。核实后我们将回复您填写的邮箱。'],
-  ['문의 내용은 운영자에게 전달됩니다.','您的お問い合わせは運営者に届きます。','您的詢問將寄送給管理員。','Your inquiry will be delivered to the operator.','您的咨询将发送给管理员。'],
+  ['문의 내용은 운영자에게 전달됩니다.','お問い合わせ内容は運営者に届きます。','您的詢問將寄送給管理員。','Your inquiry will be delivered to the operator.','您的咨询将发送给管理员。'],
   ['계정·결제·서비스 오류 등 문의 유형을 선택하시면 내용을 파악하는 데 도움이 됩니다.','アカウント・決済・不具合などの種類を選んでください。','請選擇帳號、付款、服務錯誤等諮詢類別。','Select a topic such as account, payments, or service errors.','请选择账号、支付或服务故障等咨询类别。'],
   ['비밀번호, 인증번호, 결제카드 전체 번호 등 민감한 정보는 입력하지 마세요.','パスワード、認証コード、カード番号などの機密情報は入力しないでください。','請勿輸入密碼、驗證碼或完整信用卡號等敏感資訊。','Do not include passwords, verification codes, or full payment card numbers.','请勿输入密码、验证码或完整银行卡号等敏感信息。'],
   ['01 — 문의 접수','01 — お問い合わせ','01 — 提交詢問','01 — Contact form','01 — 提交咨询'],
