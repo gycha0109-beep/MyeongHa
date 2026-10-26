@@ -4,63 +4,84 @@ import { describe, expect, it } from 'vitest';
 const loadWeb = (path: string) =>
   readFile(new URL('../apps/web/' + path, import.meta.url), 'utf8');
 
-describe('My settings launch scope', () => {
-  it('opens actual account and support information, preserving signed-in/out actions', async () => {
+describe('My settings and approved dashboard layout', () => {
+  it('follows the approved product hierarchy without redundant redirects or Today panel', async () => {
     const page = await loadWeb('src/my/MyPage.tsx');
-    for (const expected of [
-      "useState<SettingsPanel>(null)",
-      "setOpenSettingsPanel('account')",
-      'onOpenAccount={openAccountSettings}',
-      'aria-expanded={openPanel === \'account\'}',
-      'aria-controls="my-account-panel"',
-      'aria-labelledby="my-account-panel-trigger"',
-      'aria-expanded={openPanel === \'help\'}',
-      'aria-controls="my-help-panel"',
-      'aria-labelledby="my-help-panel-trigger"',
-      '계정 관리',
+    for (const item of [
+      '마이페이지',
+      '계정 정보',
+      '캐릭터 메모리',
+      '구매 내역',
+      '내 이용권',
+      '설정 및 지원',
+      '출생 정보',
+      '화면 및 언어',
+      '문의',
+      '메모리 관리하기',
+      'MY PAGE',
+    ]) expect(page).toContain(item);
+    for (const removed of [
+      '오늘의 나',
+      '최근 이어진 것',
+      '내 흐름',
+      '호칭을 설정해주세요',
+      '<FlowSection',
+      '<RecentSection',
+      '<BirthSection',
       '도움말 · 고객지원',
-      '자주 묻는 질문',
-      '<AuthActions subjectKind={payload?.subjectKind}',
+    ]) expect(page).not.toContain(removed);
+    expect(page).toContain('my-choice-grid my-settings-grid');
+    expect(page).toContain('my-memory-section');
+  });
+
+  it('keeps real account and birth reads and signed-in/out actions', async () => {
+    const [page, client] = await Promise.all([
+      loadWeb('src/my/MyPage.tsx'),
+      loadWeb('my-runtime-client.js'),
+    ]);
+    for (const expected of [
+      'client.readProfile()',
+      'client.readBirthProfile()',
+      "payload.subjectKind === 'member'",
+      'payload.subjectStatus',
+      'readMemberSession()',
+      'session?.user?.email',
       'signOutMember()',
       "auth.html?next=my.html",
+      'WEB_MY_SESSION_REQUIRED',
+      '현재 세션 권한이 더 이상 유효하지 않아 내 정보를 표시하지 않습니다.',
     ]) expect(page).toContain(expected);
-    expect(page).not.toContain('my-setting-row is-pending');
-  });
-
-  it('uses only server-verified account fields and does not invent mutations', async () => {
-    const page = await loadWeb('src/my/MyPage.tsx');
-    const client = await loadWeb('my-runtime-client.js');
-    const config = JSON.parse(await readFile(new URL('../vercel.json', import.meta.url), 'utf8')) as {
-      rewrites?: Array<{ source: string }>;
-    };
-    for (const field of ['payload.subjectKind', 'payload.subjectStatus', 'profile?.displayName', 'session?.user?.email']) {
-      expect(page).toContain(field);
-    }
     expect(client).toContain("const DEFAULT_PROFILE_ENDPOINT = '/api/me'");
     expect(client).toContain("method: 'GET'");
-    expect(page).toContain('프로필 변경 및 회원 탈퇴 요청은 검증된 서버 절차가 연결되기 전까지');
     expect(page).not.toContain("method: 'PATCH'");
     expect(page).not.toContain("method: 'DELETE'");
-    expect(config.rewrites?.some(x => x.source === '/api/me/entitlements')).toBe(false);
-    expect(page).not.toContain('잔여 이용권 0');
-    expect(page).not.toContain('알림 켜짐');
   });
 
-  it('uses safe FAQ navigation and a responsive theme-aware panel', async () => {
+  it('shows commerce, memory and support without inventing unavailable server data', async () => {
     const [page, css] = await Promise.all([
       loadWeb('src/my/MyPage.tsx'),
       loadWeb('my.css'),
     ]);
-    expect(page).toContain('href="records.html"');
-    expect(page).toContain('href="face-reading.html"');
-    expect(page).toContain('href="auth.html?next=my.html"');
+    expect(page).toContain('캐릭터별 메모리 조회·저장 기능은 아직 연결되지 않았습니다.');
+    expect(page).toContain('구매 내역 조회가 연결되지 않았습니다.');
+    expect(page).toContain('이용권 조회가 연결되지 않았습니다.');
     expect(page).toContain('href="contact.html"');
     expect(page).toContain('<strong>문의</strong>');
-    expect(page).not.toContain('공식 문의 접수처와 약관 링크는 확인된 공개 경로가 준비되면');
-    expect(css).toContain('.my-setting-trigger:focus-visible');
-    expect(css).toContain('.my-setting-detail[hidden]');
-    expect(css).toContain('.my-account-facts');
-    expect(css).toContain('var(--mh-paper-raised)');
+    expect(page).not.toContain('관리자 문의 페이지와 접수 기능은 준비 중입니다.');
+    expect(page).not.toContain('잔여 이용권 0');
+    expect(page).not.toContain('프리미엄');
+    expect(page).not.toContain('구독 중');
+    expect(css).toContain('my-hero-art.webp');
+    expect(css).toContain('my-memory-art.webp');
+    expect(css).toContain('var(--my-paper-strong)');
     expect(css).toContain('@media (max-width: 520px)');
+  });
+
+  it('keeps theme and language actions connected to the existing header controls', async () => {
+    const page = await loadWeb('src/my/MyPage.tsx');
+    expect(page).toContain("'.product-theme-toggle'");
+    expect(page).toContain("'.ui-locale-select'");
+    expect(page).toContain("picker.dispatchEvent(new Event('change'");
+    expect(page).toContain('aria-expanded');
   });
 });

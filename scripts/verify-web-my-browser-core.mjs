@@ -209,118 +209,42 @@ let client;
 try {
   client = await connectCdp(await devtoolsPort(profile, chrome));
   await navigate(client, origin);
-  await waitFor(
-    client,
-    `document.querySelector('#my-status')?.innerText.includes('현재 세션이 필요합니다.')`,
-    'My guest/session-required state did not render',
-  );
+  await waitFor(client, 'document.querySelector(".my-account-card .my-account-meta")?.textContent.includes("현재 세션이 필요합니다.")', 'My unauthenticated state did not render');
+  const guestEntry = await client.evaluate("(() => ({ title:document.title, status:document.querySelector('.my-account-card .my-account-meta')?.textContent, accountText:document.querySelector('.my-account-section')?.textContent, login:document.querySelector('.my-auth-action')?.textContent.trim(), cards:[...document.querySelectorAll('.my-choice-card')].map(e=>e.textContent), memory:!!document.querySelector('.my-memory-section'), overflow:document.documentElement.scrollWidth-innerWidth,body:document.body.innerText }))()");
+  assert(guestEntry.title === '마이 · 명하', 'My document title differs from product shell');
+  assert(guestEntry.status?.includes('현재 세션이 필요합니다.') && guestEntry.login === '로그인하기', 'Unauthenticated account must fail closed and allow sign-in');
+  assert(guestEntry.cards.length === 5 && guestEntry.memory, 'Approved My management cards are missing');
+  assert(!guestEntry.body.includes('오늘의 나') && !guestEntry.body.includes('내 흐름'), 'Removed personal home sections resurfaced');
+  assert(!guestEntry.accountText.includes('member@example.com'), 'Member email shown without authorization');
+  assert(guestEntry.overflow <= 2, 'Desktop guest horizontal overflow');
 
-  const guestEntryState = await client.evaluate(`(() => ({
-    title: document.title,
-    contentHidden: document.querySelector('#my-content')?.hidden,
-    statusVisible: (() => { const el = document.querySelector('#my-status'); const r = el?.getBoundingClientRect(); return Boolean(r && r.width > 0 && r.height > 0 && !el.hidden); })(),
-    routeHrefs: [...document.querySelectorAll('.my-route-card')].map((el) => el.getAttribute('href')),
-    routeVisible: [...document.querySelectorAll('.my-route-card')].every((el) => { const r = el.getBoundingClientRect(); const s = getComputedStyle(el); return r.width > 0 && r.height > 70 && s.display !== 'none' && s.visibility !== 'hidden'; }),
-    bodyText: document.body.innerText,
-    overflow: document.documentElement.scrollWidth - innerWidth,
-  }))()`);
-  assert(guestEntryState.title === '마이 · 명하', `Unexpected My title: ${guestEntryState.title}`);
-  assert(guestEntryState.contentHidden === true && guestEntryState.statusVisible, 'My session-required account state is not fail-closed');
-  assert(guestEntryState.routeVisible && guestEntryState.routeHrefs.length === 3, 'My personal-home route foundation is not visibly rendered');
-  for (const href of ['reading.html', 'records.html', 'chat-hub.html']) {
-    assert(guestEntryState.routeHrefs.includes(href), `My route is missing: ${href}`);
-  }
-  assert(!guestEntryState.routeHrefs.includes('birth.html'), 'My unknown Birth state exposed the create route');
-  assert(guestEntryState.bodyText.includes('오늘의 나'), 'My today section title missing');
-  assert(guestEntryState.bodyText.includes('내 흐름'), 'My flow section title missing');
-  assert(guestEntryState.bodyText.includes('설정'), 'My settings section missing');
-  assert(guestEntryState.overflow <= 2, `My desktop guest horizontal overflow: ${guestEntryState.overflow}px`);
-
-  await client.evaluate(`(() => {
-    localStorage.setItem('myeongha.productTheme.v1', 'dark');
-    localStorage.setItem('myeongha.memberSession.v1', JSON.stringify({
-      accessToken: 'header.payload.signature',
-      refreshToken: 'refresh-token',
-      expiresAt: new Date(Date.now() + 3600000).toISOString(),
-      tokenType: 'bearer',
-      user: { id: '11111111-1111-4111-8111-111111111111', email: 'member@example.com' },
-    }));
-  })()`);
+  await client.evaluate('(() => { localStorage.setItem("myeongha.productTheme.v1","dark"); localStorage.setItem("myeongha.memberSession.v1", JSON.stringify({ accessToken:"header.payload.signature",refreshToken:"refresh-token",expiresAt:new Date(Date.now()+3600000).toISOString(),tokenType:"bearer",user:{id:"11111111-1111-4111-8111-111111111111",email:"member@example.com"} })); })()');
   await navigate(client, origin);
-  await waitFor(
-    client,
-    `document.querySelector('#my-content')?.hidden === false && document.querySelector('#my-account-email')?.textContent.trim() === 'member@example.com'`,
-    'My member account state did not render',
-  );
+  await waitFor(client, 'document.querySelector(".my-account-card .my-account-meta")?.textContent.includes("member@example.com") && document.querySelector(".my-auth-action")?.textContent.includes("로그아웃")', 'Member account did not render');
+  await client.evaluate("document.querySelector('.my-account-card').click()");
+  await waitFor(client, 'document.querySelector(".my-account-section .my-account-facts")?.textContent.includes("회원")', 'Member account detail panel did not open');
+  const member = await client.evaluate("(() => {const facts={};for(const row of document.querySelectorAll('.my-account-section .my-account-facts > div'))facts[row.querySelector('dt')?.textContent.trim()]=row.querySelector('dd')?.textContent.trim(); const box=document.querySelector('.my-account-card')?.getBoundingClientRect();return {theme:document.documentElement.dataset.theme,facts,email:document.querySelector('.my-account-card .my-account-meta')?.textContent,action:document.querySelector('.my-auth-action')?.textContent.trim(),cardWidth:box?.width,overflow:document.documentElement.scrollWidth-innerWidth}})()");
+  assert(member.theme === 'dark', 'Member dark theme did not persist');
+  assert(member.facts['계정 유형'] === '회원' && member.facts['계정 상태'] === '사용 중', 'Member authority state incorrect');
+  assert(member.email.includes('member@example.com') && member.facts['로그인 이메일'] === 'member@example.com', 'Member email failed account authority check');
+  assert(member.action === '로그아웃' && member.cardWidth > 300 && member.overflow <= 2, 'Member account card/action misrendered');
+  await capture(client,'desktop-dark-member');
 
-  const memberState = await client.evaluate(`(() => {
-    const card = document.querySelector('.my-identity-card')?.getBoundingClientRect();
-    return {
-      theme: document.documentElement.dataset.theme,
-      subjectKind: document.querySelector('#my-subject-kind')?.textContent?.trim(),
-      subjectStatus: document.querySelector('#my-subject-status')?.textContent?.trim(),
-      displayName: document.querySelector('#my-display-name')?.textContent?.trim(),
-      email: document.querySelector('#my-account-email')?.textContent?.trim(),
-      action: document.querySelector('.my-auth-action')?.textContent?.trim(),
-      cardVisible: Boolean(card && card.width > 300 && card.height > 80),
-      overflow: document.documentElement.scrollWidth - innerWidth,
-    };
-  })()`);
-  assert(memberState.theme === 'dark', 'My dark theme did not apply');
-  assert(memberState.subjectKind === '회원' && memberState.subjectStatus === '사용 중', 'My member authority state is incorrect');
-  assert(memberState.displayName === '테스트 사용자', `Unexpected My display name: ${memberState.displayName}`);
-  assert(memberState.email === 'member@example.com', `Unexpected My member email: ${memberState.email}`);
-  assert(memberState.action === '로그아웃', `Unexpected My member action: ${memberState.action}`);
-  assert(memberState.cardVisible, 'My member identity card is not visibly rendered');
-  assert(memberState.overflow <= 2, `My desktop member horizontal overflow: ${memberState.overflow}px`);
-  await capture(client, 'desktop-dark-member');
+  await client.send('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});
+  await navigate(client,origin);
+  await waitFor(client,'document.querySelector(".my-account-card .my-account-meta")?.textContent.includes("member@example.com")','Mobile member account missing');
+  const mobile=await client.evaluate("(() => {const a=document.querySelector('.my-account-card')?.getBoundingClientRect(),c=document.querySelector('.my-choice-card')?.getBoundingClientRect(),n=document.querySelector('.mobile-bottom-nav')?.getBoundingClientRect();return {overflow:document.documentElement.scrollWidth-innerWidth,account:[a?.left,a?.right],choice:[c?.left,c?.right],bottom:!!n&&n.width>0&&n.height>0&&getComputedStyle(document.querySelector('.mobile-bottom-nav')).display!=='none'};})()");
+  assert(mobile.overflow<=2 && mobile.account[0]>=0 && mobile.account[1]<=390 && mobile.choice[0]>=0 && mobile.choice[1]<=390 && mobile.bottom,'My mobile layout overflow or navigation hidden');
+  await capture(client,'mobile-dark-member');
 
-  await client.send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+  await client.evaluate('(() => {localStorage.removeItem("myeongha.memberSession.v1");sessionStorage.removeItem("myeongha.pendingGuestBearer.v1");sessionStorage.setItem("myeongha.guestBearer.v1","smoke-guest-bearer");})()');
   await navigate(client, origin);
-  await waitFor(client, `document.querySelector('#my-content')?.hidden === false`, 'My mobile member content did not render');
-  const mobileState = await client.evaluate(`(() => {
-    const identity = document.querySelector('.my-identity-card')?.getBoundingClientRect();
-    const firstRoute = document.querySelector('.my-route-card')?.getBoundingClientRect();
-    const bottom = document.querySelector('.mobile-bottom-nav')?.getBoundingClientRect();
-    return {
-      width: innerWidth,
-      overflow: document.documentElement.scrollWidth - innerWidth,
-      identityLeft: identity?.left ?? -1,
-      identityRight: identity?.right ?? 9999,
-      routeLeft: firstRoute?.left ?? -1,
-      routeRight: firstRoute?.right ?? 9999,
-      bottomVisible: Boolean(bottom && bottom.width > 0 && bottom.height > 0 && getComputedStyle(document.querySelector('.mobile-bottom-nav')).display !== 'none'),
-    };
-  })()`);
-  assert(mobileState.width === 390, `Unexpected My mobile viewport: ${mobileState.width}`);
-  assert(mobileState.overflow <= 2, `My mobile horizontal overflow: ${mobileState.overflow}px`);
-  assert(mobileState.identityLeft >= 0 && mobileState.identityRight <= 390, 'My identity card escapes mobile viewport');
-  assert(mobileState.routeLeft >= 0 && mobileState.routeRight <= 390, 'My route card escapes mobile viewport');
-  assert(mobileState.bottomVisible, 'My mobile bottom navigation is not visible');
-  await capture(client, 'mobile-dark-member');
-
-  await client.evaluate(`(() => {
-    localStorage.removeItem('myeongha.memberSession.v1');
-    sessionStorage.removeItem('myeongha.pendingGuestBearer.v1');
-    sessionStorage.setItem('myeongha.guestBearer.v1', 'smoke-guest-bearer');
-  })()`);
-  await navigate(client, origin);
-  await waitFor(
-    client,
-    `document.querySelector('#my-content')?.hidden === false && document.querySelector('#my-subject-kind')?.textContent.trim() === '게스트'`,
-    'My verified guest account state did not render',
-  );
-  const verifiedGuest = await client.evaluate(`(() => ({
-    subjectKind: document.querySelector('#my-subject-kind')?.textContent?.trim(),
-    email: document.querySelector('#my-account-email')?.textContent?.trim(),
-    action: document.querySelector('.my-auth-action')?.textContent?.trim(),
-    note: document.querySelector('#my-account-note')?.textContent?.trim(),
-  }))()`);
-  assert(verifiedGuest.subjectKind === '게스트', 'My guest subject label missing');
-  assert(verifiedGuest.email === '게스트로 둘러보는 중', 'My guest account identity missing');
-  assert(verifiedGuest.action === '계정 연결', 'My guest account-connect action missing');
-  assert(verifiedGuest.note?.includes('회원 기록으로 가정하지 않습니다.'), 'My guest/member authority boundary copy missing');
-
+  await waitFor(client,'document.querySelector(".my-account-badge")?.textContent.includes("게스트") && document.querySelector(".my-auth-action")?.textContent.includes("계정 연결")','Verified guest state did not render');
+  await client.evaluate("document.querySelector('.my-account-card').click()");
+  await waitFor(client,'document.querySelector(".my-account-section .my-account-facts")?.textContent.includes("게스트")','Guest account detail did not open');
+  const guest=await client.evaluate("(() => ({account:document.querySelector('.my-account-section')?.innerText,auth:document.querySelector('.my-auth-action')?.textContent.trim()}))()");
+  assert(guest.account.includes('게스트') && !guest.account.includes('member@example.com'), 'Guest/member isolation is broken');
+  assert(guest.auth==='계정 연결','Guest account-connect action missing');
   console.log('MyeongHa_WEB_MY_BROWSER_PASS');
 } catch (error) {
   if (chromeError.trim()) console.error(chromeError.trim());
