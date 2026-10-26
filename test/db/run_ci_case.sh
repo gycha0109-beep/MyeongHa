@@ -5,26 +5,8 @@ case_name="${1:?db CI case name is required}"
 
 bash test/db/verify_no_schema_cardinality_hardcoding.sh
 
-# Current Commerce/Owner staged migrations sit beyond the historical DB
-# authority fixtures. Do not change the frozen catalog or insert live SKUs
-# while replaying older tests. An unexpected edit must still fail closed.
-skip_staged_portone_migration_from_historical_fixture() {
-  local migration="$1"
-  local expected
-  case "${migration##*/}" in
-    20261026100200_portone_chat_credit_catalog_staged_v1.sql)
-      expected='a55bd7aa06d6625523090e997f6f76f5539abee1' ;;
-    20261026110300_owner_admin_credit_testing_v1.sql)
-      expected='186ffa2085e5922ec8319d4e5dd345a41597f3cd' ;;
-    *) return 1 ;;
-  esac
-  if [[ "$(git hash-object "$migration")" != "$expected" ]]; then
-    echo 'HOLD_STAGED_COMMERCE_SQL_FINGERPRINT_DRIFT' >&2
-    exit 1
-  fi
-  echo "Skipping reviewed post-frontier migration from historical fixture: ${migration##*/}"
-  return 0
-}
+# The same pinned staged-migration guard is shared by all historical fixtures.
+source test/db/staged_commerce_migration_policy.sh
 
 apply_standard_migrations() {
   psql -v ON_ERROR_STOP=1 -f test/db/bootstrap_supabase_auth_stub.sql
