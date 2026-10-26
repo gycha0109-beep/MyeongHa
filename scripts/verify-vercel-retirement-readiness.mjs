@@ -33,8 +33,10 @@ export function approvedRetirementPublicOriginV1(candidate) {
   if (typeof candidate !== 'string' || candidate.length > 253) return null;
   let url;
   try { url = new URL(candidate); } catch { return null; }
+  // Exact origin equality rejects embedded userinfo as well as paths and queries.
+  // Also reject the serialized userinfo separator explicitly; never accept credentials.
   if (url.protocol !== 'https:' || url.origin !== candidate ||
-      url.username || url.password || url.port || url.pathname !== '/' ||
+      url.href.includes('@') || url.port || url.pathname !== '/' ||
       url.search || url.hash) return null;
   // The already-approved canonical Worker is also a valid permanent public origin.
   if (candidate === CLOUDFLARE_ORIGIN) return candidate;

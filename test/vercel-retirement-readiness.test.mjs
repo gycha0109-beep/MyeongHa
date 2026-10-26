@@ -79,6 +79,8 @@ describe('read-only Vercel retirement gate', () => {
       'https://127.0.0.1',
       'https://localhost',
       'https://app.myeongha-release.dev:8443',
+      'https://reader:fixture@app.myeongha-release.dev',
+      'https://reader@app.myeongha-release.dev',
       'https://app.myeongha-release.dev/',
       'https://app.myeongha-release.dev/health',
     ]) expect(approvedRetirementPublicOriginV1(candidate)).toBeNull();
