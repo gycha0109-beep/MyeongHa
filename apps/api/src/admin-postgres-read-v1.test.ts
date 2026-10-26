@@ -1,0 +1,57 @@
+import { describe, expect, it } from 'vitest';
+import { ADMIN_READ_SQL_V1, createAdminPostgresReadPortV1 } from './admin-postgres-read-v1.js';
+import type { PostgresSubjectPoolV1 } from './postgres-subject-execution.js';
+import type { AdminListFiltersV1 } from './admin-read-contract-v1.js';
+
+const SUBJECT = '123e4567-e89b-42d3-a456-426614174002';
+function harness(role = 'myeongha_admin_reader', rows: Record<string, unknown>[] = []) {
+  const sql: string[] = [];
+  const params: (readonly unknown[] | undefined)[] = [];
+  const pool: PostgresSubjectPoolV1 = {
+    async connect() {
+      return {
+        async query(query: string, args?: readonly unknown[]) {
+          sql.push(query);
+          params.push(args);
+          if (query.startsWith('SELECT current_user')) return { rows: [{ currentUser: role }] };
+          if (query.startsWith('SELECT')) return { rows };
+          return { rows: [] };
+        },
+        release() {},
+      };
+    },
+  };
+  return { sql, params, port: createAdminPostgresReadPortV1({ pool }) };
+}
+const filters = (kind: AdminListFiltersV1['kind'] = 'users'): AdminListFiltersV1 =>
+  ({ kind, limit: 20, cursor: null, subjectId: null, from: null, to: null });
+
+describe('admin dedicated readonly PostgreSQL adapter', () => {
+  it('blocks ordinary subject role before querying data', async () => {
+    const h = harness('myeongha_api_executor');
+    await expect(h.port.read(filters())).rejects.toThrow('Dedicated administrative');
+    expect(h.sql).toEqual(['BEGIN READ ONLY','SELECT current_user::text AS "currentUser"','ROLLBACK']);
+  });
+  it('binds user reference and date filters only as parameters', async () => {
+    const h = harness();
+    await h.port.read({ ...filters('commerce'), subjectId: SUBJECT, from: '2026-10-01', to: '2026-10-26' });
+    expect(h.sql[2]).not.toContain(SUBJECT);
+    expect(h.sql[2]).toContain('$2::uuid');
+    expect(h.params[2]).toEqual([21, SUBJECT, '2026-10-01','2026-10-26',0]);
+  });
+  it('rejects unsupported analytics data source and excludes sensitive payloads', async () => {
+    const h = harness();
+    await expect(h.port.read(filters('analytics'))).rejects.toThrow();
+    expect(h.sql.at(-1)).toBe('ROLLBACK');
+    expect(Object.values(ADMIN_READ_SQL_V1).filter(Boolean)
+      .every(query => !/verified_payload_jsonb|request_snapshot_jsonb|event_jsonb|payload_jsonb|birth_input/iu.test(query!)))
+      .toBe(true);
+  });
+  it('provides bounded pagination', async () => {
+    const h = harness('myeongha_admin_reader',Array.from({length:3},()=>({subjectId:SUBJECT})));
+    const result = await h.port.read({ ...filters(),limit:2 });
+    expect(result.rows).toHaveLength(2);
+    expect(result.nextCursor).toBe('2');
+    await expect(h.port.read({ ...filters(), cursor:'1;DELETE' })).rejects.toThrow();
+  });
+});

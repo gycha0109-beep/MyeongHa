@@ -1,0 +1,100 @@
+import type { AdminListFiltersV1, AdminReadKindV1, AdminReadPortV1, AdminReadResultV1 } from './admin-read-contract-v1.js';
+import type { PostgresSubjectPoolV1, PostgresTransactionQueryV1 } from './postgres-subject-execution.js';
+
+export const ADMIN_READ_DB_ROLE_V1 = 'myeongha_admin_reader' as const;
+
+// Source-backed, explicitly enumerated metadata-only queries. No raw payloads.
+export const ADMIN_READ_SQL_V1: Readonly<Record<AdminReadKindV1, string | null>> = Object.freeze(
+{
+  "users": "SELECT s.id::text AS \"subjectId\", s.kind, s.status, s.created_at::text AS \"createdAt\", NULL::text AS \"lastActivityAt\" FROM public.subjects s WHERE ($2::uuid IS NULL OR s.id=$2::uuid) AND ($3::date IS NULL OR s.created_at >= $3::date) AND ($4::date IS NULL OR s.created_at < $4::date + INTERVAL '1 day') ORDER BY s.created_at DESC,s.id DESC LIMIT $1::int OFFSET $5::int",
+  "user-detail": "SELECT s.id::text AS \"subjectId\", s.kind, s.status, s.created_at::text AS \"createdAt\", NULL::text AS \"lastActivityAt\", (SELECT COUNT(*)::text FROM public.readings r WHERE r.subject_id=s.id) AS \"readingsCount\", NULL::text AS \"verifiedPurchasesCount\", NULL::text AS \"availableCredits\" FROM public.subjects s WHERE s.id=$2::uuid LIMIT 1",
+  "commerce": "SELECT r.id::text AS \"transactionId\",r.subject_id::text AS \"subjectId\",p.product_key AS \"productKey\",NULL::text AS \"amountMinor\",po.currency AS \"currency\",r.verification_status AS \"providerStatus\",r.verified_at::text AS \"verifiedAt\",NULL::text AS \"entitlementStatus\" FROM public.commerce_receipts r LEFT JOIN public.product_offers po ON po.id=r.product_offer_id LEFT JOIN public.products p ON p.id=po.product_id WHERE ($2::uuid IS NULL OR r.subject_id=$2::uuid) AND ($3::date IS NULL OR r.created_at >= $3::date) AND ($4::date IS NULL OR r.created_at < $4::date + INTERVAL '1 day') AND r.created_at >= CURRENT_TIMESTAMP - INTERVAL '90 days' ORDER BY r.created_at DESC,r.id DESC LIMIT $1::int OFFSET $5::int",
+  "credits": "SELECT lot.id::text AS \"eventId\",lot.subject_id::text AS \"subjectId\",lot.credits_issued AS \"creditDelta\",lot.issued_at::text AS \"createdAt\",lot.source_kind AS \"eventKind\",NULL::text AS \"balanceAfter\",lot.source_ref::text AS \"correlationId\" FROM public.chat_credit_lots_v1 lot WHERE ($2::uuid IS NULL OR lot.subject_id=$2::uuid) AND ($3::date IS NULL OR lot.issued_at >= $3::date) AND ($4::date IS NULL OR lot.issued_at < $4::date + INTERVAL '1 day') AND lot.issued_at >= CURRENT_TIMESTAMP - INTERVAL '90 days' ORDER BY lot.issued_at DESC,lot.id DESC LIMIT $1::int OFFSET $5::int",
+  "readings": "SELECT r.id::text AS \"readingId\",r.subject_id::text AS \"subjectId\",r.execution_status AS \"status\",NULL::text AS \"productKey\",r.saju_domain AS \"domain\",NULL::text AS \"engineVersion\",r.created_at::text AS \"createdAt\",NULL::text AS \"errorCode\" FROM public.readings r WHERE ($2::uuid IS NULL OR r.subject_id=$2::uuid) AND ($3::date IS NULL OR r.created_at >= $3::date) AND ($4::date IS NULL OR r.created_at < $4::date + INTERVAL '1 day') AND r.created_at >= CURRENT_TIMESTAMP - INTERVAL '90 days' ORDER BY r.created_at DESC,r.id DESC LIMIT $1::int OFFSET $5::int",
+  "ai-costs": "SELECT l.created_at::date::text AS \"day\",l.stage AS \"feature\",l.model AS \"model\",COUNT(*)::text AS \"requests\",COUNT(*) FILTER (WHERE l.status='success')::text AS \"successes\",COUNT(*) FILTER (WHERE l.status='failed')::text AS \"failures\",SUM(COALESCE(l.input_tokens,0)+COALESCE(l.output_tokens,0))::text AS \"totalTokens\",NULL::text AS \"costKrw\",PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY l.latency_ms) AS \"p95LatencyMs\" FROM public.ai_execution_logs l WHERE ($2::uuid IS NULL OR l.subject_id=$2::uuid) AND ($3::date IS NULL OR l.created_at >= $3::date) AND ($4::date IS NULL OR l.created_at < $4::date + INTERVAL '1 day') AND l.created_at >= CURRENT_TIMESTAMP - INTERVAL '90 days' GROUP BY l.created_at::date,l.stage,l.model ORDER BY l.created_at::date DESC,l.stage,l.model LIMIT $1::int OFFSET $5::int",
+  "analytics": null,
+  "issues": "SELECT o.id::text AS \"issueId\",o.event_type AS \"category\",NULL::text AS \"severity\",o.status AS \"status\",o.created_at::text AS \"createdAt\",NULL::text AS \"requestId\" FROM public.outbox_events o WHERE o.status IN ('failed','dead_lettered') AND ($3::date IS NULL OR o.created_at >= $3::date) AND ($4::date IS NULL OR o.created_at < $4::date + INTERVAL '1 day') AND o.created_at >= CURRENT_TIMESTAMP - INTERVAL '90 days' ORDER BY o.created_at DESC,o.id DESC LIMIT $1::int OFFSET $5::int"
+}
+);
+
+export class AdminReadAuthorityUnavailableV1 extends Error {
+  constructor() {
+    super('Dedicated administrative read authority is not available.');
+    this.name = 'AdminReadAuthorityUnavailableV1';
+  }
+}
+
+function readOffset(cursor: string | null): number {
+  if (cursor === null) return 0;
+  if (!/^[1-9]\d{0,4}$/u.test(cursor)) throw new Error('Invalid pagination cursor.');
+  const value = Number(cursor);
+  if (!Number.isSafeInteger(value) || value > 10_000) throw new Error('Pagination cursor outside bound.');
+  return value;
+}
+
+async function runQuery(
+  client: PostgresTransactionQueryV1,
+  filters: AdminListFiltersV1,
+): Promise<AdminReadResultV1> {
+  const query = ADMIN_READ_SQL_V1[filters.kind];
+  if (query === null) throw new AdminReadAuthorityUnavailableV1();
+  if (filters.kind === 'user-detail' && filters.subjectId === null) {
+    throw new Error('User detail requires an exact subject reference.');
+  }
+  const offset = readOffset(filters.cursor);
+  const amount = filters.kind === 'user-detail' ? 1 : filters.limit;
+  const result = await client.query<Record<string, unknown>>(query, [
+    amount + (filters.kind === 'user-detail' ? 0 : 1),
+    filters.subjectId, filters.from, filters.to, offset,
+  ]);
+  if (result.rows.length > amount + 1 || offset + amount > 10_050) {
+    throw new AdminReadAuthorityUnavailableV1();
+  }
+  const next = filters.kind !== 'user-detail' && result.rows.length > amount
+    ? String(offset + amount)
+    : null;
+  return Object.freeze({ rows: result.rows.slice(0, amount), nextCursor: next });
+}
+
+/**
+ * No Production connection is created by this module. Only a future approved,
+ * independently provisioned least-privilege operator connection can be injected.
+ * Fail closed for ordinary API/user/service roles and missing table authority.
+ */
+export function createAdminPostgresReadPortV1(input: {
+  readonly pool: PostgresSubjectPoolV1;
+}): AdminReadPortV1 {
+  return Object.freeze({
+    async read(filters: AdminListFiltersV1): Promise<AdminReadResultV1> {
+      const connection = await input.pool.connect();
+      let started = false;
+      let releaseError: unknown;
+      try {
+        await connection.query('BEGIN READ ONLY');
+        started = true;
+        const principal = await connection.query<{ readonly currentUser: unknown }>(
+          'SELECT current_user::text AS "currentUser"',
+        );
+        if (principal.rows.length !== 1 ||
+            principal.rows[0]?.currentUser !== ADMIN_READ_DB_ROLE_V1) {
+          throw new AdminReadAuthorityUnavailableV1();
+        }
+        const result = await runQuery(connection, filters);
+        await connection.query('COMMIT');
+        started = false;
+        return result;
+      } catch (error) {
+        if (started) {
+          try { await connection.query('ROLLBACK'); }
+          catch (rollbackError) {
+            releaseError = rollbackError;
+            throw new AggregateError([error, rollbackError], 'Admin read rollback failed.');
+          }
+        }
+        throw error;
+      } finally {
+        connection.release(releaseError);
+      }
+    },
+  });
+}
