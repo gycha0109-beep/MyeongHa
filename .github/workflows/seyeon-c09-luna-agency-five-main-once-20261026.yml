@@ -1,0 +1,69 @@
+name: '[WT:character-memory] C09 approved Luna improved persona five-case one-shot'
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/seyeon-c09-luna-agency-five-main-once-20261026.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: c09-luna-improved-five-owner-approved-20261026-once
+  cancel-in-progress: false
+
+jobs:
+  luna-improved-five:
+    if: ${{ github.repository == 'gycha0109-beep/MyeongHa' && github.ref == 'refs/heads/main' && github.event_name == 'push' && github.run_attempt == 1 && contains(github.event.head_commit.message, 'C09_LUNA_AGENCY_IMPROVED_FIVE_ONCE_20261026') }}
+    runs-on: ubuntu-24.04
+    environment: production
+    timeout-minutes: 25
+    steps:
+      - name: Checkout exact approved research runner, not production main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: '454ebbd43100a4aeab4d3529eefbfd0aad2f1db1'
+          persist-credentials: false
+
+      - name: Prepare Node.js 24
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '24'
+
+      - name: Install pinned dependencies and compile C09 prompt source
+        run: |
+          set -euo pipefail
+          npm ci --no-audit --no-fund
+          npx tsc -p tsconfig.build.json --pretty false
+
+      - name: Zero-cost exact Luna five-case preflight
+        run: |
+          set -euo pipefail
+          node --check scripts/seyeon-c09-luna-agency-five-paid-once-20261026.mjs
+          node scripts/seyeon-c09-luna-agency-five-paid-once-20261026.mjs --dry-run
+          echo 'No model requests in dry-run. Exact model, case SHA, role and budget checked.'
+
+      - name: Run approved 5 paid Luna completions maximum (USD 0.05 budget quote)
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        run: |
+          set -euo pipefail
+          set +x
+          if [ -z "$OPENROUTER_API_KEY" ]; then
+            echo '::error::OpenRouter production key unavailable. Zero paid calls dispatched.'
+            exit 2
+          fi
+          node scripts/seyeon-c09-luna-agency-five-paid-once-20261026.mjs --execute --owner-approved-c09-improved-luna-five
+
+      - name: Upload public synthetic five-case before and after results
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: c09-luna-improved-five-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            artifacts/seyeon-c09-luna-agency-five-paid-once-20261026-v1.json
+            artifacts/seyeon-c09-luna-agency-five-paid-once-20261026-v1.md
+          if-no-files-found: warn
+          retention-days: 21
