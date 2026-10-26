@@ -35,8 +35,10 @@ async function readMemberCreditWallet():Promise<CreditWalletView|null> {
   const data=envelope.data as Record<string,unknown>;
   if(typeof data.isOwnerAdmin!=='boolean'||typeof data.creditExempt!=='boolean'||
      (data.creditExempt&&!data.isOwnerAdmin)||
-     (data.availableCredits!==null&&(!Number.isSafeInteger(data.availableCredits)||
-       Number(data.availableCredits)<0)))return null;
+     (data.availableCredits!==null&&(typeof data.availableCredits!=='number'||
+       !Number.isSafeInteger(data.availableCredits)||data.availableCredits<0))||
+     (data.totalCredits!==null&&(typeof data.totalCredits!=='number'||
+       !Number.isSafeInteger(data.totalCredits)||data.totalCredits<0)))return null;
   return {isOwnerAdmin:data.isOwnerAdmin,creditExempt:data.creditExempt,
     availableCredits:data.availableCredits as number|null,
     totalCredits:data.totalCredits as number|null};
