@@ -65,6 +65,7 @@ function isolatedReaderHarness() {
   let sourceCurrent = true;
   let successfulCiphertextReads = 0;
   let commits = 0;
+  let revokePrivacyAfterSecondCommit = false;
 
   const pool = {
     async connect() {
@@ -76,6 +77,10 @@ function isolatedReaderHarness() {
             || sql === 'ROLLBACK') return { rows: [] };
           if (sql === 'COMMIT') {
             commits++;
+            // Restore/revoke can win AFTER the S6 SQL transaction has committed.
+            if (revokePrivacyAfterSecondCommit && commits === 2) {
+              privacyCurrent = false;
+            }
             return { rows: [] };
           }
           if (sql.includes('begin_member_subject_context_v1')) {
@@ -219,6 +224,7 @@ function isolatedReaderHarness() {
     get, ack, readRequest, statementLog, pending, verify,
     revokePurchase() { active = false; },
     tombstonePrivacy() { privacyCurrent = false; },
+    revokePrivacyOnSecondCommit() { revokePrivacyAfterSecondCommit = true; },
     revokeSource() { sourceCurrent = false; },
     get reads() { return successfulCiphertextReads; },
     get committedTransactions() { return commits; },
@@ -268,6 +274,11 @@ describe('S4/S7 isolated protected Reader HTTP + current-purchase + Privacy + AC
     expect(ack2.status).toBe(200);
     expect((await ack2.json()).data.replayed).toBe(true);
 
+    // Cross-member ACK cannot borrow the original subject's receipt/token.
+    const crossMemberAck = await h.ack(firstData.delivery, OTHER);
+    expect(crossMemberAck.status).toBe(404);
+    expect(h.pending.get(REQUEST_ID)?.ackAt).toBe(ACK_AT);
+
     const originalToken: string = firstData.delivery.acknowledgementToken;
     const badAck = await h.ack(firstData.delivery, SUBJECT,
       originalToken.slice(0, -1) + (originalToken.endsWith('A') ? 'B' : 'A'));
@@ -285,6 +296,17 @@ describe('S4/S7 isolated protected Reader HTTP + current-purchase + Privacy + AC
     expect(h.statementLog.join(' ')).not.toContain(PRIVATE_TEXT);
     expect(createHash('sha256').update(PRIVATE_TEXT).digest('hex'))
       .not.toBe(h.pending.get(REQUEST_ID)?.tokenHash);
+  });
+
+  it('does not leak a decrypted answer or prepare delivery when Privacy revokes during the final SQL COMMIT', async () => {
+    const h = isolatedReaderHarness();
+    h.revokePrivacyOnSecondCommit();
+    const response = await h.get();
+    expect(response.status).toBe(404);
+    expect(await response.text()).not.toContain(PRIVATE_TEXT);
+    expect(h.committedTransactions).toBe(2);
+    expect(h.reads).toBe(1);
+    expect(h.pending.size).toBe(0);
   });
 
   it('blocks cross-member, cross-marker, revoked Receipt, source revocation and Privacy restore tombstone before new plaintext release', async () => {
