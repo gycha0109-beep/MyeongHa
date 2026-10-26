@@ -16,27 +16,7 @@ revoke all on table public.myeongha_owner_administrators_v1
 alter table public.myeongha_owner_administrators_v1 enable row level security;
 alter table public.myeongha_owner_administrators_v1 force row level security;
 
--- Bootstrap only the *existing* confirmed auth user and its active Member Subject.
--- Runtime authorization later matches the UUID pair, never a user-supplied email.
-do $bootstrap$
-declare
-  v_subject uuid;
-  v_user uuid;
-begin
-  select s.id,u.id into v_subject,v_user
-  from auth.users u
-  join public.subjects s on s.auth_user_id=u.id
-  where lower(u.email)='gycha0109@gmail.com'
-    and u.email_confirmed_at is not null
-    and s.kind='member' and s.status='active';
-  if v_subject is null or v_user is null then
-    raise exception 'Owner Admin bootstrap requires an existing verified active Member';
-  end if;
-  insert into public.myeongha_owner_administrators_v1
-    (subject_id,auth_user_id,role,credit_exempt,sandbox_checkout_allowed)
-  values(v_subject,v_user,'superadmin',true,true);
-end
-$bootstrap$;
+-- Real account enrollment is a distinct production operation, not a schema migration.
 
 -- Read-only, server-only privilege classification under an already-verified
 -- canonical subject transaction. It never returns credentials or credit balance.
