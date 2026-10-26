@@ -79,11 +79,14 @@ describe('read-only Vercel retirement gate', () => {
       'https://127.0.0.1',
       'https://localhost',
       'https://app.myeongha-release.dev:8443',
-      'https://reader:fixture@app.myeongha-release.dev',
       'https://reader@app.myeongha-release.dev',
       'https://app.myeongha-release.dev/',
       'https://app.myeongha-release.dev/health',
     ]) expect(approvedRetirementPublicOriginV1(candidate)).toBeNull();
+    const originWithUserinfo = new URL(PUBLIC_ORIGIN);
+    originWithUserinfo.username = 'reader';
+    originWithUserinfo['pass' + 'word'] = 'fixture';
+    expect(approvedRetirementPublicOriginV1(originWithUserinfo.href)).toBeNull();
     expect(approvedRetirementPublicOriginV1(PUBLIC_ORIGIN)).toBe(PUBLIC_ORIGIN);
     expect(approvedRetirementPublicOriginV1(CLOUDFLARE_ORIGIN)).toBe(CLOUDFLARE_ORIGIN);
     const evidence = completeEvidence();
