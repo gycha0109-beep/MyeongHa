@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { readMemberCreditWalletV1, type CreditWalletViewV1 } from './read-credit-wallet.js';
 
 export type CreditDialogReason = 'shortage' | 'manual';
 
@@ -18,6 +19,7 @@ export function CreditRechargeDialog() {
   const openerRef = useRef<HTMLElement | null>(null);
   const seenTurnIds = useRef(new Set<string>());
   const [reason, setReason] = useState<CreditDialogReason>('manual');
+  const [wallet, setWallet] = useState<CreditWalletViewV1 | null>(null);
 
   useEffect(() => {
     const open = (nextReason: CreditDialogReason, turnId?: string) => {
@@ -29,7 +31,9 @@ export function CreditRechargeDialog() {
       if (!dialog || dialog.open) return;
       openerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
       setReason(nextReason);
+      setWallet(null);
       dialog.showModal();
+      void readMemberCreditWalletV1().then(value=>setWallet(value)).catch(()=>setWallet(null));
     };
     const manual = () => open('manual');
     const shortage = (event: Event) => {
@@ -63,10 +67,15 @@ export function CreditRechargeDialog() {
             : '크레딧 이용 정책과 충전 준비 상태를 확인해 주세요.'}
         </p>
 
-        <dl className="credit-dialog-facts">
+        {wallet === null ? (<dl className="credit-dialog-facts">
           <div><dt>현재 사용 가능한 크레딧</dt><dd>조회 미연결</dd></div>
           <div><dt>응답 1회 필요량 · 승인 정책</dt><dd>{CREDIT_POLICY.creditPerReply} 크레딧</dd></div>
-        </dl>
+        </dl>) : (
+          <dl className="credit-dialog-facts">
+            <div><dt>사용 가능 크레딧</dt><dd>{wallet.operatorFreeChat ? '운영자 무료 이용' : wallet.availableCredits + ' 크레딧'}</dd></div>
+            <div><dt>AI 답변 1회</dt><dd>{wallet.operatorFreeChat ? '크레딧 차감 없음' : wallet.requiredCredits + ' 크레딧'}</dd></div>
+          </dl>
+        )}
         <div className="credit-dialog-offer" aria-label="판매 준비 중인 충전 정책">
           <div><strong>{CREDIT_POLICY.packCredits} 크레딧</strong><span>승인된 정책 기준 · 판매 준비 중</span></div>
           <strong>{CREDIT_POLICY.referencePriceWon.toLocaleString('ko-KR')}원</strong>

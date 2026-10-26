@@ -11,6 +11,7 @@ import { tryHandleCloudflareApprovedRecordsV1 } from './cloudflare-records-api.m
 import { tryHandleCloudflareApprovedTargetPersonReadV1 } from './cloudflare-target-person-read.mjs';
 import { tryHandleCloudflareApprovedDeviceInstallationsV1 } from './cloudflare-device-installations.mjs';
 import { tryHandleCloudflareReadinessV1 } from './cloudflare-readiness.mjs';
+import { tryHandleCloudflareMemberCreditWalletV1 } from './cloudflare-chat-credit-wallet.mjs';
 import { tryHandleCloudflareGenericChatReadV1 } from './cloudflare-chat-read.mjs';
 
 // Cloudflare static preview: explicitly NOT the production API runtime.
@@ -154,6 +155,8 @@ const cloudflareRuntime = {
       return handleCloudflareStaticPreviewRequest(request);
     }
     try {
+      const walletResponse = await tryHandleCloudflareMemberCreditWalletV1(request, bindings, route);
+      if (walletResponse !== null) return walletResponse;
       const approvedAuthResponse = await tryHandleCloudflareApprovedAuthV1(request, bindings, route);
       if (approvedAuthResponse !== null) return approvedAuthResponse;
       const approvedCalculationResponse = await tryHandleCloudflareApprovedSajuCalculationV1(request, bindings, route);
