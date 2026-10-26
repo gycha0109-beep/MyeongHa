@@ -105,7 +105,6 @@ export function createAdminLoopbackServerV1(input: AdminLoopbackOptionsV1): Serv
 
   return createServer({ maxHeaderSize: 8192, requestTimeout: 10_000 },
     async (req, res) => {
-      res.setHeader('Access-Control-Allow-Origin', '');
       if (req.headers.host !== LOOPBACK + ':' + port) {
         jsonReply(res, 421, { error: 'ADMIN_LOOPBACK_HOST_REQUIRED' });
         req.resume();

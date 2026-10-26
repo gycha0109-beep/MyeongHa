@@ -51,3 +51,16 @@ React 19와 기존 web 워크스페이스에서 설치하는 Vite 8 빌드 도�
 오프라인 감사 스키마 후보: apps/admin/database/operator-audit-local-v1.sql. 운영 마이그레이션에 포함되지 않았습니다.
 
 오프라인 최소 권한 후보 SQL: apps/admin/database/operator-roles-offline-v1.sql. 위 스크립트는 로컬/격리된 검토 대상이며 운영 DB에 적용되었다는 의미가 아닙니다. 컬럼별 SELECT와 관리자 전용 RLS 정책, 감사 INSERT 전용 정책을 분리하며 운영 로그인 비밀은 코드에 저장하지 않습니다.
+
+## 로컬 전용 API 실행 (A1 실행 가능 코드)
+
+일반 사용자 API나 Production 배포에 등록하지 않는 독립 로컬 백엔드가 추가되었습니다.
+
+1. 기존처럼 관리자 프런트는 `npm run dev:admin`으로 실행합니다. Vite 개발 서버는 127.0.0.1:4184로 바인딩됩니다.
+2. 관리자 API는 `npm run serve:private -w @myeongha/admin`으로 별도 실행합니다. 127.0.0.1:4185 외 네트워크 바인딩을 거부합니다.
+3. 실행 전에 서버 환경에 `MYEONGHA_ADMIN_PRIVATE_ENABLED=true`, `MYEONGHA_ADMIN_OWNER_AUTH_USER_ID`, `MYEONGHA_ADMIN_SUPABASE_ORIGIN`, `MYEONGHA_SUPABASE_API_KEY`, `MYEONGHA_ADMIN_MEMBER_AUTH_ORIGIN`, `MYEONGHA_ADMIN_READ_DATABASE_URL`, `MYEONGHA_ADMIN_AUDIT_DATABASE_URL`, `MYEONGHA_ADMIN_DATABASE_SSL_ROOT_CERT_PEM`을 안전하게 제공해야 합니다.
+4. DB URL은 서로 다른 최소권한 PostgreSQL 로그인 `myeongha_admin_reader` / `myeongha_admin_audit_writer`로 설정하고 TLS `sslmode=verify-full` 및 고정된 Supabase Root CA를 사용합니다. 자격 증명은 Vite나 브라우저 환경에 입력하지 않습니다.
+
+로컬 인증 중계는 기존 회원 인증 API의 sign-in만 재사용하며, 응답에서 access token 외 모든 사용자 정보·Refresh token·Set-Cookie를 제거합니다. 실제 Owner 확인은 다시 Supabase 회원 검증과 허용 목록/감사 DB를 사용합니다. 기존 서비스의 로그인 제한 정책을 우회하거나 새로운 인증 정본을 만들지 않습니다. 비공개 호스팅과 DB 전용 역할이 준비되지 않았다면 API 구동을 시도하지 말고 조회 차단 상태를 유지합니다.
+
+**중요:** 아직 사용자 Production DB 접근 권한과 외부 배포가 설정되지 않았습니다. 위 커맨드는 준비된 자격증명/역할이 실제 존재할 때만 동작하며, 현재 코드 병합 자체는 허가가 아닙니다.
