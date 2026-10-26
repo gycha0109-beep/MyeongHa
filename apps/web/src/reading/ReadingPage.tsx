@@ -152,7 +152,7 @@ export function ReadingPage() {
               <article className="saju-design-product-card" key={topic.title}>
                 <header><span className="saju-design-topic-symbol" aria-hidden="true">{topic.symbol}</span><h3>{topic.title}</h3></header>
                 <ul>{topic.outline.map((item) => <li key={item}>{item}</li>)}</ul>
-                <a href={topic.href}>해석 미리보기</a>
+                <a href={topic.href}>해석 구매하기</a>
               </article>
             ))}
           </div>
