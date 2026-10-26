@@ -28,3 +28,36 @@
 
 /* Prevent the Korean source UI flashing before a saved foreign locale is applied. */
 html[data-ui-pending="true"] body { visibility: hidden !important; }
+
+
+/* Header parity: the Home/Saju desktop geometry is the shared product header
+   baseline. The locale picker's compact layout must not resize other tabs. */
+@media (min-width: 768px) {
+  body.product-page:not(.gm-page) .product-utilities {
+    gap: 14px;
+  }
+  body.product-page:not(.gm-page) .product-brand-sub {
+    letter-spacing: .12em;
+  }
+  body.product-page:not(.gm-page) .product-header-inner .product-nav-link {
+    font-size: 17px;
+  }
+}
+@media (min-width: 1100px) {
+  body.product-page:not(.gm-page) .product-header-inner {
+    grid-template-columns: 220px minmax(420px, 1fr) 220px;
+    gap: 24px;
+  }
+  body.product-page:not(.gm-page) .product-header-inner .product-nav {
+    gap: clamp(28px, 4vw, 64px);
+  }
+}
+@media (min-width: 768px) and (max-width: 1099px) {
+  body.product-page:not(.gm-page) .product-header-inner {
+    grid-template-columns: 190px minmax(0, 1fr) 160px;
+    gap: 24px;
+  }
+  body.product-page:not(.gm-page) .product-header-inner .product-nav {
+    gap: 24px;
+  }
+}
