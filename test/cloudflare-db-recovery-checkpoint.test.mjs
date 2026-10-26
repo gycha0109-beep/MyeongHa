@@ -1,5 +1,5 @@
 // Watchtower-Track: ops
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { generateKeyPairSync, privateDecrypt, pbkdf2Sync, createHmac, createHash } from 'node:crypto';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
