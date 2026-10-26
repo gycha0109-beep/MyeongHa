@@ -1,0 +1,63 @@
+name: '[WT:character-memory] C09 GPT-6 Luna 5 public dialogues paid once'
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/seyeon-c09-gpt6-luna-five-main-once-20261026.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: seyeon-c09-gpt6-luna-20261026-lifetime-once
+  cancel-in-progress: false
+
+jobs:
+  luna-public-five:
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && github.run_attempt == 1 }}
+    runs-on: ubuntu-24.04
+    environment: production
+    timeout-minutes: 18
+    steps:
+      - name: Checkout pinned public research-only runner
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: 'fc103502e61fe3e46d4494ecc5704b11cef75e56'
+          persist-credentials: false
+
+      - name: Setup Node 24
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '24'
+
+      - name: Validate unchanged five first-round case matrix without charges
+        run: |
+          set -euo pipefail
+          node --check scripts/seyeon-c09-openrouter-gpt6-luna-5x1-20261026.mjs
+          node scripts/seyeon-c09-openrouter-gpt6-luna-5x1-20261026.mjs --dry-run > /dev/null
+          echo 'GPT-6 Luna model ID, 5 fixed public prompts, no paid calls during validation.'
+
+      - name: Owner-approved GPT-6 Luna only, five chargeable calls maximum
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        run: |
+          set -euo pipefail
+          set +x
+          if [ -z "$OPENROUTER_API_KEY" ]; then
+            echo '::error::production environment OpenRouter secret unavailable; no paid calls'
+            exit 2
+          fi
+          node scripts/seyeon-c09-openrouter-gpt6-luna-5x1-20261026.mjs --execute --approved-luna-five
+
+      - name: Upload five-case public-only model outputs
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: seyeon-c09-gpt6-luna-five-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            artifacts/seyeon-c09-gpt6-luna-five-20261026-v1.json
+            artifacts/seyeon-c09-gpt6-luna-five-20261026-v1.md
+          if-no-files-found: warn
+          retention-days: 14
