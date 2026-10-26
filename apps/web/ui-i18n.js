@@ -1,4 +1,5 @@
 import { PLANNED_STATIC_UI_COPY_V1, lookupPlannedStaticUiCopyV1 } from './ui-i18n-planned-copy-v1.js';
+import { MY_STATIC_UI_COPY_V1 } from './ui-my-copy.js';
 
 // Fixed, authored web UI copy only. Chat messages, birth data, and official readings are intentionally excluded.
 // Korean is the source locale; this dictionary is not a translation service.
@@ -13,6 +14,8 @@ export function normalizeUiLocale(value) {
 
 export function translateStaticUi(source, locale) {
   if (locale === 'ko-KR') return source;
+  const myRow = MY_STATIC_UI_COPY_V1.get(source);
+  if (myRow) return myRow[locale === 'ja-JP' ? 0 : locale === 'zh-TW' ? 1 : locale === 'en-US' ? 2 : 3];
   if (locale === 'en-US' || locale === 'zh-CN') return lookupPlannedStaticUiCopyV1(source, locale) ?? source;
   const row = COPY.get(source);
   return row?.[locale === 'ja-JP' ? 0 : locale === 'zh-TW' ? 1 : -1] ?? source;
@@ -51,7 +54,7 @@ function repaintText(textNode, locale) {
   const current = textNode.nodeValue ?? '';
   const trimmed = current.trim();
   let korean = trackedText.get(textNode);
-  if (COPY.has(trimmed) || PLANNED_STATIC_UI_COPY_V1.has(trimmed)) {
+  if (COPY.has(trimmed) || PLANNED_STATIC_UI_COPY_V1.has(trimmed) || MY_STATIC_UI_COPY_V1.has(trimmed)) {
     korean = trimmed;
     trackedText.set(textNode, korean);
   } else if (!korean) {
@@ -78,7 +81,7 @@ function repaintAttributes(element, locale) {
     const current = element.getAttribute(attr);
     if (current === null) continue;
     let korean = tracked.get(attr);
-    if (COPY.has(current) || PLANNED_STATIC_UI_COPY_V1.has(current)) { korean = current; tracked.set(attr, current); }
+    if (COPY.has(current) || PLANNED_STATIC_UI_COPY_V1.has(current) || MY_STATIC_UI_COPY_V1.has(current)) { korean = current; tracked.set(attr, current); }
     else if (!korean) continue;
     else if (current !== korean && current !== translateStaticUi(korean, 'ja-JP')
       && current !== translateStaticUi(korean, 'zh-TW')

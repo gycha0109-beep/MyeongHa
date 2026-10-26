@@ -217,7 +217,7 @@ export function MyPage() {
   const payload = account.kind === 'ready' ? account.payload : null;
   const memberSession = readMemberSession();
   const memberEmail = payload?.subjectKind === 'member' ? memberSession?.user?.email ?? '로그인 이메일 확인 중' : '계정 연결이 필요합니다.';
-  const accountBadge = payload?.subjectStatus === 'deletion_pending' ? '삭제 요청 진행 중' : payload?.subjectKind === 'member' ? '회원 계정' : payload?.subjectKind === 'guest' ? '게스트' : '확인 중';
+  const accountBadge = payload?.subjectStatus === 'deletion_pending' ? '삭제 요청 진행 중' : payload?.subjectKind === 'member' ? '회원 계정' : payload?.subjectKind === 'guest' ? '게스트' : account.kind === 'unavailable' && account.login ? '로그인 필요' : '확인 중';
 
   useEffect(() => {
     let active = true;
@@ -298,7 +298,7 @@ export function MyPage() {
             <span className="my-account-avatar"><MyGlyph name="user" /></span>
             <span className="my-account-copy">
               <strong>계정 정보</strong>
-              <span className="my-account-meta">{account.kind === 'ready' ? memberEmail : '내 계정 정보를 확인하세요.'} <span className="my-account-badge">{accountBadge}</span></span>
+              <span className="my-account-meta">{account.kind === 'ready' ? memberEmail : account.kind === 'unavailable' ? uiLabel(account.message) : '내 계정 정보를 확인하세요.'} <span className="my-account-badge">{accountBadge}</span></span>
             </span>
             <span className="my-account-action">계정 정보 관리하기 <MyGlyph name="chevron" /></span>
           </button>
