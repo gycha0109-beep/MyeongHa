@@ -44,12 +44,6 @@
       "mainMode": "manual",
       "workTrackAttribution": "workflow-dispatch"
     },
-    "cloudflare-db-dedicated-credential-handoff.yml": {
-      "responsibility": "cloudflare-dedicated-db-credential-rotation",
-      "prMode": "none",
-      "mainMode": "manual",
-      "workTrackAttribution": "workflow-dispatch"
-    },
     "cloudflare-primary-e2e-member.yml": {
       "responsibility": "cloudflare-primary-member-db-saju-live-e2e",
       "prMode": "none",

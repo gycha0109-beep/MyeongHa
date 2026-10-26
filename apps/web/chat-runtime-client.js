@@ -513,6 +513,10 @@ async function sendTurn(message) {
           }));
           throw new Error('CREDIT_SHORTAGE');
         }
+        if (error.code === 'SEYEON_FIRST_REVEAL_AUTHORITY_UNAVAILABLE' ||
+            error.code === 'CREDIT_AUTHORITY_UNAVAILABLE') {
+          throw new Error('AI_TURN_NOT_YET_AVAILABLE');
+        }
         if (error.status === 403) throw new Error('MEMBER_REQUIRED');
         if (['CONTENT_INCOMPATIBLE', 'CAPABILITY_UNAVAILABLE', 'TURN_IN_FLIGHT',
           'AI_TEMPORARILY_UNAVAILABLE'].includes(error.code)) {
@@ -545,6 +549,7 @@ async function sendTurn(message) {
       TURN_IN_FLIGHT: '이전 메시지를 처리 중입니다. 잠시 후 다시 보내 주세요.',
       IDEMPOTENCY_CONFLICT: '같은 전송 식별자가 다른 내용과 충돌했습니다.',
       AI_TEMPORARILY_UNAVAILABLE: '세연의 답변 생성이 잠시 지연되고 있습니다. 다시 시도해 주세요.',
+      AI_TURN_NOT_YET_AVAILABLE: '현재 세연의 AI 메시지 전송은 운영 준비 중입니다. 크레딧 예약·정산 연결이 완료되지 않아 전송할 수 없으며, 입력한 내용은 보존했습니다.',
       INVALID_RESPONSE: '대화 서버 응답을 확인할 수 없습니다.',
       TURN_SEND_FAILED: '메시지를 보내지 못했습니다. 입력한 내용은 그대로 남아 있습니다.',
       CREDIT_SHORTAGE: '크레딧 안내를 확인해 주세요. 입력한 내용은 그대로 남아 있습니다.',
