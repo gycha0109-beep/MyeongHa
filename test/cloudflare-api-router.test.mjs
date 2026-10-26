@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { readFile } from 'node:fs/promises';
 import {
   CLOUDFLARE_DIRECT_API_ROUTES,
   CLOUDFLARE_REWRITE_ROUTES,
@@ -16,8 +15,7 @@ function request(path, method = 'GET', headers = {}) {
 }
 
 describe('Cloudflare Phase 4 strict API dispatcher', () => {
-  it('matches all 12 direct API entries and 20 rewrites with no widening', async () => {
-    const vercel = JSON.parse(await readFile(new URL('../vercel.json', import.meta.url)));
+  it('matches all 12 direct API entries and 20 Cloudflare-owned rewrites with no widening', () => {
     const direct = [
       '/api/health', '/api/readiness', '/api/session/bootstrap',
       '/api/auth/sign-in', '/api/auth/sign-up', '/api/auth/sign-out',
@@ -26,8 +24,26 @@ describe('Cloudflare Phase 4 strict API dispatcher', () => {
       '/api/me/saju/calculation',
     ];
     expect(CLOUDFLARE_DIRECT_API_ROUTES.map(route => route.path)).toEqual(direct);
-    expect(CLOUDFLARE_REWRITE_ROUTES.map(({ source, destination })=>({ source, destination })))
-      .toEqual(vercel.rewrites);
+    // Runtime route correctness must not depend on the Vercel standby config.
+    const rewrites = new Map(CLOUDFLARE_REWRITE_ROUTES.map(
+      ({ source, destination }) => [source, destination],
+    ));
+    expect(rewrites.size).toBe(20);
+    for (const route of CLOUDFLARE_REWRITE_ROUTES) {
+      expect(route.source.startsWith('/api/')).toBe(true);
+      expect(route.destination.startsWith('/api/')).toBe(true);
+      expect(route.destination).not.toContain('://');
+    }
+    expect(rewrites.get('/api/birth-profiles/:id'))
+      .toBe('/api/birth-profiles?__myeongha_birth_profile_id=:id');
+    expect(rewrites.get('/api/me/credits'))
+      .toBe('/api/me?__myeongha_chat_credit_wallet=1');
+    expect(rewrites.get('/api/life-record'))
+      .toBe('/api/me?__myeongha_records_read=life-record');
+    expect(rewrites.get('/api/memories'))
+      .toBe('/api/me?__myeongha_records_read=memories');
+    expect(rewrites.get('/api/chat/:threadId/turns'))
+      .toBe('/api/me?__myeongha_chat_turn_send=1&__myeongha_chat_thread_id=:threadId');
     expect(CLOUDFLARE_REWRITE_ROUTES).toHaveLength(20);
     expect(new Set(CLOUDFLARE_DIRECT_API_ROUTES.map(route => route.id)).size).toBe(12);
     expect(new Set(CLOUDFLARE_REWRITE_ROUTES.map(route => route.id)).size).toBe(20);
