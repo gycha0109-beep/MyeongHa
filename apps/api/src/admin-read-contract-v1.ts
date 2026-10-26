@@ -1,0 +1,72 @@
+export const ADMIN_READ_KINDS_V1 = [
+  'users', 'user-detail', 'commerce', 'credits', 'readings', 'ai-costs', 'analytics', 'issues',
+] as const;
+
+export type AdminReadKindV1 = (typeof ADMIN_READ_KINDS_V1)[number];
+
+export type AdminPrimitiveV1 = string | number | boolean | null;
+
+export interface AdminListFiltersV1 {
+  readonly kind: AdminReadKindV1;
+  readonly limit: number;
+  readonly cursor: string | null;
+  readonly subjectId: string | null;
+  readonly from: string | null;
+  readonly to: string | null;
+}
+
+export interface AdminReadResultV1 {
+  readonly rows: readonly Readonly<Record<string, unknown>>[];
+  readonly nextCursor: string | null;
+}
+
+export interface AdminReadPortV1 {
+  /** Only pre-authorized, server-owned, parameterized reads; never arbitrary SQL. */
+  read(input: AdminListFiltersV1): Promise<AdminReadResultV1>;
+}
+
+const SAFE_COLUMNS: Readonly<Record<AdminReadKindV1, readonly string[]>> = Object.freeze({
+  users: ['subjectId', 'kind', 'status', 'createdAt', 'lastActivityAt'],
+  'user-detail': ['subjectId', 'kind', 'status', 'createdAt', 'lastActivityAt', 'readingsCount', 'verifiedPurchasesCount', 'availableCredits'],
+  commerce: ['transactionId', 'subjectId', 'productKey', 'amountMinor', 'currency', 'providerStatus', 'verifiedAt', 'entitlementStatus'],
+  credits: ['eventId', 'subjectId', 'creditDelta', 'createdAt', 'eventKind', 'balanceAfter', 'correlationId'],
+  readings: ['readingId', 'subjectId', 'status', 'productKey', 'domain', 'engineVersion', 'createdAt', 'errorCode'],
+  'ai-costs': ['day', 'feature', 'model', 'requests', 'successes', 'failures', 'totalTokens', 'costKrw', 'p95LatencyMs'],
+  analytics: ['day', 'campaignKey', 'visitors', 'checkoutAttempts', 'verifiedPurchases', 'conversionRate', 'sampleSize'],
+  issues: ['issueId', 'category', 'severity', 'status', 'createdAt', 'requestId'],
+});
+
+function isSafePrimitive(v: unknown): v is AdminPrimitiveV1 {
+  return v === null || typeof v === 'string' || typeof v === 'boolean'
+    || (typeof v === 'number' && Number.isFinite(v));
+}
+
+/** An allowlisted projection, not a blind serialization of database rows. */
+export function projectAdminRowsV1(
+  kind: AdminReadKindV1,
+  result: AdminReadResultV1,
+  limit: number,
+): AdminReadResultV1 {
+  if (!Array.isArray(result.rows) || result.rows.length > limit ||
+    (result.nextCursor !== null && (typeof result.nextCursor !== 'string' ||
+    result.nextCursor.length === 0 || result.nextCursor.length > 128))) {
+    throw new Error('Administrator read authority returned an invalid page.');
+  }
+  const columns = SAFE_COLUMNS[kind];
+  const rows = result.rows.map(row => {
+    if (row === null || typeof row !== 'object' || Array.isArray(row)) {
+      throw new Error('Administrator read authority returned an invalid row.');
+    }
+    const safe: Record<string, AdminPrimitiveV1> = {};
+    for (const key of columns) {
+      const value = row[key];
+      if (value === undefined) continue;
+      if (!isSafePrimitive(value)) {
+        throw new Error('Administrator read authority returned invalid field type.');
+      }
+      safe[key] = value;
+    }
+    return Object.freeze(safe);
+  });
+  return Object.freeze({ rows: Object.freeze(rows), nextCursor: result.nextCursor });
+}
