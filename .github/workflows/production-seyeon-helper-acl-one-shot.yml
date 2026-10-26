@@ -1,0 +1,48 @@
+name: Se-yeon Scoped Helper ACL One-Shot
+run-name: "[WT:db-authority-core] Scoped helper service_role revoke"
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/ops/seyeon-helper-acl-prod-20261026.once'
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: supabase-production-migrations
+  cancel-in-progress: false
+
+jobs:
+  scoped-acl:
+    name: exact single function grant revoke and recorded migration
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: production
+    env:
+      SUPABASE_PROJECT_ID: cnsfpcdiyofqvhpcegfc
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PRODUCTION_SESSION_POOLER_HOST: ${{ secrets.SUPABASE_PRODUCTION_SESSION_POOLER_HOST }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout exact one-shot merge
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      - name: Install pinned Supabase CLI for exact version registration
+        uses: supabase/setup-cli@46f7f98c7f948ad727d22c1e67fab04c223a0520 # v3.0.0
+        with:
+          version: 2.116.0
+      - name: Install PostgreSQL client for exact ACL mutation
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client >/dev/null
+      - name: Verify exact backup/restore and apply guarded single-function migration
+        shell: bash
+        run: bash scripts/operations/apply-seyeon-helper-acl-prod-once.sh

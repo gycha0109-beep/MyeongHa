@@ -42,7 +42,7 @@ apply_pg17_migrations_through_seyeon_production_frontier() {
         20261007150457_guest_promotion_auth_fk_validation.sql|20261008043000_seyeon_manifest_acl_restore.sql)
           timestamped_count=$(( timestamped_count + 1 ))
           ;;
-        20261018190000_seyeon_locked_first_zero_source_reveal_v1.sql|20261024134543_saju_abuse_admission_runtime_authority.sql|20261024134610_saju_abuse_admission_production_policy_v1.sql|20261024135504_saju_abuse_admission_cleanup_worker_authority.sql|20261024141330_saju_abuse_admission_policy_approval_clock_v2.sql)
+        20261018190000_seyeon_locked_first_zero_source_reveal_v1.sql|20261024134543_saju_abuse_admission_runtime_authority.sql|20261024134610_saju_abuse_admission_production_policy_v1.sql|20261024135504_saju_abuse_admission_cleanup_worker_authority.sql|20261024141330_saju_abuse_admission_policy_approval_clock_v2.sql|20261026025332_seyeon_chat_helper_service_role_least_privilege.sql)
           # Post-frontier security migration is known but must NEVER be replayed
           # into the historical 1510 R2 catalog/restore authority fixture.
           # Reject a same-named modified migration instead of silently skipping.
@@ -50,7 +50,17 @@ apply_pg17_migrations_through_seyeon_production_frontier() {
           # need not include git. Compute the exact canonical Git blob SHA-1
           # with coreutils if git is missing. Windows CRLF checkout is allowed
           # ONLY when LF normalization produces the unchanged pinned SQL blob.
-          local reviewed_blob_sha1='3fbe7322cb3f11484a3e0a42bdc0598879b3d1d8'
+          local reviewed_blob_sha1 hold_reason='HOLD_R2_POST_FRONTIER_SQL_FINGERPRINT_DRIFT'
+          case "$basename" in
+            20261018190000_seyeon_locked_first_zero_source_reveal_v1.sql)
+              reviewed_blob_sha1='3fbe7322cb3f11484a3e0a42bdc0598879b3d1d8'
+              hold_reason='HOLD_R2_ZERO_REVEAL_SQL_FINGERPRINT_DRIFT'
+              ;;
+            20261026025332_seyeon_chat_helper_service_role_least_privilege.sql)
+              reviewed_blob_sha1='462cf970f362550fbcfc4f6168ee6b1e0b5cf078'
+              hold_reason='HOLD_R2_CHAT_HELPER_ACL_SQL_FINGERPRINT_DRIFT'
+              ;;
+          esac
           case "$basename" in
             20261024134543_saju_abuse_admission_runtime_authority.sql) reviewed_blob_sha1='4be88ed0003bc4db226cc2324a506183094f35ff' ;;
             20261024134610_saju_abuse_admission_production_policy_v1.sql) reviewed_blob_sha1='c9a6354ec0d1fb2c932aca1e1916e65a5c623705' ;;
@@ -75,7 +85,7 @@ apply_pg17_migrations_through_seyeon_production_frontier() {
             )"
           fi
           [[ "$local_blob_sha1" == "$reviewed_blob_sha1" ]] || {
-            echo "HOLD_R2_ZERO_REVEAL_SQL_FINGERPRINT_DRIFT" >&2; return 1;
+            echo "$hold_reason" >&2; return 1;
           }
           continue
           ;;
@@ -601,6 +611,11 @@ SQL
     node scripts/operations/verify-seyeon-r2-pending-migrations.mjs > /dev/null
     apply_pg17_migrations_through_seyeon_production_frontier
     bash test/db/seyeon_r2_h_1720_forward.sh
+    ;;
+  seyeon-r2-helper-service-role-least-privilege)
+    verify_pg17
+    apply_pg17_migrations_without_birth_authority
+    bash test/db/seyeon_r2_helper_service_role_least_privilege.sh
     ;;
   seyeon-r2-rpc-catalog)
     verify_pg17
