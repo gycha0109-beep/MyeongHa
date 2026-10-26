@@ -12,7 +12,7 @@ Node 24 / npm 11, 저장소 루트에서 의존성을 설치한 후:
 - 미리보기: npm run preview -w @myeongha/admin
 - 경로 테스트: npm run test -w @myeongha/admin
 
-기존 React 19 / Vite 8 의존성을 재사용합니다. 결과물은 apps/admin/dist에만 저장하며, 기존 apps/web → public 빌드 및 명하 Production 배포와 결합하지 않습니다.
+React 19와 기존 web 워크스페이스에서 설치하는 Vite 8 빌드 도구를 재사용합니다. 취약 버전으로 표시된 Vite를 관리자 workspace에 새 의존성으로 추가하지 않으며, 개발 서버는 127.0.0.1에서만 바인딩합니다. 결과물은 apps/admin/dist에만 저장하며, 기존 apps/web → public 빌드 및 명하 Production 배포와 결합하지 않습니다.
 
 ## 현재 보안 경계
 
