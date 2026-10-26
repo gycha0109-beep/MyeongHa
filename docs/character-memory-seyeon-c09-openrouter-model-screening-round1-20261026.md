@@ -14,14 +14,22 @@
 
 | 번호 | 모델 | ID | 공개 사이트에 표기된 가격 예시 (USD / 100만 input·output token) |
 |---:|---|---|---|
-| 1 | DeepSeek V4.1 Flash | `deepseek/deepseek-v4.1-flash` | $0.13 / $0.52 |
-| 2 | GLM 5.3 Flash | `z-ai/glm-5.3-flash` | $0.075 / $0.25 |
+| 1 | DeepSeek V4.1 Flash | `deepseek/deepseek-v4.1-flash` | $0.02 / $1.00 |
+| 2 | GLM 5.3 Flash | `z-ai/glm-5.3-flash` | $0.15 / $0.50 |
 | 3 | MiMo V2.6 Flash | `xiaomi/mimo-v2.6-flash` | $0.14 / $0.28 |
 | 4 | Qwen3.8 Flash | `qwen/qwen3.8-flash` | $0.15 / $0.47 |
 | 5 | MiniMax M3.1 Flash | `minimax/minimax-m3.1-flash` | $0.15 / $0.60 |
-| 6 | Euryale 70B | `sao10k/l3.3-euryale-70b` | $0.65 / $0.75 |
+| 6 | Euryale 70B | `sao10k/l3.3-euryale-70b` | 현재 카탈로그 ID 미존재 |
 | 7 | Hermes 4 405B | `nousresearch/hermes-4-405b` | $1.00 / $3.00 |
 | 8 | Claude Sonnet 5 | `anthropic/claude-sonnet-5` | $2.00 / $10.00 |
+
+**2026-10-26 실제 API 카탈로그 확인:** 대상 PC DESKTOP-6C3L8O4에서 OpenRouter 공개 모델 카탈로그를 조회한 결과, 현재 등록 모델 467개 중 대상 모델 8종의 정확한 ID는 7개만 확인됐다.
+
+특히 `sao10k/l3.3-euryale-70b`는 조회되지 않았다. 실제 등록된 관련 모델은 `sao10k/l3.1-euryale-70b`(입력/출력 100만 토큰당 $0.85/$0.85)다. 다른 모델 버전이므로 사용자 결정 없이 대체하지 않는다.
+
+GPT-4.1 mini 대신 OpenRouter 모델을 실험한다는 방향만 승인된 것이 아니라, 해당 8개 모델을 지정한 승인이라는 점을 보존한다. 나머지 다섯 모델(MiMo/Qwen/MiniMax/Hermes/Claude)의 등록·표시 가격은 기존 표와 일치했다.
+
+API 키는 대상 PC의 실행·사용자·시스템 환경변수와 기본 .env 탐색에서는 발견되지 않았다. 실제 유료 후보 생성 0/40회. 환경 접근 권한이나 모델 ID가 확인될 때까지 유료 시험을 시작하지 않는다.
 
 **주의:** 표의 금액은 모델 상세페이지에서 확인된 *참고 가격*이다. 실제 실행 전 `GET /api/v1/models`로 ID·당시 제시된 가격을 재확인하고, API usage와 가격으로 실사용량을 기록한다. 최신 가격, 프로바이더 할인, 실제 청구 금액과 차이가 있을 수 있다. 모델 목록에서 하나라도 빠졌거나 가격이 확인되지 않으면 **유료 요청을 시작하지 않는다.** 사용자 동의 없이 다른 모델로 대체하지 않는다.
 
