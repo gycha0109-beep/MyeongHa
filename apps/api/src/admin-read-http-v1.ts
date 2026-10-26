@@ -92,7 +92,7 @@ export function parseAdminReadFiltersV1(url: URL): AdminListFiltersV1 {
     throw new Error('Unknown administrator read route.');
   }
 
-  const allowed = new Set(['limit', 'cursor', 'subjectId', 'from', 'to']);
+  const allowed = new Set(['limit', 'cursor', 'subjectId', 'from', 'to', 'status']);
   for (const [key] of url.searchParams) {
     if (!allowed.has(key) || url.searchParams.getAll(key).length !== 1) {
       throw new Error('Unknown or duplicate administrator read parameter.');
@@ -137,8 +137,14 @@ export function parseAdminReadFiltersV1(url: URL): AdminListFiltersV1 {
     Date.parse(to + 'T00:00:00Z') - Date.parse(from + 'T00:00:00Z') > 90 * 86_400_000)) {
     throw new Error('Administrator date range exceeds policy.');
   }
+  const rawIssueStatus = url.searchParams.get('status');
+  if (rawIssueStatus !== null && (kind !== 'issues' ||
+      (rawIssueStatus !== 'failed' && rawIssueStatus !== 'dead_lettered'))) {
+    throw new Error('Invalid administrator issue status filter.');
+  }
   if (!ADMIN_READ_KINDS_V1.includes(kind)) throw new Error('Unknown administrator kind.');
-  return Object.freeze({ kind, limit, cursor, subjectId, recordId, from, to });
+  const issueStatus = rawIssueStatus as 'failed' | 'dead_lettered' | null;
+  return Object.freeze({ kind, limit, cursor, subjectId, recordId, from, to, issueStatus });
 }
 
 const ISSUE_EXPORT_COLUMNS = ['issueId', 'category', 'severity', 'status', 'createdAt', 'requestId'] as const;

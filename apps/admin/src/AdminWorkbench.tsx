@@ -79,11 +79,12 @@ function isSubjectId(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(value);
 }
 
-export function buildListPath(section: ListSection, subject: string, cursor: string | null, tab: ReadTab, from: string | null = null, to: string | null = null): string {
+export function buildListPath(section: ListSection, subject: string, cursor: string | null, tab: ReadTab, from: string | null = null, to: string | null = null, issueStatus: string = 'all'): string {
   const params = new URLSearchParams({ limit: '20' });
   if (subject.length > 0) params.set('subjectId', subject);
   if (cursor !== null) params.set('cursor', cursor);
   if (from !== null && to !== null) { params.set('from', from); params.set('to', to); }
+  if (tab === 'issues' && issueStatus !== 'all') params.set('status', issueStatus);
   return '/api/admin/' + tab + '?' + params.toString();
 }
 
@@ -168,6 +169,7 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
   const [to, setTo] = useState<string | null>(null);
   const [draftFrom, setDraftFrom] = useState('');
   const [draftTo, setDraftTo] = useState('');
+  const [issueStatus, setIssueStatus] = useState<'all' | 'failed' | 'dead_lettered'>('all');
   const [pendingSubject, setPendingSubject] = useState('');
   const [detail, setDetail] = useState<string | null>(null);
   const [result, setResult] = useState<AdminReadResponse | null>(null);
@@ -181,7 +183,7 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
     setResult(null);
     const url = detail !== null
       ? (section === 'commerce' ? '/api/admin/commerce/' : '/api/admin/users/') + detail
-      : buildListPath(section, subject, cursor, tab, from, to);
+      : buildListPath(section, subject, cursor, tab, from, to, issueStatus);
     void fetchAdminReadV1(url, token)
       .then(value => { if (mounted) setResult(value); })
       .catch(e => {
@@ -193,7 +195,7 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
     return () => {
       mounted = false;
     };
-  }, [section, token, cursor, subject, detail, tab, from, to]);
+  }, [section, token, cursor, subject, detail, tab, from, to, issueStatus]);
 
   return <section className="surface admin-data">
     <div className="surface__head">
@@ -206,6 +208,17 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
         .map(([name,label]) => <button key={name} type="button" className={tab===name ? 'active' : ''} onClick={() => { setTab(name as ReadTab); setCursor(null); setDetail(null); }}>{label}</button>)}
     </div>
     <div className="admin-toolbar">
+      {section === 'issues' && tab === 'issues' && detail === null &&
+        <label className="admin-issue-filter">이슈 상태
+          <select value={issueStatus} onChange={e => {
+            setIssueStatus(e.target.value as 'all' | 'failed' | 'dead_lettered');
+            setCursor(null);
+          }}>
+            <option value="all">전체 실패</option>
+            <option value="failed">실패</option>
+            <option value="dead_lettered">처리 중단</option>
+          </select>
+        </label>}
       {detail !== null
         ? <><button type="button" onClick={() => setDetail(null)}>목록으로</button>
             {section === 'users' && onNavigate && <><button type="button" onClick={() => onNavigate('/admin/readings?subjectId=' + detail)}>Reading 조회</button><button type="button" onClick={() => onNavigate('/admin/commerce?subjectId=' + detail)}>결제 조회</button></>}</>
@@ -228,6 +241,7 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
         onClick={() => {
           const query = new URLSearchParams({ limit: '50' });
           if (from !== null && to !== null) { query.set('from', from); query.set('to', to); }
+          if (issueStatus !== 'all') query.set('status', issueStatus);
           void fetchAdminIssuesCsvV1(token, query)
             .then(content => {
               const url = URL.createObjectURL(new Blob([content], { type: 'text/csv;charset=utf-8' }));

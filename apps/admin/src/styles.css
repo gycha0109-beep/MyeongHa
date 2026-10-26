@@ -177,3 +177,6 @@ button { cursor: pointer; }
 .operator-actions { margin-top:18px; }
 @media(max-width:1150px) { .beta-targets { grid-template-columns:repeat(3,minmax(0,1fr)); } }
 @media(max-width:520px) { .beta-targets { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+
+.admin-issue-filter { display:flex; align-items:center; gap:8px; font-size:11px; color:#53627a; }
+.admin-issue-filter select { padding:10px 12px; background:#fff; border:1px solid #d8deea; border-radius:6px; color:#233248; }

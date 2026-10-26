@@ -128,7 +128,7 @@ export async function fetchAdminIssuesCsvV1(
   fetchImpl: typeof fetch = fetch,
 ): Promise<string> {
   if (!jwtLike(token)) throw new Error('관리자 세션이 유효하지 않습니다.');
-  const allowed = new Set(['limit', 'cursor', 'from', 'to']);
+  const allowed = new Set(['limit', 'cursor', 'from', 'to', 'status']);
   for (const key of query.keys()) if (!allowed.has(key)) throw new Error('허용되지 않은 내보내기 조건입니다.');
   const res = await fetchImpl('/api/admin/issues.csv?' + query.toString(), {
     method: 'GET',

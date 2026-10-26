@@ -12,6 +12,7 @@ export interface AdminListFiltersV1 {
   readonly cursor: string | null;
   readonly subjectId: string | null;
   readonly recordId?: string | null;
+  readonly issueStatus?: 'failed' | 'dead_lettered' | null;
   readonly from: string | null;
   readonly to: string | null;
 }

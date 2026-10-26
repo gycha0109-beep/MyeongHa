@@ -37,7 +37,7 @@ describe('admin dedicated readonly PostgreSQL adapter', () => {
     await h.port.read({ ...filters('commerce'), subjectId: SUBJECT, from: '2026-10-01', to: '2026-10-26' });
     expect(h.sql[2]).not.toContain(SUBJECT);
     expect(h.sql[2]).toContain('$2::uuid');
-    expect(h.params[2]).toEqual([21, SUBJECT, '2026-10-01','2026-10-26',0]);
+    expect(h.params[2]).toEqual([21, SUBJECT, '2026-10-01','2026-10-26',0,null,null]);
   });
   it('rejects unsupported analytics data source and excludes sensitive payloads', async () => {
     const h = harness();
@@ -53,7 +53,7 @@ describe('admin dedicated readonly PostgreSQL adapter', () => {
     await h.port.read({ ...filters('commerce-detail'), recordId: receiptId });
     expect(h.sql[2]).toContain('r.id=$6::uuid');
     expect(h.sql[2]).not.toContain(receiptId);
-    expect(h.params[2]).toEqual([1, null, null, null, 0, receiptId]);
+    expect(h.params[2]).toEqual([1, null, null, null, 0, receiptId, null]);
   });
   it('counts only authority-backed active Members and 7-day verified operations', async () => {
     const sql = ADMIN_READ_SQL_V1.overview ?? '';
