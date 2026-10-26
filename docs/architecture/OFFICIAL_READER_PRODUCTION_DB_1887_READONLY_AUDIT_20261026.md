@@ -36,6 +36,18 @@ Use `scripts/operations/seyeon-r2-rpc-per-function-parity-readonly.sql` in both 
 
 **Classification:** `HOLD_R2_PRODUCTION_REPO_DDL_PARITY_UNVERIFIED`. The 19 raw-function-body differences are isolated to whitespace characters by the stripped-whitespace fingerprint, but stripping whitespace can also hide differences **inside string literals**; that observation is *not* full semantic parity approval. The one **effective** ACL difference is a Production-only `service_role` EXECUTE permission for `assert_seyeon_chat_thread_runtime_v1` (3 explicit ACL EXECUTE entries in Production versus 1 in the isolated DB). Other tested non-browser roles have the same effective rights. Resolve this exact difference through an authorized forward-only ACL decision; do not silently revoke it or mistake an extra legitimate production grant for proof of compromise. The already established historical SHA is *identity evidence*, not permission to execute that historical statement again. There is no basis for blindly applying later migrations or changing Production roles.
 
+## 2026-10-26 direct-call authority decision: REMOVE EXTRA GRANT IN FORWARD MIGRATION
+
+Owner direction: check exact call path first; if `service_role` direct invocation is unnecessary, align with the original repository's least-privilege design.
+
+- Full repository exact-symbol search finds `assert_seyeon_chat_thread_runtime_v1` as an **internal PostgreSQL helper**, not in application-side SQL, PostgREST `rpc()` calls, or direct external `service_role` execution.
+- Deployed Node API uses `SET LOCAL ROLE myeongha_api_executor` and calls the narrow `cmd_*_seyeon_chat_*` functions in `apps/api/src/postgres-seyeon-production-chat-execution-v1.ts`, rather than this helper directly.
+- Connected Production `pg_proc` SELECT confirms **10/10 functions that reference this helper are `SECURITY DEFINER`**; each executes with its narrow owner (`myeongha_seyeon_chat_runtime_owner`, or `postgres` for the locked zero-source reveal), not with `service_role`. All 10 deny direct `service_role` EXECUTE. Observed browser rights on the helper remain denied.
+- Therefore the extra direct `service_role` grant is **not needed by the known runtime call graph**. This is not a claim about inaccessible external consumers.
+- New forward-only repository migration `20261026025332_seyeon_chat_helper_service_role_least_privilege.sql` revokes only this one `service_role` EXECUTE edge. It hard-stops on unexpected migration principal, function owner/SECURITY INVOKER, browser/executor privileges, any SECURITY INVOKER caller, and postcondition drift. It never rewrites `20261008090417`, moves customer data, or enables paid/AI services.
+- A disposable PostgreSQL 17 test simulated exactly the unauthorized extra grant and verified removal, API wrapper EXECUTE preservation, browser deny, owner allow, and idempotent re-application. PostgreSQL 17 and 15 full-migration Reader S7 database suites also passed.
+- **Production rollout is NOT done.** `#1887` still requires reconciled remote-only migration history, governed current-schema restore/DR gates, and an authorized exact production rollout; direct `execute_sql` against Production would bypass the official migration ledger and is not part of this work. Do not mark `authorizedForProduction` or `drReady` true.
+
 ## Governed backup / isolated restore / privacy recovery
 
 | Evidence | Observed status |

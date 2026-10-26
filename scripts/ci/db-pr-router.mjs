@@ -35,6 +35,7 @@ const commerceEntitlementPatterns = [
 ];
 
 const postgres17Patterns = [
+  /^test\/db\/seyeon_r2_helper_service_role_least_privilege\.sh$/u,
   /^test\/db\/official_reader_s7_original_delivery_ledger\.sh$/u,
   // R5/R9 exact-original-Grant tests require the named disposable PG17
   // authority-core harness. A source-only test edit must not silently skip

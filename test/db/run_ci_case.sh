@@ -595,6 +595,11 @@ SQL
     apply_pg17_migrations_through_seyeon_production_frontier
     bash test/db/seyeon_r2_h_1720_forward.sh
     ;;
+  seyeon-r2-helper-service-role-least-privilege)
+    verify_pg17
+    apply_pg17_migrations_without_birth_authority
+    bash test/db/seyeon_r2_helper_service_role_least_privilege.sh
+    ;;
   seyeon-r2-rpc-catalog)
     verify_pg17
     apply_pg17_migrations_without_birth_authority
