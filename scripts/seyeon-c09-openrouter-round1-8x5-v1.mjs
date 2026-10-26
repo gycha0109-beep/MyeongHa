@@ -110,9 +110,13 @@ if(!resp.ok)throw Error('OPENROUTER_CATALOG_HTTP_'+resp.status);
 const body=await resp.json();
 if(!Array.isArray(body.data))throw Error('OPENROUTER_CATALOG_MALFORMED');
 const catalog={};
+const missingModelIds=[];
 for(const model of MODEL_IDS){
  const m=body.data.find(x=>x.id===model);
- if(!m)throw Error('NO_PAID_CALLS_MODEL_NOT_IN_CATALOG_'+model);
+ if(!m){
+  missingModelIds.push(model);
+  continue; // No substitution or billing on unavailable models.
+ }
  const priceIn=Number(m.pricing?.prompt),priceOut=Number(m.pricing?.completion);
  if(!Number.isFinite(priceIn)||!Number.isFinite(priceOut)||priceIn<0||priceOut<0)
   throw Error('NO_PAID_CALLS_UNQUOTABLE_MODEL_'+model);
@@ -121,10 +125,11 @@ for(const model of MODEL_IDS){
   catalogName:m.name};
 }
 catalogPrices=catalog;catalogAsOf=new Date().toISOString();
-const remaining=matrix.filter(x=>!records.some(r=>r.id===x.id));
+const remaining=matrix.filter(x=>catalog[x.model]&&!records.some(r=>r.id===x.id));
 const outstandingQuote=remaining.reduce((n,x)=>n+catalog[x.model].quotedMaxUsd,0);
 if(reservedSpend()+outstandingQuote>COST_CAP_USD)throw Error('NO_PAID_CALLS_BUDGET_EXCEEDED');
-console.log('PRECHECK',JSON.stringify({catalogVerified:MODEL_IDS.length,
+console.log('PRECHECK',JSON.stringify({catalogVerified:Object.keys(catalog).length,
+ missingModelIds,unavailablePairs:missingModelIds.length*CASE_IDS.length,
  remaining:remaining.length,maximumQuotedCostUsd:outstandingQuote,
  budgetCapUsd:COST_CAP_USD}));
 let thisInvocation=0;
@@ -202,6 +207,8 @@ for(const pair of remaining){
 }
 const result=save();
 const rows=['# 명하 세연 OpenRouter 8×5 1차 예선 결과','',
+ '사용 불가로 건너뛴 모델: '+(missingModelIds.length?missingModelIds.join(', '):'없음'),'',
+ 
  '구조화 출력 및 실제 운영 인가와는 별개의 자연어 대사 시험.','',
  '| 문항 | 모델 | 결과 | 모델 답변 | 지연(ms) | 비용(USD, 실제/추정 혼합) |',
  '|---|---|---|---|---:|---:|',
