@@ -25,7 +25,7 @@ readonly restore_artifact='12626875235'
 
 # The squash merge must touch ONLY these reviewed paths. No unrelated SQL.
 actual="$(git diff --name-only HEAD^ HEAD)"
-expected="$(printf '%s\n'   '.github/ops/seyeon-helper-acl-prod-20261026.once'   '.github/workflows/production-seyeon-helper-acl-one-shot.yml'   '.github/workflows/supabase-production.yml'   'scripts/ci/db-pr-router.mjs'   'scripts/ci/db-suites.json'   'scripts/operations/apply-seyeon-helper-acl-prod-once.sh'   'supabase/migrations/20261026025332_seyeon_chat_helper_service_role_least_privilege.sql'   'test/db/run_ci_case.sh'   'test/db/seyeon_r2_helper_service_role_least_privilege.sh')"
+expected="$(printf '%s\n'   '.github/ops/seyeon-helper-acl-prod-20261026.once'   '.github/workflows/production-seyeon-helper-acl-one-shot.yml'   '.github/workflows/supabase-production.yml'   'docs/ci/workflow-responsibility-map.json'   'scripts/ci/db-pr-router.mjs'   'scripts/ci/db-suites.json'   'scripts/operations/apply-seyeon-helper-acl-prod-once.sh'   'supabase/migrations/20261026025332_seyeon_chat_helper_service_role_least_privilege.sql'   'test/db/run_ci_case.sh'   'test/db/seyeon_r2_helper_service_role_least_privilege.sh')"
 [[ "$actual" == "$expected" ]] || hold CHANGED_PATHS
 now="$(date -u +%s)"
 point="$(date -u -d '2026-10-26T00:00:00Z' +%s)"

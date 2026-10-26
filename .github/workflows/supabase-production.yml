@@ -82,6 +82,7 @@ jobs:
               '.github/ops/seyeon-helper-acl-prod-20261026.once' \
               '.github/workflows/production-seyeon-helper-acl-one-shot.yml' \
               '.github/workflows/supabase-production.yml' \
+              'docs/ci/workflow-responsibility-map.json' \
               'scripts/ci/db-pr-router.mjs' \
               'scripts/ci/db-suites.json' \
               'scripts/operations/apply-seyeon-helper-acl-prod-once.sh' \
