@@ -106,29 +106,6 @@ html[data-theme="dark"] .saju-design-example { background:#503c45;border-color:#
 .saju-design-birth-fields > div { grid-template-columns:82px minmax(0,1fr); font-size:12px; }
  .saju-design-product-grid { grid-template-columns:1fr; }
 }
-/* Live server-authorized free preview, separate from the static paid sample. */
-.saju-design-overview { margin: 6px 35px 24px; }
-.saju-design-overview[hidden], .saju-design-overview [hidden] { display: none !important; }
-.saju-design-overview-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; }
-.saju-design-overview h2 { margin:5px 0; color:#612835; font:700 23px/1.4 var(--mh-serif,serif); }
-.saju-design-overview-head p { margin:0; color:#836e6b; font-size:12px; }
-.saju-design-overview-head a { flex:0 0 auto; color:#773c4e; font-size:12px; }
-.saju-overview-card { padding:20px; display:grid; gap:14px; }
-.saju-overview-card [role="status"] { margin:0; color:#846d67; }
-.saju-overview-result { display:grid; gap:17px; }
-.saju-overview-section { padding-bottom:12px; border-bottom:1px solid #edd9d0; }
-.saju-overview-section:last-child { padding-bottom:0; border-bottom:0; }
-.saju-overview-section h3 { margin:0 0 8px; color:#6a3441; font-size:18px; line-height:1.5; }
-.saju-overview-section p { margin:0 0 8px; color:#5e4b4a; font-size:13px; line-height:1.85; white-space:pre-wrap; }
-.saju-overview-retry { justify-self:start; padding:10px 16px; min-height:40px; }
-@media (max-width:690px) {
-  .saju-design-overview { margin:5px 18px 20px; }
-  .saju-design-overview-head { align-items:start; flex-direction:column; }
-  .saju-overview-card { padding:16px; }
-}
-html[data-theme="dark"] .saju-design-overview h2,html[data-theme="dark"] .saju-overview-section h3 { color:#f3dde0; }
-html[data-theme="dark"] .saju-overview-section p { color:#d9c5c7; }
-
 /* Secondary route discovery: keep unapproved offerings visibly non-executable. */
 .saju-design-more { margin: 0 35px 24px; border-top:1px solid #eadbd5; padding-top:12px; }
 .saju-design-more summary { color:#794054; cursor:pointer; font-size:12px; font-weight:700; padding:8px 0; }
