@@ -31,3 +31,14 @@
 ## 종료 판정
 
 정확한 Cloudflare Worker 또는 사용자 정의 도메인을 최종 공개 origin으로 선택한 다음, 해당 origin에서 독립 수락 증거를 모아 `npm run verify:vercel-retirement`의 `ELIGIBLE_FOR_MANUAL_RETIREMENT`를 확인하십시오. 실제 서비스의 Vercel 사용 중단은 최종 사용자 승인 전에는 수행하지 않습니다.
+
+
+## 2026-10-26 최종 CI / 운영 재검사 (읽기 전용)
+
+- 기존 Ops Draft PR #2597, 커밋 `7805853b2c00a4e78acace921a9bb82cc63f71f2`: 연결된 5개 워크플로 모두 완료·성공. 종합 CI: https://github.com/gycha0109-beep/MyeongHa/actions/runs/40256805729
+- `node scripts/verify-cloudflare-primary-e2e.mjs`: 익명 E2E 14/14 통과. 정적 웹, readiness 200, 무인증 Member/Saju 차단, 외부 Origin 차단, Chat 보안 HOLD를 확인. **인증된 Member 로그인·사주 실제 계산 성공 증거는 아님.**
+- `npm run audit:vercel-retirement`: 실제 Cloudflare 버전 `d0cb53be-262f-423a-8b5f-276ca35a3816`을 조회. Vercel과 Cloudflare의 `/api/readiness`는 모두 HTTP 200, `userData=ready`, `sajuCalculation=ready`.
+- Cloudflare 정본 `https://myeongha.gycha0109.workers.dev`를 공개 origin으로 **읽기 전용 자동 검증**하도록 종료 검사 기본값을 보정했습니다. 공개 Worker의 health, 12개 정적 경로, 버전 동등성 및 readiness 검증 통과. 별도 사용자 정의 도메인 필수 요구는 없습니다.
+- 그러나 종료 게이트 결과는 **`HOLD`**. 별도 증거 12종(실제 OAuth callback, 인증된 회원/DB TLS·RLS, Guest→Member, 사주 양성 경로, 보호 AI/Commerce, 배포 버전·시크릿, 롤백·안정성·최종 종료 승인 포함)은 누락 상태이며 이를 자동으로 성공 처리하지 않습니다.
+- Vercel 전용 CI/운영 스크립트는 대기 서비스 관리용으로 유지합니다. 삭제 전에 실행 대상을 옮기거나 더 이상 호출하지 않도록 절차를 종료해야 하며, 기존 EAS 바이너리/외부 제공자 설정/기존 Vercel 링크는 소스 수정만으로 이관되지 않습니다.
+- **운영 배포·DNS·Supabase/OAuth provider 설정 변경·Vercel 비활성화·PR 병합·Secret 수정 없음.** 이 재검사는 Vercel 종료 승인이 아닙니다.

@@ -139,6 +139,19 @@ describe('read-only Vercel retirement gate', () => {
   });
 
 
+  it('keeps the canonical Worker public probe independent of missing shutdown evidence', async () => {
+    const fixture = fixtureFetch();
+    const report = await runVercelRetirementAuditV1({
+      fetchImpl: fixture.fetchImpl,
+      evidence: { publicOrigin: CLOUDFLARE_ORIGIN },
+    });
+    expect(report.result).toBe('HOLD');
+    expect(report.publicDomainReadiness).toEqual(readiness());
+    expect(report.blocked).not.toContain('PUBLIC_ORIGIN_NOT_VERIFIED');
+    expect(report.blocked).toContain('MISSING_EVIDENCE:explicitFinalShutdownApproval');
+    expect(report.shutdownExecuted).toBe(false);
+  });
+
   it('accepts the existing canonical Worker without requiring a separate DNS domain', () => {
     const snapshot = happySnapshot();
     snapshot.public.origin = CLOUDFLARE_ORIGIN;

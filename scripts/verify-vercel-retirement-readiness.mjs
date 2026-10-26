@@ -125,7 +125,7 @@ export function evaluateVercelRetirementV1(snapshot, evidence = {}) {
     addBlock(blocked, 'STATIC_ROUTE_NOT_READY:' + path,
       snapshot.cloudflare.static[path] !== 200 ||
       snapshot.vercel.static[path] !== 200);
-    if (publicOrigin !== null) addBlock(blocked, 'CUSTOM_DOMAIN_STATIC_NOT_READY:' + path,
+    if (publicOrigin !== null) addBlock(blocked, 'PUBLIC_ORIGIN_STATIC_NOT_READY:' + path,
       livePublic?.static?.[path] !== 200);
   }
   // These are independent operational acceptance records, never inferred
@@ -236,7 +236,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     const args = process.argv.slice(2);
     const evidenceIndex = args.indexOf('--evidence');
     if (evidenceIndex !== -1 && !args[evidenceIndex + 1]) throw Error('Missing evidence path');
-    const evidence = evidenceIndex === -1 ? {} : parseVercelRetirementEvidenceV1(
+    const evidence = evidenceIndex === -1 ? { publicOrigin: CLOUDFLARE_ORIGIN } : parseVercelRetirementEvidenceV1(
       JSON.parse(await readFile(args[evidenceIndex + 1], 'utf8')),
     );
     const result = await runVercelRetirementAuditV1({ evidence });
