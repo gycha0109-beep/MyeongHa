@@ -1,5 +1,8 @@
 # Cloudflare → Vercel 종료 준비: Ops 코드·운영 경계
 
+
+> 2026-10-26 업데이트: 이전 Stage 9/10 문서에 기재된 **별도 사용자 정의 도메인 필수** 조건은 최신 종료 게이트에서 수정됐습니다. 정확한 승인 정본 `https://myeongha.gycha0109.workers.dev` **또는** 검증된 별도 HTTPS 사용자 도메인을 선택할 수 있습니다. 종료 승인에는 실제 E2E, 버전 동등성, 롤백 및 최종 승인이 여전히 필요합니다. 실제 제품의 Vercel 고정 주소 정리와 남은 운영 절차는 `docs/operations/VERCEL_ORIGIN_DEPENDENCY_CLEANUP_20261026.md`를 참조합니다.
+
 - 점검 시점: 2026-10-25 KST
 - 개발 출발점: main `5c95e8f9` (Cloudflare 운영 버전과 별개의 소스 SHA)
 - 범위: 읽기 전용 원격 점검 + 인증 호스트 호환성 코드. 운영 배포·DNS·Vercel·DB·Provider 설정 변경 없음.

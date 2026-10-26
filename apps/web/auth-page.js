@@ -96,6 +96,9 @@ async function startSocialAuth(provider) {
   setBusy(true);
   setStatus('');
   try {
+    if (WEB_SOCIAL_AUTH_CALLBACK_URI === null) {
+      throw new ProductAuthError('WEB_SOCIAL_AUTH_ORIGIN_UNAPPROVED', '이 주소에서는 소셜 로그인을 사용할 수 없습니다.');
+    }
     // Existing guest context is preserved. Cloudflare native Auth does not create a phantom guest.
     if (!isCloudflareHostedAuthOriginV1(location.origin)) await ensureGuestBearer();
     const guestBearer = readGuestBearer();

@@ -83,14 +83,15 @@ describe('read-only Vercel retirement gate', () => {
       'https://app.myeongha-release.dev/health',
     ]) expect(approvedRetirementPublicOriginV1(candidate)).toBeNull();
     expect(approvedRetirementPublicOriginV1(PUBLIC_ORIGIN)).toBe(PUBLIC_ORIGIN);
+    expect(approvedRetirementPublicOriginV1(CLOUDFLARE_ORIGIN)).toBe(CLOUDFLARE_ORIGIN);
     const evidence = completeEvidence();
     delete evidence.publicOrigin;
     const snapshot = happySnapshot();
     delete snapshot.public;
     const report = evaluateVercelRetirementV1(snapshot, evidence);
     expect(report.result).toBe('HOLD');
-    expect(report.blocked).toContain('CUSTOM_DOMAIN_NOT_VERIFIED');
-    expect(report.blocked).not.toContain('CUSTOM_DOMAIN_WORKER_VERSION_MISMATCH');
+    expect(report.blocked).toContain('PUBLIC_ORIGIN_NOT_VERIFIED');
+    expect(report.blocked).not.toContain('PUBLIC_ORIGIN_WORKER_VERSION_MISMATCH');
     const manifest = {
       schemaVersion: 'myeongha-vercel-retirement-evidence-v1',
       workerVersion: version, gitSha: 'a'.repeat(40),
@@ -117,11 +118,11 @@ describe('read-only Vercel retirement gate', () => {
       fetchImpl: changed, evidence: completeEvidence(),
     });
     expect(report.result).toBe('HOLD');
-    expect(report.blocked).toContain('CUSTOM_DOMAIN_WORKER_VERSION_MISMATCH');
+    expect(report.blocked).toContain('PUBLIC_ORIGIN_WORKER_VERSION_MISMATCH');
     const unready = happySnapshot();
     unready.public.ready = readiness(503, 'unready');
     const hold = evaluateVercelRetirementV1(unready, completeEvidence());
-    expect(hold.blocked).toContain('CUSTOM_DOMAIN_NOT_VERIFIED');
+    expect(hold.blocked).toContain('PUBLIC_ORIGIN_NOT_VERIFIED');
     expect(hold.shutdownExecuted).toBe(false);
   });
 
@@ -138,6 +139,22 @@ describe('read-only Vercel retirement gate', () => {
   });
 
 
+  it('accepts the existing canonical Worker without requiring a separate DNS domain', () => {
+    const snapshot = happySnapshot();
+    snapshot.public.origin = CLOUDFLARE_ORIGIN;
+    const report = evaluateVercelRetirementV1(snapshot, {
+      ...completeEvidence(),
+      publicOrigin: CLOUDFLARE_ORIGIN,
+    });
+    expect(report.result).toBe('ELIGIBLE_FOR_MANUAL_RETIREMENT');
+    expect(report.blocked).toEqual([]);
+    const missingEvidence = evaluateVercelRetirementV1(snapshot, {
+      publicOrigin: CLOUDFLARE_ORIGIN,
+    });
+    expect(missingEvidence.result).toBe('HOLD');
+    expect(missingEvidence.blocked).toContain('MISSING_EVIDENCE:explicitFinalShutdownApproval');
+  });
+
   it('requires pinned Git SHA and cited, separately attested gate evidence', () => {
     const gitSha = 'a'.repeat(40);
     const checks = Object.fromEntries(RETIREMENT_EVIDENCE.map(name => [
@@ -147,7 +164,7 @@ describe('read-only Vercel retirement gate', () => {
       schemaVersion: 'myeongha-vercel-retirement-evidence-v1',
       workerVersion: version, gitSha, publicOrigin: PUBLIC_ORIGIN, checks,
     });
-    expect(parsed.approvedCustomDomain).toBe(true);
+    expect(parsed.approvedPublicOrigin).toBe(true);
     expect(parsed.explicitFinalShutdownApproval).toBe(true);
     const snapshot = happySnapshot();
     snapshot.cloudflare.version = '223e4567-e89b-42d3-a456-426614174000';
@@ -169,7 +186,7 @@ describe('read-only Vercel retirement gate', () => {
   it('never interprets a healthy site as permission to shut down', () => {
     const report = evaluateVercelRetirementV1(happySnapshot());
     expect(report.result).toBe('HOLD');
-    expect(report.blocked).toContain('CUSTOM_DOMAIN_NOT_VERIFIED');
+    expect(report.blocked).toContain('PUBLIC_ORIGIN_NOT_VERIFIED');
     expect(report.blocked.length).toBeGreaterThan(RETIREMENT_EVIDENCE.length);
     expect(report.shutdownExecuted).toBe(false);
   });

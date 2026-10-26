@@ -7,7 +7,7 @@ import { readFile } from 'node:fs/promises';
 export const CLOUDFLARE_ORIGIN = 'https://myeongha.gycha0109.workers.dev';
 export const VERCEL_ORIGIN = 'https://myeongha.vercel.app';
 export const RETIREMENT_EVIDENCE = Object.freeze([
-  'approvedCustomDomain',
+  'approvedPublicOrigin',
   'oauthCallbackE2E',
   'memberDatabaseTlsRlsE2E',
   'guestMemberContinuityE2E',
@@ -36,6 +36,8 @@ export function approvedRetirementPublicOriginV1(candidate) {
   if (url.protocol !== 'https:' || url.origin !== candidate ||
       url.username || url.password || url.port || url.pathname !== '/' ||
       url.search || url.hash) return null;
+  // The already-approved canonical Worker is also a valid permanent public origin.
+  if (candidate === CLOUDFLARE_ORIGIN) return candidate;
   const hostname = url.hostname;
   if (!/^(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z][a-z0-9-]{1,62}$/u.test(hostname) ||
       hostname === 'myeongha.vercel.app' ||
@@ -110,13 +112,13 @@ export function evaluateVercelRetirementV1(snapshot, evidence = {}) {
     evidence.evidenceWorkerVersion !== snapshot.cloudflare.version);
   const publicOrigin = approvedRetirementPublicOriginV1(evidence.publicOrigin);
   const livePublic = snapshot.public;
-  addBlock(blocked, 'CUSTOM_DOMAIN_NOT_VERIFIED',
+  addBlock(blocked, 'PUBLIC_ORIGIN_NOT_VERIFIED',
     publicOrigin === null || livePublic?.origin !== publicOrigin ||
     livePublic?.health !== 200 || livePublic?.ready?.http !== 200 ||
     livePublic?.ready?.status !== 'ready' ||
     livePublic?.ready?.userData !== 'ready' ||
     livePublic?.ready?.sajuCalculation !== 'ready');
-  if (publicOrigin !== null) addBlock(blocked, 'CUSTOM_DOMAIN_WORKER_VERSION_MISMATCH',
+  if (publicOrigin !== null) addBlock(blocked, 'PUBLIC_ORIGIN_WORKER_VERSION_MISMATCH',
     livePublic?.version !== snapshot.cloudflare.version ||
     livePublic?.confirmationVersion !== snapshot.cloudflare.confirmationVersion);
   for (const path of STATIC_PAGES) {

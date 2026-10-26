@@ -41,6 +41,21 @@ function tokenRequest(code: string, extra: Record<string, string> = {}, basic = 
 }
 
 describe('Naver OAuth transport bridge', () => {
+  it('uses the canonical Cloudflare callback without a Vercel hop', async () => {
+    const workerOrigin = 'https://myeongha.gycha0109.workers.dev';
+    const request = new Request(workerOrigin + '/api/auth/social/naver/authorize' + authQuery());
+    const response = await handleNaverOAuthBridgeRequestV1({
+      request, action: 'authorize', env, nowEpochMs: () => now,
+    });
+    expect(response.status).toBe(302);
+    expect(new URL(response.headers.get('Location')!).searchParams.get('redirect_uri'))
+      .toBe(workerOrigin + '/api/auth/social/naver/callback');
+    const wrongHost = new Request('https://preview.unapproved.test/api/auth/social/naver/authorize' + authQuery());
+    const rejected = await handleNaverOAuthBridgeRequestV1({
+      request: wrongHost, action: 'authorize', env, nowEpochMs: () => now,
+    });
+    expect(rejected.status).toBe(400);
+  });
   it.each([false, true])('preserves state, verifies PKCE, and normalizes profile without email linking (Basic=%s)', async basic => {
     const { state, code, naver } = await flow();
     expect(naver.searchParams.get('redirect_uri')).toBe(`${origin}/api/auth/social/naver/callback`);

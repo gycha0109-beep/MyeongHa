@@ -3,7 +3,8 @@ import { readAuthenticatedJsonRequestBodyV1 } from './authenticated-json-request
 import { MYEONGHA_PRODUCTION_SUPABASE_ORIGIN } from './production-user-data-runtime-config.js';
 
 // OAuth transport only. Supabase still issues sessions and owns provider identities.
-const ORIGIN = 'https://myeongha.vercel.app';
+const CANONICAL_WORKER_ORIGIN = 'https://myeongha.gycha0109.workers.dev';
+const LEGACY_VERCEL_ORIGIN = 'https://myeongha.vercel.app';
 const SUPABASE_CALLBACK = `${MYEONGHA_PRODUCTION_SUPABASE_ORIGIN}/auth/v1/callback`;
 const PATH = '/api/auth/social/naver/';
 const STATE_TTL = 10 * 60_000;
@@ -148,7 +149,9 @@ export async function handleNaverOAuthBridgeRequestV1(input: {
   const now = input.nowEpochMs?.() ?? Date.now();
   const fetcher = input.fetchImpl ?? fetch;
   const url = new URL(input.request.url);
-  const approvedWebOrigin = input.webOrigin ?? ORIGIN;
+  const approvedWebOrigin = input.webOrigin ?? (
+    url.origin === LEGACY_VERCEL_ORIGIN ? LEGACY_VERCEL_ORIGIN : CANONICAL_WORKER_ORIGIN
+  );
   let host: URL;
   try { host = new URL(approvedWebOrigin); }
   catch { return error(); }

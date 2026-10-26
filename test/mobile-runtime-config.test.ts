@@ -7,7 +7,7 @@ import {
 
 describe('mobile runtime config', () => {
   it('defaults to the repository canonical Production origin', () => {
-    expect(resolveMobileApiOriginV1(undefined)).toBe('https://myeongha.vercel.app');
+    expect(resolveMobileApiOriginV1(undefined)).toBe('https://myeongha.gycha0109.workers.dev');
   });
 
   it('accepts a governed HTTPS override and strips the root slash', () => {

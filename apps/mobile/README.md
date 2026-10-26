@@ -75,7 +75,7 @@ npm run typecheck -w @myeongha/api-client
 npm run verify:mobile-release-readiness
 ```
 
-The strict command now validates the approved production identity `com.myeongha.app` on both platforms together with version sequencing and the canonical Production API origin.
+The strict command validates `com.myeongha.app` on both platforms, version sequencing, and the canonical Cloudflare Workers API origin `https://myeongha.gycha0109.workers.dev`. Vercel and arbitrary staging API origins are rejected for release. This updates the source/release contract only; already-installed binaries and production provider callbacks are not migrated.
 
 CI uses:
 

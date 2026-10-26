@@ -30,15 +30,13 @@ const req = (origin, path = '/api/auth/sign-in') =>
 
 describe('Vercel exit: exact callback origin and native Worker admission', () => {
   it('preserves Vercel production/preview callbacks without cross-host migration', () => {
-    for (const origin of [
-      LEGACY,
-      'https://myeongha-git-main-johnny-self.vercel.app',
-      'http://localhost:3000',
-      'not-an-origin',
-    ]) {
+    for (const origin of [LEGACY, 'https://myeongha-git-main-johnny-self.vercel.app']) {
       expect(isCloudflareHostedAuthOriginV1(origin)).toBe(false);
       expect(resolveWebSocialAuthCallbackUriV1(origin))
         .toBe(LEGACY + '/auth.html?social=callback');
+    }
+    for (const origin of ['http://localhost:3000', 'not-an-origin', 'https://unapproved.vercel.app']) {
+      expect(resolveWebSocialAuthCallbackUriV1(origin)).toBeNull();
     }
   });
 
