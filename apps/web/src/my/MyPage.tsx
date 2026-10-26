@@ -388,8 +388,15 @@ function SettingsSection({ account, openPanel, setOpenPanel }: {
               <a href="auth.html?next=my.html">계정 연결 화면 →</a>
             </div>
           </div>
-          <p className="my-setting-caveat">현재는 이용 안내만 제공합니다. 공식 문의 접수처와 약관 링크는 확인된 공개 경로가 준비되면 이곳에 연결됩니다.</p>
+          <a className="my-setting-inline-link" href="contact.html">문의하기 →</a>
+          <p className="my-setting-caveat">계정, 결제, 서비스 이용 관련 문의는 문의 페이지에서 접수할 수 있습니다.</p>
         </div>
+
+        <a className="my-setting-row my-setting-link" href="contact.html">
+          <span className="my-setting-icon" aria-hidden="true">✉</span>
+          <strong>문의</strong>
+          <span className="my-setting-chevron" aria-hidden="true">→</span>
+        </a>
 
         <div className="my-setting-row my-setting-auth">
           <span className="my-setting-icon" aria-hidden="true">{payload?.subjectKind === 'member' ? '↪' : '之'}</span>
