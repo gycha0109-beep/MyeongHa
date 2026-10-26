@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { fetchAdminReadV1, signInForAdminSessionV1, verifyAdminOwnerSessionV1 } from './admin-client.js';
+import { fetchAdminReadV1, signInForAdminSessionV1, verifyAdminOwnerSessionV1, fetchAdminIssuesCsvV1 } from './admin-client.js';
 const JWT = 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.signature';
 describe('admin browser API client', () => {
+  it('downloads only audited issues CSV and rejects plain JSON substitutes', async () => {
+    const csv = (async () => new Response('issueId,category\r\n', { headers: { 'Content-Type': 'text/csv; charset=utf-8' } })) as typeof fetch;
+    expect(await fetchAdminIssuesCsvV1(JWT, new URLSearchParams({ limit: '50' }), csv)).toContain('issueId');
+    const spoof = (async () => Response.json({ data: 'not CSV' })) as typeof fetch;
+    await expect(fetchAdminIssuesCsvV1(JWT, new URLSearchParams(), spoof)).rejects.toThrow();
+    await expect(fetchAdminIssuesCsvV1(JWT, new URLSearchParams({ secret: 'true' }), csv)).rejects.toThrow();
+  });
   it('never grants Admin screen access from a regular Member token', async () => {
     const denied = (async () => Response.json({ error: 'ADMIN_FORBIDDEN' }, { status: 403 })) as typeof fetch;
     await expect(verifyAdminOwnerSessionV1(JWT, denied)).rejects.toThrow('권한');

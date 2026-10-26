@@ -113,3 +113,25 @@ export async function verifyAdminOwnerSessionV1(
     throw new Error('관리자 권한을 확인하지 못했습니다.');
   }
 }
+
+export async function fetchAdminIssuesCsvV1(
+  token: string,
+  query: URLSearchParams,
+  fetchImpl: typeof fetch = fetch,
+): Promise<string> {
+  if (!jwtLike(token)) throw new Error('관리자 세션이 유효하지 않습니다.');
+  const allowed = new Set(['limit', 'cursor', 'from', 'to']);
+  for (const key of query.keys()) if (!allowed.has(key)) throw new Error('허용되지 않은 내보내기 조건입니다.');
+  const res = await fetchImpl('/api/admin/issues.csv?' + query.toString(), {
+    method: 'GET',
+    headers: { Accept: 'text/csv', Authorization: 'Bearer ' + token },
+    credentials: 'omit',
+    cache: 'no-store',
+  });
+  if (!res.ok || !res.headers.get('content-type')?.startsWith('text/csv')) {
+    throw new Error('감사된 운영 이슈 내보내기를 완료하지 못했습니다.');
+  }
+  const content = await res.text();
+  if (content.length > 64 * 1024) throw new Error('내보내기 결과가 최대 크기를 초과했습니다.');
+  return content;
+}

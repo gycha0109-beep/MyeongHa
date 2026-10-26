@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
-import { fetchAdminReadV1, signInForAdminSessionV1, verifyAdminOwnerSessionV1 } from './admin-client.js';
+import { fetchAdminReadV1, signInForAdminSessionV1, verifyAdminOwnerSessionV1, fetchAdminIssuesCsvV1 } from './admin-client.js';
 import type { AdminReadResponse } from './admin-client.js';
 import type { AdminSection } from './routes.js';
 import { StatusPanel } from './StatusPanel.js';
@@ -223,6 +223,21 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
             <button type="submit">검색</button>
           </form>}
         </>}
+      {section === 'issues' && tab === 'issues' && detail === null && <button type="button"
+        onClick={() => {
+          const query = new URLSearchParams({ limit: '50' });
+          if (from !== null && to !== null) { query.set('from', from); query.set('to', to); }
+          void fetchAdminIssuesCsvV1(token, query)
+            .then(content => {
+              const url = URL.createObjectURL(new Blob([content], { type: 'text/csv;charset=utf-8' }));
+              const link = document.createElement('a');
+              link.href = url;
+              link.download = 'myeongha-issues.csv';
+              link.click();
+              URL.revokeObjectURL(url);
+            })
+            .catch(() => setError('내보내기를 완료할 수 없습니다. 권한과 감사 저장 상태를 확인해 주세요.'));
+        }}>운영 이슈 CSV (최대 50건)</button>}
       <button type="button" onClick={onSessionExpired}>로그아웃</button>
       {detail === null && <form className="date-range-form" onSubmit={e => {
         e.preventDefault();

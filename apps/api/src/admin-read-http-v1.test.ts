@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createAdminOwnerAuthV1 } from './admin-auth-v1.js';
-import { createAdminReadHttpHandlerV1, parseAdminReadFiltersV1 } from './admin-read-http-v1.js';
+import { createAdminReadHttpHandlerV1, parseAdminReadFiltersV1, renderIssuesCsvV1 } from './admin-read-http-v1.js';
 import type { AdminAuditEventV1 } from './admin-read-http-v1.js';
 import type { AdminReadPortV1 } from './admin-read-contract-v1.js';
 
@@ -57,6 +57,26 @@ function harness(options: {
 }
 
 describe('admin owner-only reads', () => {
+  it('exports only allowlisted issue columns with audit, bounded and formula-safe', async () => {
+    const h = harness();
+    const csv = await h.call('/api/admin/issues.csv?limit=20');
+    expect(csv.status).toBe(200);
+    expect(csv.headers.get('content-type')).toContain('text/csv');
+    expect(h.auditEvents[0]?.action).toBe('export:issues');
+    expect(h.readCount).toBe(1);
+    const text = await csv.text();
+    expect(text.split('\r\n')[0]).toBe('issueId,category,severity,status,createdAt,requestId');
+    expect(text).not.toMatch(/email|privateNote/);
+    expect(renderIssuesCsvV1([{ category: '=HYPERLINK("bad")', status: '+SUM(1)' }]))
+      .toContain("'=HYPERLINK");
+    expect((await harness({ principal: 'stranger' }).call('/api/admin/issues.csv')).status).toBe(403);
+    expect((await harness({ throwAudit: true }).call('/api/admin/issues.csv')).status).toBe(503);
+  });
+  it('rejects filters unsupported by the underlying SQL rather than silently ignoring them', () => {
+    expect(() => parseAdminReadFiltersV1(new URL('https://a.invalid/api/admin/issues?subjectId=123e4567-e89b-42d3-a456-426614174000'))).toThrow();
+    expect(() => parseAdminReadFiltersV1(new URL('https://a.invalid/api/admin/catalog?from=2026-10-01&to=2026-10-26'))).toThrow();
+    expect(() => parseAdminReadFiltersV1(new URL('https://a.invalid/api/admin/commerce/123e4567-e89b-42d3-a456-426614174000?from=2026-10-01&to=2026-10-26'))).toThrow();
+  });
   it('verifies only Owner session before any data query, with required audit', async () => {
     const allowed = harness();
     const result = await allowed.call('/api/admin/session');

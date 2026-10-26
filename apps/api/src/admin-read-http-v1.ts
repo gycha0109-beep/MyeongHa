@@ -114,8 +114,19 @@ export function parseAdminReadFiltersV1(url: URL): AdminListFiltersV1 {
     throw new Error('Administrator subject reference is invalid.');
   }
   subjectId ??= querySubject?.toLowerCase() ?? null;
+  if (subjectId !== null && ['issues','analytics','catalog','characters','content-releases'].includes(kind)) {
+    throw new Error('Subject filter is not supported by the requested authority.');
+  }
+  if (kind === 'user-detail' || kind === 'commerce-detail') {
+    if (url.searchParams.has('from') || url.searchParams.has('to')) {
+      throw new Error('Detail route does not support date filters.');
+    }
+  }
   const from = readDate(url.searchParams.get('from'));
   const to = readDate(url.searchParams.get('to'));
+  if (from !== null && ['catalog','characters','content-releases'].includes(kind)) {
+    throw new Error('Date filter is not supported by the requested authority.');
+  }
   if ((from === null) !== (to === null)) {
     throw new Error('Both administrator date boundaries must be supplied together.');
   }
@@ -126,6 +137,42 @@ export function parseAdminReadFiltersV1(url: URL): AdminListFiltersV1 {
   }
   if (!ADMIN_READ_KINDS_V1.includes(kind)) throw new Error('Unknown administrator kind.');
   return Object.freeze({ kind, limit, cursor, subjectId, recordId, from, to });
+}
+
+const ISSUE_EXPORT_COLUMNS = ['issueId', 'category', 'severity', 'status', 'createdAt', 'requestId'] as const;
+
+function escapeSpreadsheetCell(value: unknown): string {
+  let text = value === null || value === undefined ? '' : String(value);
+  text = text.replace(/[\r\n]/gu, ' ').slice(0, 256);
+  if (/^[\s]*[=+@\-]/u.test(text) || /^[\t\r]/u.test(text)) text = "'" + text;
+  return '"' + text.replace(/"/gu, '""') + '"';
+}
+
+export function renderIssuesCsvV1(rows: readonly Readonly<Record<string, unknown>>[]): string {
+  if (rows.length > 50) throw new Error('Maximum issues export size exceeded.');
+  return [
+    ISSUE_EXPORT_COLUMNS.join(','),
+    ...rows.map(row => ISSUE_EXPORT_COLUMNS.map(column =>
+      escapeSpreadsheetCell(row[column])).join(',')),
+  ].join('\r\n') + '\r\n';
+}
+
+function issueExportResponse(
+  requestId: string,
+  rows: readonly Readonly<Record<string, unknown>>[],
+): Response {
+  return new Response(renderIssuesCsvV1(rows), {
+    status: 200,
+    headers: {
+      'Content-Type': 'text/csv; charset=utf-8',
+      'Content-Disposition': 'attachment; filename="myeongha-issues.csv"',
+      'Cache-Control': 'no-store',
+      'Pragma': 'no-cache',
+      'X-Content-Type-Options': 'nosniff',
+      'X-Request-Id': requestId,
+      'Vary': 'Authorization',
+    },
+  });
 }
 
 /** Unmounted by default. A privileged deployment must separately approve this entrypoint. */
@@ -178,10 +225,13 @@ export function createAdminReadHttpHandlerV1(deps: AdminReadHttpDependenciesV1) 
     }
 
     let filters: AdminListFiltersV1;
+    const isIssueExport = requestUrl.pathname === '/api/admin/issues.csv';
     try {
       const url = new URL(request.url);
+      if (isIssueExport) url.pathname = '/api/admin/issues';
       if (!url.pathname.startsWith(PATH_PREFIX)) throw new Error('Not admin route');
       filters = parseAdminReadFiltersV1(url);
+      if (isIssueExport && filters.limit > 50) throw new Error('Export limit exceeded');
     } catch {
       try { await append(actor.authUserId, 'invalid-query', 'denied'); }
       catch { return response(503, requestId, { error: 'ADMIN_AUDIT_UNAVAILABLE' }); }
@@ -193,10 +243,11 @@ export function createAdminReadHttpHandlerV1(deps: AdminReadHttpDependenciesV1) 
         await deps.reads.read(filters),
         filters.limit,
       );
-      await append(actor.authUserId, 'read:' + filters.kind, 'allowed');
+      await append(actor.authUserId, (isIssueExport ? 'export:' : 'read:') + filters.kind, 'allowed');
+      if (isIssueExport) return issueExportResponse(requestId, result.rows);
       return response(200, requestId, { kind: filters.kind, ...result });
     } catch {
-      try { await append(actor.authUserId, 'read:' + filters.kind, 'failed'); }
+      try { await append(actor.authUserId, (isIssueExport ? 'export:' : 'read:') + filters.kind, 'failed'); }
       catch { return response(503, requestId, { error: 'ADMIN_AUDIT_UNAVAILABLE' }); }
       return response(503, requestId, { error: 'ADMIN_READ_UNAVAILABLE' });
     }
