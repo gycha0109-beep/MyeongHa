@@ -25,8 +25,10 @@ apply_pg17_migrations_without_birth_authority() {
   done
 }
 
-# Bound the R2 replay to the applied repository frontier 1510 plus both
-# known timestamped migrations. All 1520..1720 are Production HOLD.
+# Bound the R2 replay to the historical repository frontier 1510 plus both
+# known historical timestamped migrations. Newer security migrations must be
+# reviewed and pinned as skipped, never replayed into the older 1510 fixture.
+# All 1520..1720 remain excluded from this historical fixture.
 # No remote-only 20261008090417 SQL is fetched or executed.
 apply_pg17_migrations_through_seyeon_production_frontier() {
   psql -v ON_ERROR_STOP=1 -f test/db/bootstrap_supabase_auth_stub.sql
@@ -42,15 +44,24 @@ apply_pg17_migrations_through_seyeon_production_frontier() {
         20261007150457_guest_promotion_auth_fk_validation.sql|20261008043000_seyeon_manifest_acl_restore.sql)
           timestamped_count=$(( timestamped_count + 1 ))
           ;;
-        20261018190000_seyeon_locked_first_zero_source_reveal_v1.sql)
-          # Post-frontier security migration is known but must NEVER be replayed
-          # into the historical 1510 R2 catalog/restore authority fixture.
-          # Reject a same-named modified migration instead of silently skipping.
-          # The stock postgres:17.6 Docker image is intentionally minimal and
-          # need not include git. Compute the exact canonical Git blob SHA-1
-          # with coreutils if git is missing. Windows CRLF checkout is allowed
-          # ONLY when LF normalization produces the unchanged pinned SQL blob.
-          local reviewed_blob_sha1='3fbe7322cb3f11484a3e0a42bdc0598879b3d1d8'
+        20261018190000_seyeon_locked_first_zero_source_reveal_v1.sql|20261026025332_seyeon_chat_helper_service_role_least_privilege.sql)
+          # Post-frontier security migrations are known but must NEVER be
+          # replayed into the historical 1510 R2 catalog/restore fixture.
+          # Reject same-named modified SQL instead of blindly skipping it.
+          local reviewed_blob_sha1 hold_reason
+          case "$basename" in
+            20261018190000_seyeon_locked_first_zero_source_reveal_v1.sql)
+              reviewed_blob_sha1='3fbe7322cb3f11484a3e0a42bdc0598879b3d1d8'
+              hold_reason='HOLD_R2_ZERO_REVEAL_SQL_FINGERPRINT_DRIFT'
+              ;;
+            20261026025332_seyeon_chat_helper_service_role_least_privilege.sql)
+              reviewed_blob_sha1='462cf970f362550fbcfc4f6168ee6b1e0b5cf078'
+              hold_reason='HOLD_R2_CHAT_HELPER_ACL_SQL_FINGERPRINT_DRIFT'
+              ;;
+          esac
+          # Stock postgres:17.6 lacks Git. Reconstruct the exact Git blob
+          # SHA-1 with coreutils; permit Windows CRLF only when LF normalization
+          # produces the original reviewed bytes.
           local local_blob_sha1 local_bytes normalized_bytes
           if command -v git >/dev/null 2>&1; then
             local_blob_sha1="$(git hash-object "$migration")"
@@ -69,7 +80,7 @@ apply_pg17_migrations_through_seyeon_production_frontier() {
             )"
           fi
           [[ "$local_blob_sha1" == "$reviewed_blob_sha1" ]] || {
-            echo "HOLD_R2_ZERO_REVEAL_SQL_FINGERPRINT_DRIFT" >&2; return 1;
+            echo "$hold_reason" >&2; return 1;
           }
           continue
           ;;
