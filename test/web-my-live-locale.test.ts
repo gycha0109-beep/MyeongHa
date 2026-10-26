@@ -23,7 +23,7 @@ describe('My React-owned localization', () => {
 
   it('translates every explicitly authored My label in all locales', () => {
     const jsx = web('src/my/MyPage.tsx');
-    const keys = new Set([...jsx.matchAll(/<MyText source="([^"]+)"\s*\/>/gu)].map(match => match[1]));
+    const keys = new Set<string>([...jsx.matchAll(/<MyText source="([^"]+)"\s*\/>/gu)].map(match => match[1]).filter((value): value is string => typeof value === 'string'));
     for (const match of jsx.matchAll(/<Choice title="([^"]+)" description="([^"]+)"/gu)) {
       keys.add(match[1]); keys.add(match[2]);
     }
