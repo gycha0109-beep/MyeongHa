@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { createMyRuntimeClient, MyRuntimeError } from '../../my-runtime-client.js';
 import { PRODUCT_AUTH_STORAGE_V1, readMemberSession, signOutMember } from '../../product-auth.js';
 import { shouldReloadMyForMemberSessionStorageChange } from '../../product-auth-surface.js';
-import { getUiLocale, translateStaticUi } from '../../ui-i18n.js';
+import { getUiLocale } from '../../ui-i18n.js';
 
 type Profile = {
   displayName: string | null;
@@ -38,35 +38,45 @@ type AccountState =
   | { kind: 'ready'; payload: ProfilePayload }
   | { kind: 'unavailable'; message: string; login: boolean; hasStoredMemberSession: boolean };
 
-type SettingsPanel = 'account' | 'help' | null;
-
 type BirthState =
   | { kind: 'loading' }
   | { kind: 'ready'; payload: BirthPayload }
   | { kind: 'unavailable'; message: string };
 
-const uiLabel = (source: string) => translateStaticUi(source, getUiLocale());
+type MyPanel = 'account' | 'memory' | 'orders' | 'passes' | 'birth' | 'display' | 'support' | null;
+type Glyph = 'user' | 'memory' | 'bag' | 'ticket' | 'calendar' | 'palette' | 'chat' | 'chevron' | 'arrow' | 'logout' | 'moon';
+
+function MyGlyph({ name }: { name: Glyph }) {
+  const lines: Record<Glyph, string> = {
+    user: 'M20 21a8 8 0 0 0-16 0 M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z',
+    memory: 'M4 19.5A2.5 2.5 0 0 1 6.5 17H20 M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5V4.5A2.5 2.5 0 0 1 6.5 2Z M9 7h7 M9 11h7',
+    bag: 'M4 8h16l-1.2 13H5.2L4 8Z M9 9V6a3 3 0 0 1 6 0v3',
+    ticket: 'M2 9V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v4a3 3 0 0 0 0 6v4a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-4a3 3 0 0 0 0-6Z M12 3v3 M12 10v4 M12 18v3',
+    calendar: 'M3 5h18v16H3V5Z M7 2v6 M17 2v6 M3 10h18 M8 14h2 M13 14h2 M8 18h2',
+    palette: 'M12 3a9 9 0 1 0 0 18h1.5a2.5 2.5 0 0 0 2.2-3.7 2 2 0 0 1 1.8-3h.5A3 3 0 0 0 21 11a8 8 0 0 0-9-8Z M7 12h.01 M9 7h.01 M15 7h.01',
+    chat: 'M21 11.5a8.5 8.5 0 0 1-8.5 8.5 9 9 0 0 1-4-.9L3 21l1.7-5.1A8.5 8.5 0 1 1 21 11.5Z',
+    chevron: 'm9 18 6-6-6-6',
+    arrow: 'M5 12h14 m-6-6 6 6-6 6',
+    logout: 'M10 17l5-5-5-5 M15 12H3 M13 3h6a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-6',
+    moon: 'M20.9 13A9 9 0 0 1 11 3.1 9 9 0 1 0 20.9 13Z',
+  };
+  return <svg className="my-glyph" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={lines[name]} /></svg>;
+}
 
 function birthDateText(value: string) {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/u.exec(value);
-  return match ? `${match[1]}.${match[2]}.${match[3]}` : '—';
+  return match ? match[1] + '.' + match[2] + '.' + match[3] : '—';
 }
-
 function birthTimeText(input: BirthInput) {
-  if (!input.timeKnown) return '시간 모름';
-  return input.birthTime?.slice(0, 5) ?? '—';
+  return input.timeKnown ? input.birthTime?.slice(0, 5) ?? '—' : '시간 모름';
 }
-
 function calendarText(input: BirthInput) {
-  if (input.calendarType === 'solar') return '양력';
-  return input.isLeapMonth ? '음력 · 윤달' : '음력';
+  return input.calendarType === 'solar' ? '양력' : input.isLeapMonth ? '음력 윤달' : '음력';
 }
-
 function sexText(value: BirthInput['sex']) {
   if (value === 'male') return '남성';
   if (value === 'female') return '여성';
-  if (value === 'unspecified') return '미지정';
-  return '미입력';
+  return value === 'unspecified' ? '미지정' : '미입력';
 }
 
 function AuthActions({ subjectKind, hasStoredMemberSession }: {
@@ -75,7 +85,6 @@ function AuthActions({ subjectKind, hasStoredMemberSession }: {
 }) {
   const [signingOut, setSigningOut] = useState(false);
   const canSignOut = hasStoredMemberSession && subjectKind !== 'guest';
-
   async function handleSignOut() {
     setSigningOut(true);
     try {
@@ -85,338 +94,137 @@ function AuthActions({ subjectKind, hasStoredMemberSession }: {
       setSigningOut(false);
     }
   }
-
   if (!canSignOut) {
-    return (
-      <a className="my-auth-action my-connect-action" href="auth.html?next=my.html">
-        {subjectKind === 'guest' ? '계정 연결' : '로그인하기 →'}
-      </a>
-    );
+    return <a className="my-auth-action my-connect-action" href="auth.html?next=my.html">{subjectKind === 'guest' ? '계정 연결' : '로그인하기'}</a>;
   }
+  return <button className="my-auth-action my-logout-action" type="button" disabled={signingOut} onClick={() => void handleSignOut()}><MyGlyph name="logout" />{signingOut ? '로그아웃 중…' : '로그아웃'}</button>;
+}
 
+function Detail({ panel, account, birth }: { panel: Exclude<MyPanel, null>; account: AccountState; birth: BirthState }) {
+  const payload = account.kind === 'ready' ? account.payload : null;
+  const profile = payload?.profile;
+  const session = readMemberSession();
+  const input = birth.kind === 'ready' ? birth.payload.birthProfile?.currentRevision.input : null;
+  const [locale, setLocale] = useState<string>(getUiLocale());
+  function switchTheme() {
+    document.querySelector<HTMLButtonElement>('.product-theme-toggle')?.click();
+  }
+  function changeLocale(next: string) {
+    const picker = document.querySelector<HTMLSelectElement>('.ui-locale-select');
+    if (!picker) return;
+    picker.value = next;
+    picker.dispatchEvent(new Event('change', { bubbles: true }));
+    setLocale(next);
+  }
   return (
-    <button className="my-auth-action my-logout-action" type="button" disabled={signingOut} onClick={() => void handleSignOut()}>
-      {signingOut ? '로그아웃 중…' : '로그아웃'}
+    <div className="my-detail-panel" role="region" aria-label="선택한 관리 항목">
+      {panel === 'account' ? (
+        <>
+          <h3>계정 정보</h3>
+          {account.kind === 'loading' ? <p>계정 정보를 확인하는 중입니다…</p> : null}
+          {account.kind === 'unavailable' ? <p>{account.message}</p> : null}
+          {payload ? (
+            <dl className="my-account-facts">
+              <div><dt>로그인 이메일</dt><dd>{payload.subjectKind === 'member' ? session?.user?.email ?? '현재 세션에서 확인할 수 없습니다.' : '게스트 계정'}</dd></div>
+              <div><dt>계정 유형</dt><dd>{payload.subjectKind === 'member' ? '회원' : '게스트'}</dd></div>
+              <div><dt>계정 상태</dt><dd>{payload.subjectStatus === 'deletion_pending' ? '삭제 요청 진행 중' : '사용 중'}</dd></div>
+              <div><dt>표시 언어</dt><dd>{profile?.locale ?? '정보 없음'}</dd></div>
+            </dl>
+          ) : null}
+          {payload?.subjectKind === 'guest' || (account.kind === 'unavailable' && account.login) ? <a className="my-detail-link" href="auth.html?next=my.html">회원 계정 연결하기 <MyGlyph name="arrow" /></a> : null}
+          <p className="my-detail-hint">프로필 변경 및 회원 탈퇴 요청은 검증된 서버 절차가 연결되기 전까지 이 화면에서 실행하지 않습니다.</p>
+        </>
+      ) : null}
+      {panel === 'memory' ? (
+        <>
+          <h3>캐릭터 메모리 관리</h3>
+          <p>캐릭터가 기억할 정보를 확인하고 직접 추가하거나 관리하는 공간입니다.</p>
+          <p className="my-detail-hint">캐릭터별 메모리 조회·저장 기능은 아직 연결되지 않았습니다. 확인되지 않은 기억을 임의로 표시하거나 저장하지 않습니다.</p>
+        </>
+      ) : null}
+      {panel === 'orders' ? (
+        <>
+          <h3>구매 내역</h3>
+          <p>결제한 해석과 상품의 거래 내역을 확인하는 공간입니다.</p>
+          <p className="my-detail-hint">구매 내역 조회가 연결되지 않았습니다. 구매 내역이 없다는 뜻은 아닙니다.</p>
+        </>
+      ) : null}
+      {panel === 'passes' ? (
+        <>
+          <h3>내 이용권</h3>
+          <p>보유 이용권, 사용 내역, 유효기간을 확인하는 공간입니다.</p>
+          <p className="my-detail-hint">이용권 조회가 연결되지 않았습니다. 보유 수량이나 잔여 사용량을 추정하여 표시하지 않습니다.</p>
+        </>
+      ) : null}
+      {panel === 'birth' ? (
+        <>
+          <h3>출생 정보</h3>
+          {birth.kind === 'loading' ? <p>저장된 출생 정보를 확인하는 중입니다…</p> : null}
+          {birth.kind === 'unavailable' ? <p>{birth.message}</p> : null}
+          {birth.kind === 'ready' && !input ? <p>저장된 본인 출생 정보가 없습니다. <a className="my-detail-link" href="birth.html">출생 정보 입력하기 <MyGlyph name="arrow" /></a></p> : null}
+          {input ? (
+            <dl className="my-account-facts">
+              <div><dt>생년월일</dt><dd>{birthDateText(input.birthDate)}</dd></div>
+              <div><dt>출생 시간</dt><dd>{birthTimeText(input)}</dd></div>
+              <div><dt>달력 기준</dt><dd>{calendarText(input)}</dd></div>
+              <div><dt>성별</dt><dd>{sexText(input.sex)}</dd></div>
+            </dl>
+          ) : null}
+          <p className="my-detail-hint">저장된 출생 정보를 조회하는 화면입니다. 수정 기능은 현재 준비 중입니다.</p>
+        </>
+      ) : null}
+      {panel === 'display' ? (
+        <>
+          <h3>화면 및 언어</h3>
+          <div className="my-display-actions">
+            <button type="button" className="my-detail-link my-display-toggle" onClick={switchTheme}><MyGlyph name="moon" /> 라이트 · 다크 모드 전환</button>
+            <label htmlFor="my-locale-select">표시 언어</label>
+            <select id="my-locale-select" value={locale} onChange={event => changeLocale(event.target.value)}>
+              <option value="ko-KR">한국어</option><option value="ja-JP">日本語</option><option value="zh-TW">繁體中文</option><option value="en-US">English</option><option value="zh-CN">简体中文</option>
+            </select>
+          </div>
+        </>
+      ) : null}
+      {panel === 'support' ? (
+        <>
+          <h3>문의</h3>
+          <p>명하 이용 중 불편한 사항을 관리자에게 문의할 수 있는 공간입니다.</p>
+          <p className="my-detail-hint">관리자 문의 페이지와 접수 기능은 준비 중입니다. 이 화면에서는 아직 문의를 제출할 수 없습니다.</p>
+        </>
+      ) : null}
+    </div>
+  );
+}
+
+function Choice({ title, description, glyph, open, onClick }: {
+  title: string; description: string; glyph: Glyph; open: boolean; onClick: () => void;
+}) {
+  return (
+    <button type="button" className="my-choice-card" aria-expanded={open} onClick={onClick}>
+      <span className="my-icon-circle"><MyGlyph name={glyph} /></span>
+      <span className="my-choice-copy"><strong>{title}</strong><span>{description}</span></span>
+      <span className="my-chevron"><MyGlyph name="chevron" /></span>
     </button>
   );
 }
 
-function ProfileHome({ state, onOpenAccount }: { state: AccountState; onOpenAccount: () => void }) {
-  const payload = state.kind === 'ready' ? state.payload : null;
-  const profile = payload?.profile;
-  const memberSession = payload ? readMemberSession() : null;
-  const hasStoredMemberSession = state.kind === 'unavailable'
-    ? state.hasStoredMemberSession
-    : Boolean(memberSession);
-  const displayName = payload ? profile?.displayName?.trim() || '호칭을 설정해주세요' : '';
-  const email = payload
-    ? payload.subjectKind === 'member'
-      ? memberSession?.user?.email ?? '로그인 계정 확인 중'
-      : '게스트로 둘러보는 중'
-    : '';
-
-  return (
-    <header className="my-home-hero" aria-labelledby="my-page-title">
-      <div className="my-hero-orbit" aria-hidden="true"><span>明</span></div>
-      <div className="my-hero-copy">
-        <span className="my-kicker">MY MYEONGHA</span>
-        <h1 className="my-title" id="my-page-title">길어진 하루 끝에<br />다시 나를 보는 곳.</h1>
-        <p className="my-lead">내 정보와 명하에서 이어지는 사주, 기록, 대화를 한곳에서 살펴봅니다.</p>
-      </div>
-
-      <div className="my-status" id="my-status" role="status" hidden={state.kind === 'ready'}>
-        {state.kind === 'loading'
-          ? '내 정보를 불러오는 중입니다…'
-          : state.kind === 'unavailable' ? uiLabel(state.message) : ''}
-        {state.kind === 'unavailable' && state.login ? (
-          <div className="my-status-action">
-            <AuthActions subjectKind={undefined} hasStoredMemberSession={hasStoredMemberSession} />
-          </div>
-        ) : null}
-      </div>
-
-      <div id="my-content" hidden={state.kind !== 'ready'}>
-        <article className="my-identity-card">
-          <div className="my-profile-mark" aria-hidden="true">之</div>
-          <div className="my-profile-copy">
-            <strong className="my-profile-name" id="my-display-name">{displayName}</strong>
-            <span className="my-profile-email" id="my-account-email">{email}</span>
-          </div>
-          <button className="my-profile-manage" type="button" onClick={onOpenAccount}>내 정보 관리 <span aria-hidden="true">→</span></button>
-
-          <div className="my-runtime-meta" aria-hidden="true">
-            <span id="my-subject-kind">{payload?.subjectKind === 'member' ? '회원' : payload?.subjectKind === 'guest' ? '게스트' : ''}</span>
-            <span id="my-subject-status">{payload?.subjectStatus === 'deletion_pending' ? '삭제 요청 진행 중' : payload?.subjectStatus === 'active' ? '사용 중' : ''}</span>
-            <span id="my-locale">{profile?.locale ?? ''}</span>
-            <span id="my-timezone">{profile?.timezone ?? ''}</span>
-            <span id="my-onboarding-state">{profile?.onboardingState ?? ''}</span>
-            <span id="my-profile-updated">{profile?.updatedAt ?? ''}</span>
-            <span id="my-account-note">
-              {payload
-                ? payload.subjectKind === 'member'
-                  ? '로그인한 회원 세션으로 현재 계정의 저장된 흐름을 이어갑니다.'
-                  : '현재 브라우저의 게스트 흐름입니다. 계정 연결 전까지 회원 기록으로 가정하지 않습니다.'
-                : ''}
-            </span>
-          </div>
-        </article>
-      </div>
-    </header>
-  );
-}
-
-function BirthSection({ state }: { state: BirthState }) {
-  const birthProfile = state.kind === 'ready' ? state.payload.birthProfile : null;
-  const input = birthProfile?.currentRevision.input;
-  const isEmpty = state.kind === 'ready' && state.payload.birthProfile === null;
-
-  return (
-    <section className="my-today-section" aria-labelledby="my-birth-title">
-      <div className="my-section-intro">
-        <span className="my-section-kicker">TODAY</span>
-        <h2 id="my-birth-title">오늘의 나</h2>
-        <p>내 사주의 기준이 되는 출생 정보입니다.</p>
-      </div>
-
-      <div className="my-status my-birth-status" id="my-birth-status" role="status" hidden={Boolean(birthProfile)}>
-        {state.kind === 'loading'
-          ? '출생 정보를 확인하는 중입니다…'
-          : state.kind === 'unavailable'
-            ? uiLabel(state.message)
-            : isEmpty ? (
-              <>
-                저장된 본인 출생 정보가 없습니다.
-                <a href="birth.html">출생 정보 입력하기 →</a>
-              </>
-            ) : ''}
-      </div>
-
-      <article className="my-birth-card" id="my-birth-content" hidden={!birthProfile}>
-        <div className="my-birth-art" aria-hidden="true">
-          <span className="my-birth-moon" />
-          <span className="my-birth-orbit" />
-        </div>
-
-        <dl className="my-birth-facts">
-          <div>
-            <dt>생년월일</dt>
-            <dd id="my-birth-date">{input ? birthDateText(input.birthDate) : ''}</dd>
-          </div>
-          <div>
-            <dt>태어난 시간</dt>
-            <dd id="my-birth-time">{input ? birthTimeText(input) : ''}</dd>
-          </div>
-          <div>
-            <dt>기준</dt>
-            <dd className="my-birth-basis">
-              <span id="my-birth-calendar">{input ? calendarText(input) : ''}</span>
-              <span aria-hidden="true">·</span>
-              <span id="my-birth-sex">{input ? sexText(input.sex) : ''}</span>
-            </dd>
-          </div>
-        </dl>
-
-        <div className="my-birth-actions">
-          <a className="my-primary-action" href="reading.html">내 사주 보기 <span aria-hidden="true">→</span></a>
-          <span className="my-secondary-action is-disabled" aria-disabled="true">출생 정보 수정 준비 중</span>
-        </div>
-
-        <span className="my-runtime-meta" id="my-birth-revision" aria-hidden="true">
-          {birthProfile ? `현재 입력 · revision ${birthProfile.currentRevision.revisionNo}` : ''}
-        </span>
-      </article>
-    </section>
-  );
-}
-
-function FlowSection() {
-  return (
-    <section className="my-flow-section" aria-labelledby="my-flow-title">
-      <div className="my-section-intro">
-        <span className="my-section-kicker">MY FLOW</span>
-        <h2 id="my-flow-title">내 흐름</h2>
-        <p>지금의 나를 이해하고, 지나온 기록과 대화를 계속 이어갑니다.</p>
-      </div>
-
-      <div className="my-flow-grid">
-        <a className="my-route-card my-flow-primary" href="reading.html">
-          <span className="my-flow-symbol" aria-hidden="true">命</span>
-          <span className="my-route-copy">
-            <span className="my-route-kicker">SAJU</span>
-            <strong>내 사주</strong>
-            <span>지금의 사주 흐름과 해석을 다시 확인합니다.</span>
-          </span>
-          <span className="my-route-cta">사주 보기 <span aria-hidden="true">→</span></span>
-        </a>
-
-        <div className="my-flow-side">
-          <a className="my-route-card" href="records.html">
-            <span className="my-route-icon" aria-hidden="true">▤</span>
-            <span className="my-route-copy"><strong>내 기록</strong><span>지난 해석과 저장된 기록을 확인합니다.</span></span>
-            <span className="my-route-arrow" aria-hidden="true">→</span>
-          </a>
-          <a className="my-route-card" href="chat-hub.html">
-            <span className="my-route-icon" aria-hidden="true">◌</span>
-            <span className="my-route-copy"><strong>이어지는 대화</strong><span>이전에 나눈 대화를 계속 이어갑니다.</span></span>
-            <span className="my-route-arrow" aria-hidden="true">→</span>
-          </a>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function RecentSection() {
-  const items = [
-    { label: '사주', detail: '내 사주에서 현재 해석을 확인합니다.', href: 'reading.html', action: '사주 열기', icon: '✦' },
-    { label: '대화', detail: '대화 허브에서 이어갈 상대를 선택합니다.', href: 'chat-hub.html', action: '대화 열기', icon: '◌' },
-    { label: '기록', detail: '지나온 기록에서 저장된 내용을 확인합니다.', href: 'records.html', action: '기록 열기', icon: '▤' },
-  ] as const;
-
-  return (
-    <section className="my-recent-section" aria-labelledby="my-recent-title">
-      <div className="my-section-intro">
-        <span className="my-section-kicker">CONTINUE</span>
-        <h2 id="my-recent-title">최근 이어진 것</h2>
-        <p>최근 활동의 실제 내용은 각 화면에서 확인하고, 여기서는 바로 이어갈 길만 보여줍니다.</p>
-      </div>
-      <div className="my-recent-grid">
-        {items.map((item) => (
-          <a className="my-recent-card" href={item.href} key={item.label}>
-            <span className="my-recent-icon" aria-hidden="true">{item.icon}</span>
-            <span className="my-recent-copy"><strong>{uiLabel(item.label)}</strong><span>{uiLabel(item.detail)}</span></span>
-            <span className="my-recent-action">{uiLabel(item.action)} <span aria-hidden="true">→</span></span>
-          </a>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-
-function SettingsSection({ account, openPanel, setOpenPanel }: {
-  account: AccountState;
-  openPanel: SettingsPanel;
-  setOpenPanel: (panel: SettingsPanel) => void;
-}) {
-  const payload = account.kind === 'ready' ? account.payload : null;
-  const profile = payload?.profile;
-  const session = readMemberSession();
-  const hasStoredMemberSession = account.kind === 'unavailable'
-    ? account.hasStoredMemberSession
-    : Boolean(payload && session);
-
-  function toggle(panel: Exclude<SettingsPanel, null>) {
-    setOpenPanel(openPanel === panel ? null : panel);
-  }
-
-  return (
-    <section className="my-settings-section" aria-labelledby="my-settings-title">
-      <div className="my-section-intro">
-        <span className="my-section-kicker">SETTINGS</span>
-        <h2 id="my-settings-title">설정</h2>
-        <p>내 계정 정보를 확인하고 명하 이용 안내를 찾아볼 수 있습니다.</p>
-      </div>
-
-      <div className="my-settings-list">
-        <button
-          className="my-setting-row my-setting-trigger"
-          type="button"
-          id="my-account-panel-trigger"
-          aria-expanded={openPanel === 'account'}
-          aria-controls="my-account-panel"
-          onClick={() => toggle('account')}
-        >
-          <span className="my-setting-icon" aria-hidden="true">⚙</span>
-          <strong>계정 관리</strong>
-          <span className="my-setting-chevron" aria-hidden="true">{openPanel === 'account' ? '⌃' : '⌄'}</span>
-        </button>
-        <div className="my-setting-detail" id="my-account-panel" role="region" aria-labelledby="my-account-panel-trigger" hidden={openPanel !== 'account'}>
-          {account.kind === 'loading' ? <p>계정 정보를 확인하는 중입니다…</p> : null}
-          {account.kind === 'unavailable' ? (
-            <>
-              <p>{uiLabel(account.message)}</p>
-              {account.login ? <a href="auth.html?next=my.html">로그인하기 →</a> : null}
-            </>
-          ) : null}
-          {payload ? (
-            <>
-              <dl className="my-account-facts">
-                <div><dt>계정 유형</dt><dd>{payload.subjectKind === 'member' ? '회원' : '게스트'}</dd></div>
-                <div><dt>계정 상태</dt><dd>{payload.subjectStatus === 'deletion_pending' ? '삭제 요청 진행 중' : '사용 중'}</dd></div>
-                <div><dt>호칭</dt><dd>{profile?.displayName?.trim() || '설정되지 않음'}</dd></div>
-                {payload.subjectKind === 'member' ? (
-                  <div><dt>로그인 이메일</dt><dd>{session?.user?.email ?? '현재 세션에서 확인할 수 없음'}</dd></div>
-                ) : null}
-              </dl>
-              {payload.subjectKind === 'guest' ? (
-                <a className="my-setting-inline-link" href="auth.html?next=my.html">회원 계정 연결하기 →</a>
-              ) : null}
-              <p className="my-setting-caveat">현재 저장된 계정 정보를 조회하는 화면입니다. 프로필 변경 및 회원 탈퇴 요청은 검증된 서버 절차가 연결되기 전까지 이 화면에서 실행하지 않습니다.</p>
-            </>
-          ) : null}
-        </div>
-
-        <button
-          className="my-setting-row my-setting-trigger"
-          type="button"
-          id="my-help-panel-trigger"
-          aria-expanded={openPanel === 'help'}
-          aria-controls="my-help-panel"
-          onClick={() => toggle('help')}
-        >
-          <span className="my-setting-icon" aria-hidden="true">?</span>
-          <strong>도움말 · 고객지원</strong>
-          <span className="my-setting-chevron" aria-hidden="true">{openPanel === 'help' ? '⌃' : '⌄'}</span>
-        </button>
-        <div className="my-setting-detail" id="my-help-panel" role="region" aria-labelledby="my-help-panel-trigger" hidden={openPanel !== 'help'}>
-          <h3>자주 묻는 질문</h3>
-          <div className="my-help-faq">
-            <div>
-              <strong>저장한 사주 해석은 어디서 확인하나요?</strong>
-              <p>기록 화면에서 저장된 공식 풀이를 다시 볼 수 있습니다. 저장되지 않은 결과는 기록에 나타나지 않습니다.</p>
-              <a href="records.html">기록 보러 가기 →</a>
-            </div>
-            <div>
-              <strong>관상에 선택한 사진은 어디에 사용되나요?</strong>
-              <p>현재 관상 화면은 브라우저에서 사진을 미리 확인하는 단계이며, 사진 분석 기능은 아직 연결되지 않았습니다.</p>
-              <a href="face-reading.html">관상 화면 보기 →</a>
-            </div>
-            <div>
-              <strong>회원 계정은 어디서 연결하나요?</strong>
-              <p>마이페이지에서 계정 연결 또는 로그인을 통해 현재 이용 흐름을 이어갈 수 있습니다.</p>
-              <a href="auth.html?next=my.html">계정 연결 화면 →</a>
-            </div>
-          </div>
-          <p className="my-setting-caveat">현재는 이용 안내만 제공합니다. 공식 문의 접수처와 약관 링크는 확인된 공개 경로가 준비되면 이곳에 연결됩니다.</p>
-        </div>
-
-        <div className="my-setting-row my-setting-auth">
-          <span className="my-setting-icon" aria-hidden="true">{payload?.subjectKind === 'member' ? '↪' : '之'}</span>
-          <strong>{payload?.subjectKind === 'member' ? '로그아웃' : '계정 연결'}</strong>
-          <AuthActions subjectKind={payload?.subjectKind} hasStoredMemberSession={hasStoredMemberSession} />
-        </div>
-      </div>
-
-      <p className="my-settings-note">이용권·결제 내역 및 알림 설정은 실제 서버 조회·동의 기능이 연결될 때만 메뉴에 표시합니다. 잔여 이용권이나 알림 상태를 임의로 생성하지 않습니다.</p>
-    </section>
-  );
-}
-
 export function MyPage() {
-  const [openSettingsPanel, setOpenSettingsPanel] = useState<SettingsPanel>(null);
+  const [activePanel, setActivePanel] = useState<MyPanel>(null);
   const [account, setAccount] = useState<AccountState>({ kind: 'loading' });
   const [birth, setBirth] = useState<BirthState>({ kind: 'loading' });
+  const payload = account.kind === 'ready' ? account.payload : null;
+  const memberSession = readMemberSession();
+  const memberEmail = payload?.subjectKind === 'member' ? memberSession?.user?.email ?? '로그인 이메일 확인 중' : '계정 연결이 필요합니다.';
+  const accountBadge = payload?.subjectStatus === 'deletion_pending' ? '삭제 요청 진행 중' : payload?.subjectKind === 'member' ? '회원 계정' : payload?.subjectKind === 'guest' ? '게스트' : '확인 중';
 
   useEffect(() => {
     let active = true;
     const client = createMyRuntimeClient();
-
     async function boot() {
       try {
-        const payload = await client.readProfile() as ProfilePayload;
+        const data = await client.readProfile() as ProfilePayload;
         if (!active) return;
-        setAccount({ kind: 'ready', payload });
+        setAccount({ kind: 'ready', payload: data });
       } catch (error) {
         if (!active) return;
         const sessionRequired = error instanceof MyRuntimeError && error.code === 'WEB_MY_SESSION_REQUIRED';
@@ -431,10 +239,9 @@ export function MyPage() {
         setBirth({ kind: 'unavailable', message: sessionRequired ? '현재 세션이 연결되면 저장된 출생 정보를 확인할 수 있습니다.' : '현재 출생 정보를 확인할 수 없습니다.' });
         return;
       }
-
       try {
-        const payload = await client.readBirthProfile() as BirthPayload;
-        if (active) setBirth({ kind: 'ready', payload });
+        const data = await client.readBirthProfile() as BirthPayload;
+        if (active) setBirth({ kind: 'ready', payload: data });
       } catch (error) {
         if (!active) return;
         if (error instanceof MyRuntimeError && error.code === 'WEB_MY_SESSION_REQUIRED') {
@@ -452,7 +259,6 @@ export function MyPage() {
         setBirth({ kind: 'unavailable', message: '현재 출생 정보를 불러올 수 없습니다. 확인되지 않은 값을 대신 표시하지 않습니다.' });
       }
     }
-
     void boot();
     return () => { active = false; };
   }, []);
@@ -467,18 +273,75 @@ export function MyPage() {
     return () => window.removeEventListener('storage', handleStorage);
   }, []);
 
-  function openAccountSettings() {
-    setOpenSettingsPanel('account');
-    document.getElementById('my-settings-title')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  function toggle(panel: Exclude<MyPanel, null>) {
+    setActivePanel(current => current === panel ? null : panel);
+  }
+  function details(panel: Exclude<MyPanel, null>) {
+    return activePanel === panel ? <Detail key={panel} panel={panel} account={account} birth={birth} /> : null;
   }
 
   return (
-    <div className="product-shell my-page-shell">
-      <ProfileHome state={account} onOpenAccount={openAccountSettings} />
-      <BirthSection state={birth} />
-      <FlowSection />
-      <RecentSection />
-      <SettingsSection account={account} openPanel={openSettingsPanel} setOpenPanel={setOpenSettingsPanel} />
+    <div className="my-page-shell">
+      <div className="my-hero">
+        <div className="product-shell my-hero-inner">
+          <span className="my-kicker">MY PAGE</span>
+          <h1 className="my-title" id="my-page-title">마이페이지</h1>
+          <p className="my-lead">내 계정과 이용 정보를 관리합니다.</p>
+        </div>
+      </div>
+
+      <div className="product-shell my-dashboard">
+        <section className="my-account-section" aria-label="계정 정보">
+          <button type="button" className="my-account-card" aria-expanded={activePanel === 'account'} aria-controls="my-account-panel" onClick={() => toggle('account')}>
+            <span className="my-account-avatar"><MyGlyph name="user" /></span>
+            <span className="my-account-copy">
+              <strong>계정 정보</strong>
+              <span className="my-account-meta">{account.kind === 'ready' ? memberEmail : '내 계정 정보를 확인하세요.'} <span className="my-account-badge">{accountBadge}</span></span>
+            </span>
+            <span className="my-account-action">계정 정보 관리하기 <MyGlyph name="chevron" /></span>
+          </button>
+          <div id="my-account-panel">{details('account')}</div>
+        </section>
+
+        <section className="my-memory-section" aria-labelledby="my-memory-title">
+          <div className="my-memory-copy">
+            <h2 id="my-memory-title">캐릭터 메모리</h2>
+            <p>대화 중 기억한 내용과 내가 직접 추가한 내용을<br className="my-desktop-break" /> 확인하고 관리합니다.</p>
+            <button type="button" className="my-primary-action" onClick={() => toggle('memory')} aria-expanded={activePanel === 'memory'}>메모리 관리하기 <MyGlyph name="chevron" /></button>
+          </div>
+        </section>
+        {details('memory')}
+
+        <section className="my-section-card my-commerce-section" aria-labelledby="my-commerce-title">
+          <div className="my-section-heading">
+            <h2 id="my-commerce-title">구매 내역 · 내 이용권</h2>
+            <p>결제한 상품과 보유 이용권을 확인합니다.</p>
+          </div>
+          <div className="my-choice-grid">
+            <Choice title="구매 내역" description="결제한 상품 및 거래 내역" glyph="bag" open={activePanel === 'orders'} onClick={() => toggle('orders')} />
+            <Choice title="내 이용권" description="보유 이용권 · 사용 내역 · 유효기간" glyph="ticket" open={activePanel === 'passes'} onClick={() => toggle('passes')} />
+          </div>
+          {activePanel === 'orders' ? details('orders') : activePanel === 'passes' ? details('passes') : null}
+        </section>
+
+        <section className="my-section-card my-settings-section" aria-labelledby="my-settings-title">
+          <div className="my-section-heading">
+            <h2 id="my-settings-title">설정 및 지원</h2>
+            <p>서비스 이용을 위한 설정과 문의를 관리합니다.</p>
+          </div>
+          <div className="my-choice-grid my-settings-grid">
+            <Choice title="출생 정보" description="사주 계산에 사용하는 정보 관리" glyph="calendar" open={activePanel === 'birth'} onClick={() => toggle('birth')} />
+            <Choice title="화면 및 언어" description="테마 · 언어 설정" glyph="palette" open={activePanel === 'display'} onClick={() => toggle('display')} />
+            <Choice title="문의" description="관리자에게 문의하기" glyph="chat" open={activePanel === 'support'} onClick={() => toggle('support')} />
+          </div>
+          {activePanel === 'birth' ? details('birth') : activePanel === 'display' ? details('display') : activePanel === 'support' ? details('support') : null}
+        </section>
+
+        <footer className="my-footer">
+          <span>MYEONGHA · 나를 이해하는 또 하나의 방법</span>
+          <AuthActions subjectKind={payload?.subjectKind} hasStoredMemberSession={Boolean(memberSession)} />
+        </footer>
+      </div>
     </div>
   );
 }
