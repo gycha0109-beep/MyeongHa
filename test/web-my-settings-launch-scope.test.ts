@@ -54,7 +54,9 @@ describe('My settings launch scope', () => {
     expect(page).toContain('href="records.html"');
     expect(page).toContain('href="face-reading.html"');
     expect(page).toContain('href="auth.html?next=my.html"');
-    expect(page).toContain('공식 문의 접수처와 약관 링크는 확인된 공개 경로가 준비되면');
+    expect(page).toContain('href="contact.html"');
+    expect(page).toContain('<strong>문의</strong>');
+    expect(page).not.toContain('공식 문의 접수처와 약관 링크는 확인된 공개 경로가 준비되면');
     expect(css).toContain('.my-setting-trigger:focus-visible');
     expect(css).toContain('.my-setting-detail[hidden]');
     expect(css).toContain('.my-account-facts');
