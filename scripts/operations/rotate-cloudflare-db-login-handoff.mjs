@@ -1,11 +1,10 @@
 // One-time encrypted handoff for the independent Cloudflare PostgreSQL LOGIN.
 // Uses only the approved production Postgres password + session pooler + pinned CA.
-// Secrets never appear in source, output, GitHub logs, SQL text, or the artifact.
+// Plaintext passwords/DSNs never appear in source, output, logs or artifacts.
+// Only the SCRAM verifier is sent in the password-changing SQL statement.
 // Watchtower-Track: ops
-import {
-  randomBytes, createPublicKey, publicEncrypt, constants,
-  pbkdf2Sync, createHmac, createHash,
-} from 'node:crypto';
+import { validateRecipient, prepareRecovery, durableWriteExclusive, mutateAfterDurableHandoff } from './cloudflare-db-recovery-checkpoint.mjs';
+import { pathToFileURL } from 'node:url';
 import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -13,7 +12,6 @@ import { spawn } from 'node:child_process';
 
 const PROJECT = 'cnsfpcdiyofqvhpcegfc';
 const ROLE = 'myeongha_cf_api_login';
-const PUB_DER_B64 = 'MIIBojANBgkqhkiG9w0BAQEFAAOCAY8AMIIBigKCAYEAxjfAtf/z/OaD32OLoNfv23JsUDEHCtyXIXXyljXpT5gF2j0k0LuMamcs5y+rS03LFk+QDCvlIAAC+UQZOu5kMt0H36G+3Ok5vnKVC3F/RK5sqNTGnJObNQtxeS9OWq757CSQV9lUxXR5Cm6I0PXUq3w1LkHtf4xYhWKUOdaU1q9CJaym1AC32G53hfhIldkEvQI1BTPEmpdV38LZpMqLMzHHYoMASRVcYnvYlVNp4gBGimhB4Ub/oQvhWJgB9stdriJPOkt8SNCVdJBqv48W8wvNAaNT7s5OUGbpFCyV4/k5cFRlED9u2/85zoiSAoiX2gWI2bmes4KQeYEfIihreHsQGueCUEOyTtimylpYtImBsq6wpa218Yh0YKWdRMS0hTfjy1Mulp9QeyY2TEfu95Pin5dAu3tzsvxK7+tlKd6jMBBwT6IuLvrlabkrBioazcXYZrXP0ZBtFvpcab1j4IfGJFXmQ/FOR0E/vbND4XBdCkMaTGbtqrkiUm5Lxk1XAgMBAAE=';
 const REQUIRED_CONFIRM = 'ROTATE_MYEONGHA_CF_DB_LOGIN_20261026';
 let stage = 'START';
 
@@ -21,33 +19,24 @@ function ensure(condition, reason) {
   if (!condition) throw new Error(reason);
 }
 
-function scramVerifier(password) {
-  const salt = randomBytes(16);
-  const salted = pbkdf2Sync(password, salt, 4096, 32, 'sha256');
-  const stored = createHash('sha256')
-    .update(createHmac('sha256', salted).update('Client Key').digest()).digest();
-  const server = createHmac('sha256', salted).update('Server Key').digest();
-  return 'SCRAM-SHA-256$4096:' + salt.toString('base64') + '$' +
-    stored.toString('base64') + ':' + server.toString('base64');
-}
-
 async function query(sql, env, { read = false } = {}) {
   return new Promise((resolve, reject) => {
     const proc = spawn('psql', ['-X', '-v', 'ON_ERROR_STOP=1', '-qAt'], {
-      env, stdio: ['pipe', 'pipe', 'pipe'],
+      env, stdio: ['pipe', 'pipe', 'pipe'], timeout: 25000, windowsHide: true,
     });
     let output = '';
     let failed = false;
+    let stderr = '';
     proc.on('error', () => { failed = true; });
     proc.stdout.on('data', chunk => {
       if (read && output.length < 256) output += String(chunk).slice(0, 256);
     });
     // Never log stderr: the database transport may mention hosts or credentials.
-    proc.stderr.on('data', () => {});
+    proc.stderr.on('data', chunk => { if (stderr.length < 4096) stderr += String(chunk).slice(0,4096); });
     proc.stdin.on('error', () => {});
     proc.stdin.end(sql + '\n');
     proc.on('close', code => {
-      if (failed || code !== 0) reject(new Error('PostgreSQL protected command failed'));
+      if (failed || code !== 0) reject(new Error(/password authentication failed|sasl.*authentication/i.test(stderr) ? 'DB_PASSWORD_AUTH_FAILED' : /certificate|root cert|ssl/i.test(stderr) ? 'DB_TLS_PEER_FAILED' : /permission denied/i.test(stderr) ? 'DB_PERMISSION_FAILED' : 'PostgreSQL protected command failed'));
       else resolve(read ? output.trim() : '');
     });
   });
@@ -69,12 +58,8 @@ async function main() {
   ensure(typeof process.env.HANDOFF_OUTPUT === 'string' &&
     process.env.HANDOFF_OUTPUT.endsWith('.bin'), 'Encrypted handoff path not configured');
 
-  const recipient = createPublicKey({
-    key: Buffer.from(PUB_DER_B64, 'base64'), format: 'der', type: 'spki',
-  });
-  ensure(recipient.asymmetricKeyType === 'rsa' &&
-    recipient.asymmetricKeyDetails?.modulusLength >= 3072, 'Recipient key rejected');
-
+  validateRecipient(process.env.HANDOFF_RECIPIENT_DER_B64, process.env.HANDOFF_RECIPIENT_PROOF);
+  ensure(process.env.HANDOFF_ARTIFACT_MODULE, 'Durable artifact client required');
   const tempRoot = await mkdtemp(path.join(process.env.RUNNER_TEMP || tmpdir(), 'cf-db-ca-'));
   const certPath = path.join(tempRoot, 'root.pem');
   try {
@@ -83,43 +68,50 @@ async function main() {
     const baseEnv = {
       ...process.env, PGHOST: host, PGPORT: '5432', PGDATABASE: 'postgres',
       PGUSER: 'postgres.' + PROJECT, PGPASSWORD: process.env.SUPABASE_DB_PASSWORD,
-      PGSSLMODE: 'verify-full', PGSSLROOTCERT: certPath,
+      PGSSLMODE: 'verify-full', PGSSLROOTCERT: certPath, PGCONNECT_TIMEOUT: '12',
     };
 
     stage = 'OWNER_CONNECTION_AND_ROLE_PREFLIGHT';
     const preflight = await query(`select case when
       exists(select 1 from pg_roles where rolname='myeongha_cf_api_login'
         and rolcanlogin and not rolbypassrls and not rolsuper
-        and not rolcreaterole and not rolcreatedb)
+        and not rolcreaterole and not rolcreatedb and rolconnlimit=5
+        and rolvaliduntil > now()
+        and not exists(select 1 from pg_class where relowner=pg_roles.oid)
+        and not exists(select 1 from pg_proc where proowner=pg_roles.oid)
+        and not exists(select 1 from pg_namespace where nspowner=pg_roles.oid)
+        and not exists(select 1 from pg_stat_activity where usename='myeongha_cf_api_login' and state='active'))
       and pg_has_role('myeongha_cf_api_login','myeongha_api_executor','MEMBER')
       and exists(select 1 from pg_roles where rolname='myeongha_api_executor'
         and not rolcanlogin and not rolbypassrls)
       then 'PASS' else 'FAIL' end;`, baseEnv, { read: true });
     ensure(preflight === 'PASS', 'Dedicated role authority preflight failed');
 
-    const password = randomBytes(48).toString('hex');
-    ensure(/^[a-f0-9]{96}$/.test(password), 'Generated password format failure');
-    const ciphertext = publicEncrypt({
-      key: recipient, padding: constants.RSA_PKCS1_OAEP_PADDING,
-      oaepHash: 'sha256',
-    }, Buffer.from(password, 'utf8'));
-    ensure(ciphertext.length >= 384, 'Ciphertext too short');
-
-    // Never send plaintext password through PostgreSQL protocol logs.
-    const verifier = scramVerifier(password);
-    ensure(/^SCRAM-SHA-256\$4096:[A-Za-z0-9+/=]+\$[A-Za-z0-9+/=]+:[A-Za-z0-9+/=]+$/.test(verifier),
-      'Password verifier format invalid');
-    // Preserve only the recipient-encrypted credential before any mutation.
-    // This ensures an operator can reconcile an uncertain DB write or pooler check.
     stage = 'STAGE_ENCRYPTED_HANDOFF';
-    await writeFile(process.env.HANDOFF_OUTPUT, ciphertext,
-      { flag: 'wx', mode: 0o600 });
-
-    stage = 'ALTER_DEDICATED_ROLE_PASSWORD';
-    await query("ALTER ROLE " + ROLE + " WITH PASSWORD '" + verifier + "';", baseEnv);
+    const candidate = await prepareRecovery({
+      key: process.env.HANDOFF_RECIPIENT_DER_B64,
+      signature: process.env.HANDOFF_RECIPIENT_PROOF,
+      filename: process.env.HANDOFF_OUTPUT,
+    });
+    const { password } = candidate;
+    // The remote upload must finish BEFORE ALTER ROLE. An always() upload
+    // after a failed mutation cannot protect against runner loss/cancellation.
+    stage = 'UPLOAD_RECOVERY_BEFORE_MUTATION';
+    const artifactModule = await import(pathToFileURL(process.env.HANDOFF_ARTIFACT_MODULE).href);
+    const client = new artifactModule.DefaultArtifactClient();
+    await mutateAfterDurableHandoff({ candidate,
+      publish: () => client.uploadArtifact('cloudflare-db-encrypted-handoff-' + process.env.GITHUB_RUN_ID,
+        [process.env.HANDOFF_OUTPUT], path.dirname(process.env.HANDOFF_OUTPUT), { retentionDays: 1 }),
+      checkpoint: data => durableWriteExclusive(process.env.HANDOFF_OUTPUT + '.checkpoint.json', JSON.stringify(data)),
+      mutate: async verifier => {
+        console.log('cloudflare_db_rotation=RECOVERY_ARTIFACT_DURABLE_BEFORE_MUTATION');
+        stage = 'ALTER_DEDICATED_ROLE_PASSWORD';
+        return query("ALTER ROLE " + ROLE + " WITH PASSWORD '" + verifier + "';", baseEnv);
+      },
+    });
 
     // Verify the new isolated login over full peer-verified TLS and target
-    // transaction port before sending any credential to an encrypted artifact.
+    // transaction port. The encrypted artifact already exists durably.
     stage = 'VERIFY_DEDICATED_LOGIN';
     // Supavisor Shared Pooler may briefly cache the old role verifier.
     // Do not rotate again; allow one bounded reconnect after cache settling.
@@ -164,11 +156,14 @@ try {
     'Dedicated role authority preflight failed', 'Generated password format failure',
     'Ciphertext too short', 'Password verifier format invalid',
     'Dedicated login verification failed', 'PostgreSQL protected command failed',
+    'DB_PASSWORD_AUTH_FAILED', 'DB_TLS_PEER_FAILED', 'DB_PERMISSION_FAILED',
+    'Durable artifact client required', 'Durable handoff upload failed',
+    'RECIPIENT_PROOF_REJECTED', 'CHECKPOINT_READBACK_FAILED',
   ];
   // Fixed stage marker contains no SQL text or runtime data.
   const knownStages = new Set([
     'START', 'OWNER_CONNECTION_AND_ROLE_PREFLIGHT',
-    'STAGE_ENCRYPTED_HANDOFF', 'ALTER_DEDICATED_ROLE_PASSWORD',
+    'STAGE_ENCRYPTED_HANDOFF', 'UPLOAD_RECOVERY_BEFORE_MUTATION', 'ALTER_DEDICATED_ROLE_PASSWORD',
     'VERIFY_DEDICATED_LOGIN', 'COMPLETE',
   ]);
   console.error('cloudflare_db_rotation=FAILED_STAGE_' +

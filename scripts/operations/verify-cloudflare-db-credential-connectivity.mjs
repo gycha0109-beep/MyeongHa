@@ -2,9 +2,36 @@
 // password, SQL errors, server responses or any business/subject data.
 // Watchtower-Track: ops
 import { X509Certificate } from 'node:crypto';
-import { verifyCloudflareDbHandoffV1 } from './verify-cloudflare-db-handoff.mjs';
 
 export const DEDICATED_CF_LOGIN = 'myeongha_cf_api_login';
+// Staging these two DB bindings must not require reading unrelated auth/API
+// secrets. Those bindings are inherited by the existing remote Worker version.
+export function verifyCloudflareDedicatedDbTargetV2(env) {
+  try {
+    if (typeof env.MYEONGHA_DATABASE_URL !== 'string' || env.MYEONGHA_DATABASE_URL.trim() !== env.MYEONGHA_DATABASE_URL) return { result: 'HOLD', code: 'DB_CONNECTION_CONTRACT_REJECTED' };
+    const url = new URL(env.MYEONGHA_DATABASE_URL);
+    const host = env.MYEONGHA_CLOUDFLARE_DB_APPROVED_HOST;
+    const port = env.MYEONGHA_CLOUDFLARE_DB_APPROVED_PORT;
+    const login = DEDICATED_CF_LOGIN + (host?.endsWith('.pooler.supabase.com') ? '.cnsfpcdiyofqvhpcegfc' : '');
+    if (env.MYEONGHA_CLOUDFLARE_DB_TLS_RLS_APPROVAL !== 'approved-isolated-tls-rls-v1' ||
+        env.MYEONGHA_DATABASE_PRINCIPAL !== DEDICATED_CF_LOGIN ||
+        env.MYEONGHA_DATABASE_TLS_PEER_MODE !== 'verify-full' ||
+        typeof host !== 'string' || !/^(?:[a-z0-9-]+\.)+[a-z][a-z0-9-]{1,62}$/.test(host) ||
+        /\.(?:localhost|local|internal|invalid|test|example)$/.test(host) ||
+        !/^[1-9][0-9]{0,4}$/.test(port || '') || Number(port) > 65535 ||
+        !['postgres:', 'postgresql:'].includes(url.protocol) ||
+        url.hostname !== host || url.port !== port || url.pathname !== '/postgres' ||
+        decodeURIComponent(url.username) !== login || !url.password || url.hash ||
+        !['require', 'verify-full'].includes(url.searchParams.get('sslmode'))) {
+      return { result: 'HOLD', code: 'DB_CONNECTION_CONTRACT_REJECTED' };
+    }
+    // URL options must not override the pinned TLS configuration in pg.
+    if ([...url.searchParams.keys()].some(key => !['sslmode', 'sslrootcert'].includes(key))) {
+      return { result: 'HOLD', code: 'DB_CONNECTION_CONTRACT_REJECTED' };
+    }
+    return { result: 'CONFIG_CONTRACT_PASS' };
+  } catch { return { result: 'HOLD', code: 'DB_CONNECTION_CONTRACT_REJECTED' }; }
+}
 const APPROVED_ROOT_CA_FINGERPRINT256 =
   '80:70:25:AD:50:D4:ED:21:9D:2C:9C:7D:29:9C:00:4F:82:4E:B0:0C:F7:F6:5A:FE:F6:07:D0:7B:72:E6:CA:FA';
 export const CF_LOGIN_READONLY_SQL = [
@@ -39,7 +66,7 @@ export async function verifyCloudflareDbCredentialConnectionV1(env, {
   clientFactory,
   validateRoot = verifyCloudflareDbRootCaV1,
 } = {}) {
-  if (verifyCloudflareDbHandoffV1(env).result !== 'CONFIG_CONTRACT_PASS') {
+  if (verifyCloudflareDedicatedDbTargetV2(env).result !== 'CONFIG_CONTRACT_PASS') {
     return result('DB_CONNECTION_CONTRACT_REJECTED');
   }
   if (!validateRoot(env.MYEONGHA_DATABASE_SSL_ROOT_CERT_PEM)) {

@@ -36,6 +36,25 @@ const fake = (rows = [validRole]) => {
 };
 
 describe('Cloudflare dedicated DB positive TLS + role canary', () => {
+  it('stages DB credentials without requiring access to unrelated auth secrets', async () => {
+    const values = env();
+    delete values.MYEONGHA_SUPABASE_API_KEY;
+    delete values.MYEONGHA_GUEST_FINGERPRINT_SECRET;
+    const state = await verifyCloudflareDbCredentialConnectionV1(values, {
+      validateRoot: () => true, clientFactory: async () => fake(),
+    });
+    expect(state.result).toBe('DB_AUTHENTICATED_READ_ONLY');
+  });
+  it('rejects URL options that could override TLS before opening a socket', async () => {
+    const factory = vi.fn();
+    const values = env();
+    values.MYEONGHA_DATABASE_URL += '&ssl=no-verify';
+    const state = await verifyCloudflareDbCredentialConnectionV1(values, {
+      validateRoot: () => true, clientFactory: factory,
+    });
+    expect(state.result).toBe('HOLD');
+    expect(factory).not.toHaveBeenCalled();
+  });
   it('checks only the dedicated role with true TLS verification and a single SELECT', async () => {
     const client = fake();
     const factory = vi.fn(async () => client);

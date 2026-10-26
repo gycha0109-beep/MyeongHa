@@ -5,8 +5,7 @@ import { readFile } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { resolve } from 'node:path';
-import { verifyCloudflareDbHandoffV1 } from './verify-cloudflare-db-handoff.mjs';
-import { verifyCloudflareDbCredentialConnectionV1 } from './verify-cloudflare-db-credential-connectivity.mjs';
+import { verifyCloudflareDedicatedDbTargetV2, verifyCloudflareDbCredentialConnectionV1 } from './verify-cloudflare-db-credential-connectivity.mjs';
 
 export const STAGED_DB_KEYS_V1 = Object.freeze([
   'MYEONGHA_DATABASE_URL',
@@ -28,7 +27,7 @@ export function prepareCloudflareDbCredentialStageV1(env, config) {
       config?.main !== './cloudflare/myeongha-worker.mjs') {
     return failure('WRONG_WORKER_CONFIGURATION');
   }
-  const check = verifyCloudflareDbHandoffV1(env);
+  const check = verifyCloudflareDedicatedDbTargetV2(env);
   if (check.result !== 'CONFIG_CONTRACT_PASS') return failure(check.code);
   if (typeof env.MYEONGHA_DATABASE_URL !== 'string' ||
       typeof env.MYEONGHA_DATABASE_PRINCIPAL !== 'string') {
