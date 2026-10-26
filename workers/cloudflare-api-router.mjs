@@ -1,6 +1,6 @@
 // Explicit Cloudflare API path inventory and deny-first dispatcher metadata.
 // Route metadata is NEVER an upstream URL or permission to invoke a Vercel API.
-// Keep in sync with vercel.json. No network, auth, DB, or secret access here.
+// Cloudflare owns this allowlisted route inventory independently of the Vercel standby. No network, auth, DB, or secret access here.
 // Watchtower-Track: ops
 
 export const CLOUDFLARE_DIRECT_API_ROUTES = Object.freeze([
