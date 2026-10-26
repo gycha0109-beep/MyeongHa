@@ -13,6 +13,7 @@ DECLARE
   v_is_definer boolean;
   v_service_grants bigint;
   v_owner_memberships bigint;
+  v_can_set boolean;
 BEGIN
   IF current_user <> 'postgres' THEN
     RAISE EXCEPTION 'HOLD_SEYEON_HELPER_ACL_UNEXPECTED_MIGRATION_PRINCIPAL';
@@ -71,8 +72,19 @@ BEGIN
   -- Supabase Production: postgres may ADMIN the owner membership, but
   -- currently cannot SET/INHERIT it. Verify the exact preexisting edge
   -- before issuing an additional transaction-local SET-only membership.
-  IF NOT pg_catalog.pg_has_role(
-      'postgres','myeongha_seyeon_chat_runtime_owner','SET') THEN
+  IF current_setting('server_version_num')::integer < 160000 THEN
+    -- PostgreSQL 15 has no pg_has_role(..., 'SET') nor per-grant SET flags.
+    -- Only the disposable pre-16 superuser fixture is supported here.
+    SELECT r.rolsuper INTO v_can_set FROM pg_catalog.pg_roles r
+    WHERE r.rolname=current_user;
+    IF NOT v_can_set THEN
+      RAISE EXCEPTION 'HOLD_SEYEON_HELPER_ACL_PRE16_RESTRICTED_PRINCIPAL';
+    END IF;
+  ELSE
+    v_can_set := pg_catalog.pg_has_role(
+      'postgres','myeongha_seyeon_chat_runtime_owner','SET');
+  END IF;
+  IF NOT v_can_set THEN
     SELECT count(*) INTO v_owner_memberships
     FROM pg_catalog.pg_auth_members m
     WHERE m.roleid='myeongha_seyeon_chat_runtime_owner'::regrole
@@ -93,17 +105,25 @@ END
 $seyeon_helper_acl_preflight$;
 
 DO $seyeon_helper_acl_temporary_owner_access$
+DECLARE
+  v_can_set boolean;
 BEGIN
-  IF NOT pg_catalog.pg_has_role(
-      'postgres','myeongha_seyeon_chat_runtime_owner','SET') THEN
-    -- Adds a second grantor=postgres row; the preexisting provider-owned
-    -- membership is never changed. Both rows are transaction-scoped here.
+  IF current_setting('server_version_num')::integer < 160000 THEN
+    SELECT r.rolsuper INTO v_can_set FROM pg_catalog.pg_roles r
+    WHERE r.rolname=current_user;
+  ELSE
+    v_can_set := pg_catalog.pg_has_role(
+      'postgres','myeongha_seyeon_chat_runtime_owner','SET');
+  END IF;
+  IF NOT v_can_set THEN
+    -- Adds a second grantor=postgres row; the existing provider-owned
+    -- membership is never modified, and the extra row is removed below.
     EXECUTE 'GRANT myeongha_seyeon_chat_runtime_owner TO postgres
              WITH ADMIN FALSE, INHERIT FALSE, SET TRUE';
-  END IF;
-  IF NOT pg_catalog.pg_has_role(
+    IF NOT pg_catalog.pg_has_role(
       'postgres','myeongha_seyeon_chat_runtime_owner','SET') THEN
-    RAISE EXCEPTION 'HOLD_SEYEON_HELPER_ACL_OWNER_SET_UNAVAILABLE';
+      RAISE EXCEPTION 'HOLD_SEYEON_HELPER_ACL_OWNER_SET_UNAVAILABLE';
+    END IF;
   END IF;
 END
 $seyeon_helper_acl_temporary_owner_access$;

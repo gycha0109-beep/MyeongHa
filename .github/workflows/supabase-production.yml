@@ -89,7 +89,7 @@ jobs:
               echo 'HOLD_SEYEON_HELPER_OWNER_RETRY_PATH_DRIFT' >&2
               exit 1
             }
-            [[ "$(git hash-object supabase/migrations/20261026025332_seyeon_chat_helper_service_role_least_privilege.sql)" == 'd705f9a064c8f1c955942cc1fc60d24502fdd183' ]] || {
+            [[ "$(git hash-object supabase/migrations/20261026025332_seyeon_chat_helper_service_role_least_privilege.sql)" == 'c051a1dde2b3a260cdde5efafdcf1583c79d608d' ]] || {
               echo 'HOLD_SEYEON_HELPER_OWNER_RETRY_SQL_DRIFT' >&2
               exit 1
             }
