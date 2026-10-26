@@ -16,7 +16,7 @@ function request(path, method = 'GET', headers = {}) {
 }
 
 describe('Cloudflare Phase 4 strict API dispatcher', () => {
-  it('matches all 12 direct API entries and 20 rewrites with no widening', async () => {
+  it('matches all 12 direct API entries and 21 rewrites with no widening', async () => {
     const vercel = JSON.parse(await readFile(new URL('../vercel.json', import.meta.url)));
     const direct = [
       '/api/health', '/api/readiness', '/api/session/bootstrap',
@@ -28,9 +28,9 @@ describe('Cloudflare Phase 4 strict API dispatcher', () => {
     expect(CLOUDFLARE_DIRECT_API_ROUTES.map(route => route.path)).toEqual(direct);
     expect(CLOUDFLARE_REWRITE_ROUTES.map(({ source, destination })=>({ source, destination })))
       .toEqual(vercel.rewrites);
-    expect(CLOUDFLARE_REWRITE_ROUTES).toHaveLength(20);
+    expect(CLOUDFLARE_REWRITE_ROUTES).toHaveLength(21);
     expect(new Set(CLOUDFLARE_DIRECT_API_ROUTES.map(route => route.id)).size).toBe(12);
-    expect(new Set(CLOUDFLARE_REWRITE_ROUTES.map(route => route.id)).size).toBe(20);
+    expect(new Set(CLOUDFLARE_REWRITE_ROUTES.map(route => route.id)).size).toBe(21);
     for (const route of CLOUDFLARE_DIRECT_API_ROUTES) {
       const match = matchCloudflareApiRoute(route.path);
       expect(match).toMatchObject({ id: route.id, kind: 'direct' });
@@ -99,6 +99,7 @@ describe('Cloudflare Phase 4 strict API dispatcher', () => {
       ['/api/auth/social/naver/userinfo', 'GET'],
       ['/api/auth/social/start', 'POST'],
       ['/api/me/saju/preview-reading','GET'],
+      ['/api/contact','POST'],
       ['/api/me?__myeongha_chat_turn_send=1&__myeongha_chat_thread_id=x','POST'],
       ['/api/me?__myeongha_chat_turn_send=1&__myeongha_chat_turn_send=1','POST'],
       ['/api/chat','POST'], ['/api/chat/synthetic-id','GET'],
