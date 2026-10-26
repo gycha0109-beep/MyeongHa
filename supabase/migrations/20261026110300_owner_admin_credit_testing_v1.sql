@@ -3,8 +3,7 @@
 -- This is NOT PostgreSQL superuser, RLS bypass, unrestricted Commerce mutation,
 -- payment evidence, or any permission to reveal protected SeYeon memory.
 create table public.myeongha_owner_administrators_v1 (
-  subject_id uuid primary key references public.subjects(id) on delete cascade,
-  auth_user_id uuid not null unique references auth.users(id) on delete cascade,
+  auth_user_id uuid primary key references auth.users(id) on delete cascade,
   role text not null default 'superadmin' check (role = 'superadmin'),
   credit_exempt boolean not null default true check (credit_exempt),
   sandbox_checkout_allowed boolean not null default true,
@@ -36,31 +35,28 @@ begin
   select exists(
     select 1
     from public.myeongha_owner_administrators_v1 a
-    join public.subjects s on s.id=a.subject_id
-      and s.auth_user_id=a.auth_user_id and s.kind='member'
+    join public.subjects s on s.auth_user_id=a.auth_user_id and s.kind='member'
       and s.status='active'
     join auth.users u on u.id=a.auth_user_id
       and u.email_confirmed_at is not null
-    where a.subject_id=p_subject_id and a.role='superadmin'
+    where s.id=p_subject_id and a.role='superadmin'
   ) as is_owner_admin,
   exists(
     select 1 from public.myeongha_owner_administrators_v1 a
-    join public.subjects s on s.id=a.subject_id
-      and s.auth_user_id=a.auth_user_id and s.kind='member'
+    join public.subjects s on s.auth_user_id=a.auth_user_id and s.kind='member'
       and s.status='active'
     join auth.users u on u.id=a.auth_user_id
       and u.email_confirmed_at is not null
-    where a.subject_id=p_subject_id and a.role='superadmin'
+    where s.id=p_subject_id and a.role='superadmin'
       and a.credit_exempt
   ) as chat_credit_exempt,
   exists(
     select 1 from public.myeongha_owner_administrators_v1 a
-    join public.subjects s on s.id=a.subject_id
-      and s.auth_user_id=a.auth_user_id and s.kind='member'
+    join public.subjects s on s.auth_user_id=a.auth_user_id and s.kind='member'
       and s.status='active'
     join auth.users u on u.id=a.auth_user_id
       and u.email_confirmed_at is not null
-    where a.subject_id=p_subject_id and a.role='superadmin'
+    where s.id=p_subject_id and a.role='superadmin'
       and a.sandbox_checkout_allowed
   ) as sandbox_checkout_allowed;
 end
