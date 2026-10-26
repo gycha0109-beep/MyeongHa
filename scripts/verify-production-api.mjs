@@ -1,6 +1,6 @@
 import { pathToFileURL } from 'node:url';
 
-const DEFAULT_PRODUCTION_ORIGIN = 'https://myeongha.vercel.app';
+const DEFAULT_PRODUCTION_ORIGIN = 'https://myeongha.gycha0109.workers.dev';
 const DEFAULT_TIMEOUT_MS = 10_000;
 
 function resolveTimeoutMs(value) {

@@ -12,6 +12,33 @@ function jsonResponse(payload, { status = 200, contentType = 'application/json; 
 }
 
 describe('production API health verifier', () => {
+  it('defaults to Cloudflare without calling the retired Vercel origin', async () => {
+    vi.stubEnv('MYEONGHA_PRODUCTION_ORIGIN', undefined);
+    try {
+      const fetchImpl = vi.fn(async url => {
+        expect(url.href).toBe('https://myeongha.gycha0109.workers.dev/api/health');
+        return jsonResponse({ status: 'ok' });
+      });
+      const result = await verifyProductionApiHealth({ fetchImpl });
+      expect(result.status).toBe(200);
+      expect(fetchImpl).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it('keeps an explicit Vercel standby probe possible for rollback verification', async () => {
+    const fetchImpl = vi.fn(async url => {
+      expect(url.href).toBe('https://myeongha.vercel.app/api/health');
+      return jsonResponse({ status: 'ok' });
+    });
+    const result = await verifyProductionApiHealth({
+      origin: 'https://myeongha.vercel.app',
+      fetchImpl,
+    });
+    expect(result.status).toBe(200);
+  });
+
   it('accepts the exact production health contract', async () => {
     const fetchImpl = vi.fn(async (url, init) => {
       expect(url.href).toBe('https://example.test/api/health');
