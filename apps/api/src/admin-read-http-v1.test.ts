@@ -86,6 +86,9 @@ describe('admin owner-only reads', () => {
       '/api/admin/users?subjectId=anyone',
       '/api/admin/users?limit=2&limit=3',
       '/api/admin/users?secret=true',
+      '/api/admin/users?from=2026-10-01',
+      '/api/admin/users?to=2026-10-26',
+      '/api/admin/users?cursor=99999',
     ]) {
       expect((await h.call(path)).status).toBe(400);
     }

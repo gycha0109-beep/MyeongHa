@@ -10,12 +10,12 @@ function harness(role = 'myeongha_admin_reader', rows: Record<string, unknown>[]
   const pool: PostgresSubjectPoolV1 = {
     async connect() {
       return {
-        async query(query: string, args?: readonly unknown[]) {
+        async query<Row = Record<string, unknown>>(query: string, args?: readonly unknown[]) {
           sql.push(query);
           params.push(args);
-          if (query.startsWith('SELECT current_user')) return { rows: [{ currentUser: role }] };
-          if (query.startsWith('SELECT')) return { rows };
-          return { rows: [] };
+          if (query.startsWith('SELECT current_user')) return { rows: [{ currentUser: role }] as unknown as Row[] };
+          if (query.startsWith('SELECT')) return { rows: rows as unknown as Row[] };
+          return { rows: [] as Row[] };
         },
         release() {},
       };

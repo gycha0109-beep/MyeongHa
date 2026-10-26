@@ -96,7 +96,7 @@ export function parseAdminReadFiltersV1(url: URL): AdminListFiltersV1 {
     throw new Error('Administrator limit is out of range.');
   }
   const cursor = url.searchParams.get('cursor');
-  if (cursor !== null && (!/^[A-Za-z0-9_-]{1,128}$/u.test(cursor) || kind === 'user-detail')) {
+  if (cursor !== null && (!/^[1-9]\d{0,4}$/u.test(cursor) || Number(cursor) > 10_000 || kind === 'user-detail')) {
     throw new Error('Administrator cursor is invalid.');
   }
   const querySubject = url.searchParams.get('subjectId');
@@ -106,6 +106,9 @@ export function parseAdminReadFiltersV1(url: URL): AdminListFiltersV1 {
   subjectId ??= querySubject?.toLowerCase() ?? null;
   const from = readDate(url.searchParams.get('from'));
   const to = readDate(url.searchParams.get('to'));
+  if ((from === null) !== (to === null)) {
+    throw new Error('Both administrator date boundaries must be supplied together.');
+  }
   if (from !== null && to !== null &&
     (Date.parse(to + 'T00:00:00Z') < Date.parse(from + 'T00:00:00Z') ||
     Date.parse(to + 'T00:00:00Z') - Date.parse(from + 'T00:00:00Z') > 90 * 86_400_000)) {
