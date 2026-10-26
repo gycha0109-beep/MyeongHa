@@ -27,9 +27,14 @@ Use `scripts/operations/seyeon-r2-rpc-per-function-parity-readonly.sql` in both 
 | Volatility/security and anon/authenticated execute flags equal | 19/19 |
 | Anonymous/authenticated EXECUTE exposed | 0/19 both |
 | Raw `pg_get_functiondef` SHA-256 equal | **0/19** (19 mismatches) |
+| Raw `pg_proc.prosrc` SHA-256 equal | **0/19** |
+| `prosrc` after removing whitespace SHA-256 equal | **19/19** (lexical diagnostic, not semantic proof) |
+| Function `proconfig` equal | **19/19** |
 | `proacl` SHA-256 equal | **18/19**, mismatch: `assert_seyeon_chat_thread_runtime_v1` |
+| Effective `service_role` EXECUTE on mismatching function | **Production true**, isolated repository DB false |
+| Effective `anon` / `authenticated` EXECUTE on mismatching function | Both false in Production and isolated repository DB |
 
-**Classification:** `HOLD_R2_PRODUCTION_REPO_DDL_PARITY_UNVERIFIED`. Raw text-fingerprint mismatches alone cannot establish semantic incompatibility or its cause; investigate the function bodies/versions and owner/ACL changes through governed, private comparison. The already established historical SHA is *identity evidence*, not permission to execute that historical statement again. There is no basis for blindly applying later migrations or changing Production roles.
+**Classification:** `HOLD_R2_PRODUCTION_REPO_DDL_PARITY_UNVERIFIED`. The 19 raw-function-body differences are isolated to whitespace characters by the stripped-whitespace fingerprint, but stripping whitespace can also hide differences **inside string literals**; that observation is *not* full semantic parity approval. The one **effective** ACL difference is a Production-only `service_role` EXECUTE permission for `assert_seyeon_chat_thread_runtime_v1` (3 explicit ACL EXECUTE entries in Production versus 1 in the isolated DB). Other tested non-browser roles have the same effective rights. Resolve this exact difference through an authorized forward-only ACL decision; do not silently revoke it or mistake an extra legitimate production grant for proof of compromise. The already established historical SHA is *identity evidence*, not permission to execute that historical statement again. There is no basis for blindly applying later migrations or changing Production roles.
 
 ## Governed backup / isolated restore / privacy recovery
 
@@ -42,7 +47,7 @@ Use `scripts/operations/seyeon-r2-rpc-per-function-parity-readonly.sql` in both 
 | DR readiness | Latest run [40188526415](https://github.com/gycha0109-beep/MyeongHa/actions/runs/40188526415) FAILED; `docs/operations/POSTGRES_DR_READINESS_STATUS_V1.md` still pins old deployed frontier **1310** |
 | Last restore authoritative privacy replay | `authoritative_privacy_reconciliation=not_exercised_without_production_ledger` (restore log), `dr_ready=false` |
 
-Latest `main` observed at **`85655f4a136174219e36a6d94e8cdd1d72302e9e`**, later than the latest backup source SHA. This file does not label either backup or restore current-main-equivalent, does not assume successful Production recovery, and does not update legacy RPO/RTO evidence by inference.
+Later `main` observed at **`d1ddd426d46216183fd6bd86134d90696beedc41`**. A Git comparison from the successful backup source SHA to this `main` found **no changes in `supabase/migrations/` or the governed backup exporter/workflow**; direct Production history remains at frontier **20261025203519**, matching the successful backup log. Hence this backup is current for the *observed migration frontier*, not proof of identical main application state or a successful current-frontier restore. This file does not assume successful Production recovery or update legacy RPO/RTO evidence by inference.
 
 ## Remaining acceptance to close #1887
 
