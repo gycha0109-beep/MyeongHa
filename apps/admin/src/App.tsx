@@ -21,8 +21,12 @@ const metrics = [
 ] as const;
 
 function navigateTo(path: string, setPath: (path: string) => void) {
-  if (window.location.pathname !== path) window.history.pushState(null, '', path);
-  setPath(path);
+  const destination = new URL(path, window.location.origin);
+  if (destination.origin !== window.location.origin || !destination.pathname.startsWith('/admin')) return;
+  if (window.location.pathname + window.location.search !== destination.pathname + destination.search) {
+    window.history.pushState(null, '', destination.pathname + destination.search);
+  }
+  setPath(destination.pathname);
   window.scrollTo({ top: 0, behavior: 'instant' });
 }
 
@@ -205,7 +209,7 @@ export function App() {
               {route.section === 'overview' ? <><Overview />{ownerToken === null && <AdminLogin onSession={setOwnerToken} />}</> : ownerToken === null
                 ? <><PendingSection section={route.section} /><AdminLogin onSession={setOwnerToken} /></>
                 : <AdminWorkbench key={route.section} section={route.section} token={ownerToken}
-                    onSessionExpired={() => setOwnerToken(null)} />}
+                    onSessionExpired={() => setOwnerToken(null)} onNavigate={onNavigate} />}
             </>
           ) : (
             <>

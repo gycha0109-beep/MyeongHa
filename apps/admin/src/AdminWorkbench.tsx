@@ -79,10 +79,11 @@ function isSubjectId(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(value);
 }
 
-function buildListPath(section: ListSection, subject: string, cursor: string | null, tab: ReadTab): string {
+export function buildListPath(section: ListSection, subject: string, cursor: string | null, tab: ReadTab, from: string | null = null, to: string | null = null): string {
   const params = new URLSearchParams({ limit: '20' });
   if (subject.length > 0) params.set('subjectId', subject);
   if (cursor !== null) params.set('cursor', cursor);
+  if (from !== null && to !== null) { params.set('from', from); params.set('to', to); }
   return '/api/admin/' + tab + '?' + params.toString();
 }
 
@@ -99,7 +100,7 @@ function DataTable({ result, section, onDetail }: {
     <table className="admin-table">
       <thead><tr>{columns.map(k => <th scope="col" key={k}>{LABELS[k]}</th>)}
         {section === 'users' && <th scope="col">상세</th>}</tr></thead>
-      <tbody>{result.rows.map((row, i) => <tr key={String(row.subjectId ?? row.transactionId ?? row.readingId ?? row.issueId ?? i)}>
+      <tbody>{result.rows.map((row, i) => <tr key={String(row.transactionId ?? row.readingId ?? row.eventId ?? row.issueId ?? row.subjectId ?? i) + ':' + i}>
         {columns.map(k => <td key={k}>{row[k] === null || row[k] === undefined ? '—' : String(row[k])}</td>)}
         {section === 'users' && <td>{typeof row.subjectId === 'string' && isSubjectId(row.subjectId)
           ? <button type="button" className="table-link" onClick={() => onDetail(String(row.subjectId))}>조회</button>
@@ -150,14 +151,22 @@ export function AdminLogin({ onSession }: {
   </section>;
 }
 
-export function AdminWorkbench({ section, token, onSessionExpired }: {
+export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }: {
   readonly section: ListSection;
   readonly token: string;
   readonly onSessionExpired: () => void;
+  readonly onNavigate?: (path: string) => void;
 }) {
   const [cursor, setCursor] = useState<string | null>(null);
   const [tab, setTab] = useState<ReadTab>(() => DATA_PATHS[section] as ReadTab);
-  const [subject, setSubject] = useState('');
+  const [subject, setSubject] = useState(() => {
+    const value = new URLSearchParams(window.location.search).get('subjectId') ?? '';
+    return isSubjectId(value) ? value.toLowerCase() : '';
+  });
+  const [from, setFrom] = useState<string | null>(null);
+  const [to, setTo] = useState<string | null>(null);
+  const [draftFrom, setDraftFrom] = useState('');
+  const [draftTo, setDraftTo] = useState('');
   const [pendingSubject, setPendingSubject] = useState('');
   const [detail, setDetail] = useState<string | null>(null);
   const [result, setResult] = useState<AdminReadResponse | null>(null);
@@ -171,7 +180,7 @@ export function AdminWorkbench({ section, token, onSessionExpired }: {
     setResult(null);
     const url = detail !== null
       ? '/api/admin/users/' + detail
-      : buildListPath(section, subject, cursor, tab);
+      : buildListPath(section, subject, cursor, tab, from, to);
     void fetchAdminReadV1(url, token)
       .then(value => { if (mounted) setResult(value); })
       .catch(e => {
@@ -182,7 +191,7 @@ export function AdminWorkbench({ section, token, onSessionExpired }: {
     return () => {
       mounted = false;
     };
-  }, [section, token, cursor, subject, detail, tab]);
+  }, [section, token, cursor, subject, detail, tab, from, to]);
 
   return <section className="surface admin-data">
     <div className="surface__head">
@@ -196,7 +205,8 @@ export function AdminWorkbench({ section, token, onSessionExpired }: {
     </div>
     <div className="admin-toolbar">
       {detail !== null
-        ? <button type="button" onClick={() => setDetail(null)}>목록으로</button>
+        ? <><button type="button" onClick={() => setDetail(null)}>목록으로</button>
+            {onNavigate && <><button type="button" onClick={() => onNavigate('/admin/readings?subjectId=' + detail)}>Reading 조회</button><button type="button" onClick={() => onNavigate('/admin/commerce?subjectId=' + detail)}>결제 조회</button></>}</>
         : <>
           {section !== 'issues' && section !== 'analytics' && <form onSubmit={e => {
             e.preventDefault();
@@ -213,6 +223,28 @@ export function AdminWorkbench({ section, token, onSessionExpired }: {
           </form>}
         </>}
       <button type="button" onClick={onSessionExpired}>로그아웃</button>
+      {detail === null && <form className="date-range-form" onSubmit={e => {
+        e.preventDefault();
+        if ((draftFrom !== '' && draftTo === '') || (draftFrom === '' && draftTo !== '')) {
+          setError('시작일과 종료일을 함께 지정해야 합니다.');
+          return;
+        }
+        if (draftFrom && draftTo) {
+          const days = (Date.parse(draftTo + 'T00:00:00Z') - Date.parse(draftFrom + 'T00:00:00Z')) / 86_400_000;
+          if (!Number.isFinite(days) || days < 0 || days > 90) {
+            setError('조회 기간은 90일 이내여야 합니다.');
+            return;
+          }
+        }
+        setError('');
+        setFrom(draftFrom || null);
+        setTo(draftTo || null);
+        setCursor(null);
+      }}>
+        <label>시작일 <input type="date" value={draftFrom} onChange={e => setDraftFrom(e.target.value)} /></label>
+        <label>종료일 <input type="date" value={draftTo} onChange={e => setDraftTo(e.target.value)} /></label>
+        <button type="submit">기간 적용</button>
+      </form>}
     </div>
     {loading ? <StatusPanel kind="loading" /> : error
       ? <StatusPanel kind={error.includes('권한') ? 'forbidden' : 'error'} detail={error} />
