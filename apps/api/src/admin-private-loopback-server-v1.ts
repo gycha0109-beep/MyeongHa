@@ -194,9 +194,8 @@ export function createAdminLoopbackServerV1(input: AdminLoopbackOptionsV1): Serv
       try {
         const authorization = req.headers.authorization;
         const request = new Request(path.toString(), {
-          method: req.method,
-          headers: typeof authorization === 'string'
-            ? { Authorization: authorization } : undefined,
+          method: req.method ?? 'OPTIONS',
+          ...(typeof authorization === 'string' ? { headers: { Authorization: authorization } } : {}),
         });
         req.resume();
         const response = await privileged.handleRequest(request);
