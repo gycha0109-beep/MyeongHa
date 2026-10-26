@@ -87,3 +87,12 @@ Executed on the authorized local Windows PC, Docker Desktop Linux engine 29.8.2 
 4. Removed the only separately created PG17 container and verified **0** owned Guest test containers, volumes and networks; the existing Saju runner also left **0** project containers. Other developers' Docker resources were not modified.
 
 **Acceptance boundary:** this is real local GoTrue/SQL/transaction evidence, but the GoTrue and Guest promotion fixtures were **not one single complete application HTTP session**. It does not establish an actual third-party Google/Kakao/Naver OAuth provider callback, production Supabase allowlist parity, production Guest→Member HTTP promotion, nor rollback of the live Cloudflare Worker/DNS/Vercel. These require independent operational evidence before the retirement gate can move from `HOLD`.
+
+## Ops 후속 구현 — Cloudflare 배포 검증을 Vercel과 분리 (2026-10-26)
+
+- 공통 `npm run verify:deployment-config`는 이제 활성 Cloudflare 단일 Worker의 `wrangler.jsonc` 구조, 실제 Worker의 정적 파일 보안 헤더(noindex), API 12개 직접 경로·20개 rewrite 경로 및 Birth/Records/Chat 디스패처의 필수 매핑을 검증한다. 정적 HTML/CSS 참조 및 소스맵·개발 파일 유출 검사도 유지한다.
+- 이 공통 검증 단계에서는 `vercel.json`을 읽지 않는다. Vercel 전용 리전, 자동 배포 정책, 함수 12개 수량 제한은 **Cloudflare 빌드의 필수 조건이 아니다**. Vercel standby 자체의 배포 설정이나 운영 안전 게이트는 변경하지 않았다.
+- Cloudflare API 라우터 단위 테스트 또한 Vercel rewrite JSON을 기준 데이터로 사용하지 않고 실제 Worker 라우트 목록의 안전 경계·주요 목적지를 독립적으로 검사한다.
+- 이것은 **코드·CI 의존성 분리**이며 실제 운영 Vercel 삭제 또는 Cloudflare 릴리스 승인 증거를 대신하지 않는다. 종료 게이트 `HOLD`, 독립 E2E와 정본 버전 확인, OAuth/Guest 연속성, 롤백 및 최종 사용자 종료 승인은 기존 정책대로 남는다.
+
+Watchtower-Track: ops
