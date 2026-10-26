@@ -79,19 +79,6 @@ body.product-page::before {
   backdrop-filter: blur(18px);
   border-bottom: 1px solid var(--mh-line);
 }
-.product-header::after {
-  content: "◇";
-  position: absolute;
-  left: 50%;
-  bottom: -9px;
-  transform: translateX(-50%);
-  width: 24px;
-  text-align: center;
-  color: var(--mh-brass-strong);
-  background: var(--mh-paper-base);
-  font-family: var(--mh-serif);
-  font-size: 14px;
-}
 .product-header-inner {
   min-height: 92px;
   display: grid;
