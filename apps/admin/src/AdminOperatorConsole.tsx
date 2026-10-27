@@ -1,6 +1,7 @@
 import { useEffect,useState } from 'react';
 import type { FormEvent } from 'react';
 import { AdminAccessDeniedErrorV1 } from './admin-client.js';
+import {adminLocalDatetimeToUtcV1,adminUtcToLocalDatetimeV1} from './admin-local-datetime-v1.js';
 import { ADMIN_CREDIT_FIXED_LIMIT_V1,ADMIN_CREDIT_CONFIRMATION_REQUIRED_V1 } from '../../api/src/admin-operating-policy-v1.js';
 
 type State = Readonly<Record<string,string|number|boolean|null>>;
@@ -34,7 +35,7 @@ function DomainActionForm({token,capabilities,onFailure}:{token:string;capabilit
  async function loadHistory(){const response=await api(token,'/api/admin/credits/history?'+new URLSearchParams({subjectId:target}));setCreditHistory(safeRows(response.rows));}
  async function prepare(event:FormEvent){event.preventDefault();if(!capability?.enabled||busy||uncertain)return;setBusy(true);setResult(null);
   try{if(operation==='credit-adjust'&&Number(delta)>0&&(expiryMode===''||(expiryMode==='at'&&grantExpiry==='')))throw Error('지급 Lot 만료 정책을 직접 선택해 주세요.');
-   const parameters=operation==='credit-adjust'?{delta:Number(delta),expiresAt:Number(delta)>0&&expiryMode==='at'?grantExpiry+':00Z':null}:operation==='refund'?{amountMinor:Number(amount),mode}:{};
+   const parameters=operation==='credit-adjust'?{delta:Number(delta),expiresAt:Number(delta)>0&&expiryMode==='at'?adminLocalDatetimeToUtcV1(grantExpiry):null}:operation==='refund'?{amountMinor:Number(amount),mode}:{};
    const input={operation,operationId:crypto.randomUUID(),targetRef:target,reason,parameters};const response=await api(token,'/api/admin/commands/preview',input);
    if(typeof response.confirmationToken!=='string'||response.preview===null||typeof response.preview!=='object')throw new Error('명령 확인 정보를 받지 못했습니다.');
    setPreview({input,confirmationToken:response.confirmationToken,before:safeRows([(response.preview as {before:unknown}).before])[0]!});setConfirmed(false);
@@ -51,12 +52,12 @@ function DomainActionForm({token,capabilities,onFailure}:{token:string;capabilit
   <form className="admin-login" onSubmit={prepare}><fieldset disabled={busy||uncertain||!capability?.enabled}>
    <label>{operation==='refund'?'영수증 UUID':'사용자 UUID'}<input required maxLength={36} value={target} onChange={e=>setTarget(e.target.value.trim())}/></label>
    {operation==='credit-adjust'&&<><label>보정 수량 (지급 + / 회수 -)<input type="number" required step={1} value={delta} onChange={e=>setDelta(e.target.value)}/></label><p>고정 수량 한도 {ADMIN_CREDIT_FIXED_LIMIT_V1===null?'없음':String(ADMIN_CREDIT_FIXED_LIMIT_V1)} · 매회 직접 확인 {ADMIN_CREDIT_CONFIRMATION_REQUIRED_V1?'필수':'정책 확인 필요'}. 기존 원장 integer 범위와 음수 잔액 금지는 유지합니다. 회수는 예약 중 수량을 제외한 현재 가용 Lot에서 처리합니다.</p>
-    {Number(delta)>0&&<><label>지급 Lot 만료 정책<select required value={expiryMode} onChange={e=>setExpiryMode(e.target.value)}><option value="">직접 선택</option><option value="at">UTC 만료일 지정</option><option value="never">무기한</option></select></label>{expiryMode==='at'&&<label>지급 Lot UTC 만료일<input type="datetime-local" required value={grantExpiry} onChange={e=>setGrantExpiry(e.target.value)}/></label>}</>}
+    {Number(delta)>0&&<><label>지급 Lot 만료 정책<select required value={expiryMode} onChange={e=>setExpiryMode(e.target.value)}><option value="">직접 선택</option><option value="at">현지 시각 만료일 지정</option><option value="never">무기한</option></select></label>{expiryMode==='at'&&<label>지급 Lot 현지 시각 만료일<input type="datetime-local" required value={grantExpiry} onChange={e=>setGrantExpiry(e.target.value)}/></label>}</>}
    </>}
    {operation==='refund'&&<><label>환불 구분<select value={mode} onChange={e=>setMode(e.target.value)}><option value="full" disabled={!capability?.refundModes?.full}>전액{!capability?.refundModes?.full?' · 지원 미확인':''}</option><option value="partial" disabled={!capability?.refundModes?.partial}>부분{!capability?.refundModes?.partial?' · 지원 미확인':''}</option></select></label><label>환불 금액 (영수증 통화의 최소 단위)<input type="number" required min={1} step={1} value={amount} onChange={e=>setAmount(e.target.value)}/></label></>}
    <label>조치 사유<input required maxLength={500} value={reason} onChange={e=>setReason(e.target.value)}/></label><button type="submit">가능 여부·조치 전 상태 확인</button>
   </fieldset></form>
-  {preview&&<div className="surface"><h4>실행 전 확인</h4><p>{LABELS[operation]} · 대상 {target} · 사유 {reason}</p>{operation==='credit-adjust'&&<p>수량 {delta} · {Number(delta)>0?'지급':'회수'}{Number(delta)>0?' · 만료 '+(expiryMode==='never'?'무기한':grantExpiry+' UTC'):''}</p>}<dl>{Object.entries(preview.before).map(([key,value])=><div key={key}><dt>{key}</dt><dd>{value===null?'—':String(value)}</dd></div>)}</dl>
+  {preview&&<div className="surface"><h4>실행 전 확인</h4><p>{LABELS[operation]} · 대상 {target} · 사유 {reason}</p>{operation==='credit-adjust'&&<p>수량 {delta} · {Number(delta)>0?'지급':'회수'}{Number(delta)>0?' · 만료 '+(expiryMode==='never'?'무기한':grantExpiry+' (브라우저 현지 시각)'):''}</p>}<dl>{Object.entries(preview.before).map(([key,value])=><div key={key}><dt>{key}</dt><dd>{value===null?'—':String(value)}</dd></div>)}</dl>
    <label><input type="checkbox" checked={confirmed} onChange={e=>setConfirmed(e.target.checked)}/>대상·금액·사유와 조치 전 상태를 확인했습니다.</label><button type="button" disabled={busy||!confirmed||!capability?.enabled} onClick={()=>{void execute();}}>{uncertain?'같은 작업 재시도':'확인한 조치 실행'}</button></div>}
   {uncertain&&<p role="alert">실행 결과가 아직 확정되지 않았습니다. 새 작업 ID를 만들지 말고 아래의 같은 작업 결과를 재조회하거나, 확인된 동일 작업을 재시도해 주세요.</p>}
   {last&&<button type="button" disabled={busy} onClick={()=>{setBusy(true);void lookup(last).catch(onFailure).finally(()=>setBusy(false));}}>작업 {last.operationId} 결과 재조회</button>}
@@ -91,13 +92,13 @@ export function AdminOperatorConsole({token,onSessionExpired}:{readonly token:st
  }).catch(error=>{if(active)failed(error);});return()=>{active=false;};},[token]);
  useEffect(()=>{setPreview(null);setConfirmed(false);},[form,selected,revision]);
  async function select(entry:State){setSelected(String(entry.entryId));setRevision(Number(entry.revision));
-   setForm({kind:String(entry.kind),title:String(entry.title),body:String(entry.body),linkPath:entry.linkPath===null?'':String(entry.linkPath),status:String(entry.publicationStatus),startsAt:entry.startsAt===null?'':new Date(String(entry.startsAt)).toISOString().slice(0,16),endsAt:entry.endsAt===null?'':new Date(String(entry.endsAt)).toISOString().slice(0,16),reason:''});
+   setForm({kind:String(entry.kind),title:String(entry.title),body:String(entry.body),linkPath:entry.linkPath===null?'':String(entry.linkPath),status:String(entry.publicationStatus),startsAt:entry.startsAt===null?'':adminUtcToLocalDatetimeV1(String(entry.startsAt)),endsAt:entry.endsAt===null?'':adminUtcToLocalDatetimeV1(String(entry.endsAt)),reason:''});
    const data=await api(token,'/api/admin/presentations/history?entryId='+String(entry.entryId));setHistory(safeRows(data.rows));
  }
  async function prepare(event:FormEvent){event.preventDefault();if(busy||!enabled)return;setBusy(true);setError('');setResult(null);
    try{const input={operation:'presentation-save',operationId:crypto.randomUUID(),targetRef:selected??crypto.randomUUID(),reason:form.reason,
      parameters:{expectedRevision:revision,kind:form.kind,title:form.title,body:form.body,linkPath:form.linkPath||null,status:form.status,
-       startsAt:form.startsAt===''?null:form.startsAt+':00Z',endsAt:form.endsAt===''?null:form.endsAt+':00Z'}};
+       startsAt:form.startsAt===''?null:adminLocalDatetimeToUtcV1(form.startsAt),endsAt:form.endsAt===''?null:adminLocalDatetimeToUtcV1(form.endsAt)}};
      const data=await api(token,'/api/admin/commands/preview',input);
      if(typeof data.confirmationToken!=='string'||typeof data.expiresAt!=='string'||data.preview===null||typeof data.preview!=='object')throw new Error('확인 정보를 받지 못했습니다.');
      const before=safeRows([(data.preview as {before:unknown}).before])[0]!;
@@ -118,7 +119,7 @@ export function AdminOperatorConsole({token,onSessionExpired}:{readonly token:st
   {error&&<p role="alert" className="login-error">{error}</p>}
   <DomainActionForm token={token} capabilities={capabilities} onFailure={failed}/>
   {enabled&&<>
-    <h3>공지·배너 관리</h3><p>공개 표현 정보만 관리합니다. 상품 가격·판매·캐릭터 정본은 변경하지 않습니다. 날짜 입력은 UTC입니다.</p>
+    <h3>공지·배너 관리</h3><p>공개 표현 정보만 관리합니다. 상품 가격·판매·캐릭터 정본은 변경하지 않습니다. 날짜 입력은 브라우저 현지 시각이며, 저장 시 UTC로 변환됩니다.</p>
     <div className="admin-tabs"><button type="button" disabled={busy} onClick={()=>{setSelected(null);setRevision(0);setForm(FORM_EMPTY);setHistory([]);}}>새 항목</button>
       {entries.map(entry=><button key={String(entry.entryId)} type="button" disabled={busy} onClick={()=>{void select(entry).catch(failed);}}>{String(entry.title)} · {String(entry.publicationStatus)} · v{String(entry.revision)}</button>)}</div>
     <form className="admin-login" onSubmit={prepare}>
@@ -127,8 +128,8 @@ export function AdminOperatorConsole({token,onSessionExpired}:{readonly token:st
       <label>내용<textarea required maxLength={form.kind==='banner'?1000:5000} rows={5} value={form.body} onChange={e=>field('body',e.target.value)}/></label>
       <label>서비스 내부 이동 경로<input placeholder="/hall.html" maxLength={200} value={form.linkPath} onChange={e=>field('linkPath',e.target.value)}/></label>
       <label>게시 상태<select value={form.status} onChange={e=>field('status',e.target.value)}><option value="draft">비게시</option><option value="published">게시·예약</option></select></label>
-      <label>UTC 노출 시작<input type="datetime-local" value={form.startsAt} onChange={e=>field('startsAt',e.target.value)}/></label>
-      <label>UTC 노출 종료<input type="datetime-local" value={form.endsAt} onChange={e=>field('endsAt',e.target.value)}/></label>
+      <label>현지 시각 노출 시작<input type="datetime-local" value={form.startsAt} onChange={e=>field('startsAt',e.target.value)}/></label>
+      <label>현지 시각 노출 종료<input type="datetime-local" value={form.endsAt} onChange={e=>field('endsAt',e.target.value)}/></label>
       <label>변경 사유<input required maxLength={500} value={form.reason} onChange={e=>field('reason',e.target.value)}/></label>
       <button type="submit" disabled={busy}>{busy?'확인 중':'변경 전 상태 확인'}</button>
     </form>
