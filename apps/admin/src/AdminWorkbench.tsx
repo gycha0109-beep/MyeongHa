@@ -120,7 +120,7 @@ function isSubjectId(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(value);
 }
 
-export function buildListPath(section: ListSection, subject: string, cursor: string | null, tab: ReadTab, from: string | null = null, to: string | null = null, issueStatus: string = 'all', subjectKind: string = 'all', subjectStatus: string = 'all', readingStatus: string = 'all', issueCategory: string = '', creditSource: string = 'all', reservationState: string = 'all', reservationId: string = '', attemptReadingId: string = '', aiStage: string = 'all', aiErrorCode: string = '', deletionStatus: string = 'all', deletionScope: string = 'all'): string {
+export function buildListPath(section: ListSection, subject: string, cursor: string | null, tab: ReadTab, from: string | null = null, to: string | null = null, issueStatus: string = 'all', subjectKind: string = 'all', subjectStatus: string = 'all', readingStatus: string = 'all', issueCategory: string = '', creditSource: string = 'all', reservationState: string = 'all', reservationId: string = '', attemptReadingId: string = '', aiStage: string = 'all', aiErrorCode: string = '', deletionStatus: string = 'all', deletionScope: string = 'all', releaseStatus: string = 'all', characterAvailability: string = 'all'): string {
   if (tab === 'reading-attempts' && isSubjectId(attemptReadingId)) {
     const params = new URLSearchParams({ limit: '20' });
     if (cursor !== null) params.set('cursor', cursor);
@@ -134,6 +134,8 @@ export function buildListPath(section: ListSection, subject: string, cursor: str
   if (tab === 'issues' && issueCategory !== '') params.set('category', issueCategory);
   if (tab === 'deletion-jobs' && deletionStatus !== 'all') params.set('deletionStatus', deletionStatus);
   if (tab === 'deletion-jobs' && deletionScope !== 'all') params.set('deletionScope', deletionScope);
+  if (tab === 'content-releases' && releaseStatus !== 'all') params.set('releaseStatus', releaseStatus);
+  if (tab === 'characters' && characterAvailability !== 'all') params.set('characterAvailability', characterAvailability);
   if (tab === 'users' && subjectKind !== 'all') params.set('subjectKind', subjectKind);
   if (tab === 'users' && subjectStatus !== 'all') params.set('subjectStatus', subjectStatus);
   if (tab === 'readings' && readingStatus !== 'all') params.set('readingStatus', readingStatus);
@@ -234,6 +236,8 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
   const [issueStatus, setIssueStatus] = useState<'all' | 'failed' | 'dead_lettered'>('all');
   const [deletionStatus, setDeletionStatus] = useState<'all' | 'requested' | 'running' | 'completed' | 'failed'>('all');
   const [deletionScope, setDeletionScope] = useState<'all' | 'account' | 'conversation' | 'memory' | 'life_fact' | 'target_person'>('all');
+  const [releaseStatus, setReleaseStatus] = useState<'all' | 'draft' | 'active' | 'retired'>('all');
+  const [characterAvailability, setCharacterAvailability] = useState<'all' | 'available' | 'unlockable' | 'locked' | 'coming_soon'>('all');
   const [subjectKind, setSubjectKind] = useState<'all' | 'guest' | 'member'>('all');
   const [subjectStatus, setSubjectStatus] = useState<'all' | 'active' | 'merged' | 'deletion_pending' | 'deleted'>('all');
   const [readingStatus, setReadingStatus] = useState<'all' | 'pending' | 'running' | 'succeeded' | 'failed' | 'cancelled'>('all');
@@ -263,7 +267,7 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
     setResult(null);
     const url = detail !== null
       ? (section === 'commerce' ? '/api/admin/commerce/' : section === 'readings' ? '/api/admin/readings/' : '/api/admin/users/') + detail
-      : buildListPath(section, subject, cursor, tab, from, to, issueStatus, subjectKind, subjectStatus, readingStatus, issueCategory, creditSource, reservationState, reservationId, attemptReadingId, aiStage, aiErrorCode, deletionStatus, deletionScope);
+      : buildListPath(section, subject, cursor, tab, from, to, issueStatus, subjectKind, subjectStatus, readingStatus, issueCategory, creditSource, reservationState, reservationId, attemptReadingId, aiStage, aiErrorCode, deletionStatus, deletionScope, releaseStatus, characterAvailability);
     void fetchAdminReadV1(url, token)
       .then(value => { if (mounted) setResult(value); })
       .catch(e => {
@@ -275,7 +279,7 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
     return () => {
       mounted = false;
     };
-  }, [section, token, cursor, subject, detail, tab, from, to, issueStatus, subjectKind, subjectStatus, readingStatus, issueCategory, creditSource, reservationState, reservationId, attemptReadingId, aiStage, aiErrorCode, deletionStatus, deletionScope]);
+  }, [section, token, cursor, subject, detail, tab, from, to, issueStatus, subjectKind, subjectStatus, readingStatus, issueCategory, creditSource, reservationState, reservationId, attemptReadingId, aiStage, aiErrorCode, deletionStatus, deletionScope, releaseStatus, characterAvailability]);
 
   return <section className="surface admin-data">
     <div className="surface__head">
@@ -393,6 +397,31 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
           </select>
         </label>
       </div>}
+      {section === 'issues' && tab === 'content-releases' && detail === null &&
+        <label className="admin-issue-filter">릴리스 상태
+          <select value={releaseStatus} onChange={e => {
+            setReleaseStatus(e.target.value as typeof releaseStatus);
+            setCursor(null);
+          }}>
+            <option value="all">전체</option>
+            <option value="draft">초안</option>
+            <option value="active">활성</option>
+            <option value="retired">종료</option>
+          </select>
+        </label>}
+      {section === 'issues' && tab === 'characters' && detail === null &&
+        <label className="admin-issue-filter">캐릭터 공개 가능 상태
+          <select value={characterAvailability} onChange={e => {
+            setCharacterAvailability(e.target.value as typeof characterAvailability);
+            setCursor(null);
+          }}>
+            <option value="all">전체</option>
+            <option value="available">이용 가능</option>
+            <option value="unlockable">잠금 해제 가능</option>
+            <option value="locked">잠김</option>
+            <option value="coming_soon">공개 예정</option>
+          </select>
+        </label>}
       {section === 'issues' && tab === 'deletion-jobs' && detail === null &&
         <label className="admin-issue-filter">삭제 처리 상태
           <select value={deletionStatus} onChange={e => {

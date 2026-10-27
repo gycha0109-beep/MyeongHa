@@ -138,6 +138,14 @@ describe('admin owner-only reads', () => {
     expect(() => get('/api/admin/deletion-jobs?deletionScope=unknown')).toThrow();
     expect(() => get('/api/admin/issues?deletionStatus=failed')).toThrow();
   });
+  it('accepts only canonical content release and character availability states', () => {
+    const get=(path:string)=>parseAdminReadFiltersV1(new URL('https://a.invalid'+path));
+    expect(get('/api/admin/content-releases?releaseStatus=active').releaseStatus).toBe('active');
+    expect(get('/api/admin/characters?characterAvailability=coming_soon').characterAvailability).toBe('coming_soon');
+    expect(() => get('/api/admin/characters?releaseStatus=active')).toThrow();
+    expect(() => get('/api/admin/content-releases?characterAvailability=locked')).toThrow();
+    expect(() => get('/api/admin/content-releases?releaseStatus=preview')).toThrow();
+  });
   it('verifies only Owner session before any data query, with required audit', async () => {
     const allowed = harness();
     const result = await allowed.call('/api/admin/session');

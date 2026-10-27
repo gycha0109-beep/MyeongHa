@@ -260,6 +260,16 @@ describe('admin dedicated readonly PostgreSQL adapter', () => {
     expect(h.sql[2]).toContain('d.scope=$7::text');
     expect(h.params[2]).toEqual([21,null,null,null,0,'failed','account']);
   });
+  it('filters content release and character states with verified SQL parameters', async () => {
+    const release=harness();
+    await release.port.read({ ...filters('content-releases'), releaseStatus:'active' });
+    expect(release.sql[2]).toContain('r.status=$3::text');
+    expect(release.params[2]).toEqual([21,0,'active']);
+    const character=harness();
+    await character.port.read({ ...filters('characters'), characterAvailability:'coming_soon' });
+    expect(character.sql[2]).toContain('c.availability=$3::text');
+    expect(character.params[2]).toEqual([21,0,'coming_soon']);
+  });
   it('provides bounded pagination', async () => {
     const h = harness('myeongha_admin_reader',Array.from({length:3},()=>({subjectId:SUBJECT})));
     const result = await h.port.read({ ...filters(),limit:2 });
