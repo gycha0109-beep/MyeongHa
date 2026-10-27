@@ -76,6 +76,7 @@ const LABELS: Record<string, string> = {
   latencySamples: '지연 측정 표본',
   costKrw: '원화 비용',
   p95LatencyMs: 'P95 지연',
+  latencyMs: '개별 호출 지연(ms)',
   executionId: 'AI 실행 참조',
   estimatedMicroUsd: '추정 비용(마이크로 USD)',
   unknownCostCalls: '원가 미확인 호출',

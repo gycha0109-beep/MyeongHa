@@ -179,6 +179,12 @@ describe('admin dedicated readonly PostgreSQL adapter', () => {
       expect(sql).not.toContain('po.currency AS "currency"');
     }
   });
+  it('never calls single execution latency a P95 aggregate', () => {
+    const sql=ADMIN_READ_SQL_V1['ai-errors'] ?? '';
+    expect(sql).toContain('l.latency_ms AS "latencyMs"');
+    expect(sql).not.toContain('"p95LatencyMs"');
+  });
+
   it('provides bounded pagination', async () => {
     const h = harness('myeongha_admin_reader',Array.from({length:3},()=>({subjectId:SUBJECT})));
     const result = await h.port.read({ ...filters(),limit:2 });
