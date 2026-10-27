@@ -30,6 +30,30 @@ describe('admin browser API client', () => {
     const fake = (async () => Response.json({ error: 'ADMIN_FORBIDDEN' }, { status: 403 })) as typeof fetch;
     await expect(fetchAdminReadV1('/api/admin/users', JWT, fake)).rejects.toBeInstanceOf(AdminAccessDeniedErrorV1);
   });
+  it('allows safe lifecycle and incident filter paths but rejects path traversal', async () => {
+    const requests: string[] = [];
+    const fake = (async (path: RequestInfo | URL) => {
+      requests.push(String(path));
+      return Response.json({ kind: 'users', rows: [], nextCursor: null });
+    }) as typeof fetch;
+    for (const path of [
+      '/api/admin/users?subjectStatus=deletion_pending',
+      '/api/admin/issues?status=dead_lettered&category=reading.failed',
+      '/api/admin/readings?readingStatus=failed&limit=20',
+    ]) {
+      await expect(fetchAdminReadV1(path, JWT, fake)).resolves.toBeDefined();
+    }
+    expect(requests).toHaveLength(3);
+    for (const path of [
+      '//evil.test/api/admin/users',
+      '/api/admin/users#fragment',
+      '/api/admin/../../../auth/secret',
+      '/api/admin/users?subjectStatus=active&password=hello world',
+    ]) {
+      await expect(fetchAdminReadV1(path, JWT, fake)).rejects.toThrow();
+    }
+    expect(requests).toHaveLength(3);
+  });
   it('accepts only primitive projected rows', async () => {
     const fake = (async () => Response.json({
       kind: 'users', rows: [{ subjectId: 'safe', kind: 'member' }], nextCursor: null,

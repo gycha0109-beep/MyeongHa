@@ -203,7 +203,10 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
   const [readingStatus, setReadingStatus] = useState<'all' | 'pending' | 'running' | 'succeeded' | 'failed' | 'cancelled'>('all');
   const [issueCategory, setIssueCategory] = useState('');
   const [draftIssueCategory, setDraftIssueCategory] = useState('');
-  const [pendingSubject, setPendingSubject] = useState('');
+  const [pendingSubject, setPendingSubject] = useState(() => {
+    const value = new URLSearchParams(window.location.search).get('subjectId') ?? '';
+    return isSubjectId(value) ? value.toLowerCase() : '';
+  });
   const [detail, setDetail] = useState<string | null>(null);
   const [result, setResult] = useState<AdminReadResponse | null>(null);
   const [error, setError] = useState('');
