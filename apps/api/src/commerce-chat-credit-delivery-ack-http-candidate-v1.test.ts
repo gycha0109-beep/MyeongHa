@@ -1,9 +1,9 @@
 // Watchtower-Track: commerce-payment
 import {afterEach,describe,expect,it,vi} from 'vitest';
+import type {VerifiedSubjectIdentityEvidenceV1} from './subject-identity-resolver.js';
 
 const state=vi.hoisted(()=>({
-  evidence:{kind:'member',verifiedAuthUserId:'11111111-1111-4111-8111-111111111111'} as
-    {kind:string,verifiedAuthUserId:string}|null,
+  evidence:{kind:'member',verifiedAuthUserId:'11111111-1111-4111-8111-111111111111'} as VerifiedSubjectIdentityEvidenceV1|null,
   ack:vi.fn(async()=>({kind:'settled',creditsCharged:10})),
   transaction:vi.fn(async({execute}:{execute:(scope:unknown)=>Promise<unknown>})=>
     execute({client:{},resolvedSubject:{
@@ -58,7 +58,7 @@ describe('unmounted credit ACK HTTP candidate',()=>{
  it('rejects missing Member and guest before database access',async()=>{
    state.evidence=null;
    expect((await handleChatCreditDeliveryAckCandidateV1(input(request()))).status).toBe(401);
-   state.evidence={kind:'guest',verifiedAuthUserId:'11111111-1111-4111-8111-111111111111'};
+   state.evidence={kind:'guest',verifiedGuestTokenHash:'guest-verified-hash'};
    expect((await handleChatCreditDeliveryAckCandidateV1(input(request()))).status).toBe(403);
    expect(state.transaction).not.toHaveBeenCalled();
  });
