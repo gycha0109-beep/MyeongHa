@@ -28,6 +28,7 @@ export interface AdminListFiltersV1 {
   readonly characterAvailability?: 'available' | 'unlockable' | 'locked' | 'coming_soon' | null;
   readonly receiptStatus?: 'pending' | 'verified' | 'rejected' | 'revoked' | null;
   readonly auditOutcome?: 'allowed' | 'denied' | 'failed' | null;
+  readonly allocationMismatchOnly?: boolean;
   readonly from: string | null;
   readonly to: string | null;
 }

@@ -133,7 +133,7 @@ function isSubjectId(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(value);
 }
 
-export function buildListPath(section: ListSection, subject: string, cursor: string | null, tab: ReadTab, from: string | null = null, to: string | null = null, issueStatus: string = 'all', subjectKind: string = 'all', subjectStatus: string = 'all', readingStatus: string = 'all', issueCategory: string = '', creditSource: string = 'all', reservationState: string = 'all', reservationId: string = '', attemptReadingId: string = '', aiStage: string = 'all', aiErrorCode: string = '', deletionStatus: string = 'all', deletionScope: string = 'all', releaseStatus: string = 'all', characterAvailability: string = 'all', receiptStatus: string = 'all', auditOutcome: string = 'all'): string {
+export function buildListPath(section: ListSection, subject: string, cursor: string | null, tab: ReadTab, from: string | null = null, to: string | null = null, issueStatus: string = 'all', subjectKind: string = 'all', subjectStatus: string = 'all', readingStatus: string = 'all', issueCategory: string = '', creditSource: string = 'all', reservationState: string = 'all', reservationId: string = '', attemptReadingId: string = '', aiStage: string = 'all', aiErrorCode: string = '', deletionStatus: string = 'all', deletionScope: string = 'all', releaseStatus: string = 'all', characterAvailability: string = 'all', receiptStatus: string = 'all', auditOutcome: string = 'all', allocationMismatchOnly: boolean = false): string {
   if (tab === 'reading-attempts' && isSubjectId(attemptReadingId)) {
     const params = new URLSearchParams({ limit: '20' });
     if (cursor !== null) params.set('cursor', cursor);
@@ -158,6 +158,7 @@ export function buildListPath(section: ListSection, subject: string, cursor: str
   if (tab === 'ai-errors' && aiErrorCode !== '') params.set('aiErrorCode', aiErrorCode);
   if (tab === 'credits' && creditSource !== 'all') params.set('creditSource', creditSource);
   if (tab === 'credit-reservations' && reservationState !== 'all') params.set('reservationState', reservationState);
+  if (tab === 'credit-reservations' && allocationMismatchOnly) params.set('allocationMismatch','only');
   if (tab === 'credit-allocations' && reservationId !== '') params.set('reservationId', reservationId);
   return '/api/admin/' + tab + '?' + params.toString();
 }
@@ -263,6 +264,7 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
   const [issueCategory, setIssueCategory] = useState('');
   const [creditSource, setCreditSource] = useState<'all' | 'signup' | 'portone_topup' | 'reading_reward'>('all');
   const [reservationState, setReservationState] = useState<'all' | 'reserved' | 'settled' | 'released'>('all');
+  const [allocationMismatchOnly, setAllocationMismatchOnly] = useState(false);
   const [receiptStatus, setReceiptStatus] = useState<'all' | 'pending' | 'verified' | 'rejected' | 'revoked'>('all');
   const [reservationId, setReservationId] = useState('');
   const [attemptReadingId, setAttemptReadingId] = useState('');
@@ -285,7 +287,7 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
     setResult(null);
     const url = detail !== null
       ? (section === 'commerce' ? '/api/admin/commerce/' : section === 'readings' ? '/api/admin/readings/' : '/api/admin/users/') + detail
-      : buildListPath(section, subject, cursor, tab, from, to, issueStatus, subjectKind, subjectStatus, readingStatus, issueCategory, creditSource, reservationState, reservationId, attemptReadingId, aiStage, aiErrorCode, deletionStatus, deletionScope, releaseStatus, characterAvailability, receiptStatus, auditOutcome);
+      : buildListPath(section, subject, cursor, tab, from, to, issueStatus, subjectKind, subjectStatus, readingStatus, issueCategory, creditSource, reservationState, reservationId, attemptReadingId, aiStage, aiErrorCode, deletionStatus, deletionScope, releaseStatus, characterAvailability, receiptStatus, auditOutcome, allocationMismatchOnly);
     void fetchAdminReadV1(url, token)
       .then(value => { if (mounted) setResult(value); })
       .catch(e => {
@@ -297,7 +299,7 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
     return () => {
       mounted = false;
     };
-  }, [section, token, cursor, subject, detail, tab, from, to, issueStatus, subjectKind, subjectStatus, readingStatus, issueCategory, creditSource, reservationState, reservationId, attemptReadingId, aiStage, aiErrorCode, deletionStatus, deletionScope, releaseStatus, characterAvailability, receiptStatus, auditOutcome]);
+  }, [section, token, cursor, subject, detail, tab, from, to, issueStatus, subjectKind, subjectStatus, readingStatus, issueCategory, creditSource, reservationState, reservationId, attemptReadingId, aiStage, aiErrorCode, deletionStatus, deletionScope, releaseStatus, characterAvailability, receiptStatus, auditOutcome, allocationMismatchOnly]);
 
   return <section className="surface admin-data">
     <div className="surface__head">
@@ -365,6 +367,14 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
             <option value="portone_topup">결제 충전</option>
             <option value="reading_reward">첫 유료 Reading</option>
           </select>
+        </label>}
+      {section === 'commerce' && tab === 'credit-reservations' && detail === null &&
+        <label className="admin-issue-filter">
+          <input type="checkbox" checked={allocationMismatchOnly} onChange={e => {
+            setAllocationMismatchOnly(e.target.checked);
+            setCursor(null);
+          }} />
+          배분 수량 불일치만
         </label>}
       {section === 'commerce' && tab === 'credit-reservations' && detail === null &&
         <label className="admin-issue-filter">정산 상태

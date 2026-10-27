@@ -207,7 +207,7 @@ describe('admin dedicated readonly PostgreSQL adapter', () => {
     const reservation = harness();
     await reservation.port.read({ ...filters('credit-reservations'), reservationState: 'reserved' });
     expect(reservation.sql[2]).toContain('r.state=$6::text');
-    expect(reservation.params[2]).toEqual([21, null, null, null, 0, 'reserved']);
+    expect(reservation.params[2]).toEqual([21, null, null, null, 0, 'reserved', false]);
   });
   it('compares reservation required credits with its actual persisted lot allocation total', async () => {
     const sql=ADMIN_READ_SQL_V1['credit-reservations'] ?? '';
@@ -219,7 +219,14 @@ describe('admin dedicated readonly PostgreSQL adapter', () => {
     expect(sql).not.toMatch(/\bUPDATE\b|\bINSERT\b|\bDELETE\b|payload_jsonb/iu);
     const h=harness();
     await h.port.read(filters('credit-reservations'));
-    expect(h.params[2]).toEqual([21,null,null,null,0,null]);
+    expect(h.params[2]).toEqual([21,null,null,null,0,null,false]);
+  });
+
+  it('offers a bounded manual-review filter for credit reservations with allocation mismatch', async () => {
+    const h=harness();
+    await h.port.read({ ...filters('credit-reservations'), allocationMismatchOnly:true });
+    expect(h.sql[2]).toContain('allocations.allocated_credits,0)<>r.required_credits');
+    expect(h.params[2]).toEqual([21,null,null,null,0,null,true]);
   });
 
   it('traces credit allocations through reservation and original lot without changing balances', async () => {

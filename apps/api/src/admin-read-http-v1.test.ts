@@ -164,6 +164,14 @@ describe('admin owner-only reads', () => {
     expect(() => parse('/api/admin/audit?auditOutcome=denied&auditOutcome=failed')).toThrow();
   });
 
+  it('allows allocation mismatch filtering only for credit reservations', () => {
+    const get=(path:string)=>parseAdminReadFiltersV1(new URL('https://a.invalid'+path));
+    expect(get('/api/admin/credit-reservations?allocationMismatch=only').allocationMismatchOnly).toBe(true);
+    expect(get('/api/admin/credit-reservations').allocationMismatchOnly).toBe(false);
+    expect(() => get('/api/admin/credit-reservations?allocationMismatch=false')).toThrow();
+    expect(() => get('/api/admin/credit-allocations?allocationMismatch=only')).toThrow();
+  });
+
   it('verifies only Owner session before any data query, with required audit', async () => {
     const allowed = harness();
     const result = await allowed.call('/api/admin/session');
