@@ -20,6 +20,8 @@ export interface AdminListFiltersV1 {
   readonly creditSource?: 'signup' | 'portone_topup' | 'reading_reward' | null;
   readonly reservationState?: 'reserved' | 'settled' | 'released' | null;
   readonly reservationId?: string | null;
+  readonly aiStage?: 'planner' | 'renderer' | 'output_guard' | 'scene_director' | null;
+  readonly aiErrorCode?: string | null;
   readonly from: string | null;
   readonly to: string | null;
 }
