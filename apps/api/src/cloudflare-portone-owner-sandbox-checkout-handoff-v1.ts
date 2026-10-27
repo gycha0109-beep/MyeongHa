@@ -24,7 +24,7 @@ export const CLOUDFLARE_PORTONE_OWNER_SANDBOX_HANDOFF_V1=Object.freeze({
 } as const);
 
 const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/iu;
-const PAYMENT_ID=/^[A-Za-z0-9_-]{6,128}$/u;
+const PAYMENT_ID=/^[A-Za-z0-9_-]{6,40}$/u;
 const SQL=`
 select purchase_intent_id::text as "purchaseIntentId",
        product_offer_id::text as "productOfferId",
