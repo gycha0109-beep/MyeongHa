@@ -1,5 +1,6 @@
 import { PLANNED_STATIC_UI_COPY_V1, lookupPlannedStaticUiCopyV1 } from './ui-i18n-planned-copy-v1.js';
 import { MY_STATIC_UI_COPY_V1 } from './ui-my-copy.js';
+import { RECORDS_STATIC_UI_COPY_V1 } from './ui-records-copy.js';
 
 // Fixed, authored web UI copy only. Chat messages, birth data, and official readings are intentionally excluded.
 // Korean is the source locale; this dictionary is not a translation service.
@@ -17,12 +18,15 @@ export function translateStaticUi(source, locale) {
   if (locale === 'en-US' || locale === 'zh-CN') {
     return lookupPlannedStaticUiCopyV1(source, locale)
       ?? MY_STATIC_UI_COPY_V1.get(source)?.[locale === 'en-US' ? 2 : 3]
+      ?? RECORDS_STATIC_UI_COPY_V1.get(source)?.[locale]
       ?? source;
   }
   const row = COPY.get(source);
   if (row) return row[locale === 'ja-JP' ? 0 : 1];
   const myRow = MY_STATIC_UI_COPY_V1.get(source);
-  return myRow?.[locale === 'ja-JP' ? 0 : 1] ?? source;
+  return myRow?.[locale === 'ja-JP' ? 0 : 1]
+    ?? RECORDS_STATIC_UI_COPY_V1.get(source)?.[locale]
+    ?? source;
 }
 export function getUiLocale() {
   return typeof window === 'undefined' ? 'ko-KR' : storedLocale();
