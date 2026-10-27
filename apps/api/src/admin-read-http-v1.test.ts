@@ -91,6 +91,11 @@ describe('admin owner-only reads', () => {
       expect(() => parseAdminReadFiltersV1(url(path))).toThrow();
     }
   });
+  it('allows only exact bounded credit allocation list route', () => {
+    const resource=new URL('https://a.invalid/api/admin/credit-allocations?limit=20');
+    expect(parseAdminReadFiltersV1(resource).kind).toBe('credit-allocations');
+    expect(() => parseAdminReadFiltersV1(new URL('https://a.invalid/api/admin/credit-allocations?reservationState=reserved'))).toThrow();
+  });
   it('verifies only Owner session before any data query, with required audit', async () => {
     const allowed = harness();
     const result = await allowed.call('/api/admin/session');

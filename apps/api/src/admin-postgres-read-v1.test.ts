@@ -195,6 +195,17 @@ describe('admin dedicated readonly PostgreSQL adapter', () => {
     expect(reservation.sql[2]).toContain('r.state=$6::text');
     expect(reservation.params[2]).toEqual([21, null, null, null, 0, 'reserved']);
   });
+  it('traces credit allocations through reservation and original lot without changing balances', async () => {
+    const sql=ADMIN_READ_SQL_V1['credit-allocations'] ?? '';
+    expect(sql).toContain('public.chat_credit_turn_allocations_v1');
+    expect(sql).toContain('lot.subject_id=r.subject_id');
+    expect(sql).toContain('r.state AS "reservationState"');
+    expect(sql).toContain('a.credits AS "allocatedCredits"');
+    expect(sql).not.toMatch(/\bUPDATE\b|\bDELETE\b|\bINSERT\b/iu);
+    const h=harness();
+    await h.port.read({ ...filters('credit-allocations'), subjectId: SUBJECT });
+    expect(h.params[2]).toEqual([21, SUBJECT, null, null, 0]);
+  });
   it('provides bounded pagination', async () => {
     const h = harness('myeongha_admin_reader',Array.from({length:3},()=>({subjectId:SUBJECT})));
     const result = await h.port.read({ ...filters(),limit:2 });

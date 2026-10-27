@@ -85,3 +85,5 @@ React 19와 기존 web 워크스페이스에서 설치하는 Vite 8 빌드 도�
 - 검증된 크레딧 결제는 일반 `entitlement_events` 대신 출처가 연결된 `portone_topup` Lot를 확인합니다. 연결 증거가 없을 때에는 수동 점검 대상으로 표시하며 자동 지급하지 않습니다.
 - 금액·통화는 실제 `commerce_receipts`에서 `verified` 상태일 때의 `verified_amount_minor` / `verified_currency`만 표시합니다. 카탈로그 정가를 실제 결제로 표현하지 않습니다.
 - 크레딧 원장 출처 및 예약 상태는 허용값으로만 서버 필터링하며 조회·감사 권한은 동일하게 유지합니다.
+
+- 크레딧 예약에 실제 투입된 Lot별 수량은 `credit-allocations` 읽기에서 조회합니다. `released` 예약은 정산 과정에서 원장으로 복원되므로, 표시된 할당 수량을 현재 차감액으로 취급하지 않습니다. 본문·대화 내용과 원장 변경 명령은 제공하지 않습니다.
