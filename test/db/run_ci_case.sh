@@ -239,6 +239,13 @@ case "$case_name" in
     psql -1 -v ON_ERROR_STOP=1 -f test/db/commerce_trigger_security_hardening.sql
     bash test/db/entitlement_projection_recompute_concurrency.sh
     ;;
+  commerce-paid-credit-policy-v1)
+    apply_standard_migrations
+    psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261026100200_portone_chat_credit_catalog_staged_v1.sql
+    psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261026110300_owner_admin_credit_testing_v1.sql
+    psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261027101000_chat_credit_paid_validity_and_verified_mint_v1.sql
+    psql -v ON_ERROR_STOP=1 -f test/db/portone_paid_credit_policy_v1.sql
+    ;;
   commerce-payment-adversarial-e2e)
     apply_standard_migrations
     bash test/db/commerce_payment_adversarial_e2e_v1.sh
