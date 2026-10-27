@@ -68,7 +68,10 @@ describe('admin dedicated readonly PostgreSQL adapter', () => {
     expect(sql).toContain("l.status IN ('failed','blocked')");
     expect(sql).toContain("o.status IN ('failed','dead_lettered')");
     expect(sql).toContain("INTERVAL '7 days'");
-    expect(sql).not.toMatch(/SUM\(.*amount|payload_jsonb|raw_birth/iu);
+    expect(sql).toContain("SUM(r.verified_amount_minor)");
+    expect(sql).toContain("r.verified_currency='KRW'");
+    expect(sql).toContain("r.verified_amount_minor IS NULL OR r.verified_currency IS NULL");
+    expect(sql).not.toMatch(/payload_jsonb|raw_birth|display_price_minor/iu);
     const h = harness();
     await h.port.read(filters('overview'));
     expect(h.sql[2]).toContain('COUNT(*)');
