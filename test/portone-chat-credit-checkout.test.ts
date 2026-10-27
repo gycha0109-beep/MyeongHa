@@ -17,6 +17,7 @@ describe('PortOne V2 credit checkout contract',()=>{
    storeId:base.storeId,channelKey:base.channelKey,paymentId:base.paymentId,
    orderName:'명하 채팅 크레딧 300개',totalAmount:1900,
    currency:'CURRENCY_KRW',payMethod:'CARD',
+   products:[{id:'myeongha-chat-credits-300-v1',name:'명하 채팅 크레딧 300개',amount:1900,quantity:1}],
   });
  });
  it.each([
