@@ -135,6 +135,14 @@ describe('admin dedicated readonly PostgreSQL adapter', () => {
     expect(f.sql[2]).toContain('r.execution_status=$6::text');
     expect(f.params[2]).toEqual([21, null, null, null, 0, 'failed']);
   });
+  it('shows direct receipt-linked entitlement event evidence without claiming global ownership', () => {
+    const sql = ADMIN_READ_SQL_V1['commerce-detail'] ?? '';
+    expect(sql).toContain('e.source_receipt_id=r.id');
+    expect(sql).toContain("e.event_type IN ('granted','renewed')");
+    expect(sql).toContain('g.status=\'active\'');
+    expect(sql).toContain('no_linked_active_grant_observed');
+    expect(sql).not.toMatch(/payload_jsonb|verified_payload_jsonb|receipt_fingerprint/iu);
+  });
   it('provides bounded pagination', async () => {
     const h = harness('myeongha_admin_reader',Array.from({length:3},()=>({subjectId:SUBJECT})));
     const result = await h.port.read({ ...filters(),limit:2 });

@@ -44,7 +44,10 @@ const LABELS: Record<string, string> = {
   currency: '통화',
   providerStatus: '결제 검증',
   verifiedAt: '검증일',
-  entitlementStatus: '보유 권한',
+  entitlementStatus: '영수증 연계 권한 근거',
+  linkedGrantEventCount: '연계 지급 이벤트 수',
+  linkedActiveGrantCount: '연계 활성 지급 수',
+  linkedRevokedGrantCount: '연계 철회 지급 수',
   readingId: 'Reading 참조',
   domain: '사주 영역',
   engineVersion: '엔진 버전',
@@ -122,10 +125,10 @@ function DataTable({ result, section, onDetail }: {
   return <div className="admin-table-scroll">
     <table className="admin-table">
       <thead><tr>{columns.map(k => <th scope="col" key={k}>{LABELS[k]}</th>)}
-        {(section === 'users' || (section === 'commerce' && result.kind === 'commerce') || (section === 'readings' && result.kind === 'readings')) && <th scope="col">상세</th>}</tr></thead>
+        {(section === 'users' || (section === 'commerce' && (result.kind === 'commerce' || result.kind === 'commerce-alerts')) || (section === 'readings' && result.kind === 'readings')) && <th scope="col">상세</th>}</tr></thead>
       <tbody>{result.rows.map((row, i) => <tr key={String(row.transactionId ?? row.readingId ?? row.eventId ?? row.issueId ?? row.subjectId ?? i) + ':' + i}>
         {columns.map(k => <td key={k}>{row[k] === null || row[k] === undefined ? '—' : String(row[k])}</td>)}
-        {(section === 'users' || (section === 'commerce' && result.kind === 'commerce') || (section === 'readings' && result.kind === 'readings')) && <td>{section === 'users' && typeof row.subjectId === 'string' && isSubjectId(row.subjectId)
+        {(section === 'users' || (section === 'commerce' && (result.kind === 'commerce' || result.kind === 'commerce-alerts')) || (section === 'readings' && result.kind === 'readings')) && <td>{section === 'users' && typeof row.subjectId === 'string' && isSubjectId(row.subjectId)
           ? <button type="button" className="table-link" onClick={() => onDetail(String(row.subjectId))}>조회</button>
           : section === 'commerce' && typeof row.transactionId === 'string' && isSubjectId(row.transactionId)
             ? <button type="button" className="table-link" onClick={() => onDetail(String(row.transactionId))}>검증 내역</button>
