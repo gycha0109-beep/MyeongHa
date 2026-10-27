@@ -6,7 +6,7 @@ import type { AdminSection } from './routes.js';
 import { StatusPanel } from './StatusPanel.js';
 
 type ListSection = Exclude<AdminSection, 'overview'>;
-type ReadTab = 'users' | 'commerce' | 'commerce-alerts' | 'credits' | 'readings' | 'ai-costs' | 'ai-errors' | 'ai-estimates' | 'credit-reservations' | 'issues' | 'catalog' | 'characters' | 'content-releases' | 'deletion-jobs';
+type ReadTab = 'users' | 'commerce' | 'commerce-alerts' | 'credits' | 'readings' | 'ai-costs' | 'ai-errors' | 'ai-estimates' | 'credit-reservations' | 'credit-allocations' | 'issues' | 'catalog' | 'characters' | 'content-releases' | 'deletion-jobs';
 const DATA_PATHS: Record<ListSection, string> = {
   users: 'users',
   commerce: 'commerce',
@@ -31,6 +31,10 @@ const LABELS: Record<string, string> = {
   expiresAt: '만료 시각',
   validity: '유효 기간',
   reservationId: '사용 예약 참조',
+  lotId: '재원 Lot 참조',
+  allocatedCredits: '예약 투입 크레딧',
+  reservationState: '예약 처리 상태',
+  lotSource: '재원 출처',
   requiredCredits: '예약 크레딧',
   state: '정산 상태',
   deliveredTurnId: '전달 대화 참조',
@@ -249,7 +253,7 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
       <span className="neutral-tag">서버 검증 필수</span>
     </div>
     <div className="admin-tabs" aria-label="조회 종류">
-      {(section === 'commerce' ? [['commerce','결제 내역'],['commerce-alerts','검증·지급 점검'],['credits','크레딧 지급'],['credit-reservations','크레딧 사용·정산']] : section === 'readings' ? [['readings','Reading'],['ai-costs','AI 호출'],['ai-errors','AI 실패·차단'],['ai-estimates','AI 추정 원가']] : section === 'issues' ? [['issues','운영 이슈'],['deletion-jobs','삭제 작업'],['catalog','상품 카탈로그'],['characters','캐릭터'],['content-releases','콘텐츠 릴리스']] : [])
+      {(section === 'commerce' ? [['commerce','결제 내역'],['commerce-alerts','검증·지급 점검'],['credits','크레딧 지급'],['credit-reservations','크레딧 사용·정산'],['credit-allocations','차감·복원 재원']] : section === 'readings' ? [['readings','Reading'],['ai-costs','AI 호출'],['ai-errors','AI 실패·차단'],['ai-estimates','AI 추정 원가']] : section === 'issues' ? [['issues','운영 이슈'],['deletion-jobs','삭제 작업'],['catalog','상품 카탈로그'],['characters','캐릭터'],['content-releases','콘텐츠 릴리스']] : [])
         .map(([name,label]) => <button key={name} type="button" className={tab===name ? 'active' : ''} onClick={() => { setTab(name as ReadTab); setCursor(null); setDetail(null); }}>{label}</button>)}
     </div>
     <div className="admin-toolbar">
