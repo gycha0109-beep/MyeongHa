@@ -68,7 +68,9 @@ const SAFE_COLUMNS: Readonly<Record<AdminReadKindV1, readonly string[]>> = Objec
   'content-releases': ['releaseKey', 'contentVersion', 'status', 'isDefault', 'activatedAt', 'createdAt'],
   'deletion-jobs': ['deletionJobId', 'subjectId', 'scope', 'status', 'requestedAt', 'startedAt', 'completedAt', 'ageSeconds', 'errorCode'],
   catalog: ['productKey', 'productType', 'catalogEnabled', 'retiredAt', 'createdAt', 'offerCount', 'enabledOfferCount'],
-  analytics: ['day', 'campaignKey', 'visitors', 'checkoutAttempts', 'verifiedPurchases', 'conversionRate', 'sampleSize'],
+  analytics: ['metricKey','label','eventName','definition','numeratorDefinition','denominatorDefinition','unit',
+    'registryStatus','readModelVersion','sourceStatus','measurementStatus','value','numerator','denominator',
+    'sampleSize','sampleStatus','consentStatus','retentionStatus','campaignKey','periodFrom','periodTo','timezone'],
   issues: ['issueId', 'category', 'severity', 'status', 'createdAt', 'requestId', 'errorCode', 'attemptCount', 'availableAt', 'leaseExpiresAt'],
   audit: ['requestId','actorRef','targetRef','action','outcome','occurredAt'],
 });

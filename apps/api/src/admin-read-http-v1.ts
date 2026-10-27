@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { readAdminAnalyticsEvidenceV1 } from './admin-analytics-read-v1.js';
 import type { AdminAuthPortV1 } from './admin-auth-v1.js';
 import {
   ADMIN_READ_KINDS_V1,
@@ -391,7 +392,7 @@ export function createAdminReadHttpHandlerV1(deps: AdminReadHttpDependenciesV1) 
     try {
       const result = projectAdminRowsV1(
         filters.kind,
-        await deps.reads.read(filters),
+        filters.kind === 'analytics' ? readAdminAnalyticsEvidenceV1(filters) : await deps.reads.read(filters),
         filters.limit,
       );
       await append(actor.authUserId, (isIssueExport ? 'export:' : 'read:') + filters.kind, 'allowed', filters.recordId ?? filters.subjectId);

@@ -284,7 +284,7 @@ export function App() {
               {route.section === 'overview' ? <><Overview token={ownerToken} onSessionExpired={() => setOwnerToken(null)} />{ownerToken === null && <AdminLogin onSession={setOwnerToken} />}</> : ownerToken === null
                 ? <><PendingSection section={route.section} /><AdminLogin onSession={setOwnerToken} /></>
                 : <>{route.section === 'analytics'
-                  ? <BetaAnalyticsReadiness />
+                  ? <BetaAnalyticsReadiness token={ownerToken} onSessionExpired={() => setOwnerToken(null)} />
                   : <AdminWorkbench key={route.section + ':' + path} section={route.section} token={ownerToken}
                       onSessionExpired={() => setOwnerToken(null)} onNavigate={onNavigate} />}
                     {['users', 'commerce', 'issues'].includes(route.section) &&

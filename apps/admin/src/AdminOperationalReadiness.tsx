@@ -1,3 +1,8 @@
+import { useEffect, useState } from 'react';
+import { fetchAdminReadV1, AdminAccessDeniedErrorV1 } from './admin-client.js';
+import type { AdminReadResponse } from './admin-client.js';
+import { StatusPanel } from './StatusPanel.js';
+
 export const BETA_FUNNEL_EVIDENCE_V1 = Object.freeze([
   {
     label: '상품 상세 유효 방문자',
@@ -53,7 +58,31 @@ export const DISABLED_OPERATOR_ACTIONS_V1 = Object.freeze([
   },
 ] as const);
 
-export function BetaAnalyticsReadiness() {
+export function BetaAnalyticsReadiness({ token, onSessionExpired }: {
+  readonly token: string;
+  readonly onSessionExpired: () => void;
+}) {
+  const [period, setPeriod] = useState<{ from: string; to: string }>(() => ({
+    from: new Date(Date.now() - 6 * 86_400_000).toISOString().slice(0, 10),
+    to: new Date().toISOString().slice(0, 10),
+  }));
+  const [draftFrom, setDraftFrom] = useState(period.from);
+  const [draftTo, setDraftTo] = useState(period.to);
+  const [rows, setRows] = useState<AdminReadResponse['rows'] | null>(null);
+  const [error, setError] = useState('');
+  useEffect(() => {
+    let active = true;
+    setRows(null); setError('');
+    const query = new URLSearchParams({ limit: '20', from: period.from, to: period.to });
+    void fetchAdminReadV1('/api/admin/analytics?' + query.toString(), token).then(result => {
+      if (active) setRows(result.rows);
+    }).catch(error => {
+      if (!active) return;
+      if (error instanceof AdminAccessDeniedErrorV1) { onSessionExpired(); return; }
+      setError('분석 근거 계약을 조회할 수 없습니다. 다시 기간을 적용해 주세요.');
+    });
+    return () => { active = false; };
+  }, [token, period]);
   return <div className="analytics-readiness">
     <section className="surface">
       <div className="surface__head">
@@ -61,6 +90,18 @@ export function BetaAnalyticsReadiness() {
         <span className="neutral-tag">계측 원본 미연결</span>
       </div>
       <p className="readiness-explainer">아래 수치는 목표선이며 측정 결과가 아닙니다. 유효 방문·고유 방문자·전환·만족도 이벤트의 수집 및 보존 근거가 확인되기 전에는 성과율을 계산하지 않습니다.</p>
+      <form className="date-range-form" onSubmit={event => {
+        event.preventDefault();
+        const days = (Date.parse(draftTo + 'T00:00:00Z') - Date.parse(draftFrom + 'T00:00:00Z')) / 86_400_000;
+        if (!draftFrom || !draftTo || !Number.isFinite(days) || days < 0 || days > 90) {
+          setError('시작일·종료일을 함께 선택하고 90일 이내로 지정해 주세요.'); return;
+        }
+        setPeriod({ from: draftFrom, to: draftTo });
+      }}>
+        <label>UTC 시작일<input type="date" required value={draftFrom} onChange={event => setDraftFrom(event.target.value)} /></label>
+        <label>UTC 종료일<input type="date" required value={draftTo} onChange={event => setDraftTo(event.target.value)} /></label>
+        <button type="submit">동일 기간 적용</button>
+      </form>
       <div className="beta-targets">
         {BETA_TARGETS_V1.map(target => <div className="beta-target" key={target.title}>
           <span className="beta-target__title">{target.title}</span>
@@ -71,14 +112,17 @@ export function BetaAnalyticsReadiness() {
     </section>
     <section className="surface">
       <div className="surface__head"><div><span className="section-kicker">EVIDENCE GAPS</span><h2>퍼널 단계별 수집 근거</h2></div></div>
-      <div className="pending-list">
-        {BETA_FUNNEL_EVIDENCE_V1.map((item, index) => <div className="analytics-evidence" key={item.label}>
-          <span className="pending-list__index">0{index + 1}</span>
-          <div><strong>{item.label}</strong><p>{item.registryStatus}</p><small>{item.evidence}</small></div>
-          <span className="readiness-wait">미측정</span>
-        </div>)}
-      </div>
-      <p className="surface__foot">방문자 식별은 분석 전용 비식별 참조를 사용해야 하며, 출생 원문·대화·개인정보·영수증은 분석 이벤트에 적재하지 않습니다. 동의/보존·이벤트 레지스트리·서버 집계가 확정되기 전까지 기록 수집은 비활성입니다.</p>
+      {error ? <StatusPanel kind="error" detail={error} /> : rows === null ? <StatusPanel kind="loading" /> :
+        <div className="pending-list">{rows.map((item, index) => <div className="analytics-evidence" key={String(item.metricKey)}>
+          <span className="pending-list__index">{String(index + 1).padStart(2, '0')}</span>
+          <div><strong>{String(item.label)}</strong>
+            <p>{item.registryStatus === 'registered' ? '등록됨: ' + String(item.eventName) : '이벤트·데이터 계약 미확정'}</p>
+            <p>{String(item.definition)}</p>
+            <small>분자: {String(item.numeratorDefinition)} / 분모: {String(item.denominatorDefinition)}</small>
+            <p>기간 {String(item.periodFrom)} ~ {String(item.periodTo)} (UTC) · 유입 unknown · 표본 미확인</p>
+          </div><span className="readiness-wait">— · 미측정</span>
+        </div>)}</div>}
+      <p className="surface__foot">승인된 분석 적재 원본·분석 전용 비식별 참조·동의/거부·분석 연결 보존/삭제 근거가 미확인입니다. 일반 개인정보·Commerce 보존 결정만으로 분석 수집을 승인하지 않습니다. 추적은 비활성이며 데이터 없음은 0명이나 0%가 아닙니다. 표본 수·누락률·유료/체험단 구분과 채널 귀속은 미측정입니다. 출생 원문·대화·영수증·인증 ID는 분석 이벤트에 적재하지 않습니다.</p>
     </section>
   </div>;
 }
