@@ -92,6 +92,42 @@ describe('Web Records current-self Birth integration', () => {
     expect(result.memories.memories).toEqual([]);
   });
 
+  it('keeps verified sibling records when one history API is unavailable', async () => {
+    const { fetchImpl } = makeFetch({
+      '/api/life-record': () => Response.json({ ok: false }, { status: 503 }),
+    });
+    const records = await createRecordsRuntimeClient({
+      fetchImpl,
+      resolveBearer: async () => ({ kind: 'member', token: 'stable-member-token' }),
+    }).readRecords();
+    expect(records.lifeFacts).toEqual({ status: 'unavailable' });
+    expect(records.readings.readings).toEqual([]);
+    expect(records.memories.memories).toEqual([]);
+    expect(records.birth.status).toBe('ready');
+  });
+
+  it('does not treat a malformed Reading history as an empty history', async () => {
+    const { fetchImpl } = makeFetch({
+      '/api/readings': () => ok({ readings: [], pagination: { pageSize: 50, hasMore: true, nextCursor: null } }),
+    });
+    const records = await createRecordsRuntimeClient({
+      fetchImpl,
+      resolveBearer: async () => ({ kind: 'member', token: 'stable-member-token' }),
+    }).readRecords();
+    expect(records.readings).toEqual({ status: 'unavailable' });
+    expect(records.lifeFacts.facts).toEqual([]);
+  });
+
+  it('never shows partial records after a history endpoint rejects the session', async () => {
+    const { fetchImpl } = makeFetch({
+      '/api/memories': () => Response.json({ ok: false }, { status: 401 }),
+    });
+    await expect(createRecordsRuntimeClient({
+      fetchImpl,
+      resolveBearer: async () => ({ kind: 'member', token: 'stable-member-token' }),
+    }).readRecords()).rejects.toMatchObject({ code: 'WEB_RECORDS_SESSION_REQUIRED' });
+  });
+
   it('never displays an invalid current revision as verified Birth data', async () => {
     const { fetchImpl } = makeFetch({
       '/api/me/birth-profile': () => ok({
