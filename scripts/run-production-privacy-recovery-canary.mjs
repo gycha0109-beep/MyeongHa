@@ -1124,6 +1124,138 @@ async function resumeDeletion() {
   console.log('MYEONGHA_PRODUCTION_PRIVACY_CANARY_RESUME_PASS');
 }
 
+// Restore only the known synthetic fixture stranded by protected run 40322743599.
+// Source authority is pinned by its GitHub run, DB link, hosted Auth identity,
+// unused signup-credit shape and absence of an account-deletion start.
+const ORPHAN_PRESTART_SOURCE_RUN_ID = '40322743599';
+
+async function recoverOrphanPrestartState() {
+  if (requiredEnv('MYEONGHA_PRIVACY_CANARY_CONFIRM') !== CONFIRMATION) {
+    fail('CONFIRMATION_REQUIRED');
+  }
+  if (
+    requiredEnv('MYEONGHA_PRIVACY_CANARY_ORPHAN_RUN_ID') !==
+    ORPHAN_PRESTART_SOURCE_RUN_ID
+  ) {
+    fail('ORPHAN_SOURCE_RUN_NOT_APPROVED');
+  }
+
+  const pool = await createAdminPool();
+  let rows;
+  try {
+    const result = await pool.query(
+      `select
+         s.id::text as "subjectId",
+         s.auth_user_id::text as "authUserId",
+         cal.id::text as "commerceAccountLinkId"
+       from public.commerce_account_links cal
+       join public.subjects s on s.id=cal.subject_id
+       join public.profiles p on p.subject_id=s.id
+       join auth.users u on u.id=s.auth_user_id
+       where cal.provider=$1::text
+         and cal.external_account_fingerprint like $2::text
+         and cal.status='active'
+         and s.kind='member' and s.status='active'
+         and p.display_name='Synthetic Privacy Canary'
+         and p.locale='ko-KR' and p.timezone='Asia/Seoul'
+         and p.onboarding_state='canary'
+         and u.email like $3::text
+         and u.raw_user_meta_data->>'myeongha_canary'=$1::text
+         and u.raw_user_meta_data->>'canary_run_id'=$4::text
+         and not exists (
+           select 1 from public.data_deletion_jobs dj
+           where dj.subject_id=s.id
+         )
+         and (select count(*) from public.chat_credit_lots_v1 lot
+              where lot.subject_id=s.id
+                and lot.source_kind='signup' and lot.source_ref=s.id
+                and lot.credits_issued=50 and lot.credits_remaining=50)=1
+         and not exists (
+           select 1
+           from public.chat_credit_turn_allocations_v1 allocation
+           join public.chat_credit_lots_v1 lot on lot.id=allocation.lot_id
+           where lot.subject_id=s.id
+         )`,
+      [
+        PROVIDER,
+        `synthetic:${ORPHAN_PRESTART_SOURCE_RUN_ID}:%`,
+        `myeongha-privacy-canary-${ORPHAN_PRESTART_SOURCE_RUN_ID}-%@example.com`,
+        ORPHAN_PRESTART_SOURCE_RUN_ID,
+      ],
+    );
+    rows = result.rows;
+  } finally {
+    await pool.end();
+  }
+  if (rows.length !== 1) fail('ORPHAN_PRESTART_NOT_EXACTLY_ONE');
+  const row = rows[0];
+  const state = {
+    schema: 'myeongha-production-privacy-canary-state-v1',
+    phase: 'prepared',
+    authUserId: requireUuid(row.authUserId, 'ORPHAN_PRESTART_INVALID'),
+    subjectId: requireUuid(row.subjectId, 'ORPHAN_PRESTART_INVALID'),
+    commerceAccountLinkId: requireUuid(
+      row.commerceAccountLinkId,
+      'ORPHAN_PRESTART_INVALID',
+    ),
+    deletionJobId: randomUUID(),
+    outboxEventId: randomUUID(),
+    requestDedupeKey:
+      `privacy-canary-orphan-recovery-${ORPHAN_PRESTART_SOURCE_RUN_ID}`,
+  };
+  await writeState(state);
+  console.log('MYEONGHA_PRODUCTION_PRIVACY_CANARY_ORPHAN_PRESTART_RECOVERED');
+}
+
+async function verifyOrphanPrestartCleanup() {
+  if (
+    requiredEnv('MYEONGHA_PRIVACY_CANARY_ORPHAN_RUN_ID') !==
+    ORPHAN_PRESTART_SOURCE_RUN_ID
+  ) {
+    fail('ORPHAN_SOURCE_RUN_NOT_APPROVED');
+  }
+  const state = await readState();
+  if (state.phase !== 'cleaned') fail('ORPHAN_PRESTART_NOT_CLEANED');
+
+  const pool = await createAdminPool();
+  try {
+    const result = await pool.query(
+      `select
+         (select count(*)::int from public.subjects
+          where id=$1::uuid) as subjects,
+         (select count(*)::int from public.profiles
+          where subject_id=$1::uuid) as profiles,
+         (select count(*)::int from public.commerce_account_links
+          where subject_id=$1::uuid) as commerce_links,
+         (select count(*)::int from public.chat_credit_lots_v1
+          where subject_id=$1::uuid) as credit_lots,
+         (select count(*)::int from public.commerce_account_links
+          where provider=$2::text and external_account_fingerprint like $3::text)
+           as remaining_source_links`,
+      [
+        state.subjectId,
+        PROVIDER,
+        `synthetic:${ORPHAN_PRESTART_SOURCE_RUN_ID}:%`,
+      ],
+    );
+    const row = result.rows[0];
+    if (
+      result.rows.length !== 1 ||
+      row?.subjects !== 0 ||
+      row?.profiles !== 0 ||
+      row?.commerce_links !== 0 ||
+      row?.credit_lots !== 0 ||
+      row?.remaining_source_links !== 0
+    ) {
+      fail('ORPHAN_PRESTART_DATABASE_REMAINS');
+    }
+  } finally {
+    await pool.end();
+  }
+  await assertHostedUserAbsent(resolveAdminSecret(), state.authUserId);
+  console.log('PASS_PRODUCTION_PRIVACY_CANARY_ORPHAN_PRESTART_CLEANUP');
+}
+
 async function cleanupPrestart() {
   let state;
   try {
@@ -1237,6 +1369,8 @@ async function main() {
   if (mode === 'resume') return resumeDeletion();
   if (mode === 'cleanup-api-login') return cleanupApiCanaryLogin();
   if (mode === 'cleanup-prestart') return cleanupPrestart();
+  if (mode === 'recover-orphan-prestart') return recoverOrphanPrestartState();
+  if (mode === 'verify-orphan-prestart-cleanup') return verifyOrphanPrestartCleanup();
   fail('MODE_REQUIRED');
 }
 
