@@ -37,7 +37,7 @@ const SAFE_COLUMNS: Readonly<Record<AdminReadKindV1, readonly string[]>> = Objec
   'credit-reservations': ['reservationId','subjectId','requiredCredits','state','deliveredTurnId','createdAt','finalizedAt'],
   credits: ['eventId', 'subjectId', 'creditDelta', 'createdAt', 'eventKind', 'balanceAfter', 'correlationId'],
   readings: ['readingId', 'subjectId', 'status', 'productKey', 'domain', 'engineVersion', 'createdAt', 'errorCode'],
-  'ai-costs': ['day', 'feature', 'model', 'requests', 'successes', 'failures', 'totalTokens', 'costKrw', 'p95LatencyMs'],
+  'ai-costs': ['day', 'feature', 'model', 'requests', 'successes', 'failures', 'totalTokens', 'unknownTokenCalls', 'blocked', 'costKrw', 'avgLatencyMs', 'latencySamples', 'p95LatencyMs'],
   'ai-errors': ['executionId','subjectId','feature','model','status','errorCode','p95LatencyMs','createdAt'],
   'ai-estimates': ['day', 'feature', 'model', 'requests', 'successes', 'failures', 'estimatedMicroUsd', 'unknownCostCalls', 'costStatus'],
   characters: ['characterId', 'contentVersion', 'availability', 'enabled', 'releaseAt', 'publishedAt'],

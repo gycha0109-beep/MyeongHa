@@ -100,6 +100,15 @@ describe('admin dedicated readonly PostgreSQL adapter', () => {
     await f.port.read({ ...filters('commerce-alerts'), subjectId: SUBJECT });
     expect(f.params[2]).toEqual([21, SUBJECT, null, null, 0]);
   });
+  it('reports AI latency sample size, unknown token usage and blocked calls separately', () => {
+    const sql = ADMIN_READ_SQL_V1['ai-costs'] ?? '';
+    expect(sql).toContain('ROUND(AVG(l.latency_ms))');
+    expect(sql).toContain('COUNT(l.latency_ms)');
+    expect(sql).toContain("l.status='blocked'");
+    expect(sql).toContain('l.input_tokens IS NULL OR l.output_tokens IS NULL');
+    expect(sql).toContain('PERCENTILE_CONT(0.95)');
+    expect(sql).toContain('NULL::text AS "costKrw"');
+  });
   it('provides bounded pagination', async () => {
     const h = harness('myeongha_admin_reader',Array.from({length:3},()=>({subjectId:SUBJECT})));
     const result = await h.port.read({ ...filters(),limit:2 });
