@@ -114,7 +114,7 @@ describe('Cloudflare PortOne KCP V2 server-owned checkout handoff',()=>{
     await expect(loadCloudflarePortOneOwnerSandboxCheckoutHandoffV1(input))
       .rejects.toThrow('Cloudflare PortOne V2 TEST binding authority unavailable.');
   });
-  it('staged SQL requires canonical Member, exact offer/capability provenance, sandbox and enabled SKU',()=>{
+  it('base checkout SQL requires canonical Member, exact offer/capability provenance, sandbox and enabled SKU',()=>{
     const sql=readFileSync(new URL('../../../supabase/migrations/20261027163500_commerce_owner_sandbox_credit_checkout_v1.sql',import.meta.url),'utf8');
     for(const exact of [
       'public.assert_myeongha_subject_context_v1(p_subject_id)',
@@ -129,7 +129,7 @@ describe('Cloudflare PortOne KCP V2 server-owned checkout handoff',()=>{
       "h.expected_amount_minor=1900",
       'pi.offer_snapshot_jsonb=pg_catalog.jsonb_build_object(',
       'pi.capability_snapshot_jsonb=pg_catalog.jsonb_build_object(',
-      'grant execute on function public.qry_commerce_owner_sandbox_credit_checkout_v2(uuid,uuid)',
+      'grant execute on function public.qry_commerce_owner_sandbox_credit_checkout_v1(uuid,uuid)',
       'to myeongha_api_executor;',
       'from public, anon, authenticated, service_role;',
     ])expect(sql).toContain(exact);
