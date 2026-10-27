@@ -13,6 +13,7 @@ export interface AdminListFiltersV1 {
   readonly subjectId: string | null;
   readonly recordId?: string | null;
   readonly issueStatus?: 'failed' | 'dead_lettered' | null;
+  readonly issueCategory?: string | null;
   readonly subjectKind?: 'guest' | 'member' | null;
   readonly subjectStatus?: 'active' | 'merged' | 'deletion_pending' | 'deleted' | null;
   readonly readingStatus?: 'pending' | 'running' | 'succeeded' | 'failed' | 'cancelled' | null;

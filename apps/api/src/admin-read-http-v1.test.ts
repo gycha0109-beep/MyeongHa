@@ -75,6 +75,9 @@ describe('admin owner-only reads', () => {
   it('rejects filters unsupported by the underlying SQL rather than silently ignoring them', () => {
     expect(() => parseAdminReadFiltersV1(new URL('https://a.invalid/api/admin/issues?subjectId=123e4567-e89b-42d3-a456-426614174000'))).toThrow();
     expect(parseAdminReadFiltersV1(new URL('https://a.invalid/api/admin/issues?status=dead_lettered')).issueStatus).toBe('dead_lettered');
+    expect(parseAdminReadFiltersV1(new URL('https://a.invalid/api/admin/issues?category=reading.failed')).issueCategory).toBe('reading.failed');
+    expect(() => parseAdminReadFiltersV1(new URL('https://a.invalid/api/admin/issues?category=%27OR%201%3D1'))).toThrow();
+    expect(() => parseAdminReadFiltersV1(new URL('https://a.invalid/api/admin/readings?category=reading.failed'))).toThrow();
     expect(() => parseAdminReadFiltersV1(new URL('https://a.invalid/api/admin/readings?status=failed'))).toThrow();
     expect(() => parseAdminReadFiltersV1(new URL('https://a.invalid/api/admin/issues?status=anything'))).toThrow();
     expect(() => parseAdminReadFiltersV1(new URL('https://a.invalid/api/admin/catalog?from=2026-10-01&to=2026-10-26'))).toThrow();

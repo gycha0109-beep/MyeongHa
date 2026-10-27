@@ -100,7 +100,7 @@ export function parseAdminReadFiltersV1(url: URL): AdminListFiltersV1 {
     throw new Error('Unknown administrator read route.');
   }
 
-  const allowed = new Set(['limit', 'cursor', 'subjectId', 'from', 'to', 'status', 'subjectKind', 'subjectStatus', 'readingStatus']);
+  const allowed = new Set(['limit', 'cursor', 'subjectId', 'from', 'to', 'status', 'subjectKind', 'subjectStatus', 'readingStatus', 'category']);
   for (const [key] of url.searchParams) {
     if (!allowed.has(key) || url.searchParams.getAll(key).length !== 1) {
       throw new Error('Unknown or duplicate administrator read parameter.');
@@ -145,6 +145,11 @@ export function parseAdminReadFiltersV1(url: URL): AdminListFiltersV1 {
     Date.parse(to + 'T00:00:00Z') - Date.parse(from + 'T00:00:00Z') > 90 * 86_400_000)) {
     throw new Error('Administrator date range exceeds policy.');
   }
+  const issueCategory = url.searchParams.get('category');
+  if (issueCategory !== null &&
+      (kind !== 'issues' || !/^[A-Za-z0-9_.:-]{1,64}$/u.test(issueCategory))) {
+    throw new Error('Invalid issue category filter.');
+  }
   const rawIssueStatus = url.searchParams.get('status');
   if (rawIssueStatus !== null && (kind !== 'issues' ||
       (rawIssueStatus !== 'failed' && rawIssueStatus !== 'dead_lettered'))) {
@@ -172,7 +177,7 @@ export function parseAdminReadFiltersV1(url: URL): AdminListFiltersV1 {
   const subjectStatus = subjectStatusParam as 'active' | 'merged' | 'deletion_pending' | 'deleted' | null;
   if (!ADMIN_READ_KINDS_V1.includes(kind)) throw new Error('Unknown administrator kind.');
   const issueStatus = rawIssueStatus as 'failed' | 'dead_lettered' | null;
-  return Object.freeze({ kind, limit, cursor, subjectId, recordId, from, to, issueStatus, subjectKind, subjectStatus, readingStatus });
+  return Object.freeze({ kind, limit, cursor, subjectId, recordId, from, to, issueStatus, issueCategory, subjectKind, subjectStatus, readingStatus });
 }
 
 const ISSUE_EXPORT_COLUMNS = ['issueId', 'category', 'severity', 'status', 'createdAt', 'requestId'] as const;

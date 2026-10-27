@@ -101,12 +101,13 @@ function isSubjectId(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(value);
 }
 
-export function buildListPath(section: ListSection, subject: string, cursor: string | null, tab: ReadTab, from: string | null = null, to: string | null = null, issueStatus: string = 'all', subjectKind: string = 'all', subjectStatus: string = 'all', readingStatus: string = 'all'): string {
+export function buildListPath(section: ListSection, subject: string, cursor: string | null, tab: ReadTab, from: string | null = null, to: string | null = null, issueStatus: string = 'all', subjectKind: string = 'all', subjectStatus: string = 'all', readingStatus: string = 'all', issueCategory: string = ''): string {
   const params = new URLSearchParams({ limit: '20' });
   if (subject.length > 0) params.set('subjectId', subject);
   if (cursor !== null) params.set('cursor', cursor);
   if (from !== null && to !== null) { params.set('from', from); params.set('to', to); }
   if (tab === 'issues' && issueStatus !== 'all') params.set('status', issueStatus);
+  if (tab === 'issues' && issueCategory !== '') params.set('category', issueCategory);
   if (tab === 'users' && subjectKind !== 'all') params.set('subjectKind', subjectKind);
   if (tab === 'users' && subjectStatus !== 'all') params.set('subjectStatus', subjectStatus);
   if (tab === 'readings' && readingStatus !== 'all') params.set('readingStatus', readingStatus);
@@ -200,6 +201,8 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
   const [subjectKind, setSubjectKind] = useState<'all' | 'guest' | 'member'>('all');
   const [subjectStatus, setSubjectStatus] = useState<'all' | 'active' | 'merged' | 'deletion_pending' | 'deleted'>('all');
   const [readingStatus, setReadingStatus] = useState<'all' | 'pending' | 'running' | 'succeeded' | 'failed' | 'cancelled'>('all');
+  const [issueCategory, setIssueCategory] = useState('');
+  const [draftIssueCategory, setDraftIssueCategory] = useState('');
   const [pendingSubject, setPendingSubject] = useState('');
   const [detail, setDetail] = useState<string | null>(null);
   const [result, setResult] = useState<AdminReadResponse | null>(null);
@@ -213,7 +216,7 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
     setResult(null);
     const url = detail !== null
       ? (section === 'commerce' ? '/api/admin/commerce/' : section === 'readings' ? '/api/admin/readings/' : '/api/admin/users/') + detail
-      : buildListPath(section, subject, cursor, tab, from, to, issueStatus, subjectKind, subjectStatus, readingStatus);
+      : buildListPath(section, subject, cursor, tab, from, to, issueStatus, subjectKind, subjectStatus, readingStatus, issueCategory);
     void fetchAdminReadV1(url, token)
       .then(value => { if (mounted) setResult(value); })
       .catch(e => {
@@ -225,7 +228,7 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
     return () => {
       mounted = false;
     };
-  }, [section, token, cursor, subject, detail, tab, from, to, issueStatus, subjectKind, subjectStatus, readingStatus]);
+  }, [section, token, cursor, subject, detail, tab, from, to, issueStatus, subjectKind, subjectStatus, readingStatus, issueCategory]);
 
   return <section className="surface admin-data">
     <div className="surface__head">
@@ -277,6 +280,21 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
         </label>
       </div>}
       {section === 'issues' && tab === 'issues' && detail === null &&
+        <form className="admin-issue-category" onSubmit={e => {
+          e.preventDefault();
+          if (draftIssueCategory !== '' && !/^[A-Za-z0-9_.:-]{1,64}$/u.test(draftIssueCategory)) {
+            setError('운영 이벤트 유형은 영숫자, 점, 밑줄, 하이픈, 콜론만 사용할 수 있습니다.');
+            return;
+          }
+          setError('');
+          setIssueCategory(draftIssueCategory);
+          setCursor(null);
+        }}>
+          <input aria-label="이슈 이벤트 유형" placeholder="이벤트 유형 (선택)" value={draftIssueCategory}
+            onChange={e => setDraftIssueCategory(e.target.value.trim())} maxLength={64} />
+          <button type="submit">유형 검색</button>
+        </form>}
+      {section === 'issues' && tab === 'issues' && detail === null &&
         <label className="admin-issue-filter">이슈 상태
           <select value={issueStatus} onChange={e => {
             setIssueStatus(e.target.value as 'all' | 'failed' | 'dead_lettered');
@@ -310,6 +328,7 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
           const query = new URLSearchParams({ limit: '50' });
           if (from !== null && to !== null) { query.set('from', from); query.set('to', to); }
           if (issueStatus !== 'all') query.set('status', issueStatus);
+          if (issueCategory !== '') query.set('category', issueCategory);
           void fetchAdminIssuesCsvV1(token, query)
             .then(content => {
               const url = URL.createObjectURL(new Blob([content], { type: 'text/csv;charset=utf-8' }));

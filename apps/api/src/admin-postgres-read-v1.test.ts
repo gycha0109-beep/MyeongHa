@@ -143,6 +143,12 @@ describe('admin dedicated readonly PostgreSQL adapter', () => {
     expect(sql).toContain('no_linked_active_grant_observed');
     expect(sql).not.toMatch(/payload_jsonb|verified_payload_jsonb|receipt_fingerprint/iu);
   });
+  it('binds category and failure status as parameters', async () => {
+    const h = harness();
+    await h.port.read({ ...filters('issues'), issueCategory: 'reading.failed', issueStatus: 'failed' });
+    expect(h.sql[2]).toContain('o.event_type=$6::text');
+    expect(h.params[2]).toEqual([21, 'failed', null, null, 0, 'reading.failed']);
+  });
   it('provides bounded pagination', async () => {
     const h = harness('myeongha_admin_reader',Array.from({length:3},()=>({subjectId:SUBJECT})));
     const result = await h.port.read({ ...filters(),limit:2 });
