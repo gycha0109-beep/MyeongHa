@@ -41,7 +41,7 @@ const ATTEMPT='22222222-2222-4222-8222-222222222222';
 const CHECKOUT={
   storeId:'store-d9211773-4c6a-4736-9be7-c828405238bc',
   channelKey:'channel-key-d8049c19-c6e9-4729-8da1-ff6a1ab23100',
-  paymentId:'mha_pa_'+'b'.repeat(64),
+  paymentId:'mha_pa_'+'b'.repeat(32),
   orderName:'명하 채팅 크레딧 300개',
   totalAmount:1900,currency:'CURRENCY_KRW',payMethod:'CARD',
 };
