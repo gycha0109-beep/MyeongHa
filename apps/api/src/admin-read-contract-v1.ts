@@ -22,6 +22,8 @@ export interface AdminListFiltersV1 {
   readonly reservationId?: string | null;
   readonly aiStage?: 'planner' | 'renderer' | 'output_guard' | 'scene_director' | null;
   readonly aiErrorCode?: string | null;
+  readonly deletionStatus?: 'requested' | 'running' | 'completed' | 'failed' | null;
+  readonly deletionScope?: 'account' | 'conversation' | 'memory' | 'life_fact' | 'target_person' | null;
   readonly from: string | null;
   readonly to: string | null;
 }
