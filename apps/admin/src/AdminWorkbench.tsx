@@ -51,6 +51,8 @@ const LABELS: Record<string, string> = {
   linkedGrantEventCount: '연계 지급 이벤트 수',
   linkedActiveGrantCount: '연계 활성 지급 수',
   linkedRevokedGrantCount: '연계 철회 지급 수',
+  linkedCreditLotCount: '연계 충전 Lot 수',
+  linkedCreditRemaining: '연계 Lot 잔여',
   readingId: 'Reading 참조',
   domain: '사주 영역',
   engineVersion: '엔진 버전',

@@ -160,6 +160,16 @@ describe('admin dedicated readonly PostgreSQL adapter', () => {
     expect(lotsSql).toContain('lot.expires_at IS NULL');
     expect(lotsSql).toContain('lot.expires_at::text AS "expiresAt"');
   });
+  it('distinguishes PortOne credit lots from entitlement event delivery', () => {
+    const alerts = ADMIN_READ_SQL_V1['commerce-alerts'] ?? '';
+    const detail = ADMIN_READ_SQL_V1['commerce-detail'] ?? '';
+    expect(alerts).toContain("p.product_type = 'credit'");
+    expect(alerts).toContain("p.product_type <> 'credit'");
+    expect(alerts).toContain("lot.source_kind = 'portone_topup'");
+    expect(alerts).toContain("lot.source_ref = r.id");
+    expect(detail).toContain("lot.source_kind='portone_topup'");
+    expect(detail).toContain('credit_lots.remaining::text AS "linkedCreditRemaining"');
+  });
   it('provides bounded pagination', async () => {
     const h = harness('myeongha_admin_reader',Array.from({length:3},()=>({subjectId:SUBJECT})));
     const result = await h.port.read({ ...filters(),limit:2 });
