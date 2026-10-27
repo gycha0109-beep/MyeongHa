@@ -20,6 +20,9 @@ const metrics = [
   { key: 'verified_receipts_7d', title: '최근 7일 검증 영수증', note: '서버 검증 상태 verified 기준' },
   { key: 'completed_readings_7d', title: '최근 7일 완료 Reading', note: '완료 처리 시각 기준' },
   { key: 'ai_calls_7d', title: '최근 7일 AI 호출', note: '실행 로그 기준 · 원가가 아님' },
+  { key: 'reading_failures_7d', title: '최근 7일 Reading 실패', note: '실패 완료된 Reading 수' },
+  { key: 'ai_failures_blocked_7d', title: '최근 7일 AI 실패·차단', note: '실패 또는 차단된 호출 수' },
+  { key: 'outbox_failures_7d', title: '최근 7일 운영 이벤트 실패', note: '실패·처리 중단 상태의 이벤트 수' },
 ] as const;
 
 function navigateTo(path: string, setPath: (path: string) => void) {
@@ -53,7 +56,7 @@ function NavLink({
       href={route.path} aria-current={current ? 'page' : undefined} onClick={onClick}>
       <span className="nav-link__number" aria-hidden="true">{route.shortLabel}</span>
       <span className="nav-link__label">{route.label}</span>
-      {route.section !== 'overview' && <span className="nav-link__pending">예정</span>}
+      {route.section !== 'overview' && <span className="nav-link__pending">보호됨</span>}
     </a>
   );
 }
@@ -73,10 +76,10 @@ function LockNotice() {
     <div className="lock-notice" role="note">
       <span className="lock-notice__icon" aria-hidden="true">◇</span>
       <div>
-        <strong>운영자 인증 연결 전 · 조회 잠금</strong>
-        <p>현재는 화면 골격만 제공됩니다. 사용자 정보, 결제 내역 및 실제 운영 지표는 불러오지 않습니다.</p>
+        <strong>Owner 인증 전 · 운영 데이터 접근 제한</strong>
+        <p>서버의 Owner 허용 목록과 전용 읽기·감사 권한이 모두 확인돼야 실제 운영 데이터를 조회할 수 있습니다.</p>
       </div>
-      <span className="lock-notice__step">ADMIN 01 / 02</span>
+      <span className="lock-notice__step">OWNER ONLY</span>
     </div>
   );
 }

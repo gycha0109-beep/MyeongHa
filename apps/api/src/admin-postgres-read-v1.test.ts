@@ -64,6 +64,9 @@ describe('admin dedicated readonly PostgreSQL adapter', () => {
     expect(sql).toContain("s.kind='member' AND s.status='active'");
     expect(sql).toContain("r.verification_status='verified'");
     expect(sql).toContain("r.execution_status='succeeded'");
+    expect(sql).toContain("r.execution_status='failed'");
+    expect(sql).toContain("l.status IN ('failed','blocked')");
+    expect(sql).toContain("o.status IN ('failed','dead_lettered')");
     expect(sql).toContain("INTERVAL '7 days'");
     expect(sql).not.toMatch(/SUM\(.*amount|payload_jsonb|raw_birth/iu);
     const h = harness();
