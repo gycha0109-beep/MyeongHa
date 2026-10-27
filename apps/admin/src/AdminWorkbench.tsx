@@ -120,7 +120,7 @@ function isSubjectId(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(value);
 }
 
-export function buildListPath(section: ListSection, subject: string, cursor: string | null, tab: ReadTab, from: string | null = null, to: string | null = null, issueStatus: string = 'all', subjectKind: string = 'all', subjectStatus: string = 'all', readingStatus: string = 'all', issueCategory: string = '', creditSource: string = 'all', reservationState: string = 'all', reservationId: string = '', attemptReadingId: string = '', aiStage: string = 'all', aiErrorCode: string = ''): string {
+export function buildListPath(section: ListSection, subject: string, cursor: string | null, tab: ReadTab, from: string | null = null, to: string | null = null, issueStatus: string = 'all', subjectKind: string = 'all', subjectStatus: string = 'all', readingStatus: string = 'all', issueCategory: string = '', creditSource: string = 'all', reservationState: string = 'all', reservationId: string = '', attemptReadingId: string = '', aiStage: string = 'all', aiErrorCode: string = '', deletionStatus: string = 'all', deletionScope: string = 'all'): string {
   if (tab === 'reading-attempts' && isSubjectId(attemptReadingId)) {
     const params = new URLSearchParams({ limit: '20' });
     if (cursor !== null) params.set('cursor', cursor);
@@ -132,6 +132,8 @@ export function buildListPath(section: ListSection, subject: string, cursor: str
   if (from !== null && to !== null) { params.set('from', from); params.set('to', to); }
   if (tab === 'issues' && issueStatus !== 'all') params.set('status', issueStatus);
   if (tab === 'issues' && issueCategory !== '') params.set('category', issueCategory);
+  if (tab === 'deletion-jobs' && deletionStatus !== 'all') params.set('deletionStatus', deletionStatus);
+  if (tab === 'deletion-jobs' && deletionScope !== 'all') params.set('deletionScope', deletionScope);
   if (tab === 'users' && subjectKind !== 'all') params.set('subjectKind', subjectKind);
   if (tab === 'users' && subjectStatus !== 'all') params.set('subjectStatus', subjectStatus);
   if (tab === 'readings' && readingStatus !== 'all') params.set('readingStatus', readingStatus);
@@ -230,6 +232,8 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
   const [draftFrom, setDraftFrom] = useState('');
   const [draftTo, setDraftTo] = useState('');
   const [issueStatus, setIssueStatus] = useState<'all' | 'failed' | 'dead_lettered'>('all');
+  const [deletionStatus, setDeletionStatus] = useState<'all' | 'requested' | 'running' | 'completed' | 'failed'>('all');
+  const [deletionScope, setDeletionScope] = useState<'all' | 'account' | 'conversation' | 'memory' | 'life_fact' | 'target_person'>('all');
   const [subjectKind, setSubjectKind] = useState<'all' | 'guest' | 'member'>('all');
   const [subjectStatus, setSubjectStatus] = useState<'all' | 'active' | 'merged' | 'deletion_pending' | 'deleted'>('all');
   const [readingStatus, setReadingStatus] = useState<'all' | 'pending' | 'running' | 'succeeded' | 'failed' | 'cancelled'>('all');
@@ -259,7 +263,7 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
     setResult(null);
     const url = detail !== null
       ? (section === 'commerce' ? '/api/admin/commerce/' : section === 'readings' ? '/api/admin/readings/' : '/api/admin/users/') + detail
-      : buildListPath(section, subject, cursor, tab, from, to, issueStatus, subjectKind, subjectStatus, readingStatus, issueCategory, creditSource, reservationState, reservationId, attemptReadingId, aiStage, aiErrorCode);
+      : buildListPath(section, subject, cursor, tab, from, to, issueStatus, subjectKind, subjectStatus, readingStatus, issueCategory, creditSource, reservationState, reservationId, attemptReadingId, aiStage, aiErrorCode, deletionStatus, deletionScope);
     void fetchAdminReadV1(url, token)
       .then(value => { if (mounted) setResult(value); })
       .catch(e => {
@@ -271,7 +275,7 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
     return () => {
       mounted = false;
     };
-  }, [section, token, cursor, subject, detail, tab, from, to, issueStatus, subjectKind, subjectStatus, readingStatus, issueCategory, creditSource, reservationState, reservationId, attemptReadingId, aiStage, aiErrorCode]);
+  }, [section, token, cursor, subject, detail, tab, from, to, issueStatus, subjectKind, subjectStatus, readingStatus, issueCategory, creditSource, reservationState, reservationId, attemptReadingId, aiStage, aiErrorCode, deletionStatus, deletionScope]);
 
   return <section className="surface admin-data">
     <div className="surface__head">
@@ -389,6 +393,33 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
           </select>
         </label>
       </div>}
+      {section === 'issues' && tab === 'deletion-jobs' && detail === null &&
+        <label className="admin-issue-filter">삭제 처리 상태
+          <select value={deletionStatus} onChange={e => {
+            setDeletionStatus(e.target.value as typeof deletionStatus);
+            setCursor(null);
+          }}>
+            <option value="all">전체</option>
+            <option value="requested">요청됨</option>
+            <option value="running">진행 중</option>
+            <option value="completed">완료</option>
+            <option value="failed">실패</option>
+          </select>
+        </label>}
+      {section === 'issues' && tab === 'deletion-jobs' && detail === null &&
+        <label className="admin-issue-filter">처리 범위
+          <select value={deletionScope} onChange={e => {
+            setDeletionScope(e.target.value as typeof deletionScope);
+            setCursor(null);
+          }}>
+            <option value="all">전체</option>
+            <option value="account">계정</option>
+            <option value="conversation">대화</option>
+            <option value="memory">기억</option>
+            <option value="life_fact">사용자 기록</option>
+            <option value="target_person">대상 인물</option>
+          </select>
+        </label>}
       {section === 'issues' && tab === 'issues' && detail === null &&
         <form className="admin-issue-category" onSubmit={e => {
           e.preventDefault();

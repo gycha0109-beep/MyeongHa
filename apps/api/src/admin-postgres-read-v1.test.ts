@@ -253,6 +253,13 @@ describe('admin dedicated readonly PostgreSQL adapter', () => {
       expect(sql).not.toContain('lastActivityAt');
     }
   });
+  it('binds deletion lifecycle and scope from canonical enumerations', async () => {
+    const h=harness();
+    await h.port.read({ ...filters('deletion-jobs'), deletionStatus:'failed', deletionScope:'account' });
+    expect(h.sql[2]).toContain('d.status=$6::text');
+    expect(h.sql[2]).toContain('d.scope=$7::text');
+    expect(h.params[2]).toEqual([21,null,null,null,0,'failed','account']);
+  });
   it('provides bounded pagination', async () => {
     const h = harness('myeongha_admin_reader',Array.from({length:3},()=>({subjectId:SUBJECT})));
     const result = await h.port.read({ ...filters(),limit:2 });

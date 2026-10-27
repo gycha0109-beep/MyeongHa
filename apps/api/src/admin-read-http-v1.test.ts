@@ -129,6 +129,15 @@ describe('admin owner-only reads', () => {
     expect(() => read('/api/admin/readings?aiStage=renderer')).toThrow();
     expect(() => read('/api/admin/ai-costs?aiErrorCode=ERROR')).toThrow();
   });
+  it('limits deletion lifecycle filters to known status and scope', () => {
+    const get=(path:string)=>parseAdminReadFiltersV1(new URL('https://a.invalid'+path));
+    const f=get('/api/admin/deletion-jobs?deletionStatus=failed&deletionScope=account');
+    expect(f.deletionStatus).toBe('failed');
+    expect(f.deletionScope).toBe('account');
+    expect(() => get('/api/admin/deletion-jobs?deletionStatus=unknown')).toThrow();
+    expect(() => get('/api/admin/deletion-jobs?deletionScope=unknown')).toThrow();
+    expect(() => get('/api/admin/issues?deletionStatus=failed')).toThrow();
+  });
   it('verifies only Owner session before any data query, with required audit', async () => {
     const allowed = harness();
     const result = await allowed.call('/api/admin/session');
