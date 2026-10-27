@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { RECORDS_HUB_STATIC_UI_COPY_V1 } from '../ui-records-hub-copy.js';
 
 const root = resolve(process.cwd(), 'apps/web');
-const readWeb = (file: string) => readFileSync(resolve(root, file), 'utf8');
+const readWeb = (file: string) => readFileSync(resolve(root, file), 'utf8').replace(/\r\n/gu, '\n');
 
 describe('Records long-form official report boundary', () => {
   const jsx = readWeb('src/reading-detail/ReadingDetailPage.tsx');
