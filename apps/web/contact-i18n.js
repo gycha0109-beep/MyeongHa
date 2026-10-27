@@ -27,6 +27,7 @@ export const CONTACT_STATIC_COPY_V1 = Object.freeze([
   ['제목','件名','主旨','Subject','主题'],
   ['문의 제목을 입력해주세요','件名を入力してください','請輸入主旨','Enter a subject','请输入主题'],
   ['문의 내용','お問い合わせ内容','詢問內容','Message','咨询内容'],
+  ['회사명','会社名','公司名稱','Company name','公司名称'],
   ['발생한 상황이나 궁금한 내용을 자세히 작성해주세요.','状況やご質問を詳しく入力してください。','請詳細說明遇到的問題或疑問。','Describe the problem or your question.','请详细说明问题或疑问。'],
   ['문의 처리 및 답변을 위해 입력한 이메일과 문의 내용이 운영자에게 전달되는 데 동의합니다.','対応と返信のため、メールアドレスとお問い合わせ内容が運営者に送られることに同意します。','我同意將電子郵件和詢問內容寄給管理員，以便處理與回覆。','I agree that my email and message may be sent to the operator to handle and reply to my inquiry.','我同意将邮箱和咨询内容发送给管理员用于处理与回复。'],
   ['(필수)','（必須）','（必填）','(Required)','（必填）'],
