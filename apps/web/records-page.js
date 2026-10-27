@@ -1,6 +1,6 @@
 import { readerProvenanceLocaleLabelV1 } from './reader-provenance-locale.js';
 import { getUiLocale, translateStaticUi } from './ui-i18n.js';
-import { recordsBirthRevisionV1, recordsBirthUnavailableV1, recordsReadingSummaryV1, recordsTimestampV1 } from './records-page-ui-locale.js';
+import { recordsBirthRevisionV1, recordsBirthUnavailableV1, recordsReadingSummaryV1, recordsReportCountV1, recordsTimestampV1 } from './records-page-ui-locale.js';
 import { createRecordsRuntimeClient, RecordsRuntimeError } from './records-runtime-client.js';
 import { buildPersistedReadingHandoffUrlV1 } from './reading-history-handoff.js';
 
@@ -102,7 +102,10 @@ function setupTabs() {
 
   function activate(tab) {
     const targetId = tab.getAttribute('aria-controls');
-    for (const candidate of tabs) candidate.setAttribute('aria-selected', candidate === tab ? 'true' : 'false');
+    for (const candidate of tabs) {
+      candidate.setAttribute('aria-selected', candidate === tab ? 'true' : 'false');
+      candidate.tabIndex = candidate === tab ? 0 : -1;
+    }
     for (const panel of panels) panel.hidden = panel.id !== targetId;
   }
 
@@ -121,12 +124,13 @@ function setupTabs() {
   const params = new URLSearchParams(window.location.search);
   const requestedTab = params.get('tab');
   const fromReading = params.get('from') === 'reading';
-  if (requestedTab === 'saju' || fromReading) {
-    const sajuTab = tabs.find((tab) => tab.id === 'saju-records-tab');
-    if (sajuTab) {
-      activate(sajuTab);
-      document.body.dataset.recordsEntry = fromReading ? 'reading-handoff' : 'saju-deeplink';
-    }
+  const targetTabId = fromReading || requestedTab === 'saju'
+    ? 'saju-records-tab'
+    : ({ life: 'life-records-tab', birth: 'birth-records-tab', memory: 'memory-records-tab' }[requestedTab] ?? 'saju-records-tab');
+  const initialTab = tabs.find((tab) => tab.id === targetTabId);
+  if (initialTab) activate(initialTab);
+  if (fromReading || requestedTab === 'saju') {
+    document.body.dataset.recordsEntry = fromReading ? 'reading-handoff' : 'saju-deeplink';
   }
 }
 
@@ -340,6 +344,9 @@ function renderSajuReadingEmpty(target) {
   empty.className = 'records-reading-empty';
   empty.append(uiElement('h3', '', '아직 저장된 사주 풀이가 없습니다.'));
   empty.append(uiElement('p', 'muted', '완료된 사주 풀이가 저장되면 이곳에서 풀이 이력을 확인할 수 있습니다.'));
+  const explore = uiElement('a', 'records-report-explore', '다른 사주 주제 둘러보기');
+  explore.href = 'reading.html';
+  empty.append(explore);
   target.append(empty);
 }
 
@@ -403,6 +410,9 @@ function renderSajuReadings(readingPayload, lifeFactsPayload) {
   const target = byId('saju-records-list');
   clear(target);
   const readings = requireArray(readingPayload, 'readings');
+  // Only the authorized Reading History collection contributes to the count.
+  // Development-only fixture cards must never be counted as saved reports.
+  byId('saju-records-count').textContent = recordsReportCountV1(readings.length, getUiLocale());
   if (readings.length > 0) {
     for (const reading of readings) renderPersistedReading(target, reading);
     return;
