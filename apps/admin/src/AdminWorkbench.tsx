@@ -20,7 +20,7 @@ const LABELS: Record<string, string> = {
   kind: '구분',
   status: '상태',
   createdAt: '생성일',
-  lastActivityAt: '최근 활동',
+  lastThreadUpdatedAt: '최근 대화 갱신',
   readingsCount: 'Reading 수',
   verifiedPurchasesCount: '현재 검증 영수증 수',
   activeEntitlementsCount: '활성 이용 권한 수',

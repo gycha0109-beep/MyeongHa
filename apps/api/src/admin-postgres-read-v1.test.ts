@@ -243,6 +243,16 @@ describe('admin dedicated readonly PostgreSQL adapter', () => {
     expect(h.sql[2]).not.toContain('PROVIDER_TIMEOUT');
     expect(h.params[2]).toEqual([21,null,null,null,0,'renderer','PROVIDER_TIMEOUT']);
   });
+  it('shows only nondeleted conversation thread update time, not inferred global activity', () => {
+    for (const kind of ['users','user-detail'] as const) {
+      const sql=ADMIN_READ_SQL_V1[kind] ?? '';
+      expect(sql).toContain('MAX(t.updated_at)::text');
+      expect(sql).toContain("t.status<>'deleted'");
+      expect(sql).toContain('t.subject_id=s.id');
+      expect(sql).not.toContain('t.title');
+      expect(sql).not.toContain('lastActivityAt');
+    }
+  });
   it('provides bounded pagination', async () => {
     const h = harness('myeongha_admin_reader',Array.from({length:3},()=>({subjectId:SUBJECT})));
     const result = await h.port.read({ ...filters(),limit:2 });

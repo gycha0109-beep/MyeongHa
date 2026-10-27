@@ -25,6 +25,7 @@ grant usage on schema public to myeongha_admin_reader;
 -- Column-level SELECT only. No auth.users, raw Birth, chat body, Reading
 -- payload, payment receipt JSON, AI prompt/output or guest session material.
 grant select (id, kind, status, created_at) on public.subjects to myeongha_admin_reader;
+grant select (subject_id, updated_at, status) on public.conversation_threads to myeongha_admin_reader;
 grant select (id, subject_id, execution_status, saju_domain, created_at, completed_at)
   on public.readings to myeongha_admin_reader;
 grant select (id, reading_id, subject_id, execution_attempt_no, state, error_code, saju_engine_key,
@@ -62,6 +63,8 @@ grant select (character_id, content_bundle_id, availability, enabled, release_at
 -- The read role receives policies on EXACT known tables and no extra
 -- table/column privileges. Each CREATE POLICY is an offline gated change.
 create policy admin_read_subject_metadata_v1 on public.subjects
+  for select to myeongha_admin_reader using (true);
+create policy admin_read_recent_thread_update_v1 on public.conversation_threads
   for select to myeongha_admin_reader using (true);
 create policy admin_read_reading_metadata_v1 on public.readings
   for select to myeongha_admin_reader using (true);

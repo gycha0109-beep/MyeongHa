@@ -38,8 +38,8 @@ export interface AdminReadPortV1 {
 
 const SAFE_COLUMNS: Readonly<Record<AdminReadKindV1, readonly string[]>> = Object.freeze({
   overview: ['metricKey','metricValue','window'],
-  users: ['subjectId', 'kind', 'status', 'createdAt', 'lastActivityAt'],
-  'user-detail': ['subjectId', 'kind', 'status', 'createdAt', 'lastActivityAt', 'readingsCount', 'verifiedPurchasesCount', 'activeEntitlementsCount', 'availableCredits'],
+  users: ['subjectId', 'kind', 'status', 'createdAt', 'lastThreadUpdatedAt'],
+  'user-detail': ['subjectId', 'kind', 'status', 'createdAt', 'lastThreadUpdatedAt', 'readingsCount', 'verifiedPurchasesCount', 'activeEntitlementsCount', 'availableCredits'],
   'commerce-detail': ['transactionId','subjectId','productKey','provider','platform','providerStatus','purchaseStatus','createdAt','verifiedAt','amountMinor','currency','entitlementStatus','linkedGrantEventCount','linkedActiveGrantCount','linkedRevokedGrantCount','linkedCreditLotCount','linkedCreditRemaining'],
   'commerce-alerts': ['transactionId','subjectId','alertKind','providerStatus','detectedAt','evidence'],
   commerce: ['transactionId', 'subjectId', 'productKey', 'amountMinor', 'currency', 'providerStatus', 'verifiedAt', 'entitlementStatus'],
