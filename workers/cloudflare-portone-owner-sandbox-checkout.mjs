@@ -15,6 +15,8 @@ import {CLOUDFLARE_DIRECT_POSTGRES_CANDIDATE_LIMITS_V1}
  from '../apps/api/src/cloudflare-direct-postgres-candidate.js';
 import {loadCloudflarePortOneOwnerSandboxCheckoutHandoffV1}
  from '../apps/api/src/cloudflare-portone-owner-sandbox-checkout-handoff-v1.js';
+import {commitCloudflareOwnerPortOneSandboxHandoffV1}
+ from '../apps/api/src/cloudflare-owner-portone-sandbox-handoff-commit-v1.js';
 
 const HEADERS=CLOUDFLARE_APPROVED_RESPONSE_HEADERS_V1;
 const PATH='/api/me/credits/portone/test-checkout';
@@ -85,6 +87,13 @@ export async function tryHandleCloudflareOwnerPortOneSandboxCheckoutV1(request,b
     const checkout=await loadCloudflarePortOneOwnerSandboxCheckoutHandoffV1({
       env:bindings,pool,verifiedEvidence:evidence,
       paymentAttemptId:body.paymentAttemptId,
+    });
+    // Durable state transition precedes the browser response. A failed DB
+    // transition never releases SDK material; no browser callback is trusted.
+    await commitCloudflareOwnerPortOneSandboxHandoffV1({
+      pool,verifiedEvidence:evidence,
+      paymentAttemptId:body.paymentAttemptId,
+      providerRequestId:checkout.paymentId,
     });
     // Deliberate SDK handoff only, not proof of payment or credit entitlement.
     return Response.json({ok:true,data:{
