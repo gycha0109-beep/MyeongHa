@@ -73,7 +73,7 @@ export async function loadCloudflarePortOneOwnerSandboxCheckoutHandoffV1(input:R
   pool:PostgresSubjectPoolV1;
   verifiedEvidence:VerifiedSubjectIdentityEvidenceV1;
   paymentAttemptId:unknown;
-}>):Promise<ReturnType<typeof buildCloudflarePortOneOwnerTestCheckoutV1>>{
+}>):Promise<Awaited<ReturnType<typeof buildCloudflarePortOneOwnerTestCheckoutV1>>>{
   if(input.verifiedEvidence?.kind!=='member'||
      typeof input.paymentAttemptId!=='string'||
      !UUID.test(input.paymentAttemptId))return deny();
