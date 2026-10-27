@@ -25,6 +25,7 @@ describe('PortOne V2 credit checkout contract',()=>{
   {externalProductId:'myeongha-saju-general-natal-deep-v1'},
   {amountMinor:0},{amountMinor:9900},{currency:'USD'},
   {quantityCredits:999999},{paymentId:'bad:id'},
+  {paymentId:'mha_pa_'+'f'.repeat(64)},
   {storeId:'https://evil.invalid'},{channelKey:'abc def'},
  ])('does not create a payment for unverified authority %o',(override)=>{
   expect(()=>buildPortOneChatCreditCheckoutV1({...base,...override} as never))
