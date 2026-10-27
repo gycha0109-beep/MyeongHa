@@ -120,6 +120,15 @@ describe('admin owner-only reads', () => {
     expect(() => from('/api/admin/readings/'+id+'/attempts?from=2026-10-01&to=2026-10-02')).toThrow();
     expect(() => from('/api/admin/readings/bad/attempts')).toThrow();
   });
+  it('accepts only validated AI error stage and code on failure list', () => {
+    const read=(url: string)=>parseAdminReadFiltersV1(new URL('https://a.invalid'+url));
+    expect(read('/api/admin/ai-errors?aiStage=renderer&aiErrorCode=PROVIDER_TIMEOUT').aiStage).toBe('renderer');
+    expect(read('/api/admin/ai-errors?aiErrorCode=PROVIDER_TIMEOUT').aiErrorCode).toBe('PROVIDER_TIMEOUT');
+    expect(() => read('/api/admin/ai-errors?aiStage=invalid')).toThrow();
+    expect(() => read('/api/admin/ai-errors?aiErrorCode=%27%3BDELETE')).toThrow();
+    expect(() => read('/api/admin/readings?aiStage=renderer')).toThrow();
+    expect(() => read('/api/admin/ai-costs?aiErrorCode=ERROR')).toThrow();
+  });
   it('verifies only Owner session before any data query, with required audit', async () => {
     const allowed = harness();
     const result = await allowed.call('/api/admin/session');

@@ -232,6 +232,14 @@ describe('admin dedicated readonly PostgreSQL adapter', () => {
     expect(h.params[2]).toEqual([21, SUBJECT, 0]);
     await expect(h.port.read(filters('reading-attempts'))).rejects.toThrow('exact Reading reference');
   });
+  it('binds AI failure stage and exact error code without SQL interpolation', async () => {
+    const h=harness();
+    await h.port.read({ ...filters('ai-errors'), aiStage: 'renderer', aiErrorCode: 'PROVIDER_TIMEOUT' });
+    expect(h.sql[2]).toContain('l.stage=$6::text');
+    expect(h.sql[2]).toContain('l.error_code=$7::text');
+    expect(h.sql[2]).not.toContain('PROVIDER_TIMEOUT');
+    expect(h.params[2]).toEqual([21,null,null,null,0,'renderer','PROVIDER_TIMEOUT']);
+  });
   it('provides bounded pagination', async () => {
     const h = harness('myeongha_admin_reader',Array.from({length:3},()=>({subjectId:SUBJECT})));
     const result = await h.port.read({ ...filters(),limit:2 });
