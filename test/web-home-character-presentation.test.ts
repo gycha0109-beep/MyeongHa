@@ -13,8 +13,8 @@ describe('homepage character presentation', () => {
       yeoul: { 'ko-KR': '여울', 'ja-JP': 'ヨウル', 'en-US': 'Yeoul', 'zh-CN': 'Yeoul', 'zh-TW': 'Yeoul' },
     } as const;
     for (const [id, names] of Object.entries(expected)) {
-      for (const [locale, name] of Object.entries(names)) {
-        expect(resolveCharacterDisplayNameV1(id, locale), id + ' ' + locale).toBe(name);
+      for (const locale of ['ko-KR', 'ja-JP', 'en-US', 'zh-CN', 'zh-TW'] as const) {
+        expect(resolveCharacterDisplayNameV1(id, locale), id + ' ' + locale).toBe(names[locale]);
       }
     }
     expect(home).toContain('resolveCharacterDisplayNameV1(reader.key, locale) ?? reader.name');
