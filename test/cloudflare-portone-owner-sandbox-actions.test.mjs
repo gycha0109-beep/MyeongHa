@@ -27,8 +27,8 @@ vi.mock('../apps/api/src/production-request-identity-verifier.js',()=>({
 vi.mock('../apps/api/src/cloudflare-owner-kcp-sandbox-prepare-v1.js',()=>({
  prepareCloudflareOwnerKcpSandboxPurchaseV1:state.prep,
 }));
-vi.mock('../apps/api/src/cloudflare-owner-portone-sandbox-receipt-verification-v1.js',()=>({
- verifyCloudflareOwnerPortOneSandboxReceiptV1:state.verify,
+vi.mock('../apps/api/src/cloudflare-owner-portone-sandbox-readonly-verification-v1.js',()=>({
+ inspectCloudflareOwnerKcpSandboxPaymentV1:state.verify,
 }));
 import {tryHandleCloudflareOwnerSandboxActionsV1}
  from '../workers/cloudflare-portone-owner-sandbox-actions.mjs';
@@ -54,7 +54,7 @@ beforeEach(()=>{
   environment:'sandbox',productionCreditsIssued:false,
  });
  state.verify.mockResolvedValue({
-  paymentAttemptId:ATTEMPT,receiptId:ATTEMPT,replayed:false,
+  paymentAttemptId:ATTEMPT,providerVerifiedPaid:true,receiptPersisted:false,
   environment:'sandbox',productionCreditsIssued:false,
  });
 });
@@ -75,7 +75,7 @@ describe('strict Cloudflare Owner sandbox preparation and server receipt APIs',(
   const res=await tryHandleCloudflareOwnerSandboxActionsV1(
    req(VERIFY,{paymentAttemptId:ATTEMPT}),{},rVerify);
   expect(res.status).toBe(200);
-  expect((await res.json()).data).toMatchObject({replayed:false,productionCreditsIssued:false});
+  expect((await res.json()).data).toMatchObject({providerVerifiedPaid:true,receiptPersisted:false,productionCreditsIssued:false});
   expect(state.verify).toHaveBeenCalledWith(expect.objectContaining({paymentAttemptId:ATTEMPT}));
   expect(state.prep).not.toHaveBeenCalled();
  });
