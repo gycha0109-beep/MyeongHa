@@ -74,7 +74,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   } catch (error) {
     const code = String(error?.message ?? 'UNKNOWN');
     // Never emit URLs, query params, authorization response bodies or fetch error detail.
-    const allowed = /^[A-Z_]+(?:_(?:START_HTTP|CACHE_CONTROL|UNEXPECTED_COOKIE|ENVELOPE|AUTHORIZE_URL|PROVIDER_MAPPING|CALLBACK_ORIGIN))?$/u;
+    const allowed = /^(?:[A-Z_]+|(?:google|kakao|naver)_(?:START_HTTP|CACHE_CONTROL|UNEXPECTED_COOKIE|ENVELOPE|AUTHORIZE_URL|PROVIDER_MAPPING|CALLBACK_ORIGIN))$/u;
     process.stdout.write(JSON.stringify({ result: 'HOLD', callbackExchanged: false,
       reason: allowed.test(code) ? code : 'PROBE_FAILED' }) + '\n');
     process.exitCode = 2;
