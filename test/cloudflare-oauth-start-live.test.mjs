@@ -1,4 +1,4 @@
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { verifyCloudflareOAuthStart, ORIGIN } from '../scripts/operations/verify-cloudflare-oauth-start-live.mjs';
 

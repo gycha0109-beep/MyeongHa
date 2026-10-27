@@ -181,7 +181,7 @@ async function capture(client, suffix) {
     overflow: document.documentElement.scrollWidth - innerWidth,
     bodyText: document.body.innerText,
     subjectKind: document.querySelector('#my-subject-kind')?.textContent?.trim() ?? null,
-    accountEmail: document.querySelector('#my-account-email')?.textContent?.trim() ?? null,
+    accountEmail: document.querySelector('.my-account-meta')?.textContent?.trim() ?? null,
   }))()`);
   await writeFile(join(dir, `web-my-browser-smoke-${suffix}.json`), `${JSON.stringify(diagnostics, null, 2)}\n`);
 }

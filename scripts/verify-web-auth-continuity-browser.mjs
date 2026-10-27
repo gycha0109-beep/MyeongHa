@@ -251,8 +251,8 @@ async function waitFor(client, expression, message, timeout = 8_000) {
   }
   const diagnostics = await client.evaluate(`(() => ({
     pathname: location.pathname,
-    status: document.querySelector('#my-status')?.textContent?.trim() ?? null,
-    accountEmail: document.querySelector('#my-account-email')?.textContent?.trim() ?? null,
+    status: document.querySelector('.my-account-meta')?.textContent?.trim() ?? null,
+    accountEmail: document.querySelector('.my-account-meta')?.textContent?.trim() ?? null,
     authAction: document.querySelector('.my-logout-action')?.textContent?.trim() ?? null,
   }))()`);
   throw new Error(`${message}; diagnostics=${JSON.stringify(diagnostics)}; requests=${JSON.stringify(requests)}`);
@@ -326,10 +326,10 @@ try {
   assert(firstMember.accessToken === 'header1.payload1.signature1', 'Initial login stored an unexpected access token');
   assert(firstMember.activeBearer === firstMember.accessToken, 'Initial login did not stage the Member bearer');
 
-  await navigate(client, origin, '/my.html', '#my-account-email');
+  await navigate(client, origin, '/my.html', '.my-account-card');
   await waitFor(
     client,
-    `document.querySelector('#my-account-email')?.textContent?.trim() === ${JSON.stringify(testIdentity.email)} && Boolean(document.querySelector('.my-logout-action'))`,
+    `document.querySelector('.my-account-meta')?.textContent?.includes(${JSON.stringify(testIdentity.email)}) && Boolean(document.querySelector('.my-logout-action'))`,
     'My page did not resolve the signed-in Member account and logout action',
   );
   await evaluateAcrossExpectedNavigation(client, `document.querySelector('.my-logout-action')?.click()`);
