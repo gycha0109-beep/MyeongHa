@@ -27,9 +27,10 @@ describe('Production Guest bootstrap HTTP runtime composition', () => {
   it('uses the supplied Cloudflare subject pool without opening an independent direct connection or closing borrowed pool', async () => {
     const connect = vi.fn(async () => { throw new Error('INJECTED_GUEST_POOL_SENTINEL'); });
     const close = vi.fn(async () => undefined);
+    const borrowedPool = { connect, close };
     const runtime = createProductionGuestBootstrapHttpRuntimeV1({
       env: { ...BASE_PRODUCTION_ENV, MYEONGHA_GUEST_SESSION_TTL_SECONDS: '604800' },
-      pool: { connect, close },
+      pool: borrowedPool,
     });
     try {
       await expect(runtime.handleRequest({
