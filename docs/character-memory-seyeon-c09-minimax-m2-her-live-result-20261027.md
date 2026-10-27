@@ -1,5 +1,7 @@
 # C09 MiniMax M2-her — 승인된 OpenRouter 5문항 실험 결과 (2026-10-27)
 
+> **후속 완료:** 이 문서는 2026-10-27의 **첫 번째 Q1 단발 실행 기록**이다. 이후 이미 승인된 Q2/Q5/Q7/Q10 네 문항은 [run #40465712171](https://github.com/gycha0109-beep/MyeongHa/actions/runs/40465712171)에서 모두 한 번씩 실행됐다. 전체 5문항의 최종 비교·원문은 [3종 실제 비교 보고서](./character-memory-seyeon-c09-three-model-live-comparison-20261027.md) 및 [15개 원본 JSON](./experiments/seyeon-c09-three-model-minimax-luna-glm-five-20261027-raw-v1.json)을 참조한다. 아래 기록은 첫 번째 실행 시점의 상태를 보존한다.
+
 Watchtower-Track: character-memory
 
 ## 실행 출처
