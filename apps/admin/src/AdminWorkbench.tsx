@@ -267,6 +267,7 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
   const [reservationId, setReservationId] = useState('');
   const [attemptReadingId, setAttemptReadingId] = useState('');
   const [draftReservationId, setDraftReservationId] = useState('');
+  const [draftDetailId, setDraftDetailId] = useState('');
   const [draftIssueCategory, setDraftIssueCategory] = useState('');
   const [pendingSubject, setPendingSubject] = useState(() => {
     const value = new URLSearchParams(window.location.search).get('subjectId') ?? '';
@@ -309,6 +310,22 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
         .map(([name,label]) => <button key={name} type="button" className={tab===name ? 'active' : ''} onClick={() => { setTab(name as ReadTab); setCursor(null); setDetail(null); setReservationId(''); setDraftReservationId(''); if (name !== 'reading-attempts') setAttemptReadingId(''); }}>{label}</button>)}
     </div>
     <div className="admin-toolbar">
+      {((section === 'commerce' && tab === 'commerce') || (section === 'readings' && tab === 'readings')) && detail === null &&
+        <form className="admin-issue-category" onSubmit={e => {
+          e.preventDefault();
+          if (!isSubjectId(draftDetailId)) {
+            setError('조회할 영수증 또는 Reading의 정확한 UUID를 입력해 주세요.');
+            return;
+          }
+          setError('');
+          setDetail(draftDetailId.toLowerCase());
+          setCursor(null);
+        }}>
+          <input aria-label={section === "commerce" ? "영수증 UUID 직접 조회" : "Reading UUID 직접 조회"}
+            placeholder={section === "commerce" ? "영수증 UUID" : "Reading UUID"}
+            value={draftDetailId} onChange={e => setDraftDetailId(e.target.value.trim())} maxLength={36}/>
+          <button type="submit">상세 바로 조회</button>
+        </form>}
       {section === 'commerce' && tab === 'commerce' && detail === null &&
         <label className="admin-issue-filter">결제 검증 상태
           <select value={receiptStatus} onChange={e => {
