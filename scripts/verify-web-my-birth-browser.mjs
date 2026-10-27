@@ -218,66 +218,41 @@ let client;
 try {
   client = await connectCdp(await devtoolsPort(profile, chrome));
   await navigate(client, origin);
-  await client.evaluate(`(() => {
-    localStorage.setItem('myeongha.productTheme.v1', 'dark');
-    localStorage.setItem('myeongha.memberSession.v1', JSON.stringify({
-      accessToken: 'header.payload.signature',
-      refreshToken: 'refresh-token',
-      expiresAt: new Date(Date.now() + 3600000).toISOString(),
-      tokenType: 'bearer',
-      user: { id: '11111111-1111-4111-8111-111111111111', email: 'member@example.com' },
-    }));
-  })()`);
+  await client.evaluate('(() => { localStorage.setItem("myeongha.productTheme.v1","dark"); localStorage.setItem("myeongha.memberSession.v1",JSON.stringify({accessToken:"header.payload.signature",refreshToken:"refresh-token",expiresAt:new Date(Date.now()+3600000).toISOString(),tokenType:"bearer",user:{id:"11111111-1111-4111-8111-111111111111",email:"member@example.com"}})); })()');
   await navigate(client, origin);
-  await waitFor(client, `document.querySelector('#my-birth-content')?.hidden === false`, 'member Birth Profile did not render');
-  const member = await client.evaluate(`(() => ({
-    kind: document.querySelector('#my-subject-kind')?.textContent?.trim(),
-    email: document.querySelector('#my-account-email')?.textContent?.trim(),
-    date: document.querySelector('#my-birth-date')?.textContent?.trim(),
-    time: document.querySelector('#my-birth-time')?.textContent?.trim(),
-    calendar: document.querySelector('#my-birth-calendar')?.textContent?.trim(),
-    sex: document.querySelector('#my-birth-sex')?.textContent?.trim(),
-    revision: document.querySelector('#my-birth-revision')?.textContent?.trim(),
-    theme: document.documentElement.dataset.theme,
-    body: document.body.innerText,
-    overflow: document.documentElement.scrollWidth - innerWidth,
-  }))()`);
-  assert(member.kind === '회원' && member.email === 'member@example.com', 'member identity did not survive My load');
-  assert(member.date === '1996.01.09' && member.time === '09:30', 'Birth Profile date/time rendering is incorrect');
-  assert(member.calendar === '음력 · 윤달' && member.sex === '남성', 'Birth Profile calendar/sex rendering is incorrect');
-  assert(member.revision === '현재 입력 · revision 3', 'Birth Profile revision marker missing');
-  assert(member.theme === 'dark', 'dark theme did not persist');
-  assert(!member.body.includes('출생지') && !member.body.includes('위치 정보'), 'unsupported location field leaked into My');
-  assert(member.overflow <= 2, `desktop horizontal overflow: ${member.overflow}px`);
+  await waitFor(client,'document.querySelector(".my-account-card .my-account-meta")?.textContent.includes("member@example.com")','Member identity not rendered');
+  await client.evaluate("document.querySelector('.my-settings-section .my-choice-card:nth-child(1)').click()");
+  await waitFor(client,'document.querySelector(".my-settings-section .my-account-facts")?.textContent.includes("1996.01.09")','Member Birth Profile did not render');
+  const member=await client.evaluate("(() => {const details={};for(const row of document.querySelectorAll('.my-settings-section .my-account-facts > div'))details[row.querySelector('dt')?.textContent.trim()]=row.querySelector('dd')?.textContent.trim();return {email:document.querySelector('.my-account-card .my-account-meta')?.textContent,details,theme:document.documentElement.dataset.theme,body:document.body.innerText,overflow:document.documentElement.scrollWidth-innerWidth};})()");
+  assert(member.email.includes('member@example.com'), 'Birth Profile email identity mismatch');
+  assert(member.details['생년월일']==='1996.01.09'&&member.details['출생 시간']==='09:30','Birth Profile date and time incorrect');
+  assert(member.details['달력 기준']==='음력 윤달'&&member.details['성별']==='남성','Birth calendar/sex incorrect');
+  assert(member.theme==='dark','Dark theme not persisted');
+  assert(!member.body.includes('출생지')&&!member.body.includes('위치 정보'),'Unapproved birth location fields exposed');
+  assert(member.overflow<=2,'Birth desktop overflow');
+  await capture(client,'desktop-member');
 
-  await navigate(client, origin);
-  await waitFor(client, `document.querySelector('#my-account-email')?.textContent.trim() === 'member@example.com' && document.querySelector('#my-birth-date')?.textContent.trim() === '1996.01.09'`, 'member session/birth input did not survive reload');
-  await capture(client, 'desktop-member');
+  await navigate(client,origin);
+  await waitFor(client,'document.querySelector(".my-account-card .my-account-meta")?.textContent.includes("member@example.com")','Member session failed after reload');
+  await client.evaluate("document.querySelector('.my-settings-section .my-choice-card:nth-child(1)').click()");
+  await waitFor(client,'document.querySelector(".my-settings-section .my-account-facts")?.textContent.includes("1996.01.09")','Birth details failed after reload');
 
-  await client.send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
-  await navigate(client, origin);
-  await waitFor(client, `document.querySelector('#my-birth-content')?.hidden === false`, 'mobile Birth Profile did not render');
-  const mobile = await client.evaluate(`(() => {
-    const card = document.querySelector('#my-birth-content')?.getBoundingClientRect();
-    return { overflow: document.documentElement.scrollWidth - innerWidth, left: card?.left ?? -1, right: card?.right ?? 9999 };
-  })()`);
-  assert(mobile.overflow <= 2, `mobile horizontal overflow: ${mobile.overflow}px`);
-  assert(mobile.left >= 0 && mobile.right <= 390, 'Birth Profile card escapes mobile viewport');
-  await capture(client, 'mobile-member');
+  await client.send('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});
+  await navigate(client,origin);
+  await waitFor(client,'document.querySelector(".my-account-card .my-account-meta")?.textContent.includes("member@example.com")','Mobile member not rendered');
+  await client.evaluate("document.querySelector('.my-settings-section .my-choice-card:nth-child(1)').click()");
+  await waitFor(client,'document.querySelector(".my-settings-section .my-account-facts")?.textContent.includes("1996.01.09")','Mobile Birth Profile not rendered');
+  const mobile=await client.evaluate("(() => {const rect=document.querySelector('.my-settings-section .my-detail-panel')?.getBoundingClientRect();return {overflow:document.documentElement.scrollWidth-innerWidth,left:rect?.left,right:rect?.right};})()");
+  assert(mobile.overflow<=2&&mobile.left>=0&&mobile.right<=390,'Mobile Birth details escape viewport');
+  await capture(client,'mobile-member');
 
-  await client.evaluate(`(() => {
-    localStorage.removeItem('myeongha.memberSession.v1');
-    sessionStorage.removeItem('myeongha.pendingGuestBearer.v1');
-    sessionStorage.setItem('myeongha.guestBearer.v1', 'smoke-guest-bearer');
-  })()`);
-  await navigate(client, origin);
-  await waitFor(client, `document.querySelector('#my-subject-kind')?.textContent.trim() === '게스트' && document.querySelector('#my-birth-status')?.innerText.includes('저장된 본인 출생 정보가 없습니다.')`, 'guest empty Birth Profile state did not render');
-  const guest = await client.evaluate(`(() => ({
-    action: document.querySelector('#my-birth-status a')?.getAttribute('href'),
-    contentHidden: document.querySelector('#my-birth-content')?.hidden,
-  }))()`);
-  assert(guest.action === 'birth.html' && guest.contentHidden === true, 'guest birth-input CTA is incorrect');
-
+  await client.evaluate('(() => {localStorage.removeItem("myeongha.memberSession.v1");sessionStorage.removeItem("myeongha.pendingGuestBearer.v1");sessionStorage.setItem("myeongha.guestBearer.v1","smoke-guest-bearer");})()');
+  await navigate(client,origin);
+  await waitFor(client,'document.querySelector(".my-account-badge")?.textContent.includes("게스트")','Guest birth subject not recognized');
+  await client.evaluate("document.querySelector('.my-settings-section .my-choice-card:nth-child(1)').click()");
+  await waitFor(client,'document.querySelector(".my-settings-section .my-detail-panel")?.textContent.includes("저장된 본인 출생 정보가 없습니다.")','Guest authoritative empty Birth Profile not rendered');
+  const guest=await client.evaluate("(() => ({action:document.querySelector('.my-settings-section .my-detail-panel a')?.getAttribute('href'),facts:document.querySelector('.my-settings-section .my-account-facts')?.textContent}))()");
+  assert(guest.action==='birth.html'&&!guest.facts,'Guest birth input CTA/authority boundary wrong');
   console.log('MyeongHa_WEB_MY_BIRTH_BROWSER_PASS');
 } catch (error) {
   console.error(error);

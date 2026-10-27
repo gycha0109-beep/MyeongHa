@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+source test/db/staged_commerce_migration_policy.sh
+
 apply_migrations() {
   local db="$1"
   PGDATABASE="$db" psql -v ON_ERROR_STOP=1 -f test/db/bootstrap_supabase_auth_stub.sql
   for migration in supabase/migrations/*.sql; do
+    if skip_staged_portone_migration_from_historical_fixture "$migration"; then continue; fi
     echo "Applying ${migration} to ${db}"
     PGDATABASE="$db" psql -v ON_ERROR_STOP=1 -f "$migration" >/dev/null
   done

@@ -5,9 +5,13 @@ case_name="${1:?db CI case name is required}"
 
 bash test/db/verify_no_schema_cardinality_hardcoding.sh
 
+# The same pinned staged-migration guard is shared by all historical fixtures.
+source test/db/staged_commerce_migration_policy.sh
+
 apply_standard_migrations() {
   psql -v ON_ERROR_STOP=1 -f test/db/bootstrap_supabase_auth_stub.sql
   for migration in supabase/migrations/*.sql; do
+    if skip_staged_portone_migration_from_historical_fixture "$migration"; then continue; fi
     echo "Applying ${migration}"
     psql -v ON_ERROR_STOP=1 -f "${migration}" >/dev/null
   done
@@ -16,6 +20,7 @@ apply_standard_migrations() {
 apply_pg17_migrations_without_birth_authority() {
   psql -v ON_ERROR_STOP=1 -f test/db/bootstrap_supabase_auth_stub.sql
   for migration in supabase/migrations/*.sql; do
+    if skip_staged_portone_migration_from_historical_fixture "$migration"; then continue; fi
     if [[ "${migration}" == *'/0860_birth_profile_create_runtime_authority.sql' ]]; then
       echo "Skipping ${migration}; managed-principal parity is verified by the dedicated birth-profile case"
       continue
@@ -42,7 +47,7 @@ apply_pg17_migrations_through_seyeon_production_frontier() {
         20261007150457_guest_promotion_auth_fk_validation.sql|20261008043000_seyeon_manifest_acl_restore.sql)
           timestamped_count=$(( timestamped_count + 1 ))
           ;;
-        20261018190000_seyeon_locked_first_zero_source_reveal_v1.sql|20261024134543_saju_abuse_admission_runtime_authority.sql|20261024134610_saju_abuse_admission_production_policy_v1.sql|20261024135504_saju_abuse_admission_cleanup_worker_authority.sql|20261024141330_saju_abuse_admission_policy_approval_clock_v2.sql)
+        20261018190000_seyeon_locked_first_zero_source_reveal_v1.sql|20261024134543_saju_abuse_admission_runtime_authority.sql|20261024134610_saju_abuse_admission_production_policy_v1.sql|20261024135504_saju_abuse_admission_cleanup_worker_authority.sql|20261024141330_saju_abuse_admission_policy_approval_clock_v2.sql|20261026025332_seyeon_chat_helper_service_role_least_privilege.sql|20261026100200_portone_chat_credit_catalog_staged_v1.sql|20261026110300_owner_admin_credit_testing_v1.sql|20261027101000_chat_credit_paid_validity_and_verified_mint_v1.sql)
           # Post-frontier security migration is known but must NEVER be replayed
           # into the historical 1510 R2 catalog/restore authority fixture.
           # Reject a same-named modified migration instead of silently skipping.
@@ -50,12 +55,25 @@ apply_pg17_migrations_through_seyeon_production_frontier() {
           # need not include git. Compute the exact canonical Git blob SHA-1
           # with coreutils if git is missing. Windows CRLF checkout is allowed
           # ONLY when LF normalization produces the unchanged pinned SQL blob.
-          local reviewed_blob_sha1='3fbe7322cb3f11484a3e0a42bdc0598879b3d1d8'
+          local reviewed_blob_sha1 hold_reason='HOLD_R2_POST_FRONTIER_SQL_FINGERPRINT_DRIFT'
+          case "$basename" in
+            20261018190000_seyeon_locked_first_zero_source_reveal_v1.sql)
+              reviewed_blob_sha1='3fbe7322cb3f11484a3e0a42bdc0598879b3d1d8'
+              hold_reason='HOLD_R2_ZERO_REVEAL_SQL_FINGERPRINT_DRIFT'
+              ;;
+            20261026025332_seyeon_chat_helper_service_role_least_privilege.sql)
+              reviewed_blob_sha1='c051a1dde2b3a260cdde5efafdcf1583c79d608d'
+              hold_reason='HOLD_R2_CHAT_HELPER_ACL_SQL_FINGERPRINT_DRIFT'
+              ;;
+          esac
           case "$basename" in
             20261024134543_saju_abuse_admission_runtime_authority.sql) reviewed_blob_sha1='4be88ed0003bc4db226cc2324a506183094f35ff' ;;
             20261024134610_saju_abuse_admission_production_policy_v1.sql) reviewed_blob_sha1='c9a6354ec0d1fb2c932aca1e1916e65a5c623705' ;;
             20261024135504_saju_abuse_admission_cleanup_worker_authority.sql) reviewed_blob_sha1='cd31fb16e0985c732208cf69d41d1bd88f7ef31e' ;;
             20261024141330_saju_abuse_admission_policy_approval_clock_v2.sql) reviewed_blob_sha1='9b3abf4f8296c8385b55f29e224381bdf14e8a4e' ;;
+            20261026100200_portone_chat_credit_catalog_staged_v1.sql) reviewed_blob_sha1='a55bd7aa06d6625523090e997f6f76f5539abee1' ;;
+            20261026110300_owner_admin_credit_testing_v1.sql) reviewed_blob_sha1='186ffa2085e5922ec8319d4e5dd345a41597f3cd' ;;
+            20261027101000_chat_credit_paid_validity_and_verified_mint_v1.sql) reviewed_blob_sha1='5e5270466e700f98b2d41cac338298735dc1ad99' ;;
           esac
           local local_blob_sha1 local_bytes normalized_bytes
           if command -v git >/dev/null 2>&1; then
@@ -75,7 +93,7 @@ apply_pg17_migrations_through_seyeon_production_frontier() {
             )"
           fi
           [[ "$local_blob_sha1" == "$reviewed_blob_sha1" ]] || {
-            echo "HOLD_R2_ZERO_REVEAL_SQL_FINGERPRINT_DRIFT" >&2; return 1;
+            echo "$hold_reason" >&2; return 1;
           }
           continue
           ;;
@@ -220,6 +238,13 @@ case "$case_name" in
     psql -1 -v ON_ERROR_STOP=1 -f test/db/commerce_payment_source_authority.sql
     psql -1 -v ON_ERROR_STOP=1 -f test/db/commerce_trigger_security_hardening.sql
     bash test/db/entitlement_projection_recompute_concurrency.sh
+    ;;
+  commerce-paid-credit-policy-v1)
+    apply_standard_migrations
+    psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261026100200_portone_chat_credit_catalog_staged_v1.sql
+    psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261026110300_owner_admin_credit_testing_v1.sql
+    psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261027101000_chat_credit_paid_validity_and_verified_mint_v1.sql
+    psql -v ON_ERROR_STOP=1 -f test/db/portone_paid_credit_policy_v1.sql
     ;;
   commerce-payment-adversarial-e2e)
     apply_standard_migrations
@@ -601,6 +626,11 @@ SQL
     node scripts/operations/verify-seyeon-r2-pending-migrations.mjs > /dev/null
     apply_pg17_migrations_through_seyeon_production_frontier
     bash test/db/seyeon_r2_h_1720_forward.sh
+    ;;
+  seyeon-r2-helper-service-role-least-privilege)
+    verify_pg17
+    apply_pg17_migrations_without_birth_authority
+    bash test/db/seyeon_r2_helper_service_role_least_privilege.sh
     ;;
   seyeon-r2-rpc-catalog)
     verify_pg17

@@ -332,6 +332,12 @@
       "mainMode": "one-shot-trigger",
       "workTrackAttribution": "commit-metadata"
     },
+    "production-seyeon-helper-acl-one-shot.yml": {
+      "responsibility": "production-seyeon-helper-acl-single-grant-revoke",
+      "prMode": "none",
+      "mainMode": "manual",
+      "workTrackAttribution": "commit-metadata"
+    },
     "production-seyeon-turn-send-smoke.yml": {
       "responsibility": "production-chat-smoke",
       "prMode": "none",
@@ -436,6 +442,24 @@
     },
     "seyeon-c08v-offline-once-pilot-v1.yml": {
       "responsibility": "character-memory-offline-first-batch-mock-rehearsal",
+      "prMode": "none",
+      "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "commit-metadata"
+    },
+    "seyeon-c09-gpt6-luna-five-main-once-20261026.yml": {
+      "responsibility": "character-memory-owner-approved-single-model-gpt6-luna-five-public-dialogues-once",
+      "prMode": "none",
+      "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "commit-metadata"
+    },
+    "seyeon-c09-luna-agency-five-main-once-20261026.yml": {
+      "responsibility": "character-memory-owner-approved-improved-gpt6-luna-public-five-dialogues-one-shot",
+      "prMode": "none",
+      "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "commit-metadata"
+    },
+    "seyeon-c09-openrouter-round1-main-once-20261026.yml": {
+      "responsibility": "character-memory-owner-approved-public-eight-model-five-question-openrouter-screening-once",
       "prMode": "none",
       "mainMode": "one-shot-trigger",
       "workTrackAttribution": "commit-metadata"

@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const mainScript = readFileSync('test/db/run_authority_core.sh', 'utf8');
+const stagedMigrationPolicy = readFileSync('test/db/staged_commerce_migration_policy.sh', 'utf8');
 const marker = '\nbash test/db/verify_no_schema_cardinality_hardcoding.sh';
 const prefix = mainScript.slice(0, mainScript.indexOf(marker));
 
@@ -14,6 +15,7 @@ function runFixture({ profile = false, failure = false } = {}) {
     mkdirSync(join(directory, 'test', 'db'), { recursive: true });
     mkdirSync(join(directory, 'supabase', 'migrations'), { recursive: true });
     writeFileSync(join(directory, 'test', 'db', 'bootstrap_supabase_auth_stub.sql'), '-- synthetic\n');
+    writeFileSync(join(directory, 'test', 'db', 'staged_commerce_migration_policy.sh'), stagedMigrationPolicy);
     writeFileSync(join(directory, 'supabase', 'migrations', '000001_synthetic.sql'), '-- synthetic\n');
     const logPath = join(directory, 'mock-commands.log');
     const mock = [

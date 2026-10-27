@@ -1,7 +1,8 @@
 import {afterEach,describe,expect,it,vi} from 'vitest';
 const handleRequest=vi.fn(async()=>Response.json({ok:true,data:{accepted:true}}));
 const close=vi.fn(async()=>{});
-const create=vi.fn(()=>({handleRequest,close}));
+const verifyOwnerCreditExemption=vi.fn(async()=>false);
+const create=vi.fn(()=>({handleRequest,close,verifyOwnerCreditExemption}));
 vi.mock('../apps/api/src/seyeon-security-s0-production-policy-v1.js',()=>({
   SEYEON_SECURITY_S0_PRODUCTION_V1:{receiptAndWithdrawalEnabled:true,modelUseEnabled:true,
     creditBilling:{productionMounted:false}},
@@ -35,10 +36,20 @@ describe('primary Worker S0 receipt routing',()=>{
    const bindings=env();
    const blocked=await worker.default.fetch(request('/api/chat/'+id+'/turns'),bindings,{});
    expect(blocked.status).toBe(503);
-   expect(create).not.toHaveBeenCalled();
+   expect(create).toHaveBeenCalledTimes(1);
+   expect(verifyOwnerCreditExemption).toHaveBeenCalledTimes(1);
+   expect(handleRequest).not.toHaveBeenCalled();
    const receipt=await worker.default.fetch(request('/api/chat/delivery-receipts/'+id),bindings,{});
    expect(receipt.status).toBe(200);
-   expect(create).toHaveBeenCalledTimes(1);
+   expect(create).toHaveBeenCalledTimes(2);
+ });
+ it('only a verified Owner Admin can reach protected positive-model runtime',async()=>{
+   verifyOwnerCreditExemption.mockResolvedValueOnce(true);
+   const response=await worker.default.fetch(request('/api/chat/'+id+'/turns'),env(),{});
+   expect(response.status).toBe(200);
+   expect(verifyOwnerCreditExemption).toHaveBeenCalledTimes(1);
+   expect(handleRequest).toHaveBeenCalledTimes(1);
+   expect(close).toHaveBeenCalledTimes(1);
  });
  it('preserves alias holds and blocks fresh model use during emergency hold while retaining receipts',async()=>{
    const bindings={...env(),MYEONGHA_CLOUDFLARE_EMERGENCY_HOLD:'true'};

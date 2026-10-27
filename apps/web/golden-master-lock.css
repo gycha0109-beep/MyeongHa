@@ -194,20 +194,6 @@ body.gm-page .product-theme-toggle-mark {
     border-bottom: 1px solid var(--mh-line);
   }
 
-  body.gm-page .product-header::after {
-    content: "◇";
-    display: block;
-    position: absolute;
-    left: 50%;
-    bottom: -9px;
-    transform: translateX(-50%);
-    width: 24px;
-    text-align: center;
-    color: var(--mh-brass-strong);
-    background: var(--mh-paper-base);
-    font-family: var(--mh-serif);
-    font-size: 14px;
-  }
 
   body.gm-page .product-header-inner {
     width: min(var(--mh-max), calc(100% - 64px));

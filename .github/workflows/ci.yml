@@ -193,7 +193,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          source test/db/staged_commerce_migration_policy.sh
           for migration in supabase/migrations/*.sql; do
+            if skip_staged_portone_migration_from_historical_fixture "$migration"; then continue; fi
             echo "Applying ${migration}"
             psql -v ON_ERROR_STOP=1 -f "${migration}" >/dev/null
           done

@@ -150,7 +150,7 @@ await assertMissing(resolve('vercel.json'), 'Retired Vercel deployment configura
 // These counts and exact dispatch destinations are application ingress
 // contracts, not a provider-imposed limit on the number of API functions.
 if (CLOUDFLARE_DIRECT_API_ROUTES.length !== 12 ||
-    CLOUDFLARE_REWRITE_ROUTES.length !== 20) {
+    CLOUDFLARE_REWRITE_ROUTES.length !== 21) {
   throw new Error('Cloudflare API route inventory changed without an explicit routing migration.');
 }
 const directPaths = CLOUDFLARE_DIRECT_API_ROUTES.map(route => route.path);

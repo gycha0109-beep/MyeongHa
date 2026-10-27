@@ -274,19 +274,21 @@ try {
   await navigate(tabA, origin, '/hall.html', '.product-profile');
   const firstASession = await signIn(tabA, memberA);
   assert(firstASession?.user?.id === memberA.id, 'Member A sign-in did not return Member A');
-  await navigate(tabA, origin, '/my.html', '#my-content');
+  await navigate(tabA, origin, '/my.html', '.my-page-shell');
+  await waitFor(tabA, `document.querySelector('.my-account-meta')?.textContent.includes(${JSON.stringify(memberA.email)})`, 'Member A email did not render');
+  await tabA.evaluate("document.querySelector('.my-settings-section .my-choice-card:nth-child(1)').click()");
   await waitFor(
     tabA,
-    `document.querySelector('#my-content')?.hidden === false && document.querySelector('#my-display-name')?.textContent?.trim() === ${JSON.stringify(memberA.displayName)} && document.querySelector('#my-account-email')?.textContent?.trim() === ${JSON.stringify(memberA.email)} && document.querySelector('#my-birth-date')?.textContent?.trim() === '1991.01.02'`,
+    `document.querySelector('.my-settings-section .my-account-facts')?.textContent.includes('1991.01.02')`,
     'Member A My profile/birth did not render',
   );
 
   const initialLoads = myLoads;
   const initialState = await tabA.evaluate(`(() => ({
     token: JSON.parse(localStorage.getItem('myeongha.memberSession.v1') ?? 'null')?.accessToken ?? null,
-    displayName: document.querySelector('#my-display-name')?.textContent?.trim() ?? null,
-    email: document.querySelector('#my-account-email')?.textContent?.trim() ?? null,
-    birthDate: document.querySelector('#my-birth-date')?.textContent?.trim() ?? null,
+    displayName: null,
+    email: document.querySelector('.my-account-meta')?.textContent.trim() ?? '',
+    birthDate: document.querySelector('.my-settings-section .my-account-facts > div:first-child dd')?.textContent.trim() ?? '',
   }))()`);
   assert(initialLoads >= 1, 'initial My page load was not observed');
 
@@ -304,15 +306,14 @@ try {
   assert(myLoads === initialLoads, `same-Member token rotation reloaded My; before=${initialLoads} after=${myLoads}`);
   const afterSameMember = await tabA.evaluate(`(() => ({
     pathname: location.pathname,
-    displayName: document.querySelector('#my-display-name')?.textContent?.trim() ?? null,
-    email: document.querySelector('#my-account-email')?.textContent?.trim() ?? null,
-    birthDate: document.querySelector('#my-birth-date')?.textContent?.trim() ?? null,
+    displayName: null,
+    email: document.querySelector('.my-account-meta')?.textContent.trim() ?? '',
+    birthDate: document.querySelector('.my-settings-section .my-account-facts > div:first-child dd')?.textContent.trim() ?? '',
     subjectId: JSON.parse(localStorage.getItem('myeongha.memberSession.v1') ?? 'null')?.user?.id ?? null,
     token: JSON.parse(localStorage.getItem('myeongha.memberSession.v1') ?? 'null')?.accessToken ?? null,
   }))()`);
   assert(afterSameMember.pathname === '/my.html', 'same-Member rotation navigated away from My');
-  assert(afterSameMember.displayName === memberA.displayName, 'same-Member rotation disturbed My display name');
-  assert(afterSameMember.email === memberA.email, 'same-Member rotation disturbed My account email');
+  assert(afterSameMember.email.includes(memberA.email), 'same-Member rotation disturbed My account email');
   assert(afterSameMember.birthDate === '1991.01.02', 'same-Member rotation disturbed My birth data');
   assert(afterSameMember.subjectId === memberA.id, 'same-Member rotation changed canonical subject');
   assert(afterSameMember.token === secondASession.accessToken, 'same-Member rotated token was not visible cross-tab');
@@ -328,9 +329,11 @@ try {
   );
   await waitFor(
     tabA,
-    `location.pathname === '/my.html' && document.querySelector('#my-content')?.hidden === false && document.querySelector('#my-display-name')?.textContent?.trim() === ${JSON.stringify(memberB.displayName)} && document.querySelector('#my-account-email')?.textContent?.trim() === ${JSON.stringify(memberB.email)} && document.querySelector('#my-birth-date')?.textContent?.trim() === '2002.03.04' && JSON.parse(localStorage.getItem('myeongha.memberSession.v1') ?? 'null')?.user?.id === ${JSON.stringify(memberB.id)}`,
+    `location.pathname === '/my.html' && document.querySelector('.my-account-meta')?.textContent.includes(${JSON.stringify(memberB.email)}) && JSON.parse(localStorage.getItem('myeongha.memberSession.v1') ?? 'null')?.user?.id === ${JSON.stringify(memberB.id)}`,
     'My did not reload and render under Member B',
   );
+  await tabA.evaluate("document.querySelector('.my-settings-section .my-choice-card:nth-child(1)').click()");
+  await waitFor(tabA, `document.querySelector('.my-settings-section .my-account-facts')?.textContent.includes('2002.03.04')`, 'Member B Birth Profile did not render');
   assert(myLoads === loadsBeforeReplacement + 1, `Member replacement did not cause exactly one My reload; before=${loadsBeforeReplacement} after=${myLoads}`);
 
   const replacementRequests = requests.slice(requestsBeforeReplacement);
@@ -341,14 +344,13 @@ try {
 
   const finalState = await tabA.evaluate(`(() => ({
     member: JSON.parse(localStorage.getItem('myeongha.memberSession.v1') ?? 'null'),
-    displayName: document.querySelector('#my-display-name')?.textContent?.trim() ?? null,
-    email: document.querySelector('#my-account-email')?.textContent?.trim() ?? null,
-    birthDate: document.querySelector('#my-birth-date')?.textContent?.trim() ?? null,
+    displayName: null,
+    email: document.querySelector('.my-account-meta')?.textContent.trim() ?? '',
+    birthDate: document.querySelector('.my-settings-section .my-account-facts > div:first-child dd')?.textContent.trim() ?? '',
     bodyText: document.body.innerText,
   }))()`);
   assert(finalState.member?.user?.id === memberB.id, 'canonical Member did not remain Member B');
-  assert(finalState.displayName === memberB.displayName, 'Member A display name remained after replacement');
-  assert(finalState.email === memberB.email, 'Member A email remained after replacement');
+  assert(finalState.email.includes(memberB.email), 'Member A email remained after replacement');
   assert(finalState.birthDate === '2002.03.04', 'Member A birth data remained after replacement');
   assert(!finalState.bodyText.includes(memberA.displayName), 'Member A display name is still visible after replacement');
   assert(!finalState.bodyText.includes(memberA.email), 'Member A email is still visible after replacement');
@@ -362,7 +364,7 @@ try {
       sameMemberLoads: loadsBeforeReplacement,
       finalLoads: myLoads,
       sameMemberTokenRotated: secondASession.accessToken !== initialState.token,
-      sameMemberPreserved: afterSameMember.displayName === memberA.displayName && afterSameMember.birthDate === '1991.01.02',
+      sameMemberPreserved: afterSameMember.email.includes(memberA.email) && afterSameMember.birthDate === '1991.01.02',
       subjectReload: myLoads === loadsBeforeReplacement + 1,
       finalSubjectId: finalState.member?.user?.id ?? null,
       finalDisplayName: finalState.displayName,

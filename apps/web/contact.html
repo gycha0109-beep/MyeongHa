@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <script src="/ui-i18n-boot.js"></script>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="명하 서비스 이용 중 궁금한 점이나 불편사항을 문의해 주세요." />
+  <title>문의하기 · 명하</title>
+  <link rel="stylesheet" href="product.css" vite-ignore />
+  <link rel="stylesheet" href="contact.css" vite-ignore />
+  <script src="product-theme.js"></script>
+  <link rel="stylesheet" href="ui-i18n.css" vite-ignore />
+  <script type="module" src="/ui-i18n.js"></script>
+</head>
+<body class="product-page" data-page="contact">
+  <header class="product-header">
+    <div class="product-shell product-header-inner">
+      <a class="product-brand" href="hall.html" aria-label="명하 홈">
+        <span class="product-brand-name">명하</span>
+        <span class="product-brand-seal" aria-hidden="true">明河</span>
+        <span class="product-brand-sub">MyeongHa</span>
+      </a>
+      <nav class="product-nav" aria-label="주요 메뉴">
+        <a class="product-nav-link" href="hall.html">홈</a>
+        <a class="product-nav-link" href="reading.html">사주</a>
+        <a class="product-nav-link" href="face-reading.html">관상</a>
+        <a class="product-nav-link" href="chat-hub.html">대화</a>
+        <a class="product-nav-link" href="records.html">기록</a>
+        <a class="product-nav-link" href="my.html" aria-current="page">마이</a>
+      </nav>
+      <div class="product-utilities">
+        <a class="product-profile" href="my.html" aria-label="마이 페이지">
+          <span class="product-profile-mark" aria-hidden="true">之</span>
+          <span>마이</span><span aria-hidden="true">⌄</span>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <main class="product-shell contact-shell">
+    <a class="contact-back" href="my.html">← 마이페이지로 돌아가기</a>
+    <div class="contact-grid">
+      <section class="contact-intro">
+        <span class="contact-kicker">MYEONGHA SUPPORT</span>
+        <h1>무엇을 도와드릴까요?</h1>
+        <p>서비스 이용 중 궁금하신 점이나 불편한 점을 남겨주세요. 확인 후 입력하신 이메일로 답변드리겠습니다.</p>
+        <div class="contact-aside">
+          <span class="contact-aside-symbol" aria-hidden="true">問</span>
+          <strong>문의 내용은 운영자에게 전달됩니다.</strong>
+          <p>계정·결제·서비스 오류 등 문의 유형을 선택하시면 내용을 파악하는 데 도움이 됩니다.</p>
+          <p>비밀번호, 인증번호, 결제카드 전체 번호 등 민감한 정보는 입력하지 마세요.</p>
+        </div>
+      </section>
+
+      <section class="contact-panel" aria-labelledby="contact-form-title">
+        <div class="contact-panel-heading">
+          <span>01 — 문의 접수</span>
+          <h2 id="contact-form-title">문의하기</h2>
+          <p><span aria-hidden="true">*</span> 표시는 필수 입력 항목입니다.</p>
+        </div>
+        <form id="contact-form">
+          <label for="contact-category">문의 유형 <span>*</span></label>
+          <select id="contact-category" name="category" required>
+            <option value="" selected disabled>문의 유형을 선택해주세요</option>
+            <option value="service">서비스 이용</option>
+            <option value="payment">결제 · 이용권</option>
+            <option value="account">계정 · 로그인</option>
+            <option value="bug">오류 신고</option>
+            <option value="other">기타 문의</option>
+          </select>
+
+          <div class="contact-two-columns">
+            <div>
+              <label for="contact-name">이름 또는 호칭 <span>*</span></label>
+              <input id="contact-name" name="name" type="text" maxlength="60" autocomplete="name" placeholder="답변 시 불러드릴 이름" required />
+            </div>
+            <div>
+              <label for="contact-email">답변받을 이메일 <span>*</span></label>
+              <input id="contact-email" name="email" type="email" maxlength="254" autocomplete="email" placeholder="example@email.com" required />
+            </div>
+          </div>
+
+          <label for="contact-subject">제목 <span>*</span></label>
+          <input id="contact-subject" name="subject" type="text" minlength="4" maxlength="120" placeholder="문의 제목을 입력해주세요" required />
+          <label for="contact-message">문의 내용 <span>*</span></label>
+          <textarea id="contact-message" name="message" minlength="10" maxlength="4000" rows="9" placeholder="발생한 상황이나 궁금한 내용을 자세히 작성해주세요." required></textarea>
+          <div class="contact-hidden-field" aria-hidden="true">
+            <label for="contact-company">회사명</label>
+            <input id="contact-company" name="company" type="text" tabindex="-1" autocomplete="off" />
+          </div>
+          <label class="contact-consent" for="contact-consent">
+            <input id="contact-consent" type="checkbox" required />
+            <span>문의 처리 및 답변을 위해 입력한 이메일과 문의 내용이 운영자에게 전달되는 데 동의합니다. <b>(필수)</b></span>
+          </label>
+          <p class="contact-status" id="contact-status" role="status" aria-live="polite"></p>
+          <button class="contact-submit" id="contact-submit" type="submit">문의 보내기 <span aria-hidden="true">→</span></button>
+          <p class="contact-footnote">문의가 정상 접수된 경우에만 완료 메시지가 표시됩니다.</p>
+        </form>
+      </section>
+    </div>
+  </main>
+
+  <nav class="mobile-bottom-nav" aria-label="모바일 주요 메뉴">
+    <a class="mobile-nav-link" href="hall.html"><span class="mobile-nav-icon" aria-hidden="true">⌂</span><span>홈</span></a>
+    <a class="mobile-nav-link" href="reading.html"><span class="mobile-nav-icon" aria-hidden="true">✦</span><span>사주</span></a>
+    <a class="mobile-nav-link" href="face-reading.html"><span class="mobile-nav-icon" aria-hidden="true">相</span><span>관상</span></a>
+    <a class="mobile-nav-link" href="chat-hub.html"><span class="mobile-nav-icon" aria-hidden="true">◌</span><span>대화</span></a>
+    <a class="mobile-nav-link" href="records.html"><span class="mobile-nav-icon" aria-hidden="true">▤</span><span>기록</span></a>
+    <a class="mobile-nav-link" href="my.html" aria-current="page"><span class="mobile-nav-icon" aria-hidden="true">♙</span><span>마이</span></a>
+  </nav>
+  <script type="module" src="/contact.js"></script>
+</body>
+</html>

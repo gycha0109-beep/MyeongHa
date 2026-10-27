@@ -54,7 +54,6 @@ export default {
     const firstReplyRoute=/^\/api\/chat\/[a-f0-9-]+\/turns$/u.test(url.pathname);
     if(approvedCloudflareAuthOriginV1(request,env)!==null && request.method==='POST' && url.search==='' && SEYEON_SECURITY_S0_PRODUCTION_V1.receiptAndWithdrawalEnabled &&
        (receiptRoute||revokeRoute||(firstReplyRoute&&SEYEON_SECURITY_S0_PRODUCTION_V1.modelUseEnabled&&
-       SEYEON_SECURITY_S0_PRODUCTION_V1.creditBilling?.productionMounted===true&&
        !cloudflareEmergencyHoldEnabledV1(env)))){
       // Import inside the request: DB pools/credentials never become isolate
       // global state. Every alias/history/replay still reaches the sealed router.
@@ -72,6 +71,14 @@ export default {
           env,approvedPersonalRecordModelUse:()=>SEYEON_SECURITY_S0_PRODUCTION_V1.receiptAndWithdrawalEnabled,
           governorApproval:SEYEON_SECURITY_S0_GOVERNOR_APPROVAL_V1,
         });
+        // The general paid rail remains sealed until atomic reservation and
+        // delivery-receipt settlement are actually mounted. The sole DB-bound
+        // Owner Admin may test the existing governed, G1/G2/G3-protected AI.
+        // Even a server-side account lookup failure must not admit a model.
+        if(firstReplyRoute && !(await runtime.verifyOwnerCreditExemption(request))){
+          return Response.json({ok:false,error:{code:'CREDIT_AUTHORITY_UNAVAILABLE',retryable:false}},
+            {status:503,headers:HEALTH_HEADERS});
+        }
         const response=await runtime.handleRequest(request);
         const headers=new Headers(response.headers);
         for(const [key,value] of Object.entries(HEALTH_HEADERS))headers.set(key,value);

@@ -34,6 +34,8 @@ const commerceEntitlementPatterns = [
 ];
 
 const postgres17Patterns = [
+  /^test\/db\/seyeon_r2_helper_service_role_least_privilege\.sh$/u,
+  /^test\/db\/seyeon_r2_helper_owner_restricted_pg17\.sh$/u,
   /^supabase\/proposals\/20261024065948_saju_abuse_admission_runtime_authority\.sql$/u,
   /^scripts\/(?:verify-saju-abuse-admission-postgres|lib\/saju-admission-attack-e2e)\.mjs$/u,
   /^scripts\/verify-saju-abuse-production-policy-postgres\.mjs$/u,
