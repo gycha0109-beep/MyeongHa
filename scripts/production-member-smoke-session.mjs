@@ -1,4 +1,4 @@
-const PRODUCTION_ORIGIN = 'https://myeongha.vercel.app';
+const PRODUCTION_ORIGIN = 'https://myeongha.gycha0109.workers.dev';
 const REQUEST_TIMEOUT_MS = 15_000;
 
 function requireCredential(name, { trim = true } = {}) {

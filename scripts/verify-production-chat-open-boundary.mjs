@@ -1,4 +1,4 @@
-const PRODUCTION_ORIGIN = 'https://myeongha.vercel.app';
+const PRODUCTION_ORIGIN = 'https://myeongha.gycha0109.workers.dev';
 const CHAT_OPEN_URL = `${PRODUCTION_ORIGIN}/api/chat`;
 const REQUEST_TIMEOUT_MS = 15_000;
 

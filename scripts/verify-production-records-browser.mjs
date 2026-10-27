@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawn } from 'node:child_process';
 
-const PRODUCTION_ORIGIN = 'https://myeongha.vercel.app';
+const PRODUCTION_ORIGIN = 'https://myeongha.gycha0109.workers.dev';
 const AUTH_URL = `${PRODUCTION_ORIGIN}/auth.html?next=records.html`;
 const READINGS_URL = `${PRODUCTION_ORIGIN}/api/readings`;
 const chromeBin = process.env.CHROME_BIN ?? process.env.CHROME_PATH;
@@ -140,7 +140,7 @@ try {
 
   await waitFor(
     client,
-    `document.readyState === 'complete' && location.hostname === 'myeongha.vercel.app' && location.pathname === '/auth.html' && Boolean(document.querySelector('#auth-form'))`,
+    `document.readyState === 'complete' && location.hostname === 'myeongha.gycha0109.workers.dev' && location.pathname === '/auth.html' && Boolean(document.querySelector('#auth-form'))`,
     'Production auth form did not initialize',
   );
 
@@ -156,7 +156,7 @@ try {
 
   await waitFor(
     client,
-    `location.hostname === 'myeongha.vercel.app' && location.pathname === '/records.html' && document.querySelector('#records-content')?.hidden === false`,
+    `location.hostname === 'myeongha.gycha0109.workers.dev' && location.pathname === '/records.html' && document.querySelector('#records-content')?.hidden === false`,
     'Production Member login did not reach Records',
   );
 
@@ -180,7 +180,7 @@ try {
     };
   })()`);
 
-  assert(state.hostname === 'myeongha.vercel.app', 'Production Records browser smoke escaped the canonical hostname.');
+  assert(state.hostname === 'myeongha.gycha0109.workers.dev', 'Production Records browser smoke escaped the canonical hostname.');
   assert(state.pathname === '/records.html', 'Production Records browser smoke escaped Records.');
   assert(state.subjectKind === '회원 기록', 'Production Records did not render Member authority.');
   assert(state.panelHidden === false, 'Production Saju Records panel was not visible after activation.');

@@ -30,9 +30,7 @@ describe('My settings launch scope', () => {
   it('uses only server-verified account fields and does not invent mutations', async () => {
     const page = await loadWeb('src/my/MyPage.tsx');
     const client = await loadWeb('my-runtime-client.js');
-    const config = JSON.parse(await readFile(new URL('../vercel.json', import.meta.url), 'utf8')) as {
-      rewrites?: Array<{ source: string }>;
-    };
+    const router = await readFile(new URL('../workers/cloudflare-api-router.mjs', import.meta.url), 'utf8');
     for (const field of ['payload.subjectKind', 'payload.subjectStatus', 'profile?.displayName', 'session?.user?.email']) {
       expect(page).toContain(field);
     }
@@ -41,7 +39,7 @@ describe('My settings launch scope', () => {
     expect(page).toContain('프로필 변경 및 회원 탈퇴 요청은 검증된 서버 절차가 연결되기 전까지');
     expect(page).not.toContain("method: 'PATCH'");
     expect(page).not.toContain("method: 'DELETE'");
-    expect(config.rewrites?.some(x => x.source === '/api/me/entitlements')).toBe(false);
+    expect(router).not.toContain('source: "/api/me/entitlements"');
     expect(page).not.toContain('잔여 이용권 0');
     expect(page).not.toContain('알림 켜짐');
   });

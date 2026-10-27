@@ -140,7 +140,7 @@ function section(source, start, next) {
 
 for (const contract of contracts) {
   const path = '.github/workflows/' + contract.file;
-  const workflow = await readFile(path, 'utf8');
+  const workflow = (await readFile(path, 'utf8')).replace(/\r\n/gu, '\n');
   const onSection = section(workflow, 'on:\n', '\npermissions:');
   const permissionsSection = section(workflow, 'permissions:\n', '\nconcurrency:');
 

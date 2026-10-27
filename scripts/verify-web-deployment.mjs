@@ -7,18 +7,6 @@ const outputRoot = resolve(
   process.cwd(),
   process.env.MYEONGHA_WEB_OUTPUT_DIR ?? 'public',
 );
-const apiRoot = resolve(process.cwd(), 'api');
-const serverlessFunctionExtensions = new Set([
-  '.js',
-  '.mjs',
-  '.cjs',
-  '.ts',
-  '.mts',
-  '.cts',
-  '.jsx',
-  '.tsx',
-]);
-
 const requiredFiles = [
   'index.html',
   'hall.html',
@@ -39,7 +27,6 @@ const forbiddenBasenames = new Set([
 
 const localReferencePattern = /(?:href|src)=["']([^"']+)["']/g;
 const cssUrlPattern = /url\((?:["']?)([^"')]+)(?:["']?)\)/g;
-const apiTestFilePattern = /\.(?:test|spec)\.[^/\\]+$/u;
 
 async function assertExists(path) {
   try {
@@ -145,8 +132,7 @@ for (const file of deployedFiles) {
   }
 }
 
-// Validate the actual production Cloudflare Worker contract. Vercel standby
-// continues to have its own vercel.json, but must never gate Cloudflare builds.
+// Validate the Cloudflare-only production Worker contract.
 const workerConfig = JSON.parse(await readFile(resolve('wrangler.jsonc'), 'utf8'));
 assertMainWebConfig(workerConfig);
 await assertExists(resolve('cloudflare/myeongha-worker.mjs'));
@@ -159,14 +145,7 @@ for (const path of ['cloudflare/myeongha-worker.mjs', 'cloudflare/preview-worker
   }
 }
 
-const apiFiles = await collectFiles(apiRoot);
-const apiTestFiles = apiFiles.filter((file) => apiTestFilePattern.test(file));
-if (apiTestFiles.length > 0) {
-  throw new Error('API entrypoint directory must not include test/spec files: ' + apiTestFiles.join(', '));
-}
-const serverlessFunctionFiles = apiFiles.filter((file) =>
-  serverlessFunctionExtensions.has(extname(file).toLowerCase()),
-);
+await assertMissing(resolve('vercel.json'), 'Retired Vercel deployment configuration must not return.');
 
 // These counts and exact dispatch destinations are application ingress
 // contracts, not a provider-imposed limit on the number of API functions.
@@ -207,8 +186,7 @@ for (const [source, destination] of requiredRewrites) {
     throw new Error('Governed Cloudflare API dispatcher rewrite changed: ' + source);
   }
 }
-await assertExists(resolve('api/birth-profiles.ts'));
-await assertExists(resolve('api/me.ts'));
+await assertExists(resolve('workers/cloudflare-api-router.mjs'));
 for (const path of [
   'api/birth-profiles/[id].ts',
   'api/life-record.ts', 'api/readings.ts', 'api/memories.ts',
@@ -221,6 +199,5 @@ console.log(
   'MyeongHa Cloudflare deployment verification passed for ' +
   deployedFiles.length + ' static files, ' +
   CLOUDFLARE_DIRECT_API_ROUTES.length + ' direct API routes and ' +
-  CLOUDFLARE_REWRITE_ROUTES.length + ' governed rewrites (' +
-  serverlessFunctionFiles.length + ' legacy standby API entrypoints).',
+  CLOUDFLARE_REWRITE_ROUTES.length + ' governed rewrites.',
 );

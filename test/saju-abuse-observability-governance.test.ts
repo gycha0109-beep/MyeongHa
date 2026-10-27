@@ -26,12 +26,12 @@ describe('Saju abuse baseline observability governance', () => {
     const runtime = source(
       'apps/api/src/production-current-subject-saju-preview-reading-runtime.ts',
     );
-    const vercel = source('vercel.json');
+    const router = source('workers/cloudflare-api-router.mjs');
     const dispatcher = source('api/me.ts');
 
-    expect(vercel).toContain('"source": "/api/me/saju/preview-reading"');
-    expect(vercel).toContain(
-      '"destination": "/api/me?__myeongha_saju_preview_reading=1"',
+    expect(router).toContain('source: "/api/me/saju/preview-reading"');
+    expect(router).toContain(
+      'destination: "/api/me?__myeongha_saju_preview_reading=1"',
     );
     expect(dispatcher).toContain(
       "const SAJU_PREVIEW_READING_ROUTE = '/api/me/saju/preview-reading'",

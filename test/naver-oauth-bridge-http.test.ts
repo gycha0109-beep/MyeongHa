@@ -156,10 +156,12 @@ describe('Naver OAuth transport bridge', () => {
       expect(resolveAuthSignInDispatchForTestV1(new Request(`${origin}/api/auth/sign-in?${query}`))).toBeNull();
     }
   });
-  it('deploys exactly one rewrite per bridge action without another serverless function', async () => {
-    const config = JSON.parse(await readFile(new URL('../vercel.json', import.meta.url), 'utf8')) as { rewrites: { source: string; destination: string }[] };
+  it('routes the four bridge actions through the Cloudflare dispatcher', async () => {
+    const router = await readFile(new URL('../workers/cloudflare-api-router.mjs', import.meta.url), 'utf8');
     for (const action of ['authorize', 'callback', 'token', 'userinfo']) {
-      expect(config.rewrites.filter(rule => rule.source === `/api/auth/social/naver/${action}`)).toEqual([{ source: `/api/auth/social/naver/${action}`, destination: `/api/auth/sign-in?__myeongha_naver_oauth_bridge=${action}` }]);
+      expect(router).toContain(
+        'source: "/api/auth/social/naver/' + action + '", destination: "/api/auth/sign-in?__myeongha_naver_oauth_bridge=' + action + '"',
+      );
     }
   });
 });

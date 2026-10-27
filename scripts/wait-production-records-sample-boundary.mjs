@@ -1,5 +1,5 @@
-const PRODUCTION_RECORDS_PAGE = 'https://myeongha.vercel.app/records.html';
-const PRODUCTION_RECORDS_SCRIPT = 'https://myeongha.vercel.app/records-page.js';
+const PRODUCTION_RECORDS_PAGE = 'https://myeongha.gycha0109.workers.dev/records.html';
+const PRODUCTION_RECORDS_SCRIPT = 'https://myeongha.gycha0109.workers.dev/records-page.js';
 const REQUIRED_PAGE_MARKERS = Object.freeze([
   'id="records-react-root"',
   '/assets/records-',
