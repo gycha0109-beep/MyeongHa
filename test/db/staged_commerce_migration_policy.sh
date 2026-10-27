@@ -9,6 +9,8 @@ skip_staged_portone_migration_from_historical_fixture() {
       expected='a55bd7aa06d6625523090e997f6f76f5539abee1' ;;
     20261026110300_owner_admin_credit_testing_v1.sql)
       expected='186ffa2085e5922ec8319d4e5dd345a41597f3cd' ;;
+    20261027101000_chat_credit_paid_validity_and_verified_mint_v1.sql)
+      expected='5e5270466e700f98b2d41cac338298735dc1ad99' ;;
     *) return 1 ;;
   esac
   local actual

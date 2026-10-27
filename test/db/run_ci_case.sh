@@ -47,7 +47,7 @@ apply_pg17_migrations_through_seyeon_production_frontier() {
         20261007150457_guest_promotion_auth_fk_validation.sql|20261008043000_seyeon_manifest_acl_restore.sql)
           timestamped_count=$(( timestamped_count + 1 ))
           ;;
-        20261018190000_seyeon_locked_first_zero_source_reveal_v1.sql|20261024134543_saju_abuse_admission_runtime_authority.sql|20261024134610_saju_abuse_admission_production_policy_v1.sql|20261024135504_saju_abuse_admission_cleanup_worker_authority.sql|20261024141330_saju_abuse_admission_policy_approval_clock_v2.sql|20261026025332_seyeon_chat_helper_service_role_least_privilege.sql|20261026100200_portone_chat_credit_catalog_staged_v1.sql|20261026110300_owner_admin_credit_testing_v1.sql)
+        20261018190000_seyeon_locked_first_zero_source_reveal_v1.sql|20261024134543_saju_abuse_admission_runtime_authority.sql|20261024134610_saju_abuse_admission_production_policy_v1.sql|20261024135504_saju_abuse_admission_cleanup_worker_authority.sql|20261024141330_saju_abuse_admission_policy_approval_clock_v2.sql|20261026025332_seyeon_chat_helper_service_role_least_privilege.sql|20261026100200_portone_chat_credit_catalog_staged_v1.sql|20261026110300_owner_admin_credit_testing_v1.sql|20261027101000_chat_credit_paid_validity_and_verified_mint_v1.sql)
           # Post-frontier security migration is known but must NEVER be replayed
           # into the historical 1510 R2 catalog/restore authority fixture.
           # Reject a same-named modified migration instead of silently skipping.
@@ -73,6 +73,7 @@ apply_pg17_migrations_through_seyeon_production_frontier() {
             20261024141330_saju_abuse_admission_policy_approval_clock_v2.sql) reviewed_blob_sha1='9b3abf4f8296c8385b55f29e224381bdf14e8a4e' ;;
             20261026100200_portone_chat_credit_catalog_staged_v1.sql) reviewed_blob_sha1='a55bd7aa06d6625523090e997f6f76f5539abee1' ;;
             20261026110300_owner_admin_credit_testing_v1.sql) reviewed_blob_sha1='186ffa2085e5922ec8319d4e5dd345a41597f3cd' ;;
+            20261027101000_chat_credit_paid_validity_and_verified_mint_v1.sql) reviewed_blob_sha1='5e5270466e700f98b2d41cac338298735dc1ad99' ;;
           esac
           local local_blob_sha1 local_bytes normalized_bytes
           if command -v git >/dev/null 2>&1; then
@@ -237,6 +238,13 @@ case "$case_name" in
     psql -1 -v ON_ERROR_STOP=1 -f test/db/commerce_payment_source_authority.sql
     psql -1 -v ON_ERROR_STOP=1 -f test/db/commerce_trigger_security_hardening.sql
     bash test/db/entitlement_projection_recompute_concurrency.sh
+    ;;
+  commerce-paid-credit-policy-v1)
+    apply_standard_migrations
+    psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261026100200_portone_chat_credit_catalog_staged_v1.sql
+    psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261026110300_owner_admin_credit_testing_v1.sql
+    psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261027101000_chat_credit_paid_validity_and_verified_mint_v1.sql
+    psql -v ON_ERROR_STOP=1 -f test/db/portone_paid_credit_policy_v1.sql
     ;;
   commerce-payment-adversarial-e2e)
     apply_standard_migrations
