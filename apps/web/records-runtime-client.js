@@ -129,6 +129,17 @@ async function readJson(fetchImpl, endpoint, bearer) {
     throw error;
   }
 }
+// Independent Records domains may be temporarily unavailable. Keep verified sibling
+// reads visible, but NEVER downgrade an authorization rejection to empty history.
+async function readOptionalRecordsCollection(readCollection) {
+  try {
+    return await readCollection();
+  } catch (error) {
+    if (error instanceof RecordsRuntimeError && error.code === 'WEB_RECORDS_SESSION_REQUIRED') throw error;
+    return Object.freeze({ status: 'unavailable' });
+  }
+}
+
 async function readOptionalCurrentBirthProfile(fetchImpl, endpoint, bearer) {
   try {
     const payload = await readJson(fetchImpl, endpoint, bearer);
@@ -315,13 +326,17 @@ export function createRecordsRuntimeClient(options = {}) {
     readRecords() {
       return readStable(async (bearer) => {
         const profile = await readJson(fetchImpl, endpoints.profile, bearer);
-        const [lifeFacts, readingsPayload, memories, birth] = await Promise.all([
-          readPagedCollection(fetchImpl, endpoints.lifeFacts, bearer, 'facts'),
-          readPagedCollection(fetchImpl, endpoints.readings, bearer, 'readings'),
-          readPagedCollection(fetchImpl, endpoints.memories, bearer, 'memories'),
+        const [lifeFacts, readings, memories, birth] = await Promise.all([
+          readOptionalRecordsCollection(() =>
+            readPagedCollection(fetchImpl, endpoints.lifeFacts, bearer, 'facts')),
+          readOptionalRecordsCollection(async () =>
+            projectReadingHistory(
+              await readPagedCollection(fetchImpl, endpoints.readings, bearer, 'readings'),
+            )),
+          readOptionalRecordsCollection(() =>
+            readPagedCollection(fetchImpl, endpoints.memories, bearer, 'memories')),
           readOptionalCurrentBirthProfile(fetchImpl, endpoints.birthProfile, bearer),
         ]);
-        const readings = projectReadingHistory(readingsPayload);
         return Object.freeze({ profile, lifeFacts, readings, memories, birth });
       });
     },
