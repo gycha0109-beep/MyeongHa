@@ -1,4 +1,5 @@
 import { PLANNED_STATIC_UI_COPY_V1, lookupPlannedStaticUiCopyV1 } from './ui-i18n-planned-copy-v1.js';
+import { MY_STATIC_UI_COPY_V1 } from './ui-my-copy.js';
 
 // Fixed, authored web UI copy only. Chat messages, birth data, and official readings are intentionally excluded.
 // Korean is the source locale; this dictionary is not a translation service.
@@ -13,9 +14,15 @@ export function normalizeUiLocale(value) {
 
 export function translateStaticUi(source, locale) {
   if (locale === 'ko-KR') return source;
-  if (locale === 'en-US' || locale === 'zh-CN') return lookupPlannedStaticUiCopyV1(source, locale) ?? source;
+  if (locale === 'en-US' || locale === 'zh-CN') {
+    return lookupPlannedStaticUiCopyV1(source, locale)
+      ?? MY_STATIC_UI_COPY_V1.get(source)?.[locale === 'en-US' ? 2 : 3]
+      ?? source;
+  }
   const row = COPY.get(source);
-  return row?.[locale === 'ja-JP' ? 0 : locale === 'zh-TW' ? 1 : -1] ?? source;
+  if (row) return row[locale === 'ja-JP' ? 0 : 1];
+  const myRow = MY_STATIC_UI_COPY_V1.get(source);
+  return myRow?.[locale === 'ja-JP' ? 0 : 1] ?? source;
 }
 export function getUiLocale() {
   return typeof window === 'undefined' ? 'ko-KR' : storedLocale();
@@ -29,7 +36,7 @@ export function formatStaticUi(source, params, locale = getUiLocale()) {
   return template.replace(/\{([a-zA-Z]+)\}/gu, (_, name) => String(params[name] ?? ''));
 }
 
-const BLOCKED_TEXT = 'script, style, noscript, pre, code, svg, [contenteditable], [data-contact-i18n-root], .conversation-message-stream .conversation-message:not([data-chat-intro]), [data-message-id], [data-chat-message], [data-reading-content], [data-official-reading], [data-records-source], [data-chat-body-source], [data-reading-step-body], [data-reading-structure-body], [data-reader-comment], [data-context-title], [data-thread-bar-title]';
+const BLOCKED_TEXT = 'script, style, noscript, pre, code, svg, [contenteditable], [data-contact-i18n-root], [data-ui-react-owned], .conversation-message-stream .conversation-message:not([data-chat-intro]), [data-message-id], [data-chat-message], [data-reading-content], [data-official-reading], [data-records-source], [data-chat-body-source], [data-reading-step-body], [data-reading-structure-body], [data-reader-comment], [data-context-title], [data-thread-bar-title]';
 const trackedText = new WeakMap();
 const trackedAttributes = new WeakMap();
 const ATTRIBUTES = ['aria-label', 'title', 'placeholder'];
@@ -51,7 +58,7 @@ function repaintText(textNode, locale) {
   const current = textNode.nodeValue ?? '';
   const trimmed = current.trim();
   let korean = trackedText.get(textNode);
-  if (COPY.has(trimmed) || PLANNED_STATIC_UI_COPY_V1.has(trimmed)) {
+  if (COPY.has(trimmed) || PLANNED_STATIC_UI_COPY_V1.has(trimmed) || MY_STATIC_UI_COPY_V1.has(trimmed)) {
     korean = trimmed;
     trackedText.set(textNode, korean);
   } else if (!korean) {
@@ -78,7 +85,7 @@ function repaintAttributes(element, locale) {
     const current = element.getAttribute(attr);
     if (current === null) continue;
     let korean = tracked.get(attr);
-    if (COPY.has(current) || PLANNED_STATIC_UI_COPY_V1.has(current)) { korean = current; tracked.set(attr, current); }
+    if (COPY.has(current) || PLANNED_STATIC_UI_COPY_V1.has(current) || MY_STATIC_UI_COPY_V1.has(current)) { korean = current; tracked.set(attr, current); }
     else if (!korean) continue;
     else if (current !== korean && current !== translateStaticUi(korean, 'ja-JP')
       && current !== translateStaticUi(korean, 'zh-TW')

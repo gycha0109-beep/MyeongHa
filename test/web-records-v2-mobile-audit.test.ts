@@ -67,7 +67,8 @@ describe('mobile web width integration', () => {
     expect(room).toContain('@media (max-width: 767px)');
     expect(records).toContain('@media(max-width:767px)');
     expect(records).toContain('@media(max-width:420px)');
-    expect(my).toContain('@media(max-width:800px)');
+    expect(my).toContain('@media (max-width: 767px)');
+    expect(my).toContain('@media (max-width: 520px)');
   });
 
   it('does not route generic My conversation navigation into one Character Room', async () => {

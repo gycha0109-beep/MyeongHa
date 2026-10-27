@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { getActiveBearer } from '../../product-auth.js';
 
 export type CreditDialogReason = 'shortage' | 'manual';
 
@@ -13,11 +14,42 @@ const CREDIT_POLICY = Object.freeze({
 // This presentation must never pretend that reference policy equals a saleable offer.
 export const CREDIT_RECHARGE_PUBLIC_CHECKOUT_ACTIVE = false;
 
+type CreditWalletView = {
+  isOwnerAdmin:boolean;
+  creditExempt:boolean;
+  availableCredits:number|null;
+  totalCredits:number|null;
+};
+
+async function readMemberCreditWallet():Promise<CreditWalletView|null> {
+  const bearer=await getActiveBearer();
+  if (!bearer||bearer.kind!=='member')return null;
+  const response=await fetch('/api/me/credits',{
+    headers:{Accept:'application/json',Authorization:`Bearer ${bearer.token}`},
+    credentials:'same-origin',cache:'no-store',
+  });
+  if(!response.ok)return null;
+  const envelope:unknown=await response.json();
+  if(!envelope||typeof envelope!=='object'||!('ok'in envelope)||envelope.ok!==true||
+     !('data'in envelope)||!envelope.data||typeof envelope.data!=='object')return null;
+  const data=envelope.data as Record<string,unknown>;
+  if(typeof data.isOwnerAdmin!=='boolean'||typeof data.creditExempt!=='boolean'||
+     (data.creditExempt&&!data.isOwnerAdmin)||
+     (data.availableCredits!==null&&(typeof data.availableCredits!=='number'||
+       !Number.isSafeInteger(data.availableCredits)||data.availableCredits<0))||
+     (data.totalCredits!==null&&(typeof data.totalCredits!=='number'||
+       !Number.isSafeInteger(data.totalCredits)||data.totalCredits<0)))return null;
+  return {isOwnerAdmin:data.isOwnerAdmin,creditExempt:data.creditExempt,
+    availableCredits:data.availableCredits as number|null,
+    totalCredits:data.totalCredits as number|null};
+}
+
 export function CreditRechargeDialog() {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const openerRef = useRef<HTMLElement | null>(null);
   const seenTurnIds = useRef(new Set<string>());
   const [reason, setReason] = useState<CreditDialogReason>('manual');
+  const [wallet,setWallet]=useState<CreditWalletView|null>(null);
 
   useEffect(() => {
     const open = (nextReason: CreditDialogReason, turnId?: string) => {
@@ -29,7 +61,9 @@ export function CreditRechargeDialog() {
       if (!dialog || dialog.open) return;
       openerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
       setReason(nextReason);
+      setWallet(null);
       dialog.showModal();
+      void readMemberCreditWallet().then(setWallet,()=>setWallet(null));
     };
     const manual = () => open('manual');
     const shortage = (event: Event) => {
@@ -64,7 +98,11 @@ export function CreditRechargeDialog() {
         </p>
 
         <dl className="credit-dialog-facts">
-          <div><dt>현재 사용 가능한 크레딧</dt><dd>조회 미연결</dd></div>
+          <div><dt>현재 사용 가능한 크레딧</dt><dd>{wallet?.creditExempt
+            ? '관리자 · 크레딧 차감 없음'
+            : typeof wallet?.availableCredits==='number'
+              ? wallet.availableCredits.toLocaleString('ko-KR')+' 크레딧'
+              : '조회 준비 중'}</dd></div>
           <div><dt>응답 1회 필요량 · 승인 정책</dt><dd>{CREDIT_POLICY.creditPerReply} 크레딧</dd></div>
         </dl>
         <div className="credit-dialog-offer" aria-label="판매 준비 중인 충전 정책">
@@ -73,7 +111,9 @@ export function CreditRechargeDialog() {
           <p>정책상 약 {CREDIT_POLICY.referenceReplies}회 응답 분량입니다. 실제 구매 가능 상품·잔액은 서버 연결 후 표시됩니다.</p>
         </div>
         <p className="credit-dialog-hold" role="status">
-          현재 충전 결제 및 잔액 조회가 연결되지 않았습니다. 결제가 이루어지거나 크레딧이 지급되지 않습니다.
+          {wallet?.creditExempt
+            ? '관리자 계정은 AI 채팅 크레딧을 차감하지 않습니다. 모델 비용·개인정보 보호는 동일하게 적용됩니다. 포트원 결제는 별도 연결 준비 중입니다.'
+            : '포트원 충전 결제는 아직 활성화되지 않았습니다. 이 화면에서 결제가 이루어지거나 크레딧이 지급되지 않습니다.'}
         </p>
         <div className="credit-dialog-actions">
           <button type="button" className="credit-dialog-buy" disabled={!CREDIT_RECHARGE_PUBLIC_CHECKOUT_ACTIVE}

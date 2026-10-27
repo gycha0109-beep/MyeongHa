@@ -15,7 +15,9 @@ describe('Web credit guidance and free Saju contract', () => {
     expect(dialog).toContain('CREDIT_RECHARGE_PUBLIC_CHECKOUT_ACTIVE = false');
     expect(dialog).toContain('disabled={!CREDIT_RECHARGE_PUBLIC_CHECKOUT_ACTIVE}');
     expect(dialog).toContain('현재 사용 가능한 크레딧');
-    expect(dialog).toContain('조회 미연결');
+    expect(dialog).toContain('readMemberCreditWallet');
+    expect(dialog).toContain("fetch('/api/me/credits'");
+    expect(dialog).toContain('관리자 · 크레딧 차감 없음');
     expect(dialog).toContain('판매 준비 중');
     expect(dialog).toContain("dialog.showModal()");
     expect(dialog).toContain("openerRef.current?.focus()");
