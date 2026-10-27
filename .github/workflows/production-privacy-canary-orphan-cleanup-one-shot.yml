@@ -71,7 +71,7 @@ jobs:
           guard='immutable_approved_content_hashes'
           # Immutable approved Git blobs, including the historical workflow.
           [[ "$(git rev-parse "$reviewed:.github/workflows/production-privacy-canary-orphan-cleanup-one-shot.yml")" == 'a51fd51fc5495e922f20ec8d7aedc190414e8c30' ]]
-          [[ "$(git rev-parse "$reviewed:docs/ci/workflow-responsibility-map.json")" == '6564c16ea1b4261f12ffbd5e9c26722938b6004c' ]]
+          [[ "$(git rev-parse "$reviewed:docs/ci/workflow-responsibility-map.json")" == '6564c16ea1b4261f12ffbd5e9c26722938c6004c' ]]
           [[ "$(git rev-parse "$reviewed:scripts/run-production-privacy-recovery-canary.mjs")" == '7034c096b5bdac6d939153c27c38b6e04d0aae41' ]]
           [[ "$(git rev-parse "$reviewed:scripts/verify-production-privacy-canary-orphan-cleanup-workflow.mjs")" == 'a1039eb071ad3e188f30ce63713f391ca48bdf30' ]]
           guard='destructive_runtime_unchanged'
