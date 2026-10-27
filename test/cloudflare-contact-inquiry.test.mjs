@@ -68,4 +68,40 @@ describe('Cloudflare native contact inquiry', () => {
     const response = handleCloudflareStaticPreviewRequest(request());
     expect(response.status).toBe(404);
   });
+  it('requires a positive shared sender receipt instead of trusting a honeypot acknowledgement', async () => {
+    const botPayload = { ...payload, company: 'autofill bot' };
+    const botRequest = new Request(origin + '/api/contact', {
+      method: 'POST', headers: { Origin: origin, Authorization: 'Bearer valid-token',
+        'Content-Type': 'application/json' }, body: JSON.stringify(botPayload),
+    });
+    const provider = vi.fn(async () => Response.json({ id: 'should-not-send' }));
+    const response = await tryHandleCloudflareContactInquiryV1(botRequest, env, route,
+      { rateLimit: async () => null, verifySession: async () => true, sendFetch: provider });
+    expect(response.status).toBe(200);
+    expect((await response.json()).code).toBe('ACCEPTED');
+    expect(provider).not.toHaveBeenCalled();
+  });
+
+  it('keeps origin admission unavailable without the real Worker approval markers', async () => {
+    const provider = vi.fn(async () => Response.json({ id: 'should-not-send' }));
+    const response = await tryHandleCloudflareContactInquiryV1(request(),
+      { ...env, MYEONGHA_CLOUDFLARE_DB_TLS_RLS_APPROVAL: 'not-approved' },
+      route, { rateLimit: async () => null, verifySession: async () => true, sendFetch: provider });
+    expect(response).toBeNull();
+    expect(provider).not.toHaveBeenCalled();
+  });
+
+  it('does not claim delivery when the Resend API rejects or loses the receipt', async () => {
+    for (const sendFetch of [
+      async () => Response.json({ message: 'bad key' }, { status: 401 }),
+      async () => Response.json({ message: 'missing delivery id' }),
+      async () => { throw Error('connection failed'); },
+    ]) {
+      const response = await tryHandleCloudflareContactInquiryV1(request(), env, route,
+        { rateLimit: async () => null, verifySession: async () => true, sendFetch });
+      expect(response.status).toBe(502);
+      expect((await response.json()).code).toBe('MAIL_DELIVERY_FAILED');
+    }
+  });
+
 });

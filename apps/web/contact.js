@@ -1,4 +1,4 @@
-import { getActiveBearer, readMemberSession } from './product-auth.js';
+import { ensureActiveBearer, readMemberSession } from './product-auth.js';
 import { contactText, localizeContactPage } from './contact-i18n.js';
 
 const form = document.getElementById('contact-form');
@@ -43,7 +43,7 @@ form?.addEventListener('submit', async (event) => {
   announce('문의를 전송하고 있습니다.', '');
 
   try {
-    const bearer = await getActiveBearer();
+    const bearer = await ensureActiveBearer();
     if (!bearer?.token) {
       announce('문의하려면 로그인하거나 방문 세션을 시작해주세요. 마이페이지에서 계정을 연결할 수 있습니다.', 'error');
       return;
@@ -65,7 +65,7 @@ form?.addEventListener('submit', async (event) => {
         subject: fields.get('subject'),
         message: fields.get('message'),
         consent: document.getElementById('contact-consent')?.checked === true,
-        company: '',
+        company: fields.get('company') ?? '',
       }),
     });
     let result = null;
