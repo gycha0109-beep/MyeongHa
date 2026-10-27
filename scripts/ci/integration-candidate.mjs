@@ -52,7 +52,10 @@ export function assertPrerequisites(required, checks, statuses) {
       .sort((a, b) => b.id - a.id);
     // Commit statuses do not expose the app binding used by rulesets.
     const matchingStatuses = app ? [] : statuses.filter(status => status.context === name);
-    if (runs.length && (runs[0].status !== 'completed' || runs[0].conclusion !== 'success')) {
+    if (runs.length && runs[0].status !== 'completed') {
+      throw new Error(`Required check is pending: ${name}`);
+    }
+    if (runs.length && runs[0].conclusion !== 'success') {
       throw new Error(`Required check is not successful: ${name}`);
     }
     if (matchingStatuses.length && matchingStatuses[0].state !== 'success') {
@@ -112,8 +115,8 @@ export function checkCandidate(candidate, repo) {
  * On 2026-10-27 that took roughly four minutes after labeling PR #2669;
  * 12 retries/96 seconds was insufficient and exhausted before CI Verify existed.
  * Bound retry to 60 x 8s (plus API calls), with 15m job timeout.
- * Only the exact missing CI Verify check is transient. A failed, pending,
- * misattributed, or absent OTHER check stays an immediate hard failure.
+ * Only missing/running CI Verify is transient. Failed CI Verify and any
+ * incomplete, failed, misattributed or absent OTHER check block immediately.
  * Re-read the complete pinned PR/ruleset/check state on every bounded retry.
  */
 export async function waitForCiVerifyRegistration(guard, {
@@ -130,9 +133,9 @@ export async function waitForCiVerifyRegistration(guard, {
       return guard();
     } catch (error) {
       if (!(error instanceof Error)
-          || error.message !== 'Required check is missing: CI Verify'
+          || !['Required check is missing: CI Verify', 'Required check is pending: CI Verify'].includes(error.message)
           || attempt >= maxRetries) throw error;
-      process.stdout.write('CI Verify is not registered yet; retrying the pinned candidate guard.\n');
+      process.stdout.write('CI Verify is missing or still running; rechecking pinned candidate authority.\n');
       await sleep(intervalMs);
     }
   }
