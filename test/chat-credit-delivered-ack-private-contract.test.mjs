@@ -27,7 +27,7 @@ describe('private ten-credit delivery acknowledgement SQL authority',()=>{
     expect(sql).toContain('p_subject_id,p_reservation_id,true,p_committed_turn_id');
   });
   it('does not authorize an unmounted direct API, browser or service role',()=>{
-    expect(sql).toContain('revoke all on function public.internal_cmd_chat_credit_ack_delivered_v1(');
+    expect(sql).toContain('revoke all on function public.internal_cmd_chat_credit_ack_delivered_proven_v2(');
     expect(sql).toContain('from public,anon,authenticated,service_role,myeongha_api_executor;');
     expect(sql).not.toMatch(/grant\s+execute\s+on\s+function/i);
   });
