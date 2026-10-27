@@ -206,6 +206,16 @@ describe('admin dedicated readonly PostgreSQL adapter', () => {
     await h.port.read({ ...filters('credit-allocations'), subjectId: SUBJECT });
     expect(h.params[2]).toEqual([21, SUBJECT, null, null, 0]);
   });
+  it('reads only 90-day audit metadata using a bounded read-only SELECT', async () => {
+    const sql=ADMIN_READ_SQL_V1.audit ?? '';
+    expect(sql).toContain('myeongha_admin_ops.admin_audit_events_v1');
+    expect(sql).toContain("INTERVAL '90 days'");
+    expect(sql).not.toMatch(/\bUPDATE\b|\bINSERT\b|\bDELETE\b/iu);
+    expect(sql).not.toContain("payload_jsonb");
+    const h=harness();
+    await h.port.read({ ...filters('audit'), from: '2026-10-01', to: '2026-10-26' });
+    expect(h.params[2]).toEqual([21,0,'2026-10-01','2026-10-26']);
+  });
   it('provides bounded pagination', async () => {
     const h = harness('myeongha_admin_reader',Array.from({length:3},()=>({subjectId:SUBJECT})));
     const result = await h.port.read({ ...filters(),limit:2 });
