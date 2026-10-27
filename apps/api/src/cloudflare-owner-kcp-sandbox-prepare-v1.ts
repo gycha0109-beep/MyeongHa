@@ -107,7 +107,7 @@ export async function prepareCloudflareOwnerKcpSandboxPurchaseV1(
          row.paymentAttemptId!==paymentAttemptId||
          row.providerRequestId!==providerRequestId||!KCP_ID.test(providerRequestId)||
          row.attemptStatus!=='created'||typeof row.replayed!=='boolean')return deny();
-      return row;
+      return {replayed:row.replayed as boolean};
     },
   });
   return Object.freeze({
