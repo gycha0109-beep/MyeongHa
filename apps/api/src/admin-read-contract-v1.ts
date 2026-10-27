@@ -39,7 +39,7 @@ const SAFE_COLUMNS: Readonly<Record<AdminReadKindV1, readonly string[]>> = Objec
   'commerce-alerts': ['transactionId','subjectId','alertKind','providerStatus','detectedAt','evidence'],
   commerce: ['transactionId', 'subjectId', 'productKey', 'amountMinor', 'currency', 'providerStatus', 'verifiedAt', 'entitlementStatus'],
   'credit-reservations': ['reservationId','subjectId','requiredCredits','state','deliveredTurnId','createdAt','finalizedAt'],
-  credits: ['eventId', 'subjectId', 'creditDelta', 'createdAt', 'eventKind', 'balanceAfter', 'correlationId'],
+  credits: ['eventId', 'subjectId', 'creditDelta', 'creditsRemaining', 'expiresAt', 'validity', 'createdAt', 'eventKind', 'balanceAfter', 'correlationId'],
   'reading-detail': ['readingId','subjectId','status','domain','createdAt','completedAt','engineVersion','contractVersion','attemptState','attemptCount','errorCode','startedAt','finishedAt'],
   readings: ['readingId', 'subjectId', 'status', 'productKey', 'domain', 'engineVersion', 'createdAt', 'errorCode'],
   'ai-costs': ['day', 'feature', 'model', 'requests', 'successes', 'failures', 'totalTokens', 'unknownTokenCalls', 'blocked', 'costKrw', 'avgLatencyMs', 'latencySamples', 'p95LatencyMs'],
