@@ -6,7 +6,7 @@ import type { AdminSection } from './routes.js';
 import { StatusPanel } from './StatusPanel.js';
 
 type ListSection = Exclude<AdminSection, 'overview'>;
-type ReadTab = 'commerce' | 'commerce-alerts' | 'credits' | 'readings' | 'ai-costs' | 'ai-errors' | 'ai-estimates' | 'credit-reservations' | 'issues' | 'catalog' | 'characters' | 'content-releases' | 'deletion-jobs';
+type ReadTab = 'users' | 'commerce' | 'commerce-alerts' | 'credits' | 'readings' | 'ai-costs' | 'ai-errors' | 'ai-estimates' | 'credit-reservations' | 'issues' | 'catalog' | 'characters' | 'content-releases' | 'deletion-jobs';
 const DATA_PATHS: Record<ListSection, string> = {
   users: 'users',
   commerce: 'commerce',
@@ -92,12 +92,14 @@ function isSubjectId(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(value);
 }
 
-export function buildListPath(section: ListSection, subject: string, cursor: string | null, tab: ReadTab, from: string | null = null, to: string | null = null, issueStatus: string = 'all'): string {
+export function buildListPath(section: ListSection, subject: string, cursor: string | null, tab: ReadTab, from: string | null = null, to: string | null = null, issueStatus: string = 'all', subjectKind: string = 'all', subjectStatus: string = 'all'): string {
   const params = new URLSearchParams({ limit: '20' });
   if (subject.length > 0) params.set('subjectId', subject);
   if (cursor !== null) params.set('cursor', cursor);
   if (from !== null && to !== null) { params.set('from', from); params.set('to', to); }
   if (tab === 'issues' && issueStatus !== 'all') params.set('status', issueStatus);
+  if (tab === 'users' && subjectKind !== 'all') params.set('subjectKind', subjectKind);
+  if (tab === 'users' && subjectStatus !== 'all') params.set('subjectStatus', subjectStatus);
   return '/api/admin/' + tab + '?' + params.toString();
 }
 
@@ -183,6 +185,8 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
   const [draftFrom, setDraftFrom] = useState('');
   const [draftTo, setDraftTo] = useState('');
   const [issueStatus, setIssueStatus] = useState<'all' | 'failed' | 'dead_lettered'>('all');
+  const [subjectKind, setSubjectKind] = useState<'all' | 'guest' | 'member'>('all');
+  const [subjectStatus, setSubjectStatus] = useState<'all' | 'active' | 'merged' | 'deletion_pending' | 'deleted'>('all');
   const [pendingSubject, setPendingSubject] = useState('');
   const [detail, setDetail] = useState<string | null>(null);
   const [result, setResult] = useState<AdminReadResponse | null>(null);
@@ -196,7 +200,7 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
     setResult(null);
     const url = detail !== null
       ? (section === 'commerce' ? '/api/admin/commerce/' : '/api/admin/users/') + detail
-      : buildListPath(section, subject, cursor, tab, from, to, issueStatus);
+      : buildListPath(section, subject, cursor, tab, from, to, issueStatus, subjectKind, subjectStatus);
     void fetchAdminReadV1(url, token)
       .then(value => { if (mounted) setResult(value); })
       .catch(e => {
@@ -208,7 +212,7 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
     return () => {
       mounted = false;
     };
-  }, [section, token, cursor, subject, detail, tab, from, to, issueStatus]);
+  }, [section, token, cursor, subject, detail, tab, from, to, issueStatus, subjectKind, subjectStatus]);
 
   return <section className="surface admin-data">
     <div className="surface__head">
@@ -221,6 +225,30 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
         .map(([name,label]) => <button key={name} type="button" className={tab===name ? 'active' : ''} onClick={() => { setTab(name as ReadTab); setCursor(null); setDetail(null); }}>{label}</button>)}
     </div>
     <div className="admin-toolbar">
+      {section === 'users' && detail === null && <div className="admin-user-filters">
+        <label>계정 종류
+          <select value={subjectKind} onChange={e => {
+            setSubjectKind(e.target.value as 'all' | 'guest' | 'member');
+            setCursor(null);
+          }}>
+            <option value="all">전체</option>
+            <option value="member">회원</option>
+            <option value="guest">게스트</option>
+          </select>
+        </label>
+        <label>수명주기
+          <select value={subjectStatus} onChange={e => {
+            setSubjectStatus(e.target.value as typeof subjectStatus);
+            setCursor(null);
+          }}>
+            <option value="all">전체</option>
+            <option value="active">활성</option>
+            <option value="merged">병합됨</option>
+            <option value="deletion_pending">삭제 대기</option>
+            <option value="deleted">삭제 완료</option>
+          </select>
+        </label>
+      </div>}
       {section === 'issues' && tab === 'issues' && detail === null &&
         <label className="admin-issue-filter">이슈 상태
           <select value={issueStatus} onChange={e => {

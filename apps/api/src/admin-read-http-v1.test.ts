@@ -146,6 +146,17 @@ describe('admin owner-only reads', () => {
     expect(await res.text()).not.toContain('private');
   });
 
+  it('bounds user lifecycle filters and disallows using them on unrelated resources', () => {
+    const f = parseAdminReadFiltersV1(new URL('https://a.invalid/api/admin/users?subjectKind=guest&subjectStatus=merged'));
+    expect(f.subjectKind).toBe('guest');
+    expect(f.subjectStatus).toBe('merged');
+    for (const query of [
+      '/api/admin/users?subjectKind=unknown',
+      '/api/admin/users?subjectStatus=pending',
+      '/api/admin/commerce?subjectKind=guest',
+      '/api/admin/users/' + subject + '?subjectStatus=active',
+    ]) expect(() => parseAdminReadFiltersV1(new URL('https://a.invalid' + query))).toThrow();
+  });
   it('validates single resource lookup and date bounds', () => {
     expect(parseAdminReadFiltersV1(new URL('https://a.invalid/api/admin/users/' + subject)).kind).toBe('user-detail');
     expect(parseAdminReadFiltersV1(new URL('https://a.invalid/api/admin/commerce/' + subject)).recordId).toBe(subject);

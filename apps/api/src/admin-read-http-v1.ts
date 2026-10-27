@@ -96,7 +96,7 @@ export function parseAdminReadFiltersV1(url: URL): AdminListFiltersV1 {
     throw new Error('Unknown administrator read route.');
   }
 
-  const allowed = new Set(['limit', 'cursor', 'subjectId', 'from', 'to', 'status']);
+  const allowed = new Set(['limit', 'cursor', 'subjectId', 'from', 'to', 'status', 'subjectKind', 'subjectStatus']);
   for (const [key] of url.searchParams) {
     if (!allowed.has(key) || url.searchParams.getAll(key).length !== 1) {
       throw new Error('Unknown or duplicate administrator read parameter.');
@@ -146,9 +146,23 @@ export function parseAdminReadFiltersV1(url: URL): AdminListFiltersV1 {
       (rawIssueStatus !== 'failed' && rawIssueStatus !== 'dead_lettered'))) {
     throw new Error('Invalid administrator issue status filter.');
   }
+  const subjectKindParam = url.searchParams.get('subjectKind');
+  const subjectStatusParam = url.searchParams.get('subjectStatus');
+  if ((subjectKindParam !== null || subjectStatusParam !== null) && kind !== 'users') {
+    throw new Error('Lifecycle filters apply only to user list.');
+  }
+  if (subjectKindParam !== null && !['guest','member'].includes(subjectKindParam)) {
+    throw new Error('Invalid subject kind filter.');
+  }
+  if (subjectStatusParam !== null &&
+      !['active','merged','deletion_pending','deleted'].includes(subjectStatusParam)) {
+    throw new Error('Invalid subject lifecycle status filter.');
+  }
+  const subjectKind = subjectKindParam as 'guest' | 'member' | null;
+  const subjectStatus = subjectStatusParam as 'active' | 'merged' | 'deletion_pending' | 'deleted' | null;
   if (!ADMIN_READ_KINDS_V1.includes(kind)) throw new Error('Unknown administrator kind.');
   const issueStatus = rawIssueStatus as 'failed' | 'dead_lettered' | null;
-  return Object.freeze({ kind, limit, cursor, subjectId, recordId, from, to, issueStatus });
+  return Object.freeze({ kind, limit, cursor, subjectId, recordId, from, to, issueStatus, subjectKind, subjectStatus });
 }
 
 const ISSUE_EXPORT_COLUMNS = ['issueId', 'category', 'severity', 'status', 'createdAt', 'requestId'] as const;

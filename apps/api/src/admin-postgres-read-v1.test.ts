@@ -109,6 +109,15 @@ describe('admin dedicated readonly PostgreSQL adapter', () => {
     expect(sql).toContain('PERCENTILE_CONT(0.95)');
     expect(sql).toContain('NULL::text AS "costKrw"');
   });
+  it('binds guest/member and deletion lifecycle selection as SQL parameters', async () => {
+    const h = harness();
+    await h.port.read({
+      ...filters('users'), subjectKind: 'guest', subjectStatus: 'merged',
+    });
+    expect(h.sql[2]).toContain('s.kind=$6::text');
+    expect(h.sql[2]).toContain('s.status=$7::text');
+    expect(h.params[2]).toEqual([21, null, null, null, 0, 'guest', 'merged']);
+  });
   it('provides bounded pagination', async () => {
     const h = harness('myeongha_admin_reader',Array.from({length:3},()=>({subjectId:SUBJECT})));
     const result = await h.port.read({ ...filters(),limit:2 });

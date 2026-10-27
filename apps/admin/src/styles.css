@@ -180,3 +180,7 @@ button { cursor: pointer; }
 
 .admin-issue-filter { display:flex; align-items:center; gap:8px; font-size:11px; color:#53627a; }
 .admin-issue-filter select { padding:10px 12px; background:#fff; border:1px solid #d8deea; border-radius:6px; color:#233248; }
+
+.admin-user-filters { display:flex; flex-wrap:wrap; align-items:center; gap:12px; }
+.admin-user-filters label { display:flex; align-items:center; gap:7px; font-size:11px; color:#53627a; }
+.admin-user-filters select { padding:10px 12px; background:#fff; border:1px solid #d8deea; border-radius:6px; color:#233248; }
