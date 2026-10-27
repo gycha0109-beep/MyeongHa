@@ -14,7 +14,7 @@ import {
 
 const SUBJECT='11111111-1111-4111-8111-111111111111';
 const ATTEMPT='22222222-2222-4222-8222-222222222222';
-const PAYMENT_ID='mha_pa_'+'c'.repeat(64);
+const PAYMENT_ID='mha_pa_'+'c'.repeat(32);
 const IDENTITY={kind:'member' as const,verifiedAuthUserId:'33333333-3333-4333-8333-333333333333'};
 const INPUT={pool:{} as never,verifiedEvidence:IDENTITY,paymentAttemptId:ATTEMPT,providerRequestId:PAYMENT_ID};
 beforeEach(()=>{
