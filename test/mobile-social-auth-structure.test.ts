@@ -48,17 +48,12 @@ describe('mobile social auth structure', () => {
     expect(runtime).toContain("'custom:naver'");
   });
 
-  it('reuses the governed sign-in Vercel function instead of consuming a 13th function slot', async () => {
-    const vercel = await readRepoFile('vercel.json');
-    const signInRoute = await readRepoFile('api/auth/sign-in.ts');
-
-    expect(vercel).toContain('"source": "/api/auth/social/start"');
-    expect(vercel).toContain(
-      '"destination": "/api/auth/sign-in?__myeongha_social_auth_start=1"',
-    );
-    expect(signInRoute).toContain("routeId: 'api.auth.sign-in'");
-    expect(signInRoute).toContain("routeId: 'api.auth.social.start'");
-    expect(signInRoute).toContain('handleSocialAuthStartRequestV1');
+  it('routes social auth through the Cloudflare dispatcher', async () => {
+    const router = await readRepoFile('workers/cloudflare-api-router.mjs');
+    const worker = await readRepoFile('cloudflare/member-auth-worker.mjs');
+    expect(router).toContain('source: "/api/auth/social/start"');
+    expect(router).toContain('destination: "/api/auth/sign-in?__myeongha_social_auth_start=1"');
+    expect(worker).toContain("'social-start'");
   });
   it('registers exactly the native Google OAuth callback path and returns to My without moving tokens', async () => {
     const appJson = JSON.parse(await readRepoFile('apps/mobile/app.json'));

@@ -14,6 +14,7 @@ import {
   signUpWithPassword,
   writeWebSocialAuthPending,
 } from './product-auth.js';
+import { isCloudflareHostedAuthOriginV1, resolveWebSocialAuthCallbackUriV1 } from './social-auth-callback-origin.js';
 
 const BIRTH_PROFILE_ID_KEY = 'myeongha.guestBirthProfileId.v1';
 const CONFIRMATION_GUEST_HANDOFF_KEY = 'myeongha.pendingGuestConfirmation.v1';
@@ -24,11 +25,7 @@ const CONFIRMATION_GUEST_HANDOFF_ENTRY_PREFIX = 'myeongha.pendingGuestConfirmati
 const CONFIRMATION_GUEST_HANDOFF_TTL_MS = 24 * 60 * 60 * 1000;
 // Keep the same mixed-version namespace used by product-auth.js so promotion cannot cross a newer Member mutation.
 const MEMBER_MUTATION_LOCK_NAME = 'myeongha.memberSession.v1.refresh.lock';
-const CLOUDFLARE_AUTH_ORIGINS = new Set([
-  'https://myeongha.gycha0109.workers.dev',
-  'https://myeongha-web.gycha0109.workers.dev',
-]);
-const WEB_SOCIAL_AUTH_CALLBACK_URI = `${CLOUDFLARE_AUTH_ORIGINS.has(location.origin) ? location.origin : 'https://myeongha.vercel.app'}/auth.html?social=callback`;
+const WEB_SOCIAL_AUTH_CALLBACK_URI = resolveWebSocialAuthCallbackUriV1(location.origin);
 const WEB_SOCIAL_AUTH_PROVIDERS = new Set(['google', 'kakao', 'naver']);
 const ALLOWED_NEXT = new Set([
   'hall.html',
@@ -99,8 +96,11 @@ async function startSocialAuth(provider) {
   setBusy(true);
   setStatus('');
   try {
+    if (WEB_SOCIAL_AUTH_CALLBACK_URI === null) {
+      throw new ProductAuthError('WEB_SOCIAL_AUTH_ORIGIN_UNAPPROVED', '이 주소에서는 소셜 로그인을 사용할 수 없습니다.');
+    }
     // Existing guest context is preserved. Cloudflare native Auth does not create a phantom guest.
-    if (!CLOUDFLARE_AUTH_ORIGINS.has(location.origin)) await ensureGuestBearer();
+    if (!isCloudflareHostedAuthOriginV1(location.origin)) await ensureGuestBearer();
     const guestBearer = readGuestBearer();
 
     let response;
@@ -763,7 +763,7 @@ async function submitAuth({ email: rawEmail, password, confirmation }) {
   setStatus('');
   try {
     if (mode === 'sign-up') {
-      if (!CLOUDFLARE_AUTH_ORIGINS.has(location.origin)) await ensureGuestBearer();
+      if (!isCloudflareHostedAuthOriginV1(location.origin)) await ensureGuestBearer();
       const result = await signUpWithPassword(email, password, nextHref());
       if (result.status === 'verification_required') {
         if (readGuestBearer()) {

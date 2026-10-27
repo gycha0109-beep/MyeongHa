@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { acquireProductionMemberSmokeSession } from './production-member-smoke-session.mjs';
 
-const PRODUCTION_ORIGIN = 'https://myeongha.vercel.app';
+const PRODUCTION_ORIGIN = 'https://myeongha.gycha0109.workers.dev';
 const MEMBER_ME_URL = `${PRODUCTION_ORIGIN}/api/me`;
 const CHAT_OPEN_URL = `${PRODUCTION_ORIGIN}/api/chat`;
 const TURN_TEXT = '운영 연결 확인이야. 짧게 한마디만 답해줘.';

@@ -66,10 +66,8 @@ describe('native Reader Interpretation contract boundary', () => {
       readFile(new URL('../apps/mobile/src/features/reading/native-mobile-reader-interpretation-service.ts', import.meta.url), 'utf8'));
     expect(src).toContain('createMobileReaderInterpretationServiceV1');
     expect(src).not.toContain('publicRouteActivated: true');
-    const config = await import('node:fs/promises').then(({ readFile }) =>
-      readFile(new URL('../vercel.json', import.meta.url), 'utf8'));
-    const rewrites = (JSON.parse(config) as { rewrites?: { source: string }[] }).rewrites ?? [];
-    expect(rewrites.some((item) =>
-      item.source === '/api/me/readings/reader-interpretation/preview')).toBe(false);
+    const router = await import('node:fs/promises').then(({ readFile }) =>
+      readFile(new URL('../workers/cloudflare-api-router.mjs', import.meta.url), 'utf8'));
+    expect(router).not.toContain('source: "/api/me/readings/reader-interpretation/preview"');
   });
 });

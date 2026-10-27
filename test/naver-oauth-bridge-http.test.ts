@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { handleNaverOAuthBridgeRequestV1, type NaverOAuthBridgeActionV1, type NaverOAuthBridgeFetchV1 } from '../apps/api/src/naver-oauth-bridge-http.js';
 import { resolveAuthSignInDispatchForTestV1 } from '../api/auth/sign-in.js';
 
-const origin = 'https://myeongha.vercel.app';
+const origin = 'https://myeongha.gycha0109.workers.dev';
 const callback = 'https://cnsfpcdiyofqvhpcegfc.supabase.co/auth/v1/callback';
 const env = { MYEONGHA_NAVER_OAUTH_BRIDGE_ENABLED: 'true', MYEONGHA_NAVER_CLIENT_ID: 'fixture-app', MYEONGHA_NAVER_OAUTH_BRIDGE_KEY: randomBytes(32).toString('base64url') };
 const verifier = 'a'.repeat(43);
@@ -41,6 +41,21 @@ function tokenRequest(code: string, extra: Record<string, string> = {}, basic = 
 }
 
 describe('Naver OAuth transport bridge', () => {
+  it('uses the canonical Cloudflare callback without a Vercel hop', async () => {
+    const workerOrigin = 'https://myeongha.gycha0109.workers.dev';
+    const request = new Request(workerOrigin + '/api/auth/social/naver/authorize' + authQuery());
+    const response = await handleNaverOAuthBridgeRequestV1({
+      request, action: 'authorize', env, nowEpochMs: () => now,
+    });
+    expect(response.status).toBe(302);
+    expect(new URL(response.headers.get('Location')!).searchParams.get('redirect_uri'))
+      .toBe(workerOrigin + '/api/auth/social/naver/callback');
+    const wrongHost = new Request('https://preview.unapproved.test/api/auth/social/naver/authorize' + authQuery());
+    const rejected = await handleNaverOAuthBridgeRequestV1({
+      request: wrongHost, action: 'authorize', env, nowEpochMs: () => now,
+    });
+    expect(rejected.status).toBe(400);
+  });
   it.each([false, true])('preserves state, verifies PKCE, and normalizes profile without email linking (Basic=%s)', async basic => {
     const { state, code, naver } = await flow();
     expect(naver.searchParams.get('redirect_uri')).toBe(`${origin}/api/auth/social/naver/callback`);
@@ -141,10 +156,12 @@ describe('Naver OAuth transport bridge', () => {
       expect(resolveAuthSignInDispatchForTestV1(new Request(`${origin}/api/auth/sign-in?${query}`))).toBeNull();
     }
   });
-  it('deploys exactly one rewrite per bridge action without another serverless function', async () => {
-    const config = JSON.parse(await readFile(new URL('../vercel.json', import.meta.url), 'utf8')) as { rewrites: { source: string; destination: string }[] };
+  it('routes the four bridge actions through the Cloudflare dispatcher', async () => {
+    const router = await readFile(new URL('../workers/cloudflare-api-router.mjs', import.meta.url), 'utf8');
     for (const action of ['authorize', 'callback', 'token', 'userinfo']) {
-      expect(config.rewrites.filter(rule => rule.source === `/api/auth/social/naver/${action}`)).toEqual([{ source: `/api/auth/social/naver/${action}`, destination: `/api/auth/sign-in?__myeongha_naver_oauth_bridge=${action}` }]);
+      expect(router).toContain(
+        'source: "/api/auth/social/naver/' + action + '", destination: "/api/auth/sign-in?__myeongha_naver_oauth_bridge=' + action + '"',
+      );
     }
   });
 });

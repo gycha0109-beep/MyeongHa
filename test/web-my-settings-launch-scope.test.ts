@@ -53,6 +53,8 @@ describe('My settings and approved dashboard layout', () => {
     ]) expect(page).toContain(expected);
     expect(client).toContain("const DEFAULT_PROFILE_ENDPOINT = '/api/me'");
     expect(client).toContain("method: 'GET'");
+    const router = await readFile(new URL('../workers/cloudflare-api-router.mjs', import.meta.url), 'utf8');
+    expect(router).not.toContain('source: "/api/me/entitlements"');
     expect(page).not.toContain("method: 'PATCH'");
     expect(page).not.toContain("method: 'DELETE'");
   });

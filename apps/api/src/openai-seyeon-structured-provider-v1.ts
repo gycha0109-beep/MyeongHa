@@ -387,9 +387,6 @@ export function createOpenAiSeyeonStructuredProviderV1(
       const callId = crypto.randomUUID();
       const requestBody = JSON.stringify({
             model,
-            ...(endpoint === 'https://ai-gateway.vercel.sh/v1/responses' && model.startsWith('openai/')
-              ? { providerOptions: { gateway: { only: ['openai'] } } }
-              : {}),
             store: false,
             ...(config.disablePromptCaching===true ? {prompt_cache_options:{mode:'explicit'}} : {}),
             ...(requestOutputCeiling === undefined ? {} : { max_output_tokens: requestOutputCeiling }),

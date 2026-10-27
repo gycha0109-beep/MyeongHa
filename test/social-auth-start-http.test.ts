@@ -5,7 +5,7 @@ import {
 } from '../apps/api/src/social-auth-start-http.js';
 
 function request(body: unknown) {
-  return new Request('https://myeongha.vercel.app/api/auth/social/start', {
+  return new Request('https://myeongha.gycha0109.workers.dev/api/auth/social/start', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
@@ -86,7 +86,7 @@ describe('social auth start HTTP boundary', () => {
     const response = await handleSocialAuthStartRequestV1({
       request: request({
         provider: 'google',
-        redirectUri: 'https://myeongha.vercel.app/auth.html?social=callback',
+        redirectUri: 'https://myeongha.gycha0109.workers.dev/auth.html?social=callback',
       }),
       env: { MYEONGHA_SOCIAL_AUTH_GOOGLE_ENABLED: 'true' },
     });
@@ -97,7 +97,7 @@ describe('social auth start HTTP boundary', () => {
     };
     const authorize = new URL(payload.data.authorizationUrl);
     const redirect = new URL(authorize.searchParams.get('redirect_to') ?? '');
-    expect(redirect.origin).toBe('https://myeongha.vercel.app');
+    expect(redirect.origin).toBe('https://myeongha.gycha0109.workers.dev');
     expect(redirect.pathname).toBe('/auth.html');
     expect(redirect.searchParams.get('social')).toBe('callback');
     expect(redirect.searchParams.get('state')).toBe(payload.data.state);

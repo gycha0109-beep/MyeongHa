@@ -7,7 +7,7 @@ const REVERSE_DNS_PATTERN = /^[a-zA-Z][a-zA-Z0-9]*(?:\.[a-zA-Z][a-zA-Z0-9]*)+$/u
 const SEMVER_PATTERN = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/u;
 
 export const MOBILE_RELEASE_PRODUCTION_API_ORIGIN_V1 =
-  'https://myeongha.vercel.app';
+  'https://myeongha.gycha0109.workers.dev';
 
 function isRecord(value) {
   return typeof value === 'object' && value !== null && !Array.isArray(value);

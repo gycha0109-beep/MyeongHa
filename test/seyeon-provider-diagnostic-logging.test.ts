@@ -13,7 +13,7 @@ describe('Seyeon provider diagnostic logging', () => {
     );
     const source = runtime + '\n' + http;
     expect(source).toContain('MYEONGHA_SEYEON_PROVIDER_DIAGNOSTIC');
-    expect(source).toContain("stage: 'oidc_resolution'");
+    expect(source).not.toContain("stage: 'oidc_resolution'");
     expect(source).toContain("stage: 'provider'");
     expect(source).toContain('httpStatus: error.httpStatus');
     expect(source).not.toContain('token: vercelOidcToken');

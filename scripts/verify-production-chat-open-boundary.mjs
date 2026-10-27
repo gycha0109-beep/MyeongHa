@@ -1,4 +1,4 @@
-const PRODUCTION_ORIGIN = 'https://myeongha.vercel.app';
+const PRODUCTION_ORIGIN = 'https://myeongha.gycha0109.workers.dev';
 const CHAT_OPEN_URL = `${PRODUCTION_ORIGIN}/api/chat`;
 const REQUEST_TIMEOUT_MS = 15_000;
 
@@ -41,11 +41,22 @@ async function fetchCanonical(init) {
 
 const methodBoundary = await fetchCanonical({ method: 'GET' });
 requireNoStore(methodBoundary, 'GET /api/chat');
-if (methodBoundary.status !== 405) {
-  throw new Error(`GET /api/chat expected HTTP 405, received ${methodBoundary.status}.`);
-}
-if ((methodBoundary.headers.get('allow') ?? '') !== 'POST') {
-  throw new Error('GET /api/chat must preserve Allow: POST.');
+if (methodBoundary.status === 405) {
+  if ((methodBoundary.headers.get('allow') ?? '') !== 'POST') {
+    throw new Error('GET /api/chat must preserve Allow: POST.');
+  }
+} else if (methodBoundary.status === 503) {
+  // Cloudflare's stricter protected-reveal admission can fail closed
+  // before method dispatch. This is not evidence of a live chat runtime.
+  const denial = await readJsonWithoutLogging(methodBoundary, 'GET /api/chat');
+  if (denial.ok !== false ||
+      !isRecord(denial.error) ||
+      denial.error.code !== 'SEYEON_FIRST_REVEAL_AUTHORITY_UNAVAILABLE') {
+    throw new Error('GET /api/chat 503 did not carry the exact protected-reveal denial.');
+  }
+} else {
+  throw new Error('GET /api/chat expected 405 or exact protected-reveal 503, received ' +
+    methodBoundary.status + '.');
 }
 
 const unauthenticatedOpen = await fetchCanonical({
@@ -81,5 +92,5 @@ if (
 }
 
 console.log(
-  'MyeongHa production Chat open boundary smoke passed: GET=405 Allow POST, unauthenticated POST=401 AUTH_REQUIRED v0.9, cacheControl=no-store.',
+  'MyeongHa production Chat open boundary smoke passed: GET=405 or exact fail-closed 503, unauthenticated POST=401 AUTH_REQUIRED v0.9, cacheControl=no-store.',
 );

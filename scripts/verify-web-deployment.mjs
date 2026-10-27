@@ -1,23 +1,12 @@
 import { access, readFile, readdir } from 'node:fs/promises';
 import { dirname, extname, join, normalize, resolve } from 'node:path';
+import { assertMainWebConfig } from './cloudflare-main-web-cd.mjs';
+import { CLOUDFLARE_DIRECT_API_ROUTES, CLOUDFLARE_REWRITE_ROUTES, matchCloudflareApiRoute } from '../workers/cloudflare-api-router.mjs';
 
 const outputRoot = resolve(
   process.cwd(),
   process.env.MYEONGHA_WEB_OUTPUT_DIR ?? 'public',
 );
-const apiRoot = resolve(process.cwd(), 'api');
-const VERCEL_SERVERLESS_FUNCTION_LIMIT = 12;
-const serverlessFunctionExtensions = new Set([
-  '.js',
-  '.mjs',
-  '.cjs',
-  '.ts',
-  '.mts',
-  '.cts',
-  '.jsx',
-  '.tsx',
-]);
-
 const requiredFiles = [
   'index.html',
   'hall.html',
@@ -38,7 +27,6 @@ const forbiddenBasenames = new Set([
 
 const localReferencePattern = /(?:href|src)=["']([^"']+)["']/g;
 const cssUrlPattern = /url\((?:["']?)([^"')]+)(?:["']?)\)/g;
-const apiTestFilePattern = /\.(?:test|spec)\.[^/\\]+$/u;
 
 async function assertExists(path) {
   try {
@@ -144,153 +132,72 @@ for (const file of deployedFiles) {
   }
 }
 
-const apiFiles = await collectFiles(apiRoot);
-const apiTestFiles = apiFiles.filter((file) => apiTestFilePattern.test(file));
-if (apiTestFiles.length > 0) {
-  throw new Error(
-    `Test/spec files must stay outside the Vercel API function root: ${apiTestFiles.join(', ')}`,
-  );
-}
+// Validate the Cloudflare-only production Worker contract.
+const workerConfig = JSON.parse(await readFile(resolve('wrangler.jsonc'), 'utf8'));
+assertMainWebConfig(workerConfig);
+await assertExists(resolve('cloudflare/myeongha-worker.mjs'));
+await assertExists(resolve('cloudflare/preview-worker.mjs'));
 
-const serverlessFunctionFiles = apiFiles.filter((file) =>
-  serverlessFunctionExtensions.has(extname(file).toLowerCase()),
-);
-if (serverlessFunctionFiles.length > VERCEL_SERVERLESS_FUNCTION_LIMIT) {
-  throw new Error(
-    `Vercel production function budget exceeded: ${serverlessFunctionFiles.length}/${VERCEL_SERVERLESS_FUNCTION_LIMIT}. Keep tests and non-route modules outside api/ or intentionally change the deployment plan and this guard.`,
-  );
-}
-
-const vercelConfig = JSON.parse(await readFile(resolve('vercel.json'), 'utf8'));
-if (vercelConfig.buildCommand !== 'npm run build:web') {
-  throw new Error('vercel.json buildCommand must remain npm run build:web.');
-}
-if (vercelConfig.outputDirectory !== 'public') {
-  throw new Error('vercel.json outputDirectory must remain public.');
-}
-if (
-  !Array.isArray(vercelConfig.regions) ||
-  vercelConfig.regions.length !== 1 ||
-  vercelConfig.regions[0] !== 'sin1'
-) {
-  throw new Error(
-    'Vercel Functions must remain pinned to the single governed Production region sin1.',
-  );
-}
-if (vercelConfig.git?.deploymentEnabled?.['**'] !== false) {
-  throw new Error('Automatic Vercel deployments must default to disabled for non-main branches.');
-}
-if (vercelConfig.git?.deploymentEnabled?.main !== true) {
-  throw new Error('Automatic Vercel production deployment must remain enabled for main.');
-}
-
-const birthProfileRewrite = (vercelConfig.rewrites ?? []).find(
-  (entry) => entry.source === '/api/birth-profiles/:id',
-);
-if (
-  birthProfileRewrite?.destination !==
-  '/api/birth-profiles?__myeongha_birth_profile_id=:id'
-) {
-  throw new Error(
-    'Birth Profile dynamic API route must carry its captured id to the static dispatcher through the private rewrite locator.',
-  );
-}
-if (
-  (vercelConfig.rewrites ?? []).filter(
-    (entry) => entry.source === '/api/birth-profiles/:id',
-  ).length !== 1
-) {
-  throw new Error('Birth Profile dynamic API route must have exactly one static-function rewrite.');
-}
-
-await assertExists(resolve('api/birth-profiles.ts'));
-await assertMissing(
-  resolve('api/birth-profiles/[id].ts'),
-  'Bracket Birth Profile function must not coexist with the static dispatcher.',
-);
-
-const expectedRecordsRewrites = Object.freeze([
-  Object.freeze({
-    source: '/api/life-record',
-    destination: '/api/me?__myeongha_records_read=life-record',
-  }),
-  Object.freeze({
-    source: '/api/readings',
-    destination: '/api/me?__myeongha_records_read=readings',
-  }),
-  Object.freeze({
-    source: '/api/memories',
-    destination: '/api/me?__myeongha_records_read=memories',
-  }),
-]);
-for (const expected of expectedRecordsRewrites) {
-  const matches = (vercelConfig.rewrites ?? []).filter(
-    (entry) => entry.source === expected.source,
-  );
-  if (matches.length !== 1 || matches[0]?.destination !== expected.destination) {
-    throw new Error(
-      `${expected.source} must have exactly one rewrite to the governed /api/me Records dispatcher.`,
-    );
+for (const path of ['cloudflare/myeongha-worker.mjs', 'cloudflare/preview-worker.mjs']) {
+  const source = await readFile(resolve(path), 'utf8');
+  if (!/['"]X-Robots-Tag['"]\s*:\s*['"]noindex, nofollow, noarchive['"]/u.test(source)) {
+    throw new Error(path + ': the unlaunched web must retain noindex security policy.');
   }
 }
-await assertExists(resolve('api/me.ts'));
-await assertMissing(
-  resolve('api/life-record.ts'),
-  'Life Record must not consume a separate Vercel function while the Records dispatcher rewrite is active.',
-);
-await assertMissing(
-  resolve('api/readings.ts'),
-  'Reading History must not consume a separate Vercel function while the Records dispatcher rewrite is active.',
-);
-await assertMissing(
-  resolve('api/memories.ts'),
-  'Memories must not consume a separate Vercel function while the Records dispatcher rewrite is active.',
-);
 
-const creditWalletRewrites = (vercelConfig.rewrites ?? []).filter(
-  entry => entry.source === '/api/me/credits',
-);
-if (
-  creditWalletRewrites.length !== 1 ||
-  creditWalletRewrites[0]?.destination !== '/api/me?__myeongha_chat_credit_wallet=1'
-) {
-  throw new Error('Credit wallet must rewrite through the existing Member /api/me Function.');
+await assertMissing(resolve('vercel.json'), 'Retired Vercel deployment configuration must not return.');
+
+// These counts and exact dispatch destinations are application ingress
+// contracts, not a provider-imposed limit on the number of API functions.
+if (CLOUDFLARE_DIRECT_API_ROUTES.length !== 12 ||
+    CLOUDFLARE_REWRITE_ROUTES.length !== 21) {
+  throw new Error('Cloudflare API route inventory changed without an explicit routing migration.');
 }
-await assertMissing(
-  resolve('api/me/credits.ts'),
-  'Credit wallet must not consume a thirteenth Vercel Function.',
-);
-
-const chatRewriteMatches = (vercelConfig.rewrites ?? []).filter(
-  (entry) => entry.source === '/api/chat/:threadId',
-);
-if (
-  chatRewriteMatches.length !== 1 ||
-  chatRewriteMatches[0]?.destination !== '/api/me?__myeongha_chat_thread_id=:threadId'
-) {
-  throw new Error(
-    'Chat dynamic read route must have exactly one rewrite to the governed /api/me dispatcher.',
-  );
+const directPaths = CLOUDFLARE_DIRECT_API_ROUTES.map(route => route.path);
+const rewrittenPaths = CLOUDFLARE_REWRITE_ROUTES.map(route => route.source);
+if (new Set(directPaths).size !== directPaths.length ||
+    new Set(rewrittenPaths).size !== rewrittenPaths.length ||
+    directPaths.some(path => !path.startsWith('/api/')) ||
+    rewrittenPaths.some(path => !path.startsWith('/api/'))) {
+  throw new Error('Cloudflare API route paths must be unique, scoped and explicit.');
 }
-await assertMissing(
-  resolve('api/chat.ts'),
-  'Chat reads must not consume a separate Vercel function while the /api/me dispatcher rewrite is active.',
-);
-await assertMissing(
-  resolve('api/chat/[threadId].ts'),
-  'Bracket Chat read function must not coexist with the static dispatcher rewrite.',
-);
-
-const globalHeaders = (vercelConfig.headers ?? []).find(
-  (entry) => entry.source === '/(.*)',
-)?.headers ?? [];
-const robotsHeader = globalHeaders.find(
-  (header) => header.key.toLowerCase() === 'x-robots-tag',
-)?.value;
-if (robotsHeader !== 'noindex, nofollow, noarchive') {
-  throw new Error('Prototype deployment must remain noindex until the public-launch gate changes it.');
+for (const route of CLOUDFLARE_REWRITE_ROUTES) {
+  if (!route.destination.startsWith('/api/') || route.destination.includes('://')) {
+    throw new Error('Cloudflare route cannot redirect to a remote origin: ' + route.source);
+  }
+  const examplePath = route.source.replace(/:[A-Za-z][A-Za-z0-9]*/gu, 'synthetic-id');
+  const match = matchCloudflareApiRoute(examplePath);
+  if (match?.id !== route.id || match.kind !== 'rewrite') {
+    throw new Error('Cloudflare rewrite must match its own exact route: ' + route.source);
+  }
+}
+const requiredRewrites = new Map([
+  ['/api/birth-profiles/:id', '/api/birth-profiles?__myeongha_birth_profile_id=:id'],
+  ['/api/life-record', '/api/me?__myeongha_records_read=life-record'],
+  ['/api/readings', '/api/me?__myeongha_records_read=readings'],
+  ['/api/memories', '/api/me?__myeongha_records_read=memories'],
+  ['/api/me/credits', '/api/me?__myeongha_chat_credit_wallet=1'],
+  ['/api/chat/:threadId', '/api/me?__myeongha_chat_thread_id=:threadId'],
+  ['/api/chat/:threadId/turns', '/api/me?__myeongha_chat_turn_send=1&__myeongha_chat_thread_id=:threadId'],
+]);
+for (const [source, destination] of requiredRewrites) {
+  const matching = CLOUDFLARE_REWRITE_ROUTES.filter(route => route.source === source);
+  if (matching.length !== 1 || matching[0].destination !== destination) {
+    throw new Error('Governed Cloudflare API dispatcher rewrite changed: ' + source);
+  }
+}
+await assertExists(resolve('workers/cloudflare-api-router.mjs'));
+for (const path of [
+  'api/birth-profiles/[id].ts',
+  'api/life-record.ts', 'api/readings.ts', 'api/memories.ts',
+  'api/me/credits.ts', 'api/chat.ts', 'api/chat/[threadId].ts',
+]) {
+  await assertMissing(resolve(path), 'Duplicate HTTP entrypoint bypasses the governed dispatcher: ' + path);
 }
 
 console.log(
-  `MyeongHa deployment configuration verification passed for ${deployedFiles.length} static files and ${serverlessFunctionFiles.length}/${VERCEL_SERVERLESS_FUNCTION_LIMIT} serverless functions.`,
+  'MyeongHa Cloudflare deployment verification passed for ' +
+  deployedFiles.length + ' static files, ' +
+  CLOUDFLARE_DIRECT_API_ROUTES.length + ' direct API routes and ' +
+  CLOUDFLARE_REWRITE_ROUTES.length + ' governed rewrites.',
 );

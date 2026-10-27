@@ -251,7 +251,7 @@ async function waitFor(client, expression, message, timeout = 10_000) {
   const diagnostics = await client.evaluate(`(() => ({
     pathname: location.pathname,
     readyState: document.readyState,
-    status: document.querySelector('#auth-status')?.textContent?.trim() ?? document.querySelector('#my-status')?.textContent?.trim() ?? null,
+    status: document.querySelector('#auth-status')?.textContent?.trim() ?? document.querySelector('.my-account-meta')?.textContent?.trim() ?? null,
     member: localStorage.getItem(${JSON.stringify(memberKey)}),
     handoff: localStorage.getItem(${JSON.stringify(handoffKey)}),
     active: sessionStorage.getItem(${JSON.stringify(activeBearerKey)}),
@@ -364,7 +364,7 @@ try {
   assert(afterMergeRequired.pending === null, 'Merge-required login unexpectedly staged confirmation Guest A as current-tab Guest');
 
   scenario = 'sign-out';
-  await navigate(client, origin, '/my.html', '#my-status');
+  await navigate(client, origin, '/my.html', '.my-account-card');
   await waitFor(
     client,
     `[...document.querySelectorAll('.my-logout-action')].some((button) => button.textContent?.trim() === '로그아웃')`,

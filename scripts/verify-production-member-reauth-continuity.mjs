@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { acquireProductionMemberSmokeSession } from './production-member-smoke-session.mjs';
 
-const PRODUCTION_ORIGIN = 'https://myeongha.vercel.app';
+const PRODUCTION_ORIGIN = 'https://myeongha.gycha0109.workers.dev';
 const SIGN_OUT_URL = `${PRODUCTION_ORIGIN}/api/auth/sign-out`;
 const MEMBER_ME_URL = `${PRODUCTION_ORIGIN}/api/me`;
 const BIRTH_PROFILE_URL = `${PRODUCTION_ORIGIN}/api/me/birth-profile`;
