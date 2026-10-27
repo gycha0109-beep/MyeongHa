@@ -14,6 +14,8 @@ import {
 } from './commerce-credit-verified-topup-fulfillment-candidate-v1.js';
 import type { VerifiedSubjectIdentityEvidenceV1 } from './subject-identity-resolver.js';
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
+
 export const CREDIT_CHECKOUT_FULFILLMENT_CANDIDATE_V1 = Object.freeze({
   productionMounted: false,
   liveCheckoutEnabled: false,
@@ -47,6 +49,15 @@ export async function completeVerifiedCreditCheckoutCandidateV1(input: Readonly<
   if (input.approvedCreditProductOfferId === null ||
       input.approvedPaidCreditValidity === null) {
     return Object.freeze({kind:'not_activated'});
+  }
+  // The Payment Attempt may persist a verified Receipt before minting.
+  // Reject a corrupt operator/merchant Offer or invalid paid-credit validity
+  // BEFORE provider verification or ANY persistent payment side effect.
+  const policy=input.approvedPaidCreditValidity;
+  if (!UUID.test(input.approvedCreditProductOfferId) ||
+      typeof policy!=='object' || Array.isArray(policy) ||
+      policy.kind!=='never' || Object.keys(policy).length!==1) {
+    throw new Error('Credit checkout server activation policy is invalid');
   }
 
   const completion = await executeSubjectOwnedCommercePaymentCompletionV1({
