@@ -170,6 +170,15 @@ describe('admin dedicated readonly PostgreSQL adapter', () => {
     expect(detail).toContain("lot.source_kind='portone_topup'");
     expect(detail).toContain('credit_lots.remaining::text AS "linkedCreditRemaining"');
   });
+  it('displays money only from verified receipt evidence, never the catalog offer price', () => {
+    for (const kind of ['commerce', 'commerce-detail'] as const) {
+      const sql=ADMIN_READ_SQL_V1[kind] ?? '';
+      expect(sql).toContain("r.verification_status='verified'");
+      expect(sql).toContain('r.verified_amount_minor::text ELSE NULL::text END AS "amountMinor"');
+      expect(sql).toContain('r.verified_currency ELSE NULL::text END AS "currency"');
+      expect(sql).not.toContain('po.currency AS "currency"');
+    }
+  });
   it('provides bounded pagination', async () => {
     const h = harness('myeongha_admin_reader',Array.from({length:3},()=>({subjectId:SUBJECT})));
     const result = await h.port.read({ ...filters(),limit:2 });

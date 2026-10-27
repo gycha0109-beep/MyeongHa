@@ -32,7 +32,7 @@ grant select (reading_id, subject_id, execution_attempt_no, state, error_code,
   on public.reading_execution_attempts to myeongha_admin_reader;
 grant select (reading_id, subject_id, saju_engine_version, reading_contract_version)
   on public.reading_refs to myeongha_admin_reader;
-grant select (id, subject_id, purchase_intent_id, provider, platform, product_offer_id, verification_status, verified_at, created_at)
+grant select (id, subject_id, purchase_intent_id, provider, platform, product_offer_id, verification_status, verified_at, verified_amount_minor, verified_currency, created_at)
   on public.commerce_receipts to myeongha_admin_reader;
 grant select (id, status) on public.purchase_intents to myeongha_admin_reader;
 grant select (id, product_id, currency) on public.product_offers to myeongha_admin_reader;
