@@ -16,6 +16,28 @@ export function ReadingDetailPage() {
         <a className="reading-route-action" data-reading-route-action href="reading.html">다른 사주 읽기 보기 <span aria-hidden="true">→</span></a>
       </section>
 
+      <article className="official-report-view" data-official-report hidden aria-label="저장된 공식 사주 보고서">
+        <header className="official-report-head">
+          <span className="reading-route-kicker">OFFICIAL READING</span>
+          <h1>저장된 공식 사주 보고서</h1>
+          <p>기록에 저장된 해석을 원래 내용 그대로 한 번에 읽습니다.</p>
+          <dl className="official-report-meta">
+            <div><dt>발행일</dt><dd data-official-report-date>—</dd></div>
+            <div><dt>해석 버전</dt><dd data-official-report-version>—</dd></div>
+          </dl>
+        </header>
+        <nav className="official-report-toc" aria-label="보고서 목차" data-official-report-toc />
+        <div className="official-report-sections" data-official-report-sections />
+        <aside className="official-report-notice" data-official-report-notice hidden>
+          <h2>해석의 적용 범위</h2>
+          <p data-official-report-notice-text />
+        </aside>
+        <footer className="official-report-actions">
+          <button type="button" data-official-report-step-mode>단계별 읽기</button>
+          <a href="records.html?tab=saju">사주 보고서 보관함으로 돌아가기</a>
+        </footer>
+      </article>
+
       <section className="reading-stage" data-reading-stage hidden aria-label="캐릭터와 함께 읽는 사주">
         <div className="reader-scene" data-reader-portrait role="img" aria-label="세연 사주 읽기 장면">
           <div className="reader-scene-art" aria-hidden="true">
@@ -87,6 +109,7 @@ export function ReadingDetailPage() {
           </div>
 
           <footer className="reading-sheet-actions">
+            <button className="reading-secondary-action official-report-return" type="button" data-official-report-return hidden>보고서 전체 보기</button>
             <button className="reading-icon-action" type="button" data-reading-prev aria-label="이전 읽기" disabled>←</button>
             <button className="reading-secondary-action" type="button" data-chart-open>내 명식 보기</button>
             <button className="reading-primary-action" type="button" data-reading-next disabled>
