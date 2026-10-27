@@ -72,6 +72,7 @@ describe('exact Cloudflare Worker PortOne V2 TEST bindings',()=>{
       {amountMinor:2000},
       {quantityCredits:301},
       {externalProductId:'other-product'},
+      {paymentId:'mha_pa_'+'b'.repeat(64)},
     ]){
       await expect(buildCloudflarePortOneOwnerTestCheckoutV1(
         ENV,{...SOURCE,...changes} as typeof SOURCE,AUTH,
