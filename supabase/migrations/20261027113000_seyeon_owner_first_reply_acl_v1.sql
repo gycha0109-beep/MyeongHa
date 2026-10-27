@@ -16,21 +16,30 @@ declare
 begin
   if current_user <> 'postgres'
      or to_regrole('myeongha_api_executor') is null
-     or to_regrole('myeongha_seyeon_chat_runtime_owner') is null
-     or not exists (
+     or to_regrole('myeongha_seyeon_chat_runtime_owner') is null then
+    raise exception 'HOLD_SEYEON_OWNER_RECEIPT_ACL_PRINCIPAL';
+  end if;
+  -- Production uses a restricted, non-superuser postgres with the
+  -- Supabase-owned ADMIN-only membership; CI has bootstrap superuser
+  -- postgres and no supabase_admin. Never invent that platform role in CI.
+  if not exists (
+    select 1 from pg_catalog.pg_roles
+    where rolname=current_user and rolsuper
+  ) then
+    if not exists (
        select 1 from pg_catalog.pg_auth_members m
        where m.roleid='myeongha_seyeon_chat_runtime_owner'::regrole
          and m.member='postgres'::regrole
          and m.grantor='supabase_admin'::regrole
          and m.admin_option and not m.set_option and not m.inherit_option
-     )
-     or exists (
+    ) or exists (
        select 1 from pg_catalog.pg_auth_members m
        where m.roleid='myeongha_seyeon_chat_runtime_owner'::regrole
          and m.member='postgres'::regrole
          and m.grantor<>'supabase_admin'::regrole
-     ) then
-    raise exception 'HOLD_SEYEON_OWNER_RECEIPT_ACL_PRINCIPAL';
+    ) then
+      raise exception 'HOLD_SEYEON_OWNER_RECEIPT_ACL_MANAGED_ROLE_DRIFT';
+    end if;
   end if;
 
   -- Three exact original-source G1/G2/G3 functions, not a schema-wide grant.
@@ -95,8 +104,17 @@ grant execute on function public.cmd_issue_seyeon_positive_first_reply_v1(
 -- Temporarily enable SET via our own grantor record, preserving the
 -- original managed supabase_admin grant (ADMIN TRUE, SET/INHERIT FALSE).
 -- Both the temporary membership and changes to function ACLs are transactional.
-grant myeongha_seyeon_chat_runtime_owner to postgres
-  with set true, inherit false, admin false;
+do $temporary_role$
+begin
+  if not exists (
+    select 1 from pg_catalog.pg_roles
+    where rolname=current_user and rolsuper
+  ) then
+    execute 'grant myeongha_seyeon_chat_runtime_owner to postgres
+      with set true, inherit false, admin false';
+  end if;
+end
+$temporary_role$;
 set local role myeongha_seyeon_chat_runtime_owner;
 grant execute on function public.cmd_mark_seyeon_positive_context_ready_pinned_v1(
   uuid,uuid,uuid,uuid,uuid,uuid,text,text,text,text,text,text,text
@@ -107,7 +125,17 @@ grant execute on function public.cmd_commit_seyeon_positive_chat_turn_v1(
 reset role;
 -- Revoke ONLY the temporary grant made by postgres; do not alter the
 -- original membership granted by Supabase's bootstrap administrative role.
-revoke myeongha_seyeon_chat_runtime_owner from postgres granted by postgres;
+do $revoke_temporary_role$
+begin
+  if not exists (
+    select 1 from pg_catalog.pg_roles
+    where rolname=current_user and rolsuper
+  ) then
+    execute 'revoke myeongha_seyeon_chat_runtime_owner
+      from postgres granted by postgres';
+  end if;
+end
+$revoke_temporary_role$;
 
 do $postcondition$
 declare
@@ -130,19 +158,24 @@ begin
       raise exception 'HOLD_SEYEON_OWNER_RECEIPT_ACL_POSTCONDITION: %',v_signature;
     end if;
   end loop;
-  if (
-    select count(*) from pg_catalog.pg_auth_members m
-    where m.roleid='myeongha_seyeon_chat_runtime_owner'::regrole
-      and m.member='postgres'::regrole
-      and m.grantor='supabase_admin'::regrole
-      and m.admin_option and not m.set_option and not m.inherit_option
-  )<>1 or exists (
-    select 1 from pg_catalog.pg_auth_members m
-    where m.roleid='myeongha_seyeon_chat_runtime_owner'::regrole
-      and m.member='postgres'::regrole
-      and m.grantor<>'supabase_admin'::regrole
+  if not exists (
+    select 1 from pg_catalog.pg_roles
+    where rolname=current_user and rolsuper
   ) then
-    raise exception 'HOLD_SEYEON_OWNER_RECEIPT_TEMP_ROLE_NOT_REVOKED';
+    if (
+      select count(*) from pg_catalog.pg_auth_members m
+      where m.roleid='myeongha_seyeon_chat_runtime_owner'::regrole
+        and m.member='postgres'::regrole
+        and m.grantor='supabase_admin'::regrole
+        and m.admin_option and not m.set_option and not m.inherit_option
+    )<>1 or exists (
+      select 1 from pg_catalog.pg_auth_members m
+      where m.roleid='myeongha_seyeon_chat_runtime_owner'::regrole
+        and m.member='postgres'::regrole
+        and m.grantor<>'supabase_admin'::regrole
+    ) then
+      raise exception 'HOLD_SEYEON_OWNER_RECEIPT_TEMP_ROLE_NOT_REVOKED';
+    end if;
   end if;
   if exists (
     select 1 from public.seyeon_positive_source_type_registry_v1 where enabled
