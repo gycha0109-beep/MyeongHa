@@ -1,7 +1,5 @@
 // Browser callback host selection only. Server-side Worker admission and the
 // provider's exact redirect allowlist remain the independent authorities.
-const LEGACY_VERCEL_PRODUCTION_ORIGIN = 'https://myeongha.vercel.app';
-const VERCEL_PROJECT_PREVIEW_HOST = /^https:\/\/myeongha-[a-z0-9-]+-johnny-self\.vercel\.app$/u;
 const CANONICAL_WORKER_ORIGINS = new Set([
   'https://myeongha.gycha0109.workers.dev',
   'https://myeongha-web.gycha0109.workers.dev',
@@ -23,9 +21,6 @@ export function isCloudflareHostedAuthOriginV1(currentOrigin) {
 }
 
 export function resolveWebSocialAuthCallbackUriV1(currentOrigin) {
-  const callbackOrigin = isCloudflareHostedAuthOriginV1(currentOrigin)
-    ? currentOrigin
-    : currentOrigin === LEGACY_VERCEL_PRODUCTION_ORIGIN || VERCEL_PROJECT_PREVIEW_HOST.test(currentOrigin)
-      ? LEGACY_VERCEL_PRODUCTION_ORIGIN : null;
-  return callbackOrigin === null ? null : `${callbackOrigin}/auth.html?social=callback`;
+  return isCloudflareHostedAuthOriginV1(currentOrigin)
+    ? currentOrigin + '/auth.html?social=callback' : null;
 }

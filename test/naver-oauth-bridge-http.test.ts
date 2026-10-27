@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { handleNaverOAuthBridgeRequestV1, type NaverOAuthBridgeActionV1, type NaverOAuthBridgeFetchV1 } from '../apps/api/src/naver-oauth-bridge-http.js';
 import { resolveAuthSignInDispatchForTestV1 } from '../api/auth/sign-in.js';
 
-const origin = 'https://myeongha.vercel.app';
+const origin = 'https://myeongha.gycha0109.workers.dev';
 const callback = 'https://cnsfpcdiyofqvhpcegfc.supabase.co/auth/v1/callback';
 const env = { MYEONGHA_NAVER_OAUTH_BRIDGE_ENABLED: 'true', MYEONGHA_NAVER_CLIENT_ID: 'fixture-app', MYEONGHA_NAVER_OAUTH_BRIDGE_KEY: randomBytes(32).toString('base64url') };
 const verifier = 'a'.repeat(43);

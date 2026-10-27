@@ -30,10 +30,8 @@ const JSON_HEADERS = Object.freeze({
   'Content-Type': 'application/json',
 } as const);
 const MYEONGHA_PRODUCTION_WEB_ORIGIN = 'https://myeongha.gycha0109.workers.dev' as const;
-const MYEONGHA_LEGACY_VERCEL_WEB_ORIGIN = 'https://myeongha.vercel.app' as const;
 const MYEONGHA_AUTH_WEB_ORIGINS = new Set([
   MYEONGHA_PRODUCTION_WEB_ORIGIN,
-  MYEONGHA_LEGACY_VERCEL_WEB_ORIGIN,
   'https://myeongha-web.gycha0109.workers.dev',
 ]);
 const WEB_AUTH_TRANSPORT_HEADER_V1 = 'x-myeongha-auth-transport' as const;

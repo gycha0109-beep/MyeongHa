@@ -1,5 +1,3 @@
-import { getVercelOidcToken } from '@vercel/oidc';
-
 import type {
   CharacterClientCompatibilityProfileV1,
 } from '../../../packages/domain/src/index.js';
@@ -38,16 +36,7 @@ import type {
 
 export const SEYEON_PRODUCTION_PROVIDER_ROUTING_V1 = Object.freeze({
   directDefaultModel: 'gpt-5.6-terra',
-  gatewayOrigin: 'https://ai-gateway.vercel.sh',
-  gatewayDefaultModel: 'openai/gpt-5.6-sol',
-  vercelProject: 'prj_nXF0b5uv27Lyucz2SEBxzdCRXVsP',
-  vercelTeam: 'team_xuYA9OhCWlJETaYFOmeVodgS',
 } as const);
-
-export type ProductionSeyeonOidcTokenProviderV1 = (input: {
-  readonly project: string;
-  readonly team: string;
-}) => Promise<string>;
 
 function optionalEnv(
   env: ProductionUserDataRuntimeEnvV1,
@@ -68,67 +57,14 @@ function failClosedProviderConfig(): OpenAiSeyeonStructuredProviderConfigV1 {
 
 export async function resolveProductionSeyeonProviderConfigAtRequestV1(
   env: ProductionUserDataRuntimeEnvV1,
-  oidcTokenProvider: ProductionSeyeonOidcTokenProviderV1 =
-    getVercelOidcToken,
 ): Promise<OpenAiSeyeonStructuredProviderConfigV1> {
   const directApiKey = optionalEnv(env, 'OPENAI_API_KEY');
-  if (directApiKey !== null) {
-    return Object.freeze({
-      apiKey: directApiKey,
-      model:
-        optionalEnv(env, 'MYEONGHA_SEYEON_OPENAI_MODEL') ??
-        SEYEON_PRODUCTION_PROVIDER_ROUTING_V1.directDefaultModel,
-    });
-  }
-
-  let vercelOidcToken: string;
-  try {
-    vercelOidcToken = (
-      await oidcTokenProvider({
-        project: SEYEON_PRODUCTION_PROVIDER_ROUTING_V1.vercelProject,
-        team: SEYEON_PRODUCTION_PROVIDER_ROUTING_V1.vercelTeam,
-      })
-    ).trim();
-  } catch (error) {
-    console.error(
-      'MYEONGHA_SEYEON_PROVIDER_DIAGNOSTIC ' +
-      JSON.stringify({
-        schemaVersion: 'myeongha-seyeon-provider-diagnostic-v1',
-        stage: 'oidc_resolution',
-        outcome: 'failure',
-        errorName: error instanceof Error ? error.name : 'UnknownError',
-      }),
-    );
-    return failClosedProviderConfig();
-  }
-
-  if (vercelOidcToken.length === 0) {
-    console.error(
-      'MYEONGHA_SEYEON_PROVIDER_DIAGNOSTIC ' +
-      JSON.stringify({
-        schemaVersion: 'myeongha-seyeon-provider-diagnostic-v1',
-        stage: 'oidc_resolution',
-        outcome: 'empty',
-      }),
-    );
-    return failClosedProviderConfig();
-  }
-
-  console.error(
-    'MYEONGHA_SEYEON_PROVIDER_DIAGNOSTIC ' +
-    JSON.stringify({
-      schemaVersion: 'myeongha-seyeon-provider-diagnostic-v1',
-      stage: 'oidc_resolution',
-      outcome: 'success',
-    }),
-  );
-
+  if (directApiKey === null) return failClosedProviderConfig();
   return Object.freeze({
-    apiKey: vercelOidcToken,
+    apiKey: directApiKey,
     model:
-      optionalEnv(env, 'MYEONGHA_SEYEON_AI_GATEWAY_MODEL') ??
-      SEYEON_PRODUCTION_PROVIDER_ROUTING_V1.gatewayDefaultModel,
-    origin: SEYEON_PRODUCTION_PROVIDER_ROUTING_V1.gatewayOrigin,
+      optionalEnv(env, 'MYEONGHA_SEYEON_OPENAI_MODEL') ??
+      SEYEON_PRODUCTION_PROVIDER_ROUTING_V1.directDefaultModel,
   });
 }
 
@@ -173,8 +109,6 @@ export interface CreateProductionSeyeonTurnSendRuntimeInputV1 {
   readonly memberFetchImpl?: SupabaseMemberVerifierFetchV1;
   readonly identityEvidenceVerifier?: IdentityEvidenceVerificationPortV1;
   readonly createUuid?: () => string;
-  /** Test seam for request-context OIDC only. */
-  readonly oidcTokenProvider?: ProductionSeyeonOidcTokenProviderV1;
   /** Server-only explicit mode; default OFF. D5 owns activation approval. */
   readonly governorMode?: SeyeonProductionGovernorModeV1;
   /** OFF-only compatibility seam; forbidden as an ENFORCE authority. */
@@ -188,7 +122,7 @@ export interface CreateProductionSeyeonTurnSendRuntimeInputV1 {
 
 /**
  * Public-boundary composition root. Provider credentials are resolved inside the
- * request lifecycle so Vercel request-context OIDC is never cached across turns.
+ * request lifecycle. Only the server-owned direct OpenAI key is permitted.
  */
 export function createProductionSeyeonTurnSendRuntimeV1(
   input: CreateProductionSeyeonTurnSendRuntimeInputV1,
@@ -211,10 +145,7 @@ export function createProductionSeyeonTurnSendRuntimeV1(
           run: async (runInput) => {
             const providerConfig =
               input.providerConfig ??
-              await resolveProductionSeyeonProviderConfigAtRequestV1(
-                input.env,
-                input.oidcTokenProvider ?? getVercelOidcToken,
-              );
+              await resolveProductionSeyeonProviderConfigAtRequestV1(input.env);
             const roleProviderConfigs = input.providerConfig === undefined
               ? resolveProductionSeyeonRoleProviderConfigsV1(input.env, providerConfig)
               : undefined;
