@@ -315,7 +315,7 @@ describe('admin dedicated readonly PostgreSQL adapter', () => {
     expect(h.sql[2]).not.toMatch(/request_body|payload_jsonb|auth_token/iu);
   });
 
-  it('provides bounded pagination' async () => {
+  it('provides bounded pagination', async () => {
     const h = harness('myeongha_admin_reader',Array.from({length:3},()=>({subjectId:SUBJECT})));
     const result = await h.port.read({ ...filters(),limit:2 });
     expect(result.rows).toHaveLength(2);
