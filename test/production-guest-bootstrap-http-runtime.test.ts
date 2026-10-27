@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   createProductionGuestBootstrapHttpRuntimeV1,
 } from '../apps/api/src/production-guest-bootstrap-http-runtime.js';
@@ -21,6 +21,31 @@ const BASE_PRODUCTION_ENV = Object.freeze({
 describe('Production Guest bootstrap HTTP runtime composition', () => {
   it('keeps the existing production user-data config independent of Guest TTL activation', () => {
     expect(() => parseProductionUserDataRuntimeConfigV1(BASE_PRODUCTION_ENV)).not.toThrow();
+  });
+
+
+  it('uses the supplied Cloudflare subject pool without opening an independent direct connection or closing borrowed pool', async () => {
+    const connect = vi.fn(async () => { throw new Error('INJECTED_GUEST_POOL_SENTINEL'); });
+    const close = vi.fn(async () => undefined);
+    const runtime = createProductionGuestBootstrapHttpRuntimeV1({
+      env: { ...BASE_PRODUCTION_ENV, MYEONGHA_GUEST_SESSION_TTL_SECONDS: '604800' },
+      pool: { connect, close },
+    });
+    try {
+      await expect(runtime.handleRequest({
+        request: new Request('https://myeongha.example/api/session/bootstrap', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: '{}',
+        }),
+        requestId: 'req-cloudflare-guest-pool-injection',
+        serverTime: '2026-10-27T05:40:00.000Z',
+      })).rejects.toThrow('INJECTED_GUEST_POOL_SENTINEL');
+      expect(connect).toHaveBeenCalledTimes(1);
+    } finally {
+      await runtime.close();
+    }
+    expect(close).not.toHaveBeenCalled();
   });
 
   it('fails closed when Guest TTL activation is missing before any runtime pool is created', () => {
