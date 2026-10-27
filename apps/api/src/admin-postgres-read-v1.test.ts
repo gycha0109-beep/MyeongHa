@@ -152,6 +152,14 @@ describe('admin dedicated readonly PostgreSQL adapter', () => {
     expect(h.sql[2]).toContain('o.event_type=$6::text');
     expect(h.params[2]).toEqual([21, 'failed', null, null, 0, 'reading.failed']);
   });
+  it('includes unbounded paid credit lots and shows their remaining/expiry evidence', () => {
+    const userSql = ADMIN_READ_SQL_V1['user-detail'] ?? '';
+    const lotsSql = ADMIN_READ_SQL_V1.credits ?? '';
+    expect(userSql).toContain('l.expires_at IS NULL OR l.expires_at>CURRENT_TIMESTAMP');
+    expect(lotsSql).toContain('lot.credits_remaining AS "creditsRemaining"');
+    expect(lotsSql).toContain('lot.expires_at IS NULL');
+    expect(lotsSql).toContain('lot.expires_at::text AS "expiresAt"');
+  });
   it('provides bounded pagination', async () => {
     const h = harness('myeongha_admin_reader',Array.from({length:3},()=>({subjectId:SUBJECT})));
     const result = await h.port.read({ ...filters(),limit:2 });
