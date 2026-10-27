@@ -53,6 +53,7 @@ export function buildPortOneChatCreditCheckoutV1(
 }> {
   if(!UUID.test(source.purchaseIntentId)||!UUID.test(source.productOfferId)||
       !PROVIDER_ID.test(source.paymentId)||
+      (source.environment==='sandbox'&&source.paymentId.length>40)||
       source.externalProductId!==CHAT_CREDIT_PORTONE_V2_OFFER_V1.externalProductId||
       source.amountMinor!==CHAT_CREDIT_PORTONE_V2_OFFER_V1.amountMinor||
       source.currency!=='KRW'||
