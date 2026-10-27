@@ -262,7 +262,11 @@ document.addEventListener('myeongha:localechange', () => {
     if (ids) badge.textContent = readerProvenanceLocaleLabelV1(ids, getUiLocale());
   }
   const status = byId('records-status');
-  if (!status.hidden && recordsStatusSource) status.textContent = uiText(recordsStatusSource);
+  if (!status.hidden && recordsStatusSource) {
+    const retryVisible = status.querySelector('.records-retry') !== null;
+    status.textContent = uiText(recordsStatusSource);
+    if (retryVisible) appendRetryButton(status);
+  }
 });
 
 function appendReadingFooter(card, leftText, options = {}) {
@@ -407,7 +411,7 @@ function renderSajuReadings(readingPayload, lifeFactsPayload) {
     for (const reading of readings) renderPersistedReading(target, reading);
     return;
   }
-  if (allowsDevelopmentSajuSamples()) {
+  if (allowsDevelopmentSajuSamples() && Array.isArray(lifeFactsPayload?.facts)) {
     renderSajuReadingSamples(target, lifeFactsPayload);
     return;
   }
@@ -474,10 +478,27 @@ function renderMemories(payload, subjectKind) {
   }
 }
 
-function setReady() {
+function appendRetryButton(container) {
+  const button = uiElement('button', 'records-retry', '다시 시도');
+  button.type = 'button';
+  button.addEventListener('click', () => { void loadRecords(); });
+  container.append(button);
+}
+
+function renderUnavailableSection(targetId, message) {
+  const target = byId(targetId);
+  clear(target);
+  const notice = textElement('div', 'records-unavailable', '');
+  notice.append(uiElement('p', 'muted', message));
+  appendRetryButton(notice);
+  target.append(notice);
+}
+
+function setReady(partial = false) {
   const status = byId('records-status');
-  status.hidden = true;
-  status.textContent = '';
+  status.hidden = !partial;
+  recordsStatusSource = partial ? '일부 기록을 불러오지 못했습니다. 다른 기록은 계속 확인할 수 있습니다.' : '';
+  status.textContent = partial ? uiText(recordsStatusSource) : '';
   byId('records-content').hidden = false;
 }
 
@@ -488,34 +509,59 @@ function setFailure(error) {
   status.setAttribute('role', 'status');
   if (error instanceof RecordsRuntimeError && error.code === 'WEB_RECORDS_SESSION_REQUIRED') {
     recordsStatusSource = '기록을 확인하려면 현재 세션이 필요합니다. 로그인하거나 게스트 세션을 다시 연결한 뒤 확인해 주세요.';
+  } else if (error instanceof RecordsRuntimeError && error.code === 'WEB_RECORDS_SESSION_PREPARE_FAILED') {
+    recordsStatusSource = '로그인 또는 게스트 세션을 연결할 수 없습니다. 서버 연결 상태를 확인한 뒤 다시 시도해 주세요.';
   } else {
     recordsStatusSource = '현재 기록을 불러올 수 없습니다. 잠시 뒤 다시 확인해 주세요.';
   }
   status.textContent = uiText(recordsStatusSource);
+  appendRetryButton(status);
 }
 
 function renderLoadedRecords(records) {
   renderProfile(records.profile);
   renderCurrentBirthProfile(records.birth);
-  renderLifeFacts(records.lifeFacts);
-  renderSajuReadings(records.readings, records.lifeFacts);
-  renderMemories(records.memories, records.profile?.subjectKind);
+  if (records.lifeFacts?.status === 'unavailable') {
+    renderUnavailableSection('life-records-list', '현세록 조회에 실패했습니다. 기록이 없다는 뜻은 아닙니다.');
+  } else {
+    renderLifeFacts(records.lifeFacts);
+  }
+  if (records.readings?.status === 'unavailable') {
+    renderUnavailableSection('saju-records-list', '사주 기록 조회에 실패했습니다. 기록이 없다는 뜻은 아닙니다.');
+  } else {
+    renderSajuReadings(records.readings, records.lifeFacts);
+  }
+  if (records.memories?.status === 'unavailable') {
+    renderUnavailableSection('memory-records-list', '기억 조회에 실패했습니다. 기록이 없다는 뜻은 아닙니다.');
+  } else {
+    renderMemories(records.memories, records.profile?.subjectKind);
+  }
 }
 
-async function boot() {
-  setupTabs();
+async function loadRecords() {
   const status = byId('records-status');
+  recordsStatusSource = '기록을 불러오는 중입니다…';
   status.hidden = false;
   status.textContent = uiText(recordsStatusSource);
   byId('records-content').hidden = true;
+  displayedRecords = null;
   try {
     const records = await createRecordsRuntimeClient().readRecords();
     renderLoadedRecords(records);
     displayedRecords = records;
-    setReady();
+    setReady(
+      records.lifeFacts?.status === 'unavailable'
+      || records.readings?.status === 'unavailable'
+      || records.memories?.status === 'unavailable',
+    );
   } catch (error) {
     setFailure(error);
   }
 }
 
-void boot();
+function boot() {
+  setupTabs();
+  void loadRecords();
+}
+
+boot();
