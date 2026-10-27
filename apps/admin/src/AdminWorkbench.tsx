@@ -115,7 +115,7 @@ function isSubjectId(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(value);
 }
 
-export function buildListPath(section: ListSection, subject: string, cursor: string | null, tab: ReadTab, from: string | null = null, to: string | null = null, issueStatus: string = 'all', subjectKind: string = 'all', subjectStatus: string = 'all', readingStatus: string = 'all', issueCategory: string = '', creditSource: string = 'all', reservationState: string = 'all'): string {
+export function buildListPath(section: ListSection, subject: string, cursor: string | null, tab: ReadTab, from: string | null = null, to: string | null = null, issueStatus: string = 'all', subjectKind: string = 'all', subjectStatus: string = 'all', readingStatus: string = 'all', issueCategory: string = '', creditSource: string = 'all', reservationState: string = 'all', reservationId: string = ''): string {
   const params = new URLSearchParams({ limit: '20' });
   if (subject.length > 0) params.set('subjectId', subject);
   if (cursor !== null) params.set('cursor', cursor);
@@ -127,13 +127,15 @@ export function buildListPath(section: ListSection, subject: string, cursor: str
   if (tab === 'readings' && readingStatus !== 'all') params.set('readingStatus', readingStatus);
   if (tab === 'credits' && creditSource !== 'all') params.set('creditSource', creditSource);
   if (tab === 'credit-reservations' && reservationState !== 'all') params.set('reservationState', reservationState);
+  if (tab === 'credit-allocations' && reservationId !== '') params.set('reservationId', reservationId);
   return '/api/admin/' + tab + '?' + params.toString();
 }
 
-function DataTable({ result, section, onDetail }: {
+function DataTable({ result, section, onDetail, onAllocation }: {
   readonly result: AdminReadResponse;
   readonly section: ListSection;
   readonly onDetail: (id: string) => void;
+  readonly onAllocation: (id: string) => void;
 }) {
   if (result.rows.length === 0) {
     return <StatusPanel kind="empty" detail="해당 범위에서 실제 조회된 데이터가 없습니다." />;
@@ -142,15 +144,17 @@ function DataTable({ result, section, onDetail }: {
   return <div className="admin-table-scroll">
     <table className="admin-table">
       <thead><tr>{columns.map(k => <th scope="col" key={k}>{LABELS[k]}</th>)}
-        {(section === 'users' || (section === 'commerce' && (result.kind === 'commerce' || result.kind === 'commerce-alerts')) || (section === 'readings' && result.kind === 'readings')) && <th scope="col">상세</th>}</tr></thead>
+        {(section === 'users' || (section === 'commerce' && (result.kind === 'commerce' || result.kind === 'commerce-alerts')) || (section === 'readings' && result.kind === 'readings') || (section === 'commerce' && result.kind === 'credit-reservations')) && <th scope="col">상세</th>}</tr></thead>
       <tbody>{result.rows.map((row, i) => <tr key={String(row.transactionId ?? row.readingId ?? row.eventId ?? row.issueId ?? row.subjectId ?? i) + ':' + i}>
         {columns.map(k => <td key={k}>{row[k] === null || row[k] === undefined ? '—' : String(row[k])}</td>)}
-        {(section === 'users' || (section === 'commerce' && (result.kind === 'commerce' || result.kind === 'commerce-alerts')) || (section === 'readings' && result.kind === 'readings')) && <td>{section === 'users' && typeof row.subjectId === 'string' && isSubjectId(row.subjectId)
+        {(section === 'users' || (section === 'commerce' && (result.kind === 'commerce' || result.kind === 'commerce-alerts')) || (section === 'readings' && result.kind === 'readings') || (section === 'commerce' && result.kind === 'credit-reservations')) && <td>{section === 'users' && typeof row.subjectId === 'string' && isSubjectId(row.subjectId)
           ? <button type="button" className="table-link" onClick={() => onDetail(String(row.subjectId))}>조회</button>
           : section === 'commerce' && typeof row.transactionId === 'string' && isSubjectId(row.transactionId)
             ? <button type="button" className="table-link" onClick={() => onDetail(String(row.transactionId))}>검증 내역</button>
             : section === 'readings' && result.kind === 'readings' && typeof row.readingId === 'string' && isSubjectId(row.readingId)
-              ? <button type="button" className="table-link" onClick={() => onDetail(String(row.readingId))}>실행 내역</button> : '—'}</td>}
+              ? <button type="button" className="table-link" onClick={() => onDetail(String(row.readingId))}>실행 내역</button>
+              : result.kind === 'credit-reservations' && typeof row.reservationId === 'string' && isSubjectId(row.reservationId)
+                ? <button type="button" className="table-link" onClick={() => onAllocation(String(row.reservationId))}>재원 추적</button> : '—'}</td>}
       </tr>)}</tbody>
     </table>
   </div>;
@@ -220,6 +224,8 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
   const [issueCategory, setIssueCategory] = useState('');
   const [creditSource, setCreditSource] = useState<'all' | 'signup' | 'portone_topup' | 'reading_reward'>('all');
   const [reservationState, setReservationState] = useState<'all' | 'reserved' | 'settled' | 'released'>('all');
+  const [reservationId, setReservationId] = useState('');
+  const [draftReservationId, setDraftReservationId] = useState('');
   const [draftIssueCategory, setDraftIssueCategory] = useState('');
   const [pendingSubject, setPendingSubject] = useState(() => {
     const value = new URLSearchParams(window.location.search).get('subjectId') ?? '';
@@ -237,7 +243,7 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
     setResult(null);
     const url = detail !== null
       ? (section === 'commerce' ? '/api/admin/commerce/' : section === 'readings' ? '/api/admin/readings/' : '/api/admin/users/') + detail
-      : buildListPath(section, subject, cursor, tab, from, to, issueStatus, subjectKind, subjectStatus, readingStatus, issueCategory, creditSource, reservationState);
+      : buildListPath(section, subject, cursor, tab, from, to, issueStatus, subjectKind, subjectStatus, readingStatus, issueCategory, creditSource, reservationState, reservationId);
     void fetchAdminReadV1(url, token)
       .then(value => { if (mounted) setResult(value); })
       .catch(e => {
@@ -249,7 +255,7 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
     return () => {
       mounted = false;
     };
-  }, [section, token, cursor, subject, detail, tab, from, to, issueStatus, subjectKind, subjectStatus, readingStatus, issueCategory, creditSource, reservationState]);
+  }, [section, token, cursor, subject, detail, tab, from, to, issueStatus, subjectKind, subjectStatus, readingStatus, issueCategory, creditSource, reservationState, reservationId]);
 
   return <section className="surface admin-data">
     <div className="surface__head">
@@ -259,9 +265,24 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
     </div>
     <div className="admin-tabs" aria-label="조회 종류">
       {(section === 'commerce' ? [['commerce','결제 내역'],['commerce-alerts','검증·지급 점검'],['credits','크레딧 지급'],['credit-reservations','크레딧 사용·정산'],['credit-allocations','차감·복원 재원']] : section === 'readings' ? [['readings','Reading'],['ai-costs','AI 호출'],['ai-errors','AI 실패·차단'],['ai-estimates','AI 추정 원가']] : section === 'issues' ? [['issues','운영 이슈'],['audit','관리자 접근 기록'],['deletion-jobs','삭제 작업'],['catalog','상품 카탈로그'],['characters','캐릭터'],['content-releases','콘텐츠 릴리스']] : [])
-        .map(([name,label]) => <button key={name} type="button" className={tab===name ? 'active' : ''} onClick={() => { setTab(name as ReadTab); setCursor(null); setDetail(null); }}>{label}</button>)}
+        .map(([name,label]) => <button key={name} type="button" className={tab===name ? 'active' : ''} onClick={() => { setTab(name as ReadTab); setCursor(null); setDetail(null); setReservationId(''); setDraftReservationId(''); }}>{label}</button>)}
     </div>
     <div className="admin-toolbar">
+      {section === 'commerce' && tab === 'credit-allocations' && detail === null &&
+        <form className="admin-issue-category" onSubmit={e => {
+          e.preventDefault();
+          if (draftReservationId !== '' && !isSubjectId(draftReservationId)) {
+            setError('크레딧 예약 참조는 UUID 형식이어야 합니다.');
+            return;
+          }
+          setError('');
+          setReservationId(draftReservationId.toLowerCase());
+          setCursor(null);
+        }}>
+          <input aria-label="크레딧 예약 참조" placeholder="예약 ID로 재원 검색 (선택)"
+            value={draftReservationId} onChange={e => setDraftReservationId(e.target.value.trim())} maxLength={36}/>
+          <button type="submit">재원 조회</button>
+        </form>}
       {section === 'commerce' && tab === 'credits' && detail === null &&
         <label className="admin-issue-filter">지급 출처
           <select value={creditSource} onChange={e => {
@@ -415,7 +436,13 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
     {loading ? <StatusPanel kind="loading" /> : error
       ? <StatusPanel kind={error.includes('권한') ? 'forbidden' : 'error'} detail={error} />
       : result ? <>
-        <DataTable result={result} section={section} onDetail={setDetail} />
+        <DataTable result={result} section={section} onDetail={setDetail} onAllocation={id => {
+          setTab('credit-allocations');
+          setReservationId(id);
+          setDraftReservationId(id);
+          setCursor(null);
+          setDetail(null);
+        }} />
         {(cursor !== null || result.nextCursor !== null) && <div className="admin-pagination" aria-label="조회 페이지 이동">
           {cursor !== null && <button type="button" onClick={() => {
             const prior = Number(cursor) - 20;
