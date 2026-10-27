@@ -690,6 +690,12 @@ function activatePreviewReading(preview) {
   document.addEventListener('myeongha:localechange', () => {
     renderStep();
     if (completed) completeReadingExperience();
+    if (isStoredRecord && preview.record) {
+      const date = document.querySelector('[data-official-report-date]');
+      if (date) date.textContent = new Intl.DateTimeFormat(getUiLocale(), {
+        year: 'numeric', month: 'long', day: 'numeric',
+      }).format(new Date(preview.record.completedAt));
+    }
   });
 
   root.dataset.readingRouteState = isStoredRecord ? 'persisted_record' : 'preview';
