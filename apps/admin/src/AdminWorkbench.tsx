@@ -80,7 +80,6 @@ const LABELS: Record<string, string> = {
   offerCount: '제안 수',
   deletionJobId: '삭제 작업 참조',
   requestedAt: '요청 시각',
-  completedAt: '완료 시각',
   scope: '처리 범위',
   characterId: '캐릭터 참조',
   contentVersion: '콘텐츠 버전',
