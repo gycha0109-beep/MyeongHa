@@ -16,7 +16,15 @@ function requireFragment(source, fragment, name) {
 for (const fragment of [
   'name: Production Privacy Canary Orphan Prestart Cleanup One-Shot',
   'workflow_dispatch:',
-  'reviewed_main_sha:',
+  'ref: ${{ github.sha }}',
+  "guard='event_and_confirmation'",
+  "guard='approved_history_and_four_file_diff'",
+  "guard='immutable_approved_content_hashes'",
+  "guard='destructive_runtime_unchanged'",
+  "guard='original_failed_run_identity'",
+  "guard='required_production_credentials'",
+  "guard='approved_production_pooler_hostname'",
+  'trap - ERR',
   'confirmation:',
   'environment: production',
   'cancel-in-progress: false',
@@ -52,6 +60,8 @@ for (const fragment of [
 }
 
 for (const forbidden of [
+  'reviewed_main_sha:',
+  'REVIEWED_MAIN_SHA',
   '\n  push:',
   '\n  pull_request:',
   '\n  schedule:',
