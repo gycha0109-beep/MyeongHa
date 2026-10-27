@@ -5,6 +5,7 @@ import type { AdminRoute, AdminSection } from './routes.js';
 import { StatusPanel } from './StatusPanel.js';
 import { AdminLogin, AdminWorkbench } from './AdminWorkbench.js';
 import { fetchAdminReadV1, AdminAccessDeniedErrorV1 } from './admin-client.js';
+import type { AdminReadResponse } from './admin-client.js';
 import { BetaAnalyticsReadiness, OperatorActionsReadiness } from './AdminOperationalReadiness.js';
 
 const sectionDetails: Record<Exclude<AdminSection, 'overview'>, readonly string[]> = {
@@ -87,11 +88,18 @@ function LockNotice() {
 function Overview({ token, onSessionExpired }: { readonly token: string | null; readonly onSessionExpired: () => void }) {
   const [summary, setSummary] = useState<Readonly<Record<string, string>> | null>(null);
   const [unavailable, setUnavailable] = useState(false);
+  const [activity, setActivity] = useState<AdminReadResponse['rows'] | null>(null);
+  const [activityError, setActivityError] = useState(false);
   useEffect(() => {
-    if (token === null) { setSummary(null); setUnavailable(false); return; }
+    if (token === null) { setSummary(null); setUnavailable(false); setActivity(null); setActivityError(false); return; }
     let active = true;
     setSummary(null);
     setUnavailable(false);
+    setActivity(null);
+    setActivityError(false);
+    void fetchAdminReadV1('/api/admin/audit?limit=5', token)
+      .then(result => { if (active) setActivity(result.rows); })
+      .catch(error => { if (active) { setActivityError(true); if (error instanceof AdminAccessDeniedErrorV1) onSessionExpired(); } });
     void fetchAdminReadV1('/api/admin/overview', token).then(payload => {
       if (!active) return;
       const accepted = new Set(metrics.map(metric => metric.key));
@@ -136,10 +144,17 @@ function Overview({ token, onSessionExpired }: { readonly token: string | null; 
               <span className="section-kicker">ACTIVITY</span>
               <h2>최근 운영 활동</h2>
             </div>
-            <span className="neutral-tag">조회 준비 중</span>
+            <span className="neutral-tag">{activity !== null ? "감사 기록 조회 완료" : activityError ? "조회 불가" : "조회 대기"}</span>
           </div>
-          <StatusPanel kind="empty" title="아직 조회할 활동이 없습니다"
-            detail="운영자 인증 및 감사 이벤트 조회가 연결되기 전까지 활동 내역을 표시하지 않습니다." />
+          {activity === null ? <StatusPanel kind={activityError ? "error" : "loading"} detail="감사 기록 조회 권한과 저장 상태를 확인합니다." />
+            : activity.length === 0 ? <StatusPanel kind="empty" detail="현재 조회 범위에 저장된 관리자 감사 기록이 없습니다." />
+            : <div className="admin-table-scroll"><table className="admin-table">
+              <thead><tr><th scope="col">작업</th><th scope="col">결과</th><th scope="col">시각</th></tr></thead>
+              <tbody>{activity.map((item, index) => <tr key={String(item.requestId ?? index)}>
+                <td>{String(item.action ?? "—")}</td><td>{String(item.outcome ?? "—")}</td>
+                <td>{String(item.occurredAt ?? "—")}</td>
+              </tr>)}</tbody>
+            </table></div>}
         </section>
         <section className="surface">
           <div className="surface__head">
@@ -154,7 +169,7 @@ function Overview({ token, onSessionExpired }: { readonly token: string | null; 
             <div><span>관리자 읽기 API</span><span className={summary ? 'readiness-ready' : 'readiness-wait'}>{summary ? '응답 확인' : '미연결'}</span></div>
             <div><span>실제 운영 데이터</span><span className={summary ? 'readiness-ready' : 'readiness-wait'}>{summary ? '집계 확인' : '미연결'}</span></div>
           </div>
-          <div className="surface__foot">운영자 권한 검증은 다음 구현 단계에서 서버에 연결합니다.</div>
+          <div className="surface__foot">실제 운영 데이터는 Owner 인증, 전용 조회 권한, 감사 저장이 모두 확인된 경우에만 표시합니다.</div>
         </section>
       </div>
     </>
@@ -219,15 +234,15 @@ export function App() {
           ))}
         </nav>
         <div className="sidebar__bottom">
-          <div className="sidebar__bottom-indicator"><span /> 접근 제어 연결 대기</div>
+          <div className="sidebar__bottom-indicator"><span /> {ownerToken ? "Owner 인증 확인" : "Owner 인증 필요"}</div>
           <p>운영 기능은 서버 측 관리자 권한이 검증된 이후에만 활성화됩니다.</p>
-          <span className="sidebar__version">CONSOLE / A0 SCAFFOLD</span>
+          <span className="sidebar__version">CONSOLE / OWNER READ ONLY</span>
         </div>
       </aside>
       <div className="workspace">
         <header className="topbar">
           <span className="topbar__title">명하 운영 콘솔 <span>/ 내부 운영 도구</span></span>
-          <span className="topbar__security"><span aria-hidden="true" /> 비활성 · 데이터 미연결</span>
+          <span className="topbar__security"><span aria-hidden="true" /> {ownerToken ? "Owner 세션 · 읽기 전용" : "Owner 인증 전 · 접근 잠금"}</span>
         </header>
         <main id="main-content" className="main">
           {route ? (
@@ -262,7 +277,7 @@ export function App() {
         </main>
         <footer className="footer">
           <span>© MYEONGHA · ADMIN CONSOLE</span>
-          <span>사용자 웹과 별도 빌드 · 실제 운영 권한 미연결</span>
+          <span>사용자 웹과 별도 빌드 · 운영 DB 연결은 별도 승인 필요</span>
         </footer>
       </div>
     </div>
