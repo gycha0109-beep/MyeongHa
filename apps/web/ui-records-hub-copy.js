@@ -28,4 +28,41 @@ export const RECORDS_HUB_STATIC_UI_COPY_V1 = new Map([
   ['기록 확인 중…', {
     'ja-JP': '記録を確認中…', 'zh-TW': '正在確認紀錄…', 'en-US': 'Checking records…', 'zh-CN': '正在确认记录…',
   }],
+
+  ['저장된 공식 사주 보고서', {
+    'ja-JP': '保存された公式四柱推命レポート', 'zh-TW': '已儲存的正式八字報告',
+    'en-US': 'Saved official Saju report', 'zh-CN': '已保存的正式八字报告',
+  }],
+  ['기록에 저장된 해석을 원래 내용 그대로 한 번에 읽습니다.', {
+    'ja-JP': '記録に保存された鑑定を、内容を変えずにまとめて読めます。',
+    'zh-TW': '一次閱讀紀錄中儲存的完整原始解讀內容。',
+    'en-US': 'Read the original saved interpretation in full, unchanged.',
+    'zh-CN': '一次阅读全文中已保存的原始解读内容。',
+  }],
+  ['발행일', {
+    'ja-JP': '発行日', 'zh-TW': '發行日期', 'en-US': 'Issued on', 'zh-CN': '发行日期',
+  }],
+  ['해석 버전', {
+    'ja-JP': '鑑定バージョン', 'zh-TW': '解讀版本', 'en-US': 'Reading version', 'zh-CN': '解读版本',
+  }],
+  ['보고서 목차', {
+    'ja-JP': 'レポート目次', 'zh-TW': '報告目錄', 'en-US': 'Report contents', 'zh-CN': '报告目录',
+  }],
+  ['해석의 적용 범위', {
+    'ja-JP': '鑑定の適用範囲', 'zh-TW': '解讀適用範圍', 'en-US': 'Reading scope', 'zh-CN': '解读适用范围',
+  }],
+  ['단계별 읽기', {
+    'ja-JP': '段階的に読む', 'zh-TW': '逐步閱讀', 'en-US': 'Step-by-step reading', 'zh-CN': '逐步阅读',
+  }],
+  ['보고서 전체 보기', {
+    'ja-JP': 'レポート全体を見る', 'zh-TW': '查看完整報告', 'en-US': 'Read the full report', 'zh-CN': '查看完整报告',
+  }],
+  ['사주 보고서 보관함으로 돌아가기', {
+    'ja-JP': 'レポート一覧に戻る', 'zh-TW': '返回八字報告列表',
+    'en-US': 'Back to Saju reports', 'zh-CN': '返回八字报告列表',
+  }],
+  ['이 해석의 구조 보기', {
+    'ja-JP': 'この鑑定の構造を見る', 'zh-TW': '查看此解讀的結構',
+    'en-US': 'View the reading structure', 'zh-CN': '查看此解读的结构',
+  }],
 ]);
