@@ -16,7 +16,7 @@ import {
 import type {VerifiedSubjectIdentityEvidenceV1} from './subject-identity-resolver.js';
 
 export const CLOUDFLARE_PORTONE_OWNER_SANDBOX_HANDOFF_V1=Object.freeze({
-  databaseFunction:'public.qry_commerce_owner_sandbox_credit_checkout_v1',
+  databaseFunction:'public.qry_commerce_owner_sandbox_credit_checkout_v2',
   publicRouteMounted:false,
   productionCheckoutEnabled:false,
   sandboxCreditMintEnabled:false,
@@ -31,7 +31,7 @@ select purchase_intent_id::text as "purchaseIntentId",
        provider_request_id as "paymentId",
        expected_amount_minor::text as "expectedAmountMinor",
        expected_currency as "expectedCurrency"
-from public.qry_commerce_owner_sandbox_credit_checkout_v1($1::uuid,$2::uuid)
+from public.qry_commerce_owner_sandbox_credit_checkout_v2($1::uuid,$2::uuid)
 `.trim();
 
 type CheckoutHandoffRowV1=Readonly<{
