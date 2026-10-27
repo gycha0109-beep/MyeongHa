@@ -82,7 +82,7 @@ describe('admin dedicated readonly PostgreSQL adapter', () => {
       const arg = {
         ...filters(kind),
         ...(kind === 'user-detail' ? { subjectId: SUBJECT } : {}),
-        ...(kind === 'commerce-detail' ? { recordId: SUBJECT } : {}),
+        ...(kind === 'commerce-detail' || kind === 'reading-detail' ? { recordId: SUBJECT } : {}),
       };
       await h.port.read(arg);
       const sql = h.sql[2] ?? '';
