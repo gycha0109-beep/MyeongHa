@@ -1,4 +1,5 @@
 import { acquireProductionMemberSmokeSession } from './production-member-smoke-session.mjs';
+import { validateProductionReadingHistoryPageV1 } from './operations/verify-reading-history-pagination-v1.mjs';
 
 const PRODUCTION_ORIGIN = 'https://myeongha.gycha0109.workers.dev';
 const MEMBER_ME_URL = `${PRODUCTION_ORIGIN}/api/me`;
@@ -161,8 +162,7 @@ async function verifyUnauthenticatedFailClosed() {
 }
 
 function validateReadingsData(value) {
-  requireExactKeys('Production Reading History data', value, ['readings']);
-  const readings = requireArray('Production Reading History readings', value.readings);
+  const readings = validateProductionReadingHistoryPageV1(value);
   const seenIds = new Set();
   let previous = null;
 
