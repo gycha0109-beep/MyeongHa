@@ -323,3 +323,87 @@ limit 2
     acknowledged: true,
   });
 }
+
+
+/**
+ * Internal pre-payment read gate. A prepared Intent/Reader selection is not
+ * sufficient to call a payment provider: an approved, already acknowledged
+ * server notice must be durably present for this exact unit and Subject.
+ *
+ * This is NOT a checkout activation or Provider payment permission. The
+ * ordinary production API role has no SELECT grant on these tables.
+ */
+export async function loadPrivatePrepaymentCheckoutNoticeEvidenceV1(
+  query: PostgresTransactionQueryV1,
+  input: Readonly<{
+    resolvedSubjectId: string;
+    purchaseIntentId: string;
+    unitId: string;
+    productSpecVersion: string;
+  }>,
+): Promise<DigitalReadingCheckoutNoticeV1 | null> {
+  const subjectId = uuid('subject', input.resolvedSubjectId);
+  const purchaseIntentId = uuid('Purchase Intent', input.purchaseIntentId);
+  const unitId = uuid('unit', input.unitId);
+  const spec = required('spec', input.productSpecVersion);
+  const result = await query.query<{
+    purchaseIntentId: unknown;
+    unitId: unknown;
+    productSpecVersion: unknown;
+    noticeRevision: unknown;
+    previewOrInformationRevision: unknown;
+  }>(`
+select p.purchase_intent_id::text as "purchaseIntentId",
+       p.unit_id::text as "unitId",
+       p.product_spec_version as "productSpecVersion",
+       p.notice_revision as "noticeRevision",
+       p.preview_or_information_revision as "previewOrInformationRevision"
+from public.purchase_intents intent
+join public.product_offers offer on offer.id=intent.product_offer_id
+  and offer.enabled=true and offer.retired_at is null
+join public.products product on product.id=offer.product_id
+  and product.enabled=true and product.retired_at is null
+join public.digital_reading_checkout_notice_presentations_v1 p
+  on p.purchase_intent_id=intent.id
+  and p.subject_id=intent.subject_id and p.product_id=product.id
+join public.digital_reading_checkout_notice_acknowledgments_v1 a
+  on a.purchase_intent_id=p.purchase_intent_id and a.unit_id=p.unit_id
+  and a.subject_id=p.subject_id and a.submitted_challenge_sha256=p.challenge_sha256
+  and a.acknowledged=true and a.server_acknowledged_at > p.server_presented_at
+join public.digital_reading_checkout_notice_revisions_v1 r
+  on r.revision_key=p.revision_key and r.product_id=p.product_id
+  and r.product_spec_version=p.product_spec_version
+  and r.authority_state='approved' and r.approved_at <= p.server_presented_at
+  and r.notice_sha256=p.notice_sha256
+  and r.preview_or_information_sha256=p.preview_or_information_sha256
+join public.purchase_intent_reader_selections selection
+  on selection.purchase_intent_id=intent.id and selection.product_id=p.product_id
+  and selection.reader_character_id=p.reader_character_id
+  and selection.reader_content_bundle_id=p.reader_content_bundle_id
+where intent.id=$1::uuid and intent.subject_id=$2::uuid
+  and intent.status='created'
+  and p.unit_id=$3::uuid and p.product_spec_version=$4::text
+  and not exists (
+    select 1 from public.commerce_receipts receipt
+    where receipt.purchase_intent_id=intent.id
+  )
+limit 2
+`.trim(), [purchaseIntentId, subjectId, unitId, spec]);
+  if (result.rows.length !== 1) return null;
+  const row = result.rows[0]!;
+  if (row.purchaseIntentId !== purchaseIntentId || row.unitId !== unitId ||
+      row.productSpecVersion !== spec ||
+      typeof row.noticeRevision !== 'string' || !row.noticeRevision.trim() ||
+      typeof row.previewOrInformationRevision !== 'string' || !row.previewOrInformationRevision.trim()) {
+    return null;
+  }
+  return Object.freeze({
+    authority: 'server_checkout_snapshot',
+    purchaseIntentId,
+    unitId,
+    productSpecVersion: spec,
+    noticeRevision: row.noticeRevision,
+    previewOrInformationRevision: row.previewOrInformationRevision,
+    acknowledged: true,
+  });
+}

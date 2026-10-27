@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import {
   createPostgresDigitalReadingCheckoutNoticeAuthorityPortV1,
 } from '../apps/api/src/postgres-digital-reading-checkout-notice-evidence-v1.js';
@@ -39,6 +41,24 @@ const ack={purchaseIntentId,subjectId,unitId,submittedChallengeSha256:hash};
 const ackRow={...ack,acknowledged:true,serverAcknowledgedAt:'2026-10-27T05:23:00.001Z'};
 
 describe('checkout notice private PostgreSQL adapter',()=>{
+  it('keeps the exact staged SQL out of the unapproved Production deployment and historical R2 fixture', () => {
+    const sqlPath = 'supabase/migrations/20261027054525_digital_reading_checkout_notice_evidence_v1.sql';
+    const reviewed = '550e2ff3dd86d16d30334220c223650387b71ca7';
+    const actual = execFileSync('git', ['hash-object', sqlPath], { encoding: 'utf8' }).trim();
+    expect(actual).toBe(reviewed);
+    const workflow = readFileSync('.github/workflows/supabase-production.yml', 'utf8');
+    const fixture = readFileSync('test/db/run_ci_case.sh', 'utf8');
+    const baseline = readFileSync('test/db/catalog.expected.sha256', 'utf8').trim();
+    expect(baseline).toBe('14a726230b47a2c3470d774509832b219dfb42a8a8af7d0046389e3fa656eb95');
+    expect(fixture).toContain(`20261027054525_digital_reading_checkout_notice_evidence_v1.sql) reviewed_blob_sha1='${reviewed}'`);
+    const scope = workflow.slice(workflow.indexOf("== 'feat(ops): stage private checkout notice provenance and prepayment acknowledgment'"));
+    expect(scope).toContain("HOLD_PRIVATE_CHECKOUT_STAGING_PATH_DRIFT");
+    expect(scope).toContain("HOLD_PRIVATE_CHECKOUT_STAGING_SQL_DRIFT");
+    expect(scope).toContain("HOLD_PRIVATE_CHECKOUT_STAGING_CATALOG_DRIFT");
+    expect(scope).toContain(`== '${reviewed}'`);
+    expect(scope).toContain('requires_deploy=false');
+    expect(scope.indexOf('requires_deploy=false')).toBeLessThan(scope.indexOf("== 'ops(db): one-shot Se-yeon helper ACL"));
+  });
   it('only resolves exact approved prepayment server Product/Reader/notice revision',async()=>{
     const {query,calls}=fakeDb([[approved]]);
     const port=createPostgresDigitalReadingCheckoutNoticeAuthorityPortV1(query);

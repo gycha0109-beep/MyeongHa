@@ -4,6 +4,7 @@ import {
   issueDigitalReadingCheckoutNoticePresentationV1,
   acknowledgeDigitalReadingCheckoutNoticeV1,
   loadVerifiedDigitalReadingCheckoutNoticeV1,
+  loadPrivatePrepaymentCheckoutNoticeEvidenceV1,
   type DigitalReadingCheckoutNoticeAuthorityPortV1,
   type DigitalReadingCheckoutNoticePresentationWriteV1,
   type DigitalReadingCheckoutNoticeAckWriteV1,
@@ -164,6 +165,37 @@ describe('private checkout notice evidence, not a public checkout/withdrawal aut
       'pi.subject_id=p.subject_id',
       'limit 2',
     ]) expect(querySql).toContain(must);
+  });
+  it('checks actual server notice and acknowledgment before provider checkout preparation', async () => {
+    let sql = '';
+    const db = {
+      query: async (text: string, args?: readonly unknown[]) => {
+        sql = text;
+        expect(args).toEqual([purchaseIntentId,subjectId,unitId,'v1']);
+        return {rows:[{purchaseIntentId,unitId,productSpecVersion:'v1',
+          noticeRevision:'notice-v1',previewOrInformationRevision:'info-v1'}]};
+      },
+    } as PostgresTransactionQueryV1;
+    const evidence = await loadPrivatePrepaymentCheckoutNoticeEvidenceV1(db,{
+      resolvedSubjectId:subjectId,purchaseIntentId,unitId,productSpecVersion:'v1',
+    });
+    expect(evidence?.authority).toBe('server_checkout_snapshot');
+    for (const gate of [
+      "intent.status='created'",
+      'offer.enabled=true',
+      'product.enabled=true',
+      "r.authority_state='approved'",
+      'a.server_acknowledged_at > p.server_presented_at',
+      'a.submitted_challenge_sha256=p.challenge_sha256',
+      'selection.reader_character_id=p.reader_character_id',
+      'not exists (',
+      'from public.commerce_receipts receipt',
+      'limit 2',
+    ]) expect(sql).toContain(gate);
+    const missing={query:async()=>({rows:[]})} as PostgresTransactionQueryV1;
+    expect(await loadPrivatePrepaymentCheckoutNoticeEvidenceV1(missing,{
+      resolvedSubjectId:subjectId,purchaseIntentId,unitId,productSpecVersion:'v1',
+    })).toBeNull();
   });
   it('fails closed on absent, duplicate, wrong-unit or forged returned DB evidence', async () => {
     const input = {resolvedSubjectId:subjectId,purchaseIntentId,unitId,productSpecVersion:'v1'};
