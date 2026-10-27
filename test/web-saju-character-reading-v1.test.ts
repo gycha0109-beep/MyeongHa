@@ -146,7 +146,7 @@ describe('MyeongHa character-led Saju Reading v1', () => {
     expect(runtime).toContain('record.readingId !== persistedReadingHandoff.readingId');
     expect(runtime).toContain('record.readingSessionId !== persistedReadingHandoff.readingSessionId');
     expect(runtime).toContain('record.sajuDomain !== persistedReadingHandoff.sajuDomain');
-    expect(runtime).toContain("activatePreviewReading({ ...readingView, source: 'record' })");
+    expect(runtime).toContain("activatePreviewReading({ ...readingView, source: 'record', record })");
     expect(runtime).toContain("root.dataset.readingRouteState = isStoredRecord ? 'persisted_record' : 'preview'");
     expect(runtime).toContain('function clearPersistedReadingPresentation()');
     expect(runtime).toContain("delete root.dataset.reader;");
