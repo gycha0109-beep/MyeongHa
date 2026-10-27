@@ -106,7 +106,7 @@ function isSubjectId(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(value);
 }
 
-export function buildListPath(section: ListSection, subject: string, cursor: string | null, tab: ReadTab, from: string | null = null, to: string | null = null, issueStatus: string = 'all', subjectKind: string = 'all', subjectStatus: string = 'all', readingStatus: string = 'all', issueCategory: string = ''): string {
+export function buildListPath(section: ListSection, subject: string, cursor: string | null, tab: ReadTab, from: string | null = null, to: string | null = null, issueStatus: string = 'all', subjectKind: string = 'all', subjectStatus: string = 'all', readingStatus: string = 'all', issueCategory: string = '', creditSource: string = 'all', reservationState: string = 'all'): string {
   const params = new URLSearchParams({ limit: '20' });
   if (subject.length > 0) params.set('subjectId', subject);
   if (cursor !== null) params.set('cursor', cursor);
@@ -116,6 +116,8 @@ export function buildListPath(section: ListSection, subject: string, cursor: str
   if (tab === 'users' && subjectKind !== 'all') params.set('subjectKind', subjectKind);
   if (tab === 'users' && subjectStatus !== 'all') params.set('subjectStatus', subjectStatus);
   if (tab === 'readings' && readingStatus !== 'all') params.set('readingStatus', readingStatus);
+  if (tab === 'credits' && creditSource !== 'all') params.set('creditSource', creditSource);
+  if (tab === 'credit-reservations' && reservationState !== 'all') params.set('reservationState', reservationState);
   return '/api/admin/' + tab + '?' + params.toString();
 }
 
@@ -207,6 +209,8 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
   const [subjectStatus, setSubjectStatus] = useState<'all' | 'active' | 'merged' | 'deletion_pending' | 'deleted'>('all');
   const [readingStatus, setReadingStatus] = useState<'all' | 'pending' | 'running' | 'succeeded' | 'failed' | 'cancelled'>('all');
   const [issueCategory, setIssueCategory] = useState('');
+  const [creditSource, setCreditSource] = useState<'all' | 'signup' | 'portone_topup' | 'reading_reward'>('all');
+  const [reservationState, setReservationState] = useState<'all' | 'reserved' | 'settled' | 'released'>('all');
   const [draftIssueCategory, setDraftIssueCategory] = useState('');
   const [pendingSubject, setPendingSubject] = useState(() => {
     const value = new URLSearchParams(window.location.search).get('subjectId') ?? '';
@@ -224,7 +228,7 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
     setResult(null);
     const url = detail !== null
       ? (section === 'commerce' ? '/api/admin/commerce/' : section === 'readings' ? '/api/admin/readings/' : '/api/admin/users/') + detail
-      : buildListPath(section, subject, cursor, tab, from, to, issueStatus, subjectKind, subjectStatus, readingStatus, issueCategory);
+      : buildListPath(section, subject, cursor, tab, from, to, issueStatus, subjectKind, subjectStatus, readingStatus, issueCategory, creditSource, reservationState);
     void fetchAdminReadV1(url, token)
       .then(value => { if (mounted) setResult(value); })
       .catch(e => {
@@ -236,7 +240,7 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
     return () => {
       mounted = false;
     };
-  }, [section, token, cursor, subject, detail, tab, from, to, issueStatus, subjectKind, subjectStatus, readingStatus, issueCategory]);
+  }, [section, token, cursor, subject, detail, tab, from, to, issueStatus, subjectKind, subjectStatus, readingStatus, issueCategory, creditSource, reservationState]);
 
   return <section className="surface admin-data">
     <div className="surface__head">
@@ -249,6 +253,30 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
         .map(([name,label]) => <button key={name} type="button" className={tab===name ? 'active' : ''} onClick={() => { setTab(name as ReadTab); setCursor(null); setDetail(null); }}>{label}</button>)}
     </div>
     <div className="admin-toolbar">
+      {section === 'commerce' && tab === 'credits' && detail === null &&
+        <label className="admin-issue-filter">지급 출처
+          <select value={creditSource} onChange={e => {
+            setCreditSource(e.target.value as typeof creditSource);
+            setCursor(null);
+          }}>
+            <option value="all">전체</option>
+            <option value="signup">회원 가입</option>
+            <option value="portone_topup">결제 충전</option>
+            <option value="reading_reward">첫 유료 Reading</option>
+          </select>
+        </label>}
+      {section === 'commerce' && tab === 'credit-reservations' && detail === null &&
+        <label className="admin-issue-filter">정산 상태
+          <select value={reservationState} onChange={e => {
+            setReservationState(e.target.value as typeof reservationState);
+            setCursor(null);
+          }}>
+            <option value="all">전체</option>
+            <option value="reserved">예약 중</option>
+            <option value="settled">정산됨</option>
+            <option value="released">해제됨</option>
+          </select>
+        </label>}
       {section === 'readings' && tab === 'readings' && detail === null &&
         <label className="admin-reading-filter">실행 상태
           <select value={readingStatus} onChange={e => {
