@@ -17,7 +17,7 @@ begin
   if current_user <> 'postgres'
      or to_regrole('myeongha_api_executor') is null
      or to_regrole('myeongha_seyeon_chat_runtime_owner') is null
-     or not pg_has_role(current_user,'myeongha_seyeon_chat_runtime_owner','MEMBER') then
+     or not pg_has_role(current_user,'myeongha_seyeon_chat_runtime_owner','SET') then
     raise exception 'HOLD_SEYEON_OWNER_RECEIPT_ACL_PRINCIPAL';
   end if;
 
