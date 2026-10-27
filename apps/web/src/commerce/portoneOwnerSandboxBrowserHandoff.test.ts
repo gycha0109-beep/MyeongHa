@@ -31,7 +31,8 @@ describe('browser PortOne V2 Owner Admin sandbox card handoff',()=>{
     const result=await requestPortOneOwnerSandboxBrowserHandoffV1(
       VALID,{requestPayment},
     );
-    expect(requestPayment).toHaveBeenCalledExactlyOnceWith(VALID.checkout);
+    expect(requestPayment).toHaveBeenCalledTimes(1);
+    expect(requestPayment).toHaveBeenCalledWith(VALID.checkout);
     expect(result).toEqual({
       kind:'verification_required',paymentAttemptId:VALID.paymentAttemptId,
     });
