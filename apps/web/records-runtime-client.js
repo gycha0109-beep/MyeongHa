@@ -103,7 +103,13 @@ async function readJson(fetchImpl, endpoint, bearer) {
   }
 
   if (response.status === 401) {
-    invalidateRejectedBearer(bearer);
+    // Credential cleanup is best-effort; storage failures must never turn an
+    // authorization rejection into an optional history outage.
+    try {
+      invalidateRejectedBearer(bearer);
+    } catch {
+      // Never expose another Records domain after a rejected credential.
+    }
     throw new RecordsRuntimeError('WEB_RECORDS_SESSION_REQUIRED', 'A current session is required.');
   }
   if (response.status === 403) {
