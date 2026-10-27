@@ -1,5 +1,5 @@
 export const ADMIN_READ_KINDS_V1 = [
-  'overview', 'users', 'user-detail', 'commerce', 'commerce-detail', 'commerce-alerts', 'credits', 'credit-reservations', 'credit-allocations', 'readings', 'reading-detail', 'ai-costs', 'ai-errors', 'ai-estimates', 'analytics', 'issues', 'catalog', 'characters', 'content-releases', 'deletion-jobs',
+  'overview', 'users', 'user-detail', 'commerce', 'commerce-detail', 'commerce-alerts', 'credits', 'credit-reservations', 'credit-allocations', 'readings', 'reading-detail', 'ai-costs', 'ai-errors', 'ai-estimates', 'analytics', 'issues', 'audit', 'catalog', 'characters', 'content-releases', 'deletion-jobs',
 ] as const;
 
 export type AdminReadKindV1 = (typeof ADMIN_READ_KINDS_V1)[number];
@@ -54,6 +54,7 @@ const SAFE_COLUMNS: Readonly<Record<AdminReadKindV1, readonly string[]>> = Objec
   catalog: ['productKey', 'productType', 'catalogEnabled', 'createdAt', 'offerCount'],
   analytics: ['day', 'campaignKey', 'visitors', 'checkoutAttempts', 'verifiedPurchases', 'conversionRate', 'sampleSize'],
   issues: ['issueId', 'category', 'severity', 'status', 'createdAt', 'requestId'],
+  audit: ['requestId','actorRef','targetRef','action','outcome','occurredAt'],
 });
 
 function isSafePrimitive(v: unknown): v is AdminPrimitiveV1 {

@@ -104,6 +104,13 @@ create policy admin_read_content_release_metadata_v1 on public.content_releases
 create policy admin_read_character_catalog_metadata_v1 on public.character_runtime_catalog
   for select to myeongha_admin_reader using (true);
 
+-- Operator reader can inspect minimal audit metadata via its read-only transaction.
+-- Audit writer remains INSERT-only and has NO SELECT permission.
+grant usage on schema myeongha_admin_ops to myeongha_admin_reader;
+grant select (request_id,actor_auth_user_id,target_ref,action,outcome,occurred_at)
+  on myeongha_admin_ops.admin_audit_events_v1 to myeongha_admin_reader;
+create policy admin_read_audit_metadata_v1 on myeongha_admin_ops.admin_audit_events_v1
+  for select to myeongha_admin_reader using (true);
 -- Audit-only INSERT. Never grant read, update or delete for audit events.
 grant usage on schema myeongha_admin_ops to myeongha_admin_audit_writer;
 grant insert (request_id, actor_auth_user_id, target_ref, action, outcome, occurred_at)

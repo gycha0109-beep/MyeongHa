@@ -51,6 +51,7 @@ const ROUTES: Readonly<Record<string, AdminReadKindV1>> = {
   'deletion-jobs': 'deletion-jobs',
   analytics: 'analytics',
   issues: 'issues',
+  audit: 'audit',
 };
 
 function response(status: number, requestId: string, body: unknown): Response {
@@ -125,7 +126,7 @@ export function parseAdminReadFiltersV1(url: URL): AdminListFiltersV1 {
     throw new Error('Administrator subject reference is invalid.');
   }
   subjectId ??= querySubject?.toLowerCase() ?? null;
-  if (subjectId !== null && ['overview','issues','analytics','catalog','characters','content-releases'].includes(kind)) {
+  if (subjectId !== null && ['overview','issues','audit','analytics','catalog','characters','content-releases'].includes(kind)) {
     throw new Error('Subject filter is not supported by the requested authority.');
   }
   if (kind === 'user-detail' || kind === 'commerce-detail' || kind === 'reading-detail') {
