@@ -129,6 +129,12 @@ describe('admin dedicated readonly PostgreSQL adapter', () => {
     await f.port.read({ ...filters('reading-detail'), recordId: SUBJECT });
     expect(f.params[2]).toEqual([SUBJECT]);
   });
+  it('binds Reading status server-side and never interpolates filter text', async () => {
+    const f = harness();
+    await f.port.read({ ...filters('readings'), readingStatus: 'failed' });
+    expect(f.sql[2]).toContain('r.execution_status=$6::text');
+    expect(f.params[2]).toEqual([21, null, null, null, 0, 'failed']);
+  });
   it('provides bounded pagination', async () => {
     const h = harness('myeongha_admin_reader',Array.from({length:3},()=>({subjectId:SUBJECT})));
     const result = await h.port.read({ ...filters(),limit:2 });

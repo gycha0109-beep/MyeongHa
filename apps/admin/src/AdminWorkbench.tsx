@@ -98,7 +98,7 @@ function isSubjectId(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(value);
 }
 
-export function buildListPath(section: ListSection, subject: string, cursor: string | null, tab: ReadTab, from: string | null = null, to: string | null = null, issueStatus: string = 'all', subjectKind: string = 'all', subjectStatus: string = 'all'): string {
+export function buildListPath(section: ListSection, subject: string, cursor: string | null, tab: ReadTab, from: string | null = null, to: string | null = null, issueStatus: string = 'all', subjectKind: string = 'all', subjectStatus: string = 'all', readingStatus: string = 'all'): string {
   const params = new URLSearchParams({ limit: '20' });
   if (subject.length > 0) params.set('subjectId', subject);
   if (cursor !== null) params.set('cursor', cursor);
@@ -106,6 +106,7 @@ export function buildListPath(section: ListSection, subject: string, cursor: str
   if (tab === 'issues' && issueStatus !== 'all') params.set('status', issueStatus);
   if (tab === 'users' && subjectKind !== 'all') params.set('subjectKind', subjectKind);
   if (tab === 'users' && subjectStatus !== 'all') params.set('subjectStatus', subjectStatus);
+  if (tab === 'readings' && readingStatus !== 'all') params.set('readingStatus', readingStatus);
   return '/api/admin/' + tab + '?' + params.toString();
 }
 
@@ -195,6 +196,7 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
   const [issueStatus, setIssueStatus] = useState<'all' | 'failed' | 'dead_lettered'>('all');
   const [subjectKind, setSubjectKind] = useState<'all' | 'guest' | 'member'>('all');
   const [subjectStatus, setSubjectStatus] = useState<'all' | 'active' | 'merged' | 'deletion_pending' | 'deleted'>('all');
+  const [readingStatus, setReadingStatus] = useState<'all' | 'pending' | 'running' | 'succeeded' | 'failed' | 'cancelled'>('all');
   const [pendingSubject, setPendingSubject] = useState('');
   const [detail, setDetail] = useState<string | null>(null);
   const [result, setResult] = useState<AdminReadResponse | null>(null);
@@ -208,7 +210,7 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
     setResult(null);
     const url = detail !== null
       ? (section === 'commerce' ? '/api/admin/commerce/' : section === 'readings' ? '/api/admin/readings/' : '/api/admin/users/') + detail
-      : buildListPath(section, subject, cursor, tab, from, to, issueStatus, subjectKind, subjectStatus);
+      : buildListPath(section, subject, cursor, tab, from, to, issueStatus, subjectKind, subjectStatus, readingStatus);
     void fetchAdminReadV1(url, token)
       .then(value => { if (mounted) setResult(value); })
       .catch(e => {
@@ -220,7 +222,7 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
     return () => {
       mounted = false;
     };
-  }, [section, token, cursor, subject, detail, tab, from, to, issueStatus, subjectKind, subjectStatus]);
+  }, [section, token, cursor, subject, detail, tab, from, to, issueStatus, subjectKind, subjectStatus, readingStatus]);
 
   return <section className="surface admin-data">
     <div className="surface__head">
@@ -233,6 +235,20 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
         .map(([name,label]) => <button key={name} type="button" className={tab===name ? 'active' : ''} onClick={() => { setTab(name as ReadTab); setCursor(null); setDetail(null); }}>{label}</button>)}
     </div>
     <div className="admin-toolbar">
+      {section === 'readings' && tab === 'readings' && detail === null &&
+        <label className="admin-reading-filter">실행 상태
+          <select value={readingStatus} onChange={e => {
+            setReadingStatus(e.target.value as typeof readingStatus);
+            setCursor(null);
+          }}>
+            <option value="all">전체</option>
+            <option value="pending">대기</option>
+            <option value="running">진행 중</option>
+            <option value="succeeded">완료</option>
+            <option value="failed">실패</option>
+            <option value="cancelled">취소</option>
+          </select>
+        </label>}
       {section === 'users' && detail === null && <div className="admin-user-filters">
         <label>계정 종류
           <select value={subjectKind} onChange={e => {

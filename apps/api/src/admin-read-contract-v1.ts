@@ -15,6 +15,7 @@ export interface AdminListFiltersV1 {
   readonly issueStatus?: 'failed' | 'dead_lettered' | null;
   readonly subjectKind?: 'guest' | 'member' | null;
   readonly subjectStatus?: 'active' | 'merged' | 'deletion_pending' | 'deleted' | null;
+  readonly readingStatus?: 'pending' | 'running' | 'succeeded' | 'failed' | 'cancelled' | null;
   readonly from: string | null;
   readonly to: string | null;
 }

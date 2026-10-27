@@ -100,7 +100,7 @@ export function parseAdminReadFiltersV1(url: URL): AdminListFiltersV1 {
     throw new Error('Unknown administrator read route.');
   }
 
-  const allowed = new Set(['limit', 'cursor', 'subjectId', 'from', 'to', 'status', 'subjectKind', 'subjectStatus']);
+  const allowed = new Set(['limit', 'cursor', 'subjectId', 'from', 'to', 'status', 'subjectKind', 'subjectStatus', 'readingStatus']);
   for (const [key] of url.searchParams) {
     if (!allowed.has(key) || url.searchParams.getAll(key).length !== 1) {
       throw new Error('Unknown or duplicate administrator read parameter.');
@@ -150,6 +150,12 @@ export function parseAdminReadFiltersV1(url: URL): AdminListFiltersV1 {
       (rawIssueStatus !== 'failed' && rawIssueStatus !== 'dead_lettered'))) {
     throw new Error('Invalid administrator issue status filter.');
   }
+  const readingStatusParam = url.searchParams.get('readingStatus');
+  if (readingStatusParam !== null &&
+      (kind !== 'readings' || !['pending','running','succeeded','failed','cancelled'].includes(readingStatusParam))) {
+    throw new Error('Invalid Reading status filter.');
+  }
+  const readingStatus = readingStatusParam as 'pending' | 'running' | 'succeeded' | 'failed' | 'cancelled' | null;
   const subjectKindParam = url.searchParams.get('subjectKind');
   const subjectStatusParam = url.searchParams.get('subjectStatus');
   if ((subjectKindParam !== null || subjectStatusParam !== null) && kind !== 'users') {
@@ -166,7 +172,7 @@ export function parseAdminReadFiltersV1(url: URL): AdminListFiltersV1 {
   const subjectStatus = subjectStatusParam as 'active' | 'merged' | 'deletion_pending' | 'deleted' | null;
   if (!ADMIN_READ_KINDS_V1.includes(kind)) throw new Error('Unknown administrator kind.');
   const issueStatus = rawIssueStatus as 'failed' | 'dead_lettered' | null;
-  return Object.freeze({ kind, limit, cursor, subjectId, recordId, from, to, issueStatus, subjectKind, subjectStatus });
+  return Object.freeze({ kind, limit, cursor, subjectId, recordId, from, to, issueStatus, subjectKind, subjectStatus, readingStatus });
 }
 
 const ISSUE_EXPORT_COLUMNS = ['issueId', 'category', 'severity', 'status', 'createdAt', 'requestId'] as const;

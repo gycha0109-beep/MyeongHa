@@ -157,6 +157,12 @@ describe('admin owner-only reads', () => {
       '/api/admin/users/' + subject + '?subjectStatus=active',
     ]) expect(() => parseAdminReadFiltersV1(new URL('https://a.invalid' + query))).toThrow();
   });
+  it('accepts only Reading lifecycle statuses on the Reading listing', () => {
+    expect(parseAdminReadFiltersV1(new URL('https://a.invalid/api/admin/readings?readingStatus=failed')).readingStatus).toBe('failed');
+    expect(() => parseAdminReadFiltersV1(new URL('https://a.invalid/api/admin/readings?readingStatus=any'))).toThrow();
+    expect(() => parseAdminReadFiltersV1(new URL('https://a.invalid/api/admin/readings/123e4567-e89b-42d3-a456-426614174002?readingStatus=failed'))).toThrow();
+    expect(() => parseAdminReadFiltersV1(new URL('https://a.invalid/api/admin/users?readingStatus=failed'))).toThrow();
+  });
   it('validates single resource lookup and date bounds', () => {
     expect(parseAdminReadFiltersV1(new URL('https://a.invalid/api/admin/users/' + subject)).kind).toBe('user-detail');
     expect(parseAdminReadFiltersV1(new URL('https://a.invalid/api/admin/commerce/' + subject)).recordId).toBe(subject);
