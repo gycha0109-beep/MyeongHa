@@ -109,6 +109,17 @@ describe('admin owner-only reads', () => {
     expect(() => from('/api/admin/users?reservationId='+id)).toThrow();
     expect(() => from('/api/admin/credit-allocations?reservationId='+id+'&reservationId='+id)).toThrow();
   });
+  it('accepts only exact Reading execution attempt routes, with bounded pagination', () => {
+    const id='123e4567-e89b-42d3-a456-426614174002';
+    const from=(suffix:string)=>parseAdminReadFiltersV1(new URL('https://a.invalid'+suffix));
+    const parsed=from('/api/admin/readings/'+id+'/attempts?cursor=2');
+    expect(parsed.kind).toBe('reading-attempts');
+    expect(parsed.recordId).toBe(id);
+    expect(parsed.cursor).toBe('2');
+    expect(() => from('/api/admin/readings/'+id+'/attempts?subjectId='+id)).toThrow();
+    expect(() => from('/api/admin/readings/'+id+'/attempts?from=2026-10-01&to=2026-10-02')).toThrow();
+    expect(() => from('/api/admin/readings/bad/attempts')).toThrow();
+  });
   it('verifies only Owner session before any data query, with required audit', async () => {
     const allowed = harness();
     const result = await allowed.call('/api/admin/session');

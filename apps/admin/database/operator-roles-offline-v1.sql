@@ -27,7 +27,7 @@ grant usage on schema public to myeongha_admin_reader;
 grant select (id, kind, status, created_at) on public.subjects to myeongha_admin_reader;
 grant select (id, subject_id, execution_status, saju_domain, created_at, completed_at)
   on public.readings to myeongha_admin_reader;
-grant select (reading_id, subject_id, execution_attempt_no, state, error_code,
+grant select (id, reading_id, subject_id, execution_attempt_no, state, error_code, saju_engine_key,
   requested_engine_version, resolved_engine_version, started_at, finished_at)
   on public.reading_execution_attempts to myeongha_admin_reader;
 grant select (reading_id, subject_id, saju_engine_version, reading_contract_version)

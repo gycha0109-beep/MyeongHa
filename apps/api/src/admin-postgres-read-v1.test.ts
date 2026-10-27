@@ -82,7 +82,7 @@ describe('admin dedicated readonly PostgreSQL adapter', () => {
       const arg = {
         ...filters(kind),
         ...(kind === 'user-detail' ? { subjectId: SUBJECT } : {}),
-        ...(kind === 'commerce-detail' || kind === 'reading-detail' ? { recordId: SUBJECT } : {}),
+        ...(kind === 'commerce-detail' || kind === 'reading-detail' || kind === 'reading-attempts' ? { recordId: SUBJECT } : {}),
       };
       await h.port.read(arg);
       const sql = h.sql[2] ?? '';
@@ -221,6 +221,16 @@ describe('admin dedicated readonly PostgreSQL adapter', () => {
     await h.port.read({ ...filters('credit-allocations'), reservationId: SUBJECT });
     expect(h.sql[2]).toContain('a.reservation_id=$6::uuid');
     expect(h.params[2]).toEqual([21,null,null,null,0,SUBJECT]);
+  });
+  it('limits Reading execution history to a single UUID without reading private snapshots', async () => {
+    const query=ADMIN_READ_SQL_V1['reading-attempts'] ?? '';
+    expect(query).toContain('a.reading_id=$2::uuid');
+    expect(query).toContain('a.execution_attempt_no DESC');
+    expect(query).not.toMatch(/request_snapshot_jsonb|response_snapshot_jsonb|output_ref_jsonb|external_request_ref/iu);
+    const h=harness();
+    await h.port.read({ ...filters('reading-attempts'), recordId: SUBJECT });
+    expect(h.params[2]).toEqual([21, SUBJECT, 0]);
+    await expect(h.port.read(filters('reading-attempts'))).rejects.toThrow('exact Reading reference');
   });
   it('provides bounded pagination', async () => {
     const h = harness('myeongha_admin_reader',Array.from({length:3},()=>({subjectId:SUBJECT})));
