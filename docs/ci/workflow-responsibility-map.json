@@ -386,6 +386,12 @@
       "mainMode": "one-shot-trigger",
       "workTrackAttribution": "commit-metadata"
     },
+    "seyeon-c09-minimax-m2-her-five-main-once-20261027.yml": {
+      "responsibility": "character-memory-owner-approved-minimax-m2-her-five-synthetic-dialogues-one-shot",
+      "prMode": "none",
+      "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "commit-metadata"
+    },
     "seyeon-c09-openrouter-round1-main-once-20261026.yml": {
       "responsibility": "character-memory-owner-approved-public-eight-model-five-question-openrouter-screening-once",
       "prMode": "none",
