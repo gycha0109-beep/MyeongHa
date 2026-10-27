@@ -15,7 +15,9 @@ declare
   v_expected_owner text;
 begin
   if current_user <> 'postgres'
-     or to_regrole('myeongha_api_executor') is null then
+     or to_regrole('myeongha_api_executor') is null
+     or to_regrole('myeongha_seyeon_chat_runtime_owner') is null
+     or not pg_has_role(current_user,'myeongha_seyeon_chat_runtime_owner','MEMBER') then
     raise exception 'HOLD_SEYEON_OWNER_RECEIPT_ACL_PRINCIPAL';
   end if;
 
@@ -77,6 +79,9 @@ $preflight$;
 grant execute on function public.cmd_issue_seyeon_positive_first_reply_v1(
   uuid,uuid,uuid,uuid,uuid,uuid,uuid,text,bytea
 ) to myeongha_api_executor;
+-- The two G1/G2 routines are owned by the dedicated non-login runtime role.
+-- Use that existing membership only while granting; do not change ownership.
+set local role myeongha_seyeon_chat_runtime_owner;
 grant execute on function public.cmd_mark_seyeon_positive_context_ready_pinned_v1(
   uuid,uuid,uuid,uuid,uuid,uuid,text,text,text,text,text,text,text
 ) to myeongha_api_executor;
