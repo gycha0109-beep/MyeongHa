@@ -52,7 +52,9 @@ function credits(value: unknown): number {
   return n;
 }
 function validityParameters(policy: ApprovedPaidCreditValidityV1): readonly [string, number | null] {
-  if (policy?.kind === 'never') return ['never', null] as const;
+  if (policy !== null && typeof policy === 'object' &&
+      !Array.isArray(policy) && policy.kind === 'never' &&
+      Object.keys(policy).length === 1) return ['never', null] as const;
   throw new Error('Paid credit validity policy is not approved.');
 }
 
