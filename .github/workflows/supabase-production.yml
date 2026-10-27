@@ -97,7 +97,10 @@ jobs:
             }
             requires_deploy=false
             reason='owner-grantor helper ACL manual retry only; ordinary historical db push suppressed'
-          elif [[ "$EVENT_NAME" == 'push' && "$(git show -s --format=%s "$CURRENT_SHA")" == 'feat(ops): stage private checkout notice provenance and prepayment acknowledgment' ]]; then
+          elif [[ "$EVENT_NAME" == 'push' && (
+            "$(git show -s --format=%s "$CURRENT_SHA")" == 'feat(ops): stage private checkout notice provenance and prepayment acknowledgment' ||
+            "$(git show -s --format=%s "$CURRENT_SHA")" == 'feat(ops): stage private checkout notice provenance and prepayment acknowledgment (#2654)'
+          ) ]]; then
             # Private notice evidence is not approved as a Production migration.
             # Its staged SQL must never activate the historical db-push backlog.
             [[ "$BEFORE_SHA" =~ ^[0-9a-f]{40}$ ]] && git cat-file -e "$BEFORE_SHA^{commit}" || {
@@ -110,8 +113,8 @@ jobs:
               'apps/api/src/postgres-digital-reading-checkout-notice-evidence-v1.ts' \
               'docs/COMMERCE_DIGITAL_READING_CHECKOUT_NOTICE_EVIDENCE_PRIVATE_V1.md' \
               'supabase/migrations/20261027054525_digital_reading_checkout_notice_evidence_v1.sql' \
-              'test/db/catalog.expected.sha256' \
               'test/db/run_ci_case.sh' \
+              'test/db/staged_commerce_migration_policy.sh' \
               'test/digital-reading-checkout-notice-evidence-v1.test.ts' \
               'test/postgres-digital-reading-checkout-notice-evidence-v1.test.ts')"
             [[ "$changed_files" == "$expected_private_checkout" ]] || {
@@ -120,7 +123,7 @@ jobs:
             [[ "$(git hash-object supabase/migrations/20261027054525_digital_reading_checkout_notice_evidence_v1.sql)" == '550e2ff3dd86d16d30334220c223650387b71ca7' ]] || {
               echo 'HOLD_PRIVATE_CHECKOUT_STAGING_SQL_DRIFT' >&2; exit 1
             }
-            [[ "$(tr -d '[:space:]' < test/db/catalog.expected.sha256)" == '14a726230b47a2c3470d774509832b219dfb42a8a8af7d0046389e3fa656eb95' ]] || {
+            [[ "$(tr -d '[:space:]' < test/db/catalog.expected.sha256)" == '1a4106370848c27564fd4b0d64cf84c8d30dc02b205f331fe17c46e4dc061c53' ]] || {
               echo 'HOLD_PRIVATE_CHECKOUT_STAGING_CATALOG_DRIFT' >&2; exit 1
             }
             requires_deploy=false

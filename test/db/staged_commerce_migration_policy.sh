@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Historical CI fixtures must preserve their previously approved catalog and
 # synthetic credit SKU. New Commerce SQL is installed only by separate rollout.
-# This policy requires exact Git blob fingerprints before excluding either file.
+# This policy requires exact Git blob fingerprints before excluding any staged file.
 skip_staged_portone_migration_from_historical_fixture() {
   local migration="$1" expected
   case "${migration##*/}" in
@@ -13,6 +13,8 @@ skip_staged_portone_migration_from_historical_fixture() {
       expected='5e5270466e700f98b2d41cac338298735dc1ad99' ;;
     20261027125500_chat_credit_delivered_ack_private_v1.sql)
       expected='5e5db487aa8a155cfded83b8d58c363e20f1a7b0' ;;
+    20261027054525_digital_reading_checkout_notice_evidence_v1.sql)
+      expected='550e2ff3dd86d16d30334220c223650387b71ca7' ;;
     *) return 1 ;;
   esac
   local actual

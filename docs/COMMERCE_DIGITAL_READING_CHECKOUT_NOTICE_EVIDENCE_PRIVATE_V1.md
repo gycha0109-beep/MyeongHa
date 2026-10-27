@@ -35,6 +35,8 @@ All three DB tables have RLS enabled, no insert policies, no direct `anon`, `aut
 
 - Focused Vitest tests: issue challenge/verify exact server scope; malicious field injection; immutable return reconciliation; concurrent/same-proof acknowledgment replay; verified Receipt/Reader/unit joined read gate.
 - Disposable PostgreSQL 17: clean schema migration application plus guard tests (draft notice rejected, approved exact revision accepted, incorrect nonce rejected, append-only record update rejected, no runtime role table privileges).
+- This unapproved SQL is excluded from historical CI fixtures only after an exact reviewed Git blob SHA match. The frozen historical Subject-owned data inventory, transitive dependency graph, and their catalog baseline are NOT rewritten. It still must be added to the **future approved** privacy deletion/retention graph before any operational release or inserted records.
+- The protected Production deployment workflow requires the precise reviewed main change set and immutable SQL hash to suppress ordinary historical db push for this staged-only PR.
 - No Production migration, no real payment, no hosted Auth mutation and no customer/receipt data exported.
 
 The distinction between private, guarded persistence **capability** and real commercial **release/evidence** remains mandatory. `dr_ready=false` remains unchanged.

@@ -48,8 +48,11 @@ describe('checkout notice private PostgreSQL adapter',()=>{
     expect(actual).toBe(reviewed);
     const workflow = readFileSync('.github/workflows/supabase-production.yml', 'utf8');
     const fixture = readFileSync('test/db/run_ci_case.sh', 'utf8');
+    const historicalPolicy = readFileSync('test/db/staged_commerce_migration_policy.sh', 'utf8');
+    expect(historicalPolicy).toContain('20261027054525_digital_reading_checkout_notice_evidence_v1.sql)');
+    expect(historicalPolicy).toContain(`expected='${reviewed}'`);
     const baseline = readFileSync('test/db/catalog.expected.sha256', 'utf8').trim();
-    expect(baseline).toBe('14a726230b47a2c3470d774509832b219dfb42a8a8af7d0046389e3fa656eb95');
+    expect(baseline).toBe('1a4106370848c27564fd4b0d64cf84c8d30dc02b205f331fe17c46e4dc061c53');
     expect(fixture).toContain(`20261027054525_digital_reading_checkout_notice_evidence_v1.sql) reviewed_blob_sha1='${reviewed}'`);
     const scope = workflow.slice(workflow.indexOf("== 'feat(ops): stage private checkout notice provenance and prepayment acknowledgment'"));
     expect(scope).toContain("HOLD_PRIVATE_CHECKOUT_STAGING_PATH_DRIFT");
