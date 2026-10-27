@@ -61,6 +61,7 @@ describe('exact Cloudflare Worker PortOne V2 TEST bindings',()=>{
       paymentId:SOURCE.paymentId,
       orderName:'명하 채팅 크레딧 300개',
       totalAmount:1900,currency:'CURRENCY_KRW',payMethod:'CARD',
+      products:[{id:'myeongha-chat-credits-300-v1',name:'명하 채팅 크레딧 300개',amount:1900,quantity:1}],
     });
     expect(JSON.stringify(result)).not.toContain(ENV.V2_API_Secret);
     expect(state.readOwner).toHaveBeenCalledWith(AUTH.pool,AUTH.verifiedEvidence);
