@@ -142,3 +142,13 @@
 - [ ] **M1** 최종 병합 **미실행** (V1 필수 선행)
 
 단계별 기능 검증·중간 PR·자동 병합은 수행하지 않는다. **I3 발송 비밀정보가 준비되어야 V1로 넘어갈 수 있다.**
+
+## 7. I4 사용성 후속 보완 (2026-10-27)
+
+- [x] `contact.js`에서 별도 로그인 없는 방문자의 `ensureActiveBearer()` 호출로 기존 공식 Guest bootstrap 재사용.
+- [x] honeypot의 실제 `company` 값을 서버로 전달하며, 사용자에게 접수 성공은 `SENT` 영수증일 때만 표시.
+- [x] `data-contact-i18n-root` 범위를 공통 자동 번역 처리에서 제외하고 전용 5개 언어 번역기만 관리해 언어 변경 시 충돌 방지.
+- [x] 문의 API의 공급자 거부·응답 ID 누락·통신 오류·honeypot·승인 경계 회귀 테스트 코드 추가. **테스트 실행은 V1에만 편성.**
+- [ ] I3 필수 Cloudflare `RESEND_API_KEY`와 인증된 `CONTACT_FROM_EMAIL` 없음. 임의 생성·가짜 값·다른 서비스 설정으로 우회하지 않음.
+
+현 브랜치: `feat/frontend-integration/contact-inquiry-production`; 최종 검증 전 PR 생성·병합 금지.
