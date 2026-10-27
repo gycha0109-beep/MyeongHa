@@ -85,6 +85,10 @@ export function parseAdminReadFiltersV1(url: URL): AdminListFiltersV1 {
     typeof fragments[1] === 'string' && UUID.test(fragments[1])) {
     kind = 'user-detail';
     subjectId = fragments[1].toLowerCase();
+  } else if (fragments.length === 2 && fragments[0] === 'readings' &&
+    typeof fragments[1] === 'string' && UUID.test(fragments[1])) {
+    kind = 'reading-detail';
+    recordId = fragments[1].toLowerCase();
   } else if (fragments.length === 2 && fragments[0] === 'commerce' &&
     typeof fragments[1] === 'string' && UUID.test(fragments[1])) {
     kind = 'commerce-detail';
@@ -112,18 +116,18 @@ export function parseAdminReadFiltersV1(url: URL): AdminListFiltersV1 {
   }
   const cursor = url.searchParams.get('cursor');
   if (kind === 'overview' && cursor !== null) throw new Error('Overview is not paginated.');
-  if (cursor !== null && (!/^[1-9]\d{0,4}$/u.test(cursor) || Number(cursor) > 10_000 || (kind === 'user-detail' || kind === 'commerce-detail'))) {
+  if (cursor !== null && (!/^[1-9]\d{0,4}$/u.test(cursor) || Number(cursor) > 10_000 || (kind === 'user-detail' || kind === 'commerce-detail' || kind === 'reading-detail'))) {
     throw new Error('Administrator cursor is invalid.');
   }
   const querySubject = url.searchParams.get('subjectId');
-  if (querySubject !== null && (!UUID.test(querySubject) || (kind === 'user-detail' || kind === 'commerce-detail'))) {
+  if (querySubject !== null && (!UUID.test(querySubject) || (kind === 'user-detail' || kind === 'commerce-detail' || kind === 'reading-detail'))) {
     throw new Error('Administrator subject reference is invalid.');
   }
   subjectId ??= querySubject?.toLowerCase() ?? null;
   if (subjectId !== null && ['overview','issues','analytics','catalog','characters','content-releases'].includes(kind)) {
     throw new Error('Subject filter is not supported by the requested authority.');
   }
-  if (kind === 'user-detail' || kind === 'commerce-detail') {
+  if (kind === 'user-detail' || kind === 'commerce-detail' || kind === 'reading-detail') {
     if (url.searchParams.has('from') || url.searchParams.has('to')) {
       throw new Error('Detail route does not support date filters.');
     }

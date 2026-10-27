@@ -48,6 +48,12 @@ const LABELS: Record<string, string> = {
   readingId: 'Reading 참조',
   domain: '사주 영역',
   engineVersion: '엔진 버전',
+  contractVersion: 'Reading 응답 계약',
+  attemptState: '최근 실행 시도',
+  attemptCount: '시도 수',
+  completedAt: '완료 시각',
+  startedAt: '최근 시도 시작',
+  finishedAt: '최근 시도 종료',
   errorCode: '오류',
   day: '집계일',
   feature: '기능',
@@ -115,13 +121,15 @@ function DataTable({ result, section, onDetail }: {
   return <div className="admin-table-scroll">
     <table className="admin-table">
       <thead><tr>{columns.map(k => <th scope="col" key={k}>{LABELS[k]}</th>)}
-        {(section === 'users' || (section === 'commerce' && result.kind === 'commerce')) && <th scope="col">상세</th>}</tr></thead>
+        {(section === 'users' || (section === 'commerce' && result.kind === 'commerce') || (section === 'readings' && result.kind === 'readings')) && <th scope="col">상세</th>}</tr></thead>
       <tbody>{result.rows.map((row, i) => <tr key={String(row.transactionId ?? row.readingId ?? row.eventId ?? row.issueId ?? row.subjectId ?? i) + ':' + i}>
         {columns.map(k => <td key={k}>{row[k] === null || row[k] === undefined ? '—' : String(row[k])}</td>)}
-        {(section === 'users' || (section === 'commerce' && result.kind === 'commerce')) && <td>{section === 'users' && typeof row.subjectId === 'string' && isSubjectId(row.subjectId)
+        {(section === 'users' || (section === 'commerce' && result.kind === 'commerce') || (section === 'readings' && result.kind === 'readings')) && <td>{section === 'users' && typeof row.subjectId === 'string' && isSubjectId(row.subjectId)
           ? <button type="button" className="table-link" onClick={() => onDetail(String(row.subjectId))}>조회</button>
           : section === 'commerce' && typeof row.transactionId === 'string' && isSubjectId(row.transactionId)
-            ? <button type="button" className="table-link" onClick={() => onDetail(String(row.transactionId))}>검증 내역</button> : '—'}</td>}
+            ? <button type="button" className="table-link" onClick={() => onDetail(String(row.transactionId))}>검증 내역</button>
+            : section === 'readings' && result.kind === 'readings' && typeof row.readingId === 'string' && isSubjectId(row.readingId)
+              ? <button type="button" className="table-link" onClick={() => onDetail(String(row.readingId))}>실행 내역</button> : '—'}</td>}
       </tr>)}</tbody>
     </table>
   </div>;
@@ -199,7 +207,7 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
     setError('');
     setResult(null);
     const url = detail !== null
-      ? (section === 'commerce' ? '/api/admin/commerce/' : '/api/admin/users/') + detail
+      ? (section === 'commerce' ? '/api/admin/commerce/' : section === 'readings' ? '/api/admin/readings/' : '/api/admin/users/') + detail
       : buildListPath(section, subject, cursor, tab, from, to, issueStatus, subjectKind, subjectStatus);
     void fetchAdminReadV1(url, token)
       .then(value => { if (mounted) setResult(value); })
@@ -217,7 +225,7 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
   return <section className="surface admin-data">
     <div className="surface__head">
       <div><span className="section-kicker">VERIFIED READ ONLY</span>
-        <h2>{detail !== null ? '사용자 상세' : '관리자 실데이터 조회'}</h2></div>
+        <h2>{detail !== null ? section === 'users' ? '사용자 상세' : section === 'readings' ? 'Reading 실행 상세' : '결제 검증 상세' : '관리자 실데이터 조회'}</h2></div>
       <span className="neutral-tag">서버 검증 필수</span>
     </div>
     <div className="admin-tabs" aria-label="조회 종류">

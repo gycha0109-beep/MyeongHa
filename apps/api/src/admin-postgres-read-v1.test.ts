@@ -118,6 +118,17 @@ describe('admin dedicated readonly PostgreSQL adapter', () => {
     expect(h.sql[2]).toContain('s.status=$7::text');
     expect(h.params[2]).toEqual([21, null, null, null, 0, 'guest', 'merged']);
   });
+  it('reads Reading attempt metadata without response snapshots, birth input or prompts', async () => {
+    const query = ADMIN_READ_SQL_V1['reading-detail'] ?? '';
+    expect(query).toContain('public.reading_execution_attempts');
+    expect(query).toContain('public.reading_refs');
+    expect(query).toContain('execution_attempt_no DESC');
+    expect(query).toContain('ref.reading_contract_version');
+    expect(query).not.toMatch(/response_snapshot_jsonb|request_snapshot_jsonb|source_birth_input_hash|payload_jsonb/iu);
+    const f = harness();
+    await f.port.read({ ...filters('reading-detail'), recordId: SUBJECT });
+    expect(f.params[2]).toEqual([SUBJECT]);
+  });
   it('provides bounded pagination', async () => {
     const h = harness('myeongha_admin_reader',Array.from({length:3},()=>({subjectId:SUBJECT})));
     const result = await h.port.read({ ...filters(),limit:2 });

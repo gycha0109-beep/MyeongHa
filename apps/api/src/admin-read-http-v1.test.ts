@@ -160,6 +160,8 @@ describe('admin owner-only reads', () => {
   it('validates single resource lookup and date bounds', () => {
     expect(parseAdminReadFiltersV1(new URL('https://a.invalid/api/admin/users/' + subject)).kind).toBe('user-detail');
     expect(parseAdminReadFiltersV1(new URL('https://a.invalid/api/admin/commerce/' + subject)).recordId).toBe(subject);
+    expect(parseAdminReadFiltersV1(new URL('https://a.invalid/api/admin/readings/' + subject)).kind).toBe('reading-detail');
+    expect(() => parseAdminReadFiltersV1(new URL('https://a.invalid/api/admin/readings/' + subject + '?cursor=1'))).toThrow();
     expect(parseAdminReadFiltersV1(new URL('https://a.invalid/api/admin/commerce-alerts?subjectId=' + subject)).kind).toBe('commerce-alerts');
     expect(() => parseAdminReadFiltersV1(new URL('https://a.invalid/api/admin/commerce/' + subject + '?cursor=1'))).toThrow();
     expect(parseAdminReadFiltersV1(new URL('https://a.invalid/api/admin/ai-costs?limit=50&from=2026-10-01&to=2026-10-26')).limit).toBe(50);

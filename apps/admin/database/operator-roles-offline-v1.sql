@@ -25,8 +25,13 @@ grant usage on schema public to myeongha_admin_reader;
 -- Column-level SELECT only. No auth.users, raw Birth, chat body, Reading
 -- payload, payment receipt JSON, AI prompt/output or guest session material.
 grant select (id, kind, status, created_at) on public.subjects to myeongha_admin_reader;
-grant select (id, subject_id, execution_status, saju_domain, created_at)
+grant select (id, subject_id, execution_status, saju_domain, created_at, completed_at)
   on public.readings to myeongha_admin_reader;
+grant select (reading_id, subject_id, execution_attempt_no, state, error_code,
+  requested_engine_version, resolved_engine_version, started_at, finished_at)
+  on public.reading_execution_attempts to myeongha_admin_reader;
+grant select (reading_id, subject_id, saju_engine_version, reading_contract_version)
+  on public.reading_refs to myeongha_admin_reader;
 grant select (id, subject_id, purchase_intent_id, provider, platform, product_offer_id, verification_status, verified_at, created_at)
   on public.commerce_receipts to myeongha_admin_reader;
 grant select (id, status) on public.purchase_intents to myeongha_admin_reader;
@@ -58,6 +63,10 @@ grant select (character_id, content_bundle_id, availability, enabled, release_at
 create policy admin_read_subject_metadata_v1 on public.subjects
   for select to myeongha_admin_reader using (true);
 create policy admin_read_reading_metadata_v1 on public.readings
+  for select to myeongha_admin_reader using (true);
+create policy admin_read_reading_attempt_metadata_v1 on public.reading_execution_attempts
+  for select to myeongha_admin_reader using (true);
+create policy admin_read_reading_provenance_version_v1 on public.reading_refs
   for select to myeongha_admin_reader using (true);
 create policy admin_read_receipt_metadata_v1 on public.commerce_receipts
   for select to myeongha_admin_reader using (true);
