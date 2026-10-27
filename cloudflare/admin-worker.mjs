@@ -6,7 +6,7 @@ import { createAdminPrivateRuntimeV1 } from '../apps/api/src/admin-private-runti
 
 export default {
   async fetch(request, env, ctx) {
-    let reader; let audit;
+    let reader; let audit; let command;
     try {
       if (env.MYEONGHA_ADMIN_PRIVATE_ENABLED !== 'true' || env.MYEONGHA_ADMIN_HYPERDRIVE_POLICY !== 'dedicated-admin-verify-full-v1' ||
           !env.ADMIN_READ_HYPERDRIVE?.connectionString || !env.ADMIN_AUDIT_HYPERDRIVE?.connectionString || !env.ADMIN_RATE_LIMITER) throw Error('Unconfigured');
@@ -16,13 +16,17 @@ export default {
       if (!await gate(request)) return Response.json({ error:'ADMIN_ACCESS_REQUIRED' }, {status:403,headers:{'Cache-Control':'no-store'}});
       reader = new Pool({connectionString:env.ADMIN_READ_HYPERDRIVE.connectionString,max:1,connectionTimeoutMillis:3000,statement_timeout:5000});
       audit = new Pool({connectionString:env.ADMIN_AUDIT_HYPERDRIVE.connectionString,max:1,connectionTimeoutMillis:3000,statement_timeout:5000});
-      const runtime = createAdminPrivateRuntimeV1({env,readPool:reader,auditPool:audit});
+      if(env.ADMIN_COMMAND_HYPERDRIVE?.connectionString){
+        if(typeof env.MYEONGHA_ADMIN_CONFIRMATION_SECRET!=='string'||env.MYEONGHA_ADMIN_CONFIRMATION_SECRET.length<32)throw Error('Command confirmation unavailable');
+        command=new Pool({connectionString:env.ADMIN_COMMAND_HYPERDRIVE.connectionString,max:1,connectionTimeoutMillis:3000,statement_timeout:5000});
+      }
+      const runtime = createAdminPrivateRuntimeV1({env,readPool:reader,auditPool:audit,...(command?{commandPool:command}:{})});
       const handler = createAdminHostedHttpV1({origin:env.MYEONGHA_ADMIN_ORIGIN,memberAuthOrigin:env.MYEONGHA_ADMIN_MEMBER_AUTH_ORIGIN,
         verifyAccess:async()=>true, // The signed, exact Owner gate already ran above.
         allowRequest:async()=>Boolean((await env.ADMIN_RATE_LIMITER.limit({key:env.MYEONGHA_ADMIN_OWNER_AUTH_USER_ID})).success),
         api:runtime.handleRequest,assets:request=>env.ASSETS.fetch(request)});
       return await handler(request);
     } catch { return Response.json({error:'ADMIN_HOSTED_UNAVAILABLE'},{status:503,headers:{'Cache-Control':'no-store'}}); }
-    finally { if(reader||audit) ctx.waitUntil(Promise.allSettled([reader?.end(),audit?.end()])); }
+    finally { if(reader||audit||command) ctx.waitUntil(Promise.allSettled([reader?.end(),audit?.end(),command?.end()])); }
   },
 };

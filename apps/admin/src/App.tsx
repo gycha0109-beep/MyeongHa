@@ -6,7 +6,10 @@ import { StatusPanel } from './StatusPanel.js';
 import { AdminLogin, AdminWorkbench } from './AdminWorkbench.js';
 import { fetchAdminReadV1, verifyAdminOwnerSessionV1, adminTokenExpiresAtV1, AdminAccessDeniedErrorV1 } from './admin-client.js';
 import type { AdminReadResponse } from './admin-client.js';
-import { BetaAnalyticsReadiness, OperatorActionsReadiness } from './AdminOperationalReadiness.js';
+import { BetaAnalyticsReadiness } from './AdminOperationalReadiness.js';
+import { AdminOperatorConsole } from './AdminOperatorConsole.js';
+import { AdminAnalyticsDashboard } from './AdminAnalyticsDashboard.js';
+import { AdminAiFinance } from './AdminAiFinance.js';
 
 const sectionDetails: Record<Exclude<AdminSection, 'overview'>, readonly string[]> = {
   users: ['사용자 검색 및 가입 상태', 'Reading · 권한 메타데이터', '게스트 · 회원 병합 및 삭제 상태'],
@@ -270,13 +273,13 @@ export function App() {
         <div className="sidebar__bottom">
           <div className="sidebar__bottom-indicator"><span /> {ownerToken ? "Owner 인증 확인" : "Owner 인증 필요"}</div>
           <p>운영 기능은 서버 측 관리자 권한이 검증된 이후에만 활성화됩니다.</p>
-          <span className="sidebar__version">CONSOLE / OWNER READ ONLY</span>
+          <span className="sidebar__version">CONSOLE / OWNER ACCESS</span>
         </div>
       </aside>
       <div className="workspace">
         <header className="topbar">
           <span className="topbar__title">명하 운영 콘솔 <span>/ 내부 운영 도구</span></span>
-          <span className="topbar__security"><span aria-hidden="true" /> {ownerToken ? "Owner 세션 · 읽기 전용" : "Owner 인증 전 · 접근 잠금"}</span>
+          <span className="topbar__security"><span aria-hidden="true" /> {ownerToken ? "Owner 세션 · 서버 검증" : "Owner 인증 전 · 접근 잠금"}</span>
           {ownerToken !== null && <button type="button" onClick={() => setOwnerToken(null)}>로그아웃</button>}
         </header>
         <main id="main-content" className="main">
@@ -287,11 +290,13 @@ export function App() {
               {route.section === 'overview' ? <><Overview token={ownerToken} onSessionExpired={() => setOwnerToken(null)} />{ownerToken === null && <AdminLogin onSession={setOwnerToken} />}</> : ownerToken === null
                 ? <><PendingSection section={route.section} /><AdminLogin onSession={setOwnerToken} /></>
                 : <>{route.section === 'analytics'
-                  ? <BetaAnalyticsReadiness token={ownerToken} onSessionExpired={() => setOwnerToken(null)} />
+                  ? <><AdminAnalyticsDashboard token={ownerToken} onSessionExpired={() => setOwnerToken(null)} />
+                      <details className="surface"><summary>이벤트 등록·분모·분자 근거 보기</summary><BetaAnalyticsReadiness token={ownerToken} onSessionExpired={() => setOwnerToken(null)} /></details></>
                   : <AdminWorkbench key={route.section + ':' + path} section={route.section} token={ownerToken}
                       onSessionExpired={() => setOwnerToken(null)} onNavigate={onNavigate} />}
+                    {route.section === 'readings' && <AdminAiFinance token={ownerToken} onSessionExpired={() => setOwnerToken(null)} />}
                     {['users', 'commerce', 'issues'].includes(route.section) &&
-                      <OperatorActionsReadiness />}</>}
+                      <AdminOperatorConsole token={ownerToken} onSessionExpired={() => setOwnerToken(null)} />}</>}
             </>
           ) : (
             <>

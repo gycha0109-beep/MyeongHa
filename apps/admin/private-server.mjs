@@ -52,13 +52,14 @@ function createRestrictedPool(role, envName) {
 
 const readPool = createRestrictedPool('myeongha_admin_reader', 'MYEONGHA_ADMIN_READ_DATABASE_URL');
 const auditPool = createRestrictedPool('myeongha_admin_audit_writer', 'MYEONGHA_ADMIN_AUDIT_DATABASE_URL');
-const server = createAdminLoopbackServerV1({ env, readPool, auditPool });
+const commandPool = env.MYEONGHA_ADMIN_COMMAND_DATABASE_URL ? createRestrictedPool('myeongha_admin_command_executor','MYEONGHA_ADMIN_COMMAND_DATABASE_URL') : undefined;
+const server = createAdminLoopbackServerV1({ env, readPool, auditPool,...(commandPool?{commandPool}:{}) });
 const addr = await listenAdminLoopbackV1(server, 4185);
 console.info('MyeongHa private admin loopback listening at', addr.address + ':' + addr.port);
 
 async function closeServer() {
   await new Promise(resolve => server.close(resolve));
-  await Promise.allSettled([readPool.end(), auditPool.end()]);
+  await Promise.allSettled([readPool.end(), auditPool.end(),commandPool?.end()]);
 }
 for (const signal of ['SIGINT', 'SIGTERM']) {
   process.once(signal, () => { void closeServer().finally(() => process.exit(0)); });

@@ -17,6 +17,7 @@ export interface AdminLoopbackOptionsV1 {
   readonly env: AdminLoopbackEnvV1;
   readonly readPool: PostgresSubjectPoolV1;
   readonly auditPool: PostgresSubjectPoolV1;
+  readonly commandPool?: PostgresSubjectPoolV1;
   readonly memberFetchImpl?: SupabaseMemberVerifierFetchV1;
   readonly signInFetchImpl?: typeof fetch;
   readonly port?: number;
@@ -98,6 +99,7 @@ export function createAdminLoopbackServerV1(input: AdminLoopbackOptionsV1): Serv
     env: input.env,
     readPool: input.readPool,
     auditPool: input.auditPool,
+    ...(input.commandPool === undefined ? {} : {commandPool:input.commandPool}),
     ...(input.memberFetchImpl === undefined ? {} : { memberFetchImpl: input.memberFetchImpl }),
   });
   const memberOrigin = authOrigin(input.env.MYEONGHA_ADMIN_MEMBER_AUTH_ORIGIN);
@@ -196,7 +198,12 @@ export function createAdminLoopbackServerV1(input: AdminLoopbackOptionsV1): Serv
         const authorization = req.headers.authorization;
         const request = new Request(path.toString(), {
           method: req.method ?? 'OPTIONS',
-          ...(typeof authorization === 'string' ? { headers: { Authorization: authorization } } : {}),
+          headers: {
+            ...(typeof authorization === 'string' ? {Authorization:authorization}:{}),
+            ...(typeof req.headers.origin === 'string'?{Origin:req.headers.origin}:{}),
+            ...(typeof req.headers['content-type'] === 'string'?{'Content-Type':req.headers['content-type']}:{}),
+          },
+          ...(req.method === 'POST' ? {body:await limitedBody(req)}:{}),
         });
         req.resume();
         const response = await privileged.handleRequest(request);

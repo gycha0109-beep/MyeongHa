@@ -49,10 +49,18 @@ select myeongha_admin_ops.cmd_save_presentation_v1(
  '123e4567-e89b-42d3-a456-426614174000','123e4567-e89b-42d3-a456-426614174008','123e4567-e89b-42d3-a456-426614174009',repeat('e',64),
  '123e4567-e89b-42d3-a456-426614174003',2,'banner','게시 배너','표현 정보','/hall.html','published',now()-interval '1 day',now()+interval '1 day','게시 테스트');
 reset role;
+set local role myeongha_api_executor;
 do $$ declare v jsonb;begin
- select entry into v from myeongha_admin_ops.qry_visible_presentations_v1();
+ select entry into v from myeongha_admin_ops.qry_visible_presentations_v1() where entry->>'entryId'='123e4567-e89b-42d3-a456-426614174003';
  if v->>'title'<>'게시 배너' or v ? 'reason' or v ? 'actorAuthUserId' then raise exception 'Published projection invalid';end if;
- if (select count(*) from myeongha_admin_ops.admin_audit_events_v1 where action='command:presentation-save')<>3 then raise exception 'Atomic audit count invalid';end if;
+ begin
+  perform * from myeongha_admin_ops.qry_presentation_history_v1('123e4567-e89b-42d3-a456-426614174003');
+  raise exception 'Public execution role accessed private history';
+ exception when insufficient_privilege then null;end;
+end $$;
+reset role;
+do $$ begin
+ if (select count(*) from myeongha_admin_ops.admin_audit_events_v1 where action='command:presentation-save' and target_ref='123e4567-e89b-42d3-a456-426614174003')<>3 then raise exception 'Atomic audit count invalid';end if;
 end $$;
 -- A failed atomic audit insert must roll back the publication and its receipt.
 revoke insert on myeongha_admin_ops.admin_audit_events_v1 from myeongha_admin_presentation_owner;
