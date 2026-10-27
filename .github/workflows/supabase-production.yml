@@ -81,9 +81,11 @@ jobs:
               '.github/workflows/production-seyeon-helper-acl-one-shot.yml' \
               '.github/workflows/supabase-production.yml' \
               'docs/ci/workflow-responsibility-map.json' \
+              'scripts/ci/db-pr-router.mjs' \
               'scripts/operations/apply-seyeon-helper-acl-prod-once.sh' \
               'supabase/migrations/20261026025332_seyeon_chat_helper_service_role_least_privilege.sql' \
               'test/db/run_ci_case.sh' \
+              'test/db/seyeon_r2_helper_owner_restricted_pg17.sh' \
               'test/db/seyeon_r2_helper_service_role_least_privilege.sh')"
             [[ "$changed_files" == "$expected_retry" ]] || {
               echo 'HOLD_SEYEON_HELPER_OWNER_RETRY_PATH_DRIFT' >&2
