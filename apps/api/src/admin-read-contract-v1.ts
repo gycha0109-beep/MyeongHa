@@ -1,5 +1,5 @@
 export const ADMIN_READ_KINDS_V1 = [
-  'overview', 'users', 'user-detail', 'commerce', 'commerce-detail', 'commerce-alerts', 'credits', 'credit-reservations', 'readings', 'reading-detail', 'ai-costs', 'ai-errors', 'ai-estimates', 'analytics', 'issues', 'catalog', 'characters', 'content-releases', 'deletion-jobs',
+  'overview', 'users', 'user-detail', 'commerce', 'commerce-detail', 'commerce-alerts', 'credits', 'credit-reservations', 'credit-allocations', 'readings', 'reading-detail', 'ai-costs', 'ai-errors', 'ai-estimates', 'analytics', 'issues', 'catalog', 'characters', 'content-releases', 'deletion-jobs',
 ] as const;
 
 export type AdminReadKindV1 = (typeof ADMIN_READ_KINDS_V1)[number];
@@ -41,6 +41,7 @@ const SAFE_COLUMNS: Readonly<Record<AdminReadKindV1, readonly string[]>> = Objec
   'commerce-alerts': ['transactionId','subjectId','alertKind','providerStatus','detectedAt','evidence'],
   commerce: ['transactionId', 'subjectId', 'productKey', 'amountMinor', 'currency', 'providerStatus', 'verifiedAt', 'entitlementStatus'],
   'credit-reservations': ['reservationId','subjectId','requiredCredits','state','deliveredTurnId','createdAt','finalizedAt'],
+  'credit-allocations': ['reservationId','lotId','subjectId','allocatedCredits','reservationState','lotSource','createdAt'],
   credits: ['eventId', 'subjectId', 'creditDelta', 'creditsRemaining', 'expiresAt', 'validity', 'createdAt', 'eventKind', 'balanceAfter', 'correlationId'],
   'reading-detail': ['readingId','subjectId','status','domain','createdAt','completedAt','engineVersion','contractVersion','attemptState','attemptCount','errorCode','startedAt','finishedAt'],
   readings: ['readingId', 'subjectId', 'status', 'productKey', 'domain', 'engineVersion', 'createdAt', 'errorCode'],

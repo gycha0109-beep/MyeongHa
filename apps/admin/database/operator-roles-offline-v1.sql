@@ -43,6 +43,7 @@ grant select (id, status) on public.entitlement_grants to myeongha_admin_reader;
 grant select (grant_id, source_receipt_id, event_type) on public.entitlement_events to myeongha_admin_reader;
 grant select (id, subject_id, source_kind, source_ref, credits_issued, credits_remaining, issued_at, expires_at)
   on public.chat_credit_lots_v1 to myeongha_admin_reader;
+grant select (reservation_id, lot_id, credits) on public.chat_credit_turn_allocations_v1 to myeongha_admin_reader;
 grant select (id, subject_id, required_credits, state, delivered_turn_id, created_at, finalized_at)
   on public.chat_credit_turn_reservations_v1 to myeongha_admin_reader;
 grant select (id, created_at, subject_id, stage, model, status, error_code, input_tokens, output_tokens, latency_ms)
@@ -83,6 +84,8 @@ create policy admin_read_entitlement_grant_status_v1 on public.entitlement_grant
 create policy admin_read_entitlement_receipt_link_v1 on public.entitlement_events
   for select to myeongha_admin_reader using (true);
 create policy admin_read_credit_lot_metadata_v1 on public.chat_credit_lots_v1
+  for select to myeongha_admin_reader using (true);
+create policy admin_read_credit_allocations_v1 on public.chat_credit_turn_allocations_v1
   for select to myeongha_admin_reader using (true);
 create policy admin_read_credit_reservations_v1 on public.chat_credit_turn_reservations_v1
   for select to myeongha_admin_reader using (true);
