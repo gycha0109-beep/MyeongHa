@@ -25,7 +25,7 @@ export interface ProductionGuestBootstrapHttpRuntimeV1 {
 
 export interface CreateProductionGuestBootstrapHttpRuntimeInputV1 {
   readonly env: ProductionUserDataRuntimeEnvV1;
-  /** Server-side shared-pool injection only. Never derived from the client request. */
+  /** Server-owned request-scoped Cloudflare Hyperdrive pool; not derived from HTTP input. */
   readonly pool?: PostgresSubjectPoolV1;
   /** Server-side test/runtime injection only. Never derived from the client request. */
   readonly memberFetchImpl?: SupabaseMemberVerifierFetchV1;
