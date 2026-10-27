@@ -230,6 +230,12 @@
       "mainMode": "scheduled-manual",
       "workTrackAttribution": "scheduled-operations"
     },
+    "production-privacy-canary-orphan-cleanup-one-shot.yml": {
+      "responsibility": "privacy-recovery-operations",
+      "prMode": "none",
+      "mainMode": "manual",
+      "workTrackAttribution": "dispatch-input"
+    },
     "production-privacy-recovery-canary.yml": {
       "responsibility": "privacy-recovery-operations",
       "prMode": "none",

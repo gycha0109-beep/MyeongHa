@@ -109,6 +109,7 @@ async function runtimeModules() {
     workerPoolModule,
     postgresPoolModule,
     privilegedPostgresTlsModule,
+    postgresTlsModule,
   ] = await Promise.all([
     import('../dist/apps/api/src/production-account-deletion-auth-admin-config.js'),
     import('../dist/apps/api/src/supabase-auth-admin-user-deletion.js'),
@@ -117,6 +118,7 @@ async function runtimeModules() {
     import('../dist/apps/api/src/node-postgres-account-deletion-worker-pool.js'),
     import('../dist/apps/api/src/node-postgres-subject-pool.js'),
     import('../dist/apps/api/src/production-privileged-postgres-tls-peer-verification.js'),
+    import('../dist/apps/api/src/production-postgres-tls-peer-verification.js'),
   ]);
   return {
     ...authConfigModule,
@@ -126,6 +128,7 @@ async function runtimeModules() {
     ...workerPoolModule,
     ...postgresPoolModule,
     ...privilegedPostgresTlsModule,
+    ...postgresTlsModule,
   };
 }
 
@@ -280,12 +283,43 @@ async function cleanupApiCanaryLogin() {
 }
 
 async function createApiPool() {
-  const { normalizeNodePostgresConnectionStringV1 } = await runtimeModules();
-  const connectionString = normalizeNodePostgresConnectionStringV1(
-    requiredEnv('MYEONGHA_DATABASE_URL'),
-  );
+  const {
+    buildProductionPostgresStrictTlsTargetV1,
+    PRODUCTION_POSTGRES_TLS_PEER_VERIFICATION_CONTRACT_VERSION_V1,
+    PRODUCTION_POSTGRES_TLS_REQUIRED_MODE_V1,
+    PRODUCTION_POSTGRES_TLS_ROOT_FINGERPRINT256_V1,
+  } = await runtimeModules();
+  const databaseUrl = requiredEnv('MYEONGHA_DATABASE_URL');
+  let url;
+  try {
+    url = new URL(databaseUrl);
+  } catch {
+    fail('API_DATABASE_AUTHORITY_INVALID');
+  }
+  const poolerHost = requiredEnv('SUPABASE_PRODUCTION_SESSION_POOLER_HOST');
+  if (
+    !/^[a-z0-9-]+(?:[.][a-z0-9-]+)*[.]pooler[.]supabase[.]com$/u.test(poolerHost) ||
+    url.hostname !== poolerHost ||
+    url.port !== '5432' ||
+    url.pathname !== '/postgres' ||
+    decodeURIComponent(url.username) !== `${expectedApiDatabasePrincipal()}.${PROJECT_REF}` ||
+    url.searchParams.get('sslmode') !== 'verify-full'
+  ) {
+    fail('API_DATABASE_AUTHORITY_INVALID');
+  }
+  const target = buildProductionPostgresStrictTlsTargetV1({
+    databaseUrl,
+    rootCertificatePem: requiredEnv('MYEONGHA_WORKER_DATABASE_SSL_ROOT_CERT_PEM'),
+    authority: {
+      contractVersion: PRODUCTION_POSTGRES_TLS_PEER_VERIFICATION_CONTRACT_VERSION_V1,
+      projectRef: PROJECT_REF,
+      requiredTlsMode: PRODUCTION_POSTGRES_TLS_REQUIRED_MODE_V1,
+      rootCertificateFingerprint256: PRODUCTION_POSTGRES_TLS_ROOT_FINGERPRINT256_V1,
+    },
+  });
   return new Pool({
-    connectionString,
+    connectionString: target.connectionString,
+    ssl: target.ssl,
     max: 1,
     connectionTimeoutMillis: 5_000,
     idleTimeoutMillis: 10_000,
@@ -1090,6 +1124,138 @@ async function resumeDeletion() {
   console.log('MYEONGHA_PRODUCTION_PRIVACY_CANARY_RESUME_PASS');
 }
 
+// Restore only the known synthetic fixture stranded by protected run 40322743599.
+// Source authority is pinned by its GitHub run, DB link, hosted Auth identity,
+// unused signup-credit shape and absence of an account-deletion start.
+const ORPHAN_PRESTART_SOURCE_RUN_ID = '40322743599';
+
+async function recoverOrphanPrestartState() {
+  if (requiredEnv('MYEONGHA_PRIVACY_CANARY_CONFIRM') !== CONFIRMATION) {
+    fail('CONFIRMATION_REQUIRED');
+  }
+  if (
+    requiredEnv('MYEONGHA_PRIVACY_CANARY_ORPHAN_RUN_ID') !==
+    ORPHAN_PRESTART_SOURCE_RUN_ID
+  ) {
+    fail('ORPHAN_SOURCE_RUN_NOT_APPROVED');
+  }
+
+  const pool = await createAdminPool();
+  let rows;
+  try {
+    const result = await pool.query(
+      `select
+         s.id::text as "subjectId",
+         s.auth_user_id::text as "authUserId",
+         cal.id::text as "commerceAccountLinkId"
+       from public.commerce_account_links cal
+       join public.subjects s on s.id=cal.subject_id
+       join public.profiles p on p.subject_id=s.id
+       join auth.users u on u.id=s.auth_user_id
+       where cal.provider=$1::text
+         and cal.external_account_fingerprint like $2::text
+         and cal.status='active'
+         and s.kind='member' and s.status='active'
+         and p.display_name='Synthetic Privacy Canary'
+         and p.locale='ko-KR' and p.timezone='Asia/Seoul'
+         and p.onboarding_state='canary'
+         and u.email like $3::text
+         and u.raw_user_meta_data->>'myeongha_canary'=$1::text
+         and u.raw_user_meta_data->>'canary_run_id'=$4::text
+         and not exists (
+           select 1 from public.data_deletion_jobs dj
+           where dj.subject_id=s.id
+         )
+         and (select count(*) from public.chat_credit_lots_v1 lot
+              where lot.subject_id=s.id
+                and lot.source_kind='signup' and lot.source_ref=s.id
+                and lot.credits_issued=50 and lot.credits_remaining=50)=1
+         and not exists (
+           select 1
+           from public.chat_credit_turn_allocations_v1 allocation
+           join public.chat_credit_lots_v1 lot on lot.id=allocation.lot_id
+           where lot.subject_id=s.id
+         )`,
+      [
+        PROVIDER,
+        `synthetic:${ORPHAN_PRESTART_SOURCE_RUN_ID}:%`,
+        `myeongha-privacy-canary-${ORPHAN_PRESTART_SOURCE_RUN_ID}-%@example.com`,
+        ORPHAN_PRESTART_SOURCE_RUN_ID,
+      ],
+    );
+    rows = result.rows;
+  } finally {
+    await pool.end();
+  }
+  if (rows.length !== 1) fail('ORPHAN_PRESTART_NOT_EXACTLY_ONE');
+  const row = rows[0];
+  const state = {
+    schema: 'myeongha-production-privacy-canary-state-v1',
+    phase: 'prepared',
+    authUserId: requireUuid(row.authUserId, 'ORPHAN_PRESTART_INVALID'),
+    subjectId: requireUuid(row.subjectId, 'ORPHAN_PRESTART_INVALID'),
+    commerceAccountLinkId: requireUuid(
+      row.commerceAccountLinkId,
+      'ORPHAN_PRESTART_INVALID',
+    ),
+    deletionJobId: randomUUID(),
+    outboxEventId: randomUUID(),
+    requestDedupeKey:
+      `privacy-canary-orphan-recovery-${ORPHAN_PRESTART_SOURCE_RUN_ID}`,
+  };
+  await writeState(state);
+  console.log('MYEONGHA_PRODUCTION_PRIVACY_CANARY_ORPHAN_PRESTART_RECOVERED');
+}
+
+async function verifyOrphanPrestartCleanup() {
+  if (
+    requiredEnv('MYEONGHA_PRIVACY_CANARY_ORPHAN_RUN_ID') !==
+    ORPHAN_PRESTART_SOURCE_RUN_ID
+  ) {
+    fail('ORPHAN_SOURCE_RUN_NOT_APPROVED');
+  }
+  const state = await readState();
+  if (state.phase !== 'cleaned') fail('ORPHAN_PRESTART_NOT_CLEANED');
+
+  const pool = await createAdminPool();
+  try {
+    const result = await pool.query(
+      `select
+         (select count(*)::int from public.subjects
+          where id=$1::uuid) as subjects,
+         (select count(*)::int from public.profiles
+          where subject_id=$1::uuid) as profiles,
+         (select count(*)::int from public.commerce_account_links
+          where subject_id=$1::uuid) as commerce_links,
+         (select count(*)::int from public.chat_credit_lots_v1
+          where subject_id=$1::uuid) as credit_lots,
+         (select count(*)::int from public.commerce_account_links
+          where provider=$2::text and external_account_fingerprint like $3::text)
+           as remaining_source_links`,
+      [
+        state.subjectId,
+        PROVIDER,
+        `synthetic:${ORPHAN_PRESTART_SOURCE_RUN_ID}:%`,
+      ],
+    );
+    const row = result.rows[0];
+    if (
+      result.rows.length !== 1 ||
+      row?.subjects !== 0 ||
+      row?.profiles !== 0 ||
+      row?.commerce_links !== 0 ||
+      row?.credit_lots !== 0 ||
+      row?.remaining_source_links !== 0
+    ) {
+      fail('ORPHAN_PRESTART_DATABASE_REMAINS');
+    }
+  } finally {
+    await pool.end();
+  }
+  await assertHostedUserAbsent(resolveAdminSecret(), state.authUserId);
+  console.log('PASS_PRODUCTION_PRIVACY_CANARY_ORPHAN_PRESTART_CLEANUP');
+}
+
 async function cleanupPrestart() {
   let state;
   try {
@@ -1119,6 +1285,44 @@ async function cleanupPrestart() {
         guard.rows[0]?.authUserId !== state.authUserId
       ) {
         fail('CLEANUP_PRESTART_GUARD_FAILED');
+      }
+      const credits = await client.query(
+        `select id::text as id, source_kind as "sourceKind",
+                source_ref::text as "sourceRef",
+                credits_issued as "creditsIssued",
+                credits_remaining as "creditsRemaining"
+         from public.chat_credit_lots_v1
+         where subject_id = $1::uuid
+         for update`,
+        [state.subjectId],
+      );
+      const lot = credits.rows[0];
+      if (
+        credits.rows.length !== 1 ||
+        lot?.sourceKind !== 'signup' ||
+        lot?.sourceRef !== state.subjectId ||
+        lot?.creditsIssued !== 50 ||
+        lot?.creditsRemaining !== 50
+      ) {
+        fail('CLEANUP_PRESTART_CREDIT_GUARD_FAILED');
+      }
+      const allocations = await client.query(
+        'select 1 from public.chat_credit_turn_allocations_v1 where lot_id = $1::uuid limit 1',
+        [lot.id],
+      );
+      if (allocations.rows.length !== 0) {
+        fail('CLEANUP_PRESTART_CREDIT_ALLOCATION_PRESENT');
+      }
+      const deletedLot = await client.query(
+        `delete from public.chat_credit_lots_v1
+         where id = $1::uuid and subject_id = $2::uuid
+           and source_kind = 'signup' and source_ref = $2::uuid
+           and credits_issued = 50 and credits_remaining = 50
+         returning id`,
+        [lot.id, state.subjectId],
+      );
+      if (deletedLot.rows.length !== 1) {
+        fail('CLEANUP_PRESTART_CREDIT_DELETE_FAILED');
       }
       await client.query(
         'delete from public.commerce_account_links where id = $1::uuid and subject_id = $2::uuid',
@@ -1165,6 +1369,8 @@ async function main() {
   if (mode === 'resume') return resumeDeletion();
   if (mode === 'cleanup-api-login') return cleanupApiCanaryLogin();
   if (mode === 'cleanup-prestart') return cleanupPrestart();
+  if (mode === 'recover-orphan-prestart') return recoverOrphanPrestartState();
+  if (mode === 'verify-orphan-prestart-cleanup') return verifyOrphanPrestartCleanup();
   fail('MODE_REQUIRED');
 }
 

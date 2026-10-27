@@ -1,4 +1,7 @@
+import { useEffect, useState } from 'react';
 import { findReaderPresentation } from '../../reader-presentation-catalog.js';
+import { resolveCharacterDisplayNameV1 } from '../../character-display-locale.js';
+import { getUiLocale } from '../../ui-i18n.js';
 import { resolveReadingAvailabilityV1 } from '../reading/reading-availability.js';
 import { FortuneCookie } from './FortuneCookie.js';
 
@@ -40,6 +43,15 @@ const featuredReaders = ['seyeon', 'baekheon', 'yeoul']
   .filter((reader): reader is NonNullable<typeof reader> => reader !== null);
 
 export function HomePage() {
+  const [locale, setLocale] = useState(() => getUiLocale());
+
+  useEffect(() => {
+    const syncLocale = () => setLocale(getUiLocale());
+    document.addEventListener('myeongha:localechange', syncLocale);
+    syncLocale();
+    return () => document.removeEventListener('myeongha:localechange', syncLocale);
+  }, []);
+
   return (
     <div className="mhx-home">
       <section className="mhx-hero" aria-labelledby="mhx-hero-title">
@@ -83,10 +95,10 @@ export function HomePage() {
         <div className="mhx-character-list">
           {featuredReaders.map((reader) => (
             <article className="mhx-character" key={reader.key}>
-              <div className="mhx-character-art">
-                <img src={reader.portrait} alt={reader.name} loading="lazy" decoding="async" />
+              <div className="mhx-character-art" data-character={reader.key}>
+                <img src={reader.portrait} alt={resolveCharacterDisplayNameV1(reader.key, locale) ?? reader.name} data-ui-react-owned loading="lazy" decoding="async" />
                 <div className="mhx-character-caption">
-                  <h3>{reader.name}</h3>
+                  <h3 data-ui-react-owned>{resolveCharacterDisplayNameV1(reader.key, locale) ?? reader.name}</h3>
                   <span>{reader.title}</span>
                 </div>
               </div>

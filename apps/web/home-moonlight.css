@@ -226,6 +226,38 @@ body.gm-page[data-page="home"] .product-profile { display: inline-flex; }
 }
 .mhx-character-art { position: relative; height: 184px; overflow: hidden; background: #dbcbd0; }
 .mhx-character-art img { width: 100%; height: 100%; object-fit: cover; object-position: center 24%; display: block; }
+
+/* These tall source portraits need gentler framing inside the wide homepage cards.
+   Retain the original portraits; a softly blurred copy fills the newly exposed edges. */
+.mhx-character-art[data-character="seyeon"],
+.mhx-character-art[data-character="yeoul"] {
+  background-size: cover;
+  background-position: center 24%;
+  isolation: isolate;
+}
+.mhx-character-art[data-character="seyeon"] { background-image: url("assets/characters/seyeon-portrait-v2.webp"); }
+.mhx-character-art[data-character="yeoul"] { background-image: url("assets/characters/yeoul-portrait-uploaded.svg"); }
+.mhx-character-art[data-character="seyeon"]::before,
+.mhx-character-art[data-character="yeoul"]::before {
+  content: "";
+  position: absolute;
+  inset: -16px;
+  background: inherit;
+  filter: blur(14px);
+  opacity: .72;
+  pointer-events: none;
+}
+.mhx-character-art[data-character="seyeon"] img,
+.mhx-character-art[data-character="yeoul"] img {
+  position: relative;
+  z-index: 1;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+}
+.mhx-character-art[data-character="seyeon"] img { width: 93%; margin-inline: auto; object-position: center 28%; }
+.mhx-character-art[data-character="yeoul"] img { width: 75%; margin-inline: auto; object-position: center 45%; }
+.mhx-character-art[data-character="seyeon"] .mhx-character-caption,
+.mhx-character-art[data-character="yeoul"] .mhx-character-caption { z-index: 2; }
 .mhx-character-caption {
   position: absolute;
   inset: auto 0 0;
