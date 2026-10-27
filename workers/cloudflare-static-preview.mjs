@@ -14,6 +14,7 @@ import { tryHandleCloudflareApprovedDeviceInstallationsV1 } from './cloudflare-d
 import { tryHandleCloudflareReadinessV1 } from './cloudflare-readiness.mjs';
 import { tryHandleCloudflareGenericChatReadV1 } from './cloudflare-chat-read.mjs';
 import { tryHandleCloudflareChatCreditWalletV1 } from './cloudflare-chat-credit-wallet.mjs';
+import { tryHandleCloudflareOwnerPortOneSandboxCheckoutV1 } from './cloudflare-portone-owner-sandbox-checkout.mjs';
 
 // Cloudflare static preview: explicitly NOT the production API runtime.
 // Every /api request goes through this deny-only Worker; Static Assets serve
@@ -166,6 +167,8 @@ const cloudflareRuntime = {
       if (approvedPreviewReadingResponse !== null) return approvedPreviewReadingResponse;
       const walletResponse = await tryHandleCloudflareChatCreditWalletV1(request, bindings, route);
       if (walletResponse !== null) return walletResponse;
+      const sandboxCheckoutResponse = await tryHandleCloudflareOwnerPortOneSandboxCheckoutV1(request, bindings, route);
+      if (sandboxCheckoutResponse !== null) return sandboxCheckoutResponse;
       const recordsResponse = await tryHandleCloudflareApprovedRecordsV1(request, bindings, route);
       if (recordsResponse !== null) return recordsResponse;
       const targetPersonReadResponse = await tryHandleCloudflareApprovedTargetPersonReadV1(request, bindings, route);
