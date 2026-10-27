@@ -295,6 +295,9 @@ function issueExportResponse(
 
 /** Unmounted by default. A privileged deployment must separately approve this entrypoint. */
 export function createAdminReadHttpHandlerV1(deps: AdminReadHttpDependenciesV1) {
+  // One private runtime serves one Owner. Bound searches without storing IPs/tokens.
+  let ownerWindowStart = 0;
+  let ownerReads = 0;
   return async (request: Request): Promise<Response> => {
     const requestId = (deps.requestId ?? randomUUID)();
     if (!UUID.test(requestId)) {
@@ -329,6 +332,18 @@ export function createAdminReadHttpHandlerV1(deps: AdminReadHttpDependenciesV1) 
       try { await append(null, 'admin-read', 'denied'); }
       catch { return response(503, requestId, { error: 'ADMIN_AUDIT_UNAVAILABLE' }); }
       return response(403, requestId, { error: 'ADMIN_FORBIDDEN' });
+    }
+
+    if (now.getTime() - ownerWindowStart >= 60_000 || now.getTime() < ownerWindowStart) {
+      ownerWindowStart = now.getTime();
+      ownerReads = 0;
+    }
+    if (++ownerReads > 60) {
+      try { await append(actor.authUserId, 'admin-rate-limit', 'denied'); }
+      catch { return response(503, requestId, { error: 'ADMIN_AUDIT_UNAVAILABLE' }); }
+      const limited = response(429, requestId, { error: 'ADMIN_RATE_LIMITED' });
+      limited.headers.set('Retry-After', String(Math.max(1, Math.ceil((ownerWindowStart + 60_000 - now.getTime()) / 1000))));
+      return limited;
     }
 
     const requestUrl = new URL(request.url);

@@ -4,7 +4,7 @@ import { adminRoutes, getAdminRoute } from './routes.js';
 import type { AdminRoute, AdminSection } from './routes.js';
 import { StatusPanel } from './StatusPanel.js';
 import { AdminLogin, AdminWorkbench } from './AdminWorkbench.js';
-import { fetchAdminReadV1, AdminAccessDeniedErrorV1 } from './admin-client.js';
+import { fetchAdminReadV1, verifyAdminOwnerSessionV1, adminTokenExpiresAtV1, AdminAccessDeniedErrorV1 } from './admin-client.js';
 import type { AdminReadResponse } from './admin-client.js';
 import { BetaAnalyticsReadiness, OperatorActionsReadiness } from './AdminOperationalReadiness.js';
 
@@ -209,6 +209,35 @@ export function App() {
   const route = getAdminRoute(path.split('?')[0] ?? path);
 
   useEffect(() => {
+    if (ownerToken === null) return;
+    const expiresAt = adminTokenExpiresAtV1(ownerToken);
+    if (expiresAt === null || expiresAt <= Date.now()) { setOwnerToken(null); return; }
+    let active = true;
+    let checking = false;
+    const expire = () => { if (active) setOwnerToken(null); };
+    const check = async () => {
+      if (expiresAt <= Date.now()) { expire(); return; }
+      if (checking || document.visibilityState === 'hidden') return;
+      checking = true;
+      try { await verifyAdminOwnerSessionV1(ownerToken); }
+      catch { expire(); }
+      finally { checking = false; }
+    };
+    const timer = window.setTimeout(expire, Math.min(expiresAt - Date.now(), 2_147_483_647));
+    const interval = window.setInterval(() => { void check(); }, 60_000);
+    const onVisible = () => { void check(); };
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', onVisible);
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+      window.clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', onVisible);
+    };
+  }, [ownerToken]);
+
+  useEffect(() => {
     const onPopState = () => setPath(window.location.pathname + window.location.search);
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
@@ -245,6 +274,7 @@ export function App() {
         <header className="topbar">
           <span className="topbar__title">명하 운영 콘솔 <span>/ 내부 운영 도구</span></span>
           <span className="topbar__security"><span aria-hidden="true" /> {ownerToken ? "Owner 세션 · 읽기 전용" : "Owner 인증 전 · 접근 잠금"}</span>
+          {ownerToken !== null && <button type="button" onClick={() => setOwnerToken(null)}>로그아웃</button>}
         </header>
         <main id="main-content" className="main">
           {route ? (

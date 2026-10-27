@@ -21,6 +21,19 @@ function jwtLike(value: unknown): value is string {
     /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/u.test(value);
 }
 
+/** Used only to shorten UI access; a decoded claim never grants Owner authority. */
+export function adminTokenExpiresAtV1(token: string): number | null {
+  if (!jwtLike(token)) return null;
+  try {
+    const part = token.split('.')[1]!;
+    const claims: unknown = JSON.parse(atob(part.replace(/-/gu, '+').replace(/_/gu, '/')));
+    if (!isRecord(claims) || typeof claims.exp !== 'number' ||
+        !Number.isSafeInteger(claims.exp) || claims.exp <= 0 ||
+        !Number.isSafeInteger(claims.exp * 1000)) return null;
+    return claims.exp * 1000;
+  } catch { return null; }
+}
+
 /**
  * Uses the existing customer Member authentication transport, but never trusts
  * its claims for Admin authorization. Every admin read is independently checked

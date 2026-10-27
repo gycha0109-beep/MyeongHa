@@ -57,6 +57,15 @@ function harness(options: {
 }
 
 describe('admin owner-only reads', () => {
+  it('bounds Owner reads and audits denied excess requests before touching domain data', async () => {
+    const h = harness();
+    for (let i = 0; i < 60; i++) expect((await h.call()).status).toBe(200);
+    const limited = await h.call();
+    expect(limited.status).toBe(429);
+    expect(limited.headers.get('Retry-After')).toBe('60');
+    expect(h.readCount).toBe(60);
+    expect(h.auditEvents.at(-1)).toMatchObject({ action: 'admin-rate-limit', outcome: 'denied' });
+  });
   it('exports only allowlisted issue columns with audit, bounded and formula-safe', async () => {
     const h = harness();
     const csv = await h.call('/api/admin/issues.csv?limit=20');

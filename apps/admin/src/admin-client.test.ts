@@ -1,7 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { fetchAdminReadV1, signInForAdminSessionV1, verifyAdminOwnerSessionV1, fetchAdminIssuesCsvV1, AdminAccessDeniedErrorV1 } from './admin-client.js';
+import { fetchAdminReadV1, signInForAdminSessionV1, verifyAdminOwnerSessionV1, fetchAdminIssuesCsvV1, adminTokenExpiresAtV1, AdminAccessDeniedErrorV1 } from './admin-client.js';
 const JWT = 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.signature';
 describe('admin browser API client', () => {
+  it('extracts only a bounded expiry for UI revocation, without granting access from claims', () => {
+    const token = (claims: unknown) => 'header.' + btoa(JSON.stringify(claims)) + '.signature';
+    expect(adminTokenExpiresAtV1(token({ exp: 1_800_000_000, role: 'owner' }))).toBe(1_800_000_000_000);
+    for (const claims of [{ role: 'owner' }, { exp: '1800000000' }, { exp: -1 }, { exp: 1.5 }, { exp: Number.MAX_SAFE_INTEGER }]) {
+      expect(adminTokenExpiresAtV1(token(claims))).toBeNull();
+    }
+    expect(adminTokenExpiresAtV1('bad')).toBeNull();
+  });
   it('downloads only audited issues CSV and rejects plain JSON substitutes', async () => {
     const csv = (async () => new Response('issueId,category\r\n', { headers: { 'Content-Type': 'text/csv; charset=utf-8' } })) as typeof fetch;
     expect(await fetchAdminIssuesCsvV1(JWT, new URLSearchParams({ limit: '50' }), csv)).toContain('issueId');
