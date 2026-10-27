@@ -47,7 +47,7 @@ export async function commitCloudflareOwnerPortOneSandboxHandoffV1(input:Readonl
   if(input.verifiedEvidence?.kind!=='member'||
     typeof input.paymentAttemptId!=='string'||!UUID.test(input.paymentAttemptId)||
     typeof input.providerRequestId!=='string'||
-    !/^[A-Za-z0-9_-]{6,128}$/.test(input.providerRequestId))return deny();
+    !/^[A-Za-z0-9_-]{6,40}$/.test(input.providerRequestId))return deny();
 
   await executePostgresSubjectTransactionV1({
     pool:input.pool,verifiedEvidence:input.verifiedEvidence,
