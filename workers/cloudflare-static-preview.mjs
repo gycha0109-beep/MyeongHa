@@ -5,6 +5,7 @@ import {
   fenceCloudflareSeyeonBeforeFetchReturnV1,
 } from './cloudflare-seyeon-security.mjs';
 import { tryHandleCloudflareApprovedAuthV1 } from './cloudflare-auth-db-api.mjs';
+import { tryHandleCloudflareContactInquiryV1 } from './cloudflare-contact-inquiry.mjs';
 import { tryHandleCloudflareApprovedSajuCalculationV1 } from './cloudflare-saju-calculation.mjs';
 import { tryHandleCloudflareApprovedSajuPreviewReadingV1 } from './cloudflare-saju-preview-reading.mjs';
 import { tryHandleCloudflareApprovedRecordsV1 } from './cloudflare-records-api.mjs';
@@ -155,6 +156,8 @@ const cloudflareRuntime = {
       return handleCloudflareStaticPreviewRequest(request);
     }
     try {
+      const contactResponse = await tryHandleCloudflareContactInquiryV1(request, bindings, route);
+      if (contactResponse !== null) return contactResponse;
       const approvedAuthResponse = await tryHandleCloudflareApprovedAuthV1(request, bindings, route);
       if (approvedAuthResponse !== null) return approvedAuthResponse;
       const approvedCalculationResponse = await tryHandleCloudflareApprovedSajuCalculationV1(request, bindings, route);
