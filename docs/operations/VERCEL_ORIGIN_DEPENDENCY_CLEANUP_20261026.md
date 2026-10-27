@@ -117,3 +117,11 @@ Watchtower-Track: ops
 - Cloudflare version metadata for current and two previous versions show identical **41 binding names and types**, and the current version has a Preview capability. This does **not** attest the secret values, exact deployed Git source SHA, or complete Preview acceptance; corresponding evidence gates remain unresolved.
 - Actual production Guest→Member preservation, exact-version governed authenticated E2E, live rollback with Member/Saju recheck, and post-cutover stability observation are unverified. Preserve the tested previous Worker version as a candidate only; do not deploy it unannounced while other tracks may be changing production. No Worker deployment/rollback, DNS change, provider edit, DB mutation, secret read/change, Vercel pause/deletion or PR merge was performed for this audit.
 - User approved **eventual Vercel shutdown following verification**, but the actual retirement gate is not eligible. Do not pause the live Vercel standby on the basis of this conditional instruction while required checks are still missing.
+
+
+### 2026-10-27 live deployment drift detected and revalidated
+
+- During repeat execution of the new OAuth-start verifier, the previously pinned `8553fcc5-ea3e-406f-a14e-c02d332aeaba` failed closed with `WORKER_VERSION_DRIFT` (correct behavior, no OAuth authorization data leaked).
+- Cloudflare deployment read confirmed new 100% version `7b3fa095-991d-400f-b781-fbfb78fd09e0` (deployment `19f7b6b5-8033-4c5c-97a6-252ef690d84b`, created `2026-10-27T00:58:40Z`).
+- Re-ran `node scripts/operations/verify-cloudflare-oauth-start-live.mjs --worker-version 7b3fa095-991d-400f-b781-fbfb78fd09e0`: **Google/Kakao/Naver PASS_START_ONLY**. Re-ran existing anonymous Cloudflare primary suite: **14/14 PASS**. Neither is an authenticated positive Member→DB/Saju E2E or an actual OAuth callback exchange.
+- While another track continues updating the primary Worker, **do not initiate live rollback rehearsal or Vercel shutdown** from this snapshot. A stable pinned release candidate, governed authenticated E2E, actual OAuth/Guest continuity and maintenance-safe recovery evidence remain necessary.
