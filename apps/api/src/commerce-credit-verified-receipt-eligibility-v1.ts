@@ -8,9 +8,9 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-
  * by Product/Capability governance and the verified payment must be persisted
  * by the existing PortOne V2 server lookup/write path.
  *
- * The current products.product_type catalog does NOT contain 'credit', so this
- * selector intentionally returns no eligible production receipt until the
- * canonical catalog/product policy has been adopted.
+ * The credit SKU exists in the canonical catalog, but its Product and Offer
+ * remain disabled; this candidate does not activate them. Eligibility must
+ * mirror the exact receipt/Intent/Capability predicates in the private mint RPC.
  */
 export const CREDIT_TOPUP_RECEIPT_ELIGIBILITY_V1 = Object.freeze({
   schemaVersion: 'commerce-credit-verified-receipt-eligibility-v1',
@@ -35,11 +35,16 @@ join public.product_offers po
   on po.id = cr.product_offer_id
 join public.products p
   on p.id = po.product_id
+join public.product_capability_sets pcs
+  on pcs.id = pi.capability_set_id
+  and pcs.product_id = p.id
 where cr.id = $1::uuid
   and cr.subject_id = $2::uuid
+  and cr.product_offer_id = pi.product_offer_id
   and po.id = $3::uuid
   and cr.provider = 'portone_v2'
   and cr.platform = 'web'
+  and cr.environment = 'production'
   and cr.verification_status = 'verified'
   and cr.verified_at is not null
   and cr.verified_amount_minor = 1900
@@ -49,6 +54,12 @@ where cr.id = $1::uuid
   and pi.status = 'verified'
   and pi.expected_amount_minor = 1900
   and pi.expected_currency = 'KRW'
+  and pi.capability_snapshot_hash is not null
+  and pi.capability_snapshot_jsonb = pg_catalog.jsonb_build_object(
+    'capabilitySetId', pcs.id::text,
+    'definitionVersion', pcs.definition_version,
+    'definitionHash', pcs.definition_hash
+  )
   and po.provider = 'portone_v2'
   and po.platform = 'web'
   and po.enabled

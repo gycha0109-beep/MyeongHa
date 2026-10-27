@@ -52,10 +52,10 @@ describe('verified PortOne credit topup private fulfillment candidate',()=>{
   it('repeated verified Receipt returns replay instead of another credit allocation',async()=>{
     const test=db(true,false);
     expect(await fulfillVerifiedCreditTopUpCandidateV1({
-      ...args,client:test.client,approvedPaidCreditValidity:{kind:'days',days:120},
+      ...args,client:test.client,approvedPaidCreditValidity:{kind:'never'},
     })).toEqual({kind:'replayed',receiptId:receipt,lotId:lot,
       creditQuantity:300,availableCredits:300,totalCredits:300});
-    expect(test.calls[1]?.values).toEqual([owner,receipt,offer,'days',120]);
+    expect(test.calls[1]?.values).toEqual([owner,receipt,offer,'never',null]);
   });
 
   it('refuses failed/wrong-owner receipt without issuing credits',async()=>{
@@ -66,12 +66,16 @@ describe('verified PortOne credit topup private fulfillment candidate',()=>{
     expect(test.calls).toHaveLength(1);
   });
 
-  it('rejects invented validity duration before querying',async()=>{
-    const test=db(true);
-    await expect(fulfillVerifiedCreditTopUpCandidateV1({
-      ...args,client:test.client,approvedPaidCreditValidity:{kind:'days',days:0},
-    })).rejects.toThrow('validity');
-    expect(test.calls).toHaveLength(0);
+  it('rejects any runtime-injected expiring paid-credit policy before querying',async()=>{
+    for(const validity of [
+      {kind:'days',days:120}, {kind:'days',days:0}, {kind:'never',days:30},
+    ]){
+      const test=db(true);
+      await expect(fulfillVerifiedCreditTopUpCandidateV1({
+        ...args,client:test.client,approvedPaidCreditValidity:validity as never,
+      })).rejects.toThrow('validity');
+      expect(test.calls).toHaveLength(0);
+    }
   });
 
   it('fails closed on malformed issuance rows',async()=>{
