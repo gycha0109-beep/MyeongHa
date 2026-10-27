@@ -1,5 +1,7 @@
 # 명하 문의 페이지 · 운영 연결 구현 로드맵
 
+> **최종 상태(2026-10-27): I1~I5 구현 완료 · PR #2637 운영 반영 · PR #2651 Hyperdrive 인증 복구 · V1 실발송·Gmail 수신 확인 완료.** §0~§8의 과거 ‘미완료’·‘배포 전 병합 금지’는 당시 작업 기록이며, 실제 승인 순서는 §9, 최종 검증 근거는 §10이 우선합니다.
+
 - **트랙:** `frontend-integration`
 - **기준:** 2026-10-26 `main` / 문의 UI·Vercel API 기초 구현 PR #2628 병합 완료
 - **작업 브랜치:** `feat/frontend-integration/contact-inquiry-production` (**처음부터 끝까지 이 브랜치 하나만 사용**)
@@ -34,7 +36,7 @@
 
 ## 2. 구현 순서
 
-### I1. Cloudflare 문의 요청 진입 연결 [미완료]
+### I1. Cloudflare 문의 요청 진입 연결 [완료 — 근거 §10]
 
 **수정 위치:** `workers/cloudflare-static-preview.mjs`, 필요 시 `cloudflare/myeongha-worker.mjs`; 신규 문의 전용 Worker 어댑터 파일.
 
@@ -46,7 +48,7 @@
 
 **구현 종료 산출물:** Cloudflare의 정식 문의 라우트와 별도 승인 어댑터가 결선된 코드.
 
-### I2. 기존 세션 권한 재사용 및 접수 남용 방지 [미완료]
+### I2. 기존 세션 권한 재사용 및 접수 남용 방지 [완료 — 근거 §10]
 
 **수정 위치:** I1의 어댑터, 기존 Cloudflare Auth/DB 진입 구성, 필요 시 `apps/api/src/contact-inquiry-http.ts`.
 
@@ -58,7 +60,7 @@
 
 **구현 종료 산출물:** 실제 회원/게스트 보호를 받는 문의 접수 및 제한 처리.
 
-### I3. Cloudflare 메일 발송 설정 및 운영 연결 [미완료]
+### I3. Cloudflare 메일 발송 설정 및 운영 연결 [완료 — 근거 §10]
 
 **수정 위치:** Worker 환경 연동, `docs/CONTACT_INQUIRY_SETUP.md`, 배포 설정이 필요한 기존 경로.
 
@@ -70,7 +72,7 @@
 
 **구현 종료 산출물:** Cloudflare 환경의 발송 설정과 기존 메일 전송 코드 연결. **실제 키/도메인 확보가 불가능하면 이 단계의 외부 설정만 명시적 블로커로 둔다.**
 
-### I4. 문의 페이지의 운영 UX·언어 처리 [미완료]
+### I4. 문의 페이지의 운영 UX·언어 처리 [완료 — 근거 §10]
 
 **수정 위치:** `apps/web/contact.html`, `contact.js`, `contact.css`, 기존 정적 UI 번역 사전.
 
@@ -81,7 +83,7 @@
 
 **구현 종료 산출물:** 접수 상태와 다국어가 일관된 웹 문의 화면.
 
-### I5. 배포·운영 연결 마감 [미완료]
+### I5. 배포·운영 연결 마감 [완료 — 근거 §10]
 
 **수정 위치:** 관련 Worker 배포 설정·기존 운영 문서.
 
@@ -92,7 +94,7 @@
 
 **구현 종료 산출물:** 배포 가능한 변경 세트와 운영 설정 설명. **이때까지 PR/병합 없음.**
 
-## 3. V1. 마지막 통합 검증 — 단 1개 게이트 [최종에만 실행]
+## 3. V1. 마지막 통합 검증 — 단 1개 게이트 [완료 — 실제 근거 §10]
 
 **개시 조건:** I1~I5 코드 구현 완료, Worker 발송에 필요한 실제 인증 설정 준비.
 
@@ -106,7 +108,7 @@
 
 **통과 기준:** 실제 수신 1건 확인 + 보안/기능 회귀 통과 + PR 필수 체크 전부 Green + 승인·운영 블로커 없음.
 
-## 4. M1. 최종 병합 [V1 통과 후에만]
+## 4. M1. 최종 병합 [완료 — 사용자 승인에 따라 운영 배포 후 V1 실수신 검증, §9~§10]
 
 - V1의 모든 근거가 갖춰진 뒤에만 `main`에 **squash/linear history 준수 방식**으로 병합한다.
 - 자동 병합을 사용할 경우에도 **V1의 통과 조건을 충족한 다음에만** 활성화한다.
@@ -119,13 +121,13 @@
 | 단계 | 내용 | 상태 |
 |---|---|---|
 | 기준선 | 문의 UI·공통 발송 로직 및 기존 PR 병합 | **완료** |
-| I1 | Cloudflare 실접수 경로 | 미완료 |
-| I2 | 회원/게스트 권한·빈도 제한 | 미완료 |
-| I3 | Worker 메일 발송 및 실설정 | 미완료 |
-| I4 | 운영 UX·다국어 | 미완료 |
-| I5 | 배포·운영 설명 정리 | 미완료 |
-| V1 | **최종 통합 검증 한 번** | 대기 |
-| M1 | **마지막 병합** | 대기 |
+| I1 | Cloudflare 실접수 경로 | **완료** |
+| I2 | 회원/게스트 권한·빈도 제한 | **완료** |
+| I3 | Worker 메일 발송 및 실설정 | **완료** |
+| I4 | 운영 UX·다국어 | **완료** |
+| I5 | 배포·운영 설명 정리 | **완료** |
+| V1 | **최종 통합 검증 한 번** | **완료(운영 Gmail 실수신)** |
+| M1 | **마지막 병합** | **완료(운영 병합)** |
 
 **외부 의존성:** `RESEND_API_KEY`, 실제 인증된 `CONTACT_FROM_EMAIL`, Cloudflare 해당 환경 설정 권한. 확보·등록 여부는 아직 확인되지 않았으며 추정해서 완료로 표시하지 않는다.
 
@@ -167,3 +169,13 @@
 - 새로운 순서: I1~I5 구현 → PR 필수 CI 및 CI Integration Verify Green → 최신 main 변경을 보존한 동일 PR 병합 → 기존 Cloudflare main CD 배포 확인 → 실제 배포 Worker 버전을 고정한 1회 문의 발송 → Gmail 실수신·본문·Reply-To 확인.
 - 실발송 실패 또는 이상 응답은 완료가 아니다. 장애가 발생하면 기존 운영 Worker 버전으로 복원하고 같은 트랙에서 원인을 수정한다. 별도 Worker/인증 우회/고객 대상 대량 발송을 허용하지 않는다.
 - 이 항목은 이전에 기록한 V1 이전 병합 금지 등 변경 전 순서 지침보다 우선한다. 통합 CI나 Resend 발송 영수증만으로 Gmail 실수신을 추정하지 않는다.
+
+## 10. 최종 운영 배포·실발송·Gmail 실수신 완료 (2026-10-27)
+
+- **구현 및 병합:** 문의 경로 PR [#2637](https://github.com/gycha0109-beep/MyeongHa/pull/2637), 사용자 승인 후 운영 선배포 및 실수신 검증 순서를 채택. Guest bootstrap가 주입 Hyperdrive Pool을 사용하지 않고 직접 연결 풀을 생성하던 결함을 후속 PR [#2651](https://github.com/gycha0109-beep/MyeongHa/pull/2651)에서 수정·병합(`35aad0c58846223316bca0b5d61e316684551548`). 기존 인증·RLS·비밀값·회원 로그인 정책 유지.
+- **CI:** PR #2651 최종 통합 CI [40457820363](https://github.com/gycha0109-beep/MyeongHa/actions/runs/40457820363) **SUCCESS**, 기본 CI·Web·Governance 체크 통과.
+- **운영 Cloudflare 배포:** 첫 자동 빌드 `b24e2058-f054-40e5-a9b9-6cf6e8ad82d6`은 Cloudflare 도구/의존성 설치에서 실패. 동일 main 커밋에 고정한 수동 재실행 빌드 `346a4019-f9a5-45e6-a5f0-c90b0d17ef69` **SUCCESS**, 단일 `myeongha` Worker 버전 `e78780b3-dd02-41b5-a1e1-4099898adb56`을 100% 운영 배포. 기존 `RESEND_API_KEY` Secret, 발신 `onboarding@resend.dev`, Hyperdrive, Rate Limiter 유지.
+- **정식 운영 API 실검증:** `scripts/verify-cloudflare-contact-live.mjs`를 운영 Worker UUID에 고정해 **단 한 건** 전송. Health 200, `GET /api/contact` 405/Allow POST, 미인증 `POST /api/contact` 401, 정식 `POST /api/session/bootstrap` 200, 인증된 `POST /api/contact` 200/`SENT`.
+- **실제 Gmail 수신 증명:** 2026-10-27 06:12:53 UTC(한국시간 15:12:53), `gycha0109@gmail.com`의 Gmail **INBOX**에서 `[명하 문의 · 기타 문의] 문의 메일 발송 경로 검증` 메시지 실제 확인. 본문 유형·이름·제목·요청 내용·접수 ID `37735bc7-46e0-451e-abbd-ebb8e6da88e9` 일치. 원본 MIME에서 `From: onboarding@resend.dev`, `Reply-To: gycha0109@gmail.com` 검증.
+- **범위:** V1의 실제 메일 발송·수신·Reply-To **완료**. 자동 CI는 회귀 검증 완료. 별도의 사람이 UI 전체를 실제 클릭하며 수행하는 탐색 테스트, 인증 도메인을 이용한 일반 고객 대상 메일 발송, 메일 답장 자체 발송은 이번 결과의 증거가 아니며 이를 완료라고 주장하지 않음.
+- **관리 기록:** [PR #2637 확인 댓글](https://github.com/gycha0109-beep/MyeongHa/pull/2637#issuecomment-6435168971), [PR #2651 확인 댓글](https://github.com/gycha0109-beep/MyeongHa/pull/2651#issuecomment-6435168123).

@@ -1,8 +1,7 @@
 # 명하 문의 접수 운영 설정
 
 > 운영 연결 구현 브랜치: `feat/frontend-integration/contact-inquiry-production`.
-> 이 문서는 **구현된 코드 경로**를 설명하며, 배포·메일 실제 수신 성공을 선언하지 않습니다.
-> 최종 검증과 병합 순서는 [문의 로드맵](./ROADMAP_CONTACT_INQUIRY.md)의 V1 → M1을 따릅니다.
+> **최종 검증(2026-10-27):** 운영 API 인증·Resend 발신 및 Gmail 받은편지함 수신·Reply-To 확인 완료. [문의 로드맵 §9~§10](./ROADMAP_CONTACT_INQUIRY.md)의 사용자 승인에 따른 운영 배포 후 검증 순서를 따릅니다. 본문에 남은 이전 ‘미검증’ 문구는 당시의 작업 기록입니다.
 
 ## 실제 웹 / API 진입
 
@@ -48,7 +47,7 @@ Cloudflare 계정의 **Workers & Pages → `myeongha` → Settings → Variables
 
 필수 Secret과 검증 가능한 발신자(현재는 Resend 테스트 발신자)가 준비되면 V1 단일 통합 검증 구간을 실시합니다. Worker의 인가·실제 발송, 이메일 받은편지함 수신·Reply-To, 전체 관련 코드·브라우저 검사, 단일 PR의 필수 GitHub CI와 `ci-integration-ready` 통합 검증을 **마지막 한 구간에서** 확인합니다. 하나라도 실패하면 같은 브랜치에서 보정하고 **V1만 재실행**합니다. 모두 통과한 후에만 PR을 squash 병합합니다.
 
-**현재 검증 상태:** 두 바인딩의 등록은 사용자가 보고했습니다. 실제 반영 여부, Resend 발송 승인, Gmail 실수신 및 전체 V1 통합 검증은 아직 확인되지 않았습니다. 실패·미확인 상태에서는 병합하지 않습니다.
+**최종 검증 상태(2026-10-27):** Cloudflare 운영 배포 버전 `e78780b3-dd02-41b5-a1e1-4099898adb56`에서 Resend 실발신·Gmail INBOX 실수신·본문·Reply-To까지 확인했습니다. 사용자 승인 하에 PR #2637과 인증 복구 PR #2651을 병합했고 필수 CI는 Green입니다. 상세 증거는 [문의 로드맵 §10](./ROADMAP_CONTACT_INQUIRY.md)에 있습니다.
 
 ## 운영 Worker 문의 실발송 1회 검증 스크립트 (배포 이후에만)
 
@@ -61,3 +60,11 @@ Cloudflare 계정의 **Workers & Pages → `myeongha` → Settings → Variables
 ## 운영 배포 후 검증 예외 (2026-10-27 사용자 승인)
 
 사용자가 문의 PR #2637에 한정해 **운영 Worker 배포 후 Gmail 실수신 확인**을 승인했다. 앞부분의 '실수신 전 병합 금지' 순서 원칙은 [문의 로드맵 §9](./ROADMAP_CONTACT_INQUIRY.md)로 대체한다. GitHub 필수 CI Green 및 현재 main 무충돌 확인 → PR 병합 → 기존 Cloudflare main 배포 확인 → `scripts/verify-cloudflare-contact-live.mjs`의 배포 UUID 고정·게스트 보호·발송 검증 → Gmail 본문 및 Reply-To 확인으로 진행한다. 실제 운영 장애 발생 시 배포 전 버전으로 복원한다. Resend 응답 200은 Gmail 수신의 증거가 아니다.
+
+## 최종 실수신 검증 증거 (2026-10-27)
+
+- 검증 환경: 운영 `myeongha` Worker `e78780b3-dd02-41b5-a1e1-4099898adb56`; 로그인 우회 없는 실제 Guest bootstrap 및 문의 API.
+- 발송: `POST /api/contact` → `200 SENT`, 접수 ID `37735bc7-46e0-451e-abbd-ebb8e6da88e9`.
+- 실제 수신: `gycha0109@gmail.com` Gmail INBOX, 2026-10-27 06:12:53 UTC. 문의 유형·제목·본문·접수 ID를 확인하고 원본 MIME의 `Reply-To: gycha0109@gmail.com`을 별도 검증.
+- 전송 출처: Resend의 테스트 발신자 `onboarding@resend.dev`. 이 구성의 실제 동작은 **운영자 수신처 1건에 대해 검증됨**. 임의의 일반 고객 이메일에 대한 발신 권한 확대가 아니라 문의 운영자 수신 경로 검증임.
+- 운영 초도 Cloudflare 빌드의 의존성 설치 실패 후, 동일 병합 SHA 고정 빌드 재실행이 성공했다. 기존 Worker를 우회하거나 API 인증을 약화시키지 않았다. PR 근거: [#2637](https://github.com/gycha0109-beep/MyeongHa/pull/2637#issuecomment-6435168971), [#2651](https://github.com/gycha0109-beep/MyeongHa/pull/2651#issuecomment-6435168123).
