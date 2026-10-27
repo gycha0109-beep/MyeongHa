@@ -47,3 +47,7 @@ result="$(psql -X -qAt -v ON_ERROR_STOP=1 -c "
   echo HOLD_SEYEON_HELPER_ACL_POST_REVOKE_DRIFT >&2; exit 1;
 }
 echo 'PASS_SEYEON_HELPER_SERVICE_ROLE_REVOKE_ISOLATED_PG17'
+
+# The normal CI service postgres is the bootstrap superuser and cannot be
+# demoted. Exercise owner-restricted authority on a separate PG17 cluster.
+bash test/db/seyeon_r2_helper_owner_restricted_pg17.sh

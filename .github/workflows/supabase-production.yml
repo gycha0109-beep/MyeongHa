@@ -69,7 +69,35 @@ jobs:
           # for this single security PR could unexpectedly replay historical SQL.
           # Only this exact squash subject, six-path change set and pinned SQL
           # may skip the dangerous ordinary deployment path.
-          if [[ "$EVENT_NAME" == 'push' && "$(git show -s --format=%s "$CURRENT_SHA")" == 'ops(db): one-shot Se-yeon helper ACL 40232489516 40266252936' ]]; then
+          if [[ "$EVENT_NAME" == 'push' && "$(git show -s --format=%s "$CURRENT_SHA")" == 'ops(db): retry scoped Se-yeon helper owner revoke' ]]; then
+            # Scoped manual Production retry is the sole permitted SQL
+            # executor. Never use ordinary db push on the historical frontier.
+            [[ "$BEFORE_SHA" =~ ^[0-9a-f]{40}$ ]] && git cat-file -e "${BEFORE_SHA}^{commit}" || {
+              echo 'HOLD_SEYEON_HELPER_OWNER_RETRY_BASE_MISSING' >&2
+              exit 1
+            }
+            changed_files="$(git diff --name-only "$BEFORE_SHA" "$CURRENT_SHA")"
+            expected_retry="$(printf '%s\n' \
+              '.github/workflows/production-seyeon-helper-acl-one-shot.yml' \
+              '.github/workflows/supabase-production.yml' \
+              'docs/ci/workflow-responsibility-map.json' \
+              'scripts/ci/db-pr-router.mjs' \
+              'scripts/operations/apply-seyeon-helper-acl-prod-once.sh' \
+              'supabase/migrations/20261026025332_seyeon_chat_helper_service_role_least_privilege.sql' \
+              'test/db/run_ci_case.sh' \
+              'test/db/seyeon_r2_helper_owner_restricted_pg17.sh' \
+              'test/db/seyeon_r2_helper_service_role_least_privilege.sh')"
+            [[ "$changed_files" == "$expected_retry" ]] || {
+              echo 'HOLD_SEYEON_HELPER_OWNER_RETRY_PATH_DRIFT' >&2
+              exit 1
+            }
+            [[ "$(git hash-object supabase/migrations/20261026025332_seyeon_chat_helper_service_role_least_privilege.sql)" == 'c051a1dde2b3a260cdde5efafdcf1583c79d608d' ]] || {
+              echo 'HOLD_SEYEON_HELPER_OWNER_RETRY_SQL_DRIFT' >&2
+              exit 1
+            }
+            requires_deploy=false
+            reason='owner-grantor helper ACL manual retry only; ordinary historical db push suppressed'
+          elif [[ "$EVENT_NAME" == 'push' && "$(git show -s --format=%s "$CURRENT_SHA")" == 'ops(db): one-shot Se-yeon helper ACL 40232489516 40266252936' ]]; then
             # An exact-scope helper ACL reduction is executed ONLY by the
             # separately protected one-shot workflow, NEVER the legacy
             # unrestricted migration/remote-only history repair path.

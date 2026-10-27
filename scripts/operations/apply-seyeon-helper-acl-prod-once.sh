@@ -7,15 +7,17 @@ readonly repo='gycha0109-beep/MyeongHa'
 readonly project='cnsfpcdiyofqvhpcegfc'
 readonly version='20261026025332'
 readonly migration='supabase/migrations/20261026025332_seyeon_chat_helper_service_role_least_privilege.sql'
-readonly expected_blob='462cf970f362550fbcfc4f6168ee6b1e0b5cf078'
+readonly expected_blob='c051a1dde2b3a260cdde5efafdcf1583c79d608d'
 readonly marker='.github/ops/seyeon-helper-acl-prod-20261026.once'
-readonly expected_subject='ops(db): one-shot Se-yeon helper ACL 40232489516 40266252936'
+readonly expected_subject='ops(db): retry scoped Se-yeon helper owner revoke'
 readonly backup_run='40232489516'
 readonly restore_run='40266252936'
 readonly restore_artifact='12626875235'
 
-[[ "$GITHUB_REPOSITORY" == "$repo" && "$GITHUB_EVENT_NAME" == push &&
+[[ "$GITHUB_REPOSITORY" == "$repo" && "$GITHUB_EVENT_NAME" == workflow_dispatch &&
    "$GITHUB_REF" == refs/heads/main && "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ &&
+   "${REVIEWED_MAIN_SHA:-}" == "$GITHUB_SHA" &&
+   "${SCOPED_CONFIRMATION:-}" == 'RETRY_SCOPED_SEYEON_HELPER_OWNER_REVOKE' &&
    "$(git rev-parse HEAD)" == "$GITHUB_SHA" &&
    "$(git show -s --format=%s HEAD)" == "$expected_subject" ]] || hold SCOPE_OR_COMMIT
 [[ "$(cat "$marker")" == 'SEYEON-HELPER-ACL-PROD-20261026-40232489516-40266252936-V1' ]] || hold MARKER
@@ -25,10 +27,19 @@ readonly restore_artifact='12626875235'
 
 # The squash merge must touch ONLY these reviewed paths. No unrelated SQL.
 actual="$(git diff --name-only HEAD^ HEAD)"
-expected="$(printf '%s\n'   '.github/ops/seyeon-helper-acl-prod-20261026.once'   '.github/workflows/production-seyeon-helper-acl-one-shot.yml'   '.github/workflows/supabase-production.yml'   'docs/ci/workflow-responsibility-map.json'   'scripts/ci/db-pr-router.mjs'   'scripts/ci/db-suites.json'   'scripts/operations/apply-seyeon-helper-acl-prod-once.sh'   'supabase/migrations/20261026025332_seyeon_chat_helper_service_role_least_privilege.sql'   'test/db/run_ci_case.sh'   'test/db/seyeon_r2_helper_service_role_least_privilege.sh')"
+expected="$(printf '%s\n' \
+  '.github/workflows/production-seyeon-helper-acl-one-shot.yml' \
+  '.github/workflows/supabase-production.yml' \
+  'docs/ci/workflow-responsibility-map.json' \
+  'scripts/ci/db-pr-router.mjs' \
+  'scripts/operations/apply-seyeon-helper-acl-prod-once.sh' \
+  'supabase/migrations/20261026025332_seyeon_chat_helper_service_role_least_privilege.sql' \
+  'test/db/run_ci_case.sh' \
+  'test/db/seyeon_r2_helper_owner_restricted_pg17.sh' \
+  'test/db/seyeon_r2_helper_service_role_least_privilege.sh')"
 [[ "$actual" == "$expected" ]] || hold CHANGED_PATHS
 now="$(date -u +%s)"
-point="$(date -u -d '2026-10-26T00:00:00Z' +%s)"
+point="$(date -u -d '2026-10-27T00:00:00Z' +%s)"
 (( now >= point && now - point <= 86400 )) || hold EXPIRED
 [[ "$SUPABASE_PROJECT_ID" == "$project" && -n "$SUPABASE_DB_PASSWORD" &&
    "$SUPABASE_PRODUCTION_SESSION_POOLER_HOST" =~ ^[a-z0-9-]+([.][a-z0-9-]+)*[.]pooler[.]supabase[.]com$ &&
@@ -67,7 +78,40 @@ export PGUSER="postgres.$project" PGPASSWORD="$SUPABASE_DB_PASSWORD" PGSSLMODE=r
 preflight="$(PGOPTIONS='-c default_transaction_read_only=on' psql -X -qAt -v ON_ERROR_STOP=1 <<'SQL'
 select case when
   current_user='postgres'
-  and (select max(version)='20261025203519' from supabase_migrations.schema_migrations)
+  -- The governed backup predates exactly three independently deployed
+  -- Commerce migrations. Admit only their observed immutable ledger content;
+  -- never replay, remove, or repair those unrelated versions.
+  and (select max(version)='20261027011650' from supabase_migrations.schema_migrations)
+  and (select count(*)=3 from supabase_migrations.schema_migrations
+       where version>'20261025203519')
+  and exists (select 1 from supabase_migrations.schema_migrations
+       where version='20261025203519'
+         and name='seyeon_s0_resume_manual_redirect_20261025'
+         and cardinality(statements)=1
+         and octet_length(convert_to(statements[1],'UTF8'))=2440
+         and encode(sha256(convert_to(statements[1],'UTF8')),'hex')=
+           '5cdc2a5e083076a4c3963143c912531c8419edbcef8748b1f8aa6bcfe04ebed7')
+  and exists (select 1 from supabase_migrations.schema_migrations
+       where version='20261027004434'
+         and name='owner_admin_credit_testing_v1_20261026'
+         and cardinality(statements)=1
+         and octet_length(convert_to(statements[1],'UTF8'))=2947
+         and encode(sha256(convert_to(statements[1],'UTF8')),'hex')=
+           '91eaf5fcbfb2835c9b99d31487494df181e88c06c4cdf6552613487b1362ff44')
+  and exists (select 1 from supabase_migrations.schema_migrations
+       where version='20261027004544'
+         and name='portone_chat_credit_catalog_staged_v1_20261026'
+         and cardinality(statements)=1
+         and octet_length(convert_to(statements[1],'UTF8'))=1979
+         and encode(sha256(convert_to(statements[1],'UTF8')),'hex')=
+           'eb7dcffc2835c0656af0b83d25f3fa3fbdaef29532cfa3230c3cdc957447af5a')
+  and exists (select 1 from supabase_migrations.schema_migrations
+       where version='20261027011650'
+         and name='chat_credit_paid_validity_and_verified_mint_v1_20261027'
+         and cardinality(statements)=1
+         and octet_length(convert_to(statements[1],'UTF8'))=8360
+         and encode(sha256(convert_to(statements[1],'UTF8')),'hex')=
+           'fbd450033e94dc7e454bc6b3be34b40b81abccc93b9a040c623a42bc97d9ebc5')
   and not exists(select 1 from supabase_migrations.schema_migrations where version='20261026025332')
   and exists(select 1 from supabase_migrations.schema_migrations
     where version='20261008090417'
@@ -86,6 +130,22 @@ select case when
   and (select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace
        where n.nspname='public' and p.proname<>'assert_seyeon_chat_thread_runtime_v1'
          and p.prosrc like '%assert_seyeon_chat_thread_runtime_v1%' and not p.prosecdef)=0
+  and not pg_has_role('postgres','myeongha_seyeon_chat_runtime_owner','SET')
+  and not pg_has_role('postgres','myeongha_seyeon_chat_runtime_owner','USAGE')
+  and (select count(*) from pg_auth_members m
+       where m.roleid='myeongha_seyeon_chat_runtime_owner'::regrole
+         and m.member='postgres'::regrole)=1
+  and exists(select 1 from pg_auth_members m
+       where m.roleid='myeongha_seyeon_chat_runtime_owner'::regrole
+         and m.member='postgres'::regrole
+         and m.grantor='supabase_admin'::regrole
+         and m.admin_option and not m.inherit_option and not m.set_option)
+  and (select count(*) from pg_proc p,
+       lateral aclexplode(p.proacl) a
+       where p.oid='public.assert_seyeon_chat_thread_runtime_v1(uuid,uuid)'::regprocedure
+         and a.grantee='service_role'::regrole
+         and a.grantor='myeongha_seyeon_chat_runtime_owner'::regrole
+         and a.privilege_type='EXECUTE' and not a.is_grantable)=1
 then 'EXACT_SCOPE_OK' else 'HOLD' end;
 SQL
 )"
@@ -107,6 +167,16 @@ select case when
   and not has_function_privilege('authenticated','public.assert_seyeon_chat_thread_runtime_v1(uuid,uuid)','EXECUTE')
   and not has_function_privilege('myeongha_api_executor','public.assert_seyeon_chat_thread_runtime_v1(uuid,uuid)','EXECUTE')
   and has_function_privilege('myeongha_seyeon_chat_runtime_owner','public.assert_seyeon_chat_thread_runtime_v1(uuid,uuid)','EXECUTE')
+  and not pg_has_role('postgres','myeongha_seyeon_chat_runtime_owner','SET')
+  and not pg_has_role('postgres','myeongha_seyeon_chat_runtime_owner','USAGE')
+  and (select count(*) from pg_auth_members m
+       where m.roleid='myeongha_seyeon_chat_runtime_owner'::regrole
+         and m.member='postgres'::regrole)=1
+  and exists(select 1 from pg_auth_members m
+       where m.roleid='myeongha_seyeon_chat_runtime_owner'::regrole
+         and m.member='postgres'::regrole
+         and m.grantor='supabase_admin'::regrole
+         and m.admin_option and not m.inherit_option and not m.set_option)
 then 'SCOPED_ACL_AND_MIGRATION_REGISTERED' else 'HOLD' end;
 SQL
 )"

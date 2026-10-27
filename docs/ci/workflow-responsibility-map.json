@@ -335,7 +335,7 @@
     "production-seyeon-helper-acl-one-shot.yml": {
       "responsibility": "production-seyeon-helper-acl-single-grant-revoke",
       "prMode": "none",
-      "mainMode": "one-shot-trigger",
+      "mainMode": "manual",
       "workTrackAttribution": "commit-metadata"
     },
     "production-seyeon-turn-send-smoke.yml": {
