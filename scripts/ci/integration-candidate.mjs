@@ -108,17 +108,20 @@ export function checkCandidate(candidate, repo) {
 }
 
 /**
- * GitHub Actions may register CI Verify seconds after an integration label.
+ * GitHub Actions may register CI Verify only after the ordinary CI completes.
+ * On 2026-10-27 that took roughly four minutes after labeling PR #2669;
+ * 12 retries/96 seconds was insufficient and exhausted before CI Verify existed.
+ * Bound retry to 60 x 8s (plus API calls), with 15m job timeout.
  * Only the exact missing CI Verify check is transient. A failed, pending,
  * misattributed, or absent OTHER check stays an immediate hard failure.
  * Re-read the complete pinned PR/ruleset/check state on every bounded retry.
  */
 export async function waitForCiVerifyRegistration(guard, {
-  maxRetries = 12,
+  maxRetries = 60,
   sleep = sleepFor,
   intervalMs = 8000,
 } = {}) {
-  if (typeof guard !== 'function' || !Number.isInteger(maxRetries) || maxRetries < 0 || maxRetries > 12
+  if (typeof guard !== 'function' || !Number.isInteger(maxRetries) || maxRetries < 0 || maxRetries > 60
       || !Number.isInteger(intervalMs) || intervalMs < 0 || intervalMs > 8000) {
     throw new Error('Invalid CI registration retry policy');
   }

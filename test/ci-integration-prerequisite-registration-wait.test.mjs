@@ -1,7 +1,17 @@
 import { describe, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
 import { waitForCiVerifyRegistration } from '../scripts/ci/integration-candidate.mjs';
 
 describe('frozen-head CI Integration registration race guard', () => {
+  it('allows normal CI more than 3 minutes to publish its required check', () => {
+    const yaml = readFileSync('.github/workflows/ci-integration.yml', 'utf8');
+    const admission = yaml.slice(yaml.indexOf('  admission:'), yaml.indexOf('  full:'));
+    const verify = yaml.slice(yaml.indexOf('  verify:'));
+    expect(admission).toContain('timeout-minutes: 15');
+    expect(verify).toContain('timeout-minutes: 15');
+    expect(admission).toContain('scripts/ci/integration-candidate.mjs guard');
+    expect(verify).toContain('scripts/ci/integration-candidate.mjs guard');
+  });
   it('retries only the exact missing CI Verify registration and then admits full guard', async () => {
     let checks = 0;
     const sleep = vi.fn(async (ms) => {
@@ -15,6 +25,19 @@ describe('frozen-head CI Integration registration race guard', () => {
     expect(result).toEqual({ approvedPinnedHead: true });
     expect(checks).toBe(3);
     expect(sleep).toHaveBeenCalledTimes(2);
+  });
+
+  it('handles a CI Verify registration appearing after the prior 96-second limit', async () => {
+    let attempts = 0;
+    const sleep = vi.fn(async () => {});
+    const result = await waitForCiVerifyRegistration(() => {
+      attempts += 1;
+      if (attempts <= 32) throw new Error('Required check is missing: CI Verify');
+      return 'verified';
+    }, { sleep });
+    expect(result).toBe('verified');
+    expect(attempts).toBe(33);
+    expect(sleep).toHaveBeenCalledTimes(32);
   });
 
   it('does not retry a failed CI Verify, a wrong app, another missing check, or a changed PR', async () => {
