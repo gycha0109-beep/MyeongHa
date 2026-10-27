@@ -78,7 +78,40 @@ export PGUSER="postgres.$project" PGPASSWORD="$SUPABASE_DB_PASSWORD" PGSSLMODE=r
 preflight="$(PGOPTIONS='-c default_transaction_read_only=on' psql -X -qAt -v ON_ERROR_STOP=1 <<'SQL'
 select case when
   current_user='postgres'
-  and (select max(version)='20261025203519' from supabase_migrations.schema_migrations)
+  -- The governed backup predates exactly three independently deployed
+  -- Commerce migrations. Admit only their observed immutable ledger content;
+  -- never replay, remove, or repair those unrelated versions.
+  and (select max(version)='20261027011650' from supabase_migrations.schema_migrations)
+  and (select count(*)=3 from supabase_migrations.schema_migrations
+       where version>'20261025203519')
+  and exists (select 1 from supabase_migrations.schema_migrations
+       where version='20261025203519'
+         and name='seyeon_s0_resume_manual_redirect_20261025'
+         and cardinality(statements)=1
+         and octet_length(convert_to(statements[1],'UTF8'))=2440
+         and encode(sha256(convert_to(statements[1],'UTF8')),'hex')=
+           '5cdc2a5e083076a4c3963143c912531c8419edbcef8748b1f8aa6bcfe04ebed7')
+  and exists (select 1 from supabase_migrations.schema_migrations
+       where version='20261027004434'
+         and name='owner_admin_credit_testing_v1_20261026'
+         and cardinality(statements)=1
+         and octet_length(convert_to(statements[1],'UTF8'))=2947
+         and encode(sha256(convert_to(statements[1],'UTF8')),'hex')=
+           '91eaf5fcbfb2835c9b99d31487494df181e88c06c4cdf6552613487b1362ff44')
+  and exists (select 1 from supabase_migrations.schema_migrations
+       where version='20261027004544'
+         and name='portone_chat_credit_catalog_staged_v1_20261026'
+         and cardinality(statements)=1
+         and octet_length(convert_to(statements[1],'UTF8'))=1979
+         and encode(sha256(convert_to(statements[1],'UTF8')),'hex')=
+           'eb7dcffc2835c0656af0b83d25f3fa3fbdaef29532cfa3230c3cdc957447af5a')
+  and exists (select 1 from supabase_migrations.schema_migrations
+       where version='20261027011650'
+         and name='chat_credit_paid_validity_and_verified_mint_v1_20261027'
+         and cardinality(statements)=1
+         and octet_length(convert_to(statements[1],'UTF8'))=8360
+         and encode(sha256(convert_to(statements[1],'UTF8')),'hex')=
+           'fbd450033e94dc7e454bc6b3be34b40b81abccc93b9a040c623a42bc97d9ebc5')
   and not exists(select 1 from supabase_migrations.schema_migrations where version='20261026025332')
   and exists(select 1 from supabase_migrations.schema_migrations
     where version='20261008090417'
