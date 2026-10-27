@@ -122,11 +122,11 @@ export function parseAdminReadFiltersV1(url: URL): AdminListFiltersV1 {
   }
   const cursor = url.searchParams.get('cursor');
   if (kind === 'overview' && cursor !== null) throw new Error('Overview is not paginated.');
-  if (cursor !== null && (!/^[1-9]\d{0,4}$/u.test(cursor) || Number(cursor) > 10_000 || (kind === 'user-detail' || kind === 'commerce-detail' || kind === 'reading-detail' || kind === 'reading-attempts'))) {
+  if (cursor !== null && (!/^[1-9]\d{0,4}$/u.test(cursor) || Number(cursor) > 10_000 || (kind === 'user-detail' || kind === 'commerce-detail' || kind === 'reading-detail'))) {
     throw new Error('Administrator cursor is invalid.');
   }
   const querySubject = url.searchParams.get('subjectId');
-  if (querySubject !== null && (!UUID.test(querySubject) || (kind === 'user-detail' || kind === 'commerce-detail' || kind === 'reading-detail'))) {
+  if (querySubject !== null && (!UUID.test(querySubject) || (kind === 'user-detail' || kind === 'commerce-detail' || kind === 'reading-detail' || kind === 'reading-attempts'))) {
     throw new Error('Administrator subject reference is invalid.');
   }
   subjectId ??= querySubject?.toLowerCase() ?? null;

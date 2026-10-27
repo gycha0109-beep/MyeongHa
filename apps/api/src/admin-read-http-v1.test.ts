@@ -116,6 +116,8 @@ describe('admin owner-only reads', () => {
     expect(parsed.kind).toBe('reading-attempts');
     expect(parsed.recordId).toBe(id);
     expect(parsed.cursor).toBe('2');
+    expect(() => from('/api/admin/readings/'+id+'/attempts?cursor=10001')).toThrow();
+    expect(() => from('/api/admin/readings/'+id+'/attempts?cursor=NaN')).toThrow();
     expect(() => from('/api/admin/readings/'+id+'/attempts?subjectId='+id)).toThrow();
     expect(() => from('/api/admin/readings/'+id+'/attempts?from=2026-10-01&to=2026-10-02')).toThrow();
     expect(() => from('/api/admin/readings/bad/attempts')).toThrow();

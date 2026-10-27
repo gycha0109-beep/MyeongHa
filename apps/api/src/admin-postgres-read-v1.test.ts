@@ -37,7 +37,7 @@ describe('admin dedicated readonly PostgreSQL adapter', () => {
     await h.port.read({ ...filters('commerce'), subjectId: SUBJECT, from: '2026-10-01', to: '2026-10-26' });
     expect(h.sql[2]).not.toContain(SUBJECT);
     expect(h.sql[2]).toContain('$2::uuid');
-    expect(h.params[2]).toEqual([21, SUBJECT, '2026-10-01','2026-10-26',0]);
+    expect(h.params[2]).toEqual([21, SUBJECT, '2026-10-01','2026-10-26',0,null]);
   });
   it('rejects unsupported analytics data source and excludes sensitive payloads', async () => {
     const h = harness();
@@ -207,7 +207,7 @@ describe('admin dedicated readonly PostgreSQL adapter', () => {
     expect(sql).not.toMatch(/\bUPDATE\b|\bDELETE\b|\bINSERT\b/iu);
     const h=harness();
     await h.port.read({ ...filters('credit-allocations'), subjectId: SUBJECT });
-    expect(h.params[2]).toEqual([21, SUBJECT, null, null, 0]);
+    expect(h.params[2]).toEqual([21, SUBJECT, null, null, 0, null]);
   });
   it('reads only 90-day audit metadata using a bounded read-only SELECT', async () => {
     const sql=ADMIN_READ_SQL_V1.audit ?? '';
