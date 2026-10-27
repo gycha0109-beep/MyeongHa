@@ -100,7 +100,6 @@ const LABELS: Record<string, string> = {
   releaseKey: '릴리스 참조',
   isDefault: '기본 릴리스',
   activatedAt: '활성화 시각',
-  requestId: '감사 요청 참조',
   actorRef: '운영자 인증 참조',
   targetRef: '대상 참조',
   action: '관리자 행동',
@@ -109,7 +108,7 @@ const LABELS: Record<string, string> = {
   issueId: '이슈 참조',
   category: '이슈 유형',
   severity: '심각도',
-  requestId: '요청 참조',
+  requestId: '조회·감사 요청 참조',
 };
 
 function isSubjectId(value: string): boolean {
