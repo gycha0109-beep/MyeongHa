@@ -38,7 +38,7 @@ export type PortOneBrowserHandoffOutcomeV1 =
 const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/iu;
 const STORE=/^store-[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/iu;
 const CHANNEL=/^channel-key-[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/iu;
-const PAYMENT=/^[A-Za-z0-9_-]{6,128}$/u;
+const PAYMENT=/^[A-Za-z0-9_-]{6,40}$/u;
 const FIELDS=new Set(['storeId','channelKey','paymentId','orderName','totalAmount','currency','payMethod']);
 
 function deny():never{
