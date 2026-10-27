@@ -19,6 +19,13 @@ function harness(options:{owner?:boolean;auditFails?:boolean;binding?:boolean;th
 }
 async function preview(h:ReturnType<typeof harness>){const response=await h.post('/api/admin/commands/preview',INPUT);expect(response.status).toBe(200);return await response.json() as {confirmationToken:string};}
 describe('Owner command preview and durable execution boundary',()=>{
+ it('requires explicit provider and domain support for each refund mode even when a refund binding exists',async()=>{
+  let previews=0;
+  const binding:AdminCommandBindingV1={operation:'refund',authority:'test-domain',async preview(){previews++;return{before:{},expectedVersion:'1'};},async execute(){throw Error('Never refund in a test');},async findResult(){return null;}};
+  const handler=createAdminCommandHttpHandlerV1({auth:{async verifyOwner(){return{authUserId:OWNER};}},audit:{async append(){}},commands:{bindings:[binding],refundSupport:{full:true,partial:false,authority:'test-existing-provider-contract'}},allowedOrigin:'https://admin.example.test'});
+  const post=(mode:string)=>handler(new Request('https://admin.example.test/api/admin/commands/preview',{method:'POST',headers:{Origin:'https://admin.example.test','Content-Type':'application/json'},body:JSON.stringify({...INPUT,operation:'refund',parameters:{mode,amountMinor:100}})}));
+  expect((await post('partial')).status).toBe(409);expect(previews).toBe(0);expect((await post('full')).status).toBe(200);expect(previews).toBe(1);
+ });
  it('validates signed confirmation across separate Worker handler instances',async()=>{
   let executions=0;
   const binding:AdminCommandBindingV1={operation:'presentation-save',authority:'synthetic-test-binding',
@@ -60,7 +67,7 @@ describe('Owner command preview and durable execution boundary',()=>{
   const audit=harness({auditFails:true});expect((await audit.post('/api/admin/commands/preview',INPUT)).status).toBe(503);expect(audit.executions).toBe(0);
  });
  it('does not claim success after an uncertain command failure or expose error details',async()=>{
-  const h=harness({throwsExecute:true});const p=await preview(h);const response=await h.post('/api/admin/commands/execute',{input:INPUT,confirmationToken:p.confirmationToken});expect(response.status).toBe(503);const text=await response.text();expect(text).toContain('ADMIN_COMMAND_RESULT_UNCERTAIN');expect(text).not.toContain('private database detail');
+  const h=harness({throwsExecute:true});const p=await preview(h);const response=await h.post('/api/admin/commands/execute',{input:INPUT,confirmationToken:p.confirmationToken});expect(response.status).toBe(503);const text=await response.text();expect(text).toContain('ADMIN_COMMAND_RESULT_UNCERTAIN');expect(text).not.toContain('private database detail');expect(h.audits).toContainEqual(expect.objectContaining({action:'command:execute-uncertain',outcome:'failed'}));
  });
  it('rejects table-shaped fields, HTML redirect paths, unsafe amounts and malformed schedules',()=>{
   for(const input of [{...INPUT,table:'subjects'},{...INPUT,parameters:{...INPUT.parameters,linkPath:'//evil.test'}},{...INPUT,parameters:{...INPUT.parameters,startsAt:'2026-10-28T00:00:00Z',endsAt:'2026-10-27T00:00:00Z'}},{...INPUT,operation:'credit-adjust',parameters:{delta:0}},{...INPUT,operation:'refund',parameters:{mode:'partial',amountMinor:-1}}])expect(()=>parseAdminCommandInputV1(input)).toThrow();

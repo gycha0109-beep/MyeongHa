@@ -173,7 +173,7 @@ export function parseAdminReadFiltersV1(url: URL): AdminListFiltersV1 {
   }
   const creditSourceParam = url.searchParams.get('creditSource');
   if (creditSourceParam !== null && (kind !== 'credits' ||
-      !['signup','portone_topup','reading_reward'].includes(creditSourceParam))) {
+      !['signup','portone_topup','reading_reward','admin_adjustment'].includes(creditSourceParam))) {
     throw new Error('Invalid credit source filter.');
   }
   const reservationIdParam = url.searchParams.get('reservationId');
@@ -186,7 +186,7 @@ export function parseAdminReadFiltersV1(url: URL): AdminListFiltersV1 {
       !['reserved','settled','released'].includes(reservationStateParam))) {
     throw new Error('Invalid credit reservation filter.');
   }
-  const creditSource = creditSourceParam as 'signup' | 'portone_topup' | 'reading_reward' | null;
+  const creditSource = creditSourceParam as 'signup' | 'portone_topup' | 'reading_reward' | 'admin_adjustment' | null;
   const reservationState = reservationStateParam as 'reserved' | 'settled' | 'released' | null;
   const rawIssueStatus = url.searchParams.get('status');
   if (rawIssueStatus !== null && (kind !== 'issues' ||

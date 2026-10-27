@@ -24,5 +24,8 @@ describe('isolated Admin deployment configuration',()=>{
     const generated=prepareAdminHostedConfigV1({...command,MYEONGHA_ADMIN_CONFIRMATION_SECRET:secret},config);
     expect(generated.hyperdrive).toHaveLength(3);expect(JSON.stringify(generated)).not.toContain(secret);
     expect(inspectAdminHostedDeploymentV1({...command,MYEONGHA_ADMIN_COMMAND_HYPERDRIVE_ID:env.MYEONGHA_ADMIN_READ_HYPERDRIVE_ID},config).invalid).toContain('dedicated_admin_command_origin');
+    const maintenance=prepareAdminHostedConfigV1({...env,MYEONGHA_ADMIN_RETENTION_HYPERDRIVE_ID:'d'.repeat(32)},config);
+    expect(maintenance.hyperdrive.at(-1).binding).toBe('ADMIN_RETENTION_HYPERDRIVE');
+    expect(inspectAdminHostedDeploymentV1({...env,MYEONGHA_ADMIN_RETENTION_HYPERDRIVE_ID:env.MYEONGHA_ADMIN_AUDIT_HYPERDRIVE_ID},config).invalid).toContain('dedicated_admin_retention_origin');
   });
 });

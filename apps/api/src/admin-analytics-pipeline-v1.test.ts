@@ -12,7 +12,7 @@ import type { PostgresSubjectPoolV1 } from './postgres-subject-execution.js';
 
 const now=new Date('2026-10-27T12:00:00Z');
 const visitor='av_'+'a'.repeat(64),other='av_'+'b'.repeat(64),session='as_'+'a'.repeat(64),purchase='ap_'+'c'.repeat(64);
-const policy:AdminAnalyticsCollectionPolicyV1={enabled:true,approvalRef:'test-only-approval',policyVersion:'test-policy-v1',retentionSeconds:3600,
+const policy:AdminAnalyticsCollectionPolicyV1={enabled:true,approvalRef:'test-only-approval',policyVersion:'test-policy-v1',retentionSeconds:180*86400,
   deletionBindingVerified:true,validVisitPolicyVersion:'test-visit-rule',approvedEvents:[...ADMIN_ANALYTICS_EVENT_REGISTRY_V1,...ADMIN_ANALYTICS_EXTENSION_EVENTS_V1],approvedCampaignKeys:['beta-1'],approvedChannelKeys:['social']};
 const consent={visitorRef:visitor,sessionRef:session,version:'test-consent-v1',granted:true,expiresAt:'2026-10-27T13:00:00Z',validVisitor:true};
 let serial=1;
@@ -62,7 +62,7 @@ describe('analytics collection safety and source authority',()=>{
     const input={event,policy,consent,store:m.store,now};
     await expect(recordVerifiedAdminAnalyticsEventV1({...input,verifyDomainEvidence:async()=>null})).rejects.toThrow('evidence');
     await expect(recordVerifiedAdminAnalyticsEventV1({...input,verifyDomainEvidence:async()=>({paidPurchase:true})})).resolves.toBe('inserted');
-    expect([...m.events.values()][0]).toMatchObject({authority:'server_verified',paidPurchase:true,expiresAt:'2026-10-27T12:30:00.000Z'});
+    expect([...m.events.values()][0]).toMatchObject({authority:'server_verified',paidPurchase:true,expiresAt:'2026-10-27T13:00:00.000Z'});
     const ref=deriveAdminAnalyticsReferenceV1('test-only-secret-which-is-at-least-32-bytes','visitor','raw-member-id');
     expect(ref).toMatch(/^av_[a-f0-9]{64}$/u);expect(ref).not.toContain('raw-member-id');
     expect(deriveAdminAnalyticsReferenceV1('test-only-secret-which-is-at-least-32-bytes','purchase','raw-member-id')).not.toBe(ref);
@@ -91,6 +91,8 @@ describe('cohort and financial measurement boundaries',()=>{
   it('bounds periods and uses Monday UTC weeks and month starts',()=>{
     expect(adminAnalyticsBucketV1('2026-10-25T23:59:59Z','week')).toBe('2026-10-19');
     expect(adminAnalyticsBucketV1('2026-10-27T01:00:00Z','month')).toBe('2026-10-01');
+    expect(parseAdminAnalyticsPeriodV1(new URL('https://admin.test/?from=2026-05-01&to=2026-10-27')).from).toBe('2026-05-01');
+    expect(()=>parseAdminAnalyticsPeriodV1(new URL('https://admin.test/?from=2026-04-30&to=2026-10-27'))).toThrow();
     for(const query of ['from=2026-01-01&to=2026-10-27','from=2026-02-30&to=2026-03-01','from=2026-10-21&to=2026-10-27&grain=year','from=2026-10-21&to=2026-10-27&campaignKey=one&campaignKey=two']){
       expect(()=>parseAdminAnalyticsPeriodV1(new URL('https://admin.test/?'+query))).toThrow();
     }

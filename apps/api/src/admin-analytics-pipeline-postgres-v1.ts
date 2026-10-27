@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { ADMIN_READ_PRINCIPAL_SQL_V1 } from './admin-postgres-read-v1.js';
+import { ANALYTICS_RETENTION_SECONDS_V1 } from './admin-operating-policy-v1.js';
 import type { PostgresSubjectPoolV1, PostgresSubjectConnectionV1 } from './postgres-subject-execution.js';
 import {
   aggregateAdminAnalyticsEventsV1, isAdminAnalyticsCollectionApprovedV1,
@@ -106,12 +107,20 @@ async function writerTransaction<T>(pool:PostgresSubjectPoolV1,fn:(client:Postgr
 }
 
 export function createAdminAnalyticsPostgresEventStoreV1(pool:PostgresSubjectPoolV1):AdminAnalyticsEventStoreV1 & {
-  bindConsent(consent:AdminAnalyticsConsentV1,policyVersion:string,subjectLinkRef:string|null):Promise<void>;
+  bindConsent(consent:Omit<AdminAnalyticsConsentV1,'sessionRef'>,policyVersion:string,subjectLinkRef:string|null):Promise<void>;
+  isConsentActive(consent:Omit<AdminAnalyticsConsentV1,'sessionRef'>,policyVersion:string):Promise<boolean>;
 } {
   return {
+    isConsentActive(consent,policyVersion) {
+      return writerTransaction(pool,async client=>{
+        const result=await client.query<{active:boolean}>(`SELECT true AS active FROM myeongha_admin_analytics.consents_v1
+          WHERE visitor_ref=$1 AND version=$2 AND policy_version=$3 AND withdrawn_at IS NULL AND expires_at>CURRENT_TIMESTAMP`,[consent.visitorRef,consent.version,policyVersion]);
+        return result.rows.length===1&&result.rows[0]?.active===true;
+      });
+    },
     bindConsent(consent,policyVersion,subjectLinkRef) {
       return writerTransaction(pool,async client=>{
-        if(!/^av_[0-9a-f]{64}$/u.test(consent.visitorRef)||!consent.granted||!/^as_[0-9a-f]{64}$/u.test(consent.sessionRef)||
+        if(!/^av_[0-9a-f]{64}$/u.test(consent.visitorRef)||!consent.granted||
           !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,95}$/u.test(consent.version)||!Number.isFinite(Date.parse(consent.expiresAt))||
           (subjectLinkRef!==null&&!/^ah_[0-9a-f]{64}$/u.test(subjectLinkRef)))throw Error('Invalid consent binding.');
         await client.query(`INSERT INTO myeongha_admin_analytics.consents_v1(visitor_ref,version,policy_version,subject_link_ref,expires_at)
@@ -120,9 +129,12 @@ export function createAdminAnalyticsPostgresEventStoreV1(pool:PostgresSubjectPoo
     },
     append(event) {
       return writerTransaction(pool,async client=>{
-        const consent=await client.query<{version:string}>(`SELECT version FROM myeongha_admin_analytics.consents_v1
+        if(!Number.isFinite(Date.parse(event.occurredAt))||!Number.isFinite(Date.parse(event.expiresAt))||Date.parse(event.expiresAt)<=Date.parse(event.occurredAt)||
+          Date.parse(event.expiresAt)>Date.parse(event.occurredAt)+ANALYTICS_RETENTION_SECONDS_V1*1000)throw Error('Analytics retention exceeds approved 180 days.');
+        const consent=await client.query<{version:string;expiresAt:string}>(`SELECT version,expires_at::text AS "expiresAt" FROM myeongha_admin_analytics.consents_v1
           WHERE visitor_ref=$1 AND version=$2 AND policy_version=$3 AND withdrawn_at IS NULL AND expires_at>CURRENT_TIMESTAMP FOR SHARE`,[event.anonymousOrSubjectRef,event.consentVersion,event.policyVersion]);
         if(consent.rows.length!==1)throw Error('Analytics consent revoked or missing.');
+        if(Date.parse(event.expiresAt)>Date.parse(consent.rows[0]!.expiresAt))throw Error('Analytics event exceeds consent lifetime.');
         const fingerprint=createHash('sha256').update(canonical(event)).digest('hex');
         const inserted=await client.query<{eventId:string}>(`INSERT INTO myeongha_admin_analytics.events_v1
           (event_id,event_name,event_schema_version,visitor_ref,session_ref,client,authority,consent_version,policy_version,

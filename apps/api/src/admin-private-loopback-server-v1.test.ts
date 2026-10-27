@@ -12,6 +12,7 @@ let nextPort = 4187;
 const env = Object.freeze({
   MYEONGHA_ADMIN_PRIVATE_ENABLED: 'true',
   MYEONGHA_ADMIN_OWNER_AUTH_USER_ID: OWNER,
+  MYEONGHA_ADMIN_OWNER_EMAIL: "owner@example.test",
   MYEONGHA_ADMIN_SUPABASE_ORIGIN: MYEONGHA_PRODUCTION_SUPABASE_ORIGIN,
   MYEONGHA_SUPABASE_API_KEY: 'synthetic-key-for-local-tests-only',
   MYEONGHA_ADMIN_MEMBER_AUTH_ORIGIN: 'https://auth.example.test',
@@ -39,7 +40,7 @@ async function start(options: { userId?: string; invalidAuthOrigin?: boolean } =
     env: options.invalidAuthOrigin ? { ...env, MYEONGHA_ADMIN_MEMBER_AUTH_ORIGIN: 'http://bad.example.test' } : env,
     readPool: pool('myeongha_admin_reader', reads),
     auditPool: pool('myeongha_admin_audit_writer', audit),
-    memberFetchImpl: async () => Response.json({ id: options.userId ?? OWNER }),
+    memberFetchImpl: async () => Response.json({ id: options.userId ?? OWNER,email:"owner@example.test" }),
     signInFetchImpl: (async () => Response.json({
       ok: true, data: { status: 'authenticated', session: {
         accessToken: TOKEN, refreshToken: 'never-expose-this-secret',

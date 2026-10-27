@@ -31,17 +31,21 @@ export function inspectAdminHostedDeploymentV1(env,config) {
   const command=env.MYEONGHA_ADMIN_COMMAND_HYPERDRIVE_ID;
   if(command&&(!/^[a-f0-9]{32}$/.test(command)||ids.includes(command)||['1ffe61390c064c0480a0a1e933e4d2c9','8ee320f55db94f66b2681fcc43995219','64e88db2afcd4118afe1fe29bdf31742'].includes(command)))invalid.push('dedicated_admin_command_origin');
   if(command&&(!env.MYEONGHA_ADMIN_CONFIRMATION_SECRET||Buffer.byteLength(env.MYEONGHA_ADMIN_CONFIRMATION_SECRET)<32))missing.push('MYEONGHA_ADMIN_CONFIRMATION_SECRET');
+  if(command&&env.MYEONGHA_ADMIN_CONFIRMATION_SECRET&&Buffer.byteLength(env.MYEONGHA_ADMIN_CONFIRMATION_SECRET)>256)invalid.push('MYEONGHA_ADMIN_CONFIRMATION_SECRET');
+  const retention=env.MYEONGHA_ADMIN_RETENTION_HYPERDRIVE_ID;
+  if(retention&&(!/^[a-f0-9]{32}$/.test(retention)||[...ids,command,'1ffe61390c064c0480a0a1e933e4d2c9','8ee320f55db94f66b2681fcc43995219','64e88db2afcd4118afe1fe29bdf31742'].includes(retention)))invalid.push('dedicated_admin_retention_origin');
   return {configurationReady:missing.length===0&&invalid.length===0,missing,invalid,
     operationalVerification:'requires_Access_policy_and_dedicated_origin_role_audit_readback',activationEnabled:env.MYEONGHA_ADMIN_PRIVATE_ENABLED==='true'};
 }
 export function prepareAdminHostedConfigV1(env,config) {
   const report=inspectAdminHostedDeploymentV1(env,config);
   if(!report.configurationReady)throw Error('Admin deployment configuration is incomplete: '+[...report.missing,...report.invalid].join(', '));
-  const vars={MYEONGHA_ADMIN_PRIVATE_ENABLED:'false',MYEONGHA_ADMIN_HYPERDRIVE_POLICY:'dedicated-admin-verify-full-v1'};
+  const vars={MYEONGHA_ADMIN_PRIVATE_ENABLED:'false',MYEONGHA_ADMIN_CREDIT_COMMANDS_ENABLED:'false',MYEONGHA_ADMIN_RETENTION_ENABLED:'false',MYEONGHA_ADMIN_HYPERDRIVE_POLICY:'dedicated-admin-verify-full-v1'};
   for(const key of ADMIN_HOSTED_REQUIRED_V1.filter(key=>!key.endsWith('_HYPERDRIVE_ID')&&key!=='MYEONGHA_SUPABASE_API_KEY'))vars[key]=env[key];
   return {...config,vars,hyperdrive:[{binding:'ADMIN_READ_HYPERDRIVE',id:env.MYEONGHA_ADMIN_READ_HYPERDRIVE_ID},
     {binding:'ADMIN_AUDIT_HYPERDRIVE',id:env.MYEONGHA_ADMIN_AUDIT_HYPERDRIVE_ID},
-    ...(env.MYEONGHA_ADMIN_COMMAND_HYPERDRIVE_ID?[{binding:'ADMIN_COMMAND_HYPERDRIVE',id:env.MYEONGHA_ADMIN_COMMAND_HYPERDRIVE_ID}]:[])]};
+    ...(env.MYEONGHA_ADMIN_COMMAND_HYPERDRIVE_ID?[{binding:'ADMIN_COMMAND_HYPERDRIVE',id:env.MYEONGHA_ADMIN_COMMAND_HYPERDRIVE_ID}]:[]),
+    ...(env.MYEONGHA_ADMIN_RETENTION_HYPERDRIVE_ID?[{binding:'ADMIN_RETENTION_HYPERDRIVE',id:env.MYEONGHA_ADMIN_RETENTION_HYPERDRIVE_ID}]:[])]};
 }
 if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url)) {
   const config=JSON.parse(readFileSync(new URL('./wrangler.jsonc',import.meta.url),'utf8'));

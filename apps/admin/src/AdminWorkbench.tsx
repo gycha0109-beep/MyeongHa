@@ -296,7 +296,7 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
   const [aiErrorCode, setAiErrorCode] = useState('');
   const [draftAiErrorCode, setDraftAiErrorCode] = useState('');
   const [issueCategory, setIssueCategory] = useState('');
-  const [creditSource, setCreditSource] = useState<'all' | 'signup' | 'portone_topup' | 'reading_reward'>('all');
+  const [creditSource, setCreditSource] = useState<'all' | 'signup' | 'portone_topup' | 'reading_reward' | 'admin_adjustment'>('all');
   const [reservationState, setReservationState] = useState<'all' | 'reserved' | 'settled' | 'released'>('all');
   const [allocationMismatchOnly, setAllocationMismatchOnly] = useState(false);
   const [receiptStatus, setReceiptStatus] = useState<'all' | 'pending' | 'verified' | 'rejected' | 'revoked'>('all');
@@ -418,7 +418,7 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
             <option value="all">전체</option>
             <option value="signup">회원 가입</option>
             <option value="portone_topup">결제 충전</option>
-            <option value="reading_reward">첫 유료 Reading</option>
+            <option value="reading_reward">첫 유료 Reading</option><option value="admin_adjustment">관리자 보정</option>
           </select>
         </label>}
       {section === 'commerce' && tab === 'credit-reservations' && detail === null &&

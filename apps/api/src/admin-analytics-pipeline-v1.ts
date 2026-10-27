@@ -1,5 +1,6 @@
 import { createHmac } from 'node:crypto';
 import { ADMIN_ANALYTICS_EVENT_REGISTRY_V1 } from './admin-analytics-read-v1.js';
+import { ANALYTICS_RETENTION_SECONDS_V1 } from './admin-operating-policy-v1.js';
 
 export const ADMIN_ANALYTICS_PIPELINE_VERSION_V1 = 'admin-analytics-pipeline-v1' as const;
 // An explicitly versioned candidate registry. No event becomes publishable merely
@@ -77,7 +78,7 @@ export interface AdminAnalyticsEventStoreV1 {
 export function isAdminAnalyticsCollectionApprovedV1(policy?: AdminAnalyticsCollectionPolicyV1): policy is AdminAnalyticsCollectionPolicyV1 {
   return policy?.enabled === true && KEY.test(policy.approvalRef) && KEY.test(policy.policyVersion) &&
     KEY.test(policy.validVisitPolicyVersion) && policy.deletionBindingVerified === true &&
-    Number.isSafeInteger(policy.retentionSeconds) && policy.retentionSeconds > 0 &&
+    policy.retentionSeconds === ANALYTICS_RETENTION_SECONDS_V1 &&
     policy.approvedEvents.length > 0 && policy.approvedEvents.every(event => ALL_EVENTS.has(event));
 }
 
@@ -149,8 +150,8 @@ export function createAdminAnalyticsCollectorV1(input: {
       const now = (input.now ?? (()=>new Date()))();
       if (consent === null || !consent.granted || consent.visitorRef !== event.anonymousOrSubjectRef || consent.sessionRef !== event.sessionRef ||
           !KEY.test(consent.version) || Date.parse(consent.expiresAt) <= now.getTime()) return response(403,'ANALYTICS_CONSENT_REQUIRED');
-      if (Date.parse(event.occurredAt) > now.getTime() || Date.parse(event.occurredAt) < now.getTime() - input.policy.retentionSeconds * 1000) return response(400,'ANALYTICS_EVENT_OUTSIDE_RETENTION');
-      const expiry = Math.min(Date.parse(event.occurredAt) + input.policy.retentionSeconds * 1000,Date.parse(consent.expiresAt));
+      if (Date.parse(event.occurredAt) > now.getTime() || Date.parse(event.occurredAt) <= now.getTime() - ANALYTICS_RETENTION_SECONDS_V1 * 1000) return response(400,'ANALYTICS_EVENT_OUTSIDE_RETENTION');
+      const expiry = Math.min(Date.parse(event.occurredAt) + ANALYTICS_RETENTION_SECONDS_V1 * 1000,Date.parse(consent.expiresAt));
       const state = await input.store.append(Object.freeze({ ...event, authority:'client_intent',consentVersion:consent.version,
         policyVersion:input.policy.policyVersion, validVisitor:consent.validVisitor,paidPurchase:null,expiresAt:new Date(expiry).toISOString() }));
       return response(200,state === 'inserted' ? 'ANALYTICS_RECORDED' : 'ANALYTICS_REPLAYED');
@@ -174,7 +175,7 @@ export async function recordVerifiedAdminAnalyticsEventV1(input: {
       Date.parse(input.consent.expiresAt) <= input.now.getTime() || Date.parse(event.occurredAt) > input.now.getTime()) throw new Error('Analytics server consent/evidence required.');
   const evidence = await input.verifyDomainEvidence(event); if (evidence === null) throw new Error('Analytics domain evidence missing.');
   if ((event.eventName === 'READING_PURCHASED' || event.eventName === 'REFUND_COMPLETED') && !event.payload.purchaseRef) throw new Error('Purchase linkage required.');
-  const expiresAt = Math.min(Date.parse(event.occurredAt)+input.policy.retentionSeconds*1000,Date.parse(input.consent.expiresAt));
+  const expiresAt = Math.min(Date.parse(event.occurredAt)+ANALYTICS_RETENTION_SECONDS_V1*1000,Date.parse(input.consent.expiresAt));
   if (expiresAt <= input.now.getTime()) throw new Error('Analytics event expired.');
   return input.store.append(Object.freeze({ ...event,authority:'server_verified',consentVersion:input.consent.version,policyVersion:input.policy.policyVersion,
     validVisitor:input.consent.validVisitor,paidPurchase:evidence.paidPurchase,expiresAt:new Date(expiresAt).toISOString() }));
@@ -189,7 +190,7 @@ export function parseAdminAnalyticsPeriodV1(url: URL): AdminAnalyticsPeriodV1 {
   const from = url.searchParams.get('from'); const to = url.searchParams.get('to'); const grain = url.searchParams.get('grain') ?? 'day'; const campaignKey = url.searchParams.get('campaignKey');
   if (!from || !to || !/^\d{4}-\d{2}-\d{2}$/u.test(from) || !/^\d{4}-\d{2}-\d{2}$/u.test(to) ||
       new Date(from+'T00:00:00Z').toISOString().slice(0,10) !== from || new Date(to+'T00:00:00Z').toISOString().slice(0,10) !== to ||
-      Date.parse(to)-Date.parse(from) < 0 || Date.parse(to)-Date.parse(from)>90*86_400_000 ||
+      Date.parse(to)-Date.parse(from) < 0 || Date.parse(to)-Date.parse(from)>(180-1)*86_400_000 ||
       !['day','week','month'].includes(grain) || (campaignKey !== null && !KEY.test(campaignKey))) throw new Error('Invalid bounded analytics period.');
   return Object.freeze({from,to,grain:grain as AdminAnalyticsPeriodV1['grain'],campaignKey});
 }
@@ -236,6 +237,8 @@ export function aggregateAdminAnalyticsEventsV1(events: readonly AdminAnalyticsS
     return {key,label,value:d===null?n:d===0?null:(unit==='%'?100:1)*n/d,numerator:n,denominator:d,status:d===0?'empty_denominator':key==='visitors'&&n<100?'target_sample_not_met':'measured',unit};
   };
   const metrics = [
+    metric('visit_visitors','전체 방문 고유 분석 참조',new Set(rows.filter(e=>e.eventName==='VISIT_STARTED'&&e.validVisitor).map(e=>e.anonymousOrSubjectRef)).size,null,['VISIT_STARTED'],'명'),
+    metric('sessions','전체 방문 고유 세션',new Set(rows.filter(e=>e.eventName==='VISIT_STARTED'&&e.validVisitor).map(e=>e.sessionRef)).size,null,['VISIT_STARTED'],'개'),
     metric('visitors','상품 상세 유효 방문자',visitors.size,null,['PRODUCT_VIEWED'],'명'),
     metric('signup_conversion','회원가입 전환율',signup.size,visitors.size,['PRODUCT_VIEWED','SIGNUP_COMPLETED'],'%'),
     metric('signup_completion','가입 시작 대비 완료',signupFinished.size,signupStarts.size,['SIGNUP_STARTED','SIGNUP_COMPLETED','PRODUCT_VIEWED'],'%'),

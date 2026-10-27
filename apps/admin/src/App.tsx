@@ -10,6 +10,7 @@ import { BetaAnalyticsReadiness } from './AdminOperationalReadiness.js';
 import { AdminOperatorConsole } from './AdminOperatorConsole.js';
 import { AdminAnalyticsDashboard } from './AdminAnalyticsDashboard.js';
 import { AdminAiFinance } from './AdminAiFinance.js';
+import {AdminAiBudget} from './AdminAiBudget.js';
 
 const sectionDetails: Record<Exclude<AdminSection, 'overview'>, readonly string[]> = {
   users: ['사용자 검색 및 가입 상태', 'Reading · 권한 메타데이터', '게스트 · 회원 병합 및 삭제 상태'],
@@ -294,7 +295,7 @@ export function App() {
                       <details className="surface"><summary>이벤트 등록·분모·분자 근거 보기</summary><BetaAnalyticsReadiness token={ownerToken} onSessionExpired={() => setOwnerToken(null)} /></details></>
                   : <AdminWorkbench key={route.section + ':' + path} section={route.section} token={ownerToken}
                       onSessionExpired={() => setOwnerToken(null)} onNavigate={onNavigate} />}
-                    {route.section === 'readings' && <AdminAiFinance token={ownerToken} onSessionExpired={() => setOwnerToken(null)} />}
+                    {route.section === 'readings' && <><AdminAiBudget token={ownerToken} onSessionExpired={() => setOwnerToken(null)}/><AdminAiFinance token={ownerToken} onSessionExpired={() => setOwnerToken(null)} /></>}
                     {['users', 'commerce', 'issues'].includes(route.section) &&
                       <AdminOperatorConsole token={ownerToken} onSessionExpired={() => setOwnerToken(null)} />}</>}
             </>

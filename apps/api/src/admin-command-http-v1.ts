@@ -50,7 +50,18 @@ export function createAdminCommandHttpHandlerV1(deps: {
     try {
       if (request.method === 'GET' && url.pathname === '/api/admin/commands/capabilities' && url.search === '') {
         await append(actor.authUserId,'command:capabilities','allowed');
-        return json(200,requestId,{ capabilities: ADMIN_COMMAND_KEYS_V1.map(operation => ({ operation,enabled:bindings.has(operation)&&deps.allowedOrigin!==undefined,authority:bindings.get(operation)?.authority ?? null,blocker:bindings.has(operation)&&deps.allowedOrigin!==undefined ? null : ADMIN_COMMAND_BLOCKERS_V1[operation] })) });
+        return json(200,requestId,{ capabilities: ADMIN_COMMAND_KEYS_V1.map(operation => {
+          const refundModes={full:bindings.has('refund')&&deps.commands?.refundSupport?.full===true,partial:bindings.has('refund')&&deps.commands?.refundSupport?.partial===true};
+          const enabled=bindings.has(operation)&&deps.allowedOrigin!==undefined&&(operation!=='refund'||refundModes.full||refundModes.partial);
+          return {operation,enabled,authority:bindings.get(operation)?.authority??null,blocker:enabled?null:ADMIN_COMMAND_BLOCKERS_V1[operation],...(operation==='refund'?{refundModes}:{})};
+        }) });
+      }
+      if(request.method==='GET'&&url.pathname==='/api/admin/credits/history'){
+        const subjectId=url.searchParams.get('subjectId');
+        if([...url.searchParams.keys()].length!==1||!subjectId||!UUID.test(subjectId))throw Error('Invalid credit history query');
+        if(!deps.commands?.creditHistory){await append(actor.authUserId,'credit:history','denied',subjectId);return json(409,requestId,{error:'ADMIN_CREDIT_UNAVAILABLE'});}
+        const rows=await deps.commands.creditHistory(subjectId);if(rows.length>50)throw Error('Unbounded credit history');
+        await append(actor.authUserId,'credit:history','allowed',subjectId);return json(200,requestId,{rows:rows.map(requireAdminCommandStateV1)});
       }
       if (request.method === 'GET' && url.pathname === '/api/admin/commands/result') {
         const operation = url.searchParams.get('operation') as AdminCommandKeyV1; const operationId = url.searchParams.get('operationId');
@@ -87,6 +98,9 @@ export function createAdminCommandHttpHandlerV1(deps: {
       }
       const input = parseAdminCommandInputV1(inputRaw);
       const binding = bindings.get(input.operation);
+      if(input.operation==='refund'&&(!deps.commands?.refundSupport?.authority.trim()||deps.commands.refundSupport[input.parameters.mode as 'full'|'partial']!==true)){
+        await append(actor.authUserId,'command:refund-unsupported','denied',input.targetRef);return json(409,requestId,{error:'ADMIN_REFUND_MODE_UNSUPPORTED'});
+      }
       if (!binding || deps.allowedOrigin === undefined) { await append(actor.authUserId,'command:blocked','denied',input.targetRef); return json(409,requestId,{error:'ADMIN_DOMAIN_COMMAND_UNAVAILABLE',blocker:ADMIN_COMMAND_BLOCKERS_V1[input.operation]}); }
       const payloadHash = createHash('sha256').update(JSON.stringify(input)).digest('hex');
       const context = Object.freeze({ actorAuthUserId:actor.authUserId,requestId,payloadHash,input });
@@ -122,6 +136,10 @@ export function createAdminCommandHttpHandlerV1(deps: {
       } catch {
         // A network/commit acknowledgement can be uncertain. Re-read the durable
         // receipt using this operation ID before deciding whether to retry.
+        try{await deps.audit.append({requestId:randomUUID(),actorAuthUserId:actor.authUserId,targetRef:input.targetRef,
+          action:'command:execute-uncertain',outcome:'failed',at:now.toISOString()});}catch{
+          return json(503,requestId,{error:'ADMIN_AUDIT_UNAVAILABLE',operationId:input.operationId,recheckRequired:true});
+        }
         return json(503,requestId,{error:'ADMIN_COMMAND_RESULT_UNCERTAIN',operationId:input.operationId,recheckRequired:true});
       } finally { confirmation.running = false; inflight = false; }
     } catch {

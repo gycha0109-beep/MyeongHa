@@ -1,10 +1,39 @@
 import {describe,expect,it} from 'vitest';
-import {initializeMyeonghaAnalyticsV1} from '../apps/web/admin-analytics-collector.js';
+import {initializeMyeonghaAnalyticsV1,mountMyeonghaAnalyticsConsentV1} from '../apps/web/admin-analytics-collector.js';
 describe('disabled-by-default web analytics initialization',()=>{
   it('performs no request or storage access without approved policy and consent',async()=>{
     let calls=0;const collector=initializeMyeonghaAnalyticsV1({fetchImpl:async()=>{calls++;return new Response('{}');}});
     expect(collector.status).toBe('disabled');expect(collector.setConsent({granted:true})).toBe(false);
     expect(await collector.track('PAGE_VIEWED',{pageKey:'landing'})).toEqual({status:'disabled'});
     expect(await collector.withdraw()).toEqual({status:'local_consent_cleared'});expect(calls).toBe(0);
+  });
+  it('requires explicit server consent, preserves a retry envelope and withdraws after reload',async()=>{
+    const sent=[];const policy={approved:true,approvalRef:'owner-20261027',policyVersion:'product-analytics-180d-v1',retentionSeconds:180*86400,deletionBindingVerified:true,validVisitPolicyVersion:'test-admission-v1',approvedEvents:['PAGE_VIEWED']};
+    const expiresAt=new Date(Date.now()+86400_000).toISOString();const fetchImpl=async(path,init)=>{sent.push({path,body:init.body,headers:init.headers});return path.endsWith('/consent')?Response.json({consent:{granted:true,visitorRef:'av_'+'a'.repeat(64),sessionRef:'as_'+'a'.repeat(64),version:'product-analytics-consent-180d-v1',expiresAt}}):path.endsWith('/session')?Response.json({visitorRef:'av_'+'a'.repeat(64),sessionRef:'as_'+'b'.repeat(64),version:'product-analytics-consent-180d-v1',expiresAt,sessionContext:'synthetic.signature'}):Response.json({});};
+    const collector=initializeMyeonghaAnalyticsV1({enabled:true,policy,fetchImpl});
+    expect(await collector.track('PAGE_VIEWED',{pageKey:'product'})).toEqual({status:'consent_required'});expect(sent).toHaveLength(0);
+    expect(await collector.grantConsent()).toEqual({status:'granted'});expect(JSON.parse(sent[0].body)).toEqual({decision:'grant'});
+    const id='123e4567-e89b-42d3-a456-426614174000';await collector.track('PAGE_VIEWED',{pageKey:'product'},id);await collector.track('PAGE_VIEWED',{pageKey:'product'},id);
+    expect(sent[2].body).toBe(sent[3].body);expect(sent[2].headers['X-MyeongHa-Analytics-Session']).toBe('synthetic.signature');expect(await collector.track('PAGE_VIEWED',{pageKey:'other'},id)).toMatchObject({status:'conflicting_event_id'});
+    const reloaded=initializeMyeonghaAnalyticsV1({enabled:true,policy,fetchImpl});expect(await reloaded.withdraw()).toEqual({status:'withdrawn'});
+    expect(sent.at(-1).path).toBe('/api/analytics/withdraw');expect(mountMyeonghaAnalyticsConsentV1()).toBeNull();
+  });
+  it('uses consent-gated sessionStorage for a tab lifecycle rather than a 180-day cookie session',async()=>{
+    let storageReads=0,sessions=0;const values=new Map();const memory={getItem:key=>values.get(key)??null,setItem:(key,value)=>values.set(key,value),removeItem:key=>values.delete(key)};
+    const expiresAt=new Date(Date.now()+86400_000).toISOString(),visitorRef='av_'+'a'.repeat(64),version='product-analytics-consent-180d-v1';
+    const policy={approved:true,approvalRef:'owner-20261027',policyVersion:'product-analytics-180d-v1',retentionSeconds:180*86400,deletionBindingVerified:true,validVisitPolicyVersion:'test-admission-v1',approvedEvents:['PAGE_VIEWED']};
+    const fetchImpl=async path=>path.endsWith('/consent')?Response.json({consent:{granted:true,visitorRef,version,expiresAt}}):Response.json({visitorRef,version,expiresAt,sessionRef:'as_'+String(++sessions).repeat(64),sessionContext:'synthetic.signature'});
+    const options={enabled:true,policy,fetchImpl,get sessionStorage(){storageReads++;return memory;}};
+    const first=initializeMyeonghaAnalyticsV1(options);expect(await first.startSession()).toEqual({status:'consent_required'});expect(storageReads).toBe(0);
+    await first.grantConsent();expect(sessions).toBe(1);expect(storageReads).toBeGreaterThan(0);
+    const sameTab=initializeMyeonghaAnalyticsV1(options);await sameTab.grantConsent();expect(sessions).toBe(1);
+    const otherTab=initializeMyeonghaAnalyticsV1({...options,sessionStorage:{getItem:()=>null,setItem(){},removeItem(){}}});await otherTab.grantConsent();expect(sessions).toBe(2);
+  });
+  it('does not resume collection when a pending grant returns after withdrawal',async()=>{
+    let finish;const pending=new Promise(resolve=>{finish=resolve;});const sent=[];
+    const policy={approved:true,approvalRef:'owner-20261027',policyVersion:'product-analytics-180d-v1',retentionSeconds:180*86400,deletionBindingVerified:true,validVisitPolicyVersion:'test-admission-v1',approvedEvents:['PAGE_VIEWED']};
+    const collector=initializeMyeonghaAnalyticsV1({enabled:true,policy,fetchImpl:async path=>{sent.push(path);return path.endsWith('/consent')?pending:Response.json({});}});
+    const grant=collector.grantConsent();await collector.withdraw();finish(Response.json({consent:{granted:true,visitorRef:'av_'+'a'.repeat(64),version:'product-analytics-consent-180d-v1',expiresAt:new Date(Date.now()+86400_000).toISOString()}}));
+    expect(await grant).toEqual({status:'cancelled'});expect(await collector.track('PAGE_VIEWED',{pageKey:'product'})).toEqual({status:'consent_required'});expect(sent).toHaveLength(2);
   });
 });

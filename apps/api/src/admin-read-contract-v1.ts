@@ -19,7 +19,7 @@ export interface AdminListFiltersV1 {
   readonly subjectKind?: 'guest' | 'member' | null;
   readonly subjectStatus?: 'active' | 'merged' | 'deletion_pending' | 'deleted' | null;
   readonly readingStatus?: 'pending' | 'running' | 'succeeded' | 'failed' | 'cancelled' | null;
-  readonly creditSource?: 'signup' | 'portone_topup' | 'reading_reward' | null;
+  readonly creditSource?: 'signup' | 'portone_topup' | 'reading_reward' | 'admin_adjustment' | null;
   readonly reservationState?: 'reserved' | 'settled' | 'released' | null;
   readonly reservationId?: string | null;
   readonly aiStage?: 'planner' | 'renderer' | 'output_guard' | 'scene_director' | null;

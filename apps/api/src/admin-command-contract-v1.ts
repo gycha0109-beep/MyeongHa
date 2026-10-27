@@ -37,10 +37,12 @@ export interface AdminPresentationQueriesV1 {
 export interface AdminCommandServicesV1 {
   readonly bindings: readonly AdminCommandBindingV1[];
   readonly presentations?: AdminPresentationQueriesV1;
+  readonly refundSupport?: { readonly full:boolean; readonly partial:boolean; readonly authority:string };
+  readonly creditHistory?:(subjectId:string)=>Promise<readonly AdminCommandStateV1[]>;
 }
 
 export const ADMIN_COMMAND_BLOCKERS_V1: Readonly<Record<AdminCommandKeyV1, string>> = Object.freeze({
-  'credit-adjust': '기존 Credit Ledger에 관리자 수동 지급·회수와 보정 사유 원장의 승인 명령이 없습니다.',
+  'credit-adjust': '전용 크레딧 보정 RPC·Command Executor의 설치 및 운영 실행 권한 검증이 필요합니다.',
   refund: '기존 withdrawal 검토는 읽기 전용이며 PSP 환불·부분 환불·권한/크레딧 회수 실행 계약이 없습니다.',
   'account-restrict': 'subjects lifecycle에 관리자 제한 상태와 인증 차단/해제의 승인 계약이 없습니다.',
   'account-release': '관리자 제한 해제의 도메인·인증 실행 계약이 없습니다.',
@@ -56,7 +58,9 @@ function exact(value: Record<string,unknown>, keys: readonly string[]) {
 }
 function text(value: unknown, max: number): value is string { return typeof value === 'string' && value.trim().length > 0 && value.length <= max && !/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/u.test(value); }
 function date(value: unknown): value is string | null {
-  return value === null || (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/u.test(value) && Number.isFinite(Date.parse(value)));
+  if(value===null)return true;
+  if(typeof value!=='string'||!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/u.test(value)||!Number.isFinite(Date.parse(value)))return false;
+  return new Date(value).toISOString()===(value.includes('.')?value:value.replace('Z','.000Z'));
 }
 
 export function parseAdminCommandInputV1(value: unknown): AdminCommandInputV1 {
@@ -76,8 +80,14 @@ export function parseAdminCommandInputV1(value: unknown): AdminCommandInputV1 {
       break;
     }
     case 'credit-adjust':
-      exact(p,['delta']);
-      if (!Number.isSafeInteger(p.delta) || Number(p.delta) === 0 || Math.abs(Number(p.delta)) > 1_000_000) throw new Error('Invalid credit adjustment.');
+      if (Object.keys(p).some(key=>!['delta','expiresAt'].includes(key)) || !Object.hasOwn(p,'delta') ||
+          !Number.isSafeInteger(p.delta) || Number(p.delta) === 0 ||
+          // Existing Lot columns are PostgreSQL integer. These are storage
+          // type boundaries, not a per-operation product or business cap.
+          Number(p.delta)<-2_147_483_648 || Number(p.delta)>2_147_483_647 ||
+          (Number(p.delta)>0 && !Object.hasOwn(p,'expiresAt')) ||
+          (p.expiresAt!==undefined && !date(p.expiresAt)) ||
+          (Number(p.delta)<0 && p.expiresAt!==undefined && p.expiresAt!==null)) throw new Error('Invalid credit adjustment.');
       break;
     case 'refund':
       exact(p,['amountMinor','mode']);
@@ -88,6 +98,7 @@ export function parseAdminCommandInputV1(value: unknown): AdminCommandInputV1 {
   // Canonical key ordering makes same-key/different-request checks stable.
   const parameters: Record<string,string|number|boolean|null> = {};
   for (const key of Object.keys(p).sort()) parameters[key] = p[key] as string|number|boolean|null;
+  if(value.operation==='credit-adjust'&&p.expiresAt===undefined)parameters.expiresAt=null;
   return Object.freeze({ operation: value.operation as AdminCommandKeyV1, operationId: value.operationId.toLowerCase(), targetRef: value.targetRef.toLowerCase(), reason: value.reason.trim(), parameters: Object.freeze(parameters) });
 }
 

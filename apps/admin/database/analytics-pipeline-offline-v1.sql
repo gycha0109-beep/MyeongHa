@@ -1,5 +1,6 @@
 -- OFFLINE CANDIDATE ONLY. No migration/Production authority.
--- Requires approved analytics-specific consent, retention, deletion binding,
+-- Product-owner policy: product analytics only, 180 elapsed days from occurred_at.
+-- Never applies to retained Commerce evidence or backups. Requires consent, deletion binding,
 -- event registry versions and complete observation-source declarations first.
 begin;
 create schema if not exists myeongha_admin_analytics;
@@ -44,6 +45,7 @@ create table myeongha_admin_analytics.events_v1 (
   event_fingerprint text not null check(event_fingerprint ~ '^[0-9a-f]{64}$'),
   foreign key(visitor_ref,consent_version) references myeongha_admin_analytics.consents_v1(visitor_ref,version) on delete cascade,
   check(expires_at>occurred_at),
+  constraint analytics_events_retention_180d_v1 check(expires_at<=occurred_at+interval '15552000 seconds'),
   check(authority<>'server_verified' or client='server'),
   check(event_name not in ('READING_PURCHASED','REFUND_COMPLETED') or (authority='server_verified' and purchase_ref is not null)),
   check(event_name<>'SATISFACTION_SUBMITTED' or (score is not null and purchase_ref is not null))

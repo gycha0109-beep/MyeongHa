@@ -9,6 +9,7 @@ const JWT = 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.signature';
 const env = {
   MYEONGHA_ADMIN_PRIVATE_ENABLED: 'true',
   MYEONGHA_ADMIN_OWNER_AUTH_USER_ID: OWNER,
+  MYEONGHA_ADMIN_OWNER_EMAIL: "owner@example.test",
   MYEONGHA_ADMIN_SUPABASE_ORIGIN: MYEONGHA_PRODUCTION_SUPABASE_ORIGIN,
   MYEONGHA_SUPABASE_API_KEY: 'synthetic-public-anon-key-test-only',
 };
@@ -58,7 +59,7 @@ describe('isolated private Administrator runtime', () => {
     const a = mockPool('myeongha_admin_audit_writer');
     const runtime = createAdminPrivateRuntimeV1({
       env, readPool: r.pool, auditPool: a.pool,
-      memberFetchImpl: async () => Response.json({ id: OWNER }),
+      memberFetchImpl: async () => Response.json({ id: OWNER,email:"owner@example.test" }),
     });
     const response = await runtime.handleRequest(new Request('https://admin.example/api/admin/users', {
       headers: { Authorization: 'Bearer ' + JWT },
@@ -72,7 +73,7 @@ describe('isolated private Administrator runtime', () => {
     const a = mockPool('myeongha_admin_audit_writer');
     const runtime = createAdminPrivateRuntimeV1({
       env, readPool: r.pool, auditPool: a.pool,
-      memberFetchImpl: async () => Response.json({ id: OTHER }),
+      memberFetchImpl: async () => Response.json({ id: OTHER,email:"owner@example.test" }),
     });
     expect((await runtime.handleRequest(new Request('https://admin.example/api/admin/users', {
       headers: { Authorization: 'Bearer ' + JWT },
@@ -84,7 +85,7 @@ describe('isolated private Administrator runtime', () => {
     const a = mockPool('myeongha_admin_audit_writer');
     const runtime = createAdminPrivateRuntimeV1({
       env, readPool: r.pool, auditPool: a.pool,
-      memberFetchImpl: async () => Response.json({ id: OWNER }),
+      memberFetchImpl: async () => Response.json({ id: OWNER,email:"owner@example.test" }),
     });
     expect((await runtime.handleRequest(new Request('https://admin.example/api/admin/users', {
       headers: { Authorization: 'Bearer ' + JWT },

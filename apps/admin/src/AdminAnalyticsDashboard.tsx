@@ -24,7 +24,7 @@ export async function fetchAdminAnalyticsDashboardV1(token:string,query:URLSearc
 }
 
 const number=(value:number|null,unit='')=>value===null?'—':value.toLocaleString('ko-KR',{maximumFractionDigits:2})+unit;
-const sourceLabels={disabled:'추적 비활성 · 동의/보존/원본 연결 미확인',configured_source_unverified:'수집 설정 존재 · 기간 완전성 미검증',source_partial:'최대 관측 범위 초과 · 전환율 미측정',source_covered:'선택 기간의 소스 관측 범위 확인'};
+const sourceLabels={disabled:'추적 비활성 · 동의/삭제/원본 연결 미확인',configured_source_unverified:'수집 설정 존재 · 기간 완전성 미검증',source_partial:'최대 관측 범위 초과 · 전환율 미측정',source_covered:'선택 기간의 소스 관측 범위 확인'};
 
 export function AdminAnalyticsDashboard({token,onSessionExpired}:{readonly token:string;readonly onSessionExpired:()=>void}) {
   const [period,setPeriod]=useState(()=>({from:new Date(Date.now()-6*86_400_000).toISOString().slice(0,10),to:new Date().toISOString().slice(0,10),grain:'day',campaignKey:''}));
@@ -42,7 +42,7 @@ export function AdminAnalyticsDashboard({token,onSessionExpired}:{readonly token
       <div className="surface__head"><div><span className="section-kicker">SOURCE-BOUND ANALYTICS</span><h2>방문·전환 및 검증 결제 근거</h2></div><span className="neutral-tag">UTC · Owner 감사</span></div>
       <form className="date-range-form" onSubmit={event=>{
         event.preventDefault();const days=(Date.parse(draft.to)-Date.parse(draft.from))/86_400_000;
-        if(!Number.isFinite(days)||days<0||days>90||(draft.campaignKey&&!/^[A-Za-z0-9][A-Za-z0-9._:-]{0,95}$/u.test(draft.campaignKey))){setError('기간은 90일 이내이며 캠페인은 등록 식별자로 지정해 주세요.');return;}setPeriod({...draft});
+        if(!Number.isFinite(days)||days<0||days>179||(draft.campaignKey&&!/^[A-Za-z0-9][A-Za-z0-9._:-]{0,95}$/u.test(draft.campaignKey))){setError('시작·종료일을 포함해 180일 이내이며 캠페인은 등록 식별자로 지정해 주세요.');return;}setPeriod({...draft});
       }}>
         <label>UTC 시작일<input type="date" required value={draft.from} onChange={event=>setDraft({...draft,from:event.target.value})}/></label>
         <label>UTC 종료일<input type="date" required value={draft.to} onChange={event=>setDraft({...draft,to:event.target.value})}/></label>
@@ -50,7 +50,7 @@ export function AdminAnalyticsDashboard({token,onSessionExpired}:{readonly token
         <label>캠페인 식별자<input value={draft.campaignKey} maxLength={96} placeholder="전체 캠페인" onChange={event=>setDraft({...draft,campaignKey:event.target.value.trim()})}/></label>
         <button type="submit">같은 기간 조회</button>
       </form>
-      <p className="readiness-explainer">방문자·가입·구매 전환은 동일 기간과 고유 분석 참조를 사용합니다. 동의·보존·삭제 연계·유효 방문 정의와 관측 완전성이 확인되지 않으면 0 대신 —를 표시합니다. 클라이언트 구매 성공은 매출 근거가 아닙니다.</p>
+      <p className="readiness-explainer">제품 분석 이벤트는 발생 시각부터 최대 180일 보관하며 동의 철회·사용자 삭제 시 먼저 삭제합니다. 결제 법정 증빙에는 이 기간을 적용하지 않습니다. 방문자·가입·구매 전환은 동일 기간과 고유 분석 참조를 사용합니다. 동의·삭제 연계·유효 방문 정의와 관측 완전성이 확인되지 않으면 0 대신 —를 표시합니다. 클라이언트 구매 성공은 매출 근거가 아닙니다.</p>
       {error?<StatusPanel kind="error" detail={error}/>:result===null?<StatusPanel kind="loading"/>:<>
         <p role="status">{sourceLabels[result.collectionStatus]}</p>
         <div className="beta-targets">{result.analytics.metrics.map(metric=><article className="beta-target" key={metric.key}>

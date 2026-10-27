@@ -3,8 +3,17 @@ import { Pool } from 'pg';
 import { createAdminAccessGateV1 } from '../apps/api/src/admin-access-gate-v1.ts';
 import { createAdminHostedHttpV1 } from '../apps/api/src/admin-hosted-http-v1.ts';
 import { createAdminPrivateRuntimeV1 } from '../apps/api/src/admin-private-runtime-v1.ts';
+import {createAdminAuditRetentionMaintenanceV1} from '../apps/api/src/admin-audit-retention-v1.ts';
 
 export default {
+  async scheduled(_event,env,ctx){
+    if(env.MYEONGHA_ADMIN_RETENTION_ENABLED!=='true')return;
+    if(env.MYEONGHA_ADMIN_HYPERDRIVE_POLICY!=='dedicated-admin-verify-full-v1'||!env.ADMIN_RETENTION_HYPERDRIVE?.connectionString)throw Error('Dedicated retention origin unavailable');
+    ctx.waitUntil((async()=>{const pool=new Pool({connectionString:env.ADMIN_RETENTION_HYPERDRIVE.connectionString,max:1,connectionTimeoutMillis:3000,statement_timeout:5000});
+      try{const purge=createAdminAuditRetentionMaintenanceV1(pool);for(let batch=0;batch<10;batch++){
+        const result=await purge(1000);if(result.deleted<1000)return;
+      }throw Error('Audit retention backlog requires another bounded run');}finally{await pool.end();}})());
+  },
   async fetch(request, env, ctx) {
     let reader; let audit; let command;
     try {

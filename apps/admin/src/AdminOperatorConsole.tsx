@@ -1,9 +1,10 @@
 import { useEffect,useState } from 'react';
 import type { FormEvent } from 'react';
 import { AdminAccessDeniedErrorV1 } from './admin-client.js';
+import { ADMIN_CREDIT_FIXED_LIMIT_V1,ADMIN_CREDIT_CONFIRMATION_REQUIRED_V1 } from '../../api/src/admin-operating-policy-v1.js';
 
 type State = Readonly<Record<string,string|number|boolean|null>>;
-type Capability = {operation:string;enabled:boolean;authority:string|null;blocker:string|null};
+type Capability = {operation:string;enabled:boolean;authority:string|null;blocker:string|null;refundModes?:{full:boolean;partial:boolean}};
 const LABELS:Record<string,string>={'credit-adjust':'크레딧 지급·회수','refund':'전액·부분 환불','account-restrict':'계정 제한','account-release':'계정 제한 해제','account-delete-request':'계정 삭제 요청','account-restore':'계정 복구','presentation-save':'공지·배너 저장'};
 const FORM_EMPTY={kind:'notice',title:'',body:'',linkPath:'',status:'draft',startsAt:'',endsAt:'',reason:''};
 
@@ -22,35 +23,46 @@ function safeRows(value:unknown):State[] {
 function DomainActionForm({token,capabilities,onFailure}:{token:string;capabilities:Capability[];onFailure:(error:unknown)=>void}) {
  const [operation,setOperation]=useState('credit-adjust');const [target,setTarget]=useState('');const [reason,setReason]=useState('');
  const [delta,setDelta]=useState('');const [amount,setAmount]=useState('');const [mode,setMode]=useState('full');
+ const [expiryMode,setExpiryMode]=useState('');const [grantExpiry,setGrantExpiry]=useState('');const [creditHistory,setCreditHistory]=useState<State[]>([]);
  const [busy,setBusy]=useState(false);const [confirmed,setConfirmed]=useState(false);
+ const [uncertain,setUncertain]=useState(false);
  const [preview,setPreview]=useState<{input:Record<string,unknown>;confirmationToken:string;before:State}|null>(null);
  const [last,setLast]=useState<{operation:string;operationId:string}|null>(null);const [result,setResult]=useState<Record<string,unknown>|null>(null);
  const capability=capabilities.find(item=>item.operation===operation);
- useEffect(()=>{setPreview(null);setConfirmed(false);},[operation,target,reason,delta,amount,mode]);
- async function prepare(event:FormEvent){event.preventDefault();if(!capability?.enabled||busy)return;setBusy(true);setResult(null);
-  try{const parameters=operation==='credit-adjust'?{delta:Number(delta)}:operation==='refund'?{amountMinor:Number(amount),mode}:{};
+ useEffect(()=>{setPreview(null);setConfirmed(false);},[operation,target,reason,delta,amount,mode,expiryMode,grantExpiry]);
+ useEffect(()=>{setCreditHistory([]);},[target,operation]);
+ async function loadHistory(){const response=await api(token,'/api/admin/credits/history?'+new URLSearchParams({subjectId:target}));setCreditHistory(safeRows(response.rows));}
+ async function prepare(event:FormEvent){event.preventDefault();if(!capability?.enabled||busy||uncertain)return;setBusy(true);setResult(null);
+  try{if(operation==='credit-adjust'&&Number(delta)>0&&(expiryMode===''||(expiryMode==='at'&&grantExpiry==='')))throw Error('지급 Lot 만료 정책을 직접 선택해 주세요.');
+   const parameters=operation==='credit-adjust'?{delta:Number(delta),expiresAt:Number(delta)>0&&expiryMode==='at'?grantExpiry+':00Z':null}:operation==='refund'?{amountMinor:Number(amount),mode}:{};
    const input={operation,operationId:crypto.randomUUID(),targetRef:target,reason,parameters};const response=await api(token,'/api/admin/commands/preview',input);
    if(typeof response.confirmationToken!=='string'||response.preview===null||typeof response.preview!=='object')throw new Error('명령 확인 정보를 받지 못했습니다.');
    setPreview({input,confirmationToken:response.confirmationToken,before:safeRows([(response.preview as {before:unknown}).before])[0]!});setConfirmed(false);
   }catch(error){onFailure(error);}finally{setBusy(false);}
  }
- async function lookup(value:{operation:string;operationId:string}){const response=await api(token,'/api/admin/commands/result?'+new URLSearchParams(value).toString());setResult(response);return response;}
+ async function lookup(value:{operation:string;operationId:string}){const response=await api(token,'/api/admin/commands/result?'+new URLSearchParams(value).toString());setResult(response);setUncertain(!['succeeded','replayed','failed'].includes(String(response.status)));return response;}
  async function execute(){if(!preview||!confirmed||busy)return;setBusy(true);const value={operation,operationId:String(preview.input.operationId)};setLast(value);
-  try{await api(token,'/api/admin/commands/execute',{input:preview.input,confirmationToken:preview.confirmationToken});await lookup(value);setPreview(null);setConfirmed(false);}catch(error){onFailure(error);}finally{setBusy(false);}
+  let receiptConfirmed=false;
+  try{await api(token,'/api/admin/commands/execute',{input:preview.input,confirmationToken:preview.confirmationToken});const found=await lookup(value);receiptConfirmed=['succeeded','replayed','failed'].includes(String(found.status));setPreview(null);setConfirmed(false);if(operation==='credit-adjust')await loadHistory();}catch(error){if(!receiptConfirmed)setUncertain(true);onFailure(error);}finally{setBusy(false);}
  }
  return <section aria-label="크레딧 환불 계정 명령"><h3>크레딧·결제·계정 조치</h3>
-  <label>조치 종류<select value={operation} onChange={e=>setOperation(e.target.value)}>{Object.entries(LABELS).filter(([key])=>key!=='presentation-save').map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></label>
+  <label>조치 종류<select disabled={busy||uncertain} value={operation} onChange={e=>setOperation(e.target.value)}>{Object.entries(LABELS).filter(([key])=>key!=='presentation-save').map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></label>
   {!capability?.enabled&&<p role="note">실행 차단: {capability?.blocker??'명령 권한 확인 중'}</p>}
-  <form className="admin-login" onSubmit={prepare}><fieldset disabled={busy||!capability?.enabled}>
+  <form className="admin-login" onSubmit={prepare}><fieldset disabled={busy||uncertain||!capability?.enabled}>
    <label>{operation==='refund'?'영수증 UUID':'사용자 UUID'}<input required maxLength={36} value={target} onChange={e=>setTarget(e.target.value.trim())}/></label>
-   {operation==='credit-adjust'&&<label>보정 수량 (지급 + / 회수 -)<input type="number" required step={1} min={-1_000_000} max={1_000_000} value={delta} onChange={e=>setDelta(e.target.value)}/></label>}
-   {operation==='refund'&&<><label>환불 구분<select value={mode} onChange={e=>setMode(e.target.value)}><option value="full">전액</option><option value="partial">부분</option></select></label><label>환불 금액 (영수증 통화의 최소 단위)<input type="number" required min={1} step={1} value={amount} onChange={e=>setAmount(e.target.value)}/></label></>}
+   {operation==='credit-adjust'&&<><label>보정 수량 (지급 + / 회수 -)<input type="number" required step={1} value={delta} onChange={e=>setDelta(e.target.value)}/></label><p>고정 수량 한도 {ADMIN_CREDIT_FIXED_LIMIT_V1===null?'없음':String(ADMIN_CREDIT_FIXED_LIMIT_V1)} · 매회 직접 확인 {ADMIN_CREDIT_CONFIRMATION_REQUIRED_V1?'필수':'정책 확인 필요'}. 기존 원장 integer 범위와 음수 잔액 금지는 유지합니다. 회수는 예약 중 수량을 제외한 현재 가용 Lot에서 처리합니다.</p>
+    {Number(delta)>0&&<><label>지급 Lot 만료 정책<select required value={expiryMode} onChange={e=>setExpiryMode(e.target.value)}><option value="">직접 선택</option><option value="at">UTC 만료일 지정</option><option value="never">무기한</option></select></label>{expiryMode==='at'&&<label>지급 Lot UTC 만료일<input type="datetime-local" required value={grantExpiry} onChange={e=>setGrantExpiry(e.target.value)}/></label>}</>}
+   </>}
+   {operation==='refund'&&<><label>환불 구분<select value={mode} onChange={e=>setMode(e.target.value)}><option value="full" disabled={!capability?.refundModes?.full}>전액{!capability?.refundModes?.full?' · 지원 미확인':''}</option><option value="partial" disabled={!capability?.refundModes?.partial}>부분{!capability?.refundModes?.partial?' · 지원 미확인':''}</option></select></label><label>환불 금액 (영수증 통화의 최소 단위)<input type="number" required min={1} step={1} value={amount} onChange={e=>setAmount(e.target.value)}/></label></>}
    <label>조치 사유<input required maxLength={500} value={reason} onChange={e=>setReason(e.target.value)}/></label><button type="submit">가능 여부·조치 전 상태 확인</button>
   </fieldset></form>
-  {preview&&<div className="surface"><h4>실행 전 확인</h4><p>{LABELS[operation]} · 대상 {target} · 사유 {reason}</p><dl>{Object.entries(preview.before).map(([key,value])=><div key={key}><dt>{key}</dt><dd>{value===null?'—':String(value)}</dd></div>)}</dl>
-   <label><input type="checkbox" checked={confirmed} onChange={e=>setConfirmed(e.target.checked)}/>대상·금액·사유와 조치 전 상태를 확인했습니다.</label><button type="button" disabled={busy||!confirmed||!capability?.enabled} onClick={()=>{void execute();}}>확인한 조치 실행</button></div>}
+  {preview&&<div className="surface"><h4>실행 전 확인</h4><p>{LABELS[operation]} · 대상 {target} · 사유 {reason}</p>{operation==='credit-adjust'&&<p>수량 {delta} · {Number(delta)>0?'지급':'회수'}{Number(delta)>0?' · 만료 '+(expiryMode==='never'?'무기한':grantExpiry+' UTC'):''}</p>}<dl>{Object.entries(preview.before).map(([key,value])=><div key={key}><dt>{key}</dt><dd>{value===null?'—':String(value)}</dd></div>)}</dl>
+   <label><input type="checkbox" checked={confirmed} onChange={e=>setConfirmed(e.target.checked)}/>대상·금액·사유와 조치 전 상태를 확인했습니다.</label><button type="button" disabled={busy||!confirmed||!capability?.enabled} onClick={()=>{void execute();}}>{uncertain?'같은 작업 재시도':'확인한 조치 실행'}</button></div>}
+  {uncertain&&<p role="alert">실행 결과가 아직 확정되지 않았습니다. 새 작업 ID를 만들지 말고 아래의 같은 작업 결과를 재조회하거나, 확인된 동일 작업을 재시도해 주세요.</p>}
   {last&&<button type="button" disabled={busy} onClick={()=>{setBusy(true);void lookup(last).catch(onFailure).finally(()=>setBusy(false));}}>작업 {last.operationId} 결과 재조회</button>}
+  {operation==='credit-adjust'&&<button type="button" disabled={busy||!capability?.enabled||!target} onClick={()=>{setBusy(true);void loadHistory().catch(onFailure).finally(()=>setBusy(false));}}>대상 사용자 크레딧 보정 이력 조회</button>}
   {result&&<div role="status"><p>실행 상태: {String(result.status)} · 결과 원장 재조회 완료</p>{result.state!==null&&typeof result.state==='object'&&<dl>{Object.entries(result.state).map(([key,value])=><div key={key}><dt>{key}</dt><dd>{value===null?'—':String(value)}</dd></div>)}</dl>}</div>}
+  {creditHistory.length>0&&<div className="admin-table-scroll"><table className="admin-table"><thead><tr><th>작업</th><th>수량</th><th>보정 전 가용</th><th>보정 후 가용</th><th>사유</th><th>시각</th></tr></thead><tbody>{creditHistory.map(row=><tr key={String(row.operationId)}><td>{String(row.operationId)}</td><td>{String(row.delta)}</td><td>{String(row.beforeAvailableCredits)}</td><td>{String(row.afterAvailableCredits)}</td><td>{String(row.reason)}</td><td>{String(row.changedAt)}</td></tr>)}</tbody></table></div>}
  </section>;
 }
 
