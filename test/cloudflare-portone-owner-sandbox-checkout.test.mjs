@@ -4,6 +4,7 @@ const state=vi.hoisted(()=>({
   identity:{kind:'member',verifiedAuthUserId:'11111111-1111-4111-8111-111111111111'},
   close:vi.fn(async()=>{}),
   handoff:vi.fn(),
+  commit:vi.fn(async()=>{}),
   origin:'https://example.test',
   admitted:true,
 }));
@@ -29,6 +30,9 @@ vi.mock('../apps/api/src/production-request-identity-verifier.js',()=>({
 vi.mock('../apps/api/src/cloudflare-portone-owner-sandbox-checkout-handoff-v1.js',()=>({
   loadCloudflarePortOneOwnerSandboxCheckoutHandoffV1:state.handoff,
 }));
+vi.mock('../apps/api/src/cloudflare-owner-portone-sandbox-handoff-commit-v1.js',()=>({
+  commitCloudflareOwnerPortOneSandboxHandoffV1:state.commit,
+}));
 import {tryHandleCloudflareOwnerPortOneSandboxCheckoutV1}
   from '../workers/cloudflare-portone-owner-sandbox-checkout.mjs';
 
@@ -52,6 +56,7 @@ beforeEach(()=>{
   state.identity={kind:'member',verifiedAuthUserId:'11111111-1111-4111-8111-111111111111'};
   state.admitted=true;state.origin='https://example.test';
   state.handoff.mockReset();state.handoff.mockResolvedValue(CHECKOUT);
+  state.commit.mockReset();state.commit.mockResolvedValue(undefined);
   state.close.mockClear();
 });
 describe('Cloudflare Owner PortOne TEST checkout HTTP routing',()=>{
@@ -66,6 +71,10 @@ describe('Cloudflare Owner PortOne TEST checkout HTTP routing',()=>{
     expect(raw).not.toContain('V2_API_Secret');
     expect(raw).not.toContain('MYEONGHA_COMMERCE_EVIDENCE_HMAC');
     expect(state.handoff).toHaveBeenCalledTimes(1);
+    expect(state.commit).toHaveBeenCalledTimes(1);
+    expect(state.commit.mock.calls[0]?.[0]).toMatchObject({
+      paymentAttemptId:ATTEMPT,providerRequestId:CHECKOUT.paymentId,
+    });
     expect(state.handoff.mock.calls[0]?.[0]).toMatchObject({paymentAttemptId:ATTEMPT});
     expect(state.close).toHaveBeenCalledTimes(1);
   });
@@ -95,7 +104,16 @@ describe('Cloudflare Owner PortOne TEST checkout HTTP routing',()=>{
     expect((await tryHandleCloudflareOwnerPortOneSandboxCheckoutV1(big,{},ROUTE)).status).toBe(400);
     expect(state.handoff).not.toHaveBeenCalled();
   });
-  it('does not expose checkout to non-member, unverified or unavailable DB paths',async()=>{
+  it('does not reveal SDK config when DB handoff status transition fails',async()=>{
+    state.commit.mockRejectedValueOnce(new Error('transaction was rolled back'));
+    const response=await tryHandleCloudflareOwnerPortOneSandboxCheckoutV1(req(),{},ROUTE);
+    expect(response.status).toBe(503);
+    const responseText=await response.text();
+    expect(responseText).not.toContain(CHECKOUT.channelKey);
+    expect(responseText).not.toContain('transaction was rolled back');
+    expect(state.close).toHaveBeenCalledTimes(1);
+  });
+    it('does not expose checkout to non-member, unverified or unavailable DB paths',async()=>{
     state.identity=null;
     expect((await tryHandleCloudflareOwnerPortOneSandboxCheckoutV1(req(),{},ROUTE)).status).toBe(401);
     state.identity={kind:'guest',verifiedGuestTokenHash:'test-guest-hash'};
