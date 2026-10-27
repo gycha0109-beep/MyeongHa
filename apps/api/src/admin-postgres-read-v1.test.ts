@@ -185,6 +185,16 @@ describe('admin dedicated readonly PostgreSQL adapter', () => {
     expect(sql).not.toContain('"p95LatencyMs"');
   });
 
+  it('binds credit lot source and reservation state without SQL interpolation', async () => {
+    const lot = harness();
+    await lot.port.read({ ...filters('credits'), creditSource: 'reading_reward' });
+    expect(lot.sql[2]).toContain('lot.source_kind=$6::text');
+    expect(lot.params[2]).toEqual([21, null, null, null, 0, 'reading_reward']);
+    const reservation = harness();
+    await reservation.port.read({ ...filters('credit-reservations'), reservationState: 'reserved' });
+    expect(reservation.sql[2]).toContain('r.state=$6::text');
+    expect(reservation.params[2]).toEqual([21, null, null, null, 0, 'reserved']);
+  });
   it('provides bounded pagination', async () => {
     const h = harness('myeongha_admin_reader',Array.from({length:3},()=>({subjectId:SUBJECT})));
     const result = await h.port.read({ ...filters(),limit:2 });

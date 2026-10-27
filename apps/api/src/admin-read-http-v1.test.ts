@@ -83,6 +83,14 @@ describe('admin owner-only reads', () => {
     expect(() => parseAdminReadFiltersV1(new URL('https://a.invalid/api/admin/catalog?from=2026-10-01&to=2026-10-26'))).toThrow();
     expect(() => parseAdminReadFiltersV1(new URL('https://a.invalid/api/admin/commerce/123e4567-e89b-42d3-a456-426614174000?from=2026-10-01&to=2026-10-26'))).toThrow();
   });
+  it('restricts credit and reservation filters to their canonical read kinds', () => {
+    const url=(path: string) => new URL('https://a.invalid' + path);
+    expect(parseAdminReadFiltersV1(url('/api/admin/credits?creditSource=portone_topup')).creditSource).toBe('portone_topup');
+    expect(parseAdminReadFiltersV1(url('/api/admin/credit-reservations?reservationState=released')).reservationState).toBe('released');
+    for (const path of ['/api/admin/credits?creditSource=untrusted','/api/admin/credits?reservationState=settled','/api/admin/users?creditSource=signup','/api/admin/credit-reservations?reservationState=approved']) {
+      expect(() => parseAdminReadFiltersV1(url(path))).toThrow();
+    }
+  });
   it('verifies only Owner session before any data query, with required audit', async () => {
     const allowed = harness();
     const result = await allowed.call('/api/admin/session');
