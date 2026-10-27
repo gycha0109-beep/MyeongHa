@@ -44,6 +44,12 @@ export function buildPortOneChatCreditCheckoutV1(
   totalAmount:1900;
   currency:'CURRENCY_KRW';
   payMethod:'CARD';
+  products: readonly [Readonly<{
+    id:'myeongha-chat-credits-300-v1';
+    name:'명하 채팅 크레딧 300개';
+    amount:1900;
+    quantity:1;
+  }>];
 }> {
   if(!UUID.test(source.purchaseIntentId)||!UUID.test(source.productOfferId)||
       !PROVIDER_ID.test(source.paymentId)||
@@ -62,5 +68,14 @@ export function buildPortOneChatCreditCheckoutV1(
     totalAmount:1900 as const,
     currency:'CURRENCY_KRW' as const,
     payMethod:'CARD' as const,
+    products:Object.freeze([Object.freeze({
+      id:CHAT_CREDIT_PORTONE_V2_OFFER_V1.externalProductId,
+      name:CHAT_CREDIT_PORTONE_V2_OFFER_V1.paymentProductName,
+      amount:1900 as const,quantity:1 as const,
+    })]) as readonly [Readonly<{
+      id:'myeongha-chat-credits-300-v1';
+      name:'명하 채팅 크레딧 300개';
+      amount:1900;quantity:1;
+    }>],
   });
 }
