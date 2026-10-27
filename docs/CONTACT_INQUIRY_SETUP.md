@@ -57,3 +57,7 @@ Cloudflare 계정의 **Workers & Pages → `myeongha` → Settings → Variables
 실행 전 환경 변수 `CLOUDFLARE_EXPECTED_WORKER_VERSION`(Cloudflare API에서 직접 확인한 현재 배포 UUID), `MYEONGHA_CONTACT_LIVE_CONFIRM=SEND_ONE_CONTACT_TEST`가 필요합니다. 명령: `node scripts/verify-cloudflare-contact-live.mjs`. 정식 게스트 세션으로 운영자 수신처에 한 건만 발송합니다. 응답 코드 `SENT`는 Resend 접수 영수증이며 Gmail 전달 성공을 의미하지 않습니다. 테스트 후 `gycha0109@gmail.com`에서 제목, 본문, 답장 주소 및 접수 요청 ID를 별도로 확인해야 합니다. 스크립트는 API 토큰과 게스트 Bearer를 출력하지 않습니다.
 
 운영 전 배포 금지 로드맵을 준수하는 한 이 스크립트는 **병합 전 실제 수신 증거를 대체하지 않으며 실행할 수 없습니다.** 검증 환경에 독립 인증·발신 바인딩이 없는 상태에서 운영 보호 경계를 우회하지 않습니다.
+
+## 운영 배포 후 검증 예외 (2026-10-27 사용자 승인)
+
+사용자가 문의 PR #2637에 한정해 **운영 Worker 배포 후 Gmail 실수신 확인**을 승인했다. 앞부분의 '실수신 전 병합 금지' 순서 원칙은 [문의 로드맵 §9](./ROADMAP_CONTACT_INQUIRY.md)로 대체한다. GitHub 필수 CI Green 및 현재 main 무충돌 확인 → PR 병합 → 기존 Cloudflare main 배포 확인 → `scripts/verify-cloudflare-contact-live.mjs`의 배포 UUID 고정·게스트 보호·발송 검증 → Gmail 본문 및 Reply-To 확인으로 진행한다. 실제 운영 장애 발생 시 배포 전 버전으로 복원한다. Resend 응답 200은 Gmail 수신의 증거가 아니다.
