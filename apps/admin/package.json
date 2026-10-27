@@ -8,7 +8,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run src/routes.test.ts src/admin-client.test.ts src/AdminOperationalReadiness.test.tsx",
+    "test": "vitest run src/routes.test.ts src/admin-client.test.ts src/AdminOperationalReadiness.test.tsx src/AdminWorkbench.test.tsx",
+    "test:db:offline": "node database/verify-offline-v1.mjs",
     "serve:private": "npm run build -w @myeongha/admin && npm run build --prefix ../.. && node private-server.mjs"
   },
   "dependencies": {

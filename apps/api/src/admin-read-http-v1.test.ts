@@ -57,6 +57,15 @@ function harness(options: {
 }
 
 describe('admin owner-only reads', () => {
+  it('validates receipt lineage filters and strips event payloads from entitlement responses', () => {
+    const read = (path: string) => parseAdminReadFiltersV1(new URL('https://admin.invalid' + path));
+    expect(read('/api/admin/entitlement-events?receiptId=' + subject).receiptId).toBe(subject);
+    expect(read('/api/admin/entitlements?subjectId=' + subject).kind).toBe('entitlements');
+    for (const path of ['/api/admin/entitlement-events?receiptId=invalid', '/api/admin/credits?receiptId=' + subject,
+      '/api/admin/entitlement-events?receiptId=' + subject + '&receiptId=' + subject]) {
+      expect(() => read(path)).toThrow();
+    }
+  });
   it('bounds Owner reads and audits denied excess requests before touching domain data', async () => {
     const h = harness();
     for (let i = 0; i < 60; i++) expect((await h.call()).status).toBe(200);

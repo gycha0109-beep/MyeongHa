@@ -1,5 +1,5 @@
 export const ADMIN_READ_KINDS_V1 = [
-  'overview', 'users', 'user-detail', 'commerce', 'commerce-detail', 'commerce-alerts', 'credits', 'credit-reservations', 'credit-allocations', 'readings', 'reading-detail', 'reading-attempts', 'ai-costs', 'ai-errors', 'ai-estimates', 'analytics', 'issues', 'audit', 'catalog', 'characters', 'content-releases', 'deletion-jobs',
+  'overview', 'users', 'user-detail', 'commerce', 'commerce-detail', 'commerce-alerts', 'entitlements', 'entitlement-events', 'credits', 'credit-reservations', 'credit-allocations', 'readings', 'reading-detail', 'reading-attempts', 'ai-costs', 'ai-errors', 'ai-estimates', 'analytics', 'issues', 'audit', 'catalog', 'characters', 'content-releases', 'deletion-jobs',
 ] as const;
 
 export type AdminReadKindV1 = (typeof ADMIN_READ_KINDS_V1)[number];
@@ -12,6 +12,7 @@ export interface AdminListFiltersV1 {
   readonly cursor: string | null;
   readonly subjectId: string | null;
   readonly recordId?: string | null;
+  readonly receiptId?: string | null;
   readonly issueStatus?: 'failed' | 'dead_lettered' | null;
   readonly issueCategory?: string | null;
   readonly subjectKind?: 'guest' | 'member' | null;
@@ -49,8 +50,10 @@ const SAFE_COLUMNS: Readonly<Record<AdminReadKindV1, readonly string[]>> = Objec
   'user-detail': ['subjectId', 'kind', 'status', 'createdAt', 'lastThreadUpdatedAt', 'readingsCount', 'verifiedPurchasesCount', 'activeEntitlementsCount', 'availableCredits'],
   'commerce-detail': ['transactionId','subjectId','productKey','provider','platform','providerStatus','purchaseStatus','createdAt','verifiedAt','amountMinor','currency','entitlementStatus','linkedGrantEventCount','linkedActiveGrantCount','linkedRevokedGrantCount','linkedCreditLotCount','linkedCreditRemaining'],
   'commerce-alerts': ['transactionId','subjectId','alertKind','providerStatus','detectedAt','evidence'],
+  entitlements: ['entitlementId','subjectId','entitlementKey','status','activeGrantCount','effectiveValidUntil','updatedAt'],
+  'entitlement-events': ['eventId','subjectId','grantId','entitlementKey','eventKind','sourceType','transactionId','effectiveAt','createdAt'],
   commerce: ['transactionId', 'subjectId', 'productKey', 'amountMinor', 'currency', 'providerStatus', 'verifiedAt', 'entitlementStatus'],
-  'credit-reservations': ['reservationId','subjectId','requiredCredits','allocatedCredits','allocationEvidence','state','deliveredTurnId','createdAt','finalizedAt'],
+  'credit-reservations': ['reservationId','subjectId','threadId','clientTurnId','requiredCredits','allocatedCredits','allocationEvidence','state','deliveredTurnId','createdAt','finalizedAt'],
   'credit-allocations': ['reservationId','lotId','subjectId','allocatedCredits','reservationState','lotSource','createdAt'],
   credits: ['eventId', 'subjectId', 'creditDelta', 'creditsRemaining', 'expiresAt', 'validity', 'createdAt', 'eventKind', 'balanceAfter', 'correlationId'],
   'reading-attempts': ['attemptId','readingId','subjectId','attemptNo','state','engineKey','requestedEngineVersion','resolvedEngineVersion','errorCode','startedAt','finishedAt'],

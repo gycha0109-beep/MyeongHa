@@ -27,6 +27,28 @@ const filters = (kind: AdminListFiltersV1['kind'] = 'users'): AdminListFiltersV1
   ({ kind, limit: 20, cursor: null, subjectId: null, from: null, to: null });
 
 describe('admin dedicated readonly PostgreSQL adapter', () => {
+  it('reads current entitlement metadata and exact receipt event lineage without payloads or dedupe secrets', async () => {
+    const h = harness();
+    await h.port.read({ ...filters('entitlements'), subjectId: SUBJECT });
+    expect(h.params[2]).toEqual([21, SUBJECT, null, null, 0]);
+    expect(h.sql[2]).toContain('e.effective_valid_until');
+    // Current rights must remain visible even when their original creation is old.
+    expect(h.sql[2]).not.toContain("INTERVAL '90 days'");
+    const events = harness();
+    await events.port.read({ ...filters('entitlement-events'), receiptId: SUBJECT });
+    expect(events.params[2]).toEqual([21, null, null, null, 0, SUBJECT]);
+    expect(events.sql[2]).toContain('e.source_receipt_id=$6::uuid');
+    expect(events.sql[2]).not.toMatch(/payload_jsonb|event_dedupe_key|source_actor_ref/iu);
+  });
+  it('detects duplicate grant evidence by receipt, owner and logical capability scope', () => {
+    const sql = ADMIN_READ_SQL_V1['commerce-alerts']!;
+    expect(sql).toContain('g.subject_id=r.subject_id');
+    expect(sql).toContain('e.subject_id=r.subject_id');
+    expect(sql).toContain('GROUP BY g.entitlement_key,g.scope_key_norm');
+    expect(sql).toContain('HAVING COUNT(DISTINCT g.id)>1');
+    expect(sql).toContain('receipt_same_scope_multiple_active_grants');
+    expect(ADMIN_READ_SQL_V1['credit-reservations']).toContain('r.client_turn_id::text AS "clientTurnId"');
+  });
   it('blocks ordinary subject role before querying data', async () => {
     const h = harness('myeongha_api_executor');
     await expect(h.port.read(filters())).rejects.toThrow('Dedicated administrative');

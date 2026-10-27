@@ -93,3 +93,17 @@ React 19와 기존 web 워크스페이스에서 설치하는 Vite 8 빌드 도�
 - `/api/admin/audit`은 별도 읽기 역할이 허용하는 요청 UUID, 운영자 UUID, 대상 UUID, 행동, 성공/거부/실패, 기록 시각만 반환합니다. 최대 90일·페이지당 50건 제한을 유지합니다.
 - 감사 writer 역할은 INSERT 전용으로 유지하며, reader 역할의 SELECT/정확한 필드·RLS 정책은 운영 승인이 필요한 오프라인 후보에만 기술되어 있습니다.
 - 감사 테이블의 로컬 설치 후보와 운영 권한 활성화는 별개입니다. 프로덕션 적용·기록 보존 정책은 자동으로 확정하거나 실행하지 않습니다.
+
+## 사용자·거래 조사 보강 (2026-10-27)
+
+- 보유 권한은 저장된 `entitlements` 투영과 만료 근거를 표시합니다. 실제 접근 허용 판정은 기존 Access Gate의 책임입니다.
+- 영수증 상세의 권한 이력은 정확한 `source_receipt_id`에 연결된 지급·갱신·철회 등 최소 이벤트 메타데이터만 조회합니다. 이벤트 payload, 외부 거래 키, 사유 원문은 반환하지 않습니다.
+- 동일 영수증·사용자·권한 종류·범위에 복수 활성 Grant가 있으면 수동 점검 신호를 표시합니다. 한 상품의 서로 다른 Capability 지급을 중복으로 간주하지 않습니다.
+- 크레딧 예약의 `thread_id`·`client_turn_id`는 요청 멱등성 참조입니다. released는 미전달 해제·Lot 복원 상태이며, 복원한 Lot의 만료와 가용 잔액은 별도로 판단합니다.
+- UI는 access token 만료에 잠기며, 60초 간격과 화면 재진입 시 Owner 권한을 서버에서 재검증합니다. 단일 비공개 Runtime의 Owner 조회는 분당 60건으로 제한하고 초과 요청도 감사합니다.
+
+### 격리 DB 검사
+
+`npm run test:db:offline -w @myeongha/admin`은 `MYEONGHA_ADMIN_TEST_DATABASE_URL`이 `postgresql://myeongha_admin_reader@127.0.0.1:<port>/myeongha_admin_disposable`인 경우에만 실행합니다. 먼저 폐기 가능한 로컬 DB에 기존 CI bootstrap/migrations, credit private candidate, 관리자 감사·권한 후보를 준비해야 합니다. PG17의 0860 managed-principal 검사는 기존 CI 전용 경계를 따릅니다. 이 명령은 역할을 설치하거나 운영 DB에 접근하지 않습니다.
+
+실제 PostgreSQL에서 모든 지원 조회를 실행하고, 원문·비밀 컬럼 SELECT와 UPDATE/DELETE 거부를 확인합니다. 빈 데이터베이스 검사만으로 지급 불일치의 데이터 시나리오 또는 운영 E2E 통과를 주장하지 않습니다.

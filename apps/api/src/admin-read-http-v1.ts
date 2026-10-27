@@ -39,6 +39,8 @@ const ROUTES: Readonly<Record<string, AdminReadKindV1>> = {
   commerce: 'commerce',
   'commerce-alerts': 'commerce-alerts',
   credits: 'credits',
+  entitlements: 'entitlements',
+  'entitlement-events': 'entitlement-events',
   'credit-reservations': 'credit-reservations',
   'credit-allocations': 'credit-allocations',
   readings: 'readings',
@@ -106,7 +108,7 @@ export function parseAdminReadFiltersV1(url: URL): AdminListFiltersV1 {
     throw new Error('Unknown administrator read route.');
   }
 
-  const allowed = new Set(['limit', 'cursor', 'subjectId', 'from', 'to', 'status', 'subjectKind', 'subjectStatus', 'readingStatus', 'category', 'creditSource', 'reservationState', 'reservationId', 'aiStage', 'aiErrorCode', 'deletionStatus', 'deletionScope', 'releaseStatus', 'characterAvailability', 'receiptStatus', 'auditOutcome', 'allocationMismatch']);
+  const allowed = new Set(['limit', 'cursor', 'receiptId', 'subjectId', 'from', 'to', 'status', 'subjectKind', 'subjectStatus', 'readingStatus', 'category', 'creditSource', 'reservationState', 'reservationId', 'aiStage', 'aiErrorCode', 'deletionStatus', 'deletionScope', 'releaseStatus', 'characterAvailability', 'receiptStatus', 'auditOutcome', 'allocationMismatch']);
   for (const [key] of url.searchParams) {
     if (!allowed.has(key) || url.searchParams.getAll(key).length !== 1) {
       throw new Error('Unknown or duplicate administrator read parameter.');
@@ -138,6 +140,11 @@ export function parseAdminReadFiltersV1(url: URL): AdminListFiltersV1 {
       throw new Error('Detail route does not support date filters.');
     }
   }
+  const receiptIdParam = url.searchParams.get('receiptId');
+  if (receiptIdParam !== null && (kind !== 'entitlement-events' || !UUID.test(receiptIdParam))) {
+    throw new Error('Invalid entitlement receipt evidence reference.');
+  }
+  const receiptId = receiptIdParam?.toLowerCase() ?? null;
   const from = readDate(url.searchParams.get('from'));
   const to = readDate(url.searchParams.get('to'));
   if (from !== null && ['overview','catalog','characters','content-releases'].includes(kind)) {
@@ -254,7 +261,7 @@ export function parseAdminReadFiltersV1(url: URL): AdminListFiltersV1 {
   const subjectStatus = subjectStatusParam as 'active' | 'merged' | 'deletion_pending' | 'deleted' | null;
   if (!ADMIN_READ_KINDS_V1.includes(kind)) throw new Error('Unknown administrator kind.');
   const issueStatus = rawIssueStatus as 'failed' | 'dead_lettered' | null;
-  return Object.freeze({ kind, limit, cursor, subjectId, recordId, from, to, issueStatus, issueCategory, subjectKind, subjectStatus, readingStatus, creditSource, reservationState, reservationId, aiStage, aiErrorCode, deletionStatus, deletionScope, releaseStatus, characterAvailability, receiptStatus, auditOutcome, allocationMismatchOnly });
+  return Object.freeze({ kind, limit, cursor, subjectId, recordId, receiptId, from, to, issueStatus, issueCategory, subjectKind, subjectStatus, readingStatus, creditSource, reservationState, reservationId, aiStage, aiErrorCode, deletionStatus, deletionScope, releaseStatus, characterAvailability, receiptStatus, auditOutcome, allocationMismatchOnly });
 }
 
 const ISSUE_EXPORT_COLUMNS = ['issueId', 'category', 'severity', 'status', 'createdAt', 'requestId'] as const;

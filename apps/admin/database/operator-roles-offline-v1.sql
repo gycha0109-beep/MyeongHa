@@ -39,13 +39,13 @@ grant select (id, status) on public.purchase_intents to myeongha_admin_reader;
 grant select (id, product_id, currency) on public.product_offers to myeongha_admin_reader;
 grant select (id, product_key, product_type, enabled, created_at)
   on public.products to myeongha_admin_reader;
-grant select (subject_id, status) on public.entitlements to myeongha_admin_reader;
-grant select (id, status) on public.entitlement_grants to myeongha_admin_reader;
-grant select (grant_id, source_receipt_id, event_type) on public.entitlement_events to myeongha_admin_reader;
+grant select (id, subject_id, entitlement_key, status, active_grant_count, effective_valid_until, updated_at) on public.entitlements to myeongha_admin_reader;
+grant select (id, subject_id, entitlement_key, scope_key_norm, status) on public.entitlement_grants to myeongha_admin_reader;
+grant select (id, subject_id, grant_id, entitlement_key, source_receipt_id, source_type, event_type, effective_at, created_at) on public.entitlement_events to myeongha_admin_reader;
 grant select (id, subject_id, source_kind, source_ref, credits_issued, credits_remaining, issued_at, expires_at)
   on public.chat_credit_lots_v1 to myeongha_admin_reader;
 grant select (reservation_id, lot_id, credits) on public.chat_credit_turn_allocations_v1 to myeongha_admin_reader;
-grant select (id, subject_id, required_credits, state, delivered_turn_id, created_at, finalized_at)
+grant select (id, subject_id, thread_id, client_turn_id, required_credits, state, delivered_turn_id, created_at, finalized_at)
   on public.chat_credit_turn_reservations_v1 to myeongha_admin_reader;
 grant select (id, created_at, subject_id, stage, model, status, error_code, input_tokens, output_tokens, latency_ms)
   on public.ai_execution_logs to myeongha_admin_reader;
