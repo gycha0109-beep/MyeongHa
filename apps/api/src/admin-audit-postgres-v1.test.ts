@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createAdminPostgresAuditPortV1 } from './admin-audit-postgres-v1.js';
+import { ADMIN_AUDIT_PRINCIPAL_SQL_V1, createAdminPostgresAuditPortV1 } from './admin-audit-postgres-v1.js';
 import type { PostgresSubjectPoolV1 } from './postgres-subject-execution.js';
 
 const OWNER = '123e4567-e89b-42d3-a456-426614174000';
@@ -37,7 +37,7 @@ describe('admin audit writer boundary', () => {
     const h = harness('myeongha_api_executor');
     await expect(h.port.append(event)).rejects.toThrow();
     expect(h.queries.map(x => x.text)).toEqual([
-      'BEGIN', 'SELECT current_user::text AS "currentUser"', 'ROLLBACK',
+      'BEGIN', ADMIN_AUDIT_PRINCIPAL_SQL_V1, 'ROLLBACK',
     ]);
   });
   it('inserts only fixed allowlisted event columns with values bound', async () => {

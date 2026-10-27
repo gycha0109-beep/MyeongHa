@@ -2,6 +2,7 @@ import type { AdminAuditEventV1, AdminAuditPortV1 } from './admin-read-http-v1.j
 import type { PostgresSubjectPoolV1 } from './postgres-subject-execution.js';
 
 export const ADMIN_AUDIT_ROLE_V1 = 'myeongha_admin_audit_writer' as const;
+export const ADMIN_AUDIT_PRINCIPAL_SQL_V1 = 'SELECT current_user::text AS "currentUser" FROM pg_catalog.pg_roles r WHERE r.rolname=current_user AND r.rolcanlogin AND NOT r.rolsuper AND NOT r.rolbypassrls AND NOT r.rolcreatedb AND NOT r.rolcreaterole AND NOT r.rolreplication AND NOT r.rolinherit AND NOT EXISTS (SELECT 1 FROM pg_catalog.pg_auth_members m WHERE m.member=r.oid)';
 
 const INSERT_SQL = [
   'INSERT INTO myeongha_admin_ops.admin_audit_events_v1',
@@ -36,7 +37,7 @@ export function createAdminPostgresAuditPortV1(input: {
         await connection.query('BEGIN');
         active = true;
         const check = await connection.query<{ readonly currentUser: unknown }>(
-          'SELECT current_user::text AS "currentUser"',
+          ADMIN_AUDIT_PRINCIPAL_SQL_V1,
         );
         if (check.rows.length !== 1 || check.rows[0]?.currentUser !== ADMIN_AUDIT_ROLE_V1) {
           throw new Error('Administrator audit writer role unavailable.');

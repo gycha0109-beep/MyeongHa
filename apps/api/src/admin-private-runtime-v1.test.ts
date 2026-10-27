@@ -29,6 +29,19 @@ function mockPool(role: string) {
   return { pool, seen };
 }
 describe('isolated private Administrator runtime', () => {
+  it('rejects expired upstream sessions without issuing any domain read', async () => {
+    const r = mockPool('myeongha_admin_reader');
+    const a = mockPool('myeongha_admin_audit_writer');
+    const runtime = createAdminPrivateRuntimeV1({ env, readPool: r.pool, auditPool: a.pool,
+      memberFetchImpl: async () => Response.json({ error: 'jwt_expired' }, { status: 401 }),
+    });
+    const response = await runtime.handleRequest(new Request('https://admin.example/api/admin/users/' + OWNER, {
+      headers: { Authorization: 'Bearer ' + JWT },
+    }));
+    expect(response.status).toBe(403);
+    expect(r.seen).toHaveLength(0);
+    expect(a.seen.some(sql => sql.startsWith('INSERT'))).toBe(true);
+  });
   it('refuses disabled and mismatched authority environments', () => {
     const r = mockPool('myeongha_admin_reader');
     const a = mockPool('myeongha_admin_audit_writer');

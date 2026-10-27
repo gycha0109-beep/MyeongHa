@@ -18,6 +18,18 @@ begin
   end if;
 end $$;
 
+-- Fail before granting if an existing same-named principal has drifted.
+do $$
+begin
+  if (select count(*) from pg_catalog.pg_roles r
+      where r.rolname in ('myeongha_admin_reader','myeongha_admin_audit_writer')
+        and r.rolcanlogin and not r.rolsuper and not r.rolbypassrls
+        and not r.rolcreatedb and not r.rolcreaterole and not r.rolreplication and not r.rolinherit
+        and not exists (select 1 from pg_catalog.pg_auth_members m where m.member=r.oid)) <> 2 then
+    raise exception 'Administrator principal privileges or memberships drifted';
+  end if;
+end $$;
+
 -- These standalone roles are separate from the ordinary user API executor.
 -- Their secrets are provisioned outside the repository and NEVER in Vite.
 grant usage on schema public to myeongha_admin_reader;
@@ -35,6 +47,9 @@ grant select (reading_id, subject_id, saju_engine_key, saju_engine_version, read
   on public.reading_refs to myeongha_admin_reader;
 grant select (id, subject_id, purchase_intent_id, provider, platform, product_offer_id, verification_status, verified_at, verified_amount_minor, verified_currency, created_at)
   on public.commerce_receipts to myeongha_admin_reader;
+grant select (id, resolved_subject_id, resolved_receipt_id, provider, event_type, status, resolution_source_type, provider_occurred_at, received_at, processed_at)
+  on public.commerce_provider_events to myeongha_admin_reader;
+
 grant select (id, status) on public.purchase_intents to myeongha_admin_reader;
 grant select (id, product_id, currency, enabled, retired_at) on public.product_offers to myeongha_admin_reader;
 grant select (id, product_key, product_type, enabled, retired_at, created_at)
@@ -75,6 +90,8 @@ create policy admin_read_reading_provenance_version_v1 on public.reading_refs
 create policy admin_read_receipt_metadata_v1 on public.commerce_receipts
   for select to myeongha_admin_reader using (true);
 create policy admin_read_purchase_intent_status_v1 on public.purchase_intents
+  for select to myeongha_admin_reader using (true);
+create policy admin_read_provider_event_metadata_v1 on public.commerce_provider_events
   for select to myeongha_admin_reader using (true);
 create policy admin_read_offer_metadata_v1 on public.product_offers
   for select to myeongha_admin_reader using (true);

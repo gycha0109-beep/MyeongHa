@@ -27,6 +27,7 @@ const metrics = [
   { key: 'ai_failures_blocked_7d', title: '최근 7일 AI 실패·차단', note: '실패 또는 차단된 호출 수' },
   { key: 'outbox_failures_7d', title: '최근 7일 운영 이벤트 실패', note: '실패·처리 중단 상태의 이벤트 수' },
 ] as const;
+const attentionMetrics = new Set<string>(['verified_money_missing_7d','reading_failures_7d','ai_failures_blocked_7d','outbox_failures_7d']);
 
 function navigateTo(path: string, setPath: (path: string) => void) {
   const destination = new URL(path, window.location.origin);
@@ -136,6 +137,8 @@ function Overview({ token, onSessionExpired }: { readonly token: string | null; 
             </div>
             <p className="metric-card__value" aria-label={metric.title + (summary ? ' 집계값' : ' 측정 불가')}>{summary?.[metric.key] ?? '—'}</p>
             <p className="metric-card__note">{metric.note}</p>
+            {summary !== null && attentionMetrics.has(metric.key) && Number(summary[metric.key]) > 0 &&
+              <p className="readiness-wait" role="status">기록된 실패·결측 있음 · 수동 점검 필요</p>}
           </article>
         ))}
       </div>

@@ -1,5 +1,5 @@
 export const ADMIN_READ_KINDS_V1 = [
-  'overview', 'users', 'user-detail', 'commerce', 'commerce-detail', 'commerce-alerts', 'entitlements', 'entitlement-events', 'credits', 'credit-reservations', 'credit-allocations', 'readings', 'reading-detail', 'reading-attempts', 'ai-costs', 'ai-errors', 'ai-estimates', 'analytics', 'issues', 'audit', 'catalog', 'characters', 'content-releases', 'deletion-jobs',
+  'overview', 'users', 'user-detail', 'commerce', 'commerce-detail', 'commerce-alerts', 'entitlements', 'entitlement-events', 'provider-events', 'credits', 'credit-reservations', 'credit-allocations', 'readings', 'reading-detail', 'reading-attempts', 'ai-costs', 'ai-errors', 'ai-estimates', 'analytics', 'issues', 'audit', 'catalog', 'characters', 'content-releases', 'deletion-jobs',
 ] as const;
 
 export type AdminReadKindV1 = (typeof ADMIN_READ_KINDS_V1)[number];
@@ -13,6 +13,7 @@ export interface AdminListFiltersV1 {
   readonly subjectId: string | null;
   readonly recordId?: string | null;
   readonly receiptId?: string | null;
+  readonly providerEventStatus?: 'received' | 'verified' | 'unresolved' | 'processed' | 'rejected' | 'failed' | null;
   readonly issueStatus?: 'failed' | 'dead_lettered' | null;
   readonly issueCategory?: string | null;
   readonly subjectKind?: 'guest' | 'member' | null;
@@ -52,6 +53,7 @@ const SAFE_COLUMNS: Readonly<Record<AdminReadKindV1, readonly string[]>> = Objec
   'user-detail': ['subjectId', 'kind', 'status', 'createdAt', 'lastThreadUpdatedAt', 'readingsCount', 'verifiedPurchasesCount', 'activeEntitlementsCount', 'availableCredits'],
   'commerce-detail': ['transactionId','subjectId','productKey','provider','platform','providerStatus','purchaseStatus','createdAt','verifiedAt','amountMinor','currency','entitlementStatus','linkedGrantEventCount','linkedActiveGrantCount','linkedRevokedGrantCount','linkedCreditLotCount','linkedCreditRemaining'],
   'commerce-alerts': ['transactionId','subjectId','alertKind','providerStatus','detectedAt','evidence'],
+  'provider-events': ['providerEventId','subjectId','transactionId','provider','providerEventType','status','resolutionSource','occurredAt','receivedAt','processedAt'],
   entitlements: ['entitlementId','subjectId','entitlementKey','status','activeGrantCount','effectiveValidUntil','updatedAt'],
   'entitlement-events': ['eventId','subjectId','grantId','entitlementKey','eventKind','sourceType','transactionId','effectiveAt','createdAt'],
   commerce: ['transactionId', 'subjectId', 'productKey', 'amountMinor', 'currency', 'providerStatus', 'verifiedAt', 'entitlementStatus'],
@@ -60,7 +62,7 @@ const SAFE_COLUMNS: Readonly<Record<AdminReadKindV1, readonly string[]>> = Objec
   credits: ['eventId', 'subjectId', 'creditDelta', 'creditsRemaining', 'expiresAt', 'validity', 'createdAt', 'eventKind', 'balanceAfter', 'correlationId'],
   'reading-attempts': ['attemptId','readingId','subjectId','attemptNo','state','engineKey','requestedEngineVersion','resolvedEngineVersion','errorCode','startedAt','finishedAt'],
   'reading-detail': ['readingId','subjectId','status','domain','createdAt','completedAt','engineVersion','contractVersion','requestContractVersion','engineKey','responseState','committedAttemptId','attemptState','attemptCount','errorCode','startedAt','finishedAt'],
-  readings: ['readingId', 'subjectId', 'status', 'productKey', 'domain', 'engineVersion', 'contractVersion', 'errorCode', 'createdAt', 'errorCode'],
+  readings: ['readingId', 'subjectId', 'status', 'productKey', 'domain', 'engineVersion', 'contractVersion', 'createdAt', 'errorCode'],
   'ai-costs': ['day', 'feature', 'model', 'requests', 'successes', 'failures', 'characterChatCalls', 'unclassifiedCalls', 'totalTokens', 'unknownTokenCalls', 'blocked', 'costKrw', 'avgLatencyMs', 'latencySamples', 'p95LatencyMs'],
   'ai-errors': ['executionId','subjectId','feature','model','status','errorCode','latencyMs','createdAt'],
   'ai-estimates': ['day', 'feature', 'model', 'requests', 'successes', 'failures', 'estimatedMicroUsd', 'unknownCostCalls', 'costStatus'],

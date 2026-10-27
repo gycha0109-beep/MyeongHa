@@ -29,6 +29,8 @@ try {
     'SELECT response_snapshot_jsonb FROM public.reading_refs LIMIT 1',
     'SELECT output_ref_jsonb FROM public.ai_execution_logs LIMIT 1',
     'SELECT verified_payload_jsonb FROM public.commerce_receipts LIMIT 1',
+    'SELECT external_event_id FROM public.commerce_provider_events LIMIT 1',
+    'SELECT verified_payload_jsonb FROM public.commerce_provider_events LIMIT 1',
     'SELECT event_jsonb FROM public.seyeon_ai_call_cost_events LIMIT 1',
     'UPDATE public.subjects SET status=status WHERE false',
     'DELETE FROM public.entitlements WHERE false',

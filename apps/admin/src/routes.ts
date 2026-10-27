@@ -53,7 +53,7 @@ export const adminRoutes: readonly AdminRoute[] = [
     path: '/admin/analytics',
     label: '베타 분석',
     heading: '베타 분석',
-    description: '실제 이벤트를 기반으로 유입과 전환을 분석합니다.',
+    description: '유입·전환 지표의 이벤트 계약과 실제 측정 가능 여부를 확인합니다.',
     shortLabel: '05',
   },
   {

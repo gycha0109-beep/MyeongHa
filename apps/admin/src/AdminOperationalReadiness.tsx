@@ -3,34 +3,6 @@ import { fetchAdminReadV1, AdminAccessDeniedErrorV1 } from './admin-client.js';
 import type { AdminReadResponse } from './admin-client.js';
 import { StatusPanel } from './StatusPanel.js';
 
-export const BETA_FUNNEL_EVIDENCE_V1 = Object.freeze([
-  {
-    label: '상품 상세 유효 방문자',
-    registryStatus: '추가 이벤트 계약 필요',
-    evidence: '상품 상세 방문·고유 방문자 적재 확인 전까지 분모 없음',
-  },
-  {
-    label: '명식 입력 완료',
-    registryStatus: '등록됨: BIRTH_RECORD_COMPLETED',
-    evidence: '분석 저장소 적재·동의·고유 방문자 결속 근거 없음',
-  },
-  {
-    label: '결제 시도',
-    registryStatus: '추가 이벤트 계약 필요',
-    evidence: '결제 시도 수와 고유 사용자·방문자 결속 경로 미검증',
-  },
-  {
-    label: '서버 검증 결제',
-    registryStatus: '등록됨: READING_PURCHASED',
-    evidence: '원장 성공과 분석 전환 이벤트의 동일 기준 확인 필요',
-  },
-  {
-    label: '결과 열람·만족도',
-    registryStatus: '추가 이벤트 계약 필요',
-    evidence: '결과 열람·1~5점 만족도·중대 불만에 대한 저장 원본 미확인',
-  },
-] as const);
-
 export const BETA_TARGETS_V1 = Object.freeze([
   { title: '1차 유효 방문', target: '100명', value: null },
   { title: '구매 전환율', target: '5% 이상', value: null },
@@ -55,6 +27,10 @@ export const DISABLED_OPERATOR_ACTIONS_V1 = Object.freeze([
   {
     action: '가격·상품 판매 활성화',
     reason: '판매·PSP 출시 게이트와 상품 카탈로그 편집 정본은 별도 승인 대상',
+  },
+  {
+    action: '공지·홈 배너 변경',
+    reason: '표현 정보 전용 승인 설정 경로가 없어 게시·숨김·노출 기간 변경은 비활성',
   },
 ] as const);
 

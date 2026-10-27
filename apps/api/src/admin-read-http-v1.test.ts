@@ -57,6 +57,12 @@ function harness(options: {
 }
 
 describe('admin owner-only reads', () => {
+  it('allows exact provider-event receipt and state filters only on the evidence route', () => {
+    const read = (path: string) => parseAdminReadFiltersV1(new URL('https://admin.invalid' + path));
+    expect(read('/api/admin/provider-events?receiptId=' + subject + '&providerEventStatus=unresolved')).toMatchObject({ receiptId: subject, providerEventStatus: 'unresolved' });
+    for (const path of ['/api/admin/provider-events?receiptId=invalid', '/api/admin/provider-events?providerEventStatus=refunded',
+      '/api/admin/commerce?providerEventStatus=verified']) expect(() => read(path)).toThrow();
+  });
   it('accepts model and source-specific AI features and rejects SQL-shaped or cross-source filters', () => {
     const read = (path: string) => parseAdminReadFiltersV1(new URL('https://admin.invalid' + path));
     expect(read('/api/admin/ai-costs?aiFeature=renderer&aiModel=provider/model-v1').aiModel).toBe('provider/model-v1');

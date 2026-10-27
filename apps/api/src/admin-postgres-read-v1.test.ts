@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ADMIN_READ_SQL_V1, createAdminPostgresReadPortV1 } from './admin-postgres-read-v1.js';
+import { ADMIN_READ_SQL_V1, ADMIN_READ_PRINCIPAL_SQL_V1, createAdminPostgresReadPortV1 } from './admin-postgres-read-v1.js';
 import type { PostgresSubjectPoolV1 } from './postgres-subject-execution.js';
 import type { AdminListFiltersV1 } from './admin-read-contract-v1.js';
 
@@ -27,6 +27,16 @@ const filters = (kind: AdminListFiltersV1['kind'] = 'users'): AdminListFiltersV1
   ({ kind, limit: 20, cursor: null, subjectId: null, from: null, to: null });
 
 describe('admin dedicated readonly PostgreSQL adapter', () => {
+  it('binds receipt-resolved provider lifecycle metadata without external IDs or verified payloads', async () => {
+    const h = harness();
+    await h.port.read({ ...filters('provider-events'), subjectId: SUBJECT, receiptId: SUBJECT, providerEventStatus: 'failed' });
+    expect(h.params[2]).toEqual([21,SUBJECT,null,null,0,SUBJECT,'failed']);
+    expect(h.sql[2]).toContain('e.resolved_receipt_id=$6::uuid');
+    expect(h.sql[2]).not.toMatch(/external_event_id|external_transaction_id|verified_payload_jsonb|payload_fingerprint/iu);
+    expect(ADMIN_READ_SQL_V1.credits).toContain("OR (lot.credits_remaining > 0 AND (lot.expires_at IS NULL OR lot.expires_at > CURRENT_TIMESTAMP))");
+    expect(ADMIN_READ_PRINCIPAL_SQL_V1).toContain('NOT r.rolbypassrls');
+    expect(ADMIN_READ_PRINCIPAL_SQL_V1).toContain('pg_catalog.pg_auth_members');
+  });
   it('reads current entitlement metadata and exact receipt event lineage without payloads or dedupe secrets', async () => {
     const h = harness();
     await h.port.read({ ...filters('entitlements'), subjectId: SUBJECT });
@@ -52,7 +62,7 @@ describe('admin dedicated readonly PostgreSQL adapter', () => {
   it('blocks ordinary subject role before querying data', async () => {
     const h = harness('myeongha_api_executor');
     await expect(h.port.read(filters())).rejects.toThrow('Dedicated administrative');
-    expect(h.sql).toEqual(['BEGIN READ ONLY','SELECT current_user::text AS "currentUser"','ROLLBACK']);
+    expect(h.sql).toEqual(['BEGIN READ ONLY',ADMIN_READ_PRINCIPAL_SQL_V1,'ROLLBACK']);
   });
   it('binds user reference and date filters only as parameters', async () => {
     const h = harness();
@@ -357,5 +367,9 @@ describe('admin dedicated readonly PostgreSQL adapter', () => {
     expect(result.rows).toHaveLength(2);
     expect(result.nextCursor).toBe('2');
     await expect(h.port.read({ ...filters(), cursor:'1;DELETE' })).rejects.toThrow();
+    const last = await h.port.read({ ...filters(), limit: 2, cursor: '10000' });
+    expect(last.nextCursor).toBeNull();
+    await expect(h.port.read({ ...filters('commerce-detail'), recordId: null })).rejects.toThrow();
+    await expect(h.port.read({ ...filters(), limit: 100 })).rejects.toThrow();
   });
 });

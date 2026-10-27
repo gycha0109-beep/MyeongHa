@@ -202,7 +202,7 @@ export function createAdminLoopbackServerV1(input: AdminLoopbackOptionsV1): Serv
         const response = await privileged.handleRequest(request);
         const body = await response.text();
         const headers: Record<string, string> = {};
-        for (const key of ['content-type','cache-control','pragma','x-content-type-options','x-request-id','vary']) {
+        for (const key of ['content-type','cache-control','pragma','x-content-type-options','x-request-id','vary','retry-after']) {
           const value = response.headers.get(key);
           if (value !== null) headers[key] = value;
         }
