@@ -84,7 +84,7 @@ export async function fetchAdminReadV1(
     method: 'GET',
     headers: { Accept: 'application/json', Authorization: 'Bearer ' + token },
     cache: 'no-store',
-    credentials: 'omit',
+    credentials: 'same-origin',
   });
   if (response.status === 403 || response.status === 401) {
     throw new AdminAccessDeniedErrorV1();
@@ -124,7 +124,7 @@ export async function verifyAdminOwnerSessionV1(
   const response = await fetchImpl('/api/admin/session', {
     method: 'GET',
     headers: { Accept: 'application/json', Authorization: 'Bearer ' + token },
-    credentials: 'omit',
+    credentials: 'same-origin',
     cache: 'no-store',
   });
   if (response.status === 401 || response.status === 403) throw new AdminAccessDeniedErrorV1();
@@ -146,7 +146,7 @@ export async function fetchAdminIssuesCsvV1(
   const res = await fetchImpl('/api/admin/issues.csv?' + query.toString(), {
     method: 'GET',
     headers: { Accept: 'text/csv', Authorization: 'Bearer ' + token },
-    credentials: 'omit',
+    credentials: 'same-origin',
     cache: 'no-store',
   });
   if (res.status === 401 || res.status === 403) throw new AdminAccessDeniedErrorV1();

@@ -1,0 +1,20 @@
+name: Admin Console Private Build
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  private-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npm run typecheck -w @myeongha/admin
+      - run: npm run test -w @myeongha/admin
+      - run: node apps/admin/deployment-check.mjs --allow-blocked
+      - run: npm run build:private -w @myeongha/admin

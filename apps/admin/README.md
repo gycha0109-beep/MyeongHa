@@ -12,6 +12,16 @@ Node 24 / npm 11, 저장소 루트에서 의존성을 설치한 후:
 - 미리보기: npm run preview -w @myeongha/admin
 - 경로 테스트: npm run test -w @myeongha/admin
 
+## 독립 운영 배포 구성
+
+`apps/admin/wrangler.jsonc`와 `cloudflare/admin-worker.mjs`는 기존 사용자 Worker와 다른 `myeongha-admin` 대상입니다. `npm run build:private -w @myeongha/admin`은 번들·자산을 dry-run 검증하며 업로드하지 않습니다. 수동 `Admin Console Private Build` workflow도 배포·역할 설치를 실행하지 않습니다.
+
+모든 자산에 Cloudflare Access의 RS256 서명·정확한 issuer/audience/Owner 이메일·만료 검증이 선행하고, API는 기존 Supabase Owner 허용 목록을 추가 검증합니다. 원래 사용자 DB binding은 재사용하지 않습니다. 전용 Reader/Audit Writer Hyperdrive origin과 실제 최소 권한 속성 검사가 필요하며, 브라우저는 Access 쿠키를 same-origin으로만 전송하고 서버는 상류에 쿠키·refresh token을 전달하지 않습니다.
+
+`npm run verify:hosted -w @myeongha/admin`은 필요한 설정 **이름**만 보고하며 미설정이면 종료 코드 2입니다. `--allow-blocked`는 구성 계약 확인용입니다. 완성된 환경에서 `node apps/admin/deployment-check.mjs --write-config <새 로컬 경로>`로 전용 binding을 가진 구성을 생성할 수 있습니다. API 키는 생성된 파일에 쓰지 않으며 활성화는 여전히 false입니다. Access 정책·전용 origin 역할·감사 저장의 실제 검증 후에만 서버 secret으로 활성화합니다.
+
+2026-10-27 연결 메타데이터 확인: Production에는 관리자 전용 Reader/Audit Writer 역할·감사 테이블이 없고, Cloudflare에는 별도 관리자 Worker/binding이 없으며 Access는 미활성입니다. 기존 사용자 Worker와 Vercel 프로젝트를 변경하거나 postgres 연결을 관리자 자격증명으로 승격하지 않았습니다. 새 역할 비밀 생성·운영 DDL·실사용자 조치는 실행하지 않았습니다.
+
 React 19와 기존 web 워크스페이스에서 설치하는 Vite 8 빌드 도구를 재사용합니다. 취약 버전으로 표시된 Vite를 관리자 workspace에 새 의존성으로 추가하지 않으며, 개발 서버는 127.0.0.1에서만 바인딩합니다. 결과물은 apps/admin/dist에만 저장하며, 기존 apps/web → public 빌드 및 명하 Production 배포와 결합하지 않습니다.
 
 ## 현재 보안 경계
