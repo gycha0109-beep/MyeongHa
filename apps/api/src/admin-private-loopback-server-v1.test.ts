@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { createAdminLoopbackServerV1 } from './admin-private-loopback-server-v1.js';
 import { MYEONGHA_PRODUCTION_SUPABASE_ORIGIN } from './production-user-data-runtime-config.js';
 import type { PostgresSubjectPoolV1 } from './postgres-subject-execution.js';
-import type { Server } from 'node:http';
+import { request as httpRequest, type Server } from 'node:http';
 
 const OWNER = '123e4567-e89b-42d3-a456-426614174000';
 const OTHER = '123e4567-e89b-42d3-a456-426614174001';
@@ -94,10 +94,28 @@ describe('private local administrator execution boundary', () => {
   });
   it('refuses unpinned or non-HTTPS Member Auth origin', async () => {
     const { port } = await start({ invalidAuthOrigin: true });
-    expect((await fetch('http://127.0.0.1:' + port + '/api/auth/sign-in', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Origin: 'http://127.0.0.1:4184' },
-      body: JSON.stringify({ email: 'owner@example.test', password: 'pass' }),
-    })).status).toBe(503);
+    const status = await new Promise<number>((resolve, reject) => {
+      const body = JSON.stringify({ email: 'owner@example.test', password: 'pass' });
+      const request = httpRequest({
+        hostname: '127.0.0.1',
+        port,
+        path: '/api/auth/sign-in',
+        method: 'POST',
+        agent: false,
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(body),
+          Connection: 'close',
+          Origin: 'http://127.0.0.1:4184',
+        },
+      }, response => {
+        response.resume();
+        response.once('end', () => resolve(response.statusCode ?? 0));
+        response.once('error', reject);
+      });
+      request.once('error', reject);
+      request.end(body);
+    });
+    expect(status).toBe(503);
   });
 });
