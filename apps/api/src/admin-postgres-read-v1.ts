@@ -26,7 +26,7 @@ export const ADMIN_READ_SQL_V1: Readonly<Record<AdminReadKindV1, string | null>>
   "content-releases": "SELECT r.release_key AS \"releaseKey\",b.content_version AS \"contentVersion\",r.status AS \"status\",r.is_default AS \"isDefault\",r.activated_at::text AS \"activatedAt\",r.created_at::text AS \"createdAt\" FROM public.content_releases r JOIN public.content_bundles b ON b.id=r.content_bundle_id WHERE ($3::text IS NULL OR r.status=$3::text) ORDER BY r.created_at DESC,r.id DESC LIMIT $1::int OFFSET $2::int",
   "deletion-jobs": "SELECT d.id::text AS \"deletionJobId\",d.subject_id::text AS \"subjectId\",d.scope AS \"scope\",d.status AS \"status\",d.requested_at::text AS \"requestedAt\",d.completed_at::text AS \"completedAt\",d.error_code AS \"errorCode\" FROM public.data_deletion_jobs d WHERE ($2::uuid IS NULL OR d.subject_id=$2::uuid) AND ($3::date IS NULL OR d.requested_at >= $3::date) AND ($4::date IS NULL OR d.requested_at < $4::date+INTERVAL '1 day') AND ($6::text IS NULL OR d.status=$6::text) AND ($7::text IS NULL OR d.scope=$7::text) AND d.requested_at >= CURRENT_TIMESTAMP - INTERVAL '90 days' ORDER BY d.requested_at DESC,d.id DESC LIMIT $1::int OFFSET $5::int",
   "analytics": null,
-  "audit": "SELECT a.request_id::text AS \"requestId\",a.actor_auth_user_id::text AS \"actorRef\",\na.target_ref::text AS \"targetRef\",a.action AS \"action\",a.outcome AS \"outcome\",\na.occurred_at::text AS \"occurredAt\"\nFROM myeongha_admin_ops.admin_audit_events_v1 a\nWHERE a.occurred_at >= CURRENT_TIMESTAMP - INTERVAL '90 days'\nAND ($3::date IS NULL OR a.occurred_at >= $3::date)\nAND ($4::date IS NULL OR a.occurred_at < $4::date + INTERVAL '1 day')\nORDER BY a.occurred_at DESC,a.request_id DESC\nLIMIT $1::int OFFSET $2::int",
+  "audit": "SELECT a.request_id::text AS \"requestId\",a.actor_auth_user_id::text AS \"actorRef\",\na.target_ref::text AS \"targetRef\",a.action AS \"action\",a.outcome AS \"outcome\",\na.occurred_at::text AS \"occurredAt\"\nFROM myeongha_admin_ops.admin_audit_events_v1 a\nWHERE a.occurred_at >= CURRENT_TIMESTAMP - INTERVAL '90 days'\nAND ($3::date IS NULL OR a.occurred_at >= $3::date)\nAND ($4::date IS NULL OR a.occurred_at < $4::date + INTERVAL '1 day')\nAND ($5::text IS NULL OR a.outcome=$5::text) ORDER BY a.occurred_at DESC,a.request_id DESC\nLIMIT $1::int OFFSET $2::int",
   "issues": "SELECT o.id::text AS \"issueId\",o.event_type AS \"category\",NULL::text AS \"severity\",o.status AS \"status\",o.created_at::text AS \"createdAt\",NULL::text AS \"requestId\" FROM public.outbox_events o WHERE o.status IN ('failed','dead_lettered') AND ($2::text IS NULL OR o.status=$2::text) AND ($6::text IS NULL OR o.event_type=$6::text) AND ($3::date IS NULL OR o.created_at >= $3::date) AND ($4::date IS NULL OR o.created_at < $4::date + INTERVAL '1 day') AND o.created_at >= CURRENT_TIMESTAMP - INTERVAL '90 days' ORDER BY o.created_at DESC,o.id DESC LIMIT $1::int OFFSET $5::int"
 }
 );
@@ -92,7 +92,7 @@ async function runQuery(
         : filters.kind === 'deletion-jobs'
           ? [amount + 1, filters.subjectId, filters.from, filters.to, offset, filters.deletionStatus ?? null, filters.deletionScope ?? null]
         : filters.kind === 'audit'
-          ? [amount + 1, offset, filters.from, filters.to]
+          ? [amount + 1, offset, filters.from, filters.to, filters.auditOutcome ?? null]
         : filters.kind === 'characters'
           ? [amount + 1, offset, filters.characterAvailability ?? null]
         : filters.kind === 'content-releases'

@@ -155,6 +155,15 @@ describe('admin owner-only reads', () => {
     expect(() => parse('/api/admin/commerce-alerts?receiptStatus=verified')).toThrow();
     expect(() => parse('/api/admin/credits?receiptStatus=revoked')).toThrow();
   });
+  it('rejects invalid audit outcome values or audit filters on unrelated routes', () => {
+    const parse=(path:string)=>parseAdminReadFiltersV1(new URL('https://a.invalid'+path));
+    expect(parse('/api/admin/audit?auditOutcome=denied').auditOutcome).toBe('denied');
+    expect(parse('/api/admin/audit?auditOutcome=failed').auditOutcome).toBe('failed');
+    expect(() => parse('/api/admin/audit?auditOutcome=success')).toThrow();
+    expect(() => parse('/api/admin/issues?auditOutcome=denied')).toThrow();
+    expect(() => parse('/api/admin/audit?auditOutcome=denied&auditOutcome=failed')).toThrow();
+  });
+
   it('verifies only Owner session before any data query, with required audit', async () => {
     const allowed = harness();
     const result = await allowed.call('/api/admin/session');
