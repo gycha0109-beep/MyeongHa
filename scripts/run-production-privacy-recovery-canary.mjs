@@ -109,6 +109,7 @@ async function runtimeModules() {
     workerPoolModule,
     postgresPoolModule,
     privilegedPostgresTlsModule,
+    postgresTlsModule,
   ] = await Promise.all([
     import('../dist/apps/api/src/production-account-deletion-auth-admin-config.js'),
     import('../dist/apps/api/src/supabase-auth-admin-user-deletion.js'),
@@ -117,6 +118,7 @@ async function runtimeModules() {
     import('../dist/apps/api/src/node-postgres-account-deletion-worker-pool.js'),
     import('../dist/apps/api/src/node-postgres-subject-pool.js'),
     import('../dist/apps/api/src/production-privileged-postgres-tls-peer-verification.js'),
+    import('../dist/apps/api/src/production-postgres-tls-peer-verification.js'),
   ]);
   return {
     ...authConfigModule,
@@ -126,6 +128,7 @@ async function runtimeModules() {
     ...workerPoolModule,
     ...postgresPoolModule,
     ...privilegedPostgresTlsModule,
+    ...postgresTlsModule,
   };
 }
 
@@ -280,12 +283,43 @@ async function cleanupApiCanaryLogin() {
 }
 
 async function createApiPool() {
-  const { normalizeNodePostgresConnectionStringV1 } = await runtimeModules();
-  const connectionString = normalizeNodePostgresConnectionStringV1(
-    requiredEnv('MYEONGHA_DATABASE_URL'),
-  );
+  const {
+    buildProductionPostgresStrictTlsTargetV1,
+    PRODUCTION_POSTGRES_TLS_PEER_VERIFICATION_CONTRACT_VERSION_V1,
+    PRODUCTION_POSTGRES_TLS_REQUIRED_MODE_V1,
+    PRODUCTION_POSTGRES_TLS_ROOT_FINGERPRINT256_V1,
+  } = await runtimeModules();
+  const databaseUrl = requiredEnv('MYEONGHA_DATABASE_URL');
+  let url;
+  try {
+    url = new URL(databaseUrl);
+  } catch {
+    fail('API_DATABASE_AUTHORITY_INVALID');
+  }
+  const poolerHost = requiredEnv('SUPABASE_PRODUCTION_SESSION_POOLER_HOST');
+  if (
+    !/^[a-z0-9-]+(?:[.][a-z0-9-]+)*[.]pooler[.]supabase[.]com$/u.test(poolerHost) ||
+    url.hostname !== poolerHost ||
+    url.port !== '5432' ||
+    url.pathname !== '/postgres' ||
+    decodeURIComponent(url.username) !== `${expectedApiDatabasePrincipal()}.${PROJECT_REF}` ||
+    url.searchParams.get('sslmode') !== 'verify-full'
+  ) {
+    fail('API_DATABASE_AUTHORITY_INVALID');
+  }
+  const target = buildProductionPostgresStrictTlsTargetV1({
+    databaseUrl,
+    rootCertificatePem: requiredEnv('MYEONGHA_WORKER_DATABASE_SSL_ROOT_CERT_PEM'),
+    authority: {
+      contractVersion: PRODUCTION_POSTGRES_TLS_PEER_VERIFICATION_CONTRACT_VERSION_V1,
+      projectRef: PROJECT_REF,
+      requiredTlsMode: PRODUCTION_POSTGRES_TLS_REQUIRED_MODE_V1,
+      rootCertificateFingerprint256: PRODUCTION_POSTGRES_TLS_ROOT_FINGERPRINT256_V1,
+    },
+  });
   return new Pool({
-    connectionString,
+    connectionString: target.connectionString,
+    ssl: target.ssl,
     max: 1,
     connectionTimeoutMillis: 5_000,
     idleTimeoutMillis: 10_000,
@@ -1119,6 +1153,44 @@ async function cleanupPrestart() {
         guard.rows[0]?.authUserId !== state.authUserId
       ) {
         fail('CLEANUP_PRESTART_GUARD_FAILED');
+      }
+      const credits = await client.query(
+        `select id::text as id, source_kind as "sourceKind",
+                source_ref::text as "sourceRef",
+                credits_issued as "creditsIssued",
+                credits_remaining as "creditsRemaining"
+         from public.chat_credit_lots_v1
+         where subject_id = $1::uuid
+         for update`,
+        [state.subjectId],
+      );
+      const lot = credits.rows[0];
+      if (
+        credits.rows.length !== 1 ||
+        lot?.sourceKind !== 'signup' ||
+        lot?.sourceRef !== state.subjectId ||
+        lot?.creditsIssued !== 50 ||
+        lot?.creditsRemaining !== 50
+      ) {
+        fail('CLEANUP_PRESTART_CREDIT_GUARD_FAILED');
+      }
+      const allocations = await client.query(
+        'select 1 from public.chat_credit_turn_allocations_v1 where lot_id = $1::uuid limit 1',
+        [lot.id],
+      );
+      if (allocations.rows.length !== 0) {
+        fail('CLEANUP_PRESTART_CREDIT_ALLOCATION_PRESENT');
+      }
+      const deletedLot = await client.query(
+        `delete from public.chat_credit_lots_v1
+         where id = $1::uuid and subject_id = $2::uuid
+           and source_kind = 'signup' and source_ref = $2::uuid
+           and credits_issued = 50 and credits_remaining = 50
+         returning id`,
+        [lot.id, state.subjectId],
+      );
+      if (deletedLot.rows.length !== 1) {
+        fail('CLEANUP_PRESTART_CREDIT_DELETE_FAILED');
       }
       await client.query(
         'delete from public.commerce_account_links where id = $1::uuid and subject_id = $2::uuid',

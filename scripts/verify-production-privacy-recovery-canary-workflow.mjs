@@ -131,6 +131,62 @@ for (const fragment of [
 }
 
 
+const apiPoolStart = runtime.indexOf('async function createApiPool()');
+const apiPoolEnd = runtime.indexOf('async function assertApiRuntimePrincipal', apiPoolStart);
+if (apiPoolStart < 0 || apiPoolEnd <= apiPoolStart) {
+  throw new Error(`${runtimePath} must retain a dedicated ephemeral API pool boundary.`);
+}
+const apiPoolContract = runtime.slice(apiPoolStart, apiPoolEnd);
+for (const fragment of [
+  'buildProductionPostgresStrictTlsTargetV1',
+  'PRODUCTION_POSTGRES_TLS_PEER_VERIFICATION_CONTRACT_VERSION_V1',
+  'PRODUCTION_POSTGRES_TLS_REQUIRED_MODE_V1',
+  'PRODUCTION_POSTGRES_TLS_ROOT_FINGERPRINT256_V1',
+  "requiredEnv('MYEONGHA_DATABASE_URL')",
+  "requiredEnv('SUPABASE_PRODUCTION_SESSION_POOLER_HOST')",
+  'expectedApiDatabasePrincipal()',
+  "url.searchParams.get('sslmode') !== 'verify-full'",
+  "rootCertificatePem: requiredEnv('MYEONGHA_WORKER_DATABASE_SSL_ROOT_CERT_PEM')",
+  'connectionString: target.connectionString',
+  'ssl: target.ssl',
+  'API_DATABASE_AUTHORITY_INVALID',
+]) {
+  requireFragment(apiPoolContract, fragment, runtimePath);
+}
+for (const fragment of [
+  'normalizeNodePostgresConnectionStringV1',
+  'buildNodePostgresPoolConfigV1',
+  'rejectUnauthorized: false',
+]) {
+  forbidFragment(apiPoolContract, fragment, runtimePath);
+}
+
+const cleanupStart = runtime.indexOf('async function cleanupPrestart()');
+const cleanupEnd = runtime.indexOf('async function main()', cleanupStart);
+if (cleanupStart < 0 || cleanupEnd <= cleanupStart) {
+  throw new Error(`${runtimePath} must retain guarded prestart cleanup.`);
+}
+const cleanupContract = runtime.slice(cleanupStart, cleanupEnd);
+for (const fragment of [
+  'CLEANUP_PRESTART_CREDIT_GUARD_FAILED',
+  'CLEANUP_PRESTART_CREDIT_ALLOCATION_PRESENT',
+  'CLEANUP_PRESTART_CREDIT_DELETE_FAILED',
+  'from public.chat_credit_lots_v1',
+  'from public.chat_credit_turn_allocations_v1',
+  "source_kind = 'signup' and source_ref = $2::uuid",
+  'credits_issued = 50 and credits_remaining = 50',
+  'returning id',
+  'ROLLBACK',
+]) {
+  requireFragment(cleanupContract, fragment, runtimePath);
+}
+const creditDelete = cleanupContract.indexOf('delete from public.chat_credit_lots_v1');
+const accountDelete = cleanupContract.indexOf('delete from public.commerce_account_links');
+const subjectDelete = cleanupContract.indexOf('delete from public.subjects');
+if (creditDelete < 0 || accountDelete <= creditDelete || subjectDelete <= accountDelete) {
+  throw new Error(`${runtimePath} must remove only unspent synthetic signup credits before account/subject cleanup.`);
+}
+
 const adminUrlStart = runtime.indexOf('function privilegedAdminDatabaseUrl()');
 const adminUrlEnd = runtime.indexOf('function requireRunId', adminUrlStart);
 if (adminUrlStart < 0 || adminUrlEnd <= adminUrlStart) {
