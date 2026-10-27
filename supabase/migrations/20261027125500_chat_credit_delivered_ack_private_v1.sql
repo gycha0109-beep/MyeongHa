@@ -4,7 +4,7 @@
 -- A client-reported ACK never substitutes for canonical DB delivery evidence.
 begin;
 
-create function public.internal_cmd_chat_credit_ack_delivered_v1(
+create function public.internal_cmd_chat_credit_ack_delivered_proven_v2(
   p_subject_id uuid,
   p_thread_id uuid,
   p_client_turn_id uuid,
@@ -109,7 +109,7 @@ $ack$;
 -- The authenticated HTTP receipt boundary and runtime wiring are separate
 -- work. In particular, nobody receives EXECUTE until that independent
 -- identity, proof and delivery integration is implemented and exercised.
-revoke all on function public.internal_cmd_chat_credit_ack_delivered_v1(
+revoke all on function public.internal_cmd_chat_credit_ack_delivered_proven_v2(
   uuid,uuid,uuid,uuid,uuid,uuid
 ) from public,anon,authenticated,service_role,myeongha_api_executor;
 
