@@ -6,7 +6,7 @@ import type { AdminSection } from './routes.js';
 import { StatusPanel } from './StatusPanel.js';
 
 type ListSection = Exclude<AdminSection, 'overview'>;
-type ReadTab = 'users' | 'commerce' | 'commerce-alerts' | 'credits' | 'readings' | 'ai-costs' | 'ai-errors' | 'ai-estimates' | 'credit-reservations' | 'credit-allocations' | 'issues' | 'audit' | 'catalog' | 'characters' | 'content-releases' | 'deletion-jobs';
+type ReadTab = 'users' | 'commerce' | 'commerce-alerts' | 'credits' | 'readings' | 'reading-attempts' | 'ai-costs' | 'ai-errors' | 'ai-estimates' | 'credit-reservations' | 'credit-allocations' | 'issues' | 'audit' | 'catalog' | 'characters' | 'content-releases' | 'deletion-jobs';
 const DATA_PATHS: Record<ListSection, string> = {
   users: 'users',
   commerce: 'commerce',
@@ -58,6 +58,11 @@ const LABELS: Record<string, string> = {
   linkedCreditLotCount: '연계 충전 Lot 수',
   linkedCreditRemaining: '연계 Lot 잔여',
   readingId: 'Reading 참조',
+  attemptId: '시도 참조',
+  attemptNo: '시도 번호',
+  engineKey: '사주 엔진',
+  requestedEngineVersion: '요청 엔진 버전',
+  resolvedEngineVersion: '실제 엔진 버전',
   domain: '사주 영역',
   engineVersion: '엔진 버전',
   contractVersion: 'Reading 응답 계약',
@@ -115,7 +120,12 @@ function isSubjectId(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(value);
 }
 
-export function buildListPath(section: ListSection, subject: string, cursor: string | null, tab: ReadTab, from: string | null = null, to: string | null = null, issueStatus: string = 'all', subjectKind: string = 'all', subjectStatus: string = 'all', readingStatus: string = 'all', issueCategory: string = '', creditSource: string = 'all', reservationState: string = 'all', reservationId: string = ''): string {
+export function buildListPath(section: ListSection, subject: string, cursor: string | null, tab: ReadTab, from: string | null = null, to: string | null = null, issueStatus: string = 'all', subjectKind: string = 'all', subjectStatus: string = 'all', readingStatus: string = 'all', issueCategory: string = '', creditSource: string = 'all', reservationState: string = 'all', reservationId: string = '', attemptReadingId: string = ''): string {
+  if (tab === 'reading-attempts' && isSubjectId(attemptReadingId)) {
+    const params = new URLSearchParams({ limit: '20' });
+    if (cursor !== null) params.set('cursor', cursor);
+    return '/api/admin/readings/' + attemptReadingId + '/attempts?' + params.toString();
+  }
   const params = new URLSearchParams({ limit: '20' });
   if (subject.length > 0) params.set('subjectId', subject);
   if (cursor !== null) params.set('cursor', cursor);
@@ -225,6 +235,7 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
   const [creditSource, setCreditSource] = useState<'all' | 'signup' | 'portone_topup' | 'reading_reward'>('all');
   const [reservationState, setReservationState] = useState<'all' | 'reserved' | 'settled' | 'released'>('all');
   const [reservationId, setReservationId] = useState('');
+  const [attemptReadingId, setAttemptReadingId] = useState('');
   const [draftReservationId, setDraftReservationId] = useState('');
   const [draftIssueCategory, setDraftIssueCategory] = useState('');
   const [pendingSubject, setPendingSubject] = useState(() => {
@@ -243,7 +254,7 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
     setResult(null);
     const url = detail !== null
       ? (section === 'commerce' ? '/api/admin/commerce/' : section === 'readings' ? '/api/admin/readings/' : '/api/admin/users/') + detail
-      : buildListPath(section, subject, cursor, tab, from, to, issueStatus, subjectKind, subjectStatus, readingStatus, issueCategory, creditSource, reservationState, reservationId);
+      : buildListPath(section, subject, cursor, tab, from, to, issueStatus, subjectKind, subjectStatus, readingStatus, issueCategory, creditSource, reservationState, reservationId, attemptReadingId);
     void fetchAdminReadV1(url, token)
       .then(value => { if (mounted) setResult(value); })
       .catch(e => {
@@ -255,7 +266,7 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
     return () => {
       mounted = false;
     };
-  }, [section, token, cursor, subject, detail, tab, from, to, issueStatus, subjectKind, subjectStatus, readingStatus, issueCategory, creditSource, reservationState, reservationId]);
+  }, [section, token, cursor, subject, detail, tab, from, to, issueStatus, subjectKind, subjectStatus, readingStatus, issueCategory, creditSource, reservationState, reservationId, attemptReadingId]);
 
   return <section className="surface admin-data">
     <div className="surface__head">
@@ -264,8 +275,8 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
       <span className="neutral-tag">서버 검증 필수</span>
     </div>
     <div className="admin-tabs" aria-label="조회 종류">
-      {(section === 'commerce' ? [['commerce','결제 내역'],['commerce-alerts','검증·지급 점검'],['credits','크레딧 지급'],['credit-reservations','크레딧 사용·정산'],['credit-allocations','차감·복원 재원']] : section === 'readings' ? [['readings','Reading'],['ai-costs','AI 호출'],['ai-errors','AI 실패·차단'],['ai-estimates','AI 추정 원가']] : section === 'issues' ? [['issues','운영 이슈'],['audit','관리자 접근 기록'],['deletion-jobs','삭제 작업'],['catalog','상품 카탈로그'],['characters','캐릭터'],['content-releases','콘텐츠 릴리스']] : [])
-        .map(([name,label]) => <button key={name} type="button" className={tab===name ? 'active' : ''} onClick={() => { setTab(name as ReadTab); setCursor(null); setDetail(null); setReservationId(''); setDraftReservationId(''); }}>{label}</button>)}
+      {(section === 'commerce' ? [['commerce','결제 내역'],['commerce-alerts','검증·지급 점검'],['credits','크레딧 지급'],['credit-reservations','크레딧 사용·정산'],['credit-allocations','차감·복원 재원']] : section === 'readings' ? [['readings','Reading'],...(attemptReadingId ? [['reading-attempts','실행 시도']] : []),['ai-costs','AI 호출'],['ai-errors','AI 실패·차단'],['ai-estimates','AI 추정 원가']] : section === 'issues' ? [['issues','운영 이슈'],['audit','관리자 접근 기록'],['deletion-jobs','삭제 작업'],['catalog','상품 카탈로그'],['characters','캐릭터'],['content-releases','콘텐츠 릴리스']] : [])
+        .map(([name,label]) => <button key={name} type="button" className={tab===name ? 'active' : ''} onClick={() => { setTab(name as ReadTab); setCursor(null); setDetail(null); setReservationId(''); setDraftReservationId(''); if (name !== 'reading-attempts') setAttemptReadingId(''); }}>{label}</button>)}
     </div>
     <div className="admin-toolbar">
       {section === 'commerce' && tab === 'credit-allocations' && detail === null &&
@@ -371,8 +382,21 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
             <option value="dead_lettered">처리 중단</option>
           </select>
         </label>}
+      {tab === 'reading-attempts' && attemptReadingId !== '' && detail === null &&
+        <button type="button" onClick={() => {
+          setTab('readings');
+          setDetail(attemptReadingId);
+          setAttemptReadingId('');
+          setCursor(null);
+        }}>Reading 상세로</button>}
       {detail !== null
         ? <><button type="button" onClick={() => setDetail(null)}>목록으로</button>
+             {section === 'readings' && <button type="button" onClick={() => {
+               setAttemptReadingId(detail);
+               setTab('reading-attempts');
+               setDetail(null);
+               setCursor(null);
+             }}>전체 실행 시도</button>}
             {section === 'users' && onNavigate && <><button type="button" onClick={() => onNavigate('/admin/readings?subjectId=' + detail)}>Reading 조회</button><button type="button" onClick={() => onNavigate('/admin/commerce?subjectId=' + detail)}>결제 조회</button></>}</>
         : <>
           {section !== 'issues' && section !== 'analytics' && <form onSubmit={e => {
