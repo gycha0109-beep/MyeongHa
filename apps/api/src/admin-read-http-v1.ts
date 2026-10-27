@@ -108,7 +108,7 @@ export function parseAdminReadFiltersV1(url: URL): AdminListFiltersV1 {
     throw new Error('Unknown administrator read route.');
   }
 
-  const allowed = new Set(['limit', 'cursor', 'receiptId', 'subjectId', 'from', 'to', 'status', 'subjectKind', 'subjectStatus', 'readingStatus', 'category', 'creditSource', 'reservationState', 'reservationId', 'aiStage', 'aiErrorCode', 'deletionStatus', 'deletionScope', 'releaseStatus', 'characterAvailability', 'receiptStatus', 'auditOutcome', 'allocationMismatch']);
+  const allowed = new Set(['limit', 'cursor', 'receiptId', 'subjectId', 'from', 'to', 'status', 'subjectKind', 'subjectStatus', 'readingStatus', 'category', 'creditSource', 'reservationState', 'reservationId', 'aiStage', 'aiErrorCode', 'aiFeature', 'aiModel', 'deletionStatus', 'deletionScope', 'releaseStatus', 'characterAvailability', 'receiptStatus', 'auditOutcome', 'allocationMismatch']);
   for (const [key] of url.searchParams) {
     if (!allowed.has(key) || url.searchParams.getAll(key).length !== 1) {
       throw new Error('Unknown or duplicate administrator read parameter.');
@@ -227,6 +227,16 @@ export function parseAdminReadFiltersV1(url: URL): AdminListFiltersV1 {
   }
   const deletionStatus = deletionStatusParam as 'requested' | 'running' | 'completed' | 'failed' | null;
   const deletionScope = deletionScopeParam as 'account' | 'conversation' | 'memory' | 'life_fact' | 'target_person' | null;
+  const aiFeature = url.searchParams.get('aiFeature');
+  const aiModel = url.searchParams.get('aiModel');
+  if (aiFeature !== null && !((kind === 'ai-costs' && ['planner','renderer','output_guard','scene_director'].includes(aiFeature)) ||
+      (kind === 'ai-estimates' && ['chat','post_turn'].includes(aiFeature)))) {
+    throw new Error('Invalid AI measurement feature.');
+  }
+  if (aiModel !== null && (!['ai-costs','ai-errors','ai-estimates'].includes(kind) ||
+      !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(aiModel))) {
+    throw new Error('Invalid AI measurement model.');
+  }
   const aiStageParam = url.searchParams.get('aiStage');
   if (aiStageParam !== null && (kind !== 'ai-errors' ||
       !['planner','renderer','output_guard','scene_director'].includes(aiStageParam))) {
@@ -261,7 +271,7 @@ export function parseAdminReadFiltersV1(url: URL): AdminListFiltersV1 {
   const subjectStatus = subjectStatusParam as 'active' | 'merged' | 'deletion_pending' | 'deleted' | null;
   if (!ADMIN_READ_KINDS_V1.includes(kind)) throw new Error('Unknown administrator kind.');
   const issueStatus = rawIssueStatus as 'failed' | 'dead_lettered' | null;
-  return Object.freeze({ kind, limit, cursor, subjectId, recordId, receiptId, from, to, issueStatus, issueCategory, subjectKind, subjectStatus, readingStatus, creditSource, reservationState, reservationId, aiStage, aiErrorCode, deletionStatus, deletionScope, releaseStatus, characterAvailability, receiptStatus, auditOutcome, allocationMismatchOnly });
+  return Object.freeze({ kind, limit, cursor, subjectId, recordId, receiptId, from, to, issueStatus, issueCategory, subjectKind, subjectStatus, readingStatus, creditSource, reservationState, reservationId, aiStage, aiErrorCode, aiFeature, aiModel, deletionStatus, deletionScope, releaseStatus, characterAvailability, receiptStatus, auditOutcome, allocationMismatchOnly });
 }
 
 const ISSUE_EXPORT_COLUMNS = ['issueId', 'category', 'severity', 'status', 'createdAt', 'requestId'] as const;

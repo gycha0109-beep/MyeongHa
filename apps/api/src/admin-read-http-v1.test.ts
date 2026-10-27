@@ -57,6 +57,15 @@ function harness(options: {
 }
 
 describe('admin owner-only reads', () => {
+  it('accepts model and source-specific AI features and rejects SQL-shaped or cross-source filters', () => {
+    const read = (path: string) => parseAdminReadFiltersV1(new URL('https://admin.invalid' + path));
+    expect(read('/api/admin/ai-costs?aiFeature=renderer&aiModel=provider/model-v1').aiModel).toBe('provider/model-v1');
+    expect(read('/api/admin/ai-estimates?aiFeature=chat').aiFeature).toBe('chat');
+    for (const path of ['/api/admin/ai-estimates?aiFeature=renderer', '/api/admin/ai-costs?aiFeature=chat',
+      '/api/admin/users?aiModel=model', '/api/admin/ai-costs?aiModel=%27OR%201=1']) {
+      expect(() => read(path)).toThrow();
+    }
+  });
   it('validates receipt lineage filters and strips event payloads from entitlement responses', () => {
     const read = (path: string) => parseAdminReadFiltersV1(new URL('https://admin.invalid' + path));
     expect(read('/api/admin/entitlement-events?receiptId=' + subject).receiptId).toBe(subject);

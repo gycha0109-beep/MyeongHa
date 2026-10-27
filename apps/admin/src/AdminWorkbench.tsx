@@ -90,6 +90,16 @@ const LABELS: Record<string, string> = {
   domain: '사주 영역',
   engineVersion: '엔진 버전',
   contractVersion: 'Reading 응답 계약',
+  requestContractVersion: 'Reading 요청 계약',
+  responseState: '응답 전달 상태',
+  committedAttemptId: '확정 실행 시도',
+  characterChatCalls: '대화 연결 호출',
+  unclassifiedCalls: '용도 미분류 호출',
+  enabledOfferCount: '미폐기 활성 제안 수',
+  retiredAt: '카탈로그 폐기 시각',
+  ageSeconds: '요청 후 경과(초·완료 시 정지)',
+  availableAt: '저장된 처리 가능 시각',
+  leaseExpiresAt: '처리 임대 만료',
   attemptState: '최근 실행 시도',
   attemptCount: '시도 수',
   completedAt: '완료 시각',
@@ -144,7 +154,7 @@ function isSubjectId(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(value);
 }
 
-export function buildListPath(section: ListSection, subject: string, cursor: string | null, tab: ReadTab, from: string | null = null, to: string | null = null, issueStatus: string = 'all', subjectKind: string = 'all', subjectStatus: string = 'all', readingStatus: string = 'all', issueCategory: string = '', creditSource: string = 'all', reservationState: string = 'all', reservationId: string = '', attemptReadingId: string = '', aiStage: string = 'all', aiErrorCode: string = '', deletionStatus: string = 'all', deletionScope: string = 'all', releaseStatus: string = 'all', characterAvailability: string = 'all', receiptStatus: string = 'all', auditOutcome: string = 'all', allocationMismatchOnly: boolean = false, receiptId: string = ''): string {
+export function buildListPath(section: ListSection, subject: string, cursor: string | null, tab: ReadTab, from: string | null = null, to: string | null = null, issueStatus: string = 'all', subjectKind: string = 'all', subjectStatus: string = 'all', readingStatus: string = 'all', issueCategory: string = '', creditSource: string = 'all', reservationState: string = 'all', reservationId: string = '', attemptReadingId: string = '', aiStage: string = 'all', aiErrorCode: string = '', deletionStatus: string = 'all', deletionScope: string = 'all', releaseStatus: string = 'all', characterAvailability: string = 'all', receiptStatus: string = 'all', auditOutcome: string = 'all', allocationMismatchOnly: boolean = false, receiptId: string = '', aiFeature: string = 'all', aiModel: string = ''): string {
   if (tab === 'reading-attempts' && isSubjectId(attemptReadingId)) {
     const params = new URLSearchParams({ limit: '20' });
     if (cursor !== null) params.set('cursor', cursor);
@@ -153,7 +163,7 @@ export function buildListPath(section: ListSection, subject: string, cursor: str
   const params = new URLSearchParams({ limit: '20' });
   if (subject.length > 0) params.set('subjectId', subject);
   if (cursor !== null) params.set('cursor', cursor);
-  if (from !== null && to !== null) { params.set('from', from); params.set('to', to); }
+  if (from !== null && to !== null && !['catalog','characters','content-releases'].includes(tab)) { params.set('from', from); params.set('to', to); }
   if (tab === 'issues' && issueStatus !== 'all') params.set('status', issueStatus);
   if (tab === 'issues' && issueCategory !== '') params.set('category', issueCategory);
   if (tab === 'audit' && auditOutcome !== 'all') params.set('auditOutcome', auditOutcome);
@@ -165,6 +175,8 @@ export function buildListPath(section: ListSection, subject: string, cursor: str
   if (tab === 'users' && subjectKind !== 'all') params.set('subjectKind', subjectKind);
   if (tab === 'users' && subjectStatus !== 'all') params.set('subjectStatus', subjectStatus);
   if (tab === 'readings' && readingStatus !== 'all') params.set('readingStatus', readingStatus);
+  if ((tab === 'ai-costs' || tab === 'ai-estimates') && aiFeature !== 'all') params.set('aiFeature', aiFeature);
+  if (['ai-costs','ai-errors','ai-estimates'].includes(tab) && aiModel !== '') params.set('aiModel', aiModel);
   if (tab === 'ai-errors' && aiStage !== 'all') params.set('aiStage', aiStage);
   if (tab === 'ai-errors' && aiErrorCode !== '') params.set('aiErrorCode', aiErrorCode);
   if (tab === 'credits' && creditSource !== 'all') params.set('creditSource', creditSource);
@@ -270,6 +282,9 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
   const [subjectKind, setSubjectKind] = useState<'all' | 'guest' | 'member'>('all');
   const [subjectStatus, setSubjectStatus] = useState<'all' | 'active' | 'merged' | 'deletion_pending' | 'deleted'>('all');
   const [readingStatus, setReadingStatus] = useState<'all' | 'pending' | 'running' | 'succeeded' | 'failed' | 'cancelled'>('all');
+  const [aiFeature, setAiFeature] = useState('all');
+  const [aiModel, setAiModel] = useState('');
+  const [draftAiModel, setDraftAiModel] = useState('');
   const [aiStage, setAiStage] = useState<'all' | 'planner' | 'renderer' | 'output_guard' | 'scene_director'>('all');
   const [aiErrorCode, setAiErrorCode] = useState('');
   const [draftAiErrorCode, setDraftAiErrorCode] = useState('');
@@ -300,7 +315,7 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
     setResult(null);
     const url = detail !== null
       ? (section === 'commerce' ? '/api/admin/commerce/' : section === 'readings' ? '/api/admin/readings/' : '/api/admin/users/') + detail
-      : buildListPath(section, subject, cursor, tab, from, to, issueStatus, subjectKind, subjectStatus, readingStatus, issueCategory, creditSource, reservationState, reservationId, attemptReadingId, aiStage, aiErrorCode, deletionStatus, deletionScope, releaseStatus, characterAvailability, receiptStatus, auditOutcome, allocationMismatchOnly, receiptId);
+      : buildListPath(section, subject, cursor, tab, from, to, issueStatus, subjectKind, subjectStatus, readingStatus, issueCategory, creditSource, reservationState, reservationId, attemptReadingId, aiStage, aiErrorCode, deletionStatus, deletionScope, releaseStatus, characterAvailability, receiptStatus, auditOutcome, allocationMismatchOnly, receiptId, aiFeature, aiModel);
     void fetchAdminReadV1(url, token)
       .then(value => { if (mounted) setResult(value); })
       .catch(e => {
@@ -312,7 +327,7 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
     return () => {
       mounted = false;
     };
-  }, [section, token, cursor, subject, detail, tab, from, to, issueStatus, subjectKind, subjectStatus, readingStatus, issueCategory, creditSource, reservationState, reservationId, attemptReadingId, aiStage, aiErrorCode, deletionStatus, deletionScope, releaseStatus, characterAvailability, receiptStatus, auditOutcome, allocationMismatchOnly, receiptId]);
+  }, [section, token, cursor, subject, detail, tab, from, to, issueStatus, subjectKind, subjectStatus, readingStatus, issueCategory, creditSource, reservationState, reservationId, attemptReadingId, aiStage, aiErrorCode, deletionStatus, deletionScope, releaseStatus, characterAvailability, receiptStatus, auditOutcome, allocationMismatchOnly, receiptId, aiFeature, aiModel]);
 
   return <section className="surface admin-data">
     <div className="surface__head">
@@ -322,7 +337,7 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
     </div>
     <div className="admin-tabs" aria-label="조회 종류">
       {(section === 'commerce' ? [['commerce','결제 내역'],['commerce-alerts','검증·지급 점검'],['entitlements','보유 권한'],['entitlement-events','권한 지급·철회 이력'],['credits','크레딧 지급'],['credit-reservations','크레딧 사용·정산'],['credit-allocations','차감·복원 재원']] : section === 'readings' ? [['readings','Reading'],...(attemptReadingId ? [['reading-attempts','실행 시도']] : []),['ai-costs','AI 호출'],['ai-errors','AI 실패·차단'],['ai-estimates','AI 추정 원가']] : section === 'issues' ? [['issues','운영 이슈'],['audit','관리자 접근 기록'],['deletion-jobs','삭제 작업'],['catalog','상품 카탈로그'],['characters','캐릭터'],['content-releases','콘텐츠 릴리스']] : [])
-        .map(([name,label]) => <button key={name} type="button" className={tab===name ? 'active' : ''} onClick={() => { setTab(name as ReadTab); setCursor(null); setDetail(null); setReservationId(''); setDraftReservationId(''); setReceiptId(''); if (name !== 'reading-attempts') setAttemptReadingId(''); }}>{label}</button>)}
+        .map(([name,label]) => <button key={name} type="button" className={tab===name ? 'active' : ''} onClick={() => { setTab(name as ReadTab); setCursor(null); setDetail(null); setReservationId(''); setDraftReservationId(''); setReceiptId(''); setAiFeature('all'); if (name !== 'reading-attempts') setAttemptReadingId(''); }}>{label}</button>)}
     </div>
     <div className="admin-toolbar">
       {((section === 'commerce' && tab === 'commerce') || (section === 'readings' && tab === 'readings')) && detail === null &&
@@ -341,6 +356,17 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
             value={draftDetailId} onChange={e => setDraftDetailId(e.target.value.trim())} maxLength={36}/>
           <button type="submit">상세 바로 조회</button>
         </form>}
+      {['ai-costs','ai-errors','ai-estimates'].includes(tab) && detail === null && <form onSubmit={e => {
+        e.preventDefault();
+        if (draftAiModel !== '' && !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(draftAiModel)) { setError('모델 식별자 형식을 확인해 주세요.'); return; }
+        setError(''); setAiModel(draftAiModel); setCursor(null);
+      }}><input aria-label="AI 모델 식별자" placeholder="정확한 모델 식별자 (선택)" value={draftAiModel} maxLength={128} onChange={e => setDraftAiModel(e.target.value.trim())}/><button type="submit">모델 조회</button></form>}
+      {(tab === 'ai-costs' || tab === 'ai-estimates') && detail === null && <label>AI 기능
+        <select value={aiFeature} onChange={e => { setAiFeature(e.target.value); setCursor(null); }}>
+          <option value="all">전체 기능</option>
+          {(tab === 'ai-costs' ? ['planner','renderer','output_guard','scene_director'] : ['chat','post_turn']).map(feature => <option key={feature} value={feature}>{feature}</option>)}
+        </select>
+      </label>}
       {section === 'commerce' && tab === 'commerce' && detail === null &&
         <label className="admin-issue-filter">결제 검증 상태
           <select value={receiptStatus} onChange={e => {
@@ -613,7 +639,7 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
             });
         }}>운영 이슈 CSV (최대 50건)</button>}
       <button type="button" onClick={onSessionExpired}>로그아웃</button>
-      {detail === null && tab !== 'reading-attempts' && <form className="date-range-form" onSubmit={e => {
+      {detail === null && !['reading-attempts','catalog','characters','content-releases'].includes(tab) && <form className="date-range-form" onSubmit={e => {
         e.preventDefault();
         if ((draftFrom !== '' && draftTo === '') || (draftFrom === '' && draftTo !== '')) {
           setError('시작일과 종료일을 함께 지정해야 합니다.');
@@ -638,6 +664,9 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
     </div>
     {(tab === 'credit-reservations' || tab === 'credit-allocations') && <p className="readiness-explainer">reserved는 선예약, settled는 전달 참조가 있는 정산, released는 미전달 해제·Lot 복원 상태입니다. 복원 후 Lot의 만료 여부는 별도로 적용됩니다. 요청 멱등성 참조는 같은 사용자·대화 내 client_turn_id이며 원문 대화나 비밀 키가 아닙니다.</p>}
     {tab === 'entitlements' && <p className="readiness-explainer">저장된 권한 투영입니다. 실제 접근 허용은 도메인 Access Gate가 현재 유효성·범위를 다시 검사합니다.</p>}
+    {['ai-costs','ai-errors','ai-estimates'].includes(tab) && <p className="readiness-explainer">일별 기준은 UTC입니다. 대화 참조가 있는 호출과 용도 미분류 호출을 구분하며, 미분류 호출을 사주 비용으로 합산하지 않습니다. 사주 Reading 전용 비용은 적재 근거가 없어 미측정입니다. Se-yeon 비용은 별도 추정 USD 원장이고 공급사 확정 청구액·원화 원가가 아닙니다. 응답당 3~5원·상한 10원은 미확정 연구 가정입니다.</p>}
+    {tab === 'catalog' && <p className="readiness-explainer">상품·제안 활성 플래그와 폐기 시각의 읽기 전용 관측입니다. 실제 판매·가격·PSP 출시 허가는 별도 게이트입니다.</p>}
+    {tab === 'issues' && <p className="readiness-explainer">저장된 실패·시도·임대 상태입니다. 재시도 가능 여부, 최종 실패 분류 또는 재실행 권한으로 해석하지 않습니다.</p>}
     {loading ? <StatusPanel kind="loading" /> : error
       ? <StatusPanel kind={error.includes('권한') ? 'forbidden' : 'error'} detail={error} />
       : result ? <>

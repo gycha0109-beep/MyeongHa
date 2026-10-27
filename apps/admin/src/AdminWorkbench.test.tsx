@@ -2,6 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { buildListPath } from './AdminWorkbench.js';
 
 describe('administrator investigation navigation', () => {
+  it('does not carry unsupported date filters from investigations into catalog metadata', () => {
+    for (const tab of ['catalog', 'characters', 'content-releases'] as const) {
+      const url = new URL(buildListPath('issues', '', null, tab, '2026-10-01', '2026-10-27'), 'https://admin.invalid');
+      expect(url.searchParams.has('from')).toBe(false);
+      expect(url.searchParams.has('to')).toBe(false);
+    }
+  });
   it('carries user and exact receipt filters into paginated entitlement history', () => {
     const subject = '123e4567-e89b-42d3-a456-426614174002';
     const receipt = '123e4567-e89b-42d3-a456-426614174003';

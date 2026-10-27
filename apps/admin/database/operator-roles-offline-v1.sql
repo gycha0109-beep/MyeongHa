@@ -26,18 +26,18 @@ grant usage on schema public to myeongha_admin_reader;
 -- payload, payment receipt JSON, AI prompt/output or guest session material.
 grant select (id, kind, status, created_at) on public.subjects to myeongha_admin_reader;
 grant select (subject_id, updated_at, status) on public.conversation_threads to myeongha_admin_reader;
-grant select (id, subject_id, execution_status, saju_domain, created_at, completed_at)
+grant select (id, subject_id, execution_status, saju_domain, request_contract_version, committed_execution_attempt_id, created_at, completed_at)
   on public.readings to myeongha_admin_reader;
 grant select (id, reading_id, subject_id, execution_attempt_no, state, error_code, saju_engine_key,
   requested_engine_version, resolved_engine_version, started_at, finished_at)
   on public.reading_execution_attempts to myeongha_admin_reader;
-grant select (reading_id, subject_id, saju_engine_version, reading_contract_version)
+grant select (reading_id, subject_id, saju_engine_key, saju_engine_version, reading_contract_version, product_response_state)
   on public.reading_refs to myeongha_admin_reader;
 grant select (id, subject_id, purchase_intent_id, provider, platform, product_offer_id, verification_status, verified_at, verified_amount_minor, verified_currency, created_at)
   on public.commerce_receipts to myeongha_admin_reader;
 grant select (id, status) on public.purchase_intents to myeongha_admin_reader;
-grant select (id, product_id, currency) on public.product_offers to myeongha_admin_reader;
-grant select (id, product_key, product_type, enabled, created_at)
+grant select (id, product_id, currency, enabled, retired_at) on public.product_offers to myeongha_admin_reader;
+grant select (id, product_key, product_type, enabled, retired_at, created_at)
   on public.products to myeongha_admin_reader;
 grant select (id, subject_id, entitlement_key, status, active_grant_count, effective_valid_until, updated_at) on public.entitlements to myeongha_admin_reader;
 grant select (id, subject_id, entitlement_key, scope_key_norm, status) on public.entitlement_grants to myeongha_admin_reader;
@@ -47,12 +47,12 @@ grant select (id, subject_id, source_kind, source_ref, credits_issued, credits_r
 grant select (reservation_id, lot_id, credits) on public.chat_credit_turn_allocations_v1 to myeongha_admin_reader;
 grant select (id, subject_id, thread_id, client_turn_id, required_credits, state, delivered_turn_id, created_at, finalized_at)
   on public.chat_credit_turn_reservations_v1 to myeongha_admin_reader;
-grant select (id, created_at, subject_id, stage, model, status, error_code, input_tokens, output_tokens, latency_ms)
+grant select (id, created_at, subject_id, turn_id, stage, model, status, error_code, input_tokens, output_tokens, latency_ms)
   on public.ai_execution_logs to myeongha_admin_reader;
 grant select (created_at, subject_id, phase, model_key, outcome, cost_status, estimated_cost_micro_usd)
   on public.seyeon_ai_call_cost_events to myeongha_admin_reader;
-grant select (id, event_type, status, created_at) on public.outbox_events to myeongha_admin_reader;
-grant select (id, subject_id, scope, status, requested_at, completed_at, error_code)
+grant select (id, event_type, status, last_error_code, attempt_count, available_at, lease_expires_at, created_at) on public.outbox_events to myeongha_admin_reader;
+grant select (id, subject_id, scope, status, requested_at, started_at, completed_at, error_code)
   on public.data_deletion_jobs to myeongha_admin_reader;
 grant select (id, content_version) on public.content_bundles to myeongha_admin_reader;
 grant select (release_key, content_bundle_id, status, is_default, activated_at, created_at, id)

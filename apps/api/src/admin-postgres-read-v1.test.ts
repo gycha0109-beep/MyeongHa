@@ -294,7 +294,21 @@ describe('admin dedicated readonly PostgreSQL adapter', () => {
     expect(h.sql[2]).toContain('l.stage=$6::text');
     expect(h.sql[2]).toContain('l.error_code=$7::text');
     expect(h.sql[2]).not.toContain('PROVIDER_TIMEOUT');
-    expect(h.params[2]).toEqual([21,null,null,null,0,'renderer','PROVIDER_TIMEOUT']);
+    expect(h.params[2]).toEqual([21,null,null,null,0,'renderer','PROVIDER_TIMEOUT',null]);
+  });
+  it('binds model and feature measurements and keeps UTC days and unattributed calls explicit', async () => {
+    for (const kind of ['ai-costs', 'ai-estimates'] as const) {
+      const h = harness();
+      const feature = kind === 'ai-costs' ? 'renderer' : 'chat';
+      await h.port.read({ ...filters(kind), aiFeature: feature, aiModel: 'provider/model-v1' });
+      expect(h.params[2]).toEqual([21,null,null,null,0,feature,'provider/model-v1']);
+      expect(h.sql[2]).toContain("AT TIME ZONE 'UTC'");
+      expect(h.sql[2]).not.toContain('provider/model-v1');
+    }
+    expect(ADMIN_READ_SQL_V1['ai-costs']).toContain('l.turn_id IS NULL');
+    expect(ADMIN_READ_SQL_V1['ai-costs']).toContain('"unclassifiedCalls"');
+    expect(ADMIN_READ_SQL_V1.readings).toContain('attempt.error_code AS "errorCode"');
+    expect(ADMIN_READ_SQL_V1['reading-detail']).toContain('r.request_contract_version');
   });
   it('shows only nondeleted conversation thread update time, not inferred global activity', () => {
     for (const kind of ['users','user-detail'] as const) {

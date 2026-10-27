@@ -23,6 +23,8 @@ export interface AdminListFiltersV1 {
   readonly reservationId?: string | null;
   readonly aiStage?: 'planner' | 'renderer' | 'output_guard' | 'scene_director' | null;
   readonly aiErrorCode?: string | null;
+  readonly aiFeature?: string | null;
+  readonly aiModel?: string | null;
   readonly deletionStatus?: 'requested' | 'running' | 'completed' | 'failed' | null;
   readonly deletionScope?: 'account' | 'conversation' | 'memory' | 'life_fact' | 'target_person' | null;
   readonly releaseStatus?: 'draft' | 'active' | 'retired' | null;
@@ -57,17 +59,17 @@ const SAFE_COLUMNS: Readonly<Record<AdminReadKindV1, readonly string[]>> = Objec
   'credit-allocations': ['reservationId','lotId','subjectId','allocatedCredits','reservationState','lotSource','createdAt'],
   credits: ['eventId', 'subjectId', 'creditDelta', 'creditsRemaining', 'expiresAt', 'validity', 'createdAt', 'eventKind', 'balanceAfter', 'correlationId'],
   'reading-attempts': ['attemptId','readingId','subjectId','attemptNo','state','engineKey','requestedEngineVersion','resolvedEngineVersion','errorCode','startedAt','finishedAt'],
-  'reading-detail': ['readingId','subjectId','status','domain','createdAt','completedAt','engineVersion','contractVersion','attemptState','attemptCount','errorCode','startedAt','finishedAt'],
-  readings: ['readingId', 'subjectId', 'status', 'productKey', 'domain', 'engineVersion', 'createdAt', 'errorCode'],
-  'ai-costs': ['day', 'feature', 'model', 'requests', 'successes', 'failures', 'totalTokens', 'unknownTokenCalls', 'blocked', 'costKrw', 'avgLatencyMs', 'latencySamples', 'p95LatencyMs'],
+  'reading-detail': ['readingId','subjectId','status','domain','createdAt','completedAt','engineVersion','contractVersion','requestContractVersion','engineKey','responseState','committedAttemptId','attemptState','attemptCount','errorCode','startedAt','finishedAt'],
+  readings: ['readingId', 'subjectId', 'status', 'productKey', 'domain', 'engineVersion', 'contractVersion', 'errorCode', 'createdAt', 'errorCode'],
+  'ai-costs': ['day', 'feature', 'model', 'requests', 'successes', 'failures', 'characterChatCalls', 'unclassifiedCalls', 'totalTokens', 'unknownTokenCalls', 'blocked', 'costKrw', 'avgLatencyMs', 'latencySamples', 'p95LatencyMs'],
   'ai-errors': ['executionId','subjectId','feature','model','status','errorCode','latencyMs','createdAt'],
   'ai-estimates': ['day', 'feature', 'model', 'requests', 'successes', 'failures', 'estimatedMicroUsd', 'unknownCostCalls', 'costStatus'],
   characters: ['characterId', 'contentVersion', 'availability', 'enabled', 'releaseAt', 'publishedAt'],
   'content-releases': ['releaseKey', 'contentVersion', 'status', 'isDefault', 'activatedAt', 'createdAt'],
-  'deletion-jobs': ['deletionJobId', 'subjectId', 'scope', 'status', 'requestedAt', 'completedAt', 'errorCode'],
-  catalog: ['productKey', 'productType', 'catalogEnabled', 'createdAt', 'offerCount'],
+  'deletion-jobs': ['deletionJobId', 'subjectId', 'scope', 'status', 'requestedAt', 'startedAt', 'completedAt', 'ageSeconds', 'errorCode'],
+  catalog: ['productKey', 'productType', 'catalogEnabled', 'retiredAt', 'createdAt', 'offerCount', 'enabledOfferCount'],
   analytics: ['day', 'campaignKey', 'visitors', 'checkoutAttempts', 'verifiedPurchases', 'conversionRate', 'sampleSize'],
-  issues: ['issueId', 'category', 'severity', 'status', 'createdAt', 'requestId'],
+  issues: ['issueId', 'category', 'severity', 'status', 'createdAt', 'requestId', 'errorCode', 'attemptCount', 'availableAt', 'leaseExpiresAt'],
   audit: ['requestId','actorRef','targetRef','action','outcome','occurredAt'],
 });
 
