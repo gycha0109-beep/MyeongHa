@@ -24,6 +24,8 @@ export interface AdminListFiltersV1 {
   readonly aiErrorCode?: string | null;
   readonly deletionStatus?: 'requested' | 'running' | 'completed' | 'failed' | null;
   readonly deletionScope?: 'account' | 'conversation' | 'memory' | 'life_fact' | 'target_person' | null;
+  readonly releaseStatus?: 'draft' | 'active' | 'retired' | null;
+  readonly characterAvailability?: 'available' | 'unlockable' | 'locked' | 'coming_soon' | null;
   readonly from: string | null;
   readonly to: string | null;
 }
