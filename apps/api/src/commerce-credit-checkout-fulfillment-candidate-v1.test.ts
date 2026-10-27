@@ -61,8 +61,8 @@ describe('PortOne credit checkout pre-verification activation policy',()=>{
      {approvedCreditProductOfferId:offerId,approvedPaidCreditValidity:{kind:'always'}},
    ]){
      await expect(completeVerifiedCreditCheckoutCandidateV1({
-       ...args,...activation as never,
-     })).rejects.toThrow('server activation policy');
+       ...args,...activation,
+     } as unknown as Parameters<typeof completeVerifiedCreditCheckoutCandidateV1>[0])).rejects.toThrow('server activation policy');
    }
    expect(state.payment).not.toHaveBeenCalled();
    expect(state.subject).not.toHaveBeenCalled();
