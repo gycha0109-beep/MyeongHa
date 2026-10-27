@@ -39,7 +39,7 @@ beforeEach(()=>{
   state.subject.mockResolvedValue(subjectId);
   state.mint.mockResolvedValue({kind:'issued',receiptId,lotId,creditQuantity:300,
     availableCredits:300,totalCredits:300});
-  state.commerce.mockImplementation(async({execute}:any)=>execute({client:{}}));
+  state.commerce.mockImplementation(async({execute}:{execute:(scope:{client:object})=>Promise<unknown>})=>execute({client:{}}));
 });
 describe('PortOne credit checkout pre-verification activation policy',()=>{
  it('does not touch provider or database while paid checkout is unmounted',async()=>{
