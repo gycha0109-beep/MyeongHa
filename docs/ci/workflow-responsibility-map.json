@@ -386,6 +386,12 @@
       "mainMode": "one-shot-trigger",
       "workTrackAttribution": "commit-metadata"
     },
+    "seyeon-c09-minimax-remaining-four-main-once-20261027.yml": {
+      "responsibility": "character-memory-owner-approved-original-minimax-q2-q5_q7_q10-continuation-once",
+      "prMode": "none",
+      "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "commit-metadata"
+    },
     "seyeon-c09-minimax-m2-her-five-main-once-20261027.yml": {
       "responsibility": "character-memory-owner-approved-minimax-m2-her-five-synthetic-dialogues-one-shot",
       "prMode": "none",
