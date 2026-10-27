@@ -1,6 +1,9 @@
 // Watchtower-Track: commerce-payment
 // Cloudflare Worker bindings for the already-created PortOne V2 NHN KCP
 // TEST channel. A binding is not permission to activate Production checkout.
+import {readOwnerAdminAccessV1} from './myeongha-owner-admin-access-v1.js';
+import type {PostgresSubjectPoolV1} from './postgres-subject-execution.js';
+import type {VerifiedSubjectIdentityEvidenceV1} from './subject-identity-resolver.js';
 import {
   buildPortOneChatCreditCheckoutV1,
   CHAT_CREDIT_PORTONE_V2_OFFER_V1,
@@ -39,6 +42,12 @@ export type CloudflarePortOneTestBindingEnvironmentV1 =
 
 const STORE_ID = /^store-[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/iu;
 const CHANNEL_KEY = /^channel-key-[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/iu;
+const UUID = /^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/iu;
+
+export interface CloudflarePortOneOwnerSandboxAuthorityV1 {
+  readonly pool: PostgresSubjectPoolV1;
+  readonly verifiedEvidence: VerifiedSubjectIdentityEvidenceV1;
+}
 
 function fail(): never {
   // Neither Worker logs nor error objects may expose private credential text.
@@ -72,18 +81,36 @@ function resolveCloudflarePortOneTestBindingsV1(
   });
 }
 
+/** No caller-owned flag can substitute for the canonical Member/Owner DB read. */
+async function assertCloudflarePortOneSandboxOwnerV1(
+  authority: CloudflarePortOneOwnerSandboxAuthorityV1,
+): Promise<void> {
+  if (!authority || authority.verifiedEvidence?.kind !== 'member') return fail();
+  try {
+    const owner = await readOwnerAdminAccessV1(authority.pool,authority.verifiedEvidence);
+    if (owner.isOwnerAdmin !== true || owner.sandboxCheckoutAllowed !== true ||
+        typeof owner.verifiedSubjectId !== 'string' ||
+        !UUID.test(owner.verifiedSubjectId)) return fail();
+  } catch {
+    // Preserve fail-closed behavior without exposing any DB/identity details.
+    return fail();
+  }
+}
+
 /**
  * Only a previously DB-approved Owner Admin sandbox Purchase Intent can be
  * materialized into PortOne V2 browser checkout arguments. Never use the
  * browser response itself as evidence of payment or credit ownership.
  */
-export function buildCloudflarePortOneOwnerTestCheckoutV1(
+export async function buildCloudflarePortOneOwnerTestCheckoutV1(
   env: CloudflarePortOneTestBindingEnvironmentV1,
   serverIssued: Omit<ServerVerifiedCreditCheckoutV1,'storeId'|'channelKey'>,
-): ReturnType<typeof buildPortOneChatCreditCheckoutV1> {
+  authority: CloudflarePortOneOwnerSandboxAuthorityV1,
+): Promise<ReturnType<typeof buildPortOneChatCreditCheckoutV1>> {
   if (serverIssued?.environment !== 'sandbox' ||
       serverIssued.ownerAdminSandboxAllowed !== true) return fail();
   const {storeId, channelKey} = resolveCloudflarePortOneTestBindingsV1(env);
+  await assertCloudflarePortOneSandboxOwnerV1(authority);
   return buildPortOneChatCreditCheckoutV1({...serverIssued,storeId,channelKey});
 }
 
@@ -105,9 +132,10 @@ function checkSandboxVerificationContext(
  * BOTH required before ANY server-side payment lookup. The adapter remains
  * private; a new HTTP route or sandbox mint is explicitly out of scope.
  */
-export function createCloudflarePortOneOwnerTestVerifierV1(
+export async function createCloudflarePortOneOwnerTestVerifierV1(
   env: CloudflarePortOneTestBindingEnvironmentV1,
-): CommercePaymentVerificationAdapterV1 {
+  authority: CloudflarePortOneOwnerSandboxAuthorityV1,
+): Promise<CommercePaymentVerificationAdapterV1> {
   const {apiSecret} = resolveCloudflarePortOneTestBindingsV1(env);
   let evidenceHmacSecret: string;
   try {
@@ -117,6 +145,7 @@ export function createCloudflarePortOneOwnerTestVerifierV1(
   } catch {
     return fail();
   }
+  await assertCloudflarePortOneSandboxOwnerV1(authority);
   const adapter = createPortOneV2PaymentVerificationAdapterV1({
     apiSecret, evidenceHmacSecret,
   });
