@@ -1,6 +1,6 @@
 import{beforeEach,describe,expect,it,vi}from'vitest';
 const state=vi.hoisted(()=>({pools:[],wrongPrincipal:false}));
-vi.mock('pg',()=>({Pool:class{
+vi.mock('pg',()=>({Client:class{},Pool:class{
  constructor(config){this.config=config;this.calls=[];this.releases=[];this.ended=false;state.pools.push(this);}
  on(){}async end(){this.ended=true;}
  async connect(){return{query:async(sql)=>{this.calls.push(sql);

@@ -2,7 +2,7 @@
 // Stage 5 default remains the strict direct-TLS path until an independently
 // approved Hyperdrive origin has been provisioned and bound via Wrangler.
 // Watchtower-Track: ops
-import { Pool } from 'pg';
+import { Client, Pool } from 'pg';
 import {
   createNodePostgresSubjectPoolFromDriverV1,
   createNodePostgresSubjectPoolV1,
@@ -54,13 +54,79 @@ export function createCloudflareSubjectPoolV1(config, bindings, options) {
       !/^[a-z_][a-z0-9_]{0,62}$/.test(config.databasePrincipal)) {
     throw Error('Hyperdrive execution role is not authorized');
   }
-  const driverPool=createHyperdriveDriverPoolV1(target.connectionString,options);
+  const driverPool=createRequestOwnedHyperdriveClientDriverV1(target.connectionString,options);
   // Reuse the existing authoritative LOGIN principal + executable role
   // preflight and the same subject/RLS transaction executor as Vercel.
   return createNodePostgresSubjectPoolFromDriverV1({
     driverPool,
     expectedLoginPrincipal:bindings.MYEONGHA_CLOUDFLARE_HYPERDRIVE_PRINCIPAL,
   });
+}
+
+// Ordinary Auth/Guest requests must not keep a pg Pool across Hyperdrive
+// leases. Hyperdrive already owns the remote connection pool: acquire one
+// fresh node-postgres Client for each subject-scoped connection, and close it
+// before the next lease. This prevents a Worker request from reusing a socket
+// after a request-context GC/connection termination.
+export function createRequestOwnedHyperdriveClientDriverV1(connectionString,options,{createClient=(settings)=>new Client(settings)}={}){
+  let nextLease=Promise.resolve();
+  let closed=false;
+  const closing=new Set();
+  return {
+    async connect(){
+      if(closed) throw Error('Hyperdrive request client has closed');
+      let unlock;
+      const permit=new Promise(resolve=>{unlock=resolve;});
+      const previous=nextLease;
+      nextLease=permit;
+      await previous;
+      if(closed){
+        unlock();
+        throw Error('Hyperdrive request client has closed');
+      }
+      const client=createClient({
+        connectionString,
+        connectionTimeoutMillis:options?.connectionTimeoutMs??5_000,
+        statement_timeout:options?.statementTimeoutMs??5_000,
+      });
+      // Only public exception types may enter runtime diagnostics.
+      client.on?.('error',error=>{
+        console.warn('Cloudflare Hyperdrive request client error',error?.name??'Unknown');
+      });
+      try{
+        await client.connect();
+      }catch(error){
+        try{await client.end();}catch{}
+        unlock();
+        throw error;
+      }
+      let released=false;
+      return {
+        async query(sql,values){
+          if(released) throw Error('Hyperdrive request client was released');
+          const result=values===undefined
+            ?await client.query(sql)
+            :await client.query(sql,[...values]);
+          return {rows:result.rows};
+        },
+        release(){
+          if(released) return;
+          released=true;
+          let cleanup;
+          cleanup=Promise.resolve().then(()=>client.end()).catch(()=>{}).finally(()=>{
+            closing.delete(cleanup);
+            unlock();
+          });
+          closing.add(cleanup);
+        },
+      };
+    },
+    async end(){
+      closed=true;
+      await nextLease;
+      await Promise.all([...closing]);
+    },
+  };
 }
 
 function createHyperdriveDriverPoolV1(connectionString,options){
