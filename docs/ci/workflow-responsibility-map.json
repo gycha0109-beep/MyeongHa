@@ -116,18 +116,6 @@
       "mainMode": "none",
       "workTrackAttribution": "pr-metadata"
     },
-    "mobile-push-production-activate.yml": {
-      "responsibility": "mobile-push-production-activation",
-      "prMode": "none",
-      "mainMode": "one-shot-trigger",
-      "workTrackAttribution": "dispatch-input-or-commit-metadata"
-    },
-    "mobile-social-auth-production-inspect.yml": {
-      "responsibility": "mobile-social-auth-production-read-only-inspection",
-      "prMode": "none",
-      "mainMode": "one-shot-trigger",
-      "workTrackAttribution": "dispatch-input-or-commit-metadata"
-    },
     "postgres-dr-readiness.yml": {
       "responsibility": "postgres-disaster-recovery",
       "prMode": "none",
@@ -194,36 +182,6 @@
       "mainMode": "manual",
       "workTrackAttribution": "none"
     },
-    "production-guest-bootstrap-abuse-policy-evidence.yml": {
-      "responsibility": "production-abuse-policy-evidence",
-      "prMode": "none",
-      "mainMode": "scheduled-manual",
-      "workTrackAttribution": "dispatch-input-or-schedule"
-    },
-    "production-guest-bootstrap-abuse-policy.yml": {
-      "responsibility": "production-abuse-policy-operations",
-      "prMode": "none",
-      "mainMode": "manual",
-      "workTrackAttribution": "dispatch-input"
-    },
-    "production-guest-bootstrap-ttl-binding.yml": {
-      "responsibility": "production-guest-auth-operations",
-      "prMode": "none",
-      "mainMode": "manual",
-      "workTrackAttribution": "none"
-    },
-    "production-member-auth-abuse-policy.yml": {
-      "responsibility": "production-member-auth-operations",
-      "prMode": "none",
-      "mainMode": "manual",
-      "workTrackAttribution": "dispatch-input"
-    },
-    "production-member-auth-rate-limit-canary.yml": {
-      "responsibility": "production-member-auth-evidence",
-      "prMode": "none",
-      "mainMode": "manual",
-      "workTrackAttribution": "dispatch-input"
-    },
     "production-member-chat-open-reuse-smoke.yml": {
       "responsibility": "production-chat-smoke",
       "prMode": "none",
@@ -272,18 +230,6 @@
       "mainMode": "scheduled-manual",
       "workTrackAttribution": "scheduled-operations"
     },
-    "production-postgres-tls-peer-canary.yml": {
-      "responsibility": "postgres-transport-security",
-      "prMode": "none",
-      "mainMode": "one-shot-trigger",
-      "workTrackAttribution": "commit-metadata"
-    },
-    "production-postgres-tls-peer-preflight.yml": {
-      "responsibility": "postgres-transport-security",
-      "prMode": "none",
-      "mainMode": "manual",
-      "workTrackAttribution": "dispatch-input"
-    },
     "production-privacy-recovery-canary.yml": {
       "responsibility": "privacy-recovery-operations",
       "prMode": "none",
@@ -296,35 +242,11 @@
       "mainMode": "triggered-operations",
       "workTrackAttribution": "none"
     },
-    "production-saju-admission-canary.yml": {
-      "responsibility": "production-saju-smoke",
-      "prMode": "none",
-      "mainMode": "manual",
-      "workTrackAttribution": "dispatch-input"
-    },
     "production-saju-current-subject-smoke.yml": {
       "responsibility": "production-saju-smoke",
       "prMode": "none",
       "mainMode": "triggered-operations",
       "workTrackAttribution": "commit-metadata"
-    },
-    "production-saju-redeploy-recovery.yml": {
-      "responsibility": "production-saju-recovery",
-      "prMode": "none",
-      "mainMode": "triggered-operations",
-      "workTrackAttribution": "commit-metadata"
-    },
-    "production-saju-service-origin-binding.yml": {
-      "responsibility": "production-saju-operations",
-      "prMode": "none",
-      "mainMode": "manual",
-      "workTrackAttribution": "none"
-    },
-    "production-security-alerting-activate.yml": {
-      "responsibility": "production-security-alerting",
-      "prMode": "none",
-      "mainMode": "manual",
-      "workTrackAttribution": "dispatch-input"
     },
     "production-seyeon-db-authority-audit.yml": {
       "responsibility": "production-character-db-authority-audit",
