@@ -45,10 +45,18 @@ describe('Commerce Credit verified PortOne receipt payout eligibility (inert)',(
     for (const required of [
       'cr.subject_id = $2::uuid', 'po.id = $3::uuid',
       "cr.provider = 'portone_v2'", "cr.platform = 'web'",
+      "cr.environment = 'production'", 'cr.product_offer_id = pi.product_offer_id',
       "cr.verification_status = 'verified'",'cr.verified_at is not null',
       'cr.verified_amount_minor = 1900',"cr.verified_currency = 'KRW'",
       "pi.status = 'verified'",'pi.expected_amount_minor = 1900',
-      "pi.expected_currency = 'KRW'",'po.enabled','po.retired_at is null',
+      "pi.expected_currency = 'KRW'",
+      'pi.capability_snapshot_hash is not null',
+      'pi.capability_snapshot_jsonb = pg_catalog.jsonb_build_object(',
+      "'capabilitySetId', pcs.id::text",
+      "'definitionVersion', pcs.definition_version",
+      "'definitionHash', pcs.definition_hash",
+      'pcs.id = pi.capability_set_id', 'pcs.product_id = p.id',
+      'po.enabled','po.retired_at is null',
       "p.product_key = 'chat_credits_300_v1'","p.product_type = 'credit'",
     ]) expect(sql).toContain(required);
     expect(sql).not.toContain(subject);
