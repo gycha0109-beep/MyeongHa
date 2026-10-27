@@ -283,41 +283,7 @@ begin
    and terms.terms_version=pi.charge_terms_version
   where (po.enabled=true and p.enabled=true
      or (po.enabled=false and p.enabled=false
-         and pi.idempotency_key ~ '^kcp_sbx_[a-f0-9]{32}
-    and h.provider='portone_v2'
-    and h.environment='sandbox'
-    and h.expected_amount_minor=1900
-    and h.expected_currency='KRW'
-    and po.display_price_minor=1900
-    and pi.expected_amount_minor=1900
-    and pi.expected_currency='KRW'
-    and pi.offer_snapshot_hash is not null
-    and pi.capability_snapshot_hash is not null
-    and pi.offer_snapshot_jsonb=pg_catalog.jsonb_build_object(
-      'productOfferId',po.id::text,
-      'productId',p.id::text,
-      'platform','web',
-      'provider','portone_v2',
-      'externalProductId','myeongha-chat-credits-300-v1'
-    )
-    and pi.capability_snapshot_jsonb=pg_catalog.jsonb_build_object(
-      'capabilitySetId',pcs.id::text,
-      'definitionVersion',pcs.definition_version,
-      'definitionHash',pcs.definition_hash
-    )
-    and exists(
-      select 1 from public.product_capability_items pci
-      where pci.capability_set_id=pcs.id
-    );
-  if not found then
-    raise exception using
-      errcode='P0001',
-      constraint='qry_owner_sandbox_credit_checkout_unavailable',
-      message='Owner sandbox checkout context is not available';
-  end if;
-end;
-$function$;
-
+         and pi.idempotency_key ~ '^kcp_sbx_[a-f0-9]{32}$'
          and pi.request_hash like 'owner-kcp-sandbox-v1:%'))
     and h.status='created'
     and h.provider='portone_v2'
