@@ -102,6 +102,7 @@ export async function handleChatCreditDeliveryAckCandidateV1(input:Readonly<{
           client,canonicalSubjectId:resolvedSubject.subjectId,
           canonicalSubjectKind:'member',...body,
           creditReservationId:body.reservationId,
+          committedAssistantMessageId:body.assistantMessageId,
         });
       },
     });
