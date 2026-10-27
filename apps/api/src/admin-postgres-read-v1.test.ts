@@ -87,6 +87,19 @@ describe('admin dedicated readonly PostgreSQL adapter', () => {
       expect(h.params[2]?.length, kind).toBe(highest);
     }
   });
+  it('identifies only reviewable receipt-to-grant discrepancies, without performing writes', async () => {
+    const sql = ADMIN_READ_SQL_V1['commerce-alerts'] ?? '';
+    expect(sql).toContain("r.verification_status = 'verified'");
+    expect(sql).toContain("r.verification_status = 'revoked'");
+    expect(sql).toContain("e.source_receipt_id = r.id");
+    expect(sql).toContain("g.status = 'active'");
+    expect(sql).toContain("INTERVAL '30 minutes'");
+    expect(sql).toContain("'manual_review_only'");
+    expect(sql).not.toMatch(/verified_payload_jsonb|\bUPDATE\b|\bDELETE\b/iu);
+    const f = harness();
+    await f.port.read({ ...filters('commerce-alerts'), subjectId: SUBJECT });
+    expect(f.params[2]).toEqual([21, SUBJECT, null, null, 0]);
+  });
   it('provides bounded pagination', async () => {
     const h = harness('myeongha_admin_reader',Array.from({length:3},()=>({subjectId:SUBJECT})));
     const result = await h.port.read({ ...filters(),limit:2 });

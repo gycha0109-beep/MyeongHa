@@ -34,6 +34,8 @@ grant select (id, product_id, currency) on public.product_offers to myeongha_adm
 grant select (id, product_key, product_type, enabled, created_at)
   on public.products to myeongha_admin_reader;
 grant select (subject_id, status) on public.entitlements to myeongha_admin_reader;
+grant select (id, status) on public.entitlement_grants to myeongha_admin_reader;
+grant select (grant_id, source_receipt_id, event_type) on public.entitlement_events to myeongha_admin_reader;
 grant select (id, subject_id, source_kind, source_ref, credits_issued, credits_remaining, issued_at, expires_at)
   on public.chat_credit_lots_v1 to myeongha_admin_reader;
 grant select (id, subject_id, required_credits, state, delivered_turn_id, created_at, finalized_at)
@@ -66,6 +68,10 @@ create policy admin_read_offer_metadata_v1 on public.product_offers
 create policy admin_read_product_metadata_v1 on public.products
   for select to myeongha_admin_reader using (true);
 create policy admin_read_entitlements_metadata_v1 on public.entitlements
+  for select to myeongha_admin_reader using (true);
+create policy admin_read_entitlement_grant_status_v1 on public.entitlement_grants
+  for select to myeongha_admin_reader using (true);
+create policy admin_read_entitlement_receipt_link_v1 on public.entitlement_events
   for select to myeongha_admin_reader using (true);
 create policy admin_read_credit_lot_metadata_v1 on public.chat_credit_lots_v1
   for select to myeongha_admin_reader using (true);
