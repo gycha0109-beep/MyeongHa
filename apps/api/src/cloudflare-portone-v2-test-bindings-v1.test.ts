@@ -98,8 +98,8 @@ describe('exact Cloudflare Worker PortOne V2 TEST bindings',()=>{
       {expectedCurrency:'USD'},
       {expectedExternalProductId:'other-product'},
     ]) {
-      await expect(verifier.verify({...request,...changes} as CommercePaymentVerificationAdapterRequestV1))
-        .rejects.toThrow('Cloudflare PortOne V2 TEST binding authority unavailable.');
+      expect(()=>verifier.verify({...request,...changes} as CommercePaymentVerificationAdapterRequestV1))
+        .toThrow('Cloudflare PortOne V2 TEST binding authority unavailable.');
     }
   });
 });
