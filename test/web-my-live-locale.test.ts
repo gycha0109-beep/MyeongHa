@@ -25,7 +25,12 @@ describe('My React-owned localization', () => {
     const jsx = web('src/my/MyPage.tsx');
     const keys = new Set<string>([...jsx.matchAll(/<MyText source="([^"]+)"\s*\/>/gu)].map(match => match[1]).filter((value): value is string => typeof value === 'string'));
     for (const match of jsx.matchAll(/<Choice title="([^"]+)" description="([^"]+)"/gu)) {
-      keys.add(match[1]); keys.add(match[2]);
+      const title = match[1];
+      const description = match[2];
+      if (title !== undefined && description !== undefined) {
+        keys.add(title);
+        keys.add(description);
+      }
     }
     expect(keys.size).toBeGreaterThan(40);
     for (const locale of ['ja-JP', 'zh-TW', 'en-US', 'zh-CN'] as const) {
