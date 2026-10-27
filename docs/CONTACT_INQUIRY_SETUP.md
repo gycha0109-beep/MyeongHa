@@ -19,14 +19,15 @@ Cloudflare 계정의 **Workers & Pages → `myeongha` → Settings → Variables
 | 바인딩 | 유형 | 용도 |
 |---|---|---|
 | `RESEND_API_KEY` | **Secret** | Resend 실제 발송 키. 유효한 키만 사용 |
-| `CONTACT_FROM_EMAIL` | **Secret 또는 서버 전용 변수** | Resend에서 인증된 도메인의 발신 이메일. 예시 주소로 설정 금지 |
+| `CONTACT_FROM_EMAIL` | **Secret 또는 서버 전용 변수** | 검증용 `onboarding@resend.dev` 또는 자체 인증 도메인의 발신 이메일 |
 | `CONTACT_TO_EMAIL` | 선택적 서버 전용 변수 | 수신처 변경 시에만 사용. 미설정 시 `gycha0109@gmail.com` |
 | `MYEONGHA_AUTH_RATE_LIMIT_SECRET` | 기존 Secret 재사용 | 발신 IP를 해시한 rate-limit 식별자 |
 | `AUTH_RATE_LIMITER` | 기존 Cloudflare rate-limit 바인딩 재사용 | 문의 전용 `contact-inquiry` 네임스페이스 |
 | 기존 Cloudflare Auth/DB 승인 및 Hyperdrive 바인딩 | 기존 설정 유지 | 현재 회원·게스트 세션 확인 / 주체 권한 |
 
-- **2026-10-26 바인딩 이름 확인 결과:** `myeongha` Worker에 기존 인증·제한 Secret은 있지만 `RESEND_API_KEY`, `CONTACT_FROM_EMAIL`은 **없음**. 따라서 서버와 폼 코드는 완성되어도 발송은 **503 / MAIL_NOT_CONFIGURED**로 닫힙니다. 이후 설치 여부는 별도 확인해야 합니다.
-- `CONTACT_FROM_EMAIL`은 실제 보유·Resend 인증된 발신 도메인 주소만 허용합니다. `support@example.com`은 개발 예시이지 실제 사용 값이 아닙니다.
+- **2026-10-27 사용자 설정 보고:** Cloudflare `myeongha` Worker에 `RESEND_API_KEY`와 `CONTACT_FROM_EMAIL`을 모두 등록했다고 확인했습니다. 연결 도구가 Secret 이름 조회를 차단하여 실제 반영 여부 및 값은 직접 검증하지 못했습니다.
+- **자체 도메인 없는 초기 검증:** `CONTACT_FROM_EMAIL=onboarding@resend.dev`는 Resend 기본 테스트 발신자입니다. 이 발신자로는 계정 소유자에게 허용된 주소 등 제한된 수신처에만 보낼 수 있으므로, `gycha0109@gmail.com`이 해당 Resend 계정에서 수신 가능한지 실제 발송으로 확인해야 합니다. 이 구성은 일반 고객에게 보내는 운영 발신 주소가 아닙니다.
+- `support@example.com`은 개발 예시이며 운영 값으로 입력하지 않습니다. 일반 고객에게도 발신하려면 나중에 자체 도메인을 Resend에서 인증해야 합니다.
 - GitHub 또는 ChatGPT에 연결된 Gmail은 웹사이트의 발송 권한이 아닙니다. **Resend는 발신자, Gmail은 수신함**입니다.
 - Cloudflare의 이 바인딩은 Vercel 환경 변수와 **별개**입니다. Vercel에 값을 등록해도 Cloudflare 런타임에는 전달되지 않습니다.
 - Secret 값을 GitHub, `wrangler.jsonc`, 로그, PR 설명, 문의 본문에 기입하지 않습니다. 실 키가 없다면 사용자 설정 사항으로 남깁니다.
@@ -45,6 +46,6 @@ Cloudflare 계정의 **Workers & Pages → `myeongha` → Settings → Variables
 
 로드맵 I1~I5 코드를 **같은 브랜치에서** 누적합니다. 중간 별도 PR·병합을 만들지 않습니다.
 
-필수 Secret과 인증된 발신 도메인이 준비되면 V1 단일 통합 검증 구간을 실시합니다. Worker의 인가·실제 발송, 이메일 받은편지함 수신·Reply-To, 전체 관련 코드·브라우저 검사, 단일 PR의 필수 GitHub CI와 `ci-integration-ready` 통합 검증을 **마지막 한 구간에서** 확인합니다. 하나라도 실패하면 같은 브랜치에서 보정하고 **V1만 재실행**합니다. 모두 통과한 후에만 PR을 squash 병합합니다.
+필수 Secret과 검증 가능한 발신자(현재는 Resend 테스트 발신자)가 준비되면 V1 단일 통합 검증 구간을 실시합니다. Worker의 인가·실제 발송, 이메일 받은편지함 수신·Reply-To, 전체 관련 코드·브라우저 검사, 단일 PR의 필수 GitHub CI와 `ci-integration-ready` 통합 검증을 **마지막 한 구간에서** 확인합니다. 하나라도 실패하면 같은 브랜치에서 보정하고 **V1만 재실행**합니다. 모두 통과한 후에만 PR을 squash 병합합니다.
 
-**현재 블로커:** Resend 발송 Secret과 인증된 발신자 미등록. 이를 확인·설정할 수 없으면 실제 수신 검증과 병합을 수행하지 않습니다.
+**현재 검증 상태:** 두 바인딩의 등록은 사용자가 보고했습니다. 실제 반영 여부, Resend 발송 승인, Gmail 실수신 및 전체 V1 통합 검증은 아직 확인되지 않았습니다. 실패·미확인 상태에서는 병합하지 않습니다.

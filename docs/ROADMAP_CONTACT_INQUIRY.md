@@ -135,7 +135,7 @@
 
 - [x] **I1** Cloudflare `POST /api/contact` 라우트에서 실제 어댑터 호출 (`workers/cloudflare-contact-inquiry.mjs`)
 - [x] **I2** 기존 승인된 `GET /api/me`를 이용한 게스트/회원 주체 확인 및 기존 Worker 요청 제한기 연결
-- [ ] **I3** 공통 Resend 발송 경로를 Worker에 연동한 코드는 완료. **실제 `RESEND_API_KEY` 및 인증된 `CONTACT_FROM_EMAIL` 미등록**으로 운영 설정은 보류
+- [x] **I3 코드** 공통 Resend 발송 경로를 Worker에 연동했습니다. **2026-10-27 사용자가 Cloudflare `RESEND_API_KEY`와 `CONTACT_FROM_EMAIL` 등록을 보고**했으며, 실제 환경 반영·발송·Gmail 수신은 V1에서 확인합니다. 자체 도메인 없는 테스트 발신자는 계정 수신처 제한이 있습니다.
 - [x] **I4** 문의 상태 메시지와 정적 폼의 5개 언어 처리, 전송 확인 코드 기반 성공 처리
 - [x] **I5** 단일 Worker 경로 유지, 배포 구성/Secret 설정 문서 업데이트
 - [ ] **V1** 최종 통합 검증 **미실행** (I3의 실제 발송 설정 필요)
@@ -149,6 +149,13 @@
 - [x] honeypot의 실제 `company` 값을 서버로 전달하며, 사용자에게 접수 성공은 `SENT` 영수증일 때만 표시.
 - [x] `data-contact-i18n-root` 범위를 공통 자동 번역 처리에서 제외하고 전용 5개 언어 번역기만 관리해 언어 변경 시 충돌 방지.
 - [x] 문의 API의 공급자 거부·응답 ID 누락·통신 오류·honeypot·승인 경계 회귀 테스트 코드 추가. **테스트 실행은 V1에만 편성.**
-- [ ] I3 필수 Cloudflare `RESEND_API_KEY`와 인증된 `CONTACT_FROM_EMAIL` 없음. 임의 생성·가짜 값·다른 서비스 설정으로 우회하지 않음.
+- [x] 2026-10-27 사용자로부터 Cloudflare `RESEND_API_KEY`, `CONTACT_FROM_EMAIL` 등록 완료 보고. Secret 조회는 연결 도구의 안전 제한으로 확인 불가, 임의 생성·가짜 값·다른 서비스 설정으로 우회하지 않음.
 
 현 브랜치: `feat/frontend-integration/contact-inquiry-production`; 최종 검증 전 PR 생성·병합 금지.
+
+## 8. V1 개시 전 운영 보고 (2026-10-27)
+
+- 사용자 보고: Cloudflare 단일 `myeongha` Worker에 `RESEND_API_KEY`와 `CONTACT_FROM_EMAIL` 등록 완료.
+- 기본 도메인 `myeongha.gycha0109.workers.dev` 유지. 별도 도메인 없이 Resend `onboarding@resend.dev`를 쓰는 경우 계정 소유 수신처 제한 아래 실제 수신 검증만 가능하며, 일반 고객 대상 발신 운영 승인을 의미하지 않음.
+- 연결 도구가 Cloudflare Secret 이름 메타데이터 조회를 차단함. 비밀값을 조회·출력하지 않고 사용자 보고를 기준으로 V1의 CI·실수신 검증으로 판정.
+- **V1 통과 전 배포 성공, Resend 실제 발송, Gmail 실수신, 필수 CI Green, 병합을 추정하지 않음.**
