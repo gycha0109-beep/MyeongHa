@@ -63,7 +63,7 @@ jobs:
           git merge-base --is-ancestor "$reviewed" HEAD
           [[ "$(git show -s --format=%s "$reviewed")" == 'ops(privacy): recover failed synthetic canary 40322743599' ]]
           actual="$(git diff-tree --no-commit-id --name-only -r "$reviewed")"
-          expected="$(printf '%s\\n' \
+          expected="$(printf '%s\n' \
             '.github/workflows/production-privacy-canary-orphan-cleanup-one-shot.yml' \
             'docs/ci/workflow-responsibility-map.json' \
             'scripts/run-production-privacy-recovery-canary.mjs' \
