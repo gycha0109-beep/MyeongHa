@@ -16,9 +16,7 @@ export const VERIFIED_CREDIT_TOPUP_FULFILLMENT_CANDIDATE_V1 = Object.freeze({
   productionMounted: false,
 } as const);
 
-export type ApprovedPaidCreditValidityV1 =
-  | Readonly<{ kind: 'never' }>
-  | Readonly<{ kind: 'days'; days: number }>;
+export type ApprovedPaidCreditValidityV1 = Readonly<{ kind: 'never' }>;
 
 export type VerifiedCreditTopUpFulfillmentResultV1 =
   | Readonly<{ kind: 'not_activated' }>
@@ -55,10 +53,6 @@ function credits(value: unknown): number {
 }
 function validityParameters(policy: ApprovedPaidCreditValidityV1): readonly [string, number | null] {
   if (policy?.kind === 'never') return ['never', null] as const;
-  if (policy?.kind === 'days' &&
-      Number.isSafeInteger(policy.days) && policy.days > 0) {
-    return ['days', policy.days] as const;
-  }
   throw new Error('Paid credit validity policy is not approved.');
 }
 
