@@ -88,6 +88,7 @@ grant execute on function public.cmd_mark_seyeon_positive_context_ready_pinned_v
 grant execute on function public.cmd_commit_seyeon_positive_chat_turn_v1(
   uuid,uuid,uuid,uuid,uuid,uuid,uuid,uuid,jsonb,text,text,text
 ) to myeongha_api_executor;
+reset role;
 
 do $postcondition$
 declare
