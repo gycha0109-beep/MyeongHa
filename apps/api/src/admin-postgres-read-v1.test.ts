@@ -216,6 +216,12 @@ describe('admin dedicated readonly PostgreSQL adapter', () => {
     await h.port.read({ ...filters('audit'), from: '2026-10-01', to: '2026-10-26' });
     expect(h.params[2]).toEqual([21,0,'2026-10-01','2026-10-26']);
   });
+  it('binds a single reservation reference when inspecting its contributing credit lots', async () => {
+    const h=harness();
+    await h.port.read({ ...filters('credit-allocations'), reservationId: SUBJECT });
+    expect(h.sql[2]).toContain('a.reservation_id=$6::uuid');
+    expect(h.params[2]).toEqual([21,null,null,null,0,SUBJECT]);
+  });
   it('provides bounded pagination', async () => {
     const h = harness('myeongha_admin_reader',Array.from({length:3},()=>({subjectId:SUBJECT})));
     const result = await h.port.read({ ...filters(),limit:2 });

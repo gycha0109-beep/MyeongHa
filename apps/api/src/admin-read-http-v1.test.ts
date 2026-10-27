@@ -100,6 +100,15 @@ describe('admin owner-only reads', () => {
     expect(parseAdminReadFiltersV1(new URL('https://a.invalid/api/admin/audit?limit=20')).kind).toBe('audit');
     expect(() => parseAdminReadFiltersV1(new URL('https://a.invalid/api/admin/audit?subjectId=' + subject))).toThrow();
   });
+  it('restricts exact reservation allocation lookup to valid UUIDs on its own route', () => {
+    const id='123e4567-e89b-42d3-a456-426614174002';
+    const from=(path: string) => parseAdminReadFiltersV1(new URL('https://a.invalid'+path));
+    expect(from('/api/admin/credit-allocations?reservationId='+id).reservationId).toBe(id);
+    expect(() => from('/api/admin/credit-allocations?reservationId=unknown')).toThrow();
+    expect(() => from('/api/admin/credit-reservations?reservationId='+id)).toThrow();
+    expect(() => from('/api/admin/users?reservationId='+id)).toThrow();
+    expect(() => from('/api/admin/credit-allocations?reservationId='+id+'&reservationId='+id)).toThrow();
+  });
   it('verifies only Owner session before any data query, with required audit', async () => {
     const allowed = harness();
     const result = await allowed.call('/api/admin/session');

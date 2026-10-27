@@ -102,7 +102,7 @@ export function parseAdminReadFiltersV1(url: URL): AdminListFiltersV1 {
     throw new Error('Unknown administrator read route.');
   }
 
-  const allowed = new Set(['limit', 'cursor', 'subjectId', 'from', 'to', 'status', 'subjectKind', 'subjectStatus', 'readingStatus', 'category', 'creditSource', 'reservationState']);
+  const allowed = new Set(['limit', 'cursor', 'subjectId', 'from', 'to', 'status', 'subjectKind', 'subjectStatus', 'readingStatus', 'category', 'creditSource', 'reservationState', 'reservationId']);
   for (const [key] of url.searchParams) {
     if (!allowed.has(key) || url.searchParams.getAll(key).length !== 1) {
       throw new Error('Unknown or duplicate administrator read parameter.');
@@ -157,6 +157,11 @@ export function parseAdminReadFiltersV1(url: URL): AdminListFiltersV1 {
       !['signup','portone_topup','reading_reward'].includes(creditSourceParam))) {
     throw new Error('Invalid credit source filter.');
   }
+  const reservationIdParam = url.searchParams.get('reservationId');
+  if (reservationIdParam !== null && (kind !== 'credit-allocations' || !UUID.test(reservationIdParam))) {
+    throw new Error('Invalid credit allocation reservation reference.');
+  }
+  const reservationId = reservationIdParam?.toLowerCase() ?? null;
   const reservationStateParam = url.searchParams.get('reservationState');
   if (reservationStateParam !== null && (kind !== 'credit-reservations' ||
       !['reserved','settled','released'].includes(reservationStateParam))) {
@@ -191,7 +196,7 @@ export function parseAdminReadFiltersV1(url: URL): AdminListFiltersV1 {
   const subjectStatus = subjectStatusParam as 'active' | 'merged' | 'deletion_pending' | 'deleted' | null;
   if (!ADMIN_READ_KINDS_V1.includes(kind)) throw new Error('Unknown administrator kind.');
   const issueStatus = rawIssueStatus as 'failed' | 'dead_lettered' | null;
-  return Object.freeze({ kind, limit, cursor, subjectId, recordId, from, to, issueStatus, issueCategory, subjectKind, subjectStatus, readingStatus, creditSource, reservationState });
+  return Object.freeze({ kind, limit, cursor, subjectId, recordId, from, to, issueStatus, issueCategory, subjectKind, subjectStatus, readingStatus, creditSource, reservationState, reservationId });
 }
 
 const ISSUE_EXPORT_COLUMNS = ['issueId', 'category', 'severity', 'status', 'createdAt', 'requestId'] as const;

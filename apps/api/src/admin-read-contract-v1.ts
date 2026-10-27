@@ -19,6 +19,7 @@ export interface AdminListFiltersV1 {
   readonly readingStatus?: 'pending' | 'running' | 'succeeded' | 'failed' | 'cancelled' | null;
   readonly creditSource?: 'signup' | 'portone_topup' | 'reading_reward' | null;
   readonly reservationState?: 'reserved' | 'settled' | 'released' | null;
+  readonly reservationId?: string | null;
   readonly from: string | null;
   readonly to: string | null;
 }
