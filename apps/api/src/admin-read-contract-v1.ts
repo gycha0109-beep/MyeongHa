@@ -49,7 +49,7 @@ const SAFE_COLUMNS: Readonly<Record<AdminReadKindV1, readonly string[]>> = Objec
   'commerce-detail': ['transactionId','subjectId','productKey','provider','platform','providerStatus','purchaseStatus','createdAt','verifiedAt','amountMinor','currency','entitlementStatus','linkedGrantEventCount','linkedActiveGrantCount','linkedRevokedGrantCount','linkedCreditLotCount','linkedCreditRemaining'],
   'commerce-alerts': ['transactionId','subjectId','alertKind','providerStatus','detectedAt','evidence'],
   commerce: ['transactionId', 'subjectId', 'productKey', 'amountMinor', 'currency', 'providerStatus', 'verifiedAt', 'entitlementStatus'],
-  'credit-reservations': ['reservationId','subjectId','requiredCredits','state','deliveredTurnId','createdAt','finalizedAt'],
+  'credit-reservations': ['reservationId','subjectId','requiredCredits','allocatedCredits','allocationEvidence','state','deliveredTurnId','createdAt','finalizedAt'],
   'credit-allocations': ['reservationId','lotId','subjectId','allocatedCredits','reservationState','lotSource','createdAt'],
   credits: ['eventId', 'subjectId', 'creditDelta', 'creditsRemaining', 'expiresAt', 'validity', 'createdAt', 'eventKind', 'balanceAfter', 'correlationId'],
   'reading-attempts': ['attemptId','readingId','subjectId','attemptNo','state','engineKey','requestedEngineVersion','resolvedEngineVersion','errorCode','startedAt','finishedAt'],

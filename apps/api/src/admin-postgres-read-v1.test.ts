@@ -209,6 +209,19 @@ describe('admin dedicated readonly PostgreSQL adapter', () => {
     expect(reservation.sql[2]).toContain('r.state=$6::text');
     expect(reservation.params[2]).toEqual([21, null, null, null, 0, 'reserved']);
   });
+  it('compares reservation required credits with its actual persisted lot allocation total', async () => {
+    const sql=ADMIN_READ_SQL_V1['credit-reservations'] ?? '';
+    expect(sql).toContain('public.chat_credit_turn_allocations_v1 a');
+    expect(sql).toContain('a.reservation_id=r.id');
+    expect(sql).toContain('allocations.allocated_credits,0)=r.required_credits');
+    expect(sql).toContain('matching_allocation');
+    expect(sql).toContain('allocation_mismatch');
+    expect(sql).not.toMatch(/\bUPDATE\b|\bINSERT\b|\bDELETE\b|payload_jsonb/iu);
+    const h=harness();
+    await h.port.read(filters('credit-reservations'));
+    expect(h.params[2]).toEqual([21,null,null,null,0,null]);
+  });
+
   it('traces credit allocations through reservation and original lot without changing balances', async () => {
     const sql=ADMIN_READ_SQL_V1['credit-allocations'] ?? '';
     expect(sql).toContain('public.chat_credit_turn_allocations_v1');
