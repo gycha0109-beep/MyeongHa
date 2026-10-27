@@ -15,6 +15,13 @@ const DATA_PATHS: Record<ListSection, string> = {
   issues: 'issues',
 };
 
+const COMMERCE_ALERT_LABELS: Readonly<Record<string, string>> = Object.freeze({
+  verified_credit_receipt_without_linked_credit_lot: '검증 결제 · 충전 Lot 미확인',
+  revoked_credit_receipt_with_remaining_lot: '철회 영수증 · 충전 Lot 잔액 존재',
+  verified_receipt_no_linked_grant_event: '검증 결제 · 권한 지급 이력 미확인',
+  revoked_receipt_with_active_linked_grant: '철회 영수증 · 활성 이용권 존재',
+});
+
 const LABELS: Record<string, string> = {
   subjectId: '사용자 참조',
   kind: '구분',
@@ -163,7 +170,7 @@ function DataTable({ result, section, onDetail, onAllocation }: {
       <thead><tr>{columns.map(k => <th scope="col" key={k}>{LABELS[k]}</th>)}
         {(section === 'users' || (section === 'commerce' && (result.kind === 'commerce' || result.kind === 'commerce-alerts')) || (section === 'readings' && result.kind === 'readings') || (section === 'commerce' && result.kind === 'credit-reservations')) && <th scope="col">상세</th>}</tr></thead>
       <tbody>{result.rows.map((row, i) => <tr key={String(row.transactionId ?? row.readingId ?? row.eventId ?? row.issueId ?? row.subjectId ?? i) + ':' + i}>
-        {columns.map(k => <td key={k}>{row[k] === null || row[k] === undefined ? '—' : String(row[k])}</td>)}
+        {columns.map(k => <td key={k}>{row[k] === null || row[k] === undefined ? '—' : k === 'alertKind' && typeof row[k] === 'string' ? (COMMERCE_ALERT_LABELS[row[k]] ?? row[k]) : String(row[k])}</td>)}
         {(section === 'users' || (section === 'commerce' && (result.kind === 'commerce' || result.kind === 'commerce-alerts')) || (section === 'readings' && result.kind === 'readings') || (section === 'commerce' && result.kind === 'credit-reservations')) && <td>{section === 'users' && typeof row.subjectId === 'string' && isSubjectId(row.subjectId)
           ? <button type="button" className="table-link" onClick={() => onDetail(String(row.subjectId))}>조회</button>
           : section === 'commerce' && typeof row.transactionId === 'string' && isSubjectId(row.transactionId)

@@ -106,6 +106,17 @@ describe('admin dedicated readonly PostgreSQL adapter', () => {
     await f.port.read({ ...filters('commerce-alerts'), subjectId: SUBJECT });
     expect(f.params[2]).toEqual([21, SUBJECT, null, null, 0]);
   });
+  it('flags revoked paid-credit receipts only with an exact owner-bound remaining lot', () => {
+    const sql=ADMIN_READ_SQL_V1['commerce-alerts'] ?? '';
+    expect(sql).toContain("r.verification_status = 'revoked'");
+    expect(sql).toContain("p.product_type = 'credit'");
+    expect(sql).toContain("lot.source_kind = 'portone_topup'");
+    expect(sql).toContain('lot.source_ref = r.id AND lot.credits_remaining > 0');
+    expect(sql).toContain('lot.subject_id = r.subject_id');
+    expect(sql).toContain('revoked_credit_receipt_with_remaining_lot');
+    expect(sql).toContain("'manual_review_only'");
+    expect(sql).not.toMatch(/\bUPDATE\b|\bDELETE\b|\bINSERT\b/iu);
+  });
   it('reports AI latency sample size, unknown token usage and blocked calls separately', () => {
     const sql = ADMIN_READ_SQL_V1['ai-costs'] ?? '';
     expect(sql).toContain('ROUND(AVG(l.latency_ms))');
