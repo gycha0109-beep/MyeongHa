@@ -77,4 +77,4 @@ export const MY_STATIC_UI_COPY_V1 = new Map([
   ["로그아웃","ログアウト","登出","Sign out","退出登录"],
   ["알림","通知","通知","Notifications","通知"],
   ["선택한 관리 항목","選択した管理項目","已選擇的管理項目","Selected management section","已选择的管理项"],
-]);
+].map(([source, ja, zhTw, en, zhCn]) => [source, [ja, zhTw, en, zhCn]]));

@@ -1,10 +1,21 @@
-import { useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState } from 'react';
 import { createMyRuntimeClient, MyRuntimeError } from '../../my-runtime-client.js';
 import { PRODUCT_AUTH_STORAGE_V1, readMemberSession, signOutMember } from '../../product-auth.js';
 import { shouldReloadMyForMemberSessionStorageChange } from '../../product-auth-surface.js';
 import { getUiLocale, translateStaticUi } from '../../ui-i18n.js';
 
-const uiLabel = (source: string) => translateStaticUi(source, getUiLocale());
+// React alone owns the My dashboard text nodes. The shared static DOM
+// translator handles the global shell, while these labels are rendered from
+// the same locale state so no MutationObserver edits React's text nodes.
+const MyLocaleContext = createContext<ReturnType<typeof getUiLocale>>('ko-KR');
+function useMyText() {
+  const locale = useContext(MyLocaleContext);
+  return (source: string) => translateStaticUi(source, locale);
+}
+function MyText({ source }: { source: string }) {
+  const t = useMyText();
+  return <>{t(source)}</>;
+}
 
 type Profile = {
   displayName: string | null;
@@ -86,6 +97,7 @@ function AuthActions({ subjectKind, hasStoredMemberSession }: {
   hasStoredMemberSession: boolean;
 }) {
   const [signingOut, setSigningOut] = useState(false);
+  const t = useMyText();
   const canSignOut = hasStoredMemberSession && subjectKind !== 'guest';
   async function handleSignOut() {
     setSigningOut(true);
@@ -97,9 +109,9 @@ function AuthActions({ subjectKind, hasStoredMemberSession }: {
     }
   }
   if (!canSignOut) {
-    return <a className="my-auth-action my-connect-action" href="auth.html?next=my.html">{subjectKind === 'guest' ? '계정 연결' : '로그인하기'}</a>;
+    return <a className="my-auth-action my-connect-action" href="auth.html?next=my.html">{t(subjectKind === 'guest' ? '계정 연결' : '로그인하기')}</a>;
   }
-  return <button className="my-auth-action my-logout-action" type="button" disabled={signingOut} onClick={() => void handleSignOut()}><MyGlyph name="logout" />{signingOut ? '로그아웃 중…' : '로그아웃'}</button>;
+  return <button className="my-auth-action my-logout-action" type="button" disabled={signingOut} onClick={() => void handleSignOut()}><MyGlyph name="logout" />{t(signingOut ? '로그아웃 중…' : '로그아웃')}</button>;
 }
 
 function Detail({ panel, account, birth }: { panel: Exclude<MyPanel, null>; account: AccountState; birth: BirthState }) {
@@ -107,7 +119,8 @@ function Detail({ panel, account, birth }: { panel: Exclude<MyPanel, null>; acco
   const profile = payload?.profile;
   const session = readMemberSession();
   const input = birth.kind === 'ready' ? birth.payload.birthProfile?.currentRevision.input : null;
-  const [locale, setLocale] = useState<string>(getUiLocale());
+  const locale = useContext(MyLocaleContext);
+  const uiLabel = useMyText();
   function switchTheme() {
     document.querySelector<HTMLButtonElement>('.product-theme-toggle')?.click();
   }
@@ -116,71 +129,70 @@ function Detail({ panel, account, birth }: { panel: Exclude<MyPanel, null>; acco
     if (!picker) return;
     picker.value = next;
     picker.dispatchEvent(new Event('change', { bubbles: true }));
-    setLocale(next);
   }
   return (
-    <div className="my-detail-panel" role="region" aria-label="선택한 관리 항목">
+    <div className="my-detail-panel" role="region" aria-label={uiLabel('선택한 관리 항목')}>
       {panel === 'account' ? (
         <>
-          <h3>계정 정보</h3>
-          {account.kind === 'loading' ? <p>계정 정보를 확인하는 중입니다…</p> : null}
+          <h3><MyText source="계정 정보" /></h3>
+          {account.kind === 'loading' ? <p><MyText source="계정 정보를 확인하는 중입니다…" /></p> : null}
           {account.kind === 'unavailable' ? <p>{uiLabel(account.message)}</p> : null}
           {payload ? (
             <dl className="my-account-facts">
-              <div><dt>로그인 이메일</dt><dd>{payload.subjectKind === 'member' ? session?.user?.email ?? '현재 세션에서 확인할 수 없습니다.' : '게스트 계정'}</dd></div>
-              <div><dt>계정 유형</dt><dd>{payload.subjectKind === 'member' ? '회원' : '게스트'}</dd></div>
-              <div><dt>계정 상태</dt><dd>{payload.subjectStatus === 'deletion_pending' ? '삭제 요청 진행 중' : '사용 중'}</dd></div>
-              <div><dt>표시 언어</dt><dd>{profile?.locale ?? '정보 없음'}</dd></div>
+              <div><dt><MyText source="로그인 이메일" /></dt><dd>{payload.subjectKind === 'member' ? session?.user?.email ?? uiLabel('현재 세션에서 확인할 수 없습니다.') : uiLabel('게스트 계정')}</dd></div>
+              <div><dt><MyText source="계정 유형" /></dt><dd>{uiLabel(payload.subjectKind === 'member' ? '회원' : '게스트')}</dd></div>
+              <div><dt><MyText source="계정 상태" /></dt><dd>{uiLabel(payload.subjectStatus === 'deletion_pending' ? '삭제 요청 진행 중' : '사용 중')}</dd></div>
+              <div><dt><MyText source="표시 언어" /></dt><dd>{profile?.locale ?? uiLabel('정보 없음')}</dd></div>
             </dl>
           ) : null}
-          {payload?.subjectKind === 'guest' || (account.kind === 'unavailable' && account.login) ? <a className="my-detail-link" href="auth.html?next=my.html">회원 계정 연결하기 <MyGlyph name="arrow" /></a> : null}
-          <p className="my-detail-hint">프로필 변경 및 회원 탈퇴 요청은 검증된 서버 절차가 연결되기 전까지 이 화면에서 실행하지 않습니다.</p>
+          {payload?.subjectKind === 'guest' || (account.kind === 'unavailable' && account.login) ? <a className="my-detail-link" href="auth.html?next=my.html"><MyText source="회원 계정 연결하기" /> <MyGlyph name="arrow" /></a> : null}
+          <p className="my-detail-hint"><MyText source="프로필 변경 및 회원 탈퇴 요청은 검증된 서버 절차가 연결되기 전까지 이 화면에서 실행하지 않습니다." /></p>
         </>
       ) : null}
       {panel === 'memory' ? (
         <>
-          <h3>캐릭터 메모리 관리</h3>
-          <p>캐릭터가 기억할 정보를 확인하고 직접 추가하거나 관리하는 공간입니다.</p>
-          <p className="my-detail-hint">캐릭터별 메모리 조회·저장 기능은 아직 연결되지 않았습니다. 확인되지 않은 기억을 임의로 표시하거나 저장하지 않습니다.</p>
+          <h3><MyText source="캐릭터 메모리 관리" /></h3>
+          <p><MyText source="캐릭터가 기억할 정보를 확인하고 직접 추가하거나 관리하는 공간입니다." /></p>
+          <p className="my-detail-hint"><MyText source="캐릭터별 메모리 조회·저장 기능은 아직 연결되지 않았습니다. 확인되지 않은 기억을 임의로 표시하거나 저장하지 않습니다." /></p>
         </>
       ) : null}
       {panel === 'orders' ? (
         <>
-          <h3>구매 내역</h3>
-          <p>결제한 해석과 상품의 거래 내역을 확인하는 공간입니다.</p>
-          <p className="my-detail-hint">구매 내역 조회가 연결되지 않았습니다. 구매 내역이 없다는 뜻은 아닙니다.</p>
+          <h3><MyText source="구매 내역" /></h3>
+          <p><MyText source="결제한 해석과 상품의 거래 내역을 확인하는 공간입니다." /></p>
+          <p className="my-detail-hint"><MyText source="구매 내역 조회가 연결되지 않았습니다. 구매 내역이 없다는 뜻은 아닙니다." /></p>
         </>
       ) : null}
       {panel === 'passes' ? (
         <>
-          <h3>내 이용권</h3>
-          <p>보유 이용권, 사용 내역, 유효기간을 확인하는 공간입니다.</p>
-          <p className="my-detail-hint">이용권 조회가 연결되지 않았습니다. 보유 수량이나 잔여 사용량을 추정하여 표시하지 않습니다.</p>
+          <h3><MyText source="내 이용권" /></h3>
+          <p><MyText source="보유 이용권, 사용 내역, 유효기간을 확인하는 공간입니다." /></p>
+          <p className="my-detail-hint"><MyText source="이용권 조회가 연결되지 않았습니다. 보유 수량이나 잔여 사용량을 추정하여 표시하지 않습니다." /></p>
         </>
       ) : null}
       {panel === 'birth' ? (
         <>
-          <h3>출생 정보</h3>
-          {birth.kind === 'loading' ? <p>저장된 출생 정보를 확인하는 중입니다…</p> : null}
+          <h3><MyText source="출생 정보" /></h3>
+          {birth.kind === 'loading' ? <p><MyText source="저장된 출생 정보를 확인하는 중입니다…" /></p> : null}
           {birth.kind === 'unavailable' ? <p>{uiLabel(birth.message)}</p> : null}
-          {birth.kind === 'ready' && !input ? <p>저장된 본인 출생 정보가 없습니다. <a className="my-detail-link" href="birth.html">출생 정보 입력하기 <MyGlyph name="arrow" /></a></p> : null}
+          {birth.kind === 'ready' && !input ? <p><MyText source="저장된 본인 출생 정보가 없습니다." /> <a className="my-detail-link" href="birth.html"><MyText source="출생 정보 입력하기" /> <MyGlyph name="arrow" /></a></p> : null}
           {input ? (
             <dl className="my-account-facts">
-              <div><dt>생년월일</dt><dd>{birthDateText(input.birthDate)}</dd></div>
-              <div><dt>출생 시간</dt><dd>{birthTimeText(input)}</dd></div>
-              <div><dt>달력 기준</dt><dd>{calendarText(input)}</dd></div>
-              <div><dt>성별</dt><dd>{sexText(input.sex)}</dd></div>
+              <div><dt><MyText source="생년월일" /></dt><dd>{birthDateText(input.birthDate)}</dd></div>
+              <div><dt><MyText source="출생 시간" /></dt><dd>{uiLabel(birthTimeText(input))}</dd></div>
+              <div><dt><MyText source="달력 기준" /></dt><dd>{uiLabel(calendarText(input))}</dd></div>
+              <div><dt><MyText source="성별" /></dt><dd>{uiLabel(sexText(input.sex))}</dd></div>
             </dl>
           ) : null}
-          <p className="my-detail-hint">저장된 출생 정보를 조회하는 화면입니다. 수정 기능은 현재 준비 중입니다.</p>
+          <p className="my-detail-hint"><MyText source="저장된 출생 정보를 조회하는 화면입니다. 수정 기능은 현재 준비 중입니다." /></p>
         </>
       ) : null}
       {panel === 'display' ? (
         <>
-          <h3>화면 및 언어</h3>
+          <h3><MyText source="화면 및 언어" /></h3>
           <div className="my-display-actions">
-            <button type="button" className="my-detail-link my-display-toggle" onClick={switchTheme}><MyGlyph name="moon" /> 라이트 · 다크 모드 전환</button>
-            <label htmlFor="my-locale-select">표시 언어</label>
+            <button type="button" className="my-detail-link my-display-toggle" onClick={switchTheme}><MyGlyph name="moon" /> <MyText source="라이트 · 다크 모드 전환" /></button>
+            <label htmlFor="my-locale-select"><MyText source="표시 언어" /></label>
             <select id="my-locale-select" value={locale} onChange={event => changeLocale(event.target.value)}>
               <option value="ko-KR">한국어</option><option value="ja-JP">日本語</option><option value="zh-TW">繁體中文</option><option value="en-US">English</option><option value="zh-CN">简体中文</option>
             </select>
@@ -194,22 +206,24 @@ function Detail({ panel, account, birth }: { panel: Exclude<MyPanel, null>; acco
 function Choice({ title, description, glyph, open, onClick }: {
   title: string; description: string; glyph: Glyph; open: boolean; onClick: () => void;
 }) {
+  const t = useMyText();
   return (
     <button type="button" className="my-choice-card" aria-expanded={open} onClick={onClick}>
       <span className="my-icon-circle"><MyGlyph name={glyph} /></span>
-      <span className="my-choice-copy"><strong>{title}</strong><span>{description}</span></span>
+      <span className="my-choice-copy"><strong>{t(title)}</strong><span>{t(description)}</span></span>
       <span className="my-chevron"><MyGlyph name="chevron" /></span>
     </button>
   );
 }
 
-export function MyPage() {
+function MyPageBody() {
+  const uiLabel = useMyText();
   const [activePanel, setActivePanel] = useState<MyPanel>(null);
   const [account, setAccount] = useState<AccountState>({ kind: 'loading' });
   const [birth, setBirth] = useState<BirthState>({ kind: 'loading' });
   const payload = account.kind === 'ready' ? account.payload : null;
   const memberSession = readMemberSession();
-  const memberEmail = payload?.subjectKind === 'member' ? memberSession?.user?.email ?? '로그인 이메일 확인 중' : '계정 연결이 필요합니다.';
+  const memberEmail = payload?.subjectKind === 'member' ? memberSession?.user?.email ?? uiLabel('로그인 이메일 확인 중') : uiLabel('계정 연결이 필요합니다.');
   const accountBadge = payload?.subjectStatus === 'deletion_pending' ? '삭제 요청 진행 중' : payload?.subjectKind === 'member' ? '회원 계정' : payload?.subjectKind === 'guest' ? '게스트' : account.kind === 'unavailable' && account.login ? '로그인 필요' : '확인 중';
 
   useEffect(() => {
@@ -280,37 +294,37 @@ export function MyPage() {
       <div className="my-hero">
         <div className="product-shell my-hero-inner">
           <span className="my-kicker">MY PAGE</span>
-          <h1 className="my-title" id="my-page-title">마이페이지</h1>
-          <p className="my-lead">내 계정과 이용 정보를 관리합니다.</p>
+          <h1 className="my-title" id="my-page-title"><MyText source="마이페이지" /></h1>
+          <p className="my-lead"><MyText source="내 계정과 이용 정보를 관리합니다." /></p>
         </div>
       </div>
 
       <div className="product-shell my-dashboard">
-        <section className="my-account-section" aria-label="계정 정보">
+        <section className="my-account-section" aria-label={uiLabel('계정 정보')}>
           <button type="button" className="my-account-card" aria-expanded={activePanel === 'account'} aria-controls="my-account-panel" onClick={() => toggle('account')}>
             <span className="my-account-avatar"><MyGlyph name="user" /></span>
             <span className="my-account-copy">
-              <strong>계정 정보</strong>
-              <span className="my-account-meta">{account.kind === 'ready' ? memberEmail : account.kind === 'unavailable' ? uiLabel(account.message) : '내 계정 정보를 확인하세요.'} <span className="my-account-badge">{accountBadge}</span></span>
+              <strong><MyText source="계정 정보" /></strong>
+              <span className="my-account-meta">{account.kind === 'ready' ? memberEmail : account.kind === 'unavailable' ? uiLabel(account.message) : uiLabel('내 계정 정보를 확인하세요.')} <span className="my-account-badge">{uiLabel(accountBadge)}</span></span>
             </span>
-            <span className="my-account-action">계정 정보 관리하기 <MyGlyph name="chevron" /></span>
+            <span className="my-account-action"><MyText source="계정 정보 관리하기" /> <MyGlyph name="chevron" /></span>
           </button>
           <div id="my-account-panel">{details('account')}</div>
         </section>
 
         <section className="my-memory-section" aria-labelledby="my-memory-title">
           <div className="my-memory-copy">
-            <h2 id="my-memory-title">캐릭터 메모리</h2>
-            <p>대화 중 기억한 내용과 내가 직접 추가한 내용을<br className="my-desktop-break" /> 확인하고 관리합니다.</p>
-            <button type="button" className="my-primary-action" onClick={() => toggle('memory')} aria-expanded={activePanel === 'memory'}>메모리 관리하기 <MyGlyph name="chevron" /></button>
+            <h2 id="my-memory-title"><MyText source="캐릭터 메모리" /></h2>
+            <p><MyText source="대화 중 기억한 내용과 내가 직접 추가한 내용을" /><br className="my-desktop-break" /> <MyText source="확인하고 관리합니다." /></p>
+            <button type="button" className="my-primary-action" onClick={() => toggle('memory')} aria-expanded={activePanel === 'memory'}><MyText source="메모리 관리하기" /> <MyGlyph name="chevron" /></button>
           </div>
         </section>
         {details('memory')}
 
         <section className="my-section-card my-commerce-section" aria-labelledby="my-commerce-title">
           <div className="my-section-heading">
-            <h2 id="my-commerce-title">구매 내역 · 내 이용권</h2>
-            <p>결제한 상품과 보유 이용권을 확인합니다.</p>
+            <h2 id="my-commerce-title"><MyText source="구매 내역 · 내 이용권" /></h2>
+            <p><MyText source="결제한 상품과 보유 이용권을 확인합니다." /></p>
           </div>
           <div className="my-choice-grid">
             <Choice title="구매 내역" description="결제한 상품 및 거래 내역" glyph="bag" open={activePanel === 'orders'} onClick={() => toggle('orders')} />
@@ -321,15 +335,15 @@ export function MyPage() {
 
         <section className="my-section-card my-settings-section" aria-labelledby="my-settings-title">
           <div className="my-section-heading">
-            <h2 id="my-settings-title">설정 및 지원</h2>
-            <p>서비스 이용을 위한 설정과 문의를 관리합니다.</p>
+            <h2 id="my-settings-title"><MyText source="설정 및 지원" /></h2>
+            <p><MyText source="서비스 이용을 위한 설정과 문의를 관리합니다." /></p>
           </div>
           <div className="my-choice-grid my-settings-grid">
             <Choice title="출생 정보" description="사주 계산에 사용하는 정보 관리" glyph="calendar" open={activePanel === 'birth'} onClick={() => toggle('birth')} />
             <Choice title="화면 및 언어" description="테마 · 언어 설정" glyph="palette" open={activePanel === 'display'} onClick={() => toggle('display')} />
-            <a className="my-choice-card" href="contact.html" aria-label="관리자에게 문의하기">
+            <a className="my-choice-card" href="contact.html" aria-label={uiLabel('관리자에게 문의하기')}>
               <span className="my-icon-circle"><MyGlyph name="chat" /></span>
-              <span className="my-choice-copy"><strong>문의</strong><span>관리자에게 문의하기</span></span>
+              <span className="my-choice-copy"><strong><MyText source="문의" /></strong><span><MyText source="관리자에게 문의하기" /></span></span>
               <span className="my-chevron"><MyGlyph name="chevron" /></span>
             </a>
           </div>
@@ -337,10 +351,26 @@ export function MyPage() {
         </section>
 
         <footer className="my-footer">
-          <span>MYEONGHA · 나를 이해하는 또 하나의 방법</span>
+          <span><MyText source="MYEONGHA · 나를 이해하는 또 하나의 방법" /></span>
           <AuthActions subjectKind={account.kind === 'unavailable' ? undefined : payload?.subjectKind} hasStoredMemberSession={account.kind === 'unavailable' ? account.hasStoredMemberSession : Boolean(memberSession)} />
         </footer>
       </div>
     </div>
+  );
+}
+
+
+export function MyPage() {
+  const [locale, setLocale] = useState<ReturnType<typeof getUiLocale>>(() => getUiLocale());
+  useEffect(() => {
+    const syncLocale = () => setLocale(getUiLocale());
+    document.addEventListener('myeongha:localechange', syncLocale);
+    setLocale(getUiLocale());
+    return () => document.removeEventListener('myeongha:localechange', syncLocale);
+  }, []);
+  return (
+    <MyLocaleContext.Provider value={locale}>
+      <MyPageBody />
+    </MyLocaleContext.Provider>
   );
 }
