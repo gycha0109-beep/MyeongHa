@@ -1,5 +1,6 @@
 import { handleGuestBootstrapRequestV1 } from './guest-bootstrap-http.js';
-import { createNodePostgresSubjectPoolV1 } from './node-postgres-subject-pool.js';
+import type { PostgresSubjectPoolV1 } from './postgres-subject-execution.js';
+import { createProductionPostgresSubjectPoolLeaseV1 } from './production-postgres-subject-pool-lease.js';
 import {
   createProductionGuestBootstrapCredentialIssuerPortV1,
   parseProductionGuestBootstrapActivationConfigV1,
@@ -24,6 +25,8 @@ export interface ProductionGuestBootstrapHttpRuntimeV1 {
 
 export interface CreateProductionGuestBootstrapHttpRuntimeInputV1 {
   readonly env: ProductionUserDataRuntimeEnvV1;
+  /** Server-owned DB transport injection. Never derived from the request. */
+  readonly pool?: PostgresSubjectPoolV1;
   /** Server-side test/runtime injection only. Never derived from the client request. */
   readonly memberFetchImpl?: SupabaseMemberVerifierFetchV1;
 }
@@ -52,7 +55,10 @@ export function createProductionGuestBootstrapHttpRuntimeV1(
 ): ProductionGuestBootstrapHttpRuntimeV1 {
   const config = parseProductionUserDataRuntimeConfigV1(input.env);
   const activationConfig = parseProductionGuestBootstrapActivationConfigV1(input.env);
-  const pool = createNodePostgresSubjectPoolV1(config);
+  const poolLease = createProductionPostgresSubjectPoolLeaseV1({
+    config,
+    ...(input.pool === undefined ? {} : { pool: input.pool }),
+  });
   const credentialIssuerPort = createProductionGuestBootstrapCredentialIssuerPortV1({
     config: activationConfig,
   });
@@ -62,7 +68,7 @@ export function createProductionGuestBootstrapHttpRuntimeV1(
       const runtimePorts = createProductionGuestBootstrapRuntimePortsV1({
         request: requestInput.request,
         config,
-        pool,
+        pool: poolLease.pool,
         ...(input.memberFetchImpl === undefined
           ? {}
           : { memberFetchImpl: input.memberFetchImpl }),
@@ -84,7 +90,7 @@ export function createProductionGuestBootstrapHttpRuntimeV1(
       return response;
     },
     close() {
-      return pool.close();
+      return poolLease.close();
     },
   });
 }
