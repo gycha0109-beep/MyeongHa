@@ -229,6 +229,12 @@ function renderInvalidRoute() {
 }
 
 function clearPersistedReadingPresentation() {
+  const report = document.querySelector('[data-official-report]');
+  if (report) report.hidden = true;
+  document.querySelector('[data-official-report-toc]')?.replaceChildren();
+  document.querySelector('[data-official-report-sections]')?.replaceChildren();
+  const notice = document.querySelector('[data-official-report-notice]');
+  if (notice) notice.hidden = true;
   delete root.dataset.reader;
   delete root.dataset.readerSelection;
   delete root.dataset.readerAuthority;
@@ -508,9 +514,83 @@ function renderCalculationSummary(summary) {
   renderFactList(document.querySelector('[data-chart-ten-gods]'), summary.tenGods);
 }
 
+// Render only the exact owner-authorized, delivered snapshot already projected by
+// previewStepsFromPayload. This is a document layout, not a new Saju inference.
+function renderAuthorizedStoredReport(preview, record) {
+  const report = document.querySelector('[data-official-report]');
+  const toc = document.querySelector('[data-official-report-toc]');
+  const sections = document.querySelector('[data-official-report-sections]');
+  if (!report || !toc || !sections) return;
+  toc.replaceChildren();
+  sections.replaceChildren();
+
+  for (const [index, step] of preview.steps.entries()) {
+    const anchor = document.createElement('a');
+    anchor.href = `#official-report-section-${index + 1}`;
+    anchor.dataset.officialReading = '';
+    anchor.textContent = `${String(index + 1).padStart(2, '0')} · ${step.title}`;
+    toc.append(anchor);
+
+    const section = document.createElement('section');
+    section.className = 'official-report-section';
+    section.id = `official-report-section-${index + 1}`;
+    const kicker = document.createElement('span');
+    kicker.className = 'official-report-section-number';
+    kicker.textContent = String(index + 1).padStart(2, '0');
+    const heading = document.createElement('h2');
+    heading.dataset.officialReading = '';
+    heading.textContent = step.title;
+    const primary = document.createElement('p');
+    primary.className = 'official-report-primary';
+    primary.dataset.officialReading = '';
+    primary.textContent = step.primary;
+    section.append(kicker, heading, primary);
+
+    for (const text of step.supporting) {
+      const extra = document.createElement('p');
+      extra.className = 'official-report-supporting';
+      extra.dataset.officialReading = '';
+      extra.textContent = text;
+      section.append(extra);
+    }
+    if (step.structure.length > 0) {
+      const details = document.createElement('details');
+      const summary = document.createElement('summary');
+      summary.textContent = '이 해석의 구조 보기';
+      details.append(summary);
+      for (const text of step.structure) {
+        const ground = document.createElement('p');
+        ground.dataset.officialReading = '';
+        ground.textContent = text;
+        details.append(ground);
+      }
+      section.append(details);
+    }
+    sections.append(section);
+  }
+
+  const date = document.querySelector('[data-official-report-date]');
+  if (date) date.textContent = new Intl.DateTimeFormat(getUiLocale(), {
+    year: 'numeric', month: 'long', day: 'numeric',
+  }).format(new Date(record.completedAt));
+  const version = document.querySelector('[data-official-report-version]');
+  if (version) version.textContent = record.readingContractVersion;
+  const notice = document.querySelector('[data-official-report-notice]');
+  const noticeText = document.querySelector('[data-official-report-notice-text]');
+  if (notice) notice.hidden = !preview.notice;
+  if (noticeText) {
+    noticeText.dataset.officialReading = '';
+    noticeText.textContent = preview.notice;
+  }
+  report.hidden = false;
+}
+
 function activatePreviewReading(preview) {
   const { steps } = preview;
   const isStoredRecord = preview.source === 'record';
+  const report = document.querySelector('[data-official-report]');
+  const reportStepMode = document.querySelector('[data-official-report-step-mode]');
+  const reportReturn = document.querySelector('[data-official-report-return]');
   let activeIndex = 0;
   const progressLabel = document.querySelector('[data-reading-progress-label]');
   const stepTitle = document.querySelector('[data-reading-step-title]');
@@ -635,7 +715,23 @@ function activatePreviewReading(preview) {
         '이 결과는 기록에 저장된 Official Reading입니다. 대화를 시작하려면 대화 상대를 새로 선택해 주세요.';
     }
     if (productTitle) productTitle.textContent = '저장된 사주 풀이';
-    document.title = '저장된 사주 풀이 · 명하';
+    document.title = '저장된 공식 사주 보고서 · 명하';
+    if (reportReturn) reportReturn.hidden = false;
+    renderAuthorizedStoredReport(preview, preview.record);
+    if (stage && report && !report.hidden) stage.hidden = true;
+
+    reportStepMode?.addEventListener('click', () => {
+      if (!activeReadingOwner || !ensureResponseOwnerCurrent(activeReadingOwner)) return;
+      if (report) report.hidden = true;
+      if (stage) stage.hidden = false;
+      root.dataset.readingRecordMode = 'step_by_step';
+    });
+    reportReturn?.addEventListener('click', () => {
+      if (!activeReadingOwner || !ensureResponseOwnerCurrent(activeReadingOwner)) return;
+      if (stage) stage.hidden = true;
+      if (report) report.hidden = false;
+      root.dataset.readingRecordMode = 'official_archive';
+    });
   }
   renderCalculationSummary(preview.calculationSummary);
   renderStep();
@@ -743,7 +839,7 @@ async function loadPersistedReading() {
       return;
     }
 
-    activatePreviewReading({ ...readingView, source: 'record' });
+    activatePreviewReading({ ...readingView, source: 'record', record });
   } catch {
     renderPersistedReadingFailure(
       '저장된 풀이를 잠시 불러올 수 없습니다.',
