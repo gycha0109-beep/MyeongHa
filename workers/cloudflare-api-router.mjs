@@ -27,6 +27,8 @@ export const CLOUDFLARE_REWRITE_ROUTES = Object.freeze([
   Object.freeze({ id: "rewrite.contact.inquiry", source: "/api/contact", destination: "/api/me?__myeongha_contact_inquiry=1" }),
   Object.freeze({ id: "rewrite.chat.credit-wallet", source: "/api/me/credits", destination: "/api/me?__myeongha_chat_credit_wallet=1" }),
   Object.freeze({ id: "rewrite.commerce.owner-sandbox-checkout", source: "/api/me/credits/portone/test-checkout", destination: "/api/me?__myeongha_portone_owner_sandbox_checkout=1" }),
+  Object.freeze({ id: "rewrite.commerce.owner-sandbox-prepare", source: "/api/me/credits/portone/test-prepare", destination: "/api/me?__myeongha_portone_owner_sandbox_prepare=1" }),
+  Object.freeze({ id: "rewrite.commerce.owner-sandbox-verify", source: "/api/me/credits/portone/test-verify", destination: "/api/me?__myeongha_portone_owner_sandbox_verify=1" }),
   Object.freeze({ id: "rewrite.saju.preview", source: "/api/me/saju/preview-reading", destination: "/api/me?__myeongha_saju_preview_reading=1" }),
   Object.freeze({ id: "rewrite.chat.open", source: "/api/chat", destination: "/api/me?__myeongha_chat_open=1" }),
   Object.freeze({ id: "rewrite.chat.turns", source: "/api/chat/:threadId/turns", destination: "/api/me?__myeongha_chat_turn_send=1&__myeongha_chat_thread_id=:threadId" }),
