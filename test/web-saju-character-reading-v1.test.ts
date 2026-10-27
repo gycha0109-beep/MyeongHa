@@ -135,10 +135,11 @@ describe('MyeongHa character-led Saju Reading v1', () => {
   });
 
   it('reopens persisted Official Reading from Records without entering Reader Scene', async () => {
-    const [runtime, handoff] = await Promise.all([
+    const [runtimeText, handoff] = await Promise.all([
       readFile(readingRuntimePath, 'utf8'),
       readFile(readingHandoffPath, 'utf8'),
     ]);
+    const runtime = runtimeText.replace(/\r\n/gu, '\n');
 
     expect(runtime).toContain("from './official-reading-record-contract.js'");
     expect(runtime).toContain("const OFFICIAL_READING_RECORD_ENDPOINT = '/api/readings';");
