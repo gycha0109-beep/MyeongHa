@@ -4,10 +4,6 @@ run-name: "[WT:ops] Cleanup failed synthetic privacy canary 40322743599"
 on:
   workflow_dispatch:
     inputs:
-      reviewed_main_sha:
-        description: Exact reviewed squash-merged main commit SHA
-        required: true
-        type: string
       confirmation:
         description: Type CLEANUP_FAILED_PRIVACY_CANARY_40322743599
         required: true
@@ -39,24 +35,27 @@ jobs:
       - name: Checkout exact reviewed main
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ github.sha }}
           fetch-depth: 0
           persist-credentials: false
 
       - name: Verify exact one-shot source, run identity and reviewed diff
         shell: bash
         env:
-          REVIEWED_MAIN_SHA: ${{ inputs.reviewed_main_sha }}
           CLEANUP_CONFIRMATION: ${{ inputs.confirmation }}
         run: |
-          set -euo pipefail
+          set -Eeuo pipefail
+          # Report the failed gate by name without exposing private data or secrets.
+          guard='event_and_confirmation'
+          trap 'code=$?; echo "::error title=Privacy cleanup guard blocked::${guard} failed (exit ${code})" >&2' ERR
           [[ "$GITHUB_REPOSITORY" == 'gycha0109-beep/MyeongHa' ]]
           [[ "$GITHUB_EVENT_NAME" == 'workflow_dispatch' ]]
           [[ "$GITHUB_REF" == 'refs/heads/main' ]]
           [[ "$GITHUB_SHA" =~ ^[a-f0-9]{40}$ ]]
-          [[ "$REVIEWED_MAIN_SHA" == "$GITHUB_SHA" ]]
           [[ "$CLEANUP_CONFIRMATION" == 'CLEANUP_FAILED_PRIVACY_CANARY_40322743599' ]]
           [[ "$(git rev-parse HEAD)" == "$GITHUB_SHA" ]]
           [[ -z "$(git status --porcelain)" ]]
+          guard='approved_history_and_four_file_diff'
           # Review authority is the immutable #2641 squash commit, not the moving main tip.
           reviewed='518f9fef12761d84792054f0d30abf4175fea22f'
           git cat-file -e "$reviewed^{commit}"
@@ -69,14 +68,17 @@ jobs:
             'scripts/run-production-privacy-recovery-canary.mjs' \
             'scripts/verify-production-privacy-canary-orphan-cleanup-workflow.mjs')"
           [[ "$actual" == "$expected" ]]
+          guard='immutable_approved_content_hashes'
           # Immutable approved Git blobs, including the historical workflow.
           [[ "$(git rev-parse "$reviewed:.github/workflows/production-privacy-canary-orphan-cleanup-one-shot.yml")" == 'a51fd51fc5495e922f20ec8d7aedc190414e8c30' ]]
-          [[ "$(git rev-parse "$reviewed:docs/ci/workflow-responsibility-map.json")" == '6564c16ea1b4261f12ffbd5e9c26722938b6004c' ]]
+          [[ "$(git rev-parse "$reviewed:docs/ci/workflow-responsibility-map.json")" == '6564c16ea1b4261f12ffbd5e9c26722938c6004c' ]]
           [[ "$(git rev-parse "$reviewed:scripts/run-production-privacy-recovery-canary.mjs")" == '7034c096b5bdac6d939153c27c38b6e04d0aae41' ]]
           [[ "$(git rev-parse "$reviewed:scripts/verify-production-privacy-canary-orphan-cleanup-workflow.mjs")" == 'a1039eb071ad3e188f30ce63713f391ca48bdf30' ]]
+          guard='destructive_runtime_unchanged'
           # Only the destructive cleanup runtime must remain identical to the approved source.
           # Mapping and static verifier may evolve independently after the reviewed commit.
           git diff --quiet "$reviewed" HEAD -- scripts/run-production-privacy-recovery-canary.mjs
+          guard='original_failed_run_identity'
           run="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/40322743599")"
           jq -e '.path == ".github/workflows/production-privacy-recovery-canary.yml"
             and .head_branch == "main"
@@ -84,10 +86,13 @@ jobs:
             and .event == "workflow_dispatch"
             and .status == "completed"
             and .conclusion == "failure"' <<< "$run" >/dev/null
+          guard='required_production_credentials'
           [[ -n "${MYEONGHA_SUPABASE_AUTH_ADMIN_SECRET:-}" ]]
           [[ -n "${MYEONGHA_WORKER_DATABASE_SSL_ROOT_CERT_PEM:-}" ]]
           [[ -n "${SUPABASE_DB_PASSWORD:-}" ]]
+          guard='approved_production_pooler_hostname'
           [[ "$SUPABASE_PRODUCTION_SESSION_POOLER_HOST" =~ ^[a-z0-9-]+([.][a-z0-9-]+)*[.]pooler[.]supabase[.]com$ ]]
+          trap - ERR
 
       - name: Setup Node
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0

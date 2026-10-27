@@ -16,7 +16,15 @@ function requireFragment(source, fragment, name) {
 for (const fragment of [
   'name: Production Privacy Canary Orphan Prestart Cleanup One-Shot',
   'workflow_dispatch:',
-  'reviewed_main_sha:',
+  'ref: ${{ github.sha }}',
+  "guard='event_and_confirmation'",
+  "guard='approved_history_and_four_file_diff'",
+  "guard='immutable_approved_content_hashes'",
+  "guard='destructive_runtime_unchanged'",
+  "guard='original_failed_run_identity'",
+  "guard='required_production_credentials'",
+  "guard='approved_production_pooler_hostname'",
+  'trap - ERR',
   'confirmation:',
   'environment: production',
   'cancel-in-progress: false',
@@ -31,7 +39,7 @@ for (const fragment of [
   'fetch-depth: 0',
   '518f9fef12761d84792054f0d30abf4175fea22f',
   'a51fd51fc5495e922f20ec8d7aedc190414e8c30',
-  '6564c16ea1b4261f12ffbd5e9c26722938b6004c',
+  '6564c16ea1b4261f12ffbd5e9c26722938c6004c',
   '7034c096b5bdac6d939153c27c38b6e04d0aae41',
   'a1039eb071ad3e188f30ce63713f391ca48bdf30',
   '0bc93474318f1af29b1fd0adab53c31ecea0d406',
@@ -52,6 +60,8 @@ for (const fragment of [
 }
 
 for (const forbidden of [
+  'reviewed_main_sha:',
+  'REVIEWED_MAIN_SHA',
   '\n  push:',
   '\n  pull_request:',
   '\n  schedule:',
