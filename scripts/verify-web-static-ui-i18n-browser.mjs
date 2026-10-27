@@ -177,6 +177,28 @@ try{
       failures.push({page:'my.html',scenario:'account-detail',locale,detail});
     await evaluate('document.querySelector(".my-account-card").click()');
   }
+  // Home discovery cards use the same canonical character name resolver as chat.
+  // Verify live locale changes (no reload), image alt labels and card-only portrait zoom.
+  await navigate('hall.html','.mhx-character-list');
+  const expectedHomeNames={
+    'ko-KR':['세연','백헌','여울'],
+    'ja-JP':['セヨン','ベクホン','ヨウル'],
+    'zh-TW':['Seyeon','Baekheon','Yeoul'],
+    'en-US':['Seyeon','Baekheon','Yeoul'],
+    'zh-CN':['Seyeon','Baekheon','Yeoul'],
+  };
+  for(const locale of ['en-US','zh-CN','ja-JP','zh-TW','ko-KR','en-US']){
+    await change(locale);
+    const home=await evaluate('(()=>({lang:document.documentElement.lang,names:[...document.querySelectorAll(".mhx-character-caption h3")].map(n=>n.textContent.trim()),alts:[...document.querySelectorAll(".mhx-character-art img")].map(n=>n.alt),keys:[...document.querySelectorAll(".mhx-character-art")].map(n=>n.dataset.character),frame:Object.fromEntries(["seyeon","yeoul"].map(id=>{const art=document.querySelector(".mhx-character-art[data-character="+id+"]");const img=art?.querySelector("img");return [id,img&&art?img.getBoundingClientRect().width/art.getBoundingClientRect().width:null]})),overflow:document.documentElement.scrollWidth-innerWidth}))()');
+    if(home.lang!==locale ||
+      JSON.stringify(home.names)!==JSON.stringify(expectedHomeNames[locale]) ||
+      JSON.stringify(home.alts)!==JSON.stringify(expectedHomeNames[locale]) ||
+      home.keys.join(',')!=='seyeon,baekheon,yeoul' ||
+      Math.abs(home.frame.seyeon-.93)>.015 || Math.abs(home.frame.yeoul-.75)>.015 ||
+      home.overflow>3){
+      failures.push({page:'hall.html',scenario:'live-character-names-and-portrait-framing',locale,home});
+    }
+  }
   console.log(JSON.stringify({status:failures.length?'FAIL':'PASS',pages:pages.length,failures},null,2));
   assert(!failures.length,'Untranslated or invalid static UI across locales');
 }finally{
