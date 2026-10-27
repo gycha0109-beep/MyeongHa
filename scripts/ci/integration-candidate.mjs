@@ -3,6 +3,7 @@ import { execFileSync } from 'node:child_process';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import process from 'node:process';
+import { setTimeout as sleepFor } from 'node:timers/promises';
 
 export const integrationContext = 'CI Integration Verify';
 export const integrationLabel = 'ci-integration-ready';
@@ -106,7 +107,35 @@ export function checkCandidate(candidate, repo) {
   return current;
 }
 
-function run() {
+/**
+ * GitHub Actions may register CI Verify seconds after an integration label.
+ * Only the exact missing CI Verify check is transient. A failed, pending,
+ * misattributed, or absent OTHER check stays an immediate hard failure.
+ * Re-read the complete pinned PR/ruleset/check state on every bounded retry.
+ */
+export async function waitForCiVerifyRegistration(guard, {
+  maxRetries = 12,
+  sleep = sleepFor,
+  intervalMs = 8000,
+} = {}) {
+  if (typeof guard !== 'function' || !Number.isInteger(maxRetries) || maxRetries < 0 || maxRetries > 12
+      || !Number.isInteger(intervalMs) || intervalMs < 0 || intervalMs > 8000) {
+    throw new Error('Invalid CI registration retry policy');
+  }
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return guard();
+    } catch (error) {
+      if (!(error instanceof Error)
+          || error.message !== 'Required check is missing: CI Verify'
+          || attempt >= maxRetries) throw error;
+      process.stdout.write('CI Verify is not registered yet; retrying the pinned candidate guard.\n');
+      await sleep(intervalMs);
+    }
+  }
+}
+
+async function run() {
   const repo = process.env.GITHUB_REPOSITORY;
   if (process.argv[2] === 'policy') {
     if (process.env.CI_STAGED_VERIFICATION !== 'true') return;
@@ -128,8 +157,8 @@ function run() {
     const tree = execFileSync('git', ['rev-parse', 'HEAD^{tree}'], { encoding: 'utf8' }).trim();
     process.stdout.write(`Pinned candidate tree: ${tree}\n`);
   } else if (process.argv[2] === 'guard') {
-    checkCandidate(candidate, repo);
+    await waitForCiVerifyRegistration(() => checkCandidate(candidate, repo));
   } else throw new Error('Expected policy, prepare, or guard');
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) run();
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) await run();
