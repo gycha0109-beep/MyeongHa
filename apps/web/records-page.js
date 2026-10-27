@@ -411,9 +411,11 @@ function renderSajuReadings(readingPayload, lifeFactsPayload) {
     for (const reading of readings) renderPersistedReading(target, reading);
     return;
   }
-  if (allowsDevelopmentSajuSamples() && Array.isArray(lifeFactsPayload?.facts)) {
-    renderSajuReadingSamples(target, lifeFactsPayload);
-    return;
+  if (allowsDevelopmentSajuSamples()) {
+    if (Array.isArray(lifeFactsPayload?.facts)) {
+      renderSajuReadingSamples(target, lifeFactsPayload);
+      return;
+    }
   }
   renderSajuReadingEmpty(target);
 }
