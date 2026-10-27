@@ -29,8 +29,12 @@ describe('Records Saju history surface', () => {
     expect(client).toContain('readReadings: () => readStable(async (bearer) =>');
     expect(client).toContain("await readPagedCollection(fetchImpl, endpoints.readings, bearer, 'readings')");
     expect(client).toContain('if (seenCursors.has(nextCursor))');
-    expect(client).toContain('const [lifeFacts, readingsPayload, memories, birth] = await Promise.all([');
-    expect(client).toContain('const readings = projectReadingHistory(readingsPayload);');
+    expect(client).toContain('const [lifeFacts, readings, memories, birth] = await Promise.all([');
+    expect(client).toContain('readOptionalRecordsCollection(async () =>');
+    expect(client).toContain('projectReadingHistory(');
+    expect(client).toContain("if (error instanceof RecordsRuntimeError && error.code === 'WEB_RECORDS_SESSION_REQUIRED') throw error;");
+    expect(client).toContain('return Object.freeze({ status: \'unavailable\' });');
+
     expect(client).toContain('return Object.freeze({ profile, lifeFacts, readings, memories, birth });');
   });
 
