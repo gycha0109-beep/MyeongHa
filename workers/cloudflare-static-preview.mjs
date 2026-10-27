@@ -6,6 +6,7 @@ import {
 } from './cloudflare-seyeon-security.mjs';
 import { tryHandleCloudflareApprovedAuthV1 } from './cloudflare-auth-db-api.mjs';
 import { tryHandleCloudflareContactInquiryV1 } from './cloudflare-contact-inquiry.mjs';
+import { tryHandleCloudflareContactOwnerReplyV1 } from './cloudflare-contact-owner-reply.mjs';
 import { tryHandleCloudflareApprovedSajuCalculationV1 } from './cloudflare-saju-calculation.mjs';
 import { tryHandleCloudflareApprovedSajuPreviewReadingV1 } from './cloudflare-saju-preview-reading.mjs';
 import { tryHandleCloudflareApprovedRecordsV1 } from './cloudflare-records-api.mjs';
@@ -158,6 +159,8 @@ const cloudflareRuntime = {
     try {
       const contactResponse = await tryHandleCloudflareContactInquiryV1(request, bindings, route);
       if (contactResponse !== null) return contactResponse;
+      const ownerReplyResponse = await tryHandleCloudflareContactOwnerReplyV1(request, bindings, route);
+      if (ownerReplyResponse !== null) return ownerReplyResponse;
       const approvedAuthResponse = await tryHandleCloudflareApprovedAuthV1(request, bindings, route);
       if (approvedAuthResponse !== null) return approvedAuthResponse;
       const approvedCalculationResponse = await tryHandleCloudflareApprovedSajuCalculationV1(request, bindings, route);

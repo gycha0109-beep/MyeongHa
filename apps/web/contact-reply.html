@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="robots" content="noindex,nofollow" />
+  <meta name="referrer" content="same-origin" />
+  <title>문의 답변 · 명하 운영</title>
+  <link rel="stylesheet" href="/product.css" />
+  <link rel="stylesheet" href="/contact.css" />
+  <link rel="stylesheet" href="/contact-reply.css" />
+  <script type="module" src="/contact-reply.js"></script>
+</head>
+<body class="product-page">
+  <main class="contact-shell reply-shell">
+    <section class="contact-panel" aria-labelledby="reply-title">
+      <span class="contact-kicker">MYEONGHA · OWNER SUPPORT</span>
+      <h1 id="reply-title">고객 문의 답변</h1>
+      <p>운영자 전용 화면입니다. 받은 Gmail 문의에서 답변 이메일·제목·접수 요청 ID를 확인하고 옮겨 입력하십시오. 문의 내역은 이 화면에 저장되지 않습니다.</p>
+      <p class="reply-notice">공식 발신 도메인 인증 및 운영 설정 전에는 발송이 차단됩니다. 개인 Gmail을 발신자로 사용하지 않습니다.</p>
+      <form id="owner-reply-form">
+        <label for="reply-submission-id">문의 접수 요청 ID</label>
+        <input id="reply-submission-id" name="submissionId" type="text" minlength="36" maxlength="36" pattern="[0-9a-fA-F-]{36}" required autocomplete="off" />
+        <label for="reply-recipient">고객 답변 이메일</label>
+        <input id="reply-recipient" name="recipientEmail" type="email" maxlength="254" required autocomplete="off" />
+        <label for="reply-subject">원래 문의 제목</label>
+        <input id="reply-subject" name="originalSubject" type="text" minlength="4" maxlength="120" required autocomplete="off" />
+        <label for="reply-message">보낼 답변</label>
+        <textarea id="reply-message" name="message" minlength="10" maxlength="4000" rows="9" required></textarea>
+        <label class="contact-consent" for="reply-confirm">
+          <input id="reply-confirm" type="checkbox" name="confirmRecipient" required />
+          <span>고객이 입력한 답변 주소와 접수 ID를 원본 문의 메일에서 확인했습니다. 이 주소로 답변을 발송합니다.</span>
+        </label>
+        <p id="reply-status" class="contact-status" role="status" aria-live="polite"></p>
+        <button id="reply-submit" class="contact-submit" type="submit">고객에게 답변 발송</button>
+      </form>
+      <p class="contact-footnote">답변 발송은 Resend가 접수 ID를 반환했을 때만 성공으로 표시됩니다. 실제 고객 메일함 도착까지 보장하지 않습니다.</p>
+      <p><a class="contact-back" href="/my.html">마이페이지로 돌아가기</a></p>
+    </section>
+  </main>
+</body>
+</html>
