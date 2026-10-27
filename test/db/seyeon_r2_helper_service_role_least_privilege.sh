@@ -48,61 +48,6 @@ result="$(psql -X -qAt -v ON_ERROR_STOP=1 -c "
 }
 echo 'PASS_SEYEON_HELPER_SERVICE_ROLE_REVOKE_ISOLATED_PG17'
 
-# Production parity: postgres is NOSUPERUSER, has an admin-only owner
-# membership with INHERIT=FALSE and SET=FALSE, and the unwanted EXECUTE
-# edge was granted by the function owner. Run the WHOLE migration twice
-# under that constrained actor, not just the revoke fragment.
-acl_ci_password="$(openssl rand -hex 24)"
-psql -X -q -v ON_ERROR_STOP=1 -c "
-  create role myeongha_acl_ci_super superuser login password '$acl_ci_password'"
-psql -X -q -v ON_ERROR_STOP=1 -c "alter role postgres nosuperuser createrole"
-PGUSER=myeongha_acl_ci_super PGPASSWORD="$acl_ci_password" psql \
-  -X -q -v ON_ERROR_STOP=1 -c "
-    grant myeongha_seyeon_chat_runtime_owner to postgres
-    with admin true, inherit false, set false"
-PGUSER=myeongha_acl_ci_super PGPASSWORD="$acl_ci_password" psql \
-  -X -q -v ON_ERROR_STOP=1 -c "
-    grant execute on function
-      public.assert_seyeon_chat_thread_runtime_v1(uuid,uuid) to service_role"
-
-restricted_before="$(psql -X -qAt -v ON_ERROR_STOP=1 -c "
-  select
-    (select count(*) from pg_catalog.pg_auth_members m
-     where m.roleid='myeongha_seyeon_chat_runtime_owner'::regrole
-       and m.member='postgres'::regrole
-       and m.admin_option and not m.inherit_option and not m.set_option)
-    || '|' || pg_has_role('postgres','myeongha_seyeon_chat_runtime_owner','SET')::text
-    || '|' || has_function_privilege('service_role','$helper','EXECUTE')::text")"
-[[ "$restricted_before" == '1|false|true' ]] || {
-  echo HOLD_SEYEON_HELPER_ACL_RESTRICTED_FIXTURE_DRIFT >&2; exit 1;
-}
-
-psql -X -q -v ON_ERROR_STOP=1 -f "$migration" >/dev/null
-psql -X -q -v ON_ERROR_STOP=1 -f "$migration" >/dev/null
-restricted_after="$(psql -X -qAt -v ON_ERROR_STOP=1 -c "
-  select
-    (select count(*) from pg_catalog.pg_auth_members m
-     where m.roleid='myeongha_seyeon_chat_runtime_owner'::regrole
-       and m.member='postgres'::regrole
-       and m.admin_option and not m.inherit_option and not m.set_option)
-    || '|' ||
-    (select count(*) from pg_catalog.pg_auth_members m
-     where m.roleid='myeongha_seyeon_chat_runtime_owner'::regrole
-       and m.member='postgres'::regrole and m.grantor='postgres'::regrole)
-    || '|' || pg_has_role('postgres','myeongha_seyeon_chat_runtime_owner','SET')::text
-    || '|' || has_function_privilege('service_role','$helper','EXECUTE')::text
-    || '|' || has_function_privilege('myeongha_seyeon_chat_runtime_owner','$helper','EXECUTE')::text")"
-[[ "$restricted_after" == '1|0|false|false|true' ]] || {
-  echo HOLD_SEYEON_HELPER_ACL_OWNER_ROLE_RESTORATION_FAILURE >&2; exit 1;
-}
-
-# Return the disposable cluster to its original superuser/membership state.
-PGUSER=myeongha_acl_ci_super PGPASSWORD="$acl_ci_password" psql \
-  -X -q -v ON_ERROR_STOP=1 -c "alter role postgres superuser"
-PGUSER=myeongha_acl_ci_super PGPASSWORD="$acl_ci_password" psql \
-  -X -q -v ON_ERROR_STOP=1 -c "
-    revoke myeongha_seyeon_chat_runtime_owner
-    from postgres granted by myeongha_acl_ci_super"
-psql -X -q -v ON_ERROR_STOP=1 -c "drop role myeongha_acl_ci_super"
-unset acl_ci_password
-echo 'PASS_SEYEON_HELPER_OWNER_GRANTOR_REVOKE_RESTRICTED_PG17'
+# The normal CI service postgres is the bootstrap superuser and cannot be
+# demoted. Exercise owner-restricted authority on a separate PG17 cluster.
+bash test/db/seyeon_r2_helper_owner_restricted_pg17.sh
