@@ -13,6 +13,8 @@ skip_staged_portone_migration_from_historical_fixture() {
       expected='5e5270466e700f98b2d41cac338298735dc1ad99' ;;
     20261027125500_chat_credit_delivered_ack_private_v1.sql)
       expected='5e5db487aa8a155cfded83b8d58c363e20f1a7b0' ;;
+    20261027163500_commerce_owner_sandbox_credit_checkout_v1.sql)
+      expected='b5a47d794c8ffb0e62fecfb25d81c0b6c9312f70' ;;
     20261027054525_digital_reading_checkout_notice_evidence_v1.sql)
       expected='550e2ff3dd86d16d30334220c223650387b71ca7' ;;
     *) return 1 ;;
