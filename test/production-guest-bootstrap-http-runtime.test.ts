@@ -56,7 +56,7 @@ describe('Production Guest bootstrap HTTP runtime composition', () => {
     };
     const runtime = createProductionGuestBootstrapHttpRuntimeV1({
       env: { ...BASE_PRODUCTION_ENV, MYEONGHA_GUEST_SESSION_TTL_SECONDS: '604800' },
-      pool: injectedPool,
+      pool: injectedPool as unknown as Parameters<typeof createProductionGuestBootstrapHttpRuntimeV1>[0]['pool'],
     });
     try {
       const response = await runtime.handleRequest({
@@ -80,6 +80,9 @@ describe('Production Guest bootstrap HTTP runtime composition', () => {
     }
     // Injected pool remains owned by the Cloudflare adapter and is closed exactly once there.
     expect(injectedCloses).toBe(0);
+    // Cloudflare adapter, not the shared HTTP runtime, retains close ownership.
+    await injectedPool.close();
+    expect(injectedCloses).toBe(1);
   });
 
 });
