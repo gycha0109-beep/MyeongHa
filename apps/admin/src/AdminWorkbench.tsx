@@ -379,8 +379,13 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
       ? <StatusPanel kind={error.includes('권한') ? 'forbidden' : 'error'} detail={error} />
       : result ? <>
         <DataTable result={result} section={section} onDetail={setDetail} />
-        {result.nextCursor !== null && <div className="admin-pagination">
-          <button type="button" onClick={() => setCursor(result.nextCursor)}>다음 페이지</button>
+        {(cursor !== null || result.nextCursor !== null) && <div className="admin-pagination" aria-label="조회 페이지 이동">
+          {cursor !== null && <button type="button" onClick={() => {
+            const prior = Number(cursor) - 20;
+            setCursor(prior > 0 ? String(prior) : null);
+          }}>이전 페이지</button>}
+          <span aria-current="page">{Math.floor(Number(cursor ?? '0') / 20) + 1}페이지</span>
+          {result.nextCursor !== null && <button type="button" onClick={() => setCursor(result.nextCursor)}>다음 페이지</button>}
         </div>}
       </> : <StatusPanel kind="empty" />}
   </section>;
