@@ -106,7 +106,7 @@ export function parseAdminReadFiltersV1(url: URL): AdminListFiltersV1 {
     throw new Error('Unknown administrator read route.');
   }
 
-  const allowed = new Set(['limit', 'cursor', 'subjectId', 'from', 'to', 'status', 'subjectKind', 'subjectStatus', 'readingStatus', 'category', 'creditSource', 'reservationState', 'reservationId', 'aiStage', 'aiErrorCode', 'deletionStatus', 'deletionScope', 'releaseStatus', 'characterAvailability']);
+  const allowed = new Set(['limit', 'cursor', 'subjectId', 'from', 'to', 'status', 'subjectKind', 'subjectStatus', 'readingStatus', 'category', 'creditSource', 'reservationState', 'reservationId', 'aiStage', 'aiErrorCode', 'deletionStatus', 'deletionScope', 'releaseStatus', 'characterAvailability', 'receiptStatus']);
   for (const [key] of url.searchParams) {
     if (!allowed.has(key) || url.searchParams.getAll(key).length !== 1) {
       throw new Error('Unknown or duplicate administrator read parameter.');
@@ -178,6 +178,12 @@ export function parseAdminReadFiltersV1(url: URL): AdminListFiltersV1 {
       (rawIssueStatus !== 'failed' && rawIssueStatus !== 'dead_lettered'))) {
     throw new Error('Invalid administrator issue status filter.');
   }
+  const receiptStatusParam=url.searchParams.get('receiptStatus');
+  if (receiptStatusParam !== null && (kind !== 'commerce' ||
+      !['pending','verified','rejected','revoked'].includes(receiptStatusParam))) {
+    throw new Error('Invalid receipt verification status.');
+  }
+  const receiptStatus = receiptStatusParam as 'pending' | 'verified' | 'rejected' | 'revoked' | null;
   const releaseStatusParam=url.searchParams.get('releaseStatus');
   const characterAvailabilityParam=url.searchParams.get('characterAvailability');
   if (releaseStatusParam !== null && (kind !== 'content-releases' ||
@@ -236,7 +242,7 @@ export function parseAdminReadFiltersV1(url: URL): AdminListFiltersV1 {
   const subjectStatus = subjectStatusParam as 'active' | 'merged' | 'deletion_pending' | 'deleted' | null;
   if (!ADMIN_READ_KINDS_V1.includes(kind)) throw new Error('Unknown administrator kind.');
   const issueStatus = rawIssueStatus as 'failed' | 'dead_lettered' | null;
-  return Object.freeze({ kind, limit, cursor, subjectId, recordId, from, to, issueStatus, issueCategory, subjectKind, subjectStatus, readingStatus, creditSource, reservationState, reservationId, aiStage, aiErrorCode, deletionStatus, deletionScope, releaseStatus, characterAvailability });
+  return Object.freeze({ kind, limit, cursor, subjectId, recordId, from, to, issueStatus, issueCategory, subjectKind, subjectStatus, readingStatus, creditSource, reservationState, reservationId, aiStage, aiErrorCode, deletionStatus, deletionScope, releaseStatus, characterAvailability, receiptStatus });
 }
 
 const ISSUE_EXPORT_COLUMNS = ['issueId', 'category', 'severity', 'status', 'createdAt', 'requestId'] as const;

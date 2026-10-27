@@ -120,7 +120,7 @@ function isSubjectId(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(value);
 }
 
-export function buildListPath(section: ListSection, subject: string, cursor: string | null, tab: ReadTab, from: string | null = null, to: string | null = null, issueStatus: string = 'all', subjectKind: string = 'all', subjectStatus: string = 'all', readingStatus: string = 'all', issueCategory: string = '', creditSource: string = 'all', reservationState: string = 'all', reservationId: string = '', attemptReadingId: string = '', aiStage: string = 'all', aiErrorCode: string = '', deletionStatus: string = 'all', deletionScope: string = 'all', releaseStatus: string = 'all', characterAvailability: string = 'all'): string {
+export function buildListPath(section: ListSection, subject: string, cursor: string | null, tab: ReadTab, from: string | null = null, to: string | null = null, issueStatus: string = 'all', subjectKind: string = 'all', subjectStatus: string = 'all', readingStatus: string = 'all', issueCategory: string = '', creditSource: string = 'all', reservationState: string = 'all', reservationId: string = '', attemptReadingId: string = '', aiStage: string = 'all', aiErrorCode: string = '', deletionStatus: string = 'all', deletionScope: string = 'all', releaseStatus: string = 'all', characterAvailability: string = 'all', receiptStatus: string = 'all'): string {
   if (tab === 'reading-attempts' && isSubjectId(attemptReadingId)) {
     const params = new URLSearchParams({ limit: '20' });
     if (cursor !== null) params.set('cursor', cursor);
@@ -136,6 +136,7 @@ export function buildListPath(section: ListSection, subject: string, cursor: str
   if (tab === 'deletion-jobs' && deletionScope !== 'all') params.set('deletionScope', deletionScope);
   if (tab === 'content-releases' && releaseStatus !== 'all') params.set('releaseStatus', releaseStatus);
   if (tab === 'characters' && characterAvailability !== 'all') params.set('characterAvailability', characterAvailability);
+  if (tab === 'commerce' && receiptStatus !== 'all') params.set('receiptStatus', receiptStatus);
   if (tab === 'users' && subjectKind !== 'all') params.set('subjectKind', subjectKind);
   if (tab === 'users' && subjectStatus !== 'all') params.set('subjectStatus', subjectStatus);
   if (tab === 'readings' && readingStatus !== 'all') params.set('readingStatus', readingStatus);
@@ -247,6 +248,7 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
   const [issueCategory, setIssueCategory] = useState('');
   const [creditSource, setCreditSource] = useState<'all' | 'signup' | 'portone_topup' | 'reading_reward'>('all');
   const [reservationState, setReservationState] = useState<'all' | 'reserved' | 'settled' | 'released'>('all');
+  const [receiptStatus, setReceiptStatus] = useState<'all' | 'pending' | 'verified' | 'rejected' | 'revoked'>('all');
   const [reservationId, setReservationId] = useState('');
   const [attemptReadingId, setAttemptReadingId] = useState('');
   const [draftReservationId, setDraftReservationId] = useState('');
@@ -267,7 +269,7 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
     setResult(null);
     const url = detail !== null
       ? (section === 'commerce' ? '/api/admin/commerce/' : section === 'readings' ? '/api/admin/readings/' : '/api/admin/users/') + detail
-      : buildListPath(section, subject, cursor, tab, from, to, issueStatus, subjectKind, subjectStatus, readingStatus, issueCategory, creditSource, reservationState, reservationId, attemptReadingId, aiStage, aiErrorCode, deletionStatus, deletionScope, releaseStatus, characterAvailability);
+      : buildListPath(section, subject, cursor, tab, from, to, issueStatus, subjectKind, subjectStatus, readingStatus, issueCategory, creditSource, reservationState, reservationId, attemptReadingId, aiStage, aiErrorCode, deletionStatus, deletionScope, releaseStatus, characterAvailability, receiptStatus);
     void fetchAdminReadV1(url, token)
       .then(value => { if (mounted) setResult(value); })
       .catch(e => {
@@ -279,7 +281,7 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
     return () => {
       mounted = false;
     };
-  }, [section, token, cursor, subject, detail, tab, from, to, issueStatus, subjectKind, subjectStatus, readingStatus, issueCategory, creditSource, reservationState, reservationId, attemptReadingId, aiStage, aiErrorCode, deletionStatus, deletionScope, releaseStatus, characterAvailability]);
+  }, [section, token, cursor, subject, detail, tab, from, to, issueStatus, subjectKind, subjectStatus, readingStatus, issueCategory, creditSource, reservationState, reservationId, attemptReadingId, aiStage, aiErrorCode, deletionStatus, deletionScope, releaseStatus, characterAvailability, receiptStatus]);
 
   return <section className="surface admin-data">
     <div className="surface__head">
@@ -292,6 +294,19 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
         .map(([name,label]) => <button key={name} type="button" className={tab===name ? 'active' : ''} onClick={() => { setTab(name as ReadTab); setCursor(null); setDetail(null); setReservationId(''); setDraftReservationId(''); if (name !== 'reading-attempts') setAttemptReadingId(''); }}>{label}</button>)}
     </div>
     <div className="admin-toolbar">
+      {section === 'commerce' && tab === 'commerce' && detail === null &&
+        <label className="admin-issue-filter">결제 검증 상태
+          <select value={receiptStatus} onChange={e => {
+            setReceiptStatus(e.target.value as typeof receiptStatus);
+            setCursor(null);
+          }}>
+            <option value="all">전체</option>
+            <option value="pending">검증 대기</option>
+            <option value="verified">검증 완료</option>
+            <option value="rejected">검증 거부</option>
+            <option value="revoked">검증 철회</option>
+          </select>
+        </label>}
       {section === 'commerce' && tab === 'credit-allocations' && detail === null &&
         <form className="admin-issue-category" onSubmit={e => {
           e.preventDefault();

@@ -146,6 +146,13 @@ describe('admin owner-only reads', () => {
     expect(() => get('/api/admin/content-releases?characterAvailability=locked')).toThrow();
     expect(() => get('/api/admin/content-releases?releaseStatus=preview')).toThrow();
   });
+  it('restricts receipt verification status filters to the transaction listing', () => {
+    const parse=(p:string)=>parseAdminReadFiltersV1(new URL('https://a.invalid'+p));
+    expect(parse('/api/admin/commerce?receiptStatus=verified').receiptStatus).toBe('verified');
+    expect(() => parse('/api/admin/commerce?receiptStatus=paid')).toThrow();
+    expect(() => parse('/api/admin/commerce-alerts?receiptStatus=verified')).toThrow();
+    expect(() => parse('/api/admin/credits?receiptStatus=revoked')).toThrow();
+  });
   it('verifies only Owner session before any data query, with required audit', async () => {
     const allowed = harness();
     const result = await allowed.call('/api/admin/session');

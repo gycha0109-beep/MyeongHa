@@ -270,6 +270,12 @@ describe('admin dedicated readonly PostgreSQL adapter', () => {
     expect(character.sql[2]).toContain('c.availability=$3::text');
     expect(character.params[2]).toEqual([21,0,'coming_soon']);
   });
+  it('filters only verified receipt verification enum values through SQL arguments', async () => {
+    const h=harness();
+    await h.port.read({ ...filters('commerce'), receiptStatus:'revoked' });
+    expect(h.sql[2]).toContain('r.verification_status=$6::text');
+    expect(h.params[2]).toEqual([21,null,null,null,0,'revoked']);
+  });
   it('provides bounded pagination', async () => {
     const h = harness('myeongha_admin_reader',Array.from({length:3},()=>({subjectId:SUBJECT})));
     const result = await h.port.read({ ...filters(),limit:2 });

@@ -26,6 +26,7 @@ export interface AdminListFiltersV1 {
   readonly deletionScope?: 'account' | 'conversation' | 'memory' | 'life_fact' | 'target_person' | null;
   readonly releaseStatus?: 'draft' | 'active' | 'retired' | null;
   readonly characterAvailability?: 'available' | 'unlockable' | 'locked' | 'coming_soon' | null;
+  readonly receiptStatus?: 'pending' | 'verified' | 'rejected' | 'revoked' | null;
   readonly from: string | null;
   readonly to: string | null;
 }
