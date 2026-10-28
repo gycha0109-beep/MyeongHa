@@ -8,6 +8,10 @@ import { SEYEON_FAST_DIALOGUE_SHADOW_RESPONSE_SCHEMA_V1 } from '../apps/api/src/
 import {
   deriveSeyeonC09DialogueContinuityPacketShadowV1,
   composeSeyeonC09DialogueContinuityShadowRequestV1,
+  composeSeyeonC09VerifiedDialogueContinuityShadowRequestV1,
+  requireSeyeonC09ThreadSnapshotShadowV1,
+  SEYEON_C09_THREAD_SNAPSHOT_SHADOW_VERSION_V1,
+  type SeyeonC09ThreadSnapshotShadowPortV1,
 } from '../apps/api/src/seyeon-c09-dialogue-continuity-shadow-v1.js';
 
 const threeTurns = [
@@ -138,5 +142,79 @@ describe('C09 multi-turn public dialogue continuity — no calls or durable writ
       context: valid,
       request: { ...base, purpose: 'turn_interpretation' },
     })).toThrow('C09_DIALOGUE_CONTINUITY_SHADOW_NOT_ELIGIBLE');
+  });
+});
+
+function snapshotProof(context: SeyeonRuntimeContextV2) {
+  return {
+    schemaVersion: SEYEON_C09_THREAD_SNAPSHOT_SHADOW_VERSION_V1,
+    subjectId: 'owner-1',
+    threadId: 'thread-1',
+    currentUserMessageId: context.recentConversation.at(-1)!.messageId,
+    messageCount: context.recentConversation.length,
+    latestSenderType: 'user',
+    tailMessageRefs: context.recentConversation.map((message) => message.messageId),
+    complete: true,
+  };
+}
+
+function snapshotPort(raw: unknown): SeyeonC09ThreadSnapshotShadowPortV1 {
+  return {
+    subjectId: 'owner-1',
+    threadId: 'thread-1',
+    readThreadSnapshot: () => raw,
+  };
+}
+
+describe('C09 bounded continuation authoritative source closure (synthetic port only)', () => {
+  it('checks the exact current thread suffix before composing and does not add claims', async () => {
+    const context = contextFor();
+    const proof = snapshotProof(context);
+    const request = await composeSeyeonC09VerifiedDialogueContinuityShadowRequestV1({
+      context,
+      request: candidateRequest(context),
+      threadSnapshotPort: snapshotPort(proof),
+    });
+    expect((request.input as Record<string, unknown>).c09DialogueContinuity)
+      .toMatchObject({ currentUserMessageRef: 'u2' });
+    expect(request.instructions).toContain('assistant utterance proves only');
+  });
+
+  it('accepts a complete thread longer than the bounded window only with an exact ordered suffix', async () => {
+    const context = contextFor();
+    await expect(requireSeyeonC09ThreadSnapshotShadowV1({
+      context,
+      port: snapshotPort({ ...snapshotProof(context), messageCount: 100 }),
+    })).resolves.toBeUndefined();
+  });
+
+  it('rejects missing source, wrong owner/thread/latest ref, stale windows, failed census and extra fields', async () => {
+    const context = contextFor();
+    const valid = snapshotProof(context);
+    const invalid = [
+      { ...valid, subjectId: 'owner-2' },
+      { ...valid, threadId: 'thread-2' },
+      { ...valid, currentUserMessageId: 'u3' },
+      { ...valid, latestSenderType: 'assistant' },
+      { ...valid, messageCount: 2 },
+      { ...valid, complete: false },
+      { ...valid, tailMessageRefs: ['u1', 'u2', 'a1'] },
+      { ...valid, tailMessageRefs: ['u1', 'a1'] },
+      { ...valid, unsupportedPrivateField: 'secret' },
+      null,
+    ];
+    for (const proof of invalid) {
+      await expect(requireSeyeonC09ThreadSnapshotShadowV1({
+        context, port: snapshotPort(proof),
+      })).rejects.toThrow('C09_DIALOGUE_CONTINUITY_SHADOW_NOT_ELIGIBLE');
+    }
+    await expect(requireSeyeonC09ThreadSnapshotShadowV1({
+      context,
+      port: undefined,
+    })).rejects.toThrow('C09_DIALOGUE_CONTINUITY_SHADOW_NOT_ELIGIBLE');
+    await expect(requireSeyeonC09ThreadSnapshotShadowV1({
+      context,
+      port: { ...snapshotPort(valid), readThreadSnapshot: () => { throw new Error('private identifier'); } },
+    })).rejects.toThrow('C09_DIALOGUE_CONTINUITY_SHADOW_NOT_ELIGIBLE');
   });
 });

@@ -18,6 +18,7 @@ Watchtower-Track: `character-memory`
   - '세연이 그 말을 했다'와 '세연이 말한 사건이 실제 발생했다'를 엄격하게 구별한다. 영화·장소·만남·관계·장기 취향·사주·과거를 대사만으로 사실화하지 않는다.
   - 기존 `PUBLIC_PERSON_CHARACTER_V1`의 공개 성격을 재사용한다. 동일한 `turn_interpret_render_shadow` 응답 schema, `allowedReferenceVocabulary`, Interpretation/Renderer/Reviewer 계약을 보존한다.
   - 공식 서버의 검증된 CONTEXT라도 **전체 스레드 완료성 검증을 뜻하지 않는다**. 최대 12개의 bounded 최근 대화로만 취급한다.
+  - 선택적인 읽기 전용 스레드 증빙 포트를 추가했다. subject/thread/currentUserMessageId에 맞는 전체 스레드 수, 최신 발신자, 최근 메시지 ID의 정확한 순서를 검증한다. 합성 포트로만 시험했으며 실제 서버 DB 어댑터는 아직 연결하지 않았다.
   - 지금은 관계 없는 PUBLIC 턴, 이전 assistant 발화 존재, 마지막 user 발화, preflight 실행, 무결성 결정 없음, 메모리·공개허가 입력 없음인 경우에만 입력 변환을 허용한다. 변조된 스키마·레퍼런스·다른 모델 목적은 거부한다.
   - 호출 자체는 전혀 수행하지 않는다. 다른 fast Shadow나 Production 라우트의 첫 턴 guard를 느슨하게 변경하지 않는다.
 - `test/seyeon-c09-dialogue-continuity-shadow-offline-v1.test.ts`: 동기·입장 연속성 근거, 가상 사건 승격 금지, 참조 봉인 및 부적합 입력 차단을 확인한다.
@@ -34,7 +35,7 @@ Watchtower-Track: `character-memory`
 
 ## 후속 (기존 로드맵 내)
 
-1. 연구용 multi-turn 후보가 쓰려는 최근 대화의 **서버 소유 전체 스레드 범위·출처 증빙**을 추가한다. 현재 packet은 명시적으로 bounded이며 자체적으로 완료성을 보장하지 않는다.
+1. 추가된 읽기 전용 증빙 포트에 **실제 서버 소유 전체 스레드 조회 어댑터**를 안전하게 연결한다. 지금은 합성 포트의 정확한 ref 순서만 검증했으며 공식 DB 조회는 하지 않았다.
 2. 기존 해석 → 인과/행동 검증 → Renderer 검증 → 독립 Semantic Reviewer의 통합 경로를 오프라인 multi-turn에서 검사한다. 이미 첫 턴만 허용한 `createSeyeonFastDialogueShadowV1`의 eligibility는 바꾸지 않는다.
 3. 동일 캐릭터로 3~5턴 연속하여 이전 입장 유지/변경, 억지 맞장구, 사실 없는 회상, 개인적 경계, USER 주장 오염을 검증한다. 독립된 품질 평가는 유료 실행 승인 이후.
 4. 관계 발전/기억 저장/캐릭터 현재 삶 기록/운영 모델 변경은 이 작업에 포함하지 않는다.

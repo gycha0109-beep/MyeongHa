@@ -86,6 +86,87 @@ export function deriveSeyeonC09DialogueContinuityPacketShadowV1(
   });
 }
 
+export const SEYEON_C09_THREAD_SNAPSHOT_SHADOW_VERSION_V1 =
+  'seyeon-c09-thread-snapshot-shadow-v1' as const;
+
+/**
+ * Read-only authoritative snapshot source for offline multi-turn Shadow.
+ * The adapter MUST read the complete subject/thread message census and the
+ * exact, ordered suffix. A bounded runtime window is not such proof.
+ */
+export interface SeyeonC09ThreadSnapshotShadowPortV1 {
+  readonly subjectId: string;
+  readonly threadId: string;
+  readThreadSnapshot(input: Readonly<{
+    subjectId: string;
+    threadId: string;
+    currentUserMessageId: string;
+  }>): unknown | Promise<unknown>;
+}
+
+function validId(value: unknown): value is string {
+  return typeof value === 'string' && value.length > 0 &&
+    value.length <= 256 && value.trim() === value;
+}
+
+export async function requireSeyeonC09ThreadSnapshotShadowV1(input: Readonly<{
+  context: SeyeonRuntimeContextV2;
+  port: SeyeonC09ThreadSnapshotShadowPortV1 | undefined;
+}>): Promise<void> {
+  const packet = deriveSeyeonC09DialogueContinuityPacketShadowV1(input.context);
+  const port = input.port;
+  if (!port || !validId(port.subjectId) || !validId(port.threadId) ||
+      typeof port.readThreadSnapshot !== 'function') fail();
+  let raw: unknown;
+  try {
+    raw = await port.readThreadSnapshot({
+      subjectId: port.subjectId,
+      threadId: port.threadId,
+      currentUserMessageId: packet.currentUserMessageRef,
+    });
+  } catch {
+    // Never leak backend errors, user contents or thread identifiers.
+    fail();
+  }
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) fail();
+  const proof = raw as Record<string, unknown>;
+  if (
+    Object.keys(proof).length !== 8 ||
+    proof.schemaVersion !== SEYEON_C09_THREAD_SNAPSHOT_SHADOW_VERSION_V1 ||
+    proof.subjectId !== port.subjectId ||
+    proof.threadId !== port.threadId ||
+    proof.currentUserMessageId !== packet.currentUserMessageRef ||
+    proof.latestSenderType !== 'user' ||
+    proof.complete !== true ||
+    !Number.isSafeInteger(proof.messageCount) ||
+    (proof.messageCount as number) < packet.recentMessageRefs.length ||
+    !Array.isArray(proof.tailMessageRefs) ||
+    proof.tailMessageRefs.length !== packet.recentMessageRefs.length ||
+    !packet.recentMessageRefs.every(
+      (ref, index) => (proof.tailMessageRefs as readonly unknown[])[index] === ref,
+    )
+  ) fail();
+}
+
+/**
+ * Checked companion for prospective research runners.
+ * Actual generation, independent review and final pre-reveal recheck remain
+ * separate required steps; this function cannot authorize a reply.
+ */
+export async function composeSeyeonC09VerifiedDialogueContinuityShadowRequestV1(
+  input: Readonly<{
+    context: SeyeonRuntimeContextV2;
+    request: SeyeonStructuredProviderRequestV2;
+    threadSnapshotPort: SeyeonC09ThreadSnapshotShadowPortV1;
+  }>,
+): Promise<SeyeonStructuredProviderRequestV2> {
+  await requireSeyeonC09ThreadSnapshotShadowV1({
+    context: input.context,
+    port: input.threadSnapshotPort,
+  });
+  return composeSeyeonC09DialogueContinuityShadowRequestV1(input);
+}
+
 /**
  * Turns a governed interpretation+draft request into an opt-in multi-turn
  * research candidate. This transformer NEVER invokes a model and is NOT wired
