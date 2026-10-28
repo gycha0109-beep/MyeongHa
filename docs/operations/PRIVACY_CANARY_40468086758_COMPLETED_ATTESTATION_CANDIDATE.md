@@ -63,6 +63,16 @@ Require actual completed SUCCESS and inspect the identifier-free restore/reconci
 - Downloaded ZIP checked independently: exactly one `production-privacy-canary-public-evidence.json`, with `canaryOperation=attest_completed`, `resumedFromCanaryRunId=40468086758`, `governedBackupRunId=40468157715`, `privacyRecoveryLedgerRunId=40468500587`, `privacyRecoveryLedgerEventCount=1`, `accountDeletionStartedEventCount=1`, `hostedAuthDeletionInvoked=false`, `authoritativePrivacyReconciliation=false`, `futureSafePrivacyReconciliation=false`, `drReady=false`.
 - Evidence is **historical completion + encrypted artifact provenance only**, not actual restore, post-restore nonresurrection, provider Auth/Storage equivalence, or global DR readiness.
 
+
+## Failed isolated restore attempt #40645496534 (2026-10-28)
+
+- [Protected restore drill #40645496534](https://github.com/gycha0109-beep/MyeongHa/actions/runs/40645496534) completed **failure** on `main` (head `53d9389cc61b0c73af1071a07e94aebfbb685975`). The source backup authorization and download/checksum passed.
+- First failing step: `Resolve authoritative Production privacy replay provenance` (job `122673245000`). No ledger replay, restored-state validation, or successful restore evidence occurred; no restore artifact was uploaded.
+- Root cause verified against actual GitHub workflow-run API metadata: ledger #40468500587 has `name="[WT:ops] Production PostgreSQL Privacy Recovery Ledger"` and read-only completion proof #40633679630 has `name="[WT:ops] Production Privacy Recovery Canary"`; the pre-existing resolver demanded the same two names **without** the `[WT:ops]` run-name prefix. All other assertions were not reached.
+- Fixed on the existing ops branch in `scripts/operations/resolve-postgres-authoritative-privacy-replay-source.sh` by requiring the **exact returned ops run names**, while retaining the precise workflow path, successful conclusion, authorized event/branch/repository and unexpired single-artifact conditions. Added focused positive/negative regression checks for both names and wrong metadata.
+- **Only after review, CI and main integration** retry `PostgreSQL Isolated Restore Drill` as a **new workflow dispatch** using backup `40468157715`, ledger `40468500587`, successful read-only proof `40633679630`, incident reference `2026-10-27T07:40:33Z`, `watchtower_track=ops`, and S0 rehearsal disabled. Do not re-run the failed attempt by using `rerun` on its earlier SHA, do not dispatch `fresh` or `resume`, and do not regenerate the completed deletion.
+- `authoritativePrivacyReconciliation`, `provider_managed_data_full_restore`, `futureSafePrivacyReconciliation` and `dr_ready` remain unproven/false for real restored state.
+
 ## Auth / Storage provider recovery boundary (2026-10-28 read-only inventory)
 
 A separate read-only Production PostgreSQL query observed PostgreSQL 17.6, **4** current Hosted Auth user rows, **28** current Auth session rows, **0** Storage buckets, and **0** Storage object metadata rows. The query returned counts only and performed no writes. This is the live inventory at one instant, **not** the 2026-10-27 backup-time snapshot, identity-credential recovery, or proof of physical object recovery.
