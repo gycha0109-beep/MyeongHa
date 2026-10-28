@@ -90,6 +90,30 @@ this authority contract existed.
 
 #1140 remains complete for synthetic recovered-state mechanics. The follow-on Production boundary is now also complete: canary run `35653222211` produced governed pre-deletion backup `35643472159` and non-zero authoritative ledger run `35653303484`; isolated restore run `35659483080` replayed that exact captured window, executed governed account-deletion finalization/completion, verified non-resurrection and revoked P5Y Commerce retention, and emitted identifier-free artifact `10666580699`. This promotes `authoritative_privacy_reconciliation=true` only for the exact captured window. It does not make reconciliation future-safe and does not prove full hosted Supabase Auth/Storage recovery equivalence.
 
+## 2026-10-28 source-coverage fence hardening
+
+The restore serviceability validator now requires the public summary's
+`authoritativeCoverageThrough` to be **exactly the actual `capturedAt`**
+timestamp. It rejects an extended coverage claim even when the incident
+reference fits the extended timestamp. It also rejects unsupported readiness
+promotion, unaccepted replay-planner evidence, invalid source digests,
+invalid backup identity, and inconsistent event counts before returning any
+serviceability PASS.
+
+This is a **fail-closed source-metadata integrity guard**, not an independent
+proof that future privacy events will always be captured after the database
+fails. Each governed ledger remains authoritative only through its observed
+capture timestamp. The existing isolated restore still verifies the encrypted
+payload, exact backup binding, and source digest separately; metadata validation
+does not replace those checks.
+
+Production scheduled captures remain hourly snapshots, and gaps after the
+latest successful capture are **not automatically covered**. No new paid
+provider resources or destructive Production canary are required for this
+change. `future_safe_privacy_reconciliation=false` and `dr_ready=false`
+remain mandatory pending independently verified continuous source authority,
+Hosted provider equivalence, and full recovery acceptance.
+
 ## Non-claims
 
 This authority does not claim:
