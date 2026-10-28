@@ -320,6 +320,12 @@ function renderPersistedReadingFailure(title, copy, state = 'persisted_record_un
   if (productTitle) productTitle.textContent = '저장된 사주 풀이';
   if (stateTitle) stateTitle.textContent = title;
   if (stateCopy) stateCopy.textContent = copy;
+  // Only transient read failures may be retried through the same owner-checked
+  // GET. Never turn permission denial into an alternate report route.
+  if (state === 'persisted_record_unavailable' && routeAction) {
+    routeAction.href = window.location.href;
+    routeAction.textContent = '저장된 보고서 다시 불러오기 →';
+  }
 }
 
 function renderAuthorityBlockedRoute() {
@@ -948,7 +954,17 @@ async function loadPersistedReading() {
       return;
     }
 
-    const record = parseOfficialReadingRecordPayloadV1(payload.data);
+    let record;
+    try {
+      record = parseOfficialReadingRecordPayloadV1(payload.data);
+    } catch {
+      renderPersistedReadingFailure(
+        '저장된 보고서의 내용을 확인할 수 없습니다.',
+        '공식 기록 응답이 검증 기준을 충족하지 않았습니다. 다른 해석으로 대체하지 않습니다.',
+        'persisted_record_invalid_response',
+      );
+      return;
+    }
     if (
       record.readingId !== persistedReadingHandoff.readingId
       || record.readingSessionId !== persistedReadingHandoff.readingSessionId
