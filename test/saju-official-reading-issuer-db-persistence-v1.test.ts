@@ -1,4 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
+import type { BirthProfileReadResponseV1 } from '../apps/api/src/birth-profile-read.js';
+import { executeAndPersistCurrentBirthSajuOfficialReadingV1, type SajuOfficialIssuedDbTransactionPortV1 } from '../apps/api/src/saju-production-reading-execution.js';
 import { hashSajuHeldSourceProofRequestV1 } from '../apps/api/src/saju-held-source-proof-verifier-v1.js';
 import {
   persistIssuedSajuOfficialReadingV1,
@@ -82,7 +84,87 @@ function input(port: ReturnType<typeof ports>, response: unknown = native) {
   };
 }
 
+function profileFixture(revisionId = sourceBirthRevisionId): BirthProfileReadResponseV1 {
+  return {
+    birthProfileId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+    profileKind: 'self', label: null, archivedAt: null,
+    currentRevision: {
+      revisionId, revisionNo: 3,
+      input: {
+        calendarType: 'solar', birthDate: '2001-07-14',
+        birthTime: '15:20:00', timeKnown: true,
+        isLeapMonth: false, sex: 'female',
+      },
+    },
+    revisions: [{ revisionId, revisionNo: 3, isCurrent: true }],
+  };
+}
+
 describe('Saju issued official Reading -> DB immutable commit boundary', () => {
+  it('does not call the Saju network when Production issuer or DB transaction is not wired', async () => {
+    const requestReading = vi.fn(async () => native);
+    const output = await executeAndPersistCurrentBirthSajuOfficialReadingV1({
+      profile: profileFixture(), readingText: '전체 사주',
+      adapter: { requestReading }, subjectId, readingId, readingSessionId,
+      executionAttemptId, outboxEventId, sourceBirthRevisionId,
+    });
+    expect(output).toMatchObject({ state: 'held', canDisclose: false, canSell: false });
+    expect(requestReading).not.toHaveBeenCalled();
+  });
+
+  it('requires the DB-pinned current Birth revision before the Saju network or DB transaction', async () => {
+    const p = ports();
+    const requestReading = vi.fn(async () => native);
+    const dbTransaction = {
+      run: vi.fn(async (args: Parameters<SajuOfficialIssuedDbTransactionPortV1['run']>[0]) =>
+        args.commit({ currentAuthority: p.currentAuthority, commitPort: p.commitPort })),
+    };
+    const output = await executeAndPersistCurrentBirthSajuOfficialReadingV1({
+      profile: profileFixture('77777777-7777-4777-8777-777777777777'),
+      readingText: '전체 사주', adapter: { requestReading },
+      subjectId, readingId, readingSessionId, executionAttemptId,
+      outboxEventId, sourceBirthRevisionId,
+      sourceVerifier: p.sourceVerifier, mappingVerifier: p.mappingVerifier,
+      dbTransaction,
+    });
+    expect(output).toMatchObject({ state: 'held', reason: 'current_authority_unavailable' });
+    expect(requestReading).not.toHaveBeenCalled();
+    expect(dbTransaction.run).not.toHaveBeenCalled();
+  });
+
+  it('runs authenticated Saju transport before the governed DB transaction and immutable commit', async () => {
+    const p = ports();
+    const sequence: string[] = [];
+    const requestReading = vi.fn(async (_request: unknown) => {
+      sequence.push('saju');
+      return native;
+    });
+    const dbTransaction = {
+      run: vi.fn(async (args: Parameters<SajuOfficialIssuedDbTransactionPortV1['run']>[0]) => {
+        sequence.push('db');
+        expect(args.subjectId).toBe(subjectId);
+        return args.commit({ currentAuthority: p.currentAuthority, commitPort: p.commitPort });
+      }),
+    };
+    const result = await executeAndPersistCurrentBirthSajuOfficialReadingV1({
+      profile: profileFixture(),
+      readingText: '전체 사주',
+      adapter: { requestReading },
+      subjectId, readingId, readingSessionId,
+      executionAttemptId, outboxEventId, sourceBirthRevisionId,
+      sourceVerifier: p.sourceVerifier,
+      mappingVerifier: p.mappingVerifier,
+      dbTransaction,
+    });
+    expect(result).toMatchObject({ state: 'committed', readingId });
+    expect(sequence).toEqual(['saju', 'db']);
+    expect(requestReading).toHaveBeenCalledWith({
+      birth: { calendarType: 'solar', date: '2001-07-14', time: '15:20', sex: 'female' },
+      reading: { text: '전체 사주' },
+    });
+    expect(p.commitPort.finalizeSuccess).toHaveBeenCalledTimes(1);
+  });
+
   it('does not invoke any issuer, mapping, rights or DB writes when the approved ports are not installed', async () => {
     await expect(persistIssuedSajuOfficialReadingV1({
       subjectId, readingId, readingSessionId, executionAttemptId, outboxEventId,
