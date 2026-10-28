@@ -68,6 +68,52 @@ describe('isolated private Administrator runtime', () => {
     expect(r.seen.some(s => s.includes('FROM public.subjects'))).toBe(true);
     expect(a.seen.some(s => s.includes('INSERT INTO myeongha_admin_ops.admin_audit_events_v1'))).toBe(true);
   });
+  it('accepts server-only billing and FX sources without enabling them by default', async () => {
+    let exactBillLookups = 0, monthlyBillLookups = 0, fxLookups = 0;
+    const billCallId = '123e4567-e89b-42d3-a456-426614174004';
+    const readPool:PostgresSubjectPoolV1 = { async connect() { return {
+      async query<Row = Record<string,unknown>>(sql:string) {
+        if (sql.startsWith('SELECT current_user')) return {rows:[{currentUser:'myeongha_admin_reader'}] as unknown as Row[]};
+        if (sql.includes('qry_ai_finance_calls_v1')) return {rows:[{
+          callId:billCallId,subjectId:OWNER,attemptId:billCallId,turnId:billCallId,
+          createdAt:'2026-10-28T00:00:00Z',priceAppliedAt:'2026-10-28T00:00:00Z',
+          feature:'chat',provider:'synthetic-provider',model:'synthetic-model',
+          outcome:'response_received',priceVersion:null,recordedEstimateMicroUsd:null,
+          inputTokens:null,outputTokens:null,cachedInputTokens:null,reasoningTokens:null,
+          appliedInputRate:null,
+        }] as unknown as Row[]};
+        return {rows:[] as Row[]};
+      },release(){}};
+    }};
+    const runtime=createAdminPrivateRuntimeV1({
+      env,readPool,auditPool:mockPool('myeongha_admin_audit_writer').pool,
+      memberFetchImpl:async()=>Response.json({id:OWNER,email:'owner@example.test'}),
+      aiFinanceEvidence:{
+        billing:{async lookup(ids){exactBillLookups++;expect(ids).toEqual([billCallId]);return [{
+          callId:billCallId,provider:'synthetic-provider',model:'synthetic-model',currency:'USD',
+          amountMicroUsd:900,match:'exact_call',source:'provider_billing_export',
+          evidenceSha256:'a'.repeat(64),billedFrom:'2026-10-01T00:00:00Z',billedTo:'2026-11-01T00:00:00Z',
+        }];}},
+        fx:{currency:'USD/KRW',rateNumerator:1400,rateDenominator:1,
+          effectiveFrom:'2026-10-27T00:00:00Z',effectiveTo:'2026-10-29T00:00:00Z',sourceSha256:'b'.repeat(64)},
+      },
+      aiBudgetEvidence:{
+        billing:async()=>{monthlyBillLookups++;return undefined;},
+        fx:async()=>{fxLookups++;return undefined;},
+      },
+    });
+    const headers={Authorization:'Bearer '+JWT};
+    const calls=await runtime.handleRequest(new Request('https://admin.example/api/admin/ai-finance/calls?from=2026-10-27&to=2026-10-28',{headers}));
+    expect(calls.status).toBe(200);
+    const body=await calls.json() as {rows:Array<Record<string,unknown>>};
+    expect(body.rows[0]).toMatchObject({costClass:'provider_confirmed',confirmedMicroUsd:'900',confirmedMicroKrw:'1260000'});
+    expect(exactBillLookups).toBe(1);
+    const budget=await runtime.handleRequest(new Request('https://admin.example/api/admin/ai-budget?month=2026-10',{headers}));
+    expect(budget.status).toBe(200);
+    expect(monthlyBillLookups).toBe(1);
+    expect(fxLookups).toBe(1);
+    expect((await budget.json() as {confirmedMicroKrw:unknown}).confirmedMicroKrw).toBeNull();
+  });
   it('does not query user data for another authenticated Member', async () => {
     const r = mockPool('myeongha_admin_reader');
     const a = mockPool('myeongha_admin_audit_writer');

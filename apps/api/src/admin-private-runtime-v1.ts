@@ -11,6 +11,8 @@ import { createAdminAnalyticsDashboardHttpHandlerV1 } from './admin-analytics-pi
 import { createAdminAnalyticsPipelineReadPortV1 } from './admin-analytics-pipeline-postgres-v1.js';
 import { createAdminAiFinanceHttpHandlerV1 } from './admin-ai-cost-http-v1.js';
 import { createAdminAiFinanceReadPortV1 } from './admin-ai-cost-read-v1.js';
+import type { AdminAiBillingEvidencePortV1, AdminAiFxEvidenceV1 } from './admin-ai-cost-finance-v1.js';
+import type { AdminAiBudgetBillingV1, AdminAiBudgetWindowV1 } from './admin-ai-budget-v1.js';
 import {createAdminCreditPostgresV1} from './admin-credit-postgres-v1.js';
 import {createAdminAiBudgetReadV1,createAdminAiBudgetHttpV1} from './admin-ai-budget-read-v1.js';
 import type{AdminAnalyticsCollectionPolicyV1,AdminAnalyticsCoverageV1}from'./admin-analytics-pipeline-v1.js';
@@ -32,6 +34,10 @@ export interface CreateAdminPrivateRuntimeInputV1 {
   readonly memberFetchImpl?: SupabaseMemberVerifierFetchV1;
   readonly commandPool?: PostgresSubjectPoolV1;
   readonly analytics?: {readonly collection:AdminAnalyticsCollectionPolicyV1;readonly coverage?:AdminAnalyticsCoverageV1};
+  /** Server-injected provider billing/FX evidence only; never parsed from browser or request body. */
+  readonly aiFinanceEvidence?: {readonly billing?:AdminAiBillingEvidencePortV1;readonly fx?:AdminAiFxEvidenceV1};
+  /** Window-bound source adapters must not assert complete billing until the provider confirms it. */
+  readonly aiBudgetEvidence?: {readonly billing?:(window:AdminAiBudgetWindowV1)=>Promise<AdminAiBudgetBillingV1|undefined>;readonly fx?:(window:AdminAiBudgetWindowV1)=>Promise<AdminAiFxEvidenceV1|undefined>};
 }
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 
@@ -71,8 +77,8 @@ export function createAdminPrivateRuntimeV1(input: CreateAdminPrivateRuntimeInpu
     ...(presentation === undefined ? {} : {commands:{bindings:[presentation.binding,...(credit?[credit.binding]:[])],presentations:presentation.queries,...(credit?{creditHistory:credit.history}:{})}}),
     ...(env.MYEONGHA_ADMIN_CONFIRMATION_SECRET === undefined ? {} : {confirmationSigningSecret:env.MYEONGHA_ADMIN_CONFIRMATION_SECRET})});
   const analytics = createAdminAnalyticsDashboardHttpHandlerV1({auth,audit,reads:createAdminAnalyticsPipelineReadPortV1({pool:input.readPool,...input.analytics})});
-  const finance = createAdminAiFinanceHttpHandlerV1({auth,audit,reads:createAdminAiFinanceReadPortV1({pool:input.readPool})});
-  const budget=createAdminAiBudgetHttpV1({auth,audit,read:createAdminAiBudgetReadV1({pool:input.readPool})});
+  const finance = createAdminAiFinanceHttpHandlerV1({auth,audit,reads:createAdminAiFinanceReadPortV1({pool:input.readPool,...(input.aiFinanceEvidence??{})})});
+  const budget=createAdminAiBudgetHttpV1({auth,audit,read:createAdminAiBudgetReadV1({pool:input.readPool,...(input.aiBudgetEvidence??{})})});
   return Object.freeze({
     handleRequest(request:Request):Promise<Response> {
       const path=new URL(request.url).pathname;
