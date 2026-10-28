@@ -14,6 +14,7 @@ import type { SeyeonStructuredProviderRequestV2 } from
 import {
   createCharacterDialogueLiveModelStageAdaptersShadowV1,
   createCharacterDialogueLiveOpenAiStageAdaptersShadowV1,
+  runCharacterDialogueLiveModelShadowV1,
 } from '../apps/api/src/character-dialogue-live-model-shadow-v1.js';
 import { runCharacterDialogueMultiturnOfflineShadowV1 } from
   '../apps/api/src/character-dialogue-multiturn-offline-shadow-v1.js';
@@ -211,5 +212,79 @@ describe('common C1 live structured LLM boundary (network-fake only)', () => {
     expect(connected.reviewer.modelKey).toBe('review-model');
     expect(fakeFetch).not.toHaveBeenCalled();
     expect(beforeDispatch).not.toHaveBeenCalled();
+  });
+});
+
+describe('existing real OpenAI Responses transport integration, with intercepted network', () => {
+  it('performs one combined generation POST and one independent review POST only after admission', async () => {
+    const f = fixture('seorin');
+    const admission: string[] = [];
+    const outcomes: string[] = [];
+    const fetchImpl = vi.fn(async (_url: string, init: RequestInit): Promise<Response> => {
+      const body = JSON.parse(String(init.body)) as Record<string, any>;
+      const purpose = String(body.text.format.name).includes('turn_interpret_render_shadow')
+        ? 'turn_interpret_render_shadow' : 'semantic_review';
+      const modelInput = JSON.parse(body.input[0].content[0].text);
+      expect(admission).toContain(body.model);
+      expect(body.store).toBe(false);
+      expect(body.text.format.strict).toBe(true);
+      const generateRequest: SeyeonStructuredProviderRequestV2 = {
+        contractVersion: 'seyeon-structured-provider-v2',
+        purpose,
+        instructions: body.instructions,
+        input: modelInput,
+        responseSchema: body.text.format.schema,
+      };
+      const output = purpose === 'turn_interpret_render_shadow'
+        ? await f.generated(generateRequest)
+        : await f.review(generateRequest);
+      return new Response(JSON.stringify({
+        status: 'completed',
+        output: [{
+          type: 'message',
+          content: [{ type: 'output_text', text: JSON.stringify(output) }],
+        }],
+        usage: {
+          input_tokens: 160,
+          output_tokens: 80,
+          input_tokens_details: { cached_tokens: 0 },
+          output_tokens_details: { reasoning_tokens: 0 },
+        },
+      }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    });
+    const beforeDispatch = vi.fn(async (meta: { modelKey: string }) => {
+      admission.push(meta.modelKey);
+    });
+    const meteredAfterOutcome = vi.fn(async (metric: { modelKey: string; outcome: string }) => {
+      expect(metric.outcome).toBe('response_received');
+      outcomes.push(metric.modelKey);
+    });
+    const candidate = await runCharacterDialogueLiveModelShadowV1({
+      runtime: f.runtime, scope: f.scope,
+      threadId, recentConversation: conversation,
+      generator: {
+        apiKey: 'only-a-test-credential-never-sent',
+        model: 'generator-model',
+        fetchImpl, beforeDispatch, meteredAfterOutcome,
+        maxOutputTokens: 1024,
+      },
+      semanticReviewer: {
+        apiKey: 'only-a-test-credential-never-sent',
+        model: 'review-model',
+        fetchImpl, beforeDispatch, meteredAfterOutcome,
+        maxOutputTokens: 1024,
+      },
+    });
+    expect(candidate.mayCommit).toBe(false);
+    expect(candidate.mayReveal).toBe(false);
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect(beforeDispatch).toHaveBeenCalledTimes(2);
+    expect(meteredAfterOutcome).toHaveBeenCalledTimes(2);
+    expect(admission).toEqual(['generator-model', 'review-model']);
+    expect(outcomes).toEqual(['generator-model', 'review-model']);
+    expect(f.query).toHaveBeenCalledTimes(4);
   });
 });
