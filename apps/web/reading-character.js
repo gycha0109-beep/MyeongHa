@@ -474,7 +474,9 @@ function previewStepsFromPayload(payload, { requireBrowserAdmission = false } = 
   if (steps.length === 0) return null;
   return {
     steps,
-    notice: notices.find((text) => typeof text === 'string' && text.trim()) ?? '',
+    // Preserve every issued limitation in source order. Showing just the first
+    // could silently hide a condition in the owner-authorized archive.
+    notice: notices.filter((text) => typeof text === 'string' && text.trim()).join('\n\n'),
     calculationSummary:
       reading.calculationSummary && typeof reading.calculationSummary === 'object'
         ? reading.calculationSummary
@@ -915,6 +917,14 @@ async function loadPersistedReading() {
         '세션을 다시 확인해 주세요.',
         '현재 세션이 만료되었습니다. 기록 페이지에서 다시 열어 주세요.',
         'persisted_record_auth_required',
+      );
+      return;
+    }
+    if (response.status === 403) {
+      renderPersistedReadingFailure(
+        '이 공식 보고서의 열람 권한이 없습니다.',
+        '현재 계정에서 이 저장된 해석에 접근할 수 없습니다. 기록 페이지에서 이용 가능 여부를 다시 확인해 주세요.',
+        'persisted_record_access_denied',
       );
       return;
     }
