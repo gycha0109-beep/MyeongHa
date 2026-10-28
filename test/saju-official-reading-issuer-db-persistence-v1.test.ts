@@ -225,6 +225,31 @@ describe('Saju issued official Reading -> DB immutable commit boundary', () => {
     expect(requestReading).not.toHaveBeenCalled();
   });
 
+  it('never contacts Saju when a configured issuer or DB dependency lacks its required method', async () => {
+    for (const brokenPort of ['sourceVerifier', 'mappingVerifier', 'dbTransaction'] as const) {
+      const p = ports();
+      const requestReading = vi.fn(async () => native);
+      const dbTransaction = {
+        run: vi.fn(async (args: Parameters<SajuOfficialIssuedDbTransactionPortV1['run']>[0]) =>
+          args.commit({ currentAuthority: p.currentAuthority, commitPort: p.commitPort })),
+      };
+      const supplied = {
+        profile: profileFixture(), readingText: '전체 사주',
+        adapter: { requestReading }, subjectId, readingId, readingSessionId,
+        executionAttemptId, outboxEventId, sourceBirthRevisionId,
+        sourceVerifier: p.sourceVerifier, mappingVerifier: p.mappingVerifier,
+        dbTransaction,
+      };
+      const result = await executeAndPersistCurrentBirthSajuOfficialReadingV1({
+        ...supplied,
+        [brokenPort]: {} as never,
+      });
+      expect(result).toMatchObject({ state: 'held', canDisclose: false, canSell: false });
+      expect(requestReading).not.toHaveBeenCalled();
+      expect(dbTransaction.run).not.toHaveBeenCalled();
+    }
+  });
+
   it('denies malformed prepared identities before the Saju network or DB transaction', async () => {
     for (const badId of ['subjectId', 'readingId', 'readingSessionId',
       'executionAttemptId', 'outboxEventId', 'sourceBirthRevisionId'] as const) {
