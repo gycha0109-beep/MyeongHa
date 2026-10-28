@@ -28,7 +28,7 @@ export function createAdminAiBudgetReadV1(input:{readonly pool:PostgresSubjectPo
      openAiCosts.invoiceConfirmed!==false||openAiCosts.billingStatus!=='provider_reported_not_final_invoice'||
      openAiCosts.queriedFrom!==window.from||
      Date.parse(openAiCosts.queriedToExclusive)>Date.parse(window.observedThrough)||
-     !/^(?:0|[1-9]\\d{0,29})$/u.test(openAiCosts.observedMicroUsd)))
+     !/^(?:0|[1-9]\d{0,29})$/u.test(openAiCosts.observedMicroUsd)))
      throw Error('Unbound OpenAI provider observation');
    const budget=evaluateAdminAiBudgetV1({
      window,buckets,workloadCoverage:['character_chat'],truncated:result.rows.length>500,
