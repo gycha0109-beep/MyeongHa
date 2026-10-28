@@ -1,6 +1,18 @@
 // Authored Records report-hub UI labels only. Do not translate stored Saju source,
 // Reader interpretation, Birth data, or any user-created records here.
 export const RECORDS_HUB_STATIC_UI_COPY_V1 = new Map([
+  ['이 공식 보고서의 열람 권한이 없습니다.', {
+    'ja-JP': 'この公式レポートを閲覧する権限がありません。',
+    'zh-TW': '您沒有權限閱讀這份正式報告。',
+    'en-US': 'You do not have access to this official report.',
+    'zh-CN': '您没有权限阅读这份正式报告。',
+  }],
+  ['현재 계정에서 이 저장된 해석에 접근할 수 없습니다. 기록 페이지에서 이용 가능 여부를 다시 확인해 주세요.', {
+    'ja-JP': '現在のアカウントではこの保存済み鑑定を閲覧できません。記録ページで利用状況をご確認ください。',
+    'zh-TW': '目前帳號無法存取這份已儲存的解讀。請在紀錄頁確認存取狀態。',
+    'en-US': 'This account cannot access the saved reading. Check availability from your records.',
+    'zh-CN': '当前账号无法访问这份已保存的解读。请在记录页面检查访问状态。',
+  }],
   // Shared official-report composition example label on the Saju hub.
   ['공식 보고서 구성 예시. 개인별 해석이 아닙니다.', {
     'ja-JP': '公式レポートの構成例です。個別の鑑定結果ではありません。',
