@@ -46,7 +46,7 @@ const storedHash = 'sha256:v1:' + dbHash;
 
 function ports() {
   const sourceVerifier = {
-    verifyProductionIssue: vi.fn(async () => ({
+    verifyProductionIssue: vi.fn(async (_input: Parameters<SajuOfficialSourceVerificationPortV1['verifyProductionIssue']>[0]) => ({
       state: 'production_source_verified' as const,
       nativeReadingId,
       sourceResponseHash: sourceHash,
@@ -57,7 +57,7 @@ function ports() {
     })),
   } satisfies SajuOfficialSourceVerificationPortV1;
   const mappingVerifier = {
-    verifyIssuedReadingMapping: vi.fn(async () => ({
+    verifyIssuedReadingMapping: vi.fn(async (_input: Parameters<SajuOfficialDbMappingVerificationPortV1['verifyIssuedReadingMapping']>[0]) => ({
       state: 'approved_mapping' as const,
       subjectId, dbReadingId: readingId, readingSessionId,
       sourceBirthRevisionId, nativeReadingId,
@@ -65,10 +65,10 @@ function ports() {
     })),
   } satisfies SajuOfficialDbMappingVerificationPortV1;
   const currentAuthority = {
-    admitCurrentIssue: vi.fn(async () => true),
+    admitCurrentIssue: vi.fn(async (_input: Parameters<SajuOfficialCurrentAuthorityPortV1['admitCurrentIssue']>[0]) => true),
   } satisfies SajuOfficialCurrentAuthorityPortV1;
   const commitPort = {
-    finalizeSuccess: vi.fn(async () => ({
+    finalizeSuccess: vi.fn(async (_input: Parameters<SajuOfficialImmutableCommitPortV1['finalizeSuccess']>[0]) => ({
       readingId, executionAttemptId, responseHash: storedHash, replayed: false,
     })),
   } satisfies SajuOfficialImmutableCommitPortV1;
