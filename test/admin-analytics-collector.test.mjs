@@ -29,6 +29,26 @@ describe('disabled-by-default web analytics initialization',()=>{
     const sameTab=initializeMyeonghaAnalyticsV1(options);await sameTab.grantConsent();expect(sessions).toBe(1);
     const otherTab=initializeMyeonghaAnalyticsV1({...options,sessionStorage:{getItem:()=>null,setItem(){},removeItem(){}}});await otherTab.grantConsent();expect(sessions).toBe(2);
   });
+  it('offers explicit server withdrawal even after collection is disabled, without re-enabling tracking',async()=>{
+    const requests=[],nodes=[];
+    const doc={createElement(tag){return{tag,children:[],listeners:{},
+      setAttribute(){},addEventListener(name,fn){this.listeners[name]=fn;},append(...items){this.children.push(...items);}}},
+      body:{append(node){nodes.push(node);}}};
+    const opts={enabled:false,withdrawalAvailable:true,documentImpl:doc,
+      fetchImpl:async(path,options)=>{requests.push({path,options});return Response.json({code:'ANALYTICS_WITHDRAWN'});}};
+    const collector=mountMyeonghaAnalyticsConsentV1(opts);
+    expect(collector.status).toBe('disabled');
+    expect(nodes).toHaveLength(1);
+    expect(nodes[0].children.filter(node=>node.tag==='button').map(node=>node.textContent)).toEqual(['분석 동의 철회']);
+    expect(requests).toHaveLength(0);
+    expect(await collector.track('PAGE_VIEWED',{pageKey:'product'})).toEqual({status:'disabled'});
+    expect(await collector.grantConsent()).toEqual({status:'disabled'});
+    expect(requests).toHaveLength(0);
+    expect(await collector.withdraw()).toEqual({status:'withdrawn'});
+    expect(requests.map(item=>item.path)).toEqual(['/api/analytics/withdraw']);
+    expect(requests[0].options).toMatchObject({method:'POST',credentials:'same-origin',cache:'no-store'});
+    expect(mountMyeonghaAnalyticsConsentV1({documentImpl:doc})).toBeNull();
+  });
   it('does not resume collection when a pending grant returns after withdrawal',async()=>{
     let finish;const pending=new Promise(resolve=>{finish=resolve;});const sent=[];
     const policy={approved:true,approvalRef:'owner-20261027',policyVersion:'product-analytics-180d-v1',retentionSeconds:180*86400,deletionBindingVerified:true,validVisitPolicyVersion:'test-admission-v1',approvedEvents:['PAGE_VIEWED']};

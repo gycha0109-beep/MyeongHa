@@ -83,7 +83,10 @@ export function createMyeonghaAnalyticsCollectorV1(options = {}) {
       consentGeneration++;consent = null; sessionContext=null; prepared.clear();
       // A reload may leave only the server HttpOnly receipt. Withdrawal must
       // still reach the server even when this tab has no in-memory consent.
-      if (!enabled) return { status: 'local_consent_cleared' };
+      // After collection is switched off, an explicitly offered withdrawal
+      // control must still be able to erase previously granted server consent.
+      // Default unconfigured initialization still performs no request.
+      if (!enabled && options.withdrawalAvailable !== true) return { status: 'local_consent_cleared' };
       try{storage()?.removeItem(sessionKey);}catch{/* Explicit withdrawal still continues on the server. */}
       try { const response = await fetchImpl('/api/analytics/withdraw',{method:'POST',credentials:'same-origin',cache:'no-store',headers:{'Content-Type':'application/json'},body:'{}'});
         return {status:response.ok?'withdrawn':'withdrawal_pending'};
@@ -99,8 +102,10 @@ export function initializeMyeonghaAnalyticsV1(options = {}) {
 /** Mount only after the service's explicit collection activation. No implied
  * consent or collection on page entry; each grant requires a user click. */
 export function mountMyeonghaAnalyticsConsentV1(options={}) {
-  if(options.enabled!==true)return null;
-  const collector=createMyeonghaAnalyticsCollectorV1(options);if(collector.status==='disabled')return null;
+  if(options.enabled!==true && options.withdrawalAvailable!==true)return null;
+  const collector=createMyeonghaAnalyticsCollectorV1(options);
+  const withdrawalOnly=collector.status==='disabled';
+  if(withdrawalOnly && options.withdrawalAvailable!==true)return null;
   const doc=options.documentImpl??document;const section=doc.createElement('section');section.setAttribute('aria-label','제품 분석 동의');
   const description=doc.createElement('p');description.textContent='선택: 방문·페이지·가입·구매 흐름을 분석합니다. 출생정보·대화·결제 원문은 수집하지 않으며 제품 분석 이벤트는 최대 180일 보관합니다. 동의하지 않아도 서비스를 이용할 수 있습니다.';
   const grant=doc.createElement('button');grant.type='button';grant.textContent='제품 분석 동의';
@@ -108,5 +113,6 @@ export function mountMyeonghaAnalyticsConsentV1(options={}) {
   const status=doc.createElement('p');status.setAttribute('role','status');
   grant.addEventListener('click',async()=>{grant.disabled=true;const result=await collector.grantConsent();status.textContent=result.status==='granted'?'분석 동의가 저장되었습니다.':'분석 동의를 저장할 수 없습니다.';grant.disabled=false;});
   withdraw.addEventListener('click',async()=>{const result=await collector.withdraw();status.textContent=result.status==='withdrawn'||result.status==='local_consent_cleared'?'분석 수집을 중단했습니다.':'추가 수집을 중단했습니다. 서버 삭제 확인이 필요합니다.';});
-  section.append(description,grant,withdraw,status);doc.body.append(section);return collector;
+  if(withdrawalOnly)description.textContent='현재 제품 분석 수집은 비활성입니다. 이전에 허용한 수집이 있다면 여기에서 동의를 철회할 수 있습니다.';
+  section.append(description,...(withdrawalOnly?[]:[grant]),withdraw,status);doc.body.append(section);return collector;
 }
