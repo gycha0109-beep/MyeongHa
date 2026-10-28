@@ -697,6 +697,7 @@ function activatePreviewReading(preview) {
   const stepBody = document.querySelector('[data-reading-step-body]');
   const structureTitle = document.querySelector('[data-reading-structure-title]');
   const structureBody = document.querySelector('[data-reading-structure-body]');
+  const structureBlock = structureBody?.closest('.reading-block');
   const readerLine = document.querySelector('[data-reader-step-line]');
   const readerComment = document.querySelector('[data-reader-comment]');
   const authorityNote = document.querySelector('[data-reading-authority-note]');
@@ -763,10 +764,13 @@ function activatePreviewReading(preview) {
     if (stepTitle) stepTitle.textContent = step.title;
     if (stepBody) stepBody.textContent = step.primary;
     if (structureTitle) structureTitle.textContent = ui.structureTitle;
+    // The archived official report must not invent structural evidence when
+    // the stored response does not contain any. Preserve Preview UI separately.
+    if (structureBlock) structureBlock.hidden = isStoredRecord && structureParts.length === 0;
     if (structureBody) {
       structureBody.textContent = structureParts.length > 0
         ? structureParts.join('\n\n')
-        : '원국에서 확인된 해석 축을 바탕으로 읽는 항목입니다.';
+        : isStoredRecord ? '' : '원국에서 확인된 해석 축을 바탕으로 읽는 항목입니다.';
     }
     if (readerLine) readerLine.textContent = `${step.title} 항목을 확인합니다.`;
     if (readerComment) readerComment.textContent = previewCommentForStep();
