@@ -12,9 +12,10 @@ const VALID=Object.freeze({
   checkout:Object.freeze({
     storeId:'store-d9211773-4c6a-4736-9be7-c828405238bc',
     channelKey:'channel-key-d8049c19-c6e9-4729-8da1-ff6a1ab23100',
-    paymentId:'mha_pa_'+'b'.repeat(64),
+    paymentId:'mha_pa_'+'b'.repeat(32),
     orderName:'명하 채팅 크레딧 300개',
     totalAmount:1900,currency:'CURRENCY_KRW',payMethod:'CARD',
+    products:[{id:'myeongha-chat-credits-300-v1',name:'명하 채팅 크레딧 300개',amount:1900,quantity:1}],
   }),
 });
 
@@ -65,6 +66,11 @@ describe('browser PortOne V2 Owner Admin sandbox card handoff',()=>{
       {...VALID,checkout:{...VALID.checkout,storeId:'wrong'}},
       {...VALID,checkout:{...VALID.checkout,channelKey:'wrong'}},
       {...VALID,checkout:{...VALID.checkout,paymentId:'bad id'}},
+      {...VALID,checkout:{...VALID.checkout,paymentId:'mha_pa_'+'b'.repeat(64)}},
+      {...VALID,checkout:{...VALID.checkout,products:[]}},
+      {...VALID,checkout:{...VALID.checkout,products:[{...VALID.checkout.products[0],id:'forged-product'}]}},
+      {...VALID,checkout:{...VALID.checkout,products:[{...VALID.checkout.products[0],amount:1}]}},
+      {...VALID,checkout:{...VALID.checkout,products:[{...VALID.checkout.products[0],quantity:300}]}},
       {...VALID,checkout:{...VALID.checkout,V2_API_Secret:'accidental-exposure'}},
     ];
     for(const entry of candidates){

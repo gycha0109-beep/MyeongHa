@@ -17,6 +17,7 @@ describe('PortOne V2 credit checkout contract',()=>{
    storeId:base.storeId,channelKey:base.channelKey,paymentId:base.paymentId,
    orderName:'명하 채팅 크레딧 300개',totalAmount:1900,
    currency:'CURRENCY_KRW',payMethod:'CARD',
+   products:[{id:'myeongha-chat-credits-300-v1',name:'명하 채팅 크레딧 300개',amount:1900,quantity:1}],
   });
  });
  it.each([
@@ -24,6 +25,7 @@ describe('PortOne V2 credit checkout contract',()=>{
   {externalProductId:'myeongha-saju-general-natal-deep-v1'},
   {amountMinor:0},{amountMinor:9900},{currency:'USD'},
   {quantityCredits:999999},{paymentId:'bad:id'},
+  {paymentId:'mha_pa_'+'f'.repeat(64)},
   {storeId:'https://evil.invalid'},{channelKey:'abc def'},
  ])('does not create a payment for unverified authority %o',(override)=>{
   expect(()=>buildPortOneChatCreditCheckoutV1({...base,...override} as never))

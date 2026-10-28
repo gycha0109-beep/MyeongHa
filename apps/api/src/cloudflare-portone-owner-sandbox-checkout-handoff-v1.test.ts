@@ -71,6 +71,7 @@ describe('Cloudflare PortOne KCP V2 server-owned checkout handoff',()=>{
       paymentId:PAYMENT_ID,
       orderName:'명하 채팅 크레딧 300개',
       totalAmount:1900,currency:'CURRENCY_KRW',payMethod:'CARD',
+      products:[{id:'myeongha-chat-credits-300-v1',name:'명하 채팅 크레딧 300개',amount:1900,quantity:1}],
     });
     expect(JSON.stringify(result)).not.toContain(env.V2_API_Secret);
     expect(state.query).toHaveBeenCalledTimes(1);
@@ -114,7 +115,7 @@ describe('Cloudflare PortOne KCP V2 server-owned checkout handoff',()=>{
     await expect(loadCloudflarePortOneOwnerSandboxCheckoutHandoffV1(input))
       .rejects.toThrow('Cloudflare PortOne V2 TEST binding authority unavailable.');
   });
-  it('base checkout SQL requires canonical Member, exact offer/capability provenance, sandbox and enabled SKU',()=>{
+  it('base SQL requires canonical Member, exact offer/capability provenance, sandbox and enabled SKU',()=>{
     const sql=readFileSync(new URL('../../../supabase/migrations/20261027163500_commerce_owner_sandbox_credit_checkout_v1.sql',import.meta.url),'utf8');
     for(const exact of [
       'public.assert_myeongha_subject_context_v1(p_subject_id)',

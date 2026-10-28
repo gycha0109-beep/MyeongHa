@@ -19,6 +19,9 @@ export interface PortOneCardPaymentRequestV2 {
   readonly totalAmount:1900;
   readonly currency:'CURRENCY_KRW';
   readonly payMethod:'CARD';
+  readonly products:readonly [Readonly<{
+    id:'myeongha-chat-credits-300-v1';name:'명하 채팅 크레딧 300개';amount:1900;quantity:1;
+  }>];
 }
 
 export interface PortOneBrowserSdkV2 {
@@ -38,8 +41,8 @@ export type PortOneBrowserHandoffOutcomeV1 =
 const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/iu;
 const STORE=/^store-[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/iu;
 const CHANNEL=/^channel-key-[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/iu;
-const PAYMENT=/^[A-Za-z0-9_-]{6,128}$/u;
-const FIELDS=new Set(['storeId','channelKey','paymentId','orderName','totalAmount','currency','payMethod']);
+const PAYMENT=/^[A-Za-z0-9_-]{6,40}$/u;
+const FIELDS=new Set(['storeId','channelKey','paymentId','orderName','totalAmount','currency','payMethod','products']);
 
 function deny():never{
   throw new Error('PortOne V2 sandbox checkout request unavailable.');
@@ -59,13 +62,23 @@ function parseServerCheckout(value:unknown):PortOneCardPaymentRequestV2{
      typeof x.paymentId!=='string'||!PAYMENT.test(x.paymentId)||
      x.orderName!=='명하 채팅 크레딧 300개'||
      x.totalAmount!==1900||x.currency!=='CURRENCY_KRW'||
-     x.payMethod!=='CARD')return deny();
+     x.payMethod!=='CARD'||!Array.isArray(x.products)||x.products.length!==1)return deny();
+  const product=asRecord(x.products[0]);
+  if(Reflect.ownKeys(product).length!==4||
+     !['id','name','amount','quantity'].every(k=>Object.hasOwn(product,k))||
+     product.id!=='myeongha-chat-credits-300-v1'||
+     product.name!=='명하 채팅 크레딧 300개'||
+     product.amount!==1900||product.quantity!==1)return deny();
   return Object.freeze({
     storeId:x.storeId,
     channelKey:x.channelKey,
     paymentId:x.paymentId,
     orderName:'명하 채팅 크레딧 300개',
     totalAmount:1900,currency:'CURRENCY_KRW',payMethod:'CARD',
+    products:Object.freeze([Object.freeze({
+      id:'myeongha-chat-credits-300-v1',name:'명하 채팅 크레딧 300개',
+      amount:1900,quantity:1,
+    })]) as PortOneCardPaymentRequestV2['products'],
   });
 }
 function parseServerEnvelope(value:unknown):PortOneOwnerSandboxBrowserHandoffV1{
