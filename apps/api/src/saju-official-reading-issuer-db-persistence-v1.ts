@@ -16,6 +16,7 @@ export const SAJU_OFFICIAL_DB_ISSUANCE_HANDOFF_VERSION_V1 =
   'saju-official-db-issuance-handoff-v1' as const;
 
 const HASH = /^[a-f0-9]{64}$/u;
+const VERSIONED_BIRTH_HASH = /^sha256:v1:[a-f0-9]{64}$/u;
 const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/iu;
 const RESPONSE_VERSION = 'myeonghwa-product-reading-response-v2';
 const STATES = new Set(['delivered', 'delivered_with_fallback']);
@@ -200,7 +201,8 @@ export async function persistIssuedSajuOfficialReadingV1(input: Readonly<{
     || source.sourceResponseHash !== originalHash
     || !HASH.test(source.sourceResponseHash)
     || source.sourceBirthRevisionId !== input.sourceBirthRevisionId
-    || !id(source.sourceBirthInputHash)
+    || typeof source.sourceBirthInputHash !== 'string'
+    || !VERSIONED_BIRTH_HASH.test(source.sourceBirthInputHash)
     || !id(source.engineVersion)
     || !id(source.externalRequestRef)) {
     return held('production_source_unverified');
