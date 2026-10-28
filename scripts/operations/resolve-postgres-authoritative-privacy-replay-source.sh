@@ -29,8 +29,10 @@ request_json \
   "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/runs/$PRIVACY_LEDGER_RUN_ID" \
   "$ledger_run_json"
 
+# The run.name returned by GitHub uses the workflow's WT:ops run-name,
+# not the YAML 'name' header. Keep the exact protected ops title.
 jq -e '
-  .name == "Production PostgreSQL Privacy Recovery Ledger"
+  .name == "[WT:ops] Production PostgreSQL Privacy Recovery Ledger"
   and .path == ".github/workflows/production-postgres-privacy-recovery-ledger.yml"
   and .conclusion == "success"
   and .head_branch == "main"
@@ -62,8 +64,10 @@ request_json \
   "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/runs/$PRODUCTION_PRIVACY_CANARY_RUN_ID" \
   "$canary_run_json"
 
+# Enforce the distinct successful ops attestation execution; never
+# substitute the original failed parent or a similarly named workflow.
 jq -e '
-  .name == "Production Privacy Recovery Canary"
+  .name == "[WT:ops] Production Privacy Recovery Canary"
   and .path == ".github/workflows/production-privacy-recovery-canary.yml"
   and .conclusion == "success"
   and .head_branch == "main"
