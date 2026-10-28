@@ -31,7 +31,7 @@ export function createPostgresSajuOfficialIssuedDbTransactionPortV1(input: Reado
   currentAuthorityFactory: (client: PostgresTransactionQueryV1) => SajuOfficialCurrentAuthorityPortV1;
 }>): SajuOfficialIssuedDbTransactionPortV1 {
   return Object.freeze({
-    async run(request) {
+    async run(request: Parameters<SajuOfficialIssuedDbTransactionPortV1['run']>[0]) {
       return executePostgresSubjectTransactionV1({
         pool: input.pool,
         verifiedEvidence: input.verifiedEvidence,
