@@ -52,7 +52,16 @@ export function requireOwnerSandboxServerPaidV1(envelope,attemptId){
  const x=envelope?.data;
  if(envelope?.ok!==true||!x||x.paymentAttemptId!==attemptId||
     x.environment!=='sandbox'||x.providerVerifiedPaid!==true||
-    x.receiptPersisted!==false||x.productionCreditsIssued!==false)
+    typeof x.receiptPersisted!=='boolean'||x.productionCreditsIssued!==false)
     throw Error('PortOne server has not confirmed this sandbox payment');
+ if(x.receiptPersisted===true){
+    if(typeof x.receiptId!=='string'||!UUID.test(x.receiptId)||
+       typeof x.providerEventId!=='string'||!UUID.test(x.providerEventId)||
+       typeof x.replayed!=='boolean')
+       throw Error('Invalid persisted sandbox receipt authority');
+    return Object.freeze({verified:true,receiptPersisted:true,
+      receiptId:x.receiptId,replayed:x.replayed,productionCreditsIssued:false});
+ }
+ if(Object.hasOwn(x,'receiptId'))throw Error('Unexpected unpersisted receipt identity');
  return Object.freeze({verified:true,receiptPersisted:false,productionCreditsIssued:false});
 }
