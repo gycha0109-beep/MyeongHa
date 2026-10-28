@@ -13,14 +13,14 @@
 
 ## 현재 상태
 
-- 실제 관리자 Worker 미배포, 관리자 전용 Access 애플리케이션 없음.
-- 관리자 전용 Reader / Audit Writer / Command Executor DB 역할과 Hyperdrive 없음.
+- 실제 관리자 Worker 미배포. 2026-10-28 전용 Access 앱 `MyeongHa Admin Owner Only`(`3a376a53-ad4d-4a07-9fa0-cd55cb0cb62f`)을 `myeongha-admin.gycha0109.workers.dev`에 생성했으며 정확한 Owner 이메일 1개만 허용하는 정책을 API 재조회로 확인. Access AUD `5e7b528fd17cc2de740742971e542e258fc1875331a591d382a29cebac0316ab`. 로그인·JWT 실동작 검증 및 Worker 배포는 아직 수행하지 않음.
+- 관리자 전용 Reader / Audit Writer / Command Executor DB 역할과 Hyperdrive 없음. Supabase 도구 연결은 `link_id must identify an eligible linked account`를 반환해 설치 전 계정 연결 복구가 필요함.
 - `workers_dev: true`, `preview_urls: false`는 코드상의 라우팅 준비이며 실제 배포를 의미하지 않습니다.
 - `MYEONGHA_ADMIN_PRIVATE_ENABLED=false`, `MYEONGHA_ADMIN_CREDIT_COMMANDS_ENABLED=false`, `MYEONGHA_ADMIN_RETENTION_ENABLED=false`가 기본값입니다.
 
 ## 추후 운영 연결 순서 (부작용 있는 작업은 실행 승인 필요)
 
-1. `myeongha-admin`만 대상으로 Cloudflare Access 애플리케이션을 설치하고 **정확한 Owner 이메일 한 명만** 허용합니다. 계정 전체 Worker 또는 기존 공개 `myeongha`를 일괄 보호하지 않습니다.
+1. **설정 생성·정책 재조회 완료:** `myeongha-admin`만 대상으로 Cloudflare Access 애플리케이션을 설치하고 **정확한 Owner 이메일 한 명만** 허용했습니다. 로그인·JWT 실동작은 별도 확인이 필요합니다. 기존 공개 `myeongha`를 일괄 보호하지 않았습니다.
 2. 별도 Supabase 최소 권한 Reader, Audit Writer, Command Executor를 설치합니다. 기존 고객 서비스 DB 자격 증명, Hyperdrive, 권한은 재사용하지 않습니다. 오프라인 SQL 후보는 자동 운영 마이그레이션이 아닙니다.
 3. 관리자 전용 Hyperdrive와 Access AUD, 기존 Member 인증 Owner UUID, 별도 서버 비밀키를 공급합니다. 비밀키를 커밋, 화면, 보고서에 노출하지 않습니다.
 4. `npm run verify:hosted -w @myeongha/admin` 및 `npm run verify:origins -w @myeongha/admin`으로 환경 이름 누락·역할 격리를 확인합니다.
