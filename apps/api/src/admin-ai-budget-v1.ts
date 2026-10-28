@@ -26,8 +26,25 @@ function convert(value:bigint,window:AdminAiBudgetWindowV1,fx:AdminAiFxEvidenceV
  return (value*BigInt(fx.rateNumerator)/BigInt(fx.rateDenominator)).toString();
 }
 export function evaluateAdminAiBudgetV1(input:{readonly window:AdminAiBudgetWindowV1;readonly buckets:readonly AdminAiBudgetBucketV1[];readonly workloadCoverage:readonly ('reading'|'character_chat')[];readonly truncated?:boolean;readonly billing?:AdminAiBudgetBillingV1;readonly fx?:AdminAiFxEvidenceV1;}) {
+ const validWorkloads=new Set(['reading','character_chat']);
+ const coverage=new Set(input.workloadCoverage);
+ if(coverage.size!==input.workloadCoverage.length||input.workloadCoverage.some(workload=>!validWorkloads.has(workload)))
+  throw Error('Invalid budget workload coverage');
  let estimate=0n,unknownCalls=0,calls=0;
- for(const row of input.buckets){if(!['reading','character_chat'].includes(row.workload)||!Number.isSafeInteger(row.calls)||row.calls<0||!Number.isSafeInteger(row.unknownCostCalls)||row.unknownCostCalls<0||row.unknownCostCalls>row.calls)throw Error('Invalid budget usage coverage');estimate+=amount(row.estimateMicroUsd);unknownCalls+=row.unknownCostCalls;calls+=row.calls;}
+ const bucketKeys=new Set<string>();
+ for(const row of input.buckets){
+  if(!validWorkloads.has(row.workload)||!coverage.has(row.workload)||
+    !Number.isSafeInteger(row.calls)||row.calls<0||
+    !Number.isSafeInteger(row.unknownCostCalls)||row.unknownCostCalls<0||row.unknownCostCalls>row.calls||
+    ![row.feature,row.provider,row.model].every(value=>typeof value==='string'&&/^[A-Za-z0-9_.:/-]{1,256}$/u.test(value)))
+   throw Error('Invalid budget usage coverage');
+  const key=JSON.stringify([row.workload,row.feature,row.provider,row.model]);
+  if(bucketKeys.has(key))throw Error('Duplicate budget usage bucket');
+  bucketKeys.add(key);
+  const subtotal=amount(row.estimateMicroUsd);
+  if(row.calls===0&&subtotal!==0n)throw Error('Unbound budget estimate');
+  estimate+=subtotal;unknownCalls+=row.unknownCostCalls;calls+=row.calls;
+ }
  const missingWorkloads=(['reading','character_chat']as const).filter(w=>!input.workloadCoverage.includes(w));
  const estimateComplete=unknownCalls===0&&missingWorkloads.length===0&&!input.truncated;
  let confirmed:bigint|null=null;
