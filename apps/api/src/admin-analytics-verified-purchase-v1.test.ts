@@ -1,3 +1,4 @@
+import {readFileSync} from 'node:fs';
 import {describe,expect,it} from 'vitest';
 import {ADMIN_ANALYTICS_FINANCIAL_SQL_V1,createAdminAnalyticsPostgresEventStoreV1} from './admin-analytics-pipeline-postgres-v1.js';
 import {createAdminAnalyticsVerifiedPurchaseAdapterV1,ADMIN_ANALYTICS_VERIFIED_PURCHASE_SQL_V1} from './admin-analytics-verified-purchase-v1.js';
@@ -48,6 +49,8 @@ describe('consented verified Reading purchase bridge',()=>{
     expect(ADMIN_ANALYTICS_VERIFIED_PURCHASE_SQL_V1).toContain("r.verification_status='verified'");
     expect(ADMIN_ANALYTICS_VERIFIED_PURCHASE_SQL_V1).toContain("r.environment='production'");
     expect(ADMIN_ANALYTICS_FINANCIAL_SQL_V1).toContain("r.environment='production'");
+    const grants=readFileSync(new URL('../../admin/database/operator-roles-offline-v1.sql',import.meta.url),'utf8');
+    expect(grants).toMatch(/grant select \([^;]*\benvironment\b[^;]*\)\s+on public\.commerce_receipts to myeongha_admin_reader;/u);
     expect(ADMIN_ANALYTICS_VERIFIED_PURCHASE_SQL_V1).not.toMatch(/verified_payload_jsonb|external_transaction_id|offer_snapshot_jsonb/iu);
   });
   it('refuses checkout intent, unverified source, different owner, or missing active consent',async()=>{

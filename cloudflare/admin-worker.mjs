@@ -25,7 +25,9 @@ export default {
       jobs.push((async()=>{const pool=new Pool({connectionString:env.ADMIN_ANALYTICS_RETENTION_HYPERDRIVE.connectionString,max:1,connectionTimeoutMillis:3000,statement_timeout:5000});
         try{const store=createAdminAnalyticsPostgresEventStoreV1(pool);for(let batch=0;batch<10;batch++){
           const deleted=await store.purgeExpired(new Date().toISOString());
-          if(deleted<2000)return; // Up to 1000 events and 1000 consents per transaction.
+          // A partial batch does not mean the OTHER table is drained. A run
+          // continues until both expired cohorts are empty or its bounded cap.
+          if(deleted===0)return; // Up to 1000 events and 1000 consents per transaction.
         }throw Error('Analytics retention backlog requires another bounded run');}finally{await pool.end();}})());
     }
     ctx.waitUntil(Promise.all(jobs));
