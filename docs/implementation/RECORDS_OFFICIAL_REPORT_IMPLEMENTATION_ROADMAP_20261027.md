@@ -6,6 +6,29 @@
 > **출시 범위:** `saju.general_natal.deep.v1` (정밀 원국 리포트) **한 종류**를 기준으로 한다. 출생 정보 변경 시에는 같은 활성 구매권으로 신규 revision의 재생성을 허용하되 과거 결과는 보존한다. Career/Wealth/Relationship/Annual 등은 확장 후보일 뿐 최초 출시 상품에 포함하지 않는다.  
 > **원칙:** 기존 기능 중복 구현 금지 · 현재 저장소의 실제 경로 재사용 · 독립 작업부터 구현 · 기능별 1~2개 필수 테스트 · 최종 통합 검증 · HOLD 우회 금지.
 
+## 2026-10-28 실행 기준 정정 — 현재 결제 정본 우선
+
+> 이 구간은 2026-10-27 당시 구현 계획의 역사적 범위를 삭제하지 않고 **현재 정본과의 변경점**을 명시한다.
+
+- **중간 병합 없음:** 로드맵 문서와 1·2단계 작업을 `feat/frontend-integration/official-report-detail-stage2-20261027` 하나의 브랜치 / PR #2670으로 통합한다. #2666·#2667은 **병합 없이 종료**. 이후 구현은 같은 브랜치에 누적하며, 관련 최종 CI·출시 승인 게이트가 완료되기 전 병합하지 않는다.
+- **유료 상품 기준 업데이트:** 이 문서에 역사적 출시 후보로 기재된 `saju.general_natal.deep.v1`은 최신 `docs/P0_DECISION_REGISTER.md` P0-CM-03에서 **forward-retired historical candidate**로 명시한다. 기존 초기 출시 SKU 가정으로 상품/가격/Offer/Entitlement 활성화를 구현하지 않는다. 현재 제품 방향은 **전체 사주 페이지 출시 준비 + 상품별 독립 승인**, 현재 비활성 정본 `standard.love_relationship`(표시 정가 8,900원, 실행 가능한 Charge Terms 아님)이다. 개별 상품 실행/판매는 여전히 `OPEN-P0 / HOLD`이고 원문 생성·보호 저장·판매권/환불 활성화에 대한 별도 권한이 없다.
+- **실행 가능 범위:** 1단계 보관함 화면 및 상태·부분 실패 처리, 2단계 Owner-authorized 저장된 Reading 보고서 재조회, 5단계 Reader **과거 참여 이력 표시/권한 혼동 방지**, 6단계 실제 저장 응답만으로 구성한 요약·계산 근거·목차·다국어/모바일을 동일 브랜치에 계속 구현한다.
+- **외부 Production 의존:** 3단계 공식 생성·불변 저장, 4단계 결제/생성권·환불 및 5단계 정확한 Reader Grant에 따른 해설 공개는 Saju Production issuer, Native→DB Reading ID 매핑, DB/Privacy 원자 저장, 개별 상품 P0-CM-03, Commerce Entitlement fulfillment/runtime 게이트가 **실제로 충족되어야** 완료 처리한다. 현재 근거만으로 임의 Production issuer/Grant/가격/결제 경로를 새로 생성하거나 미완료를 완료로 표시하지 않는다.
+
+### 단일 통합 브랜치 진행 상태
+
+| 로드맵 영역 | 코드 현황 · 공개 조건 |
+|---|---|
+| 1단계 기록 중심 화면 | 작업 브랜치 구현, 기록 독립 조회 실패 시 오류와 빈 기록 구분, auth denial fail-closed |
+| 2단계 상세 보고서 | 작업 브랜치 구현, owner-verified 단건, 저장된 승인 섹션·근거·발행 버전, 과거 Birth revision 없는 경우 판정 유보 |
+| 3단계 유료 Production 생성·저장 | **상위 소스/DB 승인 대기**; Runtime 판매·실제 발행 미구현 |
+| 4단계 구매권·환불 | **최신 상품별 P0-CM-03, Commerce fulfillment 및 Privacy 대기**; 판매 비활성 |
+| 5단계 Reader | 과거 Reader provenance 표시, 현 접근권과 분리, 유료 해설 재조회는 정확한 Grant 게이트 대기 |
+| 6단계 보고서 사용성 | 목차/실제 첫 승인 해석/명식 근거/반응형/5언어 구현 중 |
+| 최종 병합 | **전 단계의 실제 구현·출시 게이트 확인 후 단 한 번만 수행** |
+
+---
+
 ## 1. 출시 기준 및 우선순위
 
 | 섹터 | 출시 취급 | 기능 | 난이도(상대적) | 작업 시작 조건 |
