@@ -1,4 +1,4 @@
-import { initializeMyeonghaAnalyticsV1 } from './admin-analytics-collector.js';
+import { initializeMyeonghaAnalyticsV1, mountMyeonghaAnalyticsConsentV1 } from './admin-analytics-collector.js';
 
 export const OFFICIAL_READING_RENDERED_EVENT_V1 = 'myeongha:official-reading-rendered';
 
@@ -17,6 +17,21 @@ export function bindApprovedReadingResultViewV1({ collector, documentImpl } = {}
   };
   documentImpl.addEventListener(OFFICIAL_READING_RENDERED_EVENT_V1, recordView);
   return () => documentImpl.removeEventListener(OFFICIAL_READING_RENDERED_EVENT_V1, recordView);
+}
+
+/** Explicit host-only activation seam. Supplying no approved policy leaves the
+ * page inert. On an approved page, a user can grant or revoke consent, and an
+ * existing server-verified consent can optionally be restored for this tab.
+ * Neither installation nor restoration emits a Reading result view by itself. */
+export function installApprovedReadingAnalyticsV1(options={}) {
+  const collector=mountMyeonghaAnalyticsConsentV1(options);
+  if(!collector)return null;
+  const doc=options.documentImpl??document;
+  const unbind=bindApprovedReadingResultViewV1({collector,documentImpl:doc});
+  if(options.restoreOnMount===true && collector.status!=='disabled') {
+    void Promise.resolve(collector.restoreConsent()).catch(()=>undefined);
+  }
+  return Object.freeze({collector,dispose:unbind??(()=>undefined)});
 }
 
 // The public Reading page is deliberately not opted in. Importing this module
