@@ -66,3 +66,8 @@ html[data-theme="dark"] .credit-dialog-offer p { color: #cbb8c2; }
   .credit-dialog-actions { flex-direction: column; }
   .credit-dialog-actions button { width: 100%; }
 }
+
+/* Owner only: links to an isolated KCP TEST page, never opens public sales. */
+.credit-dialog-owner-sandbox{display:flex;flex-direction:column;gap:5px;margin:14px 0;padding:12px;border-radius:12px;background:#f4ecdf}
+.credit-dialog-owner-sandbox a{color:#684521;font-size:13px;font-weight:700;text-underline-offset:3px}
+.credit-dialog-owner-sandbox span{color:#67594f;font-size:11px}
