@@ -109,8 +109,21 @@ async function writerTransaction<T>(pool:PostgresSubjectPoolV1,fn:(client:Postgr
 export function createAdminAnalyticsPostgresEventStoreV1(pool:PostgresSubjectPoolV1):AdminAnalyticsEventStoreV1 & {
   bindConsent(consent:Omit<AdminAnalyticsConsentV1,'sessionRef'>,policyVersion:string,subjectLinkRef:string|null):Promise<void>;
   isConsentActive(consent:Omit<AdminAnalyticsConsentV1,'sessionRef'>,policyVersion:string):Promise<boolean>;
+  isSubjectConsentActive(input:{visitorRef:string;consentVersion:string;policyVersion:string;subjectLinkRef:string;occurredAt:string}):Promise<boolean>;
 } {
   return {
+    isSubjectConsentActive(input) {
+      return writerTransaction(pool,async client=>{
+        if(!/^av_[0-9a-f]{64}$/u.test(input.visitorRef)||!/^ah_[0-9a-f]{64}$/u.test(input.subjectLinkRef)||
+          !Number.isFinite(Date.parse(input.occurredAt)))throw Error('Invalid subject-linked consent verification.');
+        const result=await client.query<{active:boolean}>(`SELECT true AS active FROM myeongha_admin_analytics.consents_v1
+          WHERE visitor_ref=$1 AND version=$2 AND policy_version=$3 AND subject_link_ref=$4
+            AND granted_at<=$5::timestamptz AND withdrawn_at IS NULL
+            AND expires_at>CURRENT_TIMESTAMP AND expires_at>$5::timestamptz`,
+          [input.visitorRef,input.consentVersion,input.policyVersion,input.subjectLinkRef,input.occurredAt]);
+        return result.rows.length===1&&result.rows[0]?.active===true;
+      });
+    },
     isConsentActive(consent,policyVersion) {
       return writerTransaction(pool,async client=>{
         const result=await client.query<{active:boolean}>(`SELECT true AS active FROM myeongha_admin_analytics.consents_v1
