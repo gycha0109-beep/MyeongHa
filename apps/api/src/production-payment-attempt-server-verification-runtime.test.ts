@@ -171,10 +171,15 @@ describe('production Payment Attempt server verification runtime', () => {
       now: () => new Date('2026-09-18T00:00:01.000Z'),
     };
 
+    const analyticsReceipts:string[]=[];
     const runtime = createProductionPaymentAttemptServerVerificationRuntimeV1({
       env: ENV,
       pool: fakePool({ queriedSql }),
       verificationConfig,
+      onVerifiedReceiptCommitted:async({receiptId})=>{
+        expect(queriedSql.filter(sql=>sql==='COMMIT')).toHaveLength(2);
+        analyticsReceipts.push(receiptId);
+      },
     });
 
     // Adapter configuration is snapshotted at runtime construction.
@@ -208,6 +213,7 @@ describe('production Payment Attempt server verification runtime', () => {
     expect(JSON.stringify(payload)).not.toContain(PROVIDER_REQUEST_ID);
     expect(JSON.stringify(payload)).not.toContain(PROVIDER_TRANSACTION_ID);
     expect(JSON.stringify(payload)).not.toContain(API_SECRET);
+    expect(analyticsReceipts).toEqual([RECEIPT_ID]);
 
     await runtime.close();
   });

@@ -30,6 +30,12 @@ export interface HandlePaymentAttemptServerVerificationRequestInputV1 {
   readonly identityEvidenceVerifier: IdentityEvidenceVerificationPortV1;
   readonly pool: PostgresSubjectPoolV1;
   readonly verificationAdapter: CommercePaymentVerificationAdapterV1;
+  /** Server-only optional observer, called after the receipt transaction commits.
+   * It must independently validate Member consent and the verified receipt.
+   * Never attach browser or payment-provider data directly to analytics. */
+  readonly onVerifiedReceiptCommitted?: (input: {
+    readonly request: Request; readonly receiptId: string;
+  }) => Promise<void>;
 }
 
 type PaymentAttemptServerVerificationResponseV1 = Readonly<
@@ -256,6 +262,14 @@ export async function handlePaymentAttemptServerVerificationRequestV1(
       paymentAttemptId: requestBody.paymentAttemptId,
       verificationAdapter: input.verificationAdapter,
     });
+    // A committed payment must not become an error if optional telemetry is
+    // unconfigured, consent is unavailable, or collection is offline. Even a
+    // replay may safely retry the independently idempotent analytics adapter.
+    if (input.onVerifiedReceiptCommitted !== undefined) {
+      try { await input.onVerifiedReceiptCommitted({
+        request: input.request, receiptId: result.receiptId,
+      }); } catch { /* Never roll back or misreport a persisted payment. */ }
+    }
     return successResponse(result, requestId, serverTime);
   } catch (error) {
     if (error instanceof ApiCommandError) {

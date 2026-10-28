@@ -43,6 +43,11 @@ export interface CreateProductionPaymentAttemptServerVerificationRuntimeInputV1 
   readonly verificationConfig: PortOneV2PaymentVerificationAdapterConfigV1;
   readonly pool?: PostgresSubjectPoolV1;
   readonly memberFetchImpl?: SupabaseMemberVerifierFetchV1;
+  /** Only an explicitly configured, consent-verified analytics adapter.
+   * This does not activate the presently unmounted payment route. */
+  readonly onVerifiedReceiptCommitted?: (input: {
+    readonly request: Request; readonly receiptId: string;
+  }) => Promise<void>;
 }
 
 /**
@@ -85,6 +90,8 @@ export function createProductionPaymentAttemptServerVerificationRuntimeV1(
         identityEvidenceVerifier,
         pool: poolLease.pool,
         verificationAdapter,
+        ...(input.onVerifiedReceiptCommitted === undefined ? {} :
+          { onVerifiedReceiptCommitted: input.onVerifiedReceiptCommitted }),
       });
     },
     close() {
