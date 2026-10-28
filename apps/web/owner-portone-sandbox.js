@@ -8,6 +8,7 @@ import {
 } from './owner-portone-sandbox-contract.js';
 
 const STATUS=document.getElementById('owner-test-status');
+const DIAGNOSTIC=document.getElementById('owner-test-diagnostic');
 const PAY=document.getElementById('owner-test-pay');
 const VERIFY=document.getElementById('owner-test-verify');
 const ATTEMPT=document.getElementById('owner-test-attempt');
@@ -21,7 +22,29 @@ let busy=false;
 let attemptId=null;
 let retryToken=null;
 let scriptPromise=null;
-
+let phase='idle';
+const PHASES=Object.freeze({
+ prepare:'구매 의도 생성',checkout:'서버 결제정보 발급',
+ sdk_load:'포트원 SDK 로딩',sdk_request:'KCP 결제창 호출',
+ verify:'결제 완료 서버 검증',
+});
+function safeSdkCode(value){
+ return typeof value==='string'&&/^[A-Za-z][A-Za-z0-9_-]{0,63}$/u.test(value)
+  ?value:'UNKNOWN';
+}
+function safeSdkMessage(value){
+ if(typeof value!=='string')return '';
+ const short=value.replace(/\s+/gu,' ').trim().slice(0,140);
+ // SDK/PG errors are untrusted. Never surface credentials, tokens or URLs.
+ if(!short||/https?:\/\/|bearer\s|secret|token|sk[-_]|[0-9]{12,}/iu.test(short))return '';
+ return short;
+}
+function showDiagnostic(stage,error){
+ const code=safeSdkCode(error?.code);
+ const detail=safeSdkMessage(error?.message);
+ DIAGNOSTIC.textContent='결제창 진단 · '+(PHASES[stage]||'알 수 없는 단계')+
+   ' · '+code+(detail?' · '+detail:'');
+}
 function status(message){STATUS.textContent=message;}
 function setBusy(value){
  busy=value;
@@ -96,11 +119,13 @@ function loadPortOneSdk(){
  return scriptPromise;
 }
 async function verifyWithServer(id){
- status('포트원 서버에서 결제 상태 확인 중…');
+ phase='verify';
+  status('포트원 서버에서 결제 상태 확인 중…');
  const result=await serverRequest('/api/me/credits/portone/test-verify',{
   paymentAttemptId:id,
  });
  const paid=requireOwnerSandboxServerPaidV1(result,id);
+ DIAGNOSTIC.textContent='결제창 진단 · 포트원 서버 PAID 확인';
  PROVIDER.textContent='포트원 서버 PAID 확인';
  if(paid.receiptPersisted){
    RECEIPT.textContent='샌드박스 Receipt 저장됨 · '+paid.receiptId+
@@ -118,32 +143,42 @@ async function beginTest(){
  if(!allowed||busy)return;
  setBusy(true);
  try{
+  phase='prepare';
+  DIAGNOSTIC.textContent='결제창 진단 · 구매 의도 생성 중';
   status('관리자 전용 구매 의도 생성 중…');
   const prep=await serverRequest('/api/me/credits/portone/test-prepare',{
    idempotencyToken:obtainRetryToken(),
   });
   const prepared=requireOwnerSandboxPreparedV1(prep);
   displayAttempt(prepared.paymentAttemptId);
+  phase='checkout';
   status('서버 발급 결제정보를 확인 중…');
   const handoff=await serverRequest('/api/me/credits/portone/test-checkout',{
    paymentAttemptId:prepared.paymentAttemptId,
   });
   const checkout=requireOwnerSandboxCheckoutV1(handoff,prepared.paymentAttemptId);
+  phase='sdk_load';
   const sdk=await loadPortOneSdk();
   status('KCP 테스트 결제창을 진행해 주세요…');
   // The payment callback is an untrusted hint. Never inspect its paymentId
   // or treat it as a Receipt. Verification uses our original DB-owned UUID.
+  phase='sdk_request';
   const hint=await sdk.requestPayment(checkout);
   if(hint&&typeof hint==='object'&&typeof hint.code==='string'){
-   PROVIDER.textContent='브라우저 결제창 취소 또는 실패';
-   status('결제창이 완료되지 않았습니다. 새 테스트 결제 요청으로 재시도할 수 있습니다.');
+   PROVIDER.textContent='결제창 SDK 오류 · 서버 결제 미확인';
+   showDiagnostic('sdk_request',hint);
+   status('KCP 결제창이 완료되지 않았습니다. 오류 코드를 확인하고 새 요청 전에 서버 상태를 확인해 주세요.');
    releaseRetryToken();
    return;
   }
   await verifyWithServer(prepared.paymentAttemptId);
- }catch{
-  status('테스트 결제 또는 서버 검증을 완료하지 못했습니다. 새 결제를 요청하기 전에 기존 결제 상태를 확인해 주세요.');
-  if(attemptId)PROVIDER.textContent='서버 확인 필요';
+ }catch(error){
+  // After checkout was handed off, the old idempotency token cannot start a new attempt.
+  // Keep the prior Attempt ID for read-only verification, but rotate retry identity.
+  if(phase==='sdk_load'||phase==='sdk_request'||phase==='verify')releaseRetryToken();
+  showDiagnostic(phase,error);
+  status('테스트 결제 진행 중 '+(PHASES[phase]||'알 수 없는 단계')+'에서 실패했습니다. 진단 코드를 확인해 주세요.');
+  if(attemptId)PROVIDER.textContent='서버 결제상태 확인 필요';
  }finally{setBusy(false);}
 }
 async function checkExisting(){
@@ -152,7 +187,7 @@ async function checkExisting(){
  try{await verifyWithServer(attemptId);}
  catch{
   PROVIDER.textContent='서버 PAID 확인 실패 또는 결제 미완료';
-  status('포트원 서버에서 PAID 상태를 확인하지 못했습니다. 운영 크레딧은 지급되지 않습니다.');
+  status('이 결제 시도의 PAID를 확인하지 못했습니다. 결제창 진단 내용은 위에 남아 있습니다.');
  }finally{setBusy(false);}
 }
 async function initialize(){
@@ -162,7 +197,11 @@ async function initialize(){
   requireOwnerSandboxWalletV1(data);
   allowed=true;
   const stored=sessionStorage.getItem(ATTEMPT_KEY);
-  if(typeof stored==='string'&&UUID.test(stored))displayAttempt(stored);
+  if(typeof stored==='string'&&UUID.test(stored)){
+   displayAttempt(stored);
+   // A remembered Attempt must be verified as-is; never replay its prepare token.
+   releaseRetryToken();
+  }
   status('관리자 권한 확인 완료. KCP 테스트 결제창을 열 수 있습니다.');
  }catch{
   allowed=false;

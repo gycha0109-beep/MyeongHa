@@ -95,5 +95,14 @@ describe('Owner KCP TEST console: no browser monetary authority',()=>{
    expect(client).toContain('crypto.getRandomValues(b)');
    expect(client).toContain("sdk.requestPayment(checkout)");
    expect(client).not.toContain('window.location.search');
+   expect(page).toContain('owner-test-diagnostic');
+   expect(client).toContain("phase='sdk_request'");
+   expect(client).toContain("showDiagnostic('sdk_request',hint)");
+   expect(client).toContain("DIAGNOSTIC.textContent");
+   expect(client).toContain("서버 결제상태 확인 필요");
+   expect(client).toContain('safeSdkMessage');
+   expect(client).toContain("if(phase==='sdk_load'||phase==='sdk_request'||phase==='verify')releaseRetryToken()");
+   expect(client).toContain('A remembered Attempt must be verified as-is');
+   expect(client).not.toContain('JSON.stringify(hint)');
  });
 });
