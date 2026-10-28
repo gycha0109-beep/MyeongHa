@@ -72,9 +72,11 @@ node scripts/validate-postgres-privacy-ledger-snapshot-overlap.mjs \
 jq -e '
   .sourceContinuityProven == false
   and .continuousCaptureProven == false
-  and (.captureIntervalSeconds | type == "number" and . >= 1)
+  and (.captureIntervalSeconds | type) == "number"
+  and .captureIntervalSeconds >= 1
   and .nominalScheduledIntervalSeconds == 3600
-  and (.captureIntervalBeyondNominalSeconds | type == "number" and . >= 0)
+  and (.captureIntervalBeyondNominalSeconds | type) == "number"
+  and .captureIntervalBeyondNominalSeconds >= 0
   and .futureSafePrivacyReconciliation == false
   and .drReady == false
   and .outputContainsIdentifiers == false
