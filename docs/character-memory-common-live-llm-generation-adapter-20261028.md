@@ -39,3 +39,26 @@
 - 유료 1회 실행 시도: [GitHub Actions #40633034128](https://github.com/gycha0109-beep/MyeongHa/actions/runs/40633034128) `failure`. GitHub job의 `steps=[]`, 시작 직후 실패. **모델 호출 전에 중단되어 0회/비용 $0**. 인증·Environment 보호 규칙의 구체적 차단 메시지는 현재 API에서 확인할 수 없어 원인을 단정하지 않는다. 보호 조건을 회피하는 다른 Secrets 진입점으로 재호출하지 않는다.
 - 별도 **비용 0원** 코드 검증: [GitHub Actions #40633178279](https://github.com/gycha0109-beep/MyeongHa/actions/runs/40633178279) `success`; TypeScript, 두 C1 모델/멀티턴 테스트, 실행 스크립트 `node --check`, C1 정확한 3인 Authoring 번들, 5턴 Dry-run 모두 통과.
 - 미완료: **실제 모델의 15개 응답과 독립 검토 15개는 아직 0개**. 캐릭터성·자율성 성공을 선언할 근거 없음. Main-only secret-bearing Actions trust boundary 등 승인된 실행 위치에서 정확한 동일 스크립트를 수행할 수 있는지 먼저 확인해야 한다. 운영 배포·Production DB/ACL/Memory/Relationship 변경 없음.
+
+
+## 2026-10-28 — 유료 실행 실패 원인 조사 및 보정 (추가)
+
+**결론:** 실행 40633034128은 잡이 생성되었으나 `steps=[]`, `runner_name=""` 상태로 약 3초 만에 실패했다. CI `tsc`, Node 테스트 또는 모델 API 호출 실패로 귀속할 수 없다. 동일 저장소 `production` 환경을 사용하는 기존 유료 워크플로들은 `main` 전용으로 설계되어 있다. GitHub 환경의 배포 브랜치 제한은 작업 시작 전에 실패시키므로 **브랜치 보호 규칙 충돌이 유력**하나, GitHub Actions 구체 annotation/log 원문은 현 API 접근 제약으로 읽지 못했으므로 **원인 확정은 보류**한다.
+
+**실행 방식 보정:**
+- `.github/workflows/character-c1-three-five-paid-20261028.yml`를 기능 브랜치 `push` 기반 유료 실행에서 **보호된 `main`의 `workflow_dispatch` 전용**으로 변경했다. 수동 예산 확인 `confirm_budget_usd_0_30=true`, 정확한 첫 main dispatch 이력 검사, `run_attempt=1`, `production` 환경 유지를 요구한다. 별도 환경으로 비밀키를 복제하거나 환경 제한을 완화하지 않았다.
+- 현재 해당 워크플로는 **Draft PR #2575의 연구 브랜치**에 있으며 `main`에 적용되지 않았다. 앞선 연구 브랜치 유료 실행을 재시도하지 않는다. 실제 모델 호출 및 과금: **0회 / $0** (확인된 실행 경로 기준).
+- 기존 무료 검증 후 [Actions #40646228832](https://github.com/gycha0109-beep/MyeongHa/actions/runs/40646228832)에서 보정 코드의 **TypeScript 타입검사, 공통 C1 모델·다회차 테스트, 신규 3인 C1 동작 검증, Rolldown 번들, 합성 5턴 Dry-run을 모두 통과**했다. 외부 모델과 실제 Production Runtime은 호출하지 않았다.
+
+**인격 검증 입력 보정:**
+- `scripts/character-c1-three-five-public-profile-adapter-v1.ts`에서 `CHARACTER_RUNTIME_AUTHORING_V1`의 `speech/persona/behavior`와 `CHARACTER_IMMUTABLE_AUTHORING_V1`의 **공개 성격·가치·결함·수락/거부 원칙**을 같은 캐릭터 ID로 대조해 조합한다. 기존 타입 정의와 최신 승인 직업의 충돌 위험을 피하기 위해 구식 `worldRole/origin/occupation`은 주입하지 않는다.
+- 1턴은 허위 대화 기록을 만들어 Continuity Gate를 통과시키지 않는다. **2~5턴은 기존 공통 `composeCharacterDialogueContinuityPlanShadowV1`을 실제로 호출**하며 각 캐릭터가 앞서 생성하고 독립 검토를 통과한 대사만 반영한다. 검토 FAIL 시 곧바로 중단한다.
+- OpenRouter 호출기의 부적절한 `usage:{include:true}` 추가 옵션은 제거하고 제공된 응답 `usage`만 관측한다. 모델 카탈로그 가격 확인, 최대 30 시도 및 **$0.30 상한**은 유지한다.
+
+**중요한 소스 정합성 문제 — C09 품질 성공 판정 보류:**
+- `packages/character-content/src/runtime-authority-lane-v1.ts`의 출처 승인 Runtime lane에는 현재 **세연·라현만 등록**되어 있다. 여울·태겸의 **타입 작성 정의가 존재한다는 사실만으로 실제 게시 Runtime 및 권한이 증명되지 않는다.**
+- `docs/character/YEOUL_CHARACTER_RUNTIME_DRAFT_V0_1.md`는 여울의 주의를 '감정이 행동으로 먼저 새고 들키면 방어'로 정의하지만, 현재 `runtime-authoring-v1.ts`에서는 여울이 '부드러운 감각적 정서 관찰자'로 작성돼 있다. **동일한 설계를 완전히 표현한다고 볼 수 없다.** 상세 초안은 `DRAFT / NOT YET PRODUCTION AUTHORITY`로 표시되어 있어 자동 승격하지 않는다.
+- 태겸의 [가족 설정 승인 문서](docs/character/TAEGYEOM_FAMILY_BIBLE_APPROVED_V0_2.md)는 2026-10-19 이후 최신 직업을 `프로 격구 선수`로 명시한다. 구형 불변 Authoring의 검증자 역할/훈련 지역 표현을 직업 Canon으로 되살리지 않는다.
+- 따라서 이 연구가 훗날 실제 유료 모델로 성공하더라도 **'3명 Production Character Runtime 동작 증명'이 아니라 '공통 C1 타입 공개 프로젝션을 사용한 대화 인격 연구'**다. 풀 Bible/Runtime의 승인 출처와 typed projection의 정합성은 캐릭터별로 별도 해결해야 한다.
+
+**현재 다음 진입:** 별도 운영 배포·기존 Draft PR 전체 병합·Production DB/권한 변경 없이, 리뷰된 독립 연구 코드가 보호된 `main` 실행 경로로 안전하게 들어갈 수 있을 때 유료 1회 실행한다. 지금은 이 실행 경로가 없으므로 추가 비용 발생 시도는 중지한다. 유료 비용 재승인은 필요 없으며, 실행 환경의 접근 정책을 임의 변경하지 않는다.
