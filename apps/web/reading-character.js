@@ -548,6 +548,7 @@ function renderStoredReportEvidence(summary) {
       const title = document.createElement('small');
       title.textContent = translateStaticUi(label, getUiLocale());
       const value = document.createElement('strong');
+      value.dataset.officialReading = '';
       value.textContent = displayFactValue(pillars[key]);
       wrapper.append(title, value);
       output.append(wrapper);
@@ -749,6 +750,7 @@ function activatePreviewReading(preview) {
     renderStep();
     if (completed) completeReadingExperience();
     if (isStoredRecord && preview.record) {
+      renderStoredReportEvidence(preview.calculationSummary);
       const date = document.querySelector('[data-official-report-date]');
       if (date) date.textContent = new Intl.DateTimeFormat(getUiLocale(), {
         year: 'numeric', month: 'long', day: 'numeric',
