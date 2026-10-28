@@ -1,6 +1,13 @@
 // Authored Records report-hub UI labels only. Do not translate stored Saju source,
 // Reader interpretation, Birth data, or any user-created records here.
 export const RECORDS_HUB_STATIC_UI_COPY_V1 = new Map([
+  // Shared official-report composition example label on the Saju hub.
+  ['공식 보고서 구성 예시. 개인별 해석이 아닙니다.', {
+    'ja-JP': '公式レポートの構成例です。個別の鑑定結果ではありません。',
+    'zh-TW': '正式報告的內容結構範例，並非個人化解讀。',
+    'en-US': 'Example official report structure, not an individual interpretation.',
+    'zh-CN': '正式报告结构示例，并非个人解读。',
+  }],
   ['완료되어 저장된 사주 풀이를 다시 읽고, 나의 다른 기록도 함께 확인합니다.', {
     'ja-JP': '保存済みの四柱推命の鑑定を読み直し、ほかの自分の記録も確認できます。',
     'zh-TW': '重新閱讀已儲存的八字解讀，也可以查看自己的其他紀錄。',
