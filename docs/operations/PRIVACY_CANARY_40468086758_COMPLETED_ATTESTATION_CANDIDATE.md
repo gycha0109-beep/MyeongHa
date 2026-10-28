@@ -32,6 +32,29 @@ The existing isolated restore provenance resolver intentionally requires **a suc
 
 After that protected proof exists, the established `postgres-isolated-restore-drill.yml` manual workflow can use the exact backup/ledger/new-successful-proof IDs and a reference UTC within the captured ledger window. The new `scripts/operations/assert-privacy-replay-canary-evidence.mjs` restore gate explicitly distinguishes this read-only attestation from a fresh/resumed deletion. It accepts a historical completed-case proof only with the original failed run bound as `resumedFromCanaryRunId=40468086758`, the exact backup and ledger IDs, a **different** successful proof workflow run, `hostedAuthDeletionInvoked=false` in the new execution and the explicit `already_absent_verified` observation. Existing fresh/resume replay support remains unchanged. The already successful protected workflow authority and public artifact requirements are not bypassed. Only a real successful isolated replay and verified evidence may advance *bounded* authoritative reconciliation; full hosted Auth/Storage provider recovery remains a separate unproven requirement.
 
+## Protected manual execution handoff (not yet executed)
+
+After this branch's required integration checks pass and the workflow code is on `main`, use **only** the existing `Production Privacy Recovery Canary` manual dispatch with:
+- `operation = attest_completed`
+- `confirmation = ATTEST_COMPLETED_40468086758_READ_ONLY`
+- `watchtower_track = ops`
+- `resume_canary_run_id = 40468086758`
+- `resume_backup_run_id = 40468157715`
+- `attest_ledger_run_id = 40468500587`
+- `worker_credential_action = verify_only`
+- `worker_credential_confirmation` left empty.
+
+This **does not** authorize a fresh deletion, old-run rerun or credential sync. Capture the **new** run ID and verify its successful protected job, exact one non-expired public proof artifact, original failed-run provenance, terminal DB/Auth read-only result and backup/ledger encrypted integrity before attempting restore. A green PR CI is not proof of any of these.
+
+Then and only then run the existing manual `PostgreSQL Isolated Restore Drill` with:
+- `backup_run_id = 40468157715`
+- `privacy_ledger_run_id = 40468500587`
+- `production_privacy_canary_run_id = <new successful proof run ID>`
+- `incident_reference_utc = 2026-10-27T07:40:33Z` (actual ledger capture; the recovered manifest must agree exactly)
+- `watchtower_track = ops`, `seyeon_security_s0_rehearsal = false`.
+
+Require actual completed SUCCESS and inspect the identifier-free restore/reconciliation evidence. Never infer hosted provider Auth/Storage equivalence or flip `dr_ready` from a loopback restore alone.
+
 ## Auth / Storage provider recovery boundary (2026-10-28 read-only inventory)
 
 A separate read-only Production PostgreSQL query observed PostgreSQL 17.6, **4** current Hosted Auth user rows, **28** current Auth session rows, **0** Storage buckets, and **0** Storage object metadata rows. The query returned counts only and performed no writes. This is the live inventory at one instant, **not** the 2026-10-27 backup-time snapshot, identity-credential recovery, or proof of physical object recovery.
