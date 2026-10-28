@@ -173,9 +173,26 @@ export function createAdminAnalyticsPostgresEventStoreV1(pool:PostgresSubjectPoo
     });},
     purgeExpired(now){return writerTransaction(pool,async client=>{
       if(!Number.isFinite(Date.parse(now)))throw Error('Invalid purge time.');
-      const result=await client.query<{id:string}>('DELETE FROM myeongha_admin_analytics.events_v1 WHERE expires_at<=$1::timestamptz RETURNING event_id::text AS id',[now]);
-      await client.query('DELETE FROM myeongha_admin_analytics.consents_v1 WHERE expires_at<=$1::timestamptz',[now]);
-      return result.rows.length;
+      // Each scheduled batch has a fixed upper bound. No UPDATE privilege is
+      // required by the dedicated analytics writer.
+      const events=await client.query<{id:string}>(`WITH due AS (
+          SELECT event_id FROM myeongha_admin_analytics.events_v1
+          WHERE expires_at<=$1::timestamptz
+          ORDER BY expires_at,event_id LIMIT 1000
+        ) DELETE FROM myeongha_admin_analytics.events_v1 e USING due
+          WHERE e.event_id=due.event_id RETURNING e.event_id::text AS id`,[now]);
+      // Avoid unbounded ON DELETE CASCADE by waiting until every event for the
+      // expired consent version has been removed in earlier bounded batches.
+      const consents=await client.query<{id:string}>(`WITH due AS (
+          SELECT c.visitor_ref,c.version FROM myeongha_admin_analytics.consents_v1 c
+          WHERE c.expires_at<=$1::timestamptz AND NOT EXISTS (
+            SELECT 1 FROM myeongha_admin_analytics.events_v1 e
+            WHERE e.visitor_ref=c.visitor_ref AND e.consent_version=c.version
+          ) ORDER BY c.expires_at,c.visitor_ref,c.version LIMIT 1000
+        ) DELETE FROM myeongha_admin_analytics.consents_v1 c USING due
+          WHERE c.visitor_ref=due.visitor_ref AND c.version=due.version
+          RETURNING c.visitor_ref AS id`,[now]);
+      return events.rows.length+consents.rows.length;
     });},
   };
 }

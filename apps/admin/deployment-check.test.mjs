@@ -36,5 +36,11 @@ describe('isolated Admin deployment configuration',()=>{
     const maintenance=prepareAdminHostedConfigV1({...env,MYEONGHA_ADMIN_RETENTION_HYPERDRIVE_ID:'d'.repeat(32)},config);
     expect(maintenance.hyperdrive.at(-1).binding).toBe('ADMIN_RETENTION_HYPERDRIVE');
     expect(inspectAdminHostedDeploymentV1({...env,MYEONGHA_ADMIN_RETENTION_HYPERDRIVE_ID:env.MYEONGHA_ADMIN_AUDIT_HYPERDRIVE_ID},config).invalid).toContain('dedicated_admin_retention_origin');
+    const analytics=prepareAdminHostedConfigV1({...env,MYEONGHA_ADMIN_ANALYTICS_RETENTION_HYPERDRIVE_ID:'e'.repeat(32)},config);
+    expect(analytics.hyperdrive.at(-1)).toEqual({binding:'ADMIN_ANALYTICS_RETENTION_HYPERDRIVE',id:'e'.repeat(32)});
+    expect(analytics.vars.MYEONGHA_ADMIN_ANALYTICS_RETENTION_ENABLED).toBe('false');
+    expect(inspectAdminHostedDeploymentV1({...env,MYEONGHA_ADMIN_ANALYTICS_RETENTION_HYPERDRIVE_ID:env.MYEONGHA_ADMIN_READ_HYPERDRIVE_ID},config).invalid).toContain('dedicated_admin_analytics_retention_origin');
+    expect(inspectAdminHostedDeploymentV1({...env,MYEONGHA_ADMIN_ANALYTICS_RETENTION_HYPERDRIVE_ID:'1ffe61390c064c0480a0a1e933e4d2c9'},config).invalid).toContain('dedicated_admin_analytics_retention_origin');
+    expect(inspectAdminHostedDeploymentV1({...env,MYEONGHA_ADMIN_RETENTION_HYPERDRIVE_ID:'e'.repeat(32),MYEONGHA_ADMIN_ANALYTICS_RETENTION_HYPERDRIVE_ID:'e'.repeat(32)},config).invalid).toContain('dedicated_admin_analytics_retention_origin');
   });
 });

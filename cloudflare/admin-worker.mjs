@@ -4,15 +4,31 @@ import { createAdminAccessGateV1 } from '../apps/api/src/admin-access-gate-v1.ts
 import { createAdminHostedHttpV1 } from '../apps/api/src/admin-hosted-http-v1.ts';
 import { createAdminPrivateRuntimeV1 } from '../apps/api/src/admin-private-runtime-v1.ts';
 import {createAdminAuditRetentionMaintenanceV1} from '../apps/api/src/admin-audit-retention-v1.ts';
+import {createAdminAnalyticsPostgresEventStoreV1} from '../apps/api/src/admin-analytics-pipeline-postgres-v1.ts';
 
 export default {
   async scheduled(_event,env,ctx){
-    if(env.MYEONGHA_ADMIN_RETENTION_ENABLED!=='true')return;
-    if(env.MYEONGHA_ADMIN_HYPERDRIVE_POLICY!=='dedicated-admin-verify-full-v1'||!env.ADMIN_RETENTION_HYPERDRIVE?.connectionString)throw Error('Dedicated retention origin unavailable');
-    ctx.waitUntil((async()=>{const pool=new Pool({connectionString:env.ADMIN_RETENTION_HYPERDRIVE.connectionString,max:1,connectionTimeoutMillis:3000,statement_timeout:5000});
-      try{const purge=createAdminAuditRetentionMaintenanceV1(pool);for(let batch=0;batch<10;batch++){
-        const result=await purge(1000);if(result.deleted<1000)return;
-      }throw Error('Audit retention backlog requires another bounded run');}finally{await pool.end();}})());
+    const auditEnabled=env.MYEONGHA_ADMIN_RETENTION_ENABLED==='true';
+    const analyticsEnabled=env.MYEONGHA_ADMIN_ANALYTICS_RETENTION_ENABLED==='true';
+    if(!auditEnabled&&!analyticsEnabled)return;
+    if(env.MYEONGHA_ADMIN_HYPERDRIVE_POLICY!=='dedicated-admin-verify-full-v1')throw Error('Dedicated retention policy unavailable');
+    const jobs=[];
+    if(auditEnabled){
+      if(!env.ADMIN_RETENTION_HYPERDRIVE?.connectionString)throw Error('Dedicated audit retention origin unavailable');
+      jobs.push((async()=>{const pool=new Pool({connectionString:env.ADMIN_RETENTION_HYPERDRIVE.connectionString,max:1,connectionTimeoutMillis:3000,statement_timeout:5000});
+        try{const purge=createAdminAuditRetentionMaintenanceV1(pool);for(let batch=0;batch<10;batch++){
+          const result=await purge(1000);if(result.deleted<1000)return;
+        }throw Error('Audit retention backlog requires another bounded run');}finally{await pool.end();}})());
+    }
+    if(analyticsEnabled){
+      if(!env.ADMIN_ANALYTICS_RETENTION_HYPERDRIVE?.connectionString)throw Error('Dedicated analytics retention origin unavailable');
+      jobs.push((async()=>{const pool=new Pool({connectionString:env.ADMIN_ANALYTICS_RETENTION_HYPERDRIVE.connectionString,max:1,connectionTimeoutMillis:3000,statement_timeout:5000});
+        try{const store=createAdminAnalyticsPostgresEventStoreV1(pool);for(let batch=0;batch<10;batch++){
+          const deleted=await store.purgeExpired(new Date().toISOString());
+          if(deleted<2000)return; // Up to 1000 events and 1000 consents per transaction.
+        }throw Error('Analytics retention backlog requires another bounded run');}finally{await pool.end();}})());
+    }
+    ctx.waitUntil(Promise.all(jobs));
   },
   async fetch(request, env, ctx) {
     let reader; let audit; let command;

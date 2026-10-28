@@ -30,6 +30,6 @@ try{
  assert.equal((await writer.query('SELECT count(*)::int AS n FROM myeongha_admin_analytics.consents_v1 WHERE visitor_ref=$1',[ref])).rows[0].n,0);
  const second={...consent,version:'local-test-v2'};await store.bindConsent(second,'local-test-v1',subject);
  await store.append({...event,eventId:randomUUID(),consentVersion:second.version});
- assert.equal(await store.purgeExpired(new Date(now.getTime()+7200_000).toISOString()),1);
+ assert.equal(await store.purgeExpired(new Date(now.getTime()+7200_000).toISOString()),2); // one event and its expired consent
  console.log('PASS analytics PostgreSQL insert/replay/conflict/withdrawal/subject erasure/TTL/reader denial; actual stored cohort dashboard measured while disabled source stays unmeasured.');
 }finally{await store.eraseSubject(subject);await writer.end();await read.end();}
