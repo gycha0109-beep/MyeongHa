@@ -65,6 +65,12 @@ describe('Records long-form official report boundary', () => {
     expect(runtime).not.toContain('requestPaidRegeneration(');
     expect(runtime).toContain("if (facts) facts.hidden = true;");
     expect(runtime).toContain("if (first) first.hidden = true;");
+    expect(runtime).toContain("document.querySelector('[data-chart-five-elements]')?.replaceChildren()");
+    expect(runtime).toContain("document.querySelector('[data-chart-ten-gods]')?.replaceChildren()");
+    expect(runtime).toContain("'[data-official-report-notice-text]', '[data-official-report-date]'");
+    expect(runtime).toContain("'[data-reading-step-body]', '[data-reading-structure-body]'");
+    expect(runtime).toContain("if (!mayRenderCurrentStoredRecord()) return;");
+    expect(runtime).toContain("activeReadingOwner !== null && ensureResponseOwnerCurrent(activeReadingOwner)");
   });
 
   it('focuses owner-authorized report sections and restores keyboard focus on mode changes', () => {
