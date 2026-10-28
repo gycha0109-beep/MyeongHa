@@ -4,7 +4,7 @@ const state=vi.hoisted(()=>({
  auth:{kind:'member',verifiedAuthUserId:'11111111-1111-4111-8111-111111111111'},
  origin:'https://example.test',
  stage:true,close:vi.fn(async()=>{}),
- prep:vi.fn(),verify:vi.fn(),
+ prep:vi.fn(),verify:vi.fn(),signed:vi.fn(),
 }));
 vi.mock('../workers/cloudflare-hyperdrive-subject-pool.mjs',()=>({
  createCloudflareSubjectPoolV1:()=>({close:state.close}),
@@ -29,6 +29,9 @@ vi.mock('../apps/api/src/cloudflare-owner-kcp-sandbox-prepare-v1.js',()=>({
 }));
 vi.mock('../apps/api/src/cloudflare-owner-portone-sandbox-readonly-verification-v1.js',()=>({
  inspectCloudflareOwnerKcpSandboxPaymentV1:state.verify,
+}));
+vi.mock('../apps/api/src/cloudflare-owner-kcp-signed-sandbox-receipt-v1.js',()=>({
+ persistCloudflareOwnerKcpSignedSandboxReceiptV1:state.signed,
 }));
 import {tryHandleCloudflareOwnerSandboxActionsV1}
  from '../workers/cloudflare-portone-owner-sandbox-actions.mjs';
@@ -57,6 +60,11 @@ beforeEach(()=>{
   paymentAttemptId:ATTEMPT,providerVerifiedPaid:true,receiptPersisted:false,
   environment:'sandbox',productionCreditsIssued:false,
  });
+ state.signed.mockResolvedValue({
+  paymentAttemptId:ATTEMPT,providerVerifiedPaid:true,receiptPersisted:true,
+  receiptId:ATTEMPT,providerEventId:ATTEMPT,replayed:false,
+  environment:'sandbox',productionCreditsIssued:false,
+ });
 });
 describe('strict Cloudflare Owner sandbox preparation and server receipt APIs',()=>{
  it('returns only server-generated Owner sandbox IDs on exact prepare POST',async()=>{
@@ -79,7 +87,25 @@ describe('strict Cloudflare Owner sandbox preparation and server receipt APIs',(
   expect(state.verify).toHaveBeenCalledWith(expect.objectContaining({paymentAttemptId:ATTEMPT}));
   expect(state.prep).not.toHaveBeenCalled();
  });
- it('rejects forged body fields, tampered prices, callback IDs and large inputs',async()=>{
+ it('persists only when independent K2 attestation key is available',async()=>{
+  const env={MYEONGHA_COMMERCE_SANDBOX_RECEIPT_HMAC_K2_SECRET:'a'.repeat(96)};
+  const res=await tryHandleCloudflareOwnerSandboxActionsV1(
+   req(VERIFY,{paymentAttemptId:ATTEMPT}),env,rVerify);
+  expect(res.status).toBe(200);
+  expect((await res.json()).data).toMatchObject({
+   receiptPersisted:true,productionCreditsIssued:false,
+  });
+  expect(state.signed).toHaveBeenCalledTimes(1);
+  expect(state.verify).not.toHaveBeenCalled();
+  state.signed.mockRejectedValueOnce(new Error('private-HMAC-error'));
+  const failure=await tryHandleCloudflareOwnerSandboxActionsV1(
+   req(VERIFY,{paymentAttemptId:ATTEMPT}),env,rVerify);
+  expect(failure.status).toBe(503);
+  expect(await failure.text()).not.toContain('private-HMAC-error');
+  // Fail closed: never fallback to a weaker or forged browser receipt.
+  expect(state.verify).not.toHaveBeenCalled();
+ });
+  it('rejects forged body fields, tampered prices, callback IDs and large inputs',async()=>{
   for(const [url,route,body] of [
    [PREP,rPrep,{}],[PREP,rPrep,{idempotencyToken:TOKEN,amountMinor:1}],
    [PREP,rPrep,{idempotencyToken:'invalid'}],

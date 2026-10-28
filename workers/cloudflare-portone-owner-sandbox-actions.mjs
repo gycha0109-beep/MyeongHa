@@ -18,6 +18,8 @@ import {prepareCloudflareOwnerKcpSandboxPurchaseV1}
  from '../apps/api/src/cloudflare-owner-kcp-sandbox-prepare-v1.js';
 import {inspectCloudflareOwnerKcpSandboxPaymentV1}
  from '../apps/api/src/cloudflare-owner-portone-sandbox-readonly-verification-v1.js';
+import {persistCloudflareOwnerKcpSignedSandboxReceiptV1}
+ from '../apps/api/src/cloudflare-owner-kcp-signed-sandbox-receipt-v1.js';
 
 const HEADERS=CLOUDFLARE_APPROVED_RESPONSE_HEADERS_V1;
 const PREPARE='/api/me/credits/portone/test-prepare';
@@ -96,9 +98,16 @@ export async function tryHandleCloudflareOwnerSandboxActionsV1(request,bindings,
    });
    return Response.json({ok:true,data},{status:200,headers:HEADERS});
   }
-  const data=await inspectCloudflareOwnerKcpSandboxPaymentV1({
-   env:bindings,pool,verifiedEvidence:evidence,paymentAttemptId:body.paymentAttemptId,
-  });
+  // Receipt writes require the *independent* K2 server attestation key
+  // and a restricted SECURITY DEFINER RPC. Without K2 this remains a
+  // read-only PSP inspection, never an implicit privileged DB escalation.
+  const data=typeof bindings?.MYEONGHA_COMMERCE_SANDBOX_RECEIPT_HMAC_K2_SECRET==='string'
+   ? await persistCloudflareOwnerKcpSignedSandboxReceiptV1({
+      env:bindings,pool,verifiedEvidence:evidence,paymentAttemptId:body.paymentAttemptId,
+     })
+   : await inspectCloudflareOwnerKcpSandboxPaymentV1({
+      env:bindings,pool,verifiedEvidence:evidence,paymentAttemptId:body.paymentAttemptId,
+     });
   return Response.json({ok:true,data},{status:200,headers:HEADERS});
  }catch{
   // Do not reveal Supabase secrets, PSP receipts or identity error details.
