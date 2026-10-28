@@ -23,7 +23,7 @@ const price={
   cachedInputMicroUsdPerMillion:100_000,
   outputMicroUsdPerMillion:2_000_000,
 };
-function pg(role=READING_AI_COST_WRITER_PRINCIPAL_V1,conflict=false){
+function pg(role:string=READING_AI_COST_WRITER_PRINCIPAL_V1,conflict=false){
   const statements:{sql:string;values:readonly unknown[]|undefined}[]=[];
   let released=0;
   const pool:PostgresSubjectPoolV1={
