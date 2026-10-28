@@ -28,6 +28,8 @@ export interface CreateProductionBirthProfileCreateRuntimeInputV1 {
   readonly pool?: PostgresSubjectPoolV1;
   /** Server-side test/runtime injection only. Never derived from the client request. */
   readonly memberFetchImpl?: SupabaseMemberVerifierFetchV1;
+  /** No default analytics activation. Only a server-installed, consent-bound adapter may be supplied. */
+  readonly onBirthProfileCommitted?: (input: { readonly request: Request; readonly revisionId: string }) => Promise<void>;
 }
 
 /**
@@ -69,6 +71,7 @@ export function createProductionBirthProfileCreateRuntimeV1(
         pool: poolLease.pool,
         idPort,
         fingerprintPort,
+        ...(input.onBirthProfileCommitted === undefined ? {} : { onBirthProfileCommitted: input.onBirthProfileCommitted }),
       });
     },
     close() {
