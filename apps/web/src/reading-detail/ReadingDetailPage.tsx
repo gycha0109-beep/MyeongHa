@@ -38,13 +38,13 @@ export function ReadingDetailPage() {
           <h2>보고서 첫 해석</h2>
           <p data-official-report-first-text data-official-reading />
         </div>
-        <section className="official-report-facts" data-official-report-facts hidden aria-label="저장된 명식 근거" data-official-reading>
+        <section className="official-report-facts" data-official-report-facts hidden aria-label="저장된 명식 근거">
           <h2>저장된 명식 근거</h2>
           <div className="official-report-pillars" data-official-report-pillars />
           <h3>오행 근거</h3>
-          <div className="official-report-evidence" data-official-report-elements />
+          <div className="official-report-evidence" data-official-report-elements data-official-reading />
           <h3>십성 근거</h3>
-          <div className="official-report-evidence" data-official-report-gods />
+          <div className="official-report-evidence" data-official-report-gods data-official-reading />
         </section>
         <nav className="official-report-toc" aria-label="보고서 목차" data-official-report-toc />
         <div className="official-report-sections" data-official-report-sections />
