@@ -58,7 +58,7 @@ beforeEach(()=>{
 describe('Cloudflare PortOne KCP V2 server-owned checkout handoff',()=>{
   it('is only a private candidate, never a public sale, mint or route',()=>{
     expect(CLOUDFLARE_PORTONE_OWNER_SANDBOX_HANDOFF_V1).toMatchObject({
-      databaseFunction:'public.qry_commerce_owner_sandbox_credit_checkout_v1',
+      databaseFunction:'public.qry_commerce_owner_sandbox_credit_checkout_v2',
       publicRouteMounted:false,productionCheckoutEnabled:false,sandboxCreditMintEnabled:false,
       environment:'sandbox',
     });
@@ -76,7 +76,7 @@ describe('Cloudflare PortOne KCP V2 server-owned checkout handoff',()=>{
     expect(JSON.stringify(result)).not.toContain(env.V2_API_Secret);
     expect(state.query).toHaveBeenCalledTimes(1);
     expect(state.query.mock.calls[0]?.[0]).toContain(
-      'public.qry_commerce_owner_sandbox_credit_checkout_v1($1::uuid,$2::uuid)',
+      'public.qry_commerce_owner_sandbox_credit_checkout_v2($1::uuid,$2::uuid)',
     );
     expect(state.query.mock.calls[0]?.[1]).toEqual([SUBJECT,ATTEMPT]);
     expect(state.owner).toHaveBeenCalledTimes(1);
@@ -115,7 +115,7 @@ describe('Cloudflare PortOne KCP V2 server-owned checkout handoff',()=>{
     await expect(loadCloudflarePortOneOwnerSandboxCheckoutHandoffV1(input))
       .rejects.toThrow('Cloudflare PortOne V2 TEST binding authority unavailable.');
   });
-  it('staged SQL requires canonical Member, exact offer/capability provenance, sandbox and enabled SKU',()=>{
+  it('base SQL requires canonical Member, exact offer/capability provenance, sandbox and enabled SKU',()=>{
     const sql=readFileSync(new URL('../../../supabase/migrations/20261027163500_commerce_owner_sandbox_credit_checkout_v1.sql',import.meta.url),'utf8');
     for(const exact of [
       'public.assert_myeongha_subject_context_v1(p_subject_id)',
