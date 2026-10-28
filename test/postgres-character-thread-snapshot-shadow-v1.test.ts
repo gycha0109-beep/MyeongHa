@@ -15,6 +15,8 @@ import type { PostgresSubjectExecutionScopeV1 } from
   '../apps/api/src/postgres-subject-execution.js';
 
 const subjectId = '11111111-1111-4111-8111-111111111111';
+const bundleId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+const releaseId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 const threadId = '22222222-2222-4222-8222-222222222222';
 const messages: readonly CharacterDialogueMessageShadowV1[] = [
   { messageId: '33333333-3333-4333-8333-333333333333', role: 'user', text: '제 말이 맞죠?' },
@@ -26,6 +28,9 @@ function row(characterId: string) {
   return {
     threadStatus: 'active',
     participantCharacterIds: [characterId],
+    activeContentReleaseId: releaseId,
+    activeContentBundleId: bundleId,
+    contentRevision: '1',
     messageCount: '3',
     ineligibleMessageCount: '0',
     tailRows: messages.map((m, index) => ({
@@ -47,6 +52,7 @@ function fixture(characterId: string, raw: unknown = row(characterId)) {
   } as unknown as PostgresSubjectExecutionScopeV1;
   const port = createPostgresCharacterThreadSnapshotShadowV1({
     scope, threadId, characterId, recentConversation: messages,
+    expectedContentBundleId: bundleId,
   });
   const voice = CHARACTER_RUNTIME_AUTHORING_V1.find((item) => item.characterId === characterId);
   if (!voice) throw new Error('existing character authoring missing');
@@ -141,6 +147,7 @@ describe('PostgreSQL subject-scoped Character thread snapshot Shadow', () => {
       threadId,
       characterId: 'seorin',
       recentConversation: messages,
+      expectedContentBundleId: bundleId,
     })).toThrow('CHARACTER_THREAD_SNAPSHOT_UNVERIFIABLE');
 
     const { port } = fixture('seyeon');
@@ -150,11 +157,46 @@ describe('PostgreSQL subject-scoped Character thread snapshot Shadow', () => {
         client: { query: () => { throw new Error('sensitive DB detail'); } },
       } as unknown as PostgresSubjectExecutionScopeV1,
       characterId: 'seyeon', threadId, recentConversation: messages,
+      expectedContentBundleId: bundleId,
     });
     await expect(throwing.readThreadSnapshot({
       characterId: 'seyeon', subjectId, threadId,
       currentUserMessageId: messages[2]!.messageId,
     })).rejects.toThrow('CHARACTER_THREAD_SNAPSHOT_UNVERIFIABLE');
     expect(port.characterId).toBe('seyeon');
+  });
+});
+
+describe('content binding and failed read invalidation', () => {
+  it('does not expose the content pin until an authenticated source check succeeds', async () => {
+    const { port, packet } = fixture('seorin');
+    expect(() => port.readVerifiedContentBinding()).toThrow(
+      'CHARACTER_THREAD_SNAPSHOT_UNVERIFIABLE',
+    );
+    await requireCharacterThreadSnapshotShadowV1({ packet, port });
+    expect(port.readVerifiedContentBinding()).toEqual({
+      activeContentReleaseId: releaseId,
+      activeContentBundleId: bundleId,
+      contentRevision: 1,
+    });
+    await expect(port.readThreadSnapshot({
+      characterId: 'seyeon',
+      subjectId,
+      threadId,
+      currentUserMessageId: messages[2]!.messageId,
+    })).rejects.toThrow('CHARACTER_THREAD_SNAPSHOT_UNVERIFIABLE');
+    expect(() => port.readVerifiedContentBinding()).toThrow(
+      'CHARACTER_THREAD_SNAPSHOT_UNVERIFIABLE',
+    );
+  });
+
+  it('rejects non-decimal bigint revisions and an unexpected release binding', async () => {
+    for (const revision of ['NaN', '-1', '9007199254740992']) {
+      const { port, packet } = fixture('yeoul', {
+        ...row('yeoul'), contentRevision: revision,
+      });
+      await expect(requireCharacterThreadSnapshotShadowV1({ port, packet }))
+        .rejects.toThrow('CHARACTER_DIALOGUE_CONTINUITY_SHADOW_NOT_ELIGIBLE');
+    }
   });
 });

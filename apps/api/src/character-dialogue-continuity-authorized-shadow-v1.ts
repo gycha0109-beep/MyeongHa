@@ -27,6 +27,8 @@ export interface CharacterDialogueAuthorizedShadowResultV1 {
   readonly scope: 'RESEARCH_SHADOW_NOT_PRODUCTION';
   readonly characterId: string;
   readonly sourceContentBundleId: string;
+  readonly sourceContentReleaseId: string;
+  readonly sourceContentRevision: number;
   readonly sourceContentVersion: string;
   readonly dialoguePlan: CharacterDialogueContinuityPlanShadowV1;
   readonly mayInvokeProvider: false;
@@ -76,16 +78,20 @@ export async function prepareCharacterDialogueAuthorizedShadowV1(input: Readonly
       threadId: input.threadId,
       characterId: runtime.characterId,
       recentConversation: input.recentConversation,
+      expectedContentBundleId: runtime.contentBundleId,
     });
     await requireCharacterThreadSnapshotShadowV1({
       packet: dialoguePlan.packet,
       port,
     });
+    const contentBinding = port.readVerifiedContentBinding();
     return Object.freeze({
       version: CHARACTER_DIALOGUE_AUTHORIZED_SHADOW_VERSION_V1,
       scope: 'RESEARCH_SHADOW_NOT_PRODUCTION' as const,
       characterId: runtime.characterId,
       sourceContentBundleId: runtime.contentBundleId,
+      sourceContentReleaseId: contentBinding.activeContentReleaseId,
+      sourceContentRevision: contentBinding.contentRevision,
       sourceContentVersion: runtime.contentVersion,
       dialoguePlan,
       mayInvokeProvider: false as const,

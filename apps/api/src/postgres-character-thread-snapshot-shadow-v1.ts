@@ -21,7 +21,8 @@ export const POSTGRES_CHARACTER_THREAD_SNAPSHOT_SHADOW_VERSION_V1 =
  */
 export const POSTGRES_CHARACTER_THREAD_SNAPSHOT_SHADOW_SQL_V1 = `
 with authorized_thread as materialized (
-  select thread_id, status, participant_character_ids
+  select thread_id, status, participant_character_ids,
+    active_content_release_id, active_content_bundle_id, content_revision
   from public.qry_chat_thread_runtime_binding_v1($1::uuid, $2::uuid)
 ),
 all_messages as materialized (
@@ -45,6 +46,9 @@ tail as materialized (
 select
   t.status as "threadStatus",
   t.participant_character_ids as "participantCharacterIds",
+  t.active_content_release_id::text as "activeContentReleaseId",
+  t.active_content_bundle_id::text as "activeContentBundleId",
+  t.content_revision::text as "contentRevision",
   (select count(*)::text from all_messages) as "messageCount",
   (select count(*)::text from all_messages m
    where m."redacted"
@@ -80,6 +84,9 @@ export class PostgresCharacterThreadSnapshotShadowHoldV1 extends Error {
 type SnapshotRowV1 = Readonly<{
   threadStatus: unknown;
   participantCharacterIds: unknown;
+  activeContentReleaseId: unknown;
+  activeContentBundleId: unknown;
+  contentRevision: unknown;
   messageCount: unknown;
   ineligibleMessageCount: unknown;
   tailRows: unknown;
@@ -114,13 +121,24 @@ function validMessages(
       message.text.trim().length > 0 && message.text.length <= 8000);
 }
 
+export interface CharacterThreadVerifiedContentBindingShadowV1 {
+  readonly activeContentReleaseId: string;
+  readonly activeContentBundleId: string;
+  readonly contentRevision: number;
+}
+export interface PostgresCharacterThreadSnapshotPortShadowV1
+  extends CharacterThreadSnapshotShadowPortV1 {
+  readVerifiedContentBinding(): CharacterThreadVerifiedContentBindingShadowV1;
+}
+
 function validatedTail(input: Readonly<{
   row: SnapshotRowV1;
+  expectedContentBundleId: string;
   characterId: string;
   currentUserMessageId: string;
   expected: readonly CharacterDialogueMessageShadowV1[];
-}>): number {
-  const { row, characterId, currentUserMessageId, expected } = input;
+}>): Readonly<{ messageCount: number; contentBinding: CharacterThreadVerifiedContentBindingShadowV1 }> {
+  const { row, expectedContentBundleId, characterId, currentUserMessageId, expected } = input;
   if (
     row.threadStatus !== 'active' ||
     !Array.isArray(row.participantCharacterIds) ||
@@ -128,6 +146,16 @@ function validatedTail(input: Readonly<{
     row.participantCharacterIds[0] !== characterId ||
     boundedCount(row.ineligibleMessageCount) !== 0
   ) fail();
+  if (!validId(row.activeContentReleaseId) ||
+      !validId(row.activeContentBundleId) ||
+      row.activeContentBundleId !== expectedContentBundleId ||
+      typeof row.contentRevision !== 'string') fail();
+  const contentRevision = boundedCount(row.contentRevision);
+  const contentBinding = Object.freeze({
+    activeContentReleaseId: row.activeContentReleaseId,
+    activeContentBundleId: row.activeContentBundleId,
+    contentRevision,
+  }) as CharacterThreadVerifiedContentBindingShadowV1;
   const count = boundedCount(row.messageCount);
   const tailRows = row.tailRows;
   if (count < expected.length || !Array.isArray(tailRows) ||
@@ -169,7 +197,7 @@ function validatedTail(input: Readonly<{
       stored.bodyText !== supplied.text
     ) fail();
   }
-  return count;
+  return Object.freeze({ messageCount: count, contentBinding });
 }
 
 /**
@@ -183,15 +211,19 @@ export function createPostgresCharacterThreadSnapshotShadowV1(input: Readonly<{
   threadId: string;
   characterId: string;
   recentConversation: readonly CharacterDialogueMessageShadowV1[];
-}>): CharacterThreadSnapshotShadowPortV1 {
+  expectedContentBundleId: string;
+}>): PostgresCharacterThreadSnapshotPortShadowV1 {
   const subjectId = input.scope?.resolvedSubject?.subjectId;
   const client = input.scope?.client;
   if (!UUID.test(subjectId ?? '') || !UUID.test(input.threadId) ||
-      !validId(input.characterId) || !validMessages(input.recentConversation) ||
+      !validId(input.characterId) ||
+      !validId(input.expectedContentBundleId) ||
+      !validMessages(input.recentConversation) ||
       !client || typeof client.query !== 'function' ||
       !['member', 'guest'].includes(input.scope.resolvedSubject.subjectKind)) fail();
 
-  const { characterId, threadId } = input;
+  const { characterId, threadId, expectedContentBundleId } = input;
+  let verifiedContentBinding: CharacterThreadVerifiedContentBindingShadowV1 | null = null;
   const expected = Object.freeze(input.recentConversation.map(
     (message) => Object.freeze({ ...message }),
   ));
@@ -199,12 +231,18 @@ export function createPostgresCharacterThreadSnapshotShadowV1(input: Readonly<{
     characterId,
     subjectId: subjectId!,
     threadId,
+    readVerifiedContentBinding() {
+      const binding = verifiedContentBinding;
+      if (binding === null) return fail();
+      return binding;
+    },
     async readThreadSnapshot(request: Readonly<{
       characterId: string;
       subjectId: string;
       threadId: string;
       currentUserMessageId: string;
     }>): Promise<unknown> {
+      verifiedContentBinding = null;
       if (!request || request.characterId !== characterId ||
           request.subjectId !== subjectId || request.threadId !== threadId ||
           !UUID.test(request.currentUserMessageId) ||
@@ -220,11 +258,12 @@ export function createPostgresCharacterThreadSnapshotShadowV1(input: Readonly<{
         fail();
       }
       if (rows.length !== 1 || !rows[0]) fail();
-      const messageCount = validatedTail({
-        row: rows[0]!, characterId,
+      const { messageCount, contentBinding } = validatedTail({
+        row: rows[0]!, expectedContentBundleId, characterId,
         currentUserMessageId: request.currentUserMessageId,
         expected,
       });
+      verifiedContentBinding = contentBinding;
       return Object.freeze({
         schemaVersion: CHARACTER_THREAD_SNAPSHOT_SHADOW_VERSION_V1,
         characterId,

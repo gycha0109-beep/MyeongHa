@@ -107,6 +107,10 @@ export interface CharacterMultiturnReviewedCandidateShadowV1 {
   readonly version: typeof CHARACTER_MULTITURN_OFFLINE_SHADOW_VERSION_V1;
   readonly scope: 'TEST_ONLY_REVIEWED_CANDIDATE_NOT_PRODUCTION';
   readonly characterId: string;
+  readonly sourceContentReleaseId: string;
+  readonly sourceContentBundleId: string;
+  readonly sourceContentRevision: number;
+  readonly sourceContentVersion: string;
   readonly decision: CharacterMultiturnDecisionShadowV1;
   readonly draft: CharacterMultiturnDraftShadowV1;
   readonly cosmeticEnvelope: CharacterDialogueEnvelopeV1;
@@ -314,15 +318,27 @@ export async function runCharacterDialogueMultiturnOfflineShadowV1(input: Readon
   try {
     const prepared = await check();
     const plan = prepared.dialoguePlan;
+    const pinnedContent = Object.freeze({
+      releaseId: prepared.sourceContentReleaseId,
+      bundleId: prepared.sourceContentBundleId,
+      revision: prepared.sourceContentRevision,
+    });
+    const recheck = async () => {
+      const current = await check();
+      if (current.sourceContentReleaseId !== pinnedContent.releaseId ||
+          current.sourceContentBundleId !== pinnedContent.bundleId ||
+          current.sourceContentRevision !== pinnedContent.revision ||
+          current.sourceContentVersion !== prepared.sourceContentVersion) fail();
+    };
     const decision = guardDecision(await input.decider.decide({
       plan, conversation: input.recentConversation,
     }), plan);
     // Recheck actual DB-owned message bodies after an awaited decision stage.
-    await check();
+    await recheck();
     const { draft, cosmeticEnvelope } = guardDraft(await input.renderer.render({
       plan, decision, conversation: input.recentConversation,
     }), plan, input.runtime);
-    await check();
+    await recheck();
     const utteranceHash = hash(draft.utterance);
     const decisionHash = hash(JSON.stringify(decision));
     const semanticReview = guardReview(await input.reviewer.review({
@@ -330,11 +346,15 @@ export async function runCharacterDialogueMultiturnOfflineShadowV1(input: Readon
       utteranceHash, decisionHash, conversation: input.recentConversation,
       reviewCriteria: CHARACTER_MULTITURN_REVIEW_CRITERIA_SHADOW_V1,
     }), plan, utteranceHash, decisionHash);
-    await check();
+    await recheck();
     return Object.freeze({
       version: CHARACTER_MULTITURN_OFFLINE_SHADOW_VERSION_V1,
       scope: 'TEST_ONLY_REVIEWED_CANDIDATE_NOT_PRODUCTION' as const,
       characterId: plan.packet.characterId,
+      sourceContentReleaseId: pinnedContent.releaseId,
+      sourceContentBundleId: pinnedContent.bundleId,
+      sourceContentRevision: pinnedContent.revision,
+      sourceContentVersion: prepared.sourceContentVersion,
       decision, draft, cosmeticEnvelope, semanticReview,
       mayCommit: false as const,
       mayReveal: false as const,

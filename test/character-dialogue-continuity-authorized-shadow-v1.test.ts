@@ -10,6 +10,8 @@ import {
 } from '../apps/api/src/character-dialogue-continuity-authorized-shadow-v1.js';
 
 const subjectId = '11111111-1111-4111-8111-111111111111';
+const bundleId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+const releaseId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 const threadId = '22222222-2222-4222-8222-222222222222';
 const recentConversation = [
   { messageId: '33333333-3333-4333-8333-333333333333', role: 'user', text: '어떻게 생각하세요?' },
@@ -25,7 +27,7 @@ function runtime(characterId: string): CharacterRuntimeContextV1 {
   return {
     schemaVersion: 'v1',
     characterId,
-    contentBundleId: 'public-test-bundle',
+    contentBundleId: bundleId,
     contentVersion: 'v1',
     speech: authored.speech,
     persona: authored.persona,
@@ -41,6 +43,9 @@ function fixture(characterId: string, overrides: Record<string, unknown> = {}) {
   const row = {
     threadStatus: 'active',
     participantCharacterIds: [characterId],
+    activeContentReleaseId: releaseId,
+    activeContentBundleId: bundleId,
+    contentRevision: '1',
     messageCount: '3',
     ineligibleMessageCount: '0',
     tailRows: recentConversation.map((message, index) => ({

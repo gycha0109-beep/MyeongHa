@@ -11,8 +11,13 @@ import type { PostgresSubjectExecutionScopeV1 } from
 import {
   runCharacterDialogueMultiturnOfflineShadowV1,
 } from '../apps/api/src/character-dialogue-multiturn-offline-shadow-v1.js';
+import {
+  auditCharacterDialoguePreRevealHoldShadowV1,
+} from '../apps/api/src/character-dialogue-pre-reveal-hold-shadow-v1.js';
 
 const subjectId = '11111111-1111-4111-8111-111111111111';
+const bundleId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+const releaseId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 const threadId = '22222222-2222-4222-8222-222222222222';
 const msgId = (n: number) =>
   '33333333-3333-4333-8333-' + String(n).padStart(12, '0');
@@ -45,7 +50,7 @@ function fakeRuntime(
   return {
     schemaVersion: 'v1',
     characterId,
-    contentBundleId: 'offline-test-bundle',
+    contentBundleId: bundleId,
     contentVersion: 'offline-test-content',
     speech: authored.speech,
     persona: authored.persona,
@@ -68,6 +73,9 @@ function sourceRow(
   return {
     threadStatus: 'active',
     participantCharacterIds: [characterId],
+    activeContentReleaseId: releaseId,
+    activeContentBundleId: bundleId,
+    contentRevision: '1',
     messageCount: String(conversation.length),
     ineligibleMessageCount: '0',
     tailRows: conversation.map((m, index) => ({
@@ -322,5 +330,96 @@ describe('research-only execution boundary', () => {
     } finally {
       vi.unstubAllEnvs();
     }
+  });
+});
+
+describe('post-review content pinning and pre-reveal HOLD boundary', () => {
+  it('rejects content revisions changed after decision before renderer or reviewer', async () => {
+    for (const staleAt of [2, 3, 4]) {
+      const conversation = messages(5);
+      const fx = fixture('seorin', conversation, (read) => ({
+        ...sourceRow('seorin', conversation),
+        contentRevision: read >= staleAt ? '2' : '1',
+      }));
+      await expect(runCharacterDialogueMultiturnOfflineShadowV1(fx.input))
+        .rejects.toThrow('CHARACTER_MULTITURN_OFFLINE_SHADOW_REJECTED');
+      expect(fx.query).toHaveBeenCalledTimes(staleAt);
+      expect(fx.reviewer).toHaveBeenCalledTimes(staleAt === 4 ? 1 : 0);
+    }
+  });
+
+  it('holds if the original content bundle does not match the live thread binding', async () => {
+    const fx = fixture('yeoul', messages(3), () => ({
+      ...sourceRow('yeoul', messages(3)),
+      activeContentBundleId: 'ffffffff-ffff-4fff-8fff-ffffffffffff',
+    }));
+    await expect(runCharacterDialogueMultiturnOfflineShadowV1(fx.input))
+      .rejects.toThrow('CHARACTER_MULTITURN_OFFLINE_SHADOW_REJECTED');
+    expect(fx.decision).not.toHaveBeenCalled();
+    expect(fx.renderer).not.toHaveBeenCalled();
+    expect(fx.reviewer).not.toHaveBeenCalled();
+  });
+
+  it('rechecks the exact post-review candidate and returns HOLD without dialogue body or release permission', async () => {
+    const fx = fixture('rahyeon', messages(5));
+    const candidate = await runCharacterDialogueMultiturnOfflineShadowV1(fx.input);
+    const audit = await auditCharacterDialoguePreRevealHoldShadowV1({
+      candidate,
+      runtime: fx.input.runtime,
+      recentConversation: fx.input.recentConversation,
+      scope: fx.input.scope,
+      threadId,
+    });
+    expect(fx.query).toHaveBeenCalledTimes(5);
+    expect(audit.disposition).toBe('HOLD_NOT_AUTHORIZED_FOR_REVEAL');
+    expect(audit.reason).toBe('MISSING_ATOMIC_COMMIT_AND_LIVE_RIGHTS_REVEAL');
+    expect(audit.characterId).toBe('rahyeon');
+    expect(audit.sourceContentReleaseId).toBe(releaseId);
+    expect(audit.sourceContentRevision).toBe(1);
+    expect(audit.requiresCommittedServerReceipt).toBe(true);
+    expect(audit.requiresLockedOriginalRightsAtSend).toBe(true);
+    expect(audit.mayCommit).toBe(false);
+    expect(audit.mayReveal).toBe(false);
+    expect(audit.mayUseCachedReviewForReveal).toBe(false);
+    expect(JSON.stringify(audit)).not.toContain(candidate.draft.utterance);
+    expect(Object.isFrozen(audit)).toBe(true);
+  });
+
+  it('rejects content revision altered at final pre-reveal audit', async () => {
+    const conversation = messages(5);
+    const fx = fixture('seyeon', conversation, (read) => ({
+      ...sourceRow('seyeon', conversation),
+      contentRevision: read >= 5 ? '2' : '1',
+    }));
+    const candidate = await runCharacterDialogueMultiturnOfflineShadowV1(fx.input);
+    await expect(auditCharacterDialoguePreRevealHoldShadowV1({
+      candidate,
+      runtime: fx.input.runtime,
+      recentConversation: fx.input.recentConversation,
+      scope: fx.input.scope,
+      threadId,
+    })).rejects.toThrow('CHARACTER_DIALOGUE_PRE_REVEAL_HOLD');
+    expect(fx.query).toHaveBeenCalledTimes(5);
+  });
+
+  it('rejects tampered candidate text/hash without any further DB read', async () => {
+    const fx = fixture('yeoul', messages(5));
+    const candidate = await runCharacterDialogueMultiturnOfflineShadowV1(fx.input);
+    for (const forged of [
+      { ...candidate, draft: { ...candidate.draft, utterance: '조작한 대화입니다.' } },
+      { ...candidate, semanticReview: {
+        ...candidate.semanticReview, reviewedDecisionHash: 'sha256:v1:forged',
+      } },
+      { ...candidate, mayReveal: true },
+    ]) {
+      await expect(auditCharacterDialoguePreRevealHoldShadowV1({
+        candidate: forged as typeof candidate,
+        runtime: fx.input.runtime,
+        recentConversation: fx.input.recentConversation,
+        scope: fx.input.scope,
+        threadId,
+      })).rejects.toThrow('CHARACTER_DIALOGUE_PRE_REVEAL_HOLD');
+    }
+    expect(fx.query).toHaveBeenCalledTimes(4);
   });
 });
