@@ -1,0 +1,68 @@
+name: '[WT:character-memory] C1 three characters x five turns paid research once (2026-10-28)'
+on:
+  push:
+    branches:
+      - feat/character-memory/c08-local-one-call-shadow-v1
+    paths:
+      - '.github/character-c1-three-five-20261028-one-shot.trigger'
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: c1-three-five-paid-20261028-one-shot
+  cancel-in-progress: false
+
+jobs:
+  research:
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/feat/character-memory/c08-local-one-call-shadow-v1' && github.run_attempt == 1 }}
+    runs-on: ubuntu-24.04
+    environment: production
+    timeout-minutes: 16
+    steps:
+      - name: Checkout exact research branch commit without persisted credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Setup Node 24
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Verify TypeScript and targeted model adapter tests before payment
+        run: |
+          set -euo pipefail
+          npm ci --ignore-scripts --no-audit --no-fund
+          npx tsc -p tsconfig.json --noEmit
+          npx vitest run test/character-dialogue-live-model-shadow-v1.test.ts test/character-dialogue-multiturn-offline-shadow-v1.test.ts
+          node --check scripts/character-c1-three-five-paid-eval-20261028.mjs
+      - name: Bundle exact authored public C1 runtime projection
+        run: |
+          set -euo pipefail
+          npx rolldown scripts/character-c1-three-five-public-profile-adapter-v1.ts --platform node --format esm --file "$RUNNER_TEMP/c1-three-five-profiles.mjs"
+          test -s "$RUNNER_TEMP/c1-three-five-profiles.mjs"
+      - name: Verify exact roster matrix with no provider calls
+        env:
+          MYEONGHA_C1_EVAL_PROFILES_MODULE: ${{ runner.temp }}/c1-three-five-profiles.mjs
+          MYEONGHA_C1_EVAL_OUTPUT_DIR: ${{ runner.temp }}/character-c1-three-five-20261028
+        run: node scripts/character-c1-three-five-paid-eval-20261028.mjs --dry-run
+      - name: Explicit owner-approved 15 candidate and 15 independent review paid calls maximum
+        env:
+          MYEONGHA_C1_EVAL_PROFILES_MODULE: ${{ runner.temp }}/c1-three-five-profiles.mjs
+          MYEONGHA_C1_EVAL_OUTPUT_DIR: ${{ runner.temp }}/character-c1-three-five-20261028
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        run: |
+          set -euo pipefail
+          set +x
+          test -n "${OPENROUTER_API_KEY:-}"
+          node scripts/character-c1-three-five-paid-eval-20261028.mjs --execute --approved-three-five-20261028
+      - name: Retain synthetic transcripts and bounded spend evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: c1-three-character-five-turn-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/character-c1-three-five-20261028/
+          if-no-files-found: warn
+          retention-days: 14
