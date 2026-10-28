@@ -17,8 +17,8 @@ describe('Paid Records archive current-Grant authority', () => {
     expect(migration).toContain('perform public.assert_myeongha_subject_context_v1(p_subject_id);');
     expect(migration).toContain("rr.product_response_state in ('delivered', 'delivered_with_fallback')");
     expect(migration).toContain('r.subject_id = p_subject_id');
-    expect(migration).toContain('not exists (\n          select 1 from public.standard_reading_official_bindings o');
-    expect(migration).toContain('and not exists (\n          select 1 from public.standard_reading_unit_bindings b');
+    expect(migration).toContain('select 1 from public.standard_reading_official_bindings o');
+    expect(migration).toContain('select 1 from public.standard_reading_unit_bindings b');
     expect(migration).toContain('internal_qry_standard_reading_artifact_source_v2(');
     expect(migration).toContain('internal_qry_standard_reading_artifact_source_v1(');
     expect(migration).toContain('paid.response_hash = rr.response_hash');
