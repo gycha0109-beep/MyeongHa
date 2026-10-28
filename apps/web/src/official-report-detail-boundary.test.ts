@@ -114,6 +114,26 @@ describe('Records long-form official report boundary', () => {
     }
   });
 
+  it('retries only transient reads and rejects malformed stored official Reading without substitution', () => {
+    expect(runtime).toContain("if (state === 'persisted_record_unavailable' && routeAction) {");
+    expect(runtime).toContain('routeAction.href = window.location.href;');
+    expect(runtime).toContain("'persisted_record_invalid_response'");
+    expect(runtime).toContain('record = parseOfficialReadingRecordPayloadV1(payload.data);');
+    expect(runtime).toContain('공식 기록 응답이 검증 기준을 충족하지 않았습니다. 다른 해석으로 대체하지 않습니다.');
+    for (const source of [
+      '저장된 보고서 다시 불러오기 →',
+      '저장된 보고서의 내용을 확인할 수 없습니다.',
+      '공식 기록 응답이 검증 기준을 충족하지 않았습니다. 다른 해석으로 대체하지 않습니다.',
+    ]) {
+      const translation = RECORDS_HUB_STATIC_UI_COPY_V1.get(source);
+      expect(translation).toBeDefined();
+      for (const locale of ['ja-JP', 'zh-TW', 'en-US', 'zh-CN'] as const) {
+        expect(translation?.[locale]).toBeTruthy();
+        expect(translation?.[locale]).not.toMatch(/[가-힣]/u);
+      }
+    }
+  });
+
   it('has five-locale fixed controls without translating report source text', () => {
     for (const source of [
       '저장된 공식 사주 보고서', '발행일', '해석 버전',
