@@ -78,4 +78,9 @@ export const RECORDS_HUB_STATIC_UI_COPY_V1 = new Map([
   ["오행 근거", {'ja-JP':"五行の根拠", 'zh-TW':"五行依據", 'en-US':"Five-element evidence", 'zh-CN':"五行依据"}],
   ["십성 근거", {'ja-JP':"通変星の根拠", 'zh-TW':"十神依據", 'en-US':"Ten-god evidence", 'zh-CN':"十神依据"}],
   ["대화 상대 선택 (별도 이용)", {'ja-JP':"会話相手を選択（別サービス）", 'zh-TW':"選擇對話對象（另行使用）", 'en-US':"Choose chat partner (separate access)", 'zh-CN':"选择聊天对象（独立使用）"}],
+  ["현세록을 지금 확인할 수 없습니다. 다른 기록은 계속 확인할 수 있습니다.", {'ja-JP':"現在、生活記録を確認できません。ほかの記録は引き続き表示できます。", 'zh-TW':"目前無法查閱現世錄，其他紀錄仍可使用。", 'en-US':"Life records are unavailable now. You can still view your other records.", 'zh-CN':"目前无法查看现世录，其他记录仍可使用。"}],
+  ["저장된 사주 보고서를 지금 확인할 수 없습니다.", {'ja-JP':"現在、保存済みの四柱推命レポートを表示できません。", 'zh-TW':"目前無法查看已儲存的八字報告。", 'en-US':"Saved Saju reports are currently unavailable.", 'zh-CN':"目前无法查看已保存的八字报告。"}],
+  ["조회가 실패한 상태이며, 기록이 없다는 뜻은 아닙니다. 나중에 다시 확인해 주세요.", {'ja-JP':"取得に失敗しました。記録がないことを意味しません。後ほど再度ご確認ください。", 'zh-TW':"查詢失敗並不代表沒有紀錄，請稍後再試。", 'en-US':"The read failed; this does not mean you have no records. Try again later.", 'zh-CN':"查询失败不代表没有记录，请稍后重试。"}],
+  ["저장된 기억을 지금 확인할 수 없습니다. 다른 기록은 계속 확인할 수 있습니다.", {'ja-JP':"現在、保存済みの記憶を確認できません。ほかの記録は引き続き表示できます。", 'zh-TW':"目前無法查看已儲存的記憶，其他紀錄仍可使用。", 'en-US':"Saved memories are unavailable now. You can still view your other records.", 'zh-CN':"目前无法查看已保存的记忆，其他记录仍可使用。"}],
+  ["조회할 수 없음", {'ja-JP':"確認できません", 'zh-TW':"無法查詢", 'en-US':"Unable to load", 'zh-CN':"无法查询"}],
 ]);
