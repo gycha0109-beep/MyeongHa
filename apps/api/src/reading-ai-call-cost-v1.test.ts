@@ -21,7 +21,9 @@ describe('authoritative server-only Reading AI provider call costs',()=>{
       estimatedCostMicroUsd:1020,costStatus:'estimated',invoiceReconciled:false,
       inputTokens:1000,outputTokens:100,cachedInputTokens:200,reasoningTokens:20,
     });
-    const noPrice=buildReadingAiCallCostV1({...known,price:undefined});
+    const {price:omittedPrice,...withoutPrice}=known;
+    expect(omittedPrice.priceVersion).toBe('fixture-rate-v1');
+    const noPrice=buildReadingAiCallCostV1(withoutPrice);
     expect(noPrice.estimatedCostMicroUsd).toBeNull();
     expect(noPrice.costStatus).toBe('price_unknown');
     const missingCache=buildReadingAiCallCostV1({...known,usage:{...known.usage,cachedInputTokens:null}});
