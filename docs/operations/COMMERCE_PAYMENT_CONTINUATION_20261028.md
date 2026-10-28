@@ -25,6 +25,20 @@ type, and execute the console code in isolated regression tests.
 Local verification: six direct suites, 32 tests passed. This is isolated evidence,
 not a real KCP payment or hosted PAID/Receipt proof.
 
+### Hosted defect found while restoring #2680
+
+The original #2680 relay returns 503 on the real Worker preview even though the
+official CDN directly returns 200 JavaScript. Preview build `707db6ca-6216-4ac6-a641-6f65f66e3fad`
+at `577af8dc2acb4a711f9c264a9564a2d59f21ac26` reports only the fixed
+`upstream-unavailable` classification, without leaking upstream body/error text.
+
+[Cloudflare's Request contract](https://developers.cloudflare.com/workers/runtime-apis/request/)
+supports `follow` and `manual`, but `redirect:error` throws before network I/O.
+The restored Node/mock tests could not establish Workers compatibility. Change
+the relay to `manual` and reject every non-200 response, including all redirects.
+Add the Workers-specific regression and require hosted SDK 200 before merge.
+This preserves the fixed URL and redirect rejection; it does not relax a guard.
+
 ## Current runtime boundary
 
 Initial Cloudflare readback: active Worker v174,
