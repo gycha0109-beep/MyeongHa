@@ -430,8 +430,9 @@ function renderSajuReadings(readingPayload, lifeFactsPayload) {
     for (const reading of readings) renderPersistedReading(target, reading);
     return;
   }
-  if (allowsDevelopmentSajuSamples() && lifeFactsPayload?.status !== 'unavailable') {
-    renderSajuReadingSamples(target, lifeFactsPayload);
+  if (allowsDevelopmentSajuSamples()) {
+    if (lifeFactsPayload?.status === 'unavailable') renderSajuReadingEmpty(target);
+    else renderSajuReadingSamples(target, lifeFactsPayload);
     return;
   }
   renderSajuReadingEmpty(target);
