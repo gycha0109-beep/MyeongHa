@@ -168,8 +168,22 @@ jobs:
 
           run_id=''
           for _ in $(seq 1 30); do
-            runs="$(gh run list               --workflow production-postgres-backup.yml               --branch main               --event workflow_dispatch               --limit 20               --json databaseId,headSha,createdAt)"
-            run_id="$(jq -r               --arg sha "$GITHUB_SHA"               --argjson dispatched_at "$dispatched_at"               '[.[] | select(.headSha == $sha and ((.createdAt | fromdateiso8601) >= $dispatched_at))] | sort_by(.createdAt) | last | .databaseId // empty'               <<<"$runs")"
+            runs="$(gh run list               --workflow production-postgres-backup.yml               --branch main               --event workflow_dispatch               --limit 20               --json databaseId,createdAt,event,headBranch)"
+            # Moving main is valid; bind an unambiguous bot-triggered child run.
+            candidates="$(jq -c --argjson dispatched_at "$dispatched_at" '[.[] | select(.event == "workflow_dispatch" and .headBranch == "main" and ((.createdAt | fromdateiso8601) >= $dispatched_at)) | .databaseId]' <<<"$runs")"
+            count="$(jq 'length' <<<"$candidates")"
+            if [[ "$count" -gt 1 ]]; then
+              echo '::error title=Ambiguous child dispatch::Multiple child runs matched; refusing to guess.' >&2
+              exit 1
+            fi
+            run_id="$(jq -r 'if length == 1 then .[0] else empty end' <<<"$candidates")"
+            if [[ -n "$run_id" ]]; then
+              child="$(gh api "/repos/$GITHUB_REPOSITORY/actions/runs/$run_id")"
+              jq -e '.event == "workflow_dispatch" and .head_branch == "main" and .actor.login == "github-actions[bot]"' <<<"$child" >/dev/null || {
+                echo '::error title=Untrusted child dispatch::Child run is not a main-branch Actions-bot dispatch.' >&2
+                exit 1
+              }
+            fi
             [[ -z "$run_id" ]] || break
             sleep 2
           done
@@ -247,8 +261,22 @@ jobs:
 
           run_id=''
           for _ in $(seq 1 30); do
-            runs="$(gh run list               --workflow production-postgres-privacy-recovery-ledger.yml               --branch main               --event workflow_dispatch               --limit 20               --json databaseId,headSha,createdAt)"
-            run_id="$(jq -r               --arg sha "$GITHUB_SHA"               --argjson dispatched_at "$dispatched_at"               '[.[] | select(.headSha == $sha and ((.createdAt | fromdateiso8601) >= $dispatched_at))] | sort_by(.createdAt) | last | .databaseId // empty'               <<<"$runs")"
+            runs="$(gh run list               --workflow production-postgres-privacy-recovery-ledger.yml               --branch main               --event workflow_dispatch               --limit 20               --json databaseId,createdAt,event,headBranch)"
+            # Moving main is valid; bind an unambiguous bot-triggered child run.
+            candidates="$(jq -c --argjson dispatched_at "$dispatched_at" '[.[] | select(.event == "workflow_dispatch" and .headBranch == "main" and ((.createdAt | fromdateiso8601) >= $dispatched_at)) | .databaseId]' <<<"$runs")"
+            count="$(jq 'length' <<<"$candidates")"
+            if [[ "$count" -gt 1 ]]; then
+              echo '::error title=Ambiguous child dispatch::Multiple child runs matched; refusing to guess.' >&2
+              exit 1
+            fi
+            run_id="$(jq -r 'if length == 1 then .[0] else empty end' <<<"$candidates")"
+            if [[ -n "$run_id" ]]; then
+              child="$(gh api "/repos/$GITHUB_REPOSITORY/actions/runs/$run_id")"
+              jq -e '.event == "workflow_dispatch" and .head_branch == "main" and .actor.login == "github-actions[bot]"' <<<"$child" >/dev/null || {
+                echo '::error title=Untrusted child dispatch::Child run is not a main-branch Actions-bot dispatch.' >&2
+                exit 1
+              }
+            fi
             [[ -z "$run_id" ]] || break
             sleep 2
           done
