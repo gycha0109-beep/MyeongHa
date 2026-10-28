@@ -1,0 +1,36 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { describe, expect, it } from 'vitest';
+
+const migration = readFileSync(
+  join(process.cwd(), 'supabase/migrations/1303_records_official_reading_purchase_grant_reread.sql'),
+  'utf8',
+);
+const fixture = readFileSync(
+  join(process.cwd(), 'test/db/official_standard_reading_reader_interpretation.sql'),
+  'utf8',
+);
+
+describe('Paid Records archive current-Grant authority', () => {
+  it('preserves the owner-scoped server-only official Reading query without opening paid rights', () => {
+    expect(migration).toContain('create or replace function public.qry_official_reading_record_runtime_v1');
+    expect(migration).toContain('perform public.assert_myeongha_subject_context_v1(p_subject_id);');
+    expect(migration).toContain("rr.product_response_state in ('delivered', 'delivered_with_fallback')");
+    expect(migration).toContain('r.subject_id = p_subject_id');
+    expect(migration).toContain('not exists (\n          select 1 from public.standard_reading_official_bindings o');
+    expect(migration).toContain('and not exists (\n          select 1 from public.standard_reading_unit_bindings b');
+    expect(migration).toContain('internal_qry_standard_reading_artifact_source_v2(');
+    expect(migration).toContain('internal_qry_standard_reading_artifact_source_v1(');
+    expect(migration).toContain('paid.response_hash = rr.response_hash');
+  });
+
+  it('retains executor-only access and tests final revoke, B2-active and independent-reader behavior', () => {
+    expect(migration).toContain('revoke all on function public.qry_official_reading_record_runtime_v1');
+    expect(migration).toContain('to myeongha_api_executor;');
+    expect(migration).toContain("'anon'");
+    expect(migration).toContain("'authenticated'");
+    expect(fixture).toContain('Records paid archive denies a fully revoked official Reading');
+    expect(fixture).toContain('Records rereads the same immutable official Reading with B2 exact active grant');
+    expect(fixture).toContain('Records paid archive becomes inaccessible after last active Grant revoke');
+  });
+});
