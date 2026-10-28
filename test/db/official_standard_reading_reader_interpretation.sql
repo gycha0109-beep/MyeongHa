@@ -392,48 +392,120 @@ select pg_temp.assert_v2_true(
   (select count(*) = 1 from public.standard_reading_reader_access_grants)
 );
 
--- Commit the official Source Truth before an Additional Reader may reuse it.
-insert into public.reading_execution_attempts(
-  id, reading_id, subject_id, execution_attempt_no, state,
-  transport_key, saju_engine_key, requested_engine_version, resolved_engine_version,
-  external_request_ref, started_at, finished_at, error_code
-) values (
-  '12104000-0000-0000-0000-000000000001',
-  '12103100-0000-0000-0000-000000000001',
-  '11390000-0000-0000-0000-000000000001',
-  1, 'succeeded',
-  'official-reader-v2-test', 'saju-test', null, 'saju-test-v2',
-  null, clock_timestamp(), clock_timestamp(), null
+-- End-to-end DB issuance: exercise the EXISTING transport prepare/finalize
+-- transaction instead of manually inserting successful rows. The response is an
+-- explicit SYNTHETIC ProductReadingResponse fixture, never Production Saju authority.
+select pg_temp.assert_v2_true(
+  'E2E initial paid official Reading prepares exactly one source transport attempt',
+  (
+    select execution_attempt_id = '12104000-0000-0000-0000-000000000001'::uuid
+       and execution_attempt_no = 1
+       and attempt_state = 'running'
+       and replayed = false
+    from public.cmd_prepare_reading_transport_attempt_v1(
+      '11390000-0000-0000-0000-000000000001',
+      '12103100-0000-0000-0000-000000000001',
+      '12104000-0000-0000-0000-000000000001',
+      'official-reader-v2-test',
+      'saju-test',
+      'saju-test-v2'
+    )
+  )
 );
 
-begin;
-
-insert into public.reading_refs(
-  reading_id, subject_id, execution_attempt_id, saju_engine_key,
-  external_reading_ref, source_birth_input_hash, target_birth_input_hash,
-  saju_engine_version, reading_contract_version, product_response_state,
-  required_action_jsonb, clarifications_jsonb, calculation_ambiguity_jsonb,
-  response_snapshot_jsonb, response_hash, created_at
-) values (
-  '12103100-0000-0000-0000-000000000001',
-  '11390000-0000-0000-0000-000000000001',
-  '12104000-0000-0000-0000-000000000001',
-  'saju-test', null, 'sha256:test:official-standard-reading-self-v1', null,
-  'saju-test-v2', 'product-reading-test-v2', 'delivered',
-  null, null, null,
-  '{"responseVersion":"myeonghwa-product-reading-response-v2","artifact":"official-source"}'::jsonb,
-  'sha256:test-official-reading-artifact',
-  clock_timestamp()
+select pg_temp.assert_v2_true(
+  'E2E pre-finalize Reading is not available in paid Records',
+  not exists(
+    select 1 from public.qry_official_reading_record_runtime_v1(
+      '11390000-0000-0000-0000-000000000001',
+      '12103100-0000-0000-0000-000000000001'
+    )
+  )
 );
 
-update public.readings
-set execution_status = 'succeeded',
-    committed_execution_attempt_id = '12104000-0000-0000-0000-000000000001',
-    completed_at = clock_timestamp()
-where id = '12103100-0000-0000-0000-000000000001'
-  and subject_id = '11390000-0000-0000-0000-000000000001';
+-- Authenticated Production source signature and semantics would have to be
+-- approved BEFORE this lower-level command. This fixture explicitly exercises
+-- only the DB command, hash provenance and read authority without claiming it.
+select pg_temp.assert_v2_true(
+  'E2E synthetic approved-source fixture finalizes and creates immutable Reading Ref',
+  (
+    select reading_id = '12103100-0000-0000-0000-000000000001'::uuid
+       and execution_attempt_id = '12104000-0000-0000-0000-000000000001'::uuid
+       and response_hash = 'sha256:v1:a070c64d52193e398ba24eede0370be111de9352d1f652f81c487ebfc7ca3bb0'
+       and replayed = false
+    from public.cmd_finalize_reading_transport_success_v1(
+      '11390000-0000-0000-0000-000000000001',
+      '12103100-0000-0000-0000-000000000001',
+      '12104000-0000-0000-0000-000000000001',
+      '12105000-0000-0000-0000-000000000001',
+      'test-issuer-request-ref-v1',
+      'saju-test-v2',
+      'test-saju-native-reading-v1',
+      'sha256:test:official-standard-reading-self-v1',
+      null,
+      'myeonghwa-product-reading-response-v2',
+      'delivered',
+      null,
+      null,
+      null,
+      '{"responseVersion":"myeonghwa-product-reading-response-v2","responseId":"reading_response_aaaaaaaaaaaaaaaaaaaaaaaa","state":"delivered","messageCode":"READING_DELIVERED","requiredAction":"none","reading":{"readingId":"12103100-0000-0000-0000-000000000001","sections":[{"sectionType":"overview","state":"complete","title":"테스트 공식 결과","blocks":[{"type":"paragraph","text":"합성 테스트 결과입니다. 실제 사주 해석이 아닙니다."}]}],"disclosures":[{"type":"scope_limitation","text":"실제 발행 검증이 아닌 테스트입니다."}]}}'::jsonb,
+      'sha256:v1:a070c64d52193e398ba24eede0370be111de9352d1f652f81c487ebfc7ca3bb0'
+    )
+  )
+);
 
-commit;
+select pg_temp.assert_v2_true(
+  'E2E committed report reads the exact source and immutable Body only with active buyer Grant',
+  (
+    select count(*) = 1
+       and min(response_hash) = 'sha256:v1:a070c64d52193e398ba24eede0370be111de9352d1f652f81c487ebfc7ca3bb0'
+       and bool_and(response_snapshot_jsonb->>'responseId' = 'reading_response_aaaaaaaaaaaaaaaaaaaaaaaa')
+       and bool_and(response_snapshot_jsonb->'reading'->>'readingId'
+         = '12103100-0000-0000-0000-000000000001')
+       and bool_and(response_snapshot_jsonb->'reading'->'disclosures'->0->>'type'
+         = 'scope_limitation')
+    from public.qry_official_reading_record_runtime_v1(
+      '11390000-0000-0000-0000-000000000001',
+      '12103100-0000-0000-0000-000000000001'
+    )
+  )
+  and (select count(*) = 1 from public.reading_refs
+       where reading_id = '12103100-0000-0000-0000-000000000001')
+  and (select count(*) = 1 from public.outbox_events
+       where aggregate_type = 'reading'
+         and aggregate_id = '12103100-0000-0000-0000-000000000001')
+);
+
+select pg_temp.assert_v2_true(
+  'E2E exact successful finalize retry returns the same artifact without creating a second Outbox',
+  (
+    select replayed = true
+       and response_hash = 'sha256:v1:a070c64d52193e398ba24eede0370be111de9352d1f652f81c487ebfc7ca3bb0'
+    from public.cmd_finalize_reading_transport_success_v1(
+      '11390000-0000-0000-0000-000000000001',
+      '12103100-0000-0000-0000-000000000001',
+      '12104000-0000-0000-0000-000000000001',
+      '12105000-0000-0000-0000-000000000002',
+      'test-issuer-request-ref-v1',
+      'saju-test-v2',
+      'test-saju-native-reading-v1',
+      'sha256:test:official-standard-reading-self-v1',
+      null,
+      'myeonghwa-product-reading-response-v2',
+      'delivered',
+      null,
+      null,
+      null,
+      '{"responseVersion":"myeonghwa-product-reading-response-v2","responseId":"reading_response_aaaaaaaaaaaaaaaaaaaaaaaa","state":"delivered","messageCode":"READING_DELIVERED","requiredAction":"none","reading":{"readingId":"12103100-0000-0000-0000-000000000001","sections":[{"sectionType":"overview","state":"complete","title":"테스트 공식 결과","blocks":[{"type":"paragraph","text":"합성 테스트 결과입니다. 실제 사주 해석이 아닙니다."}]}],"disclosures":[{"type":"scope_limitation","text":"실제 발행 검증이 아닌 테스트입니다."}]}}'::jsonb,
+      'sha256:v1:a070c64d52193e398ba24eede0370be111de9352d1f652f81c487ebfc7ca3bb0'
+    )
+  )
+  and (select count(*) = 1 from public.reading_refs
+       where reading_id = '12103100-0000-0000-0000-000000000001')
+  and (select count(*) = 1 from public.outbox_events
+       where aggregate_type = 'reading'
+         and aggregate_id = '12103100-0000-0000-0000-000000000001')
+);
 
 create temp table _v2_additional_result as
 select *
@@ -502,7 +574,7 @@ select pg_temp.assert_v2_true(
       clock_timestamp()
     ) q
     where q.reading_id = '12103100-0000-0000-0000-000000000001'
-      and q.response_hash = 'sha256:test-official-reading-artifact'
+      and q.response_hash = 'sha256:v1:a070c64d52193e398ba24eede0370be111de9352d1f652f81c487ebfc7ca3bb0'
   )
   and exists (
     select 1
@@ -535,7 +607,7 @@ select pg_temp.assert_v2_true(
       and q.reading_id = '12103100-0000-0000-0000-000000000001'
       and q.reader_character_id = 'test-standard-reader'
       and q.reader_content_bundle_id = '11391000-0000-0000-0000-000000000001'
-      and q.response_hash = 'sha256:test-official-reading-artifact'
+      and q.response_hash = 'sha256:v1:a070c64d52193e398ba24eede0370be111de9352d1f652f81c487ebfc7ca3bb0'
   )
   and exists (
     select 1
@@ -616,7 +688,7 @@ select pg_temp.assert_v2_true(
     select 1
     from public.reading_refs
     where reading_id = '12103100-0000-0000-0000-000000000001'
-      and response_hash = 'sha256:test-official-reading-artifact'
+      and response_hash = 'sha256:v1:a070c64d52193e398ba24eede0370be111de9352d1f652f81c487ebfc7ca3bb0'
   )
 );
 
@@ -1089,7 +1161,7 @@ select pg_temp.assert_v2_true(
   'Records rereads the same immutable official Reading with B2 exact active grant',
   (
     select count(*) = 1
-       and min(result.response_hash) = 'sha256:test-official-reading-artifact'
+       and min(result.response_hash) = 'sha256:v1:a070c64d52193e398ba24eede0370be111de9352d1f652f81c487ebfc7ca3bb0'
     from public.qry_official_reading_record_runtime_v1(
       '11390000-0000-0000-0000-000000000001',
       '12103100-0000-0000-0000-000000000001'
