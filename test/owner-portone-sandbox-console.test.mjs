@@ -89,6 +89,11 @@ describe('Owner KCP TEST console: no browser monetary authority',()=>{
    const client=readFileSync(new URL('../apps/web/owner-portone-sandbox.js',import.meta.url),'utf8');
    expect(worker).toContain("url.pathname === '/owner-portone-sandbox.html'");
    expect(worker).toContain("script-src 'self' https://cdn.portone.io");
+   // Actual V2 SDK prepare traffic uses this exact iamport service origin.
+   // It must be allowed only by the dedicated Owner sandbox page policy.
+   expect(worker).toContain("connect-src 'self' https://checkout-service.prod.iamport.co https://*.portone.io https://*.kcp.co.kr");
+   expect(worker.split("if (url.pathname === '/owner-portone-sandbox.html'")[0])
+     .not.toContain('https://checkout-service.prod.iamport.co');
    expect(page).toContain('owner-portone-sandbox.js');
    expect(client).toContain("await serverRequest('/api/me/credits')");
    expect(client).toContain("requireOwnerSandboxWalletV1(data)");
