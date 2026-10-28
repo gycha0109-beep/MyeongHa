@@ -13,6 +13,8 @@ const paths = {
   strictTlsHelper: 'scripts/operations/prepare-production-postgres-strict-libpq.mjs',
   builder: 'scripts/build-postgres-privacy-recovery-ledger-manifest.mjs',
   coverage: 'scripts/validate-postgres-privacy-recovery-ledger-coverage.mjs',
+  snapshotOverlap: 'scripts/validate-postgres-privacy-ledger-snapshot-overlap.mjs',
+  previousSnapshotHelper: 'scripts/operations/verify-previous-privacy-ledger-snapshot-overlap.sh',
   decisions: 'docs/P0_DECISION_REGISTER.md',
   authority: 'docs/operations/POSTGRES_PRIVACY_RECOVERY_LEDGER_AUTHORITY_V1.md',
   historicalCandidate: 'docs/operations/POSTGRES_PRIVACY_RECOVERY_LEDGER_CANDIDATE_V1.md',
@@ -23,7 +25,7 @@ const entries = await Promise.all(
   Object.entries(paths).map(async ([key, path]) => [key, await readFile(path, 'utf8')]),
 );
 const files = Object.fromEntries(entries);
-const contract = files.workflow + '\n' + files.runner + '\n' + files.strictTlsHelper;
+const contract = [files.workflow, files.runner, files.strictTlsHelper, files.previousSnapshotHelper].join('\n');
 
 function requireFragment(key, fragment) {
   if (!files[key].includes(fragment)) {
@@ -75,6 +77,13 @@ for (const fragment of [
   'openssl enc -aes-256-cbc -salt -pbkdf2 -iter 200000',
   'retention-days: 30',
   'authoritative only for the exact governed backup cutoff through captured-at window',
+  'Resolve prior governed privacy ledger artifact',
+  'Download previous encrypted privacy ledger',
+  'verify-previous-privacy-ledger-snapshot-overlap.sh',
+  'PREVIOUS_LEDGER_ARTIFACT_DIR',
+  'snapshot_overlap: $overlap[0]',
+  'validate-postgres-privacy-ledger-snapshot-overlap.mjs',
+  'sha256sum -c',
 ]) {
   if (!contract.includes(fragment)) {
     throw new Error('Missing privacy recovery ledger workflow contract fragment: ' + fragment);
@@ -134,6 +143,17 @@ for (const fragment of [
   'drReady: false',
 ]) {
   requireFragment('coverage', fragment);
+}
+
+for (const fragment of [
+  'previously captured post-backup privacy event absent',
+  'current backup cutoff moved backward',
+  'BACKUP_ADVANCED_WITHOUT_OVERLAP_PROOF',
+  'sourceContinuityProven: false',
+  'futureSafePrivacyReconciliation: false',
+  'drReady: false',
+]) {
+  requireFragment('snapshotOverlap', fragment);
 }
 
 for (const fragment of [
