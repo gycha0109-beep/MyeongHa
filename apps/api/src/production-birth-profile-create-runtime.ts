@@ -44,6 +44,9 @@ export interface CreateProductionBirthProfileCreateRuntimeInputV1 {
 export function createProductionBirthProfileCreateRuntimeV1(
   input: CreateProductionBirthProfileCreateRuntimeInputV1,
 ): ProductionBirthProfileCreateRuntimeV1 {
+  if(input.verifiedBirthAnalytics!==undefined&&input.onBirthProfileCommitted!==undefined)
+    throw Error('Ambiguous birth analytics observer configuration');
+
   const userDataConfig = parseProductionUserDataRuntimeConfigV1(input.env);
   const createConfig = parseProductionBirthProfileCreateRuntimeConfigV1(input.env);
   const poolLease = createProductionPostgresSubjectPoolLeaseV1({
@@ -64,8 +67,6 @@ export function createProductionBirthProfileCreateRuntimeV1(
     nextBirthRevisionId: randomUUID,
   });
 
-  if(input.verifiedBirthAnalytics!==undefined&&input.onBirthProfileCommitted!==undefined)
-    throw Error('Ambiguous birth analytics observer configuration');
   const observer=input.verifiedBirthAnalytics===undefined?input.onBirthProfileCommitted:
     async ({request,revisionId}:{readonly request:Request;readonly revisionId:string})=>{
       await input.verifiedBirthAnalytics!.record(request,revisionId);
