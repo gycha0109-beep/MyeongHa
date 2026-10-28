@@ -38,6 +38,36 @@ The successful [protected isolated restore 40655447574](https://github.com/gycha
 
 Read-only Production ledger inspection on 2026-10-28 found `20261028011357`, newer than the selected backup's `20261027043527`. Repository filename `20261028110500` is separately observed, not assumed to match the live ledger. Consequently current-live-schema freshness, post-capture privacy completeness and future-safe DR remain **HOLD**, tracked in [#1887](https://github.com/gycha0109-beep/MyeongHa/issues/1887). No migration repair/deployment or destructive canary was performed by this documentation update. Approved `PT24H`/`PT6H` and historical comparison `5536s`/`67s` remain unchanged; three-second isolated database execution is **not** service RTO.
 
+## 2026-10-28 — migration frontier authority in the executable DR guard
+
+`scripts/verify-postgres-dr-readiness-authority.mjs` now reads the
+**single latest dated verified restore YAML block above** for currently known
+repository/Production/restore evidence. It **does not** treat the
+`production_schema_latest_deployed_migration: 1310` field in the 2026-09-27
+historical section as a current Production observation.
+
+The 2026-10-28 read-only Production observation is `20261028011357`;
+the selected successful isolated restore is bound to the older backup
+migration `20261027043527`. The latest repository migration filename
+observation is `20261028110500`; that different filename/version is **not**
+automatically equivalent to the remote migration ledger, even though separate
+read-only inspection found the stored SQL body of remote `20261028011357`
+matching the source file prefix except for the trailing transaction terminator.
+Remote-only `20261008090417` remains unresolved under [#1887](https://github.com/gycha0109-beep/MyeongHa/issues/1887).
+
+The guard enforces `verified_restore_covers_live_frontier=false`,
+`provider_managed_data_full_restore=false`,
+`future_safe_privacy_reconciliation=false`, and `dr_ready=false`.
+A later repository migration filename on a PR is treated as an **unverified
+candidate**, not proof of deployed Production or a fresh restore. Main-branch
+repository advancement requires the dated observation to be refreshed;
+no historical 1310 assertion is allowed to serve as that refresh. Existing
+historical evidence assertions are retained **only as provenance checks**.
+
+This is a classification/false-positive correction. It neither repairs
+Supabase migration history nor authorizes live-schema DR, Hosted provider
+recovery, or service resumption.
+
 ## Historical evidence snapshot — 2026-09-27 (fields below are not current 2026-10-28 Production authority)
 
 ```yaml
