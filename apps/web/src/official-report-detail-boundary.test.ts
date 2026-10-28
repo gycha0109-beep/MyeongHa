@@ -50,6 +50,23 @@ describe('Records long-form official report boundary', () => {
     expect(runtime).toContain('window.addEventListener(PRODUCT_AUTH_STORAGE_V1.changedEvent, onReadingAuthChanged)');
   });
 
+  it('shows only evidence and reader history from the authorized snapshot, never inferred Birth revision', () => {
+    expect(jsx).toContain('data-official-report-facts hidden');
+    expect(jsx).toContain('data-official-report-first hidden');
+    expect(jsx).toContain('data-official-report-reader');
+    expect(jsx).toContain('발행 당시 출생정보 차수');
+    expect(jsx).toContain('이 기록에 제공되지 않음');
+    expect(jsx).toContain('현재 명식록 확인하기 →');
+    expect(runtime).toContain('renderStoredReportEvidence(preview.calculationSummary)');
+    expect(runtime).toContain('firstText.textContent = preview.steps[0].primary;');
+    expect(runtime).toContain("const ids = record.readerCharacterIds;");
+    expect(runtime).toContain("resolveCharacterDisplayNameV1(id, getUiLocale()) ?? id");
+    expect(runtime).not.toContain('currentBirthRevision ===');
+    expect(runtime).not.toContain('requestPaidRegeneration(');
+    expect(runtime).toContain("if (facts) facts.hidden = true;");
+    expect(runtime).toContain("if (first) first.hidden = true;");
+  });
+
   it('has five-locale fixed controls without translating report source text', () => {
     for (const source of [
       '저장된 공식 사주 보고서', '발행일', '해석 버전',
