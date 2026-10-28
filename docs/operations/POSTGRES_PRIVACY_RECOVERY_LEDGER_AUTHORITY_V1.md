@@ -114,6 +114,42 @@ change. `future_safe_privacy_reconciliation=false` and `dr_ready=false`
 remain mandatory pending independently verified continuous source authority,
 Hosted provider equivalence, and full recovery acceptance.
 
+## 2026-10-28 — encrypted snapshot overlap preservation
+
+The existing scheduled Production privacy-ledger workflow now selects the latest
+successful prior ledger and downloads its encrypted artifact into the same
+protected ephemeral Actions job. It verifies the predecessor ciphertext and
+plaintext checksums, decrypts it only inside the job, and compares the previous
+and current governed reconciliation manifests before uploading the next ledger.
+
+- When snapshot windows overlap (including two snapshots of the same governed
+  backup), every previously captured deletion or revocation event occurring
+  after the newer backup cutoff **must still appear with identical event facts**.
+  A missing captured event fails the scheduled ledger run before the new
+  authoritative artifact upload.
+- When the governed backup cutoff has advanced beyond the previous capture,
+  the comparison reports `BACKUP_ADVANCED_WITHOUT_OVERLAP_PROOF`, **not**
+  continuity PASS. A current backup's restored privacy state is not proved by
+  comparison of the two lists.
+- Without any previous successful artifact, the status is
+  `NO_PREDECESSOR_UNVERIFIED`. An earlier successful run with a missing,
+  expired, ambiguous or corrupt artifact fails closed rather than silently
+  upgrading a new snapshot to continuity authority.
+- The uploaded public manifest carries only identifier-free overlap status,
+  dates, run IDs, and counts. Source identifiers and event payloads remain
+  inside encrypted archives; decryption work directories are removed.
+- Verification neither changes Production tables nor replays a destructive
+  canary. It reuses GitHub Actions and the existing encrypted artifact storage.
+
+**Important limit:** snapshot overlap preservation does not detect events
+written and permanently removed between two successful captures. It does not
+prove independent continuous event capture, cross-backup restored-state parity,
+Hosted Auth/Storage restoration or general service readiness. The admission
+rule remains `incident_reference_utc <= authoritative_coverage_through`;
+`sourceContinuityProven=false`, `future_safe_privacy_reconciliation=false`,
+and `dr_ready=false` remain mandatory until real independent source evidence
+and the remaining provider/serving requirements are proven.
+
 ## Non-claims
 
 This authority does not claim:
