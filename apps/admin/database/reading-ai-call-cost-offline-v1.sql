@@ -44,6 +44,9 @@ create table myeongha_admin_ops.reading_ai_call_cost_events_v1 (
   cached_input_tokens bigint null,
   reasoning_tokens bigint null,
   price_version text null,
+  applied_input_rate_micro_usd_per_million bigint null,
+  applied_cached_input_rate_micro_usd_per_million bigint null,
+  applied_output_rate_micro_usd_per_million bigint null,
   estimated_cost_micro_usd bigint null,
   cost_status text not null,
   event_jsonb jsonb not null,
@@ -58,6 +61,11 @@ create table myeongha_admin_ops.reading_ai_call_cost_events_v1 (
   constraint reading_ai_cost_status_ck check(
     (cost_status='estimated' and estimated_cost_micro_usd is not null and price_version is not null)
     or (cost_status in('usage_unknown','price_unknown') and estimated_cost_micro_usd is null)),
+  constraint reading_ai_cost_rate_ck check(
+    ((price_version is null and applied_input_rate_micro_usd_per_million is null
+       and applied_cached_input_rate_micro_usd_per_million is null and applied_output_rate_micro_usd_per_million is null)
+     or (price_version is not null and applied_input_rate_micro_usd_per_million>=0
+       and applied_cached_input_rate_micro_usd_per_million>=0 and applied_output_rate_micro_usd_per_million>=0))),
   constraint reading_ai_cost_counts_ck check(
     (input_tokens is null or input_tokens>=0) and
     (output_tokens is null or output_tokens>=0) and
@@ -71,6 +79,7 @@ create table myeongha_admin_ops.reading_ai_call_cost_events_v1 (
 create index reading_ai_cost_reading_lookup_v1 on myeongha_admin_ops.reading_ai_call_cost_events_v1
   (reading_id,observed_at desc);
 alter table myeongha_admin_ops.reading_ai_call_cost_events_v1 enable row level security;
+grant create on schema myeongha_admin_ops to myeongha_reading_ai_cost_source_v1;
 alter table myeongha_admin_ops.reading_ai_call_cost_events_v1 owner to myeongha_reading_ai_cost_source_v1;
 
 -- SECURITY DEFINER is private and narrow; nobody gets table write access.
@@ -86,6 +95,7 @@ declare
   v_existing jsonb;
   v_field text;
   v_amount numeric;
+  v_expected numeric;
   v_observed timestamptz;
 begin
   if p_subject is null or p_reading is null or p_attempt is null or
@@ -94,8 +104,9 @@ begin
        ('schemaVersion','source','workload','purpose','subjectId','readingId','executionAttemptId',
         'callId','observedAt','providerKey','modelKey','outcome','inputTokens','outputTokens',
         'cachedInputTokens','reasoningTokens','priceVersion','estimatedCostMicroUsd',
-        'costStatus','invoiceReconciled'))>0 or
-     (select count(*) from jsonb_object_keys(p_event))<>20 or
+        'costStatus','invoiceReconciled','appliedInputRateMicroUsdPerMillion',
+        'appliedCachedInputRateMicroUsdPerMillion','appliedOutputRateMicroUsdPerMillion'))>0 or
+     (select count(*) from jsonb_object_keys(p_event))<>23 or
      p_event->>'schemaVersion'<>'reading-ai-call-cost-v1' or
      p_event->>'workload'<>'reading' or
      p_event->>'purpose'<>'reading_generation' or
@@ -124,7 +135,8 @@ begin
     raise exception 'Unbound Reading AI execution attempt';
   end if;
   foreach v_field in array array['inputTokens','outputTokens','cachedInputTokens',
-    'reasoningTokens','estimatedCostMicroUsd'] loop
+    'reasoningTokens','estimatedCostMicroUsd','appliedInputRateMicroUsdPerMillion',
+    'appliedCachedInputRateMicroUsdPerMillion','appliedOutputRateMicroUsdPerMillion'] loop
     if p_event->v_field <> 'null'::jsonb then
       if jsonb_typeof(p_event->v_field) is distinct from 'number' or
         p_event->>v_field !~ '^(0|[1-9][0-9]*)$' then
@@ -134,7 +146,21 @@ begin
       if v_amount>9007199254740991 then raise exception 'Unsafe Reading AI cost amount';end if;
     end if;
   end loop;
-  if (p_event->>'costStatus'='estimated') <> (p_event->>'estimatedCostMicroUsd' is not null)
+  if ((p_event->>'priceVersion' is null) <> (p_event->>'appliedInputRateMicroUsdPerMillion' is null
+     and p_event->>'appliedCachedInputRateMicroUsdPerMillion' is null
+     and p_event->>'appliedOutputRateMicroUsdPerMillion' is null))
+    or (p_event->>'priceVersion' is not null and
+      (p_event->>'appliedInputRateMicroUsdPerMillion' is null
+       or p_event->>'appliedCachedInputRateMicroUsdPerMillion' is null
+       or p_event->>'appliedOutputRateMicroUsdPerMillion' is null))
+    or (p_event->>'priceVersion' is null and p_event->>'costStatus'<>'price_unknown')
+    or (p_event->>'priceVersion' is not null and
+      (p_event->>'inputTokens' is null or p_event->>'outputTokens' is null
+       or p_event->>'cachedInputTokens' is null) and p_event->>'costStatus'<>'usage_unknown')
+    or (p_event->>'costStatus'='estimated' and
+      (p_event->>'inputTokens' is null or p_event->>'outputTokens' is null
+       or p_event->>'cachedInputTokens' is null))
+    or (p_event->>'costStatus'='estimated') <> (p_event->>'estimatedCostMicroUsd' is not null)
     or (p_event->>'costStatus'='estimated' and p_event->>'priceVersion' is null)
     or (p_event->>'source'='provider_response_usage' and
        (p_event->>'inputTokens' is null or p_event->>'outputTokens' is null))
@@ -143,16 +169,30 @@ begin
         p_event->>'cachedInputTokens' is not null or p_event->>'reasoningTokens' is not null)) then
     raise exception 'Unbound Reading AI cost observation';
   end if;
+  if p_event->>'costStatus'='estimated' then
+    v_expected:=ceil(((p_event->>'inputTokens')::numeric-(p_event->>'cachedInputTokens')::numeric)
+      *(p_event->>'appliedInputRateMicroUsdPerMillion')::numeric / 1000000
+      + (p_event->>'cachedInputTokens')::numeric*(p_event->>'appliedCachedInputRateMicroUsdPerMillion')::numeric / 1000000
+      + (p_event->>'outputTokens')::numeric*(p_event->>'appliedOutputRateMicroUsdPerMillion')::numeric / 1000000);
+    if v_expected is distinct from (p_event->>'estimatedCostMicroUsd')::numeric then
+      raise exception 'Reading AI estimate does not match pinned usage and rate';
+    end if;
+  end if;
   insert into myeongha_admin_ops.reading_ai_call_cost_events_v1 (
     call_id,reading_id,subject_id,execution_attempt_id,provider_key,model_key,outcome,
     source,observed_at,input_tokens,output_tokens,cached_input_tokens,reasoning_tokens,
-    price_version,estimated_cost_micro_usd,cost_status,event_jsonb
+    price_version,applied_input_rate_micro_usd_per_million,
+    applied_cached_input_rate_micro_usd_per_million,applied_output_rate_micro_usd_per_million,
+    estimated_cost_micro_usd,cost_status,event_jsonb
   ) values (
     v_call,p_reading,p_subject,p_attempt,p_event->>'providerKey',p_event->>'modelKey',
     p_event->>'outcome',p_event->>'source',v_observed,
     (p_event->>'inputTokens')::bigint,(p_event->>'outputTokens')::bigint,
     (p_event->>'cachedInputTokens')::bigint,(p_event->>'reasoningTokens')::bigint,
-    p_event->>'priceVersion',(p_event->>'estimatedCostMicroUsd')::bigint,
+    p_event->>'priceVersion',(p_event->>'appliedInputRateMicroUsdPerMillion')::bigint,
+    (p_event->>'appliedCachedInputRateMicroUsdPerMillion')::bigint,
+    (p_event->>'appliedOutputRateMicroUsdPerMillion')::bigint,
+    (p_event->>'estimatedCostMicroUsd')::bigint,
     p_event->>'costStatus',p_event
   ) on conflict (call_id) do nothing;
   get diagnostics v_inserted=row_count;
@@ -166,7 +206,6 @@ begin
   return query select v_call,v_inserted=0;
 end $$;
 
-grant create on schema myeongha_admin_ops to myeongha_reading_ai_cost_source_v1;
 alter function myeongha_admin_ops.cmd_record_reading_ai_call_v1(uuid,uuid,uuid,jsonb)
   owner to myeongha_reading_ai_cost_source_v1;
 revoke create on schema myeongha_admin_ops from myeongha_reading_ai_cost_source_v1;
