@@ -88,6 +88,32 @@ describe('Records long-form official report boundary', () => {
     expect(css).toContain('.official-report-section:focus-visible');
   });
 
+  it('preserves every official scope limitation and hides missing structural evidence', () => {
+    expect(runtime).toContain("notices.filter((text) => typeof text === 'string' && text.trim()).join('\\n\\n')");
+    expect(runtime).not.toContain("notices.find((text)");
+    expect(runtime).toContain("structureBlock.hidden = isStoredRecord && structureParts.length === 0;");
+    expect(runtime).toContain("isStoredRecord ? '' : '원국에서 확인된 해석 축을 바탕으로 읽는 항목입니다.'");
+  });
+
+  it('blocks an explicit 403 without treating revoked access as a temporary Records failure', () => {
+    const ownerDenied = runtime.indexOf('if (response.status === 403)');
+    const genericFailure = runtime.indexOf('if (!response.ok || !payload || payload.ok !== true)');
+    expect(ownerDenied).toBeGreaterThan(0);
+    expect(ownerDenied).toBeLessThan(genericFailure);
+    expect(runtime).toContain("'persisted_record_access_denied'");
+    for (const source of [
+      '이 공식 보고서의 열람 권한이 없습니다.',
+      '현재 계정에서 이 저장된 해석에 접근할 수 없습니다. 기록 페이지에서 이용 가능 여부를 다시 확인해 주세요.',
+    ]) {
+      const translations = RECORDS_HUB_STATIC_UI_COPY_V1.get(source);
+      expect(translations).toBeDefined();
+      for (const locale of ['ja-JP', 'zh-TW', 'en-US', 'zh-CN'] as const) {
+        expect(translations?.[locale]).toBeTruthy();
+        expect(translations?.[locale]).not.toMatch(/[가-힣]/u);
+      }
+    }
+  });
+
   it('has five-locale fixed controls without translating report source text', () => {
     for (const source of [
       '저장된 공식 사주 보고서', '발행일', '해석 버전',
