@@ -38,7 +38,7 @@ describe('OpenAI Admin costs official read-only source',()=>{
     const current=adminAiBudgetWindowV1('2026-10',new Date('2026-10-28T06:00:00Z'));
     const seen:string[]=[];
     const reader=createOpenAiAdminCostsReaderV1({adminKey,projectId,
-      fetchImpl:async url=>{seen.push(String(url));return reply([]);} as typeof fetch});
+      fetchImpl:(async url=>{seen.push(String(url));return reply([]);}) as typeof fetch});
     const observed=await reader.read(current);
     expect(new URL(seen[0]!).searchParams.get('end_time')).toBe(String(Math.floor(Date.parse(current.observedThrough)/1000)));
     expect(observed?.invoiceConfirmed).toBe(false);
