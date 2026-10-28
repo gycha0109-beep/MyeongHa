@@ -110,7 +110,7 @@ begin
      p_event->>'schemaVersion'<>'reading-ai-call-cost-v1' or
      p_event->>'workload'<>'reading' or
      p_event->>'purpose'<>'reading_generation' or
-     p_event->>'invoiceReconciled'<>'false' or
+     p_event->'invoiceReconciled' is distinct from 'false'::jsonb or
      p_event->>'subjectId' is distinct from p_subject::text or
      p_event->>'readingId' is distinct from p_reading::text or
      p_event->>'executionAttemptId' is distinct from p_attempt::text or
@@ -154,6 +154,9 @@ begin
        or p_event->>'appliedCachedInputRateMicroUsdPerMillion' is null
        or p_event->>'appliedOutputRateMicroUsdPerMillion' is null))
     or (p_event->>'priceVersion' is null and p_event->>'costStatus'<>'price_unknown')
+    or (p_event->>'priceVersion' is not null and p_event->>'inputTokens' is not null
+      and p_event->>'outputTokens' is not null and p_event->>'cachedInputTokens' is not null
+      and p_event->>'costStatus'<>'estimated')
     or (p_event->>'priceVersion' is not null and
       (p_event->>'inputTokens' is null or p_event->>'outputTokens' is null
        or p_event->>'cachedInputTokens' is null) and p_event->>'costStatus'<>'usage_unknown')
