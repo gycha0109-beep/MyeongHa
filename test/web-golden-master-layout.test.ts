@@ -75,8 +75,8 @@ describe('Web Golden Master', () => {
       '나의 사주 기본 정보',
       '입력 정보',
       '나의 사주 명식',
-      '유료 사주 해석에서 제공되는 내용',
-      '예시 결과물 미리보기',
+      '사주 해석 상품',
+      '보고서 구성 미리보기',
     ]);
     expectInOrder(page.slice(page.indexOf('const productPreviewTopics')), [
       '전체 사주 해석', '직업 · 커리어', '재물', '연애 · 관계',
