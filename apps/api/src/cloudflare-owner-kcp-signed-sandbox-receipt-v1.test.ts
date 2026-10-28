@@ -82,6 +82,8 @@ describe('Owner KCP TEST signed receipt persistence',()=>{
   const query=state.query.mock.calls[0];
   expect(query?.[0]).toContain('cmd_persist_owner_kcp_signed_sandbox_receipt_v1');
   const [subject,attempt,payload,signature]=query?.[1] as string[];
+  if(typeof payload!=='string'||typeof signature!=='string')
+   throw new Error('Signed receipt query did not include canonical attestation.');
   expect(subject).toBe(SUBJECT);
   expect(attempt).toBe(ATTEMPT);
   expect(JSON.parse(payload)).toMatchObject({
