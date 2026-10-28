@@ -63,6 +63,9 @@ export interface CreateProductionPaymentAttemptServerVerificationRuntimeInputV1 
 export function createProductionPaymentAttemptServerVerificationRuntimeV1(
   input: CreateProductionPaymentAttemptServerVerificationRuntimeInputV1,
 ): ProductionPaymentAttemptServerVerificationRuntimeV1 {
+  if(input.verifiedPurchaseAnalytics!==undefined&&input.onVerifiedReceiptCommitted!==undefined)
+    throw Error('Ambiguous purchase analytics observer configuration');
+
   const userDataConfig = parseProductionUserDataRuntimeConfigV1(input.env);
 
   // Validate and snapshot server-side provider credentials before pool ownership.
@@ -82,8 +85,6 @@ export function createProductionPaymentAttemptServerVerificationRuntimeV1(
     ...(input.pool === undefined ? {} : { pool: input.pool }),
   });
 
-  if(input.verifiedPurchaseAnalytics!==undefined&&input.onVerifiedReceiptCommitted!==undefined)
-    throw Error('Ambiguous purchase analytics observer configuration');
   const observer=input.verifiedPurchaseAnalytics===undefined?input.onVerifiedReceiptCommitted:
     async ({request,receiptId}:{readonly request:Request;readonly receiptId:string})=>{
       await input.verifiedPurchaseAnalytics!.record(request,receiptId);
