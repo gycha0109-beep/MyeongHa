@@ -178,6 +178,12 @@ React 19와 기존 web 워크스페이스에서 설치하는 Vite 8 빌드 도�
 - 현재 명하→Saju `ProductReadingResponse` 계약에는 AI 공급사의 **실제 토큰 사용량·AI 호출 식별자**가 전달되지 않습니다. 따라서 기존 Saju HTTP transport 결과나 Character의 Reading grounding 사용 기록을 Reading 생성 AI 비용으로 변환하지 않습니다. **실제 비용이 0원이라는 뜻이 아니며**, 정본 공급사 호출 관측/전달 경로가 추가될 때까지 원장은 미연결입니다.
 - 일반 `myeongha_api_executor`·고객-facing HTTP·브라우저에는 원장 쓰기 권한을 부여하지 않습니다. 별도 Owner 전용 `GET /api/admin/readings/:id/generation-cost`는 조회 전용 Reader·감사 확인 후 최대 50건의 실제 관측 호출을 반환합니다. 관리자 Reading 상세의 **Reading 생성 AI 비용**에서 열 수 있으며 기존 `/ai-usage`(Reading을 참고한 캐릭터 대화 AI)와 분리됩니다. 운영 DB 역할/SQL 설치, 별도 writer 연결, 실제 공급사 usage source, 예산 전체 관측 완전성 판단은 아직 승인·연결되지 않았습니다.
 
+### A4 Reading 생성 AI 월간 집계 (2026-10-28)
+
+- 전용 `myeongha_admin_ops.qry_reading_ai_cost_month_v1`은 서울 월 시작·종료의 `timestamptz` 구간으로 **이미 기록된 Reading 생성 공급사 호출만** 집계합니다. 호출 수, Reading 수, 비용 결측, 토큰 결측, 관측된 추정 micro-USD를 반환합니다. 0건은 데이터가 없는 것이며 0원 확정이 아닙니다.
+- Owner 감사 경계를 거친 `GET /api/admin/reading-generation-cost/monthly?month=YYYY-MM`을 별도 Admin 예산 패널에 연결했습니다. 월 전체 비용·공급사 청구 확정액·원화 비용은 명시적으로 `null`; 공급사 호출 관측 완전성은 항상 `provider_events_only_unverified`입니다.
+- 기존 `/api/admin/ai-budget`의 캐릭터 대화 원가에 이 원장을 **합산하지 않습니다.** 향후 Saju 서버가 실제 공급사 호출 전체를 권위 있게 관측·전달하고, 가격·환율 근거가 연결되기 전까지 예산 전체 완전성 표시는 HOLD입니다. SQL은 여전히 운영 DB에 설치하지 않은 오프라인 후보이며, 기능은 기본 미연결 상태입니다.
+
 ## workers.dev without a purchased domain (2026-10-28)
 
 The verified account subdomain is gycha0109.workers.dev; this isolated console's intended origin is https://myeongha-admin.gycha0109.workers.dev. Cloudflare Zero Trust registration is complete but there is not yet a dedicated Access application, Admin Worker, dedicated Hyperdrive, or Admin Postgres role.
