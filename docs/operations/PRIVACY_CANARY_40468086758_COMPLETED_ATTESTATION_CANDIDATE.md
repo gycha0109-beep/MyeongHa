@@ -21,7 +21,8 @@ The existing isolated restore provenance resolver intentionally requires **a suc
 
 ## Prepared, unreleased path
 
-- `scripts/attest-completed-production-privacy-canary.mjs` is a candidate, strictly pinned to the three run IDs. It validates only read-only terminal DB and Hosted Auth state and never performs deletion.
+- `scripts/attest-completed-production-privacy-canary.mjs` is a candidate, strictly pinned to the three run IDs. It verifies historical run/job provenance and live GitHub artifact listings (exact IDs, archive digest, original-parent artifact absence and unexpired P30D evidence), then validates only read-only terminal DB and Hosted Auth state. It never performs deletion.
+- Verified GitHub artifact metadata on 2026-10-28 KST: backup artifact `12717562316` (digest `sha256:ba8035581d928091abe9b3f6e49f079368898a9782735cc70653946d4a182506`, expires 2026-11-26T07:39:49Z); ledger artifact `12716914499` (digest `sha256:e381ce4d061da400215987d7ccb4919a0712abf236ee871eb4b0fd8f009018c6`, expires 2026-11-26T07:40:35Z). Parent had zero uploaded artifacts. Expiry and metadata integrity are not actual restoration evidence.
 - `scripts/run-production-privacy-recovery-canary.mjs attest-completed` is a CLI candidate only: the protected GitHub Actions workflow **does not expose the operation**. Its execution route cannot be treated as approved, run or as a successful production proof.
 - `scripts/operations/verify-completed-privacy-canary-artifact-pair.py` validates only public manifest/archive integrity and excludes raw row payloads. It cannot establish completed canary execution by itself.
 

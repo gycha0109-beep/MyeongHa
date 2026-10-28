@@ -1366,6 +1366,7 @@ async function attestCompletedCanary() {
   const {
     attestCompletedPrivacyCanaryReadOnlyV1,
     assertCompletedCanaryHistoricalExecutionV1,
+    assertCompletedCanaryArtifactListingsV1,
   } = await import('./attest-completed-production-privacy-canary.mjs');
   const sourceCanaryRunId = requireRunId(
     requiredEnv('MYEONGHA_PRIVACY_CANARY_RESUME_RUN_ID'));
@@ -1398,6 +1399,12 @@ async function attestCompletedCanary() {
     backupRun: await readGithub(`actions/runs/${governedBackupRunId}`),
     ledgerRun: await readGithub(`actions/runs/${canonicalLedgerRunId}`),
     sourceJobs: await readGithub(`actions/runs/${sourceCanaryRunId}/jobs?per_page=10`),
+  });
+  assertCompletedCanaryArtifactListingsV1({
+    sourceArtifacts: await readGithub(`actions/runs/${sourceCanaryRunId}/artifacts?per_page=100`),
+    backupArtifacts: await readGithub(`actions/runs/${governedBackupRunId}/artifacts?per_page=100`),
+    ledgerArtifacts: await readGithub(`actions/runs/${canonicalLedgerRunId}/artifacts?per_page=100`),
+    nowUtc: new Date().toISOString(),
   });
   const pool = await createAdminPool();
   const client = await pool.connect();

@@ -35,7 +35,12 @@ def load_artifact(path, tag):
         require(len(manifests) == len(ciphertexts) == len(checksums) == 1,
                 f"{tag}_ARCHIVE_STRUCTURE_INVALID")
         manifest = json.loads(archive.read(manifests[0]))
-        cipher_hash = hashlib.sha256(archive.read(ciphertexts[0])).hexdigest()
+        # Production backups can grow; never materialize the encrypted archive in RAM.
+        digest = hashlib.sha256()
+        with archive.open(ciphertexts[0]) as ciphertext:
+            while chunk := ciphertext.read(1024 * 1024):
+                digest.update(chunk)
+        cipher_hash = digest.hexdigest()
         require(manifest.get("archive_name") == ciphertexts[0],
                 f"{tag}_ENCRYPTED_ARCHIVE_NAME_MISMATCH")
         require(manifest.get("encrypted_sha256") == cipher_hash,

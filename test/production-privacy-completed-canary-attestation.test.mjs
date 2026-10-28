@@ -5,6 +5,7 @@ import {
   COMPLETED_PRIVACY_CANARY_READ_ONLY_SQL_V1,
   assertCompletedPrivacyCanaryAttestationInputsV1,
   assertCompletedCanaryHistoricalExecutionV1,
+  assertCompletedCanaryArtifactListingsV1,
   attestCompletedPrivacyCanaryReadOnlyV1,
 } from '../scripts/attest-completed-production-privacy-canary.mjs';
 
@@ -112,6 +113,7 @@ describe('historical privacy canary completed evidence is read-only and exact-sc
       'Remove ephemeral API canary login',
     ].map(name=>({name,conclusion:'success'}));
     const sourceJobs = {jobs:[{name:'production-privacy-recovery-canary',
+      run_id:40468086758,status:'completed',
       conclusion:'failure',steps:[...successSteps,
         {name:'Dispatch and wait for canonical non-zero privacy recovery ledger',conclusion:'failure'}]}]};
     expect(assertCompletedCanaryHistoricalExecutionV1({
@@ -129,12 +131,52 @@ describe('historical privacy canary completed evidence is read-only and exact-sc
       sourceRun,backupRun,ledgerRun:{...ledgerRun,conclusion:'failure'},sourceJobs,
     })).toThrow('COMPLETED_CANARY_LEDGER_RUN_NOT_APPROVED');
     expect(() => assertCompletedCanaryHistoricalExecutionV1({
+      sourceRun,backupRun,ledgerRun:{...ledgerRun,head_sha:sourceRun.head_sha},sourceJobs,
+    })).toThrow('COMPLETED_CANARY_LEDGER_RUN_NOT_APPROVED');
+    expect(() => assertCompletedCanaryHistoricalExecutionV1({
+      sourceRun,backupRun,ledgerRun,sourceJobs:{jobs:[{...sourceJobs.jobs[0],run_id:40468086759}]},
+    })).toThrow('COMPLETED_CANARY_SOURCE_EXECUTION_NOT_PROVEN');
+    expect(() => assertCompletedCanaryHistoricalExecutionV1({
       sourceRun,backupRun:{...backupRun,actor:{login:'untrusted'}},ledgerRun,sourceJobs,
     })).toThrow('COMPLETED_CANARY_DISPATCH_PROVENANCE_NOT_APPROVED');
     expect(() => assertCompletedCanaryHistoricalExecutionV1({
       sourceRun,backupRun,ledgerRun:{...ledgerRun,created_at:backupRun.created_at},sourceJobs,
     })).toThrow('COMPLETED_CANARY_DISPATCH_ORDER_NOT_PROVEN');
 
+  });
+
+  it('requires real pinned GitHub artifact identities, digests and unexpired provenance', () => {
+    const sourceArtifacts = { total_count:0, artifacts:[] };
+    const backupArtifact = {
+      id:12717562316,
+      name:'myeongha-postgres-20261027T073720Z',
+      digest:'sha256:ba8035581d928091abe9b3f6e49f079368898a9782735cc70653946d4a182506',
+      expired:false, expires_at:'2026-11-26T07:39:49Z',
+      workflow_run:{id:40468157715,head_sha:'ed52c0cd442dfcf4396804275da2df74321f5799'},
+    };
+    const ledgerArtifact = {
+      id:12716914499,
+      name:'myeongha-privacy-ledger-20261027T074035Z',
+      digest:'sha256:e381ce4d061da400215987d7ccb4919a0712abf236ee871eb4b0fd8f009018c6',
+      expired:false, expires_at:'2026-11-26T07:40:35Z',
+      workflow_run:{id:40468500587,head_sha:'711c8719a7e7ed2d42a333ec56463f008d2e1fc5'},
+    };
+    const input = {
+      sourceArtifacts,
+      backupArtifacts:{total_count:1,artifacts:[backupArtifact]},
+      ledgerArtifacts:{total_count:1,artifacts:[ledgerArtifact]},
+      nowUtc:'2026-10-28T02:00:00.000Z',
+    };
+    expect(assertCompletedCanaryArtifactListingsV1(input)).toBe(true);
+    for (const variation of [
+      {...input,backupArtifacts:{total_count:1,artifacts:[{...backupArtifact,expired:true}]}},
+      {...input,ledgerArtifacts:{total_count:1,artifacts:[{...ledgerArtifact,digest:'sha256:wrong'}]}},
+      {...input,nowUtc:'2026-11-27T00:00:00.000Z'},
+    ]) expect(() => assertCompletedCanaryArtifactListingsV1(variation))
+      .toThrow('COMPLETED_CANARY_ARTIFACT_PROVENANCE_NOT_APPROVED');
+    expect(() => assertCompletedCanaryArtifactListingsV1({
+      ...input,sourceArtifacts:{total_count:1,artifacts:[{id:1}]},
+    })).toThrow('COMPLETED_CANARY_ORIGINAL_ARTIFACT_BOUNDARY_DRIFT');
   });
 
   it('cannot be invoked by the existing resume workflow without new protected approval', () => {
