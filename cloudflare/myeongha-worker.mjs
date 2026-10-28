@@ -2,6 +2,7 @@
 // separately governed subject-scoped Auth/DB/Saju API adapters.
 // No API Worker-to-Worker hop and no implicit Vercel proxy.
 import sealedRuntime from './preview-worker.mjs';
+import {isOwnerPortOneSdkRequestV1,serveOwnerPortOneSdkV1} from './owner-portone-sdk-proxy.mjs';
 import {SEYEON_SECURITY_S0_PRODUCTION_V1,
   SEYEON_SECURITY_S0_GOVERNOR_APPROVAL_V1} from '../apps/api/src/seyeon-security-s0-production-policy-v1.js';
 import apiRuntime, {cloudflareEmergencyHoldEnabledV1} from '../workers/cloudflare-static-preview.mjs';
@@ -126,6 +127,11 @@ export default {
           })
         : await apiRuntime.fetch(request, env, ctx);
       return withWorkerVersion(response,env);
+    }
+    // Only this exact read-only path may relay the fixed official PortOne
+    // SDK. No arbitrary URLs, request credentials or checkout data cross it.
+    if (isOwnerPortOneSdkRequestV1(request,url)) {
+      return withWorkerVersion(await serveOwnerPortOneSdkV1(),env);
     }
     // This owner-only *test console* static HTML can load the official KCP
     // SDK without relaxing the production SPA's strict CSP. All sensitive
