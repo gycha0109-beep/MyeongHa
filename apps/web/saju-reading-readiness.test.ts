@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { RECORDS_HUB_STATIC_UI_COPY_V1 } from './ui-records-hub-copy.js';
 
 const html = [
   readFileSync(new URL('./reading.html', import.meta.url), 'utf8'),
@@ -7,6 +8,15 @@ const html = [
 ].join('\n');
 
 describe('Saju hub target product discovery', () => {
+  it('localizes the example report aria-label without modifying official result source', () => {
+    const translations = RECORDS_HUB_STATIC_UI_COPY_V1.get('공식 보고서 구성 예시. 개인별 해석이 아닙니다.');
+    expect(html).toContain('aria-label="공식 보고서 구성 예시. 개인별 해석이 아닙니다."');
+    for (const locale of ['ja-JP', 'zh-TW', 'en-US', 'zh-CN'] as const) {
+      expect(translations?.[locale]).toBeTruthy();
+      expect(translations?.[locale]).not.toMatch(/[가-힣]/u);
+    }
+  });
+
   it('keeps full product discovery and report structure, independent of runtime activation gates', () => {
     expect(html).toContain('사주 해석 상품');
     for (const topic of ['전체 사주 해석', '직업 · 커리어', '재물', '연애 · 관계']) {
