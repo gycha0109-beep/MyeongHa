@@ -1,6 +1,24 @@
 // Authored Records report-hub UI labels only. Do not translate stored Saju source,
 // Reader interpretation, Birth data, or any user-created records here.
 export const RECORDS_HUB_STATIC_UI_COPY_V1 = new Map([
+  ['저장된 보고서 다시 불러오기 →', {
+    'ja-JP': '保存済みのレポートを再読み込み →',
+    'zh-TW': '重新載入已儲存報告 →',
+    'en-US': 'Reload saved report →',
+    'zh-CN': '重新加载已保存报告 →',
+  }],
+  ['저장된 보고서의 내용을 확인할 수 없습니다.', {
+    'ja-JP': '保存済みのレポートの内容を確認できません。',
+    'zh-TW': '無法確認已儲存報告的內容。',
+    'en-US': 'The saved report content could not be verified.',
+    'zh-CN': '无法验证已保存报告的内容。',
+  }],
+  ['공식 기록 응답이 검증 기준을 충족하지 않았습니다. 다른 해석으로 대체하지 않습니다.', {
+    'ja-JP': '公式記録の応答が検証基準を満たしていません。別の鑑定には置き換えません。',
+    'zh-TW': '正式紀錄回應未通過驗證，不會以其他解讀替代。',
+    'en-US': 'The official record response failed verification. Another reading will not be substituted.',
+    'zh-CN': '正式记录响应未通过验证，不会以其他解读替代。',
+  }],
   ['이 공식 보고서의 열람 권한이 없습니다.', {
     'ja-JP': 'この公式レポートを閲覧する権限がありません。',
     'zh-TW': '您沒有權限閱讀這份正式報告。',
