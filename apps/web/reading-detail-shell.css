@@ -153,3 +153,29 @@
 .official-report-actions a:hover,.official-report-actions button:hover,.official-report-return:hover{border-color:var(--mh-brass-strong)}
 .official-report-actions a:focus-visible,.official-report-actions button:focus-visible,.official-report-return:focus-visible{outline:2px solid var(--mh-brass-strong);outline-offset:3px}
 @media(max-width:680px){.official-report-view{width:calc(100% - 26px);margin:12px auto 36px}.official-report-head{padding:28px 22px}.official-report-toc{padding:20px}.official-report-sections{padding:0 22px}.official-report-primary{font-size:16px}.official-report-supporting{font-size:14px}.official-report-notice{margin:24px 20px 0}}
+
+/* Existing approved section and calculation evidence, kept distinct from current Birth input. */
+.official-report-provenance-note{margin:0;padding:18px clamp(20px,5vw,58px);border-bottom:1px solid var(--mh-brass-faint);color:var(--mh-ink-muted);font-size:12px;line-height:1.8}
+.official-report-provenance-note p{margin:0 0 8px}
+.official-report-provenance-note a{color:var(--mh-ink-strong);font-weight:700}
+.official-report-keypoints{margin:26px clamp(20px,5vw,58px) 0;padding:22px 25px;border:1px solid var(--mh-brass-faint);border-radius:12px;background:var(--mh-paper-muted)}
+.official-report-keypoints h2{margin:7px 0 13px;font-family:var(--mh-serif);font-size:20px}
+.official-report-keypoints p{margin:0;font-family:var(--mh-serif);font-size:16px;line-height:1.9;white-space:pre-wrap;overflow-wrap:anywhere}
+.official-report-facts{margin:24px clamp(20px,5vw,58px) 0;padding:22px 25px;border:1px solid var(--mh-brass-faint);border-radius:12px}
+.official-report-facts h2{margin:0 0 17px;font-family:var(--mh-serif);font-size:20px}
+.official-report-facts h3{margin:18px 0 9px;color:var(--mh-ink-muted);font-family:var(--mh-serif);font-size:13px}
+.official-report-pillars{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.official-report-pillars>div{display:grid;gap:8px;padding:14px 12px;border:1px solid var(--mh-brass-faint);border-radius:8px;background:var(--mh-paper-muted);text-align:center}
+.official-report-pillars small{font-size:11px;color:var(--mh-ink-muted)}
+.official-report-pillars strong{font-family:var(--mh-serif);font-size:14px;overflow-wrap:anywhere}
+.official-report-evidence{display:flex;flex-wrap:wrap;gap:9px}
+.official-report-evidence .reading-chart-fact{display:grid;gap:4px;padding:10px 14px;border:1px solid var(--mh-brass-faint);border-radius:8px}
+.official-report-evidence small{font-size:10px;color:var(--mh-ink-muted)}
+.official-report-evidence strong{font-size:13px}
+@media(max-width:680px){
+  .official-report-provenance-note{padding:18px 22px}
+  .official-report-keypoints,.official-report-facts{margin:18px 20px 0;padding:18px}
+  .official-report-pillars{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .official-report-keypoints p{font-size:15px}
+}
+@media(prefers-reduced-motion:reduce){.official-report-view *{scroll-behavior:auto}}
