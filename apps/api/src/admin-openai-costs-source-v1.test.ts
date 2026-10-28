@@ -59,7 +59,8 @@ describe('OpenAI Admin costs official read-only source',()=>{
   });
   it('rejects truncated, repeated or malformed pagination instead of treating a partial sum as complete',async()=>{
     const a=Math.floor(Date.parse(window.from)/1000);
-    const api=vi.fn(async()=>reply([result(a,1)],true,'same-cursor'));
+    let pageIndex=0;
+    const api=vi.fn(async()=>reply([result(a+(pageIndex++)*86400,1)],true,'same-cursor'));
     await expect(createOpenAiAdminCostsReaderV1({adminKey,projectId,fetchImpl:api}).read(window))
       .rejects.toThrow(/pagination cursor/u);
     expect(api).toHaveBeenCalledTimes(2);
