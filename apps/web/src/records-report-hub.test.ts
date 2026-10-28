@@ -28,7 +28,7 @@ describe('Records official-report-first entry', () => {
   it('counts only authenticated Reading History and does not treat fixture cards as purchased reports', () => {
     expect(page).toContain("byId('saju-records-count').textContent = recordsReportCountV1(readings.length, getUiLocale());");
     expect(page).toContain("const readings = requireArray(readingPayload, 'readings');");
-    expect(page).toContain("if (allowsDevelopmentSajuSamples())");
+    expect(page).toContain("if (allowsDevelopmentSajuSamples() && lifeFactsPayload?.status !== 'unavailable')");
     expect(page).toContain("explore.href = 'reading.html'");
     expect(page).not.toContain('records-report-purchase-count');
     expect(page).not.toContain('records-report-price');
