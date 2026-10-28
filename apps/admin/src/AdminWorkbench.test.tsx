@@ -18,4 +18,17 @@ describe('administrator investigation navigation', () => {
     expect(url.pathname).toBe('/api/admin/entitlement-events');
     expect(Object.fromEntries(url.searchParams)).toEqual({ limit: '20', cursor: '20', subjectId: subject, receiptId: receipt });
   });
+  it('routes Reading generation cost separately from Character AI consuming its grounding',()=>{
+    const reading='123e4567-e89b-42d3-a456-426614174001';
+    const path=buildListPath('readings','', '20','reading-generation-cost',null,null,
+      'all','all','all','all','','all','all','',reading);
+    const url=new URL(path,'https://admin.invalid');
+    expect(url.pathname).toBe('/api/admin/readings/'+reading+'/generation-cost');
+    expect(Object.fromEntries(url.searchParams)).toEqual({limit:'20',cursor:'20'});
+    const linked=buildListPath('readings','',null,'reading-ai-usage',null,null,
+      'all','all','all','all','','all','all','',reading);
+    expect(new URL(linked,'https://admin.invalid').pathname)
+      .toBe('/api/admin/readings/'+reading+'/ai-usage');
+  });
+
 });
