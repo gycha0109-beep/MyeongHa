@@ -1062,4 +1062,58 @@ select pg_temp.assert_v2_true(
   and (select count(*) = 1 from public.standard_reading_official_bindings)
 );
 
+-- Records full-body reread follows the same exact paid Grant authority as the
+-- existing Reader-bound source, not mere reading ownership or history.
+select pg_temp.assert_v2_true(
+  'Records paid archive denies a fully revoked official Reading',
+  not exists (
+    select 1
+    from public.qry_official_reading_record_runtime_v1(
+      '11390000-0000-0000-0000-000000000001',
+      '12103100-0000-0000-0000-000000000001'
+    )
+  )
+  and (select count(*) = 1 from public.standard_reading_official_bindings)
+);
+
+-- A distinct verified Reader purchase B2 is enough to retain the same immutable
+-- official artifact after the initial/A grant and all other grants are revoked.
+update public.entitlement_grants g
+set status = 'active', revision = revision + 1,
+    last_effective_at = clock_timestamp(), updated_at = clock_timestamp()
+from public.standard_reading_reader_access_grants a
+where a.purchase_intent_id = '12192300-0000-0000-0000-000000000002'
+  and a.entitlement_grant_id = g.id;
+
+select pg_temp.assert_v2_true(
+  'Records rereads the same immutable official Reading with B2 exact active grant',
+  (
+    select count(*) = 1
+       and min(result.response_hash) = 'sha256:test-official-reading-artifact'
+    from public.qry_official_reading_record_runtime_v1(
+      '11390000-0000-0000-0000-000000000001',
+      '12103100-0000-0000-0000-000000000001'
+    ) as result
+  )
+  and (select count(*) = 1 from public.standard_reading_official_bindings)
+);
+
+update public.entitlement_grants g
+set status = 'revoked', revision = revision + 1,
+    last_effective_at = clock_timestamp(), updated_at = clock_timestamp()
+from public.standard_reading_reader_access_grants a
+where a.purchase_intent_id = '12192300-0000-0000-0000-000000000002'
+  and a.entitlement_grant_id = g.id;
+
+select pg_temp.assert_v2_true(
+  'Records paid archive becomes inaccessible after last active Grant revoke',
+  not exists (
+    select 1 from public.qry_official_reading_record_runtime_v1(
+      '11390000-0000-0000-0000-000000000001',
+      '12103100-0000-0000-0000-000000000001'
+    )
+  )
+  and (select count(*) = 1 from public.standard_reading_official_bindings)
+);
+
 \echo 'Official Standard Reading + Reader Interpretation authority tests passed'
