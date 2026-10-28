@@ -100,9 +100,16 @@ async function verifyWithServer(id){
  const result=await serverRequest('/api/me/credits/portone/test-verify',{
   paymentAttemptId:id,
  });
- requireOwnerSandboxServerPaidV1(result,id);
- PROVIDER.textContent='포트원 서버 PAID 확인 (읽기 전용)';
- status('테스트 결제 PAID 확인. 영수증 저장 및 운영 크레딧 지급은 수행되지 않았습니다.');
+ const paid=requireOwnerSandboxServerPaidV1(result,id);
+ PROVIDER.textContent='포트원 서버 PAID 확인';
+ if(paid.receiptPersisted){
+   RECEIPT.textContent='샌드박스 Receipt 저장됨 · '+paid.receiptId+
+      (paid.replayed?' (재확인)':'');
+   status('포트원 PAID와 샌드박스 영수증 저장 확인. 운영 크레딧은 지급되지 않았습니다.');
+ }else{
+   RECEIPT.textContent='저장 미연결 (서버 PAID만 확인)';
+   status('테스트 결제 PAID 확인. 영수증 저장 및 운영 크레딧 지급은 수행되지 않았습니다.');
+ }
  // A finished attempt cannot be charged again. The next user click must
  // create a new payment request identity, never replay a PAID paymentId.
  releaseRetryToken();
