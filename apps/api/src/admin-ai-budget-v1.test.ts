@@ -13,7 +13,7 @@ describe('approved Seoul monthly budget policy',()=>{
  it('rejects duplicate, misclassified or unsupported cost buckets before any monthly total',()=>{
   const valid={window,buckets:[bucket],workloadCoverage:['character_chat'] as const};
   expect(()=>evaluateAdminAiBudgetV1({...valid,buckets:[bucket,bucket]})).toThrow('Duplicate budget usage bucket');
-  expect(()=>evaluateAdminAiBudgetV1({...valid,workloadCoverage:[]})).toThrow('Invalid budget workload coverage');
+  expect(()=>evaluateAdminAiBudgetV1({...valid,workloadCoverage:[]})).toThrow('Invalid budget usage coverage');
   expect(()=>evaluateAdminAiBudgetV1({...valid,workloadCoverage:['character_chat','character_chat']})).toThrow('Invalid budget workload coverage');
   expect(()=>evaluateAdminAiBudgetV1({...valid,buckets:[{...bucket,workload:'reading'}]})).toThrow('Invalid budget usage coverage');
   expect(()=>evaluateAdminAiBudgetV1({...valid,buckets:[{...bucket,calls:0,unknownCostCalls:1}]})).toThrow('Invalid budget usage coverage');
@@ -67,7 +67,7 @@ describe('approved Seoul monthly budget policy',()=>{
  });
  it('rejects an invoice from a different period and does not warn one fractional won early or use an out-of-period FX',()=>{
   const r=evaluateAdminAiBudgetV1({window,buckets:[{...bucket,estimateMicroUsd:'79999999'}],workloadCoverage:['character_chat'],fx});expect(r.warnings).toHaveLength(0);
-  expect(evaluateAdminAiBudgetV1({window,buckets:[bucket],workloadCoverage:[],fx:{...fx,effectiveFrom:'2026-10-02T00:00:00Z'}}).knownEstimateMicroKrw).toBeNull();
+  expect(evaluateAdminAiBudgetV1({window,buckets:[bucket],workloadCoverage:['character_chat'],fx:{...fx,effectiveFrom:'2026-10-02T00:00:00Z'}}).knownEstimateMicroKrw).toBeNull();
   expect(()=>evaluateAdminAiBudgetV1({window,buckets:[],workloadCoverage:[],billing:{source:'provider_billing_export',evidenceSha256:'b'.repeat(64),from:'2026-01-01',toExclusive:window.toExclusive,coverage:'complete',amountMicroUsd:'1'}})).toThrow('Unbound');
  });
  it('keeps official project costs separately observed, never treating them as final invoice or confirmed warnings',async()=>{
