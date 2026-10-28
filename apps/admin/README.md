@@ -184,9 +184,15 @@ React 19와 기존 web 워크스페이스에서 설치하는 Vite 8 빌드 도�
 - Owner 감사 경계를 거친 `GET /api/admin/reading-generation-cost/monthly?month=YYYY-MM`을 별도 Admin 예산 패널에 연결했습니다. 월 전체 비용·공급사 청구 확정액·원화 비용은 명시적으로 `null`; 공급사 호출 관측 완전성은 항상 `provider_events_only_unverified`입니다.
 - 기존 `/api/admin/ai-budget`의 캐릭터 대화 원가에 이 원장을 **합산하지 않습니다.** 향후 Saju 서버가 실제 공급사 호출 전체를 권위 있게 관측·전달하고, 가격·환율 근거가 연결되기 전까지 예산 전체 완전성 표시는 HOLD입니다. SQL은 여전히 운영 DB에 설치하지 않은 오프라인 후보이며, 기능은 기본 미연결 상태입니다.
 
+### A4 / A5 추가 연결 — 공급사 원가 기록과 완료 이벤트 (2026-10-28)
+
+- `apps/api/src/reading-ai-cost-writer-v1.ts`: Saju 소유의 **실제 공급사 응답**을 받은 서버가 사용량을 정규화한 후, `myeongha_reading_ai_cost_writer_v1` 전용 로그인 역할을 확인하고 단일 트랜잭션으로 Reading/실행 시도별 비용을 원장에 기록합니다. Owner/고객 HTTP에서 호출하거나 AI 호출을 추측해 생성하지 않습니다. `reading-ai-openai-usage-v1.ts`의 OpenAI usage 파싱 결과에서 민감한 응답 문장·프롬프트·공급사 응답 ID는 저장하지 않습니다. **Saju 서버에서 실제 호출 시점에 이 Writer를 연결하는 부분은 여전히 미완료**이며 전용 DB 역할도 운영 설치 전입니다.
+- `apps/api/src/official-reading-record-http.ts`에 opt-in `verifiedReadingAnalytics` 주입을 추가했습니다. 소유자 권한으로 기존 공식 Reading 아카이브 조회가 성공한 뒤, 별도 DB 읽기로 `succeeded` Reading 및 `committed_execution_attempt_id`를 재확인하고, 분석 동의 시점 이전에 완료된 Reading은 제외하는 기존 `admin-analytics-verified-reading-v1.ts` 증거 검증을 수행합니다. 익명 요청·잘못된 Reading·실패 조회에는 적용하지 않으며 분석 실패는 원래 Reading 조회 결과를 바꾸지 않습니다.
+- `apps/api/src/production-official-reading-record-runtime-v1.ts`에는 위 후처리의 Production 구성 지점을 추가했지만 **기본적으로 analytics 주입을 하지 않습니다**. 과거 공식 기록을 다시 여는 경우에 한해 미수집 완료 이벤트를 보강할 수 있으며, 새로운 Reading이 생성되는 모든 순간을 관측한 것은 아닙니다. `READING_COMPLETED` 관측률은 미확정이고 `FIRST_READING_DELIVERED` 또는 `RESULT_VIEWED`를 완료 이벤트로 변조하지 않습니다. 기존 서비스 공개 라우트 마운트·분석 수집 활성화는 수행하지 않았습니다.
+
 ## workers.dev without a purchased domain (2026-10-28)
 
-The verified account subdomain is gycha0109.workers.dev; this isolated console's intended origin is https://myeongha-admin.gycha0109.workers.dev. Cloudflare Zero Trust registration is complete but there is not yet a dedicated Access application, Admin Worker, dedicated Hyperdrive, or Admin Postgres role.
+The verified account subdomain is gycha0109.workers.dev; this isolated console's intended origin is https://myeongha-admin.gycha0109.workers.dev. Cloudflare Access application `MyeongHa Admin Owner Only` exists for the isolated hostname, with one verified Owner-email allow policy. Admin Worker, dedicated Hyperdrive, and Admin Postgres roles are NOT installed. Access login/JWT live-path verification remains pending.
 
 The wrangler.jsonc now permits only its own workers.dev hostname, while keeping preview_urls: false and all operational activation flags at false. The worker rejects every request unless the explicit private enablement, verified Access JWT/Owner, dedicated read/audit DB and rate limiter are available. The deploy preflight rejects other worker hostnames, mismatched Access tenants, and reused customer DB bindings. No production deploy is implicit in build or dry-run.
 
