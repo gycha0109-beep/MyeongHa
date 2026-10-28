@@ -1,4 +1,5 @@
 import { projectProductReadingResponseV2 } from '../../../packages/api-client/src/product-reading-display.js';
+import type { SajuProductionReadingRequestV1 } from './saju-production-reading-http-adapter.js';
 import { hashSajuHeldSourceProofRequestV1 } from './saju-held-source-proof-verifier-v1.js';
 
 /**
@@ -55,6 +56,7 @@ export interface ApprovedSajuReadingIdMappingV1 {
 export interface SajuOfficialSourceVerificationPortV1 {
   verifyProductionIssue(input: Readonly<{
     readonly sourceResponse: unknown;
+    readonly executedRequest: SajuProductionReadingRequestV1;
     readonly subjectId: string;
     readonly dbReadingId: string;
     readonly readingSessionId: string;
@@ -152,6 +154,8 @@ export async function persistIssuedSajuOfficialReadingV1(input: Readonly<{
   readonly outboxEventId: string;
   readonly sourceBirthRevisionId: string;
   readonly sourceResponse: unknown;
+  /** Exact request sent to the authenticated Saju host, for issuer digest verification. */
+  readonly executedRequest: SajuProductionReadingRequestV1;
   readonly sourceVerifier?: SajuOfficialSourceVerificationPortV1;
   readonly mappingVerifier?: SajuOfficialDbMappingVerificationPortV1;
   readonly currentAuthority?: SajuOfficialCurrentAuthorityPortV1;
@@ -186,7 +190,7 @@ export async function persistIssuedSajuOfficialReadingV1(input: Readonly<{
   }
 
   const source = await input.sourceVerifier.verifyProductionIssue({
-    sourceResponse: native, subjectId: input.subjectId,
+    sourceResponse: native, executedRequest: input.executedRequest, subjectId: input.subjectId,
     dbReadingId: input.readingId, readingSessionId: input.readingSessionId,
     sourceBirthRevisionId: input.sourceBirthRevisionId,
   });
