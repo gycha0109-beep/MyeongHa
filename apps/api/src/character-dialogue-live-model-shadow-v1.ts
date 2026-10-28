@@ -1,4 +1,10 @@
 import { canonicalJson } from '../../../packages/domain/src/index.js';
+import type { CharacterRuntimeContextV1 } from '../../../packages/domain/src/character-runtime-context.js';
+import type { PostgresSubjectExecutionScopeV1 } from './postgres-subject-execution.js';
+import {
+  runCharacterDialogueMultiturnOfflineShadowV1,
+  type CharacterMultiturnReviewedCandidateShadowV1,
+} from './character-dialogue-multiturn-offline-shadow-v1.js';
 import type {
   CharacterDialogueContinuityPlanShadowV1,
   CharacterDialogueMessageShadowV1,
@@ -320,5 +326,35 @@ export function createCharacterDialogueLiveOpenAiStageAdaptersShadowV1(config: R
   return createCharacterDialogueLiveModelStageAdaptersShadowV1({
     generator: createOpenAiSeyeonStructuredProviderV1(config.generator),
     semanticReviewer: createOpenAiSeyeonStructuredProviderV1(config.semanticReviewer),
+  });
+}
+
+/**
+ * Real-model capable, server-scope-only orchestration entrypoint for the
+ * offline C1 research track. Two actual structured API calls (combined
+ * decision + draft; independent reviewer) occur ONLY if a trusted caller
+ * supplies live, admitted transports and a valid Subject DB read scope.
+ *
+ * No HTTP route imports this module. This cannot publish a reply or commit.
+ */
+export async function runCharacterDialogueLiveModelShadowV1(input: Readonly<{
+  runtime: CharacterRuntimeContextV1;
+  recentConversation: readonly CharacterDialogueMessageShadowV1[];
+  threadId: string;
+  scope: PostgresSubjectExecutionScopeV1;
+  generator: OpenAiSeyeonStructuredProviderConfigV1;
+  semanticReviewer: OpenAiSeyeonStructuredProviderConfigV1;
+}>): Promise<CharacterMultiturnReviewedCandidateShadowV1> {
+  assertEngineeringVerticalSliceMockExecution('runCharacterDialogueLiveModelShadowV1');
+  const providers = createCharacterDialogueLiveOpenAiStageAdaptersShadowV1({
+    generator: input.generator,
+    semanticReviewer: input.semanticReviewer,
+  });
+  return runCharacterDialogueMultiturnOfflineShadowV1({
+    runtime: input.runtime,
+    recentConversation: input.recentConversation,
+    threadId: input.threadId,
+    scope: input.scope,
+    ...providers,
   });
 }
