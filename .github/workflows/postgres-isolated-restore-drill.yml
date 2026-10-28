@@ -234,6 +234,31 @@ jobs:
           SOURCE_ARTIFACT_EXPIRES_AT: ${{ steps.source.outputs.artifact_expires_at }}
         run: bash scripts/operations/build-postgres-restore-evidence.sh
 
+      - name: Record fail-closed recovered service admission
+        shell: bash
+        env:
+          RESTORE_EVIDENCE_PATH: ${{ runner.temp }}/restore-evidence/restore-evidence.json
+          AUTHORITATIVE_PRIVACY_EVIDENCE_PATH: ${{ runner.temp }}/restore-evidence/authoritative-privacy-reconciliation-evidence.json
+          SERVING_ADMISSION_REPORT_PATH: ${{ runner.temp }}/restore-evidence/recovered-serving-admission.json
+        run: |
+          set -euo pipefail
+          args=(
+            --restore-evidence "$RESTORE_EVIDENCE_PATH"
+            --output "$SERVING_ADMISSION_REPORT_PATH"
+          )
+          if [[ -f "$AUTHORITATIVE_PRIVACY_EVIDENCE_PATH" ]]; then
+            args+=(--privacy-evidence "$AUTHORITATIVE_PRIVACY_EVIDENCE_PATH")
+          fi
+          node scripts/build-postgres-recovered-serving-admission.mjs "${args[@]}"
+          jq -e '
+            .gate == "BLOCKED"
+            and .serviceResumptionAllowed == false
+            and .providerManagedDataFullRestore == false
+            and .futureSafePrivacyReconciliation == false
+            and .drReady == false
+            and .outputContainsIdentifiers == false
+          ' "$SERVING_ADMISSION_REPORT_PATH" >/dev/null
+
       - name: Record current-frontier restore evidence
         shell: bash
         env:
