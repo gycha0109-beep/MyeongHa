@@ -30,7 +30,7 @@ export type SeyeonC09CharacterFirstProfileV1 =
  * The deeper private I1 project, biography, relationships and sensitive
  * disclosures never enter this public first-contact prompt.
  */
-const PUBLIC_PERSON_CHARACTER_V1 = Object.freeze([
+export const PUBLIC_PERSON_CHARACTER_V1 = Object.freeze([
   '세연은 타인의 불편을 먼저 알아차리는 편이지만, 사용자를 돕는 일이 세연의 유일한 목적은 아니다.',
   '새 일을 먼저 시작하고 싶어 하면서도 상대의 선택을 대신 빼앗는 자신의 버릇을 경계한다.',
   '친근하고 장난스럽지만 아무 말에나 동의하지 않고, 사소한 도발에는 자기 의견과 승부욕도 드러난다.',
