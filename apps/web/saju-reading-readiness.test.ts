@@ -6,20 +6,20 @@ const html = [
   readFileSync(new URL('./src/reading/ReadingPage.tsx', import.meta.url), 'utf8'),
 ].join('\n');
 
-describe('Saju hub Reading readiness presentation', () => {
-  it('does not hardcode Product Reading completion or resume claims while runtime authority is blocked', () => {
+describe('Saju hub current service readiness', () => {
+  it('does not present retired or unapproved paid products as purchasable', () => {
+    for (const obsolete of ['유료 사주 해석에서 제공되는 내용', '이 해석 선택하기', '예시 결과물 미리보기', '실제 구매 시', '구매하시면']) {
+      expect(html).not.toContain(obsolete);
+    }
     expect(html).not.toContain('<span class="gm-chip is-green">완료</span>');
     expect(html).not.toContain('<span class="gm-chip">이어보기</span>');
-    expect(html).not.toContain('<span class="gm-chip">추천</span>');
-    expect(html).not.toContain('<span class="gm-chip">새로 보기</span>');
   });
 
-  it('keeps route discovery available without presenting Reading as already available', () => {
-    expect(html).toContain('나의 사주 기본 정보');
-    expect(html).toContain('다른 사주 주제 둘러보기');
+  it('shows actual chart and stored records while preserving free preview', () => {
+    expect(html).toContain('지금 이용할 수 있는 사주 기능');
+    expect(html).toContain('records.html?tab=birth');
+    expect(html).toContain('records.html?tab=saju');
     expect(html).toContain('reading-detail.html?topic=temperament&scope=original');
-    expect(html).toContain('reading-detail.html?topic=love');
-    expect(html).toContain('reading-detail.html?scope=year');
-    expect(html).toContain('reading-detail.html?scope=month');
+    expect(html).toContain('상품별 확정 전까지 안내하거나 구매받지 않습니다');
   });
 });
