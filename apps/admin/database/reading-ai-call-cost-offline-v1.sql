@@ -251,6 +251,42 @@ revoke all on function myeongha_admin_ops.qry_reading_ai_cost_calls_v1(uuid,inte
 grant execute on function myeongha_admin_ops.qry_reading_ai_cost_calls_v1(uuid,integer,integer)
   to myeongha_admin_reader;
 
+-- Month-bounded aggregate: observed supplier calls only. Even when every
+-- recorded call has a rate, this is never a complete Reading AI budget:
+-- there is still no Saju-wide provider-call admission/coverage receipt.
+create index reading_ai_cost_observed_month_v1
+  on myeongha_admin_ops.reading_ai_call_cost_events_v1(observed_at desc);
+
+create function myeongha_admin_ops.qry_reading_ai_cost_month_v1(
+  p_from timestamptz,p_to timestamptz
+) returns table("observedCalls" text,"observedReadings" text,
+  "unknownCostCalls" text,"missingUsageCalls" text,
+  "knownEstimateMicroUsd" text)
+language plpgsql stable security definer set search_path=pg_catalog,myeongha_admin_ops
+as $
+begin
+  if p_from is null or p_to is null or p_to<=p_from
+    or p_to>p_from+interval '32 days' then
+    raise exception 'Invalid bounded Reading AI cost month';
+  end if;
+  return query
+  select count(*)::text,count(distinct c.reading_id)::text,
+    count(*) filter (where c.cost_status<>'estimated')::text,
+    count(*) filter (where c.source='provider_attempt_without_usage'
+      or c.input_tokens is null or c.output_tokens is null)::text,
+    coalesce(sum(c.estimated_cost_micro_usd),0)::text
+  from myeongha_admin_ops.reading_ai_call_cost_events_v1 c
+  where c.observed_at>=p_from and c.observed_at<p_to;
+end $;
+grant create on schema myeongha_admin_ops to myeongha_reading_ai_cost_source_v1;
+alter function myeongha_admin_ops.qry_reading_ai_cost_month_v1(timestamptz,timestamptz)
+  owner to myeongha_reading_ai_cost_source_v1;
+revoke create on schema myeongha_admin_ops from myeongha_reading_ai_cost_source_v1;
+revoke all on function myeongha_admin_ops.qry_reading_ai_cost_month_v1(timestamptz,timestamptz)
+  from public;
+grant execute on function myeongha_admin_ops.qry_reading_ai_cost_month_v1(timestamptz,timestamptz)
+  to myeongha_admin_reader;
+
 -- Deliberately no direct writer access, no anon/authenticated/service_role
 -- grant, no operational installation, and no claim of Reading coverage.
 commit;
