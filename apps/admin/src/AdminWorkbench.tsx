@@ -6,7 +6,7 @@ import type { AdminSection } from './routes.js';
 import { StatusPanel } from './StatusPanel.js';
 
 type ListSection = Exclude<AdminSection, 'overview'>;
-type ReadTab = 'users' | 'commerce' | 'commerce-alerts' | 'entitlements' | 'entitlement-events' | 'provider-events' | 'credits' | 'readings' | 'reading-attempts' | 'reading-ai-usage' | 'ai-costs' | 'ai-errors' | 'ai-estimates' | 'credit-reservations' | 'credit-allocations' | 'issues' | 'audit' | 'catalog' | 'characters' | 'content-releases' | 'deletion-jobs';
+type ReadTab = 'users' | 'commerce' | 'commerce-alerts' | 'entitlements' | 'entitlement-events' | 'provider-events' | 'credits' | 'readings' | 'reading-attempts' | 'reading-ai-usage' | 'reading-generation-cost' | 'ai-costs' | 'ai-errors' | 'ai-estimates' | 'credit-reservations' | 'credit-allocations' | 'issues' | 'audit' | 'catalog' | 'characters' | 'content-releases' | 'deletion-jobs';
 const DATA_PATHS: Record<ListSection, string> = {
   users: 'users',
   commerce: 'commerce',
@@ -130,6 +130,11 @@ const LABELS: Record<string, string> = {
   p95LatencyMs: 'P95 지연',
   latencyMs: '개별 호출 지연(ms)',
   executionId: 'AI 실행 참조',
+  callId: '공급사 AI 호출 ID',
+  executionAttemptId: 'Reading 실행 시도 ID',
+  observedAt: '공급사 호출 관측 시각',
+  priceVersion: '관측 당시 단가 버전',
+  source: '사용량 원본 상태',
   estimatedMicroUsd: '추정 비용(마이크로 USD)',
   unknownCostCalls: '원가 미확인 호출',
   costStatus: '원가 근거',
@@ -164,10 +169,10 @@ function isSubjectId(value: string): boolean {
 }
 
 export function buildListPath(section: ListSection, subject: string, cursor: string | null, tab: ReadTab, from: string | null = null, to: string | null = null, issueStatus: string = 'all', subjectKind: string = 'all', subjectStatus: string = 'all', readingStatus: string = 'all', issueCategory: string = '', creditSource: string = 'all', reservationState: string = 'all', reservationId: string = '', attemptReadingId: string = '', aiStage: string = 'all', aiErrorCode: string = '', deletionStatus: string = 'all', deletionScope: string = 'all', releaseStatus: string = 'all', characterAvailability: string = 'all', receiptStatus: string = 'all', auditOutcome: string = 'all', allocationMismatchOnly: boolean = false, receiptId: string = '', aiFeature: string = 'all', aiModel: string = '', providerEventStatus: string = 'all'): string {
-  if (['reading-attempts','reading-ai-usage'].includes(tab) && isSubjectId(attemptReadingId)) {
+  if (['reading-attempts','reading-ai-usage','reading-generation-cost'].includes(tab) && isSubjectId(attemptReadingId)) {
     const params = new URLSearchParams({ limit: '20' });
     if (cursor !== null) params.set('cursor', cursor);
-    return '/api/admin/readings/' + attemptReadingId + (tab === 'reading-ai-usage' ? '/ai-usage?' : '/attempts?') + params.toString();
+    return '/api/admin/readings/' + attemptReadingId + (tab === 'reading-ai-usage' ? '/ai-usage?' : tab === 'reading-generation-cost' ? '/generation-cost?' : '/attempts?') + params.toString();
   }
   const params = new URLSearchParams({ limit: '20' });
   if (subject.length > 0) params.set('subjectId', subject);
@@ -347,7 +352,7 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
       <span className="neutral-tag">서버 검증 필수</span>
     </div>
     <div className="admin-tabs" aria-label="조회 종류">
-      {(section === 'commerce' ? [['commerce','결제 내역'],['commerce-alerts','검증·지급 점검'],['provider-events','결제사 이벤트'],['entitlements','보유 권한'],['entitlement-events','권한 지급·철회 이력'],['credits','크레딧 지급'],['credit-reservations','크레딧 사용·정산'],['credit-allocations','차감·복원 재원']] : section === 'readings' ? [['readings','Reading'],...(attemptReadingId ? [['reading-attempts','실행 시도']] : []),['ai-costs','AI 호출'],['ai-errors','AI 실패·차단'],['ai-estimates','AI 추정 원가']] : section === 'issues' ? [['issues','운영 이슈'],['audit','관리자 접근 기록'],['deletion-jobs','삭제 작업'],['catalog','상품 카탈로그'],['characters','캐릭터'],['content-releases','콘텐츠 릴리스']] : [])
+      {(section === 'commerce' ? [['commerce','결제 내역'],['commerce-alerts','검증·지급 점검'],['provider-events','결제사 이벤트'],['entitlements','보유 권한'],['entitlement-events','권한 지급·철회 이력'],['credits','크레딧 지급'],['credit-reservations','크레딧 사용·정산'],['credit-allocations','차감·복원 재원']] : section === 'readings' ? [['readings','Reading'],...(attemptReadingId ? [['reading-attempts','실행 시도'],['reading-generation-cost','Reading 생성 AI 비용']] : []),['ai-costs','AI 호출'],['ai-errors','AI 실패·차단'],['ai-estimates','AI 추정 원가']] : section === 'issues' ? [['issues','운영 이슈'],['audit','관리자 접근 기록'],['deletion-jobs','삭제 작업'],['catalog','상품 카탈로그'],['characters','캐릭터'],['content-releases','콘텐츠 릴리스']] : [])
         .map(([name,label]) => <button key={name} type="button" className={tab===name ? 'active' : ''} onClick={() => { setTab(name as ReadTab); setCursor(null); setDetail(null); setReservationId(''); setDraftReservationId(''); setReceiptId(''); setAiFeature('all'); if (name !== 'reading-attempts') setAttemptReadingId(''); }}>{label}</button>)}
     </div>
     <div className="admin-toolbar">
@@ -601,7 +606,7 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
           </select>
         </label>}
       {['entitlement-events','provider-events'].includes(tab) && receiptId !== '' && detail === null && <p>영수증 {receiptId}에 직접 연결된 이력만 조회합니다.</p>}
-      {['reading-attempts','reading-ai-usage'].includes(tab) && attemptReadingId !== '' && detail === null &&
+      {['reading-attempts','reading-ai-usage','reading-generation-cost'].includes(tab) && attemptReadingId !== '' && detail === null &&
         <button type="button" onClick={() => {
           setTab('readings');
           setDetail(attemptReadingId);
@@ -623,9 +628,10 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
                setCursor(null);
              }}>전체 실행 시도</button>}
             {section === 'readings' && <button type="button" onClick={() => { setAttemptReadingId(detail); setTab('reading-ai-usage'); setDetail(null); setCursor(null); }}>Reading-linked AI usage</button>}
+            {section === 'readings' && <button type="button" onClick={() => { setAttemptReadingId(detail); setTab('reading-generation-cost'); setDetail(null); setCursor(null); }}>Reading 생성 AI 비용</button>}
             {section === 'users' && onNavigate && <><button type="button" onClick={() => onNavigate('/admin/readings?subjectId=' + detail)}>Reading 조회</button><button type="button" onClick={() => onNavigate('/admin/commerce?subjectId=' + detail)}>결제 조회</button></>}</>
         : <>
-          {section !== 'issues' && section !== 'analytics' && !['reading-attempts','reading-ai-usage'].includes(tab) && <form onSubmit={e => {
+          {section !== 'issues' && section !== 'analytics' && !['reading-attempts','reading-ai-usage','reading-generation-cost'].includes(tab) && <form onSubmit={e => {
             e.preventDefault();
             if (pendingSubject !== '' && !isSubjectId(pendingSubject)) {
               setError('사용자 참조는 UUID 형식이어야 합니다.');
@@ -687,6 +693,7 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
     {tab === 'entitlements' && <p className="readiness-explainer">저장된 권한 투영입니다. 실제 접근 허용은 도메인 Access Gate가 현재 유효성·범위를 다시 검사합니다.</p>}
     {['ai-costs','ai-errors','ai-estimates'].includes(tab) && <p className="readiness-explainer">일별 기준은 UTC입니다. 대화 참조가 있는 호출과 용도 미분류 호출을 구분하며, 미분류 호출을 사주 비용으로 합산하지 않습니다. 사주 Reading 전용 비용은 적재 근거가 없어 미측정입니다. Se-yeon 비용은 별도 추정 USD 원장이고 공급사 확정 청구액·원화 원가가 아닙니다. 응답당 3~5원·상한 10원은 미확정 연구 가정입니다.</p>}
     {tab === 'reading-ai-usage' && <p className="readiness-explainer">Reading-linked character AI usage is not the cost of generating a Reading. KRW cost remains unmeasured; only recorded calls within 90 days are shown.</p>}
+    {tab === 'reading-generation-cost' && <p className="readiness-explainer">실제 공급사 호출에서 기록된 Reading 생성 AI 사용량과 당시 단가 기반 USD 추정액만 보여줍니다. 기록이 없다고 생성 비용이 0원인 것은 아니며, Reading 전체 호출 관측률·공급사 확정 청구·KRW 환율은 미측정입니다. 이 원장은 별도 비공개 DB 설치 후보로 운영 기본값은 미연결입니다.</p>}
     {tab === 'catalog' && <p className="readiness-explainer">상품·제안 활성 플래그와 폐기 시각의 읽기 전용 관측입니다. 실제 판매·가격·PSP 출시 허가는 별도 게이트입니다.</p>}
     {tab === 'issues' && <p className="readiness-explainer">저장된 실패·시도·임대 상태입니다. 재시도 가능 여부, 최종 실패 분류 또는 재실행 권한으로 해석하지 않습니다.</p>}
     {tab === 'provider-events' && <p className="readiness-explainer">수신·검증·처리 상태와 정확히 결속된 영수증만 표시합니다. 결제사 이벤트 유형 또는 revoked 상태만으로 실제 환불 완료를 선언하지 않습니다. 외부 거래 ID·원본 영수증·결제사 payload는 조회하지 않습니다.</p>}
