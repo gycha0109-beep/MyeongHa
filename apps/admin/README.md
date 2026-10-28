@@ -148,3 +148,12 @@ React 19와 기존 web 워크스페이스에서 설치하는 Vite 8 빌드 도�
 - AI는 기존 `seyeon_ai_call_cost_events`와 저장된 가격 버전을 좁은 RPC로 조회합니다. 캐릭터 대화와 미적재 Reading 비용을 혼합하지 않습니다. 서버의 청구 원본 어댑터가 없는 확정 비용·원화·매출 대비 비율은 null입니다. 브라우저 청구 비교 입력은 미검증 미리보기이며 원장이나 확정액을 바꾸지 않습니다.
 
 호스팅 기본 필수 이름은 `deployment-check.mjs`의 `ADMIN_HOSTED_REQUIRED_V1`에 있습니다: 관리자 origin, Access issuer/AUD, Owner 이메일/Auth UUID, 고정 Supabase origin/publishable API key, 기존 회원 인증 origin, 서로 다른 Reader/Audit Writer Hyperdrive ID. 현재 실제 전용 역할·감사 테이블·Access 앱·관리자 Worker가 없어 배포와 활성화를 수행하지 않았습니다. 이 미연결 상태는 코드·로컬 테스트 통과와 별개입니다.
+
+
+## workers.dev without a purchased domain (2026-10-28)
+
+The verified account subdomain is gycha0109.workers.dev; this isolated console's intended origin is https://myeongha-admin.gycha0109.workers.dev. Cloudflare Zero Trust registration is complete but there is not yet a dedicated Access application, Admin Worker, dedicated Hyperdrive, or Admin Postgres role.
+
+The wrangler.jsonc now permits only its own workers.dev hostname, while keeping preview_urls: false and all operational activation flags at false. The worker rejects every request unless the explicit private enablement, verified Access JWT/Owner, dedicated read/audit DB and rate limiter are available. The deploy preflight rejects other worker hostnames, mismatched Access tenants, and reused customer DB bindings. No production deploy is implicit in build or dry-run.
+
+See docs/operations/ADMIN_WORKERS_DEV_HOSTING_20261028.md before any live execution. Existing public myeongha Worker must not be protected or replaced with Admin settings.

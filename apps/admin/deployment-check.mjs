@@ -2,6 +2,11 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 
+// Verified Cloudflare account workers.dev subdomain (2026-10-28). No purchased domain required.
+export const ADMIN_WORKERS_DEV_HOSTNAME_V1 = 'myeongha-admin.gycha0109.workers.dev';
+export const ADMIN_WORKERS_DEV_ORIGIN_V1 = 'https://' + ADMIN_WORKERS_DEV_HOSTNAME_V1;
+// A separate Cloudflare Access app for THIS Worker, and existing Member auth,
+// must both be configured before the Owner console can be activated.
 export const ADMIN_HOSTED_REQUIRED_V1=Object.freeze([
   'MYEONGHA_ADMIN_ORIGIN','MYEONGHA_ADMIN_ACCESS_ISSUER','MYEONGHA_ADMIN_ACCESS_AUD','MYEONGHA_ADMIN_OWNER_EMAIL',
   'MYEONGHA_ADMIN_OWNER_AUTH_USER_ID','MYEONGHA_ADMIN_SUPABASE_ORIGIN','MYEONGHA_SUPABASE_API_KEY','MYEONGHA_ADMIN_MEMBER_AUTH_ORIGIN',
@@ -10,13 +15,20 @@ export const ADMIN_HOSTED_REQUIRED_V1=Object.freeze([
 export function inspectAdminHostedDeploymentV1(env,config) {
   const missing=ADMIN_HOSTED_REQUIRED_V1.filter(key=>typeof env[key]!=='string'||!env[key].trim());
   const invalid=[];
-  if(config.name!=='myeongha-admin'||config.workers_dev!==false||config.preview_urls!==false||
+  if(config.name!=='myeongha-admin'||config.workers_dev!==true||config.preview_urls!==false||
     config.assets?.binding!=='ASSETS'||config.assets?.directory!=='./dist'||config.assets?.run_worker_first!==true||
     config.main!=='../../cloudflare/admin-worker.mjs'||config.routes!==undefined||config.route!==undefined) invalid.push('isolated_private_worker_config');
   for(const key of ['MYEONGHA_ADMIN_ORIGIN','MYEONGHA_ADMIN_MEMBER_AUTH_ORIGIN','MYEONGHA_ADMIN_ACCESS_ISSUER']) {
     if(!env[key])continue;
     try {const url=new URL(env[key]);if(url.protocol!=='https:'||url.username||url.password||url.pathname!=='/'||url.search||url.hash)invalid.push(key);}catch{invalid.push(key);}
   }
+  if(env.MYEONGHA_ADMIN_ORIGIN && env.MYEONGHA_ADMIN_ORIGIN!==ADMIN_WORKERS_DEV_ORIGIN_V1)
+    invalid.push('dedicated_workers_dev_origin_required');
+  // This account's active Zero Trust organization. An untrusted Access tenant
+  // cannot establish the required one-Owner deployment boundary.
+  if(env.MYEONGHA_ADMIN_ACCESS_ISSUER &&
+     env.MYEONGHA_ADMIN_ACCESS_ISSUER.replace(/\/$/u,'')!=='https://noisy-star-3d9a.cloudflareaccess.com')
+    invalid.push('dedicated_admin_access_issuer_required');
   if(env.MYEONGHA_ADMIN_ACCESS_ISSUER&&!/^https:\/\/[a-z0-9-]+\.cloudflareaccess\.com\/?$/.test(env.MYEONGHA_ADMIN_ACCESS_ISSUER))invalid.push('MYEONGHA_ADMIN_ACCESS_ISSUER');
   if(env.MYEONGHA_ADMIN_ACCESS_AUD&&!/^[a-f0-9]{64}$/i.test(env.MYEONGHA_ADMIN_ACCESS_AUD))invalid.push('MYEONGHA_ADMIN_ACCESS_AUD');
   if(env.MYEONGHA_ADMIN_OWNER_EMAIL&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(env.MYEONGHA_ADMIN_OWNER_EMAIL))invalid.push('MYEONGHA_ADMIN_OWNER_EMAIL');
@@ -40,6 +52,10 @@ export function inspectAdminHostedDeploymentV1(env,config) {
 export function prepareAdminHostedConfigV1(env,config) {
   const report=inspectAdminHostedDeploymentV1(env,config);
   if(!report.configurationReady)throw Error('Admin deployment configuration is incomplete: '+[...report.missing,...report.invalid].join(', '));
+  // workers.dev is a publicly routable hostname; never generate a live
+  // activation. The Worker itself fails closed, even before the Access app exists.
+  if(config.workers_dev!==true||config.preview_urls!==false)
+    throw Error('Isolated workers.dev routing required.');
   const vars={MYEONGHA_ADMIN_PRIVATE_ENABLED:'false',MYEONGHA_ADMIN_CREDIT_COMMANDS_ENABLED:'false',MYEONGHA_ADMIN_RETENTION_ENABLED:'false',MYEONGHA_ADMIN_HYPERDRIVE_POLICY:'dedicated-admin-verify-full-v1'};
   for(const key of ADMIN_HOSTED_REQUIRED_V1.filter(key=>!key.endsWith('_HYPERDRIVE_ID')&&key!=='MYEONGHA_SUPABASE_API_KEY'))vars[key]=env[key];
   return {...config,vars,hyperdrive:[{binding:'ADMIN_READ_HYPERDRIVE',id:env.MYEONGHA_ADMIN_READ_HYPERDRIVE_ID},
