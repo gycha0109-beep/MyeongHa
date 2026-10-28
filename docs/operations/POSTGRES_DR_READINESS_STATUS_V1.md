@@ -1,10 +1,44 @@
 # PostgreSQL DR Readiness Status v1
 
 > Issue: #389  
-> Evidence date: 2026-09-27 KST  
+> Historical baseline date: 2026-09-27 KST; latest bounded evidence addendum: 2026-10-28  
 > Purpose: record measured recovery evidence, bounded authoritative privacy reconciliation, approved RPO/RTO comparisons, and the remaining provider-equivalence boundary.
 
-## Current evidence
+## 2026-10-28 verified restore status (latest observation)
+
+```yaml
+verified_bounded_restore_run_id: 40655447574
+verified_bounded_restore_result: SUCCESS
+verified_bounded_restore_head_sha: 39fc280b393d15e39c47fa24596573eacd697f47
+verified_bounded_restore_backup_run_id: 40468157715
+verified_bounded_restore_backup_migration: 20261027043527
+verified_bounded_restore_privacy_ledger_run_id: 40468500587
+verified_bounded_restore_read_only_completion_run_id: 40633679630
+verified_bounded_restore_original_failed_canary_run_id: 40468086758
+verified_bounded_restore_artifact_id: 12801666793
+verified_bounded_restore_artifact_expires_at: 2026-11-27T08:16:04Z
+verified_bounded_restore_artifact_sha256: 59ea25bf3d29b7a06e9f26bd1616c41c10f651ee11da56a0d7342717b6b5ab6d
+verified_bounded_privacy_replay_events: 1
+verified_bounded_privacy_replay: PASS
+verified_bounded_privacy_idempotency: PASS
+verified_bounded_privacy_access_nonresurrection: PASS
+verified_bounded_privacy_commerce_p5y: PASS
+verified_bounded_authoritative_source_scope: captured-window-only
+observed_live_production_migration_version_20261028: 20261028011357
+repository_latest_migration_file_version_20261028: 20261028110500
+verified_restore_covers_live_frontier: false
+provider_managed_data_blocks_projected: 3
+provider_managed_data_blocks_skipped: 27
+provider_managed_data_full_restore: false
+future_safe_privacy_reconciliation: false
+dr_ready: false
+```
+
+The successful [protected isolated restore 40655447574](https://github.com/gycha0109-beep/MyeongHa/actions/runs/40655447574) used the exact [backup 40468157715](https://github.com/gycha0109-beep/MyeongHa/actions/runs/40468157715), [privacy ledger 40468500587](https://github.com/gycha0109-beep/MyeongHa/actions/runs/40468500587), and separately successful read-only completed-canary proof [40633679630](https://github.com/gycha0109-beep/MyeongHa/actions/runs/40633679630). The **original canary 40468086758 remains FAILURE**. Evidence artifact `12801666793` contains three sanitized restore/privacy JSON reports; their completed captured-window replay, repeat idempotency, Commerce P5Y and non-resurrection checks passed. This demonstrates application-data restore/ACL/Auth identity-reference continuity and bounded privacy finalization, **not** full Hosted Auth/Storage service recovery.
+
+Read-only Production ledger inspection on 2026-10-28 found `20261028011357`, newer than the selected backup's `20261027043527`. Repository filename `20261028110500` is separately observed, not assumed to match the live ledger. Consequently current-live-schema freshness, post-capture privacy completeness and future-safe DR remain **HOLD**, tracked in [#1887](https://github.com/gycha0109-beep/MyeongHa/issues/1887). No migration repair/deployment or destructive canary was performed by this documentation update. Approved `PT24H`/`PT6H` and historical comparison `5536s`/`67s` remain unchanged; three-second isolated database execution is **not** service RTO.
+
+## Historical evidence snapshot — 2026-09-27 (fields below are not current 2026-10-28 Production authority)
 
 ```yaml
 latest_governed_backup_run_id: 36294430134

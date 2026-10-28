@@ -4,6 +4,16 @@
 **Baseline observed:** 2026-10-28 KST
 **DR ready:** `false`
 
+## 2026-10-28 — actual successful isolated restore / bounded authoritative replay
+
+The protected [PostgreSQL 17 restore workflow #40655447574](https://github.com/gycha0109-beep/MyeongHa/actions/runs/40655447574) **completed SUCCESS** on `main` SHA `39fc280b393d15e39c47fa24596573eacd697f47`. It used the previously captured `40468157715` backup (migration `20261027043527`), `40468500587` authoritative privacy ledger (one event), and `40633679630` successful read-only attestation of the failed parent `40468086758`, with incident reference `2026-10-27T07:40:33Z`.
+
+Verified evidence artifact `12801666793` (`postgres-isolated-restore-drill-40655447574`) includes `restore-evidence.json`, `privacy-reconciliation-evidence.json` and `authoritative-privacy-reconciliation-evidence.json`. ZIP SHA-256 `59ea25bf3d29b7a06e9f26bd1616c41c10f651ee11da56a0d7342717b6b5ab6d`, expires `2026-11-27T08:16:04Z`. Restored application integrity/role ownership/ACL, Auth user-ID links, one-event governed privacy replay, repeated replay and completion idempotency, non-resurrection and Commerce P5Y retention passed.
+
+**Strict limits:** `authoritative_source_scope=captured-window-only`; `future_safe_privacy_reconciliation=false`, `provider_managed_data_full_restore=false` (3 projected / 27 skipped provider-managed COPY blocks), `dr_ready=false`. Neither Hosted Auth session/token/login functionality nor Storage file bytes were restored end-to-end. Latest read-only live Production migration `20261028011357` is ahead of backup `20261027043527`. The failed parent `40468086758` and failed initial restore `40645496534` remain FAILURE. **Never rerun `fresh` or `resume` for this completed case.**
+
+The older *pending isolated restore* instructions and failure investigations below are historical execution records, not the current operational state.
+
 ## Exact provenance
 
 - Failed parent Production Privacy Recovery Canary: [40468086758](https://github.com/gycha0109-beep/MyeongHa/actions/runs/40468086758), head `ed52c0cd442dfcf4396804275da2df74321f5799`. The **destructive execute step passed**, cleanup of ephemeral API login passed, but the ledger dispatch binding step failed on moving-`main` SHA and no public parent-canary evidence was uploaded.
@@ -28,11 +38,11 @@ The existing isolated restore provenance resolver requires **a successful, prote
 - It checks GitHub execution and artifact provenance, reads the terminal Production state in a `BEGIN READ ONLY` transaction, validates the original encrypted artifact pair without decryption, then constructs a distinct identifier-free attestation artifact. It does **not** rerun the failed parent or upload a synthetic claim of historical success.
 - `scripts/operations/verify-completed-privacy-canary-artifact-pair.py` validates only public manifest/archive integrity and excludes raw row payloads. It cannot establish completed canary execution by itself.
 
-**Current operational boundary (2026-10-28):** Protected read-only completion proof **succeeded and uploaded its evidence** (run `40633679630`). The **isolated PostgreSQL 17 restore/replay has not run**, and full hosted Auth/Storage equivalence remains unproven. Never rerun `fresh` or `resume` for this completed case.
+**Historical pre-restore boundary (superseded by successful run `40655447574`):** Protected read-only completion proof **succeeded and uploaded its evidence** (run `40633679630`). At that earlier stage the **isolated PostgreSQL 17 restore/replay had not run**, and full hosted Auth/Storage equivalence remains unproven. Never rerun `fresh` or `resume` for this completed case.
 
 The protected proof now exists. The established `postgres-isolated-restore-drill.yml` manual workflow can use exact backup `40468157715`, ledger `40468500587`, successful proof `40633679630`, and the captured incident time `2026-10-27T07:40:33Z`. The new `scripts/operations/assert-privacy-replay-canary-evidence.mjs` restore gate explicitly distinguishes this read-only attestation from a fresh/resumed deletion. It accepts a historical completed-case proof only with the original failed run bound as `resumedFromCanaryRunId=40468086758`, the exact backup and ledger IDs, a **different** successful proof workflow run, `hostedAuthDeletionInvoked=false` in the new execution and the explicit `already_absent_verified` observation. Existing fresh/resume replay support remains unchanged. The already successful protected workflow authority and public artifact requirements are not bypassed. Only a real successful isolated replay and verified evidence may advance *bounded* authoritative reconciliation; full hosted Auth/Storage provider recovery remains a separate unproven requirement.
 
-## Completed read-only execution inputs / pending isolated restore
+## Historical completed read-only execution inputs / formerly pending isolated restore
 
 The protected `Production Privacy Recovery Canary` manual dispatch **already succeeded** on 2026-10-28 as run `40633679630`; the successful input scope was:
 - `operation = attest_completed`
