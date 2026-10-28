@@ -91,7 +91,8 @@ export async function executeAndPersistCurrentBirthSajuOfficialReadingV1<Admitte
   });
   // The existing current Saju proof endpoint only emits Preview/HELD.
   // Never charge an upstream call without a wired Production issuer + DB scope.
-  if (!input.sourceVerifier || !input.mappingVerifier || !input.dbTransaction) {
+  const { sourceVerifier, mappingVerifier, dbTransaction } = input;
+  if (!sourceVerifier || !mappingVerifier || !dbTransaction) {
     return unavailable;
   }
 
@@ -111,7 +112,7 @@ export async function executeAndPersistCurrentBirthSajuOfficialReadingV1<Admitte
       ? {}
       : { targetPersonRef: input.targetPersonRef }),
   });
-  return input.dbTransaction.run({
+  return dbTransaction.run({
     subjectId: input.subjectId,
     commit: ({ currentAuthority, commitPort }) =>
       persistIssuedSajuOfficialReadingV1({
@@ -122,8 +123,8 @@ export async function executeAndPersistCurrentBirthSajuOfficialReadingV1<Admitte
         outboxEventId: input.outboxEventId,
         sourceBirthRevisionId: input.sourceBirthRevisionId,
         sourceResponse: response,
-        sourceVerifier: input.sourceVerifier,
-        mappingVerifier: input.mappingVerifier,
+        sourceVerifier,
+        mappingVerifier,
         currentAuthority,
         commitPort,
       }),
