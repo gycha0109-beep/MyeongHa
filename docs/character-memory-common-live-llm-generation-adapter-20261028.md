@@ -27,3 +27,15 @@
 비용 승인 전까지 기존 분리된 C09 Shadow와 공통 LLM 호환성을 연결·검증하고, 실제 허용된 서비스 권한에서 스레드/콘텐츠 Pin이 해결되면 소액 한도 안에서 세연·여울·서린 등 서로 다른 캐릭터의 **동일 질문 3~5턴 실모델 평가**를 수행한다. 평가 기준은 실제 고유 의사결정, 근거 있는 입장 유지·변경, 허위 기억 금지, 일관된 말투·관계 거리, 모델 비용 및 지연이다.
 
 **현 시점 완료 판정:** 실제 LLM 호출 가능한 어댑터 코드 구현 후보 / 실모델 검증·Production 통합 **미완료**.
+
+
+## 2026-10-28 세연·여울·태겸 5턴 실모델 비교 실행 기록
+
+- 실행 대상은 `seyeon`, `yeoul`, `taegyeom` **세 명만**이다. `seorin`은 실제 운영 Runtime 준비 상태가 확인되지 않아 제외했다.
+- 별도 실험은 기존 `CHARACTER_RUNTIME_AUTHORING_V1`의 공개 `speech/persona/behavior`를 직접 추출한다. 이는 실제 운영 DB Snapshot을 읽는 것이 아니므로 **게시된 Production Runtime 전체 검증**과 혼동하지 않는다.
+- 동일한 사용자 5턴(선택 존중 / 개입 반박 / 서운함 / 무조건 내 편 압박 / 이전 입장 질문)을 독립 스레드로 진행하며, 첫 질문 이후에는 각 캐릭터의 **실제 생성 대사**를 다음 입력으로 연결한다.
+- 고정 모델: OpenRouter `openai/gpt-4.1-mini` 후보 생성, `openai/gpt-4.1-nano` 독립 검토, **최대 15+15=30 호출, $0.30 상한**. 유료 실행은 모델 카탈로그, 토큰 예상 최대 비용, 저장 전 사전예약, 결과 사용량, 실패 시 즉시 중단, 재실행 금지로 제한된다.
+- 신규 `scripts/character-c1-three-five-paid-eval-20261028.mjs`와 공개 Authoring 번들, 전용 1회 GitHub workflow 및 합성 대화 결과 리포트 출력 기능을 구현했다.
+- 유료 1회 실행 시도: [GitHub Actions #40633034128](https://github.com/gycha0109-beep/MyeongHa/actions/runs/40633034128) `failure`. GitHub job의 `steps=[]`, 시작 직후 실패. **모델 호출 전에 중단되어 0회/비용 $0**. 인증·Environment 보호 규칙의 구체적 차단 메시지는 현재 API에서 확인할 수 없어 원인을 단정하지 않는다. 보호 조건을 회피하는 다른 Secrets 진입점으로 재호출하지 않는다.
+- 별도 **비용 0원** 코드 검증: [GitHub Actions #40633178279](https://github.com/gycha0109-beep/MyeongHa/actions/runs/40633178279) `success`; TypeScript, 두 C1 모델/멀티턴 테스트, 실행 스크립트 `node --check`, C1 정확한 3인 Authoring 번들, 5턴 Dry-run 모두 통과.
+- 미완료: **실제 모델의 15개 응답과 독립 검토 15개는 아직 0개**. 캐릭터성·자율성 성공을 선언할 근거 없음. Main-only secret-bearing Actions trust boundary 등 승인된 실행 위치에서 정확한 동일 스크립트를 수행할 수 있는지 먼저 확인해야 한다. 운영 배포·Production DB/ACL/Memory/Relationship 변경 없음.
