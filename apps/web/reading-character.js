@@ -233,6 +233,17 @@ function clearPersistedReadingPresentation() {
   if (report) report.hidden = true;
   document.querySelector('[data-official-report-toc]')?.replaceChildren();
   document.querySelector('[data-official-report-sections]')?.replaceChildren();
+  document.querySelector('[data-official-report-pillars]')?.replaceChildren();
+  document.querySelector('[data-official-report-elements]')?.replaceChildren();
+  document.querySelector('[data-official-report-gods]')?.replaceChildren();
+  const facts = document.querySelector('[data-official-report-facts]');
+  if (facts) facts.hidden = true;
+  const first = document.querySelector('[data-official-report-first]');
+  if (first) first.hidden = true;
+  const firstText = document.querySelector('[data-official-report-first-text]');
+  if (firstText) firstText.textContent = '';
+  const reader = document.querySelector('[data-official-report-reader]');
+  if (reader) reader.textContent = '—';
   const notice = document.querySelector('[data-official-report-notice]');
   if (notice) notice.hidden = true;
   delete root.dataset.reader;
@@ -514,6 +525,39 @@ function renderCalculationSummary(summary) {
   renderFactList(document.querySelector('[data-chart-ten-gods]'), summary.tenGods);
 }
 
+// Display only calculation facts already included in the authorized stored response.
+// Never recompute an earlier Birth revision from the current Birth Profile.
+function renderStoredReportEvidence(summary) {
+  const section = document.querySelector('[data-official-report-facts]');
+  if (!section || !summary || typeof summary !== 'object') return;
+  const pillars = summary.pillars && typeof summary.pillars === 'object' ? summary.pillars : {};
+  const validPillars = ['year', 'month', 'day', 'hour'].filter((key) => {
+    const fact = pillars[key];
+    return fact && typeof fact === 'object' && typeof fact.status === 'string';
+  });
+  const hasElements = Array.isArray(summary.fiveElements) && summary.fiveElements.length > 0;
+  const hasGods = Array.isArray(summary.tenGods) && summary.tenGods.length > 0;
+  if (validPillars.length === 0 && !hasElements && !hasGods) return;
+
+  const output = document.querySelector('[data-official-report-pillars]');
+  if (output) {
+    output.replaceChildren();
+    for (const [key, label] of [['year', '연주'], ['month', '월주'], ['day', '일주'], ['hour', '시주']]) {
+      if (!validPillars.includes(key)) continue;
+      const wrapper = document.createElement('div');
+      const title = document.createElement('small');
+      title.textContent = translateStaticUi(label, getUiLocale());
+      const value = document.createElement('strong');
+      value.textContent = displayFactValue(pillars[key]);
+      wrapper.append(title, value);
+      output.append(wrapper);
+    }
+  }
+  renderFactList(document.querySelector('[data-official-report-elements]'), hasElements ? summary.fiveElements : []);
+  renderFactList(document.querySelector('[data-official-report-gods]'), hasGods ? summary.tenGods : []);
+  section.hidden = false;
+}
+
 // Render only the exact owner-authorized, delivered snapshot already projected by
 // previewStepsFromPayload. This is a document layout, not a new Saju inference.
 function renderAuthorizedStoredReport(preview, record) {
@@ -575,6 +619,20 @@ function renderAuthorizedStoredReport(preview, record) {
   }).format(new Date(record.completedAt));
   const version = document.querySelector('[data-official-report-version]');
   if (version) version.textContent = record.readingContractVersion;
+  const reader = document.querySelector('[data-official-report-reader]');
+  if (reader) {
+    const ids = record.readerCharacterIds;
+    reader.textContent = ids.length > 0
+      ? ids.map((id) => resolveCharacterDisplayNameV1(id, getUiLocale()) ?? id).join(', ')
+      : '—';
+  }
+  const first = document.querySelector('[data-official-report-first]');
+  const firstText = document.querySelector('[data-official-report-first-text]');
+  if (first && firstText && preview.steps[0]) {
+    firstText.textContent = preview.steps[0].primary;
+    first.hidden = false;
+  }
+  renderStoredReportEvidence(preview.calculationSummary);
   const notice = document.querySelector('[data-official-report-notice]');
   const noticeText = document.querySelector('[data-official-report-notice-text]');
   if (notice) notice.hidden = !preview.notice;
@@ -695,6 +753,11 @@ function activatePreviewReading(preview) {
       if (date) date.textContent = new Intl.DateTimeFormat(getUiLocale(), {
         year: 'numeric', month: 'long', day: 'numeric',
       }).format(new Date(preview.record.completedAt));
+      const reader = document.querySelector('[data-official-report-reader]');
+      if (reader) {
+        reader.textContent = preview.record.readerCharacterIds
+          .map((id) => resolveCharacterDisplayNameV1(id, getUiLocale()) ?? id).join(', ') || '—';
+      }
     }
   });
 
