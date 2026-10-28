@@ -216,6 +216,41 @@ revoke all on function myeongha_admin_ops.cmd_record_reading_ai_call_v1(uuid,uui
 grant execute on function myeongha_admin_ops.cmd_record_reading_ai_call_v1(uuid,uuid,uuid,jsonb)
   to myeongha_reading_ai_cost_writer_v1;
 
+-- Bounded private Owner-reader projection. No provider raw payload or
+-- claim that these are all the calls made by the Saju Reading engine.
+create function myeongha_admin_ops.qry_reading_ai_cost_calls_v1(
+  p_reading uuid,p_limit integer,p_offset integer
+) returns table("callId" text,"readingId" text,"executionAttemptId" text,
+  "observedAt" text,provider text,model text,outcome text,source text,
+  "inputTokens" text,"outputTokens" text,"cachedInputTokens" text,
+  "reasoningTokens" text,"priceVersion" text,"estimatedMicroUsd" text,
+  "costStatus" text)
+language plpgsql stable security definer set search_path=pg_catalog,myeongha_admin_ops
+as $
+begin
+  if p_reading is null or p_limit is null or p_limit not between 1 and 51
+    or p_offset is null or p_offset not between 0 and 10000 then
+    raise exception 'Invalid bounded Reading AI cost query';
+  end if;
+  return query
+  select c.call_id::text,c.reading_id::text,c.execution_attempt_id::text,
+    c.observed_at::text,c.provider_key,c.model_key,c.outcome,c.source,
+    c.input_tokens::text,c.output_tokens::text,c.cached_input_tokens::text,
+    c.reasoning_tokens::text,c.price_version,c.estimated_cost_micro_usd::text,
+    c.cost_status
+  from myeongha_admin_ops.reading_ai_call_cost_events_v1 c
+  where c.reading_id=p_reading
+    and c.observed_at>=current_timestamp-interval '90 days'
+  order by c.observed_at desc,c.call_id desc limit p_limit offset p_offset;
+end $;
+grant create on schema myeongha_admin_ops to myeongha_reading_ai_cost_source_v1;
+alter function myeongha_admin_ops.qry_reading_ai_cost_calls_v1(uuid,integer,integer)
+  owner to myeongha_reading_ai_cost_source_v1;
+revoke create on schema myeongha_admin_ops from myeongha_reading_ai_cost_source_v1;
+revoke all on function myeongha_admin_ops.qry_reading_ai_cost_calls_v1(uuid,integer,integer) from public;
+grant execute on function myeongha_admin_ops.qry_reading_ai_cost_calls_v1(uuid,integer,integer)
+  to myeongha_admin_reader;
+
 -- Deliberately no direct writer access, no anon/authenticated/service_role
 -- grant, no operational installation, and no claim of Reading coverage.
 commit;
