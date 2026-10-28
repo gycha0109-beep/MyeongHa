@@ -171,6 +171,13 @@ React 19와 기존 web 워크스페이스에서 설치하는 Vite 8 빌드 도�
 - Each requires an authenticated Subject, active consent/session, matching durable pseudonymous Subject link, and **consent granted before the actual domain event**. Stable server event IDs deduplicate repeated processing. No conversion is inferred from browser success screens or a purchase intent.
 - These adapters are not attached to Production command handlers or event collectors. The separate analytics writer, consent runtime, complete observability coverage, deletion binding and explicit collection activation remain prerequisites. Billing exports, verified FX and Reading-generation costs are still unconnected.
 
+## Reading AI 생성 호출 비용 기록 — 코드 구현 / 운영 비활성 (2026-10-28)
+
+- `apps/api/src/reading-ai-call-cost-v1.ts`는 **실제 공급사 응답 또는 실패한 호출 시도를 서버가 직접 관측한 경우에만** Reading 생성 호출 비용 이벤트를 만듭니다. `subjectId`, `readingId`, `executionAttemptId`, 개별 `callId`, 제공사·모델, 토큰 사용량, 결과, 당시 단가 버전과 정확한 단가를 기록합니다. 실패/타임아웃도 비용이 없었다고 단정하지 않고 미측정으로 보존합니다.
+- `apps/admin/database/reading-ai-call-cost-offline-v1.sql`은 **오프라인 설치 후보**입니다. 별도 최소 권한 Writer와 private schema 원장을 사용하며, 이미 존재하는 동일 Subject의 Reading 실행 시도에만 기록하고 중복 호출은 정확히 같은 데이터일 때만 replay로 인정합니다. 저장 함수에서 입력 토큰·캐시 토큰·출력 토큰과 단가를 재계산하여 거짓 예상 금액을 차단합니다. 본문의 출생 정보·해석 내용·AI 프롬프트와 응답은 저장하지 않습니다.
+- 현재 명하→Saju `ProductReadingResponse` 계약에는 AI 공급사의 **실제 토큰 사용량·AI 호출 식별자**가 전달되지 않습니다. 따라서 기존 Saju HTTP transport 결과나 Character의 Reading grounding 사용 기록을 Reading 생성 AI 비용으로 변환하지 않습니다. **실제 비용이 0원이라는 뜻이 아니며**, 정본 공급사 호출 관측/전달 경로가 추가될 때까지 원장은 미연결입니다.
+- 일반 `myeongha_api_executor`·고객-facing HTTP·브라우저에는 원장 쓰기 권한을 부여하지 않습니다. 운영 DB 역할/SQL 설치, 별도 writer 연결, 실제 공급사 usage source, 관리자 read projection과 예산 완전성 판단은 아직 승인·연결되지 않았습니다.
+
 ## workers.dev without a purchased domain (2026-10-28)
 
 The verified account subdomain is gycha0109.workers.dev; this isolated console's intended origin is https://myeongha-admin.gycha0109.workers.dev. Cloudflare Zero Trust registration is complete but there is not yet a dedicated Access application, Admin Worker, dedicated Hyperdrive, or Admin Postgres role.
