@@ -21,6 +21,11 @@ describe('Paid Records archive current-Grant authority', () => {
     expect(migration).toContain('select 1 from public.standard_reading_unit_bindings b');
     expect(migration).toContain('internal_qry_standard_reading_artifact_source_v2(');
     expect(migration).toContain('internal_qry_standard_reading_artifact_source_v1(');
+    // A migrated v2 official artifact must never be opened through an old
+    // v1 unit grant when the last v2 Reader purchase was revoked.
+    expect(migration).toMatch(
+      /or \(\s*-- Once a Reading has a Reader-independent official binding,[\s\S]*?not exists \(\s*select 1 from public\.standard_reading_official_bindings official\s*where official\.reading_id = r\.id\s*\)\s*and exists \(\s*select 1\s*from public\.standard_reading_unit_bindings b/u,
+    );
     expect(migration).toContain('paid.response_hash = rr.response_hash');
   });
 
