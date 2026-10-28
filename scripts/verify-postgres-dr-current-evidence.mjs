@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import { validateDrCurrentEvidence } from './validate-postgres-dr-current-evidence.mjs';
 
@@ -93,4 +94,10 @@ assert.throws(
   ), frontier),
   /exactly one latest dated verified restore/u,
 );
+// Exercise the complete legacy DR contract with the new latest-evidence
+// validator as part of PR governance, not only its pure parsing unit tests.
+execFileSync('node', ['scripts/verify-postgres-dr-readiness-authority.mjs'], {
+  stdio: 'inherit',
+  env: { ...process.env, GITHUB_EVENT_NAME: 'pull_request' },
+});
 console.log('PostgreSQL DR current evidence PASS: latest dated bounded proof is distinct from historical frontier 1310 and cannot authorize serving.');
