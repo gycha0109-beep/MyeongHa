@@ -1,5 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { readdir, readFile } from 'node:fs/promises';
+import { validateDrCurrentEvidence } from './validate-postgres-dr-current-evidence.mjs';
 
 const paths = {
   operations: 'docs/architecture/PRODUCTION_OPERATIONS_ARCHITECTURE_V1.md',
@@ -34,36 +35,14 @@ if (migrationNumbers.length === 0) {
   throw new Error('No numbered SQL migrations found under supabase/migrations');
 }
 const repositoryMigrationFrontier = Math.max(...migrationNumbers);
-const productionMigrationMatch = files.readinessStatus.match(
-  /^production_schema_latest_deployed_migration:\s*(\d+)\s*$/m,
+// The September 1310 snapshot is deliberately historical and must never be
+// used as current Production authority. A dated October observation is a
+// bounded snapshot, not a live Supabase query or a serving promotion.
+const currentEvidence = validateDrCurrentEvidence(
+  files.readinessStatus,
+  repositoryMigrationFrontier,
+  process.env.GITHUB_EVENT_NAME ?? 'local',
 );
-if (!productionMigrationMatch) {
-  throw new Error(
-    `${paths.readinessStatus} is missing production_schema_latest_deployed_migration authority`,
-  );
-}
-const productionMigrationFrontier = Number(productionMigrationMatch[1]);
-if (!Number.isSafeInteger(productionMigrationFrontier)) {
-  throw new Error('Production migration frontier is not a safe integer');
-}
-if (repositoryMigrationFrontier < productionMigrationFrontier) {
-  throw new Error(
-    `Repository migration frontier ${repositoryMigrationFrontier} is behind deployed production migration ${productionMigrationFrontier}.`,
-  );
-}
-if (repositoryMigrationFrontier > productionMigrationFrontier) {
-  const eventName = process.env.GITHUB_EVENT_NAME ?? 'local';
-  if (eventName !== 'pull_request') {
-    throw new Error(
-      `PostgreSQL DR evidence covers deployed migration ${productionMigrationFrontier}, but repository migration frontier is ${repositoryMigrationFrontier}. ` +
-      'After merge/deployment, capture and restore a new governed production backup before claiming current-production-schema recovery.',
-    );
-  }
-  console.log(
-    `PostgreSQL DR pre-deploy guard: PR candidate migration frontier ${repositoryMigrationFrontier} is ahead of deployed production ${productionMigrationFrontier}; ` +
-    'existing backup/restore evidence remains authoritative only for the deployed production frontier and does not cover the candidate schema.',
-  );
-}
 
 function requireFragment(key, fragment) {
   if (!files[key].includes(fragment)) {
@@ -231,11 +210,13 @@ for (const staleRuntimeFragment of [
   }
 }
 
-const candidateFrontierNote =
-  repositoryMigrationFrontier > productionMigrationFrontier
-    ? ` Repository candidate migration ${repositoryMigrationFrontier} is pending deployment and is not covered by that recovery evidence.`
-    : '';
-
 console.log(
-  `PostgreSQL DR readiness authority guard PASS: production is deployed through migration ${productionMigrationFrontier}; Production non-zero bounded-window reconciliation and full authoritative RPO/RTO comparisons are proven, while provider-managed full-restore equivalence and future-safe recovery remain open so dr_ready=false.${candidateFrontierNote}`,
+  `PostgreSQL DR authority guard PASS (blocked): latest verified bounded restore ${currentEvidence.restoreRunId} ` +
+  `covers backup migration ${currentEvidence.restoredBackupMigration}, while the observed 2026-10-28 live ` +
+  `migration is ${currentEvidence.observedLiveMigrationAsOf20261028}; repository frontier is ` +
+  `${currentEvidence.repositoryMigrationFrontier}. Current-live-schema recovery and Hosted Auth/Storage ` +
+  `equivalence are unproven. Independent future privacy source and serving S8 remain HOLD; dr_ready=false.` +
+  (currentEvidence.repositoryCandidateBeyondObservation
+    ? ' PR-only candidate migration advance is unverified by current production recovery evidence.'
+    : ''),
 );
