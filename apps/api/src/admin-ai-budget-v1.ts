@@ -35,8 +35,14 @@ export function evaluateAdminAiBudgetV1(input:{readonly window:AdminAiBudgetWind
  const estimatedMicroKrw=convert(estimate,input.window,input.fx);
  // A partial provider export proves only a lower bound, never the monthly total.
  const knownConfirmedMicroKrw=confirmed===null?null:convert(confirmed,input.window,input.fx);
- const confirmedMicroKrw=input.billing?.coverage==='complete'?knownConfirmedMicroKrw:null;
- const states=[{basis:'provider_confirmed' as const,value:knownConfirmedMicroKrw,coverage:input.billing?.coverage??'unconnected'},
+ // A running Seoul calendar month cannot have a final full-month invoice.
+ // Even a verified export labelled complete is only a known partial amount
+ // until the window has actually closed.
+ const monthClosed=input.window.observedThrough>=input.window.toExclusive;
+ const billingCoverage=input.billing?.coverage==='complete'&&monthClosed?'complete':
+  input.billing?'partial':'unconnected';
+ const confirmedMicroKrw=billingCoverage==='complete'?knownConfirmedMicroKrw:null;
+ const states=[{basis:'provider_confirmed' as const,value:knownConfirmedMicroKrw,coverage:billingCoverage},
   {basis:'usage_price_estimate' as const,value:estimatedMicroKrw,coverage:estimateComplete?'complete':'partial'}];
  const warnings=states.flatMap(s=>s.value===null?[]:ADMIN_AI_BUDGET_THRESHOLDS_V1.filter(percent=>BigInt(s.value!)>=BigInt(ADMIN_AI_MONTHLY_BUDGET_KRW_V1)*1_000_000n*BigInt(percent)/100n).map(percent=>Object.freeze({
    id:`ai-budget:${input.window.month}:${s.basis}:${percent}`,thresholdPercent:percent,thresholdKrw:ADMIN_AI_MONTHLY_BUDGET_KRW_V1*percent/100,basis:s.basis,coverage:s.coverage,notificationOnly:true,automaticShutdown:false,
@@ -47,8 +53,8 @@ export function evaluateAdminAiBudgetV1(input:{readonly window:AdminAiBudgetWind
   thresholdsKrw:[80_000,100_000],automaticShutdown:false,observedCalls:calls,unknownCostCalls:unknownCalls,missingWorkloads,
   estimateCoverage:estimateComplete?'complete':'partial',knownEstimateMicroUsd:estimate.toString(),estimatedMicroUsd:estimateComplete?estimate.toString():null,
   knownEstimateMicroKrw:estimatedMicroKrw,knownConfirmedMicroUsd:confirmed?.toString()??null,
-  knownConfirmedMicroKrw,confirmedMicroUsd:input.billing?.coverage==='complete'?confirmed?.toString()??null:null,confirmedMicroKrw,
-  billingStatus:input.billing?input.billing.coverage:'unconnected',fxStatus:estimatedMicroKrw===null?'unmeasured_or_out_of_scope':'verified_evidence_supplied',
+  knownConfirmedMicroKrw,confirmedMicroUsd:billingCoverage==='complete'?confirmed?.toString()??null:null,confirmedMicroKrw,
+  billingStatus:billingCoverage,fxStatus:estimatedMicroKrw===null?'unmeasured_or_out_of_scope':'verified_evidence_supplied',
   budgetStatus:confirmedMicroKrw===null?'confirmed_budget_unmeasured':'confirmed_observed',warnings,buckets:input.buckets,
  });
 }

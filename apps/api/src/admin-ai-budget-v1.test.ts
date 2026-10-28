@@ -39,6 +39,23 @@ describe('approved Seoul monthly budget policy',()=>{
   expect(complete.confirmedMicroKrw).toBe(complete.knownConfirmedMicroKrw);
   expect(complete.budgetStatus).toBe('confirmed_observed');
  });
+ it('never marks the current unfinished Seoul month as fully provider-confirmed',()=>{
+  const current=adminAiBudgetWindowV1('2026-10',new Date('2026-10-28T06:00:00Z'));
+  const billed={source:'provider_billing_export' as const,evidenceSha256:'d'.repeat(64),
+    from:current.from,toExclusive:current.toExclusive,coverage:'complete' as const,amountMicroUsd:'80000000'};
+  const actual=evaluateAdminAiBudgetV1({window:current,buckets:[],workloadCoverage:[],billing:billed,fx:{
+    ...fx,effectiveFrom:current.from,effectiveTo:current.toExclusive,
+  }});
+  expect(actual.knownConfirmedMicroUsd).toBe('80000000');
+  expect(actual.confirmedMicroUsd).toBeNull();
+  expect(actual.confirmedMicroKrw).toBeNull();
+  expect(actual.billingStatus).toBe('partial');
+  expect(actual.warnings.filter(w=>w.basis==='provider_confirmed')).toMatchObject([
+    {thresholdPercent:80,coverage:'partial',notificationOnly:true,automaticShutdown:false},
+  ]);
+  const closed=adminAiBudgetWindowV1('2026-10',new Date('2026-11-01T00:00:00Z'));
+  expect(evaluateAdminAiBudgetV1({window:closed,buckets:[],workloadCoverage:[],billing:billed,fx}).billingStatus).toBe('complete');
+ });
  it('rejects an invoice from a different period and does not warn one fractional won early or use an out-of-period FX',()=>{
   const r=evaluateAdminAiBudgetV1({window,buckets:[{...bucket,estimateMicroUsd:'79999999'}],workloadCoverage:['character_chat'],fx});expect(r.warnings).toHaveLength(0);
   expect(evaluateAdminAiBudgetV1({window,buckets:[bucket],workloadCoverage:[],fx:{...fx,effectiveFrom:'2026-10-02T00:00:00Z'}}).knownEstimateMicroKrw).toBeNull();
