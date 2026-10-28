@@ -234,13 +234,13 @@
 | Records 기존 목록·기본 명식록·현세록·기억 조회 | **기반 구현 유지** |
 | 1단계 보고서 중심 진입 화면 | **브랜치 구현**: 보고서 기본 탭·owner 조회·실제 기록 수·부분 실패와 전체 권한 거부 구분 |
 | 2단계 공식 장문 보고서 읽기 UX | **브랜치 구현**: 승인된 단건 원문·섹션/목차·출처·현재 계정 확인, 새로고침과 직접 링크 |
-| 3단계 Production 공식 결과 생성/불변 저장 E2E | **HOLD / 미완료**: Saju issuer 및 DB·Privacy 출처/원자 저장 필요 |
+| 3단계 Production 공식 결과 생성/불변 저장 E2E | **서버 내부 연결부 구현 / Production HOLD**: 현재 Birth→Saju 요청→Production issuer·DB ID 매핑·현재 Grant/Privacy 별도 검증→기존 원자 DB finalize 및 원문 출처 해시 재조회 경로는 코드로 연결. 실제 Saju Production issuer·DB/Privacy 권한 포트와 운영 E2E 미완료 |
 | 4단계 검증된 유료 구매·권한·재생성·환불 E2E | **HOLD / 미완료**: 상품별 활성화·Commerce Grant 및 환불 검증 필요 |
 | 5단계 최초 Reader와 보고서 재조회 연결 | **과거 Reader provenance UI만 구현**: 현재 Reader 정확한 Grant/유료 해설 미연결 |
 | 6단계 보고서 독서 UX 보완 | **일부 구현**: 실제 목차/근거·모바일·5개 언어·목차와 읽기 모드 초점 이동; 여러 scope limitation 보존, 없는 구조 근거는 미표시 |
 | S2~S4 확장 | **출시 범위 밖** |
 
-**다음 구현:** 승인된 Saju issuer·DB 매핑/저장·Commerce/Reader Grant가 실제 준비되면 3·4·5단계 통합 경로를 연결한다. 그 전에는 **현재 보유한 승인된 공식 Reading의 권한 검증·재열람·Reader provenance 분리·보고서 사용성**에서 독립적으로 구현 가능한 개선을 수행한다. 과거 첫 SKU/출시 가정은 2026-10-28 최신 상품 정본보다 우선하지 않는다.
+**다음 구현:** 3단계 서버 연결부의 Production Source verifier·DB 승인 매핑 영수증·현재 Commerce/Privacy 권한 포트와 기존 DB finalize 실행권을 **정본 증거에 따라 실구현**하고, 정식 발행·환불·재열람 E2E를 검증한다. 그 전에는 **현재 보유한 승인된 공식 Reading의 권한 검증·재열람·Reader provenance 분리·보고서 사용성**에서 독립적으로 구현 가능한 개선을 수행한다. 과거 첫 SKU/출시 가정은 2026-10-28 최신 상품 정본보다 우선하지 않는다.
 
 ## 9. 원본 설계·계약 링크
 
