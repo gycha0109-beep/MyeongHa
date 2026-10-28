@@ -152,6 +152,17 @@ case "$case_name" in
       }
     '
     ;;
+  saju-official-records-http-e2e)
+    verify_pg17
+    [[ "${CI:-}" == true && "${GITHUB_ACTIONS:-}" == true &&
+       "${DB_SUITE:-}" == postgres17 && "${PGHOST:-}" == localhost &&
+       "${PGDATABASE:-}" =~ ^myeongha_ci_case_[0-9]+$ ]] || {
+      echo HOLD_SAJU_OFFICIAL_REREAD_E2E_DISPOSABLE_DB_REQUIRED >&2
+      exit 1
+    }
+    apply_pg17_migrations_without_birth_authority
+    bash test/db/saju_official_records_http_e2e_pg17.sh
+    ;;
   seyeon-security-s0-real-path-pg17)
     verify_pg17
     [[ "${CI:-}" == true && "${GITHUB_ACTIONS:-}" == true &&
