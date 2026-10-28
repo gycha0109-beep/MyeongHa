@@ -1,4 +1,5 @@
 import { SAJU_DOMAINS } from '../../../packages/contracts/src/index.js';
+import { projectProductReadingResponseV2 } from '../../../packages/api-client/src/product-reading-display.js';
 import { ApiCommandError } from './api-error.js';
 import { hashSajuHeldSourceProofRequestV1 } from './saju-held-source-proof-verifier-v1.js';
 
@@ -214,10 +215,26 @@ export async function getOfficialReadingRecord(input: {
     if (
       readingContractVersion === 'myeonghwa-product-reading-response-v2'
       && /^sha256:v1:[a-f0-9]{64}$/u.test(storedResponseHash)
-      && hashSajuHeldSourceProofRequestV1(reading)
-        !== storedResponseHash.slice('sha256:v1:'.length)
     ) {
-      throw new Error('Official Reading archive source response hash mismatch.');
+      // A canonically issuer-hashed v2 report must be both byte-identical to
+      // the committed snapshot and displayable under its actual Product Reading
+      // schema. Do not return malformed or empty v2 interpretations to the
+      // browser merely because a matching hash was stored.
+      if (hashSajuHeldSourceProofRequestV1(reading)
+        !== storedResponseHash.slice('sha256:v1:'.length)) {
+        throw new Error('Official Reading archive source response hash mismatch.');
+      }
+      let display;
+      try {
+        display = projectProductReadingResponseV2(reading);
+      } catch {
+        throw new Error('Official Reading archive canonical response failed product admission.');
+      }
+      if (display.kind !== 'delivered'
+        || display.responseState !== productResponseState
+        || display.readingId !== readingId) {
+        throw new Error('Official Reading archive canonical response failed product admission.');
+      }
     }
 
     return Object.freeze({
