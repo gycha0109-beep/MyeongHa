@@ -302,6 +302,10 @@ else
       previousCapturedAt: null,
       currentCapturedAt: $captured_at,
       overlapEventCount: 0,
+      captureIntervalSeconds: null,
+      nominalScheduledIntervalSeconds: 3600,
+      captureIntervalBeyondNominalSeconds: null,
+      continuousCaptureProven: false,
       snapshotOverlapStatus: "NO_PREDECESSOR_UNVERIFIED",
       sourceContinuityProven: false,
       futureSafePrivacyReconciliation: false,
@@ -378,8 +382,10 @@ echo "captured_at_utc=$captured_at_utc" >> "$GITHUB_OUTPUT"
   printf -- '- captured at: `%s`\n' "$captured_at_utc"
   printf -- '- replay-supported event count: `%s`\n' "$(jq -r '.eventCount' "$public_manifest")"
   printf -- '- prior snapshot overlap: %s\n' "$(jq -r '.snapshot_overlap.snapshotOverlapStatus' "$public_manifest")"
+  printf -- '- capture interval since predecessor (seconds; null if unavailable): %s\n' "$(jq -r '.snapshot_overlap.captureIntervalSeconds' "$public_manifest")"
+  printf -- '- capture delay beyond nominal hourly cadence (seconds; not RPO): %s\n' "$(jq -r '.snapshot_overlap.captureIntervalBeyondNominalSeconds' "$public_manifest")"
   echo
-  echo 'This encrypted artifact is authoritative only for the exact governed backup cutoff through captured-at window recorded above. Recovery must fail closed when its incident reference is later than captured-at. Snapshot comparison does not establish independent continuous capture or future-safe privacy authority. Snapshot cadence is operational mechanics, not an approved RPO. Authoritative reconciliation, RPO/RTO, and DR Ready remain separately gated.'
+  echo 'This encrypted artifact is authoritative only for the exact governed backup cutoff through captured-at window recorded above. Recovery must fail closed when its incident reference is later than captured-at. Measured snapshot intervals are diagnostic only; snapshot comparison does not establish independent continuous capture or future-safe privacy authority. Snapshot cadence is operational mechanics, not an approved RPO. Authoritative reconciliation, RPO/RTO, and DR Ready remain separately gated.'
 } >> "$GITHUB_STEP_SUMMARY"
 
 trap - EXIT
