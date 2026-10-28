@@ -37,7 +37,7 @@ export interface VerifiedSajuProductionIssueV1 {
   readonly sourceBirthRevisionId: string;
   readonly sourceBirthInputHash: string;
   readonly engineVersion: string;
-  readonly externalRequestRef: string | null;
+  readonly externalRequestRef: string;
 }
 
 /** DB Owner must separately attest that the ONLY transformation is Reading ID. */
@@ -92,8 +92,9 @@ export interface SajuOfficialImmutableCommitPortV1 {
     readonly executionAttemptId: string;
     readonly outboxEventId: string;
     readonly engineVersion: string;
-    readonly externalRequestRef: string | null;
+    readonly externalRequestRef: string;
     readonly nativeReadingId: string;
+    readonly sourceResponseHash: string;
     readonly sourceBirthInputHash: string;
     readonly readingContractVersion: typeof RESPONSE_VERSION;
     readonly productResponseState: 'delivered' | 'delivered_with_fallback';
@@ -197,7 +198,7 @@ export async function persistIssuedSajuOfficialReadingV1(input: Readonly<{
     || source.sourceBirthRevisionId !== input.sourceBirthRevisionId
     || !id(source.sourceBirthInputHash)
     || !id(source.engineVersion)
-    || (source.externalRequestRef !== null && !id(source.externalRequestRef))) {
+    || !id(source.externalRequestRef)) {
     return held('production_source_unverified');
   }
 
@@ -244,6 +245,7 @@ export async function persistIssuedSajuOfficialReadingV1(input: Readonly<{
     engineVersion: source.engineVersion,
     externalRequestRef: source.externalRequestRef,
     nativeReadingId: source.nativeReadingId,
+    sourceResponseHash: originalHash,
     sourceBirthInputHash: source.sourceBirthInputHash,
     readingContractVersion: RESPONSE_VERSION,
     productResponseState: native.state as 'delivered' | 'delivered_with_fallback',
