@@ -18,6 +18,43 @@ describe('disabled-by-default web analytics initialization',()=>{
     const reloaded=initializeMyeonghaAnalyticsV1({enabled:true,policy,fetchImpl});expect(await reloaded.withdraw()).toEqual({status:'withdrawn'});
     expect(sent.at(-1).path).toBe('/api/analytics/withdraw');expect(mountMyeonghaAnalyticsConsentV1()).toBeNull();
   });
+  it('restores an approved server-side consent only by explicit call, without a new grant',async()=>{
+    const consent={granted:true,visitorRef:'av_'+'a'.repeat(64),
+      version:'product-analytics-consent-180d-v1',expiresAt:new Date(Date.now()+86400_000).toISOString()};
+    const sent=[];
+    const policy={approved:true,approvalRef:'approved-test',policyVersion:'policy-v1',retentionSeconds:180*86400,
+      deletionBindingVerified:true,validVisitPolicyVersion:'admitted-v1',approvedEvents:['PAGE_VIEWED']};
+    const fetchImpl=async(path,options)=>{
+      sent.push({path,options});
+      if(path.endsWith('/consent'))return Response.json({code:'ANALYTICS_CONSENT_ACTIVE',consent});
+      if(path.endsWith('/session'))return Response.json({visitorRef:consent.visitorRef,
+        version:consent.version,expiresAt:consent.expiresAt,sessionRef:'as_'+'b'.repeat(64),
+        sessionContext:'server-signed.context'});
+      return Response.json({code:'ANALYTICS_RECORDED'});
+    };
+    const disabled=initializeMyeonghaAnalyticsV1({fetchImpl});
+    expect(await disabled.restoreConsent()).toEqual({status:'disabled'});
+    expect(sent).toHaveLength(0);
+    const collector=initializeMyeonghaAnalyticsV1({enabled:true,policy,fetchImpl});
+    expect(sent).toHaveLength(0); // Import/construct never resumes tracking.
+    expect(await collector.restoreConsent()).toEqual({status:'restored'});
+    expect(sent.slice(0,2).map(x=>x.path)).toEqual(['/api/analytics/consent','/api/analytics/session']);
+    expect(JSON.parse(sent[0].options.body)).toEqual({decision:'status'});
+    expect(await collector.track('PAGE_VIEWED',{pageKey:'reading'})).toMatchObject({status:'recorded'});
+    expect(sent).toHaveLength(3);
+    expect(await collector.withdraw()).toEqual({status:'withdrawn'});
+  });
+  it('refuses expired/missing server consent without transmitting an event',async()=>{
+    const policy={approved:true,approvalRef:'approved-test',policyVersion:'policy-v1',retentionSeconds:180*86400,
+      deletionBindingVerified:true,validVisitPolicyVersion:'admitted-v1',approvedEvents:['PAGE_VIEWED']};
+    let requests=0;
+    const collector=initializeMyeonghaAnalyticsV1({enabled:true,policy,
+      fetchImpl:async()=>{requests++;return Response.json({code:'ANALYTICS_CONSENT_REQUIRED'},{status:403});}});
+    expect(await collector.restoreConsent()).toEqual({status:'consent_required'});
+    expect(requests).toBe(1);
+    expect(await collector.track('PAGE_VIEWED',{pageKey:'reading'})).toEqual({status:'consent_required'});
+    expect(requests).toBe(1);
+  });
   it('uses consent-gated sessionStorage for a tab lifecycle rather than a 180-day cookie session',async()=>{
     let storageReads=0,sessions=0;const values=new Map();const memory={getItem:key=>values.get(key)??null,setItem:(key,value)=>values.set(key,value),removeItem:key=>values.delete(key)};
     const expiresAt=new Date(Date.now()+86400_000).toISOString(),visitorRef='av_'+'a'.repeat(64),version='product-analytics-consent-180d-v1';

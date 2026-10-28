@@ -96,8 +96,15 @@ export function createAdminAnalyticsConsentRuntimeV1(input:{
      const payload=Buffer.from(JSON.stringify(session)).toString('base64url');
      return reply(200,'ANALYTICS_SESSION_STARTED',{...session,sessionContext:payload+'.'+sessionMac(payload).toString('base64url')});
     }
-    if(body===null||typeof body!=='object'||Array.isArray(body)||Object.keys(body).length!==1||body.decision!=='grant')return reply(400,'ANALYTICS_BAD_CONSENT');
+    if(body===null||typeof body!=='object'||Array.isArray(body)||Object.keys(body).length!==1||
+       !['grant','status'].includes(String(body.decision)))return reply(400,'ANALYTICS_BAD_CONSENT');
     const existing=await resolveBase(request);
+    if(body.decision==='status') {
+      // Read-only verification of the existing signed HttpOnly receipt and
+      // durable active consent. This never creates a visitor or grants consent.
+      if(existing===null)return reply(403,'ANALYTICS_CONSENT_REQUIRED');
+      return reply(200,'ANALYTICS_CONSENT_ACTIVE',{consent:existing});
+    }
     const granted=existing??Object.freeze({visitorRef:deriveAdminAnalyticsReferenceV1(input.secret,'visitor',randomUUID()),
      version:ADMIN_ANALYTICS_CONSENT_VERSION_V1,granted:true,validVisitor:await input.admitVisitor(request),expiresAt:new Date(now().getTime()+ANALYTICS_RETENTION_SECONDS_V1*1000).toISOString()});
     const subjectLinkRef=await subjectLink(request);

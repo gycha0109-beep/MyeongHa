@@ -47,6 +47,36 @@ export function createMyeonghaAnalyticsCollectorV1(options = {}) {
         consent={...value};await startSession();return {status:generation===consentGeneration?'granted':'cancelled'};
       }catch{return {status:'unavailable'};}
     },
+    async restoreConsent() {
+      // Only an explicitly configured, approved caller can ask the server
+      // whether its existing HttpOnly receipt is still active. A missing or
+      // revoked receipt creates no visitor, identifier, or tracked event.
+      if (!enabled) return {status:'disabled'};
+      const generation=++consentGeneration;
+      consent=null;sessionContext=null;prepared.clear();
+      try {
+        const response=await fetchImpl('/api/analytics/consent',{
+          method:'POST',credentials:'same-origin',cache:'no-store',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({decision:'status'}),
+        });
+        if(generation!==consentGeneration)return{status:'cancelled'};
+        if(response.status===403)return{status:'consent_required'};
+        if(!response.ok)return{status:'unavailable'};
+        const data=await response.json();
+        if(generation!==consentGeneration)return{status:'cancelled'};
+        const value=data.consent;
+        if(data.code!=='ANALYTICS_CONSENT_ACTIVE'||!value||value.granted!==true||
+           !/^av_[0-9a-f]{64}$/u.test(value.visitorRef??'')||
+           !KEY.test(value.version??'')||!Number.isFinite(Date.parse(value.expiresAt))||
+           Date.parse(value.expiresAt)<=Date.now())return{status:'unavailable'};
+        consent={...value};
+        const session=await startSession();
+        if(generation!==consentGeneration)return{status:'cancelled'};
+        return session.status==='session_started'||session.status==='session_resumed'
+          ?{status:'restored'}:{status:'session_unavailable'};
+      }catch{return{status:'unavailable'};}
+    },
     setConsent(value) {
       if (!enabled) return false;
       if (!value || value.granted !== true || !/^av_[0-9a-f]{64}$/u.test(value.visitorRef ?? '') ||

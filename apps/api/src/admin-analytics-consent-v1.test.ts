@@ -35,6 +35,26 @@ describe('explicit consent and fixed 180-day retention',()=>{
   const revoked=await disabled.handleRequest(h.post('withdraw',{},cookie));expect(revoked.status).toBe(200);expect(revoked.headers.get('set-cookie')).toContain('Max-Age=0');expect(h.events.size).toBe(0);
   h.subject(subject);expect((await h.runtime.handleRequest(h.post('events',event,cookie,session.sessionContext))).status).toBe(403);
  });
+ it('restores only a server-signed and still active consent, never grants by status polling',async()=>{
+  const h=harness();
+  expect((await h.runtime.handleRequest(h.post('consent',{decision:'status'}))).status).toBe(403);
+  expect(h.calls()).toBe(0);
+  const grant=await h.runtime.handleRequest(h.post('consent',{decision:'grant'}));
+  const cookie=grant.headers.get('set-cookie')!;
+  const restored=await h.runtime.handleRequest(h.post('consent',{decision:'status'},cookie));
+  expect(restored.status).toBe(200);
+  const body=await restored.json() as {code:string;consent:Record<string,unknown>};
+  expect(body.code).toBe('ANALYTICS_CONSENT_ACTIVE');
+  expect(body.consent).toMatchObject({granted:true,version:'product-analytics-consent-180d-v1'});
+  expect(body.consent).not.toHaveProperty('sessionRef');
+  expect(restored.headers.has('set-cookie')).toBe(false);
+  h.subject(null);
+  expect((await h.runtime.handleRequest(h.post('consent',{decision:'status'},cookie))).status).toBe(403);
+  h.subject(subject);
+  await h.store.eraseVisitor(body.consent.visitorRef as string);
+  expect((await h.runtime.handleRequest(h.post('consent',{decision:'status'},cookie))).status).toBe(403);
+  expect((await h.runtime.handleRequest(h.post('consent',{decision:'status',visitorRef:'caller'}))).status).toBe(400);
+ });
  it('rejects forged receipts, client identity/consent assertions and over-retained events',async()=>{
   const h=harness();expect((await h.runtime.handleRequest(h.post('consent',{decision:'grant',extra:true}))).status).toBe(400);
   const r=await h.runtime.handleRequest(h.post('consent',{decision:'grant'}));const cookie=r.headers.get('set-cookie')!;const value=(await r.json()).consent;
