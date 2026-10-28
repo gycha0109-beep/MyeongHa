@@ -72,8 +72,8 @@ describe('Web Saju Product discovery: honest route availability', () => {
       load('golden-master.css'),
     ]);
     expect(reading).toContain('resolveReadingAvailabilityV1(href).label');
-    expect(reading).toContain('추가 입력 준비 중');
-    expect(reading).toContain('정식 읽기 준비 중');
+    expect(resolveReadingAvailabilityV1('reading-detail.html?topic=family')).toMatchObject({ kind: 'input_pending', label: '추가 입력 준비 중' });
+    expect(resolveReadingAvailabilityV1('reading-detail.html?scope=year').kind).toBe('unavailable');
     expect(home).toContain('resolveReadingAvailabilityV1(');
     expect(css).toContain('reading-topic-availability.is-preview');
     for (const source of [home, reading]) {
