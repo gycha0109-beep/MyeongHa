@@ -26,6 +26,9 @@ describe('Records long-form official report boundary', () => {
 
   it('reuses the existing current-subject exact Reading boundary and same authorized content', () => {
     expect(runtime).toContain('parseOfficialReadingRecordPayloadV1(payload.data)');
+    expect(runtime).toContain('const readingView = stepsFromIssuedProductResponse(record.reading);');
+    expect(runtime).not.toContain("data: { lifecycle: 'preview', reading: record.reading }");
+    expect(runtime).toContain('function previewStepsFromPayload(payload, { requireBrowserAdmission = false } = {})');
     expect(runtime).toContain("record.readingId !== persistedReadingHandoff.readingId");
     expect(runtime).toContain("record.readingSessionId !== persistedReadingHandoff.readingSessionId");
     expect(runtime).toContain("record.sajuDomain !== persistedReadingHandoff.sajuDomain");
