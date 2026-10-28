@@ -12,6 +12,7 @@ const PAY=document.getElementById('owner-test-pay');
 const VERIFY=document.getElementById('owner-test-verify');
 const ATTEMPT=document.getElementById('owner-test-attempt');
 const PROVIDER=document.getElementById('owner-test-provider');
+const RECEIPT=document.getElementById('owner-test-receipt');
 const RETRY_KEY='myeongha.ownerKcpSandboxRetry.v1';
 const ATTEMPT_KEY='myeongha.ownerKcpSandboxAttempt.v1';
 const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/iu;
