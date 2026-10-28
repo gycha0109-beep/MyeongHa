@@ -34,6 +34,14 @@ describe('Records official-report-first entry', () => {
     expect(page).not.toContain('records-report-price');
   });
 
+  it('never treats a failed records request as an empty report archive', () => {
+    expect(page).toContain("if (readingPayload?.status === 'unavailable')");
+    expect(page).toContain("byId('saju-records-count').textContent = uiText('조회할 수 없음');");
+    expect(page).toContain('조회가 실패한 상태이며, 기록이 없다는 뜻은 아닙니다.');
+    expect(page).toContain("if (payload?.status === 'unavailable')");
+    expect(page).toContain("lifeFactsPayload?.status !== 'unavailable'");
+  });
+
   it('formats verified saved-record count for every supported locale', () => {
     const locale = ['ko-KR', 'ja-JP', 'zh-TW', 'en-US', 'zh-CN'] as const;
     for (const tag of locale) {
