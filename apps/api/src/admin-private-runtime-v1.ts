@@ -13,6 +13,7 @@ import { createAdminAiFinanceHttpHandlerV1 } from './admin-ai-cost-http-v1.js';
 import { createAdminAiFinanceReadPortV1 } from './admin-ai-cost-read-v1.js';
 import type { AdminAiBillingEvidencePortV1, AdminAiFxEvidenceV1 } from './admin-ai-cost-finance-v1.js';
 import type { AdminAiBudgetBillingV1, AdminAiBudgetWindowV1 } from './admin-ai-budget-v1.js';
+import type { OpenAiCostsObservationV1 } from './admin-openai-costs-source-v1.js';
 import {createAdminCreditPostgresV1} from './admin-credit-postgres-v1.js';
 import {createAdminAiBudgetReadV1,createAdminAiBudgetHttpV1} from './admin-ai-budget-read-v1.js';
 import type{AdminAnalyticsCollectionPolicyV1,AdminAnalyticsCoverageV1}from'./admin-analytics-pipeline-v1.js';
@@ -37,7 +38,9 @@ export interface CreateAdminPrivateRuntimeInputV1 {
   /** Server-injected provider billing/FX evidence only; never parsed from browser or request body. */
   readonly aiFinanceEvidence?: {readonly billing?:AdminAiBillingEvidencePortV1;readonly fx?:AdminAiFxEvidenceV1};
   /** Window-bound source adapters must not assert complete billing until the provider confirms it. */
-  readonly aiBudgetEvidence?: {readonly billing?:(window:AdminAiBudgetWindowV1)=>Promise<AdminAiBudgetBillingV1|undefined>;readonly fx?:(window:AdminAiBudgetWindowV1)=>Promise<AdminAiFxEvidenceV1|undefined>};
+  readonly aiBudgetEvidence?: {readonly billing?:(window:AdminAiBudgetWindowV1)=>Promise<AdminAiBudgetBillingV1|undefined>;
+    readonly fx?:(window:AdminAiBudgetWindowV1)=>Promise<AdminAiFxEvidenceV1|undefined>;
+    readonly openAiCosts?:(window:AdminAiBudgetWindowV1)=>Promise<OpenAiCostsObservationV1|undefined>};
 }
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 

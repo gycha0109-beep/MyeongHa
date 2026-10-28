@@ -1,7 +1,7 @@
 import{useEffect,useState}from'react';
 import{StatusPanel}from'./StatusPanel.js';
-import type{evaluateAdminAiBudgetV1}from'../../api/src/admin-ai-budget-v1.js';
-type Budget=ReturnType<typeof evaluateAdminAiBudgetV1>;
+import type{createAdminAiBudgetReadV1}from'../../api/src/admin-ai-budget-read-v1.js';
+type Budget=Awaited<ReturnType<ReturnType<typeof createAdminAiBudgetReadV1>>>;
 const krw=(micro:string|null)=>micro===null?'미측정':(BigInt(micro)/1_000_000n).toLocaleString('ko-KR')+'원';
 export function AdminAiBudget({token,onSessionExpired}:{readonly token:string;readonly onSessionExpired:()=>void}){
  const[month,setMonth]=useState(()=>new Date(Date.now()+9*3600_000).toISOString().slice(0,7));
@@ -20,6 +20,8 @@ export function AdminAiBudget({token,onSessionExpired}:{readonly token:string;re
    <dl><div><dt>공급사 확인 비용 (월 전체)</dt><dd>{krw(data.confirmedMicroKrw)}</dd></div>
     <div><dt>공급사 확인 비용 (일부 포함)</dt><dd>{krw(data.knownConfirmedMicroKrw)} · {data.billingStatus==='complete'?'전체 청구 확인':data.billingStatus==='partial'?'일부 청구만 확인':'청구 미연결'}</dd></div><div><dt>관측된 추정 비용 합</dt><dd>{krw(data.knownEstimateMicroKrw)} · {data.estimateCoverage==='complete'?'전체 관측':'부분 관측'}</dd></div>
     <div><dt>USD 원본</dt><dd>관측 추정 {data.knownEstimateMicroUsd} micro-USD · 확인 청구 일부 포함 {data.knownConfirmedMicroUsd??'미측정'} micro-USD · 월 전체 확정 {data.confirmedMicroUsd??'미측정'} micro-USD</dd></div>
+    <div><dt>OpenAI API 프로젝트 비용 관측</dt><dd>{data.openAiCosts===null?'미연결':
+      data.openAiCosts.observedMicroUsd+' micro-USD · '+data.openAiCosts.queriedToExclusive+'까지의 공급사 API 보고값 (전체 비용 항목, 최종 청구서 아님)'}</dd></div>
     <div><dt>누락 근거</dt><dd>원가 결측 {data.unknownCostCalls}건 · 미연결 영역 {data.missingWorkloads.join(', ')||'없음'} · 환율 {data.fxStatus==='verified_evidence_supplied'?'검증 근거 연결':'미측정'}</dd></div></dl>
    {data.warnings.length===0?<p role="status">{data.confirmedMicroKrw===null?'확정 비용 또는 환율 근거가 없어 예산 도달 여부는 미측정입니다.':'현재 확인된 경고가 없습니다.'}</p>:
     <ul aria-label="월간 예산 경고">{data.warnings.map(w=><li key={w.id}><strong>{w.thresholdPercent}% 경고</strong> · {w.thresholdKrw.toLocaleString('ko-KR')}원 · {w.basis==='provider_confirmed'?'청구 확인':'사용량·단가 추정'} · {w.coverage==='complete'?'전체 관측':'부분 관측'}</li>)}</ul>}

@@ -61,6 +61,26 @@ describe('approved Seoul monthly budget policy',()=>{
   expect(evaluateAdminAiBudgetV1({window,buckets:[bucket],workloadCoverage:[],fx:{...fx,effectiveFrom:'2026-10-02T00:00:00Z'}}).knownEstimateMicroKrw).toBeNull();
   expect(()=>evaluateAdminAiBudgetV1({window,buckets:[],workloadCoverage:[],billing:{source:'provider_billing_export',evidenceSha256:'b'.repeat(64),from:'2026-01-01',toExclusive:window.toExclusive,coverage:'complete',amountMicroUsd:'1'}})).toThrow('Unbound');
  });
+ it('keeps official project costs separately observed, never treating them as final invoice or confirmed warnings',async()=>{
+  const observed={
+    version:'openai-organization-costs-observation-v1' as const,provider:'openai' as const,
+    scope:'project_all_line_items' as const,projectId:'proj_fixture',
+    queriedFrom:window.from,queriedToExclusive:window.toExclusive,observedMicroUsd:'90000000',
+    sourceSha256:'f'.repeat(64),pageCount:1,
+    billingStatus:'provider_reported_not_final_invoice' as const,invoiceConfirmed:false as const,
+  };
+  const sql:string[]=[];
+  const read=createAdminAiBudgetReadV1({pool:{async connect(){return{
+    async query<Row>(s:string){sql.push(s);return {rows:(s.startsWith('SELECT current_user')?
+      [{currentUser:'myeongha_admin_reader'}]:[]) as Row[]};},release(){}};
+  }},openAiCosts:async()=>observed});
+  const result=await read(window);
+  expect(result.openAiCosts).toEqual(observed);
+  expect(result.confirmedMicroUsd).toBeNull();
+  expect(result.confirmedMicroKrw).toBeNull();
+  expect(result.warnings).toEqual([]);
+  expect(sql.at(-1)).toBe('COMMIT');
+ });
  it('denies non-Owner/unaudited responses and uses a fixed bounded read-only RPC',async()=>{
   const sql:string[]=[];const read=createAdminAiBudgetReadV1({pool:{async connect(){return{async query<Row>(s:string){sql.push(s);return{rows:(s.startsWith('SELECT current_user')?[{currentUser:'myeongha_admin_reader'}]:[])as Row[]};},release(){}};}}});
   await read(window);expect(sql[2]).toContain('qry_ai_monthly_budget_v1($1::timestamptz,$2::timestamptz)');expect(sql.at(-1)).toBe('COMMIT');

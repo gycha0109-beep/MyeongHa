@@ -4,8 +4,10 @@ import type{PostgresSubjectPoolV1}from'./postgres-subject-execution.js';
 import type{AdminAuthPortV1}from'./admin-auth-v1.js';
 import type{AdminAuditPortV1}from'./admin-read-http-v1.js';
 import type{AdminAiFxEvidenceV1}from'./admin-ai-cost-finance-v1.js';
+import type{OpenAiCostsObservationV1}from'./admin-openai-costs-source-v1.js';
 import {adminAiBudgetWindowV1,evaluateAdminAiBudgetV1,type AdminAiBudgetBillingV1,type AdminAiBudgetWindowV1,type AdminAiBudgetBucketV1}from'./admin-ai-budget-v1.js';
-export function createAdminAiBudgetReadV1(input:{readonly pool:PostgresSubjectPoolV1;readonly billing?:(window:AdminAiBudgetWindowV1)=>Promise<AdminAiBudgetBillingV1|undefined>;readonly fx?:(window:AdminAiBudgetWindowV1)=>Promise<AdminAiFxEvidenceV1|undefined>;}) {
+export function createAdminAiBudgetReadV1(input:{readonly pool:PostgresSubjectPoolV1;readonly billing?:(window:AdminAiBudgetWindowV1)=>Promise<AdminAiBudgetBillingV1|undefined>;readonly fx?:(window:AdminAiBudgetWindowV1)=>Promise<AdminAiFxEvidenceV1|undefined>;
+ readonly openAiCosts?:(window:AdminAiBudgetWindowV1)=>Promise<OpenAiCostsObservationV1|undefined>;}) {
  return async(window:AdminAiBudgetWindowV1)=>{
   const client=await input.pool.connect();let active=false,discard:unknown;
   try{
@@ -19,8 +21,22 @@ export function createAdminAiBudgetReadV1(input:{readonly pool:PostgresSubjectPo
     return{workload:r.workload,feature:r.feature,provider:r.provider,model:r.model,calls:Number(r.calls),unknownCostCalls:Number(r.unknownCostCalls),estimateMicroUsd:r.estimateMicroUsd}as AdminAiBudgetBucketV1;
    });
    await client.query('COMMIT');active=false;
-   const [billing,fx]=await Promise.all([input.billing?.(window),input.fx?.(window)]);
-   return evaluateAdminAiBudgetV1({window,buckets,workloadCoverage:['character_chat'],truncated:result.rows.length>500,...(billing?{billing}:{}),...(fx?{fx}:{})});
+   const [billing,fx,openAiCosts]=await Promise.all([
+     input.billing?.(window),input.fx?.(window),input.openAiCosts?.(window),
+   ]);
+   if(openAiCosts!==undefined && (openAiCosts.version!=='openai-organization-costs-observation-v1'||
+     openAiCosts.invoiceConfirmed!==false||openAiCosts.billingStatus!=='provider_reported_not_final_invoice'||
+     openAiCosts.queriedFrom!==window.from||
+     Date.parse(openAiCosts.queriedToExclusive)>Date.parse(window.observedThrough)||
+     !/^(?:0|[1-9]\\d{0,29})$/u.test(openAiCosts.observedMicroUsd)))
+     throw Error('Unbound OpenAI provider observation');
+   const budget=evaluateAdminAiBudgetV1({
+     window,buckets,workloadCoverage:['character_chat'],truncated:result.rows.length>500,
+     ...(billing?{billing}:{}),...(fx?{fx}:{}),
+   });
+   // A provider API observation is not an invoice and can include other
+   // organization/project charges, so never add it to confirmed AI totals.
+   return Object.freeze({...budget,openAiCosts:openAiCosts??null});
   }catch(e){if(active)try{await client.query('ROLLBACK');}catch(error){discard=error;}throw e;}finally{client.release(discard);}
  };
 }
