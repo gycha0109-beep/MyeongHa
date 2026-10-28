@@ -48,7 +48,7 @@ describe('Records Saju history surface', () => {
     expect(page).toContain("records-reading-card records-reading-card--persisted");
     expect(page).toContain('readerProvenanceLocaleLabelV1(reading.readerCharacterIds, getUiLocale())');
     expect(page).toContain('readerBadgeSources.set(badge, reading.readerCharacterIds)');
-    expect(page).toContain('if (allowsDevelopmentSajuSamples())');
+    expect(page).toContain("if (allowsDevelopmentSajuSamples() && lifeFactsPayload?.status !== 'unavailable')");
     expect(page).toContain('renderSajuReadingSamples(target, lifeFactsPayload)');
     expect(page).toContain('renderSajuReadingEmpty(target);');
   });
