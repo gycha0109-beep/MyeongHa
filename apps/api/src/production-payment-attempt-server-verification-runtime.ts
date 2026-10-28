@@ -1,3 +1,4 @@
+import type { createAdminAnalyticsVerifiedPurchaseAdapterV1 } from './admin-analytics-verified-purchase-v1.js';
 import {
   createPortOneV2PaymentVerificationAdapterV1,
   type PortOneV2PaymentVerificationAdapterConfigV1,
@@ -48,6 +49,8 @@ export interface CreateProductionPaymentAttemptServerVerificationRuntimeInputV1 
   readonly onVerifiedReceiptCommitted?: (input: {
     readonly request: Request; readonly receiptId: string;
   }) => Promise<void>;
+  /** Opt-in: provider-verified production Reading receipt and active consent only. */
+  readonly verifiedPurchaseAnalytics?: Pick<ReturnType<typeof createAdminAnalyticsVerifiedPurchaseAdapterV1>, 'record'>;
 }
 
 /**
@@ -79,6 +82,13 @@ export function createProductionPaymentAttemptServerVerificationRuntimeV1(
     ...(input.pool === undefined ? {} : { pool: input.pool }),
   });
 
+  if(input.verifiedPurchaseAnalytics!==undefined&&input.onVerifiedReceiptCommitted!==undefined)
+    throw Error('Ambiguous purchase analytics observer configuration');
+  const observer=input.verifiedPurchaseAnalytics===undefined?input.onVerifiedReceiptCommitted:
+    async ({request,receiptId}:{readonly request:Request;readonly receiptId:string})=>{
+      await input.verifiedPurchaseAnalytics!.record(request,receiptId);
+    };
+
   return Object.freeze({
     handleRequest(
       requestInput: ProductionPaymentAttemptServerVerificationRequestV1,
@@ -90,8 +100,8 @@ export function createProductionPaymentAttemptServerVerificationRuntimeV1(
         identityEvidenceVerifier,
         pool: poolLease.pool,
         verificationAdapter,
-        ...(input.onVerifiedReceiptCommitted === undefined ? {} :
-          { onVerifiedReceiptCommitted: input.onVerifiedReceiptCommitted }),
+        ...(observer === undefined ? {} :
+          { onVerifiedReceiptCommitted: observer }),
       });
     },
     close() {
